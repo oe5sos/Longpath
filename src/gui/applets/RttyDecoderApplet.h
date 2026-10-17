@@ -107,11 +107,52 @@ private slots:
     void onTextDecoded(const QString& text, float confidence);
     void onStatsUpdated(float markLevel, float spaceLevel, float snrDb, bool locked);
 
+public:
+    // ── Aus dem Textstrom ein Rufzeichen (2026-10-17) ───────────────
+    //
+    // RTTY ist kein Nachrichtenformat, sondern ein Zeichenstrom. Es
+    // gibt keine Felder, keine Grenzen, kein „CQ OE5SOS JN78" mit
+    // garantierten drei Feldern wie bei FT8. Es gibt Betriebsbrauch:
+    //
+    //     CQ CQ CQ DE DL1ABC DL1ABC DL1ABC K
+    //     OE5SOS DE DL1ABC DL1ABC KN
+    //
+    // Was in beiden Faellen traegt, ist das Wort DE und das Feld
+    // danach. Genau das liest diese Funktion, und ABSICHTLICH nicht
+    // mehr: wer im Strom jedes rufzeichenaehnliche Feld einsammelt,
+    // meldet Reihenfolgen wie „599 599 OE5SOS" als Station und fuellt
+    // die Spotliste mit Unsinn. Ein falscher Spot ist schlimmer als
+    // ein fehlender — er steht auf dem Panadapter und wird geglaubt.
+    //
+    // Das Feld muss ABGESCHLOSSEN sein, also ein Trennzeichen hinter
+    // sich haben. Ohne diese Bedingung meldet der Lauf „DL1AB",
+    // sobald das B angekommen ist, und „DL1ABC" eine Zehntelsekunde
+    // spaeter — zwei Spots fuer eine Station, einer davon falsch.
+    //
+    // Gibt das Rufzeichen hinter dem LETZTEN abgeschlossenen DE
+    // zurueck, oder leer. Statisch und ohne Fenster — der Prueflauf
+    // braucht weder Scheibe noch Dekoder.
+    static QString rufzeichenNachDe(const QString& strom);
+
+#ifdef LONGPATH_BUILD_TESTS
+    /// Einen Textschnipsel so hineingeben, wie ihn der Dekoder
+    /// liefern wuerde — mit voller Zuversicht, damit die
+    /// Empfindlichkeitsschwelle nicht mitspielt. Hier INLINE, nicht
+    /// in der .cpp: eine Definition dort braeuchte denselben
+    /// #ifdef-Waechter, und ohne ihn ist der Bau ohne Tests rot
+    /// (Windows und Linux), waehrend er oertlich gruen aussieht.
+    void speiseTextFuerTest(const QString& text) { onTextDecoded(text, 1.0f); }
+#endif
+
 private:
     void buildUI();
     void loadSettings();
     void saveSettings() const;
     void applyMarkShiftFromSlice();
+    /// Steht ein abgeschlossenes Rufzeichen hinter DE im Puffer und
+    /// ist es ein anderes als das letzte, geht ein Fund an
+    /// RadioModel::onNativeRttyDecode.
+    void meldeFundWennRufzeichen();
     void updateAudioTap();
 
     QPointer<SliceModel> m_slice;
@@ -134,6 +175,18 @@ private:
     // Row 3 -- text
     QPlainTextEdit* m_textOutput{nullptr};
     int m_charCount{0};
+    // Die letzten Zeichen, nur fuer die Rufzeichensuche — der Strom
+    // selbst steht im Textfeld, aber dort auch gekuerzt und mit der
+    // Gestaltung vermischt. Kurz gehalten: ein Rufzeichen hinter DE
+    // steht innerhalb weniger Zeichen, und ein langer Puffer wuerde
+    // alte Anrufe nach jedem neuen Zeichen erneut melden.
+    QString m_rufPuffer;
+    // Wen wir zuletzt gemeldet haben. SpotModel entdoppelt selbst,
+    // aber ohne das hier geht bei jedem Zeichen ein Fund hinaus,
+    // solange DL1ABC noch im Puffer steht.
+    QString m_letzterGemeldeterRuf;
+    /// Der Rapport aus onStatsUpdated, fuer den Fund.
+    int m_letzterSnrDb{0};
     // Above this, drop characters whose confidence is too low to trust --
     // see RttyDecoderSensitivity.h for the slider-to-threshold mapping.
     int m_sensitivity{0};

@@ -21,6 +21,7 @@
 #include "core/audio/AudioTapRing.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "core/DxSpot.h"       // DxSpot — der Fund, der hinausgeht
 
 #include "core/MoxController.h"
 #include "core/RttyTx.h"
@@ -35,6 +36,8 @@
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+
+#include <cmath>
 
 namespace Longpath {
 
@@ -57,6 +60,12 @@ constexpr int kPumpIntervalMs = 50;
 // Cap the visible transcript so a long, unattended RTTY session doesn't
 // grow the QPlainTextEdit's document without bound.
 constexpr int kMaxCharCount = 4000;
+
+// So viele Zeichen behaelt der Puffer, aus dem die Rufzeichensuche
+// liest. „CQ CQ CQ DE DL1ABC DL1ABC DL1ABC K" sind 36 Zeichen; 120
+// fasst das samt Vorlauf und einem zweiten Anruf, und ein alter
+// Anruf fliegt nach rund zwei Zeilen heraus statt nachzuhallen.
+constexpr int kRufPufferZeichen = 120;
 } // namespace
 
 RttyDecoderApplet::RttyDecoderApplet(RadioModel* model, QWidget* parent)
@@ -514,6 +523,103 @@ void RttyDecoderApplet::openExtendedSettings()
     popup->show();
 }
 
+QString RttyDecoderApplet::rufzeichenNachDe(const QString& strom)
+{
+    // Wie ein Rufzeichen: drei bis elf Zeichen, mindestens eine
+    // Ziffer UND ein Buchstabe, die letzte Stelle keine Ziffer.
+    // Wortgleich die Pruefung aus Ft8Applet::senderCallsign — sie
+    // haelt dort „JN78", „-12", „RR73" und „73" heraus, und hier
+    // zusaetzlich „599" und „5NN", die in RTTY in jedem Rapport
+    // stehen.
+    const auto wieRufzeichen = [](const QString& f) {
+        if (f.size() < 3 || f.size() > 11) { return false; }
+        bool ziffer = false;
+        bool buchstabe = false;
+        for (const QChar c : f) {
+            if (c.isDigit()) { ziffer = true; }
+            else if (c.isLetter()) { buchstabe = true; }
+            else if (c != QLatin1Char('/')) { return false; }
+        }
+        if (!ziffer || !buchstabe) { return false; }
+        return !f.back().isDigit();
+    };
+
+    // Ob das LETZTE Feld abgeschlossen ist, steht nicht in der Liste
+    // der Felder, sondern im rohen Strom: simplified() wirft genau
+    // das Trennzeichen weg, auf das es hier ankommt. „DE DL1ABC" und
+    // „DE DL1ABC " sehen danach gleich aus — nur ist das erste ein
+    // halb angekommenes Rufzeichen und das zweite ein fertiges.
+    // Baudot schickt auch CR und LF; isSpace() deckt beides mit ab.
+    const bool letztesFeldFertig =
+        !strom.isEmpty() && strom.back().isSpace();
+
+    const QStringList felder = strom.simplified().toUpper()
+        .split(QLatin1Char(' '), Qt::SkipEmptyParts);
+
+    // Von hinten: das letzte DE gilt. Ein Strom kann mehrere Anrufe
+    // enthalten, und der juengste ist der, der gerade sendet.
+    //
+    // Wie weit hinten ein DE stehen darf, haengt am Abschluss: ist das
+    // letzte Feld fertig, darf DE an zweitletzter Stelle stehen; ist
+    // es noch im Wachsen, muss DE eine Stelle weiter vorn liegen,
+    // sonst wird ein halbes Rufzeichen gemeldet. Genau dieser Fall
+    // kostete beim ersten Anlauf einen roten Lauf: „CQ CQ DE DL1AB"
+    // gab „DL1AB" zurueck.
+    const int letzterDeIndex = felder.size() - (letztesFeldFertig ? 2 : 3);
+    for (int i = letzterDeIndex; i >= 0; --i) {
+        if (felder.at(i) != QLatin1String("DE")) { continue; }
+        const QString kandidat = felder.at(i + 1);
+        if (wieRufzeichen(kandidat)) { return kandidat; }
+        // Ein DE mit Unsinn dahinter ist kein Treffer, aber auch kein
+        // Grund, weiter nach vorn zu suchen: dann war die Stelle
+        // verstuemmelt, und ein aelteres DE waere geraten.
+        return {};
+    }
+    return {};
+}
+
+// ── Aus einem Anruf ein Fund (2026-10-17) ───────────────────────────
+//
+// Bis heute endete ein RTTY-Anruf im Textfeld und nirgends sonst. Der
+// eigene FT8-Dekoder reicht seine Funde an RadioModel weiter
+// (Spotliste, Sammler, PSK Reporter) — RTTY nicht, obwohl derselbe
+// Weg offen lag. Hier ist er.
+//
+// Die Frequenz rechnet sich wie bei FT8: Wahlfrequenz plus Tonlage,
+// bei unterem Seitenband (DIGL) minus. Die Tonlage ist bei RTTY die
+// MARK-Frequenz von der Scheibe — es gibt dort genau einen Ort, an
+// dem sie steht (siehe sendeText()).
+void RttyDecoderApplet::meldeFundWennRufzeichen()
+{
+    if (!m_model) { return; }
+
+    const QString ruf = rufzeichenNachDe(m_rufPuffer);
+    if (ruf.isEmpty() || ruf == m_letzterGemeldeterRuf) { return; }
+    m_letzterGemeldeterRuf = ruf;
+
+    const double wahlHz = m_slice ? static_cast<double>(m_slice->frequency())
+                                  : 0.0;
+    if (wahlHz <= 0.0) { return; }
+    const int markHz = m_slice ? m_slice->rttyMarkHz() : 2295;
+    const bool unteresSeitenband =
+        m_slice && m_slice->dspMode() == DSPMode::DIGL;
+
+    DxSpot spot;
+    spot.dxCall = ruf;
+    spot.freqMhz = (wahlHz + (unteresSeitenband ? -markHz : markHz)) / 1.0e6;
+    spot.snr = m_letzterSnrDb;
+    // Der Modus steht im Kommentar, wie bei FT8:
+    // SpotTableModel::extractMode liest ihn dort heraus. Dahinter der
+    // Ausschnitt des Stroms, in dem der Anruf stand — ohne ihn ist im
+    // Spot nicht zu sehen, WORAUS er gelesen wurde.
+    spot.comment = QStringLiteral("RTTY  %1")
+                       .arg(m_rufPuffer.simplified().right(60));
+    spot.source = QStringLiteral("Longpath");
+    spot.spotterCall = QStringLiteral("Longpath");
+    spot.utcTime = QDateTime::currentDateTimeUtc().time();
+    m_model->onNativeRttyDecode(spot);
+}
+
 void RttyDecoderApplet::onTextDecoded(const QString& text, float confidence)
 {
     if (confidence < rttyConfThresholdFor(m_sensitivity)) { return; }
@@ -540,6 +646,16 @@ void RttyDecoderApplet::onTextDecoded(const QString& text, float confidence)
         trimCursor.removeSelectedText();
         m_charCount = m_textOutput->toPlainText().size();
     }
+
+    // Und derselbe Text noch einmal in den kurzen Puffer, aus dem die
+    // Rufzeichensuche liest. Kurz gehalten (siehe Kopfdatei): lang
+    // genug fuer „... DE DL1ABC DL1ABC K", kurz genug, dass ein alter
+    // Anruf nicht ewig nachhallt.
+    m_rufPuffer += text;
+    if (m_rufPuffer.size() > kRufPufferZeichen) {
+        m_rufPuffer = m_rufPuffer.right(kRufPufferZeichen);
+    }
+    meldeFundWennRufzeichen();
 }
 
 void RttyDecoderApplet::onStatsUpdated(float markLevel, float spaceLevel, float snrDb, bool locked)
@@ -548,6 +664,9 @@ void RttyDecoderApplet::onStatsUpdated(float markLevel, float spaceLevel, float 
     m_spaceLevel->setValue(spaceLevel);
 
     m_snrValue->setText(QStringLiteral("%1 dB").arg(snrDb, 0, 'f', 1));
+    // Fuer den Fund (siehe meldeFundWennRufzeichen): der Spot braucht
+    // einen Rapport, und der steht nur hier.
+    m_letzterSnrDb = static_cast<int>(std::lround(snrDb));
 
     if (locked) {
         m_lockCapsule->setText(QStringLiteral("LOCK"));

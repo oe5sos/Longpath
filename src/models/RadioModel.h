@@ -1140,6 +1140,9 @@ public:
     /// `connect` auf einen privaten Schlitz geht in der
     /// Zeiger-Schreibweise nicht.
     void onNativeFt8Decode(const Longpath::DxSpot& spot);
+    /// Derselbe Weg fuer den eigenen RTTY-Dekoder (2026-10-17):
+    /// Spotliste, Sammler, PSK Reporter. Siehe meldeEigenenFund.
+    void onNativeRttyDecode(const Longpath::DxSpot& spot);
 
     /// Der eigene FT8/FT4-Sender, oder null vor dem Verbinden
     /// (2026-10-15). Siehe core/Ft8Tx.h.
@@ -2907,6 +2910,21 @@ private:
     // Phase 3Q-1: drives the RadioModel-level connection state machine.
     // Guards against redundant transitions (no emit if state unchanged).
     void setConnectionState(ConnectionState s);
+
+    // ── Ein eigener Fund, dreifach weitergereicht (2026-10-17) ──────
+    //
+    // Spotliste (und damit Panadapter), der Sammler „was mein Geraet
+    // gehoert hat", und PSK Reporter. Einmal geschrieben fuer die
+    // eigenen FT8- und RTTY-Funde: der Rumpf stand vorher nur in
+    // onNativeFt8Decode, und eine zweite Abschrift waere die Stelle
+    // gewesen, an der die beiden auseinanderlaufen. Lebensdauer,
+    // Farbschluessel und die Betriebsart, die gilt, wenn im Kommentar
+    // keine steht, kommen vom Aufrufer.
+    void meldeEigenenFund(const Longpath::DxSpot& spot,
+                          const QString& lebensdauerSchluessel,
+                          int lebensdauerVorgabeSek,
+                          const QString& farbSchluessel,
+                          const QString& modusVorgabe);
 
     // ── Per-radio peripherals lifecycle ────────────────────────────────────
     // Drive the RF-Kit / 4O3A / PGXL / TGXL connections from the connection
