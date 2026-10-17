@@ -223,6 +223,13 @@ private:
     //   Phase 8 emits trx:rx,bool; without ",tci" suffix.
     QString handleTrxCommand(const QStringList& args);
 
+    // TX-Leistung, Abstimmleistung und Abstimmträger — bis 2026-09-30 fehlten
+    // alle drei, siehe Herleitung samt Thetis-Fundstellen an den
+    // Implementierungen in TciProtocol.cpp.
+    QString handleDriveCommand(const QStringList& args);
+    QString handleTuneDriveCommand(const QStringList& args);
+    QString handleTuneCommand(const QStringList& args);
+
     // From Thetis TCIServer.cs:4935 [v2.10.3.13] — split_enable case in set switch.
     // handleSplitEnableMessage at TCIServer.cs:3091-3127 [v2.10.3.13]:
     //   args.size() == 2 → set (rx, bool); args.size() == 1 → query.

@@ -48,7 +48,7 @@
 #include <QString>
 #include <QWidget>
 
-class QVBoxLayout;
+class QBoxLayout;
 class QPushButton;
 
 namespace Longpath {
@@ -58,7 +58,26 @@ class LayoutProfiles;
 class ProfileRail : public QWidget {
     Q_OBJECT
 public:
-    explicit ProfileRail(LayoutProfiles* profiles, QWidget* parent = nullptr);
+    /// Waagrecht oder senkrecht. Senkrecht ist die Schiene am linken
+    /// Rand, wie seit 2026-08-15; waagrecht sitzt sie in der
+    /// Kommandoleiste neben der Rate.
+    ///
+    /// Betreiber am 2026-10-06: „meine profile links im eck sollten oben
+    /// in die taksleite neben 48 khz". Es ist DASSELBE Bauteil, nur
+    /// anders gelegt -- damit bleiben Rechtsklickmenue, das X am
+    /// Abzeichen und das gestrichelte Plus erhalten, statt sie in einer
+    /// zweiten Fassung nachzubauen.
+    /// Die Richtung hat KEINEN Vorgabewert, mit Absicht: mit einem
+    /// band der alte Aufruf ProfileRail(profiles, parent) das Elternteil
+    /// stillschweigend an die Richtung, und der Fehler faellt erst im
+    /// Bild auf. Ohne Vorgabe meldet ihn der Uebersetzer
+    /// (2026-10-06 in tst_menus_of_native_fields genau so passiert).
+    explicit ProfileRail(LayoutProfiles* profiles,
+                         Qt::Orientation richtung,
+                         QWidget* parent = nullptr);
+
+    /// Wie die Schiene gerade liegt.
+    Qt::Orientation richtung() const { return m_richtung; }
 
     /// Abzeichen neu aufbauen. Wird auf profilesChanged() gerufen.
     void rebuild();
@@ -67,6 +86,15 @@ public:
 
     /// Die Namen der Abzeichen, von oben nach unten.
     QStringList badges() const;
+    /// Das Umhaengen melden, ohne das Menue zu oeffnen -- damit ein
+    /// Pruefstand den INHALT der Meldung sehen kann und nicht nur, dass
+    /// es das Signal gibt.
+    void meldeUmhaengenForTest()
+    {
+        emit placementToggleRequested(m_richtung == Qt::Horizontal
+                                          ? Qt::Vertical : Qt::Horizontal);
+    }
+
     /// Der Name des hervorgehobenen Abzeichens, oder leer.
     QString activeBadge() const;
     /// Ein Abzeichen anklicken. false, wenn es das nicht gibt.
@@ -77,11 +105,35 @@ public:
 
     static constexpr int kWidth      = 44;
     static constexpr int kBadgeSide  = 30;
+    /// Die Hoehe der SCHIENE in der Leiste. Dort steht sie neben den
+    /// Pillen von CommandBar, und Scheiben von 30 px zwischen
+    /// Rechtecken liessen sich als Fremdkoerper lesen -- genau das war
+    /// am 2026-10-07 der Befund am Bildschirm.
+    ///
+    /// Es sind zwei Pixel mehr als CommandBar::kPillHeight, und das ist
+    /// kein Versehen: in Qt gilt `min-height` im Stilblatt fuer die
+    /// INHALTSflaeche, der 1 px starke Rand kommt oben und unten dazu.
+    /// Eine Pille mit kPillHeight = 27 ist also 29 Pixel hoch. Die
+    /// Schiene auf 27 festzunageln hiesse, die Abzeichen zwei Pixel
+    /// flacher als ihre Nachbarn zu machen.
+    ///
+    /// Die Abzeichen selbst bekommen hier KEINE Hoehe gesetzt -- die
+    /// kommt aus pillStyle(), damit sie gar nicht erst abweichen kann.
+    /// tst_profilschiene_richtung stellt Schiene, Abzeichen und eine
+    /// echte Pille nebeneinander, damit diese Zahl nicht stillschweigend
+    /// verrutscht.
+    static constexpr int kLeistenSeite = 29;
 
 signals:
     /// Der Betreiber will ein neues Profil. Den Namen erfragt der
     /// Empfänger — die Schiene kennt keinen Dialog, damit sie ohne
     /// Oberfläche prüfbar bleibt.
+    /// Der Betreiber will die Schiene woanders haben. Die Schiene legt
+    /// sich NICHT selbst um -- sie haengt im Aufbau des Hauptfensters,
+    /// und ein Bauteil, das sich im Rechtsklick selbst umhaengt, waere
+    /// an zwei Stellen gleichzeitig zustaendig. Also meldet sie nur.
+    void placementToggleRequested(Qt::Orientation neueRichtung);
+
     void newProfileRequested();
     void renameRequested(const QString& name);
     void duplicateRequested(const QString& name);
@@ -117,7 +169,27 @@ private:
     QHash<QString, QPushButton*> m_closers;
 
     QPointer<LayoutProfiles> m_profiles;
-    QVBoxLayout* m_column{nullptr};
+    /// Quer zur Laufrichtung mittig: senkrecht waagrecht zentriert,
+    /// waagrecht senkrecht zentriert.
+    Qt::Alignment mittig() const
+    {
+        return m_richtung == Qt::Vertical ? Qt::AlignHCenter : Qt::AlignVCenter;
+    }
+
+    /// Die Kantenlaenge eines Abzeichens am jetzigen Platz. Am Rand die
+    /// Scheibe, in der Leiste die Pillenhoehe -- siehe kLeistenSeite.
+    int seite() const
+    {
+        return m_richtung == Qt::Vertical ? kBadgeSide : kLeistenSeite;
+    }
+
+    /// Hoehe und Breite eines Knopfes am jetzigen Platz. Begruendung
+    /// an der Umsetzung -- kurz: in der Leiste darf die Breite NICHT
+    /// fest sein, sonst schneidet der geerbte Innenabstand die Schrift ab.
+    void setzeMasse(QPushButton* b) const;
+
+    QBoxLayout*  m_column{nullptr};   // VBox oder HBox, je nach Richtung
+    Qt::Orientation m_richtung{Qt::Vertical};
     QPushButton* m_plus{nullptr};
     QHash<QString, QPushButton*> m_badges;
     QStringList m_order;

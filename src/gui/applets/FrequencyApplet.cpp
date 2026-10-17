@@ -233,14 +233,15 @@ void FrequencyApplet::toggleKiwiDisplay()
 
 void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
 {
-    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<FrequencyApplet> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug; Menuegrau statt des geerbten #08080a (2026-09-30)
     QMenu& menu = *menuOwner.get();
 
     // Haken, keine Punkte: die beiden Zeilen sind unabhaengig. Ein
     // Auswahlkranz aus "keine / Stehwelle / SWR / beide" waere
     // dieselbe Information in vier Zeilen statt zwei und liesse sich
     // schlechter erweitern.
-    QAction* tiles = menu.addAction(tr("Empfängerkacheln anzeigen"));
+    QAction* tiles = menu.addAction(tr("Show receiver tiles"));
     tiles->setCheckable(true);
     tiles->setChecked(m_showTiles);
     connect(tiles, &QAction::triggered, this,
@@ -249,7 +250,7 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
     // Betreiber 2026-08-30: "A und B sollte man im Frequenzfeld auch
     // anhacken können" -- dieselbe Ein-/Ausblenden-Idee wie die beiden
     // Zusatzzeilen unten, nur fuer die VFO-Zeile ("A ... B ...").
-    QAction* vfo = menu.addAction(tr("A/B-Zeile anzeigen"));
+    QAction* vfo = menu.addAction(tr("Show A/B row"));
     vfo->setCheckable(true);
     vfo->setChecked(m_showVfo);
     connect(vfo, &QAction::triggered, this,
@@ -265,7 +266,7 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
     // Betreiber 2026-08-30 stiess genau darauf ("brauche die Zeile
     // darunter nicht, soll als Option sein" -- die Option gab es
     // schon, nur unter dem falschen Namen versteckt).
-    QAction* pwr = menu.addAction(tr("Leistung anzeigen"));
+    QAction* pwr = menu.addAction(tr("Show power"));
     pwr->setCheckable(true);
     pwr->setChecked(m_showPower);
     connect(pwr, &QAction::triggered, this,
@@ -273,9 +274,9 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
 
     // Betreiber 2026-08-30: "Stehwelle bitte auch noch als Option" --
     // "SWR" und "Stehwelle" sind dasselbe Wort (siehe Begruendung oben
-    // bei "Leistung anzeigen"); die Beschriftung traegt seither beide,
+    // bei "Show power"); die Beschriftung traegt seither beide,
     // damit niemand mehr danach sucht, ohne es zu finden.
-    QAction* swr = menu.addAction(tr("SWR / Stehwelle anzeigen"));
+    QAction* swr = menu.addAction(tr("Show SWR"));
     swr->setCheckable(true);
     swr->setChecked(m_showSwr);
     connect(swr, &QAction::triggered, this,
@@ -283,7 +284,7 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
 
     // Betreiber 2026-08-30: "S-Meter bitte noch bei Frequenz
     // hinzufügen" -- dieselbe Zusatzzeile wie Leistung/SWR.
-    QAction* sig = menu.addAction(tr("S-Meter anzeigen"));
+    QAction* sig = menu.addAction(tr("Show S-meter"));
     sig->setCheckable(true);
     sig->setChecked(m_showSignal);
     connect(sig, &QAction::triggered, this,
@@ -298,7 +299,7 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
     menu.exec(ev->globalPos());
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
     // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-    if (!menuOwner) { return; }
+    if (!menuOwner || !self) { return; }
     ev->accept();
 }
 

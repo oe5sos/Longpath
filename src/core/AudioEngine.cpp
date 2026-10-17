@@ -122,8 +122,10 @@
 #include "RxChannel.h"        // afGain() — for VAX AF-bypass
 #include "WdspEngine.h"       // rxChannel(0) lookup
 #include "audio/PortAudioBus.h"
+#include "core/audio/BusMitFrist.h"
 #include "../models/RadioModel.h"
 #include "../models/SliceModel.h"
+#include "core/MacMicPermission.h"   // microphoneAccessGranted()
 
 #ifdef Q_OS_MAC
 #include "audio/CoreAudioHalBus.h"
@@ -140,6 +142,7 @@
 
 #include <QDateTime>
 #include <QStandardPaths>
+#include <QTimer>
 
 #include <algorithm>
 #include <vector>
@@ -216,6 +219,44 @@ void waitForTapQuiescence(std::atomic<unsigned>& busy)
 AudioEngine::AudioEngine(QObject* parent)
     : QObject(parent)
 {
+    // ── Driftausgleich am Lautsprecherweg (#131, 2026-10-06) ─────────────
+    //
+    // AB WERK AUS. Ein neuer Umtaster im Hoerweg einer laufenden Station
+    // gehoert nicht ungefragt eingeschaltet -- `RxDriftAusgleich=True`
+    // schaltet ihn ein, und danach entscheidet das Ohr
+    // (feedback-messung-schlaegt-nicht-das-geraet).
+    //
+    // Einmal hier angelegt und nicht spaeter im Tonweg: eine Zuteilung
+    // auf dem DSP-Faden mitten im Betrieb waere genau das, was man dort
+    // nicht will. Der Umtaster selbst entsteht beim ersten Durchlauf nach
+    // der Anlaufzeit -- einmalig, drei Sekunden nach dem Start, und auf
+    // dem DSP-Faden, nicht im Geraeterueckruf.
+    if (AppSettings::instance()
+            .value(QStringLiteral("RxDriftAusgleich"), QStringLiteral("False"))
+            .toString() == QStringLiteral("True")) {
+        m_rxDrift = std::make_unique<RxRatenAngleich>(48000, 2);
+        qCInfo(lcAudio) << "RX-Driftausgleich eingeschaltet (RxDriftAusgleich)"
+                        << "— Ziel" << RxRatenAngleich::kZielMs << "ms";
+
+        // „stören nicht, im auge behalten" (Betreiber, 2026-10-06) --
+        // beobachten laesst sich nur, was man sieht. Einmal je Minute
+        // eine Zeile, und zwar von HIER, nicht aus `rxBlockReady`:
+        // `QString` teilt Speicher zu und `qCInfo` nimmt eine Sperre.
+        // Im Tonweg war genau das der Fehler, den dieser Zeitgeber
+        // behebt -- dort haette er einmal je Minute einen Aussetzer
+        // kosten koennen, und niemand haette gewusst, woher er kommt.
+        auto* protokoll = new QTimer(this);
+        protokoll->setInterval(60 * 1000);
+        protokoll->setTimerType(Qt::VeryCoarseTimer);
+        connect(protokoll, &QTimer::timeout, this, [this] {
+            if (!m_rxDrift) { return; }
+            const QString zeile = m_rxDrift->protokollZeile(
+                QDateTime::currentMSecsSinceEpoch(), 0);
+            if (!zeile.isEmpty()) { qCInfo(lcAudio).noquote() << zeile; }
+        });
+        protokoll->start();
+    }
+
 #if defined(Q_OS_LINUX)
     // Cache the Linux audio backend detection result up front so Task 14's
     // dispatch (PipeWireBus vs. LinuxPipeBus pactl path) has a stable
@@ -453,7 +494,35 @@ void AudioEngine::start()
     // (RadioModel.cpp §"open the WDSP channel pool").
     preregisterSlices(m_radio ? m_radio->boardCapabilities().maxSlices : 1);
 
+    // ── Schrittmarken, damit ein Einfrieren das Geraet nennt ────────────
+    //
+    // Hier werden SIEBEN Geraete nacheinander geoeffnet, jedes ohne
+    // Zeitlimit: Lautsprecher, Mikrofon, VAX RX 1-4, VAX TX. Jedes kann
+    // haengen -- an einer noch offenen Berechtigungsfrage, an einer
+    // Schnittstelle, die ein anderes Programm exklusiv haelt, an einem
+    // traegen Treiber. Und weil start() in der verschachtelten
+    // Ereignisschleife von RadioModel::connectToRadio laeuft, steht dann
+    // nicht nur der Ton, sondern die gesamte Oberflaeche samt
+    // "Abbrechen" (am 2026-10-03 live erlebt, siehe
+    // docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md).
+    //
+    // Bis hierher hinterliess so ein Haenger KEINE Spur: die letzte
+    // Logzeile stand weit davor, und aus ihr war nicht zu erkennen,
+    // welches der sieben Geraete nicht zurueckkam. Genau dagegen helfen
+    // Schrittmarken -- derselbe Griff, den der Betreiber am 2026-09-01
+    // fuer den Profilwechsel bestellt hat ("[ProfileApply:Step] n/6").
+    //
+    // Sie ersetzen kein Zeitlimit. Sie machen aus "eingefroren, niemand
+    // weiss warum" ein "eingefroren beim VAX-TX-Bus" -- und das ist der
+    // Unterschied zwischen einer Fehlersuche und einem Ratespiel.
+    //
+    // Kosten: sieben Zeilen je Verbindungsaufbau. Im Normalfall dauert
+    // das Ganze 20 ms (gemessen am 2026-10-03: Mikrofon 18 ms, alle
+    // fuenf VAX-Busse zusammen unter 1 ms), die Marken fallen also nicht
+    // ins Gewicht.
+    qCInfo(lcAudio) << "[AudioStart:Step] 1/7 Lautsprecher";
     ensureSpeakersOpen();
+    qCInfo(lcAudio) << "[AudioStart:Step] 2/7 Mikrofon (TX-Eingang)";
     ensureTxInputOpen();
 
     // Sub-Phase 8.5: eagerly construct platform-native VAX RX buses + the
@@ -474,6 +543,13 @@ void AudioEngine::start()
             // platform-native bus.
             continue;
         }
+        // In EINEM String zusammenbauen, nicht in den Strom stuecken: qCInfo
+        // setzt zwischen zwei gestreamte Werte ein Leerzeichen, und in
+        // Martins Log stand deshalb "3 /7" statt "3/7". In einer Zeile, die
+        // man liest, waehrend gerade etwas haengt, ist das schlampig.
+        qCInfo(lcAudio).noquote()
+            << QStringLiteral("[AudioStart:Step] %1/7 VAX RX %2")
+                   .arg(2 + channel).arg(channel);
         m_vaxBus[idx] = makeVaxBus(channel);
         if (m_vaxBus[idx]) {
             qCInfo(lcAudio) << "VAX" << channel << "bus opened (eager)"
@@ -482,6 +558,7 @@ void AudioEngine::start()
     }
 
     if (!m_vaxTxBus) {
+        qCInfo(lcAudio) << "[AudioStart:Step] 7/7 VAX TX";
         m_vaxTxBus = makeVaxTxBus();
         if (m_vaxTxBus) {
             qCInfo(lcAudio) << "VAX TX bus opened (eager)"
@@ -497,6 +574,11 @@ void AudioEngine::start()
     }
 
     m_running = true;
+
+    // Die Gegenmarke: steht sie im Log, sind alle sieben zurueckgekommen.
+    // Fehlt sie und die letzte Marke nennt ein Geraet, haengt genau das.
+    qCInfo(lcAudio) << "[AudioStart:Step] fertig -- alle sieben offen oder "
+                       "sauber uebersprungen";
 
     qCInfo(lcAudio) << "AudioEngine started ("
                     << (m_speakersBus && m_speakersBus->isOpen()
@@ -639,11 +721,21 @@ std::unique_ptr<IAudioBus> AudioEngine::makeBus(const AudioDeviceConfig& cfg,
     bus->setConfig(pcfg);
 
     const AudioFormat fmt = toAudioFormat(cfg);
-    if (!bus->open(fmt)) {
-        qCWarning(lcAudio) << "IAudioBus open failed:" << bus->errorString();
-        return nullptr;
+    // Mit Frist oeffnen: ohne sie kann dieser Aufruf die ganze Oberflaeche
+    // einfrieren (siehe oeffneMitFrist). Der Fehlertext muss VOR der
+    // Uebergabe geholt werden -- nach einem Zeitlimit gehoert der Bus dem
+    // Oeffnungsfaden und darf hier nicht mehr angefasst werden.
+    const QString wofuer = QStringLiteral("%1 \"%2\"")
+                               .arg(capture ? QStringLiteral("Aufnahme")
+                                            : QStringLiteral("Wiedergabe"),
+                                    cfg.deviceName.isEmpty()
+                                        ? QStringLiteral("(Vorgabegeraet)")
+                                        : cfg.deviceName);
+    auto geoeffnet = Audio::oeffneMitFrist(std::move(bus), fmt, wofuer);
+    if (!geoeffnet) {
+        return nullptr;   // oeffneMitFrist hat den Grund schon gemeldet
     }
-    return bus;
+    return geoeffnet;
 }
 
 std::unique_ptr<IAudioBus> AudioEngine::makeVaxBus(int channel)
@@ -891,8 +983,20 @@ std::unique_ptr<IAudioBus> AudioEngine::makeMonitorOut(const QString& targetNode
 
 void AudioEngine::ensureSpeakersOpen()
 {
-    if (m_speakersBus && m_speakersBus->isOpen()) {
+    if (m_speakersBus && m_speakersBus->isAlive()) {
         return;
+    }
+    if (m_speakersBus) {
+        // Geoeffnet, aber tot: das ist der Fall vom 2026-10-04 -- Ton im
+        // Programm, nichts aus den Lautsprechern. Vorher hat isOpen() hier
+        // "ja" gesagt und der tote Strom blieb stehen. Jetzt wird er
+        // weggeraeumt und darunter neu geoeffnet.
+        qCWarning(lcAudio)
+            << "Lautsprecher: der Ausgang war geoeffnet, lebt aber nicht "
+               "mehr (Geraet gewechselt, Rate umgestellt oder Ruhezustand) "
+               "-- er wird neu geoeffnet.";
+        m_speakersBus->close();
+        m_speakersBus.reset();
     }
     if (!m_paInitialized) {
         return;
@@ -923,6 +1027,31 @@ void AudioEngine::ensureTxInputOpen()
         return;
     }
     if (!m_paInitialized) {
+        return;
+    }
+
+    // Nicht oeffnen, solange die Mikrofon-Berechtigung noch offen ist.
+    //
+    // Ohne diese Pruefung blockiert der Oeffnungsversuch, bis der Bediener
+    // den TCC-Dialog beantwortet — ohne Zeitlimit. Das waere halb so
+    // schlimm, laege der Aufruf nicht in der verschachtelten
+    // Ereignisschleife von RadioModel::connectToRadio: dort friert mit ihm
+    // die GESAMTE Oberflaeche ein, samt Verbindungsdialog und dessen
+    // "Abbrechen". Am 2026-10-03 live erlebt — der Dialog stand auf einem
+    // unsichtbaren Space, Longpath war eine Minute spaeter immer noch tot
+    // (0,2 % Prozessorlast, Log stumm, TCI-Port horcht, nimmt aber nichts
+    // an). Belegt per sample(1); beschrieben in
+    // docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md.
+    //
+    // Empfangen braucht kein Mikrofon. Faellt der Eingang weg, bleibt nur
+    // der Pegelbalken leer — ein Zustand, den der Zweig unten ohnehin kennt
+    // und meldet. Das ist ungleich besser als ein totes Programm.
+    //
+    // Sobald die Berechtigung erteilt ist, oeffnet der naechste Aufruf den
+    // Eingang ganz normal; auf Nicht-macOS ist die Pruefung immer true.
+    if (!microphoneAccessGranted()) {
+        qCInfo(lcAudio) << "TX input bus not opened — microphone permission "
+                           "pending or denied; receiving is unaffected";
         return;
     }
 
@@ -1225,6 +1354,19 @@ void AudioEngine::setCwTap(AudioTapRing* ring, int sliceId)
     }
 }
 
+void AudioEngine::setFt8Tap(AudioTapRing* ring, int sliceId)
+{
+    // Reihenfolge wie bei den anderen Abgriffen (siehe setRttyTap).
+    if (ring) {
+        m_ft8TapSlice.store(sliceId, std::memory_order_release);
+        m_ft8Tap.store(ring, std::memory_order_release);
+    } else {
+        m_ft8Tap.store(nullptr, std::memory_order_seq_cst);
+        m_ft8TapSlice.store(-1, std::memory_order_release);
+        waitForTapQuiescence(m_ft8TapBusy);
+    }
+}
+
 void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
 {
     if (m_mixAdmissionClosed.load(std::memory_order_acquire)) {
@@ -1455,6 +1597,11 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
     writeToTapIfCurrent(m_cwTap, m_cwTapSlice, m_cwTapBusy, sliceId,
                         samples, frames, m_tapWriteDelayHookForTest);
 
+    // Der Abgriff fuer den nativen FT8/FT4-Dekoder (2026-10-15): eigener
+    // Ring, derselbe Grund. Siehe Ft8Stream.h.
+    writeToTapIfCurrent(m_ft8Tap, m_ft8TapSlice, m_ft8TapBusy, sliceId,
+                        samples, frames, m_tapWriteDelayHookForTest);
+
     // Flush synchronously on the DSP thread. thread_local scratch so the
     // per-block vector reuse costs zero allocation after the first block
     // per thread. Channel count = 2 is intentionally hard-coded here:
@@ -1557,9 +1704,31 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
         if (speakersLk.owns_lock()) {
             IAudioBus* speakersBus = m_speakersBus.get();
             if (speakersBus != nullptr && speakersBus->isOpen()) {
+                const float* rahmen = mix.data();
+                int anzahl = stereoFloats / 2;
+                // Driftausgleich (#131). Meldet der Bus -1, gibt
+                // `verarbeite` denselben Zeiger unveraendert zurueck --
+                // dann kostet das hier eine Abfrage und sonst nichts.
+                if (m_rxDrift) {
+                    const auto ang = m_rxDrift->verarbeite(
+                        rahmen, anzahl, speakersBus->queuedFrames(),
+                        RxRatenAngleich::ringRahmenFuer(
+                            speakersBus->negotiatedFormat().sampleRate),
+                        // Gezaehlter Verbrauch, wenn der Bus einen fuehrt.
+                        // -1 heisst "weiss ich nicht", dann bleibt es beim
+                        // geschaetzten Weg -- siehe RxRatenAngleich.
+                        speakersBus->consumedFrames());
+                    rahmen = ang.rahmen;
+                    anzahl = ang.anzahl;
+                }
+                // Die Kanalzahl kommt vom Angleich, nicht aus einer
+                // eigenen 2: zwei Stellen, die dieselbe Zahl kennen,
+                // laufen auseinander -- hier hiesse das, den doppelten
+                // Puffer in den Bus zu schieben.
+                const int kan = m_rxDrift ? m_rxDrift->kanaele() : 2;
                 speakersBus->push(
-                    reinterpret_cast<const char*>(mix.data()),
-                    static_cast<qint64>(stereoFloats) * sizeof(float));
+                    reinterpret_cast<const char*>(rahmen),
+                    static_cast<qint64>(anzahl) * kan * sizeof(float));
             }
         }
         // A contending writer holding m_speakersBusMutex

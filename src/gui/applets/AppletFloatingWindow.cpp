@@ -270,9 +270,16 @@ void AppletFloatingWindow::closeEvent(QCloseEvent* ev)
     // versteckt das Fenster nur; es bleibt in m_floatingApplets, das
     // Profil bleibt richtig, und der Auswaehler (+) zeigt es wieder.
     // Die Zeile darunter sagt im Log, wann und woher es kam.
-    qWarning() << "[AppletFloatClose]" << appletId()
-               << "spontaneous=" << ev->spontaneous()
-               << "-- nicht angedockt, siehe closeEvent()";
+    // INFO, nicht Warnung (2026-10-04): die Zeile sagt, WANN und WOHER
+    // ein Schliessen kam -- das ist Auskunft, kein Fehler. In Martins
+    // Betriebslogs kommt sie nur beim Beenden, und dort gehoert sie hin.
+    // Als Warnung stellte sie zusammen mit den Profil-Schrittmarken den
+    // groessten Teil der Warnungen einer voellig gesunden Sitzung, und
+    // genau darin ist mir am 2026-10-03 die echte Warnung ueber die
+    // Dienstguete des Sende-Fadens fast durchgerutscht.
+    qInfo() << "[AppletFloatClose]" << appletId()
+            << "spontaneous=" << ev->spontaneous()
+            << "-- nicht angedockt, siehe closeEvent()";
 
     // Vor dem Weggehen durchschreiben: der Zug, dem sofort das
     // Schliessen folgt, darf nicht in der Wartezeit hängen bleiben.
@@ -291,6 +298,10 @@ void AppletFloatingWindow::moveEvent(QMoveEvent* ev)
     // fluchten. Gedaempft (siehe WindowPlacement.h) -- ein direktes
     // Runden hier wuerde gegen das native Ziehen kaempfen.
     snapToGridAfterSettle(this);
+    // Den Schutzrahmen zeigen, solange gezogen wird
+    // (2026-10-14). Siehe setzeZugmelder() in WindowPlacement.h --
+    // ein Melder statt eines globalen Ereignisfilters.
+    meldeZug(this);
 }
 
 void AppletFloatingWindow::resizeEvent(QResizeEvent* ev)
@@ -300,6 +311,10 @@ void AppletFloatingWindow::resizeEvent(QResizeEvent* ev)
     // Raster auch fuer die Groesse (2026-09-26): alle vier Kanten, siehe
     // WindowPlacement.h snappedFrameRect.
     snapToGridAfterSettle(this);
+    // Den Schutzrahmen zeigen, solange gezogen wird
+    // (2026-10-14). Siehe setzeZugmelder() in WindowPlacement.h --
+    // ein Melder statt eines globalen Ereignisfilters.
+    meldeZug(this);
 }
 
 void AppletFloatingWindow::paintEvent(QPaintEvent*)

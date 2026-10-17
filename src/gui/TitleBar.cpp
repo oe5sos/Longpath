@@ -347,7 +347,9 @@ void ConnectionSegment::paintEvent(QPaintEvent*)
     p.setBrush(QColor(Style::hexRole(Style::kAppBg)));   // war das rohe #08080a
     p.drawRoundedRect(rect(), 3, 3);
 
-    p.setFont(QFont(QStringLiteral("SF Mono"), 10, QFont::DemiBold));
+    // Vorher QFont("SF Mono", ...) mit nur diesem einen Namen -- und die
+    // Schrift ist auf macOS nicht angemeldet, Qt nahm also irgendeine.
+    p.setFont(Style::monoFontPt(10, QFont::DemiBold));
 
     // ── 1. State-encoding dot ──────────────────────────────────────────────
     const QRect dotRect(8, height() / 2 - 5, 10, 10);
@@ -584,7 +586,7 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     m_utcLabel->setToolTip(tr("UTC time"));
     m_utcLabel->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { color: %1; font-size: 11px;"
-        " font-family: 'SF Mono', Menlo, monospace; }")
+        " font-family: " LP_MONO_QSS "; }")
             .arg(QString::fromLatin1(Style::kTextSecondary))));
     m_hbox->addWidget(m_utcLabel);
     m_hbox->addSpacing(24);

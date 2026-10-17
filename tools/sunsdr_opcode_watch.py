@@ -150,14 +150,24 @@ def pcapDatagrams(path):
             yield t, pl
 
 MAGIC1 = 0xFF
+# Am 2026-10-02 aus den dreizehn mitgeschnittenen Rahmen ergaenzt, die
+# seit dem 2026-09-25 als CRC-Pruefdaten im Projekt liegen (ihre Nutzlast
+# war bis dahin nie ausgewertet) -- siehe
+# docs/architecture/2026-10-02-sunsdr-verbindungsablauf.md.
 KNOWN = {
     0x00: "Suchanfrage (Rundsendung)",
-    0x01: "Zustand / Start des Stroms",
-    0x04: "Vorverstaerker / Daempfung",
+    0x01: "Strom starten (Tabelle als Nutzlast)",
+    0x04: "Vorverstaerker / Daempfung, vier Stufen",
     0x06: "MOX / PTT (Kandidat)",
-    0x08: "Frequenz",
+    0x07: "DDC-Frequenz, sub = Unterempfaenger (sub 1 wird quittiert, bleibt aber stumm)",
+    0x08: "VFO-Frequenz (im Mitschnitt mit 0 Hz)",
+    0x0c: "ABFRAGE -- Antwort 320 Byte, 39 Doubles (am 2026-10-03 gemessen)",
+    0x10: "unbekannt, im Mitschnitt 0",
     0x15: "Antennenwahl (Kandidat)",
+    0x16: "Konfigurationsblock (9 Worte)",
     0x17: "Ansteuerung/Drive (Kandidat)",
+    0x18: "Haupttakt 307,2 MHz (stellt die Abtastrate NICHT -- 2026-10-03 gemessen)",
+    0x1c: "Kalibrierwerte (4 Worte)",
     0x24: "PA ein (Kandidat)",
 }
 

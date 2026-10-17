@@ -71,7 +71,7 @@ private slots:
         QCOMPARE(tracked.count(), 1);
         QCOMPARE(tracked.last().at(0).toInt(), sliceId);
         QCOMPARE(tracked.last().at(5).toInt(), SliceModel::cwPitchHz());
-        QVERIFY(SliceModel::cwPitchHz() >= 100);
+        QVERIFY(SliceModel::cwPitchHz() >= SliceModel::kCwPitchMinHz);
 
         // Drehen: die neue Frequenz geht an den Kiwi.
         tracked.clear();
@@ -99,11 +99,38 @@ private slots:
         QCOMPARE(tracked.last().at(3).toInt(), slice->filterLow());
         QCOMPARE(tracked.last().at(4).toInt(), slice->filterHigh());
 
+        // CW-Tonhoehe verstellt (2026-09-27, Setup > DSP > CW): die neue
+        // Tonhoehe und der mitgewanderte Filter gehen an den Kiwi.
+        tracked.clear();
+        model->setCwPitch(pitch + 100);
+        QVERIFY2(tracked.count() >= 1, "die Tonhoehe wurde dem Kiwi nicht nachgefuehrt");
+        QCOMPARE(tracked.last().at(5).toInt(), pitch + 100);
+        QCOMPARE(tracked.last().at(3).toInt(), slice->filterLow());
+        QCOMPARE(tracked.last().at(4).toInt(), slice->filterHigh());
+        QCOMPARE(slice->filterLow(), pitch);          // 200 breit um pitch+100
+        QCOMPARE(slice->filterHigh(), pitch + 200);
+
+        // Liegt der Durchlass an der Spiegelgrenze, bewegt ihn eine neue
+        // Tonhoehe nicht -- filterChanged kommt dann nicht, der Kiwi muss
+        // die Tonhoehe trotzdem bekommen.
+        model->setCwPitch(300);
+        slice->setFilter(0, 1500);
+        tracked.clear();
+        model->setCwPitch(350);
+        QCOMPARE(slice->filterLow(), 0);
+        QCOMPARE(slice->filterHigh(), 1500);
+        QVERIFY2(tracked.count() >= 1,
+                 "Tonhoehe ohne Filterbewegung kam nicht beim Kiwi an");
+        QCOMPARE(tracked.last().at(5).toInt(), 350);
+        model->setCwPitch(SliceModel::kCwPitchDefaultHz);
+
         // Zuordnung geloest: die Scheibe steuert den Kiwi nicht mehr.
         mgr->clearSliceAssignment(sliceId);
         tracked.clear();
         slice->setFrequency(7.030e6);
+        model->setCwPitch(SliceModel::kCwPitchDefaultHz + 10);
         QCOMPARE(tracked.count(), 0);
+        model->setCwPitch(SliceModel::kCwPitchDefaultHz);
     }
 
     void eineUebernommeneScheibeSteuertDenKiwiNichtMehr()

@@ -41,7 +41,9 @@
 
 #pragma once
 
+#include <QList>
 #include <QObject>
+#include <QPointer>
 #include <QSet>
 
 class QWidget;
@@ -61,6 +63,8 @@ public:
 
     // Fuer Tests: was der Filter gerade gehoben hat.
     QSet<QWidget*> trackedForTest() const { return m_tracked; }
+    // Fuer Tests: die Fenster, zuletzt benutztes zuerst.
+    QList<QWidget*> recentOrderForTest() const;
 
 private:
     void track(QWidget* w);
@@ -68,6 +72,14 @@ private:
     void onApplicationStateChanged();
 
     QSet<QWidget*> m_tracked;
+    // Die Fenster der App, zuletzt benutztes (angeklickt, aktiviert,
+    // gezeigt) zuerst. Beim Zurueckkommen in die App stellt macOS alle
+    // Paletten gemeinsam nach vorne -- auch vor das Logbuch, das der
+    // Betreiber gerade vor sich hatte (2026-09-26). Danach wird diese
+    // Reihenfolge wiederhergestellt.
+    QList<QPointer<QWidget>> m_recent;
+    void touch(QWidget* top);
+    void restoreRecentOrder();
 };
 
 } // namespace Longpath

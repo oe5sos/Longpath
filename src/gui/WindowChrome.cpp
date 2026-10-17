@@ -102,9 +102,19 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
         "Volle Groesse — noch einmal klicken stellt die vorige "
         "Groesse wieder her"));
     m_zoomBtn->setCursor(Qt::ArrowCursor);
+    // ── `padding: 0` an allen drei Knoepfen (2026-10-07) ────────────
+    //
+    // Style::kButtonStyle gilt app-weit und bringt `padding: 4px 12px`
+    // mit -- auch fuer einen Knopf mit eigenem Stilblatt, solange das
+    // zum Innenabstand schweigt. Bei 16 Pixeln Kantenlaenge blieben
+    // damit -8 Pixel fuer das Zeichen: gemessen, nicht gerechnet, in
+    // tst_fensterknoepfe_lesbar.
+    //
+    // Dritter Fall derselben Falle (Zoomknoepfe 2026-09-25,
+    // Profilschiene 2026-10-07). Siehe HAUSSTIL.md.
     m_zoomBtn->setStyleSheet(
         QStringLiteral("QPushButton { color: %1; background: transparent;"
-                       " border: none; font-size: 11px; }"
+                       " border: none; font-size: 11px; padding: 0; }"
                        "QPushButton:hover { background: %2; }")
             .arg(Style::kTextPrimary, Style::kButtonHover));
     connect(m_zoomBtn, &QPushButton::clicked, this, &WindowTitleBar::toggleZoom);
@@ -112,11 +122,11 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
 
     auto* dock = new QPushButton(QStringLiteral("↙"), this);
     dock->setFixedSize(16, 16);
-    dock->setToolTip(QStringLiteral("Zurueck in die Spalte"));
+    dock->setToolTip(tr("Back into the column"));
     dock->setCursor(Qt::ArrowCursor);
     dock->setStyleSheet(
         QStringLiteral("QPushButton { color: %1; background: transparent;"
-                       " border: none; font-size: 11px; }"
+                       " border: none; font-size: 11px; padding: 0; }"
                        "QPushButton:hover { background: %2; }")
             .arg(Style::kTextPrimary, Style::kButtonHover));
     connect(dock, &QPushButton::clicked, this, &WindowTitleBar::dockRequested);
@@ -127,7 +137,7 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
     close->setCursor(Qt::ArrowCursor);
     close->setStyleSheet(
         QStringLiteral("QPushButton { color: %1; background: transparent;"
-                       " border: none; font-size: 11px; }"
+                       " border: none; font-size: 11px; padding: 0; }"
                        "QPushButton:hover { background: %2; color: #fff; }")
             .arg(QLatin1String(Style::kTextPrimary),
                  QLatin1String(Style::kRedBorder)));
@@ -189,11 +199,10 @@ void WindowTitleBar::applyLockVisuals()
     m_lockBtn->setText(m_locked ? QStringLiteral("🔒")
                                 : QStringLiteral("🔓"));
     m_lockBtn->setToolTip(m_locked
-        ? QStringLiteral("Festgestellt — Klicken zum Loesen. "
-                         "Das Fenster laesst sich weder schieben noch "
-                         "in der Groesse aendern.")
-        : QStringLiteral("Feststellen — dann bleibt das Fenster, wo es "
-                         "steht, und behaelt seine Groesse."));
+        ? tr("Locked — click to unlock. The window can neither be "
+               "moved nor resized.")
+        : tr("Lock it — then the window stays where it is and keeps "
+             "its size."));
     m_lockBtn->setStyleSheet(
         QStringLiteral("QPushButton { background: transparent; border: none;"
                        " font-size: 9px; padding: 0; }"
@@ -256,9 +265,9 @@ void WindowTitleBar::toggleZoom()
     if (m_zoomBtn) {
         m_zoomBtn->setText(m_zoomed ? QStringLiteral("⤡") : QStringLiteral("⤢"));
         m_zoomBtn->setToolTip(m_zoomed
-            ? QStringLiteral("Vorige Groesse wiederherstellen")
-            : QStringLiteral("Volle Groesse — noch einmal klicken stellt "
-                             "die vorige Groesse wieder her"));
+            ? tr("Restore the previous size")
+            : tr("Full size — click again to restore the previous "
+                 "size"));
     }
 }
 
@@ -279,7 +288,7 @@ ResizeGrip::ResizeGrip(QWidget* parent)
 {
     setFixedSize(kGripSize, kGripSize);
     setCursor(Qt::SizeFDiagCursor);
-    setToolTip(QStringLiteral("Groesse ziehen"));
+    setToolTip(tr("Drag to resize"));
     // Der Anfasser sitzt UEBER dem Inhalt, nicht daneben. Ein Applet,
     // das bis in die Ecke reicht, faengt sonst den Druck ab, und der
     // Anfasser waere zwar zu sehen, aber nicht zu benutzen.
@@ -328,8 +337,8 @@ void ResizeGrip::setLocked(bool on)
     if (m_locked == on) { return; }
     m_locked = on;
     setCursor(on ? Qt::ArrowCursor : Qt::SizeFDiagCursor);
-    setToolTip(on ? QStringLiteral("Fenster ist festgestellt")
-                  : QStringLiteral("Groesse ziehen"));
+    setToolTip(on ? tr("Window is locked")
+                  : tr("Drag to resize"));
     update();   // blass zeichnen
 }
 

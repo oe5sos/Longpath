@@ -8,6 +8,7 @@
 //                Begruendung stehen in der Kopfdatei.
 
 #include "gui/applets/KiwiSdrApplet.h"
+#include "gui/Zahlentext.h"
 
 #include "core/KiwiSdrManager.h"
 #include "gui/StyleConstants.h"
@@ -64,7 +65,7 @@ QString receiverRowStyle()
 {
     return QStringLiteral(
         "QWidget#kiwiReceiverRow { background: %1; "
-        "border: 1px solid %2; border-radius: 3px; }")
+        "border: 1px solid %2; border-radius: 6px; }")
         .arg(panel(), border());
 }
 
@@ -113,9 +114,9 @@ QString stateText(KiwiSdrClient::State state)
     case KiwiSdrClient::State::Camping:
         return QObject::tr("Beobachtet");
     case KiwiSdrClient::State::CampDisconnected:
-        return QObject::tr("Beobachtung beendet");
+        return QObject::tr("Watching stopped");
     case KiwiSdrClient::State::Error:
-        return QObject::tr("Fehler");
+        return QObject::tr("Error");
     }
     return QObject::tr("Getrennt");
 }
@@ -134,12 +135,12 @@ QString sliceBadgeStyle(int colorIdx, bool assigned)
     if (assigned) {
         return QStringLiteral(
             "QLabel { background: %1; color: %2; border: 1px solid %1; "
-            "border-radius: 3px; font-weight: bold; font-size: 9px; padding: 0; }")
+            "border-radius: 6px; font-weight: bold; font-size: 9px; padding: 0; }")
             .arg(color);
     }
     return QStringLiteral(
         "QLabel { background: %2; color: %1; border: 1px solid %1; "
-        "border-radius: 3px; font-weight: bold; font-size: 9px; padding: 0; }")
+        "border-radius: 6px; font-weight: bold; font-size: 9px; padding: 0; }")
         .arg(color, QLatin1String(Style::kButtonHover));
 }
 
@@ -168,10 +169,10 @@ QString receiverAccessibleText(const KiwiSdrReceiverStatus& receiver)
         parts << receiver.protocolSummary.trimmed();
     }
     if (receiver.assignedSlice) {
-        parts << QObject::tr("Scheibe %1 zugeordnet")
+        parts << QObject::tr("assigned to slice %1")
                      .arg(sliceLetterOf(receiver.assignedSlice.data()));
     } else {
-        parts << QObject::tr("Keiner Scheibe zugeordnet");
+        parts << QObject::tr("not assigned to a slice");
     }
     return parts.join(QStringLiteral(", "));
 }
@@ -187,17 +188,17 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     root->setContentsMargins(4, 2, 4, 4);
     root->setSpacing(4);
 
-    m_emptyLabel = new QLabel(tr("Keine KiwiSDR-Empfangsantenne eingerichtet"), this);
-    m_emptyLabel->setAccessibleName(tr("Zustand der KiwiSDR-Empfaenger"));
+    m_emptyLabel = new QLabel(tr("No KiwiSDR receive antenna configured"), this);
+    m_emptyLabel->setAccessibleName(tr("KiwiSDR receiver status"));
     m_emptyLabel->setStyleSheet(emptyStyle());
     m_emptyLabel->setWordWrap(true);
     root->addWidget(m_emptyLabel);
 
     m_receiverList = new QListWidget(this);
-    m_receiverList->setAccessibleName(tr("Zustand der KiwiSDR-Empfaenger"));
+    m_receiverList->setAccessibleName(tr("KiwiSDR receiver status"));
     m_receiverList->setAccessibleDescription(
-        tr("Zeigt die eingerichteten KiwiSDR-Empfangsantennen, ihren "
-           "Verbindungszustand und die zugeordnete Scheibe."));
+        tr("Shows the configured KiwiSDR receive antennas, their "
+            "connection state and the slice they are assigned to."));
     m_receiverList->setFocusPolicy(Qt::NoFocus);
     m_receiverList->setSelectionMode(QAbstractItemView::NoSelection);
     m_receiverList->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
@@ -281,7 +282,7 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
 
     auto* name = new QLabel(receiver.name, row);
     name->setTextFormat(Qt::PlainText);
-    name->setAccessibleName(tr("Name des KiwiSDR-Empfaengers"));
+    name->setAccessibleName(tr("Name of the KiwiSDR receiver"));
     name->setAccessibleDescription(receiver.name);
     name->setStyleSheet(primaryLabelStyle());
     name->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -289,7 +290,7 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
 
     auto* status = new QLabel(stateText(receiver.state), row);
     status->setTextFormat(Qt::PlainText);
-    status->setAccessibleName(tr("Zustand des KiwiSDR-Empfaengers"));
+    status->setAccessibleName(tr("State of the KiwiSDR receiver"));
     status->setAccessibleDescription(receiverAccessibleText(receiver));
     status->setStyleSheet(statusStyle(receiver.state));
     status->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
@@ -300,7 +301,7 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
     auto* waterfallToggle = blueToggle(tr("WF"), 32, 20);
     waterfallToggle->setCheckable(true);
     waterfallToggle->setAccessibleName(
-        tr("Wasserfall-Vorschau fuer %1").arg(receiver.name));
+        tr("Waterfall preview for %1").arg(receiver.name));
     if (m_kiwiSdrManager) {
         waterfallToggle->setChecked(
             m_kiwiSdrManager->waterfallPreviewEnabled(receiver.id));
@@ -330,7 +331,7 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
         const QString detail = detailLines.join(QLatin1Char('\n'));
         auto* detailLabel = new QLabel(detail, row);
         detailLabel->setTextFormat(Qt::PlainText);
-        detailLabel->setAccessibleName(tr("Einzelheiten zum KiwiSDR-Empfaenger"));
+        detailLabel->setAccessibleName(tr("KiwiSDR receiver details"));
         detailLabel->setAccessibleDescription(detail);
         detailLabel->setStyleSheet(detailStyle());
         detailLabel->setWordWrap(true);
@@ -349,7 +350,7 @@ QWidget* KiwiSdrApplet::buildSliceAssignmentRow(SliceModel* slice, QWidget* pare
     layout->setSpacing(4);
 
     if (!slice) {
-        auto* text = new QLabel(tr("Nicht zugeordnet"), row);
+        auto* text = new QLabel(tr("Not assigned"), row);
         text->setTextFormat(Qt::PlainText);
         text->setStyleSheet(labelStyle());
         layout->addWidget(text, 1);
@@ -386,7 +387,7 @@ QString KiwiSdrApplet::sliceText(SliceModel* slice) const
     // DSPMode am Modell, und SliceModel::modeName macht daraus den
     // Namen, der auch sonst ueberall in der Oberflaeche steht.
     return QStringLiteral("%1 MHz  %2  %3")
-        .arg(slice->frequency() / 1.0e6, 0, 'f', 6)
+        .arg(anzeigeZahl(slice->frequency() / 1.0e6, 6))
         .arg(SliceModel::modeName(slice->dspMode()))
         .arg(filter);
 }

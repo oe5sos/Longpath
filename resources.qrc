@@ -1,5 +1,9 @@
 <RCC>
     <qresource prefix="/">
+        <!-- Laenderpraefixe fuer DXCC-Faerbung, Flaggen, "schon gearbeitet"
+             je Land und die Ersatzposition der Logbuch-Karte. Wie in
+             AetherSDR resources/resources.qrc [@d58e2b8a]. -->
+        <file alias="cty.dat">cty.dat</file>
     </qresource>
     <qresource prefix="/bandplans">
         <file alias="arrl-us.json">resources/bandplans/arrl-us.json</file>

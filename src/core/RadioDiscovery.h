@@ -259,10 +259,29 @@ public:
     // socket: scanAllNics() itself always skips loopback interfaces (see its
     // isNicCandidate check), so the loop is otherwise unreachable without a
     // real non-loopback NIC and a live radio on it.
+    // What the loop DID, as counts instead of milliseconds — see
+    // quietPollAttempt()'s `quietPollsUsed` for why. `datagrams` is counted
+    // here in the forwarding callback, so a test can tell "the reply never
+    // arrived" (loopback loss, a thread that did not get scheduled) apart
+    // from "the reply arrived and the counter stayed frozen" — without it,
+    // a lost datagram would make the regression test pass for the wrong
+    // reason.
+    struct QuietPollMetrics {
+        int quietPolls = 0;
+        int datagrams = 0;
+    };
+
     QuietPollOutcome quietPollAttemptForTest(QUdpSocket& sock, int quietBeforeStop, int pollMs,
-                                              const QDeadlineTimer& deadline) {
-        return quietPollAttempt(sock, quietBeforeStop, pollMs, deadline,
-                                 [](const QByteArray&, const QHostAddress&, quint16) {});
+                                              const QDeadlineTimer& deadline,
+                                              QuietPollMetrics* metrics = nullptr) {
+        return quietPollAttempt(
+            sock, quietBeforeStop, pollMs, deadline,
+            [metrics](const QByteArray&, const QHostAddress&, quint16) {
+                if (metrics != nullptr) {
+                    metrics->datagrams++;
+                }
+            },
+            metrics != nullptr ? &metrics->quietPolls : nullptr);
     }
 #endif
 
@@ -344,14 +363,86 @@ private:
     // not merely a slow path. Returns Cancelled if stopDiscovery() fires
     // mid-poll (checked once per poll, same cadence scanAllNics() always
     // had).
+    //
+    // `quietPollsUsed` (optional, 2026-10-17) reports how many NOT-readable
+    // polls the loop consumed IN TOTAL — which is not the same as the
+    // internal counter's final value: that one always ends at
+    // quietBeforeStop, in the fixed behaviour and in the regression alike,
+    // so it tells the two apart not at all. The total does: the
+    // reset-on-readable regression spends the polls it had already made
+    // before the reply a second time. It exists because the test that
+    // guards the frozen counter above had to measure wall-clock time to
+    // see it, and that is a bet on the runner's scheduling: the fixed
+    // behaviour needs quietBeforeStop polls (6 x 30 ms = 180 ms in that
+    // test), the reset-on-readable regression needs three more (270 ms),
+    // and on 2026-10-17 a loaded macOS runner took 257 ms for the FIXED
+    // path — inside the regression's band, with the test failing although
+    // the code was right. The count is the quantity that actually carries
+    // the invariant, and it is the same number on a fast machine and a
+    // slow one.
     QuietPollOutcome quietPollAttempt(
         QUdpSocket& sock, int quietBeforeStop, int pollMs, const QDeadlineTimer& deadline,
         const std::function<void(const QByteArray& datagram, const QHostAddress& sender,
-                                  quint16 senderPort)>& onDatagram);
+                                  quint16 senderPort)>& onDatagram,
+        int* quietPollsUsed = nullptr);
+
+    // ── Der Suchlauf als Zustandsautomat (2026-10-16) ────────────────
+    //
+    // Bis heute lief scanAllNics() als eine Schleife durch, die je
+    // Netzkarte attemptsPerNic × quietPollsBeforeResend × pollTimeoutMs
+    // in waitForReadyRead() stand — auf SafeDefault 2250 ms je Karte,
+    // und zwar im Hauptfaden, ohne Faden dahinter. Der Konstruktor
+    // dieser Klasse kuendigte den Umbau an ("Async rewrite is a
+    // follow-up"); dies ist er.
+    //
+    // Was dabei GLEICH bleibt: die Karten werden nacheinander
+    // abgeklopft, je Karte attemptsPerNic Versuche, je Versuch bis zu
+    // quietPollsBeforeResend stille Fenster von pollTimeoutMs, und der
+    // Stille-Zaehler friert bei einer Antwort statt sich
+    // zurueckzusetzen (Thetis clsRadioDiscovery.cs:964-976). Nur die
+    // Wartezeit kommt jetzt von einem Zeitgeber statt von poll().
+    //
+    // Was NEU ist: zwischen zwei Fenstern laeuft die Ereignisschleife.
+    // Das macht auch die Oberflaeche ehrlich — ConnectionPanel setzt
+    // bei discoveryStarted "Searching for radios..." und schaltet den
+    // Knopf ab, was bisher niemand sehen konnte, weil beide Signale im
+    // selben Takt kamen.
+    struct NicCandidate {
+        QString      name;
+        QHostAddress ipv4;
+        QHostAddress broadcast;
+    };
+
+    // Eine Karte beginnen (oder den Lauf beenden, wenn keine mehr da
+    // ist), einen Versuch beginnen, ein Poll-Fenster abschliessen.
+    void beginNextNic();
+    void beginAttempt();
+    void onScanPoll();
+    void onScanReadyRead();
+    void finishScan();
+
+    // Der Rumpf der alten onDatagram-Lambda, unveraendert: Laenge
+    // pruefen, P1/P2 unterscheiden, MAC-Dedup, m_radios pflegen,
+    // radioDiscovered/radioUpdated melden.
+    void handleDatagram(const QByteArray& data, const QHostAddress& sender);
+
+    QList<NicCandidate> m_scanNics;
+    int  m_scanNicIndex{-1};
+    int  m_scanAttempt{0};
+    int  m_scanQuietPolls{0};
+    bool m_scanSawDatagram{false};   // in DIESEM Poll-Fenster
+    bool m_scanRunning{false};
+    QUdpSocket* m_scanSock{nullptr}; // Kind dieses Objekts, lebt je Karte
+    QTimer m_scanPollTimer;
+    QDeadlineTimer m_scanAttemptDeadline;
+    QSet<QString> m_scanSeen;        // MAC-Dedup fuer DIESEN Lauf
+    qint64 m_scanNowMs{0};
+    QByteArray m_scanP1;
+    QByteArray m_scanP2;
+    DiscoveryTiming m_scanTiming{timingFor(DiscoveryProfile::SafeDefault)};
 
     DiscoveryProfile m_profile{DiscoveryProfile::SafeDefault};
 
-    QTimer m_continuousTimer;   // drives ongoing NIC re-scans while monitoring
     QTimer m_staleTimer;
 
     // holdOffScans deadline.  Default-constructed QDeadlineTimer is already
@@ -382,14 +473,14 @@ private:
     QString m_connectedMac;              // MAC currently in use by a RadioConnection; exempt from stale-removal
     QSet<QString>  m_savedMacs;          // Design §7.4: MACs that are saved in AppSettings; exempt from stale-removal
 
-    // Cooperative cancel for scanAllNics(). The synchronous NIC walk does
-    // attemptsPerNic × quietPollsBeforeResend × pollTimeoutMs of blocking
-    // waitForReadyRead per NIC — up to ~4.5 s for the SafeDefault profile
-    // on a 2-NIC machine. stopDiscovery() flips this flag so an in-flight
-    // (or queued-by-timer) scan exits within one pollTimeoutMs window
-    // instead of blocking shutdown for several seconds. Atomic because
-    // stopDiscovery may run from any thread context (main, in practice,
-    // but cheap defense-in-depth).
+    // Abbruch fuer den laufenden Suchlauf. Seit dem Umbau auf den
+    // Zustandsautomaten (2026-10-16) blockiert der Lauf nichts mehr;
+    // das Flag beendet ihn aber weiterhin beim naechsten Poll-Fenster,
+    // und finishScan() macht den Socket zu. Vorher war es die einzige
+    // Bremse: die blockierende Variante hielt das Beenden bis zu ~4,5 s
+    // auf einer Maschine mit zwei Karten fest (SafeDefault). Atomar,
+    // weil stopDiscovery() aus jedem Fadenzusammenhang kommen darf (in
+    // der Praxis der Hauptfaden, aber billig).
     std::atomic<bool> m_stopRequested{false};
 };
 

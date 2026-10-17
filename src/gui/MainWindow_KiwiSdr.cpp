@@ -32,7 +32,8 @@
 //             der zugeordneten Scheibe gehen bei jeder Aenderung an den
 //             Kiwi (2026-09-21; bis dahin wurde er nur bei der Zuordnung
 //             einmal abgestimmt -- updateSliceTracking war portiert,
-//             aber nirgends aufgerufen).
+//             aber nirgends aufgerufen). Seit 2026-09-27 auch die
+//             CW-Tonhoehe (RadioModel::cwPitchChanged).
 //   Stufe 5 — Ton: decodedAudioReady in die Mischung (2026-08-27).
 //   Stufe 6 — Wasserfall: waterfallRowReady auf den Panadapter.
 //   Stufe 7a — Sendesperre (syncKiwiSdrTransmitMute).
@@ -50,12 +51,15 @@
 #include "core/KiwiSdrManager.h"
 #include "gui/KiwiWaterfallPanel.h"
 #include "gui/applets/AppletPanelWidget.h"
+#include "gui/applets/AppletVisibilityController.h"
+#include "gui/widgets/StatusToast.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/applets/KiwiSdrApplet.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "models/TransmitModel.h"
 
+#include <QPointer>
 #include <QTimer>
 
 #include <QStringList>
@@ -384,6 +388,16 @@ void MainWindow::syncKiwiSdrTransmitMute()
 //
 // Die Zuordnung geht an die AKTIVE Scheibe. Das ist die einzige, bei
 // der man sagen kann, was der Betreiber gemeint hat.
+bool MainWindow::appletVisibleForTest(const QString& id) const
+{
+    return m_appletVis && m_appletVis->isVisible(id);
+}
+
+void MainWindow::setAppletVisibleForTest(const QString& id, bool visible)
+{
+    if (m_appletVis) { m_appletVis->setVisible(id, visible); }
+}
+
 void MainWindow::addKiwiSdrReceiver(const QString& name,
                                     const QString& endpoint)
 {
@@ -491,11 +505,40 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
     m_kiwiSdrManager->connectProfile(id);
     refreshKiwiSdrAppletReceivers();
 
+    // ── Sag dem Bediener, dass etwas passiert ist (2026-10-14) ───────
+    //
+    // Betreiber: "auswaehlen kann ich, aber wo und wie dann weiter
+    // geht ??!?" -- und er hatte recht, ohne dass die Technik schuld
+    // war. Bis hierher ist naemlich schon ALLES geschehen: Profil
+    // angelegt, notfalls eine Scheibe dafuer erzeugt, zugeordnet,
+    // verbunden. Nur sieht man nichts davon. refreshKiwiSdrApplet
+    // Receivers() fuellt ein Panel, das in aller Regel gar nicht
+    // eingeschaltet ist, und sonst meldet sich niemand.
+    //
+    // Also beides: das Panel aufmachen, damit es einen Ort gibt, an dem
+    // es weitergeht -- und eine Zeile, die sagt, was gerade geschah und
+    // wo der Ton landet. Die Scheibennummer gehoert dazu: ohne sie ist
+    // "verbunden" eine Behauptung, mit ihr eine Adresse.
+    if (m_appletVis) {
+        m_appletVis->setVisible(QStringLiteral("KiwiSdr"), true);
+    }
+    if (slice) {
+        showToast(tr("KiwiSDR \"%1\" added — audio goes to slice %2.")
+                      .arg(label).arg(slice->sliceIndex()),
+                  ToastSeverity::Info, 6000);
+    } else {
+        // Der Fall, in dem der Ton keinen Weg hat. Er steht seit jeher
+        // im Protokoll; dort liest ihn niemand.
+        showToast(tr("KiwiSDR \"%1\" added, but no slice could take its "
+                     "audio — it stays silent.").arg(label),
+                  ToastSeverity::Warning, 8000);
+    }
+
     qCInfo(lcKiwiSdr).nospace()
         << "KiwiSDR aufgenommen: " << label << " (" << endpoint << ")"
-        << (slice ? QStringLiteral(" -> Scheibe %1").arg(slice->sliceIndex())
-                  : QStringLiteral(" OHNE SCHEIBE — sein Ton hat keinen "
-                                   "Weg in die Mischung"));
+        << (slice ? QStringLiteral(" -> slice %1").arg(slice->sliceIndex())
+                  : QStringLiteral(" WITHOUT A SLICE - its audio has no "
+                                   "way into the mix"));
 }
 
 // ── Stufe 3b: der Kiwi folgt der Scheibe ────────────────────────────
@@ -505,9 +548,12 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
 // panIdChanged JEDER Scheibe an updateKiwiSdrVirtualTrackingForSlice,
 // dazu cwPitchChanged des Senders. Bei uns kann nur eine ZUGEORDNETE
 // Scheibe Kiwi-gefuettert sein, also wird je Zuordnung verdrahtet und
-// beim Loesen wieder getrennt; die CW-Tonhoehe hat in Longpath (noch)
-// keine Bedienflaeche und kein Signal -- SliceModel::cwPitchHz() wird
-// bei jeder Nachfuehrung frisch gelesen.
+// beim Loesen wieder getrennt. Die CW-Tonhoehe meldet seit 2026-09-27
+// RadioModel::cwPitchChanged (Setup > DSP > CW); SliceModel::cwPitchHz()
+// wird bei jeder Nachfuehrung frisch gelesen. Eigene Verbindung, weil
+// eine neue Tonhoehe den Filter nicht immer bewegt: ein breiter CW-
+// Durchlass, der schon an der Spiegelgrenze anliegt, bleibt, wo er ist
+// (SliceModel::centreCwFilterOnPitch) -- filterChanged kaeme dann nie.
 void MainWindow::rewireKiwiSdrTrackingForSlice(int sliceId, const QString& profileId)
 {
     for (const QMetaObject::Connection& c : m_kiwiSdrTrackingConnections.take(sliceId)) {
@@ -523,6 +569,14 @@ void MainWindow::rewireKiwiSdrTrackingForSlice(int sliceId, const QString& profi
     conns << connect(slice, &SliceModel::dspModeChanged, this, follow);
     conns << connect(slice, &SliceModel::filterChanged, this, follow);
     conns << connect(slice, &SliceModel::panKeyChanged, this, follow);
+    // Absender ist hier das Modell, nicht die Scheibe: stirbt die Scheibe
+    // vor dem Loesen der Zuordnung, trennt Qt diese Verbindung nicht von
+    // selbst -- daher der QPointer statt des rohen Zeigers.
+    const QPointer<SliceModel> guarded(slice);
+    conns << connect(m_radioModel, &RadioModel::cwPitchChanged, this,
+                     [this, guarded]() {
+        if (guarded) { updateKiwiSdrTrackingForSlice(guarded.data()); }
+    });
     m_kiwiSdrTrackingConnections.insert(sliceId, conns);
 }
 
@@ -595,15 +649,14 @@ void MainWindow::wireKiwiSdr()
         return;
     }
 
-    // Aether holt das Rufzeichen vom RadioModel. Bei uns steht es nicht
-    // dort, sondern seit jeher unter StationCallsign in den
-    // Einstellungen — QsoMapWindow und RadioModel lesen es von genau
-    // dort. Der KiwiSDR schickt es dem Betreiber des Empfaengers als
-    // Kennung; leer ist zulaessig.
+    // Aether holt das Rufzeichen vom RadioModel. Bei uns steht es in
+    // den Einstellungen — und zwar NICHT nur unter StationCallsign:
+    // den schreibt niemand, kanonisch ist User/Callsign (siehe
+    // AppSettings::stationCallsign, 2026-10-16). Bis dahin stand hier
+    // nur der alte Schluessel, und der war leer. Der KiwiSDR schickt
+    // die Kennung dem Betreiber des Empfaengers; leer ist zulaessig.
     m_kiwiSdrManager->setOperatorCallsign(
-        AppSettings::instance()
-            .value(QStringLiteral("StationCallsign"), QString{})
-            .toString());
+        AppSettings::stationCallsign());
 
     connect(m_kiwiSdrManager, &KiwiSdrManager::profilesChanged,
             this, &MainWindow::refreshKiwiSdrAppletReceivers);

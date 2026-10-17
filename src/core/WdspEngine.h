@@ -120,6 +120,13 @@ class TestRadeApplet;
 // 2026-09-17: same pattern for the NR-backend audio pruefstand, which
 // pushes real audio through every noise-reduction slot on a real channel.
 class TstNrBackendsProcessAudio;
+// 2026-09-27: same pattern for the PB-SNR noise probe, which pushes
+// Gaussian noise through a real channel and reads the S meter.
+class TstPbsnrNoiseProbe;
+// 2026-10-04: same pattern for the SunSDR rate pruefstand, which drives
+// RadioModel::setStreamSampleRate through setSampleRateLive and therefore
+// has to get past its !isInitialized() guard without a wisdom load.
+class TstSunSdrBoardCaps;
 // Phase 3F Sub-Epic I closeout, defect H1: the per-stream drain-geometry
 // test primes the engine so createRxChannel can seed real RX channels.
 class TestStreamPoolBinding;
@@ -621,6 +628,31 @@ public slots:
     // ~12-17 dB below the spectrum's displayed pixel value because the
     // detector pipeline reconstructs window-spread integrated power that
     // a single bin can't show on its own.
+    // Ein Takt des MaxBin-Haltewerts: steigt sofort auf einen staerkeren
+    // Messwert, faellt sonst mit der Zeitkonstante des Detektors.
+    //
+    // Longpath-eigen seit 2026-10-09, und zwar als Fehlerbehebung.
+    // Thetis rechnet (wdsp/analyzer.c:815-818 [@501e3f5], bei uns bis
+    // heute Zeile fuer Zeile uebernommen):
+    //
+    //     held -= fabs((1 - decay) * held);
+    //
+    // Der Abzug ist also proportional zum BETRAG des Haltewerts. Unter
+    // 0 dBm geht das gut -- der Betrag ist dort der Abstand zu 0, und
+    // der Wert laeuft nach unten. Oberhalb 0 dBm schrumpft der Abzug
+    // mit dem Wert selbst: der Haltewert naehert sich 0 dBm und
+    // unterschreitet sie nie. Ein einziges sehr starkes Signal nagelt
+    // die Anzeige damit dauerhaft fest (im Thetis-Fehlerverzeichnis
+    // als #2681 gemeldet; die Vorlage hat denselben Fehler im Oktober
+    // 2026 behoben, mit einer anderen Formel als dieser hier).
+    //
+    // Hier bekommt derselbe Abzug einen Mindestbezug von 20 dB: im
+    // ganzen Arbeitsbereich dieses Instruments (unterhalb -20 dBm)
+    // rechnet er Zeile fuer Zeile wie bisher, oberhalb faellt der
+    // Haltewert endlich. Zwanzig dB sind gut drei S-Stufen je
+    // Zeitkonstante -- siehe die Begruendung an der Umsetzung.
+    static double maxBinHoldNextDbm(double heldDbm, double liveDbm, double decay);
+
     void onSpectrumBinsForMaxBin(int receiverId, const QVector<float>& binsDbm);
 
     // 2026-05-22 bench fix: direct override of the MaxBin detector's
@@ -793,6 +825,8 @@ private:
     // Phase 3F: same friendship for the channel-id map test, which drives
     // RadioModel::openRxChannelPool and asserts on the ids it opened.
     friend class ::TestWdspChannelIdMap;
+    // 2026-10-04: same friendship for the SunSDR rate pruefstand.
+    friend class ::TstSunSdrBoardCaps;
     // Authoritative-TX regression: seed nonzero RX channels without the
     // asynchronous wisdom lifecycle so MOX can prove which exact ID moves.
     friend class ::TestRadioModelMoxHardwareFlip;
@@ -815,6 +849,8 @@ private:
     // (tests/tst_nr_backends_process_audio.cpp), which needs really
     // opened RX channels to run NR1..NR4/NNR/MNR on audio.
     friend class ::TstNrBackendsProcessAudio;
+    // 2026-09-27: same friendship for the PB-SNR noise probe.
+    friend class ::TstPbsnrNoiseProbe;
 #endif
 };
 

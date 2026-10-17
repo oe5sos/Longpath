@@ -18,6 +18,7 @@
 // =================================================================
 
 #include <QtTest/QtTest>
+#include "core/ZeitUtc.h"
 #include <QApplication>
 #include <QDialog>
 #include <QDir>
@@ -34,12 +35,13 @@
 #include "gui/LogbookWindow.h"
 #include "gui/widgets/LogbookStatsWidget.h"
 #include "models/LogEntry.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
 namespace {
 
-const QDateTime kNow = QDateTime(QDate(2026, 9, 18), QTime(12, 0), Qt::UTC);
+const QDateTime kNow = Longpath::Zeit::utc(QDate(2026, 9, 18), QTime(12, 0));
 
 LogEntry qso(const QString& call, int daysAgo, const QString& band,
              const QString& mode, const QString& grid = {})
@@ -109,7 +111,7 @@ private slots:
         // Renders without a crash at a small size too.
         w.resize(400, 300);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         w.grab();
     }
 
@@ -179,7 +181,7 @@ private slots:
         w.setStats(s);
         w.resize(900, 560);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         const QPixmap pm = w.grab();
         QVERIFY(!pm.isNull());
         const QString grabDir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
@@ -225,7 +227,10 @@ private slots:
         QVERIFY(view->stats().dxccWorked == 1 || view->stats().dxccWorked == 2);
 
         // Narrow the view to CW: the dialog follows the filter while open.
-        QLineEdit* search = w.findChild<QLineEdit*>();
+        // Das Suchfeld ausdruecklich: seit der Eingabezeile (2026-09-26)
+        // ist das erste Textfeld im Fenster das Rufzeichen der neuen
+        // Verbindung, nicht die Suche.
+        QLineEdit* search = w.searchForTest();
         QVERIFY(search);
         search->setText(QStringLiteral("DL1ABC"));
         QTRY_COMPARE(view->totalLabel()->text(), QStringLiteral("1"));

@@ -3,9 +3,12 @@
 #include "gui/styles/AppTheme.h"
 #include "gui/styles/Theme.h"
 #include "core/AppSettings.h"
+#include "core/CrashReportDigest.h"
 #include "core/SettingsBackup.h"
 #include "core/AudioDeviceConfig.h"
 #include "core/BuildIdentity.h"
+#include "core/CNumericLocale.h"
+#include "core/LogDatei.h"
 #include "core/MacMicPermission.h"
 #include "core/audio/RealtimeAudioPriority.h"
 #include "core/RadioConnection.h"
@@ -25,6 +28,7 @@
 #include "LongpathBuildTag.h"
 
 #include <QApplication>
+#include <QTranslator>
 #include <QCommandLineOption>
 #include <QMetaObject>
 #include <csignal>
@@ -38,13 +42,19 @@
 #include <QDir>
 #include <QFile>
 #include <QDateTime>
-#include <QTextStream>
+#include <QElapsedTimer>
+#include <QTimer>
 #include <QStandardPaths>
 #include <QRegularExpression>
 #include <QStringList>
 #include "core/SupportBundle.h"
 
 static QFile* s_logFile = nullptr;
+
+// Die Schreibstelle liegt in core/LogDatei.{h,cpp} — mit Schloss, mit einem
+// einzigen Schreibaufruf, und dort pruefbar (main.cpp ist nicht Teil der
+// Pruefstaende). Die Begruendung samt der sechs zerschriebenen Zeilen vom
+// 2026-10-03 steht im Kopf von LogDatei.h.
 
 // Von einer AetherSDR-Sichtung angestossen (2026-09-05): dort gibt es ein
 // umfangreiches SystemInventory, das aber an ihre eigene Whisper/ggml-
@@ -103,12 +113,7 @@ static void messageHandler(QtMsgType type, const QMessageLogContext& ctx, const 
     const QString line = QString("[%1] %2: %3\n")
         .arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz"), label, safeMsg);
 
-    if (s_logFile && s_logFile->isOpen()) {
-        QTextStream ts(s_logFile);
-        ts << line;
-        ts.flush();
-    }
-    fprintf(stderr, "%s", line.toLocal8Bit().constData());
+    Longpath::Log::schreibe(line);
 
 #ifndef Q_OS_WIN
     // Diagnostic aid (2026-08-11): one field warning has resisted every
@@ -117,20 +122,28 @@ static void messageHandler(QtMsgType type, const QMessageLogContext& ctx, const 
     // so the context carries no caller. When it fires, append a native
     // backtrace so the call site identifies itself in the log; costs
     // nothing on every other message. Remove once the caller is found.
-    if (type == QtWarningMsg
-        && msg.contains(QLatin1String("Cannot add a null widget"))) {
+    // 2026-10-14: dieselbe Not mit einer zweiten Warnung. Im Protokoll
+    // des Betreibers stand 82-mal "QFormLayout::takeAt: Invalid index 0",
+    // in Schueben zu viert, etwa einmal je Minute -- irgendwo wird ein
+    // Formular geleert, das schon leer ist. Aus einem kalten Start auf
+    // main ist sie in 100 s nicht gekommen; sie haengt an einem Zustand
+    // oder einer Bedienung. Also muss sie sich selbst verraten, wenn sie
+    // das naechste Mal auftritt.
+    //
+    // LONGPATH_TRACE_WARNING setzt denselben Haken auf einen beliebigen
+    // Text, ohne dass man dafuer neu bauen muss.
+    static const QString traceNeedle = qEnvironmentVariable("LONGPATH_TRACE_WARNING");
+    const bool wanted = msg.contains(QLatin1String("Cannot add a null widget"))
+                        || msg.contains(QLatin1String("QFormLayout::takeAt"))
+                        || (!traceNeedle.isEmpty() && msg.contains(traceNeedle));
+    if (type == QtWarningMsg && wanted) {
         void* frames[32];
         const int n = backtrace(frames, 32);
         if (char** syms = backtrace_symbols(frames, n)) {
             for (int i = 0; i < n; ++i) {
                 const QString bt = QStringLiteral("  [bt] %1\n")
                                        .arg(QString::fromLocal8Bit(syms[i]));
-                if (s_logFile && s_logFile->isOpen()) {
-                    QTextStream ts(s_logFile);
-                    ts << bt;
-                    ts.flush();
-                }
-                fprintf(stderr, "%s", bt.toLocal8Bit().constData());
+                Longpath::Log::schreibe(bt);
             }
             free(syms);
         }
@@ -206,6 +219,11 @@ int main(int argc, char* argv[])
     }
 
     QApplication app(argc, argv);
+    // Gleich danach, bevor irgendetwas Zahlen aus Text liest: Qt hat eben
+    // setlocale(LC_ALL, "") aufgerufen, und mit deutscher Systemsprache
+    // lasen sscanf/fscanf in SGP4 und WDSP ein Komma als Dezimalzeichen
+    // (alle Satelliten verworfen). Siehe core/CNumericLocale.h.
+    Longpath::useCNumericLocale();
     app.setApplicationName("Longpath");
     // LONGPATH_PRETEND_VERSION: nur fuer Pruefstaende des Updaters (Help >
     // Check for Updates...) -- laesst einen Bau aelter aussehen, als er
@@ -214,26 +232,6 @@ int main(int argc, char* argv[])
     app.setApplicationVersion(qEnvironmentVariable("LONGPATH_PRETEND_VERSION", QStringLiteral(LONGPATH_VERSION)));
     app.setOrganizationName("Longpath");
     app.setWindowIcon(QIcon(":/icons/Longpath.png"));
-
-    // 2026-05-25 KG4VCF bench fix: elevate the main GUI thread to
-    // USER_INTERACTIVE QoS so heavy user-initiated background work
-    // (parallel compiles, mdworker indexing, Time Machine snapshots,
-    // etc.) does not preempt the Qt event loop and produce visibly
-    // choppy spectrum / waterfall rendering.  The audio DSP thread
-    // already gets a stronger elevation (see RxDspWorker::onThreadStarted)
-    // but the GUI thread runs the spectrum paint cycle and was still
-    // being preempted at DEFAULT QoS.  Bench symptom: "whole program
-    // stutters when a build happens".
-    //
-    // Cross-platform via src/core/audio/RealtimeAudioPriority.cpp:
-    //   macOS:   pthread_set_qos_class_self_np(USER_INTERACTIVE)
-    //   Linux:   nice(-5)  (soft-fail without privilege)
-    //   Windows: SetThreadPriority(ABOVE_NORMAL) -- was HIGHEST; dropped
-    //            2026-09-03 after a measured ~85ms periodic Windows-only
-    //            audio glitch traced to this thread contending at the
-    //            same tier as audio-critical work (see
-    //            RealtimeAudioPriority.cpp's elevateGuiMainThreadPriority).
-    Longpath::elevateGuiMainThreadPriority();
 
     // 2026-05-22 bench-finding: pkill / kill / system shutdown sends SIGTERM
     // by default; the OS terminates the process without giving Qt a chance
@@ -259,12 +257,6 @@ int main(int argc, char* argv[])
                                       "quit", Qt::QueuedConnection);
         }
     });
-
-    // Trigger the macOS microphone permission dialog deterministically
-    // (issue #203). The OS only prompts when something actually engages
-    // TCC; relying on PortAudio's CoreAudio backend to do so is unreliable
-    // on machines without a built-in mic, so call AVCaptureDevice directly.
-    Longpath::requestMicrophonePermission();
 
     // Re-parse properly so --help / --version / unknown options surface
     // via Qt's standard machinery. The earlyProfile pass above already
@@ -312,6 +304,10 @@ int main(int argc, char* argv[])
     s_logFile = new QFile(logPath);
     if (s_logFile->open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
         s_logFile->setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+        // Erst die Datei bekanntgeben, dann den Umleiter setzen: andersherum
+        // gaebe es ein Fenster, in dem Meldungen schon durch den Umleiter
+        // laufen, aber noch nirgends landen.
+        Longpath::Log::setzeDatei(s_logFile);
         qInstallMessageHandler(messageHandler);
 
         const QString symlink = logDir + "/longpath.log";
@@ -324,6 +320,57 @@ int main(int argc, char* argv[])
     }
 
     logStartupHardwareInventory();
+
+    // Steht hier und nicht direkt hinter dem QApplication-Bau, weil die
+    // Meldung dieses Aufrufs ins Log gehoert: bis zum 2026-10-03 lief er
+    // rund 70 Zeilen VOR dem qInstallMessageHandler, und damit fehlte in
+    // allen fuenf vorliegenden Betriebslogs sowohl das "GUI main thread
+    // elevated to USER_INTERACTIVE QoS" als auch -- schlimmer -- die
+    // Warnung "Failed to elevate GUI main thread", die ein Misslingen
+    // meldet. Ein Ruckeln der Oberflaeche waere damit nicht
+    // nachvollziehbar gewesen.
+    //
+    // Spaeter ist gefahrlos: es existiert noch kein Fenster und keine
+    // Ereignisschleife, die QoS gilt dem Faden, nicht dem Zeitpunkt.
+    // 2026-05-25 KG4VCF bench fix: elevate the main GUI thread to
+    // USER_INTERACTIVE QoS so heavy user-initiated background work
+    // (parallel compiles, mdworker indexing, Time Machine snapshots,
+    // etc.) does not preempt the Qt event loop and produce visibly
+    // choppy spectrum / waterfall rendering.  The audio DSP thread
+    // already gets a stronger elevation (see RxDspWorker::onThreadStarted)
+    // but the GUI thread runs the spectrum paint cycle and was still
+    // being preempted at DEFAULT QoS.  Bench symptom: "whole program
+    // stutters when a build happens".
+    //
+    // Cross-platform via src/core/audio/RealtimeAudioPriority.cpp:
+    //   macOS:   pthread_set_qos_class_self_np(USER_INTERACTIVE)
+    //   Linux:   nice(-5)  (soft-fail without privilege)
+    //   Windows: SetThreadPriority(ABOVE_NORMAL) -- was HIGHEST; dropped
+    //            2026-09-03 after a measured ~85ms periodic Windows-only
+    //            audio glitch traced to this thread contending at the
+    //            same tier as audio-critical work (see
+    //            RealtimeAudioPriority.cpp's elevateGuiMainThreadPriority).
+    Longpath::elevateGuiMainThreadPriority();
+
+    // Trigger the macOS microphone permission dialog deterministically
+    // (issue #203). The OS only prompts when something actually engages
+    // TCC; relying on PortAudio's CoreAudio backend to do so is unreliable
+    // on machines without a built-in mic, so call AVCaptureDevice directly.
+    //
+    // Steht hier und nicht weiter oben, weil die Antwort ins Log gehoert.
+    // Der Aufruf lag bis zum 2026-10-03 rund 45 Zeilen VOR dem Oeffnen der
+    // Log-Datei: er lief, aber seine einzige Ausgabe — "Microphone TCC
+    // status on launch: NotDetermined|Authorized|Denied" — ging ins Leere,
+    // weil der Meldungs-Umleiter erst danach gesetzt wird. Genau diese
+    // Zeile hat am 2026-10-03 gefehlt, als ein unbeantworteter
+    // Berechtigungsdialog den ganzen Verbindungsaufbau einfror; der
+    // Zustand war aus dem Log nicht zu erkennen.
+    //
+    // Spaeter ist hier gefahrlos: der Mikrofon-Eingang wird erst beim
+    // Verbinden geoeffnet (AudioEngine::start), und bis dahin liegen
+    // Fenster und Ereignisschleife laengst.
+    // Siehe docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md.
+    Longpath::requestMicrophonePermission();
 
     // Fusion style as a clean cross-platform base, then layer the
     // Longpath dark palette + minimal baseline QSS on top so every
@@ -361,6 +408,67 @@ int main(int argc, char* argv[])
 
     // Load XML settings
     Longpath::AppSettings::instance().load();
+
+    // ── Was seit dem letzten Lauf abgestuerzt ist (2026-10-14) ───────
+    //
+    // Ein Programm, das abstuerzt, schreibt seinen letzten Satz nicht
+    // mehr selbst. macOS legt ihn aber ab, und beim naechsten Start
+    // laesst er sich nachholen. Am 2026-10-14 lagen sieben Berichte zu
+    // Longpath herum -- drei SIGSEGV vom Vorabend mit immer demselben
+    // Weg -- und gefunden wurden sie erst, weil jemand danach fragte.
+    //
+    // Kein Dialog, kein Versenden, keine Nachfrage: eine Zeile je
+    // Bericht im eigenen Protokoll, dort wo bei der Fehlersuche
+    // ohnehin zuerst gelesen wird. Im Pruefstands-Sandkasten still
+    // (isTestModeEnabled), damit kein Lauf fremde Berichte liest.
+    if (!QStandardPaths::isTestModeEnabled()) {
+        auto& s = Longpath::AppSettings::instance();
+        const QDateTime seit = QDateTime::fromString(
+            s.value(Longpath::CrashReportDigest::lastScanKey(), QString()).toString(),
+            Qt::ISODate);
+        const QStringList zeilen = Longpath::CrashReportDigest::summarise(
+            Longpath::CrashReportDigest::reportDir(), seit);
+        if (!zeilen.isEmpty()) {
+            qWarning().noquote()
+                << QStringLiteral("Seit dem letzten Lauf abgestuerzt: %1 Bericht(e)")
+                       .arg(zeilen.size());
+            for (const QString& z : zeilen) {
+                qWarning().noquote() << QStringLiteral("  Absturz: ") + z;
+            }
+        }
+        s.setValue(Longpath::CrashReportDigest::lastScanKey(),
+                   QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+    }
+
+    // ── Sprache (2026-10-14) ──────────────────────────────────────────
+    //
+    // Betreiber: "englisch durchgehend, aber deutsch als option".
+    // Englisch ist die Quellsprache und steht im Quelltext; eine andere
+    // Sprache kommt aus der eingebauten .qm (:/i18n/, siehe
+    // CMakeLists.txt). Hier, direkt nach load() und lange vor dem ersten
+    // Fenster: ein spaeter eingesetzter Uebersetzer erreicht Texte
+    // nicht mehr, die schon gebaut sind.
+    //
+    // Absichtlich NICHT nach der Systemsprache gegriffen: wer Longpath
+    // auf einem deutschen macOS startet, hat deshalb noch lange keine
+    // deutsche Oberflaeche bestellt. Vorgabe ist Englisch, alles andere
+    // ist eine Wahl (Setup -> General -> Language).
+    static QTranslator s_uiTranslator;
+    const QString uiLang = Longpath::AppSettings::instance()
+                               .value(QStringLiteral("UiLanguage"), QStringLiteral("en"))
+                               .toString();
+    if (uiLang != QStringLiteral("en")) {
+        if (s_uiTranslator.load(QStringLiteral(":/i18n/longpath_") + uiLang)) {
+            app.installTranslator(&s_uiTranslator);
+            qInfo() << "UI language:" << uiLang;
+        } else {
+            // Kein stilles Zurueckfallen: wer Deutsch gewaehlt hat und
+            // Englisch sieht, soll im Protokoll finden, warum.
+            qWarning() << "UI language" << uiLang
+                       << "was chosen but :/i18n/longpath_" + uiLang
+                       << "did not load -- staying with English";
+        }
+    }
 
     // Automatic start-up copy of the settings file (File > Settings
     // Backups, "Backup on start-up"; off unless switched on). After
@@ -480,8 +588,39 @@ int main(int argc, char* argv[])
     // Absturz beim Beenden sonst nur die Stelle wechselt.
     int rc = 0;
     {
+        // ── Messpunkte (2026-10-16): wo die Startzeit wirklich liegt ──
+        //
+        // Martins Protokoll vom 15.10. zeigt zwischen „TciServer
+        // listening" (21:47:03.900) und dem ersten Lebenszeichen des
+        // Verbinden-Fensters (21:47:10.065) eine Luecke von 6,2 s ohne
+        // eine einzige Zeile — der groesste einzelne Posten seines
+        // 17-Sekunden-Starts und der einzige voellig unvermessene.
+        //
+        // Derselbe Weg mit demselben Profil, aber offscreen, braucht
+        // bis dorthin 2,1 s. Die Zeit haengt also an der echten
+        // Darstellung und nicht am Profil — und genau die kann eine
+        // Sonde nicht nachstellen. Diese drei Zahlen koennen es: der
+        // Konstruktor, das show(), und die erste Runde der
+        // Ereignisschleife danach.
+        //
+        // Statisch, damit die Uhr das Lambda ueberlebt, das sie liest.
+        static QElapsedTimer startUhr;
+        startUhr.start();
+
         Longpath::MainWindow window;
+        const qint64 nachKonstruktor = startUhr.elapsed();
+
         window.show();
+        const qint64 nachShow = startUhr.elapsed();
+
+        // Erst nach der ersten Runde ist das Fenster wirklich da.
+        QTimer::singleShot(0, &window, [nachKonstruktor, nachShow]() {
+            qWarning().nospace()
+                << "[Startzeit] MainWindow-Konstruktor " << nachKonstruktor
+                << " ms, show() " << (nachShow - nachKonstruktor)
+                << " ms, erste Runde der Schleife bei " << startUhr.elapsed()
+                << " ms";
+        });
 
         // Dev automation bridge (Phase 0: dumpTree + grab + get, read-only) --
         // off unless explicitly requested, so a normal launch is unaffected.
@@ -511,6 +650,10 @@ int main(int argc, char* argv[])
     // else in this TU) could already be destroyed. Belt-and-braces
     // for the leaked-regex fix in redactPii().
     qInstallMessageHandler(nullptr);
+    // Umgekehrte Reihenfolge wie beim Oeffnen: erst den Umleiter abhaengen,
+    // dann die Datei abmelden. Ein Faden, der jetzt noch schreibt, findet
+    // keine Datei mehr vor — statt in eine geschlossene zu schreiben.
+    Longpath::Log::setzeDatei(nullptr);
     if (s_logFile) {
         s_logFile->close();
         // Intentionally leaked — Qt may still try to log between

@@ -264,6 +264,24 @@ warren@wpratt.com
 #include "MacNRFilter.h"
 #endif
 
+// Direkter Zugriff auf die WDSP-Struktur, um den eqp-Run-Zustand zu lesen:
+// es gibt kein GetRXAEQRun. Dasselbe Muster, das TxChannel.cpp:362-368 fuer
+// txa[] benutzt. WDSP deklariert "extern struct _rxa rxa[];" in RXA.h:198.
+#ifdef HAVE_WDSP
+extern "C" {
+#include "../../third_party/wdsp/src/RXA.h"
+}
+// RXA.h zieht ueber comm.h das linux_port.h herein, und das definiert
+// `max`/`min` als Makros (linux_port.h:81-82). Ohne diese zwei Zeilen
+// zerbricht das Makro jedes spaetere std::max in dieser Datei -- erstmals
+// gesehen an filterResponseMagnitudes() (`std::max(magDb, -120.0)`), das
+// mit "expected unqualified-id" scheiterte. TxChannel.cpp kommt mit dem
+// gleichen Include ohne aus, weil es hinter dem Include kein std::max
+// benutzt; hier ist das anders.
+#undef max
+#undef min
+#endif
+
 // filterResponseMagnitudes() uses fir_bandpass() from WDSP and fftw_* from FFTW3.
 // Both are guarded below with #if defined(HAVE_WDSP) && defined(HAVE_FFTW3).
 #if defined(HAVE_WDSP) && defined(HAVE_FFTW3)
@@ -1485,6 +1503,26 @@ void RxChannel::setAmsqThresh(double dB)
 // Squelch — FM
 // ---------------------------------------------------------------------------
 
+void RxChannel::setCtcssNotchFreq(double hz)
+{
+    m_ctcssNotchHz = hz;
+#ifdef HAVE_WDSP
+    // From Thetis Console/radio.cs:2913-2916 [@852bf0e]
+    SetRXACTCSSFreq(m_channelId, hz);
+#else
+    Q_UNUSED(hz);
+#endif
+}
+
+void RxChannel::setFmDeviation(double hz)
+{
+    m_fmDeviationHz = hz;
+#ifdef HAVE_WDSP
+    // From Thetis Console/radio.cs:1427-1444 [@852bf0e] -- RXFMDeviation
+    SetRXAFMDeviation(m_channelId, hz);
+#endif
+}
+
 void RxChannel::setFmsqEnabled(bool enabled)
 {
     if (enabled == m_fmsqEnabled.load()) {
@@ -1517,6 +1555,165 @@ void RxChannel::setFmsqThresh(double dB)
     SetRXAFMSQThreshold(m_channelId, linear);
 #else
     Q_UNUSED(dB);
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// Empfangs-Equalizer (WDSP eqp) — Longpath-eigen, 2026-10-11
+// ---------------------------------------------------------------------------
+//
+// Spiegel der sieben TxChannel::setTxEq*-Wrapper. Zur Lage im Durchlauf,
+// zu den Vorgaben beim Anlegen und zu den Faeden: RxChannel.h bei der
+// Deklaration. Die Signaturen folgen dem VENDORTEN TAPR v1.29
+// (third_party/wdsp/src/eq.c), nicht Thetis' neuerem eq.c -- siehe die
+// Notiz in wdsp_api.h.
+//
+// Jeder Wrapper prueft ZWEI Dinge, und beide sind noetig:
+//
+//   1. wdspChannelInRange() -- Pruefstaende in diesem Baum bauen RxChannel
+//      mit kTestChannel = 99, und ein WDSP-Ruf darauf schreibt ueber das
+//      Feldende von rxa[] hinaus.
+//   2. rxa[m_channelId].eqp.p != nullptr -- die WDSP-Setter fassen
+//      rxa[channel].eqp.p->... direkt an. Ohne OpenChannel ist dieser
+//      Zeiger null, und der Ruf ist ein Absturz, kein Fehlschlag.
+//      Dieselbe Pruefung, die TxChannel auf seiner Seite ueber
+//      txa[m_channelId].rsmpin.p macht.
+//
+// (2) ist nicht theoretisch: der erste Lauf von tests/tst_rx_equalizer.cpp
+// hat genau hier ein SIGSEGV geholt -- Kanal 0 liegt in Reichweite, war
+// aber nicht geoeffnet. Mit (1) allein greift der Schutz nur fuer die
+// Pruefstaende mit Kanal 99 und laesst jeden echten Kanal auflaufen, der
+// vor dem WDSP-Aufbau ein Signal bekommt.
+
+namespace {
+
+// Ist die eqp-Stufe dieses Kanals in WDSP tatsaechlich angelegt?
+bool rxEqStufeOffen(int channelId, bool inRange)
+{
+#ifdef HAVE_WDSP
+    return inRange && rxa[channelId].eqp.p != nullptr;
+#else
+    Q_UNUSED(channelId);
+    Q_UNUSED(inRange);
+    return false;
+#endif
+}
+
+} // namespace
+
+void RxChannel::setRxEqRunning(bool on)
+{
+    m_rxEqRunning = on;
+#ifdef HAVE_WDSP
+    if (!rxEqStufeOffen(m_channelId, wdspChannelInRange())) { return; }
+    // third_party/wdsp/src/eq.c:279-285
+    // (Thetis Console/radio.cs:827-843 [v2.10.3.15] -- RXEQOn).
+    // csDSP-geschuetzt; vom Hauptfaden aus sicher, waehrend der Tonfaden laeuft.
+    SetRXAEQRun(m_channelId, on ? 1 : 0);
+#endif
+}
+
+int RxChannel::rxEqRunningInWdsp() const
+{
+#ifdef HAVE_WDSP
+    if (!wdspChannelInRange() || rxa[m_channelId].eqp.p == nullptr) { return -1; }
+    return rxa[m_channelId].eqp.p->run;
+#else
+    return -1;
+#endif
+}
+
+void RxChannel::setRxEqGraph10(const std::array<int, 11>& preampPlus10Bands)
+{
+    m_rxEqGraph10 = preampPlus10Bands;
+#ifdef HAVE_WDSP
+    if (!rxEqStufeOffen(m_channelId, wdspChannelInRange())) { return; }
+    // third_party/wdsp/src/eq.c:385-411
+    // (Thetis Console/radio.cs:800-824 [v2.10.3.15] -- RXEQ10 reicht ein
+    //  int[11] durch: [0] Vorverstaerkung, [1..10] die Baender).
+    // SetRXAGrphEQ10 nimmt einen nicht-konstanten Zeiger, schreibt aber
+    // nicht hinein (eq.c:385-411 liest nur) -- daher die Kopie.
+    std::array<int, 11> copy = preampPlus10Bands;
+    SetRXAGrphEQ10(m_channelId, copy.data());
+#endif
+}
+
+void RxChannel::setRxEqProfile(const std::vector<double>& freqs10,
+                               const std::vector<double>& gains11)
+{
+    // Groessen vor dem WDSP-Ruf pruefen -- genau wie TxChannel::setTxEqProfile.
+    if (freqs10.size() != 10) {
+        qCWarning(lcDsp) << "RxChannel::setRxEqProfile: freqs10 braucht 10 Eintraege, hat"
+                         << freqs10.size() << "-- Ruf verworfen";
+        return;
+    }
+    if (gains11.size() != 11) {
+        qCWarning(lcDsp) << "RxChannel::setRxEqProfile: gains11 braucht 11 Eintraege, hat"
+                         << gains11.size() << "-- Ruf verworfen";
+        return;
+    }
+
+#ifdef HAVE_WDSP
+    if (!rxEqStufeOffen(m_channelId, wdspChannelInRange())) { return; }
+    // third_party/wdsp/src/eq.c:316-333. F ist in WDSP 1-indiziert (F[0] ist
+    // das unbenutzte Polster), G ist 0-indiziert (G[0] = Vorverstaerkung).
+    // Beide Felder brauchen mindestens nfreqs+1 Eintraege; sie entstehen hier
+    // frisch auf dem Stapel. Kein Q -- das vendorte TAPR v1.29 kennt es nicht.
+    constexpr int kNfreqs = 10;
+    double F[kNfreqs + 1];
+    double G[kNfreqs + 1];
+    F[0] = 0.0;  // WDSP-Polster
+    for (int i = 0; i < kNfreqs; ++i) {
+        F[i + 1] = freqs10[static_cast<std::size_t>(i)];
+    }
+    for (int i = 0; i < kNfreqs + 1; ++i) {
+        G[i] = gains11[static_cast<std::size_t>(i)];
+    }
+    SetRXAEQProfile(m_channelId, kNfreqs, F, G);
+#endif
+}
+
+void RxChannel::setRxEqNc(int nc)
+{
+#ifdef HAVE_WDSP
+    if (!rxEqStufeOffen(m_channelId, wdspChannelInRange())) { return; }
+    // third_party/wdsp/src/eq.c:287-302 -- legt die Impulsantwort neu an.
+    SetRXAEQNC(m_channelId, nc);
+#else
+    Q_UNUSED(nc);
+#endif
+}
+
+void RxChannel::setRxEqMp(bool mp)
+{
+#ifdef HAVE_WDSP
+    if (!rxEqStufeOffen(m_channelId, wdspChannelInRange())) { return; }
+    // third_party/wdsp/src/eq.c:304-314 -- legt die Impulsantwort neu an.
+    SetRXAEQMP(m_channelId, mp ? 1 : 0);
+#else
+    Q_UNUSED(mp);
+#endif
+}
+
+void RxChannel::setRxEqCtfmode(int mode)
+{
+#ifdef HAVE_WDSP
+    if (!rxEqStufeOffen(m_channelId, wdspChannelInRange())) { return; }
+    // third_party/wdsp/src/eq.c:335-345 -- legt die Impulsantwort neu an.
+    SetRXAEQCtfmode(m_channelId, mode);
+#else
+    Q_UNUSED(mode);
+#endif
+}
+
+void RxChannel::setRxEqWintype(int wintype)
+{
+#ifdef HAVE_WDSP
+    if (!rxEqStufeOffen(m_channelId, wdspChannelInRange())) { return; }
+    // third_party/wdsp/src/eq.c:347-357 -- legt die Impulsantwort neu an.
+    SetRXAEQWintype(m_channelId, wintype);
+#else
+    Q_UNUSED(wintype);
 #endif
 }
 

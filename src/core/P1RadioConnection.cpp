@@ -260,6 +260,7 @@ mw0lge@grange-lane.co.uk
 // Migrated to VS2026 - 18/12/25 MW0LGE v2.10.3.12
 
 #include "P1RadioConnection.h"
+#include "SendeFehler.h"
 #include "LogCategories.h"
 #include "OcMatrix.h"
 #include "IoBoardHl2.h"
@@ -283,6 +284,9 @@ mw0lge@grange-lane.co.uk
 #include <QThread>
 #include <QVariant>
 #include <QCoreApplication>
+
+#include <cerrno>
+#include <cstring>
 
 namespace Longpath {
 
@@ -2717,7 +2721,9 @@ void P1RadioConnection::onReadyRead()
                     const qint64 nowGap = QDateTime::currentMSecsSinceEpoch();
                     if (nowGap - m_lastGapSignalMs >= 20) {
                         m_lastGapSignalMs = nowGap;
-                        emit iqSequenceGap();
+                        // -1: die EP6-Folge traegt alle Empfaenger verschachtelt, eine
+                        // Luecke dort trifft wirklich jeden.
+                        emit iqSequenceGap(-1);
                     }
                 }
                 m_ep6LastSeq = seq;
@@ -3054,7 +3060,23 @@ void P1RadioConnection::sendMetisStart(bool iqAndMic)
     const quint8 watchdogBit = m_watchdogEnabled ? quint8(0x00) : quint8(0x80);
     pkt[3] = static_cast<char>(runBits | watchdogBit);
 
-    m_socket->writeDatagram(pkt, m_radioInfo.address, m_radioInfo.port);
+    const qint64 geschrieben =
+        m_socket->writeDatagram(pkt, m_radioInfo.address, m_radioInfo.port);
+    // Sofort lesen, vor jedem weiteren Aufruf: errorString() und alles
+    // andere darf errno ueberschreiben.
+    if (geschrieben != pkt.size()) {
+        const int fehlerNr = Netz::letzterFehler();
+        m_letzterSendeFehler = fehlerNr;
+        qCWarning(lcConnection).noquote()
+            << QStringLiteral("P1: %1 send failed — wrote %2 of %3 bytes; "
+                              "fehler=%4 (%5); Qt: %6")
+                   .arg(QStringLiteral("Start/Stop"))
+                   .arg(geschrieben)
+                   .arg(pkt.size())
+                   .arg(fehlerNr)
+                   .arg(Netz::fehlerName(fehlerNr))
+                   .arg(m_socket->errorString());
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -3090,7 +3112,23 @@ void P1RadioConnection::sendMetisStop()
     const quint8 watchdogBit = m_watchdogEnabled ? quint8(0x00) : quint8(0x80);
     pkt[3] = static_cast<char>(watchdogBit); // run = 0; watchdog bit set if disabled
 
-    m_socket->writeDatagram(pkt, m_radioInfo.address, m_radioInfo.port);
+    const qint64 geschrieben =
+        m_socket->writeDatagram(pkt, m_radioInfo.address, m_radioInfo.port);
+    // Sofort lesen, vor jedem weiteren Aufruf: errorString() und alles
+    // andere darf errno ueberschreiben.
+    if (geschrieben != pkt.size()) {
+        const int fehlerNr = Netz::letzterFehler();
+        m_letzterSendeFehler = fehlerNr;
+        qCWarning(lcConnection).noquote()
+            << QStringLiteral("P1: %1 send failed — wrote %2 of %3 bytes; "
+                              "fehler=%4 (%5); Qt: %6")
+                   .arg(QStringLiteral("Stop"))
+                   .arg(geschrieben)
+                   .arg(pkt.size())
+                   .arg(fehlerNr)
+                   .arg(Netz::fehlerName(fehlerNr))
+                   .arg(m_socket->errorString());
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -3186,7 +3224,23 @@ void P1RadioConnection::sendCommandFrame()
     fillTxZone(frame + 528);
 
     QByteArray pkt(reinterpret_cast<const char*>(frame), 1032);
-    m_socket->writeDatagram(pkt, m_radioInfo.address, m_radioInfo.port);
+    const qint64 geschrieben =
+        m_socket->writeDatagram(pkt, m_radioInfo.address, m_radioInfo.port);
+    // Sofort lesen, vor jedem weiteren Aufruf: errorString() und alles
+    // andere darf errno ueberschreiben.
+    if (geschrieben != pkt.size()) {
+        const int fehlerNr = Netz::letzterFehler();
+        m_letzterSendeFehler = fehlerNr;
+        qCWarning(lcConnection).noquote()
+            << QStringLiteral("P1: %1 send failed — wrote %2 of %3 bytes; "
+                              "fehler=%4 (%5); Qt: %6")
+                   .arg(QStringLiteral("EP2"))
+                   .arg(geschrieben)
+                   .arg(pkt.size())
+                   .arg(fehlerNr)
+                   .arg(Netz::fehlerName(fehlerNr))
+                   .arg(m_socket->errorString());
+    }
 
     // Phase 3P-E Task 3: record ep2 egress bytes for bandwidth monitor.
     // Source: mi0bot bandwidth_monitor.c:80-84 bandwidth_monitor_out() [@c26a8a4]

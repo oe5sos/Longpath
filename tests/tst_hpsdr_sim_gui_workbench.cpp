@@ -26,6 +26,7 @@
 #include "models/SliceModel.h"
 
 #include <QDir>
+#include <QRegularExpression>
 #include <QHostAddress>
 #include <QPainter>
 #include <QSignalSpy>
@@ -82,6 +83,13 @@ private slots:
         const QStringList hp = target.split(QLatin1Char(':'));
         const QHostAddress addr(hp.value(0, QStringLiteral("127.0.0.1")));
         const quint16 port = static_cast<quint16>(hp.value(1, QStringLiteral("1024")).toUInt());
+
+        // 2026-09-27: MainWindow verband iqSequenceGap mit einem Lambda
+        // und Qt::UniqueConnection -- Qt6 verweigert das mit dieser
+        // Warnung, das FFT-Fenster wurde nach einem IQ-Loch nie
+        // verworfen. Jetzt ein benannter Slot; die Warnung ist ein Fehler.
+        QTest::failOnWarning(QRegularExpression(
+            QStringLiteral("unique connections require a pointer to member function")));
 
         auto* mw = new MainWindow();
         mw->resize(1680, 1000);

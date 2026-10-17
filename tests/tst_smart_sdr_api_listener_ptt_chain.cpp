@@ -25,8 +25,12 @@ namespace {
 // Helper: wait until `pred()` returns true or `timeoutMs` elapses, pumping
 // the Qt event loop. Used because the listener does its work over queued
 // signals + async TCP, so blocking sleeps would deadlock.
+// Dieselbe Begruendung wie bei drain(): unter Last sind 1000 ms zu
+// knapp, und eine grosszuegige Frist kostet nur im Fehlerfall Zeit.
+constexpr int kVerbindenMs = 10000;
+
 template<typename Pred>
-bool waitFor(Pred pred, int timeoutMs = 1000)
+bool waitFor(Pred pred, int timeoutMs = 5000)
 {
     QElapsedTimer timer;
     timer.start();
@@ -39,15 +43,36 @@ bool waitFor(Pred pred, int timeoutMs = 1000)
 // Drain everything readable on `sock` into a QByteArray, with up to
 // `timeoutMs` to let bytes arrive. Test-side mirror of what Wireshark
 // would record for one TCP-4992 client.
-QByteArray drain(QTcpSocket* sock, int timeoutMs = 200)
+QByteArray drain(QTcpSocket* sock, int timeoutMs = 2000, int ruheMs = 60)
 {
+    // ── Warten, bis etwas da ist — nicht blind eine Zeit absitzen ───
+    //
+    // Hier standen 200 ms fest. Das reicht auf einem ruhigen Rechner
+    // und nicht unter Last: im `ctest -j6`-Durchgang vom 2026-10-15
+    // fiel `smoke_listenerAcceptsClientAndSendsBanner` um, und der
+    // Fehlertext sagte genau, was los war — „expected V<ver>\n
+    // prefix, got: " mit LEEREM got. Es war kein Byte angekommen,
+    // bevor die 200 ms abliefen.
+    //
+    // Jetzt zweistufig: erst warten, bis das erste Byte da ist
+    // (grosszuegig — die Zeit laeuft nur im Fehlerfall ab), dann noch
+    // eine kurze Ruhezeit, damit der Rest der Zeile mitkommt.
     QByteArray out;
     QElapsedTimer timer;
     timer.start();
-    while (timer.elapsed() < timeoutMs) {
+    while (out.isEmpty() && timer.elapsed() < timeoutMs) {
         QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
         if (sock->bytesAvailable() > 0) {
             out.append(sock->readAll());
+        }
+    }
+    QElapsedTimer ruhe;
+    ruhe.start();
+    while (ruhe.elapsed() < ruheMs) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 25);
+        if (sock->bytesAvailable() > 0) {
+            out.append(sock->readAll());
+            ruhe.restart();        // es kommt noch etwas: weiter warten
         }
     }
     return out;
@@ -131,7 +156,7 @@ void SmartSdrApiListenerPttChainTest::smoke_listenerAcceptsClientAndSendsBanner(
 
     QTcpSocket fakeAmp;
     fakeAmp.connectToHost(QHostAddress::LocalHost, port);
-    QVERIFY(fakeAmp.waitForConnected(1000));
+    QVERIFY(fakeAmp.waitForConnected(kVerbindenMs));
 
     const QByteArray bytes = drain(&fakeAmp);
     const QString text = QString::fromUtf8(bytes);
@@ -158,9 +183,9 @@ void SmartSdrApiListenerPttChainTest::sliceOwner_isLocalClientHandleNotPerClient
 
     QTcpSocket a, b;
     a.connectToHost(QHostAddress::LocalHost, listener.serverPort());
-    QVERIFY(a.waitForConnected(1000));
+    QVERIFY(a.waitForConnected(kVerbindenMs));
     b.connectToHost(QHostAddress::LocalHost, listener.serverPort());
-    QVERIFY(b.waitForConnected(1000));
+    QVERIFY(b.waitForConnected(kVerbindenMs));
     const QString textA = QString::fromUtf8(drain(&a));
     const QString textB = QString::fromUtf8(drain(&b));
 
@@ -199,9 +224,9 @@ void SmartSdrApiListenerPttChainTest::c1_localClientHandleIsStableAndDistinctFro
     // from the local-client handle.
     QTcpSocket a, b;
     a.connectToHost(QHostAddress::LocalHost, listener.serverPort());
-    QVERIFY(a.waitForConnected(1000));
+    QVERIFY(a.waitForConnected(kVerbindenMs));
     b.connectToHost(QHostAddress::LocalHost, listener.serverPort());
-    QVERIFY(b.waitForConnected(1000));
+    QVERIFY(b.waitForConnected(kVerbindenMs));
 
     auto bannerOf = [](const QByteArray& bytes) -> QString {
         const QString text = QString::fromUtf8(bytes);
@@ -238,7 +263,7 @@ void SmartSdrApiListenerPttChainTest::c2_pttRequestedIsOneFrameWithCanonicalFiel
     // Two amps: TGXL initiates TUNE, PGXL participates.
     QTcpSocket tgxl, pgxl;
     tgxl.connectToHost(QHostAddress::LocalHost, port);
-    QVERIFY(tgxl.waitForConnected(1000));
+    QVERIFY(tgxl.waitForConnected(kVerbindenMs));
     pgxl.connectToHost(QHostAddress::LocalHost, port);
     QVERIFY(pgxl.waitForConnected(1000));
     drain(&tgxl); drain(&pgxl);  // banner + initial status
@@ -297,7 +322,7 @@ void SmartSdrApiListenerPttChainTest::c2b_localInitTunePicksFirstTgxlAsInitiator
 
     QTcpSocket tgxl, pgxl;
     tgxl.connectToHost(QHostAddress::LocalHost, port);
-    QVERIFY(tgxl.waitForConnected(1000));
+    QVERIFY(tgxl.waitForConnected(kVerbindenMs));
     pgxl.connectToHost(QHostAddress::LocalHost, port);
     QVERIFY(pgxl.waitForConnected(1000));
     drain(&tgxl); drain(&pgxl);
@@ -335,7 +360,7 @@ void SmartSdrApiListenerPttChainTest::handshakeFlap_lsbInitialStatusUsesNegative
 
     QTcpSocket fakeAmp;
     fakeAmp.connectToHost(QHostAddress::LocalHost, port);
-    QVERIFY(fakeAmp.waitForConnected(1000));
+    QVERIFY(fakeAmp.waitForConnected(kVerbindenMs));
     const QByteArray bytes = drain(&fakeAmp);
     const QString text = QString::fromUtf8(bytes);
     QVERIFY2(text.contains(QStringLiteral("mode=LSB ")),
@@ -357,7 +382,7 @@ void SmartSdrApiListenerPttChainTest::handshakeFlap_usbInitialStatusUsesPositive
 
     QTcpSocket fakeAmp;
     fakeAmp.connectToHost(QHostAddress::LocalHost, port);
-    QVERIFY(fakeAmp.waitForConnected(1000));
+    QVERIFY(fakeAmp.waitForConnected(kVerbindenMs));
     const QByteArray bytes = drain(&fakeAmp);
     const QString text = QString::fromUtf8(bytes);
     QVERIFY2(text.contains(QStringLiteral("mode=USB ")),
@@ -379,7 +404,7 @@ void SmartSdrApiListenerPttChainTest::c3_transmittingIsOneFrameWithCommaSeparate
 
     QTcpSocket tgxl, pgxl;
     tgxl.connectToHost(QHostAddress::LocalHost, port);
-    QVERIFY(tgxl.waitForConnected(1000));
+    QVERIFY(tgxl.waitForConnected(kVerbindenMs));
     pgxl.connectToHost(QHostAddress::LocalHost, port);
     QVERIFY(pgxl.waitForConnected(1000));
     drain(&tgxl); drain(&pgxl);
@@ -425,7 +450,7 @@ void SmartSdrApiListenerPttChainTest::c4_transmittingIsDelayed30msAfterLastAck()
 
     QTcpSocket tgxl, pgxl;
     tgxl.connectToHost(QHostAddress::LocalHost, port);
-    QVERIFY(tgxl.waitForConnected(1000));
+    QVERIFY(tgxl.waitForConnected(kVerbindenMs));
     pgxl.connectToHost(QHostAddress::LocalHost, port);
     QVERIFY(pgxl.waitForConnected(1000));
     drain(&tgxl); drain(&pgxl);
@@ -474,7 +499,7 @@ void SmartSdrApiListenerPttChainTest::c5_unkeyEmitsUnkeyRequestedThenTwoReadyFra
 
     QTcpSocket tgxl, pgxl;
     tgxl.connectToHost(QHostAddress::LocalHost, port);
-    QVERIFY(tgxl.waitForConnected(1000));
+    QVERIFY(tgxl.waitForConnected(kVerbindenMs));
     pgxl.connectToHost(QHostAddress::LocalHost, port);
     QVERIFY(pgxl.waitForConnected(1000));
     drain(&tgxl); drain(&pgxl);
@@ -539,7 +564,7 @@ void SmartSdrApiListenerPttChainTest::c6_pttAPushesAreReplacedWithAmplifierState
 
     QTcpSocket tgxl, pgxl;
     tgxl.connectToHost(QHostAddress::LocalHost, port);
-    QVERIFY(tgxl.waitForConnected(1000));
+    QVERIFY(tgxl.waitForConnected(kVerbindenMs));
     pgxl.connectToHost(QHostAddress::LocalHost, port);
     QVERIFY(pgxl.waitForConnected(1000));
     drain(&tgxl); drain(&pgxl);
@@ -605,7 +630,7 @@ void SmartSdrApiListenerPttChainTest::c5b_wireDrivenTuneOffPreservesAmpTgReason(
 
     QTcpSocket tgxl, pgxl;
     tgxl.connectToHost(QHostAddress::LocalHost, port);
-    QVERIFY(tgxl.waitForConnected(1000));
+    QVERIFY(tgxl.waitForConnected(kVerbindenMs));
     pgxl.connectToHost(QHostAddress::LocalHost, port);
     QVERIFY(pgxl.waitForConnected(1000));
     drain(&tgxl); drain(&pgxl);

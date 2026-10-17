@@ -30,12 +30,18 @@
 //                 AetherSDR's default (0.70) without the sensitivity
 //                 slider, and confidence dims the text instead of
 //                 colouring it green/yellow/orange/red.
+//   2026-09-27 -- The pitch band follows RadioModel::cwPitchChanged live
+//                 instead of only at construction / slice change, and
+//                 reads the pitch through SliceModel::cwPitchHz (one
+//                 range, 200..2250). Martin Fischer (OE5SOS), AI-assisted
+//                 via Anthropic Claude.
 // =================================================================
 
 #pragma once
 
 #include "AppletWidget.h"
 
+#include <QPair>
 #include <QPointer>
 
 #include <memory>
@@ -80,6 +86,8 @@ public:
     QLabel*         statsForTest() const { return m_stats; }
     QPushButton*    lockPitchForTest() const { return m_lockPitchBtn; }
     QPushButton*    lockSpeedForTest() const { return m_lockSpeedBtn; }
+    // The band last handed to CwDecoder::setPitchRange ({0,0} before).
+    QPair<int, int> pitchBandForTest() const { return m_pitchBand; }
 
 private slots:
     void onTextDecoded(const QString& text, float cost);
@@ -95,6 +103,7 @@ private:
     std::unique_ptr<AudioTapRing> m_tapRing;
     QTimer* m_pumpTimer{nullptr};
     QMetaObject::Connection m_pitchConn;
+    QPair<int, int> m_pitchBand{0, 0};
 
     QLabel*         m_stats{nullptr};
     QLabel*         m_lockCapsule{nullptr};

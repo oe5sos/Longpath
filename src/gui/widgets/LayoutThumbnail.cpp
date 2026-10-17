@@ -119,7 +119,14 @@ void LayoutThumbnail::paintEvent(QPaintEvent*)
 
         if (i < static_cast<int>(sizeof(kLetters) - 1)) {
             p.setPen(textColor);
-            p.setFont(QFont(QStringLiteral("sans-serif"), 14, QFont::Bold));
+            // "sans-serif" ist ein CSS-Gattungsname, keine Qt-Familie:
+            // Qt suchte sich hier selbst eine Schrift aus, statt die
+            // des Programms zu nehmen. Gewollt war immer nur "die
+            // normale Schrift, 14 pt, fett".
+            QFont beschriftung = p.font();
+            beschriftung.setPointSize(14);
+            beschriftung.setWeight(QFont::Bold);
+            p.setFont(beschriftung);
             p.drawText(cells[i], Qt::AlignCenter, QString(QLatin1Char(kLetters[i])));
         }
     }

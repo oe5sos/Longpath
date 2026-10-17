@@ -2,8 +2,9 @@
 // src/gui/applets/PhoneCwApplet.cpp  (Longpath)
 // =================================================================
 //
-// Ported from Thetis source:
+// Ported from Thetis sources:
 //   Project Files/Source/Console/setup.cs, original licence from Thetis source is included below
+//   Project Files/Source/Console/console.cs, original licence from Thetis source is included below
 //
 // =================================================================
 // Modification history (Longpath):
@@ -33,6 +34,14 @@
 //                 m_voxDlyLabel/m_voxPeakMeter removed.  DEXP row (#11)
 //                 stays.  pollDexpMeters() trimmed to drive only the DEXP
 //                 strip; VOX peak polling lives on TxApplet now.
+//   2026-09-27 — FM page: deviation 5.0k / 2.5k wired to
+//                 RadioModel::setFmDeviationHz (console.cs FMDeviation_Hz,
+//                 [@852bf0e]); CTCSS, tone (Thetis' 49), simplex, offset,
+//                 direction and reverse bound to the active slice
+//                 (console.cs:40293-40468); memory channels list +
+//                 recall + wrap-around stepping (console.cs:40311-40316,
+//                 40557-40576). Martin Fischer (OE5SOS),
+//                 AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 //=================================================================
@@ -80,16 +89,71 @@
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 
+//=================================================================
+// console.cs
+//=================================================================
+// Thetis is a C# implementation of a Software Defined Radio.
+// Copyright (C) 2004-2009  FlexRadio Systems
+// Copyright (C) 2010-2020  Doug Wigley
+// Credit is given to Sizenko Alexander of Style-7 (http://www.styleseven.com/) for the Digital-7 font.
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+//
+// You may contact us via email at: sales@flex-radio.com.
+// Paper mail may be sent to:
+//    FlexRadio Systems
+//    8900 Marybank Dr.
+//    Austin, TX 78750
+//    USA
+//
+//=================================================================
+// Modifications to support the Behringer Midi controllers
+// by Chris Codella, W2PA, May 2017.  Indicated by //-W2PA comment lines.
+// Modifications for using the new database import function.  W2PA, 29 May 2017
+// Support QSK, possible with Protocol-2 firmware v1.7 (Orion-MkI and Orion-MkII), and later.  W2PA, 5 April 2019
+// Modfied heavily - Copyright (C) 2019-2026 Richard Samphire (MW0LGE)
+//
+//============================================================================================//
+// Dual-Licensing Statement (Applies Only to Author's Contributions, Richard Samphire MW0LGE) //
+// ------------------------------------------------------------------------------------------ //
+// For any code originally written by Richard Samphire MW0LGE, or for any modifications       //
+// made by him, the copyright holder for those portions (Richard Samphire) reserves the       //
+// right to use, license, and distribute such code under different terms, including           //
+// closed-source and proprietary licences, in addition to the GNU General Public License      //
+// granted above. Nothing in this statement restricts any rights granted to recipients under  //
+// the GNU GPL. Code contributed by others (not Richard Samphire) remains licensed under      //
+// its original terms and is not affected by this dual-licensing statement in any way.        //
+// Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
+//============================================================================================//
+
 #include "PhoneCwApplet.h"
 #include "gui/HGauge.h"
 #include "gui/ComboStyle.h"
 #include "gui/widgets/DexpPeakMeter.h"
+#include "gui/widgets/TriBtn.h"
 #include "NyiOverlay.h"
 #include "core/BoardCapabilities.h"
 #include "core/AudioEngine.h"
 #include "core/MoxController.h"
 #include "core/TxChannel.h"
+#include "core/MicProfileManager.h"
 #include "models/RadioModel.h"
+#include "models/SliceModel.h"
+#include "models/MemoryList.h"
+#include "models/MemoryRecord.h"
+#include "gui/widgets/VfoModeContainers.h"
 #include "models/TransmitModel.h"
 #include "gui/StyleConstants.h"
 
@@ -139,22 +203,10 @@ static inline QString phoneButtonStyle()
           Longpath::Style::kButtonAltHover);
 }
 
-// CTCSS tones (standard 38-tone list from Thetis setup.cs)
-static const QStringList kCtcssTones = {
-    QStringLiteral("67.0"),  QStringLiteral("71.9"),  QStringLiteral("74.4"),
-    QStringLiteral("77.0"),  QStringLiteral("79.7"),  QStringLiteral("82.5"),
-    QStringLiteral("85.4"),  QStringLiteral("88.5"),  QStringLiteral("91.5"),
-    QStringLiteral("94.8"),  QStringLiteral("97.4"),  QStringLiteral("100.0"),
-    QStringLiteral("103.5"), QStringLiteral("107.2"), QStringLiteral("110.9"),
-    QStringLiteral("114.8"), QStringLiteral("118.8"), QStringLiteral("123.0"),
-    QStringLiteral("127.3"), QStringLiteral("131.8"), QStringLiteral("136.5"),
-    QStringLiteral("141.3"), QStringLiteral("146.2"), QStringLiteral("151.4"),
-    QStringLiteral("156.7"), QStringLiteral("162.2"), QStringLiteral("167.9"),
-    QStringLiteral("173.8"), QStringLiteral("179.9"), QStringLiteral("186.2"),
-    QStringLiteral("192.8"), QStringLiteral("203.5"), QStringLiteral("210.7"),
-    QStringLiteral("218.1"), QStringLiteral("225.7"), QStringLiteral("233.6"),
-    QStringLiteral("241.8"), QStringLiteral("254.1"),
-};
+// CTCSS tones: the FM page uses Thetis' 49-tone console list
+// (console.cs:236-241 CTCSS_array) via FmOptContainer::ctcssTones(), the
+// same list as the VFO flag (2026-09-27). The 38-tone list that stood here
+// was labelled "from Thetis setup.cs", but setup.cs has no CTCSS list.
 
 
 // ── PhoneCwApplet ─────────────────────────────────────────────────────────────
@@ -284,8 +336,11 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
     // ── Control 3: Mic profile combo ─────────────────────────────────────────
     m_micProfileCombo = new QComboBox(page);
     m_micProfileCombo->setFixedHeight(22);
-    m_micProfileCombo->addItems({QStringLiteral("Default"), QStringLiteral("DX"),
-                                 QStringLiteral("Contest"), QStringLiteral("Custom")});
+    // KEINE Namen hier: der MicProfileManager fuellt die Liste (22
+    // Werksprofile plus die eigenen des Betreibers), siehe
+    // fuelleProfilCombo(). Hier standen "Default"/"DX"/... -- erfundene
+    // Namen, die mit den echten Profilen nichts zu tun hatten; wer eines
+    // waehlte, waehlte nichts.
     m_micProfileCombo->setAccessibleName(QStringLiteral("Microphone profile"));
     applyComboStyle(m_micProfileCombo);
     vbox->addWidget(m_micProfileCombo);
@@ -297,11 +352,27 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
 
         // Control 4: Mic source combo (fixedWidth 55, fixedHeight 22)
         m_micSourceCombo = new QComboBox(page);
-        m_micSourceCombo->setFixedWidth(55);
+        // Breiter als 55 px: "Radio" passt sonst nicht.
+        m_micSourceCombo->setFixedWidth(68);
         m_micSourceCombo->setFixedHeight(22);
-        m_micSourceCombo->addItems({QStringLiteral("MIC"), QStringLiteral("BAL"),
-                                    QStringLiteral("LINE"), QStringLiteral("ACC"),
-                                    QStringLiteral("PC")});
+        // Longpaths drei Quellen, nicht Thetis' fuenf Hardware-Eingaenge.
+        //
+        // Hier standen MIC / BAL / LINE / ACC / PC -- die Eingangswahl am
+        // ANAN, die Thetis als `Mic_Source` in Hardware-Register schreibt.
+        // Longpath hat diesen Begriff nicht: `MicSource`
+        // (CompositeTxMicRouter.h:66) kennt Pc, Radio und Vax -- also
+        // WOHER das Sendeaudio kommt, nicht welche Buchse am Geraet.
+        //
+        // Fuenf Eintraege, von denen vier nichts bezeichnen, sind
+        // schlechter als drei, die es tun. Wer die Buchsenwahl braucht,
+        // braucht dafuer Hardware-Register (eigener Gang); dieser
+        // Auswaehler waere dann der falsche Ort.
+        m_micSourceCombo->addItem(QStringLiteral("PC"),
+                                  static_cast<int>(MicSource::Pc));
+        m_micSourceCombo->addItem(QStringLiteral("Radio"),
+                                  static_cast<int>(MicSource::Radio));
+        m_micSourceCombo->addItem(QStringLiteral("VAX"),
+                                  static_cast<int>(MicSource::Vax));
         m_micSourceCombo->setAccessibleName(QStringLiteral("Microphone source"));
         applyComboStyle(m_micSourceCombo);
         row->addWidget(m_micSourceCombo);
@@ -424,11 +495,14 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         m_monSlider->setAccessibleName(QStringLiteral("Monitor level"));
         row->addWidget(m_monSlider, 1);
 
-        auto* monLabel = new QLabel(QStringLiteral("50"), page);
-        monLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(Longpath::Style::kTextPrimary));
-        monLabel->setMinimumWidth(22);
-        monLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        row->addWidget(monLabel);
+        // Das MITGLIED, nicht eine lokale Variable: m_monLabel ist seit
+        // dem Aufbau dieses Felds deklariert und blieb null, weil hier
+        // ein `auto*` stand. Die Verdrahtung braucht es.
+        m_monLabel = new QLabel(QStringLiteral("50"), page);
+        m_monLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(Longpath::Style::kTextPrimary));
+        m_monLabel->setMinimumWidth(22);
+        m_monLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        row->addWidget(m_monLabel);
 
         vbox->addLayout(row);
     }
@@ -511,7 +585,13 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         row->addWidget(lbl);
 
         m_amCarSlider = new QSlider(Qt::Horizontal, page);
-        m_amCarSlider->setRange(0, 100);
+        // 0..125, nicht 0..100: das ist Thetis' Bereich
+        // (setup.designer.cs udTXAMCarrierLevel Minimum 0, Maximum 125,
+        // Value 100). Mit 0..100 waere die Vorgabe am oberen Anschlag und
+        // das obere Viertel des DSP-Bereichs nie erreichbar.
+        m_amCarSlider->setRange(TransmitModel::kAmCarrierPercentMin,
+                                TransmitModel::kAmCarrierPercentMax);
+        m_amCarSlider->setValue(TransmitModel::kAmCarrierPercentDefault);
         m_amCarSlider->setValue(25);
         m_amCarSlider->setStyleSheet(Longpath::Style::sliderHStyle());
         m_amCarSlider->setAccessibleName(QStringLiteral("AM carrier level"));
@@ -535,13 +615,8 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
     // #11 m_dexpBtn / m_dexpSlider — wired (Phase 3M-3a-iii Task 15;
     //     m_dexpSlider is decorative-only per Thetis quirk, see wireControls())
     NyiOverlay::markNyi(m_compGauge,        kNyiProc);    // #2 — Phase 3I-3
-    NyiOverlay::markNyi(m_micProfileCombo,  kNyiPhone);   // #3
-    NyiOverlay::markNyi(m_micSourceCombo,   kNyiPhone);   // #4
     NyiOverlay::markNyi(m_accBtn,           kNyiPhone);   // #6
     // #8 m_vaxBtn: wired (Phase 3M-VAX-toggle)
-    NyiOverlay::markNyi(m_monBtn,           kNyiPhone);   // #9
-    NyiOverlay::markNyi(m_monSlider,        kNyiPhone);   // #9 slider
-    NyiOverlay::markNyi(m_amCarSlider,      kNyiProc);    // #13 — Phase 3I-3
 }
 
 // ── CW page — placeholder until Phase 3M-2 ───────────────────────────────────
@@ -643,13 +718,17 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
         m_ctcssBtn = new QPushButton(QStringLiteral("CTCSS"), page);
         m_ctcssBtn->setCheckable(true);
         m_ctcssBtn->setFixedHeight(22);
-        m_ctcssBtn->setFixedWidth(52);
+        // Width from the text, like the Simplex button below: a fixed 52 px
+        // cut the label to "·TCSS·" (2026-09-27).
+        m_ctcssBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         m_ctcssBtn->setStyleSheet(phoneButtonStyle() + Longpath::Style::greenCheckedStyle());
         m_ctcssBtn->setAccessibleName(QStringLiteral("CTCSS sub-audible tone squelch"));
         row->addWidget(m_ctcssBtn);
 
         m_ctcssCombo = new QComboBox(page);
-        m_ctcssCombo->addItems(kCtcssTones);
+        for (double hz : FmOptContainer::ctcssTones()) {
+            m_ctcssCombo->addItem(QString::number(hz, 'f', 1), hz);
+        }
         applyComboStyle(m_ctcssCombo);
         m_ctcssCombo->setAccessibleName(QStringLiteral("CTCSS tone frequency"));
         row->addWidget(m_ctcssCombo, 1);
@@ -777,15 +856,14 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
         m_fmMemCombo->setAccessibleName(QStringLiteral("FM memory channel"));
         row->addWidget(m_fmMemCombo, 1);
 
-        m_fmMemPrev = new QPushButton(QStringLiteral("\u25c4"), page);
-        m_fmMemPrev->setFixedSize(22, 22);
-        m_fmMemPrev->setStyleSheet(phoneButtonStyle());
+        // Painted triangles like every other stepper (TriBtn, 22x22): the
+        // U+25C4 / U+25BA glyphs did not show inside the styled 22 px
+        // buttons -- two empty boxes (2026-09-27).
+        m_fmMemPrev = new TriBtn(TriBtn::Left, page);
         m_fmMemPrev->setAccessibleName(QStringLiteral("Previous FM memory"));
         row->addWidget(m_fmMemPrev);
 
-        m_fmMemNext = new QPushButton(QStringLiteral("\u25ba"), page);
-        m_fmMemNext->setFixedSize(22, 22);
-        m_fmMemNext->setStyleSheet(phoneButtonStyle());
+        m_fmMemNext = new TriBtn(TriBtn::Right, page);
         m_fmMemNext->setAccessibleName(QStringLiteral("Next FM memory"));
         row->addWidget(m_fmMemNext);
 
@@ -797,20 +875,105 @@ void PhoneCwApplet::buildFmPage(QWidget* page)
     // ── Mark all FM controls NYI (Phase 3I-1) ────────────────────────────────
     NyiOverlay::markNyi(m_fmMicSlider,     kNyiFm);
     NyiOverlay::markNyi(m_fmMicLabel,      kNyiFm);
-    NyiOverlay::markNyi(m_dev5kBtn,        kNyiFm);
-    NyiOverlay::markNyi(m_dev25kBtn,       kNyiFm);
-    NyiOverlay::markNyi(m_ctcssBtn,        kNyiFm);
-    NyiOverlay::markNyi(m_ctcssCombo,      kNyiFm);
-    NyiOverlay::markNyi(m_simplexBtn,      kNyiFm);
-    NyiOverlay::markNyi(m_rptOffsetSlider, kNyiFm);
-    NyiOverlay::markNyi(m_rptOffsetLabel,  kNyiFm);
-    NyiOverlay::markNyi(m_offsetMinusBtn,  kNyiFm);
-    NyiOverlay::markNyi(m_offsetPlusBtn,   kNyiFm);
-    NyiOverlay::markNyi(m_offsetRevBtn,    kNyiFm);
     NyiOverlay::markNyi(m_fmProfileCombo,  kNyiFm);
-    NyiOverlay::markNyi(m_fmMemCombo,      kNyiFm);
-    NyiOverlay::markNyi(m_fmMemPrev,       kNyiFm);
-    NyiOverlay::markNyi(m_fmMemNext,       kNyiFm);
+}
+
+// ── Vier Attrappen verdrahtet (2026-10-12) ──────────────────────────────────
+//
+// Mithoeren (Knopf + Regler), Mikrofonquelle, Mikrofonprofil und
+// AM-Traegerpegel trugen NyiOverlay. Der Unterbau war fuer drei davon
+// schon da -- man konnte ihn nur nicht erreichen:
+//
+//   Mithoeren  -> TransmitModel::setMonEnabled/setMonitorVolume ->
+//                 AudioEngine (RadioModel.cpp:7096-7118), fertig seit E.3
+//   Quelle     -> TransmitModel::setMicSource; der VAX-Knopf daneben
+//                 bedient sie schon, und sein Kommentar sagt wortwoertlich
+//                 "future combo wiring"
+//   Profil     -> MicProfileManager, 22 Werksprofile
+//   AM-Traeger -> gab es NICHT; neu gebaut (TxChannel::setAmCarrierLevel,
+//                 TransmitModel::amCarrierPercent mit der Wurzelkennlinie
+//                 aus Thetis setup.cs:9709)
+//
+// Nicht verdrahtet und mit Marke BEHALTEN, mit Grund:
+//   ACC-Knopf    -> gehoert zur Buchsenwahl am Geraet (Thetis Mic_Source,
+//                   Hardware-Register). Longpath hat diesen Begriff nicht.
+//   Komp-Anzeige -> der Messwert ist zurueckgestellt (TxChannel.h:1287,
+//                   getCompMeter gibt 0.0f). Eine Anzeige, die 0 zeigt,
+//                   waere eine Luege, kein Fortschritt.
+
+void PhoneCwApplet::setMicProfileManager(MicProfileManager* mgr)
+{
+    m_micProfileMgr = mgr;
+    if (!m_micProfileCombo) { return; }
+    // Ohne Verwalter bleibt die Combo GESPERRT, statt leer zu stehen und
+    // sich bedienen zu lassen.
+    m_micProfileCombo->setEnabled(mgr != nullptr);
+    if (!mgr) {
+        m_micProfileCombo->setToolTip(
+            tr("No profile manager available"));
+        return;
+    }
+    connect(mgr, &MicProfileManager::profileListChanged,
+            this, [this]() { fuelleProfilCombo(); });
+    connect(mgr, &MicProfileManager::activeProfileChanged,
+            this, [this](const QString&) { fuelleProfilCombo(); });
+    connect(m_micProfileCombo, &QComboBox::currentTextChanged,
+            this, [this](const QString& name) {
+        if (m_updatingFromModel || !m_micProfileMgr || !m_model) { return; }
+        if (name.isEmpty()) { return; }
+        m_micProfileMgr->setActiveProfile(name, &m_model->transmitModel());
+    });
+    fuelleProfilCombo();
+}
+
+void PhoneCwApplet::fuelleProfilCombo()
+{
+    if (!m_micProfileCombo || !m_micProfileMgr) { return; }
+    const QStringList namen = m_micProfileMgr->profileNames();
+    const QString aktiv = m_micProfileMgr->activeProfileName();
+    m_updatingFromModel = true;
+    {
+        QSignalBlocker b(m_micProfileCombo);
+        m_micProfileCombo->clear();
+        m_micProfileCombo->addItems(namen);
+        const int i = namen.indexOf(aktiv);
+        if (i >= 0) { m_micProfileCombo->setCurrentIndex(i); }
+    }
+    m_updatingFromModel = false;
+}
+
+void PhoneCwApplet::zeigeMicQuelle()
+{
+    if (!m_micSourceCombo || !m_model) { return; }
+    const TransmitModel& tx = m_model->transmitModel();
+    m_updatingFromModel = true;
+    {
+        QSignalBlocker b(m_micSourceCombo);
+        const int i = m_micSourceCombo->findData(static_cast<int>(tx.micSource()));
+        if (i >= 0) { m_micSourceCombo->setCurrentIndex(i); }
+    }
+    // Die Mikrofonbuchse des Geraets ist bei Baugruppen ohne sie gesperrt
+    // (RadioModel ruft setMicSourceLocked(!caps.hasMicJack) beim
+    // Verbinden). Den Eintrag dann AUSGRAUEN, nicht stillschweigend
+    // ignorieren: sonst waehlt der Betreiber "Radio", es geschieht nichts,
+    // und die Combo springt von selbst zurueck -- das sieht nach einem
+    // kaputten Programm aus, nicht nach einer fehlenden Buchse.
+    const int iRadio =
+        m_micSourceCombo->findData(static_cast<int>(MicSource::Radio));
+    if (iRadio >= 0) {
+        const bool gesperrt = tx.isMicSourceLocked();
+        auto* mdl = m_micSourceCombo->model();
+        mdl->setData(mdl->index(iRadio, 0),
+                     gesperrt ? QVariant(Qt::NoItemFlags)
+                              : QVariant(Qt::ItemIsSelectable | Qt::ItemIsEnabled),
+                     Qt::UserRole - 1);
+        m_micSourceCombo->setToolTip(
+            gesperrt
+                ? tr("This radio has no microphone jack "
+                      "-- \"Radio\" is disabled")
+                : tr("Where the transmit audio comes from"));
+    }
+    m_updatingFromModel = false;
 }
 
 // ── wireControls — Phase 3M-1b mic gain slider + mic level gauge ─────────────
@@ -835,6 +998,93 @@ void PhoneCwApplet::wireControls()
 {
     if (!m_model) {
         return;
+    }
+
+    // ── FM page: deviation 5.0k / 2.5k (2026-09-27) ───────────────────────────
+    // Thetis radFMDeviation5kHz / radFMDeviation2kHz -> FMDeviation_Hz
+    // (console.cs:20860-20885, 40318-40395 [@852bf0e]); RadioModel pushes
+    // TX + RX deviation and the FM filter. A checked button stays checked.
+    {
+        auto pickDeviation = [this](int hz) {
+            if (m_updatingFromModel || !m_model) { return; }
+            m_model->setFmDeviationHz(hz);
+            syncFmDeviation();
+        };
+        connect(m_dev5kBtn,  &QPushButton::clicked, this, [pickDeviation]() { pickDeviation(5000); });
+        connect(m_dev25kBtn, &QPushButton::clicked, this, [pickDeviation]() { pickDeviation(2500); });
+        connect(m_model, &RadioModel::fmDeviationHzChanged,
+                this, [this](int) { syncFmDeviation(); });
+        syncFmDeviation();
+    }
+
+    // ── FM page: CTCSS, simplex, offset, direction, reverse (2026-09-27) ─────
+    // Bound to the active slice: the same SliceModel properties the VFO
+    // flag's FM container drives; both follow the slice's signals.
+    {
+        connect(m_ctcssBtn, &QPushButton::clicked, this, [this](bool on) {
+            if (m_updatingFromModel || !m_fmSlice) { return; }
+            // From Thetis console.cs:40293-40296, 40318-40328 [@852bf0e] --
+            // chkFMCTCSS -> CTCSSOn -> radio.GetDSPTX(0).CTCSSFlag: the box
+            // keys the TX tone only; a decode choice made in the flag stays.
+            const int mode = m_fmSlice->fmCtcssMode();
+            const bool decode = (mode == 2 || mode == 3);
+            m_fmSlice->setFmCtcssMode(on ? (decode ? 3 : 1) : (decode ? 2 : 0));
+        });
+        connect(m_ctcssCombo, &QComboBox::currentIndexChanged, this, [this](int idx) {
+            if (m_updatingFromModel || !m_fmSlice || idx < 0) { return; }
+            // comboFMCTCSS_SelectedIndexChanged -> CTCSSFreq (console.cs:40298-40302)
+            m_fmSlice->setFmCtcssValueHz(m_ctcssCombo->itemData(idx).toDouble());
+        });
+        // chkFMTXSimplex / chkFMTXLow / chkFMTXHigh (console.cs:40400-40440):
+        // one of three; SliceModel::setFmTxMode turns Reverse off first.
+        auto pickTx = [this](FmTxMode m) {
+            if (m_updatingFromModel || !m_fmSlice) { return; }
+            m_fmSlice->setFmTxMode(m);
+            syncFmSliceControls();
+        };
+        connect(m_simplexBtn,     &QPushButton::clicked, this, [pickTx]() { pickTx(FmTxMode::Simplex); });
+        connect(m_offsetMinusBtn, &QPushButton::clicked, this, [pickTx]() { pickTx(FmTxMode::Low); });
+        connect(m_offsetPlusBtn,  &QPushButton::clicked, this, [pickTx]() { pickTx(FmTxMode::High); });
+        connect(m_offsetRevBtn,   &QPushButton::clicked, this, [this](bool on) {
+            if (m_updatingFromModel || !m_fmSlice) { return; }
+            m_fmSlice->setFmReverse(on);   // chkFMTXRev_CheckedChanged (console.cs:40442-40468)
+        });
+        // Offset slider in kHz (udFMOffset_ValueChanged -> FMTXOffsetMHz,
+        // console.cs:40395-40398).
+        connect(m_rptOffsetSlider, &QSlider::valueChanged, this, [this](int kHz) {
+            m_rptOffsetLabel->setText(QString::number(kHz));
+            if (m_updatingFromModel || !m_fmSlice) { return; }
+            m_fmSlice->setFmOffsetHz(kHz * 1000);
+        });
+        connect(m_model, &RadioModel::activeSliceChanged, this, [this](int) {
+            bindFmSlice(m_model ? m_model->activeSlice() : nullptr);
+        });
+        bindFmSlice(m_model->activeSlice());
+    }
+
+    // ── FM page: memory channels (2026-09-27) ─────────────────────────────────
+    // From Thetis console.cs:40311-40316 [@852bf0e] -- InitMemoryFrontPanel:
+    // comboFMMemory.DataSource = MemoryList.List, DisplayMember = "Name";
+    // console.cs:40557-40576 -- a selection recalls the memory, Up/Down step
+    // with wrap-around.
+    if (MemoryList* mem = m_model->memories()) {
+        connect(mem, &MemoryList::listChanged, this, [this]() { fillFmMemories(); });
+        connect(m_fmMemCombo, &QComboBox::currentIndexChanged, this, [this](int idx) {
+            if (m_updatingFromModel || !m_model || !m_model->memories()) { return; }
+            MemoryList* list = m_model->memories();
+            if (idx < 0 || idx >= list->count()) { return; }
+            // comboFMMemory_SelectedIndexChanged: RecallMemory(new MemoryRecord(selected))
+            m_model->recallMemory(MemoryRecord(list->at(idx)));
+        });
+        auto step = [this](int delta) {
+            const int n = m_model && m_model->memories() ? m_model->memories()->count() : 0;
+            if (n == 0 || m_fmMemCombo->currentIndex() < 0) { return; }
+            // btnFMMemoryUp: (i + 1) % n; btnFMMemoryDown: (i - 1 + n) % n
+            m_fmMemCombo->setCurrentIndex((m_fmMemCombo->currentIndex() + delta + n) % n);
+        };
+        connect(m_fmMemNext, &QPushButton::clicked, this, [step]() { step(+1); });
+        connect(m_fmMemPrev, &QPushButton::clicked, this, [step]() { step(-1); });
+        fillFmMemories();
     }
 
     TransmitModel& tx = m_model->transmitModel();
@@ -939,6 +1189,102 @@ void PhoneCwApplet::wireControls()
             }
             m_updatingFromModel = false;
         });
+    }
+
+    // ── Mithoeren: Knopf + Regler (2026-10-12) ──────────────────────────────
+    //
+    // Die ganze Kette stand seit E.3: TransmitModel::monEnabled/
+    // monitorVolume -> AudioEngine::setTxMonitorEnabled/Volume
+    // (RadioModel.cpp:7096-7118), mit eigenen Prueffaellen. Es fehlte nur
+    // der Knopf -- und der daneben im TX-Feld bedient dieselben zwei
+    // Eigenschaften, beide bleiben also von selbst gleich.
+    if (m_monBtn && m_monSlider && m_monLabel) {
+        m_monBtn->setToolTip(QStringLiteral(
+            "Mithoeren: das eigene Sendesignal ueber die Lautsprecher"));
+        {
+            QSignalBlocker bb(m_monBtn);
+            QSignalBlocker bs(m_monSlider);
+            m_monBtn->setChecked(tx.monEnabled());
+            // Das Modell haelt 0..1, der Regler 0..100.
+            m_monSlider->setValue(qRound(tx.monitorVolume() * 100.0f));
+            m_monLabel->setText(QString::number(
+                qRound(tx.monitorVolume() * 100.0f)));
+        }
+        connect(m_monBtn, &QPushButton::toggled, this, [this, &tx](bool on) {
+            if (m_updatingFromModel) { return; }
+            tx.setMonEnabled(on);
+        });
+        connect(m_monSlider, &QSlider::valueChanged, this, [this, &tx](int v) {
+            if (m_updatingFromModel) { return; }
+            m_monLabel->setText(QString::number(v));
+            tx.setMonitorVolume(static_cast<float>(v) / 100.0f);
+        });
+        // Modell -> Oberflaeche: das TX-Feld, ein Mikrofonprofil oder TCI
+        // koennen dasselbe stellen.
+        connect(&tx, &TransmitModel::monEnabledChanged, this, [this](bool on) {
+            m_updatingFromModel = true;
+            { QSignalBlocker b(m_monBtn); m_monBtn->setChecked(on); }
+            m_updatingFromModel = false;
+        });
+        connect(&tx, &TransmitModel::monitorVolumeChanged,
+                this, [this](float vol) {
+            m_updatingFromModel = true;
+            const int v = qRound(vol * 100.0f);
+            { QSignalBlocker b(m_monSlider); m_monSlider->setValue(v); }
+            m_monLabel->setText(QString::number(v));
+            m_updatingFromModel = false;
+        });
+    }
+
+    // ── AM-Traegerpegel (2026-10-12) ────────────────────────────────────────
+    //
+    // Den gab es in Longpath nicht; WDSPs ammod lief auf seiner
+    // Anlegevorgabe. Der Regler haelt PROZENT (0..125, Thetis-Bereich),
+    // die Wurzelkennlinie steckt in TransmitModel::amCarrierDspFromPercent.
+    if (m_amCarSlider && m_amCarLabel) {
+        m_amCarSlider->setToolTip(QStringLiteral(
+            "AM-Traegerpegel in Prozent (Vorgabe 100)"));
+        {
+            QSignalBlocker b(m_amCarSlider);
+            m_amCarSlider->setValue(tx.amCarrierPercent());
+            m_amCarLabel->setText(QString::number(tx.amCarrierPercent()));
+        }
+        connect(m_amCarSlider, &QSlider::valueChanged, this, [this, &tx](int v) {
+            if (m_updatingFromModel) { return; }
+            m_amCarLabel->setText(QString::number(v));
+            tx.setAmCarrierPercent(v);
+        });
+        connect(&tx, &TransmitModel::amCarrierPercentChanged,
+                this, [this](int v) {
+            m_updatingFromModel = true;
+            { QSignalBlocker b(m_amCarSlider); m_amCarSlider->setValue(v); }
+            m_amCarLabel->setText(QString::number(v));
+            m_updatingFromModel = false;
+        });
+    }
+
+    // ── Mikrofonquelle: die Combo (2026-10-12) ──────────────────────────────
+    //
+    // Der VAX-Knopf daneben schaltet schon zwischen VAX und der vorherigen
+    // Quelle; sein eigener Kommentar nennt diese Combo "future combo
+    // wiring". Jetzt ist sie da -- und sie kann, was der Knopf nicht kann:
+    // ausdruecklich auf die Mikrofonbuchse des Geraets umstellen.
+    if (m_micSourceCombo) {
+        connect(m_micSourceCombo, &QComboBox::currentIndexChanged,
+                this, [this, &tx](int i) {
+            if (m_updatingFromModel || i < 0) { return; }
+            const QVariant d = m_micSourceCombo->itemData(i);
+            if (!d.isValid()) { return; }
+            tx.setMicSource(static_cast<MicSource>(d.toInt()));
+        });
+        connect(&tx, &TransmitModel::micSourceChanged,
+                this, [this](MicSource) { zeigeMicQuelle(); });
+        // Die Sperre kommt beim Verbinden (caps.hasMicJack), also auch
+        // darauf horchen -- sonst bleibt "Radio" waehlbar an einem Geraet
+        // ohne Buchse.
+        connect(&tx, &TransmitModel::micSourceLockedChanged,
+                this, [this](bool) { zeigeMicQuelle(); });
+        zeigeMicQuelle();
     }
 
     // ── #8 VAX button bidirectional with TransmitModel::toggleVaxSource ────
@@ -1241,6 +1587,95 @@ void PhoneCwApplet::pollDexpMeters()
             m_dexpPeakMeter->setSignalLevel(0.0);
         }
     }
+}
+
+// ── syncFmDeviation — the FM page's 5.0k / 2.5k pair from the model ─────────
+//
+// From Thetis console.cs:20870-20879 [@852bf0e] -- FMDeviation_Hz setter:
+// 5000 checks 5 kHz, 2500 checks 2.5 kHz, anything else leaves both.
+void PhoneCwApplet::syncFmDeviation()
+{
+    if (!m_model || !m_dev5kBtn || !m_dev25kBtn) { return; }
+    m_updatingFromModel = true;
+    const int hz = m_model->fmDeviationHz();
+    if (hz == 5000) {
+        m_dev25kBtn->setChecked(false);
+        m_dev5kBtn->setChecked(true);
+    } else if (hz == 2500) {
+        m_dev5kBtn->setChecked(false);
+        m_dev25kBtn->setChecked(true);
+    }
+    m_updatingFromModel = false;
+}
+
+// ── FM page ⇄ active slice (2026-09-27) ──────────────────────────────────────
+
+void PhoneCwApplet::bindFmSlice(SliceModel* s)
+{
+    if (m_fmSlice) { disconnect(m_fmSlice, nullptr, this, nullptr); }
+    m_fmSlice = s;
+    if (s) {
+        connect(s, &SliceModel::fmCtcssModeChanged,    this, [this](int)      { syncFmSliceControls(); });
+        connect(s, &SliceModel::fmCtcssValueHzChanged, this, [this](double)   { syncFmSliceControls(); });
+        connect(s, &SliceModel::fmOffsetHzChanged,     this, [this](int)      { syncFmSliceControls(); });
+        connect(s, &SliceModel::fmTxModeChanged,       this, [this](FmTxMode) { syncFmSliceControls(); });
+        connect(s, &SliceModel::fmReverseChanged,      this, [this](bool)     { syncFmSliceControls(); });
+    }
+    syncFmSliceControls();
+}
+
+void PhoneCwApplet::syncFmSliceControls()
+{
+    if (!m_ctcssBtn) { return; }
+    m_updatingFromModel = true;
+    const bool have = !m_fmSlice.isNull();
+    for (QWidget* w : {static_cast<QWidget*>(m_ctcssBtn), static_cast<QWidget*>(m_ctcssCombo),
+                       static_cast<QWidget*>(m_simplexBtn), static_cast<QWidget*>(m_rptOffsetSlider),
+                       static_cast<QWidget*>(m_offsetMinusBtn), static_cast<QWidget*>(m_offsetPlusBtn),
+                       static_cast<QWidget*>(m_offsetRevBtn)}) {
+        w->setEnabled(have);
+    }
+    if (have) {
+        const int mode = m_fmSlice->fmCtcssMode();
+        m_ctcssBtn->setChecked(mode == 1 || mode == 3);
+        const int idx = m_ctcssCombo->findText(QString::number(m_fmSlice->fmCtcssValueHz(), 'f', 1));
+        if (idx >= 0) { m_ctcssCombo->setCurrentIndex(idx); }
+        const int kHz = m_fmSlice->fmOffsetHz() / 1000;
+        m_rptOffsetSlider->setValue(kHz);
+        m_rptOffsetLabel->setText(QString::number(kHz));
+        const FmTxMode tx = m_fmSlice->fmTxMode();
+        m_simplexBtn->setChecked(tx == FmTxMode::Simplex);
+        m_offsetMinusBtn->setChecked(tx == FmTxMode::Low);
+        m_offsetPlusBtn->setChecked(tx == FmTxMode::High);
+        m_offsetRevBtn->setChecked(m_fmSlice->fmReverse());
+        // chkFMTXRev.Enabled = false in Simplex (console.cs:40414-40424).
+        m_offsetRevBtn->setEnabled(tx != FmTxMode::Simplex);
+    }
+    m_updatingFromModel = false;
+}
+
+// The memory combo lists the memory channels by name, like Thetis'
+// comboFMMemory. Refilling never recalls (Thetis: DataSource rebinding
+// happens with `initializing` set).
+void PhoneCwApplet::fillFmMemories()
+{
+    if (!m_fmMemCombo || !m_model) { return; }
+    MemoryList* list = m_model->memories();
+    const int n = list ? list->count() : 0;
+    m_updatingFromModel = true;
+    const int keep = m_fmMemCombo->currentIndex();
+    m_fmMemCombo->clear();
+    for (int i = 0; i < n; ++i) {
+        const QString name = list->at(i).name;
+        m_fmMemCombo->addItem(name.isEmpty() ? QStringLiteral("#%1").arg(i + 1) : name);
+    }
+    if (n > 0) {
+        m_fmMemCombo->setCurrentIndex(keep >= 0 && keep < n ? keep : 0);
+    }
+    m_fmMemCombo->setEnabled(n > 0);
+    m_fmMemPrev->setEnabled(n > 0);
+    m_fmMemNext->setEnabled(n > 0);
+    m_updatingFromModel = false;
 }
 
 // ── showPage — switch stacked widget to the given page index ─────────────────

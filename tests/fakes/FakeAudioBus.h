@@ -41,6 +41,9 @@ public:
 
     void close() override { m_open = false; }
     bool isOpen() const override { return m_open; }
+    // Getrennt von isOpen(): ein Strom kann geoeffnet SEIN und trotzdem
+    // tot. Genau das ist am 2026-10-04 am Mac passiert.
+    bool isAlive() const override { return m_open && m_lebt; }
 
     qint64 push(const char* data, qint64 bytes) override {
         if (!m_open || data == nullptr || bytes <= 0) {
@@ -97,6 +100,10 @@ public:
     // next open() call return false (and leave the bus closed).
     void setOpenResult(bool ok) { m_openResult = ok; }
 
+    // Der Strom gilt weiter als geoeffnet, lebt aber nicht mehr --
+    // Geraet weggezogen, Rate umgestellt, Ruhezustand.
+    void setLebendig(bool lebt) { m_lebt = lebt; }
+
     // Inject data for pull() to return. Resets the read cursor.
     // Caller specifies the negotiated format via setNegotiatedFormat() or
     // open(fmt) before calling setPullData(). The byte layout must match
@@ -118,6 +125,7 @@ private:
     AudioFormat m_negotiatedFormat;
     bool        m_open{false};
     bool        m_openResult{true};
+    bool        m_lebt{true};
     QByteArray  m_buffer;
     int         m_pushes{0};
     qint64      m_lastPushBytes{0};

@@ -91,6 +91,7 @@ public:
     bool open(const AudioFormat& format) override;
     void close() override;
     bool isOpen() const override { return m_stream != nullptr; }
+    bool isAlive() const override;
 
     qint64 push(const char* data, qint64 bytes) override;
     qint64 pull(char* data, qint64 maxBytes) override;
@@ -101,6 +102,8 @@ public:
 
     QString     backendName() const override { return m_backendName; }
     AudioFormat negotiatedFormat() const override { return m_negFormat; }
+    qint64 queuedFrames() const override;
+    qint64 consumedFrames() const override;
     QString     errorString() const override { return m_err; }
 
     // Diagnostics: drop-oldest overrun accounting.  Output-mode push()
@@ -230,6 +233,19 @@ private:
     // Input mode:  audio callback writes, pull() (caller thread) reads.
     std::vector<float>  m_ring;
     std::atomic<qint64> m_ringRead{0};
+
+    // ── Was WIRKLICH zum Geraet gegangen ist (2026-10-07) ────────────────
+    //
+    // `m_ringRead` taugt dafuer nicht: `flush()` setzt ihn auf den
+    // Schreibzeiger, ohne dass das Geraet eine einzige dieser Rahmen
+    // gehoert haette. Wer daraus den Verbrauch liest, bekommt beim
+    // Stummschalten einen Sprung geschenkt.
+    //
+    // Dieser Zaehler waechst NUR im Rueckruf und nur um das, was dort
+    // wirklich aus dem Ring geholt wurde. Unterlaeuft der Ring, holt der
+    // Rueckruf nichts und der Zaehler steht -- richtig so, denn gehoert
+    // hat das Geraet dann auch nichts.
+    std::atomic<qint64> m_verbrauchteFloats{0};
     std::atomic<qint64> m_ringWrite{0};
 
     std::atomic<float> m_rxLevel{0.0f};

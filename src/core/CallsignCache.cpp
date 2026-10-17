@@ -12,6 +12,7 @@
 // =================================================================
 
 #include "core/CallsignCache.h"
+#include "core/AppSettings.h"
 
 #include <QDateTime>
 #include <QDir>
@@ -27,7 +28,7 @@ namespace Longpath {
 QString CallsignCache::defaultPath()
 {
     const QString dir =
-        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+        AppSettings::dataDir();
     QDir().mkpath(dir);
     return dir + QStringLiteral("/callsign-cache.json");
 }

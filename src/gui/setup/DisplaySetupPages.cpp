@@ -171,6 +171,8 @@ void SpectrumDefaultsPage::loadFromRenderer()
     QSignalBlocker b6(m_fillAlphaSlider);
     QSignalBlocker b7(m_lineWidthSlider);
     QSignalBlocker b8(m_gradientToggle);
+    QSignalBlocker b8a(m_softEdgeToggle);
+    QSignalBlocker b8b(m_haloToggle);
     QSignalBlocker b9(m_calOffsetSpin);
     QSignalBlocker b10(m_peakHoldToggle);
     QSignalBlocker b11(m_peakHoldDelaySpin);
@@ -244,6 +246,8 @@ void SpectrumDefaultsPage::loadFromRenderer()
         m_lineWidthSpin->setValue(qBound(1, static_cast<int>(sw->lineWidth()), 3));
     }
     m_gradientToggle->setChecked(sw->gradientEnabled());
+    m_softEdgeToggle->setChecked(sw->traceSoftEdge());
+    m_haloToggle->setChecked(sw->traceHalo());
     m_calOffsetSpin->setValue(static_cast<double>(sw->dbmCalOffset()));
     m_peakHoldToggle->setChecked(sw->peakHoldEnabled());
     m_peakHoldDelaySpin->setValue(sw->peakHoldDelayMs());
@@ -467,7 +471,7 @@ void SpectrumDefaultsPage::buildUI()
     const QString readoutStyle = QStringLiteral(
         "QLabel { background-color: #0a0a18; color: #4a7ba8; "
         "border: 1px solid #1e2e3e; padding: 1px 6px; "
-        "font-family: Menlo, Consolas, monospace; }");
+        "font-family: " LP_MONO_QSS "; }");
 
     // Row 0: centered "Size" header label.  Mirrors Thetis labelTS139
     // ("Size") at (118, 13) [v2.10.3.13] -- centered horizontally over
@@ -860,6 +864,34 @@ void SpectrumDefaultsPage::buildUI()
         }
     });
     renderForm->addRow(QString(), m_gradientToggle);
+
+    // ── Weiche Kante und Hof (Glas & Tiefe, 2026-09-17) ──────────────
+    //
+    // Kein Thetis-Vorbild: beides ist Longpath-eigen. Beide ab Werk aus
+    // -- wie die Kurve aussieht, entscheidet der Betreiber am Schirm.
+    m_softEdgeToggle = new QCheckBox(QStringLiteral("Soft trace edge"), renderGroup);
+    m_softEdgeToggle->setToolTip(QStringLiteral(
+        "Fades the outermost device pixel of the trace (and of the peak hold "
+        "line) to transparent. Removes the stair-stepping on steep slopes "
+        "without widening the line."));
+    connect(m_softEdgeToggle, &QCheckBox::toggled, this, [this](bool on) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setTraceSoftEdge(on);
+        }
+    });
+    renderForm->addRow(QString(), m_softEdgeToggle);
+
+    m_haloToggle = new QCheckBox(QStringLiteral("Trace halo"), renderGroup);
+    m_haloToggle->setToolTip(QStringLiteral(
+        "Draws a faint glow around the live trace (22 % at the line, 0 at "
+        "2.5 px out). Gives the curve depth over the waterfall; in heavy "
+        "noise it can read as haze. Peak hold is left without a halo."));
+    connect(m_haloToggle, &QCheckBox::toggled, this, [this](bool on) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setTraceHalo(on);
+        }
+    });
+    renderForm->addRow(QString(), m_haloToggle);
 
     contentLayout()->addWidget(renderGroup);
 
@@ -1437,7 +1469,7 @@ void SpectrumDefaultsPage::buildUI()
     // bleibt im Code (Vergleichbarkeit der Baeume), aber die
     // Beschriftung sagt, was der Regler tut — sonst dreht ihn jeder
     // falsch herum.
-    auto* bgGroup = new QGroupBox(QStringLiteral("Hintergrund"), this);
+    auto* bgGroup = new QGroupBox(tr("Background"), this);
     auto* bgForm  = new QFormLayout(bgGroup);
     bgForm->setSpacing(6);
 
@@ -1445,16 +1477,16 @@ void SpectrumDefaultsPage::buildUI()
     auto* bgRowL  = new QHBoxLayout(bgRow);
     bgRowL->setContentsMargins(0, 0, 0, 0);
     bgRowL->setSpacing(6);
-    m_bgPathLabel = new QLabel(QStringLiteral("— kein Bild —"), bgRow);
+    m_bgPathLabel = new QLabel(tr("— no image —"), bgRow);
     m_bgPathLabel->setToolTip(QStringLiteral(
         "Bild hinter Raster und Spur. Wird auf die Flaeche vergroessert "
         "und mittig beschnitten, das Seitenverhaeltnis bleibt."));
-    auto* bgPick  = new QPushButton(QStringLiteral("Waehlen…"), bgRow);
-    auto* bgClear = new QPushButton(QStringLiteral("Entfernen"), bgRow);
+    auto* bgPick  = new QPushButton(tr("Choose…"), bgRow);
+    auto* bgClear = new QPushButton(tr("Remove"), bgRow);
     bgRowL->addWidget(m_bgPathLabel, 1);
     bgRowL->addWidget(bgPick);
     bgRowL->addWidget(bgClear);
-    bgForm->addRow(QStringLiteral("Bild"), bgRow);
+    bgForm->addRow(tr("Image"), bgRow);
 
     m_bgOpacitySlider = new QSlider(Qt::Horizontal, bgGroup);
     m_bgOpacitySlider->setRange(0, 100);
@@ -1473,7 +1505,7 @@ void SpectrumDefaultsPage::buildUI()
         "Hellt das Bild auf. 100 = unveraendert. Aufgehellt wird "
         "additiv: dunkle Stellen kommen hoch, helle brennen nicht aus. "
         "Abdunkeln geht ueber die Fuellfarbe darueber."));
-    bgForm->addRow(QStringLiteral("Bild aufhellen (%)"), m_bgBrightSlider);
+    bgForm->addRow(tr("Brighten image (%)"), m_bgBrightSlider);
 
     m_bgFillButton = new ColorSwatchButton(
         QColor(Style::kPanadapterBg), bgGroup);
@@ -1487,12 +1519,12 @@ void SpectrumDefaultsPage::buildUI()
     auto refreshBgLabel = [this, spectrum] {
         auto* w = spectrum();
         const QString p = w ? w->backgroundImagePath() : QString();
-        m_bgPathLabel->setText(p.isEmpty() ? QStringLiteral("— kein Bild —")
+        m_bgPathLabel->setText(p.isEmpty() ? tr("— no image —")
                                            : QFileInfo(p).fileName());
     };
     connect(bgPick, &QPushButton::clicked, this, [this, spectrum, refreshBgLabel] {
         const QString p = QFileDialog::getOpenFileName(
-            this, QStringLiteral("Hintergrundbild waehlen"), QString(),
+            this, tr("Choose a background image"), QString(),
             QStringLiteral("Bilder (*.png *.jpg *.jpeg *.bmp *.webp)"));
         if (p.isEmpty()) { return; }
         if (auto* w = spectrum()) { w->setBackgroundImage(p); }
@@ -1555,7 +1587,7 @@ void SpectrumDefaultsPage::buildUI()
     bpForm->setSpacing(6);
 
     m_bandPlanShow = new QCheckBox(
-        QStringLiteral("Bandsegmente im Spektrum zeigen"), bpGroup);
+        tr("Show band segments on the spectrum"), bpGroup);
     m_bandPlanShow->setToolTip(QStringLiteral(
         "Faerbt die Bandsegmente des gewaehlten Plans am unteren Rand "
         "des Spektrums ein — CW, SSB, Digimodes, Baken."));
@@ -1572,7 +1604,7 @@ void SpectrumDefaultsPage::buildUI()
     m_bandPlanSize->setSuffix(QStringLiteral(" pt"));
     m_bandPlanSize->setToolTip(QStringLiteral(
         "Schriftgroesse der Segmentbeschriftung."));
-    bpForm->addRow(QStringLiteral("Beschriftung"), m_bandPlanSize);
+    bpForm->addRow(tr("Labels"), m_bandPlanSize);
 
     auto spec2 = [this]() -> SpectrumWidget* {
         return model() ? model()->spectrumWidget() : nullptr;
@@ -2057,7 +2089,7 @@ void WaterfallDefaultsPage::buildUI()
         // Die Reihenfolge muss WfColorScheme entsprechen — der Index
         // dieser Liste IST der gespeicherte Wert. Anhängen, nie
         // einfügen.
-        QStringLiteral("Gedämpft")       // 2026-08-15, folgt dem Theme
+        tr("Muted")                      // 2026-08-15, folgt dem Theme
     });
     // Thetis: setup.designer.cs:34110 (comboColorPalette) — rewritten
     // Thetis original: "Sets the color scheme"
@@ -2530,10 +2562,19 @@ void GridScalesPage::buildUI()
     // Thetis: setup.designer.cs:34683 (udDisplayGridStep) — rewritten
     // Thetis original: "Horizontal Grid Step Size in dB."
     m_dbStepSpin->setToolTip(QStringLiteral("Horizontal grid step size in dB. Sets the spacing between dB grid lines across all bands (global, not per-band)."));
+    // Der gespeicherte Wert des Panadapters (2026-09-27; 0 = automatisch,
+    // dann zeigt der Regler die 10 dB, die meist gelten).
+    if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+        if (w->gridStepDb() > 0) { m_dbStepSpin->setValue(w->gridStepDb()); }
+    }
     connect(m_dbStepSpin, qOverload<int>(&QSpinBox::valueChanged),
             this, [this](int v) {
         if (auto* pan = firstPan(model())) {
             pan->setGridStep(v);
+        }
+        // Wirkt jetzt am Panadapter -- PanadapterModel liest niemand.
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setGridStepDb(v);
         }
     });
     gridForm->addRow(QStringLiteral("dB Step (global):"), m_dbStepSpin);

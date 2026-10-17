@@ -38,6 +38,38 @@
 
 namespace Longpath::Style {
 
+/// Dieselbe Schriftwahl wie monoFont(), aber fuer Stilvorlagen (QSS).
+///
+/// Warum es das geben muss: am 2026-10-06 stand im Protokoll
+///
+///     Populating font family aliases took N ms. Replace uses of missing
+///     font family "SF Mono" with one that exists.
+///
+/// Nachgezaehlt gab es dann ACHT verschiedene Schreibweisen fuer
+/// dieselbe Absicht, und auf dem Mac des Betreibers kamen dabei VIER
+/// verschiedene Schriften heraus:
+///
+///     'SF Mono', Menlo, monospace        12x  -> Menlo
+///     monospace                          12x  -> Qt-Vorgabe
+///     'ui-monospace','Menlo','Consolas'   3x  -> Menlo
+///     Menlo                               2x  -> Menlo
+///     Menlo, monospace                    1x  -> Menlo
+///     Menlo, Consolas, monospace          1x  -> Menlo
+///     Consolas, 'Courier New', monospace  1x  -> COURIER NEW
+///     'Monaco','Menlo',monospace          1x  -> MONACO
+///     QFont("SF Mono") ohne Rueckfall     1x  -> gar nicht Monospace
+///     QFont("Consolas") ohne Rueckfall    1x  -> gar nicht Monospace
+///
+/// SF Mono ist auf dem Mac NICHT als Familie ansprechbar (geprueft:
+/// 0 Treffer in system_profiler, Menlo 26). Consolas ist Windows. Wer
+/// sie ohne Rueckfall nennt, bekommt die proportionale Vorgabeschrift --
+/// und genau das sah der Betreiber.
+///
+/// Als Makro, damit es sich an Zeichenkettenliterale anfuegen laesst:
+///     "QLabel { font-family: " LP_MONO_QSS "; }"
+#define LP_MONO_QSS "Menlo, 'DejaVu Sans Mono', monospace"
+
+
 // ── Entblaut, 2026-08-15 ──────────────────────────────────────────────
 //
 // „nach [der Vorlage] sieht das aber nicht aus" — OE5SOS, mit einem Screenshot,
@@ -484,6 +516,12 @@ constexpr auto kGaugePeak       = "#c4c4c9";
 // Die Grundregeln des Hausstils bleiben (zwei Prozent Farbe, Blau ist
 // anfassbar, Warm ist gemessen); das hier ist ihre Ausformung.
 //
+// "Kurven mit Hof" steht NICHT hier, sondern in `gui/KurvenStreifen.h`:
+// es ist Geometrie fuer die GPU, keine Farbe. Dort auch die Deckkraft
+// des Hofs -- 22 %, derselbe Wert, mit dem docs/design/HAUSSTIL.md
+// §Weiche Uebergaenge die Fuellung unter der Kurve auslaufen laesst,
+// damit nicht zwei Deckkraft-Vokabulare nebeneinander stehen.
+//
 // Licht und Schatten sind ALPHA-Werte auf Weiss bzw. Schwarz, keine
 // Farben: dieselbe Kante liegt auf jedem Grund richtig.
 constexpr auto kGlassPanelTop   = "#17171b";   // Panelverlauf oben
@@ -717,18 +755,56 @@ inline QString sunkenFill(const char* baseHex, int deepen = -1, int lift = -1)
 // sagt, DASS man ziehen kann. Ohne den weiss es niemand.
 constexpr int kSplitterHandlePx = 6;
 
+// ── Der eine Abstand zwischen zwei Feldern (2026-10-15) ─────────────
+//
+// Der Betreiber: „es sollte auch immer automatisch zwischen windows
+// und windows ein minimaler automatischer Abstand sein, vielleicht
+// 2 pixel. x und y, dann sieht es besser aus und gleich."
+//
+// „Gleich" ist das Stichwort. Gemessen am laufenden Programm stand
+// zwischen zwei Applet-Feldern 6 px, links vom Fensterrand 6 px,
+// rechts 8 px (Rinne fuer den Rollbalken) und oben 6 px — vier Werte
+// fuer dieselbe Sache. Im ganzen Quelltext sind es fuenfzehn
+// verschiedene setSpacing-Werte (0,1,2,3,4,5,6,7,8,9,10,12,14,16,22).
+//
+// Dieser eine Wert gilt ab jetzt fuer jeden Abstand ZWISCHEN Feldern,
+// in beiden Achsen, und fuer den Rand des Fensters.
+//
+// NICHT fuer kSplitterHandlePx darueber: ein Ziehgriff ist kein
+// Abstand, sondern ein Bedienteil. Der Betreiber hat am 2026-08-21
+// selbst gemeldet, dass drei Pixel nicht zu treffen sind; sechs
+// bleiben sechs.
+constexpr int kPanelGapPx = 2;
+
+// ── Der Griff ist UNSICHTBAR, bis man ihn beruehrt (2026-10-14) ──────
+//
+// Der Betreiber, mit einem Bild: „Ich moechte im Hintergrund keine
+// Linien haben, das muss ein schwarzer Bildschirm sein. Keinen Rahmen
+// hier setzen, mit keinen Begrenzungen und so weiter."
+//
+// Bis heute trug jeder Griff einen HAARSTRICH (`border-left`/
+// `border-top: 1px solid kBorder`) und einen eigenen Grund
+// (`kPanelBg`). Das waren die senkrechten und waagerechten Linien in
+// seinem Bild -- sie liefen quer durch die leere, schwarze Flaeche.
+//
+// Der Strich hatte seinen Grund, und der steht oben: ein Griff von drei
+// Pixeln war nicht zu treffen, und „ein sichtbarer Strich in der Mitte
+// sagt, DASS man ziehen kann". **Die Greifbarkeit bleibt** -- sechs
+// Pixel sind sechs Pixel, ob man sie sieht oder nicht. Nur das
+// DAUERHAFTE Zeigen faellt weg: beim Darueberfahren leuchtet der Griff
+// in der Akzentfarbe auf, und das sagt dasselbe, ohne im Weg zu stehen.
 inline QString splitterStyle()
 {
     return QStringLiteral(
-        "QSplitter::handle { background: %1; }"
-        "QSplitter::handle:horizontal { width: %2px; "
-        "  image: none; border-left: 1px solid %3; }"
-        "QSplitter::handle:vertical { height: %2px; "
-        "  image: none; border-top: 1px solid %3; }"
-        "QSplitter::handle:hover { background: %4; }")
-        .arg(hexRole(kPanelBg))
+        // `transparent`, nicht kPanelBg: der Griff nimmt die Farbe
+        // dessen an, worueber er liegt -- auf schwarzem Grund ist er
+        // schwarz.
+        "QSplitter::handle { background: transparent; border: none; }"
+        "QSplitter::handle:horizontal { width: %1px; image: none; }"
+        "QSplitter::handle:vertical { height: %1px; image: none; }"
+        "QSplitter::handle:hover { background: %2; }")
         .arg(kSplitterHandlePx)
-        .arg(hexRole(kBorder), hexRole(kAccent));
+        .arg(hexRole(kAccent));
 }
 
 inline QString buttonBaseStyle()
@@ -1005,7 +1081,7 @@ inline QString insetValueStyle()
     // die dunkle Kante, unten Licht, Monospace fuer die Zahl (Regel 4).
     return QStringLiteral(
         "QLabel {"
-        "  font-size: 11px; font-family: Menlo; background: %1; border: 1px solid %2;"
+        "  font-size: 11px; font-family: " LP_MONO_QSS "; background: %1; border: 1px solid %2;"
         "  border-top-color: %4; border-bottom-color: %5;"
         "  border-radius: %6px; padding: 1px 4px; color: %3;"
         "}"
@@ -1325,14 +1401,86 @@ inline QFont capsFont(const QFont& base, int px = kFontCaption)
     return f;
 }
 
+
+/// Die Rueckfallkette auf eine bestehende Schrift legen.
+///
+/// Fuer die Stellen, die sich die Schrift selbst zusammenbauen und nur
+/// die Familie setzen wollen. setFamily() nimmt EINE Familie: fehlt sie,
+/// sucht Qt sich klaglos irgendeine -- und die muss nicht dicktengleich
+/// sein. Am 2026-10-07 beim Gegenlesen an zehn Stellen gefunden, alle
+/// mit setFamily("Menlo"), also genau der Schwaeche, die monoFont() und
+/// monoFontPt() einen Tag vorher losgeworden waren.
+inline void setzeMonoFamilien(QFont& f)
+{
+    f.setFamilies({QStringLiteral("Menlo"),
+                   QStringLiteral("DejaVu Sans Mono"),
+                   QStringLiteral("monospace")});
+    f.setStyleHint(QFont::TypeWriter);
+    f.setFixedPitch(true);
+}
+
 /// Eine Zahl, die sich aendert: Monospace, damit Stellen untereinander
 /// stehen. HAUSSTIL.md §Die acht Regeln, Regel 2.
+///
+/// Haelt dieselbe Familie wie LP_MONO_QSS. Wer eine aendert, aendert
+/// beide -- tst_schriftfamilien faengt das Auseinanderlaufen.
 inline QFont monoFont(const QFont& base, int px, QFont::Weight w = QFont::Normal)
 {
     QFont f = base;
     f.setPixelSize(px);
     f.setWeight(w);
-    f.setFamily(QStringLiteral("Menlo"));
+    // setFamilies statt setFamily: die ganze Rueckfallkette, dieselbe wie
+    // LP_MONO_QSS. Mit setFamily() stand hier nur "Menlo" -- auf einem
+    // Rechner ohne Menlo nahm Qt die naechstbeste Schrift, und das war
+    // nicht zwingend eine dicktengleiche.
+    f.setFamilies({QStringLiteral("Menlo"),
+                   QStringLiteral("DejaVu Sans Mono"),
+                   QStringLiteral("monospace")});
+    // Menlo gibt es nur auf dem Mac. Ohne diesen Hinweis nahm Qt unter
+    // Windows/Linux eine proportionale Schrift, und die Stellen tanzten
+    // doch (2026-09-27).
+    f.setStyleHint(QFont::TypeWriter);
+    f.setFixedPitch(true);
+    return f;
+}
+
+/// Dieselbe Entscheidung, aber fuer Aufrufstellen mit PUNKT-Groesse.
+///
+/// Vier Stellen bauten ihre Schrift selbst zusammen und nannten dabei je
+/// EINEN Familiennamen, den es auf der laufenden Plattform nicht gibt:
+/// `QFont("SF Mono", 10, DemiBold)` in TitleBar, `QFont("Consolas", 9)`
+/// im SupportDialog (eine Windows-Schrift!), dazu zweimal die
+/// CSS-Gattungsnamen "monospace" und "sans-serif", die Qt nicht als
+/// Familie kennt. Qt sucht sich dann selbst etwas aus — und das ist
+/// nicht zwangslaeufig dicktengleich, womit genau das zurueckkommt, was
+/// die Schwesterfunktion oben 2026-09-27 abgestellt hat.
+///
+/// Belegt im Betriebslog vom 2026-10-03, bei jedem Start:
+///
+///   WRN: Populating font family aliases took 35 ms. Replace uses of
+///        missing font family "SF Mono" with one that exists ...
+///
+/// Punktgroesse statt Pixelgroesse, weil die Aufrufstellen sie so
+/// angeben: 10 pt und 10 px sind auf dem Mac dasselbe, unter Windows
+/// (96 dpi) nicht — die Groesse umzurechnen waere eine Aenderung am
+/// Bild, und die steht hier nicht an. Familie, Hinweis und fixedPitch
+/// sind dieselben wie oben.
+inline QFont monoFontPt(int pt, QFont::Weight w = QFont::Normal)
+{
+    QFont f;
+    f.setPointSize(pt);
+    f.setWeight(w);
+    // setFamilies statt setFamily, dieselbe Kette wie monoFont() und
+    // LP_MONO_QSS. Mit setFamily stand hier nur "Menlo" -- auf einem
+    // Rechner ohne Menlo nahm Qt die naechstbeste Schrift, und die muss
+    // keine dicktengleiche sein. Der Pruefstand
+    // tst_schrift_dicktengleich misst auf DIESEM Mac, auf dem es Menlo
+    // gibt; die Kette ist fuer die anderen.
+    f.setFamilies({QStringLiteral("Menlo"),
+                   QStringLiteral("DejaVu Sans Mono"),
+                   QStringLiteral("monospace")});
+    f.setStyleHint(QFont::TypeWriter);
+    f.setFixedPitch(true);
     return f;
 }
 

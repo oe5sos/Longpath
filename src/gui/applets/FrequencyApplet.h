@@ -38,7 +38,7 @@ public:
     explicit FrequencyApplet(RadioModel* model, QWidget* parent = nullptr);
 
     QString appletId() const override    { return QStringLiteral("Frequency"); }
-    QString appletTitle() const override { return QStringLiteral("Frequenz"); }
+    QString appletTitle() const override { return tr("Frequency"); }
     void    syncFromModel() override;
 
     void setForm(FrequencyInstrument::Form f) { m_instrument->setForm(f); }

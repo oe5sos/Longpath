@@ -62,6 +62,8 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "PureSignalApplet.h"
+#include "gui/Zahlentext.h"
+#include "core/AppSettings.h"
 
 #include "core/PureSignal.h"
 #include "gui/HGauge.h"
@@ -335,8 +337,7 @@ void PureSignalApplet::wireRightClicks()
     // inside the lambda on m_ps presence so they're safe pre-coordinator.
     connect(m_saveBtn, &QPushButton::clicked, this, [this]() {
         if (!m_ps) { return; }
-        const QString defaultDir = QStandardPaths::writableLocation(
-                QStandardPaths::AppConfigLocation)
+        const QString defaultDir = AppSettings::dataDir()
             + QStringLiteral("/PureSignal/");
         QDir().mkpath(defaultDir);
         const QString filename = QFileDialog::getSaveFileName(
@@ -349,8 +350,7 @@ void PureSignalApplet::wireRightClicks()
 
     connect(m_restoreBtn, &QPushButton::clicked, this, [this]() {
         if (!m_ps) { return; }
-        const QString defaultDir = QStandardPaths::writableLocation(
-                QStandardPaths::AppConfigLocation)
+        const QString defaultDir = AppSettings::dataDir()
             + QStringLiteral("/PureSignal/");
         const QString filename = QFileDialog::getOpenFileName(
             this, tr("Restore PureSignal corrections"), defaultDir,
@@ -402,7 +402,7 @@ void PureSignalApplet::wireCoordinator(PureSignal* ps)
             const double db = level > 0
                 ? 20.0 * std::log10(static_cast<double>(level) / 255.0)
                 : -120.0;
-            m_feedbackDb->setText(tr("Feedback: %1 dB").arg(db, 0, 'f', 1));
+            m_feedbackDb->setText(tr("Feedback: %1 dB").arg(anzeigeZahl(db, 1)));
         }
     });
 
@@ -419,7 +419,7 @@ void PureSignalApplet::wireCoordinator(PureSignal* ps)
             const double db = peak > 0.0
                 ? 20.0 * std::log10(peak)
                 : -120.0;
-            m_correctionDb->setText(tr("Correction: %1 dB").arg(db, 0, 'f', 1));
+            m_correctionDb->setText(tr("Correction: %1 dB").arg(anzeigeZahl(db, 1)));
         }
     });
 

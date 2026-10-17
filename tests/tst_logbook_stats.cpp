@@ -22,6 +22,7 @@
 // =================================================================
 
 #include <QtTest/QtTest>
+#include "core/ZeitUtc.h"
 #include <QTemporaryFile>
 
 #include "core/CtyDatParser.h"
@@ -52,13 +53,17 @@ QString writeCty()
 {
     auto* f = new QTemporaryFile;
     f->setAutoRemove(false);
-    f->open();
+    // Siehe tst_cty_latlon: eine leere Vorlage misst das Nichts.
+    if (!f->open()) {
+        qFatal("Vorlage laesst sich nicht anlegen: %s",
+               qPrintable(f->errorString()));
+    }
     f->write(kCty);
     f->close();
     return f->fileName();
 }
 
-const QDateTime kNow = QDateTime(QDate(2026, 9, 18), QTime(12, 0), Qt::UTC);
+const QDateTime kNow = Longpath::Zeit::utc(QDate(2026, 9, 18), QTime(12, 0));
 
 LogEntry qso(const QString& call, int daysAgo, const QString& band,
              const QString& mode, const QString& grid = {},

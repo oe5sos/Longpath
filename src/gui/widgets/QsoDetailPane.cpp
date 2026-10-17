@@ -167,7 +167,7 @@ void QsoDetailPane::buildUi()
     {
         QFont f = m_call->font();
         f.setPixelSize(22);
-        f.setFamily(QStringLiteral("Menlo"));
+        Longpath::Style::setzeMonoFamilien(f);
         f.setLetterSpacing(QFont::AbsoluteSpacing, 1.0);
         m_call->setFont(f);
     }
@@ -221,7 +221,7 @@ void QsoDetailPane::buildUi()
     auto valueLabel = [this]() {
         auto* l = new QLabel(this);
         QFont f = l->font();
-        f.setFamily(QStringLiteral("Menlo"));
+        Longpath::Style::setzeMonoFamilien(f);
         f.setPixelSize(11);
         l->setFont(f);
         l->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
@@ -266,15 +266,12 @@ void QsoDetailPane::buildUi()
     col->addWidget(m_travel);
 
     connect(m_turnShort, &QPushButton::clicked, this, [this]() {
-        if (!m_haveEntry) { return; }
-        emit turnRotorRequested(BeamHeading::wrap360(m_entry.bearingDeg),
-                                m_entry.call);
+        if (!m_haveEntry || !m_haveBeam) { return; }
+        emit turnRotorRequested(m_beamDeg, m_entry.call);
     });
     connect(m_turnLong, &QPushButton::clicked, this, [this]() {
-        if (!m_haveEntry) { return; }
-        emit turnRotorRequested(
-            BeamHeading::longPath(BeamHeading::wrap360(m_entry.bearingDeg)),
-            m_entry.call);
+        if (!m_haveEntry || !m_haveBeam) { return; }
+        emit turnRotorRequested(BeamHeading::longPath(m_beamDeg), m_entry.call);
     });
 
     col->addWidget(rule(this));
@@ -369,6 +366,9 @@ void QsoDetailPane::wireQrz()
         if (!m_haveEntry
             || Callsigns::normalized(m_entry.call) != call) { return; }
         applyInfo(info, false);
+        // Die Antwort kann eine genauere Lage bringen als der Locator im
+        // Log -- dann stimmt die Peilung erst jetzt.
+        refreshBeam();
     });
 
     connect(m_qrz, &QrzClient::lookupFailed, this,
@@ -566,15 +566,59 @@ void QsoDetailPane::applyInfo(const CallsignInfo& info, bool stale)
     }
 }
 
+bool QsoDetailPane::beamNow(double& bearingDeg, double& km) const
+{
+    // ── Wo die Station ist ── 2026-09-26 ────────────────────────────
+    //
+    // Nicht die Peilung aus dem Log: die kam aus dem Locator, oft nur
+    // vier Zeichen. OE5VVM in Laakirchen, 9 km noerdlich, stand mit dem
+    // Mittelpunkt von JN67 74 km im Suedwesten -- "Turn to 234°", die
+    // Karte daneben sagte 11°. Reihenfolge wie in applyInfo(): QRZ-
+    // Koordinaten, dann ein genauerer QRZ-Locator, dann der aus dem Log.
+    double lat = 0.0, lon = 0.0;
+    const QString logged = m_entry.gridSquare.trimmed();
+    const QString looked = m_info.grid.trimmed();
+    if (m_info.isValid() && m_info.hasLatLon) {
+        lat = m_info.latitude;
+        lon = m_info.longitude;
+    } else if (m_info.isValid() && isValidGridSquare(looked)
+               && looked.size() > logged.size()) {
+        calculateLatLonFromGridSquare(looked, lat, lon);
+    } else if (isValidGridSquare(logged)) {
+        calculateLatLonFromGridSquare(logged, lat, lon);
+    } else {
+        return false;
+    }
+
+    // Von wo: der eigene Locator dieses QSOs, sonst der der Station.
+    QString home = m_entry.myGridSquare.trimmed();
+    if (!isValidGridSquare(home)) {
+        home = AppSettings::instance()
+                   .value(QStringLiteral("StationGridSquare"), QString{})
+                   .toString().trimmed();
+    }
+    if (!isValidGridSquare(home)) { return false; }
+    double hlat = 0.0, hlon = 0.0;
+    calculateLatLonFromGridSquare(home, hlat, hlon);
+
+    const BeamHeading::GreatCircle g = BeamHeading::greatCircle(hlat, hlon, lat, lon);
+    bearingDeg = g.bearingDeg;
+    km = g.km;
+    return true;
+}
+
 void QsoDetailPane::refreshBeam()
 {
-    // A bearing needs both locators. Without them the entry carries a
-    // bearing of zero, and offering to turn the antenna due north
-    // because a grid square is missing is worse than offering nothing.
-    const bool have = m_haveEntry
-                   && m_entry.distanceKm > 0.0
-                   && !m_entry.gridSquare.trimmed().isEmpty()
-                   && !m_entry.myGridSquare.trimmed().isEmpty();
+    // A bearing needs both ends. Without them offering to turn the
+    // antenna due north because a position is missing is worse than
+    // offering nothing.
+    double sp = 0.0, km = 0.0;
+    const bool have = m_haveEntry && beamNow(sp, km) && km > 0.0;
+    const double before = m_haveBeam ? m_beamDeg : -1.0;
+    m_haveBeam = have;
+    m_beamDeg = have ? BeamHeading::wrap360(sp) : 0.0;
+    const double now = m_haveBeam ? m_beamDeg : -1.0;
+    if (!qFuzzyCompare(before + 2.0, now + 2.0)) { emit beamChanged(now); }
 
     m_turnShort->setEnabled(have);
     m_turnLong->setEnabled(have);
@@ -600,7 +644,7 @@ void QsoDetailPane::refreshBeam()
         return;
     }
 
-    const double sp = BeamHeading::wrap360(m_entry.bearingDeg);
+    sp = m_beamDeg;
     const double lp = BeamHeading::longPath(sp);
     m_shortPath->setText(QStringLiteral("%1° %2")
                              .arg(sp, 0, 'f', 0, QLatin1Char(' '))
@@ -609,7 +653,7 @@ void QsoDetailPane::refreshBeam()
                             .arg(lp, 0, 'f', 0, QLatin1Char(' '))
                             .arg(compassPoint(lp)));
     m_distance->setText(QStringLiteral("%1 km")
-                            .arg(m_entry.distanceKm, 0, 'f', 0));
+                            .arg(km, 0, 'f', 0));
     m_turnShort->setText(QStringLiteral("Turn to %1°").arg(sp, 0, 'f', 0));
 
     if (m_haveRotor) {
@@ -622,9 +666,16 @@ void QsoDetailPane::refreshBeam()
         m_travel->setText(QStringLiteral("Rotor at %1° — %2")
                               .arg(m_rotorDeg, 0, 'f', 0)
                               .arg(BeamHeading::advice(m)));
+        m_travel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                    .arg(QLatin1String(Style::kAmberWarn)));
         m_travel->setVisible(true);
     } else {
-        m_travel->setVisible(false);
+        // Der Stand muss immer zu sehen sein -- auch, dass es keinen gibt
+        // (Betreiber 2026-09-26). Eine erfundene Gradzahl waere schlimmer.
+        m_travel->setText(QStringLiteral("Rotor not connected — no current heading"));
+        m_travel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                    .arg(QLatin1String(Style::kTextScale)));
+        m_travel->setVisible(true);
     }
 }
 
@@ -637,7 +688,11 @@ void QsoDetailPane::refreshExtras()
     // on top of them, and the pane draws one contact's fields over
     // another's for a frame. Nothing being deleted is on the call
     // stack, so the immediate delete is safe.
-    while (QLayoutItem* it = m_extras->takeAt(0)) {
+    // Nach der Anzahl, nicht bis takeAt() nichts mehr liefert: anders als
+    // QBoxLayout meldet QFormLayout ein takeAt() hinter dem Ende als
+    // Warnung -- bei jeder Auswahl eine Zeile "Invalid index 0" im Log.
+    while (m_extras->count() > 0) {
+        QLayoutItem* it = m_extras->takeAt(0);
         delete it->widget();
         delete it;
     }
@@ -665,7 +720,7 @@ void QsoDetailPane::refreshExtras()
                              .arg(QLatin1String(Style::kTextScale)));
         auto* v = new QLabel(kv.second, m_extrasBox);
         QFont f = v->font();
-        f.setFamily(QStringLiteral("Menlo"));
+        Longpath::Style::setzeMonoFamilien(f);
         f.setPixelSize(11);
         v->setFont(f);
         v->setStyleSheet(QStringLiteral("QLabel { color: %1; }")

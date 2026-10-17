@@ -233,6 +233,7 @@ longpath_add_test(tst_setup_helpers)
 longpath_add_test(tst_smoke)
 
 # ── Issue #75: receiver leak across disconnect/reconnect ──────────────────
+longpath_add_test(tst_sunsdr_zweiter_empfaenger_oben)
 longpath_add_test(tst_receiver_manager_reconnect)
 
 # ── HL2 connect-init parity: spectrum DDC center push (Bug 1) ─────────────
@@ -280,6 +281,8 @@ longpath_add_test(tst_clarity_defaults)
 # ── Phase 3G-9c Clarity adaptive display tuning ──────────────────────────
 longpath_add_test(tst_noise_floor_estimator)
 longpath_add_test(tst_noise_floor_tracker)
+# RX-Messwerte: PB SNR nach Thetis, feste Zahlenbreite (2026-09-27).
+longpath_add_test(tst_rx_meter_readings)
 longpath_add_test(tst_clarity_controller)
 
 # ── Task 2.10: per-band NF-estimate priming (Longpath-original) ─────────
@@ -340,6 +343,30 @@ longpath_add_test(tst_fft_window_after_gap)
 longpath_add_test(tst_nnr_without_model)
 if(TEST tst_nnr_without_model)
     set_tests_properties(tst_nnr_without_model PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
+# ── Profilschiene: waagrecht in der Leiste oder senkrecht am Rand ──
+# Betreiber 2026-10-06: erst „neben 48 khz", dann „macht sinn, dass man
+# dies individuell verschieben und anpassen kann". Beide Lagen muessen
+# dieselben Abzeichen tragen, und die Gruppe in der Leiste muss sich
+# wieder wegraeumen.
+longpath_add_test(tst_profilschiene_richtung)
+longpath_add_test(tst_fensterknoepfe_lesbar)
+longpath_add_test(tst_receiver_manager_log_je_kanal)
+if(TEST tst_profilschiene_richtung)
+    # nichts weiter noetig -- nur damit der Eintrag nicht im naechsten
+    # Kommentarblock landet wie beim ersten Mal (2026-10-07 gefunden).
+endif()
+
+# ── Waechter gegen das Auseinanderlaufen der Schriftwahl (2026-10-06) ──
+# Liest den Quelltext: jede Stilvorlage muss LP_MONO_QSS benutzen, und
+# keine QFont darf eine Familie ohne Rueckfallkette nennen. Anlass war
+# die Protokollzeile "missing font family SF Mono" -- dahinter steckten
+# acht Schreibweisen und vier verschiedene Schriften auf dem Schirm.
+longpath_add_test(tst_schriftfamilien)
+if(TEST tst_schriftfamilien)
+    set_tests_properties(tst_schriftfamilien PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
@@ -919,6 +946,11 @@ longpath_add_test(tst_nr_backends_process_audio)
 # wdspmain-Thread nicht mehr an die Reihe, der Ring lief ueber, und
 # fexchange2 stuerzte mit SIGSEGV ab -- Echtzeit braucht die Maschine
 # fuer sich. Wie tst_notch_removable_offline: RUN_SERIAL.
+longpath_add_test(tst_pbsnr_noise_probe)
+# Taktet den WDSP-Kanal wie das Funkgeraet (siehe tst_nr_backends_process_audio).
+if(TEST tst_pbsnr_noise_probe)
+    set_tests_properties(tst_pbsnr_noise_probe PROPERTIES RUN_SERIAL TRUE)
+endif()
 if(TEST tst_nr_backends_process_audio)
     set_tests_properties(tst_nr_backends_process_audio PROPERTIES RUN_SERIAL TRUE)
 endif()
@@ -951,9 +983,28 @@ longpath_add_test(tst_radio_model_band_click)
 longpath_add_test(tst_about_dialog)
 longpath_add_test(tst_support_dialog)
 longpath_add_test(tst_dev_automation_server)
+# ── RTTY senden (2026-10-16) ─────────────────────────────────────────
+# Der staerkste Pruefstand fuer einen Sender ist der Empfaenger, den es
+# schon gibt: der Lauf schickt seine Toene durch RttyDecoder zurueck.
+#
+# Dieser Eintrag kam mit #257 und war beim Merge von #254 wieder weg:
+# dort war ein Squash-Konflikt in dieser Datei mit
+# `git checkout --ours` geloest, und die eigene Zweigseite kannte #257
+# noch nicht. Der Pruefstand wurde danach weiter GEBAUT, aber nicht
+# mehr angemeldet — ctest kannte ihn nicht, und nichts meldete das.
+longpath_add_test(tst_rtty_senden)
+target_link_libraries(tst_rtty_senden PRIVATE Qt6::Multimedia)
+
 longpath_add_test(tst_rtty_decoder)
 longpath_add_test(tst_rtty_decoder_sensitivity)
 longpath_add_test(tst_rtty_decoder_applet)
+# 2026-10-16: RTTY SENDEN im Programm. Der Sender (core/RttyTx.h) war
+# seit PR #257 fertig und gruen — nur fuehrte von der Oberflaeche kein
+# Weg zu ihm. Dieser Lauf prueft die Verdrahtung: Knopf -> Text auf
+# Toene -> Mikrofonweg -> Tasten -> und alles wieder zurueck. Dazu der
+# Fall, der bei FT8 teuer war: sagt der Bandplan nein, darf nichts
+# weiterlaufen.
+longpath_add_test(tst_rtty_senden_gui)
 
 # ── Phase 3O Sub-Phase 11 Task 11a: VaxFirstRunDialog ────────────────────
 longpath_add_test(tst_vax_first_run_dialog)
@@ -1362,6 +1413,7 @@ longpath_add_test(tst_audio_engine_vax_tee)
 # Covers setMasterMuted / masterMuted / masterMutedChanged. Verifies the
 # rxBlockReady mute check gates ONLY the speakers push (VAX taps must keep
 # running so 3rd-party consumer apps don't hear the local monitor mute).
+longpath_add_test(tst_audio_engine_dead_speakers)
 longpath_add_test(tst_audio_engine_master_mute)
 
 # ── Phase 3O Sub-Phase 10 Task 10b: MasterOutputWidget ──────────────────────
@@ -1512,6 +1564,8 @@ target_compile_definitions(tst_audio_engine_reset_audio_settings PRIVATE LONGPAT
 # P2RadioConnection::setRx1Preamp(bool) routes to byte 1403 bit 1 via codec.
 # Default state (rx1Preamp=false) leaves bit 1 clear → regression-freeze safe.
 longpath_add_test(tst_rxapplet_adc_ovl)
+# SQL-Regler steuert in FM die FM-Rauschsperre (Thetis, 2026-09-27).
+longpath_add_test(tst_rxapplet_fm_squelch)
 target_compile_definitions(tst_rxapplet_adc_ovl PRIVATE LONGPATH_BUILD_TESTS)
 
 # ── Issue #174: HL2 A-ATT label flip on auto-att toggle ─────────────────────
@@ -1754,6 +1808,32 @@ longpath_add_test(tst_band_change_retunes_ddc_in_ctun)
 # reason (console.cs:31889-31893 [v2.10.3.15]).
 # Longpath-original: no Thetis port.
 longpath_add_test(tst_tx_frequency_follows_tx_slice)
+# FM-Relais: Ablage, Reverse, 49 Toene, Speichern (2026-09-27).
+longpath_add_test(tst_fm_repeater_wiring)
+longpath_add_test(tst_fm_deviation)
+longpath_add_test(tst_rx_equalizer)
+longpath_add_test(tst_cat_protokoll)
+longpath_add_test(tst_cat_server)
+longpath_add_test(tst_cat_zz)
+longpath_add_test(tst_schutzrahmen)
+longpath_add_test(tst_neues_feld_schaltet_sich_nicht_ein)
+longpath_add_test(tst_schwarzer_hintergrund)
+longpath_add_test(tst_multi_rx_pegel)
+longpath_add_test(tst_thetis_profil_import)
+longpath_add_test(tst_cat_verdrahtung)
+longpath_add_test(tst_mehrere_fenster)
+longpath_add_test(tst_phone_felder)
+longpath_add_test(tst_rufzeichen_locator)
+longpath_add_test(tst_zahlentext)
+# Die serielle Haelfte (2026-10-12). Nur auf UNIX: der Prueffall legt
+# echte Pseudoterminals an (posix_openpt), und die gibt es auf Windows
+# nicht. Dort meldet CatPtyServer::verfuegbar() false und der Schalter
+# im Applet bleibt gesperrt -- genau das ist das gepruefte Verhalten,
+# und ein Prueffall, der nur das pruefen koennte, braucht keine Datei.
+if(UNIX)
+    longpath_add_test(tst_cat_pty)
+endif()
+longpath_add_test(tst_fm_applet_wiring)
 
 # ── Phase 3F Sub-Epic B Task 17: AlexController event-matrix coverage ─────────
 # Verifies the 16-row event trigger matrix from design §10:
@@ -1933,6 +2013,174 @@ longpath_add_test(tst_radio_status)
 #    (bis 2026-09-21 rief das niemand; Diagnoseseite blieb bei „RX (idle)") --
 longpath_add_test(tst_radio_status_follows_mox)
 longpath_add_test(tst_settings_hygiene)
+
+# ── QSO vom Telefon ins Logbuch (2026-10-04) ────────────────────────────────
+# tst_tci_qso_eintragen: der Longpath-eigene TCI-Befehl log_qso:. Prueft die
+#   Zusagen, auf denen er steht — ohne Anmeldung gar nichts, abgeschaltet
+#   abgelehnt ABER mit Antwort, leeres/unsinniges Rufzeichen abgelehnt, ein
+#   gueltiger Eintrag steht wirklich in der Datei, und der ADIF-Kopf steht
+#   genau einmal.
+longpath_add_test(tst_tci_qso_eintragen)
+
+# ── Ins Logbuch SEHEN, vom Telefon aus (2026-10-04) ─────────────────────────
+# tst_tci_logbuch_lesen: die Gegenstuecke zu log_qso: — log_last: und
+#   log_dup:. Geprueft wird vor allem die ANZAHL in der Abschlusszeile: die
+#   Seite zeigt eine Liste nur, wenn sie mit den gesendeten Zeilen
+#   uebereinstimmt, weil eine kuerzere Liste wie ein kuerzeres Logbuch
+#   aussieht und niemand es merkt. Dazu: juengster zuerst (auf einem Telefon
+#   sieht man drei Zeilen), Ablehnung MIT Grund statt stumm (ein stummes Nein
+#   ist auf einer Fernbedienung nicht von einem Defekt zu unterscheiden), und
+#   der Deckel auf log_last: — 100000 Zeilen wuerden die Steuerleitung
+#   fluten, hinter der jede Bedienung wartet.
+longpath_add_test(tst_tci_logbuch_lesen)
+
+# ── Ein Geraet, das nicht aufmacht, darf nicht alles mitnehmen (2026-10-03) ──
+# tst_bus_mit_frist: gibt einen Bus herein, dessen open() absichtlich
+#   stehenbleibt, und prueft die zwei Zusagen der Behebung — nach der Frist
+#   geht es weiter, und der aufgegebene Bus wird wirklich aufgeraeumt (ueber
+#   einen Lebendzaehler belegt, nicht behauptet).
+longpath_add_test(tst_bus_mit_frist)
+
+# ── Ein gescheiterter Versand muss den Grund NENNEN (2026-10-04) ────────────
+# tst_sendefehler_deutung: haelt auseinander, was auseinandergehalten werden
+#   muss — "das Betriebssystem laesst uns nicht ins lokale Netz" (EHOSTUNREACH,
+#   EPERM) gegen "die Sendewarteschlange ist voll" (ENOBUFS). Grund: am
+#   2026-10-04 verband Anvelina nicht, und der Dialog riet zur Netzstrecke,
+#   waehrend in Wahrheit kein einziges Datagramm den Mac verliess. Werden die
+#   beiden Faelle vertauscht, schickt die Meldung den Bediener an den falschen
+#   Schalter.
+longpath_add_test(tst_sendefehler_deutung)
+
+# ── Eine Peilung vom Netz dreht echtes Metall (2026-10-05) ──────────────────
+# tst_rotor_peilung: am anderen Ende der Leitung steht ein Mast mit einer
+#   Antenne darauf. Drei Faelle, gegen die der Stand steht: `toDouble()` macht
+#   aus "" und "abc" eine 0, und NULL GRAD IST NORD -- eine leere Zeile wuerde
+#   die Antenne nach Norden drehen. NaN besteht jeden Bereichsvergleich, weil
+#   jeder Vergleich mit NaN falsch ist. Und 360 ist dieselbe Richtung wie 0
+#   und gehoert angenommen, 361 ist ein Tippfehler. Ausserhalb wird ABGELEHNT
+#   statt umgerechnet: wer -90 schickt, hat sich vertan, und 270 Grad sind
+#   eine andere Antwort als "ich habe mich vertan".
+longpath_add_test(tst_rotor_peilung)
+
+# ── Ein Feld, das die Zeile beendet, ist ein Einbruch (2026-10-07) ──────────
+# tst_tci_feld: Longpaths eigene Antworten sind zeilenweise und durch Kommas
+#   geteilt (`spot_zeile:`, `log_qso_zeile:`, `log_dup_ok:`) -- und die Felder
+#   darin kommen NICHT von uns. `ruf`, `mode` und `quelle` stammen aus den
+#   Spotquellen, und eine davon ist ein Telnet-Strom von einem fremden Rechner
+#   im Internet; `call`, `band`, `mode` und die RST-Felder stammen aus der
+#   ADIF-Datei, in der auch Einfuhren aus anderen Programmen liegen.
+#   Ein Komma verschiebt alle folgenden Felder, ein Semikolon beendet die
+#   Zeile -- und was danach kommt, liest die Gegenseite als NEUEN BEFEHL.
+#   `derEinbruchGehtNichtMehr` fuehrt genau das vor: "OE5SOS;trx:0,true;".
+longpath_add_test(tst_tci_feld)
+
+# ── Den Rotor vom Telefon drehen -- und wann NICHT (2026-10-05) ─────────────
+# tst_tci_rotor: am anderen Ende steht ein Mast, der minutenlang ohne Zutun
+#   dreht, und niemand steht daneben. Darum dieselbe Strenge wie beim Senden:
+#   ABFRAGEN darf jeder angemeldete Client (hinsehen bewegt nichts), DREHEN
+#   nur mit TciAllowRemoteRotor=True -- ab Werk False, und wer die Vorgabe
+#   versehentlich umdreht, faellt hier auf. Dazu: Ablehnung MIT Grund (ein
+#   stummes Nein ist von einem Defekt nicht zu unterscheiden, und beim Rotor
+#   sieht man ohnehin zehn Sekunden nichts), "kein Rotor" ist eine andere
+#   Auskunft als "0 Grad", und eine unbrauchbare Peilung dreht NICHT nach
+#   Norden.
+longpath_add_test(tst_tci_rotor)
+# ── Uhrendrift zwischen Funkgeraet und Tonkarte (#131, 2026-10-05) ──────────
+# tst_audio_rate_matcher: das Regelgesetz aus Thetis' rmatch, auf die
+#   Erzeugerseite geholt (CLAUDE.md verbietet eine Sperre im Tonrueckruf;
+#   Thetis nimmt dort `cs_var`). Gemessen am 2026-09-27: der Ausgangsring
+#   fuellt sich um 0,23 ms je Minute = rund 4 ppm, und laeuft mit dem
+#   100-ms-Ring nach fuenf Stunden ueber.
+#   Geprueft auf einer virtuellen Uhr ueber acht simulierte Stunden -- anders
+#   ist acht Stunden Drift nicht zu pruefen. ENTSCHEIDEND ist die Gegenprobe
+#   `ohneRegelungLaeuftDerRingUeber`: dieselbe Simulation mit festem
+#   Verhaeltnis MUSS ueberlaufen, sonst belegt das gruene Ergebnis nur, dass
+#   die Simulation zu gutmuetig ist.
+#   Der Resampler und die Verdrahtung in den Tonweg sind NICHT dabei; die
+#   kommen getrennt zur Durchsicht (Entwurf 2026-09-27, §4).
+longpath_add_test(tst_audio_rate_matcher)
+
+# ── Der Driftausgleich am Tonweg: die Verdrahtung (2026-10-06) ─────────────
+# tst_rx_raten_angleich: das Regelgesetz steht in tst_audio_rate_matcher,
+#   hier zaehlen die Zusagen der Verdrahtung. Die wichtigste: meldet der Bus
+#   "Fuellstand unbekannt" (-1), gehen die Rahmen UNVERAENDERT durch, mit
+#   demselben Zeiger. Nicht jeder Hintergrund hat einen Ring, den man fragen
+#   kann (HAL-Shm, PipeWire, FIFO); wer -1 als 0 liest, sieht einen dauerhaft
+#   leeren Puffer und regelt dagegen an, bis der Ton verstimmt ist.
+#   Dazu die Gegenprobe ohne Ausgleich, die leerlaufen MUSS.
+longpath_add_test(tst_rx_raten_angleich)
+
+# ── Der Schalter fuer den Driftausgleich (2026-10-06) ───────────────────────
+# tst_rx_drift_schalter: ein Haekchen, das nichts schaltet, ist schlimmer als
+#   keines -- man legt es um, hoert hin, hoert keinen Unterschied und schliesst
+#   daraus auf den Regler statt auf die Verdrahtung. Geprueft wird die
+#   BEDIENUNG (toggle) und der Rueckweg: ab Werk aus, Klick schreibt die
+#   Einstellung, und ein gesetzter Wert kommt beim naechsten Aufbau wieder
+#   heraus.
+longpath_add_test(tst_rx_drift_schalter)
+
+# ── Vom Dateiende lesen darf keinen Kontakt ERFINDEN (2026-10-04) ───────────
+# tst_logbuch_rueckschau: die App kann seit #184 loggen, aber nicht nachsehen.
+#   Die letzten Kontakte kommen deshalb aus dem DATEIENDE (gemessen an Martins
+#   Logbuch: 6,6 MB / 9271 Datensaetze — voller Durchlauf 4,1 ms, letzte 64 kB
+#   0,04 ms). Genau daraus entsteht die Gefahr: ein Schnitt an einer
+#   willkuerlichen Bytestelle beginnt mitten in einem Datensatz, und der
+#   ADIF-Parser macht aus der hinteren Haelfte einen eigenen Kontakt — ein
+#   Rufzeichen, das niemand gearbeitet hat, in einem Logbuch, das fuer Diplome
+#   eingereicht wird. Der Stand fuehrt denselben Schnitt ohne und mit
+#   Grenzschnitt vor; ohne entsteht der erfundene Datensatz wirklich.
+#   Zweitens: eine Dupe-Warnung, die bei unbekanntem Band auf Verdacht wahr
+#   wird, verhindert unbemerkt einen Kontakt, den es noch nicht gibt.
+longpath_add_test(tst_logbuch_rueckschau)
+
+# ── Spots fuer die App: was ins Bild passt, und NUR das (2026-10-05) ────────
+# tst_spot_auswahl: Longpath sammelt Cluster, RBN, POTA und SpotCollector in
+#   EINEM SpotModel; die Filter des Spot-Hub-Dialogs sitzen im Dialog, nicht
+#   im Modell. RBN allein liefert in einer guten Stunde Hunderte Meldungen.
+#   Ungefiltert ueber die TCI-Steuerleitung geschoben blockieren sie jede
+#   Bedienung dahinter -- dieselbe Leitung traegt Frequenz, Betriebsart und
+#   den Abbruch eines Sendewunsches. Gefiltert wird darum nach dem einzigen
+#   Kriterium, das auf einem Telefon zaehlt: passt der Spot ins Bild.
+#   Festgehalten: nichts von ausserhalb, abgelaufene fallen weg (der
+#   Kehrbesen im SpotModel laeuft nur alle 30 s, und ein toter Spot kostet
+#   einen Anruf ins Leere), und beim Kuerzen bleiben die NAHE DER MITTE.
+longpath_add_test(tst_spot_auswahl)
+
+# ── Der Weg der Spots durch den Server (2026-10-05) ─────────────────────────
+# tst_tci_spots: `spots:<rx>;` ueber den echten WebSocket. Die Auswahl selbst
+#   steht in tst_spot_auswahl; hier zaehlen die Zusagen des Wegs: ohne
+#   Anmeldung gar nichts, die Anzahl in der Abschlusszeile stimmt mit den
+#   gesendeten Zeilen ueberein (sonst sieht eine kuerzere Liste aus wie ein
+#   leereres Band), und ein fehlender Empfaenger wird als FEHLER gemeldet
+#   statt als leere Liste -- "ich kann gerade nicht" und "da ist nichts" sind
+#   zwei Auskuenfte, und nur eine heisst: weiterdrehen.
+longpath_add_test(tst_tci_spots)
+
+# ── Logzeilen duerfen sich nicht zerschreiben (2026-10-03) ───────────────────
+# tst_log_schreibt_atomar: acht Faeden schreiben gleichzeitig 250 Zeilen und
+#   danach muss JEDE vollstaendig und genau einmal dastehen. Grund: in den
+#   Betriebslogs vom 2026-10-03 standen sechs zerschriebene Zeilen (vorne
+#   abgeschnitten, hinten ganz), weil main.cpp je Meldung einen eigenen
+#   QTextStream auf dieselbe QFile legte. Zwei davon waren ausgerechnet die
+#   QoS-Meldung, der an dem Tag jemand nachging.
+longpath_add_test(tst_log_schreibt_atomar)
+
+# ── Qt-Prioritaet gegen QoS-Klasse (2026-10-03) ──────────────────────────────
+# tst_audio_faden_qos: haelt die Regel fest, warum Audio-Faeden OHNE
+#   QThread-Prioritaet starten. Qt setzt fuer eine ausdrueckliche Prioritaet
+#   auf macOS die Ablaufparameter, und Darwin verweigert danach jede
+#   QoS-Klasse (EPERM, Faden bleibt auf QOS_CLASS_UNSPECIFIED). Der
+#   Sende-Faden lief deshalb ohne die Erhoehung, die er haben soll.
+longpath_add_test(tst_audio_faden_qos)
+
+# ── Dicktengleiche Schrift muss auch ankommen (2026-10-03) ───────────────────
+# tst_schrift_dicktengleich: prueft nicht den FAMILIENNAMEN, sondern was Qt
+#   nach seiner Auswahl hergibt (QFontInfo::fixedPitch). Vier Stellen nannten
+#   je einen Namen, den es auf der laufenden Plattform nicht gibt ("SF Mono"
+#   auf macOS -- loest hier auf zu .AppleSystemUIFont, also proportional --,
+#   "Consolas" ausserhalb von Windows, dazu die CSS-Gattungsnamen
+#   "monospace"/"sans-serif").
+longpath_add_test(tst_schrift_dicktengleich)
 
 # ── Phase 3P-H Task 4: status-packet parsing + RadioModel ownership ──────────
 # tst_p1_status_telemetry: feeds a hand-crafted 1032-byte ep6 datagram
@@ -2319,6 +2567,9 @@ longpath_add_test(tst_hpsdr_sim_gui_workbench)
 # -- Satelliten in Sicht: TLE-Satz, Vallado-Pruefvektor, Beobachter-
 #    geometrie, ISS-Plausibilitaet, Stempeltext --
 longpath_add_test(tst_satellite_tracker)
+# -- Zahlen mit Punkt, auch bei deutscher Systemsprache (2026-09-27): aus
+#    dem Terminal verwarf SGP4 alle 95 Satelliten (sscanf + Dezimalkomma). --
+longpath_add_test(tst_c_numeric_locale)
 # -- TLE-Speicher (nachgespielter CelesTrak, Datei, Alter, Fehlerseite) +
 #    ADIF-Rundweg des Stempels --
 longpath_add_test(tst_tle_store)
@@ -2429,6 +2680,13 @@ target_compile_definitions(tst_p1_watchdog_wire PRIVATE LONGPATH_BUILD_TESTS)
 longpath_add_test(tst_p2_tx_iq_wire)
 target_compile_definitions(tst_p2_tx_iq_wire PRIVATE LONGPATH_BUILD_TESTS)
 
+# ── P2 TX I/Q erst nach dem ersten Rahmen des Geraets (2026-09-30) ─────────
+# Schein-Geraet auf 127.0.0.1:1024/1025/1029: vor dem ersten Status darf an
+# 1029 nichts ankommen (ARP-Warteschlange von macOS verwarf sonst SendStart),
+# danach laeuft der Takt. Ueberspringt sich, wenn die Ports belegt sind.
+longpath_add_test(tst_p2_tx_iq_waits_for_radio)
+target_compile_definitions(tst_p2_tx_iq_waits_for_radio PRIVATE LONGPATH_BUILD_TESTS)
+
 # ── Phase 3M-1a Task E.7: P2 MOX wire byte (byte 4 bit 1 = 0x02) ─────────────
 # 10 tests verify:
 #   1-5. Legacy path (no codec): default=0, setMox(true)→1, setMox(false)→0,
@@ -2494,6 +2752,8 @@ longpath_add_test(tst_spectrum_widget_highswr_overlay)
 # No pixel-diff — visual: red border appears on TX.
 # Derives from Thetis display.cs:1569-1593 [v2.10.3.13] Display.MOX setter.
 longpath_add_test(tst_spectrum_widget_mox_overlay)
+# Panadapter-Mausrad: Trackpad, Rasten, Zoom-Bereich, SnapTune, dB-Raster (2026-09-27).
+longpath_add_test(tst_panadapter_wheel)
 
 # ── Phase 3M-1a H.2: MeterPoller TX bindings on MOX engage ───────────────────
 # Verifies setInTx(bool) switches poll set, idempotency, null guards in
@@ -2851,6 +3111,8 @@ longpath_add_test(tst_app_settings_migration)
 # prevents any future change from accidentally adding one.  Background in
 # docs/architecture/2026-05-12-phase3j-1-loose-ends-plan.md Item 7.
 longpath_add_test(tst_app_settings_arbitrary_key_persistence)
+# Binaere Werte (saveGeometry/saveState) ueberleben Speichern + Neuladen (2026-09-26).
+longpath_add_test(tst_app_settings_binary_values)
 
 # ── Phase 3J-1 closeout Item 3 (2026-05-12): production Q_INVOKABLE shims ───
 # 18 category-level tests invoking the new RadioModel shims via
@@ -2859,6 +3121,65 @@ longpath_add_test(tst_app_settings_arbitrary_key_persistence)
 # Matrix-test parity against TestMockRadioModel is covered separately by
 # tst_tci_matrix_runner -- this file pins the PRODUCTION-side wiring.
 longpath_add_test(tst_tci_radio_model_shims)
+
+# ── TCI drive / tune_drive / tune (2026-09-30) ──────────────────────────────
+# Die drei Kommandos fehlten vollständig; weil unbekannte Namen still
+# verworfen werden, blieb jeder Leistungsregler einer Fernbedienung wirkungslos,
+# ohne dass irgendwo ein Fehler auftauchte. Der Prüfstand pinnt beide Pfade
+# (Setzen mit Klemmung, Abfrage) und die Regel, dass `tune:` keine eigene
+# Zustandsmeldung erfindet, solange der Träger nicht wirklich steht.
+longpath_add_test(tst_tci_drive_tune_drive)
+
+# ── Herkunftsprüfung + Sendezeit-Deckel (2026-09-30) ────────────────────────
+# Zwei Sicherungen, ohne die der TCI-Server nicht ins Netz darf: eine fremde
+# Webseite im Browser des Bedieners konnte bisher die Station tasten (WebSocket
+# kennt keine Gleiche-Herkunft-Regel, und Loopback hilft dagegen nicht), und
+# ein Sendevorgang hatte überhaupt keine Obergrenze.
+longpath_add_test(tst_tci_origin_and_tx_time_cap)
+
+# ── Spektrumstrom (2026-09-30) ──────────────────────────────────────────────
+# Longpath-eigener sechster Stromtyp: fertig gerechnetes Spektrum statt rohem
+# I/Q. Gemessen kostet I/Q 404 kB/s bei 48 kHz und rund 1,5 MB/s bei 192 kHz;
+# der Spektrumrahmen kostet rund 27 kB/s. Der Prüfstand pinnt Kopf, Kodierung
+# (dBm+200 auf ein Byte), die Randfälle und die Spitzenwert-Verdichtung.
+longpath_add_test(tst_tci_spectrum_stream)
+
+# ── Tonumtaster je Kanal (2026-09-30) ──────────────────────────────────────
+# WDSPs RESAMPLEF rechnet einkanalig und reell. Der verschraenkte
+# Stereopuffer lief bis 2026-09-30 als EIN Strom hindurch: L und R
+# vermischten sich, und die Tonhoehe stimmte nicht, weil der Resampler die
+# doppelte Abtastzahl sah. Betraf jede Rate ausser 48000.
+longpath_add_test(tst_tci_audio_resample_channels)
+
+# ── Fernzugriff: Token + Sendefreigabe (2026-09-30) ────────────────────────
+# TCI kennt weder Anmeldung noch Verschluesselung. Solange der Server auf
+# Loopback lauscht, ist das vertretbar; im Netz nicht. Der Schnitt laeuft
+# entlang der HERKUNFT: Loopback unveraendert (sonst steht jeder Logger
+# still), aus dem Netz Token und ausdrueckliche Sendefreigabe.
+longpath_add_test(tst_tci_remote_auth)
+
+# ── Sendesperre fuers Netz (2026-09-30) ───────────────────────────────────
+# Prueft die NAHT, nicht den Getter: echte Clients schicken `trx:`/`tune:` in
+# den Schreibweisen, die bis 2026-09-30 an der Sperre vorbeiliefen (TRX:,
+# `trx :`), dazu Besitzer und Ruecknahme des Abstimmtraegers beim Trennen.
+longpath_add_test(tst_tci_sendesperre)
+target_compile_definitions(tst_tci_sendesperre PRIVATE LONGPATH_BUILD_TESTS)
+
+longpath_add_test(tst_tci_bind_wiederversuch)
+target_compile_definitions(tst_tci_bind_wiederversuch PRIVATE LONGPATH_BUILD_TESTS)
+# ── mu-law als Tonformat (2026-09-30) ─────────────────────────────────────
+# Misst den Stoerabstand statt nur durchzulaufen, prueft dass der Fehler dem
+# Pegel folgt (der ganze Sinn des Kompandierens), und vergleicht die
+# C++-Kennlinie Byte fuer Byte mit der aus handfunke/tci.js.
+longpath_add_test(tst_tci_mulaw)
+target_compile_definitions(tst_tci_mulaw PRIVATE LONGPATH_BUILD_TESTS)
+
+# ── Fernzugriffs-Gruppe auf der TCI-Setupseite (2026-09-30) ───────────────
+# Prueft, dass die Bedienelemente da sind und der Hinweistext sagt, was
+# gerade gilt — eine Sicherheitsgruppe, die schweigt, wenn sie wirkungslos
+# ist, verleitet dazu, sich auf sie zu verlassen. Zeichnet mit
+# LONGPATH_BLATT_PNG=<pfad> zusaetzlich ein Blatt zum Ansehen.
+longpath_add_test(tst_tci_remote_access_page)
 
 # ── Phase 3J-1 closeout Item 4 (2026-05-12): per-(band, mode) filter ────────
 # Pins the contract that SliceModel::setDspMode saves the current filter
@@ -3080,6 +3401,7 @@ target_compile_definitions(tst_mox_controller_mic_ptt_extraction PRIVATE LONGPAT
 #   RX channel 0 and TX channel 1 co-exist without aliasing.
 #   Channel ID: WDSP.id(1, 0) = CMsubrcvr * CMrcvr = 1 with single-RX layout.
 longpath_add_test(tst_wdsp_engine_tx_channel)
+longpath_add_test(tst_maxbin_hold_decay)
 
 # ── Phase 3M-3a-iii Task 20: WdspEngine DEXP DSP-instance lifecycle ──────────
 # The bench-failing fix: before Task 20, pdexp[1] was permanently nullptr
@@ -4815,12 +5137,33 @@ longpath_add_test(tst_applet_window_size)
 longpath_add_test(tst_real_mainwindow_detach)
 longpath_add_test(tst_real_pan_float)
 longpath_add_test(tst_real_rotor_window)
+
+# tst_rotor_panel_abbau: der Abbau des Rotor-Feldes bei stehender
+# Verbindung. Sechs Abstuerze beim Beenden (2026-10-10/11), seit der
+# Rotor wieder im Netz haengt; die fuenfte Stelle derselben Fehlerform.
+longpath_add_test(tst_rotor_panel_abbau)
+
+# tst_rotor_status_ins_protokoll: der Rotor schreibt jeden Wechsel seines
+# Zustandes ins Protokoll -- einmal, nicht bei jedem Abfragedurchgang.
+longpath_add_test(tst_rotor_status_ins_protokoll)
 longpath_add_test(tst_real_status_bar_chain_indicators)
 longpath_add_test(tst_app_settings_autosave)
 longpath_add_test(tst_whisper_server_launcher)
 target_link_libraries(tst_whisper_server_launcher PRIVATE Qt6::Network)
 longpath_add_test(tst_pan_options_button)
 longpath_add_test(tst_window_widgets)
+# -- Roter Knopf = zu, auch beim naechsten Start (2026-09-27): Kanalzug,
+#    Logbuch und Spot-Zentrale gingen trotz Schliessen immer wieder auf. --
+longpath_add_test(tst_window_close_stays_closed)
+# -- Rechtsklick-Menues am Fenster, nicht am nativen Feld (2026-09-27):
+#    „ProfileRailClassWindow must be a top level window" im Protokoll. --
+longpath_add_test(tst_menus_of_native_fields)
+# -- Dasselbe im ECHTEN Hauptfenster (2026-09-30): Panadapter, Overlay-
+#    „…", Behaelter, Lautsprecher, Applet-Spalte, Globus. --
+longpath_add_test(tst_real_menus_hang_on_the_window)
+# -- Formatfuellend + Werkzeugfenster passen auf den Schirm (2026-09-27):
+#    Kanalzug 980x1000 auf 849 px Hoehe, unten hinter dem Dock. --
+longpath_add_test(tst_tool_windows_fit_the_screen)
 
 # -- ScopedChildWidget (2026-09-22): ein Kontextmenue auf dem Haufen statt
 #    auf dem Stapel -- normales Aufraeumen, und Aufraeumen nachdem das
@@ -4858,6 +5201,16 @@ longpath_add_test(tst_theme_form_knobs)
 longpath_add_test(tst_surface_gradients)
 longpath_add_test(tst_stilblatt)
 longpath_add_test(tst_logbook_import)
+
+# ── Das Logbuch traegt denselben Rahmen wie alle (2026-10-06) ───────────────
+# tst_logbuch_rahmenlos: Betreiber mit Bildschirmfoto -- "die fensterecken sind
+#   rund, alle anderen widget sind doch eckig?!?!". Er hatte recht, und der
+#   Grund war strukturell: das Logbuch war das EINZIGE Fenster mit dem Rahmen
+#   des Betriebssystems, waehrend Rotor, abgeloeste Applets, schwebender
+#   Panadapter und Seitenbereich seit 2026-08-20 rahmenlos mit WindowChrome
+#   laufen. macOS rundet jedes Fenster mit Systemrahmen; dagegen hilft kein
+#   Stilblatt, nur der Verzicht auf den Rahmen.
+longpath_add_test(tst_logbuch_rahmenlos)
 
 # -- Sync QRZ (2026-09-21): der Abholer (Antwort-Parser, Blaettern gegen
 #    einen HTTP-Mock) und das Zusammenfuehren im Logbuchfenster ohne Netz --
@@ -4938,6 +5291,10 @@ longpath_add_test(tst_waterfall_time_markers)
 #    synthetic keyed CW decodes, estimates, ring bound, stop semantics --
 longpath_add_test(tst_cw_decoder)
 longpath_add_test(tst_cw_decoder_applet)
+# 2026-09-27: die CW-Tonhoehe bekommt Setter, Signal und Setup-Feld --
+# Thetis-CWPitch-Setter: CW-Durchlaesse (Vorgaben, Ueberschreibungen,
+# VAR, laufend, gespeichert) folgen, Rutschen an der Spiegelgrenze.
+longpath_add_test(tst_cw_pitch_follows)
 # 2026-09-21, KiwiSDR Stufe 3b: der Kiwi folgt der zugeordneten Scheibe
 # (Frequenz, Betriebsart, Filter) -- vorher nur einmal bei der Zuordnung.
 longpath_add_test(tst_kiwi_tracking_follows_the_slice)
@@ -4952,6 +5309,88 @@ longpath_add_test(tst_color_picker_not_native)
 # 2026-09-21: Help > Check for Updates... -- Release-JSON, Version, Paket,
 # SHA256SUMS, Startpruefung, Zielpfad, Neustart-Helfer, DMG-Einspielen (macOS).
 longpath_add_test(tst_update_checker)
+# 2026-10-14: sieben Absturzberichte lagen herum, keiner stand im
+# Protokoll. CrashReportDigest holt sie beim naechsten Start nach.
+longpath_add_test(tst_absturzberichte)
+# 2026-10-14: 680 Wiederanlaeufe im Protokoll des Betreibers, alle 14 s.
+# Die Treppe stieg nicht, weil onConnected() den Zaehler zuruecksetzte --
+# ein offener Socket ist aber noch keine brauchbare Sitzung.
+longpath_add_test(tst_dxcluster_wiederanlauf)
+# 2026-10-15: „theme wechsel funktioniert nicht" -- im Menue stand ein
+# toter Schalter, die echte Auswahl lag acht Klicks tief, und die Wahl
+# wirkt erst beim Start. Dieser Lauf haelt beides nach.
+longpath_add_test(tst_palette_im_menue)
+# 2026-10-15: „zwischen windows ... ein minimaler automatischer
+# Abstand ... dann sieht es besser aus und gleich." Dieser Lauf misst
+# die Luecken am echten Hauptfenster.
+longpath_add_test(tst_abstand_zwischen_feldern)
+# 2026-10-15: „er soll mal technisch funktionieren ... nur eine
+# option, die man ein und ausblenden kann." Der schwebende Panadapter
+# hatte im Menue nur eine Einbahn ohne Haken.
+longpath_add_test(tst_panadapter_schalter)
+# 2026-10-15: „englisch durchgehend" — ich habe zweimal „0 deutsche
+# Quelltexte" gemeldet und lag zweimal falsch. Jetzt zaehlt es ein Lauf.
+longpath_add_test(tst_oberflaeche_englisch)
+# 2026-10-15: das breite rosa Band im Bildschirmfoto — ein umgedrehter
+# HGauge war IMMER in der Gefahrenfarbe, ohne jede Schwelle.
+longpath_add_test(tst_kompressionsbalken_nicht_rot)
+# 2026-10-15: „-40dB" las sich als „0dB", „+10" als „+1" — die erste
+# und die letzte Zahl der Skala standen ausserhalb des Widgets.
+longpath_add_test(tst_skala_enden_lesbar)
+# 2026-10-15: ein Eintrag fuer das Feldbetrieb-Bild — und der Nachweis,
+# dass er in ein EIGENES Profil schreibt.
+longpath_add_test(tst_feldbetrieb)
+# 2026-10-15: zwei Abstuerze beim Beenden in zwei Stunden, beide
+# „Kind meldet sein Ende, Rumpf greift ins halb abgebaute Fenster".
+longpath_add_test(tst_abbau_ueberlebt)
+# 2026-10-15: moos.json nannte zwei Rollen, die es im Programm nicht
+# gibt — still uebergangen, also seit dem ersten Tag wirkungslos.
+longpath_add_test(tst_palette_ohne_tote_rollen)
+# 2026-10-15: die Scheibenflagge ueber dem Panadapter, als Option —
+# dritter Anlauf um dieselbe Sache, siehe den Kopf der Datei.
+longpath_add_test(tst_scheibenflagge)
+# 2026-10-15: FT8/FT4 nativ — Nachricht hin, Nachricht zurueck, ohne
+# Tondatei und ohne Funkgeraet.
+longpath_add_test(tst_ft8_dekodiert)
+# 2026-10-15: FT8 am laufenden Ton — die Fenstergrenze ist der Punkt.
+longpath_add_test(tst_ft8_am_ton)
+# 2026-10-15: die Sendeseite, geschlossene Schleife — Text hinein,
+# Tonproben am Sendeweg abgeholt, wieder dekodiert.
+# ── Der FT8-QSO-Ablauf, Zustand fuer Zustand ─────────────────────────
+# Ft8Ablauf sendet nicht, tastet nicht und kennt keine Uhr — darum
+# laeuft dieser Pruefstand ohne Fenster, ohne Funkgeraet und ohne zu
+# warten (QTEST_APPLESS_MAIN).
+longpath_add_test(tst_ft8_ablauf)
+
+longpath_add_test(tst_ft8_senden)
+# 2026-10-15: FT8 im PROGRAMM — Abgriff, Flaeche, Eintrag. Dekoder und
+# Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die
+# Verdrahtung, nicht die Rechnung.
+longpath_add_test(tst_ft8_flaeche)
+# 2026-10-15: und wie lange ein ganzes Fenster rechnet — die Zahl
+# entscheidet, ob das im Faden der Oberflaeche laufen darf.
+longpath_add_test(tst_ft8_rechenzeit)
+target_compile_definitions(tst_palette_ohne_tote_rollen PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(tst_oberflaeche_englisch PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+# 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im
+# Quelltext. Dieser Lauf liest die Quellen und haelt die Regel nach;
+# QSlider::groove ist die eine begruendete Ausnahme.
+longpath_add_test(tst_hausstil_radius)
+# 2026-10-14: Sperrklinke gegen namenlose Farben. 128 am Tag des
+# Einbaus; die Zahl darf sinken, nie steigen.
+longpath_add_test(tst_hausstil_farben)
+target_compile_definitions(tst_hausstil_farben PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(tst_hausstil_radius PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+# 2026-10-14: "englisch durchgehend, aber deutsch als option" -- die
+# Kette .ts -> .qm -> :/i18n/ -> QTranslator. LONGPATH_QM_FILE zeigt auf
+# die Datei, die qt_add_translations gerade gebaut hat.
+longpath_add_test(tst_sprache_umschaltbar)
+target_compile_definitions(tst_sprache_umschaltbar PRIVATE
+    LONGPATH_QM_FILE="${CMAKE_BINARY_DIR}/longpath_de.qm")
 # 2026-09-21: Schluesselbund-Dienstname "Longpath: <key>" mit Umzug vom
 # alten Namen -- live nur mit LONGPATH_KEYCHAIN_LIVE=1 (echter Schluesselbund).
 longpath_add_test(tst_credential_store_migration)
@@ -5223,11 +5662,21 @@ longpath_add_test(tst_flatmap_station_marker)
 #    Netz, der Flug der flachen Karte, die Zielstation mit Grosskreis --
 longpath_add_test(tst_gibs_tile_geometry)
 longpath_add_test(tst_flat_map_flyto)
+# Sandbox (LONGPATH_CONFIG_DIR): Logbuch und Zwischenspeicher getrennt (2026-09-26).
+longpath_add_test(tst_sandbox_data_dir)
+# Karteikarte im Logbuch: Drehrichtung aus QRZ-Koordinaten (2026-09-26).
+longpath_add_test(tst_logbook_beam_bearing)
+# Logbuch: Eingabezeile "NEW QSO" (2026-09-26).
+longpath_add_test(tst_logbook_entry_row)
+# Logbuch-Durchgangstest (Nacht 2026-09-26): Neuschreiben verliert nichts, alle Ablaeufe.
+longpath_add_test(tst_logbook_durchgang)
 longpath_add_test(tst_qso_map_flyto_window)
 # -- Satelliten ueber dem Horizont auf der Karte + Stempel im Detailpaneel --
 longpath_add_test(tst_qso_map_satellites)
 # -- Logbuch-Werkzeugleiste bricht um statt das Fenster breit zu halten --
 longpath_add_test(tst_logbook_toolbar_wraps)
+# Das Logbuch geht in der vorgesehenen Groesse auf (2026-09-26).
+longpath_add_test(tst_logbook_opens_at_its_size)
 # -- Logbuch als eine Seite: Karte als Spalte, Kennzahlen als Reihe --
 longpath_add_test(tst_logbook_one_page)
 # -- Blue Marble fuer die Kugel aus GIBS-Kacheln (mit LONGPATH_NET echt) --
@@ -5396,6 +5845,24 @@ longpath_add_test(tst_sunsdr_radio_connection)
 #    ohne LONGPATH_SUNSDRSIM. Anleitung in
 #    docs/development/sunsdr-simulator-workbench.md --
 longpath_add_test(tst_sunsdr_sim_workbench)
+# Messlauf am echten Geraet, laeuft nur mit LONGPATH_SUNSDR_MESSLAUF
+# (sonst QSKIP) -- siehe Kopf der Datei.
+longpath_add_test(tst_sunsdr_messlauf)
+
+# tst_sunsdr_ein_steller: Vorverstaerker und Daempfung sind an der QRP
+# EIN Steller (Opcode 0x04, Stufenindex an Byte 18). Am 2026-10-11 mit
+# Antenne am Geraet nachgemessen; dieser Stand haelt den Befund fest.
+longpath_add_test(tst_sunsdr_ein_steller)
+
+# tst_sunsdr_netzlage: ob das Geraet ueberhaupt in einem Netz dieses
+# Rechners liegt -- die Frage, die in der Nacht zum 2026-10-12 fuenf
+# Suchversuche lang unbeantwortet blieb.
+longpath_add_test(tst_sunsdr_netzlage)
+
+# tst_sunsdr_uebersteuerung: schlaegt die Uebersteuerungserkennung
+# ueberhaupt an? Am Geraet war nur belegt, dass sie nicht falsch
+# alarmiert -- ein Signal am Anschlag kann man nicht bestellen.
+longpath_add_test(tst_sunsdr_uebersteuerung)
 
 # -- Die QRP muss mit IHRER Abtastrate gefahren werden, nicht mit Atlas'
 #    (2026-09-23: sie steht in keiner HPSDRModel-Liste, darum fiel die
@@ -5586,6 +6053,11 @@ longpath_add_test(tst_spectrum_tx_overlay)
 # round-trips through AppSettings, resetPreset restores Thetis default,
 # setPresetsForMode reorder persists, presetsChanged fires on every mutator.
 longpath_add_test(tst_filter_preset_store)
+
+# -- Der laufende Filter heisst wie seine Vorgabe (RX-Applet, Befehlsleiste),
+#    sonst die Breite; Thetis panelFilter.Text = "Filter - " + GetName(f).
+#    2026-09-28 --
+longpath_add_test(tst_filter_label_names)
 
 # ── Issue #175 Task 1: per-SKU PA UI constants for HL2 mi0bot parity ─────────
 # 5 tests asserting the 9 constexpr helpers + 2 attenuator constants added
@@ -6072,6 +6544,8 @@ longpath_add_test(tst_dxcc_worked_status)
 #   (W1AW on 20m PHONE -> colorWorked dim grey). Source:
 #   AetherSDR src/core/DxccColorProvider.{h,cpp} [@0cd4559].
 longpath_add_test(tst_dxcc_color_provider)
+# DXCC-Farben der Spots: an, Hausfarben, Schalter im Spot-Hub (2026-09-27).
+longpath_add_test(tst_dxcc_spot_colours)
 
 # ── Phase 3J-2 Task D1: SpotModel (TCI-keyed spot sink) ────────────────────
 # Pins the contract that SpotModel is a QMap<int, SpotData> sink
@@ -6208,6 +6682,8 @@ longpath_add_test(tst_dspmode_rade)
 #   resetButtonClickInvokesResetTx        - button click dispatches to
 #                                           RadeChannel::resetTx.
 longpath_add_test(tst_rade_applet)
+# cty.dat ist zur Laufzeit geladen, nicht nur in Tests (2026-09-26).
+longpath_add_test(tst_cty_dat_loaded_at_runtime)
 
 # ── Phase 3R Task L3: Mode menu + VFO chip RADE entry ────────────────────────
 # Pins the RADE entries (upper + lower sidebands) in the user-facing
@@ -7179,6 +7655,27 @@ longpath_add_test(tst_rendering_werkbank)
 longpath_add_test(tst_waterfall_column_reduce)
 longpath_add_test(tst_freq_scale_labels)
 
+# ── Weiche Kante und Hof: die Zusage "beide aus = wie vorher" (2026-10-08) ──
+# tst_kurven_streifen: `Kurve::baue` entscheidet, aus wie vielen Baendern die
+#   GPU die Kurve zeichnet. Die Vorgabe beider Schalter ist AUS, und sie taugt
+#   nur, solange dann GENAU EIN Streifen mit den alten Werten herauskommt --
+#   +halbPx / -halbPx, Deckkraft 0,9 (Kurve) bzw. 0,55 (Spitzenhaltelinie).
+#   Die Zahlen im Prueffall stammen aus dem Malcode VOR dem Umbau, nicht aus
+#   der neuen Funktion; damit prueft er gegen die alte Fassung und nicht gegen
+#   sich selbst. Dazu: Kern verschwindet nicht bei Linienbreite 1 ohne Retina,
+#   Hof skaliert mit der Pixeldichte und der Auslauf nicht, und keine
+#   Schalterkombination schreibt mehr Streifen, als der GPU-Puffer hat.
+#   Reine Geometrie -- kein Fenster, keine GPU, laeuft offscreen im CI.
+longpath_add_test(tst_kurven_streifen)
+
+# tst_kurve_setup_schalter: der haeufigste Fehler an einem neuen Schalter ist
+#   nicht, dass er falsch rechnet, sondern dass er NICHTS tut -- Kaestchen
+#   gebaut, Signal vergessen -- oder dass er beim Oeffnen der Seite seinen
+#   eigenen Zustand nicht zurueckliest und falsch dasteht. Beide Richtungen,
+#   dazu die Vorgabe selbst (beide AUS, am Widget und am Kaestchen) und die
+#   Unabhaengigkeit der zwei Schalter voneinander.
+longpath_add_test(tst_kurve_setup_schalter)
+
 # --------------------------------------------------------------------------
 # Aggregate "all_tests" target  (2026-05-26 KG4VCF dev-loop fix, from PR #291)
 # --------------------------------------------------------------------------
@@ -7343,4 +7840,38 @@ foreach(_asan_gap_target IN ITEMS
     endif()
 endforeach()
 
-
+# ── Gemeinsame Sperre fuer die Fernzugriffs-Pruefstaende (2026-10-01) ──────
+#
+# Diese drei fassen dieselben AppSettings-Schluessel an (TciAllowRemoteTx,
+# TciRemoteTokenPlain), und im Testbetrieb teilen sich ALLE Staende eine
+# Einstellungsdatei: QStandardPaths::setTestModeEnabled(true) gibt ihnen
+# denselben Pfad (TestSandboxInit.cpp).
+#
+# Parallel gestartet schrieben sie sich gegenseitig hinein — der eine setzt
+# die Sendefreigabe auf an, waehrend der andere prueft, dass sie ab Werk aus
+# ist. Ergebnis war ein Flattern, das einzeln nie auftrat: im Sammellauf fiel
+# mal tst_tci_remote_auth, mal tst_tci_sendesperre, in etwa zwei von drei
+# Durchgaengen.
+#
+# Diese Zeilen stehen am DATEIENDE, weil set_tests_properties die Tests
+# bereits kennen muss — vor longpath_add_test() bricht CMake ab
+# ("Can not find test to add properties to").
+#
+# RESOURCE_LOCK statt RUN_SERIAL: nur diese drei laufen nacheinander, alles
+# andere weiter parallel. Das kostet ein paar Sekunden und macht den
+# Sammellauf verlaesslich.
+# Jeden Stand einzeln und nur, wenn er in DIESER Konfiguration ueberhaupt
+# registriert wurde. Ohne die Pruefung bricht CMake ab
+# ("Can not find test to add properties to"), sobald ein Stand fehlt — und
+# das ist der Normalfall: ohne Qt6::WebSockets oder ohne GUI faellt je nach
+# Bauumgebung ein anderer weg. Am 2026-10-01 scheiterte daran der
+# Configure-Schritt auf Linux UND macOS, waehrend er lokal durchlief.
+foreach(stand IN ITEMS
+    tst_tci_remote_auth
+    tst_tci_sendesperre
+    tst_tci_remote_access_page)
+  if(TEST ${stand})
+    set_tests_properties(${stand}
+      PROPERTIES RESOURCE_LOCK longpath_tci_fernzugriff_settings)
+  endif()
+endforeach()

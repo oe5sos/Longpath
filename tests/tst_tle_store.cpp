@@ -17,6 +17,7 @@
 
 #include <QFile>
 #include <QSignalSpy>
+#include <QStandardPaths>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTemporaryDir>
@@ -136,6 +137,60 @@ private slots:
         store.refresh();
         QTRY_COMPARE_WITH_TIMEOUT(failed.count(), 1, 8000);
         QVERIFY(!store.hasData());
+    }
+
+    // 2026-09-27: jeder Pruefstand mit MainWindow holte bei CelesTrak
+    // (eigener AppData-Ordner je Programm), bis CelesTrak die IP sperrte.
+    // Die voreingestellte Quelle bleibt in Pruefstaenden stumm.
+    void aTestBinaryNeverCallsCelestrak()
+    {
+        QVERIFY(QStandardPaths::isTestModeEnabled());
+        QTemporaryDir dir;
+        TleStore store;
+        store.setCachePath(dir.path() + QStringLiteral("/amateur.tle"));
+        QCOMPARE(store.sourceUrl(), TleStore::defaultSource());
+        store.refresh();
+        QVERIFY(!store.isBusy());
+        QVERIFY(!store.lastAttemptAt().isValid());
+    }
+
+    // Nach einem Versuch sechs Stunden Ruhe -- auch fuer ein frisch
+    // gestartetes Programm (die Marke liegt als Datei neben den Daten).
+    void aFailedFetchIsNotRetriedAtEveryStart()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + QStringLiteral("/amateur.tle");
+        {
+            TleStore store;
+            store.setCachePath(path);
+            store.setSourceUrl(QUrl(QStringLiteral("http://127.0.0.1:1/gp.php")));
+            QSignalSpy failed(&store, &TleStore::failed);
+            store.refreshIfStale(24);
+            QTRY_COMPARE_WITH_TIMEOUT(failed.count(), 1, 8000);
+            QVERIFY(store.lastAttemptAt().isValid());
+        }
+
+        MockCelestrak srv;
+        srv.body = kTle;
+        QVERIFY(srv.listen(QHostAddress::LocalHost));
+        TleStore again;   // „naechster Start"
+        again.setCachePath(path);
+        again.setSourceUrl(QUrl(QStringLiteral("http://127.0.0.1:%1/gp.php").arg(srv.serverPort())));
+        again.refreshIfStale(24);
+        QVERIFY2(!again.isBusy(), "zwei Minuten nach dem Fehlschlag nicht schon wieder");
+        QTest::qWait(200);
+        QCOMPARE(srv.hits, 0);
+
+        // Sieben Stunden spaeter darf es wieder.
+        QFile marker(path + QStringLiteral(".attempt"));
+        QVERIFY(marker.open(QIODevice::ReadWrite));
+        QVERIFY(marker.setFileTime(QDateTime::currentDateTimeUtc().addSecs(-7 * 3600),
+                                   QFileDevice::FileModificationTime));
+        marker.close();
+        QSignalSpy updated(&again, &TleStore::updated);
+        again.refreshIfStale(24);
+        QTRY_COMPARE_WITH_TIMEOUT(updated.count(), 1, 8000);
+        QCOMPARE(srv.hits, 1);
     }
 
     void theStampSurvivesTheAdifRoundTrip()

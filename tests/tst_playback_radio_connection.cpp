@@ -26,6 +26,7 @@
 // =================================================================
 
 #include <QtTest/QtTest>
+#include "core/ZeitUtc.h"
 #include <QSignalSpy>
 #include <QTemporaryDir>
 
@@ -51,7 +52,7 @@ QVector<float> iqBlock(int frames, float iValue, float qValue)
 IqRecordingInfo someRecordingInfo()
 {
     IqRecordingInfo i;
-    i.utcStart  = QDateTime(QDate(2026, 8, 26), QTime(9, 0), Qt::UTC);
+    i.utcStart  = Longpath::Zeit::utc(QDate(2026, 8, 26), QTime(9, 0));
     i.frequency = QStringLiteral("14.074.000");
     i.mode      = QStringLiteral("USB");
     i.band      = QStringLiteral("20m");

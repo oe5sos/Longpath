@@ -35,6 +35,12 @@
 //                 propagation to TransmitModel::setStepAttenuatorController
 //                 inside RadioModel::setStepAttController.  J.J. Boyd
 //                 (KG4VCF), AI-assisted via Anthropic Claude Code.
+//   2026-09-27 -- CW pitch setter (Martin Fischer, OE5SOS, AI-assisted via
+//                 Anthropic Claude): setCwPitch/cwPitchChanged after the
+//                 console.cs CWPitch setter [@852bf0e] (RX part only;
+//                 sidetone and the MOX VFO shift are CW TX, deferred);
+//                 APF centre = CWPitch + tune from the setting instead of
+//                 a fixed 600 (setup.cs tbRX1APFTune_Scroll).
 // =================================================================
 
 //=================================================================
@@ -286,6 +292,7 @@ warren@wpratt.com
 #include "core/RadioConnection.h"
 #include "core/RadioConnectionTeardown.h"
 #include "core/P1RadioConnection.h"
+#include "core/SunSdrRadioConnection.h"
 #include "core/P2RadioConnection.h"
 #include "core/PsccPump.h"   // Phase 3M-4 Task 17 chunk C — pscc() driver
 #include "core/WidebandFftEngine.h"  // Phase 3F Sub-Epic F Task 5 — per-ADC wb FFT
@@ -335,6 +342,8 @@ warren@wpratt.com
 // TxWorkerThread is already included above (line 268) for the existing
 // TX pump wiring; K-bench reuses that include for setRadeChannel +
 // the radeMicBlockReady signal.
+#include "core/Ft8Tx.h"
+#include "core/RttyTx.h"
 #include "core/Resampler.h"
 
 // FlexRadio UDP 4992 discovery beacon. Owned by RadioModel; configured
@@ -551,6 +560,11 @@ RadioModel::RadioModel(QObject* parent)
     // treats a null as a safe no-op (tests that build AudioEngine
     // standalone).
     m_audioEngine->setRadioModel(this);
+
+    // FM-Deviation (2026-09-27): Thetis haelt die Wahl mit dem Konsolen-
+    // zustand (console.cs:3236-3237 [@852bf0e], GetStateList: RadioButton
+    // -> Name/Checked).
+    m_fmDeviationHz = SliceModel::fmDeviationHz();
 
     // Frequency memories. From Thetis console.cs:2006-2007 [@852bf0e]:
     //   MemoryList = MemoryList.Restore();
@@ -875,6 +889,7 @@ RadioModel::RadioModel(QObject* parent)
     connect(m_txSliceArbiter, &TxSliceArbiter::txBoundSliceChanged,
             this, [this](int, int) {
         pushTxFrequencyFromTxSlice();
+        pushFmToneFromTxSlice();
         pushTxModeAndBandpass();
         applyTxAntennaFromBoundSlice();
         if (m_moxController) {
@@ -1859,6 +1874,36 @@ RadioModel::RadioModel(QObject* parent)
     m_freeDvStationModel  = std::make_unique<FreeDVStationModel>(this);
     m_rxDecodeModel       = std::make_unique<RxDecodeModel>(/*maxSize*/ 200, this);
     m_dxccColorProvider   = std::make_unique<DxccColorProvider>(this);
+    // cty.dat laden (2026-09-26). Beim Port kam der Provider mit, nicht
+    // der Aufruf, der ihn fuellt, und nicht der Eintrag in resources.qrc:
+    // From AetherSDR src/gui/MainWindow.cpp:1555 [@d58e2b8a] --
+    // `m_dxccProvider.loadCtyDat(":/cty.dat");` ("DXCC spot coloring #330").
+    // Ohne ihn war der Parser leer: keine DXCC-Faerbung der Spots, keine
+    // Flagge und kein "schon gearbeitet" je Land im Rotor/Log-Feld, keine
+    // Ersatzposition auf der Logbuch-Karte (Betreiber-Log: 3304 Kontakte
+    // ohne Locator "could not be placed at all"). Hier statt im
+    // MainWindow, weil der Provider in Longpath dem RadioModel gehoert;
+    // vor jedem ADIF-Einlesen, das den Parser danach nur noch liest.
+    if (!m_dxccColorProvider->loadCtyDat()) {
+        qWarning("cty.dat not loaded: DXCC colouring, flags and map fallback are off");
+    }
+    // Und was schon gearbeitet ist: AetherSDR liest dafuer ein vom
+    // Betreiber gewaehltes ADIF ein und beobachtet es
+    // (From AetherSDR src/gui/MainWindow.cpp:1563-1568 [@d58e2b8a],
+    // importAdifFile + setAutoReload). Longpath hat genau ein Log, das
+    // eigene Logbuch (derselbe Pfad wie RotorLogbookPanel::logbookPath).
+    // Ohne es galt mit geladener cty.dat jeder Spot als neues Land, und
+    // der Spot-Hub zaehlte unter "New DXCC in feed" jeden Spot mit.
+    // Eingelesen im Hintergrund-Thread des Providers; nach jedem
+    // Schreiben des Logs (QSaveFile: ersetzen, der Ordner-Waechter
+    // nimmt die neue Datei auf) nach 2 s erneut.
+    {
+        const QString log = AppSettings::dataDir() + QStringLiteral("/logbook.adi");
+        if (QFileInfo::exists(log)) {
+            m_dxccColorProvider->importAdifFile(log);
+            m_dxccColorProvider->setAutoReload(true, log);
+        }
+    }
 
     // 2026-05-12 bench fix: seed FreeDVStationModel::setOurGridSquare
     // from the User/GridSquare AppSettings key.  Without this the
@@ -2412,6 +2457,20 @@ QMap<QString, QString> kvsFromSpot(const Longpath::DxSpot& spot,
     return kvs;
 }
 
+/// Die Farbe der FT8-Funde — EINMAL, fuer beide Quellen.
+///
+/// WSJT-X und der eigene Dekoder zeigen dieselbe Sorte Fund, also
+/// dieselbe Farbe; nur der Einstellungsschluessel ist ein anderer.
+/// Ein zweites „#6fa384" im Quelltext haette die Drift-Bremse
+/// ausgeloest (scripts/verify-style-drift.py, colour_literals) — zu
+/// Recht: zwei Abschriften derselben Farbe laufen beim naechsten
+/// Palettenwechsel auseinander.
+QString ft8SpotFarbe(const QString& schluessel)
+{
+    return Longpath::AppSettings::instance()
+        .value(schluessel, QStringLiteral("#6fa384")).toString();
+}
+
 }  // namespace
 
 void RadioModel::onClusterSpotReceived(const DxSpot& spot)
@@ -2451,8 +2510,7 @@ void RadioModel::onWsjtxSpotReceived(const DxSpot& spot)
     // the dialog's UI, so reuse that here.
     const int lifetime = s.value(QStringLiteral("WsjtxSpotLifetimeSec"),
                                  120).toInt();
-    const QString color = s.value(QStringLiteral("WsjtxSpotColor"),
-                                  QStringLiteral("#6fa384")).toString();
+    const QString color = ft8SpotFarbe(QStringLiteral("WsjtxSpotColor"));
     const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
     m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
 
@@ -2488,6 +2546,144 @@ void RadioModel::onWsjtxSpotReceived(const DxSpot& spot)
         m_pskReporter->reportDecode(
             spot.dxCall,
             mode.isEmpty() ? QStringLiteral("FT8") : mode,
+            spot.freqMhz,
+            spot.snr);
+    }
+}
+
+// Nur im Testbau — genau wie die Deklaration in RadioModel.h, die
+// im #ifdef LONGPATH_BUILD_TESTS-Block steht. Ohne denselben Waechter
+// hier sucht der Compiler im Release-Bau eine Deklaration, die es dort
+// nicht gibt: „no declaration matches
+// 'void Longpath::RadioModel::installFt8TxForTest()'" — auf Windows
+// und Linux rot, lokal gruen, weil dort mit Tests gebaut wird
+// (2026-10-16).
+#ifdef LONGPATH_BUILD_TESTS
+void RadioModel::installFt8TxForTest()
+{
+    if (!m_compositeMicRouter) {
+        // Weder PC- noch Funkmikrofon, keine Mikrofonbuchse: der
+        // Router liefert dann Stille, und genau das soll er hier.
+        m_compositeMicRouter = std::make_unique<CompositeTxMicRouter>(
+            nullptr, nullptr, false);
+    }
+    if (!m_ft8TxSource) {
+        m_ft8TxSource = std::make_unique<Ft8TxSource>(48000);
+        m_compositeMicRouter->setFt8Source(m_ft8TxSource.get());
+    }
+}
+
+void RadioModel::installRttyTxForTest()
+{
+    if (!m_compositeMicRouter) {
+        m_compositeMicRouter = std::make_unique<CompositeTxMicRouter>(
+            nullptr, nullptr, false);
+    }
+    if (!m_rttyTxSource) {
+        m_rttyTxSource = std::make_unique<RttyTxSource>(48000);
+        m_compositeMicRouter->setRttySource(m_rttyTxSource.get());
+    }
+}
+#endif  // LONGPATH_BUILD_TESTS
+
+void RadioModel::onNativeFt8Decode(const DxSpot& spot)
+{
+    // Der eigene Dekoder (2026-10-15). Gebaut wie
+    // onWsjtxSpotReceived — es ist dieselbe Sorte Fund, nur aus dem
+    // eigenen Haus statt aus einem zweiten Programm.
+    //
+    // Lebensdauer und Farbe stehen auf denselben Werten wie bei
+    // WSJT-X: 120 s (ein FT8-Fenster ist 15 s, nach zwei Minuten ist
+    // der Fund kalt) und dasselbe Gruen. Das ist mit Absicht KEINE
+    // neue Farbwahl — es ist dieselbe Sache, und wer die beiden
+    // auseinanderhalten will, liest die Quellenspalte. Beides laesst
+    // sich in den Einstellungen aendern.
+    meldeEigenenFund(spot,
+                     QStringLiteral("NativeFt8SpotLifetimeSec"), 120,
+                     QStringLiteral("NativeFt8SpotColor"),
+                     QStringLiteral("FT8"));
+}
+
+void RadioModel::onNativeRttyDecode(const DxSpot& spot)
+{
+    // Der eigene RTTY-Dekoder (2026-10-17). Derselbe Weg wie bei FT8:
+    // Fund in die Spotliste (und damit auf den Panadapter), in den
+    // Sammler „was mein Geraet gehoert hat", und weiter an PSK
+    // Reporter. Bis heute endete RTTY im Textfeld des Applets und
+    // nirgends sonst — der Fund war da, aber unerreichbar.
+    //
+    // Lebensdauer 900 s, und das ist eine Wahl mit Grund: ein
+    // FT8-Fenster ist 15 s lang, darum sind dort 120 s richtig. Ein
+    // RTTY-Anruf laeuft Minuten, und die Station bleibt auf ihrer
+    // Frequenz — das ist naeher an einem Cluster-Spot (1800 s) als an
+    // einem FT8-Fenster. 900 s liegt dazwischen: lang genug, um die
+    // Station wiederzufinden, kurz genug, dass die Liste nicht mit
+    // Stationen voll steht, die langst weg sind. Aenderbar.
+    //
+    // Die FARBE ist mit Absicht dieselbe wie bei den eigenen
+    // FT8-Funden: es ist dieselbe Quelle („Longpath"), und wer die
+    // Betriebsart sehen will, liest die Modusspalte. Eine zweite
+    // Farbe waere eine Gestaltungsentscheidung, und die faellt nicht
+    // hier.
+    meldeEigenenFund(spot,
+                     QStringLiteral("NativeRttySpotLifetimeSec"), 900,
+                     QStringLiteral("NativeRttySpotColor"),
+                     QStringLiteral("RTTY"));
+}
+
+// ── Ein eigener Fund, dreifach weitergereicht ───────────────────────
+//
+// Einmal geschrieben fuer FT8 und RTTY (2026-10-17). Vorher stand der
+// Rumpf nur in onNativeFt8Decode; als RTTY dazukam, waere die zweite
+// Abschrift die Stelle gewesen, an der die beiden beim naechsten
+// Eingriff auseinanderlaufen.
+void RadioModel::meldeEigenenFund(const DxSpot& spot,
+                                  const QString& lebensdauerSchluessel,
+                                  int lebensdauerVorgabeSek,
+                                  const QString& farbSchluessel,
+                                  const QString& modusVorgabe)
+{
+    auto& s = AppSettings::instance();
+    const int lifetime = s.value(lebensdauerSchluessel,
+                                 lebensdauerVorgabeSek).toInt();
+    const QString color = ft8SpotFarbe(farbSchluessel);
+
+    if (m_spotModel) {
+        const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
+        m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
+    }
+
+    // Und in den Sammler „was mein Geraet gerade gehoert hat".
+    if (m_rxDecodeModel) {
+        RxDecode dec;
+        dec.callsign = spot.dxCall;
+        dec.freqMhz  = spot.freqMhz;
+        dec.snr      = spot.snr;
+        dec.mode     = SpotTableModel::extractMode(spot.comment);
+        if (dec.mode.isEmpty()) { dec.mode = modusVorgabe; }
+        dec.source   = spot.source;
+        // Die Zeit des FENSTERS, nicht die von jetzt: ein Fund gehoert
+        // in die Periode, in der er gehoert wurde, sonst stimmt er im
+        // Logbuch um bis zu fuenfzehn Sekunden nicht. DxSpot traegt
+        // nur die Uhrzeit; das Datum kommt von heute (ein Fenster
+        // liegt Sekunden zurueck, nicht Tage).
+        const QDateTime jetzt = QDateTime::currentDateTimeUtc();
+        dec.utcTime  = spot.utcTime.isValid()
+            ? QDateTime(jetzt.date(), spot.utcTime, QTimeZone::UTC)
+            : jetzt;
+        dec.payload  = spot.comment;
+        m_rxDecodeModel->addDecode(dec);
+    }
+
+    // Weitermelden, unter denselben Bedingungen wie der WSJT-X-Weg:
+    // nur wenn die Selbstmeldung ueberhaupt laeuft und ein Rufzeichen
+    // dasteht.
+    if (m_pskReporter && m_pskReporter->isAutoSendActive()
+        && !spot.dxCall.isEmpty()) {
+        const QString mode = SpotTableModel::extractMode(spot.comment);
+        m_pskReporter->reportDecode(
+            spot.dxCall,
+            mode.isEmpty() ? modusVorgabe : mode,
             spot.freqMhz,
             spot.snr);
     }
@@ -2905,6 +3101,88 @@ void RadioModel::setRfKitEnabled(bool enabled)
     }
 
     emit rfKitEnabledChanged(enabled);
+}
+
+// ── CW-Tonhoehe ────────────────────────────────────────────────────────────
+//
+// Porting from Thetis console.cs:18142-18242 [@852bf0e] — public int
+// CWPitch, set (Schrittfolge ausfuehrlich bei SliceModel::
+// centreCwFilterOnPitch). Hier die Reihenfolge und was davon bei uns
+// ankommt:
+//
+//   cw_pitch = value; if (cw_pitch <= 0) cw_pitch = 0;  //-W2PA
+//       -> Klemmen wie CATCWPitch (unten), dann AppSettings "CWPitch".
+//   udCWPitch.Value = cw_pitch;
+//       -> das Setup-Feld horcht auf cwPitchChanged.
+//   Display.CWPitch = cw_pitch;
+//       -> kein Gegenstueck: die CW-Nullinie/Anzeigeversatz ist nicht
+//          portiert.
+//   NetworkIO.SetCWSidetoneFreq(cw_pitch);
+//       -> Mithoerton = SENDEN. 3M-2 CW-TX ist zurueckgestellt
+//          (Betreiber 2026-08-27); bewusst weggelassen.
+//   //-W2PA June 2017 … die Vorgabenschleife (rx1_filters/rx2_filters)
+//       -> FilterPresetStore::followCwPitch (Plaetze mit Ueberschreibung;
+//          die Vorgaben selbst rechnet presetsForMode aus der Tonhoehe)
+//          und SliceModel::recentreStoredCwFilters (gespeicherte
+//          Banddurchlaesse, siehe dort).
+//   switch (_rx1_dsp_mode) CWL/CWU:
+//       if (_mox) VFOAFreq += diff (…VFOBFreq bei Split)
+//           -> SENDEN, weggelassen (siehe oben).
+//       else txtVFOAFreq_LostFocus / txtVFOBFreq_LostFocus
+//           -> Thetis stimmt hier neu ab, weil es den Empfaenger in CW
+//              um die Tonhoehe versetzt (console.cs:31759-31767). Longpath
+//              stimmt den DDC auf die Anzeigefrequenz ab, ohne diesen
+//              Versatz — also gibt es nichts neu abzustimmen.
+//       RX1Filter = rx1_filter; RX2Filter = rx2_filter;
+//           -> SliceModel::followCwPitch je Scheibe.
+//   SetupForm.RX1APFFreq = ptbCWAPFFreq.Value (und RX1sub/RX2)
+//       -> tbRX1APFTune_Scroll: RXAPFFreq = console.CWPitch + Tune
+//          (setup.cs:17112) — hier je Scheibe CWPitch + apfTuneHz.
+//   if (old_cwpitch != cw_pitch) CWPitchChangedHandlers?.Invoke(…)
+//       -> emit cwPitchChanged(pitch), ebenfalls nur bei Aenderung.
+int RadioModel::cwPitch() const
+{
+    return SliceModel::cwPitchHz();
+}
+
+void RadioModel::setCwPitch(int hz)
+{
+    // From Thetis setup.cs:5733-5734 [@852bf0e] — CATCWPitch klemmt auf
+    // die Spanne des Setup-Felds, bevor es setzt:
+    //   value = (int)Math.Max(udDSPCWPitch.Minimum, value);
+    //   value = (int)Math.Min(udDSPCWPitch.Maximum, value);
+    const int pitch = SliceModel::clampCwPitch(hz);
+    const int oldPitch = cwPitch();
+    if (pitch == oldPitch) {
+        return;
+    }
+
+    AppSettings::instance().setValue(QStringLiteral("CWPitch"),
+                                     QString::number(pitch));
+
+    // Die Vorgabenschleife und RX1Filter/RX2Filter.
+    if (m_filterPresetStore) {
+        m_filterPresetStore->followCwPitch(pitch);
+    }
+    SliceModel::recentreStoredCwFilters(pitch);
+    for (SliceModel* slice : std::as_const(m_slices)) {
+        slice->followCwPitch(pitch);
+    }
+
+    // APF-Mitte.
+    // From Thetis setup.cs:17112 [@852bf0e] — tbRX1APFTune_Scroll:
+    //   console.radio.GetDSPRX(0, 0).RXAPFFreq = console.CWPitch + (double)tbRX1APFTune.Value;
+    if (m_wdspEngine) {
+        for (SliceModel* slice : std::as_const(m_slices)) {
+            if (RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex())) {
+                rxCh->setApfFreq(static_cast<double>(pitch)
+                                 + static_cast<double>(slice->apfTuneHz()));
+            }
+        }
+    }
+
+    scheduleSettingsSave();
+    emit cwPitchChanged(pitch);
 }
 
 // ── Per-radio peripherals helpers ──────────────────────────────────────────
@@ -3386,6 +3664,21 @@ void RadioModel::openRxChannelPool(int poolSize, int inputBufferSize,
     // is not (RXANBPSetTuneFrequency short-circuits at
     // third_party/wdsp/src/nbp.c:479).
     syncNotchesToAllChannels();
+
+    // FM-Deviation (2026-09-27): WDSP legt jeden Kanal mit 5000 Hz an.
+    pushFmDeviationToChannels();
+
+    // CTCSS-Kerbe beim Empfang auf den Ton des Slices (2026-09-27). WDSP
+    // legt sie bei 254.1 Hz an (wdsp RXA.c:208); Thetis setzt beim Start
+    // CTCSSFreqHz = ctcss_freq_hz, das auch SetRXACTCSSFreq ruft
+    // (radio.cs:2480-2512 SyncAll, 2913-2916 [@852bf0e]). Bisher zog
+    // Longpath die Kerbe erst beim ersten Tonwechsel nach.
+    for (SliceModel* s : m_slices) {
+        if (!s) { continue; }
+        if (RxChannel* rx = m_wdspEngine->rxChannel(s->sliceIndex())) {
+            rx->setCtcssNotchFreq(s->fmCtcssValueHz());
+        }
+    }
 }
 
 // ── Phase 3F Sub-Epic I: pooled-channel activation ──────────────────────────
@@ -4106,7 +4399,38 @@ bool RadioModel::sampleRateIsRadioWide() const
     // takes a single sampleRate and encodes it as srBits, so there is no
     // per-receiver rate to set. Protocol 2 carries a per-DDC rate through
     // DdcAssignment::rate[], which the codecs populate per stream.
-    return qobject_cast<Longpath::P1RadioConnection*>(m_connection) != nullptr;
+    if (qobject_cast<Longpath::P1RadioConnection*>(m_connection) != nullptr) {
+        return true;
+    }
+
+    // Die SunSDR gehoert auf dieselbe Seite, und das ist seit dem
+    // 2026-10-04 nicht mehr nur eine Einordnung: der Stromstart-Rahmen 0x01
+    // traegt EINEN Modus fuer das ganze Geraet (SunSdrProtocol.h,
+    // StromModus), den SunSdrRadioConnection::setSampleRate waehlt. Eine
+    // Rate je DDC, die man einzeln stellen koennte, gibt es hier nicht.
+    //
+    // Stand hier nur P1, galt die SunSDR als "Rate je Strom" -- und der Weg
+    // auf den Draht fuer so eine Rate ist der DdcAssignment-Push in
+    // invokeCodecDdcAssignment, der ausdruecklich nur P2 bedient. Also ging
+    // eine Ratenaenderung nach dem Verbinden gar nicht hinaus. An der echten
+    // QRP sah das am 2026-10-04 so aus:
+    //
+    //     INF: Connecting with sampleRate= 96000 inSize= 128
+    //     INF: SunSdr: Abtastrate -> 96000 Hz (Stromstart-Rahmen ...)
+    //     DBG: Connected to "SunSDR2 QRP"
+    //     INF: setRxChannelRate: channel 0 -> 48000 Hz, in_size= 64
+    //
+    // 63 ms nach dem Verbinden zog die Wiederanwendung der je Band
+    // gespeicherten Rate den Empfangskanal auf 48 kHz, waehrend das Geraet
+    // weiter mit 96 streamte (Stromkopf 0200, 960 Folgenummern/s) -- wieder
+    // Daten einer Rate in einem Kanal einer anderen, derselbe Riss wie am
+    // 2026-09-24. Die RATE-Anzeige der Kopfleiste stand danach bernsteinfarben
+    // auf "48 kHz"; sie hat nicht geirrt, sie hat genau das gemeldet.
+    //
+    // "Radio-wide" schickt die Aenderung stattdessen durch setSampleRateLive,
+    // und dessen Schritt 4 ruft conn->setSampleRate() fuer alles, was nicht P1
+    // ist -- bei der SunSDR also den Stromstart-Rahmen.
+    return qobject_cast<Longpath::SunSdrRadioConnection*>(m_connection) != nullptr;
 }
 
 int RadioModel::rx0ChannelRateHz() const
@@ -5125,6 +5449,49 @@ int RadioModel::addSlice(const QString& initialPanId, bool suppressAutoStreamBin
     connect(slice, &SliceModel::xitHzChanged, this, [this, slice]() {
         if (slice == txBoundSlice()) { pushTxFrequencyFromTxSlice(); }
     });
+    // FM-Relaisablage (2026-09-27): Ablage, Richtung, Reverse und der
+    // Wechsel nach/aus FM aendern die Sendefrequenz.
+    connect(slice, &SliceModel::fmOffsetHzChanged, this, [this, slice](int) {
+        if (slice == txBoundSlice()) { pushTxFrequencyFromTxSlice(); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::fmTxModeChanged, this, [this, slice](FmTxMode) {
+        if (slice == txBoundSlice()) { pushTxFrequencyFromTxSlice(); }
+    });
+    connect(slice, &SliceModel::dspModeChanged, this, [this, slice](DSPMode) {
+        if (slice == txBoundSlice()) {
+            pushTxFrequencyFromTxSlice();
+            pushFmToneFromTxSlice();
+        }
+    });
+    // Reverse hoert auf der Eingabe des Relais: die Empfangsfrequenz
+    // wandert um die Ablage, die Sendeablage kehrt sich um.
+    // From Thetis Console/console.cs:40442-40468 [@852bf0e]
+    //   chkFMTXRev_CheckedChanged: on  -> Low: VFOAFreq -= off; High: += off
+    //                              off -> Low: VFOAFreq += off; High: -= off
+    connect(slice, &SliceModel::fmReverseChanged, this, [this, slice](bool on) {
+        if (slice->fmTxMode() != FmTxMode::Simplex) {
+            const qint64 off = static_cast<qint64>(slice->fmOffsetHz());
+            const bool low = slice->fmTxMode() == FmTxMode::Low;
+            const qint64 delta = (low == on) ? -off : off;
+            const qint64 f = static_cast<qint64>(slice->frequency()) + delta;
+            if (f > 0) { slice->setFrequency(static_cast<double>(f)); }
+        }
+        if (slice == txBoundSlice()) { pushTxFrequencyFromTxSlice(); }
+    });
+    // CTCSS: Ton beim Senden, Kerbe beim Empfang.
+    connect(slice, &SliceModel::fmCtcssModeChanged, this, [this, slice](int) {
+        if (slice == txBoundSlice()) { pushFmToneFromTxSlice(); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::fmCtcssValueHzChanged, this, [this, slice](double hz) {
+        if (RxChannel* rx = m_wdspEngine ? m_wdspEngine->rxChannel(slice->sliceIndex()) : nullptr) {
+            rx->setCtcssNotchFreq(hz);
+        }
+        if (slice == txBoundSlice()) { pushFmToneFromTxSlice(); }
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::fmTxModeChanged, this, [this](FmTxMode) { scheduleSettingsSave(); });
 
     // 3M-1b H.1: only the TX-bound slice owns the global VOX mode gate.
     // Every slice is wired because the binding can move, but an RX/UI-only
@@ -6334,7 +6701,7 @@ void RadioModel::connectToRadio(const RadioInfo& info)
 
     // Initialize WDSP DSP engine (wisdom runs async — channel creation
     // is deferred until initializedChanged fires)
-    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    QString configDir = AppSettings::dataDir();
     // Sample rate + active RX count come from Hardware Config (per-MAC).
     // Falls back to Thetis default (192000, setup.cs:866) when nothing
     // is persisted, and to the board-cap first-entry if 192000 isn't
@@ -6627,7 +6994,13 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 rxCh->setApfSelection(3);       // radio.cs:1986 _rx_apf_type = 3 (bi-quad)
                 rxCh->setApfBandwidth(600.0);   // radio.cs:1948 rx_apf_bw = 600.0 Hz
                 rxCh->setApfGain(1.0);          // radio.cs:1967 rx_apf_gain = 1.0
-                rxCh->setApfFreq(600.0);        // radio.cs:1929 rx_apf_freq = 600.0 Hz
+                // radio.cs:1929 rx_apf_freq = 600.0 Hz ist nur der Startwert
+                // der Klasse; Thetis setzt die Mitte danach aus dem Setup
+                // (tbRX1APFTune_Scroll, setup.cs:17112: CWPitch + Tune).
+                // Mit fest 600 lag der APF nach einem Neustart neben einer
+                // anders eingestellten Tonhoehe (2026-09-27).
+                rxCh->setApfFreq(static_cast<double>(cwPitch())
+                                 + static_cast<double>(m_activeSlice->apfTuneHz()));
                 rxCh->setApfEnabled(m_activeSlice->apfEnabled());
                 // Squelch initial push — From Thetis radio.cs:1185,1164,1274,1293,1312
                 rxCh->setSsqlEnabled(m_activeSlice->ssqlEnabled());
@@ -6637,6 +7010,14 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 rxCh->setAmsqThresh(m_activeSlice->amsqThresh());
                 rxCh->setFmsqEnabled(m_activeSlice->fmsqEnabled());
                 rxCh->setFmsqThresh(m_activeSlice->fmsqThresh());
+                // Empfangs-Equalizer: die gespeicherte Kurve beim Verbinden
+                // hinausschieben, sonst laeuft der Kanal auf WDSPs flacher
+                // Vorgabe (RXA.c:259-275), waehrend das Modell die Werte des
+                // Betreibers meldet -- genau die Form, die bei NB/SNB oben
+                // schon einmal zugeschlagen hat. Kurve zuerst, run-Flag
+                // zuletzt (Thetis' Reihenfolge, console.cs:43297 SelectNR).
+                rxCh->setRxEqGraph10(m_activeSlice->rxEqGraph10());
+                rxCh->setRxEqRunning(m_activeSlice->rxEqEnabled());
                 // Audio panel initial push
                 // Mute: From Thetis dsp.cs:393-394 — panel runs by default (unmuted)
                 // Pan: From Thetis radio.cs:1386 — pan = 0.5f (center); Longpath 0.0 center
@@ -6794,6 +7175,13 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // Task 4.2: give TxChannel a handle to WdspEngine so onModeChanged()
             // can call rebuild() when the active mode's DSP-Options settings change.
             m_txChannel->setWdspEngine(m_wdspEngine);
+            // FM-CTCSS des Sende-Slices (2026-09-27) -- WdspEngine hat den
+            // Ton beim Anlegen abgeschaltet, hier gilt die Wahl des Slices.
+            pushFmToneFromTxSlice();
+            m_txChannel->setFmDeviation(static_cast<double>(m_fmDeviationHz));
+            qCInfo(lcDsp) << "TX channel FM CTCSS: WDSP ctcss_run ="
+                          << m_txChannel->ctcssRunInWdsp()
+                          << "(0 = kein Ton; vor 2026-09-27 stand hier 1)";
 
             // ── L.1: construct Pc + Radio mic sources + composite router ──────────
             // Construct after m_connection is live so RadioMicSource has a valid
@@ -6827,6 +7215,25 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             m_compositeMicRouter = std::make_unique<CompositeTxMicRouter>(
                 m_pcMicSource.get(), m_radioMicSource.get(), hasMicJack);
             m_compositeMicRouter->setVaxSource(m_vaxTxMicSource.get());
+
+            // Der eigene FT8/FT4-Sender (2026-10-15). Eine
+            // Mikrofonquelle wie die anderen drei — sie liefert
+            // Stille, solange niemand sie startet.
+            //
+            // ANMELDEN heisst nicht SENDEN: der Router liefert sie
+            // nur, wenn jemand MicSource::Ft8 waehlt, und auch dann
+            // nur das, was die Quelle hergibt. Das Tasten entscheidet
+            // der MoxController, nicht diese Zeile.
+            m_ft8TxSource = std::make_unique<Ft8TxSource>(48000);
+            m_compositeMicRouter->setFt8Source(m_ft8TxSource.get());
+
+            // Der eigene RTTY-Sender (2026-10-16), aus demselben
+            // Grund und mit derselben Einschraenkung: angemeldet,
+            // aber still, bis jemand MicSource::Rtty waehlt UND die
+            // Quelle laeuft. Getastet wird auch hier nur ueber den
+            // MoxController.
+            m_rttyTxSource = std::make_unique<RttyTxSource>(48000);
+            m_compositeMicRouter->setRttySource(m_rttyTxSource.get());
 
             // Replace the 3M-1a NullMicSource stub with the composite router.
             m_txChannel->setMicRouter(m_compositeMicRouter.get());
@@ -7855,6 +8262,23 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 m_txChannel->setTxCpdrGainDb(static_cast<double>(dB));
             });
 
+            // AM-Traegerpegel (2026-10-12). Der Regler haelt Prozent,
+            // WDSP will den DSP-Wert -- die Wurzelkennlinie steht in
+            // TransmitModel::amCarrierDspFromPercent und NUR dort, damit
+            // sie nicht an zwei Stellen auseinanderlaeuft.
+            connect(&m_transmitModel, &TransmitModel::amCarrierPercentChanged,
+                    m_txChannel, [this](int percent) {
+                m_txChannel->setAmCarrierLevel(
+                    TransmitModel::amCarrierDspFromPercent(percent));
+            });
+            // Den gespeicherten Wert beim Anlegen des Sendekanals
+            // hinausschieben -- ohne das laeuft ammod auf seiner
+            // Anlegevorgabe, waehrend das Feld den Wert des Betreibers
+            // zeigt. Dieselbe Form wie beim Empfangs-Equalizer.
+            m_txChannel->setAmCarrierLevel(
+                TransmitModel::amCarrierDspFromPercent(
+                    m_transmitModel.amCarrierPercent()));
+
             // 27. cessbOnChanged → setTxCessbOn.
             connect(&m_transmitModel, &TransmitModel::cessbOnChanged,
                     m_txChannel, [this](bool on) {
@@ -8595,9 +9019,46 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     // setActiveReceiverCount on P2 here would enable DDC0..N-1 on top of
     // the DDC2 enable that connectToRadio sets, leaving extra DDCs active.
     // Deferred to Phase 3F (multi-panadapter) which ports UpdateDDCs().
+    //
+    // Die SunSDR gehoert auf dieselbe Seite wie P1 und zwar seit dem
+    // 2026-10-04 zwingend: ihr setActiveReceiverCount() setzt keine DDCs
+    // frei, sondern waehlt den Stromstart-Modus (ein Strom oder zwei,
+    // SunSdrProtocol.h). Ohne diesen Push bleibt im Treiber stehen, was
+    // die VORIGE Sitzung gesetzt hat -- eine Sitzung mit zwei Empfaengern
+    // vererbt den zweiten Strom an die naechste, und ueber die Oberflaeche
+    // laesst sich der zweite Empfaenger beim Verbinden gar nicht
+    // einschalten, nur nachtraeglich.
+    //
+    // Davor hat der Sitzungs-Reset im Treiber das verdeckt (er setzte auf
+    // 1 zurueck); der musste weg, weil er auch die Rate wegwarf, die
+    // RadioModel kurz vorher gesetzt hatte -- siehe 88844941.
     if (info.protocol == ProtocolVersion::Protocol1) {
         QMetaObject::invokeMethod(m_connection, [conn = m_connection, activeRxCount]() {
             conn->setActiveReceiverCount(activeRxCount);
+        });
+    } else if (info.protocol == ProtocolVersion::SunSdr) {
+        // Fuer die SunSDR NICHT der gespeicherte Wert, sondern die Zahl
+        // der Empfaenger, die es oben WIRKLICH gibt.
+        //
+        // Hintergrund (2026-10-04, am Geraet gesehen): mit
+        // activeRxCount = 2 und EINER Scheibe forderte Longpath zwei
+        // Stroeme an, und der zweite fiel eine Ebene hoeher weg --
+        //
+        //   SunSdr: Stromstart-Rahmen -> zwei Stroeme, je 48 kHz
+        //   ReceiverManager: first feedIqData DROPPED; hw= 1  map="hw0->rx0"
+        //
+        // Doppelte Netzlast ohne Gegenwert. Ein Empfaenger entsteht erst,
+        // wenn sich eine Scheibe an den Strom bindet
+        // (syncReceiverToStream), und genau diese Zahl wird hier
+        // geschickt. Waechst sie spaeter, zieht die Verdrahtung ueber
+        // ReceiverManager::hardwareReceiverCountChanged nach -- die gibt
+        // es laengst, mein frueherer Push mit dem gespeicherten Wert hat
+        // sie nur ueberstimmt.
+        const int echte = qMax(1, m_receiverManager
+                                      ? m_receiverManager->activeReceiverCount()
+                                      : 1);
+        QMetaObject::invokeMethod(m_connection, [conn = m_connection, echte]() {
+            conn->setActiveReceiverCount(echte);
         });
     }
     if (m_activeSlice) {
@@ -8660,9 +9121,13 @@ void RadioModel::connectToRadio(const RadioInfo& info)
         m_flexBroadcaster->setMacAddress(mac);
         m_flexBroadcaster->setSerial(derivedFlexSerial(mac));
         m_flexBroadcaster->setVersion(QStringLiteral(LONGPATH_VERSION));
+        // Dieselbe Rueckfallkette wie ueberall sonst: StationCallsign
+        // schreibt niemand, das Rufzeichen steht kanonisch unter
+        // User/Callsign (siehe AppSettings::stationCallsign). Ohne sie
+        // rief sich die Station im Netz „LONGPATH".
+        const QString rufzeichen = AppSettings::stationCallsign();
         m_flexBroadcaster->setCallsign(
-            as.value(QStringLiteral("StationCallsign"),
-                     QStringLiteral("LONGPATH")).toString());
+            rufzeichen.isEmpty() ? QStringLiteral("LONGPATH") : rufzeichen);
         m_flexBroadcaster->setNickname(
             as.value(QStringLiteral("PGXL_BroadcastNickname"),
                      QStringLiteral("Longpath")).toString());
@@ -9002,6 +9467,33 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
         Q_UNUSED(current);
         Q_UNUSED(fwd);
         Q_UNUSED(rev);
+    });
+
+    // Temperaturen, die das Geraet von sich aus meldet → RadioStatus.
+    //
+    // Heute nur die SunSDR2 QRP (2026-10-07): sie schickt 20 Rahmen je
+    // Sekunde mit zwei Werten.
+    //
+    // Der ERSTE ist richtig, und das ist seit dem 2026-10-08 belegt
+    // statt gewaehlt. Zwei Messungen zusammen:
+    //
+    //   Aufwaermkurve von kalt: A 39,5 -> 42,5 ueber 50 Minuten, B
+    //   30,5 -> 32,5. Beide saettigen, der Abstand ist nicht konstant
+    //   (9,0 kalt, 10,0 warm) -- also zwei unabhaengige Fuehler und
+    //   beide Temperaturen.
+    //
+    //   ExpertSDR2, mit demselben Geraet im selben warmen Zustand
+    //   verbunden, zeigt in seiner Statuszeile 42,5 Grad. Das ist
+    //   derselbe Wert wie A, nicht ein aehnlicher.
+    //
+    // Der zweite Wert bleibt vorerst ungenutzt: wo sein Fuehler sitzt,
+    // trennt erst Last am Ausgang (ohne Senden erwaermt sich keine
+    // Endstufe). Begruendung und Zahlen:
+    // docs/architecture/2026-10-02-sunsdr-paritaet.md.
+    connect(m_connection, &RadioConnection::deviceTemperaturesUpdated,
+            this, [this](double erster, double zweiter) {
+        Q_UNUSED(zweiter);
+        m_radioStatus.setPaTemperature(erster);
     });
 
     // Phase 3P-H Task 4: PA telemetry → RadioStatus.
@@ -9633,7 +10125,26 @@ quint64 RadioModel::txFrequencyForSlice(const SliceModel* slice) const
 
     const qint64 xitOffset =
         slice->xitEnabled() ? static_cast<qint64>(slice->xitHz()) : 0LL;
-    const qint64 txHz = static_cast<qint64>(slice->frequency()) + xitOffset;
+    qint64 txHz = static_cast<qint64>(slice->frequency()) + xitOffset;
+
+    // FM-Relaisablage (2026-09-27). Bisher nur Oberflaeche.
+    // From Thetis Console/console.cs:29347-29366 [@852bf0e]:
+    //   //FM Offsets
+    //   if (radio.GetDSPTX(0).CurrentDSPMode == DSPMode.FM
+    //       && current_fm_tx_mode != FMTXMode.Simplex && !chkVFOSplit.Checked)
+    //     Low:  !chkFMTXRev -> TXFreq -= fm_tx_offset_mhz; // usual case
+    //                  else -> TXFreq += fm_tx_offset_mhz;
+    //     High: !chkFMTXRev -> TXFreq += fm_tx_offset_mhz; // usual case
+    //                  else -> TXFreq -= fm_tx_offset_mhz;
+    // Thetis verschiebt beim Tasten; Longpath fuehrt die Sendefrequenz
+    // staendig nach, daher hier. Split kennt Longpath als eigenen
+    // Sende-Slice -- dessen eigene FM-Einstellung gilt.
+    if (slice->dspMode() == DSPMode::FM && slice->fmTxMode() != FmTxMode::Simplex) {
+        const qint64 off = static_cast<qint64>(slice->fmOffsetHz());
+        const bool high = slice->fmTxMode() == FmTxMode::High;
+        const bool rev = slice->fmReverse();
+        txHz += (high != rev) ? off : -off;
+    }
     return (txHz < 0) ? 0 : static_cast<quint64>(txHz);
 }
 
@@ -9867,6 +10378,62 @@ double RadioModel::composedShiftHz(const SliceModel* slice,
     return offset;
 }
 
+// ---------------------------------------------------------------------------
+// FM CTCSS-Ton aus dem Sende-Slice (2026-09-27).
+// From Thetis Console/console.cs:40488-40516 [@852bf0e] (CTCSSOn / CTCSSFreq)
+// -> radio.cs:2901-2940 (SetTXACTCSSFreq / SetTXACTCSSRun). Der Ton laeuft
+// nur, wenn der Slice "Encode" oder "Enc+Dec" gewaehlt hat; fmmod laeuft
+// ohnehin nur in FM.
+// ---------------------------------------------------------------------------
+void RadioModel::setFmDeviationHz(int hz)
+{
+    if (hz <= 0 || hz == m_fmDeviationHz) { return; }
+    m_fmDeviationHz = hz;
+    AppSettings::instance().setValue(QStringLiteral("FmDeviationHz"), QString::number(hz));
+    scheduleSettingsSave();
+    pushFmDeviationToChannels();
+
+    // From Thetis console.cs:40325-40347 [@852bf0e] -- fmDeviation2k (and
+    // fmDeviation5k, :40363-40385): TX and both RX deviations, then every
+    // receiver in FM gets the filter that fits the new deviation:
+    //   int halfBw = (int)(radio.GetDSPRX(0, 0).RXFMDeviation + radio.GetDSPRX(0, 0).RXFMHighCut); //[2.10.3.4]MW0LGE
+    //   UpdateRX1Filters(-halfBw, halfBw, force);
+    // The TX half (SetTXFilters(FM, +/-halfBw)) is not repeated here:
+    // Longpath derives the TX bandpass from the TX filter, and in WDSP
+    // TXA bp0 runs before the FM modulator (TXA.c:573/582), whose own
+    // output bandpass follows the deviation set above.
+    const int halfBw = SliceModel::fmHalfBandwidthHz();
+    for (SliceModel* s : m_slices) {
+        if (s && s->dspMode() == DSPMode::FM) { s->setFilter(-halfBw, halfBw); }
+    }
+    emit fmDeviationHzChanged(hz);
+}
+
+void RadioModel::pushFmDeviationToChannels()
+{
+    const double dev = static_cast<double>(m_fmDeviationHz);
+    if (m_wdspEngine) {
+        for (int ch = WdspEngine::kFirstSliceChannelId;
+             ch < WdspEngine::kMaxSliceChannels; ++ch) {
+            if (RxChannel* rx = m_wdspEngine->rxChannel(ch)) { rx->setFmDeviation(dev); }
+        }
+    }
+    if (m_txChannel) { m_txChannel->setFmDeviation(dev); }
+}
+
+void RadioModel::pushFmToneFromTxSlice()
+{
+    if (!m_txChannel) { return; }
+    const SliceModel* slice = txBoundSlice();
+    if (!slice) {
+        m_txChannel->setCtcssRun(false);
+        return;
+    }
+    const int mode = slice->fmCtcssMode();   // 0 Off, 1 Encode, 2 Decode, 3 Enc+Dec
+    m_txChannel->setCtcssFreq(slice->fmCtcssValueHz());
+    m_txChannel->setCtcssRun(mode == 1 || mode == 3);
+}
+
 void RadioModel::pushTxFrequencyFromTxSlice()
 {
     if (!m_connection) {
@@ -9874,9 +10441,29 @@ void RadioModel::pushTxFrequencyFromTxSlice()
         // frequency is never published and the radio keeps 0 Hz. Logged
         // because a caller running before m_connection is assigned looks
         // identical from the outside to never being called at all.
-        qCWarning(lcConnection)
-            << "TX frequency NOT pushed: no connection yet (caller ran before"
-               " m_connection was assigned).";
+        //
+        // INFO, nicht Warnung (2026-10-04). Nachgezaehlt in Martins
+        // Betriebslog: diese Zeile kommt bei JEDEM gesunden Verbinden
+        // viermal (19:02:41.140 bis .144) -- und danach steht zweimal
+        // "TX frequency pushed: 28350350 Hz (slice 0, xit=0)". Sie meldet
+        // also keinen Fehler, sondern die normale Reihenfolge des
+        // Verbindungsaufbaus: mehrere Stellen wollen die Sendefrequenz
+        // setzen, bevor m_connection steht, und die Stelle danach setzt
+        // sie richtig.
+        //
+        // Eine Meldung, die in jeder gesunden Sitzung erscheint, sagt
+        // ueber den Fehlerfall nichts aus -- sie erzieht nur dazu,
+        // Warnungen zu ueberlesen. Der wirklich gefaehrliche Fall (kein
+        // gebundener Slice -> das Geraet sendet auf 0 Hz) bleibt unten
+        // eine Warnung.
+        //
+        // Gruendlicher waere eine POSITIVE Pruefung: wenn die Verbindung
+        // steht und bis dahin nie eine Sendefrequenz hinausging, warnen.
+        // Das ist nicht gebaut; es braucht einen Zustand ueber den
+        // Verbindungsaufbau hinweg, und der gehoert dem Betreiber.
+        qCInfo(lcConnection)
+            << "TX frequency not pushed yet: no connection (caller ran before"
+               " m_connection was assigned); a later call publishes it.";
         return;
     }
 
@@ -10419,6 +11006,62 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
         scheduleSettingsSave();
     });
 
+    // ── Empfangs-Equalizer (2026-10-11) ──────────────────────────────────────
+    //
+    // Longpath-eigen: Thetis hat den Empfangs-Equalizer
+    // (Console/radio.cs:827-843 RXEQOn, :800-824 RXEQ10), Longpath hatte ihn
+    // nicht -- die WDSP-Rufe waren nicht einmal deklariert, obwohl das
+    // vendorte eqp im RXA-Durchlauf steht (RXA.c:673).
+    //
+    // Ein geaenderter Bandwert schiebt IMMER die ganze Kurve hinaus, nicht
+    // nur das eine Band: SetRXAGrphEQ10 nimmt Vorverstaerkung und alle zehn
+    // Baender in einem Zug, es gibt kein "nur Band 3 setzen". Thetis macht
+    // es genauso (radio.cs:800-824 reicht das ganze int[11] durch).
+    //
+    // Die Kurve wird auch dann hinausgeschoben, wenn der Equalizer AUS ist.
+    // Das ist Absicht: so steht beim Einschalten sofort das Richtige da,
+    // statt erst beim naechsten Reglerzug. WDSPs run-Flag entscheidet
+    // allein, ob gerechnet wird (eq.c:279-285).
+    auto pushRxEq = [this, slice]() {
+        RxChannel* rxCh = m_wdspEngine ? m_wdspEngine->rxChannel(slice->sliceIndex())
+                                       : nullptr;
+        if (!rxCh) { return; }
+        rxCh->setRxEqGraph10(slice->rxEqGraph10());
+        rxCh->setRxEqRunning(slice->rxEqEnabled());
+    };
+    connect(slice, &SliceModel::rxEqEnabledChanged, this, [this, pushRxEq](bool) {
+        pushRxEq();
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::rxEqPreampDbChanged, this, [this, pushRxEq](int) {
+        pushRxEq();
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::rxEqBandDbChanged, this, [this, pushRxEq](int, int) {
+        pushRxEq();
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::rxEqFreqHzChanged, this, [this, slice](int, int) {
+        // Freie Mitten gehen nicht ueber SetRXAGrphEQ10 (das rechnet mit den
+        // festen Mitten aus RXA.c:260), sondern ueber SetRXAEQProfile.
+        RxChannel* rxCh = m_wdspEngine ? m_wdspEngine->rxChannel(slice->sliceIndex())
+                                       : nullptr;
+        if (rxCh) {
+            std::vector<double> freqs;
+            std::vector<double> gains;
+            freqs.reserve(10);
+            gains.reserve(11);
+            gains.push_back(static_cast<double>(slice->rxEqPreampDb()));
+            for (int i = 0; i < slice->rxEqNumBands(); ++i) {
+                freqs.push_back(static_cast<double>(slice->rxEqFreqHz(i)));
+                gains.push_back(static_cast<double>(slice->rxEqBandDb(i)));
+            }
+            rxCh->setRxEqProfile(freqs, gains);
+            rxCh->setRxEqRunning(slice->rxEqEnabled());
+        }
+        scheduleSettingsSave();
+    });
+
     // NR3 (RNNR) — position + useDefaultGain
     // From Thetis setup.cs:35460-35462 [v2.10.3.13]
     connect(slice, &SliceModel::nr3PositionChanged, this, [this, slice](Longpath::NrPosition p) {
@@ -10702,10 +11345,13 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
     connect(slice, &SliceModel::apfTuneHzChanged, this, [this, slice](int hz) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) {
-            // From Thetis setup.cs:17071 — freq = CWPitch + tuneOffset
-            // CW pitch default 600 Hz from Thetis console.cs
-            static constexpr double kCwPitchHz = 600.0;
-            rxCh->setApfFreq(kCwPitchHz + static_cast<double>(hz));
+            // From Thetis setup.cs:17112 [@852bf0e] — freq = CWPitch + tuneOffset
+            // (tbRX1APFTune_Scroll; bei v2.10.3.13 stand es auf :17071).
+            // CWPitch ist seit 2026-09-27 die eingestellte Tonhoehe, nicht
+            // mehr fest 600 (die Vorgabe aus Thetis console.cs); eine
+            // Aenderung schiebt die Mitte in setCwPitch nach.
+            rxCh->setApfFreq(static_cast<double>(cwPitch())
+                             + static_cast<double>(hz));
         }
         scheduleSettingsSave();
     });
@@ -12483,6 +13129,35 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
         // Settings Validation sub-tab (built in Phase H Task 3).
         if (!m_lastRadioInfo.macAddress.isEmpty()) {
             m_settingsHygiene.validate(m_lastRadioInfo.macAddress, boardCapabilities());
+            // ... und sagen, was dabei herauskam.
+            //
+            // Bis 2026-10-04 landete das Ergebnis AUSSCHLIESSLICH auf der
+            // Diagnoseseite. Wer sie nicht aufschlaegt, erfaehrt nie, dass
+            // eine gespeicherte Einstellung nicht zur angeschlossenen
+            // Platine passt -- und niemand schlaegt eine Diagnoseseite auf,
+            // solange nichts auffaellt. Genau das ist aber die Lage, in der
+            // eine geklemmte S-ATT oder ein falsch gemerkter Vorverstaerker
+            // sitzt: unauffaellig.
+            //
+            // Eine Zeile im Log kostet nichts und macht den Befund
+            // auffindbar. Bei null Befunden steht sie auf DBG und stoert
+            // niemanden; ab einem Befund steht sie auf WRN -- dann ist sie
+            // eine Warnung, die etwas bedeutet.
+            const auto befunde = m_settingsHygiene.issues();
+            if (befunde.isEmpty()) {
+                qCDebug(lcConnection)
+                    << "Einstellungs-Hygiene: keine Befunde fuer"
+                    << m_lastRadioInfo.macAddress;
+            } else {
+                qCWarning(lcConnection)
+                    << "Einstellungs-Hygiene:" << befunde.size()
+                    << "Befund(e) fuer" << m_lastRadioInfo.macAddress
+                    << "-- Diagnose > Radio Status > Settings Validation";
+                for (const auto& b : befunde) {
+                    qCWarning(lcConnection)
+                        << "  -" << b.key << ":" << b.summary;
+                }
+            }
         }
         // Per-radio peripherals refactor (2026-05-26): now that the MAC
         // is known and settings have been validated, fire the
@@ -13194,6 +13869,20 @@ void RadioModel::setTune(bool on)
         // match Thetis console.cs:30010 [v2.10.3.13] ordering (G.4 fixup).
         if (m_moxController) {
             m_moxController->setTune(true);
+            // Kam MOX nicht (Bandplan: z. B. FM/AM noch ohne Senden,
+            // Frequenz ausserhalb; oder die Sende-Verriegelung), dann TUNE
+            // gleich wieder aus -- wie Thetis' chkTUN, das bei verweigertem
+            // chkMOX selbst auf false geht. Bis 2026-09-27 blieb TUNE hier
+            // „an" (isTune true, mox false): der Knopf leuchtete, gesendet
+            // wurde nichts, und Betriebsart/Leistung blieben vertauscht, bis
+            // man TUNE von Hand wieder ausschaltete. Gefunden an der HL2-
+            // Werkbank. Der Aus-Zweig deckt den Fall „MOX war nie an" schon
+            // ab (completeTuneOff ueber den Einmal-Zeitgeber). Den Grund
+            // zeigt der moxRejected-Hinweis.
+            if (!m_moxController->isMox()) {
+                setTune(false);
+                return;
+            }
         }
 
     } else {
@@ -13462,9 +14151,13 @@ MemoryRecord RadioModel::captureMemory() const
     if (!stepName.isEmpty()) { r.tuneStep = stepName; }
     r.rptr = slice->fmTxMode();
     r.rptrOffsetMHz = slice->fmOffsetHz() / 1.0e6;
-    r.ctcssOn = slice->fmCtcssMode() != 0;
+    // CTCSSOn is the TX tone (console.cs:40318-40328 [@852bf0e]:
+    // radio.GetDSPTX(0).CTCSSFlag): only Encode / Enc+Dec count. Before
+    // 2026-09-27 a Decode-only slice was stored as "on" and came back from
+    // the memory as Encode -- transmitting a tone nobody had switched on.
+    r.ctcssOn = (slice->fmCtcssMode() == 1 || slice->fmCtcssMode() == 3);
     r.ctcssFreq = slice->fmCtcssValueHz();
-    // TXFMDeviation: not a Longpath model property; the record default stays.
+    r.deviation = m_fmDeviationHz;   // (int)console.radio.GetDSPTX(0).TXFMDeviation
     r.power = m_transmitModel.power();
     // VFOSplit / TXFreq: Longpath has no split VFO (design 2026-05-26 §3);
     // recorded as "no split, TX = RX" so a Thetis reading the file gets a
@@ -13537,7 +14230,7 @@ void RadioModel::recallMemory(const MemoryRecord& record)
         slice->setFmOffsetHz(static_cast<int>(std::lround(record.rptrOffsetMHz * 1.0e6)));
         slice->setFmCtcssMode(record.ctcssOn ? 1 : 0);
         slice->setFmCtcssValueHz(record.ctcssFreq);
-        // FMDeviation_Hz = record.Deviation: no Longpath model property yet.
+        setFmDeviationHz(record.deviation);   // FMDeviation_Hz = record.Deviation;
     } else {
         // Longpath deviation: no Filter enum to select a preset by name, so
         // the stored bounds are applied for every filter, not only VAR1/VAR2
@@ -13750,6 +14443,35 @@ int RadioModel::agcGain(int rx) const
 {
     if (const auto* s = sliceById(rx)) { return s->rfGain(); }
     return 0;
+}
+
+// ── TX-Leistung / Abstimmleistung (TCI `drive:` / `tune_drive:`) ────────────
+//
+// From Thetis TCIServer.cs:4138-4164 [v2.10.3.13] — handleDrive setzt
+// consoleThreadSafe.PWR, handleTuneDrive die Abstimmleistung; der Bereich
+// 0..100 steht dort in sendDrivePower / sendTunePower (TCIServer.cs:2328-2341).
+//
+// Unterschied zu Thetis, absichtlich: die Abstimmleistung liegt in Longpath
+// pro Band (TransmitModel::setTunePower schreibt auf das aktuelle Band und
+// klemmt dabei modellabhängig -- HERMESLITE 0..99, sonst 0..100,
+// TransmitModel.cpp setTunePowerForBand).  Deshalb klemmt hier nur die
+// Sendeleistung selbst; die Abstimmleistung überlassen wir der Klemmung des
+// Modells, damit ein HL2 nicht über seine 99 hinausgesetzt wird.
+void RadioModel::setDrivePower(int pct)
+{
+    transmitModel().setPower(std::clamp(pct, 0, 100));
+}
+int RadioModel::drivePower() const
+{
+    return m_transmitModel.power();
+}
+void RadioModel::setTuneDrivePower(int pct)
+{
+    transmitModel().setTunePower(pct);
+}
+int RadioModel::tuneDrivePower() const
+{
+    return m_transmitModel.tunePower();
 }
 
 // ── Squelch ─────────────────────────────────────────────────────────────────
@@ -14144,6 +14866,20 @@ bool RadioModel::tune() const
 // powerOn -- From Thetis PowerOn at console.cs:19799-19803 [v2.10.3.15].
 // Architectural divergence: Longpath has no separate Power button, so
 // connection IS power.  TCI clients see powerOn = isConnected().
+double RadioModel::rxSignalDbm(int rx) const
+{
+    // Uebernommen aus der zweiten CAT-Fassung (Zweig
+    // fix/discovery-quietpolls-thetis-parity) -- dort fuer SM und
+    // rigctlds STRENGTH gebaut. Der Pegel ist der gemittelte, nicht der
+    // Spitzenwert: ein S-Meter-Rapport soll nicht bei jeder Silbe
+    // springen.
+    RxChannel* const ch = rxChannelForSlice(rx);
+    if (!ch) {
+        return -200.0;   // kein Kanal -- jeder Aufrufer klammert das weg
+    }
+    return ch->getMeter(RxMeterType::SignalAvg) + rxMeterOffsetDb();
+}
+
 bool RadioModel::powerOn() const
 {
     return isConnected();

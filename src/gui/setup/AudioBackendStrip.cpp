@@ -11,6 +11,7 @@
 // =================================================================
 
 #include "gui/setup/AudioBackendStrip.h"
+#include "core/AppSettings.h"
 #include "core/AudioEngine.h"
 
 #include <QDesktopServices>
@@ -117,7 +118,7 @@ void AudioBackendStrip::onRescanClicked()
 void AudioBackendStrip::onOpenLogsClicked()
 {
     const QString logDir =
-        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+        AppSettings::dataDir();
     QDesktopServices::openUrl(QUrl::fromLocalFile(logDir));
 }
 

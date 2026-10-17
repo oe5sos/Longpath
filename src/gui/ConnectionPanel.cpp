@@ -444,7 +444,7 @@ void ConnectionPanel::buildUI()
         "  background: %1;"
         "  color: %2;"
         "  border: 1px solid %3;"
-        "  font-family: Consolas, 'Courier New', monospace;"
+        "  font-family: " LP_MONO_QSS ";"
         "  font-size: 13px;"
         "  gridline-color: %4;"
         "}"

@@ -4193,6 +4193,11 @@ TxChannelState TxChannel::captureState() const
     s.filterLowHz  = m_filterLowHz;
     s.filterHighHz = m_filterHighHz;
 
+    // FM (2026-09-27)
+    s.ctcssRun      = m_ctcssRun;
+    s.ctcssFreqHz   = m_ctcssFreq;
+    s.fmDeviationHz = m_fmDeviationHz;
+
     // Mic / EQ carry
     s.micGainDb  = m_micGainDb;
     s.eqEnabled  = m_eqEnabled;
@@ -4253,6 +4258,11 @@ void TxChannel::applyState(const TxChannelState& s)
     m_filterLowHz  = s.filterLowHz;
     m_filterHighHz = s.filterHighHz;
     setTxBandpass(s.filterLowHz, s.filterHighHz);
+
+    // FM (2026-09-27): Ton und Deviation wie vor dem Rebuild.
+    setCtcssFreq(s.ctcssFreqHz);
+    setFmDeviation(s.fmDeviationHz);
+    setCtcssRun(s.ctcssRun);
 
     // Mic / EQ carry only — no WDSP call yet
     m_micGainDb  = s.micGainDb;
@@ -4923,6 +4933,82 @@ void TxChannel::setPSTxIdx(int txid, int idx)
 #else
     Q_UNUSED(txid);
     Q_UNUSED(idx);
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// FM CTCSS (2026-09-27)
+// From Thetis Console/radio.cs:2901-2940 [@852bf0e]:
+//   CTCSSFreqHz -> WDSP.SetTXACTCSSFreq(WDSP.id(thread, 0), value)
+//   CTCSSFlag   -> WDSP.SetTXACTCSSRun(WDSP.id(thread, 0), value)
+// ---------------------------------------------------------------------------
+void TxChannel::setCtcssRun(bool on)
+{
+    m_ctcssRun = on;
+#ifdef HAVE_WDSP
+    if (m_channelId < 0 || txa[m_channelId].fmmod.p == nullptr) { return; }
+    SetTXACTCSSRun(m_channelId, on ? 1 : 0);
+#endif
+}
+
+int TxChannel::ctcssRunInWdsp() const
+{
+#ifdef HAVE_WDSP
+    if (m_channelId < 0 || txa[m_channelId].fmmod.p == nullptr) { return -1; }
+    return txa[m_channelId].fmmod.p->ctcss_run;
+#else
+    return -1;
+#endif
+}
+
+void TxChannel::setCtcssFreq(double hz)
+{
+    m_ctcssFreq = hz;
+#ifdef HAVE_WDSP
+    if (m_channelId < 0 || txa[m_channelId].fmmod.p == nullptr) { return; }
+    SetTXACTCSSFreq(m_channelId, hz);
+#endif
+}
+
+void TxChannel::setAmCarrierLevel(double level)
+{
+    m_amCarrierLevel = level;
+#ifdef HAVE_WDSP
+    if (txa[m_channelId].rsmpin.p == nullptr) { return; }
+    // From Thetis Console/radio.cs:2944-2959 [v2.10.3.15] --
+    // TXAMCarrierLevel -> SetTXAAMCarrierLevel.
+    // third_party/wdsp/src/ammod.c:104-110, csDSP-geschuetzt.
+    SetTXAAMCarrierLevel(m_channelId, level);
+#endif
+}
+
+double TxChannel::amCarrierLevelInWdsp() const
+{
+#ifdef HAVE_WDSP
+    if (m_channelId < 0 || txa[m_channelId].ammod.p == nullptr) { return -1; }
+    return txa[m_channelId].ammod.p->c_level;
+#else
+    return -1;
+#endif
+}
+
+void TxChannel::setFmDeviation(double hz)
+{
+    m_fmDeviationHz = hz;
+#ifdef HAVE_WDSP
+    if (m_channelId < 0 || txa[m_channelId].fmmod.p == nullptr) { return; }
+    // From Thetis Console/radio.cs:2882-2899 [@852bf0e] -- TXFMDeviation
+    SetTXAFMDeviation(m_channelId, hz);
+#endif
+}
+
+double TxChannel::fmDeviationInWdsp() const
+{
+#ifdef HAVE_WDSP
+    if (m_channelId < 0 || txa[m_channelId].fmmod.p == nullptr) { return -1.0; }
+    return txa[m_channelId].fmmod.p->deviation;
+#else
+    return -1.0;
 #endif
 }
 

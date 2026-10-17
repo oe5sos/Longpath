@@ -1,0 +1,29 @@
+/* Rollen 1:1 aus handfunke/stil.css — die Entwuerfe erfinden keine Farben,
+   sie ordnen nur anders an. */
+:root{
+  --app-bg:#08080a; --panel:#0c0c0e; --inset:#050507; --inset-border:#232329;
+  --border:#2c2c31; --border-subtle:#1f1f23;
+  --text:#dcdce1; --text2:#a6a6ac; --text3:#909096; --text-scale:#7e7e85;
+  --text-inactive:#58585e; --title:#c4c4ca;
+  --accent:#4a7ba8; --measured:#d8a55f; --amber-dim:#6b5630;
+  --ok:#6fa384; --warn:#a8853f;
+  --pan-bg:#141e27;
+  --glass-btn-top:#222227; --glass-btn-bot:#141417;
+  --glass-sel-top:#2f5f92; --glass-sel-bot:#1e3d5f;
+  --glass-sel-border:#3d78b0; --glass-sel-text:#dbe9f8;
+  --badge-info:#161e27;
+  --light:rgba(255,255,255,.07);
+  --f-caption:9px; --f-small:11px; --f-body:13px;
+  --f-sub:16px; --f-reading:22px; --f-display:38px;
+  --r-chip:7px; --r-panel:10px;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:393px;height:852px;overflow:hidden}
+body{background:var(--app-bg);color:var(--text);
+  font:var(--f-body)/1.3 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+  display:flex;flex-direction:column}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.caps{font-size:var(--f-caption);letter-spacing:.18em;text-transform:uppercase;
+      font-weight:600;color:var(--text3)}
+canvas{display:block;width:100%}

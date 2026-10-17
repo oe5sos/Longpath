@@ -134,7 +134,7 @@ bool parseControlHeader(const quint8* data, int len, const Profile& profile,
 }
 
 QByteArray buildIqHeader(const Profile& profile, quint8 opcode, quint16 seq,
-                         quint8 byte8, quint8 byte9)
+                         quint8 byte8, quint8 byte9, int payloadLen)
 {
     // Mirrors sunsdr_build_iq_header, sunsdr.c:1678-1690 [@f8b01d25c5].
     QByteArray out(kIqHeaderSize, char(0));
@@ -144,8 +144,8 @@ QByteArray buildIqHeader(const Profile& profile, quint8 opcode, quint16 seq,
     buf[1] = kMagic1;
     buf[2] = opcode;
     buf[3] = 0xFF;
-    buf[4] = static_cast<uchar>(kIqPayloadSize & 0xFF);
-    buf[5] = static_cast<uchar>((kIqPayloadSize >> 8) & 0xFF);
+    buf[4] = static_cast<uchar>(payloadLen & 0xFF);
+    buf[5] = static_cast<uchar>((payloadLen >> 8) & 0xFF);
     buf[6] = static_cast<uchar>(seq & 0xFF);
     buf[7] = static_cast<uchar>((seq >> 8) & 0xFF);
     buf[8] = byte8;
@@ -223,6 +223,42 @@ namespace {
 constexpr quint64 kFreqScaleCandidate = 10;
 }
 
+QByteArray stromModusPayload(StromModus modus)
+{
+    switch (modus) {
+    case StromModus::EinStrom48:
+        return QByteArray::fromHex("010000000c08040302020202");
+    case StromModus::ZweiStroemeJe48:
+        return QByteArray::fromHex("020000000c08040302020202");
+    case StromModus::ZweiStroemeJe96:
+        return QByteArray::fromHex("020100000a06040302020201");
+    case StromModus::EinStrom96:
+        // Vom Draht, 2026-10-07: erstes Byte 01 (ein Strom), zweites 01
+        // (Stufe 96 kHz), Schwanz wie bei allen 96ern. Die drei anderen
+        // Nutzlasten sind seit dem 2026-10-03 gemessen; diese ist die
+        // vierte und schliesst die Tabelle.
+        return QByteArray::fromHex("010100000a06040302020201");
+    }
+    return QByteArray::fromHex("010000000c08040302020202");
+}
+
+QByteArray buildStromStartFrame(const Profile& profile, StromModus modus)
+{
+    const QByteArray nutz = stromModusPayload(modus);
+    QByteArray frame = buildControlHeader(profile, 0x01, 0,
+                                          quint16(nutz.size()));
+    frame += nutz;
+    return withControlFrameCrc(frame);
+}
+
+QByteArray buildStopFrame(const Profile& profile)
+{
+    // Vier Byte Nutzlast, alle null -- byte-fuer-byte wie im Mitschnitt.
+    QByteArray frame = buildControlHeader(profile, 0x02, 0, 4);
+    frame += QByteArray(4, char(0));
+    return withControlFrameCrc(frame);
+}
+
 quint32 controlFrameCrc(const QByteArray& frame)
 {
     // CRC-32/IEEE, bitweise (die Rahmen sind hoechstens ein paar hundert
@@ -277,12 +313,31 @@ quint64 decodeFrequencyPayload(const QByteArray& payload)
 // the full citation and the "zero wire reachability" scope this Step 1
 // sits behind.
 
+// ── Jeder Rahmenbauer liefert einen SENDEFERTIGEN Rahmen (2026-10-08) ──
+//
+// buildStromStartFrame und buildStopFrame -- die beiden, die verdrahtet
+// sind -- riefen withControlFrameCrc selbst. Die vier darunter, die
+// bewusst KEINE Aufrufstelle haben, taten es nicht: sie lieferten Bytes
+// 14..17 als null.
+//
+// Das ist kein Schoenheitsfehler. Dieses Projekt hat am 2026-09-25 am
+// Geraet gezeigt, dass ein Rahmen mit falschem Ende STILLSCHWEIGEND
+// verworfen wird -- kein Fehler, keine Antwort, nichts. Wer einen dieser
+// vier als Erster verdrahtet, schickt einen toten Rahmen hinaus und
+// sucht die Ursache im Funkgeraet statt in der Zeile. Das waere beim
+// Durchgang mit dem 50-Ohm-Abschluss passiert, wo die Zeit am Geraet
+// teuer ist.
+//
+// Darum tragen jetzt alle sechs die Pruefsumme, und ein Waechter in
+// tst_sunsdr_protocol haelt fest, dass JEDER Rahmenbauer einen Rahmen
+// liefert, dessen Pruefsumme stimmt -- auch der naechste, den jemand
+// dazuschreibt.
 QByteArray buildMoxFrame(const Profile& profile, bool on)
 {
     QByteArray out = buildControlHeader(profile, kOpMoxPtt, /*sub=*/0,
                                         /*declaredPayloadLen=*/4);
     appendU32Le(out, on ? 1u : 0u);
-    return out;
+    return withControlFrameCrc(out);
 }
 
 namespace {
@@ -364,7 +419,7 @@ bool buildAntennaSelectFrame(const Profile& profile, AntennaPort port,
                                               /*sub=*/0,
                                               /*declaredPayloadLen=*/4);
         appendU32Le(frame, entry.byteValue);
-        *out = frame;
+        *out = withControlFrameCrc(frame);
         return true;
     }
     return false;
@@ -375,7 +430,7 @@ QByteArray buildDriveFrame(const Profile& profile, quint8 raw0to255)
     QByteArray out = buildControlHeader(profile, kOpDrive, /*sub=*/0,
                                         /*declaredPayloadLen=*/4);
     appendU32Le(out, static_cast<quint32>(raw0to255));
-    return out;
+    return withControlFrameCrc(out);
 }
 
 QByteArray buildPaEnableFrame(const Profile& profile, bool enabled)
@@ -383,7 +438,7 @@ QByteArray buildPaEnableFrame(const Profile& profile, bool enabled)
     QByteArray out = buildControlHeader(profile, kOpPaEnable, /*sub=*/0,
                                         /*declaredPayloadLen=*/4);
     appendU32Le(out, enabled ? 1u : 0u);
-    return out;
+    return withControlFrameCrc(out);
 }
 
 } // namespace SunSdr

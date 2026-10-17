@@ -12,6 +12,14 @@
 //   2026-05-02 — Original implementation for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted authoring via Anthropic
 //                 Claude Code (Stage C2 filter preset editor).
+//   2026-09-27 -- followCwPitch (Martin Fischer, OE5SOS, AI-assisted via
+//                 Anthropic Claude). See FilterPresetStore.h.
+//   2026-09-28 -- default names are the Thetis button names
+//                 (SliceModel::presetNamesForMode) instead of "F1".."F10"
+//                 (Martin Fischer, OE5SOS, AI-assisted via Anthropic
+//                 Claude).
+//   2026-09-28 -- nameForEdges / defaultNameForEdges (Martin Fischer,
+//                 OE5SOS, AI-assisted via Anthropic Claude).
 // =================================================================
 
 #include "FilterPresetStore.h"
@@ -97,21 +105,27 @@ std::optional<FilterPreset> FilterPresetStore::loadSlot(DSPMode mode, int slot)
 
 // ── defaultPreset ─────────────────────────────────────────────────────────────
 
-// Default preset names — "F1".."F10" — matching Thetis filter slot labels.
-// (Thetis uses "F1"–"F10" for the filter bank buttons.)
-static QString defaultPresetName(int slot)
+// Default preset names: the Thetis button names of the slot ("5.0k",
+// "1.0k", "800" …), from SliceModel::presetNamesForMode. F1..F10 are
+// Thetis's slot identifiers (enum Filter), not what the button says —
+// until 2026-09-28 this returned "F1".."F10" and claimed Thetis did too.
+static QString defaultPresetName(DSPMode mode, int slot)
 {
-    // slot is 0-based; label is F1..F10
+    const QStringList names = SliceModel::presetNamesForMode(mode);
+    if (slot >= 0 && slot < names.size()) {
+        return names.at(slot);
+    }
+    // slot is 0-based; out of range for this mode — the slot identifier
     return QStringLiteral("F%1").arg(slot + 1);
 }
 
 FilterPreset FilterPresetStore::defaultPreset(DSPMode mode, int slot)
 {
-    // Delegate to SliceModel::presetsForMode — the existing Thetis-verbatim
-    // port (console.cs:5180-5575 [v2.10.3.13]).
+    // Delegate to SliceModel::presetsForMode — the Thetis-verbatim
+    // port (console.cs:5118-5515 [@852bf0e]).
     const auto pairs = SliceModel::presetsForMode(mode);
     FilterPreset p;
-    p.name = defaultPresetName(slot);
+    p.name = defaultPresetName(mode, slot);
     if (slot >= 0 && slot < pairs.size()) {
         p.low  = pairs[slot].first;
         p.high = pairs[slot].second;
@@ -121,6 +135,35 @@ FilterPreset FilterPresetStore::defaultPreset(DSPMode mode, int slot)
         p.high = 3000;
     }
     return p;
+}
+
+// ── nameForEdges ──────────────────────────────────────────────────────────────
+
+// Thetis beschriftet den laufenden Filter mit dem Namen des gewaehlten
+// Platzes: panelFilter.Text = "Filter - " + ...GetName(f)
+// (console.cs:7721 [@852bf0e], RX2 :38256). Genaue Gleichheit, keine
+// Toleranz: die Vorgaben und der laufende Durchlass werden mit derselben
+// Rechnung verschoben (CW-Tonhoehe), sie bleiben also deckungsgleich.
+QString FilterPresetStore::nameForEdges(DSPMode mode, int low, int high) const
+{
+    for (const FilterPreset& p : presetsForMode(mode)) {
+        if (p.low == low && p.high == high) {
+            return p.name;
+        }
+    }
+    return QString();
+}
+
+QString FilterPresetStore::defaultNameForEdges(DSPMode mode, int low, int high)
+{
+    const auto edges = SliceModel::presetsForMode(mode);
+    const QStringList names = SliceModel::presetNamesForMode(mode);
+    for (int i = 0; i < edges.size() && i < names.size(); ++i) {
+        if (edges[i].first == low && edges[i].second == high) {
+            return names.at(i);
+        }
+    }
+    return QString();
 }
 
 // ── presetsForMode ────────────────────────────────────────────────────────────
@@ -139,7 +182,7 @@ QList<FilterPreset> FilterPresetStore::presetsForMode(DSPMode mode) const
             result.append(override.value());
         } else {
             FilterPreset p;
-            p.name = defaultPresetName(i);
+            p.name = defaultPresetName(mode, i);
             p.low  = defaults[i].first;
             p.high = defaults[i].second;
             result.append(p);
@@ -206,6 +249,24 @@ void FilterPresetStore::resetAll()
     };
     for (DSPMode m : kAllModes) {
         clearMode(m);
+        emit presetsChanged(m);
+    }
+}
+
+// ── followCwPitch ─────────────────────────────────────────────────────────────
+
+void FilterPresetStore::followCwPitch(int pitchHz)
+{
+    for (DSPMode m : {DSPMode::CWL, DSPMode::CWU}) {
+        for (int slot = 0; slot < 10; ++slot) {
+            auto override = loadSlot(m, slot);
+            if (!override.has_value()) {
+                continue;
+            }
+            FilterPreset p = override.value();
+            SliceModel::centreCwFilterOnPitch(p.low, p.high, m, pitchHz);
+            persistPreset(m, slot, p);
+        }
         emit presetsChanged(m);
     }
 }

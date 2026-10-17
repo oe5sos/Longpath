@@ -24,6 +24,7 @@ private slots:
     void a_modelled_field_is_never_written_twice();
     void merge_fills_in_fields_the_local_copy_lacks();
     void merge_does_not_overwrite_an_extra_it_already_has();
+    void merge_lets_a_confirmation_replace_a_no();
     void value_containing_a_bracket_survives();
     void four_digit_time_is_accepted();
     void last_record_without_eor_is_kept();
@@ -247,6 +248,53 @@ void TstAdifLog::merge_does_not_overwrite_an_extra_it_already_has()
     }
     QCOMPARE(qsl, QStringLiteral("Y"));        // kept, not replaced by N
     QCOMPARE(iota, QStringLiteral("EU-005"));  // added, it was missing
+}
+
+void TstAdifLog::merge_lets_a_confirmation_replace_a_no()
+{
+    // Das Betreiber-Log (QRZ-Export) fuehrt "nicht bestaetigt" als N.
+    // Ein LoTW-Bericht mit Y muss dort ankommen -- samt Datum --, eine
+    // Karte ebenso; alles andere bleibt, und ein Y wird nie zu N.
+    const QVector<LogEntry> mine = AdifLog::parse(QStringLiteral(
+        "<EOH>\n"
+        "<CALL:5>DL2AB <QSO_DATE:8>20260807 <TIME_ON:6>141500 <BAND:3>20m <MODE:3>SSB "
+        "<QSL_RCVD:1>N <LOTW_QSL_RCVD:1>N <LOTW_QSLRDATE:8>20260101 <QSL_VIA:6>BUREAU <EOR>\n"
+        "<CALL:5>G4ABC <QSO_DATE:8>20260808 <TIME_ON:6>101500 <BAND:3>40m <MODE:2>CW "
+        "<LOTW_QSL_RCVD:1>Y <LOTW_QSLRDATE:8>20260301 <EOR>\n"
+        "<CALL:5>K1ABC <QSO_DATE:8>20260809 <TIME_ON:6>111500 <BAND:3>15m <MODE:3>FT8 "
+        "<EQSL_QSL_RCVD:1>R <EOR>\n"));
+    const QVector<LogEntry> report = AdifLog::parse(QStringLiteral(
+        "<EOH>\n"
+        "<CALL:5>DL2AB <QSO_DATE:8>20260807 <TIME_ON:6>141500 <BAND:3>20m <MODE:3>SSB "
+        "<LOTW_QSL_RCVD:1>Y <LOTW_QSLRDATE:8>20260920 <QSL_VIA:6>DIRECT <EOR>\n"
+        "<CALL:5>G4ABC <QSO_DATE:8>20260808 <TIME_ON:6>101500 <BAND:3>40m <MODE:2>CW "
+        "<LOTW_QSL_RCVD:1>N <LOTW_QSLRDATE:8>20260921 <EOR>\n"
+        "<CALL:5>K1ABC <QSO_DATE:8>20260809 <TIME_ON:6>111500 <BAND:3>15m <MODE:3>FT8 "
+        "<EQSL_QSL_RCVD:1>Y <EQSL_QSLRDATE:8>20260922 <EOR>\n"));
+
+    const AdifLog::MergeResult r = AdifLog::merge(mine, report);
+    QCOMPARE(r.added, 0);
+    QCOMPARE(r.merged.size(), 3);
+    auto get = [&r](const QString& call, const QString& field) {
+        for (const LogEntry& e : r.merged) {
+            if (e.call != call) { continue; }
+            for (const auto& kv : e.extras) { if (kv.first == field) { return kv.second; } }
+        }
+        return QString();
+    };
+    // N -> Y, mit Datum; die Karte bleibt N, QSL_VIA (kein Bestaetigungsfeld) bleibt.
+    QCOMPARE(get(QStringLiteral("DL2AB"), QStringLiteral("LOTW_QSL_RCVD")), QStringLiteral("Y"));
+    QCOMPARE(get(QStringLiteral("DL2AB"), QStringLiteral("LOTW_QSLRDATE")), QStringLiteral("20260920"));
+    QCOMPARE(get(QStringLiteral("DL2AB"), QStringLiteral("QSL_RCVD")), QStringLiteral("N"));
+    QCOMPARE(get(QStringLiteral("DL2AB"), QStringLiteral("QSL_VIA")), QStringLiteral("BUREAU"));
+    // Y bleibt Y, auch das Datum.
+    QCOMPARE(get(QStringLiteral("G4ABC"), QStringLiteral("LOTW_QSL_RCVD")), QStringLiteral("Y"));
+    QCOMPARE(get(QStringLiteral("G4ABC"), QStringLiteral("LOTW_QSLRDATE")), QStringLiteral("20260301"));
+    // R (angefordert) -> Y, Datum ergaenzt.
+    QCOMPARE(get(QStringLiteral("K1ABC"), QStringLiteral("EQSL_QSL_RCVD")), QStringLiteral("Y"));
+    QCOMPARE(get(QStringLiteral("K1ABC"), QStringLiteral("EQSL_QSLRDATE")), QStringLiteral("20260922"));
+    // Gezaehlt als angereichert: DL2AB und K1ABC, nicht G4ABC.
+    QCOMPARE(r.enriched, 2);
 }
 
 void TstAdifLog::value_containing_a_bracket_survives()

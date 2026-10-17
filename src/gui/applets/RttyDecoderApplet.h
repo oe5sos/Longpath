@@ -44,6 +44,7 @@ class QComboBox;
 class QSlider;
 class QPlainTextEdit;
 class QPushButton;
+class QLineEdit;
 
 namespace Longpath {
 
@@ -79,15 +80,75 @@ public:
     // change (mirrors AudioEngine's other taps -- see RttyDecoder.h).
     void setSlice(SliceModel* slice);
 
+    // ── Senden (2026-10-16) ──────────────────────────────────────────
+    //
+    // Der Dekoder hoerte seit 2026-09-06, und seit PR #257 gibt es mit
+    // RttyTxSource (core/RttyTx.h) auch das Gegenstueck — nur kam man
+    // nicht heran. Das holt das hier nach, Zug um Zug wie bei
+    // Ft8Applet::sendeNachricht(): Text auf Toene legen, Sendeweg auf
+    // die RTTY-Quelle legen, tasten, und nach der Laenge des Textes
+    // alles zurueck.
+    //
+    // Was hier NICHT eingebaut ist, genau wie bei FT8: eine
+    // Folgeschaltung. Kein Rundruf in Schleife, keine Antwort von
+    // selbst. Ein Druck, eine Aussendung.
+    //
+    // Anders als FT8 wird nicht auf ein Fenster gewartet — RTTY hat
+    // keine Fenstergrenzen. Gesendet wird sofort.
+    void sendeText(const QString& text);
+    void abbrechen();
+    bool sendetGerade() const { return m_sendet; }
+
 private slots:
     void onTextDecoded(const QString& text, float confidence);
     void onStatsUpdated(float markLevel, float spaceLevel, float snrDb, bool locked);
+
+public:
+    // ── Aus dem Textstrom ein Rufzeichen (2026-10-17) ───────────────
+    //
+    // RTTY ist kein Nachrichtenformat, sondern ein Zeichenstrom. Es
+    // gibt keine Felder, keine Grenzen, kein „CQ OE5SOS JN78" mit
+    // garantierten drei Feldern wie bei FT8. Es gibt Betriebsbrauch:
+    //
+    //     CQ CQ CQ DE DL1ABC DL1ABC DL1ABC K
+    //     OE5SOS DE DL1ABC DL1ABC KN
+    //
+    // Was in beiden Faellen traegt, ist das Wort DE und das Feld
+    // danach. Genau das liest diese Funktion, und ABSICHTLICH nicht
+    // mehr: wer im Strom jedes rufzeichenaehnliche Feld einsammelt,
+    // meldet Reihenfolgen wie „599 599 OE5SOS" als Station und fuellt
+    // die Spotliste mit Unsinn. Ein falscher Spot ist schlimmer als
+    // ein fehlender — er steht auf dem Panadapter und wird geglaubt.
+    //
+    // Das Feld muss ABGESCHLOSSEN sein, also ein Trennzeichen hinter
+    // sich haben. Ohne diese Bedingung meldet der Lauf „DL1AB",
+    // sobald das B angekommen ist, und „DL1ABC" eine Zehntelsekunde
+    // spaeter — zwei Spots fuer eine Station, einer davon falsch.
+    //
+    // Gibt das Rufzeichen hinter dem LETZTEN abgeschlossenen DE
+    // zurueck, oder leer. Statisch und ohne Fenster — der Prueflauf
+    // braucht weder Scheibe noch Dekoder.
+    static QString rufzeichenNachDe(const QString& strom);
+
+#ifdef LONGPATH_BUILD_TESTS
+    /// Einen Textschnipsel so hineingeben, wie ihn der Dekoder
+    /// liefern wuerde — mit voller Zuversicht, damit die
+    /// Empfindlichkeitsschwelle nicht mitspielt. Hier INLINE, nicht
+    /// in der .cpp: eine Definition dort braeuchte denselben
+    /// #ifdef-Waechter, und ohne ihn ist der Bau ohne Tests rot
+    /// (Windows und Linux), waehrend er oertlich gruen aussieht.
+    void speiseTextFuerTest(const QString& text) { onTextDecoded(text, 1.0f); }
+#endif
 
 private:
     void buildUI();
     void loadSettings();
     void saveSettings() const;
     void applyMarkShiftFromSlice();
+    /// Steht ein abgeschlossenes Rufzeichen hinter DE im Puffer und
+    /// ist es ein anderes als das letzte, geht ein Fund an
+    /// RadioModel::onNativeRttyDecode.
+    void meldeFundWennRufzeichen();
     void updateAudioTap();
 
     QPointer<SliceModel> m_slice;
@@ -110,6 +171,18 @@ private:
     // Row 3 -- text
     QPlainTextEdit* m_textOutput{nullptr};
     int m_charCount{0};
+    // Die letzten Zeichen, nur fuer die Rufzeichensuche — der Strom
+    // selbst steht im Textfeld, aber dort auch gekuerzt und mit der
+    // Gestaltung vermischt. Kurz gehalten: ein Rufzeichen hinter DE
+    // steht innerhalb weniger Zeichen, und ein langer Puffer wuerde
+    // alte Anrufe nach jedem neuen Zeichen erneut melden.
+    QString m_rufPuffer;
+    // Wen wir zuletzt gemeldet haben. SpotModel entdoppelt selbst,
+    // aber ohne das hier geht bei jedem Zeichen ein Fund hinaus,
+    // solange DL1ABC noch im Puffer steht.
+    QString m_letzterGemeldeterRuf;
+    /// Der Rapport aus onStatsUpdated, fuer den Fund.
+    int m_letzterSnrDb{0};
     // Above this, drop characters whose confidence is too low to trust --
     // see RttyDecoderSensitivity.h for the slider-to-threshold mapping.
     int m_sensitivity{0};
@@ -120,6 +193,32 @@ private:
     QSlider*     m_sensitivitySlider{nullptr};
     QLabel*      m_sensitivityValue{nullptr};
     QPushButton* m_clearBtn{nullptr};
+
+    // Row 5 -- senden (2026-10-16)
+    QLineEdit*   m_textFeld{nullptr};
+    QPushButton* m_sendBtn{nullptr};
+    QPushButton* m_stopBtn{nullptr};
+    QLabel*      m_sendeStatus{nullptr};
+    class QTimer* m_sendeEndeTimer{nullptr};
+    bool m_sendet{false};
+    // Welcher Mikrofonweg vor dem Senden eingestellt war; -1 heisst
+    // „nicht umgelegt". Ohne das kaeme nach dem Senden nicht das
+    // Mikrofon zurueck, sondern irgendetwas.
+    int  m_quelleVorher{-1};
+
+public:
+    // Fuer den Pruefstand.
+    QLineEdit*   textFeldForTest()  const { return m_textFeld; }
+    QPushButton* sendButtonForTest() const { return m_sendBtn; }
+    QPushButton* stopButtonForTest() const { return m_stopBtn; }
+    QLabel*      sendeStatusForTest() const { return m_sendeStatus; }
+    /// Die Aussendung ist um. Im Betrieb kommt das von einem Zeitgeber
+    /// nach der Laenge des Textes — im Prueflauf waeren das Sekunden
+    /// Warten je Zug.
+    void sendeEndeForTest() { sendeEnde(); }
+
+private:
+    void sendeEnde();
 };
 
 } // namespace Longpath

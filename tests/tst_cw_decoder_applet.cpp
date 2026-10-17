@@ -30,6 +30,7 @@
 #include "gui/applets/CwDecoderApplet.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -124,6 +125,26 @@ private slots:
         AppSettings::instance().remove(QStringLiteral("CWPitch"));
     }
 
+    // 2026-09-27: the band follows RadioModel::cwPitchChanged live, not
+    // only at construction -- before, a pitch change reached the decoder
+    // only after the applet was rebuilt.
+    void pitchBandFollowsAPitchChangeLive()
+    {
+        AppSettings::instance().remove(QStringLiteral("CWPitch"));
+        RadioModel radio;
+        CwDecoderApplet applet(&radio);
+        QCOMPARE(applet.pitchBandForTest(), qMakePair(450, 750));   // 600 +/- 150
+
+        radio.setCwPitch(800);
+        QCOMPARE(applet.pitchBandForTest(), qMakePair(650, 950));
+
+        // The low end never drops under 100 Hz (200 - 150 would be 50).
+        radio.setCwPitch(200);
+        QCOMPARE(applet.pitchBandForTest(), qMakePair(100, 350));
+
+        AppSettings::instance().remove(QStringLiteral("CWPitch"));
+    }
+
     void removedSliceUnbindsAndRebindMovesTheTap()
     {
         RadioModel radio;
@@ -152,7 +173,7 @@ private slots:
         CwDecoderApplet applet(&radio);
         applet.resize(380, 260);
         applet.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
         QMetaObject::invokeMethod(&applet, "onStatsUpdated", Qt::DirectConnection,
                                   Q_ARG(float, 700.0f), Q_ARG(float, 24.0f));
         QMetaObject::invokeMethod(&applet, "onTextDecoded", Qt::DirectConnection,

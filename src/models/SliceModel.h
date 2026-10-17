@@ -16,6 +16,13 @@
 //                 Claude Code.
 //                 Structural pattern follows AetherSDR (ten9876/AetherSDR,
 //                 GPLv3).
+//   2026-09-27 -- CW pitch range constants + follow API (Martin Fischer,
+//                 OE5SOS, AI-assisted via Anthropic Claude; Thetis
+//                 v2.10.3.15-5-g852bf0e setup.designer.cs udDSPCWPitch /
+//                 console.cs CWPitch setter).
+//   2026-09-28 -- presetNamesForMode (Thetis InitFilterPresets names),
+//                 commonPresetsForMode removed (no caller). Martin
+//                 Fischer (OE5SOS), AI-assisted via Anthropic Claude.
 // =================================================================
 
 //=================================================================
@@ -128,7 +135,9 @@
 #include <QPointer>
 #include <QTimer>
 #include <QString>
+#include <QStringList>
 
+#include <array>
 #include <atomic>
 #include <limits>
 #include <optional>
@@ -387,6 +396,12 @@ class SliceModel : public QObject {
     Q_PROPERTY(int    fmOffsetHz      READ fmOffsetHz      WRITE setFmOffsetHz      NOTIFY fmOffsetHzChanged)
     Q_PROPERTY(Longpath::FmTxMode fmTxMode READ fmTxMode WRITE setFmTxMode NOTIFY fmTxModeChanged)
     Q_PROPERTY(bool   fmReverse       READ fmReverse       WRITE setFmReverse       NOTIFY fmReverseChanged)
+    // Empfangs-Equalizer (2026-10-11). Die Baender selbst sind kein
+    // Q_PROPERTY: zehn einzelne waeren zehn Namen fuer eine Sache, also
+    // rxEqBandDb(i)/setRxEqBandDb(i, dB) mit einem Signal, das den Index
+    // mitfuehrt -- genauso wie TransmitModel::txEqBand auf der Sendeseite.
+    Q_PROPERTY(bool   rxEqEnabled     READ rxEqEnabled     WRITE setRxEqEnabled     NOTIFY rxEqEnabledChanged)
+    Q_PROPERTY(int    rxEqPreampDb    READ rxEqPreampDb    WRITE setRxEqPreampDb    NOTIFY rxEqPreampDbChanged)
     Q_PROPERTY(int    diglOffsetHz    READ diglOffsetHz    WRITE setDiglOffsetHz    NOTIFY diglOffsetHzChanged)
     Q_PROPERTY(int    diguOffsetHz    READ diguOffsetHz    WRITE setDiguOffsetHz    NOTIFY diguOffsetHzChanged)
     Q_PROPERTY(int    rttyMarkHz      READ rttyMarkHz      WRITE setRttyMarkHz      NOTIFY rttyMarkHzChanged)
@@ -584,9 +599,55 @@ public:
     static int defaultFilterCenter(DSPMode mode, int widthHz);
 
     /// Die CW-Tonhoehe, auf der die CW-Filter sitzen (AppSettings
-    /// CWPitch, Thetis-Quelle, 100..2000 Hz). Fuer Verbraucher, die den
+    /// CWPitch, Thetis-Quelle, 200..2250 Hz). Fuer Verbraucher, die den
     /// Durchlass einer CW-Scheibe deuten muessen (der KiwiSDR-Pfad).
+    /// Gesetzt wird sie nur ueber RadioModel::setCwPitch, das auch
+    /// cwPitchChanged meldet.
     static int cwPitchHz();
+
+    /// Die FM-Deviation (AppSettings FmDeviationHz, Vorgabe 5000 --
+    /// Thetis console FMDeviation_Hz) und die halbe FM-Filterbreite
+    /// daraus: Deviation + FM-Hochpass 3000 (Thetis radio.cs:1571
+    /// rx_fm_highcut). 2026-09-27.
+    static int fmDeviationHz();
+    static int fmHalfBandwidthHz();
+
+    // ── CW-Tonhoehe: Spanne und Nachfuehren ──────────────────────────
+    //
+    // From Thetis setup.designer.cs:38259-38284 [@852bf0e] — udDSPCWPitch
+    // (Setup > DSP > CW > „CW Pitch (Hz)"): Increment 10, Maximum 2250,
+    // Minimum 200, Value 600. Das Konsolenfeld udCWPitch hat dieselben
+    // Werte (console.Designer.cs, Zeilen 1372-1392 bei 852bf0e). Frueher
+    // wurde hier auf 100..2000 geklemmt — mit dem Vermerk „matches Thetis
+    // udCWPitch", was nicht stimmte.
+    static constexpr int kCwPitchMinHz     = 200;
+    static constexpr int kCwPitchMaxHz     = 2250;
+    static constexpr int kCwPitchStepHz    = 10;
+    static constexpr int kCwPitchDefaultHz = 600;
+
+    /// Auf die Spanne der beiden Thetis-Felder klemmen — das, was
+    /// CATCWPitch vor dem Setzen tut (setup.cs:5733-5734).
+    static int clampCwPitch(int hz);
+
+    /// Einen CW-Durchlass auf die Tonhoehe setzen und die Breite
+    /// behalten, mit dem Rutschen an der Spiegelgrenze: der
+    /// Schleifenkoerper des Thetis-Setters CWPitch
+    /// (console.cs:18162-18195). Fuer alles ausser CWL/CWU unveraendert.
+    static void centreCwFilterOnPitch(int& low, int& high, DSPMode mode,
+                                      int pitchHz);
+
+    /// Die Scheibe folgt einer neuen Tonhoehe: VAR1/VAR2 von CWL und
+    /// CWU (in Thetis Teil derselben Schleife) und, wenn sie in CW
+    /// steht, der laufende Durchlass (Thetis: RX1Filter = rx1_filter).
+    void followCwPitch(int pitchHz);
+
+    /// Die gespeicherten CW-Durchlaesse aller Scheiben und Baender
+    /// (Slice<n>/Band<b>/ModeCWL|ModeCWU/Filter*, dazu der alte
+    /// Band-Schluessel, wenn das Band in CW steht) auf die neue
+    /// Tonhoehe setzen. In Thetis merkt sich ein Band den PLATZ
+    /// (LastFilter = F5, VAR1 …), dessen Werte die Schleife mitnimmt;
+    /// wir merken uns die Werte selbst, also muessen sie mit.
+    static void recentreStoredCwFilters(int pitchHz);
 
     /// Breite setzen, Mitte behalten (soweit die Betriebsart das
     /// zulaesst). Geht durch setFilter, also durch die Begrenzung.
@@ -1008,6 +1069,55 @@ public:
     bool   fmReverse()       const { return m_fmReverse; }
     void   setFmReverse(bool v);
 
+    // ── Empfangs-Equalizer (WDSP eqp im RXA-Durchlauf) ──────────────────────
+    //
+    // Thetis hat den Empfangs-Equalizer (Console/radio.cs:827-843 RXEQOn,
+    // :800-824 RXEQ10, Bedienung in eqform.cs), Longpath hatte ihn nie.
+    //
+    // ABWEICHUNG, bewusst: Thetis haelt ihn GLOBAL und legt ihn auf
+    // id(0,0) und id(0,1) zugleich (eqform.cs:3027-3028). Hier sitzt er
+    // je Slice, wie jede andere Empfangs-DSP-Einstellung in diesem Baum --
+    // zwei Empfaenger duerfen verschieden klingen. Persistiert unter
+    // slicePrefix (nicht bandPrefix): eine Klangeinstellung des Betreibers,
+    // die beim Bandwechsel nicht umspringen soll.
+    //
+    // Zehn Baender auf den festen WDSP-Mitten (RXA.c:260). Die Frequenzen
+    // sind hier mitgefuehrt, damit setRxEqProfile() (freie Mitten) spaeter
+    // ohne neue Zustandsform angebunden werden kann; die Oberflaeche fasst
+    // sie derzeit nicht an.
+    bool   rxEqEnabled()     const { return m_rxEqEnabled; }
+    void   setRxEqEnabled(bool on);
+
+    int    rxEqPreampDb()    const { return m_rxEqPreampDb; }
+    void   setRxEqPreampDb(int dB);
+
+    /// Anzahl der Baender -- fest 10, wie Thetis' Bedienfeld.
+    int    rxEqNumBands()    const noexcept { return kRxEqNumBands; }
+
+    /// Verstaerkung des Bandes i (0..9) in dB. 0 bei ungueltigem Index.
+    int    rxEqBandDb(int index) const noexcept;
+    void   setRxEqBandDb(int index, int dB);
+
+    /// Mitte des Bandes i (0..9) in Hz. 0 bei ungueltigem Index.
+    int    rxEqFreqHz(int index) const noexcept;
+    void   setRxEqFreqHz(int index, int hz);
+
+    /// Vorverstaerkung + zehn Baender in der Form, die
+    /// RxChannel::setRxEqGraph10 erwartet: [0] = Vorverstaerkung,
+    /// [1..10] = Baender.
+    std::array<int, 11> rxEqGraph10() const;
+
+    static constexpr int kRxEqNumBands = 10;
+    // Thetis eqform.cs:1871-1872 (tbRXEQ1) und :1946-1947 (tbRXEQPreamp)
+    // [v2.10.3.15]: Maximum = 15, Minimum = -12 -- fuer die Baender UND die
+    // Vorverstaerkung, beide gleich.
+    static constexpr int kRxEqGainDbMin = -12;
+    static constexpr int kRxEqGainDbMax =  15;
+    // WDSP nimmt beim Anlegen 10 Baender auf diesen Mitten (RXA.c:260,
+    // default_F ohne das Polster F[0]).
+    static constexpr std::array<int, kRxEqNumBands> kRxEqDefaultFreqsHz{
+        {32, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000}};
+
     int    diglOffsetHz()    const { return m_diglOffsetHz; }
     void   setDiglOffsetHz(int hz);
 
@@ -1052,17 +1162,18 @@ public:
 
     // ---- Per-mode filter presets ----
     // Returns the F5 (default) filter low/high for a given mode.
-    // Ported from Thetis console.cs:5180-5575 InitFilterPresets.
+    // Ported from Thetis console.cs:5118-5515 [@852bf0e] InitFilterPresets.
     static std::pair<int, int> defaultFilterForMode(DSPMode mode);
 
     // Returns the full ordered filter preset list for the given mode.
-    // Source of truth: InitFilterPresets() table (Thetis console.cs:5180-5575 [v2.10.3.13]).
-    // Each pair is (low_hz, high_hz) relative to the carrier.
+    // Source of truth: InitFilterPresets() table (Thetis console.cs:5118-5515 [@852bf0e]).
+    // Each pair is (low_hz, high_hz) relative to the carrier. CWL/CWU
+    // sit on the current CW pitch and slide at the image limit.
     static QList<std::pair<int, int>> presetsForMode(DSPMode mode);
 
-    // Returns the 5-6 most-common filter presets for the given mode,
-    // matching Thetis main-panel filter buttons (compact subset of presetsForMode).
-    static QList<std::pair<int, int>> commonPresetsForMode(DSPMode mode);
+    // The Thetis button names of the same slots, same order ("5.0k",
+    // "1.0k", "800" …). FilterPresetStore uses them as default names.
+    static QStringList presetNamesForMode(DSPMode mode);
 
     // Returns human-readable mode name (e.g., DSPMode::LSB → "LSB")
     static QString modeName(DSPMode mode);
@@ -1275,6 +1386,12 @@ signals:
     void fmOffsetHzChanged(int hz);
     void fmTxModeChanged(Longpath::FmTxMode mode);
     void fmReverseChanged(bool v);
+
+    // Empfangs-Equalizer (2026-10-11).
+    void rxEqEnabledChanged(bool on);
+    void rxEqPreampDbChanged(int dB);
+    void rxEqBandDbChanged(int index, int dB);
+    void rxEqFreqHzChanged(int index, int hz);
     void diglOffsetHzChanged(int hz);
     void diguOffsetHzChanged(int hz);
     void rttyMarkHzChanged(int hz);
@@ -1484,6 +1601,13 @@ private:
     int      m_fmOffsetHz{0};           // Neutral default — zero offset
     FmTxMode m_fmTxMode{FmTxMode::Simplex};  // From Thetis console.cs:20873 — current_fm_tx_mode = FMTXMode.Simplex
     bool     m_fmReverse{false};        // Neutral default — normal direction
+
+    // Empfangs-Equalizer. Vorgaben wie WDSP beim Anlegen (RXA.c:259-275):
+    // aus, flach, Vorverstaerkung 0, Mitten wie kRxEqDefaultFreqsHz.
+    bool     m_rxEqEnabled{false};
+    int      m_rxEqPreampDb{0};
+    std::array<int, kRxEqNumBands> m_rxEqBandsDb{{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+    std::array<int, kRxEqNumBands> m_rxEqFreqsHz{kRxEqDefaultFreqsHz};
     // Upstream inline attribution preserved verbatim:
     //   console.cs:14669  //reset preset filter's center frequency - W4TME
     int      m_diglOffsetHz{0};         // From Thetis console.cs:14672 — DIGLClickTuneOffset default 0 Hz

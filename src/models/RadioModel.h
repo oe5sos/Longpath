@@ -14,6 +14,8 @@
 //                 Claude Code.
 //                 Structural pattern follows AetherSDR (ten9876/AetherSDR,
 //                 GPLv3).
+//   2026-09-27 -- cwPitch()/setCwPitch()/cwPitchChanged(int) (Martin
+//                 Fischer, OE5SOS, AI-assisted via Anthropic Claude).
 // =================================================================
 
 //=================================================================
@@ -106,6 +108,11 @@
 #include "core/safety/BandPlanGuard.h"
 
 #include <QDateTime>
+#include <QPointer>
+
+// Vollstaendig noetig: QPointer<T> kann T nicht vorwaerts deklariert
+// benutzen (static_cast auf QObject*). Der Kopf ist winzig.
+#include "core/RotorController.h"
 #include <QHash>
 #include <QObject>
 #include <QMap>
@@ -195,6 +202,8 @@ class DxccColorProvider;
 class SpotModel;
 class SpotTableModel;
 class FreeDVStationModel;
+class Ft8TxSource;
+class RttyTxSource;
 class RxDecodeModel;
 // TNF (design section 5): the canonical notch store, owned by RadioModel
 // alongside SpotModel. One list shared by every slice (design D1) because
@@ -699,9 +708,19 @@ public:
     /// Protocol 1 encodes the rate as srBits in C&C bank 0
     /// (P1RadioConnection::composeCcBank0 takes a single sampleRate), so every
     /// stream shares it and setStreamSampleRate fans a change across all of
-    /// them. Protocol 2 carries a per-DDC rate in DdcAssignment::rate[]. UI
-    /// that offers the rate from a per-slice surface has to disclose the P1
-    /// scope rather than imply a private rate. False when disconnected.
+    /// them. Die SunSDR ebenso: ihr Stromstart-Rahmen 0x01 traegt einen Modus
+    /// fuer das ganze Geraet (SunSdrProtocol.h, StromModus). Protocol 2
+    /// carries a per-DDC rate in DdcAssignment::rate[]. UI that offers the
+    /// rate from a per-slice surface has to disclose the radio-wide scope
+    /// rather than imply a private rate. False when disconnected.
+    ///
+    /// Das ist nicht nur eine Beschriftung: nur fuer "radio-wide" schickt
+    /// setStreamSampleRate die Aenderung ueber setSampleRateLive auf den
+    /// Draht. Der Weg fuer eine Rate je DDC ist der DdcAssignment-Push, und
+    /// der bedient ausschliesslich P2 (invokeCodecDdcAssignment). Eine
+    /// Verbindung, die hier faelschlich false meldet, stellt ihren
+    /// Empfangskanal um und laesst das Geraet auf der alten Rate stehen
+    /// (2026-10-04 an der SunSDR2 QRP gemessen).
     bool sampleRateIsRadioWide() const;
 
     /// Sample rates the connected radio accepts, ascending; empty when
@@ -1040,6 +1059,19 @@ public:
     // Constructed once in RadioModel ctor; lifetime is RadioModel's lifetime.
     FilterPresetStore* filterPresetStore() const { return m_filterPresetStore; }
 
+    // ── CW-Tonhoehe (2026-09-27) ───────────────────────────────────────────
+    // Thetis console.cs CWPitch: EIN Wert fuer alle Empfaenger, der die
+    // CW-Filter, den APF und die Anzeige traegt. Gespeichert in
+    // AppSettings "CWPitch" (SliceModel::cwPitchHz liest ihn), gesetzt
+    // nur hier: setCwPitch klemmt auf 200..2250, schiebt die CW-Vorgaben
+    // (FilterPresetStore), die gespeicherten und die laufenden CW-
+    // Durchlaesse jeder Scheibe und die APF-Mitte nach und meldet
+    // cwPitchChanged -- nur, wenn sich der Wert wirklich geaendert hat.
+    // Senden (Mithoerton, VFO-Versatz bei MOX) ist bewusst NICHT dabei:
+    // 3M-2 CW-TX ist zurueckgestellt.
+    int  cwPitch() const;
+    void setCwPitch(int hz);
+
     // ── Phase 3J-2 H2: spot-system accessors ────────────────────────────────
     // RadioModel owns the seven spot-ingest clients, three view models, and
     // the DxccColorProvider as std::unique_ptr members. Each accessor returns
@@ -1051,6 +1083,26 @@ public:
     // Constructed in RadioModel ctor with identity / endpoint defaults from
     // AppSettings; startConnection() is NOT called at construction time.
     SpotModel*            spotModel()           const { return m_spotModel.get(); }
+
+    // ── Der Rotor, ohne Fenster dazwischen (2026-10-05) ──────────────────
+    //
+    // Hier steht eine REGISTRIERUNG, kein Besitz: angelegt wird der
+    // RotctldClient weiterhin von `RotorLogbookPanel`, das ihn auch
+    // bedient. Diese Stelle gibt es nur, damit der TCI-Server ihn
+    // erreichen kann, ohne in ein Fenster zu greifen -- derselbe Grund,
+    // aus dem `WorkedBefore` beim Logbuch nicht angefasst wurde: ein
+    // Netzdienst, der an einem Fenster haengt, stirbt mit dem Fenster.
+    //
+    // DER SAUBERERE WEG waere, den Besitz hierher zu holen (wie bei
+    // `m_spotModel`, das 2026-05-12 aus `SpotHubDialog` hierher kam).
+    // Das ist eine Architekturaenderung an einem Geraet, das an Martins
+    // Mast haengt, und CLAUDE.md verlangt dafuer den Betreiber. Bis
+    // dahin ist dies der kleine, umkehrbare Schritt.
+    //
+    // QPointer, nicht roher Zeiger: wird das Fenster geschlossen, steht
+    // hier nachher nullptr statt einer Leiche.
+    RotorController*      rotor()               const { return m_rotor; }
+    void setRotor(RotorController* r)                 { m_rotor = r; }
     // 2026-05-12 bench fix: moved from SpotHubDialog ownership so the
     // table stays populated from app start regardless of whether the
     // dialog is open.  Spots from auto-connected sources were
@@ -1060,6 +1112,40 @@ public:
     SpotTableModel*       spotTableModel()      const { return m_spotTableModel.get(); }
     FreeDVStationModel*   freeDvStationModel()  const { return m_freeDvStationModel.get(); }
     RxDecodeModel*        rxDecodeModel()       const { return m_rxDecodeModel.get(); }
+
+    /// Ein Fund des EIGENEN FT8/FT4-Dekoders (Ft8Applet, 2026-10-15).
+    ///
+    /// Derselbe Weg wie bei WSJT-X — SpotModel mit Entdopplung,
+    /// RxDecodeModel, PSK Reporter —, nur mit eigener Quelle
+    /// („Longpath"), damit sich die beiden in der Liste nicht
+    /// vermischen. Ohne das blieben die eigenen Funde in einem
+    /// Textfeld und erreichten die Panadapter-Ueberlagerung nie.
+    ///
+    /// OEFFENTLICH, anders als die Adapter-Schlitze der
+    /// Netz-Quellen weiter unten: die haengen an einem Client, der
+    /// sich selbst verbindet. Hier ruft das Applet herein, und ein
+    /// `connect` auf einen privaten Schlitz geht in der
+    /// Zeiger-Schreibweise nicht.
+    void onNativeFt8Decode(const Longpath::DxSpot& spot);
+    /// Derselbe Weg fuer den eigenen RTTY-Dekoder (2026-10-17):
+    /// Spotliste, Sammler, PSK Reporter. Siehe meldeEigenenFund.
+    void onNativeRttyDecode(const Longpath::DxSpot& spot);
+
+    /// Der eigene FT8/FT4-Sender, oder null vor dem Verbinden
+    /// (2026-10-15). Siehe core/Ft8Tx.h.
+    Ft8TxSource* ft8TxSource() const { return m_ft8TxSource.get(); }
+
+    /// Der eigene RTTY-Sender, oder null vor dem Verbinden
+    /// (2026-10-16). Siehe core/RttyTx.h.
+    RttyTxSource* rttyTxSource() const { return m_rttyTxSource.get(); }
+
+    /// Der Mikrofon-Umschalter, oder null vor dem Verbinden. Ueber ihn
+    /// laeuft das Umlegen auf die FT8-Quelle beim Senden.
+    CompositeTxMicRouter* micRouter() const
+    {
+        return m_compositeMicRouter.get();
+    }
+
     DxccColorProvider*    dxccColorProvider()   const { return m_dxccColorProvider.get(); }
     DxClusterClient*      dxCluster()           const { return m_dxCluster.get(); }
     DxClusterClient*      rbn()                 const { return m_rbn.get(); }
@@ -1139,6 +1225,16 @@ public:
     // in TxChannel drives fexchange2 → sendTxIq (SPSC ring) while running.
     // Wired by 3M-1a Task G.1 (bench fix: TUNE carrier now reaches the radio).
     TxChannel* txChannel() const { return m_txChannel; }
+    /// FM-CTCSS des Sende-Slices an den Sendekanal (2026-09-27).
+    void pushFmToneFromTxSlice();
+
+    /// FM-Deviation fuer Senden und Empfang aller Kanaele, 5000 oder
+    /// 2500 Hz (Thetis console FMDeviation_Hz, radFMDeviation5kHz /
+    /// radFMDeviation2kHz). Gespeichert als FmDeviationHz. 2026-09-27.
+    int fmDeviationHz() const { return m_fmDeviationHz; }
+    void setFmDeviationHz(int hz);
+    /// Die Deviation an alle offenen RX-Kanaele und den Sendekanal.
+    void pushFmDeviationToChannels();
 
     /// Longpath Audio Channel Strip — the client-side transmit chain.
     ///
@@ -1337,6 +1433,7 @@ signals:
     // RX1_MeterCalOffsetDb override).  MeterPoller connects this to
     // refresh its cached offset value.
     void rxMeterOffsetChanged(double db);
+    void fmDeviationHzChanged(int hz);
 
 public:
 
@@ -1569,6 +1666,21 @@ public:
     // tst_radio_model_mic_ptt_wire can verify the signal/slot bind + prime
     // path without spinning up the full wireConnectionSignals pipeline.
     void wireMicPttDisabledForTest() { connectMicPttDisabledSignal(); }
+
+    /// Nur fuer Prueflaeufe: den Sendeweg so weit aufsetzen, dass
+    /// Ft8Applet wirklich senden kann — ohne Funkverbindung.
+    ///
+    /// ft8TxSource() und micRouter() entstehen sonst erst beim
+    /// Verbinden (siehe dort), und ohne sie bricht
+    /// Ft8Applet::sendeNachricht() mit „no transmit path" ab, bevor
+    /// irgendetwas geprueft werden kann. Setzt nur die beiden
+    /// Bausteine, nichts vom Rest der Kette: ein Pruefstand, der
+    /// senden WILL, soll nicht nebenbei eine Tonausgabe aufmachen.
+    void installFt8TxForTest();
+    /// Dasselbe fuer den RTTY-Sendeweg (2026-10-16). Eigener
+    /// Einbau statt eines gemeinsamen, damit ein Prueflauf, der nur
+    /// RTTY will, nicht nebenbei den FT8-Sender anmeldet.
+    void installRttyTxForTest();
     void wireMicInputsForTest() { connectMicInputSignals(); }
     void setLastBandForTest(Longpath::Band b) {
         const bool cross = (b != m_lastBand);
@@ -2084,6 +2196,28 @@ public slots:
     Q_INVOKABLE void setAgcGain(int rx, int gain);
     Q_INVOKABLE int  agcGain(int rx) const;
 
+    // TX-Leistung / Abstimmleistung — Fassade für die TCI-Kommandos `drive:`
+    // und `tune_drive:`.  Beide fehlten bis 2026-09-30 vollständig, weshalb
+    // die Leistungsschieber jeder Fernbedienung (TCI Remote von ON7OFF,
+    // N1MM+, Log4OM) still wirkungslos blieben: TciProtocol verwirft
+    // unbekannte Namen ohne Antwort (TciProtocol.cpp, dispatch-Ende).
+    //
+    // From Thetis TCIServer.cs:4138-4164 [v2.10.3.13] — handleDrive /
+    // handleTuneDrive: 1 Argument = Abfrage, 2 Argumente = Setzen; Ziel ist
+    // consoleThreadSafe.PWR bzw. TUNPower.  Der Bereich 0..100 wird dort
+    // beim SENDEN geprüft (sendDrivePower / sendTunePower,
+    // TCIServer.cs:2328-2341: `if (drive < 0 || drive > 100) return;`).
+    // Longpath klemmt statt dessen schon hier, damit ein fremder Client mit
+    // einem Ausreißer nicht erst eine unmögliche Leistung setzt und dann
+    // eine Meldung bekommt, die nie gesendet wird.
+    //
+    // Ziel ist TransmitModel::power / tunePower — dieselben Eigenschaften,
+    // die das TX-Applet über seine Schieber setzt (TxApplet.cpp:866).
+    Q_INVOKABLE void setDrivePower(int pct);
+    Q_INVOKABLE int  drivePower() const;
+    Q_INVOKABLE void setTuneDrivePower(int pct);
+    Q_INVOKABLE int  tuneDrivePower() const;
+
     // Squelch — routes to SliceModel::ssqlEnabled / ssqlThresh.  TCI level
     // is int (-140..0 dBm); SliceModel::ssqlThresh is double in same units.
     Q_INVOKABLE void setSqlEnable(int rx, bool on);
@@ -2260,6 +2394,18 @@ public slots:
     /// while connected, false while disconnected (no "soft off" state).
     Q_INVOKABLE bool powerOn() const;
 
+    /// Der Empfangspegel in dBm fuer den CAT-Befehl SM; (2026-10-13).
+    ///
+    /// Gibt -200.0, wenn es noch keinen WDSP-Kanal gibt (vor dem
+    /// Verbinden) -- ein Wert, den jeder Aufrufer wegklammert, statt ihn
+    /// fuer ein Signal zu halten.
+    ///
+    /// Uebernommen aus der zweiten CAT-Fassung dieses Projekts (Zweig
+    /// fix/discovery-quietpolls-thetis-parity), die ihn fuer SM und fuer
+    /// rigctlds STRENGTH gebaut hat. Siehe
+    /// docs/architecture/2026-10-12-cat-zwei-fassungen.md.
+    Q_INVOKABLE double rxSignalDbm(int rx) const;
+
     /// DIGL click-tune offset -- active slice's diglOffsetHz.
     ///
     /// Architectural divergence from Thetis console.cs:14693-14749
@@ -2361,6 +2507,10 @@ signals:
     // RF-Kit -> General). Consumers (e.g. MainWindow applet visibility)
     // react to show/hide the RF2K-S applet.
     void rfKitEnabledChanged(bool enabled);
+    // Die CW-Tonhoehe hat sich geaendert (setCwPitch). Thetis:
+    // CWPitchChangedHandlers (console.cs:18241). Abnehmer: CW-Decoder
+    // (Suchband), KiwiSDR-Nachfuehrung, Setup-Feld.
+    void cwPitchChanged(int hz);
     // Fires on each transition to Connected with the RadioInfo of the live
     // connection. HardwarePage (Phase 3I) listens to this to repopulate
     // sub-tabs with per-radio fields.
@@ -2684,6 +2834,21 @@ private:
     // Phase 3Q-1: drives the RadioModel-level connection state machine.
     // Guards against redundant transitions (no emit if state unchanged).
     void setConnectionState(ConnectionState s);
+
+    // ── Ein eigener Fund, dreifach weitergereicht (2026-10-17) ──────
+    //
+    // Spotliste (und damit Panadapter), der Sammler „was mein Geraet
+    // gehoert hat", und PSK Reporter. Einmal geschrieben fuer die
+    // eigenen FT8- und RTTY-Funde: der Rumpf stand vorher nur in
+    // onNativeFt8Decode, und eine zweite Abschrift waere die Stelle
+    // gewesen, an der die beiden auseinanderlaufen. Lebensdauer,
+    // Farbschluessel und die Betriebsart, die gilt, wenn im Kommentar
+    // keine steht, kommen vom Aufrufer.
+    void meldeEigenenFund(const Longpath::DxSpot& spot,
+                          const QString& lebensdauerSchluessel,
+                          int lebensdauerVorgabeSek,
+                          const QString& farbSchluessel,
+                          const QString& modusVorgabe);
 
     // ── Per-radio peripherals lifecycle ────────────────────────────────────
     // Drive the RF-Kit / 4O3A / PGXL / TGXL connections from the connection
@@ -3393,6 +3558,7 @@ private:
     // Written from the wireSampleRateChanged path in connectToRadio().
     // connectionSampleRateHz() / connectionSampleRateText() read this.
     int m_connectionSampleRateHz{0};
+    int m_fmDeviationHz{5000};
 
     // Task 1.7: active-RX count last pushed to the wire (0 = disconnected).
     // Updated by setActiveRxCountLive() after hardware reconfiguration completes.
@@ -3688,6 +3854,10 @@ private:
     // Reset before m_compositeMicRouter on teardown — see notes
     // around teardownConnection().
     std::unique_ptr<VaxTxMicSource>        m_vaxTxMicSource;
+    /// Der eigene FT8/FT4-Sender (2026-10-15). Am Router angemeldet,
+    /// liefert Stille, bis ihn jemand startet. Siehe core/Ft8Tx.h.
+    std::unique_ptr<Ft8TxSource> m_ft8TxSource;
+    std::unique_ptr<RttyTxSource> m_rttyTxSource;
     std::unique_ptr<CompositeTxMicRouter>  m_compositeMicRouter;
 
     // ── 3M-1c Phase L: cross-cutting ownership ──────────────────────────────
@@ -3806,6 +3976,8 @@ private:
     // startConnection() / startListening() / startPolling() is the M3
     // follow-up task. H2 only wires the in-process signal graph.
     std::unique_ptr<SpotModel>            m_spotModel;
+    // Registriert von RotorLogbookPanel, nicht besessen -- siehe rotor().
+    QPointer<RotorController>             m_rotor;
     std::unique_ptr<SpotTableModel>       m_spotTableModel;
     std::unique_ptr<FreeDVStationModel>   m_freeDvStationModel;
     std::unique_ptr<RxDecodeModel>        m_rxDecodeModel;

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Handfunke — Symbol für den Startbildschirm</title>
+<style>
+  :root{
+    --app-bg:#08080a; --panel:#0c0c0e; --inset:#050507;
+    --text:#d5d5db; --text3:#8a8a92; --title:#c4c4ca;
+    --accent:#4a7ba8;            /* anfassbar */
+    --measured:#d8a55f;          /* gemessen */
+    --border:#232329;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--app-bg);color:var(--text);padding:40px 32px 80px;
+       font:13px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
+  h1{font-size:22px;font-weight:600;color:var(--title);letter-spacing:.01em;margin-bottom:6px}
+  .unter{color:var(--text3);font-size:11px;margin-bottom:34px;max-width:62ch;line-height:1.6}
+  .reihe{display:flex;gap:40px;flex-wrap:wrap;margin-bottom:46px}
+  .blatt{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+         padding:22px;width:300px}
+  .caps{font-size:9px;letter-spacing:.18em;text-transform:uppercase;
+        font-weight:600;color:var(--text3);margin-bottom:14px}
+  .gross{display:flex;align-items:center;gap:18px;margin-bottom:16px}
+  .echt{display:flex;align-items:flex-end;gap:14px;
+        border-top:1px solid var(--border);padding-top:14px}
+  .echt figure{text-align:center}
+  .echt figcaption{font-size:9px;color:var(--text3);margin-top:5px;font-family:var(--mono)}
+  /* iOS rundet selbst; hier nur zur Anschauung */
+  .maske{border-radius:22.37%;overflow:hidden;display:block}
+  p.warum{font-size:11px;color:var(--text3);margin-top:14px;line-height:1.55}
+  .hinweis{max-width:70ch;color:var(--text3);font-size:11px;line-height:1.7;
+           border-left:2px solid var(--border);padding-left:16px}
+</style>
+</head>
+<body>
+
+<h1>Handfunke — Symbol für den Startbildschirm</h1>
+<p class="unter">
+  Drei Entwürfe, jeweils gross zur Beurteilung und darunter in den Größen, in
+  denen iOS sie wirklich zeigt: 180 px ist das Symbol auf dem Startbildschirm,
+  120 px die Einstellungen, 60 px die Suche. Was bei 60 px zu Brei wird, taugt
+  nicht — das ist der eigentliche Prüfstein, nicht die grosse Ansicht.
+  Die Farben sind aus <code>stil.css</code> übernommen, nichts Neues erfunden.
+</p>
+
+<div class="reihe">
+
+  <!-- ── 1 ──────────────────────────────────────────────────────────────── -->
+  <div class="blatt">
+    <div class="caps">1 · Signalspur</div>
+    <div class="gross">
+      <svg class="maske" width="180" height="180" viewBox="0 0 180 180">
+        <rect width="180" height="180" fill="#0c0c0e"/>
+        <rect width="180" height="180" fill="none" stroke="#232329" stroke-width="2"/>
+        <g stroke="#d8a55f" stroke-width="7" fill="none"
+           stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 118 L40 112 L52 120 L64 96 L76 116 L88 40 L100 114 L112 104
+                   L124 118 L140 110 L158 116"/>
+        </g>
+        <line x1="88" y1="26" x2="88" y2="152" stroke="#4a7ba8" stroke-width="3" opacity=".55"/>
+      </svg>
+      <div>
+        <svg class="maske" width="72" height="72" viewBox="0 0 180 180">
+          <rect width="180" height="180" fill="#0c0c0e"/>
+          <g stroke="#d8a55f" stroke-width="7" fill="none"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 118 L40 112 L52 120 L64 96 L76 116 L88 40 L100 114 L112 104
+                     L124 118 L140 110 L158 116"/>
+          </g>
+          <line x1="88" y1="26" x2="88" y2="152" stroke="#4a7ba8" stroke-width="3" opacity=".55"/>
+        </svg>
+      </div>
+    </div>
+    <div class="echt">
+      <figure><svg class="maske" width="60" height="60" viewBox="0 0 180 180">
+        <rect width="180" height="180" fill="#0c0c0e"/>
+        <g stroke="#d8a55f" stroke-width="9" fill="none" stroke-linecap="round">
+          <path d="M22 118 L40 112 L52 120 L64 96 L76 116 L88 40 L100 114 L112 104
+                   L124 118 L140 110 L158 116"/></g>
+        <line x1="88" y1="26" x2="88" y2="152" stroke="#4a7ba8" stroke-width="4" opacity=".55"/>
+      </svg><figcaption>60</figcaption></figure>
+    </div>
+    <p class="warum">
+      Das Bild, das die Seite selbst zeigt: eine Spur mit einem Träger in der
+      Mitte, dazu der Abstimmstrich in Blau. Bernstein ist die gemessene
+      Farbe, Blau die anfassbare — dieselbe Regel wie im Programm.
+    </p>
+  </div>
+
+  <!-- ── 2 ──────────────────────────────────────────────────────────────── -->
+  <div class="blatt">
+    <div class="caps">2 · Zwei Bögen</div>
+    <div class="gross">
+      <svg class="maske" width="180" height="180" viewBox="0 0 180 180">
+        <rect width="180" height="180" fill="#0c0c0e"/>
+        <rect width="180" height="180" fill="none" stroke="#232329" stroke-width="2"/>
+        <g fill="none" stroke="#d8a55f" stroke-width="9" stroke-linecap="round">
+          <path d="M96 60 a42 42 0 0 1 0 60"/>
+          <path d="M116 40 a72 72 0 0 1 0 100"/>
+        </g>
+        <circle cx="66" cy="90" r="13" fill="#4a7ba8"/>
+      </svg>
+      <svg class="maske" width="72" height="72" viewBox="0 0 180 180">
+        <rect width="180" height="180" fill="#0c0c0e"/>
+        <g fill="none" stroke="#d8a55f" stroke-width="9" stroke-linecap="round">
+          <path d="M96 60 a42 42 0 0 1 0 60"/>
+          <path d="M116 40 a72 72 0 0 1 0 100"/>
+        </g>
+        <circle cx="66" cy="90" r="13" fill="#4a7ba8"/>
+      </svg>
+    </div>
+    <div class="echt">
+      <figure><svg class="maske" width="60" height="60" viewBox="0 0 180 180">
+        <rect width="180" height="180" fill="#0c0c0e"/>
+        <g fill="none" stroke="#d8a55f" stroke-width="12" stroke-linecap="round">
+          <path d="M96 60 a42 42 0 0 1 0 60"/>
+          <path d="M116 40 a72 72 0 0 1 0 100"/>
+        </g>
+        <circle cx="66" cy="90" r="15" fill="#4a7ba8"/>
+      </svg><figcaption>60</figcaption></figure>
+    </div>
+    <p class="warum">
+      Aussendung, auf das Nötigste gebracht: ein Punkt und zwei Bögen. Die
+      Form, die auch bei 60 px noch eindeutig bleibt — und die niemand mit
+      einem anderen Symbol auf dem Bildschirm verwechselt.
+    </p>
+  </div>
+
+  <!-- ── 3 ──────────────────────────────────────────────────────────────── -->
+  <div class="blatt">
+    <div class="caps">3 · Rufzeichen</div>
+    <div class="gross">
+      <svg class="maske" width="180" height="180" viewBox="0 0 180 180">
+        <rect width="180" height="180" fill="#0c0c0e"/>
+        <rect width="180" height="180" fill="none" stroke="#232329" stroke-width="2"/>
+        <text x="90" y="88" text-anchor="middle" fill="#d5d5db"
+              font-family="ui-monospace,Menlo,monospace" font-size="46"
+              font-weight="600" letter-spacing="1">OE5</text>
+        <text x="90" y="128" text-anchor="middle" fill="#d8a55f"
+              font-family="ui-monospace,Menlo,monospace" font-size="46"
+              font-weight="600" letter-spacing="1">SOS</text>
+      </svg>
+      <svg class="maske" width="72" height="72" viewBox="0 0 180 180">
+        <rect width="180" height="180" fill="#0c0c0e"/>
+        <text x="90" y="88" text-anchor="middle" fill="#d5d5db"
+              font-family="ui-monospace,Menlo,monospace" font-size="46"
+              font-weight="600">OE5</text>
+        <text x="90" y="128" text-anchor="middle" fill="#d8a55f"
+              font-family="ui-monospace,Menlo,monospace" font-size="46"
+              font-weight="600">SOS</text>
+      </svg>
+    </div>
+    <div class="echt">
+      <figure><svg class="maske" width="60" height="60" viewBox="0 0 180 180">
+        <rect width="180" height="180" fill="#0c0c0e"/>
+        <text x="90" y="86" text-anchor="middle" fill="#d5d5db"
+              font-family="ui-monospace,Menlo,monospace" font-size="50"
+              font-weight="700">OE5</text>
+        <text x="90" y="130" text-anchor="middle" fill="#d8a55f"
+              font-family="ui-monospace,Menlo,monospace" font-size="50"
+              font-weight="700">SOS</text>
+      </svg><figcaption>60</figcaption></figure>
+    </div>
+    <p class="warum">
+      Dein Rufzeichen, zweizeilig. Am schnellsten zu erfassen, weil es nichts
+      zu deuten gibt — aber es bindet das Symbol an eine Station. Läuft die
+      Handfunke je gegen ein anderes Gerät, stimmt es nicht mehr.
+    </p>
+  </div>
+
+</div>
+
+<p class="hinweis">
+  <b>Was ich empfehle:</b> Nummer 2. Sie bleibt bei 60 px eindeutig, während
+  die Spur aus Nummer 1 dort zur gezackten Linie wird — und sie sagt
+  „Funkgerät" statt „Diagramm“. Nummer 3 liest sich am schnellsten, bindet
+  das Symbol aber an dein Rufzeichen; das ist eine Festlegung, die man dem
+  Programm sonst nirgends antut.<br><br>
+  Sag mir eine Nummer, dann baue ich sie als PNG in den drei Größen und hänge
+  sie samt Web-App-Manifest ein. Gefällt dir keine, sag was fehlt — das ist
+  billiger, als wenn ich rate.
+</p>
+
+</body>
+</html>

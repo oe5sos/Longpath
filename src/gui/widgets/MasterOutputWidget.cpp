@@ -16,6 +16,7 @@
 // =================================================================
 
 #include "MasterOutputWidget.h"
+#include "core/LogCategories.h"
 #include "gui/ScopedChildWidget.h"
 
 #include "core/AppSettings.h"
@@ -109,6 +110,24 @@ MasterOutputWidget::MasterOutputWidget(AudioEngine* audio, QWidget* parent)
                                         QString()).toString();
     m_currentDeviceName = savedDevice;
 
+    // Ins Protokoll, wenn das Programm STUMM startet (2026-10-15).
+    //
+    // Am 2026-10-15 kostete „kein Ton" eine Stunde: hier stand `True`,
+    // der Lautsprecherknopf sass stumm da, und sonst sagte es nichts —
+    // weder das Protokoll noch eine Meldung. Alles andere war in
+    // Ordnung (Geraet offen, WDSP bereit, I/Q lief), also suchte man
+    // ueberall sonst.
+    //
+    // Der Knopf bleibt wie er ist; nur steht der Zustand jetzt auch
+    // dort, wo man bei Stille zuerst nachsieht.
+    if (savedMuted) {
+        qCWarning(lcAudio).noquote()
+            << QStringLiteral("Hauptausgang startet STUMM "
+                              "(audio/Master/Muted=True) — der "
+                              "Lautsprecherknopf in der Hauptausgabe "
+                              "loest ihn.");
+    }
+
     // ── Speaker button ─────────────────────────────────────────────────────
     m_speakerBtn = new QPushButton(this);
     m_speakerBtn->setIcon(speakerIcon(savedMuted));
@@ -150,7 +169,7 @@ MasterOutputWidget::MasterOutputWidget(AudioEngine* audio, QWidget* parent)
     // 2026-09-22 im 0.6.4-Paket gesehen, seit dem Glaschip vom 17.09.
     {
         QFont chip = m_dbLabel->font();
-        chip.setFamily(QStringLiteral("Menlo"));
+        Longpath::Style::setzeMonoFamilien(chip);
         chip.setPixelSize(11);
         m_dbLabel->setFixedWidth(QFontMetrics(chip).horizontalAdvance(QStringLiteral("100")) + 10);
     }
@@ -248,7 +267,8 @@ void MasterOutputWidget::setCurrentOutputDevice(const QString& name)
 
 void MasterOutputWidget::onSpeakerContextMenu(const QPoint& pos)
 {
-    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<MasterOutputWidget> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug (2026-09-30)
     QMenu& menu = *menuOwner.get();
     menu.setTitle(QStringLiteral("Output device"));
 
@@ -296,7 +316,7 @@ void MasterOutputWidget::onSpeakerContextMenu(const QPoint& pos)
     menu.exec(m_speakerBtn->mapToGlobal(pos));
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
     // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-    if (!menuOwner) { return; }
+    if (!menuOwner || !self) { return; }
 }
 
 void MasterOutputWidget::onAudioEngineVolumeChanged(float v)

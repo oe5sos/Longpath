@@ -29,6 +29,8 @@
 // =================================================================
 
 #include "RotorLogbookPanel.h"
+
+#include <QLoggingCategory>
 #include "gui/ScopedChildWidget.h"
 #include "GlobeWidget.h"
 #include "WorldTexture.h"
@@ -38,6 +40,7 @@
 
 #include "core/AdifLog.h"
 #include "core/AppSettings.h"
+#include "core/LogbookDatei.h"
 #include "core/CtyDatParser.h"
 #include "core/DxccColorProvider.h"
 #include "core/DxccFlag.h"
@@ -76,6 +79,7 @@
 #include <QInputDialog>
 #include <QMenu>
 #include <cmath>
+#include <limits>
 #include <QMessageBox>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
@@ -109,6 +113,14 @@ namespace {
 const QString kMyGridKey    = QStringLiteral("StationGridSquare");
 const QString kWorldImgKey  = QStringLiteral("GlobeWorldImagePath");
 const QString kShowPhotoKey = QStringLiteral("RotorLogShowQrzPhoto");
+// Der Rotor hat bis zum 2026-10-11 nie ins Protokoll geschrieben: ob
+// er verbunden war, liess sich nur am Statusschild im Fenster ablesen
+// -- an dem Tag musste ich den Widget-Baum der laufenden Instanz ueber
+// die Automatisierungsbruecke abfragen, um "Rotator connected" zu
+// sehen. In einem Protokoll, das sonst jede Verbindung mitschreibt,
+// fehlte genau die eine Zeile, die man beim Nachsehen braucht.
+Q_LOGGING_CATEGORY(lcRotor, "longpath.rotor")
+
 const QString kRotorHostKey = QStringLiteral("RotorRotctldHost");
 const QString kRotorPortKey = QStringLiteral("RotorRotctldPort");
 // Teachable presets + park (2026-08-11). %1 is the slot number 1..4.
@@ -121,6 +133,9 @@ const QString kRotorUseSerialKey = QStringLiteral("RotorUseLocalSerial");
 const QString kRotorModelKey     = QStringLiteral("RotorHamlibModel");
 const QString kRotorDeviceKey    = QStringLiteral("RotorSerialDevice");
 const QString kRotorBaudKey      = QStringLiteral("RotorSerialBaud");
+// Beim Start wieder verbinden, wenn der Betreiber zuletzt verbunden hatte
+// (und nicht selbst getrennt). "True"/"False" (2026-09-26).
+const QString kRotorConnectOnStartKey = QStringLiteral("RotorConnectOnStart");
 // Mechanical end stop, degrees; negative = turns freely. Drives the
 // dial's travel-path maths so the shown direction is the one the mast
 // can actually take.
@@ -234,12 +249,44 @@ RotorLogbookPanel::RotorLogbookPanel(RadioModel* radio, QrzClient* qrz,
     solarTick->start();
 }
 
+// ── Abbau ──────────────────────────────────────────────────────────────
+//
+// Diese zwei Zeilen sind die ERSTEN im Abbau, und das ist der ganze
+// Punkt. Der Weg, den der Betreiber sechs Mal gesehen hat (Berichte vom
+// 2026-10-10 16:05/16:06/16:10/16:13, 21:34 und 2026-10-11 11:08, alle
+// SIGSEGV):
+//
+//   ~RotorLogbookPanel -> ~QWidget -> deleteChildren()
+//     -> ~RotctldClient -> ~QAbstractSocket -> disconnectFromHost()
+//     -> stateChanged(Disconnected) -> das Lambda aus ensureRotor()
+//     -> setStatus() -> m_status->setText()   == toter Zeiger
+//
+// Die Kinder werden in der Reihenfolge geloescht, in der sie angelegt
+// wurden: das Statusschild baut buildUi() zuerst, den Rotctld-Client
+// legt ensureRotor() spaeter an. Wenn also der Socket im Abbau noch
+// einmal meldet, ist das Schild schon weg -- und die QObject-Basis des
+// Feldes lebt noch, weshalb die Verbindung noch traegt.
+//
+// Dieselbe Fehlerform steckte in diesem Programm schon in
+// SpeConnection, MainWindow, PgxlConnection und TgxlConnection; behoben
+// wird sie an der Ursache (Verbindung trennen), nicht mit einer
+// Abbau-Fahne und Waechtern in jedem Zweig.
+//
+// m_rotorProc ist ein MITGLIED und wird noch vor den Kindern abgebaut;
+// sein exited()-Rueckruf fasst dasselbe Schild an, also geht er mit.
+RotorLogbookPanel::~RotorLogbookPanel()
+{
+    if (m_rotor) { m_rotor->disconnect(this); }
+    m_rotorProc.disconnect(this);
+}
+
 QString RotorLogbookPanel::logbookPath()
 {
-    const QString dir =
-        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    QDir().mkpath(dir);
-    return dir + QStringLiteral("/logbook.adi");
+    // Eine Stelle fuer alle: seit dem QSO-Eintrag vom Telefon (TCI
+    // `log_qso:`) gibt es einen zweiten Anlass, in diese Datei zu
+    // schreiben. Zwei Stellen, die dieselbe Datei anfassen, sind genau die
+    // Lage, die am 2026-10-03 die Logzeilen zerschrieben hat.
+    return LogbookDatei::pfad();
 }
 
 // ── UI ──────────────────────────────────────────────────────────────
@@ -322,13 +369,14 @@ void RotorLogbookPanel::buildUi()
     m_photo->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_photo, &QWidget::customContextMenuRequested, this,
             [this](const QPoint& pos) {
-        ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        const QPointer<RotorLogbookPanel> self(this);   // Menue am Fenster: am nativen Feld bekam es keinen Fensterbezug (2026-09-27)
         QMenu& menu = *menuOwner.get();
         QAction* off = menu.addAction(QStringLiteral("Don't show QRZ photos"));
         const QAction* chosen = menu.exec(m_photo->mapToGlobal(pos));
         // Das Elternteil kann waehrend exec() gestorben sein — dann ist
         // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-        if (!menuOwner) { return; }
+        if (!menuOwner || !self) { return; }
         if (chosen == off) {
             AppSettings::instance().setValue(kShowPhotoKey, false);
             m_photo->showPlaceholder(QString{});
@@ -428,7 +476,8 @@ void RotorLogbookPanel::buildUi()
     // beides hier, im einen Knopf, der schon fuer "wie sieht die Kugel
     // aus" zustaendig ist.
     connect(worldBtn, &QPushButton::clicked, this, [this, worldBtn]() {
-        ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        const QPointer<RotorLogbookPanel> self(this);   // Menue am Fenster: am nativen Feld bekam es keinen Fensterbezug (2026-09-27)
         QMenu& menu = *menuOwner.get();
         QAction* small = menu.addAction(
             QStringLiteral("Download from NASA — 2048 × 1024 (about 1 MB)"));
@@ -473,7 +522,7 @@ void RotorLogbookPanel::buildUi()
             QPoint(0, worldBtn->height())));
         // Das Elternteil kann waehrend exec() gestorben sein — dann ist
         // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-        if (!menuOwner) { return; }
+        if (!menuOwner || !self) { return; }
         if (chosen == small) {
             downloadWorldImage(smallCandidates(), 0,
                                QStringLiteral("2048 × 1024"));
@@ -718,6 +767,64 @@ void RotorLogbookPanel::buildUi()
             [this](double) { beginTurn(); });
     connect(stopBtn, &QPushButton::clicked,
             this, &RotorLogbookPanel::haltTurn);
+
+    // ── Den Rotor beim Start wieder verbinden (2026-09-26) ───────────
+    //
+    // Betreiber: "man muss auch den aktuellen Stand des Rotors sehen!!!"
+    // Bisher verband der Rotor nur ueber Rotor... -> Connect; nach jedem
+    // Neustart gab es keinen Stand, bis man das wieder tat. Hatte der
+    // Betreiber zuletzt verbunden (und nicht selbst getrennt), verbindet
+    // Longpath jetzt von selbst -- nur lesen, nie drehen. Ist der Rotor
+    // nicht erreichbar (anderes Netz, ausgeschaltet), steht das in der
+    // Statuszeile, und Logbuch und Radar zeigen "not connected".
+    if (AppSettings::instance().value(kRotorConnectOnStartKey, QStringLiteral("False"))
+            .toString() == QStringLiteral("True")) {
+        QTimer::singleShot(1500, this, [this]() {
+            QString err;
+            if (connectRotorFromSettings(&err)) {
+                setStatus(QStringLiteral("Connecting to the rotator…"));
+            } else {
+                setStatus(QStringLiteral("Rotator: %1").arg(err), true);
+            }
+        });
+    }
+}
+
+bool RotorLogbookPanel::connectRotorFromSettings(QString* err)
+{
+    ensureRotor();
+    if (m_rotor->isConnected()) { return true; }
+    AppSettings& s = AppSettings::instance();
+    // Dieselbe Voreinstellung wie der Dialog (lokaler rotctld).
+    const bool local = s.value(kRotorUseSerialKey, true).toBool();
+    if (local) {
+        const int model = s.value(kRotorModelKey, 601).toInt();
+        const QString device = s.value(kRotorDeviceKey, QString{}).toString().trimmed();
+        const int baud = s.value(kRotorBaudKey, 9600).toInt();
+        if (device.isEmpty()) {
+            if (err) { *err = QStringLiteral("no rotator device set up (Rotor…)"); }
+            return false;
+        }
+        QString e;
+        if (!m_rotorProc.start(model, device, baud, 4533, &e)) {
+            if (err) { *err = e; }
+            return false;
+        }
+        const quint16 port = m_rotorProc.listenPort();
+        m_rotor->setTarget(QStringLiteral("127.0.0.1"), port);
+        s.setValue(kRotorHostKey, QStringLiteral("127.0.0.1"));
+        s.setValue(kRotorPortKey, port);
+    } else {
+        const QString host = s.value(kRotorHostKey, QString{}).toString().trimmed();
+        const quint16 port = static_cast<quint16>(s.value(kRotorPortKey, 4533).toUInt());
+        if (host.isEmpty()) {
+            if (err) { *err = QStringLiteral("no rotctld address set up (Rotor…)"); }
+            return false;
+        }
+        m_rotor->setTarget(host, port ? port : 4533);
+    }
+    m_rotor->connectToRotor();
+    return true;
 }
 
 // ── Shrinking down to the compass ───────────────────────────────────
@@ -822,13 +929,14 @@ bool RotorLogbookPanel::teachableBearing(double* outDeg) const
 // Rotate dreht. Das galt fuer die Knoepfe und gilt hier weiter.
 void RotorLogbookPanel::contextMenuEvent(QContextMenuEvent* ev)
 {
-    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<RotorLogbookPanel> self(this);   // Menue am Fenster: am nativen Feld bekam es keinen Fensterbezug (2026-09-27)
     QMenu& menu = *menuOwner.get();
     buildAimMenu(menu, ev->globalPos());
     menu.exec(ev->globalPos());
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
     // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-    if (!menuOwner) { return; }
+    if (!menuOwner || !self) { return; }
     ev->accept();
 }
 
@@ -868,7 +976,7 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
             st.value(kPresetLabelKey.arg(i + 1), QString{}).toString();
 
         QMenu* sub = menu.addMenu(
-            label.isEmpty() ? tr("Ziel %1 (leer)").arg(i + 1)
+            label.isEmpty() ? tr("Target %1 (empty)").arg(i + 1)
                             : QStringLiteral("%1 · %2°")
                                   .arg(label, deg.isEmpty() ? QStringLiteral("—")
                                                             : deg));
@@ -879,7 +987,7 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
                 m_dial->setTargetBearing(deg.toDouble());
             }
         });
-        QAction* teach = sub->addAction(tr("Lernen, umbenennen…"));
+        QAction* teach = sub->addAction(tr("Teach, rename…"));
         connect(teach, &QAction::triggered, this, [this, i, g]() {
             userPresetMenu(i, g);
         });
@@ -889,7 +997,7 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
 
     const QString park = st.value(kParkDegKey, QString{}).toString();
     QMenu* parkSub = menu.addMenu(
-        park.isEmpty() ? tr("Park (nicht gelernt)")
+        park.isEmpty() ? tr("Park (not taught)")
                        : tr("Park · %1°").arg(park));
     QAction* parkAim = parkSub->addAction(tr("Park anzielen"));
     parkAim->setEnabled(!park.isEmpty());
@@ -903,11 +1011,11 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
         parkMenu(g);
     });
 
-    QAction* lp = menu.addAction(tr("Gegenkurs (±180°)"));
+    QAction* lp = menu.addAction(tr("Long path (±180°)"));
     lp->setEnabled(m_dial && m_dial->hasTarget());
     lp->setToolTip(tr(
-        "Dreht die PEILUNG auf den langen Weg. Erst zielen, dann "
-        "Gegenkurs, dann Rotate."));
+        "Turns the BEARING to the long path. Aim first, then reverse "
+         "course, then Rotate."));
     connect(lp, &QAction::triggered, this, [this]() {
         if (!m_dial || !m_dial->hasTarget()) { return; }
         m_dial->setTargetBearing(
@@ -915,7 +1023,7 @@ void RotorLogbookPanel::buildAimMenu(QMenu& menu, const QPoint& g)
     });
 
     menu.addSeparator();
-    QAction* setup = menu.addAction(tr("Rotor-Einstellungen…"));
+    QAction* setup = menu.addAction(tr("Rotor settings…"));
     connect(setup, &QAction::triggered,
             this, &RotorLogbookPanel::openRotorSetupDialog);
 
@@ -941,7 +1049,8 @@ void RotorLogbookPanel::userPresetMenu(int slot, const QPoint& globalPos)
     const QString labelKey = kPresetLabelKey.arg(slot + 1);
     const bool taught = !s.value(degKey, QString{}).toString().isEmpty();
 
-    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<RotorLogbookPanel> self(this);   // Menue am Fenster: am nativen Feld bekam es keinen Fensterbezug (2026-09-27)
     QMenu& menu = *menuOwner.get();
     double teach = 0.0;
     const bool canTeach = teachableBearing(&teach);
@@ -959,7 +1068,7 @@ void RotorLogbookPanel::userPresetMenu(int slot, const QPoint& globalPos)
         menu.exec(globalPos);
         // Das Elternteil kann waehrend exec() gestorben sein — dann ist
         // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-        if (!menuOwner) { return; }
+        if (!menuOwner || !self) { return; }
     if (!chosen) { return; }
 
     if (chosen == save) {
@@ -997,7 +1106,8 @@ void RotorLogbookPanel::parkMenu(const QPoint& globalPos)
     AppSettings& s = AppSettings::instance();
     const bool taught = !s.value(kParkDegKey, QString{}).toString().isEmpty();
 
-    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<RotorLogbookPanel> self(this);   // Menue am Fenster: am nativen Feld bekam es keinen Fensterbezug (2026-09-27)
     QMenu& menu = *menuOwner.get();
     double teach = 0.0;
     const bool canTeach = teachableBearing(&teach);
@@ -1013,7 +1123,7 @@ void RotorLogbookPanel::parkMenu(const QPoint& globalPos)
     QAction* chosen = menu.exec(globalPos);
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
     // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-    if (!menuOwner) { return; }
+    if (!menuOwner || !self) { return; }
     if (!chosen) { return; }
     if (chosen == save) {
         s.setValue(kParkDegKey, QString::number(teach, 'f', 1));
@@ -1064,6 +1174,10 @@ void RotorLogbookPanel::ensureRotor()
 {
     if (m_rotor) { return; }
     m_rotor = new RotctldClient(this);
+    // Beim Modell anmelden, damit der TCI-Server ihn erreicht, ohne in
+    // dieses Fenster zu greifen (RadioModel::rotor()). Angelegt und
+    // bedient wird er weiter hier; das Modell haelt nur einen QPointer.
+    if (m_radio) { m_radio->setRotor(m_rotor); }
 
     AppSettings& s = AppSettings::instance();
     m_rotor->setTarget(
@@ -1081,6 +1195,10 @@ void RotorLogbookPanel::ensureRotor()
         m_simTimer->stop();
         m_dial->setSimulated(false);
         m_dial->setActualBearing(az);
+        // Das Logbuch zeigt ihn auch -- nur echte Ablesungen, nie die
+        // Stellvertreter-Nadel (2026-09-26).
+        m_lastRotorAz = az;
+        if (m_logWindow) { m_logWindow->setRotorBearing(az); }
     });
 
     // Az/el rotators: the reported elevation appears on the dial. The
@@ -1107,6 +1225,8 @@ void RotorLogbookPanel::ensureRotor()
                           .arg(m_rotor->description()));
             break;
         case RotorController::State::Disconnected:
+            m_lastRotorAz = std::numeric_limits<double>::quiet_NaN();
+            if (m_logWindow) { m_logWindow->setRotorBearing(m_lastRotorAz); }
             setStatus(QStringLiteral("Rotator disconnected"), true);
             break;
         case RotorController::State::Error:
@@ -1149,9 +1269,14 @@ void RotorLogbookPanel::ensureRotor()
     connect(&m_rotorProc, &RotctldProcess::exited, this,
             [this](int code, const QString& stderrText) {
         m_rotor->disconnectFromRotor();
+        // Nicht die letzte Zeile: Hamlib schliesst mit „IO error" ab, und
+        // genau das stand am 2026-10-06 in Martins Protokoll -- waehrend
+        // die Zeile darueber Adresse UND Ursache nannte
+        // („connect to ...:4001 failed ... Operation timed out"). Wer
+        // nichts erfaehrt, sucht beim Programm statt beim Kabel.
         const QString why = stderrText.isEmpty()
             ? QStringLiteral("exit code %1").arg(code)
-            : stderrText.section(QLatin1Char('\n'), -1).trimmed();
+            : RotctldProcess::grundAus(stderrText);
         setStatus(QStringLiteral("Rotator: rotctld exited — %1").arg(why),
                   true);
     });
@@ -1337,7 +1462,7 @@ void RotorLogbookPanel::openRotorSetupDialog()
     installLog->setVisible(false);
     installLog->setStyleSheet(
         QStringLiteral("QPlainTextEdit { background: %1; color: %2; "
-                       "font-family: Menlo, monospace; font-size: 11px; "
+                       "font-family: " LP_MONO_QSS "; font-size: 11px; "
                        "border: 1px solid %3; }")
             .arg(QString::fromLatin1(Style::kInsetBg),
                  QString::fromLatin1(Style::kTextSecondary),
@@ -1519,9 +1644,15 @@ void RotorLogbookPanel::openRotorSetupDialog()
         if (m_rotor->isConnected()) {
             m_rotor->disconnectFromRotor();
             m_rotorProc.stop();
+            // Selbst getrennt: beim naechsten Start nicht wieder verbinden.
+            AppSettings::instance().setValue(kRotorConnectOnStartKey,
+                                              QStringLiteral("False"));
             refreshUi();
             return;
         }
+        // Verbunden wird auf Wunsch: beim naechsten Start wieder.
+        AppSettings::instance().setValue(kRotorConnectOnStartKey,
+                                          QStringLiteral("True"));
 
         const bool local = modeBox->currentIndex() == 0;
         s.setValue(kRotorUseSerialKey, local);
@@ -1685,7 +1816,7 @@ void RotorLogbookPanel::downloadWorldImage(const QStringList& candidates,
     if (!m_net) { m_net = new QNetworkAccessManager(this); }
 
     const QString dest =
-        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+        AppSettings::dataDir()
         + QStringLiteral("/world.jpg");
 
     setStatus(QStringLiteral("Downloading world image (%1)…").arg(label));
@@ -2016,14 +2147,36 @@ void RotorLogbookPanel::adoptGridFromQrz(const CallsignInfo& info)
 
 LogEntry RotorLogbookPanel::buildEntry() const
 {
-    LogEntry e;
-    e.call         = Callsigns::normalized(m_callEdit->text());
-    e.timeOn       = QDateTime::currentDateTimeUtc();
-    e.myGridSquare = m_myGrid->text().trimmed().toUpper();
+    LogEntry e = draftFromRadio(m_callEdit->text());
     e.gridSquare   = m_dxGrid->text().trimmed().toUpper();
     e.rstSent      = m_rstSent->text().trimmed();
     e.rstRcvd      = m_rstRcvd->text().trimmed();
     e.comment      = m_comment->text().trimmed();
+
+    // QRZ detail, but only when it belongs to THIS callsign — a card
+    // left over from the previous station would put the wrong operator
+    // in the log.
+    if (m_lastInfo.isValid()
+        && Callsigns::normalized(m_lastInfo.call) == e.call) {
+        e.name    = m_lastInfo.displayName();
+        e.qth     = m_lastInfo.city;
+        e.country = m_lastInfo.country;
+    }
+
+    if (isValidGridSquare(e.myGridSquare) && isValidGridSquare(e.gridSquare)) {
+        e.distanceKm = calculateDistanceKm(e.myGridSquare, e.gridSquare);
+        e.bearingDeg = calculateBearingInDegrees(e.myGridSquare, e.gridSquare);
+    }
+    stampSatellites(e);
+    return e;
+}
+
+LogEntry RotorLogbookPanel::draftFromRadio(const QString& call) const
+{
+    LogEntry e;
+    e.call         = Callsigns::normalized(call);
+    e.timeOn       = QDateTime::currentDateTimeUtc();
+    e.myGridSquare = m_myGrid->text().trimmed().toUpper();
 
     if (SliceModel* s = m_radio ? m_radio->activeSlice() : nullptr) {
         e.freqMHz = s->frequency() / 1e6;
@@ -2041,22 +2194,6 @@ LogEntry RotorLogbookPanel::buildEntry() const
             e.mode = m;
         }
     }
-
-    // QRZ detail, but only when it belongs to THIS callsign — a card
-    // left over from the previous station would put the wrong operator
-    // in the log.
-    if (m_lastInfo.isValid()
-        && Callsigns::normalized(m_lastInfo.call) == e.call) {
-        e.name    = m_lastInfo.displayName();
-        e.qth     = m_lastInfo.city;
-        e.country = m_lastInfo.country;
-    }
-
-    if (isValidGridSquare(e.myGridSquare) && isValidGridSquare(e.gridSquare)) {
-        e.distanceKm = calculateDistanceKm(e.myGridSquare, e.gridSquare);
-        e.bearingDeg = calculateBearingInDegrees(e.myGridSquare, e.gridSquare);
-    }
-    stampSatellites(e);
     return e;
 }
 
@@ -2086,33 +2223,24 @@ void RotorLogbookPanel::setSatellites(SatelliteService* svc)
 
 bool RotorLogbookPanel::appendToLogFile(const LogEntry& entry, QString* error)
 {
-    const QString path = logbookPath();
-    const bool isNew = !QFile::exists(path);
-
-    QFile f(path);
-    if (!f.open(QIODevice::Append | QIODevice::Text)) {
-        if (error) { *error = f.errorString(); }
-        return false;
-    }
-    QTextStream out(&f);
-    if (isNew) {
-        // Strict importers reject a file whose first token is a record
-        // rather than a header terminated by <EOH>.
-        out << "Longpath logbook\n"
-            << "<ADIF_VER:5>3.1.4 <PROGRAMID:8>Longpath <EOH>\n";
-    }
-    out << entry.toAdifRecord() << "\n";
-    out.flush();
-    return true;
+    // Der Rumpf ist nach core/LogbookDatei umgezogen -- siehe logbookPath().
+    return LogbookDatei::anhaengen(entry, error);
 }
 
-void RotorLogbookPanel::onLogQso()
+bool RotorLogbookPanel::commitEntry(LogEntry e, QWidget* askParent, QString* message)
 {
-    const LogEntry e = buildEntry();
+    QString dummy;
+    QString& msg = message ? *message : dummy;
     if (!e.isValid()) {
-        setStatus(QStringLiteral("Enter a callsign to log"), true);
-        return;
+        msg = QStringLiteral("Enter a callsign to log");
+        return false;
     }
+    if (e.distanceKm <= 0.0
+        && isValidGridSquare(e.myGridSquare) && isValidGridSquare(e.gridSquare)) {
+        e.distanceKm = calculateDistanceKm(e.myGridSquare, e.gridSquare);
+        e.bearingDeg = calculateBearingInDegrees(e.myGridSquare, e.gridSquare);
+    }
+    stampSatellites(e);
 
     // Ask, do not refuse. Working the same station twice on one band
     // and mode inside a couple of minutes is unusual but legitimate —
@@ -2120,7 +2248,7 @@ void RotorLogbookPanel::onLogQso()
     // The same rule the importer uses, so one idea of "the same QSO"
     // rather than two that disagree.
     if (m_worked.wouldDuplicate(e)) {
-        if (QMessageBox::question(this, QStringLiteral("Duplicate"),
+        if (QMessageBox::question(askParent ? askParent : this, QStringLiteral("Duplicate"),
                 QStringLiteral("You already have %1 on %2 at about this "
                                "time.\n\nLog it again?")
                     .arg(e.call,
@@ -2128,31 +2256,60 @@ void RotorLogbookPanel::onLogQso()
                                           : e.band),
                 QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
             != QMessageBox::Yes) {
-            setStatus(QStringLiteral("Not logged — %1 is already in the log")
-                          .arg(e.call), true);
-            return;
+            msg = QStringLiteral("Not logged — %1 is already in the log").arg(e.call);
+            return false;
         }
     }
 
     QString err;
     if (!appendToLogFile(e, &err)) {
-        setStatus(QStringLiteral("Couldn't write the log: %1").arg(err), true);
-        return;
+        msg = QStringLiteral("Couldn't write the log: %1").arg(err);
+        return false;
     }
 
     // Confirm the local write before the upload, so a failing upload
     // never reads as a lost contact.
-    QString msg = QStringLiteral("Logged %1").arg(e.call);
+    msg = QStringLiteral("Logged %1").arg(e.call);
     if (!e.band.isEmpty()) { msg += QStringLiteral(" on %1").arg(e.band); }
     if (m_uploader && m_uploader->isConfigured()) {
         msg += QStringLiteral(" · uploading…");
         m_lastLogged = e;
         m_uploader->upload(e);
     }
-    setStatus(msg);
 
     refreshRecentList();
     emit qsoLogged(e);
+    return true;
+}
+
+void RotorLogbookPanel::logFromLogbook(const LogEntry& partial)
+{
+    // Frequenz, Band, Betriebsart, Zeit und eigener Locator kommen von
+    // hier -- dieselben wie beim "Log QSO" dieses Felds. Aus dem Logbuch
+    // nur, was dort eingegeben oder nachgeschlagen wurde.
+    LogEntry e = draftFromRadio(partial.call);
+    e.rstSent    = partial.rstSent;
+    e.rstRcvd    = partial.rstRcvd;
+    e.comment    = partial.comment;
+    e.name       = partial.name;
+    e.qth        = partial.qth;
+    e.country    = partial.country;
+    e.gridSquare = partial.gridSquare;
+
+    QString msg;
+    const bool ok = commitEntry(e, m_logWindow ? static_cast<QWidget*>(m_logWindow) : this, &msg);
+    setStatus(msg, !ok);
+    if (m_logWindow) { m_logWindow->reportLogged(ok, msg); }
+}
+
+void RotorLogbookPanel::onLogQso()
+{
+    QString msg;
+    const LogEntry e = buildEntry();
+    const bool ok = commitEntry(e, this, &msg);
+    setStatus(msg, !ok);
+    if (!ok) { return; }
+    if (m_logWindow) { m_logWindow->reload(); }
 
     // Clear only what belongs to the contact just made. The locators
     // and the reports stay — the next station is usually worked with
@@ -2210,6 +2367,11 @@ void RotorLogbookPanel::logExternalQso(const LogEntry& entry)
         return;
     }
 
+    // Ein offenes Logbuch liest mit. Sonst haelt es den alten Stand,
+    // und seine naechste Korrektur (saveAll schreibt die ganze Datei)
+    // loeschte dieses QSO wieder (Nachttest 2026-09-26).
+    if (m_logWindow) { m_logWindow->reload(); }
+
     QString msg = QStringLiteral("Logged %1 from WSJT-X").arg(e.call);
     if (!e.band.isEmpty()) { msg += QStringLiteral(" on %1").arg(e.band); }
     if (m_uploader && m_uploader->isConfigured()) {
@@ -2249,6 +2411,10 @@ void RotorLogbookPanel::markUploaded(const QString& call)
         // consequence is that it gets offered for upload again, where
         // QRZ will call it a duplicate.
         qWarning("Couldn't record the QRZ upload: %s", qPrintable(err));
+    } else if (m_logWindow) {
+        // Wie beim WSJT-X-QSO: sonst schriebe die naechste Korrektur im
+        // Logbuch den Vermerk wieder zurueck.
+        m_logWindow->reload();
     }
     m_lastLogged = LogEntry{};
 }
@@ -2374,6 +2540,19 @@ void RotorLogbookPanel::openLogbookWindow()
         // So the target goes on the dial and beginTurn() decides the
         // rest, exactly as it does for the button. Whatever it does, it
         // now does the same thing from both places.
+        // Die Eingabezeile oben im Logbuch loggt ueber dieses Feld: eine
+        // Datei, eine Doppelt-Regel, ein Hochladen (2026-09-26).
+        m_logWindow->setRadio(m_radio);
+        m_logWindow->setRotorBeamWidth(m_dial ? m_dial->beamWidth() : 40.0);
+        m_logWindow->setRotorBearing(m_lastRotorAz);
+        connect(m_logWindow, &LogbookWindow::logQsoRequested,
+                this, &RotorLogbookPanel::logFromLogbook);
+        // Schliessen melden, damit der Haken „Logbuch" in der Auswahl
+        // mitgeht -- sonst ging das Logbuch bei jedem Start wieder auf
+        // (Betreiber 2026-09-27).
+        connect(m_logWindow, &QDialog::finished,
+                this, &RotorLogbookPanel::logbookClosed);
+
         connect(m_logWindow, &LogbookWindow::turnRotorRequested, this,
                 [this](double bearing, const QString& call) {
             Q_UNUSED(call);
@@ -2417,8 +2596,23 @@ void RotorLogbookPanel::hideLogbook()
     if (m_logWindow) { m_logWindow->hide(); }
 }
 
+void RotorLogbookPanel::raiseLogbookIfOpen()
+{
+    if (!m_logWindow || !m_logWindow->isVisible()) { return; }
+    m_logWindow->raise();
+    m_logWindow->activateWindow();
+}
+
 void RotorLogbookPanel::setStatus(const QString& text, bool warn)
 {
+    // Nur echte Wechsel, sonst schreibt die wiederholte Meldung das
+    // Protokoll voll (der Zustand wird bei jedem Abfragedurchgang
+    // gesetzt, nicht nur wenn er sich aendert).
+    if (text != m_letzterStatus) {
+        m_letzterStatus = text;
+        if (warn) { qCWarning(lcRotor).noquote() << "Rotor:" << text; }
+        else      { qCInfo(lcRotor).noquote()    << "Rotor:" << text; }
+    }
     m_status->setText(text);
     m_status->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 11px; }"

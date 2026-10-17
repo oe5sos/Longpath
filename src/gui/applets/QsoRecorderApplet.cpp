@@ -64,6 +64,8 @@ mw0lge@grange-lane.co.uk
 // =================================================================
 
 #include "QsoRecorderApplet.h"
+#include "gui/Zahlentext.h"
+#include "core/AppSettings.h"
 #include "gui/ScopedChildWidget.h"
 
 #include "gui/StyleConstants.h"
@@ -156,8 +158,7 @@ QString QsoRecorderApplet::recordingFolder() const
 {
     // Neben die Einstellungen, wie beim Sprachspeicher — ein Ort, den
     // man wiederfindet, ohne zu suchen.
-    const QString base = QStandardPaths::writableLocation(
-        QStandardPaths::AppConfigLocation);
+    const QString base = AppSettings::dataDir();
     QDir().mkpath(base + QStringLiteral("/recordings"));
     return base + QStringLiteral("/recordings");
 }
@@ -227,7 +228,7 @@ void QsoRecorderApplet::buildUI()
             auto* box = new QWidget(body);
             box->setStyleSheet(QStringLiteral(
                 "QWidget { background: %1; border: 1px solid %2;"
-                " border-radius: 3px; }")
+                " border-radius: 6px; }")
                 .arg(QLatin1String(Style::kInsetBg),
                      QLatin1String(Style::kBorderSubtle)));
             auto* col = new QVBoxLayout(box);
@@ -300,7 +301,7 @@ void QsoRecorderApplet::buildUI()
     m_list->setMaximumHeight(96);
     m_list->setStyleSheet(QStringLiteral(
         "QListWidget { background: %1; border: 1px solid %2;"
-        " border-radius: 3px; color: %3; font-size: 11px; }"
+        " border-radius: 6px; color: %3; font-size: 11px; }"
         "QListWidget::item { padding: 1px 4px; }"
         "QListWidget::item:selected { background: %4; color: %5; }")
         .arg(QLatin1String(Style::kInsetBg),
@@ -323,7 +324,8 @@ void QsoRecorderApplet::buildUI()
         const QString file = item->data(Qt::UserRole).toString();
         if (file.isEmpty()) { return; }
 
-        ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        const QPointer<QsoRecorderApplet> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug (2026-09-30)
         QMenu& menu = *menuOwner.get();
         menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
         QAction* listen = menu.addAction(
@@ -337,7 +339,7 @@ void QsoRecorderApplet::buildUI()
         const QAction* chosen = menu.exec(m_list->mapToGlobal(pos));
         // Das Elternteil kann waehrend exec() gestorben sein — dann ist
         // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-        if (!menuOwner) { return; }
+        if (!menuOwner || !self) { return; }
         if (chosen == listen) {
             if (m_player.isPlaying() && m_player.currentPath() == file) {
                 m_player.stop();
@@ -462,7 +464,10 @@ void QsoRecorderApplet::onRecordClicked()
         SliceModel* s = m_model->activeSlice();
         if (!s) { s = m_model->sliceById(0); }
         if (s) {
-            info.frequency = QString::number(s->frequency() / 1.0e6, 'f', 6);
+            // datenZahl, NICHT anzeigeZahl: das landet in der
+            // Beschreibungsdatei neben der Aufnahme, die andere
+            // Programme lesen. Ein Komma waere dort ein Fehler.
+            info.frequency = datenZahl(s->frequency() / 1.0e6, 6);
             info.mode      = SliceModel::modeName(s->dspMode());
         }
         rec.setSliceId(s ? s->sliceIndex() : 0);
@@ -552,7 +557,7 @@ void QsoRecorderApplet::refreshState()
         if (!l) { return; }
         if (!on || peak <= 0.0f) { l->setText(QStringLiteral("—")); return; }
         const double db = 20.0 * std::log10(static_cast<double>(peak));
-        l->setText(QStringLiteral("%1 dB").arg(db, 0, 'f', 0));
+        l->setText(QStringLiteral("%1 dB").arg(anzeigeZahl(db, 0)));
     };
     setPeakText(m_rxPeak, rec.lastRxPeak());
     setPeakText(m_txPeak, rec.lastTxPeak());

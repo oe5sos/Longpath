@@ -12,6 +12,7 @@
 // =================================================================
 
 #include "gui/widgets/StationPhoto.h"
+#include "core/AppSettings.h"
 
 #include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
@@ -31,7 +32,7 @@ namespace Longpath {
 QString StationPhoto::cacheDir()
 {
     const QString dir =
-        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+        AppSettings::dataDir()
         + QStringLiteral("/qrz-photos");
     QDir().mkpath(dir);
     return dir;

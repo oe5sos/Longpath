@@ -210,7 +210,7 @@ void MainWindow::connectSunSdr(const QString& endpoint)
     quint16 port = 0;
     if (!parseSunSdrEndpoint(endpoint, &host, &port)) {
         showSunSdrNotice(
-            this, QMessageBox::Warning, QStringLiteral("SunSDR verbinden"),
+            this, QMessageBox::Warning, tr("Connect SunSDR"),
             QStringLiteral("Adresse unlesbar: „%1“\n\n"
                            "Erwartet wird eine IP-Adresse oder ein "
                            "Rechnername, wahlweise mit :Port.")
@@ -281,9 +281,9 @@ void MainWindow::connectSunSdr(const QString& endpoint)
         qCWarning(lcTci) << "SunSDR: keine Scheibe zu bekommen -- der Ton "
                             "haette keinen Weg in die Mischung";
         showSunSdrNotice(
-            this, QMessageBox::Warning, QStringLiteral("SunSDR verbinden"),
-            QStringLiteral("Es konnte keine Scheibe angelegt werden. "
-                           "Der SunSDR wird nicht verbunden."));
+            this, QMessageBox::Warning, tr("Connect SunSDR"),
+            tr("No slice could be created. The SunSDR is not being "
+               "connected."));
         return;
     }
     // Auch fuer die beiden Rueckfall-Zweige oben (wiederverwendete aktive
@@ -326,7 +326,7 @@ void MainWindow::disconnectSunSdr()
     // Stream zu haengen. releaseSunSdrSlice() deckt alles ab, was hier
     // vorher von Hand stand (Ton-Quelle entfernen, die drei
     // Verbindungen trennen), plus die fehlende Kennungs-Ruecksetzung.
-    releaseSunSdrSlice(QStringLiteral("Trennen (Menü)"));
+    releaseSunSdrSlice(QStringLiteral("disconnect (menu)"));
 }
 
 // Siehe MainWindow.h fuer den Zweck: die EINE Stelle, die "gibt es eine
@@ -591,12 +591,12 @@ void MainWindow::wireSunSdr()
         // laestiges Wiederholen: deviceDescribed feuert genau einmal je
         // "Verbinden…"-Klick, TciClient baut nicht von selbst neu auf.
         showSunSdrNotice(
-            this, QMessageBox::Information, QStringLiteral("SunSDR verbunden"),
+            this, QMessageBox::Information, tr("SunSDR connected"),
             deviceName.isEmpty()
-                ? QStringLiteral("Verbunden. Sobald der Empfaenger in "
-                                 "ExpertSDR2 laeuft, kommt Ton.")
-                : QStringLiteral("Verbunden mit „%1“.\n\nSobald der "
-                                 "Empfaenger in ExpertSDR2 laeuft, kommt Ton.")
+                ? tr("Connected. Audio arrives as soon as the receiver is "
+                     "running in ExpertSDR2.")
+                : tr("Connected to “%1”.\n\nAudio arrives as soon as "
+                     "the receiver is running in ExpertSDR2.")
                       .arg(deviceName));
     });
 
@@ -663,9 +663,9 @@ void MainWindow::wireSunSdr()
             // einer Schleife.
             showSunSdrNotice(
                 this, QMessageBox::Warning, QStringLiteral("SunSDR"),
-                QStringLiteral("Verbindung fehlgeschlagen: %1")
+                tr("Connection failed: %1")
                     .arg(detail.isEmpty()
-                             ? QStringLiteral("(keine weitere Angabe)")
+                             ? tr("(no further detail)")
                              : detail));
         }
         if (state == TciClient::State::Error
@@ -686,7 +686,7 @@ void MainWindow::wireSunSdr()
             // -- derselbe Fund/derselbe Fix wie bei disconnectSunSdr().
             releaseSunSdrSlice(state == TciClient::State::Error
                                     ? QStringLiteral("Verbindungsfehler")
-                                    : QStringLiteral("Verbindung getrennt"));
+                                    : tr("Disconnected"));
         }
     });
 

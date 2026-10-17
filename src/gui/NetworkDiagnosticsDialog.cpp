@@ -64,17 +64,17 @@ namespace Longpath {
 //   Monospace font stack is diagnostics-specific (all three constants).
 static constexpr const char* kValueStyle =
     "color: #c8d8e8;"           // Style::kTextPrimary
-    "font-family: 'SF Mono', Menlo, monospace;"
+    "font-family: " LP_MONO_QSS ";"
     "font-size: 11px;";
 
 static constexpr const char* kFieldStyle =
     "color: #8aa8c0;"           // Style::kTitleText
-    "font-family: 'SF Mono', Menlo, monospace;"
+    "font-family: " LP_MONO_QSS ";"
     "font-size: 11px;";
 
 static constexpr const char* kSectionHeaderStyle =
     "color: #4a7ba8;"           // §D exception: diagnostics section header blue
-    "font-family: 'SF Mono', Menlo, monospace;"
+    "font-family: " LP_MONO_QSS ";"
     "font-size: 11px;"
     "font-weight: bold;"
     "padding: 6px 0;"

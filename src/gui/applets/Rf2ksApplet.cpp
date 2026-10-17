@@ -397,7 +397,7 @@ QMenu* Rf2ksApplet::buildContextMenu(QObject* menuParent)
 
 void Rf2ksApplet::contextMenuEvent(QContextMenuEvent* ev)
 {
-    auto* menu = buildContextMenu(this);
+    auto* menu = buildContextMenu(window());   // am Fenster, siehe AmpApplet::contextMenuEvent()
     menu->exec(ev->globalPos());
     delete menu;
 }

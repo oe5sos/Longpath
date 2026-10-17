@@ -783,7 +783,7 @@ void PsForm::onSavePressed()
     //   if (savefile1.ShowDialog() == DialogResult.OK)
     //       puresignal.PSSaveCorr(_txachannel, savefile1.FileName);
     const QString defaultDir =
-        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+        AppSettings::dataDir()
         + QStringLiteral("/PureSignal/");
     QDir().mkpath(defaultDir);
 
@@ -813,7 +813,7 @@ void PsForm::onRestorePressed()
     //       _restoreON = true;
     //   }
     const QString defaultDir =
-        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
+        AppSettings::dataDir()
         + QStringLiteral("/PureSignal/");
     QDir().mkpath(defaultDir);
 

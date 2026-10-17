@@ -429,7 +429,7 @@ void MainWindow::showSideAreaAddMenu(const QPoint& globalPos)
         });
     }
     if (menu->isEmpty()) {
-        menu->addAction(QStringLiteral("Alles liegt schon hier"))->setEnabled(false);
+        menu->addAction(tr("Everything is here already"))->setEnabled(false);
     }
     menu->popup(globalPos);
 }

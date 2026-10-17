@@ -194,6 +194,23 @@ PaDeviceIndex resolveDevice(const PortAudioConfig& inCfg,
         if (crossApiSub    != paNoDevice) { return crossApiSub; }
         // Named device not found: fall through to defaults rather than
         // erroring out — better silent fallback than no audio at all.
+        //
+        // Aber NICHT lautlos (2026-10-15). Am 2026-10-15 kostete „kein
+        // Ton" eine Stunde: in den Einstellungen stand ein Headset, das
+        // nicht angesteckt war, und Longpath wich still auf die
+        // eingebauten Lautsprecher aus. Im Protokoll stand danach nur
+        // das Ist-Geraet — wer das Soll nicht daneben hat, sucht beim
+        // Funkgeraet.
+        //
+        // Der Rueckfall bleibt, wie er ist; nur sagt er es jetzt.
+        qCWarning(lcAudio).noquote()
+            << QStringLiteral("Audiogeraet \"%1\" (%2) nicht gefunden — "
+                              "es wird das Standardgeraet genommen. "
+                              "Steht im Protokoll gleich darunter als "
+                              "\"%2 via …\".")
+                   .arg(wanted,
+                        wantOutput ? QStringLiteral("output")
+                                   : QStringLiteral("input"));
     }
 
     // 2. Host-API default.
@@ -295,6 +312,16 @@ PortAudioBus::~PortAudioBus() {
 
 void PortAudioBus::setConfig(const PortAudioConfig& cfg) {
     m_cfg = cfg;
+}
+
+// Lebt der Strom noch? Pa_IsStreamActive gibt 1 (laeuft), 0 (steht) oder
+// einen negativen Fehlercode -- zum Beispiel paDeviceUnavailable, wenn das
+// Geraet unter dem Strom weggezogen wurde. Nur 1 heisst "es kommt wirklich
+// etwas heraus"; alles andere behandeln wir als tot, damit der Aufrufer neu
+// oeffnet. Siehe die Begruendung an IAudioBus::isAlive().
+bool PortAudioBus::isAlive() const {
+    if (m_stream == nullptr) { return false; }
+    return Pa_IsStreamActive(m_stream) == 1;
 }
 
 bool PortAudioBus::open(const AudioFormat& format) {
@@ -607,6 +634,31 @@ void PortAudioBus::flush() {
     m_ringRead.store(w, std::memory_order_release);
 }
 
+qint64 PortAudioBus::consumedFrames() const {
+    if (!m_stream) { return -1; }
+    // Derselbe Kanalteiler wie bei queuedFrames: der Ring zaehlt FLOATS.
+    const int kanaele = (m_negFormat.channels > 0) ? m_negFormat.channels : 1;
+    return m_verbrauchteFloats.load(std::memory_order_relaxed) / kanaele;
+}
+
+qint64 PortAudioBus::queuedFrames() const {
+    if (!m_stream) { return -1; }
+    // Der Ring zaehlt FLOATS, nicht Rahmen -- m_ring ist 4800 Rahmen mal
+    // zwei Kanaelen gross. Wer hier die Differenz der Zeiger
+    // zurueckgibt, meldet bei Stereo den doppelten Fuellstand, und der
+    // Driftausgleich regelte auf die halbe Zielverzoegerung.
+    const int kanaele = (m_negFormat.channels > 0) ? m_negFormat.channels : 1;
+    // Zuerst den Lesezeiger, dann den Schreibzeiger: in dieser Reihenfolge
+    // kann die Differenz hoechstens zu KLEIN ausfallen, nie negativ.
+    // Andersherum koennte zwischen den beiden Ladevorgaengen geschrieben
+    // werden und der Fuellstand groesser erscheinen, als er je war.
+    const qint64 r = m_ringRead.load(std::memory_order_acquire);
+    const qint64 w = m_ringWrite.load(std::memory_order_acquire);
+    const qint64 floats = w - r;
+    if (floats <= 0) { return 0; }
+    return floats / kanaele;
+}
+
 qint64 PortAudioBus::pull(char* data, qint64 maxBytes) {
     if (!m_stream) { return 0; }
     if (m_cfg.direction != AudioDirection::Input) { return 0; }
@@ -660,6 +712,10 @@ int PortAudioBus::paCallback(const void* in, void* out,
         const int want = static_cast<int>(frames) * self->m_negFormat.channels;
 
         qint64 r = self->m_ringRead.load(std::memory_order_relaxed);
+        // Anfangsstand merken: die Differenz am Ende ist das, was dieser
+        // Rueckruf WIRKLICH aus dem Ring geholt hat. Siehe
+        // m_verbrauchteFloats -- `m_ringRead` allein luegt nach `flush()`.
+        const qint64 rAnfang = r;
         const qint64 w = self->m_ringWrite.load(std::memory_order_acquire);
 
         // 2026-05-26 KG4VCF perf instrumentation: report the ring fill
@@ -763,6 +819,12 @@ int PortAudioBus::paCallback(const void* in, void* out,
             last = o[i];
         }
         self->m_ringRead.store(r, std::memory_order_release);
+        // Entspannte Ordnung genuegt: an dieser Zahl haengt keine
+        // Entscheidung im Rueckruf, sie wird nur von aussen angesehen.
+        if (r > rAnfang) {
+            self->m_verbrauchteFloats.fetch_add(r - rAnfang,
+                                                std::memory_order_relaxed);
+        }
         self->m_lastOutL = lastL;
         self->m_lastOutR = lastR;
         self->m_crossfadeFramesRem = crossfadeRem;

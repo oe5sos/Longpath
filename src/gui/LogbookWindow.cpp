@@ -28,8 +28,14 @@
 #include "core/QsoUploader.h"
 #include "gui/QsoMapWindow.h"
 #include "gui/widgets/FlowLayout.h"
+#include "gui/FramelessResizer.h"
 #include "gui/StyleConstants.h"
+#include "gui/WindowChrome.h"
 #include "gui/widgets/QsoDetailPane.h"
+#include "core/Maidenhead.h"
+#include "models/Band.h"
+#include "models/RadioModel.h"
+#include "models/SliceModel.h"
 
 #include <QSplitter>
 
@@ -50,6 +56,7 @@
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
@@ -59,11 +66,13 @@
 #include <QSet>
 #include <QSignalBlocker>
 #include <QTableWidget>
+#include <QTimer>
 #include <QTextStream>
 #include <QTimeZone>
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <cmath>
 
 #include <algorithm>
 
@@ -106,6 +115,10 @@ LogbookWindow::LogbookWindow(const QString& adifPath, QWidget* parent)
     : QDialog(parent), m_path(adifPath)
 {
     setWindowTitle(QStringLiteral("Logbook"));
+    // Rahmenlos wie jedes andere Longpath-Fenster. Bis hierher war das
+    // Logbuch das einzige mit dem Rahmen des Betriebssystems -- und damit
+    // das einzige mit runden Ecken, waehrend alles andere eckig ist.
+    setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
     // Not modal: you look things up in the log *while* working a
     // station, which is exactly when a modal dialog would be in the way.
     setModal(false);
@@ -115,6 +128,18 @@ LogbookWindow::LogbookWindow(const QString& adifPath, QWidget* parent)
     // after every start looks like a station nobody has ever heard of.
     m_callCache.load();
     buildUi();
+    // Kein Knopf ist Standardknopf. In einem QDialog ist jeder QPushButton
+    // "autoDefault": Return in einem Feld drueckt dann zusaetzlich den
+    // ersten Knopf -- Return in der Suche oeffnete "Edit..." (gefunden
+    // 2026-09-26 an einem haengenden Test: modaler Bearbeiten-Dialog).
+    for (QPushButton* b : findChildren<QPushButton*>()) { b->setAutoDefault(false); b->setDefault(false); }
+    // Ziehen an der Leiste, Groesse an den Kanten und am Griff unten
+    // rechts -- dieselben drei Teile, die ToolWindow installiert. Der
+    // obere Streifen gehoert dem Ziehen, sonst schnappt der Resizer den
+    // Griff weg (AetherSDR #4266).
+    FramelessResizer::install(this, 6, m_titleBar->height());
+    attachResizeGrip(this);
+
     restoreHeaderState();
     restoreSplitState();
     restoreGeometryState();
@@ -150,6 +175,9 @@ void LogbookWindow::moveEvent(QMoveEvent* event)
 void LogbookWindow::resizeEvent(QResizeEvent* event)
 {
     QDialog::resizeEvent(event);
+    if (m_settling) {
+        m_settleTarget = m_settleTarget.boundedTo(event->size());
+    }
     saveGeometryState();
 }
 
@@ -166,7 +194,125 @@ void LogbookWindow::restoreGeometryState()
     // Empty on a first run, or a saved state from before this window
     // had a screen of its own to remember -- the resize(1240, 620)
     // above already set a sane default in that case.
-    if (!st.isEmpty()) { restoreGeometry(st); }
+    if (!st.isEmpty()) { m_geometryRestored = restoreGeometry(st); }
+}
+
+void LogbookWindow::setVisible(bool visible)
+{
+    // ── Die gespeicherte Groesse halten (2026-09-26) ─────────────────
+    //
+    // Beim ersten Zeigen kennen die umbrechenden Leisten (Knopfzeilen
+    // der Karte, Werkzeugleisten) noch nicht ihre wirkliche Breite. Die
+    // Kartenspalte steht fuer einen Durchgang schmal -- das kleine
+    // Rotor-Radar belegt noch Platz, die Aufteilung ist noch nicht
+    // angekommen --, die Knoepfe brauchen dort viele Zeilen, und das
+    // Logbuch meldet fuer diesen Augenblick bis zu 931 px Mindesthoehe.
+    // Qt zieht das Fenster darauf auf; einen Takt spaeter ist die
+    // Mindesthoehe wieder 597, aber das Fenster schrumpft nie von
+    // selbst zurueck. Jede gespeicherte Hoehe ging so verloren, und auf
+    // dem Laptop schob macOS das Fenster dabei nach oben.
+    //
+    // Darum: was vor dem ersten Zeigen vorgesehen war, danach noch
+    // einmal anwenden -- nie kleiner als der Inhalt dann braucht. Die
+    // Lage nur, wenn sie wirklich wiederhergestellt wurde; sonst bleibt
+    // Qts Platzierung neben dem Hauptfenster.
+    //
+    // Mehrmals, nicht einmal: im Test ist die Mindesthoehe nach 20 ms
+    // eingeschwungen, im laufenden Programm (Karte, Karteikarte,
+    // Kennzahlen) spaeter -- live nach 50 ms noch 776 statt 637.
+    //
+    // Nur zuruecknehmen, was aufgezogen wurde -- nie vergroessern
+    // (2026-09-27): wer das Fenster in der ersten Sekunde kleiner zieht,
+    // behaelt es so. Vorher stellte der naechste Takt die vorgesehene
+    // Groesse wieder her (auf der CI: tst_logbook_toolbar_wraps).
+    //
+    // Ziel ist die kleinste Groesse, die das Fenster in dieser Zeit hatte
+    // (m_settleTarget, gefuehrt in resizeEvent): zieht Qt NACH einer
+    // Verkleinerung noch einmal auf, geht es auf die Verkleinerung
+    // zurueck, nicht nur auf die vorgesehene Groesse (unter Last auf
+    // cocoa: 900x650 gewollt, 900x698 aufgezogen, 2026-09-27).
+    const bool first = visible && !m_shownOnce;
+    const QRect intended = geometry();
+    if (first) {
+        m_settling = true;
+        m_settleTarget = intended.size();
+    }
+    QDialog::setVisible(visible);
+    if (!first) { return; }
+    m_shownOnce = true;
+
+    // ── Laufend statt an drei Punkten (2026-10-16) ───────────────────
+    //
+    // Hier standen drei feste Takte: 50, 300, 1000 ms. Jeder nahm
+    // zurueck bis m_settleTarget.expandedTo(minimumSizeHint()) — und
+    // war die Mindesthoehe beim LETZTEN noch nicht eingeschwungen, war
+    // diese Grenze selbst der aufgezogene Wert. Dann unterblieb die
+    // Korrektur, und danach lief kein Takt mehr. Im vollen Durchgang
+    // vom 2026-10-16 stand das Fenster unter -j8-Last auf 780 statt
+    // 700; allein gefahren war derselbe Lauf gruen.
+    //
+    // Der Kommentar oben sagt es selbst: „im laufenden Programm
+    // (Karte, Karteikarte, Kennzahlen) spaeter — live nach 50 ms noch
+    // 776 statt 637". Drei Zeitpunkte zu raten, an denen das vorbei
+    // ist, geht auf einer besetzten Maschine schief.
+    m_settleIntended     = intended;
+    m_settleWithPosition = m_geometryRestored;
+    m_settleLastHint     = QSize();
+    m_settleUhr.start();
+    if (!m_settleTimer) {
+        m_settleTimer = new QTimer(this);
+        connect(m_settleTimer, &QTimer::timeout,
+                this, &LogbookWindow::onSettleTick);
+    }
+    m_settleTimer->start(kSettleTickMs);
+}
+
+void LogbookWindow::onSettleTick()
+{
+    if (!isVisible() || isMaximized() || isFullScreen()) {
+        stopSettling();
+        return;
+    }
+
+    const QSize hint = minimumSizeHint();
+    const bool eingeschwungen = (hint == m_settleLastHint);
+    m_settleLastHint = hint;
+
+    // Nur zuruecknehmen, was aufgezogen wurde — nie vergroessern. Ziel
+    // ist die kleinste Groesse, die das Fenster in dieser Zeit hatte
+    // (m_settleTarget, gefuehrt in resizeEvent), nie kleiner als der
+    // Inhalt jetzt braucht.
+    const QSize bound = m_settleTarget.expandedTo(hint);
+    const QSize jetzt = size();
+    const QSize soll  = jetzt.boundedTo(bound);
+    const bool nichtsZurueckzunehmen = (soll == jetzt);
+    if (!nichtsZurueckzunehmen) {
+        setGeometry(m_settleWithPosition
+                        ? QRect(m_settleIntended.topLeft(), soll)
+                        : QRect(pos(), soll));
+    }
+
+    const qint64 seit = m_settleUhr.elapsed();
+
+    // Die erste Sekunde gehoert dem Betreiber: wer in ihr kleiner
+    // zieht, behaelt es, und dafuer muss der Takt noch laufen. Erst
+    // danach darf Ruhe einkehren — und auch dann nur, wenn die
+    // Mindestgroesse wirklich steht und nichts mehr aufgezogen war.
+    if (seit >= kSettleMinMs && eingeschwungen && nichtsZurueckzunehmen) {
+        stopSettling();
+        return;
+    }
+    // Und irgendwann ist Schluss, damit ein Fenster, dessen
+    // Mindestgroesse nie zur Ruhe kommt, nicht ewig gefangen bleibt.
+    if (seit >= kSettleMaxMs) {
+        stopSettling();
+    }
+}
+
+void LogbookWindow::stopSettling()
+{
+    if (m_settleTimer) { m_settleTimer->stop(); }
+    m_settling = false;
 }
 
 void LogbookWindow::restoreSplitState()
@@ -195,7 +341,30 @@ void LogbookWindow::buildUi()
     setStyleSheet(QStringLiteral("QDialog { background: %1; }")
                       .arg(QString::fromLatin1(Style::kAppBg)));
 
-    auto* col = new QVBoxLayout(this);
+    // ── Eigene Titelleiste, buendig am Rand ──────────────────────────
+    //
+    // Das aeussere Layout traegt KEINE Raender, damit die Leiste von Kante
+    // zu Kante geht wie bei jedem anderen Longpath-Fenster. Die bisherigen
+    // zehn Punkte Rand sitzen jetzt am Inhalt darunter -- `col` bleibt
+    // dadurch genau das, was es vorher war, und alles Folgende
+    // unveraendert.
+    auto* aussen = new QVBoxLayout(this);
+    aussen->setContentsMargins(0, 0, 0, 0);
+    aussen->setSpacing(0);
+
+    m_titleBar = new WindowTitleBar(tr("Logbook"), this);
+    // Das Logbuch gehoert in kein Dock -- das × schliesst, und der
+    // Andockwunsch (Doppelklick auf die Leiste) tut dasselbe, statt ins
+    // Leere zu laufen.
+    connect(m_titleBar, &WindowTitleBar::closeRequested, this, &QDialog::close);
+    connect(m_titleBar, &WindowTitleBar::dockRequested, this, &QDialog::close);
+    m_titleBar->setLockKey(QStringLiteral("Tool_Logbook"));
+    aussen->addWidget(m_titleBar);
+
+    auto* inhalt = new QWidget(this);
+    aussen->addWidget(inhalt, 1);
+
+    auto* col = new QVBoxLayout(inhalt);
     col->setContentsMargins(10, 10, 10, 10);
     col->setSpacing(8);
 
@@ -204,6 +373,8 @@ void LogbookWindow::buildUi()
     // und liessen es nicht schmaler ziehen — die Leiste bricht jetzt in
     // eine zweite Zeile um (Betreiber, 2026-09-21). Das Suchfeld nimmt,
     // was in seiner Zeile uebrig bleibt.
+    buildEntryRow(col);
+
     auto* top = new FlowLayout(nullptr, 6, 6);
     m_search = new QLineEdit(this);
     m_search->setPlaceholderText(
@@ -373,6 +544,10 @@ void LogbookWindow::buildUi()
     // nimmt die Breite des Rollbereichs.
     m_detail = new QsoDetailPane;
     m_detail->setCache(&m_callCache);
+    connect(m_detail, &QsoDetailPane::beamChanged, this, [this](double deg) {
+        m_rotorTargetDeg = deg;
+        applyRotorToMap();
+    });
     auto* detailScroll = new QScrollArea(m_split);
     detailScroll->setWidgetResizable(true);
     detailScroll->setFrameShape(QFrame::NoFrame);
@@ -514,11 +689,27 @@ void LogbookWindow::buildUi()
                                          m_split->saveState());
     });
 
+    // ── Tippen bleibt fluessig (Vorschlag 2026-09-27) ────────────────
+    //
+    // Gemessen mit 9271 QSOs: der erste Buchstabe kostete 243 ms, davon
+    // rund 180 ms das Neuzeichnen der eingebetteten Karte und 34 ms die
+    // Kennzahlen -- die Tabelle selbst 27 ms. Beide folgen dem Filter
+    // jetzt erst, wenn 200 ms lang keine Taste kam; Tabelle und
+    // Statuszeile sofort wie bisher.
+    m_followUpTimer = new QTimer(this);
+    m_followUpTimer->setSingleShot(true);
+    m_followUpTimer->setInterval(200);
+    connect(m_followUpTimer, &QTimer::timeout, this, [this]() {
+        refreshStatsView();
+        refreshMapPanel();
+    });
     connect(m_search, &QLineEdit::textChanged, this, [this]() {
         applyFilter();
         applySort();
         refreshTable();
+        m_deferFollowUp = true;
         updateStats();
+        m_deferFollowUp = false;
     });
 
     // ── Return on a callsign means "tell me about this station" ──────
@@ -535,23 +726,7 @@ void LogbookWindow::buildUi()
     // because "who is this" is a fair question about a station you have
     // never worked, and an empty pane is a poor answer to it.
     connect(m_search, &QLineEdit::returnPressed, this, [this]() {
-        const QString call = Callsigns::normalized(m_search->text());
-        if (call.isEmpty()) { return; }
-
-        for (int row = 0; row < m_visible.size(); ++row) {
-            const int idx = sourceRow(row);
-            if (idx < 0) { continue; }
-            if (Callsigns::normalized(m_all.at(idx).call) != call) {
-                continue;
-            }
-            m_table->setCurrentCell(row, ColCall);
-            m_detail->setEntry(m_all.at(idx));
-            m_detail->lookUpNow();
-            return;
-        }
-
-        if (!Callsigns::isLikelyCallsign(call)) { return; }
-        m_detail->showCallsign(call);
+        showStationFor(m_search->text());
     });
     connect(m_editBtn,   &QPushButton::clicked, this, &LogbookWindow::editSelected);
     connect(m_deleteBtn, &QPushButton::clicked, this, &LogbookWindow::deleteSelected);
@@ -702,6 +877,11 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
         QSignalBlocker b1(m_search), b2(m_bandBox), b3(m_modeBox);
         QSignalBlocker b4(m_gridEdit), b5(m_countryEdit), b6(m_useDates);
         QSignalBlocker b7(m_activationBox);
+        // „Unconfirmed only" kam nach Clear dazu und blieb stehen: die
+        // Tabelle blieb gefiltert, obwohl Clear gedrueckt war (Nachttest
+        // 2026-09-26).
+        QSignalBlocker b8(m_unconfirmedOnly);
+        m_unconfirmedOnly->setChecked(false);
         m_search->clear();
         m_bandBox->setCurrentIndex(0);
         m_modeBox->setCurrentIndex(0);
@@ -1115,8 +1295,13 @@ void LogbookWindow::refreshTable()
 void LogbookWindow::updateStats()
 {
     // The Kennzahlen dialog follows the same view as this status line.
-    refreshStatsView();
-    refreshMapPanel();
+    if (m_deferFollowUp && m_followUpTimer) {
+        m_followUpTimer->start();
+    } else {
+        if (m_followUpTimer) { m_followUpTimer->stop(); }
+        refreshStatsView();
+        refreshMapPanel();
+    }
 
     QSet<QString> calls;
     QSet<QString> bands;
@@ -1338,6 +1523,30 @@ bool LogbookWindow::saveAll()
     return false;
 }
 
+namespace {
+
+// Derselbe Kontakt nach einem modalen Dialog wiederfinden. Waehrend
+// "Edit" oder die Loesch-Rueckfrage offen stehen, laeuft die
+// Ereignisschleife weiter -- ein QSO aus WSJT-X liest das Logbuch neu
+// ein, und m_all ist danach neu sortiert (neuestes zuerst): der alte
+// Index zeigt auf den Nachbarn. Wiedererkannt am ganzen Datensatz,
+// nicht an isSameQso(), das eine Zeittoleranz hat und zwei Kontakte
+// derselben Station kurz hintereinander verwechseln wuerde.
+int indexOfRecord(const QVector<LogEntry>& all, const QString& record,
+                  int hint, const QSet<int>& taken = {})
+{
+    if (hint >= 0 && hint < all.size() && !taken.contains(hint)
+        && all.at(hint).toAdifRecord() == record) {
+        return hint;
+    }
+    for (int i = 0; i < all.size(); ++i) {
+        if (!taken.contains(i) && all.at(i).toAdifRecord() == record) { return i; }
+    }
+    return -1;
+}
+
+} // namespace
+
 void LogbookWindow::editSelected()
 {
     const int view = m_table->currentRow();
@@ -1345,6 +1554,7 @@ void LogbookWindow::editSelected()
     if (idx < 0) { return; }
 
     LogEntry e = m_all.at(idx);
+    const QString original = e.toAdifRecord();
 
     QDialog dlg(this);
     dlg.setWindowTitle(QStringLiteral("Edit %1").arg(e.call));
@@ -1418,7 +1628,24 @@ void LogbookWindow::editSelected()
     connect(box, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
     connect(box, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
 
+    // Was der Dialog beim Oeffnen zeigte. Nur ein Feld, dessen Text sich
+    // davon unterscheidet, wird uebernommen und dabei in Form gebracht --
+    // ein unveraendertes Feld bleibt, wie es in der Datei steht.
+    // Nachttest 2026-09-26: 1495 Kontakte im Betreiber-Log tragen den
+    // Locator in der ueblichen Schreibweise "PL05sa"; wer nur den
+    // Kommentar aenderte, bekam "PL05SA" mitgeschrieben. Ebenso das
+    // Datum: ein Kontakt ohne gueltige Zeit bekaeme sonst still, was das
+    // Feld ohne Wert anzeigt.
+    const QDateTime shownWhen = when->dateTime();
+    QHash<const QLineEdit*, QString> shown;
+    for (const QLineEdit* le : dlg.findChildren<QLineEdit*>()) { shown.insert(le, le->text()); }
+    const auto edited = [&shown](const QLineEdit* le) { return le->text() != shown.value(le); };
+
     if (dlg.exec() != QDialog::Accepted) { return; }
+    // Waehrend des Dialogs neu eingelesen? Dann steht der Kontakt
+    // anderswo -- oder gar nicht mehr.
+    const int at = indexOfRecord(m_all, original, idx);
+    if (at < 0) { return; }
 
     if (call->text().trimmed().isEmpty()) {
         QMessageBox::warning(this, QStringLiteral("Logbook"),
@@ -1426,37 +1653,41 @@ void LogbookWindow::editSelected()
         return;
     }
 
-    e.call         = call->text().trimmed().toUpper();
-    e.timeOn       = when->dateTime();
-    e.band         = band->text().trimmed();
-    e.mode         = mode->text().trimmed().toUpper();
-    e.submode      = submode->text().trimmed().toUpper();
-    e.rstSent      = sent->text().trimmed();
-    e.rstRcvd      = rcvd->text().trimmed();
-    e.gridSquare   = grid->text().trimmed().toUpper();
-    e.myGridSquare = myGrid->text().trimmed().toUpper();
+    if (edited(call))    { e.call         = call->text().trimmed().toUpper(); }
+    if (when->dateTime() != shownWhen) { e.timeOn = when->dateTime(); }
+    if (edited(band))    { e.band         = band->text().trimmed(); }
+    if (edited(mode))    { e.mode         = mode->text().trimmed().toUpper(); }
+    if (edited(submode)) { e.submode      = submode->text().trimmed().toUpper(); }
+    if (edited(sent))    { e.rstSent      = sent->text().trimmed(); }
+    if (edited(rcvd))    { e.rstRcvd      = rcvd->text().trimmed(); }
+    if (edited(grid))    { e.gridSquare   = grid->text().trimmed().toUpper(); }
+    if (edited(myGrid))  { e.myGridSquare = myGrid->text().trimmed().toUpper(); }
 
-    e.mySotaRef.clear();
-    e.myPotaRef.clear();
-    if (const QString mine = myActivation->text().trimmed().toUpper();
-        !mine.isEmpty()) {
-        if (mine.contains(QLatin1Char('/'))) { e.mySotaRef = mine; }
-        else                                 { e.myPotaRef = mine; }
+    if (edited(myActivation)) {
+        e.mySotaRef.clear();
+        e.myPotaRef.clear();
+        if (const QString mine = myActivation->text().trimmed().toUpper();
+            !mine.isEmpty()) {
+            if (mine.contains(QLatin1Char('/'))) { e.mySotaRef = mine; }
+            else                                 { e.myPotaRef = mine; }
+        }
     }
-    e.sotaRef.clear();
-    e.potaRef.clear();
-    if (const QString theirs = theirActivation->text().trimmed().toUpper();
-        !theirs.isEmpty()) {
-        if (theirs.contains(QLatin1Char('/'))) { e.sotaRef = theirs; }
-        else                                   { e.potaRef = theirs; }
+    if (edited(theirActivation)) {
+        e.sotaRef.clear();
+        e.potaRef.clear();
+        if (const QString theirs = theirActivation->text().trimmed().toUpper();
+            !theirs.isEmpty()) {
+            if (theirs.contains(QLatin1Char('/'))) { e.sotaRef = theirs; }
+            else                                   { e.potaRef = theirs; }
+        }
     }
 
-    e.name         = name->text().trimmed();
-    e.qth          = qth->text().trimmed();
-    e.country      = country->text().trimmed();
-    e.comment      = comment->text().trimmed();
+    if (edited(name))    { e.name         = name->text().trimmed(); }
+    if (edited(qth))     { e.qth          = qth->text().trimmed(); }
+    if (edited(country)) { e.country      = country->text().trimmed(); }
+    if (edited(comment)) { e.comment      = comment->text().trimmed(); }
 
-    m_all[idx] = e;
+    m_all[at] = e;
     if (saveAll()) { reload(); }
 }
 
@@ -1466,6 +1697,8 @@ void LogbookWindow::deleteSelected()
     // is being rebuilt underneath is how you remove the wrong contact.
     QList<int> victims = selectedSourceRows();
     if (victims.isEmpty()) { return; }
+    QList<QPair<QString, int>> records;
+    for (int idx : victims) { records.append({m_all.at(idx).toAdifRecord(), idx}); }
 
     const QString question = victims.size() == 1
         ? QStringLiteral("Delete the contact with %1?")
@@ -1478,6 +1711,14 @@ void LogbookWindow::deleteSelected()
         return;
     }
 
+    // Nach der Rueckfrage wiederfinden (siehe indexOfRecord): geloescht
+    // wird, was gefragt wurde, nicht was inzwischen an der Stelle steht.
+    QSet<int> found;
+    for (const auto& [record, hint] : records) {
+        const int at = indexOfRecord(m_all, record, hint, found);
+        if (at >= 0) { found.insert(at); }
+    }
+    victims = QList<int>(found.begin(), found.end());
     std::sort(victims.begin(), victims.end(), std::greater<int>());
     for (int idx : victims) { m_all.removeAt(idx); }
     if (saveAll()) { reload(); }
@@ -1942,6 +2183,8 @@ void LogbookWindow::setMapPanelShown(bool on)
     if (on && !m_mapPanel) {
         m_mapPanel = new QsoMapWindow(this);
         m_mapPanel->setEmbedded(true);
+        m_mapPanel->setRotorRadarShown(true);
+        applyRotorToMap();
         m_split->insertWidget(1, m_mapPanel);
         connect(m_mapPanel, &QsoMapWindow::popOutRequested, this, &LogbookWindow::openMap);
         connect(m_detail, &QsoDetailPane::stationLocated, m_mapPanel,
@@ -2054,6 +2297,341 @@ void LogbookWindow::mergeFetchedEntries(const QString& adif)
     // „hochgeladen" gilt fuer jeden dieser Datensaetze.
     for (LogEntry& e : incoming) { e.uploadedToQrz = true; }
     importEntries(incoming, QStringLiteral("your QRZ logbook"), /*fromQrz*/ true);
+}
+
+
+// ── Eingabezeile "NEW QSO" (2026-09-26) ─────────────────────────────────
+//
+// Betreiber: "ich sehe hier nirgendwo, wo ich das QSO loggen koennte, die
+// Frequenz und die Betriebsart geht auch ab. Ich will dieses auch zum
+// Loggen verwenden." Gewaehlt: Blatt A -- eine Zeile ueber der Suche.
+// Das Rufzeichen filtert zugleich das Log darunter (war er schon da?)
+// und zeigt die Station in der Karteikarte. Enter loggt, Esc leert.
+
+namespace {
+
+// 14215800 -> "14.215.800", wie die Frequenz am Funkgeraet steht.
+QString dottedHz(double hz)
+{
+    const qint64 v = qRound64(hz);
+    const qint64 mhz = v / 1000000;
+    const qint64 khz = (v / 1000) % 1000;
+    const qint64 rest = v % 1000;
+    return QStringLiteral("%1.%2.%3").arg(mhz)
+        .arg(khz, 3, 10, QLatin1Char('0'))
+        .arg(rest, 3, 10, QLatin1Char('0'));
+}
+
+QString chipStyle()
+{
+    return QStringLiteral(
+        "QLabel { background: %1; color: %2; border: 1px solid %3;"
+        " border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: bold; }")
+        .arg(QLatin1String(Style::kGreenBg), QLatin1String(Style::kGreenText),
+             QLatin1String(Style::kGreenBorder));
+}
+
+} // namespace
+
+void LogbookWindow::buildEntryRow(QVBoxLayout* col)
+{
+    auto* row = new FlowLayout(nullptr, 6, 6);
+
+    auto* caption = new QLabel(QStringLiteral("NEW QSO"), this);
+    caption->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: %2px; letter-spacing: 2px; }")
+        .arg(QLatin1String(Style::kTextScale)).arg(Style::kFontCaption));
+    row->addWidget(caption);
+
+    m_entryCall = new QLineEdit(this);
+    m_entryCall->setPlaceholderText(QStringLiteral("callsign"));
+    m_entryCall->setStyleSheet(Style::lineEditStyle());
+    m_entryCall->setFont(Style::monoFont(m_entryCall->font(), 14, QFont::Bold));
+    m_entryCall->setFixedWidth(170);
+    // Fest, nicht "Expanding" (Vorgabe von QLineEdit): sonst gibt das
+    // FlowLayout dem Feld Platz, den es nicht nehmen kann -- eine Luecke.
+    m_entryCall->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    m_entryCall->setToolTip(QStringLiteral(
+        "The station you are working. Filters the log below as you type, "
+        "so you see at once whether and when you worked them before."));
+    row->addWidget(m_entryCall);
+
+    m_entryLive = new QLabel(QStringLiteral("●"), this);
+    row->addWidget(m_entryLive);
+    m_entryFreq = new QLabel(QStringLiteral("—"), this);
+    m_entryFreq->setFont(Style::monoFont(m_entryFreq->font(), 14));
+    m_entryFreq->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                                   .arg(QLatin1String(Style::kTextPrimary)));
+    m_entryFreq->setToolTip(QStringLiteral(
+        "Frequency and mode are taken from the radio when you log"));
+    row->addWidget(m_entryFreq);
+    m_entryMode = new QLabel(this);
+    m_entryMode->setStyleSheet(chipStyle());
+    row->addWidget(m_entryMode);
+    m_entryBand = new QLabel(this);
+    m_entryBand->setStyleSheet(chipStyle());
+    row->addWidget(m_entryBand);
+    m_entrySource = new QLabel(QStringLiteral("from radio"), this);
+    m_entrySource->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                     .arg(QLatin1String(Style::kTextScale)));
+    row->addWidget(m_entrySource);
+
+    auto small = [this](const QString& text) {
+        auto* l = new QLabel(text, this);
+        l->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                             .arg(QLatin1String(Style::kTextScale)));
+        return l;
+    };
+    row->addWidget(small(QStringLiteral("RST S")));
+    m_entryRstS = new QLineEdit(QStringLiteral("59"), this);
+    m_entryRstS->setStyleSheet(Style::lineEditStyle());
+    m_entryRstS->setFixedWidth(52);
+    m_entryRstS->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    row->addWidget(m_entryRstS);
+    row->addWidget(small(QStringLiteral("R")));
+    m_entryRstR = new QLineEdit(QStringLiteral("59"), this);
+    m_entryRstR->setStyleSheet(Style::lineEditStyle());
+    m_entryRstR->setFixedWidth(52);
+    m_entryRstR->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    row->addWidget(m_entryRstR);
+
+    m_entryComment = new QLineEdit(this);
+    m_entryComment->setPlaceholderText(QStringLiteral("comment"));
+    m_entryComment->setStyleSheet(Style::lineEditStyle());
+    m_entryComment->setMinimumWidth(180);
+    m_entryComment->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    row->addWidget(m_entryComment);
+
+    m_entryLogBtn = new QPushButton(QStringLiteral("Log QSO"), this);
+    m_entryLogBtn->setAutoDefault(false);
+    // Die Hauptsache der Zeile: in der Auswahlfarbe, wie ein gedrueckter
+    // Schalter -- dieselbe Flaeche wie "Map"/"Stats" im gedrueckten Zustand.
+    m_entryLogBtn->setStyleSheet(Style::buttonBaseStyle()
+        + QString(Style::blueCheckedStyle()).replace(
+              QStringLiteral("QPushButton:checked"), QStringLiteral("QPushButton")));
+    row->addWidget(m_entryLogBtn);
+
+    m_entryHint = new QLabel(QStringLiteral("Enter logs · Esc clears"), this);
+    m_entryHint->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                   .arg(QLatin1String(Style::kTextScale)));
+    row->addWidget(m_entryHint);
+
+    col->addLayout(row);
+
+    for (QLineEdit* e : {m_entryCall, m_entryRstS, m_entryRstR, m_entryComment}) {
+        e->installEventFilter(this);
+    }
+    connect(m_entryLogBtn, &QPushButton::clicked, this, &LogbookWindow::requestLog);
+
+    // Tippen filtert das Log (Doppelt-Blick) und zeigt die Station nach
+    // einer kurzen Pause in der Karteikarte -- entprellt wie im
+    // Rotor/Log-Feld, damit OE, OE5, OE5V nicht drei Anfragen werden.
+    m_entryLookup = new QTimer(this);
+    m_entryLookup->setSingleShot(true);
+    m_entryLookup->setInterval(700);
+    connect(m_entryLookup, &QTimer::timeout, this, [this]() {
+        const QString call = Callsigns::normalized(m_entryCall->text());
+        if (call.size() >= 3 && Callsigns::isLikelyCallsign(call)) { showStationFor(call); }
+    });
+    connect(m_entryCall, &QLineEdit::textEdited, this, [this](const QString& text) {
+        const QString up = text.toUpper();
+        if (up != text) {
+            const int pos = m_entryCall->cursorPosition();
+            m_entryCall->setText(up);
+            m_entryCall->setCursorPosition(pos);
+        }
+        if (m_search) { m_search->setText(Callsigns::normalized(up)); }
+        m_entryLookup->start();
+        m_entryHint->setText(QStringLiteral("Enter logs · Esc clears"));
+        m_entryHint->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                       .arg(QLatin1String(Style::kTextScale)));
+    });
+
+    refreshRadioReadout();
+}
+
+bool LogbookWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    const bool entryField = watched == m_entryCall || watched == m_entryRstS
+                         || watched == m_entryRstR || watched == m_entryComment;
+    // Erst fragt Qt, ob ein Tastenkuerzel die Taste will. Das Hauptfenster
+    // hat eines auf Esc (Vollbild verlassen) -- im echten Programm kam Esc
+    // deshalb nie im Feld an (Live-Test 2026-09-26; QTest schickt die
+    // Taste direkt und sah es nicht). Die Felder melden Esc und Enter als
+    // ihre eigenen, dann geht die Taste als KeyPress hierher.
+    if (entryField && event->type() == QEvent::ShortcutOverride) {
+        auto* ke = static_cast<QKeyEvent*>(event);
+        if (ke->key() == Qt::Key_Escape || ke->key() == Qt::Key_Return
+            || ke->key() == Qt::Key_Enter) {
+            event->accept();
+            return true;
+        }
+    }
+    if (event->type() == QEvent::KeyPress && entryField) {
+        auto* ke = static_cast<QKeyEvent*>(event);
+        if (ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter) {
+            requestLog();
+            return true;        // nicht an den Dialog: kein Standardknopf
+        }
+        if (ke->key() == Qt::Key_Escape) {
+            clearEntry();
+            return true;        // nicht an den Dialog: Esc schliesst sonst das Logbuch
+        }
+    }
+    return QDialog::eventFilter(watched, event);
+}
+
+void LogbookWindow::setRadio(RadioModel* radio)
+{
+    if (m_radio) { disconnect(m_radio, nullptr, this, nullptr); }
+    m_radio = radio;
+    if (m_radio) {
+        connect(m_radio, &RadioModel::activeSliceChanged,
+                this, [this](int) { rewireSlice(); });
+        connect(m_radio, &RadioModel::connectionStateChanged,
+                this, [this](ConnectionState) { refreshRadioReadout(); });
+    }
+    rewireSlice();
+}
+
+void LogbookWindow::rewireSlice()
+{
+    disconnect(m_sliceFreqConn);
+    disconnect(m_sliceModeConn);
+    if (SliceModel* s = m_radio ? m_radio->activeSlice() : nullptr) {
+        m_sliceFreqConn = connect(s, &SliceModel::frequencyChanged,
+                                  this, [this](double) { refreshRadioReadout(); });
+        m_sliceModeConn = connect(s, &SliceModel::dspModeChanged,
+                                  this, [this](DSPMode) { refreshRadioReadout(); });
+    }
+    refreshRadioReadout();
+}
+
+void LogbookWindow::refreshRadioReadout()
+{
+    if (!m_entryFreq) { return; }
+    SliceModel* s = m_radio ? m_radio->activeSlice() : nullptr;
+    const bool live = s && m_radio->connectionState() == ConnectionState::Connected;
+    m_entryLive->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+        .arg(QString::fromLatin1(live ? Style::kLiveGreen : Style::kTextScale)));
+    if (!s) {
+        m_entryFreq->setText(QStringLiteral("—"));
+        m_entryMode->setVisible(false);
+        m_entryBand->setVisible(false);
+        // Ein Funkgeraet gibt es, nur noch keine Verbindung (und damit
+        // keinen Empfaenger) -- "no radio" waere falsch.
+        m_entrySource->setText(m_radio ? QStringLiteral("radio not connected")
+                                       : QStringLiteral("no radio"));
+        return;
+    }
+    m_entryFreq->setText(dottedHz(s->frequency()));
+    m_entryMode->setText(SliceModel::modeName(s->dspMode()));
+    m_entryMode->setVisible(true);
+    const QString band = bandLabel(bandFromFrequency(s->frequency()));
+    m_entryBand->setText(band);
+    m_entryBand->setVisible(!band.isEmpty());
+    m_entrySource->setText(live ? QStringLiteral("from radio")
+                                : QStringLiteral("radio not connected"));
+}
+
+void LogbookWindow::requestLog()
+{
+    LogEntry e;
+    e.call    = Callsigns::normalized(m_entryCall->text());
+    if (e.call.isEmpty()) {
+        reportLogged(false, QStringLiteral("Enter a callsign to log"));
+        m_entryCall->setFocus();
+        return;
+    }
+    e.rstSent = m_entryRstS->text().trimmed();
+    e.rstRcvd = m_entryRstR->text().trimmed();
+    e.comment = m_entryComment->text().trimmed();
+    // Was QRZ zu genau diesem Rufzeichen weiss -- nicht das Blatt einer
+    // anderen Station, die gerade in der Karteikarte steht.
+    if (m_callCache.contains(e.call)) {
+        const CallsignInfo info = m_callCache.get(e.call);
+        e.name    = info.displayName();
+        e.qth     = info.city;
+        e.country = info.country;
+        if (isValidGridSquare(info.grid.trimmed())) {
+            e.gridSquare = info.grid.trimmed().toUpper();
+        } else if (info.hasLatLon) {
+            e.gridSquare = gridSquareFromLatLon(info.latitude, info.longitude);
+        }
+    }
+    emit logQsoRequested(e);
+}
+
+void LogbookWindow::reportLogged(bool ok, const QString& message)
+{
+    m_entryHint->setText(message);
+    m_entryHint->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+        .arg(QString::fromLatin1(ok ? Style::kGreenText : Style::kAmberWarn)));
+    if (!ok) { return; }
+    const QString call = Callsigns::normalized(m_entryCall->text());
+    // Rufzeichen und Kommentar gehen, die Rapporte bleiben: die naechste
+    // Station wird meist mit denselben gearbeitet (wie im Rotor/Log-Feld).
+    m_entryCall->clear();
+    m_entryComment->clear();
+    if (m_search) { m_search->clear(); }
+    reload();
+    emit logChanged();
+    m_entryCall->setFocus();
+    Q_UNUSED(call);
+}
+
+void LogbookWindow::clearEntry()
+{
+    m_entryLookup->stop();
+    m_entryCall->clear();
+    m_entryComment->clear();
+    if (m_search) { m_search->clear(); }
+    m_entryCall->setFocus();
+}
+
+void LogbookWindow::showStationFor(const QString& raw)
+{
+    const QString call = Callsigns::normalized(raw);
+    if (call.isEmpty()) { return; }
+
+    for (int row = 0; row < m_visible.size(); ++row) {
+        const int idx = sourceRow(row);
+        if (idx < 0) { continue; }
+        if (Callsigns::normalized(m_all.at(idx).call) != call) {
+            continue;
+        }
+        m_table->setCurrentCell(row, ColCall);
+        m_detail->setEntry(m_all.at(idx));
+        m_detail->lookUpNow();
+        return;
+    }
+
+    if (!Callsigns::isLikelyCallsign(call)) { return; }
+    m_detail->showCallsign(call);
+}
+
+
+// ── Rotor im Logbuch (2026-09-26) ───────────────────────────────────────
+
+void LogbookWindow::setRotorBearing(double deg)
+{
+    m_rotorDeg = std::isnan(deg) ? -1.0 : deg;
+    if (m_detail) { m_detail->setRotorBearing(deg); }
+    applyRotorToMap();
+}
+
+void LogbookWindow::setRotorBeamWidth(double deg)
+{
+    m_rotorBeamDeg = deg;
+    applyRotorToMap();
+}
+
+void LogbookWindow::applyRotorToMap()
+{
+    if (!m_mapPanel) { return; }
+    m_mapPanel->setRotorBeamWidth(m_rotorBeamDeg);
+    m_mapPanel->setRotorHeading(m_rotorDeg);
+    m_mapPanel->setRotorTarget(m_rotorTargetDeg);
 }
 
 } // namespace Longpath

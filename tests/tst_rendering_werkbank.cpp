@@ -37,6 +37,7 @@
 
 #include <QFile>
 #include <QXmlStreamReader>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -227,6 +228,25 @@ private slots:
                  w.setSpectrumDetector(SpectrumDetector::Peak);
                  w.setWaterfallDetector(SpectrumDetector::Peak);
              }},
+            // "Kurven mit Hof" (Glas & Tiefe): Martins 2D-Stand in drei
+            // Fassungen -- heute (beide Schalter aus, also der
+            // Werkszustand) / weiche Kante / weiche Kante + Hof. Die
+            // drei Bilder sind die Vorlage, an der er entscheidet.
+            {QStringLiteral("k_kurve_heute"), [martin](SpectrumWidget& w) {
+                 martin(w);
+                 w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
+             }},
+            {QStringLiteral("l_kurve_weich"), [martin](SpectrumWidget& w) {
+                 martin(w);
+                 w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
+                 w.setTraceSoftEdge(true);
+             }},
+            {QStringLiteral("m_kurve_weich_hof"), [martin](SpectrumWidget& w) {
+                 martin(w);
+                 w.setSpectrumRenderMode(SpectrumRenderMode::Mode2D);
+                 w.setTraceSoftEdge(true);
+                 w.setTraceHalo(true);
+             }},
         };
 
         for (const Variant& v : variants) {
@@ -256,7 +276,7 @@ private slots:
             const bool hidden = hiddenMode != 0;
             if (!hidden || hiddenMode == 2) {
                 w.show();
-                QVERIFY(QTest::qWaitForWindowExposed(&w));
+                QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
             }
             if (hiddenMode == 2) {
                 QTest::qWait(300);
@@ -280,7 +300,7 @@ private slots:
             }
             if (hidden) {
                 w.show();
-                QVERIFY(QTest::qWaitForWindowExposed(&w));
+                QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
                 QTest::qWait(300);
             }
             const QImage img = grabSpectrum(w);

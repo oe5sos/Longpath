@@ -90,7 +90,7 @@ namespace MeterBinding {
 
     // RX meters — new (Phase 3G-4)
     constexpr int SignalMaxBin = 7;    // Spectral peak bin
-    constexpr int PbSnr        = 8;    // Peak-to-baseline SNR
+    constexpr int PbSnr        = 8;    // Estimated passband SNR (Thetis ESTIMATED_PBSNR, core/PassbandSnr.h)
 
     // ── Zwei Groessen, die NICHT aus WDSP kommen (2026-08-18) ────────
     //

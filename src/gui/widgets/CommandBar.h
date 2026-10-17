@@ -52,6 +52,9 @@
 // Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
+//   2026-09-28 -- the filter "…" reads FilterPresetStore (Thetis names +
+//                 the operator's own presets), Martin Fischer, OE5SOS,
+//                 AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "core/WdspTypes.h"
@@ -69,6 +72,7 @@ class QPushButton;
 
 namespace Longpath {
 
+class FilterPresetStore;
 class SliceModel;
 
 class CommandBar : public QWidget {
@@ -111,6 +115,35 @@ public:
     /// Leiste nicht auf ihn warten soll.
     void addTrailing(QWidget* w);
 
+    /// Ein Bauteil als eigene Gruppe ans Ende der Gruppen haengen --
+    /// also NACH der Rate und VOR der Dehnung, damit es neben der Rate
+    /// steht und nicht am rechten Rand.
+    ///
+    /// Betreiber am 2026-10-06: „meine profile links im eck sollten oben
+    /// in die taksleite neben 48 khz".
+    void addGroupWidget(const QString& caption, QWidget* w);
+
+    /// Das Gegenstueck: nimmt das Bauteil UND seine Versalzeile wieder
+    /// aus der Leiste. Das Bauteil selbst wird nicht geloescht.
+    void removeGroupWidget(QWidget* w);
+
+    /// Woher das „…" der Filtergruppe seine Vorgaben nimmt: aus dem
+    /// Vorgabenspeicher, also mit den Thetis-Namen („1.0k", „800" …)
+    /// und mit dem, was der Betreiber unter Setup › Filter Presets
+    /// selbst eingetragen hat. Ohne Speicher (Tests, frueher Aufbau)
+    /// die Thetis-Vorgaben selbst. Ein Zeiger auf den Speicher, nicht
+    /// aufs RadioModel — die Leiste kennt sonst nur die Scheibe.
+    void setFilterPresetStore(FilterPresetStore* store);
+
+    /// Was das „…" der Filtergruppe gerade anbietet, in Reihenfolge:
+    /// Name und Kanten. Ohne Scheibe leer.
+    struct FilterMenuEntry {
+        QString name;
+        int     low{0};
+        int     high{0};
+    };
+    QVector<FilterMenuEntry> filterMenuEntries() const;
+
     // ── Für Tests ────────────────────────────────────────────────────
     //
     // Ob die Leiste hübsch ist, kann kein Test sagen. Ob genau eine
@@ -140,19 +173,61 @@ public:
     // „gleich" aussehen sollen und ihre Farben getrennt fuehren, sehen
     // nach dem naechsten Feinschliff wieder verschieden aus.
     static QString pillStyle();
+    /// Dieselbe Pille, nur leise: fuer eine Gruppe, die ohne Funkgeraet
+    /// nichts anzuzeigen hat. Gleiche Masse wie pillStyle(), damit beim
+    /// Verbinden nichts springt -- nur Fuellung, Rand und Schrift
+    /// treten zurueck.
+    static QString pillStyleGedaempft();
 
     static constexpr int kPillHeight = 27;
     static constexpr int kPillRadius = 6;
     /// Sichtbare Einträge je Gruppe, bevor das „…" übernimmt.
     static constexpr int kVisiblePerGroup = 3;
 
+protected:
+    void paintEvent(QPaintEvent* e) override;
+
 private:
+    /// Wo die Dehnung steht -- gesucht, nicht geraten (siehe .cpp).
+    int dehnungsPlatz() const;
+    /// Bauteil -> die Gruppe, in der es steckt (fuer removeGroupWidget).
+    QHash<QWidget*, QLayout*> m_gruppenWidgets;
+
     struct Group {
         QString name;
         QHBoxLayout* row{nullptr};   // wo die Pillen hineinwandern
         QVector<QPushButton*> pills;
         QPushButton* overflow{nullptr};
+        /// Die Versalzeile ueber den Pillen. Gemerkt, damit eine Gruppe
+        /// ohne Inhalt samt ihrer Ueberschrift zuruecktreten kann --
+        /// eine helle Ueberschrift ueber gedaempften Pillen saehe aus
+        /// wie ein halb geladener Zustand.
+        QLabel* caption{nullptr};
     };
+
+    /// ── Die Leiste als Reihe lesbar machen (2026-10-07) ────────────
+    ///
+    /// Betreiber: "suche das, welches am besten harmonisch dazu passt".
+    /// Drei Dinge zusammen, alle drei folgen dem, was im Fenster schon
+    /// gilt:
+    ///
+    ///   Trennstriche  -- jedes andere Bauteil ist eingefasst
+    ///                    (BANDWIDTH FILTER, PANADAPTER, S-METER, TX).
+    ///                    Die Leiste war die einzige Stelle ohne Grenze.
+    ///   Verteilen     -- rechts standen 168 Pixel tot. Dafuer gibt es
+    ///                    im Fenster kein Gegenstueck.
+    ///   Zuruecknehmen -- die "—" bei POWER/SWR/SIGNAL AVERAGE stehen
+    ///                    gedaempft da. FILTER und RATE schrien dagegen
+    ///                    in voller Helligkeit "hier ist nichts".
+    void verteileGruppen();
+    void zieheLeereGruppenZurueck();
+    /// Hat die Gruppe ohne Funkgeraet nichts zu zeigen? Nicht statisch,
+    /// weil RATE seinen Wert in einem eigenen Schild traegt und nicht
+    /// in Pillen.
+    bool gruppeIstLeer(const Group& g) const;
+    /// Die Gruppenkaesten in der Reihenfolge der Reihe. Alles andere
+    /// darin (Dehnungen, das angehaengte Plus) faellt heraus.
+    QVector<QLayout*> gruppenKaesten() const;
 
     Group* group(const QString& name);
     const Group* group(const QString& name) const;
@@ -193,6 +268,8 @@ private:
     void askForCustomFilter();
     /// Wie eine Breite in der Leiste heisst: „2.9k" statt „-2900…-100".
     static QString filterLabel(int low, int high);
+    /// Die Pille des laufenden Filters: Name der Vorgabe oder Breite.
+    QString runningFilterLabel(int low, int high) const;
     /// Die drei Breiten, die vorne stehen (Einstellung
     /// „CommandBarFilterFront", Vorgabe 2700,2900,3500 Hz).
     static QVector<int> frontWidthsHz();
@@ -216,6 +293,7 @@ private:
     bool m_rateWarn{false};
     int m_rateMismatchSeconds{0};
     QPointer<SliceModel> m_slice;
+    QPointer<FilterPresetStore> m_presetStore;
     QList<QMetaObject::Connection> m_links;
 
     // Der vollständige Rest, den das „…" anbietet.

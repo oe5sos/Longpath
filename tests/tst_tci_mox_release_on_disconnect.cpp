@@ -180,10 +180,19 @@ void TestTciMoxReleaseOnDisconnect::the_release_follows_the_last_client_that_key
     QVERIFY(connectClient(second, server));
     QTRY_COMPARE_WITH_TIMEOUT(server.clientCount(), 2, 2000);
 
+    // Auf den Server warten, nicht schlafen: auf einem ausgelasteten
+    // CI-Rechner hatte er "trx:0,true" vom zweiten nach 50 ms noch nicht
+    // verarbeitet, der erste galt noch als Taster und sein Abriss loeste
+    // den Sender (2026-09-27, macOS-Laeufer). Die Server-Seite eines
+    // Clients erkennt man an dessen lokalem Port.
+    auto ownerPort = [&server]() -> quint16 {
+        QWebSocket* o = server.moxOwnerForTest();
+        return o ? o->peerPort() : quint16(0);
+    };
     first.sendTextMessage(QStringLiteral("trx:0,true;"));
-    QTest::qWait(50);
+    QTRY_COMPARE_WITH_TIMEOUT(ownerPort(), first.localPort(), 2000);
     second.sendTextMessage(QStringLiteral("trx:0,true;"));
-    QTest::qWait(50);
+    QTRY_COMPARE_WITH_TIMEOUT(ownerPort(), second.localPort(), 2000);
 
     first.abort();
     QTRY_COMPARE_WITH_TIMEOUT(server.clientCount(), 1, 2000);

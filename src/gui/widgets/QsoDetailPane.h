@@ -108,6 +108,9 @@ signals:
     void stationLocated(const QString& call, double lat, double lon,
                         const QString& caption);
     void editRequested();
+    // Die Richtung zur gezeigten Station, sobald sie sich aendert (-1 =
+    // keine). Fuer das Rotor-Radar neben der Karte (2026-09-26).
+    void beamChanged(double bearingDeg);
 
 private:
     void buildUi();
@@ -161,6 +164,14 @@ private:
 
     double m_rotorDeg{0.0};
     bool   m_haveRotor{false};
+
+    // Die Peilung, die refreshBeam() gerade zeigt und die Drehknoepfe
+    // schicken. Aus der genauesten Lage, die da ist (siehe beamNow()).
+    double m_beamDeg{0.0};
+    bool   m_haveBeam{false};
+    // Peilung und Entfernung von hier zur Station, aus QRZ-Koordinaten
+    // vor dem Locator, und nicht aus dem Wert im Log.
+    bool beamNow(double& bearingDeg, double& km) const;
 };
 
 } // namespace Longpath

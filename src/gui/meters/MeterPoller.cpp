@@ -376,6 +376,13 @@ void MeterPoller::poll()
         if (bindingId == MeterBinding::SignalAvg) {
             smeterDbm = value;   // post-offset; matches VfoWidget expectation
         }
+        // From Thetis Console/console.cs:46844 [@852bf0e] (2026-09-27):
+        //   _RX1MeterValues[Reading.AGC_GAIN] = 0 - WDSP.CalculateRXMeter(.., AGC_GAIN);
+        // Die Skala (-50..125, ItemGroup::createAgcGainBarPreset) ist die
+        // von Thetis und erwartet diesen Wert.
+        if (bindingId == MeterBinding::AgcGain) {
+            value = 0 - value;
+        }
         dispatch(bindingId, value);
     }
 

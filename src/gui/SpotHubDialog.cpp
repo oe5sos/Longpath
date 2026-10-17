@@ -111,6 +111,7 @@
 #include "core/AppSettings.h"
 #include "core/DxClusterClient.h"
 #include "core/DxccColorProvider.h"
+#include "gui/DxccSpotColours.h"
 #include "core/DxSpot.h"
 #include "core/FreeDVReporterClient.h"
 #include "core/PotaAlertsClient.h"
@@ -207,7 +208,7 @@ constexpr const char* kConsoleStyle =
     "QPlainTextEdit {"
     "  background: #0a0a14;"
     "  color: #8aa8c0;"
-    "  font-family: monospace;"
+    "  font-family: " LP_MONO_QSS ";"
     "  font-size: 11px;"
     "  border: 1px solid #203040;"
     "  padding: 4px;"
@@ -3357,6 +3358,27 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
         save("IsSpotsEnabled", on ? "True" : "False");
     });
     grid->addWidget(spotsToggle, row++, 1, Qt::AlignLeft);
+
+    // DXCC-Farben (2026-09-27): neues Land, neues Band/Betriebsart --
+    // gegen das eigene Logbuch. Farben: DxccSpotColours.h.
+    grid->addWidget(new QLabel("DXCC colours:"), row, 0);
+    const bool dxccOn = dxccColoringEnabled();
+    auto* dxccToggle = new QPushButton(dxccOn ? "Enabled" : "Disabled");
+    dxccToggle->setObjectName("displayDxccToggle");
+    dxccToggle->setCheckable(true);
+    dxccToggle->setChecked(dxccOn);
+    dxccToggle->setFixedWidth(80);
+    dxccToggle->setToolTip(
+        "Colour spots against your logbook: amber for a new country, "
+        "muted brass for a new band or mode. Stations you have already "
+        "worked keep their normal colour.");
+    dxccToggle->setStyleSheet(kToggleStyle);
+    connect(dxccToggle, &QPushButton::toggled, this,
+            [dxccToggle, save](bool on) {
+        dxccToggle->setText(on ? "Enabled" : "Disabled");
+        save(QString::fromLatin1(kDxccColoringKey), on ? "True" : "False");
+    });
+    grid->addWidget(dxccToggle, row++, 1, Qt::AlignLeft);
 
     // Memories: Enabled/Disabled. Upstream :74-89 [@0cd4559].
     grid->addWidget(new QLabel("Memories:"), row, 0);

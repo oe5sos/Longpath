@@ -269,7 +269,38 @@ void TxWorkerThread::startPump()
     qCInfo(lcTxWorker) << "startPump: launching worker thread"
                        << "blockFrames=" << kBlockFrames
                        << "(semaphore-wake, fexchange0)";
-    QThread::start(QThread::HighPriority);
+    // Ohne ausdrueckliche Qt-Prioritaet starten -- genau wie der
+    // Empfangs-Faden (RadioModel: m_dspThread->start()).
+    //
+    // Hier stand `QThread::start(QThread::HighPriority)`, und das hat die
+    // Erhoehung weiter unten in run() AUFGEHOBEN statt sie zu ergaenzen.
+    // Qt setzt auf macOS fuer eine ausdrueckliche Prioritaet die
+    // Ablaufparameter des Fadens, und Darwin verweigert danach jede
+    // QoS-Klasse: `pthread_set_qos_class_self_np` gibt EPERM zurueck, und
+    // der Faden bleibt auf QOS_CLASS_UNSPECIFIED stehen.
+    //
+    // Am 2026-10-03 nachgemessen (drei Faeden, sonst gleich):
+    //
+    //   start()                      set() -> 0   QoS danach = 0x21 (USER_INTERACTIVE)
+    //   start(HighPriority)          set() -> 1   QoS danach = 0x00 (UNSPECIFIED)
+    //   start(TimeCriticalPriority)  set() -> 1   QoS danach = 0x00
+    //
+    // In Martins Betriebslog steht genau das als eine Zeile:
+    //   WRN: pthread_set_qos_class_self_np(USER_INTERACTIVE) failed;
+    //        thread continues at default QoS.
+    //
+    // Damit lief der Sende-Faden seit Einfuehrung der Prioritaet ohne die
+    // Behandlung, die der Kommentar unten ausdruecklich haben will -- und
+    // zwar auf der Seite, auf der es auf die Luft geht.
+    //
+    // Was `elevateAudioThreadPriority()` stattdessen tut, ist auf jeder
+    // Plattform staerker als Qts Prioritaet: macOS QoS USER_INTERACTIVE +
+    // os_workgroup des Ausgabegeraets, Linux SCHED_FIFO, Windows MMCSS
+    // "Pro Audio". Sollte der Linux-Zweig einmal zu schwach sein (SCHED_FIFO
+    // scheitert ohne CAP_SYS_NICE), gehoert ein Rueckfall DORTHIN -- an eine
+    // Stelle, fuer beide Faeden -- und nicht als Prioritaetsangabe an einen
+    // von beiden, die auf macOS still das Gegenteil bewirkt.
+    QThread::start();
 }
 
 void TxWorkerThread::stopPump()

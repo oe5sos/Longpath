@@ -20,6 +20,7 @@
 // no-port-check: Longpath-original test file.
 
 #include <QtTest>
+#include "core/ZeitUtc.h"
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <vector>
@@ -33,7 +34,7 @@ namespace {
 IqRecordingInfo someRecording()
 {
     IqRecordingInfo i;
-    i.utcStart  = QDateTime(QDate(2026, 8, 25), QTime(23, 0), Qt::UTC);
+    i.utcStart  = Longpath::Zeit::utc(QDate(2026, 8, 25), QTime(23, 0));
     i.frequency = QStringLiteral("10.136.000");
     i.mode      = QStringLiteral("USB");
     i.band      = QStringLiteral("30m");

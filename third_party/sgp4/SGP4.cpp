@@ -1431,11 +1431,19 @@ namespace SGP4Funcs
 		satrec.error = 0;
 		satrec.operationmode = opsmode;
 		// new alpha5 or 9-digit number
+		// Longpath local patch (2026-09-27): twoline2rv passes satrec.satnum
+		// itself as satn, and a copy onto the same buffer is undefined
+		// behaviour (AddressSanitizer: strcpy-param-overlap). The self-copy is
+		// skipped; any other caller still gets its number copied. Only change
+		// to this file -- see docs/attribution/SGP4-PROVENANCE.md.
+		if (satn != satrec.satnum)
+		{
 		#ifdef _MSC_VER
 						   strcpy_s(satrec.satnum, 6 * sizeof(char), satn);
 		#else
 						   strcpy(satrec.satnum, satn);
 		#endif
+		}
 
 		// sgp4fix - note the following variables are also passed directly via satrec.
 		// it is possible to streamline the sgp4init call by deleting the "x"

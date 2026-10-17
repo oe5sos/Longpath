@@ -9,16 +9,25 @@
 // Modification history (Longpath):
 //   2026-08-15 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
+//   2026-09-28 -- the filter "…" reads FilterPresetStore (Thetis names +
+//                 the operator's own presets), Martin Fischer, OE5SOS,
+//                 AI-assisted via Anthropic Claude.
+//   2026-09-28 -- the running-filter pill says the preset name when the
+//                 filter is a preset (same rule as the RX applet).
 // =================================================================
 
 #include "gui/widgets/CommandBar.h"
 
+#include "gui/ScopedChildWidget.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/DspQuickPopups.h"
 #include "core/AppSettings.h"
+#include "models/FilterPresetStore.h"
 #include "models/SliceModel.h"
 
 #include <QHBoxLayout>
+#include <QPainter>
+#include <QStyleOption>
 #include <QInputDialog>
 #include <QLabel>
 #include <QMenu>
@@ -124,7 +133,194 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     buildStepGroup(row);
     buildNrGroup(row);
     buildRateGroup(row);
-    row->addStretch(1);
+    verteileGruppen();
+    zieheLeereGruppenZurueck();
+}
+
+// ── Die leise Pille (2026-10-07) ─────────────────────────────────────
+//
+// Gleiche Masse wie pillStyle(), damit beim Verbinden nichts springt:
+// derselbe Innenabstand, dieselbe min-/max-Hoehe. Nur Fuellung, Rand
+// und Schrift treten zurueck. Kein Verlauf -- "Glas & Tiefe" heisst
+// erhaben, und etwas, das gerade nichts kann, soll nicht erhaben sein.
+QString CommandBar::pillStyleGedaempft()
+{
+    return QStringLiteral(
+        "QPushButton {"
+        "  background: %1;"
+        "  border: 1px solid %2;"
+        "  color: %3; font-size: 11px; font-weight: 600;"
+        "  padding: 0 11px; min-height: %4px; max-height: %4px;"
+        "  border-radius: %5px;"
+        "}"
+        "QPushButton:hover { color: %6; border: 1px solid %7; }")
+        .arg(QString::fromLatin1(Style::kPanelBg),
+             QString::fromLatin1(Style::kBorderSubtle),
+             QString::fromLatin1(Style::kTextScale))
+        .arg(CommandBar::kPillHeight)
+        .arg(CommandBar::kPillRadius)
+        .arg(QString::fromLatin1(Style::kTextSecondary),
+             QString::fromLatin1(Style::kBorder));
+}
+
+void CommandBar::addGroupWidget(const QString& caption, QWidget* w)
+{
+    if (!w || !m_row) { return; }
+    // Wie addGroup(): Versalzeile oben, Inhalt darunter -- damit das
+    // Bauteil auf derselben Linie sitzt wie die Pillen daneben und die
+    // Ueberschrift mit BAND/MODE/FILTER/RATE fluchtet.
+    auto* box = new QVBoxLayout;
+    box->setContentsMargins(0, 0, 0, 0);
+    box->setSpacing(5);
+    box->addWidget(captionLabel(caption, this), 0, Qt::AlignLeft);
+    box->addWidget(w, 0, Qt::AlignLeft);
+    m_row->insertLayout(dehnungsPlatz(), box);
+    m_gruppenWidgets.insert(w, box);
+    verteileGruppen();
+}
+
+int CommandBar::dehnungsPlatz() const
+{
+    // Die Stelle der Dehnung SUCHEN, nicht raten.
+    //
+    // Hier stand m_row->count() - 1 mit der Begruendung "buildGroups()
+    // haengt sie als letztes an". Das stimmt nur, solange niemand
+    // addTrailing() gerufen hat -- das haengt WEITER hinten an. Danach
+    // ist das letzte Element der Plus-Knopf, und die Gruppe landete
+    // zwischen Dehnung und Plus, also ganz rechts statt neben der Rate.
+    //
+    // Am 2026-10-07 beim Gegenlesen gefunden: schon der erste Wechsel von
+    // links zurueck in die Leiste setzte die Abzeichen an den rechten
+    // Rand, weil das Plus beim Aufbau laengst angehaengt war.
+    // 2026-10-07, zweite Fassung: seit verteileGruppen() steht zwischen
+    // JEDEM Gruppenpaar eine Dehnung. "Die erste Dehnung" waere jetzt
+    // die zwischen BAND und MODE -- die Profile landeten gleich hinter
+    // dem Band. Also nicht mehr nach der Dehnung suchen, sondern nach
+    // der letzten Gruppe: dort gehoert eine neue Gruppe hin, und das
+    // bleibt richtig, wie viele Dehnungen auch dazwischenstehen.
+    if (!m_row) { return 0; }
+    for (int i = m_row->count() - 1; i >= 0; --i) {
+        if (m_row->itemAt(i) && m_row->itemAt(i)->layout()) { return i + 1; }
+    }
+    // Keine Gruppe da: ganz nach vorne. NICHT ans Ende -- dort haengt
+    // schon das Plus, und dahinter waere wieder der rechte Rand.
+    return 0;
+}
+
+QVector<QLayout*> CommandBar::gruppenKaesten() const
+{
+    QVector<QLayout*> k;
+    if (!m_row) { return k; }
+    for (int i = 0; i < m_row->count(); ++i) {
+        QLayoutItem* it = m_row->itemAt(i);
+        if (it && it->layout()) { k.append(it->layout()); }
+    }
+    return k;
+}
+
+// ── Die Gruppen ueber die Breite verteilen ───────────────────────────
+//
+// Vorher: eine einzige Dehnung ganz hinten. Folge: alle Gruppen klebten
+// links zusammen, und rechts standen 168 Pixel tot, in denen allein das
+// Plus schwebte.
+//
+// Jetzt eine Dehnung hinter jeder Gruppe, die nicht das letzte Element
+// der Reihe ist. Damit verteilt Qt den uebrigen Platz gleichmaessig --
+// und wenn das Fenster schmal wird, schrumpfen alle Dehnungen auf null,
+// und es bleibt beim Grundabstand von 22. Eine gerechnete Weite haette
+// bei schmalem Fenster ueberlaufen; eine Dehnung kann das nicht.
+//
+// Die letzte Gruppe bekommt bewusst eine Dehnung, SOLANGE hinter ihr
+// noch das Plus haengt -- das schiebt das Plus an den rechten Rand, wo
+// es hingehoert. Haengt nichts dahinter, bekommt sie keine, sonst
+// ruecke alles nach links und die Verteilung waere dahin.
+void CommandBar::verteileGruppen()
+{
+    if (!m_row) { return; }
+
+    for (int i = m_row->count() - 1; i >= 0; --i) {
+        QLayoutItem* it = m_row->itemAt(i);
+        if (it && it->spacerItem()) { delete m_row->takeAt(i); }
+    }
+
+    QVector<int> kaesten;
+    for (int i = 0; i < m_row->count(); ++i) {
+        QLayoutItem* it = m_row->itemAt(i);
+        if (it && it->layout()) { kaesten.append(i); }
+    }
+    const int letztes = m_row->count() - 1;
+    for (int k = kaesten.size() - 1; k >= 0; --k) {
+        const int i = kaesten.at(k);
+        if (i == letztes) { continue; }
+        m_row->insertStretch(i + 1, 1);
+    }
+}
+
+void CommandBar::removeGroupWidget(QWidget* w)
+{
+    // Das Gegenstueck zu addGroupWidget. Ohne das blieb die Versalzeile
+    // ("PROFIL") samt leerem Teil-Layout in der Leiste stehen, wenn das
+    // Bauteil wegging -- und beim naechsten Hinzufuegen kam eine zweite
+    // dazu. Nach drei Wechseln standen drei Ueberschriften nebeneinander
+    // (2026-10-07 offscreen nachgemessen).
+    if (!w || !m_row) { return; }
+    const auto it = m_gruppenWidgets.constFind(w);
+    if (it == m_gruppenWidgets.constEnd()) { return; }
+    QLayout* box = it.value();
+    m_gruppenWidgets.erase(it);
+    if (!box) { return; }
+    // Das Bauteil selbst gehoert dem Aufrufer -- nur aus der Anordnung
+    // nehmen, nicht loeschen. Alles andere darin (die Versalzeile) ist
+    // unser und geht mit.
+    box->removeWidget(w);
+    while (QLayoutItem* item = box->takeAt(0)) {
+        delete item->widget();
+        delete item;
+    }
+    m_row->removeItem(box);
+    delete box;
+    verteileGruppen();
+}
+
+// ── Die Trennstriche ─────────────────────────────────────────────────
+//
+// Jedes andere Bauteil im Fenster ist eingefasst: BANDWIDTH FILTER,
+// PANADAPTER, S-METER, TX, FREQUENZ, ROTOR/LOG -- alle mit Rahmen und
+// Versalzeile. Die Kommandoleiste war die einzige Stelle, an der
+// Gruppen ueberhaupt keine Grenze hatten; vierundzwanzig fast gleiche
+// Pillen in einer Reihe, und das Auge hat keinen Halt.
+//
+// Der Haarstrich ist die leiseste Form derselben Aussage. kGlassEdgeLight
+// ist dafuer die Hausfarbe (Lichtkante auf kBorder) -- kein neuer Ton.
+//
+// Gezeichnet, nicht gebaut: ein Strich-Widget waere ein weiteres Element
+// in der Reihe, an dem dehnungsPlatz(), addGroupWidget() und
+// removeGroupWidget() vorbeizielen koennten.
+void CommandBar::paintEvent(QPaintEvent* e)
+{
+    // Erst das Stilblatt zeichnen lassen -- die Leiste traegt
+    // WA_StyledBackground, und ohne diesen Aufruf bliebe ihr Grund leer.
+    QStyleOption opt;
+    opt.initFrom(this);
+    QPainter p(this);
+    style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
+    QWidget::paintEvent(e);
+
+    const QVector<QLayout*> k = gruppenKaesten();
+    if (k.size() < 2) { return; }
+
+    p.setPen(QPen(QColor(QString::fromLatin1(Style::kGlassEdgeLight)), 1));
+    for (int i = 0; i + 1 < k.size(); ++i) {
+        const QRect a = k.at(i)->geometry();
+        const QRect b = k.at(i + 1)->geometry();
+        if (!a.isValid() || !b.isValid()) { continue; }
+        // Genau in die Mitte der Luecke. Am Rand einer Gruppe klebend
+        // waere er ihr Rahmen und gehoerte dann auch ringsum.
+        const int x = (a.right() + b.left()) / 2;
+        const int oben  = qMin(a.top(), b.top());
+        const int unten = qMax(a.bottom(), b.bottom());
+        p.drawLine(x, oben, x, unten);
+    }
 }
 
 void CommandBar::addTrailing(QWidget* w)
@@ -134,6 +330,10 @@ void CommandBar::addTrailing(QWidget* w)
     // dahinter. Die Ausrichtung unten hält das Plus auf einer Linie mit
     // den Pillen und nicht mit den Versalzeilen darüber.
     m_row->addWidget(w, 0, Qt::AlignBottom);
+    // Erst jetzt steht fest, dass hinter der letzten Gruppe noch etwas
+    // haengt -- sie braucht also doch eine Dehnung, damit das Plus an
+    // den rechten Rand wandert. Siehe verteileGruppen().
+    verteileGruppen();
 }
 
 // ── Gruppen bauen ────────────────────────────────────────────────────
@@ -144,7 +344,8 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
     auto* box = new QVBoxLayout;
     box->setContentsMargins(0, 0, 0, 0);
     box->setSpacing(5);
-    box->addWidget(captionLabel(caption, this), 0, Qt::AlignLeft);
+    QLabel* versal = captionLabel(caption, this);
+    box->addWidget(versal, 0, Qt::AlignLeft);
 
     auto* pills = new QHBoxLayout;
     pills->setContentsMargins(0, 0, 0, 0);
@@ -152,10 +353,54 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
     box->addLayout(pills);
     row->addLayout(box);
 
-    auto* g = new Group{caption, pills, {}, nullptr};
+    auto* g = new Group{caption, pills, {}, nullptr, versal};
     m_groups.append(g);
     return *g;
 }
+
+namespace {
+
+// ── Die Pille darf nie schmaler sein als ihre Schrift ────────────────
+//
+// „advance + 20" stand hier seit dem 2026-08-23 und war damals
+// richtig. Seit „Glas & Tiefe" (2026-09-17) tragen die Pillen aber
+// Rand und Polsterung aus dem Stylesheet, und die zwanzig Punkte
+// decken das nicht mehr. Gemessen am laufenden Programm (2026-10-15,
+// Fenster 796 px): JEDE Pille stand genau auf ihrer gesetzten
+// Mindestbreite, und die lag durchweg VIER Punkte unter dem, was Qt
+// selbst als minimumSizeHint ausrechnet. Darum las sich „40m" als
+// „40", „LSB" als „LSI" und „NR1" als „NR" — derselbe Fehler wie
+// damals, nur vier Punkte statt vieler.
+//
+// Also nicht mehr selbst rechnen, sondern das Groessere von beidem
+// nehmen: die eigene Schaetzung UND Qts Bedarf, der Rand und
+// Polsterung des Stylesheets kennt. ensurePolished() davor, sonst
+// antwortet der Hinweis noch ohne Stylesheet.
+void setzeMindestbreite(QPushButton* b, const QString& label)
+{
+    if (!b) { return; }
+    b->ensurePolished();
+
+    // Mit DER Schrift rechnen, die das Stylesheet setzt, nicht mit der
+    // des Widgets: pillStyle() sagt font-size: 11px und font-weight:
+    // 600. b->fontMetrics() antwortet dagegen fuer die geerbte Schrift
+    // und kommt zu klein heraus — der zweite Grund, warum die Pillen
+    // zu schmal blieben.
+    QFont schrift = b->font();
+    schrift.setPixelSize(11);
+    schrift.setWeight(QFont::DemiBold);
+
+    // Und mit DEM Beiwerk, das dasselbe Stylesheet verlangt:
+    // padding 0 11px auf beiden Seiten, dazu 1px Rand. Macht 24 statt
+    // der alten 20. Zwei Punkte Luft obendrauf, damit Kantenglaettung
+    // und Sperrung nicht an der Kante kratzen.
+    const int ausDerSchrift =
+        QFontMetrics(schrift).horizontalAdvance(label) + 24 + 2;
+    const int ausDemStil = b->minimumSizeHint().width();
+    b->setMinimumWidth(qMax(ausDerSchrift, ausDemStil));
+}
+
+} // namespace
 
 QPushButton* CommandBar::addPill(Group& g, const QString& label)
 {
@@ -166,7 +411,7 @@ QPushButton* CommandBar::addPill(Group& g, const QString& label)
 
     // ── Keine Pille schmaler als ihre Schrift ───────────────────────
     //
-    // Am 2026-08-23 live gesehen, nachdem die BAND-Gruppe dazukam:
+// Am 2026-08-23 live gesehen, nachdem die BAND-Gruppe dazukam:
     // aus "10 Hz" wurde "I0 Hz", aus "100 Hz" wurde "00 H". Die
     // Anordnung hatte keinen Platz mehr und hat die Pillen unter ihre
     // eigene Schrift gequetscht — eine halb gelesene Schrittweite ist
@@ -175,10 +420,58 @@ QPushButton* CommandBar::addPill(Group& g, const QString& label)
     // Mindestbreite aus der Schriftmetrik plus Innenabstand: darunter
     // darf die Anordnung nicht. Wird es zu eng, muss sich etwas
     // anderes ruehren (die Leiste rollt), nicht die Beschriftung.
-    b->setMinimumWidth(b->fontMetrics().horizontalAdvance(label) + 20);
+    setzeMindestbreite(b, label);
     g.pills.append(b);
     if (g.row) { g.row->addWidget(b); }
     return b;
+}
+
+// ── Ohne Funkgeraet tritt eine leere Gruppe zurueck ──────────────────
+//
+// Die Regel steht schon im Fenster: POWER, SWR und SIGNAL AVERAGE
+// zeigen ihre "—" gedaempft. FILTER und RATE taten es nicht -- drei
+// helle Pillen mit einem Strich darin sehen nicht nach "noch nichts"
+// aus, sondern nach kaputt.
+//
+// Die Masse bleiben gleich (siehe pillStyleGedaempft), es springt also
+// nichts, wenn das Geraet kommt.
+bool CommandBar::gruppeIstLeer(const Group& g) const
+{
+    // RATE traegt seinen Wert in einem eigenen Schild, nicht in Pillen
+    // -- ohne diese Abzweigung waere die Gruppe immer "leer", auch mit
+    // "48 kHz" darin.
+    if (g.pills.isEmpty()) {
+        return !m_rateLabel || m_rateLabel->text() == QStringLiteral("—");
+    }
+    for (QPushButton* b : g.pills) {
+        if (!b) { continue; }
+        const QString t = b->text();
+        // Das "…" ist kein Inhalt, es ist der Weg zu mehr davon.
+        if (t == QStringLiteral("…") || t == QStringLiteral("—")) { continue; }
+        return false;
+    }
+    return true;
+}
+
+void CommandBar::zieheLeereGruppenZurueck()
+{
+    for (Group* g : m_groups) {
+        if (!g) { continue; }
+        const bool leer = gruppeIstLeer(*g);
+        for (QPushButton* b : g->pills) {
+            if (b) { b->setStyleSheet(leer ? pillStyleGedaempft() : pillStyle()); }
+        }
+        if (g->caption) {
+            // Zurueck auf kTextScale, nicht auf einen leeren Stil:
+            // captionLabel() setzt die Farbe selbst, und ein leeres
+            // Stilblatt haette die Versalzeile auf die Vorgabefarbe
+            // gestellt -- heller als vorher statt gleich.
+            g->caption->setStyleSheet(
+                QStringLiteral("QLabel { color: %1; }")
+                    .arg(QString::fromLatin1(leer ? Style::kBorderMuted
+                                                  : Style::kTextScale)));
+        }
+    }
 }
 
 void CommandBar::setActive(Group& g, const QString& label)
@@ -297,12 +590,18 @@ void CommandBar::addOverflow(Group& g, const QVector<Entry>& all, Apply apply)
     auto* more = new QPushButton(QStringLiteral("…"), this);
     more->setStyleSheet(pillStyle());
     more->setCursor(Qt::PointingHandCursor);
-    more->setToolTip(QStringLiteral("Alle %1 anzeigen").arg(all.size()));
+    more->setToolTip(tr("Show all %1").arg(all.size()));
     g.overflow = more;
     if (g.row) { g.row->addWidget(more); }
 
     connect(more, &QPushButton::clicked, this, [this, all, apply]() {
-        QMenu m(this);
+        // Am Fenster, nicht an der Leiste: die Leiste (oder ihr Elternteil)
+        // hat ein eigenes natives Fenster, und ein Menue daran bekam von Qt
+        // keinen Fensterbezug -- „QWidgetClassWindow must be a top level
+        // window." im Protokoll vom 2026-09-29, jedesmal kurz vor einem
+        // Bandwechsel. Wie ProfileRail (2552eadc).
+        ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        QMenu& m = *menuOwner.get();
         for (const auto& e : all) {
             QAction* a = m.addAction(e.first);
             connect(a, &QAction::triggered, this,
@@ -386,20 +685,62 @@ void CommandBar::buildFilterGroup(QHBoxLayout* row)
 
     connect(more, &QPushButton::clicked, this, [this]() {
         if (!m_slice) { return; }
-        QMenu m(this);
-        const auto all = SliceModel::presetsForMode(m_slice->dspMode());
-        for (const auto& pr : all) {
-            const int low = pr.first, high = pr.second;
-            QAction* a = m.addAction(filterLabel(low, high));
+        ScopedChildWidget<QMenu> menuOwner(window());   // am Fenster, siehe addOverflow()
+        QMenu& m = *menuOwner.get();
+        // Beschriftet mit dem NAMEN der Vorgabe, wie Thetis' Knoepfe —
+        // nicht mit der aus den Kanten gerechneten Breite: CW F10 ist
+        // ±13 Hz, also 26 Hz breit, und heisst in Thetis „25".
+        for (const FilterMenuEntry& e : filterMenuEntries()) {
+            const int low = e.low, high = e.high;
+            QAction* a = m.addAction(e.name);
             connect(a, &QAction::triggered, this,
                     [this, low, high]() { pushFilterToModel(low, high); });
         }
         m.addSeparator();
-        QAction* own = m.addAction(QStringLiteral("Eigene Breite…"));
+        QAction* own = m.addAction(tr("Own width…"));
         connect(own, &QAction::triggered, this,
                 [this]() { askForCustomFilter(); });
         m.exec(QCursor::pos());
     });
+}
+
+void CommandBar::setFilterPresetStore(FilterPresetStore* store)
+{
+    m_presetStore = store;
+}
+
+QVector<CommandBar::FilterMenuEntry> CommandBar::filterMenuEntries() const
+{
+    QVector<FilterMenuEntry> out;
+    if (!m_slice) { return out; }
+    const DSPMode mode = m_slice->dspMode();
+    if (m_presetStore) {
+        for (const FilterPreset& p : m_presetStore->presetsForMode(mode)) {
+            out.append({p.name, p.low, p.high});
+        }
+        return out;
+    }
+    const auto edges = SliceModel::presetsForMode(mode);
+    const QStringList names = SliceModel::presetNamesForMode(mode);
+    for (int i = 0; i < edges.size(); ++i) {
+        out.append({names.value(i, filterLabel(edges[i].first, edges[i].second)),
+                    edges[i].first, edges[i].second});
+    }
+    return out;
+}
+
+/// Was die Pille des LAUFENDEN Filters sagt: der Name der Vorgabe, wenn er
+/// eine ist, sonst die Breite. Dieselbe Regel wie im RX-Applet
+/// (RxApplet::updateFilterLabel, dort mit dem Thetis-Bezug) — sonst
+/// stuende oben „26" und rechts „25" fuer denselben Filter.
+QString CommandBar::runningFilterLabel(int low, int high) const
+{
+    if (!m_slice) { return filterLabel(low, high); }
+    const DSPMode mode = m_slice->dspMode();
+    const QString name = m_presetStore
+        ? m_presetStore->nameForEdges(mode, low, high)
+        : FilterPresetStore::defaultNameForEdges(mode, low, high);
+    return name.isEmpty() ? filterLabel(low, high) : name;
 }
 
 /// Wie eine Breite in der Leiste heisst: „2.9k" statt „-2900…-100".
@@ -422,10 +763,14 @@ QString CommandBar::filterLabel(int low, int high)
 //
 // Genau deshalb steht die Auswahl in den EINSTELLUNGEN und nicht im
 // Quelltext: die erste Bitte enthielt zwei Breiten, die unsere
-// Preset-Liste gar nicht kennt (sie fuehrt 5,0 / 4,4 / 3,8 / 3,2 /
-// 2,9 / 2,6 / 2,3 / 1,7 / 1,1 / 0,5), die zweite nur bekannte. Waere
-// die Reihe fest verdrahtet, waere jede Meinungsaenderung eine
-// Uebersetzung; so ist sie eine Zahl in einer Datei.
+// Preset-Liste damals nicht kannte (sie fuehrte 5,0 / 4,4 / 3,8 / 3,2 /
+// 2,9 / 2,6 / 2,3 / 1,7 / 1,1 / 0,5), die zweite nur bekannte. Seit
+// 2026-09-28 fuehrt sie die Thetis-Liste 5,0 / 4,4 / 3,8 / 3,3 / 2,9 /
+// 2,7 / 2,4 / 2,1 / 1,8 / 1,0 — die alte war erfunden (siehe
+// SliceModel::presetsForMode); jetzt fehlt 3,5 aus der ersten Bitte
+// und 3,2 aus der zweiten. Waere die Reihe fest verdrahtet, waere jede
+// Meinungsaenderung eine Uebersetzung; so ist sie eine Zahl in einer
+// Datei.
 //
 // Die drei vorderen sind darum keine Presets, sondern BREITEN. Das ist
 // auch naeher an der Sache: wer „3,2" sagt, meint eine Breite und
@@ -479,7 +824,7 @@ void CommandBar::relabelFilterPills()
             // 2026-08-23-Kommentar in addPill() fuer BAND schon einmal
             // beschreibt ("aus '10 Hz' wurde 'I0 Hz'"), nur an der
             // Stelle, wo die Beschriftung sich NACH dem Anlegen aendert.
-            b->setMinimumWidth(b->fontMetrics().horizontalAdvance(label) + 20);
+            setzeMindestbreite(b, label);
             b->setProperty("loHz", e.first);
             b->setProperty("hiHz", e.second);
             b->setEnabled(true);
@@ -493,6 +838,7 @@ void CommandBar::relabelFilterPills()
             b->setToolTip(QString{});
         }
     }
+    zieheLeereGruppenZurueck();
 }
 
 void CommandBar::pushFilterToModel(int low, int high)
@@ -516,7 +862,7 @@ void CommandBar::askForCustomFilter()
     bool ok = false;
     const int w = QInputDialog::getInt(
         this, QStringLiteral("Filterbreite"),
-        QStringLiteral("Breite in Hz:"), cur, 50, 20000, 50, &ok);
+        tr("Width in Hz:"), cur, 50, 20000, 50, &ok);
     if (!ok) { return; }
 
     pushFilterToModel(qRound(centre - w / 2.0), qRound(centre + w / 2.0));
@@ -616,7 +962,7 @@ void CommandBar::buildRateGroup(QHBoxLayout* row)
     Group& g = addGroup(QStringLiteral("Rate"), row);
     m_rateLabel = new QLabel(QStringLiteral("—"), this);
     m_rateLabel->setAlignment(Qt::AlignCenter);
-    m_rateLabel->setToolTip(tr("Nicht verbunden"));
+    m_rateLabel->setToolTip(tr("Not connected"));
     if (g.row) { g.row->addWidget(m_rateLabel); }
     applyRateStyle(false);
 }
@@ -656,7 +1002,7 @@ void CommandBar::setRateReadout(int channelRateHz, int measuredRateHz)
     if (!m_rateLabel) { return; }
     if (channelRateHz <= 0) {
         m_rateLabel->setText(QStringLiteral("—"));
-        m_rateLabel->setToolTip(tr("Nicht verbunden"));
+        m_rateLabel->setToolTip(tr("Not connected"));
         m_rateMismatchSeconds = 0;
         m_rateWarn = false;
         applyRateStyle(false);
@@ -674,8 +1020,8 @@ void CommandBar::setRateReadout(int channelRateHz, int measuredRateHz)
 
     if (warn) {
         m_rateLabel->setToolTip(
-            tr("Der Empfangskanal läuft mit %1, es kommen aber %2 an — "
-               "so klingt es falsch.")
+            tr("The receive channel runs at %1 but %2 is arriving — that is "
+                "why it sounds wrong.")
                 .arg(rateText(channelRateHz), rateText(measuredRateHz)));
     } else if (measuredRateHz > 0) {
         m_rateLabel->setToolTip(tr("Empfangskanal %1 · gemessen %2")
@@ -688,6 +1034,7 @@ void CommandBar::setRateReadout(int channelRateHz, int measuredRateHz)
         m_rateWarn = warn;
         applyRateStyle(warn);
     }
+    zieheLeereGruppenZurueck();
 }
 
 QString CommandBar::rateReadoutText() const
@@ -832,7 +1179,7 @@ void CommandBar::pullFromModel()
     if (Group* g = group(QStringLiteral("Filter"))) {
         const int lo = m_slice->filterLow();
         const int hi = m_slice->filterHigh();
-        const QString label = filterLabel(lo, hi);
+        const QString label = runningFilterLabel(lo, hi);
 
         // Dieselbe Regel wie bei Modus und Schrittweite: was laeuft,
         // rueckt an die letzte sichtbare Stelle, wenn es nicht schon
@@ -850,8 +1197,7 @@ void CommandBar::pullFromModel()
             // Neuberechnung bleibt sie auf der alten Mindestbreite
             // haengen und die neue, breitere Beschriftung wird an
             // beiden Raendern abgeschnitten.
-            last->setMinimumWidth(
-                last->fontMetrics().horizontalAdvance(label) + 20);
+            setzeMindestbreite(last, label);
             last->setProperty("loHz", lo);
             last->setProperty("hiHz", hi);
             last->setEnabled(true);
@@ -888,6 +1234,7 @@ void CommandBar::pullFromModel()
         // leuchten.
         setActive(*g, label);
     }
+    zieheLeereGruppenZurueck();
 }
 
 CommandBar::~CommandBar() { qDeleteAll(m_groups); }

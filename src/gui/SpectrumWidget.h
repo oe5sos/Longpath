@@ -165,6 +165,7 @@ mw0lge@grange-lane.co.uk
 #include <QPropertyAnimation>
 
 #include "gui/DssRenderer.h"
+#include "gui/KurvenStreifen.h"   // Streifen der Kurve: weiche Kante, Hof
 #include "gui/StyleConstants.h"   // kAmberText — Vorgabe des Spot-Tons
 #include "gui/WaterfallHistoryBuffer.h"
 #include "spectrum/ActivePeakHoldTrace.h"
@@ -586,6 +587,39 @@ public:
     void setLineWidth(float w);
     float lineWidth() const { return m_lineWidth; }
 
+    // ── Weiche Kante und Hof ("Kurven mit Hof", Glas & Tiefe) ────────
+    //
+    // Zwei Zutaten der am 2026-09-17 gewaehlten Gestaltungsrichtung, an
+    // der GPU-Kurve und an der Spitzenhaltelinie.
+    //
+    // VORGABE: weiche Kante AN, Hof AUS. Gewaehlt vom Betreiber am
+    // 2026-10-08 ("entscheide selbst") nach den drei Blaettern in
+    // docs/design/2026-10-08-kurve-weiche-kante/. Die weiche Kante nimmt
+    // die Treppe an steilen Flanken weg und sonst nichts; der Hof machte
+    // das Band im Rauschen merklich dicker und nebliger und bleibt
+    // deshalb ein Schalter, keine Vorgabe.
+    //
+    // Mit BEIDEN aus zeichnet die GPU weiterhin genau einen Streifen mit
+    // den alten Werten, bitgleich -- Geometrie in
+    // `gui/KurvenStreifen.h`, gepinnt in tst_kurven_streifen. Wer die
+    // alte Kurve zurueck will, schaltet die weiche Kante ab.
+    //
+    // Der Hof gilt nur fuer die lebende Kurve. Die Spitzenhaltelinie
+    // bekommt die weiche Kante mit (das ist die Treppenbehebung), aber
+    // keinen zweiten Hof: zwei Hoefe uebereinander sind Nebel, und der
+    // Hof soll die lebende Kurve heben, nicht die Merklinie.
+    //
+    // BEIDES WIRKT AUF DEM GPU-WEG. Der QPainter-Rueckfall (greift nur,
+    // wenn QRhi nicht aufsetzt) malt die Kurve als `QPen` -- der hat
+    // seine weiche Kante vom Antialiasing schon und kennt keinen Hof.
+    // Dort sehen die Schalter deshalb nach nichts aus. Das ist eine
+    // bewusste Luecke und keine Vergessenheit: der Rueckfall ist kein
+    // Weg, auf dem jemand Gestaltung beurteilt.
+    void setTraceSoftEdge(bool on);
+    bool traceSoftEdge() const { return m_traceSoftEdge; }
+    void setTraceHalo(bool on);
+    bool traceHalo() const { return m_traceHalo; }
+
     // Trace gradient: when enabled, the QPainter fill gradient ramps
     // from transparent at baseline to the fill color at the trace,
     // and the trace uses a vertical color gradient. GPU path keeps
@@ -737,6 +771,12 @@ public:
 
     void setGridEnabled(bool on);
     bool gridEnabled() const { return m_gridEnabled; }
+    // Abstand der waagrechten dB-Linien (2026-09-27). 0 = wie bisher
+    // selbst (10 dB, bei <= 50 dB Bereich 5 dB). Der Regler "dB Step"
+    // schrieb in das tote PanadapterModel und wirkte nie.
+    // Thetis: setup.designer.cs udDisplayGridStep, "Horizontal Grid Step Size in dB."
+    void setGridStepDb(int db);
+    int gridStepDb() const { return m_gridStepDb; }
 
     // Right-edge dBm scale strip visibility. When false, the strip is
     // hidden and the spectrum fills the full widget width.
@@ -761,6 +801,13 @@ public:
     /// Rand, genau so, wie dort auch gezeichnet wird. Eine Rechnung
     /// fuer Zeichnen und Treffen.
     QRect spectrumRect() const;
+
+    /// Wo auf dem Schirm steht diese Frequenz? Oeffentlich seit
+    /// 2026-10-15 fuer die Scheibenflaggen (SliceFlag): die rechnen
+    /// dieselbe Umrechnung wie das Malen, und zwei Rechnungen fuer
+    /// dieselbe Sache laufen frueher oder spaeter auseinander.
+    /// Gibt -1, wenn die Frequenz gerade nicht im Ausschnitt liegt.
+    int xForHz(double hz) const;
 
     void setBackgroundImage(const QString& path);
     QString backgroundImagePath() const { return m_bgImagePath; }
@@ -1924,6 +1971,12 @@ protected:
     /// Zeigt der Panadapter an dieser Stelle ein eigenes Menue?
     bool hasOwnContextMenuAt(const QPoint& pos) const;
     void wheelEvent(QWheelEvent* event) override;
+    // Radereignis -> ganze Schritte (Trackpad/hochaufloesend, 2026-09-27).
+    int wheelStepsFor(QWheelEvent* ev);
+public:
+    // Thetis SnapTune (console.cs:31215-31228): auf das Schrittraster.
+    static double snapTuneHz(double freqHz, int stepHz, int numSteps);
+protected:
     void leaveEvent(QEvent* event) override;
 
 private:
@@ -2533,6 +2586,13 @@ private:
     // DisplaySetupPages.cpp), which the old 1.6f default couldn't even
     // reach (the slider casts to int).
     float       m_lineWidth{1.0f};
+    bool        m_traceSoftEdge{true};    // AN ab Werk, siehe setTraceSoftEdge
+    bool        m_traceHalo{false};       // AUS ab Werk, siehe setTraceHalo
+    // Wie viele Streifen im jeweiligen Puffer stehen. Gesetzt beim Bauen
+    // der Scheitelpunkte, gelesen beim Zeichnen -- zwei Stellen, eine
+    // Zahl, sonst zeichnet die GPU aus einem halb gefuellten Puffer.
+    int         m_lineStripCount{1};
+    int         m_peakStripCount{1};
     // ── Warum das zwei Fahnen sind und nicht eine ────────────────────
     //
     // Es war eine, und sie bedeutete auf den beiden Malwegen etwas
@@ -2631,6 +2691,7 @@ private:
     // ---- Phase 3G-8 commit 5: grid / scales renderer state ----
 
     bool  m_gridEnabled{true};
+    int   m_gridStepDb{0};      // 0 = automatisch
     bool  m_showZeroLine{false};
     bool  m_showFps{false};
     bool  m_dbmScaleVisible{true};  // right-edge dBm strip; false → spectrum fills full width
@@ -2686,6 +2747,9 @@ private:
     int    m_filterLowHz{-2850};    // LSB default — from Thetis
     int    m_filterHighHz{-150};
     int    m_stepHz{100};           // tuning step size
+    int    m_wheelPixelAccum{0};
+    int    m_wheelAngleAccum{0};
+    qint64 m_lastWheelStepMs{0};
 
     int    m_panIndex{0};            // for per-pan settings keys
 
@@ -3293,6 +3357,11 @@ private:
     // From AetherSDR: kMaxFftBins = 8192, kFftVertStride = 6
     static constexpr int kMaxFftBins = 65536;
     static constexpr int kFftVertStride = 6;  // x, y, r, g, b, a
+    // Kurve als bis zu fuenf Streifen: Hof oben/unten, Kante oben,
+    // Kern, Kante unten. Ohne Kante und Hof bleibt es bei einem
+    // Streifen; die Puffer sind trotzdem fuer fuenf angelegt, damit das
+    // Umschalten im Betrieb keine Zuteilung auf dem Malweg braucht.
+    static constexpr int kLineStrips = Kurve::kStreifenHoechstens;
 
 #endif
 

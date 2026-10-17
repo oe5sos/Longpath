@@ -101,7 +101,7 @@ private:
 
 } // namespace
 
-QString WidgetPicker::allCategory() { return QStringLiteral("Alle"); }
+QString WidgetPicker::allCategory() { return tr("All"); }
 
 WidgetPicker::WidgetPicker(AppletVisibilityController* vis, QWidget* parent)
     : QWidget(parent), m_vis(vis), m_category(allCategory())
@@ -162,7 +162,7 @@ WidgetPicker::WidgetPicker(AppletVisibilityController* vis, QWidget* parent)
     body->addLayout(right, 1);
 
     m_search = new QLineEdit(this);
-    m_search->setPlaceholderText(QStringLiteral("Widgets durchsuchen…"));
+    m_search->setPlaceholderText(tr("Search widgets…"));
     m_search->setStyleSheet(QStringLiteral(
         "QLineEdit { background: %1; border: 1px solid %2;"
         "  border-radius: 6px; color: %3; padding: 7px 11px;"
@@ -239,7 +239,7 @@ void WidgetPicker::rebuild()
             // Die Vorlage schreibt DISABLED neben den Namen und den
             // Grund darunter. Sagen, wo man es einschaltet, ist der
             // Unterschied zwischen einer Auskunft und einem grauen Feld.
-            auto* badge = new QLabel(QStringLiteral("ABGESCHALTET"), frame);
+            auto* badge = new QLabel(tr("OFF"), frame);
             QFont bf = badge->font();
             bf.setPixelSize(9);
             bf.setBold(true);
@@ -254,8 +254,7 @@ void WidgetPicker::rebuild()
 
         const QString sub = avail
             ? m_vis->keywords(id).join(QStringLiteral(" · "))
-            : QStringLiteral("Die zugehörige Hardware oder Hauptschaltung "
-                             "ist aus.");
+            : tr("The hardware or master switch behind it is off.");
         auto* keys = new QLabel(sub, frame);
         {
             QFont f = keys->font();
@@ -401,14 +400,19 @@ AddWidgetButton::AddWidgetButton(AppletVisibilityController* vis,
     auto* plus = new QPushButton(QStringLiteral("+"), this);
     plus->setFixedSize(kSide, kSide);
     plus->setCursor(Qt::PointingHandCursor);
-    plus->setToolTip(QStringLiteral("Widget hinzufügen oder entfernen"));
+    plus->setToolTip(tr("Add or remove a widget"));
     // Gestrichelt wie in der Vorlage: der Rand sagt „hier ist noch
     // nichts, hier kann etwas hin". Ein durchgezogener Rahmen sähe aus
     // wie ein Knopf, der schon etwas ist.
     plus->setStyleSheet(QStringLiteral(
+        // `padding: 0` ist Pflicht: Style::kButtonStyle gilt app-weit
+        // und bringt `padding: 4px 12px` mit. Bei 34 Pixeln blieben
+        // dafuer gerade noch 8 -- genau die Breite eines „+", darum ist
+        // es nie aufgefallen. Bei 29 waeren es 3, und das Zeichen waere
+        // weg. Siehe HAUSSTIL.md, „der geerbte Innenabstand".
         "QPushButton { background: transparent; color: %1;"
         "  border: 1px dashed %2; border-radius: 6px;"
-        "  font-size: 16px; }"
+        "  font-size: 16px; padding: 0; }"
         "QPushButton:hover { color: %3; border-color: %4; background: %5; }")
         .arg(QString::fromLatin1(Style::kTextScale),
              QString::fromLatin1(Style::kBorder),
@@ -438,7 +442,7 @@ void AddWidgetButton::openPicker()
         // bleibt offen, bleibt über dem Hauptfenster.
         m_picker = new WidgetPicker(m_vis, this);
         m_picker->setWindowFlags(Qt::Tool);
-        m_picker->setWindowTitle(QStringLiteral("Widget hinzufügen"));
+        m_picker->setWindowTitle(tr("Add a widget"));
         connect(m_picker, &WidgetPicker::toggled,
                 this, &AddWidgetButton::toggled);
     }

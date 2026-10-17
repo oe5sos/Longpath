@@ -792,6 +792,37 @@ public:
     /// is then fed into the same TXA mic-input path.
     void setTxMode(DSPMode mode);
 
+    /// AM-Traegerpegel (2026-10-12).
+    /// Wraps SetTXAAMCarrierLevel(channel, level).
+    /// From Thetis Console/radio.cs:2944-2959 [v2.10.3.15] --
+    /// TXAMCarrierLevel. `level` ist der DSP-Wert, nicht der
+    /// Reglerwert: die Umrechnung steht in
+    /// TransmitModel::amCarrierDspFromPercent (Wurzelkennlinie).
+    /// csDSP-geschuetzt (ammod.c:104-110), vom Hauptfaden aus sicher.
+    void setAmCarrierLevel(double level);
+    double amCarrierLevelForTest() const { return m_amCarrierLevel; }
+    /// Was WDSP selbst haelt (ammod.p->c_level), -1 ohne Kanal.
+    double amCarrierLevelInWdsp() const;
+
+    /// FM CTCSS-Ton beim Senden (2026-09-27).
+    /// From Thetis Console/radio.cs:2901-2940 [@852bf0e] -- CTCSSFreqHz /
+    /// CTCSSFlag -> SetTXACTCSSFreq / SetTXACTCSSRun.
+    void setCtcssRun(bool on);
+    void setCtcssFreq(double hz);
+    bool ctcssRunForTest() const { return m_ctcssRun; }
+    /// Was WDSP selbst gerade haelt (fmmod.ctcss_run), -1 ohne Kanal --
+    /// fuer das Protokoll beim Anlegen des Sendekanals.
+    int ctcssRunInWdsp() const;
+    double ctcssFreqForTest() const { return m_ctcssFreq; }
+    /// FM-Deviation beim Senden (2026-09-27).
+    /// From Thetis Console/radio.cs:2882-2899 [@852bf0e] -- TXFMDeviation
+    /// -> SetTXAFMDeviation, Voreinstellung 5000.0.
+    void setFmDeviation(double hz);
+    double fmDeviationForTest() const { return m_fmDeviationHz; }
+    // AM-Traegerpegel (2026-10-12), Mitschrieb des letzten Werts.
+    /// Was WDSP haelt (fmmod.deviation), -1 ohne Kanal.
+    double fmDeviationInWdsp() const;
+
     /// Test seam: returns the DSPMode last passed to SetTXAMode (the WDSP-
     /// mapped value, not the carry m_mode which preserves RADE_U/L for
     /// Longpath-side dispatch). Used by tst_tx_channel_rade_mode_mapping
@@ -3120,6 +3151,10 @@ private:
     // Mode + filter carry
     DSPMode m_mode         {DSPMode::USB};   // carry; setTxMode also calls WDSP
     DSPMode m_lastWdspTxMode{DSPMode::USB};  // test seam: RADE_U/L map -> USB/LSB
+    bool   m_ctcssRun{false};
+    double m_ctcssFreq{100.0};
+    double m_fmDeviationHz{5000.0};
+    double m_amCarrierLevel{0.5};   // Thetis-Vorgabe: Regler 100 -> 0.5
     int     m_filterLowHz  {200};            // carry; setTxBandpass also calls WDSP
     int     m_filterHighHz {2700};           // carry; setTxBandpass also calls WDSP
 

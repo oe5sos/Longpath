@@ -1,0 +1,132 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8">
+<title>Entwurf C — Glas und Tiefe</title><link rel="stylesheet" href="_grund.css">
+<style>
+/* ENTWURF C — Glas und Tiefe.
+   Die am 2026-09-17 fuer Longpath gewaehlte Richtung, hier aufs Telefon
+   uebersetzt. Nicht umraeumen wie A, nicht weglassen wie B, sondern
+   SCHICHTEN: der Grund traegt ein leichtes Leuchten, die Panels schweben
+   darauf mit echtem Schatten und einer Lichtkante oben, und Gemessenes
+   bekommt einen Hof statt eines Kastens.
+   Dieselbe Anordnung wie heute — wer die Seite kennt, findet alles am
+   selben Platz. Was sich aendert, ist nur, wie fest die Teile aussehen.
+   Risiko: Schatten und Weichzeichnung kosten auf aelteren Telefonen
+   Bildrate. Darum liegt die Weichzeichnung nur auf unbewegten Flaechen,
+   nie auf dem Wasserfall. */
+body{background:
+  radial-gradient(130% 68% at 50% -8%, #17212b 0%, #0b0d10 46%, #08080a 100%)}
+.schicht{background:linear-gradient(rgba(34,36,42,.88),rgba(18,19,23,.92));
+  border:1px solid rgba(255,255,255,.075);border-radius:14px;
+  box-shadow:0 1px 0 rgba(255,255,255,.07) inset,
+             0 10px 22px rgba(0,0,0,.55),
+             0 2px 5px rgba(0,0,0,.45)}
+
+header{height:46px;flex:none;display:flex;align-items:center;gap:9px;padding:0 16px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);
+  box-shadow:0 0 10px rgba(111,163,132,.9),0 0 3px rgba(111,163,132,1)}
+header .name{font-size:var(--f-caption);letter-spacing:.17em;text-transform:uppercase;color:var(--text3)}
+header .spacer{flex:1}
+header .rate{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-inactive)}
+
+.vfo{flex:none;padding:2px 16px 10px;display:flex;align-items:baseline;gap:8px}
+.vfo .hz{font-size:42px;font-family:var(--mono);line-height:1;letter-spacing:-.015em;
+  /* Hof statt Kasten: die Zahl leuchtet leise, wie eine Anzeige hinter Glas */
+  text-shadow:0 0 22px rgba(216,165,95,.17),0 2px 6px rgba(0,0,0,.7)}
+.vfo .hz .dez{color:var(--text-scale);font-size:24px}
+.vfo .unit{font-size:var(--f-small);color:var(--text3)}
+.vfo .spacer{flex:1}
+.vfo .b{font-size:var(--f-small);font-family:var(--mono);color:var(--measured)}
+
+.scope{flex:1;min-height:0;margin:0 12px;border-radius:14px;overflow:hidden;background:#0b141c;
+  display:flex;flex-direction:column;
+  position:relative;border:1px solid rgba(255,255,255,.08);
+  box-shadow:0 10px 24px rgba(0,0,0,.6),0 1px 0 rgba(255,255,255,.08) inset}
+#pan{flex:none;height:96px}
+#wf{flex:1;min-height:0;height:auto}
+.scope canvas{width:100%}
+.cursor{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(230,230,235,.42)}
+.cursor::before{content:"";position:absolute;left:-4px;top:0;width:9px;height:9px;
+  background:var(--accent);border-radius:50%;box-shadow:0 0 10px rgba(74,123,168,.95)}
+
+.meter{flex:none;margin:11px 12px 0;padding:9px 12px 10px}
+.meter .row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.meter .val{margin-left:auto;font-family:var(--mono);font-size:var(--f-small);color:var(--measured);
+  text-shadow:0 0 12px rgba(216,165,95,.3)}
+.bar{height:10px;border-radius:6px;background:#040507;border:1px solid rgba(0,0,0,.8);
+  position:relative;overflow:hidden;box-shadow:inset 0 2px 5px rgba(0,0,0,.85)}
+.bar i{position:absolute;inset:1px auto 1px 1px;border-radius:5px;width:62%;
+  background:linear-gradient(90deg,#47463b,#817b5c 62%,var(--measured));
+  box-shadow:0 0 12px rgba(216,165,95,.45)}
+.ticks{display:flex;justify-content:space-between;margin-top:4px}
+.ticks span{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-scale)}
+
+.feld{margin:11px 12px 0;padding:10px 12px 12px}
+.feld > .caps{margin:0 0 7px}
+.chips{display:flex;gap:6px}
+.chips + .caps{margin-top:11px}
+.chip{flex:1;min-width:0;height:36px;display:flex;align-items:center;justify-content:center;
+  font-size:var(--f-small);font-family:var(--mono);color:var(--text2);
+  background:linear-gradient(rgba(44,46,53,.9),rgba(24,25,30,.9));
+  border:1px solid rgba(255,255,255,.07);border-radius:9px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 4px rgba(0,0,0,.45)}
+.chip.on{background:linear-gradient(#36699f,#21436a);
+  border-color:#4886c0;color:#e2eefb;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 0 14px rgba(74,123,168,.4),0 2px 5px rgba(0,0,0,.5)}
+.chip.more{flex:0 0 36px;color:var(--text3)}
+
+.sliders{margin:11px 12px 0;padding:12px;display:flex;flex-direction:column;gap:14px}
+.sl{display:flex;align-items:center;gap:10px}
+.sl .caps{flex:0 0 30px}
+.sl .track{flex:1;height:5px;border-radius:3px;background:#040507;
+  border:1px solid rgba(0,0,0,.8);position:relative;box-shadow:inset 0 1px 3px rgba(0,0,0,.9)}
+.sl .track i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;
+  background:var(--accent);box-shadow:0 0 10px rgba(74,123,168,.55)}
+.sl .track b{position:absolute;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;
+  background:linear-gradient(#6b9cca,#3a648c);border:1px solid #7fb0dd;
+  box-shadow:0 2px 6px rgba(0,0,0,.75),0 0 10px rgba(74,123,168,.35)}
+.sl .v{flex:0 0 52px;text-align:right;font-family:var(--mono);font-size:var(--f-small);color:var(--measured)}
+
+.gesperrt{margin:13px 12px 0;height:36px;display:flex;align-items:center;justify-content:center;
+  border-radius:11px;background:rgba(18,19,23,.6);border:1px solid rgba(255,255,255,.05);
+  font-size:var(--f-caption);letter-spacing:.13em;text-transform:uppercase;color:var(--text-inactive)}
+footer{flex:none;height:32px;display:flex;align-items:center;gap:10px;padding:0 16px;margin-top:9px}
+footer span{font-size:var(--f-caption);font-family:var(--mono);color:var(--text-inactive)}
+footer .ok{color:var(--ok)}
+</style></head><body>
+
+<header><span class="dot"></span><span class="name">Longpath · Anvelina</span>
+<span class="spacer"></span><span class="rate">18 kB/s</span></header>
+
+<div class="vfo"><span class="hz mono">14.074<span class="dez">.000</span></span>
+<span class="unit">MHz</span><span class="spacer"></span>
+<span class="b">20 m</span><span class="b">48 kHz</span></div>
+
+<div class="scope"><canvas id="pan" width="738" height="190"></canvas>
+<canvas id="wf" width="738" height="300"></canvas><div class="cursor"></div></div>
+
+<div class="meter schicht"><div class="row"><span class="caps">Signal</span>
+<span class="val">S8 · −74 dBm</span></div><div class="bar"><i></i></div>
+<div class="ticks"><span>1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>+20</span><span>+40</span></div></div>
+
+<div class="feld schicht">
+  <div class="caps">Band</div>
+  <div class="chips"><span class="chip">40</span><span class="chip">30</span><span class="chip on">20</span>
+    <span class="chip">17</span><span class="chip">15</span><span class="chip more">…</span></div>
+  <div class="caps">Betriebsart</div>
+  <div class="chips"><span class="chip">AM</span><span class="chip">LSB</span><span class="chip on">USB</span>
+    <span class="chip">CW</span><span class="chip">FM</span><span class="chip more">…</span></div>
+</div>
+
+<div class="sliders schicht">
+  <div class="sl"><span class="caps">AF</span><div class="track"><i style="width:70%"></i><b style="left:70%"></b></div><span class="v">70 %</span></div>
+  <div class="sl"><span class="caps">PWR</span><div class="track"><i style="width:55%"></i><b style="left:55%"></b></div><span class="v">55 %</span></div>
+</div>
+
+<div class="gesperrt">Senden nur in der App</div>
+<footer><span class="ok">◆ gekoppelt</span><span>4 kB/s bild</span><span>13 kB/s ton</span></footer>
+
+<script src="bild.js"></script>
+<script>
+malPan(document.getElementById('pan'), '#e3b979', ['rgba(216,165,95,.32)','rgba(216,165,95,0)']);
+malWf(document.getElementById('wf'));
+</script>
+</body></html>

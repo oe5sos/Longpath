@@ -29,6 +29,8 @@
 
 #include "MicProfileManager.h"
 
+#include "ThetisProfilImport.h"
+
 #include "AppSettings.h"
 #include "LogCategories.h"
 #include "models/TransmitModel.h"
@@ -204,6 +206,15 @@ const QStringList& liveKeyList()
         QStringLiteral("CompanderLevel"),
         // CESSB (1) — database.cs:4689 [v2.10.3.13].
         QStringLiteral("CESSB_On"),
+        // ── AM-Traegerpegel (1 key, 2026-10-13) ────────────────────────────
+        // database.cs:4381 [v2.10.3.15] -- AM_Carrier_Level, in Thetis das
+        // Bedienelement udTXAMCarrierLevel (setup.cs:3xxx). Der Pegel
+        // selbst ist seit dem 2026-10-13 in TransmitModel verdrahtet; dass
+        // er NICHT im Profil lag, ist bei der Arbeit am
+        // Thetis-Profil-Einlesen aufgefallen: Thetis fuehrt ihn dort seit
+        // immer, und ein Profil ohne AM-Traeger laesst beim Wechsel genau
+        // die Einstellung stehen, die man gerade geaendert hat.
+        QStringLiteral("AM_Carrier_Level"),
         // ── Plan 4 D1 — TX filter bandwidth (2 keys) ───────────────────────
         // Longpath-original. Defaults 100/2900 (USB voice typical SSB).
         QStringLiteral("FilterLow"),
@@ -880,9 +891,30 @@ void MicProfileManager::load()
         // profiles are present but not selected, so existing-user
         // first-run behaviour is unchanged.
         writeActiveKey(QStringLiteral("Default"));
-        emit profileListChanged();
     }
-    // No emit on subsequent loads — the manifest already exists.
+
+    // IMMER melden, nicht nur beim Saeen (2026-10-12).
+    //
+    // Hier stand "No emit on subsequent loads — the manifest already
+    // exists". Das stimmt fuer das Manifest, aber nicht fuer die
+    // Empfaenger: jede Oberflaeche, die ihre Liste auf
+    // profileListChanged aufbaut, bleibt beim ZWEITEN Start mit demselben
+    // Geraet LEER.
+    //
+    // Die Reihenfolge im Betrieb ist naemlich:
+    //   1. Fensteraufbau: setMicProfileManager() -> Liste einmal fuellen,
+    //      aber es gibt noch keine MAC, also ist sie leer
+    //   2. Verbinden: setMacAddress() + load()
+    //
+    // Beim ersten Mal je Geraet wird gesaet und gemeldet, die Liste
+    // kommt. Danach nie wieder -- und der Betreiber sieht eine leere
+    // Profilauswahl, obwohl 22 Werksprofile daliegen.
+    //
+    // Betrifft TxApplet::rebuildProfileCombo (haengt allein an diesem
+    // Signal), PhoneCwApplet::fuelleProfilCombo und RadeApplet. Ein
+    // ueberfluessiges Signal beim ersten Mal ist harmlos: alle drei
+    // bauen ihre Liste neu auf, das ist idempotent.
+    emit profileListChanged();
 }
 
 QStringList MicProfileManager::profileNames() const
@@ -1072,6 +1104,116 @@ bool MicProfileManager::isActiveProfileModified(const TransmitModel* tx) const
 // Static helpers
 // ---------------------------------------------------------------------------
 
+// ── Thetis-Profile einlesen (2026-10-13) ───────────────────────────────
+//
+// Zweiter Gang. Der Leser (ThetisProfilImport) sagt, WAS in der Datei
+// steht; hier wird es angelegt.
+MicProfileManager::ThetisEinleseErgebnis
+MicProfileManager::einleseThetisProfile(const QList<ThetisProfil>& profile)
+{
+    ThetisEinleseErgebnis e;
+    if (m_mac.isEmpty()) {
+        // Ohne Geraete-MAC gibt es keinen Ort fuer ein Profil. Das ist
+        // kein Fehlerfall, sondern die Reihenfolge: die Profile haengen
+        // an der MAC (siehe profileFieldKey), und die kennt Longpath
+        // erst nach dem Verbinden.
+        for (const ThetisProfil& p : profile) {
+            e.ausgelassen.insert(p.name,
+                QStringLiteral("Es ist kein Geraet verbunden. "
+                               "Profile haengen an der Geraete-Kennung, "
+                               "darum erst verbinden, dann einlesen."));
+        }
+        return e;
+    }
+
+    const QHash<QString, QVariant> vorgaben = defaultProfileValues();
+    QStringList namen = readManifest();
+    bool listeGeaendert = false;
+
+    for (const ThetisProfil& p : profile) {
+        if (p.name.isEmpty()) { continue; }
+
+        // Dieselbe Namensregel wie saveProfile: kein Komma, weil die
+        // TCI-Meldung der Profilliste sonst nach mehreren Teilen
+        // aussieht (setup.cs:9550-9552, MW0LGEs Notiz).
+        QString name = p.name;
+        name.replace(QLatin1Char(','), QLatin1Char('_'));
+
+        QStringList hinweise = p.hinweise;
+        if (name != p.name) {
+            hinweise << QStringLiteral(
+                "Das Komma im Namen wurde zu einem Unterstrich -- ein "
+                "Komma zerlegt die TCI-Meldung der Profilliste.");
+        }
+
+        // ── Nichts ueberschreiben ───────────────────────────────────────
+        if (namen.contains(name)) {
+            const QString urspruenglich = name;
+            QString versuch = QStringLiteral("%1 (Thetis)").arg(urspruenglich);
+            int n = 2;
+            while (namen.contains(versuch)) {
+                versuch = QStringLiteral("%1 (Thetis %2)").arg(urspruenglich).arg(n++);
+            }
+            hinweise << QStringLiteral(
+                "Ein Profil \"%1\" gab es hier schon; das eingelesene "
+                "heisst darum \"%2\". Dein eigenes ist unberuehrt.")
+                .arg(urspruenglich, versuch);
+            name = versuch;
+        }
+
+        // ── Luecken auffuellen ──────────────────────────────────────────
+        //
+        // From database.cs:11263-11292 -- ExpandOldTxProfileTable: Thetis
+        // nimmt eine Default-Zeile und ueberschreibt davon die Spalten,
+        // die die alte Tabelle hatte. Genau das hier, mit unseren
+        // Vorgaben als Grundlage.
+        QHash<QString, QVariant> werte = vorgaben;
+        int uebernommen = 0;
+        for (auto it = p.werte.constBegin(); it != p.werte.constEnd(); ++it) {
+            if (!vorgaben.contains(it.key())) {
+                // Der Leser hat ein Feld geliefert, das der
+                // Profilverwalter nicht fuehrt. Das kann nur passieren,
+                // wenn die beiden Feldlisten auseinandergelaufen sind --
+                // ein Prueffall bewacht das
+                // (dieFeldlisteDecktSichMitDemProfilverwalter), und hier
+                // steht es trotzdem: still verschlucken waere der
+                // Fehler, der bei Rufzeichen und Locator vier Dinge ins
+                // Leere laufen liess.
+                hinweise << QStringLiteral(
+                    "Das Feld \"%1\" kennt der Profilverwalter nicht "
+                    "und es wurde NICHT gespeichert.").arg(it.key());
+                continue;
+            }
+            werte.insert(it.key(), it.value());
+            ++uebernommen;
+        }
+        const int geerbt = vorgaben.size() - uebernommen;
+        if (geerbt > 0) {
+            hinweise << QStringLiteral(
+                "%1 von %2 Feldern standen in der Datei; die uebrigen "
+                "%3 stehen auf Longpaths Vorgabe.")
+                .arg(uebernommen).arg(vorgaben.size()).arg(geerbt);
+        }
+
+        writeProfileKeys(name, werte);
+        if (!namen.contains(name)) {
+            namen.append(name);
+            listeGeaendert = true;
+        }
+        e.angelegt.insert(p.name, name);
+        if (!hinweise.isEmpty()) { e.hinweise.insert(name, hinweise); }
+    }
+
+    if (listeGeaendert) {
+        writeManifest(namen);
+        emit profileListChanged();
+    }
+    // KEIN setActiveProfile. Siehe die Zusage am Kopf der Deklaration:
+    // ein Einlesen, das sofort umschaltet, verstellt den Sendeton
+    // waehrend eines Gespraechs.
+    return e;
+}
+
 QHash<QString, QVariant> MicProfileManager::defaultProfileValues()
 {
     QHash<QString, QVariant> out;
@@ -1183,6 +1325,11 @@ QHash<QString, QVariant> MicProfileManager::defaultProfileValues()
     out.insert(QStringLiteral("CompanderLevel"), QStringLiteral("2"));               // database.cs:4580
     // CESSB (1)
     out.insert(QStringLiteral("CESSB_On"), QStringLiteral("False"));                 // database.cs:4689
+    // AM-Traegerpegel in Prozent. Thetis' Anlegewert ist 100
+    // (database.cs AM_Carrier_Level; der Regler geht 0..125, und die
+    // Umrechnung in den WDSP-Wert ist eine WURZELKENNLINIE --
+    // TransmitModel::amCarrierDspFromPercent, Thetis setup.cs:9709).
+    out.insert(QStringLiteral("AM_Carrier_Level"), QStringLiteral("100"));
 
     // ── Plan 4 D1 — TX filter bandwidth (2 keys) ─────────────────────────
     // Longpath-original defaults: 100/2900 Hz (USB voice typical SSB).
@@ -1306,6 +1453,10 @@ QHash<QString, QVariant> MicProfileManager::captureLiveValues(const TransmitMode
     // CESSB (1)
     out.insert(QStringLiteral("CESSB_On"),
                tx->cessbOn() ? QStringLiteral("True") : QStringLiteral("False"));
+
+    // AM-Traegerpegel (1)
+    out.insert(QStringLiteral("AM_Carrier_Level"),
+               QString::number(tx->amCarrierPercent()));
 
     // ── Plan 4 D1 — TX filter bandwidth (2 keys) ─────────────────────────
     out.insert(QStringLiteral("FilterLow"),  QString::number(tx->filterLow()));
@@ -1455,6 +1606,12 @@ void MicProfileManager::applyValuesToModel(const QHash<QString, QVariant>& value
     // CESSB (1)
     tx->setCessbOn(take(QStringLiteral("CESSB_On"), QStringLiteral("False"))
                         == QLatin1String("True"));
+
+    // AM-Traegerpegel (1). Geklammert wird im Setter (0..125), nicht
+    // hier: ein Wert aus einer fremden Profildatei hat kein Feld davor,
+    // das ihn abfaengt.
+    tx->setAmCarrierPercent(
+        take(QStringLiteral("AM_Carrier_Level"), QStringLiteral("100")).toInt());
 
     // ── Plan 4 D1 — TX filter bandwidth (2 keys) ─────────────────────────
     // Defaults 100/2900 (USB voice typical SSB) per Plan 4 spec §Task 2.

@@ -2,7 +2,780 @@
 
 ## [Unreleased]
 
+### Der Empfangs-Equalizer — neu (2026-10-11)
+
+Longpath hatte keinen. WDSPs `eqp` laeuft im RXA-Durchlauf
+(`third_party/wdsp/src/RXA.c:673`) und ist beim Anlegen aus und flach,
+aber **kein einziger `SetRXAEQ*`-Ruf war in `src/core/wdsp_api.h`
+deklariert** — die Stufe lief also leer mit, und niemand konnte sie
+anfassen. Thetis hat sie seit immer (`Console/radio.cs:827-843` RXEQOn,
+`:800-824` RXEQ10, Bedienung in `eqform.cs`).
+
+Gebaut ist die ganze Kette:
+
+* `wdsp_api.h` — sieben Deklarationen. Die Signaturen folgen dem
+  **vendorten** TAPR v1.29, nicht Thetis' neuerem `eq.c`: dort nimmt
+  `SetRXAEQProfile` einen vierten Parameter `double* Q` fuer die
+  parametrische Form (Thetis `wdsp/eq.c:623`), den unsere Fassung nicht
+  kennt. Verhalten von Thetis, Signatur vom vendorten Header.
+* `RxChannel` — sieben Wrapper, Spiegel der `setTxEq*`-Familie. Jeder
+  prueft `wdspChannelInRange()`: Pruefstaende bauen den Kanal mit der
+  Nummer 99, und ein WDSP-Ruf darauf schreibt ueber das Feldende hinaus.
+  `rxEqRunningInWdsp()` liest zurueck, was WDSP selbst haelt — dieselbe
+  Vorsicht, die beim Sende-CTCSS einen echten Fehler gefunden hat.
+* `SliceModel` — Zustand je Slice, persistiert slice-weit (nicht per
+  Band: eine Klangeinstellung soll beim Bandwechsel nicht umspringen).
+  **Abweichung von Thetis, bewusst:** dort ist der Equalizer global und
+  wird auf `id(0,0)` und `id(0,1)` zugleich gelegt (`eqform.cs:3027`).
+  Hier haengt er am Slice wie jede andere Empfangs-DSP-Einstellung —
+  zwei Empfaenger duerfen verschieden klingen. Geklammert wird im
+  Setter, nicht in der Oberflaeche: ein Wert aus der Einstellungsdatei
+  oder aus einem Frequenzspeicher hat kein Feld davor, das ihn abfaengt.
+  Grenzen `-12..+15` dB, aus Thetis `eqform.cs:1871-1872` (Baender) und
+  `:1946-1947` (Vorverstaerkung) — gemessen, nicht geschaetzt.
+* `RadioModel` — Verdrahtung. Ein geaenderter Bandwert schiebt immer die
+  **ganze** Kurve hinaus, weil `SetRXAGrphEQ10` nichts anderes anbietet
+  (Thetis macht es genauso). Die Kurve geht auch hinaus, wenn der
+  Equalizer aus ist, damit beim Einschalten sofort das Richtige
+  dasteht; WDSPs `run`-Flag entscheidet allein, ob gerechnet wird. Beim
+  Verbinden wird die gespeicherte Kurve nachgeschoben — ohne das lief
+  der Kanal flach, waehrend das Modell die Werte des Betreibers meldete,
+  genau die Form, die bei NB/SNB schon einmal zugeschlagen hat.
+
+### Das Equalizer-Feld haengt jetzt im Panel
+
+`EqApplet` stand seit der Skelettphase als Geister-Applet in
+`MainWindow.cpp` auskommentiert, mit der Bedingung
+`// TODO 3I-3: TX/RX EQ wiring`. Die ist erfuellt, also haengt es:
+
+* Die RX/TX-Umschaltung waehlt, welche Kurve die zehn Schieber bedienen.
+  Die Sendeseite ging auf `TransmitModel::txEq*` (seit 3M-3a-i da, der
+  grosse Editor dazu bleibt `TxEqDialog`), die Empfangsseite auf das
+  Neue oben. Beide Haelften waren vorher Attrappen — alle sechs
+  Bedienelemente trugen `NyiOverlay`.
+* **„Music" ist aus der Vorwahl-Liste entfernt.** Es gab dafuer keine
+  Quelle: Thetis kennt ueberhaupt keine EQ-Vorwahlen (`eqform.cs`),
+  AetherSDR auch nicht (`EqApplet.cpp:277` hat nur die Schieber). Die
+  beiden, die bleiben, sind belegt — „Flach" ist WDSPs Vorgabe beim
+  Anlegen, „Sprache" die Kurve, die in WDSPs Quelltext direkt darueber
+  auskommentiert steht (`RXA.c:260`). Eigene DSP-Kurven zu erfinden
+  verbietet `CLAUDE.md` ausdruecklich.
+* Der Eintrag in `m_appletsById` ist Pflicht neben `registerApplet` —
+  ohne ihn kennt der Auswaehler das Applet nicht, und es waere wieder
+  gebaut und unerreichbar.
+
+Die Schieber gehen `-10..+10`, die DSP-Grenzen bis `-12..+15`. Der
+Bereich bleibt, wie die Vorlage ihn hatte; ihn zu weiten ist eine Sache
+der Gestaltung. Das Modell klammert, es kann also nichts Falsches
+hinausgehen.
+
+Prueffaelle: `tests/tst_rx_equalizer.cpp`.
+
+
+## [0.7.0] - 2026-10-16
+
+29 Commits seit 0.6.9. Zwei Themen: **zwei Betriebsarten koennen jetzt
+senden** — und **was auf eine Uhr gewettet hatte, wettet nicht mehr.**
+
+### FT8 und FT4 senden
+
+Longpath dekodiert FT8/FT4 seit 0.6.9 selbst. Jetzt sendet es auch:
+ein Druck auf „Send" legt eine Nachricht auf einen Ton und gibt sie im
+naechsten eigenen Fenster hinaus, mit Bandplanpruefung und Tasten ueber
+den MoxController. Lehnt der Bandplan ab, bricht der Versuch sofort ab
+und nennt den Grund — vorher lief der Ton das ganze Fenster weiter,
+das Mikrofon blieb abgeklemmt, und in der Zeile stand „transmitting",
+waehrend nichts hinausging.
+
+Ein Doppelklick auf eine Zeile der Fundliste legt den Standardanruf
+ins Eingabefeld. Mit dem Schalter „Auto" — der AUS voreingestellt ist
+— laeuft daraus der ganze QSO-Ablauf (CQ → Antwort → Rapport → RR73),
+und ein vollstaendiges QSO geht denselben Weg ins Logbuch wie eines
+aus WSJT-X. Der Ablauf kommt ausschliesslich durch gehoerte Funde
+voran; es gibt keinen Zeitgeber, der von sich aus eine Nachricht
+nachschiebt, und nach fuenf Fenstern ohne Antwort gibt er auf.
+
+### RTTY senden
+
+Dazu das Gegenstueck zum vorhandenen RTTY-Dekoder: Baudot/ITA2,
+Mark 2295 Hz, Shift 170 Hz, 45,45 Baud. Geprueft als Rundlauf — was
+der Sender schreibt, liest der eigene Dekoder wieder ein. Die
+Anbindung ans Fenster folgt.
+
+### Die Geraetesuche hielt die Oberflaeche an
+
+4656 ms, im Hauptfaden, bei jedem Oeffnen des Verbinden-Fensters:
+scanAllNics() wartete je Netzkarte attemptsPerNic ×
+quietPollsBeforeResend × pollTimeoutMs in waitForReadyRead ab. Jetzt
+ein Zustandsautomat mit Zeitgeber — der Aufruf kehrt nach 1 ms
+zurueck, die Suche laeuft im Hintergrund weiter. Damit wird auch die
+Anzeige ehrlich: „Searching for radios…" war bisher nie zu sehen, weil
+Start und Ende im selben Takt kamen.
+
+### Was auf eine Uhr gewettet hatte
+
+Dieselbe Fehlerklasse an sechs Stellen, jedes Mal eine feste
+Millisekundenzahl, die auf einer besetzten Maschine reisst:
+
+  * 205 Stellen im Pruefstand nahmen stillschweigend die 5000 ms von
+    qWaitForWindowExposed — ein MainWindow braucht allein rund 5 s.
+  * Das Logbuchfenster korrigierte seine Groesse an drei festen
+    Punkten (50/300/1000 ms) und blieb aufgezogen, wenn die
+    Mindesthoehe beim letzten noch nicht stand.
+  * Die Luecken-Drossel verlangte „genau eine Meldung" und meinte
+    „hoechstens eine je 20-ms-Fenster".
+  * Dazu zwei knappe Fristen, ein drain(), das blind 200 ms absass,
+    und ein Signal-Spion, der auf das naechste statt auf das
+    vorhandene Signal wartete.
+
+Voller Durchgang auf diesem Stand: 978 von 978 gruen.
+
+### Kleineres
+
+  * Die Sendebandbreite in der TX-Fussleiste ist jetzt ein
+    Bedienelement: Linksklick geht zur naechsten Stufe (2.8k, 3.0k,
+    3.3k, 3.6k, 5.0k, 8.0k), Rechtsklick oeffnet die Liste.
+  * Vier Stellen lasen das Stationsrufzeichen nur unter
+    `StationCallsign` — und den schreibt niemand. Die eigene Station
+    fehlte dadurch auf der QSO-Karte, und im FlexRadio-Rundruf hiess
+    sie „LONGPATH".
+  * Messpunkte fuer die Startzeit: der MainWindow-Konstruktor, show()
+    und die erste freie Runde der Ereignisschleife, dazu fuenf
+    Teilzeiten je abgeloestem Fenster.
+
+
+## [0.6.9] - 2026-10-14
+
+Neun Commits seit 0.6.8. Thema: **was im Protokoll steht — und was dort
+fehlte.** Sieben der neun Stuecke beginnen damit, dass eine Frage am
+laufenden Geraet nicht zu beantworten war, weil nichts aufgeschrieben
+wurde: ob der Rotor verbunden ist, ob der Vorverstaerker und die
+Daempfung derselbe Steller sind, ob die Suche im richtigen Netz sucht,
+ob die Uebersteuerungserkennung ueberhaupt anschlaegt, ob die
+Update-Pruefung durchkam.
+
+Der Anlass fuer diese Fassung ist der letzte Punkt. Auf dem zweiten
+Rechner des Betreibers (Mac mini) stand 0.6.5 und blieb dort: der
+Updater kennt nur `api.github.com`, und dieser Rechner erreicht die
+Adresse nicht. **Ohne diese Veroeffentlichung kommt die Abhilfe bei
+niemandem an**, denn die ausgelieferte 0.6.8 traegt sie noch nicht.
+
+### Der Updater kommt auch ohne api.github.com weiter
+
+Auf dem Mac mini des Betreibers stand 0.6.5, waehrend das MacBook
+laengst weiter war — und „Check for Updates" half dort nicht. Die
+Ursache lag nicht im Programm: `api.github.com` liegt inzwischen in
+Azure (20.250.119.72), und von diesem Rechner aus baut sich die
+TCP-Verbindung dorthin zwar auf, der TLS-Handshake bleibt aber stehen,
+bis die Zeit ablaeuft. `github.com` selbst (140.82.121.3) antwortet
+einwandfrei. Am MacBook war derselbe Fehler vorher mit zwei festen
+Zeilen in `/etc/hosts` ueberdeckt worden.
+
+Betreiber dazu: **„macht der enduser auch nicht alles."** Eine Abhilfe,
+die in `/etc/hosts` steht, ist keine. Also kann der Updater es jetzt
+selbst: scheitert die API — stumm, ohne DNS, mit Ratelimit oder mit
+einer Antwort, die kein Release ist — wird die Veroeffentlichung von der
+Webseite abgeleitet. `github.com/.../releases/latest` leitet auf
+`/releases/tag/<tag>` weiter; das Tag genuegt, denn jede Datei liegt
+unter `/releases/download/<tag>/<name>` und die Namen schreibt
+`release.yml` nach fester Regel. Ein HEAD auf das Paket dieser Maschine
+beantwortet in einem Zug, ob es existiert und wie gross es ist — statt
+es zu behaupten. Fehlt es (Windows seit 0.6.7), sagt der Dialog das
+weiter wie bisher und bietet die Seite an.
+
+Was dabei fehlt, wird benannt statt verschwiegen: die Notizen stehen nur
+in der API, also steht an ihrer Stelle, warum sie fehlen, und die
+Statuszeile sagt „read from github.com — api.github.com did not answer".
+Der Hinweis haengt an der Veroeffentlichung, nicht am Abfrager: die
+stille Startpruefung benutzt einen eigenen `UpdateChecker` und reicht
+nur das Objekt weiter — haengte er am Abfrager, waere er auf genau
+diesem Weg verlorengegangen (beim Bauen gesehen und behoben).
+
+Dazu zwei Kleinigkeiten, die dieselbe Suche gekostet haben:
+
+* Die stille Startpruefung meldet ihr Scheitern jetzt ins Protokoll.
+  Vorher hing an `checkFailed` nur `deleteLater` — auf dem Mac mini lief
+  sie bei jedem Start in den haengenden Handshake, und es war nichts
+  davon zu sehen. Der Bediener bekommt weiterhin keinen Dialog.
+* Die Paketgroesse wird nur gezeigt, wenn sie bekannt ist, statt als
+  „0.0 MB" dazustehen.
+
+`LONGPATH_UPDATE_API_URL` zeigt die API fuer Pruefstaende auf eine
+andere Adresse (etwa einen geschlossenen Port) — nur so laesst sich der
+zweite Weg belegen statt behaupten. Der Prueflauf dazu ist mit
+`LONGPATH_NET_TESTS=1` scharf; die Gegenprobe mit abgeschaltetem
+Rueckfall faellt, wie sie soll.
+
+
+### Der Rotor stuerzte beim Beenden ab (#217)
+
+Seit der Rotor am 2026-10-10 wieder am Netz haengt, stuerzte Longpath
+beim Beenden ab — sechs Berichte in `~/Library/Logs/DiagnosticReports`,
+alle denselben Weg. Behoben.
+
+### Der Rotorzustand steht jetzt im Protokoll (#224)
+
+Am 2026-10-11 stand in den Protokollen keine einzige Zeile darueber, ob
+der Rotor verbunden war; „Rotator connected" liess sich nur am
+Statusschild im Fenster ablesen — der Widget-Baum der laufenden Instanz
+musste ueber die Automatisierungsbruecke abgefragt werden, um es zu
+sehen. Jetzt: eine Zeile je Wechsel, nicht mehr.
+
+### QRP: Vorverstaerker und Daempfung sind EIN Steller (#219)
+
+Beide Setter schreiben Opcode 0x04 mit demselben Stufenindex an
+derselben Stelle (Byte 18): 00/01/02/03 = -20/-10/0/+10 dB. Wer eines
+bewegt, verstellt das andere mit, und die Anzeige des anderen stimmt
+danach nicht mehr. Der Befund ist festgehalten, nicht geraten.
+
+### QRP: die Suche sagt, ob das Geraet im eigenen Netz liegt (#225)
+
+Ein Messlauf lief fuenf Suchversuche — 90 Sekunden — ins Leere und
+meldete „keine Antwort", also dieselbe Meldung wie bei einem gesperrten
+Geraet. Die Ursache stand nirgends: der Rechner hing in einem anderen
+Netz als die eingetragene Adresse. Das sagt der erste Fehlversuch jetzt.
+
+### QRP: Pruefstand fuer die Uebersteuerungserkennung (#223)
+
+Die QRP meldet Uebersteuerung nicht selbst; Longpath liest sie aus dem
+Signal, indem es Proben am Anschlag zaehlt. Belegt war bisher nur die
+eine Haelfte — dass sie nicht falsch anschlaegt. Jetzt auch die andere.
+
+### QRP: vier tote Rahmen, zwei Temperaturen, zwei Behauptungen weniger (#212)
+
+Aufraeumen in der Paritaetsliste: zwei Punkte standen dort als offen,
+die laengst gebaut waren.
+
+### MaxBin: der Haltewert klebte nach einem starken Signal oben (#215)
+
+In der Vorlage als „the BIN meter no longer sticks near the top of the
+scale after a very strong signal" beschrieben — bei uns an zwei Stellen
+bestaetigt und behoben.
+
+### App am Telefon: Panadapter und Wasserfall 1:1 wie Longpath (#214)
+
+Betreiber: „ich wuerde gerne die grafik vom longpath software 1:1 auf
+das app in bezug auf farben und hintergrund verwenden". Wert fuer Wert
+gegen `StyleConstants.h` nachgemessen.
+
+Keine Windows-Pakete — unveraendert seit 0.6.7.
+
+### Der Empfangs-Equalizer — neu (2026-10-11)
+
+Longpath hatte keinen. WDSPs `eqp` laeuft im RXA-Durchlauf
+(`third_party/wdsp/src/RXA.c:673`) und ist beim Anlegen aus und flach,
+aber **kein einziger `SetRXAEQ*`-Ruf war in `src/core/wdsp_api.h`
+deklariert** — die Stufe lief also leer mit, und niemand konnte sie
+anfassen. Thetis hat sie seit immer (`Console/radio.cs:827-843` RXEQOn,
+`:800-824` RXEQ10, Bedienung in `eqform.cs`).
+
+Gebaut ist die ganze Kette:
+
+* `wdsp_api.h` — sieben Deklarationen. Die Signaturen folgen dem
+  **vendorten** TAPR v1.29, nicht Thetis' neuerem `eq.c`: dort nimmt
+  `SetRXAEQProfile` einen vierten Parameter `double* Q` fuer die
+  parametrische Form (Thetis `wdsp/eq.c:623`), den unsere Fassung nicht
+  kennt. Verhalten von Thetis, Signatur vom vendorten Header.
+* `RxChannel` — sieben Wrapper, Spiegel der `setTxEq*`-Familie. Jeder
+  prueft `wdspChannelInRange()`: Pruefstaende bauen den Kanal mit der
+  Nummer 99, und ein WDSP-Ruf darauf schreibt ueber das Feldende hinaus.
+  `rxEqRunningInWdsp()` liest zurueck, was WDSP selbst haelt — dieselbe
+  Vorsicht, die beim Sende-CTCSS einen echten Fehler gefunden hat.
+* `SliceModel` — Zustand je Slice, persistiert slice-weit (nicht per
+  Band: eine Klangeinstellung soll beim Bandwechsel nicht umspringen).
+  **Abweichung von Thetis, bewusst:** dort ist der Equalizer global und
+  wird auf `id(0,0)` und `id(0,1)` zugleich gelegt (`eqform.cs:3027`).
+  Hier haengt er am Slice wie jede andere Empfangs-DSP-Einstellung —
+  zwei Empfaenger duerfen verschieden klingen. Geklammert wird im
+  Setter, nicht in der Oberflaeche: ein Wert aus der Einstellungsdatei
+  oder aus einem Frequenzspeicher hat kein Feld davor, das ihn abfaengt.
+  Grenzen `-12..+15` dB, aus Thetis `eqform.cs:1871-1872` (Baender) und
+  `:1946-1947` (Vorverstaerkung) — gemessen, nicht geschaetzt.
+* `RadioModel` — Verdrahtung. Ein geaenderter Bandwert schiebt immer die
+  **ganze** Kurve hinaus, weil `SetRXAGrphEQ10` nichts anderes anbietet
+  (Thetis macht es genauso). Die Kurve geht auch hinaus, wenn der
+  Equalizer aus ist, damit beim Einschalten sofort das Richtige
+  dasteht; WDSPs `run`-Flag entscheidet allein, ob gerechnet wird. Beim
+  Verbinden wird die gespeicherte Kurve nachgeschoben — ohne das lief
+  der Kanal flach, waehrend das Modell die Werte des Betreibers meldete,
+  genau die Form, die bei NB/SNB schon einmal zugeschlagen hat.
+
+### Das Equalizer-Feld haengt jetzt im Panel
+
+`EqApplet` stand seit der Skelettphase als Geister-Applet in
+`MainWindow.cpp` auskommentiert, mit der Bedingung
+`// TODO 3I-3: TX/RX EQ wiring`. Die ist erfuellt, also haengt es:
+
+* Die RX/TX-Umschaltung waehlt, welche Kurve die zehn Schieber bedienen.
+  Die Sendeseite ging auf `TransmitModel::txEq*` (seit 3M-3a-i da, der
+  grosse Editor dazu bleibt `TxEqDialog`), die Empfangsseite auf das
+  Neue oben. Beide Haelften waren vorher Attrappen — alle sechs
+  Bedienelemente trugen `NyiOverlay`.
+* **„Music" ist aus der Vorwahl-Liste entfernt.** Es gab dafuer keine
+  Quelle: Thetis kennt ueberhaupt keine EQ-Vorwahlen (`eqform.cs`),
+  AetherSDR auch nicht (`EqApplet.cpp:277` hat nur die Schieber). Die
+  beiden, die bleiben, sind belegt — „Flach" ist WDSPs Vorgabe beim
+  Anlegen, „Sprache" die Kurve, die in WDSPs Quelltext direkt darueber
+  auskommentiert steht (`RXA.c:260`). Eigene DSP-Kurven zu erfinden
+  verbietet `CLAUDE.md` ausdruecklich.
+* Der Eintrag in `m_appletsById` ist Pflicht neben `registerApplet` —
+  ohne ihn kennt der Auswaehler das Applet nicht, und es waere wieder
+  gebaut und unerreichbar.
+
+Die Schieber gehen `-10..+10`, die DSP-Grenzen bis `-12..+15`. Der
+Bereich bleibt, wie die Vorlage ihn hatte; ihn zu weiten ist eine Sache
+der Gestaltung. Das Modell klammert, es kann also nichts Falsches
+hinausgehen.
+
+Prueffaelle: `tests/tst_rx_equalizer.cpp`.
+
+
+## [0.6.8] - 2026-10-08
+
+Zwei Commits seit 0.6.7, einen Tag. Thema: **die Oberflaeche, nicht die
+Technik.**
+
+Beide Stuecke haben denselben Hergang: der Betreiber hat auf etwas
+gezeigt, das nicht passt, und beide Male stand die Ursache nicht da, wo
+sie vermutet wurde. Die Leiste sah falsch aus, weil ein app-weites
+Stilblatt vom 2026-09-18 jedem Knopf 24 Pixel Innenabstand vererbt, der
+nicht widerspricht — aus dem „N" eines Abzeichens wurde ein
+Schraegstrich. Die Kurve sah treppig aus, weil die GPU sie als Band mit
+harten Kanten zeichnet, nicht wegen der Linienbreite.
+
+### Die Kommandoleiste passt (#210)
+
+Die Profilschiene traegt in der Leiste jetzt `CommandBar::pillStyle()` —
+denselben Aufruf wie BAND und MODE, nicht etwas Aehnliches, damit es
+beim naechsten Stilblatt nicht wieder auseinanderlaeuft. Dazu
+Trennstriche und verteilte Gruppen: die Kommandoleiste war die einzige
+Stelle im Fenster ohne jede Grenze, waehrend BANDWIDTH FILTER,
+PANADAPTER, S-METER, TX, FREQUENZ und ROTOR/LOG alle eingefasst sind.
+
+**Der geerbte Innenabstand** traf drei Stellen (Abzeichen am Rand, Kreuz
+am Abzeichen, Plus in der Leiste) und war seit drei Wochen zu sehen.
+Keine Pruefung hat ihn gemerkt, weil keine das app-weite Blatt trug: ein
+Bauteil allein im Pruefstand erbt nichts und ist gruen.
+`tst_profilschiene_richtung` ruft jetzt `applyAppBaselineQss(*qApp)` und
+misst gegen eine leibhaftige Pille aus einer echten `CommandBar` statt
+gegen eine Zahl — `kPillHeight` ist 27, eine Pille auf dem Schirm aber
+29, weil `min-height` in Qt der Inhaltsflaeche gilt.
+
+**Diese Fassung traegt die Leiste zum ersten Mal in einem Paket.** Das
+Etikett v0.6.7 wurde 40 Minuten vor dem Merge von #210 gesetzt; wer
+0.6.7 geladen hat, hat die alte Leiste.
+
+### Die Kurve bekommt eine weiche Kante (#101)
+
+Zwei Zutaten der am 2026-09-17 gewaehlten Gestaltungsrichtung „Glas &
+Tiefe" (dort: „Kurven mit Hof") sind jetzt gebaut und schaltbar in
+Setup › Display › Render:
+
+* **Soft trace edge** — die GPU zeichnet die Kurve als Band aus zwei
+  Scheitelpunkten je Bildspalte; an steilen Flanken ergibt das eine
+  Treppe, weil das Band harte Kanten hat. Der Kern wird jetzt einen
+  halben Geraete-Pixel schmaler gerechnet, und aussen laeuft je ein
+  Streifen von voller Deckkraft auf 0 aus. Das ist ein Gouraud-Verlauf,
+  also **kein neuer Shader**. Die Linienbreite bleibt, wie sie ist
+  (1 px, Entscheidung des Betreibers vom 2026-08-26). Gilt auch fuer die
+  **Spitzenhaltelinie** — dieselbe Treppe, dieselbe Behebung.
+* **Trace halo** — ein schwaches Band um die lebende Kurve, 22 % an der
+  Linie und 0 bei 2,5 px, unter ihr gezeichnet. Nur an der lebenden
+  Kurve, nicht an der Spitzenhaltelinie: zwei Hoefe uebereinander sind
+  Nebel. Die 22 % sind geborgt, nicht gewaehlt — derselbe Wert, mit dem
+  `docs/design/HAUSSTIL.md` §Weiche Uebergaenge die Fuellung unter der
+  Kurve auslaufen laesst.
+
+**Vorgabe: weiche Kante AN, Hof AUS.** So hat der Betreiber am
+2026-10-08 nach den drei Blaettern entschieden. Die weiche Kante nimmt
+die Treppe weg und sonst nichts; der Hof blieb ein Schalter, weil er das
+Band im Rauschen merklich dicker und nebliger macht.
+
+**Die alte Kurve ist einen Haken weit entfernt.** Mit beiden Schaltern
+aus zeichnet die GPU **genau einen Streifen mit den alten Werten**,
+bitgleich zum Stand davor — nachgerechnet ueber 48 000 Scheitelwerte,
+drei Linienbreiten und zwei Pixeldichten, 0 abweichend. Die Geometrie
+liegt dafuer als reine Funktion in `src/gui/KurvenStreifen.h`, und
+`tst_kurven_streifen` vergleicht sie gegen die Zahlen, die vor dem Umbau
+als Literal im Malcode standen — nicht gegen sich selbst.
+
+Die Kurve **verschiebt sich nicht**: `tst_spectrum_trace_on_grid` liest
+mit echter GPU nach, dass sie weiter auf ihrer Gitterlinie liegt (6/6,
+auch mit Bandplan, 1-Hz-Normierung und +15 dB Kalibrierung).
+
+Vergleichsbilder (drei Fassungen desselben Ausschnitts, Martins
+Anzeige-Einstellungen) erzeugt `tst_rendering_werkbank` mit
+`LONGPATH_RENDER_VARIANTS=k_kurve_heute,l_kurve_weich,m_kurve_weich_hof`.
+
+## [0.6.7] - 2026-10-07
+
+76 Commits seit 0.6.6, drei Tage. Thema: **die Instrumente haben
+geantwortet.**
+
+0.6.6 hat an einer Reihe Stellen das Schweigen abgestellt. Diese Fassung
+zeigt, was dabei herauskommt, wenn man danach hinsieht.
+
+Der **Driftausgleich am Empfangston** bekam eine Minutenmeldung ins
+Protokoll — und meldete beim ersten echten Lauf an der SunSDR2 QRP nach
+genau einer Minute, dass er am unteren Anschlag klebt: Verhaeltnis
+0,960000000 statt der erwarteten 4 ppm, nach einer Stunde zwei Minuten
+Ton weggeworfen. Ursache war eine Plausibilitaetsgrenze aus dem Tag
+davor, die ueber Netz ankommende Tonschuebe fuer Stoerungen hielt. Der
+Bus **zaehlt** den Verbrauch jetzt, statt ihn aus zwei Fuellstaenden zu
+erschliessen.
+
+Die **Compilerwarnungen des Linux-Laufs** — 156 in eigenen Dateien, von
+denen niemand je eine gelesen hat, weil der Baum ohne `-Werror`
+uebersetzt — hielten zwei echte Funde: eine Sicherheitsdecke fuer die
+Sendeleistung, die wegen `std::clamp` **gar nicht scheitern konnte**, und
+eine Schleife, die bei REDPITAYA endete und die danach hinzugekommene
+ANAN-G2E deshalb nie geprueft hat.
+
+Die **Protokolle der Station** sagten, warum `rotctld` 75 Sekunden lang
+versuchte und starb — die Zeile darueber nannte Adresse und Ursache,
+waehrend die Statusleiste nur „IO error" zeigte.
+
+Und zwei Luecken, die eine Fernbedienung betreffen: die **Bruecke**
+(`tci-bruecke.py`) hob den Token-Schutz und alle drei Freigaben auf, weil
+sie eine eigene Verbindung nach 127.0.0.1 aufbaut und damit jeder Client
+der App aus Loopback kam; und ein **Feld in einer Antwortzeile** konnte
+die Zeile beenden und einen zweiten Befehl anhaengen — aus einem
+Telnet-Strom von einem fremden Rechner.
+
+An der **SunSDR2 QRP** ist der Empfang fertig: zweiter Empfaenger, 96 kHz,
+zwei Stroeme, Mikrofon-PTT, Antennenwahl, Erholung beim Verbinden — alles
+am echten Geraet gemessen.
+
+### Hinzugefuegt
+
+- **Spots im Bild am Telefon** (#197, #201). Longpath kennt Cluster, RBN,
+  POTA und SpotCollector; die App zeigte davon nichts. Jetzt stehen sie im
+  Spektrum, verblassen mit dem Alter, und ein Tipp auf das Rufzeichen
+  schlaegt es bei QRZ nach — zwei Tipps tragen es ins QSO-Blatt.
+- **Ins Logbuch sehen, nicht nur hineinschreiben** (#196). `log_last:` und
+  `log_dup:` am TCI-Weg; die App zeigt die letzten Verbindungen und sagt
+  beim Eintragen, ob die Station auf diesem Band und in dieser Betriebsart
+  schon im Buch steht.
+- **Den Rotor vom Telefon drehen** (#200), hinter `TciAllowRemoteRotor` —
+  ab Werk aus, mit eigenem Schalter in Setup > CAT & Network > TCI Server
+  (#205). Abfragen darf jeder angemeldete Client, drehen nur mit Freigabe.
+- **Zurueck aus dem Hintergrund** (#199). Die App wartete nach dem
+  Aufwachen bis zu acht Sekunden auf den ersten Spot; gemessen bei gleich
+  langer Unterbrechung sind es jetzt null.
+- **Driftausgleich am Empfangston** (#131, #198, #202, #208), portiert aus
+  WDSP `rmatch.c` und `varsamp.c`. Ab Werk aus.
+- **Die Profilschiene liegt wahlweise oben in der Kommandoleiste** (#204),
+  umschaltbar im Rechtsklickmenue; in der Leistenlage gehoeren die 44 px
+  am linken Rand dem Panadapter.
+- **SunSDR2 QRP: zweiter Empfaenger, 96 kHz, zwei Stroeme, Mikrofon-PTT,
+  Antennenwahl 0x15** — am echten Geraet gemessen.
+
+### Geaendert
+
+- **Das Logbuchfenster traegt denselben Rahmen wie alle anderen Fenster**
+  (#203) — rahmenlos, eckig, mit eigener Titelzeile.
+- **Der Rotorzustand geht als NAME hinaus**, nicht als Nummer (#203).
+  Vorher kannten zwei Stellen dieselbe Zaehlung; ein eingefuegter Zustand
+  haette am Telefon „DREHT" angezeigt, wo der Rotor einen Fehler meldet.
+- **Eine Ablehnung sagt, wo der Schalter sitzt** (#206):
+  „NICHT FREIGEGEBEN — Setup > CAT & Network > TCI Server".
+- **Eine Schriftwahl statt acht** (c048a9b7). Auf dem Mac kamen dabei vier
+  verschiedene Schriften heraus, zwei davon gar keine Monospace.
+
+### Behoben
+
+- **Der Driftausgleich lief in den Anschlag** (#208). Der Verbrauch wird
+  gezaehlt statt geschaetzt; `flush()` faelscht ihn nicht mehr, und
+  Tonschuebe ueber Netz werfen ihn nicht mehr aus der Bahn.
+- **Ein geleerter Ring ist kein Verbrauch** (#203). `setMasterMuted(true)`
+  leert den Ring; aus dem Unterschied gelesen sah das aus wie der
+  sechsfache Verbrauch — bei JEDEM Stummschalten.
+- **Die Bruecke hebelte alle drei Freigaben aus** (#205). `TciAllowRemoteTx`
+  und `TciAllowRemoteRotor` schuetzten nicht, solange sie lief, und das
+  fuer jedes Geraet im Heimnetz.
+- **Ein Feld konnte die Antwortzeile beenden** (#203). `spot_zeile:` und
+  `log_qso_zeile:` fuehren Text aus Spotquellen und ADIF-Dateien; ein
+  Semikolon darin haengte der Gegenseite einen zweiten Befehl an. Beide
+  Richtungen sichern jetzt.
+- **Eine Sicherheitsdecke, die nie scheitern konnte** (#207).
+  `computeAudioVolume` endet auf jedem Weg in `std::clamp(..., 0.0, 1.0)`;
+  `QVERIFY(v <= 1.0)` war damit eine Tautologie. Die 16 Zellen, in denen
+  die Klammer wirklich kappt, sind jetzt festgehalten.
+- **Die ANAN-G2E stand ausserhalb der Pruefschleife** (#207), weil deren
+  Obergrenze ein Geraet NANNTE statt die Aufzaehlung zu Ende zu gehen.
+- **„IO error" ist keine Auskunft** (#203). Der Grund steht eine Zeile
+  hoeher: Adresse und Ursache statt der letzten Zeile von Hamlibs stderr.
+- **Ein toter Ausgang galt als offen** (c8761850) — Ton im Programm,
+  nichts am Lautsprecher.
+- **Eine Protokollzeile stand auf dem DSP-Faden** (#203). `QString` teilt
+  Speicher zu, `qCInfo` nimmt eine Sperre; beides hat im Tonweg nichts zu
+  suchen.
+- **Vier Pruefstaende haetten eine fehlende Vorlage nicht bemerkt** (#207)
+  und danach das Nichts gemessen — gruen.
+- **Der Driftpruefstand war eine Zeitbombe** (#208): 83,7 s von 120 s
+  CTest-Grenze. Jetzt +-100 ppm ueber 40 000 Bloecke statt +-4 ppm ueber
+  200 000 — haerter, und 9,8 s.
+- **43 von 156 Warnungen** (#209) liegen jetzt an einer Stelle statt an
+  zweiundzwanzig (`core/ZeitUtc.h`), ohne den Bau mit Qt 6.4 zu brechen.
+
+## [0.6.6] - 2026-10-04
+
+Zwei Tage nach 0.6.5, 103 Commits, und sie haben ein Thema: **eine
+Anzeige, die schweigt, ist so schlimm wie eine, die luegt.**
+
+Vom Telefon laesst sich jetzt **loggen** — ein eigener TCI-Befehl traegt
+das QSO in dasselbe Logbuch ein, das die Oberflaeche schreibt, und holt
+Frequenz, Band, Betriebsart und Zeit selbst aus der aktiven Scheibe. Der
+**Sendeton** ist bis zum fertigen Rahmen gebaut, samt Haltetaste und
+Pegelbalken; getastet wird davon nichts, und das ist Absicht.
+
+Dahinter liegt der Befund des Tages: am Telefon fehlen **Mikrofon,
+AudioWorklet und Opus aus EINEM Grund** — `isSecureContext` ist dort
+`false`. Drei Posten, die als drei verschiedene Eigenheiten in den
+Unterlagen standen. Das Zertifikat dafuer legt jetzt ein Skript an, der
+Seitenserver spricht `https`, und die TCI-Bruecke beendet TLS auf
+demselben Port wie bisher.
+
+Und eine Reihe Stellen, die etwas wussten und nichts sagten: die
+**Einstellungs-Hygiene** prueft bei jedem Verbinden und meldete es
+niemandem; **sieben Audio-Geraete** wurden ohne Zeitlimit geoeffnet und
+konnten die ganze Oberflaeche anhalten; ein **gescheiterter Versand**
+meldete "Unable to send a message" und verschwieg den Grund — jetzt nennt
+er ihn, auf Windows ueber `WSAGetLastError()`, weil Winsock `errno` gar
+nicht setzt; ein **abgelehnter Sendewunsch** wurde stumm verworfen, was
+auf einer Fernbedienung von einem Defekt nicht zu unterscheiden ist. Dazu
+264 fremde Warnungen aus dem Linux-Bau, die die eigenen zudeckten.
+
+### Hinzugefuegt
+
+- **Loggen vom Telefon, ganz** (#184, #185). Ein eigener TCI-Befehl
+  `log_qso:<rufzeichen>[,<rst gesendet>[,<rst empfangen>]];` traegt ein QSO
+  in dasselbe Logbuch ein, das die Oberflaeche schreibt — Frequenz, Band,
+  Betriebsart und Zeit holt der Server sich selbst aus der aktiven Scheibe,
+  damit vom Telefon nur kommt, was dort wirklich bekannt ist. Dazu das
+  QSO-Blatt (Entwurf A von vier): Rufzeichen, zweimal RST, drei Zeilen
+  "automatisch". Gesperrt wie jeder andere Netzbefehl — Token noetig,
+  `TciAllowRemoteLog` ab Werk an, aber abschaltbar.
+- **Sendeton vom Telefon: der Rahmenbau** (#186) und **die Halteleiste**
+  — mu-law nach G.711, Ratenwandlung mit uebertragenem Rest, TCI-Binaerkopf
+  genau so, wie der Server ihn liest. **Nichts davon kann tasten**: es gibt
+  weder `trx:` noch `tune:`, und das bleibt so bis zur ausdruecklichen
+  Freigabe an der Dummy-Last. Vier Entwuerfe fuer die Sendetaste lagen vor,
+  gewaehlt wurde die **Haltetaste** (#190) — der Finger ist die Sicherung,
+  und was ohne Finger endet, kann nicht haengenbleiben.
+- **Handfunke: der Tonvorrat wandert nicht mehr** (#181). Er lief mit der
+  Zeit aus dem Ruder und wurde erst am harten Deckel zurechtgerissen — ein
+  hoerbarer Sprung. Jetzt wird der Leseschritt um hoechstens 0,3 Promille
+  nachgezogen; der Deckel bleibt als Netz darunter.
+
+- **Handfunke: ein Zertifikat — und damit ueberhaupt erst ein Mikrofon.**
+  Der naechste Baustein beim Senden waere die Mikrofonaufnahme gewesen;
+  geschrieben wurde davon keine Zeile, weil `getUserMedia` **[SecureContext]**
+  ist und am Telefon ueber `http` gar nicht existiert. Das Telefon meldete
+  das seit Wochen selbst — `sicher=false` in jeder Zeile von 172.30.30.x,
+  `sicher=true` nur von 127.0.0.1, wo ohne Zertifikat alles gruen laeuft.
+  Derselbe Schalter kostet das `AudioWorklet` (deshalb
+  `weg=scriptprocessor`) und WebCodecs/Opus; drei Posten, die als drei
+  Eigenheiten in den Unterlagen standen. `tls-einrichten.sh` legt eine
+  eigene Zertifizierungsstelle und ein Serverzertifikat an, der Seitenserver
+  horcht zusaetzlich mit TLS und reicht die Stelle unter `/ca.crt` heraus,
+  und `tci-bruecke.py` beendet TLS **auf demselben Port** — welches
+  Protokoll gesprochen wird, steht im ersten Byte. Der alte Weg ueber `http`
+  und `ws://` bleibt unveraendert offen. Am Geraet ist das noch nicht
+  geprueft; `kann-das-telefon.html` beantwortet es in einem Blick.
+- **Die Einstellungs-Hygiene prueft bei jedem Verbinden — und sagte es
+  niemandem** (#182). Sie lief seit Monaten, ihr Ergebnis ging nirgendwo
+  hin. Eine Pruefung, deren Ergebnis niemand sieht, ist keine Pruefung.
+- **Ein Geraet, das nicht aufmacht, nimmt nicht mehr alles mit** (#176).
+  `AudioEngine::start()` oeffnet sieben Geraete nacheinander, und zwar in
+  der verschachtelten Ereignisschleife des Verbindungsaufbaus — blieb eines
+  stehen, stand die ganze Oberflaeche. Jetzt oeffnet jedes auf eigenem Faden
+  mit 5000 ms Frist (gemessener Normalfall: 20 ms, also zwei Zehnerpotenzen
+  Abstand), und Schrittmarken `[AudioStart:Step] n/7` nennen im Hangfall das
+  Geraet, statt eine stumme Luecke zu hinterlassen. Die Marke selbst stand
+  anfangs als "3 /7" da, weil Qt zwischen gestreamten Werten ein Leerzeichen
+  setzt (#187).
+- **264 fremde Warnungen aus dem Linux-Bau** (#177, #178), die die eigenen
+  zudeckten. Eine Warnung, die in jedem gesunden Lauf steht, verdeckt die
+  eine, auf die es ankommt.
+- **Ein Messlauf fuer die dBm-Skala** (#180), statt sie anzuschauen.
+- **Entwurf: Senden und Loggen vom Telefon** (#183) — der Gesamtweg, bevor
+  davon etwas gebaut wurde.
+
+- **Handfunke: die Seite sagt, wenn die Station sendet** (#170). `trx:` und
+  `tune:` wurden seit dem ersten Tag mitgelesen und nirgends verwendet — die
+  Seite wusste es und schwieg. Jetzt steht dort, wo sonst „SENDEN / NUR IN DER
+  APP" steht, in Messing: „STATION SENDET · EMPFAENGER STUMM". Dazu werden
+  „nur rauschen — antenne?" und „stockt" waehrend des Sendens unterdrueckt;
+  der Empfaenger ist dann stumm, und beide waeren die falsche Erklaerung. Die
+  Sendetasten bleiben tot wie bisher.
+- **SunSDR2 QRP: der Treiber hoert dem Geraet endlich zu** (#150, #154, #168).
+  Inventar je Rahmensorte, Folgenummern mit Verlust/Luecken/Wiederholungen,
+  Quittungsbuchfuehrung — und ein unquittierter Rahmen wird **einmal**
+  nachgeschickt. Am Geraet beobachtet: ein VFO-Frequenzrahmen ging verloren,
+  und das Geraet stand danach auf einer anderen Frequenz als die Anzeige.
+  Nachgeschickt wird nur, wo es die Lage verbessert (0x01, 0x04, 0x07, 0x08) —
+  nie ein Werkbank-Rahmen, und keiner dieser Opcodes loest HF aus. Dazu
+  Uebersteuerung aus dem I/Q und Mikrofon-PTT aus dem Stromkopf, beide ohne ein
+  einziges geratenes Protokollfeld. Alle vier TX-Encoder sind per Pruefstand
+  gesperrt (#154).
+- **TCI meldet die WIRKLICH gezeigte Spanne** (`spectrum_span`, #151). Der
+  Client rechnete bis dahin mit seinem Wunsch, und der Server hebt eine zu
+  schmale Anforderung an: aus 6 kHz werden bei 373 Punkten und 2048er FFT in
+  Wahrheit 8742 Hz. Daran haengen Abstimmstrich, Durchlassband und
+  Wasserfallversatz.
+- **Ein gescheiterter TCI-Bind wird wiederholt und ist sichtbar** (#149).
+  Vorher blieb der Server nach einem Netzwechsel fuer immer unten, und das
+  Einstellungsfeld sagte nur „Stopped"; jetzt steht dort „Wartet auf …" mit
+  Grund, und der Port wird genommen, sobald er frei ist.
+
+### Behoben
+
+- **Der Verbindungsaufbau konnte am Mikrofon einfrieren** (#166). Nicht der Ton
+  stand still, sondern das ganze Programm — samt „Abbrechen". Ursache: der
+  Mikrofon-Eingang wird eifrig beim Verbinden geoeffnet, und das blockiert ohne
+  Zeitlimit, solange macOS die Berechtigungsfrage stellt; der Aufruf steckt in
+  der verschachtelten Ereignisschleife des Verbindungsaufbaus. Empfangen
+  braucht kein Mikrofon: es wird jetzt nicht mehr geoeffnet, solange die
+  Antwort aussteht. Untersuchung mit allen Zahlen in
+  `docs/architecture/2026-10-03-verbindungshaenger-mikrofon.md` (#165).
+- **Logzeilen zerschrieben sich gegenseitig — und gingen dabei verloren**
+  (#171). Jeder Faden legte einen eigenen QTextStream auf dieselbe Datei.
+  Gemessen gingen bei acht gleichzeitigen Schreibern **7 bis 55 Prozent der
+  Zeilen ganz verloren**; sichtbar waren nur sechs zerschriebene Zeilen in den
+  Betriebslogs. Jetzt ein Schloss und ein einziger Schreibaufruf je Zeile.
+- **Zwei Diagnosezeilen lagen vor dem Log-Umleiter** (#169) und standen darum
+  in keinem einzigen Log: der Mikrofon-Berechtigungszustand beim Start und die
+  Meldung, ob der Oberflaechen-Faden seine Dienstguete bekommen hat — letztere
+  faellt im Misserfolgsfall als Warnung an, und die fehlte damit auch.
+- **Handfunke, Funde vom Geraet** (#148, #153, #163, #164): die iOS-Lupe fror
+  das Bild fuer immer ein; der Wasserfall sass auf dem Mittelwert statt auf dem
+  Rauschboden und blieb dunkel; Kneifen konnte rechnerisch nie zoomen;
+  `ctx.resume()` stand hinter zwei `await` und wurde von iOS verworfen (kein
+  Ton am Lautsprecher); die Rauschgrenze lag mit 10 dB genau auf einem
+  gemessenen Wert und schwieg ausgerechnet dort.
+- **Die Anzeige hielt Messwerte fest, die niemand mehr vornahm** (#155–#162):
+  das S-Meter zeigte nach einem Abriss dreissig Sekunden weiter; bei gar keinem
+  Funkgeraet machte es aus dem Rueckfallwert −140 dBm brav „S1"; das
+  Kopplungsblatt blieb ueber einer laengst wieder stehenden Verbindung liegen.
+  Massstab ist jetzt ueberall `ready`, nie der offene Socket.
+- **P2: erster Verbindungsaufbau ueber WLAN** (#147) — TX-I/Q erst nach dem
+  ersten Rahmen des Geraets.
+- **Der Sende-Faden hob seine eigene Echtzeit-Behandlung auf** (#174).
+  `TxWorkerThread` startete mit `QThread::start(QThread::HighPriority)`, und Qt
+  setzt dafuer auf macOS die Ablaufparameter des Fadens — Darwin verweigert
+  danach **jede** QoS-Klasse. Die Prioritaet hob damit genau die Behandlung
+  auf, die `run()` ausdruecklich haben will („audible glitches on the air").
+  Gemessen: `start()` -> USER_INTERACTIVE, `start(HighPriority)` ->
+  UNSPECIFIED. Der Empfangs-Faden war nie betroffen.
+- **Vier Stellen baten um eine Schrift, die es nicht gibt** (#172). `SF Mono`
+  ist auf macOS nicht angemeldet und loest zu `.AppleSystemUIFont` auf —
+  proportional. Die Zustandszeile der Kopfleiste und die Log-Ansicht im
+  Support-Fenster standen deshalb in der falschen Schrift. Dazu `Consolas`
+  (eine Windows-Schrift) und zweimal CSS-Gattungsnamen, die Qt nicht als
+  Familie kennt.
+- **Drei Fehlalarme im Log** (#175). Von 17 Warnungen einer gesunden Sitzung
+  kamen 13 in **jeder** Sitzung — und in diesem Rauschen waere die eine echte
+  (der Sende-Faden) fast untergegangen. `[PanFloatClose]`,
+  `[AppletFloatClose]` und „TX frequency NOT pushed: no connection yet" stehen
+  jetzt auf INFO. Die Schrittmarken des Profilwechsels bleiben unberuehrt; die
+  sind so bestellt.
+
+### Dokumentation
+
+- Durchgang durch die Handfunke mit allen Messwerten, inklusive der zwei
+  Messfallen, die mich selbst hereingelegt haben (#162, #173).
+- SunSDR-Blaetter: Verbindungsablauf, Paritaetsplan, Mitschnitt-Anleitung.
+
+## [0.6.5] - 2026-10-02
+
+Zehn Tage Arbeit seit 0.6.4, rund 120 Pull Requests: **Longpath am
+iPhone** (die Handfunke, eine Weboberflaeche ueber TCI mit Spektrum,
+Wasserfall, Ton und Bedienung) und dafuer ein TCI, das gegen fremde
+Webseiten und das Netz abgesichert ist; die **Filtervorgaben wie in
+Thetis**; FM mit CTCSS, Ablage, Reverse und Rauschsperre; ein Logbuch,
+das loggt und den Rotor zeigt; Menues am Fenster statt an der Leiste;
+die SunSDR2 QRP mit echtem I/Q; viele Rendering- und Absturzfunde. Die
+Pakete laufen jetzt auch auf **aelteren Systemen**: macOS ab 12 (Apple
+Silicon und Intel), Linux x86_64 ab glibc 2.35, Linux aarch64 ab glibc 2.38,
+Windows x64.
+
 ### Added
+
+- **Handfunke: Longpath am iPhone** (#146). Eine Webseite, die Longpath
+  selbst ausliefert: Spektrum und Wasserfall, Abstimmen durch Tippen und
+  Ziehen, Ton (12 kHz mono, mu-law), Kopplung mit kurzem Code, Symbol fuer
+  den Startbildschirm. Findet den Rechner ueber seinen Namen, auch ueber IPv6.
+- **TCI: Fernzugriff nur mit Token, Senden aus dem Netz ab Werk gesperrt**
+  (#145, #146). Herkunftspruefung fuer Webseiten, Sendezeit-Deckel,
+  drive/tune_drive/tune, Fernzugriffs-Gruppe in Setup › TCI mit ablesbarem
+  Token. Schmaler Spektrumrahmen (4 kB/s statt 257) und Zoom im Spektrum.
+- **Logbuch loggt mit Frequenz und Mode vom Funkgeraet**, der Rotor steht als
+  Radar neben der Karte und zeigt nur die gewaehlte Station (#107, #118);
+  Drehrichtung aus der genauen Lage statt aus dem Locator (#106).
+- **FM wie Thetis**: kein 100-Hz-Ton mehr beim Senden, CTCSS, Relaisablage
+  und Reverse wirken (#120, #130), Rauschsperre ueber den SQL-Regler (#123),
+  Deviation 5 / 2,5 kHz (#129).
+- **DXCC-Farben der Spots** in den Hausfarben, abschaltbar (#119); cty.dat
+  wird zur Laufzeit geladen (#115).
+- **Seitenbereich rechts**: Rotor/Log und Applets hinter einer Symbolleiste
+  (#99); ein eingeschaltetes Applet kommt nach vorne (#96).
+- **SunSDR2 QRP**: echtes I/Q wird selbst eingeschaltet (#94), Preamp-Schalter
+  +10/0/−10/−20 dB (#95), Pegel wie ExpertSDR2 (#89), Einschaltstoss stumm (#104).
+- **RX-Messwerte nach Thetis**: PB SNR, Rauschflur je Empfaenger, AGC-Gain,
+  feste Zahlenbreite (#121).
+
+### Changed
+
+- **Filtervorgaben Thetis-getreu** (#139): Werte, Namen, DIGx-Grundfilter;
+  der laufende Filter heisst wie seine Vorgabe (#140).
+- **Menues am Fenster** statt an der Leiste oder am nativen Feld: Befehlsleiste,
+  Rotor/Log, Profilleiste (#136, #142, #143).
+- **Longpath startet immer formatfuellend** mit Profil 1, der Kanalzug passt
+  auf den Schirm (#134); der rote Knopf schliesst Kanalzug, Logbuch und
+  Spot-Zentrale dauerhaft (#133).
+- **Panadapter**: Trackpad in ganzen Schritten, Rad-Zoom meldet den Bereich,
+  Abstimmen rastet ein, dB-Raster wirkt (#122); leichtes Rendering ueberall,
+  Fensterraster an allen vier Kanten (#103).
+- **Aeltere Systeme, alle Prozessoren** (#141): Mac ab macOS 12, Linux ab
+  glibc 2.35, Qt 6.8 in allen Paketen, serialport und imageformats ueberall.
+
+### Fixed
+
+- **Rendering: zehn Panadapter-Fehler** (Retina, Echo, Skala, Alpha,
+  Bandplan, FPS, Wasserfall nach Pause) (#100); kein rotes Aufblitzen bei
+  Groessenaenderung (#98).
+- **TUNE geht wieder aus, wenn MOX verweigert wird** (#137).
+- **TCI**: Ton kanalweise umgetastet (L und R vermischten sich ausser bei
+  48 kHz), Mono lief doppelt so schnell, Binaerstroeme stauten sich bei einem
+  eingefrorenen Client, der lokale AF-Regler daempfte den Fernton mit (#146).
+- **Fensterzustaende gingen beim Speichern verloren** (AppSettings, #111);
+  das Logbuch geht in der gespeicherten Hoehe auf (#113, #125, #132).
+- **Karte**: der Ort bleibt beim Vergroessern in der Mitte (#105).
+- **Absturz beim Beenden** mit Applets nach dem RadioModel (#92) und
+  weitere Beenden-Faelle (#83, #134).
+- **Satelliten fehlten bei deutscher Systemsprache** (#135); SGP4 kopierte
+  satnum auf sich selbst (#126).
+
+### Weitere Eintraege seit 0.6.4
+
+### Added
+
+- **CW-Tonhoehe einstellbar, und alles folgt ihr live.** Setup › DSP ›
+  CW › „CW Pitch (Hz)“ (Thetis `udDSPCWPitch`: 200–2250 Hz, Schritt 10,
+  Tooltip wortgetreu) setzt `RadioModel::setCwPitch`, das
+  `cwPitchChanged(int)` meldet. Nachgezogen wird wie im Thetis-Setter
+  `CWPitch` (console.cs, [@852bf0e]): jede CW-Vorgabe, jeder vom
+  Bedienenden ueberschriebene Platz, VAR1/VAR2, der laufende Durchlass
+  jeder CW-Scheibe und die gespeicherten Banddurchlaesse wandern auf die
+  neue Tonhoehe, Breite bleibt, an der Spiegelgrenze rutschen sie statt
+  ueber den Traeger zu reichen. APF-Mitte (Tonhoehe + Feinabstimmung,
+  auch beim Verbinden statt fest 600 Hz), das Suchband des CW-Decoders
+  und die KiwiSDR-Nachfuehrung folgen ebenfalls. Nur Empfang: Mithoerton
+  und der VFO-Versatz bei MOX gehoeren zu CW-TX (zurueckgestellt).
+  Nebenwirkung: CW-F1 (±750 Hz) liegt bei 600 Hz jetzt auf 0–1500 statt
+  −150–1350 Hz, weil auch die Vorgabentabelle an der Spiegelgrenze
+  rutscht; die gelesene Spanne ist 200–2250 statt 100–2000.
 
 - **QRP-Verbindungsreihenfolge widerlegt.** ExpertSDRs kompletter
   Verbindungsstoss (24 Steuerrahmen, Original-Reihenfolge, 12 vor und
@@ -174,6 +947,57 @@
   Knoepfe. Pruefstand `tst_logbook_one_page`.
 
 ### Fixed
+
+- **Longpath läuft wieder auf älteren Systemen, auf allen Prozessoren.**
+  Gemessen an den ausgelieferten 0.6.4-Paketen (minos jeder Mach-O-Datei,
+  höchste verlangte glibc):
+  - Mac Apple Silicon verlangte **macOS 15** (Qt und FFTW aus Homebrew,
+    für das macOS des Bau-Rechners gebaut), obwohl „14.0“ eingetragen war.
+    Jetzt wie die Intel-Fassung: offizielles Qt 6.8, FFTW aus dem
+    Quelltext, **ab macOS 12 (Monterey)** auf Apple Silicon und Intel.
+  - Linux ARM (aarch64) verlangte **glibc 2.38** (Ubuntu 24.04, Ubuntus
+    Qt 6.4) und startete auf dem Raspberry Pi (Raspberry Pi OS Bookworm,
+    glibc 2.36) nicht. Jetzt wie x86-64: Ubuntu 22.04 mit offiziellem
+    Qt 6.8.3, **ab glibc 2.35** (Ubuntu 22.04+, Debian 12+, Raspberry Pi
+    OS Bookworm).
+  - Serielles PTT/CW fehlte in Mac Intel, Linux x64 und Linux ARM
+    (`qtserialport` war nicht installiert); jetzt überall.
+  - Die Mac-Pakete tragen `LSMinimumSystemVersion`: ein zu altes macOS
+    meldet das, statt beim Start abzustürzen.
+  - Das Intel-Programm 0.6.4 trug `/opt/homebrew/lib` als **ersten**
+    Suchpfad (aus `link_directories` in `CMakeLists.txt`). Mit dem
+    offiziellen Qt im Paket hätte das auf jedem Mac mit Homebrew-Qt dessen
+    Qt geladen, und Longpath wäre nicht gestartet (lokal nachgestellt).
+    Releases bauen jetzt mit `-DLONGPATH_HOMEBREW_PATHS=OFF`.
+  - WebP/TIFF, die die Bilddialoge anbieten, fehlten in allen Fassungen
+    außer Mac Apple Silicon (`qtimageformats` nicht installiert).
+  - Xcode 16 ist festgelegt: Qt 6.8 linkt noch `AGL.framework`, das im
+    macOS-26-SDK fehlt.
+  - Die Release-Pipeline prüft bei jedem Bau Untergrenze, Architektur und
+    Verweise nach außen (`packaging/macos/check-min-macos.sh`) bzw. die
+    glibc-Untergrenze (Linux-Job).
+
+- **Satelliten fehlten bei deutscher Systemsprache.** Aus dem Terminal
+  gestartet (oder auf einem deutschen Linux) meldete Longpath „TLE-Satz:
+  0 Satelliten, 95 verworfen“: Qt setzt beim Start das C-Gebietsschema auf
+  die Systemsprache, und SGP4 las die Bahndaten mit `sscanf("%lf")` --
+  mit Komma als Dezimalzeichen. Dasselbe traf `fscanf` in WDSP (gespeicherte
+  PureSignal-Korrektur, Impulsantwort aus Datei). `main()` setzt jetzt
+  direkt nach der QApplication `LC_NUMERIC` auf „C“, wie Qt es empfiehlt
+  (`src/core/CNumericLocale.h`); die Anzeige bleibt unberührt.
+  Prüfstand `tst_c_numeric_locale`.
+
+- **SGP4: `strcpy` auf sich selbst in `sgp4init`.** Vallados
+  `twoline2rv` reicht `satrec.satnum` als `satn` an `sgp4init` weiter, das
+  dann `strcpy(satrec.satnum, satn)` macht — Quelle gleich Ziel, also
+  undefiniertes Verhalten, praktisch harmlos. AddressSanitizer bricht dort
+  aber ab (`strcpy-param-overlap`): ein voller Debug/ASAN-Lauf verlor 23
+  von 906 Tests, `tst_satellite_tracker` und jeden Test, der ein
+  `MainWindow` baut (das startet den Satellitendienst). Ein markierter
+  lokaler Patch in `third_party/sgp4/SGP4.cpp` überspringt jetzt nur die
+  Selbstkopie; festgehalten unter „Local modifications" in
+  `docs/attribution/SGP4-PROVENANCE.md`. Upstream (python-sgp4 `master`)
+  ist an der Stelle unverändert.
 
 - **SunSDR2 QRP: Longpath schaltet echtes I/Q jetzt selbst ein — und die
   Prüfsumme der Steuerrahmen ist entschlüsselt.** Nach dem Einschalten

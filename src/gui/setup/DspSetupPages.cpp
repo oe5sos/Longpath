@@ -13,6 +13,10 @@
 //   2026-05-04 — Issue #175 Wave 1: dropped misplaced AM TX / Carrier
 //                 Level stub from AmSamSetupPage (control belongs at
 //                 Thetis grpTXAM on tpTransmit, not the DSP/AM tab).
+//   2026-09-27 — CwSetupPage: CW Pitch (Hz) group after Thetis
+//                 grpDSPCWPitch/udDSPCWPitch [@852bf0e], live via
+//                 RadioModel::setCwPitch / cwPitchChanged. Martin Fischer
+//                 (OE5SOS), AI-assisted via Anthropic Claude.
 // =================================================================
 
 //=================================================================
@@ -1891,6 +1895,38 @@ NbSnbSetupPage::NbSnbSetupPage(RadioModel* model, QWidget* parent)
 CwSetupPage::CwSetupPage(RadioModel* model, QWidget* parent)
     : SetupPage("CW", model, parent)
 {
+    // ── CW Pitch ──────────────────────────────────────────────────────────────
+    // From Thetis setup.designer.cs:38236-38284 [@852bf0e] — grpDSPCWPitch
+    // („CW Pitch (Hz)", oben links auf tpDSPKeyer „CW") mit lblDSPCWPitchFreq
+    // („Freq:") und udDSPCWPitch: Increment 10, Maximum 2250, Minimum 200,
+    // Value 600, ToolTip „Selects the preferred CW tone frequency.".
+    // udDSPCWPitch_ValueChanged setzt console.CWPitch (setup.cs:8788-8792);
+    // bei uns RadioModel::setCwPitch. Die Tonhoehe traegt den EMPFANG
+    // (CW-Filter, APF, Decoder, Kiwi) — deshalb, anders als Keyer und
+    // Timing darunter, nicht gesperrt.
+    QGroupBox* pitchGrp = addSection("CW Pitch (Hz)");
+    QVBoxLayout* pitchLay = qobject_cast<QVBoxLayout*>(pitchGrp->layout());
+
+    m_cwPitch = new QSpinBox;
+    m_cwPitch->setRange(SliceModel::kCwPitchMinHz, SliceModel::kCwPitchMaxHz);
+    m_cwPitch->setSingleStep(SliceModel::kCwPitchStepHz);
+    m_cwPitch->setValue(model ? model->cwPitch() : SliceModel::cwPitchHz());
+    // Ein NumericUpDown meldet ValueChanged beim Uebernehmen, nicht bei
+    // jedem getippten Zeichen; wer „2000" tippt, soll nicht zuerst 200
+    // setzen und damit alle Durchlaesse zweimal schieben.
+    m_cwPitch->setKeyboardTracking(false);
+    m_cwPitch->setToolTip(QStringLiteral("Selects the preferred CW tone frequency."));
+    addLabeledSpinner(pitchLay, "Freq", m_cwPitch);
+
+    if (model) {
+        connect(m_cwPitch, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, [model](int hz) { model->setCwPitch(hz); });
+        connect(model, &RadioModel::cwPitchChanged, this, [this](int hz) {
+            QSignalBlocker block(m_cwPitch);
+            m_cwPitch->setValue(hz);
+        });
+    }
+
     // ── Keyer ─────────────────────────────────────────────────────────────────
     QGroupBox* keyerGrp = addSection("Keyer");
     QVBoxLayout* keyerLay = qobject_cast<QVBoxLayout*>(keyerGrp->layout());

@@ -1007,6 +1007,52 @@ private slots:
 
         model.injectConnectionForTest(nullptr);
     }
+    // ── Verweigertes MOX nimmt TUNE zurueck (2026-09-27) ─────────────────────
+    // HL2-Werkbank: TUNE in FM auf 14,2 MHz -- der Bandplan verweigert MOX
+    // („AM/FM TX coming in Phase 3M-3"), aber TUNE blieb an (isTune true,
+    // mox false): Knopf an, nichts gesendet. Wie Thetis' chkTUN, das bei
+    // verweigertem chkMOX selbst auf false geht, geht TUNE jetzt wieder aus.
+    void aRefusedTuneSwitchesItselfOffAgain()
+    {
+        RadioModel model;
+        MockConnection* conn = nullptr;
+        setupModel(model, conn);
+        std::unique_ptr<MockConnection> connOwner(conn);
+        AppSettings::instance().setValue(QStringLiteral("Region"),
+                                         QStringLiteral("United States"));
+        model.installBandPlanMoxCheckForTest();
+
+        auto* slice = model.activeSlice();
+        QVERIFY(slice != nullptr);
+        slice->setDspMode(DSPMode::FM);
+        slice->setFrequency(14'200'000.0);
+
+        QSignalSpy rejected(model.moxController(), &MoxController::moxRejected);
+        model.setTune(true);
+        pump();
+
+        QCOMPARE(rejected.count(), 1);
+        QVERIFY(!model.moxController()->isMox());
+        QVERIFY2(!model.isTune(), "TUNE darf nach verweigertem MOX nicht an bleiben");
+        QVERIFY(!model.transmitModel().isTune());
+        QVERIFY(!model.moxController()->isManualMox());
+        QCOMPARE(slice->dspMode(), DSPMode::FM);
+
+        // Erlaubt (USB): TUNE kommt und bleibt.
+        slice->setDspMode(DSPMode::USB);
+        rejected.clear();
+        model.setTune(true);
+        pump();
+        QCOMPARE(rejected.count(), 0);
+        QVERIFY(model.moxController()->isMox());
+        QVERIFY(model.isTune());
+
+        model.setTune(false);
+        pump();
+        QVERIFY(!model.moxController()->isMox());
+        model.injectConnectionForTest(nullptr);
+    }
+
 };
 
 QTEST_MAIN(TestRadioModelSetTune)

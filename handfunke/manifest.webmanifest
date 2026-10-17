@@ -1,0 +1,13 @@
+{
+  "name": "Longpath Handfunke",
+  "short_name": "Handfunke",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08080a",
+  "theme_color": "#08080a",
+  "icons": [
+    { "src": "symbol-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "symbol-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

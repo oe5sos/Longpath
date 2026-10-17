@@ -31,6 +31,7 @@
 #include <QWidget>
 
 #include "gui/SpectrumWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -93,7 +94,7 @@ private slots:
         col->addWidget(m_pan, 1);
         m_host.resize(1200, 700);
         m_host.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&m_host));
+        QVERIFY(QTest::qWaitForWindowExposed(&m_host, kFensterFrist));
 
         m_pan->setFrequencyRange(7'131'200.0, 200'000.0);
 
@@ -175,7 +176,9 @@ private slots:
         sendPress(m_pan, QPoint(m_notchX, 80), Qt::RightButton);
         QCoreApplication::processEvents();
 
-        QMenu* mine = m_pan->findChild<QMenu*>();
+        // Am Fenster, nicht am Panadapter (seit 2026-09-30, siehe
+        // tst_real_menus_hang_on_the_window).
+        QMenu* mine = m_pan->window()->findChild<QMenu*>();
         QVERIFY2(mine, "Rechtsklick auf den Balken oeffnet KEIN Menue");
 
         bool hasNotchEntry = false;

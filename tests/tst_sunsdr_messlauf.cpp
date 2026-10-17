@@ -1,0 +1,422 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// tests/tst_sunsdr_messlauf.cpp  (Longpath)
+//
+// Ein MESSLAUF am echten Geraet, kein Pruefpunkt.
+//
+// Die Frage, die er beantwortet, steht in
+// docs/architecture/2026-10-02-sunsdr-verbindungsablauf.md: ExpertSDR2
+// bekommt an derselben QRP 480 Pakete/s mit ZWEI VERSCHIEDENEN Paketen je
+// Folgenummer, Longpath 240 mit einem. Das ist die doppelte Datenmenge,
+// und die Vermutung ist, dass die zweite Paketsorte der zweite Empfaenger
+// ist (0x07 kommt im Mitschnitt mit sub 0 UND sub 1).
+//
+// Pruefen laesst sich das ohne jede Codeaenderung: die rund zwanzig
+// Steuerrahmen, die ExpertSDR2 beim Verbinden schickt, gehen ueber
+// LONGPATH_SUNSDR_PRE/_EXTRA (siehe sendBenchFrames) mit hinaus, und
+// danach wird einfach gezaehlt, was hereinkommt.
+//
+// Er laeuft NUR, wenn LONGPATH_SUNSDR_MESSLAUF gesetzt ist -- in der CI
+// gibt es kein Funkgeraet, und ein Messlauf gehoert ohnehin nicht in eine
+// Testsuite, die gruen sein muss.
+//
+//     LONGPATH_SUNSDR_MESSLAUF=192.168.16.200:50001 \
+//     LONGPATH_SUNSDR_FIXED_PORTS=1 \
+//     LONGPATH_CONFIG_DIR=<Sandkasten> \
+//     LONGPATH_SUNSDR_SEKUNDEN=70 \
+//     QT_QPA_PLATFORM=offscreen ./build/tests/tst_sunsdr_messlauf
+//
+// Es wird NICHTS gesendet, was HF erzeugt: kein MOX, kein Drive, keine
+// PA-Freigabe. Der Treiber schickt im Empfang genau die vier Rahmen, die
+// er immer schickt, plus die Rahmen aus PRE/EXTRA, die der Mensch davor
+// eintraegt.
+//
+// =================================================================
+// Modification history (Longpath):
+//   2026-10-03 — Original fuer Longpath, KI-gestuetzt (Anthropic
+//                 Claude), Betreiber Martin Fischer.
+// =================================================================
+
+#include <QtTest>
+
+#include "core/ConnectionState.h"
+#include "core/RadioDiscovery.h"
+#include "core/SunSdrRadioConnection.h"
+#include "core/sunsdr/SunSdrProtocol.h"
+
+#include <cmath>
+#include <QHostAddress>
+#include <QSignalSpy>
+
+using namespace Longpath;
+
+namespace {
+
+RadioInfo qrpAt(const QHostAddress& addr, quint16 port)
+{
+    RadioInfo info;
+    info.address    = addr;
+    info.port       = port;
+    info.boardType  = HPSDRHW::SunSdr2Qrp;
+    info.protocol   = ProtocolVersion::SunSdr;
+    info.macAddress = QStringLiteral("00:00:00:00:00:00");
+    info.name       = QStringLiteral("SunSDR2 QRP (Messlauf)");
+    return info;
+}
+
+}  // namespace
+
+class TstSunSdrMesslauf : public QObject { Q_OBJECT
+private slots:
+    void messe()
+    {
+        const QString ziel = qEnvironmentVariable("LONGPATH_SUNSDR_MESSLAUF");
+        if (ziel.isEmpty()) {
+            QSKIP("LONGPATH_SUNSDR_MESSLAUF nicht gesetzt — Messlauf, kein CI-Test.");
+        }
+        const QStringList hp = ziel.split(QLatin1Char(':'));
+        const QHostAddress addr(hp.value(0));
+        const quint16 port = quint16(hp.value(1, QStringLiteral("50001")).toUInt());
+        const int sekunden =
+            qEnvironmentVariableIntValue("LONGPATH_SUNSDR_SEKUNDEN") > 0
+                ? qEnvironmentVariableIntValue("LONGPATH_SUNSDR_SEKUNDEN")
+                : 70;
+
+        // QtTest bricht eine Pruefmethode nach 5 Minuten ab. In der Nacht
+        // vom 2026-10-06 standen hier 1200 Sekunden, und alle fuenf
+        // Laeufe starben nach genau 300 s mit "Test function timed out" --
+        // MITTEN im Messen, also OHNE den Schlussbericht. Die
+        // Fensterzeilen waren noch da und liessen sich retten, der
+        // Bericht nicht.
+        //
+        // QTEST_FUNCTION_TIMEOUT wird beim Start von QtTest gelesen, also
+        // reicht Setzen hier nicht -- es muss von aussen kommen. Darum
+        // hier nur die WARNUNG, damit der naechste es sofort sieht,
+        // statt es wie ich aus den Zeitstempeln zu erschliessen.
+        if (sekunden > 290 && !qEnvironmentVariableIsSet("QTEST_FUNCTION_TIMEOUT")) {
+            qWarning().noquote() << QStringLiteral(
+                "ACHTUNG: %1 s gewuenscht, aber QtTest bricht nach 300 s ab "
+                "und der Schlussbericht faellt aus. Mit "
+                "QTEST_FUNCTION_TIMEOUT=%2 starten (Millisekunden).")
+                .arg(sekunden).arg((sekunden + 60) * 1000);
+        }
+
+        SunSdrRadioConnection conn;
+        // Das echte Geraet antwortet nur auf Port 50001 (am 2026-08-26 live
+        // gelernt), also feste Ports -- und nichts anderes darf sie halten.
+        conn.setFixedPortBindingEnabledForTest(
+            qEnvironmentVariableIsSet("LONGPATH_SUNSDR_FIXED_PORTS"));
+        conn.init();
+        conn.setSingleChannelHoldMsForTest(0);
+
+        QSignalSpy iq(&conn, &RadioConnection::iqDataReceived);
+        QSignalSpy verloren(&conn, &RadioConnection::iqPacketLoss);
+        QSignalSpy failed(&conn, &RadioConnection::connectFailed);
+
+        // ── Pegelmesser ──────────────────────────────────────────────
+        //
+        // Mit Antenne ist der Rauschflur selbst ein Messwert: er MUSS den
+        // Vorverstaerkerstufen und der Daempfung folgen. Ohne Antenne tut
+        // er das nicht (2026-10-03 gemessen: 2e-05, also praktisch das
+        // Eigenrauschen des Wandlers) -- deshalb war bis heute unbelegt,
+        // ob setPreampModeIndex() und setAttenuator() am Geraet ueberhaupt
+        // etwas bewirken. Gemessen wird VOR dem Pegelabgleich des Profils
+        // (rxLevelGainForTest(), im Betrieb 40 dB), sonst misst man die
+        // eigene Verstaerkung statt der Antenne.
+        struct Pegel { double sumsq = 0.0; double spitze = 0.0; quint64 n = 0; };
+        Pegel pegel;
+        QObject::connect(&conn, &RadioConnection::iqDataReceived, &conn,
+                         [&pegel](int, const QVector<float>& s) {
+            for (const float v : s) {
+                const double a = std::fabs(double(v));
+                pegel.sumsq += double(v) * double(v);
+                if (a > pegel.spitze) { pegel.spitze = a; }
+            }
+            pegel.n += quint64(s.size());
+        });
+        const auto pegelZeile = [&](const QString& was) {
+            const double gain = conn.rxLevelGainForTest() > 0.0f
+                                    ? double(conn.rxLevelGainForTest()) : 1.0;
+            if (pegel.n == 0) {
+                qInfo().noquote()
+                    << QStringLiteral("  %1 keine Proben").arg(was, -30);
+                return;
+            }
+            const double rms  = std::sqrt(pegel.sumsq / double(pegel.n)) / gain;
+            const double peak = pegel.spitze / gain;
+            qInfo().noquote() << QStringLiteral(
+                "  %1 Rauschflur %2 dBFS, Spitze %3 dBFS (%4 Proben)")
+                .arg(was, -30)
+                .arg(20.0 * std::log10(std::max(rms,  1e-12)), 7, 'f', 1)
+                .arg(20.0 * std::log10(std::max(peak, 1e-12)), 7, 'f', 1)
+                .arg(pegel.n);
+            pegel = Pegel{};
+        };
+        // Einschwingen lassen, dann ein frisches Fenster messen.
+        const auto pegelNach = [&](const QString& was) {
+            QTest::qWait(300);
+            pegel = Pegel{};
+            QTest::qWait(700);
+            pegelZeile(was);
+        };
+
+        QElapsedTimer uhr;
+        uhr.start();
+        conn.connectToRadio(qrpAt(addr, port));
+        QTRY_VERIFY_WITH_TIMEOUT(conn.state() == ConnectionState::Connected
+                                 || failed.count() > 0, 15000);
+        if (failed.count() > 0) {
+            QFAIL(qPrintable(QStringLiteral(
+                "Der Treiber kam nicht durch (Grund %1) — ist die QRP an "
+                "und auf %2 erreichbar?")
+                .arg(int(failed.first().at(0).value<ConnectFailure>()))
+                .arg(ziel)));
+        }
+        qInfo().noquote() << QStringLiteral("verbunden nach %1 ms")
+                                 .arg(uhr.elapsed());
+
+        // Frequenz setzen, BEVOR gemessen wird. Ohne das geht der
+        // 0x07-Rahmen nie hinaus, und die QRP bleibt im Einkanal-Zustand
+        // (Q = 0, Seitenbaender uebereinander) -- gemessen am 2026-09-25.
+        // Ein Messlauf in diesem Zustand misst nicht den Betrieb.
+        // Mit LONGPATH_SUNSDR_KEINE_FREQ bleibt der Frequenzrahmen aus --
+        // damit laesst sich der EINSCHALTZUSTAND messen (am 2026-09-25
+        // eingegrenzt: nach dem Einschalten liefert die QRP nur einen
+        // reellen Kanal, Q = 0, die Seitenbaender liegen uebereinander).
+        if (!qEnvironmentVariableIsSet("LONGPATH_SUNSDR_KEINE_FREQ")) {
+            const quint64 freqHz =
+                qEnvironmentVariableIsSet("LONGPATH_SUNSDR_FREQ")
+                    ? qEnvironmentVariable("LONGPATH_SUNSDR_FREQ").toULongLong()
+                    : 7100000ULL;
+            conn.setReceiverFrequency(0, freqHz);
+            qInfo().noquote() << QStringLiteral("Frequenz gesetzt: %1 Hz").arg(freqHz);
+            QTest::qWait(1500);
+        } else {
+            qInfo().noquote() << QStringLiteral(
+                "KEIN Frequenzrahmen -- Einschaltzustand wird gemessen");
+            QTest::qWait(1500);
+        }
+
+        qInfo().noquote() << QStringLiteral(
+            "Q ungleich null: %1 %  (0 % = nur ein reeller Kanal, "
+            "Seitenbaender uebereinander)")
+            .arg(conn.qNonZeroPercentForTest(), 0, 'f', 1);
+
+        // Abfragen ZUR LAUFZEIT, nachdem die Frequenz steht. Damit laesst
+        // sich dieselbe Abfrage auf zwei Baendern stellen und vergleichen.
+        if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_NACHFRAGE")) {
+            conn.sendBenchFramesForTest(QStringLiteral("LONGPATH_SUNSDR_NACHFRAGE"));
+            QTest::qWait(1200);
+        }
+        if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_FREQ2")) {
+            const quint64 f2 =
+                qEnvironmentVariable("LONGPATH_SUNSDR_FREQ2").toULongLong();
+            conn.setReceiverFrequency(0, f2);
+            qInfo().noquote() << QStringLiteral("zweite Frequenz: %1 Hz").arg(f2);
+            QTest::qWait(1500);
+            if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_NACHFRAGE")) {
+                conn.sendBenchFramesForTest(QStringLiteral("LONGPATH_SUNSDR_NACHFRAGE"));
+                QTest::qWait(1200);
+            }
+            qInfo().noquote() << QStringLiteral(
+                "Q ungleich null nach Bandwechsel: %1 %")
+                .arg(conn.qNonZeroPercentForTest(), 0, 'f', 1);
+        }
+
+        // Viele Frequenzwechsel, um die Verlustrate von STEUERRAHMEN zu
+        // messen: jeder Wechsel schickt zwei Rahmen (DDC 0x07 und VFO 0x08)
+        // und muss zwei Quittungen bekommen. Am 2026-10-03 war EINER von
+        // etwa fuenfzehn Laeufen unquittiert -- diese Messung sagt, wie oft
+        // das wirklich vorkommt, und das ist die Zahl, an der die
+        // Entscheidung ueber das Nachschicken haengt.
+        const int wechsel = qEnvironmentVariableIntValue("LONGPATH_SUNSDR_WECHSEL");
+        if (wechsel > 0) {
+            quint64 f = 7000000;
+            for (int i = 0; i < wechsel; ++i) {
+                f += 1000;                       // 1 kHz weiter, im Band bleiben
+                if (f > 7200000) { f = 7000000; }
+                conn.setReceiverFrequency(0, f);
+                QTest::qWait(60);                // Quittung kommt in 15-50 ms
+            }
+            qInfo().noquote() << QStringLiteral(
+                "%1 Frequenzwechsel geschickt (= %2 Steuerrahmen)")
+                .arg(wechsel).arg(wechsel * 2);
+            QTest::qWait(1500);
+        }
+
+        // Alle Bedienelemente durchschalten, die beim QRP ueberhaupt etwas
+        // schicken, und mitschreiben, was zurueckkommt. Das ist die Frage,
+        // fuer die das Mithoeren gebaut wurde: aendert sich im Betrieb eine
+        // Nutzlast, ist es ein Messwert; bleibt alles still, meldet das
+        // Geraet nichts. Dazwischen jeweils die Abfrage 0x0c -- wenn ihre
+        // 320 Byte den Geraetezustand tragen, muessen sie sich hier
+        // bewegen.
+        if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_BEDIENEN")) {
+            const QByteArray abfrage =
+                QByteArray::fromHex("03ff0c000000000000000100000037f7affe");
+            const auto abfragen = [&]() {
+                qputenv("LONGPATH_SUNSDR_ABFRAGE", abfrage.toHex());
+                conn.sendBenchFramesForTest(QStringLiteral("LONGPATH_SUNSDR_ABFRAGE"));
+                qunsetenv("LONGPATH_SUNSDR_ABFRAGE");
+                QTest::qWait(400);
+            };
+
+            abfragen();
+            pegelNach(QStringLiteral("vor dem Durchschalten:"));
+            const QStringList stufenNamen{
+                QStringLiteral("Vorverstaerker -20 dB:"),
+                QStringLiteral("Vorverstaerker -10 dB:"),
+                QStringLiteral("Vorverstaerker   0 dB:"),
+                QStringLiteral("Vorverstaerker +10 dB:")};
+            int si = 0;
+            for (const int stufe : {0, 2, 1, 7}) {   // -20, -10, 0, +10 dB
+                conn.setPreampModeIndex(stufe);
+                pegelNach(stufenNamen.at(si++));
+                abfragen();
+            }
+            for (const int dB : {0, -20}) {
+                conn.setAttenuator(dB);
+                pegelNach(QStringLiteral("Daempfung %1 dB:").arg(dB));
+                abfragen();
+            }
+            conn.setActiveReceiverCount(2);
+            conn.setSampleRate(96000);
+            QTest::qWait(500);
+            abfragen();
+            qInfo().noquote() << QStringLiteral(
+                "Bedienung durchgeschaltet: 4 Vorverstaerkerstufen, "
+                "2 Daempfungswerte, Empfaengerzahl, Abtastrate -- je mit "
+                "Abfrage 0x0c dazwischen");
+        }
+
+        // Rate zur Laufzeit umstellen -- der Weg, den spaeter die
+        // Oberflaeche nimmt. LONGPATH_SUNSDR_RATE=96000 schaltet nach dem
+        // Verbinden um.
+        // Zwei Empfaenger: der Weg, den die Oberflaeche nimmt. Am
+        // 2026-10-04 belegt, dass der zweite Strom echtes I/Q traegt --
+        // hier wird gemessen, ob er oben auch ANKOMMT statt verworfen zu
+        // werden.
+        if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_EMPFAENGER")) {
+            const int n =
+                qEnvironmentVariableIntValue("LONGPATH_SUNSDR_EMPFAENGER");
+            conn.setActiveReceiverCount(n);
+            qInfo().noquote()
+                << QStringLiteral("setActiveReceiverCount(%1) gerufen").arg(n);
+            QTest::qWait(1500);
+        }
+
+        if (qEnvironmentVariableIsSet("LONGPATH_SUNSDR_RATE")) {
+            const int r = qEnvironmentVariableIntValue("LONGPATH_SUNSDR_RATE");
+            conn.setSampleRate(r);
+            qInfo().noquote() << QStringLiteral("setSampleRate(%1) gerufen").arg(r);
+            QTest::qWait(2000);
+        }
+
+        // ── Eine Abfrage WAEHREND des Laufs wiederholen ──────────────
+        //
+        // LONGPATH_SUNSDR_PRE schickt seine Rahmen einmal beim Verbinden.
+        // Fuer die Frage, ob eine Antwort MESSWERTE traegt, nuetzt das
+        // nichts: ein einzelner Abzug sieht immer gleich aus. Erst wenn
+        // dieselbe Abfrage ueber Minuten wiederholt wird und die Antwort
+        // sich NICHT aendert, ist belegt, dass nichts Lebendes drinsteht
+        // -- und wenn sie sich aendert, hat man gefunden, wonach wir
+        // suchen (2026-10-06: ExpertSDR2 zeigt Spannung, Strom und
+        // Temperatur, Longpath nichts).
+        //
+        // Das Rahmen-Inventar meldet Aenderungen der Nutzlast von selbst.
+        const QByteArray wiederholt = qgetenv("LONGPATH_SUNSDR_WIEDERHOLT");
+        const int wiederholtMs =
+            qEnvironmentVariableIntValue("LONGPATH_SUNSDR_WIEDERHOLT_MS") > 0
+                ? qEnvironmentVariableIntValue("LONGPATH_SUNSDR_WIEDERHOLT_MS")
+                : 10000;
+        QElapsedTimer abfrageUhr;
+        if (!wiederholt.isEmpty()) {
+            qInfo().noquote() << QStringLiteral(
+                "Abfrage wird alle %1 ms wiederholt").arg(wiederholtMs);
+            abfrageUhr.start();
+        }
+
+        const int bloeckeVorher = iq.count();
+        pegel = Pegel{};              // das Messfenster bekommt eigene Zahlen
+        QElapsedTimer fenster;
+        fenster.start();
+        while (fenster.elapsed() < sekunden * 1000) {
+            if (!wiederholt.isEmpty() && abfrageUhr.elapsed() >= wiederholtMs) {
+                abfrageUhr.restart();
+                conn.sendBenchFramesForTest(
+                    QStringLiteral("LONGPATH_SUNSDR_WIEDERHOLT"));
+            }
+            // 20 ms, nicht 500: mit groben Bloecken laeuft die
+            // Ereignisschleife zu selten, die Blockantworten gehen
+            // verspaetet hinaus, und das Geraet WIEDERHOLT -- am
+            // 2026-10-03 gemessen 1,20 Kopien je Nummer im Messlauf gegen
+            // 1,00 im echten Betrieb des Betreibers. Der Pruefstand hat
+            // also gemessen, was er selbst verursacht hat. Genau der
+            // Fehler, vor dem feedback-messung-schlaegt-nicht-das-geraet
+            // warnt, nur umgekehrt: hier war nicht das Geraet schuld,
+            // sondern das Messgeraet.
+            QTest::qWait(20);
+        }
+        const double secs = double(fenster.elapsed()) / 1000.0;
+        const int bloecke = iq.count() - bloeckeVorher;
+
+        qInfo().noquote() << QStringLiteral(
+            "MESSLAUF ueber %1 s: %2 IQ-Bloecke nach oben (%3/s), "
+            "%4 Verlustmeldungen")
+            .arg(secs, 0, 'f', 1).arg(bloecke)
+            .arg(double(bloecke) / secs, 0, 'f', 1).arg(verloren.count());
+        for (const QList<QVariant>& e : verloren) {
+            qInfo().noquote() << QStringLiteral(
+                "  Verlust: %1 %, verloren %2, angenommen %3")
+                .arg(e.at(0).toDouble(), 0, 'f', 2)
+                .arg(e.at(1).toUInt()).arg(e.at(2).toUInt());
+        }
+
+        // Das Inventar ist die eigentliche Ausbeute: welche Rahmensorten das
+        // Geraet geschickt hat, und ob sich eine Nutzlast geaendert hat.
+        qInfo().noquote() << QStringLiteral(
+            "Quittungen: %1 gesehen, %2 unbeantwortet, %3 nachgeschickt, "
+            "%4 noch offen")
+            .arg(conn.quittungenGesehenForTest())
+            .arg(conn.rahmenOhneQuittungForTest())
+            .arg(conn.rahmenWiederholtForTest())
+            .arg(conn.offeneRahmenForTest());
+        // Was WIR zurueckschicken -- der Gegenstand der A/B-Messung vom
+        // 2026-10-05. Ohne diese Zeile sieht man am Ergebnis nicht, ob der
+        // Schalter ueberhaupt gegriffen hat.
+        qInfo().noquote() << QStringLiteral(
+            "Rueckweg: %1 Antworten (%2/s), davon %3 blosse Koepfe, "
+            "letzte %4 Byte")
+            .arg(conn.blockRepliesSentForTest())
+            .arg(double(conn.blockRepliesSentForTest()) / secs, 0, 'f', 0)
+            .arg(conn.bareBlockRepliesSentForTest())
+            .arg(conn.lastBlockReplyBytesForTest());
+        pegelZeile(QStringLiteral("Messfenster:"));
+        qInfo().noquote() << QStringLiteral(
+            "Uebersteuerung: %1 Proben am Anschlag, %2 Meldungen")
+            .arg(conn.anschlagProbenForTest())
+            .arg(conn.anschlagMeldungenForTest());
+        qInfo().noquote() << QStringLiteral(
+            "PTT vom Geraet: %1 Flanken, Geraet sendet jetzt: %2")
+            .arg(conn.mikrofonPttFlankenForTest())
+            .arg(conn.geraetSendetForTest() ? QStringLiteral("ja")
+                                            : QStringLiteral("nein"));
+        for (int k = 0; k < 4; ++k) {
+            const quint64 n = conn.kanalPaketeForTest(k);
+            if (n == 0) { continue; }
+            qInfo().noquote() << QStringLiteral(
+                "Kanal %1: %2 Pakete (%3/s), %4 Fortsetzungen, %5 verworfen")
+                .arg(k).arg(n).arg(double(n)/secs, 0, 'f', 0)
+                .arg(conn.kanalFortsetzungenForTest(k))
+                .arg(conn.kanalVerworfenForTest(k));
+        }
+        qInfo().noquote() << conn.frameInventoryReport();
+        qInfo().noquote() << conn.seqDeltaReport();
+
+        conn.disconnect();
+        QTRY_VERIFY_WITH_TIMEOUT(conn.state() != ConnectionState::Connected, 5000);
+    }
+};
+
+QTEST_MAIN(TstSunSdrMesslauf)
+#include "tst_sunsdr_messlauf.moc"

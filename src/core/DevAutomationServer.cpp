@@ -9,6 +9,7 @@
 // =================================================================
 
 #include "DevAutomationServer.h"
+#include "AppSettings.h"   // connect: gespeichertes Radio holen
 #include "LogCategories.h"
 
 #include <QApplication>
@@ -349,6 +350,23 @@ QJsonObject DevAutomationServer::handleLine(const QByteArray& line)
         }
         return doGrab(parts.at(1));
     }
+    if (verb == QStringLiteral("connect")) {
+        return doConnect(parts.size() >= 2 ? parts.at(1) : QString());
+    }
+    if (verb == QStringLiteral("addSlice")) {
+        return doAddSlice();
+    }
+    if (verb == QStringLiteral("setFreq")) {
+        if (parts.size() < 3) {
+            return QJsonObject{{QStringLiteral("ok"), false},
+                               {QStringLiteral("error"),
+                                QStringLiteral("setFreq <scheibe> <hz>")}};
+        }
+        return doSetFrequency(parts.at(1).toInt(), parts.at(2).toDouble());
+    }
+    if (verb == QStringLiteral("disconnect")) {
+        return doDisconnect();
+    }
     if (verb == QStringLiteral("get")) {
         if (parts.size() < 2) {
             return QJsonObject{{QStringLiteral("ok"), false},
@@ -360,7 +378,118 @@ QJsonObject DevAutomationServer::handleLine(const QByteArray& line)
     return QJsonObject{{QStringLiteral("ok"), false},
                         {QStringLiteral("error"),
                          QStringLiteral("unknown command: ") + verb +
-                             QStringLiteral(" (known: ping, dumpTree, grab, get)")}};
+                             QStringLiteral(" (known: ping, dumpTree, grab, get, connect, disconnect, addSlice, setFreq)")}};
+}
+
+// ── doConnect / doDisconnect (2026-09-30) ────────────────────────────────────
+//
+// Begründung an der Deklaration. Kurz: ohne diese beiden hängt jeder Livetest
+// an einem Mausklick, und Verbinden sendet nicht.
+//
+// Der Weg ist derselbe, den der Connect-Knopf nimmt
+// (ConnectionPanel::onConnectClicked → RadioModel::connectToRadio), nur ohne
+// das Panel: das gespeicherte Radio aus den Einstellungen holen und übergeben.
+// Bewusst NICHT der Discovery-Weg — ein Verb, das sich sein Ziel selbst sucht,
+// könnte am falschen Gerät landen, und in einem Shack steht selten nur eines.
+QJsonObject DevAutomationServer::doAddSlice()
+{
+    if (m_radioModel.isNull()) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"), QStringLiteral("no radio model")}};
+    }
+    // Direkt rufen: dieser Handler laeuft bereits im Hauptfaden (siehe
+    // die Begruendung an doConnect). Ein BlockingQueuedConnection in
+    // denselben Faden blockiert sich selbst -- am 2026-10-04 beim ersten
+    // Versuch genau so passiert, die Antwort kam nie.
+    const int id = m_radioModel->addSlice();
+
+    if (id < 0) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"),
+                            QStringLiteral("addSlice refused (pool full?)")}};
+    }
+    return QJsonObject{{QStringLiteral("ok"), true},
+                       {QStringLiteral("slice"), id}};
+}
+
+QJsonObject DevAutomationServer::doSetFrequency(int sliceId, double hz)
+{
+    if (m_radioModel.isNull()) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"), QStringLiteral("no radio model")}};
+    }
+    // Hauptfaden, direkt -- gleiche Begruendung wie bei doAddSlice.
+    SliceModel* slice = m_radioModel->sliceById(sliceId);
+    if (slice == nullptr) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"),
+                            QStringLiteral("keine Scheibe %1").arg(sliceId)}};
+    }
+    slice->setFrequency(hz);
+    return QJsonObject{{QStringLiteral("ok"), true},
+                       {QStringLiteral("slice"), sliceId},
+                       {QStringLiteral("hz"), slice->frequency()}};
+}
+
+QJsonObject DevAutomationServer::doConnect(const QString& macKeyOrEmpty)
+{
+    if (m_radioModel.isNull()) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"), QStringLiteral("no radio model")}};
+    }
+
+    AppSettings& s = AppSettings::instance();
+    const QString macKey = macKeyOrEmpty.isEmpty() ? s.lastConnected() : macKeyOrEmpty;
+    if (macKey.isEmpty()) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"),
+                            QStringLiteral("no macKey given and no last-connected radio")}};
+    }
+
+    const auto saved = s.savedRadio(macKey);
+    if (!saved) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"),
+                            QStringLiteral("no saved radio for ") + macKey}};
+    }
+
+    // NICHT direkt aufrufen: dieser Handler läuft im Hauptfaden, und der
+    // Verbindungsaufbau braucht genau den — er wartet auf UDP-Antworten des
+    // Geräts, die nur die Ereignisschleife zustellt. Ein direkter Aufruf
+    // blockiert also die Schleife, auf die er selbst angewiesen ist, und die
+    // Verbindung kommt nie zustande.
+    //
+    // Beim ersten Versuch an echtem Gerät genau so passiert: das Verb lief in
+    // die Zeitüberschreitung, im Log stand "Connecting with sampleRate=192000"
+    // und danach nichts mehr — kein Socket, kein Rahmen. Der Klick-Weg hat das
+    // Problem nicht, weil dort die Schleife nach dem Handler weiterläuft.
+    //
+    // Also einreihen und sofort antworten. Die Antwort sagt deshalb
+    // "connecting", nicht "connected" — ob es geklappt hat, fragt der Aufrufer
+    // danach mit `get radio` ab.
+    QMetaObject::invokeMethod(m_radioModel.data(), [m = m_radioModel, info = saved->info] {
+        if (!m.isNull()) { m->connectToRadio(info); }
+    }, Qt::QueuedConnection);
+
+    return QJsonObject{
+        {QStringLiteral("ok"), true},
+        {QStringLiteral("connecting"), saved->info.displayName()},
+        {QStringLiteral("macKey"), macKey},
+        {QStringLiteral("address"), saved->info.address.toString()},
+    };
+}
+
+QJsonObject DevAutomationServer::doDisconnect()
+{
+    if (m_radioModel.isNull()) {
+        return QJsonObject{{QStringLiteral("ok"), false},
+                           {QStringLiteral("error"), QStringLiteral("no radio model")}};
+    }
+    QMetaObject::invokeMethod(m_radioModel.data(), [m = m_radioModel] {
+        if (!m.isNull()) { m->disconnectFromRadio(); }
+    }, Qt::QueuedConnection);
+    return QJsonObject{{QStringLiteral("ok"), true},
+                       {QStringLiteral("disconnected"), true}};
 }
 
 QJsonObject DevAutomationServer::doPing() const
@@ -462,6 +591,12 @@ QJsonObject DevAutomationServer::doGet(const QString& model, const QString& sele
         if (SliceModel* active = radio->activeSlice()) {
             o[QStringLiteral("activeSliceIndex")] = active->sliceIndex();
         }
+        // Die Temperatur, die das Geraet meldet. Ohne sie laesst sich der
+        // Weg vom Draht bis in die Oberflaeche nicht ohne Mensch pruefen:
+        // die Statusseite entsteht erst, wenn jemand den Diagnosedialog
+        // oeffnet, und bis dahin ist der Wert unsichtbar (2026-10-07).
+        o[QStringLiteral("paTemperatureCelsius")] =
+            radio->radioStatus().paTemperatureCelsius();
         return o;
     }
 

@@ -14,6 +14,10 @@
 //                 Claude Code.
 //                 Structural pattern follows AetherSDR (ten9876/AetherSDR,
 //                 GPLv3).
+//   2026-09-28 -- filter label shows the preset name when the running
+//                 filter is a preset (Thetis console.cs:7721 [@852bf0e]),
+//                 width otherwise; Martin Fischer (OE5SOS), AI-assisted via
+//                 Anthropic Claude.
 // =================================================================
 
 //=================================================================
@@ -200,7 +204,11 @@ RxApplet::RxApplet(SliceModel* slice, RadioModel* model, QWidget* parent)
         connect(m_model->filterPresetStore(), &FilterPresetStore::presetsChanged,
                 this, [this](DSPMode mode) {
             // Only rebuild when the changed mode matches the currently-active mode.
+            // Seit 2026-09-28 haengt die Filterbeschriftung am Namen der
+            // Vorgabe — ein umbenannter oder verschobener Platz muss sie
+            // nachziehen.
             if (m_slice && mode == m_slice->dspMode()) {
+                updateFilterLabel();
             }
         });
     }
@@ -326,7 +334,8 @@ void RxApplet::buildUi()
         ));
         connect(m_rxAntBtn, &QPushButton::clicked, this, [this] {
             // B3: AntennaPopupBuilder — capability-gated popup (Phase 3P-I-a T22).
-            ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+            ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+            const QPointer<RxApplet> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug (2026-09-30)
             QMenu& menu = *menuOwner.get();
             // Dark popup palette — without this, Ubuntu's default theme renders
             // items as dark-on-dark (only visible on hover). Issue #98.
@@ -351,7 +360,7 @@ void RxApplet::buildUi()
                 m_rxAntBtn->mapToGlobal(QPoint(0, m_rxAntBtn->height())));
             // Das Elternteil kann waehrend exec() gestorben sein — dann ist
             // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-            if (!menuOwner) { return; }
+            if (!menuOwner || !self) { return; }
             if (sel && m_slice) {
                 const QString text = sel->data().isValid() ? sel->data().toString()
                                                            : sel->text();
@@ -377,7 +386,8 @@ void RxApplet::buildUi()
         )));
         connect(m_txAntBtn, &QPushButton::clicked, this, [this] {
             // B3: AntennaPopupBuilder TX mode — only main ANT1-3 (Phase 3P-I-a T22).
-            ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+            ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+            const QPointer<RxApplet> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug (2026-09-30)
             QMenu& menu = *menuOwner.get();
             // Dark popup palette — see RX button above. Issue #98.
             menu.setStyleSheet(Style::themed(QStringLiteral(
@@ -401,7 +411,7 @@ void RxApplet::buildUi()
                 m_txAntBtn->mapToGlobal(QPoint(0, m_txAntBtn->height())));
             // Das Elternteil kann waehrend exec() gestorben sein — dann ist
             // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-            if (!menuOwner) { return; }
+            if (!menuOwner || !self) { return; }
             if (sel && m_slice) {
                 const QString text = sel->data().isValid() ? sel->data().toString()
                                                            : sel->text();
@@ -415,7 +425,7 @@ void RxApplet::buildUi()
         // Control 5: Filter width label (color #00c8ff, 11px bold)
         // §A2 one-off: #00c8ff is a lighter cyan than kAccent (#00b4d8); distinct
         // intent (filter display highlight vs interactive accent). Not snapped.
-        m_filterWidthLbl = new QLabel(QStringLiteral("2.9K"), this);
+        m_filterWidthLbl = new QLabel(QStringLiteral("2.9k"), this);
         m_filterWidthLbl->setAlignment(Qt::AlignCenter);
         m_filterWidthLbl->setStyleSheet(QStringLiteral(
             "QLabel { color: #4a7ba8; font-size: 11px; font-weight: bold; }"  // §A2 one-off filter highlight
@@ -647,7 +657,14 @@ void RxApplet::buildUi()
         m_sqlBtn = greenToggle(QStringLiteral("SQL"), 52, 20);
         connect(m_sqlBtn, &QPushButton::toggled, this, [this](bool on) {
             if (m_updatingFromModel || !m_slice) { return; }
-            m_slice->setSsqlEnabled(on);
+            // In FM die FM-Rauschsperre (2026-09-27) -- sonst war sie
+            // nirgends zu erreichen. Thetis steuert je Betriebsart: im
+            // FM-Zweig RXFMSquelchOn = true, SSqlOn/RXAMSquelchOn = false.
+            if (m_slice->dspMode() == DSPMode::FM) {
+                m_slice->setFmsqEnabled(on);
+            } else {
+                m_slice->setSsqlEnabled(on);
+            }
         });
         row->addWidget(m_sqlBtn);
 
@@ -658,7 +675,11 @@ void RxApplet::buildUi()
         m_sqlSlider->setStyleSheet(Style::sliderHStyle());
         connect(m_sqlSlider, &QSlider::valueChanged, this, [this](int val) {
             if (m_updatingFromModel || !m_slice) { return; }
-            m_slice->setSsqlThresh(static_cast<double>(val));
+            if (m_slice->dspMode() == DSPMode::FM) {
+                m_slice->setFmsqThresh(fmSquelchDbFromSlider(val));
+            } else {
+                m_slice->setSsqlThresh(static_cast<double>(val));
+            }
         });
         row->addWidget(m_sqlSlider, 1);
 
@@ -1089,8 +1110,9 @@ void RxApplet::buildUi()
     m_rxAntBtn->setToolTip(QStringLiteral("Toggles receive antenna between RX and TX antennas for RX1"));
     // Longpath native — no single Thetis TX-antenna tooltip
     m_txAntBtn->setToolTip(QStringLiteral("Select the transmit antenna port"));
-    // Longpath native — filter width label, no Thetis equivalent control
-    m_filterWidthLbl->setToolTip(QStringLiteral("Current filter passband width"));
+    // Longpath native — filter label: preset name (Thetis panelFilter title)
+    // or passband width
+    m_filterWidthLbl->setToolTip(QStringLiteral("Current filter: preset name, or passband width"));
     // Longpath native — Thetis uses discrete radio buttons per mode
     m_modeCombo->setToolTip(QStringLiteral("Select operating mode"));
     // m_muteBtn und m_afSlider sind 2026-08-18 zurueckgekommen — die
@@ -1108,21 +1130,38 @@ void RxApplet::buildUi()
     m_xitOnBtn->setToolTip(QStringLiteral("Transmit Incremental Tuning - offset TX frequency by the value below in Hz."));
 }
 
+// Ist der laufende Filter eine Vorgabe, steht ihr NAME da, wie in Thetis:
+//   panelFilter.Text = "Filter - " + rx1_filters[(int)_rx1_dsp_mode].GetName(f);
+// From Thetis console.cs:7721 [@852bf0e] (RX2: console.cs:38256).
+// Sonst die Breite. Thetis hat dafuer keinen Fall — ein von Hand gezogener
+// Filter liegt dort auf VAR1 und heisst „Var 1"; wir fuehren keinen
+// gewaehlten Platz und zeigen stattdessen die Breite.
+//
+// Der Unterschied ist sichtbar: CW F10 ist ±13 Hz, also 26 Hz breit, und
+// heisst „25"; bis 2026-09-28 stand hier „26".
 void RxApplet::updateFilterLabel()
 {
     if (!m_slice) {
         m_filterWidthLbl->setText(QStringLiteral("---"));
         return;
     }
-    m_filterWidthLbl->setText(
-        formatFilterWidth(m_slice->filterLow(), m_slice->filterHigh()));
+    const DSPMode mode = m_slice->dspMode();
+    const int low  = m_slice->filterLow();
+    const int high = m_slice->filterHigh();
+    FilterPresetStore* store = m_model ? m_model->filterPresetStore() : nullptr;
+    const QString name = store ? store->nameForEdges(mode, low, high)
+                               : FilterPresetStore::defaultNameForEdges(mode, low, high);
+    m_filterWidthLbl->setText(name.isEmpty() ? formatFilterWidth(low, high) : name);
 }
 
+// Kleines „k" wie in den Thetis-Namen („2.7k"), damit eine Vorgabe und
+// eine von Hand gezogene Breite gleich geschrieben stehen (bis 2026-09-28
+// „2.7K").
 QString RxApplet::formatFilterWidth(int low, int high)
 {
     const int width = qAbs(high - low);
     if (width >= 1000) {
-        return QStringLiteral("%1K").arg(width / 1000.0, 0, 'g', 3);
+        return QStringLiteral("%1k").arg(width / 1000.0, 0, 'g', 3);
     }
     return QStringLiteral("%1").arg(width);
 }
@@ -1371,14 +1410,7 @@ void RxApplet::syncFromModel()
         // SliceModel pan: −1.0..+1.0 → slider 0..100 (center = 50)
         m_panSlider->setValue(qRound(m_slice->audioPan() * 50.0 + 50.0));
     }
-    {
-        QSignalBlocker bl(m_sqlBtn);
-        m_sqlBtn->setChecked(m_slice->ssqlEnabled());
-    }
-    {
-        QSignalBlocker bl(m_sqlSlider);
-        m_sqlSlider->setValue(qRound(m_slice->ssqlThresh()));
-    }
+    syncSquelchFromModel();
 
     // AGC-T slider initial pull (§B1 fix-up).
     if (m_agcTSlider) {
@@ -1503,14 +1535,12 @@ void RxApplet::connectSlice(SliceModel* s)
         QSignalBlocker bl(m_panSlider);
         m_panSlider->setValue(qRound(pan * 50.0 + 50.0));
     });
-    connect(s, &SliceModel::ssqlEnabledChanged, this, [this](bool on) {
-        QSignalBlocker bl(m_sqlBtn);
-        m_sqlBtn->setChecked(on);
-    });
-    connect(s, &SliceModel::ssqlThreshChanged, this, [this](double thresh) {
-        QSignalBlocker bl(m_sqlSlider);
-        m_sqlSlider->setValue(qRound(thresh));
-    });
+    // SQL zeigt in FM die FM-Rauschsperre, sonst die Sprach-Sperre.
+    connect(s, &SliceModel::ssqlEnabledChanged, this, [this](bool) { syncSquelchFromModel(); });
+    connect(s, &SliceModel::ssqlThreshChanged, this, [this](double) { syncSquelchFromModel(); });
+    connect(s, &SliceModel::fmsqEnabledChanged, this, [this](bool) { syncSquelchFromModel(); });
+    connect(s, &SliceModel::fmsqThreshChanged, this, [this](double) { syncSquelchFromModel(); });
+    connect(s, &SliceModel::dspModeChanged, this, [this](DSPMode) { syncSquelchFromModel(); });
 
     // AGC-T slider model→UI sync (§B1 fix-up).
     // The B1 alignment commits added AGC-T writing (m_slice->setAgcThreshold)
@@ -1925,7 +1955,7 @@ void RxApplet::buildInheritedRows(QVBoxLayout* col)
 {
     // ── Lautstaerke · Stumm · Binaural ───────────────────────────────
     {
-        auto* cap = new QLabel(QStringLiteral("LAUTSTÄRKE"), this);
+        auto* cap = new QLabel(tr("VOLUME"), this);
         cap->setFont(Style::capsFont(cap->font(), Style::kFontCaption));
         cap->setStyleSheet(Style::themed(QStringLiteral(
             "QLabel { color: %1; }").arg(Style::kTextScale)));
@@ -1973,7 +2003,7 @@ void RxApplet::buildInheritedRows(QVBoxLayout* col)
     // Zwei Reihen zu vier, wie im Zielbild. Die sieben schliessen sich
     // gegenseitig aus: setActiveNr(slot) oder setActiveNr(Off).
     {
-        auto* cap = new QLabel(QStringLiteral("RAUSCHMINDERUNG"), this);
+        auto* cap = new QLabel(tr("NOISE REDUCTION"), this);
         cap->setFont(Style::capsFont(cap->font(), Style::kFontCaption));
         cap->setStyleSheet(Style::themed(QStringLiteral(
             "QLabel { color: %1; }").arg(Style::kTextScale)));
@@ -2166,6 +2196,43 @@ void RxApplet::applyColumnDirection()
     // rechte (3) die Reihen der linken auseinander.
     for (int i = 0; i < m_columns->count(); ++i) {
         m_columns->setStretch(i, stacked ? 0 : (i == 0 ? 2 : 3));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FM-Rauschsperre am SQL-Regler (2026-09-27).
+// From Thetis console.cs:47225-47235 [@852bf0e]:
+//   if (_rx1_dsp_mode == DSPMode.FM) //FM Squelch
+//     //nValue = ptbSquelch.Value; // 0-100
+//     //[2.10.3.5]MW0LGE convert to a 0-100 scale from a -160 to 0 scale
+//     nValue = (int)(((ptbSquelch.Value + 160) / 160f) * 100f);
+//     FMSquelchThreshold = (float)Math.Pow(10.0, -2.0 * nValue / 100.0);
+// Longpaths Regler laeuft schon auf der 0-100-Skala (wie nValue).
+// SliceModel haelt die Schwelle in dB (RxChannel: linear = 10^(dB/20)),
+// also dB = -0.4 * n.
+// ---------------------------------------------------------------------------
+double RxApplet::fmSquelchDbFromSlider(int n)
+{
+    return -0.4 * static_cast<double>(n);
+}
+
+int RxApplet::fmSquelchSliderFromDb(double dB)
+{
+    return qBound(0, qRound(-dB / 0.4), 100);
+}
+
+void RxApplet::syncSquelchFromModel()
+{
+    if (!m_slice || !m_sqlBtn || !m_sqlSlider) { return; }
+    const bool fm = m_slice->dspMode() == DSPMode::FM;
+    {
+        QSignalBlocker bl(m_sqlBtn);
+        m_sqlBtn->setChecked(fm ? m_slice->fmsqEnabled() : m_slice->ssqlEnabled());
+    }
+    {
+        QSignalBlocker bl(m_sqlSlider);
+        m_sqlSlider->setValue(fm ? fmSquelchSliderFromDb(m_slice->fmsqThresh())
+                                 : qRound(m_slice->ssqlThresh()));
     }
 }
 

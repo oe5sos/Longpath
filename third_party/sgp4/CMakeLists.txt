@@ -7,7 +7,10 @@
 # docs/attribution/SGP4-PROVENANCE.md.
 #
 # Files are verbatim (CRLF line endings preserved so the upstream hashes
-# match). Longpath talks to it only through src/core/sat/SatelliteTracker.
+# match) except for one marked local patch in SGP4.cpp (sgp4init no longer
+# strcpy()s satrec.satnum onto itself; see "Local modifications" in the
+# provenance record). Longpath talks to it only through
+# src/core/sat/SatelliteTracker.
 
 add_library(sgp4 STATIC SGP4.cpp)
 target_include_directories(sgp4 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

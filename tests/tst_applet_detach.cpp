@@ -55,6 +55,7 @@
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/AppletVisibilityController.h"
 #include "gui/applets/AppletWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -156,8 +157,11 @@ private slots:
         QMenu* menu = panel.buildTitleBarMenuForTesting(rx);
         QVERIFY2(menu, "kein Kontextmenue fuer ein Applet der Spalte");
         QCOMPARE(menu->actions().size(), 1);
+        // Dieselbe tr()-Rolle wie im Programm (2026-10-15 englisch),
+        // nicht der Wortlaut — sonst faellt der Lauf bei der naechsten
+        // Umstellung wieder.
         QCOMPARE(menu->actions().first()->text(),
-                 QStringLiteral("Als Fenster ablösen"));
+                 AppletPanelWidget::tr("Detach as a window"));
 
         QSignalSpy spy(&panel, &AppletPanelWidget::appletDetachRequested);
         menu->actions().first()->trigger();
@@ -364,7 +368,7 @@ private slots:
         panel.addApplet(rx);
         panel.addApplet(tx);
         panel.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&panel));
+        QVERIFY(QTest::qWaitForWindowExposed(&panel, kFensterFrist));
 
         const AppletMap map{{QStringLiteral("Rx"), rx},
                             {QStringLiteral("Tx"), tx}};

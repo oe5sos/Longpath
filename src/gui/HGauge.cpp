@@ -1,5 +1,6 @@
 // src/gui/HGauge.cpp
 #include "gui/styles/ThemeQss.h"
+#include "gui/Zahlentext.h"
 #include "HGauge.h"
 #include "StyleConstants.h"
 #include <QPainter>
@@ -66,7 +67,11 @@ static QString readoutText(double v, double min, int decimals,
                            const QString& unit)
 {
     if (v <= min) { return QStringLiteral("\u2014"); }
-    QString s = QLocale::system().toString(v, 'f', decimals);
+    // Ueber anzeigeZahl, nicht direkt ueber QLocale: so gibt es EINE
+    // Stelle, die entscheidet, wie eine gelesene Zahl aussieht -- und
+    // die Tausendergruppierung ist dort abgeschaltet (bei QLocale ist
+    // sie an, was aus 1296 MHz "1.296,000000" machen wuerde).
+    QString s = anzeigeZahl(v, decimals);
     if (!unit.isEmpty()) { s += QLatin1Char(' ') + unit; }
     return s;
 }
@@ -101,10 +106,56 @@ void HGauge::paintEvent(QPaintEvent*)
     const double normalized = qBound(0.0, (m_value - m_min) / range, 1.0);
 
     if (m_reversed) {
+        // ── Ein umgedrehter Balken ist trotzdem eine Messung ─────────
+        //
+        // Hier stand EIN drawRoundedRect in der Gefahrenfarbe, ohne
+        // jede Schwelle: der umgedrehte Balken war IMMER rot, egal bei
+        // welchem Wert. Der einzige, der ihn benutzt, ist die
+        // Kompressionsanzeige im PHONE/CW-Feld — mit Bereich -25..0 dB
+        // und setRedStart(1.0), also einer Schwelle OBERHALB des
+        // Maximums: rot sollte er nie werden. Sichtbar wurde es im
+        // Bildschirmfoto des Betreibers vom 2026-10-15 als breites
+        // rosa Band quer durch die Sendegruppe.
+        //
+        // Hausstil, seit der Sendetaste in Messing (2026-09): „Kein
+        // kraeftiges Rot als Zustandsfarbe — Rot bleibt der Warnung."
+        // Kompression IST ein Messwert, also Bernstein, und die Gefahr
+        // beginnt da, wo das Applet sie hinsetzt.
+        //
+        // Dieselben drei Abschnitte wie unten, nur von rechts
+        // aufgetragen: der Balken waechst nach links, der aktuelle
+        // Wert sitzt an seiner linken Kante.
         const int fillW = static_cast<int>(normalized * barW);
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(Style::role("danger", Style::kGaugeDanger)));
-        p.drawRoundedRect(barX + barW - fillW, barY + 1, fillW, barH - 2, 1, 1);
+        if (fillW > 0) {
+            const double yellowNorm =
+                qBound(0.0, (m_yellowStart - m_min) / range, 1.0);
+            const double redNorm =
+                qBound(0.0, (m_redStart - m_min) / range, 1.0);
+            const int yellowX = static_cast<int>(yellowNorm * barW);
+            const int redX    = static_cast<int>(redNorm * barW);
+
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(Style::role("measured-dim", kMeasuredDim)));
+            p.drawRoundedRect(barX + barW - fillW, barY + 1,
+                              qMin(fillW, yellowX), barH - 2, 1, 1);
+
+            if (fillW > yellowX) {
+                const int warnW = qMin(fillW, redX) - yellowX;
+                if (warnW > 0) {
+                    p.setBrush(QColor(Style::role("measured",
+                                                  Style::kAmberText)));
+                    p.drawRect(barX + barW - yellowX - warnW, barY + 1,
+                               warnW, barH - 2);
+                }
+            }
+            if (fillW > redX) {
+                const int dangerW = fillW - redX;
+                p.setBrush(QColor(Style::role("danger",
+                                              Style::kGaugeDanger)));
+                p.drawRect(barX + barW - fillW, barY + 1,
+                           dangerW, barH - 2);
+            }
+        }
     } else {
         const int fillW = static_cast<int>(normalized * barW);
         if (fillW > 0) {
@@ -177,8 +228,29 @@ void HGauge::paintEvent(QPaintEvent*)
                 col = QColor(Style::role("danger", Style::kGaugeDanger));
             }
             p.setPen(col);
-            p.drawText(QRect(x - 20, barY + barH + 1, 40, 10),
-                       Qt::AlignHCenter | Qt::AlignTop, m_tickLabels[i]);
+            // ── Die erste und die letzte Zahl passen ins Feld ───────
+            //
+            // Vorher stand hier EIN Rechteck von 40 Punkten, mittig um
+            // den Strich. Beim ersten Strich beginnt es also bei
+            // barX - 20 = -18, beim letzten endet es 20 Punkte hinter
+            // der rechten Kante — beide Male ausserhalb des Widgets,
+            // und Qt schneidet ab. Im Bildschirmfoto des Betreibers
+            // vom 2026-10-15 las sich „-30dB" als „0dB" und „+10" als
+            // „+1". Eine Skala, deren Enden fehlen, ist keine Skala.
+            //
+            // Die Enden ziehen sich also nach innen und richten sich
+            // nach aussen aus; die Zahl bleibt am Strich, nur nicht
+            // mehr mittig darueber.
+            QRect kasten(x - 20, barY + barH + 1, 40, 10);
+            int ausrichtung = Qt::AlignHCenter | Qt::AlignTop;
+            if (i == 0) {
+                kasten.moveLeft(barX);
+                ausrichtung = Qt::AlignLeft | Qt::AlignTop;
+            } else if (i == n - 1) {
+                kasten.moveRight(barX + barW);
+                ausrichtung = Qt::AlignRight | Qt::AlignTop;
+            }
+            p.drawText(kasten, ausrichtung, m_tickLabels[i]);
         }
     }
 }

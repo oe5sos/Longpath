@@ -41,11 +41,97 @@ QByteArray hexBytes(const char* hex)
 
 } // namespace
 
+// Sucht echte Aufrufstellen einer Funktion unter src/, Kommentarzeilen
+// ausgenommen.
+//
+// Die Kommentar-Ausnahme ist nicht Kosmetik: am 2026-10-03 schlug die
+// erste Fassung dieser Pruefung an einer Zeile an, die genau das Gegenteil
+// sagt -- "encoders (SunSdrProtocol::buildMoxFrame() and friends) are NOT
+// called". Eine Pruefung, die an der Beschreibung des richtigen Zustands
+// scheitert, erzieht dazu, sie abzuschalten.
+//
+// Blockkommentare werden nur erkannt, soweit die Zeile mit * beginnt; das
+// deckt den hier ueblichen Stil ab, mehr soll diese Hilfe nicht leisten.
+inline QStringList aufrufstellenVon(const QString& name)
+{
+    const QString root =
+        QString::fromLatin1(LONGPATH_SOURCE_ROOT) + QStringLiteral("/src");
+    const QRegularExpression callSite(
+        QStringLiteral(R"(\b%1\s*\()").arg(name));
+    QStringList treffer;
+
+    QDirIterator it(root,
+                    QStringList{QStringLiteral("*.cpp"), QStringLiteral("*.h"),
+                                 QStringLiteral("*.cc"), QStringLiteral("*.hpp"),
+                                 QStringLiteral("*.mm")},
+                    QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        const QString path = it.next();
+        if (path.endsWith(QStringLiteral("src/core/sunsdr/SunSdrProtocol.h"))
+            || path.endsWith(QStringLiteral("src/core/sunsdr/SunSdrProtocol.cpp"))) {
+            continue;  // Erklaerung und Umsetzung der Funktion selbst
+        }
+        QFile f(path);
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) { continue; }
+        const QStringList zeilen =
+            QString::fromUtf8(f.readAll()).split(QLatin1Char('\n'));
+        for (const QString& zeile : zeilen) {
+            const QString roh = zeile.trimmed();
+            if (roh.startsWith(QStringLiteral("//"))
+                || roh.startsWith(QLatin1Char('*'))) { continue; }
+            if (callSite.match(zeile).hasMatch()) {
+                treffer << path;
+                break;
+            }
+        }
+    }
+    return treffer;
+}
+
 class TestSunSdrProtocol : public QObject
 {
     Q_OBJECT
 
 private slots:
+    // Die vierte Nutzlast des Stromstart-Rahmens: EIN Strom mit 96 kHz.
+    //
+    // Bis zum 2026-10-07 gab es nur drei der vier Kombinationen -- bei
+    // 96 kHz stellte Longpath IMMER auf zwei Stroeme, auch mit einem
+    // Empfaenger. ExpertSDR2 benutzt die vierte (Mitschnitt 2026-10-07,
+    // RX2 aus, Spanne 96 kHz), und das Geraet nimmt sie an.
+    //
+    // Erstes Byte = Stromzahl, zweites = Ratenstufe, Schwanz haengt an
+    // der Rate. Genau so steht es auf dem Draht.
+    void einStromMitSechsundneunzigHatDieVierteNutzlast()
+    {
+        const QByteArray f = Longpath::SunSdr::buildStromStartFrame(
+            Longpath::SunSdr::kProfileQrp, Longpath::SunSdr::StromModus::EinStrom96);
+        const QByteArray nutz = f.mid(Longpath::SunSdr::kCtlHeaderSize);
+        QCOMPARE(nutz.toHex(), QByteArray("010100000a06040302020201"));
+        // Zur Abgrenzung: zwei Stroeme bei derselben Rate unterscheiden
+        // sich NUR im ersten Byte.
+        const QByteArray zwei = Longpath::SunSdr::buildStromStartFrame(
+            Longpath::SunSdr::kProfileQrp, Longpath::SunSdr::StromModus::ZweiStroemeJe96)
+            .mid(Longpath::SunSdr::kCtlHeaderSize);
+        QCOMPARE(zwei.toHex(), QByteArray("020100000a06040302020201"));
+        QCOMPARE(nutz.mid(1), zwei.mid(1));
+        QVERIFY(nutz.at(0) != zwei.at(0));
+    }
+
+    // Der Pegelabgleich ist keine Geschmacksfrage, sondern eine Messung:
+    // am 2026-10-04 hat der Betreiber am echten Geraet +40,0 dB
+    // eingestellt und bestaetigt ("die lautstaerke passt"), nachdem die
+    // alten +20,0 -- ueber den TCI-Weg geeicht -- am nativen Treiber bei
+    // Weitem nicht reichten ("ich muss voll aufdrehen, dass ich etwas
+    // hoere"). Diese Pruefung haelt die Zahl fest, damit sie nicht
+    // unbemerkt zurueckwandert.
+    void derPegelabgleichDerQrpIstEineMessung()
+    {
+        QCOMPARE(Longpath::SunSdr::kProfileQrp.rxLevelTrimDb, 40.0);
+        // DX und PRO bleiben bei 0 -- nie an dieser Hardware gemessen.
+        QCOMPARE(Longpath::SunSdr::kProfileDx.rxLevelTrimDb, 0.0);
+        QCOMPARE(Longpath::SunSdr::kProfilePro.rxLevelTrimDb, 0.0);
+    }
     // CRC-32 ueber den Rahmen mit genulltem Feld 14..17 -- an 13 echten
     // Rahmen von 10 Befehlen aus ExpertSDR2s Start (2026-09-25) byte-genau.
     void controlFrameCrcReproducesThirteenCapturedFrames()
@@ -374,21 +460,27 @@ private slots:
 
     // ── MOX/PTT (opcode 0x06) ────────────────────────────────────────
 
+    // Die Erwartungen unten wickeln die Hexfolge in withControlFrameCrc:
+    // seit dem 2026-10-08 liefert JEDER Rahmenbauer einen sendefertigen
+    // Rahmen. Die Pruefsumme als Literal einzumauern waere schlechter --
+    // vier Byte, die niemand im Kopf nachrechnet, und bei jeder Aenderung
+    // am Kopf muss sie jemand von Hand nachziehen. So bleibt in der Zeile
+    // stehen, worum es hier geht: das AUSWAHLbyte.
     void buildMoxFrameEncodesOnAsOne()
     {
         const QByteArray built = buildMoxFrame(kProfileQrp, /*on=*/true);
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 06 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "01 00 00 00");
+            "01 00 00 00"));
         QCOMPARE(built, expected);
     }
 
     void buildMoxFrameEncodesOffAsZero()
     {
         const QByteArray built = buildMoxFrame(kProfileQrp, /*on=*/false);
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 06 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "00 00 00 00");
+            "00 00 00 00"));
         QCOMPARE(built, expected);
     }
 
@@ -400,14 +492,69 @@ private slots:
     // exist specifically to catch a future edit that collapses the
     // lookup table back into a single shared literal.
 
+    // ── Der Waechter: sendefertig heisst MIT Pruefsumme ─────────────
+    //
+    // Am 2026-10-08 gefunden: buildMoxFrame, buildAntennaSelectFrame,
+    // buildDriveFrame und buildPaEnableFrame lieferten Bytes 14..17 als
+    // null, waehrend buildStromStartFrame und buildStopFrame die
+    // Pruefsumme setzten. Die vier ohne sind genau die, die (zu Recht)
+    // keine Aufrufstelle haben -- der Fehler war also latent und haette
+    // beim ERSTEN Verdrahten zugeschlagen.
+    //
+    // Am Geraet gezeigt (2026-09-25): ein Rahmen mit falschem Ende wird
+    // STILLSCHWEIGEND verworfen. Kein Fehler, keine Antwort. Man sucht
+    // die Ursache dann im Funkgeraet statt in der Zeile -- und zwar am
+    // 50-Ohm-Abschluss, wo die Zeit am Geraet teuer ist.
+    //
+    // Diese Pruefung nennt die Rahmenbauer EINZELN statt eine Schleife
+    // ueber eine Liste zu fahren: ein neuer Bauer faellt hier nicht
+    // automatisch durch, aber er faellt beim Lesen auf, und das ist
+    // mehr wert als eine Liste, die jemand zu pflegen vergisst.
+    void jederRahmenbauerLiefertEineRichtigePruefsumme()
+    {
+        auto stimmt = [](const QByteArray& rahmen, const char* wer) {
+            QVERIFY2(rahmen.size() >= 18,
+                     qPrintable(QStringLiteral("%1: zu kurz").arg(
+                         QString::fromLatin1(wer))));
+            QByteArray genullt = rahmen;
+            genullt[14] = genullt[15] = genullt[16] = genullt[17] = 0;
+            QVERIFY2(withControlFrameCrc(genullt) == rahmen,
+                     qPrintable(QStringLiteral(
+                         "%1 liefert keinen sendefertigen Rahmen: Bytes "
+                         "14..17 sind %2, richtig waere %3. Das Geraet "
+                         "verwirft so einen Rahmen stillschweigend.")
+                         .arg(QString::fromLatin1(wer),
+                              QString::fromLatin1(rahmen.mid(14, 4).toHex()),
+                              QString::fromLatin1(
+                                  withControlFrameCrc(genullt).mid(14, 4).toHex()))));
+        };
+
+        stimmt(buildStopFrame(kProfileQrp), "buildStopFrame");
+        stimmt(buildStromStartFrame(kProfileQrp, StromModus::EinStrom48),
+               "buildStromStartFrame");
+        stimmt(buildMoxFrame(kProfileQrp, true),  "buildMoxFrame(an)");
+        stimmt(buildMoxFrame(kProfileQrp, false), "buildMoxFrame(aus)");
+        stimmt(buildDriveFrame(kProfileQrp, 0),   "buildDriveFrame");
+        stimmt(buildPaEnableFrame(kProfileQrp, false), "buildPaEnableFrame");
+
+        for (AntennaPort port : {AntennaPort::A1, AntennaPort::A2,
+                                 AntennaPort::A3}) {
+            for (bool tx : {false, true}) {
+                QByteArray gebaut;
+                QVERIFY(buildAntennaSelectFrame(kProfileQrp, port, tx, &gebaut));
+                stimmt(gebaut, "buildAntennaSelectFrame");
+            }
+        }
+    }
+
     void antennaA3SelectorByteIs0x03OnRx()
     {
         QByteArray built;
         QVERIFY(buildAntennaSelectFrame(kProfileQrp, AntennaPort::A3,
                                         /*forTx=*/false, &built));
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 15 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "03 00 00 00");
+            "03 00 00 00"));
         QCOMPARE(built, expected);
     }
 
@@ -416,9 +563,9 @@ private slots:
         QByteArray built;
         QVERIFY(buildAntennaSelectFrame(kProfileQrp, AntennaPort::A3,
                                         /*forTx=*/true, &built));
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 15 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "02 00 00 00");
+            "02 00 00 00"));
         QCOMPARE(built, expected);
 
         // Restated as a direct byte comparison, independent of the
@@ -452,9 +599,9 @@ private slots:
         QVERIFY(buildAntennaSelectFrame(kProfileQrp, AntennaPort::A2,
                                         /*forTx=*/true, &a2Tx));
 
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 15 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "01 00 00 00");
+            "01 00 00 00"));
         QCOMPARE(a1Rx, expected);
         QCOMPARE(a1Tx, expected);
         QCOMPARE(a2Rx, expected);
@@ -466,14 +613,14 @@ private slots:
     void buildDriveFrameIsABarePassthrough()
     {
         QCOMPARE(buildDriveFrame(kProfileQrp, 0x00),
-                 hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
-                           "00 00 00 00 00 00 00 00"));
+                 withControlFrameCrc(hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
+                           "00 00 00 00 00 00 00 00")));
         QCOMPARE(buildDriveFrame(kProfileQrp, 0x80),
-                 hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
-                           "00 00 00 00 80 00 00 00"));
+                 withControlFrameCrc(hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
+                           "00 00 00 00 80 00 00 00")));
         QCOMPARE(buildDriveFrame(kProfileQrp, 0xFF),
-                 hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
-                           "00 00 00 00 ff 00 00 00"));
+                 withControlFrameCrc(hexBytes("03 ff 17 00 04 00 00 00 00 00 01 00 00 00 "
+                           "00 00 00 00 ff 00 00 00")));
     }
 
     // Step 1 scope guard: this byte must never reach a real caller
@@ -487,34 +634,12 @@ private slots:
     // enforcing an absence instead of a presence.
     void buildDriveFrameHasNoProductionCallSites()
     {
-        const QString root =
-            QString::fromLatin1(LONGPATH_SOURCE_ROOT) + QStringLiteral("/src");
-        QDirIterator it(root,
-                        QStringList{QStringLiteral("*.cpp"), QStringLiteral("*.h"),
-                                     QStringLiteral("*.cc"), QStringLiteral("*.hpp"),
-                                     QStringLiteral("*.mm")},
-                        QDir::Files, QDirIterator::Subdirectories);
-
-        const QRegularExpression callSite(
-            QStringLiteral(R"(\bbuildDriveFrame\s*\()"));
-        QStringList offenders;
-
-        while (it.hasNext()) {
-            const QString path = it.next();
-            if (path.endsWith(QStringLiteral(
-                    "src/core/sunsdr/SunSdrProtocol.h")) ||
-                path.endsWith(QStringLiteral(
-                    "src/core/sunsdr/SunSdrProtocol.cpp"))) {
-                continue;  // the function's own declaration/definition
-            }
-            QFile f(path);
-            if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) { continue; }
-            const QString src = QString::fromUtf8(f.readAll());
-            if (callSite.match(src).hasMatch()) {
-                offenders << path;
-            }
-        }
-
+        // Auf aufrufstellenVon() umgestellt (2026-10-03): die eigene Suche
+        // hier traf auch Kommentarzeilen. Das fiel nur deshalb nie auf, weil
+        // ueber buildDriveFrame() zufaellig keine Kommentarzeile mit Klammern
+        // existiert -- bei buildMoxFrame() gibt es eine, und sie sagt das
+        // Gegenteil eines Aufrufs.
+        const QStringList offenders = aufrufstellenVon(QStringLiteral("buildDriveFrame"));
         QVERIFY2(offenders.isEmpty(),
                  qPrintable(QStringLiteral(
                      "buildDriveFrame() must have zero production call "
@@ -523,23 +648,134 @@ private slots:
                      offenders.join(QStringLiteral(", "))));
     }
 
+    // ── Die drei anderen DX-staemmigen TX-Rahmenbauer: ebenso gesperrt ──
+    //
+    // Begruendung ist hier eine ANDERE als bei buildDriveFrame (dort fehlt
+    // die Leistungskalibrierung) und sie ist am 2026-10-03 aus den
+    // mitgeschnittenen Rahmen heraus praeziser geworden: bei der QRP sind
+    // drei am Geraet gemessene Steuerbefehle gegenueber der DX **um eins
+    // nach unten verschoben**, und ihre Nutzlasten sind anders codiert:
+    //
+    //   Vorverstaerker   QRP 0x04, Werte 0..3   | DX 0x05, Werte 0x80..0x83
+    //   DDC-Frequenz     QRP 0x07               | DX 0x08 (FREQ_COMP)
+    //   VFO-Frequenz     QRP 0x08               | DX 0x09 (FREQ_PRIMARY)
+    //
+    // Dazu ist schon das erste Byte ein anderes (QRP 0x03, DX 0x32). Die
+    // QRP spricht also eine verwandte, aber eigene Variante -- und
+    // buildMoxFrame/buildAntennaSelectFrame/buildPaEnableFrame tragen
+    // unveraendert die DX-Nummern 0x06/0x15/0x24. Ein globaler Versatz ist
+    // es allerdings NICHT: 0x01 passt ohne Versatz zu DX' STATE_SYNC.
+    // Daraus folgt nicht "minus eins rechnen", sondern: jede Nummer muss
+    // einzeln bestaetigt werden, bevor sie an ein Funkgeraet geht.
+    //
+    // Was sonst passiert, ist durchgerechnet: schickt Longpath 0x06 in der
+    // Annahme "MOX" und ist die QRP-Bedeutung eine andere, dann geht beim
+    // ersten Sendeversuch etwas Unbekanntes ans Geraet -- genau der Fehler
+    // vom 2026-09-23, als unzugeordnete Opcodes an die QRP geschickt
+    // wurden. Bestaetigt wird darum nicht durch Probieren am Geraet,
+    // sondern durch einen Mitschnitt, in dem ExpertSDR2 sendet.
+    // Der Stopp-Rahmen, byte-fuer-byte aus dem Mitschnitt vom 2026-10-03
+    // (rate-umschalten.pcap, dreimal enthalten, immer gleich). ExpertSDR2
+    // schickt ihn beim Beenden, und das letzte Strompaket liegt in
+    // derselben Millisekunde.
+    void stopRahmenStimmtMitDemAufgezeichnetenUeberein()
+    {
+        using namespace Longpath::SunSdr;
+        QCOMPARE(buildStopFrame(kProfileQrp).toHex(),
+                 QByteArray("03ff0200040000000000010000000d99f99d00000000"));
+    }
+
+    // ── Die drei gemessenen Stromstart-Rahmen ──────────────────────────
+    //
+    // Der aus EinStrom48 gebaute Rahmen MUSS byte-fuer-byte der sein, den
+    // Longpath heute schickt (stateSyncFrameForTest) und der im
+    // ExpertSDR2-Mitschnitt steht. Stimmt das, sind auch die beiden
+    // anderen Rahmen richtig gebaut -- gleicher Kopf, gleiche
+    // Pruefsummenrechnung, nur andere Nutzlast.
+    void stromStartRahmenStimmtMitDemAufgezeichnetenUeberein()
+    {
+        using namespace Longpath::SunSdr;
+        QCOMPARE(buildStromStartFrame(kProfileQrp, StromModus::EinStrom48).toHex(),
+                 QByteArray("03ff01000c0000000000010000007648ea9e"
+                            "010000000c08040302020202"));
+        // Die zwei gemessenen Zustaende mit zwei Stroemen. Nutzlast
+        // byte-fuer-byte aus dem Mitschnitt vom 2026-10-03; die Pruefsumme
+        // rechnet dieselbe Funktion, die oben an dreizehn echten Rahmen
+        // bestaetigt ist.
+        const QByteArray a =
+            buildStromStartFrame(kProfileQrp, StromModus::ZweiStroemeJe48);
+        const QByteArray b =
+            buildStromStartFrame(kProfileQrp, StromModus::ZweiStroemeJe96);
+        QCOMPARE(a.mid(18).toHex(), QByteArray("020000000c08040302020202"));
+        QCOMPARE(b.mid(18).toHex(), QByteArray("020100000a06040302020201"));
+        // Erste zwei Bytes der Nutzlast: Zahl der Stroeme, und sie steigt.
+        QCOMPARE(quint8(a[18]), quint8(2));
+        QCOMPARE(quint8(b[18]), quint8(2));
+        QCOMPARE(quint8(b[19]), quint8(1));
+        // Und die Pruefsummen sind gueltig -- nachgerechnet wie bei den
+        // dreizehn aufgezeichneten Rahmen.
+        for (const QByteArray& f : {a, b}) {
+            QByteArray genullt = f;
+            genullt[14] = genullt[15] = genullt[16] = genullt[17] = 0;
+            QCOMPARE(withControlFrameCrc(genullt).toHex(), f.toHex());
+        }
+    }
+
+    // Gegenprobe zu den zwei Sperren darueber und darunter: eine Suche, die
+    // nie etwas findet, beweist nichts. withControlFrameCrc() WIRD benutzt
+    // (SunSdrRadioConnection.cpp, Frequenzrahmen) -- findet die Hilfe sie
+    // nicht, ist jedes gruene "keine Aufrufstellen" wertlos.
+    void dieSucheFindetEinenEchtenAufruf()
+    {
+        const QStringList treffer =
+            aufrufstellenVon(QStringLiteral("withControlFrameCrc"));
+        QVERIFY2(!treffer.isEmpty(),
+                 "Die Suche findet einen bekannten echten Aufruf nicht -- "
+                 "damit sagen die Sperrpruefungen nichts aus");
+    }
+
+    // Und sie darf sich nicht von einer Kommentarzeile taeuschen lassen:
+    // genau daran schlug die erste Fassung an (SunSdrRadioConnection.cpp
+    // sagt "buildMoxFrame() and friends are NOT called").
+    void dieSucheUebergehtKommentarzeilen()
+    {
+        QVERIFY(aufrufstellenVon(QStringLiteral("buildMoxFrame")).isEmpty());
+    }
+
+    void dieDreiAnderenDxStaemmigenTxEncoderHabenKeineAufrufstellen()
+    {
+        const QStringList gesperrt{QStringLiteral("buildMoxFrame"),
+                                   QStringLiteral("buildAntennaSelectFrame"),
+                                   QStringLiteral("buildPaEnableFrame")};
+        for (const QString& name : gesperrt) {
+            const QStringList offenders = aufrufstellenVon(name);
+            QVERIFY2(offenders.isEmpty(),
+                     qPrintable(QStringLiteral(
+                         "%1() traegt eine DX-Opcode-Nummer, die fuer die QRP "
+                         "nicht bestaetigt ist (bei drei gemessenen Befehlen "
+                         "liegt die QRP um eins darunter). Erst bestaetigen, "
+                         "dann verdrahten -- gefunden in: ")
+                         .arg(name) + offenders.join(QStringLiteral(", "))));
+        }
+    }
+
     // ── PA enable (opcode 0x24) ──────────────────────────────────────
 
     void buildPaEnableFrameEncodesEnabledAsOne()
     {
         const QByteArray built = buildPaEnableFrame(kProfileQrp, /*enabled=*/true);
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 24 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "01 00 00 00");
+            "01 00 00 00"));
         QCOMPARE(built, expected);
     }
 
     void buildPaEnableFrameEncodesDisabledAsZero()
     {
         const QByteArray built = buildPaEnableFrame(kProfileQrp, /*enabled=*/false);
-        const QByteArray expected = hexBytes(
+        const QByteArray expected = withControlFrameCrc(hexBytes(
             "03 ff 24 00 04 00 00 00 00 00 01 00 00 00 00 00 00 00 "
-            "00 00 00 00");
+            "00 00 00 00"));
         QCOMPARE(built, expected);
     }
 };

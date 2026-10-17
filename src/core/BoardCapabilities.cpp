@@ -1254,9 +1254,22 @@ const BoardCapabilities kSunSdr2Qrp = {
     // Revisit if/when a second-receiver capability is confirmed on the
     // bench.
     .adcCount         = 1,
-    .maxReceivers     = 1,
-    .maxSlices        = 1,
-    .userDdcCount     = 1,
+    // Zwei Empfaenger -- am 2026-10-04 aus einem Mitschnitt des Betreibers
+    // belegt, in dem ExpertSDR2 mit RX UND RX2 lief ("es waren immer beide
+    // rx und rx2"). Der zweite Strom traegt echtes I/Q: -127,9 dBFS,
+    // 31,5 % Q ungleich null, also etwas KRAEFTIGER als der erste
+    // (-130,0 dBFS / 21,2 %). Bis dahin stand hier 1, und der Treiber hat
+    // den zweiten Kanal weggeworfen -- die Lueckenliste nannte ihn
+    // faelschlich "stumm".
+    .maxReceivers     = 2,
+    .maxSlices        = 2,
+    // Zwei Stroeme, nicht einer -- sonst hat der Strompool genau einen
+    // Platz, und eine zweite Scheibe bekommt nie einen eigenen Strom.
+    // Am 2026-10-04 am Geraet gesehen: eine zweite Scheibe auf 20 m
+    // wurde abgelehnt ("Placement: slice 1 freq=14.1 MHz -> Rejected
+    // stream=-1"), obwohl das Geraet zwei Stroeme liefert und der
+    // Treiber beide hochreicht. Das war das letzte Glied der Kette.
+    .userDdcCount     = 2,
     .widebandAdcs     = 0,   // no wideband/panadapter-bypass stream documented
     // 48 000 Hz — am Geraet gemessen (2026-09-23/24), nicht uebernommen.
     //
@@ -1276,8 +1289,21 @@ const BoardCapabilities kSunSdr2Qrp = {
     // Atlas und mit ihr auf Atlas' 192 kHz. Siehe die Stelle in
     // RadioModel::connectToRadio, die das jetzt richtigstellt -- ohne sie
     // ist die Zahl hier wirkungslos.
-    .sampleRates      = {48000, 0, 0, 0, 0, 0},
-    .maxSampleRate    = 48000,
+    // 96 000 Hz ist am 2026-10-03 am Geraet gemessen und laeuft durch die
+    // ganze Kette: der Stromstart-Rahmen 0x01 stellt sie (SunSdrProtocol.h,
+    // StromModus), setSampleRate waehlt ihn, und Kanal 0 kommt mit
+    // 480 Folgenummern je Sekunde = 96 kHz beim Empfaenger an. Gemessen
+    // ohne Verlust, mit erkanntem Stromneustart.
+    //
+    // 144 000 waere ebenfalls belegt (zwei Stroeme je 96 kHz ergeben
+    // zusammen 192 kHz), steht hier aber NICHT: ein Eintrag in dieser
+    // Liste heisst, dass die Oberflaeche die Rate anbietet, und was die
+    // Oberflaeche anbietet, muss durch den ganzen Weg stimmen -- einmal
+    // Daten einer Rate in einem Kanal einer anderen, und der Betreiber
+    // hoert "schlechtes Rauschen" (2026-09-24). Erst wenn der zweite Kanal
+    // oben einen Empfaenger hat, kommt mehr dazu.
+    .sampleRates      = {48000, 96000, 0, 0, 0, 0},
+    .maxSampleRate    = 96000,
     // No OpenHPSDR-style wire-encoded step attenuator exists on this
     // protocol. SunSDR has its own, structurally different mechanism: a
     // single opcode (0x05) selecting one of 4 discrete preamp/atten

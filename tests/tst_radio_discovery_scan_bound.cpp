@@ -69,8 +69,30 @@ void floodLoopbackPort(quint16 port, std::atomic<bool>* stop)
 // `delayMs`. Runs on its own std::thread for the same reason
 // floodLoopbackPort() does — the code under test blocks the calling thread
 // inside waitForReadyRead(), so a same-thread timer would never fire.
-void sendSingleDatagramAfterDelay(quint16 port, int delayMs)
+// ── Warum der Faden erst meldet, dass er laeuft (2026-10-17) ────────
+//
+// Vorher begann die Wartezeit beim Aufruf von std::thread. Damit lag
+// die Zeit, die das Betriebssystem braucht, um den Faden ueberhaupt
+// anzulegen und einzuplanen, MIT im Zeitbudget — und auf einem
+// ausgelasteten Laeufer ist das keine Kleinigkeit.
+//
+// Genau daran fiel der Lauf am 2026-10-17 auf „Build (macOS Apple
+// Silicon (2/2))" um: `metrics.datagrams >= 1` meldete 0. Die
+// Schleife lief ihre sechs stillen Fenster ab und endete, bevor der
+// Faden ueberhaupt zum Senden kam. Bemerkenswert daran: der ALTE
+// Lauf waere hier still gruen gewesen (sechs stille Fenster, 180 ms,
+// unter der Latte von 240) und haette die Sperrklinke nie geprueft.
+// Der Zaehler fuer die angekommenen Datagramme hat das sichtbar
+// gemacht.
+//
+// `laeuft` wird gesetzt, sobald der Faden rechnet; der Aufrufer
+// wartet darauf, BEVOR er die Schleife betritt. Danach steht nur
+// noch die Wartezeit selbst im Budget, nicht mehr das Anlegen des
+// Fadens.
+void sendSingleDatagramAfterDelay(quint16 port, int delayMs,
+                                  std::atomic<bool>* laeuft)
 {
+    if (laeuft != nullptr) { laeuft->store(true, std::memory_order_release); }
     std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
     const int fd = ::socket(AF_INET, SOCK_DGRAM, 0);
     if (fd < 0) {
@@ -113,16 +135,33 @@ private slots:
         constexpr int kPollMs = 30;
         const QDeadlineTimer deadline(qint64(kQuietBeforeStop + 1) * kPollMs, Qt::CoarseTimer);
 
+        RadioDiscovery::QuietPollMetrics metrics;
         QElapsedTimer clock;
         clock.start();
-        const auto outcome =
-            disc.quietPollAttemptForTest(victim, kQuietBeforeStop, kPollMs, deadline);
+        const auto outcome = disc.quietPollAttemptForTest(
+            victim, kQuietBeforeStop, kPollMs, deadline, &metrics);
         const qint64 elapsedMs = clock.elapsed();
 
         stopFlood.store(true);
         flooder.join();
 
         QCOMPARE(int(outcome), int(RadioDiscovery::QuietPollOutcome::DeadlineExceeded));
+        // Hier bleibt die ZEIT der Gegenstand — die Frist ist das
+        // Sicherheitsnetz, das geprueft wird, und eine Zahl kann sie
+        // nicht ersetzen. Die Zaehler sagen dafuer, dass die Flut
+        // wirklich ankam und der Zaehler unter ihr nicht durchlief;
+        // ohne sie koennte der Lauf auch an einem stillen Socket in die
+        // Frist laufen und gruen aussehen.
+        QVERIFY2(metrics.datagrams >= 1,
+                 qPrintable(QStringLiteral(
+                     "die Flut kam nicht an (%1 Datagramme) — dieser Lauf hat "
+                     "die Frist dann an einem stillen Socket geprueft")
+                     .arg(metrics.datagrams)));
+        QVERIFY2(metrics.quietPolls < kQuietBeforeStop,
+                 qPrintable(QStringLiteral(
+                     "unter der Flut liefen %1 stille Fenster durch — dann war "
+                     "es nicht die Frist, die die Schleife beendet hat")
+                     .arg(metrics.quietPolls)));
         // Generous CI slack — the point is "bounded", not "exactly on time".
         // The pre-fix behaviour was unbounded (effectively forever, i.e. up
         // to CTest's 120s TIMEOUT), so even a loose multiple of the intended
@@ -143,39 +182,123 @@ private slots:
     // arrives: total time to Quiet stays close to kQuietBeforeStop *
     // kPollMs, same as if no reply had come at all. The pre-fix
     // reset-to-0 behaviour instead adds a full extra kQuietBeforeStop
-    // polls on top of however many had already elapsed before the burst,
-    // which for this delay would push it close to 270 ms instead of the
-    // fixed behaviour's ~180 ms — the threshold below sits clearly between
-    // the two so a regression back to reset-on-readable fails the test.
+    // polls on top of however many had already elapsed before the burst.
+    //
+    // ── Gezaehlt, nicht gemessen (2026-10-17) ───────────────────────
+    //
+    // Hier stand eine Zeitlatte: 180 ms fuer die feste Fassung, 270 ms
+    // fuer den Rueckfall, Schwelle bei 8 * kPollMs = 240 ms dazwischen.
+    // Am 2026-10-17 brauchte ein ausgelasteter macOS-Laeufer 257 ms fuer
+    // die RICHTIGE Fassung (main-Lauf zu d7d57af7, „Build (macOS Apple
+    // Silicon (2/2))"), der Lauf fiel also um, obwohl das Programm
+    // stimmte; der Neulauf desselben Jobs war gruen. Zwischen „gut" und
+    // „schlecht" lagen 90 ms, und die Schwelle liess 60 ms Luft fuer
+    // Taktschwankungen — zu wenig.
+    //
+    // Geprueft wird jetzt die Groesse, auf die es ankommt: die ZAHL der
+    // stillen Fenster. Sie ist bei der festen Fassung genau
+    // quietBeforeStop, egal wann die Antwort kommt und egal wie schnell
+    // der Rechner ist; der Rueckfall braucht kBurstDelayMs/kPollMs
+    // mehr. Dieselbe Wette ist dieser Pruefstand an vier anderen
+    // Stellen gerade losgeworden (#250, #246, #248, #252) und bei
+    // tst_ft8_senden noch einmal (#260).
     void aBurstyReplyDoesNotResetTheQuietCounter() {
         RadioDiscovery disc;
         QUdpSocket victim;
         QVERIFY(victim.bind(QHostAddress::LocalHost, 0));
 
-        constexpr int kQuietBeforeStop = 6;
+        // Zehn statt sechs stille Fenster (2026-10-17): die Schleife
+        // dauert damit mindestens 300 ms statt 180, und das eine
+        // Datagramm bei 90 ms hat ein entsprechend breiteres Ziel.
+        // Der Rueckfall kostet weiter drei zusaetzliche Fenster
+        // (13 statt 10) und bleibt damit klar unterscheidbar.
+        constexpr int kQuietBeforeStop = 10;
         constexpr int kPollMs = 30;
         constexpr int kBurstDelayMs = 3 * kPollMs;
-        const QDeadlineTimer deadline(qint64(kQuietBeforeStop + 4) * kPollMs, Qt::CoarseTimer);
+        // Die Frist ist hier NICHT der Gegenstand — das ist
+        // floodedSocketStillTerminatesViaDeadline. Hier soll sie nur
+        // verhindern, dass ein Fehler die Schleife ewig laufen laesst,
+        // und darum liegt sie weit weg: Faktor fuenf.
+        //
+        // Vorher stand hier (quietBeforeStop + 4) * pollMs = 420 ms,
+        // und gemessen brauchte der Lauf 316 bis 350 ms — 70 ms Luft.
+        // Das ist dieselbe duenne Wette, die dieser Pruefstand gerade
+        // losgeworden ist, nur eine Stelle weiter: auf einem langsamen
+        // Laeufer waere die Schleife in die Frist gelaufen, der
+        // Ausgang DeadlineExceeded statt Quiet, und die Meldung haette
+        // vom Ausgang gesprochen statt von der Sperrklinke. Mit der
+        // Gegenprobe (Rueckfall, 13 Fenster, 412 ms gemessen) waere es
+        // noch knapper gewesen.
+        const QDeadlineTimer deadline(
+            qint64(5 * kQuietBeforeStop) * kPollMs, Qt::CoarseTimer);
 
-        std::thread burst(sendSingleDatagramAfterDelay, victim.localPort(), kBurstDelayMs);
+        // Erst den Faden, dann warten, bis er wirklich rechnet — siehe
+        // sendSingleDatagramAfterDelay. Ohne das steht das Anlegen des
+        // Fadens im Zeitbudget, und genau daran fiel dieser Lauf
+        // am 2026-10-17 in der CI um.
+        std::atomic<bool> burstLaeuft{false};
+        std::thread burst(sendSingleDatagramAfterDelay, victim.localPort(),
+                          kBurstDelayMs, &burstLaeuft);
+        QElapsedTimer anlaufUhr;
+        anlaufUhr.start();
+        while (!burstLaeuft.load(std::memory_order_acquire)
+               && anlaufUhr.elapsed() < 5000) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        QVERIFY2(burstLaeuft.load(std::memory_order_acquire),
+                 "der sendende Faden kam in fuenf Sekunden nicht zum "
+                 "Rechnen — dann sagt dieser Lauf nichts ueber den "
+                 "Stille-Zaehler");
+        qInfo().noquote() << "Faden lief nach" << anlaufUhr.elapsed() << "ms an";
 
+        RadioDiscovery::QuietPollMetrics metrics;
         QElapsedTimer clock;
         clock.start();
-        const auto outcome =
-            disc.quietPollAttemptForTest(victim, kQuietBeforeStop, kPollMs, deadline);
+        const auto outcome = disc.quietPollAttemptForTest(
+            victim, kQuietBeforeStop, kPollMs, deadline, &metrics);
         const qint64 elapsedMs = clock.elapsed();
 
         burst.join();
 
         QCOMPARE(int(outcome), int(RadioDiscovery::QuietPollOutcome::Quiet));
-        QVERIFY2(elapsedMs < 8 * kPollMs,
+
+        // Immer melden, nicht erst im Fehlerfall: als dieser Lauf am
+        // 2026-10-17 in der CI umfiel, stand im Protokoll nur, dass
+        // null Datagramme ankamen — nicht, wie lange die Schleife
+        // gelaufen war. Eine Messung, die nur bei Rot erscheint, ist
+        // bei Rot die halbe Antwort.
+        qInfo().noquote() << "stille Fenster:" << metrics.quietPolls
+                          << " Datagramme:" << metrics.datagrams
+                          << " Dauer:" << elapsedMs << "ms";
+
+        // Erst: die Antwort ist wirklich angekommen. Ohne diese Zeile
+        // wuerde ein verlorenes Datagramm den Lauf gruen machen, ohne
+        // dass die Sperrklinke je geprueft worden waere.
+        QVERIFY2(metrics.datagrams >= 1,
                  qPrintable(QStringLiteral(
-                     "bursty-reply quiet-poll loop took %1 ms — expected close "
-                     "to %2 ms (quietBeforeStop * pollMs); a reset-on-readable "
-                     "regression would push this past ~%3 ms")
-                     .arg(elapsedMs)
-                     .arg(kQuietBeforeStop * kPollMs)
-                     .arg((kBurstDelayMs / kPollMs + kQuietBeforeStop) * kPollMs)));
+                     "die eine Antwort kam nicht an (%1 Datagramme) — dieser "
+                     "Lauf hat den Stille-Zaehler dann gar nicht geprueft")
+                     .arg(metrics.datagrams)));
+
+        // Und dann die Sperrklinke selbst, gezaehlt statt gemessen: die
+        // feste Fassung braucht GENAU quietBeforeStop stille Fenster,
+        // egal wann die Antwort kommt und egal wie schnell der Rechner
+        // ist. Der Rueckfall (Zaehler bei einer Antwort auf 0) braucht
+        // die vor der Antwort verbrauchten Fenster noch einmal, hier
+        // also kBurstDelayMs/kPollMs mehr.
+        QCOMPARE(metrics.quietPolls, kQuietBeforeStop);
+
+        // Die Zeit bleibt als Schranke stehen, nicht als Messlatte: sie
+        // faengt nur noch den Haenger, nicht mehr den Rueckfall. Die
+        // Grenze liegt darum weit weg (dieselbe Grosszuegigkeit wie in
+        // floodedSocketStillTerminatesViaDeadline) — am 2026-10-17
+        // brauchte ein ausgelasteter macOS-Laeufer 257 ms fuer die
+        // RICHTIGE Fassung, wo die alte Latte bei 240 ms lag.
+        QVERIFY2(elapsedMs < 5 * (kQuietBeforeStop + 4) * kPollMs,
+                 qPrintable(QStringLiteral(
+                     "bursty-reply quiet-poll loop took %1 ms — die Schleife "
+                     "war nicht mehr begrenzt (%2 stille Fenster)")
+                     .arg(elapsedMs).arg(metrics.quietPolls)));
     }
 
     // No-regression check: with nothing flooding it, the loop must still
@@ -191,13 +314,19 @@ private slots:
         constexpr int kPollMs = 30;
         const QDeadlineTimer deadline(qint64(kQuietBeforeStop + 1) * kPollMs, Qt::CoarseTimer);
 
+        RadioDiscovery::QuietPollMetrics metrics;
         QElapsedTimer clock;
         clock.start();
-        const auto outcome =
-            disc.quietPollAttemptForTest(victim, kQuietBeforeStop, kPollMs, deadline);
+        const auto outcome = disc.quietPollAttemptForTest(
+            victim, kQuietBeforeStop, kPollMs, deadline, &metrics);
         const qint64 elapsedMs = clock.elapsed();
 
         QCOMPARE(int(outcome), int(RadioDiscovery::QuietPollOutcome::Quiet));
+        // Der gewoehnliche Weg, gezaehlt: genau quietBeforeStop stille
+        // Fenster, kein Datagramm. Das ist zugleich die Grundlinie, gegen
+        // die der Fall mit der einen Antwort oben zu lesen ist.
+        QCOMPARE(metrics.quietPolls, kQuietBeforeStop);
+        QCOMPARE(metrics.datagrams, 0);
         QVERIFY2(elapsedMs < 5 * kQuietBeforeStop * kPollMs,
                  qPrintable(QStringLiteral(
                      "quiet loop with no traffic took %1 ms").arg(elapsedMs)));
@@ -220,19 +349,27 @@ private slots:
         constexpr int kPollMs = 30;
         const QDeadlineTimer deadline(qint64(kQuietBeforeStop + 1) * kPollMs, Qt::CoarseTimer);
 
+        RadioDiscovery::QuietPollMetrics metrics;
         QElapsedTimer clock;
         clock.start();
-        const auto outcome =
-            disc.quietPollAttemptForTest(victim, kQuietBeforeStop, kPollMs, deadline);
+        const auto outcome = disc.quietPollAttemptForTest(
+            victim, kQuietBeforeStop, kPollMs, deadline, &metrics);
         const qint64 elapsedMs = clock.elapsed();
 
         stopFlood.store(true);
         flooder.join();
 
         QCOMPARE(int(outcome), int(RadioDiscovery::QuietPollOutcome::Cancelled));
-        QVERIFY2(elapsedMs < kPollMs * 5,
+        // „Steigt beim allerersten Poll aus" — und das ist eine Zahl,
+        // keine Zeitspanne: die Abbruchpruefung steht VOR dem ersten
+        // Fenster, es darf also kein stilles Fenster verbraucht worden
+        // sein. Vorher stand hier `elapsedMs < kPollMs * 5` (150 ms),
+        // was dasselbe sagen sollte, aber von der Auslastung des
+        // Laeufers abhing.
+        QCOMPARE(metrics.quietPolls, 0);
+        QVERIFY2(elapsedMs < kPollMs * 20,
                  qPrintable(QStringLiteral(
-                     "cancel took %1 ms — should exit on the very first poll")
+                     "cancel took %1 ms — der Abbruch war nicht begrenzt")
                      .arg(elapsedMs)));
     }
 };

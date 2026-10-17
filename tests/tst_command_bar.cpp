@@ -21,13 +21,27 @@
 
 #include <QtTest>
 
+#include <cmath>
+
+#include "MenueFaenger.h"
+
 #include "gui/widgets/CommandBar.h"
+#include "core/AppSettings.h"
+#include "models/FilterPresetStore.h"
 #include "models/SliceModel.h"
 #include "gui/widgets/DspParamPopup.h"
 #include "gui/widgets/DspQuickPopups.h"
 
+#include <QApplication>
+#include <QHBoxLayout>
+#include <QImage>
+#include <QLabel>
+#include <QMenu>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QSlider>
+#include <QTimer>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -36,6 +50,143 @@ class TestCommandBar : public QObject
     Q_OBJECT
 
 private slots:
+    // ════════════════════════════════════════════════════════════════
+    // Die Leiste als Reihe lesbar machen (2026-10-07)
+    //
+    // Betreiber zum Bild der Leiste: „die leiste oben passt aber noch
+    // immer nicht", und nach fuenf Entwuerfen: „suche das, welches am
+    // besten harmonisch dazu passt". Gewaehlt wurden drei Dinge, die
+    // alle dem folgen, was im Fenster schon gilt. Hier steht je eine
+    // Pruefung dafuer.
+    // ════════════════════════════════════════════════════════════════
+
+    /// A — zwischen den Gruppen steht ein Strich. Am BILD gemessen,
+    /// nicht an der Absicht: der Strich wird gezeichnet, nicht gebaut,
+    /// also kann kein Bauteil ihn bezeugen.
+    void zwischenDenGruppenStehtEinStrich()
+    {
+        CommandBar bar;
+        bar.resize(1400, 70);
+        bar.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&bar, kFensterFrist));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        const QImage bild = bar.grab().toImage();
+        auto* row = bar.findChild<QHBoxLayout*>();
+        QVERIFY(row);
+
+        QVector<QRect> kaesten;
+        for (int i = 0; i < row->count(); ++i) {
+            QLayoutItem* it = row->itemAt(i);
+            if (it && it->layout() && it->layout()->geometry().isValid()) {
+                kaesten.append(it->layout()->geometry());
+            }
+        }
+        QVERIFY2(kaesten.size() >= 2, "weniger als zwei Gruppen in der Leiste");
+
+        // ── Bildpunkte sind nicht Layoutpunkte (2026-10-15) ─────────
+        //
+        // `grab()` liefert auf einem Retina-Schirm ein Bild mit der
+        // doppelten Kantenlaenge (hier gemessen: Leiste 1400x70,
+        // Bild 2800x152), die Kaesten aus dem Layout zaehlen aber in
+        // Layoutpunkten. Ohne Umrechnung sucht dieser Lauf an den
+        // falschen Stellen: er fand 2 von 5 Strichen und fiel auf
+        // JEDEM Mac um, waehrend er in der CI (1x-Schirm) gruen war.
+        const qreal dpr = bild.devicePixelRatio();
+        const auto zuBild = [dpr](int v) {
+            return static_cast<int>(std::lround(v * dpr));
+        };
+
+        const QRgb grund = bild.pixel(2, 2);
+        int striche = 0;
+        int luecken = 0;
+        for (int i = 0; i + 1 < kaesten.size(); ++i) {
+            // Nur die Luecke absuchen, nicht die Gruppen selbst.
+            const int von  = zuBild(kaesten.at(i).right() + 2);
+            const int bis  = zuBild(kaesten.at(i + 1).left() - 2);
+            if (von > bis) { continue; }        // kein Platz, kein Strich
+            ++luecken;
+            const int mitteY = zuBild(kaesten.at(i).center().y());
+            bool gefunden = false;
+            for (int x = von; x <= bis && x < bild.width(); ++x) {
+                if (x < 0) { continue; }
+                if (bild.pixel(x, mitteY) != grund) { gefunden = true; break; }
+            }
+            if (gefunden) { ++striche; }
+        }
+        QVERIFY2(luecken >= 2, "weniger als zwei Luecken zwischen den Gruppen");
+        QCOMPARE(striche, luecken);
+    }
+
+    /// B — hinter jeder Gruppe steht eine Dehnung, solange noch etwas
+    /// dahinter haengt. Nur so verteilt Qt den Platz gleichmaessig,
+    /// statt alles links zusammenzuschieben und rechts 168 Pixel tot
+    /// stehen zu lassen.
+    void dieGruppenVerteilenSichUeberDieBreite()
+    {
+        CommandBar bar;
+        auto* plus = new QPushButton(QStringLiteral("+"), &bar);
+        bar.addTrailing(plus);
+        auto* row = bar.findChild<QHBoxLayout*>();
+        QVERIFY(row);
+
+        int kaesten = 0, dehnungen = 0;
+        bool letzterKastenHatDehnung = false;
+        for (int i = 0; i < row->count(); ++i) {
+            QLayoutItem* it = row->itemAt(i);
+            if (!it) { continue; }
+            if (it->layout()) {
+                ++kaesten;
+                QLayoutItem* next = (i + 1 < row->count()) ? row->itemAt(i + 1) : nullptr;
+                letzterKastenHatDehnung = next && next->spacerItem();
+                QVERIFY2(letzterKastenHatDehnung,
+                         "hinter jeder Gruppe muss eine Dehnung stehen");
+            } else if (it->spacerItem()) { ++dehnungen; }
+        }
+        QVERIFY2(kaesten >= 6, "zu wenige Gruppen gefunden");
+        // Eine je Gruppe -- auch hinter der letzten, denn dahinter
+        // haengt das Plus und soll an den rechten Rand.
+        QCOMPARE(dehnungen, kaesten);
+        QVERIFY2(letzterKastenHatDehnung,
+                 "auch hinter der letzten Gruppe muss eine stehen, sonst "
+                 "klebt das Plus an der Rate statt am rechten Rand");
+    }
+
+    /// D — ohne Funkgeraet traegt eine leere Gruppe den leisen Stil,
+    /// eine volle nicht. FILTER zeigt ohne Geraet nur „—", BAND immer
+    /// seine Baender -- an dem Paar laesst es sich entscheiden.
+    void ohneFunkgeraetTretenLeereGruppenZurueck()
+    {
+        CommandBar bar;
+
+        // Die Pillen einer Gruppe ueber ihre Beschriftung finden.
+        auto pillenMit = [&bar](const QStringList& texte) {
+            QVector<QPushButton*> gefunden;
+            for (QPushButton* b : bar.findChildren<QPushButton*>()) {
+                if (texte.contains(b->text())) { gefunden.append(b); }
+            }
+            return gefunden;
+        };
+
+        const QVector<QPushButton*> baender =
+            pillenMit({QStringLiteral("40m"), QStringLiteral("20m")});
+        QVERIFY2(!baender.isEmpty(), "keine Band-Pillen gefunden");
+        for (QPushButton* b : baender) {
+            QCOMPARE(b->styleSheet(), CommandBar::pillStyle());
+        }
+
+        const QVector<QPushButton*> leere = pillenMit({QStringLiteral("—")});
+        QVERIFY2(!leere.isEmpty(), "keine leeren Pillen gefunden");
+        for (QPushButton* b : leere) {
+            QVERIFY2(b->styleSheet() == CommandBar::pillStyleGedaempft(),
+                     "eine Gruppe ohne Inhalt muss den leisen Stil tragen");
+        }
+
+        // Und die beiden Stile duerfen sich nicht gleichen, sonst
+        // belegt die Pruefung oben nichts.
+        QVERIFY(CommandBar::pillStyle() != CommandBar::pillStyleGedaempft());
+    }
+
     void noPillIsNarrowerThanItsText()
     {
         // Der Betreiber sah am 2026-08-23 live "I0 Hz" statt "10 Hz"
@@ -47,7 +198,7 @@ private slots:
         CommandBar bar;
         bar.resize(700, 60);          // absichtlich eng
         bar.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&bar));
+        QVERIFY(QTest::qWaitForWindowExposed(&bar, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
         for (QPushButton* b : bar.findChildren<QPushButton*>()) {
@@ -400,6 +551,48 @@ private slots:
                      .arg(ssb.join(QLatin1Char('|')))));
     }
 
+    /// Das „…" der Filtergruppe zeigt die Vorgaben mit ihren NAMEN —
+    /// ohne Speicher die Thetis-Namen, mit Speicher auch das, was der
+    /// Betreiber unter Setup › Filter Presets selbst eingetragen hat.
+    ///
+    /// Bis 2026-09-28 las das Menue SliceModel::presetsForMode direkt:
+    /// eigene Vorgaben kamen nie an, und die Beschriftung war aus den
+    /// Kanten gerechnet — CW F10 (±13 Hz) hiesse „26", Thetis sagt „25".
+    void theFilterOverflowOffersNamedAndOwnPresets()
+    {
+        AppSettings::instance().remove(QStringLiteral("CWPitch"));
+        SliceModel slice;
+        slice.setDspMode(DSPMode::CWU);
+        CommandBar bar;
+        bar.attach(&slice);
+
+        auto entries = bar.filterMenuEntries();
+        QCOMPARE(entries.size(), 10);
+        QCOMPARE(entries.at(0).name, QStringLiteral("1.0k"));
+        QCOMPARE(entries.at(0).low, 100);
+        QCOMPARE(entries.at(0).high, 1100);
+        QCOMPARE(entries.at(9).name, QStringLiteral("25"));
+        QCOMPARE(entries.at(9).low, 587);
+        QCOMPARE(entries.at(9).high, 613);
+
+        FilterPresetStore store;
+        store.setPreset(DSPMode::CWU, 0, FilterPreset{QStringLiteral("Mine"), 400, 800});
+        bar.setFilterPresetStore(&store);
+        entries = bar.filterMenuEntries();
+        QCOMPARE(entries.at(0).name, QStringLiteral("Mine"));
+        QCOMPARE(entries.at(0).low, 400);
+        QCOMPARE(entries.at(0).high, 800);
+        QCOMPARE(entries.at(1).name, QStringLiteral("800"));
+
+        // Folgt dem Modus der Scheibe.
+        slice.setDspMode(DSPMode::USB);
+        entries = bar.filterMenuEntries();
+        QCOMPARE(entries.at(3).name, QStringLiteral("3.3k"));
+        QCOMPARE(entries.at(3).high, 3400);
+
+        store.resetAll();
+    }
+
     /// NR schaltet ein — und ein zweiter Klick wieder aus.
     void anNrPillTogglesTheModel()
     {
@@ -546,6 +739,60 @@ private slots:
         more->click();
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.at(0).at(0).value<NrSlot>(), NrSlot::NR3);
+    }
+    /// Jedes „…"-Menue haengt am Fenster, nicht an der Leiste.
+    ///
+    /// Befund 2026-09-29 (Martins Protokoll): „QWidgetWindow(...,
+    /// name="QWidgetClassWindow") must be a top level window." — dreimal,
+    /// jedesmal kurz vor einem Bandwechsel auf die gespeicherte Frequenz
+    /// des Bandes. Die Leiste liegt neben dem nativen Panadapter; je nach
+    /// Aufbau hat sie selbst ein natives Fenster oder ihr (namenloses)
+    /// Elternteil. Ein QMenu an so einem Feld bekommt von Qt keinen
+    /// Fensterbezug — QWindow::setTransientParent() lehnt ab. Beide
+    /// Aufbauten werden geprueft. Die Farbe bleibt: am echten Hauptfenster
+    /// verglichen, 0 abweichende Pixel.
+    void theOverflowMenusHangOnTheWindow_data()
+    {
+        QTest::addColumn<bool>("barItselfNative");
+        QTest::newRow("Leiste nativ") << true;
+        QTest::newRow("Leiste im nativen Feld") << false;
+    }
+
+    void theOverflowMenusHangOnTheWindow()
+    {
+        QFETCH(bool, barItselfNative);
+        QTest::failOnWarning(QRegularExpression(QStringLiteral("must be a top level window")));
+
+        SliceModel slice;
+        slice.setDspMode(DSPMode::USB);
+        QWidget top;
+        top.resize(1200, 120);
+        auto* field = new QWidget(&top);
+        field->setGeometry(0, 0, 1200, 120);
+        field->setAttribute(Qt::WA_DontCreateNativeAncestors);
+        field->setAttribute(Qt::WA_NativeWindow);
+        auto* bar = new CommandBar(field);
+        if (barItselfNative) {
+            bar->setAttribute(Qt::WA_NativeWindow);
+        }
+        bar->setGeometry(0, 0, 1200, 120);
+        bar->attach(&slice);
+        top.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&top, kFensterFrist));
+        QCOMPARE(bar->windowHandle() != nullptr, barItselfNative);
+
+        int opened = 0;
+        for (QPushButton* more : bar->findChildren<QPushButton*>()) {
+            if (more->text() != QStringLiteral("…")) { continue; }
+            // Frueher ein eigener QTimer auf activePopupWidget(): der
+            // las unter Last den Stand von vorher, und dieser Lauf fiel
+            // nur im -j6-Durchgang um. Siehe tests/MenueFaenger.h.
+            const auto fund = Test::oeffneMenue([&]() { more->click(); });
+            QVERIFY2(fund.seen, "kein Ueberlaufmenue erschienen");
+            QCOMPARE(fund.parent, static_cast<QWidget*>(&top));
+            ++opened;
+        }
+        QCOMPARE(opened, 5);   // Modus, Band, Filter, Schritt, NR
     }
 };
 

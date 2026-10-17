@@ -13,6 +13,8 @@
 
 #include "core/BeamHeading.h"
 
+#include <algorithm>
+
 #include <cmath>
 
 namespace Longpath::BeamHeading {
@@ -27,6 +29,23 @@ double wrap360(double deg)
 double longPath(double shortPathDeg)
 {
     return wrap360(shortPathDeg + 180.0);
+}
+
+GreatCircle greatCircle(double lat1, double lon1, double lat2, double lon2)
+{
+    constexpr double kPi = 3.14159265358979323846;
+    constexpr double kEarthKm = 6371.0;
+    const double p1 = lat1 * kPi / 180.0;
+    const double p2 = lat2 * kPi / 180.0;
+    const double dl = (lon2 - lon1) * kPi / 180.0;
+    const double a = std::sin((p2 - p1) / 2) * std::sin((p2 - p1) / 2)
+                   + std::cos(p1) * std::cos(p2) * std::sin(dl / 2) * std::sin(dl / 2);
+    GreatCircle g;
+    g.km = 2.0 * kEarthKm * std::asin(std::min(1.0, std::sqrt(a)));
+    const double y = std::sin(dl) * std::cos(p2);
+    const double x = std::cos(p1) * std::sin(p2) - std::sin(p1) * std::cos(p2) * std::cos(dl);
+    g.bearingDeg = wrap360(std::atan2(y, x) * 180.0 / kPi);
+    return g;
 }
 
 Move plan(double fromDeg, double toDeg, Stop stop)

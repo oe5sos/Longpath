@@ -15,6 +15,9 @@
 
 #include "CredentialStore.h"
 
+#include <QStandardPaths>   // Pruefstaende fassen den Schluesselbund nicht an
+#include "core/AppSettings.h"
+
 #include <QHash>
 #include <QProcess>
 
@@ -33,7 +36,10 @@ QHash<QString, QString>& sessionVault()
 
 QString vaultKey(const QString& key, const QString& account)
 {
-    return key + QLatin1Char('\x1f') + account;
+    // Die Sandbox auch hier getrennt (siehe serviceName()).
+    const QString ns = AppSettings::isSandbox() ? QStringLiteral("sandbox\x1f")
+                                                : QString{};
+    return ns + key + QLatin1Char('\x1f') + account;
 }
 
 #ifdef Q_OS_MACOS
@@ -43,6 +49,13 @@ constexpr int kSecurityTimeoutMs = 5000;
 // operator can find and delete it without going through this app.
 QString serviceName(const QString& key)
 {
+    // Eine Sandbox (LONGPATH_CONFIG_DIR) hat ihren eigenen Namensraum:
+    // sie sieht die echten Zugaenge nicht -- sonst luede ein Test-QSO mit
+    // dem echten Schluessel ins QRZ-Logbuch des Betreibers hoch
+    // (2026-09-26, vor einem Nachttest des Logbuchs gefunden).
+    if (AppSettings::isSandbox()) {
+        return QStringLiteral("Longpath Sandbox: %1").arg(key);
+    }
     return QStringLiteral("Longpath: %1").arg(key);
 }
 
@@ -84,8 +97,29 @@ bool runSecurity(const QStringList& args, QString* stdOut = nullptr)
 
 } // namespace
 
+namespace {
+// ── Pruefstaende fassen den echten Schluesselbund nicht an (2026-09-30) ──────
+//
+// QStandardPaths::setTestModeEnabled(true) laeuft in jedem Testbinaer vor
+// main() (tests/TestSandboxInit.cpp) und leitet Dateipfade in einen Sandkasten
+// um. Den SCHLUESSELBUND leitet es nicht um: der haengt am Benutzerkonto, nicht
+// am Pfad. Ein Test, der hier etwas ablegt, schreibt also in den echten
+// Anmeldebund des Betreibers — und laesst es dort stehen, wenn er unterwegs
+// abbricht.
+//
+// Aufgefallen am 2026-09-30 beim Bau des TCI-Fernzugriffs: der neue Pruefstand
+// legte ein Token an und raeumte es im cleanup() wieder weg. Das ging gut,
+// war aber Glueck und kein Entwurf. Deshalb nimmt der Testbetrieb denselben
+// Speicher-Tresor, den Linux und Windows ohnehin benutzen.
+bool useSessionVaultOnly()
+{
+    return QStandardPaths::isTestModeEnabled();
+}
+}  // namespace
+
 bool CredentialStore::isPersistent()
 {
+    if (useSessionVaultOnly()) { return false; }
 #ifdef Q_OS_MACOS
     return true;
 #else
@@ -107,6 +141,8 @@ bool CredentialStore::store(const QString& key, const QString& account,
                             const QString& secret)
 {
     sessionVault().insert(vaultKey(key, account), secret);
+    // Im Testbetrieb ist der Speicher-Tresor oben alles, was passiert.
+    if (useSessionVaultOnly()) { return true; }
 
 #ifdef Q_OS_MACOS
     // -U updates in place; without it a second save fails with
@@ -136,6 +172,9 @@ bool CredentialStore::store(const QString& key, const QString& account,
 
 QString CredentialStore::retrieve(const QString& key, const QString& account)
 {
+    if (useSessionVaultOnly()) {
+        return sessionVault().value(vaultKey(key, account));
+    }
 #ifdef Q_OS_MACOS
     QString out;
     if (runSecurity({
@@ -147,8 +186,9 @@ QString CredentialStore::retrieve(const QString& key, const QString& account)
         return out;
     }
     // Der Umzug (siehe legacyServiceName): unter dem alten Namen lesen,
-    // unter dem neuen ablegen, den alten Eintrag danach loeschen.
-    if (runSecurity({
+    // unter dem neuen ablegen, den alten Eintrag danach loeschen. Nie aus
+    // einer Sandbox -- sie wuerde die echten alten Eintraege loeschen.
+    if (!AppSettings::isSandbox() && runSecurity({
             QStringLiteral("find-generic-password"),
             QStringLiteral("-s"), legacyServiceName(key),
             QStringLiteral("-a"), account,
@@ -178,6 +218,7 @@ QString CredentialStore::retrieve(const QString& key, const QString& account)
 bool CredentialStore::erase(const QString& key, const QString& account)
 {
     sessionVault().remove(vaultKey(key, account));
+    if (useSessionVaultOnly()) { return true; }
 #ifdef Q_OS_MACOS
     const bool ok = runSecurity({
         QStringLiteral("delete-generic-password"),

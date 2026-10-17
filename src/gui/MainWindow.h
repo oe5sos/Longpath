@@ -83,6 +83,7 @@
 #include <QMap>
 #include <QVector>
 
+class QHBoxLayout;
 class QProgressDialog;
 class QThread;
 class QSplitter;
@@ -136,6 +137,7 @@ class PsaIndicatorWidget;
 class AppletVisibilityController;
 class AppletWidget;
 class QrzClient;
+class RotorLogbookPanel;
 class QrzLogbookUploader;
 class CloudlogUploader;
 class AdifNetworkUploader;
@@ -158,6 +160,24 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
+
+    /// Die Scheibenflaggen ein- oder ausschalten (View > Slice
+    /// flags). Aus ist der Zustand von August bis heute; an ist der
+    /// dritte Entwurf vom 2026-10-15. Oeffentlich fuer den Pruefstand.
+    void setSliceFlagsEnabled(bool on);
+    bool sliceFlagsEnabled() const { return m_sliceFlagsOn; }
+
+    /// Das Feldbetrieb-Bild herstellen: ein eigenes Profil „Field",
+    /// darin nur die Felder, die am Berg zaehlen. Der Pruefstand geht
+    /// ueber den Menueeintrag — dann ist mitgeprueft, dass man
+    /// hinkommt.
+    void applyFieldLayout();
+
+    /// Die Kennungen, die im Feldbetrieb SICHTBAR bleiben. Alles
+    /// andere tritt zurueck. Statisch, damit der Pruefstand dieselbe
+    /// Liste liest und nicht eine zweite fuehrt.
+    static QStringList fieldLayoutKeepIds();
+
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
@@ -223,6 +243,72 @@ public:
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
 
+
+    // ── Der Schutzrahmen (2026-10-14) ────────────────────────────────
+    //
+    // Auf Ansage des Betreibers: „es sollte vielleicht einen grossen
+    // Rahmen geben, ueber den man nichts ziehen kann und keine Fenster
+    // anordnen kann." Siehe die lange Begruendung bei
+    // `ausSperrstreifenSchieben()` in WindowPlacement.h.
+
+    /// Die Streifen des Hauptfensters, auf denen kein schwebendes
+    /// Fenster liegen darf, in GLOBALEN Koordinaten.
+    ///
+    /// Das sind die beiden Bedienleisten: die Kommandoleiste oben (Band,
+    /// Mode, Filter, Step, NR, Rate, Profil) und die Statuszeile unten
+    /// (MOX, VOX, TUNE, PS, CAT, TCI, CPU, PA, ON AIR). Links und rechts
+    /// gibt es keinen Rahmen: dort steht keine Bedienung, und ein
+    /// seitliches Ausweichen wuerde eine Anordnung zerreissen, die der
+    /// Betreiber nebeneinander gestellt hat.
+    ///
+    /// Leer, solange das Fenster nicht sichtbar ist -- dann sind die
+    /// Leisten noch nicht an ihrem Platz, und ein Rahmen aus Nullen
+    /// schoebe jedes Fenster an den oberen Rand.
+    /// Die Lage eines schwebenden Fensters ins Profil schreiben --
+    /// ABSOLUT (wie bisher) UND relativ zum Hauptfenster.
+    ///
+    /// Der Grund (2026-10-14): bis heute standen nur absolute
+    /// Bildschirmkoordinaten im Profil. Eine Anordnung, die im Vollbild
+    /// entstanden ist, passt damit in keiner anderen Fenstergroesse --
+    /// das Hauptfenster rutscht um die Titelleiste nach unten, die
+    /// schwebenden Fenster bleiben stehen, und sie liegen auf der
+    /// Kommandoleiste. Genau der Fall, den der Betreiber mit zwei
+    /// Bildschirmfotos gemeldet hat.
+    ///
+    /// Die absoluten Werte bleiben stehen: ein Profil, das eine aeltere
+    /// Fassung liest, soll weiter funktionieren, und fuer ein Fenster
+    /// auf einem ZWEITEN Schirm ist die absolute Lage die richtige.
+    void merkeLage(QVariantMap& ziel, const QRect& g) const;
+
+    /// Das Gegenstueck: die heutige Lage aus einem Profileintrag.
+    /// Traegt er `dx`/`dy`, wird daraus und aus der JETZIGEN Lage des
+    /// Hauptfensters gerechnet; sonst gelten die alten absoluten Werte.
+    QRect lageAusProfil(const QVariantMap& quelle) const;
+
+    QList<QRect> schutzrahmen() const;
+
+    /// Alle schwebenden Fenster (Applets, Panadapter, Rotor/Log) aus dem
+    /// Schutzrahmen holen. Tut nichts an Fenstern, die ihn ohnehin nicht
+    /// beruehren -- auch nicht an solchen auf einem zweiten Schirm.
+    /// Gibt zurueck, wie viele verschoben wurden (fuer Prueffaelle).
+    int schwebendeAusDemSchutzrahmenHolen();
+
+    /// Dasselbe mit Nachlauf: waehrend eines Groessenzugs feuert
+    /// resizeEvent bei jedem Pixel, und Fenster, die dabei im Takt
+    /// springen, sind unbedienbar. 250 ms nach der letzten Aenderung
+    /// einmal.
+    void schutzrahmenNachziehen();
+
+
+    /// Den Schutzrahmen sichtbar machen, solange ein schwebendes
+    /// Fenster gezogen wird (2026-10-14). Blendet sich 600 ms nach der
+    /// letzten Bewegung von selbst wieder aus.
+    void zeigeSchutzrahmenKurz();
+
+    /// Nur fuer Prueffaelle: liegt der Hinweis gerade sichtbar ueber den
+    /// Leisten?
+    bool schutzrahmenHinweisSichtbarFuerTest() const;
+
     // ── Pruefzugaenge fuer „hinter die Connect-Maske" ────────────────
     //
     // Die Regel ist nur an einem laufenden MainWindow pruefbar (die
@@ -279,6 +365,12 @@ public:
     /// Fuer tst_every_applet_is_reachable. Gebaut und nicht erreichbar
     /// ist so gut wie nicht gebaut, und genau das ist am 2026-08-23
     /// dreimal passiert.
+    /// Ob ein Panel laut Bedienerwunsch sichtbar ist. Gebraucht fuer
+    /// die Pruefung, dass das Hinzufuegen eines KiwiSDR sein Panel
+    /// aufmacht -- vorher war das Ergebnis des Hinzufuegens unsichtbar.
+    bool appletVisibleForTest(const QString& id) const;
+    void setAppletVisibleForTest(const QString& id, bool visible);
+
     bool appletIsRegisteredForTest(const class AppletWidget* a) const
     {
         for (auto it = m_appletsById.cbegin(); it != m_appletsById.cend(); ++it) {
@@ -493,6 +585,14 @@ private slots:
     /// the connect outright — the handler would never fire.
     void onAddTnfClicked(const QString& panId);
 
+    /// Ein Loch im IQ-Strom: jeder Panadapter verwirft sein angefangenes
+    /// FFT-Fenster. Ein Slot, kein Lambda (2026-09-27): wireRtt verbindet
+    /// ihn bei jedem Verbindungsversuch neu, mit Qt::UniqueConnection --
+    /// und an einem Lambda verweigerte Qt6 genau diesen connect ("unique
+    /// connections require a pointer to member function", stand bei
+    /// jedem Verbinden im Protokoll). Das Verwerfen geschah also nie.
+    void onIqSequenceGap(int hwReceiverIndex);
+
     /// TNF: surface a rejected add. Without this a +TNF press inside the
     /// 10 Hz dedupe window is silently ignored and the button reads as dead.
     void onNotchAddRejected(const QString& reason);
@@ -696,6 +796,10 @@ private:
     // having to be visible. Both go through the one panel, so there is
     // never a second window over the same file.
     void openLogbookWindow();
+    // Start: das offene Logbuch vor Panadapter und Rotor/Log (2026-09-26).
+    void raiseLogbookIfOpen();
+    // Start mit offenem Logbuch: nach dem Verbinden-Fenster nach vorne.
+    bool m_raiseLogbookAfterConnectMask{false};
     void openRotorSetup();
     void openVoiceCheck();
     void wirePuduMonitor();
@@ -867,6 +971,14 @@ private:
     /// Die Profilschiene an ihre Dialoge hängen (Anlegen, Umbenennen,
     /// Duplizieren, Löschen) und den Stand beim Beenden sichern.
     void wireProfileRail();
+
+    /// Die Profilschiene an ihren Platz setzen -- waagrecht in die
+    /// Kommandoleiste oder senkrecht an den linken Rand. Baut sie dabei
+    /// neu auf (die Richtung steht im Aufbau des Bauteils) und haengt
+    /// die Verdrahtung wieder an.
+    void setzeProfilschiene(Qt::Orientation richtung);
+    /// Was in den Einstellungen steht; Vorgabe ist die Leiste.
+    Qt::Orientation profilschienenRichtungAusEinstellung() const;
 
     /// Das schwebende „+" unten rechts an seinen Platz setzen. Es hat
     /// keine Anordnung, die es mitzieht, also von Hand bei jeder
@@ -1044,6 +1156,12 @@ private:
     /// Absichten; dass daraus ein Fenster wird statt einer Huelle in
     /// der Spalte, entscheidet sich hier und nur hier.
     void applyWindowVisibility(const QString& id, bool on);
+
+    /// Der Betreiber hat ein solches Fenster selbst geschlossen (roter
+    /// Knopf): der Haken in der Auswahl geht aus und das Profil merkt es,
+    /// sonst reisst der naechste Start es wieder auf. Das Schliessen beim
+    /// Beenden zaehlt nicht -- was da offen war, soll wieder aufgehen.
+    void noteWindowClosedByOperator(const QString& id);
 
     /// Bildschirmkennung für die Geometrie im Profil.
     /// QScreen::serialNumber() zuerst — nur sie hält zwei baugleiche
@@ -1410,6 +1528,20 @@ private:
     // nicht aus dem Takt bringt.
     QAction* m_fullScreenAction{nullptr};
 
+    /// Der EINE Schalter fuer den schwebenden Panadapter (2026-10-15,
+    /// Betreiber: „das sollte nur eine option sein, die man ein und
+    /// ausblenden kann"). Ankreuzbar und beidseitig: an loest ab, aus
+    /// dockt an. Vorher war es „Float active pan…" -- eine Handlung in
+    /// EINE Richtung, ohne Haken, also ohne Weg zurueck und ohne
+    /// Auskunft darueber, ob gerade etwas schwebt.
+    QAction* m_floatPanAction{nullptr};
+
+    /// Je Scheibe eine Flagge auf dem Panadapter, nach Scheibenkennung.
+    /// Leer, solange der Schalter aus ist.
+    QHash<int, class SliceFlag*> m_sliceFlags;
+    bool     m_sliceFlagsOn{false};
+    QAction* m_sliceFlagAction{nullptr};
+
     // Container infrastructure (Phase 3G-1)
     ContainerManager* m_containerManager{nullptr};
     QSplitter* m_mainSplitter{nullptr};
@@ -1420,7 +1552,11 @@ private:
     QWidget*   m_belowPane{nullptr};   // Flaeche unter dem Panadapter
     // Das Panel selbst, unabhaengig davon, WO es gerade haengt (Dock
     // oder untere Flaeche). ensureRotorPanel() liest diesen Zeiger.
-    class RotorLogbookPanel* m_rotorPanel{nullptr};
+    // QPointer (2026-09-27): beim Beenden geht das Panel mit seinem
+    // Fenster/Dock zu Bruch, und ein noch eingereihtes
+    // raiseLogbookIfOpen() griff danach auf den freigegebenen Speicher
+    // zu (SIGSEGV in tst_window_close_stays_closed).
+    QPointer<RotorLogbookPanel> m_rotorPanel;
     int m_hDelta{0};
     int m_vDelta{0};
 
@@ -1462,7 +1598,6 @@ private:
     QActionGroup* m_agcGroup = nullptr;
 
     // Dark theme checkable action (Task 12)
-    QAction* m_darkThemeAction = nullptr;
 
     // Radio menu state-aware actions (3Q-9; trimmed in 3Q polish — Discover Now
     // dropped because Manage Radios already exposes a ↻ Scan button).
@@ -1574,11 +1709,15 @@ private:
     class RadeApplet* m_radeApplet{nullptr};
     class RttyDecoderApplet* m_rttyDecoderApplet{nullptr};
     class CwDecoderApplet*   m_cwDecoderApplet{nullptr};
+    class Ft8Applet*         m_ft8Applet{nullptr};
     // Torn down and rebuilt on every rebindRttyRadeAvailability() call --
     // same QMetaObject::Connection-list idiom CommandBar::attach() uses,
     // so the dspModeChanged listener below never accumulates one dangling
     // connection per past slice.
     QList<QMetaObject::Connection> m_rttyRadeLinks;
+    /// Der CAT-Server (2026-10-11). Vier Kanaele, nur auf 127.0.0.1.
+    class CatServer*    m_catServer{nullptr};
+    class CatPtyServer* m_catPtyServer{nullptr};
     class EqApplet* m_eqApplet{nullptr};
     class VaxApplet* m_vaxApplet{nullptr};
 
@@ -1760,6 +1899,29 @@ private:
                            ToastSeverity severity,
                            int timeoutMs);
 
+    /// Die gemerkte Palette gilt erst beim naechsten Start -- fragen,
+    /// ob jetzt neu gestartet werden soll. Unter
+    /// QStandardPaths::isTestModeEnabled() kehrt die Methode sofort
+    /// zurueck: ein Pruefstand darf an keinem modalen Fenster haengen
+    /// bleiben (dieselbe Regel wie showAudioDiagnoseDialog()).
+    /// Den Haken des Panadapter-Schalters auf den wirklichen Zustand
+    /// setzen, ohne dabei sein eigenes toggled() auszuloesen.
+    void syncFloatPanAction();
+
+    /// Flaggen anlegen, abraeumen und an ihre Traeger legen. Drei
+    /// Schritte, drei Stellen — rebuildSliceFlags() beim Kommen und
+    /// Gehen einer Scheibe, refreshSliceFlags() bei Frequenz, Mode und
+    /// Groessenaenderung.
+    void rebuildSliceFlags();
+    void refreshSliceFlags();
+
+    void offerPaletteRestart(const QString& paletteName);
+
+    /// Beendet dieses Programm und laesst es wieder oeffnen. Nutzt den
+    /// abgekoppelten Helfer der Aktualisierung, damit derselbe Weg
+    /// (und dieselben Argumente, „--profile" eingeschlossen) gilt.
+    void restartNow();
+
     /// The suspended-streams notice, kept so it can be taken down the
     /// moment the streams come back instead of aging out.
     QPointer<class StatusToast> m_suspendToast;
@@ -1840,8 +2002,22 @@ private:
     // Das Plus entsteht erst, wenn m_appletVis alle Kategorien kennt —
     // deshalb zwei Zeiger und nicht einer.
     class CommandBar* m_commandBar{nullptr};
+    /// Nachlauf fuer den Schutzrahmen (2026-10-14).
+    QTimer* m_schutzrahmenTimer{nullptr};
+    /// Der sichtbare Hinweis auf die gesperrten Streifen.
+    class SchutzrahmenHinweis* m_rahmenHinweis{nullptr};
+    QTimer* m_rahmenHinweisTimer{nullptr};
     class AddWidgetButton* m_addWidget{nullptr};
     class ProfileRail* m_profileRail{nullptr};
+    /// Die Reihe ganz links im Mittelteil -- dort haengt die Schiene,
+    /// wenn sie senkrecht steht.
+    ///
+    /// OHNE das Schluesselwort "class" davor: eine Deklaration der Form
+    /// "class QHBoxLayout* x" legt im Klassenbereich einen NEUEN,
+    /// unvollstaendigen Typ dieses Namens an und verdeckt den echten --
+    /// der ganze Rest der Datei bekam dann "incomplete type".
+    QHBoxLayout* m_profileRailRow{nullptr};
+    QWidget*     m_profileRailHome{nullptr};
     class AddWidgetButton* m_addWidgetBtn{nullptr};
 
     /// Welche Applets als freie Kachel auf der Flaeche liegen:
@@ -1882,7 +2058,6 @@ private:
     // entfernten Flaeche haengen bleiben (Qt trennt dann automatisch,
     // die Leiste folgt danach ueberhaupt keiner Flaeche mehr). Wird jetzt
     // bei jedem PanadapterStack::activePanChanged neu gezogen.
-    QMetaObject::Connection m_zoomBarSyncConn;
 
     AppletVisibilityController* m_appletVis{nullptr};
     QHash<QString, AppletWidget*> m_appletsById;

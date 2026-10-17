@@ -170,6 +170,8 @@ private:
     // or changed because the readout lied).
     QSpinBox*  m_lineWidthSpin{nullptr};
     QCheckBox* m_gradientToggle{nullptr};    // S14 gradient enabled
+    QCheckBox* m_softEdgeToggle{nullptr};    // weiche Kante an der Kurve
+    QCheckBox* m_haloToggle{nullptr};        // Hof um die lebende Kurve
 
     // Section: Colors moved to Setup → Appearance → Colors & Theme (S11/S12/S13).
 

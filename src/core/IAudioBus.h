@@ -35,6 +35,22 @@ public:
     virtual void close() = 0;
     virtual bool isOpen() const = 0;
 
+    // Lebt der Strom noch -- nicht nur: wurde er einmal geoeffnet?
+    //
+    // Am 2026-10-04 am Mac des Betreibers: Longpath hatte Ton (die
+    // Handy-App bekam ihn ueber TCI), aus den Lautsprechern kam nichts.
+    // Der Ausgang war 33 Minuten vor dem Verbinden geoeffnet worden, und
+    // AudioEngine::ensureSpeakersOpen() prueft mit isOpen() -- das ist bei
+    // PortAudioBus ein ZEIGERVERGLEICH (m_stream != nullptr). Stirbt der
+    // Strom darunter (Geraetewechsel, Ratenwechsel durch einen virtuellen
+    // Treiber wie BoomAudio/DeskFx, Ruhezustand), bleibt der Zeiger
+    // stehen, ensureSpeakersOpen kehrt sofort zurueck, und Longpath
+    // schreibt in einen toten Strom, ohne dass irgendwo etwas auffaellt.
+    //
+    // Vorgabe ist isOpen(), damit jeder Bus, der keine eigene Auskunft
+    // geben kann, sich verhaelt wie bisher.
+    virtual bool isAlive() const { return isOpen(); }
+
     // Producer side (RX taps). Interleaved PCM bytes. Returns bytes actually
     // written, or -1 on error. Must be callable from the audio thread.
     virtual qint64 push(const char* data, qint64 bytes) = 0;
@@ -50,6 +66,37 @@ public:
     // shm, PipeWire, FIFO).  PortAudioBus overrides to atomically equalize
     // its ring read/write cursors.  Safe to call from any thread.
     virtual void flush() {}
+
+    // Wie viele Rahmen liegen gerade im Puffer des Busses -- geschoben,
+    // aber noch nicht abgespielt?
+    //
+    // -1 heisst UNBEKANNT, und das ist kein Platzhalter: nicht jeder
+    // Hintergrund hat einen eigenen Ring, den man befragen kann (HAL-Shm,
+    // PipeWire, FIFO reichen die Rahmen weiter, ohne sie zu halten). Ein
+    // Aufrufer, der -1 als 0 liest, sieht einen dauerhaft leeren Puffer
+    // und regelt dagegen an -- darum muss die Unterscheidung bis nach
+    // oben durchkommen. Der Driftausgleich laesst die Rahmen bei -1
+    // unveraendert durch (Entwurf 2026-09-27, §4.1).
+    //
+    // Darf vom ERZEUGERfaden gelesen werden, ohne eine Sperre zu nehmen;
+    // Umsetzungen bauen das aus denselben Atomics, die Lesen und
+    // Schreiben ohnehin fuehren.
+    virtual qint64 queuedFrames() const { return -1; }
+
+    /// Wie viele Rahmen seit dem Oeffnen WIRKLICH an das Geraet gegangen
+    /// sind -- monoton wachsend. -1 heisst „weiss ich nicht", wie oben.
+    ///
+    /// Warum zusaetzlich zu `queuedFrames()`: aus zwei Fuellstaenden laesst
+    /// sich der Verbrauch nur schaetzen, und die Schaetzung setzt voraus,
+    /// dass zwischen zwei Fragen immer gleich viel Zeit vergeht. Kommt der
+    /// Ton in Schueben (TCI ueber Netz), stimmt das nicht -- am 2026-10-07
+    /// lief der Driftausgleich an der SunSDR2 QRP deshalb in seinen
+    /// Anschlag und warf zwei Sekunden Ton je Minute weg.
+    ///
+    /// Ein Zaehler kennt keine Schuebe. Und er luegt auch beim Leeren des
+    /// Rings nicht: weggeworfene Rahmen hat das Geraet nicht gehoert, also
+    /// zaehlt er sie nicht.
+    virtual qint64 consumedFrames() const { return -1; }
 
     // Metering (RMS of last block). 0.0–1.0. Published atomically for UI.
     virtual float rxLevel() const = 0;

@@ -213,9 +213,11 @@ warren@wpratt.com
 #include <QList>
 #include <QObject>
 
+#include <array>
 #include <atomic>
 #include <cstring>
 #include <memory>
+#include <vector>
 
 namespace Longpath {
 
@@ -630,7 +632,82 @@ public:
     //   linear = pow(10.0, dB / 20.0)
     bool fmsqEnabled() const { return m_fmsqEnabled.load(); }
     void setFmsqEnabled(bool enabled);
+    /// Die CTCSS-Kerbe beim Empfang auf den gewaehlten Ton (2026-09-27).
+    /// From Thetis Console/radio.cs:2913-2916 [@852bf0e] -- CTCSSFreqHz
+    /// setzt auch SetRXACTCSSFreq der Empfangskanaele.
+    void setCtcssNotchFreq(double hz);
+    double ctcssNotchFreqForTest() const { return m_ctcssNotchHz; }
+    /// FM-Deviation fuer die Demodulation (2026-09-27).
+    /// From Thetis Console/radio.cs:1427-1444 [@852bf0e] -- RXFMDeviation
+    /// -> SetRXAFMDeviation, Voreinstellung 5000.0.
+    void setFmDeviation(double hz);
+    double fmDeviationForTest() const { return m_fmDeviationHz; }
     void setFmsqThresh(double dB);  // converts dB → linear before WDSP call
+
+    // --- Empfangs-Equalizer (WDSP eqp, RXA-Durchlauf) ------------------------
+    //
+    // Der Spiegel der sieben `SetTXAEQ*`-Wrapper in TxChannel.h, auf der
+    // Empfangsseite. WDSP laesst ihn bei third_party/wdsp/src/RXA.c:673
+    // laufen -- NACH der Demodulation (amd/fmd/fmsq) und VOR jeder
+    // Rauschminderung (anf/anr/emnr/rnnr/sbnr/nnr), vor dem Bandpass und
+    // vor der AGC. Eine Absenkung hier ist also eine, die Rauschminderer
+    // und AGC danach schon sehen; das ist eine andere Stelle als die, an
+    // der der Sende-Equalizer in TXA sitzt.
+    //
+    // Angelegt wird er AUS und flach (RXA.c:259-275): zehn Baender auf den
+    // festen Mitten 32/63/125/250/500/1k/2k/4k/8k/16k Hz, alle 0 dB,
+    // nc = max(2048, dsp_size), Minimalphase aus, ctfmode 0, wintype 0.
+    //
+    // Faeden, genau wie auf der Sendeseite: `setRxEqRunning` ist
+    // csDSP-geschuetzt (eq.c:279-285) und vom Hauptfaden aus sicher,
+    // waehrend der Tonfaden laeuft. Alle anderen legen die Impulsantwort
+    // neu an und sind es NICHT -- nur vom Hauptfaden aufrufen.
+    //
+    // Longpath-eigen (2026-10-11): Thetis hat den Empfangs-Equalizer
+    // (Console/radio.cs:827-843 RXEQOn, :800-824 RXEQ10), Longpath hatte
+    // ihn nie -- die WDSP-Rufe waren nicht einmal in wdsp_api.h
+    // deklariert, obwohl das vendorte eqp im Durchlauf steht.
+
+    /// SetRXAEQRun(channel, on ? 1 : 0).
+    /// third_party/wdsp/src/eq.c:279-285
+    /// (Thetis Console/radio.cs:827-843 [v2.10.3.15] -- RXEQOn).
+    void setRxEqRunning(bool on);
+    bool rxEqRunningForTest() const { return m_rxEqRunning; }
+    /// Was WDSP selbst gerade haelt (eqp.p->run), -1 ohne Kanal.
+    int rxEqRunningInWdsp() const;
+
+    /// SetRXAGrphEQ10(channel, rxeq) -- der 10-Band-Weg, den Thetis nimmt.
+    /// rxeq[0] = Vorverstaerkung dB, rxeq[1..10] = Baender dB auf den
+    /// festen Mitten. third_party/wdsp/src/eq.c:385-411
+    /// (Thetis Console/radio.cs:800-824 [v2.10.3.15] -- RXEQ10).
+    /// Legt die Impulsantwort neu an -- nur Hauptfaden.
+    void setRxEqGraph10(const std::array<int, 11>& preampPlus10Bands);
+
+    /// SetRXAEQProfile(channel, 10, F[11], G[11]) -- fuer Baender, die
+    /// nicht auf den festen Mitten sitzen. F ist in WDSP 1-indiziert
+    /// (F[0] ist das unbenutzte Polster), G ist 0-indiziert (G[0] =
+    /// Vorverstaerkung). third_party/wdsp/src/eq.c:316-333.
+    /// Das vendorte TAPR v1.29 kennt KEIN Q (Thetis' neueres eq.c:623 schon)
+    /// -- die grafische Form ist, was hier geht.
+    /// Legt die Impulsantwort neu an -- nur Hauptfaden.
+    void setRxEqProfile(const std::vector<double>& freqs10,
+                        const std::vector<double>& gains11);
+
+    /// SetRXAEQNC(channel, nc). Vorgabe max(2048, dsp_size) aus RXA.c:262.
+    /// third_party/wdsp/src/eq.c:287-302. Nur Hauptfaden.
+    void setRxEqNc(int nc);
+
+    /// SetRXAEQMP(channel, mp ? 1 : 0).
+    /// third_party/wdsp/src/eq.c:304-314. Nur Hauptfaden.
+    void setRxEqMp(bool mp);
+
+    /// SetRXAEQCtfmode(channel, mode).
+    /// third_party/wdsp/src/eq.c:335-345. Nur Hauptfaden.
+    void setRxEqCtfmode(int mode);
+
+    /// SetRXAEQWintype(channel, wintype).
+    /// third_party/wdsp/src/eq.c:347-357. Nur Hauptfaden.
+    void setRxEqWintype(int wintype);
 
     // --- Audio panel (mute / pan / binaural) ---
 
@@ -1016,6 +1093,12 @@ private:
     // fmsq: FM squelch — off by default
     // From Thetis radio.cs:1312 — rx_fm_squelch_on default = false
     std::atomic<bool> m_fmsqEnabled{false};
+    double m_fmDeviationHz{5000.0};
+    double m_ctcssNotchHz{254.1};   // WDSP create_fmd default (RXA.c:208)
+    // Empfangs-Equalizer: der Mitschrieb dessen, was zuletzt hinausging.
+    // Vorgaben aus RXA.c:259-275 -- aus und flach.
+    bool m_rxEqRunning{false};
+    std::array<int, 11> m_rxEqGraph10{{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
     // muted: audio panel mute — off by default (panel runs)
     // From Thetis Project Files/Source/Console/dsp.cs:393-394
     std::atomic<bool> m_muted{false};

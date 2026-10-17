@@ -230,10 +230,49 @@ public:
     static QString resolveSettingsPath(const QString& profile);
     static QString resolveConfigDir(const QString& profile);
 
+    // Der Ordner fuer Dateien NEBEN den Einstellungen: Logbuch, QRZ-
+    // Zwischenspeicher, Stationsfotos, Weltbild, Spot-Protokolle.
+    // Ist LONGPATH_CONFIG_DIR gesetzt, ist es dieser Ordner -- eine
+    // Sandbox-Instanz darf nie in die echten Daten des Betreibers
+    // schreiben (2026-09-26: das Logbuch lag trotz LONGPATH_CONFIG_DIR
+    // weiter in ~/Library/Preferences/Longpath/Longpath). Sonst, wie
+    // bisher, QStandardPaths::AppConfigLocation.
+    static QString dataDir();
+    // Laeuft diese Instanz in einer Sandbox (LONGPATH_CONFIG_DIR gesetzt)?
+    // Dann auch eigene Zugangsdaten im Schluesselbund (CredentialStore):
+    // ein Test-QSO darf nie ins echte QRZ-Logbuch hochgeladen werden.
+    static bool isSandbox();
+
     // Profile names are restricted to [A-Za-z0-9_-] and non-empty.
     // Anything else (path traversal, whitespace, separators) falls back
     // to the default/empty profile in the resolvers above.
     static bool isValidProfileName(const QString& profile);
+
+    // ── Wer die Station ist (2026-10-16) ─────────────────────────────
+    //
+    // Das Rufzeichen steht an mehreren Stellen: `User/Callsign` ist
+    // der kanonische (SpotHubDialog schreibt ihn ausdruecklich so —
+    // „Writes canonical keys: User/Callsign, User/GridSquare"), und
+    // daneben gibt es die alten Schluessel je Quelle (DxClusterCallsign,
+    // RbnCallsign und so fort). RadioModel loest das seit der
+    // 3J-2-Nachbesserung mit einer Rueckfallkette auf.
+    //
+    // DREI Stellen taten das NICHT, sondern lasen nur
+    // `StationCallsign` — und den schreibt niemand:
+    //
+    //   SotaClient.cpp:186/238     Kennung im User-Agent
+    //   MainWindow_KiwiSdr.cpp:659 Betreiberkennung an den Empfaenger
+    //   QsoMapWindow.cpp:628       der eigene Marker auf der Karte
+    //
+    // In Martins Einstellungen steht unter FUENF Schluesseln OE5SOS —
+    // und genau dieser ist leer. Die QSO-Karte zeichnete seine eigene
+    // Station deshalb gar nicht (applyStationMarker kehrt bei leerem
+    // Rufzeichen sofort zurueck).
+    //
+    // Reihenfolge: erst `StationCallsign` (damit eine von Hand
+    // gesetzte Fassung weiter gilt), dann der kanonische.
+    static QString stationCallsign();
+    static QString stationGridSquare();
 
     // -------------------------------------------------------------------------
     // Saved-radio management (Phase 3I Task 15).

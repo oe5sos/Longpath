@@ -5,6 +5,7 @@
 // =================================================================
 
 #include "gui/applets/AppletGrid.h"
+#include "gui/StyleConstants.h"
 
 #include <QResizeEvent>
 
@@ -15,21 +16,26 @@
 
 namespace Longpath {
 
-namespace {
-/// Abstand zwischen zwei FELDERN. Im Zielbild 9 px; Schritt 1 liess
-/// ihn auf 0, weil die Applets bisher ohne Abstand untereinander
-/// standen. Seit "Glas & Tiefe" (2026-09-17) ist jede Zelle eine
-/// Platte mit Rahmen und Verlauf, und eine Platte braucht Luft um
-/// sich, sonst ist sie nur ein Strich zwischen zwei Flaechen.
-constexpr int kCellGap = 6;
-} // namespace
+// Abstand zwischen zwei FELDERN -- seit 2026-10-15 der eine
+// Hausstil-Wert Style::kPanelGapPx, auf Ansage des Betreibers
+// („vielleicht 2 pixel. x und y, dann sieht es besser aus und
+// gleich"). Vorher stand hier eine eigene 6; im Zielbild waren es 9,
+// in Schritt 1 null. Drei Werte fuer denselben Abstand sind genau das,
+// was er gesehen hat.
+//
+// Die alte Begruendung bleibt richtig und ist der Grund, dass hier
+// nicht 0 steht: seit „Glas & Tiefe" (2026-09-17) ist jede Zelle eine
+// Platte mit Rahmen und Verlauf, und eine Platte braucht Luft um sich,
+// sonst ist sie nur ein Strich zwischen zwei Flaechen.
 
 AppletGrid::AppletGrid(QWidget* parent)
     : QWidget(parent)
 {
     m_layout = new QGridLayout(this);
     m_layout->setContentsMargins(0, 0, 0, 0);
-    m_layout->setSpacing(kCellGap);
+    // setSpacing deckt in einem QGridLayout BEIDE Achsen ab -- „x und
+    // y", wie gewuenscht, mit einem Wert.
+    m_layout->setSpacing(Style::kPanelGapPx);
 }
 
 QString AppletGrid::nextId()

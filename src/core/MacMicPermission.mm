@@ -43,4 +43,17 @@ void requestMicrophonePermission()
     }
 }
 
+// Darf dieser Prozess das Mikrofon JETZT oeffnen?
+//
+// Fragt nur ab, fordert nichts an — das tut requestMicrophonePermission()
+// beim Programmstart. "NotDetermined" heisst: die Frage laeuft noch (oder
+// wurde nie gestellt), und ein Oeffnungsversuch wuerde blockieren, bis der
+// Bediener den Dialog beantwortet. Das ist der Zustand, der am 2026-10-03
+// den Verbindungsaufbau einfror.
+bool microphoneAccessGranted()
+{
+    return [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio]
+           == AVAuthorizationStatusAuthorized;
+}
+
 } // namespace Longpath

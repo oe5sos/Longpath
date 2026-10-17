@@ -18,7 +18,7 @@ namespace Longpath {
 namespace {
 
 // Die Grenzen sind die des Modells, nicht erfundene: NotchModel nimmt
-// Breiten in Hz entgegen, und WDSP setzt zu schmale selbst herauf
+// Widthn in Hz entgegen, und WDSP setzt zu schmale selbst herauf
 // (nbp.c:122-125). Oben gedeckelt, damit ein Vertipper nicht das halbe
 // Band wegnotcht.
 constexpr int kMinWidthHz = 10;
@@ -55,30 +55,30 @@ void NotchEditPopup::buildUi()
     m_centre->setRange(0.0, 1'000'000.0);      // kHz
     m_centre->setSingleStep(0.1);
     m_centre->setSuffix(QStringLiteral(" kHz"));
-    m_centre->setToolTip(tr("Mittenfrequenz des Notch-Filters."));
+    m_centre->setToolTip(tr("Centre frequency of the notch filter."));
     m_centre->setStyleSheet(Style::doubleSpinBoxStyle());
     grid->addWidget(m_centre, 0, 1);
 
-    grid->addWidget(new QLabel(tr("Breite")), 1, 0);
+    grid->addWidget(new QLabel(tr("Width")), 1, 0);
     m_width = new QSpinBox(this);
     m_width->setRange(kMinWidthHz, kMaxWidthHz);
     m_width->setSingleStep(10);
     m_width->setSuffix(QStringLiteral(" Hz"));
     m_width->setToolTip(tr(
-        "Breite des Notch-Filters. Sehr schmale Werte setzt die "
-        "Signalverarbeitung selbst herauf — dann steht hier danach die "
-        "Zahl, die wirklich gilt."));
+        "Width of the notch filter. The DSP raises very narrow values "
+         "by itself — the number shown afterwards is the one that "
+         "actually applies."));
     m_width->setStyleSheet(Style::spinBoxStyle());
     grid->addWidget(m_width, 1, 1);
 
     m_active = new QCheckBox(tr("Aktiv"), this);
     m_active->setToolTip(tr(
-        "Ausgeschaltet bleibt der Filter liegen und wirkt nicht — "
-        "praktisch zum Vergleichen, ohne ihn wegzuwerfen."));
+        "Switched off, the filter stays but has no effect — handy for "
+         "comparing without throwing it away."));
     grid->addWidget(m_active, 2, 0, 1, 2);
 
-    auto* del = new QPushButton(tr("Löschen"), this);
-    del->setToolTip(tr("Diesen Notch-Filter entfernen."));
+    auto* del = new QPushButton(tr("Delete"), this);
+    del->setToolTip(tr("Remove this notch filter."));
     del->setStyleSheet(Style::redCheckedStyle());
     grid->addWidget(del, 3, 0, 1, 2);
 

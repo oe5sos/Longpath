@@ -25,8 +25,11 @@
 #include "models/LogEntry.h"
 
 #include <QHash>
+#include <QPointer>
 #include <QVector>
 #include <QWidget>
+
+#include <limits>
 
 class QTimer;
 
@@ -67,6 +70,13 @@ public:
     RotorLogbookPanel(RadioModel* radio, QrzClient* qrz,
                       QrzLogbookUploader* uploader,
                       QWidget* parent = nullptr);
+    // Eigener Destruktor, weil der Abbau sonst in schon abgeraeumte
+    // Kinder greift: ~QWidget loescht den Rotctld-Client, dessen
+    // Socket meldet beim Abbau noch disconnected(), und der Rueckruf
+    // schreibt ins Statusschild, das als frueheres Kind bereits weg
+    // ist. Sechs Abstuerze beim Beenden, 2026-10-10/11. Siehe
+    // tests/tst_rotor_panel_abbau.cpp.
+    ~RotorLogbookPanel() override;
 
     // Where the ADIF log is written.
     static QString logbookPath();
@@ -107,6 +117,13 @@ public:
     // window keeps showing on top of a profile that never opened it.
     // No-op if the window was never created.
     void hideLogbook();
+    // Das offene Logbuch nach vorne holen, ohne es neu einzulesen (Start:
+    // Panadapter und Rotor/Log gehen nach ihm auf und lagen davor).
+    void raiseLogbookIfOpen();
+    // Den Rotor mit den gespeicherten Einstellungen verbinden (lokaler
+    // rotctld oder Netz-rotctld), wie Rotor... -> Connect. false + Grund,
+    // wenn nichts eingerichtet ist oder rotctld nicht startet.
+    bool connectRotorFromSettings(QString* err = nullptr);
 
     // Open the rotator setup dialog. Public for the same reason as
     // showLogbook(): an operator whose rotator is not working yet
@@ -147,6 +164,10 @@ public:
 
 signals:
     void qsoLogged(const LogEntry& entry);
+    // Der Betreiber hat das Logbuchfenster selbst zugemacht (roter Knopf).
+    // hideLogbook() loest es NICHT aus -- nur QDialog::finished, also ein
+    // echtes Schliessen, kein Verstecken durch Profil oder Verbinden-Maske.
+    void logbookClosed();
 
 protected:
     // Every resize re-decides which rows still fit — see
@@ -240,8 +261,20 @@ private:
                             const QString& label);
     bool appendToLogFile(const LogEntry& entry, QString* error);
     LogEntry buildEntry() const;
+    // Das Geruest jedes neuen QSOs: Rufzeichen, Zeit, eigener Locator,
+    // und Frequenz / Band / Betriebsart vom Funkgeraet (2026-09-26, damit
+    // die Eingabezeile im Logbuch dasselbe loggt wie dieses Feld).
+    LogEntry draftFromRadio(const QString& call) const;
+    // Der eine Weg ins Log: Entfernung/Peilung, Satellitenstempel, die
+    // Doppelt-Frage (an askParent), Datei, Hochladen, Liste, qsoLogged.
+    // false, wenn nicht geloggt; *message sagt dann warum.
+    bool commitEntry(LogEntry e, QWidget* askParent, QString* message);
+    // Ein QSO aus der Eingabezeile des Logbuch-Fensters.
+    void logFromLogbook(const LogEntry& partial);
     void stampSatellites(LogEntry& e) const;
 
+    // Letzte echte Ablesung des Rotors, NaN solange keiner verbunden ist.
+    double              m_lastRotorAz{std::numeric_limits<double>::quiet_NaN()};
     RadioModel*         m_radio{nullptr};
     QrzClient*          m_qrz{nullptr};
     class SatelliteService* m_satellites{nullptr};
@@ -275,12 +308,15 @@ private:
 
     // Created on first use and kept. Two windows over one file is how
     // one of them ends up writing over the other's correction.
-    LogbookWindow* m_logWindow{nullptr};
+    QPointer<LogbookWindow> m_logWindow;
     QVector<QsoUploader*> m_uploadTargets;
 
     // The rotator link, and the timer that stands in for one. Exactly
     // one of the two drives the needle at any moment.
     RotctldClient* m_rotor{nullptr};
+    // Der zuletzt protokollierte Status -- damit nur WECHSEL ins
+    // Protokoll gehen, nicht jede Wiederholung (siehe setStatus()).
+    QString        m_letzterStatus;
     // rotctld started by us, when the controller is on this computer.
     // Owned so it is stopped on the way out rather than left holding
     // the serial port.

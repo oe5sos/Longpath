@@ -27,6 +27,10 @@
 //                 three copies of the row-button stylesheet folded into
 //                 kRowButtonStyle. By Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork).
+//   2026-09-27 — The removed title bar was still handed to the layout
+//                 as nullptr ("QLayout: Cannot add a null widget" on
+//                 every build of the panel). No longer added. Martin
+//                 Fischer, AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "gui/applets/eq/StripEqPanel.h"
@@ -204,9 +208,9 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
     // its own draggable title bar. Longpath embeds it in a tab, so
     // there is no window to drag and no title to carry — the tab
     // already says which stage this is.
-    QWidget* titleBar = nullptr;
-    m_titleBar = titleBar;
-    root->addWidget(titleBar);
+    // Not added to the layout: there is no widget, and handing Qt a
+    // nullptr only earned a warning on every build of the panel.
+    m_titleBar = nullptr;
 
     // Interaction hint + filter family + bypass strip.  Path heading
     // lives in the frameless title bar above instead.

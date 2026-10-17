@@ -250,7 +250,7 @@ void StatusBadge::applyStyle()
     // width layout. The vertical padding bump lives in the constructor.
     setStyleSheet(QStringLiteral(
         "Longpath--StatusBadge { background: %1; border-radius: 6px; }"
-        "QLabel { color: %2; font-family: 'SF Mono', Menlo, monospace;"
+        "QLabel { color: %2; font-family: " LP_MONO_QSS ";"
         " font-size: 13px; font-weight: 600; line-height: 1.4; }"
     ).arg(bg, fg));
 }

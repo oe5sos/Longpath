@@ -33,6 +33,16 @@ int assumedChannelsForStream(TciStreamType type)
         return 2;
     case TciStreamType::TxChrono:
         return 0;
+    case TciStreamType::SpectrumStream:
+        // Longpath-eigen, nicht Teil von TCI: ein fremder Server (ExpertSDR2)
+        // schickt das nie, und dieser Client spricht ausschliesslich mit
+        // einem fremden Server. Trotzdem ausdruecklich aufgefuehrt, damit
+        // -Wswitch nicht bei jedem Bau meckert -- und damit beim naechsten
+        // neuen Stromtyp wieder genau hierher gezeigt wird.
+        //
+        // Der Wert waere ohnehin falsch gewesen: ein Spektrumrahmen traegt
+        // EIN Byte je Punkt, keine verschraenkten Paare. 1, nicht 2.
+        return 1;
     }
     return 2;
 }
@@ -87,7 +97,7 @@ void TciClient::connectToEndpoint(const QString& host, quint16 port)
 
     const QString trimmedHost = host.trimmed();
     if (trimmedHost.isEmpty()) {
-        setState(State::Error, tr("Keine Adresse angegeben."));
+        setState(State::Error, tr("No address given."));
         return;
     }
 
@@ -99,7 +109,7 @@ void TciClient::connectToEndpoint(const QString& host, quint16 port)
         // "ready;" als Abschluss. Vor diesem Punkt sind die Raten aus
         // dem Textkanal noch nicht bekannt — Stroeme anzufordern waere
         // verfrueht (siehe startIqStream/startAudioStream).
-        setState(State::Connecting, tr("verbunden, warte auf Selbstauskunft"));
+        setState(State::Connecting, tr("connected, waiting for the device to identify itself"));
     });
     connect(m_socket, &QWebSocket::textMessageReceived,
             this, &TciClient::handleTextMessage);

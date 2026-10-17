@@ -175,7 +175,7 @@ void SwrSweepPanel::buildUi()
     row3->addWidget(m_traceList, 1);
 
     auto* btnCol = new QVBoxLayout;
-    m_removeTraceBtn = new QPushButton(QStringLiteral("Entfernen"), this);
+    m_removeTraceBtn = new QPushButton(tr("Remove"), this);
     m_removeTraceBtn->setStyleSheet(Style::buttonBaseStyle());
     connect(m_removeTraceBtn, &QPushButton::clicked, this, [this]() {
         const int idx = m_traceList->currentRow();
@@ -367,13 +367,13 @@ void SwrSweepPanel::setBackend(const Backend& backend)
         } else if (result.completed && result.validPoints() > 0) {
             const quint64 res = result.resonanceHz();
             m_status->setText(res > 0
-                ? QStringLiteral("Fertig. Resonanz bei %1 MHz, SWR %2 "
+                ? tr("Done. Resonance at %1 MHz, SWR %2 "
                                  "(%3 von %4 Punkten gemessen).")
                       .arg(static_cast<double>(res) / 1e6, 0, 'f', 3)
                       .arg(result.minSwr(), 0, 'f', 2)
                       .arg(result.validPoints())
                       .arg(result.points.size())
-                : QStringLiteral("Fertig, aber ohne verwertbares Minimum."));
+                : tr("Done, but without a usable minimum."));
         } else if (result.completed) {
             // Completed and measured nothing. Say the watts — "zu
             // niedrig?" was a guess, and the numbers were there all
@@ -420,7 +420,7 @@ void SwrSweepPanel::setBackend(const Backend& backend)
                       .arg(result.maxFwdW, 0, 'f', 2)
                       .arg(SwrSweepController::kMinFwdW, 0, 'f', 1));
         } else {
-            m_status->setText(QStringLiteral("Abgebrochen: %1")
+            m_status->setText(tr("Aborted: %1")
                                   .arg(result.abortReason));
         }
     });
@@ -563,12 +563,12 @@ void SwrSweepPanel::refreshTunePowerLabel()
         if (m_backend.rawAdc) {
             const auto raw = m_backend.rawAdc();
             QString text =
-                QStringLiteral("   Koppler-ADC:  VOR %1  ·  RÜCK %2")
+                tr("   Coupler ADC:  FWD %1  ·  REV %2")
                     .arg(raw.first, 4).arg(raw.second, 4);
             if (m_backend.couplerProfile) {
                 const QString prof = m_backend.couplerProfile();
                 if (!prof.isEmpty()) {
-                    text += QStringLiteral("  ·  Profil %1").arg(prof);
+                    text += tr("  ·  profile %1").arg(prof);
                 }
             }
             m_couplerLabel->setText(text);
@@ -577,7 +577,7 @@ void SwrSweepPanel::refreshTunePowerLabel()
             // should be visible before a sweep rather than after.
             const bool quiet = (raw.first < 100 || raw.second < 20);
             m_couplerLabel->setStyleSheet(
-                QStringLiteral("color:%1; font-family: monospace;")
+                QStringLiteral("color:%1; font-family: " LP_MONO_QSS ";")
                     .arg(QString::fromLatin1(
                         quiet ? Style::kTextSecondary : Style::kGreenText)));
         } else {
@@ -630,7 +630,7 @@ void SwrSweepPanel::refreshTunePowerLabel()
     // mehrere Bänder. Der Sweep bleibt jetzt in einem Band, und in einem
     // Band gilt eine Tune-Leistung — der Hinweis ist mit der Sache
     // weggefallen, für die er galt.
-    m_powerLabel->setText(QStringLiteral("Tune-Leistung: %1 W (%2)%3")
+    m_powerLabel->setText(tr("Tune power: %1 W (%2)%3")
                               .arg(watts).arg(drive.sourceLabel)
                               .arg(note));
 
@@ -679,8 +679,8 @@ void SwrSweepPanel::exportCsv()
     }
     QFile f(path);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, QStringLiteral("Export"),
-                             QStringLiteral("Datei nicht schreibbar."));
+        QMessageBox::warning(this, tr("Export"),
+                             tr("The file cannot be written."));
         return;
     }
     QTextStream out(&f);

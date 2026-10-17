@@ -16,6 +16,7 @@
 
 #include <QEvent>
 #include <QGuiApplication>
+#include <QTimer>
 #include <QWidget>
 
 namespace Longpath {
@@ -41,6 +42,21 @@ bool AuxiliaryWindowLeveler::isAuxiliaryWindow(const QWidget* w)
 
 bool AuxiliaryWindowLeveler::eventFilter(QObject* watched, QEvent* event)
 {
+    // Die Reihenfolge, wie der Betreiber sie sieht: was er anklickt,
+    // was aktiv wird, was neu aufgeht, liegt vorne. Der Klick zaehlt mit,
+    // weil eine angeklickte Palette (NSPanel) nicht immer aktiv wird,
+    // aber nach vorne kommt.
+    if (event->type() == QEvent::WindowActivate
+        || event->type() == QEvent::MouseButtonPress
+        || event->type() == QEvent::Show) {
+        if (auto* w = qobject_cast<QWidget*>(watched)) {
+            QWidget* top = w->window();
+            if (top && (event->type() == QEvent::MouseButtonPress || w == top)) {
+                touch(top);
+            }
+        }
+    }
+
     // QEvent::Show kommt VOR dem eigentlichen Anzeigen (show_sys), das
     // native Fenster existiert aber schon -- die Ebene greift also fuer
     // das erste orderFront. Beim erneuten Zeigen kommt es wieder.
@@ -71,6 +87,49 @@ void AuxiliaryWindowLeveler::onApplicationStateChanged()
     for (QWidget* w : m_tracked) {
         if (w->isVisible()) { applyLevel(w); }
     }
+    // Zurueck in der App: macOS zeigt die Paletten wieder und legt sie
+    // dabei alle VOR das Fenster, das der Betreiber zuletzt vorne hatte
+    // (Test 2026-09-26: nach Finder -> Longpath lagen Rotor/Log und
+    // Panadapter wieder vor dem Logbuch). Einen Takt spaeter, wenn AppKit
+    // fertig sortiert hat, die zuletzt gesehene Reihenfolge herstellen.
+    if (qApp->applicationState() == Qt::ApplicationActive) {
+        QTimer::singleShot(50, this, [this]() { restoreRecentOrder(); });
+    }
+}
+
+void AuxiliaryWindowLeveler::touch(QWidget* top)
+{
+    // Nur richtige Fenster: Menues, Tooltips und Aufklapplisten gehen und
+    // kommen, sie sind keine Lage, die sich jemand merkt.
+    const Qt::WindowType type = static_cast<Qt::WindowType>(
+        static_cast<int>(top->windowFlags() & Qt::WindowType_Mask));
+    if (type == Qt::Popup || type == Qt::ToolTip || type == Qt::SplashScreen
+        || type == Qt::Drawer || type == Qt::Desktop) {
+        return;
+    }
+    for (int i = m_recent.size() - 1; i >= 0; --i) {
+        if (!m_recent.at(i) || m_recent.at(i) == top) { m_recent.removeAt(i); }
+    }
+    m_recent.prepend(top);
+    while (m_recent.size() > 24) { m_recent.removeLast(); }
+}
+
+void AuxiliaryWindowLeveler::restoreRecentOrder()
+{
+    // Von hinten nach vorne heben: das zuletzt benutzte Fenster wird als
+    // letztes gehoben und liegt vorne. Die Ebenen bleiben, wie sie sind --
+    // das Hauptfenster (normale Ebene) bleibt unter den Paletten.
+    for (int i = m_recent.size() - 1; i >= 0; --i) {
+        QWidget* w = m_recent.at(i);
+        if (w && w->isVisible() && !w->isMinimized()) { w->raise(); }
+    }
+}
+
+QList<QWidget*> AuxiliaryWindowLeveler::recentOrderForTest() const
+{
+    QList<QWidget*> out;
+    for (const QPointer<QWidget>& w : m_recent) { if (w) { out << w; } }
+    return out;
 }
 
 } // namespace Longpath

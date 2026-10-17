@@ -111,6 +111,7 @@ warren@wpratt.com
 #include <QPointer>
 #include <QSpinBox>
 #include <QPushButton>
+#include <QVector>
 
 class QLabel;
 
@@ -133,6 +134,9 @@ class FmOptContainer : public QWidget {
     Q_OBJECT
 public:
     explicit FmOptContainer(QWidget* parent = nullptr);
+    /// Thetis' 49 CTCSS tones (console.cs CTCSS_array), shared with the
+    /// FM applet so both lists match.
+    static QVector<double> ctcssTones();
     void setSlice(SliceModel* s);
     void syncFromSlice();  // reads slice state into widgets; safe if m_slice is null
 

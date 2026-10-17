@@ -119,7 +119,7 @@ void SupportDialog::buildUI()
     auto* logInfoLayout = new QHBoxLayout();
     m_logPathLabel = new QLabel(this);
     m_logPathLabel->setStyleSheet(
-        QStringLiteral("QLabel { color: %1; font-family: monospace; font-size: 11px; }")
+        QStringLiteral("QLabel { color: %1; font-family: " LP_MONO_QSS "; font-size: 11px; }")
         .arg(Style::kTextScale));
     logInfoLayout->addWidget(m_logPathLabel, 1);
 
@@ -134,7 +134,9 @@ void SupportDialog::buildUI()
     m_logViewer = new QPlainTextEdit(this);
     m_logViewer->setReadOnly(true);
     m_logViewer->setMaximumBlockCount(kMaxLogViewLines);
-    m_logViewer->setFont(QFont(QStringLiteral("Consolas"), 9));
+    // Vorher "Consolas" -- eine WINDOWS-Schrift, auf macOS/Linux nicht
+    // vorhanden: das Log stand dort in einer proportionalen Schrift.
+    m_logViewer->setFont(Style::monoFontPt(9));
     // §D: #0a0a14 = Style::kStatusBarBg, #203040 = Style::kBorderSubtle, #00b4d8 = Style::kAccent.
     // §D exception: fg #8aa8c0 (off-palette warm-blue for log text readability).
     m_logViewer->setStyleSheet(Style::themed(

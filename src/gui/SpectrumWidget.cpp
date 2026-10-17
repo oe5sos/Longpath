@@ -202,6 +202,13 @@ namespace {
 const QColor kPassbandWash(0xdc, 0xe6, 0xf0, 60);
 const QColor kPassbandEdgeLight(0xdc, 0xe6, 0xf0, 165);
 
+// Deckkraft der beiden GPU-Baender. Standen bis 2026-10-08 als
+// Zahlenliteral je zweimal im Malcode; jetzt an einer Stelle, weil
+// `Kurve::baue` sie als Wert bekommt und sonst zwei Zahlen
+// auseinanderlaufen koennten, die dasselbe bedeuten.
+constexpr float kTraceAlpha = 0.9f;
+constexpr float kPeakAlpha  = 0.55f;
+
 } // namespace
 
 // ── Flächen, Gitter und Rahmen kommen aus dem Theme ──────────────────
@@ -1038,6 +1045,10 @@ void SpectrumWidget::loadSettings()
     // und aus einem gespeicherten Wert laesst sich nicht ablesen,
     // welches von beidem gemeint war.
     m_heatmapEnabled  = readBool(QStringLiteral("DisplaySpectrumHeatmap"), false);
+    // Weiche Kante AN, Hof AUS -- Wahl des Betreibers vom 2026-10-08
+    // nach den drei Blaettern. Siehe setTraceSoftEdge im Header.
+    m_traceSoftEdge   = readBool(QStringLiteral("DisplayTraceSoftEdge"), true);
+    m_traceHalo       = readBool(QStringLiteral("DisplayTraceHalo"), false);
     // Delay the peak hold enable path until the timer infra is ready.
     if (peakOn) {
         setPeakHoldEnabled(true);
@@ -1161,6 +1172,7 @@ void SpectrumWidget::loadSettings()
 
     // Phase 3G-8 commit 5: grid / scales state.
     m_gridEnabled = readBool(QStringLiteral("DisplayGridEnabled"), true);
+    m_gridStepDb = qBound(0, readInt(QStringLiteral("DisplayGridStepDb"), 0), 40);
     m_showZeroLine = readBool(QStringLiteral("DisplayShowZeroLine"), false);
     m_showFps = readBool(QStringLiteral("DisplayShowFps"), false);
     // B8 Task 21: cursor frequency readout persists across restarts.
@@ -1384,6 +1396,10 @@ void SpectrumWidget::saveSettings()
               m_gradientEnabled ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplaySpectrumHeatmap"), m_panIndex),
               m_heatmapEnabled ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayTraceSoftEdge"), m_panIndex),
+              m_traceSoftEdge ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayTraceHalo"), m_panIndex),
+              m_traceHalo ? QStringLiteral("True") : QStringLiteral("False"));
 
     // Phase 3G-8 commit 4: waterfall renderer state.
     s.setValue(settingsKey(QStringLiteral("DisplayWfAgc"), m_panIndex),
@@ -1420,6 +1436,7 @@ void SpectrumWidget::saveSettings()
     // Phase 3G-8 commit 5: grid / scales state.
     s.setValue(settingsKey(QStringLiteral("DisplayGridEnabled"), m_panIndex),
               m_gridEnabled ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayGridStepDb"), m_panIndex), m_gridStepDb);
     s.setValue(settingsKey(QStringLiteral("DisplayShowZeroLine"), m_panIndex),
               m_showZeroLine ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayShowFps"), m_panIndex),
@@ -2154,6 +2171,26 @@ void SpectrumWidget::setGradientEnabled(bool on)
     m_gradientEnabled = on;
     scheduleSettingsSave();
     update();  // Fuellung: Verlauf statt flach, beim naechsten Rahmen
+}
+
+void SpectrumWidget::setTraceSoftEdge(bool on)
+{
+    if (m_traceSoftEdge == on) {
+        return;
+    }
+    m_traceSoftEdge = on;
+    scheduleSettingsSave();
+    update();  // Streifenzahl aendert sich beim naechsten Rahmen
+}
+
+void SpectrumWidget::setTraceHalo(bool on)
+{
+    if (m_traceHalo == on) {
+        return;
+    }
+    m_traceHalo = on;
+    scheduleSettingsSave();
+    update();
 }
 
 void SpectrumWidget::setHeatmapEnabled(bool on)
@@ -2907,6 +2944,15 @@ void SpectrumWidget::setGridEnabled(bool on)
 {
     if (m_gridEnabled == on) { return; }
     m_gridEnabled = on;
+    scheduleSettingsSave();
+    markOverlayDirty();
+}
+
+void SpectrumWidget::setGridStepDb(int db)
+{
+    db = qBound(0, db, 40);
+    if (m_gridStepDb == db) { return; }
+    m_gridStepDb = db;
     scheduleSettingsSave();
     markOverlayDirty();
 }
@@ -4062,6 +4108,9 @@ void SpectrumWidget::drawGrid(QPainter& p, const QRect& specRect)
     float step = 10.0f;  // 10 dB steps
     if (m_dynamicRange <= 50.0f) {
         step = 5.0f;
+    }
+    if (m_gridStepDb > 0) {
+        step = static_cast<float>(m_gridStepDb);   // Setup: dB Step
     }
 
     for (float dbm = bottom + step; dbm < m_refLevel; dbm += step) {
@@ -7903,7 +7952,11 @@ void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
 // From AetherSDR src/gui/SpectrumWidget.cpp:4635-4672 [@0cd4559]
 void SpectrumWidget::showSpotClusterPopup(const SpotCluster& cluster, const QPoint& globalPos)
 {
-    auto* menu = new QMenu(this);
+    // Am Fenster, nicht am Panadapter (2026-09-30): der Panadapter ist
+    // nativ, und ein Menue daran bekam von Qt keinen Fensterbezug („...
+    // must be a top level window."). Aufgeraeumt wird weiter mit ihm.
+    auto* menu = new QMenu(window());
+    connect(this, &QObject::destroyed, menu, &QObject::deleteLater);
     // ── Ein Menü ist Bedienung, kein Messwert ────────────────────────
     //
     // OE5SOS, 2026-08-15: alle fünf Werte, auch die zwei Textfarben.
@@ -8763,7 +8816,7 @@ void SpectrumWidget::buildNotchContextMenu(int id, QMenu& menu)
     // notchfilter klickt und dann diese bearbeite kann und auch
     // loeschen." Die Liste fester Breiten oben deckt den haeufigen
     // Fall; hier stehen Mitte und Breite frei.
-    menu.addAction(QStringLiteral("Notch bearbeiten…"), this,
+    menu.addAction(tr("Edit notch…"), this,
                    [this, id]() { openNotchEditor(id, QCursor::pos()); });
 
     menu.addSeparator();
@@ -8784,7 +8837,7 @@ void SpectrumWidget::buildNotchContextMenu(int id, QMenu& menu)
     // waere der Eintrag dasselbe wie „Remove Notch" und damit eine
     // Falle.
     if (m_notchMarkers.size() > 1) {
-        menu.addAction(QStringLiteral("Alle %1 Notch-Filter entfernen…")
+        menu.addAction(tr("Remove all %1 notch filters…")
                            .arg(m_notchMarkers.size()),
                        this, [this]() { emit notchRemoveAllRequested(); });
     }
@@ -8935,7 +8988,8 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                 // popup() instead of exec() — no nested event loop
                 // inside mousePressEvent on the native QRhi surface
                 // (finding #3; same treatment as the spot menu below).
-                QMenu* menu = new QMenu(this);
+                QMenu* menu = new QMenu(window());   // am Fenster, siehe showSpotClusterPopup()
+                connect(this, &QObject::destroyed, menu, &QObject::deleteLater);
                 menu->setAttribute(Qt::WA_DeleteOnClose);
                 buildNotchContextMenu(hitNotch, *menu);
                 connect(menu, &QMenu::aboutToHide, this, [this]() {
@@ -8987,7 +9041,8 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                 // menu. popup() returns immediately; the lambdas
                 // capture by value and use `this` as context object,
                 // so they stay valid for the menu's async lifetime.
-                QMenu* menu = new QMenu(this);
+                QMenu* menu = new QMenu(window());   // am Fenster, siehe showSpotClusterPopup()
+                connect(this, &QObject::destroyed, menu, &QObject::deleteLater);
                 menu->setAttribute(Qt::WA_DeleteOnClose);
                 connect(menu, &QMenu::aboutToHide, this, [this]() {
                     m_contextMenuClosedMs = QDateTime::currentMSecsSinceEpoch();
@@ -10276,43 +10331,95 @@ void SpectrumWidget::wheelEvent(QWheelEvent* event)
     }
 
     // Plain scroll: tune VFO by step size (matches Thetis panadapter behavior)
-    // Ctrl+scroll: adjust ref level
-    // Ctrl+Shift+scroll: zoom bandwidth
-    int delta = event->angleDelta().y();
-    if (delta == 0) {
-        QWidget::wheelEvent(event);
+    // Cmd/Ctrl+scroll: zoom bandwidth
+    // Shift+scroll: adjust ref level
+    //
+    // Schritte statt Rohwerte (2026-09-27). Ein Trackpad schickt viele
+    // kleine Ereignisse; jedes zaehlte als voller Schritt, und ein
+    // Wischen stimmte Dutzende Schritte weit ab oder zoomte davon.
+    const int steps = wheelStepsFor(event);
+    if (steps == 0) {
+        event->accept();
         return;
     }
 
     if (event->modifiers() & Qt::MetaModifier || event->modifiers() & Qt::ControlModifier) {
         // Cmd+scroll (macOS) or Ctrl+scroll: zoom bandwidth in/out
-        double factor = (delta > 0) ? 0.8 : 1.25;
+        double factor = (steps > 0) ? 0.8 : 1.25;
         double newBw = m_bandwidthHz * factor;
         newBw = std::clamp(newBw, 1000.0, m_sampleRateHz);
-        m_bandwidthHz = newBw;
-        // Recenter on VFO when zooming
-        m_centerHz = m_vfoHz;
-        emit centerChanged(m_centerHz);
+        // Recenter on VFO when zooming. Ueber setFrequencyRange
+        // (2026-09-27): nur dort wird der Wasserfall umgerechnet, der
+        // Zoom gespeichert und frequencyRangeChanged gesendet, dem die
+        // Zoom-Leiste folgt -- das Rad ging an allen dreien vorbei.
+        const double oldCenter = m_centerHz;
+        setFrequencyRange(m_vfoHz, newBw);
+        if (!qFuzzyCompare(oldCenter, m_centerHz)) {
+            emit centerChanged(m_centerHz);
+        }
         emit bandwidthChangeRequested(newBw);
-        updateVfoPositions();
-#ifdef LONGPATH_GPU_SPECTRUM
-        markOverlayDirty();
-#endif
     } else if (event->modifiers() & Qt::ShiftModifier) {
         // Shift+scroll: adjust ref level
-        float step = (delta > 0) ? 5.0f : -5.0f;
+        float step = (steps > 0) ? 5.0f : -5.0f;
         m_refLevel = qBound(-160.0f, m_refLevel + step, 20.0f);
         scheduleSettingsSave();
     } else {
-        // Plain scroll: tune VFO by step size
-        int steps = (delta > 0) ? 1 : -1;
-        double newHz = m_vfoHz + steps * m_stepHz;
-        newHz = std::max(newHz, 100000.0);
-        emit frequencyClicked(newHz);
+        // Plain scroll: tune VFO by step size, auf das Schrittraster
+        // (2026-09-27; vorher lief 14.215.050 mit 100-Hz-Schritten auf
+        // ...150/...250 statt auf ...100/...200).
+        emit frequencyClicked(std::max(snapTuneHz(m_vfoHz, m_stepHz, steps), 100000.0));
     }
 
     update();
-    QWidget::wheelEvent(event);
+    event->accept();
+}
+
+// From Thetis console.cs:31215-31228 [@852bf0e] -- SnapTune(freq_mhz, step_size_hz, num_steps):
+//   long temp = freq_hz / step_size_hz; // do integer division to end up on a step size boundary
+//   // handle when starting frequency was already on a step size boundary and tuning down
+//   if (num_steps < 0 && freq_hz % step_size_hz != 0)
+//       num_steps++; // off boundary -- add one as the divide takes care of one step
+//   temp += num_steps; freq_hz = temp * step_size_hz;
+double SpectrumWidget::snapTuneHz(double freqHz, int stepHz, int numSteps)
+{
+    if (stepHz <= 0) { return freqHz; }
+    const qint64 f = static_cast<qint64>(std::llround(freqHz));
+    qint64 temp = f / stepHz;
+    if (numSteps < 0 && f % stepHz != 0) {
+        numSteps++;
+    }
+    temp += numSteps;
+    return static_cast<double>(temp * stepHz);
+}
+
+// Radereignis -> ganze Schritte (2026-09-27).
+// From AetherSDR src/gui/SpectrumWidget.cpp:11529-11573 [@d58e2b8a]:
+// Trackpad (pixelDelta) je ~15 px ein Schritt, Nachlauf und
+// Querwischen ignoriert; Mausrad (angleDelta) je 120 ein Schritt; beides
+// auf +-1 je Ereignis begrenzt und in 50 ms entprellt (#504, #556, #2150).
+int SpectrumWidget::wheelStepsFor(QWheelEvent* ev)
+{
+    int steps = 0;
+    if (!ev->pixelDelta().isNull()) {
+        if (ev->phase() == Qt::ScrollMomentum) { return 0; }
+        if (qAbs(ev->pixelDelta().x()) > qAbs(ev->pixelDelta().y())) { return 0; }
+        m_wheelPixelAccum += ev->pixelDelta().y();
+        steps = m_wheelPixelAccum / 15;
+        m_wheelPixelAccum -= steps * 15;
+    } else {
+        m_wheelAngleAccum += ev->angleDelta().y();
+        steps = m_wheelAngleAccum / 120;
+        m_wheelAngleAccum -= steps * 120;
+    }
+    steps = qBound(-1, steps, 1);
+    if (steps != 0) {
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        if (now - m_lastWheelStepMs < 50) {
+            return 0;
+        }
+        m_lastWheelStepMs = now;
+    }
+    return steps;
 }
 
 // ============================================================================
@@ -10598,7 +10705,7 @@ void SpectrumWidget::initSpectrumPipeline()
     // Setup slider previously only reached the QPainter fallback path,
     // never the GPU one -- see m_lineWidth's other call sites).
     m_fftLineVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
-                                 kMaxFftBins * 2 * kFftVertStride * sizeof(float));
+                                 kMaxFftBins * 2 * kFftVertStride * kLineStrips * sizeof(float));
     if (!rhiCreate(m_fftLineVbo, "spectrum line vertex buffer", &m_gpuInitFailure)) { return; }
 
     m_fftFillVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
@@ -10608,7 +10715,7 @@ void SpectrumWidget::initSpectrumPipeline()
     // Phase 3G-8 commit 10: peak hold VBO (same layout as line VBO --
     // now the ribbon layout, same reason as m_fftLineVbo above).
     m_fftPeakVbo = r->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer,
-                                 kMaxFftBins * 2 * kFftVertStride * sizeof(float));
+                                 kMaxFftBins * 2 * kFftVertStride * kLineStrips * sizeof(float));
     if (!rhiCreate(m_fftPeakVbo, "spectrum peak vertex buffer", &m_gpuInitFailure)) { return; }
 
     m_fftSrb = r->newShaderResourceBindings();
@@ -11319,7 +11426,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                                  / (1024.0 * 1024.0), 0, 'f', 1);
                 QFont pf = p.font();
                 pf.setPixelSize(11);
-                pf.setFamily(QStringLiteral("Menlo"));
+                Longpath::Style::setzeMonoFamilien(pf);
                 p.setFont(pf);
                 const QFontMetrics fm(pf);
                 const int lineH = fm.height();
@@ -11630,8 +11737,43 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         // symmetric ribbon (offset applied on both sides of the centre).
         const float lineHalfWidthPx = (m_lineWidth * dpr) * 0.5f;
 
-        QVector<float> lineVerts(n * 2 * kFftVertStride);
+        // ── Weiche Kante und Hof ───────────────────────────────────────
+        //
+        // Geometrie steht in `gui/KurvenStreifen.h`, damit sie ohne
+        // Fenster und ohne GPU geprueft werden kann. Mit beiden
+        // Schaltern aus kommt hier GENAU EIN Streifen heraus, Wert fuer
+        // Wert wie vor diesem Umbau.
+        Kurve::Streifen streifen[Kurve::kStreifenHoechstens];
+        const int nStrips = Kurve::baue(m_traceSoftEdge, m_traceHalo,
+                                        lineHalfWidthPx, dpr,
+                                        kTraceAlpha, streifen);
+        m_lineStripCount = nStrips;
+
+        QVector<float> lineVerts(static_cast<qsizetype>(n) * 2 * kFftVertStride * nStrips);
         QVector<float> fillVerts(n * 2 * kFftVertStride);
+        // Zwei Punkte eines Streifens. `nxPx`/`nyPx` ist die Normale in
+        // Geraete-Pixeln (nicht normiert in NDC) und die Teilung durch
+        // die halbe Fenstergroesse passiert HIER -- so steht beim
+        // Ein-Streifen-Fall dieselbe Rechenfolge wie vorher, und der
+        // Puffer wird bitgleich.
+        auto putStrip = [&](int strip, int j, float x, float y,
+                            float nxPx, float nyPx,
+                            const Kurve::Streifen& st,
+                            float r, float g, float b) {
+            const qsizetype k = (static_cast<qsizetype>(strip) * n + j) * 2 * kFftVertStride;
+            lineVerts[k]     = x + (nxPx * st.o1) / (vpWpx * 0.5f);
+            lineVerts[k + 1] = y + (nyPx * st.o1) / (vpHpx * 0.5f);
+            lineVerts[k + 2] = r;
+            lineVerts[k + 3] = g;
+            lineVerts[k + 4] = b;
+            lineVerts[k + 5] = st.a1;
+            lineVerts[k + 6] = x + (nxPx * st.o2) / (vpWpx * 0.5f);
+            lineVerts[k + 7] = y + (nyPx * st.o2) / (vpHpx * 0.5f);
+            lineVerts[k + 8]  = r;
+            lineVerts[k + 9]  = g;
+            lineVerts[k + 10] = b;
+            lineVerts[k + 11] = st.a2;
+        };
 
         for (int j = 0; j < n; ++j) {
             float x = (n > 1) ? 2.0f * j / (n - 1) - 1.0f : 0.0f;
@@ -11659,11 +11801,10 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // ribbon rather than dividing by ~zero.
             const float uxPx = (segLenPx > 1e-6f) ? dxPx / segLenPx : 1.0f;
             const float uyPx = (segLenPx > 1e-6f) ? dyPx / segLenPx : 0.0f;
-            // Rotate the unit tangent 90 degrees for the perpendicular,
-            // scale to the half-width, convert back from device px to
-            // NDC using the same vpWpx/vpHpx the tangent itself used.
-            const float offXNdc = (-uyPx * lineHalfWidthPx) / (vpWpx * 0.5f);
-            const float offYNdc = ( uxPx * lineHalfWidthPx) / (vpHpx * 0.5f);
+            // Die Normale ist der um 90 Grad gedrehte Einheitstangens,
+            // in Geraete-Pixeln: (-uyPx, uxPx). Auf die halbe Breite
+            // skaliert und von Pixeln nach NDC gerechnet wird sie in
+            // `putStrip`, mit demselben vpWpx/vpHpx wie der Tangens.
 
             float cr, cg, cb2;
             if (m_heatmapEnabled) {
@@ -11692,23 +11833,13 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // Line vertex -- ribbon: two vertices per point (offset +/-
             // perpendicular from centre), same alternating-edge order
             // the fill strip below already uses so both form a valid
-            // connected TriangleStrip.  Same alpha on both edges (0.9f,
-            // unchanged from the old single-vertex value) -- a solid
-            // ribbon, no feather in this pass (see the block comment
-            // above the loop).
-            int li = j * 2 * kFftVertStride;
-            lineVerts[li]     = x + offXNdc;
-            lineVerts[li + 1] = y + offYNdc;
-            lineVerts[li + 2] = cr;
-            lineVerts[li + 3] = cg;
-            lineVerts[li + 4] = cb2;
-            lineVerts[li + 5] = 0.9f;
-            lineVerts[li + 6] = x - offXNdc;
-            lineVerts[li + 7] = y - offYNdc;
-            lineVerts[li + 8]  = cr;
-            lineVerts[li + 9]  = cg;
-            lineVerts[li + 10] = cb2;
-            lineVerts[li + 11] = 0.9f;
+            // connected TriangleStrip.  Beide Kanten tragen dieselbe
+            // Deckkraft (kTraceAlpha), solange keine weiche Kante
+            // eingeschaltet ist -- dann ist es genau ein solides Band
+            // wie vorher.
+            for (int s = 0; s < nStrips; ++s) {
+                putStrip(s, j, x, y, -uyPx, uxPx, streifen[s], cr, cg, cb2);
+            }
 
             // ── Fuellung: dicht an der Kurve, weg zur Grundlinie ─────
             //
@@ -11742,7 +11873,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         }
 
         batch->updateDynamicBuffer(m_fftLineVbo, 0,
-            n * 2 * kFftVertStride * sizeof(float), lineVerts.constData());
+            static_cast<size_t>(n) * 2 * kFftVertStride * nStrips * sizeof(float), lineVerts.constData());
         batch->updateDynamicBuffer(m_fftFillVbo, 0,
             n * 2 * kFftVertStride * sizeof(float), fillVerts.constData());
 
@@ -11759,7 +11890,32 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // QPainter fallback's own convention (drawSpectrum():
             // QPen peakPen(peakCol, qMax(1.0f, m_lineWidth * 0.75f))).
             const float peakHalfWidthPx = (m_lineWidth * 0.75f * dpr) * 0.5f;
-            QVector<float> peakVerts(n * 2 * kFftVertStride);
+            // Weiche Kante ja, Hof nein -- siehe setTraceHalo im Header.
+            Kurve::Streifen pStreifen[Kurve::kStreifenHoechstens];
+            const int nPeakStrips = Kurve::baue(m_traceSoftEdge, /*hof*/ false,
+                                                peakHalfWidthPx, dpr,
+                                                kPeakAlpha, pStreifen);
+            m_peakStripCount = nPeakStrips;
+            QVector<float> peakVerts(
+                static_cast<qsizetype>(n) * 2 * kFftVertStride * nPeakStrips);
+            auto putPeakStrip = [&](int strip, int j, float x, float y,
+                                    float nxPx, float nyPx,
+                                    const Kurve::Streifen& st) {
+                const qsizetype k =
+                    (static_cast<qsizetype>(strip) * n + j) * 2 * kFftVertStride;
+                peakVerts[k]     = x + (nxPx * st.o1) / (vpWpx * 0.5f);
+                peakVerts[k + 1] = y + (nyPx * st.o1) / (vpHpx * 0.5f);
+                peakVerts[k + 2] = flatR;
+                peakVerts[k + 3] = flatG;
+                peakVerts[k + 4] = flatB;
+                peakVerts[k + 5] = st.a1;
+                peakVerts[k + 6] = x + (nxPx * st.o2) / (vpWpx * 0.5f);
+                peakVerts[k + 7] = y + (nyPx * st.o2) / (vpHpx * 0.5f);
+                peakVerts[k + 8]  = flatR;
+                peakVerts[k + 9]  = flatG;
+                peakVerts[k + 10] = flatB;
+                peakVerts[k + 11] = st.a2;
+            };
             for (int j = 0; j < n; ++j) {
                 float x = (n > 1) ? 2.0f * j / (n - 1) - 1.0f : 0.0f;
                 float t = qBound(0.0f, (m_pxPeakHold[j] - minDbm) / range, 1.0f);
@@ -11779,25 +11935,14 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 const float segLenPx = std::sqrt(dxPx * dxPx + dyPx * dyPx);
                 const float uxPx = (segLenPx > 1e-6f) ? dxPx / segLenPx : 1.0f;
                 const float uyPx = (segLenPx > 1e-6f) ? dyPx / segLenPx : 0.0f;
-                const float offXNdc = (-uyPx * peakHalfWidthPx) / (vpWpx * 0.5f);
-                const float offYNdc = ( uxPx * peakHalfWidthPx) / (vpHpx * 0.5f);
-
-                int li = j * 2 * kFftVertStride;
-                peakVerts[li]     = x + offXNdc;
-                peakVerts[li + 1] = y + offYNdc;
-                peakVerts[li + 2] = flatR;
-                peakVerts[li + 3] = flatG;
-                peakVerts[li + 4] = flatB;
-                peakVerts[li + 5] = 0.55f;
-                peakVerts[li + 6] = x - offXNdc;
-                peakVerts[li + 7] = y - offYNdc;
-                peakVerts[li + 8]  = flatR;
-                peakVerts[li + 9]  = flatG;
-                peakVerts[li + 10] = flatB;
-                peakVerts[li + 11] = 0.55f;
+                for (int s = 0; s < nPeakStrips; ++s) {
+                    putPeakStrip(s, j, x, y, -uyPx, uxPx, pStreifen[s]);
+                }
             }
             batch->updateDynamicBuffer(m_fftPeakVbo, 0,
-                n * 2 * kFftVertStride * sizeof(float), peakVerts.constData());
+                static_cast<size_t>(n) * 2 * kFftVertStride * nPeakStrips
+                    * sizeof(float),
+                peakVerts.constData());
             m_peakHoldHasData = true;
         }
     }
@@ -11950,7 +12095,10 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             cb->setViewport(specVp);
             const QRhiCommandBuffer::VertexInput peakVbuf(m_fftPeakVbo, 0);
             cb->setVertexInput(0, 1, &peakVbuf);
-            cb->draw(m_visibleBinCount * 2);  // ribbon: 2 vertices per point
+            // Je Streifen ein Zug, wie bei der Kurve unten.
+            for (int s = 0; s < m_peakStripCount; ++s) {
+                cb->draw(m_visibleBinCount * 2, 1, s * m_visibleBinCount * 2);
+            }
         }
 
         // Line pass
@@ -11959,7 +12107,11 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         cb->setViewport(specVp);
         const QRhiCommandBuffer::VertexInput lineVbuf(m_fftLineVbo, 0);
         cb->setVertexInput(0, 1, &lineVbuf);
-        cb->draw(m_visibleBinCount * 2);  // ribbon: 2 vertices per point
+        // Je Streifen ein eigener Zug aus demselben Puffer: Hof,
+        // Kanten, Kern -- ohne sie genau einer wie bisher.
+        for (int s = 0; s < m_lineStripCount; ++s) {
+            cb->draw(m_visibleBinCount * 2, 1, s * m_visibleBinCount * 2);
+        }
     }
 
     // Draw overlay -- static chrome layer first, then dynamic
@@ -12198,6 +12350,16 @@ void SpectrumWidget::setCtunEnabled(bool enabled)
 // wieder nach oben, sonst ueberdeckte die naechste Positionsrunde sie.
 // Die Flaggen sind am 2026-08-18 geloescht; die vorderste Scheibe wird
 // weiter gefuehrt, weil das Malen sie braucht.
+int SpectrumWidget::xForHz(double hz) const
+{
+    const QRect r = spectrumRect();
+    if (r.width() <= 0) { return -1; }
+    const int x = hzToX(hz, r);
+    // Ausserhalb: die Flagge soll sich dann gar nicht erst setzen.
+    if (x < r.left() || x > r.right()) { return -1; }
+    return x;
+}
+
 void SpectrumWidget::setFrontSliceIndex(int sliceIndex)
 {
     m_frontSliceIndex = sliceIndex;

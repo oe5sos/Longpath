@@ -22,6 +22,7 @@
 //     vorhersagbare Regel mehr wert als eine kluge.
 
 #include <QtTest>
+#include <QSignalSpy>
 
 #include "core/AppSettings.h"
 #include "gui/LayoutProfiles.h"
@@ -365,6 +366,47 @@ private slots:
                  QStringLiteral("cw"));
         QVERIFY(again.isBoundToMode(QStringLiteral("CW"), DSPMode::CWU));
         QVERIFY(again.isBoundToBand(QStringLiteral("CW"), Band::Band40m));
+    }
+
+    // Betreiber 2026-09-27: „beim start von longpath muss immer das
+    // standardprofil zu sehen sein" -- Profil 1, nicht das zuletzt
+    // aktive. Und das zuletzt aktive bleibt dabei unangetastet.
+    void theStartIsAlwaysProfileOne()
+    {
+        {
+            LayoutProfiles lp;
+            hook(lp);
+            m_live.insert(QStringLiteral("v"), QStringLiteral("standard"));
+            QVERIFY(lp.create(QStringLiteral("Neu")));
+            QVERIFY(lp.create(QStringLiteral("S")));
+            m_live.insert(QStringLiteral("v"), QStringLiteral("schlicht"));
+            lp.captureIntoCurrent();
+            lp.save();
+        }
+
+        LayoutProfiles again;
+        hook(again);
+        again.load();
+        QCOMPARE(again.current(), QStringLiteral("S"));
+        QSignalSpy changed(&again, &LayoutProfiles::currentChanged);
+        m_live.insert(QStringLiteral("v"), QStringLiteral("leeres-fenster"));
+
+        again.startWithFirst();
+
+        QCOMPARE(again.current(), QStringLiteral("Neu"));
+        QCOMPARE(changed.count(), 1);
+        QCOMPARE(again.snapshot(QStringLiteral("S"))
+                     .value(QStringLiteral("v")).toString(),
+                 QStringLiteral("schlicht"));
+        again.applyCurrent();
+        QCOMPARE(m_live.value(QStringLiteral("v")).toString(),
+                 QStringLiteral("standard"));
+
+        // Schon Profil 1: nichts passiert. (applyCurrent() hat selbst
+        // noch einmal currentChanged gemeldet -- ab hier zaehlen.)
+        const int before = changed.count();
+        again.startWithFirst();
+        QCOMPARE(changed.count(), before);
     }
 
     void abrokenFileLeavesTheProfilesAlone()
