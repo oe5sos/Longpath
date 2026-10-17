@@ -355,7 +355,12 @@ void TstAcomVerbindung::dieSystemauskunftWirdQuittiertUndBestaetigtDasModell()
 
     // Dann kommt die Auskunft, und sie wird QUITTIERT (0x86) -- anders
     // als die geschobenen Rahmen, die niemand quittiert.
-    QVERIFY2(auskunft.wait(2000), "Die Systemauskunft kam nicht");
+    // QTRY_VERIFY statt wait(): dieselbe Falle wie in
+    // tst_spe_verbindung (siehe dort, 2026-10-17). `wait()` wartet auf
+    // ein WEITERES Signal -- kommt die Auskunft schon INNERHALB von
+    // verbinden() zurueck, wartet es vergeblich. Gemessen: drei von
+    // fuenf Laeufen rot.
+    QTRY_VERIFY_WITH_TIMEOUT(!auskunft.isEmpty(), 2000);
     QTRY_VERIFY_WITH_TIMEOUT(m_amp->quittungen() >= 1, 2000);
 
     QTRY_VERIFY_WITH_TIMEOUT(modell.size() >= 2, 2000);

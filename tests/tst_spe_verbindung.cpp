@@ -258,10 +258,21 @@ void TstSpeVerbindung::derErsteTaktKommtSofort()
     QVERIFY(verbinden());
     QVERIFY(m_verb->isConnected());
 
-    QVERIFY2(zustand.wait(2000),
-             "Nach dem Verbinden kam kein Zustand -- die erste Abfrage wird "
-             "dem Zeitgeber ueberlassen, und der feuert erst nach einem "
-             "vollen Intervall");
+    // QTRY_VERIFY, nicht QSignalSpy::wait() (2026-10-17).
+    //
+    // `wait()` wartet auf ein WEITERES Signal; dass schon eines da ist,
+    // prueft es nicht. Die sofortige Abfrage aus onTransportUp() kommt
+    // aber oft so schnell zurueck, dass `statusUpdated` noch INNERHALB
+    // von verbinden() feuert -- dann wartet wait() auf einen zweiten
+    // Zustand, und der kommt bei 60 s Takt nie.
+    //
+    // Gemessen, 11 Laeufe: zwei gruen, neun rot, auch isoliert. Die
+    // Sonde zeigte in den roten Laeufen abfragen=1, verbunden=1,
+    // antwortet=1 -- es war alles richtig, nur der Spy sah nichts. Mit
+    // `schon-da` daneben war die Korrelation vollstaendig: schon-da=1
+    // genau dann, wenn wait() leer zurueckkam. Kein Zeitproblem: wenn
+    // es ankam, dann in 12-17 ms, sonst nie.
+    QTRY_VERIFY_WITH_TIMEOUT(!zustand.isEmpty(), 2000);
     QCOMPARE(m_amp->abfragen(), 1);
     QCOMPARE(m_verb->lastStatus().id, QStringLiteral("20K"));
     QVERIFY(m_verb->isResponding());
