@@ -154,6 +154,30 @@ endif()
 # Die Wirkung ist auf einem Mac NICHT messbar.  Gemessen wird sie an den
 # df/du-Punkten im CI-Testbau; was dort herauskommt, gehoert in diesen
 # Kommentar.
+# ── Warum add_compile_options und nicht CMAKE_CXX_FLAGS ─────────────
+#
+# Weil die Flagge auf dem anderen Weg NICHT WIRKT. PR #216 hat
+# -gsplit-dwarf schon am 2026-10-10 eingefuehrt, in ci.yml ueber
+# -DCMAKE_CXX_FLAGS_INIT, und dort gemessen: build/tests weiterhin
+# 69 GB. Die Reihenfolge erklaert es (lokal an einem Minimalprojekt mit
+# `ninja -t commands` belegt):
+#
+#   Position  4:  -gsplit-dwarf   <- aus CMAKE_CXX_FLAGS
+#   Position  6:  -O2
+#   Position  7:  -g              <- aus CMAKE_CXX_FLAGS_RELWITHDEBINFO
+#   Position 11:  -gsplit-dwarf   <- aus add_compile_options (hier)
+#
+# Bei clang und gcc gilt die LETZTE Debug-Option. Das -g an Position 7
+# hebt die Flagge an Position 4 wieder auf; die an Position 11 steht
+# dahinter und gewinnt.
+#
+# Die beiden Messungen bestaetigen es unabhaengig: 243 Tests ohne
+# Flagge gaben 65 GB, 262 Tests MIT der Flagge auf Position 4 gaben
+# 69 GB -- beides entspricht denselben 267 MB je Binaerdatei.
+#
+# Wer das hier auf CMAKE_CXX_FLAGS umstellt, dreht die Wirkung also
+# wieder ab, ohne dass etwas rot wird.
+
 option(LONGPATH_SPLIT_DWARF
        "Linux: Debug-Info in .dwo-Dateien statt in jede Binaerdatei" ON)
 
