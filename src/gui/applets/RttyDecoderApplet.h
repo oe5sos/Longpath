@@ -44,6 +44,7 @@ class QComboBox;
 class QSlider;
 class QPlainTextEdit;
 class QPushButton;
+class QLineEdit;
 
 namespace Longpath {
 
@@ -82,6 +83,25 @@ public:
     // Bound from MainWindow on construction and again on every active-slice
     // change (mirrors AudioEngine's other taps -- see RttyDecoder.h).
     void setSlice(SliceModel* slice);
+
+    // ── Senden (2026-10-16) ──────────────────────────────────────────
+    //
+    // Der Dekoder hoerte seit 2026-09-06, und seit PR #257 gibt es mit
+    // RttyTxSource (core/RttyTx.h) auch das Gegenstueck — nur kam man
+    // nicht heran. Das holt das hier nach, Zug um Zug wie bei
+    // Ft8Applet::sendeNachricht(): Text auf Toene legen, Sendeweg auf
+    // die RTTY-Quelle legen, tasten, und nach der Laenge des Textes
+    // alles zurueck.
+    //
+    // Was hier NICHT eingebaut ist, genau wie bei FT8: eine
+    // Folgeschaltung. Kein Rundruf in Schleife, keine Antwort von
+    // selbst. Ein Druck, eine Aussendung.
+    //
+    // Anders als FT8 wird nicht auf ein Fenster gewartet — RTTY hat
+    // keine Fenstergrenzen. Gesendet wird sofort.
+    void sendeText(const QString& text);
+    void abbrechen();
+    bool sendetGerade() const { return m_sendet; }
 
 private slots:
     void onTextDecoded(const QString& text, float confidence);
@@ -124,6 +144,32 @@ private:
     QSlider*     m_sensitivitySlider{nullptr};
     QLabel*      m_sensitivityValue{nullptr};
     QPushButton* m_clearBtn{nullptr};
+
+    // Row 5 -- senden (2026-10-16)
+    QLineEdit*   m_textFeld{nullptr};
+    QPushButton* m_sendBtn{nullptr};
+    QPushButton* m_stopBtn{nullptr};
+    QLabel*      m_sendeStatus{nullptr};
+    class QTimer* m_sendeEndeTimer{nullptr};
+    bool m_sendet{false};
+    // Welcher Mikrofonweg vor dem Senden eingestellt war; -1 heisst
+    // „nicht umgelegt". Ohne das kaeme nach dem Senden nicht das
+    // Mikrofon zurueck, sondern irgendetwas.
+    int  m_quelleVorher{-1};
+
+public:
+    // Fuer den Pruefstand.
+    QLineEdit*   textFeldForTest()  const { return m_textFeld; }
+    QPushButton* sendButtonForTest() const { return m_sendBtn; }
+    QPushButton* stopButtonForTest() const { return m_stopBtn; }
+    QLabel*      sendeStatusForTest() const { return m_sendeStatus; }
+    /// Die Aussendung ist um. Im Betrieb kommt das von einem Zeitgeber
+    /// nach der Laenge des Textes — im Prueflauf waeren das Sekunden
+    /// Warten je Zug.
+    void sendeEndeForTest() { sendeEnde(); }
+
+private:
+    void sendeEnde();
 };
 
 } // namespace Longpath

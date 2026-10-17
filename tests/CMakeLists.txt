@@ -1014,6 +1014,13 @@ longpath_add_test(tst_start_watch)
 longpath_add_test(tst_rtty_decoder)
 longpath_add_test(tst_rtty_decoder_sensitivity)
 longpath_add_test(tst_rtty_decoder_applet)
+# 2026-10-16: RTTY SENDEN im Programm. Der Sender (core/RttyTx.h) war
+# seit PR #257 fertig und gruen — nur fuehrte von der Oberflaeche kein
+# Weg zu ihm. Dieser Lauf prueft die Verdrahtung: Knopf -> Text auf
+# Toene -> Mikrofonweg -> Tasten -> und alles wieder zurueck. Dazu der
+# Fall, der bei FT8 teuer war: sagt der Bandplan nein, darf nichts
+# weiterlaufen.
+longpath_add_test(tst_rtty_senden_gui)
 
 # ── Phase 3O Sub-Phase 11 Task 11a: VaxFirstRunDialog ────────────────────
 longpath_add_test(tst_vax_first_run_dialog)
