@@ -151,9 +151,35 @@ endif()
 # auf macOS erzeugt clang keine .dwo (Mach-O nutzt .dSYM), und auf
 # Windows gilt das Format gar nicht.
 #
-# Die Wirkung ist auf einem Mac NICHT messbar.  Gemessen wird sie an den
-# df/du-Punkten im CI-Testbau; was dort herauskommt, gehoert in diesen
-# Kommentar.
+# Die Wirkung ist auf einem Mac NICHT messbar.  Gemessen wurde sie an den
+# df/du-Punkten im CI-Testbau, am 2026-10-17:
+#
+#   Shard 2/4 (262 Tests), der seit vier Wochen in JEDEM Lauf ohne Log
+#   starb:   Binaerdatei 267 M -> 244 M, build/tests 70 G -> 68 G,
+#            .dwo 2,0 G, Platte frei 32 G (tot) -> 35 G (gruen).
+#   Shard 3/4 (243 Tests): 65 G -> 58 G, 45 G frei.
+#
+# Alle vier Shards gruen, erstmals seit dem 2026-10-15.
+#
+# ABER: die Erwartung dahinter war falsch.  Gerechnet war mit einem
+# Faktor um 9 ("243 x 20 MB statt 65 GB"); gemessen sind es NEUN
+# PROZENT.  Nur 2 GB wanderten in .dwo-Dateien.  Die 244 MB, die
+# bleiben, sind nicht Debug-Information, sondern der duplizierte CODE
+# von LongpathObjs selbst -- jede Testbinaerdatei bindet die ganze
+# OBJECT-Bibliothek statisch ein.
+#
+# Die Marge zwischen tot und gruen betrug damit rund 3 GB.  Das ist
+# kein Abstand: jeder neue Pruefstand kostet 244 MB, und beim naechsten
+# Dutzend ist es wieder soweit.
+#
+# Der Hebel, der die Klasse wirklich schliesst, bleibt offen:
+# LongpathObjs als GETEILTE Bibliothek statt OBJECT-Bibliothek, dann
+# liegt der Code einmal statt 262-mal.  Groesserer Eingriff (Windows
+# braucht dann Symbol-Export), aber der einzige, der nicht nur
+# verschiebt.
+#
+# Und: -j2 im Testbau bleibt unbegruendet.  Der Speicher lag auch in
+# diesem Lauf bei 960 MB von 16 GB.
 # ── Warum add_compile_options und nicht CMAKE_CXX_FLAGS ─────────────
 #
 # Weil die Flagge auf dem anderen Weg NICHT WIRKT. PR #216 hat
