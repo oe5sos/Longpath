@@ -77,6 +77,20 @@ typedef struct _fmd
 	int lim_run;
 	double lim_gain;
 	double lim_pre_gain;
+
+	// --- Longpath-Zusatz, KEIN Thetis-Port -------------------------------
+	// Ein Abgriff auf das demodulierte Basisband, abgenommen direkt nach
+	// der PLL-Schleife -- also VOR De-Emphase, Audiofilter und
+	// CTCSS-Notch. Das ist die einzige Stelle im Empfangsweg, an der ein
+	// CTCSS-Subton unverfaelscht vorliegt: das Audiofilter ist ein
+	// Bandpass ab 0.8 * f_low (mit der Vorgabe f_low = 300 Hz also ab
+	// 240 Hz) und schneidet 46 der 49 Normtoene nach TIA-603-D weg, und
+	// was danach noch durchkommt, entfernt der snotch.
+	// Es ist dieselbe Stelle, aus der fmsq seinen Trigger nimmt
+	// (RXA.c: "pointer to trigger buffer" = rxa[channel].fmd.p->audio).
+	// Gebraucht von Longpaths CTCSS-Tonsquelch (src/core/CtcssDetector).
+	void (*baseband_tap)(void* user, const double* audio, int frames);
+	void* baseband_tap_user;
 } fmd, *FMD;
 
 extern FMD create_fmd ( int run, int size, double* in, double* out, int rate, double deviation, 
@@ -106,5 +120,11 @@ extern void SetRXAFMMPde (int channel, int mp);
 extern void SetRXAFMNCaud (int channel, int nc);
 
 extern void SetRXAFMMPaud (int channel, int mp);
+
+// Longpath-Zusatz (kein Thetis-Port): siehe baseband_tap in struct _fmd.
+// `fn` wird im DSP-Thread aufgerufen, mit dem Basisband als
+// stereo-verschraenktem double-Feld (beide Kanaele traegen denselben Wert)
+// bei a->rate. Mit fn == 0 wird der Abgriff abgeschaltet.
+extern void SetRXAFMBasebandTap (int channel, void (*fn)(void*, const double*, int), void* user);
 
 #endif

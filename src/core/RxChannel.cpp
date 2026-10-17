@@ -1551,15 +1551,228 @@ void RxChannel::setMuted(bool muted)
     }
 
     m_muted.store(muted);
+    applyEffectiveMute();
+}
+
+void RxChannel::applyEffectiveMute()
+{
+    // Stumm ist der Kanal, wenn der Benutzer stumm geschaltet hat ODER
+    // die CTCSS-Tonsperre zu ist. `m_ctcssTonePresent` steht bei
+    // abgeschalteter Tonsperre auf true und faellt dann nicht ins
+    // Gewicht.
+    const bool stumm = m_muted.load() || !m_ctcssTonePresent.load();
 
 #ifdef HAVE_WDSP
-    // Mute → run=0 (panel disabled), unmute → run=1 (panel enabled).
-    // From Thetis Project Files/Source/Console/dsp.cs:393-394 — P/Invoke decl
-    // WDSP: third_party/wdsp/src/patchpanel.c:126
-    SetRXAPanelRun(m_channelId, muted ? 0 : 1);
+    // Engine guard, wie `onModeChanged`: ohne angehaengte Engine ist
+    // dieser Kanal nie durch `OpenChannel` gelaufen, `rxa[].panel.p` ist
+    // dann ein Nullzeiger und `SetRXAPanelRun` greift danach. Das traf
+    // `setMuted` schon vorher -- der bestehende Pruefstand
+    // (`tst_rxchannel_audio_panel`) ruft `setMuted` darum nur mit dem
+    // Vorgabewert auf, der vorher zurueckkehrt ("early return, no WDSP
+    // call"), und umgeht den Absturz statt ihn zu verhindern. Mit diesem
+    // Gate laesst sich die Stummschaltung endlich auch mit echtem
+    // Wertwechsel pruefen.
+    if (m_wdspEngine) {
+        // Mute → run=0 (panel disabled), unmute → run=1 (panel enabled).
+        // From Thetis Project Files/Source/Console/dsp.cs:393-394 — P/Invoke decl
+        // WDSP: third_party/wdsp/src/patchpanel.c:126
+        SetRXAPanelRun(m_channelId, stumm ? 0 : 1);
+    }
 #else
-    Q_UNUSED(muted);
+    Q_UNUSED(stumm);
 #endif
+}
+
+void RxChannel::setCtcssSquelch(bool enabled, double toneHz)
+{
+    // Der Abgriff muss stehen, BEVOR wir ihn einschalten, und abgehaengt
+    // sein, BEVOR der Detektor verschwindet. Dazwischen laeuft der
+    // DSP-Thread.
+    if (!enabled || toneHz <= 0.0) {
+        m_ctcssSquelchEnabled.store(false);
+        applyBasebandTap();          // haengt ab, wenn auch DCS aus ist
+        {
+            const std::lock_guard<std::mutex> halt(m_ctcssMutex);
+            m_ctcssDetector.reset();
+        }
+        // Sperre aus heisst: nichts gesperrt. Sonst bliebe der Kanal
+        // stumm, wenn man die Tonsperre bei fehlendem Ton abschaltet.
+        const bool vorher = m_ctcssTonePresent.exchange(true);
+        applyEffectiveMute();
+        if (!vorher) { emit ctcssTonePresenceChanged(true); }
+        return;
+    }
+
+    {
+        const std::lock_guard<std::mutex> halt(m_ctcssMutex);
+        // Die beiden Sperren schliessen einander aus.
+        m_dcsDetector.reset();
+        if (m_ctcssDetector) {
+            m_ctcssDetector->setToneHz(toneHz);
+            m_ctcssDetector->reset();
+        } else {
+            // 48 kHz: die Rate des RX-Weges, siehe kWdspRxOutputRate.
+            m_ctcssDetector = std::make_unique<CtcssDetector>(48000.0, toneHz);
+        }
+    }
+    m_dcsSquelchEnabled.store(false);
+
+    // Beim Einschalten gilt der Ton als nicht anliegend -- der Detektor
+    // braucht sein erstes Fenster (250 ms). Zu beginnen heisst also:
+    // Sperre zu, bis der Ton da ist. Das ist die sichere Richtung; die
+    // andere liesse eine fremde Station eine Viertelsekunde durch.
+    const bool vorher = m_ctcssTonePresent.exchange(false);
+    m_ctcssSquelchEnabled.store(true);
+    applyEffectiveMute();
+    if (vorher) { emit ctcssTonePresenceChanged(false); }
+
+    // Zuletzt anhaengen, wenn alles andere steht: ab hier kann der
+    // DSP-Thread hereinkommen.
+    applyBasebandTap();
+}
+
+void RxChannel::applyBasebandTap()
+{
+    // Beide Tonsperren teilen sich denselben Abgriff: er haengt, solange
+    // mindestens eine laeuft.
+    const bool gebraucht = m_ctcssSquelchEnabled.load() || m_dcsSquelchEnabled.load();
+#ifdef HAVE_WDSP
+    // Engine guard wie in applyEffectiveMute: ohne OpenChannel ist
+    // rxa[].fmd.p ein Nullzeiger.
+    if (!m_wdspEngine) {
+        return;
+    }
+    if (gebraucht) {
+        SetRXAFMBasebandTap(m_channelId, &RxChannel::ctcssBasebandTapThunk, this);
+    } else {
+        // SetRXAFMBasebandTap haelt ch[].csDSP und deckt damit den
+        // Blockdurchlauf mit ab -- nach der Rueckkehr kann der Abnehmer
+        // nicht mehr laufen, die Detektoren duerfen also weg.
+        SetRXAFMBasebandTap(m_channelId, nullptr, nullptr);
+    }
+#else
+    Q_UNUSED(gebraucht);
+#endif
+}
+
+void RxChannel::setDcsSquelch(bool enabled, int oktal, bool inverted)
+{
+    if (!enabled || oktal <= 0) {
+        m_dcsSquelchEnabled.store(false);
+        applyBasebandTap();
+        {
+            const std::lock_guard<std::mutex> halt(m_ctcssMutex);
+            m_dcsDetector.reset();
+        }
+        const bool vorher = m_ctcssTonePresent.exchange(true);
+        applyEffectiveMute();
+        if (!vorher) { emit ctcssTonePresenceChanged(true); }
+        return;
+    }
+
+    const DcsPolarity pol = inverted ? DcsPolarity::Inverted : DcsPolarity::Normal;
+    {
+        const std::lock_guard<std::mutex> halt(m_ctcssMutex);
+        m_ctcssDetector.reset();          // die beiden schliessen einander aus
+        if (m_dcsDetector) {
+            m_dcsDetector->setCode(oktal, pol);
+            m_dcsDetector->reset();
+        } else {
+            m_dcsDetector = std::make_unique<DcsDetector>(48000.0, oktal, pol);
+        }
+    }
+    m_ctcssSquelchEnabled.store(false);
+
+    // Wie bei CTCSS: zu beginnen heisst Sperre ZU. Bei DCS dauert das
+    // laenger -- zwei Woerter sind 342 ms -- und genau darum darf sie
+    // nicht offen anfangen.
+    const bool vorher = m_ctcssTonePresent.exchange(false);
+    m_dcsSquelchEnabled.store(true);
+    applyEffectiveMute();
+    if (vorher) { emit ctcssTonePresenceChanged(false); }
+
+    applyBasebandTap();
+}
+
+int RxChannel::dcsLastAgreement() const
+{
+    const std::lock_guard<std::mutex> halt(m_ctcssMutex);
+    return m_dcsDetector ? m_dcsDetector->lastAgreement() : 0;
+}
+
+void RxChannel::feedDcsBasebandForTest(const double* audio, int frames)
+{
+    onCtcssBaseband(audio, frames);
+}
+
+double RxChannel::ctcssLastRatio() const
+{
+    const std::lock_guard<std::mutex> halt(m_ctcssMutex);
+    return m_ctcssDetector ? m_ctcssDetector->lastRatio() : 0.0;
+}
+
+void RxChannel::ctcssBasebandTapThunk(void* user, const double* audio, int frames)
+{
+    if (auto* self = static_cast<RxChannel*>(user)) {
+        self->onCtcssBaseband(audio, frames);
+    }
+}
+
+void RxChannel::feedCtcssBasebandForTest(const double* audio, int frames)
+{
+    onCtcssBaseband(audio, frames);
+}
+
+void RxChannel::onCtcssBaseband(const double* audio, int frames)
+{
+    // DSP-Thread. Kurz bleiben, nichts belegen, nichts blockieren.
+    if (!audio || frames <= 0) {
+        return;
+    }
+    const bool ctcssLaeuft = m_ctcssSquelchEnabled.load();
+    const bool dcsLaeuft   = m_dcsSquelchEnabled.load();
+    if (!ctcssLaeuft && !dcsLaeuft) {
+        return;
+    }
+
+    // WDSP liefert stereo-verschraenkt, beide Kanaele mit demselben Wert
+    // (fmd.c: audio[2*i+1] = audio[2*i+0]). Der Detektor will einkanalig
+    // und float. Der Puffer waechst hoechstens einmal.
+    if (static_cast<int>(m_ctcssScratch.size()) < frames) {
+        m_ctcssScratch.resize(static_cast<size_t>(frames));
+    }
+    for (int i = 0; i < frames; ++i) {
+        m_ctcssScratch[static_cast<size_t>(i)] = static_cast<float>(audio[2 * i]);
+    }
+
+    bool wechsel = false;
+    bool jetzt   = false;
+    {
+        // try_lock, nicht lock: der DSP-Thread darf hier nicht warten.
+        // Bekommt er das Schloss nicht, laeuft gerade setCtcssSquelch --
+        // dann ist dieser Block eben verloren, und das naechste Fenster
+        // entscheidet. Besser ein ausgelassener Block als eine Pause im
+        // Audioweg.
+        std::unique_lock<std::mutex> halt(m_ctcssMutex, std::try_to_lock);
+        if (!halt.owns_lock()) {
+            return;
+        }
+        if (ctcssLaeuft && m_ctcssDetector) {
+            wechsel = m_ctcssDetector->process(m_ctcssScratch.data(), frames);
+            jetzt   = m_ctcssDetector->detected();
+        } else if (dcsLaeuft && m_dcsDetector) {
+            wechsel = m_dcsDetector->process(m_ctcssScratch.data(), frames);
+            jetzt   = m_dcsDetector->detected();
+        } else {
+            return;
+        }
+    }
+
+    if (wechsel) {
+        m_ctcssTonePresent.store(jetzt);
+        applyEffectiveMute();
+        emit ctcssTonePresenceChanged(jetzt);
+    }
 }
 
 void RxChannel::setAfGain(double gain)

@@ -40,6 +40,60 @@
     </message>
 </context>
 <context>
+    <name>Longpath::AcomApplet</name>
+    <message>
+        <location filename="../src/gui/applets/AcomApplet.cpp" line="102" />
+        <source>Output power</source>
+        <translation>Ausgangsleistung</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/AcomApplet.cpp" line="109" />
+        <source>Reflected power</source>
+        <translation>Rücklaufleistung</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/AcomApplet.cpp" line="125" />
+        <source>Standing wave ratio</source>
+        <translation>Stehwellenverhältnis</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/AcomApplet.cpp" line="141" />
+        <location filename="../src/gui/applets/AcomApplet.cpp" line="414" />
+        <source>UPTIME  —</source>
+        <translation>BETRIEB  —</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/AcomApplet.cpp" line="145" />
+        <source>Total run time of the amplifier -- not reset when it is switched off</source>
+        <translation>Gesamte Betriebszeit des Verstärkers — wird beim Ausschalten nicht zurückgesetzt</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/AcomApplet.cpp" line="181" />
+        <source>CLEAR FAULT</source>
+        <translation>FEHLER LÖSCHEN</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/AcomApplet.cpp" line="182" />
+        <source>Clear pending soft faults</source>
+        <translation>Anliegende weiche Fehler löschen</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/AcomApplet.cpp" line="189" />
+        <source>OFF</source>
+        <translation>AUS</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/AcomApplet.cpp" line="190" />
+        <source>Switch the amplifier off</source>
+        <translation>Verstärker ausschalten</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/AcomApplet.cpp" line="296" />
+        <source>UPTIME  %1</source>
+        <translation>BETRIEB  %1</translation>
+    </message>
+</context>
+<context>
     <name>Longpath::AddWidgetButton</name>
     <message>
         <location filename="../src/gui/widgets/WidgetPicker.cpp" line="403" />
@@ -399,6 +453,19 @@ Please ensure you understand the implications of including the BPFs when transmi
         <location filename="../src/gui/applets/AppletPanelWidget.cpp" line="608" />
         <source>Detach as a window</source>
         <translation>Als Fenster ablösen</translation>
+    </message>
+</context>
+<context>
+    <name>Longpath::AppletWidget</name>
+    <message>
+        <location filename="../src/gui/applets/AppletWidget.cpp" line="204" />
+        <source>Receiver</source>
+        <translation>Empfänger</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/AppletWidget.cpp" line="242" />
+        <source>Pinned keeps this window on its receiver, even while work happens elsewhere.</source>
+        <translation>Fest gewählt bleibt dieses Fenster an seinem Empfänger, auch wenn woanders gearbeitet wird.</translation>
     </message>
 </context>
 <context>
@@ -1851,6 +1918,19 @@ Higher = smoother but slower to react to changing noise.</source>
     </message>
 </context>
 <context>
+    <name>Longpath::FmOptContainer</name>
+    <message>
+        <location filename="../src/gui/widgets/VfoModeContainers.cpp" line="449" />
+        <source>The %1 is present</source>
+        <translation>Der %1 liegt an</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/widgets/VfoModeContainers.cpp" line="450" />
+        <source>Waiting for the %1 -- it is missing, the channel is muted</source>
+        <translation>Warten auf den %1 -- er fehlt, der Kanal ist stumm</translation>
+    </message>
+</context>
+<context>
     <name>Longpath::FourO3APage</name>
     <message>
         <location filename="../src/gui/setup/FourO3APage.cpp" line="62" />
@@ -3091,6 +3171,64 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
     </message>
 </context>
 <context>
+    <name>Longpath::Kpa500Applet</name>
+    <message>
+        <location filename="../src/gui/applets/Kpa500Applet.cpp" line="101" />
+        <source>Output power</source>
+        <translation>Ausgangsleistung</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/Kpa500Applet.cpp" line="114" />
+        <source>Standing wave ratio</source>
+        <translation>Stehwellenverhältnis</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/Kpa500Applet.cpp" line="129" />
+        <source>Heatsink temperature</source>
+        <translation>Kühlkörpertemperatur</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/Kpa500Applet.cpp" line="178" />
+        <source>Switch the amplifier on. Elecraft's boot loader command 'P' -- only useful while the amplifier is off but still reachable on the wire.</source>
+        <translation>Verstärker einschalten. Elecrafts Befehl 'P' des Boot-Laders — nur sinnvoll, solange der Verstärker aus, aber am Draht erreichbar ist.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/Kpa500Applet.cpp" line="184" />
+        <source>Toggle between STANDBY and OPERATE</source>
+        <translation>Zwischen STANDBY und OPERATE umschalten</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/Kpa500Applet.cpp" line="188" />
+        <source>Switch the amplifier off. It stays reachable on the wire afterwards, and ON brings it back.</source>
+        <translation>Verstärker ausschalten. Danach bleibt er am Draht erreichbar und lässt sich mit ON wieder einschalten.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/Kpa500Applet.cpp" line="196" />
+        <source>CLEAR FAULT</source>
+        <translation>FEHLER LÖSCHEN</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/Kpa500Applet.cpp" line="197" />
+        <source>Clear the pending fault (^FLC;)</source>
+        <translation>Den anliegenden Fehler löschen (^FLC;)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/Kpa500Applet.cpp" line="279" />
+        <source>FAULT %1 -- its meaning is not in Elecraft's documentation; the unit shows it on the front panel.</source>
+        <translation>FEHLER %1 — die Bedeutung steht nicht in Elecrafts Beschreibung; das Gerät zeigt sie an der Front.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/Kpa500Applet.cpp" line="328" />
+        <source>OFF · on the wire</source>
+        <translation>AUS · am Draht</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/Kpa500Applet.cpp" line="334" />
+        <source>no reply</source>
+        <translation>keine Antwort</translation>
+    </message>
+</context>
+<context>
     <name>Longpath::LanScanDialog</name>
     <message>
         <location filename="../src/gui/LanScanDialog.cpp" line="30" />
@@ -3776,6 +3914,30 @@ Audio arrives as soon as the receiver is running in ExpertSDR2.</source>
         <location filename="../src/gui/MainWindow_SideArea.cpp" line="432" />
         <source>Everything is here already</source>
         <translation>Alles liegt schon hier</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/MainWindow.cpp" line="7557" />
+        <source>Warning: %1</source>
+        <translation>Warnung: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/MainWindow.cpp" line="7720" />
+        <source>Power class %1 (%2). Rated %3 W, scale end %4 W.
+
+The manufacturer's documentation lists only a type code, so the class is inferred from the observed power when the unit does not confirm it.</source>
+        <translation>Leistungsklasse %1 (%2). Nennleistung %3 W, Skalenende %4 W.
+
+Die Beschreibung des Herstellers dokumentiert nur einen Typcode, darum wird die Klasse aus der beobachteten Leistung geschlossen, wenn das Gerät sie nicht bestätigt.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/MainWindow.cpp" line="10054" />
+        <source>&amp;Display size</source>
+        <translation>&amp;Darstellungsgröße</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/MainWindow.cpp" line="10068" />
+        <source>Display size</source>
+        <translation>Darstellungsgröße</translation>
     </message>
 </context>
 <context>
@@ -6191,6 +6353,74 @@ All custom band/pin mappings will be cleared.</source>
         <location filename="../src/gui/SideAreaWindow.cpp" line="276" />
         <source>Take it out of the side area</source>
         <translation>Aus dem Seitenbereich nehmen</translation>
+    </message>
+</context>
+<context>
+    <name>Longpath::SpeApplet</name>
+    <message>
+        <location filename="../src/gui/applets/SpeApplet.cpp" line="151" />
+        <source>Output power</source>
+        <translation>Ausgangsleistung</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/SpeApplet.cpp" line="171" />
+        <source>SWR at the antenna</source>
+        <translation>Stehwelle an der Antenne</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/SpeApplet.cpp" line="187" />
+        <source>Heatsink temperature, in whichever unit the amplifier's own display is set to</source>
+        <translation>Kühlkörpertemperatur, in der Einheit, auf die das Display des Verstärkers eingestellt ist</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/SpeApplet.cpp" line="238" />
+        <source>Switch the amplifier on -- a pulse on the control lines. Over the network this needs a ser2net port with rfc2217; see the note in the settings.</source>
+        <translation>Verstärker einschalten — ein Impuls auf den Steuerleitungen. Über Netz braucht das einen ser2net-Anschluss mit rfc2217; siehe den Hinweis in den Einstellungen.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/SpeApplet.cpp" line="247" />
+        <source>Toggle between STANDBY and OPERATE (OPERATE key on the unit)</source>
+        <translation>Zwischen STANDBY und OPERATE umschalten (OPERATE-Taste am Gerät)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/SpeApplet.cpp" line="254" />
+        <source>Power level -- one press steps LOW / MID / HIGH</source>
+        <translation>Leistungsstufe — ein Druck schaltet LOW / MID / HIGH weiter</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/SpeApplet.cpp" line="260" />
+        <source>Tune the ATU (TUNE key on the unit). TRANSMITS: tuning runs with drive.</source>
+        <translation>Anpassgerät abstimmen (TUNE-Taste am Gerät). SENDET: die Abstimmung läuft mit Vorlauf.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/SpeApplet.cpp" line="264" />
+        <source>Switch the amplifier off. ON brings it back up (over the network this needs a ser2net port with rfc2217).</source>
+        <translation>Verstärker ausschalten. Mit ON wieder hoch (über Netz braucht das einen ser2net-Anschluss mit rfc2217).</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/SpeApplet.cpp" line="282" />
+        <source>Step the transmit antenna for the current band</source>
+        <translation>Sendeantenne für das aktuelle Band weiterschalten</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/SpeApplet.cpp" line="291" />
+        <source>Lower the requested drive power</source>
+        <translation>Angeforderte Vorlaufleistung senken</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/SpeApplet.cpp" line="292" />
+        <source>Lower the drive power the amplifier asks of the radio (arrow key on the unit)</source>
+        <translation>Die Vorlaufleistung senken, die der Verstärker vom Funkgerät anfordert (Pfeiltaste am Gerät)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/SpeApplet.cpp" line="297" />
+        <source>Raise the requested drive power</source>
+        <translation>Angeforderte Vorlaufleistung erhöhen</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/SpeApplet.cpp" line="298" />
+        <source>Raise the drive power the amplifier asks of the radio (arrow key on the unit)</source>
+        <translation>Die Vorlaufleistung erhöhen, die der Verstärker vom Funkgerät anfordert (Pfeiltaste am Gerät)</translation>
     </message>
 </context>
 <context>

@@ -535,6 +535,17 @@ set(CORE_SOURCES
     src/core/SpotAuswahl.cpp
     src/core/SettingsBackup.cpp
     src/core/RxProfileManager.cpp
+    src/core/CtcssDetector.cpp
+    src/core/DcsCode.cpp
+    src/core/DcsDetector.cpp
+    src/core/UiScale.cpp
+    src/core/StartWatch.cpp
+    src/core/SpeProtocol.cpp
+    src/core/SpeConnection.cpp
+    src/core/Kpa500Protocol.cpp
+    src/core/Kpa500Connection.cpp
+    src/core/AcomProtocol.cpp
+    src/core/AcomConnection.cpp
     src/core/CwDecoder.cpp
     src/core/Ft8Decoder.cpp
     src/core/Ft8Ablauf.cpp
@@ -1074,6 +1085,9 @@ set(GUI_SOURCES
     src/gui/setup/PgxlInterlockPage.cpp
     src/gui/setup/FourO3APage.cpp
     src/gui/setup/RfKitPage.cpp
+    src/gui/setup/SpePage.cpp
+    src/gui/setup/Kpa500Page.cpp
+    src/gui/setup/AcomPage.cpp
     src/gui/setup/TciLogWindow.cpp
     src/gui/setup/KeyboardSetupPages.cpp
     src/gui/setup/DiagnosticsSetupPages.cpp
@@ -1203,6 +1217,9 @@ set(GUI_SOURCES
     src/gui/applets/TunerApplet.cpp
     src/gui/applets/AmpApplet.cpp
     src/gui/applets/Rf2ksApplet.cpp
+    src/gui/applets/SpeApplet.cpp
+    src/gui/applets/Kpa500Applet.cpp
+    src/gui/applets/AcomApplet.cpp
     src/gui/applets/TciApplet.cpp
     src/gui/applets/ClientChainApplet.cpp
 )

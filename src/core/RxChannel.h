@@ -210,12 +210,17 @@ warren@wpratt.com
 #include "MacNRFilter.h"
 #endif
 
+#include "core/CtcssDetector.h"
+#include "core/DcsDetector.h"
+
 #include <QList>
 #include <QObject>
 
 #include <atomic>
 #include <cstring>
 #include <memory>
+#include <mutex>
+#include <vector>
 
 namespace Longpath {
 
@@ -651,6 +656,48 @@ public:
     bool muted() const { return m_muted.load(); }
     void setMuted(bool muted);
 
+    // --- CTCSS-Tonsquelch (Longpath-eigen, kein Thetis-Port) ------------
+    //
+    // Thetis hat das nicht: `wdsp/fmd.c` filtert den Subton mit `snotch`
+    // nur aus dem Hoerbaren heraus, erkannt wird er nie. Entsprechend
+    // bewirkten `SliceModel::fmCtcssMode` 2 ("Decode") und 3
+    // ("Encode+Decode") empfangsseitig bis jetzt nichts.
+    //
+    // Eingeschaltet haengt sich der Kanal mit `SetRXAFMBasebandTap` an
+    // das demodulierte Basisband VOR De-Emphase und Audiofilter -- die
+    // einzige Stelle, an der der Subton unverfaelscht vorliegt (das
+    // Audiofilter ist ein Bandpass ab 240 Hz und schneidet 46 der 49
+    // Normtoene weg). `CtcssDetector` entscheidet, und das Ergebnis
+    // schliesst oder oeffnet den Audioweg.
+    //
+    // Die Sperre hat einen EIGENEN Weg zum Audiopanel und fasst
+    // `m_muted` nicht an: `setMuted` ist Martins Stummschalter, und ein
+    // Tonsquelch, der ihn mitbenutzt, wuerde ihn ueberschreiben und
+    // `muted()` falsch anzeigen lassen. Stumm ist der Kanal, wenn der
+    // Benutzer stumm geschaltet hat ODER die Tonsperre zu ist.
+    void setCtcssSquelch(bool enabled, double toneHz);
+
+    /// Dasselbe fuer DCS: `oktal` ist der Code wie im Geraetemenue
+    /// ("023"), `inverted` die Polaritaet. CTCSS- und DCS-Sperre
+    /// schliessen einander aus -- die eine einzuschalten schaltet die
+    /// andere ab, denn sie teilen sich denselben Basisband-Abgriff und
+    /// denselben Weg zum Audiopanel.
+    void setDcsSquelch(bool enabled, int oktal, bool inverted);
+    bool dcsSquelchEnabled() const { return m_dcsSquelchEnabled.load(); }
+    /// Die beste Uebereinstimmung im letzten Wortfenster, 0..23.
+    int  dcsLastAgreement() const;
+    /// Nur fuer den Pruefstand, wie feedCtcssBasebandForTest.
+    void feedDcsBasebandForTest(const double* audio, int frames);
+    bool ctcssSquelchEnabled() const { return m_ctcssSquelchEnabled.load(); }
+    /// Liegt der eingestellte Subton gerade an? Bei abgeschalteter
+    /// Tonsperre immer true -- dann sperrt sie nichts.
+    bool ctcssTonePresent() const { return m_ctcssTonePresent.load(); }
+    /// Das zuletzt gemessene Verhaeltnis, fuer Anzeige und Pruefstand.
+    double ctcssLastRatio() const;
+    /// Nur fuer den Pruefstand: einen Block Basisband einspeisen, wie es
+    /// der WDSP-Abgriff im Betrieb tut (stereo-verschraenkt).
+    void feedCtcssBasebandForTest(const double* audio, int frames);
+
     // AF Gain: 0.0..1.0 linear, fed straight to the WDSP RX audio panel.
     // wdsp/rxa.c:538 [v2.10.3.14] initializes panel.gain1 = 4.0 (+12 dB),
     // so the host MUST call this to bring the panel down to a sane unity
@@ -947,6 +994,10 @@ public:
     qint64 onModeChanged(DSPMode newMode);
 
 signals:
+    /// Der Subton kam oder ging. Wird aus dem DSP-Thread ausgeloest --
+    /// Empfaenger muessen das beachten (Qt::QueuedConnection).
+    void ctcssTonePresenceChanged(bool present);
+
     void modeChanged(Longpath::DSPMode mode);
     void agcModeChanged(Longpath::AGCMode mode);
     void activeChanged(bool active);
@@ -1031,6 +1082,29 @@ private:
     // muted: audio panel mute — off by default (panel runs)
     // From Thetis Project Files/Source/Console/dsp.cs:393-394
     std::atomic<bool> m_muted{false};
+
+    // --- CTCSS-Tonsquelch ---
+    std::atomic<bool> m_ctcssSquelchEnabled{false};
+    std::atomic<bool> m_ctcssTonePresent{true};   ///< aus = nichts gesperrt
+    /// Der Detektor wird nur aus dem DSP-Thread angefasst, solange der
+    /// Abgriff haengt; `m_ctcssMutex` deckt das Anlegen und Verwerfen ab.
+    std::unique_ptr<CtcssDetector> m_ctcssDetector;
+    std::atomic<bool> m_dcsSquelchEnabled{false};
+    std::unique_ptr<DcsDetector> m_dcsDetector;
+    mutable std::mutex m_ctcssMutex;
+    /// Der Abgriff liefert double und stereo-verschraenkt, der Detektor
+    /// will float und einkanalig. Dieser Puffer liegt dauerhaft hier,
+    /// damit im DSP-Thread nichts belegt wird.
+    std::vector<float> m_ctcssScratch;
+
+    /// Setzt das Audiopanel nach `m_muted` UND `m_ctcssTonePresent`.
+    void applyEffectiveMute();
+    /// Der Weg, den WDSP im DSP-Thread aufruft.
+    static void ctcssBasebandTapThunk(void* user, const double* audio, int frames);
+    void onCtcssBaseband(const double* audio, int frames);
+    /// Haengt den WDSP-Abgriff an oder ab, je nachdem ob eine der beiden
+    /// Tonsperren laeuft. Beide teilen sich denselben Abgriff.
+    void applyBasebandTap();
     // afGain: 0.0..1.0 linear, mirrors Thetis radio.cs:1078 rx_output_gain
     // [v2.10.3.14] (default 1.0 = unity panel gain). The WDSP RX panel
     // initializes its internal gain1 to 4.0 in rxa.c:538, so setActive()
