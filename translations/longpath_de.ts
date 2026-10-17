@@ -1004,6 +1004,67 @@ Also disables the Freq Cal Start button (cannot auto-cal with 10 MHz ref).</sour
     </message>
 </context>
 <context>
+    <name>Longpath::CatApplet</name>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="266" />
+        <source>No CAT server available</source>
+        <translation>Kein CAT-Server vorhanden</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="271" />
+        <source>CAT over TCP on 127.0.0.1:%1..%2 (four channels)</source>
+        <translation>CAT über TCP auf 127.0.0.1:%1..%2 (vier Kanäle)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="327" />
+        <source>This platform has no pseudo-terminals. WSJT-X, fldigi and hamlib can take the TCP route instead (switch above).</source>
+        <translation>Pseudoterminals gibt es auf dieser Plattform nicht. WSJT-X, fldigi und hamlib können stattdessen den TCP-Weg nehmen (Schalter darüber).</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="330" />
+        <source>No PTY server available</source>
+        <translation>Kein PTY-Server vorhanden</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="335" />
+        <source>CAT as a serial port: four pseudo-terminals.
+Enter the stable link %1 .. %2 -- that one stays the same across restarts.
+The device path below it (/dev/tty...) changes on every start.</source>
+        <translation>CAT als serielle Schnittstelle: vier Pseudoterminals.
+Einzutragen ist die feste Verknüpfung %1 .. %2 -- die bleibt über Neustarts gleich.
+Der Gerätepfad darunter (/dev/tty...) wechselt bei jedem Start.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="404" />
+        <location filename="../src/gui/applets/CatApplet.cpp" line="479" />
+        <source>Channel %1 is off</source>
+        <translation>Kanal %1 ist aus</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="409" />
+        <source>Channel %1: %2</source>
+        <translation>Kanal %1: %2</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="420" />
+        <source>Channel %1
+Device right now: %2
+Enter this one: %3
+
+The device path changes on every start of Longpath. In WSJT-X, fldigi or the logbook enter the STABLE line -- it always points at the current device.</source>
+        <translation>Kanal %1
+Gerät jetzt: %2
+Fest eintragen: %3
+
+Der Gerätepfad wechselt bei jedem Start von Longpath. In WSJT-X, fldigi oder im Logbuch die FESTE Zeile eintragen -- die zeigt immer auf das aktuelle Gerät.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="477" />
+        <source>Channel %1 listening on port %2, %3 connection(s)</source>
+        <translation>Kanal %1 horcht auf Port %2, %3 Verbindung(en)</translation>
+    </message>
+</context>
+<context>
     <name>Longpath::CatTciServerPage</name>
     <message>
         <location filename="../src/gui/setup/CatNetworkSetupPages.cpp" line="149" />

@@ -1,3 +1,11 @@
+// no-port-check: Die drei Verweise auf RXA.c in dieser Datei meinen
+// WDSP (TAPR), nicht Thetis -- third_party/wdsp/src/RXA.c:260/261/673,
+// die Vorgabekurve default_G und der eqp-Einstiegspunkt. Der Pruefer
+// erkennt den Dateinamen, nicht den Baum: RXA.c steht in Thetis'
+// mitgeliefertem wdsp-Ordner genauso. Eine Zeile in
+// THETIS-PROVENANCE.md waere hier falsch und wuerde die Spur
+// verfaelschen; WDSP hat seine eigene Herkunft und seinen eigenen
+// Pruefer (audit-wdsp-headers.py, gruen).
 // src/gui/applets/EqApplet.cpp
 //
 // Layout from AetherSDR EqApplet.cpp (ten9876/AetherSDR).
@@ -37,8 +45,14 @@
 #include <QSlider>
 #include <QComboBox>
 #include <QLabel>
+#include "models/RadioModel.h"
+#include "models/SliceModel.h"
+#include "models/TransmitModel.h"
+
 #include <QPainter>
 #include <QPen>
+#include <QSignalBlocker>
+#include <algorithm>
 #include <cmath>
 
 namespace Longpath {
@@ -110,6 +124,30 @@ static constexpr const char* kBandLabels[kEqBandCount] = {
     "32", "63", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"
 };
 
+// Die Vorwahlen, 2026-10-11. Nur zwei, und beide sind belegt:
+//
+//   "Flach"  — alles 0 dB. WDSPs eigene Vorgabe beim Anlegen
+//              (third_party/wdsp/src/RXA.c:261 default_G, und TXA.c:113
+//              auf der Sendeseite dasselbe).
+//   "Sprache"— die Kurve, die in WDSPs Quelltext direkt ueber der flachen
+//              steht, dort auskommentiert (RXA.c:260):
+//                //double default_G[11] = {0.0, -12.0, -12.0, -12.0, -1.0,
+//                //                        +1.0, +4.0, +9.0, +12.0, -10.0, -10.0};
+//              Tiefen weg, 1-8 kHz angehoben, die obersten zwei gedaempft.
+//
+// "Music" stand hier bis heute als dritter Eintrag und ist entfernt: es gab
+// dafuer keine Quelle -- weder Thetis (eqform.cs kennt ueberhaupt keine
+// Vorwahlen) noch AetherSDR (EqApplet.cpp:277 hat nur die Schieber). Eine
+// Vorwahl, deren Werte niemand nachrechnen kann, ist weniger wert als keine.
+// Eigene DSP-Kurven zu erfinden verbietet CLAUDE.md ausdruecklich.
+static constexpr std::array<int, 11> kKurveFlach{
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+static constexpr std::array<int, 11> kKurveSprache{
+    {0, -12, -12, -12, -1, 1, 4, 9, 12, -10, -10}};
+
+// Reihenfolge der Combo-Eintraege.
+enum class Vorwahl : int { Flach = 0, Sprache = 1, Eigen = 2 };
+
 
 // ── EqApplet ──────────────────────────────────────────────────────────────────
 
@@ -117,6 +155,7 @@ EqApplet::EqApplet(RadioModel* model, QWidget* parent)
     : AppletWidget(model, parent)
 {
     buildUI();
+    wireControls();
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 }
 
@@ -146,13 +185,11 @@ void EqApplet::buildUI()
         m_onBtn->setStyleSheet(kBtnBase + kGreenActive);
         m_onBtn->setToolTip(QStringLiteral("Enable equalizer"));
         row->addWidget(m_onBtn);
-        NyiOverlay::markNyi(m_onBtn, QStringLiteral("Phase 3I-3"));
 
         // Control 4: Reset — 22×22, paints 3/4-circle undo icon (pen #c8d8e8, 1.5px)
         auto* resetBtn = new ResetButton(this);
         m_resetBtn = resetBtn;
         row->addWidget(m_resetBtn);
-        NyiOverlay::markNyi(m_resetBtn, QStringLiteral("Phase 3I-3"));
 
         // Control 2: RX — blue checkable 36×22
         m_rxBtn = new QPushButton(QStringLiteral("RX"), this);
@@ -161,7 +198,6 @@ void EqApplet::buildUI()
         m_rxBtn->setStyleSheet(kBtnBase + kBlueActive);
         m_rxBtn->setToolTip(QStringLiteral("Show receive equalizer bands"));
         row->addWidget(m_rxBtn);
-        NyiOverlay::markNyi(m_rxBtn, QStringLiteral("Phase 3I-3"));
 
         // Control 3: TX — blue checkable 36×22, starts checked
         m_txBtn = new QPushButton(QStringLiteral("TX"), this);
@@ -171,7 +207,6 @@ void EqApplet::buildUI()
         m_txBtn->setStyleSheet(kBtnBase + kBlueActive);
         m_txBtn->setToolTip(QStringLiteral("Show transmit equalizer bands"));
         row->addWidget(m_txBtn);
-        NyiOverlay::markNyi(m_txBtn, QStringLiteral("Phase 3I-3"));
 
         row->addStretch();
 
@@ -264,7 +299,6 @@ void EqApplet::buildUI()
                     QString::fromLatin1(kBandLabels[i])));
             m_sliders[i] = slider;
             col->addWidget(slider, 0, Qt::AlignHCenter);
-            NyiOverlay::markNyi(slider, QStringLiteral("Phase 3I-3"));
 
             // Value label under each slider (#c8d8e8, 9px)
             auto* valLbl = new QLabel(QStringLiteral("0"), this);
@@ -331,22 +365,218 @@ void EqApplet::buildUI()
 
         // Control 17: Preset combo — Flat / Voice / Music / Custom
         m_presetCombo = new QComboBox(this);
-        m_presetCombo->addItem(QStringLiteral("Flat"));
-        m_presetCombo->addItem(QStringLiteral("Voice"));
-        m_presetCombo->addItem(QStringLiteral("Music"));
-        m_presetCombo->addItem(QStringLiteral("Custom"));
+        // Reihenfolge = enum Vorwahl. "Music" ist weg, siehe die Notiz bei
+        // kKurveFlach -- es gab keine Quelle dafuer.
+        m_presetCombo->addItem(QStringLiteral("Flach"));
+        m_presetCombo->addItem(QStringLiteral("Sprache"));
+        m_presetCombo->addItem(QStringLiteral("Eigen"));
         m_presetCombo->setToolTip(QStringLiteral("Equalizer preset"));
         applyComboStyle(m_presetCombo);
         row->addWidget(m_presetCombo, 1);
-        NyiOverlay::markNyi(m_presetCombo, QStringLiteral("Phase 3I-3"));
 
         vbox->addLayout(row);
     }
 }
 
+// ── Verdrahtung (2026-10-11) ─────────────────────────────────────────────────
+//
+// Dieses Feld stand seit der Skelettphase (3-UI) vollstaendig da und tat
+// nichts: zehn Schieber, ON, Reset, RX/TX und eine Vorwahl, alle sechs mit
+// NyiOverlay markiert. Beide Haelften gehen jetzt dorthin, wo die Kurve
+// wirklich liegt:
+//
+//   RX -> SliceModel::rxEq* -> RadioModel -> RxChannel::setRxEqGraph10
+//         (WDSP eqp, RXA.c:673 -- neu am 2026-10-11, Longpath hatte den
+//          Empfangs-Equalizer nicht)
+//   TX -> TransmitModel::txEq* -> TxChannel::setTxEqGraph10
+//         (schon seit 3M-3a-i vorhanden; der grosse Editor dazu ist
+//          TxEqDialog, dieses Feld ist die Schnellbedienung davor)
+//
+// Die Schieber gehen -10..+10, die DSP-Grenzen sind -12..+15 (Thetis
+// eqform.cs:1871-1872 tbRXEQ1, :1946-1947 tbRXEQPreamp [v2.10.3.15]). Der
+// Bereich bleibt, wie die Vorlage ihn hatte (AetherSDR EqApplet.cpp:277) --
+// ihn zu weiten ist eine Sache der Gestaltung und gehoert dem Betreiber.
+// Die Modelle klammern selbst, es kann also nichts Falsches hinausgehen.
+
+void EqApplet::wireControls()
+{
+    if (!m_model) { return; }
+
+    // ── Seitenwahl RX / TX, gegenseitig ausschliessend ───────────────────────
+    connect(m_rxBtn, &QPushButton::clicked, this, [this]() {
+        setSeite(Seite::Empfang);
+    });
+    connect(m_txBtn, &QPushButton::clicked, this, [this]() {
+        setSeite(Seite::Senden);
+    });
+
+    // ── ON ───────────────────────────────────────────────────────────────────
+    connect(m_onBtn, &QPushButton::clicked, this, [this](bool on) {
+        if (m_updatingFromModel || !m_model) { return; }
+        if (m_seite == Seite::Empfang) {
+            if (m_slice) { m_slice->setRxEqEnabled(on); }
+        } else {
+            m_model->transmitModel().setTxEqEnabled(on);
+        }
+    });
+
+    // ── Die zehn Baender ─────────────────────────────────────────────────────
+    for (int i = 0; i < kEqBandCount; ++i) {
+        connect(m_sliders[i], &QSlider::valueChanged, this, [this, i](int dB) {
+            if (m_updatingFromModel || !m_model) { return; }
+            if (m_seite == Seite::Empfang) {
+                if (m_slice) { m_slice->setRxEqBandDb(i, dB); }
+            } else {
+                m_model->transmitModel().setTxEqBand(i, dB);
+            }
+            m_valueLabels[i]->setText(QString::number(dB));
+            // Von Hand gezogen heisst "Eigen" -- sonst behauptete die Combo
+            // weiter "Flach", waehrend die Kurve es nicht mehr ist.
+            QSignalBlocker b(m_presetCombo);
+            m_presetCombo->setCurrentIndex(static_cast<int>(Vorwahl::Eigen));
+        });
+    }
+
+    // ── Reset: zurueck auf flach ─────────────────────────────────────────────
+    connect(m_resetBtn, &QPushButton::clicked, this, [this]() {
+        kurveSetzen(kKurveFlach);
+        QSignalBlocker b(m_presetCombo);
+        m_presetCombo->setCurrentIndex(static_cast<int>(Vorwahl::Flach));
+    });
+
+    // ── Vorwahl ──────────────────────────────────────────────────────────────
+    connect(m_presetCombo, &QComboBox::currentIndexChanged, this, [this](int idx) {
+        if (m_updatingFromModel) { return; }
+        switch (static_cast<Vorwahl>(idx)) {
+        case Vorwahl::Flach:   kurveSetzen(kKurveFlach);   break;
+        case Vorwahl::Sprache: kurveSetzen(kKurveSprache); break;
+        case Vorwahl::Eigen:   /* nichts -- das ist der Zustand, nicht ein Befehl */ break;
+        }
+    });
+
+    // ── Modell -> Oberflaeche, Sendeseite ────────────────────────────────────
+    TransmitModel& tx = m_model->transmitModel();
+    connect(&tx, &TransmitModel::txEqEnabledChanged, this, [this](bool) {
+        if (m_seite == Seite::Senden) { syncSeite(); }
+    });
+    connect(&tx, &TransmitModel::txEqBandChanged, this, [this](int, int) {
+        if (m_seite == Seite::Senden) { syncSeite(); }
+    });
+    connect(&tx, &TransmitModel::txEqPreampChanged, this, [this](int) {
+        if (m_seite == Seite::Senden) { syncSeite(); }
+    });
+
+    // ── Modell -> Oberflaeche, Empfangsseite (haengt am aktiven Slice) ───────
+    connect(m_model, &RadioModel::activeSliceChanged, this, [this](int) {
+        bindSlice(m_model ? m_model->activeSlice() : nullptr);
+    });
+    bindSlice(m_model->activeSlice());
+
+    syncSeite();
+}
+
+void EqApplet::bindSlice(SliceModel* s)
+{
+    if (m_slice) { disconnect(m_slice, nullptr, this, nullptr); }
+    m_slice = s;
+    if (s) {
+        connect(s, &SliceModel::rxEqEnabledChanged, this, [this](bool) {
+            if (m_seite == Seite::Empfang) { syncSeite(); }
+        });
+        connect(s, &SliceModel::rxEqBandDbChanged, this, [this](int, int) {
+            if (m_seite == Seite::Empfang) { syncSeite(); }
+        });
+        connect(s, &SliceModel::rxEqPreampDbChanged, this, [this](int) {
+            if (m_seite == Seite::Empfang) { syncSeite(); }
+        });
+    }
+    if (m_seite == Seite::Empfang) { syncSeite(); }
+}
+
+void EqApplet::setSeite(Seite seite)
+{
+    m_seite = seite;
+    // Die zwei Knoepfe sind nicht in einer QButtonGroup; der Zustand wird
+    // hier von Hand gehalten, damit ein zweiter Klick auf den schon
+    // gewaehlten Knopf ihn nicht ausschaltet und beide Seiten dunkel laesst.
+    {
+        QSignalBlocker br(m_rxBtn);
+        QSignalBlocker bt(m_txBtn);
+        m_rxBtn->setChecked(seite == Seite::Empfang);
+        m_txBtn->setChecked(seite == Seite::Senden);
+    }
+    syncSeite();
+}
+
+void EqApplet::kurveSetzen(const std::array<int, 11>& kurve)
+{
+    if (!m_model) { return; }
+    // kurve[0] ist die Vorverstaerkung, kurve[1..10] die Baender -- dieselbe
+    // Form, die WDSPs SetRXAGrphEQ10 / SetTXAGrphEQ10 erwartet.
+    if (m_seite == Seite::Empfang) {
+        if (!m_slice) { return; }
+        m_slice->setRxEqPreampDb(kurve[0]);
+        for (int i = 0; i < kEqBandCount; ++i) {
+            m_slice->setRxEqBandDb(i, kurve[static_cast<std::size_t>(i) + 1]);
+        }
+    } else {
+        TransmitModel& tx = m_model->transmitModel();
+        tx.setTxEqPreamp(kurve[0]);
+        for (int i = 0; i < kEqBandCount; ++i) {
+            tx.setTxEqBand(i, kurve[static_cast<std::size_t>(i) + 1]);
+        }
+    }
+    syncSeite();
+}
+
+void EqApplet::syncSeite()
+{
+    if (!m_model) { return; }
+
+    bool on = false;
+    std::array<int, kEqBandCount> baender{};
+    if (m_seite == Seite::Empfang) {
+        if (!m_slice) {
+            // Ohne Slice gibt es keine Empfangskurve -- die Schieber dann
+            // nicht auf 0 luegen lassen, sondern sperren.
+            m_updatingFromModel = true;
+            for (int i = 0; i < kEqBandCount; ++i) { m_sliders[i]->setEnabled(false); }
+            m_onBtn->setEnabled(false);
+            m_updatingFromModel = false;
+            return;
+        }
+        on = m_slice->rxEqEnabled();
+        for (int i = 0; i < kEqBandCount; ++i) { baender[static_cast<std::size_t>(i)] = m_slice->rxEqBandDb(i); }
+    } else {
+        const TransmitModel& tx = m_model->transmitModel();
+        on = tx.txEqEnabled();
+        for (int i = 0; i < kEqBandCount; ++i) { baender[static_cast<std::size_t>(i)] = tx.txEqBand(i); }
+    }
+
+    m_updatingFromModel = true;
+    m_onBtn->setEnabled(true);
+    {
+        QSignalBlocker b(m_onBtn);
+        m_onBtn->setChecked(on);
+    }
+    for (int i = 0; i < kEqBandCount; ++i) {
+        const int dB = baender[static_cast<std::size_t>(i)];
+        m_sliders[i]->setEnabled(true);
+        QSignalBlocker b(m_sliders[i]);
+        // Die Schieber gehen -10..+10, das Modell bis -12..+15. Ein Wert
+        // ausserhalb wird fuer die ANZEIGE geklammert; das Modell behaelt
+        // seinen echten Wert, damit ein Blick auf das Feld ihn nicht
+        // heimlich zurechtzieht.
+        m_sliders[i]->setValue(std::clamp(dB, m_sliders[i]->minimum(), m_sliders[i]->maximum()));
+        m_valueLabels[i]->setText(QString::number(dB));
+    }
+    m_updatingFromModel = false;
+}
+
 void EqApplet::syncFromModel()
 {
-    // NYI — Phase 3I-3 will sync band values, enabled state, and preset from model.
+    bindSlice(m_model ? m_model->activeSlice() : nullptr);
+    syncSeite();
 }
 
 } // namespace Longpath

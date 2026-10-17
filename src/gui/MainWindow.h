@@ -1649,6 +1649,9 @@ private:
     // so the dspModeChanged listener below never accumulates one dangling
     // connection per past slice.
     QList<QMetaObject::Connection> m_rttyRadeLinks;
+    /// Der CAT-Server (2026-10-11). Vier Kanaele, nur auf 127.0.0.1.
+    class CatServer*    m_catServer{nullptr};
+    class CatPtyServer* m_catPtyServer{nullptr};
     class EqApplet* m_eqApplet{nullptr};
     class VaxApplet* m_vaxApplet{nullptr};
 

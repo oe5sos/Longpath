@@ -1811,6 +1811,19 @@ longpath_add_test(tst_tx_frequency_follows_tx_slice)
 # FM-Relais: Ablage, Reverse, 49 Toene, Speichern (2026-09-27).
 longpath_add_test(tst_fm_repeater_wiring)
 longpath_add_test(tst_fm_deviation)
+longpath_add_test(tst_rx_equalizer)
+longpath_add_test(tst_cat_protokoll)
+longpath_add_test(tst_cat_server)
+longpath_add_test(tst_cat_verdrahtung)
+# Die serielle Haelfte (2026-10-12). Nur auf UNIX: der Prueffall legt
+# echte Pseudoterminals an (posix_openpt), und die gibt es auf Windows
+# nicht. Dort meldet CatPtyServer::verfuegbar() false und der Schalter
+# im Applet bleibt gesperrt -- genau das ist das gepruefte Verhalten,
+# und ein Prueffall, der nur das pruefen koennte, braucht keine Datei.
+if(UNIX)
+    longpath_add_test(tst_cat_pty)
+endif()
+longpath_add_test(tst_mehrere_fenster)
 longpath_add_test(tst_fm_applet_wiring)
 
 # ── Phase 3F Sub-Epic B Task 17: AlexController event-matrix coverage ─────────
