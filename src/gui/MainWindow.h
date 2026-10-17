@@ -327,6 +327,12 @@ public:
     void restoreFloatingWindowsForTest()
     { restoreFloatingWindowsHiddenBehindConnectMask(); }
 
+    /// Pruefzugang (2026-10-17): steht das Fenster im RAHMENLOSEN
+    /// Vollbild? Seit heute ist die Antwort beim Start `false` --
+    /// formatfuellend wird ueber showMaximized() erreicht, damit die
+    /// drei Knoepfe links oben bleiben. Siehe tst_fenster_hat_rahmen.
+    bool rahmenlosesVollbildFuerTest() const { return m_borderlessFullSize; }
+
     // ── Pruefzugaenge fuer den Seitenbereich (tst_side_area_integration) ──
     void setSideAreaEnabledForTest(bool on) { setSideAreaEnabled(on); }
     bool addToSideAreaForTest(const QString& id, bool activate)
@@ -1518,6 +1524,11 @@ private:
     // nicht mehr (Qt::WindowFullScreen wird nie gesetzt); dieses Flag
     // ist die neue Quelle der Wahrheit fuers Sichern/Wiederherstellen.
     bool m_borderlessFullSize{false};
+    /// Erst wenn der Aufbau durch ist, zaehlt eine Fensterbewegung als
+    /// ZIEHEN. Davor platziert das Programm selbst: Profilgeometrien,
+    /// showMaximized(), der Wechsel des Rahmens. Ohne dieses Flag stand
+    /// der Schutzrahmen-Hinweis schon beim Start da (2026-10-17).
+    bool m_fensterAufbauFertig{false};
 
     // View > Vollbild (2026-09-08, Betreiber: "es sollte auch im
     // gernellen fenster die möglichkeit geben, immer auf full screen
