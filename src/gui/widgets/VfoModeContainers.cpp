@@ -447,8 +447,8 @@ void FmOptContainer::syncFromSlice()
                       .arg(QString::number(m_slice->fmCtcssValueHz(), 'f', 1));
             m_toneLamp->setToolTip(tonDa
                 ? tr("The %1 is present").arg(was)
-                : tr("Waiting for the %1 -- it is missing, the "
-                                 "channel is muted")
+                : tr("Waiting for the %1 -- it is missing, "
+                     "the channel is muted")
                       .arg(was));
         }
     }

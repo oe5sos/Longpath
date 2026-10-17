@@ -59,12 +59,21 @@ void TstUiScaleMenue::dasMenueIstDaUndAnklickbar()
     // sichtbaren Namen.
     QMenu* groesse = nullptr;
     for (QMenu* m : leiste->findChildren<QMenu*>()) {
-        if (m && m->title().contains(QStringLiteral("Darstellungsgröße"))) {
+        // Ueber tr() gesucht, nicht ueber den deutschen Namen: die
+        // Oberflaeche spricht seit dem 2026-10-15 englisch, die
+        // deutsche Fassung ist die Uebersetzung. Das Et-Zeichen des
+        // Tastenkuerzels steht im Titel mit drin, darum ohne es
+        // vergleichen.
+        const QString gesucht =
+            MainWindow::tr("&Display size").remove(QLatin1Char('&'));
+        if (m && m->title().remove(QLatin1Char('&')).contains(gesucht)) {
             groesse = m;
             break;
         }
     }
-    QVERIFY2(groesse, "das Menue \"Darstellungsgröße\" fehlt");
+    QVERIFY2(groesse, qPrintable(QStringLiteral(
+                          "das Menue \"%1\" fehlt")
+                          .arg(MainWindow::tr("&Display size"))));
 
     const QList<QAction*> eintraege = groesse->actions();
     QVERIFY2(!eintraege.isEmpty(), "das Menue ist leer");

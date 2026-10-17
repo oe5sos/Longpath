@@ -279,8 +279,7 @@ SpeApplet::SpeApplet(RadioModel* model, QWidget* parent)
     m_inputBtn->setToolTip(tr("Eingang 1 / 2 umschalten"));
     connect(m_inputBtn, &QPushButton::clicked, this, &SpeApplet::inputClicked);
     m_antBtn = macheTaste(QStringLiteral("ANT"));
-    m_antBtn->setToolTip(tr("Step the transmit antenna for the current "
-                            "band"));
+    m_antBtn->setToolTip(tr("Step the transmit antenna for the current band"));
     connect(m_antBtn, &QPushButton::clicked, this, &SpeApplet::antennaClicked);
     // Die Pfeiltasten des Expert stellen die Vorlaufleistung ein, die der
     // Verstaerker vom Funkgeraet ueber CAT anfordert. Bandtasten gibt es

@@ -194,7 +194,15 @@ void TstCtcssTonleuchte::derHinweisNenntDenEingestelltenTon()
     QVERIFY2(lamp->toolTip().contains(QStringLiteral("123.0")),
              qPrintable(QStringLiteral("Der Hinweis nennt den Ton nicht: %1")
                             .arg(lamp->toolTip())));
-    QVERIFY2(lamp->toolTip().contains(QStringLiteral("stumm")),
+    // Der Vergleich geht ueber tr(): der Quelltext ist seit dem
+    // Englisch-Durchgang englisch ("the channel is muted"), die
+    // deutsche Fassung liegt in translations/longpath_de.ts. Ein
+    // festgenageltes Teilwort faellt auf dem jeweils anderen Rechner --
+    // und ein Teilwort trennt ausserdem die beiden Zustaende nicht.
+    QVERIFY2(lamp->toolTip()
+                 == FmOptContainer::tr("Waiting for the %1 -- it is missing, "
+                                       "the channel is muted")
+                        .arg(QStringLiteral("CTCSS-Subton 123.0 Hz")),
              qPrintable(QStringLiteral("Der Hinweis sagt nicht, dass der Kanal stumm "
                                        "ist: %1").arg(lamp->toolTip())));
 

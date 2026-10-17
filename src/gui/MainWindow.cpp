@@ -10051,8 +10051,7 @@ void MainWindow::buildMenuBar()
         // Die Stufen: 75 bis 200 wie bisher vorgesehen, dazu 115 und 130
         // als feine Zwischenstufen -- von 100 auf 125 ist ein grosser
         // Sprung, und genau dort liegt der Bedarf.
-        QMenu* uiScaleMenu = viewMenu->addMenu(tr("&Display "
-                                                              "size"));
+        QMenu* uiScaleMenu = viewMenu->addMenu(tr("&Display size"));
         QActionGroup* scaleGroup = new QActionGroup(this);
         scaleGroup->setExclusive(true);
 

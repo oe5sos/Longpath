@@ -1918,6 +1918,19 @@ Higher = smoother but slower to react to changing noise.</source>
     </message>
 </context>
 <context>
+    <name>Longpath::FmOptContainer</name>
+    <message>
+        <location filename="../src/gui/widgets/VfoModeContainers.cpp" line="449" />
+        <source>The %1 is present</source>
+        <translation>Der %1 liegt an</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/widgets/VfoModeContainers.cpp" line="450" />
+        <source>Waiting for the %1 -- it is missing, the channel is muted</source>
+        <translation>Warten auf den %1 -- er fehlt, der Kanal ist stumm</translation>
+    </message>
+</context>
+<context>
     <name>Longpath::FourO3APage</name>
     <message>
         <location filename="../src/gui/setup/FourO3APage.cpp" line="62" />
@@ -7338,19 +7351,6 @@ Save before switching?</source>
         <location filename="../src/gui/setup/AudioVaxPage.cpp" line="642" />
         <source>Pick a device first</source>
         <translation type="unfinished" />
-    </message>
-</context>
-<context>
-    <name>Longpath::VfoModeContainers</name>
-    <message>
-        <location filename="../src/gui/widgets/VfoModeContainers.cpp" line="449" />
-        <source>The %1 is present</source>
-        <translation>Der %1 liegt an</translation>
-    </message>
-    <message>
-        <location filename="../src/gui/widgets/VfoModeContainers.cpp" line="450" />
-        <source>Waiting for the %1 -- it is missing, the channel is muted</source>
-        <translation>Warten auf den %1 -- er fehlt, der Kanal ist stumm</translation>
     </message>
 </context>
 <context>
