@@ -243,6 +243,72 @@ public:
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
 
+
+    // ── Der Schutzrahmen (2026-10-14) ────────────────────────────────
+    //
+    // Auf Ansage des Betreibers: „es sollte vielleicht einen grossen
+    // Rahmen geben, ueber den man nichts ziehen kann und keine Fenster
+    // anordnen kann." Siehe die lange Begruendung bei
+    // `ausSperrstreifenSchieben()` in WindowPlacement.h.
+
+    /// Die Streifen des Hauptfensters, auf denen kein schwebendes
+    /// Fenster liegen darf, in GLOBALEN Koordinaten.
+    ///
+    /// Das sind die beiden Bedienleisten: die Kommandoleiste oben (Band,
+    /// Mode, Filter, Step, NR, Rate, Profil) und die Statuszeile unten
+    /// (MOX, VOX, TUNE, PS, CAT, TCI, CPU, PA, ON AIR). Links und rechts
+    /// gibt es keinen Rahmen: dort steht keine Bedienung, und ein
+    /// seitliches Ausweichen wuerde eine Anordnung zerreissen, die der
+    /// Betreiber nebeneinander gestellt hat.
+    ///
+    /// Leer, solange das Fenster nicht sichtbar ist -- dann sind die
+    /// Leisten noch nicht an ihrem Platz, und ein Rahmen aus Nullen
+    /// schoebe jedes Fenster an den oberen Rand.
+    /// Die Lage eines schwebenden Fensters ins Profil schreiben --
+    /// ABSOLUT (wie bisher) UND relativ zum Hauptfenster.
+    ///
+    /// Der Grund (2026-10-14): bis heute standen nur absolute
+    /// Bildschirmkoordinaten im Profil. Eine Anordnung, die im Vollbild
+    /// entstanden ist, passt damit in keiner anderen Fenstergroesse --
+    /// das Hauptfenster rutscht um die Titelleiste nach unten, die
+    /// schwebenden Fenster bleiben stehen, und sie liegen auf der
+    /// Kommandoleiste. Genau der Fall, den der Betreiber mit zwei
+    /// Bildschirmfotos gemeldet hat.
+    ///
+    /// Die absoluten Werte bleiben stehen: ein Profil, das eine aeltere
+    /// Fassung liest, soll weiter funktionieren, und fuer ein Fenster
+    /// auf einem ZWEITEN Schirm ist die absolute Lage die richtige.
+    void merkeLage(QVariantMap& ziel, const QRect& g) const;
+
+    /// Das Gegenstueck: die heutige Lage aus einem Profileintrag.
+    /// Traegt er `dx`/`dy`, wird daraus und aus der JETZIGEN Lage des
+    /// Hauptfensters gerechnet; sonst gelten die alten absoluten Werte.
+    QRect lageAusProfil(const QVariantMap& quelle) const;
+
+    QList<QRect> schutzrahmen() const;
+
+    /// Alle schwebenden Fenster (Applets, Panadapter, Rotor/Log) aus dem
+    /// Schutzrahmen holen. Tut nichts an Fenstern, die ihn ohnehin nicht
+    /// beruehren -- auch nicht an solchen auf einem zweiten Schirm.
+    /// Gibt zurueck, wie viele verschoben wurden (fuer Prueffaelle).
+    int schwebendeAusDemSchutzrahmenHolen();
+
+    /// Dasselbe mit Nachlauf: waehrend eines Groessenzugs feuert
+    /// resizeEvent bei jedem Pixel, und Fenster, die dabei im Takt
+    /// springen, sind unbedienbar. 250 ms nach der letzten Aenderung
+    /// einmal.
+    void schutzrahmenNachziehen();
+
+
+    /// Den Schutzrahmen sichtbar machen, solange ein schwebendes
+    /// Fenster gezogen wird (2026-10-14). Blendet sich 600 ms nach der
+    /// letzten Bewegung von selbst wieder aus.
+    void zeigeSchutzrahmenKurz();
+
+    /// Nur fuer Prueffaelle: liegt der Hinweis gerade sichtbar ueber den
+    /// Leisten?
+    bool schutzrahmenHinweisSichtbarFuerTest() const;
+
     // ── Pruefzugaenge fuer „hinter die Connect-Maske" ────────────────
     //
     // Die Regel ist nur an einem laufenden MainWindow pruefbar (die
@@ -1659,6 +1725,9 @@ private:
     // so the dspModeChanged listener below never accumulates one dangling
     // connection per past slice.
     QList<QMetaObject::Connection> m_rttyRadeLinks;
+    /// Der CAT-Server (2026-10-11). Vier Kanaele, nur auf 127.0.0.1.
+    class CatServer*    m_catServer{nullptr};
+    class CatPtyServer* m_catPtyServer{nullptr};
     class EqApplet* m_eqApplet{nullptr};
     class VaxApplet* m_vaxApplet{nullptr};
 
@@ -1946,6 +2015,11 @@ private:
     // Das Plus entsteht erst, wenn m_appletVis alle Kategorien kennt —
     // deshalb zwei Zeiger und nicht einer.
     class CommandBar* m_commandBar{nullptr};
+    /// Nachlauf fuer den Schutzrahmen (2026-10-14).
+    QTimer* m_schutzrahmenTimer{nullptr};
+    /// Der sichtbare Hinweis auf die gesperrten Streifen.
+    class SchutzrahmenHinweis* m_rahmenHinweis{nullptr};
+    QTimer* m_rahmenHinweisTimer{nullptr};
     class AddWidgetButton* m_addWidget{nullptr};
     class ProfileRail* m_profileRail{nullptr};
     /// Die Reihe ganz links im Mittelteil -- dort haengt die Schiene,
@@ -1997,7 +2071,6 @@ private:
     // entfernten Flaeche haengen bleiben (Qt trennt dann automatisch,
     // die Leiste folgt danach ueberhaupt keiner Flaeche mehr). Wird jetzt
     // bei jedem PanadapterStack::activePanChanged neu gezogen.
-    QMetaObject::Connection m_zoomBarSyncConn;
 
     AppletVisibilityController* m_appletVis{nullptr};
     QHash<QString, AppletWidget*> m_appletsById;

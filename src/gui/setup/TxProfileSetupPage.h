@@ -101,6 +101,16 @@ public:
     QComboBox*   profileCombo() const { return m_combo; }
     QPushButton* saveButton()   const { return m_saveBtn; }
     QPushButton* deleteButton() const { return m_deleteBtn; }
+    /// Die Taste "Thetis-Profile einlesen…" (2026-10-13). Oeffentlich
+    /// wie die anderen zwei, damit ein Prueffall sie druecken kann --
+    /// ohne das waere nur die Existenz pruefbar, nicht die Wirkung.
+    QPushButton* importButton() const { return m_importBtn; }
+
+    /// Den Dateiinhalt einlesen, ohne Dateidialog. Der Dialog gehoert
+    /// der Taste; diese Stelle ist das, was danach geschieht, und sie
+    /// ist dadurch pruefbar. Gibt den Bericht zurueck, den der Betreiber
+    /// zu sehen bekommt.
+    QString einleseThetisDateiFuerTest(const QByteArray& inhalt);
 
     // ── Test seams ──────────────────────────────────────────────────────────
     // (No LONGPATH_BUILD_TESTS guard — same convention as TestTwoTonePage.)
@@ -159,6 +169,7 @@ private slots:
     // MicProfileManager::deleteProfile.  On last-remaining-profile, surfaces
     // the verbatim Thetis string via RejectionMessageHook.
     void onDeleteClicked();
+    void onImportClicked();
 
 private:
     void buildUi();
@@ -182,6 +193,7 @@ private:
     QComboBox*   m_combo{nullptr};
     QPushButton* m_saveBtn{nullptr};
     QPushButton* m_deleteBtn{nullptr};
+    QPushButton* m_importBtn{nullptr};
 
     // ── State ───────────────────────────────────────────────────────────────
     // The previous combo selection (used to revert on Cancel).

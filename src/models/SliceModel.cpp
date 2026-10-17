@@ -2201,6 +2201,90 @@ void SliceModel::setFmReverse(bool v)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Empfangs-Equalizer (2026-10-11) — Longpath-eigen
+// ---------------------------------------------------------------------------
+//
+// Zur Herkunft, zur Abweichung von Thetis (dort global, hier je Slice) und
+// zu den Grenzen: SliceModel.h bei der Deklaration.
+//
+// Geklammert wird HIER, nicht erst in der Oberflaeche: ein Wert, der ueber
+// AppSettings oder aus einem Frequenzspeicher hereinkommt, hat kein Feld
+// davor, das ihn abfaengt.
+
+void SliceModel::setRxEqEnabled(bool on)
+{
+    if (m_rxEqEnabled != on) {
+        m_rxEqEnabled = on;
+        emit rxEqEnabledChanged(on);
+    }
+}
+
+void SliceModel::setRxEqPreampDb(int dB)
+{
+    const int v = std::clamp(dB, kRxEqGainDbMin, kRxEqGainDbMax);
+    if (m_rxEqPreampDb != v) {
+        m_rxEqPreampDb = v;
+        emit rxEqPreampDbChanged(v);
+    }
+}
+
+int SliceModel::rxEqBandDb(int index) const noexcept
+{
+    if (index < 0 || index >= kRxEqNumBands) { return 0; }
+    return m_rxEqBandsDb[static_cast<std::size_t>(index)];
+}
+
+void SliceModel::setRxEqBandDb(int index, int dB)
+{
+    if (index < 0 || index >= kRxEqNumBands) {
+        qCWarning(lcDsp) << "SliceModel::setRxEqBandDb: Index" << index
+                           << "liegt ausserhalb 0.." << (kRxEqNumBands - 1)
+                           << "-- Ruf verworfen";
+        return;
+    }
+    const int v = std::clamp(dB, kRxEqGainDbMin, kRxEqGainDbMax);
+    auto& slot = m_rxEqBandsDb[static_cast<std::size_t>(index)];
+    if (slot != v) {
+        slot = v;
+        emit rxEqBandDbChanged(index, v);
+    }
+}
+
+int SliceModel::rxEqFreqHz(int index) const noexcept
+{
+    if (index < 0 || index >= kRxEqNumBands) { return 0; }
+    return m_rxEqFreqsHz[static_cast<std::size_t>(index)];
+}
+
+void SliceModel::setRxEqFreqHz(int index, int hz)
+{
+    if (index < 0 || index >= kRxEqNumBands) {
+        qCWarning(lcDsp) << "SliceModel::setRxEqFreqHz: Index" << index
+                           << "liegt ausserhalb 0.." << (kRxEqNumBands - 1)
+                           << "-- Ruf verworfen";
+        return;
+    }
+    // Obergrenze wie Thetis' Frequenzfeld (eqform.cs udTXEQ1.Maximum = 20000);
+    // 0 ist erlaubt und heisst in WDSPs eq_impulse "Band aus".
+    const int v = std::clamp(hz, 0, 20000);
+    auto& slot = m_rxEqFreqsHz[static_cast<std::size_t>(index)];
+    if (slot != v) {
+        slot = v;
+        emit rxEqFreqHzChanged(index, v);
+    }
+}
+
+std::array<int, 11> SliceModel::rxEqGraph10() const
+{
+    std::array<int, 11> out{};
+    out[0] = m_rxEqPreampDb;
+    for (int i = 0; i < kRxEqNumBands; ++i) {
+        out[static_cast<std::size_t>(i) + 1] = m_rxEqBandsDb[static_cast<std::size_t>(i)];
+    }
+    return out;
+}
+
 void SliceModel::setDiglOffsetHz(int hz)
 {
     if (m_diglOffsetHz == hz) { return; }
@@ -2780,6 +2864,19 @@ void SliceModel::saveToSettings(Band band)
     s.setValue(sp + QStringLiteral("FmCtcssValueHz"), m_fmCtcssValueHz);
     s.setValue(sp + QStringLiteral("FmOffsetHz"),     m_fmOffsetHz);
     s.setValue(sp + QStringLiteral("FmTxMode"),       static_cast<int>(m_fmTxMode));
+    // Empfangs-Equalizer (2026-10-11): slice-weit, nicht per Band -- eine
+    // Klangeinstellung des Betreibers soll beim Bandwechsel nicht umspringen.
+    // Die Mitten kommen mit, damit eine spaeter frei eingestellte Mitte nicht
+    // beim naechsten Start auf die WDSP-Vorgabe zurueckfaellt.
+    s.setValue(sp + QStringLiteral("RxEqEnabled"),  boolStr(m_rxEqEnabled));
+    s.setValue(sp + QStringLiteral("RxEqPreampDb"), m_rxEqPreampDb);
+    for (int i = 0; i < kRxEqNumBands; ++i) {
+        const QString n = QString::number(i + 1);
+        s.setValue(sp + QStringLiteral("RxEqBand") + n + QStringLiteral("Db"),
+                   m_rxEqBandsDb[static_cast<std::size_t>(i)]);
+        s.setValue(sp + QStringLiteral("RxEqFreq") + n + QStringLiteral("Hz"),
+                   m_rxEqFreqsHz[static_cast<std::size_t>(i)]);
+    }
     s.setValue(sp + QStringLiteral("AfGain"),     m_afGain);
     s.setValue(sp + QStringLiteral("RfGain"),     m_rfGain);
     s.setValue(sp + QStringLiteral("RxAntenna"),  m_rxAntenna);
@@ -3178,6 +3275,24 @@ void SliceModel::restoreFromSettings(Band band)
     if (s.contains(sp + QStringLiteral("XitHz"))) {
         setXitHz(s.value(sp + QStringLiteral("XitHz")).toInt());
     }
+    // Empfangs-Equalizer (2026-10-11). Die Setter klammern selbst, also
+    // kommt auch eine von Hand verdorbene Einstellungsdatei nicht als
+    // +40 dB im WDSP an.
+    if (s.contains(sp + QStringLiteral("RxEqEnabled"))) {
+        setRxEqEnabled(s.value(sp + QStringLiteral("RxEqEnabled")).toString()
+                       == QStringLiteral("True"));
+    }
+    if (s.contains(sp + QStringLiteral("RxEqPreampDb"))) {
+        setRxEqPreampDb(s.value(sp + QStringLiteral("RxEqPreampDb")).toInt());
+    }
+    for (int i = 0; i < kRxEqNumBands; ++i) {
+        const QString n = QString::number(i + 1);
+        const QString bk = sp + QStringLiteral("RxEqBand") + n + QStringLiteral("Db");
+        const QString fk = sp + QStringLiteral("RxEqFreq") + n + QStringLiteral("Hz");
+        if (s.contains(bk)) { setRxEqBandDb(i, s.value(bk).toInt()); }
+        if (s.contains(fk)) { setRxEqFreqHz(i, s.value(fk).toInt()); }
+    }
+
     if (s.contains(sp + QStringLiteral("AfGain"))) {
         setAfGain(s.value(sp + QStringLiteral("AfGain")).toInt());
     }

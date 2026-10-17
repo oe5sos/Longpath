@@ -7286,6 +7286,14 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 rxCh->setAmsqThresh(m_activeSlice->amsqThresh());
                 rxCh->setFmsqEnabled(m_activeSlice->fmsqEnabled());
                 rxCh->setFmsqThresh(m_activeSlice->fmsqThresh());
+                // Empfangs-Equalizer: die gespeicherte Kurve beim Verbinden
+                // hinausschieben, sonst laeuft der Kanal auf WDSPs flacher
+                // Vorgabe (RXA.c:259-275), waehrend das Modell die Werte des
+                // Betreibers meldet -- genau die Form, die bei NB/SNB oben
+                // schon einmal zugeschlagen hat. Kurve zuerst, run-Flag
+                // zuletzt (Thetis' Reihenfolge, console.cs:43297 SelectNR).
+                rxCh->setRxEqGraph10(m_activeSlice->rxEqGraph10());
+                rxCh->setRxEqRunning(m_activeSlice->rxEqEnabled());
                 // Audio panel initial push
                 // Mute: From Thetis dsp.cs:393-394 — panel runs by default (unmuted)
                 // Pan: From Thetis radio.cs:1386 — pan = 0.5f (center); Longpath 0.0 center
@@ -8529,6 +8537,23 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                     m_txChannel, [this](int dB) {
                 m_txChannel->setTxCpdrGainDb(static_cast<double>(dB));
             });
+
+            // AM-Traegerpegel (2026-10-12). Der Regler haelt Prozent,
+            // WDSP will den DSP-Wert -- die Wurzelkennlinie steht in
+            // TransmitModel::amCarrierDspFromPercent und NUR dort, damit
+            // sie nicht an zwei Stellen auseinanderlaeuft.
+            connect(&m_transmitModel, &TransmitModel::amCarrierPercentChanged,
+                    m_txChannel, [this](int percent) {
+                m_txChannel->setAmCarrierLevel(
+                    TransmitModel::amCarrierDspFromPercent(percent));
+            });
+            // Den gespeicherten Wert beim Anlegen des Sendekanals
+            // hinausschieben -- ohne das laeuft ammod auf seiner
+            // Anlegevorgabe, waehrend das Feld den Wert des Betreibers
+            // zeigt. Dieselbe Form wie beim Empfangs-Equalizer.
+            m_txChannel->setAmCarrierLevel(
+                TransmitModel::amCarrierDspFromPercent(
+                    m_transmitModel.amCarrierPercent()));
 
             // 27. cessbOnChanged → setTxCessbOn.
             connect(&m_transmitModel, &TransmitModel::cessbOnChanged,
@@ -11288,6 +11313,62 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
     connect(slice, &SliceModel::nr2Post2TaperChanged, this, [this, slice](int v) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) { rxCh->setEmnrPost2Taper(v); }
+        scheduleSettingsSave();
+    });
+
+    // ── Empfangs-Equalizer (2026-10-11) ──────────────────────────────────────
+    //
+    // Longpath-eigen: Thetis hat den Empfangs-Equalizer
+    // (Console/radio.cs:827-843 RXEQOn, :800-824 RXEQ10), Longpath hatte ihn
+    // nicht -- die WDSP-Rufe waren nicht einmal deklariert, obwohl das
+    // vendorte eqp im RXA-Durchlauf steht (RXA.c:673).
+    //
+    // Ein geaenderter Bandwert schiebt IMMER die ganze Kurve hinaus, nicht
+    // nur das eine Band: SetRXAGrphEQ10 nimmt Vorverstaerkung und alle zehn
+    // Baender in einem Zug, es gibt kein "nur Band 3 setzen". Thetis macht
+    // es genauso (radio.cs:800-824 reicht das ganze int[11] durch).
+    //
+    // Die Kurve wird auch dann hinausgeschoben, wenn der Equalizer AUS ist.
+    // Das ist Absicht: so steht beim Einschalten sofort das Richtige da,
+    // statt erst beim naechsten Reglerzug. WDSPs run-Flag entscheidet
+    // allein, ob gerechnet wird (eq.c:279-285).
+    auto pushRxEq = [this, slice]() {
+        RxChannel* rxCh = m_wdspEngine ? m_wdspEngine->rxChannel(slice->sliceIndex())
+                                       : nullptr;
+        if (!rxCh) { return; }
+        rxCh->setRxEqGraph10(slice->rxEqGraph10());
+        rxCh->setRxEqRunning(slice->rxEqEnabled());
+    };
+    connect(slice, &SliceModel::rxEqEnabledChanged, this, [this, pushRxEq](bool) {
+        pushRxEq();
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::rxEqPreampDbChanged, this, [this, pushRxEq](int) {
+        pushRxEq();
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::rxEqBandDbChanged, this, [this, pushRxEq](int, int) {
+        pushRxEq();
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::rxEqFreqHzChanged, this, [this, slice](int, int) {
+        // Freie Mitten gehen nicht ueber SetRXAGrphEQ10 (das rechnet mit den
+        // festen Mitten aus RXA.c:260), sondern ueber SetRXAEQProfile.
+        RxChannel* rxCh = m_wdspEngine ? m_wdspEngine->rxChannel(slice->sliceIndex())
+                                       : nullptr;
+        if (rxCh) {
+            std::vector<double> freqs;
+            std::vector<double> gains;
+            freqs.reserve(10);
+            gains.reserve(11);
+            gains.push_back(static_cast<double>(slice->rxEqPreampDb()));
+            for (int i = 0; i < slice->rxEqNumBands(); ++i) {
+                freqs.push_back(static_cast<double>(slice->rxEqFreqHz(i)));
+                gains.push_back(static_cast<double>(slice->rxEqBandDb(i)));
+            }
+            rxCh->setRxEqProfile(freqs, gains);
+            rxCh->setRxEqRunning(slice->rxEqEnabled());
+        }
         scheduleSettingsSave();
     });
 
@@ -15136,6 +15217,20 @@ bool RadioModel::tune() const
 // powerOn -- From Thetis PowerOn at console.cs:19799-19803 [v2.10.3.15].
 // Architectural divergence: Longpath has no separate Power button, so
 // connection IS power.  TCI clients see powerOn = isConnected().
+double RadioModel::rxSignalDbm(int rx) const
+{
+    // Uebernommen aus der zweiten CAT-Fassung (Zweig
+    // fix/discovery-quietpolls-thetis-parity) -- dort fuer SM und
+    // rigctlds STRENGTH gebaut. Der Pegel ist der gemittelte, nicht der
+    // Spitzenwert: ein S-Meter-Rapport soll nicht bei jeder Silbe
+    // springen.
+    RxChannel* const ch = rxChannelForSlice(rx);
+    if (!ch) {
+        return -200.0;   // kein Kanal -- jeder Aufrufer klammert das weg
+    }
+    return ch->getMeter(RxMeterType::SignalAvg) + rxMeterOffsetDb();
+}
+
 bool RadioModel::powerOn() const
 {
     return isConnected();

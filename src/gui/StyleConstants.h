@@ -776,18 +776,35 @@ constexpr int kSplitterHandlePx = 6;
 // bleiben sechs.
 constexpr int kPanelGapPx = 2;
 
+// ── Der Griff ist UNSICHTBAR, bis man ihn beruehrt (2026-10-14) ──────
+//
+// Der Betreiber, mit einem Bild: „Ich moechte im Hintergrund keine
+// Linien haben, das muss ein schwarzer Bildschirm sein. Keinen Rahmen
+// hier setzen, mit keinen Begrenzungen und so weiter."
+//
+// Bis heute trug jeder Griff einen HAARSTRICH (`border-left`/
+// `border-top: 1px solid kBorder`) und einen eigenen Grund
+// (`kPanelBg`). Das waren die senkrechten und waagerechten Linien in
+// seinem Bild -- sie liefen quer durch die leere, schwarze Flaeche.
+//
+// Der Strich hatte seinen Grund, und der steht oben: ein Griff von drei
+// Pixeln war nicht zu treffen, und „ein sichtbarer Strich in der Mitte
+// sagt, DASS man ziehen kann". **Die Greifbarkeit bleibt** -- sechs
+// Pixel sind sechs Pixel, ob man sie sieht oder nicht. Nur das
+// DAUERHAFTE Zeigen faellt weg: beim Darueberfahren leuchtet der Griff
+// in der Akzentfarbe auf, und das sagt dasselbe, ohne im Weg zu stehen.
 inline QString splitterStyle()
 {
     return QStringLiteral(
-        "QSplitter::handle { background: %1; }"
-        "QSplitter::handle:horizontal { width: %2px; "
-        "  image: none; border-left: 1px solid %3; }"
-        "QSplitter::handle:vertical { height: %2px; "
-        "  image: none; border-top: 1px solid %3; }"
-        "QSplitter::handle:hover { background: %4; }")
-        .arg(hexRole(kPanelBg))
+        // `transparent`, nicht kPanelBg: der Griff nimmt die Farbe
+        // dessen an, worueber er liegt -- auf schwarzem Grund ist er
+        // schwarz.
+        "QSplitter::handle { background: transparent; border: none; }"
+        "QSplitter::handle:horizontal { width: %1px; image: none; }"
+        "QSplitter::handle:vertical { height: %1px; image: none; }"
+        "QSplitter::handle:hover { background: %2; }")
         .arg(kSplitterHandlePx)
-        .arg(hexRole(kBorder), hexRole(kAccent));
+        .arg(hexRole(kAccent));
 }
 
 inline QString buttonBaseStyle()

@@ -36,6 +36,7 @@
 
 #include "core/AppSettings.h"
 #include "core/MicProfileManager.h"
+#include "gui/SetupDialog.h"
 #include "gui/setup/TxProfileSetupPage.h"
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
@@ -457,6 +458,160 @@ private slots:
         // Cancel keeps active at original.
         QCOMPARE(mgr.activeProfileName(), originalActive);
         QCOMPARE(page.profileCombo()->currentText(), originalActive);
+    }
+
+    // ── Thetis-Profile einlesen (2026-10-13) ─────────────────────────────
+    //
+    // Dritter Gang des Zeus-Punkts aus 2.0.50. Leser und Anlegen sind in
+    // tst_thetis_profil_import geprueft; hier geht es um die SEITE.
+
+    void dieEinleseTasteIstDaUndAnklickbar()
+    {
+        TransmitModel tx;
+        MicProfileManager mgr;
+        mgr.setMacAddress(kMacA);
+        mgr.load();
+        RadioModel rm;
+        TxProfileSetupPage page(&rm, &mgr, &tx);
+
+        QVERIFY(page.importButton() != nullptr);
+        QVERIFY(page.importButton()->isEnabled());
+        QVERIFY(!page.importButton()->text().isEmpty());
+
+        // ── Und sie muss WIRKLICH IM BILD STEHEN ────────────────────────
+        //
+        // Die Gegenprobe hat das erzwungen: mit ausgebautem
+        // `btnRow->addWidget(m_importBtn)` -- also einer Taste, die
+        // erzeugt wird und in keinem Layout haengt -- blieb dieser Fall
+        // GRUEN. Vorhanden und anklickbar war sie ja. Sichtbar nicht.
+        //
+        // Das ist genau die Attrappe, die in diesem Programm schon
+        // mehrfach monatelang gestanden hat. Geprueft wird darum nach dem
+        // RENDERN: ein Elternteil im Fenster, eine Groesse groesser als
+        // null und eine Lage innerhalb der Seite.
+        page.resize(600, 800);
+        page.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&page, 15000));
+        QCoreApplication::processEvents();
+
+        QPushButton* b = page.importButton();
+        QVERIFY2(b->parentWidget() != nullptr, "Die Taste hat kein Elternteil");
+        QVERIFY2(b->isVisible(), "Die Taste ist nicht sichtbar");
+        QVERIFY2(b->width() > 0 && b->height() > 0,
+                 qPrintable(QStringLiteral("Die Taste hat keine Groesse: %1x%2")
+                                .arg(b->width()).arg(b->height())));
+        // Sie liegt neben Speichern und Loeschen, nicht irgendwo.
+        const QPoint mitte = b->mapTo(&page, b->rect().center());
+        QVERIFY2(page.rect().contains(mitte),
+                 qPrintable(QStringLiteral("Die Taste liegt ausserhalb der "
+                                           "Seite: %1,%2 in %3x%4")
+                                .arg(mitte.x()).arg(mitte.y())
+                                .arg(page.width()).arg(page.height())));
+        const QPoint speichern =
+            page.saveButton()->mapTo(&page, page.saveButton()->rect().center());
+        QVERIFY2(qAbs(mitte.y() - speichern.y()) < 10,
+                 "Die Taste steht nicht in derselben Zeile wie Speichern");
+        // Dass sie wirklich an einem Empfaenger haengt, ist hier NICHT
+        // gemessen: `QObject::receivers()` ist geschuetzt, und ein Klick
+        // oeffnet einen MODALEN Dateidialog, der in einem Prueflauf
+        // haengt, bis die Zeit ablaeuft. Was stattdessen geprueft wird,
+        // ist die Arbeit dahinter -- `einleseThetisDateiFuerTest()`, die
+        // genau das tut, was der Klick nach dem Dialog tut. Die eine
+        // Zeile `connect(m_importBtn, ...)` bleibt damit unbewacht; das
+        // ist die Grenze dieses Falls, und sie steht hier, damit niemand
+        // ihn fuer mehr nimmt, als er ist.
+    }
+
+    void dieSeiteLegtDieProfileAnUndBerichtetDarueber()
+    {
+        TransmitModel tx;
+        MicProfileManager mgr;
+        mgr.setMacAddress(kMacA);
+        mgr.load();
+        RadioModel rm;
+        TxProfileSetupPage page(&rm, &mgr, &tx);
+
+        const QByteArray datei =
+            "<?xml version=\"1.0\" standalone=\"yes\"?>\n"
+            "<Data>\n"
+            "  <TXProfile>\n"
+            "    <Name>Martins ESSB</Name>\n"
+            "    <MicGain>12</MicGain>\n"
+            "    <FilterHigh>3100</FilterHigh>\n"
+            "    <Dexp_Attenuate>14</Dexp_Attenuate>\n"
+            "    <Power>100</Power>\n"
+            "  </TXProfile>\n"
+            "</Data>\n";
+
+        const QString bericht = page.einleseThetisDateiFuerTest(datei);
+        // Ueber tr(): der Quelltext ist seit dem 2026-10-15 englisch,
+        // die deutsche Fassung liegt in translations/longpath_de.ts.
+        QVERIFY2(bericht.contains(
+                     TxProfileSetupPage::tr(
+                         "%1 profile(s) created, nothing applied and "
+                         "nothing overwritten.").arg(1)),
+                 qPrintable(bericht));
+        QVERIFY2(bericht.contains(QStringLiteral("Martins ESSB")),
+                 qPrintable(bericht));
+        // Die Art der Datei steht dabei.
+        QVERIFY2(bericht.contains(
+                     TxProfileSetupPage::tr("File: a Thetis profile export.")),
+                 qPrintable(bericht));
+        // Und was liegengeblieben ist, auch -- sonst sieht der Betreiber
+        // einen Profilnamen und weiss nicht, dass die Leistung draussen
+        // blieb.
+        QVERIFY2(bericht.contains(QStringLiteral("Power")), qPrintable(bericht));
+
+        // Das Profil ist wirklich da, und das Auswahlfeld zeigt es.
+        QVERIFY(mgr.profileNames().contains(QStringLiteral("Martins ESSB")));
+        QVERIFY2(page.profileCombo()->findText(QStringLiteral("Martins ESSB")) >= 0,
+                 "Das neue Profil steht nicht im Auswahlfeld -- "
+                 "profileListChanged kommt nicht an");
+    }
+
+    void eineFremdeDateiSagtWARUMNichtsGeschah()
+    {
+        TransmitModel tx;
+        MicProfileManager mgr;
+        mgr.setMacAddress(kMacA);
+        mgr.load();
+        RadioModel rm;
+        TxProfileSetupPage page(&rm, &mgr, &tx);
+        const int vorher = mgr.profileNames().size();
+
+        const QString bericht = page.einleseThetisDateiFuerTest(
+            QByteArray("<?xml version=\"1.0\"?>\n<Irgendwas/>\n"));
+        QVERIFY2(bericht.contains(TxProfileSetupPage::tr("Nothing imported.")),
+                 qPrintable(bericht));
+        QVERIFY2(bericht.contains(QStringLiteral("Irgendwas")),
+                 qPrintable(bericht));
+        QCOMPARE(mgr.profileNames().size(), vorher);
+    }
+
+    void dieTasteIstUeberDenEinstellungsdialogERREICHBAR()
+    {
+        // Die Faelle darueber bauen die SEITE direkt. Dass sie auch im
+        // ECHTEN Dialog ankommt, ist damit nicht gesagt -- genau diese
+        // Luecke hat am 2026-10-09 beim Menue "Darstellungsgroesse"
+        // zugeschlagen: der Unterbau stand, der Menueeintrag war tot.
+        //
+        // Hier also der Weg, den der Betreiber geht: Dialog aufmachen,
+        // Audio -> TX Profile waehlen, und die Taste muss da stehen.
+        RadioModel model;
+        SetupDialog dialog(&model);
+        QWidget* seite = dialog.realizePageForTest(QStringLiteral("TX Profile"));
+        QVERIFY2(seite != nullptr,
+                 "Die Seite \"TX Profile\" gibt es im Dialog nicht");
+
+        auto* page = qobject_cast<TxProfileSetupPage*>(seite);
+        QVERIFY2(page != nullptr,
+                 "Die Seite \"TX Profile\" ist keine TxProfileSetupPage");
+        QVERIFY(page->importButton() != nullptr);
+        QVERIFY(page->importButton()->isEnabled());
+
+        // Und mit dem Namen, den der Betreiber liest.
+        QVERIFY2(page->importButton()->text().contains(QStringLiteral("Thetis")),
+                 qPrintable(page->importButton()->text()));
     }
 };
 

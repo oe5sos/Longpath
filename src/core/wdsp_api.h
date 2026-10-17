@@ -448,6 +448,57 @@ void RXANBPGetMinNotchWidth(int channel, double* minwidth);
 void RXANBPSetAutoIncrease(int channel, int autoincr);
 
 // ---------------------------------------------------------------------------
+// eqp (eq.h) — receive equaliser, RXA pipeline
+// ---------------------------------------------------------------------------
+//
+// The partitioned overlap-save equaliser on the RECEIVE side. WDSP runs it at
+// third_party/wdsp/src/RXA.c:673 — after demodulation (amd/fmd/fmsq) and
+// BEFORE every noise reducer (anf/anr/emnr/rnnr/sbnr/nnr), the bandpass and
+// the AGC. So a cut made here is a cut the noise reducers and the AGC then
+// see, which is not the same place as the transmit equaliser sits in TXA.
+//
+// Created OFF with flat gains (RXA.c:259-275): 10 bands at the fixed centres
+// 32/63/125/250/500/1k/2k/4k/8k/16k Hz, all 0 dB, nc = max(2048, dsp_size),
+// minimum-phase off, ctfmode 0, wintype 0.
+//
+// The older non-partitioned `eq` variant further down eq.c (from eq.c:665) is
+// commented out upstream ("UNCOMMENT properties when a pointer is in place in
+// rxa[channel]") and has no pointer in rxa — these are the live ones.
+//
+// Threading, exactly as on the transmit side: Run is csDSP-protected
+// (eq.c:279-285), the rest reallocate the impulse response and are NOT —
+// main thread only. See RxChannel.h for the wrapper docs.
+
+// Signatures follow the VENDORED WDSP (third_party/wdsp/src/eq.c), not
+// Thetis's own copy: Thetis ships a newer eq.c whose SetRXAEQProfile takes a
+// fourth `double* Q` for the parametric form (Thetis wdsp/eq.c:623
+// [v2.10.3.15]). TAPR v1.29 as vendored here has no Q parameter, so the
+// graphic form is what Longpath can drive. Behaviour source is Thetis, the
+// wire signature is the vendored header.
+
+// third_party/wdsp/src/eq.c:279-285 (Thetis wdsp/eq.c:586-592 [v2.10.3.15]).
+void SetRXAEQRun(int channel, int run);
+// third_party/wdsp/src/eq.c:287-302 (Thetis wdsp/eq.c:594-609 [v2.10.3.15]).
+void SetRXAEQNC(int channel, int nc);
+// third_party/wdsp/src/eq.c:304-314 (Thetis wdsp/eq.c:611-621 [v2.10.3.15]).
+void SetRXAEQMP(int channel, int mp);
+// third_party/wdsp/src/eq.c:316-333 (Thetis wdsp/eq.c:623-650 [v2.10.3.15] —
+// that one additionally takes `double* Q`; see the note above).
+//   F[0..nfreqs] freqs Hz (F[0] unused / preamp pad)
+//   G[0..nfreqs] gains dB (G[0] = preamp)
+void SetRXAEQProfile(int channel, int nfreqs, double* F, double* G);
+// third_party/wdsp/src/eq.c:335-345 (Thetis wdsp/eq.c:652-662 [v2.10.3.15]).
+void SetRXAEQCtfmode(int channel, int mode);
+// third_party/wdsp/src/eq.c:347-357 (Thetis wdsp/eq.c:664-674 [v2.10.3.15]).
+void SetRXAEQWintype(int channel, int wintype);
+// third_party/wdsp/src/eq.c:385-411 (Thetis wdsp/eq.c:704-730 [v2.10.3.15]) —
+// 10-band graphic EQ; rxeq[0]=preamp dB, rxeq[1..10]=band gains dB at the
+// fixed centres above. Thetis drives the receive EQ through this one
+// (Console/radio.cs:800-824, RXEQ10) and the Run flag separately
+// (Console/radio.cs:827-843, RXEQOn).
+void SetRXAGrphEQ10(int channel, int* rxeq);
+
+// ---------------------------------------------------------------------------
 // Patch panel (patchpanel.h) — final mix stage in RXA pipeline
 // ---------------------------------------------------------------------------
 
@@ -1066,6 +1117,12 @@ void SetTXAPHROTReverse(int channel, int reverse);
 // amsq (stage 5): TX AM squelch / downward expander.
 // From Thetis wdsp/amsq.c:246-252 [v2.10.3.13] and amsq.h:83.
 void SetTXAAMSQRun(int channel, int run);
+
+// ammod (stage 8): AM-Traegerpegel.
+// third_party/wdsp/src/ammod.c:104-110 (Deklaration ammod.h:58).
+// Der Wert ist KEIN Prozentsatz: Thetis rechnet den Reglerwert ueber
+// eine Wurzelkennlinie um, siehe TransmitModel::amCarrierDspFromPercent.
+void SetTXAAMCarrierLevel(int channel, double c_level);
 
 // eqp (stage 6): TX parametric EQ.
 // From Thetis wdsp/eq.c:742-747 [v2.10.3.13].

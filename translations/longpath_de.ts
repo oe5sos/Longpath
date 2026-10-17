@@ -1071,6 +1071,67 @@ Also disables the Freq Cal Start button (cannot auto-cal with 10 MHz ref).</sour
     </message>
 </context>
 <context>
+    <name>Longpath::CatApplet</name>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="266" />
+        <source>No CAT server available</source>
+        <translation>Kein CAT-Server vorhanden</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="271" />
+        <source>CAT over TCP on 127.0.0.1:%1..%2 (four channels)</source>
+        <translation>CAT über TCP auf 127.0.0.1:%1..%2 (vier Kanäle)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="327" />
+        <source>This platform has no pseudo-terminals. WSJT-X, fldigi and hamlib can take the TCP route instead (switch above).</source>
+        <translation>Pseudoterminals gibt es auf dieser Plattform nicht. WSJT-X, fldigi und hamlib können stattdessen den TCP-Weg nehmen (Schalter darüber).</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="330" />
+        <source>No PTY server available</source>
+        <translation>Kein PTY-Server vorhanden</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="335" />
+        <source>CAT as a serial port: four pseudo-terminals.
+Enter the stable link %1 .. %2 -- that one stays the same across restarts.
+The device path below it (/dev/tty...) changes on every start.</source>
+        <translation>CAT als serielle Schnittstelle: vier Pseudoterminals.
+Einzutragen ist die feste Verknüpfung %1 .. %2 -- die bleibt über Neustarts gleich.
+Der Gerätepfad darunter (/dev/tty...) wechselt bei jedem Start.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="404" />
+        <location filename="../src/gui/applets/CatApplet.cpp" line="479" />
+        <source>Channel %1 is off</source>
+        <translation>Kanal %1 ist aus</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="409" />
+        <source>Channel %1: %2</source>
+        <translation>Kanal %1: %2</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="420" />
+        <source>Channel %1
+Device right now: %2
+Enter this one: %3
+
+The device path changes on every start of Longpath. In WSJT-X, fldigi or the logbook enter the STABLE line -- it always points at the current device.</source>
+        <translation>Kanal %1
+Gerät jetzt: %2
+Fest eintragen: %3
+
+Der Gerätepfad wechselt bei jedem Start von Longpath. In WSJT-X, fldigi oder im Logbuch die FESTE Zeile eintragen -- die zeigt immer auf das aktuelle Gerät.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/CatApplet.cpp" line="477" />
+        <source>Channel %1 listening on port %2, %3 connection(s)</source>
+        <translation>Kanal %1 horcht auf Port %2, %3 Verbindung(en)</translation>
+    </message>
+</context>
+<context>
     <name>Longpath::CatTciServerPage</name>
     <message>
         <location filename="../src/gui/setup/CatNetworkSetupPages.cpp" line="149" />
@@ -5247,6 +5308,24 @@ All custom band/pin mappings will be cleared.</source>
     </message>
 </context>
 <context>
+    <name>Longpath::PhoneCwApplet</name>
+    <message>
+        <location filename="../src/gui/applets/PhoneCwApplet.cpp" line="913" />
+        <source>No profile manager available</source>
+        <translation>Kein Profilverwalter vorhanden</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/PhoneCwApplet.cpp" line="972" />
+        <source>This radio has no microphone jack -- &quot;Radio&quot; is disabled</source>
+        <translation>Dieses Gerät hat keine Mikrofonbuchse -- „Radio“ ist gesperrt</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/applets/PhoneCwApplet.cpp" line="974" />
+        <source>Where the transmit audio comes from</source>
+        <translation>Woher das Sendeaudio kommt</translation>
+    </message>
+</context>
+<context>
     <name>Longpath::PowerPage</name>
     <message>
         <location filename="../src/gui/setup/TransmitSetupPages.cpp" line="654" />
@@ -6525,6 +6604,14 @@ All custom band/pin mappings will be cleared.</source>
     </message>
 </context>
 <context>
+    <name>Longpath::StartupPrefsPage</name>
+    <message>
+        <location filename="../src/gui/setup/GeneralSetupPages.cpp" line="91" />
+        <source>&quot;%1&quot; is not a valid grid square (expected e.g. JN78 or JN78dc)</source>
+        <translation>„%1“ ist kein gültiger Locator (erwartet z. B. JN78 oder JN78dc)</translation>
+    </message>
+</context>
+<context>
     <name>Longpath::SwrChartWidget</name>
     <message>
         <location filename="../src/gui/widgets/SwrChartWidget.cpp" line="275" />
@@ -7273,6 +7360,95 @@ Save before switching?</source>
         <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="433" />
         <source>Cannot Delete Profile</source>
         <translation type="unfinished" />
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="113" />
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="516" />
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="541" />
+        <source>Import Thetis profiles</source>
+        <translation>Thetis-Profile einlesen</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="113" />
+        <source>Import Thetis profiles…</source>
+        <translation>Thetis-Profile einlesen…</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="522" />
+        <source>Thetis files (*.xml *.XML);;All files (*)</source>
+        <translation>Thetis-Dateien (*.xml *.XML);;Alle Dateien (*)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="528" />
+        <source>Import failed</source>
+        <translation>Einlesen nicht möglich</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="529" />
+        <source>The file could not be opened:
+%1
+
+%2</source>
+        <translation>Die Datei ließ sich nicht öffnen:
+%1
+
+%2</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="555" />
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="568" />
+        <source>Nothing imported.</source>
+        <translation>Nichts eingelesen.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="562" />
+        <source>Recognised: a Thetis profile export.</source>
+        <translation>Erkannt: eine Thetis-Profilausfuhr.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="565" />
+        <source>Recognised: a whole Thetis database.</source>
+        <translation>Erkannt: eine ganze Thetis-Datenbank.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="573" />
+        <source>There is no profile manager here -- nothing created.</source>
+        <translation>Es gibt hier keine Profilverwaltung -- nichts angelegt.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="581" />
+        <source>%1 profile(s) created, nothing applied and nothing overwritten.</source>
+        <translation>%1 Profil(e) angelegt, nichts angewandt und nichts überschrieben.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="586" />
+        <source>File: a Thetis profile export.</source>
+        <translation>Datei: eine Thetis-Profilausfuhr.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="588" />
+        <source>File: a whole Thetis database.</source>
+        <translation>Datei: eine ganze Thetis-Datenbank.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="594" />
+        <source>  created: %1</source>
+        <translation>  angelegt: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="596" />
+        <source>  created: %1  (in the file: %2)</source>
+        <translation>  angelegt: %1  (in der Datei: %2)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="605" />
+        <source>  NOT created: %1 -- %2</source>
+        <translation>  NICHT angelegt: %1 -- %2</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/setup/TxProfileSetupPage.cpp" line="609" />
+        <source>About the file:</source>
+        <translation>Zur Datei:</translation>
     </message>
 </context>
 <context>

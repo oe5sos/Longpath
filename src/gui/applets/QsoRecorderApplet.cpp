@@ -64,6 +64,7 @@ mw0lge@grange-lane.co.uk
 // =================================================================
 
 #include "QsoRecorderApplet.h"
+#include "gui/Zahlentext.h"
 #include "core/AppSettings.h"
 #include "gui/ScopedChildWidget.h"
 
@@ -463,7 +464,10 @@ void QsoRecorderApplet::onRecordClicked()
         SliceModel* s = m_model->activeSlice();
         if (!s) { s = m_model->sliceById(0); }
         if (s) {
-            info.frequency = QString::number(s->frequency() / 1.0e6, 'f', 6);
+            // datenZahl, NICHT anzeigeZahl: das landet in der
+            // Beschreibungsdatei neben der Aufnahme, die andere
+            // Programme lesen. Ein Komma waere dort ein Fehler.
+            info.frequency = datenZahl(s->frequency() / 1.0e6, 6);
             info.mode      = SliceModel::modeName(s->dspMode());
         }
         rec.setSliceId(s ? s->sliceIndex() : 0);
@@ -553,7 +557,7 @@ void QsoRecorderApplet::refreshState()
         if (!l) { return; }
         if (!on || peak <= 0.0f) { l->setText(QStringLiteral("—")); return; }
         const double db = 20.0 * std::log10(static_cast<double>(peak));
-        l->setText(QStringLiteral("%1 dB").arg(db, 0, 'f', 0));
+        l->setText(QStringLiteral("%1 dB").arg(anzeigeZahl(db, 0)));
     };
     setPeakText(m_rxPeak, rec.lastRxPeak());
     setPeakText(m_txPeak, rec.lastTxPeak());
