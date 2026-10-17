@@ -69,8 +69,30 @@ void floodLoopbackPort(quint16 port, std::atomic<bool>* stop)
 // `delayMs`. Runs on its own std::thread for the same reason
 // floodLoopbackPort() does — the code under test blocks the calling thread
 // inside waitForReadyRead(), so a same-thread timer would never fire.
-void sendSingleDatagramAfterDelay(quint16 port, int delayMs)
+// ── Warum der Faden erst meldet, dass er laeuft (2026-10-17) ────────
+//
+// Vorher begann die Wartezeit beim Aufruf von std::thread. Damit lag
+// die Zeit, die das Betriebssystem braucht, um den Faden ueberhaupt
+// anzulegen und einzuplanen, MIT im Zeitbudget — und auf einem
+// ausgelasteten Laeufer ist das keine Kleinigkeit.
+//
+// Genau daran fiel der Lauf am 2026-10-17 auf „Build (macOS Apple
+// Silicon (2/2))" um: `metrics.datagrams >= 1` meldete 0. Die
+// Schleife lief ihre sechs stillen Fenster ab und endete, bevor der
+// Faden ueberhaupt zum Senden kam. Bemerkenswert daran: der ALTE
+// Lauf waere hier still gruen gewesen (sechs stille Fenster, 180 ms,
+// unter der Latte von 240) und haette die Sperrklinke nie geprueft.
+// Der Zaehler fuer die angekommenen Datagramme hat das sichtbar
+// gemacht.
+//
+// `laeuft` wird gesetzt, sobald der Faden rechnet; der Aufrufer
+// wartet darauf, BEVOR er die Schleife betritt. Danach steht nur
+// noch die Wartezeit selbst im Budget, nicht mehr das Anlegen des
+// Fadens.
+void sendSingleDatagramAfterDelay(quint16 port, int delayMs,
+                                  std::atomic<bool>* laeuft)
 {
+    if (laeuft != nullptr) { laeuft->store(true, std::memory_order_release); }
     std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
     const int fd = ::socket(AF_INET, SOCK_DGRAM, 0);
     if (fd < 0) {
@@ -185,12 +207,49 @@ private slots:
         QUdpSocket victim;
         QVERIFY(victim.bind(QHostAddress::LocalHost, 0));
 
-        constexpr int kQuietBeforeStop = 6;
+        // Zehn statt sechs stille Fenster (2026-10-17): die Schleife
+        // dauert damit mindestens 300 ms statt 180, und das eine
+        // Datagramm bei 90 ms hat ein entsprechend breiteres Ziel.
+        // Der Rueckfall kostet weiter drei zusaetzliche Fenster
+        // (13 statt 10) und bleibt damit klar unterscheidbar.
+        constexpr int kQuietBeforeStop = 10;
         constexpr int kPollMs = 30;
         constexpr int kBurstDelayMs = 3 * kPollMs;
-        const QDeadlineTimer deadline(qint64(kQuietBeforeStop + 4) * kPollMs, Qt::CoarseTimer);
+        // Die Frist ist hier NICHT der Gegenstand — das ist
+        // floodedSocketStillTerminatesViaDeadline. Hier soll sie nur
+        // verhindern, dass ein Fehler die Schleife ewig laufen laesst,
+        // und darum liegt sie weit weg: Faktor fuenf.
+        //
+        // Vorher stand hier (quietBeforeStop + 4) * pollMs = 420 ms,
+        // und gemessen brauchte der Lauf 316 bis 350 ms — 70 ms Luft.
+        // Das ist dieselbe duenne Wette, die dieser Pruefstand gerade
+        // losgeworden ist, nur eine Stelle weiter: auf einem langsamen
+        // Laeufer waere die Schleife in die Frist gelaufen, der
+        // Ausgang DeadlineExceeded statt Quiet, und die Meldung haette
+        // vom Ausgang gesprochen statt von der Sperrklinke. Mit der
+        // Gegenprobe (Rueckfall, 13 Fenster, 412 ms gemessen) waere es
+        // noch knapper gewesen.
+        const QDeadlineTimer deadline(
+            qint64(5 * kQuietBeforeStop) * kPollMs, Qt::CoarseTimer);
 
-        std::thread burst(sendSingleDatagramAfterDelay, victim.localPort(), kBurstDelayMs);
+        // Erst den Faden, dann warten, bis er wirklich rechnet — siehe
+        // sendSingleDatagramAfterDelay. Ohne das steht das Anlegen des
+        // Fadens im Zeitbudget, und genau daran fiel dieser Lauf
+        // am 2026-10-17 in der CI um.
+        std::atomic<bool> burstLaeuft{false};
+        std::thread burst(sendSingleDatagramAfterDelay, victim.localPort(),
+                          kBurstDelayMs, &burstLaeuft);
+        QElapsedTimer anlaufUhr;
+        anlaufUhr.start();
+        while (!burstLaeuft.load(std::memory_order_acquire)
+               && anlaufUhr.elapsed() < 5000) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        QVERIFY2(burstLaeuft.load(std::memory_order_acquire),
+                 "der sendende Faden kam in fuenf Sekunden nicht zum "
+                 "Rechnen — dann sagt dieser Lauf nichts ueber den "
+                 "Stille-Zaehler");
+        qInfo().noquote() << "Faden lief nach" << anlaufUhr.elapsed() << "ms an";
 
         RadioDiscovery::QuietPollMetrics metrics;
         QElapsedTimer clock;
@@ -202,6 +261,15 @@ private slots:
         burst.join();
 
         QCOMPARE(int(outcome), int(RadioDiscovery::QuietPollOutcome::Quiet));
+
+        // Immer melden, nicht erst im Fehlerfall: als dieser Lauf am
+        // 2026-10-17 in der CI umfiel, stand im Protokoll nur, dass
+        // null Datagramme ankamen — nicht, wie lange die Schleife
+        // gelaufen war. Eine Messung, die nur bei Rot erscheint, ist
+        // bei Rot die halbe Antwort.
+        qInfo().noquote() << "stille Fenster:" << metrics.quietPolls
+                          << " Datagramme:" << metrics.datagrams
+                          << " Dauer:" << elapsedMs << "ms";
 
         // Erst: die Antwort ist wirklich angekommen. Ohne diese Zeile
         // wuerde ein verlorenes Datagramm den Lauf gruen machen, ohne
