@@ -126,6 +126,11 @@ public:
                                          Ft8Decoder::Protocol p,
                                          const QString& meinLocator);
 
+    /// Der eigene CQ-Ruf: „CQ <mein Ruf> <mein Locator>". Leer ohne
+    /// Rufzeichen. Statisch, damit die Regel ohne Fenster zu pruefen
+    /// ist — wie antwortAuf().
+    static QString cqRuf(const QString& meinRuf, const QString& meinLocator);
+
     static QString eigenesRufzeichen();
     static QString eigenerLocator();
 
@@ -137,6 +142,10 @@ public:
     QPushButton* cqButtonForTest()  const { return m_cqBtn; }
     QPushButton* stopButtonForTest() const { return m_stopBtn; }
     QPushButton* autoButtonForTest() const { return m_autoBtn; }
+    /// Der „CQ"-Knopf, der den eigenen Ruf einsetzt. Nicht zu
+    /// verwechseln mit cqButtonForTest() — das ist seit #244 der
+    /// „Send"-Knopf (m_cqBtn), der Name ist dort eine Altlast.
+    QPushButton* cqRufenButtonForTest() const { return m_cqRufenBtn; }
     const Ft8Ablauf& ablaufForTest() const { return m_ablauf; }
     /// Einen Fund einspeisen, als waere er dekodiert worden — der
     /// einzige Weg, auf dem der Ablauf vorankommt, also auch der
@@ -223,6 +232,11 @@ private:
     /// diese Wache stuende dasselbe QSO mehrfach im Logbuch.
     bool         m_qsoGemeldet{false};
     QPushButton* m_autoBtn{nullptr};
+    /// „CQ": legt den eigenen Ruf ins Feld. Mit Auto faengt damit der
+    /// Ablauf als ANRUFER an — bis zum 2026-10-16 war diese Haelfte
+    /// von Ft8Ablauf gebaut und geprueft, aber von nirgends
+    /// erreichbar: starteAlsAnrufer() hatte keinen einzigen Aufrufer.
+    QPushButton* m_cqRufenBtn{nullptr};
     void fensterZuEnde();
     void meldeFertigesQso();
     void ablaufSchritt();
