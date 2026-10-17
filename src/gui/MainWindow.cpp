@@ -367,6 +367,7 @@ warren@wpratt.com
 #include "applets/PhoneCwApplet.h"
 #include "applets/RadeApplet.h"
 #include "core/CatModeMap.h"
+#include "core/CatPtyServer.h"
 #include "core/CatServer.h"
 #include "applets/EqApplet.h"
 #include "applets/VaxApplet.h"
@@ -796,7 +797,6 @@ MainWindow::MainWindow(QWidget* parent)
                 catSetzeSperre(sl, w != 0);
             }
         };
-
         // setzeVfoB und setzeSplit bleiben ABSICHTLICH leer. Longpath hat
         // kein VFO B und keinen Split; die Protokollschicht lehnt einen
         // Befehl ohne Haken mit "?;" ab, statt ihn zu quittieren und
@@ -881,6 +881,28 @@ MainWindow::MainWindow(QWidget* parent)
 
             wir->zeigeSchutzrahmenKurz();
         });
+
+        // ── Die serielle Haelfte (2026-10-12) ────────────────────────
+        //
+        // Viele Programme koennen CAT nur ueber eine serielle
+        // Schnittstelle: fldigi fragt nach einem Geraetepfad, Logbuecher
+        // und aeltere Contestprogramme ebenso. Auf macOS und Linux ist
+        // die Entsprechung ein Pseudoterminal.
+        //
+        // KEINE zweite Protokollschicht. Der Antwortgeber zeigt auf
+        // denselben CatServer, den auch der TCP-Weg fragt -- genau ein
+        // Zustandsgeber, genau ein Satz Haken, genau eine AI-Flagge. Wer
+        // je Transport eine eigene Schicht baut, hat zwei Stellen, an
+        // denen ein Haken fehlen kann, und merkt es an der zweiten nie:
+        // am 2026-10-11 hat ein fehlender VFO-B-Haken in EINER Schicht
+        // drei gruene Pruefstaende ueberlebt und erst der Livelauf hat
+        // ihn gezeigt.
+        m_catPtyServer = new CatPtyServer(this);
+        m_catPtyServer->setzeAntwortgeber(
+            [this](const QString& befehl) -> QString {
+                if (!m_catServer) { return {}; }
+                return m_catServer->antwortAuf(befehl);
+            });
     }
 
     buildUI();
@@ -7243,6 +7265,7 @@ void MainWindow::populateDefaultMeter()
     panel->addApplet(m_cwDecoderApplet);
     m_cwDecoderApplet->setVisible(false);
 
+    // EqApplet — Equalizer, Empfang und Senden (eingehaengt 2026-10-11).
     // Ft8Applet (2026-10-15) -- der native FT8/FT4-Dekoder, sichtbar in
     // den Datenmodi (DIGU/DIGL). Gleiche Verdrahtung wie CW und RTTY.
     m_ft8Applet = new Ft8Applet(m_radioModel, nullptr);
@@ -7278,6 +7301,7 @@ void MainWindow::populateDefaultMeter()
     // bei den Konstruktoren weiter unten.
     m_catApplet = new CatApplet(m_radioModel, nullptr);
     m_catApplet->setzeCatServer(m_catServer);
+    m_catApplet->setzeCatPtyServer(m_catPtyServer);
     panel->addApplet(m_catApplet);
 
     // Geister-Applets — verborgen nach
@@ -7790,6 +7814,8 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Rade")]       = m_radeApplet;
     m_appletsById[QStringLiteral("RttyDecoder")] = m_rttyDecoderApplet;
     m_appletsById[QStringLiteral("CwDecoder")] = m_cwDecoderApplet;
+    m_appletsById[QStringLiteral("Eq")]         = m_eqApplet;
+    m_appletsById[QStringLiteral("Cat")]        = m_catApplet;
     m_appletsById[QStringLiteral("Ft8Decoder")] = m_ft8Applet;
     m_appletsById[QStringLiteral("Eq")]         = m_eqApplet;
     m_appletsById[QStringLiteral("Cat")]        = m_catApplet;
@@ -7860,6 +7886,22 @@ void MainWindow::populateDefaultMeter()
     // CW: same shape -- defaultVisible=true, gated on CWL/CWU below.
     m_appletVis->registerApplet(QStringLiteral("CwDecoder"),
                                 QStringLiteral("CW Decoder"), true);
+    // Equalizer (eingehaengt 2026-10-11). Sichtbar ab Werk: beide Haelften
+    // sind jetzt verdrahtet, und der Empfangs-Equalizer ist neu -- ein
+    // Merkmal, das man erst in einem Menue suchen muss, findet niemand
+    // (dieselbe Begruendung wie beim Sprachspeicher darunter).
+    //
+    // Der Eintrag in m_appletsById oben ist dabei genauso Pflicht wie
+    // dieser: ohne ihn kennt der Auswaehler das Applet nicht. Siehe die
+    // Notiz bei "Die vier vom 2026-08-23".
+    m_appletVis->registerApplet(QStringLiteral("Eq"),
+                                QStringLiteral("Equalizer"),    true);
+    // CAT: NICHT sichtbar ab Werk. Wer kein Fremdprogramm anbindet,
+    // braucht das Feld nie, und zwei seiner vier Reihen sind noch
+    // Attrappen -- es soll gefunden werden, wenn man es sucht, und nicht
+    // im Weg stehen, wenn nicht.
+    m_appletVis->registerApplet(QStringLiteral("Cat"),
+                                QStringLiteral("CAT"),          false);
     // FT8/FT4: dieselbe Form, gehaengt an die Datenmodi (2026-10-15).
     m_appletVis->registerApplet(QStringLiteral("Ft8Decoder"),
                                 QStringLiteral("FT8 Decoder"), true);

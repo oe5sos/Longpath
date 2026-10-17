@@ -665,6 +665,149 @@ private slots:
         applet.abbrechen();
     }
 
+    // ── CQ rufen ────────────────────────────────────────────────────
+    //
+    // Ft8Ablauf kann die ANRUFER-Rolle seit dem QSO-Ablauf
+    // (starteAlsAnrufer, dreizehn Faelle in tst_ft8_ablauf) — nur rief
+    // sie bis zum 2026-10-16 niemand auf. Antworten ging per
+    // Doppelklick, selbst CQ rufen gar nicht.
+
+    void derCqRufStimmt_data()
+    {
+        QTest::addColumn<QString>("ruf");
+        QTest::addColumn<QString>("locator");
+        QTest::addColumn<QString>("erwartet");
+
+        QTest::newRow("mit Locator")
+            << QStringLiteral("OE5SOS") << QStringLiteral("JN67VV")
+            << QStringLiteral("CQ OE5SOS JN67");
+        // Ohne Feldkenner ist „CQ OE5SOS" zulaessig und kommt auf dem
+        // Band vor.
+        QTest::newRow("ohne Locator")
+            << QStringLiteral("OE5SOS") << QString()
+            << QStringLiteral("CQ OE5SOS");
+        QTest::newRow("klein geschrieben")
+            << QStringLiteral("oe5sos") << QStringLiteral("jn67vv")
+            << QStringLiteral("CQ OE5SOS JN67");
+        // Ohne Rufzeichen gar nichts — sonst stuende „CQ  JN67" auf
+        // dem Band.
+        QTest::newRow("ohne Ruf")
+            << QString() << QStringLiteral("JN67")
+            << QString();
+        QTest::newRow("nur Leerzeichen")
+            << QStringLiteral("   ") << QStringLiteral("JN67")
+            << QString();
+    }
+
+    void derCqRufStimmt()
+    {
+        QFETCH(QString, ruf);
+        QFETCH(QString, locator);
+        QFETCH(QString, erwartet);
+        QCOMPARE(Ft8Applet::cqRuf(ruf, locator), erwartet);
+    }
+
+    // Ohne „Auto" legt der Knopf den Ruf nur ins Feld — dieselbe
+    // Grenze wie beim Doppelklick.
+    void ohneAutoFuelltDerCqKnopfNurDasFeld()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        QVERIFY(applet.cqRufenButtonForTest());
+        QVERIFY(!applet.autoButtonForTest()->isChecked());
+
+        applet.cqRufenButtonForTest()->click();
+
+        QCOMPARE(applet.textFeldForTest()->text(),
+                 QStringLiteral("CQ OE5SOS JN67"));
+        QVERIFY2(!applet.ablaufForTest().laeuft(),
+                 "ohne Auto darf kein Ablauf anlaufen");
+        QVERIFY2(!applet.sendetGerade(),
+                 "ohne Auto darf nichts gesendet werden");
+    }
+
+    // Mit „Auto" faengt der Ablauf als ANRUFER an.
+    void mitAutoRuftDerKnopfWirklichCq()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        applet.setProtocol(Ft8Decoder::Protocol::Ft4);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        applet.autoButtonForTest()->setChecked(true);
+        applet.cqRufenButtonForTest()->click();
+
+        QVERIFY2(applet.ablaufForTest().laeuft(), "der Ablauf muss anlaufen");
+        QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::RufeCq);
+        QVERIFY2(applet.ablaufForTest().partner().isEmpty(),
+                 "beim CQ-Rufen gibt es noch keinen Partner");
+        QVERIFY2(applet.sendetGerade(),
+                 "der Ruf muss auf sein Fenster warten");
+
+        applet.autoButtonForTest()->setChecked(false);
+        applet.abbrechen();
+    }
+
+    // Und der ganze Weg aus der Anrufer-Rolle: jemand antwortet, der
+    // Rapport geht hinaus, er bestaetigt, RR73 — ein Logbucheintrag.
+    void einQsoAusDerAnruferRolle()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        applet.setProtocol(Ft8Decoder::Protocol::Ft4);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        QSignalSpy gemeldet(&applet, &Ft8Applet::qsoFertig);
+        applet.autoButtonForTest()->setChecked(true);
+        applet.cqRufenButtonForTest()->click();
+        QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::RufeCq);
+
+        const auto fund = [&applet](const char* text, double snr) {
+            Ft8Decode d;
+            d.text   = QString::fromLatin1(text);
+            d.snrDb  = snr;
+            d.freqHz = 1500.0;
+            applet.fundForTest(d);
+        };
+
+        fund("OE5SOS DL1ABC JO31", -7.0);
+        QCOMPARE(applet.ablaufForTest().partner(), QStringLiteral("DL1ABC"));
+        QCOMPARE(applet.ablaufForTest().zustand(),
+                 Ft8Ablauf::Zustand::SendeReport);
+
+        fund("OE5SOS DL1ABC R-15", -7.0);
+        QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::SendeRR73);
+        QCOMPARE(gemeldet.count(), 0);
+
+        // Das gesendete RR73 schliesst das QSO ab.
+        applet.fensterZuEndeForTest();
+        QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::Fertig);
+        QCOMPARE(gemeldet.count(), 1);
+
+        const auto e = gemeldet.first().first().value<LogEntry>();
+        QCOMPARE(e.call, QStringLiteral("DL1ABC"));
+        QCOMPARE(e.gridSquare, QStringLiteral("JO31"));
+        QCOMPARE(e.rstSent, QStringLiteral("-07"));   // was ich von ihm mass
+        QCOMPARE(e.rstRcvd, QStringLiteral("-15"));   // was er mir gab
+
+        applet.autoButtonForTest()->setChecked(false);
+        applet.abbrechen();
+    }
+
     void derRouterLiefertDieFt8QuelleDurch()
     {
         PcMicSource* keinPc = nullptr;

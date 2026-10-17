@@ -983,6 +983,18 @@ longpath_add_test(tst_radio_model_band_click)
 longpath_add_test(tst_about_dialog)
 longpath_add_test(tst_support_dialog)
 longpath_add_test(tst_dev_automation_server)
+# ── RTTY senden (2026-10-16) ─────────────────────────────────────────
+# Der staerkste Pruefstand fuer einen Sender ist der Empfaenger, den es
+# schon gibt: der Lauf schickt seine Toene durch RttyDecoder zurueck.
+#
+# Dieser Eintrag kam mit #257 und war beim Merge von #254 wieder weg:
+# dort war ein Squash-Konflikt in dieser Datei mit
+# `git checkout --ours` geloest, und die eigene Zweigseite kannte #257
+# noch nicht. Der Pruefstand wurde danach weiter GEBAUT, aber nicht
+# mehr angemeldet — ctest kannte ihn nicht, und nichts meldete das.
+longpath_add_test(tst_rtty_senden)
+target_link_libraries(tst_rtty_senden PRIVATE Qt6::Multimedia)
+
 longpath_add_test(tst_rtty_decoder)
 longpath_add_test(tst_rtty_decoder_sensitivity)
 longpath_add_test(tst_rtty_decoder_applet)
@@ -1813,6 +1825,14 @@ longpath_add_test(tst_mehrere_fenster)
 longpath_add_test(tst_phone_felder)
 longpath_add_test(tst_rufzeichen_locator)
 longpath_add_test(tst_zahlentext)
+# Die serielle Haelfte (2026-10-12). Nur auf UNIX: der Prueffall legt
+# echte Pseudoterminals an (posix_openpt), und die gibt es auf Windows
+# nicht. Dort meldet CatPtyServer::verfuegbar() false und der Schalter
+# im Applet bleibt gesperrt -- genau das ist das gepruefte Verhalten,
+# und ein Prueffall, der nur das pruefen koennte, braucht keine Datei.
+if(UNIX)
+    longpath_add_test(tst_cat_pty)
+endif()
 longpath_add_test(tst_fm_applet_wiring)
 
 # ── Phase 3F Sub-Epic B Task 17: AlexController event-matrix coverage ─────────

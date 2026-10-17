@@ -202,6 +202,33 @@ void Ft8Applet::buildUI()
         .arg(Style::kInsetBg, Style::kTextPrimary, Style::kInsetBorder));
     sendRow->addWidget(m_textFeld, 1);
 
+    // ── CQ rufen ────────────────────────────────────────────────────
+    //
+    // Ft8Ablauf kann seit dem QSO-Ablauf auch die ANRUFER-Rolle
+    // (starteAlsAnrufer, dreizehn Prueffaelle) — nur rief sie
+    // niemand auf. Antworten ging per Doppelklick, selbst CQ rufen
+    // gar nicht. Dieser Knopf schliesst das, mit demselben Verhalten
+    // wie der Doppelklick: ohne „Auto" legt er den Ruf nur ins Feld,
+    // mit „Auto" faengt der Ablauf an.
+    m_cqRufenBtn = styledButton(tr("CQ"), 40);
+    m_cqRufenBtn->setToolTip(tr(
+        "Put your own CQ call in the box.\nWith Auto on, start calling "
+        "CQ and run the QSO sequence."));
+    connect(m_cqRufenBtn, &QPushButton::clicked, this, [this]() {
+        const QString ruf = cqRuf(eigenesRufzeichen(), eigenerLocator());
+        if (ruf.isEmpty()) {
+            if (m_status) { m_status->setText(tr("set your callsign first")); }
+            return;
+        }
+        if (m_textFeld) { m_textFeld->setText(ruf); }
+        if (m_autoBtn && m_autoBtn->isChecked() && !m_sendet) {
+            m_qsoGemeldet = false;
+            m_ablauf.starteAlsAnrufer(eigenesRufzeichen(), eigenerLocator());
+            ablaufSchritt();
+        }
+    });
+    sendRow->addWidget(m_cqRufenBtn);
+
     m_cqBtn = styledButton(tr("Send"), 56);
     m_cqBtn->setToolTip(tr("Send this message once, in the next own "
                            "period. No auto-sequencing."));
@@ -438,6 +465,18 @@ QString Ft8Applet::antwortAuf(const QString& zeile,
     }
     return QStringLiteral("%1 %2 %3")
         .arg(seinRuf, meinRuf.trimmed().toUpper(), locator);
+}
+
+// Der eigene CQ-Ruf. Derselbe Aufbau wie eine Antwort, nur ohne
+// Gegenstation: „CQ OE5SOS JN67". Ohne Locator bleibt „CQ OE5SOS" —
+// das ist zulaessig und kommt auf dem Band vor.
+QString Ft8Applet::cqRuf(const QString& meinRuf, const QString& meinLocator)
+{
+    const QString ruf = meinRuf.trimmed().toUpper();
+    if (ruf.isEmpty()) { return {}; }
+    const QString loc = meinLocator.trimmed().left(4).toUpper();
+    return loc.isEmpty() ? QStringLiteral("CQ %1").arg(ruf)
+                         : QStringLiteral("CQ %1 %2").arg(ruf, loc);
 }
 
 // `User/Callsign` ist der kanonische Schluessel — SpotHubDialog
