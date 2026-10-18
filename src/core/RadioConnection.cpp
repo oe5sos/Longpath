@@ -30,6 +30,19 @@ std::unique_ptr<RadioConnection> RadioConnection::create(const RadioInfo& info)
         return std::make_unique<P1RadioConnection>();
     case ProtocolVersion::SunSdr:
         return std::make_unique<SunSdrRadioConnection>();
+    case ProtocolVersion::Flex:
+        // Es gibt bewusst keine RadioConnection-Unterklasse fuer Flex.
+        // Diese Basis ist durch und durch OpenHPSDR (Alex-Wege,
+        // ADC-Zahlen, Metis-Rahmen) und setzt voraus, dass der CLIENT
+        // rechnet; bei Flex rechnet das Radio. Der Flex-Weg laeuft
+        // daneben, ueber FlexRadioDiscovery und FlexRadioConnection —
+        // Stufe 1 (Erkennung + Befehlskanal, keine Stroeme), siehe
+        // docs/architecture/2026-10-18-flex-stufe1-design.md.
+        //
+        // Hier steht der Fall ausdruecklich, nicht als Durchfall: so
+        // bleibt der switch vollstaendig, und der Grund steht an der
+        // Stelle, an der jemand ihn sucht.
+        return nullptr;
     }
     qCWarning(lcConnection) << "Unknown protocol version:" << static_cast<int>(info.protocol);
     return nullptr;

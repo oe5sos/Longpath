@@ -550,6 +550,7 @@ double scalePaTemperatureCelsius(quint16 /*adcRaw*/, HPSDRModel /*model*/)
 RadioModel::RadioModel(QObject* parent)
     : QObject(parent)
     , m_discovery(new RadioDiscovery(this))
+    , m_flexDiscovery(new FlexRadioDiscovery(this))
     , m_receiverManager(new ReceiverManager(this))
     , m_audioEngine(new AudioEngine(this))
     , m_wdspEngine(new WdspEngine(this))
@@ -7369,6 +7370,20 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     auto conn = RadioConnection::create(info);
     if (!conn) {
         qCWarning(lcConnection) << "Failed to create connection for" << info.displayName();
+        if (info.protocol == ProtocolVersion::Flex) {
+            // Eine Flex-Zeile steht seit Stufe 1 in der Geraeteliste
+            // (FlexRadioDiscovery findet sie), aber verbinden kann
+            // Longpath sie noch nicht. Ohne diese Meldung klickt der
+            // Betreiber auf „Connect" und es passiert sichtbar nichts —
+            // genau die Klasse Fehler, die ConnectionPanels Statuszeile
+            // 2026-08-26 fuer SunSDR aufgedeckt hat.
+            emit connectAttemptFailed(
+                ConnectFailure::ProtocolMismatch,
+                QStringLiteral("FlexRadio detected, but Longpath cannot "
+                               "connect to it yet \u2014 discovery and the "
+                               "command channel are in place, audio and "
+                               "panadapter streams are not."));
+        }
         return;
     }
     m_connection = conn.release();

@@ -6,7 +6,9 @@ attribution per GPLv3 §5. Every file below has the project-level
 AetherSDR copyright block in its own header; this table is the index.
 
 Upstream reference: `../AetherSDR` at `3a1f59e`; the channel-strip
-DSP below was taken later, at `31b29583`.
+DSP below was taken later, at `31b29583`, and the Flex Stufe-1 wire
+(discovery + command channel) later still, at `d58e2b8a`
+(`v26.8.3-144-gd58e2b8a`).
 
 The wider structural debt to AetherSDR (applet panel shape, style
 palette, meter widgets, CtyDatParser, AdifParser) is catalogued in
@@ -273,3 +275,31 @@ via inline AetherSDR citations.
 | `src/gui/WindowChrome.h` | `src/gui/FloatingContainerWindow.{h,cpp}` | `31b2958` | 2026-08-20 | Longpath-original frameless-window titlebar + resize-handle chrome; structurally modeled on AetherSDR's file, which pairs the same two parts (a draggable bar, a resize handle) atop a frameless window. |
 | `src/core/dsp/FftwPlannerLock.h`, `.cpp` | `src/core/dsp/FftwPlannerLock.{h,cpp}` | `7f68dda0` | 2026-09-22 | Namensraum; die Aufzaehlung der Aufrufstellen im Kopf ist Longpaths eigene (FFTEngine, WidebandFftEngine, RxChannel, WDSP-Kanaele und der WDSPwisdom-Faden). Die Sperren selbst sind Wort fuer Wort dieselbe Loesung: je Genauigkeit ein prozessweiter Mutex, gehalten ueber Belegung, Plan, Verwerfen und Wissenszugriff, nie ueber fftw_execute. |
 | `src/gui/ScopedChildWidget.h` | `src/gui/ScopedChildWidget.h` | `b9e96a94` | 2026-09-22 | Namensraum; die Begruendung im Kopf ist ausgeschrieben und nennt Longpaths eigenen Absturz vom 2026-08-30. Die Klasse selbst ist unveraendert: QPointer auf ein Kind auf dem Haufen, Freigabe im Destruktor nur wenn es noch da ist. |
+
+## Flex-Treiber Stufe 1 (2026-10-18)
+
+Erkennung und Befehlskanal einer FlexRadio-Maschine. AetherSDR ist hier
+**Alleinquelle**: Thetis spricht kein SmartSDR-Protokoll, es gibt keinen
+C#-Urtext, gegen den man übersetzen könnte. Dieselbe Lage wie beim
+RTTY-Dekoder und bei der Automatisierungsbrücke.
+
+Die Satzlehre (V/H/C/R/S/M) ist zeichengetreu übernommen, bis hin zum
+Hinweis, warum ein Ergebniscode nicht als `int` gelesen werden darf.
+Der 28-Byte-Kopf des Erkennungsrufs stammt NICHT von AetherSDR (dessen
+Leser kennt keinen Kopf), sondern aus dem eigenen Baum,
+`FlexRadioDiscoveryBroadcaster.cpp:281-297`, am 2026-10-18 gegen die
+echte FLEX-8400 nachgemessen.
+
+Was bewusst NICHT portiert ist: `client gui` (Longpath bleibt Mitleser,
+Begründung im Kopf von `FlexRadioConnection.h`), die
+Demo-/Synthetikzweige, die Multi-Flex-Verwaltung, Keepalive-Ping und
+die RTT-Messung über `TCP_INFO`, und alles an Strömen
+(`PanadapterStream`, 2279 Zeilen) — das ist Stufe 2.
+
+Entwurf und Messprotokoll:
+`docs/architecture/2026-10-18-flex-stufe1-design.md`.
+
+| NereusSDR file | AetherSDR source | Rev | Ported | Notes |
+|---|---|---|---|---|
+| `src/core/FlexRadioDiscovery.h`, `.cpp` | `src/core/RadioDiscovery.{h,cpp}` | `d58e2b8a` | 2026-10-18 | Namensraumwechsel. Übernommen: der Feldsatz des Rufs, `cleanDiscoveryValue` / `splitDiscoveryListValue` (Steuerzeichen raus, DEL→Leerzeichen in Listenwerten), die Zerlegung an Leerzeichen und am ersten `=`, der Auffrischen-statt-Anlegen-Abgleich (`upsertRadio`) und die 5-Sekunden-Vergessensfrist (`STALE_TIMEOUT_MS`, gefegt im halben Takt). Abweichungen, alle gemessen: (1) Kopfprüfung auf die VITA-Kennung in Byte 8-15 statt „ganzes Datagramm als Text" — der Kopf steht im eigenen Baum; (2) Liste nach MAC statt nach Seriennummer, weil Longpaths `RadioInfo` MAC-geschlüsselt ist (MAC aus `radio_license_id`, Seriennummer als Rückfall); (3) vierzehn Schlüssel ergänzt, die eine echte Maschine zusätzlich sendet, darunter die drei, die AetherSDRs Leser falsch erwartet (`inuse` → `inuse_ip`/`inuse_host`, `mf_enable` → `licensed_clients`/`available_clients`, `max_licensed_version` ist „v3" und keine Zahl); (4) Eigenruf-Filter über die Absenderadresse — Longpath ruft auf demselben Port selbst aus und stand sonst in seiner eigenen Liste. Nicht übernommen: `RadioBindSettings` / Bind-Modus, die Bind- und Re-Bind-Wiederholschleifen, `setConnected(connected, remote)`, `displayName()`, die Gateway-Felder (`family`, `versionLabel`, `bands`, `isRouted`). |
+| `src/core/FlexRadioConnection.h`, `.cpp` | `src/core/CommandParser.{h,cpp}`; `src/core/RadioConnection.{h,cpp}`; `src/models/RadioModel.cpp:6523-6596`; `src/core/backends/flex/FlexBackend.cpp:724-745` | `d58e2b8a` | 2026-10-18 | Namensraumwechsel; `ParsedMessage` → `FlexLine`, `MessageType` → `FlexLineType`, `MessageSeverity` → `FlexSeverity`, `LogManager` → lokale `Q_LOGGING_CATEGORY(lcFlexCmd)`. Zeichengetreu: `parseKVs`, `parseLine` (alle sechs Satzarten, die Objektgrenze im S-Satz = letztes Leerzeichen VOR dem ersten `=`, die Schwere in Bit 24-25 des M-Satzes per FlexLib `Radio.cs:4498-4516`), `buildCommand`, die Zeilenaufsammlung samt 16-MB-Deckel, der Zustandswechsel am H-Satz, das Heraushalten von `\|gps ` aus dem Protokoll. `resultCode` ist `quint32` statt `int` — AetherSDRs eigener Kommentar an dieser Stelle (`CommandParser.cpp:63-70`) begründet, warum ein `int` eine schwere Ablehnung still in Erfolg verwandelt; hier ist der Typ von Anfang an richtig, statt den Bitmustertrick zu wiederholen. `RF_frequency` wird nach der dort begründeten Regel gelesen (fehlend oder unlesbar ⇒ nichts, niemals 0 Hz). Nicht übernommen: `client gui` und die ganze GUI-Client-Anmeldung samt Verdrängungsschutz, `client low_bw_connect`, `client station`, `enforce_network_mtu`, `keepalive enable`, die zehn weiteren `sub`-Themen, `gracefulDisconnect`, der Demo-/Synthetikbetrieb, `kernelRttMs()` (TCP_INFO auf drei Plattformen), der Worker-Thread-Aufbau (`init()` nach `moveToThread`) — Stufe 1 liest auf dem Hauptfaden. |

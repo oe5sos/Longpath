@@ -101,6 +101,7 @@
 #include "core/accessories/PennyLaneController.h"
 #include "core/CalibrationController.h"
 #include "core/RadioDiscovery.h"
+#include "core/FlexRadioDiscovery.h"
 #include "core/RadioConnection.h"
 #include "core/HardwareProfile.h"
 #include "core/codec/CodecContext.h"  // SliceConfig (Phase 3F Sub-Epic B Task 16)
@@ -268,6 +269,11 @@ public:
     RadioConnection*  connection()       { return m_connection; }
     const RadioConnection* connection() const { return m_connection; }
     RadioDiscovery*   discovery()        { return m_discovery; }
+    // Flex-Treiber Stufe 1: die passive Erkennung auf UDP 4992. Getrennt
+    // von m_discovery, weil die beiden entgegengesetzt arbeiten --
+    // OpenHPSDR wird gefragt (Rundruf auf 1024, NIC-Lauf), FlexRadio
+    // ruft von selbst. Siehe core/FlexRadioDiscovery.h.
+    FlexRadioDiscovery* flexDiscovery()  { return m_flexDiscovery; }
     ReceiverManager*  receiverManager()  { return m_receiverManager; }
     AudioEngine*      audioEngine()      { return m_audioEngine; }
     WdspEngine*       wdspEngine()       { return m_wdspEngine; }
@@ -3431,6 +3437,7 @@ private:
 
     // Sub-components (owned, main thread)
     RadioDiscovery*  m_discovery{nullptr};
+    FlexRadioDiscovery* m_flexDiscovery{nullptr};  // Flex-Treiber Stufe 1
     ReceiverManager* m_receiverManager{nullptr};
     AudioEngine*     m_audioEngine{nullptr};
     WdspEngine*      m_wdspEngine{nullptr};

@@ -721,6 +721,10 @@ set(CORE_SOURCES
     src/core/TxInterlockPolicy.cpp
     # FlexRadio UDP 4992 discovery beacon (PGXL/TGXL auto-detect)
     src/core/FlexRadioDiscoveryBroadcaster.cpp
+    # Flex-Treiber Stufe 1: Erkennung (UDP 4992, passiv) und
+    # Befehlskanal (TCP 4992, Saetze C/R/S/M). Keine Stroeme.
+    src/core/FlexRadioDiscovery.cpp
+    src/core/FlexRadioConnection.cpp
     # Multi-homed-host source-IP picker (PGXL/TGXL/broadcaster per-peer
     # route probe + socket source bind)
     src/core/RouteProbe.cpp

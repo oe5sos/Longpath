@@ -7691,6 +7691,17 @@ longpath_add_test(tst_tnf_ui_wiring)
 #         section 8.3 + section 11.
 longpath_add_test(tst_notch_visual_does_not_perturb_noise_floor_or_maxbin)
 
+# -- Flex-Treiber Stufe 1: Erkennung + Befehlskanal -----------------------
+# Gegen ECHTE Bytes: die Erkennungsrufe sind am 2026-10-18 vom Draht
+# gelesen -- Martins FLEX-8400 (172.30.30.12) und Longpaths eigener Ruf
+# (172.30.30.110), der am Maestro als Phantom-Flex in der Liste stand.
+# Deckt dazu die Satzlehre V/H/R/S/M, den Ergebniscode mit gesetztem
+# oberstem Bit, die Objektgrenze im Zustandsschub und die
+# „unlesbare Frequenz wird nicht null"-Regel.
+# Quelle: Longpath-original; Satzlehre portiert aus AetherSDR (siehe
+#         src/core/FlexRadioConnection.h und docs/attribution/AETHERSDR-PORTS.md).
+longpath_add_test(tst_flex_stufe1)
+
 # 2026-09-25: Rendering-Pruefstand (ohne LONGPATH_GRAB_DIR uebersprungen),
 # die Retina-Spaltenzusammenfassung und die Frequenzskalen-Beschriftung,
 # die er gefunden hat.
