@@ -118,6 +118,23 @@ public:
                               const QString& meinRuf,
                               const QString& meinLocator);
 
+    /// Welcher Sorte ist eine Zeile? Die REIHENFOLGE ist die Aussage:
+    ///
+    ///   1. AnMich      -- jemand ruft DICH. Schlaegt alles.
+    ///   2. NeuesLand   -- ein Land, das noch nie im Logbuch stand.
+    ///   3. Cq          -- jemand ist rufbar.
+    ///   4. Gewoehnlich -- ein fremdes QSO.
+    ///
+    /// „Neues Land" steht ueber „CQ", weil ein neues Land auch dann
+    /// zaehlt, wenn die Station gerade kein CQ ruft -- man kann sie
+    /// trotzdem im Auge behalten. Es steht UNTER „an mich", weil ein
+    /// Ruf an die eigene Station immer das Dringendere ist.
+    ///
+    /// Statisch, damit die Reihenfolge ohne Fenster, ohne Logbuch und
+    /// ohne cty.dat pruefbar ist.
+    enum class Zeilenart { AnMich, NeuesLand, Cq, Gewoehnlich };
+    static Zeilenart zeilenart(bool anMich, bool neuesLand, bool istCq);
+
     /// Das eigene Rufzeichen aus den Einstellungen. `User/Callsign`
     /// ist der kanonische Schluessel (SpotHubDialog schreibt ihn);
     /// `StationCallsign` ist der Rueckfall.
