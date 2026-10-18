@@ -422,8 +422,8 @@ QWidget* AppletPanelWidget::wrapWithTitleBar(QWidget* child, const QString& titl
         auto* detach = new QPushButton(QStringLiteral("\u2197"), titleBar);
         detach->setFixedSize(16, 14);
         detach->setCursor(Qt::PointingHandCursor);
-        detach->setToolTip(QStringLiteral(
-            "Als eigenes Fenster ablösen — dann frei verschiebbar."));
+        detach->setToolTip(tr("Detach as its own window -- then "
+                                          "freely movable."));
         detach->setStyleSheet(btnCss);
         connect(detach, &QPushButton::clicked, this, [this, aw]() {
             emit appletDetachRequested(aw, appletPosition(aw));
@@ -433,8 +433,8 @@ QWidget* AppletPanelWidget::wrapWithTitleBar(QWidget* child, const QString& titl
         auto* close = new QPushButton(QStringLiteral("\u2715"), titleBar);
         close->setFixedSize(16, 14);
         close->setCursor(Qt::PointingHandCursor);
-        close->setToolTip(QStringLiteral(
-            "Ausblenden. Mit dem + unten rechts kommt es zurück."));
+        close->setToolTip(tr("Hide. The + at the bottom right "
+                                         "brings it back."));
         close->setStyleSheet(btnCss);
         connect(close, &QPushButton::clicked, this, [this, aw]() {
             emit appletHideRequested(aw);

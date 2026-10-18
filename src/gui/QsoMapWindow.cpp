@@ -214,13 +214,17 @@ void QsoMapWindow::buildUi()
 
     m_background = new QComboBox(this);
     m_background->setMinimumWidth(150);
-    m_background->setToolTip(QStringLiteral(
-        "Weltbild fuer Karte und Globus. Die Dateien liegen in\n%1\n\n"
-        "Erwartet wird eine gleichabstaendige Zylinderprojektion im "
-        "Verhaeltnis 2:1 mit Mitte bei 0 Grad Laenge. Ein Bild mit "
-        "anderem Verhaeltnis wird ausgegraut angeboten und nicht "
-        "gezeichnet \u2014 verzerrt saehe die Karte richtig aus und nur "
-        "die Stationsmarken saessen daneben.")
+    m_background->setToolTip(tr("World image for map and globe. "
+                                            "The files live "
+                                            "in\n%1\n\nExpected is an "
+                                            "equirectangular projection at a "
+                                            "2:1 ratio centred on 0 degrees "
+                                            "longitude. An image with a "
+                                            "different ratio is offered "
+                                            "greyed out and not drawn \u2014 "
+                                            "stretched, the map would look "
+                                            "right and only the station "
+                                            "markers would sit wrong.")
             .arg(WorldMapCatalog::directory()));
     // Die Liste erst beim Aufklappen fuellen. Der Filter, weil
     // showPopup() kein Signal ist.

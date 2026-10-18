@@ -8596,8 +8596,7 @@ void MainWindow::populateDefaultMeter()
             [this](const QString& id, bool visible) {
         if (visible) { bringAppletToFront(id); }
     });
-    m_addWidgetBtn->setToolTip(QStringLiteral(
-        "Fenster hinzufügen oder entfernen"));
+    m_addWidgetBtn->setToolTip(tr("Add or remove windows"));
     m_addWidgetBtn->raise();
     m_addWidgetBtn->show();
     positionAddWidgetButton();
@@ -10214,9 +10213,9 @@ void MainWindow::buildMenuBar()
             panLayoutAct->setEnabled(on);
             panLayoutAct->setToolTip(on
                 ? QStringLiteral("Pick a panadapter layout template")
-                : QStringLiteral(
-                      "Erst verbinden: wie viele Panadapter moeglich "
-                      "sind, sagt das Geraet (DDC-Anzahl)."));
+                : tr("Connect first: how many panadapters are "
+                                 "possible is up to the radio (its DDC "
+                                 "count)."));
         };
         syncPanLayoutEnabled();
         if (m_radioModel) {
@@ -11192,10 +11191,10 @@ void MainWindow::buildMenuBar()
         QAction* sideAct = containersMenu->addAction(
             tr("Side area on the right"));
         sideAct->setCheckable(true);
-        sideAct->setToolTip(QStringLiteral(
-            "Rotor/Log und Applets in einem Bereich am rechten Rand, "
-            "umschaltbar über eine Symbolleiste; Klick auf das aktive "
-            "Symbol klappt ihn zu."));
+        sideAct->setToolTip(tr("Rotator/log and applets in one "
+                                           "area along the right edge, "
+                                           "switched by a toolbar; clicking "
+                                           "the active icon folds it away."));
         connect(containersMenu, &QMenu::aboutToShow, sideAct, [this, sideAct]() {
             QSignalBlocker block(sideAct);
             sideAct->setChecked(m_sideArea != nullptr);

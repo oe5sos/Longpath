@@ -184,9 +184,9 @@ void SpectrumOverlayMenu::buildUI()
     m_renderModeCombo->setObjectName(QStringLiteral("overlayMenuRenderModeCombo"));
     m_renderModeCombo->addItems({tr("2D waterfall"),
                                  QStringLiteral("3D gestapelte Trassen")});
-    m_renderModeCombo->setToolTip(QStringLiteral(
-        "2D: Trasse plus Wasserfall.\n"
-        "3D: perspektivisch gestapelte Trassen."));
+    m_renderModeCombo->setToolTip(tr("2D: trace plus "
+                                                 "waterfall.\n3D: traces "
+                                                 "stacked in perspective."));
     modeRow->addWidget(m_renderModeCombo, 1);
     layout->addLayout(modeRow);
 
@@ -275,9 +275,9 @@ void SpectrumOverlayMenu::buildUI()
     // und drei Regler in einem Menue, das ueber dem Wasserfall
     // aufklappt, waere die falsche Flaeche.
     auto* bgButton = new QPushButton(tr("Background…"), this);
-    bgButton->setToolTip(QStringLiteral(
-        "Bild, Fuellfarbe und Deckkraft des Panadapters — oeffnet "
-        "Setup → Display → Spectrum Defaults"));
+    bgButton->setToolTip(tr("Image, fill colour and opacity of "
+                                        "the panadapter -- opens Setup → "
+                                        "Display → Spectrum Defaults"));
     connect(bgButton, &QPushButton::clicked, this, [this]() {
         emit openSetupPageRequested(QStringLiteral("Spectrum Defaults"));
     });

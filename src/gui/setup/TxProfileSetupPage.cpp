@@ -112,9 +112,10 @@ void TxProfileSetupPage::buildUi()
     // einem Auswahlfeld in einem Streifen, der ohnehin eng ist.
     m_importBtn = new QPushButton(tr("Import Thetis profiles…"),
                                   group);
-    m_importBtn->setToolTip(QStringLiteral(
-        "Eine Thetis-Profilausfuhr oder eine ganze Thetis-Datenbank "
-        "einlesen. Es wird nichts angewandt und nichts ueberschrieben."));
+    m_importBtn->setToolTip(tr("Import a Thetis profile export or "
+                                           "a whole Thetis database. Nothing "
+                                           "is applied and nothing is "
+                                           "overwritten."));
 
     btnRow->addWidget(m_saveBtn);
     btnRow->addWidget(m_deleteBtn);
