@@ -20,6 +20,7 @@
 #include "HeadlessMacGuard.h"
 #include "gui/MainWindow.h"
 #include "gui/applets/AppletVisibilityController.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -33,7 +34,7 @@ private slots:
         auto* mwp = new MainWindow();      // bewusst nicht abgeraeumt
         mwp->resize(1280, 800);
         mwp->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mwp));
+        QVERIFY(QTest::qWaitForWindowExposed(mwp, kFensterFrist));
         QTest::qWait(400);
 
         auto* vis = mwp->findChild<AppletVisibilityController*>();
@@ -59,7 +60,7 @@ private slots:
         auto* mwp = new MainWindow();
         mwp->resize(1280, 800);
         mwp->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mwp));
+        QVERIFY(QTest::qWaitForWindowExposed(mwp, kFensterFrist));
         QTest::qWait(400);
 
         auto* vis = mwp->findChild<AppletVisibilityController*>();
@@ -81,7 +82,7 @@ private slots:
         auto* mwp = new MainWindow();
         mwp->resize(1280, 800);
         mwp->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mwp));
+        QVERIFY(QTest::qWaitForWindowExposed(mwp, kFensterFrist));
         QTest::qWait(400);
 
         auto* vis = mwp->findChild<AppletVisibilityController*>();

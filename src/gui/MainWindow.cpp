@@ -302,6 +302,8 @@ warren@wpratt.com
 #include "core/TxChannel.h"  // H.2: setTxChannel wiring
 #include "core/ReceiverManager.h"
 #include "core/AppSettings.h"
+#include "core/StartWatch.h"
+#include "core/UiScale.h"
 #include "core/BuildIdentity.h"
 #include "core/PaTempUnit.h"
 #include "core/RadioStatus.h"
@@ -339,6 +341,9 @@ warren@wpratt.com
 #include "core/SettingsBackup.h"
 #include "applets/AmpApplet.h"
 #include "applets/Rf2ksApplet.h"
+#include "applets/SpeApplet.h"
+#include "applets/Kpa500Applet.h"
+#include "applets/AcomApplet.h"
 #include "applets/AppletVisibilityController.h"
 #include "applets/RxApplet.h"
 #include "core/PgxlConnection.h"
@@ -371,6 +376,7 @@ warren@wpratt.com
 #include "applets/PhoneCwApplet.h"
 #include "applets/RadeApplet.h"
 #include "core/CatModeMap.h"
+#include "core/CatPtyServer.h"
 #include "core/CatServer.h"
 #include "applets/EqApplet.h"
 #include "applets/VaxApplet.h"
@@ -381,6 +387,7 @@ warren@wpratt.com
 #include "applets/DvkApplet.h"
 #include "applets/RttyDecoderApplet.h"
 #include "applets/CwDecoderApplet.h"
+#include "applets/Ft8Applet.h"
 #include "applets/QsoRecorderApplet.h"
 #include "applets/KiwiSdrApplet.h"
 #include "KiwiWaterfallPanel.h"
@@ -463,17 +470,22 @@ warren@wpratt.com
 #include <QVBoxLayout>
 #include <QSplitter>
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QPainter>
 #include <QPixmap>
 #include <QProgressDialog>
 #include <QInputDialog>
 #include <QMessageBox>
+#include "core/UpdateInstaller.h"
+#include "gui/styles/Theme.h"
+#include "gui/widgets/SliceFlag.h"
 #include <QDialog>
 #include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QLineEdit>
+#include <QProcess>
 #include <QStandardPaths>
 #include <QTextStream>
 #include <QTimer>
@@ -829,14 +841,85 @@ MainWindow::MainWindow(QWidget* parent)
             // Bedingung ist aber nicht nur eine Wache, sie ist der
             // bessere Zeitpunkt -- der Rahmen soll auftauchen, wenn man
             // IHM NAHE KOMMT, und nicht bei jeder Bewegung blinken.
-            bool beruehrt = false;
+            // Waehrend des Aufbaus platziert das Programm selbst --
+            // Profilgeometrien, showMaximized(), Rahmenwechsel. Das ist
+            // kein Ziehen, auch wenn sich die Lage dabei aendert
+            // (2026-10-17: genau daran fiel tst_schutzrahmen, nachdem
+            // der Start von randlos auf maximiert umgestellt wurde).
+            if (!wir->m_fensterAufbauFertig) { return; }
+
             const QRect wo = bewegtes->frameGeometry();
+            // ── Platzieren ist kein Ziehen (2026-10-17) ─────────────
+            //
+            // Die Beruehrungsbedingung darueber reicht nicht. Gemessen
+            // (offscreen, wie die CI): beim Aufbau meldet ein
+            // ToolWindow ZWEIMAL mit identischer Geometrie
+            // (248,296 536x504) -- das ist die Wiederherstellung seiner
+            // Profilposition, und die liegt im Sperrstreifen. Der
+            // Hinweis stand damit schon da, bevor jemand zog; in der
+            // CI faellt deswegen `beimZiehenWirdDerRahmenSICHTBAR`,
+            // lokal auf einem echten Schirm nicht (dort landet das
+            // Fenster anders).
+            //
+            // Unterschieden wird am Verlauf, nicht an der Maustaste:
+            // beim nativen Ziehen auf macOS sieht Qt den Knopf nicht
+            // zuverlaessig, und der Prueflauf meldet ohnehin direkt.
+            // Zwei Bedingungen zusammen:
+            //
+            //   1. die ERSTE Meldung eines Fensters zaehlt nicht -- beim
+            //      Erscheinen hat es keine Vorgeschichte;
+            //   2. danach nur, wenn sich die Lage WIRKLICH geaendert hat.
+            //
+            // Beim echten Ziehen kommen Dutzende Bewegungen, der
+            // Hinweis erscheint also sofort mit der zweiten.
+            //
+            // OB der Hinweis stattdessen an der gedrueckten Maustaste
+            // haengen soll, ist eine Entwurfsfrage -- die gehoert dem
+            // Betreiber, nicht diesem Merge.
+            static QHash<QWidget*, QRect> letzteLage;
+            const auto vorher = letzteLage.constFind(bewegtes);
+            const bool kannteEsSchon = vorher != letzteLage.constEnd();
+            const bool verschoben = kannteEsSchon && *vorher != wo;
+            letzteLage.insert(bewegtes, wo);
+            // Der Eintrag haelt nur ein QRect, nie einen Zugriff auf das
+            // Fenster -- ein toter Schluessel ist darum harmlos. Beim
+            // Schliessen raeumen wir ihn trotzdem weg, damit die Tabelle
+            // nicht mitwaechst.
+            connect(bewegtes, &QObject::destroyed, bewegtes,
+                    [bewegtes]() { letzteLage.remove(bewegtes); });
+            if (!verschoben) { return; }
+
+            bool beruehrt = false;
             for (const QRect& sp : wir->schutzrahmen()) {
                 if (sp.intersects(wo)) { beruehrt = true; break; }
             }
             if (!beruehrt) { return; }
+
+
             wir->zeigeSchutzrahmenKurz();
         });
+
+        // ── Die serielle Haelfte (2026-10-12) ────────────────────────
+        //
+        // Viele Programme koennen CAT nur ueber eine serielle
+        // Schnittstelle: fldigi fragt nach einem Geraetepfad, Logbuecher
+        // und aeltere Contestprogramme ebenso. Auf macOS und Linux ist
+        // die Entsprechung ein Pseudoterminal.
+        //
+        // KEINE zweite Protokollschicht. Der Antwortgeber zeigt auf
+        // denselben CatServer, den auch der TCP-Weg fragt -- genau ein
+        // Zustandsgeber, genau ein Satz Haken, genau eine AI-Flagge. Wer
+        // je Transport eine eigene Schicht baut, hat zwei Stellen, an
+        // denen ein Haken fehlen kann, und merkt es an der zweiten nie:
+        // am 2026-10-11 hat ein fehlender VFO-B-Haken in EINER Schicht
+        // drei gruene Pruefstaende ueberlebt und erst der Livelauf hat
+        // ihn gezeigt.
+        m_catPtyServer = new CatPtyServer(this);
+        m_catPtyServer->setzeAntwortgeber(
+            [this](const QString& befehl) -> QString {
+                if (!m_catServer) { return {}; }
+                return m_catServer->antwortAuf(befehl);
+            });
     }
 
     buildUI();
@@ -1383,6 +1466,10 @@ MainWindow::~MainWindow()
     // wireSunSdr/TciClient::stateChanged -- Abbau greift in tote
     // Mitglieder. Dies ist die fuenfte Stelle; die vier anderen haben
     // ihren Waechter, hier fehlte nur das Setzen.
+    //
+    // Dieselbe Stelle hat main am 2026-10-15 unabhaengig erreicht;
+    // von dort der Verweis: siehe auch die Wache in
+    // showConnectionPanel().
     m_shuttingDown = true;
 
     // Sicherheitsnetz, 2026-09-03: regulaer haelt closeEvent() den
@@ -1546,7 +1633,7 @@ void MainWindow::showTileTabMenu(const QString& tileId)
     ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
     QMenu& menu = *menuOwner.get();
     menu.setStyleSheet(QString::fromLatin1(kPopupMenu));
-    menu.addSection(QStringLiteral("Fenster hierher holen"));
+    menu.addSection(tr("Bring a window here"));
 
     QHash<QAction*, QString> byAction;
     for (auto it = m_canvasApplets.constBegin();
@@ -1558,7 +1645,7 @@ void MainWindow::showTileTabMenu(const QString& tileId)
 
     if (byAction.isEmpty()) {
         QAction* none = menu.addAction(
-            QStringLiteral("keine anderen freien Fenster"));
+            tr("no other free windows"));
         none->setEnabled(false);
     }
 
@@ -1854,6 +1941,19 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     const QString id = panelIdFor(applet);
     if (id.isEmpty() || m_floatingApplets.contains(id)) { return; }
 
+    // ── Teilzeiten (2026-10-16) ──────────────────────────────────────
+    //
+    // Der Messpunkt im Profil-Schritt 3 sagt, WELCHES Applet 600 ms
+    // braucht; diese Zahlen sagen, WELCHER TEIL davon. Die drei
+    // Verdaechtigen stehen weiter unten: das Erzeugen des Fensters, das
+    // show() (auf macOS das erste Mal, dass ein NSWindow wirklich
+    // entsteht) und applyDefaultSize(), das die Anordnung nach ihrer
+    // Mindestgroesse fragt. Alle drei sind billig zu messen und wurden
+    // noch nie gemessen.
+    QElapsedTimer loeseTeile;
+    loeseTeile.start();
+    qint64 tFenster = 0, tGeometrie = 0, tShow = 0, tGroesse = 0;
+
     // ── Der Grund, warum es nur EINEN Weg hierher gibt ───────────────
     //
     // Dieses setParent() geht über eine Top-Level-Grenze, und genau da
@@ -1925,6 +2025,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     m_appletPanel->removeApplet(applet);
     auto* win = new AppletFloatingWindow(applet, id, dockIndex, this);
     m_floatingApplets.insert(id, win);
+    tFenster = loeseTeile.elapsed();
 
     // Kommt eine Geometrie aus dem Profil, gilt sie — und der
     // Bildschirm, auf dem sie stand, entscheidet mit. Steht das Fenster
@@ -2006,6 +2107,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
         ensureOnVisibleScreen(win, this,
                               QSize(Style::kAppletPanelW, 120));
     }
+    tGeometrie = loeseTeile.elapsed();
 
     connect(win, &AppletFloatingWindow::dockRequested,
             this, &MainWindow::dockAppletBack);
@@ -2026,6 +2128,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // stillschweigend rückgängig gemacht.
     if (!m_appletVis || m_appletVis->isEffectivelyVisible(id)) {
         win->show();
+        tShow = loeseTeile.elapsed();
         // Erst JETZT die Groesse: vor dem Anzeigen verlangt die
         // Anordnung fast nichts, danach ihre echte Untergrenze — und
         // die zieht das Fenster bildschirmfuellend auf. Nur wenn das
@@ -2033,6 +2136,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
         // Betreiber.
         if (!rect.isValid()) {
             win->applyDefaultSize();
+            tGroesse = loeseTeile.elapsed();
             // Und dann dorthin, wo es hergekommen ist. Die Groesse
             // bleibt die eben berechnete — die Lage des Feldes waere
             // meist zu schmal fuer ein Fenster mit eigener Leiste.
@@ -2043,6 +2147,18 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
             }
         }
         win->raise();
+    }
+
+    // Nur wenn es wirklich etwas gekostet hat — sonst ist die Zeile
+    // Rauschen in einem Protokoll, das ohnehin lang ist.
+    if (loeseTeile.elapsed() >= 100) {
+        qWarning().nospace()
+            << "[Detach:Teile] " << id
+            << ": Fenster erzeugen " << tFenster
+            << " ms, Geometrie " << (tGeometrie - tFenster)
+            << " ms, show() " << (tShow > 0 ? tShow - tGeometrie : 0)
+            << " ms, Vorgabegroesse " << (tGroesse > 0 ? tGroesse - tShow : 0)
+            << " ms, zusammen " << loeseTeile.elapsed() << " ms";
     }
 }
 
@@ -2513,7 +2629,7 @@ void MainWindow::setzeProfilschiene(Qt::Orientation richtung)
     if (richtung == Qt::Horizontal) {
         m_profileRail = new ProfileRail(m_layoutProfiles, Qt::Horizontal,
                                         m_commandBar);
-        m_commandBar->addGroupWidget(QStringLiteral("Profil"), m_profileRail);
+        m_commandBar->addGroupWidget(tr("Profile"), m_profileRail);
     } else {
         m_profileRail = new ProfileRail(m_layoutProfiles, Qt::Vertical,
                                         m_profileRailHome);
@@ -2543,23 +2659,22 @@ void MainWindow::wireProfileRail()
                    -> QString {
         bool ok = false;
         const QString name = QInputDialog::getText(
-            this, title, QStringLiteral("Name:"), QLineEdit::Normal,
+            this, title, tr("Name:"), QLineEdit::Normal,
             preset, &ok).trimmed();
         return ok ? name : QString();
     };
 
     auto complain = [this](const QString& name) {
         QMessageBox::warning(
-            this, QStringLiteral("Profil"),
+            this, tr("Profile"),
             name.isEmpty()
-                ? QStringLiteral("Ein Profil braucht einen Namen.")
-                : QStringLiteral("„%1“ gibt es schon.").arg(name));
+                ? tr("A profile needs a name.")
+                : tr("“%1” already exists.").arg(name));
     };
 
     connect(m_profileRail, &ProfileRail::newProfileRequested, this,
             [this, askName, complain]() {
-        const QString name = askName(QStringLiteral("Neues Profil"),
-                                     QStringLiteral("Neu"));
+        const QString name = askName(tr("New profile"), tr("New"));
         if (name.isNull()) { return; }
         // ── Leer, nicht als Kopie ────────────────────────────────────
         //
@@ -2613,16 +2728,15 @@ void MainWindow::wireProfileRail()
                      QDateTime::currentDateTime()
                          .toString(QStringLiteral("yyyy-MM-dd_HHmm")));
         const QString path = QFileDialog::getSaveFileName(
-            this, QStringLiteral("Layout-Profil auf Schreibtisch sichern"),
+            this, tr("Save layout profile to the Desktop"),
             suggested, QStringLiteral("JSON (*.json)"));
         if (path.isEmpty()) { return; }
 
         QFile f(path);
         if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             QMessageBox::warning(
-                this, QStringLiteral("Profil"),
-                QStringLiteral("„%1“ konnte nicht geschrieben werden.")
-                    .arg(path));
+                this, tr("Profile"),
+                tr("“%1” could not be written.").arg(path));
             return;
         }
         f.write(json);
@@ -2643,13 +2757,13 @@ void MainWindow::wireProfileRail()
         const QString suggested =
             QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
         const QString path = QFileDialog::getOpenFileName(
-            this, QStringLiteral("Layout-Profil vom Schreibtisch laden"),
+            this, tr("Load layout profile from the Desktop"),
             suggested, QStringLiteral("JSON (*.json)"));
         if (path.isEmpty()) { return; }
 
         const auto answer = QMessageBox::question(
-            this, QStringLiteral("Profil"),
-            QStringLiteral("„%1“ mit dem Inhalt der Datei ersetzen?")
+            this, tr("Profile"),
+            tr("Replace “%1” with the contents of the file?")
                 .arg(name),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
         if (answer != QMessageBox::Yes) { return; }
@@ -2657,8 +2771,8 @@ void MainWindow::wireProfileRail()
         QFile f(path);
         if (!f.open(QIODevice::ReadOnly)) {
             QMessageBox::warning(
-                this, QStringLiteral("Profil"),
-                QStringLiteral("„%1“ konnte nicht gelesen werden.").arg(path));
+                this, tr("Profile"),
+                tr("“%1” could not be read.").arg(path));
             return;
         }
         const QByteArray json = f.readAll();
@@ -2666,9 +2780,9 @@ void MainWindow::wireProfileRail()
         QString error;
         if (!m_layoutProfiles->importFromJson(name, json, &error)) {
             QMessageBox::warning(
-                this, QStringLiteral("Profil"),
+                this, tr("Profile"),
                 error.isEmpty()
-                    ? QStringLiteral("„%1“ liess sich nicht als Profil lesen.")
+                    ? tr("“%1” could not be read as a profile.")
                           .arg(path)
                     : error);
         }
@@ -2676,7 +2790,7 @@ void MainWindow::wireProfileRail()
 
     connect(m_profileRail, &ProfileRail::renameRequested, this,
             [this, askName, complain](const QString& old) {
-        const QString name = askName(QStringLiteral("Profil umbenennen"), old);
+        const QString name = askName(tr("Rename profile"), old);
         if (name.isNull() || name == old) { return; }
         if (!m_layoutProfiles->rename(old, name)) { complain(name); return; }
         m_layoutProfiles->save();
@@ -2684,8 +2798,8 @@ void MainWindow::wireProfileRail()
 
     connect(m_profileRail, &ProfileRail::duplicateRequested, this,
             [this, askName, complain](const QString& from) {
-        const QString name = askName(QStringLiteral("Profil duplizieren"),
-                                     from + QStringLiteral(" Kopie"));
+        const QString name = askName(tr("Duplicate profile"),
+                                     from + tr(" copy"));
         if (name.isNull()) { return; }
         if (!m_layoutProfiles->duplicate(from, name)) {
             complain(name);
@@ -2699,9 +2813,8 @@ void MainWindow::wireProfileRail()
         // Nachfragen, weil es kein Rückgängig gibt. In so einem Profil
         // steckt eine halbe Stunde Einrichten.
         const auto answer = QMessageBox::question(
-            this, QStringLiteral("Profil löschen"),
-            QStringLiteral("„%1“ mit seinem ganzen Aufbau löschen?")
-                .arg(name),
+            this, tr("Delete profile"),
+            tr("Delete “%1” with its whole layout?").arg(name),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
         if (answer != QMessageBox::Yes) { return; }
         m_layoutProfiles->remove(name);
@@ -2950,6 +3063,14 @@ FFTEngine* MainWindow::createFftEngineForStream(int streamIndex)
     // sich damit immer korrekt selbst auf, bevor ein zweiter Aufruf mit
     // demselben Index eine Chance hat, den alten Zeiger noch zu sehen.
     connect(engine, &QObject::destroyed, this, [this, streamIndex]() {
+        // Beim Abbau NICHT mehr in m_fftEngines greifen: die Maschine
+        // ist ein Kind dieses Fensters, und ~QWidget raeumt die Kinder
+        // ab, BEVOR ~QObject die Verbindungen loest. Dieselbe Wache wie
+        // bei der Verbindungsmaske und beim Hinweiszettel (beide am
+        // 2026-10-15 als EXC_BAD_ACCESS @ 0x5 gefunden); hier ist noch
+        // kein Absturz beobachtet, aber es ist dieselbe Stelle im
+        // selben Ablauf.
+        if (m_shuttingDown) { return; }
         m_fftEngines.remove(streamIndex);
     });
 
@@ -3314,8 +3435,8 @@ void MainWindow::onNotchRemoveAll()
 
     if (QMessageBox::question(
             this, tr("Notch-Filter"),
-            tr("Alle %1 Notch-Filter entfernen?\n\n"
-               "Das laesst sich nicht rueckgaengig machen.").arg(n),
+            tr("Remove all %1 notch filters?\n\n"
+               "This cannot be undone.").arg(n),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No)
         != QMessageBox::Yes) {
         return;
@@ -3576,8 +3697,8 @@ void MainWindow::wireSpectrumSliceControls(SpectrumWidget* sw,
         // schon Stunden gekostet — und wenn es nicht die Ursache ist,
         // erscheint der Hinweis nie und wir haben sie ausgeschlossen.
         if (s->locked()) {
-            showToast(tr("Die Frequenz dieser Scheibe ist gesperrt — "
-                         "das Schloss in der VFO-Leiste gibt sie frei."),
+            showToast(tr("This slice's frequency is locked — the padlock in the VFO bar "
+                          "releases it."),
                       ToastSeverity::Info, 5000);
             return;
         }
@@ -3977,7 +4098,7 @@ void MainWindow::onPanBackgroundColour()
     // Mit Alphakanal: die Grundflaeche darf durchscheinen, wenn ein
     // Hintergrundbild darunter liegt.
     const QColor c = QColorDialog::getColor(
-        w->backgroundFillColor(), this, tr("Grundfarbe des Panadapters"),
+        w->backgroundFillColor(), this, tr("Panadapter base colour"),
         QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
     if (c.isValid()) { w->setBackgroundFillColor(c); }
 }
@@ -4244,7 +4365,7 @@ void MainWindow::buildUI()
     // Ein Wort im Fenstertitel kostet nichts und beantwortet alle drei
     // Fragen, bevor sie entstehen.
     if (!qEnvironmentVariable("LONGPATH_CONFIG_DIR").trimmed().isEmpty()) {
-        title += QStringLiteral(" — PRÜFLAUF (eigener Einstellungsordner)");
+        title += QStringLiteral(" — TEST RUN (own settings folder)");
     }
 
     setWindowTitle(title);
@@ -4293,10 +4414,14 @@ void MainWindow::buildUI()
     // dasselbe Bild wie beim Rotor vor dem heutigen RotorFloating-Fix, nur
     // dass hier noch nie ueberhaupt ein Schluessel dafuer existierte.
     connect(m_panStack, &PanadapterStack::panFloatStateChanged,
-            this, [](const QString& panId, bool floating) {
+            this, [this](const QString& panId, bool floating) {
         AppSettings::instance().setValue(
             QStringLiteral("PanFloating_%1").arg(panId),
             floating ? QStringLiteral("True") : QStringLiteral("False"));
+        // Der Haken im View-Menue zeigt den wirklichen Zustand, egal
+        // ueber welchen der drei Wege (↗, Rechtsklick, Menue) er
+        // zustande kam.
+        syncFloatPanAction();
     });
 
     SpectrumWidget* const initialSpectrum = activeSpectrumWidget();
@@ -4462,20 +4587,10 @@ void MainWindow::buildUI()
         m_panStack->applyLayout(restoredLayout, panIdsForLayout(restoredLayout));
         m_panStack->restoreSplitterState();
 
-        // Betreiber 2026-08-31: "Panadapter ändert sich immer!" -- siehe
-        // die ausfuehrliche Begruendung beim panFloatStateChanged-Anschluss
-        // oben. applyLayout() hat gerade eben jeden Panadapter angedockt
-        // (sein allererster Schritt, dockAllFloatingPans(), unbedingt);
-        // hier wird direkt danach nachgeholt, was zuletzt tatsaechlich
-        // schwebte. PanFloatingWindow::restoreGeometryState() (in dessen
-        // eigenem Konstruktor) liest die dazugehoerige Lage gleich mit.
-        for (const QString& panId : panIdsForLayout(restoredLayout)) {
-            if (s.value(QStringLiteral("PanFloating_%1").arg(panId),
-                        QStringLiteral("False")).toString()
-                    == QStringLiteral("True")) {
-                m_panStack->floatPanadapter(panId);
-            }
-        }
+        // Was zuletzt schwebte, wird NACH dem Layoutprofil
+        // wiederhergestellt — siehe [PanFloatRestore] weiter unten.
+        // Bis zum 2026-10-15 stand der Block hier, also VOR dem Profil,
+        // und das Profil dockte 82 ms spaeter wieder an.
 
         // ...and finish the job once there IS a radio. Skipping the slice
         // add-loop above is right, but nothing used to pick it up afterwards,
@@ -4723,9 +4838,15 @@ void MainWindow::buildUI()
     m_profileRailHome = centre;
     setzeProfilschiene(profilschienenRichtungAusEinstellung());
 
+    // Rand und Abstand aus EINEM Wert (2026-10-15, Betreiber: „ein
+    // minimaler automatischer Abstand ... x und y, dann sieht es
+    // besser aus und gleich"). Vorher 6/6/6/0 und Abstand 6 — gemessen
+    // am laufenden Programm war der Rand damit 6 px links, 8 px rechts
+    // (Rollbalkenrinne) und 6 px zwischen den Feldern.
     auto* centreCol = new QVBoxLayout;
-    centreCol->setContentsMargins(6, 6, 6, 0);
-    centreCol->setSpacing(6);
+    centreCol->setContentsMargins(Style::kPanelGapPx, Style::kPanelGapPx,
+                                  Style::kPanelGapPx, 0);
+    centreCol->setSpacing(Style::kPanelGapPx);
     centreCol->addWidget(m_commandBar, 0);
 
     // ── Panadapter in BEIDE Richtungen veraenderbar (2026-08-19) ──────
@@ -4992,7 +5113,39 @@ void MainWindow::buildUI()
         });
     });
 
-    m_containerManager->restoreState();
+    // Sicherer Start (2026-10-09): blieb Longpath zweimal hintereinander
+    // beim Hochfahren stecken, faehrt es ohne die gespeicherte Anordnung
+    // hoch. Genau hier ist die Stelle -- `restoreState()` baut die
+    // Fenster aus dem Gespeicherten auf, und wenn dort etwas faul ist
+    // (ein Applet, das auf Verschwundenes zeigt), kommt man ohne diesen
+    // Ausweg nicht mehr an die Einstellungen heran, um es zu
+    // reparieren. Siehe core/StartWatch.h.
+    if (StartWatch::shouldStartSafely()) {
+        m_startedSafely     = true;
+        m_failedStartCount  = StartWatch::failedStarts();
+        qCWarning(lcContainer) << "Sicherer Start: die gespeicherte Anordnung wird"
+                               << "uebersprungen, weil" << m_failedStartCount
+                               << "Starts hintereinander nicht durchkamen";
+        createDefaultContainers();
+
+        // Den Hinweis erst zeigen, wenn das Fenster steht -- ein Dialog
+        // mitten im Aufbau haette keinen Elternrahmen und koennte
+        // hinter dem Hauptfenster landen.
+        //
+        // Im Pruefstand bleibt er weg: ein modaler Dialog haelt den Lauf
+        // an, bis jemand klickt, und es klickt niemand. Die Entscheidung
+        // selbst (`startedSafely()`) ist davon unberuehrt und bleibt
+        // pruefbar -- das Zeigen ist nur die Ausgabe.
+        if (!qEnvironmentVariableIsSet("LONGPATH_NO_DIALOGS")) {
+            const int anzahl = m_failedStartCount;
+            QTimer::singleShot(0, this, [this, anzahl]() {
+                QMessageBox::information(this, QStringLiteral("Sicherer Start"),
+                                         StartWatch::safeStartNotice(anzahl));
+            });
+        }
+    } else {
+        m_containerManager->restoreState();
+    }
     if (m_containerManager->containerCount() == 0) {
         createDefaultContainers();
     }
@@ -7206,6 +7359,26 @@ void MainWindow::populateDefaultMeter()
     m_cwDecoderApplet->setVisible(false);
 
     // EqApplet — Equalizer, Empfang und Senden (eingehaengt 2026-10-11).
+    // Ft8Applet (2026-10-15) -- der native FT8/FT4-Dekoder, sichtbar in
+    // den Datenmodi (DIGU/DIGL). Gleiche Verdrahtung wie CW und RTTY.
+    m_ft8Applet = new Ft8Applet(m_radioModel, nullptr);
+    panel->addApplet(m_ft8Applet);
+    m_ft8Applet->setVisible(false);
+
+    // Ein fertiges QSO aus dem FT8-Ablauf geht denselben Weg wie eines
+    // aus WSJT-X (siehe die Verdrahtung von WsjtxClient::qsoLogged
+    // weiter oben): das Panel entscheidet ueber Doppelt-Regel, Datei
+    // und Hochladen. Hier wird nichts selbst geschrieben — sonst
+    // stuende dasselbe QSO zweimal im Logbuch und nur einmal auf dem
+    // Server.
+    connect(m_ft8Applet, &Ft8Applet::qsoFertig, this,
+            [this](const LogEntry& e) {
+        if (RotorLogbookPanel* p = ensureRotorPanel()) {
+            p->logExternalQso(e);
+        }
+    });
+
+    // EqApplet — Equalizer, Empfang und Senden (eingehaengt 2026-10-11).
     //
     // Es stand hier als Geister-Applet mit der Bedingung "TODO 3I-3: TX/RX
     // EQ wiring". Die ist erfuellt: beide Haelften sind verdrahtet. Die
@@ -7221,6 +7394,7 @@ void MainWindow::populateDefaultMeter()
     // bei den Konstruktoren weiter unten.
     m_catApplet = new CatApplet(m_radioModel, nullptr);
     m_catApplet->setzeCatServer(m_catServer);
+    m_catApplet->setzeCatPtyServer(m_catPtyServer);
     panel->addApplet(m_catApplet);
 
     // Geister-Applets — verborgen nach
@@ -7407,7 +7581,7 @@ void MainWindow::populateDefaultMeter()
     });
 
     m_swrInstrument = new InstrumentApplet(QStringLiteral("SwrInstrument"),
-                                           QStringLiteral("Stehwelle"),
+                                           tr("SWR"),
                                            m_radioModel, nullptr);
     m_swrInstrument->setPrimary(MeterBinding::TxSwr);
     m_swrInstrument->restoreState();
@@ -7675,6 +7849,266 @@ void MainWindow::populateDefaultMeter()
         });
     }
 
+    // ── SPE Expert (Zeus-Punkt 7) ───────────────────────────────────────
+    //
+    // Wie der RF2K-S hier einmal angelegt und einmal verdrahtet: die
+    // Verbindung (RadioModel::speConnection) lebt die ganze Laufzeit und
+    // wird nie neu gebaut. Sichtbar ist das Fenster nur, wenn der
+    // Umschalter in Setup -> Network -> SPE Expert an ist (gesetzt weiter
+    // unten, nachgezogen ueber speEnabledChanged).
+    m_speApplet = new SpeApplet(m_radioModel, nullptr);
+    panel->addApplet(m_speApplet);
+
+    if (SpeConnection* speConn = m_radioModel ? m_radioModel->speConnection()
+                                              : nullptr) {
+        // Verbindung -> Fenster.
+        connect(speConn, &SpeConnection::connected, this, [this, speConn]() {
+            if (!m_speApplet) { return; }
+            m_speApplet->setConnected(true);
+            m_speApplet->setSource(speConn->sourceLabel());
+        });
+        connect(speConn, &SpeConnection::disconnected, this, [this]() {
+            if (m_speApplet) { m_speApplet->setConnected(false); }
+        });
+        connect(speConn, &SpeConnection::respondingChanged,
+                this, [this](bool responding) {
+            if (m_speApplet) { m_speApplet->setResponding(responding); }
+        });
+        connect(speConn, &SpeConnection::modelChanged,
+                this, [this](const QString& id) {
+            if (m_speApplet) {
+                m_speApplet->setModelName(Spe::modelSpec(id).displayName);
+            }
+        });
+        connect(speConn, &SpeConnection::statusUpdated,
+                this, [this](const Spe::Status& s) {
+            if (!m_speApplet) { return; }
+            // Die Balkenachse folgt der GEWAEHLTEN Leistungsstufe, nicht
+            // nur dem Geraet -- so wie das Display des Verstaerkers selbst.
+            // setPowerRange() verwirft Wiederholungen, darum darf das hier
+            // bei jedem Rahmen stehen (zehnmal je Sekunde).
+            const auto& spec = Spe::modelSpec(s.id);
+            const auto achse = Spe::levelGaugeRange(spec, s.powerLevel);
+            m_speApplet->setPowerRange(achse.nominalW, achse.warnW, achse.maxW);
+
+            m_speApplet->setForwardPower(s.outputPowerW);
+            m_speApplet->setSwrAnt(s.swrAnt);
+            m_speApplet->setSwrAtu(s.swrAtu);
+            m_speApplet->setSupplyVoltage(s.paVoltageV);
+            m_speApplet->setSupplyCurrent(s.paCurrentA);
+            m_speApplet->setTemps(s.tempUpper, s.tempLower, s.tempCombiner,
+                                  spec.hasCombiner);
+            m_speApplet->setBand(Spe::bandName(s.bandIndex));
+            m_speApplet->setAntenna(s.txAntenna, s.atuState);
+            m_speApplet->setInputPort(s.input);
+            m_speApplet->setPowerLevel(Spe::powerLevelName(s.powerLevel));
+            m_speApplet->setMode(s.operate, s.transmitting);
+
+            // Alarm schlaegt Warnung: beides zugleich zu zeigen hiesse, die
+            // ernstere Meldung neben einer harmlosen zu verstecken. Der
+            // Farbton haengt daran (Hausstil: das kraeftige Rot bleibt der
+            // Gefahr).
+            const QString alarm = Spe::alarmText(s.alarm);
+            if (!alarm.isEmpty()) {
+                m_speApplet->setFaultText(tr("ALARM: %1").arg(alarm), true);
+            } else {
+                const QString warnung = Spe::warningText(s.warning);
+                m_speApplet->setFaultText(
+                    warnung.isEmpty() ? QString()
+                                      : tr("Warning: %1").arg(warnung), false);
+            }
+        });
+
+        // Fenster -> Verbindung. Jeder Knopf ist ein Tastendruck.
+        connect(m_speApplet, &SpeApplet::powerOnClicked,
+                speConn, &SpeConnection::powerOn);
+        connect(m_speApplet, &SpeApplet::operateClicked,
+                speConn, &SpeConnection::toggleOperate);
+        connect(m_speApplet, &SpeApplet::powerLevelClicked,
+                speConn, &SpeConnection::cyclePowerLevel);
+        connect(m_speApplet, &SpeApplet::tuneClicked,
+                speConn, &SpeConnection::tune);
+        connect(m_speApplet, &SpeApplet::offClicked,
+                speConn, &SpeConnection::switchOff);
+        connect(m_speApplet, &SpeApplet::inputClicked, speConn, [speConn]() {
+            speConn->sendKey(Spe::Key::Input);
+        });
+        connect(m_speApplet, &SpeApplet::antennaClicked, speConn, [speConn]() {
+            speConn->sendKey(Spe::Key::Antenna);
+        });
+        // Die Pfeiltasten stellen die Vorlaufleistung ein, die der
+        // Verstaerker vom Funkgeraet ueber CAT anfordert.
+        connect(m_speApplet, &SpeApplet::driveUpClicked, speConn, [speConn]() {
+            speConn->sendKey(Spe::Key::RightArrow);
+        });
+        connect(m_speApplet, &SpeApplet::driveDownClicked, speConn, [speConn]() {
+            speConn->sendKey(Spe::Key::LeftArrow);
+        });
+    }
+
+    // ── Elecraft KPA500 (Zeus-Punkt 7) ──────────────────────────────────
+    //
+    // Wie der SPE einmal angelegt und einmal verdrahtet. Der Unterschied
+    // steckt in livenessChanged: der KPA500 kann melden „aus, aber am
+    // Draht erreichbar", und genau dann hat sein ON-Knopf einen Sinn.
+    m_kpa500Applet = new Kpa500Applet(m_radioModel, nullptr);
+    panel->addApplet(m_kpa500Applet);
+
+    if (Kpa500Connection* kpaConn = m_radioModel ? m_radioModel->kpa500Connection()
+                                                 : nullptr) {
+        connect(kpaConn, &Kpa500Connection::connected, this, [this, kpaConn]() {
+            if (!m_kpa500Applet) { return; }
+            m_kpa500Applet->setConnected(true);
+            m_kpa500Applet->setSource(kpaConn->sourceLabel());
+        });
+        connect(kpaConn, &Kpa500Connection::disconnected, this, [this]() {
+            if (m_kpa500Applet) { m_kpa500Applet->setConnected(false); }
+        });
+        connect(kpaConn, &Kpa500Connection::livenessChanged, this,
+                [this](Kpa500Connection::Liveness s) {
+            if (m_kpa500Applet) { m_kpa500Applet->setLiveness(s); }
+        });
+        connect(kpaConn, &Kpa500Connection::telemetryUpdated,
+                this, [this, kpaConn]() {
+            if (!m_kpa500Applet) { return; }
+            m_kpa500Applet->setPowerSwr(kpaConn->lastPowerSwr());
+            m_kpa500Applet->setVoltsAmps(kpaConn->lastVoltsAmps());
+            m_kpa500Applet->setTemperature(kpaConn->lastTemperature());
+            m_kpa500Applet->setBand(Kpa500::bandName(kpaConn->lastBandIndex()));
+            m_kpa500Applet->setIdentity(kpaConn->firmware(), kpaConn->serialNumber());
+            // ── Betriebszustand und Fehler GEHOEREN HIERHER, nicht nur
+            //    in die Aenderungsmeldungen ──────────────────────────
+            //
+            // Der erste Anlauf hat sie allein operateChanged/faultChanged
+            // ueberlassen. Die feuern aber nur bei AENDERUNG -- und das
+            // Feld leert bei Stille oder im Boot-Zustand ALLE Messwerte.
+            // Kommt der Verstaerker dann im GLEICHEN Zustand zurueck,
+            // aendert sich nichts, es feuert nichts, und das Feld zeigt
+            // dauerhaft „STANDBY", obwohl er auf OPERATE steht.
+            // Deterministisch gefallen in
+            // tst_kpa500_anbindung::derUmschalterSchicktDasGegenteil,
+            // nachdem der Fall davor einen Boot-Ausflug gemacht hatte.
+            //
+            // So macht es auch die SPE-Verdrahtung daneben: dort traegt
+            // statusUpdated den GANZEN Zustand und schiebt jedes Mal
+            // alles nach. Genau diese Unstimmigkeit war der Fehler.
+            m_kpa500Applet->setOperate(kpaConn->isOperate());
+            m_kpa500Applet->setFault(kpaConn->lastFaultCode());
+        });
+        connect(kpaConn, &Kpa500Connection::operateChanged, this, [this](bool op) {
+            if (m_kpa500Applet) { m_kpa500Applet->setOperate(op); }
+        });
+        connect(kpaConn, &Kpa500Connection::faultChanged, this, [this](int code) {
+            if (m_kpa500Applet) { m_kpa500Applet->setFault(code); }
+        });
+
+        // Fenster -> Verbindung.
+        connect(m_kpa500Applet, &Kpa500Applet::powerOnClicked,
+                kpaConn, &Kpa500Connection::powerOn);
+        connect(m_kpa500Applet, &Kpa500Applet::offClicked,
+                kpaConn, &Kpa500Connection::powerOff);
+        connect(m_kpa500Applet, &Kpa500Applet::clearFaultClicked,
+                kpaConn, &Kpa500Connection::clearFault);
+        // Der Umschalter schickt das GEGENTEIL des gemeldeten Zustands --
+        // das Geraet bestaetigt mit der naechsten Antwort, und erst dann
+        // wechselt die Anzeige.
+        connect(m_kpa500Applet, &Kpa500Applet::operateClicked,
+                kpaConn, [kpaConn]() { kpaConn->setOperate(!kpaConn->isOperate()); });
+    }
+
+    // ── ACOM S-Serie (Betreiberwunsch 2026-10-09) ───────────────────────
+    //
+    // Der ACOM SCHIEBT seine Telemetrie -- es gibt hier keinen
+    // Abfragetakt, auf den sich die Anzeige stuetzen koennte, sondern
+    // einen Strom von Rahmen. telemetryUpdated traegt den GANZEN Rahmen
+    // mit, darum wird bei jedem alles nachgeschoben; die Lehre aus dem
+    // KPA500 (Aenderungsmeldungen allein reichen nicht, wenn das Feld
+    // zwischendurch geleert wird) ist hier von Anfang an eingebaut.
+    m_acomApplet = new AcomApplet(m_radioModel, nullptr);
+    panel->addApplet(m_acomApplet);
+
+    if (AcomConnection* acomConn = m_radioModel ? m_radioModel->acomConnection()
+                                                : nullptr) {
+        connect(acomConn, &AcomConnection::connected, this, [this, acomConn]() {
+            if (!m_acomApplet) { return; }
+            m_acomApplet->setConnected(true);
+            m_acomApplet->setSource(acomConn->sourceLabel());
+        });
+        connect(acomConn, &AcomConnection::disconnected, this, [this]() {
+            if (m_acomApplet) { m_acomApplet->setConnected(false); }
+        });
+
+        connect(acomConn, &AcomConnection::telemetryUpdated, this,
+                [this, acomConn](const Acom::Telemetry& t) {
+            if (!m_acomApplet) { return; }
+            const auto& spec = Acom::modelSpec(acomConn->currentModel());
+            m_acomApplet->setForwardPower(t.forwardPowerW);
+            m_acomApplet->setReflectedPower(t.reflectedPowerW);
+            m_acomApplet->setSwr(t.swr_x100 / 100.0f);
+            // Die Temperatur kommt in ROHEN Sensoreinheiten -- der
+            // Modellversatz muss abgezogen werden, und der haengt an der
+            // erkannten Stufe. Darum hier und nicht in der Protokollschicht:
+            // die kennt kein Modell.
+            m_acomApplet->setTemp(static_cast<float>(t.paTempRaw)
+                                  - static_cast<float>(spec.temperatureOffset));
+            m_acomApplet->setDrainVoltage(t.hv1_x10V / 10.0f);
+            m_acomApplet->setDrainCurrent(t.id1_mA / 1000.0f);
+            m_acomApplet->setBand(Acom::bandName(t.activeBand));
+            m_acomApplet->setUptime(t.systemClockSec);
+            m_acomApplet->setMode(t.mode);
+
+            // 0xFF heisst „kein Fehler" -- und nur dann ist der
+            // Loeschknopf sinnlos.
+            const bool fehlerAn = (t.errorCode != 0xFF);
+            m_acomApplet->setFaultText(
+                fehlerAn ? Acom::errorCodeName(t.errorCode) : QString());
+            m_acomApplet->setClearFaultEnabled(fehlerAn);
+        });
+
+        connect(acomConn, &AcomConnection::modelChanged, this,
+                [this](const QString& name, const QString& grund) {
+            if (!m_acomApplet) { return; }
+            const auto& spec = Acom::modelSpec(name);
+            m_acomApplet->setPowerRange(spec.nominalForwardW, spec.maxForwardW);
+            m_acomApplet->setReflectedRange(spec.nominalReflectedW, spec.maxReflectedW);
+            m_acomApplet->setModelName(name);
+            // „Warum ist die Skala, wie sie ist" -- als Sprechblase, nicht
+            // als Feld. Der Grund ist die halbe Auskunft: „default" heisst
+            // geraten, „confirmed" heisst vom Geraet bestaetigt,
+            // „auto-scaled" heisst aus der beobachteten Leistung
+            // geschlossen.
+            m_acomApplet->setDiagnosticTooltip(
+                tr("Power class %1 (%2). Rated %3 W, scale end %4 "
+                   "W.\n\nThe manufacturer's documentation lists only a "
+                   "type code, so the class is inferred from the observed "
+                   "power when the unit does not confirm it.")
+                    .arg(name, grund)
+                    .arg(spec.nominalForwardW, 0, 'f', 0)
+                    .arg(spec.maxForwardW, 0, 'f', 0));
+        });
+
+        connect(acomConn, &AcomConnection::systemConfigReceived, this,
+                [](const Acom::SystemConfig& cfg) {
+            // Nur ins Protokoll -- der Zweck ist, eine unbekannte
+            // Typkennung melden zu koennen (siehe AcomProtocol.h).
+            qCInfo(lcConnection) << "ACOM SystemConfig: Typ" << cfg.amplifierType
+                                 << "Firmware" << cfg.fwVersion << "." << cfg.fwSubVersion
+                                 << "Seriennummer" << cfg.serialNumberHex;
+        });
+
+        // Fenster -> Verbindung. Drei Zielzustaende, drei Knoepfe.
+        connect(m_acomApplet, &AcomApplet::standbyClicked, acomConn, [acomConn]() {
+            acomConn->setOperate(false);
+        });
+        connect(m_acomApplet, &AcomApplet::operateClicked, acomConn, [acomConn]() {
+            acomConn->setOperate(true);
+        });
+        connect(m_acomApplet, &AcomApplet::offClicked,
+                acomConn, &AcomConnection::powerOff);
+        connect(m_acomApplet, &AcomApplet::clearFaultClicked,
+                acomConn, &AcomConnection::clearFaults);
+    }
+
     // Antenna labels: load operator-set labels from AppSettings at startup.
     // Keys: RfKit_Ant1_Label .. RfKit_Ant4_Label (stored by RfKitPage.cpp).
     // If a key is absent or empty the applet already shows "ANT N" by default.
@@ -7735,6 +8169,9 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("CwDecoder")] = m_cwDecoderApplet;
     m_appletsById[QStringLiteral("Eq")]         = m_eqApplet;
     m_appletsById[QStringLiteral("Cat")]        = m_catApplet;
+    m_appletsById[QStringLiteral("Ft8Decoder")] = m_ft8Applet;
+    m_appletsById[QStringLiteral("Eq")]         = m_eqApplet;
+    m_appletsById[QStringLiteral("Cat")]        = m_catApplet;
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
     m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
     m_appletsById[QStringLiteral("QsoRec")]     = m_qsoRecorderApplet;
@@ -7743,6 +8180,9 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Amp")]        = m_ampApplet;
     m_appletsById[QStringLiteral("Tuner")]      = m_tunerApplet;
     m_appletsById[QStringLiteral("RfKit")]      = m_rfKitApplet;
+    m_appletsById[QStringLiteral("Spe")]        = m_speApplet;
+    m_appletsById[QStringLiteral("Kpa500")]     = m_kpa500Applet;
+    m_appletsById[QStringLiteral("Acom")]       = m_acomApplet;
     m_appletsById[QStringLiteral("Frequency")]        = m_frequencyApplet;
     m_appletsById[QStringLiteral("SwrInstrument")]    = m_swrInstrument;
     m_appletsById[QStringLiteral("SignalInstrument")] = m_signalInstrument;
@@ -7802,6 +8242,25 @@ void MainWindow::populateDefaultMeter()
     // CW: same shape -- defaultVisible=true, gated on CWL/CWU below.
     m_appletVis->registerApplet(QStringLiteral("CwDecoder"),
                                 QStringLiteral("CW Decoder"), true);
+    // Equalizer (eingehaengt 2026-10-11). Sichtbar ab Werk: beide Haelften
+    // sind jetzt verdrahtet, und der Empfangs-Equalizer ist neu -- ein
+    // Merkmal, das man erst in einem Menue suchen muss, findet niemand
+    // (dieselbe Begruendung wie beim Sprachspeicher darunter).
+    //
+    // Der Eintrag in m_appletsById oben ist dabei genauso Pflicht wie
+    // dieser: ohne ihn kennt der Auswaehler das Applet nicht. Siehe die
+    // Notiz bei "Die vier vom 2026-08-23".
+    m_appletVis->registerApplet(QStringLiteral("Eq"),
+                                QStringLiteral("Equalizer"),    true);
+    // CAT: NICHT sichtbar ab Werk. Wer kein Fremdprogramm anbindet,
+    // braucht das Feld nie, und zwei seiner vier Reihen sind noch
+    // Attrappen -- es soll gefunden werden, wenn man es sucht, und nicht
+    // im Weg stehen, wenn nicht.
+    m_appletVis->registerApplet(QStringLiteral("Cat"),
+                                QStringLiteral("CAT"),          false);
+    // FT8/FT4: dieselbe Form, gehaengt an die Datenmodi (2026-10-15).
+    m_appletVis->registerApplet(QStringLiteral("Ft8Decoder"),
+                                QStringLiteral("FT8 Decoder"), true);
     // Equalizer (eingehaengt 2026-10-11). **NICHT sichtbar ab Werk**
     // (geaendert 2026-10-14).
     //
@@ -7853,14 +8312,20 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Tuner Genius"), true);
     m_appletVis->registerApplet(QStringLiteral("RfKit"),
                                 QStringLiteral("RF-Kit RF2K-S"), true);
+    m_appletVis->registerApplet(QStringLiteral("Spe"),
+                                QStringLiteral("SPE Expert"),   true);
+    m_appletVis->registerApplet(QStringLiteral("Kpa500"),
+                                QStringLiteral("Elecraft KPA500"), true);
+    m_appletVis->registerApplet(QStringLiteral("Acom"),
+                                QStringLiteral("ACOM"),          true);
     // Die beiden Instrumente. defaultVisible=true, damit sie beim
     // ersten Start dastehen und angesehen werden können — das ist der
     // Zweck dieses Schritts. Wer sie nicht will, blendet sie über das
     // Plus aus wie jedes andere Widget.
     m_appletVis->registerApplet(QStringLiteral("Frequency"),
-                                QStringLiteral("Frequenz"),     true);
+                                tr("Frequency"),                true);
     m_appletVis->registerApplet(QStringLiteral("SwrInstrument"),
-                                QStringLiteral("Stehwelle"),    true);
+                                tr("SWR"),                      true);
     m_appletVis->registerApplet(QStringLiteral("SignalInstrument"),
                                 QStringLiteral("S-Meter"),      true);
     m_appletVis->registerApplet(QStringLiteral("KiwiSdr"),
@@ -7870,9 +8335,9 @@ void MainWindow::populateDefaultMeter()
     // nutzen, waere Ballast. Ueber das "+" wie jedes andere Widget
     // einblendbar, sobald man will.
     m_appletVis->registerApplet(QStringLiteral("KiwiWaterfalls"),
-                                QStringLiteral("KIWI-WASSERFÄLLE"), false);
+                                tr("KIWI WATERFALLS"), false);
     m_appletVis->registerApplet(QStringLiteral("Asr"),
-                                QStringLiteral("Mitschrift"),   true);
+                                tr("Transcript"),               true);
 
     // ── Kategorie und Schlagwoerter ──────────────────────────────────
     //
@@ -7922,37 +8387,52 @@ void MainWindow::populateDefaultMeter()
     // jemand sie sucht. Die Schlagwörter sind das, wonach man tippt:
     // wer „swr" oder „zeiger" eingibt, soll sie finden, ohne den
     // Applet-Namen zu kennen.
+    //
+    // Die Schlagwoerter bleiben ZWEISPRACHIG (2026-10-15). Die
+    // Oberflaeche ist englisch, der Betreiber denkt deutsch — wer
+    // „leistung" tippt, soll das Sendefeld finden, und wer „power"
+    // tippt, auch. Sie stehen nicht in tr(): eine Uebersetzung wuerde
+    // die deutschen Wege abschalten, sobald die Oberflaeche englisch
+    // ist, also genau dann, wenn er sie braucht.
     m_appletVis->describeApplet(QStringLiteral("Frequency"),
-        QStringLiteral("Abstimmen"),
-        {QStringLiteral("frequenz"), QStringLiteral("vfo"),
+        tr("Tuning"),
+        {QStringLiteral("frequenz"), QStringLiteral("frequency"),
+         QStringLiteral("vfo"),
          QStringLiteral("qrg"), QStringLiteral("band"),
-         QStringLiteral("abstimmen"), QStringLiteral("split"),
-         QStringLiteral("mhz")});
+         QStringLiteral("abstimmen"), QStringLiteral("tuning"),
+         QStringLiteral("split"), QStringLiteral("mhz")});
     m_appletVis->describeApplet(QStringLiteral("SwrInstrument"),
-        QStringLiteral("Messanzeigen"),
+        tr("Meters"),
         {QStringLiteral("swr"), QStringLiteral("stehwelle"),
-         QStringLiteral("anpassung"), QStringLiteral("zeiger"),
-         QStringLiteral("instrument"), QStringLiteral("balken")});
+         QStringLiteral("anpassung"), QStringLiteral("match"),
+         QStringLiteral("zeiger"), QStringLiteral("needle"),
+         QStringLiteral("instrument"), QStringLiteral("meter"),
+         QStringLiteral("balken"), QStringLiteral("bar")});
     m_appletVis->describeApplet(QStringLiteral("SignalInstrument"),
-        QStringLiteral("Messanzeigen"),
+        tr("Meters"),
         {QStringLiteral("s-meter"), QStringLiteral("smeter"),
          QStringLiteral("signal"), QStringLiteral("pegel"),
-         QStringLiteral("zeiger"), QStringLiteral("instrument"),
-         QStringLiteral("balken")});
+         QStringLiteral("level"), QStringLiteral("zeiger"),
+         QStringLiteral("needle"), QStringLiteral("instrument"),
+         QStringLiteral("meter"), QStringLiteral("balken"),
+         QStringLiteral("bar")});
 
     m_appletVis->describeApplet(QStringLiteral("Rx"),
-        QStringLiteral("Empfang"),
+        tr("Receive"),
         {QStringLiteral("rx"), QStringLiteral("empfang"),
-         QStringLiteral("filter"), QStringLiteral("agc"),
-         QStringLiteral("squelch"), QStringLiteral("daempfung")});
+         QStringLiteral("receive"), QStringLiteral("filter"),
+         QStringLiteral("agc"), QStringLiteral("squelch"),
+         QStringLiteral("daempfung"), QStringLiteral("attenuator")});
     m_appletVis->describeApplet(QStringLiteral("Tx"),
-        QStringLiteral("Senden"),
+        tr("Transmit"),
         {QStringLiteral("tx"), QStringLiteral("senden"),
-         QStringLiteral("leistung"), QStringLiteral("mox"),
+         QStringLiteral("transmit"), QStringLiteral("leistung"),
+         QStringLiteral("power"), QStringLiteral("mox"),
          QStringLiteral("vox"), QStringLiteral("tune"),
-         QStringLiteral("swr"), QStringLiteral("mikrofon")});
+         QStringLiteral("swr"), QStringLiteral("mikrofon"),
+         QStringLiteral("mic")});
     m_appletVis->describeApplet(QStringLiteral("PhoneCw"),
-        QStringLiteral("Betriebsart"),
+        tr("Mode"),
         {QStringLiteral("cw"), QStringLiteral("morse"),
          QStringLiteral("keyer"), QStringLiteral("phone"),
          QStringLiteral("wpm"), QStringLiteral("paddle")});
@@ -7970,6 +8450,11 @@ void MainWindow::populateDefaultMeter()
         QStringLiteral("Digital"),
         {QStringLiteral("cw"), QStringLiteral("morse"), QStringLiteral("decoder"),
          QStringLiteral("telegrafie"), QStringLiteral("cwl"), QStringLiteral("cwu")});
+    m_appletVis->describeApplet(QStringLiteral("Ft8Decoder"),
+        QStringLiteral("Digital"),
+        {QStringLiteral("ft8"), QStringLiteral("ft4"), QStringLiteral("digital"),
+         QStringLiteral("decoder"), QStringLiteral("wsjt"),
+         QStringLiteral("digu"), QStringLiteral("digl")});
     m_appletVis->describeApplet(QStringLiteral("Vax"),
         QStringLiteral("Audio"),
         {QStringLiteral("vax"), QStringLiteral("audio"),
@@ -7994,7 +8479,7 @@ void MainWindow::populateDefaultMeter()
          QStringLiteral("low cut"), QStringLiteral("high cut"),
          QStringLiteral("shift")});
     m_appletVis->describeApplet(QStringLiteral("PureSignal"),
-        QStringLiteral("Linearisierung"),
+        tr("Linearisation"),
         {QStringLiteral("puresignal"), QStringLiteral("ps"),
          QStringLiteral("linearisierung"), QStringLiteral("vorverzerrung"),
          QStringLiteral("zweiton")});
@@ -8011,6 +8496,23 @@ void MainWindow::populateDefaultMeter()
     m_appletVis->describeApplet(QStringLiteral("RfKit"),
         QStringLiteral("Endstufen"),
         {QStringLiteral("rf-kit"), QStringLiteral("rf2k"),
+         QStringLiteral("verstaerker"), QStringLiteral("endstufe")});
+    m_appletVis->describeApplet(QStringLiteral("Acom"),
+        QStringLiteral("Endstufen"),
+        {QStringLiteral("acom"), QStringLiteral("600s"),
+         QStringLiteral("700s"), QStringLiteral("1200s"),
+         QStringLiteral("2020s"), QStringLiteral("verstaerker"),
+         QStringLiteral("endstufe")});
+    m_appletVis->describeApplet(QStringLiteral("Kpa500"),
+        QStringLiteral("Endstufen"),
+        {QStringLiteral("kpa500"), QStringLiteral("kpa"),
+         QStringLiteral("elecraft"), QStringLiteral("500 w"),
+         QStringLiteral("verstaerker"), QStringLiteral("endstufe")});
+    m_appletVis->describeApplet(QStringLiteral("Spe"),
+        QStringLiteral("Endstufen"),
+        {QStringLiteral("spe"), QStringLiteral("expert"),
+         QStringLiteral("taurus"), QStringLiteral("1.3k"),
+         QStringLiteral("1.5k"), QStringLiteral("2k-fa"),
          QStringLiteral("verstaerker"), QStringLiteral("endstufe")});
 #ifdef HAVE_WEBSOCKETS
     if (m_tciApplet) {
@@ -8053,19 +8555,19 @@ void MainWindow::populateDefaultMeter()
     // dorthin, die Statuszeile ist die Statuszeile. In der Vorlage ist es
     // genauso. Ein- und Ausblenden ist hier die ganze Bedienung.
     m_appletVis->registerApplet(QString::fromLatin1(kChromeOverlayId),
-                                QStringLiteral("Knopfleiste am Spektrum"),
+                                tr("Button strip on the spectrum"),
                                 true);
     m_appletVis->describeApplet(QString::fromLatin1(kChromeOverlayId),
-        QStringLiteral("Empfang"),
+        tr("Receive"),
         {QStringLiteral("knoepfe"), QStringLiteral("band"),
          QStringLiteral("antenne"), QStringLiteral("tnf"),
          QStringLiteral("rx"), QStringLiteral("display"),
          QStringLiteral("vax"), QStringLiteral("overlay")});
 
     m_appletVis->registerApplet(QString::fromLatin1(kChromeStatusId),
-                                QStringLiteral("Statuszeile"), true);
+                                tr("Status line"), true);
     m_appletVis->describeApplet(QString::fromLatin1(kChromeStatusId),
-        QStringLiteral("Fenster"),
+        tr("Windows"),
         {QStringLiteral("status"), QStringLiteral("cat"),
          QStringLiteral("tci"), QStringLiteral("pa"),
          QStringLiteral("cpu"), QStringLiteral("spannung"),
@@ -8090,28 +8592,36 @@ void MainWindow::populateDefaultMeter()
         const char* category;
         std::initializer_list<const char*> keywords;
     };
+    // Beschriftung und Kategorie englisch (2026-10-15), die
+    // Schlagwoerter zweisprachig — wie bei den Applets darueber: die
+    // Oberflaeche ist englisch, der Betreiber denkt deutsch.
     static const WindowEntry kWindows[] = {
-        {"WinLogbook", "Logbuch", "Aufnahme",
-         {"logbuch", "log", "qso", "adif", "kontakte", "eintraege"}},
-        {"WinRotorLog", "Rotor / Log", "Abstimmen",
-         {"rotor", "antenne", "richtung", "peilung", "drehen", "azimut",
-          "grad", "kompass"}},
-        {"WinChannelStrip", "Kanalzug", "Senden",
-         {"kanalzug", "strip", "channel", "eq", "kompressor", "leveler",
-          "mikrofon", "sprache"}},
-        {"WinAntenna", "Antenne", "Tuner",
-         {"antenne", "swr", "stehwelle", "sweep", "wobbeln", "analyzer",
-          "resonanz", "laenge"}},
-        {"WinSpotHub", "Spot-Zentrale", "Netzwerk",
-         {"spots", "cluster", "dx", "rbn", "wsjt", "pota", "meldungen"}},
+        {"WinLogbook", QT_TR_NOOP("Logbook"), QT_TR_NOOP("Recording"),
+         {"logbuch", "logbook", "log", "qso", "adif", "kontakte",
+          "contacts", "eintraege"}},
+        {"WinRotorLog", QT_TR_NOOP("Rotor / Log"), QT_TR_NOOP("Tuning"),
+         {"rotor", "antenne", "antenna", "richtung", "heading", "peilung",
+          "bearing", "drehen", "azimut", "azimuth", "grad", "kompass",
+          "compass"}},
+        {"WinChannelStrip", QT_TR_NOOP("Channel strip"),
+         QT_TR_NOOP("Transmit"),
+         {"kanalzug", "strip", "channel", "eq", "kompressor",
+          "compressor", "leveler", "mikrofon", "mic", "sprache",
+          "speech"}},
+        {"WinAntenna", QT_TR_NOOP("Antenna"), QT_TR_NOOP("Tuner"),
+         {"antenne", "antenna", "swr", "stehwelle", "sweep", "wobbeln",
+          "analyzer", "resonanz", "resonance", "laenge", "length"}},
+        {"WinSpotHub", QT_TR_NOOP("Spot hub"), QT_TR_NOOP("Network"),
+         {"spots", "cluster", "dx", "rbn", "wsjt", "pota", "meldungen",
+          "reports"}},
     };
     for (const WindowEntry& w : kWindows) {
         const QString id = QString::fromLatin1(w.id);
-        m_appletVis->registerApplet(id, QString::fromLatin1(w.label),
+        m_appletVis->registerApplet(id, tr(w.label),
                                     /*defaultVisible=*/false);
         QStringList kw;
         for (const char* k : w.keywords) { kw << QString::fromLatin1(k); }
-        m_appletVis->describeApplet(id, QString::fromLatin1(w.category), kw);
+        m_appletVis->describeApplet(id, tr(w.category), kw);
     }
 
     // ── DAS PLUS ─────────────────────────────────────────────────────
@@ -8135,8 +8645,7 @@ void MainWindow::populateDefaultMeter()
             [this](const QString& id, bool visible) {
         if (visible) { bringAppletToFront(id); }
     });
-    m_addWidgetBtn->setToolTip(QStringLiteral(
-        "Fenster hinzufügen oder entfernen"));
+    m_addWidgetBtn->setToolTip(tr("Add or remove windows"));
     m_addWidgetBtn->raise();
     m_addWidgetBtn->show();
     positionAddWidgetButton();
@@ -8160,11 +8669,23 @@ void MainWindow::populateDefaultMeter()
     m_appletVis->setAvailable(QStringLiteral("Rade"),  false);
     m_appletVis->setAvailable(QStringLiteral("RttyDecoder"), false);
     m_appletVis->setAvailable(QStringLiteral("CwDecoder"), false);
+    m_appletVis->setAvailable(QStringLiteral("Ft8Decoder"), false);
 
     // RF-Kit RF2K-S: available only when the master toggle is enabled.
     // Default OFF; live-updated via rfKitEnabledChanged below.
     const bool rfKitOn = m_radioModel && m_radioModel->rfKitEnabled();
     m_appletVis->setAvailable(QStringLiteral("RfKit"), rfKitOn);
+
+    // SPE Expert: dasselbe, eigener Umschalter.
+    const bool speOn = m_radioModel && m_radioModel->speEnabled();
+    m_appletVis->setAvailable(QStringLiteral("Spe"), speOn);
+
+    const bool kpaOn = m_radioModel && m_radioModel->kpa500Enabled();
+    m_appletVis->setAvailable(QStringLiteral("Kpa500"), kpaOn);
+
+    const bool acomOn = m_radioModel && m_radioModel->acomEnabled();
+    m_appletVis->setAvailable(QStringLiteral("Acom"), acomOn);
+
 
     // ── Die Reihenfolge im Stapel ────────────────────────────────────
     //
@@ -8490,6 +9011,8 @@ void MainWindow::populateDefaultMeter()
                 // Schritt die letzte Zeile steht -- ohne das war der
                 // gesamte ~450-zeilige Block ein einziger, blinder
                 // synchroner Aufruf.
+                QElapsedTimer profilUhr;
+                profilUhr.start();
                 qWarning() << "[ProfileApply:Step] 1/6 Vollbild";
                 // Vollbild MERKEN, bevor irgendein Schritt unten es
                 // kippen kann -- am Ende wird es wieder durchgesetzt
@@ -8541,7 +9064,27 @@ void MainWindow::populateDefaultMeter()
                 // Full Screen fuer eine Weile verlassen war). Die
                 // Aufnahme behaelt den Schluessel; er entscheidet nur
                 // nichts mehr.
-                const bool wantFullScreen = true;
+                // ── Korrektur 2026-10-17: formatfuellend JA,
+                // rahmenlos NEIN ────────────────────────────────────
+                //
+                // Betreiber heute: „die punkte fuer die vergroesserung
+                // links oben sind wieder weg." Gemessen am laufenden
+                // Fenster: es meldet sich als AXDialog ohne
+                // Titelleisten-Knoepfe, und die einzige Stelle, die die
+                // Titelleiste nimmt, ist das rahmenlose Vollbild hier.
+                //
+                // Zwischen beiden Wuenschen gibt es keinen Widerspruch:
+                // MAXIMIERT fuellt den Schirm genauso und behaelt die
+                // Titelleiste mit den drei Knoepfen. Rahmenlos bleibt
+                // ueber Ansicht > Full Screen erreichbar, es ist nur
+                // nicht mehr die Vorgabe.
+                //
+                // (Die Zeile hiess bis heute `const bool
+                // wantFullScreen = true;` mit der Begruendung vom
+                // 2026-09-27 — „longpath sollte immer formatfüllend
+                // sein". Der Wunsch bleibt, der Weg dorthin aendert
+                // sich.)
+                const bool wantFullScreen = false;
                 // Diagnose 2026-09-01 (leeres-Fenster-Untersuchung): NUR
                 // bei einer Abweichung loest enterBorderlessFullSize()/
                 // exitBorderlessFullSize() ihren hide()/setWindowFlag()/
@@ -8553,7 +9096,10 @@ void MainWindow::populateDefaultMeter()
                                << wasFullScreen << "wantFullScreen="
                                << wantFullScreen;
                 }
-                enterBorderlessFullSize();
+                // Formatfuellend ueber showMaximized(), nicht ueber
+                // das rahmenlose Vollbild -- siehe den Block darueber.
+                if (m_borderlessFullSize) { exitBorderlessFullSize(); }
+                if (!isMaximized()) { showMaximized(); }
 
                 // Erst das Weltbild: es loest den Geber aus, und die
                 // Ansichten sollen einmal neu zeichnen und nicht
@@ -8573,7 +9119,13 @@ void MainWindow::populateDefaultMeter()
                     }
                 }
 
-                qWarning() << "[ProfileApply:Step] 2/6 Sichtbarkeits-Map";
+                // Messpunkt (2026-10-16): zwischen Schritt 1 und 2
+                // lagen in Martins Protokoll 2231 ms. Schritt 1 ist
+                // der Vollbild-Uebergang, und macOS animiert den —
+                // diese Zeile sagt, ob es wirklich das ist.
+                qWarning() << "[ProfileApply:Step] 2/6 Sichtbarkeits-Map"
+                           << "(Schritt 1 brauchte"
+                           << profilUhr.elapsed() << "ms)";
                 const QVariantMap vis =
                     s.value(QStringLiteral("visible")).toMap();
                 for (auto it = vis.constBegin(); it != vis.constEnd(); ++it) {
@@ -8691,7 +9243,24 @@ void MainWindow::populateDefaultMeter()
                         ensureOnVisibleScreen(w, this,
                                               QSize(Style::kAppletPanelW, 120));
                     } else if (auto* a = appletForKey(it.key())) {
+                        // Messpunkt (2026-10-16): wohin die Startzeit
+                        // geht.
+                        //
+                        // Gemessen an Martins Protokoll vom 15.10.:
+                        // „Profil anwenden" braucht 6,5 s, davon 3,5 s
+                        // allein in diesem Schritt. Er ruft
+                        // detachApplet() je schwebendem Applet — bei
+                        // ihm sechs. Ob sich die 3,5 s gleichmaessig
+                        // verteilen oder an EINEM haengen, sagt erst
+                        // diese Zeile.
+                        QElapsedTimer loeseUhr;
+                        loeseUhr.start();
                         detachApplet(a, dockIndex, rect, screen);
+                        const qint64 gebraucht = loeseUhr.elapsed();
+                        if (gebraucht >= 100) {
+                            qWarning() << "[ProfileApply:Step3] abgeloest"
+                                       << it.key() << "in" << gebraucht << "ms";
+                        }
                     }
                     // Eine Kennung ohne Applet dahinter wird
                     // übergangen: eine Aufnahme von vor einem Update
@@ -9048,10 +9617,64 @@ void MainWindow::populateDefaultMeter()
             // löst m_apply ohne diese Wache aus. Bug + Fix 2026-08-28.
             m_layoutProfiles->applyCurrent();
         }
+
+        // ── Was zuletzt schwebte, NACH dem Profil ────────────────────
+        //
+        // Betreiber, 2026-10-15: „er soll mal technisch
+        // funktionieren!"
+        //
+        // Gemessen am selben Tag in einer Sandkiste: der globale
+        // Schluessel PanFloating_<id> liess pan-0 schweben, und 82 ms
+        // spaeter stand „[PanDockRequested] pan-0" im Protokoll — das
+        // Layoutprofil kam danach und dockte ihn wieder an. Zwei
+        // Hoheiten ueber denselben Zustand, und die zweite gewinnt
+        // immer. Ein abgeloester Panadapter ueberlebte so keinen
+        // Neustart.
+        //
+        // Das Profil ist die richtige Hoheit: es haelt je Profil,
+        // WELCHE Panadapter schweben und WO (snapshot["floatingPans"],
+        // angewandt in runApply). Sagt es etwas dazu, hat es das letzte
+        // Wort. Sagt es nichts — erster Start, oder ein Profil aus einer
+        // Fassung vor diesem Schluessel — zaehlt der globale Schluessel.
+        if (m_panStack) {
+            const bool profilEntscheidet =
+                !m_layoutProfiles->current().isEmpty()
+                && m_layoutProfiles->snapshot(m_layoutProfiles->current())
+                       .contains(QStringLiteral("floatingPans"));
+            int wiederhergestellt = 0;
+            if (!profilEntscheidet) {
+                AppSettings& ps = AppSettings::instance();
+                for (const QString& panId : m_panStack->panIdsForTesting()) {
+                    if (ps.value(QStringLiteral("PanFloating_%1").arg(panId),
+                                 QStringLiteral("False")).toString()
+                            != QStringLiteral("True")) {
+                        continue;
+                    }
+                    if (m_panStack->isPanFloating(panId)) { continue; }
+                    m_panStack->floatPanadapter(panId);
+                    ++wiederhergestellt;
+                }
+            }
+            qWarning() << "[PanFloatRestore] profilEntscheidet="
+                       << profilEntscheidet
+                       << "wiederhergestellt=" << wiederhergestellt;
+            syncFloatPanAction();
+        }
+
         // Auch ohne ein Profil, das angewandt wird (allererster Start):
         // formatfuellend (Betreiber 2026-09-27, siehe die Profil-
         // Anwendung oben). Nach applyCurrent() ist das schon geschehen.
-        if (!m_borderlessFullSize) { enterBorderlessFullSize(); }
+        // Formatfuellend, aber MIT Rahmen (2026-10-17) -- die drei
+        // Knoepfe links oben gehoeren zur Titelleiste, und die nimmt
+        // das rahmenlose Vollbild mit. showMaximized() fuellt den
+        // Schirm genauso.
+        if (m_borderlessFullSize) { exitBorderlessFullSize(); }
+        if (!isMaximized()) { showMaximized(); }
+
+        // Ab hier zaehlt eine Fensterbewegung als Ziehen. Nicht sofort:
+        // showMaximized() loest selbst noch Bewegungen aus, und die
+        // Container folgen in derselben Runde.
+        QTimer::singleShot(0, this, [this]() { m_fensterAufbauFertig = true; });
         // KEIN wireProfileRail() mehr an dieser Stelle.
         //
         // Seit die Schiene umhaengbar ist (2026-10-06), verdrahtet
@@ -9186,6 +9809,27 @@ void MainWindow::populateDefaultMeter()
     // wieder hineingelegt.
     restoreCanvasLayout();
 
+    // Die Scheibenflaggen aus den Einstellungen. NACH der Flaeche, weil
+    // sie am Panadapter haengen und der erst hier steht. Vorgabe AUS —
+    // das ist der Zustand, den der Betreiber seit August kennt.
+    m_sliceFlagsOn = AppSettings::instance()
+                         .value(QStringLiteral("SliceFlagsVisible"),
+                                QStringLiteral("False"))
+                         .toString() == QLatin1String("True");
+    if (m_sliceFlagAction) {
+        QSignalBlocker b(m_sliceFlagAction);
+        m_sliceFlagAction->setChecked(m_sliceFlagsOn);
+    }
+    rebuildSliceFlags();
+
+    // Kommt oder geht eine Scheibe, kommt oder geht ihre Flagge.
+    if (m_radioModel) {
+        connect(m_radioModel, &RadioModel::sliceAdded, this,
+                [this](int) { rebuildSliceFlags(); });
+        connect(m_radioModel, &RadioModel::sliceRemoved, this,
+                [this](int) { rebuildSliceFlags(); });
+    }
+
     // Pump future EFFECTIVE-visibility changes from the controller into
     // the panel. effectiveVisibilityChanged fires when either the user
     // toggle or the availability gate flips the net visibility, so we
@@ -9212,6 +9856,24 @@ void MainWindow::populateDefaultMeter()
                 this, [this](bool enabled) {
             if (!m_appletVis) { return; }
             m_appletVis->setAvailable(QStringLiteral("RfKit"), enabled);
+        });
+
+        connect(m_radioModel, &RadioModel::speEnabledChanged,
+                this, [this](bool enabled) {
+            if (!m_appletVis) { return; }
+            m_appletVis->setAvailable(QStringLiteral("Spe"), enabled);
+        });
+
+        connect(m_radioModel, &RadioModel::kpa500EnabledChanged,
+                this, [this](bool enabled) {
+            if (!m_appletVis) { return; }
+            m_appletVis->setAvailable(QStringLiteral("Kpa500"), enabled);
+        });
+
+        connect(m_radioModel, &RadioModel::acomEnabledChanged,
+                this, [this](bool enabled) {
+            if (!m_appletVis) { return; }
+            m_appletVis->setAvailable(QStringLiteral("Acom"), enabled);
         });
     }
 
@@ -9437,7 +10099,7 @@ void MainWindow::buildMenuBar()
     {
         QMenu* kiwiMenu = radioMenu->addMenu(QStringLiteral("&KiwiSDR"));
 
-        kiwiMenu->addAction(QStringLiteral("Öffentliche Empfänger…"),
+        kiwiMenu->addAction(tr("Public receivers…"),
             this, [this]() {
                 auto* picker = new KiwiPublicReceiverPicker(this);
                 picker->setAttribute(Qt::WA_DeleteOnClose);
@@ -9448,16 +10110,16 @@ void MainWindow::buildMenuBar()
                 picker->show();
             });
 
-        kiwiMenu->addAction(QStringLiteral("Empfänger von Hand hinzufügen…"),
+        kiwiMenu->addAction(tr("Add a receiver by hand…"),
             this, [this]() {
                 // Fuer den eigenen Kiwi im Heimnetz. Er steht in keinem
                 // oeffentlichen Verzeichnis, und genau der ist fuer
                 // einen Funker der interessanteste.
                 bool ok = false;
                 const QString ep = QInputDialog::getText(
-                    this, QStringLiteral("KiwiSDR hinzufügen"),
-                    QStringLiteral("Adresse (Rechnername oder IP, "
-                                   "wahlweise mit :Port):"),
+                    this, tr("Add a KiwiSDR"),
+                    tr("Address (host name or IP, optionally with "
+                       ":port):"),
                     QLineEdit::Normal, QStringLiteral("kiwisdr.local:8073"),
                     &ok);
                 if (!ok || ep.trimmed().isEmpty()) { return; }
@@ -9465,7 +10127,7 @@ void MainWindow::buildMenuBar()
             });
 
         kiwiMenu->addSeparator();
-        kiwiMenu->addAction(QStringLiteral("Alle trennen"), this, [this]() {
+        kiwiMenu->addAction(tr("Disconnect all"), this, [this]() {
             if (m_kiwiSdrManager) { m_kiwiSdrManager->disconnectAll(); }
         });
     }
@@ -9482,7 +10144,7 @@ void MainWindow::buildMenuBar()
     {
         QMenu* sunSdrMenu = radioMenu->addMenu(QStringLiteral("&SunSDR (TCI)"));
 
-        sunSdrMenu->addAction(QStringLiteral("&Verbinden…"), this, [this]() {
+        sunSdrMenu->addAction(tr("&Connect…"), this, [this]() {
             auto& s = AppSettings::instance();
             // Vorschlag 127.0.0.1, NICHT die Adresse der SunSDR-Hardware:
             // TCI ist ein Dienst von ExpertSDR2 (der Software), die in
@@ -9498,18 +10160,18 @@ void MainWindow::buildMenuBar()
                 QStringLiteral("127.0.0.1:40001")).toString();
             bool ok = false;
             const QString ep = QInputDialog::getText(
-                this, QStringLiteral("SunSDR verbinden"),
-                QStringLiteral("Adresse von ExpertSDR2 (IP oder Rechnername, "
-                               "wahlweise mit :Port -- Voreinstellung 40001).\n"
-                               "Meist 127.0.0.1, wenn ExpertSDR2 auf diesem "
-                               "Rechner laeuft -- NICHT die Adresse der "
-                               "SunSDR-Hardware selbst."),
+                this, tr("Connect SunSDR"),
+                tr("Address of ExpertSDR2 (IP or host name, optionally with "
+                   ":port \u2014 default 40001).\n"
+                   "Usually 127.0.0.1 when ExpertSDR2 runs on this "
+                   "machine \u2014 NOT the address of the SunSDR hardware "
+                   "itself."),
                 QLineEdit::Normal, lastEndpoint, &ok);
             if (!ok || ep.trimmed().isEmpty()) { return; }
             connectSunSdr(ep.trimmed());
         });
 
-        sunSdrMenu->addAction(QStringLiteral("&Trennen"), this, [this]() {
+        sunSdrMenu->addAction(tr("&Disconnect"), this, [this]() {
             disconnectSunSdr();
         });
     }
@@ -9600,9 +10262,9 @@ void MainWindow::buildMenuBar()
             panLayoutAct->setEnabled(on);
             panLayoutAct->setToolTip(on
                 ? QStringLiteral("Pick a panadapter layout template")
-                : QStringLiteral(
-                      "Erst verbinden: wie viele Panadapter moeglich "
-                      "sind, sagt das Geraet (DDC-Anzahl)."));
+                : tr("Connect first: how many panadapters are "
+                                 "possible is up to the radio (its DDC "
+                                 "count)."));
         };
         syncPanLayoutEnabled();
         if (m_radioModel) {
@@ -9653,8 +10315,8 @@ void MainWindow::buildMenuBar()
             if (!m_radioModel) { return; }
             const QList<SliceModel*> list = m_radioModel->slices();
             if (list.size() <= 1) {
-                showToast(tr("Der letzte Empfänger bleibt — sonst gäbe es "
-                             "nichts mehr zu hören."),
+                showToast(tr("The last receiver stays — otherwise there would be nothing "
+                              "left to listen to."),
                           ToastSeverity::Info, 4000);
                 return;
             }
@@ -9662,20 +10324,67 @@ void MainWindow::buildMenuBar()
             if (!s) { return; }
             const QString letter = QString(s->sliceLetter());
             m_radioModel->removeSlice(s->sliceIndex());
-            showToast(tr("Empfänger %1 geschlossen.").arg(letter),
+            showToast(tr("Receiver %1 closed.").arg(letter),
                       ToastSeverity::Info, 3000);
         });
     }
 
+    // ── Der schwebende Panadapter: EIN Schalter ──────────────────────
+    //
+    // Betreiber, 2026-10-15: „er soll mal technisch funktionieren!
+    // ... das sollte nur eine option sein, die man ein und ausblenden
+    // kann."
+    //
+    // Hier stand „Float active pan…" -- eine Handlung in EINE
+    // Richtung. Sie loeste ab und konnte nie wieder andocken; ob
+    // gerade etwas schwebte, sagte das Menue nicht. Zurueck ging es
+    // nur ueber den ↙ im Kopf des Schwebefensters, also nur, wenn man
+    // das Fenster schon gefunden hatte.
+    //
+    // Jetzt ein Haken: an loest ab, aus dockt an, und der Haken zeigt
+    // den WIRKLICHEN Zustand -- nachgefuehrt ueber
+    // panFloatStateChanged, damit ↗, Rechtsklick und dieser Schalter
+    // nicht auseinanderlaufen.
     {
-        QAction* floatAct = viewMenu->addAction(
-            QStringLiteral("&Float active pan…"));
-        floatAct->setToolTip(QStringLiteral(
-            "Detach the active panadapter into its own floating window"));
-        connect(floatAct, &QAction::triggered, this, [this]() {
-            if (m_panStack) {
-                m_panStack->floatPanadapter(m_panStack->activePanId());
-            }
+        m_floatPanAction = viewMenu->addAction(tr("Floating &Panadapter"));
+        m_floatPanAction->setCheckable(true);
+        m_floatPanAction->setToolTip(
+            tr("Show the active panadapter in its own window — freely "
+               "movable and resizable, also on a second screen. Switch it "
+               "off to dock it back."));
+        connect(m_floatPanAction, &QAction::toggled, this, [this](bool on) {
+            if (!m_panStack) { return; }
+            const QString panId = m_panStack->activePanId();
+            if (panId.isEmpty()) { return; }
+            if (on == m_panStack->isPanFloating(panId)) { return; }
+            if (on) { m_panStack->floatPanadapter(panId); }
+            else    { m_panStack->dockPanadapter(panId); }
+        });
+        connect(viewMenu, &QMenu::aboutToShow, this, [this]() {
+            syncFloatPanAction();
+        });
+    }
+
+    // ── Die Scheibenflagge, als Option ───────────────────────────────
+    //
+    // Betreiber, 2026-10-15: „würde 1 nehmen und dies als eine option
+    // verwenden. sprich wenn ich sota mache stelle ich mir ein anderes
+    // profil zusammen, als ich zu hause bin und dadurch andere
+    // prioritäten. da wäre die vfo flagge besser geeignet."
+    //
+    // Also ein Haken wie jeder andere — und weil Layoutprofile die
+    // Sichtbarkeiten mitnehmen, kann zu Hause die Spalte stehen und am
+    // Berg die Flagge, ohne dass eines das andere ausschliesst.
+    {
+        m_sliceFlagAction = viewMenu->addAction(tr("&Slice flag"));
+        m_sliceFlagAction->setCheckable(true);
+        m_sliceFlagAction->setChecked(m_sliceFlagsOn);
+        m_sliceFlagAction->setToolTip(
+            tr("A flag per slice, right on the panadapter: frequency, "
+               "band, mode. Drag it where you want it — the line keeps "
+               "pointing at its own carrier."));
+        connect(m_sliceFlagAction, &QAction::toggled, this, [this](bool on) {
+            setSliceFlagsEnabled(on);
         });
     }
 
@@ -9790,25 +10499,144 @@ void MainWindow::buildMenuBar()
     }
 
     {
-        QMenu* uiScaleMenu = viewMenu->addMenu(QStringLiteral("&UI Scale"));
+        // Darstellungsgroesse (2026-10-09). Der Unterbau stand schon:
+        // `main.cpp` liest `UiScalePercent` aus den Einstellungen und
+        // setzt daraus `QT_SCALE_FACTOR` -- und zwar VOR dem
+        // QApplication-Konstruktor, weil Qt den Faktor nur dort liest.
+        // Nur das Menue war tot (jeder Eintrag `setEnabled(false)`,
+        // Tooltip "NYI"), man konnte die Groesse also ueberhaupt nicht
+        // einstellen; sie haette von Hand in die Einstellungsdatei
+        // gemusst.
+        //
+        // Genau daraus folgt auch, warum eine Aenderung erst nach einem
+        // Neustart greift: `QT_SCALE_FACTOR` wirkt nur beim Start. Das
+        // sagen wir dem Benutzer, statt eine Aenderung vorzutaeuschen,
+        // die er nicht sieht.
+        //
+        // Die Stufen: 75 bis 200 wie bisher vorgesehen, dazu 115 und 130
+        // als feine Zwischenstufen -- von 100 auf 125 ist ein grosser
+        // Sprung, und genau dort liegt der Bedarf.
+        QMenu* uiScaleMenu = viewMenu->addMenu(tr("&Display size"));
         QActionGroup* scaleGroup = new QActionGroup(this);
         scaleGroup->setExclusive(true);
-        const struct { const char* label; bool isDefault; } scales[] = {
-            { "&75%",  false },
-            { "&100%", true  },
-            { "&125%", false },
-            { "&150%", false },
-            { "&175%", false },
-            { "&200%", false },
-        };
-        for (const auto& s : scales) {
-            QAction* a = uiScaleMenu->addAction(QString::fromUtf8(s.label));
+
+        const int aktuell = UiScale::current();
+        for (int pct : UiScale::steps()) {
+            QAction* a = uiScaleMenu->addAction(QStringLiteral("%1 %").arg(pct));
             a->setCheckable(true);
-            a->setEnabled(false);
-            a->setToolTip(QStringLiteral("NYI — Phase X"));
-            if (s.isDefault) { a->setChecked(true); }
+            a->setChecked(pct == aktuell);
+            a->setData(pct);
             scaleGroup->addAction(a);
+            connect(a, &QAction::triggered, this, [this, pct]() {
+                if (!UiScale::store(pct)) { return; }
+                QMessageBox::information(this,
+                                         tr("Display size"),
+                                         UiScale::restartHint(pct));
+            });
         }
+    }
+
+    // ── Palette (2026-10-15) ─────────────────────────────────────────
+    //
+    // Der Betreiber: „theme wechsel funktioniert nicht." Zwei Gruende,
+    // beide echt, beide hier behoben:
+    //
+    //   1. Im Menue stand bis zum 2026-10-14 „Dark Theme" -- ein
+    //      Eintrag, der nur `qDebug("Dark Theme toggle NYI")` schrieb.
+    //      Wer das Menue benutzte, hat NIE etwas umgestellt. Der
+    //      Eintrag ist gefallen; dieses Untermenue nimmt seinen Platz
+    //      ein und fuehrt die Paletten wirklich. Die einzige echte
+    //      Auswahl lag bis heute in Setup > Appearance > Palette --
+    //      acht Klicks tief, und in seinen Einstellungen stand nach
+    //      Wochen kein einziges ActiveTheme.
+    //
+    //   2. Eine Umstellung wirkte NICHT im laufenden Programm.
+    //      themed() ersetzt Quelltextfarben in EINE Richtung: hat eine
+    //      Palette #00b4d8 schon durch ihren Ton ersetzt, findet die
+    //      naechste das #00b4d8 nicht mehr. Dagegen merkt sich
+    //      ThemeQss jetzt zu jedem Ergebnis seine Vorlage, und
+    //      ThemeFilter::reapplyAll() rechnet von DER aus — damit
+    //      wechselt die Farbe auf Knopfdruck, in jede Richtung
+    //      (Betreiber, 2026-10-15: „das theme sollte man danach auch
+    //      per knopfdruck ändern können").
+    //
+    //      Nicht auf Knopfdruck geht die FORM: Eckenradius, Polsterung
+    //      und Relief stehen als fertige Zahlen in Stylesheets, die
+    //      beim Bauen des Fensters entstanden sind. Nur wenn eine
+    //      Palette die Form anders will, fragt das Programm nach einem
+    //      Neustart — „Flach" und „Tief" tragen absichtlich nur Form.
+    {
+        QMenu* paletteMenu = viewMenu->addMenu(QStringLiteral("&Palette"));
+        auto* paletteGroup = new QActionGroup(this);
+        paletteGroup->setExclusive(true);
+
+        const QString stored =
+            AppSettings::instance().value("ActiveTheme", QString()).toString();
+
+        auto addPalette = [this, paletteMenu, paletteGroup, stored](
+                              const QString& label, const QString& key) {
+            QAction* a = paletteMenu->addAction(label);
+            a->setCheckable(true);
+            a->setChecked(stored == key);
+            paletteGroup->addAction(a);
+            connect(a, &QAction::triggered, this, [this, key, label]() {
+                // Formwerte vorher merken: Farben koennen sofort
+                // wechseln, Formen nicht (siehe unten).
+                const QHash<QString, int> formVorher =
+                    Style::Theme::instance().formOverrides();
+
+                QString err;
+                if (!Style::Theme::instance().activate(key, &err)) {
+                    showToast(QStringLiteral("Palette %1: %2").arg(label, err),
+                              ToastSeverity::Warning, 6000);
+                    return;
+                }
+
+                // Der Knopfdruck, um den es geht (Betreiber,
+                // 2026-10-15: „das theme sollte man danach auch per
+                // knopfdruck ändern können").
+                const quint64 umgefaerbt = Style::ThemeFilter::reapplyAll();
+
+                // Nur wenn die Palette auch die FORM anders will, fehlt
+                // noch etwas: Eckenradius, Polsterung und Relief stehen
+                // als fertige Zahlen in Stylesheets, die beim Bauen des
+                // Fensters entstanden sind — die kann kein Umfaerben
+                // nachtragen. „Flach" und „Tief" tragen absichtlich nur
+                // Form und keine Farbe; fuer sie ist dieser Zweig der
+                // Normalfall.
+                if (Style::Theme::instance().formOverrides() != formVorher) {
+                    offerPaletteRestart(label);
+                    return;
+                }
+                showToast(tr("Palette “%1” — %2 panels recoloured.")
+                              .arg(label)
+                              .arg(umgefaerbt),
+                          ToastSeverity::Info, 4000);
+            });
+        };
+
+        addPalette(Style::Theme::builtInName(), QString());
+        for (const Style::Theme::Entry& e : Style::Theme::available()) {
+            addPalette(e.name, e.name);
+        }
+
+        // Zwei Wege zur selben Sache driften auseinander: wer die
+        // Palette in Setup > Appearance umstellt, faende hier sonst
+        // weiter den alten Haken. Beim Aufklappen nachziehen — dieselbe
+        // Lehre wie bei „View > Network Applets" (Phase 23), nur hier
+        // billiger zu haben.
+        connect(paletteMenu, &QMenu::aboutToShow, this, [paletteMenu]() {
+            const QString jetzt = AppSettings::instance()
+                                      .value("ActiveTheme", QString())
+                                      .toString();
+            for (QAction* a : paletteMenu->actions()) {
+                const QString key = (a->text() == Style::Theme::builtInName())
+                                        ? QString()
+                                        : a->text();
+                QSignalBlocker blocker(a);
+                a->setChecked(key == jetzt);
+            }
+        });
     }
 
     // Phase 23 "View > Network Applets" submenu removed: TCI Server and
@@ -9846,13 +10674,20 @@ void MainWindow::buildMenuBar()
 
     viewMenu->addSeparator();
 
-    m_darkThemeAction = viewMenu->addAction(QStringLiteral("&Dark Theme"));
-    m_darkThemeAction->setCheckable(true);
-    m_darkThemeAction->setChecked(true);
-    m_darkThemeAction->setToolTip(QStringLiteral("Toggle dark theme (NYI — Phase X)"));
-    connect(m_darkThemeAction, &QAction::toggled, this, [](bool /*on*/) {
-        qCDebug(lcConnection) << "Dark Theme toggle NYI";
-    });
+    // View > Dark Theme ist am 2026-10-14 entfernt worden.
+    //
+    // Der Eintrag war ankreuzbar, stand auf „an" und schrieb beim
+    // Umschalten "Dark Theme toggle NYI" ins Protokoll -- sonst nichts.
+    // Sein eigener Tooltip sagte "(NYI — Phase X)", was niemand sieht,
+    // der nicht stehenbleibt. Der Betreiber hat ihn zweimal betaetigt
+    // (21:03:30 und 21:03:41 in seinem Protokoll) und daraus geschlossen,
+    // die Palettenumschaltung sei kaputt.
+    //
+    // Sie ist es nicht: Setup > Appearance schaltet, und zwar sichtbar
+    // (nachgemessen ueber drei Starts mit demselben Fensterausschnitt --
+    // die Formpalette "Tief" aendert 37,6 % aller Bildpunkte). Ein
+    // Schalter, der nichts tut, ist schlimmer als keiner: er laesst den
+    // Bediener am Richtigen zweifeln.
 
     {
         QAction* minimalAction = viewMenu->addAction(QStringLiteral("&Minimal Mode"));
@@ -10381,13 +11216,13 @@ void MainWindow::buildMenuBar()
     // Hand zu warten.
     if (m_appletPanel) {
         m_freeCanvasAction = containersMenu->addAction(
-            QStringLiteral("Neue Fenster gleich ablösen"));
+            tr("Detach new windows right away"));
         m_freeCanvasAction->setCheckable(true);
         m_freeCanvasAction->setChecked(m_freeCanvasMode);
-        m_freeCanvasAction->setToolTip(QStringLiteral(
-            "Jedes Fenster bekommt eine eigene Lage auf der Flaeche — "
-            "ziehen an der Titelleiste, Groesse an der Ecke, Schloss im "
-            "Kopf. Neue Fenster kommen gleich so."));
+        m_freeCanvasAction->setToolTip(tr(
+            "Every window gets its own place on the canvas — drag by the "
+            "title bar, resize at the corner, lock in the header. New "
+            "windows arrive that way."));
         connect(m_freeCanvasAction, &QAction::toggled, this, [this](bool on) {
             setFreeCanvasMode(on);
             if (on) { moveAllAppletsToCanvas(); }
@@ -10403,12 +11238,12 @@ void MainWindow::buildMenuBar()
     // Buchfuehrung.
     {
         QAction* sideAct = containersMenu->addAction(
-            QStringLiteral("Seitenbereich rechts"));
+            tr("Side area on the right"));
         sideAct->setCheckable(true);
-        sideAct->setToolTip(QStringLiteral(
-            "Rotor/Log und Applets in einem Bereich am rechten Rand, "
-            "umschaltbar über eine Symbolleiste; Klick auf das aktive "
-            "Symbol klappt ihn zu."));
+        sideAct->setToolTip(tr("Rotator/log and applets in one "
+                                           "area along the right edge, "
+                                           "switched by a toolbar; clicking "
+                                           "the active icon folds it away."));
         connect(containersMenu, &QMenu::aboutToShow, sideAct, [this, sideAct]() {
             QSignalBlocker block(sideAct);
             sideAct->setChecked(m_sideArea != nullptr);
@@ -10426,11 +11261,11 @@ void MainWindow::buildMenuBar()
     // im Kopf.
     if (m_appletPanel) {
         QAction* freeAll = containersMenu->addAction(
-            QStringLiteral("Alle Fenster als eigene Fenster ablösen"));
-        freeAll->setToolTip(QStringLiteral(
-            "Jedes Fenster wird ein eigenes Betriebssystem-Fenster: "
-            "ueberall hinschiebbar, in der Groesse aenderbar, auch auf "
-            "einen zweiten Schirm. Zurueck ueber das ✕ am Fenster."));
+            tr("Detach every window into its own window"));
+        freeAll->setToolTip(tr(
+            "Each one becomes its own operating-system window: movable "
+            "anywhere, resizable, also onto a second screen. Back via the "
+            "✕ on the window."));
         connect(freeAll, &QAction::triggered,
                 this, &MainWindow::moveAllAppletsToCanvas);
     }
@@ -10445,10 +11280,10 @@ void MainWindow::buildMenuBar()
     // Umkehrbar: das Plus unten rechts holt jedes Fenster zurueck.
     if (m_appletVis) {
         QAction* clearAll = containersMenu->addAction(
-            QStringLiteral("Alle Fenster ausblenden"));
-        clearAll->setToolTip(QStringLiteral(
-            "Leere Flaeche. Mit dem + unten rechts holst du jedes "
-            "Fenster einzeln zurueck."));
+            tr("Hide every window"));
+        clearAll->setToolTip(tr(
+            "An empty canvas. The + at the bottom right brings each window "
+            "back one at a time."));
         connect(clearAll, &QAction::triggered, this, [this]() {
             for (const QString& id : m_appletVis->registeredIds()) {
                 // Rahmen bleibt: Knopfleiste und Statuszeile sind keine
@@ -10457,6 +11292,39 @@ void MainWindow::buildMenuBar()
                 if (id == QLatin1String(kChromeStatusId))  { continue; }
                 m_appletVis->setVisible(id, false);
             }
+        });
+    }
+
+    // ── Feldbetrieb (2026-10-15) ─────────────────────────────────────
+    //
+    // Betreiber, 2026-10-14: „wenn man wenig platz hat und sota macht
+    // waere es besser um mehr am wasserfall sehen zu koennen ... sonst
+    // ist alles sehr eng ... dann koennte man den wasserfall groesser
+    // machen und auch das logbuch, die unwichtigen dinge wuerden dann
+    // weg bleiben."
+    //
+    // Was bleibt und was geht, steht so im Vorschlagsblatt vom
+    // 2026-10-14, das er gelesen hat: Frequenz, Band, Mode und Filter
+    // bleiben, dazu das kleine S-Meter. Weg gehen die Sendewerkstatt
+    // (TX, PureSignal, CFC/EQ), das Zubehoer (Verstaerker, Tuner,
+    // RF2K-S), die Netzfenster (TCI, Ketten, KiwiSDR) und was man am
+    // Berg nicht aufsetzt (VAX, DVK, Mitschrift, Decoder).
+    //
+    // WICHTIG: ueber ein eigenes Profil, nicht ueber das laufende.
+    // LayoutProfiles::activate() sichert das bisherige Profil, BEVOR
+    // es wechselt — seine Einrichtung ist also nicht weg, sondern
+    // einen Klick in der Profilschiene entfernt. Ein „Feldbetrieb",
+    // der die Arbeit von Wochen ueberschreibt, waere das Gegenteil
+    // von hilfreich.
+    if (m_appletPanel && m_layoutProfiles) {
+        QAction* feld = containersMenu->addAction(tr("&Field layout"));
+        feld->setToolTip(tr(
+            "For a small screen in the field: frequency, mode, filter and "
+            "the S-meter stay, everything else steps aside so the "
+            "waterfall gets the room. Goes into its own profile — your "
+            "own arrangement is one click away in the profile rail."));
+        connect(feld, &QAction::triggered, this, [this]() {
+            applyFieldLayout();
         });
     }
 
@@ -10929,6 +11797,7 @@ void MainWindow::buildMenuBar()
 // same badge through the same opacity-only state change -- a plain
 // setVisible() no longer represents "inactive" once a badge lives in a
 // permanently allocated slot.
+
 void MainWindow::dimSafetyBadge(QWidget* w, bool active)
 {
     auto* fx = qobject_cast<QGraphicsOpacityEffect*>(w->graphicsEffect());
@@ -12171,6 +13040,317 @@ void MainWindow::buildStatusBar()
 // moved to TitleBar, Task A7), all at once, mid-transmit.
 //
 // The notices themselves are worth keeping. They move here instead.
+// ── Neustart fuer eine Palette (2026-10-15) ──────────────────────────
+//
+// Die FARBEN sind beim Aufruf schon umgestellt (reapplyAll). Diese
+// Frage kommt nur, wenn die Palette auch die FORM anders will — die
+// steht als fertige Zahl in Stylesheets, die beim Bauen des Fensters
+// entstanden sind, und kommt erst beim naechsten Start nach.
+
+QStringList MainWindow::fieldLayoutKeepIds()
+{
+    // Die Liste aus dem Vorschlagsblatt vom 2026-10-14, Spalte
+    // „Bleibt". Panadapter und Wasserfall stehen nicht darin, weil sie
+    // keine Applets sind — sie bekommen genau den Platz, den die
+    // anderen raeumen.
+    return {
+        QStringLiteral("Frequency"),         // Band, Mode, Abstimmen
+        QStringLiteral("Rx"),                // Filter, AGC, Rauschen
+        QStringLiteral("PhoneCw"),           // Betriebsart und Mikrofon
+        QStringLiteral("SignalInstrument"),  // das kleine S-Meter
+    };
+    // „bandfilter waere da zb uninteressant" (Betreiber, 2026-10-15):
+    // die Durchlassflaeche stand bis dahin in dieser Liste. Am Berg
+    // zaehlt sie nicht — dort stellt man den Filter einmal und sieht
+    // danach auf den Wasserfall.
+}
+
+void MainWindow::applyFieldLayout()
+{
+    if (!m_appletVis || !m_layoutProfiles) { return; }
+
+    // Erst das Profil, dann die Sichtbarkeit. activate() sichert das
+    // bisherige Profil, bevor es wechselt — ohne diesen Schritt
+    // schriebe der Feldbetrieb in SEIN Profil und die Einrichtung von
+    // Wochen waere weg.
+    const QString name = QStringLiteral("Field");
+    if (!m_layoutProfiles->exists(name)) {
+        m_layoutProfiles->create(name);
+    }
+    if (m_layoutProfiles->current() != name) {
+        m_layoutProfiles->activate(name);
+    }
+
+    const QStringList bleiben = fieldLayoutKeepIds();
+    for (const QString& id : m_appletVis->registeredIds()) {
+        // Der Rahmen ist kein Feld: Knopfleiste und Statuszeile legt
+        // niemand dazu und niemand weg.
+        if (id == QLatin1String(kChromeOverlayId)) { continue; }
+        if (id == QLatin1String(kChromeStatusId))  { continue; }
+        m_appletVis->setVisible(id, bleiben.contains(id));
+    }
+
+    // Rotor und Logbuch sind KEIN Applet, sondern ein eigener Dock —
+    // die Schleife oben trifft sie nicht. Im Vorschlagsblatt stehen
+    // sie unter „Bleibt" mit der Einschraenkung „nur, wenn
+    // verbunden"; am Berg mit einer Drahtantenne ist kein Rotor
+    // angeschlossen, und ein Kompass auf 000° ohne Ziel ist genau die
+    // Flaeche, die der Wasserfall haben soll.
+    //
+    // Der Wunsch wird mitgeschrieben, nicht nur das Fenster versteckt:
+    // sonst holt ihn die naechste Profilanwendung zurueck.
+    m_rotorDockWantedVisible = false;
+    if (m_rotorDock) { m_rotorDock->setVisible(false); }
+
+    // Und die Scheibenflagge AN: „da waere die vfo flagge besser
+    // geeignet" (Betreiber, 2026-10-15). Am Berg ersetzt sie die
+    // Spalte; zu Hause bleibt sie aus, und das Layoutprofil haelt
+    // beides auseinander.
+    setSliceFlagsEnabled(true);
+
+    // Und der Panadapter bekommt die Breite, die frei geworden ist.
+    //
+    // Ohne diese Zeilen behaelt der Splitter seine bisherige Teilung:
+    // die Spalte wird nicht schmaler, sondern nur leerer, und der
+    // Wasserfall gewinnt nichts. Gemessen am Blatt vom 2026-10-15:
+    // die Spalte stand nach dem Aufraeumen auf 470 Punkten, mit vier
+    // Feldern darin.
+    //
+    // Ein Fuenftel fuer die Spalte, vier Fuenftel fuer den Panadapter.
+    //
+    // Nachgemessen, damit hier keine Erwartung steht, die nicht
+    // eintritt: WEITER als bis zur Mindestbreite der Spalte kommt das
+    // nicht. AppletPanelWidget leitet seine Mindestbreite vom
+    // breitesten Feld darin ab (PHONE/CW mit seinen Reglerzeilen,
+    // rund 465 Punkte bei dieser Schrift) — der Splitter kann sie
+    // nicht unterschreiten, auch wenn er hier weniger verlangt. Bei
+    // 1700 Punkten Fensterbreite bekommt der Panadapter damit 1220,
+    // also rund 72 Prozent.
+    //
+    // Wirksam ist die Zeile trotzdem: wer die Spalte vorher auf 700
+    // gezogen hatte, bekommt sie hier auf das Noetige zurueck. Der
+    // Betreiber kann den Griff danach ziehen wie immer; das ist ein
+    // Ausgangspunkt, keine Fessel.
+    if (m_mainSplitter && m_mainSplitter->count() >= 2) {
+        const int gesamt = m_mainSplitter->width();
+        if (gesamt > 600) {
+            const int spalte = qMax(300, gesamt / 5);
+            m_mainSplitter->setSizes({gesamt - spalte, spalte});
+        }
+    }
+
+    m_layoutProfiles->save();
+
+    showToast(tr("Field layout — %1 panels stay, the rest steps aside. "
+                 "Your own arrangement is in the profile rail.")
+                  .arg(bleiben.size()),
+              ToastSeverity::Info, 5000);
+}
+
+// ── Die Scheibenflaggen (2026-10-15) ────────────────────────────────
+//
+// Siehe SliceFlag.h fuer die Herkunft: die alte VFO-Flagge fiel am
+// 2026-08-18 auf Ansage des Betreibers, und am 2026-10-15 wollte er
+// sie zurueck — schmal, je Scheibe eine, mit Leitlinie zum eigenen
+// Traeger (Entwurf 3 von dreien).
+//
+// Die Flaggen haengen am AKTIVEN Panadapter, nicht am Fenster: sie
+// sind Kinder seines SpectrumWidget und verschwinden mit ihm. Der
+// Schalter steht in View; aus ist der Zustand, den der Betreiber seit
+// August kannte, und er bleibt die Vorgabe.
+
+void MainWindow::setSliceFlagsEnabled(bool on)
+{
+    if (m_sliceFlagsOn == on) { return; }
+    m_sliceFlagsOn = on;
+    AppSettings::instance().setValue(
+        QStringLiteral("SliceFlagsVisible"),
+        on ? QStringLiteral("True") : QStringLiteral("False"));
+    rebuildSliceFlags();
+    if (m_sliceFlagAction && m_sliceFlagAction->isChecked() != on) {
+        QSignalBlocker b(m_sliceFlagAction);
+        m_sliceFlagAction->setChecked(on);
+    }
+}
+
+void MainWindow::rebuildSliceFlags()
+{
+    // Erst abraeumen — auch beim Ausschalten, und auch dann, wenn eine
+    // Scheibe verschwunden ist. qDeleteAll waere falsch: die Flaggen
+    // sind Kinder des Panadapters und koennten mit ihm schon weg sein.
+    for (auto it = m_sliceFlags.begin(); it != m_sliceFlags.end(); ++it) {
+        if (it.value()) { it.value()->deleteLater(); }
+    }
+    m_sliceFlags.clear();
+    if (!m_sliceFlagsOn || m_shuttingDown || !m_radioModel) { return; }
+
+    SpectrumWidget* sw = activeSpectrumWidget();
+    if (!sw) { return; }
+
+    for (SliceModel* slice : m_radioModel->slices()) {
+        if (!slice) { continue; }
+        const int idx = slice->sliceIndex();
+        auto* flagge = new SliceFlag(idx, sw);
+        m_sliceFlags.insert(idx, flagge);
+
+        // Von Hand verschobene Lage wiederherstellen.
+        const QString key = QStringLiteral("SliceFlagOffset_%1").arg(idx);
+        const QString roh = AppSettings::instance()
+                                .value(key, QString{}).toString();
+        const QStringList teile = roh.split(QLatin1Char(','));
+        if (teile.size() == 2) {
+            flagge->setManualOffset(QPoint(teile.at(0).toInt(),
+                                           teile.at(1).toInt()));
+        }
+
+        connect(flagge, &SliceFlag::moved, this,
+                [](int i, const QPoint& o) {
+            AppSettings::instance().setValue(
+                QStringLiteral("SliceFlagOffset_%1").arg(i),
+                QStringLiteral("%1,%2").arg(o.x()).arg(o.y()));
+        });
+        // Das Kreuz schliesst die FLAGGE, nicht die Scheibe. Eine
+        // Scheibe schliesst man dort, wo man sie angelegt hat — ein
+        // Kreuz an einer Beschriftung darf kein Funkgeraet umbauen.
+        connect(flagge, &SliceFlag::closeRequested, this, [this](int i) {
+            if (SliceFlag* f = m_sliceFlags.take(i)) { f->deleteLater(); }
+        });
+        connect(flagge, &SliceFlag::picked, this, [this](int i) {
+            if (m_radioModel) { m_radioModel->setActiveSlice(i); }
+            refreshSliceFlags();
+        });
+
+        // Der Inhalt folgt der Scheibe.
+        connect(slice, &SliceModel::frequencyChanged, flagge,
+                [this](double) { refreshSliceFlags(); });
+        connect(slice, &SliceModel::dspModeChanged, flagge,
+                [this](DSPMode) { refreshSliceFlags(); });
+        flagge->show();
+    }
+    refreshSliceFlags();
+}
+
+void MainWindow::refreshSliceFlags()
+{
+    if (m_sliceFlags.isEmpty() || m_shuttingDown || !m_radioModel) { return; }
+    SpectrumWidget* sw = activeSpectrumWidget();
+    if (!sw) { return; }
+
+    const QRect flaeche = sw->spectrumRect();
+    const int aktiv = m_radioModel->activeSlice()
+                          ? m_radioModel->activeSlice()->sliceIndex() : -1;
+
+    for (SliceModel* slice : m_radioModel->slices()) {
+        if (!slice) { continue; }
+        SliceFlag* flagge = m_sliceFlags.value(slice->sliceIndex(), nullptr);
+        if (!flagge) { continue; }
+
+        flagge->setFrequency(slice->frequency());
+        flagge->setBand(bandLabel(bandFromFrequency(slice->frequency())));
+        flagge->setMode(SliceModel::modeName(slice->dspMode()));
+        flagge->setFront(slice->sliceIndex() == aktiv);
+
+        const int x = sw->xForHz(slice->frequency());
+        if (x < 0) {
+            // Ausserhalb des Ausschnitts: nicht am Rand kleben lassen,
+            // sondern weg. Eine Flagge, die auf nichts zeigt, luegt.
+            flagge->hide();
+            continue;
+        }
+        flagge->show();
+        flagge->anchorTo(x, flaeche.top(), flaeche.bottom());
+    }
+}
+
+void MainWindow::syncFloatPanAction()
+{
+    if (!m_floatPanAction) { return; }
+    const bool schwebt =
+        m_panStack && !m_panStack->activePanId().isEmpty()
+        && m_panStack->isPanFloating(m_panStack->activePanId());
+    if (m_floatPanAction->isChecked() == schwebt) { return; }
+    // Sperre: ohne sie loest das Setzen des Hakens genau die Handlung
+    // aus, die ihn gerade gesetzt hat.
+    QSignalBlocker blocker(m_floatPanAction);
+    m_floatPanAction->setChecked(schwebt);
+}
+
+void MainWindow::offerPaletteRestart(const QString& paletteName)
+{
+    // Ein Pruefstand darf nicht an einem modalen Fenster haengen
+    // bleiben. Dieselbe Regel wie showAudioDiagnoseDialog(): nur
+    // Pruefbinaerdateien setzen diese Fahne.
+    if (QStandardPaths::isTestModeEnabled()) { return; }
+
+    QMessageBox box(this);
+    box.setWindowTitle(tr("Palette"));
+    box.setIcon(QMessageBox::Question);
+    box.setText(tr("“%1” is now the chosen palette.").arg(paletteName));
+    // Die Farben sind an dieser Stelle schon umgestellt. Was fehlt, ist
+    // die FORM: Eckenradius, Polsterung und Relief stehen als fertige
+    // Zahlen in Stylesheets, die beim Bauen des Fensters entstanden
+    // sind. Der Text sagt genau das — „startet neu, sonst passiert
+    // nichts" waere nach dem sichtbaren Farbwechsel schlicht falsch.
+    // Nur sagen, was wahr ist (2026-10-15).
+    //
+    // Hier stand unbedingt „The colours are on already". Bei den
+    // Paletten „Flach" und „Tief" ist das FALSCH: die tragen null
+    // Farben (nachgesehen in resources/themes/flach.json und
+    // tief.json — Schluessel `formen`, keine `colors`). Wer eine
+    // davon waehlt, sieht nichts, liest „die Farben sind schon an"
+    // und schliesst daraus, dass die Umstellung nicht geht. Genau
+    // diese Rueckmeldung kam am 2026-10-15: „theme funktioniert auch
+    // noch nicht."
+    if (Style::Theme::instance().hasColours()) {
+        box.setInformativeText(
+            tr("The colours are on already. This palette also changes "
+               "corners, padding and depth, and those are set while the "
+               "window is built — they need a restart. Restart now?"));
+    } else {
+        box.setInformativeText(
+            tr("This palette carries no colours at all — it only changes "
+               "corners, padding and depth. Those are set while the window "
+               "is built, so nothing looks different until a restart. "
+               "Restart now?"));
+    }
+    QPushButton* now = box.addButton(tr("Restart now"), QMessageBox::AcceptRole);
+    box.addButton(tr("Later"), QMessageBox::RejectRole);
+    box.setDefaultButton(now);
+    box.exec();
+    if (box.clickedButton() != now) { return; }
+
+    restartNow();
+}
+
+void MainWindow::restartNow()
+{
+    QStringList args = QCoreApplication::arguments();
+    if (!args.isEmpty()) { args.removeFirst(); }
+
+#if defined(Q_OS_WIN)
+    // relaunchScript() ist eine Argumentliste fuer /bin/sh -- auf
+    // Windows startet die Binaerdatei direkt. Das Warten auf die eigene
+    // PID entfaellt dort: die Datei wird nicht ersetzt, nur erneut
+    // geoeffnet.
+    QProcess::startDetached(QCoreApplication::applicationFilePath(), args);
+#else
+    const QString bundle =
+        UpdateInstaller::runningBundlePath(QCoreApplication::applicationDirPath());
+    const bool viaOpen = !bundle.isEmpty();
+    const QString target =
+        viaOpen ? bundle : QCoreApplication::applicationFilePath();
+    QProcess::startDetached(
+        QStringLiteral("/bin/sh"),
+        UpdateInstaller::relaunchScript(QCoreApplication::applicationPid(),
+                                        target, viaOpen, args));
+#endif
+
+    // Der Helfer wartet, bis diese PID weg ist. Der normale Weg hinaus
+    // speichert die Einstellungen -- also hier KEIN exit(), sondern
+    // quit().
+    qApp->quit();
+}
+
 StatusToast* MainWindow::showToast(const QString& message,
                                    ToastSeverity severity,
                                    int timeoutMs)
@@ -12194,6 +13374,23 @@ StatusToast* MainWindow::showToast(const QString& message,
 
     auto* toast = new StatusToast(message, severity, timeoutMs, this);
     connect(toast, &QObject::destroyed, this, [this]() {
+        // ── Nicht mehr waehrend des Abbaus (2026-10-15) ─────────────
+        //
+        // Dieselbe Falle wie bei der Verbindungsmaske, nur eine Stunde
+        // spaeter gefunden: der Hinweis ist ein KIND dieses Fensters.
+        // Beim Beenden raeumt ~QWidget die Kinder ab, BEVOR ~QObject
+        // die Verbindungen loest — dieser Rumpf lief also mit einem
+        // MainWindow, dessen Rumpf schon durch war, und ging ueber
+        // m_toasts. Ergebnis: EXC_BAD_ACCESS bei 0x5, im
+        // Absturzbericht lesbar als
+        //   ~MainWindow -> ~StatusToast -> destroyed()
+        //   -> QPointer<StatusToast>::isNull()
+        //
+        // Ausgeloest, sobald beim Beenden noch ein Hinweis auf dem
+        // Schirm steht — also in jedem Lauf, der kurz vorher etwas
+        // gemeldet hat. Gefunden von tst_feldbetrieb, dessen
+        // Menueeintrag genau das tut.
+        if (m_shuttingDown) { return; }
         m_toasts.removeIf([](const QPointer<StatusToast>& t) { return t.isNull(); });
         restackToasts();
     });
@@ -12665,16 +13862,26 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
     for (const auto& c : m_rttyRadeLinks) { disconnect(c); }
     m_rttyRadeLinks.clear();
 
-    // RttyDecoderApplet is a single global widget, not per-flag -- it
-    // follows whichever slice is CURRENTLY active. setSlice() already
-    // disconnects its own old mark/shift links and re-points the audio
-    // tap (RttyDecoderApplet::setSlice), so calling it again here with the
-    // (possibly unchanged) active slice is cheap and safe.
+    // Die Decoder sind einzelne, globale Fenster, keine je Flagge.
+    // setSlice() loest die eigenen alten Verbindungen und richtet den
+    // Audio-Abgriff neu aus, der Aufruf ist also auch mit unveraendertem
+    // Empfaenger billig und gefahrlos.
+    //
+    // NICHT den aktiven Empfaenger uebergeben, sondern den GEBUNDENEN
+    // (2026-10-09): seit der Empfaengerwahl kann ein Decoder an einem
+    // festen Empfaenger haengen. Wer hier `slice` durchreichte, zoege ihn
+    // bei jedem Wechsel doch wieder auf den aktiven -- die Wahl waere
+    // wirkungslos, und zwar auf eine Art, die man erst im Betrieb merkt.
+    // Steht die Wahl auf "folgt dem aktiven" (Vorgabe), liefert
+    // boundSlice() genau `slice`.
     if (m_rttyDecoderApplet) {
-        m_rttyDecoderApplet->setSlice(slice);
+        m_rttyDecoderApplet->setSlice(m_rttyDecoderApplet->boundSlice());
     }
     if (m_cwDecoderApplet) {
-        m_cwDecoderApplet->setSlice(slice);
+        m_cwDecoderApplet->setSlice(m_cwDecoderApplet->boundSlice());
+    }
+    if (m_ft8Applet) {
+        m_ft8Applet->setSlice(slice);
     }
 
     if (!m_appletVis) { return; }
@@ -12683,6 +13890,7 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
         m_appletVis->setAvailable(QStringLiteral("Rade"), false);
         m_appletVis->setAvailable(QStringLiteral("RttyDecoder"), false);
         m_appletVis->setAvailable(QStringLiteral("CwDecoder"), false);
+        m_appletVis->setAvailable(QStringLiteral("Ft8Decoder"), false);
         return;
     }
 
@@ -12702,6 +13910,11 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
         // CW decoder: the two CW modes, nothing else (2026-09-21).
         m_appletVis->setAvailable(QStringLiteral("CwDecoder"),
                                   mode == DSPMode::CWL || mode == DSPMode::CWU);
+        // FT8/FT4 liegen in den Datenmodi -- beiden, nicht nur DIGL:
+        // FT8 wird ueblicherweise in USB/DIGU gehoert, und wer DIGL
+        // stellt, soll den Dekoder nicht verlieren.
+        m_appletVis->setAvailable(QStringLiteral("Ft8Decoder"),
+                                  mode == DSPMode::DIGU || mode == DSPMode::DIGL);
     };
     applyForMode(slice->dspMode());
 
@@ -13863,7 +15076,7 @@ void MainWindow::showNotchBarMenu(const QPoint& globalPos)
 
     QAction* head = menu->addAction(
         list.isEmpty()
-            ? tr("Keine Notch-Filter")
+            ? tr("No notch filters")
             : tr("%n Notch-Filter", "", static_cast<int>(list.size())));
     head->setEnabled(false);
 
@@ -13871,8 +15084,8 @@ void MainWindow::showNotchBarMenu(const QPoint& globalPos)
     global->setCheckable(true);
     global->setChecked(notches->globalEnabled());
     global->setToolTip(tr(
-        "Alle Notch-Filter auf einmal stumm schalten, ohne sie zu "
-        "verlieren. Dasselbe wie ein Linksklick auf TNF."));
+        "Mute all notch filters at once without losing them. Same as a "
+         "left-click on TNF."));
     connect(global, &QAction::toggled, this, [notches](bool on) {
         notches->setGlobalEnabled(on);
     });
@@ -13880,7 +15093,7 @@ void MainWindow::showNotchBarMenu(const QPoint& globalPos)
     if (list.isEmpty()) {
         menu->addSeparator();
         QAction* hint = menu->addAction(
-            tr("Anlegen: Cmd-Klick ins Spektrum"));
+            tr("To add one: Cmd-click on the spectrum"));
         hint->setEnabled(false);
         menu->popup(globalPos);
         return;
@@ -13899,7 +15112,7 @@ void MainWindow::showNotchBarMenu(const QPoint& globalPos)
 
         const int id = n.id;
 
-        QAction* edit = sub->addAction(tr("Bearbeiten…"));
+        QAction* edit = sub->addAction(tr("Edit…"));
         connect(edit, &QAction::triggered, this, [this, id, globalPos]() {
             SpectrumWidget* w =
                 m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
@@ -13914,7 +15127,7 @@ void MainWindow::showNotchBarMenu(const QPoint& globalPos)
         });
 
         sub->addSeparator();
-        QAction* del = sub->addAction(tr("Löschen"));
+        QAction* del = sub->addAction(tr("Delete"));
         connect(del, &QAction::triggered, this, [notches, id]() {
             notches->removeNotch(id);
         });
@@ -13923,7 +15136,7 @@ void MainWindow::showNotchBarMenu(const QPoint& globalPos)
     if (list.size() > 1) {
         menu->addSeparator();
         QAction* all = menu->addAction(
-            tr("Alle %1 entfernen…").arg(list.size()));
+            tr("Remove all %1…").arg(list.size()));
         connect(all, &QAction::triggered,
                 this, &MainWindow::onNotchRemoveAll);
     }
@@ -14156,6 +15369,28 @@ void MainWindow::showConnectionPanel()
         m_connectionPanel->setAttribute(Qt::WA_DeleteOnClose);
         connect(m_connectionPanel, &QObject::destroyed, this, [this]() {
             m_connectionPanel = nullptr;
+            // ── Nicht mehr waehrend des Abbaus (2026-10-15) ─────────
+            //
+            // Die Maske ist ein KIND dieses Fensters. Beim Beenden
+            // raeumt ~QWidget seine Kinder ab, BEVOR ~QObject die
+            // Verbindungen loest — dieser Rumpf lief also mit einem
+            // MainWindow, dessen Rumpf schon durch war, und griff in
+            // m_floatingContainersHiddenPreConnect. Ergebnis:
+            // EXC_BAD_ACCESS bei 0x5, im Absturzbericht sauber
+            // lesbar als
+            //   ~MainWindow -> ~ConnectionPanel -> destroyed()
+            //   -> restoreFloatingWindowsHiddenBehindConnectMask()
+            //   -> QPointer<QWidget>::operator bool()
+            //
+            // Ausgeloest nur, wenn die Liste NICHT leer ist, also genau
+            // dann, wenn etwas hinter der Maske versteckt wurde — zum
+            // Beispiel ein schwebender Panadapter ohne Funkgeraet.
+            // Gefunden am 2026-10-15 von tst_panadapter_schalter.
+            //
+            // Dieselbe Wache wie beim TCI-Abbau-Absturz vom 2026-08-29
+            // (siehe CLAUDE.md): beim Beenden gibt es nichts mehr
+            // wiederherzustellen.
+            if (m_shuttingDown) { return; }
             // Betreiber 2026-09-01: "panadapter kann ich nicht finden
             // ... profil 01 ist leer" -- die Maske ist zu, aber ohne
             // Verbindung blieb ALLES dauerhaft versteckt und der
@@ -14270,6 +15505,10 @@ void MainWindow::showSupportDialog()
         m_supportDialog = new SupportDialog(m_radioModel, this);
         m_supportDialog->setAttribute(Qt::WA_DeleteOnClose);
         connect(m_supportDialog, &QObject::destroyed, this, [this]() {
+            // Siehe die Wache beim Hinweiszettel: beim Abbau schreibt
+            // dieser Rumpf in ein Fenster, dessen Destruktor schon
+            // durch ist.
+            if (m_shuttingDown) { return; }
             m_supportDialog = nullptr;
         });
     }
@@ -15290,7 +16529,7 @@ void MainWindow::openAntennaWindow()
                              QStringLiteral("Tune-Pwr-Regler") };
                 case DrivePowerSource::Fixed:
                     return { cap(tx.tunePower()),
-                             QStringLiteral("festen Wert im Setup") };
+                             tr("a fixed value in Setup") };
                 case DrivePowerSource::DriveSlider:
                     break;
                 }
@@ -15774,13 +17013,15 @@ void MainWindow::scheduleStartupUpdateCheck()
             m_updateDialog->show();
             m_updateDialog->raise();
         });
-        connect(checker, &UpdateChecker::checkFailed, this, [this, checker]() {
+        // Stillschweigen heisst nicht: unsichtbar. Am 2026-10-14 stand auf
+        // dem Mac mini des Betreibers 0.6.5, waehrend die Pruefung bei
+        // jedem Start in einen haengenden TLS-Handshake lief -- und das
+        // Protokoll sagte darueber nichts, weil hier nur deleteLater
+        // hing. Der Bediener bekommt weiter keinen Dialog zu sehen.
+        connect(checker, &UpdateChecker::checkFailed, this,
+                [checker](const QString& why) {
+            qWarning() << "Startup update check failed:" << why;
             checker->deleteLater();
-            // Offline ist kein Fehler, aber es ist auch kein „aktuell".
-            if (m_titleBar) {
-                m_titleBar->setUpdateState(QStringLiteral("· nicht erreichbar"),
-                                           TitleBar::AktualisierungsStand::Unbekannt);
-            }
         });
         checker->checkLatest();
     });

@@ -2,7 +2,8 @@
 // no-port-check: Longpath-eigener Prueffall; die Modustabellen stammen aus
 // Thetis und sind in src/core/CatModeMap.h zitiert.
 //
-// CAT, dritter Gang: die Verdrahtung (2026-10-11).
+// CAT, dritter Gang: die Verdrahtung (2026-10-11); seit 2026-10-12 auch
+// die serielle Haelfte (PTY) am selben Fenster.
 //
 // NUR EIN MainWindow JE PROZESS -- und das ist keine Stilfrage.
 //
@@ -31,12 +32,21 @@
 
 #include <QtTest/QtTest>
 #include <QCoreApplication>
+#include <QLabel>
 #include <QPushButton>
 #include <QTcpServer>
 #include <QTcpSocket>
 
 #include <optional>
 
+#if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
+#include <fcntl.h>
+#include <unistd.h>
+#endif
+
+#include "core/AppSettings.h"
+#include "core/CatModeMap.h"
+#include "core/CatPtyServer.h"
 #include "core/AppSettings.h"
 #include "core/CatModeMap.h"
 #include "core/CatServer.h"
@@ -51,6 +61,33 @@ class TstCatVerdrahtung : public QObject {
     Q_OBJECT
 
 private:
+#if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
+    /// Ein Fremdprogramm, das den Geraetepfad oeffnet -- so, wie fldigi
+    /// es tut. Setzt KEINEN Rohmodus: den soll Longpath mitbringen.
+    /// Gibt, was ankam (gewartet wird auf Ereignisse, nicht auf die Uhr).
+    QByteArray fragePty(int fd, const QByteArray& befehl,
+                        int mindestens = 1, int msec = 5000)
+    {
+        if (::write(fd, befehl.constData(),
+                    static_cast<size_t>(befehl.size())) < 0) { return {}; }
+        QByteArray a;
+        QElapsedTimer uhr;
+        uhr.start();
+        while (a.count(';') < mindestens && uhr.elapsed() < msec) {
+            // Die Ereignisschleife MUSS drehen: Longpath liest ueber
+            // einen QSocketNotifier, und Fenster und Fremdprogramm
+            // sitzen in DIESEM Prozess auf demselben Faden.
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+            char roh[512];
+            for (;;) {
+                const ssize_t n = ::read(fd, roh, sizeof(roh));
+                if (n > 0) { a.append(roh, static_cast<int>(n)); continue; }
+                break;
+            }
+        }
+        return a;
+    }
+#endif
     QString frage(QTcpSocket* s, const QByteArray& befehl,
                   int mindestens = 1, int msec = 5000)
     {
@@ -58,18 +95,7 @@ private:
         QByteArray a;
         QElapsedTimer uhr;
         uhr.start();
-        if (mindestens == 0) {
-            // Die Schleife ein paar Mal drehen, damit der Server
-            // arbeitet, und dann nachsehen, dass nichts kam.
-            while (uhr.elapsed() < msec) {
-                QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
-                if (s->bytesAvailable() > 0) { a += s->readAll(); }
-            }
-            return QString::fromLatin1(a);
-        }
-        // mindestens == 0 heisst: KEINE Antwort erwartet -- dann wird die
-        // Schleife einmal gedreht und geprueft, dass nichts kam.
-        while (a.count(';') <= mindestens - 1 && uhr.elapsed() < msec) {
+        while (a.count(';') < mindestens && uhr.elapsed() < msec) {
             QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
             if (s->bytesAvailable() > 0) { a += s->readAll(); }
         }
@@ -166,9 +192,9 @@ private slots:
         if (!rm->activeSlice()) {
             // "FA00000000000;" waere eine Angabe, und ein Fremdprogramm
             // glaubt sie. Der Zustandsgeber gibt dafuer std::nullopt.
-            QCOMPARE(srv->verarbeiteFuerTest(QStringLiteral("FA;")),
+            QCOMPARE(srv->antwortAuf(QStringLiteral("FA;")),
                      QStringLiteral("?;"));
-            QCOMPARE(srv->verarbeiteFuerTest(QStringLiteral("IF;")),
+            QCOMPARE(srv->antwortAuf(QStringLiteral("IF;")),
                      QStringLiteral("?;"));
         }
 
@@ -318,7 +344,6 @@ private slots:
         sl->setXitEnabled(false);
         QCOMPARE(frage(s, "RU;"), QStringLiteral("?;"));
         QCOMPARE(frage(s, "RC;"), QStringLiteral("?;"));
-
         // Aus: danach horcht niemand mehr, und die Einstellung zieht mit.
         tcp->click();
         for (int k = 0; k < CatServer::kKanaele; ++k) { QVERIFY(!srv->laeuft(k)); }
@@ -326,6 +351,143 @@ private slots:
                      .value(QStringLiteral("CatTcpEnabled")).toString(),
                  QStringLiteral("False"));
 
+        // ── 5. Dieselbe Pruefung fuer die serielle Haelfte (2026-10-12) ──
+        //
+        // Am SELBEN Fenster, weil ein zweiter Aufbau den Prozess toetet
+        // (siehe die Notiz im Kopf).
+        const QList<CatPtyServer*> ptyServer = mw->findChildren<CatPtyServer*>();
+        QCOMPARE(ptyServer.size(), 1);
+        CatPtyServer* pty = ptyServer.first();
+
+        QPushButton* ptyBtn = nullptr;
+        for (QPushButton* b : feld->findChildren<QPushButton*>()) {
+            if (b->text() == QStringLiteral("PTY")) { ptyBtn = b; break; }
+        }
+        QVERIFY(ptyBtn);
+
+#if defined(Q_OS_MAC) || defined(Q_OS_LINUX)
+        // Das ist der Fang fuer die GANZE Verdrahtung: ohne
+        // setzeCatPtyServer() in MainWindow sperrt das Applet den
+        // Schalter, und bis 2026-10-12 trug er obendrein eine
+        // NyiOverlay-Marke.
+        QVERIFY2(ptyBtn->isEnabled(),
+                 "Der PTY-Schalter ist gesperrt -- der PTY-Server haengt "
+                 "nicht am Feld.");
+
+        // Vor dem Druecken: kein Kanal, und in den Beschriftungen steht
+        // ein Strich -- KEIN erfundener Pfad. Hier stand bis 2026-10-12
+        // "/dev/ptyp0".."/dev/ptyp3".
+        for (int k = 0; k < CatPtyServer::kKanaele; ++k) {
+            QVERIFY(!pty->laeuft(k));
+        }
+        for (QLabel* l : feld->findChildren<QLabel*>()) {
+            QVERIFY2(!l->text().contains(QStringLiteral("ptyp")),
+                     "Im Feld steht noch ein /dev/ptyp-Altname.");
+        }
+
+        // Und dasselbe fuer ein Feld OHNE PTY-Server. Das ist die Stelle,
+        // an der der Altname ueberlebt haette: `zeigePfade()` deckt ihn
+        // zu, sobald setzeCatPtyServer() gelaufen ist -- die Gegenprobe
+        // am 2026-10-12 hat den Platzhalter zurueckgesetzt, und ALLE
+        // Faelle blieben gruen. Erst ein Feld, an dem nie ein Server
+        // hing (ein zweiter Behaelter, ein kuenftiger Pfad), zeigt ihn.
+        //
+        // Ein zweites CatApplet ist erlaubt -- nur ein zweites
+        // MainWindow toetet den Prozess.
+        {
+            auto* nackt = new CatApplet(rm, nullptr);
+            bool strichGefunden = false;
+            for (QLabel* l : nackt->findChildren<QLabel*>()) {
+                QVERIFY2(!l->text().contains(QStringLiteral("ptyp")),
+                         qPrintable(QStringLiteral(
+                             "Ein Feld ohne PTY-Server zeigt den Altnamen "
+                             "%1 - einen Pfad, den niemand oeffnen kann.")
+                                 .arg(l->text())));
+                if (l->text() == QStringLiteral("\u2014")) { strichGefunden = true; }
+            }
+            QVERIFY2(strichGefunden,
+                     "Ein Feld ohne PTY-Server zeigt gar keinen Platzhalter.");
+            delete nackt;
+        }
+
+        ptyBtn->click();
+        for (int k = 0; k < CatPtyServer::kKanaele; ++k) {
+            QVERIFY2(pty->laeuft(k),
+                     qPrintable(QStringLiteral("PTY-Kanal %1 laeuft nicht: %2")
+                                    .arg(k).arg(pty->grund(k))));
+            QVERIFY(!pty->pfad(k).isEmpty());
+        }
+        QVERIFY(ptyBtn->isChecked());
+        QCOMPARE(AppSettings::instance()
+                     .value(QStringLiteral("CatPtyEnabled")).toString(),
+                 QStringLiteral("True"));
+
+        // Die Pfade stehen auch IM FELD -- das war der Auftrag: "sonst
+        // findet sie niemand". Gesucht wird der kurze Geraetename, so
+        // wie zeigePfade() ihn setzt.
+        {
+            const QString kurz = pty->pfad(0).section(QLatin1Char('/'), -1);
+            bool gefunden = false;
+            for (QLabel* l : feld->findChildren<QLabel*>()) {
+                if (l->text() == kurz) { gefunden = true; break; }
+            }
+            QVERIFY2(gefunden,
+                     qPrintable(QStringLiteral("Der Geraetename %1 steht in "
+                                               "keiner Beschriftung").arg(kurz)));
+        }
+
+        // Und jetzt der eigentliche Beleg: ein Fremdprogramm oeffnet den
+        // Geraetepfad und stimmt das ECHTE Fenster ab.
+        const int fd = ::open(pty->pfad(0).toLocal8Bit().constData(),
+                              O_RDWR | O_NOCTTY | O_NONBLOCK);
+        QVERIFY2(fd >= 0,
+                 qPrintable(QStringLiteral("%1 laesst sich nicht oeffnen")
+                                .arg(pty->pfad(0))));
+
+        // Lesen -- und GENAU das, nichts davor: ohne Rohmodus spiegelt
+        // die Leitungsdisziplin die Antwort zurueck, Longpath liest sie
+        // als Befehl und laeuft im Kreis.
+        QCOMPARE(fragePty(fd, "FA;"), QByteArray("FA00021300000;"));
+        QCOMPARE(fragePty(fd, "MD;"), QByteArray("MD1;"));
+
+        // Schreiben: der Slice im laufenden Fenster folgt.
+        QVERIFY(::write(fd, "FA00050100000;", 14) == 14);
+        QTRY_COMPARE(static_cast<quint64>(sl->frequency()), Q_UINT64_C(50100000));
+        // Kenwood-Modus 3 ist CWU, nicht CWL -- CWL ist die 7
+        // (CatModeMap.h:54, aus Thetis CATCommands.cs). Hier zuerst die
+        // falsche Erwartung gehabt und vom Prueffall korrigiert bekommen.
+        QVERIFY(::write(fd, "MD3;", 4) == 4);
+        QTRY_COMPARE(sl->dspMode(), DSPMode::CWU);
+        QCOMPARE(fragePty(fd, "MD;"), QByteArray("MD3;"));
+        // Und die Gegenrichtung: 7 muss CWL geben, nicht wieder CWU.
+        QVERIFY(::write(fd, "MD7;", 4) == 4);
+        QTRY_COMPARE(sl->dspMode(), DSPMode::CWL);
+        QCOMPARE(fragePty(fd, "MD;"), QByteArray("MD7;"));
+
+        // Beide Wege sehen denselben Zustand -- EINE Protokollschicht.
+        QCOMPARE(srv->antwortAuf(QStringLiteral("FA;")),
+                 QStringLiteral("FA00050100000;"));
+
+        ::close(fd);
+
+        // Aus: kein Kanal mehr, in den Beschriftungen wieder der Strich,
+        // und die Einstellung zieht mit.
+        ptyBtn->click();
+        for (int k = 0; k < CatPtyServer::kKanaele; ++k) {
+            QVERIFY(!pty->laeuft(k));
+            QVERIFY(pty->pfad(k).isEmpty());
+        }
+        QCOMPARE(AppSettings::instance()
+                     .value(QStringLiteral("CatPtyEnabled")).toString(),
+                 QStringLiteral("False"));
+#else
+        // Auf Windows gibt es keine Pseudoterminals. Geprueft wird dann,
+        // dass der Schalter GESPERRT ist und sagt, warum -- nicht, dass
+        // er sich druecken laesst und nichts tut.
+        QVERIFY(!CatPtyServer::verfuegbar());
+        QVERIFY(!ptyBtn->isEnabled());
+        QVERIFY(!ptyBtn->toolTip().isEmpty());
+#endif
         delete mw;
     }
 
@@ -339,7 +501,7 @@ private slots:
         // Verdrahtung des ZZ-Satzes waere damit genau dann ungeprueft,
         // wenn der Rechner in Betrieb ist. Also hier ohne Horchen:
         // echtes Fenster, echte Scheibe, und die Befehle ueber
-        // `verarbeiteFuerTest()` statt ueber einen Socket. Der Transport
+        // `antwortAuf()` statt ueber einen Socket. Der Transport
         // ist in tst_cat_server geprueft, hier geht es um die Haken.
         auto* mw = new MainWindow();
         mw->resize(1200, 800);
@@ -361,7 +523,7 @@ private slots:
         QVERIFY(sl);
 
         auto frageDirekt = [srv](const char* befehl) {
-            return srv->verarbeiteFuerTest(QString::fromLatin1(befehl));
+            return srv->antwortAuf(QString::fromLatin1(befehl));
         };
 
         //
@@ -450,26 +612,33 @@ private slots:
         h.setzeVfoA = [](quint64) {};
         srv.setzeHaken(h);          // kein setzeVfoB, kein setzeSplit
 
-        QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("FB00007100000;")),
+        QCOMPARE(srv.antwortAuf(QStringLiteral("FB00007100000;")),
                  QStringLiteral("?;"));
-        QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("FT1;")),
+        QCOMPARE(srv.antwortAuf(QStringLiteral("FT1;")),
+                 QStringLiteral("?;"));
+        // Was es kann, geht weiter.
+        QCOMPARE(srv.antwortAuf(QStringLiteral("FA;")),
+                 QStringLiteral("FA00014225000;"));
+        QCOMPARE(srv.antwortAuf(QStringLiteral("FB00007100000;")),
+                 QStringLiteral("?;"));
+        QCOMPARE(srv.antwortAuf(QStringLiteral("FT1;")),
                  QStringLiteral("?;"));
         // Dasselbe im ZZ-Satz. ZZFT ist dabei die Sendefrequenz (elf
         // Stellen), nicht die VFO-Wahl wie Kenwoods FT -- lesbar, aber
         // nicht setzbar, weil es keinen Split gibt.
-        QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("ZZFB00007100000;")),
+        QCOMPARE(srv.antwortAuf(QStringLiteral("ZZFB00007100000;")),
                  QStringLiteral("?;"));
-        QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("ZZSP;")),
+        QCOMPARE(srv.antwortAuf(QStringLiteral("ZZSP;")),
                  QStringLiteral("?;"));
-        QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("ZZFT00014100000;")),
+        QCOMPARE(srv.antwortAuf(QStringLiteral("ZZFT00014100000;")),
                  QStringLiteral("?;"));
-        QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("ZZFT;")),
+        QCOMPARE(srv.antwortAuf(QStringLiteral("ZZFT;")),
                  QStringLiteral("ZZFT00014225000;"));
 
         // Was es kann, geht weiter.
-        QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("FA;")),
+        QCOMPARE(srv.antwortAuf(QStringLiteral("FA;")),
                  QStringLiteral("FA00014225000;"));
-        QCOMPARE(srv.verarbeiteFuerTest(QStringLiteral("ZZFA;")),
+        QCOMPARE(srv.antwortAuf(QStringLiteral("ZZFA;")),
                  QStringLiteral("ZZFA00014225000;"));
     }
 };

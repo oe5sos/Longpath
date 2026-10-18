@@ -313,11 +313,13 @@ void AntennaWindow::buildUi()
     // to tell "the display is broken" from "my radio is not measuring".
     m_demoBtn = new QPushButton(QStringLiteral("Beispiel"), this);
     m_demoBtn->setStyleSheet(Style::buttonBaseStyle());
-    m_demoBtn->setToolTip(QStringLiteral(
-        "Lädt einen mitgelieferten 40-m-Dipol-Sweep mit bekanntem "
-        "Ergebnis: resonant bei 7.183 MHz, 55 Ω, SWR 1.10. Zeigt das "
-        "Fenster etwas anderes, liegt es am Fenster — zeigt es das, "
-        "funktioniert die Darstellung und es liegt an der Messung."));
+    m_demoBtn->setToolTip(tr("Loads a bundled 40 m dipole sweep "
+                                         "with a known result: resonant at "
+                                         "7.183 MHz, 55 Ω, SWR 1.10. If the "
+                                         "window shows something else, the "
+                                         "window is at fault -- if it shows "
+                                         "this, the display works and the "
+                                         "measurement is at fault."));
     top->addWidget(m_demoBtn);
 
     // ── The whole range, from the instrument that may sweep it ───────
@@ -327,13 +329,15 @@ void AntennaWindow::buildUi()
     // afterwards, rather than being pushed out by the next one.
     m_pinBtn = new QPushButton(QStringLiteral("VNA-Referenz…"), this);
     m_pinBtn->setStyleSheet(Style::buttonBaseStyle());
-    m_pinBtn->setToolTip(QStringLiteral(
-        "Eine .s1p vom VNA als durchgehende Vergleichskurve dahinter "
-        "legen. Sie bleibt liegen, wenn du danach mit dem Funkgerät "
-        "misst.\n\n"
-        "Das Funkgerät kann den ganzen Bereich nicht messen: zwischen "
-        "den Bändern darf es nicht senden, und der Durchlauf sendet. "
-        "Der VNA darf — er ist ein Messgerät mit Mikrowatt."));
+    m_pinBtn->setToolTip(tr("Place an .s1p from the VNA behind it "
+                                        "as a continuous reference curve. It "
+                                        "stays there when you measure with "
+                                        "the radio afterwards.\n\nThe radio "
+                                        "cannot measure the whole range: "
+                                        "between the bands it must not "
+                                        "transmit, and the sweep transmits. "
+                                        "The VNA may -- it is an instrument "
+                                        "working with microwatts."));
     top->addWidget(m_pinBtn);
 
     top->addStretch(1);
@@ -876,7 +880,7 @@ void AntennaWindow::choosePinned()
     AppSettings& s = AppSettings::instance();
     const QString start = s.value(kDirKey, QString{}).toString();
     const QString path = QFileDialog::getOpenFileName(
-        this, QStringLiteral("VNA-Sweep als Referenz"), start,
+        this, tr("VNA sweep as reference"), start,
         QStringLiteral("Touchstone one-port (*.s1p *.S1P);;All files (*)"));
     if (path.isEmpty()) { return; }
     s.setValue(kDirKey, QFileInfo(path).absolutePath());
@@ -885,7 +889,7 @@ void AntennaWindow::choosePinned()
     if (ref.points.isEmpty()) {
         QMessageBox::warning(this, QStringLiteral("VNA-Referenz"),
             ref.note.isEmpty()
-                ? QStringLiteral("Die Datei enthält keine Punkte.")
+                ? tr("The file holds no points.")
                 : ref.note);
         return;
     }
@@ -935,10 +939,9 @@ void AntennaWindow::loadSample()
         }
     }
     QMessageBox::information(this, QStringLiteral("Beispiel"),
-        QStringLiteral(
-            "Die Beispieldatei wurde nicht gefunden. Sie liegt im "
-            "Quellbaum unter\n\n    %1\n\nund lässt sich mit "
-            "„Open sweep…“ von dort öffnen.").arg(rel));
+        tr("The example file was not found. It lives in the "
+                       "source tree at\n\n    %1\n\nand can be opened from "
+                       "there with „Open sweep…“.").arg(rel));
 }
 
 Feedline::Cable AntennaWindow::currentCable() const
@@ -1165,7 +1168,7 @@ void AntennaWindow::refreshBandTable()
                 bestSwr > limit ? QColor(Style::kRedBorder)
                                 : ink(Style::kGreenText));
         } else {
-            put(4, QStringLiteral("nicht gemessen"),
+            put(4, tr("not measured"),
                 QColor(Style::kTextInactive));
         }
 
@@ -1423,19 +1426,22 @@ void AntennaWindow::refresh()
                     .arg(QLatin1String(best.swr <= limit
                                            ? Style::kGreenText
                                            : Style::kAmberText)));
-            m_actionSub->setText(QStringLiteral(
-                "bester Anpassungspunkt · SWR %1 — gemessen vom "
-                "Funkgerät.\n"
-                "Wo genau die Antenne resonant ist und wie viele "
-                "Zentimeter Draht fehlen, kann diese Messung nicht "
-                "sagen: der Richtkoppler misst nur, wie viel "
-                "zurückkommt, nicht mit welcher Phase. Dafür braucht "
-                "es einen Sweep mit Phase (.s1p).")
+            m_actionSub->setText(tr("best match point · SWR %1 -- "
+                                                "measured by the radio.\nThis "
+                                                "measurement cannot say where "
+                                                "exactly the antenna is "
+                                                "resonant or how many "
+                                                "centimetres of wire are "
+                                                "missing: the directional "
+                                                "coupler only measures how "
+                                                "much comes back, not with "
+                                                "what phase. That needs a "
+                                                "sweep with phase (.s1p).")
                     .arg(best.swr, 0, 'f', 2));
         } else {
             m_action->setText(QStringLiteral("—"));
-            m_actionSub->setText(QStringLiteral(
-                "Keine verwertbaren Punkte in dieser Messung."));
+            m_actionSub->setText(tr("No usable points in this "
+                                                "measurement."));
         }
         m_caution->setVisible(false);
         return;

@@ -1154,6 +1154,264 @@ hinausgehen.
 Prueffaelle: `tests/tst_rx_equalizer.cpp`.
 
 
+## [0.7.0] - 2026-10-16
+
+29 Commits seit 0.6.9. Zwei Themen: **zwei Betriebsarten koennen jetzt
+senden** — und **was auf eine Uhr gewettet hatte, wettet nicht mehr.**
+
+### FT8 und FT4 senden
+
+Longpath dekodiert FT8/FT4 seit 0.6.9 selbst. Jetzt sendet es auch:
+ein Druck auf „Send" legt eine Nachricht auf einen Ton und gibt sie im
+naechsten eigenen Fenster hinaus, mit Bandplanpruefung und Tasten ueber
+den MoxController. Lehnt der Bandplan ab, bricht der Versuch sofort ab
+und nennt den Grund — vorher lief der Ton das ganze Fenster weiter,
+das Mikrofon blieb abgeklemmt, und in der Zeile stand „transmitting",
+waehrend nichts hinausging.
+
+Ein Doppelklick auf eine Zeile der Fundliste legt den Standardanruf
+ins Eingabefeld. Mit dem Schalter „Auto" — der AUS voreingestellt ist
+— laeuft daraus der ganze QSO-Ablauf (CQ → Antwort → Rapport → RR73),
+und ein vollstaendiges QSO geht denselben Weg ins Logbuch wie eines
+aus WSJT-X. Der Ablauf kommt ausschliesslich durch gehoerte Funde
+voran; es gibt keinen Zeitgeber, der von sich aus eine Nachricht
+nachschiebt, und nach fuenf Fenstern ohne Antwort gibt er auf.
+
+### RTTY senden
+
+Dazu das Gegenstueck zum vorhandenen RTTY-Dekoder: Baudot/ITA2,
+Mark 2295 Hz, Shift 170 Hz, 45,45 Baud. Geprueft als Rundlauf — was
+der Sender schreibt, liest der eigene Dekoder wieder ein. Die
+Anbindung ans Fenster folgt.
+
+### Die Geraetesuche hielt die Oberflaeche an
+
+4656 ms, im Hauptfaden, bei jedem Oeffnen des Verbinden-Fensters:
+scanAllNics() wartete je Netzkarte attemptsPerNic ×
+quietPollsBeforeResend × pollTimeoutMs in waitForReadyRead ab. Jetzt
+ein Zustandsautomat mit Zeitgeber — der Aufruf kehrt nach 1 ms
+zurueck, die Suche laeuft im Hintergrund weiter. Damit wird auch die
+Anzeige ehrlich: „Searching for radios…" war bisher nie zu sehen, weil
+Start und Ende im selben Takt kamen.
+
+### Was auf eine Uhr gewettet hatte
+
+Dieselbe Fehlerklasse an sechs Stellen, jedes Mal eine feste
+Millisekundenzahl, die auf einer besetzten Maschine reisst:
+
+  * 205 Stellen im Pruefstand nahmen stillschweigend die 5000 ms von
+    qWaitForWindowExposed — ein MainWindow braucht allein rund 5 s.
+  * Das Logbuchfenster korrigierte seine Groesse an drei festen
+    Punkten (50/300/1000 ms) und blieb aufgezogen, wenn die
+    Mindesthoehe beim letzten noch nicht stand.
+  * Die Luecken-Drossel verlangte „genau eine Meldung" und meinte
+    „hoechstens eine je 20-ms-Fenster".
+  * Dazu zwei knappe Fristen, ein drain(), das blind 200 ms absass,
+    und ein Signal-Spion, der auf das naechste statt auf das
+    vorhandene Signal wartete.
+
+Voller Durchgang auf diesem Stand: 978 von 978 gruen.
+
+### Kleineres
+
+  * Die Sendebandbreite in der TX-Fussleiste ist jetzt ein
+    Bedienelement: Linksklick geht zur naechsten Stufe (2.8k, 3.0k,
+    3.3k, 3.6k, 5.0k, 8.0k), Rechtsklick oeffnet die Liste.
+  * Vier Stellen lasen das Stationsrufzeichen nur unter
+    `StationCallsign` — und den schreibt niemand. Die eigene Station
+    fehlte dadurch auf der QSO-Karte, und im FlexRadio-Rundruf hiess
+    sie „LONGPATH".
+  * Messpunkte fuer die Startzeit: der MainWindow-Konstruktor, show()
+    und die erste freie Runde der Ereignisschleife, dazu fuenf
+    Teilzeiten je abgeloestem Fenster.
+
+
+## [0.6.9] - 2026-10-14
+
+Neun Commits seit 0.6.8. Thema: **was im Protokoll steht — und was dort
+fehlte.** Sieben der neun Stuecke beginnen damit, dass eine Frage am
+laufenden Geraet nicht zu beantworten war, weil nichts aufgeschrieben
+wurde: ob der Rotor verbunden ist, ob der Vorverstaerker und die
+Daempfung derselbe Steller sind, ob die Suche im richtigen Netz sucht,
+ob die Uebersteuerungserkennung ueberhaupt anschlaegt, ob die
+Update-Pruefung durchkam.
+
+Der Anlass fuer diese Fassung ist der letzte Punkt. Auf dem zweiten
+Rechner des Betreibers (Mac mini) stand 0.6.5 und blieb dort: der
+Updater kennt nur `api.github.com`, und dieser Rechner erreicht die
+Adresse nicht. **Ohne diese Veroeffentlichung kommt die Abhilfe bei
+niemandem an**, denn die ausgelieferte 0.6.8 traegt sie noch nicht.
+
+### Der Updater kommt auch ohne api.github.com weiter
+
+Auf dem Mac mini des Betreibers stand 0.6.5, waehrend das MacBook
+laengst weiter war — und „Check for Updates" half dort nicht. Die
+Ursache lag nicht im Programm: `api.github.com` liegt inzwischen in
+Azure (20.250.119.72), und von diesem Rechner aus baut sich die
+TCP-Verbindung dorthin zwar auf, der TLS-Handshake bleibt aber stehen,
+bis die Zeit ablaeuft. `github.com` selbst (140.82.121.3) antwortet
+einwandfrei. Am MacBook war derselbe Fehler vorher mit zwei festen
+Zeilen in `/etc/hosts` ueberdeckt worden.
+
+Betreiber dazu: **„macht der enduser auch nicht alles."** Eine Abhilfe,
+die in `/etc/hosts` steht, ist keine. Also kann der Updater es jetzt
+selbst: scheitert die API — stumm, ohne DNS, mit Ratelimit oder mit
+einer Antwort, die kein Release ist — wird die Veroeffentlichung von der
+Webseite abgeleitet. `github.com/.../releases/latest` leitet auf
+`/releases/tag/<tag>` weiter; das Tag genuegt, denn jede Datei liegt
+unter `/releases/download/<tag>/<name>` und die Namen schreibt
+`release.yml` nach fester Regel. Ein HEAD auf das Paket dieser Maschine
+beantwortet in einem Zug, ob es existiert und wie gross es ist — statt
+es zu behaupten. Fehlt es (Windows seit 0.6.7), sagt der Dialog das
+weiter wie bisher und bietet die Seite an.
+
+Was dabei fehlt, wird benannt statt verschwiegen: die Notizen stehen nur
+in der API, also steht an ihrer Stelle, warum sie fehlen, und die
+Statuszeile sagt „read from github.com — api.github.com did not answer".
+Der Hinweis haengt an der Veroeffentlichung, nicht am Abfrager: die
+stille Startpruefung benutzt einen eigenen `UpdateChecker` und reicht
+nur das Objekt weiter — haengte er am Abfrager, waere er auf genau
+diesem Weg verlorengegangen (beim Bauen gesehen und behoben).
+
+Dazu zwei Kleinigkeiten, die dieselbe Suche gekostet haben:
+
+* Die stille Startpruefung meldet ihr Scheitern jetzt ins Protokoll.
+  Vorher hing an `checkFailed` nur `deleteLater` — auf dem Mac mini lief
+  sie bei jedem Start in den haengenden Handshake, und es war nichts
+  davon zu sehen. Der Bediener bekommt weiterhin keinen Dialog.
+* Die Paketgroesse wird nur gezeigt, wenn sie bekannt ist, statt als
+  „0.0 MB" dazustehen.
+
+`LONGPATH_UPDATE_API_URL` zeigt die API fuer Pruefstaende auf eine
+andere Adresse (etwa einen geschlossenen Port) — nur so laesst sich der
+zweite Weg belegen statt behaupten. Der Prueflauf dazu ist mit
+`LONGPATH_NET_TESTS=1` scharf; die Gegenprobe mit abgeschaltetem
+Rueckfall faellt, wie sie soll.
+
+
+### Der Rotor stuerzte beim Beenden ab (#217)
+
+Seit der Rotor am 2026-10-10 wieder am Netz haengt, stuerzte Longpath
+beim Beenden ab — sechs Berichte in `~/Library/Logs/DiagnosticReports`,
+alle denselben Weg. Behoben.
+
+### Der Rotorzustand steht jetzt im Protokoll (#224)
+
+Am 2026-10-11 stand in den Protokollen keine einzige Zeile darueber, ob
+der Rotor verbunden war; „Rotator connected" liess sich nur am
+Statusschild im Fenster ablesen — der Widget-Baum der laufenden Instanz
+musste ueber die Automatisierungsbruecke abgefragt werden, um es zu
+sehen. Jetzt: eine Zeile je Wechsel, nicht mehr.
+
+### QRP: Vorverstaerker und Daempfung sind EIN Steller (#219)
+
+Beide Setter schreiben Opcode 0x04 mit demselben Stufenindex an
+derselben Stelle (Byte 18): 00/01/02/03 = -20/-10/0/+10 dB. Wer eines
+bewegt, verstellt das andere mit, und die Anzeige des anderen stimmt
+danach nicht mehr. Der Befund ist festgehalten, nicht geraten.
+
+### QRP: die Suche sagt, ob das Geraet im eigenen Netz liegt (#225)
+
+Ein Messlauf lief fuenf Suchversuche — 90 Sekunden — ins Leere und
+meldete „keine Antwort", also dieselbe Meldung wie bei einem gesperrten
+Geraet. Die Ursache stand nirgends: der Rechner hing in einem anderen
+Netz als die eingetragene Adresse. Das sagt der erste Fehlversuch jetzt.
+
+### QRP: Pruefstand fuer die Uebersteuerungserkennung (#223)
+
+Die QRP meldet Uebersteuerung nicht selbst; Longpath liest sie aus dem
+Signal, indem es Proben am Anschlag zaehlt. Belegt war bisher nur die
+eine Haelfte — dass sie nicht falsch anschlaegt. Jetzt auch die andere.
+
+### QRP: vier tote Rahmen, zwei Temperaturen, zwei Behauptungen weniger (#212)
+
+Aufraeumen in der Paritaetsliste: zwei Punkte standen dort als offen,
+die laengst gebaut waren.
+
+### MaxBin: der Haltewert klebte nach einem starken Signal oben (#215)
+
+In der Vorlage als „the BIN meter no longer sticks near the top of the
+scale after a very strong signal" beschrieben — bei uns an zwei Stellen
+bestaetigt und behoben.
+
+### App am Telefon: Panadapter und Wasserfall 1:1 wie Longpath (#214)
+
+Betreiber: „ich wuerde gerne die grafik vom longpath software 1:1 auf
+das app in bezug auf farben und hintergrund verwenden". Wert fuer Wert
+gegen `StyleConstants.h` nachgemessen.
+
+Keine Windows-Pakete — unveraendert seit 0.6.7.
+
+### Der Empfangs-Equalizer — neu (2026-10-11)
+
+Longpath hatte keinen. WDSPs `eqp` laeuft im RXA-Durchlauf
+(`third_party/wdsp/src/RXA.c:673`) und ist beim Anlegen aus und flach,
+aber **kein einziger `SetRXAEQ*`-Ruf war in `src/core/wdsp_api.h`
+deklariert** — die Stufe lief also leer mit, und niemand konnte sie
+anfassen. Thetis hat sie seit immer (`Console/radio.cs:827-843` RXEQOn,
+`:800-824` RXEQ10, Bedienung in `eqform.cs`).
+
+Gebaut ist die ganze Kette:
+
+* `wdsp_api.h` — sieben Deklarationen. Die Signaturen folgen dem
+  **vendorten** TAPR v1.29, nicht Thetis' neuerem `eq.c`: dort nimmt
+  `SetRXAEQProfile` einen vierten Parameter `double* Q` fuer die
+  parametrische Form (Thetis `wdsp/eq.c:623`), den unsere Fassung nicht
+  kennt. Verhalten von Thetis, Signatur vom vendorten Header.
+* `RxChannel` — sieben Wrapper, Spiegel der `setTxEq*`-Familie. Jeder
+  prueft `wdspChannelInRange()`: Pruefstaende bauen den Kanal mit der
+  Nummer 99, und ein WDSP-Ruf darauf schreibt ueber das Feldende hinaus.
+  `rxEqRunningInWdsp()` liest zurueck, was WDSP selbst haelt — dieselbe
+  Vorsicht, die beim Sende-CTCSS einen echten Fehler gefunden hat.
+* `SliceModel` — Zustand je Slice, persistiert slice-weit (nicht per
+  Band: eine Klangeinstellung soll beim Bandwechsel nicht umspringen).
+  **Abweichung von Thetis, bewusst:** dort ist der Equalizer global und
+  wird auf `id(0,0)` und `id(0,1)` zugleich gelegt (`eqform.cs:3027`).
+  Hier haengt er am Slice wie jede andere Empfangs-DSP-Einstellung —
+  zwei Empfaenger duerfen verschieden klingen. Geklammert wird im
+  Setter, nicht in der Oberflaeche: ein Wert aus der Einstellungsdatei
+  oder aus einem Frequenzspeicher hat kein Feld davor, das ihn abfaengt.
+  Grenzen `-12..+15` dB, aus Thetis `eqform.cs:1871-1872` (Baender) und
+  `:1946-1947` (Vorverstaerkung) — gemessen, nicht geschaetzt.
+* `RadioModel` — Verdrahtung. Ein geaenderter Bandwert schiebt immer die
+  **ganze** Kurve hinaus, weil `SetRXAGrphEQ10` nichts anderes anbietet
+  (Thetis macht es genauso). Die Kurve geht auch hinaus, wenn der
+  Equalizer aus ist, damit beim Einschalten sofort das Richtige
+  dasteht; WDSPs `run`-Flag entscheidet allein, ob gerechnet wird. Beim
+  Verbinden wird die gespeicherte Kurve nachgeschoben — ohne das lief
+  der Kanal flach, waehrend das Modell die Werte des Betreibers meldete,
+  genau die Form, die bei NB/SNB schon einmal zugeschlagen hat.
+
+### Das Equalizer-Feld haengt jetzt im Panel
+
+`EqApplet` stand seit der Skelettphase als Geister-Applet in
+`MainWindow.cpp` auskommentiert, mit der Bedingung
+`// TODO 3I-3: TX/RX EQ wiring`. Die ist erfuellt, also haengt es:
+
+* Die RX/TX-Umschaltung waehlt, welche Kurve die zehn Schieber bedienen.
+  Die Sendeseite ging auf `TransmitModel::txEq*` (seit 3M-3a-i da, der
+  grosse Editor dazu bleibt `TxEqDialog`), die Empfangsseite auf das
+  Neue oben. Beide Haelften waren vorher Attrappen — alle sechs
+  Bedienelemente trugen `NyiOverlay`.
+* **„Music" ist aus der Vorwahl-Liste entfernt.** Es gab dafuer keine
+  Quelle: Thetis kennt ueberhaupt keine EQ-Vorwahlen (`eqform.cs`),
+  AetherSDR auch nicht (`EqApplet.cpp:277` hat nur die Schieber). Die
+  beiden, die bleiben, sind belegt — „Flach" ist WDSPs Vorgabe beim
+  Anlegen, „Sprache" die Kurve, die in WDSPs Quelltext direkt darueber
+  auskommentiert steht (`RXA.c:260`). Eigene DSP-Kurven zu erfinden
+  verbietet `CLAUDE.md` ausdruecklich.
+* Der Eintrag in `m_appletsById` ist Pflicht neben `registerApplet` —
+  ohne ihn kennt der Auswaehler das Applet nicht, und es waere wieder
+  gebaut und unerreichbar.
+
+Die Schieber gehen `-10..+10`, die DSP-Grenzen bis `-12..+15`. Der
+Bereich bleibt, wie die Vorlage ihn hatte; ihn zu weiten ist eine Sache
+der Gestaltung. Das Modell klammert, es kann also nichts Falsches
+hinausgehen.
+
+Prueffaelle: `tests/tst_rx_equalizer.cpp`.
+
+
 ## [0.6.8] - 2026-10-08
 
 Zwei Commits seit 0.6.7, einen Tag. Thema: **die Oberflaeche, nicht die

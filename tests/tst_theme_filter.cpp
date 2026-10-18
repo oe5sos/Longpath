@@ -28,6 +28,7 @@
 #include <QLabel>
 #include <QTemporaryDir>
 #include <QWidget>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -80,7 +81,7 @@ private slots:
 
         w.resize(120, 60);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         const QString after = w.styleSheet();
         QVERIFY2(after.contains(QStringLiteral("#123456")),
@@ -106,7 +107,7 @@ private slots:
 
         parent.resize(120, 60);
         parent.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&parent));
+        QVERIFY(QTest::qWaitForWindowExposed(&parent, kFensterFrist));
 
         QVERIFY2(child->styleSheet().contains(QStringLiteral("#654321")),
                  qPrintable(child->styleSheet()));
@@ -122,7 +123,7 @@ private slots:
         QWidget w;
         w.resize(120, 60);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         w.setStyleSheet(QStringLiteral("QWidget { color: #00b4d8; }"));
         QVERIFY2(w.styleSheet().contains(QStringLiteral("#0f0f0f")),
@@ -151,7 +152,7 @@ private slots:
             "QWidget { color: #c8d8e8; border: 1px solid #205070; }"));
         w.resize(120, 60);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         const QString after = w.styleSheet();
         QVERIFY2(after.contains(QString::fromLatin1(Style::kTextPrimary)),
@@ -175,7 +176,7 @@ private slots:
         w.setStyleSheet(qss);
         w.resize(120, 60);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QCOMPARE(w.styleSheet(), qss);
     }
@@ -186,7 +187,7 @@ private slots:
         QWidget w;
         w.resize(120, 60);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QVERIFY(w.styleSheet().isEmpty());
     }
 
@@ -205,7 +206,7 @@ private slots:
             "QWidget:hover { color: #00b4d8; }"));
         w.resize(120, 60);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         const QString a = w.styleSheet();
         w.setStyleSheet(a);              // noch einmal, von Hand
@@ -223,7 +224,7 @@ private slots:
         w.setStyleSheet(QStringLiteral("QWidget { border: 1px solid #205070; }"));
         w.resize(120, 60);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QVERIFY(Style::ThemeFilter::appliedCount() > before);
     }

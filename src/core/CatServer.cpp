@@ -6,18 +6,18 @@
 //   Project Files/Source/Console/CAT/TCPIPcatServer.cs [v2.10.3.15]
 // Original licence from the Thetis source is included below.
 //
-// Der vollstaendige Block steht hier UND in CatServer.h: der Pruefer
-// verify-thetis-headers.py geht Datei fuer Datei, und beide stehen in
-// THETIS-PROVENANCE.md.
-//
 // =================================================================
 // Modification history (Longpath):
 //   2026-10-11 — Reimplemented in C++20/Qt6 for Longpath, AI-assisted
 //                 via Anthropic Claude Code. Zweiter Gang der
-//                 CAT-Anbindung: der Transport, vier Kanaele,
-//                 ereignisgesteuert statt ein Faden je Verbindung.
-//   2026-10-13 — Der Zustandsgeber ist jetzt auch der Nachleser, damit
-//                 ein Setzen nicht blind quittiert wird.
+//                 CAT-Anbindung: der Transport. Die Protokollschicht
+//                 (CatProtocol) ist der erste, die Verdrahtung an
+//                 RadioModel und das CatApplet folgen.
+//                 Thetis faehrt einen Faden je Verbindung mit
+//                 50-ms-Schlaf und Available-Abfrage; hier
+//                 ereignisgesteuert ueber QTcpServer/QTcpSocket auf
+//                 dem Hauptfaden -- die Antworten lesen Modellzustand,
+//                 und der gehoert diesem Faden.
 // =================================================================
 //
 //=================================================================
@@ -52,6 +52,10 @@
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 
+// =================================================================
+// Der Kopf spiegelt CatServer.h.
+// =================================================================
+
 #include "CatServer.h"
 
 #include "LogCategories.h"
@@ -83,9 +87,10 @@ void CatServer::setzeZustandsgeber(
 {
     m_geber = std::move(geber);
 
-    // Derselbe Geber ist auch der NACHLESER (2026-10-13): nach einem
-    // Setzen fragt die Protokollschicht damit nach, ob der Wunsch
-    // angekommen ist, und antwortet sonst mit "?;".
+    // Derselbe Geber ist auch der NACHLESER (2026-10-13, aus dem
+    // ZZ-Zweig hereingeholt): nach einem Setzen fragt die
+    // Protokollschicht damit nach, ob der Wunsch angekommen ist, und
+    // antwortet sonst mit "?;".
     //
     // Warum das wichtig ist: ohne Nachleser quittiert ein Setzen blind.
     // Die zweite CAT-Fassung dieses Projekts hat es am 2026-10-11 am
@@ -95,9 +100,9 @@ void CatServer::setzeZustandsgeber(
     //
     // Meldet der Geber std::nullopt (kein Empfaenger), gilt der letzte
     // bekannte Stand als Nachlese-Ergebnis. Der Befehl selbst wird dann
-    // ohnehin schon in verarbeiteFuerTest() abgelehnt, bevor er hierher
-    // kommt -- das ist nur die Absicherung fuer den Fall, dass der
-    // Empfaenger MITTEN im Befehl wegfaellt.
+    // ohnehin schon in antwortAuf() abgelehnt, bevor er hierher kommt --
+    // das ist nur die Absicherung fuer den Fall, dass der Empfaenger
+    // MITTEN im Befehl wegfaellt.
     if (m_geber) {
         m_protokoll.setzeNachleser([this]() {
             const std::optional<CatProtocol::Zustand> z = m_geber();
@@ -183,12 +188,10 @@ quint16 CatServer::port(int k) const
     return (k >= 0 && k < kKanaele) ? m_k[k].port : 0;
 }
 
-QHostAddress CatServer::adresse(int k) const
+QHostAddress CatServer::bindAdresse(int k) const
 {
-    if (k < 0 || k >= kKanaele) { return {}; }
-    QTcpServer* srv = m_k[k].server;
-    if (!srv || !srv->isListening()) { return {}; }
-    return srv->serverAddress();
+    if (k < 0 || k >= kKanaele || !m_k[k].server) { return {}; }
+    return m_k[k].server->serverAddress();
 }
 
 int CatServer::verbindungen(int k) const
@@ -201,7 +204,7 @@ void CatServer::nimmVerbindung(int k)
     Kanal& ka = m_k[k];
     if (!ka.server) { return; }
     while (QTcpSocket* s = ka.server->nextPendingConnection()) {
-        ka.puffer.insert(s, QString());
+        ka.puffer.insert(s, CatPuffer());
         connect(s, &QTcpSocket::readyRead, this, [this, k, s]() { lies(k, s); });
         connect(s, &QTcpSocket::disconnected, this, [this, k, s]() { raeumeAuf(k, s); });
         qCInfo(lcConnection).nospace()
@@ -235,82 +238,60 @@ void CatServer::lies(int k, QTcpSocket* s)
     // ASCII, wie Thetis (Encoding.ASCII.GetString). Ein Byte > 0x7F
     // kommt in CAT nicht vor und wuerde als Ersatzzeichen im Puffer
     // landen; QLatin1 laesst es durch, ohne den Befehl zu verschieben.
-    it->append(QString::fromLatin1(roh));
-    verarbeitePuffer(k, s);
-}
-
-void CatServer::verarbeitePuffer(int k, QTcpSocket* s)
-{
-    Kanal& ka = m_k[k];
-    auto it = ka.puffer.find(s);
-    if (it == ka.puffer.end()) { return; }
-    QString& puffer = *it;
-
-    // From Thetis CAT/TCPIPcatServer.cs:275-296 [v2.10.3.15] --
-    // ParseReceiveBuffer, am 2.10.3.9 (MW0LGE) auf mehrere Befehle in
-    // einem Paket gefixt:
-    //   m_oneLineBuf.Replace(Environment.NewLine, "");
-    //     // so can be used a by raw telnet client
-    //   while (lineEndIndex > -1) { msg = ...Substring(0, idx+1); ... }
-    //   if (m_oneLineBuf.Length > 255) m_oneLineBuf.Clear();
-    //
-    // Zeilenumbrueche fliegen raus, DAMIT ein rohes telnet geht -- wer
-    // dort "FA;" eintippt, schickt "FA;\r\n", und ohne diese Zeile
-    // steckte das \r\n vor dem naechsten Befehl.
-    puffer.remove(QLatin1Char('\r'));
-    puffer.remove(QLatin1Char('\n'));
-
-    int ende = puffer.indexOf(QLatin1Char(';'));
-    while (ende >= 0) {
-        const QString befehl = puffer.left(ende + 1);
-        puffer.remove(0, ende + 1);
-
-        const QString antwort = verarbeiteFuerTest(befehl);
-        if (!antwort.isEmpty() && s->state() == QAbstractSocket::ConnectedState) {
-            s->write(antwort.toLatin1());
-            // flush() spart eine Runde der Ereignisschleife: write()
-            // legt die Bytes nur in den Socketpuffer, hinausgeschrieben
-            // werden sie sonst erst beim naechsten Durchlauf. Bei einem
-            // Fremdprogramm, das synchron auf die Antwort wartet (hamlib,
-            // WSJT-X, fldigi tun das), ist das die Latenz, die es sieht.
-            //
-            // EHRLICH DAZU: notwendig ist es nicht. Ich habe diese Zeile
-            // am 2026-10-11 eingebaut, als acht Prueffaelle rot waren und
-            // jede Abfrage leer zurueckkam -- die Ursache lag aber im
-            // PRUEFSTAND (waitForReadyRead am Client dreht die
-            // Ereignisschleife nicht, also arbeitete der Server nie; siehe
-            // die Notiz bei frage() in tst_cat_server.cpp). Die Gegenprobe
-            // ohne diese Zeile ist gruen. Sie bleibt, weil sie nichts
-            // kostet und die Latenz senkt, nicht weil sie etwas repariert.
-            s->flush();
-        }
-        // Nach dem Schreiben erneut nachsehen: ein Fremdprogramm kann
-        // sich auf die Antwort hin trennen, und dann ist der Eintrag
-        // (und damit `puffer`) weg.
-        //
-        // VORSORGE, nicht belegte Notwendigkeit. Die Gegenprobe am
-        // 2026-10-11 hat diese drei Zeilen entfernt und zwanzig Runden
-        // mit sofortigem abort() nach zwei Befehlen gefahren -- nichts
-        // fiel. Qt liefert `disconnected` verzoegert, der Eintrag lebt
-        // also waehrend dieser Schleife noch. Die Zeilen bleiben, weil
-        // sie nichts kosten und die Annahme "waehrend meiner Schleife
-        // aendert sich die Hashtabelle nicht" nicht in diesem Code
-        // steht, sondern in Qts Zustellreihenfolge -- und die ist keine
-        // Zusicherung, auf die ein Zeiger zeigen sollte.
-        it = ka.puffer.find(s);
-        if (it == ka.puffer.end()) { return; }
-        ende = it->indexOf(QLatin1Char(';'));
-    }
-
-    if (it->size() > kPufferDeckel) {
+    const QStringList befehle = it->nimm(QString::fromLatin1(roh));
+    if (it->verworfen()) {
         qCWarning(lcConnection).nospace()
-            << "CAT-Kanal " << k << ": " << it->size()
+            << "CAT-Kanal " << k << ": mehr als " << CatPuffer::kDeckel
             << " Zeichen ohne Abschluss ';' - Puffer verworfen";
-        it->clear();
+    }
+    // Ab hier wird `it` NICHT mehr angefasst. Die Befehle liegen in
+    // einer eigenen Liste, und das ist der Grund, aus dem die Zerlegung
+    // ueberhaupt herausgehoben wurde: der alte Ablauf beantwortete einen
+    // Befehl mitten in der Schleife ueber den Puffer und griff danach
+    // wieder hinein -- wenn sich das Fremdprogramm auf die Antwort hin
+    // trennt, ist der Eintrag weg, und mit ihm die Referenz. Der alte
+    // Code hat das mit einem erneuten Nachschlagen abgefangen (und in
+    // einer langen Notiz erklaert, dass das Vorsorge sei); wer die
+    // Befehle erst herausgibt und dann abarbeitet, hat das Problem nicht.
+    verarbeiteBefehle(k, s, befehle);
+}
+
+void CatServer::verarbeiteBefehle(int k, QTcpSocket* s,
+                                  const QStringList& befehle)
+{
+    for (const QString& befehl : befehle) {
+        // Vor JEDEM Befehl nachsehen, ob die Verbindung noch steht. Ein
+        // Fremdprogramm kann sich auf die erste Antwort hin trennen, und
+        // der zweite Befehl aus demselben Paket liefe dann in einen
+        // Socket, den Qt gerade abbaut.
+        if (!m_k[k].puffer.contains(s)
+            || s->state() != QAbstractSocket::ConnectedState) {
+            return;
+        }
+
+        const QString antwort = antwortAuf(befehl);
+        if (antwort.isEmpty()) { continue; }
+
+        s->write(antwort.toLatin1());
+        // flush() spart eine Runde der Ereignisschleife: write() legt die
+        // Bytes nur in den Socketpuffer, hinausgeschrieben werden sie
+        // sonst erst beim naechsten Durchlauf. Bei einem Fremdprogramm,
+        // das synchron auf die Antwort wartet (hamlib, WSJT-X, fldigi tun
+        // das), ist das die Latenz, die es sieht.
+        //
+        // EHRLICH DAZU: notwendig ist es nicht. Ich habe diese Zeile am
+        // 2026-10-11 eingebaut, als acht Prueffaelle rot waren und jede
+        // Abfrage leer zurueckkam -- die Ursache lag aber im PRUEFSTAND
+        // (waitForReadyRead am Client dreht die Ereignisschleife nicht,
+        // also arbeitete der Server nie; siehe die Notiz bei frage() in
+        // tst_cat_server.cpp). Die Gegenprobe ohne diese Zeile ist gruen.
+        // Sie bleibt, weil sie nichts kostet und die Latenz senkt, nicht
+        // weil sie etwas repariert.
+        s->flush();
     }
 }
 
-QString CatServer::verarbeiteFuerTest(const QString& befehl)
+QString CatServer::antwortAuf(const QString& befehl)
 {
     if (!m_geber) {
         // Kein Zustandsgeber heisst: wir wissen nichts ueber das Geraet.

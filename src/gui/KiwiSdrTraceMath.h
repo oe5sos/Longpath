@@ -7,6 +7,7 @@
 // Das KiwiSDR-Protokoll stammt von John Seamons (ZL/KF6VO),
 // http://kiwisdr.com.
 //
+// Modification history (Longpath):
 //   2026-08-23 — Portiert (Nachtschicht, Stufe 3: Bedienflaeche).
 //                Namensraum und Kopfdatei-Pfade angepasst, sonst
 //                zeichengetreu.

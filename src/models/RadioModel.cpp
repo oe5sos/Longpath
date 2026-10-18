@@ -342,6 +342,8 @@ warren@wpratt.com
 // TxWorkerThread is already included above (line 268) for the existing
 // TX pump wiring; K-bench reuses that include for setRadeChannel +
 // the radeMicBlockReady signal.
+#include "core/Ft8Tx.h"
+#include "core/RttyTx.h"
 #include "core/Resampler.h"
 
 // FlexRadio UDP 4992 discovery beacon. Owned by RadioModel; configured
@@ -1290,6 +1292,12 @@ RadioModel::RadioModel(QObject* parent)
     // RfKit_ManualIp / RfKit_ManualPort from per-MAC peripherals scope at
     // that point).
     m_rfKitConnection = std::make_unique<Rf2ksConnection>(this);
+    // SPE Expert (Zeus-Punkt 7). Wie der RF2K-S: einmal angelegt, lebt
+    // die ganze Laufzeit, verbindet sich aber erst, wenn der per-MAC-
+    // Bereich da ist (applyPeripheralsForCurrentMac).
+    m_speConnection = std::make_unique<SpeConnection>(this);
+    m_kpa500Connection = std::make_unique<Kpa500Connection>(this);
+    m_acomConnection = std::make_unique<AcomConnection>(this);
 
     // Per-radio peripherals refactor (2026-05-26): the ctor-time RF-Kit
     // auto-connect from globals was removed.  The lifecycle now runs in
@@ -2482,6 +2490,20 @@ QMap<QString, QString> kvsFromSpot(const Longpath::DxSpot& spot,
     return kvs;
 }
 
+/// Die Farbe der FT8-Funde — EINMAL, fuer beide Quellen.
+///
+/// WSJT-X und der eigene Dekoder zeigen dieselbe Sorte Fund, also
+/// dieselbe Farbe; nur der Einstellungsschluessel ist ein anderer.
+/// Ein zweites „#6fa384" im Quelltext haette die Drift-Bremse
+/// ausgeloest (scripts/verify-style-drift.py, colour_literals) — zu
+/// Recht: zwei Abschriften derselben Farbe laufen beim naechsten
+/// Palettenwechsel auseinander.
+QString ft8SpotFarbe(const QString& schluessel)
+{
+    return Longpath::AppSettings::instance()
+        .value(schluessel, QStringLiteral("#6fa384")).toString();
+}
+
 }  // namespace
 
 void RadioModel::onClusterSpotReceived(const DxSpot& spot)
@@ -2521,8 +2543,7 @@ void RadioModel::onWsjtxSpotReceived(const DxSpot& spot)
     // the dialog's UI, so reuse that here.
     const int lifetime = s.value(QStringLiteral("WsjtxSpotLifetimeSec"),
                                  120).toInt();
-    const QString color = s.value(QStringLiteral("WsjtxSpotColor"),
-                                  QStringLiteral("#6fa384")).toString();
+    const QString color = ft8SpotFarbe(QStringLiteral("WsjtxSpotColor"));
     const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
     m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
 
@@ -2558,6 +2579,144 @@ void RadioModel::onWsjtxSpotReceived(const DxSpot& spot)
         m_pskReporter->reportDecode(
             spot.dxCall,
             mode.isEmpty() ? QStringLiteral("FT8") : mode,
+            spot.freqMhz,
+            spot.snr);
+    }
+}
+
+// Nur im Testbau — genau wie die Deklaration in RadioModel.h, die
+// im #ifdef LONGPATH_BUILD_TESTS-Block steht. Ohne denselben Waechter
+// hier sucht der Compiler im Release-Bau eine Deklaration, die es dort
+// nicht gibt: „no declaration matches
+// 'void Longpath::RadioModel::installFt8TxForTest()'" — auf Windows
+// und Linux rot, lokal gruen, weil dort mit Tests gebaut wird
+// (2026-10-16).
+#ifdef LONGPATH_BUILD_TESTS
+void RadioModel::installFt8TxForTest()
+{
+    if (!m_compositeMicRouter) {
+        // Weder PC- noch Funkmikrofon, keine Mikrofonbuchse: der
+        // Router liefert dann Stille, und genau das soll er hier.
+        m_compositeMicRouter = std::make_unique<CompositeTxMicRouter>(
+            nullptr, nullptr, false);
+    }
+    if (!m_ft8TxSource) {
+        m_ft8TxSource = std::make_unique<Ft8TxSource>(48000);
+        m_compositeMicRouter->setFt8Source(m_ft8TxSource.get());
+    }
+}
+
+void RadioModel::installRttyTxForTest()
+{
+    if (!m_compositeMicRouter) {
+        m_compositeMicRouter = std::make_unique<CompositeTxMicRouter>(
+            nullptr, nullptr, false);
+    }
+    if (!m_rttyTxSource) {
+        m_rttyTxSource = std::make_unique<RttyTxSource>(48000);
+        m_compositeMicRouter->setRttySource(m_rttyTxSource.get());
+    }
+}
+#endif  // LONGPATH_BUILD_TESTS
+
+void RadioModel::onNativeFt8Decode(const DxSpot& spot)
+{
+    // Der eigene Dekoder (2026-10-15). Gebaut wie
+    // onWsjtxSpotReceived — es ist dieselbe Sorte Fund, nur aus dem
+    // eigenen Haus statt aus einem zweiten Programm.
+    //
+    // Lebensdauer und Farbe stehen auf denselben Werten wie bei
+    // WSJT-X: 120 s (ein FT8-Fenster ist 15 s, nach zwei Minuten ist
+    // der Fund kalt) und dasselbe Gruen. Das ist mit Absicht KEINE
+    // neue Farbwahl — es ist dieselbe Sache, und wer die beiden
+    // auseinanderhalten will, liest die Quellenspalte. Beides laesst
+    // sich in den Einstellungen aendern.
+    meldeEigenenFund(spot,
+                     QStringLiteral("NativeFt8SpotLifetimeSec"), 120,
+                     QStringLiteral("NativeFt8SpotColor"),
+                     QStringLiteral("FT8"));
+}
+
+void RadioModel::onNativeRttyDecode(const DxSpot& spot)
+{
+    // Der eigene RTTY-Dekoder (2026-10-17). Derselbe Weg wie bei FT8:
+    // Fund in die Spotliste (und damit auf den Panadapter), in den
+    // Sammler „was mein Geraet gehoert hat", und weiter an PSK
+    // Reporter. Bis heute endete RTTY im Textfeld des Applets und
+    // nirgends sonst — der Fund war da, aber unerreichbar.
+    //
+    // Lebensdauer 900 s, und das ist eine Wahl mit Grund: ein
+    // FT8-Fenster ist 15 s lang, darum sind dort 120 s richtig. Ein
+    // RTTY-Anruf laeuft Minuten, und die Station bleibt auf ihrer
+    // Frequenz — das ist naeher an einem Cluster-Spot (1800 s) als an
+    // einem FT8-Fenster. 900 s liegt dazwischen: lang genug, um die
+    // Station wiederzufinden, kurz genug, dass die Liste nicht mit
+    // Stationen voll steht, die langst weg sind. Aenderbar.
+    //
+    // Die FARBE ist mit Absicht dieselbe wie bei den eigenen
+    // FT8-Funden: es ist dieselbe Quelle („Longpath"), und wer die
+    // Betriebsart sehen will, liest die Modusspalte. Eine zweite
+    // Farbe waere eine Gestaltungsentscheidung, und die faellt nicht
+    // hier.
+    meldeEigenenFund(spot,
+                     QStringLiteral("NativeRttySpotLifetimeSec"), 900,
+                     QStringLiteral("NativeRttySpotColor"),
+                     QStringLiteral("RTTY"));
+}
+
+// ── Ein eigener Fund, dreifach weitergereicht ───────────────────────
+//
+// Einmal geschrieben fuer FT8 und RTTY (2026-10-17). Vorher stand der
+// Rumpf nur in onNativeFt8Decode; als RTTY dazukam, waere die zweite
+// Abschrift die Stelle gewesen, an der die beiden beim naechsten
+// Eingriff auseinanderlaufen.
+void RadioModel::meldeEigenenFund(const DxSpot& spot,
+                                  const QString& lebensdauerSchluessel,
+                                  int lebensdauerVorgabeSek,
+                                  const QString& farbSchluessel,
+                                  const QString& modusVorgabe)
+{
+    auto& s = AppSettings::instance();
+    const int lifetime = s.value(lebensdauerSchluessel,
+                                 lebensdauerVorgabeSek).toInt();
+    const QString color = ft8SpotFarbe(farbSchluessel);
+
+    if (m_spotModel) {
+        const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
+        m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
+    }
+
+    // Und in den Sammler „was mein Geraet gerade gehoert hat".
+    if (m_rxDecodeModel) {
+        RxDecode dec;
+        dec.callsign = spot.dxCall;
+        dec.freqMhz  = spot.freqMhz;
+        dec.snr      = spot.snr;
+        dec.mode     = SpotTableModel::extractMode(spot.comment);
+        if (dec.mode.isEmpty()) { dec.mode = modusVorgabe; }
+        dec.source   = spot.source;
+        // Die Zeit des FENSTERS, nicht die von jetzt: ein Fund gehoert
+        // in die Periode, in der er gehoert wurde, sonst stimmt er im
+        // Logbuch um bis zu fuenfzehn Sekunden nicht. DxSpot traegt
+        // nur die Uhrzeit; das Datum kommt von heute (ein Fenster
+        // liegt Sekunden zurueck, nicht Tage).
+        const QDateTime jetzt = QDateTime::currentDateTimeUtc();
+        dec.utcTime  = spot.utcTime.isValid()
+            ? QDateTime(jetzt.date(), spot.utcTime, QTimeZone::UTC)
+            : jetzt;
+        dec.payload  = spot.comment;
+        m_rxDecodeModel->addDecode(dec);
+    }
+
+    // Weitermelden, unter denselben Bedingungen wie der WSJT-X-Weg:
+    // nur wenn die Selbstmeldung ueberhaupt laeuft und ein Rufzeichen
+    // dasteht.
+    if (m_pskReporter && m_pskReporter->isAutoSendActive()
+        && !spot.dxCall.isEmpty()) {
+        const QString mode = SpotTableModel::extractMode(spot.comment);
+        m_pskReporter->reportDecode(
+            spot.dxCall,
+            mode.isEmpty() ? modusVorgabe : mode,
             spot.freqMhz,
             spot.snr);
     }
@@ -2977,6 +3136,225 @@ void RadioModel::setRfKitEnabled(bool enabled)
     emit rfKitEnabledChanged(enabled);
 }
 
+// ── SPE Expert (Zeus-Punkt 7) ──────────────────────────────────────────────
+
+bool RadioModel::speEnabled() const
+{
+    return peripheralValue(QStringLiteral("Spe_Enabled"),
+                           QStringLiteral("False"))
+        == QStringLiteral("True");
+}
+
+void RadioModel::applySpeOperatorSettings()
+{
+    if (!m_speConnection) {
+        return;
+    }
+    // Vorgabe AN: ein Verstaerker, der aus- und wieder eingeschaltet wird,
+    // soll von selbst wieder auftauchen. Derselbe Wert wie beim RF2K-S.
+    const bool autoRe = peripheralValue(QStringLiteral("Spe_AutoReconnect"),
+                                        QStringLiteral("True"))
+        == QStringLiteral("True");
+    m_speConnection->setAutoReconnect(autoRe);
+}
+
+void RadioModel::applySpeConnection()
+{
+    if (!m_speConnection) {
+        return;
+    }
+    if (!speEnabled()) {
+        m_speConnection->disconnect();
+        return;
+    }
+
+    applySpeOperatorSettings();
+
+    const QString modus = peripheralValue(QStringLiteral("Spe_Mode"),
+                                          QStringLiteral("Network"));
+    if (modus == QStringLiteral("Serial")) {
+#ifdef HAVE_SERIALPORT
+        const QString anschluss = peripheralValue(QStringLiteral("Spe_SerialPort"));
+        if (anschluss.isEmpty()) {
+            // Kein Erraten: ein serieller Anschlussname laesst sich nicht
+            // ableiten, und den falschen zu oeffnen heisst, ein fremdes
+            // Geraet zu beschreiben.
+            qCInfo(lcConnection) << "SPE auf seriell gestellt, aber kein "
+                                    "Anschluss angegeben -- nicht verbunden";
+            return;
+        }
+        m_speConnection->connectSerial(anschluss);
+#else
+        qCWarning(lcConnection) << "SPE auf seriell gestellt, aber dieser Bau "
+                                   "hat kein Qt6::SerialPort -- nicht verbunden";
+#endif
+        return;
+    }
+
+    const QString rechner = peripheralValue(QStringLiteral("Spe_Host"));
+    const quint16 anschluss = static_cast<quint16>(
+        peripheralValue(QStringLiteral("Spe_Port"), QStringLiteral("4001")).toUInt());
+    if (rechner.isEmpty()) {
+        // Auch hier kein Erraten: ser2net antwortet auf keine Rundfrage,
+        // es gibt also nichts zu suchen.
+        qCInfo(lcConnection) << "SPE ueber Netz, aber kein Rechner angegeben "
+                                "-- nicht verbunden";
+        return;
+    }
+    m_speConnection->connectNetwork(rechner, anschluss);
+}
+
+void RadioModel::setSpeEnabled(bool enabled)
+{
+    const bool jetzt = speEnabled();
+    if (enabled == jetzt) {
+        return;
+    }
+    setPeripheralValue(QStringLiteral("Spe_Enabled"),
+                       enabled ? QStringLiteral("True") : QStringLiteral("False"));
+    applySpeConnection();
+    emit speEnabledChanged(enabled);
+}
+
+// ── Elecraft KPA500 (Zeus-Punkt 7) ─────────────────────────────────────────
+
+bool RadioModel::kpa500Enabled() const
+{
+    return peripheralValue(QStringLiteral("Kpa500_Enabled"),
+                           QStringLiteral("False"))
+        == QStringLiteral("True");
+}
+
+void RadioModel::applyKpa500Connection()
+{
+    if (!m_kpa500Connection) {
+        return;
+    }
+    if (!kpa500Enabled()) {
+        m_kpa500Connection->disconnect();
+        return;
+    }
+
+    const bool autoRe = peripheralValue(QStringLiteral("Kpa500_AutoReconnect"),
+                                        QStringLiteral("True"))
+        == QStringLiteral("True");
+    m_kpa500Connection->setAutoReconnect(autoRe);
+
+    const QString modus = peripheralValue(QStringLiteral("Kpa500_Mode"),
+                                          QStringLiteral("Network"));
+    if (modus == QStringLiteral("Serial")) {
+#ifdef HAVE_SERIALPORT
+        const QString anschluss = peripheralValue(QStringLiteral("Kpa500_SerialPort"));
+        if (anschluss.isEmpty()) {
+            qCInfo(lcConnection) << "KPA500 auf seriell gestellt, aber kein "
+                                    "Anschluss angegeben -- nicht verbunden";
+            return;
+        }
+        // Die Datenrate wird NICHT geraten: an der falschen kommt nichts
+        // durch, und das Dokument nennt keine Vorgabe. 38400 ist die
+        // hoechste der vier moeglichen und damit der beste erste Versuch.
+        const int baud = peripheralValue(QStringLiteral("Kpa500_Baud"),
+                                         QStringLiteral("38400")).toInt();
+        m_kpa500Connection->connectSerial(anschluss, baud > 0 ? baud : 38400);
+#else
+        qCWarning(lcConnection) << "KPA500 auf seriell gestellt, aber dieser Bau "
+                                   "hat kein Qt6::SerialPort -- nicht verbunden";
+#endif
+        return;
+    }
+
+    const QString rechner = peripheralValue(QStringLiteral("Kpa500_Host"));
+    const quint16 anschluss = static_cast<quint16>(
+        peripheralValue(QStringLiteral("Kpa500_Port"),
+                        QStringLiteral("4001")).toUInt());
+    if (rechner.isEmpty()) {
+        qCInfo(lcConnection) << "KPA500 ueber Netz, aber kein Rechner angegeben "
+                                "-- nicht verbunden";
+        return;
+    }
+    m_kpa500Connection->connectNetwork(rechner, anschluss);
+}
+
+void RadioModel::setKpa500Enabled(bool enabled)
+{
+    const bool jetzt = kpa500Enabled();
+    if (enabled == jetzt) {
+        return;
+    }
+    setPeripheralValue(QStringLiteral("Kpa500_Enabled"),
+                       enabled ? QStringLiteral("True") : QStringLiteral("False"));
+    applyKpa500Connection();
+    emit kpa500EnabledChanged(enabled);
+}
+
+// ── ACOM S-Serie (Betreiberwunsch 2026-10-09) ──────────────────────────────
+
+bool RadioModel::acomEnabled() const
+{
+    return peripheralValue(QStringLiteral("Acom_Enabled"),
+                           QStringLiteral("False"))
+        == QStringLiteral("True");
+}
+
+void RadioModel::applyAcomConnection()
+{
+    if (!m_acomConnection) {
+        return;
+    }
+    if (!acomEnabled()) {
+        m_acomConnection->disconnect();
+        return;
+    }
+
+    const bool autoRe = peripheralValue(QStringLiteral("Acom_AutoReconnect"),
+                                        QStringLiteral("True"))
+        == QStringLiteral("True");
+    m_acomConnection->setAutoReconnect(autoRe);
+
+    const QString modus = peripheralValue(QStringLiteral("Acom_Mode"),
+                                          QStringLiteral("Network"));
+    if (modus == QStringLiteral("Serial")) {
+#ifdef HAVE_SERIALPORT
+        const QString anschluss = peripheralValue(QStringLiteral("Acom_SerialPort"));
+        if (anschluss.isEmpty()) {
+            qCInfo(lcConnection) << "ACOM auf seriell gestellt, aber kein "
+                                    "Anschluss angegeben -- nicht verbunden";
+            return;
+        }
+        // Die Datenrate ist FEST 9600 8N1 -- die Beschreibung des
+        // Herstellers schreibt sie vor, es gibt nichts einzustellen
+        // (anders als beim KPA500, wo sie vier Werte kennt).
+        m_acomConnection->connectSerial(anschluss);
+#else
+        qCWarning(lcConnection) << "ACOM auf seriell gestellt, aber dieser Bau "
+                                   "hat kein Qt6::SerialPort -- nicht verbunden";
+#endif
+        return;
+    }
+
+    const QString rechner = peripheralValue(QStringLiteral("Acom_Host"));
+    const quint16 anschluss = static_cast<quint16>(
+        peripheralValue(QStringLiteral("Acom_Port"), QStringLiteral("4001")).toUInt());
+    if (rechner.isEmpty()) {
+        qCInfo(lcConnection) << "ACOM ueber Netz, aber kein Rechner angegeben "
+                                "-- nicht verbunden";
+        return;
+    }
+    m_acomConnection->connectNetwork(rechner, anschluss);
+}
+
+void RadioModel::setAcomEnabled(bool enabled)
+{
+    const bool jetzt = acomEnabled();
+    if (enabled == jetzt) {
+        return;
+    }
+    setPeripheralValue(QStringLiteral("Acom_Enabled"),
+                       enabled ? QStringLiteral("True") : QStringLiteral("False"));
+    applyAcomConnection();
+    emit acomEnabledChanged(enabled);
+}
+
 // ── CW-Tonhoehe ────────────────────────────────────────────────────────────
 //
 // Porting from Thetis console.cs:18142-18242 [@852bf0e] — public int
@@ -3161,6 +3539,42 @@ void RadioModel::applyPeripheralsForCurrentMac()
         emit fourO3AEnabledChanged(false);
     }
 
+    // ── ACOM S-Serie ────────────────────────────────────────────────────
+    if (acomEnabled() && m_acomConnection) {
+        applyAcomConnection();
+        if (m_acomConnection->isConnected()
+            || !m_acomConnection->description().isEmpty()) {
+            qCInfo(lcConnection)
+                << "ACOM auto-connect for MAC" << mac
+                << ":" << m_acomConnection->description();
+            ++started;
+        }
+    }
+
+    // ── Elecraft KPA500 ─────────────────────────────────────────────────
+    if (kpa500Enabled() && m_kpa500Connection) {
+        applyKpa500Connection();
+        if (m_kpa500Connection->isConnected()
+            || !m_kpa500Connection->description().isEmpty()) {
+            qCInfo(lcConnection)
+                << "KPA500 auto-connect for MAC" << mac
+                << ":" << m_kpa500Connection->description();
+            ++started;
+        }
+    }
+
+    // ── SPE Expert ──────────────────────────────────────────────────────
+    if (speEnabled() && m_speConnection) {
+        applySpeConnection();
+        if (m_speConnection->isConnected()
+            || !m_speConnection->description().isEmpty()) {
+            qCInfo(lcConnection)
+                << "SPE auto-connect for MAC" << mac
+                << ":" << m_speConnection->description();
+            ++started;
+        }
+    }
+
     // ── RF-Kit RF2K-S ───────────────────────────────────────────────────
     if (rfKitEnabled() && m_rfKitConnection) {
         const QString host =
@@ -3237,6 +3651,21 @@ void RadioModel::teardownPeripherals()
     if (m_rfKitConnection) {
         m_rfKitConnection->disconnect();
         qCInfo(lcConnection) << "Peripherals teardown: RF-Kit disconnected";
+    }
+    if (m_kpa500Connection) {
+        m_kpa500Connection->disconnect();
+        qCInfo(lcConnection) << "Peripherals teardown: KPA500 disconnected";
+    }
+    if (m_acomConnection) {
+        m_acomConnection->disconnect();
+        qCInfo(lcConnection) << "Peripherals teardown: ACOM disconnected";
+    }
+    if (m_speConnection) {
+        // Wie beim RF2K-S bedingungslos: disconnect() ist folgenlos, wenn
+        // nichts stand, und entscharft dabei den Wiederverbinder. Nur
+        // isConnected() abzufragen liesse ihn armiert zurueck.
+        m_speConnection->disconnect();
+        qCInfo(lcConnection) << "Peripherals teardown: SPE disconnected";
     }
     if (m_smartSdrListener && m_smartSdrListener->isListening()) {
         m_smartSdrListener->stop();
@@ -7090,6 +7519,25 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 m_pcMicSource.get(), m_radioMicSource.get(), hasMicJack);
             m_compositeMicRouter->setVaxSource(m_vaxTxMicSource.get());
 
+            // Der eigene FT8/FT4-Sender (2026-10-15). Eine
+            // Mikrofonquelle wie die anderen drei — sie liefert
+            // Stille, solange niemand sie startet.
+            //
+            // ANMELDEN heisst nicht SENDEN: der Router liefert sie
+            // nur, wenn jemand MicSource::Ft8 waehlt, und auch dann
+            // nur das, was die Quelle hergibt. Das Tasten entscheidet
+            // der MoxController, nicht diese Zeile.
+            m_ft8TxSource = std::make_unique<Ft8TxSource>(48000);
+            m_compositeMicRouter->setFt8Source(m_ft8TxSource.get());
+
+            // Der eigene RTTY-Sender (2026-10-16), aus demselben
+            // Grund und mit derselben Einschraenkung: angemeldet,
+            // aber still, bis jemand MicSource::Rtty waehlt UND die
+            // Quelle laeuft. Getastet wird auch hier nur ueber den
+            // MoxController.
+            m_rttyTxSource = std::make_unique<RttyTxSource>(48000);
+            m_compositeMicRouter->setRttySource(m_rttyTxSource.get());
+
             // Replace the 3M-1a NullMicSource stub with the composite router.
             m_txChannel->setMicRouter(m_compositeMicRouter.get());
 
@@ -8975,9 +9423,13 @@ void RadioModel::connectToRadio(const RadioInfo& info)
         m_flexBroadcaster->setMacAddress(mac);
         m_flexBroadcaster->setSerial(derivedFlexSerial(mac));
         m_flexBroadcaster->setVersion(QStringLiteral(LONGPATH_VERSION));
+        // Dieselbe Rueckfallkette wie ueberall sonst: StationCallsign
+        // schreibt niemand, das Rufzeichen steht kanonisch unter
+        // User/Callsign (siehe AppSettings::stationCallsign). Ohne sie
+        // rief sich die Station im Netz „LONGPATH".
+        const QString rufzeichen = AppSettings::stationCallsign();
         m_flexBroadcaster->setCallsign(
-            as.value(QStringLiteral("StationCallsign"),
-                     QStringLiteral("LONGPATH")).toString());
+            rufzeichen.isEmpty() ? QStringLiteral("LONGPATH") : rufzeichen);
         m_flexBroadcaster->setNickname(
             as.value(QStringLiteral("PGXL_BroadcastNickname"),
                      QStringLiteral("Longpath")).toString());
@@ -9009,12 +9461,35 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             m_flexBroadcaster->setPeerHint(QHostAddress(pgxlIpStr));
         }
 
-        const bool enabled =
+        // Betreiber 2026-10-18, auf seinem MAESTRO gefunden: in der
+        // Geraeteliste stand ein „FLEX-6400", das er nicht besitzt (er
+        // hat eine FLEX-8400, sonst nichts). Aufgeklaert -- es war
+        // LONGPATH SELBST. Richtig gehandelt: er hat es nicht geoeffnet,
+        // denn dahinter ist kein Radio. Der SmartSdrApiListener
+        // beantwortet nur die Handvoll Befehle, die die Endstufe zum
+        // Koppeln braucht: kein Panadapter, kein Ton, keine Steuerung.
+        //
+        // Der Ausruf ist fuer die PGXL/TGXL gebaut, damit sie Longpath
+        // in IHRER Geraeteliste finden. Er hing aber nur an
+        // PGXL_BroadcastDiscovery, und das steht per Vorgabe auf „True"
+        // -- unabhaengig davon, ob ueberhaupt eine 4O3A-Endstufe da ist.
+        // Also legte JEDE Longpath-Installation ein Phantom-Flex in ihr
+        // Netz, sichtbar fuer jeden SmartSDR-Client darin.
+        //
+        // Jetzt zwei Tore statt einem, und das erste ist der
+        // 4O3A-Hauptschalter (per-MAC, Vorgabe „False") -- derselbe,
+        // hinter dem der SmartSdrApiListener schon seit jeher wartet.
+        // PGXL_BroadcastDiscovery bleibt als Feinschalter daneben: wer
+        // eine 4O3A hat und den Ausruf trotzdem nicht will, schaltet
+        // ihn dort aus.
+        const bool feinschalter =
             as.value(QStringLiteral("PGXL_BroadcastDiscovery"),
                      QStringLiteral("True")).toString()
             == QStringLiteral("True");
-        if (enabled) {
+        if (flexAusrufSollLaufen(fourO3AEnabled(), feinschalter)) {
             m_flexBroadcaster->start();
+        } else {
+            m_flexBroadcaster->stop();
         }
     }
 
@@ -10284,6 +10759,40 @@ void RadioModel::pushFmToneFromTxSlice()
     m_txChannel->setCtcssRun(mode == 1 || mode == 3);
 }
 
+void RadioModel::pushCtcssSquelchForSlice(const SliceModel* slice)
+{
+    // Longpath-eigen, kein Thetis-Port. Siehe RxChannel::setCtcssSquelch.
+    if (!slice || !m_wdspEngine) { return; }
+    RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
+    if (!rxCh) { return; }
+
+    // 0 Off, 1 CTCSS Enc, 2 CTCSS Dec, 3 CTCSS Enc+Dec, 4 DCS Dec
+    const int mode = slice->fmCtcssMode();
+    // Nur in FM. In jeder anderen Betriebsart gibt es kein Subtonband,
+    // und eine Sperre, die dort auf einen Ton wartet, wuerde den Kanal
+    // einfach stumm halten.
+    const bool istFm = (slice->dspMode() == DSPMode::FM);
+
+    const bool ctcssHoert = istFm && (mode == 2 || mode == 3);
+    const bool dcsHoert   = istFm && (mode == 4);
+
+    // Reihenfolge: erst die abschalten, die nicht gilt. Beide teilen
+    // sich den Basisband-Abgriff, und `RxChannel` schaltet die jeweils
+    // andere beim Einschalten ohnehin ab -- aber so bleibt der Zustand
+    // auch dann richtig, wenn beide aus sind.
+    if (!dcsHoert) {
+        rxCh->setDcsSquelch(false, 0, false);
+    }
+    if (!ctcssHoert) {
+        rxCh->setCtcssSquelch(false, 0.0);
+    }
+    if (ctcssHoert) {
+        rxCh->setCtcssSquelch(true, slice->fmCtcssValueHz());
+    } else if (dcsHoert) {
+        rxCh->setDcsSquelch(true, slice->fmDcsCode(), slice->fmDcsPolarity() != 0);
+    }
+}
+
 void RadioModel::pushTxFrequencyFromTxSlice()
 {
     if (!m_connection) {
@@ -11263,6 +11772,47 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
         }
         scheduleSettingsSave();
     });
+
+    // CTCSS-Tonsquelch — Longpath-eigen, kein Thetis-Port.
+    //
+    // `fmCtcssMode` kennt 0 Off, 1 Encode, 2 Decode, 3 Encode+Decode.
+    // Senden (1 und 3) geht seit jeher ueber `pushFmToneFromTxSlice`;
+    // empfangsseitig (2 und 3) geschah bisher nichts, weil Thetis dafuer
+    // nichts hat -- `wdsp/fmd.c` filtert den Subton mit `snotch` nur aus
+    // dem Hoerbaren heraus, erkannt wird er nie. `RxChannel::
+    // setCtcssSquelch` schliesst das.
+    //
+    // Beide Eigenschaften muessen hier haengen: der Modus schaltet die
+    // Sperre ein und aus, der Tonwert stellt sie um. Und der Betriebsart
+    // auch -- ein Tonsquelch hat nur in FM einen Sinn.
+    connect(slice, &SliceModel::fmCtcssModeChanged, this, [this, slice](int) {
+        pushCtcssSquelchForSlice(slice);
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::fmCtcssValueHzChanged, this, [this, slice](double) {
+        pushCtcssSquelchForSlice(slice);
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::dspModeChanged, this, [this, slice](Longpath::DSPMode) {
+        pushCtcssSquelchForSlice(slice);
+    });
+    connect(slice, &SliceModel::fmDcsCodeChanged, this, [this, slice](int) {
+        pushCtcssSquelchForSlice(slice);
+        scheduleSettingsSave();
+    });
+    connect(slice, &SliceModel::fmDcsPolarityChanged, this, [this, slice](int) {
+        pushCtcssSquelchForSlice(slice);
+        scheduleSettingsSave();
+    });
+    // Und der Rueckweg: was der Detektor sieht, landet im Slice, damit die
+    // Oberflaeche es anzeigen kann. Das Signal kommt aus dem DSP-Thread --
+    // darum QueuedConnection, sonst liefe die Anzeige dort.
+    if (RxChannel* rxCh = m_wdspEngine ? m_wdspEngine->rxChannel(slice->sliceIndex())
+                                       : nullptr) {
+        connect(rxCh, &RxChannel::ctcssTonePresenceChanged, slice,
+                [slice](bool present) { slice->setFmCtcssToneDetected(present); },
+                Qt::QueuedConnection);
+    }
 
     // Audio panel — mute / pan / binaural → WDSP PatchPanel
     // From Thetis Project Files/Source/Console/radio.cs:1386-1403 (pan)

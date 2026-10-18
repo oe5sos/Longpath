@@ -4181,7 +4181,8 @@ void StripWindow::refreshInsertCard(int slot)
         value->setMinimumWidth(96);
         value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         value->setStyleSheet(QStringLiteral(
-            "QLabel { font-family: monospace; color: %1; border: none; }")
+            "QLabel { font-family: " LP_MONO_QSS "; color: %1;"
+            " border: none; }")
             .arg(QString::fromLatin1(Style::kTextPrimary)));
 
         const float span = pp.maxValue - pp.minValue;

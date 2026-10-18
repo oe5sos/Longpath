@@ -1955,7 +1955,7 @@ void RxApplet::buildInheritedRows(QVBoxLayout* col)
 {
     // ── Lautstaerke · Stumm · Binaural ───────────────────────────────
     {
-        auto* cap = new QLabel(QStringLiteral("LAUTSTÄRKE"), this);
+        auto* cap = new QLabel(tr("VOLUME"), this);
         cap->setFont(Style::capsFont(cap->font(), Style::kFontCaption));
         cap->setStyleSheet(Style::themed(QStringLiteral(
             "QLabel { color: %1; }").arg(Style::kTextScale)));
@@ -2003,7 +2003,7 @@ void RxApplet::buildInheritedRows(QVBoxLayout* col)
     // Zwei Reihen zu vier, wie im Zielbild. Die sieben schliessen sich
     // gegenseitig aus: setActiveNr(slot) oder setActiveNr(Off).
     {
-        auto* cap = new QLabel(QStringLiteral("RAUSCHMINDERUNG"), this);
+        auto* cap = new QLabel(tr("NOISE REDUCTION"), this);
         cap->setFont(Style::capsFont(cap->font(), Style::kFontCaption));
         cap->setStyleSheet(Style::themed(QStringLiteral(
             "QLabel { color: %1; }").arg(Style::kTextScale)));

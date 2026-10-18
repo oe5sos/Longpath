@@ -8,6 +8,9 @@
 // Modification history (Longpath):
 //   2026-09-21 -- Created for Longpath by Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude.
+//   2026-10-14 -- Zweiter Weg ueber github.com, wenn api.github.com
+//                 nicht antwortet, by Martin Fischer (OE5SOS),
+//                 AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "UpdateChecker.h"
@@ -23,9 +26,16 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QRegularExpression>
+#include <QLoggingCategory>
 #include <QSysInfo>
 
 namespace Longpath {
+
+// Eigene Kategorie, Vorgabe QtInfoMsg: der zweite Weg muss im Protokoll
+// stehen, ohne dass jemand vorher einen Haken setzt -- genau dieser Fall
+// (stumme API) war am 2026-10-14 nicht nachweisbar, weil die
+// Startpruefung ihr Scheitern nirgends vermerkt hat.
+Q_LOGGING_CATEGORY(lcUpdate, "longpath.update", QtInfoMsg)
 
 namespace {
 constexpr int kApiTimeoutMs = 15000;
@@ -67,7 +77,61 @@ UpdateChecker::UpdateChecker(const QString& runningVersion, QObject* parent)
 
 QUrl UpdateChecker::latestReleaseApiUrl()
 {
+    // LONGPATH_UPDATE_API_URL: nur fuer Pruefstaende -- laesst die API
+    // gezielt scheitern (etwa auf einen geschlossenen Port zeigen), damit
+    // der zweite Weg ueber github.com belegt werden kann und nicht bloss
+    // behauptet. Im Betrieb nie gesetzt.
+    const QString override = qEnvironmentVariable("LONGPATH_UPDATE_API_URL");
+    if (!override.isEmpty()) { return QUrl(override); }
     return QUrl(QStringLiteral("https://api.github.com/repos/oe5sos/Longpath/releases/latest"));
+}
+
+QUrl UpdateChecker::latestReleaseWebUrl()
+{
+    return QUrl(QStringLiteral("https://github.com/oe5sos/Longpath/releases/latest"));
+}
+
+QString UpdateChecker::tagFromReleaseUrl(const QUrl& url)
+{
+    // ".../releases/tag/v0.6.8" -- nur diese Form. Ein beliebiger Pfad
+    // (etwa die Anmeldeseite, auf die GitHub bei einem privaten Repo
+    // umleitet) darf nicht als Tag durchgehen.
+    const QStringList parts = url.path().split(QLatin1Char('/'), Qt::SkipEmptyParts);
+    if (parts.size() < 2) { return {}; }
+    if (parts.at(parts.size() - 2) != QStringLiteral("tag")) { return {}; }
+    const QString tag = parts.last();
+    // Ohne Ziffer ist es kein Tag von uns.
+    return numericVersion(tag).isEmpty() ? QString() : tag;
+}
+
+QUrl UpdateChecker::assetDownloadUrl(const QString& tag, const QString& assetName)
+{
+    return QUrl(QStringLiteral("https://github.com/oe5sos/Longpath/releases/download/%1/%2")
+                    .arg(tag, assetName));
+}
+
+ReleaseInfo UpdateChecker::releaseFromTag(const QString& tag)
+{
+    ReleaseInfo r;
+    r.tag = tag;
+    r.viaWebsiteFallback = true;
+    r.version = numericVersion(tag);
+    r.name = QStringLiteral("Longpath %1").arg(r.version);
+    // Die Notizen stehen nur in der API. Statt eines leeren Feldes die
+    // Wahrheit samt Verweis -- der Bediener soll nicht raten, warum der
+    // Text fehlt.
+    r.notes = QStringLiteral(
+        "_Release notes are not available: api.github.com could not be reached, "
+        "so this release was read from the release page instead. "
+        "Open the release page to read them._");
+    r.htmlUrl = QUrl(QStringLiteral("https://github.com/oe5sos/Longpath/releases/tag/%1").arg(tag));
+    // SHA256SUMS.txt liegt bei jeder Veroeffentlichung an derselben
+    // Stelle; downloadAndVerify() braucht genau diesen Eintrag.
+    ReleaseAsset sums;
+    sums.name = QString::fromLatin1(kSumsAssetName);
+    sums.url = assetDownloadUrl(tag, sums.name);
+    r.assets.append(sums);
+    return r;
 }
 
 QByteArray UpdateChecker::userAgent()
@@ -217,14 +281,94 @@ void UpdateChecker::checkLatest()
         reply->deleteLater();
         if (m_active == reply) { m_active = nullptr; }
         if (m_cancelled) { return; }
+        // Stumme API (Azure-Handshake bleibt stehen, DNS weg, Ratelimit)
+        // oder eine Antwort, die kein Release ist: zweiter Weg ueber
+        // github.com. Erst wenn auch der scheitert, gibt es einen Fehler.
         if (reply->error() != QNetworkReply::NoError) {
-            emit checkFailed(reply->errorString());
+            qCWarning(lcUpdate) << "api.github.com failed:" << reply->errorString()
+                                << "-- trying github.com instead";
+            checkLatestViaWebsite(reply->errorString());
             return;
         }
         QString err;
         const auto release = parseLatestRelease(reply->readAll(), &err);
-        if (!release) { emit checkFailed(err); return; }
+        if (!release) {
+            qCWarning(lcUpdate) << "api.github.com answered but not with a release:" << err
+                                << "-- trying github.com instead";
+            checkLatestViaWebsite(err);
+            return;
+        }
         emit latestKnown(*release, compareVersions(release->version, m_runningVersion) > 0);
+    });
+}
+
+void UpdateChecker::checkLatestViaWebsite(const QString& apiError)
+{
+    // Die Weiterleitung ist die ganze Auskunft -- ihr folgen muss man
+    // nicht, die HTML-Seite dahinter interessiert nicht.
+    QNetworkRequest req(latestReleaseWebUrl());
+    req.setHeader(QNetworkRequest::UserAgentHeader, userAgent());
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                     QNetworkRequest::ManualRedirectPolicy);
+    req.setTransferTimeout(kApiTimeoutMs);
+    QNetworkReply* reply = m_net->get(req);
+    m_active = reply;
+    connect(reply, &QNetworkReply::finished, this, [this, reply, apiError]() {
+        reply->deleteLater();
+        if (m_active == reply) { m_active = nullptr; }
+        if (m_cancelled) { return; }
+        if (reply->error() != QNetworkReply::NoError) {
+            emit checkFailed(QStringLiteral("%1 (github.com: %2)")
+                                 .arg(apiError, reply->errorString()));
+            return;
+        }
+        // Relativ zulaessig, darum ueber die Anfrage-URL aufloesen.
+        QUrl target = reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
+        target = target.isEmpty() ? reply->url() : reply->url().resolved(target);
+        const QString tag = tagFromReleaseUrl(target);
+        if (tag.isEmpty()) {
+            emit checkFailed(QStringLiteral("%1 (github.com did not point at a release: %2)")
+                                 .arg(apiError, target.toString()));
+            return;
+        }
+        qCInfo(lcUpdate) << "github.com points at release" << tag;
+        probeAssetAndFinish(releaseFromTag(tag), apiError);
+    });
+}
+
+void UpdateChecker::probeAssetAndFinish(const ReleaseInfo& release, const QString& apiError)
+{
+    // Ohne API gibt es keine Dateiliste. Statt die Datei zu BEHAUPTEN wird
+    // sie mit einem HEAD nachgesehen: das beantwortet beides auf einmal --
+    // ob es sie gibt und wie gross sie ist (der Dialog zeigt die Groesse).
+    const QString wanted = assetNameForThisMachine(release.version);
+    if (wanted.isEmpty()) {
+        emit latestKnown(release, compareVersions(release.version, m_runningVersion) > 0);
+        return;
+    }
+    QNetworkRequest req = request(assetDownloadUrl(release.tag, wanted), kApiTimeoutMs);
+    QNetworkReply* reply = m_net->head(req);
+    m_active = reply;
+    connect(reply, &QNetworkReply::finished, this, [this, reply, release, wanted, apiError]() {
+        reply->deleteLater();
+        if (m_active == reply) { m_active = nullptr; }
+        if (m_cancelled) { return; }
+        ReleaseInfo r = release;
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (reply->error() == QNetworkReply::NoError && status == 200) {
+            ReleaseAsset a;
+            a.name = wanted;
+            a.url = assetDownloadUrl(release.tag, wanted);
+            a.size = reply->header(QNetworkRequest::ContentLengthHeader).toLongLong();
+            r.assets.append(a);
+        } else {
+            // Kein Paket fuer diese Maschine (etwa Windows seit 0.6.7).
+            // Der Dialog sagt das von sich aus und bietet die Seite an.
+            qCWarning(lcUpdate) << "no package" << wanted << "in" << release.tag
+                                << "-- HTTP" << status << reply->errorString();
+        }
+        Q_UNUSED(apiError);
+        emit latestKnown(r, compareVersions(r.version, m_runningVersion) > 0);
     });
 }
 

@@ -22,6 +22,13 @@
 //                 All controls NYI — wired in later phase.
 //   2026-05-10 — Phase 24 (Task 24.1): stripped TCI button row; TCI
 //                 controls now live in TciApplet (Phase 21, 0b615a7).
+//   2026-10-11 — TCP-Schalter verdrahtet (CatServer).
+//   2026-10-12 — PTY-Schalter verdrahtet (CatPtyServer). Die vier
+//                 Pfadbeschriftungen zeigten bis hierher
+//                 "/dev/ptyp0".."/dev/ptyp3" -- BSD-Altnamen, die auf
+//                 macOS und Linux nicht existieren. Jetzt stehen dort
+//                 die Pfade, die ptsname() meldet, und daneben die
+//                 feste Verknuepfung, die man in WSJT-X eintragen kann.
 // =================================================================
 //
 // --- From CAT/TCPIPcatServer.cs (Thetis) ---------------------------
@@ -110,6 +117,11 @@ public:
     /// TCP-Schalter gesperrt statt zu luegen.
     void setzeCatServer(class CatServer* srv);
 
+    /// Den PTY-Server anhaengen (2026-10-12). Ohne ihn -- oder auf einer
+    /// Plattform ohne Pseudoterminals -- bleibt der PTY-Schalter
+    /// gesperrt, mit dem Grund im Hinweistext.
+    void setzeCatPtyServer(class CatPtyServer* srv);
+
     /// Den gespeicherten Schalterzustand anwenden (2026-10-11).
     /// Getrennt von setzeCatServer, weil das Binden von Ports und das
     /// Schreiben von Einstellungen nicht in den Aufbau eines Applets
@@ -138,9 +150,11 @@ private:
     QPushButton* m_iqBtn         = nullptr;
     QComboBox*   m_iqRateCombo   = nullptr;
 
-    // Verdrahtung 2026-10-11
-    class CatServer* m_cat = nullptr;
+    // Verdrahtung 2026-10-11 / 2026-10-12
+    class CatServer*    m_cat    = nullptr;
+    class CatPtyServer* m_catPty = nullptr;
     void zeigeKanaele();
+    void zeigePfade();
     /// From Thetis CAT/TCPIPcatServer.cs:442 [v2.10.3.15] --
     /// `public static int DEFAULT_PORT = 31001;`
     /// Die vier Kanaele liegen darauf aufsteigend.

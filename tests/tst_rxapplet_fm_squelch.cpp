@@ -14,6 +14,7 @@
 #include "gui/applets/RxApplet.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -62,7 +63,7 @@ private slots:
         RxApplet applet(s, &model);
         applet.resize(400, 600);
         applet.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
         QPushButton* btn = sqlButton(applet);
         QVERIFY(btn);
         QSlider* slider = sqlSlider(applet, btn);

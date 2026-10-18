@@ -56,6 +56,7 @@ static void counting(QtMsgType t, const QMessageLogContext& c,
 #include "gui/PanadapterStack.h"
 #include "gui/PanadapterApplet.h"
 #include "gui/SpectrumWidget.h"
+#include "FensterFrist.h"
 using namespace Longpath;
 // Was hier bewacht wird, ist NICHT der gemeldete Fehler — der liess
 // sich nicht nachstellen. Bewacht werden die drei Eigenschaften, die
@@ -81,7 +82,7 @@ private slots:
         auto* mw = new MainWindow();
         mw->resize(1700, 1000);
         mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
         for (int i=0;i<10;++i) QCoreApplication::processEvents();
         QTest::qWait(300);
 

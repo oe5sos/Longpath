@@ -160,6 +160,24 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
+
+    /// Die Scheibenflaggen ein- oder ausschalten (View > Slice
+    /// flags). Aus ist der Zustand von August bis heute; an ist der
+    /// dritte Entwurf vom 2026-10-15. Oeffentlich fuer den Pruefstand.
+    void setSliceFlagsEnabled(bool on);
+    bool sliceFlagsEnabled() const { return m_sliceFlagsOn; }
+
+    /// Das Feldbetrieb-Bild herstellen: ein eigenes Profil „Field",
+    /// darin nur die Felder, die am Berg zaehlen. Der Pruefstand geht
+    /// ueber den Menueeintrag — dann ist mitgeprueft, dass man
+    /// hinkommt.
+    void applyFieldLayout();
+
+    /// Die Kennungen, die im Feldbetrieb SICHTBAR bleiben. Alles
+    /// andere tritt zurueck. Statisch, damit der Pruefstand dieselbe
+    /// Liste liest und nicht eine zweite fuehrt.
+    static QStringList fieldLayoutKeepIds();
+
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
@@ -309,6 +327,12 @@ public:
     void restoreFloatingWindowsForTest()
     { restoreFloatingWindowsHiddenBehindConnectMask(); }
 
+    /// Pruefzugang (2026-10-17): steht das Fenster im RAHMENLOSEN
+    /// Vollbild? Seit heute ist die Antwort beim Start `false` --
+    /// formatfuellend wird ueber showMaximized() erreicht, damit die
+    /// drei Knoepfe links oben bleiben. Siehe tst_fenster_hat_rahmen.
+    bool rahmenlosesVollbildFuerTest() const { return m_borderlessFullSize; }
+
     // ── Pruefzugaenge fuer den Seitenbereich (tst_side_area_integration) ──
     void setSideAreaEnabledForTest(bool on) { setSideAreaEnabled(on); }
     bool addToSideAreaForTest(const QString& id, bool activate)
@@ -347,6 +371,12 @@ public:
     /// Fuer tst_every_applet_is_reachable. Gebaut und nicht erreichbar
     /// ist so gut wie nicht gebaut, und genau das ist am 2026-08-23
     /// dreimal passiert.
+    /// Ob ein Panel laut Bedienerwunsch sichtbar ist. Gebraucht fuer
+    /// die Pruefung, dass das Hinzufuegen eines KiwiSDR sein Panel
+    /// aufmacht -- vorher war das Ergebnis des Hinzufuegens unsichtbar.
+    bool appletVisibleForTest(const QString& id) const;
+    void setAppletVisibleForTest(const QString& id, bool visible);
+
     bool appletIsRegisteredForTest(const class AppletWidget* a) const
     {
         for (auto it = m_appletsById.cbegin(); it != m_appletsById.cend(); ++it) {
@@ -394,6 +424,14 @@ public:
     /// Operator notice for a rejected notch add. Pure so the wording can be
     /// pinned without standing MainWindow up.
     static QString tnfAddRejectedNotice(const QString& reason);
+
+    /// Ist dieses Fenster OHNE die gespeicherte Anordnung hochgefahren,
+    /// weil zuvor zwei Starts hintereinander steckenblieben? Siehe
+    /// core/StartWatch.h.
+    bool startedSafely() const { return m_startedSafely; }
+    /// Wieviele Starts davor nicht durchkamen (0, wenn normal
+    /// hochgefahren).
+    int  failedStartCount() const { return m_failedStartCount; }
 
 public slots:
     // ── Phase 3M-0 Task 14 helper slots ──────────────────────────────────
@@ -775,6 +813,8 @@ private:
     // Start: das offene Logbuch vor Panadapter und Rotor/Log (2026-09-26).
     void raiseLogbookIfOpen();
     // Start mit offenem Logbuch: nach dem Verbinden-Fenster nach vorne.
+    bool m_startedSafely{false};
+    int  m_failedStartCount{0};
     bool m_raiseLogbookAfterConnectMask{false};
     void openRotorSetup();
     void openVoiceCheck();
@@ -1500,6 +1540,11 @@ private:
     // nicht mehr (Qt::WindowFullScreen wird nie gesetzt); dieses Flag
     // ist die neue Quelle der Wahrheit fuers Sichern/Wiederherstellen.
     bool m_borderlessFullSize{false};
+    /// Erst wenn der Aufbau durch ist, zaehlt eine Fensterbewegung als
+    /// ZIEHEN. Davor platziert das Programm selbst: Profilgeometrien,
+    /// showMaximized(), der Wechsel des Rahmens. Ohne dieses Flag stand
+    /// der Schutzrahmen-Hinweis schon beim Start da (2026-10-17).
+    bool m_fensterAufbauFertig{false};
 
     // View > Vollbild (2026-09-08, Betreiber: "es sollte auch im
     // gernellen fenster die möglichkeit geben, immer auf full screen
@@ -1509,6 +1554,20 @@ private:
     // beiden Methoden nachgezogen, damit ein Profilwechsel den Haken
     // nicht aus dem Takt bringt.
     QAction* m_fullScreenAction{nullptr};
+
+    /// Der EINE Schalter fuer den schwebenden Panadapter (2026-10-15,
+    /// Betreiber: „das sollte nur eine option sein, die man ein und
+    /// ausblenden kann"). Ankreuzbar und beidseitig: an loest ab, aus
+    /// dockt an. Vorher war es „Float active pan…" -- eine Handlung in
+    /// EINE Richtung, ohne Haken, also ohne Weg zurueck und ohne
+    /// Auskunft darueber, ob gerade etwas schwebt.
+    QAction* m_floatPanAction{nullptr};
+
+    /// Je Scheibe eine Flagge auf dem Panadapter, nach Scheibenkennung.
+    /// Leer, solange der Schalter aus ist.
+    QHash<int, class SliceFlag*> m_sliceFlags;
+    bool     m_sliceFlagsOn{false};
+    QAction* m_sliceFlagAction{nullptr};
 
     // Container infrastructure (Phase 3G-1)
     ContainerManager* m_containerManager{nullptr};
@@ -1566,7 +1625,6 @@ private:
     QActionGroup* m_agcGroup = nullptr;
 
     // Dark theme checkable action (Task 12)
-    QAction* m_darkThemeAction = nullptr;
 
     // Radio menu state-aware actions (3Q-9; trimmed in 3Q polish — Discover Now
     // dropped because Manage Radios already exposes a ↻ Scan button).
@@ -1678,13 +1736,15 @@ private:
     class RadeApplet* m_radeApplet{nullptr};
     class RttyDecoderApplet* m_rttyDecoderApplet{nullptr};
     class CwDecoderApplet*   m_cwDecoderApplet{nullptr};
+    class Ft8Applet*         m_ft8Applet{nullptr};
     // Torn down and rebuilt on every rebindRttyRadeAvailability() call --
     // same QMetaObject::Connection-list idiom CommandBar::attach() uses,
     // so the dspModeChanged listener below never accumulates one dangling
     // connection per past slice.
     QList<QMetaObject::Connection> m_rttyRadeLinks;
     /// Der CAT-Server (2026-10-11). Vier Kanaele, nur auf 127.0.0.1.
-    class CatServer* m_catServer{nullptr};
+    class CatServer*    m_catServer{nullptr};
+    class CatPtyServer* m_catPtyServer{nullptr};
     class EqApplet* m_eqApplet{nullptr};
     class VaxApplet* m_vaxApplet{nullptr};
 
@@ -1816,6 +1876,9 @@ private:
 
     // Phase 3P-III Task 14: RF-Kit RF2K-S applet.
     class Rf2ksApplet*      m_rfKitApplet{nullptr};
+    class SpeApplet*        m_speApplet{nullptr};
+    class Kpa500Applet*    m_kpa500Applet{nullptr};
+    class AcomApplet*      m_acomApplet{nullptr};
 
     // Phase 23: TCI server + applets.
     // m_tciServer is nullptr in non-WebSocket builds (HAVE_WEBSOCKETS not defined).
@@ -1865,6 +1928,29 @@ private:
     StatusToast* showToast(const QString& message,
                            ToastSeverity severity,
                            int timeoutMs);
+
+    /// Die gemerkte Palette gilt erst beim naechsten Start -- fragen,
+    /// ob jetzt neu gestartet werden soll. Unter
+    /// QStandardPaths::isTestModeEnabled() kehrt die Methode sofort
+    /// zurueck: ein Pruefstand darf an keinem modalen Fenster haengen
+    /// bleiben (dieselbe Regel wie showAudioDiagnoseDialog()).
+    /// Den Haken des Panadapter-Schalters auf den wirklichen Zustand
+    /// setzen, ohne dabei sein eigenes toggled() auszuloesen.
+    void syncFloatPanAction();
+
+    /// Flaggen anlegen, abraeumen und an ihre Traeger legen. Drei
+    /// Schritte, drei Stellen — rebuildSliceFlags() beim Kommen und
+    /// Gehen einer Scheibe, refreshSliceFlags() bei Frequenz, Mode und
+    /// Groessenaenderung.
+    void rebuildSliceFlags();
+    void refreshSliceFlags();
+
+    void offerPaletteRestart(const QString& paletteName);
+
+    /// Beendet dieses Programm und laesst es wieder oeffnen. Nutzt den
+    /// abgekoppelten Helfer der Aktualisierung, damit derselbe Weg
+    /// (und dieselben Argumente, „--profile" eingeschlossen) gilt.
+    void restartNow();
 
     /// The suspended-streams notice, kept so it can be taken down the
     /// moment the streams come back instead of aging out.

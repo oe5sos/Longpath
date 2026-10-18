@@ -44,6 +44,7 @@
 #include "core/SunSdrRadioConnection.h"
 #include "core/sunsdr/SunSdrProtocol.h"
 
+#include <cmath>
 #include <QHostAddress>
 #include <QSignalSpy>
 
@@ -111,6 +112,53 @@ private slots:
         QSignalSpy iq(&conn, &RadioConnection::iqDataReceived);
         QSignalSpy verloren(&conn, &RadioConnection::iqPacketLoss);
         QSignalSpy failed(&conn, &RadioConnection::connectFailed);
+
+        // ── Pegelmesser ──────────────────────────────────────────────
+        //
+        // Mit Antenne ist der Rauschflur selbst ein Messwert: er MUSS den
+        // Vorverstaerkerstufen und der Daempfung folgen. Ohne Antenne tut
+        // er das nicht (2026-10-03 gemessen: 2e-05, also praktisch das
+        // Eigenrauschen des Wandlers) -- deshalb war bis heute unbelegt,
+        // ob setPreampModeIndex() und setAttenuator() am Geraet ueberhaupt
+        // etwas bewirken. Gemessen wird VOR dem Pegelabgleich des Profils
+        // (rxLevelGainForTest(), im Betrieb 40 dB), sonst misst man die
+        // eigene Verstaerkung statt der Antenne.
+        struct Pegel { double sumsq = 0.0; double spitze = 0.0; quint64 n = 0; };
+        Pegel pegel;
+        QObject::connect(&conn, &RadioConnection::iqDataReceived, &conn,
+                         [&pegel](int, const QVector<float>& s) {
+            for (const float v : s) {
+                const double a = std::fabs(double(v));
+                pegel.sumsq += double(v) * double(v);
+                if (a > pegel.spitze) { pegel.spitze = a; }
+            }
+            pegel.n += quint64(s.size());
+        });
+        const auto pegelZeile = [&](const QString& was) {
+            const double gain = conn.rxLevelGainForTest() > 0.0f
+                                    ? double(conn.rxLevelGainForTest()) : 1.0;
+            if (pegel.n == 0) {
+                qInfo().noquote()
+                    << QStringLiteral("  %1 keine Proben").arg(was, -30);
+                return;
+            }
+            const double rms  = std::sqrt(pegel.sumsq / double(pegel.n)) / gain;
+            const double peak = pegel.spitze / gain;
+            qInfo().noquote() << QStringLiteral(
+                "  %1 Rauschflur %2 dBFS, Spitze %3 dBFS (%4 Proben)")
+                .arg(was, -30)
+                .arg(20.0 * std::log10(std::max(rms,  1e-12)), 7, 'f', 1)
+                .arg(20.0 * std::log10(std::max(peak, 1e-12)), 7, 'f', 1)
+                .arg(pegel.n);
+            pegel = Pegel{};
+        };
+        // Einschwingen lassen, dann ein frisches Fenster messen.
+        const auto pegelNach = [&](const QString& was) {
+            QTest::qWait(300);
+            pegel = Pegel{};
+            QTest::qWait(700);
+            pegelZeile(was);
+        };
 
         QElapsedTimer uhr;
         uhr.start();
@@ -214,14 +262,21 @@ private slots:
             };
 
             abfragen();
+            pegelNach(QStringLiteral("vor dem Durchschalten:"));
+            const QStringList stufenNamen{
+                QStringLiteral("Vorverstaerker -20 dB:"),
+                QStringLiteral("Vorverstaerker -10 dB:"),
+                QStringLiteral("Vorverstaerker   0 dB:"),
+                QStringLiteral("Vorverstaerker +10 dB:")};
+            int si = 0;
             for (const int stufe : {0, 2, 1, 7}) {   // -20, -10, 0, +10 dB
                 conn.setPreampModeIndex(stufe);
-                QTest::qWait(300);
+                pegelNach(stufenNamen.at(si++));
                 abfragen();
             }
             for (const int dB : {0, -20}) {
                 conn.setAttenuator(dB);
-                QTest::qWait(300);
+                pegelNach(QStringLiteral("Daempfung %1 dB:").arg(dB));
                 abfragen();
             }
             conn.setActiveReceiverCount(2);
@@ -282,6 +337,7 @@ private slots:
         }
 
         const int bloeckeVorher = iq.count();
+        pegel = Pegel{};              // das Messfenster bekommt eigene Zahlen
         QElapsedTimer fenster;
         fenster.start();
         while (fenster.elapsed() < sekunden * 1000) {
@@ -335,6 +391,7 @@ private slots:
             .arg(double(conn.blockRepliesSentForTest()) / secs, 0, 'f', 0)
             .arg(conn.bareBlockRepliesSentForTest())
             .arg(conn.lastBlockReplyBytesForTest());
+        pegelZeile(QStringLiteral("Messfenster:"));
         qInfo().noquote() << QStringLiteral(
             "Uebersteuerung: %1 Proben am Anschlag, %2 Meldungen")
             .arg(conn.anschlagProbenForTest())

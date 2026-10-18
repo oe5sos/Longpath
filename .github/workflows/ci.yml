@@ -572,11 +572,51 @@ jobs:
         # tell tests/CMakeLists.txt's longpath_add_test() to register
         # only the slice of tests whose name-MD5 modulo SHARDS matches
         # SHARD.  See tests/CMakeLists.txt for the dispatch rules.
+        #
+        # 2026-10-10 (-gsplit-dwarf): the Linux shard 2/4 died twice in a
+        # row with the runner itself unable to write its own diagnostic
+        # log -- "No space left on device" -- which is why those two jobs
+        # have no log at all.  Same failure as run #25835957362 noted in
+        # the disk-cleanup step above, and the cheap lever there (docker
+        # image prune) was already pulled, so this one goes at the cause.
+        #
+        # The cause is duplication, not volume.  Every test executable
+        # statically links LongpathObjs, and with plain RelWithDebInfo
+        # each of the ~113 executables in a shard carries its OWN copy of
+        # the same DWARF.  -gsplit-dwarf leaves that DWARF in .dwo files
+        # beside the object files -- written ONCE -- and puts only a
+        # skeleton in the executables.  Nothing is lost on the runner:
+        # gdb (the hang-diagnostics step below) resolves .dwo through the
+        # skeleton as long as the build tree is present, which it is.
+        # This is also why macOS never hit the wall -- it keeps debug
+        # info in the object files by default and its binaries are ~30 MB.
         run: |
+          # ── Debug-Info auf -g1 (2026-10-16, Abend) ──────────────
+          #
+          # RelWithDebInfo bedeutet -g2: volle Debug-Information in
+          # jeder der rund 250 Testbinaerdateien. Genau die muss der
+          # Linker im Speicher halten, und daran ist der Runner-Agent
+          # dreimal gestorben (siehe „Build test executables" unten).
+          # Erst -j2, dann -j1 — beide haben nicht gereicht, also ist
+          # es nicht die Parallelitaet, sondern ein EINZELNER
+          # Linkvorgang.
+          #
+          # -g1 behaelt, was die Fehlersuche hier wirklich braucht:
+          # Funktionsnamen und Zeilennummern, also brauchbare
+          # Stack-Traces fuer gdb und die hang-diagnostics. Weg faellt,
+          # was im Speicher am meisten wiegt und was hier noch nie
+          # jemand gebraucht hat: Typen und lokale Variablen.
+          #
+          # Nur der Linux-CI-Bau ist betroffen. Was ausgeliefert wird,
+          # baut „Ship build" getrennt.
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -g1 -DNDEBUG" \
+            -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -g1 -DNDEBUG" \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_C_FLAGS_INIT=-gsplit-dwarf \
+            -DCMAKE_CXX_FLAGS_INIT=-gsplit-dwarf \
             -DCMAKE_EXE_LINKER_FLAGS_INIT=-fuse-ld=mold \
             -DCMAKE_SHARED_LINKER_FLAGS_INIT=-fuse-ld=mold \
             -DCMAKE_MODULE_LINKER_FLAGS_INIT=-fuse-ld=mold \
@@ -652,7 +692,92 @@ jobs:
       # fail with "No rule to make target".
       - name: Build test executables (Linux)
         if: runner.os == 'Linux'
-        run: cmake --build build -j$(nproc) --target all_tests
+        # ── Beim LINKEN sparsamer sein (2026-10-16) ─────────────────
+        #
+        # Linux-Shard 2/4 faellt seit dem 2026-10-15 in jedem Lauf um
+        # (#238, #239, #244, #245), und immer derselbe. Was gemessen
+        # ist:
+        #
+        #   * Der Abbruch passiert in GENAU diesem Schritt: „Build
+        #     (Linux/macOS)" ist success, dieser und alle folgenden
+        #     haben gar kein Ergebnis.
+        #   * Es gibt KEIN Log („BlobNotFound" ueber die API) — der
+        #     Runner-Agent selbst stirbt, er meldet keinen Fehler.
+        #   * Platte ist es nicht: im gruenen Shard gemessen, 107 GB
+        #     frei nach dem Freiraeumen.
+        #   * Shard 2/4 ist der GROESSTE: 262 Testbinaerdateien gegen
+        #     243 / 224 / 231 in den anderen (Namens-MD5 modulo 4,
+        #     nachgerechnet).
+        #
+        # Das Muster passt auf einen OOM-Kill beim Linken: vier
+        # gleichzeitige Linker auf einem 16-GB-Laeufer, und der
+        # groesste Stapel kippt zuerst. Bewiesen ist es nicht — darum
+        # steht die Messung unten, die es beim naechsten Lauf zeigt.
+        #
+        # -j2 statt -j$(nproc) kostet Zeit und spart Speicher. Der
+        # Shard lag bei 25 Minuten, die anderen bei 29 — Luft ist da.
+        #
+        # ── Nachtrag 2026-10-16, Abend: -j2 hat NICHT gereicht ───────
+        #
+        # Im Lauf zu #260 fielen DREI Shards um (2/4, 3/4, 4/4) statt
+        # einem, mit genau demselben Muster: „Build (Linux/macOS)"
+        # gruen, dieser Schritt ohne Ergebnis, kein Log ueber die API
+        # („BlobNotFound"), und der Messschritt darunter laeuft trotz
+        # always() nicht mehr — der Agent stirbt, er meldet nichts.
+        #
+        # Dass es mit einem zusaetzlichen Testziel von einem auf drei
+        # Shards ging, passt zur These: es ist knapp, und jede weitere
+        # Binaerdatei kippt den naechsten Stapel.
+        #
+        # Was den Spitzenspeicher hier so hoch treibt, sind zwei Dinge
+        # zusammen: RelWithDebInfo gibt jeder der rund 250
+        # Testbinaerdateien volle Debug-Symbole, und mold mappt den
+        # ganzen Linkvorgang in den Speicher — es ist schnell, weil es
+        # sich nichts spart. Zwei davon gleichzeitig auf einem 16-GB-
+        # Laeufer sind zu viel.
+        #
+        # -j1 ist die konservative Fortsetzung dessen, was oben schon
+        # steht: keine neue Variable, nur noch ein Linker statt zwei.
+        # Kostet Zeit (der Shard lag bei 29 min, Luft ist bis 6 h),
+        # aendert aber nichts am Erzeugnis — anders als an den
+        # Debug-Symbolen oder am Linker zu drehen, was auch die
+        # Fehlersuche (gdb, hang-diagnostics) treffen wuerde.
+        run: cmake --build build -j1 --target all_tests
+
+      - name: Speicher und Platte nach dem Testbau (Linux)
+        if: runner.os == 'Linux' && always()
+        # Die Messung zur These oben. Beim naechsten roten Lauf steht
+        # hier, wie nah es war — und wenn der Shard gruen bleibt,
+        # steht hier, wieviel Luft -j1 gebracht hat.
+        #
+        # ACHTUNG, Grenze dieser Messung: stirbt der Agent, laeuft
+        # auch dieser Schritt nicht, always() hin oder her. Sie sagt
+        # also nur etwas ueber Shards, die DURCHKOMMEN — wie nah die
+        # an der Kante waren. Vom roten Shard gibt es nichts.
+        run: |
+          free -m || true
+          df -h / || true
+          echo "--- groesste Testbinaerdateien ---"
+          ls -S build/tests/tst_* 2>/dev/null | head -5 | xargs -r du -h 2>/dev/null || true
+          echo "--- Zahl der Testbinaerdateien in diesem Shard ---"
+          ls build/tests/tst_* 2>/dev/null | wc -l || true
+          # ── Vorwarnung statt Nachruf (vom Zweig, 2026-10-10) ───────
+          # Faellt der Rest unter 15 G, soll das AUFFALLEN, solange der
+          # Lauf noch gruen ist -- und nicht erst, wenn der Laeufer sein
+          # eigenes Protokoll nicht mehr schreiben kann.
+          # Vorsichtig gelesen: liefert df nichts, darf die Rechnung den
+          # Schritt NICHT umbringen -- $(( / 1024 )) mit leerer Zahl ist
+          # ein Syntaxfehler, und der Schritt laeuft unter `bash -e`.
+          # Keine Zahl heisst "keine Aussage", nicht "kein Platz".
+          FREI_KB=$(df -k --output=avail / 2>/dev/null | tail -1 | tr -dc '0-9')
+          FREI_GB=$(( ${FREI_KB:-0} / 1024 / 1024 ))
+          if [ -z "$FREI_KB" ]; then FREI_GB=99; echo "df lieferte nichts -- keine Aussage"; fi
+          echo "Rest: ${FREI_GB} G"
+          if [ "$FREI_GB" -lt 15 ]; then
+            echo "::warning title=Platte wird knapp::Nach dem Bau der" \
+                 "Pruefprogramme sind nur noch ${FREI_GB} G frei" \
+                 "(Warnschwelle 15 G)."
+          fi
 
       - name: Build test executables (macOS)
         if: runner.os == 'macOS'

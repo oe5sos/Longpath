@@ -51,7 +51,7 @@ private slots:
 
         const QString txt = allText(&applet);
         qInfo().noquote() << "Leer:" << txt;
-        QVERIFY2(txt.contains(QStringLiteral("Keine KiwiSDR")),
+        QVERIFY2(txt.contains(KiwiSdrApplet::tr("No KiwiSDR receive antenna configured")),
                  qPrintable(txt));
 
         auto* list = applet.findChild<QListWidget*>();
@@ -94,7 +94,7 @@ private slots:
         QVERIFY2(txt.contains(QStringLiteral("kiwi.example.at:8073")),
                  qPrintable(txt));
         // Ohne Scheibe muss das auch DASTEHEN, nicht bloss fehlen.
-        QVERIFY2(txt.contains(QStringLiteral("Nicht zugeordnet")),
+        QVERIFY2(txt.contains(KiwiSdrApplet::tr("Not assigned")),
                  qPrintable(txt));
     }
 
@@ -131,7 +131,7 @@ private slots:
         lok.setNumberOptions(QLocale::OmitGroupSeparator);
         const QString erwartet = lok.toString(7.1, 'f', 6);
         QVERIFY2(txt.contains(erwartet), qPrintable(txt + " | erwartet: " + erwartet));
-        QVERIFY2(!txt.contains(QStringLiteral("Nicht zugeordnet")),
+        QVERIFY2(!txt.contains(KiwiSdrApplet::tr("Not assigned")),
                  qPrintable(txt));
 
         // ── Der eigentliche Punkt ───────────────────────────────────

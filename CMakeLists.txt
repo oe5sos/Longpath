@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Longpath VERSION 0.6.8 LANGUAGES C CXX)
+project(Longpath VERSION 0.7.0 LANGUAGES C CXX)
 
 # ── ccache compiler launcher (2026-07-25) ──────────────────────────────
 # CI has always configured ccache explicitly; local dev machines never
@@ -145,6 +145,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Multimedia
     Svg
     WebSockets
+    LinguistTools
 )
 
 # WebSockets is REQUIRED (not optional) because both the TCI server and the
@@ -155,6 +156,15 @@ find_package(Qt6 REQUIRED COMPONENTS
 # only a warning in the log. Mirroring the v0.1.1 LONGPATH_GPU_SPECTRUM lesson
 # (see release.yml Configure step): if a feature is mandatory, the build
 # system has to refuse to configure without it.
+#
+# LinguistTools (2026-10-14) steht aus demselben Grund in derselben Liste.
+# Betreiber: "englisch durchgehend, aber deutsch als option". Eine Sprache,
+# die man waehlen kann, ist eine Zusage an den Bediener -- kein Extra, das
+# bei einem Laeufer ohne qttools stillschweigend wegfallen darf. Wer das
+# QUIET macht, baut genau die Fassung, die im Menue eine Sprache anbietet
+# und dann englisch bleibt. An den Pipelines war dafuer nichts zu tun:
+# ab Qt 6.8 steckt qttools in qtbase und ist nicht einmal als -m Modul
+# auflistbar (so steht es in release.yml an der aqt-Zeile).
 
 # Optional Qt components
 find_package(Qt6 QUIET COMPONENTS SerialPort)
@@ -518,6 +528,7 @@ set(CORE_SOURCES
     src/gui/FensterKnoepfe.cpp
     src/core/Sprache.cpp
     src/core/SpracheTabelle.cpp
+    src/core/CrashReportDigest.cpp
     src/core/LogDatei.cpp
     src/core/audio/BusMitFrist.cpp
     src/core/audio/AudioRateMatcher.cpp
@@ -527,11 +538,28 @@ set(CORE_SOURCES
     src/core/SpotAuswahl.cpp
     src/core/SettingsBackup.cpp
     src/core/RxProfileManager.cpp
+    src/core/CtcssDetector.cpp
+    src/core/DcsCode.cpp
+    src/core/DcsDetector.cpp
+    src/core/UiScale.cpp
+    src/core/StartWatch.cpp
+    src/core/SpeProtocol.cpp
+    src/core/SpeConnection.cpp
+    src/core/Kpa500Protocol.cpp
+    src/core/Kpa500Connection.cpp
+    src/core/AcomProtocol.cpp
+    src/core/AcomConnection.cpp
     src/core/CwDecoder.cpp
+    src/core/Ft8Decoder.cpp
+    src/core/Ft8Ablauf.cpp
+    src/core/Ft8Stream.cpp
+    src/core/Ft8Tx.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CatProtocol.cpp
     src/core/ThetisProfilImport.cpp
+    src/core/CatPuffer.cpp
+    src/core/CatPtyServer.cpp
     src/core/CatServer.cpp
     src/core/CallsignCache.cpp
     src/core/CouplerZero.cpp
@@ -548,6 +576,7 @@ set(CORE_SOURCES
     src/core/LogCategories.cpp
     src/core/DevAutomationServer.cpp
     src/core/RttyDecoder.cpp
+    src/core/RttyTx.cpp
     src/core/SupportBundle.cpp
     src/core/RadioDiscovery.cpp
     src/core/RadioConnection.cpp
@@ -873,6 +902,7 @@ set(GUI_SOURCES
     src/gui/widgets/TriBtn.cpp
     src/gui/widgets/VaxChannelSelector.cpp
     src/gui/widgets/MasterOutputWidget.cpp
+    src/gui/widgets/Ft8Wasserfall.cpp
     src/gui/widgets/VfoModeContainers.cpp
     src/gui/widgets/VfoModeContainers.h
     src/gui/widgets/SliceColors.h
@@ -926,6 +956,7 @@ set(GUI_SOURCES
     src/gui/KiwiWaterfallPanel.cpp
     src/gui/applets/AsrApplet.cpp
     src/gui/widgets/VfoTileRow.cpp
+    src/gui/widgets/SliceFlag.cpp
     src/asr/AsrSegmenter.cpp
     src/asr/AsrService.cpp
     src/asr/RemoteAsrBackend.cpp
@@ -1065,6 +1096,9 @@ set(GUI_SOURCES
     src/gui/setup/PgxlInterlockPage.cpp
     src/gui/setup/FourO3APage.cpp
     src/gui/setup/RfKitPage.cpp
+    src/gui/setup/SpePage.cpp
+    src/gui/setup/Kpa500Page.cpp
+    src/gui/setup/AcomPage.cpp
     src/gui/setup/TciLogWindow.cpp
     src/gui/setup/KeyboardSetupPages.cpp
     src/gui/setup/DiagnosticsSetupPages.cpp
@@ -1200,12 +1234,16 @@ set(GUI_SOURCES
     src/gui/applets/DvkApplet.cpp
     src/gui/applets/RttyDecoderApplet.cpp
     src/gui/applets/CwDecoderApplet.cpp
+    src/gui/applets/Ft8Applet.cpp
     src/gui/applets/QsoRecorderApplet.cpp
     src/gui/applets/BandwidthFilterApplet.cpp
     src/gui/applets/CatApplet.cpp
     src/gui/applets/TunerApplet.cpp
     src/gui/applets/AmpApplet.cpp
     src/gui/applets/Rf2ksApplet.cpp
+    src/gui/applets/SpeApplet.cpp
+    src/gui/applets/Kpa500Applet.cpp
+    src/gui/applets/AcomApplet.cpp
     src/gui/applets/TciApplet.cpp
     src/gui/applets/ClientChainApplet.cpp
 )
@@ -1329,15 +1367,21 @@ endif()
 # gleichnamige mitgelieferte ueberschreiben duerfen (siehe
 # Theme::available()).
 add_custom_command(TARGET Longpath POST_BUILD
+    # Erst leeren, dann fuellen (2026-10-14). copy_if_different raeumt
+    # NICHT auf: eine Palette, die aus dem Quellbaum verschwindet,
+    # bleibt im Paket liegen und steht weiter zur Auswahl. Genau das
+    # passiert gerade mit kreide.json, die dieser Commit entfernt --
+    # ohne diese Zeile haette der Betreiber sie nach dem naechsten Bau
+    # immer noch im Menue.
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${_longpath_theme_dest}"
     COMMAND ${CMAKE_COMMAND} -E make_directory
             "${_longpath_theme_dest}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_SOURCE_DIR}/resources/themes/kreide.json"
             "${CMAKE_SOURCE_DIR}/resources/themes/flach.json"
             "${CMAKE_SOURCE_DIR}/resources/themes/tief.json"
             "${CMAKE_SOURCE_DIR}/resources/themes/moos.json"
             "${_longpath_theme_dest}/"
-    COMMENT "Farbpaletten mitliefern")
+    COMMENT "Paletten mitliefern")
 if(LONGPATH_LTO_AVAILABLE)
     # Main app + its OBJECT-lib link both get LTO when enabled.  The
     # IPO property on the executable arranges -flto on the link line;
@@ -1352,6 +1396,24 @@ if(LONGPATH_LTO_AVAILABLE)
 else()
     target_link_libraries(Longpath PRIVATE LongpathObjs)
 endif()
+
+# ── Sprachen (2026-10-14) ────────────────────────────────────────────
+#
+# Betreiber: "englisch durchgehend, aber deutsch als option". Englisch
+# ist die Quellsprache -- im Quelltext steht englischer Text, die
+# Uebersetzung liegt daneben. qt_add_translations baut die .qm aus der
+# .ts und legt sie unter :/i18n/ in die Binaerdatei, es gibt also keine
+# Datei, die beim Ausliefern vergessen werden kann (genau das ist
+# v0.5.0 mit rade.dll passiert).
+#
+# Gepflegt wird die .ts mit `cmake --build build --target update_translations`
+# (ruft lupdate ueber alle Quellen) und danach dem Qt Linguist. Der
+# Bau selbst ruft nur lrelease -- ein Lauf ohne lupdate bleibt
+# reproduzierbar.
+qt_add_translations(Longpath
+    TS_FILES translations/longpath_de.ts
+    RESOURCE_PREFIX "/i18n"
+)
 
 # LSMinimumSystemVersion im Info.plist (2026-09-29). Ohne den Schluessel
 # startete ein zu altes macOS die App und dyld brach dann beim Laden der
@@ -1681,6 +1743,59 @@ target_link_libraries(LongpathObjs PUBLIC sgp4)
 # --------------------------------------------------------------------------
 add_subdirectory(third_party/ggmorse)
 target_link_libraries(LongpathObjs PUBLIC ggmorse)
+
+# ── ft8_lib (FT8/FT4, MIT) ──────────────────────────────────────────
+#
+# Der Kern von Kārlis Gobas ft8_lib, Byte fuer Byte uebernommen; siehe
+# third_party/ft8_lib/FT8LIB-PROVENANCE.md fuer Herkunft, Umfang und
+# die Begruendung. Eigene statische Bibliothek, damit Longpaths
+# Warnungseinstellungen nicht auf fremden Quelltext losgehen.
+add_library(ft8_static STATIC
+    third_party/ft8_lib/ft8/constants.c
+    third_party/ft8_lib/ft8/crc.c
+    third_party/ft8_lib/ft8/decode.c
+    third_party/ft8_lib/ft8/encode.c
+    third_party/ft8_lib/ft8/ldpc.c
+    third_party/ft8_lib/ft8/message.c
+    third_party/ft8_lib/ft8/text.c
+    third_party/ft8_lib/common/monitor.c
+    third_party/ft8_lib/common/gfsk.c
+    third_party/ft8_lib/fft/kiss_fft.c
+    third_party/ft8_lib/fft/kiss_fftr.c)
+target_include_directories(ft8_static PUBLIC third_party/ft8_lib)
+set_target_properties(ft8_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# Fremder Quelltext: keine Warnungen, keine Warnungen-als-Fehler.
+if(NOT MSVC)
+    target_compile_options(ft8_static PRIVATE -w)
+else()
+    target_compile_options(ft8_static PRIVATE /w)
+endif()
+
+# Und keine drei Zeilen nach stderr bei JEDEM Fenster.
+#
+# common/monitor.c:4 setzt `#define LOG_LEVEL LOG_INFO` fest und
+# schreibt beim Aufbau des Wasserfalls „Block size = …", „Subblock
+# size = …", „N_FFT = …". Ft8Stream baut den Wasserfall einmal je
+# Fenster — alle 15 s drei Zeilen, rund 720 in der Stunde, in
+# derselben Datei, in der Fehler stehen sollen.
+#
+# Die Quelle bleibt byte-gleich (FT8LIB-PROVENANCE.md): ft8/debug.h
+# definiert LOG_PRINTF nur, WENN es noch nicht definiert ist. Hier
+# wird es leer definiert, die Zeilen entfallen beim Uebersetzen.
+#
+# Als OPTION, nicht als DEFINITION: CMake laesst Makros mit Argumenten
+# durch target_compile_definitions() nicht durch („CMake is dropping a
+# preprocessor definition: LOG_PRINTF(...)=", gesehen 2026-10-15) und
+# haette die Zeile stillschweigend verschluckt. Als Uebersetzungsoption
+# geht sie woertlich an den Uebersetzer.
+#
+# MSVC kennt keine Makros mit Argumenten auf der Befehlszeile; dort
+# bleiben die Zeilen stehen.
+if(NOT MSVC)
+    target_compile_options(ft8_static PRIVATE "-DLOG_PRINTF(...)=")
+endif()
+
+target_link_libraries(LongpathObjs PUBLIC ft8_static)
 
 # --------------------------------------------------------------------------
 # DeepFilterNet3 DFNR — pre-built neural noise reduction library (MIT/Apache-2.0)

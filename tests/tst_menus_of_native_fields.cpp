@@ -38,20 +38,17 @@
 #include "gui/widgets/ProfileRail.h"
 #include "gui/widgets/RotorLogbookPanel.h"
 
+#include "MenueFaenger.h"
+#include "FensterFrist.h"
+
 using namespace Longpath;
 
 namespace {
 
-// Schliesst das Menue, sobald es offen ist, und merkt sich sein Elternteil.
-void closeMenuSoon(QWidget** parentSeen)
-{
-    QTimer::singleShot(150, qApp, [parentSeen]() {
-        if (auto* m = qobject_cast<QMenu*>(QApplication::activePopupWidget())) {
-            *parentSeen = m->parentWidget();
-            m->close();
-        }
-    });
-}
+// Frueher stand hier ein eigener QTimer auf activePopupWidget(). Der
+// las unter Last den Stand von vorher („Compared QObject pointers are
+// not the same", nur im -j6-Lauf). Die Technik liegt jetzt einmal in
+// tests/MenueFaenger.h — siehe dort, warum kein Taktgeber.
 
 QRegularExpression notTopLevel()
 {
@@ -87,7 +84,7 @@ private slots:
         rail->setAttribute(Qt::WA_NativeWindow);   // wie neben dem Panadapter
         rail->setGeometry(0, 0, 60, 300);
         top.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&top));
+        QVERIFY(QTest::qWaitForWindowExposed(&top, kFensterFrist));
         QVERIFY(rail->windowHandle());
 
         QPushButton* badge = nullptr;
@@ -96,10 +93,11 @@ private slots:
         }
         QVERIFY(badge);
 
-        QWidget* parentSeen = nullptr;
-        closeMenuSoon(&parentSeen);
-        emit badge->customContextMenuRequested(QPoint(5, 5));
-        QCOMPARE(parentSeen, rail->window());
+        const auto fund = Test::oeffneMenue([&]() {
+            emit badge->customContextMenuRequested(QPoint(5, 5));
+        });
+        QVERIFY2(fund.seen, "kein Menue erschienen");
+        QCOMPARE(fund.parent, rail->window());
     }
 
     void theLogbookPanelMenuHangsOnTheWindow()
@@ -111,15 +109,16 @@ private slots:
         panel->setAttribute(Qt::WA_NativeWindow);
         panel->setGeometry(0, 0, 500, 600);
         top.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&top));
+        QVERIFY(QTest::qWaitForWindowExposed(&top, kFensterFrist));
         QVERIFY(panel->windowHandle());
 
-        QWidget* parentSeen = nullptr;
-        closeMenuSoon(&parentSeen);
-        QContextMenuEvent ev(QContextMenuEvent::Mouse, QPoint(40, 40),
-                             panel->mapToGlobal(QPoint(40, 40)));
-        QApplication::sendEvent(panel, &ev);
-        QCOMPARE(parentSeen, panel->window());
+        const auto fund = Test::oeffneMenue([&]() {
+            QContextMenuEvent ev(QContextMenuEvent::Mouse, QPoint(40, 40),
+                                 panel->mapToGlobal(QPoint(40, 40)));
+            QApplication::sendEvent(panel, &ev);
+        });
+        QVERIFY2(fund.seen, "kein Menue erschienen");
+        QCOMPARE(fund.parent, panel->window());
     }
 };
 

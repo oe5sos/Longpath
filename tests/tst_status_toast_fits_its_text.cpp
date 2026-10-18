@@ -28,6 +28,7 @@
 #include <QLabel>
 
 #include "gui/widgets/StatusToast.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -51,7 +52,7 @@ void assertFits(const QString& message, const char* what)
     auto* toast = new StatusToast(message, ToastSeverity::Warning,
                                   60'000, nullptr);
     toast->show();
-    QVERIFY(QTest::qWaitForWindowExposed(toast));
+    QVERIFY(QTest::qWaitForWindowExposed(toast, kFensterFrist));
 
     auto* label = toast->findChild<QLabel*>();
     QVERIFY2(label, "der Kasten traegt keine Beschriftung");

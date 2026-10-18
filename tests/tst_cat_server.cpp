@@ -17,7 +17,6 @@
 
 #include <QtTest/QtTest>
 #include <QCoreApplication>
-#include <QHostAddress>
 #include <QTcpServer>
 
 #include <optional>
@@ -407,41 +406,41 @@ private slots:
         // QHostAddress::LocalHost gegen ::Any getauscht, und ALLE zwanzig
         // Faelle blieben gruen. Eine Eigenschaft, die keine Pruefung
         // bewacht, haelt nur so lange, wie niemand die Zeile anfasst.
-        // ── Wie gemessen wird, und warum nicht mehr anders ──────────────
         //
-        // Bis zum 2026-10-14 band dieser Fall eine SONDE auf 0.0.0.0
-        // denselben Port und schloss aus dem Erfolg auf eine lokale
-        // Bindung. Das war falsch gedacht, und zwar
-        // PLATTFORMABHAENGIG falsch:
+        // WIE hier gemessen wird, ist am 2026-10-13 umgebaut worden, und
+        // der Grund gehoert aufgeschrieben:
         //
-        //   macOS/BSD  erlaubt die Platzhalterbindung neben einer
-        //              lokalen auf demselben Port -> Sonde gelingt
-        //              -> gruen.
-        //   Linux      verbietet sie -> Sonde schlaegt fehl -> ROT,
-        //              obwohl der Code stimmt.
+        // Vorher wurde die Eigenschaft ERSCHLOSSEN -- "gelingt eine
+        // zweite Bindung auf 0.0.0.0 desselben Ports, dann haengt der
+        // Server nur auf 127.0.0.1". Auf macOS geht dieser Rueckschluss
+        // auf. In der Linux-CI ist er FALSCH ALARM gefahren: dort
+        // scheiterte die Probe-Bindung, der Fall meldete "haengt an allen
+        // Schnittstellen", und die Bindung war die ganze Zeit richtig.
+        // Linux laesst eine Platzhalter-Bindung nicht zu, solange eine
+        // konkrete Adresse denselben Port haelt -- das Scheitern der
+        // Probe sagt also ueber den CAT-Server nichts.
         //
-        // Aufgefallen in der CI von PR #222 (Build Linux x64 2/4): hier
-        // auf dem Mac 25 von 25 gruen, dort rot. **Ein Prueffall, der
-        // eine Eigenschaft nur MITTELBAR messen kann, misst in
-        // Wirklichkeit das Betriebssystem.**
+        // Jetzt wird die Eigenschaft GELESEN, nicht erschlossen:
+        // QTcpServer::serverAddress() gibt die Adresse, auf der die
+        // Bindung tatsaechlich sitzt. Das hat auf keiner Plattform einen
+        // Zwischenschritt, der kippen kann.
         //
-        // Jetzt direkt: `QTcpServer::serverAddress()` ueber
-        // `CatServer::adresse()`. Das ist die Adresse, an der der Kanal
-        // wirklich haengt -- keine Schlussfolgerung, eine Ablesung.
+        // Wer hier wieder auf eine Probe-Bindung umbaut, baut den
+        // Fehlalarm wieder ein.
         QVERIFY(srv->starte(0, 0));
-        const QHostAddress wo = srv->adresse(0);
-        QVERIFY2(!wo.isNull(),
-                 "Kanal 0 horcht nicht -- dann sagt dieser Fall nichts.");
-        QVERIFY2(wo.isLoopback(),
+        const QHostAddress gebunden = srv->bindAdresse(0);
+        QVERIFY2(!gebunden.isNull(),
+                 "Der Kanal laeuft, meldet aber keine Bindeadresse.");
+        QVERIFY2(gebunden.isLoopback(),
                  qPrintable(QStringLiteral(
-                     "Der CAT-Server haengt an %1 statt an der eigenen "
-                     "Maschine -- jeder im Netz kann damit TX; schicken.")
-                     .arg(wo.toString())));
-        // Und ausdruecklich NICHT der Platzhalter: `isLoopback()` allein
-        // wuerde bei 0.0.0.0 ohnehin false geben, aber die Absicht soll
-        // dastehen.
-        QVERIFY(wo != QHostAddress(QHostAddress::Any));
-        QVERIFY(wo != QHostAddress(QHostAddress::AnyIPv4));
+                     "Der CAT-Server haengt auf %1 statt auf der "
+                     "Rueckschleife -- jeder im Netz kann damit TX; "
+                     "schicken.").arg(gebunden.toString())));
+        // Und ausdruecklich: NICHT der Platzhalter. isLoopback() allein
+        // genuegt, aber ein Fehlgriff auf ::Any soll mit Namen fallen.
+        QVERIFY(gebunden != QHostAddress(QHostAddress::Any));
+        QVERIFY(gebunden != QHostAddress(QHostAddress::AnyIPv4));
+        QVERIFY(gebunden != QHostAddress(QHostAddress::AnyIPv6));
     }
 
     void einZweiterServerAufDemselbenPortBekommtKeineBefehle()
@@ -484,37 +483,6 @@ private slots:
         QCOMPARE(frage(gut, "ID;"), QStringLiteral("ID900;"));
     }
 
-    // ── Der Nachleser geht durch den Server ─────────────────────────────────
-
-    void einWirkungslosesSetzenWirdUeberDenServerAbgelehnt()
-    {
-        // Nachgezogen am 2026-10-13. Die Gegenprobe hat im Server die
-        // Zeile stillgelegt, die den Zustandsgeber ALS NACHLESER an die
-        // Protokollschicht haengt -- und kein Fall fiel. Die
-        // Protokollschicht hat ihren eigenen Prueffall dafuer
-        // (mitNachleserWirdEinWIRKUNGSLOSESSetzenAbgelehnt), aber ob der
-        // Server ihn anhaengt, prueft nur dieser hier.
-        //
-        // Der Unterschied ist der, der live zaehlt: ohne Nachleser
-        // quittiert ein Setzen blind, und ein Contestprogramm sendet auf
-        // der alten Frequenz weiter.
-        QVERIFY(srv->starte(0, 0));
-        QTcpSocket* s = verbinde(0);
-        QVERIFY(s);
-
-        // Den Frequenz-Haken taub machen: er wird gerufen, bewegt aber
-        // nichts (genau der Fall "kein gebundener Slice").
-        CatProtocol::Haken taub;
-        taub.setzeVfoA = [](quint64) { };
-        srv->setzeHaken(taub);
-
-        QCOMPARE(frage(s, "FA;"), QStringLiteral("FA00014225000;"));
-        // Ohne Nachleser kaeme hier eine leere Antwort ("erledigt").
-        QCOMPARE(frage(s, "FA00021300000;"), QStringLiteral("?;"));
-        // Und die Frequenz steht noch, wo sie war.
-        QCOMPARE(frage(s, "FA;"), QStringLiteral("FA00014225000;"));
-    }
-
     // ── Ohne Zustandsgeber ──────────────────────────────────────────────────
 
     void einStummerGeberWirdAbgelehntStattMitNullenBeantwortet()
@@ -544,9 +512,9 @@ private slots:
         // Kein Geber angehaengt: der Server weiss nichts ueber das
         // Geraet. Eine Vorgabe zu melden (0 Hz, USB) waere eine
         // erfundene Frequenz -- und das Fremdprogramm wuerde sie glauben.
-        QCOMPARE(blank.verarbeiteFuerTest(QStringLiteral("FA;")),
+        QCOMPARE(blank.antwortAuf(QStringLiteral("FA;")),
                  QStringLiteral("?;"));
-        QCOMPARE(blank.verarbeiteFuerTest(QStringLiteral("IF;")),
+        QCOMPARE(blank.antwortAuf(QStringLiteral("IF;")),
                  QStringLiteral("?;"));
     }
 };

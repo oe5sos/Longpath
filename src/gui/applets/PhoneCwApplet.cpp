@@ -910,7 +910,7 @@ void PhoneCwApplet::setMicProfileManager(MicProfileManager* mgr)
     m_micProfileCombo->setEnabled(mgr != nullptr);
     if (!mgr) {
         m_micProfileCombo->setToolTip(
-            QStringLiteral("Kein Profilverwalter vorhanden"));
+            tr("No profile manager available"));
         return;
     }
     connect(mgr, &MicProfileManager::profileListChanged,
@@ -969,9 +969,9 @@ void PhoneCwApplet::zeigeMicQuelle()
                      Qt::UserRole - 1);
         m_micSourceCombo->setToolTip(
             gesperrt
-                ? QStringLiteral("Dieses Geraet hat keine Mikrofonbuchse "
-                                 "- \"Radio\" ist gesperrt")
-                : QStringLiteral("Woher das Sendeaudio kommt"));
+                ? tr("This radio has no microphone jack "
+                      "-- \"Radio\" is disabled")
+                : tr("Where the transmit audio comes from"));
     }
     m_updatingFromModel = false;
 }
@@ -1199,8 +1199,8 @@ void PhoneCwApplet::wireControls()
     // der Knopf -- und der daneben im TX-Feld bedient dieselben zwei
     // Eigenschaften, beide bleiben also von selbst gleich.
     if (m_monBtn && m_monSlider && m_monLabel) {
-        m_monBtn->setToolTip(QStringLiteral(
-            "Mithoeren: das eigene Sendesignal ueber die Lautsprecher"));
+        m_monBtn->setToolTip(tr("Monitor: your own transmit "
+                                            "signal through the speakers"));
         {
             QSignalBlocker bb(m_monBtn);
             QSignalBlocker bs(m_monSlider);

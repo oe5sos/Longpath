@@ -32,6 +32,7 @@
 #include <QLabel>
 
 #include "gui/SpectrumWidget.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -44,7 +45,7 @@ private slots:
         auto* w = new SpectrumWidget();
         w->resize(700, 400);
         w->show();
-        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
 
         QLabel* label = nullptr;
         for (QLabel* l : w->findChildren<QLabel*>()) {

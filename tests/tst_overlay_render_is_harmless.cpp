@@ -30,6 +30,7 @@
 
 #include "gui/applets/InstrumentApplet.h"
 #include "gui/meters/MeterPoller.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -73,7 +74,7 @@ private:
         col->addWidget(inst, 1);
         host.resize(360, 320);
         host.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&host));
+        QVERIFY(QTest::qWaitForWindowExposed(&host, kFensterFrist));
         QCoreApplication::processEvents();
 
         const QSize before = inst->size();
@@ -131,7 +132,7 @@ private slots:
         col->addWidget(inst, 1);
         host.resize(400, 240);           // deutlich breiter als hoch
         host.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&host));
+        QVERIFY(QTest::qWaitForWindowExposed(&host, kFensterFrist));
         QCoreApplication::processEvents();
 
         const QImage img = inst->renderTransparent(240);

@@ -25,6 +25,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QTemporaryDir>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -45,7 +46,7 @@ private slots:
         // Breit: eine Zeile, das Suchfeld nimmt den Rest.
         host.resize(1200, 60);
         host.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&host));
+        QVERIFY(QTest::qWaitForWindowExposed(&host, kFensterFrist));
         QCoreApplication::processEvents();
         QCOMPARE(flow->rowsLaidOut(), 1);
         QVERIFY2(search->width() > 500, qPrintable(QString::number(search->width())));
@@ -68,7 +69,7 @@ private slots:
         QTemporaryDir dir;
         LogbookWindow w(dir.path() + QStringLiteral("/log.adi"));
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         const int minW = w.minimumSizeHint().width();
         qInfo() << "Logbuchfenster: Mindestbreite" << minW << "Voreinstellung" << w.width();
         QVERIFY2(minW < 700, qPrintable(QStringLiteral("Mindestbreite %1 px — die Leiste bricht nicht um").arg(minW)));
@@ -114,7 +115,7 @@ private slots:
         QsoMapWindow w;
         w.imagery()->setNetworkEnabled(false);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         const int minW = w.minimumSizeHint().width();
         qInfo() << "Kartenfenster: Mindestbreite" << minW;
         QVERIFY2(minW < 700, qPrintable(QString::number(minW)));

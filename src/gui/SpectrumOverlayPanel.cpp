@@ -659,7 +659,7 @@ void SpectrumOverlayPanel::updateLayout()
             m_moreBtn->setFixedSize(kBtnW, kBtnH);
             m_moreBtn->setStyleSheet(OverlayColors::kMenuBtnNormal);
             m_moreBtn->setToolTip(
-                QStringLiteral("Weitere Gruppen — hier ist der Platz zu Ende"));
+                tr("More groups — this is where the room ends"));
             connect(m_moreBtn, &QPushButton::clicked, this, [this]() {
                 ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
                 const QPointer<SpectrumOverlayPanel> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug (2026-09-30)
@@ -1023,7 +1023,7 @@ void SpectrumOverlayPanel::buildDisplayFlyout()
             QStringLiteral("LinLog"),    QStringLiteral("LinRad"),
             QStringLiteral("Custom"),
             QStringLiteral("Clarity Blue"),
-            QStringLiteral("Gedämpft")
+            tr("Muted")
         });
         grid->addWidget(m_colorSchemeCmb, row, 2, 1, 2);
         connect(m_colorSchemeCmb, QOverload<int>::of(&QComboBox::currentIndexChanged),

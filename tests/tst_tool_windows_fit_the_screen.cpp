@@ -42,6 +42,7 @@
 #include "core/strip/StripChain.h"
 #include "gui/applets/StripWindow.h"
 #include "models/RadioModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -385,10 +386,14 @@ private slots:
         }
 #endif
         auto* mw = new MainWindow();        // bewusst nicht abgeraeumt
-        QVERIFY2(mw->windowFlags().testFlag(Qt::FramelessWindowHint),
-                 "nach dem Start formatfuellend (randlos)");
+        // Seit 2026-10-17 formatfuellend MIT Rahmen: randlos nimmt die
+        // Titelleiste mit, und mit ihr die drei Knoepfe links oben, die
+        // der Betreiber zweimal vermisst hat. showMaximized() fuellt den
+        // Schirm genauso.
+        QVERIFY2(!mw->windowFlags().testFlag(Qt::FramelessWindowHint),
+                 "nach dem Start randlos -- dann fehlen die Fensterknoepfe");
         mw->show();
-        QVERIFY(QTest::qWaitForWindowExposed(mw));
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
         if (QTest::qWaitFor([mw]() { return mw->findChild<ConnectionPanel*>() != nullptr; },
                             15000)) {
             mw->findChild<ConnectionPanel*>()->close();
@@ -404,13 +409,21 @@ private slots:
                                  {QStringLiteral("maximized"), false}});
         QVERIFY(profiles->createWith(QStringLiteral("Ohne-Vollbild"), state));
         QTest::qWait(100);
-        QVERIFY2(mw->windowFlags().testFlag(Qt::FramelessWindowHint),
-                 "ein Profil schaltet das Vollbild nicht ab");
+        // Das Prinzip bleibt: ein Profil schaltet das Formatfuellende
+        // nicht ab. Nur die FORM hat sich am 2026-10-17 geaendert --
+        // maximiert statt randlos, damit die Fensterknoepfe bleiben.
+        QVERIFY2(!mw->windowFlags().testFlag(Qt::FramelessWindowHint),
+                 "ein Profil hat das Fenster randlos gemacht");
+        QVERIFY2(mw->isMaximized(),
+                 "ein Profil schaltet das Formatfuellende nicht ab");
 
         // Esc im Hauptfenster: ein Feld abbrechen, nicht das Vollbild.
         QTest::keyClick(mw, Qt::Key_Escape);
         QTest::qWait(50);
-        QVERIFY(mw->windowFlags().testFlag(Qt::FramelessWindowHint));
+        QVERIFY2(!mw->windowFlags().testFlag(Qt::FramelessWindowHint),
+                 "Esc hat das Fenster randlos gemacht");
+        QVERIFY2(mw->isMaximized(),
+                 "Esc soll ein Feld abbrechen, nicht das Formatfuellende");
     }
 };
 

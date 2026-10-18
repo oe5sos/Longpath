@@ -75,6 +75,15 @@ CwDecoderApplet::CwDecoderApplet(RadioModel* model, QWidget* parent)
     // Unbind promptly when the bound slice goes away (the same safety net
     // RttyDecoderApplet has, for the same reason: a stale sliceIndex in the
     // tap would route whatever slice next reuses that index in here).
+    // Empfaengerwahl: liest die gemerkte Wahl, haengt sich an den
+    // Empfaengerwechsel und schreibt den Zusatz ("CW DECODER · RX2") in
+    // die Titelleiste. Die Reihenfolge zu buildUI() ist egal --
+    // `initReceiverBinding()` setzt den Zusatz selbst nach.
+    initReceiverBinding();
+    connect(this, &AppletWidget::boundSliceChanged, this, [this](SliceModel* s) {
+        setSlice(s);
+    });
+
     if (m_model) {
         connect(m_model, &RadioModel::sliceRemoved, this, [this](int index) {
             if (m_slice && m_slice->sliceIndex() == index) {
@@ -161,8 +170,9 @@ void CwDecoderApplet::buildUI()
     auto* ctrlRow = new QHBoxLayout();
     m_lockPitchBtn = blueToggle(QStringLiteral("LOCK Hz"), 86);
     m_lockPitchBtn->setCheckable(true);
-    m_lockPitchBtn->setToolTip(QStringLiteral(
-        "Tonhoehe auf dem erkannten Wert festhalten, statt ihr weiter zu folgen"));
+    m_lockPitchBtn->setToolTip(tr("Hold the pitch at the detected "
+                                              "value instead of following it "
+                                              "further"));
     connect(m_lockPitchBtn, &QPushButton::toggled, this, [this](bool on) {
         if (m_decoder) { m_decoder->lockPitch(on); }
         onStatsUpdated(m_decoder ? m_decoder->estimatedPitch() : 0.0f,
@@ -172,8 +182,9 @@ void CwDecoderApplet::buildUI()
 
     m_lockSpeedBtn = blueToggle(QStringLiteral("LOCK WPM"), 96);
     m_lockSpeedBtn->setCheckable(true);
-    m_lockSpeedBtn->setToolTip(QStringLiteral(
-        "Tempo auf dem erkannten Wert festhalten, statt ihm weiter zu folgen"));
+    m_lockSpeedBtn->setToolTip(tr("Hold the speed at the detected "
+                                              "value instead of following it "
+                                              "further"));
     connect(m_lockSpeedBtn, &QPushButton::toggled, this, [this](bool on) {
         if (m_decoder) { m_decoder->lockSpeed(on); }
         onStatsUpdated(m_decoder ? m_decoder->estimatedPitch() : 0.0f,
@@ -224,7 +235,33 @@ void CwDecoderApplet::updateAudioTap()
 
 void CwDecoderApplet::syncFromModel()
 {
-    setSlice(m_model ? m_model->activeSlice() : nullptr);
+    // `boundSlice()` statt `activeSlice()`: steht die Empfaengerwahl auf
+    // "folgt dem aktiven" (Vorgabe), ist das dasselbe wie frueher. Hat
+    // jemand einen festen Empfaenger gewaehlt, bleibt der CW-Decoder
+    // an seinem, auch waehrend woanders gearbeitet wird.
+    setSlice(boundSlice());
+}
+
+bool CwDecoderApplet::hasExtendedSettings() const
+{
+    return true;
+}
+
+void CwDecoderApplet::openExtendedSettings()
+{
+    // Ein frisches Blatt bei jedem Oeffnen, wie bei RxApplet: Qt::Popup
+    // schliesst beim Klick daneben, WA_DeleteOnClose raeumt auf.
+    auto* popup = new QWidget(this, Qt::Popup);
+    popup->setAttribute(Qt::WA_DeleteOnClose);
+    popup->setStyleSheet(QStringLiteral(
+        "QWidget { background: %1; border: 1px solid %2; }")
+        .arg(Style::kPanelBg, Style::kBorder));
+    auto* vbox = new QVBoxLayout(popup);
+    vbox->setContentsMargins(10, 10, 10, 10);
+    vbox->addWidget(receiverChoiceWidget(popup));
+    popup->adjustSize();
+    popup->move(mapToGlobal(QPoint(width() - popup->width(), 0)));
+    popup->show();
 }
 
 void CwDecoderApplet::onTextDecoded(const QString& text, float cost)

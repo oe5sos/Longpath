@@ -79,6 +79,7 @@ mw0lge@grange-lane.co.uk
 #include "core/AppSettings.h"
 #include "core/SettingsBackup.h"
 #include "gui/SettingsBackupDialog.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -384,7 +385,7 @@ private slots:
         SettingsBackupDialog dlg(rig.settingsPath);
         dlg.resize(820, 360);
         dlg.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&dlg));
+        QVERIFY(QTest::qWaitForWindowExposed(&dlg, kFensterFrist));
         dlg.tableForTest()->selectRow(1);
         const QPixmap pm = dlg.grab();
         QVERIFY(!pm.isNull());

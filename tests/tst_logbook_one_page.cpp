@@ -23,6 +23,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QTemporaryDir>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -60,7 +61,7 @@ private slots:
         LogbookWindow w(writeAdif(QDir(dir.path())));
         w.resize(1400, 760);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         QsoMapWindow* map = w.mapPanelForTest();
         QVERIFY2(map, "keine eingebettete Karte");
@@ -116,7 +117,7 @@ private slots:
         QTemporaryDir dir;
         LogbookWindow w(writeAdif(QDir(dir.path())));
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QVERIFY(!w.mapPanelForTest());               // gar nicht erst gebaut
         QVERIFY(!w.statsRowForTest()->isVisible());
         QVERIFY(!w.mapToggleForTest()->isChecked());

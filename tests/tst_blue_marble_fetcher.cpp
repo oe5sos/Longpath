@@ -23,6 +23,7 @@
 #include <QPainter>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -156,7 +157,7 @@ private slots:
         g.setTarget(40.7, -74.0);
         g.setShowAtmosphere(true);
         g.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&g));
+        QVERIFY(QTest::qWaitForWindowExposed(&g, kFensterFrist));
         QTest::qWait(400);
         const QString grabDir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
         if (!grabDir.isEmpty()) {

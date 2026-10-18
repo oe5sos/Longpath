@@ -1258,7 +1258,7 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
         const QString txt = have
             ? QStringLiteral("%1 MHz   SWR %2")
                   .arg(mhz(hz, 4)).arg(swr, 0, 'f', 2)
-            : QStringLiteral("%1 MHz   (nicht gemessen)").arg(mhz(hz, 4));
+            : tr("%1 MHz   (not measured)").arg(mhz(hz, 4));
 
         const double tw = sfm.horizontalAdvance(txt) + 10.0;
         const double th = sfm.height() + 4.0;
@@ -1298,8 +1298,8 @@ void SwrCurveWidget::paintEvent(QPaintEvent*)
         const QFontMetrics cfm(caps);
 
         const QString txt = m_supersededBand.isEmpty()
-            ? QStringLiteral("ÜBERHOLT")
-            : QStringLiteral("%1 · ÜBERHOLT").arg(m_supersededBand);
+            ? tr("SUPERSEDED")
+            : tr("%1 · SUPERSEDED").arg(m_supersededBand);
         const double tw = cfm.horizontalAdvance(txt);
         const double th = cfm.height();
         const QRectF cap(m_plotR - tw - 24.0, m_plotT + 8.0,

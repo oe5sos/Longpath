@@ -27,6 +27,7 @@
 #include <QWidget>
 
 #include <complex>
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -71,7 +72,7 @@ private slots:
         AntennaWindow w;
         w.resize(1000, 760);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         // 40 m well matched, 10 m poor — the shape that produced the
         // wrong headline.
@@ -105,7 +106,7 @@ private slots:
         AntennaWindow w;
         w.resize(1000, 760);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         Sweep s;
         s.source = QStringLiteral("range");
@@ -140,7 +141,7 @@ private slots:
         AntennaWindow w;
         w.resize(1000, 760);
         w.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
         Sweep wide;
         wide.source = QStringLiteral("range");

@@ -136,6 +136,19 @@ public:
                || !m_byForm.isEmpty();
     }
 
+    /// Traegt diese Palette ueberhaupt FARBEN?
+    ///
+    /// „Flach" und „Tief" tragen absichtlich nur Form (Ecken,
+    /// Polsterung, Tiefe) und keine einzige Farbe. Wer eine davon
+    /// waehlt, sieht im laufenden Programm nichts — und die
+    /// Neustartfrage sagte ihm bis zum 2026-10-15 trotzdem „die
+    /// Farben sind schon an". Das ist genau die Erfahrung, die der
+    /// Betreiber mit „theme funktioniert nicht" beschrieb.
+    bool hasColours() const
+    {
+        return !m_byRole.isEmpty() || !m_byHex.isEmpty();
+    }
+
     /// What this theme wants for a role, or an empty string when it has
     /// no opinion.
     QString forRole(const QString& role) const;
@@ -164,6 +177,14 @@ public:
     //   relief   aufgesetzt: Aufhellung oben     0..40   (16)
     //   mulde    versenkt: Tiefe                 0..40   (10)
     int forForm(const QString& name, int fallback) const;
+
+    /// Die Formwerte dieser Palette (radius, luft-v, luft-h, relief,
+    /// mulde). Zum Vergleichen vor und nach einem Wechsel: Farben
+    /// lassen sich im Betrieb austauschen, Formen nicht -- die stehen
+    /// als fertige Zahlen in den Stylesheets, die beim Bauen des
+    /// Fensters entstanden sind. Unterscheiden sich die Formwerte,
+    /// fehlt nach dem Wechsel noch ein Neustart, und nur dann.
+    const QHash<QString, int>& formOverrides() const { return m_byForm; }
 
     /// What this theme wants in place of a source-code colour, or empty.
     QString forHex(const QString& legacyHex) const;
@@ -220,6 +241,20 @@ public:
     /// und für die Diagnoseseite; ein Filter, der eingehängt ist und
     /// nie zuschlägt, sieht sonst genauso aus wie einer, der wirkt.
     static quint64 appliedCount();
+
+    /// Jedes bestehende Widget auf die GERADE geladene Palette
+    /// umstellen -- der Knopfdruck, nach dem der Betreiber am
+    /// 2026-10-15 gefragt hat („das theme sollte man danach auch per
+    /// knopfdruck ändern können").
+    ///
+    /// Rechnet NICHT vom aktuellen Stylesheet, sondern von der Vorlage
+    /// (Style::sourceOf). Das ist der ganze Trick: das aktuelle
+    /// Stylesheet traegt die Farben der ALTEN Palette, und die kennt
+    /// die neue nicht. Nimmt ausserdem QPalette und Grund-Stylesheet
+    /// mit, die keinen Filter kennen.
+    ///
+    /// Gibt zurueck, wie viele Widgets wirklich anders aussehen.
+    static quint64 reapplyAll();
 };
 
 } // namespace Longpath::Style

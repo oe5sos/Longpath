@@ -21,15 +21,23 @@
 #include "core/audio/AudioTapRing.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "core/DxSpot.h"       // DxSpot — der Fund, der hinausgeht
+
+#include "core/MoxController.h"
+#include "core/RttyTx.h"
+#include "core/audio/CompositeTxMicRouter.h"
 
 #include <QComboBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSlider>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+
+#include <cmath>
 
 namespace Longpath {
 
@@ -52,6 +60,12 @@ constexpr int kPumpIntervalMs = 50;
 // Cap the visible transcript so a long, unattended RTTY session doesn't
 // grow the QPlainTextEdit's document without bound.
 constexpr int kMaxCharCount = 4000;
+
+// So viele Zeichen behaelt der Puffer, aus dem die Rufzeichensuche
+// liest. „CQ CQ CQ DE DL1ABC DL1ABC DL1ABC K" sind 36 Zeichen; 120
+// fasst das samt Vorlauf und einem zweiten Anruf, und ein alter
+// Anruf fliegt nach rund zwei Zeilen heraus statt nachzuhallen.
+constexpr int kRufPufferZeichen = 120;
 } // namespace
 
 RttyDecoderApplet::RttyDecoderApplet(RadioModel* model, QWidget* parent)
@@ -81,6 +95,15 @@ RttyDecoderApplet::RttyDecoderApplet(RadioModel* model, QWidget* parent)
     // MainWindow::rebindRttyRadeAvailability(), which re-calls setSlice()
     // on every RadioModel::activeSliceChanged (bench-found 2026-09-07;
     // this applet used to be bound once, for the whole session).
+    // Empfaengerwahl: liest die gemerkte Wahl, haengt sich an den
+    // Empfaengerwechsel und schreibt den Zusatz ("RTTY DECODER · RX2") in
+    // die Titelleiste. Die Reihenfolge zu buildUI() ist egal --
+    // `initReceiverBinding()` setzt den Zusatz selbst nach.
+    initReceiverBinding();
+    connect(this, &AppletWidget::boundSliceChanged, this, [this](SliceModel* s) {
+        setSlice(s);
+    });
+
     if (m_model) {
         connect(m_model, &RadioModel::sliceRemoved, this, [this](int index) {
             if (m_slice && m_slice->sliceIndex() == index) {
@@ -144,7 +167,7 @@ void RttyDecoderApplet::buildUI()
     statusRow->addWidget(m_snrValue);
 
     // Zustand als umrandete Kapsel, HAUSSTIL.md Regel 5.
-    m_lockCapsule = new QLabel(QStringLiteral("KEIN LOCK"), this);
+    m_lockCapsule = new QLabel(tr("NO LOCK"), this);
     m_lockCapsule->setAlignment(Qt::AlignCenter);
     m_lockCapsule->setFixedHeight(20);
     // Schrift per setFont auf der Leiter (9 px versal), nicht als
@@ -224,7 +247,174 @@ void RttyDecoderApplet::buildUI()
     ctrlRow->addWidget(m_clearBtn);
 
     root->addLayout(ctrlRow);
+
+    // ── Zeile 5: senden (2026-10-16) ─────────────────────────────────
+    //
+    // Der Sender (core/RttyTx.h) stand seit PR #257 fertig im Baum und
+    // war von hier aus nicht erreichbar. Die Zeile ist absichtlich
+    // schmal gehalten: ein Feld, zwei Knoepfe, eine Zeile Auskunft —
+    // dasselbe Mass wie bei Ft8Applet, und kein Schalter, der von
+    // selbst sendet.
+    root->addWidget(divider());
+
+    auto* sendRow = new QHBoxLayout();
+    m_textFeld = new QLineEdit(this);
+    m_textFeld->setPlaceholderText(tr("Text to send"));
+    m_textFeld->setToolTip(tr(
+        "Baudot has no lower case and no accented letters. Anything it "
+        "does not know is dropped rather than altering the text."));
+    connect(m_textFeld, &QLineEdit::returnPressed, this, [this]() {
+        sendeText(m_textFeld->text());
+    });
+    sendRow->addWidget(m_textFeld, 1);
+
+    m_sendBtn = styledButton(tr("Send"), 64);
+    connect(m_sendBtn, &QPushButton::clicked, this, [this]() {
+        sendeText(m_textFeld ? m_textFeld->text() : QString());
+    });
+    sendRow->addWidget(m_sendBtn);
+
+    m_stopBtn = styledButton(tr("Stop"), 48);
+    m_stopBtn->setEnabled(false);
+    connect(m_stopBtn, &QPushButton::clicked, this, [this]() { abbrechen(); });
+    sendRow->addWidget(m_stopBtn);
+
+    root->addLayout(sendRow);
+
+    m_sendeStatus = new QLabel(QString(), this);
+    m_sendeStatus->setStyleSheet(
+        QStringLiteral("color: %1;").arg(Style::kTextSecondary));
+    m_sendeStatus->setFont(Style::capsFont(font(), Style::kFontCaption));
+    root->addWidget(m_sendeStatus);
+
     root->addStretch(1);
+}
+
+// ── Senden ───────────────────────────────────────────────────────────
+//
+// Die Reihenfolge ist dieselbe wie in Ft8Applet::sendeNachricht() und
+// aus demselben Grund so herum: erst den Sendeweg legen, dann tasten.
+// Andersherum ginge der Sender fuer einen Augenblick mit dem Mikrofon
+// auf, nicht mit dem Ton.
+void RttyDecoderApplet::sendeText(const QString& text)
+{
+    if (m_sendet) { return; }
+
+    const QString sauber = text.trimmed();
+    if (sauber.isEmpty()) {
+        if (m_sendeStatus) { m_sendeStatus->setText(tr("nothing to send")); }
+        return;
+    }
+    if (!m_model || !m_model->rttyTxSource() || !m_model->micRouter()) {
+        if (m_sendeStatus) { m_sendeStatus->setText(tr("no transmit path")); }
+        return;
+    }
+
+    // Mark und Shift kommen von der Scheibe, nicht aus einer zweiten
+    // Einstellung — derselbe Grund, aus dem die Anzeige oben sie nur
+    // liest: es gibt genau einen Ort, an dem sie stehen.
+    const int markHz = m_slice ? m_slice->rttyMarkHz() : 2295;
+    const int shiftHz = m_slice ? m_slice->rttyShiftHz() : 170;
+    const float baud = m_baudCombo && m_baudCombo->currentIndex() >= 0
+                           ? static_cast<float>(
+                                 kBaudRates[m_baudCombo->currentIndex()])
+                           : 45.45f;
+
+    RttyTxSource* quelle = m_model->rttyTxSource();
+    if (!quelle->vorbereiten(sauber, markHz, shiftHz, baud)) {
+        if (m_sendeStatus) {
+            m_sendeStatus->setText(tr("cannot send “%1”").arg(sauber));
+        }
+        return;
+    }
+
+    auto* router = m_model->micRouter();
+    m_quelleVorher = static_cast<int>(router->activeSource());
+    router->setActiveSource(MicSource::Rtty);
+    quelle->starten();
+
+    // ── Wenn der Bandplan nein sagt, nicht weitermachen ──────────────
+    //
+    // Wortgleich zu Ft8Applet: setMox(true) darf abgelehnt werden
+    // (falsche Betriebsart, Frequenz ausserhalb des Bandes), und die
+    // Ablehnung kommt ausschliesslich als moxRejected(grund) —
+    // setMox() selbst gibt nichts zurueck. Ohne diese Verbindung
+    // liefe der Ton die volle Laenge des Textes weiter, waehrend
+    // nichts hinausgeht.
+    bool abgelehnt = false;
+    if (auto* mox = m_model->moxController()) {
+        QMetaObject::Connection c = connect(
+            mox, &MoxController::moxRejected, this,
+            [this, &abgelehnt](const QString& grund) {
+                abgelehnt = true;
+                if (m_sendeStatus) {
+                    m_sendeStatus->setText(tr("not transmitting: %1").arg(grund));
+                }
+            });
+        mox->setMox(true);
+        disconnect(c);
+    }
+    if (abgelehnt) {
+        const QString grund = m_sendeStatus ? m_sendeStatus->text() : QString();
+        abbrechen();
+        if (m_sendeStatus && !grund.isEmpty()) { m_sendeStatus->setText(grund); }
+        return;
+    }
+
+    m_sendet = true;
+    if (m_sendBtn)  { m_sendBtn->setEnabled(false); }
+    if (m_stopBtn)  { m_stopBtn->setEnabled(true); }
+    if (m_textFeld) { m_textFeld->setEnabled(false); }
+
+    // Wie lange der Text dauert, weiss die Quelle selbst: sie hat ihn
+    // schon auf Proben gelegt. Ein Zuschlag von 300 ms, damit der
+    // letzte Ton draussen ist, bevor der Sender abschaltet — dieselben
+    // 300 ms wie bei FT8.
+    const int dauerMs = quelle->proben() > 0
+                            ? (quelle->proben() * 1000) / 48000
+                            : 0;
+    if (m_sendeStatus) {
+        m_sendeStatus->setText(tr("sending (%1 s)")
+                                   .arg(dauerMs / 1000.0, 0, 'f', 1));
+    }
+
+    if (!m_sendeEndeTimer) {
+        m_sendeEndeTimer = new QTimer(this);
+        m_sendeEndeTimer->setSingleShot(true);
+        connect(m_sendeEndeTimer, &QTimer::timeout, this,
+                [this]() { sendeEnde(); });
+    }
+    m_sendeEndeTimer->start(dauerMs + 300);
+}
+
+void RttyDecoderApplet::sendeEnde()
+{
+    if (!m_sendet) { return; }
+    abbrechen();
+    if (m_sendeStatus) { m_sendeStatus->setText(tr("sent")); }
+}
+
+void RttyDecoderApplet::abbrechen()
+{
+    if (m_sendeEndeTimer) { m_sendeEndeTimer->stop(); }
+
+    // Erst den Sender aus, dann den Weg zurueck — in dieser
+    // Reihenfolge ist zu keinem Zeitpunkt das Mikrofon auf Sendung.
+    if (m_model && m_model->moxController()) {
+        m_model->moxController()->setMox(false);
+    }
+    if (m_model && m_model->rttyTxSource()) {
+        m_model->rttyTxSource()->abbrechen();
+    }
+    if (m_model && m_model->micRouter() && m_quelleVorher >= 0) {
+        m_model->micRouter()->setActiveSource(
+            static_cast<MicSource>(m_quelleVorher));
+    }
+    m_quelleVorher = -1;
+    m_sendet = false;
+    if (m_sendBtn)  { m_sendBtn->setEnabled(true); }
+    if (m_stopBtn)  { m_stopBtn->setEnabled(false); }
+    if (m_textFeld) { m_textFeld->setEnabled(true); }
 }
 
 void RttyDecoderApplet::loadSettings()
@@ -304,7 +494,130 @@ void RttyDecoderApplet::updateAudioTap()
 
 void RttyDecoderApplet::syncFromModel()
 {
-    setSlice(m_model ? m_model->activeSlice() : nullptr);
+    // `boundSlice()` statt `activeSlice()`: steht die Empfaengerwahl auf
+    // "folgt dem aktiven" (Vorgabe), ist das dasselbe wie frueher. Hat
+    // jemand einen festen Empfaenger gewaehlt, bleibt der RTTY-Decoder
+    // an seinem, auch waehrend woanders gearbeitet wird.
+    setSlice(boundSlice());
+}
+
+bool RttyDecoderApplet::hasExtendedSettings() const
+{
+    return true;
+}
+
+void RttyDecoderApplet::openExtendedSettings()
+{
+    // Ein frisches Blatt bei jedem Oeffnen, wie bei RxApplet: Qt::Popup
+    // schliesst beim Klick daneben, WA_DeleteOnClose raeumt auf.
+    auto* popup = new QWidget(this, Qt::Popup);
+    popup->setAttribute(Qt::WA_DeleteOnClose);
+    popup->setStyleSheet(QStringLiteral(
+        "QWidget { background: %1; border: 1px solid %2; }")
+        .arg(Style::kPanelBg, Style::kBorder));
+    auto* vbox = new QVBoxLayout(popup);
+    vbox->setContentsMargins(10, 10, 10, 10);
+    vbox->addWidget(receiverChoiceWidget(popup));
+    popup->adjustSize();
+    popup->move(mapToGlobal(QPoint(width() - popup->width(), 0)));
+    popup->show();
+}
+
+QString RttyDecoderApplet::rufzeichenNachDe(const QString& strom)
+{
+    // Wie ein Rufzeichen: drei bis elf Zeichen, mindestens eine
+    // Ziffer UND ein Buchstabe, die letzte Stelle keine Ziffer.
+    // Wortgleich die Pruefung aus Ft8Applet::senderCallsign — sie
+    // haelt dort „JN78", „-12", „RR73" und „73" heraus, und hier
+    // zusaetzlich „599" und „5NN", die in RTTY in jedem Rapport
+    // stehen.
+    const auto wieRufzeichen = [](const QString& f) {
+        if (f.size() < 3 || f.size() > 11) { return false; }
+        bool ziffer = false;
+        bool buchstabe = false;
+        for (const QChar c : f) {
+            if (c.isDigit()) { ziffer = true; }
+            else if (c.isLetter()) { buchstabe = true; }
+            else if (c != QLatin1Char('/')) { return false; }
+        }
+        if (!ziffer || !buchstabe) { return false; }
+        return !f.back().isDigit();
+    };
+
+    // Ob das LETZTE Feld abgeschlossen ist, steht nicht in der Liste
+    // der Felder, sondern im rohen Strom: simplified() wirft genau
+    // das Trennzeichen weg, auf das es hier ankommt. „DE DL1ABC" und
+    // „DE DL1ABC " sehen danach gleich aus — nur ist das erste ein
+    // halb angekommenes Rufzeichen und das zweite ein fertiges.
+    // Baudot schickt auch CR und LF; isSpace() deckt beides mit ab.
+    const bool letztesFeldFertig =
+        !strom.isEmpty() && strom.back().isSpace();
+
+    const QStringList felder = strom.simplified().toUpper()
+        .split(QLatin1Char(' '), Qt::SkipEmptyParts);
+
+    // Von hinten: das letzte DE gilt. Ein Strom kann mehrere Anrufe
+    // enthalten, und der juengste ist der, der gerade sendet.
+    //
+    // Wie weit hinten ein DE stehen darf, haengt am Abschluss: ist das
+    // letzte Feld fertig, darf DE an zweitletzter Stelle stehen; ist
+    // es noch im Wachsen, muss DE eine Stelle weiter vorn liegen,
+    // sonst wird ein halbes Rufzeichen gemeldet. Genau dieser Fall
+    // kostete beim ersten Anlauf einen roten Lauf: „CQ CQ DE DL1AB"
+    // gab „DL1AB" zurueck.
+    const int letzterDeIndex = felder.size() - (letztesFeldFertig ? 2 : 3);
+    for (int i = letzterDeIndex; i >= 0; --i) {
+        if (felder.at(i) != QLatin1String("DE")) { continue; }
+        const QString kandidat = felder.at(i + 1);
+        if (wieRufzeichen(kandidat)) { return kandidat; }
+        // Ein DE mit Unsinn dahinter ist kein Treffer, aber auch kein
+        // Grund, weiter nach vorn zu suchen: dann war die Stelle
+        // verstuemmelt, und ein aelteres DE waere geraten.
+        return {};
+    }
+    return {};
+}
+
+// ── Aus einem Anruf ein Fund (2026-10-17) ───────────────────────────
+//
+// Bis heute endete ein RTTY-Anruf im Textfeld und nirgends sonst. Der
+// eigene FT8-Dekoder reicht seine Funde an RadioModel weiter
+// (Spotliste, Sammler, PSK Reporter) — RTTY nicht, obwohl derselbe
+// Weg offen lag. Hier ist er.
+//
+// Die Frequenz rechnet sich wie bei FT8: Wahlfrequenz plus Tonlage,
+// bei unterem Seitenband (DIGL) minus. Die Tonlage ist bei RTTY die
+// MARK-Frequenz von der Scheibe — es gibt dort genau einen Ort, an
+// dem sie steht (siehe sendeText()).
+void RttyDecoderApplet::meldeFundWennRufzeichen()
+{
+    if (!m_model) { return; }
+
+    const QString ruf = rufzeichenNachDe(m_rufPuffer);
+    if (ruf.isEmpty() || ruf == m_letzterGemeldeterRuf) { return; }
+    m_letzterGemeldeterRuf = ruf;
+
+    const double wahlHz = m_slice ? static_cast<double>(m_slice->frequency())
+                                  : 0.0;
+    if (wahlHz <= 0.0) { return; }
+    const int markHz = m_slice ? m_slice->rttyMarkHz() : 2295;
+    const bool unteresSeitenband =
+        m_slice && m_slice->dspMode() == DSPMode::DIGL;
+
+    DxSpot spot;
+    spot.dxCall = ruf;
+    spot.freqMhz = (wahlHz + (unteresSeitenband ? -markHz : markHz)) / 1.0e6;
+    spot.snr = m_letzterSnrDb;
+    // Der Modus steht im Kommentar, wie bei FT8:
+    // SpotTableModel::extractMode liest ihn dort heraus. Dahinter der
+    // Ausschnitt des Stroms, in dem der Anruf stand — ohne ihn ist im
+    // Spot nicht zu sehen, WORAUS er gelesen wurde.
+    spot.comment = QStringLiteral("RTTY  %1")
+                       .arg(m_rufPuffer.simplified().right(60));
+    spot.source = QStringLiteral("Longpath");
+    spot.spotterCall = QStringLiteral("Longpath");
+    spot.utcTime = QDateTime::currentDateTimeUtc().time();
+    m_model->onNativeRttyDecode(spot);
 }
 
 void RttyDecoderApplet::onTextDecoded(const QString& text, float confidence)
@@ -333,6 +646,16 @@ void RttyDecoderApplet::onTextDecoded(const QString& text, float confidence)
         trimCursor.removeSelectedText();
         m_charCount = m_textOutput->toPlainText().size();
     }
+
+    // Und derselbe Text noch einmal in den kurzen Puffer, aus dem die
+    // Rufzeichensuche liest. Kurz gehalten (siehe Kopfdatei): lang
+    // genug fuer „... DE DL1ABC DL1ABC K", kurz genug, dass ein alter
+    // Anruf nicht ewig nachhallt.
+    m_rufPuffer += text;
+    if (m_rufPuffer.size() > kRufPufferZeichen) {
+        m_rufPuffer = m_rufPuffer.right(kRufPufferZeichen);
+    }
+    meldeFundWennRufzeichen();
 }
 
 void RttyDecoderApplet::onStatsUpdated(float markLevel, float spaceLevel, float snrDb, bool locked)
@@ -341,6 +664,9 @@ void RttyDecoderApplet::onStatsUpdated(float markLevel, float spaceLevel, float 
     m_spaceLevel->setValue(spaceLevel);
 
     m_snrValue->setText(QStringLiteral("%1 dB").arg(snrDb, 0, 'f', 1));
+    // Fuer den Fund (siehe meldeFundWennRufzeichen): der Spot braucht
+    // einen Rapport, und der steht nur hier.
+    m_letzterSnrDb = static_cast<int>(std::lround(snrDb));
 
     if (locked) {
         m_lockCapsule->setText(QStringLiteral("LOCK"));
@@ -349,7 +675,7 @@ void RttyDecoderApplet::onStatsUpdated(float markLevel, float spaceLevel, float 
             " border-radius: 10px; padding: 0 10px; }")
             .arg(Style::kGreenBg, Style::kGreenText, Style::kGreenBorder));
     } else {
-        m_lockCapsule->setText(QStringLiteral("KEIN LOCK"));
+        m_lockCapsule->setText(tr("NO LOCK"));
         m_lockCapsule->setStyleSheet(QStringLiteral(
             "QLabel { background: %1; color: %2; border: 1px solid %3;"
             " border-radius: 10px; padding: 0 10px; }")

@@ -75,6 +75,9 @@
 #include "core/audio/QsoRecorderController.h"
 #include "core/PgxlConnection.h"
 #include "core/Rf2ksConnection.h"
+#include "core/SpeConnection.h"
+#include "core/Kpa500Connection.h"
+#include "core/AcomConnection.h"
 #include "core/TgxlConnection.h"
 #include "core/FaultLog.h"
 #include "core/TxInterlockPolicy.h"
@@ -202,6 +205,8 @@ class DxccColorProvider;
 class SpotModel;
 class SpotTableModel;
 class FreeDVStationModel;
+class Ft8TxSource;
+class RttyTxSource;
 class RxDecodeModel;
 // TNF (design section 5): the canonical notch store, owned by RadioModel
 // alongside SpotModel. One list shared by every slice (design D1) because
@@ -244,6 +249,16 @@ class RadioModel : public QObject {
     Q_PROPERTY(bool    connected   READ isConnected NOTIFY connectionStateChanged)
     Q_PROPERTY(bool rfKitEnabled READ rfKitEnabled WRITE setRfKitEnabled
                NOTIFY rfKitEnabledChanged)
+    // Zeus-Punkt 7: SPE Expert (1.3K-FA / 1.5K-FA / 2K-FA). Gleiche Form
+    // wie rfKitEnabled, eigener Schluessel.
+    Q_PROPERTY(bool speEnabled READ speEnabled WRITE setSpeEnabled
+               NOTIFY speEnabledChanged)
+    Q_PROPERTY(bool kpa500Enabled READ kpa500Enabled WRITE setKpa500Enabled
+               NOTIFY kpa500EnabledChanged)
+    // ACOM S-Serie. Nicht auf Zeus' Liste, aber das Geraet, das der
+    // Betreiber einmal anschliessen will (2026-10-09).
+    Q_PROPERTY(bool acomEnabled READ acomEnabled WRITE setAcomEnabled
+               NOTIFY acomEnabledChanged)
 
 public:
     explicit RadioModel(QObject* parent = nullptr);
@@ -1110,6 +1125,40 @@ public:
     SpotTableModel*       spotTableModel()      const { return m_spotTableModel.get(); }
     FreeDVStationModel*   freeDvStationModel()  const { return m_freeDvStationModel.get(); }
     RxDecodeModel*        rxDecodeModel()       const { return m_rxDecodeModel.get(); }
+
+    /// Ein Fund des EIGENEN FT8/FT4-Dekoders (Ft8Applet, 2026-10-15).
+    ///
+    /// Derselbe Weg wie bei WSJT-X — SpotModel mit Entdopplung,
+    /// RxDecodeModel, PSK Reporter —, nur mit eigener Quelle
+    /// („Longpath"), damit sich die beiden in der Liste nicht
+    /// vermischen. Ohne das blieben die eigenen Funde in einem
+    /// Textfeld und erreichten die Panadapter-Ueberlagerung nie.
+    ///
+    /// OEFFENTLICH, anders als die Adapter-Schlitze der
+    /// Netz-Quellen weiter unten: die haengen an einem Client, der
+    /// sich selbst verbindet. Hier ruft das Applet herein, und ein
+    /// `connect` auf einen privaten Schlitz geht in der
+    /// Zeiger-Schreibweise nicht.
+    void onNativeFt8Decode(const Longpath::DxSpot& spot);
+    /// Derselbe Weg fuer den eigenen RTTY-Dekoder (2026-10-17):
+    /// Spotliste, Sammler, PSK Reporter. Siehe meldeEigenenFund.
+    void onNativeRttyDecode(const Longpath::DxSpot& spot);
+
+    /// Der eigene FT8/FT4-Sender, oder null vor dem Verbinden
+    /// (2026-10-15). Siehe core/Ft8Tx.h.
+    Ft8TxSource* ft8TxSource() const { return m_ft8TxSource.get(); }
+
+    /// Der eigene RTTY-Sender, oder null vor dem Verbinden
+    /// (2026-10-16). Siehe core/RttyTx.h.
+    RttyTxSource* rttyTxSource() const { return m_rttyTxSource.get(); }
+
+    /// Der Mikrofon-Umschalter, oder null vor dem Verbinden. Ueber ihn
+    /// laeuft das Umlegen auf die FT8-Quelle beim Senden.
+    CompositeTxMicRouter* micRouter() const
+    {
+        return m_compositeMicRouter.get();
+    }
+
     DxccColorProvider*    dxccColorProvider()   const { return m_dxccColorProvider.get(); }
     DxClusterClient*      dxCluster()           const { return m_dxCluster.get(); }
     DxClusterClient*      rbn()                 const { return m_rbn.get(); }
@@ -1191,6 +1240,10 @@ public:
     TxChannel* txChannel() const { return m_txChannel; }
     /// FM-CTCSS des Sende-Slices an den Sendekanal (2026-09-27).
     void pushFmToneFromTxSlice();
+    /// Schaltet den CTCSS-Tonsquelch dieses Slices nach `fmCtcssMode`,
+    /// `fmCtcssValueHz` und der Betriebsart. Longpath-eigen, kein
+    /// Thetis-Port -- siehe RxChannel::setCtcssSquelch.
+    void pushCtcssSquelchForSlice(const SliceModel* slice);
 
     /// FM-Deviation fuer Senden und Empfang aller Kanaele, 5000 oder
     /// 2500 Hz (Thetis console FMDeviation_Hz, radFMDeviation5kHz /
@@ -1235,6 +1288,11 @@ public:
     // All three accessors return non-null pointers from construction time.
     PgxlConnection* pgxlConnection() { return m_pgxlConnection; }
     Rf2ksConnection* rfKitConnection() const { return m_rfKitConnection.get(); }
+    // Der SPE-Treiber lebt wie der RF2K-S fuer die ganze Laufzeit; das
+    // Fenster verbindet sich einmal darauf und nie neu.
+    SpeConnection* speConnection() const { return m_speConnection.get(); }
+    Kpa500Connection* kpa500Connection() const { return m_kpa500Connection.get(); }
+    AcomConnection* acomConnection() const { return m_acomConnection.get(); }
     TgxlConnection* tgxlConnection() { return m_tgxlConnection; }
     TunerModel*     tunerModel()     { return m_tunerModel;     }
     // SmartSDR API server on TCP 4992. Owned by RadioModel; lifetime matches.
@@ -1253,6 +1311,21 @@ public:
     //
     // When true: listener starts (if not already running), AppSettings
     // persisted, FourO3APage updates its enabled state.
+    /// Soll der FlexRadio-Ausruf laufen? Zwei Tore, UND-verknuepft.
+    ///
+    /// Betreiber 2026-10-18 auf seinem Maestro: dort stand ein
+    /// „FLEX-6400" in der Geraeteliste, das er nicht besitzt -- es war
+    /// Longpath selbst. Der Ausruf haengt seither am
+    /// 4O3A-HAUPTSCHALTER (Vorgabe „False"), nicht mehr allein am
+    /// Feinschalter PGXL_BroadcastDiscovery (Vorgabe „True").
+    ///
+    /// Statisch und ohne Zustand, damit die REGEL pruefbar ist und
+    /// nicht nur die Verdrahtung: tests/tst_kein_phantom_flex.cpp
+    /// faehrt die ganze Wahrheitstafel.
+    static bool flexAusrufSollLaufen(bool fourO3AEnabled,
+                                     bool broadcastDiscovery)
+    { return fourO3AEnabled && broadcastDiscovery; }
+
     void setFourO3AEnabled(bool enabled);
     bool fourO3AEnabled() const;
 
@@ -1266,6 +1339,63 @@ public:
     // the live connection. Called before every connectToAmp().
     void applyRfKitOperatorSettings();
     bool rfKitEnabled() const;
+
+    // ── SPE Expert (Zeus-Punkt 7) ────────────────────────────────────────
+    //
+    // Gleiche Form wie der RF2K-S darueber, ein Unterschied: der SPE kann
+    // ueber Netz ODER seriell angeschlossen sein, und welches von beiden
+    // steht in Spe_Mode. Die Schluessel liegen im selben per-MAC-Bereich:
+    //   Spe_Enabled "True"|"False", Spe_Mode "Serial"|"Network",
+    //   Spe_SerialPort, Spe_Host, Spe_Port, Spe_AutoReconnect
+    //
+    // Default AUS beim ersten Start. Ohne Anschlussangabe (leerer Rechner
+    // bzw. leerer Anschlussname) wird NICHT verbunden -- es gibt keine
+    // Suche im Netz: ser2net antwortet auf keine Rundfrage, und ein
+    // serieller Anschluss laesst sich nicht erraten.
+    void setSpeEnabled(bool enabled);
+    bool speEnabled() const;
+    // Schiebt Spe_AutoReconnect aus dem per-MAC-Bereich in die lebende
+    // Verbindung. Vor jedem Verbinden gerufen -- derselbe Grund wie bei
+    // applyRfKitOperatorSettings(): ein Schalter, den niemand zurueckliest,
+    // ist ein Schalter, der nichts tut.
+    void applySpeOperatorSettings();
+    // Verbindet nach den gespeicherten Angaben, oder trennt. Gerufen vom
+    // Umschalter, von der Einstellseite nach einer Aenderung und beim
+    // Verbinden eines Funkgeraets (dann ist der per-MAC-Bereich erst da).
+    void applySpeConnection();
+
+    // ── Elecraft KPA500 (Zeus-Punkt 7) ───────────────────────────────────
+    //
+    // Wie der SPE: Netz ODER seriell, Umschalter in Spe_Mode's Gegenstueck
+    // Kpa500_Mode. EIN Unterschied, und er ist wichtig: die Datenrate des
+    // seriellen Anschlusses laesst sich beim KPA500 NICHT erraten (vier
+    // Werte, Vorgabe nicht dokumentiert -- siehe core/Kpa500Connection.h).
+    // Sie steht darum in Kpa500_Baud und gehoert dem Betreiber.
+    //
+    // Schluessel im per-MAC-Bereich:
+    //   Kpa500_Enabled "True"|"False", Kpa500_Mode "Serial"|"Network",
+    //   Kpa500_SerialPort, Kpa500_Baud, Kpa500_Host, Kpa500_Port,
+    //   Kpa500_AutoReconnect
+    void setKpa500Enabled(bool enabled);
+    bool kpa500Enabled() const;
+    void applyKpa500Connection();
+
+    // ── ACOM S-Serie (Betreiberwunsch 2026-10-09) ────────────────────────
+    //
+    // Wie SPE und KPA500: Netz ODER seriell. Zwei Unterschiede, beide aus
+    // dem Protokoll:
+    //   * seriell ist die Datenrate FEST 9600 8N1 (die Beschreibung
+    //     schreibt sie vor) -- kein Feld dafuer, anders als beim KPA500
+    //   * ueber Netz braucht es einen ROHEN Vermittler. Der Datenstrom
+    //     enthaelt legitim 0xFF, und Telnets IAC-Maskierung verfaelscht
+    //     genau das. Beim SPE ging Telnet noch, hier nicht.
+    //
+    // Schluessel im per-MAC-Bereich:
+    //   Acom_Enabled "True"|"False", Acom_Mode "Serial"|"Network",
+    //   Acom_SerialPort, Acom_Host, Acom_Port, Acom_AutoReconnect
+    void setAcomEnabled(bool enabled);
+    bool acomEnabled() const;
+    void applyAcomConnection();
 
     // ── Per-radio peripherals scope (RF-Kit / 4O3A / PGXL / TGXL) ────────
     //
@@ -1283,6 +1413,12 @@ public:
     //   hardware/<mac>/peripherals/PGXL_ManualPort     int (string-encoded)
     //   hardware/<mac>/peripherals/TGXL_ManualIp       string
     //   hardware/<mac>/peripherals/TGXL_ManualPort     int (string-encoded)
+    //   hardware/<mac>/peripherals/Spe_Enabled         "True" | "False"
+    //   hardware/<mac>/peripherals/Spe_Mode            "Serial" | "Network"
+    //   hardware/<mac>/peripherals/Spe_SerialPort      string
+    //   hardware/<mac>/peripherals/Spe_Host            string
+    //   hardware/<mac>/peripherals/Spe_Port            int (string-encoded)
+    //   hardware/<mac>/peripherals/Spe_AutoReconnect   "True" | "False"
     //
     // peripheralValue(key, default):
     //   Returns the per-MAC value when connected, defaultValue otherwise.
@@ -1638,6 +1774,21 @@ public:
     // tst_radio_model_mic_ptt_wire can verify the signal/slot bind + prime
     // path without spinning up the full wireConnectionSignals pipeline.
     void wireMicPttDisabledForTest() { connectMicPttDisabledSignal(); }
+
+    /// Nur fuer Prueflaeufe: den Sendeweg so weit aufsetzen, dass
+    /// Ft8Applet wirklich senden kann — ohne Funkverbindung.
+    ///
+    /// ft8TxSource() und micRouter() entstehen sonst erst beim
+    /// Verbinden (siehe dort), und ohne sie bricht
+    /// Ft8Applet::sendeNachricht() mit „no transmit path" ab, bevor
+    /// irgendetwas geprueft werden kann. Setzt nur die beiden
+    /// Bausteine, nichts vom Rest der Kette: ein Pruefstand, der
+    /// senden WILL, soll nicht nebenbei eine Tonausgabe aufmachen.
+    void installFt8TxForTest();
+    /// Dasselbe fuer den RTTY-Sendeweg (2026-10-16). Eigener
+    /// Einbau statt eines gemeinsamen, damit ein Prueflauf, der nur
+    /// RTTY will, nicht nebenbei den FT8-Sender anmeldet.
+    void installRttyTxForTest();
     void wireMicInputsForTest() { connectMicInputSignals(); }
     void setLastBandForTest(Longpath::Band b) {
         const bool cross = (b != m_lastBand);
@@ -2464,6 +2615,9 @@ signals:
     // RF-Kit -> General). Consumers (e.g. MainWindow applet visibility)
     // react to show/hide the RF2K-S applet.
     void rfKitEnabledChanged(bool enabled);
+    void speEnabledChanged(bool enabled);
+    void kpa500EnabledChanged(bool enabled);
+    void acomEnabledChanged(bool enabled);
     // Die CW-Tonhoehe hat sich geaendert (setCwPitch). Thetis:
     // CWPitchChangedHandlers (console.cs:18241). Abnehmer: CW-Decoder
     // (Suchband), KiwiSDR-Nachfuehrung, Setup-Feld.
@@ -2791,6 +2945,21 @@ private:
     // Phase 3Q-1: drives the RadioModel-level connection state machine.
     // Guards against redundant transitions (no emit if state unchanged).
     void setConnectionState(ConnectionState s);
+
+    // ── Ein eigener Fund, dreifach weitergereicht (2026-10-17) ──────
+    //
+    // Spotliste (und damit Panadapter), der Sammler „was mein Geraet
+    // gehoert hat", und PSK Reporter. Einmal geschrieben fuer die
+    // eigenen FT8- und RTTY-Funde: der Rumpf stand vorher nur in
+    // onNativeFt8Decode, und eine zweite Abschrift waere die Stelle
+    // gewesen, an der die beiden auseinanderlaufen. Lebensdauer,
+    // Farbschluessel und die Betriebsart, die gilt, wenn im Kommentar
+    // keine steht, kommen vom Aufrufer.
+    void meldeEigenenFund(const Longpath::DxSpot& spot,
+                          const QString& lebensdauerSchluessel,
+                          int lebensdauerVorgabeSek,
+                          const QString& farbSchluessel,
+                          const QString& modusVorgabe);
 
     // ── Per-radio peripherals lifecycle ────────────────────────────────────
     // Drive the RF-Kit / 4O3A / PGXL / TGXL connections from the connection
@@ -3802,6 +3971,10 @@ private:
     // Reset before m_compositeMicRouter on teardown — see notes
     // around teardownConnection().
     std::unique_ptr<VaxTxMicSource>        m_vaxTxMicSource;
+    /// Der eigene FT8/FT4-Sender (2026-10-15). Am Router angemeldet,
+    /// liefert Stille, bis ihn jemand startet. Siehe core/Ft8Tx.h.
+    std::unique_ptr<Ft8TxSource> m_ft8TxSource;
+    std::unique_ptr<RttyTxSource> m_rttyTxSource;
     std::unique_ptr<CompositeTxMicRouter>  m_compositeMicRouter;
 
     // ── 3M-1c Phase L: cross-cutting ownership ──────────────────────────────
@@ -4035,6 +4208,9 @@ private:
     // so destruction order is deterministic and QObject hierarchy is intact.
     // Constructed once in the ctor; non-null from that point.
     std::unique_ptr<Rf2ksConnection> m_rfKitConnection;
+    std::unique_ptr<SpeConnection>   m_speConnection;
+    std::unique_ptr<Kpa500Connection> m_kpa500Connection;
+    std::unique_ptr<AcomConnection>   m_acomConnection;
 
     // Phase 3P-III review fix I2: last-seen RF-Kit operate state, used to gate
     // externalAmpOperateChanged so the cross-vendor signal fires only on actual

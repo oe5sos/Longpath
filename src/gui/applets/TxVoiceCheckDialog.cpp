@@ -238,7 +238,7 @@ void TxVoiceCheckDialog::updateGuide()
 
     m_nextLine->setText(QStringLiteral(
         "<span style='color:%1; letter-spacing:0.14em; "
-        "font-family:monospace;'>NEXT</span> "
+        "font-family:" LP_MONO_QSS ";'>NEXT</span> "
         "<span style='color:%2;'>%3</span>")
         .arg(QString::fromLatin1(Style::kTextGroupHead),
              QString::fromLatin1(Style::kTextPrimary),
