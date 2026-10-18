@@ -16,6 +16,8 @@
 #include "models/Band.h"
 #include <QDateTime>
 #include "core/AppSettings.h"
+#include "core/DxccColorProvider.h"
+#include "core/DxccWorkedStatus.h"
 #include "core/MoxController.h"
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/audio/AudioTapRing.h"
@@ -850,6 +852,15 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
 // appendHtml(): die Liste steht in fester Schrittweite, und HTML
 // faltet mehrfache Leerzeichen zusammen -- die Spalten (Zeit, dB, DT,
 // Hz) stuenden danach nicht mehr untereinander.
+Ft8Applet::Zeilenart Ft8Applet::zeilenart(bool anMich, bool neuesLand,
+                                         bool istCq)
+{
+    if (anMich)    { return Zeilenart::AnMich; }
+    if (neuesLand) { return Zeilenart::NeuesLand; }
+    if (istCq)     { return Zeilenart::Cq; }
+    return Zeilenart::Gewoehnlich;
+}
+
 void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht)
 {
     if (!m_list) { return; }
@@ -868,11 +879,40 @@ void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht)
     // eine Zeile, die an mich geht.
     if (m_nurCq && !istCq && !anMich) { return; }
 
+    // Ein Land, das noch nie im Logbuch stand? Der Auflaeser steht
+    // schon im Modell -- derselbe, der die Funde im Panadapter
+    // einfaerbt. Also DIESELBE Palette, keine zweite erfunden.
+    bool neuesLand = false;
+    QColor landFarbe;
+    const QString senderRuf = senderCallsign(nachricht);
+    if (m_model && m_model->dxccColorProvider() && !senderRuf.isEmpty()) {
+        auto* dxcc = m_model->dxccColorProvider();
+        if (dxcc->isEnabled()) {
+            const double mhz = (m_slice ? m_slice->frequency() : 0.0) / 1.0e6;
+            const QString modus = protocol() == Ft8Decoder::Protocol::Ft4
+                                      ? QStringLiteral("FT4")
+                                      : QStringLiteral("FT8");
+            neuesLand = dxcc->statusForSpot(senderRuf, mhz, modus)
+                        == DxccStatus::NewDxcc;
+            if (neuesLand) {
+                landFarbe = dxcc->colorForSpot(senderRuf, mhz, modus);
+            }
+        }
+    }
+
     QTextCharFormat f;
-    if (anMich) {
+    const Zeilenart art = zeilenart(anMich, neuesLand, istCq);
+    if (art == Zeilenart::AnMich) {
         f.setForeground(QColor(QString::fromLatin1(Style::kGreenText)));
         f.setFontWeight(QFont::Bold);
-    } else if (istCq) {
+    } else if (art == Zeilenart::NeuesLand) {
+        // Fett wie „an mich": ein neues Land uebersieht man sonst in
+        // zwanzig Zeilen je Fenster.
+        f.setForeground(landFarbe.isValid()
+                            ? landFarbe
+                            : QColor(QString::fromLatin1(Style::kAmberText)));
+        f.setFontWeight(QFont::Bold);
+    } else if (art == Zeilenart::Cq) {
         f.setForeground(QColor(QString::fromLatin1(Style::kAmberText)));
     } else {
         f.setForeground(QColor(QString::fromLatin1(Style::kTextPrimary)));

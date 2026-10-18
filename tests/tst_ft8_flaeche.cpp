@@ -63,6 +63,36 @@ private:
 
 private slots:
 
+    // ── Die Reihenfolge der Zeilenarten ─────────────────────────────
+    //
+    // Vier Sorten, und die REIHENFOLGE ist die Aussage. Sie laesst
+    // sich nicht ansehen: eine Zeile kann gleichzeitig „an mich",
+    // „neues Land" und „CQ" sein, und dann entscheidet diese Regel,
+    // was der Betreiber sieht.
+    //
+    // Der Fall, auf den es ankommt, ist die dritte Zeile unten: ein
+    // neues Land, das gerade KEIN CQ ruft. Es muss trotzdem
+    // hervorgehoben werden -- man kann die Station im Auge behalten,
+    // bis sie frei ist. Wuerde „CQ" darueber stehen, ginge genau das
+    // verloren, was man am wenigsten uebersehen will.
+    void dieReihenfolgeDerZeilenartenStimmt()
+    {
+        using Art = Ft8Applet::Zeilenart;
+
+        // an mich + neues Land + CQ -> an mich gewinnt
+        QCOMPARE(Ft8Applet::zeilenart(true, true, true), Art::AnMich);
+        // an mich allein
+        QCOMPARE(Ft8Applet::zeilenart(true, false, false), Art::AnMich);
+        // neues Land OHNE CQ -> trotzdem hervorgehoben
+        QCOMPARE(Ft8Applet::zeilenart(false, true, false), Art::NeuesLand);
+        // neues Land MIT CQ -> das Land schlaegt das CQ
+        QCOMPARE(Ft8Applet::zeilenart(false, true, true), Art::NeuesLand);
+        // nur CQ
+        QCOMPARE(Ft8Applet::zeilenart(false, false, true), Art::Cq);
+        // ein fremdes QSO
+        QCOMPARE(Ft8Applet::zeilenart(false, false, false), Art::Gewoehnlich);
+    }
+
     // ── „CQ only" filtert die ANSICHT, nicht den Betrieb ────────────
     //
     // Betreiber 2026-10-18: „dachte das sind dann mehr optionen usw.
