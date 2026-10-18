@@ -29,6 +29,8 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QColor>
+#include <QTextCharFormat>
 #include <QTextCursor>
 #include <QMouseEvent>
 #include <QProgressBar>
@@ -144,6 +146,28 @@ void Ft8Applet::buildUI()
         setProtocol(Ft8Decoder::Protocol::Ft4);
     });
     head->addWidget(m_ft4Btn);
+
+    head->addSpacing(8);
+
+    // ── „CQ only" ───────────────────────────────────────────────────
+    //
+    // Betreiber 2026-10-18, nach dem ersten Blick in das Fenster:
+    // „dachte das sind dann mehr optionen usw. wie ein richtiges ft8
+    // programm". In WSJT-X ist das der haeufigste Griff ueberhaupt --
+    // man sucht jemanden, den man rufen KANN, und das sind die
+    // CQ-Zeilen.
+    //
+    // Nur die Ansicht wird gefiltert. Der Ablauf bekommt weiter jeden
+    // Fund (siehe m_nurCq in Ft8Applet.h): sonst verschwaende ein
+    // laufendes QSO, sobald der Haken sitzt.
+    m_nurCqBtn = blueToggle(tr("CQ only"), 64);
+    m_nurCqBtn->setCheckable(true);
+    m_nurCqBtn->setToolTip(tr("Show only CQ calls. The QSO still runs "
+                              "on every decode."));
+    connect(m_nurCqBtn, &QPushButton::clicked, this, [this](bool an) {
+        m_nurCq = an;
+    });
+    head->addWidget(m_nurCqBtn);
 
     head->addSpacing(8);
 
@@ -762,8 +786,7 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
             .arg(d.dtSeconds, 5, 'f', 1)
             .arg(static_cast<int>(std::lround(d.freqHz)), 5)
             .arg(d.text);
-        m_list->appendPlainText(zeile);
-        ++m_lineCount;
+        zeigeZeile(zeile, d.text);
 
         // Der Fund geht an EINE Stelle: RadioModel verteilt ihn weiter
         // (Panadapter-Ueberlagerung ueber SpotModel, der Sammler
@@ -810,6 +833,56 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
 
     m_list->moveCursor(QTextCursor::End);
     m_list->ensureCursorVisible();
+}
+
+
+// ── Eine Zeile in die Liste, gefiltert und gefaerbt ─────────────────
+//
+// Drei Sorten, nach Dringlichkeit:
+//
+//   1. Die Nachricht enthaelt das EIGENE Rufzeichen -- jemand ruft
+//      dich. Gruen und fett; das ist die einzige Zeile, die man nicht
+//      uebersehen darf.
+//   2. Die Nachricht faengt mit „CQ" an -- jemand ist rufbar. Bernstein.
+//   3. Alles andere -- ein fremdes QSO. Die gewoehnliche Textfarbe.
+//
+// Eingefaerbt wird ueber einen Cursor mit Zeichenformat, nicht ueber
+// appendHtml(): die Liste steht in fester Schrittweite, und HTML
+// faltet mehrfache Leerzeichen zusammen -- die Spalten (Zeit, dB, DT,
+// Hz) stuenden danach nicht mehr untereinander.
+void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht)
+{
+    if (!m_list) { return; }
+
+    const QString ruf = eigenesRufzeichen();
+    // Wortgrenzen, nicht contains(): „OE5SOS" steckt auch in
+    // „OE5SOSX", und das ist eine andere Station.
+    const bool anMich =
+        !ruf.isEmpty()
+        && nachricht.toUpper().split(QLatin1Char(' '),
+                                     Qt::SkipEmptyParts).contains(ruf);
+    const bool istCq = nachricht.trimmed().toUpper().startsWith(
+        QStringLiteral("CQ"));
+
+    // Der Filter gilt NUR fuer die Ansicht -- und auch dort nicht fuer
+    // eine Zeile, die an mich geht.
+    if (m_nurCq && !istCq && !anMich) { return; }
+
+    QTextCharFormat f;
+    if (anMich) {
+        f.setForeground(QColor(QString::fromLatin1(Style::kGreenText)));
+        f.setFontWeight(QFont::Bold);
+    } else if (istCq) {
+        f.setForeground(QColor(QString::fromLatin1(Style::kAmberText)));
+    } else {
+        f.setForeground(QColor(QString::fromLatin1(Style::kTextPrimary)));
+    }
+
+    QTextCursor c(m_list->document());
+    c.movePosition(QTextCursor::End);
+    if (!m_list->document()->isEmpty()) { c.insertBlock(); }
+    c.insertText(zeile, f);
+    ++m_lineCount;
 }
 
 } // namespace Longpath
