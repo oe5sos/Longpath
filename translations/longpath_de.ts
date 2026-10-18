@@ -1989,6 +1989,14 @@ Higher = smoother but slower to react to changing noise.</source>
 <context>
     <name>Longpath::FmOptContainer</name>
     <message>
+        <source>Lit while the configured CTCSS sub-tone is present</source>
+        <translation>Leuchtet, solange der eingestellte CTCSS-Subton anliegt</translation>
+    </message>
+    <message>
+        <source>DCS code in octal, N = normal, I = inverted</source>
+        <translation>DCS-Code als Oktalzahl, N = normal, I = invertiert</translation>
+    </message>
+    <message>
         <location filename="../src/gui/widgets/VfoModeContainers.cpp" line="449"/>
         <source>The %1 is present</source>
         <translation>Der %1 liegt an</translation>
