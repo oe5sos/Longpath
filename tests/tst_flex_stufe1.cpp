@@ -140,9 +140,14 @@ public:
     // des Befehls. Wert ist „<code-hex>|<rumpf>".
     QMap<QString, QString> antworten;
 
-    // Zeilen, die nach einer bestimmten Antwort ungefragt nachkommen
-    // (die echte Maschine schiebt den Scheibenzustand so nach).
+    // Zeilen, die nach einer bestimmten Antwort ungefragt nachkommen.
     QMap<QString, QStringList> nachschub;
+
+    // Zeilen, die VOR der Antwort kommen. Die echte 8400 schiebt den
+    // Scheibenzustand so — am 2026-10-18 13:40 gemessen: die Frequenz
+    // stand im Protokoll, bevor „angemeldet" gemeldet wurde. AetherSDR
+    // beschreibt dasselbe (RadioModel.cpp:6535-6539 [@d58e2b8a]).
+    QMap<QString, QStringList> vorschub;
 
     QStringList empfangeneBefehle;
 
@@ -178,6 +183,13 @@ private slots:
                     break;
                 }
             }
+
+            if (!treffer.isEmpty()) {
+                for (const QString& frueh : vorschub.value(treffer)) {
+                    schreiben(frueh);
+                }
+            }
+
             schreiben(QStringLiteral("R%1|%2").arg(seq).arg(antwort));
 
             if (!treffer.isEmpty()) {
@@ -1055,6 +1067,57 @@ private slots:
         QVERIFY(angemeldet.wait(8000) || model.flexConnection()->isConnected());
         QVERIFY(model.connection() == nullptr);
         model.disconnectFromRadio();
+    }
+
+    // Am 2026-10-18 13:40 an der echten FLEX-8400 gemessen: die
+    // Maschine legt Panadapter und Scheibe SELBST an, sobald sich ein
+    // GUI-Client anmeldet — und schiebt den Scheibenzustand VOR der
+    // Antwort auf `client gui`. `slice list` meldet dann 1, nicht 0,
+    // und der Anlegeweg darf nicht greifen.
+    //
+    // Das ist an dieser Maschine der NORMALFALL, nicht der Randfall.
+    void echteMaschineLegtSelbstAnUndSchiebtVorDerAntwort()
+    {
+        FalscheMaschine radio;
+        QVERIFY(radio.hoeren());
+        radio.antworten.insert(QStringLiteral("client program"),
+                               QStringLiteral("10000002|unknown client program Longpath"));
+        radio.antworten.insert(QStringLiteral("client gui"), QStringLiteral("0|"));
+        // Die Scheibe ist schon da, wenn `slice list` gefragt wird.
+        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|0"));
+        // …und ihr Zustand kommt VOR der Anmeldeantwort.
+        radio.vorschub.insert(QStringLiteral("client gui"), {
+            QStringLiteral("S57468A0B|display pan 0x40000000 center=14.100000 "
+                           "bandwidth=0.200000 waterfall=0x42000000"),
+            QStringLiteral("S57468A0B|slice 0 in_use=1 RF_frequency=14.100000 "
+                           "mode=USB rxant=ANT1 ant_list=ANT1,ANT2,RX_A,XVTA")});
+
+        FlexRadioConnection conn;
+        conn.setGuiClientId(QStringLiteral("ABCDEF01-2345-6789-ABCD-EF0123456789"));
+
+        QSignalSpy frequenz(&conn, &FlexRadioConnection::sliceFrequencyChanged);
+        QSignalSpy angemeldet(&conn, &FlexRadioConnection::guiClientRegistered);
+        QSignalSpy listeGelesen(&conn, &FlexRadioConnection::sliceListRead);
+        QSignalSpy angelegt(&conn, &FlexRadioConnection::defaultSliceCreated);
+
+        conn.connectToRadio(QHostAddress::LocalHost, radio.port());
+        QVERIFY(listeGelesen.wait(5000));
+
+        // Die Frequenz war VOR der Anmeldung da — der Hoerer haengt
+        // seit dem Erzeugen dran, nicht erst seit der Anmeldung. Haette
+        // man ihn erst nach `guiClientRegistered` verdrahtet, waere sie
+        // verloren.
+        QCOMPARE(frequenz.count(), 1);
+        QCOMPARE(frequenz.at(0).at(1).toDouble(), 14'100'000.0);
+        QCOMPARE(angemeldet.count(), 1);
+
+        // Eine Scheibe ist da ⇒ nichts anlegen.
+        QCOMPARE(listeGelesen.at(0).at(0).value<QList<int>>(), QList<int>({0}));
+        QTest::qWait(300);
+        QCOMPARE(angelegt.count(), 0);
+        QVERIFY(!radio.empfangeneBefehle.contains(
+            QStringLiteral("display panafall create x=100 y=100")));
+        QVERIFY(radio.empfangeneBefehle.filter(QStringLiteral("slice create")).isEmpty());
     }
 
     void rueckrufLaeuftGenauEinmal()

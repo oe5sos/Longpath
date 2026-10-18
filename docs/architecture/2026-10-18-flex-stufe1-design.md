@@ -238,6 +238,55 @@ Maschine nie.
 `display panafall create` + `slice create`. Das ist, was ein echter
 Treiber tun muss.
 
+### Nachtrag 13:40 — am echten Gerät gefahren, und es kam anders
+
+Das Stationsnetz war wieder da (`172.30.30.110`, Ping zur 8400 52 ms).
+Die Sonde durchgelaufen:
+
+```
+GEFUNDEN   FLEX-8400 (Martin)  172.30.30.12  maxRx=2
+API        1.4.0.0
+KENNUNG    ACA918B0-… (flüchtig, nur für diese Sonde)
+PAN        display pan 0x40000000  center=14.100000 bandwidth=0.200000
+                                   waterfall=0x42000000
+ZUSTAND    slice 0  mode=USB rxant=ANT1
+                    ant_list=ANT1,ANT2,RX_A,XVTA in_use=1
+>>> FREQUENZ  Scheibe 0 = 14.100000 MHz
+ANGEMELDET als GUI-Client
+SCHEIBEN   1 vorhanden [0]
+--- Aufräumen ---  nichts angelegt, nichts zu entfernen
+```
+
+**Die Frequenz ist gelesen.** Das Ziel der Stufe 1 ist am echten Gerät
+belegt.
+
+Drei Befunde, die §4 korrigieren bzw. ergänzen:
+
+1. **Die Maschine legt Panadapter und Scheibe SELBST an**, sobald sich
+   ein GUI-Client anmeldet — `display pan 0x40000000` (Mitte 14,1 MHz,
+   Breite 200 kHz) und `slice 0`. Unser Weg „leere Liste ⇒ anlegen" hat
+   also gar nicht gegriffen: `slice list` meldete **1**, und die
+   „nicht verdoppeln"-Verzweigung hat richtig nichts getan. Damit ist
+   diese Verzweigung kein Randfall, sondern der **Normalfall** an dieser
+   Maschine. Der Anlegeweg bleibt trotzdem drin — er ist der Fall, den
+   AetherSDR an seiner eigenen Hardware gesehen hat (deren #3212).
+2. **Der Scheibenzustand kommt VOR der Antwort auf `client gui`.** Die
+   Frequenz stand im Protokoll, bevor „angemeldet" gemeldet wurde.
+   AetherSDR beschreibt genau das (`RadioModel.cpp:6535-6539
+   [@d58e2b8a]`: „The radio dumps slice status in response to GUI-client
+   registration, which lands BEFORE the `client gui` reply"); hier ist
+   es bestätigt. Folge für Longpath: `flexSliceFrequencyChanged` kann
+   feuern, während der Zustand noch `Connecting` ist. Für Stufe 1
+   harmlos — die Frequenz wird nur weitergereicht.
+3. **Es sammelt sich nichts an.** Zweiter Lauf mit einer anderen
+   flüchtigen Kennung: wieder `pan 0x40000000`, wieder genau eine
+   Scheibe `[0]`. Die Maschine stapelt also keine Panadapter je
+   weggeworfener Kennung. Trotzdem bleibt das Merken der Kennung richtig
+   (§8) — sie stellt Frequenz und Betriebsart wieder her.
+
+Nebenbei abgelesen: die Antennen der 8400 sind
+`ANT1, ANT2, RX_A, XVTA`.
+
 ### Gewählt: (b)
 
 Martin am 2026-10-18 auf die Frage: „keine ahnung, entscheide selbst."
@@ -404,7 +453,7 @@ Gestaltungsfrage und gehört Martin — nicht dieser Naht.
 | Befehlskanal am echten Gerät | live: V/H, `sub slice all` → `R2|0|` |
 | GUI-Anmeldung, `slice list`, Anlegen einer Vorgabescheibe | `tst_flex_stufe1`, **Rundlauf durch den echten Socket** gegen eine falsche Maschine auf 127.0.0.1 — Reihenfolge der Befehle, zurückgemeldete Kennung, Rückfall `panafall` → `panadapter create`, „vorhandene Scheibe nicht verdoppeln", abgelehnte Anmeldung, `setMayCreateDefaultSlice(false)` |
 | Kennungen und Listen aus Antworten | `tst_flex_stufe1`; die drei Antwortformen von `display panafall create` stammen aus AetherSDRs eigenem Prüfstand (`radio_status_ownership_test.cpp:354-362 [@d58e2b8a]`), nicht aus einer Annahme — siehe §6.1 |
-| **Frequenz am echten Gerät** | **NICHT belegt.** Erst war keine Scheibe da (§4); seit der GUI-Anmeldung gebaut ist, ist die 8400 nicht erreichbar — der Mac hängt jetzt an 192.168.78.0/24, die Route nach 172.30.30.12 geht über das Standard-Gateway ins Leere. Kein Code-Befund, ein Netzzustand. |
+| **Frequenz am echten Gerät** | **BELEGT, 2026-10-18 13:40** — GUI-Anmeldung durch, `slice list` = [0], `slice 0 RF_frequency=14.100000` gelesen, nichts auf dem Gerät zurückgelassen. Protokoll im Nachtrag zu §4. |
 | Zeile in der Geräteliste | `tst_flex_zeile_in_der_geraeteliste` — Platine „FLEX-8400", Spalte „Flex", IP, In-Use; ein zweiter Ruf führt die Zeile nach statt sie zu verdoppeln; ein Flex und ein OpenHPSDR stehen nebeneinander richtig beschriftet. **Mit Gegenprobe:** ohne die zwei `case`-Zweige meldet der Prüfstand „Unknown" und „P1" — genau der SunSDR-Fehler vom 2026-08-26. Live **nicht** gesehen (siehe §6.2). |
 
 40 von 40 Prüffällen grün.
@@ -430,11 +479,8 @@ Kennung zu melden; das steht jetzt als eigener Prüffall drin.
 
 ## 7. Offen
 
-1. **Die GUI-Anmeldung am echten Gerät fahren.** Braucht die
-   Stationsnetz-Verbindung zurück (§6). Die Sonde dafür liegt bereit:
-   sie räumt hinterher auf, was sie angelegt hat (`slice remove`,
-   `display pan remove`, `display panafall remove` — das Paar aus
-   `RadioModel::removePanadapter [@d58e2b8a]`).
+1. *(erledigt 13:40)* Die GUI-Anmeldung am echten Gerät gefahren, die
+   Frequenz gelesen — siehe Nachtrag zu §4.
 2. *(erledigt)* Die Kennung wird dauerhaft gemerkt — siehe §8.
 3. Die Zeile in der Geräteliste live ansehen — inhaltlich jetzt durch
    `tst_flex_zeile_in_der_geraeteliste` samt Gegenprobe abgedeckt, der
