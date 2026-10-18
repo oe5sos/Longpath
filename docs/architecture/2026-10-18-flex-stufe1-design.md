@@ -405,7 +405,7 @@ Gestaltungsfrage und gehört Martin — nicht dieser Naht.
 | GUI-Anmeldung, `slice list`, Anlegen einer Vorgabescheibe | `tst_flex_stufe1`, **Rundlauf durch den echten Socket** gegen eine falsche Maschine auf 127.0.0.1 — Reihenfolge der Befehle, zurückgemeldete Kennung, Rückfall `panafall` → `panadapter create`, „vorhandene Scheibe nicht verdoppeln", abgelehnte Anmeldung, `setMayCreateDefaultSlice(false)` |
 | Kennungen und Listen aus Antworten | `tst_flex_stufe1`; die drei Antwortformen von `display panafall create` stammen aus AetherSDRs eigenem Prüfstand (`radio_status_ownership_test.cpp:354-362 [@d58e2b8a]`), nicht aus einer Annahme — siehe §6.1 |
 | **Frequenz am echten Gerät** | **NICHT belegt.** Erst war keine Scheibe da (§4); seit der GUI-Anmeldung gebaut ist, ist die 8400 nicht erreichbar — der Mac hängt jetzt an 192.168.78.0/24, die Route nach 172.30.30.12 geht über das Standard-Gateway ins Leere. Kein Code-Befund, ein Netzzustand. |
-| **Zeile in der Geräteliste** | **NICHT live gesehen** — Longpath läuft gerade (PID 76168), eine zweite Fassung daneben zu starten hätte Martins Betrieb gestört. Verdrahtung steht, Beschriftung steht. |
+| Zeile in der Geräteliste | `tst_flex_zeile_in_der_geraeteliste` — Platine „FLEX-8400", Spalte „Flex", IP, In-Use; ein zweiter Ruf führt die Zeile nach statt sie zu verdoppeln; ein Flex und ein OpenHPSDR stehen nebeneinander richtig beschriftet. **Mit Gegenprobe:** ohne die zwei `case`-Zweige meldet der Prüfstand „Unknown" und „P1" — genau der SunSDR-Fehler vom 2026-08-26. Live **nicht** gesehen (siehe §6.2). |
 
 40 von 40 Prüffällen grün.
 
@@ -436,7 +436,9 @@ Kennung zu melden; das steht jetzt als eigener Prüffall drin.
    `display pan remove`, `display panafall remove` — das Paar aus
    `RadioModel::removePanadapter [@d58e2b8a]`).
 2. *(erledigt)* Die Kennung wird dauerhaft gemerkt — siehe §8.
-3. Die Zeile in der Geräteliste live ansehen.
+3. Die Zeile in der Geräteliste live ansehen — inhaltlich jetzt durch
+   `tst_flex_zeile_in_der_geraeteliste` samt Gegenprobe abgedeckt, der
+   Blick auf das echte Fenster fehlt weiter.
 4. `V1.4.0.0` vs. `version=4.3.16.42034`: wenn eine Fassung angezeigt
    wird, die aus dem Ruf nehmen, nicht die aus dem Kanal.
 5. **Stufe 2:** VITA-49 und die zwei Eingänge aus §5.1/§5.2.
@@ -510,4 +512,13 @@ Panadapter → Scheibe → **Frequenz 14.074 MHz gelesen** → Kennung
 gespeichert → trennen. Dazu: eine gespeicherte Kennung wird
 wiederverwendet, und ein Flex erzeugt keine `RadioConnection`.
 
-43 von 43 Prüffällen grün.
+43 + 5 = **48 Prüffälle grün** (`tst_flex_stufe1` 43, `tst_flex_zeile_in_der_geraeteliste` 5).
+
+### 6.2 Warum die Zeile nicht live angesehen wurde
+
+Zweimal nicht möglich, aus zwei verschiedenen Gründen: zuerst lief
+Longpath (PID 76168) und eine zweite Fassung daneben hätte den Betrieb
+gestört; danach war die 8400 nicht mehr erreichbar, es wäre also auch
+keine Zeile erschienen. Ein Blick, den man nicht tun kann, ist kein
+Beleg — deshalb der Prüfstand mit Gegenprobe. Der Blick bleibt trotzdem
+ausstehend (§7).

@@ -7702,6 +7702,14 @@ longpath_add_test(tst_notch_visual_does_not_perturb_noise_floor_or_maxbin)
 #         src/core/FlexRadioConnection.h und docs/attribution/AETHERSDR-PORTS.md).
 longpath_add_test(tst_flex_stufe1)
 
+# -- Flex: steht die Maschine richtig beschriftet in der Geraeteliste? ----
+# Schliesst einen offenen Punkt aus dem Entwurf, den man NICHT live
+# ansehen konnte (Longpath lief, danach war das Geraet nicht erreichbar).
+# Geprueft wird die Falle, die beim SunSDR erst live auffiel: Spalte
+# „Protocol" richtig, Feld darunter trotzdem „P1".
+# Quelle: Longpath-original.
+longpath_add_test(tst_flex_zeile_in_der_geraeteliste)
+
 # 2026-09-25: Rendering-Pruefstand (ohne LONGPATH_GRAB_DIR uebersprungen),
 # die Retina-Spaltenzusammenfassung und die Frequenzskalen-Beschriftung,
 # die er gefunden hat.
