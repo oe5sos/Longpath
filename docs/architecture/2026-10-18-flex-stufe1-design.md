@@ -487,7 +487,13 @@ Kennung zu melden; das steht jetzt als eigener Prüffall drin.
    Blick auf das echte Fenster fehlt weiter.
 4. `V1.4.0.0` vs. `version=4.3.16.42034`: wenn eine Fassung angezeigt
    wird, die aus dem Ruf nehmen, nicht die aus dem Kanal.
-5. **Stufe 2:** VITA-49 und die zwei Eingänge aus §5.1/§5.2.
+5. **Stufe 2:** VITA-49 und die zwei Eingänge aus §5.1/§5.2. Der Draht
+   dafür ist am 2026-10-18 gemessen und steht in
+   `docs/protocols/flex-vita49-gemessen.md` — Kopf, beide Unterköpfe,
+   Rahmenaufbau, und die zwei Stellen, an denen man sich sicher irrt
+   (Bins sind Y-Pixel, nicht dBm; die Kachelfrequenzen sind Festkomma
+   Hz × 2²⁰). Der **Tonweg fehlt dort** und braucht einen eigenen
+   Messlauf, bevor er portiert wird.
 
 Nicht mehr offen: das Phantom-Flex (§3.3) — auf main behoben, `e5515581`
 / PR #272. Und die Richtungsfrage aus §4 — entschieden: (b).
