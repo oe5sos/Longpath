@@ -63,6 +63,62 @@ private:
 
 private slots:
 
+    // ── „CQ only" filtert die ANSICHT, nicht den Betrieb ────────────
+    //
+    // Betreiber 2026-10-18: „dachte das sind dann mehr optionen usw.
+    // wie ein richtiges ft8 programm". In WSJT-X ist das der haeufigste
+    // Griff -- man sucht jemanden, den man rufen KANN.
+    //
+    // Der Lauf haelt beide Haelften fest: die fremde QSO-Zeile
+    // verschwindet aus der Liste, steht aber weiter im Modell. Faellt
+    // die zweite Haelfte weg, waere der Filter kein Filter mehr,
+    // sondern ein Taubstellen des Dekoders.
+    void nurCqFiltertDieAnsichtAberNichtDasModell()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        QVERIFY(slice);
+        slice->setFrequency(14074000.0);
+        applet.setSlice(slice);
+
+        QVERIFY2(applet.nurCqButtonForTest(), "der Knopf fehlt");
+        applet.nurCqButtonForTest()->click();
+        QVERIFY(applet.nurCqButtonForTest()->isChecked());
+
+        QVERIFY(radio.rxDecodeModel());
+        const int vorher = radio.rxDecodeModel()->decodes().size();
+
+        const QDateTime fenster =
+            QDateTime::fromMSecsSinceEpoch(999999990000LL, QTimeZone::UTC);
+
+        // 1. Ein fremdes QSO -- kein CQ.
+        QMetaObject::invokeMethod(
+            &applet, "onDecoded", Qt::DirectConnection,
+            Q_ARG(QVector<Longpath::Ft8Decode>,
+                  einFund(QStringLiteral("DL1ABC DK0BO -12"))),
+            Q_ARG(QDateTime, fenster));
+
+        QVERIFY2(!applet.listForTest()->toPlainText()
+                     .contains(QStringLiteral("DL1ABC DK0BO")),
+                 qPrintable(applet.listForTest()->toPlainText()));
+        QVERIFY2(radio.rxDecodeModel()->decodes().size() == vorher + 1,
+                 "der Filter hat den Fund auch aus dem Modell gehalten");
+
+        // 2. Ein CQ -- der kommt durch.
+        QMetaObject::invokeMethod(
+            &applet, "onDecoded", Qt::DirectConnection,
+            Q_ARG(QVector<Longpath::Ft8Decode>,
+                  einFund(QStringLiteral("CQ DL1ABC JN49"))),
+            Q_ARG(QDateTime, fenster));
+
+        QVERIFY2(applet.listForTest()->toPlainText()
+                     .contains(QStringLiteral("CQ DL1ABC JN49")),
+                 qPrintable(applet.listForTest()->toPlainText()));
+    }
+
     // ── Der Fund kommt an zwei Stellen an ───────────────────────────
 
     void einFundStehtInDerListeUndImModell()

@@ -162,6 +162,7 @@ public:
     QPlainTextEdit* listForTest()   const { return m_list; }
     QLabel*         statusForTest() const { return m_status; }
     QLabel*         lastLabelForTest() const { return m_lastLabel; }
+    QPushButton*    nurCqButtonForTest() const { return m_nurCqBtn; }
     QPushButton*    ft8ButtonForTest() const { return m_ft8Btn; }
     QPushButton*    ft4ButtonForTest() const { return m_ft4Btn; }
     int             lastPeriodCountForTest() const { return m_lastPeriodCount; }
@@ -202,6 +203,18 @@ private:
     QLabel*         m_lastLabel{nullptr};
     QProgressBar*   m_fill{nullptr};
     QPlainTextEdit* m_list{nullptr};
+    /// „CQ only": ein reiner ANSICHTS-Filter. Der Ablauf und die Funde
+    /// fuer Panadapter/Logbuch laufen weiter ueber ALLE Zeilen -- wer
+    /// dich ruft, darf nicht verschwinden, nur weil die Liste gerade
+    /// aufgeraeumt ist. Bewusst nicht gesichert: er gehoert zum Blick
+    /// auf das Band, nicht zur Einrichtung der Station.
+    /// Haengt eine fertig gesetzte Zeile an die Liste -- gefiltert
+    /// (siehe m_nurCq) und nach Dringlichkeit gefaerbt. `nachricht` ist
+    /// der reine FT8-Text ohne die Spalten davor.
+    void zeigeZeile(const QString& zeile, const QString& nachricht);
+
+    QPushButton* m_nurCqBtn{nullptr};
+    bool m_nurCq{false};
     QPushButton*    m_ft8Btn{nullptr};
     QPushButton*    m_ft4Btn{nullptr};
     QPushButton*    m_clearBtn{nullptr};
