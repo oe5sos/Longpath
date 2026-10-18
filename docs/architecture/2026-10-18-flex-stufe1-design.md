@@ -492,8 +492,13 @@ Kennung zu melden; das steht jetzt als eigener Prüffall drin.
    `docs/protocols/flex-vita49-gemessen.md` — Kopf, beide Unterköpfe,
    Rahmenaufbau, und die zwei Stellen, an denen man sich sicher irrt
    (Bins sind Y-Pixel, nicht dBm; die Kachelfrequenzen sind Festkomma
-   Hz × 2²⁰). Der **Tonweg fehlt dort** und braucht einen eigenen
-   Messlauf, bevor er portiert wird.
+   Hz × 2²⁰). **Der Ton ist inzwischen mitgemessen:** eigener Strom
+   (`stream create type=remote_audio_rx`), 24 kHz float32-Stereo ohne
+   Unterkopf — dieselbe Form, die `feedKiwiSdrAudioData` schon
+   entgegennimmt, §5.1 passt also ohne Umbau. Dazu zwei Fallen, die
+   erst der Mitschnitt zeigt: die vier Null-Byte am Paketende sind kein
+   VITA-Anhang (wer nach Datagrammlänge zählt, erfindet zwei Bins
+   Vollausschlag je Rahmenrand), und die VITA-Zeitstempel stehen still.
 
 Nicht mehr offen: das Phantom-Flex (§3.3) — auf main behoben, `e5515581`
 / PR #272. Und die Richtungsfrage aus §4 — entschieden: (b).

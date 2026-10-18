@@ -1,7 +1,8 @@
 # FlexRadio VITA-49 — gemessen an einer FLEX-8400
 
 Aufgezeichnet am 2026-10-18 an OE5SOS' FLEX-8400 (172.30.30.12, SmartSDR
-4.3.16.42034, API 1.4.0.0). 1832 Datagramme, 2,1 MB in 20 s.
+4.3.16.42034, API 1.4.0.0). Zwei Läufe: 1832 Datagramme / 2,1 MB ohne
+Ton, dann 5160 Datagramme / 5,7 MB mit Ton.
 
 Diese Datei ist der Gegenprüfstein für den Port von AetherSDRs
 `PanadapterStream` (2279 Zeilen). **Nichts daraus ist geraten:** jede
@@ -174,19 +175,121 @@ kommen — beim Wasserfall steht sie drin, beim Panadapter nicht.
 
 ---
 
-## 5. Was im Mitschnitt NICHT vorkam
+## 5. Paketklasse 0x03E3 — Ton
 
-Nur `0x8003` und `0x8004`. Kein Ton (`0x03E3` float32-Stereo,
-`0x0123` int16-Mono reduzierte Bandbreite) und keine Messwerte
-(`0x8002`). Das ist **kein** Befund über das Protokoll: der Messlauf hat
-den Ton nie angeschaltet. Abwesenheit ist keine Aussage — es heißt nur,
-dass hier nichts darüber belegt ist.
+### Der Ton braucht einen eigenen Strom
 
-Der Tonweg braucht einen eigenen Messlauf, bevor er portiert wird.
+Im ersten Lauf kam **kein einziges** Tonpaket. `slice set 0 audio_mute=0`
+und `audio_level=50` wurden beide mit Code 0 angenommen und änderten
+nichts. Es fehlt ein eigener Strom:
+
+```
+stream create type=remote_audio_rx compression=none   → R|0|4000008
+```
+
+`compression=none` ist die LAN-Vorgabe, `opus` die für WAN
+(`RadioModel::audioCompressionParam [@d58e2b8a]`). Die Antwort trägt die
+Stromkennung, und **genau die steht dann im VITA-Kopf**: `0x04000008`.
+
+### ⚠ Nebenwirkung auf die Station
+
+Die Firmware hat `mute_local_audio_when_remote=1` (im Radio-Zustand
+nachzulesen). **Sobald ein `remote_audio_rx`-Strom existiert, schweigen
+die Hardware-Ausgänge des Geräts** — der Betreiber hört an seiner
+eigenen Station nichts mehr. AetherSDR schiebt deshalb vor dem Öffnen
+eine 0 hin (`RadioModel.cpp:8438-8443 [@d58e2b8a]`).
+
+Der Messlauf hat es genauso gemacht und danach zurückgestellt:
+
+```
+radio set mute_local_audio_when_remote=0     (vor dem Öffnen)
+…
+stream remove 4000008
+radio set mute_local_audio_when_remote=1     (zurück)
+slice set 0 audio_mute=1
+```
+
+Wer diesen Strom öffnet, ohne daran zu denken, macht die Station stumm
+und sucht den Fehler dann im Verstärker.
+
+### Der Aufbau
+
+**Kein Unterkopf.** Nach den 28 Byte Kopf kommen direkt die Werte:
+big-endian **float32, Stereo verschränkt** (L, R, L, R, …) —
+`PanadapterStream.cpp:1142-1157 [@d58e2b8a]`.
+
+Gemessen, 3382 Pakete, **alle 1052 Byte**:
+
+```
+Kopf: 38 50 01 07 | 04 00 00 08 | 00 00 1c 2d | 53 4c 03 e3 | …
+      StreamID 0x04000008 = die Kennung aus der stream-create-Antwort
+      Nutzlast 1024 Byte = 128 Rahmen × float32-Stereo, genau aufgehend
+      Werte alle endlich und alle in [-1, 1]; min -0,054 max +0,065
+      Links ≠ Rechts, also echtes Stereo, kein Mono im Stereorahmen
+```
+
+3382 × 128 = 432 896 Rahmen in ~20 s ≈ **24 kHz Stereo**. Das ist
+dieselbe Form, die `AudioEngine::feedKiwiSdrAudioData` schon
+entgegennimmt (`pcm24kStereoFloat`) — der Tonweg aus §5.1 des Entwurfs
+passt also ohne Umbau.
+
+Nicht gemessen: die schmale Klasse `0x0123` (int16-Mono, reduzierte
+Bandbreite — kommt mit `client set send_reduced_bw_dax=1`) und die
+Messwerte `0x8002`. Abwesenheit ist keine Aussage; dazu ist hier nichts
+belegt.
 
 ---
 
-## 6. Wie man den Mitschnitt wiederholt
+## 6. Zwei Fallen, die erst der Mitschnitt zeigt
+
+### 6.1 Die vier Null-Byte am Ende sind KEIN VITA-Anhang
+
+Jedes Paket aller drei Klassen ist 4 Byte länger als seine Nutzdaten,
+und diese 4 Byte sind immer `00 00 00 00`:
+
+```
+FFT  len=1384  numBins=670  Bindaten enden bei 1380   Rest 4   T-Bit=0
+FFT  len= 752  numBins=354  Bindaten enden bei  748   Rest 4   T-Bit=0
+WF   len=1384  width=658    Daten enden bei 1380      Rest 4   T-Bit=0
+WF   len=1040  width=486    Daten enden bei 1036      Rest 4   T-Bit=0
+Ton  len=1052  1024 Byte = 128 × float32-Stereo       Rest 0   T-Bit=0
+```
+
+Das **T-Bit im Kopf ist überall 0**, es ist also kein angekündigter
+VITA-Trailer, sondern Füllung — und beim Ton fehlt sie ganz.
+
+**Die Falle:** wer die Anzahl der Werte aus der *Datagrammlänge*
+ableitet statt aus dem Unterkopf, liest bei FFT und Wasserfall **zwei
+Werte zu viel**, beide 0. Und 0 heißt im Pixelcode der Maschine
+`max_dbm`, also **Vollausschlag** — man bekommt an jedem Rahmenrand ein
+erfundenes Riesensignal. Richtig ist: `numBins` bzw.
+`tileWidth × tileHeight` zählen, den Rest wegwerfen.
+
+### 6.2 Die VITA-Zeitstempel stehen still
+
+Über den ganzen Mitschnitt, alle drei Klassen:
+
+```
+FFT        Sekundenstempel: 1 verschiedener Wert   Bruchteil: 1 Wert
+Wasserfall Bruchteil überall 0
+Ton        Sekundenstempel: 1 Wert    Bruchteil: 11009, 3381× Abstand 0
+```
+
+Der Kopf sagt TSI=1 (UTC) und TSF=1 (Sample-Count) — die Felder tragen
+aber keine laufende Zeit. **Ein Leser, der Ton nach diesen Zeitstempeln
+taktet oder Pakete danach ordnet, bleibt stehen.** Was wirklich läuft:
+
+* der **4-Bit-Rollzähler** in Byte 1 des Kopfes (fortlaufend geprüft:
+  12,13,14,15,0,1,…) — für Verlusterkennung,
+* `frameIndex` im FFT-Unterkopf — für Rahmengrenzen,
+* `timecode` im Wasserfall-Unterkopf — für Zeilengrenzen.
+
+AetherSDR benutzt die VITA-Zeitstempel an keiner Stelle; das sah nach
+einer Auslassung aus und ist eine richtige Entscheidung.
+
+---
+
+## 7. Wie man den Mitschnitt wiederholt
 
 Die Sonde liegt im Kritzelverzeichnis der Sitzung (`vitacap`), nicht im
 Baum — sie ist 120 Zeilen und hängt nur an `FlexRadioDiscovery` und
