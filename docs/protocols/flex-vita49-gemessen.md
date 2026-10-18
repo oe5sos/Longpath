@@ -110,17 +110,56 @@ len= 752  startBin= 670  numBins= 354  binSize=2  totalBins=1024
   (670 + 354 = 1024) und wird über `startBin` zusammengesetzt.
 * **459 Rahmen im Mitschnitt, alle vollständig, keiner lückenhaft.**
 
-### Was ein Bin bedeutet — die Stelle, an der man sich irrt
+### Was ein Bin bedeutet — nachgemessen, nicht übernommen
 
 Die uint16-Werte sind **keine** dBm und **kein** 0…65535-Bereich,
 sondern **Y-Pixelpositionen**: 0 = oben = `max_dbm`,
 `ypixels − 1` = unten = `min_dbm` (`PanadapterStream.h`, Kommentar zu
-`setYPixels`). Wer sie als Rohpegel liest, bekommt Unsinn, der plausibel
-aussieht. Die Umrechnung braucht also `min_dbm`/`max_dbm`/`ypixels`,
-und die stehen im TCP-Zustand des Panadapters — nicht im Paket.
+`setYPixels [@d58e2b8a]`).
 
-Daraus folgt die Reihenfolge beim Bauen: **erst** den Panadapter-Zustand
-lesen, **dann** Bins deuten.
+Das steht so in der Vorlage — und es ist hier **zweimal gegengeprüft**,
+weil ein falsch gedeuteter Pegel plausibel aussieht und nie auffällt.
+
+**Probe 1: skaliert mit ypixels.** Zweimal dasselbe Signal, nur andere
+Höhe angefordert:
+
+| angefordert | Mittel der Bins | Mittel / ypixels |
+|---|---|---|
+| `ypixels=700` | 539 | **0,770** |
+| `ypixels=1000` | 770 | **0,770** |
+
+Derselbe Anteil aus völlig verschiedenen Zahlen. Die Bins sind also
+Pixel in der angeforderten Höhe.
+
+**Probe 2: die Spanne fällt richtig heraus.** Zweimal dasselbe Signal,
+nur andere dBm-Spanne:
+
+| Spanne | Mittel der Bins | daraus dBm |
+|---|---|---|
+| `min=-130 max=-40` | 770,4 | **−109,34** |
+| `min=-150 max=-50` | 593,5 | **−109,35** |
+
+Verschiedene Rohwerte, **dieselbe Leistung** — die Umrechnung
+
+```
+dBm = max_dbm − (bin / ypixels) × (max_dbm − min_dbm)
+```
+
+ist damit belegt, und nicht nur abgeschrieben. −109,3 dBm ist ein
+glaubwürdiger Rauschboden auf 20 m.
+
+### ⚠ Die Maschine meldet `y_pixels` NICHT zurück
+
+In jedem Lauf blieb der Zustandsschub bei `x_pixels=50 y_pixels=20`
+stehen, obwohl `display pan set … xpixels=1024 ypixels=1000` mit Code 0
+angenommen wurde **und wirkte** (`totalBins` wurde 1024, die Bins
+skalierten auf 1000). Es gibt also kein Echo, auf das man warten kann.
+
+**Folge für den Leser:** der Maßstab muss von der Stelle kommen, die ihn
+gesetzt hat — nicht aus dem Gerätezustand. AetherSDR führt ihn deshalb
+je Strom mit (`setYPixels(streamId, yPixels)` und
+`setDbmRange(streamId, …, waitForEcho)`); hier ist belegt, warum: auf
+diesem Gerät kommt das Echo nie.
 
 ---
 
@@ -163,6 +202,35 @@ len=1384  frameLowFreq=14542897152000  -> 13.869188 MHz
   `totalBinsInFrame` immer 2460.
 * `timecode` trennt die Zeilen; AetherSDR beginnt einen neuen Rahmen bei
   Wechsel von `timecode` **oder** `totalBinsInFrame`.
+
+### Die Kachelwerte sind absolut — und KEINE dBm
+
+Dieselben zwei Läufe mit verschiedener dBm-Spanne:
+
+| Spanne | Kachelwerte min / Mittel / max |
+|---|---|
+| `min=-130 max=-40` | 10470 / 11305,8 / 12310 |
+| `min=-150 max=-50` | 10470 / 11305,8 / 12310 |
+
+**Byte für Byte unverändert.** Der Wasserfall hängt also nicht an
+`min_dbm`/`max_dbm` — anders als die FFT-Bins, die sich im selben
+Experiment von 770 auf 594 verschoben haben. Die Kachelwerte tragen
+einen eigenen, absoluten Maßstab.
+
+**Welchen, ist hier NICHT belegt.** AetherSDR rechnet
+`(qint16)wert / 128.0f` (`PanadapterStream.cpp:1093-1095 [@d58e2b8a]`);
+das ergibt bei diesen Zahlen ≈ 88,3 — keine dBm. Zum Quervergleich
+taugt der Mittelwert nicht, weil Panadapter und Wasserfall **nicht
+denselben Bereich** abdecken (siehe unten). Dazu passt, wie AetherSDR
+die Werte benutzt: sie gehen in die **Farbgebung**, zusammen mit dem
+`autoBlackLevel` aus demselben Unterkopf (gemessen 7977, also unter dem
+Datenbereich 10470…12310 — ein Schwarzpunkt, kein Pegel). Als dBm
+werden sie dort nirgends ausgegeben.
+
+Also: Formel von der Vorlage übernehmen, als **Farbmaßstab** behandeln,
+und keinen dBm-Wert daraus anzeigen, solange er nicht gegen ein bekanntes
+Signal geprüft ist. Was das prüfen würde: einen Generator mit bekanntem
+Pegel einspeisen, oder dieselbe Stelle gleichzeitig in SmartSDR ablesen.
 
 ### Der Wasserfall ist breiter als der Panadapter
 
