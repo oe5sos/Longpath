@@ -1848,6 +1848,10 @@ longpath_add_test(tst_schwarzer_hintergrund)
 longpath_add_test(tst_multi_rx_pegel)
 longpath_add_test(tst_thetis_profil_import)
 longpath_add_test(tst_cat_verdrahtung)
+# Die drei Knoepfe links oben: zweimal gemeldet, einmal auf einem nie
+# gepushten Zweig verloren, und die Behebung von damals war ausserdem
+# wirkungslos (Flags gemessen, identisch). Jetzt gibt es einen Lauf.
+longpath_add_test(tst_fenster_hat_rahmen)
 longpath_add_test(tst_mehrere_fenster)
 longpath_add_test(tst_phone_felder)
 longpath_add_test(tst_rufzeichen_locator)

@@ -836,6 +836,13 @@ MainWindow::MainWindow(QWidget* parent)
             // Bedingung ist aber nicht nur eine Wache, sie ist der
             // bessere Zeitpunkt -- der Rahmen soll auftauchen, wenn man
             // IHM NAHE KOMMT, und nicht bei jeder Bewegung blinken.
+            // Waehrend des Aufbaus platziert das Programm selbst --
+            // Profilgeometrien, showMaximized(), Rahmenwechsel. Das ist
+            // kein Ziehen, auch wenn sich die Lage dabei aendert
+            // (2026-10-17: genau daran fiel tst_schutzrahmen, nachdem
+            // der Start von randlos auf maximiert umgestellt wurde).
+            if (!wir->m_fensterAufbauFertig) { return; }
+
             const QRect wo = bewegtes->frameGeometry();
             // ── Platzieren ist kein Ziehen (2026-10-17) ─────────────
             //
@@ -9009,7 +9016,27 @@ void MainWindow::populateDefaultMeter()
                 // Full Screen fuer eine Weile verlassen war). Die
                 // Aufnahme behaelt den Schluessel; er entscheidet nur
                 // nichts mehr.
-                const bool wantFullScreen = true;
+                // ── Korrektur 2026-10-17: formatfuellend JA,
+                // rahmenlos NEIN ────────────────────────────────────
+                //
+                // Betreiber heute: „die punkte fuer die vergroesserung
+                // links oben sind wieder weg." Gemessen am laufenden
+                // Fenster: es meldet sich als AXDialog ohne
+                // Titelleisten-Knoepfe, und die einzige Stelle, die die
+                // Titelleiste nimmt, ist das rahmenlose Vollbild hier.
+                //
+                // Zwischen beiden Wuenschen gibt es keinen Widerspruch:
+                // MAXIMIERT fuellt den Schirm genauso und behaelt die
+                // Titelleiste mit den drei Knoepfen. Rahmenlos bleibt
+                // ueber Ansicht > Full Screen erreichbar, es ist nur
+                // nicht mehr die Vorgabe.
+                //
+                // (Die Zeile hiess bis heute `const bool
+                // wantFullScreen = true;` mit der Begruendung vom
+                // 2026-09-27 — „longpath sollte immer formatfüllend
+                // sein". Der Wunsch bleibt, der Weg dorthin aendert
+                // sich.)
+                const bool wantFullScreen = false;
                 // Diagnose 2026-09-01 (leeres-Fenster-Untersuchung): NUR
                 // bei einer Abweichung loest enterBorderlessFullSize()/
                 // exitBorderlessFullSize() ihren hide()/setWindowFlag()/
@@ -9021,7 +9048,10 @@ void MainWindow::populateDefaultMeter()
                                << wasFullScreen << "wantFullScreen="
                                << wantFullScreen;
                 }
-                enterBorderlessFullSize();
+                // Formatfuellend ueber showMaximized(), nicht ueber
+                // das rahmenlose Vollbild -- siehe den Block darueber.
+                if (m_borderlessFullSize) { exitBorderlessFullSize(); }
+                if (!isMaximized()) { showMaximized(); }
 
                 // Erst das Weltbild: es loest den Geber aus, und die
                 // Ansichten sollen einmal neu zeichnen und nicht
@@ -9586,7 +9616,17 @@ void MainWindow::populateDefaultMeter()
         // Auch ohne ein Profil, das angewandt wird (allererster Start):
         // formatfuellend (Betreiber 2026-09-27, siehe die Profil-
         // Anwendung oben). Nach applyCurrent() ist das schon geschehen.
-        if (!m_borderlessFullSize) { enterBorderlessFullSize(); }
+        // Formatfuellend, aber MIT Rahmen (2026-10-17) -- die drei
+        // Knoepfe links oben gehoeren zur Titelleiste, und die nimmt
+        // das rahmenlose Vollbild mit. showMaximized() fuellt den
+        // Schirm genauso.
+        if (m_borderlessFullSize) { exitBorderlessFullSize(); }
+        if (!isMaximized()) { showMaximized(); }
+
+        // Ab hier zaehlt eine Fensterbewegung als Ziehen. Nicht sofort:
+        // showMaximized() loest selbst noch Bewegungen aus, und die
+        // Container folgen in derselben Runde.
+        QTimer::singleShot(0, this, [this]() { m_fensterAufbauFertig = true; });
         // KEIN wireProfileRail() mehr an dieser Stelle.
         //
         // Seit die Schiene umhaengbar ist (2026-10-06), verdrahtet
