@@ -897,6 +897,7 @@ set(GUI_SOURCES
     src/gui/widgets/TriBtn.cpp
     src/gui/widgets/VaxChannelSelector.cpp
     src/gui/widgets/MasterOutputWidget.cpp
+    src/gui/widgets/Ft8Wasserfall.cpp
     src/gui/widgets/VfoModeContainers.cpp
     src/gui/widgets/VfoModeContainers.h
     src/gui/widgets/SliceColors.h

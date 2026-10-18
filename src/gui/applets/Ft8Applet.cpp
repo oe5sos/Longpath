@@ -16,6 +16,7 @@
 #include "models/Band.h"
 #include <QDateTime>
 #include "core/AppSettings.h"
+#include "gui/widgets/Ft8Wasserfall.h"
 #include "core/MoxController.h"
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/audio/AudioTapRing.h"
@@ -107,6 +108,11 @@ Ft8Applet::Ft8Applet(RadioModel* model, QWidget* parent)
         const int got = m_tapRing->read(scratch.data(), want);
         if (got >= 2) {
             m_stream->feedAudio(scratch.data(), got / 2);
+            // Derselbe Ton in den Streifen -- ein Abgriff, zwei
+            // Verbraucher. Kein zweiter Ring, nichts zu halten.
+            if (m_wasserfall) {
+                m_wasserfall->speiseStereo(scratch.data(), got / 2, 48000);
+            }
         } else {
             // Kein Ton: die Fenstergrenze trotzdem pruefen, sonst
             // friert die Anzeige auf dem vorletzten Stand ein und
@@ -203,6 +209,7 @@ void Ft8Applet::buildUI()
     connect(m_tonFeld, &QSpinBox::valueChanged, this, [this](int hz) {
         m_sendeTonHz = hz;
         AppSettings::instance().setValue(QLatin1String(kSendeTonSchluessel), hz);
+        if (m_wasserfall) { m_wasserfall->setzeSendeTon(hz); }
     });
     head->addWidget(m_tonFeld);
 
@@ -219,6 +226,19 @@ void Ft8Applet::buildUI()
     // Dekoder, der gerade sammelt, genauso aus wie einer, der nichts
     // bekommt — und bei fuenfzehn Sekunden Fenster ist das die
     // haeufigste Fehldeutung.
+    // ── Der Streifen ───────────────────────────────────────────────
+    //
+    // Zwischen Kopfzeile und Fuellstand: erst sehen, wo frei ist, dann
+    // die Stelle waehlen. Ein Klick darin setzt das Feld „TX Hz" und
+    // umgekehrt -- eine Wahrheit, zwei Wege sie zu fassen.
+    m_wasserfall = new Ft8Wasserfall(this);
+    m_wasserfall->setzeSendeTon(m_sendeTonHz);
+    connect(m_wasserfall, &Ft8Wasserfall::sendeTonGewaehlt, this,
+            [this](int hz) {
+                if (m_tonFeld) { m_tonFeld->setValue(hz); }
+            });
+    root->addWidget(m_wasserfall);
+
     m_fill = new QProgressBar(this);
     m_fill->setRange(0, 100);
     m_fill->setValue(0);
