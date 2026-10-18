@@ -201,6 +201,47 @@ private slots:
         QCOMPARE(mw.schutzrahmen().size(), 2);
     }
 
+    // ── Der Schutzrahmen greift VON SELBST nach dem Aufbau ──────────
+    //
+    // Betreiber 2026-10-18, am frisch gestarteten Fenster: „Bandwidth
+    // Filter", „TX" und „Rotor/Log" lagen auf der Kommandoleiste --
+    // Band, Betriebsart und Profil waren nicht erreichbar.
+    //
+    // Der Fall darunter prueft die METHODE und war immer gruen. Nur
+    // rief sie beim Start niemand: angewandt wurde der Schutzrahmen
+    // ausschliesslich in moveEvent()/resizeEvent() des Hauptfensters,
+    // und nach dem Aufbau bewegt sich das Hauptfenster nicht mehr.
+    //
+    // Dieser Lauf prueft darum die VERDRAHTUNG: ein schwebendes
+    // Fenster wird gleich nach show() auf die Leiste gesetzt, und
+    // niemand ruft etwas -- der Nachlauf des Aufbaus muss es von selbst
+    // herunterholen.
+    void nachDemAufbauRaeumtErVonSelbstAb()
+    {
+        QStandardPaths::setTestModeEnabled(true);
+        MainWindow mw;
+        mw.resize(1600, 1000);
+        mw.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&mw, 20000));
+
+        const QList<QRect> sperren = mw.schutzrahmen();
+        QCOMPARE(sperren.size(), 2);
+        const QRect oben = sperren.at(0);
+
+        auto* schweber = new QWidget(&mw, Qt::Window);
+        schweber->setObjectName(QStringLiteral("Aufbauschweber"));
+        schweber->resize(400, 180);
+        schweber->show();
+        QVERIFY(QTest::qWaitForWindowExposed(schweber, 15000));
+        schweber->move(oben.left() + 20, oben.top() + 10);
+        QTRY_VERIFY_WITH_TIMEOUT(
+            schweber->frameGeometry().intersects(oben), 5000);
+
+        // Ab hier NICHTS mehr aufrufen -- das ist der ganze Punkt.
+        QTRY_VERIFY_WITH_TIMEOUT(
+            !schweber->frameGeometry().intersects(oben), 8000);
+    }
+
     void einSchwebendesFensterAufDerLeisteWirdHERUNTERGEHOLT()
     {
         QStandardPaths::setTestModeEnabled(true);
