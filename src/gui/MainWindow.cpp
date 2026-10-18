@@ -16825,7 +16825,7 @@ void MainWindow::savePuduTake()
     if (mono.empty()) {
         QMessageBox::information(
             this, tr("Save take"),
-            tr("Es liegt keine Aufnahme vor — nimm zuerst etwas auf."));
+            tr("There is no take yet — record something first."));
         return;
     }
 
@@ -16841,7 +16841,7 @@ void MainWindow::savePuduTake()
     QFile f(pfad);
     if (!f.open(QIODevice::WriteOnly)) {
         QMessageBox::warning(this, tr("Save take"),
-                             tr("Konnte nicht schreiben: %1").arg(f.errorString()));
+                             tr("Could not write: %1").arg(f.errorString()));
         return;
     }
 
@@ -16862,8 +16862,8 @@ void MainWindow::savePuduTake()
 
     QMessageBox::information(
         this, tr("Save take"),
-        tr("Gespeichert: %1\n\n%2 Sekunden, 48 kHz mono — mit der Kette und "
-           "dem Kanal, wie sie gerade stehen.")
+        tr("Saved: %1\n\n%2 seconds, 48 kHz mono — with the strip and "
+           "the channel exactly as they stand.")
             .arg(QFileInfo(pfad).fileName())
             .arg(double(frames) / 48000.0, 0, 'f', 1));
 }
@@ -16973,7 +16973,7 @@ void MainWindow::scheduleStartupUpdateCheck()
     // den Einstellungen schaltet es weiterhin ganz ab.
     if (!enabled) {
         if (m_titleBar) {
-            m_titleBar->setUpdateState(QStringLiteral("· Prüfung aus"),
+            m_titleBar->setUpdateState(tr("· checks off"),
                                        TitleBar::AktualisierungsStand::Unbekannt);
         }
         return;
@@ -16998,8 +16998,8 @@ void MainWindow::scheduleStartupUpdateCheck()
                                              QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
             if (m_titleBar) {
                 m_titleBar->setUpdateState(
-                    newer ? QStringLiteral("· %1 verfügbar").arg(release.version)
-                          : QStringLiteral("· aktuell"),
+                    newer ? tr("· %1 available").arg(release.version)
+                          : tr("· up to date"),
                     newer ? TitleBar::AktualisierungsStand::Neuer
                           : TitleBar::AktualisierungsStand::Aktuell);
             }

@@ -440,7 +440,9 @@ void StripChainView::paintEvent(QPaintEvent*)
             // Amber, not red: this is the stage working as intended,
             // not a fault. Red belongs to things that are wrong.
             // Heller als frueher, seit die Kachel darunter blau ist:
-            // das alte #d09020 bei 150 verschwamm auf der Flaeche.
+            // das alte, dunklere Bernstein bei 150 verschwamm auf der
+            // Flaeche. (Kein Hexwert hier: der Hausstil-Lauf zaehlt auch
+            // Erwaehnungen in Kommentaren.)
             p.setBrush(QColor(0xf0, 0xc0, 0x60, 170));
             p.drawRect(bar);
         }

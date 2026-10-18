@@ -590,11 +590,11 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     m_updateState->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 11px; }")
         .arg(QLatin1String(Style::kTextInactive)));
-    m_updateState->setText(QStringLiteral("· wird geprüft …"));
-    m_updateState->setToolTip(QStringLiteral(
-        "Der Stand gegenüber der neuesten veröffentlichten Fassung. "
-        "Geprüft bei jedem Start; Help → Check for Updates… prüft "
-        "sofort nach."));
+    m_updateState->setText(tr("· checking …"));
+    m_updateState->setToolTip(tr(
+        "How this build compares with the latest published release. "
+        "Checked at every start; Help → Check for Updates… checks "
+        "right away."));
     m_hbox->addSpacing(6);
     m_hbox->addWidget(m_updateState);
 
