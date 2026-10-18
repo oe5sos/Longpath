@@ -43,9 +43,10 @@ StartupPrefsPage::StartupPrefsPage(RadioModel* model, QWidget* parent)
     // ungelesenen Namen gespeichert.
     auto* callsign = addLabeledEdit(QStringLiteral("Callsign"),
                                     QStringLiteral("z. B. OE5SOS"));
-    callsign->setToolTip(QStringLiteral(
-        "Das eigene Rufzeichen. Geht an die QSO-Karte, den KiwiSDR, den "
-        "FlexRadio-Rundruf im Netz und ins Logbuch."));
+    callsign->setToolTip(tr("Your own callsign. Goes to the QSO "
+                                        "map, the KiwiSDR, the FlexRadio "
+                                        "broadcast on the network, and into "
+                                        "the logbook."));
     {
         auto& st = AppSettings::instance();
         callsign->setText(st.value(QStringLiteral("StationCallsign"), QString{})
@@ -63,9 +64,10 @@ StartupPrefsPage::StartupPrefsPage(RadioModel* model, QWidget* parent)
 
     auto* gridSquare = addLabeledEdit(QStringLiteral("Grid Square"),
                                       QStringLiteral("z. B. JN78"));
-    gridSquare->setToolTip(QStringLiteral(
-        "Der eigene Locator. Der Satellitendienst rechnet Ueberfluege "
-        "daraus -- ohne gueltigen Locator findet er nichts."));
+    gridSquare->setToolTip(tr("Your own grid square. The "
+                                          "satellite service computes passes "
+                                          "from it -- without a valid one it "
+                                          "finds nothing."));
     {
         auto& st = AppSettings::instance();
         gridSquare->setText(st.value(QStringLiteral("StationGridSquare"), QString{})
@@ -93,9 +95,9 @@ StartupPrefsPage::StartupPrefsPage(RadioModel* model, QWidget* parent)
                 return;
             }
             gridSquare->setStyleSheet(QString{});
-            gridSquare->setToolTip(QStringLiteral(
-                "Der eigene Locator. Der Satellitendienst rechnet "
-                "Ueberfluege daraus."));
+            gridSquare->setToolTip(tr("Your own grid square. The "
+                                                  "satellite service computes "
+                                                  "passes from it."));
             AppSettings::instance().setValue(QStringLiteral("StationGridSquare"), wert);
         });
     }

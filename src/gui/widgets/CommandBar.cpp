@@ -678,8 +678,8 @@ void CommandBar::buildFilterGroup(QHBoxLayout* row)
     auto* more = new QPushButton(QStringLiteral("…"), this);
     more->setStyleSheet(pillStyle());
     more->setCursor(Qt::PointingHandCursor);
-    more->setToolTip(QStringLiteral(
-        "Alle Breiten dieses Modus — und eine eigene zum Eintippen."));
+    more->setToolTip(tr("All widths for this mode -- and one of "
+                                    "your own to type in."));
     g.overflow = more;
     if (g.row) { g.row->addWidget(more); }
 

@@ -7171,6 +7171,7 @@ longpath_add_test(tst_pgxl_connection_save)
 #   packetCountRolls (upper nibble=0x5, lower=count for 0..15);
 #   totalSizeIsMultipleOf4 (packet size and size-words field consistent).
 longpath_add_test(tst_flex_radio_discovery_broadcaster)
+longpath_add_test(tst_kein_phantom_flex)
 
 # ── Per-radio peripherals refactor (2026-05-26) ──────────────────────────
 # Verifies the RadioModel::peripheralValue / setPeripheralValue helpers
