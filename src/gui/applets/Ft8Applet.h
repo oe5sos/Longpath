@@ -42,6 +42,7 @@
 
 #include <QDateTime>
 #include <QPointer>
+#include <QHash>
 #include <QVector>
 
 #include <memory>
@@ -49,6 +50,8 @@
 class QLabel;
 class QPlainTextEdit;
 class QSpinBox;
+
+namespace Longpath { class Ft8Wasserfall; }
 class QProgressBar;
 class QLineEdit;
 class QPushButton;
@@ -138,6 +141,23 @@ public:
     /// Der Logbucheintrag zu einem fertigen Ablauf. Statisch und ohne
     /// Zustand, damit die Felder ohne Fenster zu pruefen sind — das
     /// Signal ist nur die Zustellung.
+    /// Welcher Satz gehoert zu Tx1..Tx6? Die Zuordnung ist WSJT-X
+    /// nachgebildet und steht als statische Regel da, damit sie ohne
+    /// Fenster pruefbar ist. Gebaut wird der Satz selbst nicht hier,
+    /// sondern von Ft8Ablauf::nachrichtFuer() -- eine Wahrheit.
+    ///
+    /// `partner` leer heisst: nur Tx6 (CQ) ergibt einen Satz, die
+    /// uebrigen fuenf sprechen jemanden an, den es noch nicht gibt.
+    /// Wer ist gerade das Gegenueber? Der laufende Ablauf, sonst das
+    /// erste Wort im Textfeld (dort legt der Doppelklick es hin).
+    QString aktuellerPartner() const;
+
+    static QString txKnopfNachricht(int nummer,
+                                    const QString& partner,
+                                    const QString& meinRuf,
+                                    const QString& meinLocator,
+                                    int reportDb);
+
     /// `sendeTonHz` ist die Tonlage, auf der gesendet wurde -- seit
     /// 2026-10-18 waehlbar (siehe m_sendeTonHz). Sie geht in die
     /// gemeldete Frequenz ein, darum ein PARAMETER und keine
@@ -188,6 +208,7 @@ public:
     QLabel*         lastLabelForTest() const { return m_lastLabel; }
     QPushButton*    nurCqButtonForTest() const { return m_nurCqBtn; }
     QSpinBox*       sendeTonFeldForTest() const { return m_tonFeld; }
+    Longpath::Ft8Wasserfall* wasserfallForTest() const { return m_wasserfall; }
     int             sendeTonHzForTest() const { return m_sendeTonHz; }
     QPushButton*    ft8ButtonForTest() const { return m_ft8Btn; }
     QPushButton*    ft4ButtonForTest() const { return m_ft4Btn; }
@@ -239,6 +260,11 @@ private:
     /// der reine FT8-Text ohne die Spalten davor.
     void zeigeZeile(const QString& zeile, const QString& nachricht);
 
+    /// Der zuletzt gehoerte Rauschabstand je Rufzeichen -- daraus
+    /// bauen die Knoepfe Tx2/Tx3 ihren Rapport. Ohne ihn muesste man
+    /// eine Zahl erfinden, und ein erfundener Rapport ist schlimmer
+    /// als keiner.
+    QHash<QString, int> m_letzterRapport;
     /// Die Tonlage im Durchlassbereich, auf der GESENDET wird.
     ///
     /// Betreiber 2026-10-18: „die sendestelle steht fest auf 1500 Hz"
@@ -251,6 +277,10 @@ private:
     /// wer sich eine freie Stelle gesucht hat, will sie beim naechsten
     /// Start wiederhaben.
     QSpinBox* m_tonFeld{nullptr};
+    /// Der Streifen ueber der Fundliste. Zeigt den Durchlassbereich und
+    /// nimmt per Klick die Sendestelle entgegen -- ohne ihn waere die
+    /// waehlbare Sendestelle eine Zahl ohne Blick aufs Band.
+    Longpath::Ft8Wasserfall* m_wasserfall{nullptr};
     int m_sendeTonHz{1500};
 
     QPushButton* m_nurCqBtn{nullptr};

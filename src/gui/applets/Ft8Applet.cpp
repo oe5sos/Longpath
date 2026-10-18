@@ -18,6 +18,7 @@
 #include "core/AppSettings.h"
 #include "core/DxccColorProvider.h"
 #include "core/DxccWorkedStatus.h"
+#include "gui/widgets/Ft8Wasserfall.h"
 #include "core/MoxController.h"
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/audio/AudioTapRing.h"
@@ -109,6 +110,11 @@ Ft8Applet::Ft8Applet(RadioModel* model, QWidget* parent)
         const int got = m_tapRing->read(scratch.data(), want);
         if (got >= 2) {
             m_stream->feedAudio(scratch.data(), got / 2);
+            // Derselbe Ton in den Streifen -- ein Abgriff, zwei
+            // Verbraucher. Kein zweiter Ring, nichts zu halten.
+            if (m_wasserfall) {
+                m_wasserfall->speiseStereo(scratch.data(), got / 2, 48000);
+            }
         } else {
             // Kein Ton: die Fenstergrenze trotzdem pruefen, sonst
             // friert die Anzeige auf dem vorletzten Stand ein und
@@ -205,6 +211,7 @@ void Ft8Applet::buildUI()
     connect(m_tonFeld, &QSpinBox::valueChanged, this, [this](int hz) {
         m_sendeTonHz = hz;
         AppSettings::instance().setValue(QLatin1String(kSendeTonSchluessel), hz);
+        if (m_wasserfall) { m_wasserfall->setzeSendeTon(hz); }
     });
     head->addWidget(m_tonFeld);
 
@@ -221,6 +228,19 @@ void Ft8Applet::buildUI()
     // Dekoder, der gerade sammelt, genauso aus wie einer, der nichts
     // bekommt — und bei fuenfzehn Sekunden Fenster ist das die
     // haeufigste Fehldeutung.
+    // ── Der Streifen ───────────────────────────────────────────────
+    //
+    // Zwischen Kopfzeile und Fuellstand: erst sehen, wo frei ist, dann
+    // die Stelle waehlen. Ein Klick darin setzt das Feld „TX Hz" und
+    // umgekehrt -- eine Wahrheit, zwei Wege sie zu fassen.
+    m_wasserfall = new Ft8Wasserfall(this);
+    m_wasserfall->setzeSendeTon(m_sendeTonHz);
+    connect(m_wasserfall, &Ft8Wasserfall::sendeTonGewaehlt, this,
+            [this](int hz) {
+                if (m_tonFeld) { m_tonFeld->setValue(hz); }
+            });
+    root->addWidget(m_wasserfall);
+
     m_fill = new QProgressBar(this);
     m_fill->setRange(0, 100);
     m_fill->setValue(0);
@@ -273,6 +293,34 @@ void Ft8Applet::buildUI()
     // gar nicht. Dieser Knopf schliesst das, mit demselben Verhalten
     // wie der Doppelklick: ohne „Auto" legt er den Ruf nur ins Feld,
     // mit „Auto" faengt der Ablauf an.
+    // ── Tx1..Tx6 ────────────────────────────────────────────────────
+    //
+    // Eine Reihe ueber dem Textfeld. Jeder Knopf LEGT den Satz nur ins
+    // Feld -- gesendet wird weiterhin erst mit „Send".
+    auto* txReihe = new QHBoxLayout();
+    txReihe->setSpacing(3);
+    for (int n = 1; n <= 6; ++n) {
+        QPushButton* b = styledButton(QStringLiteral("Tx%1").arg(n), 34);
+        b->setToolTip(tr("Put standard message Tx%1 in the box.").arg(n));
+        connect(b, &QPushButton::clicked, this, [this, n]() {
+            const QString gegen = aktuellerPartner();
+            const QString was = txKnopfNachricht(
+                n, gegen, eigenesRufzeichen(), eigenerLocator(),
+                m_letzterRapport.value(gegen, 0));
+            if (was.isEmpty()) {
+                if (m_status) {
+                    m_status->setText(n == 6 ? tr("set your callsign first")
+                                             : tr("no station selected"));
+                }
+                return;
+            }
+            if (m_textFeld) { m_textFeld->setText(was); }
+        });
+        txReihe->addWidget(b);
+    }
+    txReihe->addStretch(1);
+    root->addLayout(txReihe);
+
     m_cqRufenBtn = styledButton(tr("CQ"), 40);
     m_cqRufenBtn->setToolTip(tr(
         "Put your own CQ call in the box.\nWith Auto on, start calling "
@@ -551,6 +599,59 @@ QString Ft8Applet::cqRuf(const QString& meinRuf, const QString& meinLocator)
 // geschrieben und nur gelesen (SotaClient, MainWindow_KiwiSdr,
 // QsoMapWindow); er steht hier als Rueckfall, damit eine von Hand
 // gesetzte Fassung nicht ins Leere laeuft.
+// ── Tx1..Tx6, wie in WSJT-X ──────────────────────────────────────────
+//
+// Betreiber 2026-10-18: „dachte das sind dann mehr optionen usw. wie
+// ein richtiges ft8 programm." Die sechs Standardsaetze sind der
+// haeufigste Griff im QSO -- bisher musste man sie tippen.
+//
+// Gebaut werden sie NICHT hier, sondern von Ft8Ablauf::nachrichtFuer():
+// derselbe Code, den die Automatik benutzt. Hier steht nur, welcher
+// Knopf welchen Zustand meint.
+QString Ft8Applet::txKnopfNachricht(int nummer, const QString& partner,
+                                    const QString& meinRuf,
+                                    const QString& meinLocator,
+                                    int reportDb)
+{
+    using Z = Ft8Ablauf::Zustand;
+    if (meinRuf.isEmpty()) { return {}; }
+    // Tx1 bis Tx5 sprechen jemanden an. Ohne Gegenueber gibt es nichts
+    // zu senden -- und einen Platzhalter ins Feld zu legen waere
+    // schlimmer, denn der ginge auf Knopfdruck hinaus.
+    if (nummer >= 1 && nummer <= 5 && partner.isEmpty()) { return {}; }
+
+    switch (nummer) {
+        case 1: return Ft8Ablauf::nachrichtFuer(Z::RufeAn, partner, meinRuf,
+                                                meinLocator, reportDb);
+        case 2: return Ft8Ablauf::nachrichtFuer(Z::SendeReport, partner,
+                                                meinRuf, meinLocator, reportDb);
+        case 3: return Ft8Ablauf::nachrichtFuer(Z::SendeRReport, partner,
+                                                meinRuf, meinLocator, reportDb);
+        case 4: return Ft8Ablauf::nachrichtFuer(Z::SendeRR73, partner, meinRuf,
+                                                meinLocator, reportDb);
+        case 5: return Ft8Ablauf::nachrichtFuer(Z::Sende73, partner, meinRuf,
+                                                meinLocator, reportDb);
+        case 6: return Ft8Ablauf::nachrichtFuer(Z::RufeCq, partner, meinRuf,
+                                                meinLocator, reportDb);
+        default: return {};
+    }
+}
+
+// Das Gegenueber: der laufende Ablauf, sonst das erste Wort im
+// Textfeld -- in jedem Standardsatz steht dort das Rufzeichen der
+// Gegenstation, und ein Doppelklick auf eine Zeile hat es genau
+// dorthin gelegt. Kein zusaetzliches Feld, keine zweite Wahrheit.
+QString Ft8Applet::aktuellerPartner() const
+{
+    if (m_ablauf.laeuft() && !m_ablauf.partner().isEmpty()) {
+        return m_ablauf.partner();
+    }
+    if (!m_textFeld) { return {}; }
+    const QString erstes =
+        m_textFeld->text().trimmed().section(QLatin1Char(' '), 0, 0).toUpper();
+    return erstes == QLatin1String("CQ") ? QString{} : erstes;
+}
+
 QString Ft8Applet::eigenesRufzeichen()
 {
     auto& s = AppSettings::instance();
@@ -845,6 +946,10 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
         }
 
         const QString ruf = senderCallsign(d.text);
+        if (!ruf.isEmpty()) {
+            m_letzterRapport.insert(ruf,
+                                    static_cast<int>(std::lround(d.snrDb)));
+        }
         if (m_model && !ruf.isEmpty()) {
             DxSpot spot;
             spot.dxCall   = ruf;

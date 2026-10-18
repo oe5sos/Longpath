@@ -134,26 +134,36 @@ bool Ft8Ablauf::laeuft() const
 
 QString Ft8Ablauf::naechsteNachricht() const
 {
-    switch (m_zustand) {
+    return nachrichtFuer(m_zustand, m_partner, m_meinRuf, m_meinLocator,
+                         m_reportGesendet);
+}
+
+QString Ft8Ablauf::nachrichtFuer(Zustand z,
+                                 const QString& partner,
+                                 const QString& meinRuf,
+                                 const QString& meinLocator,
+                                 int reportDb)
+{
+    switch (z) {
         case Zustand::RufeCq:
-            return m_meinLocator.isEmpty()
-                ? QStringLiteral("CQ %1").arg(m_meinRuf)
-                : QStringLiteral("CQ %1 %2").arg(m_meinRuf, m_meinLocator);
+            return meinLocator.isEmpty()
+                ? QStringLiteral("CQ %1").arg(meinRuf)
+                : QStringLiteral("CQ %1 %2").arg(meinRuf, meinLocator);
         case Zustand::RufeAn:
-            return m_meinLocator.isEmpty()
-                ? QStringLiteral("%1 %2").arg(m_partner, m_meinRuf)
-                : QStringLiteral("%1 %2 %3").arg(m_partner, m_meinRuf,
-                                                 m_meinLocator);
+            return meinLocator.isEmpty()
+                ? QStringLiteral("%1 %2").arg(partner, meinRuf)
+                : QStringLiteral("%1 %2 %3").arg(partner, meinRuf,
+                                                 meinLocator);
         case Zustand::SendeReport:
             return QStringLiteral("%1 %2 %3")
-                .arg(m_partner, m_meinRuf, rapportText(m_reportGesendet));
+                .arg(partner, meinRuf, rapportText(reportDb));
         case Zustand::SendeRReport:
             return QStringLiteral("%1 %2 R%3")
-                .arg(m_partner, m_meinRuf, rapportText(m_reportGesendet));
+                .arg(partner, meinRuf, rapportText(reportDb));
         case Zustand::SendeRR73:
-            return QStringLiteral("%1 %2 RR73").arg(m_partner, m_meinRuf);
+            return QStringLiteral("%1 %2 RR73").arg(partner, meinRuf);
         case Zustand::Sende73:
-            return QStringLiteral("%1 %2 73").arg(m_partner, m_meinRuf);
+            return QStringLiteral("%1 %2 73").arg(partner, meinRuf);
         default:
             return {};
     }
