@@ -80,6 +80,54 @@ private:
 
 private slots:
 
+    // ── Tx1..Tx6 ────────────────────────────────────────────────────
+    //
+    // Die sechs Standardsaetze sind PROTOKOLL -- an jedem Buchstaben
+    // haengt, ob die Gegenstation den Zug versteht. Darum wird hier
+    // der ganze Satz verglichen und nicht nur „ist nicht leer".
+    //
+    // Die beiden letzten Faelle sind die wichtigen: ohne Gegenueber
+    // duerfen Tx1..Tx5 NICHTS liefern. Ein Platzhalter im Feld ginge
+    // auf den naechsten Druck auf „Send" hinaus.
+    void dieSechsStandardsaetzeStimmenWoertlich()
+    {
+        const QString dx   = QStringLiteral("DL1ABC");
+        const QString ich  = QStringLiteral("OE5SOS");
+        const QString grid = QStringLiteral("JN67");
+
+        QCOMPARE(Ft8Applet::txKnopfNachricht(1, dx, ich, grid, -12),
+                 QStringLiteral("DL1ABC OE5SOS JN67"));
+        QCOMPARE(Ft8Applet::txKnopfNachricht(2, dx, ich, grid, -12),
+                 QStringLiteral("DL1ABC OE5SOS -12"));
+        QCOMPARE(Ft8Applet::txKnopfNachricht(3, dx, ich, grid, -12),
+                 QStringLiteral("DL1ABC OE5SOS R-12"));
+        QCOMPARE(Ft8Applet::txKnopfNachricht(4, dx, ich, grid, -12),
+                 QStringLiteral("DL1ABC OE5SOS RR73"));
+        QCOMPARE(Ft8Applet::txKnopfNachricht(5, dx, ich, grid, -12),
+                 QStringLiteral("DL1ABC OE5SOS 73"));
+        QCOMPARE(Ft8Applet::txKnopfNachricht(6, dx, ich, grid, -12),
+                 QStringLiteral("CQ OE5SOS JN67"));
+    }
+
+    void ohneGegenueberLiefernTx1BisTx5NICHTS()
+    {
+        const QString ich  = QStringLiteral("OE5SOS");
+        const QString grid = QStringLiteral("JN67");
+        for (int n = 1; n <= 5; ++n) {
+            QVERIFY2(Ft8Applet::txKnopfNachricht(n, QString{}, ich, grid, 0)
+                         .isEmpty(),
+                     qPrintable(QStringLiteral("Tx%1 hat ohne Gegenueber "
+                                               "etwas geliefert").arg(n)));
+        }
+        // Tx6 ruft CQ -- das geht immer.
+        QCOMPARE(Ft8Applet::txKnopfNachricht(6, QString{}, ich, grid, 0),
+                 QStringLiteral("CQ OE5SOS JN67"));
+        // Und ohne eigenes Rufzeichen geht gar nichts.
+        QVERIFY(Ft8Applet::txKnopfNachricht(6, QString{}, QString{}, grid, 0)
+                    .isEmpty());
+    }
+
+
     // ── Die Schleife ────────────────────────────────────────────────
 
     void wasGesendetWuerdeLaesstSichZurueckLesen()

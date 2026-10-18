@@ -42,6 +42,7 @@
 
 #include <QDateTime>
 #include <QPointer>
+#include <QHash>
 #include <QVector>
 
 #include <memory>
@@ -120,6 +121,23 @@ public:
     /// Der Logbucheintrag zu einem fertigen Ablauf. Statisch und ohne
     /// Zustand, damit die Felder ohne Fenster zu pruefen sind — das
     /// Signal ist nur die Zustellung.
+    /// Welcher Satz gehoert zu Tx1..Tx6? Die Zuordnung ist WSJT-X
+    /// nachgebildet und steht als statische Regel da, damit sie ohne
+    /// Fenster pruefbar ist. Gebaut wird der Satz selbst nicht hier,
+    /// sondern von Ft8Ablauf::nachrichtFuer() -- eine Wahrheit.
+    ///
+    /// `partner` leer heisst: nur Tx6 (CQ) ergibt einen Satz, die
+    /// uebrigen fuenf sprechen jemanden an, den es noch nicht gibt.
+    /// Wer ist gerade das Gegenueber? Der laufende Ablauf, sonst das
+    /// erste Wort im Textfeld (dort legt der Doppelklick es hin).
+    QString aktuellerPartner() const;
+
+    static QString txKnopfNachricht(int nummer,
+                                    const QString& partner,
+                                    const QString& meinRuf,
+                                    const QString& meinLocator,
+                                    int reportDb);
+
     static Longpath::LogEntry logEintrag(const Ft8Ablauf& ablauf,
                                          double wahlHz,
                                          bool unteresSeitenband,
@@ -212,6 +230,12 @@ private:
     /// (siehe m_nurCq) und nach Dringlichkeit gefaerbt. `nachricht` ist
     /// der reine FT8-Text ohne die Spalten davor.
     void zeigeZeile(const QString& zeile, const QString& nachricht);
+
+    /// Der zuletzt gehoerte Rauschabstand je Rufzeichen -- daraus
+    /// bauen die Knoepfe Tx2/Tx3 ihren Rapport. Ohne ihn muesste man
+    /// eine Zahl erfinden, und ein erfundener Rapport ist schlimmer
+    /// als keiner.
+    QHash<QString, int> m_letzterRapport;
 
     QPushButton* m_nurCqBtn{nullptr};
     bool m_nurCq{false};

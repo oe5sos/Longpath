@@ -94,6 +94,19 @@ public:
     /// Was im naechsten Fenster zu senden waere, oder leer.
     QString naechsteNachricht() const;
 
+    /// Derselbe Textbau, ohne Ablauf: welcher Satz gehoert zu welchem
+    /// Zustand?
+    ///
+    /// Herausgezogen am 2026-10-18 fuer die Tx1-Tx6-Knoepfe im Fenster.
+    /// Sie bauen die Saetze NICHT selbst -- sonst gaebe es zwei
+    /// Wahrheiten, und die zweite waere die, die beim naechsten
+    /// Protokollbesuch vergessen wird.
+    static QString nachrichtFuer(Zustand z,
+                                 const QString& partner,
+                                 const QString& meinRuf,
+                                 const QString& meinLocator,
+                                 int reportDb);
+
     /// Eine gehoerte Nachricht einspeisen. Gibt true, wenn sie den
     /// Ablauf weitergebracht hat (dann ist der Zaehler zurueckgesetzt).
     /// Nachrichten, die nicht an mich gerichtet sind, werden still
