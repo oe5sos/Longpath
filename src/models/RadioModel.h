@@ -1303,6 +1303,21 @@ public:
     //
     // When true: listener starts (if not already running), AppSettings
     // persisted, FourO3APage updates its enabled state.
+    /// Soll der FlexRadio-Ausruf laufen? Zwei Tore, UND-verknuepft.
+    ///
+    /// Betreiber 2026-10-18 auf seinem Maestro: dort stand ein
+    /// „FLEX-6400" in der Geraeteliste, das er nicht besitzt -- es war
+    /// Longpath selbst. Der Ausruf haengt seither am
+    /// 4O3A-HAUPTSCHALTER (Vorgabe „False"), nicht mehr allein am
+    /// Feinschalter PGXL_BroadcastDiscovery (Vorgabe „True").
+    ///
+    /// Statisch und ohne Zustand, damit die REGEL pruefbar ist und
+    /// nicht nur die Verdrahtung: tests/tst_kein_phantom_flex.cpp
+    /// faehrt die ganze Wahrheitstafel.
+    static bool flexAusrufSollLaufen(bool fourO3AEnabled,
+                                     bool broadcastDiscovery)
+    { return fourO3AEnabled && broadcastDiscovery; }
+
     void setFourO3AEnabled(bool enabled);
     bool fourO3AEnabled() const;
 

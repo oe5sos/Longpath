@@ -9435,12 +9435,35 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             m_flexBroadcaster->setPeerHint(QHostAddress(pgxlIpStr));
         }
 
-        const bool enabled =
+        // Betreiber 2026-10-18, auf seinem MAESTRO gefunden: in der
+        // Geraeteliste stand ein „FLEX-6400", das er nicht besitzt (er
+        // hat eine FLEX-8400, sonst nichts). Aufgeklaert -- es war
+        // LONGPATH SELBST. Richtig gehandelt: er hat es nicht geoeffnet,
+        // denn dahinter ist kein Radio. Der SmartSdrApiListener
+        // beantwortet nur die Handvoll Befehle, die die Endstufe zum
+        // Koppeln braucht: kein Panadapter, kein Ton, keine Steuerung.
+        //
+        // Der Ausruf ist fuer die PGXL/TGXL gebaut, damit sie Longpath
+        // in IHRER Geraeteliste finden. Er hing aber nur an
+        // PGXL_BroadcastDiscovery, und das steht per Vorgabe auf „True"
+        // -- unabhaengig davon, ob ueberhaupt eine 4O3A-Endstufe da ist.
+        // Also legte JEDE Longpath-Installation ein Phantom-Flex in ihr
+        // Netz, sichtbar fuer jeden SmartSDR-Client darin.
+        //
+        // Jetzt zwei Tore statt einem, und das erste ist der
+        // 4O3A-Hauptschalter (per-MAC, Vorgabe „False") -- derselbe,
+        // hinter dem der SmartSdrApiListener schon seit jeher wartet.
+        // PGXL_BroadcastDiscovery bleibt als Feinschalter daneben: wer
+        // eine 4O3A hat und den Ausruf trotzdem nicht will, schaltet
+        // ihn dort aus.
+        const bool feinschalter =
             as.value(QStringLiteral("PGXL_BroadcastDiscovery"),
                      QStringLiteral("True")).toString()
             == QStringLiteral("True");
-        if (enabled) {
+        if (flexAusrufSollLaufen(fourO3AEnabled(), feinschalter)) {
             m_flexBroadcaster->start();
+        } else {
+            m_flexBroadcaster->stop();
         }
     }
 
