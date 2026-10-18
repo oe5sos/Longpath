@@ -584,7 +584,7 @@ private slots:
         // liegt darueber.
         const LogEntry e = Ft8Applet::logEintrag(
             a, 14074000.0, /*unteresSeitenband=*/false,
-            Ft8Decoder::Protocol::Ft8, QStringLiteral("JN67VV"));
+            Ft8Decoder::Protocol::Ft8, QStringLiteral("JN67VV"), 1500);
 
         QCOMPARE(e.call, QStringLiteral("DL1ABC"));
         QCOMPARE(e.mode, QStringLiteral("FT8"));
@@ -609,9 +609,9 @@ private slots:
         QVERIFY(a.verarbeite(QStringLiteral("OE5SOS DL1ABC JO31"), -7));
 
         const LogEntry oben = Ft8Applet::logEintrag(
-            a, 14074000.0, false, Ft8Decoder::Protocol::Ft8, QStringLiteral("JN67"));
+            a, 14074000.0, false, Ft8Decoder::Protocol::Ft8, QStringLiteral("JN67"), 1500);
         const LogEntry unten = Ft8Applet::logEintrag(
-            a, 14074000.0, true, Ft8Decoder::Protocol::Ft8, QStringLiteral("JN67"));
+            a, 14074000.0, true, Ft8Decoder::Protocol::Ft8, QStringLiteral("JN67"), 1500);
         QVERIFY2(unten.freqMHz < oben.freqMHz,
                  "in DIGL muss die Frequenz unter der in DIGU liegen");
         QVERIFY(qAbs((oben.freqMHz - unten.freqMHz) - 0.003) < 1e-6);
@@ -624,7 +624,7 @@ private slots:
         a.starteAlsAnrufer(QStringLiteral("OE5SOS"), QStringLiteral("JN67"));
         QVERIFY(a.verarbeite(QStringLiteral("OE5SOS DL1ABC JO31"), -7));
         const LogEntry e = Ft8Applet::logEintrag(
-            a, 7074000.0, false, Ft8Decoder::Protocol::Ft4, QStringLiteral("JN67"));
+            a, 7074000.0, false, Ft8Decoder::Protocol::Ft4, QStringLiteral("JN67"), 1500);
         QCOMPARE(e.mode, QStringLiteral("FT4"));
         QVERIFY2(e.submode.isEmpty(), "FT4 ist kein SUBMODE");
         QCOMPARE(e.band, QStringLiteral("40m"));
@@ -637,7 +637,7 @@ private slots:
         a.starteAlsAnrufer(QStringLiteral("OE5SOS"), QStringLiteral("JN67"));
         QVERIFY(a.verarbeite(QStringLiteral("OE5SOS DL1ABC"), -7));
         const LogEntry e = Ft8Applet::logEintrag(
-            a, 14074000.0, false, Ft8Decoder::Protocol::Ft8, QStringLiteral("JN67"));
+            a, 14074000.0, false, Ft8Decoder::Protocol::Ft8, QStringLiteral("JN67"), 1500);
         QVERIFY(e.gridSquare.isEmpty());
     }
 

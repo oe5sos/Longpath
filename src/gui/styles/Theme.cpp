@@ -299,14 +299,14 @@ bool Theme::loadFile(const QString& path, QString* error)
         if (key.startsWith(QLatin1Char('_'))) { continue; }
 
         if (!hexRe().match(val).hasMatch()) {
-            return fail(QStringLiteral(
-                "%1: \"%2\" ist kein Farbwert der Form #rrggbb")
-                    .arg(it.key(), it.value().toString()));
+            return fail(QObject::tr("%1: \"%2\" is not a colour "
+                                    "value of the form #rrggbb")
+                            .arg(it.key(), it.value().toString()));
         }
         if (key.startsWith(QLatin1Char('#'))) {
             if (!hexRe().match(key).hasMatch()) {
-                return fail(QStringLiteral(
-                    "%1 ist weder eine Rolle noch ein Farbwert").arg(key));
+                return fail(QObject::tr("%1 is neither a role nor a "
+                                        "colour value").arg(key));
             }
             byHex.insert(key.toLower(), val.toLower());
         } else {

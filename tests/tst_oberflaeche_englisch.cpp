@@ -122,9 +122,24 @@ private slots:
 
         // tr("…"), QStringLiteral("…"), QLatin1String("…") — alles, was
         // als Text im Fenster landen kann.
+        // Ein Ruf, EIN oder MEHRERE Literale dahinter. Der Umbau vom
+        // 2026-10-18: bis dahin las dieser Lauf zeilenweise und
+        // verlangte das Anfuehrungszeichen auf DERSELBEN Zeile wie die
+        // Klammer. Steht die Klammer am Zeilenende -- die uebliche Form
+        // fuer lange Hinweistexte --, sah er nichts:
+        //
+        //     m_bgPathLabel->setToolTip(QStringLiteral(
+        //         "Bild hinter Raster und Spur. Wird auf die Flaeche "
+        //         "vergroessert und mittig beschnitten."));
+        //
+        // Gemessen am 2026-10-17: zu den damals gemeldeten 9 kamen so
+        // 47 weitere, die durchrutschten. Jetzt wird die Datei als
+        // GANZES gelesen und die Stuecke werden zusammengesetzt.
         static const QRegularExpression sichtbar(
             QStringLiteral("(?:\\btr|QStringLiteral|QLatin1String)"
-                           "\\(\\s*\"((?:[^\"\\\\]|\\\\.)*)\""));
+                           "\\(\\s*((?:\"(?:[^\"\\\\]|\\\\.)*\"\\s*)+)"));
+        static const QRegularExpression stueck(
+            QStringLiteral("\"((?:[^\"\\\\]|\\\\.)*)\""));
 
         QStringList funde;
         QDirIterator it(wurzel, {QStringLiteral("*.cpp"), QStringLiteral("*.h")},
@@ -133,30 +148,40 @@ private slots:
             const QString pfad = it.next();
             QFile f(pfad);
             if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) { continue; }
-            QTextStream in(&f);
-            int zeile = 0;
-            while (!in.atEnd()) {
-                const QString z = in.readLine();
-                ++zeile;
+            const QString ganz = QString::fromUtf8(f.readAll());
+
+            // Kommentar- und Protokollzeilen NEUTRALISIEREN statt
+            // ueberspringen: so bleibt die Datei ein zusammenhaengender
+            // Text (mehrzeilige Literale bleiben also lesbar), und die
+            // Zeilennummern stimmen weiter, weil nur der Inhalt durch
+            // Leerzeichen ersetzt wird.
+            QStringList zeilen = ganz.split(QLatin1Char('\n'));
+            for (QString& z : zeilen) {
                 const QString roh = z.trimmed();
-                // Kommentare sind deutsch, mit Absicht.
-                if (roh.startsWith(QLatin1String("//"))
-                    || roh.startsWith(QLatin1Char('*'))) {
-                    continue;
-                }
-                // Protokollzeilen auch. Die liest der Betreiber, nicht
-                // der Benutzer — dieselbe Regel wie fuer src/core, nur
-                // dass sie hier mitten in einer GUI-Datei stehen.
-                if (roh.startsWith(QLatin1String("qC"))
+                const bool raus =
+                    roh.startsWith(QLatin1String("//"))
+                    || roh.startsWith(QLatin1Char('*'))
+                    || roh.startsWith(QLatin1String("qC"))
                     || roh.startsWith(QLatin1String("qDebug"))
                     || roh.startsWith(QLatin1String("qInfo"))
                     || roh.startsWith(QLatin1String("qWarning"))
-                    || roh.startsWith(QLatin1String("<<"))) {
-                    continue;
-                }
-                auto m = sichtbar.globalMatch(z);
+                    || roh.startsWith(QLatin1String("<<"));
+                if (raus) { z = QString(z.size(), QLatin1Char(' ')); }
+            }
+            const QString text = zeilen.join(QLatin1Char('\n'));
+
+            {
+                auto m = sichtbar.globalMatch(text);
                 while (m.hasNext()) {
-                    const QString t = m.next().captured(1);
+                    const QRegularExpressionMatch tref = m.next();
+                    // Die Stuecke eines Rufs zusammensetzen -- ein
+                    // Hinweistext ueber vier Zeilen ist EIN Text.
+                    QString t;
+                    auto st = stueck.globalMatch(tref.captured(1));
+                    while (st.hasNext()) { t += st.next().captured(1); }
+                    const int zeile =
+                        int(QStringView(text).left(tref.capturedStart())
+                                .count(QLatin1Char('\n'))) + 1;
                     if (t.size() < 3) { continue; }
                     if (t.startsWith(QLatin1Char('#'))) { continue; }
                     // Stylesheets sind kein Text im Fenster.

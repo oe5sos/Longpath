@@ -213,8 +213,8 @@ void FmOptContainer::buildUi()
         m_toneLamp = new QLabel(this);
         m_toneLamp->setObjectName("toneLamp");
         m_toneLamp->setFixedSize(10, 10);
-        m_toneLamp->setToolTip(QStringLiteral(
-            "Leuchtet, solange der eingestellte CTCSS-Subton anliegt"));
+        m_toneLamp->setToolTip(tr(
+            "Lit while the configured CTCSS sub-tone is present"));
         row->addWidget(m_toneLamp, 0, Qt::AlignVCenter);
         vbox->addLayout(row);
     }
@@ -404,8 +404,8 @@ void FmOptContainer::syncFromSlice()
                 m_toneValueCmb->addItem(basis + QStringLiteral(" I"),
                                         QStringLiteral("%1I").arg(basis));
             }
-            m_toneValueCmb->setToolTip(QStringLiteral(
-                "DCS-Code als Oktalzahl, N = normal, I = invertiert"));
+            m_toneValueCmb->setToolTip(tr(
+                "DCS code in octal, N = normal, I = inverted"));
         } else {
             for (int i = 0; i < kCtcssCount; ++i) {
                 const QString text = QString::number(kCtcssTones[i], 'f', 1);

@@ -49,6 +49,7 @@
 
 class QLabel;
 class QPlainTextEdit;
+class QSpinBox;
 class QProgressBar;
 class QLineEdit;
 class QPushButton;
@@ -138,11 +139,17 @@ public:
                                     const QString& meinLocator,
                                     int reportDb);
 
+    /// `sendeTonHz` ist die Tonlage, auf der gesendet wurde -- seit
+    /// 2026-10-18 waehlbar (siehe m_sendeTonHz). Sie geht in die
+    /// gemeldete Frequenz ein, darum ein PARAMETER und keine
+    /// Konstante: statisch bleibt die Funktion, damit die Rechnung
+    /// ohne Fenster pruefbar ist.
     static Longpath::LogEntry logEintrag(const Ft8Ablauf& ablauf,
                                          double wahlHz,
                                          bool unteresSeitenband,
                                          Ft8Decoder::Protocol p,
-                                         const QString& meinLocator);
+                                         const QString& meinLocator,
+                                         int sendeTonHz);
 
     /// Der eigene CQ-Ruf: „CQ <mein Ruf> <mein Locator>". Leer ohne
     /// Rufzeichen. Statisch, damit die Regel ohne Fenster zu pruefen
@@ -181,6 +188,8 @@ public:
     QLabel*         statusForTest() const { return m_status; }
     QLabel*         lastLabelForTest() const { return m_lastLabel; }
     QPushButton*    nurCqButtonForTest() const { return m_nurCqBtn; }
+    QSpinBox*       sendeTonFeldForTest() const { return m_tonFeld; }
+    int             sendeTonHzForTest() const { return m_sendeTonHz; }
     QPushButton*    ft8ButtonForTest() const { return m_ft8Btn; }
     QPushButton*    ft4ButtonForTest() const { return m_ft4Btn; }
     int             lastPeriodCountForTest() const { return m_lastPeriodCount; }
@@ -236,6 +245,19 @@ private:
     /// eine Zahl erfinden, und ein erfundener Rapport ist schlimmer
     /// als keiner.
     QHash<QString, int> m_letzterRapport;
+    /// Die Tonlage im Durchlassbereich, auf der GESENDET wird.
+    ///
+    /// Betreiber 2026-10-18: „die sendestelle steht fest auf 1500 Hz"
+    /// war der einzige Punkt der Luecken-Liste mit Folgen auf dem BAND
+    /// statt am Schirm. Wer mit „Auto" auf einem vollen Band ruft,
+    /// sendet sonst immer dorthin, wo schon jemand ist.
+    ///
+    /// Gesichert unter `Ft8/SendeTonHz` -- anders als „CQ only" gehoert
+    /// das zur Einrichtung der Station und nicht zum Blick aufs Band:
+    /// wer sich eine freie Stelle gesucht hat, will sie beim naechsten
+    /// Start wiederhaben.
+    QSpinBox* m_tonFeld{nullptr};
+    int m_sendeTonHz{1500};
 
     QPushButton* m_nurCqBtn{nullptr};
     bool m_nurCq{false};

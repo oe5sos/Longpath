@@ -1199,8 +1199,8 @@ void PhoneCwApplet::wireControls()
     // der Knopf -- und der daneben im TX-Feld bedient dieselben zwei
     // Eigenschaften, beide bleiben also von selbst gleich.
     if (m_monBtn && m_monSlider && m_monLabel) {
-        m_monBtn->setToolTip(QStringLiteral(
-            "Mithoeren: das eigene Sendesignal ueber die Lautsprecher"));
+        m_monBtn->setToolTip(tr("Monitor: your own transmit "
+                                            "signal through the speakers"));
         {
             QSignalBlocker bb(m_monBtn);
             QSignalBlocker bs(m_monSlider);
