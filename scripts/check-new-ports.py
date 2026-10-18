@@ -47,6 +47,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Shared with scripts/compliance-inventory.py. The explicit sys.path entry
+# keeps the import working under `python3 -I` (isolated mode implies -P
+# since 3.11, which drops the script's own directory).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import provenance_tables  # noqa: E402
+
 REPO = Path(__file__).resolve().parent.parent
 PROVENANCE = REPO / "docs" / "attribution" / "THETIS-PROVENANCE.md"
 WDSP_PROVENANCE = REPO / "docs" / "attribution" / "WDSP-PROVENANCE.md"
@@ -236,89 +242,19 @@ def diffed_lines(rel):
 
 
 def parse_provenance_paths(*doc_paths):
-    """Return union of *first-column* file paths listed in provenance tables.
+    """First-column paths of the given provenance tables; see
+    `scripts/provenance_tables.py`, which both gates now share.
 
     Default (no args): just THETIS-PROVENANCE.md; diff mode passes the
     WDSP table as well (2026-09-21), see main().
 
-    Full-tree mode passes (PROVENANCE, WDSP_PROVENANCE, AETHER_RECONCILIATION)
-    to get the complete "registered somewhere" set. All three docs use the
-    same markdown-table convention: the first cell of each data row is the
-    registered NereusSDR file path. Counterpart / source / prose cells
-    sometimes contain `src/...` strings too (e.g. reconciliation cites
-    AetherSDR upstream paths that happen to share a filename with a
-    NereusSDR file), so we MUST NOT pull paths from anywhere else in the
-    row — doing so allowlists files that aren't actually registered and
-    creates a false-negative loophole for future ports.
-
-    Backtick wrapping (``| `src/foo.h` |``) is handled. The `.{h,cpp}`
-    shorthand is also recognised in the first cell.
-
-    2026-09-08 bug fix: AETHERSDR-PORTS.md and FREEDV-GUI-PROVENANCE.md
-    both use a second first-cell shorthand for a header/source pair --
-    two separate backtick-quoted tokens, comma-separated, where the
-    second token is extension-only and shares the first token's
-    basename (e.g. ``| `src/core/strip/ClientGate.h`, `.cpp` | ...``).
-    The old code only stripped the OUTERMOST backtick characters of the
-    whole cell, which left the inner backticks and comma embedded in a
-    single bogus "path" that could never match a real src file -- every
-    one of the 23+ rows already using this established format was
-    silently unregistered as a result. Extract every backtick-quoted
-    token in the cell instead and resolve extension-only tokens against
-    the nearest preceding `src/...` token.
+    Full-tree mode passes (PROVENANCE, WDSP_PROVENANCE,
+    AETHER_RECONCILIATION, AETHER_PORTS, FREEDV_PROVENANCE) to get the
+    complete "registered somewhere" set.
     """
     if not doc_paths:
         doc_paths = (PROVENANCE,)
-    paths = set()
-    for doc in doc_paths:
-        if not doc.is_file():
-            continue
-        for line in doc.read_text().splitlines():
-            line = line.strip()
-            if not line.startswith("|") or line.startswith("|---"):
-                continue
-            cells = [c.strip() for c in line.strip("|").split("|")]
-            if not cells:
-                continue
-            first_cell = cells[0].strip()
-            if not first_cell or first_cell.lower() in ("nereussdr file", "file"):
-                continue
-
-            tokens = re.findall(r"`([^`]+)`", first_cell)
-            if not tokens:
-                tokens = [first_cell.strip("`").strip()]
-
-            base = None
-            for tok in tokens:
-                tok = tok.strip()
-                if not tok:
-                    continue
-                m = re.match(r"(src/.+)\.\{h,cpp\}$", tok)
-                if m:
-                    paths.add(f"{m.group(1)}.h")
-                    paths.add(f"{m.group(1)}.cpp")
-                    base = m.group(1)
-                    continue
-                if tok.startswith("."):
-                    # Extension-only shorthand referring to the previous
-                    # token's basename (e.g. the "`.cpp`" in the example
-                    # above). Silently ignored if there was no preceding
-                    # src/ token to anchor it to.
-                    if base:
-                        paths.add(f"{base}{tok}")
-                    continue
-                # 2026-09-21: THETIS-PROVENANCE.md registers tests
-                # (`tests/tst_*.cpp`, unquoted first cell) and
-                # WDSP-PROVENANCE.md the vendored tree under
-                # `third_party/wdsp/src/`; both were dropped here by
-                # the `src/` prefix test, so every registered test and
-                # WDSP file was flagged the moment a PR touched it
-                # (PR #42, 53 files, all of them already in a table).
-                if re.match(r"(src|tests|third_party)/", tok):
-                    stem = re.sub(r"\.[^./]+$", "", tok)
-                    paths.add(tok)
-                    base = stem
-    return paths
+    return provenance_tables.parse_provenance_paths(*doc_paths)
 
 
 def all_src_files():

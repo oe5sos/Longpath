@@ -12,6 +12,11 @@
 //   2026-05-18  Ported in C++20/Qt6 for NereusSDR by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic Claude Code.
 //                 Layout from AetherSDR src/core/PgxlConnection.{h,cpp} [@0cd4559].
+//   2026-10-10  Destruktor nachgetragen (Martin Fischer, OE5SOS,
+//                 KI-gestuetzt via Anthropic Claude Code). Das Vorbild
+//                 hat keinen; ohne ihn ruft der Abbau in schon
+//                 zerstoerte Mitglieder zurueck. Begruendung am
+//                 Destruktor. Sonst unveraendert.
 // =================================================================
 #pragma once
 
@@ -29,6 +34,9 @@ class PgxlConnection : public QObject {
     Q_OBJECT
 public:
     explicit PgxlConnection(QObject* parent = nullptr);
+    // Trennt die Verbindungen des Sockets, BEVOR ein Mitglied
+    // abgebaut werden kann -- siehe die Begruendung im Rumpf.
+    ~PgxlConnection() override;
 
     bool    isConnected() const { return m_connected; }
     QString version()     const { return m_version; }

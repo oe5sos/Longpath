@@ -1,3 +1,6 @@
+#include "core/StartWatch.h"
+
+#include <QTimer>
 #include "gui/MainWindow.h"
 #include "gui/AuxiliaryWindowLeveler.h"
 #include "gui/styles/AppTheme.h"
@@ -586,6 +589,17 @@ int main(int argc, char* argv[])
     // Sterben noch angemeldet wurde. Das closeEvent raeumt zusaetzlich
     // die schwebenden Fenster selbst ab — beides zusammen, weil ein
     // Absturz beim Beenden sonst nur die Stelle wechselt.
+    // Startwaechter (2026-10-09): die Marke VOR dem Fenster setzen, also
+    // bevor irgendetwas Gespeichertes geladen wird. Bleibt Longpath
+    // beim Hochfahren stecken, findet der naechste Start sie vor.
+    // Siehe core/StartWatch.h.
+    const int steckengebliebeneStarts = Longpath::StartWatch::beginStart();
+    if (steckengebliebeneStarts > 0) {
+        qInfo().noquote() << QStringLiteral(
+            "Startwaechter: %1 Start(s) in Folge kamen nicht durch")
+            .arg(steckengebliebeneStarts);
+    }
+
     int rc = 0;
     {
         // ── Messpunkte (2026-10-16): wo die Startzeit wirklich liegt ──
@@ -620,6 +634,16 @@ int main(int argc, char* argv[])
                 << " ms, show() " << (nachShow - nachKonstruktor)
                 << " ms, erste Runde der Schleife bei " << startUhr.elapsed()
                 << " ms";
+        });
+
+        // Steht die Oberflaeche lange genug, gilt der Start als
+        // gelungen und die Marke faellt. Laufzeit als Maßstab, nicht
+        // sauberes Beenden: wer das Programm hart abschiesst, hat
+        // keinen Startfehler -- mit dem Beenden als Maßstab zaehlte
+        // jedes `kill` als Absturz.
+        QTimer::singleShot(Longpath::StartWatch::kSettleSeconds * 1000,
+                           &window, []() {
+            Longpath::StartWatch::markRunning();
         });
 
         // Dev automation bridge (Phase 0: dumpTree + grab + get, read-only) --

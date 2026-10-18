@@ -14,6 +14,11 @@
 //                 Layout from AetherSDR src/core/TgxlConnection.{h,cpp} [@0cd4559].
 //   2026-05-19  Tier 2 additions (keepalive/ping/setup r/w/ifconf r/w/save +
 //                 auto-reconnect). Longpath-native; design §4.2.1 + §6.4.
+//   2026-10-10  Destruktor nachgetragen (Martin Fischer, OE5SOS,
+//                 KI-gestuetzt via Anthropic Claude Code). Das Vorbild
+//                 hat keinen; ohne ihn ruft der Abbau in schon
+//                 zerstoerte Mitglieder zurueck. Begruendung am
+//                 Destruktor. Sonst unveraendert.
 // =================================================================
 #include "TgxlConnection.h"
 #include "AppSettings.h"
@@ -51,6 +56,59 @@ TgxlConnection::TgxlConnection(QObject* parent)
     m_pingTimeoutTimer.setSingleShot(false);
     connect(&m_pingTimeoutTimer, &QTimer::timeout, this, &TgxlConnection::onPingTimeoutCheck);
     m_pingTimeoutTimer.start();
+}
+
+TgxlConnection::~TgxlConnection()
+{
+    // ── Ein echter Fehler, hier gefunden, nicht aus dem Vorbild ──────
+    //
+    // AetherSDRs TgxlConnection hat keinen Destruktor, und diese
+    // Klasse hatte bis 2026-10-10 auch keinen. Beim Abbau werden die
+    // Mitglieder in UMGEKEHRTER Erklaerungsreihenfolge zerstoert: also
+    // zuerst die fuenf Zeitgeber (m_pollTimer, m_keepaliveTimer,
+    // m_pingTimer, m_pingTimeoutTimer, m_reconnectTimer), DANACH
+    // m_socket, der vor ihnen steht. Der Destruktor von QTcpSocket ruft
+    // disconnectFromHost(), das loest disconnected() aus, und das haengt
+    // noch an onDisconnected() -- die QObject-Basis dieses Objekts lebt
+    // zu dem Zeitpunkt ja noch.
+    //
+    // onDisconnected() greift dann nach m_pollTimer.stop() und
+    // m_keepaliveTimer.stop() und laeuft, wenn der Abbau kein gewollter
+    // Trennvorgang war, weiter in scheduleReconnect() -- das einen
+    // schon abgebauten QTimer STARTET. Das ist die schaerfere Haelfte:
+    // ein stop() auf abgebautem Speicher geht oft unbemerkt durch, ein
+    // start() meldet sich als Warnung, die nach einem Zeitgeber in einem
+    // fremden Faden klingt und mit Faeden nichts zu tun hat:
+    //
+    //   QObject::startTimer: Timers cannot be started from another thread
+    //
+    // Die Fadenpruefung in QObject::startTimer schlaegt an, weil die
+    // Fadendaten des zerstoerten QTimer schon weg sind. Dazu meldet
+    // onDisconnected() disconnected() aus einem halb abgebauten Objekt
+    // heraus -- jeder angeschlossene Empfaenger laeuft gegen ein
+    // sterbendes Objekt.
+    //
+    // Dieselbe Form steckte in SpeConnection (dort am 2026-10-09
+    // behoben, mit derselben Begruendung am Destruktor) und in
+    // MainWindow (fehlende Abbau-Fahne, dort als heap-use-after-free
+    // unter AddressSanitizer bestaetigt). Hier ist es die dritte und
+    // vierte Stelle.
+    //
+    // Behoben an der Ursache statt mit einer Abbau-Fahne und Waechtern
+    // in jedem Zweig: die Verbindungen werden getrennt, BEVOR ein
+    // Mitglied abgebaut werden kann. Danach kann kein
+    // Mitglieds-Destruktor mehr hierher zurueckrufen.
+    m_socket.disconnect(this);
+    m_pollTimer.stop();
+    m_keepaliveTimer.stop();
+    m_pingTimer.stop();
+    m_pingTimeoutTimer.stop();
+    // m_reconnectTimer wird derzeit NIRGENDS gestartet -- scheduleReconnect()
+    // nimmt QTimer::singleShot. Das stop() hier ist also heute ein Leerlauf;
+    // es steht trotzdem da, damit der Destruktor vollstaendig bleibt, falls
+    // das Mitglied je verdrahtet wird. (Aufgefallen beim Nachzaehlen der
+    // Mitglieder fuer diesen Destruktor.)
+    m_reconnectTimer.stop();
 }
 
 // From AetherSDR src/core/TgxlConnection.cpp:18 [@0cd4559]

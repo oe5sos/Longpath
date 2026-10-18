@@ -221,14 +221,29 @@ private slots:
         schweber->show();
         QVERIFY(QTest::qWaitForWindowExposed(schweber, 15000));
         // Mitten auf die Kommandoleiste setzen.
+        //
+        // QTRY statt processEvents()+QVERIFY (2026-10-18): genau hier
+        // ist der Lauf in der CI umgefallen -- und zwar an der
+        // VORBEDINGUNG („der Pruefaufbau liegt gar nicht auf der
+        // Leiste"), nicht am Ergebnis. Lokal 19/19 in drei Durchgaengen,
+        // in der CI einmal rot; der Unterschied steht in der Laufzeit
+        // derselben Reihe: 12,86 s dort gegen 3,2 s hier, weil daneben
+        // 487 Prueflaeufe die Maschine belegten.
+        //
+        // move() auf einem Fenster ist eine BITTE an das Fenstersystem,
+        // keine Zuweisung. Ein einzelnes processEvents() reicht dafuer
+        // auf einer unbelasteten Maschine und unter Last eben nicht --
+        // dann liest frameGeometry() noch die alte Lage.
         schweber->move(oben.left() + 20, oben.top() + 10);
-        QCoreApplication::processEvents();
-        QVERIFY2(schweber->frameGeometry().intersects(oben),
-                 "der Pruefaufbau liegt gar nicht auf der Leiste");
+        QTRY_VERIFY_WITH_TIMEOUT(
+            schweber->frameGeometry().intersects(oben), 5000);
 
         const int verschoben = mw.schwebendeAusDemSchutzrahmenHolen();
         QCOMPARE(verschoben, 1);
-        QCoreApplication::processEvents();
+        // Dieselbe Begruendung wie oben -- das Verschieben selbst ist
+        // auch nur eine Bitte.
+        QTRY_VERIFY_WITH_TIMEOUT(
+            !schweber->frameGeometry().intersects(oben), 5000);
         QVERIFY2(!schweber->frameGeometry().intersects(oben),
                  qPrintable(QStringLiteral("liegt immer noch auf der Leiste: %1,%2")
                                 .arg(schweber->x()).arg(schweber->y())));

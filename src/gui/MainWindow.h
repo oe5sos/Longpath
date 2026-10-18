@@ -327,6 +327,12 @@ public:
     void restoreFloatingWindowsForTest()
     { restoreFloatingWindowsHiddenBehindConnectMask(); }
 
+    /// Pruefzugang (2026-10-17): steht das Fenster im RAHMENLOSEN
+    /// Vollbild? Seit heute ist die Antwort beim Start `false` --
+    /// formatfuellend wird ueber showMaximized() erreicht, damit die
+    /// drei Knoepfe links oben bleiben. Siehe tst_fenster_hat_rahmen.
+    bool rahmenlosesVollbildFuerTest() const { return m_borderlessFullSize; }
+
     // ── Pruefzugaenge fuer den Seitenbereich (tst_side_area_integration) ──
     void setSideAreaEnabledForTest(bool on) { setSideAreaEnabled(on); }
     bool addToSideAreaForTest(const QString& id, bool activate)
@@ -418,6 +424,14 @@ public:
     /// Operator notice for a rejected notch add. Pure so the wording can be
     /// pinned without standing MainWindow up.
     static QString tnfAddRejectedNotice(const QString& reason);
+
+    /// Ist dieses Fenster OHNE die gespeicherte Anordnung hochgefahren,
+    /// weil zuvor zwei Starts hintereinander steckenblieben? Siehe
+    /// core/StartWatch.h.
+    bool startedSafely() const { return m_startedSafely; }
+    /// Wieviele Starts davor nicht durchkamen (0, wenn normal
+    /// hochgefahren).
+    int  failedStartCount() const { return m_failedStartCount; }
 
 public slots:
     // ── Phase 3M-0 Task 14 helper slots ──────────────────────────────────
@@ -799,6 +813,8 @@ private:
     // Start: das offene Logbuch vor Panadapter und Rotor/Log (2026-09-26).
     void raiseLogbookIfOpen();
     // Start mit offenem Logbuch: nach dem Verbinden-Fenster nach vorne.
+    bool m_startedSafely{false};
+    int  m_failedStartCount{0};
     bool m_raiseLogbookAfterConnectMask{false};
     void openRotorSetup();
     void openVoiceCheck();
@@ -1518,6 +1534,11 @@ private:
     // nicht mehr (Qt::WindowFullScreen wird nie gesetzt); dieses Flag
     // ist die neue Quelle der Wahrheit fuers Sichern/Wiederherstellen.
     bool m_borderlessFullSize{false};
+    /// Erst wenn der Aufbau durch ist, zaehlt eine Fensterbewegung als
+    /// ZIEHEN. Davor platziert das Programm selbst: Profilgeometrien,
+    /// showMaximized(), der Wechsel des Rahmens. Ohne dieses Flag stand
+    /// der Schutzrahmen-Hinweis schon beim Start da (2026-10-17).
+    bool m_fensterAufbauFertig{false};
 
     // View > Vollbild (2026-09-08, Betreiber: "es sollte auch im
     // gernellen fenster die möglichkeit geben, immer auf full screen
@@ -1849,6 +1870,9 @@ private:
 
     // Phase 3P-III Task 14: RF-Kit RF2K-S applet.
     class Rf2ksApplet*      m_rfKitApplet{nullptr};
+    class SpeApplet*        m_speApplet{nullptr};
+    class Kpa500Applet*    m_kpa500Applet{nullptr};
+    class AcomApplet*      m_acomApplet{nullptr};
 
     // Phase 23: TCI server + applets.
     // m_tciServer is nullptr in non-WebSocket builds (HAVE_WEBSOCKETS not defined).
