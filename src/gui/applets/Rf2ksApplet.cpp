@@ -196,19 +196,13 @@ void Rf2ksApplet::setOperateMode(const QString& mode)
     // the glowing dot on mode change").  Mirror AmpApplet::setState
     // styling: green pill on OPERATE, neutral blue-grey on STANDBY.
     const bool operating = (mode == QStringLiteral("OPERATE"));
-    if (operating) {
-        m_operateBtn->setStyleSheet(Style::themed(
-            QStringLiteral(
-                "QPushButton { background: #1a6030; border: 1px solid #6fa384; "
-                "border-radius: 6px; color: #ffffff; font-size: 11px; font-weight: bold; }"
-                "QPushButton:hover { background: #33684c; }")));
-    } else {
-        m_operateBtn->setStyleSheet(Style::themed(
-            QStringLiteral(
-                "QPushButton { background: #204060; border: 1px solid #205070; "
-                "border-radius: 6px; color: #c8d8e8; font-size: 11px; font-weight: bold; }"
-                "QPushButton:hover { background: #204060; }")));
-    }
+    // 2026-10-09: dieselben vier Hausfarben, jetzt benannt in
+    // StyleConstants.h -- das SPE-Feld nimmt denselben Knopf, und acht
+    // weitere Literale haette scripts/verify-style-drift.py gemeldet.
+    // Farben und Werte sind unveraendert.
+    m_operateBtn->setStyleSheet(Style::themed(QLatin1String(
+        operating ? Style::kAmpOperateActiveBtnStyle
+                  : Style::kAmpNeutralBtnStyle)));
 }
 
 void Rf2ksApplet::setConnectedState(bool connected)

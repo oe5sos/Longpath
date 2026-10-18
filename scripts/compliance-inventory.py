@@ -19,10 +19,17 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Shared with scripts/check-new-ports.py. The explicit sys.path entry keeps
+# the import working under `python3 -I` (isolated mode implies -P since
+# 3.11, which drops the script's own directory).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import provenance_tables  # noqa: E402
+
 REPO = Path(__file__).resolve().parent.parent
 
 THETIS_PROVENANCE = REPO / "docs" / "attribution" / "THETIS-PROVENANCE.md"
 AETHER_RECONCILIATION = REPO / "docs" / "attribution" / "aethersdr-reconciliation.md"
+AETHER_WHOLE_FILE_PORTS = REPO / "docs" / "attribution" / "AETHERSDR-PORTS.md"
 
 
 def _git_tracked_files() -> list[str]:
@@ -90,7 +97,26 @@ def _aethersdr_bucket_a_paths(md_path: Path) -> set[str]:
 
 
 THETIS_PORTS = _paths_from_table(THETIS_PROVENANCE)
-AETHER_PORTS = _aethersdr_bucket_a_paths(AETHER_RECONCILIATION)
+
+# TWO tables carry AetherSDR derivation claims, and for a while this script
+# read only the first of them.
+#
+#   aethersdr-reconciliation.md, Bucket A -- the 2026-04 sweep of files that
+#     already existed when the AetherSDR debt was reconciled.
+#   AETHERSDR-PORTS.md -- "AetherSDR whole-file ports", the table opened
+#     AFTER that reconciliation for every port made since.
+#
+# The second one was never opened here, although the variable is called
+# AETHER_PORTS and `scripts/check-new-ports.py` has read both since
+# 2026-05-13. Found 2026-10-09 while porting the SPE amplifier driver: its
+# brand-new files landed in the inventory as `nereussdr-original`, as had
+# every AetherSDR port of the past five months -- the channel strip, the
+# equaliser UI, KiwiSDR, the ASR backend, DssRenderer. The attribution
+# merge gate held throughout (it reads both tables); what was wrong was the
+# BOOKKEEPING, and with it the per-bucket header-marker check, which never
+# looked at any of those files.
+AETHER_PORTS = _aethersdr_bucket_a_paths(AETHER_RECONCILIATION) | \
+    provenance_tables.aethersdr_port_paths(AETHER_WHOLE_FILE_PORTS)
 
 
 def classify(path: str) -> str:

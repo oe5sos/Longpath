@@ -14,6 +14,11 @@
 //                 Layout from AetherSDR src/core/TgxlConnection.{h,cpp} [@0cd4559].
 //   2026-05-19  Tier 2 additions (keepalive/ping/setup r/w/ifconf r/w/save +
 //                 auto-reconnect). Longpath-native; design §4.2.1 + §6.4.
+//   2026-10-10  Destruktor nachgetragen (Martin Fischer, OE5SOS,
+//                 KI-gestuetzt via Anthropic Claude Code). Das Vorbild
+//                 hat keinen; ohne ihn ruft der Abbau in schon
+//                 zerstoerte Mitglieder zurueck. Begruendung am
+//                 Destruktor. Sonst unveraendert.
 // =================================================================
 #pragma once
 
@@ -42,6 +47,9 @@ class TgxlConnection : public QObject {
     Q_OBJECT
 public:
     explicit TgxlConnection(QObject* parent = nullptr);
+    // Trennt die Verbindungen des Sockets, BEVOR ein Mitglied
+    // abgebaut werden kann -- siehe die Begruendung im Rumpf.
+    ~TgxlConnection() override;
 
     bool    isConnected() const { return m_connected; }
     QString version()     const { return m_version; }

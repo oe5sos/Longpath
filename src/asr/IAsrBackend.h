@@ -6,6 +6,7 @@
 //   Copyright (C) 2024-2026  Jeremy (KK7GWY) / AetherSDR contributors
 //       per https://github.com/ten9876/AetherSDR (GPLv3)
 //
+// Modification history (Longpath):
 //   2026-08-23 — Portiert. Namensraum angepasst, sonst zeichengetreu.
 //
 // ── Warum NUR dieser Teil von ASR ───────────────────────────────────
