@@ -45,8 +45,10 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 
+#include "core/AppSettings.h"
 #include "core/FlexRadioConnection.h"
 #include "core/FlexRadioDiscovery.h"
+#include "models/RadioModel.h"
 
 using namespace Longpath;
 
@@ -948,6 +950,111 @@ private slots:
         conn.connectToRadio(QHostAddress::LocalHost, radio.port());
         QVERIFY(misslungen.wait(5000));
         QCOMPARE(misslungen.at(0).at(0).toUInt(), 0x50000039u);
+    }
+
+    // ─── Die Verdrahtung: RadioModel oeffnet den Kanal ─────────────
+
+    void radioModelOeffnetDenFlexKanal()
+    {
+        FalscheMaschine radio;
+        QVERIFY(radio.hoeren());
+        radio.antworten.insert(QStringLiteral("client program"),
+                               QStringLiteral("10000002|unknown client program Longpath"));
+        radio.antworten.insert(QStringLiteral("client gui"),
+                               QStringLiteral("0|11112222-3333-4444-5555-666677778888"));
+        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|"));
+        radio.antworten.insert(QStringLiteral("display panafall create"),
+                               QStringLiteral("0|0x40000000,0x42000000"));
+        radio.antworten.insert(QStringLiteral("slice create"), QStringLiteral("0|0"));
+        radio.nachschub.insert(QStringLiteral("slice create"),
+            {QStringLiteral("S5081495E|slice 0 in_use=1 RF_frequency=14.074000 mode=DIGU")});
+
+        RadioModel model;
+        QVERIFY(model.flexConnection() == nullptr);   // erst beim Verbinden
+
+        QSignalSpy angemeldet(&model, &RadioModel::flexGuiClientRegistered);
+        QSignalSpy frequenz(&model, &RadioModel::flexSliceFrequencyChanged);
+        QSignalSpy zustand(&model, &RadioModel::connectionStateChanged);
+
+        RadioInfo info;
+        info.protocol   = ProtocolVersion::Flex;
+        info.boardType  = HPSDRHW::Flex8400;
+        info.name       = QStringLiteral("FLEX-8400 (Pruefstand)");
+        info.macAddress = QStringLiteral("00:1C:2D:05:34:28");
+        info.address    = QHostAddress(QHostAddress::LocalHost);
+        info.port       = radio.port();
+
+        model.connectToRadio(info);
+        QVERIFY(model.flexConnection() != nullptr);
+        QVERIFY(frequenz.wait(8000));
+
+        QCOMPARE(angemeldet.count(), 1);
+        QCOMPARE(frequenz.at(0).at(0).toInt(), 0);
+        QCOMPARE(frequenz.at(0).at(1).toDouble(), 14'074'000.0);
+        QCOMPARE(model.connectionState(), ConnectionState::Connected);
+
+        // Die Kennung, die die MASCHINE zurueckgemeldet hat, ist
+        // behalten — sonst legt die naechste Verbindung wieder eine
+        // Vorgabescheibe auf dem Geraet an.
+        QCOMPARE(AppSettings::instance()
+                     .value(QStringLiteral("FlexGuiClientId")).toString(),
+                 QStringLiteral("11112222-3333-4444-5555-666677778888"));
+
+        // Und beim Trennen wird der Kanal zugemacht: ein GUI-Client,
+        // der nach „Disconnect" angemeldet bleibt, haelt die Maschine
+        // weiter besetzt.
+        model.disconnectFromRadio();
+        QTRY_COMPARE(model.connectionState(), ConnectionState::Disconnected);
+    }
+
+    void gespeicherteKennungWirdWiederverwendet()
+    {
+        AppSettings::instance().setValue(
+            QStringLiteral("FlexGuiClientId"),
+            QStringLiteral("AAAABBBB-CCCC-DDDD-EEEE-FFFF00001111"));
+
+        FalscheMaschine radio;
+        QVERIFY(radio.hoeren());
+        radio.antworten.insert(QStringLiteral("client gui"), QStringLiteral("0|"));
+        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|0"));
+
+        RadioModel model;
+        QSignalSpy angemeldet(&model, &RadioModel::flexGuiClientRegistered);
+
+        RadioInfo info;
+        info.protocol = ProtocolVersion::Flex;
+        info.address  = QHostAddress(QHostAddress::LocalHost);
+        info.port     = radio.port();
+        model.connectToRadio(info);
+        QVERIFY(angemeldet.wait(8000));
+
+        QVERIFY(radio.empfangeneBefehle.contains(QStringLiteral(
+            "client gui AAAABBBB-CCCC-DDDD-EEEE-FFFF00001111")));
+        model.disconnectFromRadio();
+    }
+
+    void einFlexGehtNichtDurchDenOpenHpsdrWeg()
+    {
+        // Der Abzweig muss VOR der ganzen OpenHPSDR-Maschinerie sitzen:
+        // HardwareProfile, Alex-Wege, OC-Matrix und Platinenfaehigkeiten
+        // gelten fuer ein Flex nicht. Belegt daran, dass kein
+        // RadioConnection entsteht.
+        FalscheMaschine radio;
+        QVERIFY(radio.hoeren());
+        radio.antworten.insert(QStringLiteral("client gui"), QStringLiteral("0|"));
+        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|0"));
+
+        RadioModel model;
+        RadioInfo info;
+        info.protocol = ProtocolVersion::Flex;
+        info.address  = QHostAddress(QHostAddress::LocalHost);
+        info.port     = radio.port();
+        model.connectToRadio(info);
+
+        QSignalSpy angemeldet(&model, &RadioModel::flexGuiClientRegistered);
+        QVERIFY(angemeldet.wait(8000) || model.flexConnection()->isConnected());
+        QVERIFY(model.connection() == nullptr);
+        model.disconnectFromRadio();
     }
 
     void rueckrufLaeuftGenauEinmal()

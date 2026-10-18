@@ -6716,11 +6716,118 @@ void RadioModel::removePanadapter(int index)
 
 // --- Connection ---
 
+// ─── Flex-Treiber Stufe 1 ────────────────────────────────────────────
+//
+// Oeffnet den Befehlskanal zu einer FlexRadio-Maschine: Erkennung hat
+// sie gefunden (FlexRadioDiscovery), hier wird verbunden, angemeldet
+// und die Frequenz gelesen. Keine Stroeme, kein Senden — der Entwurf
+// steht in docs/architecture/2026-10-18-flex-stufe1-design.md.
+void RadioModel::connectFlexRadio(const RadioInfo& info)
+{
+    if (!m_flexConnection) {
+        m_flexConnection = new FlexRadioConnection(this);
+
+        // Die Kennung, unter der die Maschine unsere Scheiben und
+        // Panadapter zurueckbehaelt. Sie identifiziert LONGPATH, nicht
+        // das Geraet — deshalb global und nicht per MAC wie die
+        // Hardware-Einstellungen. Ohne sie legt jede Verbindung eine
+        // neue Vorgabescheibe auf dem Geraet an.
+        auto& settings = AppSettings::instance();
+        const QString gespeichert =
+            settings.value(QStringLiteral("FlexGuiClientId")).toString().trimmed();
+        if (!gespeichert.isEmpty()) {
+            m_flexConnection->setGuiClientId(gespeichert);
+        }
+
+        // Der Name, den die Maschine in ihrer Clientliste zeigt.
+        const QString rufzeichen = AppSettings::stationCallsign().trimmed();
+        if (!rufzeichen.isEmpty()) {
+            m_flexConnection->setStationName(rufzeichen);
+        }
+
+        connect(m_flexConnection, &FlexRadioConnection::guiClientIdChosen,
+                this, [](const QString& id) {
+            // Behalten, sonst ist die naechste Verbindung ein neuer
+            // Client und die Maschine legt wieder eine Scheibe an.
+            AppSettings::instance().setValue(QStringLiteral("FlexGuiClientId"), id);
+        });
+
+        connect(m_flexConnection, &FlexRadioConnection::guiClientRegistered,
+                this, [this](const QString& id) {
+            setConnectionState(ConnectionState::Connected);
+            emit flexGuiClientRegistered(id);
+        });
+
+        connect(m_flexConnection, &FlexRadioConnection::guiClientRejected,
+                this, [this](quint32 code, const QString& body) {
+            // Eine abgelehnte Anmeldung ist ein gescheiterter Verbindungs-
+            // versuch, nicht eine stille Nichtverbindung. Dieselbe Klasse
+            // Fehler, die ConnectionPanels Statuszeile 2026-08-26 fuer
+            // SunSDR aufgedeckt hat.
+            setConnectionState(ConnectionState::Disconnected);
+            emit connectAttemptFailed(
+                ConnectFailure::ProtocolMismatch,
+                QStringLiteral("The FlexRadio refused the GUI-client "
+                               "registration (code 0x%1). %2")
+                    .arg(code, 0, 16)
+                    .arg(body));
+        });
+
+        connect(m_flexConnection, &FlexRadioConnection::sliceFrequencyChanged,
+                this, [this](int sliceId, double hz) {
+            // Weitergereicht, nicht eingespeist: wohin die Frequenz im
+            // Modell gehoert, entscheidet Stufe 2 zusammen mit Ton und
+            // Bild (Entwurf Abschnitt 5). Eine Flex-Scheibe ist eine
+            // Scheibe OHNE RxChannel, und die 34 WDSP-Stellen in dieser
+            // Datei fragen alle nach einem.
+            emit flexSliceFrequencyChanged(sliceId, hz);
+        });
+
+        connect(m_flexConnection, &FlexRadioConnection::disconnected,
+                this, [this] {
+            setConnectionState(ConnectionState::Disconnected);
+        });
+
+        connect(m_flexConnection, &FlexRadioConnection::errorOccurred,
+                this, [this](const QString& msg) {
+            setConnectionState(ConnectionState::Disconnected);
+            emit connectAttemptFailed(ConnectFailure::Unreachable, msg);
+        });
+    }
+
+    qCInfo(lcConnection) << "Flex: verbinde nach" << info.address.toString()
+                         << ":" << info.port;
+    setConnectionState(ConnectionState::Connecting);
+    m_flexConnection->connectToRadio(info.address, info.port);
+}
+
+void RadioModel::teardownFlexConnection()
+{
+    if (!m_flexConnection) {
+        return;
+    }
+    m_flexConnection->disconnectFromRadio();
+}
+
 void RadioModel::connectToRadio(const RadioInfo& info)
 {
     // Tear down any existing connection
     if (m_connection) {
         teardownConnection();
+    }
+    teardownFlexConnection();
+
+    // Flex-Treiber Stufe 1: eine FlexRadio-Maschine geht einen eigenen
+    // Weg und kommt nie durch den Rest dieser Funktion. Alles darunter
+    // ist OpenHPSDR — HardwareProfile, Alex-Antennenwege, OC-Matrix,
+    // Platinenfaehigkeiten, Dämpfungsbereiche — und fuer ein Flex gilt
+    // davon nichts: dort rechnet das Radio.
+    // Siehe docs/architecture/2026-10-18-flex-stufe1-design.md.
+    if (info.protocol == ProtocolVersion::Flex) {
+        m_lastRadioInfo = info;
+        m_intentionalDisconnect = false;
+        connectFlexRadio(info);
+        return;
     }
 
     m_lastRadioInfo = info;
@@ -7369,21 +7476,11 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     // Factory-create the connection (no parent — will be moved to thread)
     auto conn = RadioConnection::create(info);
     if (!conn) {
+        // Flex kommt hier nicht an: der Abzweig am Anfang dieser
+        // Funktion kehrt vorher zurueck und faehrt connectFlexRadio().
+        // `RadioConnection::create()` traegt den Flex-Fall trotzdem
+        // ausdruecklich — fuer jeden anderen Aufrufer.
         qCWarning(lcConnection) << "Failed to create connection for" << info.displayName();
-        if (info.protocol == ProtocolVersion::Flex) {
-            // Eine Flex-Zeile steht seit Stufe 1 in der Geraeteliste
-            // (FlexRadioDiscovery findet sie), aber verbinden kann
-            // Longpath sie noch nicht. Ohne diese Meldung klickt der
-            // Betreiber auf „Connect" und es passiert sichtbar nichts —
-            // genau die Klasse Fehler, die ConnectionPanels Statuszeile
-            // 2026-08-26 fuer SunSDR aufgedeckt hat.
-            emit connectAttemptFailed(
-                ConnectFailure::ProtocolMismatch,
-                QStringLiteral("FlexRadio detected, but Longpath cannot "
-                               "connect to it yet \u2014 discovery and the "
-                               "command channel are in place, audio and "
-                               "panadapter streams are not."));
-        }
         return;
     }
     m_connection = conn.release();
@@ -9501,6 +9598,11 @@ void RadioModel::disconnectFromRadio()
 {
     m_intentionalDisconnect = true;
     teardownConnection();
+    // Der Flex-Kanal haengt NICHT an m_connection (er ist keine
+    // RadioConnection-Unterklasse), also raeumt teardownConnection ihn
+    // auch nicht ab. Ohne diese Zeile bliebe Longpath nach „Disconnect"
+    // als GUI-Client auf der Maschine angemeldet.
+    teardownFlexConnection();
 }
 
 void RadioModel::wireConnectionSignals(int wdspInSize)

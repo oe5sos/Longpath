@@ -42,6 +42,10 @@ std::unique_ptr<RadioConnection> RadioConnection::create(const RadioInfo& info)
         // Hier steht der Fall ausdruecklich, nicht als Durchfall: so
         // bleibt der switch vollstaendig, und der Grund steht an der
         // Stelle, an der jemand ihn sucht.
+        //
+        // RadioModel kommt mit einem Flex gar nicht hierher —
+        // connectToRadio() zweigt vorher auf connectFlexRadio() ab. Der
+        // Fall bleibt fuer jeden anderen Aufrufer.
         return nullptr;
     }
     qCWarning(lcConnection) << "Unknown protocol version:" << static_cast<int>(info.protocol);

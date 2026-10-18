@@ -435,18 +435,79 @@ Kennung zu melden; das steht jetzt als eigener Prüffall drin.
    sie räumt hinterher auf, was sie angelegt hat (`slice remove`,
    `display pan remove`, `display panafall remove` — das Paar aus
    `RadioModel::removePanadapter [@d58e2b8a]`).
-2. **Die Kennung dauerhaft merken.** `guiClientIdChosen` wird noch von
-   niemandem gehört; solange legt jede Verbindung eine neue
-   Vorgabescheibe auf dem Gerät an. Gehört in `RadioModel`, wenn der
-   Flex-Kanal dort einzieht (`AppSettings`, per MAC wie die übrigen
-   Geräteeinstellungen).
-3. **`RadioModel` öffnet den Flex-Kanal noch nicht.** `create()` gibt für
-   Flex nullptr und `RadioModel` meldet das ehrlich; den Kanal fährt
-   bisher nur die Sonde. Das ist der erste Schritt der Stufe 2, zusammen
-   mit §5.1/§5.2.
-4. Die Zeile in der Geräteliste live ansehen.
-5. `V1.4.0.0` vs. `version=4.3.16.42034`: wenn eine Fassung angezeigt
+2. *(erledigt)* Die Kennung wird dauerhaft gemerkt — siehe §8.
+3. Die Zeile in der Geräteliste live ansehen.
+4. `V1.4.0.0` vs. `version=4.3.16.42034`: wenn eine Fassung angezeigt
    wird, die aus dem Ruf nehmen, nicht die aus dem Kanal.
+5. **Stufe 2:** VITA-49 und die zwei Eingänge aus §5.1/§5.2.
 
 Nicht mehr offen: das Phantom-Flex (§3.3) — auf main behoben, `e5515581`
 / PR #272. Und die Richtungsfrage aus §4 — entschieden: (b).
+
+---
+
+## 8. Die Verdrahtung: `RadioModel` fährt den Kanal
+
+Nachgelegt am 2026-10-18, nachdem die Richtung entschieden war.
+
+`RadioModel::connectToRadio()` zweigt **als Erstes** ab:
+
+```cpp
+if (info.protocol == ProtocolVersion::Flex) {
+    m_lastRadioInfo = info;
+    m_intentionalDisconnect = false;
+    connectFlexRadio(info);
+    return;
+}
+```
+
+Der Abzweig sitzt vor allem Übrigen, weil alles darunter OpenHPSDR ist —
+`HardwareProfile`, Alex-Antennenwege, OC-Matrix, Platinenfähigkeiten,
+Dämpfungsbereiche — und davon gilt für ein Flex nichts. `connection()`
+bleibt `nullptr`; ein Prüffall hält das fest.
+
+`connectFlexRadio()` legt den Kanal an und verdrahtet fünf Dinge:
+
+| Signal | Was passiert |
+|---|---|
+| `guiClientIdChosen` | in `AppSettings` unter `FlexGuiClientId` schreiben |
+| `guiClientRegistered` | Zustand → `Connected`, `flexGuiClientRegistered` weiter |
+| `guiClientRejected` | Zustand → `Disconnected` **und** `connectAttemptFailed` mit dem Code der Maschine |
+| `sliceFrequencyChanged` | als `flexSliceFrequencyChanged` weitergereicht |
+| `disconnected` / `errorOccurred` | Zustand → `Disconnected` |
+
+Drei Entscheidungen darin:
+
+* **Die GUI-Kennung liegt global, nicht per MAC.** Sie identifiziert
+  *Longpath* gegenüber jeder Maschine, nicht ein Gerät — anders als die
+  übrigen Hardware-Einstellungen, die per MAC liegen. So wie AetherSDR es
+  auch hält (`AppSettings::persistentGuiClientId` [@d58e2b8a]).
+* **`disconnectFromRadio()` schließt den Flex-Kanal mit.** Er hängt nicht
+  an `m_connection`, also räumt `teardownConnection()` ihn nicht ab —
+  ohne die zusätzliche Zeile bliebe Longpath nach „Disconnect" als
+  GUI-Client auf der Maschine angemeldet und hielte sie besetzt.
+* **Die Frequenz wird weitergereicht, nicht eingespeist.** Wohin sie im
+  Modell gehört, entscheidet Stufe 2 zusammen mit Ton und Bild (§5).
+  `flexSliceFrequencyChanged` hört heute nur das Protokoll.
+
+### Und die Leiste sagt, was wirklich läuft
+
+`ConnectionPanel`s Statusleiste hatte schon einen Zweig für „verbunden,
+aber ohne `RadioConnection`" — genau der Flex-Fall. Er zeigt jetzt:
+
+```
+Connected — FLEX-8400 (Martin)  (command channel only, no audio yet)
+```
+
+Ein bloßes „Connected" wäre irreführend: der Betreiber sieht ein
+verbundenes Gerät und hört nichts, und das sieht aus wie ein Fehler.
+
+### Geprüft
+
+Drei Prüffälle fahren den ganzen Weg durch ein echtes `RadioModel` gegen
+die falsche Maschine: verbinden → anmelden → leere `slice list` →
+Panadapter → Scheibe → **Frequenz 14.074 MHz gelesen** → Kennung
+gespeichert → trennen. Dazu: eine gespeicherte Kennung wird
+wiederverwendet, und ein Flex erzeugt keine `RadioConnection`.
+
+43 von 43 Prüffällen grün.

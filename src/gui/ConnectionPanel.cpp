@@ -801,6 +801,22 @@ void ConnectionPanel::updateStatusStrip()
             m_stripInfoLabel->setToolTip(QString());
             m_stripInfoLabel->setText(QStringLiteral("Connected — %1  (%2)")
                 .arg(ri.displayName(), ri.address.toString()));
+        } else if (FlexRadioConnection* flex = m_radioModel->flexConnection();
+                   flex && flex->isConnected()) {
+            // Flex-Treiber Stufe 1: verbunden heisst hier NUR Erkennung
+            // und Befehlskanal — es gibt noch keinen Ton und kein Bild.
+            // „Connected" allein waere irrefuehrend: der Betreiber sieht
+            // ein verbundenes Geraet und hoert nichts, und das sieht aus
+            // wie ein Fehler. Deshalb steht hier, was wirklich laeuft.
+            // Entwurf: docs/architecture/2026-10-18-flex-stufe1-design.md
+            if (m_failureDetailLabel) { m_failureDetailLabel->setVisible(false); }
+            m_stripInfoLabel->setToolTip(
+                QStringLiteral("Stage 1 of the Flex driver: discovery and the "
+                               "command channel. Audio and panadapter streams "
+                               "(VITA-49) are not implemented yet."));
+            m_stripInfoLabel->setText(
+                QStringLiteral("Connected — %1  (command channel only, no audio yet)")
+                    .arg(m_radioModel->name()));
         } else {
             if (m_failureDetailLabel) { m_failureDetailLabel->setVisible(false); }
             m_stripInfoLabel->setToolTip(QString());

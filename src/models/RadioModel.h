@@ -102,6 +102,7 @@
 #include "core/CalibrationController.h"
 #include "core/RadioDiscovery.h"
 #include "core/FlexRadioDiscovery.h"
+#include "core/FlexRadioConnection.h"
 #include "core/RadioConnection.h"
 #include "core/HardwareProfile.h"
 #include "core/codec/CodecContext.h"  // SliceConfig (Phase 3F Sub-Epic B Task 16)
@@ -274,6 +275,11 @@ public:
     // OpenHPSDR wird gefragt (Rundruf auf 1024, NIC-Lauf), FlexRadio
     // ruft von selbst. Siehe core/FlexRadioDiscovery.h.
     FlexRadioDiscovery* flexDiscovery()  { return m_flexDiscovery; }
+    // Der Flex-Befehlskanal. Nur belegt, solange eine FlexRadio-Maschine
+    // verbunden ist; sonst nullptr. Siehe core/FlexRadioConnection.h —
+    // bewusst KEINE RadioConnection-Unterklasse, deshalb steht er
+    // neben m_connection und nicht darin.
+    FlexRadioConnection* flexConnection() { return m_flexConnection; }
     ReceiverManager*  receiverManager()  { return m_receiverManager; }
     AudioEngine*      audioEngine()      { return m_audioEngine; }
     WdspEngine*       wdspEngine()       { return m_wdspEngine; }
@@ -2770,6 +2776,14 @@ signals:
     /// verband und scheiterte, sah "Disconnected" und sonst nichts —
     /// der Betreiber hat daraufhin drei Tage die App verdaechtigt,
     /// waehrend es die Netzwerkstrecke war.
+    // Flex-Treiber Stufe 1: die vom Gerät gelesene Frequenz einer
+    // Scheibe, in Hz. Hört heute nur das Protokoll — bei Flex rechnet
+    // das Radio, und wohin Ton und Bild gehen, entscheidet Stufe 2
+    // (docs/architecture/2026-10-18-flex-stufe1-design.md §5).
+    void flexSliceFrequencyChanged(int sliceId, double frequencyHz);
+    // Die Maschine hat Longpath als GUI-Client angenommen.
+    void flexGuiClientRegistered(const QString& guiClientId);
+
     void connectAttemptFailed(Longpath::ConnectFailure reason,
                               const QString& detail);
 
@@ -3435,9 +3449,17 @@ private:
 
     void commitStreamSampleRateChange(const StreamRateChangePlan& plan);
 
+    // Flex-Treiber Stufe 1: oeffnet den Befehlskanal zu einer
+    // FlexRadio-Maschine. Getrennt von connectToRadio()s uebrigem Weg,
+    // weil dort alles OpenHPSDR ist (HardwareProfile, Alex, OC-Matrix,
+    // Platinenfaehigkeiten) und fuer ein Flex nichts davon gilt.
+    void connectFlexRadio(const RadioInfo& info);
+    void teardownFlexConnection();
+
     // Sub-components (owned, main thread)
     RadioDiscovery*  m_discovery{nullptr};
     FlexRadioDiscovery* m_flexDiscovery{nullptr};  // Flex-Treiber Stufe 1
+    FlexRadioConnection* m_flexConnection{nullptr};  // nur bei Flex belegt
     ReceiverManager* m_receiverManager{nullptr};
     AudioEngine*     m_audioEngine{nullptr};
     WdspEngine*      m_wdspEngine{nullptr};
