@@ -49,6 +49,8 @@
 class QLabel;
 class QPlainTextEdit;
 class QSpinBox;
+
+namespace Longpath { class Ft8Wasserfall; }
 class QProgressBar;
 class QLineEdit;
 class QPushButton;
@@ -171,6 +173,7 @@ public:
     QLabel*         lastLabelForTest() const { return m_lastLabel; }
     QPushButton*    nurCqButtonForTest() const { return m_nurCqBtn; }
     QSpinBox*       sendeTonFeldForTest() const { return m_tonFeld; }
+    Longpath::Ft8Wasserfall* wasserfallForTest() const { return m_wasserfall; }
     int             sendeTonHzForTest() const { return m_sendeTonHz; }
     QPushButton*    ft8ButtonForTest() const { return m_ft8Btn; }
     QPushButton*    ft4ButtonForTest() const { return m_ft4Btn; }
@@ -234,6 +237,10 @@ private:
     /// wer sich eine freie Stelle gesucht hat, will sie beim naechsten
     /// Start wiederhaben.
     QSpinBox* m_tonFeld{nullptr};
+    /// Der Streifen ueber der Fundliste. Zeigt den Durchlassbereich und
+    /// nimmt per Klick die Sendestelle entgegen -- ohne ihn waere die
+    /// waehlbare Sendestelle eine Zahl ohne Blick aufs Band.
+    Longpath::Ft8Wasserfall* m_wasserfall{nullptr};
     int m_sendeTonHz{1500};
 
     QPushButton* m_nurCqBtn{nullptr};
