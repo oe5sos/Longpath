@@ -31,6 +31,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QSpinBox>
 #include <QColor>
 #include <QTextCharFormat>
 #include <QTextCursor>
@@ -63,9 +64,16 @@ constexpr int kPumpIntervalMs = 200;
 // Minuten.
 constexpr int kMaxLines = 400;
 
-// Die Tonlage, auf der gesendet wird. 1500 Hz ist die Mitte des
-// Durchlassbereichs und das, was WSJT-X ab Werk nimmt.
-constexpr float kSendeTonHz = 1500.0f;
+// Die Tonlage, auf der gesendet wird: Vorgabe und Grenzen. 1500 Hz ist
+// die Mitte des Durchlassbereichs und das, was WSJT-X ab Werk nimmt --
+// seit 2026-10-18 nur noch die VORGABE, nicht mehr die einzige Wahl
+// (siehe m_sendeTonHz in Ft8Applet.h). Die Grenzen sind der nutzbare
+// Durchlassbereich eines gewoehnlichen SSB-Filters; darueber hinaus
+// kaeme der Ton gar nicht erst heraus.
+constexpr int kSendeTonVorgabeHz = 1500;
+constexpr int kSendeTonMinHz = 200;
+constexpr int kSendeTonMaxHz = 2800;
+constexpr auto kSendeTonSchluessel = "Ft8/SendeTonHz";
 
 } // namespace
 
@@ -170,6 +178,35 @@ void Ft8Applet::buildUI()
         m_nurCq = an;
     });
     head->addWidget(m_nurCqBtn);
+
+    head->addSpacing(8);
+
+    // ── Die Sendestelle ─────────────────────────────────────────────
+    auto* tonBez = new QLabel(tr("TX Hz"), this);
+    tonBez->setFont(Style::monoFont(font(), Style::kFontSmall));
+    tonBez->setStyleSheet(QStringLiteral("color: %1;").arg(Style::kTextSecondary));
+    head->addWidget(tonBez);
+
+    m_sendeTonHz = AppSettings::instance()
+                       .value(QLatin1String(kSendeTonSchluessel),
+                              kSendeTonVorgabeHz)
+                       .toInt();
+    if (m_sendeTonHz < kSendeTonMinHz || m_sendeTonHz > kSendeTonMaxHz) {
+        m_sendeTonHz = kSendeTonVorgabeHz;
+    }
+    m_tonFeld = new QSpinBox(this);
+    m_tonFeld->setRange(kSendeTonMinHz, kSendeTonMaxHz);
+    m_tonFeld->setSingleStep(10);
+    m_tonFeld->setValue(m_sendeTonHz);
+    m_tonFeld->setFont(Style::monoFont(font(), Style::kFontSmall));
+    m_tonFeld->setToolTip(tr(
+        "Where in the passband you transmit. Pick a clear spot: with "
+        "Auto on, every call goes out here."));
+    connect(m_tonFeld, &QSpinBox::valueChanged, this, [this](int hz) {
+        m_sendeTonHz = hz;
+        AppSettings::instance().setValue(QLatin1String(kSendeTonSchluessel), hz);
+    });
+    head->addWidget(m_tonFeld);
 
     head->addSpacing(8);
 
@@ -383,7 +420,8 @@ LogEntry Ft8Applet::logEintrag(const Ft8Ablauf& ablauf,
                                double wahlHz,
                                bool unteresSeitenband,
                                Ft8Decoder::Protocol p,
-                               const QString& meinLocator)
+                               const QString& meinLocator,
+                               int sendeTonHz)
 {
     LogEntry e;
     e.call   = ablauf.partner();
@@ -391,8 +429,9 @@ LogEntry Ft8Applet::logEintrag(const Ft8Ablauf& ablauf,
 
     // Dieselbe Rechnung wie fuer die Funde: die Wahlfrequenz der
     // Scheibe plus die Tonlage, und das Vorzeichen haengt am
-    // Seitenband. Gesendet wird auf kSendeTonHz.
-    const double hz = wahlHz + (unteresSeitenband ? -kSendeTonHz : kSendeTonHz);
+    // Seitenband. Gesendet wird auf der gewaehlten Tonlage.
+    const double hz = wahlHz + (unteresSeitenband ? -double(sendeTonHz)
+                                                  : double(sendeTonHz));
     e.freqMHz = hz / 1.0e6;
     e.band    = bandLabel(bandFromFrequency(hz));
 
@@ -429,7 +468,8 @@ void Ft8Applet::meldeFertigesQso()
     emit qsoFertig(logEintrag(m_ablauf,
                               m_slice ? m_slice->frequency() : 0.0,
                               m_slice && m_slice->dspMode() == DSPMode::DIGL,
-                              protocol(), eigenerLocator()));
+                              protocol(), eigenerLocator(),
+                              m_sendeTonHz));
 }
 
 void Ft8Applet::zeigeAblauf()
@@ -582,7 +622,7 @@ void Ft8Applet::sendeNachricht(const QString& text)
     }
 
     Ft8TxSource* quelle = m_model->ft8TxSource();
-    if (!quelle->vorbereiten(sauber, kSendeTonHz, protocol())) {
+    if (!quelle->vorbereiten(sauber, float(m_sendeTonHz), protocol())) {
         if (m_status) {
             m_status->setText(tr("cannot encode “%1”").arg(sauber));
         }

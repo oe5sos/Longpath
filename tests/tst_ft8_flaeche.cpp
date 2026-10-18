@@ -31,6 +31,7 @@
 #include <QPlainTextEdit>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QTimeZone>
 
 #include "core/AudioEngine.h"
@@ -91,6 +92,35 @@ private slots:
         QCOMPARE(Ft8Applet::zeilenart(false, false, true), Art::Cq);
         // ein fremdes QSO
         QCOMPARE(Ft8Applet::zeilenart(false, false, false), Art::Gewoehnlich);
+    }
+
+    // ── Die Sendestelle ist waehlbar und bleibt ─────────────────────
+    //
+    // Betreiber 2026-10-18: von den Luecken gegenueber WSJT-X war das
+    // die einzige mit Folgen auf dem BAND statt am Schirm -- die
+    // Tonlage stand fest auf 1500 Hz, also sendete jeder Longpath-
+    // Betreiber mit „Auto" immer auf dieselbe Stelle.
+    //
+    // Der Lauf haelt beide Haelften fest: das Feld setzt die Tonlage,
+    // UND sie ueberlebt das Schliessen des Fensters. Ohne die zweite
+    // waere die Wahl bei jedem Start wieder weg.
+    void dieSendestelleIstWaehlbarUndBleibt()
+    {
+        RadioModel radio;
+        {
+            Ft8Applet applet(&radio);
+            QVERIFY2(applet.sendeTonFeldForTest(), "kein Feld fuer die Tonlage");
+            QCOMPARE(applet.sendeTonHzForTest(), 1500);   // Vorgabe wie WSJT-X
+
+            applet.sendeTonFeldForTest()->setValue(1725);
+            QCOMPARE(applet.sendeTonHzForTest(), 1725);
+        }
+        // Zweites Fenster, frisch gebaut: die Wahl muss wieder da sein.
+        {
+            Ft8Applet wieder(&radio);
+            QCOMPARE(wieder.sendeTonHzForTest(), 1725);
+            QCOMPARE(wieder.sendeTonFeldForTest()->value(), 1725);
+        }
     }
 
     // ── „CQ only" filtert die ANSICHT, nicht den Betrieb ────────────
