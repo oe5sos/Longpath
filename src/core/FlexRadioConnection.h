@@ -35,16 +35,27 @@
 // Antwort auf eine Frage, nicht ein halbes Geraet: traegt der Entwurf,
 // bevor die 2279 Zeilen VITA-49 angefasst werden.
 //
-// **`client gui` wird NICHT gesendet.** AetherSDR sendet es
-// (RadioModel.cpp:6540 [@d58e2b8a]) und muss das auch — es ist der
-// Hauptbediener der Maschine. Ein GUI-Client uebernimmt die Maschine:
-// er bekommt die Scheibenverwaltung, und bei Bedarf wirft die Maschine
-// dafuer einen anderen hinaus (AetherSDR fuehrt dafuer eigens eine
-// „reclaim-eviction guard", RadioModel.cpp:6580). Zum LESEN einer
-// Frequenz braucht es das nicht: `sub slice all` genuegt, und Martins
-// Maschine darf dabei weiter an SmartSDR oder am Maestro haengen. Der
-// Schritt vom Mitleser zum Bediener gehoert in die Stufe, die auch
-// senden kann — nicht in die, die nur nachsieht.
+// **Longpath meldet sich als GUI-Client an** (`client gui <uuid>`).
+// Das war in der ersten Fassung dieser Datei anders — da blieb Longpath
+// bewusst Mitleser. Die Messung am echten Gerät hat die Frage
+// entschieden: `slice list` kam LEER zurück. Die Maschine hat ohne
+// GUI-Client gar keine Scheiben, also auch keine Frequenz zu lesen.
+// `max_slices=2` ist die lizenzierte Zahl, nicht die vorhandene.
+//
+// Mitlesen wäre eine Sackgasse gewesen: Ton und Panadapter hängen
+// später an genau den Scheiben und Panadaptern, die ein GUI-Client
+// anlegt und besitzt. Ein Weg, der nur funktioniert, solange SmartSDR
+// nebenher läuft, führt zu keiner Stufe 2.
+//
+// Was ein GUI-Client bedeutet, ausdrücklich: er übernimmt die
+// Scheibenverwaltung, und bei Bedarf wirft die Maschine dafür einen
+// anderen Client hinaus (AetherSDR führt dafür eigens eine
+// „reclaim-eviction guard", RadioModel.cpp:6580 [@d58e2b8a] — hier
+// nicht portiert, weil Stufe 1 sich nicht wiederverbindet).
+//
+// Was Stufe 1 trotzdem NICHT tut: senden. Kein `xmit`, keine
+// TX-Scheibe, keine Leistung. Die Interlock-Meldung der Maschine
+// (`state=RECEIVE tx_allowed=0`) wird gelesen, nie geschrieben.
 //
 // Was daraus folgt: diese Klasse ist KEINE RadioConnection-Unterklasse.
 // Die Basis dort ist durch und durch OpenHPSDR (Alex-Antennenwege,
@@ -58,10 +69,13 @@
 //   2026-10-18 — Ported to Longpath by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork). Namespace AetherSDR →
 //                 Longpath. Satzlehre unveraendert uebernommen;
-//                 Anmeldefolge ohne `client gui` (Begruendung oben);
 //                 Demo-/Synthetik-Zweige, Multi-Flex-Verwaltung,
-//                 Keepalive-Ping und RTT-Messung nicht uebernommen —
-//                 Stufe 1 liest, sie fuehrt nicht.
+//                 Keepalive-Ping und RTT-Messung nicht uebernommen.
+//   2026-10-18 — Zweiter Durchgang, nach der Messung am Gerät: GUI-
+//                 Anmeldung, `slice list`, und das Anlegen einer
+//                 Vorgabescheibe, wenn keine da ist (portiert aus
+//                 RadioModel::createPanadapter / createDefaultSliceOnPan
+//                 und SliceRecreatePolicy, alle [@d58e2b8a]).
 // =================================================================
 
 #include <QByteArray>
@@ -71,6 +85,7 @@
 #include <QString>
 #include <QTcpSocket>
 
+#include <functional>
 #include <optional>
 
 namespace Longpath {
@@ -128,6 +143,23 @@ QMap<QString, QString> parseKVs(const QString& body);
 // „slice 3" → 3; alles andere → -1.
 int sliceIdFromObject(const QString& object);
 
+// From AetherSDR RadioStatusOwnership.h:27-41 [@d58e2b8a] —
+// normalizedFlexId(). Flex-Kennungen kommen als Hex, mal mit „0x"
+// davor, mal ohne, mal nicht auf acht Stellen gefuellt. Zurueck kommt
+// immer die achtstellige Kleinschreibung; unlesbar ⇒ leer.
+QString normalizedFlexId(QString text);
+
+// From AetherSDR RadioStatusOwnership.h:48-60 [@d58e2b8a] —
+// parsePanafallCreatePanId(). Die Antwort auf „display panafall
+// create" traegt die Kennung mal als `pan=`, mal als `id=`, mal nackt
+// als erstes Glied einer Kommaliste. Alle drei Formen werden gelesen.
+QString panIdFromCreateReply(const QString& body);
+
+// Die Antwort auf „slice list" ist eine Kommaliste von Nummern, und
+// LEER, wenn die Maschine keine Scheiben hat — das ist der Normalfall
+// ohne GUI-Client, nicht ein Fehler.
+QList<int> sliceListFromReply(const QString& body);
+
 // Liest `RF_frequency` (MHz) aus einem Scheibenzustand und gibt Hz.
 // Fehlt der Schluessel oder ist er unlesbar, kommt nichts zurueck —
 // NICHT 0. From AetherSDR FlexBackend.cpp:731-742 [@d58e2b8a]: eine
@@ -153,6 +185,26 @@ public:
     explicit FlexRadioConnection(QObject* parent = nullptr);
     ~FlexRadioConnection() override;
 
+    // Die Kennung, unter der Longpath sich als GUI-Client anmeldet.
+    // Wird von aussen gesetzt (RadioModel kennt AppSettings, diese
+    // Klasse soll es nicht), weil die Maschine Scheiben und Panadapter
+    // je Kennung ZURUECKLEGT: eine neue Kennung bei jedem Start heisst
+    // jedes Mal eine neue Vorgabescheibe auf der Maschine.
+    // Ungesetzt ⇒ es wird eine erzeugt und per
+    // guiClientIdChosen() gemeldet, damit der Aufrufer sie behalten
+    // kann. Form wie AetherSDR: UUID ohne Klammern, gross
+    // (AppSettings.cpp:1256 [@d58e2b8a]).
+    void setGuiClientId(const QString& id);
+    QString guiClientId() const { return m_guiClientId; }
+
+    // Der Stationsname, den die Maschine in ihrer Clientliste zeigt.
+    void setStationName(const QString& name) { m_stationName = name; }
+
+    // Darf Longpath eine Vorgabescheibe anlegen, wenn die Maschine
+    // keine hat? Vorgabe ja — ohne Scheibe gibt es nichts zu lesen.
+    // Aus heisst: nur nachsehen, nichts auf der Maschine aendern.
+    void setMayCreateDefaultSlice(bool may) { m_mayCreateSlice = may; }
+
     State  state() const { return m_state; }
     bool   isConnected() const { return m_state == State::Connected; }
     quint32 clientHandle() const { return m_handle; }
@@ -168,6 +220,19 @@ public:
     // Schickt einen Befehl und gibt die verwendete Folgenummer zurueck.
     // 0 heisst „nicht gesendet" (keine Verbindung).
     quint32 sendCommand(const QString& command);
+
+    // Dasselbe mit Rueckruf auf die Antwort dieses Befehls. Der
+    // Rueckruf laeuft genau einmal. Ohne Verbindung laeuft er nicht.
+    //
+    // AetherSDR fuehrt diese Zuordnung eine Ebene hoeher, in
+    // RadioModel (RadioConnection.cpp:339 + „Callbacks removed —
+    // responses emitted via commandResponse signal (#502)"), weil die
+    // Verbindung dort auf einem eigenen Faden liegt. Hier liegt sie auf
+    // dem Hauptfaden, und die Anmeldefolge besteht gerade aus
+    // „warte auf die Antwort, dann der naechste Schritt" — deshalb
+    // sitzt die Zuordnung hier.
+    using ResponseCallback = std::function<void(quint32 code, const QString& body)>;
+    quint32 sendCommand(const QString& command, ResponseCallback onResponse);
 
     // Nur fuer Pruefstaende: schiebt eine Zeile durch denselben Weg,
     // den der Socket nimmt.
@@ -188,6 +253,20 @@ signals:
     // Das Ziel der Stufe 1.
     void sliceFrequencyChanged(int sliceId, double frequencyHz);
 
+    // Die Anmeldung ist durch: ab hier fuehrt Longpath die Maschine.
+    void guiClientRegistered(const QString& guiClientId);
+    // Die Anmeldung wurde abgelehnt — mit dem Code der Maschine.
+    void guiClientRejected(quint32 resultCode, const QString& body);
+    // Die verwendete Kennung, damit der Aufrufer sie behalten kann.
+    // Kommt auch, wenn die Maschine eine eigene zurueckmeldet.
+    void guiClientIdChosen(const QString& guiClientId);
+    // Was „slice list" geantwortet hat. Leere Liste ist ein Ergebnis,
+    // kein Fehler.
+    void sliceListRead(const QList<int>& sliceIds);
+    // Eine Vorgabescheibe wurde angelegt (oder es ist misslungen).
+    void defaultSliceCreated(const QString& panId);
+    void defaultSliceFailed(quint32 resultCode, const QString& body);
+
 private slots:
     void onSocketConnected();
     void onSocketDisconnected();
@@ -198,6 +277,10 @@ private:
     void processLine(const QString& line);
     void setState(State s);
     void sendRegistrationSequence();
+    void onGuiClientAccepted(const QString& body);
+    void queryAndRecoverSlices();
+    void createDefaultSlice();
+    void createSliceOnPan(const QString& panId);
 
     QTcpSocket m_socket;
     QByteArray m_readBuffer;
@@ -206,6 +289,12 @@ private:
     quint32    m_nextSeq{1};
     QString    m_version;
     QMap<int, double> m_sliceFreqHz;
+
+    QString m_guiClientId;
+    QString m_stationName{QStringLiteral("Longpath")};
+    bool    m_mayCreateSlice{true};
+    bool    m_guiRegistered{false};
+    QMap<quint32, ResponseCallback> m_pending;
 };
 
 }  // namespace Longpath

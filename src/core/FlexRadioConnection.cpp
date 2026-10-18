@@ -20,6 +20,7 @@
 
 #include <QLoggingCategory>
 #include <QStringList>
+#include <QUuid>
 
 namespace Longpath {
 
@@ -178,6 +179,56 @@ QByteArray buildCommand(quint32 seq, const QString& command)
     return QStringLiteral("C%1|%2\n").arg(seq).arg(command).toUtf8();
 }
 
+// From AetherSDR RadioStatusOwnership.h:27-41 [@d58e2b8a] —
+// normalizedFlexId().
+QString normalizedFlexId(QString text)
+{
+    text = text.trimmed();
+    if (text.isEmpty()) {
+        return QString();
+    }
+
+    if (text.startsWith(QStringLiteral("0x"), Qt::CaseInsensitive)) {
+        text = text.mid(2);
+    }
+
+    bool ok = false;
+    const quint32 id = text.toUInt(&ok, 16);
+    if (!ok) {
+        return QString();
+    }
+    return QString::number(id, 16).rightJustified(8, QLatin1Char('0'));
+}
+
+// From AetherSDR RadioStatusOwnership.h:48-60 [@d58e2b8a] —
+// parsePanafallCreatePanId().
+QString panIdFromCreateReply(const QString& body)
+{
+    const QMap<QString, QString> kvs = parseKVs(body);
+    if (kvs.contains(QStringLiteral("pan"))) {
+        return normalizedFlexId(kvs.value(QStringLiteral("pan")));
+    }
+    if (kvs.contains(QStringLiteral("id"))) {
+        return normalizedFlexId(kvs.value(QStringLiteral("id")));
+    }
+
+    const QStringList parts = body.trimmed().split(QLatin1Char(','));
+    return parts.isEmpty() ? QString() : normalizedFlexId(parts.constFirst());
+}
+
+QList<int> sliceListFromReply(const QString& body)
+{
+    QList<int> ids;
+    for (const QString& token : body.split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+        bool ok = false;
+        const int id = token.trimmed().toInt(&ok);
+        if (ok) {
+            ids.append(id);
+        }
+    }
+    return ids;
+}
+
 int sliceIdFromObject(const QString& object)
 {
     const QStringList parts = object.split(' ', Qt::SkipEmptyParts);
@@ -242,6 +293,8 @@ void FlexRadioConnection::connectToRadio(const QHostAddress& address, quint16 po
     m_nextSeq = 1;
     m_version.clear();
     m_sliceFreqHz.clear();
+    m_pending.clear();
+    m_guiRegistered = false;
 
     qCInfo(lcFlexCmd) << "verbinde nach" << address.toString() << ":" << port;
     setState(State::Connecting);
@@ -259,6 +312,21 @@ void FlexRadioConnection::disconnectFromRadio()
     // [@d58e2b8a]) nimmt vorher Stroeme zurueck; das gehoert in die
     // Stufe, die Stroeme oeffnet.
     m_socket.disconnectFromHost();
+}
+
+void FlexRadioConnection::setGuiClientId(const QString& id)
+{
+    m_guiClientId = id.trimmed();
+}
+
+quint32 FlexRadioConnection::sendCommand(const QString& command,
+                                         ResponseCallback onResponse)
+{
+    const quint32 seq = sendCommand(command);
+    if (seq != 0 && onResponse) {
+        m_pending.insert(seq, std::move(onResponse));
+    }
+    return seq;
 }
 
 quint32 FlexRadioConnection::sendCommand(const QString& command)
@@ -355,14 +423,25 @@ void FlexRadioConnection::processLine(const QString& line)
         sendRegistrationSequence();
         break;
 
-    case FlexLineType::Response:
+    case FlexLineType::Response: {
         emit commandResponse(msg.sequence, msg.resultCode, msg.object);
         if (msg.resultCode != 0) {
             qCWarning(lcFlexCmd) << "Befehl" << msg.sequence << "abgelehnt, Code"
                                  << QStringLiteral("0x%1").arg(msg.resultCode, 0, 16)
                                  << msg.object;
         }
+        // Der Rueckruf wird VOR dem Aufruf entnommen: laeuft er genau
+        // einmal, auch wenn er selbst wieder sendet und antwortet.
+        const auto it = m_pending.find(msg.sequence);
+        if (it != m_pending.end()) {
+            const ResponseCallback cb = it.value();
+            m_pending.erase(it);
+            if (cb) {
+                cb(msg.resultCode, msg.object);
+            }
+        }
         break;
+    }
 
     case FlexLineType::Status: {
         emit statusReceived(msg.object, msg.kvs);
@@ -398,9 +477,7 @@ void FlexRadioConnection::processLine(const QString& line)
 }
 
 // From AetherSDR RadioModel.cpp:6523-6596 [@d58e2b8a] — die
-// Anmeldefolge, OHNE `client gui`: siehe den Kopf von
-// FlexRadioConnection.h fuer den Grund. Was bleibt, ist das Minimum,
-// mit dem ein Mitleser Scheibenzustaende bekommt.
+// Anmeldefolge. Die Reihenfolge ist nicht beliebig, siehe unten.
 void FlexRadioConnection::sendRegistrationSequence()
 {
     // „client program <name>" zuerst — die Maschine will die Identitaet
@@ -410,10 +487,182 @@ void FlexRadioConnection::sendRegistrationSequence()
     // still ignoriert, wenn es vor `client program` kam. Die Nummer hier
     // ohne Raute, weil `verify-style-drift.py` ein „#2447" als namenloses
     // Farbliteral zaehlt — vier Hexstellen hinter einer Raute).
+    //
+    // Die 8400 lehnt das mit `R|10000002|unknown client program Longpath`
+    // ab (am 2026-10-18 gemessen) — sie prueft den Namen gegen eine ihr
+    // bekannte Liste. Das ist NICHT toedlich: alles danach wird
+    // angenommen. Der Befehl bleibt, weil er die dokumentierte Folge ist;
+    // einen fremden Programmnamen zu senden, um durchzukommen, waere
+    // Impersonieren.
     sendCommand(QStringLiteral("client program Longpath"));
 
-    // Und das eine Abonnement, das Stufe 1 braucht.
+    // Die Kennung, unter der die Maschine unsere Scheiben und
+    // Panadapter zurueckbehaelt. Keine gesetzt ⇒ eine erzeugen und
+    // melden, damit der Aufrufer sie behalten kann — sonst legt jeder
+    // Start eine neue Vorgabescheibe auf der Maschine an.
+    // Form aus AppSettings.cpp:1256 [@d58e2b8a]: UUID ohne Klammern,
+    // gross.
+    if (m_guiClientId.isEmpty()) {
+        m_guiClientId =
+            QUuid::createUuid().toString(QUuid::WithoutBraces).toUpper();
+        qCInfo(lcFlexCmd) << "keine GUI-Kennung gesetzt, neue erzeugt";
+        emit guiClientIdChosen(m_guiClientId);
+    }
+
+    sendCommand(QStringLiteral("client gui %1").arg(m_guiClientId),
+                [this](quint32 code, const QString& body) {
+        if (code != 0) {
+            qCWarning(lcFlexCmd) << "GUI-Anmeldung abgelehnt, Code"
+                                 << QStringLiteral("0x%1").arg(code, 0, 16)
+                                 << body;
+            emit guiClientRejected(code, body);
+            return;
+        }
+        onGuiClientAccepted(body);
+    });
+}
+
+void FlexRadioConnection::onGuiClientAccepted(const QString& body)
+{
+    m_guiRegistered = true;
+
+    // From AetherSDR RadioModel.cpp:6570-6576 [@d58e2b8a]: die Maschine
+    // antwortet mit der Kennung, unter der sie uns gefuehrt hat. Die
+    // behalten — sie stellt bei der naechsten Verbindung Scheiben und
+    // Frequenzen wieder her.
+    const QString returned = body.trimmed();
+    if (!returned.isEmpty() && returned != m_guiClientId) {
+        m_guiClientId = returned;
+        emit guiClientIdChosen(m_guiClientId);
+    }
+
+    qCInfo(lcFlexCmd) << "als GUI-Client angemeldet, Kennung" << m_guiClientId;
+    emit guiClientRegistered(m_guiClientId);
+
+    sendCommand(QStringLiteral("client station %1").arg(m_stationName));
+
+    // Abonnements sind unabhaengige Themen, und die Maschine arbeitet
+    // Befehle in Sendereihenfolge ab — sie koennen also hintereinander
+    // raus, ohne auf je eine Antwort zu warten
+    // (RadioModel.cpp:6588-6592 [@d58e2b8a] begruendet das: die alte
+    // Kette kostete elf Umlaeufe, rund 0,7 s auf einem LAN, ohne
+    // Protokollgrund). Stufe 1 braucht genau eines davon.
     sendCommand(QStringLiteral("sub slice all"));
+
+    queryAndRecoverSlices();
+}
+
+// From AetherSDR SliceRecreatePolicy.h [@d58e2b8a] — der dort
+// beschriebene Fall „die Maschine meldet null Scheiben beim Anmelden".
+// Bei AetherSDR ist das die Ausnahme (Sitzungswiederherstellung brachte
+// den Panadapter ohne seine Scheibe zurueck, deren #3212); hier ist es
+// der Normalfall, weil eine Maschine ohne GUI-Client ueberhaupt keine
+// Scheiben hat.
+void FlexRadioConnection::queryAndRecoverSlices()
+{
+    sendCommand(QStringLiteral("slice list"),
+                [this](quint32 code, const QString& body) {
+        if (code != 0) {
+            qCWarning(lcFlexCmd) << "slice list abgelehnt, Code"
+                                 << QStringLiteral("0x%1").arg(code, 0, 16);
+            return;
+        }
+
+        const QList<int> ids = FlexCommandWire::sliceListFromReply(body);
+        qCInfo(lcFlexCmd) << "Scheiben auf der Maschine:" << ids.size();
+        emit sliceListRead(ids);
+
+        if (!ids.isEmpty()) {
+            // Die Maschine hat uns Scheiben zurueckgelegt. Ihre
+            // Zustaende kommen ueber `sub slice all` von selbst; es
+            // gibt nichts anzulegen. Eine zweite Vorgabescheibe hier
+            // waere genau der Doppelfehler, den AetherSDRs
+            // SliceRecreatePolicy verhindert.
+            return;
+        }
+
+        if (!m_mayCreateSlice) {
+            qCInfo(lcFlexCmd) << "keine Scheibe da, und Anlegen ist aus "
+                                 "— es gibt nichts zu lesen";
+            return;
+        }
+        createDefaultSlice();
+    });
+}
+
+namespace {
+
+// From AetherSDR SliceRecreatePolicy.h:52-56 [@d58e2b8a] — die
+// Vorgaben der Decision-Struktur. 14,225 MHz liegt im 20-m-Band;
+// Empfang, kein Senden. Stufe 1 hat keine gespeicherte „letzte
+// Frequenz", die der Entscheider dort bevorzugen wuerde, also bleibt
+// es bei der Vorgabe.
+constexpr double kDefaultSliceFreqMhz = 14.225000;
+
+}  // namespace
+
+// From AetherSDR RadioModel::createPanadapter [@d58e2b8a] — eine
+// Scheibe braucht einen Panadapter, auf dem sie sitzt. Der Panadapter
+// entsteht auf der MASCHINE; Longpath liest seine Daten nicht (das
+// waeren die Stroeme, und die sind Stufe 2).
+void FlexRadioConnection::createDefaultSlice()
+{
+    sendCommand(QStringLiteral("display panafall create x=100 y=100"),
+                [this](quint32 code, const QString& body) {
+        if (code == 0) {
+            const QString panId = FlexCommandWire::panIdFromCreateReply(body);
+            if (panId.isEmpty()) {
+                qCWarning(lcFlexCmd) << "panafall angelegt, aber keine Kennung "
+                                        "in der Antwort:" << body;
+                emit defaultSliceFailed(code, body);
+                return;
+            }
+            createSliceOnPan(panId);
+            return;
+        }
+
+        qCWarning(lcFlexCmd) << "display panafall create abgelehnt, Code"
+                             << QStringLiteral("0x%1").arg(code, 0, 16)
+                             << "— versuche panadapter create";
+        sendCommand(QStringLiteral("panadapter create"),
+                    [this](quint32 legacyCode, const QString& legacyBody) {
+            if (legacyCode != 0) {
+                emit defaultSliceFailed(legacyCode, legacyBody);
+                return;
+            }
+            const QString panId = FlexCommandWire::panIdFromCreateReply(legacyBody);
+            if (panId.isEmpty()) {
+                emit defaultSliceFailed(legacyCode, legacyBody);
+                return;
+            }
+            createSliceOnPan(panId);
+        });
+    });
+}
+
+// From AetherSDR RadioModel::createDefaultSliceOnPan [@d58e2b8a] —
+// „slice create pan=<id> freq=<mhz> antenna=<ant> mode=<mode>".
+void FlexRadioConnection::createSliceOnPan(const QString& panId)
+{
+    const QString cmd =
+        QStringLiteral("slice create pan=%1 freq=%2 antenna=ANT1 mode=USB")
+            .arg(panId)
+            .arg(kDefaultSliceFreqMhz, 0, 'f', 6);
+
+    sendCommand(cmd, [this, panId](quint32 code, const QString& body) {
+        if (code != 0) {
+            qCWarning(lcFlexCmd) << "slice create abgelehnt fuer pan" << panId
+                                 << "Code" << QStringLiteral("0x%1").arg(code, 0, 16)
+                                 << body;
+            emit defaultSliceFailed(code, body);
+            return;
+        }
+        qCInfo(lcFlexCmd) << "Vorgabescheibe angelegt auf pan" << panId
+                          << "— Nummer" << body.trimmed();
+        // Die Maschine schickt jetzt von selbst „S|slice N …"; der
+        // Zustandszweig oben liest die Frequenz daraus.
+        emit defaultSliceCreated(panId);
+    });
 }
 
 void FlexRadioConnection::setState(State s)

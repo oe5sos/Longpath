@@ -42,6 +42,8 @@
 
 #include <QHostAddress>
 #include <QSignalSpy>
+#include <QTcpServer>
+#include <QTcpSocket>
 
 #include "core/FlexRadioConnection.h"
 #include "core/FlexRadioDiscovery.h"
@@ -103,6 +105,100 @@ QByteArray beacon(const char* payload)
 }
 
 }  // namespace
+
+// Eine falsche Maschine: spricht dieselben Saetze wie die echte, auf
+// 127.0.0.1. Der Rundlauf durch den echten Socket ist der Punkt —
+// `ingestLineForTesting` allein kann die Anmeldefolge nicht pruefen,
+// weil `sendCommand` ohne Verbindung nichts sendet und damit auch kein
+// Rueckruf faellig wird. Antworten kommen aus einer Tafel, die der
+// Pruefstand je Fall setzt.
+class FalscheMaschine : public QObject
+{
+    Q_OBJECT
+public:
+    explicit FalscheMaschine(QObject* parent = nullptr) : QObject(parent)
+    {
+        connect(&m_server, &QTcpServer::newConnection, this, [this] {
+            m_client = m_server.nextPendingConnection();
+            connect(m_client, &QTcpSocket::readyRead, this, &FalscheMaschine::lesen);
+            // Genau wie die echte 8400: zuerst die API-Fassung, dann die
+            // Clientkennung.
+            schreiben(QStringLiteral("V1.4.0.0"));
+            schreiben(QStringLiteral("H5081495E"));
+        });
+    }
+
+    bool hoeren()
+    {
+        return m_server.listen(QHostAddress::LocalHost, 0);
+    }
+    quint16 port() const { return m_server.serverPort(); }
+
+    // Was auf einen Befehl geantwortet wird. Schluessel ist der Anfang
+    // des Befehls. Wert ist „<code-hex>|<rumpf>".
+    QMap<QString, QString> antworten;
+
+    // Zeilen, die nach einer bestimmten Antwort ungefragt nachkommen
+    // (die echte Maschine schiebt den Scheibenzustand so nach).
+    QMap<QString, QStringList> nachschub;
+
+    QStringList empfangeneBefehle;
+
+signals:
+    void befehlGesehen(const QString& command);
+
+private slots:
+    void lesen()
+    {
+        m_puffer.append(m_client->readAll());
+        int nl;
+        while ((nl = m_puffer.indexOf('\n')) >= 0) {
+            const QString zeile = QString::fromUtf8(m_puffer.left(nl)).trimmed();
+            m_puffer.remove(0, nl + 1);
+            if (zeile.isEmpty() || !zeile.startsWith(QLatin1Char('C'))) {
+                continue;
+            }
+            const int pipe = zeile.indexOf(QLatin1Char('|'));
+            if (pipe < 0) {
+                continue;
+            }
+            const quint32 seq = zeile.mid(1, pipe - 1).toUInt();
+            const QString befehl = zeile.mid(pipe + 1);
+            empfangeneBefehle << befehl;
+            emit befehlGesehen(befehl);
+
+            QString antwort = QStringLiteral("0|");
+            QString treffer;
+            for (auto it = antworten.cbegin(); it != antworten.cend(); ++it) {
+                if (befehl.startsWith(it.key())) {
+                    antwort = it.value();
+                    treffer = it.key();
+                    break;
+                }
+            }
+            schreiben(QStringLiteral("R%1|%2").arg(seq).arg(antwort));
+
+            if (!treffer.isEmpty()) {
+                for (const QString& extra : nachschub.value(treffer)) {
+                    schreiben(extra);
+                }
+            }
+        }
+    }
+
+private:
+    void schreiben(const QString& zeile)
+    {
+        if (m_client) {
+            m_client->write((zeile + QLatin1Char('\n')).toUtf8());
+            m_client->flush();
+        }
+    }
+
+    QTcpServer  m_server;
+    QTcpSocket* m_client{nullptr};
+    QByteArray  m_puffer;
+};
 
 class TestFlexStufe1 : public QObject
 {
@@ -569,6 +665,317 @@ private slots:
     {
         FlexRadioConnection conn;
         QCOMPARE(conn.sendCommand(QStringLiteral("sub slice all")), quint32(0));
+    }
+
+    // ─── Kennungen und Listen aus Antworten ────────────────────────
+
+    void flexKennungWirdVereinheitlicht()
+    {
+        using FlexCommandWire::normalizedFlexId;
+        QCOMPARE(normalizedFlexId(QStringLiteral("0x40000000")),
+                 QStringLiteral("40000000"));
+        QCOMPARE(normalizedFlexId(QStringLiteral("40000000")),
+                 QStringLiteral("40000000"));
+        // Nicht auf acht Stellen gefuellt kommt gefuellt zurueck.
+        QCOMPARE(normalizedFlexId(QStringLiteral("0x4")),
+                 QStringLiteral("00000004"));
+        QCOMPARE(normalizedFlexId(QStringLiteral("  0X4A  ")),
+                 QStringLiteral("0000004a"));
+        QVERIFY(normalizedFlexId(QString()).isEmpty());
+        QVERIFY(normalizedFlexId(QStringLiteral("keine-zahl")).isEmpty());
+    }
+
+    // Die drei Formen sind NICHT geraten: sie stehen so in AetherSDRs
+    // eigenem Pruefstand, tests/radio_status_ownership_test.cpp:354-362
+    // [@d58e2b8a]. Ich hatte sie beim ersten Versuch erfunden („wf="
+    // statt „waterfall=", und die Schluesselform mit Komma verbunden) —
+    // der Pruefstand fiel durch, und das war richtig so.
+    void panKennungAusDreiAntwortformen()
+    {
+        using FlexCommandWire::panIdFromCreateReply;
+        // Kommaform — so antwortet die Maschine wirklich; das zweite
+        // Glied ist der Wasserfall.
+        QCOMPARE(panIdFromCreateReply(QStringLiteral("0x40000000,0x42000000")),
+                 QStringLiteral("40000000"));
+        QCOMPARE(panIdFromCreateReply(QStringLiteral("40000000,0x42000000")),
+                 QStringLiteral("40000000"));
+        // Schluesselform, an LEERZEICHEN getrennt.
+        QCOMPARE(panIdFromCreateReply(
+                     QStringLiteral("pan=0x40000001 waterfall=0x42000001")),
+                 QStringLiteral("40000001"));
+        QCOMPARE(panIdFromCreateReply(QStringLiteral("id=0x40000002")),
+                 QStringLiteral("40000002"));
+        QVERIFY(panIdFromCreateReply(QString()).isEmpty());
+        QVERIFY(panIdFromCreateReply(QStringLiteral("nichts brauchbares")).isEmpty());
+
+        // Die Falle, in die ich gelaufen bin: eine Schluesselform mit
+        // Komma dahinter ist KEINE gueltige Antwort, und der Leser faellt
+        // dabei zu statt eine halbe Kennung zu melden.
+        QVERIFY(panIdFromCreateReply(
+                    QStringLiteral("pan=0x40000000,waterfall=0x42000000")).isEmpty());
+    }
+
+    void scheibenlisteAusDerAntwort()
+    {
+        using FlexCommandWire::sliceListFromReply;
+        // Der Normalfall ohne GUI-Client: LEER. Das ist ein Ergebnis,
+        // kein Fehler — genau dieser Befund hat die Stufe entschieden.
+        QVERIFY(sliceListFromReply(QString()).isEmpty());
+        QVERIFY(sliceListFromReply(QStringLiteral("   ")).isEmpty());
+
+        QCOMPARE(sliceListFromReply(QStringLiteral("0")), QList<int>({0}));
+        QCOMPARE(sliceListFromReply(QStringLiteral("0,1")), QList<int>({0, 1}));
+        QCOMPARE(sliceListFromReply(QStringLiteral(" 0 , 1 , 2 ")),
+                 QList<int>({0, 1, 2}));
+        // Unlesbare Glieder fallen heraus, lesbare bleiben.
+        QCOMPARE(sliceListFromReply(QStringLiteral("0,xx,2")), QList<int>({0, 2}));
+    }
+
+    // ─── Der Rundlauf: Anmeldung gegen eine falsche Maschine ───────
+
+    void anmeldungLegtScheibeAnWennKeineDaIst()
+    {
+        FalscheMaschine radio;
+        QVERIFY(radio.hoeren());
+
+        // Genau die Antworten, die die echte 8400 am 2026-10-18 gab,
+        // plus die, die sie ohne GUI-Anmeldung nicht gab.
+        radio.antworten.insert(QStringLiteral("client program"),
+                               QStringLiteral("10000002|unknown client program Longpath"));
+        radio.antworten.insert(QStringLiteral("client gui"),
+                               QStringLiteral("0|9F2C1A4E-0000-4000-8000-0123456789AB"));
+        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|"));
+        // Kommaform, wie AetherSDRs eigener Pruefstand sie fuehrt
+        // (radio_status_ownership_test.cpp:354 [@d58e2b8a]).
+        radio.antworten.insert(QStringLiteral("display panafall create"),
+                               QStringLiteral("0|0x40000000,0x42000000"));
+        radio.antworten.insert(QStringLiteral("slice create"), QStringLiteral("0|0"));
+        // Die echte Maschine schiebt den Scheibenzustand hinterher.
+        radio.nachschub.insert(QStringLiteral("slice create"),
+            {QStringLiteral("S5081495E|slice 0 in_use=1 RF_frequency=14.225000 "
+                            "mode=USB rxant=ANT1 ant_list=ANT1,ANT2,RX_A")});
+
+        FlexRadioConnection conn;
+        conn.setGuiClientId(QStringLiteral("ABCDEF01-2345-6789-ABCD-EF0123456789"));
+
+        QSignalSpy angemeldet(&conn, &FlexRadioConnection::guiClientRegistered);
+        QSignalSpy listeGelesen(&conn, &FlexRadioConnection::sliceListRead);
+        QSignalSpy angelegt(&conn, &FlexRadioConnection::defaultSliceCreated);
+        QSignalSpy frequenz(&conn, &FlexRadioConnection::sliceFrequencyChanged);
+        QSignalSpy kennung(&conn, &FlexRadioConnection::guiClientIdChosen);
+
+        conn.connectToRadio(QHostAddress::LocalHost, radio.port());
+        QVERIFY(frequenz.wait(5000));
+
+        QCOMPARE(angemeldet.count(), 1);
+        QCOMPARE(listeGelesen.count(), 1);
+        QVERIFY(listeGelesen.at(0).at(0).value<QList<int>>().isEmpty());
+        QCOMPARE(angelegt.count(), 1);
+        QCOMPARE(angelegt.at(0).at(0).toString(), QStringLiteral("40000000"));
+
+        QCOMPARE(frequenz.count(), 1);
+        QCOMPARE(frequenz.at(0).at(0).toInt(), 0);
+        QCOMPARE(frequenz.at(0).at(1).toDouble(), 14'225'000.0);
+
+        // Die Maschine hat eine andere Kennung zurueckgemeldet als die
+        // gesetzte — die gilt, und sie wird gemeldet, damit der
+        // Aufrufer sie behalten kann.
+        QCOMPARE(kennung.count(), 1);
+        QCOMPARE(kennung.at(0).at(0).toString(),
+                 QStringLiteral("9F2C1A4E-0000-4000-8000-0123456789AB"));
+        QCOMPARE(conn.guiClientId(),
+                 QStringLiteral("9F2C1A4E-0000-4000-8000-0123456789AB"));
+
+        // Die Reihenfolge ist Teil des Protokolls: Programm, dann GUI,
+        // dann Station und Abonnement, dann nachsehen.
+        const QStringList b = radio.empfangeneBefehle;
+        QVERIFY(b.size() >= 6);
+        QVERIFY(b.at(0).startsWith(QStringLiteral("client program")));
+        QVERIFY(b.at(1).startsWith(QStringLiteral("client gui")));
+        QVERIFY(b.contains(QStringLiteral("client station Longpath")));
+        QVERIFY(b.contains(QStringLiteral("sub slice all")));
+        QVERIFY(b.contains(QStringLiteral("slice list")));
+        QVERIFY(b.contains(QStringLiteral("display panafall create x=100 y=100")));
+        QVERIFY(b.contains(QStringLiteral(
+            "slice create pan=40000000 freq=14.225000 antenna=ANT1 mode=USB")));
+
+        // Die Reihenfolge, an der AetherSDR einmal haengen geblieben
+        // ist: Programm VOR GUI, GUI VOR allem Weiteren.
+        const int iProgramm = 0;   // b.at(0), oben geprueft
+        const int iGui      = 1;   // b.at(1), oben geprueft
+        QVERIFY(iProgramm < iGui);
+        QVERIFY(iGui < b.indexOf(QStringLiteral("client station Longpath")));
+        QVERIFY(iGui < b.indexOf(QStringLiteral("sub slice all")));
+        QVERIFY(iGui < b.indexOf(QStringLiteral("slice list")));
+        // Und nachgesehen wird, bevor etwas angelegt wird.
+        QVERIFY(b.indexOf(QStringLiteral("slice list"))
+                < b.indexOf(QStringLiteral("display panafall create x=100 y=100")));
+    }
+
+    void vorhandeneScheibeWirdNichtVerdoppelt()
+    {
+        // Die Maschine hat uns Scheiben zurueckgelegt (sie kennt unsere
+        // Kennung). Dann wird NICHTS angelegt — sonst entsteht genau der
+        // Doppelfehler, den AetherSDRs SliceRecreatePolicy verhindert.
+        FalscheMaschine radio;
+        QVERIFY(radio.hoeren());
+        radio.antworten.insert(QStringLiteral("client gui"), QStringLiteral("0|"));
+        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|0,1"));
+
+        FlexRadioConnection conn;
+        conn.setGuiClientId(QStringLiteral("ABCDEF01-2345-6789-ABCD-EF0123456789"));
+        QSignalSpy listeGelesen(&conn, &FlexRadioConnection::sliceListRead);
+        QSignalSpy angelegt(&conn, &FlexRadioConnection::defaultSliceCreated);
+
+        conn.connectToRadio(QHostAddress::LocalHost, radio.port());
+        QVERIFY(listeGelesen.wait(5000));
+
+        QCOMPARE(listeGelesen.at(0).at(0).value<QList<int>>(), QList<int>({0, 1}));
+        QTest::qWait(300);
+        QCOMPARE(angelegt.count(), 0);
+        QVERIFY(!radio.empfangeneBefehle.contains(
+            QStringLiteral("display panafall create x=100 y=100")));
+    }
+
+    void abgelehnteAnmeldungLegtNichtsAn()
+    {
+        FalscheMaschine radio;
+        QVERIFY(radio.hoeren());
+        radio.antworten.insert(QStringLiteral("client gui"),
+                               QStringLiteral("50000015|client gui refused"));
+
+        FlexRadioConnection conn;
+        conn.setGuiClientId(QStringLiteral("ABCDEF01-2345-6789-ABCD-EF0123456789"));
+        QSignalSpy abgelehnt(&conn, &FlexRadioConnection::guiClientRejected);
+        QSignalSpy angemeldet(&conn, &FlexRadioConnection::guiClientRegistered);
+
+        conn.connectToRadio(QHostAddress::LocalHost, radio.port());
+        QVERIFY(abgelehnt.wait(5000));
+
+        QCOMPARE(abgelehnt.at(0).at(0).toUInt(), 0x50000015u);
+        QCOMPARE(angemeldet.count(), 0);
+        QTest::qWait(300);
+        // Nach einer Ablehnung wird nichts abonniert und nichts angelegt.
+        QVERIFY(!radio.empfangeneBefehle.contains(QStringLiteral("sub slice all")));
+        QVERIFY(!radio.empfangeneBefehle.contains(QStringLiteral("slice list")));
+    }
+
+    void ohneErlaubnisWirdNurNachgesehen()
+    {
+        // setMayCreateDefaultSlice(false) heisst: nachsehen ja, auf der
+        // Maschine etwas aendern nein.
+        FalscheMaschine radio;
+        QVERIFY(radio.hoeren());
+        radio.antworten.insert(QStringLiteral("client gui"), QStringLiteral("0|"));
+        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|"));
+
+        FlexRadioConnection conn;
+        conn.setGuiClientId(QStringLiteral("ABCDEF01-2345-6789-ABCD-EF0123456789"));
+        conn.setMayCreateDefaultSlice(false);
+        QSignalSpy listeGelesen(&conn, &FlexRadioConnection::sliceListRead);
+
+        conn.connectToRadio(QHostAddress::LocalHost, radio.port());
+        QVERIFY(listeGelesen.wait(5000));
+        QTest::qWait(300);
+
+        QVERIFY(!radio.empfangeneBefehle.contains(
+            QStringLiteral("display panafall create x=100 y=100")));
+        QVERIFY(radio.empfangeneBefehle.contains(QStringLiteral("slice list")));
+    }
+
+    void ohneGesetzteKennungWirdEineErzeugtUndGemeldet()
+    {
+        FalscheMaschine radio;
+        QVERIFY(radio.hoeren());
+        radio.antworten.insert(QStringLiteral("client gui"), QStringLiteral("0|"));
+        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|0"));
+
+        FlexRadioConnection conn;   // keine Kennung gesetzt
+        QSignalSpy kennung(&conn, &FlexRadioConnection::guiClientIdChosen);
+        QSignalSpy listeGelesen(&conn, &FlexRadioConnection::sliceListRead);
+
+        conn.connectToRadio(QHostAddress::LocalHost, radio.port());
+        QVERIFY(listeGelesen.wait(5000));
+
+        QCOMPARE(kennung.count(), 1);
+        const QString erzeugt = kennung.at(0).at(0).toString();
+        // Form wie bei AetherSDR: UUID ohne Klammern, gross.
+        QCOMPARE(erzeugt.size(), 36);
+        QVERIFY(!erzeugt.startsWith(QLatin1Char('{')));
+        QCOMPARE(erzeugt, erzeugt.toUpper());
+        QVERIFY(radio.empfangeneBefehle.contains(
+            QStringLiteral("client gui %1").arg(erzeugt)));
+    }
+
+    void panafallFaelltAufPanadapterCreateZurueck()
+    {
+        FalscheMaschine radio;
+        QVERIFY(radio.hoeren());
+        radio.antworten.insert(QStringLiteral("client gui"), QStringLiteral("0|"));
+        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|"));
+        radio.antworten.insert(QStringLiteral("display panafall create"),
+                               QStringLiteral("50001000|"));
+        radio.antworten.insert(QStringLiteral("panadapter create"),
+                               QStringLiteral("0|0x40000009"));
+        radio.antworten.insert(QStringLiteral("slice create"), QStringLiteral("0|0"));
+
+        FlexRadioConnection conn;
+        conn.setGuiClientId(QStringLiteral("ABCDEF01-2345-6789-ABCD-EF0123456789"));
+        QSignalSpy angelegt(&conn, &FlexRadioConnection::defaultSliceCreated);
+
+        conn.connectToRadio(QHostAddress::LocalHost, radio.port());
+        QVERIFY(angelegt.wait(5000));
+
+        QCOMPARE(angelegt.at(0).at(0).toString(), QStringLiteral("40000009"));
+        QVERIFY(radio.empfangeneBefehle.contains(QStringLiteral("panadapter create")));
+    }
+
+    void misslungenesAnlegenMeldetDenCode()
+    {
+        FalscheMaschine radio;
+        QVERIFY(radio.hoeren());
+        radio.antworten.insert(QStringLiteral("client gui"), QStringLiteral("0|"));
+        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|"));
+        radio.antworten.insert(QStringLiteral("display panafall create"),
+                               QStringLiteral("0|0x40000000,0x42000000"));
+        radio.antworten.insert(QStringLiteral("slice create"),
+                               QStringLiteral("50000039|slice limit reached"));
+
+        FlexRadioConnection conn;
+        conn.setGuiClientId(QStringLiteral("ABCDEF01-2345-6789-ABCD-EF0123456789"));
+        QSignalSpy misslungen(&conn, &FlexRadioConnection::defaultSliceFailed);
+
+        conn.connectToRadio(QHostAddress::LocalHost, radio.port());
+        QVERIFY(misslungen.wait(5000));
+        QCOMPARE(misslungen.at(0).at(0).toUInt(), 0x50000039u);
+    }
+
+    void rueckrufLaeuftGenauEinmal()
+    {
+        FalscheMaschine radio;
+        QVERIFY(radio.hoeren());
+        radio.antworten.insert(QStringLiteral("client gui"), QStringLiteral("0|"));
+        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|0"));
+
+        FlexRadioConnection conn;
+        conn.setGuiClientId(QStringLiteral("ABCDEF01-2345-6789-ABCD-EF0123456789"));
+        QSignalSpy listeGelesen(&conn, &FlexRadioConnection::sliceListRead);
+        conn.connectToRadio(QHostAddress::LocalHost, radio.port());
+        QVERIFY(listeGelesen.wait(5000));
+
+        int laeufe = 0;
+        const quint32 seq = conn.sendCommand(
+            QStringLiteral("info"),
+            [&laeufe](quint32, const QString&) { ++laeufe; });
+        QVERIFY(seq != 0);
+        QTest::qWait(400);
+        QCOMPARE(laeufe, 1);
+
+        // Genau DIESE Folgenummer ein zweites Mal: der Rueckruf ist
+        // entnommen, bevor er laeuft, also laeuft er nicht wieder.
+        conn.ingestLineForTesting(QStringLiteral("R%1|0|").arg(seq));
+        QTest::qWait(100);
+        QCOMPARE(laeufe, 1);
     }
 };
 

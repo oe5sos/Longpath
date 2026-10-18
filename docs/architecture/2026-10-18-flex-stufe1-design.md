@@ -227,59 +227,168 @@ findet, sondern weil keine existiert. Scheiben werden von einem
 `max_slices=2` und `num_slice=2` sind die **lizenzierte Zahl**, nicht
 die vorhandene.
 
-Daraus folgen genau zwei Wege, und das ist die Entscheidung, die Stufe 1
-herausgearbeitet hat:
+Daraus folgten genau zwei Wege:
 
 **(a) Mitlesen.** Longpath bleibt Beobachter. Sobald SmartSDR oder der
 Maestro verbunden ist, legt dieser Scheiben an, und `sub slice all`
-liefert sie. Kostet keine Zeile Code mehr — der Weg steht und ist
-geprüft, er braucht nur eine Gegenstelle. Longpath übernimmt die
+liefert sie. Kostet keine Zeile Code mehr. Longpath übernimmt die
 Maschine nie.
 
-**(b) Selbst Bediener werden.** `client gui <uuid>` senden, dann
-`slice create`. Das ist, was ein echter Treiber tun muss, und es ist der
-erste Schritt, der Martins Maschine tatsächlich anfasst (und bei Bedarf
-einen anderen Client hinauswirft).
+**(b) Selbst Bediener werden.** `client gui <uuid>`, dann bei Bedarf
+`display panafall create` + `slice create`. Das ist, was ein echter
+Treiber tun muss.
 
-Stufe 1 hat (b) **nicht** getan: es ändert den Zustand seiner laufenden
-Station, und das ist keine Entscheidung, die eine Leseprobe nebenbei
-trifft.
+### Gewählt: (b)
+
+Martin am 2026-10-18 auf die Frage: „keine ahnung, entscheide selbst."
+
+**(a) ist eine Sackgasse.** Ton und Panadapter hängen später an genau den
+Scheiben und Panadaptern, die ein GUI-Client anlegt und besitzt. Ein Weg,
+der nur funktioniert, solange SmartSDR nebenher läuft, führt zu keiner
+Stufe 2 — und zu keinem Betrieb, bei dem Longpath die Station ist.
+
+Gebaut ist damit (siehe `FlexRadioConnection.h`):
+
+```
+client program Longpath          → R|10000002| (abgelehnt, nicht tödlich)
+client gui <uuid>                → R|0|<uuid der Maschine>
+client station Longpath
+sub slice all
+slice list                       → leer?
+   ja  → display panafall create x=100 y=100   (Rückfall: panadapter create)
+         slice create pan=<id> freq=14.225000 antenna=ANT1 mode=USB
+   nein → nichts anlegen (die Maschine hat uns Scheiben zurückgelegt)
+```
+
+Drei Dinge daran sind bewusst so:
+
+* **Die Kennung wird von außen gesetzt** (`setGuiClientId`). Die Maschine
+  legt Scheiben und Panadapter **je Kennung** zurück; eine neue Kennung
+  bei jedem Start heißt jedes Mal eine neue Vorgabescheibe auf dem Gerät.
+  `FlexRadioConnection` kennt `AppSettings` nicht, meldet die verwendete
+  Kennung aber über `guiClientIdChosen`, damit der Aufrufer sie behält.
+* **Vorhandene Scheiben werden nicht verdoppelt.** Genau der Fehler, den
+  AetherSDRs `SliceRecreatePolicy` verhindert (deren #3212: die
+  Sitzungswiederherstellung brachte den Panadapter ohne seine Scheibe
+  zurück, und der alte Code legte einen zweiten, leeren Panadapter an).
+* **`setMayCreateDefaultSlice(false)`** lässt den Weg nachsehen, ohne auf
+  der Maschine etwas zu ändern. Für eine Messung, die nichts anfassen
+  darf.
+
+Was Stufe 1 weiterhin **nicht** tut: senden. Kein `xmit`, keine
+TX-Scheibe, keine Leistung. Die Interlock-Meldung der Maschine
+(`state=RECEIVE tx_allowed=0`) wird gelesen, nie geschrieben.
 
 ---
 
-## 5. Der Haken für Stufe 2: bei Flex rechnet das Radio
+## 5. Der Haken: bei Flex rechnet das Radio — und die Naht steht schon
 
-Heute, gemessen am 2026-10-18: **34 Funktionen** in `RadioModel.cpp`
-führen den Empfangsweg durch WDSP (`RxChannel`/`rxChannel`,
-nach Funktionsnamen entdoppelt — Martins Zahl 33 trifft auf eins):
+Das war die Frage, die Martin als „den eigentlichen Aufwand" bezeichnet
+hat: 33 Stellen in `RadioModel` führen den Empfangsweg heute durch WDSP,
+und ein Flex braucht daneben einen Weg, der **fertigen Ton und fertige
+Panadapter-Daten** entgegennimmt.
+
+Nachgezählt am 2026-10-18: es sind **34 Funktionen** in `RadioModel.cpp`,
+die `RxChannel`/`rxChannel` anfassen (nach Funktionsnamen entdoppelt —
+seine 33 trifft auf eins).
+
+**Der Befund ist aber ein anderer als erwartet: keine dieser 34 Stellen
+muss angefasst werden.** Die Naht existiert, und sie ist zweimal benutzt.
+
+### 5.1 Der Tonweg
+
+`AudioEngine` hat genau einen Punkt, an dem fertiger Ton hereinkommt:
 
 ```
-activateSliceChannel      deactivateSliceChannel   reconcileNotchCount
-addNotchForSlice          flushNotchEditPush       reshiftSlicesOnStream
-addSlice                  onMoxHardwareFlipped     rxAnf
-applyStreamDspGeometry    onSliceBandChanged       rxBin
-bindSliceToStream         openRxChannelPool        rxChannelForSlice
-commitStreamSampleRateChange  pushNotchOrigin      rxNrIndex
-connectToRadio            rebuildDspOptionsForMode rxSignalDbm
-setActiveRxCountLive      reconcileExternalDiversityRoute
-setSampleRateLive         sliceRxChannels          slicesOnStream
-syncNotchesToAllChannels  syncNotchesToChannel     teardownConnection
-wireConnectionSignals     wireNotchModel           wireRadeChannel
-wireSliceSignals
+rxBlockReady(int sliceId, const float* samples, int frames)
 ```
 
-Für ein Flex braucht es daneben einen Weg, der **fertigen Ton und
-fertige Panadapter-Daten entgegennimmt**. Das ist der Aufwand, nicht der
-Draht. AetherSDR hat dafür `IRadioBackend` (1086 Zeilen) — eine Naht, an
-der ein Backend entweder rechnet oder fertige Daten liefert. Longpath
-hat diese Naht nicht; `RadioModel` ist die Naht.
+Dort landet WDSPs Ausgang — und dort landen auch schon zwei fremde
+Quellen, jede über ihren eigenen Eingang:
 
-Was Stufe 1 dazu beiträgt: sie zeigt, dass Erkennung und Steuerung
-sauber **neben** diesem Weg liegen können (eigene Klassen, eigene
-Signale, kein WDSP), und dass die Geräteliste keine zweite Zeilenart
-braucht. Die Naht wird erst gebraucht, wenn Ton und Bild kommen.
+| Eingang | Quelle | Was er tut |
+|---|---|---|
+| `feedKiwiSdrAudioData(sliceId, pcm24kStereoFloat)` | KiwiSDR | PCM annehmen, wandeln, `rxBlockReady` |
+| `feedSunSdrAudioData(sliceId, interleavedStereo, frames, sourceRateHz)` | SunSDR2 QRP | Resampler je Rate anlegen, dann `rxBlockReady` |
 
----
+`feedSunSdrAudioData` ist **40 Zeilen** (`AudioEngine.cpp:2411-2448`), und
+davon sind zwei Drittel Vorsicht: keine Rate ⇒ kein Wandler (sonst wird
+er mit 0 Hz gebaut), Rate geändert ⇒ Wandler neu (TCI darf
+`audio_samplerate` jederzeit umstellen). Ein `feedFlexAudioData` ist
+dasselbe Muster, ein drittes Mal.
+
+### 5.2 Der Bildweg
+
+`SpectrumWidget` braucht für eine fremde Quelle **keine zweite
+Rohrleitung** — das steht dort schon so, mit Begründung
+(`SpectrumWidget.h:1405-1421`):
+
+> Ein KiwiSDR liefert seinen Wasserfall als fertige dBm-Werte über einen
+> eigenen Frequenzausschnitt — nicht als I/Q um eine DDC-Mitte. Trotzdem
+> braucht es dafür KEINE zweite Rohrleitung. […] Setzt man `m_ddcCenterHz`
+> und `m_sampleRateHz` auf den Kiwi-Ausschnitt, ist der Kiwi einfach eine
+> weitere Quelle von Bins — und Zoom, CTUN, Detektor, Mittelung,
+> Wasserfall und Rücklauf arbeiten unverändert.
+
+Die zwei Zugänge dafür sind da:
+
+* `updateKiwiSpectrumDbm(binsDbm, …)` — fertige dBm, kein FFTEngine, kein
+  zweiter Eichversatz (der Kiwi eicht selbst).
+* `setKiwiDisplaySource(bool)` — solange sie steht, werden Bins **vom
+  Gerät verworfen**, damit nicht zwei Quellen in denselben Panadapter
+  schreiben.
+
+Ein Flex liefert ebenfalls fertige Werte über einen eigenen Ausschnitt.
+Der Weg ist derselbe; es braucht einen dritten Namen, nicht eine dritte
+Rohrleitung.
+
+### 5.3 Was daraus folgt
+
+Ein Flex-Empfänger ist in Longpath eine **Scheibe ohne `RxChannel`**:
+`SliceModel` führt Frequenz, Betriebsart und Filter wie immer, aber es
+hängt kein WDSP-Kanal daran, und Ton und Bild kommen von außen an den
+zwei Eingängen oben. Deshalb bleiben die 34 Stellen unberührt — sie
+fragen alle nach einem `RxChannel`, und für eine Flex-Scheibe gibt es
+keinen.
+
+**Das Sicherheitstor ist auch schon da, und es muss wachsen.** Die
+SunSDR-Arbeit hat eine Regel hinterlassen, die aus jeder Richtung
+erzwungen wird (Ton, Panadapter-Zuordnung und Steuerung, nicht nur
+Steuerung — ein früherer Durchgang hatte nur die Steuerung abgesichert
+und wurde nach einer feindseligen Durchsicht nachgezogen):
+
+> Eine Scheibe mit echter DDC-Bindung (`streamIndex() >= 0` — ein
+> wirkliches, womöglich sendefähiges Gerät) wird aus diesem Weg **nie**
+> gefüttert oder gesteuert.
+
+`MainWindow_SunSdr.cpp:338 sunSdrControllableSlice()` ist das eine Tor,
+durch das jeder Verbraucher muss; `:257` prüft zusätzlich
+`isKiwiClaimed(slice)`. Eine dritte Quelle heißt: ein `isFlexClaimed`
+daneben, in **demselben** Tor — nicht ein zweites Tor.
+
+### 5.4 Der Umfang, den Stufe 2 wirklich hat
+
+| Stück | Vorlage | Umfang |
+|---|---|---|
+| VITA-49-Empfang | `PanadapterStream.{h,cpp}` [@d58e2b8a] | 2279 Zeilen |
+| Opus-Dekoder für den Ton | `OpusCodec.h` [@d58e2b8a] | 62 Zeilen Hülle; Opus selbst liegt schon im Baum (für RADE) |
+| `feedFlexAudioData` | `feedSunSdrAudioData` | ~40 Zeilen |
+| Bildweg | `updateKiwiSpectrumDbm` + `setKiwiDisplaySource` | dritter Name, keine neue Leitung |
+| Verdrahtung im Fenster | `MainWindow_KiwiSdr.cpp` 875 / `MainWindow_SunSdr.cpp` 849 | derselbe Rahmen |
+| Sicherheitstor | `sunSdrControllableSlice()` + `isKiwiClaimed` | ein `isFlexClaimed` im selben Tor |
+
+Also: **VITA-49 ist das Stück Arbeit, nicht die Naht.** Die Naht ist ein
+drittes Mal dasselbe Muster. AetherSDRs Antwort auf dieselbe Frage war
+`IRadioBackend` (1086 Zeilen) — eine Schnittstelle, hinter der ein
+Backend entweder rechnet oder fertige Daten liefert. Longpath braucht sie
+nicht, weil es die Trennung schon an den zwei Eingängen hat, wo sie
+praktisch anfällt.
+
+Was dabei **offen** bleibt und keine Vorlage hat: eine Flex-Scheibe hat
+radio-seitige DSP-Regler (NR, NB, ANF, AGC rechnen auf dem Gerät), die
+Longpath heute als WDSP-Regler zeigt. Welche Oberfläche eine Scheibe
+bekommt, deren Regler nach außen gehen statt in WDSP, ist eine
+Gestaltungsfrage und gehört Martin — nicht dieser Naht.
 
 ## 6. Was geprüft ist, und wie
 
@@ -293,19 +402,51 @@ braucht. Die Naht wird erst gebraucht, wenn Ton und Bild kommen.
 | Frequenz MHz→Hz, unlesbar ≠ null | `tst_flex_stufe1` |
 | Erkennung am echten Gerät | live: `FLEX-8400 (Martin)`, MAC `00:1C:2D:05:34:28` |
 | Befehlskanal am echten Gerät | live: V/H, `sub slice all` → `R2|0|` |
-| **Frequenz am echten Gerät** | **NICHT belegt — keine Scheibe vorhanden, siehe §4** |
+| GUI-Anmeldung, `slice list`, Anlegen einer Vorgabescheibe | `tst_flex_stufe1`, **Rundlauf durch den echten Socket** gegen eine falsche Maschine auf 127.0.0.1 — Reihenfolge der Befehle, zurückgemeldete Kennung, Rückfall `panafall` → `panadapter create`, „vorhandene Scheibe nicht verdoppeln", abgelehnte Anmeldung, `setMayCreateDefaultSlice(false)` |
+| Kennungen und Listen aus Antworten | `tst_flex_stufe1`; die drei Antwortformen von `display panafall create` stammen aus AetherSDRs eigenem Prüfstand (`radio_status_ownership_test.cpp:354-362 [@d58e2b8a]`), nicht aus einer Annahme — siehe §6.1 |
+| **Frequenz am echten Gerät** | **NICHT belegt.** Erst war keine Scheibe da (§4); seit der GUI-Anmeldung gebaut ist, ist die 8400 nicht erreichbar — der Mac hängt jetzt an 192.168.78.0/24, die Route nach 172.30.30.12 geht über das Standard-Gateway ins Leere. Kein Code-Befund, ein Netzzustand. |
 | **Zeile in der Geräteliste** | **NICHT live gesehen** — Longpath läuft gerade (PID 76168), eine zweite Fassung daneben zu starten hätte Martins Betrieb gestört. Verdrahtung steht, Beschriftung steht. |
 
-29 von 29 Prüffällen grün.
+40 von 40 Prüffällen grün.
+
+### 6.1 Ein geratenes Drahtformat, vom Prüfstand gefangen
+
+Für den Rundlauf habe ich die Antwort auf `display panafall create`
+zuerst **erfunden**: `pan=0x40000000,wf=0x42000000`. Der Prüfstand fiel
+durch, und das war richtig — die Schlüsselform ist an **Leerzeichen**
+getrennt und der zweite Schlüssel heißt `waterfall`, nicht `wf`. Richtig
+sind drei Formen, alle aus AetherSDRs eigenem Prüfstand:
+
+```
+0x40000000,0x42000000                      Kommaform (so antwortet die Maschine)
+40000000,0x42000000                        dasselbe, ungefüllt
+pan=0x40000001 waterfall=0x42000001        Schlüsselform, an Leerzeichen
+```
+
+Der Leser fällt bei der erfundenen Mischform **zu** statt eine halbe
+Kennung zu melden; das steht jetzt als eigener Prüffall drin.
 
 ---
 
 ## 7. Offen
 
-1. **Die Entscheidung aus §4** — mitlesen (a) oder Bediener werden (b).
-2. Die Zeile in der Geräteliste live ansehen.
-3. `V1.4.0.0` vs. `version=4.3.16.42034`: wenn eine Fassung angezeigt
+1. **Die GUI-Anmeldung am echten Gerät fahren.** Braucht die
+   Stationsnetz-Verbindung zurück (§6). Die Sonde dafür liegt bereit:
+   sie räumt hinterher auf, was sie angelegt hat (`slice remove`,
+   `display pan remove`, `display panafall remove` — das Paar aus
+   `RadioModel::removePanadapter [@d58e2b8a]`).
+2. **Die Kennung dauerhaft merken.** `guiClientIdChosen` wird noch von
+   niemandem gehört; solange legt jede Verbindung eine neue
+   Vorgabescheibe auf dem Gerät an. Gehört in `RadioModel`, wenn der
+   Flex-Kanal dort einzieht (`AppSettings`, per MAC wie die übrigen
+   Geräteeinstellungen).
+3. **`RadioModel` öffnet den Flex-Kanal noch nicht.** `create()` gibt für
+   Flex nullptr und `RadioModel` meldet das ehrlich; den Kanal fährt
+   bisher nur die Sonde. Das ist der erste Schritt der Stufe 2, zusammen
+   mit §5.1/§5.2.
+4. Die Zeile in der Geräteliste live ansehen.
+5. `V1.4.0.0` vs. `version=4.3.16.42034`: wenn eine Fassung angezeigt
    wird, die aus dem Ruf nehmen, nicht die aus dem Kanal.
 
 Nicht mehr offen: das Phantom-Flex (§3.3) — auf main behoben, `e5515581`
-/ PR #272.
+/ PR #272. Und die Richtungsfrage aus §4 — entschieden: (b).
