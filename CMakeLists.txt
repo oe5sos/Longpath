@@ -725,6 +725,10 @@ set(CORE_SOURCES
     # Befehlskanal (TCP 4992, Saetze C/R/S/M). Keine Stroeme.
     src/core/FlexRadioDiscovery.cpp
     src/core/FlexRadioConnection.cpp
+    # Stufe 2: der VITA-49-Leser. Nur Bytes und Rahmen, kein Sockel —
+    # gegen den Mitschnitt vom 2026-10-18 pruefbar
+    # (docs/protocols/flex-vita49-gemessen.md).
+    src/core/FlexVitaReader.cpp
     # Multi-homed-host source-IP picker (PGXL/TGXL/broadcaster per-peer
     # route probe + socket source bind)
     src/core/RouteProbe.cpp

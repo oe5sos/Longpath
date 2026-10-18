@@ -7710,6 +7710,18 @@ longpath_add_test(tst_flex_stufe1)
 # Quelle: Longpath-original.
 longpath_add_test(tst_flex_zeile_in_der_geraeteliste)
 
+# -- Flex Stufe 2: der VITA-49-Leser gegen ECHTE Bytes --------------------
+# Koepfe und Unterkoepfe in tests/flex_vita_golden.h sind gelesener Draht
+# (FLEX-8400, 2026-10-18). Geprueft werden die Stellen, an denen eine
+# falsche Annahme toedlich und unsichtbar ist: die vier Fuellbyte am
+# Paketende (wer nach Datagrammlaenge zaehlt, erfindet Vollausschlag),
+# die Festkomma-Frequenzen (Hz x 2^20, sonst 14,5 Terahertz), die
+# Bin->dBm-Umrechnung (gegen zwei Messproben) und der Zeilenbau samt der
+# Schutzgrenzen aus GHSA-7gvg-x594-pprq.
+# Quelle: Longpath-original; Satzbau portiert aus AetherSDR (siehe
+#         src/core/FlexVitaReader.h und docs/attribution/AETHERSDR-PORTS.md).
+longpath_add_test(tst_flex_vita_reader)
+
 # 2026-09-25: Rendering-Pruefstand (ohne LONGPATH_GRAB_DIR uebersprungen),
 # die Retina-Spaltenzusammenfassung und die Frequenzskalen-Beschriftung,
 # die er gefunden hat.
