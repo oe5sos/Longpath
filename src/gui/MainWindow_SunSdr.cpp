@@ -253,11 +253,22 @@ void MainWindow::connectSunSdr(const QString& endpoint)
             && !m_kiwiSdrManager->assignedProfileForSlice(s->sliceIndex()).isEmpty();
     };
 
+    // Dritte fremde Quelle, dieselbe Luecke: der Flex-Anspruch ist ueber
+    // streamIndex() ebenfalls nicht sichtbar
+    // (MainWindow::m_flexTargetSliceId). Ohne diese Pruefung koennte eine
+    // Scheibe gleichzeitig den Flex-Ton tragen UND an das echte SunSDR
+    // gebunden werden.
+    const auto isFlexClaimed = [this](const SliceModel* s) {
+        return s && m_flexTargetSliceId == s->sliceIndex();
+    };
+
     SliceModel* slice = m_radioModel->activeSlice();
-    if (slice && (slice->streamIndex() >= 0 || isKiwiClaimed(slice))) { slice = nullptr; }
+    if (slice && (slice->streamIndex() >= 0 || isKiwiClaimed(slice)
+                  || isFlexClaimed(slice))) { slice = nullptr; }
     if (!slice) {
         for (SliceModel* candidate : m_radioModel->slices()) {
-            if (candidate && candidate->streamIndex() < 0 && !isKiwiClaimed(candidate)) {
+            if (candidate && candidate->streamIndex() < 0
+                && !isKiwiClaimed(candidate) && !isFlexClaimed(candidate)) {
                 slice = candidate;
                 break;
             }

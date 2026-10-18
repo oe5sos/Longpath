@@ -729,6 +729,8 @@ set(CORE_SOURCES
     # gegen den Mitschnitt vom 2026-10-18 pruefbar
     # (docs/protocols/flex-vita49-gemessen.md).
     src/core/FlexVitaReader.cpp
+    # Der Sockel darum: ein UDP-Port fuer alles, Anmeldung per Null-Byte
+    src/core/FlexVitaStream.cpp
     # Multi-homed-host source-IP picker (PGXL/TGXL/broadcaster per-peer
     # route probe + socket source bind)
     src/core/RouteProbe.cpp
@@ -964,6 +966,8 @@ set(GUI_SOURCES
     src/asr/RemoteAsrBackend.cpp
     src/asr/WhisperServerLauncher.cpp
     src/gui/MainWindow_KiwiSdr.cpp
+    # Flex-Treiber Stufe 2: Ton und Bild einer FlexRadio-Maschine
+    src/gui/MainWindow_Flex.cpp
     src/gui/MainWindow_Asr.cpp
     src/gui/MainWindow_SunSdr.cpp
     src/gui/MainWindow_SideArea.cpp

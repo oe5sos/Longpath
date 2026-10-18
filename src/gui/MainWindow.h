@@ -1781,6 +1781,19 @@ private:
     class TciClient* m_sunSdrClient{nullptr};
     int m_sunSdrTargetSliceId{-1};
 
+    // Flex-Treiber Stufe 2: die Scheibe, die den Flex-Ton traegt. Genau
+    // wie m_sunSdrTargetSliceId ist das eine Zuordnung, die ueber
+    // streamIndex() NICHT sichtbar ist — sie muss darum in die
+    // Anspruchspruefungen der beiden anderen fremden Quellen hinein,
+    // sonst bindet eine von ihnen dieselbe Scheibe ein zweites Mal.
+    int m_flexTargetSliceId{-1};
+    // Der Frequenzausschnitt der Flex-Anzeige, in Hz. Er steht NICHT im
+    // FFT-Paket — nur die Wasserfall-Kachel traegt ihre Frequenzen
+    // (gemessen). Solange er unbekannt ist, wird nichts gezeichnet:
+    // lieber kein Bild als ein Bild an der falschen Frequenz.
+    double m_flexSpanLowHz{0.0};
+    double m_flexSpanHighHz{0.0};
+
     // ── SunSDR-Bild (2026-08-24) ──────────────────────────────────────
     //
     // Letzte an den FFTEngine gemeldete I/Q-Rate, um QMetaObject::
@@ -1832,6 +1845,10 @@ private:
     // Hand wiederholen -- genau das Auseinanderlaufen kostete vorher die
     // Sicherheitsschranke an mehreren, aber nicht allen Verbrauchern.
     class SliceModel* sunSdrControllableSlice() const;
+    // Dasselbe Tor fuer den Flex-Weg: nie eine Scheibe mit echter
+    // DDC-Bindung (streamIndex() >= 0) fuettern oder steuern.
+    class SliceModel* flexControllableSlice() const;
+    void wireFlex();
     // Gibt die aktuelle Zielscheibe vollstaendig frei -- Ton, Panadapter-
     // Zuordnung, Ausgangssteuerung -- und setzt m_sunSdrTargetSliceId auf
     // -1 zurueck. Aufgerufen, wenn die Scheibe geloescht wird oder eine

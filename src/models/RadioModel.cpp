@@ -6752,10 +6752,21 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
             AppSettings::instance().setValue(QStringLiteral("FlexGuiClientId"), id);
         });
 
+        // Die Panadapter-Kennung aus dem Zustandsschub mitlesen. Sie ist
+        // zugleich die StreamID im VITA-Kopf — gemessen, siehe
+        // docs/protocols/flex-vita49-gemessen.md §2.
+        connect(m_flexConnection, &FlexRadioConnection::statusReceived,
+                this, [this](const QString& object, const QMap<QString, QString>&) {
+            if (m_flexPanId.isEmpty() && object.startsWith(QLatin1String("display pan "))) {
+                m_flexPanId = object.split(QLatin1Char(' ')).value(2);
+            }
+        });
+
         connect(m_flexConnection, &FlexRadioConnection::guiClientRegistered,
                 this, [this](const QString& id) {
             setConnectionState(ConnectionState::Connected);
             emit flexGuiClientRegistered(id);
+            startFlexStreams();
         });
 
         connect(m_flexConnection, &FlexRadioConnection::guiClientRejected,
@@ -6801,10 +6812,131 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
     m_flexConnection->connectToRadio(info.address, info.port);
 }
 
+// Startet den VITA-49-Strom. Die Reihenfolge ist gemessen, nicht
+// geraten (docs/protocols/flex-vita49-gemessen.md §1 und §5).
+void RadioModel::startFlexStreams()
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) {
+        return;
+    }
+    if (!m_flexStream) {
+        m_flexStream = new FlexVitaStream(this);
+        connect(m_flexStream, &FlexVitaStream::spectrumReady,
+                this, [this](quint32 id, const QVector<float>& dbm) {
+            emit flexSpectrumReady(id, dbm);
+        });
+        connect(m_flexStream, &FlexVitaStream::waterfallRowReady,
+                this, [this](quint32 id, const QVector<quint16>& v,
+                             double lo, double hi, quint32 ab) {
+            emit flexWaterfallRowReady(id, v, lo, hi, ab);
+        });
+        connect(m_flexStream, &FlexVitaStream::audioSamplesReady,
+                this, [this](quint32 id, const QVector<float>& s) {
+            emit flexAudioSamplesReady(id, s);
+        });
+    }
+
+    // 1. Eigenen Port binden; die Klasse schickt dabei das Null-Byte an
+    //    die Maschine, aus dessen Absenderadresse sie IP:Port lernt.
+    const quint16 port = m_flexStream->start(m_lastRadioInfo.address);
+    if (port == 0) {
+        qCWarning(lcConnection) << "Flex: VITA-Strom liess sich nicht binden";
+        return;
+    }
+    // 2. Und derselbe Port noch einmal ueber TCP. AetherSDR notiert,
+    //    das werde bei Firmware 1.4.0.0 abgelehnt; an Martins Maschine
+    //    (genau diese Fassung) kam Code 0. Beide Wege bleiben: belegt
+    //    ist nur, dass der TCP-Befehl hier nicht abgelehnt wird, NICHT
+    //    dass er allein genuegt.
+    m_flexConnection->sendCommand(QStringLiteral("client udpport %1").arg(port));
+
+    if (m_flexPanId.isEmpty()) {
+        qCWarning(lcConnection) << "Flex: noch keine Panadapter-Kennung — "
+                                   "kein Bild, nur Ton";
+    } else {
+        // 3. Ohne Breite weiss die Maschine nicht, wie viele Bins sie
+        //    schicken soll; `totalBins` folgt xpixels (gemessen: der
+        //    Sprung von 50 auf 1024).
+        constexpr int kXPixels = 1024;
+        constexpr int kYPixels = 1000;
+        constexpr double kMinDbm = -130.0;
+        constexpr double kMaxDbm = -40.0;
+        m_flexConnection->sendCommand(
+            QStringLiteral("display pan set %1 xpixels=%2 ypixels=%3")
+                .arg(m_flexPanId).arg(kXPixels).arg(kYPixels));
+        m_flexConnection->sendCommand(
+            QStringLiteral("display pan set %1 min_dbm=%2 max_dbm=%3")
+                .arg(m_flexPanId).arg(kMinDbm).arg(kMaxDbm));
+
+        // Und derselbe Maszstab in den Leser. Das ist nicht doppelt
+        // gepflegt, sondern notwendig: die Maschine meldet `y_pixels`
+        // NIE zurueck (gemessen — der Zustand bleibt auf
+        // `x_pixels=50 y_pixels=20`, obwohl das Setzen wirkt). Es gibt
+        // kein Echo, auf das man warten koennte.
+        bool ok = false;
+        const quint32 panStream = m_flexPanId.toUInt(&ok, 16);
+        if (ok) {
+            m_flexStream->setYPixels(panStream, kYPixels);
+            m_flexStream->setDbmRange(panStream, kMinDbm, kMaxDbm);
+        }
+    }
+
+    // 4. Der Ton braucht einen EIGENEN Strom; `slice set audio_*` allein
+    //    genuegt nicht (erster Messlauf: null Tonpakete).
+    //
+    //    ACHTUNG, Nebenwirkung auf die Station: die Firmware hat
+    //    `mute_local_audio_when_remote=1` — sobald ein
+    //    remote_audio_rx-Strom existiert, SCHWEIGEN die
+    //    Hardware-Ausgaenge des Geraets. Wer das vergisst, macht die
+    //    Station stumm, und der Betreiber sucht im Verstaerker.
+    //    AetherSDR schiebt deshalb vorher eine 0 hin
+    //    (RadioModel.cpp:8438-8443 [@d58e2b8a]); wir auch.
+    m_flexConnection->sendCommand(
+        QStringLiteral("radio set mute_local_audio_when_remote=0"));
+    m_flexMuteLocalWasOn = true;
+
+    m_flexConnection->sendCommand(QStringLiteral("slice set 0 audio_mute=0"));
+    m_flexConnection->sendCommand(QStringLiteral("slice set 0 audio_level=50"));
+    // `compression=none` ist die LAN-Vorgabe (opus waere WAN) und
+    // liefert die breite Klasse 0x03E3, float32-Stereo.
+    m_flexConnection->sendCommand(
+        QStringLiteral("stream create type=remote_audio_rx compression=none"),
+        [this](quint32 code, const QString& body) {
+            if (code != 0) {
+                qCWarning(lcConnection) << "Flex: Tonstrom abgelehnt, Code"
+                                        << QStringLiteral("0x%1").arg(code, 0, 16);
+                return;
+            }
+            m_flexAudioStreamId = body.trimmed();
+            qCInfo(lcConnection) << "Flex: Tonstrom" << m_flexAudioStreamId;
+        });
+}
+
 void RadioModel::teardownFlexConnection()
 {
     if (!m_flexConnection) {
         return;
+    }
+
+    // Aufraeumen, solange der Kanal noch steht: der Tonstrom weg und
+    // die lokale Stummschaltung zurueck. Ohne das bleibt Martins
+    // Station stumm, nachdem Longpath sich getrennt hat.
+    if (m_flexConnection->isConnected()) {
+        if (!m_flexAudioStreamId.isEmpty()) {
+            m_flexConnection->sendCommand(
+                QStringLiteral("stream remove %1").arg(m_flexAudioStreamId));
+        }
+        if (m_flexMuteLocalWasOn) {
+            m_flexConnection->sendCommand(
+                QStringLiteral("radio set mute_local_audio_when_remote=1"));
+        }
+    }
+    m_flexAudioStreamId.clear();
+    m_flexMuteLocalWasOn = false;
+    m_flexPanId.clear();
+
+    if (m_flexStream) {
+        m_flexStream->stop();
     }
     m_flexConnection->disconnectFromRadio();
 }

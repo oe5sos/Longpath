@@ -7722,6 +7722,12 @@ longpath_add_test(tst_flex_zeile_in_der_geraeteliste)
 #         src/core/FlexVitaReader.h und docs/attribution/AETHERSDR-PORTS.md).
 longpath_add_test(tst_flex_vita_reader)
 
+# -- Flex Stufe 2: der Sockel um den Leser --------------------------------
+# Ein UDP-Port fuer alles, Verteilung an der Paketklasse, und der Kern:
+# der Maszstab MUSS von aussen kommen, weil die Maschine y_pixels nie
+# zurueckmeldet. Datagramme aus echten Koepfen gebaut.
+longpath_add_test(tst_flex_vita_stream)
+
 # 2026-09-25: Rendering-Pruefstand (ohne LONGPATH_GRAB_DIR uebersprungen),
 # die Retina-Spaltenzusammenfassung und die Frequenzskalen-Beschriftung,
 # die er gefunden hat.

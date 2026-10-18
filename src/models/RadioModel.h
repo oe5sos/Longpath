@@ -103,6 +103,7 @@
 #include "core/RadioDiscovery.h"
 #include "core/FlexRadioDiscovery.h"
 #include "core/FlexRadioConnection.h"
+#include "core/FlexVitaStream.h"
 #include "core/RadioConnection.h"
 #include "core/HardwareProfile.h"
 #include "core/codec/CodecContext.h"  // SliceConfig (Phase 3F Sub-Epic B Task 16)
@@ -280,6 +281,8 @@ public:
     // bewusst KEINE RadioConnection-Unterklasse, deshalb steht er
     // neben m_connection und nicht darin.
     FlexRadioConnection* flexConnection() { return m_flexConnection; }
+    // Der VITA-49-Strom. Nur belegt, solange ein Flex verbunden ist.
+    FlexVitaStream* flexStream() { return m_flexStream; }
     ReceiverManager*  receiverManager()  { return m_receiverManager; }
     AudioEngine*      audioEngine()      { return m_audioEngine; }
     WdspEngine*       wdspEngine()       { return m_wdspEngine; }
@@ -2783,6 +2786,15 @@ signals:
     void flexSliceFrequencyChanged(int sliceId, double frequencyHz);
     // Die Maschine hat Longpath als GUI-Client angenommen.
     void flexGuiClientRegistered(const QString& guiClientId);
+    // Fertiger FFT-Rahmen in dBm, und die Wasserfallzeile (roh, ein
+    // Farbmaszstab — keine dBm, siehe core/FlexVitaReader.h).
+    void flexSpectrumReady(quint32 streamId, const QVector<float>& dbm);
+    void flexWaterfallRowReady(quint32 streamId, const QVector<quint16>& values,
+                               double lowFreqMhz, double highFreqMhz,
+                               quint32 autoBlackLevel);
+    // Ton: float32 Stereo verschraenkt, 24 kHz (gemessen 24 012,3 Hz).
+    void flexAudioSamplesReady(quint32 streamId,
+                               const QVector<float>& interleavedStereo);
 
     void connectAttemptFailed(Longpath::ConnectFailure reason,
                               const QString& detail);
@@ -3455,11 +3467,19 @@ private:
     // Platinenfaehigkeiten) und fuer ein Flex nichts davon gilt.
     void connectFlexRadio(const RadioInfo& info);
     void teardownFlexConnection();
+    // Startet den VITA-49-Strom, meldet den Port und laesst sich Bild
+    // und Ton schicken. Laeuft erst, wenn die GUI-Anmeldung durch ist:
+    // ohne sie gibt es keinen Panadapter, dem der Strom gehoeren koennte.
+    void startFlexStreams();
 
     // Sub-components (owned, main thread)
     RadioDiscovery*  m_discovery{nullptr};
     FlexRadioDiscovery* m_flexDiscovery{nullptr};  // Flex-Treiber Stufe 1
     FlexRadioConnection* m_flexConnection{nullptr};  // nur bei Flex belegt
+    FlexVitaStream*      m_flexStream{nullptr};
+    QString              m_flexPanId;        // „40000000"
+    QString              m_flexAudioStreamId;
+    bool                 m_flexMuteLocalWasOn{false};
     ReceiverManager* m_receiverManager{nullptr};
     AudioEngine*     m_audioEngine{nullptr};
     WdspEngine*      m_wdspEngine{nullptr};
