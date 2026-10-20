@@ -241,12 +241,19 @@ void StripLiveMonitor::doStart()
     // zu knapp; was in dieser Zeit nicht abgeholt wird, ist beim
     // Eingang unwiederbringlich weg und klingt wie Kratzen. Die
     // Verzoegerung macht allein der Vorrat am Ausgang.
-    m_src->setBufferSize(m_blockFrames * m_inChannels
+    // qsizetype VORNE, nicht am Ende: `setBufferSize` nimmt qsizetype,
+    // aber die vier Faktoren sind `int`, also rechnet C++ erst in int
+    // und wandelt DANACH um. CodeQL meldet das als
+    // cpp/integer-multiplication-cast-to-long (hoch) und hat recht im
+    // Grundsatz -- hier sind es real ein paar tausend, aber die Regel
+    // kostet nichts und das Tor steht sonst zu.
+    m_src->setBufferSize(qsizetype(m_blockFrames) * m_inChannels
                          * bytesPerSample(inFmt.sampleFormat())
                          * kSinkBlocks);
     m_sink = new QAudioSink(out, outFmt, this);
     // Grosszuegig, damit write() nie abschneidet -- siehe kSinkBlocks.
-    m_sink->setBufferSize(m_blockFrames * m_outBytesPerFrame * kSinkBlocks);
+    m_sink->setBufferSize(qsizetype(m_blockFrames) * m_outBytesPerFrame
+                          * kSinkBlocks);
     m_fade = 0.0f;                 // jeder Start blendet ein
     m_hotBlocks = 0;
     m_feedbackCut.store(false, std::memory_order_release);

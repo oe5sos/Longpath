@@ -201,6 +201,69 @@ private slots:
         QCOMPARE(mw.schutzrahmen().size(), 2);
     }
 
+    // ── Der Schutzrahmen greift VON SELBST nach dem Aufbau ──────────
+    //
+    // Betreiber 2026-10-18, am frisch gestarteten Fenster: „Bandwidth
+    // Filter", „TX" und „Rotor/Log" lagen auf der Kommandoleiste --
+    // Band, Betriebsart und Profil waren nicht erreichbar.
+    //
+    // Der Fall darunter prueft die METHODE und war immer gruen. Nur
+    // rief sie beim Start niemand: angewandt wurde der Schutzrahmen
+    // ausschliesslich in moveEvent()/resizeEvent() des Hauptfensters,
+    // und nach dem Aufbau bewegt sich das Hauptfenster nicht mehr.
+    //
+    // Dieser Lauf prueft darum die VERDRAHTUNG: ein schwebendes
+    // Fenster wird gleich nach show() auf die Leiste gesetzt, und
+    // niemand ruft etwas -- der Nachlauf des Aufbaus muss es von selbst
+    // herunterholen.
+    void nachDemAufbauRaeumtErVonSelbstAb()
+    {
+        QStandardPaths::setTestModeEnabled(true);
+        MainWindow mw;
+        mw.resize(1600, 1000);
+        mw.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&mw, 20000));
+
+        const QList<QRect> sperren = mw.schutzrahmen();
+        QCOMPARE(sperren.size(), 2);
+        const QRect oben = sperren.at(0);
+
+        auto* schweber = new QWidget(&mw, Qt::Window);
+        schweber->setObjectName(QStringLiteral("Aufbauschweber"));
+        schweber->resize(400, 180);
+        schweber->show();
+        QVERIFY(QTest::qWaitForWindowExposed(schweber, 15000));
+        schweber->move(oben.left() + 20, oben.top() + 10);
+        QTRY_VERIFY_WITH_TIMEOUT(
+            schweber->frameGeometry().intersects(oben), 5000);
+
+        // Ab hier NICHTS mehr aufrufen -- das ist der ganze Punkt.
+        QTRY_VERIFY_WITH_TIMEOUT(
+            !schweber->frameGeometry().intersects(oben), 8000);
+
+        // ── Was dieser Lauf NICHT belegt (gemessen 2026-10-20) ──────
+        //
+        // Gegenprobe gefahren: mit beiden Nachlaeufen aus #280
+        // herausgenommen besteht er UNVERAENDERT. Er faengt also nicht,
+        // wofuer er geschrieben wurde.
+        //
+        // Der Grund ist ein Zufall des Zeitablaufs. Was den Schweber
+        // hier herausholt, ist nicht der Nachlauf nach dem Aufbau,
+        // sondern `schutzrahmenNachziehen()` aus `resizeEvent` des
+        // Hauptfensters: `showMaximized()` beim Start loest eine
+        // Groessenaenderung aus, deren 250-ms-Nachlauf genau in die
+        // Wartezeit hier faellt.
+        //
+        // Der Fall, den #280 wirklich behebt, ist ein anderer: ein
+        // schwebendes Fenster, das WAEHREND des Aufbaus aus dem Profil
+        // in den Sperrstreifen gesetzt wird -- also bevor es ein
+        // `resizeEvent` gibt, das nachraeumen koennte. Um den zu
+        // stellen, braeuchte dieser Lauf einen Griff, der ein Fenster
+        // vor `m_fensterAufbauFertig` platziert. Den gibt es noch
+        // nicht, und ohne ihn ist dieser Lauf ein Waechter gegen
+        // Rueckschritte im Nachziehen -- kein Beleg fuer #280.
+    }
+
     void einSchwebendesFensterAufDerLeisteWirdHERUNTERGEHOLT()
     {
         QStandardPaths::setTestModeEnabled(true);
