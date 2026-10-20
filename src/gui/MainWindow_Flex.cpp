@@ -4,11 +4,31 @@
 //
 // Flex-Treiber Stufe 2: Ton und Bild ins Fenster.
 //
-// Longpath-original. Der Zuschnitt folgt den zwei fremden Quellen, die
-// es schon gibt — MainWindow_KiwiSdr.cpp (875 Zeilen) und
-// MainWindow_SunSdr.cpp (849) — und ist deutlich kleiner als beide,
-// weil ein Flex kein Profil-Verwaltungswerk braucht: es gibt genau
-// eine Maschine, und ihre Stroeme tragen ihre Kennung im Kopf.
+// Longpath-original — aber es haengt an zwei Naehten, die aus AetherSDR
+// stammen (https://github.com/aethersdr/AetherSDR, GPLv3, primary
+// author Jeremy [KK7GWY]), und deshalb steht das hier und nicht nur in
+// der Herkunftstabelle:
+//
+//   * `AudioEngine::feedFlexAudioData` ist das dritte Mal desselben
+//     Musters; die zwei davor (`feedKiwiSdrAudioData`,
+//     `feedSunSdrAudioData`) sind aus AetherSDRs Tonweg portiert und
+//     muenden wie dieser in `rxBlockReady`.
+//   * `SpectrumWidget::updateKiwiSpectrumDbm` ist der Eingang fuer
+//     fertige dBm-Bins einer fremden Quelle; seine Begruendung („keine
+//     zweite Rohrleitung noetig") ist in SpectrumWidget.h an AetherSDR
+//     zitiert.
+//   * Das Sicherheitstor (`streamIndex() >= 0` nie fuettern) kommt aus
+//     der SunSDR-Durchsicht, die ihrerseits AetherSDRs Aufbau folgt.
+//
+// Dieselbe Lage wie `src/gui/applets/StripGraphics.h`: eigener Code,
+// der auf portiertem aufsitzt — also wird die Quelle benannt, nicht nur
+// die eigene Urheberschaft.
+//
+// Der Zuschnitt folgt den zwei fremden Quellen, die es schon gibt —
+// MainWindow_KiwiSdr.cpp (875 Zeilen) und MainWindow_SunSdr.cpp (849) —
+// und ist deutlich kleiner als beide, weil ein Flex kein
+// Profil-Verwaltungswerk braucht: es gibt genau eine Maschine, und ihre
+// Stroeme tragen ihre Kennung im Kopf.
 //
 // Was hier passiert, ist die Naht aus
 // docs/architecture/2026-10-18-flex-stufe1-design.md §5:
