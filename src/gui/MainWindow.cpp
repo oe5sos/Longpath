@@ -2450,7 +2450,10 @@ void MainWindow::enterBorderlessFullSize()
     // weiter. Siehe gui/MacVollflaeche.h.
     //
     // Nur wenn das nicht geht (andere Plattform), bleibt es beim
-    // randlosen Fenster.
+    // randlosen Fenster. Einen Waechter braucht es hier nicht: der
+    // Kopf traegt fuer alles ausser macOS Stummel, die `false`
+    // melden -- „der Aufrufer darf trotzdem auf jeder Plattform
+    // fragen" (gui/MacVollflaeche.h).
     if (MacVollflaeche::verfuegbar()
         && MacVollflaeche::setzeVollflaeche(this, true)) {
         if (QScreen* scr = this->screen()) {
