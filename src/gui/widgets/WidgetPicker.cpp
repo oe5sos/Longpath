@@ -662,28 +662,31 @@ AddWidgetButton::AddWidgetButton(AppletVisibilityController* vis,
     auto* col = new QVBoxLayout(this);
     col->setContentsMargins(0, 0, 0, 0);
 
-    auto* plus = new QPushButton(QStringLiteral("+"), this);
-    plus->setFixedSize(kSide, kSide);
-    plus->setCursor(Qt::PointingHandCursor);
+    // ── Das Plus ist ein PlusGlyph, nicht ein QPushButton ───────────
+    //
+    // Gebaut und unerreichbar (gefunden 2026-10-20): `PlusGlyph` steht
+    // weiter unten in dieser Datei mit allem, was der Betreiber
+    // verlangt hat -- „das plus symbol sollte eine animation sein,
+    // dann kann man es leichter sehen" -- Drehung ins Kreuz beim
+    // Oeffnen, Zeiger- und Druckantwort, das ruhige Atmen. Nur ERZEUGT
+    // hat es niemand: hier stand ein einfacher QPushButton mit
+    // Stilvorlage, `m_glyph` blieb nullptr, und damit war
+    // `setGlyphOpen()` ein Leerlauf und `PlusGlyph` toter Code. Der
+    // CHANGELOG versprach das Atmen schon („Das Plus atmet").
+    //
+    // Aufgefallen ist es an `tst_plus_glyph_renders`: der Lauf fand
+    // einen QPushButton statt des Glyphs, `setProperty("hover", 1.0)`
+    // meldete `false` (kein solches Q_PROPERTY), und alle vier
+    // Zustaende lieferten BILDGLEICHE Bilder -- gemessen 0 von 841
+    // Bildpunkten Unterschied.
+    //
+    // Der gestrichelte Rand, die Rundung und die Farben stecken in
+    // `PlusGlyph::paintEvent`; eine Stilvorlage braucht es nicht mehr,
+    // und der geerbte Innenabstand aus `Style::kButtonStyle` kann
+    // nichts mehr verdruecken.
+    auto* plus = new PlusGlyph(this);
     plus->setToolTip(tr("Add or remove a widget"));
-    // Gestrichelt wie in der Vorlage: der Rand sagt „hier ist noch
-    // nichts, hier kann etwas hin". Ein durchgezogener Rahmen sähe aus
-    // wie ein Knopf, der schon etwas ist.
-    plus->setStyleSheet(QStringLiteral(
-        // `padding: 0` ist Pflicht: Style::kButtonStyle gilt app-weit
-        // und bringt `padding: 4px 12px` mit. Bei 34 Pixeln blieben
-        // dafuer gerade noch 8 -- genau die Breite eines „+", darum ist
-        // es nie aufgefallen. Bei 29 waeren es 3, und das Zeichen waere
-        // weg. Siehe HAUSSTIL.md, „der geerbte Innenabstand".
-        "QPushButton { background: transparent; color: %1;"
-        "  border: 1px dashed %2; border-radius: 6px;"
-        "  font-size: 16px; padding: 0; }"
-        "QPushButton:hover { color: %3; border-color: %4; background: %5; }")
-        .arg(QString::fromLatin1(Style::kTextScale),
-             QString::fromLatin1(Style::kBorder),
-             QString::fromLatin1(Style::kTextPrimary),
-             QString::fromLatin1(Style::kBlueBorder),
-             QString::fromLatin1(Style::kButtonBg)));
+    m_glyph = plus;
     col->addWidget(plus);
 
     // Ein Druck auf ein offenes Kreuz schliesst wieder. Vorher war das
