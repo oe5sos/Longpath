@@ -111,6 +111,17 @@ endfunction()
 add_library(longpath_test_sandbox OBJECT EXCLUDE_FROM_ALL TestSandboxInit.cpp)
 target_link_libraries(longpath_test_sandbox PRIVATE Qt6::Core)
 
+# Schirm für die Prüfstände -- siehe die Begründung in
+# longpath_add_test() weiter unten. Auf Windows leer, weil die dortige
+# CI ohne offscreen grün ist.
+if(WIN32)
+    set(_longpath_default_test_platform "")
+else()
+    set(_longpath_default_test_platform "offscreen")
+endif()
+set(LONGPATH_TEST_PLATFORM "${_longpath_default_test_platform}" CACHE STRING
+    "QT_QPA_PLATFORM für die Prüfstände; leer = Systemvorgabe")
+
 function(longpath_add_test name)
     # Ein Test HINTER dem Sammelziel all_tests (unten) kommt nicht in
     # dessen Abhaengigkeiten: CI baut nur all_tests, ctest meldet ihn
@@ -8003,3 +8014,47 @@ foreach(stand IN ITEMS
       PROPERTIES RESOURCE_LOCK longpath_tci_fernzugriff_settings)
   endif()
 endforeach()
+
+# ---------------------------------------------------------------------
+# Offscreen-Schirm für ALLE Prüfstände, sofern nichts anderes verlangt ist.
+#
+# Die CI setzt QT_QPA_PLATFORM=offscreen schon lange selbst (Linux und
+# macOS, siehe ci.yml) -- ein LOKALER `ctest` tut es nicht. Dann öffnen
+# auf dem Rechner des Bedieners hunderte echte Fenster, und die
+# Prüfstände werden unzuverlässig: Qt stellt Kurzbefehle (QShortcut mit
+# Qt::WidgetWithChildrenShortcut) nur einem AKTIVEN Fenster zu, und ein
+# Prüfstand, der hinter dem Fenster des Bedieners startet, bekommt den
+# Tastaturfokus nicht. Die Taste verpufft, der Prüfstand meldet einen
+# Fehler, den es nicht gibt.
+#
+# Im Schwesterprojekt Contestprogramm am 2026-10-20 gemessen (gleiche
+# Fassung, gleicher Rechner, voller Lauf):
+#     echter Schirm: 8 von 124 rot, zwei davon mit SIGABRT, 451 s
+#     offscreen:     0 von 124 rot,                          114 s
+#
+# Das steht bewusst am ENDE der Datei und ergänzt die vorhandene
+# Umgebung, statt sie zu ersetzen: ein gutes Dutzend Prüfstände setzt
+# sich weiter oben selbst ein ENVIRONMENT (LONGPATH_SOURCE_DIR=...), und
+# eine Setzung in longpath_add_test() wurde davon stillschweigend
+# überschrieben -- 18 Prüfstände liefen dadurch weiter mit echtem
+# Schirm, ohne dass es jemand gesehen hätte. Dazu kommen die zwölf, die
+# gar nicht über longpath_add_test() laufen, sondern direkt mit
+# add_test() registriert werden.
+#
+# Windows bleibt ausgenommen: dort fährt die CI bis heute ohne offscreen
+# und ist grün -- ohne Not wird daran nichts geändert.
+#
+# Wer zusehen will: -DLONGPATH_TEST_PLATFORM=cocoa (oder leer für die
+# Systemvorgabe).
+if(LONGPATH_TEST_PLATFORM)
+    get_property(_longpath_alle_tests DIRECTORY PROPERTY TESTS)
+    foreach(_longpath_test IN LISTS _longpath_alle_tests)
+        get_test_property(${_longpath_test} ENVIRONMENT _longpath_env)
+        if(NOT _longpath_env)
+            set(_longpath_env "")
+        endif()
+        list(APPEND _longpath_env "QT_QPA_PLATFORM=${LONGPATH_TEST_PLATFORM}")
+        set_tests_properties(${_longpath_test} PROPERTIES
+            ENVIRONMENT "${_longpath_env}")
+    endforeach()
+endif()
