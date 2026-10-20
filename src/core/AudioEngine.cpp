@@ -2446,6 +2446,74 @@ void AudioEngine::feedSunSdrAudioData(int sliceId, const float* interleavedStere
                  outFrames);
 }
 
+// ─── Flex-Ton ────────────────────────────────────────────────────────
+// Nach dem Muster von feedSunSdrAudioData darueber; der Grund fuer jede
+// Vorsicht steht dort und gilt hier genauso.
+
+void AudioEngine::setFlexAudioSourceEnabled(int sliceId, bool enabled)
+{
+    if (enabled) {
+        if (m_flexEnabledSlices.insert(sliceId).second) {
+            m_masterMix.setSliceOpportunistic(sliceId, true);
+            m_antiVoxMix.setSliceOpportunistic(sliceId, true);
+            qCInfo(lcAudio) << "Flex-Ton eingeschaltet fuer Scheibe"
+                            << sliceId << "(opportunistisch im Mix)";
+        }
+        return;
+    }
+    if (m_flexEnabledSlices.erase(sliceId) > 0) {
+        m_masterMix.setSliceOpportunistic(sliceId, false);
+        m_antiVoxMix.setSliceOpportunistic(sliceId, false);
+        qCInfo(lcAudio) << "Flex-Ton abgeschaltet fuer Scheibe" << sliceId;
+    }
+}
+
+bool AudioEngine::flexAudioEnabled(int sliceId) const
+{
+    return m_flexEnabledSlices.count(sliceId) > 0;
+}
+
+void AudioEngine::removeFlexAudioSource(int sliceId)
+{
+    setFlexAudioSourceEnabled(sliceId, false);
+    // Den Wandler mit wegwerfen: er traegt einen Filterzustand, und ein
+    // alter Zustand auf einem neuen Empfaenger gibt beim ersten Block
+    // ein Knacken.
+    m_flexResamplers.erase(sliceId);
+}
+
+void AudioEngine::feedFlexAudioData(int sliceId, const float* interleavedStereo,
+                                    int frames, int sourceRateHz)
+{
+    if (!flexAudioEnabled(sliceId)) {
+        return;
+    }
+    if (!interleavedStereo || frames <= 0 || sourceRateHz <= 0) {
+        // Ohne echte Rate darf kein Wandler gebaut werden — der wuerde
+        // mit 0 Hz gebaut und liefert Unsinn oder stuerzt ab.
+        return;
+    }
+
+    auto it = m_flexResamplers.find(sliceId);
+    if (it == m_flexResamplers.end() || it->second.rateHz != sourceRateHz) {
+        FlexResamplerSlot slot;
+        slot.resampler =
+            std::make_unique<Resampler>(double(sourceRateHz), 48000.0, 8192);
+        slot.rateHz = sourceRateHz;
+        it = m_flexResamplers.insert_or_assign(sliceId, std::move(slot)).first;
+    }
+
+    const QByteArray out =
+        it->second.resampler->processStereoToStereo(interleavedStereo, frames);
+    if (out.isEmpty()) {
+        return;   // der Wandler haelt noch zurueck; das ist normal
+    }
+    const int outFrames = out.size() / int(sizeof(float) * 2);
+    rxBlockReady(sliceId,
+                 reinterpret_cast<const float*>(out.constData()),
+                 outFrames);
+}
+
 void AudioEngine::setDspSampleRate(int rate)
 {
     AppSettings::instance().setValue(QStringLiteral("audio/DspRate"),

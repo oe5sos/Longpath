@@ -305,6 +305,24 @@ ConnectionPanel::ConnectionPanel(RadioModel* model, QWidget* parent)
     // Start discovery automatically when panel opens
     disc->startDiscovery();
 
+    // Flex-Treiber Stufe 1: dieselben drei Meldungen, anderer Draht.
+    // FlexRadio-Maschinen rufen von selbst im Sekundentakt auf UDP 4992
+    // aus; hier wird nur zugehoert, nichts gefragt. Die Zeilen landen
+    // deshalb in denselben Zellen wie P1/P2 -- die Geraeteliste braucht
+    // keine zweite Zeilenart. Siehe core/FlexRadioDiscovery.h.
+    if (FlexRadioDiscovery* flex = m_radioModel->flexDiscovery()) {
+        connect(flex, &FlexRadioDiscovery::radioDiscovered,
+                this, &ConnectionPanel::onRadioDiscovered);
+        connect(flex, &FlexRadioDiscovery::radioUpdated,
+                this, &ConnectionPanel::onRadioUpdated);
+        connect(flex, &FlexRadioDiscovery::radioLost,
+                this, &ConnectionPanel::onRadioLost);
+        for (const RadioInfo& info : flex->discoveredRadios()) {
+            onRadioDiscovered(info);
+        }
+        flex->startListening();
+    }
+
     if (m_radioTable->rowCount() == 0) {
         setStatusText(QStringLiteral("Searching for radios..."));
     }
@@ -783,6 +801,22 @@ void ConnectionPanel::updateStatusStrip()
             m_stripInfoLabel->setToolTip(QString());
             m_stripInfoLabel->setText(QStringLiteral("Connected — %1  (%2)")
                 .arg(ri.displayName(), ri.address.toString()));
+        } else if (FlexRadioConnection* flex = m_radioModel->flexConnection();
+                   flex && flex->isConnected()) {
+            // Flex-Treiber Stufe 1: verbunden heisst hier NUR Erkennung
+            // und Befehlskanal — es gibt noch keinen Ton und kein Bild.
+            // „Connected" allein waere irrefuehrend: der Betreiber sieht
+            // ein verbundenes Geraet und hoert nichts, und das sieht aus
+            // wie ein Fehler. Deshalb steht hier, was wirklich laeuft.
+            // Entwurf: docs/architecture/2026-10-18-flex-stufe1-design.md
+            if (m_failureDetailLabel) { m_failureDetailLabel->setVisible(false); }
+            m_stripInfoLabel->setToolTip(
+                QStringLiteral("Stage 1 of the Flex driver: discovery and the "
+                               "command channel. Audio and panadapter streams "
+                               "(VITA-49) are not implemented yet."));
+            m_stripInfoLabel->setText(
+                QStringLiteral("Connected — %1  (command channel only, no audio yet)")
+                    .arg(m_radioModel->name()));
         } else {
             if (m_failureDetailLabel) { m_failureDetailLabel->setVisible(false); }
             m_stripInfoLabel->setToolTip(QString());
@@ -1018,6 +1052,7 @@ void ConnectionPanel::populateRow(int row, const RadioInfo& info)
         case HPSDRHW::HermesC10:         boardStr = QStringLiteral("HermesC10");   break;  // From Thetis network.h:425 [v2.10.3.15] //N1GP G2E added (HermesC10) — within ±5 of cite: //MI0BOT (network.h:422 HermesLite) and //G8NJJ (network.h:423 Saturn) preserved per inline-tag-preservation rule
         case HPSDRHW::Andromeda:         boardStr = QStringLiteral("Andromeda");   break;
         case HPSDRHW::SunSdr2Qrp:        boardStr = QStringLiteral("SunSDR2 QRP"); break;
+        case HPSDRHW::Flex8400:          boardStr = QStringLiteral("FLEX-8400");   break;
         default:                         boardStr = QStringLiteral("Unknown");     break;
     }
 
@@ -1029,6 +1064,7 @@ void ConnectionPanel::populateRow(int row, const RadioInfo& info)
     switch (info.protocol) {
         case ProtocolVersion::Protocol2: protoStr = QStringLiteral("P2"); break;
         case ProtocolVersion::SunSdr:    protoStr = QStringLiteral("SunSDR"); break;
+        case ProtocolVersion::Flex:      protoStr = QStringLiteral("Flex"); break;
         case ProtocolVersion::Protocol1:
         default:                         protoStr = QStringLiteral("P1"); break;
     }
@@ -1627,6 +1663,7 @@ void ConnectionPanel::updateDetailPanel()
     switch (info.protocol) {
         case ProtocolVersion::Protocol2: detailProtoStr = QStringLiteral("P2");     break;
         case ProtocolVersion::SunSdr:    detailProtoStr = QStringLiteral("SunSDR"); break;
+        case ProtocolVersion::Flex:      detailProtoStr = QStringLiteral("Flex");   break;
         case ProtocolVersion::Protocol1:
         default:                         detailProtoStr = QStringLiteral("P1");    break;
     }

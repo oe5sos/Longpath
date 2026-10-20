@@ -84,10 +84,21 @@ namespace Longpath {
 // discovery for this protocol (the radio's IP is supplied out-of-band,
 // same design doc) — see AddCustomRadioDialog's manual-entry path,
 // plan docs/architecture/2026-08-26-sunsdr-connection-plan.md §Phase A.
+// Flex ist, wie SunSdr, keine OpenHPSDR-Protokollfassung: es ist
+// FlexRadios eigenes SmartSDR-Protokoll -- ein Erkennungsruf im
+// Sekundentakt auf UDP 4992 und ein Textbefehlskanal auf TCP 4992
+// (Satzarten C/R/S/M). Steht hier aus demselben Grund wie SunSdr:
+// RadioConnection::create() und BoardCapabilities fragen beide „welches
+// Drahtformat" an diesem Feld ab.
+//
+// Anders als bei SunSdr gibt es hier eine Erkennung, sie laeuft aber
+// umgekehrt: die Maschine ruft von selbst, Longpath hoert nur zu
+// (FlexRadioDiscovery). Es wird nichts gefragt.
 enum class ProtocolVersion : int {
     Protocol1 = 1,
     Protocol2 = 2,
-    SunSdr    = 3
+    SunSdr    = 3,
+    Flex      = 4
 };
 
 // Information about a discovered OpenHPSDR radio.

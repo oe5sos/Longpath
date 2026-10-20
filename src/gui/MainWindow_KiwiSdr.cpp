@@ -446,12 +446,19 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
     const auto isSunSdrClaimed = [this](const SliceModel* s) {
         return s && m_sunSdrTargetSliceId == s->sliceIndex();
     };
+    // Dritte fremde Quelle, dieselbe nicht-sichtbare Zuordnung:
+    // MainWindow::m_flexTargetSliceId traegt den Flex-Ton.
+    const auto isFlexClaimed = [this](const SliceModel* s) {
+        return s && m_flexTargetSliceId == s->sliceIndex();
+    };
 
     SliceModel* slice = m_radioModel ? m_radioModel->activeSlice() : nullptr;
-    if (slice && (slice->streamIndex() >= 0 || isSunSdrClaimed(slice))) { slice = nullptr; }
+    if (slice && (slice->streamIndex() >= 0 || isSunSdrClaimed(slice)
+                  || isFlexClaimed(slice))) { slice = nullptr; }
     if (!slice && m_radioModel) {
         for (SliceModel* candidate : m_radioModel->slices()) {
-            if (candidate && candidate->streamIndex() < 0 && !isSunSdrClaimed(candidate)) {
+            if (candidate && candidate->streamIndex() < 0
+                && !isSunSdrClaimed(candidate) && !isFlexClaimed(candidate)) {
                 slice = candidate;
                 break;
             }

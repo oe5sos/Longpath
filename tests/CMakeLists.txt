@@ -7692,6 +7692,43 @@ longpath_add_test(tst_tnf_ui_wiring)
 #         section 8.3 + section 11.
 longpath_add_test(tst_notch_visual_does_not_perturb_noise_floor_or_maxbin)
 
+# -- Flex-Treiber Stufe 1: Erkennung + Befehlskanal -----------------------
+# Gegen ECHTE Bytes: die Erkennungsrufe sind am 2026-10-18 vom Draht
+# gelesen -- Martins FLEX-8400 (172.30.30.12) und Longpaths eigener Ruf
+# (172.30.30.110), der am Maestro als Phantom-Flex in der Liste stand.
+# Deckt dazu die Satzlehre V/H/R/S/M, den Ergebniscode mit gesetztem
+# oberstem Bit, die Objektgrenze im Zustandsschub und die
+# „unlesbare Frequenz wird nicht null"-Regel.
+# Quelle: Longpath-original; Satzlehre portiert aus AetherSDR (siehe
+#         src/core/FlexRadioConnection.h und docs/attribution/AETHERSDR-PORTS.md).
+longpath_add_test(tst_flex_stufe1)
+
+# -- Flex: steht die Maschine richtig beschriftet in der Geraeteliste? ----
+# Schliesst einen offenen Punkt aus dem Entwurf, den man NICHT live
+# ansehen konnte (Longpath lief, danach war das Geraet nicht erreichbar).
+# Geprueft wird die Falle, die beim SunSDR erst live auffiel: Spalte
+# „Protocol" richtig, Feld darunter trotzdem „P1".
+# Quelle: Longpath-original.
+longpath_add_test(tst_flex_zeile_in_der_geraeteliste)
+
+# -- Flex Stufe 2: der VITA-49-Leser gegen ECHTE Bytes --------------------
+# Koepfe und Unterkoepfe in tests/flex_vita_golden.h sind gelesener Draht
+# (FLEX-8400, 2026-10-18). Geprueft werden die Stellen, an denen eine
+# falsche Annahme toedlich und unsichtbar ist: die vier Fuellbyte am
+# Paketende (wer nach Datagrammlaenge zaehlt, erfindet Vollausschlag),
+# die Festkomma-Frequenzen (Hz x 2^20, sonst 14,5 Terahertz), die
+# Bin->dBm-Umrechnung (gegen zwei Messproben) und der Zeilenbau samt der
+# Schutzgrenzen aus GHSA-7gvg-x594-pprq.
+# Quelle: Longpath-original; Satzbau portiert aus AetherSDR (siehe
+#         src/core/FlexVitaReader.h und docs/attribution/AETHERSDR-PORTS.md).
+longpath_add_test(tst_flex_vita_reader)
+
+# -- Flex Stufe 2: der Sockel um den Leser --------------------------------
+# Ein UDP-Port fuer alles, Verteilung an der Paketklasse, und der Kern:
+# der Maszstab MUSS von aussen kommen, weil die Maschine y_pixels nie
+# zurueckmeldet. Datagramme aus echten Koepfen gebaut.
+longpath_add_test(tst_flex_vita_stream)
+
 # 2026-09-25: Rendering-Pruefstand (ohne LONGPATH_GRAB_DIR uebersprungen),
 # die Retina-Spaltenzusammenfassung und die Frequenzskalen-Beschriftung,
 # die er gefunden hat.

@@ -548,6 +548,32 @@ public:
     void removeSunSdrAudioSource(int sliceId);
     bool sunSdrAudioEnabled(int sliceId) const;
 
+    // ── Flex-Ton (VITA-49, Stufe 2, 2026-10-18) ──────────────────────
+    //
+    // Der dritte fremde Toneingang, und derselbe Zuschnitt wie die zwei
+    // darueber: bei Flex rechnet das RADIO, es liefert fertigen Ton und
+    // nicht I/Q. Also nicht in die DSP-Kette, sondern an rxBlockReady.
+    //
+    // Gemessen am 2026-10-18 an einer FLEX-8400
+    // (docs/protocols/flex-vita49-gemessen.md §5): Paketklasse 0x03E3,
+    // big-endian float32, Stereo verschraenkt, kein Unterkopf, 128
+    // Rahmen je Paket — und **24 012,3 Hz** ueber ein 24-Sekunden-
+    // Fenster gezaehlt, also 24 kHz auf 0,05 % genau. Die Rate ist
+    // trotzdem ein Parameter und keine Annahme im Wandler: sie ist
+    // gezaehlt, nicht aus einem Protokollfeld gelesen, und wenn sich
+    // das je aendert, soll es EINE Stelle sein.
+    //
+    // Dieselbe Bedingung wie bei Kiwi und SunSDR: die Spur einer
+    // Scheibe hat GENAU EINEN Erzeuger, darum schaltet
+    // setFlexAudioSourceEnabled die Scheibe ebenso auf
+    // "opportunistisch" — ein Netzaussetzer zum Flex darf nicht den
+    // ganzen Mix anhalten.
+    void feedFlexAudioData(int sliceId, const float* interleavedStereo,
+                           int frames, int sourceRateHz);
+    void setFlexAudioSourceEnabled(int sliceId, bool enabled);
+    void removeFlexAudioSource(int sliceId);
+    bool flexAudioEnabled(int sliceId) const;
+
     /// TX-monitor block consumer. Called via Qt::DirectConnection from
     /// TxChannel::sip1OutputReady on the audio thread. When monitor is
     /// enabled, expands the mono TXA samples to interleaved stereo (L=R),
@@ -1024,6 +1050,15 @@ private:
     };
     std::map<int, SunSdrResamplerSlot> m_sunSdrResamplers;
     std::set<int> m_sunSdrEnabledSlices;
+
+    // Flex-Ton: derselbe Zuschnitt. Der Wandler traegt die Rate, fuer
+    // die er gebaut wurde, mit sich — siehe feedFlexAudioData.
+    struct FlexResamplerSlot {
+        std::unique_ptr<Resampler> resampler;
+        int rateHz = 0;
+    };
+    std::map<int, FlexResamplerSlot> m_flexResamplers;
+    std::set<int> m_flexEnabledSlices;
 
     // Second mixer whose output is the anti-VOX reference, not the speakers.
     //

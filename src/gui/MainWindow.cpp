@@ -7402,6 +7402,9 @@ void MainWindow::populateDefaultMeter()
     m_kiwiWaterfallPanel = new KiwiWaterfallPanel(m_radioModel, nullptr);
     panel->addApplet(m_kiwiWaterfallPanel);
     wireKiwiSdr();
+    // Flex-Treiber Stufe 2: Ton und Bild einer FlexRadio-Maschine.
+    // Verbindet nur Signale; ohne verbundenes Flex kommt nie eines.
+    wireFlex();
 
     // Stille Pruefung auf eine neuere Veroeffentlichung (UpdateDialog.h);
     // laeuft 20 s nach dem Start, hoechstens einmal je 20 h, offline still.

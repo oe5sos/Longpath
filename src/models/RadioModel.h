@@ -101,6 +101,9 @@
 #include "core/accessories/PennyLaneController.h"
 #include "core/CalibrationController.h"
 #include "core/RadioDiscovery.h"
+#include "core/FlexRadioDiscovery.h"
+#include "core/FlexRadioConnection.h"
+#include "core/FlexVitaStream.h"
 #include "core/RadioConnection.h"
 #include "core/HardwareProfile.h"
 #include "core/codec/CodecContext.h"  // SliceConfig (Phase 3F Sub-Epic B Task 16)
@@ -268,6 +271,18 @@ public:
     RadioConnection*  connection()       { return m_connection; }
     const RadioConnection* connection() const { return m_connection; }
     RadioDiscovery*   discovery()        { return m_discovery; }
+    // Flex-Treiber Stufe 1: die passive Erkennung auf UDP 4992. Getrennt
+    // von m_discovery, weil die beiden entgegengesetzt arbeiten --
+    // OpenHPSDR wird gefragt (Rundruf auf 1024, NIC-Lauf), FlexRadio
+    // ruft von selbst. Siehe core/FlexRadioDiscovery.h.
+    FlexRadioDiscovery* flexDiscovery()  { return m_flexDiscovery; }
+    // Der Flex-Befehlskanal. Nur belegt, solange eine FlexRadio-Maschine
+    // verbunden ist; sonst nullptr. Siehe core/FlexRadioConnection.h —
+    // bewusst KEINE RadioConnection-Unterklasse, deshalb steht er
+    // neben m_connection und nicht darin.
+    FlexRadioConnection* flexConnection() { return m_flexConnection; }
+    // Der VITA-49-Strom. Nur belegt, solange ein Flex verbunden ist.
+    FlexVitaStream* flexStream() { return m_flexStream; }
     ReceiverManager*  receiverManager()  { return m_receiverManager; }
     AudioEngine*      audioEngine()      { return m_audioEngine; }
     WdspEngine*       wdspEngine()       { return m_wdspEngine; }
@@ -2764,6 +2779,23 @@ signals:
     /// verband und scheiterte, sah "Disconnected" und sonst nichts —
     /// der Betreiber hat daraufhin drei Tage die App verdaechtigt,
     /// waehrend es die Netzwerkstrecke war.
+    // Flex-Treiber Stufe 1: die vom Gerät gelesene Frequenz einer
+    // Scheibe, in Hz. Hört heute nur das Protokoll — bei Flex rechnet
+    // das Radio, und wohin Ton und Bild gehen, entscheidet Stufe 2
+    // (docs/architecture/2026-10-18-flex-stufe1-design.md §5).
+    void flexSliceFrequencyChanged(int sliceId, double frequencyHz);
+    // Die Maschine hat Longpath als GUI-Client angenommen.
+    void flexGuiClientRegistered(const QString& guiClientId);
+    // Fertiger FFT-Rahmen in dBm, und die Wasserfallzeile (roh, ein
+    // Farbmaszstab — keine dBm, siehe core/FlexVitaReader.h).
+    void flexSpectrumReady(quint32 streamId, const QVector<float>& dbm);
+    void flexWaterfallRowReady(quint32 streamId, const QVector<quint16>& values,
+                               double lowFreqMhz, double highFreqMhz,
+                               quint32 autoBlackLevel);
+    // Ton: float32 Stereo verschraenkt, 24 kHz (gemessen 24 012,3 Hz).
+    void flexAudioSamplesReady(quint32 streamId,
+                               const QVector<float>& interleavedStereo);
+
     void connectAttemptFailed(Longpath::ConnectFailure reason,
                               const QString& detail);
 
@@ -3429,8 +3461,25 @@ private:
 
     void commitStreamSampleRateChange(const StreamRateChangePlan& plan);
 
+    // Flex-Treiber Stufe 1: oeffnet den Befehlskanal zu einer
+    // FlexRadio-Maschine. Getrennt von connectToRadio()s uebrigem Weg,
+    // weil dort alles OpenHPSDR ist (HardwareProfile, Alex, OC-Matrix,
+    // Platinenfaehigkeiten) und fuer ein Flex nichts davon gilt.
+    void connectFlexRadio(const RadioInfo& info);
+    void teardownFlexConnection();
+    // Startet den VITA-49-Strom, meldet den Port und laesst sich Bild
+    // und Ton schicken. Laeuft erst, wenn die GUI-Anmeldung durch ist:
+    // ohne sie gibt es keinen Panadapter, dem der Strom gehoeren koennte.
+    void startFlexStreams();
+
     // Sub-components (owned, main thread)
     RadioDiscovery*  m_discovery{nullptr};
+    FlexRadioDiscovery* m_flexDiscovery{nullptr};  // Flex-Treiber Stufe 1
+    FlexRadioConnection* m_flexConnection{nullptr};  // nur bei Flex belegt
+    FlexVitaStream*      m_flexStream{nullptr};
+    QString              m_flexPanId;        // „40000000"
+    QString              m_flexAudioStreamId;
+    bool                 m_flexMuteLocalWasOn{false};
     ReceiverManager* m_receiverManager{nullptr};
     AudioEngine*     m_audioEngine{nullptr};
     WdspEngine*      m_wdspEngine{nullptr};

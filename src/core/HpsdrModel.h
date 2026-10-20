@@ -138,7 +138,18 @@ enum class HPSDRHW : int {
     // docs/architecture/2026-08-24-sunsdr-native-driver-design.md and
     // docs/architecture/2026-08-26-sunsdr-connection-plan.md §Phase A.
     SunSdr2Qrp       = 13, // SunSDR2 QRP, native driver (no ExpertSDR2)
-    // 14..19 available for future Longpath-original SKU slots.
+    // Auch keine OpenHPSDR-Platine: eine FlexRadio-Maschine, erkannt und
+    // bedient ueber SmartSDRs eigenes Protokoll (ProtocolVersion::Flex,
+    // UDP/TCP 4992). Hier eingetragen aus demselben Grund wie SunSdr2Qrp
+    // darueber: RadioInfo::boardType und BoardCapabilities verteilen
+    // ueber HPSDRHW, unabhaengig von der Protokollfamilie.
+    //
+    // Bei Flex rechnet das RADIO -- Empfaengerzahl, Panadapter und
+    // Bandbreiten stehen im Erkennungsruf (`max_slices`,
+    // `max_panadapters`), nicht in einer Platinentabelle. Siehe
+    // FlexRadioDiscovery.h.
+    Flex8400         = 14, // FlexRadio FLEX-8400, Stufe 1 (Erkennung + Befehlskanal)
+    // 15..19 available for future Longpath-original SKU slots.
     // From Thetis network.h:425 [v2.10.3.15] //N1GP G2E added (HermesC10)
     // -- same tagged enum block also carries //MI0BOT at :422 (HermesLite,
     // see above) and G8NJJ at :423 (Saturn, see above)
@@ -437,6 +448,7 @@ constexpr const char* boardCodeName(HPSDRHW hw) noexcept {
         case HPSDRHW::HermesC10:       return "HermesC10";  // //N1GP G2E added (HermesC10)
         case HPSDRHW::Andromeda:        return "Andromeda";
         case HPSDRHW::SunSdr2Qrp:       return "SunSDR2 QRP";
+        case HPSDRHW::Flex8400:         return "FLEX-8400";
         case HPSDRHW::Unknown:          return "Unknown";
     }
     return "Unknown";
