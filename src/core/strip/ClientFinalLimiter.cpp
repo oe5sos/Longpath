@@ -237,7 +237,8 @@ void ClientFinalLimiter::process(float* interleaved, int frames, int channels) n
         // Positive trim makes the limiter work harder (more squash);
         // negative trim sits below the ceiling and the limiter passes
         // through.  Output is always ≤ ceiling regardless of trim,
-        // because the limiter clamps on the trimmed signal below.
+        // because of the safety clamp further down — the envelope
+        // follower alone let 0.5 to 1.3 dB through, measured.
         // Enabled-gated for the same pass-through contract as the
         // DC-block above.
         if (enabled) {
@@ -276,6 +277,29 @@ void ClientFinalLimiter::process(float* interleaved, int frames, int channels) n
                 // clamp has finished.  ~10^(0.5/20) ≈ 1.0593.
                 if (m_envLin > 1.0593f) ++firedCount;
             }
+        }
+
+        // ── Die Zusicherung, zuletzt ─────────────────────────────
+        //
+        // Der Huellkurvenfolger ist schnell, aber nicht hellsehend:
+        // den ERSTEN Abtastwerten einer steilen Flanke kommt er
+        // nicht zuvor. Am Geraet gemessen (2026-10-10,
+        // tst_bandbreiten_genau, echte Sprache durch die
+        // Empfehlung): bei Decke -1,0 dB stand die groesste Spitze
+        // auf -0,48 dBFS, bei Decke -2,0 dB auf -0,72 -- der
+        // Ueberschwinger waechst mit, weil der Clipper davor die
+        // Flanken noch steiler macht. Eine Decke tiefer zu legen
+        // hilft also NICHT.
+        //
+        // Ein Begrenzer, der seine Decke nicht haelt, ist keine
+        // Decke -- und der Kopf dieser Datei hat sie zugesichert.
+        // Also wird abgeschnitten, was der Huellkurvenfolger stehen
+        // laesst. Das trifft eine Handvoll Abtastwerte je Flanke;
+        // davor sitzt ein Clipper mit 12 dB Drive, dagegen ist das
+        // nichts.
+        if (enabled) {
+            l = std::clamp(l, -ceilingLin, ceilingLin);
+            r = std::clamp(r, -ceilingLin, ceilingLin);
         }
 
         // Write-back only while enabled — a disabled stage is a wire.

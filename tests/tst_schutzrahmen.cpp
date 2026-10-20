@@ -240,6 +240,28 @@ private slots:
         // Ab hier NICHTS mehr aufrufen -- das ist der ganze Punkt.
         QTRY_VERIFY_WITH_TIMEOUT(
             !schweber->frameGeometry().intersects(oben), 8000);
+
+        // ── Was dieser Lauf NICHT belegt (gemessen 2026-10-20) ──────
+        //
+        // Gegenprobe gefahren: mit beiden Nachlaeufen aus #280
+        // herausgenommen besteht er UNVERAENDERT. Er faengt also nicht,
+        // wofuer er geschrieben wurde.
+        //
+        // Der Grund ist ein Zufall des Zeitablaufs. Was den Schweber
+        // hier herausholt, ist nicht der Nachlauf nach dem Aufbau,
+        // sondern `schutzrahmenNachziehen()` aus `resizeEvent` des
+        // Hauptfensters: `showMaximized()` beim Start loest eine
+        // Groessenaenderung aus, deren 250-ms-Nachlauf genau in die
+        // Wartezeit hier faellt.
+        //
+        // Der Fall, den #280 wirklich behebt, ist ein anderer: ein
+        // schwebendes Fenster, das WAEHREND des Aufbaus aus dem Profil
+        // in den Sperrstreifen gesetzt wird -- also bevor es ein
+        // `resizeEvent` gibt, das nachraeumen koennte. Um den zu
+        // stellen, braeuchte dieser Lauf einen Griff, der ein Fenster
+        // vor `m_fensterAufbauFertig` platziert. Den gibt es noch
+        // nicht, und ohne ihn ist dieser Lauf ein Waechter gegen
+        // Rueckschritte im Nachziehen -- kein Beleg fuer #280.
     }
 
     void einSchwebendesFensterAufDerLeisteWirdHERUNTERGEHOLT()
@@ -405,8 +427,15 @@ private slots:
         mw.show();
         QVERIFY(QTest::qWaitForWindowExposed(&mw, 20000));
         QCoreApplication::processEvents();
-        QVERIFY2(!mw.schutzrahmenHinweisSichtbarFuerTest(),
-                 "der Hinweis steht da, ohne dass jemand zieht");
+        // WARTEN, nicht sofort pruefen: der Melder liegt statisch (siehe
+        // den Prueffall unten), sein Hinweis ueberlebt also das Ende des
+        // vorigen Falls und geht erst nach seiner eigenen Frist wieder
+        // weg. Hier war ein nacktes QVERIFY2 -- auf dieser Maschine
+        // immer gruen, auf dem Linux-Runner am 2026-10-20 rot (#279,
+        // Shard 3/4): dort war der Hinweis des vorigen Falls noch da.
+        // Dieselbe Lehre wie bei der Fensterfrist: eine Frist, die hier
+        // reicht, reicht dort nicht.
+        QTRY_VERIFY_WITH_TIMEOUT(!mw.schutzrahmenHinweisSichtbarFuerTest(), 5000);
 
         // Ein schwebendes Fenster meldet eine Bewegung -- genau das tut
         // `meldeZug()` aus dem moveEvent der drei Fensterarten.

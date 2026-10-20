@@ -1,3 +1,4 @@
+#include "gui/FensterKnoepfe.h"
 #include "core/StartWatch.h"
 
 #include <QTimer>
@@ -404,6 +405,12 @@ int main(int argc, char* argv[])
     // Ebene der schwebenden Paletten heben, sonst gehen sie auf macOS
     // hinter ihnen auf -- siehe AuxiliaryWindowLeveler.h.
     app.installEventFilter(new Longpath::AuxiliaryWindowLeveler(&app));
+
+    // Die drei Punkte links oben auch an den Werkzeugfenstern: ein
+    // QDialog bekommt von Qt auf macOS nur den Schliessknopf, und
+    // ein Fenster, das man nicht ins Dock legen kann, muss man
+    // schliessen. Begruendung und Ausnahmen in gui/FensterKnoepfe.h.
+    app.installEventFilter(new Longpath::FensterKnoepfe(&app));
 
     // Register custom metatypes for cross-thread signal/slot connections.
     qRegisterMetaType<Longpath::RadioConnectionError>();

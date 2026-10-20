@@ -67,6 +67,14 @@ public:
     // edit.  The ClientEq pointer itself is set via setEq() on the base.
     void setAudioEngine(EqHost* engine);
 
+    // Die einfache Ansicht. Dann sind nur die sechs benannten Baender
+    // anfassbar, ein Zug aendert ausschliesslich den Pegel, und die
+    // Wege in die Tiefe (Filterart, Rechtsklickmenue, Filterkanten)
+    // sind zu. Nichts davon aendert den Ton -- es aendert, was man
+    // aus Versehen tun kann.
+    void setSimpleMode(bool on);
+    bool simpleMode() const noexcept { return m_simpleMode; }
+
     // The ring itself lives in EqFilterRing.h, shared with the icon row
     // — see the note there for why it is not defined in this class.
 
@@ -81,6 +89,9 @@ protected:
     void mouseReleaseEvent(QMouseEvent* ev) override;
     void mouseDoubleClickEvent(QMouseEvent* ev) override;
     void contextMenuEvent(QContextMenuEvent* ev) override;
+    // Rad über einem Griff = Breite. Siehe die Begründung an der
+    // Umsetzung.
+    void wheelEvent(QWheelEvent* ev) override;
 
 private:
     // Hit-test pixel point against all active handles.  Returns band index
@@ -99,11 +110,23 @@ private:
 
     EqHost* m_audio{nullptr};
     int  m_draggingBand{-1};
-    bool m_dragShift{false};
+    // Erst wenn wirklich gezogen wurde, wird ein Band eingeschaltet
+    // und veraendert. Ein Klick allein aendert nichts am Ton. Welche
+    // Groesse der Zug meint, entscheiden ⇧ und ⌥ -- laufend gelesen,
+    // nicht beim Druecken festgehalten.
+    bool m_dragMoved{false};
+    // Welche Achse dieser Zug meint. Entschieden an den ersten
+    // Pixeln, danach fest -- siehe mouseMoveEvent.
+    enum class Achse { Offen, Senkrecht, Waagrecht };
+    Achse m_achse{Achse::Offen};
+    bool m_simpleMode{false};
     QPointF m_dragStart;
     float   m_dragStartFreqHz{0};
     float   m_dragStartGainDb{0};
     float   m_dragStartQ{0};
+    /// Mit welcher Filterart das Ziehen begann -- siehe die Kerbe,
+    /// die beim Ziehen ueber null zur Nadel wird und zurueck.
+    ClientEq::FilterType m_dragStartType{ClientEq::FilterType::Peak};
 
     CutoffEdge m_draggingCutoff{CutoffEdge::None};
 };

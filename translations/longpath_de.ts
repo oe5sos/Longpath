@@ -3397,6 +3397,34 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 <context>
     <name>Longpath::MainWindow</name>
     <message>
+        <source>There is no take yet — record something first.</source>
+        <translation>Es liegt keine Aufnahme vor — nimm zuerst etwas auf.</translation>
+    </message>
+    <message>
+        <source>Could not write: %1</source>
+        <translation>Konnte nicht schreiben: %1</translation>
+    </message>
+    <message>
+        <source>Saved: %1
+
+%2 seconds, 48 kHz mono — with the strip and the channel exactly as they stand.</source>
+        <translation>Gespeichert: %1
+
+%2 Sekunden, 48 kHz mono — mit der Kette und dem Kanal, wie sie gerade stehen.</translation>
+    </message>
+    <message>
+        <source>· checks off</source>
+        <translation>· Prüfung aus</translation>
+    </message>
+    <message>
+        <source>· %1 available</source>
+        <translation>· %1 verfügbar</translation>
+    </message>
+    <message>
+        <source>· up to date</source>
+        <translation>· aktuell</translation>
+    </message>
+    <message>
         <location filename="../src/gui/MainWindow.cpp" line="3016"/>
         <source>Notch-Filter</source>
         <translation type="unfinished"></translation>
@@ -6972,6 +7000,14 @@ Rechtsklick, um auf „ganze Maschine“ umzustellen.</translation>
 </context>
 <context>
     <name>Longpath::TitleBar</name>
+    <message>
+        <source>· checking …</source>
+        <translation>· wird geprüft …</translation>
+    </message>
+    <message>
+        <source>How this build compares with the latest published release. Checked at every start; Help → Check for Updates… checks right away.</source>
+        <translation>Der Stand gegenüber der neuesten veröffentlichten Fassung. Geprüft bei jedem Start; Help → Check for Updates… prüft sofort nach.</translation>
+    </message>
     <message>
         <location filename="../src/gui/TitleBar.cpp" line="586"/>
         <source>UTC time</source>

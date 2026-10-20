@@ -568,6 +568,36 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
         m_hbox->addWidget(build);
     }
 
+    // ── Der Stand der Aktualisierung, immer sichtbar ─────────────────
+    //
+    // „checking for update sollte auch immer automatisch angezeigt
+    //  werden nach dem neustart!"
+    //
+    // Die stille Prüfung beim Start gab es schon, aber sie meldete
+    // sich NUR, wenn es etwas Neueres gab. „Nichts gesehen" hiess
+    // damit zweierlei: alles aktuell, oder gar nicht nachgesehen --
+    // und genau diese Unsicherheit hat heute früh eine Stunde
+    // gekostet, als die Fassung im Dock eine andere war als die
+    // gebaute.
+    //
+    // Also steht der Stand jetzt neben der Version: „aktuell",
+    // „v0.7.0 verfügbar" oder „nicht erreichbar". Kein Fenster, das
+    // bei jedem Start aufgeht -- eine Zeile, die man im Vorbeigehen
+    // liest. Ein Dialog, der jedes Mal sagt „alles in Ordnung", wird
+    // nach drei Tagen weggeklickt, ohne gelesen zu werden.
+    m_updateState = new QLabel(this);
+    m_updateState->setObjectName(QStringLiteral("titleBarUpdateState"));
+    m_updateState->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; }")
+        .arg(QLatin1String(Style::kTextInactive)));
+    m_updateState->setText(tr("· checking …"));
+    m_updateState->setToolTip(tr(
+        "How this build compares with the latest published release. "
+        "Checked at every start; Help → Check for Updates… checks "
+        "right away."));
+    m_hbox->addSpacing(6);
+    m_hbox->addWidget(m_updateState);
+
     // ── Right stretch ──────────────────────────────────────────────────────
     m_hbox->addStretch(1);
 
@@ -672,6 +702,29 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     connect(m_featureBtn, &QPushButton::clicked,
             this, &TitleBar::featureRequestClicked);
     m_hbox->addWidget(m_featureBtn);
+}
+
+void TitleBar::setLinkerRand(int punkte)
+{
+    if (m_hbox == nullptr) { return; }
+    const QMargins m = m_hbox->contentsMargins();
+    m_hbox->setContentsMargins(punkte, m.top(), m.right(), m.bottom());
+}
+
+void TitleBar::setUpdateState(const QString& text,
+                              AktualisierungsStand art)
+{
+    if (m_updateState == nullptr) { return; }
+    const char* farbe = Style::kTextInactive;
+    switch (art) {
+    case AktualisierungsStand::Aktuell:     farbe = Style::kGreenText;    break;
+    case AktualisierungsStand::Neuer:       farbe = Style::kAmberText;    break;
+    case AktualisierungsStand::Unbekannt:   farbe = Style::kTextInactive; break;
+    }
+    m_updateState->setText(text);
+    m_updateState->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; }")
+        .arg(QLatin1String(farbe)));
 }
 
 void TitleBar::setMenuBar(QMenuBar* mb)

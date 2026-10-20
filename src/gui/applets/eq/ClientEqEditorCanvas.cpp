@@ -28,9 +28,11 @@
 #include "gui/ScopedChildWidget.h"
 #include "gui/applets/eq/EqFilterRing.h"
 #include "gui/applets/eq/EqHost.h"
+#include "gui/applets/eq/StripEqSimpleBar.h"
 #include "core/strip/ClientEq.h"
 
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QAction>
@@ -57,6 +59,41 @@ void ClientEqEditorCanvas::setAudioEngine(EqHost* engine)
     m_audio = engine;
 }
 
+void ClientEqEditorCanvas::setSimpleMode(bool on)
+{
+    if (m_simpleMode == on) { return; }
+    m_simpleMode = on;
+    m_draggingBand = -1;
+    m_draggingCutoff = CutoffEdge::None;
+    setSelectedBand(-1);
+    // Nur zeichnen, was sich auch anfassen laesst. Ein Punkt, der auf
+    // einen Zug nicht reagiert, ist schlimmer als kein Punkt.
+    quint32 mask = 0xffffffffu;
+    if (on) {
+        mask = 0u;
+        for (const auto& sl : StripEqSimpleBar::bandSlots()) {
+            if (sl.band >= 0 && sl.band < 32) {
+                mask |= (1u << sl.band);
+            }
+        }
+    }
+    setHandleMask(mask);
+    update();
+}
+
+namespace {
+
+// Gehoert dieses Band zu den sechs benannten Reglern?
+bool isSimpleBand(int idx)
+{
+    for (const auto& s : StripEqSimpleBar::bandSlots()) {
+        if (s.band == idx) { return true; }
+    }
+    return false;
+}
+
+} // namespace
+
 int ClientEqEditorCanvas::hitTestHandle(const QPointF& pos) const
 {
     if (!m_eq) return -1;
@@ -64,6 +101,7 @@ int ClientEqEditorCanvas::hitTestHandle(const QPointF& pos) const
     int best = -1;
     float bestDist = kHandleHitRadius * kHandleHitRadius;
     for (int i = 0; i < n; ++i) {
+        if (m_simpleMode && !isSimpleBand(i)) { continue; }
         const auto bp = m_eq->band(i);
         const bool isSlope = (bp.type == ClientEq::FilterType::LowPass
                            || bp.type == ClientEq::FilterType::HighPass);
@@ -84,6 +122,7 @@ ClientEqEditorCanvas::CutoffEdge
 ClientEqEditorCanvas::hitTestCutoffEdge(const QPointF& pos) const
 {
     constexpr int kHitTol = 5;
+    if (m_simpleMode) { return CutoffEdge::None; }
     // Don't intercept clicks in the bottom band-plan strip area.
     if (pos.y() > height() - kAudioBandStripPx) return CutoffEdge::None;
 
@@ -137,19 +176,18 @@ void ClientEqEditorCanvas::mousePressEvent(QMouseEvent* ev)
 
     setSelectedBand(idx);
 
-    auto bp = m_eq->band(idx);
-    // Auto-enable on interaction: the 8 default slots start disabled so
-    // the EQ is audibly transparent until the user grabs a handle.
-    if (!bp.enabled) {
-        bp.enabled = true;
-        m_eq->setBand(idx, bp);
-        emit bandsChanged();
-    }
+    const auto bp = m_eq->band(idx);
+    // Frueher wurde ein Band hier eingeschaltet -- beim Druecken, vor
+    // jeder Bewegung. Zehn Griffe liegen auf der Nulllinie, also war
+    // jeder Klick auf die Linie schon ein Eingriff in den Ton. Jetzt
+    // schaltet erst das wirkliche Ziehen ein (mouseMoveEvent).
     m_draggingBand = idx;
-    m_dragShift    = (ev->modifiers() & Qt::ShiftModifier) != 0;
+    m_dragMoved    = false;
+    m_achse        = Achse::Offen;
     m_dragStart    = ev->position();
     m_dragStartFreqHz = bp.freqHz;
     m_dragStartGainDb = bp.gainDb;
+    m_dragStartType   = bp.type;
     m_dragStartQ      = bp.q;
     setCursor(Qt::ClosedHandCursor);
     ev->accept();
@@ -188,32 +226,118 @@ void ClientEqEditorCanvas::mouseMoveEvent(QMouseEvent* ev)
         QWidget::mouseMoveEvent(ev); return;
     }
 
+    // ── Eine Geste, eine Groesse ─────────────────────────────────────
+    //
+    // „das klicken der linie bewegt teilweise die komplette kurve, was
+    //  ich oft nicht will."
+    //
+    // Er hat zweimal recht. Die zehn Griffe stehen ab Werk alle auf der
+    // Nulllinie -- die Linie IST die Griffreihe, jeder Klick darauf
+    // fasst einen an. Und ein Zug aenderte bis hierher Frequenz UND
+    // Pegel zugleich, also rutschte das Band beim Anheben nebenbei zur
+    // Seite. Bei Q = 0,707 ist ein Band rund zwei Oktaven breit, und
+    // so sieht das aus wie „die ganze Kurve bewegt sich".
+    //
+    // Ab jetzt aendert ein Zug genau eine Groesse:
+    //   ziehen        -- Pegel (bei Hoch-/Tiefpass: Grenzfrequenz,
+    //                    die haben keinen Pegel)
+    //   ⌥ + ziehen    -- Frequenz
+    //   ⇧ + ziehen    -- Breite
+    //
+    // Und relativ zum Griffpunkt, nicht absolut zum Zeiger: wer den
+    // Griff um drei Pixel verfehlt, soll das Band nicht um drei Pixel
+    // springen sehen.
     const auto bp = m_eq->band(m_draggingBand);
     ClientEq::BandParams next = bp;
     const bool isSlope = (bp.type == ClientEq::FilterType::LowPass
                        || bp.type == ClientEq::FilterType::HighPass);
 
-    if (m_dragShift) {
+    if (!m_dragMoved) {
+        const QPointF d = ev->position() - m_dragStart;
+        if (d.manhattanLength() < 3.0) { ev->accept(); return; }
+        m_dragMoved = true;
+
+        // ── Die Richtung entscheidet, nicht eine Taste ───────────
+        //
+        // „man muss die punkte beim EQ auch horizontal verschieben
+        //  können."
+        //
+        // Stimmt -- und vorher hiess es: „das klicken der linie
+        // bewegt teilweise die komplette kurve, was ich oft nicht
+        // will." Beides ist dieselbe Forderung von zwei Seiten:
+        // waagrecht schieben JA, aber nicht nebenbei beim Anheben.
+        //
+        // Also entscheiden die ersten Pixel. Wer nach oben zieht,
+        // zieht den Pegel; wer zur Seite zieht, zieht die Frequenz.
+        // Schraeg gibt es nicht mehr, und deshalb kann auch nichts
+        // mehr versehentlich mitwandern. ⌥ bleibt der Weg, beides
+        // zugleich zu wollen.
+        //
+        // Die Schwelle liegt bei drei Pixeln (oben), die Richtung
+        // entscheidet sich an dem Pixel danach -- das ist frueh
+        // genug, dass es sich sofort anfuehlt, und spaet genug,
+        // dass ein Zittern der Hand sie nicht bestimmt.
+        m_achse = (std::abs(d.x()) > std::abs(d.y()))
+                      ? Achse::Waagrecht : Achse::Senkrecht;
+        // Jetzt, nicht beim Druecken: ein Band wird eingeschaltet,
+        // weil daran gezogen wird.
+        if (!bp.enabled) {
+            next.enabled = true;
+        }
+    }
+
+    // Verschiebung gegenueber dem Griffpunkt, in den Einheiten der
+    // Achsen.
+    const float dDb = yToDb(static_cast<float>(ev->position().y()))
+                    - yToDb(static_cast<float>(m_dragStart.y()));
+    const float fRatio =
+        xToFreq(static_cast<float>(ev->position().x()))
+        / std::max(1.0f, xToFreq(static_cast<float>(m_dragStart.x())));
+
+    // Die Umschalttasten werden LAUFEND gelesen, nicht beim Druecken
+    // festgehalten: wer mitten im Zug merkt, dass er doch die
+    // Frequenz meint, soll ⌥ druecken koennen, statt loszulassen und
+    // neu anzusetzen.
+    const bool wantQ    = !m_simpleMode
+                       && (ev->modifiers() & Qt::ShiftModifier) != 0;
+    const bool wantFreq = !m_simpleMode
+                       && (ev->modifiers() & Qt::AltModifier) != 0;
+
+    if (wantQ) {
         // Shift-drag = vertical Q control. Map vertical delta to
         // exponential Q change so a full-height drag spans ~2 decades.
         const float dy = static_cast<float>(m_dragStart.y() - ev->position().y());
         const float hOver2 = std::max(1.0f, static_cast<float>(height()) * 0.5f);
         const float factor = std::pow(10.0f, dy / hOver2);
         next.q = std::clamp(m_dragStartQ * factor, 0.1f, 18.0f);
+    } else if (wantFreq || isSlope || m_achse == Achse::Waagrecht) {
+        // Hoch- und Tiefpass haben keinen Pegel: bei ihnen IST die
+        // waagrechte Bewegung die Sache, auch ohne ⌥.
+        next.freqHz = std::clamp(m_dragStartFreqHz * fRatio, 20.0f, 20000.0f);
     } else {
-        // Freq is always horizontal. Gain is vertical for peak/shelf.
-        // HP/LP have no gain, so their vertical drag controls Q instead
-        // — each handle keeps two degrees of freedom, no shift needed.
-        next.freqHz = std::clamp(xToFreq(static_cast<float>(ev->position().x())),
-                                 20.0f, 20000.0f);
-        if (isSlope) {
-            const float dy = static_cast<float>(m_dragStart.y() - ev->position().y());
-            const float hOver2 = std::max(1.0f, static_cast<float>(height()) * 0.5f);
-            const float factor = std::pow(10.0f, dy / hOver2);
-            next.q = std::clamp(m_dragStartQ * factor, 0.1f, 18.0f);
-        } else {
-            next.gainDb = std::clamp(yToDb(static_cast<float>(ev->position().y())),
-                                     -18.0f, 18.0f);
+        next.gainDb = std::clamp(m_dragStartGainDb + dDb, -18.0f, 18.0f);
+        // ── Eine Kerbe nach oben ist eine Nadel ─────────────────
+        //
+        // „diese form sollte auch nach oben gehen, nicht nur nach
+        // unten" (2026-10-15).
+        //
+        // Die Kerbe ist eine eigene Filterart mit fester Form: sie
+        // loescht ihre Frequenz, und ihr Pegel wird gar nicht
+        // gelesen. Nach oben ziehen hat deshalb nichts getan.
+        //
+        // Das Gegenstueck zu einer schmalen Kerbe ist keine zweite
+        // Filterart, sondern eine Glocke mit derselben hohen Guete
+        // und umgekehrtem Vorzeichen. Also wird beim Ziehen ueber
+        // null daraus genau das -- dieselbe Breite, dieselbe
+        // Frequenz, nur nach oben. Wer wieder unter null zieht,
+        // bekommt seine Kerbe zurueck.
+        if (next.type == ClientEq::FilterType::Notch
+            && next.gainDb > 0.5f) {
+            next.type = ClientEq::FilterType::Peak;
+        } else if (m_dragStartType == ClientEq::FilterType::Notch
+                   && next.type == ClientEq::FilterType::Peak
+                   && next.gainDb <= 0.5f) {
+            next.type = ClientEq::FilterType::Notch;
         }
     }
     m_eq->setBand(m_draggingBand, next);
@@ -232,15 +356,52 @@ void ClientEqEditorCanvas::mouseReleaseEvent(QMouseEvent* ev)
     }
     if (m_draggingBand < 0) { QWidget::mouseReleaseEvent(ev); return; }
     m_draggingBand = -1;
-    m_dragShift = false;
+    m_dragMoved = false;
+    m_achse = Achse::Offen;
     setCursor(Qt::CrossCursor);
+    persist();
+    ev->accept();
+}
+
+// ── Das Rad ist die Breite ───────────────────────────────────────────
+//
+// „man sollte das auch minimaler erhöhen können, nicht sooo breit."
+//
+// Die Breite liess sich bisher nur mit ⇧ + ziehen ändern. Das steht
+// zwar in der Zeile darüber, aber eine Taste, die man kennen muss,
+// ist keine Bedienung -- und wer eine Glocke zu breit findet, greift
+// als Erstes zum Rad. In jedem Entzerrer, den er kennt, tut das
+// genau das hier.
+//
+// Nur über einem Griff, und nur in der Profi-Ansicht: in der
+// einfachen ist die Breite absichtlich festgelegt.
+void ClientEqEditorCanvas::wheelEvent(QWheelEvent* ev)
+{
+    if (!m_eq || m_simpleMode) { QWidget::wheelEvent(ev); return; }
+
+    const int idx = hitTestHandle(ev->position());
+    if (idx < 0) { QWidget::wheelEvent(ev); return; }
+
+    const int stufen = ev->angleDelta().y() / 120;
+    if (stufen == 0) { QWidget::wheelEvent(ev); return; }
+
+    auto bp = m_eq->band(idx);
+    // Je Rastung ein Achtel Oktave enger oder weiter -- fein genug,
+    // um zu treffen, grob genug, um in drei Rastungen anzukommen.
+    const float faktor = std::pow(1.25f, float(stufen));
+    bp.q = std::clamp(bp.q * faktor, 0.3f, 18.0f);
+    if (!bp.enabled) { bp.enabled = true; }
+    m_eq->setBand(idx, bp);
+    setSelectedBand(idx);
+    emit bandsChanged();
+    update();
     persist();
     ev->accept();
 }
 
 void ClientEqEditorCanvas::mouseDoubleClickEvent(QMouseEvent* ev)
 {
-    if (!m_eq) { QWidget::mouseDoubleClickEvent(ev); return; }
+    if (!m_eq || m_simpleMode) { QWidget::mouseDoubleClickEvent(ev); return; }
     if (ev->button() != Qt::LeftButton) {
         QWidget::mouseDoubleClickEvent(ev); return;
     }
@@ -259,7 +420,7 @@ void ClientEqEditorCanvas::mouseDoubleClickEvent(QMouseEvent* ev)
     // a platform that delivers the events in another order would
     // otherwise leave the band stuck to the cursor.
     m_draggingBand = -1;
-    m_dragShift    = false;
+    m_dragMoved    = false;
     setCursor(Qt::CrossCursor);
 
     setSelectedBand(idx);
@@ -275,6 +436,9 @@ void ClientEqEditorCanvas::mouseDoubleClickEvent(QMouseEvent* ev)
 
 void ClientEqEditorCanvas::contextMenuEvent(QContextMenuEvent* ev)
 {
+    // In der einfachen Ansicht gibt es kein Menue. Wer es braucht,
+    // schaltet auf Profi -- das ist ein Knopf, kein Umweg.
+    if (m_simpleMode) { QWidget::contextMenuEvent(ev); return; }
     if (!m_eq) { QWidget::contextMenuEvent(ev); return; }
 
     const int idx = hitTestHandle(ev->pos());
@@ -295,6 +459,8 @@ void ClientEqEditorCanvas::contextMenuEvent(QContextMenuEvent* ev)
     auto* hsAct    = menu.addAction("Set type: High Shelf");
     auto* lpAct    = menu.addAction("Set type: Low Pass");
     auto* hpAct    = menu.addAction("Set type: High Pass");
+    auto* noAct    = menu.addAction("Set type: Notch");
+    auto* bpAct    = menu.addAction("Set type: Band Pass");
 
     // Slope submenu — only meaningful for HP / LP bands.
     const bool isSlope = (bp.type == ClientEq::FilterType::LowPass
@@ -336,6 +502,8 @@ void ClientEqEditorCanvas::contextMenuEvent(QContextMenuEvent* ev)
     else if (chosen == hsAct)   change(ClientEq::FilterType::HighShelf);
     else if (chosen == lpAct)   change(ClientEq::FilterType::LowPass);
     else if (chosen == hpAct)   change(ClientEq::FilterType::HighPass);
+    else if (chosen == noAct)   change(ClientEq::FilterType::Notch);
+    else if (chosen == bpAct)   change(ClientEq::FilterType::BandPass);
     else if (chosen == enAct) {
         ClientEq::BandParams p = bp; p.enabled = !bp.enabled; m_eq->setBand(idx, p);
     }

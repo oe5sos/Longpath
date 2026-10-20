@@ -547,6 +547,28 @@ double scalePaTemperatureCelsius(quint16 /*adcRaw*/, HPSDRModel /*model*/)
 
 } // anonymous namespace
 
+// Der Kanalzug entsteht einmal und bleibt.
+//
+// Vorher entstand er mit der Sendepumpe und starb mit ihr. Ohne
+// Funkgeraet war damit das ganze Kanalzugfenster tot: Hauptschalter
+// ohne Wirkung, acht Stufenseiten ohne Werte, Vorgaben ohne Ziel.
+// Genau die Arbeit, fuer die das Fenster da ist -- eine Stimme
+// einstellen und abhoeren --, macht man aber, BEVOR man auf Sendung
+// geht.
+//
+// prepare() wird beim Pumpenstart erneut gerufen; es loescht nur die
+// Filterzustaende, die Einstellungen bleiben.
+void RadioModel::ensureStripChain()
+{
+    if (m_stripChain) { return; }
+    m_stripChain = std::make_unique<StripChain>();
+    m_stripChain->prepare(48000.0);   // TXA input rate
+    // Hier wiederhergestellt und nicht erst beim Oeffnen des Fensters:
+    // die Einstellungen des Betreibers gelten ab dem ersten Block,
+    // ob er den Kanalzug je aufmacht oder nicht.
+    StripSettings::restore(*m_stripChain);
+}
+
 RadioModel::RadioModel(QObject* parent)
     : QObject(parent)
     , m_discovery(new RadioDiscovery(this))
@@ -555,6 +577,11 @@ RadioModel::RadioModel(QObject* parent)
     , m_audioEngine(new AudioEngine(this))
     , m_wdspEngine(new WdspEngine(this))
 {
+    // Der Sendeton-Kanalzug steht ab dem ersten Augenblick. Siehe
+    // ensureStripChain() -- und RadioModel.h, warum er nicht mehr an
+    // der Verbindung haengt.
+    ensureStripChain();
+
     // Phase 3O: give AudioEngine a non-owning back-pointer to this model
     // so rxBlockReady() can look up per-slice mute / VAX state. Wired
     // immediately after construction; AudioEngine caches the pointer and
@@ -9087,16 +9114,15 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 m_txWorker->setAudioEngine(m_audioEngine);
                 m_txWorker->setMicSource(m_txMicSource.get());
 
-                // Longpath Audio Channel Strip. Created with the pump
-                // and handed to it before it starts, so there is no
-                // window in which the worker holds a half-prepared
-                // chain. Off by default — see StripChain.h.
-                m_stripChain = std::make_unique<StripChain>();
+                // Longpath Audio Channel Strip. It already exists —
+                // built in the constructor, see ensureStripChain() —
+                // because the operator sets it up and auditions it
+                // long before a radio is attached. Prepared again
+                // here: prepare() clears every filter's state and
+                // leaves the settings alone, so the pump starts on a
+                // chain with no history in it.
+                ensureStripChain();
                 m_stripChain->prepare(48000.0);   // TXA input rate
-                // Restore here rather than when the window opens: the
-                // operator's settings should be in force from the first
-                // block, whether or not they ever open the strip.
-                StripSettings::restore(*m_stripChain);
                 m_txWorker->setStripChain(m_stripChain.get());
                 m_txChannel->moveToThread(m_txWorker.get());
                 m_txWorker->startPump();
@@ -13349,9 +13375,12 @@ void RadioModel::teardownConnection()
             m_txChannel->moveToThread(this->thread());
         }
         m_txWorker.reset();
-        // After the worker, never before: the worker holds a raw
-        // pointer to the chain and runs it on the audio thread.
-        m_stripChain.reset();
+        // The chain is NOT destroyed with the worker. It outlives the
+        // connection on purpose: the strip window is a workbench, and
+        // a workbench that empties itself when the radio goes away is
+        // useless for the thing it is for. The worker held a raw
+        // pointer to it and ran it on the audio thread, so the order
+        // still matters — the reset above has already joined it.
     }
     // Phase 3M-1c TX pump v3: drop the connection's view of the mic
     // source BEFORE destroying it.  Otherwise the next inbound mic

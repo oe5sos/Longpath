@@ -241,6 +241,7 @@ warren@wpratt.com
 //============================================================================================//
 
 #include "MainWindow.h"
+#include "gui/MacVollflaeche.h"
 #include "gui/DxccSpotColours.h"
 #include "gui/ScopedChildWidget.h"
 #include "gui/styles/ThemeQss.h"
@@ -269,6 +270,7 @@ warren@wpratt.com
 #include "gui/LayoutProfiles.h"
 #include "gui/widgets/WorldTexture.h"
 #include "applets/StripWindow.h"
+#include "core/strip/BandLimit.h"
 #include "UpdateDialog.h"
 #include "core/UpdateChecker.h"
 #include "widgets/RotorLogbookPanel.h"
@@ -802,6 +804,7 @@ MainWindow::MainWindow(QWidget* parent)
                 catSetzeSperre(sl, w != 0);
             }
         };
+
         // setzeVfoB und setzeSplit bleiben ABSICHTLICH leer. Longpath hat
         // kein VFO B und keinen Split; die Protokollschicht lehnt einen
         // Befehl ohne Haken mit "?;" ab, statt ihn zu quittieren und
@@ -2429,6 +2432,44 @@ void MainWindow::enterBorderlessFullSize()
     // existiert laengst -- die Applet-/Meter-Fenster brauchen es schon
     // vorher) erst nach einem erneuten show() ankommt, auf macOS
     // zuverlaessig nur mit einem hide() davor.
+    // ── Volle Flaeche MIT den drei Punkten ──────────────────────────
+    //
+    // „ich meine eigentlich das hauptfenster!" -- die drei farbigen
+    // Knoepfe links oben fehlten hier, und damit auch das Zuklappen
+    // ins Dock.
+    //
+    // Der Grund war Qt::FramelessWindowHint: das ergibt auf macOS ein
+    // Fenster mit NSWindowStyleMaskBorderless, und so eines hat
+    // keinen Titelbalken -- also keine Knoepfe, und AppKit laesst es
+    // auch nicht zuklappen.
+    //
+    // Auf dem Mac geht es ohne randloses Fenster: Titelbalken
+    // durchsichtig, Inhalt darunter durchgezogen. Optisch dasselbe,
+    // aber die echten Knoepfe liegen darueber und der gelbe tut, was
+    // er soll. Kein eigener Space -- die Begruendung oben gilt
+    // weiter. Siehe gui/MacVollflaeche.h.
+    //
+    // Nur wenn das nicht geht (andere Plattform), bleibt es beim
+    // randlosen Fenster. Einen Waechter braucht es hier nicht: der
+    // Kopf traegt fuer alles ausser macOS Stummel, die `false`
+    // melden -- „der Aufrufer darf trotzdem auf jeder Plattform
+    // fragen" (gui/MacVollflaeche.h).
+    if (MacVollflaeche::verfuegbar()
+        && MacVollflaeche::setzeVollflaeche(this, true)) {
+        if (QScreen* scr = this->screen()) {
+            setGeometry(scr->availableGeometry());
+        }
+        // Links oben Platz fuer die Knoepfe, sonst liegt die halbe
+        // Menuezeile unter ihnen und ist nicht anklickbar.
+        if (m_titleBar) {
+            m_titleBar->setLinkerRand(MacVollflaeche::kKnopfBreite);
+        }
+        show();
+        raise();
+        activateWindow();
+        return;
+    }
+
     const bool wasVisible = isVisible();
     if (wasVisible) { hide(); }
     setWindowFlag(Qt::FramelessWindowHint, true);
@@ -2447,6 +2488,15 @@ void MainWindow::exitBorderlessFullSize()
     if (m_fullScreenAction && m_fullScreenAction->isChecked()) {
         const QSignalBlocker blocker(m_fullScreenAction);
         m_fullScreenAction->setChecked(false);
+    }
+    if (m_titleBar) { m_titleBar->setLinkerRand(0); }
+    if (MacVollflaeche::verfuegbar()
+        && !windowFlags().testFlag(Qt::FramelessWindowHint)) {
+        MacVollflaeche::setzeVollflaeche(this, false);
+        show();
+        raise();
+        activateWindow();
+        return;
     }
     if (isVisible()) { hide(); }
     setWindowFlag(Qt::FramelessWindowHint, false);
@@ -14865,6 +14915,7 @@ int MainWindow::schwebendeAusDemSchutzrahmenHolen()
             // Betreiber. Und auf den Rahmenversatz achten -- move()
             // setzt die Ecke des RAHMENS, frameGeometry() liest ihn
             // ebenfalls, also stimmt es ohne Umrechnung.
+            const EigeneBewegung wirSelbst;
             w->move(neu.topLeft());
             ++verschoben;
         }
@@ -16607,14 +16658,24 @@ void MainWindow::wirePuduMonitor()
             finishPuduTake();
         } else {
             if (m_finalMonitor->isPlaying()) m_finalMonitor->stopPlayback();
+            // Der vorige Mitschnitt geht in recordingStarted weg, nicht
+            // beim Abspielen -- sonst wäre er nach dem ersten Hören
+            // nicht mehr umzurechnen.
             m_finalMonitor->startRecording();
         }
     });
     connect(m_stripWindow.data(), &StripWindow::monitorPlayClicked,
             this, [this]() {
-        if (m_finalMonitor->isPlaying()) m_finalMonitor->stopPlayback();
-        else                             m_finalMonitor->startPlayback();
+        if (m_finalMonitor->isPlaying()) { m_finalMonitor->stopPlayback(); return; }
+        // Vor jedem Abspielen neu durchrechnen: Kette und Kanal stehen
+        // beim zweiten Druck vielleicht anders als beim ersten, und
+        // genau das ist der Sinn der Übung -- dieselbe Aufnahme, eine
+        // andere Bandbreite.
+        reseatPuduTake();
+        m_finalMonitor->startPlayback();
     });
+    connect(m_stripWindow.data(), &StripWindow::monitorSaveClicked,
+            this, [this]() { savePuduTake(); });
 
     // ── Capture: the SOUND CARD paces it, never the radio ────────────
     //
@@ -16709,67 +16770,161 @@ void MainWindow::finishPuduTake()
     }
     if (!m_finalMonitor || !m_finalMonitor->isRecording()) { return; }
 
+    // Der rohe Mitschnitt BLEIBT liegen. Bis zum 2026-10-14 wurde er
+    // hier verworfen, und damit war die Aufnahme ein für alle Mal in
+    // der Fassung eingefroren, die beim Loslassen der Taste galt. „beim
+    // aufnehmen will ich die unterschiedlichen kh bereiche ändern
+    // können um den unterschied auch zu hören" -- das geht nur, wenn
+    // dieselbe Aufnahme jedes Mal neu durchgerechnet werden kann.
+    reseatPuduTake();
+    m_finalMonitor->stopRecording();
+}
+
+// ── Aus dem rohen Mitschnitt die Fassung, die man hoert ─────────────
+//
+// Kette (offline, aus den gespeicherten Einstellungen) und danach der
+// gewaehlte Sendekanal. Beides wird bei JEDEM Abspielen neu gerechnet,
+// damit ein Wechsel der Bandbreite an derselben Aufnahme hoerbar wird.
+std::vector<float> MainWindow::puduTakeProcessed() const
+{
     const int inFrames = m_puduRawTake.size()
                          / static_cast<int>(sizeof(int16_t));
-    if (inFrames > 0) {
-        // int16 mono 48 kHz → float for the strip.
-        std::vector<float> mono(static_cast<size_t>(inFrames));
-        const auto* s16 =
-            reinterpret_cast<const int16_t*>(m_puduRawTake.constData());
-        for (int i = 0; i < inFrames; ++i) {
-            mono[static_cast<size_t>(i)] = s16[i] / 32768.0f;
-        }
+    std::vector<float> mono(static_cast<size_t>(std::max(0, inFrames)));
+    if (inFrames <= 0) { return mono; }
 
-        // Offline strip pass. A PRIVATE chain, configured from the
-        // same persisted settings the live one writes on every edit —
-        // the live chain is owned by the worker thread and must not be
-        // touched from here. The master switch is deliberately not
-        // persisted (loads off), so it is mirrored from the live chain
-        // (an atomic read); stage enables come with the settings. When
-        // the strip master is off, the take stays raw — which is the
-        // honest A of the A/B.
-        StripChain* live =
-            m_radioModel ? m_radioModel->stripChain() : nullptr;
-        if (live && live->isEnabled()) {
-            StripChain offline;
-            // 2026-08-11 crash fix (first Voice-Check take on this
-            // bench, SIGSEGV in ClientReverb::process): prepare()
-            // allocates every stage's delay lines and was never
-            // called on the offline instance. Stages that are
-            // DISABLED bypass before touching buffers — which is why
-            // the earlier bench (reverb off) never hit it — but any
-            // ENABLED stage with internal state dereferenced empty
-            // vectors. Capture format is fixed 48 kHz mono, so the
-            // rate is a constant here, matching the QAudioFormat
-            // above.
-            offline.prepare(48000.0);
-            StripSettings::restore(offline);
-            offline.setEnabled(true);
-            constexpr int kBlock = 64;
-            for (int at = 0; at + kBlock <= inFrames; at += kBlock) {
-                offline.processMono(mono.data() + at, kBlock);
-            }
-        }
-
-        // float mono 48 kHz → int16 stereo 24 kHz, the ported
-        // monitor's native diet: average adjacent samples (the correct
-        // 2:1 decimator for a voice-band signal), L = R.
-        const int outFrames = inFrames / 2;
-        QByteArray pcm(outFrames * ClientPuduMonitor::kBytesPerFrame,
-                       Qt::Uninitialized);
-        auto* dst = reinterpret_cast<int16_t*>(pcm.data());
-        for (int i = 0; i < outFrames; ++i) {
-            const float v = 0.5f * (mono[static_cast<size_t>(2 * i)]
-                                    + mono[static_cast<size_t>(2 * i + 1)]);
-            const auto q = static_cast<int16_t>(
-                std::lround(std::clamp(v, -1.0f, 1.0f) * 32767.0f));
-            *dst++ = q;
-            *dst++ = q;
-        }
-        m_finalMonitor->feedTxPostDsp(pcm);
+    const auto* s16 =
+        reinterpret_cast<const int16_t*>(m_puduRawTake.constData());
+    for (int i = 0; i < inFrames; ++i) {
+        mono[static_cast<size_t>(i)] = s16[i] / 32768.0f;
     }
-    m_puduRawTake.clear();
-    m_finalMonitor->stopRecording();
+
+    // Offline-Durchgang der Kette. Eine EIGENE Kette, eingestellt aus
+    // denselben gespeicherten Werten, die die laufende schreibt: die
+    // laufende gehoert dem Audiofaden und wird von hier nicht
+    // angefasst. Der Hauptschalter wird nicht gespeichert (laedt aus)
+    // und deshalb von der laufenden Kette gespiegelt.
+    StripChain* live =
+        m_radioModel ? m_radioModel->stripChain() : nullptr;
+    if (live && live->isEnabled()) {
+        StripChain offline;
+        offline.prepare(48000.0);
+        StripSettings::restore(offline);
+        offline.setEnabled(true);
+        constexpr int kBlock = 64;
+        for (int at = 0; at + kBlock <= inFrames; at += kBlock) {
+            offline.processMono(mono.data() + at, kBlock);
+        }
+    }
+
+    // Und durch den Sendekanal. Er gehoert dem SENDER, nicht der
+    // Kette, und laeuft deshalb auch bei ausgeschaltetem
+    // Hauptschalter -- das rohe Mikrofon durch den Kanal ist die
+    // ehrliche Seite A des Vergleichs.
+    const int kanal = AppSettings::instance()
+                          .value(QStringLiteral("StripMonitorChannel"), -1)
+                          .toInt();
+    if (kanal >= 0 && kanal < BandLimit::kChannelCount) {
+        BandLimit band;
+        band.prepare(48000.0);
+        band.setChannel(kanal);
+        constexpr int kBlock = 240;
+        int at = 0;
+        for (; at + kBlock <= inFrames; at += kBlock) {
+            band.process(mono.data() + at, kBlock);
+        }
+        if (at < inFrames) {
+            band.process(mono.data() + at, inFrames - at);
+        }
+    }
+    return mono;
+}
+
+// ── Die Aufnahme auf die Platte ────────────────────────────────────
+//
+// „ein speichern sollte auch möglich sein, sodass ich die aufnahme am
+//  desktop speichern kann." (2026-10-14)
+//
+// Gespeichert wird, was „Abspielen" hören lässt: Kette und Kanal, wie
+// sie JETZT stehen. Eine Datei, die anders klingt als das eben
+// Gehörte, taugt zu keinem Vergleich -- und verglichen wird mit ihr,
+// sonst würde sie nicht gespeichert.
+//
+// 48 kHz, mono, 16 Bit: die Rate, in der die Kette rechnet. Der
+// Monitor spielt mit 24 kHz ab (seine portierte Kost); die Datei trägt
+// die volle Rate, weil sie für den Vergleich am Rechner gedacht ist
+// und nicht für seinen Lautsprecher.
+void MainWindow::savePuduTake()
+{
+    const std::vector<float> mono = puduTakeProcessed();
+    if (mono.empty()) {
+        QMessageBox::information(
+            this, tr("Save take"),
+            tr("There is no take yet — record something first."));
+        return;
+    }
+
+    const QString vorschlag =
+        QStandardPaths::writableLocation(QStandardPaths::DesktopLocation)
+        + QStringLiteral("/Longpath-Aufnahme-")
+        + QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd-HHmm"))
+        + QStringLiteral(".wav");
+    const QString pfad = QFileDialog::getSaveFileName(
+        this, tr("Save take"), vorschlag, QStringLiteral("WAV (*.wav)"));
+    if (pfad.isEmpty()) { return; }
+
+    QFile f(pfad);
+    if (!f.open(QIODevice::WriteOnly)) {
+        QMessageBox::warning(this, tr("Save take"),
+                             tr("Could not write: %1").arg(f.errorString()));
+        return;
+    }
+
+    const quint32 frames = quint32(mono.size());
+    const quint32 datenBytes = frames * 2;        // 16 Bit, ein Kanal
+    QDataStream ds(&f);
+    ds.setByteOrder(QDataStream::LittleEndian);
+    const auto vier = [&ds](const char* s) { ds.writeRawData(s, 4); };
+    vier("RIFF"); ds << quint32(36 + datenBytes); vier("WAVE");
+    vier("fmt "); ds << quint32(16) << quint16(1) << quint16(1)
+                     << quint32(48000) << quint32(48000 * 2)
+                     << quint16(2) << quint16(16);
+    vier("data"); ds << datenBytes;
+    for (const float v : mono) {
+        ds << qint16(std::lround(std::clamp(v, -1.0f, 1.0f) * 32767.0f));
+    }
+    f.close();
+
+    QMessageBox::information(
+        this, tr("Save take"),
+        tr("Saved: %1\n\n%2 seconds, 48 kHz mono — with the strip and "
+           "the channel exactly as they stand.")
+            .arg(QFileInfo(pfad).fileName())
+            .arg(double(frames) / 48000.0, 0, 'f', 1));
+}
+
+// Die gerechnete Fassung in den Monitor legen: float mono 48 kHz →
+// int16 stereo 24 kHz, die Kost des portierten Monitors (Mittel zweier
+// Nachbarn ist der richtige 2:1-Dezimierer fuer ein Sprachband).
+void MainWindow::reseatPuduTake()
+{
+    if (!m_finalMonitor) { return; }
+    const std::vector<float> mono = puduTakeProcessed();
+    const int inFrames = int(mono.size());
+    if (inFrames <= 0) { return; }
+
+    const int outFrames = inFrames / 2;
+    QByteArray pcm(outFrames * ClientPuduMonitor::kBytesPerFrame,
+                   Qt::Uninitialized);
+    auto* dst = reinterpret_cast<int16_t*>(pcm.data());
+    for (int i = 0; i < outFrames; ++i) {
+        const float v = 0.5f * (mono[static_cast<size_t>(2 * i)]
+                                + mono[static_cast<size_t>(2 * i + 1)]);
+        const auto q = static_cast<int16_t>(
+            std::lround(std::clamp(v, -1.0f, 1.0f) * 32767.0f));
+        *dst++ = q;
+        *dst++ = q;
+    }
+    m_finalMonitor->feedTxPostDsp(pcm);
 }
 
 void MainWindow::openVoiceCheck()
@@ -16833,18 +16988,55 @@ void MainWindow::scheduleStartupUpdateCheck()
     auto& s = AppSettings::instance();
     const bool enabled = s.value(UpdateDialog::startupCheckKey(), QStringLiteral("True")).toString()
                          == QStringLiteral("True");
-    const QDateTime last = QDateTime::fromString(
-        s.value(UpdateDialog::lastCheckKey(), QString()).toString(), Qt::ISODate);
-    if (!UpdateDialog::startupCheckDue(enabled, last, QDateTime::currentDateTimeUtc())) { return; }
+
+    // ── Bei JEDEM Start, und das Ergebnis steht da ───────────────────
+    //
+    // „checking for update sollte auch immer automatisch angezeigt
+    //  werden nach dem neustart!"
+    //
+    // Vorher lagen hier zwei Sperren: eine Wartezeit von 20 Stunden
+    // seit der letzten Prüfung, und eine Anzeige, die sich NUR
+    // meldete, wenn es etwas Neueres gab. Damit hiess „nichts
+    // gesehen" zweierlei -- alles aktuell, oder gar nicht
+    // nachgesehen. Genau diese Unsicherheit hat heute früh eine
+    // Stunde gekostet.
+    //
+    // Jetzt: jeder Start prüft (eine Abfrage an GitHub, einmal je
+    // Programmlauf, das ist nichts), und der Stand steht neben der
+    // Version im Kopf -- auch wenn alles aktuell ist. Der Haken in
+    // den Einstellungen schaltet es weiterhin ganz ab.
+    if (!enabled) {
+        if (m_titleBar) {
+            m_titleBar->setUpdateState(tr("· checks off"),
+                                       TitleBar::AktualisierungsStand::Unbekannt);
+        }
+        return;
+    }
     // Ein Testbau (leere Version) hat nichts zu vergleichen.
-    if (UpdateChecker::numericVersion(QCoreApplication::applicationVersion()).isEmpty()) { return; }
-    QTimer::singleShot(20000, this, [this]() {
+    if (UpdateChecker::numericVersion(QCoreApplication::applicationVersion()).isEmpty()) {
+        if (m_titleBar) {
+            m_titleBar->setUpdateState(QStringLiteral("· Eigenbau"),
+                                       TitleBar::AktualisierungsStand::Unbekannt);
+        }
+        return;
+    }
+    // Fünf Sekunden statt zwanzig: der Start soll nicht darauf
+    // warten, aber man soll auch nicht erst weggehen müssen, bevor
+    // die Antwort kommt.
+    QTimer::singleShot(5000, this, [this]() {
         auto* checker = new UpdateChecker(QCoreApplication::applicationVersion(), this);
         connect(checker, &UpdateChecker::latestKnown, this,
                 [this, checker](const ReleaseInfo& release, bool newer) {
             checker->deleteLater();
             AppSettings::instance().setValue(UpdateDialog::lastCheckKey(),
                                              QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+            if (m_titleBar) {
+                m_titleBar->setUpdateState(
+                    newer ? tr("· %1 available").arg(release.version)
+                          : tr("· up to date"),
+                    newer ? TitleBar::AktualisierungsStand::Neuer
+                          : TitleBar::AktualisierungsStand::Aktuell);
+            }
             if (!newer) { return; }
             if (!m_updateDialog) {
                 m_updateDialog = new UpdateDialog(QCoreApplication::applicationVersion(), this);

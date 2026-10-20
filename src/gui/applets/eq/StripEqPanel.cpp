@@ -40,7 +40,9 @@
 #include "gui/applets/eq/ClientEqIconRow.h"
 #include "gui/applets/eq/ClientEqOutputFader.h"
 #include "gui/applets/eq/ClientEqParamRow.h"
+#include "gui/applets/eq/StripEqSimpleBar.h"
 #include "core/AppSettings.h"
+#include "core/Sprache.h"
 #include "gui/applets/eq/EqHost.h"
 #include "core/strip/ClientEq.h"
 #include "core/strip/EqBandLayout.h"
@@ -217,13 +219,89 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
     {
         auto* row = new QHBoxLayout;
         row->setSpacing(8);
+
+        // ── Einfach | Profi ──────────────────────────────────────────
+        //
+        // Zwei Knoepfe, kein Menue und kein Haken: die Wahl ist eine
+        // von zweien und steht dort, wo man sie sucht -- als erstes
+        // auf der Zeile, vor allem, was sie ein- und ausblendet.
+        const QString modeCss = QStringLiteral(
+            "QPushButton {"
+            "  background: %1; color: %2;"
+            "  border: 1px solid %3; border-radius: 6px;"
+            "  padding: 2px 14px; font-size: 11px; font-weight: bold;"
+            "}"
+            "QPushButton:hover { background: %3; }"
+            "QPushButton:checked {"
+            "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+            "               stop:0 %4, stop:1 %5);"
+            "  color: %6; border-color: %7;"
+            "}")
+            .arg(QString::fromLatin1(Style::kAppBg),
+                 QString::fromLatin1(Style::kTextSecondary),
+                 QString::fromLatin1(Style::kButtonBg),
+                 QString::fromLatin1(Style::kGlassSelTop),
+                 QString::fromLatin1(Style::kGlassSelBot),
+                 QString::fromLatin1(Style::kGlassSelText),
+                 QString::fromLatin1(Style::kGlassSelBorder));
+
+        m_simpleBtn = new QPushButton(QStringLiteral("Einfach"));
+        m_simpleBtn->setCheckable(true);
+        m_simpleBtn->setFixedHeight(24);
+        m_simpleBtn->setStyleSheet(modeCss);
+        m_simpleBtn->setToolTip(QStringLiteral(
+            "Seven named sliders. The same curve, the same sound — "
+            "only nothing that can slip by accident."));
+        row->addWidget(m_simpleBtn);
+
+        m_proBtn = new QPushButton(QStringLiteral("Profi"));
+        m_proBtn->setCheckable(true);
+        m_proBtn->setFixedHeight(24);
+        m_proBtn->setStyleSheet(modeCss);
+        m_proBtn->setToolTip(QStringLiteral(
+            "All bands, filter types, reference curves, smoothing, "
+            "undo."));
+        row->addWidget(m_proBtn);
+
+        connect(m_simpleBtn, &QPushButton::clicked,
+                this, [this]() { setSimpleView(true); });
+        connect(m_proBtn, &QPushButton::clicked,
+                this, [this]() { setSimpleView(false); });
+
+        // ── Ordnen ───────────────────────────────────────────────────
+        //
+        // Ein Regler setzt seinen Griff erst beim Ziehen auf seine
+        // Frequenz und Breite -- sonst waere das Umschalten der
+        // Ansicht ein Eingriff in den Ton, und das soll es nicht
+        // sein. Wer aber vorher in der Profi-Ansicht geschoben hat,
+        // findet die Reihe durcheinander: am Geraet gesehen stand
+        // NASAL auf 2 kHz, oberhalb von KLARHEIT auf 1,5 kHz.
+        // Dieser Knopf raeumt das in einem Griff auf und laesst die
+        // Pegel stehen.
+        auto* tidyBtn = new QPushButton(QStringLiteral("Ordnen"));
+        tidyBtn->setFixedHeight(24);
+        applyThemed(tidyBtn, kRowButtonStyle);
+        tidyBtn->setToolTip(QStringLiteral(
+            "Resets the seven sliders to their own frequency and "
+            "width — the levels stay as they are."));
+        connect(tidyBtn, &QPushButton::clicked, this, [this]() {
+            if (m_simpleBar) { m_simpleBar->tidy(); }
+        });
+        row->addWidget(tidyBtn);
+        m_simpleOnly.push_back(tidyBtn);
+
+        // Eine Geste, eine Groesse -- und das muss dastehen, sonst
+        // ist es keine Regel, sondern ein Geheimnis. Siehe
+        // ClientEqEditorCanvas::mouseMoveEvent.
         auto* hint = new QLabel(
-            "Drag peak/shelf = freq + gain · "
-            "drag HP/LP = freq + Q · Shift + drag for Q · "
-            "double-click a point to change its filter type · "
-            "right-click for the full menu");
+            "Ziehen = lauter/leiser · "
+            "⌥ + ziehen = Frequenz · "
+            "Rad = Breite · "
+            "Doppelklick = Filterart · "
+            "Rechtsklick = ganzes Menü");
         applyThemed(hint, "QLabel { color: {{color.background.3}}; font-size: 11px; }");
         row->addWidget(hint, 1);
+        m_hint = hint;
 
         // Reference curve overlay — paints one of several target curves
         // on the EQ canvas as a thin amber line.  Includes the AT&T 1959
@@ -233,6 +311,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
         applyThemed(refLbl,
             "QLabel { color: {{color.text.primary}}; font-size: 11px; font-weight: bold; }");
         row->addWidget(refLbl);
+        m_proOnly.push_back(refLbl);
 
         auto* refCombo = new QComboBox;
         for (const QString& id : ClientEqCurveWidget::referenceCurveIds())
@@ -261,6 +340,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             AppSettings::instance().save();
         });
         row->addWidget(refCombo);
+        m_proOnly.push_back(refCombo);
 
         // Smoothing — fractional-octave display smoothing for the FFT
         // analyzer trace.  Doesn't affect EQ math, just the visual.
@@ -269,6 +349,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
         auto* smoothingLbl = new QLabel("Smoothing:");
         applyThemed(smoothingLbl, "QLabel { color: {{color.text.primary}}; font-size: 11px; font-weight: bold; }");
         row->addWidget(smoothingLbl);
+        m_proOnly.push_back(smoothingLbl);
 
         auto* smoothingCombo = new QComboBox;
         smoothingCombo->addItem("Off (1/96)", 96);
@@ -302,6 +383,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             AppSettings::instance().save();
         });
         row->addWidget(smoothingCombo);
+        m_proOnly.push_back(smoothingCombo);
 
         // Peak Hold — when checked, the analyzer's per-bin peak trace
         // stops decaying so the highest level seen at each frequency
@@ -317,6 +399,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             if (m_canvas) m_canvas->setPeakHoldFrozen(on);
         });
         row->addWidget(peakHoldBtn);
+        m_proOnly.push_back(peakHoldBtn);
 
         // Global filter-family selector — applies to HP/LP cascade math.
         // Shelves and peaks keep their native 2nd-order topology.
@@ -347,6 +430,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             if (m_canvas) m_canvas->update();
         });
         row->addWidget(m_familyCombo);
+        m_proOnly.push_back(m_familyCombo);
 
         // ── Back, and forward again ──────────────────────────────────
         //
@@ -368,6 +452,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             if (m_audio && m_audio->undoEqEdit()) { afterHistoryStep(); }
         });
         row->addWidget(m_undoBtn);
+        m_proOnly.push_back(m_undoBtn);
 
         m_redoBtn = new QPushButton(QStringLiteral("↷"));
         m_redoBtn->setFixedHeight(24);
@@ -377,6 +462,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             if (m_audio && m_audio->redoEqEdit()) { afterHistoryStep(); }
         });
         row->addWidget(m_redoBtn);
+        m_proOnly.push_back(m_redoBtn);
 
         // Reset — drops every band back to ClientEq::defaultBand(i),
         // restores the default 10-band count, and resets the filter
@@ -412,6 +498,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             // refresh() reloads each column's freq / gain / Q text from
             // the engine; update() alone just repaints stale labels.
             if (m_paramRow) m_paramRow->refresh();
+            if (m_simpleBar) m_simpleBar->reload();
         });
         row->addWidget(resetBtn);
 
@@ -455,6 +542,32 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
 
     m_paramRow = new ClientEqParamRow;
     eqColumn->addWidget(m_paramRow);
+
+    // Die einfache Ansicht steht an derselben Stelle wie die
+    // Zahlenzeile der Profi-Ansicht: unter der Kurve. Dieselbe Kurve
+    // darueber, dieselbe Hoehe -- beim Umschalten springt nichts.
+    // Eine Zeile, die sagt, woran gemessen wird -- sonst steht über
+    // den Reglern eine Wertung ohne Maßstab, und das ist schlimmer
+    // als keine.
+    m_zielNote = new QLabel(
+        QStringLiteral("Target: speech. Measured against your own voice "
+                       "while Hear myself runs — the line over each fader "
+                       "says how far you are from it. Nothing is changed "
+                       "for you."));
+    m_zielNote->setWordWrap(true);
+    applyThemed(m_zielNote,
+                "QLabel { color: {{color.background.3}}; font-size: 11px; }");
+    eqColumn->addWidget(m_zielNote);
+
+    m_simpleBar = new StripEqSimpleBar;
+    m_simpleBar->setHost(m_audio);
+    eqColumn->addWidget(m_simpleBar);
+    connect(m_simpleBar, &StripEqSimpleBar::changed, this, [this]() {
+        if (m_canvas)   { m_canvas->update(); }
+        if (m_paramRow) { m_paramRow->refresh(); }
+        if (m_iconRow)  { m_iconRow->refresh(); }
+        refreshHistoryButtons();
+    });
 
     body->addLayout(eqColumn, 1);
 
@@ -501,6 +614,7 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             m_paramRow->refresh();
             m_paramRow->setSelectedBand(m_canvas->selectedBand());
         }
+        if (m_simpleBar) { m_simpleBar->reload(); }
         // Cheap, and the only signal that fires for every kind of edit.
         // It also fires DURING a drag, before the commit — so Undo lights
         // up a moment early. That is the right way round: a button that
@@ -550,6 +664,14 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
             this, &StripEqPanel::saveGeometryToSettings);
 
     restoreGeometryFromSettings();
+
+    // Einfach ist der Standard -- auch fuer den, der die Seite zum
+    // ersten Mal oeffnet. Die Profi-Ansicht ist einen Knopf weit weg
+    // und bleibt, wenn sie einmal gewaehlt wurde.
+    Sprache::uebersetzeBaum(this);
+    setSimpleView(AppSettings::instance()
+                      .value("StripEqSimpleView", "True")
+                      .toString() != QLatin1String("False"));
 }
 
 void StripEqPanel::refreshHistoryButtons()
@@ -564,23 +686,76 @@ void StripEqPanel::refreshHistoryButtons()
         // the curve, which is the thing being looked at.
         m_undoBtn->setToolTip(
             canUndo
-                ? QStringLiteral("Undo the last change  (%1 step%2 back, "
-                                 "%3)")
+                ? Sprache::T(QStringLiteral("Undo the last change  (%1 step%2 back, "
+                                 "%3)"))
                       .arg(m_audio->undoDepth())
                       .arg(m_audio->undoDepth() == 1 ? QString()
                                                      : QStringLiteral("s"))
                       .arg(QKeySequence(QKeySequence::Undo)
                                .toString(QKeySequence::NativeText))
-                : QStringLiteral("Nothing to undo yet"));
+                : Sprache::T(QStringLiteral("Nothing to undo yet")));
     }
     if (m_redoBtn) {
         m_redoBtn->setEnabled(canRedo);
         m_redoBtn->setToolTip(canRedo
-            ? QStringLiteral("Redo the step just undone  (%1)")
+            ? Sprache::T(QStringLiteral("Redo the step just undone  (%1)"))
                   .arg(QKeySequence(QKeySequence::Redo)
                            .toString(QKeySequence::NativeText))
-            : QStringLiteral("Nothing to redo"));
+            : Sprache::T(QStringLiteral("Nothing to redo")));
     }
+}
+
+// ── Zwei Ansichten, eine Seite ───────────────────────────────────────
+//
+// Was hier passiert, ist AUSSCHLIESSLICH Zeigen und Verbergen. Kein
+// Band wird angefasst, kein Wert umgerechnet, nichts gespeichert
+// ausser der Wahl selbst. Wer umschaltet, hoert danach genau
+// dasselbe wie davor -- das ist die Zusage, die eine zweite Ansicht
+// ueberhaupt erst vertretbar macht.
+void StripEqPanel::setSimpleView(bool simple)
+{
+    m_simpleView = simple;
+
+    if (m_simpleBtn) {
+        const QSignalBlocker b(m_simpleBtn);
+        m_simpleBtn->setChecked(simple);
+    }
+    if (m_proBtn) {
+        const QSignalBlocker b(m_proBtn);
+        m_proBtn->setChecked(!simple);
+    }
+
+    for (QWidget* w : m_proOnly) {
+        if (w != nullptr) { w->setVisible(!simple); }
+    }
+    for (QWidget* w : m_simpleOnly) {
+        if (w != nullptr) { w->setVisible(simple); }
+    }
+    if (m_iconRow)   { m_iconRow->setVisible(!simple); }
+    if (m_paramRow)  { m_paramRow->setVisible(!simple); }
+    if (m_zielNote)  { m_zielNote->setVisible(simple); }
+    if (m_simpleBar) {
+        m_simpleBar->setVisible(simple);
+        m_simpleBar->reload();
+    }
+    if (m_canvas)    { m_canvas->setSimpleMode(simple); }
+
+    if (m_hint != nullptr) {
+        m_hint->setText(simple
+            ? Sprache::T(QStringLiteral(
+                  "Drag a slider — or a point on the curve, which "
+                  "only moves up and down. Each slider reaches about "
+                  "two thirds of an octave wide."))
+            : Sprache::T(QStringLiteral(
+                  "Drag = louder/softer · "
+                  "⌥ + drag = frequency · "
+                  "Wheel = width · "
+                  "Double-click = filter type · "
+                  "Right-click = the full menu")));
+    }
+
+    AppSettings::instance().setValue(
+        "StripEqSimpleView", simple ? "True" : "False");
 }
 
 void StripEqPanel::afterHistoryStep()
@@ -600,6 +775,7 @@ void StripEqPanel::afterHistoryStep()
     if (m_canvas)   m_canvas->update();
     if (m_iconRow)  m_iconRow->refresh();
     if (m_paramRow) m_paramRow->refresh();
+    if (m_simpleBar) m_simpleBar->reload();
     syncBypassFromEq();
     refreshHistoryButtons();
 }
@@ -672,6 +848,7 @@ void StripEqPanel::showForPath(ClientEqApplet::Path path)
     m_canvas->setEq(eq);
     if (m_iconRow)  m_iconRow->setEq(eq);
     if (m_paramRow) m_paramRow->setEq(eq);
+    if (m_simpleBar) m_simpleBar->setEq(eq);
     if (m_outFader && eq) m_outFader->setGainLinear(eq->masterGain());
     if (m_familyCombo && eq) {
         QSignalBlocker b(m_familyCombo);
@@ -724,6 +901,11 @@ void StripEqPanel::setRxFilterCutoffs(int audioLowHz, int audioHighHz)
         m_canvas->setFilterCutoffs(audioLowHz, audioHighHz);
 }
 
+void StripEqPanel::setZiel(const QVector<double>& abweichungDb)
+{
+    if (m_simpleBar != nullptr) { m_simpleBar->setZiel(abweichungDb); }
+}
+
 void StripEqPanel::refreshFromEngine()
 {
     ClientEq* eq = (m_path == ClientEqApplet::Path::Rx)
@@ -732,6 +914,7 @@ void StripEqPanel::refreshFromEngine()
     if (m_iconRow)  m_iconRow->refresh();
     if (m_canvas)   m_canvas->update();
     if (m_paramRow) m_paramRow->refresh();
+    if (m_simpleBar) m_simpleBar->reload();
     if (eq && m_familyCombo) {
         QSignalBlocker b(m_familyCombo);
         m_familyCombo->setCurrentIndex(static_cast<int>(eq->filterFamily()));

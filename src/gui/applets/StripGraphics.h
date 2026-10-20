@@ -38,9 +38,16 @@
 
 #include "core/strip/MicSpectrum.h"
 
+#include "core/strip/MicSpectrum.h"
 #include "core/strip/StripChain.h"
 
 #include <QWidget>
+
+class QDragEnterEvent;
+class QResizeEvent;
+class QDragLeaveEvent;
+class QDragMoveEvent;
+class QDropEvent;
 
 #include <QElapsedTimer>
 #include <QTimer>
@@ -67,16 +74,84 @@ public:
     void setReduction(StripChain::Stage s, double db);
 
     QSize sizeHint() const override;
+    QSize minimumSizeHint() const override;
+
+    // Welche Stufenseite gerade offen ist, oder -1. Die Kachel bekommt
+    // dann einen hellen Ring. Zwei Fragen, zwei Zeichen: die Farbe
+    // sagt „laeuft", der Ring sagt „das sehe ich gerade an".
+    void setOpenStage(int stageIndex);
+
+    // Die Reihe muss nach einem Einschubwechsel neu gelegt werden --
+    // sie wird breiter oder schmaler.
+    void refreshInserts();
+
+    static constexpr const char* kPluginMime =
+        "application/x-longpath-plugin";
 
 signals:
     void stageClicked(int stageIndex);
+    // ── Nur diese Stufe hoeren ───────────────────────────────────
+    //
+    // „hier sollten wir morgen jedes einzelne probieren"
+    // (2026-10-14). Mit der Hand hiesse das: neun Stufen ausschalten,
+    // hoeren, neun wieder einschalten, und beim naechsten Mal von
+    // vorn -- und nach dem dritten Durchgang weiss niemand mehr, was
+    // vorher an war.
+    //
+    // Deshalb eine eigene Geste und nicht der einfache Klick: der
+    // oeffnet weiter nur die Seite. Ein Klick, der den Ton aendert,
+    // ist ein Klick, der aus Versehen passiert -- mit Wahltaste
+    // passiert er nicht.
+    void stageSoloRequested(int stageIndex);
+    // Ein Plugin wurde auf die Reihe gezogen und an dieser Stelle
+    // fallen gelassen (0 = vor dem Gate, kStageCount = hinter dem
+    // Begrenzer).
+    void pluginDropped(const QString& identifier, int position);
+    // Das Kreuz auf einer Einschubkachel.
+    void insertRemoveRequested(int slot);
+    // Sonst irgendwo auf eine Einschubkachel.
+    void insertClicked(int slot);
+    // Doppelklick auf eine Einschubkachel: das eigene Fenster des
+    // Plugins. Dieselbe Geste wie in jeder Aufnahmesoftware.
+    void insertEditorRequested(int slot);
 
 protected:
     void paintEvent(QPaintEvent*) override;
+    void resizeEvent(QResizeEvent* ev) override;
     void mousePressEvent(QMouseEvent* ev) override;
+    void mouseDoubleClickEvent(QMouseEvent* ev) override;
+    void dragEnterEvent(QDragEnterEvent* ev) override;
+    void dragMoveEvent(QDragMoveEvent* ev) override;
+    void dragLeaveEvent(QDragLeaveEvent* ev) override;
+    void dropEvent(QDropEvent* ev) override;
 
 private:
-    QRect tileRect(int index) const;
+    // ── Die Reihe als Folge ──────────────────────────────────────────
+    //
+    // Frueher war sie acht Kacheln mit fester Breite, und tileRect(i)
+    // konnte sie ausrechnen. Jetzt haengen Einschuebe dazwischen, also
+    // wird sie einmal gelegt und danach nur noch abgelesen. Das ist
+    // nicht nur Buchhaltung: wer ein Plugin an eine STELLE ziehen
+    // soll, muss die Stellen sehen -- und sie sieht man nur, wenn die
+    // Reihe wirklich die Kette ist und nicht ein Bild davon.
+    struct Cell {
+        enum class Kind { Stage, Insert, Gap } kind{Kind::Stage};
+        int  index{0};      // Stufennummer, Einschubplatz, oder Stelle
+        int  position{0};   // Stelle in der Kette, fuer Gap und Insert
+        QRect rect;
+    };
+    void relayout();
+    // Wie breit eine Stufenkachel bei der aktuellen Fensterbreite
+    // sein darf. Mit zehn Stufen passt die feste Breite nicht mehr
+    // auf den Schirm -- siehe den Kommentar in relayout().
+    int  tileWidth() const;
+    const Cell* cellAt(const QPoint& p) const;
+    int  dropPositionAt(const QPoint& p) const;
+    QRect removeBoxOf(const Cell& c) const;
+
+    std::vector<Cell> m_cells;
+    int  m_dropPosition{-1};   // -1 = kein Ziehen im Gange
+    int  m_openStage{-1};      // -1 = keine Stufenseite offen
 
     StripChain* m_chain{nullptr};
     std::array<double, StripChain::kStageCount> m_reduction{};
@@ -86,6 +161,65 @@ private:
     // the row readable as one picture — a bar that means -12 on one
     // tile and -40 on the next is decoration.
     static constexpr double kBarFullScaleDb = 24.0;
+};
+
+// ── Was die Kette tut, gemessen ──────────────────────────────────────
+//
+// Die Frage, die den 2026-10-09 getragen hat, war nie „welche Werte
+// habe ich eingestellt" -- die stehen in den Reglern. Sie war: WAS
+// MACHT DAS. Einen ganzen Tag lang wurde sie beantwortet, indem
+// jemand hingehoert und etwas vermutet hat.
+//
+// Dieses Bild beantwortet sie mit einer Messung: das Langzeitspektrum
+// VOR der Kette und das DANACH, uebereinandergelegt, und dazwischen
+// ihre Differenz als gefuellte Kurve. Angehoben ist oben, gesenkt ist
+// unten, und wo nichts gemacht wird, ist es eine gerade Linie.
+//
+// Es kommt aus dem Mithoerer, also aus demselben Ton, den man im
+// Kopfhoerer hat -- einschliesslich der Einschuebe. Ein Plugin, das
+// etwas tut, ist hier zu SEHEN, auch wenn seine eigene Oberflaeche
+// nichts darueber verraet.
+class StripTransferCurve : public QWidget {
+    Q_OBJECT
+public:
+    explicit StripTransferCurve(QWidget* parent = nullptr);
+
+    // Nicht besessen. Null heisst „es laeuft kein Mithoeren" und
+    // wird als Satz gezeichnet, nicht als leeres Gitter.
+    void setRings(MicSpectrum* in, MicSpectrum* out);
+
+    // Vom Messtakt des Fensters. Rechnet nur, wenn sichtbar.
+    void refresh();
+
+    QSize sizeHint() const override;
+
+protected:
+    void paintEvent(QPaintEvent*) override;
+
+private:
+    MicSpectrum* m_in{nullptr};
+    MicSpectrum* m_out{nullptr};
+    std::vector<double> m_before;
+    std::vector<double> m_after;
+    std::vector<float>  m_scratch;
+    int m_quietTicks{0};
+    int m_tick{0};
+
+    // Zwei Sekunden Material je Messung. Kuerzer und das
+    // Langzeitspektrum einer Stimme ist noch die Silbe, die gerade
+    // gesprochen wurde.
+    static constexpr int kWindowSeconds = 2;
+
+    // Nur jeder fuenfte Messtakt, also rund zweimal in der Sekunde.
+    //
+    // Ausgerechnet statt geschaetzt, und das ist die Lehre desselben
+    // Abends: zwei Langzeitspektren ueber je zwei Sekunden sind rund
+    // 190 Durchlaeufe einer 2048er FFT. Zehnmal in der Sekunde waeren
+    // das 1900 in der Sekunde -- fuer ein Bild, das sich ueber zwei
+    // Sekunden mittelt und sich in einem Zehntel ohnehin nicht
+    // sichtbar aendert. Zweimal reicht und ist noch fluessig.
+    static constexpr int kEveryNthTick = 5;
+    static constexpr double kRangeDb = 18.0;
 };
 
 // ── In, out, and the difference ──────────────────────────────────────

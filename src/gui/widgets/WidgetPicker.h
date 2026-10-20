@@ -162,9 +162,17 @@ public:
 signals:
     void toggled(const QString& id, bool visible);
 
+protected:
+    /// Faengt das Zugehen des Auswaehlers ab, damit das Kreuz
+    /// zurueckdreht -- auch wenn niemand das Plus angeruehrt hat.
+    bool eventFilter(QObject* watched, QEvent* e) override;
+
 private:
+    void setGlyphOpen(bool open);
+
     QPointer<AppletVisibilityController> m_vis;
     WidgetPicker* m_picker{nullptr};
+    QWidget* m_glyph{nullptr};
 };
 
 } // namespace Longpath

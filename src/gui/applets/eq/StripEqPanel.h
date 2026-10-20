@@ -31,8 +31,10 @@
 #pragma once
 
 #include "gui/applets/eq/ClientEqApplet.h"  // for Path enum
+#include <QVector>
 #include <QWidget>
 #include <memory>
+#include <vector>
 
 class QComboBox;
 class QLabel;
@@ -47,6 +49,7 @@ class ClientEqFftAnalyzer;
 class ClientEqIconRow;
 class ClientEqOutputFader;
 class ClientEqParamRow;
+class StripEqSimpleBar;
 
 // Floating editor window for the client-side parametric EQ. One single
 // instance lives on MainWindow; calling showForPath() swaps its bound
@@ -84,6 +87,11 @@ public:
     // engine without going through the canvas's own gestures, so the
     // text labels would otherwise stay stale.
     void refreshFromEngine();
+
+    // Je Regler die Abweichung der gemessenen Stimme vom Sprachziel,
+    // in dB. Leer heisst „noch nichts gemessen". Siehe
+    // StripEqSimpleBar::setZiel.
+    void setZiel(const QVector<double>& abweichungDb);
 
 signals:
     // Fired when the bypass button is toggled in the editor. The docked
@@ -136,6 +144,18 @@ private:
     void afterHistoryStep();
     void refreshHistoryButtons();
 
+    // ── Zwei Ansichten, eine Seite ───────────────────────────────────
+    //
+    // „ev generell 2 varianten, einen leichtere und eine für profi im
+    //  gleichen design?"
+    //
+    // Es gibt KEINE zweite Seite und keinen zweiten Entzerrer. Die
+    // Umschaltung zeigt und verbirgt; die Kurve steht in beiden
+    // Ansichten an derselben Stelle und zeigt dasselbe. Was die
+    // einfache Ansicht wegnimmt, ist nicht Klang, sondern das, was
+    // man aus Versehen tun kann.
+    void setSimpleView(bool simple);
+
     EqHost*               m_audio{nullptr};
     ClientEqApplet::Path       m_path{ClientEqApplet::Path::Rx};
     int                        m_txFilterLowCutHz{0};
@@ -156,6 +176,18 @@ private:
     ClientEqIconRow*           m_iconRow{nullptr};
     ClientEqEditorCanvas*      m_canvas{nullptr};
     ClientEqParamRow*          m_paramRow{nullptr};
+    StripEqSimpleBar*          m_simpleBar{nullptr};
+    QLabel*                    m_zielNote{nullptr};
+    QPushButton*               m_simpleBtn{nullptr};
+    QPushButton*               m_proBtn{nullptr};
+    QLabel*                    m_hint{nullptr};
+    // Alles, was nur die Profi-Ansicht zeigt. Als Liste, damit das
+    // Umschalten eine Schleife ist und nicht zwoelf Zeilen, von denen
+    // beim naechsten Knopf eine vergessen wird.
+    std::vector<QWidget*>      m_proOnly;
+    // Und das Gegenstueck: was nur die einfache Ansicht zeigt.
+    std::vector<QWidget*>      m_simpleOnly;
+    bool                       m_simpleView{true};
     ClientEqOutputFader*       m_outFader{nullptr};
     QTimer*                    m_fftTimer{nullptr};
 

@@ -5195,6 +5195,8 @@ longpath_add_test(tst_real_menus_hang_on_the_window)
 # -- Formatfuellend + Werkzeugfenster passen auf den Schirm (2026-09-27):
 #    Kanalzug 980x1000 auf 849 px Hoehe, unten hinter dem Dock. --
 longpath_add_test(tst_tool_windows_fit_the_screen)
+target_compile_definitions(tst_tool_windows_fit_the_screen PRIVATE
+    LONGPATH_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
 
 # -- ScopedChildWidget (2026-09-22): ein Kontextmenue auf dem Haufen statt
 #    auf dem Stapel -- normales Aufraeumen, und Aufraeumen nachdem das
@@ -5600,9 +5602,54 @@ longpath_add_test(tst_strip_dsp)
 #    that "off" is bit-exact even with all eight stages set up, and
 #    the non-finite guard: whatever goes in, numbers come out --
 longpath_add_test(tst_strip_chain)
+longpath_add_test(tst_gleich_laut)
+
+# -- Martins Aether-Profil, Wert fuer Wert: seine eigene Datei vom
+#    2026-10-13 durch den Importeur in unsere Kette, samt Reihenfolge
+#    (Roehre vorne), samt der Zusage, dass nichts mitlaeuft, das er in
+#    Aether nie hatte --
+longpath_add_test(tst_aether_profil)
+
+# -- Eine Voreinstellung ersetzt jede Stufe: der Stand davor muss
+#    abrufbar bleiben, sonst vernichtet ein Griff in die Liste eine
+#    Stunde Handarbeit (am 2026-10-13 um 21:05 genau so passiert) --
+longpath_add_test(tst_kanalzug_voreinstellung_schuetzt)
+target_compile_definitions(tst_aether_profil PRIVATE
+    LONGPATH_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
 
 # -- One voice measurement into a whole chain: the refusals, the four
 #    decisions as pure functions, and the rule that it explains itself --
+longpath_add_test(tst_broadcast_optimizer)
+longpath_add_test(tst_broadcast_optimizer_panel)
+longpath_add_test(tst_voice_check_without_radio)
+longpath_add_test(tst_strip_works_without_radio)
+longpath_add_test(tst_strip_plugin_inserts)
+longpath_add_test(tst_eq_peak_hold_stands_still)
+longpath_add_test(tst_plugin_placement)
+longpath_add_test(tst_strip_chain_row_drops)
+longpath_add_test(tst_plus_glyph_renders)
+longpath_add_test(tst_hum_is_not_the_voice)
+longpath_add_test(tst_resync_does_not_click)
+longpath_add_test(tst_eq_reaches_the_monitor)
+longpath_add_test(tst_eq_flat_does_not_mute)
+longpath_add_test(tst_ltas_measures_the_chain)
+longpath_add_test(tst_strip_row_marks_active_stages)
+longpath_add_test(tst_eq_one_drag_one_parameter)
+longpath_add_test(tst_eq_two_views)
+longpath_add_test(tst_strip_denoise_removes_noise)
+longpath_add_test(tst_monitor_hears_the_channel)
+longpath_add_test(tst_clipper_buys_talk_power)
+longpath_add_test(tst_voice_hears_the_room)
+longpath_add_test(tst_sprache_deutsch)
+longpath_add_test(tst_fensterknoepfe)
+longpath_add_test(tst_empfehlung_profil)
+longpath_add_test(tst_eingangspegel)
+longpath_add_test(tst_plugin_auswahl_bleibt)
+longpath_add_test(tst_kanalzug_messlauf)
+longpath_add_test(tst_bandbreiten_genau)
+target_compile_definitions(tst_bandbreiten_genau PRIVATE
+    LONGPATH_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
+longpath_add_test(tst_profil_schluessel)
 longpath_add_test(tst_strip_tuner)
 
 # -- The ring behind the EQ picture: oldest-first, newest-kept, and

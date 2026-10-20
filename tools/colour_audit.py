@@ -135,6 +135,14 @@ EXEMPT = {
     "EqPalette.h",        # acht Entzerrer-Töne, die sich gegenseitig
                           # unterscheidbar halten müssen, nicht der Chrome
     "ThemeQss.cpp",       # die Theme-Tabelle
+    # Die deutsche Fassung der Oberflaeche. Wo ein englischer Text
+    # Auszeichnung mit einer Farbe traegt, traegt seine Uebersetzung
+    # dieselbe Farbe -- sie ist eine Kopie, keine zweite Entscheidung.
+    # Ohne diese Zeile zaehlt jede uebersetzte Zeile ihre Farbe ein
+    # zweites Mal, und die Drift waechst, obwohl niemand eine Farbe
+    # gewaehlt hat (gemessen 2026-10-20: 1145 -> 1191, alle 48 aus
+    # dieser Datei).
+    "SpracheTabelle.cpp",
 }
 
 HEX = re.compile(r"#[0-9a-fA-F]{6}\b")

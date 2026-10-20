@@ -63,6 +63,12 @@ public:
     // Null is allowed — widget draws the grid with no response data.
     void setEq(ClientEq* eq);
 
+    // Welche Griffe ueberhaupt gezeichnet werden -- ein Bit je Band,
+    // alle an ist der Normalfall. Die einfache Ansicht blendet damit
+    // die Baender aus, die sie nicht anfassen laesst: ein Punkt, der
+    // sich nicht ziehen laesst, ist schlimmer als kein Punkt.
+    void setHandleMask(quint32 mask);
+
     // -1 means "nothing selected" — the default in the docked applet view.
     // The editor canvas sets this as the user interacts with handles /
     // icons / param columns so all three UI layers stay in sync.
@@ -81,10 +87,21 @@ public:
     void setFftBinsDb(const std::vector<float>& binsDb,
                       double sampleRate);
 
-    // When true, the per-bin peak-hold trace stops decaying — peaks
-    // stick at whatever maximum has been observed so far.  Toggling
-    // back to false resumes the normal decay.
+    // Eingefroren wird die Linie NICHT MEHR ANGEFASST -- sie steht,
+    // bis jemand sie loest. Upstream hielt hier nur den Abfall an und
+    // zog das Maximum weiter nach, womit die eingefrorene Linie bei
+    // jedem Geraeusch nach oben kroch; nach einer Minute war sie
+    // nicht mehr die Stimme, sondern alles, was der Raum hergegeben
+    // hat. Begruendung in voller Laenge in der .cpp
+    // (Longpath-Abweichung, 2026-10-09).
     void setPeakHoldFrozen(bool frozen);
+    bool peakHoldFrozen() const { return m_peakHoldFrozen; }
+
+    // Nur fuer Prueffaelle: die rohe Spitzenwertlinie. Ein Prueftand
+    // kann nicht in ein gezeichnetes Bild sehen, und genau dieses
+    // Verhalten -- steht sie wirklich still? -- verschwindet sonst
+    // beim naechsten Umbau unbemerkt.
+    const std::vector<float>& peakHoldDbForTest() const { return m_peakHoldDb; }
 
     // Fractional-octave smoothing for the analyzer trace (display-only;
     // does not affect EQ math).  Value is N where the smoothing window
@@ -167,11 +184,13 @@ protected:
     float yToDb(float y) const;
 
     ClientEq*          m_eq{nullptr};
+    quint32            m_handleMask{0xffffffffu};
     int                m_selectedBand{-1};
     bool               m_showFilled{true};
     std::vector<float> m_fftBinsDb;      // empty = no analyzer drawn
     std::vector<float> m_fftBinsDbSmoothed;  // fractional-octave smoothed copy used for drawing
     std::vector<float> m_peakHoldDb;     // per-bin peak-hold trail (raw, used for max tracking)
+    std::vector<int>   m_peakHoldAge;    // Bilder seit der letzten Spitze je Fach
     std::vector<float> m_peakHoldDbSmoothed;  // smoothed copy of peak-hold used for drawing
     bool               m_peakHoldFrozen{false};
     double             m_fftSampleRate{24000.0};
@@ -214,6 +233,7 @@ private:
         int filterFamily{0};
         double sampleRate{0.0};
         int activeBandCount{0};
+        quint32 handleMask{0xffffffffu};
         // Keep in sync with ClientEq::kMaxBands. responseCacheKey() pins
         // the relationship with a static_assert where ClientEq is complete.
         // ── 16 upstream, ClientEq::kMaxBands here ────────────────

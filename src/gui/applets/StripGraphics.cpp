@@ -13,6 +13,9 @@
 
 #include "gui/applets/StripGraphics.h"
 
+#include "core/strip/AudioPlugin.h"
+#include "core/strip/LtasSpectrum.h"
+
 #include "gui/styles/ThemeQss.h"
 
 #include "core/VoiceAnalyzer.h"
@@ -23,9 +26,15 @@
 #include "core/strip/ClientComp.h"
 #include "core/strip/ClientFinalLimiter.h"
 
+#include "core/Sprache.h"
 #include "gui/StyleConstants.h"
 
+#include <QDragEnterEvent>
+#include <QDragLeaveEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QEvent>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QContextMenuEvent>
 #include <QWheelEvent>
@@ -34,15 +43,31 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <complex>
 
 namespace Longpath {
 
 namespace {
 
-constexpr int kTileW   = 84;
-constexpr int kTileH   = 46;
-constexpr int kTileGap = 6;
+// Die Wunschbreite einer Stufenkachel. Bei acht Stufen ging sie
+// immer aus; seit es zehn sind (Entrauschen vorn, Clipper vor dem
+// Begrenzer) wird die Reihe damit breiter als das Fenster -- 10 x 84
+// plus elf Fugen sind 994 Punkte, und der Inhalt des Fensters hat
+// rund 960. Also ist sie jetzt eine OBERGRENZE, und tileWidth()
+// rechnet aus, was wirklich hineinpasst.
+constexpr int kTileWMax = 84;
+constexpr int kTileWMin = 52;
+constexpr int kTileH    = 46;
+constexpr int kTileGap  = 6;
+// Einschubkacheln sind schmaler als Stufen. Absichtlich: sie gehoeren
+// nicht zur Kette, sie haengen darin.
+constexpr int kInsertW  = 92;
+// Die Fuge zwischen zwei Stufen, in die man etwas fallen lassen kann.
+// Breit genug, um sie zu treffen, schmal genug, dass die Reihe nicht
+// auseinanderfaellt.
+constexpr int kGapW     = 14;
+constexpr int kRemoveBox = 13;
 
 // ── Farben durch die Palette, nicht am ihr vorbei ────────────────────
 //
@@ -59,6 +84,18 @@ constexpr int kTileGap = 6;
 // kommt der uebergebene Wert unveraendert zurueck.
 QColor c(const char* hex) { return QColor(Style::hexRole(hex)); }
 
+// Eine Zwischenfarbe aus zwei Palettenfarben. Gebraucht fuer die
+// „eingeschaltet, aber die Kette laeuft nicht"-Kachel: sie soll
+// erkennbar dieselbe Markierung tragen, nur geparkt. Gemischt statt
+// als neuer Hexwert hingeschrieben, damit sie beim Themenwechsel
+// mitgeht -- ein Literal wuerde stehenbleiben.
+QColor mix(const QColor& a, const QColor& b, double t)
+{
+    return QColor(int(a.red()   + (b.red()   - a.red())   * t),
+                  int(a.green() + (b.green() - a.green()) * t),
+                  int(a.blue()  + (b.blue()  - a.blue())  * t));
+}
+
 } // namespace
 
 // ── StripChainView ───────────────────────────────────────────────────
@@ -69,12 +106,144 @@ StripChainView::StripChainView(QWidget* parent)
     m_reduction.fill(0.0);
     setMinimumHeight(kTileH + 8);
     setCursor(Qt::PointingHandCursor);
+    setAcceptDrops(true);
+    relayout();
 }
 
 void StripChainView::setChain(StripChain* chain)
 {
     m_chain = chain;
+    relayout();
     update();
+}
+
+void StripChainView::setOpenStage(int stageIndex)
+{
+    if (m_openStage == stageIndex) { return; }
+    m_openStage = stageIndex;
+    // Ganze Reihe, nicht die beiden Kacheln: der Ring liegt AUSSERHALB
+    // des Kachelrechtecks, ein update(rect) wuerde ihn stehenlassen.
+    update();
+}
+
+void StripChainView::refreshInserts()
+{
+    relayout();
+    updateGeometry();
+    update();
+}
+
+// Die Reihe einmal legen: Fuge, Stufe, Fuge, Stufe ... und ueberall
+// dort, wo ein Einschub haengt, seine Kachel statt der leeren Fuge.
+int StripChainView::tileWidth() const
+{
+    // Was die Fugen und die Einschuebe schon belegen.
+    int inserts = 0;
+    for (int slot = 0; m_chain != nullptr
+                       && slot < StripChain::kInsertCount; ++slot) {
+        if (m_chain->insertPlugin(slot) != nullptr) {
+            inserts += kInsertW + 2 * kTileGap;
+        }
+    }
+    const int gaps = (StripChain::kStageCount + 1) * kGapW;
+    const int have = width() - inserts - gaps - 2;
+    if (have <= 0) { return kTileWMax; }
+    const int each = have / StripChain::kStageCount;
+    return std::clamp(each, kTileWMin, kTileWMax);
+}
+
+void StripChainView::relayout()
+{
+    m_cells.clear();
+    const int kTileW = tileWidth();
+    int x = 0;
+
+    const auto addGapOrInserts = [&](int position) {
+        bool any = false;
+        for (int slot = 0; m_chain != nullptr
+                           && slot < StripChain::kInsertCount; ++slot) {
+            if (m_chain->insertPosition(slot) != position) { continue; }
+            if (m_chain->insertPlugin(slot) == nullptr)    { continue; }
+            // Luft auf BEIDEN Seiten. Am gerenderten Blatt gesehen:
+            // ohne die vordere klebte die Einschubkachel an der Stufe
+            // davor, und zwei Kacheln ohne Fuge lesen sich als eine.
+            if (position > 0) { x += kTileGap; }
+            Cell c;
+            c.kind = Cell::Kind::Insert;
+            c.index = slot;
+            c.position = position;
+            c.rect = QRect(x, 4, kInsertW, kTileH);
+            m_cells.push_back(c);
+            x += kInsertW + kTileGap;
+            any = true;
+        }
+        if (!any) {
+            Cell c;
+            c.kind = Cell::Kind::Gap;
+            c.index = position;
+            c.position = position;
+            c.rect = QRect(x, 4, kGapW, kTileH);
+            m_cells.push_back(c);
+            x += kGapW;
+        }
+    };
+
+    // ── Die Reihe zeigt die KETTE, nicht die Aufzählung ─────────────
+    //
+    // Seit dem 2026-10-13 ist die Reihenfolge der Stufen einstellbar,
+    // und Martins Aether-Profil stellt die Röhre nach vorn. Die Reihe
+    // zeichnete trotzdem weiter die Reihenfolge des Aufzählungstyps —
+    // „sehe das noch nicht" (2026-10-14), und zwar zu Recht: sie zeigte
+    // eine Kette, die so nicht läuft.
+    //
+    // `index` bleibt die STUFE (Name, Farbe, Absenkung, Klickziel),
+    // `position` bleibt die STELLE in der Reihe (dort hängen die
+    // Einschübe). Beide waren bisher dieselbe Zahl; das war der
+    // Kurzschluss.
+    const StripChain::Order folge =
+        m_chain != nullptr ? m_chain->stageOrder()
+                           : StripChain::defaultOrder();
+
+    for (int i = 0; i < StripChain::kStageCount; ++i) {
+        addGapOrInserts(i);
+        Cell c;
+        c.kind = Cell::Kind::Stage;
+        c.index = static_cast<int>(folge[static_cast<size_t>(i)]);
+        c.position = i;
+        c.rect = QRect(x, 4, kTileW, kTileH);
+        m_cells.push_back(c);
+        x += kTileW;
+    }
+    addGapOrInserts(StripChain::kStageCount);
+}
+
+const StripChainView::Cell* StripChainView::cellAt(const QPoint& p) const
+{
+    for (const Cell& c : m_cells) {
+        if (c.rect.contains(p)) { return &c; }
+    }
+    return nullptr;
+}
+
+QRect StripChainView::removeBoxOf(const Cell& c) const
+{
+    return QRect(c.rect.right() - kRemoveBox - 2, c.rect.top() + 2,
+                 kRemoveBox, kRemoveBox);
+}
+
+// Wohin faellt es? Die naechstgelegene Fuge oder Einschubstelle --
+// nicht die Kachel, auf der der Zeiger gerade steht. Wer ueber der
+// Mitte einer Stufe loslaesst, meint nicht „in die Stufe hinein".
+int StripChainView::dropPositionAt(const QPoint& p) const
+{
+    int best = 0;
+    int bestDist = std::numeric_limits<int>::max();
+    for (const Cell& c : m_cells) {
+        if (c.kind == Cell::Kind::Stage) { continue; }
+        const int d = std::abs(c.rect.center().x() - p.x());
+        if (d < bestDist) { bestDist = d; best = c.position; }
+    }
+    return best;
 }
 
 void StripChainView::setReduction(StripChain::Stage s, double db)
@@ -86,18 +255,46 @@ void StripChainView::setReduction(StripChain::Stage s, double db)
     // whole row for a number that moved by a hundredth of a decibel.
     if (std::abs(m_reduction[static_cast<size_t>(i)] - db) < 0.05) { return; }
     m_reduction[static_cast<size_t>(i)] = db;
-    update(tileRect(i));
+    for (const Cell& c : m_cells) {
+        if (c.kind == Cell::Kind::Stage && c.index == i) {
+            update(c.rect);
+            return;
+        }
+    }
 }
 
 QSize StripChainView::sizeHint() const
 {
-    const int n = StripChain::kStageCount;
-    return QSize(n * kTileW + (n - 1) * kTileGap, kTileH + 8);
+    const int right = m_cells.empty() ? 0 : m_cells.back().rect.right();
+    return QSize(right + 1, kTileH + 8);
 }
 
-QRect StripChainView::tileRect(int index) const
+QSize StripChainView::minimumSizeHint() const
 {
-    return QRect(index * (kTileW + kTileGap), 4, kTileW, kTileH);
+    // Die schmalste Reihe, die noch alle Stufen zeigt. Damit kann das
+    // Fenster schmaler werden, ohne dass die Reihe abgeschnitten wird
+    // -- sie wird dichter statt laenger.
+    int inserts = 0;
+    for (int slot = 0; m_chain != nullptr
+                       && slot < StripChain::kInsertCount; ++slot) {
+        if (m_chain->insertPlugin(slot) != nullptr) {
+            inserts += kInsertW + 2 * kTileGap;
+        }
+    }
+    return QSize(StripChain::kStageCount * kTileWMin
+                     + (StripChain::kStageCount + 1) * kGapW + inserts,
+                 kTileH + 8);
+}
+
+void StripChainView::resizeEvent(QResizeEvent* ev)
+{
+    // Die Kachelbreite haengt an der Fensterbreite, also muss die
+    // Reihe bei jeder Aenderung neu gelegt werden -- sonst stimmen
+    // die Trefferflaechen nicht mehr mit dem ueberein, was zu sehen
+    // ist, und ein Klick oeffnet die Nachbarstufe.
+    QWidget::resizeEvent(ev);
+    relayout();
+    update();
 }
 
 void StripChainView::paintEvent(QPaintEvent*)
@@ -107,30 +304,129 @@ void StripChainView::paintEvent(QPaintEvent*)
 
     const bool master = m_chain && m_chain->isEnabled();
 
-    for (int i = 0; i < StripChain::kStageCount; ++i) {
+    for (const Cell& cell : m_cells) {
+        const QRect r = cell.rect;
+
+        // ── Die Fuge ────────────────────────────────────────────────
+        //
+        // Im Ruhezustand nur das Kettenzeichen. Waehrend etwas
+        // gezogen wird, leuchtet die Stelle auf, auf die es faellt --
+        // das ist die ganze Erklaerung, die ein Zielplatz braucht,
+        // und sie steht genau dort, wo hingesehen wird.
+        if (cell.kind == Cell::Kind::Gap) {
+            if (m_dropPosition == cell.position) {
+                p.setPen(QPen(c(Style::kBlueBorder), 1, Qt::DashLine));
+                p.setBrush(QColor(c(Style::kBlueBorder).red(),
+                                  c(Style::kBlueBorder).green(),
+                                  c(Style::kBlueBorder).blue(), 60));
+                p.drawRoundedRect(r.adjusted(1, 0, -2, -1), 3, 3);
+            } else if (cell.position > 0
+                       && cell.position < StripChain::kStageCount) {
+                // Das Kettenzeichen heisst „fliesst hinein“.
+                // Vor der ersten Stufe fliesst nichts hinein --
+                // dort stand es trotzdem, bis es auf dem
+                // gerenderten Blatt auffiel.
+                p.setPen(c(Style::kTextInactive));
+                p.drawText(r, Qt::AlignCenter, QStringLiteral("›"));
+            }
+            continue;
+        }
+
+        // ── Eine Einschubkachel ─────────────────────────────────────
+        //
+        // Gestrichelt, weil sie nicht uns gehoert -- dieselbe Zusage
+        // wie beim Plus: ein gestrichelter Rand heisst „hier steht
+        // etwas, das hinzugefuegt wurde". Mit Kreuz rechts oben, weil
+        // „relativ leicht auch wieder loeschen" ausdruecklich verlangt
+        // war und ein Loeschweg, der durch einen Reiter fuehrt, das
+        // nicht ist.
+        if (cell.kind == Cell::Kind::Insert) {
+            AudioPlugin* pl = m_chain != nullptr
+                            ? m_chain->insertPlugin(cell.index) : nullptr;
+            const bool on = m_chain != nullptr
+                         && m_chain->insertEnabled(cell.index);
+
+            QColor edge = (on && master) ? c(Style::kBlueBorder)
+                                         : c(Style::kInsetBorder);
+            p.setPen(QPen(edge, 1, Qt::DashLine));
+            p.setBrush(c(Style::kInsetBg));
+            p.drawRoundedRect(r.adjusted(0, 0, -1, -1), 3, 3);
+
+            QFont f = p.font();
+            f.setPointSizeF(8.0);
+            p.setFont(f);
+            p.setPen(c(Style::kTextInactive));
+            p.drawText(QRect(r.left() + 6, r.top() + 3,
+                             r.width() - kRemoveBox - 10, 11),
+                       Qt::AlignLeft | Qt::AlignVCenter,
+                       QStringLiteral("PLUGIN"));
+
+            f.setPointSizeF(9.0);
+            p.setFont(f);
+            p.setPen((on && master) ? c(Style::kTextPrimary)
+                                    : c(Style::kTextSecondary));
+            const QString name = pl != nullptr ? pl->descriptor().name
+                                               : QStringLiteral("—");
+            p.drawText(r.adjusted(4, 12, -4, -4),
+                       Qt::AlignCenter | Qt::TextWordWrap,
+                       p.fontMetrics().elidedText(
+                           name, Qt::ElideRight, r.width() - 10));
+
+            const QRect x = removeBoxOf(cell);
+            p.setPen(QPen(c(Style::kTextInactive), 1.2));
+            p.drawLine(x.left() + 4, x.top() + 4, x.right() - 4, x.bottom() - 4);
+            p.drawLine(x.right() - 4, x.top() + 4, x.left() + 4, x.bottom() - 4);
+            continue;
+        }
+
+        // ── Eine Stufe ──────────────────────────────────────────────
+        const int i = cell.index;
         const auto st = static_cast<StripChain::Stage>(i);
         const bool on = m_chain && m_chain->stageEnabled(st);
-        const QRect r = tileRect(i);
 
         // Three states, drawn as three states. A stage can be switched
         // on and doing nothing because the master is off, and painting
         // that the same as "running" is how an operator concludes the
         // strip is broken.
-        QColor bg, edge, text;
+        //
+        // Bis zum 2026-10-10 wechselte nur der RAHMEN die Farbe. Der
+        // Betreiber vor dem Geraet: „wenn ich ein feld aktiviere sollte
+        // das feld oben als ganze markiert sein". Er hat recht -- eine
+        // Linie von einem Pixel ist aus zwei Metern keine Aussage.
+        // Jetzt die ganze Flaeche, und zwar in der Auswahlfarbe des
+        // Hauses: Blau heisst hier ueberall „angefasst, eingeschaltet",
+        // Warm heisst „gemessen" (HAUSSTIL.md). Deshalb bleibt der
+        // Arbeitsbalken bernstein -- er sagt etwas anderes als die
+        // Flaeche, und auf Blau sagt er es deutlicher als vorher.
+        const QRect box = r.adjusted(0, 0, -1, -1);
+        QColor text;
         if (on && master) {
-            bg = c(Style::kButtonBg); edge = c(Style::kAccent);
-            text = c(Style::kTextPrimary);
+            QLinearGradient g(box.topLeft(), box.bottomLeft());
+            g.setColorAt(0.0, c(Style::kGlassSelTop));
+            g.setColorAt(1.0, c(Style::kGlassSelBot));
+            p.setBrush(g);
+            p.setPen(QPen(c(Style::kGlassSelBorder), 1));
+            text = c(Style::kGlassSelText);
         } else if (on) {
-            bg = c(Style::kInsetBg); edge = c(Style::kBorderSubtle);
+            // Dieselbe Markierung, nur geparkt: eingeschaltet, aber die
+            // Kette laeuft nicht. Zuerst mit 0,30 gemischt -- das war
+            // fast Schwarz und hat die Markierung in genau dem Zustand
+            // verschluckt, in dem das Fenster ohne Funkgeraet steht.
+            // Sie muss auch hier als blaues Feld zu sehen sein, nur
+            // schwaecher als „arbeitet".
+            QLinearGradient g(box.topLeft(), box.bottomLeft());
+            g.setColorAt(0.0, mix(c(Style::kInsetBg), c(Style::kGlassSelTop), 0.55));
+            g.setColorAt(1.0, mix(c(Style::kInsetBg), c(Style::kGlassSelBot), 0.55));
+            p.setBrush(g);
+            p.setPen(QPen(mix(c(Style::kInsetBorder),
+                              c(Style::kGlassSelBorder), 0.55), 1));
             text = c(Style::kTextSecondary);
         } else {
-            bg = c(Style::kInsetBg); edge = c(Style::kInsetBorder);
+            p.setBrush(c(Style::kInsetBg));
+            p.setPen(QPen(c(Style::kInsetBorder), 1));
             text = c(Style::kTextInactive);
         }
-
-        p.setPen(QPen(edge, 1));
-        p.setBrush(bg);
-        p.drawRoundedRect(r.adjusted(0, 0, -1, -1), 3, 3);
+        p.drawRoundedRect(box, 3, 3);
 
         // Gain reduction, as a bar growing downward from the top edge.
         // Downward because that is the direction the gain is going, and
@@ -143,7 +439,11 @@ void StripChainView::paintEvent(QPaintEvent*)
             p.setPen(Qt::NoPen);
             // Amber, not red: this is the stage working as intended,
             // not a fault. Red belongs to things that are wrong.
-            p.setBrush(QColor(0xd0, 0x90, 0x20, 150));
+            // Heller als frueher, seit die Kachel darunter blau ist:
+            // das alte, dunklere Bernstein bei 150 verschwamm auf der
+            // Flaeche. (Kein Hexwert hier: der Hausstil-Lauf zaehlt auch
+            // Erwaehnungen in Kommentaren.)
+            p.setBrush(QColor(0xf0, 0xc0, 0x60, 170));
             p.drawRect(bar);
         }
 
@@ -151,39 +451,284 @@ void StripChainView::paintEvent(QPaintEvent*)
         QFont f = p.font();
         f.setPointSizeF(9.5);
         p.setFont(f);
-        p.drawText(r.adjusted(2, 2, -2, -14), Qt::AlignCenter,
-                   QString::fromLatin1(StripChain::stageName(st)));
+        // Kuerzen statt ueberlaufen. Bei zehn Stufen in einem
+        // Fenster von 960 Punkten wird die Kachel schmaler als
+        // „Compressor" -- und ein Name, der ueber den Rand
+        // hinauslaeuft, sieht aus wie ein Fehler und verdeckt
+        // ausserdem die Nachbarkachel.
+        {
+            const QRect nameBox = r.adjusted(2, 2, -2, -14);
+            p.drawText(nameBox, Qt::AlignCenter,
+                       p.fontMetrics().elidedText(
+                           Sprache::T(QString::fromLatin1(
+                               StripChain::stageName(st))),
+                           Qt::ElideRight, nameBox.width()));
+        }
 
         if (on && master && gr > 0.1) {
             QFont sf = f;
             sf.setPointSizeF(8.0);
             p.setFont(sf);
-            p.setPen(c(Style::kTextSecondary));
+            // Auf der blauen Flaeche war Grau kaum noch zu lesen:
+            // dieselbe Schriftfarbe wie der Name, nur zurueckgenommen.
+            p.setPen(mix(c(Style::kGlassSelText), c(Style::kGlassSelBot), 0.35));
             p.drawText(QRect(r.left(), r.bottom() - 14, r.width(), 13),
                        Qt::AlignCenter,
                        QStringLiteral("-%1 dB").arg(gr, 0, 'f', 1));
         }
 
-        if (i < StripChain::kStageCount - 1) {
-            p.setPen(c(Style::kTextInactive));
-            p.drawText(QRect(r.right(), r.top(), kTileGap, r.height()),
-                       Qt::AlignCenter, QStringLiteral("›"));
+        // Der offene Reiter. Weiss und nur als Ring: er sagt nichts
+        // ueber den Zustand der Stufe, nur darueber, welche Seite
+        // gerade darunter aufgeschlagen ist. Liegt ausserhalb der
+        // Kachel, damit er die Markierung nicht ueberdeckt.
+        if (i == m_openStage) {
+            p.setBrush(Qt::NoBrush);
+            p.setPen(QPen(c(Style::kTextPrimary), 1.4));
+            p.drawRoundedRect(QRectF(r).adjusted(-2.5, -2.5, 1.5, 1.5), 5, 5);
         }
     }
 }
 
 void StripChainView::mousePressEvent(QMouseEvent* ev)
 {
-    for (int i = 0; i < StripChain::kStageCount; ++i) {
-        if (tileRect(i).contains(ev->pos())) {
-            // Opens the stage. Deliberately not a bypass toggle: the
-            // row is the thing an operator's eye rests on while
-            // speaking, and a click that changes the audio is a click
-            // that happens by accident.
-            emit stageClicked(i);
+    const Cell* cell = cellAt(ev->pos());
+    if (cell == nullptr) { return; }
+
+    if (cell->kind == Cell::Kind::Insert) {
+        if (removeBoxOf(*cell).contains(ev->pos())) {
+            emit insertRemoveRequested(cell->index);
+        } else {
+            emit insertClicked(cell->index);
+        }
+        return;
+    }
+    if (cell->kind == Cell::Kind::Stage) {
+        // Mit Wahltaste: nur diese Stufe. Siehe stageSoloRequested().
+        if (ev->modifiers().testFlag(Qt::AltModifier)) {
+            emit stageSoloRequested(cell->index);
             return;
         }
+        // Opens the stage. Deliberately not a bypass toggle: the
+        // row is the thing an operator's eye rests on while
+        // speaking, and a click that changes the audio is a click
+        // that happens by accident.
+        emit stageClicked(cell->index);
     }
+}
+
+void StripChainView::mouseDoubleClickEvent(QMouseEvent* ev)
+{
+    const Cell* cell = cellAt(ev->pos());
+    if (cell != nullptr && cell->kind == Cell::Kind::Insert
+        && !removeBoxOf(*cell).contains(ev->pos())) {
+        emit insertEditorRequested(cell->index);
+        return;
+    }
+    QWidget::mouseDoubleClickEvent(ev);
+}
+
+// ── Hineinziehen ─────────────────────────────────────────────────────
+//
+// „diese sollte man dann in der timeline oben reinziehen koennen. aber
+// relativ leicht auch wieder loeschen."
+//
+// Die Reihe ist die Kette. Was man hier fallen laesst, haengt danach
+// an genau dieser Stelle -- nicht an einer, die eine Auswahlliste in
+// einem Reiter nennt. Das ist der Unterschied zwischen „man kann die
+// Stelle einstellen" und „man sieht, wo es hinkommt".
+
+void StripChainView::dragEnterEvent(QDragEnterEvent* ev)
+{
+    if (!ev->mimeData()->hasFormat(QLatin1String(kPluginMime))) { return; }
+    ev->acceptProposedAction();
+}
+
+void StripChainView::dragMoveEvent(QDragMoveEvent* ev)
+{
+    if (!ev->mimeData()->hasFormat(QLatin1String(kPluginMime))) { return; }
+    const int at = dropPositionAt(ev->position().toPoint());
+    if (at != m_dropPosition) { m_dropPosition = at; update(); }
+    ev->acceptProposedAction();
+}
+
+void StripChainView::dragLeaveEvent(QDragLeaveEvent*)
+{
+    m_dropPosition = -1;
+    update();
+}
+
+void StripChainView::dropEvent(QDropEvent* ev)
+{
+    if (!ev->mimeData()->hasFormat(QLatin1String(kPluginMime))) { return; }
+    const int at = dropPositionAt(ev->position().toPoint());
+    m_dropPosition = -1;
+    update();
+    emit pluginDropped(QString::fromUtf8(
+        ev->mimeData()->data(QLatin1String(kPluginMime))), at);
+    ev->acceptProposedAction();
+}
+
+
+// ── StripTransferCurve ───────────────────────────────────────────────
+
+StripTransferCurve::StripTransferCurve(QWidget* parent)
+    : QWidget(parent)
+{
+    setMinimumHeight(132);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+}
+
+void StripTransferCurve::setRings(MicSpectrum* in, MicSpectrum* out)
+{
+    m_in = in;
+    m_out = out;
+    m_before.clear();
+    m_after.clear();
+    update();
+}
+
+QSize StripTransferCurve::sizeHint() const { return QSize(640, 132); }
+
+void StripTransferCurve::refresh()
+{
+    if (!isVisible() || m_in == nullptr || m_out == nullptr) { return; }
+    if (++m_tick < kEveryNthTick) { return; }
+    m_tick = 0;
+
+    const int rate = m_in->sampleRate();
+    const int want = kWindowSeconds * rate;
+    if (int(m_scratch.size()) < want) {
+        m_scratch.assign(static_cast<size_t>(want), 0.0f);
+    }
+
+    const int gotIn = m_in->snapshot(m_scratch.data(), want);
+    std::vector<double> before = Ltas::analyse(m_scratch.data(), gotIn, rate);
+    const int gotOut = m_out->snapshot(m_scratch.data(), want);
+    std::vector<double> after = Ltas::analyse(m_scratch.data(), gotOut, rate);
+
+    // Stille ist keine Messung. Eine Kurve, die aus Raumrauschen
+    // gerechnet wurde, sieht genauso aus wie eine aus Sprache -- und
+    // waere eine Aussage ueber das Zimmer.
+    if (before.empty() || after.empty()) {
+        if (++m_quietTicks > 20) { m_before.clear(); m_after.clear(); update(); }
+        return;
+    }
+    m_quietTicks = 0;
+    m_before.swap(before);
+    m_after.swap(after);
+    update();
+}
+
+void StripTransferCurve::paintEvent(QPaintEvent*)
+{
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    const QRect r = rect().adjusted(0, 0, -1, -1);
+    p.setPen(QPen(c(Style::kBorderSubtle), 1));
+    p.setBrush(c(Style::kInsetBg));
+    p.drawRoundedRect(r, 4, 4);
+
+    const QRect plot = r.adjusted(34, 10, -8, -16);
+    if (plot.width() < 60 || plot.height() < 40) { return; }
+
+    const std::vector<double>& grid = Ltas::centresHz();
+    const double loHz = grid.front();
+    const double hiHz = grid.back();
+    const auto xOf = [&](double hz) {
+        const double t = std::log(hz / loHz) / std::log(hiHz / loHz);
+        return plot.left() + t * plot.width();
+    };
+    const auto yOf = [&](double db) {
+        const double t = std::clamp(db / kRangeDb, -1.0, 1.0);
+        return plot.center().y() - t * (plot.height() / 2.0);
+    };
+
+    // Gitter: die Nulllinie kraeftiger, denn sie ist die Aussage
+    // „hier wird nichts gemacht".
+    QFont f = p.font();
+    f.setPointSizeF(8.0);
+    p.setFont(f);
+    for (const double db : {-12.0, -6.0, 6.0, 12.0}) {
+        p.setPen(QPen(c(Style::kInsetBorder), 1, Qt::DotLine));
+        p.drawLine(QPointF(plot.left(), yOf(db)), QPointF(plot.right(), yOf(db)));
+        p.setPen(c(Style::kTextInactive));
+        p.drawText(QRect(r.left() + 2, int(yOf(db)) - 7, 30, 14),
+                   Qt::AlignRight | Qt::AlignVCenter,
+                   QStringLiteral("%1").arg(db, 0, 'f', 0));
+    }
+    p.setPen(QPen(c(Style::kBorderSubtle), 1));
+    p.drawLine(QPointF(plot.left(), yOf(0.0)), QPointF(plot.right(), yOf(0.0)));
+
+    for (const double hz : {100.0, 300.0, 1000.0, 3000.0, 6000.0}) {
+        if (hz < loHz || hz > hiHz) { continue; }
+        p.setPen(QPen(c(Style::kInsetBorder), 1, Qt::DotLine));
+        p.drawLine(QPointF(xOf(hz), plot.top()), QPointF(xOf(hz), plot.bottom()));
+        p.setPen(c(Style::kTextInactive));
+        p.drawText(QRect(int(xOf(hz)) - 24, plot.bottom() + 1, 48, 14),
+                   Qt::AlignCenter,
+                   hz >= 1000.0 ? QStringLiteral("%1k").arg(hz / 1000.0, 0, 'f', 0)
+                                : QStringLiteral("%1").arg(hz, 0, 'f', 0));
+    }
+
+    if (m_before.empty() || m_after.empty()
+        || m_before.size() != grid.size() || m_after.size() != grid.size()) {
+        p.setPen(c(Style::kTextInactive));
+        p.drawText(plot, Qt::AlignCenter,
+                   m_in == nullptr
+                       ? Sprache::T(QStringLiteral("Switch Hear myself on to measure "
+                                        "what the strip does."))
+                       : Sprache::T(QStringLiteral("Speak — this draws the difference "
+                                        "between what goes in and what "
+                                        "comes out.")));
+        return;
+    }
+
+    // Die Differenz als gefuellte Flaeche um die Nulllinie. Das ist
+    // die eigentliche Aussage; die beiden Spektren selbst stehen nur
+    // dahinter, damit man sieht, WO ueberhaupt Signal ist.
+    QPainterPath area;
+    QPainterPath line;
+    for (size_t i = 0; i < grid.size(); ++i) {
+        const double d = m_after[i] - m_before[i];
+        const QPointF pt(xOf(grid[i]), yOf(d));
+        if (i == 0) {
+            area.moveTo(QPointF(pt.x(), yOf(0.0)));
+            area.lineTo(pt);
+            line.moveTo(pt);
+        } else {
+            area.lineTo(pt);
+            line.lineTo(pt);
+        }
+    }
+    area.lineTo(QPointF(xOf(grid.back()), yOf(0.0)));
+    area.closeSubpath();
+
+    QColor fill = c(Style::kAccent);
+    fill.setAlpha(60);
+    p.setPen(Qt::NoPen);
+    p.setBrush(fill);
+    p.drawPath(area);
+    p.setPen(QPen(c(Style::kAccent), 1.6));
+    p.setBrush(Qt::NoBrush);
+    p.drawPath(line);
+
+    // Und die groesste Aenderung als Zahl. Eine Kurve sagt „hier
+    // passiert etwas", eine Zahl sagt wie viel -- und nur die laesst
+    // sich mit der von gestern vergleichen.
+    double worst = 0.0;
+    double worstHz = 0.0;
+    for (size_t i = 0; i < grid.size(); ++i) {
+        const double d = m_after[i] - m_before[i];
+        if (std::abs(d) > std::abs(worst)) { worst = d; worstHz = grid[i]; }
+    }
+    p.setPen(c(Style::kTextSecondary));
+    p.drawText(QRect(plot.left(), r.top() + 1, plot.width(), 14),
+               Qt::AlignRight | Qt::AlignVCenter,
+               Sprache::T(QStringLiteral("largest change %1%2 dB at %3 Hz"))
+                   .arg(worst >= 0.0 ? QStringLiteral("+") : QString())
+                   .arg(worst, 0, 'f', 1)
+                   .arg(worstHz, 0, 'f', 0));
 }
 
 // ── StripLevelBars ───────────────────────────────────────────────────
@@ -269,7 +814,7 @@ void StripLevelBars::paintEvent(QPaintEvent*)
     if (!running) {
         p.setPen(c(Style::kTextInactive));
         p.drawText(rect(), Qt::AlignCenter,
-                   QStringLiteral("strip off — nothing to measure"));
+                   Sprache::T(QStringLiteral("strip off — nothing to measure")));
         return;
     }
 
@@ -445,7 +990,7 @@ double StripDynamicsCurve::outputDb(double inDb) const
 
 QString StripDynamicsCurve::explain() const
 {
-    if (!m_chain) { return QStringLiteral("No radio connected."); }
+    if (!m_chain) { return Sprache::T(QStringLiteral("No radio connected.")); }
 
     const double in  = m_liveIn;
     const bool quiet = in < minDb() + 3.0;
@@ -457,30 +1002,30 @@ QString StripDynamicsCurve::explain() const
         const double ret = double(g.returnDb());
         const double gr  = double(g.gainReductionDb());
         if (quiet) {
-            return QStringLiteral(
+            return Sprache::T(QStringLiteral(
                 "<b style='color:%1'>Silent</b><br>Nothing is arriving "
-                "at the gate. Talk, or check the microphone.")
+                "at the gate. Talk, or check the microphone."))
                 .arg(QString::fromLatin1(Style::kTextGroupHead));
         }
         if (in >= thr) {
-            return QStringLiteral(
+            return Sprache::T(QStringLiteral(
                 "<b style='color:#6fa384'>▲ Open</b><br>You are "
                 "<b>%1 dB above</b> the threshold. The gate is passing your "
-                "voice and taking nothing off.")
+                "voice and taking nothing off."))
                 .arg(in - thr, 0, 'f', 1);
         }
         if (in >= thr - ret) {
-            return QStringLiteral(
+            return Sprache::T(QStringLiteral(
                 "<b style='color:#c2924f'>◆ In the sticky zone</b><br>"
                 "%1 dB below the threshold but still inside the deadband, "
                 "so the gate holds whatever it was doing. This is the part "
-                "that stops it chattering on a breath.")
+                "that stops it chattering on a breath."))
                 .arg(thr - in, 0, 'f', 1);
         }
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "<b style='color:#a8853f'>▼ Closing</b><br>%1 dB below the "
             "threshold; the gate is taking off <b>%2 dB</b>. If that is "
-            "your voice rather than the room, the threshold is too high.")
+            "your voice rather than the room, the threshold is too high."))
             .arg(thr - in, 0, 'f', 1).arg(gr, 0, 'f', 1);
     }
     case Stage::Compressor: {
@@ -488,52 +1033,52 @@ QString StripDynamicsCurve::explain() const
         const double thr = double(c.thresholdDb());
         const double gr  = double(c.gainReductionDb());
         if (quiet) {
-            return QStringLiteral(
+            return Sprache::T(QStringLiteral(
                 "<b style='color:%1'>Silent</b><br>Nothing is reaching "
-                "the compressor.")
+                "the compressor."))
                 .arg(QString::fromLatin1(Style::kTextGroupHead));
         }
         if (gr < 0.3) {
-            return QStringLiteral(
+            return Sprache::T(QStringLiteral(
                 "<b style='color:%2'>Not working</b><br>You are "
                 "%1 dB below the threshold, so the compressor is a straight "
                 "wire right now. Lower the threshold if you wanted it to do "
-                "something.")
+                "something."))
                 .arg(thr - in, 0, 'f', 1)
                 .arg(QString::fromLatin1(Style::kTextTertiary));
         }
         if (gr > 12.0) {
-            return QStringLiteral(
+            return Sprache::T(QStringLiteral(
                 "<b style='color:#a8853f'>Working hard</b><br>Taking off "
                 "<b>%1 dB</b>. Past about 12 dB a compressor stops evening "
-                "a voice out and starts being the loudest thing about it.")
+                "a voice out and starts being the loudest thing about it."))
                 .arg(gr, 0, 'f', 1);
         }
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "<b style='color:#6fa384'>Working</b><br>Taking off "
             "<b>%1 dB</b> on the peaks. That is the useful range: audibly "
-            "steadier, still recognisably a voice.")
+            "steadier, still recognisably a voice."))
             .arg(gr, 0, 'f', 1);
     }
     case Stage::Limiter: {
         const double ceil = double(m_chain->limiter().ceilingDb());
         const double gr   = double(m_chain->limiter().gainReductionDb());
         if (quiet) {
-            return QStringLiteral(
-                "<b style='color:%1'>Silent</b><br>Nothing to limit.")
+            return Sprache::T(QStringLiteral(
+                "<b style='color:%1'>Silent</b><br>Nothing to limit."))
                 .arg(QString::fromLatin1(Style::kTextGroupHead));
         }
         if (gr < 0.2) {
-            return QStringLiteral(
+            return Sprache::T(QStringLiteral(
                 "<b style='color:#6fa384'>Idle — which is correct</b><br>"
                 "You are %1 dB under the ceiling. A brickwall that never "
-                "acts is a brickwall doing its job.")
+                "acts is a brickwall doing its job."))
                 .arg(ceil - in, 0, 'f', 1);
         }
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "<b style='color:#c2924f'>Catching peaks</b><br>Holding back "
             "<b>%1 dB</b>. Occasional is fine; if this is constant, the "
-            "limiter is doing the compressor's job and doing it worse.")
+            "limiter is doing the compressor's job and doing it worse."))
             .arg(gr, 0, 'f', 1);
     }
     }
@@ -544,17 +1089,25 @@ QString StripDynamicsCurve::legend() const
 {
     QString band;
     if (m_stage == Stage::Gate) {
-        band = QStringLiteral(
+        band = Sprache::T(QStringLiteral(
             "<span style='color:#4a7ba8'>▬</span> the sticky zone — inside "
-            "it the gate keeps its current state<br>");
+            "it the gate keeps whatever it was doing, so the ball sits "
+            "on the dashed open branch or on the curve, never between "
+            "them<br>"));
     }
-    return QStringLiteral(
+    QString ring;
+    if (m_stage == Stage::Gate) {
+        ring = Sprache::T(QStringLiteral(
+            "<span style='color:#c2924f'>○</span> the threshold on the "
+            "curve — a ring, not the ball<br>"));
+    }
+    return Sprache::T(QStringLiteral(
         "<span style='color:#c4c4c9'>●</span> your signal: across is what "
         "goes in, up is what comes out<br>"
         "<span style='color:#2c2c31'>╱</span> dashed: where nothing "
-        "happens<br>%1"
-        "<span style='color:#c2924f'>┊</span> the threshold you set")
-        .arg(band);
+        "happens<br>%1%2"
+        "<span style='color:#c2924f'>┊</span> the threshold you set"))
+        .arg(ring, band);
 }
 
 double StripDynamicsCurve::xFor(double db, const QRect& r) const
@@ -701,12 +1254,51 @@ void StripDynamicsCurve::paintEvent(QPaintEvent*)
     p.setPen(curvePen);
     p.drawPath(path);
 
-    // A dot where the threshold meets the curve, so the eye finds the
-    // knee without tracing the dashed line down to the axis.
+    // ── Der zweite Ast: das Gate hat ZWEI Kennlinien ────────────────
+    //
+    // „ich gehe davon aus, dass der punkt genau in dem strahl sein
+    // soll ... also komplett daneben" (2026-10-14). Er hatte recht
+    // hinzusehen, und das Bild war schuld, nicht seine Einstellung.
+    //
+    // Ein Gate mit Hysterese hat in der Haltezone keinen Wert,
+    // sondern zwei: offen geblieben heisst „Draht", geschlossen
+    // geblieben heisst „Kennlinie". Gezeichnet war nur der zweite.
+    // Seine Stimme lag bei -57 dBFS noch offen auf dem Draht,
+    // waehrend die Kurve dort schon siebzehn Dezibel tiefer lief --
+    // der Ball stand also richtig und trotzdem neben der Linie.
+    //
+    // Also wird der offene Ast mitgezeichnet, gestrichelt, nur
+    // innerhalb der Haltezone. Dann ist zu sehen, was wirklich gilt:
+    // dort entscheidet nicht der Pegel, sondern die Vorgeschichte.
+    if (m_stage == Stage::Gate) {
+        const double ret = double(m_chain->gate().returnDb());
+        if (ret > 0.05) {
+            const double xR = xFor(thr, r);
+            const double xL = xFor(thr - ret, r);
+            if (xR > xL) {
+                QPen offen(curveCol, 1.6, Qt::DashLine);
+                offen.setDashPattern({ 4.0, 3.0 });
+                p.setPen(offen);
+                p.setBrush(Qt::NoBrush);
+                p.drawLine(QPointF(xL, yFor(thr - ret, r)),
+                           QPointF(xR, yFor(thr, r)));
+            }
+        }
+    }
+
+    // Eine RINGMARKE, wo die Schwelle auf die Kennlinie trifft.
+    //
+    // Hier stand ein gefuellter Punkt in derselben Farbe und
+    // derselben Groesse wie der Signalball -- und die Legende kennt
+    // nur einen Punkt („dein Signal"). Zwei gleich aussehende Punkte
+    // mit einer Beschriftung: der Betreiber hat die Schwellenmarke
+    // fuer sein Signal gehalten und sich gewundert, warum sie sich
+    // nicht bewegt. Ein Ring ist auf einen Blick etwas anderes als
+    // eine leuchtende Kugel.
     {
-        p.setPen(Qt::NoPen);
-        p.setBrush(curveCol);
-        p.drawEllipse(QPointF(xFor(thr, r), yFor(outputDb(thr), r)), 3.0, 3.0);
+        p.setPen(QPen(curveCol, 1.6));
+        p.setBrush(Qt::NoBrush);
+        p.drawEllipse(QPointF(xFor(thr, r), yFor(outputDb(thr), r)), 3.6, 3.6);
     }
 
     // ── Where the signal is, right now ───────────────────────────────
@@ -785,14 +1377,14 @@ void StripShaperCurve::refresh() { update(); }
 
 QString StripShaperCurve::explain() const
 {
-    if (!m_chain) { return QStringLiteral("No radio connected."); }
+    if (!m_chain) { return Sprache::T(QStringLiteral("No radio connected.")); }
     ClientTube& t = m_chain->tube();
     const double drive = double(t.driveDb());
 
     if (m_livePeak < -55.0) {
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "<b style='color:%1'>Silent</b><br>Nothing is reaching the "
-            "tube.")
+            "tube."))
             .arg(QString::fromLatin1(Style::kTextGroupHead));
     }
     // How far up the curve the signal actually gets. This is the whole
@@ -800,36 +1392,36 @@ QString StripShaperCurve::explain() const
     const double reach = std::pow(10.0, m_livePeak / 20.0)
                        * std::pow(10.0, drive / 20.0);
     if (reach < 0.25) {
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "<b style='color:%1'>A straight wire</b><br>Your voice is "
             "only reaching the flat middle of the curve, so this stage is "
             "doing nothing audible whatever the knobs say. More drive, or "
-            "more level ahead of it.")
+            "more level ahead of it."))
             .arg(QString::fromLatin1(Style::kTextTertiary));
     }
     if (reach > 1.4) {
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "<b style='color:#a8853f'>Deep in the bend</b><br>You are well "
             "into the flat top of the curve. That is heavy distortion — it "
             "will be loud, and it will be heard as distortion rather than "
-            "as warmth.");
+            "as warmth."));
     }
-    return QStringLiteral(
+    return Sprache::T(QStringLiteral(
         "<b style='color:#6fa384'>In the bend</b><br>Your voice is reaching "
         "the curved part, which is where harmonics come from. The gap "
         "between the orange curve and the dashed line is how much is being "
-        "added.");
+        "added."));
 }
 
 QString StripShaperCurve::legend() const
 {
-    return QStringLiteral(
+    return Sprache::T(QStringLiteral(
         "<span style='color:#c4c4c9'>●</span> how far up the curve your "
         "voice reaches, either side of zero<br>"
         "<span style='color:#c2924f'>▬</span> the shaper — the audio "
         "thread's own function, not a drawing of it<br>"
         "<span style='color:#2c2c31'>╱</span> dashed: no distortion. The "
-        "distance between the two IS the distortion.");
+        "distance between the two IS the distortion."));
 }
 
 void StripShaperCurve::paintEvent(QPaintEvent*)
@@ -949,23 +1541,23 @@ double StripBandCurve::xForHz(double hz, const QRect& r) const
 
 QString StripBandCurve::explain() const
 {
-    if (!m_chain) { return QStringLiteral("No radio connected."); }
+    if (!m_chain) { return Sprache::T(QStringLiteral("No radio connected.")); }
 
     if (m_stage == Stage::DeEsser) {
         ClientDeEss& d = m_chain->deEss();
         const double f0 = double(d.frequencyHz());
         if (m_liveGr > 0.3) {
-            return QStringLiteral(
+            return Sprache::T(QStringLiteral(
                 "<b style='color:#c2924f'>Working</b><br>Taking off "
                 "<b>%1 dB</b> around %2 Hz. It only acts on that band, so "
-                "the rest of your voice is untouched.")
+                "the rest of your voice is untouched."))
                 .arg(m_liveGr, 0, 'f', 1).arg(f0, 0, 'f', 0);
         }
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "<b style='color:%2'>Listening, not acting</b><br>Nothing "
             "loud enough at %1 Hz to trigger it. Either you are not "
             "sibilant, or it is pointed at the wrong band — that is the "
-            "commonest way to end up with a de-esser that does nothing.")
+            "commonest way to end up with a de-esser that does nothing."))
             .arg(f0, 0, 'f', 0)
             .arg(QString::fromLatin1(Style::kTextTertiary));
     }
@@ -974,16 +1566,16 @@ QString StripBandCurve::explain() const
     const double lo = double(p.pooMix());
     const double hi = double(p.dooMix());
     if (lo < 0.02 && hi < 0.02) {
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "<b style='color:%1'>Nothing mixed in</b><br>Both "
-            "generators are at zero, so the stage is running and silent.")
+            "generators are at zero, so the stage is running and silent."))
             .arg(QString::fromLatin1(Style::kTextTertiary));
     }
-    return QStringLiteral(
+    return Sprache::T(QStringLiteral(
         "<b style='color:#6fa384'>Generating</b><br>Low at %1 Hz mixed "
         "<b>%2%</b>, high at %3 Hz mixed <b>%4%</b>. This stage invents "
         "content that was not in your voice; past a point it stops "
-        "sounding like you.")
+        "sounding like you."))
         .arg(double(p.pooTuneHz()), 0, 'f', 0).arg(int(lo * 100.0))
         .arg(double(p.dooTuneHz()), 0, 'f', 0).arg(int(hi * 100.0));
 }
@@ -991,17 +1583,17 @@ QString StripBandCurve::explain() const
 QString StripBandCurve::legend() const
 {
     if (m_stage == Stage::DeEsser) {
-        return QStringLiteral(
+        return Sprache::T(QStringLiteral(
             "<span style='color:#c2924f'>▬</span> the band it LISTENS to — "
             "not the cut it makes<br>"
             "<span style='color:#c2924f'>┊</span> where it is centred<br>"
             "<span style='color:#c2924f'>▐</span> right-hand bar: how hard "
-            "it is working now");
+            "it is working now"));
     }
-    return QStringLiteral(
+    return Sprache::T(QStringLiteral(
         "<span style='color:%1'>▬</span> the low generator<br>"
         "<span style='color:#c2924f'>▬</span> the high generator<br>"
-        "height is how much is mixed in, position is where it is tuned")
+        "height is how much is mixed in, position is where it is tuned"))
         .arg(QString::fromLatin1(Style::kBlueBorder));
 }
 
@@ -1076,9 +1668,9 @@ void StripBandCurve::paintEvent(QPaintEvent*)
                    QStringLiteral("%1 Hz").arg(f0, 0, 'f', 0));
         p.setPen(c(Style::kTextScale));
         p.drawText(r.adjusted(4, 3, -4, 0), Qt::AlignLeft | Qt::AlignTop,
-                   QStringLiteral("what it listens to"));
+                   Sprache::T(QStringLiteral("what it listens to")));
         p.drawText(r.adjusted(4, 0, -4, -2), Qt::AlignRight | Qt::AlignBottom,
-                   QStringLiteral("bar right = working now"));
+                   Sprache::T(QStringLiteral("bar right = working now")));
 
         // How hard it is working, now. Without this the picture says
         // where it is listening and never whether it heard anything.

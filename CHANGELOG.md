@@ -4,6 +4,1119 @@
 
 ## [0.8.0] - 2026-10-20
 
+### Der Schutzrahmen greift jetzt beim Start
+
+Betreiber am frisch gestarteten Fenster: „Bandwidth Filter", „TX" und
+„Rotor/Log" lagen auf der Kommandoleiste — Band, Betriebsart und
+Profil waren nicht mehr erreichbar. Der Schutzrahmen konnte das gar
+nicht verhindern: angewandt wurde er nur in `moveEvent()` und
+`resizeEvent()` des Hauptfensters, die gespeicherten Plätze setzt das
+Profil aber beim AUFBAU, und danach bewegt sich das Hauptfenster nicht
+mehr. Aufgefallen ist es erst, seit das Fenster maximiert statt
+randlos startet — die Kommandoleiste sitzt damit 28 Punkte tiefer als
+zu der Zeit, aus der die gespeicherten Plätze stammen. Der Fehler lag
+schon vorher darin, nur traf er nichts.
+
+Dazu zwei Prüfstände, die unter Linux falsch anschlugen und beide mit
+Gegenprobe belegt sind: der Wächter gegen einen wiederkehrenden
+Zoom-Schieber trennt jetzt nach der LAGE statt nach der Breite (ein
+gewöhnlicher Schieber im RX-Applet ist kein Zoom-Schieber, auch wenn
+das Fenster schmal genug wird), und der Hinweis des Schutzrahmens wird
+abgewartet statt sofort behauptet.
+
+### Der Kanalzug: zwei Wochen Sendeton — und das Live-Hören ist zurück
+
+Die Arbeit vom 9. bis 18. Oktober ist mit drin. Ohne sie wäre der
+Kanalzug dieser Veröffentlichung der Stand vom 11. August gewesen:
+englische Bedienung, kein Live-Hören, kein Clipper, keine
+Rückkopplungswache. Was unten Stück für Stück steht, ist diese Arbeit
+— angefangen bei dem Satz, mit dem sie begann: „ich will mich live
+hören".
+
+### „Aufnehmen" und „Abspielen" gehen jetzt durch den Sendekanal
+
+Die beiden Knöpfe liessen die Stimme in voller Bandbreite hören — also
+in einer Fassung, die auf der Gegenseite nie ankommt. Der Mithörer hat
+die Kanalwahl seit dem 2026-10-10; dieselbe Einstellung, dieselbe
+Nummer, nur hier nicht benutzt. Die Aufnahme läuft jetzt nach der Kette
+durch denselben Kanal, bis zum letzten Abtastwert (ein ungefilterter
+Rest am Ende wäre genau die Stelle, an der ein Vergleich kippt).
+
+Der Kanal gehört dem Sender, nicht der Kette: er läuft deshalb auch
+dann, wenn der Hauptschalter aus ist — das rohe Mikrofon durch den
+Kanal ist die ehrliche Seite A des Vergleichs.
+
+### Ein Griff in die Profilliste vernichtet keine Arbeit mehr
+
+Eine Voreinstellung ersetzt JEDE Stufe. Der bestehende Stand wandert
+vorher unter „Zuletzt bearbeitet" und steht gleich danach in derselben
+Liste — ohne Rückfrage, ohne Fenster. Die Sicherung sichert sich beim
+Zurückkehren nicht selbst über.
+
+### Eine kaputte Einstellungsdatei wird repariert statt aufgegeben
+
+Der Schreiber kannte die echte XML-Regel seit heute Abend; der Leser
+hat eine zweite Stelle mit derselben Lücke — die Reparaturstufe, die
+beim Laden über die Datei läuft. Beide prüfen jetzt `istNameChar()`.
+Nachgerechnet an der Datei, die am 2026-10-13 um 21:43 anfiel:
+
+```
+Elementnamen mit verbotenem Zeichen   326
+nach der Reparatur                    gültiges XML, 9860 Einträge
+ohne Reparatur                        Fehler in Zeile 9701, Spalte 51
+```
+
+### Aethers Kanalzug ist die Grundlage — sein Profil, Wert für Wert
+
+> „mein headset funktioniert mit windows und dem aether channel strip,
+>  also die einstellungen bei eather perfekt! wir müssen unsere grafik
+>  verwenden, aber alle einstellungen usw. von aether verwenden."
+
+`core/strip/AetherPreset` liest „AetherSDR ChannelStripPreset v1" in
+unsere Kette. Das geht nur, weil unsere Stufen aus AetherSDR portiert
+sind und zeilengleich rechnen; von rund sechzig Werten sind alle 1:1
+übernehmbar außer sieben. Die sieben stehen im Importeur und melden
+sich auch im Fenster:
+
+* **masterGain ist LINEAR** (1,653). Als dB gelesen wäre die ganze
+  Kette 2,7 dB zu leise.
+* **Auto-Makeup** gibt es nur bei uns und hätte seine 6,66 dB still auf
+  8,04 gehoben. Aus, ebenso Kompressor-Drive und Phasendreher: Werte,
+  die seine Datei nicht trägt, dürfen nicht aus dem geerbt werden, was
+  vorher in der Kette stand.
+* **gate.mode vor ratio/floor** — sonst überschreibt „Expander" seine
+  3,215 mit 2,0.
+* **deess.slopeStages** kennt Aether nicht → ausdrücklich auf 2.
+* **Entrauschen** (sein `rn2` ist false), **Clipper** und die
+  **Eingangsautomatik** sind aus: die kennt Aether nicht.
+* Der Entzerrer bekommt **erst die Bänder, dann die Anzahl**; seine
+  zehn werden auf unsere vierzehn Griffe aufgefüllt, mit flachen,
+  abgeschalteten Bändern.
+* Der **rx-Block** wird überlesen — empfangsseitig haben wir keinen
+  Kanalzug.
+
+### Die Reihenfolge der Stufen ist einstellbar
+
+Seine Kette lautet `Tube, Gate, Eq, Comp, DeEss, Enh, Reverb` — die
+Röhre steht **vorne**, vor dem Tor. Bei uns stand sie hinter dem
+Kompressor, und die Reihenfolge war eine feste Folge von Aufrufen.
+Dieselben zwei Stufen, dieselben Werte, nur getauscht:
+
+```
+Kompressor → Röhre    RMS 0,9138
+Röhre → Kompressor    RMS 0,2373      (−11,7 dB)
+```
+
+Gehalten wird sie in EINER atomaren Zahl: zehn Stufen zu je vier Bit.
+Der Audiofaden liest sie einmal je Block, der Hauptfaden schreibt sie
+in einem Zug. `setStageOrder()` nimmt nur eine vollständige Permutation
+an. Gespeichert wird sie als Liste von Wörtern, nicht als Zahlen — eine
+Datei, die „4,5,6" sagt, ist nach dem nächsten Umbau des
+Aufzählungstyps eine andere Kette.
+
+### „bei 4000 klingt das nicht besonders" — gemessen gegen ein perfektes Filter
+
+Echte Sprache, dreimal: roh, durch unseren IIR-Kanal, durch einen
+idealen linearphasigen Kanal (2047 Koeffizienten, dieselben Ecken).
+
+| Band | roh | unser Kanal | ideal | wir gegen ideal |
+| --- | --- | --- | --- | --- |
+| 500 Hz | 73,2 | 73,2 | 73,2 | 0,00 |
+| 1 kHz | 69,3 | 69,3 | 69,3 | 0,00 |
+| 2 kHz | 62,6 | 62,6 | 62,6 | 0,00 |
+| 3,15 k | 58,4 | 58,3 | 58,4 | −0,08 |
+| 4 kHz | 56,7 | 53,9 | 53,9 | −0,05 |
+| 5 kHz | 59,4 | 44,3 | −56,9 | |
+| 8 kHz | 59,3 | 8,4 | −80,2 | |
+
+Im Durchlassbereich ist unser Kanal von einem perfekten nicht zu
+unterscheiden (höchste Abweichung 0,84 dB, und die sitzt bei 63 Hz am
+Hochpass). Der Unterschied, den man hört, ist die Bandbreite — und ein
+Teil davon ist hausgemacht: sein Kuhschwanz sitzt bei 4982 Hz, also
+über der Kanalgrenze. Deshalb liegt neben seiner Kette eine zweite mit
+genau diesem einen Zug anders (3400 Hz).
+
+### Zwei eigene Ketten löschten die Liste — und ein Gedankenstrich die Datei
+
+> „sehe aber keine speicherung der profile"
+
+Der Knopf war da und hieß „Speichern unter…"; er heißt jetzt „Profil
+speichern…". Dahinter lagen zwei Fehler im Unterbau:
+
+**Eine Liste mit zwei Einträgen wurde zu einer leeren Zeichenkette.**
+`AppSettings` legt jeden Wert als `val.toString()` ab, und
+`QVariant::toString()` liefert bei einer QStringList mit EINEM Eintrag
+diesen Eintrag — bei zweien nichts. Die zweite abgelegte Kette nahm die
+erste mit, sofort, im laufenden Programm. Listen werden jetzt als
+`@StringList(<base64>,…)` abgelegt.
+
+**Ein Gedankenstrich im Namen machte die Einstellungsdatei unlesbar.**
+Der Name wird Teil des Schlüssels und der Schlüssel ein
+XML-Elementname; U+2014 ist dort verboten. Am Gerät des Betreibers ist
+genau das passiert (`Longpath.settings.corrupt-20261013-214358`, danach
+Wiederherstellung aus der Sicherung). `encodeXmlKey()` prüft jetzt die
+echte Regel aus XML 1.0 statt einer Liste von Verdächtigen; was erlaubt
+ist, bleibt Zeichen für Zeichen stehen, alles andere wird `__uXXXX__`.
+
+### „das live hören nicht mehr zu sehen" — zwei Ursachen
+
+Die erste lag nicht im Programm: in `/Applications` stand eine Fassung
+aus einem fremden Zweig, die den Mithörer gar nicht kennt (116 Symbole
+`StripLiveMonitor` hier, null dort). Die zweite gehört uns — die
+Mithörreihe war über sechs Bedienteile gewachsen und verlangte 1312 px
+Mindestbreite, bei einem Fenster, das 980 px breit öffnet. Sie steht
+jetzt in einer eigenen Zeile; Mindestbreite 864 px.
+
+### Der 4-kHz-Kanal klang massiv schlechter — zwei Ursachen
+
+> „volle bandbreite läuft perfekt über apollo und longpath, sobald
+>  4000k eingeschalten ist wird die qualität massiv anders und
+>  schlechter … longpath hat ja mit dem apollo keine filter, ich habe
+>  bewusst alles ausgeschalten."
+
+Genau das war der Befund: mit allem aus tat Longpath beim Kanalwechsel
+trotzdem zwei Dinge.
+
+**Erstens ein Begrenzer, den niemand bestellt hatte.** Der Mithörweg
+legt seit heute einen Brickwall hinter das Kanalfilter — richtig
+gemessen, solange die Kette läuft. Die Bedingung lautete aber nur „ein
+Kanal ist gewählt" und nicht „die Kette ist eingeschaltet". Wer den
+Kanalzug ausschaltete, um sein unbearbeitetes Signal zu hören, bekam
+auf ein Studiosignal mit −1,5 dBFS Spitze:
+
+```
+nur Kanalfilter   Spitze -2,8 dBFS
+mit Begrenzer     Spitze -3,0 dBFS · Fremdanteil -19,7 dB
+```
+
+Rund **zehn Prozent** Fremdanteil — und nur bei gewähltem Kanal. Er
+läuft jetzt nur noch, wenn die Kette im Weg steht.
+
+**Zweitens: das Filter stimmte im Pegel und nicht in der Zeit.** Der
+Pegelgang ist seit heute Vormittag nachgemessen und tadellos. Die
+Gruppenlaufzeit war nie gemessen worden:
+
+| Kanal | 60 Hz | 100 Hz | 200 Hz | 1 kHz | 4 kHz |
+| --- | --- | --- | --- | --- | --- |
+| 50–4050 · ESSB (vorher) | **16,8 ms** | 4,9 | 1,2 | 0,2 | 0,4 |
+| 50–4050 · ESSB (jetzt) | **3,6 ms** | 1,6 | 0,5 | 0,2 | 0,4 |
+| 100–3200 (vorher → jetzt) | 11,8 → **2,9** | 13,0 → 2,5 | | | |
+
+Acht Pole bei 50 Hz stehen sehr dicht am Einheitskreis: der Boden der
+Stimme kam **16,6 ms nach** ihrer Mitte heraus. Das hört man nicht als
+Klangfarbe, sondern als Verschmieren — und bei voller Bandbreite läuft
+gar kein Filter, darum ist die perfekt.
+
+Die untere Flanke hängt jetzt an der Ecke: **unter 150 Hz zweite
+Ordnung, ab 150 Hz achte.** Gemessen, warum:
+
+| Hochpass | 60 Hz | 100 Hz | Pegel 30 Hz | 20 Hz |
+| --- | --- | --- | --- | --- |
+| 12 dB/Okt | 3,6 ms | 1,6 | −9,4 dB | −16,0 |
+| 24 dB/Okt | 8,1 ms | 2,7 | −17,8 | −31,8 |
+| 48 dB/Okt | 16,8 ms | 4,9 | −35,5 | −63,7 |
+
+Unterhalb von 150 Hz liegt keine Stimme mehr: Steilheit bringt dort
+nichts und kostet am meisten Zeit. Im DX-Kanal dagegen sitzt die Ecke
+bei 200 Hz **mitten** in der Stimme — dort bleibt es bei 48 dB je
+Oktave, sonst käme 100 Hz mit −12 dB durch, was ein DX-Filter nie tut.
+Die Prüfstände haben genau das sofort gezeigt, als die flache Flanke
+versehentlich für alle galt.
+
+Oben bleibt es überall bei 48 dB je Oktave: dort kostet die Steilheit
+0,2 bis 0,4 ms, und diese Kante ist der Grund, warum man einen Kanal
+überhaupt wählt.
+
+Ehrlich bleibt dabei: ein Sender filtert mit **linearer Phase** (FIR),
+verschmiert also gar nicht. Jede IIR-Nachbildung ist darin falsch —
+diese ist nur weniger falsch als die vorige.
+
+### Jede Durchsage begann mit 30 ms der vorigen
+
+`StripChain::reset()` traf acht der zehn Stufen. Es fehlten genau die
+beiden, die nach der ursprünglichen Acht dazugekommen sind — das
+Entrauschen und der Clipper —, und beide halten Zustand: eine
+Verzögerungsleitung über 1440 Abtastwerte und die Vorgeschichte eines
+Halbbandfilters.
+
+Gegenprobe gegen die alte Fassung, laut hinein, zurücksetzen, dann
+Stille messen:
+
+```
+Clipper        0,9999 kommt noch heraus   (Vollaussteuerung, ein Knacken)
+Entrauschen    −6,0 dBFS laufen 30 ms nach
+```
+
+Nach der Behebung: −240 dBFS, also nichts. Zwei Prüfungen halten es
+fest, getrennt nach Stufe — das Entrauschen braucht sein Modell und
+damit ein QApplication, das `tst_strip_chain` nicht hat.
+
+Dazu laufen die Summierer des Scheitelfaktors jetzt mit zurück. Ohne
+das mischte die einzige Dichtezahl der Oberfläche über die Sendepause
+hinweg und zeigte einen Wert, den es nie gegeben hat.
+
+### Drive im Kompressor bekommt keinen Knopf — gemessen, warum
+
+AetherSDR hat genau einen Dichtesteller, und es ist nicht der Clipper:
+Drive im Kompressor, 0–18 dB, nach dem Optimod-Modell. Longpaths
+Kompressor rechnet das identisch, hat aber keinen Regler dafür. Bevor
+einer gebaut wurde, die Messung:
+
+| Drive | Lautheit | Scheitel | Kennlinie | verstecktes Brickwall | Klirr |
+| --- | --- | --- | --- | --- | --- |
+| 0 | −10,8 | 7,8 | −1,6 | 0,0 | −42,8 dB |
+| 3 | −8,5 | 5,8 | −3,5 | −1,5 | **−15,5 dB** |
+| 6 | −7,2 | 4,8 | −5,5 | −6,1 | −11,0 dB |
+| 18 | −5,4 | 3,7 | −13,5 | −22,3 | −9,5 dB |
+
+**Drei Dezibel Drive sind siebzehn Prozent Klirr.** Der Clipper holt
+dieselbe Größenordnung Dichte für 0,34 %. Der Grund steht in der
+vorletzten Spalte: die Dichte kommt nicht aus der Kennlinie, sondern
+aus einem Brickwall mitten im Kompressor — Abtastwert für Abtastwert,
+0,1 ms Anstieg, **ohne Überabtastung**. Der Clipper rechnet mit
+doppelter Rate und Halbbandfilter, genau dagegen.
+
+Ein Knopf „Drive" wäre ein Verzerrungsregler mit der Aufschrift „mehr
+Druck". Er kommt nicht. Stattdessen steht das versteckte Glied jetzt in
+der laufenden Zeile des Kompressors (`%1 dB caught by its own
+brickwall`) — unsichtbar war es schlimmer als vorhanden.
+
+### Der Hochpass stand auf dem Grundton — und der A/B-Vergleich war unfair
+
+> „also roh, volle bandbreite — auf dem signal sollte man aufbauen …
+>  aber die abstriche sind leider viel zu groß."
+
+Bis hierher wurde gemessen, was die Kette **bringt**. Diese Runde misst
+das Gegenteil, und zwar am ehrlichen Maßstab: bei **gleicher Lautheit**
+gegen das rohe Signal — welche Bänder fehlen?
+
+| Band | vorher | ohne Entzerrer | jetzt |
+| --- | --- | --- | --- |
+| 63 Hz | −6,7 dB | −1,5 | **−2,4** |
+| 80 Hz | **−8,0 dB** | −0,4 | **−1,9** |
+| 100 Hz | −4,9 dB | −0,2 | **−1,3** |
+| 125 Hz | −1,7 dB | +0,4 | −0,6 |
+| 630 Hz | −1,5 dB | −0,2 | −0,3 |
+
+**Acht Dezibel bei 80 Hz.** Der Hochpass stand auf 110 Hz mit 24 dB je
+Oktave — und der Grundton einer Männerstimme liegt bei 100 bis 125 Hz.
+Das Profil nahm der Stimme ihr Fundament und gab dafür nichts. Ohne den
+Entzerrer war die Kette unter 1 kHz durchsichtig; mit ihm war sie genau
+das, was man hört, wenn man roh dagegenhält.
+
+Jetzt 60 Hz mit 12 dB je Oktave — bei 110 Hz praktisch nichts mehr, bei
+30 Hz zwölf Dezibel weniger Rumpeln. Dazu zwei weitere Abstriche
+gestrichen: das Tiefenregal (−1,5 dB unter 200 Hz) und der MULM-Griff
+(−2 dB bei 650 Hz) stehen auf null und bleiben als Griffe stehen.
+
+**Und die Dichte stieg dabei:** 8,9 → **9,3 dB** mehr Druck,
+Scheitelfaktor 8,2 → **7,8 dB**. Was man vorne nicht wegnimmt, kann der
+Clipper hinten verdichten.
+
+#### Der Vergleich selbst war der Fehler
+
+Beim Umschalten auf „roh" fiel die Laufzeit der Kette weg: 30 ms für das
+Entrauschen gegen null. Beim Mithören der **eigenen Stimme** ist das
+kein Nichts — man hört sich mit Nachschlag, und das klingt immer
+schlechter, unabhängig davon, was die Kette mit dem Klang macht.
+
+```
+vorher   durch die Kette 1452 Abtastwerte · roh 0
+jetzt    durch die Kette 1452 Abtastwerte · roh 1452   (30,3 ms, beide)
+```
+
+Der überbrückte Weg wartet jetzt genauso lange. Der Vergleich wird
+dadurch nicht besser oder schlechter — er wird ehrlich. Bis heute hat er
+mitentschieden, und niemand hat es gewusst.
+
+### Der Eingangsregler stand bei jedem Öffnen auf Null
+
+Ein Bildschirmabzug vom Gerät hat es gezeigt: **Eingang −39,6 dBFS ·
+Ziel −12 dBFS · 28 dB fehlen** — und der Regler darunter auf 0,0 dB.
+Die Ursache steht in einer Zeile, und zwei unabhängige Durchsichten
+haben sie am selben Tag gefunden:
+
+```cpp
+m_eingangSlider->setValue(0);        // statt: Wert der Kette lesen
+```
+
+Der Schieber zeigte bei **jedem** Öffnen des Fensters 0,0 dB, egal was
+gespeichert war, und die erste Berührung schrieb diese angezeigte Null
+in die Kette zurück. Wer einmal „Übernehmen" gedrückt hatte, verlor
+seine Einstellung beim nächsten Anfassen — stumm.
+
+**Und das ist die kleinere Hälfte.** Ein Vorverstärker, bei dem man
+erst einen Knopf drücken muss, ehe er verstärkt, ist keiner.
+`StripChain::setInputAuto()` sucht den Arbeitspunkt jetzt selbst: alle
+zwei Sekunden ein Schritt von einem Drittel des Fehlers, gedeckelt auf
+4 dB, und **nur wenn in diesen zwei Sekunden gesprochen wurde** — in
+der Stille rührt er sich nicht, sonst zöge er den Raum hoch, bis die
+Kette ihn für eine Stimme hält. Gemessen an echter Sprache, 28 dB zu
+leise eingespeist:
+
+| | Spitze | Druck | gefundene Verstärkung |
+| --- | --- | --- | --- |
+| Automatik aus | −27,2 dBFS | −21,2 LUFS | 0,0 dB |
+| Automatik an | **−2,0 dBFS** | **−10,7 LUFS** | 29,0 dB |
+
+Nach 20 s Stille: 28,91 → 28,91 dB. Vorgabe **an**, auch für
+gespeicherte Ketten ohne den Schlüssel — ein Profil, das die Schwellen
+setzt, aber den Pegel nicht, setzt gar nichts.
+
+Die erste Fassung der Regel lief in den Anschlag (36 statt 27,6 dB):
+sie zog die eigene Verstärkung von einer Spitze ab, die noch gar nicht
+verstärkt war, und rechnete sie sich so jedes Fenster erneut dazu.
+
+**Drei weitere Funde aus derselben Durchsicht:**
+
+* **„Output trim" konnte den Ausgang nicht lauter machen.** Der Kopf
+  der Datei sagte „applied AFTER the limiter … trim sets RMS"; der
+  Quelltext wendet ihn VOR der Hüllkurve an und schneidet danach hart
+  auf die Decke. Heißt jetzt **„Antrieb in den Begrenzer"**, weil das
+  ist, was er tut. Genau der Regler, nach dem man greift, wenn die
+  Kraft fehlt — und genau der, der sie nicht liefert.
+* **Der Mithörweg konnte nur dämpfen.** Lautstärke hart auf 0…1
+  geklemmt, Vorgabe 0,7: wer seine Kette am Kopfhörer beurteilte,
+  hörte sie grundsätzlich 3 dB unter dem, was sie liefert, und hatte
+  keinen Weg, das zu ändern. Jetzt bis +6 dB.
+* **„DX — punchy" hatte den Clipper nicht eingeschaltet** — die eine
+  Stufe, die 6,3 der 8,9 dB Dichte macht. Ein Profil für DX ohne
+  Clipper ist ein Profil ohne das, wofür man es wählt.
+
+### „mir geht die Kraft als Vorverstärker ab · zu wenig Druck in der Stimme"
+
+Druck ist nicht Lautstärke. Druck ist **Lautheit bei gleicher Spitze** —
+wie viel Stimme pro Dezibel Aussteuerung ankommt. Gemessen wird er
+jetzt so: beide Fassungen auf −2 dBFS normieren, dann BS.1770
+(`src/core/Loudness.h`, lag seit Oktober da und wurde nie benutzt).
+
+**Die Kette lieferte 4,2 dB Druck. Jetzt sind es 8,9 dB,** und der
+Scheitelfaktor fällt von 12,9 auf **8,2 dB** — der Bereich, in dem ein
+Sendekanalzug arbeitet.
+
+Stufe für Stufe, Lautheit bei gleicher Spitze (vorher → nachher):
+
+| Stufe | Δ Druck vorher | Δ Druck nachher |
+| --- | --- | --- |
+| Entrauschen | −0,1 | −0,1 |
+| Gate | 0,0 | 0,0 |
+| Entzerrer | +0,7 | +0,7 |
+| De-Esser | 0,0 | 0,0 |
+| Kompressor | +1,4 | +1,4 |
+| **Clipper** | **+0,7** | **+6,3** |
+| Begrenzer | +1,6 | +0,7 |
+
+**Befund 1: der Kompressor machte die Stimme dünner, je mehr man ihn
+aufdrehte.** `ClientClipper` schneidet an der Vollaussteuerung ab —
+`samples[i] * drive`, Kante fest bei 1,0. Wie viel der Clipper tut,
+hängt also vollständig am Pegel, der bei ihm ankommt. Und der
+Kompressor hatte kein Auto-Makeup (Vorgabe 0 dB), nahm dem Clipper
+also genau den Pegel weg, den der braucht. Gemessen:
+
+| Schwelle | Verhältnis | Makeup fest | ausgeglichen |
+| --- | --- | --- | --- |
+| −22 | 3:1 | −15,9 LUFS | **−13,0** |
+| −28 | 4:1 | −18,2 LUFS | **−11,2** |
+| −34 | 6:1 | −19,1 LUFS | **−10,1** |
+| −40 | 8:1 | −19,4 LUFS | **−10,0** |
+
+Links läuft es rückwärts, rechts vorwärts. `ClientComp::setAutoMakeup`
+rechnet `(−12 − Schwelle) × (1 − 1/Verhältnis)` und addiert es zum
+Makeup von Hand; Haken auf der Kompressorseite, Beitrag in der
+laufenden Zeile. Vorgabe **aus** — eine Stufe mit Vorgabewerten ist
+ein Draht, und gespeicherte Ketten dürfen nicht über Nacht lauter
+werden. Die Empfehlung schaltet ihn ein.
+
+**Befund 2: der Clipper-Drive musste neu gewählt werden.** Die erste
+Messreihe sagte 18 dB — entstanden, bevor der Ausgleich an war. Der
+schickt 6,7 dB mehr in den Clipper und verschiebt dessen besten Punkt
+um genau diese 6,7 dB. Neu gemessen, mit Klirr an einem 1-kHz-Ton
+durch dieselbe Kette:
+
+| Drive | Lautheit | Scheitelfaktor | Klirr |
+| --- | --- | --- | --- |
+| 12 | −11,1 LUFS | 8,2 dB | −49,3 dB (0,34 %) |
+| 15 | −9,6 LUFS | 6,7 dB | −21,1 dB (9 %) |
+| 18 | −8,4 LUFS | 5,7 dB | −14,2 dB (19 %) |
+
+12 bleibt. Oberhalb ist es kein Druck mehr, sondern Verzerrung.
+
+**Befund 3: durch den Kanal kam die Kette auf +3,35 dBFS.** Der
+Überschwinger wächst mit der Dichte — 1,89 dB bei Scheitelfaktor 12,9,
+aber **5,35 dB** bei 8,2: härteres Clippen erzeugt mehr Energie
+außerhalb des Kanals, und genau die hat die Spitzen flach gehalten.
+Gegen die Reihenfolge hilft keine Decke:
+
+```
+A  Kette -> Kanal                        Spitze +3,35 dBFS · -16,8 LUFS
+B  Kette ohne Begrenzer -> Kanal
+     -> Begrenzer                        Spitze -2,00 dBFS · -12,3 LUFS
+```
+
+B hält die Spitze **und** ist 4,5 dB dichter. Der Mithörweg hat jetzt
+einen Begrenzer **hinter** dem Kanalfilter (`StripLiveMonitor`), mit
+der Decke aus der Kette. Das ist zugleich die ehrlichere Nachbildung:
+im Sender steht hinter dem Bandfilter auch eine Regelung.
+
+Nebenbei widerlegt und als Widerlegung festgehalten: ein Tiefpass
+**vor** dem Clipper senkt den Überschwinger nur von 1,89 auf 1,70 dB —
+die Oberwellen entstehen hinter ihm.
+
+### Noch einmal ganz genau — und das Prüfsignal war der Fehler
+
+> „teste bitte nochmals ganz genau"
+
+`tests/tst_bandbreiten_genau.cpp`. Zwei Messgeräte, beide im
+Prüfstand selbst gebaut, damit keines mit dem Gerät dieselbe Formel
+teilt: reine Töne mit Effektivwertmessung für die Filter, eine eigene
+Fourier-Zerlegung für die Bandenergien.
+
+**Die Bandbreiten stimmen — alle vier, auf ein Zehntelprozent.**
+
+| Kanal | untere Ecke | obere Ecke | Welligkeit | Flanke |
+| --- | --- | --- | --- | --- |
+| 200–2500 | 200,0 Hz | 2500,0 Hz | −0,01 dB | −48,2 / −50,1 dB je Oktave |
+| 150–2700 | 149,9 Hz | 2700,0 Hz | −0,00 dB | −48,2 / −50,4 dB |
+| 100–3200 | 100,0 Hz | 3200,0 Hz | −0,01 dB | −48,2 / −51,4 dB |
+| 50–4050 | 50,0 Hz | 4050,0 Hz | −0,02 dB | −48,2 / −53,5 dB |
+
+„4 k klingt wie 2700" liegt also nicht am Filter. Was wirklich dahinter
+steckt, haben **fünf** Befunde gezeigt — und der erste trifft den
+Messlauf von heute Vormittag selbst.
+
+**1. Die Entrausch-Tabelle von heute Vormittag war ungültig.** Nicht
+falsch gerechnet, sondern über die falsche Sache: gemessen wurde an
+einer *nachgebauten* Stimme, und rnnoise hat die mit einer
+Sprachwahrscheinlichkeit von **0,13** nicht als Sprache erkannt. Die
+„sieben Dezibel Höhenverlust" waren, wie stark ein Sprachnetz etwas
+wegdrückt, das es nicht kennt. Ein neuronales Netz kann man nicht mit
+Synthetik prüfen. Der Prüfstand holt sich jetzt echte Sprache von der
+Sprachausgabe des Systems (Wahrscheinlichkeit 0,98) und überspringt
+den Fall, wo es die nicht gibt.
+
+**2. Trocken und entrauscht lagen 20 ms auseinander.** Der eigentliche
+Fund des Tages. Die Mischung `dry·(1−a) + wet·a` setzt voraus, dass
+beide Wege gleich alt sind; der Quelltext behauptete das auch. Die
+Kreuzkorrelation über drei Sekunden echter Sprache sagt:
+
+```
+trockener Weg allein      480 Abtastwerte Verzögerung
+entrauschter Weg allein  1440 Abtastwerte Verzögerung
+Korrelation der beiden   0,991 bei Versatz 960
+                        −0,011 bei Versatz 0   ← dort wurde gemischt
+```
+
+rnnoise liefert seinen Ausgang **zwei Rahmen** hinter seinem Eingang.
+Jede Zwischenstellung des Reglers mischte also zwei verschiedene
+Zeitpunkte: ein Kamm mit 50 Hz Abstand. Die Vorgabe des Reglers war
+0,8 — wer das Entrauschen einschaltete und nichts weiter tat, bekam
+diesen Kamm. Der trockene Anteil läuft jetzt durch drei Rahmen.
+`latencySamples()` sagt 1440 statt 480, die Seite sagt 30 ms statt 10.
+
+Vorher und nachher, an echter Sprache:
+
+| Anteil | Sprache vorher | Sprache nachher | Störabstand nachher |
+| --- | --- | --- | --- |
+| 0,20 | −1,8 dB | **−0,1 dB** | +1,9 dB |
+| 0,35 | −2,8 dB | **−0,1 dB** | +3,7 dB |
+| 0,50 | −3,3 dB | **−0,1 dB** | +5,9 dB |
+| 0,70 | −2,6 dB | **−0,1 dB** | +10,3 dB |
+| 1,00 | −0,1 dB | −0,1 dB | +28,7 dB |
+
+Die Stufe kostet an *jeder* Stellung ein Zehntel Dezibel. Es gibt
+keine Stellung, bei der sie die Stimme stumpf macht. Die Empfehlung
+steht jetzt auf **0,70** (vorher 0,35, begründet mit der ungültigen
+Tabelle).
+
+**3. Der De-Esser hat nie gegriffen.** Die Schwelle gilt für den
+**Seitenweg**, und der liegt rund 13 dB unter dem Vollband, weil er
+ein schmales Band aus der Stimme ist. Bei Sprache mit −12 dBFS Spitze
+erreicht er −25,3 dBFS; die eingestellte Schwelle war −28. Gemessen:
+−34 → −2,4 dB Minderung, −40 → −6,0 dB. Die Empfehlung steht jetzt
+auf **−36**, die Mitte bleibt dabei unberührt (0,00 dB in 1–3 kHz).
+Dazu auf der Seite die Zahl, die man braucht, um das selbst zu sehen.
+
+Und: bei 6 kHz bewacht diese Stufe eine Stelle, die der Sender im
+DX-Kanal um 63,9 dB abschneidet. Sie lohnt sich nur im 4-kHz-Kanal.
+
+**4. Der Begrenzer hielt seine Decke nicht.** Der Kopf von
+`ClientFinalLimiter.h` sicherte zu, „no sample escapes louder than the
+configured ceiling". Gemessen: Decke −1,0 dB, größte Spitze −0,48 dBFS
+— ein halbes Dezibel darüber, und bei Decke −2,0 waren es 1,28 dB,
+weil der Clipper die Flanken noch steiler macht. Ein Hüllkurvenfolger
+ohne Vorausschau kann den ersten Abtastwerten einer Flanke nicht
+zuvorkommen. Jetzt wird abgeschnitten, was er stehen lässt; die Decke
+hält auf 0,01 dB.
+
+**5. Das Kanalfilter hebt die Spitzen wieder.** Hinter dem Begrenzer
+steht im Sender immer ein Bandfilter, und es nimmt dem abgeflachten
+Verlauf gerade die Energie, die ihn flach gehalten hat. Gemessen bis
+**1,89 dB** Überschwinger. Bei Decke −1,0 dB stand nach dem DX-Kanal
++0,21 dBFS — über Vollaussteuerung. Die Empfehlung lässt jetzt 2 dB
+Luft.
+
+Der naheliegende Ausweg wurde geprüft und ist keiner: ein Tiefpass im
+Entzerrer, also **vor** dem Clipper, senkt den Überschwinger nur von
+1,89 auf 1,70 dB. Die Oberwellen entstehen *im* Clipper, hinter dem
+Tiefpass — er kann sie unmöglich begrenzen. Steht als Widerlegung im
+Prüfstand, damit es niemand ein zweites Mal versucht.
+
+**Dazu zwei Prüfstände, die seit heute Vormittag rot waren** und es
+niemand gesehen hat: `tst_empfehlung_profil` prüfte noch 3 dB
+Clipper-Drive, `tst_strip_chain::the_limiter_is_last` noch die
+Stufenreihenfolge ohne das Entrauschen.
+
+**Die Kette an echter Sprache, nach allem:** Spitze −12,0 → −2,0 dBFS,
+Sprache −28,8 → −14,9 dB, Scheitelfaktor **16,8 → 12,9 dB**,
+Störabstand **30,4 → 54,0 dB**. Durch den DX-Kanal bleibt die Spitze
+bei −0,7 dBFS, durch den 4-kHz-Kanal bei −0,1.
+
+### Der Kanalzug, Stufe für Stufe nachgemessen
+
+> „bitte teste nun unseren kanalzug ganz genau. mit den ergebnissen
+>  bin ich nicht wirklich zufrieden, das rohe audiosignal ist besser
+>  als alles andere."
+
+`tests/tst_kanalzug_messlauf.cpp`: eine nachgebaute Stimme (Pulszug
+mit drei Formanten, Silben, Pausen, Grundgeräusch, auf −12 dBFS) geht
+durch jede Stufe **einzeln**. Gemessen werden Pegel, Scheitelfaktor,
+Spektrum in Sechstel-Oktaven, Klirr und das Rauschen in den Pausen.
+
+**Drei Befunde, drei Fehler von mir:**
+
+1. **Das Entrauschen nahm sieben Dezibel Höhen weg.** Bei Anteil 0,70:
+   −6,7 dB bei 4 kHz, −7,6 dB bei 6 kHz. Das war der Grund, aus dem
+   das rohe Signal besser klang — eine stumpfe Stimme hört man
+   sofort, fehlendes Rauschen erst, wenn man darauf achtet. Der Preis
+   explodiert oberhalb von 0,5; **0,35** kostet 0,7 dB Höhen für
+   3,7 dB weniger Rauschen. Die Empfehlung steht jetzt dort.
+2. **Der Clipper tat bei 3 dB Drive nichts** außer lauter machen —
+   bei Sprachspitzen von −12 dBFS beginnt die Wirkung erst bei 12 dB.
+   Die Empfehlung steht jetzt auf 12.
+3. **Die Gate-Schwelle saß auf den Rauschspitzen.** Ein Grundgeräusch
+   von −48 dBFS *effektiv* hat Spitzen um −38 — und genau dort stand
+   die Schwelle. Das Gate tat deshalb exakt nichts. Jetzt −34.
+
+Dazu ein Messfehler in der Anzeige: der Clipper meldete **immer
+0,0 dB**, weil er Blockspitzen vorher gegen nachher verglich — durch
+ein Filter mit sechzehn Abtastwerten Verzögerung gehören die beiden
+gar nicht zusammen. Gemessen wird jetzt **an der Kante selbst**, mit
+Halten und 20 dB/s Zerfall wie jede Rücknahmeanzeige.
+
+**Die Kette nach den Korrekturen:** Scheitelfaktor 11,7 → 7,6 dB,
+Störabstand **24,7 → 30,3 dB**, Spitze bleibt unter Vollaussteuerung.
+
+### Warum das rohe Signal jedes Profil geschlagen hat
+
+> „die rohdaten (natürlich mit voller bandbreite) sind bei allen
+>  profilen um weiten voraus."
+
+Der Grund stand in seinen eigenen Zahlen, auf zwei Bildschirmfotos:
+die Stimme kam mit **−25 bis −35 dBFS** an. Jede Schwelle dieser
+Kette ist aber in **dBFS** angegeben — Gate, Kompressor, De-Esser,
+Begrenzer. Bei 15 dB zu wenig Pegel hält das Gate die Stimme für den
+Raum und macht zu, der Kompressor greift nie, der Clipper schneidet
+nichts ab. Die Kette tut dann genau zwei Dinge: sie **verschluckt
+Wörter** und sie **färbt** — und das rohe Signal gewinnt zu Recht.
+
+Gemessen (`tst_eingangspegel`): ein −26-dBFS-Ton durch ein Gate mit
+Schwelle −20 kommt bei **−32 dB** heraus. Mit +14 dB Eingang bei
+**−12 dB**.
+
+`StripChain::setInputGainDb` sitzt jetzt **vor allem anderen**, und
+die Übersichtsseite sagt als Erstes, wo man steht:
+
+> Eingang: −26,0 dBFS Spitze — 14 dB zu wenig. Jede Schwelle hier ist
+> in dBFS, also macht das Gate bei diesem Pegel auf deiner Stimme zu
+> und der Kompressor greift nie.
+
+Daneben ein Regler und **„Übernehmen"**, das die Differenz auf
+−12 dBFS setzt. Gemessen statt geraten, gesetzt vom Betreiber statt
+von selbst.
+
+### Ein Ausgangsprofil: „Empfehlung — Sprache"
+
+> „kannst du mal deine empfehlung bei allem eingeben?"
+> „mache bitte ein gutes profil für mich als ausgangswert"
+
+Als **Ausgangspunkt** im Profilfeld, nicht als Automatik — jede
+Zeile hat einen Grund, und die Gründe stammen aus der Arbeit dieses
+Tages:
+
+| Stufe | Einstellung | Warum |
+|---|---|---|
+| Entrauschen | an, 0,70 | zuerst, sonst hebt der Kompressor den Raum mit |
+| Gate | −38 dB, Boden −18 | darf sanft sein, der Raum ist schon weg |
+| Entzerrer | HP 110 Hz, Mulm −2, Präsenz +2,5 | drei Griffe, keine Kurve aus sieben Bergen |
+| De-Esser | 6 kHz, −28 dB | im 4-kHz-Kanal hörbar, sonst harmlos |
+| Kompressor | 3:1, 8 ms, 150 ms | die Alltagseinstellung |
+| Clipper | 3 dB, Knie 0,2 | hier kommt die Sprechleistung her |
+| Begrenzer | Decke −1 dB | die Mauer darüber |
+| **Röhre, PUDU, Hall** | **aus** | sie färben, und auf SSB kostet Farbe Bandbreite |
+
+Der Prüfstand hält fest, dass es die genannten Stufen einschaltet —
+**und die anderen auslässt**. Ein Profil, das den Hall anlässt, weil
+niemand nachgesehen hat, ist schlimmer als keines.
+
+### Die drei Punkte links oben — auch an den Werkzeugfenstern
+
+> „bei apple sind links oben 3 farbige symbole, rot, gelb und grün …
+>  diese sollte auch in longpath zu sehen sein"
+
+Fast jedes Fenster ausser dem Hauptfenster ist ein `QDialog`, und
+ein QDialog bekommt von Qt auf macOS nur den Schliessknopf. Das
+System zeichnet die anderen beiden grau und tot — und ein Fenster,
+das man nicht ins Dock legen kann, muss man schliessen, womit die
+Einstellungsarbeit darin weg ist.
+
+`gui/FensterKnoepfe`: ein Filter, der die Flaggen bei `QEvent::Polish`
+nachrüstet, also bevor das Fenster angelegt wird. **Nicht** bei
+modalen Fenstern (die im Dock sperren das Programm), nicht bei
+Popups, Werkzeugfenstern, rahmenlosen und Sheets.
+
+### Das Plus atmet
+
+Die Drehung beim Öffnen sieht nur, wer das Plus schon gefunden hat.
+Jetzt atmet es: drei Sekunden je Atemzug, Sinus, kleine Amplitude —
+der Rand wandert zwischen ruhig und einem Hauch Blau. Es hält an,
+sobald der Zeiger darauf liegt oder der Auswähler offen ist.
+
+### Der Stand der Aktualisierung steht da
+
+> „checking for update sollte auch immer automatisch angezeigt werden
+>  nach dem neustart!"
+
+Die stille Prüfung beim Start meldete sich nur, wenn es etwas
+Neueres gab — „nichts gesehen" hiess damit *alles aktuell* oder *gar
+nicht nachgesehen*. Jetzt prüft jeder Start, und der Stand steht
+neben der Version: **aktuell** · **v0.7.0 verfügbar** · **nicht
+erreichbar**. Kein Fenster, das bei jedem Start aufgeht — eines, das
+jedes Mal „alles in Ordnung" sagt, wird nach drei Tagen weggeklickt.
+
+### Ein Ziel für den Entzerrer
+
+> „das mit dem eq bekomme ich leider nicht so hin, wie es sein sollte"
+> — und auf Nachfrage: ich weiß nicht, welche Kurve richtig wäre, und
+> es klingt danach nicht besser.
+
+Beides dasselbe Problem: ohne Ziel ist „besser" nicht zu beurteilen.
+Über jedem der sieben Regler steht jetzt, **wo du stehst** —
+`3 zuviel` · `passt` · `+4 fehlt`.
+
+* Gemessen wird die eigene Stimme **vor** der Kette, als
+  Langzeitspektrum aus dem Eingangsring des Mithörers.
+* Verglichen wird mit `VoiceAnalyzer::targetDb` — **derselben**
+  Meinung, die das Messblatt benutzt. Zwei Ziele in einem Programm
+  wären eines zuviel.
+* Beide liegen auf derselben Bezugsgröße (Mittel 300–3000 Hz = 0 dB),
+  verglichen wird die **Form**, nicht die Lautstärke: die hängt an der
+  Mikrofonverstärkung und sagt über die Kurve nichts.
+* ±3 dB heißt „passt". Enger wäre eine Genauigkeit, die weder die
+  Messung noch das Ohr hergibt — und sie lüde zur Jagd nach einer
+  Zahl ein, die nichts bedeutet.
+* **Es wird nichts verstellt.** Das ist der Unterschied zur
+  verworfenen Automatik, und er ist der ganze Punkt: sie hat gedreht,
+  das hier sagt nur, wo du stehst.
+
+Ohne Messung steht dort ein Strich und keine Null (HAUSSTIL §7); der
+Prüfstand hält genau das fest.
+
+### Deutsch als Sprache des Hauses
+
+> „generell sollte für mich primär alles in deutsch sein, eine
+>  englische version sollte es natürlich auch geben."
+
+`core/Sprache`: Englisch bleibt im Quelltext, Deutsch steht in einer
+Tabelle (**239 Einträge**), und ein Durchgang durch den fertigen
+Widget-Baum tauscht aus, was er findet — Beschriftungen, Knöpfe,
+Haken, Gruppen, Auswahlfelder, Reiter, Kurzhilfen, Fenstertitel. Ein
+Aufruf je Fenster statt zweihundert Änderungen an den Aufrufstellen.
+
+Texte, die erst zur Laufzeit entstehen, erwischt kein Durchgang: die
+Messzeilen, die Erklärtexte unter den Kurven, die Hinweiszeilen oben,
+der ganze Charakter-Katalog. Die haben ein `Sprache::T()` um ihre
+Vorlage bekommen — rund 50 Stellen, einzeln eingefasst.
+
+Fehlt ein Eintrag, erscheint der englische Text: sichtbar und damit
+auffindbar, statt einer leeren Zeile. Umschaltbar über die
+Einstellung `Sprache` (`de`/`en`).
+
+### Plugins: von selbst gefunden, und sie erklären sich
+
+> „ich muss auch immer auf look for plugins klicken … ggf auch beim
+>  drüber scrollen eine kurze beschreibung"
+
+Gesucht wird, sobald der Reiter aufgeht — der Knopf heißt jetzt
+„Erneut suchen" und ist keine Voraussetzung mehr. Beim Programmstart
+wird weiterhin nicht gesucht: wer die Seite nie öffnet, lädt nie
+fremden Code.
+
+`PluginPlacement::beschreibung()` sagt in einem Satz, was ein Plugin
+tut — aus einer Tabelle der Stücke, die wir kennen, einschließlich
+der Warnungen (AUNetSend ist kein Effekt, AURogerBeep ein Scherz).
+Was nicht darin steht, bekommt die geratene Gruppe, und dass sie
+geraten ist, steht dabei. Zu lesen in einer festen Zeile unter der
+Liste statt in einer Kurzhilfe, auf die man warten muss.
+
+### Raum und Mikrofon messen — da, wo Software aufhört zu helfen
+
+Ein Entzerrer legt keinen Raum trocken, ein Kompressor repariert
+kein Poppen; beide machen es schlimmer, weil sie anheben. Das
+Messblatt sagt jetzt, wann das der Fall ist.
+
+* **Nachhall**, geschätzt aus dem Abklingen nach Sprachenden — keine
+  Messung nach Norm, und das steht auch so da. Gegen einen
+  künstlichen Raum mit eingestellten 800 ms geprüft: **827 ms**
+  gemessen; ein trockenes Signal liest **25 ms**.
+* **Poppen**: kurze Stösse unter 80 Hz gezählt, dazu der stärkste in
+  dB über dem sonst üblichen Tiefton. Drei eingebaute Stösse werden
+  gefunden, im sauberen Signal keiner erfunden.
+* **Mikrofonabstand** aus der Tiefe gegen 1 kHz — keine neue
+  Rechnung, nur die richtige Lesart der Bandwerte.
+
+Jede Zeile nennt einen Handgriff, keinen Vorschlag zum Anklicken:
+näher ans Mikrofon, Poppschutz, Vorhang.
+
+### Der Clipper — die Stufe, die bei SSB wirklich Leistung bringt
+
+Die Endstufe wird von der **Spitze** begrenzt, gehört wird der
+**Effektivwert**. Der Abstand dazwischen ist verschenkte Leistung.
+Ein Kompressor macht den Pegelverlauf gleichmäßiger, lässt die
+einzelne Spitze im Wellenzug aber stehen — und genau die legt die
+Endstufe fest. Abschneiden nimmt sie weg.
+
+`core/strip/ClientClipper`, neunte… zehnte Stufe, direkt vor dem
+Begrenzer. **Zweifach überabgetastet**: Abschneiden erzeugt
+Oberwellen bis ins Unendliche, und bei 48 kHz faltet sich alles über
+24 kHz zurück *ins* Sprachband — die 15. Oberwelle eines 3,1-kHz-Tons
+landet bei 1,5 kHz mitten in der Stimme, und kein Filter holt sie je
+wieder heraus. Gemessen: **−72,9 dB** statt hörbarem Störton.
+
+Gemessen bei 6 dB Drive, Knie 0,2: Scheitelfaktor **16,0 → 13,6 dB**,
+Effektivwert **+3,4 dB**, Spitze **+0,9 dB**.
+
+Zwei Entwurfsfehler hat erst der Prüfstand aufgedeckt, nicht das Ohr:
+
+* Die erste Fassung nahm nach dem Abschneiden die Verstärkung wieder
+  heraus — Spitze −5,1 dB, Effektivwert −2,6 dB. Der Scheitelfaktor
+  wurde besser, aber alles wurde leiser, und **niemand in der Kette
+  holt den Gewinn zurück**. Ein Clipper arbeitet andersherum.
+* Der Lautstärkeabgleich zum Vergleichen war ein Regelkreis und hatte
+  eine **bleibende** Abweichung von 1,30 dB: das Mittel vieler
+  Augenblicksverhältnisse ist nicht das Verhältnis der Mittel. Jetzt
+  zwei getrennt geglättete Leistungen, danach geteilt — Rest
+  **0,007 dB**.
+
+### Die Kettenreihe passt sich der Fensterbreite an
+
+Mit zehn Stufen sind 10 × 84 plus elf Fugen 994 Punkte, und der
+Inhalt des Fensters hat rund 960. Die Kachelbreite ist jetzt eine
+Obergrenze; die Reihe wird dichter statt länger, Namen werden
+gekürzt statt überzulaufen.
+
+### Mithören durch den Sendekanal — und der Scheitelfaktor als Zahl
+
+Im Kopfhörer lief bisher die **volle Bandbreite** der Soundkarte,
+20 Hz bis 20 kHz. Der Sender macht daraus 200–2500 Hz oder 50–4050.
+Wer „Wärme bei 300" und „Schärfe bei 3,8 k" nach Gehör einstellt,
+stellt damit zum Teil Energie ein, die der Sender anschließend
+wegwirft — jedes einzelne Urteil richtig, nur über das falsche
+Signal. Das ist die stillste Art, eine Einstellung falsch zu machen.
+
+`core/strip/BandLimit`: Butterworth achter Ordnung (48 dB/Okt) hoch
+und tief, die vier Kanäle des Betreibers (200–2500, 150–2700,
+100–3200, 50–4050) plus „roh". Im Mithörweg wählbar, **hinter** dem
+Messabgriff: das Bild oben zeigt weiter, was die KETTE tut, das Ohr
+hört, was der KANAL davon durchlässt.
+
+Gemessen (`tst_monitor_hears_the_channel`): im engen Kanal 1 kHz
+±0,0 dB, 100 Hz −48,2 dB, 4 kHz −33,7 dB; bei 3,5 kHz eng −24,0 dB
+gegen weit −0,4 dB.
+
+**Scheitelfaktor** auf der Übersichtsseite, vor und nach der Kette.
+Bei SSB entscheidet er über die Reichweite: die Endstufe wird von der
+Spitze begrenzt, gehört wird der Effektivwert. Die Zahl steckte
+bisher nur im verworfenen Automatikteil.
+
+Dabei gefunden und behoben: `m_transfer` wurde beim Umbau der Reiter
+nicht genullt — dieselbe Fehlerform, die direkt darüber in drei
+Absätzen beschrieben steht. Sichtbar wurde sie andersherum: nach
+einem Profilwechsel blieb das Messbild leer, weil die Ringe des
+Mithörers am alten Bild hingen.
+
+### Entrauschen im Sendeweg — die neunte Stufe
+
+Aus dem ESSB-Plugin-Paket, das der Betreiber mitbrachte (KC1EGU),
+waren **fünf von rund zwanzig Stücken Entrauscher**. Alles andere
+darin — Entzerrer, Kompressoren, Begrenzer, Anreicherer — hatte in
+unserer Kette längst eine Entsprechung. Die Entrauscher nicht.
+
+`core/strip/NoiseReduction` schließt die Lücke: rnnoise (Xiph.Org,
+BSD-3) direkt gerufen, dasselbe Netz und dasselbe Modell, das im
+Empfang als NR3 läuft. Die Stufe steht **vorn in der Kette**, damit
+das Gate seine Schwelle auf einem sauberen Signal setzt und der
+Kompressor den Lüfter gar nicht erst anhebt.
+
+* Was das Gate nicht kann: es duckt die Pausen zwischen den Wörtern.
+  Entrauschen arbeitet auch **während** gesprochen wird.
+* **Preis: 10 ms Laufzeit**, solange die Stufe an ist — rnnoise
+  rechnet in 480er-Blöcken. Steht auf der Seite, nicht in einer
+  Anleitung, und die Stufe ist aus, bis jemand sie einschaltet.
+* Bei einer anderen Rate als 48 kHz arbeitet sie **nicht** statt
+  stillschweigend umzutasten.
+* Mischung 0…1 statt Schalter; der trockene Anteil läuft durch
+  dieselbe Verzögerung, sonst löschen sich beide aus.
+
+`tests/tst_strip_denoise_removes_noise.cpp` misst statt zu behaupten:
+Rauschen geht um **51,9 dB** zurück, bei Mischung 0 kommt das Signal
+**bitgleich** wieder heraus (nur um 480 Werte verzögert), und
+ausgeschaltet ist die Stufe bitgleich ohne Verzögerung.
+
+Das gespeicherte Format bleibt heil: die alten acht Stufen stehen
+weiter unter `Stage0…7` in ihrer alten Reihenfolge, das Entrauschen
+unter eigenem Schlüssel. Sonst wäre aus jedem gespeicherten „Gate an"
+ein „Entrauschen an" geworden.
+
+### Entzerrer: zwei Ansichten, eine Seite
+
+> „ja baue es, ev generell 2 varianten, einen leichtere und eine für
+>  profi im gleichen design?"
+
+**Einfach** ist jetzt der Standard: sieben benannte Regler — WÄRME 300
+· FÜLLE 450 · MULM 650 · NASAL 950 · KLARHEIT 1,4k · PRÄSENZ 2,5k ·
+SCHÄRFE 3,8k. **Profi** ist ein Knopf daneben und zeigt die heutige
+Seite unverändert. Dieselbe Kurve an derselben Stelle; beim
+Umschalten springt nichts.
+
+Die Regler hängen an den **sieben freien Griffen** des Bandsatzes,
+nicht an den Bändern eines Ausgangspunkts: wer „Clean voice" gewählt
+hat, hört weiter Clean voice, und die Regler stehen beim ersten
+Öffnen auf null — das ist, was man selbst dazugetan hat. Unter jedem
+Namen steht die wirkliche Frequenz des Bandes. In der einfachen
+Ansicht zeichnet die Kurve nur die Punkte, die sich auch ziehen
+lassen.
+
+Umschalten ist ausschließlich Zeigen und Verbergen —
+`tests/tst_eq_two_views.cpp` hält fest, dass hin und zurück kein Band
+bewegt. Blätter: `docs/design/2026-10-10-eq-einfach/`.
+
+### Entzerrer: ein Zug, eine Größe
+
+> „das klicken der linie bewegt teilweise die komplette kurve, was ich
+>  oft nicht will."
+
+Zwei Ursachen, beide behoben:
+
+* Ein Zug änderte **Frequenz und Pegel zugleich**. Wer anheben wollte,
+  verschob das Band nebenbei zur Seite -- bei Q = 0,707 über rund zwei
+  Oktaven, und das sieht aus wie „die ganze Kurve bewegt sich". Jetzt:
+  **ziehen = lauter/leiser**, **⌥ + ziehen = Frequenz**, **⇧ + ziehen
+  = Breite**. Hoch- und Tiefpass haben keinen Pegel, bei ihnen bleibt
+  Ziehen die Grenzfrequenz.
+* Schon das **Drücken** schaltete ein Band ein. Die zehn Griffe liegen
+  ab Werk alle auf der Nulllinie -- die Linie IST die Griffreihe, also
+  war jeder Klick darauf ein Eingriff in den Ton. Jetzt schaltet erst
+  das wirkliche Ziehen ein (ab 3 px).
+
+Dazu rechnet der Zug **relativ zum Griffpunkt**: wer den Griff um ein
+paar Pixel verfehlt, sieht das Band nicht mehr dorthin springen. Die
+Zeile über der Kurve nennt die drei Gesten.
+
+`tests/tst_eq_one_drag_one_parameter.cpp`, **Gegenprobe gefahren:**
+alle vier Fälle fallen mit der alten Fassung durch.
+
+### Die eingeschaltete Stufe sieht man jetzt
+
+> „wenn ich ein feld aktiviere sollte das feld oben als ganze markiert
+>  sein, andere farbe."
+
+Bis heute wechselte in der Kettenreihe nur der **Rahmen** die Farbe --
+ein Pixel, auf Schwarz. Aus vier Entwuerfen (Blaues Glas, Blaue Kappe,
+Bernstein, Linke Flanke; `docs/design/2026-10-10-kachel-markierung/`)
+hat der Betreiber das **Blaue Glas** gewaehlt: die ganze Kachel in der
+Auswahlfarbe des Hauses.
+
+* Keine neue Farbe. Blau heisst in HAUSSTIL.md ueberall „angefasst,
+  eingeschaltet", Warm heisst „gemessen" -- deshalb bleibt der
+  Arbeitsbalken bernstein und wird auf Blau sogar deutlicher.
+* „Eingeschaltet, aber die Kette laeuft nicht" traegt dieselbe
+  Markierung, geparkt -- **gemischt** aus Palettenfarben statt als
+  Hexwert hingeschrieben, sonst bleibt sie beim Themenwechsel stehen.
+* Dazu ein **weisser Ring** um die Kachel der aufgeschlagenen Seite.
+  Zwei Fragen, zwei Zeichen: Farbe sagt „laeuft", Ring sagt „das sehe
+  ich gerade an". Er folgt dem Reiternamen, nicht der Reiternummer --
+  die Reiter werden umgebaut, und die Voice-check-Seite kommt und geht.
+* `tests/tst_strip_row_marks_active_stages.cpp` misst, was auf der
+  Flaeche ankommt, nicht ob eine Farbe gesetzt wird. **Gegenprobe:**
+  mit der alten Fuellung fallen zwei der drei Faelle durch.
+
+### Was macht die Kette? Ein Bild, das es misst
+
+Die Frage, die den 2026-10-09 getragen hat, war nie „welche Werte habe
+ich eingestellt" -- die stehen in den Reglern. Sie war: **was macht
+das.** Oben im Uebersichtsreiter steht jetzt eine Messung statt einer
+Vermutung: das Langzeitspektrum **vor** der Kette und das **danach**,
+dazwischen ihre Differenz als gefuellte Kurve, dazu die groesste
+Aenderung als Zahl.
+
+* Es kommt aus dem Mithoerer -- also aus demselben Ton, den man im
+  Kopfhoerer hat, **Einschuebe eingerechnet**. Ein Plugin, das etwas
+  tut, ist hier zu sehen, auch wenn seine eigene Oberflaeche nichts
+  darueber verraet.
+* `core/strip/LtasSpectrum`: Sechstel-Oktaven von 50 Hz bis 8 kHz auf
+  einem **festen** Raster -- die Differenz zweier Spektren waere sonst
+  eine Differenz zweier Rasterungen. Stille Faenster fallen heraus.
+* Geprueft gegen einen Filter mit bekannter Antwort, nicht gegen das
+  Auge: eine Glocke von +10 dB bei 2 kHz wird aus der Differenz mit
+  +7,1 dB wiedergefunden, eine Oktave tiefer bleibt es unter 3 dB.
+
+### Plugins bekommen ihr eigenes Fenster
+
+Die Parameter in unseren Reglern zu zeichnen war zu eng gedacht: bei
+einem Entzerrer steckt das halbe Werkzeug in der Zeichnung. Die
+Ansicht kommt jetzt in ein **eigenes Cocoa-Fenster** (eigene Ansicht
+des Plugins ueber `kAudioUnitProperty_CocoaUI`, sonst Apples
+`AUGenericView`) -- nicht in ein Qt-Widget, denn genau das Einbetten
+ist die Stelle, an der solche Vorhaben scheitern. „Open window" auf
+der Einschubkarte oder Doppelklick auf die Kachel in der Kette. Die
+eigenen Regler bleiben daneben: sie sind das, was auch ohne
+Plugin-Oberflaeche da ist, und das Einzige, was spaeter auf Windows
+und Linux gleich aussieht.
+
+### Werkbank statt Automatik: Mithoeren, eigene Kurve, fremde Effekte
+
+Vier Wuensche an einem Abend, alle in dieselbe Richtung. Aus einem
+Fenster, das Profile herleitet, ist eine Werkbank geworden.
+
+* **Mithoeren mit waehlbarer Latenz.** Soundkarte ein, eigener
+  Kanalzug, Soundkarte aus -- das Funkgeraet wird nicht angeruehrt.
+  **Safe / Low / Lowest** statt einer Zahl im Quelltext: wie knapp ein
+  Rechner laufen kann, weiss der nicht, der die Zahl schreibt. Der
+  Zaehler daneben sagt, ob die Maschine traegt, was gewaehlt wurde.
+* **Die Entzerrerkurve zeigt die eigene Stimme und HAELT sie.** Der
+  Mithoerer fuellt das Mikrofonspektrum, das bisher allein die
+  Sendepumpe fuellte. Und „eingefroren" friert jetzt wirklich ein:
+  Aethers Fassung (wortgleich portiert) hielt nur den Abfall an und
+  zog das Maximum weiter nach -- nach einer Minute war die Linie nicht
+  mehr die Stimme, sondern die Hoechstmarke des Raums. Frei laufend
+  haelt sie zwei Sekunden und faellt dann mit 3 statt 12,5 dB/s.
+* **Zwei Einschubplaetze fuer fremde Effekte**, Stelle frei waehlbar,
+  zum Hineinziehen in die Kette oben und mit einem Kreuz wieder
+  heraus. Audio Units auf dem Mac (Systemsache, kein fremdes SDK);
+  der Katalog ist nach dem Platz gruppiert, an den ein Plugin gehoert.
+  **Zusatz, nicht Weg:** leer ist der Normalfall, ein fehlendes Plugin
+  ist kein Fehler, und was keine Zahlen liefert, bekommt den Block
+  weggenommen.
+* **Das Plus fuer neue Widgets dreht sich** beim Oeffnen in 180 ms zum
+  Kreuz -- und das Kreuz schliesst auch wieder. Von selbst bewegt sich
+  nichts; bewegt wird nur, was etwas aussagt.
+
+Entwurfsblatt: `docs/architecture/2026-10-09-sendeton-optimierer.md`,
+Nachtrag „Werkbank statt Automatik".
+
+### Der Kanalzug steht auch ohne Funkgeraet -- und man hoert sich dabei selbst
+
+Zwei Dinge vom 2026-10-09, dieselbe Wurzel: eine Stimme stellt man am
+Schreibtisch ein, nicht auf Sendung.
+
+* **Der Kanalzug haengt nicht mehr an der Sendepumpe.** Er entstand in
+  `connectToRadio()` und starb in der Teardown; ohne Verbindung war
+  damit das ganze Fenster tot -- Hauptschalter ohne Wirkung, acht
+  Stufenseiten ohne Werte, Uebersichtskarten mit acht Strichen,
+  „Through your strip" im Stimmcheck durch gar nichts. Am Geraet, mit
+  offenem Fenster: *„kann diese nicht aktivieren."* Jetzt entsteht er
+  im Konstruktor und bleibt; beim Pumpenstart nur noch `prepare()`
+  (loescht Filterzustaende, laesst Einstellungen stehen) und die
+  Uebergabe an den Worker.
+* **Mithoeren, Fassung 2.** Das Haekchen „Hear myself" flog am
+  2026-08-11 hinaus, weil sein Weg am Mikrofonstrom des Funkgeraets
+  hing -- 3 bis 15 % verlorene Bloecke, unheilbares Stottern. Diese
+  Fassung beruehrt das Geraet nicht: Soundkarte ein, eigener
+  `StripChain`, Soundkarte aus. Ein Taktgeber, keine Netzstrecke.
+  Eigener Kanalzug statt des Sendekanalzugs, weil zwei Audiofaeden in
+  denselben Filterzustaenden ein Datenrennen waeren; gehoert wird
+  trotzdem dasselbe, weil er aus derselben gespeicherten Einstellung
+  wiederhergestellt wird.
+* **Ueber die Latenz wird nicht geschwindelt.** Angezeigt wird nur der
+  eigene Anteil (rund 21 ms bei 48 kHz und 256 Rahmen); was Soundkarte
+  und CoreAudio darunter dazulegen, sieht das Modul nicht, und der
+  Text sagt das auch. Ueber- und Unterlaeufe werden gezaehlt und
+  angezeigt. Verschiedene Abtastraten auf beiden Seiten werden
+  abgelehnt statt umgerechnet -- ein Mithoeren, das die Tonhoehe
+  verschiebt, faellt beim Beurteilen einer Stimme nicht auf.
+
+Prueftand `tst_strip_works_without_radio`; Gegenprobe gegen die alte
+Fassung gefahren, drei von vier Faellen fallen dort.
+
+### Sendeton-Optimierer: vier Profile aus einem Durchgang
+
+> **Endstand 2026-10-09.** Das automatische Herleiten von Ketten ist
+> **entfallen** — Entscheidung des Betreibers nach einem Tag
+> Gegenproben, in denen seine eigene Einstellung jedes Mal besser
+> klang. Geblieben sind: eine **Uebersicht ueber alle acht Stufen**
+> nach AetherSDRs Vorbild, ein **Messblatt** (Grundton, LUFS/LRA,
+> Stoerabstand, Zischfrequenz, Mikrofonende), **vier Sendekanaele**
+> mit seinen Zahlen (200-2500 bis 50-4050), das **Hoeren** beider
+> Seiten durch den jeweiligen Kanal, und das **Ablegen der von Hand
+> eingestellten Kette** unter dem Namen einer Breite. Die Abschnitte
+> unten beschreiben Zwischenstaende desselben Tages.
+>
+> **Frueherer Zwischenstand, 2026-10-09.** Der Optimierer wurde noch am
+> selben Tag auf Zeus' Form umgebaut, nachdem der Betreiber die erste
+> Fassung gehoert hatte: **er fasst den Entzerrer nicht mehr an.** Ein
+> Profil ist Expander + Pegeltrimm auf −20 dBFS + De-Esser auf der
+> gemessenen Zischfrequenz + Kompressor + Phasendreher, und die Breite
+> ist die kennzeichnende Aenderung. Die Abschnitte unten, die von
+> Kuhschwaenzen, Hochpass und Zielkurven sprechen, beschreiben die
+> verworfene erste Fassung; die Begruendung steht im Entwurfsblatt
+> unter „Warum der Entzerrer draussen bleibt".
+
+Fuenfzehn Sekunden sprechen, ohne Einstellungen. Daraus entstehen vier
+vollstaendige Profile fuer 2,3 / 2,7 / 3,2 / 4,0 kHz — jedes mit seinem
+eigenen Hochpass, Klang, Kompressor und Sendefilter, jedes einzeln
+hoerbar, und keines wird angewendet, bevor es jemand auswaehlt.
+
+**Laeuft neben dem bisherigen Stimmcheck, nicht an seiner Stelle.** Die
+zwei alten Knoepfe (WDSP-Entzerrer, Strip) tun unveraendert, was sie
+taten; der Optimierer ist ein Abschnitt darunter, der in einem Stueck
+wieder verschwinden kann.
+
+* **Zeus ist der Maszstab.** Aus `zeus-station-engine` uebernommen: ein
+  Profil traegt die ganze Kette **samt** Low/High-Cut (`TxAudioProfileDto`),
+  und die Dichte ist **eine** Achse 0..100 statt Verhaeltnis und Schwelle
+  einzeln (`TargetSpectralDensity`, Vorgabe 55). Der Kompressor wird aus
+  der Dichte *gerechnet*: Verhaeltnis = gemessener Scheitelfaktor geteilt
+  durch den angezielten. Nichts daran ist Geschmack.
+* **Die schmalen Profile vergessen Stufen.** 2,3 k schaltet Roehre,
+  Exciter und Nachhall **ab** statt sie zu lassen; ab 2,7 k bleiben sie.
+  Betreiberregel, und NU9N kennzeichnet dieselben Stufen als optional,
+  waehrend Entzerrer und Kompressor unmarkiert bleiben.
+* **Drei neue Messgroeszen** in `VoiceAnalyzer`: Grundton (der Hochpass
+  folgt jetzt der Stimme statt einer festen Zahl — dieselben 40 Hz
+  Rumpeln liegen unter einer 95- und einer 185-Hz-Stimme), Abfallpunkt
+  des Mikrofons (ein 4-kHz-Profil aus einer Kapsel, die bei 3,1 kHz
+  schon 20 dB unten ist, sagt das jetzt), und **LUFS + LRA** nach
+  BS.1770 / EBU Tech 3342 (`src/core/Loudness.{h,cpp}`, eigener Code).
+  Die LUFS/LRA ersetzen die hausgemachte Pegelstreuung — zwei Zahlen
+  fuer eine Rolle sind schlimmer als die falschere von beiden.
+* **Hoeren, mit Pegelabgleich.** Jedes Profil spielt den rohen Durchgang
+  durch eine Wegwerfkette gerechnet ab, „Ohne" liegt daneben — und
+  beides standardmaeszig auf gleiche Lautheit gebracht. Ein A/B ohne
+  Abgleich gewinnt immer das Lautere, und der Optimierer legt gerade
+  mehrere dB Aufholverstaerkung dazu.
+
+`tests/tst_broadcast_optimizer.cpp`, 12 Faelle. Zwei davon tragen: die
+K-Gewichtung wird gegen die veroeffentlichte 48-kHz-Tabelle gestellt
+(gerechnet, nicht abgeschrieben, damit sie bei jeder Abtastrate gilt),
+und die vier Profile muessen sich wirklich unterscheiden — eine
+Breitentabelle so zu verdrahten, dass jede Zeile dieselbe Kette erzeugt,
+saehe im Fenster voellig plausibel aus.
+
+Entwurfsblatt: [`docs/architecture/2026-10-09-sendeton-optimierer.md`](docs/architecture/2026-10-09-sendeton-optimierer.md)
+— dort auch, was bewusst **nicht** gebaut wurde (Airwindows `ClipOnly2`
+als letzter Clipper, ein echter Mehrbaender) und warum.
+
+
 ### CAT-Server: Longpath ist fuer Fremdprogramme erreichbar (#221, #222)
 
 Longpath war fuer Fremdprogramme stumm — kein Logprogramm, kein
@@ -102,16 +1215,6 @@ Erst benannt (#266), dann behoben, dann die 54 Texte uebersetzt (#270).
 **richtigen** Fassung um (257 ms statt der erwarteten 180 ms), der
 Neulauf war gruen. Gemessen wird jetzt, was gemeint ist: stille
 Fenster, nicht Wanduhrzeit.
-
-### Nicht enthalten: der Kanalzug
-
-Die Sendeton-Arbeit vom 9. bis 18. Oktober — **Live-Hoeren** („Mich
-hoeren"), Rueckkopplungswache, Apollo mit sechzehn Eingaengen, die
-Messungen am Clipper und am Gate, die Stimmprobe — liegt auf
-`feat/sendeton-auf-main` (PR #279) und ist in dieser Fassung **nicht
-dabei**. Der Empfangs-Equalizer unten ist der einzige Teil davon, der
-es ueber #221 schon auf main geschafft hat.
-
 ### Der Empfangs-Equalizer — neu (2026-10-11)
 
 Longpath hatte keinen. WDSPs `eqp` laeuft im RXA-Durchlauf

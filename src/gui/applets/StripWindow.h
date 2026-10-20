@@ -53,12 +53,16 @@
 #include <QPointer>
 #include <QVector>
 
+#include "core/strip/AudioPlugin.h"
+
 #include <array>
 #include <functional>
 
 class QCheckBox;
 class QComboBox;
 class QLabel;
+class QFormLayout;
+class QSlider;
 class QTableWidget;
 class QTabWidget;
 class QVBoxLayout;
@@ -69,12 +73,25 @@ namespace Longpath {
 
 class EqHost;
 class RadioModel;
+class StripLiveMonitor;
 class StripEqPanel;
 class TxVoiceCheckDialog;
 
 class StripWindow : public QDialog {
     Q_OBJECT
 public:
+    // Der Name, unter dem der Stand VOR einem Voreinstellungswechsel
+    // landet. Eine Funktion und keine Konstante, damit die Übersetzung
+    // greift, sobald die Sprache steht. Öffentlich, weil der Prüfstand
+    // nach genau diesem Eintrag sucht -- ein Prüfstand, der den Namen
+    // selbst hinschreibt, prüft seine eigene Schreibweise.
+    static QString kLetzterStand();
+
+    /// Der Schluessel, unter dem der Hauptschalter JE SOUNDKARTE
+    /// liegt -- am Apollo gehoert keine Kette dazu, am Headset an der
+    /// Klinke schon. Leer, wenn die Kennung leer ist.
+    static QString kettenSchluessel(const QByteArray& geraeteId);
+
     explicit StripWindow(RadioModel* radio, QWidget* parent = nullptr);
     ~StripWindow() override;
 
@@ -96,6 +113,9 @@ public:
 signals:
     void monitorRecordClicked();
     void monitorPlayClicked();
+    // „ein speichern sollte auch möglich sein, sodass ich die aufnahme
+    //  am desktop speichern kann." (2026-10-14)
+    void monitorSaveClicked();
 
 private:
     void buildUi();
@@ -103,6 +123,8 @@ private:
     QWidget* buildEqPanel();
     QWidget* buildDeEssPanel();
     QWidget* buildCompPanel();
+    QWidget* buildDenoisePanel();
+    QWidget* buildClipperPanel();
     QWidget* buildTubePanel();
     QWidget* buildPuduPanel();
     QWidget* buildReverbPanel();
@@ -184,6 +206,10 @@ private:
     StripChain* chain() const;
 
     void applyPreset(const QString& name);
+
+    // Ein Kanalzugprofil aus AetherSDR. Unsere Grafik, seine
+    // Einstellungen -- siehe core/strip/AetherPreset.h.
+    void importAetherPreset();
     void rebuildPresetBox(const QString& select = QString());
     void saveUserPreset();
     void deleteUserPreset();
@@ -201,11 +227,118 @@ private:
     // is a panel that is wrong for the rest of the session in the one
     // case where the operator most needs it.
     void adoptChainIfArrived();
+    QString noteText() const;
+    bool m_wasConnected{false};
     bool m_hadChain{false};
 
-    // setSelfMonitor is gone (2026-08-11): live listening left this
-    // window with the "Hear myself" checkbox. The record-then-listen
-    // monitor (buttons above) replaced it — the AetherSDR way.
+    // ── Mithoeren, Fassung 2 (2026-10-09) ────────────────────────────
+    //
+    // Am 2026-08-11 flog das Haekchen "Hear myself" hinaus, weil sein
+    // Weg ueber den Mikrofonstrom des Funkgeraets lief und dieser
+    // 3-15 % seiner Bloecke verliert -- es stotterte unheilbar. Der
+    // Wunsch selbst war nie falsch, und er kam am 2026-10-09 wieder:
+    // "ohne und mit nur minimaler latenz selbst zu hoeren. hat den
+    // vorteil, aenderung sofort wahr zu nehmen."
+    //
+    // Diese Fassung laeuft ausschliesslich ueber die Soundkarte des
+    // Rechners und ruehrt das Funkgeraet nicht an. Siehe
+    // core/strip/StripLiveMonitor.h.
+    void toggleLiveMonitor(bool on);
+    void useChainForDisplay(StripChain* c);
+    StripChain* displayChain() const;
+
+
+    /// Den gespeicherten Stand dieses Geraets auf den Hauptschalter
+    /// legen. Ist nichts gespeichert, bleibt alles, wie es ist.
+    void wendeKettenStandAn(const QByteArray& geraeteId);
+    StripChain* m_displayChain{nullptr};   // nicht besessen
+    void updateLiveNote();
+
+    // ── Einschubplaetze (2026-10-09) ────────────────────────────────
+    //
+    // Fremde Effekte als ZUSATZ. „plugins koennen nur als option
+    // zusaetzlich gelten, wenn gewollt. ist nicht der standard."
+    // Deshalb: letzter Reiter, leer beim ersten Aufschlagen, Suchlauf
+    // erst auf Knopfdruck.
+    QWidget* buildInsertsPanel();
+    void scanPlugins();
+
+public:
+    // Nur fuer Prueftaende: den Suchlauf und den Umbau der Reiter von
+    // aussen anstossen. Beides sind sonst innere Wege -- aber genau
+    // ihre REIHENFOLGE war der Fehler („kann keine auswählen"), und
+    // ein Prueftand, der sie nicht nachstellen kann, haette ihn nicht
+    // gefunden.
+    void scanPluginsForTest()   { scanPlugins(); }
+    void rebuildTabsForTest()   { reloadControls(); }
+
+private:
+    // Die beiden Einschub-Auswahllisten aus m_plugins fuellen.
+    // Gerufen vom Suchlauf UND vom Aufbau der Seite -- siehe die
+    // Begruendung an der Umsetzung.
+    void refillInsertCombos();
+    void chooseInsertPlugin(int slot);
+    void refreshInsertCard(int slot);
+    void refreshInsertCards();
+    void rebuildPluginCatalogue();
+    void dropPluginAt(const QString& identifier, int position);
+    void clearInsert(int slot);
+    static QString insertPositionName(int at);
+
+    struct InsertUi {
+        QComboBox*   plugin{nullptr};
+        QComboBox*   position{nullptr};
+        QCheckBox*   on{nullptr};
+        QPushButton* editor{nullptr};
+        QLabel*      note{nullptr};
+        QWidget*     params{nullptr};
+        QFormLayout* paramForm{nullptr};
+    };
+    std::array<InsertUi, 2> m_insertUi{};
+    QVector<PluginDescriptor> m_plugins;
+    bool m_pluginsScanned{false};
+    QWidget*     m_catalogue{nullptr};
+    QLabel*      m_insertsNote{nullptr};
+    // Die Zeile unter der Liste, die beim Darueberfahren sagt, was
+    // das Plugin tut -- ohne die Wartezeit einer Kurzhilfe.
+    QLabel*      m_pluginSatz{nullptr};
+    QLabel*      m_eqMuteWarning{nullptr};
+    class StripTransferCurve* m_transfer{nullptr};
+    QLabel* m_crestNote{nullptr};
+    // Der Eingangspegel: gemessen, gebraucht, und der Knopf dazwischen.
+    QLabel*      m_eingangNote{nullptr};
+    QSlider*     m_eingangSlider{nullptr};
+    QLabel*      m_eingangWert{nullptr};
+    QPushButton* m_eingangBtn{nullptr};
+    QCheckBox*   m_eingangAuto{nullptr};
+    QComboBox*   m_liveIn{nullptr};
+    QComboBox*   m_liveOut{nullptr};
+    // Fuer die Zielanzeige im einfachen Entzerrer: Zaehler und
+    // Arbeitsspeicher, damit nicht zehnmal je Sekunde ein
+    // Langzeitspektrum gerechnet wird.
+    int                m_zielTick{0};
+    std::vector<float> m_zielScratch;
+    QPushButton* m_insertScanBtn{nullptr};
+
+    StripLiveMonitor* m_live{nullptr};
+    QCheckBox*  m_liveBtn{nullptr};
+    QLabel*     m_liveNote{nullptr};
+    QSlider*    m_liveVol{nullptr};
+    /// „gleich laut" -- siehe core/strip/LoudnessMatch.h.
+    QCheckBox*  m_liveGleich{nullptr};
+
+    // ── „Nur diese Stufe" ────────────────────────────────────────
+    //
+    // Welche Stufe gerade allein laeuft (-1 = keine), und der Stand,
+    // der vorher galt. Siehe die Begruendung am Signal
+    // stageSoloRequested().
+    int  m_soloStufe{-1};
+    bool m_soloMasterVorher{false};
+    std::array<bool, StripChain::kStageCount> m_soloVorher{};
+    QComboBox*  m_liveLatency{nullptr};
+    // Durch welchen Sendekanal gehoert wird; -1 = roh.
+    QComboBox*  m_liveChannel{nullptr};
+    QTimer*     m_liveSync{nullptr};
 
     // ── The radio's own processing, while listening ──────────────────
     //
@@ -256,11 +389,16 @@ private:
     QComboBox*      m_presetBox{nullptr};
     QPushButton*    m_presetSave{nullptr};
     QPushButton*    m_presetDelete{nullptr};
+    QPushButton*    m_aetherImport{nullptr};
+    // Welche eigene Kette beim nächsten Druck auf „Löschen" wirklich
+    // gelöscht wird. Leer heißt: der nächste Druck fragt erst.
+    QString         m_presetDeleteArmed;
     QPushButton*    m_compareBtn{nullptr};
 
     // PUDU monitor buttons — state painted by the three setters above.
     QPushButton*    m_monRecordBtn{nullptr};
     QPushButton*    m_monPlayBtn{nullptr};
+    QPushButton*    m_monSaveBtn{nullptr};
     bool            m_monHasRecording{false};
     // Measure, then shape. See the note at the button's construction
     // for why a take with a start and a stop replaced the rolling
@@ -334,6 +472,37 @@ private:
     static QString characterKeyFor(StripChain::Stage s);
     static void    rememberCharacter(StripChain::Stage s, const QString& name);
 
+
+    // ── Alle Stufen auf einer Flaeche ────────────────────────────────
+    //
+    // Nach AetherSDRs Kanalzug gebaut (src/gui/AetherialAudioStrip.cpp,
+    // Raster ab Zeile 447). Betreiber, 2026-10-09: "bei aether konnte
+    // ich es allein sehr gut machen ... schaue bitte, wie aether es
+    // gemacht hat. so werden wir es auch machen."
+    //
+    // Der Unterschied ist genau das: Aether zeigt alle Stufen
+    // gleichzeitig in einem zweispaltigen Raster, Longpath zeigte eine
+    // je Reiter. Wer von Hand einstellt, muss die ganze Kette sehen,
+    // waehrend er an einer Stufe dreht -- sonst stellt er acht Dinge
+    // nacheinander ein und hoert erst am Ende, dass sie sich
+    // widersprechen.
+    //
+    // Die Leserichtung ist die Kettenreihenfolge (Betreiber,
+    // 2026-10-09: "nach der reihen"): links nach rechts, oben nach
+    // unten ergibt Gate, EQ, De-Esser, Kompressor, Roehre, PUDU,
+    // Nachhall, Begrenzer.
+    QWidget* buildAllStagesSurface();
+    QWidget* buildStageCard(StripChain::Stage stage);
+    void     refreshStageCards();
+    QString  stageSummary(StripChain::Stage stage) const;
+
+    struct StageCard {
+        QLabel* state{nullptr};
+        QLabel* values{nullptr};
+        QLabel* note{nullptr};
+    };
+    std::array<StageCard, StripChain::kStageCount> m_stageCards{};
+
     struct StageText {
         QWidget* picture{nullptr};
         QLabel*  live{nullptr};
@@ -365,6 +534,8 @@ private:
                           const StripChain& c);
 
     QLabel* m_presetNote{nullptr};
+    QLabel* m_nrMeter{nullptr};
+    QLabel* m_clipMeter{nullptr};
     QLabel* m_gateMeter{nullptr};
     QLabel* m_deEssMeter{nullptr};
     QLabel* m_compMeter{nullptr};

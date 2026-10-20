@@ -820,6 +820,12 @@ private:
     void openVoiceCheck();
     void wirePuduMonitor();
     void finishPuduTake();
+    // Der rohe Mitschnitt, durch Kette und Sendekanal gerechnet -- bei
+    // jedem Abspielen neu, damit ein Wechsel der Bandbreite an
+    // derselben Aufnahme hoerbar wird.
+    std::vector<float> puduTakeProcessed() const;
+    void reseatPuduTake();
+    void savePuduTake();
     // Open the antenna window: a measured sweep turned into a length of
     // wire. Reads a file, touches nothing else.
     void openAntennaWindow();

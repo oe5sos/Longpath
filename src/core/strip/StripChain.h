@@ -53,13 +53,17 @@
 #include "core/strip/ClientDeEss.h"
 #include "core/strip/ClientEq.h"
 #include "core/strip/ClientFinalLimiter.h"
+#include "core/strip/ClientClipper.h"
 #include "core/strip/ClientGate.h"
+#include "core/strip/NoiseReduction.h"
 #include "core/strip/ClientPudu.h"
 #include "core/strip/ClientReverb.h"
 #include "core/strip/ClientTube.h"
+#include "core/strip/AudioPlugin.h"
 #include "core/strip/MicSpectrum.h"
 
 #include <array>
+#include <memory>
 #include <atomic>
 #include <cstdint>
 #include <vector>
@@ -71,8 +75,13 @@ public:
     // Order matches AetherSDR's defaultChain(); the limiter is not in
     // that list because upstream applies it separately at the very end
     // of the output path, and it is last here for the same reason.
+    // Entrauschen steht VORN. Nicht aus Geschmack: das Gate soll
+    // seine Schwelle auf einem sauberen Signal setzen, und alles, was
+    // danach Pegel anhebt -- Kompressor, Roehre, Anreicherer -- soll
+    // das Raumgeraeusch gar nicht erst mitbekommen.
     enum class Stage : uint8_t {
-        Gate = 0, Eq, DeEss, Comp, Tube, Pudu, Reverb, Limiter, Count
+        Denoise = 0, Gate, Eq, DeEss, Comp, Tube, Pudu, Reverb, Clip,
+        Limiter, Count
     };
     static constexpr int kStageCount = static_cast<int>(Stage::Count);
 
@@ -99,6 +108,95 @@ public:
 
     static const char* stageName(Stage s) noexcept;
 
+    // ── Die Reihenfolge der Stufen ───────────────────────────────────
+    //
+    // Bis zum 2026-10-13 stand sie als Folge von Aufrufen im
+    // Rumpf von processMono(). AetherSDR traegt sie dagegen als LISTE
+    // im Profil ("chain": ["Tube","Gate","Eq",...]) -- und Martins
+    // Profil, das er unter Windows als gut befunden hat, stellt die
+    // Roehre VOR das Tor. Das ist kein Geschmack, sondern ein anderes
+    // Geraet: vorne saettigt sie das rohe Mikrofon, hinten das schon
+    // komprimierte Signal.
+    //
+    // Gehalten wird die Reihenfolge in EINER atomaren Zahl: zehn
+    // Stufen zu je vier Bit. Der Audiofaden liest sie einmal je Block,
+    // der Hauptfaden schreibt sie in einem Zug -- kein halb
+    // umgestellter Zustand, kein Schloss im Audiofaden.
+    using Order = std::array<Stage, kStageCount>;
+
+    // Longpaths eigene Reihenfolge: Entrauschen vorn, Clipper und
+    // Begrenzer hinten. Siehe die Begruendung am Aufzaehlungstyp.
+    static Order defaultOrder() noexcept;
+
+    // Nimmt NUR eine Permutation an: jede Stufe genau einmal. Alles
+    // andere laesst die bisherige Reihenfolge stehen und meldet false
+    // -- eine Kette, in der eine Stufe zweimal oder gar nicht
+    // vorkommt, ist kein Kanalzug mehr.
+    bool setStageOrder(const Order& order) noexcept;
+    Order stageOrder() const noexcept;
+
+    // Ein kurzes, UNVERAENDERLICHES Wort je Stufe -- fuer die
+    // Einstellungsdatei und fuer Aethers Profile, die ihre Kette als
+    // Liste solcher Woerter tragen. Bewusst NICHT stageName(): das ist
+    // die Beschriftung, die darf sich aendern und wird uebersetzt.
+    // Eine Reihenfolge, die an Beschriftungen haengt, kippt beim
+    // naechsten Umbenennen.
+    static const char* stageToken(Stage s) noexcept;
+
+    // Nimmt auch Aethers Namen an: "Enh" ist dort der Anreicherer, bei
+    // uns heisst dieselbe Stufe "Pudu". Unbekanntes meldet false.
+    static bool stageFromToken(const char* token, Stage& out) noexcept;
+
+    // ── Einschubplaetze fuer fremde Effekte ──────────────────────────
+    //
+    // ZUSATZ, nicht Weg. Beide Plaetze sind leer, solange sie niemand
+    // befuellt, und ein leerer Platz kostet im Block eine atomare
+    // Ladung und sonst nichts -- siehe die drei Regeln in
+    // AudioPlugin.h.
+    //
+    // Die Stelle in der Kette waehlt der Betreiber: 0 heisst vor dem
+    // Gate, kStageCount heisst hinter dem Begrenzer, dazwischen vor
+    // der Stufe mit diesem Index. Das ist der ganze Grund, warum es
+    // Einschuebe sind und keine neunte Stufe -- ein Kompressor vor dem
+    // Entzerrer ist ein anderes Geraet als einer dahinter, und das
+    // gehoert dem gewaehlt, der es hoert.
+    static constexpr int kInsertCount = 2;
+
+    // Hauptfaden. Uebernimmt das Plugin, bereitet es auf die laufende
+    // Rate vor und haengt es ein. nullptr leert den Platz. Die
+    // Uebergabe wartet, bis der Audiofaden das alte Plugin sicher
+    // nicht mehr in der Hand hat.
+    void setInsertPlugin(int slot, std::unique_ptr<AudioPlugin> plugin);
+    AudioPlugin* insertPlugin(int slot) const noexcept;
+
+    void setInsertPosition(int slot, int position) noexcept;
+    int  insertPosition(int slot) const noexcept;
+
+    void setInsertEnabled(int slot, bool on) noexcept;
+    bool insertEnabled(int slot) const noexcept;
+
+    // Wie oft dieser Einschub etwas geliefert hat, das keine Zahl war.
+    // Ein fremdes Plugin ist das einzige Stueck dieser Kette, das wir
+    // nicht gelesen haben; was es tut, wird gezaehlt wie bei jeder
+    // eigenen Stufe.
+    uint32_t nonFiniteInsertBlocks(int slot) const noexcept;
+
+    // Den gespeicherten Zustand eines Plugins uebernehmen, falls er
+    // sich geaendert hat.
+    //
+    // Gebraucht vom Mithoerer: er hat seinen EIGENEN Kanalzug und
+    // damit eine eigene Instanz desselben Plugins. Ohne das hier
+    // bliebe sie auf dem Stand, den sie beim Laden hatte -- man
+    // drehte an einem Regler und hoerte nichts, was die ganze
+    // Uebung sinnlos macht.
+    //
+    // Haelt den Audiofaden kurz an (derselbe Handschlag wie
+    // setInsertPlugin): einem fremden Plugin den Zustand zu setzen,
+    // waehrend es rechnet, ist nichts, was man ihm zutrauen darf.
+    // Kostet also einen Block, wenn sich wirklich etwas geaendert
+    // hat -- und nur dann, darum der Vergleich.
+    void applyInsertState(int slot, const QByteArray& blob);
+
     // Audio thread. Mono, in place. Returns immediately when the
     // master switch is off, so bypass costs one atomic load and the
     // samples are untouched.
@@ -118,7 +216,108 @@ public:
     // Held at -120 while the strip is off rather than reporting the
     // input twice. A gain change of zero and a strip that is not
     // running are different facts and should not read the same.
+    // ── Eingangsverstärkung ──────────────────────────────────────────
+    //
+    // „die rohdaten sind bei allen profilen um weiten voraus."
+    //
+    // Der Grund stand in seinen eigenen Zahlen: die Stimme kam mit
+    // -25 bis -35 dBFS an. JEDE Schwelle in dieser Kette ist aber in
+    // dBFS angegeben -- Gate, Kompressor, De-Esser, Begrenzer. Bei
+    // 15 dB zu wenig Pegel heisst das: das Gate hält die Stimme für
+    // den Raum und macht zu, der Kompressor greift nie, der Clipper
+    // schneidet nichts ab. Die Kette tut dann genau zwei Dinge --
+    // sie verschluckt Wörter und sie färbt --, und gegen das rohe
+    // Signal verliert sie zu Recht.
+    //
+    // Keine Schwelle der Welt hilft dagegen, solange der Pegel nicht
+    // stimmt. Also sitzt hier, VOR allem anderen, eine einfache
+    // Verstärkung -- und die Oberfläche sagt, welche Zahl gebraucht
+    // wird. Gemessen, nicht geraten; gesetzt vom Betreiber, nicht
+    // von selbst.
+    void  setInputGainDb(float db) noexcept;   // -12 .. +36 dB
+    float inputGainDb() const noexcept;
+
+    // ── Und derselbe Pegel, von selbst ───────────────────────────────
+    //
+    // „mir geht die kraft als vorverstärker ab."
+    //
+    // Darüber stand: „gesetzt vom Betreiber, nicht von selbst." Das
+    // war als Tugend gemeint und war ein Fehler. Ein Vorverstärker,
+    // bei dem man erst einen Knopf drücken muss, ehe er verstärkt,
+    // ist keiner -- und wer ihn nicht drückt, hört eine Kette, in der
+    // JEDE Schwelle am falschen Platz steht, ohne dass ihm irgendwo
+    // gesagt würde, warum.
+    //
+    // Also sucht sie den Arbeitspunkt selbst. Kein Regelkreis über
+    // den Ton: die Verstärkung ist weiterhin eine einzige Zahl, sie
+    // wird nur alle zwei Sekunden um einen Schritt nachgezogen --
+    // und ausschliesslich dann, wenn in diesen zwei Sekunden
+    // gesprochen wurde. In der Stille rührt sie sich nicht, sonst
+    // zöge sie das Grundgeräusch hoch, bis die Kette es für eine
+    // Stimme hält.
+    //
+    // Der Zielwert ist kZielSpitzeDbFs: dort liegen alle Schwellen
+    // der Kette, dort rechnet der Ausgleich des Kompressors, und
+    // dort beginnt der Clipper zu arbeiten.
+    static constexpr float kZielSpitzeDbFs = -12.0f;
+    // Unter diesem Pegel gilt ein Zeitfenster als Pause.
+    static constexpr float kSpracheAbDbFs  = -45.0f;
+
+    // Der Scheitelfaktor, ab dem ein Fenster als Sprache gilt.
+    // Gemessen: echte Sprache liegt bei 12-18 dB, Brummen und
+    // Rauschen bei 3-6 dB. 9 dB trennt beides mit Abstand nach beiden
+    // Seiten. Siehe die Begründung in StripChain.cpp — ohne diese
+    // Schranke hebt die Automatik einen Störteppich auf Sprachpegel.
+    static constexpr float kScheitelAbDb   = 9.0f;
+    void  setInputAuto(bool on) noexcept;
+    bool  inputAuto() const noexcept;
+    // Was gerade WIRKLICH verstärkt wird -- von Hand oder gefunden.
+    // Die Anzeige liest diese Zahl, nicht inputGainDb().
+    float effectiveInputGainDb() const noexcept;
+
+    // Was AM EINGANG ankommt, vor der Verstärkung -- also das, was
+    // das Mikrofon liefert. Ein Augenblickswert: die Spitze des
+    // letzten Blocks, rund zehn Millisekunden. Zum ANSEHEN gut, zum
+    // RECHNEN nicht -- siehe speechPeakDb().
+    float rawInputPeakDb() const noexcept;
+
+    // ── Der Pegel, mit dem gerechnet werden darf ─────────────────
+    //
+    // Dieselbe Messung, aus der die Automatik ihren Schritt zieht:
+    // die Spitze eines Zwei-Sekunden-Fensters, aber nur aus einem
+    // Fenster, das den Scheitelfaktor-Test bestanden hat. Also der
+    // Pegel seiner STIMME, nicht der des Raums zwischen zwei Wörtern.
+    //
+    // Warum es die Zahl gibt: am 2026-10-14 rechnete die Empfehlung
+    // („x dB fehlen") und der Knopf daneben beide mit
+    // rawInputPeakDb(). Der Knopf wurde in einer Sprechpause
+    // gedrückt, traf den Störteppich bei -48 dBFS, setzte die vollen
+    // +36 dB -- und der Kopfhörer stand an der Decke des Begrenzers.
+    // Es war das dritte Mal an diesem Tag.
+    //
+    // -120 heisst „noch nichts gehört": dann rechnet niemand, und
+    // der Knopf bleibt aus.
+    float speechPeakDb() const noexcept;
+
     float inputPeakDb() const noexcept;
+
+    // ── Scheitelfaktor ───────────────────────────────────────────────
+    //
+    // Der Abstand zwischen Spitze und Effektivwert, über eine Sekunde.
+    // Bei SSB ist das die Zahl, die über die Reichweite entscheidet:
+    // die Endstufe wird von der SPITZE begrenzt, gehört wird der
+    // EFFEKTIVWERT. 18 dB Abstand heissen, dass die Spitzenleistung
+    // kaum als Lautstärke ankommt.
+    //
+    // Zwei Werte, weil nur der Vergleich etwas sagt: was die Stimme
+    // mitbringt, und was die Kette daraus macht. Eine einzelne Zahl
+    // wäre nicht zu beurteilen.
+    //
+    // 0 heisst „noch nicht gemessen" -- es gibt keinen Scheitelfaktor
+    // von null, also kann die Null nicht mit einer Messung verwechselt
+    // werden.
+    float inputCrestDb() const noexcept;
+    float outputCrestDb() const noexcept;
     float outputPeakDb() const noexcept;
 
     // ── Values that are not numbers ──────────────────────────────────
@@ -163,6 +362,8 @@ public:
 
     // The stages themselves, for the panels to bind to. Not owned by
     // the caller and not valid across a prepare().
+    NoiseReduction&     nr()      noexcept { return m_nr; }
+    ClientClipper&      clipper() noexcept { return m_clip; }
     ClientGate&         gate()    noexcept { return m_gate; }
     ClientEq&           eq()      noexcept { return m_eq; }
     ClientDeEss&        deEss()   noexcept { return m_deEss; }
@@ -177,6 +378,8 @@ public:
     // compares a stage against every character and must not be able to
     // change one by accident — the stage it is inspecting is being read
     // by the audio thread at the same time.
+    const NoiseReduction&     nr()      const noexcept { return m_nr; }
+    const ClientClipper&      clipper() const noexcept { return m_clip; }
     const ClientGate&         gate()    const noexcept { return m_gate; }
     const ClientEq&           eq()      const noexcept { return m_eq; }
     const ClientDeEss&        deEss()   const noexcept { return m_deEss; }
@@ -196,10 +399,62 @@ private:
     // tst_strip_chain holds the two in step.
     std::array<std::atomic<bool>, kStageCount> m_stageOn;
 
+    // Ein Einschubplatz. m_owned haelt das Plugin, m_live ist das, was
+    // der Audiofaden sehen darf, und m_busy ist der Handschlag
+    // zwischen beiden: der Audiofaden setzt ihn, BEVOR er den Zeiger
+    // liest, der Hauptfaden leert den Zeiger und wartet dann, bis
+    // m_busy null ist. Danach kann kein Durchlauf das alte Plugin
+    // mehr in die Hand bekommen.
+    struct Insert {
+        std::unique_ptr<AudioPlugin> owned;
+        std::atomic<AudioPlugin*> live{nullptr};
+        std::atomic<int>  busy{0};
+        std::atomic<bool> on{true};
+        std::atomic<int>  position{0};
+        std::atomic<uint32_t> nonFinite{0};
+        QByteArray lastState;   // nur Hauptfaden
+    };
+    std::array<Insert, kInsertCount> m_inserts;
+
+    // Groesster Block, den ein Einschub vorbereiten muss. Die
+    // Sendepumpe rechnet in 64 Rahmen, der Mithoerer auch; der
+    // Spielraum ist da, damit ein Offline-Durchlauf mit groesseren
+    // Haeppchen kein Plugin ueberfaehrt.
+    static constexpr int kMaxInsertFrames = 2048;
+
+    // Laeuft die Einschuebe, die an dieser Stelle der Kette haengen.
+    void runInserts(int position, float* samples, int frames) noexcept;
+    static void waitUntilIdle(Insert& in) noexcept;
+
     // Written on the audio thread once per block, read by the meter.
     // Plain relaxed stores: a meter that is one block stale is a meter,
     // and paying for ordering on the transmit path to make a picture
     // slightly fresher is the wrong trade.
+    std::atomic<float> m_inCrestDb{0.0f};
+    std::atomic<float> m_outCrestDb{0.0f};
+    // Sammelt über eine Sekunde, dann einmal veröffentlichen.
+    double m_crestSumIn{0.0};
+    double m_crestSumOut{0.0};
+    float  m_crestPeakIn{0.0f};
+    float  m_crestPeakOut{0.0f};
+    int    m_crestFrames{0};
+
+    std::atomic<float> m_inputGainDb{0.0f};
+    // ── Der gefundene Pegel ──────────────────────────────────────
+    //
+    // Getrennt vom Wert des Betreibers, und zwar mit Absicht: der
+    // Mithörer spiegelt die Einstellungen der Sendekette, und wenn
+    // beide dieselbe Zahl benutzten, würde jede Spiegelung die
+    // gefundene Verstärkung der anderen überschreiben. So sucht
+    // jede Kette ihren eigenen Pegel aus ihrem eigenen Strom, und
+    // kopiert wird nur, was der Betreiber eingestellt hat.
+    std::atomic<bool>  m_inputAuto{false};
+    std::atomic<float> m_autoGainDb{0.0f};
+    std::atomic<float> m_speechPeakDb{-120.0f};
+    float m_autoPeak{0.0f};
+    double m_autoSumSq{0.0};        // Spitze im laufenden Zeitfenster
+    int   m_autoFrames{0};
+    std::atomic<float> m_rawInPeakDb{-120.0f};
     std::atomic<float> m_inPeakDb{-120.0f};
     std::atomic<float> m_outPeakDb{-120.0f};
 
@@ -209,6 +464,15 @@ private:
     // instantiation lives there.
     template <typename S>
     void runStage(Stage which, S& stage, float* samples, int frames) noexcept;
+
+    // Der Verteiler: aus einer Stufennummer das zugehoerige Mitglied.
+    // Nur hier steht, welche Stufe welches Objekt ist.
+    void runStageAt(Stage which, float* samples, int frames) noexcept;
+
+    // Zehn Stufen zu vier Bit, Stufe 0 in den untersten vier.
+    static uint64_t packOrder(const Order& order) noexcept;
+    static Order unpackOrder(uint64_t packed) noexcept;
+    std::atomic<uint64_t> m_order;
 
     // The block as it was before the stage that is running now. Fixed
     // size and part of the object, so the audio thread never allocates
@@ -225,6 +489,8 @@ private:
     std::atomic<uint32_t> m_nonFiniteInputBlocks{0};
     std::atomic<uint32_t> m_nonFiniteTotal{0};
 
+    NoiseReduction     m_nr;
+    ClientClipper      m_clip;
     ClientGate         m_gate;
     ClientEq           m_eq;
     ClientDeEss        m_deEss;

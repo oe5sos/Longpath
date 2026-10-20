@@ -51,7 +51,7 @@ namespace Longpath::EqFilterRing {
 // How many entries the ring has. A static_assert cannot check an enum's
 // size, so this is the one place the count lives and step() is written
 // against it.
-inline constexpr int kTypeCount = 5;
+inline constexpr int kTypeCount = 7;
 
 // Move `direction` places round the ring. +1 is forward, -1 back;
 // anything else is taken modulo the ring, so a mouse wheel can be
@@ -75,6 +75,8 @@ inline const char* name(ClientEq::FilterType t)
     case ClientEq::FilterType::HighShelf: return "High Shelf";
     case ClientEq::FilterType::LowPass:   return "Low Pass";
     case ClientEq::FilterType::HighPass:  return "High Pass";
+    case ClientEq::FilterType::Notch:     return "Notch";
+    case ClientEq::FilterType::BandPass:  return "Band Pass";
     }
     return "Peak";
 }
@@ -101,9 +103,36 @@ inline const char* name(ClientEq::FilterType t)
 inline void applyTo(ClientEq& eq, int bandIdx, ClientEq::FilterType t)
 {
     ClientEq::BandParams p = eq.band(bandIdx);
+    const ClientEq::FilterType vorher = p.type;
     p.type    = t;
     p.enabled = true;
-    if (t != ClientEq::FilterType::Peak && p.q > 1.0f) {
+    // Die Güte zähmen -- aber nicht bei den Arten, deren ganzer Sinn
+    // eine hohe Güte IST. Eine Kerbe mit Güte 0,707 ist keine Kerbe,
+    // sondern eine Mulde, und ein Bandpass mit 0,707 lässt die halbe
+    // Stimme durch.
+    const bool brauchtGuete = t == ClientEq::FilterType::Peak
+                           || t == ClientEq::FilterType::Notch
+                           || t == ClientEq::FilterType::BandPass;
+    if (!brauchtGuete && p.q > 1.0f) {
+        p.q = 0.707f;
+    }
+    // Und eine frische Kerbe soll eine sein.
+    if (t == ClientEq::FilterType::Notch && p.q < 4.0f) {
+        p.q = 8.0f;
+    }
+    // ── Und wieder heraus ───────────────────────────────────────────
+    //
+    // Seit Kerbe und Bandpass im Ring stehen (2026-10-10), fuehrt eine
+    // volle Runde durch eine Art, die die Guete auf 8 hebt -- und
+    // zurueck bei der Glocke blieb sie dort stehen. Wer mit dem Rad
+    // durch die Arten geht, um sie zu probieren, hatte danach statt
+    // seiner Glocke einen Nadelstich, ohne eine Zahl angefasst zu
+    // haben. Aufgefallen am 2026-10-13, als tst_eq_filter_ring zum
+    // ersten Mal seit dem Umbau wirklich gebaut wurde.
+    if (t == ClientEq::FilterType::Peak
+        && (vorher == ClientEq::FilterType::Notch
+            || vorher == ClientEq::FilterType::BandPass)
+        && p.q >= 4.0f) {
         p.q = 0.707f;
     }
     eq.setBand(bandIdx, p);

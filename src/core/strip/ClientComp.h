@@ -79,6 +79,70 @@ public:
     void  setMakeupDb(float db) noexcept;
     float makeupDb() const noexcept;
 
+    // ── Auto-Makeup ──────────────────────────────────────────────────
+    //
+    // Gemessen am 2026-10-10 an echter Sprache, Lautheit bei gleicher
+    // Spitze (tst_bandbreiten_genau::autoMakeupWouldStopTheInversion):
+    //
+    //   Schwelle  Verhaeltnis   Makeup fest 3 dB   ausgeglichen
+    //     -22        3:1           -15,9 LUFS       -13,0 LUFS
+    //     -28        4:1           -18,2 LUFS       -11,2 LUFS
+    //     -34        6:1           -19,1 LUFS       -10,1 LUFS
+    //     -40        8:1           -19,4 LUFS       -10,0 LUFS
+    //
+    // Mit festem Makeup wird die Stimme DUENNER, je mehr man
+    // komprimiert -- der Regler tut das Gegenteil von dem, was
+    // draufsteht. Der Grund liegt eine Stufe weiter: der Clipper
+    // schneidet an der Vollaussteuerung ab, also haengt seine Wirkung
+    // allein am Pegel, der bei ihm ankommt. Wer komprimiert, ohne
+    // auszugleichen, nimmt dem Clipper den Pegel weg -- und der
+    // Clipper ist die Stufe, die den Druck macht.
+    //
+    // Der Ausgleich ist die Rechnung, die jeder Kompressor macht: was
+    // die Kennlinie einer Spitze von kReferenzDbFs wegnimmt, kommt
+    // wieder drauf. Keine Regelschleife, keine Messung des Signals --
+    // eine Zahl aus Schwelle und Verhaeltnis, damit dieselbe
+    // Einstellung immer dasselbe tut.
+    //
+    // Beim Einschalten wird makeupDb NICHT ueberschrieben: beide
+    // addieren sich, der ausgerechnete Teil und der von Hand
+    // eingestellte.
+    // ── Warum Drive KEINEN Knopf bekommt ─────────────────────────────
+    //
+    // AetherSDR hat genau einen Dichtesteller, und es ist dieser:
+    // Drive, 0..18 dB, nach dem Optimod-Modell -- hinein verstaerken,
+    // am Ausgang denselben Faktor zurueck, netto also keine
+    // Lautstaerke, sondern mehr Material in der Kennlinie. Longpath
+    // rechnet das identisch, hat aber keinen Regler dafuer, und das
+    // bleibt so. Gemessen am 2026-10-10 an echter Sprache, Lautheit
+    // bei gleicher Spitze, Klirr an einem 1-kHz-Ton durch dieselbe
+    // Kette (tst_bandbreiten_genau::theCompressorsHiddenDrive):
+    //
+    //   Drive  Lautheit  Scheitel  Kennlinie  Brickwall   Klirr
+    //     0    -10,8       7,8       -1,6       0,0      -42,8 dB
+    //     3     -8,5       5,8       -3,5      -1,5      -15,5 dB
+    //     6     -7,2       4,8       -5,5      -6,1      -11,0 dB
+    //     9     -6,3       4,2       -7,5     -10,2       -9,5 dB
+    //    18     -5,4       3,7      -13,5     -22,3       -9,5 dB
+    //
+    // Drei Dezibel Drive sind bereits SIEBZEHN PROZENT Klirr. Der
+    // Clipper holt bei 12 dB dieselbe Groessenordnung Dichte fuer
+    // 0,34 %. Der Grund steht in der vierten Spalte: die Dichte
+    // kommt nicht aus der Kennlinie, sondern aus dem Brickwall
+    // unten in dieser Klasse -- Abtastwert fuer Abtastwert, 0,1 ms
+    // Anstieg, OHNE Ueberabtastung. Der Clipper rechnet mit
+    // doppelter Rate und einem Halbbandfilter, genau damit das
+    // nicht passiert.
+    //
+    // Ein Knopf „Drive" waere also ein Verzerrungsregler mit der
+    // Aufschrift „mehr Druck". Wer Dichte will, nimmt den Clipper.
+    static constexpr float kReferenzDbFs = -12.0f;
+    void  setAutoMakeup(bool on) noexcept;
+    bool  autoMakeup() const noexcept;
+    // Was der Ausgleich gerade beitraegt, in dB. Fuer die Anzeige --
+    // ein Betreiber soll sehen, woher seine Lautstaerke kommt.
+    float autoMakeupDb() const noexcept;
+
     // Brickwall limiter on the output.  Ceiling in dBFS (negative).
     void  setLimiterEnabled(bool on) noexcept;
     bool  limiterEnabled() const noexcept;
@@ -125,6 +189,11 @@ private:
         std::atomic<float>    releaseMs{200.0f};
         std::atomic<float>    kneeDb{6.0f};
         std::atomic<float>    makeupDb{0.0f};
+        // Vorgabe AUS: eine Stufe mit Vorgabewerten muss ein Draht
+        // sein, und gespeicherte Ketten aus der Zeit davor duerfen
+        // nicht ploetzlich lauter werden. Die Empfehlung schaltet es
+        // ein, und StripSettings schreibt den Schluessel mit.
+        std::atomic<bool>     autoMakeup{false};
         std::atomic<bool>     limEnabled{true};
         std::atomic<float>    limCeilingDb{-1.0f};
         std::atomic<float>    driveDb{0.0f};
@@ -139,6 +208,7 @@ private:
         float releaseCoeff{0.0f};
         float kneeDb{6.0f};
         float makeupLin{1.0f};
+        float autoMakeupDb{0.0f};
         bool  limEnabled{true};
         float limCeilingLin{0.891f};       // 10^(-1/20)
         float limAttackCoeff{0.0f};

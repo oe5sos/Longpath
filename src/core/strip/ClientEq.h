@@ -63,6 +63,26 @@ public:
         HighShelf  = 2,
         LowPass    = 3,
         HighPass   = 4,
+        // ── Zwei dazu, 2026-10-10 ────────────────────────────────────
+        //
+        // „ich denke, dass man in den kleinen fenstern mehr
+        //  auswahlmöglichkeiten für den filter haben soll."
+        //
+        // Hinten angehängt, nie dazwischen: die Art wird als Zahl
+        // gespeichert, und eine Umnummerierung würde jedes
+        // gespeicherte Band auf eine andere Art zeigen lassen.
+        //
+        // Kerbe: eine schmale Senke, die eine einzelne Frequenz
+        // herausnimmt -- Netzbrummen, eine Raumresonanz, ein Pfeifen.
+        // Bisher wurde sie als Glocke mit Güte 8 und -18 dB
+        // nachgebaut; das ist eine Hilfskonstruktion, die nie ganz
+        // auf null kommt.
+        //
+        // Bandpass: lässt NUR diese Gegend durch. Im Sendeweg selten
+        // richtig -- aber unersetzlich, um zu hören, was in einem
+        // Bereich überhaupt steckt, bevor man ihn anfasst.
+        Notch      = 5,
+        BandPass   = 6,
     };
 
     // Global filter family — applies to the cascade math for HP/LP bands

@@ -234,6 +234,18 @@ class TitleBar : public QWidget {
     Q_OBJECT
 
 public:
+    // Der Stand gegenüber der neuesten veröffentlichten Fassung,
+    // neben der Version. Begründung an der Stelle, an der das Feld
+    // gebaut wird (TitleBar.cpp). Heisst bewusst anders als
+    // ConnectionSegment::UpdateState -- zwei gleichnamige
+    // Aufzaehlungen in einer Datei sind eine Falle.
+    enum class AktualisierungsStand { Unbekannt, Aktuell, Neuer };
+    void setUpdateState(const QString& text, AktualisierungsStand art);
+
+    // Platz links, damit die drei Fensterknoepfe von macOS nicht auf
+    // der Menuezeile liegen. Siehe gui/MacVollflaeche.h.
+    void setLinkerRand(int punkte);
+
     explicit TitleBar(AudioEngine* audio, QWidget* parent = nullptr);
 
     // Re-style `mb` and insert it at position 0 of the hbox layout.
@@ -265,6 +277,8 @@ private:
     ConnectionSegment*  m_connectionSegment{nullptr};
     MasterOutputWidget* m_master{nullptr};
     QPushButton*        m_featureBtn{nullptr};
+    // Der Stand der Aktualisierung, neben der Version.
+    QLabel*             m_updateState{nullptr};
     QLabel*             m_utcLabel{nullptr};
     QTimer*             m_utcTimer{nullptr};
 };

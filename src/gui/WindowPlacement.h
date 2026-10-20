@@ -235,7 +235,31 @@ void setzeZugmelder(std::function<void(QWidget*)> melder);
 
 /// Aus dem `moveEvent` eines schwebenden Fensters. Tut nichts, solange
 /// niemand einen Melder eingehaengt hat (Prueffaelle, Werkzeugfenster
-/// ohne Hauptfenster).
+/// ohne Hauptfenster), nichts, solange eine `EigeneBewegung` lebt, und
+/// nichts fuer ein Fenster, das nicht sichtbar ist.
 void meldeZug(QWidget* bewegtes);
+
+/// Solange eines dieser Objekte lebt, zaehlt eine Fensterbewegung NICHT
+/// als Ziehen.
+///
+/// Gefunden am 2026-10-20: der Hinweis auf den Schutzrahmen stand schon
+/// da, bevor jemand zog. Nicht das Wiederherstellen des Profils war es,
+/// sondern Longpaths EIGENES Raster -- `snapToGridAfterSettle()` schiebt
+/// das Fenster nach 180 ms auf die naechste Rasterlinie, das `move()`
+/// loest ein `moveEvent` aus, und von dort aus sieht `meldeZug()` eine
+/// zweite, veraenderte Lage: genau das Muster, an dem ein Ziehen erkannt
+/// wird. Der Bediener hatte die Maus nie angefasst.
+///
+/// Darum die Unterscheidung an der Quelle statt an der Zeit: wer selbst
+/// schiebt, sagt es. Das Raster hier, das Herausholen aus dem
+/// Sperrstreifen in MainWindow -- und jede weitere Stelle, die ein
+/// schwebendes Fenster von sich aus bewegt.
+class EigeneBewegung {
+public:
+    EigeneBewegung();
+    ~EigeneBewegung();
+    EigeneBewegung(const EigeneBewegung&) = delete;
+    EigeneBewegung& operator=(const EigeneBewegung&) = delete;
+};
 
 } // namespace Longpath

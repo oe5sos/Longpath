@@ -328,6 +328,42 @@ void AppSettings::initFilePath()
 // after upgrade — once the next save() runs they are well-formed.
 // ---------------------------------------------------------------------------
 
+// ── Alles, was XML in einem Elementnamen NICHT erlaubt ───────────────
+//
+// Die Liste der Sonderzeichen unten faengt die ASCII-Zeichen. Alles
+// darueber lief bis zum 2026-10-13 ungeprueft durch -- und das ging
+// gut, solange es Umlaute waren (die sind in XML-Namen erlaubt). Ein
+// Gedankenstrich ist es NICHT: U+2014 liegt im gesperrten Bereich
+// #x2000-#x206F. Eine eigene Kette namens „SSB — Glanz im Band"
+// schrieb damit eine Einstellungsdatei, die kein Leser mehr oeffnen
+// kann; beim naechsten Start lief die Wiederherstellung aus der
+// Sicherung an (das hat gehalten, aber die Arbeit seit der letzten
+// Sicherung war weg).
+//
+// Geprueft wird jetzt die echte Regel aus XML 1.0, nicht eine Liste
+// von Verdaechtigen. Was sie erlaubt, bleibt Zeichen fuer Zeichen
+// stehen -- jede bisher geschriebene Datei wird also unveraendert
+// gelesen; nur was ohnehin kaputt gewesen waere, wird als __uXXXX__
+// abgelegt.
+static bool istNameStartChar(char32_t c)
+{
+    return c == ':' || c == '_'
+        || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+        || (c >= 0xC0   && c <= 0xD6)   || (c >= 0xD8   && c <= 0xF6)
+        || (c >= 0xF8   && c <= 0x2FF)  || (c >= 0x370  && c <= 0x37D)
+        || (c >= 0x37F  && c <= 0x1FFF) || (c >= 0x200C && c <= 0x200D)
+        || (c >= 0x2070 && c <= 0x218F) || (c >= 0x2C00 && c <= 0x2FEF)
+        || (c >= 0x3001 && c <= 0xD7FF) || (c >= 0xF900 && c <= 0xFDCF)
+        || (c >= 0xFDF0 && c <= 0xFFFD);
+}
+
+static bool istNameChar(char32_t c)
+{
+    return istNameStartChar(c) || c == '-' || c == '.' || c == 0xB7
+        || (c >= '0' && c <= '9')
+        || (c >= 0x300 && c <= 0x36F) || (c >= 0x203F && c <= 0x2040);
+}
+
 static QString encodeXmlKey(const QString& key)
 {
     QString out;
@@ -364,7 +400,15 @@ static QString encodeXmlKey(const QString& key)
             case '~':  out += QLatin1String("__tilde__"); break;
             case '`':  out += QLatin1String("__bt__");    break;
             case '\\': out += QLatin1String("__bs__");    break;
-            default:   out += c;                          break;
+            default:
+                if (istNameChar(c.unicode())) {
+                    out += c;
+                } else {
+                    out += QStringLiteral("__u%1__")
+                               .arg(uint(c.unicode()), 4, 16,
+                                    QLatin1Char('0'));
+                }
+                break;
         }
     }
     return out;
@@ -403,6 +447,15 @@ static QString decodeXmlKey(const QString& tag)
     out.replace(QLatin1String("__tilde__"), QLatin1String("~"));
     out.replace(QLatin1String("__bt__"),    QLatin1String("`"));
     out.replace(QLatin1String("__bs__"),    QLatin1String("\\"));
+
+    // Und zuletzt die allgemeine Form, siehe encodeXmlKey().
+    static const QRegularExpression kU(QStringLiteral("__u([0-9a-f]{4})__"));
+    QRegularExpressionMatch m = kU.match(out);
+    while (m.hasMatch()) {
+        const ushort code = m.captured(1).toUShort(nullptr, 16);
+        out.replace(m.capturedStart(), m.capturedLength(), QChar(code));
+        m = kU.match(out, m.capturedStart() + 1);
+    }
     return out;
 }
 
@@ -480,7 +533,21 @@ static QString sanitizeXmlForLoad(const QString& text)
                 case '~':  out += QLatin1String("__tilde__"); break;
                 case '`':  out += QLatin1String("__bt__");    break;
                 case '\\': out += QLatin1String("__bs__");    break;
-                default:   out += nc;                         break;
+                default:
+                    // Wie beim Schreiben: die echte XML-Regel, nicht
+                    // eine Liste von Verdaechtigen. Damit laesst sich
+                    // eine Datei RETTEN, die eine aeltere Fassung mit
+                    // einem Gedankenstrich im Schluessel geschrieben
+                    // hat -- vorher war sie nur noch ein Fall fuer die
+                    // Sicherung.
+                    if (istNameChar(nc.unicode())) {
+                        out += nc;
+                    } else {
+                        out += QStringLiteral("__u%1__")
+                                   .arg(uint(nc.unicode()), 4, 16,
+                                        QLatin1Char('0'));
+                    }
+                    break;
             }
             i++;
         }
@@ -907,6 +974,25 @@ namespace {
 
 const QLatin1String kByteArrayOpen("@ByteArray(");
 
+// ── Listen (2026-10-13) ──────────────────────────────────────────────
+//
+// val.toString() liefert bei einer QStringList mit EINEM Eintrag
+// diesen Eintrag und bei zwei Eintraegen eine LEERE Zeichenkette. Jede
+// Liste mit mehr als einem Element verschwand also beim Speichern
+// spurlos -- und weil setValue() sofort umwandelt, schon im laufenden
+// Programm.
+//
+// Aufgefallen am Kanalzug: die zweite eigene Kette nahm beim Ablegen
+// die erste mit, und die Auswahlliste stand danach leer da („sehe aber
+// keine speicherung der profile"). Dieselbe Falle traf die Seitenliste
+// des Seitenbereichs und die Applet-Liste einer Rasterzelle.
+//
+// Jede Zeichenkette wird einzeln base64-kodiert, damit ein Trennzeichen
+// nicht in einem Eintrag vorkommen kann. Eine Datei von frueher traegt
+// weiter einen schlichten Text; der wird wie bisher gelesen und ergibt
+// beim toStringList() eine Liste mit einem Eintrag.
+const QLatin1String kStringListOpen("@StringList(");
+
 bool survivesAsText(const QByteArray& bytes)
 {
     for (const char c : bytes) {
@@ -919,6 +1005,16 @@ bool survivesAsText(const QByteArray& bytes)
 
 QString encodeValue(const QVariant& val)
 {
+    if (val.typeId() == QMetaType::QStringList) {
+        const QStringList liste = val.toStringList();
+        QStringList teile;
+        teile.reserve(liste.size());
+        for (const QString& e : liste) {
+            teile << QString::fromLatin1(e.toUtf8().toBase64());
+        }
+        return kStringListOpen + teile.join(QLatin1Char(','))
+               + QLatin1Char(')');
+    }
     if (val.typeId() == QMetaType::QByteArray) {
         const QByteArray bytes = val.toByteArray();
         if (!survivesAsText(bytes)) {
@@ -931,6 +1027,18 @@ QString encodeValue(const QVariant& val)
 
 QVariant decodeValue(const QString& stored)
 {
+    if (stored.startsWith(kStringListOpen) && stored.endsWith(QLatin1Char(')'))) {
+        const QStringView roh = QStringView(stored).mid(
+            kStringListOpen.size(), stored.size() - kStringListOpen.size() - 1);
+        QStringList liste;
+        if (!roh.isEmpty()) {
+            for (const QStringView& e : roh.split(QLatin1Char(','))) {
+                liste << QString::fromUtf8(
+                    QByteArray::fromBase64(e.toLatin1()));
+            }
+        }
+        return QVariant(liste);
+    }
     if (stored.startsWith(kByteArrayOpen) && stored.endsWith(QLatin1Char(')'))) {
         const QStringView b64 = QStringView(stored).mid(
             kByteArrayOpen.size(), stored.size() - kByteArrayOpen.size() - 1);

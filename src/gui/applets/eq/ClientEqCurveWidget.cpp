@@ -150,20 +150,60 @@ void ClientEqCurveWidget::setFftBinsDb(const std::vector<float>& binsDb,
     m_fftBinsDb = binsDb;
     m_fftSampleRate = sampleRate > 0.0 ? sampleRate : 24000.0;
 
-    // Peak-hold trail: per-bin running max, decaying ~10 dB/sec at 25 Hz
-    // updates so recent resonances stay visible without permanent clutter.
-    // Frozen mode skips decay so the trace sticks at the max.  Operates on
-    // raw bins so peak-detection is sample-accurate; visual smoothing of
-    // the peak trace happens in applySmoothing() below.
-    constexpr float kPeakDecayDb = 0.5f;
+    // ── Die Spitzenwertlinie ─────────────────────────────────────────
+    //
+    // Longpath-Abweichung vom portierten Verhalten, 2026-10-09, auf
+    // Ansage am Geraet: „die eigene kurve sollte auch laengere zeit
+    // mit hold stehen bleiben und standhaft bleiben, so kann man
+    // danach ohne stress diese aendern."
+    //
+    // Upstream hielt je Fach das laufende Maximum und liess es mit
+    // 0,5 dB je Bild fallen -- bei 25 Bildern in der Sekunde sind das
+    // 12,5 dB/s. Wer einen Satz spricht und dann HINSIEHT, sieht
+    // nichts mehr. Und „eingefroren" hiess dort nur: faellt nicht
+    // mehr. Das Maximum wurde weiter nachgezogen, also kroch die
+    // eingefrorene Linie bei jedem Geraeusch nach oben -- nach einer
+    // Minute war sie nicht mehr seine Stimme, sondern alles, was der
+    // Raum seither hergegeben hat.
+    //
+    // Jetzt gilt beides, was der Name verspricht:
+    //
+    //   eingefroren  es wird NICHTS mehr angefasst. Die Linie steht,
+    //                bis jemand sie wieder loest. Nur so laesst sich
+    //                in Ruhe eine Kurve dagegen legen.
+    //   frei         je Fach zwei Sekunden halten, DANN mit 3 dB/s
+    //                fallen. Lange genug, um einen Satz zu sprechen
+    //                und danach hinzusehen.
+    constexpr float kPeakDecayDbPerFrame = 0.12f;   // ~3 dB/s bei 25 Hz
+    constexpr int   kPeakHoldFrames      = 50;      // ~2 s bei 25 Hz
     constexpr float kPeakFloorDb = -100.0f;
-    if (m_peakHoldDb.size() != m_fftBinsDb.size()) {
-        m_peakHoldDb.assign(m_fftBinsDb.size(), kPeakFloorDb);
-    }
-    const float decayStep = m_peakHoldFrozen ? 0.0f : kPeakDecayDb;
-    for (size_t i = 0; i < m_fftBinsDb.size(); ++i) {
-        const float decayed = m_peakHoldDb[i] - decayStep;
-        m_peakHoldDb[i] = std::max(decayed, m_fftBinsDb[i]);
+
+    if (m_peakHoldFrozen) {
+        // Nichts. Auch kein Umhaengen der Groesse: ein Wechsel der
+        // Abtastrate waehrend des Haltens wuerde die Linie sonst
+        // loeschen, und die Linie ist genau das, was gerade gebraucht
+        // wird.
+    } else {
+        if (m_peakHoldDb.size() != m_fftBinsDb.size()) {
+            m_peakHoldDb.assign(m_fftBinsDb.size(), kPeakFloorDb);
+            m_peakHoldAge.assign(m_fftBinsDb.size(), 0);
+        }
+        if (m_peakHoldAge.size() != m_peakHoldDb.size()) {
+            m_peakHoldAge.assign(m_peakHoldDb.size(), 0);
+        }
+        for (size_t i = 0; i < m_fftBinsDb.size(); ++i) {
+            if (m_fftBinsDb[i] >= m_peakHoldDb[i]) {
+                m_peakHoldDb[i]  = m_fftBinsDb[i];
+                m_peakHoldAge[i] = 0;
+                continue;
+            }
+            if (m_peakHoldAge[i] < kPeakHoldFrames) {
+                ++m_peakHoldAge[i];
+                continue;
+            }
+            m_peakHoldDb[i] = std::max(m_peakHoldDb[i] - kPeakDecayDbPerFrame,
+                                       m_fftBinsDb[i]);
+        }
     }
 
     // Smoothing runs AFTER peak-hold update so both buffers reflect the
@@ -175,7 +215,15 @@ void ClientEqCurveWidget::setFftBinsDb(const std::vector<float>& binsDb,
 
 void ClientEqCurveWidget::setPeakHoldFrozen(bool frozen)
 {
+    if (m_peakHoldFrozen == frozen) { return; }
     m_peakHoldFrozen = frozen;
+    // Beim Loesen neu anfangen statt eine Minute alte Spitzen
+    // weiterfallen zu lassen -- sonst haengt die Linie nach dem
+    // Aufheben noch lange ueber der Stimme, die gerade spricht.
+    if (!frozen) {
+        std::fill(m_peakHoldAge.begin(), m_peakHoldAge.end(), 0);
+    }
+    update();
 }
 
 void ClientEqCurveWidget::setSmoothingOctaveFraction(int n)
@@ -300,6 +348,13 @@ ClientEqCurveWidget::BackgroundCacheKey ClientEqCurveWidget::backgroundCacheKey(
     return {size(), devicePixelRatioF(), font(), m_filterLowCutHz, m_filterHighCutHz};
 }
 
+void ClientEqCurveWidget::setHandleMask(quint32 mask)
+{
+    if (m_handleMask == mask) { return; }
+    m_handleMask = mask;
+    update();
+}
+
 ClientEqCurveWidget::ResponseCacheKey ClientEqCurveWidget::responseCacheKey() const
 {
     static_assert(std::tuple_size_v<decltype(ResponseCacheKey::bands)>
@@ -313,6 +368,7 @@ ClientEqCurveWidget::ResponseCacheKey ClientEqCurveWidget::responseCacheKey() co
     key.selectedBand = m_selectedBand;
     key.showFilled = m_showFilled;
     key.referencePreset = m_referencePreset;
+    key.handleMask = m_handleMask;
     if (!m_eq) {
         return key;
     }
@@ -610,6 +666,28 @@ void ClientEqCurveWidget::drawResponse(QPainter& p, const QRect& r,
             if (!bp.enabled) {
                 continue;
             }
+            // ── Nur das Band fuellen, das gewaehlt ist ───────────
+            //
+            // „alles markiert ist und nichts damit anzufangen"
+            // (2026-10-15, zu einem Bild, auf dem die Flaeche von
+            // 20 Hz bis 10 kHz braun zugelaufen war).
+            //
+            // Jede Flaeche reicht von der Null-Linie bis zur Kurve
+            // des Bandes. Ein Hochpass oder ein breiter Kuhschwanz
+            // liegt ueber die ganze Breite weit von null entfernt --
+            // seine Flaeche ist damit das halbe Bild. Mehrere davon
+            // uebereinander, jede mit 22 Prozent Deckung, ergeben
+            // eine undurchsichtige Wand, hinter der weder die
+            // Summenkurve noch der Analysator noch die Griffe zu
+            // sehen sind.
+            //
+            // Also traegt nur noch das gewaehlte Band seine Flaeche.
+            // Die anderen bleiben als duenne Linie stehen -- man
+            // sieht sie, sie decken aber nichts zu. Und die Auswahl
+            // bekommt damit erst einen Sinn: sie zeigt EIN Band.
+            if (i != key.selectedBand) {
+                continue;
+            }
             QColor fill = bandColor(i);
             fill.setAlphaF(eqOn ? 0.22f : 0.07f);
             p.setPen(Qt::NoPen);
@@ -666,6 +744,7 @@ void ClientEqCurveWidget::drawResponse(QPainter& p, const QRect& r,
     // Selected band renders a halo ring to match the icon-row highlight.
     p.setRenderHint(QPainter::Antialiasing, true);
     for (int i = 0; i < bandCount; ++i) {
+        if ((key.handleMask >> i & 1u) == 0u) { continue; }
         const BandCacheState& bp = key.bands[static_cast<size_t>(i)];
         const bool isSlope = (bp.type == static_cast<int>(ClientEq::FilterType::LowPass)
                            || bp.type == static_cast<int>(ClientEq::FilterType::HighPass));

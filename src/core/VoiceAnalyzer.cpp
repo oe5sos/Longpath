@@ -12,6 +12,8 @@
 
 #include "VoiceAnalyzer.h"
 
+#include "core/Loudness.h"
+
 #include "models/TransmitModel.h"
 
 #include <algorithm>
@@ -236,6 +238,119 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
         return r;
     }
 
+    // ── Der Raum: wie lange es nach dem Sprechen weiterklingt ────────
+    //
+    // Keine Messung nach Norm -- dafür bräuchte es einen Impuls und
+    // einen stillen Raum. Hier wird das genommen, was die Aufnahme
+    // ohnehin hergibt: die Stellen, an denen die Stimme aufhört. Der
+    // Pegel fällt danach in den Raumhall hinein, und die Steigung
+    // dieses Falls ist die Abklingzeit.
+    //
+    // Mehrere Abklingvorgänge, und genommen wird der MITTLERE (der
+    // Median), nicht der Durchschnitt: ein einziges Türknallen im
+    // falschen Moment würde einen Durchschnitt verderben.
+    {
+        // Gesucht wird nicht die Stelle, an der die Hüllkurve unter
+        // eine Schwelle rutscht -- im halligen Raum kommt sie dort
+        // zwischen zwei Silben nie an, und im trockenen ist sie
+        // schon beim ersten Fenster am Grundgeräusch. Beides hat der
+        // erste Entwurf übersehen und für BEIDE Räume „nichts
+        // gefunden" gemeldet.
+        //
+        // Gesucht wird stattdessen jeder Gipfel, dem ein
+        // ununterbrochenes Fallen folgt. Was danach zählt, ist die
+        // STEIGUNG dieses Falls: ein trockener Raum fällt in zwei
+        // Fenstern ins Grundgeräusch (sehr steil, kurze Abklingzeit),
+        // ein halliger braucht zwanzig.
+        std::vector<double> perSecond;
+        const double floorE = std::max(quiet, kEps) * 4.0;   // 6 dB drüber
+        for (int w = 1; w + 2 < windows; ++w) {
+            const double here = energy[static_cast<size_t>(w)];
+            // Kein „örtlicher Gipfel" als Bedingung: in einem
+            // halligen Raum ist die Hüllkurve während der Silbe ein
+            // Plateau mit Kräuselung, und der eine Punkt, an dem das
+            // Abklingen beginnt, ist dann zufällig kein Gipfel. Der
+            // zweite Entwurf hat daran genau das Signal nicht
+            // gefunden, für das die Messung gedacht ist.
+            //
+            // Es reicht: laut genug, und das nächste Fenster ist
+            // leiser. Mehrfachfunde auf derselben Flanke verhindert
+            // das Weiterspringen am Ende.
+            if (here <= gate) { continue; }
+            if (energy[static_cast<size_t>(w + 1)] >= here) { continue; }
+
+            const double first = 10.0 * std::log10(std::max(here, kEps));
+            double last = first;
+            int n = 0;
+            for (int k = w + 1; k < windows && k < w + 60; ++k) {
+                const double e = energy[static_cast<size_t>(k)];
+                if (e >= energy[static_cast<size_t>(k - 1)]) { break; }
+                last = 10.0 * std::log10(std::max(e, kEps));
+                n = k - w;
+                if (e < floorE) { break; }
+            }
+            const double fall = first - last;
+            if (n >= 2 && fall >= 10.0) {
+                const double seconds = double(n) * win / sampleRate;
+                perSecond.push_back(fall / seconds);
+                w += n;                      // nicht zweimal dieselbe Flanke
+            }
+        }
+        if (perSecond.size() >= 3) {
+            std::sort(perSecond.begin(), perSecond.end());
+            const double mid = perSecond[perSecond.size() / 2];
+            if (mid > 1.0) {
+                r.reverbMs = 60.0 / mid * 1000.0;         // auf 60 dB
+                r.reverbValid = true;
+            }
+        }
+    }
+
+    // ── Poppen: kurze Stösse unter 80 Hz ─────────────────────────────
+    //
+    // Ein P oder B direkt ins Mikrofon setzt einen Luftstoss, der im
+    // Spektrum ganz unten als kurzer, kräftiger Berg erscheint. Ein
+    // Hochpass nimmt ihn weg -- aber nur, wenn jemand weiss, dass er
+    // da ist. Deshalb gezählt statt stillschweigend gefiltert.
+    {
+        // Einpoliger Tiefpass bei 80 Hz, zweimal durchlaufen: steil
+        // genug, um den Grundton einer tiefen Stimme (um 100 Hz)
+        // schon deutlich zu dämpfen.
+        const double a = std::exp(-2.0 * M_PI * 80.0 / sampleRate);
+        double z1 = 0.0;
+        double z2 = 0.0;
+        std::vector<double> lf(static_cast<size_t>(windows), 0.0);
+        for (int w = 0; w < windows; ++w) {
+            double sum = 0.0;
+            for (int i = 0; i < win; ++i) {
+                z1 = (1.0 - a) * samples[w * win + i] + a * z1;
+                z2 = (1.0 - a) * z1 + a * z2;
+                sum += z2 * z2;
+            }
+            lf[static_cast<size_t>(w)] = sum / win;
+        }
+
+        std::vector<double> during;
+        for (int w = 0; w < windows; ++w) {
+            if (energy[static_cast<size_t>(w)] > gate) {
+                during.push_back(lf[static_cast<size_t>(w)]);
+            }
+        }
+        if (during.size() >= 10) {
+            std::sort(during.begin(), during.end());
+            const double usual = std::max(during[during.size() / 2], kEps);
+            double worst = 0.0;
+            for (int w = 0; w < windows; ++w) {
+                if (energy[static_cast<size_t>(w)] <= gate) { continue; }
+                const double over = 10.0 * std::log10(
+                    std::max(lf[static_cast<size_t>(w)], kEps) / usual);
+                if (over >= 12.0) { ++r.plosiveCount; }
+                worst = std::max(worst, over);
+            }
+            r.plosiveDb = worst;
+        }
+    }
+
     // ── Spectrum of the speech windows only ──────────────────────────
     constexpr int kFft = 4096;
     std::vector<double> power(kFft / 2 + 1, 0.0);
@@ -301,14 +416,102 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
     }
     r.sibilanceDb = toDb(sib) - toDb(mid);
 
+    // Und wo es sitzt: die lauteste Stelle zwischen 4 und 9 kHz,
+    // ueber Drittel-Oktaven geglaettet, damit nicht eine einzelne
+    // Spitze die Frequenz bestimmt.
+    {
+        double best = 0.0;
+        double bestHz = 6000.0;
+        const double step = std::pow(2.0, 1.0 / 3.0);
+        for (double lo = 4000.0; lo < 9000.0; lo *= step) {
+            const double hi = std::min(9000.0, lo * step);
+            double acc = 0.0;
+            int    cnt = 0;
+            for (int k = 1; k <= kFft / 2; ++k) {
+                const double hz = k * binHz;
+                if (hz >= lo && hz < hi) {
+                    acc += power[static_cast<size_t>(k)];
+                    ++cnt;
+                }
+            }
+            if (cnt > 0 && acc / cnt > best) {
+                best   = acc / cnt;
+                bestHz = std::sqrt(lo * hi);
+            }
+        }
+        r.sibilanceHz = bestHz;
+    }
+
     // ── Hum ──────────────────────────────────────────────────────────
     // Both mains frequencies are tried and the stronger wins, rather
     // than assuming the operator's country. Harmonics are included
     // because a transformer hum is rarely a clean sine.
+    // ── Der Wachhund vor dem Brummfenster (2026-10-09) ───────────────
+    //
+    // Die Fenster sind plus/minus zwei Faecher breit, das sind bei
+    // dieser Laenge rund 23 Hz. Eine Maennerstimme mit 110 Hz
+    // Grundton legt damit IHREN Grundton in das 100-Hz-Fenster (77 bis
+    // 123 Hz) und ihre zweite Oberwelle in das 200-Hz-Fenster. Das
+    // Ergebnis war am Geraet gemessen: 110 Hz bei -12,5 dB, 150 Hz bei
+    // -17,6 dB -- „Netzbrumm", der in Wahrheit die Stimme selbst war.
+    // Und weil StripTuner daran haengt, kerbte die Automatik den
+    // Grundton mit -18 dB aus.
+    //
+    // Also: ein Brummfenster, in dem eine Oberwelle der STIMME liegt,
+    // wird uebersprungen. Trennen laesst sich beides bei dieser
+    // Aufloesung nicht -- ein 100-Hz-Brumm und eine 110-Hz-Stimme
+    // teilen sich dasselbe Fach. Was sich machen laesst, ist nicht so
+    // zu tun, als ginge es: was uebersprungen wurde, wird gezaehlt,
+    // und bleibt nichts uebrig, gibt es keine Zahl (siehe
+    // VoiceAnalysis::humMeasurable).
+    const auto masksAVoiceHarmonic = [&](double hz) {
+        const double voiceF0 = r.pitchHz;   // beim AUFRUF gelesen
+        if (voiceF0 < 40.0) { return false; }   // keine stabile Tonhoehe
+
+        // Zwei verschieden weite Abstandsregeln, und der Unterschied
+        // ist gemessen, nicht geschaetzt.
+        //
+        // Fuer die OBERWELLEN der Stimme reicht die Fensterbreite
+        // selbst: liegt eine darin, ist das Fenster hin.
+        //
+        // Fuer den GRUNDTON nicht. Er ist das Lauteste im ganzen
+        // Spektrum, und die Silbenflanken verschmieren seine Linie
+        // weit nach unten -- bei einer 110-Hz-Stimme liegt das
+        // 63-Hz-Band nur rund 23 dB unter ihm, und das 50-Hz-Fenster
+        // faengt den Ausläufer. Mit der engen Regel allein meldete
+        // der Detektor dort weiter -9,5 dB „Brumm", wo keiner ist.
+        // Acht Faecher sind rund 93 Hz: weit genug, dass eine
+        // 110-Hz-Stimme das 50-Hz-Fenster sperrt, und eng genug, dass
+        // eine 210-Hz-Stimme es freigibt (160 Hz entfernt).
+        const double nearHarmonic = 2.5 * binHz;
+        const double nearF0       = 8.0 * binHz;
+        if (std::abs(voiceF0 - hz) <= nearF0) { return true; }
+        for (int n = 2; n <= 12; ++n) {
+            const double v = voiceF0 * n;
+            if (v > hz + nearHarmonic + binHz) { break; }
+            if (std::abs(v - hz) <= nearHarmonic) { return true; }
+        }
+        return false;
+    };
+
+    int  humWindowsUsed = 0;
+    int  humWindowsMasked = 0;
+    bool humBaseMasked = false;
     auto humAt = [&](double base) {
         double total = 0.0;
+        humWindowsUsed = 0;
+        humWindowsMasked = 0;
+        humBaseMasked = false;
         for (int h = 1; h <= 4; ++h) {
             const double hz = base * h;
+            if (masksAVoiceHarmonic(hz)) {
+                ++humWindowsMasked;
+                // Das erste Fenster ist das, in dem Netzbrumm lebt.
+                // Ist es hin, gibt es keine Messung -- die restlichen
+                // Oberwellen sind beim Brumm ohnehin die schwaecheren.
+                if (h == 1) { humBaseMasked = true; }
+                continue;
+            }
             const int k = int(std::lround(hz / binHz));
             if (k > 0 && k <= kFft / 2) {
                 // Two bins either side, so a mains frequency that is
@@ -319,6 +522,7 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
                         total += power[static_cast<size_t>(kk)];
                     }
                 }
+                ++humWindowsUsed;
             }
         }
         return total;
@@ -360,6 +564,9 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
     }
     r.humBaseHz =
         (std::abs(fPeak - 60.0) < std::abs(fPeak - 50.0)) ? 60 : 50;
+    // Vorlaeufig: der Wachhund braucht die Tonhoehe, und die wird
+    // weiter unten gemessen. Nach ihr wird das hier noch einmal
+    // gerechnet -- siehe „Brumm, zweiter Durchgang".
     r.humDb = toDb(humAt(double(r.humBaseHz))) - toDb(mid);
 
     // ── Crest factor ─────────────────────────────────────────────────
@@ -378,6 +585,194 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
     r.crestFactorDb = 20.0 * std::log10(std::max(peak, kEps)
                                         / std::max(rms, kEps));
 
+    // ── Pitch ────────────────────────────────────────────────────────
+    //
+    // Normalised autocorrelation per speech frame, median over the
+    // frames that had a clear peak. The median and not the mean: one
+    // octave error on one frame — the classic autocorrelation failure
+    // — would drag a mean by tens of hertz and leaves a median alone.
+    //
+    // Only frames whose best lag scores above kPitchConfidence are
+    // counted. An unvoiced frame has no periodicity to find, and a
+    // number produced from one is noise wearing a unit.
+    {
+        constexpr double kPitchLowHz  = 60.0;    // below any speaking voice
+        constexpr double kPitchHighHz = 350.0;   // above any speaking voice
+        constexpr double kPitchConfidence = 0.30;
+
+        const int frame = std::min(frames, std::max(1024, sampleRate / 20));
+        const int lagMin = std::max(1, int(sampleRate / kPitchHighHz));
+        const int lagMax = std::min(frame / 2, int(sampleRate / kPitchLowHz));
+
+        std::vector<double> pitches;
+        for (int start = 0; start + frame <= frames; start += frame / 2) {
+            const int w = start / win;
+            if (w >= windows || energy[static_cast<size_t>(w)] <= gate) {
+                continue;
+            }
+            double zero = 0.0;
+            for (int i = 0; i < frame; ++i) {
+                const double v = samples[start + i];
+                zero += v * v;
+            }
+            if (zero <= kEps) { continue; }
+
+            double bestScore = 0.0;
+            int    bestLag   = 0;
+            for (int lag = lagMin; lag <= lagMax; ++lag) {
+                double acc = 0.0;
+                for (int i = 0; i + lag < frame; ++i) {
+                    acc += double(samples[start + i])
+                         * double(samples[start + i + lag]);
+                }
+                const double score = acc / zero;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestLag   = lag;
+                }
+            }
+            if (bestLag > 0 && bestScore >= kPitchConfidence) {
+                pitches.push_back(double(sampleRate) / bestLag);
+            }
+        }
+        if (!pitches.empty()) {
+            std::sort(pitches.begin(), pitches.end());
+            r.pitchHz = pitches[pitches.size() / 2];
+        }
+    }
+
+    // ── Brumm, zweiter Durchgang ─────────────────────────────────────
+    //
+    // Jetzt erst, weil der Wachhund die Tonhoehe braucht und die
+    // Tonhoehe aus der Zeitreihe kommt, nicht aus dem Spektrum. Beim
+    // ersten Durchgang oben war r.pitchHz noch null, der Wachhund
+    // also wirkungslos -- genau der Fehler, den dieser zweite
+    // Durchgang behebt (gefunden vom eigenen Prueftand, der sonst
+    // gruen geworden waere, ohne etwas zu pruefen).
+    {
+        const double humPower = humAt(double(r.humBaseHz));
+        r.humMaskedHarmonics = humWindowsMasked;
+
+        // Entscheidend ist das ERSTE Fenster, nicht die Zahl der
+        // belegten.
+        //
+        // Das war der zweite Anlauf. Der erste rechnete mit den
+        // uebriggebliebenen Fenstern weiter und meldete bei einer
+        // 110-Hz-Stimme immer noch -9,5 dB „Brumm", wo keiner ist.
+        // Der Grund steht am Messwert: das 63-Hz-Band liegt bei so
+        // einer Stimme nur rund 23 dB unter dem Grundton -- die
+        // Silbenflanken verschmieren die Grundtonlinie weit nach
+        // unten, und das 50-Hz-Fenster faengt den Ausläufer. Sauber
+        // trennen laesst sich das bei 11,7 Hz je Fach nicht.
+        //
+        // Also wird nicht geschaetzt. Liegt auch nur eine Oberwelle
+        // der Stimme in einem der Fenster, ist das Ergebnis keine
+        // Messung -- Hausstil Regel 7: Unbekannt ist ein Strich,
+        // keine Null. Eine Zahl, die man nicht verteidigen kann, ist
+        // schlimmer als keine: StripTuner hat auf genau so eine Zahl
+        // hin den Grundton mit -18 dB ausgekerbt.
+        if (humWindowsUsed == 0 || humBaseMasked) {
+            r.humMeasurable = false;
+            r.humDb = -120.0;
+        } else {
+            r.humMeasurable = true;
+            r.humDb = toDb(humPower) - toDb(mid);
+        }
+    }
+
+    // ── Roll-off ─────────────────────────────────────────────────────
+    //
+    // Smoothed into sixth-octave bins before being read. A single
+    // narrow notch — a room mode, a comb from a reflection — is not a
+    // roll-off, and reading the raw spectrum would let one bin decide
+    // whether a 4 kHz profile is worth building.
+    //
+    // Scanned upward from the loudest bin. The first sixth-octave that
+    // is more than 20 dB down AND is not recovered by the next two is
+    // where the microphone has stopped; recovering is what a notch
+    // does and a roll-off does not.
+    {
+        constexpr double kRolloffDownDb = 20.0;
+        constexpr double kBinsPerOctave = 6.0;
+        constexpr double kScanLowHz  = 200.0;
+        constexpr double kScanHighHz = 10000.0;
+
+        std::vector<double> smoothHz, smoothDb;
+        const double step = std::pow(2.0, 1.0 / kBinsPerOctave);
+        for (double lo = kScanLowHz; lo < kScanHighHz; lo *= step) {
+            const double hi = lo * step;
+            double acc = 0.0;
+            int    n2  = 0;
+            for (int k = 1; k <= kFft / 2; ++k) {
+                const double hz = k * binHz;
+                if (hz >= lo && hz < hi) {
+                    acc += power[static_cast<size_t>(k)];
+                    ++n2;
+                }
+            }
+            if (n2 > 0) {
+                smoothHz.push_back(std::sqrt(lo * hi));
+                smoothDb.push_back(toDb(acc / n2));
+            }
+        }
+        if (!smoothDb.empty()) {
+            // ── Gemessen gegen 1 kHz, nicht gegen die lauteste
+            //    Stelle ─────────────────────────────────────────────
+            //
+            // Die erste Fassung suchte den Abfall von der lautesten
+            // Sechstel-Oktave aus. Die liegt bei jeder Stimme um
+            // 200-500 Hz, und von dort sind 20 dB bis 2,4 kHz keine
+            // Mikrofongrenze, sondern die natuerliche Neigung einer
+            // Stimme. Am Geraet meldete das dem Betreiber bei 2,7 k,
+            // 3,2 k UND 4,0 k, sein Mikrofon sei bei 2397 Hz am Ende
+            // (2026-10-09) -- und redete ihm damit genau die Profile
+            // aus, die in Ordnung waren.
+            //
+            // Derselbe Fehler wie beim Klangziel: die Neigung einer
+            // Stimme ist kein Mangel. Der Bezug ist deshalb 1 kHz,
+            // mitten im Sprachband, und gesucht wird ab dort
+            // aufwaerts.
+            size_t ref = 0;
+            for (size_t i = 0; i < smoothHz.size(); ++i) {
+                if (std::abs(smoothHz[i] - 1000.0)
+                    < std::abs(smoothHz[ref] - 1000.0)) {
+                    ref = i;
+                }
+            }
+            const double floorDb = smoothDb[ref] - kRolloffDownDb;
+            r.rolloffHz = smoothHz.back();
+            for (size_t i = ref + 1; i < smoothDb.size(); ++i) {
+                if (smoothDb[i] >= floorDb) { continue; }
+                bool recovers = false;
+                for (size_t j = i + 1; j <= i + 2 && j < smoothDb.size(); ++j) {
+                    if (smoothDb[j] >= floorDb) { recovers = true; }
+                }
+                if (!recovers) {
+                    r.rolloffHz = smoothHz[i];
+                    break;
+                }
+            }
+        }
+    }
+
+    // ── Loudness and loudness range ──────────────────────────────────
+    //
+    // Measured over the WHOLE take, pauses included, and that is not
+    // an oversight: BS.1770's two-stage gate is what removes the
+    // pauses, and it does it the same way in every tool that reports
+    // the number. Pre-filtering the take to the speech windows here
+    // would quietly produce a figure that no other meter agrees with.
+    {
+        const Loudness::Result l =
+            Loudness::measure(samples, frames, sampleRate);
+        if (l.valid) {
+            r.loudnessLufs       = l.integratedLufs;
+            r.loudnessRangeLu    = l.rangeLu;
+            r.loudnessRangeValid = l.rangeValid;
+            r.samplePeakDbFs     = l.samplePeakDbFs;
+        }
+    }
+
     suggestEq(r.bandDb, r.suggestedEqDb, r.suggestedPreampDb);
 
     // ── Findings, worst first ────────────────────────────────────────
@@ -387,7 +782,7 @@ VoiceAnalysis VoiceAnalyzer::analyse(const float* samples, int frames,
             "gain down and record again; nothing below this can be "
             "trusted until it is fixed.").arg(r.clippedSamples);
     }
-    if (r.humDb > -35.0) {
+    if (r.humMeasurable && r.humDb > -35.0) {
         r.findings << QStringLiteral(
             "Mains hum at %1 Hz, %2 dB under your voice. Check the "
             "microphone cable and the earth before anything else — "

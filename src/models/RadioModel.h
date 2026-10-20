@@ -1270,10 +1270,18 @@ public:
 
     /// Longpath Audio Channel Strip — the client-side transmit chain.
     ///
-    /// Lives for as long as the connection does, because the strip's
-    /// stages hold prepared delay lines sized to the sample rate.
-    /// Null before connectToRadio() and after teardown; the panels
-    /// must check.
+    /// Always there, from the constructor to the destructor, radio or
+    /// no radio. It used to be built with the transmit pump and torn
+    /// down with it, which left the whole strip window dead on a
+    /// workbench with nothing plugged in: no master switch, no stage
+    /// to set, no preset to apply, and the Voice check's "through
+    /// your strip" silently doing nothing. Setting a voice up is
+    /// exactly the work one does *before* going on the air
+    /// (2026-10-09, "kann diese nicht aktivieren").
+    ///
+    /// Callers may still see null in tests that build a bare model
+    /// through a path that skips the constructor body; the panels
+    /// keep their checks.
     StripChain* stripChain() const { return m_stripChain.get(); }
 
     // Phase 3F Sub-Epic J Task 11: the one place GUI code may resolve a
@@ -3967,7 +3975,13 @@ private:
     TxChannel* m_txChannel{nullptr};
     // Off by default and owned here rather than by the worker, so the
     // panels can reach it without going through the audio thread.
+    // Declared BEFORE m_txWorker: the worker holds a raw pointer to
+    // it, and members die in reverse order of declaration.
     std::unique_ptr<StripChain> m_stripChain;
+
+    /// Build and restore the strip chain if it is not there yet.
+    /// Called from the constructor and again when the pump starts.
+    void ensureStripChain();
 
     // TX mic source — strategy interface for silence (3M-1a) or real mic (3M-1b).
     // Owned by RadioModel via unique_ptr. NullMicSource for 3M-1a; replaced with

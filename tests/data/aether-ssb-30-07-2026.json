@@ -1,0 +1,421 @@
+{
+    "chain": [
+        "Tube",
+        "Gate",
+        "Eq",
+        "Comp",
+        "DeEss",
+        "Enh",
+        "Reverb"
+    ],
+    "comp": {
+        "attackMs": 0.9543820023536682,
+        "enabled": true,
+        "kneeDb": 9.960000038146973,
+        "limiterCeilingDb": -3.880000114440918,
+        "limiterEnabled": true,
+        "makeupDb": 6.659999847412109,
+        "ratio": 3.0998899936676025,
+        "releaseMs": 50.41469955444336,
+        "thresholdDb": -14.040399551391602
+    },
+    "createdAt": "2026-10-13T15:46:14Z",
+    "createdBy": "AetherSDR",
+    "deess": {
+        "amountDb": -15.119999885559082,
+        "attackMs": 1,
+        "enabled": true,
+        "frequencyHz": 3836.179931640625,
+        "q": 5,
+        "releaseMs": 65.02989959716797,
+        "thresholdDb": -34.5
+    },
+    "eq": {
+        "activeBandCount": 10,
+        "bands": [
+            {
+                "enabled": true,
+                "freqHz": 62.689998626708984,
+                "gainDb": 0,
+                "q": 2.5309998989105225,
+                "slopeDbPerOct": 12,
+                "type": "HighPass"
+            },
+            {
+                "enabled": true,
+                "freqHz": 68.94999694824219,
+                "gainDb": 5.710000038146973,
+                "q": 0.7070000171661377,
+                "slopeDbPerOct": 12,
+                "type": "Peak"
+            },
+            {
+                "enabled": true,
+                "freqHz": 165.5399932861328,
+                "gainDb": 0.4399999976158142,
+                "q": 0.7070000171661377,
+                "slopeDbPerOct": 12,
+                "type": "Peak"
+            },
+            {
+                "enabled": true,
+                "freqHz": 386.9800109863281,
+                "gainDb": 1.7599999904632568,
+                "q": 0.7070000171661377,
+                "slopeDbPerOct": 12,
+                "type": "Peak"
+            },
+            {
+                "enabled": true,
+                "freqHz": 794.7999877929688,
+                "gainDb": 1.6100000143051147,
+                "q": 0.5049999952316284,
+                "slopeDbPerOct": 12,
+                "type": "Peak"
+            },
+            {
+                "enabled": true,
+                "freqHz": 1249.5,
+                "gainDb": 4.099999904632568,
+                "q": 0.7070000171661377,
+                "slopeDbPerOct": 12,
+                "type": "Peak"
+            },
+            {
+                "enabled": true,
+                "freqHz": 2247.739990234375,
+                "gainDb": -1.4600000381469727,
+                "q": 1.975000023841858,
+                "slopeDbPerOct": 12,
+                "type": "Peak"
+            },
+            {
+                "enabled": false,
+                "freqHz": 5000,
+                "gainDb": 0,
+                "q": 0.7070000171661377,
+                "slopeDbPerOct": 12,
+                "type": "Peak"
+            },
+            {
+                "enabled": true,
+                "freqHz": 4981.8701171875,
+                "gainDb": 2.630000114440918,
+                "q": 0.7070000171661377,
+                "slopeDbPerOct": 12,
+                "type": "HighShelf"
+            },
+            {
+                "enabled": true,
+                "freqHz": 8819.8701171875,
+                "gainDb": 0,
+                "q": 1.7450000047683716,
+                "slopeDbPerOct": 12,
+                "type": "LowPass"
+            },
+            {
+                "enabled": true,
+                "freqHz": 1000,
+                "gainDb": 0,
+                "q": 0.7070000171661377,
+                "slopeDbPerOct": 12,
+                "type": "Peak"
+            },
+            {
+                "enabled": true,
+                "freqHz": 1000,
+                "gainDb": 0,
+                "q": 0.7070000171661377,
+                "slopeDbPerOct": 12,
+                "type": "Peak"
+            },
+            {
+                "enabled": true,
+                "freqHz": 1000,
+                "gainDb": 0,
+                "q": 0.7070000171661377,
+                "slopeDbPerOct": 12,
+                "type": "Peak"
+            },
+            {
+                "enabled": true,
+                "freqHz": 1000,
+                "gainDb": 0,
+                "q": 0.7070000171661377,
+                "slopeDbPerOct": 12,
+                "type": "Peak"
+            },
+            {
+                "enabled": true,
+                "freqHz": 1000,
+                "gainDb": 0,
+                "q": 0.7070000171661377,
+                "slopeDbPerOct": 12,
+                "type": "Peak"
+            },
+            {
+                "enabled": true,
+                "freqHz": 1000,
+                "gainDb": 0,
+                "q": 0.7070000171661377,
+                "slopeDbPerOct": 12,
+                "type": "Peak"
+            }
+        ],
+        "enabled": true,
+        "filterFamily": "Chebyshev",
+        "masterGain": 1.652999997138977
+    },
+    "finalLimiter": {
+        "ceilingDb": -2.9126200675964355,
+        "dcBlock": true,
+        "enabled": true,
+        "outputTrimDb": -3.9600000381469727
+    },
+    "gate": {
+        "attackMs": 0.19677500426769257,
+        "enabled": true,
+        "floorDb": -15,
+        "holdMs": 85,
+        "lookaheadMs": 3,
+        "mode": "Expander",
+        "ratio": 3.2149999141693115,
+        "releaseMs": 40.70899963378906,
+        "returnDb": 17.100000381469727,
+        "thresholdDb": -20
+    },
+    "name": "SSB_30.07.2026 (imported)",
+    "pudu": {
+        "dooHarmonicsDb": 4.039999961853027,
+        "dooMix": 0.3449999988079071,
+        "dooTuneHz": 3971.64990234375,
+        "enabled": true,
+        "mode": "Aphex",
+        "pooDriveDb": 9.960000038146973,
+        "pooMix": 1,
+        "pooTuneHz": 119.8499984741211
+    },
+    "reverb": {
+        "damping": 0.5,
+        "decayS": 0.9057250022888184,
+        "enabled": true,
+        "mix": 0.27000001072883606,
+        "preDelayMs": 20,
+        "size": 0.16500000655651093
+    },
+    "rn2": false,
+    "rx": {
+        "chain": [
+            "Gate",
+            "Eq",
+            "Comp",
+            "DeEss",
+            "Tube",
+            "Pudu"
+        ],
+        "comp": {
+            "attackMs": 14.51930046081543,
+            "enabled": false,
+            "kneeDb": 6,
+            "limiterCeilingDb": -1,
+            "limiterEnabled": true,
+            "makeupDb": 0,
+            "ratio": 3,
+            "releaseMs": 200,
+            "thresholdDb": -18
+        },
+        "deess": {
+            "amountDb": -6,
+            "attackMs": 1,
+            "enabled": false,
+            "frequencyHz": 6000,
+            "q": 2,
+            "releaseMs": 100,
+            "thresholdDb": -30
+        },
+        "eq": {
+            "activeBandCount": 10,
+            "bands": [
+                {
+                    "enabled": false,
+                    "freqHz": 40,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "HighPass"
+                },
+                {
+                    "enabled": false,
+                    "freqHz": 100,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "LowShelf"
+                },
+                {
+                    "enabled": false,
+                    "freqHz": 200,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "Peak"
+                },
+                {
+                    "enabled": true,
+                    "freqHz": 200.50999450683594,
+                    "gainDb": 0.15000000596046448,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "Peak"
+                },
+                {
+                    "enabled": false,
+                    "freqHz": 800,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "Peak"
+                },
+                {
+                    "enabled": false,
+                    "freqHz": 1500,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "Peak"
+                },
+                {
+                    "enabled": false,
+                    "freqHz": 3000,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "Peak"
+                },
+                {
+                    "enabled": false,
+                    "freqHz": 5000,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "Peak"
+                },
+                {
+                    "enabled": false,
+                    "freqHz": 8000,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "HighShelf"
+                },
+                {
+                    "enabled": false,
+                    "freqHz": 12000,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "LowPass"
+                },
+                {
+                    "enabled": true,
+                    "freqHz": 1000,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "Peak"
+                },
+                {
+                    "enabled": true,
+                    "freqHz": 1000,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "Peak"
+                },
+                {
+                    "enabled": true,
+                    "freqHz": 1000,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "Peak"
+                },
+                {
+                    "enabled": true,
+                    "freqHz": 1000,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "Peak"
+                },
+                {
+                    "enabled": true,
+                    "freqHz": 1000,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "Peak"
+                },
+                {
+                    "enabled": true,
+                    "freqHz": 1000,
+                    "gainDb": 0,
+                    "q": 0.7070000171661377,
+                    "slopeDbPerOct": 12,
+                    "type": "Peak"
+                }
+            ],
+            "enabled": true,
+            "filterFamily": "Butterworth",
+            "masterGain": 1
+        },
+        "gate": {
+            "attackMs": 0.5,
+            "enabled": false,
+            "floorDb": -15,
+            "holdMs": 20,
+            "lookaheadMs": 0,
+            "mode": "Expander",
+            "ratio": 2,
+            "releaseMs": 100,
+            "returnDb": 2,
+            "thresholdDb": -40
+        },
+        "pudu": {
+            "dooHarmonicsDb": 5.28000020980835,
+            "dooMix": 0.30000001192092896,
+            "dooTuneHz": 5000,
+            "enabled": false,
+            "mode": "Aphex",
+            "pooDriveDb": 6,
+            "pooMix": 0.30000001192092896,
+            "pooTuneHz": 100
+        },
+        "rn2": false,
+        "tube": {
+            "attackMs": 5,
+            "biasAmount": 0.019999999552965164,
+            "driveDb": 0,
+            "dryWet": 1,
+            "enabled": false,
+            "envelopeAmount": 0,
+            "model": "A",
+            "outputGainDb": 0,
+            "releaseMs": 35,
+            "tone": 0
+        }
+    },
+    "schema": "AetherSDR ChannelStripPreset v1",
+    "tube": {
+        "attackMs": 1,
+        "biasAmount": 0,
+        "driveDb": 16.200000762939453,
+        "dryWet": 0.9900000095367432,
+        "enabled": true,
+        "envelopeAmount": 0,
+        "model": "A",
+        "outputGainDb": 0,
+        "releaseMs": 35,
+        "tone": 0.7699999809265137
+    }
+}

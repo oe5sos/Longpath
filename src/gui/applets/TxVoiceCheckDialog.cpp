@@ -13,11 +13,15 @@
 
 #include "gui/applets/TxVoiceCheckDialog.h"
 
+#include "gui/applets/BroadcastOptimizerPanel.h"
+
 #include "core/AudioEngine.h"
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/TxChannel.h"
 #include "core/TxWorkerThread.h"
+#include "core/Loudness.h"
 #include "core/strip/StripChain.h"
+#include "core/strip/StripSettings.h"
 #include "core/strip/StripTuner.h"
 #include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
@@ -26,6 +30,7 @@
 #include <QAudio>
 #include <QAudioFormat>
 #include <QAudioSink>
+#include <QAudioSource>
 #include <QBuffer>
 #include <QFileDialog>
 #include <QHBoxLayout>
@@ -39,8 +44,11 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
+#include "core/AppSettings.h"
+
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace Longpath {
 
@@ -94,10 +102,147 @@ TxVoiceCheckDialog::~TxVoiceCheckDialog()
     if (m_radio && m_radio->txWorker()) {
         m_radio->txWorker()->setVoiceTapEnabled(false);
     }
+    closeDirectMic();
     QObject::disconnect(m_micTap);
     QObject::disconnect(m_procTap);
+    // The direct source stays OPEN on purpose: it is also what drives
+    // the level meter, and closing it here would leave the bar dead
+    // until the next take — which is exactly the state that makes
+    // "is my microphone live" unanswerable.
     QObject::disconnect(m_levelTap);
     stopPlayback();   // also lifts the RX quiet gate
+}
+
+
+// ── The three steps, and the one next thing ──────────────────────────
+
+QWidget* TxVoiceCheckDialog::buildGuide()
+{
+    auto* box = new QWidget(this);
+    auto* col = new QVBoxLayout(box);
+    col->setContentsMargins(0, 0, 0, 0);
+    col->setSpacing(6);
+
+    struct StepText { const char* title; const char* why; };
+    // The three paragraphs this row replaced, one per chip, kept as
+    // the tooltip. Nothing was thrown away; it stopped being in the
+    // way.
+    static const StepText kSteps[3] = {
+        {"1 · Speak 15 s",
+         "Speak as you would on the air — normal distance, normal "
+         "level, a couple of sentences with pauses between them. The "
+         "pauses matter: the noise floor can only be measured where "
+         "you are not talking. Nothing is transmitted."},
+        {"2 · Listen",
+         "The same words, raw against processed, from memory and off "
+         "the real-time path — so it cannot crackle, which is what "
+         "makes it fit to judge a chain with."},
+        {"3 · Choose a profile",
+         "Four transmit bandwidths built from that one take. Pick "
+         "one, hear it, and load it into the strip if it is better. "
+         "Nothing is applied until you say so."},
+    };
+
+    auto* row = new QHBoxLayout;
+    row->setSpacing(5);
+    for (const StepText& st : kSteps) {
+        // fromUtf8, not fromLatin1: the separator in "1 · Speak" is
+        // two bytes, and reading it as Latin-1 turns it into "1 Â·"
+        // on screen. Caught in the rendered picture, 2026-10-09.
+        auto* chip = new QLabel(QString::fromUtf8(st.title), box);
+        chip->setToolTip(QString::fromUtf8(st.why));
+        chip->setAlignment(Qt::AlignCenter);
+        m_stepChips.push_back(chip);
+        row->addWidget(chip);
+    }
+    row->addStretch(1);
+    col->addLayout(row);
+
+    // Zeus's NEXT line: one sentence, the one action. Monospaced tag,
+    // plain words after it.
+    m_nextLine = new QLabel(box);
+    m_nextLine->setWordWrap(true);
+    m_nextLine->setTextFormat(Qt::RichText);
+    col->addWidget(m_nextLine);
+
+    return box;
+}
+
+void TxVoiceCheckDialog::updateGuide()
+{
+    if (m_stepChips.size() != 3 || !m_nextLine) { return; }
+
+    const bool recording = m_recorder.isRecording();
+    const bool haveTake  = m_recorder.hasRecording() && !recording;
+    const bool clipped   = m_haveResult && m_result.clippedSamples > 0;
+    const bool usable    = m_haveResult && m_result.valid;
+
+    Step step = Step::Speak;
+    QString next;
+
+    if (recording) {
+        step = Step::Speak;
+        next = QStringLiteral("Speak — %1 seconds left.").arg(m_secondsLeft);
+    } else if (clipped) {
+        step = Step::Speak;
+        next = QStringLiteral(
+            "Too loud — the take clipped, so nothing can be measured "
+            "from it. Turn the microphone gain down and record again.");
+    } else if (!haveTake) {
+        step = Step::Speak;
+        next = QStringLiteral(
+            "Press <b>Record %1 s and analyse</b> and talk. Watch the "
+            "Mic bar move while you do.").arg(kRecordSeconds);
+    } else if (!usable) {
+        step = Step::Speak;
+        next = QStringLiteral(
+            "That take could not be measured. Record again, a little "
+            "longer, with pauses between sentences.");
+    } else {
+        // A take that measured. Which of the two remaining steps is
+        // next depends on whether the optimiser got far enough to
+        // offer anything — without profiles there is nothing to
+        // choose between, and sending the operator to step three
+        // would be sending them to an empty room.
+        const bool haveProfiles =
+            m_optimizer && !m_optimizer->plans().isEmpty();
+        if (haveProfiles) {
+            step = Step::Choose;
+            next = QStringLiteral(
+                "Pick a width under <b>Broadcast optimizer</b>, press "
+                "<b>With this profile</b>, then <b>Without</b>. Load it "
+                "into the strip only if it is actually better.");
+        } else {
+            step = Step::Listen;
+            next = QStringLiteral(
+                "Listen back with <b>Play mic (raw)</b>, then read what "
+                "the measurement found below.");
+        }
+    }
+
+    // Rule 2: exactly one lit, the others nearly invisible.
+    for (int i = 0; i < m_stepChips.size(); ++i) {
+        const bool on = i == int(step);
+        m_stepChips[i]->setStyleSheet(QStringLiteral(
+            "QLabel { color: %1; background: %2; border: 1px solid %3; "
+            "border-radius: 6px; padding: 4px 11px; font-size: 11px; "
+            "font-weight: %4; }")
+            .arg(QString::fromLatin1(on ? Style::kGlassSelText
+                                        : Style::kTextInactive),
+                 QString::fromLatin1(on ? Style::kGlassSelTop
+                                        : Style::kPanelBg),
+                 QString::fromLatin1(on ? Style::kGlassSelBorder
+                                        : Style::kBorderSubtle),
+                 QString::number(on ? 600 : 400)));
+    }
+
+    m_nextLine->setText(QStringLiteral(
+        "<span style='color:%1; letter-spacing:0.14em; "
+        "font-family:" LP_MONO_QSS ";'>NEXT</span> "
+        "<span style='color:%2;'>%3</span>")
+        .arg(QString::fromLatin1(Style::kTextGroupHead),
+             QString::fromLatin1(Style::kTextPrimary),
+             next));
 }
 
 // ── Building ─────────────────────────────────────────────────────────
@@ -120,13 +265,9 @@ void TxVoiceCheckDialog::buildUi()
     // record 15 s, hear it played back automatically, adjust, repeat.
     // (The on-air MON path for actual transmissions is untouched.)
     {
-        auto* note = new QLabel(QStringLiteral(
-            "Speak, then listen: recording captures your voice straight "
-            "off the channel strip and plays it back to you when the "
-            "countdown ends. Nothing is transmitted."), this);
-        note->setWordWrap(true);
-        note->setStyleSheet(secondaryLabelStyle());
-        col->addWidget(note);
+        // Three steps and one NEXT line, in place of the paragraph
+        // that used to stand here. See buildGuide().
+        col->addWidget(buildGuide());
 
         // The meter is the honest part. If it moves, the microphone is
         // reaching the transmit chain and any silence is on the output
@@ -151,15 +292,6 @@ void TxVoiceCheckDialog::buildUi()
 
     // ── Recording ────────────────────────────────────────────────────
     {
-        auto* ask = new QLabel(QStringLiteral(
-            "Speak for %1 seconds as you would on the air — normal "
-            "distance, normal level, a couple of sentences with pauses "
-            "between them. The pauses matter: the noise floor can only "
-            "be measured where you are not talking.")
-                                   .arg(kRecordSeconds), this);
-        ask->setWordWrap(true);
-        col->addWidget(ask);
-
         auto* row = new QHBoxLayout;
         m_recordBtn = new QPushButton(this);
         m_recordBtn->setStyleSheet(Style::buttonBaseStyle());
@@ -212,6 +344,72 @@ void TxVoiceCheckDialog::buildUi()
             .arg(QString::fromLatin1(Style::kInsetBg),
                  QString::fromLatin1(Style::kInsetBorder)));
     col->addWidget(m_findings);
+
+    // ── The broadcast optimiser, beside the existing path ────────────
+    //
+    // Deliberately AFTER the findings and before the apply buttons:
+    // the order on screen is the order of the decision. What the
+    // measurement found, then the four profiles it suggests, then
+    // the two older buttons that set WDSP's equaliser and the strip
+    // the way they always did.
+    //
+    // Nothing above it changed. The operator asked for this to run
+    // alongside the current audio setup so that either can be chosen
+    // later (2026-10-09), and a section that can be deleted in one
+    // block is what that promise looks like in code.
+    {
+        m_optimizer = new BroadcastOptimizerPanel(this);
+        col->addWidget(m_optimizer);
+
+        // Roh: nur der Kanal, sonst nichts.
+        connect(m_optimizer, &BroadcastOptimizerPanel::beforeRequested,
+                this, [this](const BroadcastOptimizer::Plan& plan) {
+            if (m_playingPlan) { stopPlayback(); return; }
+            playPlan(plan, /*throughStrip=*/false);
+        });
+
+        // Und durch die eigene Kette des Bedieners, dann den Kanal.
+        connect(m_optimizer, &BroadcastOptimizerPanel::afterRequested,
+                this, [this](const BroadcastOptimizer::Plan& plan) {
+            if (m_playingPlan) { stopPlayback(); return; }
+            playPlan(plan, /*throughStrip=*/true);
+        });
+
+        connect(m_optimizer, &BroadcastOptimizerPanel::openStripRequested,
+                this, [this]() { emit curveEditRequested(); });
+
+        connect(m_optimizer, &BroadcastOptimizerPanel::saveProfileRequested,
+                this, [this](const BroadcastOptimizer::Plan& plan) {
+            StripChain* chain = m_radio ? m_radio->stripChain() : nullptr;
+            if (chain == nullptr) {
+                // Ohne Funkgeraet gibt es keine lebende Kette. Statt
+                // nichts zu tun wird die gespeicherte Einstellung
+                // abgelegt -- das ist dieselbe, die "Through your
+                // strip" gerade vorgespielt hat, also genau das, was
+                // der Bediener gerade beurteilt hat.
+                StripChain scratch;
+                scratch.prepare(double(kMicRateHz));
+                StripSettings::restore(scratch);
+                const bool ok =
+                    BroadcastOptimizer::saveCurrentAsProfile(plan, scratch);
+                m_findings->setText(ok
+                    ? QStringLiteral(
+                        "Saved as \"%1\" — from your stored strip "
+                        "settings, since no radio is connected and "
+                        "there is no live chain to read.").arg(plan.name)
+                    : QStringLiteral("Could not save that profile."));
+                return;
+            }
+            const bool ok =
+                BroadcastOptimizer::saveCurrentAsProfile(plan, *chain);
+            m_findings->setText(ok
+                ? QStringLiteral(
+                    "Saved as \"%1\". It sits in the strip's preset "
+                    "list beside your own and can be recalled or "
+                    "edited there like any other.").arg(plan.name)
+                : QStringLiteral("Could not save that profile."));
+        });
+    }
 
     {
         auto* row = new QHBoxLayout;
@@ -318,6 +516,10 @@ void TxVoiceCheckDialog::buildUi()
     connect(m_countdown, &QTimer::timeout, this, [this]() {
         --m_secondsLeft;
         m_progress->setValue(kRecordSeconds - m_secondsLeft);
+        // The countdown is the one thing that changes once a second
+        // while nothing else does; without this the NEXT line would
+        // say "15 seconds left" for the whole take.
+        updateGuide();
         if (m_secondsLeft <= 0) { stopRecording(); }
     });
 
@@ -376,11 +578,24 @@ QString TxVoiceCheckDialog::micSourceName() const
 void TxVoiceCheckDialog::startLevelWatch()
 {
     if (!m_radio || !m_radio->txChannel()) {
-        m_liveStatus->setText(QStringLiteral(
-            "Not connected to a radio. The microphone is read through the "
-            "radio's transmit chain, so there is nothing to listen to "
-            "yet — connect first. This window will pick it up on its own "
-            "once you do."));
+        // No radio is no longer a dead end: the system microphone is
+        // opened for metering right here, so the bar moves and a take
+        // can be recorded. Connecting later still wins — the timer
+        // below notices it and switches to the transmit tap, which
+        // measures what the radio actually gets.
+        if (openDirectMic()) {
+            m_liveStatus->setText(QStringLiteral(
+                "No radio — recording straight from the microphone. "
+                "That is enough to measure your voice and build the "
+                "four profiles. Connect later and this window switches "
+                "to the radio's own transmit chain by itself, which is "
+                "what it actually sends."));
+        } else {
+            m_liveStatus->setText(QStringLiteral(
+                "Not connected to a radio, and no microphone of this "
+                "computer could be opened either — so there is nothing "
+                "to record yet."));
+        }
         // The timer still runs. It is the only thing that will notice
         // the radio arriving: this window has no other way to hear
         // about a connection, and the version without this sat dead for
@@ -444,8 +659,17 @@ void TxVoiceCheckDialog::updateLevel()
 {
     // Arm late if the radio was connected after this window opened.
     if (!m_tapsArmed) {
-        if (m_radio && m_radio->txChannel()) { startLevelWatch(); }
-        return;
+        if (m_radio && m_radio->txChannel()) {
+            // The radio wins over the direct source: it measures what
+            // is actually transmitted, after mic source and mic gain.
+            closeDirectMic();
+            startLevelWatch();
+            return;
+        }
+        // On the direct path there are no taps to arm, and the meter
+        // below is fed by pullDirectMic(). Falling through is the
+        // point; returning here is what would leave the bar dead.
+        if (!directMicActive()) { return; }
     }
 
     const unsigned micros = m_micPeakMicros.exchange(
@@ -467,6 +691,11 @@ void TxVoiceCheckDialog::updateLevel()
 
     // First broken link, not the last. Each of these is a different
     // thing to go and do, and naming two at once helps nobody.
+    if (mic == 0 && directMicActive()) {
+        m_liveStatus->setText(QStringLiteral(
+            "The microphone is open but no audio is arriving from it."));
+        return;
+    }
     if (mic == 0) {
         m_liveStatus->setText(QStringLiteral(
             "No microphone blocks are arriving. The transmit chain is "
@@ -498,24 +727,266 @@ void TxVoiceCheckDialog::updateLevel()
         "Hearing you through %1 — ready to record.").arg(micSourceName()));
 }
 
+
+// ── The system microphone, when there is no radio ────────────────────
+
+bool TxVoiceCheckDialog::openDirectMic()
+{
+    if (m_micSource) { return true; }
+
+    const QAudioDevice dev = QMediaDevices::defaultAudioInput();
+    if (dev.isNull()) {
+        m_liveStatus->setText(QStringLiteral(
+            "No microphone is available to this computer at all, so "
+            "there is nothing to record. Connecting to the radio is the "
+            "other way in — then the microphone is read through its "
+            "transmit chain."));
+        return false;
+    }
+
+    // Float mono at the transmit rate if the device will take it,
+    // because that is what the recorder and the analyser both want and
+    // every conversion in between is a chance to be wrong. Otherwise
+    // Int16, otherwise whatever the device prefers — the analyser is
+    // given the real rate either way, so none of this changes the
+    // measurement, only how much arithmetic happens first.
+    QAudioFormat fmt;
+    fmt.setSampleRate(kMicRateHz);
+    fmt.setChannelCount(1);
+    fmt.setSampleFormat(QAudioFormat::Float);
+    // ── Einen Mehrkanalwandler nicht zusammenlegen lassen ────────
+    //
+    // Dieselbe Falle wie im Mithörweg, gemessen am 2026-10-14 an
+    // einem Apollo Twin: die Bitte um EINEN Kanal wird angenommen,
+    // und CoreAudio legt die sechzehn Eingänge selbst zusammen.
+    // Fünfzehn stille davon kosten 20·log10(16) = 24 dB, und diese
+    // Stimmprobe misst dann einen Pegel, den das Mikrofon nie hatte
+    // — sie sagt „viel zu leise" über ein sauber ausgesteuertes
+    // Signal. Also in der eigenen Kanalzahl öffnen und EINEN Kanal
+    // nehmen, denselben wie der Mithörweg.
+    const int nativ = dev.maximumChannelCount();
+    if (nativ > 2) { fmt.setChannelCount(nativ); }
+    if (!dev.isFormatSupported(fmt)) {
+        fmt.setSampleFormat(QAudioFormat::Int16);
+    }
+    if (!dev.isFormatSupported(fmt)) {
+        fmt.setSampleFormat(QAudioFormat::Float);
+        fmt.setChannelCount(1);
+        if (!dev.isFormatSupported(fmt)) {
+            fmt.setSampleFormat(QAudioFormat::Int16);
+        }
+    }
+    if (!dev.isFormatSupported(fmt)) {
+        fmt = dev.preferredFormat();
+    }
+
+    m_micSourceRate     = fmt.sampleRate();
+    m_micSourceChannels = std::max(1, fmt.channelCount());
+    // Welcher Eingang die Stimme trägt. Bei einem oder zwei Kanälen
+    // werden sie zusammengelegt (-1), sonst der gewählte, sonst der
+    // erste -- gelesen aus demselben Schlüssel wie im Kanalzug,
+    // damit die beiden Messgeräte nicht verschiedene Mikrofone
+    // messen.
+    m_micPick = (m_micSourceChannels > 2)
+        ? std::clamp(AppSettings::instance()
+                         .value(QStringLiteral("StripMonitorInChannel"), 0)
+                         .toInt(),
+                     0, m_micSourceChannels - 1)
+        : -1;
+    m_micSourceFormat   = int(fmt.sampleFormat());
+
+    m_micSource = new QAudioSource(dev, fmt, this);
+    m_micIo = m_micSource->start();
+    if (!m_micIo) {
+        m_micSource->deleteLater();
+        m_micSource = nullptr;
+        m_liveStatus->setText(QStringLiteral(
+            "The microphone would not open. Nothing was recorded."));
+        return false;
+    }
+    connect(m_micIo, &QIODevice::readyRead,
+            this, &TxVoiceCheckDialog::pullDirectMic);
+
+    // The recorder is told the REAL rate, not the one that was asked
+    // for. A device that hands back 44.1 kHz while the buffer thinks
+    // it is 48 produces an analysis whose every frequency is out by
+    // nine percent — and it looks entirely plausible.
+    m_recorder.setSampleRate(m_micSourceRate);
+    return true;
+}
+
+void TxVoiceCheckDialog::closeDirectMic()
+{
+    if (m_micIo) {
+        QObject::disconnect(m_micIo, nullptr, this, nullptr);
+        m_micIo = nullptr;
+    }
+    if (m_micSource) {
+        m_micSource->stop();
+        m_micSource->deleteLater();
+        m_micSource = nullptr;
+    }
+}
+
+void TxVoiceCheckDialog::pullDirectMic()
+{
+    if (!m_micIo) { return; }
+    const QByteArray chunk = m_micIo->readAll();
+    if (chunk.isEmpty()) { return; }
+
+    const int channels = m_micSourceChannels;
+    std::vector<float> mono;
+
+    const auto format =
+        static_cast<QAudioFormat::SampleFormat>(m_micSourceFormat);
+    if (format == QAudioFormat::Float) {
+        const auto* in = reinterpret_cast<const float*>(chunk.constData());
+        const int frames = int(chunk.size() / sizeof(float)) / channels;
+        mono.resize(static_cast<size_t>(std::max(0, frames)));
+        for (int i = 0; i < frames; ++i) {
+            if (m_micPick >= 0) {
+                mono[static_cast<size_t>(i)] = in[i * channels + m_micPick];
+                continue;
+            }
+            double acc = 0.0;
+            for (int c = 0; c < channels; ++c) {
+                acc += in[i * channels + c];
+            }
+            mono[static_cast<size_t>(i)] = float(acc / channels);
+        }
+    } else if (format == QAudioFormat::Int16) {
+        const auto* in = reinterpret_cast<const qint16*>(chunk.constData());
+        const int frames = int(chunk.size() / sizeof(qint16)) / channels;
+        mono.resize(static_cast<size_t>(std::max(0, frames)));
+        for (int i = 0; i < frames; ++i) {
+            if (m_micPick >= 0) {
+                mono[static_cast<size_t>(i)] =
+                    float(double(in[i * channels + m_micPick]) / 32768.0);
+                continue;
+            }
+            double acc = 0.0;
+            for (int c = 0; c < channels; ++c) {
+                acc += double(in[i * channels + c]) / 32768.0;
+            }
+            mono[static_cast<size_t>(i)] = float(acc / channels);
+        }
+    } else {
+        // An exotic format from preferredFormat(). Rather than guess at
+        // its layout and feed the analyser noise, say so once.
+        m_liveStatus->setText(QStringLiteral(
+            "This microphone offers a sample format this window cannot "
+            "read. Connecting to the radio is the other way in."));
+        closeDirectMic();
+        return;
+    }
+    if (mono.empty()) { return; }
+
+    // Same two atomics the radio path writes, so the meter, the
+    // watchdog and the "was there ever any signal" report all work
+    // unchanged whichever way the microphone arrived.
+    float peak = 0.0f;
+    for (float v : mono) { peak = std::max(peak, std::abs(v)); }
+    const unsigned micros = unsigned(std::lround(
+        std::clamp(double(peak), 0.0, 1.0) * 1'000'000.0));
+    unsigned prev = m_micPeakMicros.load(std::memory_order_relaxed);
+    while (micros > prev
+           && !m_micPeakMicros.compare_exchange_weak(
+                  prev, micros, std::memory_order_acq_rel)) {
+    }
+    m_micBlocks.fetch_add(1, std::memory_order_acq_rel);
+
+    if (m_recorder.isRecording()) {
+        m_recorder.feed(mono.data(), int(mono.size()));
+    }
+}
+
 // ── Recording ────────────────────────────────────────────────────────
 
 void TxVoiceCheckDialog::startRecording()
 {
-    if (!m_radio || !m_radio->txChannel()) {
-        m_findings->setText(QStringLiteral(
-            "No transmit channel. Connect to the radio first — the "
-            "microphone is read through it."));
+    // ── No radio? Then the system microphone ─────────────────────────
+    //
+    // Measuring your own voice does not need a transceiver, and
+    // making it depend on one put a connection in front of the one
+    // thing the broadcast optimiser asks for: fifteen seconds of
+    // speech with nothing set up. Reported at the bench, 2026-10-09
+    // ("aufnahme geht nicht"), with the radio off.
+    //
+    // Only the RAW take exists on this path — there is no strip
+    // running to record the far side of — so the analysis, which
+    // reads the raw take anyway, is unaffected, and the processed
+    // playback button stays dark.
+    // ── Which microphone, decided on evidence ────────────────────────
+    //
+    // The transmit chain wins WHEN IT DELIVERS. It measures what the
+    // radio actually gets, after the mic source selection and the mic
+    // gain, and that is what goes on the air.
+    //
+    // But "the chain exists" and "the chain is delivering" are two
+    // different facts, and treating the first as the second is what
+    // produced a fifteen-second take of pure silence and the message
+    // "Nothing was recorded — check that the mic isn't muted"
+    // (bench, 2026-10-09, radio connected, pump running, mic open,
+    // and not one block reaching the tap).
+    //
+    // The level watch has been counting blocks since this window
+    // opened, so by the time anybody presses record the answer is
+    // already known. A chain that has delivered nothing does not get
+    // the take; the system microphone does, and the operator is told
+    // which one is being used rather than being sent to go and check
+    // a setting.
+    const bool haveChain = m_radio && m_radio->txChannel()
+                           && m_radio->txWorker();
+    //
+    // The !directMicActive() term is not belt-and-braces, it is the
+    // whole correctness of the test: pullDirectMic() counts into the
+    // SAME block counter, so once the fallback has run once, a second
+    // take would read its own blocks as proof that the transmit chain
+    // had come alive and switch back to a tap that is still silent.
+    const bool chainDelivering =
+        haveChain && !directMicActive()
+        && m_micBlocks.load(std::memory_order_acquire) > 0;
+    if (!chainDelivering) {
+        if (!openDirectMic()) { return; }
+
+        m_haveResult = false;
+        stopPlayback();
+        m_recorder.clear();
+        m_procRecorder.clear();
+        m_micBlocksAtStart = m_micBlocks.load(std::memory_order_acquire);
+        m_peakSeenDb = -60.0;
+
+        // The band goes quiet for the take, exactly as on the radio
+        // path. Forgetting it here is why the receiver's hiss was
+        // audible all the way through a recording (bench, 2026-10-09:
+        // "beim aufnehmen hört man das rauschen des funkgerätes") —
+        // and worse than being unpleasant, a loudspeaker playing band
+        // noise into the room is noise the microphone records and the
+        // analyser then measures as the operator's noise floor.
+        setRxQuiet(true);
+
+        m_recorder.start();
+        m_secondsLeft = kRecordSeconds;
+        m_progress->setValue(0);
+        m_countdown->start();
+        refreshButtons();
+        m_findings->setText(haveChain
+            ? QStringLiteral(
+                "The radio is connected, but no microphone blocks have "
+                "reached its transmit chain since this window opened — "
+                "so this take comes straight from the microphone "
+                "instead. Good enough to measure your voice and build "
+                "the four profiles; it is not what the radio sends. "
+                "Speak for %1 seconds.").arg(kRecordSeconds)
+            : QStringLiteral(
+                "Recording from the microphone directly — no radio "
+                "needed for this. Speak for %1 seconds.")
+                .arg(kRecordSeconds));
         return;
     }
+
     TxChannel* tx = m_radio->txChannel();
     TxWorkerThread* worker = m_radio->txWorker();
-    if (!worker) {
-        m_findings->setText(QStringLiteral(
-            "The transmit pump is not running yet — connect to the radio "
-            "first."));
-        return;
-    }
 
     m_haveResult = false;
     stopPlayback();
@@ -610,6 +1081,49 @@ void TxVoiceCheckDialog::playRecording(bool processed)
 {
     stopPlayback();
 
+    // ── The processed side, when nothing recorded it ─────────────────
+    //
+    // The post-strip take comes from the transmit worker's own tap, so
+    // it only exists when a radio was driving the chain. Without one
+    // there is no second recording — and the button went dark, which
+    // the bench called out in three words: "kein play after strip".
+    //
+    // Rendering is the answer, exactly as the optimiser's audition
+    // does it: the raw take pushed through a scratch chain carrying
+    // the operator's own saved strip settings. It is what the strip
+    // WOULD do to those words, computed instead of recorded.
+    //
+    // Not the same thing as the recorded take, and not claimed to be:
+    // the recorded one is the live chain as it actually ran, this one
+    // is the saved state applied offline. When the recorded one
+    // exists it is used, every time.
+    if (processed && !m_procRecorder.hasRecording()
+        && m_recorder.hasRecording() && !m_recorder.isRecording()) {
+        const float* raw = m_recorder.samples();
+        if (raw == nullptr) { return; }
+        const int frames = m_recorder.recordedFrames();
+        const int rate   = m_recorder.sampleRate();
+
+        StripChain scratch;
+        scratch.prepare(double(rate));
+        StripSettings::restore(scratch);
+        // restore() deliberately never brings the master switch back —
+        // a strip that switches itself on is a strip that changes the
+        // operator's transmit audio while they are not there. For an
+        // offline render of "what would the strip do", it has to be
+        // on, and this chain reaches nothing.
+        scratch.setEnabled(true);
+
+        std::vector<float> rendered(raw, raw + frames);
+        scratch.processMono(rendered.data(), frames);
+
+        setRxQuiet(true);
+        m_playingProcessed = true;
+        m_playingPlan      = false;
+        playBuffer(rendered.data(), frames, rate);
+        return;
+    }
+
     const TxAudioRecorder& rec = processed ? m_procRecorder : m_recorder;
     if (!rec.hasRecording() || rec.isRecording()) { return; }
 
@@ -619,6 +1133,74 @@ void TxVoiceCheckDialog::playRecording(bool processed)
     const float* src = rec.samples();
     if (src == nullptr) { return; }
     const int frames = rec.recordedFrames();
+
+    m_playingProcessed = processed;
+    m_playingPlan      = false;
+    playBuffer(src, frames, rec.sampleRate());
+}
+
+// ── Rendering a profile that is not in the chain ─────────────────────
+//
+// A scratch chain per press rather than one kept around: a StripChain
+// is cheap to build, and a reused one would carry whatever the
+// previous plan left in it — which is exactly the failure that would
+// make an A/B between two profiles a comparison of the wrong two
+// things.
+void TxVoiceCheckDialog::playPlan(const BroadcastOptimizer::Plan& plan,
+                                  bool throughStrip)
+{
+    stopPlayback();
+    if (!m_recorder.hasRecording() || m_recorder.isRecording()) { return; }
+    const float* raw = m_recorder.samples();
+    if (raw == nullptr) { return; }
+    const int frames = m_recorder.recordedFrames();
+    const int rate   = m_recorder.sampleRate();
+
+    std::vector<float> rendered(raw, raw + frames);
+
+    if (throughStrip) {
+        // Die Kette des Bedieners, nicht eine hergeleitete. Gibt es
+        // eine lebende, wird sie gelesen; sonst die gespeicherte --
+        // in beiden Faellen SEINE Einstellung.
+        StripChain scratch;
+        scratch.prepare(double(rate));
+        StripSettings::restore(scratch);
+        // restore() bringt den Hauptschalter bewusst nicht zurueck.
+        // Fuer eine Rechnung abseits jedes Signalwegs muss er an
+        // sein, sonst geht der Durchgang unveraendert hindurch.
+        scratch.setEnabled(true);
+        scratch.processMono(rendered.data(), frames);
+    }
+
+    // Der Kanal zuletzt, so wie auf dem Band: erst die Kette, dann
+    // das Sendefilter.
+    BroadcastOptimizer::applyChannelFilter(rendered.data(), frames, rate,
+                                           plan);
+
+    if (throughStrip && m_optimizer && m_optimizer->levelMatched()) {
+        const Loudness::Result before = Loudness::measure(raw, frames, rate);
+        const Loudness::Result after =
+            Loudness::measure(rendered.data(), frames, rate);
+        if (before.valid && after.valid
+            && before.integratedLufs > Loudness::kAbsoluteGateLufs
+            && after.integratedLufs > Loudness::kAbsoluteGateLufs) {
+            const double deltaDb =
+                std::min(0.0, before.integratedLufs - after.integratedLufs);
+            const double gain = std::pow(10.0, deltaDb / 20.0);
+            for (float& v : rendered) { v = float(v * gain); }
+        }
+    }
+
+    setRxQuiet(true);
+    m_playingProcessed = throughStrip;
+    m_playingPlan      = true;
+    playBuffer(rendered.data(), frames, rate);
+    if (m_optimizer) { m_optimizer->setAuditioning(m_playSink != nullptr); }
+}
+
+void TxVoiceCheckDialog::playBuffer(const float* src, int frames, int rate)
+{
+    if (src == nullptr || frames <= 0) { return; }
 
     // Mono float → mono int16, once, into a member the QBuffer wraps
     // without copying.
@@ -630,7 +1212,7 @@ void TxVoiceCheckDialog::playRecording(bool processed)
     }
 
     QAudioFormat fmt;
-    fmt.setSampleRate(rec.sampleRate());
+    fmt.setSampleRate(rate);
     fmt.setChannelCount(1);
     fmt.setSampleFormat(QAudioFormat::Int16);
 
@@ -646,7 +1228,6 @@ void TxVoiceCheckDialog::playRecording(bool processed)
     m_playBuf = new QBuffer(&m_playPcm, this);
     m_playBuf->open(QIODevice::ReadOnly);
     m_playSink = new QAudioSink(dev, fmt, this);
-    m_playingProcessed = processed;
     connect(m_playSink, &QAudioSink::stateChanged, this,
             [this](QAudio::State s) {
         if (s == QAudio::IdleState || s == QAudio::StoppedState) {
@@ -677,6 +1258,8 @@ void TxVoiceCheckDialog::stopPlayback()
         m_playBuf->deleteLater();
         m_playBuf = nullptr;
     }
+    m_playingPlan = false;
+    if (m_optimizer) { m_optimizer->setAuditioning(false); }
     // Buttons exist for every call after buildUi(); the destructor path
     // may arrive here with the UI already half-gone.
     if (m_playRawBtn && m_playProcBtn) { refreshButtons(); }
@@ -708,6 +1291,11 @@ void TxVoiceCheckDialog::runAnalysis()
     m_haveResult = m_result.valid;
 
     showFindings();
+    // The optimiser is fed the same measurement, every time. Handing
+    // it an invalid or clipped one is not skipped: that is how it
+    // clears itself back to dashes instead of leaving the previous
+    // take's four profiles on screen beside a new recording.
+    if (m_optimizer) { m_optimizer->setAnalysis(m_result); }
     fillAdvancedTable();
 }
 
@@ -801,7 +1389,7 @@ void TxVoiceCheckDialog::fillAdvancedTable()
                 .arg(m_result.speechDbFs - m_result.noiseFloorDbFs, 0, 'f', 1);
     bits << QStringLiteral("Crest factor %1 dB")
                 .arg(m_result.crestFactorDb, 0, 'f', 1);
-    if (m_result.humBaseHz > 0) {
+    if (m_result.humBaseHz > 0 && m_result.humMeasurable) {
         bits << QStringLiteral("Hum at %1 Hz, %2 dB below speech")
                     .arg(m_result.humBaseHz).arg(-m_result.humDb, 0, 'f', 1);
     } else {
@@ -810,6 +1398,60 @@ void TxVoiceCheckDialog::fillAdvancedTable()
     bits << QStringLiteral("Sibilance %1 dB (5-8 kHz against 1-3 kHz)")
                 .arg(m_result.sibilanceDb, 0, 'f', 1);
     bits << QStringLiteral("Clipped samples: %1").arg(m_result.clippedSamples);
+
+    // ── Der Raum und das Mikrofon ────────────────────────────────────
+    //
+    // Die Zeilen, bei denen Software aufhört zu helfen. Ein Entzerrer
+    // legt keinen Raum trocken, ein Kompressor repariert kein Poppen
+    // -- beide machen es schlimmer, weil sie anheben. Also steht hier
+    // kein Vorschlag, sondern ein Befund und ein Handgriff.
+    if (m_result.reverbValid) {
+        const double ms = m_result.reverbMs;
+        bits << QStringLiteral("Room: about %1 ms of decay — %2")
+                    .arg(ms, 0, 'f', 0)
+                    .arg(ms < 300.0
+                             ? QStringLiteral("dry, nothing to do")
+                         : ms < 600.0
+                             ? QStringLiteral("audible; closer to the "
+                                              "microphone helps more than "
+                                              "any setting")
+                             : QStringLiteral("this is the biggest thing "
+                                              "between you and clean audio "
+                                              "— soft furnishings, or speak "
+                                              "closer"));
+    } else {
+        bits << QStringLiteral("Room: not enough clean speech endings to "
+                               "judge the decay");
+    }
+    if (m_result.plosiveCount > 0) {
+        bits << QStringLiteral("Pops: %1 bursts below 80 Hz, worst %2 dB "
+                               "over the usual low end — a pop filter, or "
+                               "speak past the microphone instead of into "
+                               "it")
+                    .arg(m_result.plosiveCount)
+                    .arg(m_result.plosiveDb, 0, 'f', 0);
+    } else {
+        bits << QStringLiteral("Pops: none found below 80 Hz");
+    }
+    {
+        // Nähe zum Mikrofon: die Tiefe gegen die Mitte. Die Bandwerte
+        // sind schon auf 1 kHz bezogen, also IST der unterste Wert
+        // der Nahbesprechungseffekt -- es braucht keine zweite
+        // Rechnung, nur die richtige Lesart.
+        const double lf = m_result.bandDb[1];
+        bits << QStringLiteral("Microphone distance: low end %1 dB against "
+                               "1 kHz — %2")
+                    .arg(lf, 0, 'f', 1)
+                    .arg(lf > 8.0
+                             ? QStringLiteral("very close; a hand's width "
+                                              "back takes the boom out "
+                                              "without an equaliser")
+                         : lf < -6.0
+                             ? QStringLiteral("far off, or a thin "
+                                              "microphone; closer gives you "
+                                              "body for free")
+                             : QStringLiteral("about right"));
+    }
     bits << QStringLiteral("Suggested make-up gain %1 dB")
                 .arg(m_result.suggestedPreampDb, 0, 'f', 1);
     bits << QStringLiteral("Levels are relative to the 1 kHz band; the "
@@ -905,6 +1547,10 @@ void TxVoiceCheckDialog::saveRecording()
 
 void TxVoiceCheckDialog::refreshButtons()
 {
+    // Every path that changes what the operator can do ends here, so
+    // this is the one place the guide has to be refreshed from.
+    updateGuide();
+
     const bool recording = m_recorder.isRecording();
     m_recordBtn->setText(recording
         ? QStringLiteral("Stop")
@@ -921,8 +1567,12 @@ void TxVoiceCheckDialog::refreshButtons()
             : QStringLiteral("▶ Play mic (raw)"));
     }
     if (m_playProcBtn) {
+        // Enabled whenever there is anything to play on that side:
+        // the recorded post-strip take, or — when no radio recorded
+        // one — the raw take rendered through the saved settings.
         m_playProcBtn->setEnabled(!recording
-                                  && m_procRecorder.hasRecording());
+                                  && (m_procRecorder.hasRecording()
+                                      || m_recorder.hasRecording()));
         m_playProcBtn->setText(playing && m_playingProcessed
             ? QStringLiteral("■ Stop")
             : QStringLiteral("▶ Play after strip && EQ"));

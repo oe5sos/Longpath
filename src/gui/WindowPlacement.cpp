@@ -6,6 +6,8 @@
 // =================================================================
 
 #include "gui/WindowPlacement.h"
+
+#include <QSet>
 #include "gui/MacFloatingWindowBehavior.h"
 
 #include <algorithm>
@@ -169,6 +171,10 @@ QRect snappedFrameRect(const QRect& frame, const QSize& minSize, int grid)
 
 namespace {
 std::function<void(QWidget*)> s_zugmelder;
+// Wieviele `EigeneBewegung` gerade leben. Ein Zaehler, nicht ein
+// Schalter: die Stellen schachteln sich (das Raster laeuft waehrend des
+// Herausholens weiter).
+int s_eigeneBewegungen = 0;
 }
 
 void setzeZugmelder(std::function<void(QWidget*)> melder)
@@ -176,9 +182,27 @@ void setzeZugmelder(std::function<void(QWidget*)> melder)
     s_zugmelder = std::move(melder);
 }
 
+EigeneBewegung::EigeneBewegung()  { ++s_eigeneBewegungen; }
+EigeneBewegung::~EigeneBewegung() { --s_eigeneBewegungen; }
+
 void meldeZug(QWidget* bewegtes)
 {
-    if (s_zugmelder && bewegtes) { s_zugmelder(bewegtes); }
+    if (!bewegtes) { return; }
+    // Wir haben selbst geschoben -- das ist kein Ziehen. Siehe
+    // EigeneBewegung in WindowPlacement.h.
+    if (s_eigeneBewegungen > 0) { return; }
+    // Was man nicht sieht, kann man nicht ziehen.
+    //
+    // Gefunden am 2026-10-20: Qt schickt die aufgestauten Lage- und
+    // Groessenereignisse eines Fensters, BEVOR es sichtbar wird --
+    // `QWidgetPrivate::show_helper()` ruft
+    // `sendPendingMoveAndResizeEvents()` zuerst und das `showEvent`
+    // erst danach. Von `meldeZug()` aus sahen zwei davon hintereinander
+    // wie ein Ziehen aus, und der Hinweis stand da, bevor jemand die
+    // Maus angefasst hatte. Dasselbe beim Malen eines verborgenen
+    // Fensters in ein Bild (Vorschaubilder der Fensteranordnung).
+    if (!bewegtes->isVisible()) { return; }
+    if (s_zugmelder) { s_zugmelder(bewegtes); }
 }
 
 QRect ausSperrstreifenSchieben(const QRect& wunsch,
@@ -296,7 +320,10 @@ void snapToGridAfterSettle(QWidget* w, int grid, int delayMs, bool snapSize)
                 // Rueckstoss dieses move() loest selbst ein moveEvent()
                 // aus, das diese Funktion erneut aufruft; beim zweiten
                 // Mal stimmt die Position schon, also keine dritte Runde.
-                if (snapped != w->pos()) { w->move(snapped); }
+                if (snapped != w->pos()) {
+                    const EigeneBewegung wirSelbst;
+                    w->move(snapped);
+                }
                 return;
             }
             // Der RAHMEN rastet ein: bei rahmenlosen Fenstern dasselbe wie
@@ -344,6 +371,7 @@ void snapToGridAfterSettle(QWidget* w, int grid, int delayMs, bool snapSize)
             // Innenbereich, also um die Rahmenstaerke versetzt. Wie beim
             // Punkt oben stimmt beim Rueckstoss schon alles.
             const QPoint inset = w->geometry().topLeft() - frame.topLeft();
+            const EigeneBewegung wirSelbst;
             w->setGeometry(QRect(target.topLeft() + inset, target.size() - deco));
         });
         QObject::connect(w, &QObject::destroyed, w, [w]() {

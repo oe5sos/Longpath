@@ -17,6 +17,7 @@
 // Seit der Behebung folgt CH 1 der Entscheidung fuer CH 0.
 
 #include <QtTest>
+#include "HeadlessMacGuard.h"
 #include <QLabel>
 #include "gui/MainWindow.h"
 #include "models/RadioModel.h"
@@ -46,6 +47,7 @@ class TestRealStatusBarChainIndicators : public QObject
 private slots:
     void bothChainsShowOrHideTogether_data()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         QTest::addColumn<int>("width");
         QTest::newRow("Notebook 1470") << 1470;
         QTest::newRow("breit 1900")    << 1900;
@@ -53,6 +55,7 @@ private slots:
 
     void bothChainsShowOrHideTogether()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         QFETCH(int, width);
         auto* mw = new MainWindow();      // bewusst nicht abgeraeumt
         mw->resize(width, 859);

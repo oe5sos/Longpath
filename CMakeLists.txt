@@ -525,6 +525,9 @@ set(CORE_SOURCES
     src/core/antenna/AntennaTrim.cpp
     src/core/antenna/RadioSweep.cpp
     src/core/AppSettings.cpp
+    src/gui/FensterKnoepfe.cpp
+    src/core/Sprache.cpp
+    src/core/SpracheTabelle.cpp
     src/core/CrashReportDigest.cpp
     src/core/LogDatei.cpp
     src/core/audio/BusMitFrist.cpp
@@ -758,6 +761,13 @@ set(CORE_SOURCES
 if(APPLE)
     list(APPEND CORE_SOURCES src/core/audio/CoreAudioHalBus.cpp)
     list(APPEND CORE_SOURCES src/core/MacMicPermission.mm)
+    # Das eigene Fenster einer Audio Unit (CoreAudioKit).
+    list(APPEND CORE_SOURCES src/core/strip/AuPluginEditor.mm)
+else()
+    # Ueberall sonst gibt es keine Audio Units -- aber AuPluginEditor.h
+    # verspricht die Rufe plattformweit, also muessen sie auch da sein.
+    # Ohne das fehlen beim Linken close/available/show.
+    list(APPEND CORE_SOURCES src/core/strip/AuPluginEditorStub.cpp)
 endif()
 
 # LinuxPipeBus — Linux-only IAudioBus implementation bridging to PulseAudio /
@@ -1181,8 +1191,18 @@ set(GUI_SOURCES
     # The runner: the eight stages in order, with the master bypass the
     # operator's A/B comparison depends on.
     src/core/strip/MicSpectrum.cpp
+    src/core/strip/BandLimit.cpp
+    src/core/strip/LoudnessMatch.cpp
+    src/core/strip/ClientClipper.cpp
+    src/core/strip/NoiseReduction.cpp
     src/core/strip/StripChain.cpp
+    src/core/strip/AudioPluginAu.cpp
+    src/core/strip/PluginPlacement.cpp
+    src/core/strip/LtasSpectrum.cpp
+    src/core/strip/StripLiveMonitor.cpp
     src/core/strip/StripSettings.cpp
+    src/core/strip/AetherPreset.cpp
+    src/core/strip/BroadcastOptimizer.cpp
     src/core/strip/StripTuner.cpp
     src/core/strip/EqLoudness.cpp
     src/core/strip/StripCharacters.cpp
@@ -1190,6 +1210,7 @@ set(GUI_SOURCES
     src/core/strip/TargetFromFile.cpp
     src/core/strip/TxSpectrumAnalysis.cpp
     src/core/TxAudioRecorder.cpp
+    src/core/Loudness.cpp
     src/core/VoiceAnalyzer.cpp
     # Header-only Q_OBJECT: AUTOMOC needs the explicit listing, same as
     # QsoUploader above.
@@ -1203,6 +1224,7 @@ set(GUI_SOURCES
     src/gui/applets/RxApplet.cpp
     src/gui/applets/TxApplet.cpp
     src/gui/applets/TxEqDialog.cpp
+    src/gui/applets/BroadcastOptimizerPanel.cpp
     src/gui/applets/TxVoiceCheckDialog.cpp
     src/gui/applets/eq/ClientEqCurveWidget.cpp
     src/gui/applets/eq/ClientEqOutputFader.cpp
@@ -1213,6 +1235,7 @@ set(GUI_SOURCES
     src/gui/applets/eq/ClientEqFftAnalyzer.cpp
     src/gui/applets/eq/ClientEqIconRow.cpp
     src/gui/applets/eq/ClientEqParamRow.cpp
+    src/gui/applets/eq/StripEqSimpleBar.cpp
     src/gui/applets/StripGraphics.cpp
     src/gui/applets/StripWindow.cpp
     src/gui/applets/TxCfcDialog.cpp
@@ -1250,6 +1273,7 @@ set(GUI_SOURCES
 # Betreiber, repeatedly reported. See MacFloatingWindowBehavior.h.
 if(APPLE)
     list(APPEND GUI_SOURCES src/gui/MacFloatingWindowBehavior.mm)
+    list(APPEND GUI_SOURCES src/gui/MacVollflaeche.mm)
     list(APPEND GUI_SOURCES src/gui/MacFloatingWindowBehavior.h)
 endif()
 
@@ -1501,6 +1525,17 @@ if(APPLE)
     # APIs themselves come from libSystem (already linked) but the
     # property-query helpers and AudioDeviceID type live in CoreAudio.
     target_link_libraries(LongpathObjs PUBLIC "-framework CoreAudio")
+
+    # AudioToolbox traegt den Audio-Unit-Wirt fuer die Einschubplaetze
+    # der Sendetonkette (src/core/strip/AudioPluginAu.cpp). Systemsache,
+    # kein fremdes SDK im Baum -- und genau deshalb zuerst AU und nicht
+    # VST3.
+    target_link_libraries(LongpathObjs PUBLIC "-framework AudioToolbox")
+
+    # CoreAudioKit traegt AUGenericView -- Apples Reglertafel fuer
+    # jede Audio Unit ohne eigene Oberflaeche
+    # (src/core/strip/AuPluginEditor.mm).
+    target_link_libraries(LongpathObjs PUBLIC "-framework CoreAudioKit")
 endif()
 
 if(WIN32)
@@ -1568,6 +1603,13 @@ if(WDSP_FOUND)
     add_subdirectory(third_party/wdsp)
     target_link_libraries(LongpathObjs PUBLIC wdsp_static)
     target_compile_definitions(LongpathObjs PUBLIC HAVE_WDSP)
+
+    # Der Kanalzug ruft rnnoise direkt (src/core/strip/NoiseReduction),
+    # nicht ueber WDSPs rnnr.c wie der Empfang. Dieselbe Bibliothek,
+    # dasselbe Modell -- nur ohne den Umweg ueber eine WDSP-Kette, die
+    # es im Sendeweg gar nicht gibt.
+    target_link_libraries(LongpathObjs PUBLIC rnnoise_static)
+    target_compile_definitions(LongpathObjs PUBLIC HAVE_RNNOISE)
 
     # NNR (WDSP 2.10) weights — same treatment as the DeepFilterNet3 model
     # below: ModelPaths::probeModel("nnr", …) looks next to the binary, in
@@ -2057,9 +2099,14 @@ option(LONGPATH_USE_PCH "Use precompiled headers to speed up builds" ON)
 # SKIP_PRECOMPILE_HEADERS bypasses the include for that single file
 # without disabling PCH for the whole target.
 if(APPLE)
+    set_source_files_properties(src/core/strip/AuPluginEditor.mm
+                                PROPERTIES SKIP_PRECOMPILE_HEADERS ON
+                                           SKIP_UNITY_BUILD_INCLUSION ON)
     set_source_files_properties(src/core/MacMicPermission.mm
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
     set_source_files_properties(src/gui/MacFloatingWindowBehavior.mm
+        PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+    set_source_files_properties(src/gui/MacVollflaeche.mm
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 endif()
 if(LONGPATH_USE_PCH)

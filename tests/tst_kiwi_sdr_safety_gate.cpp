@@ -33,6 +33,7 @@
 // nicht ueber eine einzelne gespeicherte Kennung.
 
 #include <QtTest>
+#include "HeadlessMacGuard.h"
 #include <QScopeGuard>
 
 #include "core/AudioEngine.h"
@@ -67,6 +68,7 @@ class TstKiwiSdrSafetyGate : public QObject
 private slots:
     void hinzufuegenUeberspringtEineEchteScheibeUndLegtEineNeueAn()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         auto* mw = new MainWindow();
         mw->show();
         QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
@@ -152,6 +154,7 @@ private slots:
 
     void zugeordneteScheibeWirdBeiEchterDdcBindungSpaeterFreigegeben()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         auto* mw = new MainWindow();
         mw->show();
         QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
@@ -203,6 +206,7 @@ private slots:
 
     void scheibeLoeschenGibtDieZuordnungFreiUndVerhindertKennungsWiederverwendung()
     {
+        LONGPATH_SKIP_IF_HEADLESS_MAC_GUI();
         auto* mw = new MainWindow();
         mw->show();
         QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));

@@ -147,6 +147,29 @@ void ClientComp::setMakeupDb(float db) noexcept
 float ClientComp::makeupDb() const noexcept
 { return m_atomics.makeupDb.load(std::memory_order_relaxed); }
 
+void ClientComp::setAutoMakeup(bool on) noexcept
+{
+    m_atomics.autoMakeup.store(on, std::memory_order_relaxed);
+    m_atomics.version.fetch_add(1, std::memory_order_release);
+}
+
+bool ClientComp::autoMakeup() const noexcept
+{
+    return m_atomics.autoMakeup.load(std::memory_order_relaxed);
+}
+
+float ClientComp::autoMakeupDb() const noexcept
+{
+    // Aus den Atomaren gerechnet, nicht aus m_cached: diese Frage
+    // kommt vom Bedienfaden, und der darf den Zwischenspeicher des
+    // Audiofadens nicht lesen.
+    if (!m_atomics.autoMakeup.load(std::memory_order_relaxed)) { return 0.0f; }
+    const float r = std::max(1.0f, m_atomics.ratio.load(std::memory_order_relaxed));
+    const float ueber = kReferenzDbFs
+                        - m_atomics.thresholdDb.load(std::memory_order_relaxed);
+    return ueber > 0.0f ? ueber * (1.0f - 1.0f / r) : 0.0f;
+}
+
 void ClientComp::setLimiterEnabled(bool on) noexcept
 {
     m_atomics.limEnabled.store(on, std::memory_order_relaxed);
@@ -214,8 +237,27 @@ void ClientComp::recacheIfDirty() noexcept
     m_cached.releaseCoeff = coeffFromMs(
         m_atomics.releaseMs.load(std::memory_order_relaxed), m_sampleRate);
     m_cached.kneeDb      = m_atomics.kneeDb.load(std::memory_order_relaxed);
+    // ── Makeup, von Hand plus ausgeglichen ──────────────────────
+    //
+    // Die Kennlinie nimmt einer Spitze von kReferenzDbFs genau
+    //   (Spitze - Schwelle) * (1 - 1/Verhaeltnis)
+    // weg; genau das kommt wieder drauf. Unterhalb der Schwelle ist
+    // der Ausgleich null, denn dort komprimiert nichts.
+    //
+    // Das weiche Knie wird dabei nicht mitgerechnet. Es verteilt die
+    // Ruecknahme ueber einen Bereich, aendert aber an der Stelle
+    // kReferenzDbFs -- die bei einem Knie von 8 dB und einer Schwelle
+    // von -22 weit darueber liegt -- nichts mehr.
+    m_cached.autoMakeupDb = 0.0f;
+    if (m_atomics.autoMakeup.load(std::memory_order_relaxed)) {
+        const float ueber = kReferenzDbFs - m_cached.thresholdDb;
+        if (ueber > 0.0f) {
+            m_cached.autoMakeupDb = ueber * (1.0f - m_cached.ratioInv);
+        }
+    }
     m_cached.makeupLin   = dbToLin(
-        m_atomics.makeupDb.load(std::memory_order_relaxed));
+        m_atomics.makeupDb.load(std::memory_order_relaxed)
+        + m_cached.autoMakeupDb);
     m_cached.limEnabled  = m_atomics.limEnabled.load(std::memory_order_relaxed);
     m_cached.limCeilingLin = dbToLin(
         m_atomics.limCeilingDb.load(std::memory_order_relaxed));

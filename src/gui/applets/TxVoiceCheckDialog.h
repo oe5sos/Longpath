@@ -79,15 +79,19 @@
 
 #include "core/TxAudioRecorder.h"
 #include "core/VoiceAnalyzer.h"
+#include "core/strip/BroadcastOptimizer.h"
 
 #include <QDialog>
 #include <QMetaObject>
+#include <QVector>
 #include <QPointer>
 
 #include <atomic>
 
 class QAudioSink;
+class QAudioSource;
 class QBuffer;
+class QIODevice;
 class QLabel;
 class QProgressBar;
 class QPushButton;
@@ -97,10 +101,23 @@ class QWidget;
 
 namespace Longpath {
 
+class BroadcastOptimizerPanel;
 class RadioModel;
 
 class TxVoiceCheckDialog : public QDialog {
     Q_OBJECT
+public:
+signals:
+    // The operator wants to see and drag this profile's curve. The
+    // profile is already in the channel strip by the time this is
+    // emitted; the host's job is only to go to the equaliser.
+    //
+    // A signal rather than a direct call because this window has no
+    // business knowing it lives in a tab bar — it is also usable
+    // standalone, and was for months.
+    void curveEditRequested();
+
+
 public:
     // embedded=true turns the dialog into a plain widget for hosting
     // inside the channel strip's tab bar (2026-08-11, asked for at the
@@ -133,11 +150,53 @@ private:
     // post-strip/EQ monitor signal. Pressing the active button again
     // stops. See the header note for why this exists.
     void playRecording(bool processed);
+
+    // ── Hearing a profile that is not in the chain ───────────────────
+    //
+    // The broadcast optimiser's four profiles are not applied to
+    // anything, so there is no post-strip tap to record them from.
+    // They are rendered instead: the raw take copied, pushed through
+    // a scratch StripChain set to the plan, and played from memory
+    // like the other two.
+    //
+    // Rendering and not applying is the point. Hearing a profile must
+    // not require putting it into the live chain first — that would
+    // make "listen before you decide" into "decide, then listen".
+    // throughStrip=false spielt den rohen Durchgang nur durch den
+    // Kanal dieser Breite; true schickt ihn vorher durch die Kette,
+    // wie der Bediener sie eingestellt hat. Das ist das A/B, das
+    // geblieben ist -- es vergleicht seine Arbeit mit dem Original,
+    // nicht eine Herleitung mit seiner Arbeit.
+    void playPlan(const BroadcastOptimizer::Plan& plan, bool throughStrip);
+
+    // The three playback paths all end up here. Mono float in, sink
+    // out; the caller has already decided what the samples are.
+    void playBuffer(const float* src, int frames, int rate);
+
     void stopPlayback();
     void runAnalysis();
     void applySuggestion();       // WDSP's own equaliser
     void applyToStrip();          // the channel strip, whole chain
     void saveRecording();
+
+    // ── Saying what to do next ───────────────────────────────────────
+    //
+    // Three numbered steps with exactly one lit, and one line under
+    // them naming the single next action. Taken from Zeus Link, which
+    // carries the same thing over its processing panel as a "NEXT"
+    // line — the operator there is never left reading four paragraphs
+    // to work out which button is theirs.
+    //
+    // This tab had grown into exactly those four paragraphs. Bench,
+    // 2026-10-09: "das ganze sollte uebersichtlicher gestaltet werden,
+    // sodass man weiss, was man tun soll."
+    //
+    // The prose is not deleted, it is moved: every step chip carries
+    // the paragraph it replaced as its tooltip, so the reasoning is
+    // one hover away instead of permanently in the way.
+    enum class Step { Speak = 0, Listen, Choose };
+    QWidget* buildGuide();
+    void     updateGuide();
 
     void showFindings();
     void fillAdvancedTable();
@@ -154,6 +213,33 @@ private:
     //
     // So the taps are always listening while this window is open, and
     // the watchdog reports the first broken link rather than the last.
+    // ── Recording without a radio ────────────────────────────────────
+    //
+    // The transmit chain is the right place to tap the microphone when
+    // there IS one: it measures what the radio actually gets, after
+    // the mic source selection and the mic gain, which is what the
+    // operator transmits. But it made measuring your own voice depend
+    // on a connected radio, and the broadcast optimiser's whole
+    // premise is "speak for fifteen seconds with no settings as a
+    // baseline" — which needs a microphone and nothing else.
+    //
+    // So when there is no transmit channel, this window opens the
+    // system input itself. Same recorder, same analysis, same four
+    // profiles. What it cannot give is the POST-strip take, because
+    // there is no strip running to record the other side of — so
+    // "Play after strip & EQ" stays dark, and the optimiser's own
+    // audition (which renders the raw take through a scratch chain)
+    // does that job instead.
+    //
+    // Opened for metering as soon as the window notices there is no
+    // radio, so the level bar moves before anybody presses record —
+    // without that, "is my microphone even live" is unanswerable
+    // until after a fifteen-second take.
+    bool directMicActive() const { return m_micSource != nullptr; }
+    bool openDirectMic();
+    void closeDirectMic();
+    void pullDirectMic();
+
     void startLevelWatch();
     void stopLevelWatch();
     void updateLevel();
@@ -211,6 +297,11 @@ private:
     QBuffer*    m_playBuf{nullptr};
     QByteArray  m_playPcm;
     bool        m_playingProcessed{false};
+    // Playing one of the optimiser's profiles rather than either of
+    // the two recorded takes. Kept apart from m_playingProcessed so
+    // the panel's own button can show "Stop" without the strip's
+    // playback button also claiming to be running.
+    bool        m_playingPlan{false};
 
     // The band-quiet gate (setRxQuiet). True from record start until
     // playback ends — the AetherSDR record/listen contract.
@@ -218,6 +309,18 @@ private:
 
     QMetaObject::Connection m_micTap;
 
+    // The system input, used only when there is no transmit chain.
+    QAudioSource* m_micSource{nullptr};
+    QIODevice*    m_micIo{nullptr};
+    int           m_micSourceRate{48000};
+    int           m_micSourceChannels{1};
+    /// Welcher Eingang des Geräts die Stimme trägt; -1 legt alle
+    /// zusammen. Siehe die Begründung an der Formatwahl.
+    int           m_micPick{-1};
+    int           m_micSourceFormat{0};   // QAudioFormat::SampleFormat
+
+    QVector<QLabel*> m_stepChips;
+    QLabel*       m_nextLine{nullptr};
     QLabel*       m_liveStatus{nullptr};
     QProgressBar* m_levelBar{nullptr};
     QPushButton*  m_recordBtn{nullptr};
@@ -236,6 +339,11 @@ private:
     QWidget*      m_advanced{nullptr};
     QTableWidget* m_bands{nullptr};
     QLabel*       m_numbers{nullptr};
+
+    // The broadcast optimiser, hosted. It knows nothing about the
+    // radio or the recorder — see BroadcastOptimizerPanel.h for why
+    // it is a separate widget and not another section down here.
+    BroadcastOptimizerPanel* m_optimizer{nullptr};
 };
 
 } // namespace Longpath

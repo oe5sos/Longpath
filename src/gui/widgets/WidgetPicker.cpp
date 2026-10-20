@@ -26,11 +26,18 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMouseEvent>
+#include <QAbstractButton>
+#include <QEasingCurve>
+#include <QEvent>
+#include <QLinearGradient>
+#include <QPainter>
+#include <QPropertyAnimation>
 #include <QPushButton>
 #include <QGuiApplication>
 #include <QScreen>
 #include <QScrollArea>
 
+#include <algorithm>
 #include <functional>
 #include <QVBoxLayout>
 
@@ -390,6 +397,264 @@ bool WidgetPicker::toggle(const QString& id)
 
 // ── Das Plus ─────────────────────────────────────────────────────────
 
+
+// ── Das Plus, von Hand gemalt ────────────────────────────────────────
+//
+// Es war ein QPushButton mit einem „+" darin und einem gestrichelten
+// Rand aus dem Stilblatt. Der Wunsch vom 2026-10-09: „das PLUS, wo man
+// windows hinzufuegen kann, sollte animiert sein, lass dir was
+// einfallen."
+//
+// Was dabei NICHT entstanden ist: ein hupfendes, pulsierendes oder
+// sich drehendes Zierstueck. Der Hausstil hat zu Bewegung genau einen
+// Satz, und der ist eine Grenze: „Zustandswechsel: 150 ms ease.
+// Nichts springt." Also bewegt sich hier nichts von selbst. Bewegt
+// wird nur, was auch etwas AUSSAGT:
+//
+//   offen   — das Plus dreht sich in 180 ms um 45 Grad und steht als
+//             Kreuz da. Derselbe Knopf schliesst den Auswaehler
+//             wieder, und man sieht ihm an, dass er das jetzt tut.
+//             Das ist Regel 5 in Bewegung: Zustand, immer an
+//             derselben Stelle.
+//   Zeiger  — 150 ms, in denen Rand und Zeichen zur blauen Kante
+//             wandern und eine Flaeche darunter aufgeht. Vorher
+//             sprang das per :hover um.
+//   Druck   — 90 ms auf 94 Prozent und zurueck. Kurz genug, um nicht
+//             aufzufallen, lang genug, dass die Hand eine Antwort
+//             bekommt.
+//
+// Selbst gemalt statt per Stilblatt, aus zwei Gruenden. Drehen laesst
+// sich ein Textzeichen in einem Stilblatt nicht. Und der geerbte
+// Innenabstand aus Style::kButtonStyle, der diesem Knopf schon einmal
+// das Zeichen weggefressen haette (HAUSSTIL.md, „der geerbte
+// Innenabstand"), kann hier gar nicht mehr zuschlagen: ein eigener
+// paintEvent kennt kein padding.
+class PlusGlyph : public QAbstractButton {
+    Q_OBJECT
+    Q_PROPERTY(qreal turn  READ turn  WRITE setTurn)
+    Q_PROPERTY(qreal hover READ hover WRITE setHover)
+    Q_PROPERTY(qreal press READ press WRITE setPress)
+    // Das ruhige Atmen, damit man das Plus ueberhaupt findet.
+    Q_PROPERTY(qreal puls  READ puls  WRITE setPuls)
+
+public:
+    explicit PlusGlyph(QWidget* parent = nullptr)
+        : QAbstractButton(parent)
+    {
+        setFixedSize(AddWidgetButton::kSide, AddWidgetButton::kSide);
+        setCursor(Qt::PointingHandCursor);
+        setAttribute(Qt::WA_Hover, true);
+
+        m_turnAnim  = new QPropertyAnimation(this, "turn", this);
+        m_turnAnim->setDuration(180);
+        m_turnAnim->setEasingCurve(QEasingCurve::OutCubic);
+
+        m_hoverAnim = new QPropertyAnimation(this, "hover", this);
+        m_hoverAnim->setDuration(150);
+        m_hoverAnim->setEasingCurve(QEasingCurve::InOutQuad);
+
+        m_pressAnim = new QPropertyAnimation(this, "press", this);
+        m_pressAnim->setDuration(90);
+        m_pressAnim->setEasingCurve(QEasingCurve::OutQuad);
+
+        // ── Warum es atmet ───────────────────────────────────────
+        //
+        // „das plus symbol sollte eine animation sein, dann kann man
+        //  es leichter sehen."
+        //
+        // Die Drehung beim Oeffnen gab es schon -- die sieht aber
+        // nur, wer das Plus bereits gefunden hat. Gesucht war das
+        // Gegenteil: etwas, das den Blick AUF es lenkt, bevor man es
+        // kennt.
+        //
+        // Drei Sekunden je Atemzug, Sinus, und die Amplitude
+        // absichtlich klein: ein Rand, der zwischen ruhig und einem
+        // Hauch Blau wandert, dazu ein weicher Schein. Keine
+        // Groessenaenderung, kein Blinken. „Nichts springt"
+        // (HAUSSTIL) gilt auch fuer etwas, das auffallen soll --
+        // eine Ecke, die eine Stunde lang zuckt, schaltet man ab,
+        // und dann hat man nichts gewonnen.
+        //
+        // Es haelt an, sobald der Zeiger darauf liegt oder der
+        // Auswaehler offen ist: dann ist es gefunden, und das Atmen
+        // haette seine Aufgabe erfuellt.
+        m_pulsAnim = new QPropertyAnimation(this, "puls", this);
+        m_pulsAnim->setDuration(3000);
+        m_pulsAnim->setEasingCurve(QEasingCurve::InOutSine);
+        m_pulsAnim->setKeyValueAt(0.0, 0.0);
+        m_pulsAnim->setKeyValueAt(0.5, 1.0);
+        m_pulsAnim->setKeyValueAt(1.0, 0.0);
+        m_pulsAnim->setLoopCount(-1);
+        m_pulsAnim->start();
+    }
+
+    qreal turn()  const { return m_turn; }
+    qreal hover() const { return m_hover; }
+    qreal press() const { return m_press; }
+    qreal puls()  const { return m_puls; }
+    void setTurn (qreal v) { m_turn  = v; update(); }
+    void setHover(qreal v) { m_hover = v; update(); }
+    void setPress(qreal v) { m_press = v; update(); }
+    void setPuls (qreal v) { m_puls  = v; update(); }
+
+    // Offen heisst Kreuz. Gerufen vom Auswaehler, nicht vom Klick --
+    // er kann auch ueber sein eigenes Schliesskreuz zugehen, und dann
+    // muss das Plus trotzdem zurueckdrehen.
+    void setOpen(bool open)
+    {
+        if (m_open == open) { return; }
+        m_open = open;
+        m_turnAnim->stop();
+        m_turnAnim->setStartValue(m_turn);
+        m_turnAnim->setEndValue(open ? 1.0 : 0.0);
+        m_turnAnim->start();
+        atmen(!open);
+    }
+
+protected:
+    void enterEvent(QEnterEvent*) override
+    {
+        glide(m_hoverAnim, m_hover, 1.0);
+        atmen(false);
+    }
+    void leaveEvent(QEvent*) override
+    {
+        glide(m_hoverAnim, m_hover, 0.0);
+        atmen(!m_open);
+    }
+    void mousePressEvent(QMouseEvent* e) override
+    {
+        glide(m_pressAnim, m_press, 1.0);
+        QAbstractButton::mousePressEvent(e);
+    }
+    void mouseReleaseEvent(QMouseEvent* e) override
+    {
+        glide(m_pressAnim, m_press, 0.0);
+        QAbstractButton::mouseReleaseEvent(e);
+    }
+
+    void atmen(bool an)
+    {
+        if (an) {
+            if (m_pulsAnim->state() != QAbstractAnimation::Running) {
+                m_pulsAnim->start();
+            }
+        } else {
+            m_pulsAnim->stop();
+            setPuls(0.0);
+        }
+    }
+
+    void paintEvent(QPaintEvent*) override
+    {
+        QPainter g(this);
+        g.setRenderHint(QPainter::Antialiasing, true);
+
+        const QColor ruhe(QString::fromLatin1(Style::kBorder));
+        const QColor wach(QString::fromLatin1(Style::kBlueBorder));
+        const QColor zeichenRuhe(QString::fromLatin1(Style::kTextScale));
+        const QColor zeichenWach(QString::fromLatin1(Style::kTextPrimary));
+
+        // Das Aufgehen des Auswaehlers zaehlt wie ein Zeiger darauf:
+        // solange er offen ist, bleibt das Plus wach, auch wenn die
+        // Maus laengst woanders ist. Sonst sieht ein gedrehtes Kreuz
+        // aus wie ein ausgegrauter Knopf.
+        const qreal wachheit = std::max(m_hover, m_turn);
+
+        // Der Ruf: nur solange nichts anderes wach ist, und hoechstens
+        // ein knappes Drittel des Weges zum wachen Rand. Mehr waere
+        // ein Blinken.
+        const qreal ruf = (1.0 - wachheit) * m_puls;
+
+        const QColor rand    = mix(ruhe, wach, wachheit + 0.30 * ruf);
+        const QColor zeichen = m_turn > 0.01
+            ? mix(mix(zeichenRuhe, zeichenWach, wachheit),
+                  QColor(QString::fromLatin1(Style::kGlassSelText)), m_turn)
+            : mix(zeichenRuhe, zeichenWach, wachheit);
+
+        const qreal schrumpf = 1.0 - 0.06 * m_press;
+        const QRectF voll(rect());
+        QRectF feld(0, 0, voll.width() * schrumpf, voll.height() * schrumpf);
+        feld.moveCenter(voll.center());
+        feld.adjust(0.5, 0.5, -0.5, -0.5);
+
+        // Die Fuellung sagt zwei verschiedene Dinge, und sie duerfen
+        // nicht gleich aussehen: ein Zeiger darauf ist eine Andeutung,
+        // ein offener Auswaehler ist ein ZUSTAND. Hausstil Regel 2 --
+        // „genau ein Knopf leuchtet, aktiv gefuellt".
+        //
+        // Am gerenderten Blatt nachgebessert: erst stand hier fuer
+        // beides dieselbe Flaeche aus kButtonBg, und die liegt so
+        // dicht am Grund, dass auf dem Bild kein Unterschied zu sehen
+        // war. Jetzt traegt der offene Zustand den gedeckten
+        // Auswahlverlauf der Kommandoleiste (kGlassSel*) -- dieselbe
+        // Antwort, die jede aktive Pille im Fenster gibt.
+        if (m_turn > 0.01) {
+            QLinearGradient sel(feld.topLeft(), feld.bottomLeft());
+            QColor top(QString::fromLatin1(Style::kGlassSelTop));
+            QColor bot(QString::fromLatin1(Style::kGlassSelBot));
+            top.setAlphaF(float(m_turn));
+            bot.setAlphaF(float(m_turn));
+            sel.setColorAt(0.0, top);
+            sel.setColorAt(1.0, bot);
+            g.setBrush(sel);
+        } else if (m_hover > 0.0) {
+            QColor flaeche(QString::fromLatin1(Style::kButtonHover));
+            flaeche.setAlphaF(float(m_hover));
+            g.setBrush(flaeche);
+        } else {
+            g.setBrush(Qt::NoBrush);
+        }
+
+        // Gestrichelt bleibt gestrichelt: der Rand sagt "hier ist noch
+        // nichts, hier kann etwas hin", und das gilt im Ruhezustand
+        // wie im gedrehten.
+        QPen stift(rand, 1.0, Qt::DashLine);
+        stift.setDashPattern({3.0, 2.5});
+        g.setPen(stift);
+        g.drawRoundedRect(feld, 6.0, 6.0);
+
+        // Zwei Balken um die Mitte. 45 Grad daraus machen ein Kreuz.
+        g.save();
+        g.translate(feld.center());
+        g.rotate(45.0 * m_turn);
+        g.setPen(Qt::NoPen);
+        g.setBrush(zeichen);
+        const qreal arm  = feld.width() * 0.28;
+        const qreal dick = 1.6;
+        g.drawRoundedRect(QRectF(-arm, -dick / 2.0, arm * 2.0, dick),
+                          dick / 2.0, dick / 2.0);
+        g.drawRoundedRect(QRectF(-dick / 2.0, -arm, dick, arm * 2.0),
+                          dick / 2.0, dick / 2.0);
+        g.restore();
+    }
+
+private:
+    static QColor mix(const QColor& a, const QColor& b, qreal t)
+    {
+        t = std::clamp(t, 0.0, 1.0);
+        return QColor::fromRgbF(a.redF()   + (b.redF()   - a.redF())   * t,
+                                a.greenF() + (b.greenF() - a.greenF()) * t,
+                                a.blueF()  + (b.blueF()  - a.blueF())  * t);
+    }
+
+    static void glide(QPropertyAnimation* a, qreal from, qreal to)
+    {
+        a->stop();
+        a->setStartValue(from);
+        a->setEndValue(to);
+        a->start();
+    }
+
+    qreal m_turn{0.0}, m_hover{0.0}, m_press{0.0};
+    qreal m_puls{0.0};
+    bool  m_open{false};
+    QPropertyAnimation* m_turnAnim{nullptr};
+    QPropertyAnimation* m_hoverAnim{nullptr};
+    QPropertyAnimation* m_pressAnim{nullptr};
+    QPropertyAnimation* m_pulsAnim{nullptr};
+};
+
 AddWidgetButton::AddWidgetButton(AppletVisibilityController* vis,
                                  QWidget* parent)
     : QWidget(parent), m_vis(vis)
@@ -397,31 +662,58 @@ AddWidgetButton::AddWidgetButton(AppletVisibilityController* vis,
     auto* col = new QVBoxLayout(this);
     col->setContentsMargins(0, 0, 0, 0);
 
-    auto* plus = new QPushButton(QStringLiteral("+"), this);
-    plus->setFixedSize(kSide, kSide);
-    plus->setCursor(Qt::PointingHandCursor);
+    // ── Das Plus ist ein PlusGlyph, nicht ein QPushButton ───────────
+    //
+    // Gebaut und unerreichbar (gefunden 2026-10-20): `PlusGlyph` steht
+    // weiter unten in dieser Datei mit allem, was der Betreiber
+    // verlangt hat -- „das plus symbol sollte eine animation sein,
+    // dann kann man es leichter sehen" -- Drehung ins Kreuz beim
+    // Oeffnen, Zeiger- und Druckantwort, das ruhige Atmen. Nur ERZEUGT
+    // hat es niemand: hier stand ein einfacher QPushButton mit
+    // Stilvorlage, `m_glyph` blieb nullptr, und damit war
+    // `setGlyphOpen()` ein Leerlauf und `PlusGlyph` toter Code. Der
+    // CHANGELOG versprach das Atmen schon („Das Plus atmet").
+    //
+    // Aufgefallen ist es an `tst_plus_glyph_renders`: der Lauf fand
+    // einen QPushButton statt des Glyphs, `setProperty("hover", 1.0)`
+    // meldete `false` (kein solches Q_PROPERTY), und alle vier
+    // Zustaende lieferten BILDGLEICHE Bilder -- gemessen 0 von 841
+    // Bildpunkten Unterschied.
+    //
+    // Der gestrichelte Rand, die Rundung und die Farben stecken in
+    // `PlusGlyph::paintEvent`; eine Stilvorlage braucht es nicht mehr,
+    // und der geerbte Innenabstand aus `Style::kButtonStyle` kann
+    // nichts mehr verdruecken.
+    auto* plus = new PlusGlyph(this);
     plus->setToolTip(tr("Add or remove a widget"));
-    // Gestrichelt wie in der Vorlage: der Rand sagt „hier ist noch
-    // nichts, hier kann etwas hin". Ein durchgezogener Rahmen sähe aus
-    // wie ein Knopf, der schon etwas ist.
-    plus->setStyleSheet(QStringLiteral(
-        // `padding: 0` ist Pflicht: Style::kButtonStyle gilt app-weit
-        // und bringt `padding: 4px 12px` mit. Bei 34 Pixeln blieben
-        // dafuer gerade noch 8 -- genau die Breite eines „+", darum ist
-        // es nie aufgefallen. Bei 29 waeren es 3, und das Zeichen waere
-        // weg. Siehe HAUSSTIL.md, „der geerbte Innenabstand".
-        "QPushButton { background: transparent; color: %1;"
-        "  border: 1px dashed %2; border-radius: 6px;"
-        "  font-size: 16px; padding: 0; }"
-        "QPushButton:hover { color: %3; border-color: %4; background: %5; }")
-        .arg(QString::fromLatin1(Style::kTextScale),
-             QString::fromLatin1(Style::kBorder),
-             QString::fromLatin1(Style::kTextPrimary),
-             QString::fromLatin1(Style::kBlueBorder),
-             QString::fromLatin1(Style::kButtonBg)));
+    m_glyph = plus;
     col->addWidget(plus);
 
-    connect(plus, &QPushButton::clicked, this, &AddWidgetButton::openPicker);
+    // Ein Druck auf ein offenes Kreuz schliesst wieder. Vorher war das
+    // Plus eine Einbahn: zweimal druecken hiess zweimal oeffnen, und
+    // das Fenster stand schon da.
+    connect(plus, &QAbstractButton::clicked, this, [this]() {
+        if (m_picker && m_picker->isVisible()) { m_picker->close(); }
+        else                                   { openPicker(); }
+    });
+}
+
+void AddWidgetButton::setGlyphOpen(bool open)
+{
+    if (auto* g = qobject_cast<PlusGlyph*>(m_glyph)) { g->setOpen(open); }
+}
+
+// Der Auswaehler kann auch an uns vorbei zugehen -- ueber sein eigenes
+// Schliesskreuz oder mit Esc. Dann muss das Plus trotzdem
+// zurueckdrehen, sonst steht ein Kreuz ueber einem geschlossenen
+// Fenster und luegt.
+bool AddWidgetButton::eventFilter(QObject* watched, QEvent* e)
+{
+    if (watched == m_picker
+        && (e->type() == QEvent::Close || e->type() == QEvent::Hide)) {
+        setGlyphOpen(false);
+    }
+    return QWidget::eventFilter(watched, e);
 }
 
 void AddWidgetButton::openPicker()
@@ -445,6 +737,7 @@ void AddWidgetButton::openPicker()
         m_picker->setWindowTitle(tr("Add a widget"));
         connect(m_picker, &WidgetPicker::toggled,
                 this, &AddWidgetButton::toggled);
+        m_picker->installEventFilter(this);
     }
     m_picker->refresh();
     m_picker->adjustSize();
@@ -452,6 +745,7 @@ void AddWidgetButton::openPicker()
     m_picker->show();
     m_picker->raise();
     m_picker->activateWindow();
+    setGlyphOpen(true);
 }
 
 QPoint AddWidgetButton::placeNear(const QSize& want) const
@@ -484,3 +778,6 @@ QPoint AddWidgetButton::placeNear(const QSize& want) const
 }
 
 } // namespace Longpath
+
+// PlusGlyph traegt Q_OBJECT und lebt in dieser .cpp.
+#include "WidgetPicker.moc"
