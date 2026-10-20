@@ -241,9 +241,7 @@ warren@wpratt.com
 //============================================================================================//
 
 #include "MainWindow.h"
-#ifdef Q_OS_MAC
 #include "gui/MacVollflaeche.h"
-#endif
 #include "gui/DxccSpotColours.h"
 #include "gui/ScopedChildWidget.h"
 #include "gui/styles/ThemeQss.h"

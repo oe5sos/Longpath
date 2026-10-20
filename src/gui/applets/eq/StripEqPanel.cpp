@@ -250,8 +250,8 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
         m_simpleBtn->setFixedHeight(24);
         m_simpleBtn->setStyleSheet(modeCss);
         m_simpleBtn->setToolTip(QStringLiteral(
-            "Sieben benannte Regler. Dieselbe Kurve, derselbe Klang — "
-            "nur nichts, was aus Versehen verrutschen kann."));
+            "Seven named sliders. The same curve, the same sound — "
+            "only nothing that can slip by accident."));
         row->addWidget(m_simpleBtn);
 
         m_proBtn = new QPushButton(QStringLiteral("Profi"));
@@ -259,8 +259,8 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
         m_proBtn->setFixedHeight(24);
         m_proBtn->setStyleSheet(modeCss);
         m_proBtn->setToolTip(QStringLiteral(
-            "Alle Bänder, Filterarten, Referenzkurven, Glättung, "
-            "Rückgängig."));
+            "All bands, filter types, reference curves, smoothing, "
+            "undo."));
         row->addWidget(m_proBtn);
 
         connect(m_simpleBtn, &QPushButton::clicked,
@@ -282,8 +282,8 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
         tidyBtn->setFixedHeight(24);
         applyThemed(tidyBtn, kRowButtonStyle);
         tidyBtn->setToolTip(QStringLiteral(
-            "Setzt die sieben Regler zurück auf ihre Frequenz und "
-            "Breite — die Pegel bleiben, wie sie stehen."));
+            "Resets the seven sliders to their own frequency and "
+            "width — the levels stay as they are."));
         connect(tidyBtn, &QPushButton::clicked, this, [this]() {
             if (m_simpleBar) { m_simpleBar->tidy(); }
         });
@@ -742,15 +742,16 @@ void StripEqPanel::setSimpleView(bool simple)
 
     if (m_hint != nullptr) {
         m_hint->setText(simple
-            ? QStringLiteral("Regler ziehen — oder einen Punkt in der "
-                             "Kurve, der geht nur hoch und runter. "
-                             "Jeder Regler greift rund zwei "
-                             "Drittel einer Oktave breit.")
-            : QStringLiteral("Ziehen = lauter/leiser · "
-                             "⌥ + ziehen = Frequenz · "
-                             "Rad = Breite · "
-                             "Doppelklick = Filterart · "
-                             "Rechtsklick = ganzes Menü"));
+            ? Sprache::T(QStringLiteral(
+                  "Drag a slider — or a point on the curve, which "
+                  "only moves up and down. Each slider reaches about "
+                  "two thirds of an octave wide."))
+            : Sprache::T(QStringLiteral(
+                  "Drag = louder/softer · "
+                  "⌥ + drag = frequency · "
+                  "Wheel = width · "
+                  "Double-click = filter type · "
+                  "Right-click = the full menu")));
     }
 
     AppSettings::instance().setValue(

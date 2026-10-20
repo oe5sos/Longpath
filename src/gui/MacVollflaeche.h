@@ -59,6 +59,8 @@
 //                 (Claude Code).
 // =================================================================
 
+#include <QtGlobal>
+
 class QWidget;
 
 namespace Longpath::MacVollflaeche {
@@ -71,9 +73,18 @@ inline constexpr int kKnopfBreite = 78;
 // Schaltet die Behandlung an oder aus. Auf allem ausser macOS
 // passiert nichts und es wird `false` gemeldet -- der Aufrufer bleibt
 // dann beim randlosen Fenster.
+#ifdef Q_OS_MAC
 bool setzeVollflaeche(QWidget* fenster, bool an);
 
 // Ob diese Fassung die Behandlung überhaupt kann (also: macOS).
 bool verfuegbar();
+#else
+// Ohne macOS gibt es die Behandlung nicht. Die Stummel stehen hier
+// inline und nicht in einem eigenen Baustein, weil MacVollflaeche.mm
+// nur auf dem Mac mitgebaut wird -- der Aufrufer darf trotzdem auf
+// jeder Plattform fragen und bleibt dann beim randlosen Fenster.
+inline bool setzeVollflaeche(QWidget*, bool) { return false; }
+inline bool verfuegbar() { return false; }
+#endif
 
 } // namespace Longpath::MacVollflaeche

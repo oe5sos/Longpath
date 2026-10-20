@@ -700,6 +700,116 @@ const QHash<QString, QString>& tabelle()
           QStringLiteral("Tiefpass") },
         { QStringLiteral("High Pass"),
           QStringLiteral("Hochpass") },
+        // ── Kanalzug und Entzerrer: die Texte, die am 2026-10-20 noch
+        // deutsch im Quelltext standen ──────────────────────────────
+        //
+        // Sie waren beim Umstellen auf „Englisch im Code, Deutsch in
+        // der Tabelle" liegen geblieben -- tst_oberflaeche_englisch
+        // zaehlte 29, erlaubt sind 9. Der deutsche Wortlaut ist
+        // derselbe wie vorher, er steht jetzt nur hier.
+        { QStringLiteral("Seven named sliders. The same curve, the same sound "
+          "— only nothing that can slip by accident."),
+          QStringLiteral("Sieben benannte Regler. Dieselbe Kurve, derselbe "
+            "Klang — nur nichts, was aus Versehen verrutschen "
+            "kann.") },
+        { QStringLiteral("All bands, filter types, reference curves, smoothing, "
+          "undo."),
+          QStringLiteral("Alle Bänder, Filterarten, Referenzkurven, Glättung, "
+            "Rückgängig.") },
+        { QStringLiteral("Resets the seven sliders to their own frequency "
+          "and width — the levels stay as they are."),
+          QStringLiteral("Setzt die sieben Regler zurück auf ihre Frequenz "
+            "und Breite — die Pegel bleiben, wie sie stehen.") },
+        { QStringLiteral("Saves the last recording as a WAV (48 kHz, mono) "
+          "— just as it sounds right now: through the strip "
+          "as it is set and through the chosen channel."),
+          QStringLiteral("Legt die letzte Aufnahme als WAV ab (48 kHz, mono) "
+            "— so, wie sie gerade klingt: mit der eingestellten "
+            "Kette und durch den gewählten Kanal.") },
+        { QStringLiteral("Drag a slider — or a point on the curve, which only "
+          "moves up and down. Each slider reaches about two "
+          "thirds of an octave wide."),
+          QStringLiteral("Regler ziehen — oder einen Punkt in der Kurve, der "
+            "geht nur hoch und runter. Jeder Regler greift rund "
+            "zwei Drittel einer Oktave breit.") },
+        { QStringLiteral("Drag = louder/softer · ⌥ + drag = frequency · Wheel "
+          "= width · Double-click = filter type · Right-click "
+          "= the full menu"),
+          QStringLiteral("Ziehen = lauter/leiser · ⌥ + ziehen = Frequenz · "
+            "Rad = Breite · Doppelklick = Filterart · Rechtsklick "
+            "= ganzes Menü") },
+        { QStringLiteral("Puts the transmitter's own bandwidth into the monitor "
+          "path — this is how it sounds at the far end, not "
+          "in the studio. The measurement above is untouched "
+          "by it: it still shows what the STRIP does, not what "
+          "the channel lets through."),
+          QStringLiteral("Legt die Bandgrenze des Senders in den Mithörweg "
+            "— so klingt es auf der Gegenseite, nicht im Studio. "
+            "Das Messbild oben bleibt davon unberührt: es zeigt "
+            "weiter, was die KETTE tut, nicht was der Kanal davon "
+            "durchlässt.") },
+        { QStringLiteral("Stores the COMPLETE strip under a name — every stage, "
+          "its values, which ones are on and the order they "
+          "run in. Your changes are not lost without it: the "
+          "current state is saved as you go and comes back "
+          "on the next start. A profile is what you need to "
+          "switch BETWEEN settings."),
+          QStringLiteral("Legt die KOMPLETTE Kette unter einem Namen ab — "
+            "alle Stufen, ihre Werte, welche an sind und in welcher "
+            "Reihenfolge sie laufen. Deine Änderungen sind auch "
+            "ohne das nicht verloren: der Stand wird laufend "
+            "gespeichert und kommt beim nächsten Start zurück. "
+            "Ein Profil brauchst du, um ZWISCHEN Einstellungen "
+            "zu wechseln.") },
+        { QStringLiteral("Loads a channel-strip profile from AetherSDR (.json) "
+          "— with the stage order, every value, and the promise "
+          "that nothing runs along that Aether did not have."),
+          QStringLiteral("Lädt ein Kanalzugprofil aus AetherSDR (.json) — "
+            "mit Reihenfolge der Stufen, allen Werten und der "
+            "Zusage, dass nichts mitläuft, was es in Aether nicht "
+            "gab.") },
+        { QStringLiteral("Pick one of your own chains in the list first — "
+          "only what you stored yourself can be deleted."),
+          QStringLiteral("Wähle zuerst eine eigene Kette in der Liste — gelöscht "
+            "werden kann nur, was du selbst abgelegt hast.") },
+        { QStringLiteral("\"%1\" is a bundled starting profile and stays — "
+          "your own chains are in the list below it."),
+          QStringLiteral("„%1\" ist ein mitgeliefertes Ausgangsprofil und "
+            "bleibt — eigene Ketten stehen in der Liste darunter.") },
+        { QStringLiteral("Delete \"%1\"? Press Delete once more. (The chain "
+          "that is running stays.)"),
+          QStringLiteral("„%1\" löschen? Noch einmal auf Löschen drücken. "
+            "(Die Kette, die gerade läuft, bleibt.)") },
+        { QStringLiteral("\"%1\" deleted. The chain that is running stays "
+          "as it is."),
+          QStringLiteral("„%1\" gelöscht. Die Kette, die gerade läuft, bleibt "
+            "wie sie ist.") },
+        { QStringLiteral("\"%1\" was not in the list at all."),
+          QStringLiteral("„%1\" stand gar nicht in der Liste.") },
+        { QStringLiteral(" · Your previous state is stored as \"%1\"."),
+          QStringLiteral(" · Dein vorheriger Stand liegt als „%1\".") },
+        { QStringLiteral("Feedback suspected: the input has stood above −30 "
+          "dBFS for three seconds without a pause (%1 → %2). "
+          "Anyone who speaks leaves pauses — this does not. "
+          "Turn the control down or use separate devices."),
+          QStringLiteral("Verdacht auf Rückkopplung: der Eingang steht seit "
+            "drei Sekunden ohne Pause über −30 dBFS (%1 → %2). "
+            "Wer spricht, macht Pausen — das hier macht keine. "
+            "Dreh den Regler herunter oder nimm getrennte Geräte.") },
+        { QStringLiteral("Crest factor —— · speak, and this says how much "
+          "peak sits above the RMS value"),
+          QStringLiteral("Scheitelfaktor —— · sprechen, dann steht hier, wieviel "
+            "Spitze über dem Effektivwert liegt") },
+        { QStringLiteral("Crest factor: before the strip %1 dB · after it "
+          "%2 dB · %3 — the amplifier limits the peak, what "
+          "is heard is the RMS value"),
+          QStringLiteral("Scheitelfaktor: vor der Kette %1 dB · danach %2 "
+            "dB · %3 — die Endstufe begrenzt die Spitze, gehört "
+            "wird der Effektivwert") },
+        { QStringLiteral("%1 dB more speech power"),
+          QStringLiteral("%1 dB mehr Sprechleistung") },
+        { QStringLiteral("the strip gains nothing here"),
+          QStringLiteral("die Kette gewinnt hier nichts") },
     };
     return t;
 }

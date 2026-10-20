@@ -725,9 +725,9 @@ void StripWindow::buildUi()
         m_monSaveBtn->setStyleSheet(Style::buttonBaseStyle());
         m_monSaveBtn->setEnabled(false);
         m_monSaveBtn->setToolTip(QStringLiteral(
-            "Legt die letzte Aufnahme als WAV ab (48 kHz, mono) — so, "
-            "wie sie gerade klingt: mit der eingestellten Kette und "
-            "durch den gewählten Kanal."));
+            "Saves the last recording as a WAV (48 kHz, mono) — just "
+            "as it sounds right now: through the strip as it is set "
+            "and through the chosen channel."));
         connect(m_monSaveBtn, &QPushButton::clicked,
                 this, &StripWindow::monitorSaveClicked);
         row->addWidget(m_monSaveBtn);
@@ -823,10 +823,11 @@ void StripWindow::buildUi()
                 QString::fromUtf8(BandLimit::channels()[size_t(i)].name), i);
         }
         m_liveChannel->setToolTip(QStringLiteral(
-            "Legt die Bandgrenze des Senders in den Mithörweg — so "
-            "klingt es auf der Gegenseite, nicht im Studio. Das "
-            "Messbild oben bleibt davon unberührt: es zeigt weiter, "
-            "was die KETTE tut, nicht was der Kanal davon durchlässt."));
+            "Puts the transmitter's own bandwidth into the monitor "
+            "path — this is how it sounds at the far end, not in the "
+            "studio. The measurement above is untouched by it: it "
+            "still shows what the STRIP does, not what the channel "
+            "lets through."));
         connect(m_liveChannel, &QComboBox::activated, this, [this](int i) {
             const int v = m_liveChannel->itemData(i).toInt();
             AppSettings::instance().setValue(
@@ -1061,12 +1062,12 @@ void StripWindow::buildUi()
         m_presetSave = new QPushButton(
             Sprache::T(QStringLiteral("Save profile…")), this);
         m_presetSave->setToolTip(QStringLiteral(
-            "Legt die KOMPLETTE Kette unter einem Namen ab — alle "
-            "Stufen, ihre Werte, welche an sind und in welcher "
-            "Reihenfolge sie laufen. Deine Änderungen sind auch ohne "
-            "das nicht verloren: der Stand wird laufend gespeichert "
-            "und kommt beim nächsten Start zurück. Ein Profil "
-            "brauchst du, um ZWISCHEN Einstellungen zu wechseln."));
+            "Stores the COMPLETE strip under a name — every stage, "
+            "its values, which ones are on and the order they run "
+            "in. Your changes are not lost without it: the current "
+            "state is saved as you go and comes back on the next "
+            "start. A profile is what you need to switch BETWEEN "
+            "settings."));
         m_presetSave->setStyleSheet(Style::buttonBaseStyle());
         row->addWidget(m_presetSave);
         m_presetDelete = new QPushButton(QStringLiteral("Delete"), this);
@@ -1088,9 +1089,9 @@ void StripWindow::buildUi()
             Sprache::T(QStringLiteral("Aether profile…")), this);
         m_aetherImport->setStyleSheet(Style::buttonBaseStyle());
         m_aetherImport->setToolTip(QStringLiteral(
-            "Lädt ein Kanalzugprofil aus AetherSDR (.json) — mit "
-            "Reihenfolge der Stufen, allen Werten und der Zusage, dass "
-            "nichts mitläuft, was es in Aether nicht gab."));
+            "Loads a channel-strip profile from AetherSDR (.json) — "
+            "with the stage order, every value, and the promise that "
+            "nothing runs along that Aether did not have."));
         row->addWidget(m_aetherImport);
         row->addStretch(1);
 
@@ -2579,17 +2580,16 @@ void StripWindow::deleteUserPreset()
     if (name.isEmpty()) {
         if (m_presetNote) {
             m_presetNote->setText(Sprache::T(QStringLiteral(
-                "Wähle zuerst eine eigene Kette in der Liste — "
-                "gelöscht werden kann nur, was du selbst abgelegt "
-                "hast.")));
+                "Pick one of your own chains in the list first — "
+                "only what you stored yourself can be deleted.")));
         }
         return;
     }
     if (!m_presetBox->currentData(Qt::UserRole + 1).toBool()) {
         if (m_presetNote) {
             m_presetNote->setText(Sprache::T(QStringLiteral(
-                "„%1\" ist ein mitgeliefertes Ausgangsprofil und bleibt "
-                "— eigene Ketten stehen in der Liste darunter."))
+                "\"%1\" is a bundled starting profile and stays — "
+                "your own chains are in the list below it."))
                 .arg(name));
         }
         return;
@@ -2611,9 +2611,9 @@ void StripWindow::deleteUserPreset()
         m_presetDeleteArmed = name;
         if (m_presetNote) {
             m_presetNote->setText(
-                Sprache::T(QStringLiteral("„%1\" löschen? Noch einmal auf "
-                                          "Löschen drücken. (Die Kette, die "
-                                          "gerade läuft, bleibt.)"))
+                Sprache::T(QStringLiteral("Delete \"%1\"? Press Delete "
+                                          "once more. (The chain that is "
+                                          "running stays.)"))
                     .arg(name));
         }
         return;
@@ -2623,11 +2623,11 @@ void StripWindow::deleteUserPreset()
     rebuildPresetBox();
     if (m_presetNote) {
         m_presetNote->setText(weg
-            ? Sprache::T(QStringLiteral("„%1\" gelöscht. Die Kette, die "
-                                        "gerade läuft, bleibt wie sie ist."))
+            ? Sprache::T(QStringLiteral("\"%1\" deleted. The chain that "
+                                        "is running stays as it is."))
                   .arg(name)
-            : Sprache::T(QStringLiteral("„%1\" stand gar nicht in der "
-                                        "Liste.")).arg(name));
+            : Sprache::T(QStringLiteral("\"%1\" was not in the list at "
+                                        "all.")).arg(name));
     }
 }
 
@@ -2684,9 +2684,10 @@ void StripWindow::applyPreset(const QString& name)
         rebuildPresetBox(name);
         if (m_presetNote && !m_presetNote->text().isEmpty()) {
             m_presetNote->setText(
-                m_presetNote->text() + QStringLiteral(" · Dein vorheriger "
-                                                      "Stand liegt als „%1\".")
-                                           .arg(kLetzterStand()));
+                m_presetNote->text()
+                + Sprache::T(QStringLiteral(" · Your previous state is "
+                                            "stored as \"%1\"."))
+                      .arg(kLetzterStand()));
         }
     }
 }
@@ -4236,11 +4237,11 @@ void StripWindow::refreshMeters()
     // hört.
     if (m_live && m_liveNote && m_live->feedbackCut()
         && !m_liveNote->text().startsWith(QStringLiteral("Verdacht"))) {
-        m_liveNote->setText(QStringLiteral(
-            "Verdacht auf Rückkopplung: der Eingang steht seit drei "
-            "Sekunden ohne Pause über −30 dBFS (%1 → %2). Wer spricht, "
-            "macht Pausen — das hier macht keine. Dreh den Regler "
-            "herunter oder nimm getrennte Geräte.")
+        m_liveNote->setText(Sprache::T(QStringLiteral(
+            "Feedback suspected: the input has stood above −30 dBFS "
+            "for three seconds without a pause (%1 → %2). Anyone who "
+            "speaks leaves pauses — this does not. Turn the control "
+            "down or use separate devices."))
             .arg(m_live->inputName(), m_live->outputName()));
     }
 
@@ -4444,20 +4445,22 @@ void StripWindow::refreshMeters()
         const float out = cc ? cc->outputCrestDb() : 0.0f;
         if (in <= 0.0f) {
             // „Unbekannt ist ein Strich, keine Null" (HAUSSTIL §7).
-            m_crestNote->setText(QStringLiteral(
-                "Scheitelfaktor —— · sprechen, dann steht hier, wieviel "
-                "Spitze über dem Effektivwert liegt"));
+            m_crestNote->setText(Sprache::T(QStringLiteral(
+                "Crest factor —— · speak, and this says how much peak "
+                "sits above the RMS value")));
         } else {
-            m_crestNote->setText(QStringLiteral(
-                "Scheitelfaktor: vor der Kette %1 dB · danach %2 dB · "
-                "%3 — die Endstufe begrenzt die Spitze, gehört wird der "
-                "Effektivwert")
+            m_crestNote->setText(Sprache::T(QStringLiteral(
+                "Crest factor: before the strip %1 dB · after it %2 dB "
+                "· %3 — the amplifier limits the peak, what is heard "
+                "is the RMS value"))
                     .arg(double(in),  0, 'f', 1)
                     .arg(double(out), 0, 'f', 1)
                     .arg(out > 0.0f && out < in - 0.5f
-                             ? QStringLiteral("%1 dB mehr Sprechleistung")
+                             ? Sprache::T(QStringLiteral(
+                                   "%1 dB more speech power"))
                                    .arg(double(in - out), 0, 'f', 1)
-                             : QStringLiteral("die Kette gewinnt hier nichts")));
+                             : Sprache::T(QStringLiteral(
+                                   "the strip gains nothing here"))));
         }
     }
 

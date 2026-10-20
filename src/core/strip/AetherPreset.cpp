@@ -1,5 +1,10 @@
 // =================================================================
 // src/core/strip/AetherPreset.cpp  (Longpath)
+//
+// no-port-check: Longpath-eigene Zuordnungstafel, kein Port. Die
+// AetherSDR-Stellenangaben unten sagen, WO sich die beiden Programme
+// im Verhalten unterscheiden -- sie sind Fundstellen fuer einen
+// Vergleich, nicht die Quelle dieses Codes.
 // =================================================================
 //
 // Siehe AetherPreset.h. Jede Zuordnung unten wurde gegen BEIDE
