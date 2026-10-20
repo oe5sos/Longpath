@@ -14883,6 +14883,7 @@ int MainWindow::schwebendeAusDemSchutzrahmenHolen()
             // Betreiber. Und auf den Rahmenversatz achten -- move()
             // setzt die Ecke des RAHMENS, frameGeometry() liest ihn
             // ebenfalls, also stimmt es ohne Umrechnung.
+            const EigeneBewegung wirSelbst;
             w->move(neu.topLeft());
             ++verschoben;
         }

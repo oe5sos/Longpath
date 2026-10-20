@@ -124,6 +124,7 @@ void ToolWindow::restoreGeometryState()
     // Leer beim ersten Mal -- dann entscheidet der Aufrufer per
     // applyDefaultSize()/move(), genau wie bisher.
     if (st.isEmpty()) { return; }
+    const EigeneBewegung wirSelbst;
     restoreGeometry(st);
     // Verhindert, dass der Aufrufer applyDefaultSize() gleich danach die
     // gerade wiederhergestellte Groesse ueberschreibt -- dieselbe
@@ -143,6 +144,8 @@ void ToolWindow::applyDefaultSize(const QSize& want)
         s.setWidth (qMin(s.width(),  (avail.width()  * 2) / 3));
         s.setHeight(qMin(s.height(), (avail.height() * 4) / 5));
     }
+    // Wir geben die Groesse selbst -- kein Ziehen.
+    const EigeneBewegung wirSelbst;
     resize(s);
 }
 
