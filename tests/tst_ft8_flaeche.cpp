@@ -31,6 +31,7 @@
 #include <QPlainTextEdit>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QTimeZone>
 
 #include "core/AudioEngine.h"
@@ -62,6 +63,65 @@ private:
     }
 
 private slots:
+
+    // ── Die Reihenfolge der Zeilenarten ─────────────────────────────
+    //
+    // Vier Sorten, und die REIHENFOLGE ist die Aussage. Sie laesst
+    // sich nicht ansehen: eine Zeile kann gleichzeitig „an mich",
+    // „neues Land" und „CQ" sein, und dann entscheidet diese Regel,
+    // was der Betreiber sieht.
+    //
+    // Der Fall, auf den es ankommt, ist die dritte Zeile unten: ein
+    // neues Land, das gerade KEIN CQ ruft. Es muss trotzdem
+    // hervorgehoben werden -- man kann die Station im Auge behalten,
+    // bis sie frei ist. Wuerde „CQ" darueber stehen, ginge genau das
+    // verloren, was man am wenigsten uebersehen will.
+    void dieReihenfolgeDerZeilenartenStimmt()
+    {
+        using Art = Ft8Applet::Zeilenart;
+
+        // an mich + neues Land + CQ -> an mich gewinnt
+        QCOMPARE(Ft8Applet::zeilenart(true, true, true), Art::AnMich);
+        // an mich allein
+        QCOMPARE(Ft8Applet::zeilenart(true, false, false), Art::AnMich);
+        // neues Land OHNE CQ -> trotzdem hervorgehoben
+        QCOMPARE(Ft8Applet::zeilenart(false, true, false), Art::NeuesLand);
+        // neues Land MIT CQ -> das Land schlaegt das CQ
+        QCOMPARE(Ft8Applet::zeilenart(false, true, true), Art::NeuesLand);
+        // nur CQ
+        QCOMPARE(Ft8Applet::zeilenart(false, false, true), Art::Cq);
+        // ein fremdes QSO
+        QCOMPARE(Ft8Applet::zeilenart(false, false, false), Art::Gewoehnlich);
+    }
+
+    // ── Die Sendestelle ist waehlbar und bleibt ─────────────────────
+    //
+    // Betreiber 2026-10-18: von den Luecken gegenueber WSJT-X war das
+    // die einzige mit Folgen auf dem BAND statt am Schirm -- die
+    // Tonlage stand fest auf 1500 Hz, also sendete jeder Longpath-
+    // Betreiber mit „Auto" immer auf dieselbe Stelle.
+    //
+    // Der Lauf haelt beide Haelften fest: das Feld setzt die Tonlage,
+    // UND sie ueberlebt das Schliessen des Fensters. Ohne die zweite
+    // waere die Wahl bei jedem Start wieder weg.
+    void dieSendestelleIstWaehlbarUndBleibt()
+    {
+        RadioModel radio;
+        {
+            Ft8Applet applet(&radio);
+            QVERIFY2(applet.sendeTonFeldForTest(), "kein Feld fuer die Tonlage");
+            QCOMPARE(applet.sendeTonHzForTest(), 1500);   // Vorgabe wie WSJT-X
+
+            applet.sendeTonFeldForTest()->setValue(1725);
+            QCOMPARE(applet.sendeTonHzForTest(), 1725);
+        }
+        // Zweites Fenster, frisch gebaut: die Wahl muss wieder da sein.
+        {
+            Ft8Applet wieder(&radio);
+            QCOMPARE(wieder.sendeTonHzForTest(), 1725);
+            QCOMPARE(wieder.sendeTonFeldForTest()->value(), 1725);
+        }
+    }
 
     // ── „CQ only" filtert die ANSICHT, nicht den Betrieb ────────────
     //

@@ -16,6 +16,9 @@
 #include "models/Band.h"
 #include <QDateTime>
 #include "core/AppSettings.h"
+#include "core/DxccColorProvider.h"
+#include "core/DxccWorkedStatus.h"
+#include "gui/widgets/Ft8Wasserfall.h"
 #include "core/MoxController.h"
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/audio/AudioTapRing.h"
@@ -29,6 +32,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QSpinBox>
 #include <QColor>
 #include <QTextCharFormat>
 #include <QTextCursor>
@@ -61,9 +65,16 @@ constexpr int kPumpIntervalMs = 200;
 // Minuten.
 constexpr int kMaxLines = 400;
 
-// Die Tonlage, auf der gesendet wird. 1500 Hz ist die Mitte des
-// Durchlassbereichs und das, was WSJT-X ab Werk nimmt.
-constexpr float kSendeTonHz = 1500.0f;
+// Die Tonlage, auf der gesendet wird: Vorgabe und Grenzen. 1500 Hz ist
+// die Mitte des Durchlassbereichs und das, was WSJT-X ab Werk nimmt --
+// seit 2026-10-18 nur noch die VORGABE, nicht mehr die einzige Wahl
+// (siehe m_sendeTonHz in Ft8Applet.h). Die Grenzen sind der nutzbare
+// Durchlassbereich eines gewoehnlichen SSB-Filters; darueber hinaus
+// kaeme der Ton gar nicht erst heraus.
+constexpr int kSendeTonVorgabeHz = 1500;
+constexpr int kSendeTonMinHz = 200;
+constexpr int kSendeTonMaxHz = 2800;
+constexpr auto kSendeTonSchluessel = "Ft8/SendeTonHz";
 
 } // namespace
 
@@ -99,6 +110,11 @@ Ft8Applet::Ft8Applet(RadioModel* model, QWidget* parent)
         const int got = m_tapRing->read(scratch.data(), want);
         if (got >= 2) {
             m_stream->feedAudio(scratch.data(), got / 2);
+            // Derselbe Ton in den Streifen -- ein Abgriff, zwei
+            // Verbraucher. Kein zweiter Ring, nichts zu halten.
+            if (m_wasserfall) {
+                m_wasserfall->speiseStereo(scratch.data(), got / 2, 48000);
+            }
         } else {
             // Kein Ton: die Fenstergrenze trotzdem pruefen, sonst
             // friert die Anzeige auf dem vorletzten Stand ein und
@@ -171,6 +187,36 @@ void Ft8Applet::buildUI()
 
     head->addSpacing(8);
 
+    // ── Die Sendestelle ─────────────────────────────────────────────
+    auto* tonBez = new QLabel(tr("TX Hz"), this);
+    tonBez->setFont(Style::monoFont(font(), Style::kFontSmall));
+    tonBez->setStyleSheet(QStringLiteral("color: %1;").arg(Style::kTextSecondary));
+    head->addWidget(tonBez);
+
+    m_sendeTonHz = AppSettings::instance()
+                       .value(QLatin1String(kSendeTonSchluessel),
+                              kSendeTonVorgabeHz)
+                       .toInt();
+    if (m_sendeTonHz < kSendeTonMinHz || m_sendeTonHz > kSendeTonMaxHz) {
+        m_sendeTonHz = kSendeTonVorgabeHz;
+    }
+    m_tonFeld = new QSpinBox(this);
+    m_tonFeld->setRange(kSendeTonMinHz, kSendeTonMaxHz);
+    m_tonFeld->setSingleStep(10);
+    m_tonFeld->setValue(m_sendeTonHz);
+    m_tonFeld->setFont(Style::monoFont(font(), Style::kFontSmall));
+    m_tonFeld->setToolTip(tr(
+        "Where in the passband you transmit. Pick a clear spot: with "
+        "Auto on, every call goes out here."));
+    connect(m_tonFeld, &QSpinBox::valueChanged, this, [this](int hz) {
+        m_sendeTonHz = hz;
+        AppSettings::instance().setValue(QLatin1String(kSendeTonSchluessel), hz);
+        if (m_wasserfall) { m_wasserfall->setzeSendeTon(hz); }
+    });
+    head->addWidget(m_tonFeld);
+
+    head->addSpacing(8);
+
     m_status = new QLabel(QStringLiteral("—"), this);
     m_status->setFont(Style::monoFont(font(), Style::kFontSmall));
     m_status->setStyleSheet(QStringLiteral("color: %1;").arg(Style::kTextSecondary));
@@ -182,6 +228,19 @@ void Ft8Applet::buildUI()
     // Dekoder, der gerade sammelt, genauso aus wie einer, der nichts
     // bekommt — und bei fuenfzehn Sekunden Fenster ist das die
     // haeufigste Fehldeutung.
+    // ── Der Streifen ───────────────────────────────────────────────
+    //
+    // Zwischen Kopfzeile und Fuellstand: erst sehen, wo frei ist, dann
+    // die Stelle waehlen. Ein Klick darin setzt das Feld „TX Hz" und
+    // umgekehrt -- eine Wahrheit, zwei Wege sie zu fassen.
+    m_wasserfall = new Ft8Wasserfall(this);
+    m_wasserfall->setzeSendeTon(m_sendeTonHz);
+    connect(m_wasserfall, &Ft8Wasserfall::sendeTonGewaehlt, this,
+            [this](int hz) {
+                if (m_tonFeld) { m_tonFeld->setValue(hz); }
+            });
+    root->addWidget(m_wasserfall);
+
     m_fill = new QProgressBar(this);
     m_fill->setRange(0, 100);
     m_fill->setValue(0);
@@ -234,6 +293,34 @@ void Ft8Applet::buildUI()
     // gar nicht. Dieser Knopf schliesst das, mit demselben Verhalten
     // wie der Doppelklick: ohne „Auto" legt er den Ruf nur ins Feld,
     // mit „Auto" faengt der Ablauf an.
+    // ── Tx1..Tx6 ────────────────────────────────────────────────────
+    //
+    // Eine Reihe ueber dem Textfeld. Jeder Knopf LEGT den Satz nur ins
+    // Feld -- gesendet wird weiterhin erst mit „Send".
+    auto* txReihe = new QHBoxLayout();
+    txReihe->setSpacing(3);
+    for (int n = 1; n <= 6; ++n) {
+        QPushButton* b = styledButton(QStringLiteral("Tx%1").arg(n), 34);
+        b->setToolTip(tr("Put standard message Tx%1 in the box.").arg(n));
+        connect(b, &QPushButton::clicked, this, [this, n]() {
+            const QString gegen = aktuellerPartner();
+            const QString was = txKnopfNachricht(
+                n, gegen, eigenesRufzeichen(), eigenerLocator(),
+                m_letzterRapport.value(gegen, 0));
+            if (was.isEmpty()) {
+                if (m_status) {
+                    m_status->setText(n == 6 ? tr("set your callsign first")
+                                             : tr("no station selected"));
+                }
+                return;
+            }
+            if (m_textFeld) { m_textFeld->setText(was); }
+        });
+        txReihe->addWidget(b);
+    }
+    txReihe->addStretch(1);
+    root->addLayout(txReihe);
+
     m_cqRufenBtn = styledButton(tr("CQ"), 40);
     m_cqRufenBtn->setToolTip(tr(
         "Put your own CQ call in the box.\nWith Auto on, start calling "
@@ -381,7 +468,8 @@ LogEntry Ft8Applet::logEintrag(const Ft8Ablauf& ablauf,
                                double wahlHz,
                                bool unteresSeitenband,
                                Ft8Decoder::Protocol p,
-                               const QString& meinLocator)
+                               const QString& meinLocator,
+                               int sendeTonHz)
 {
     LogEntry e;
     e.call   = ablauf.partner();
@@ -389,8 +477,9 @@ LogEntry Ft8Applet::logEintrag(const Ft8Ablauf& ablauf,
 
     // Dieselbe Rechnung wie fuer die Funde: die Wahlfrequenz der
     // Scheibe plus die Tonlage, und das Vorzeichen haengt am
-    // Seitenband. Gesendet wird auf kSendeTonHz.
-    const double hz = wahlHz + (unteresSeitenband ? -kSendeTonHz : kSendeTonHz);
+    // Seitenband. Gesendet wird auf der gewaehlten Tonlage.
+    const double hz = wahlHz + (unteresSeitenband ? -double(sendeTonHz)
+                                                  : double(sendeTonHz));
     e.freqMHz = hz / 1.0e6;
     e.band    = bandLabel(bandFromFrequency(hz));
 
@@ -427,7 +516,8 @@ void Ft8Applet::meldeFertigesQso()
     emit qsoFertig(logEintrag(m_ablauf,
                               m_slice ? m_slice->frequency() : 0.0,
                               m_slice && m_slice->dspMode() == DSPMode::DIGL,
-                              protocol(), eigenerLocator()));
+                              protocol(), eigenerLocator(),
+                              m_sendeTonHz));
 }
 
 void Ft8Applet::zeigeAblauf()
@@ -509,6 +599,59 @@ QString Ft8Applet::cqRuf(const QString& meinRuf, const QString& meinLocator)
 // geschrieben und nur gelesen (SotaClient, MainWindow_KiwiSdr,
 // QsoMapWindow); er steht hier als Rueckfall, damit eine von Hand
 // gesetzte Fassung nicht ins Leere laeuft.
+// ── Tx1..Tx6, wie in WSJT-X ──────────────────────────────────────────
+//
+// Betreiber 2026-10-18: „dachte das sind dann mehr optionen usw. wie
+// ein richtiges ft8 programm." Die sechs Standardsaetze sind der
+// haeufigste Griff im QSO -- bisher musste man sie tippen.
+//
+// Gebaut werden sie NICHT hier, sondern von Ft8Ablauf::nachrichtFuer():
+// derselbe Code, den die Automatik benutzt. Hier steht nur, welcher
+// Knopf welchen Zustand meint.
+QString Ft8Applet::txKnopfNachricht(int nummer, const QString& partner,
+                                    const QString& meinRuf,
+                                    const QString& meinLocator,
+                                    int reportDb)
+{
+    using Z = Ft8Ablauf::Zustand;
+    if (meinRuf.isEmpty()) { return {}; }
+    // Tx1 bis Tx5 sprechen jemanden an. Ohne Gegenueber gibt es nichts
+    // zu senden -- und einen Platzhalter ins Feld zu legen waere
+    // schlimmer, denn der ginge auf Knopfdruck hinaus.
+    if (nummer >= 1 && nummer <= 5 && partner.isEmpty()) { return {}; }
+
+    switch (nummer) {
+        case 1: return Ft8Ablauf::nachrichtFuer(Z::RufeAn, partner, meinRuf,
+                                                meinLocator, reportDb);
+        case 2: return Ft8Ablauf::nachrichtFuer(Z::SendeReport, partner,
+                                                meinRuf, meinLocator, reportDb);
+        case 3: return Ft8Ablauf::nachrichtFuer(Z::SendeRReport, partner,
+                                                meinRuf, meinLocator, reportDb);
+        case 4: return Ft8Ablauf::nachrichtFuer(Z::SendeRR73, partner, meinRuf,
+                                                meinLocator, reportDb);
+        case 5: return Ft8Ablauf::nachrichtFuer(Z::Sende73, partner, meinRuf,
+                                                meinLocator, reportDb);
+        case 6: return Ft8Ablauf::nachrichtFuer(Z::RufeCq, partner, meinRuf,
+                                                meinLocator, reportDb);
+        default: return {};
+    }
+}
+
+// Das Gegenueber: der laufende Ablauf, sonst das erste Wort im
+// Textfeld -- in jedem Standardsatz steht dort das Rufzeichen der
+// Gegenstation, und ein Doppelklick auf eine Zeile hat es genau
+// dorthin gelegt. Kein zusaetzliches Feld, keine zweite Wahrheit.
+QString Ft8Applet::aktuellerPartner() const
+{
+    if (m_ablauf.laeuft() && !m_ablauf.partner().isEmpty()) {
+        return m_ablauf.partner();
+    }
+    if (!m_textFeld) { return {}; }
+    const QString erstes =
+        m_textFeld->text().trimmed().section(QLatin1Char(' '), 0, 0).toUpper();
+    return erstes == QLatin1String("CQ") ? QString{} : erstes;
+}
+
 QString Ft8Applet::eigenesRufzeichen()
 {
     auto& s = AppSettings::instance();
@@ -580,7 +723,7 @@ void Ft8Applet::sendeNachricht(const QString& text)
     }
 
     Ft8TxSource* quelle = m_model->ft8TxSource();
-    if (!quelle->vorbereiten(sauber, kSendeTonHz, protocol())) {
+    if (!quelle->vorbereiten(sauber, float(m_sendeTonHz), protocol())) {
         if (m_status) {
             m_status->setText(tr("cannot encode “%1”").arg(sauber));
         }
@@ -803,6 +946,10 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
         }
 
         const QString ruf = senderCallsign(d.text);
+        if (!ruf.isEmpty()) {
+            m_letzterRapport.insert(ruf,
+                                    static_cast<int>(std::lround(d.snrDb)));
+        }
         if (m_model && !ruf.isEmpty()) {
             DxSpot spot;
             spot.dxCall   = ruf;
@@ -850,6 +997,15 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
 // appendHtml(): die Liste steht in fester Schrittweite, und HTML
 // faltet mehrfache Leerzeichen zusammen -- die Spalten (Zeit, dB, DT,
 // Hz) stuenden danach nicht mehr untereinander.
+Ft8Applet::Zeilenart Ft8Applet::zeilenart(bool anMich, bool neuesLand,
+                                         bool istCq)
+{
+    if (anMich)    { return Zeilenart::AnMich; }
+    if (neuesLand) { return Zeilenart::NeuesLand; }
+    if (istCq)     { return Zeilenart::Cq; }
+    return Zeilenart::Gewoehnlich;
+}
+
 void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht)
 {
     if (!m_list) { return; }
@@ -868,11 +1024,40 @@ void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht)
     // eine Zeile, die an mich geht.
     if (m_nurCq && !istCq && !anMich) { return; }
 
+    // Ein Land, das noch nie im Logbuch stand? Der Auflaeser steht
+    // schon im Modell -- derselbe, der die Funde im Panadapter
+    // einfaerbt. Also DIESELBE Palette, keine zweite erfunden.
+    bool neuesLand = false;
+    QColor landFarbe;
+    const QString senderRuf = senderCallsign(nachricht);
+    if (m_model && m_model->dxccColorProvider() && !senderRuf.isEmpty()) {
+        auto* dxcc = m_model->dxccColorProvider();
+        if (dxcc->isEnabled()) {
+            const double mhz = (m_slice ? m_slice->frequency() : 0.0) / 1.0e6;
+            const QString modus = protocol() == Ft8Decoder::Protocol::Ft4
+                                      ? QStringLiteral("FT4")
+                                      : QStringLiteral("FT8");
+            neuesLand = dxcc->statusForSpot(senderRuf, mhz, modus)
+                        == DxccStatus::NewDxcc;
+            if (neuesLand) {
+                landFarbe = dxcc->colorForSpot(senderRuf, mhz, modus);
+            }
+        }
+    }
+
     QTextCharFormat f;
-    if (anMich) {
+    const Zeilenart art = zeilenart(anMich, neuesLand, istCq);
+    if (art == Zeilenart::AnMich) {
         f.setForeground(QColor(QString::fromLatin1(Style::kGreenText)));
         f.setFontWeight(QFont::Bold);
-    } else if (istCq) {
+    } else if (art == Zeilenart::NeuesLand) {
+        // Fett wie „an mich": ein neues Land uebersieht man sonst in
+        // zwanzig Zeilen je Fenster.
+        f.setForeground(landFarbe.isValid()
+                            ? landFarbe
+                            : QColor(QString::fromLatin1(Style::kAmberText)));
+        f.setFontWeight(QFont::Bold);
+    } else if (art == Zeilenart::Cq) {
         f.setForeground(QColor(QString::fromLatin1(Style::kAmberText)));
     } else {
         f.setForeground(QColor(QString::fromLatin1(Style::kTextPrimary)));

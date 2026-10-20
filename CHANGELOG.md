@@ -2,6 +2,116 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-20
+
+### CAT-Server: Longpath ist fuer Fremdprogramme erreichbar (#221, #222)
+
+Longpath war fuer Fremdprogramme stumm — kein Logprogramm, kein
+Steuerprogramm konnte die Frequenz lesen oder setzen. Der CAT-Server
+kam in vier Gaengen: Protokollschicht, TCP-Transport, Verdrahtung ans
+Modell, und die serielle Haelfte ueber vier Pseudoterminals.
+
+Dazu der **ZZ-Satz aus Zeus 2.0.46…2.0.50** (#222): N1MM+ (Geraetetyp
+Flex5000 ueber TCP) und DXLab Commander (Geraetetyp Thetis) haengen sich
+jetzt an. Der Fund dahinter: `antwortAuf()` schnitt stur **zwei**
+Zeichen als Befehlswort ab, womit *alle 239* ZZ-Befehle auf das
+unbekannte Praefix „ZZ" fielen. 22 Befehle gebaut (Frequenzen,
+Betriebsart zweistellig, der 36-Zeichen-Statussatz, Tasten, RIT/XIT,
+Filterkanten, Rauschsperre, Erkennung). Dabei ein eigener Fehler
+behoben: `Zustand` fuehrte **eine** Ablage, `SliceModel` hat `ritHz`
+und `xitHz` seit immer getrennt — ZZXF stellt die XIT-Ablage, auch wenn
+RIT an ist. Ausserdem liest Longpath jetzt die **TX-Profile von
+Thetis** ein.
+
+### Zeus-Liste 1–4 und 7 (#216)
+
+Fuenf Punkte der Zeus-Liste auf einmal: **CTCSS/DCS-Tonsquelch**,
+**Multi-RX**, **Darstellungsgroesse**, **Startwaechter** — und drei
+Verstaerker (**SPE**, **KPA500**, **ACOM**).
+
+### FT8, FT4 und RTTY sind fertig
+
+Der RTTY-Sender stand seit 0.7.0 fertig im Baum (Baudot/ITA2, Mark
+2295 Hz, Shift 170 Hz, 45,45 Baud, als Rundlauf gegen den eigenen
+Dekoder geprueft) — nur fuehrte von der Oberflaeche kein Weg zu ihm.
+Das ist nachgeholt (#260), und `tst_rtty_senden` ist wieder
+**angemeldet**: er wurde weiter gebaut, aber ctest kannte ihn nicht
+mehr, verloren in einem Squash-Konflikt in `tests/CMakeLists.txt`
+(#262). Ein Pruefstand, der schweigt, ist schlimmer als keiner.
+
+* **Selbst CQ rufen** (#263). `Ft8Ablauf` konnte die Anrufer-Rolle
+  seit dem QSO-Ablauf — dreizehn Prueffaelle, der ganze Weg von Tx6
+  ueber den Rapport bis RR73. Nur rief sie **niemand** auf: im ganzen
+  Quellbaum gab es genau einen Aufrufer von `starteAlsAntworter` (den
+  Doppelklick) und **keinen** von `starteAlsAnrufer`. Die Haelfte
+  einer geprueften Mechanik lag unerreichbar im Baum.
+* **FT4-Suchband gemittet, RTTY-Funde angeschlossen** (#268).
+* **Die Sendestelle ist waehlbar und bleibt** (#273). Die Tonlage stand
+  fest auf 1500 Hz — wer mit *Auto* auf einem vollen Band ruft, sendete
+  also immer dorthin, wo schon jemand ist. Feld **TX Hz**, 200–2800 Hz,
+  Schritte von 10, Vorgabe 1500 wie bei WSJT-X, gesichert unter
+  `Ft8/SendeTonHz`. Die Wahl gilt fuer alles Gesendete.
+* **Ein Wasserfall im Fenster** (#274), und **ein Klick setzt die
+  Sendestelle**: das laufende Spektrum des Durchlassbereichs
+  (0–3000 Hz), darunter der Wasserfall der letzten 120 Durchgaenge, die
+  gruene Marke auf der Sendestelle, Striche alle 500 Hz. Genau so macht
+  es WSJT-X — und erst damit wird „such dir eine freie Stelle" eine
+  Handlung statt einer Zahl.
+* **Farben nach Dringlichkeit und ein „CQ only"** (#271).
+* **Ein neues Land faellt in der Liste auf** (#275). Der DXCC-Aufloeser
+  und die Logbuch-Rueckschau lagen fertig im Baum, nur nicht an dieses
+  Fenster angeschlossen. Die Zeile nimmt die Farbe des
+  `DxccColorProvider` — keine zweite Palette.
+* **Die sechs Standardsaetze als Knoepfe** (#276). Gebaut werden sie
+  **nicht im Fenster**, sondern von `Ft8Ablauf::nachrichtFuer()` —
+  derselbe Code, den die Automatik benutzt, damit es nicht zwei
+  Fassungen desselben Protokolls gibt.
+* **Ein Pruefblatt fuer den ersten Durchgang an der Antenne** (#278):
+  FT8, FT4 und RTTY sind gebaut und geprueft, aber **nie an einem
+  echten Signal gehoert**. Vier Fragen in fester Reihenfolge, und zu
+  jeder steht da, was die Antwort bedeutet.
+
+### Kein Phantom-Flex mehr im Netz (#272)
+
+Auf dem Maestro des Betreibers stand ein **„FLEX-6400", das er nicht
+besitzt**. Es war Longpath selbst: `FlexRadioDiscoveryBroadcaster` rief
+einmal je Sekunde per Broadcast auf UDP 4992 eine FlexRadio-Erkennung
+ins Netz — gebaut, damit die PGXL/TGXL-Endstufe Longpath in *ihrer*
+Liste findet, gesehen aber von **jedem** SmartSDR-Client im selben
+Netz. Der Ausruf wartet jetzt auf den 4O3A-Schalter.
+
+### Formatfuellend ja, randlos nein (#269)
+
+Die drei Knoepfe links oben kommen zurueck. Die Behebung vom 15.10. war
+wirkungslos: sie lag auf einem Zweig, der **nie gepusht wurde** — und
+haette ohnehin nichts geaendert, wie die gemessenen Fenster-Hints
+zeigen. `exitBorderlessFullSize()` liess sie fallen.
+
+### Die Oberflaeche englisch — und das Loch im Pruefstand (#266, #270)
+
+`tst_oberflaeche_englisch` meldete **9** deutsche Texte. Tatsaechlich
+waren es **64**. Der Unterschied war kein Zaehlfehler, sondern ein Loch
+im Pruefstand selbst: er las **zeilenweise**, und in einer einzelnen
+Zeile faengt `\s` keinen Zeilenumbruch — stand die Klammer am
+Zeilenende und das Anfuehrungszeichen erst darunter, sah er nichts.
+Erst benannt (#266), dann behoben, dann die 54 Texte uebersetzt (#270).
+
+### Die Geraetesuche prueft stille Fenster, nicht Millisekunden (#267)
+
+`tst_radio_discovery_scan_bound` fiel am 17.10. auf main an der
+**richtigen** Fassung um (257 ms statt der erwarteten 180 ms), der
+Neulauf war gruen. Gemessen wird jetzt, was gemeint ist: stille
+Fenster, nicht Wanduhrzeit.
+
+### Nicht enthalten: der Kanalzug
+
+Die Sendeton-Arbeit vom 9. bis 18. Oktober — **Live-Hoeren** („Mich
+hoeren"), Rueckkopplungswache, Apollo mit sechzehn Eingaengen, die
+Messungen am Clipper und am Gate, die Stimmprobe — liegt auf
+`feat/sendeton-auf-main` (PR #279) und ist in dieser Fassung **nicht
+dabei**. Der Empfangs-Equalizer unten ist der einzige Teil davon, der
+es ueber #221 schon auf main geschafft hat.
+
 ### Der Empfangs-Equalizer — neu (2026-10-11)
 
 Longpath hatte keinen. WDSPs `eqp` laeuft im RXA-Durchlauf

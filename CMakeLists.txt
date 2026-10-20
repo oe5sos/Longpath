@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Longpath VERSION 0.7.0 LANGUAGES C CXX)
+project(Longpath VERSION 0.8.0 LANGUAGES C CXX)
 
 # ── ccache compiler launcher (2026-07-25) ──────────────────────────────
 # CI has always configured ccache explicitly; local dev machines never
@@ -907,6 +907,7 @@ set(GUI_SOURCES
     src/gui/widgets/TriBtn.cpp
     src/gui/widgets/VaxChannelSelector.cpp
     src/gui/widgets/MasterOutputWidget.cpp
+    src/gui/widgets/Ft8Wasserfall.cpp
     src/gui/widgets/VfoModeContainers.cpp
     src/gui/widgets/VfoModeContainers.h
     src/gui/widgets/SliceColors.h

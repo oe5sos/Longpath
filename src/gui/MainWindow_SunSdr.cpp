@@ -211,9 +211,8 @@ void MainWindow::connectSunSdr(const QString& endpoint)
     if (!parseSunSdrEndpoint(endpoint, &host, &port)) {
         showSunSdrNotice(
             this, QMessageBox::Warning, tr("Connect SunSDR"),
-            QStringLiteral("Adresse unlesbar: „%1“\n\n"
-                           "Erwartet wird eine IP-Adresse oder ein "
-                           "Rechnername, wahlweise mit :Port.")
+            tr("Address not readable: „%1“\n\nExpected is an IP "
+                           "address or a host name, optionally with :port.")
                 .arg(endpoint));
         return;
     }
@@ -475,8 +474,8 @@ void MainWindow::wireSunSdrOutboundControl(SliceModel* slice)
     m_sunSdrStreamIndexWatchConn = connect(
         slice, &SliceModel::streamIndexChanged, this, [this](int newIndex) {
         if (newIndex < 0) { return; }
-        releaseSunSdrSlice(QStringLiteral(
-            "ein echtes Funkgeraet hat sie inzwischen uebernommen"));
+        releaseSunSdrSlice(tr("a real radio has taken it over in "
+                                          "the meantime"));
     });
 }
 
