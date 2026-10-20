@@ -80,14 +80,67 @@ private slots:
         // Der Schieber war waagerecht, 20 px hoch und lief ueber fast
         // die ganze Breite des Spektrumbereichs. Genau so einen darf es
         // nicht mehr geben.
+        // Drei Merkmale, alle aus e31c8a42 abgelesen, nicht geraten:
+        // `new QSlider(Qt::Horizontal, spectrumPane)` mit
+        // `setFixedHeight(20)`, und er lief ueber fast die ganze
+        // Breite. Entsprechend: waagerecht, 16..24 px hoch, NICHT in
+        // einem Applet, und mindestens vier Fuenftel breit.
+        //
+        // Die drei Einschraenkungen sind am 2026-10-20 dazugekommen,
+        // weil der Lauf auf Linux falsch anschlug (#279, Shard 2/4):
+        // gemeldet war „400x18", und 18 px hoch im RxApplet ist ein
+        // gewoehnlicher Empfangsregler, kein Zoom-Schieber. Unter xvfb
+        // ist das Fenster schmaler als die hier gesetzten 1600, und
+        // damit reichte „halbe Fensterbreite" bis in die Applets
+        // hinein. Die alte Hoehenzeile konnte ausserdem nie greifen:
+        // `> 24 && < 16` ist fuer jede Zahl falsch.
+        // Applets und Titelleiste sind nicht der Hintergrund: dort
+        // gehoeren Regler hin. Der Zoom-Schieber sass im spectrumPane,
+        // also im Splitter darunter. Ohne die Titelleiste faengt der
+        // Lauf sonst den Hauptlautstaerkeregler (masterSlider, 100x16)
+        // mit -- in der Gegenprobe vom 2026-10-20 genau so gesehen.
+        const auto gehoertNichtZumHintergrund = [](const QWidget* w) {
+            for (const QObject* o = w->parent(); o != nullptr; o = o->parent()) {
+                const QString klasse = QString::fromUtf8(o->metaObject()->className());
+                if (klasse.endsWith(QLatin1String("Applet"))
+                    || klasse.endsWith(QLatin1String("TitleBar"))) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        const auto elternkette = [](const QWidget* w) {
+            QStringList kette;
+            for (const QObject* o = w->parent(); o != nullptr; o = o->parent()) {
+                kette << QString::fromUtf8(o->metaObject()->className());
+            }
+            return kette.join(QLatin1String(" < "));
+        };
+
         QStringList gefunden;
         for (QSlider* sl : mw.findChildren<QSlider*>()) {
             if (!sl->isVisible()) { continue; }
             if (sl->orientation() != Qt::Horizontal) { continue; }
-            if (sl->height() > 24 && sl->height() < 16) { continue; }
-            if (sl->width() < mw.width() / 2) { continue; }
-            gefunden << QStringLiteral("%1 %2x%3")
-                            .arg(sl->objectName()).arg(sl->width()).arg(sl->height());
+            if (sl->height() < 16 || sl->height() > 24) { continue; }
+            // Breit im Verhaeltnis zu SEINEM Bereich, nicht zum
+            // Fenster: der Spektrumbereich ist nur ein Teil davon
+            // (links liegen die Applets). Die erste Fassung dieser
+            // Zeile mass gegen mw.width() und liess den Schieber aus
+            // e31c8a42 in der Gegenprobe glatt durch.
+            const QWidget* bereich = sl->parentWidget();
+            if (bereich == nullptr || sl->width() * 5 < bereich->width() * 3) {
+                continue;
+            }
+            if (gehoertNichtZumHintergrund(sl)) { continue; }
+            // „ueber fast die ganze Breite" -- ein handlicher Regler
+            // von 100 px ist nie gemeint gewesen.
+            if (sl->width() < 200) { continue; }
+            // Die Elternkette mit melden: beim naechsten Fund steht
+            // sofort da, WER es ist -- der Name war leer, und das
+            // allein hat hier einen Lauf gekostet.
+            gefunden << QStringLiteral("%1 %2x%3 [%4]")
+                            .arg(sl->objectName()).arg(sl->width()).arg(sl->height())
+                            .arg(elternkette(sl));
         }
         QVERIFY2(gefunden.isEmpty(),
                  qPrintable(QStringLiteral("breiter waagerechter Schieber "
