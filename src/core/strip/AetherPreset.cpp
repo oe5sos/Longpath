@@ -1,6 +1,17 @@
+// no-port-check: Longpath-eigene Datei. Die AetherSDR-Dateinamen in
+// den Kommentaren unten belegen VERHALTEN -- die Stelle, an der sich
+// Aethers Kette und unsere unterscheiden --, es ist kein portierter
+// Code. Die Zahlenwerte stammen aus Aethers Profil (siehe Quelle
+// unten, Projektebene nach docs/attribution/HOW-TO-PORT.md Punkt 6:
+// AetherSDR hat keine Dateikoepfe).
+
 // =================================================================
 // src/core/strip/AetherPreset.cpp  (Longpath)
 // =================================================================
+//
+// Source attribution (AetherSDR — GPLv3):
+//
+//   Copyright (C) 2024-2026  Jeremy (KK7GWY) / AetherSDR contributors
 //
 // Siehe AetherPreset.h. Jede Zuordnung unten wurde gegen BEIDE
 // Quellen geprueft -- AetherSDR d58e2b8a und unsere eigene -- und

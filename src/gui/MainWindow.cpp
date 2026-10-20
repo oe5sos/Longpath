@@ -2452,7 +2452,10 @@ void MainWindow::enterBorderlessFullSize()
     // weiter. Siehe gui/MacVollflaeche.h.
     //
     // Nur wenn das nicht geht (andere Plattform), bleibt es beim
-    // randlosen Fenster.
+    // randlosen Fenster. Der Wächter muss sein: MacVollflaeche.h wird
+    // nur auf dem Mac eingebunden (siehe oben), sonst kennt der
+    // Übersetzer den Namensraum gar nicht.
+#ifdef Q_OS_MAC
     if (MacVollflaeche::verfuegbar()
         && MacVollflaeche::setzeVollflaeche(this, true)) {
         if (QScreen* scr = this->screen()) {
@@ -2468,6 +2471,7 @@ void MainWindow::enterBorderlessFullSize()
         activateWindow();
         return;
     }
+#endif
 
     const bool wasVisible = isVisible();
     if (wasVisible) { hide(); }
@@ -2489,6 +2493,7 @@ void MainWindow::exitBorderlessFullSize()
         m_fullScreenAction->setChecked(false);
     }
     if (m_titleBar) { m_titleBar->setLinkerRand(0); }
+#ifdef Q_OS_MAC
     if (MacVollflaeche::verfuegbar()
         && !windowFlags().testFlag(Qt::FramelessWindowHint)) {
         MacVollflaeche::setzeVollflaeche(this, false);
@@ -2497,6 +2502,7 @@ void MainWindow::exitBorderlessFullSize()
         activateWindow();
         return;
     }
+#endif
     if (isVisible()) { hide(); }
     setWindowFlag(Qt::FramelessWindowHint, false);
     show();

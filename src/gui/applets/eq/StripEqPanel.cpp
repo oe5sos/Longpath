@@ -245,22 +245,22 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
                  QString::fromLatin1(Style::kGlassSelText),
                  QString::fromLatin1(Style::kGlassSelBorder));
 
-        m_simpleBtn = new QPushButton(QStringLiteral("Einfach"));
+        m_simpleBtn = new QPushButton(QStringLiteral("Simple"));
         m_simpleBtn->setCheckable(true);
         m_simpleBtn->setFixedHeight(24);
         m_simpleBtn->setStyleSheet(modeCss);
         m_simpleBtn->setToolTip(QStringLiteral(
-            "Sieben benannte Regler. Dieselbe Kurve, derselbe Klang — "
-            "nur nichts, was aus Versehen verrutschen kann."));
+            "Seven named sliders. Same curve, same sound — only "
+            "nothing that can slip by accident."));
         row->addWidget(m_simpleBtn);
 
-        m_proBtn = new QPushButton(QStringLiteral("Profi"));
+        m_proBtn = new QPushButton(QStringLiteral("Pro"));
         m_proBtn->setCheckable(true);
         m_proBtn->setFixedHeight(24);
         m_proBtn->setStyleSheet(modeCss);
         m_proBtn->setToolTip(QStringLiteral(
-            "Alle Bänder, Filterarten, Referenzkurven, Glättung, "
-            "Rückgängig."));
+            "All bands, filter types, reference curves, smoothing, "
+            "undo."));
         row->addWidget(m_proBtn);
 
         connect(m_simpleBtn, &QPushButton::clicked,
@@ -278,12 +278,12 @@ StripEqPanel::StripEqPanel(EqHost* engine, QWidget* parent)
         // NASAL auf 2 kHz, oberhalb von KLARHEIT auf 1,5 kHz.
         // Dieser Knopf raeumt das in einem Griff auf und laesst die
         // Pegel stehen.
-        auto* tidyBtn = new QPushButton(QStringLiteral("Ordnen"));
+        auto* tidyBtn = new QPushButton(QStringLiteral("Tidy"));
         tidyBtn->setFixedHeight(24);
         applyThemed(tidyBtn, kRowButtonStyle);
         tidyBtn->setToolTip(QStringLiteral(
-            "Setzt die sieben Regler zurück auf ihre Frequenz und "
-            "Breite — die Pegel bleiben, wie sie stehen."));
+            "Resets the seven sliders to their own frequency and "
+            "width — the levels stay where they are."));
         connect(tidyBtn, &QPushButton::clicked, this, [this]() {
             if (m_simpleBar) { m_simpleBar->tidy(); }
         });
@@ -742,15 +742,15 @@ void StripEqPanel::setSimpleView(bool simple)
 
     if (m_hint != nullptr) {
         m_hint->setText(simple
-            ? QStringLiteral("Regler ziehen — oder einen Punkt in der "
-                             "Kurve, der geht nur hoch und runter. "
-                             "Jeder Regler greift rund zwei "
-                             "Drittel einer Oktave breit.")
-            : QStringLiteral("Ziehen = lauter/leiser · "
-                             "⌥ + ziehen = Frequenz · "
-                             "Rad = Breite · "
-                             "Doppelklick = Filterart · "
-                             "Rechtsklick = ganzes Menü"));
+            ? QStringLiteral("Drag a slider — or a point on the "
+                             "curve, which only moves up and down. "
+                             "Each slider reaches about two thirds "
+                             "of an octave.")
+            : QStringLiteral("Drag = louder/softer · "
+                             "⌥ + drag = frequency · "
+                             "Wheel = width · "
+                             "Double-click = filter type · "
+                             "Right-click = full menu"));
     }
 
     AppSettings::instance().setValue(
