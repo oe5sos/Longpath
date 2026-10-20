@@ -4,6 +4,18 @@
 
 ## [0.8.0] - 2026-10-20
 
+### Flex-Treiber, Stufe 1: die FLEX-8400 wird erkannt und gelesen
+
+Erkennung, Befehlskanal und GUI-Anmeldung — **keine Ströme, kein
+Senden**. `FlexRadioDiscovery` hört passiv auf UDP 4992 und übersetzt
+den Ruf in Longpaths eigene Gerätebeschreibung;
+`FlexRadioConnection` spricht TCP 4992 mit den Sätzen V/H/C/R/S/M,
+meldet sich als GUI an und meldet Frequenzwechsel weiter.
+
+Am echten Gerät gelesen: **14.100000 MHz**. Die Maschine legt Pan und
+Scheibe selbst an und schiebt ihren Zustand heraus, bevor die Antwort
+auf die Anmeldung kommt — darauf muss der Leser gefasst sein.
+
 ### Der Schutzrahmen greift jetzt beim Start
 
 Betreiber am frisch gestarteten Fenster: „Bandwidth Filter", „TX" und
