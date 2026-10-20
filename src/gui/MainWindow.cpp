@@ -9626,6 +9626,35 @@ void MainWindow::populateDefaultMeter()
         // showMaximized() loest selbst noch Bewegungen aus, und die
         // Container folgen in derselben Runde.
         QTimer::singleShot(0, this, [this]() { m_fensterAufbauFertig = true; });
+
+        // ── Den Schutzrahmen EINMAL nach dem Aufbau anwenden ─────────
+        //
+        // Betreiber 2026-10-18, am frisch gestarteten Fenster: „Bandwidth
+        // Filter", „TX" und „Rotor/Log" lagen auf der Kommandoleiste --
+        // Band, Betriebsart und Profil waren nicht mehr erreichbar.
+        //
+        // Der Schutzrahmen konnte das gar nicht verhindern: angewandt
+        // wurde er NUR in moveEvent() und resizeEvent() des
+        // Hauptfensters. Das Profil setzt die schwebenden Fenster aber
+        // beim AUFBAU, und danach bewegt sich das Hauptfenster nicht
+        // mehr -- also rief ihn niemand.
+        //
+        // Aufgefallen ist es erst jetzt, weil #269 die Fensterform
+        // geaendert hat: maximiert statt randlos, und damit sitzt die
+        // Kommandoleiste 28 Punkte tiefer als zu der Zeit, aus der die
+        // gespeicherten Plaetze stammen. Der Fehler lag aber schon
+        // vorher darin, nur traf er nichts.
+        //
+        // Zwei Nachlaeufe: der erste, sobald die Ereignisschlange leer
+        // ist, der zweite nach einer halben Sekunde -- die Container
+        // setzen ihre Geometrie teils verzoegert, und ein einzelner
+        // Lauf traefe sie auf halbem Weg.
+        QTimer::singleShot(0, this, [this]() {
+            schwebendeAusDemSchutzrahmenHolen();
+        });
+        QTimer::singleShot(500, this, [this]() {
+            schwebendeAusDemSchutzrahmenHolen();
+        });
         // KEIN wireProfileRail() mehr an dieser Stelle.
         //
         // Seit die Schiene umhaengbar ist (2026-10-06), verdrahtet
