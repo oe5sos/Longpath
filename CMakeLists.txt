@@ -753,6 +753,11 @@ if(APPLE)
     list(APPEND CORE_SOURCES src/core/MacMicPermission.mm)
     # Das eigene Fenster einer Audio Unit (CoreAudioKit).
     list(APPEND CORE_SOURCES src/core/strip/AuPluginEditor.mm)
+else()
+    # Ueberall sonst gibt es keine Audio Units -- aber AuPluginEditor.h
+    # verspricht die Rufe plattformweit, also muessen sie auch da sein.
+    # Ohne das fehlen beim Linken close/available/show.
+    list(APPEND CORE_SOURCES src/core/strip/AuPluginEditorStub.cpp)
 endif()
 
 # LinuxPipeBus — Linux-only IAudioBus implementation bridging to PulseAudio /
