@@ -4,6 +4,26 @@
 
 ## [0.8.0] - 2026-10-20
 
+### Der Schutzrahmen greift jetzt beim Start
+
+Betreiber am frisch gestarteten Fenster: „Bandwidth Filter", „TX" und
+„Rotor/Log" lagen auf der Kommandoleiste — Band, Betriebsart und
+Profil waren nicht mehr erreichbar. Der Schutzrahmen konnte das gar
+nicht verhindern: angewandt wurde er nur in `moveEvent()` und
+`resizeEvent()` des Hauptfensters, die gespeicherten Plätze setzt das
+Profil aber beim AUFBAU, und danach bewegt sich das Hauptfenster nicht
+mehr. Aufgefallen ist es erst, seit das Fenster maximiert statt
+randlos startet — die Kommandoleiste sitzt damit 28 Punkte tiefer als
+zu der Zeit, aus der die gespeicherten Plätze stammen. Der Fehler lag
+schon vorher darin, nur traf er nichts.
+
+Dazu zwei Prüfstände, die unter Linux falsch anschlugen und beide mit
+Gegenprobe belegt sind: der Wächter gegen einen wiederkehrenden
+Zoom-Schieber trennt jetzt nach der LAGE statt nach der Breite (ein
+gewöhnlicher Schieber im RX-Applet ist kein Zoom-Schieber, auch wenn
+das Fenster schmal genug wird), und der Hinweis des Schutzrahmens wird
+abgewartet statt sofort behauptet.
+
 ### Der Kanalzug: zwei Wochen Sendeton — und das Live-Hören ist zurück
 
 Die Arbeit vom 9. bis 18. Oktober ist mit drin. Ohne sie wäre der
