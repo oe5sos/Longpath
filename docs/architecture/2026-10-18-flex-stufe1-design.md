@@ -503,6 +503,26 @@ Kennung zu melden; das steht jetzt als eigener Prüffall drin.
 Nicht mehr offen: das Phantom-Flex (§3.3) — auf main behoben, `e5515581`
 / PR #272. Und die Richtungsfrage aus §4 — entschieden: (b).
 
+### Nachtrag 2026-10-20: Stufe 1 **und** Stufe 2 sind auf main
+
+`3f0e7c70` (PR #277, squash). Punkt 5 oben ist damit **erledigt**, nicht
+mehr offen: der Leser (`FlexVitaReader`), der Sockel (`FlexVitaStream`)
+und die zwei Eingänge aus §5.1/§5.2 sind gebaut, am echten Gerät
+gefahren und mit 88 Prüffällen abgedeckt.
+
+Was **wirklich** noch offen ist, und nur das:
+
+* Die schmale Tonklasse `0x0123` und die Messwerte `0x8002` sind **nicht
+  gemessen** und darum **nicht gebaut**. Beides braucht das
+  Stationsnetz; in der Nacht vom 2026-10-20 stand der Mac auf
+  `192.168.78.153`, die 8400 war nicht erreichbar. Nicht gemessen heißt
+  nicht gebaut — wer das aufgreift, schneidet zuerst mit.
+* Punkt 3 oben: der Blick auf das echte Fenster mit der Zeile in der
+  Geräteliste fehlt weiter.
+* Punkt 4 oben: die Fassungsanzeige (`V1.4.0.0` vs.
+  `version=4.3.16.42034`) ist noch nicht entschieden.
+* **Senden** ist nicht dabei. Stufe 1 und 2 sind Empfang.
+
 ---
 
 ## 8. Die Verdrahtung: `RadioModel` fährt den Kanal
