@@ -32,6 +32,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QSplitter>
 #include <QSpinBox>
 #include <QColor>
 #include <QTextCharFormat>
@@ -43,6 +44,7 @@
 #include <QVBoxLayout>
 
 #include <cmath>
+#include <cstdlib>
 #include <vector>
 
 namespace Longpath {
@@ -268,7 +270,44 @@ void Ft8Applet::buildUI()
     m_list->setStyleSheet(QStringLiteral(
         "QPlainTextEdit { background: %1; color: %2; border: 1px solid %3; }")
         .arg(Style::kInsetBg, Style::kTextPrimary, Style::kInsetBorder));
-    root->addWidget(m_list, 1);
+
+    // Zweite Spalte: „Rx Frequency" wie in WSJT-X. Links alles, rechts
+    // nur, was auf der eigenen Stelle liegt oder an mich geht. In
+    // einem vollen Band ist die linke Liste nach zwei Durchgaengen
+    // voll -- die eine Zeile, auf die es ankommt, scrollt weg.
+    m_listRx = new QPlainTextEdit(this);
+    m_listRx->setReadOnly(true);
+    m_listRx->viewport()->installEventFilter(this);
+    m_listRx->setToolTip(tr("Decodes on your own frequency, and anything "
+                            "addressed to you. Double-click to answer."));
+    m_listRx->setFont(Style::monoFont(font(), Style::kFontSmall));
+    m_listRx->setMinimumHeight(120);
+    m_listRx->setLineWrapMode(QPlainTextEdit::NoWrap);
+    m_listRx->setStyleSheet(m_list->styleSheet());
+
+    // Die Ueberschriften stehen ueber den Listen, nicht in ihnen: eine
+    // Kopfzeile IN einer Textflaeche scrollt mit weg.
+    const auto spalte = [this](QPlainTextEdit* liste, const QString& titel) {
+        auto* huelle = new QWidget(this);
+        auto* v = new QVBoxLayout(huelle);
+        v->setContentsMargins(0, 0, 0, 0);
+        v->setSpacing(2);
+        auto* kopf = new QLabel(titel, huelle);
+        kopf->setFont(Style::monoFont(font(), Style::kFontMicro));
+        kopf->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                                .arg(Style::kTextInactive));
+        v->addWidget(kopf);
+        v->addWidget(liste, 1);
+        return huelle;
+    };
+
+    m_listenTeiler = new QSplitter(Qt::Horizontal, this);
+    m_listenTeiler->addWidget(spalte(m_list,   tr("Band Activity")));
+    m_listenTeiler->addWidget(spalte(m_listRx, tr("Rx Frequency")));
+    m_listenTeiler->setStretchFactor(0, 3);
+    m_listenTeiler->setStretchFactor(1, 2);
+    m_listenTeiler->setChildrenCollapsible(false);
+    root->addWidget(m_listenTeiler, 1);
 
     // ── Fusszeile ───────────────────────────────────────────────────
     // ── Senden ──────────────────────────────────────────────────────
@@ -377,6 +416,7 @@ void Ft8Applet::buildUI()
     m_clearBtn = styledButton(tr("Clear"), 60);
     connect(m_clearBtn, &QPushButton::clicked, this, [this]() {
         m_list->clear();
+        if (m_listRx) { m_listRx->clear(); }
         m_lineCount = 0;
     });
     foot->addWidget(m_clearBtn);
@@ -930,7 +970,8 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
             static_cast<int>(std::lround(d.freqHz)),
             d.text,
             landFuer(senderCallsign(d.text)));
-        zeigeZeile(zeile, d.text);
+        zeigeZeile(zeile, d.text,
+                   static_cast<int>(std::lround(d.freqHz)));
 
         // Der Fund geht an EINE Stelle: RadioModel verteilt ihn weiter
         // (Panadapter-Ueberlagerung ueber SpotModel, der Sammler
@@ -1054,7 +1095,8 @@ QString Ft8Applet::landFuer(const QString& rufzeichen) const
     return e ? e->name : QString();
 }
 
-void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht)
+void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
+                           int tonHz)
 {
     if (!m_list) { return; }
 
@@ -1111,11 +1153,27 @@ void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht)
         f.setForeground(QColor(QString::fromLatin1(Style::kTextPrimary)));
     }
 
-    QTextCursor c(m_list->document());
-    c.movePosition(QTextCursor::End);
-    if (!m_list->document()->isEmpty()) { c.insertBlock(); }
-    c.insertText(zeile, f);
+    const auto anhaengen = [&f, &zeile](QPlainTextEdit* liste) {
+        QTextCursor c(liste->document());
+        c.movePosition(QTextCursor::End);
+        if (!liste->document()->isEmpty()) { c.insertBlock(); }
+        c.insertText(zeile, f);
+    };
+
+    anhaengen(m_list);
     ++m_lineCount;
+
+    // Rechte Spalte („Rx Frequency"): was auf der eigenen Stelle liegt
+    // -- oder an mich geht, egal wo. Das Fenster ist die Signalbreite
+    // von FT8/FT4 (50 Hz), nicht ein gegriffener Wert: schmaler, und
+    // ein Fund am Rand des eigenen Signals fehlt; breiter, und die
+    // Spalte fuellt sich mit Nachbarn.
+    if (m_listRx != nullptr) {
+        const int abstand = std::abs(tonHz - m_sendeTonHz);
+        if (anMich || abstand <= kRxFensterHz) {
+            anhaengen(m_listRx);
+        }
+    }
 }
 
 } // namespace Longpath

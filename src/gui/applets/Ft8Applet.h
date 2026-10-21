@@ -49,6 +49,7 @@
 
 class QLabel;
 class QPlainTextEdit;
+class QSplitter;
 class QSpinBox;
 
 namespace Longpath { class Ft8Wasserfall; }
@@ -229,6 +230,7 @@ public:
     // Fuer den Pruefstand.
     Ft8Stream*      streamForTest() const { return m_stream; }
     QPlainTextEdit* listForTest()   const { return m_list; }
+    QPlainTextEdit* listRxForTest() const { return m_listRx; }
     QLabel*         statusForTest() const { return m_status; }
     QLabel*         lastLabelForTest() const { return m_lastLabel; }
     QPushButton*    nurCqButtonForTest() const { return m_nurCqBtn; }
@@ -275,6 +277,15 @@ private:
     QLabel*         m_lastLabel{nullptr};
     QProgressBar*   m_fill{nullptr};
     QPlainTextEdit* m_list{nullptr};
+    // Zweite Spalte wie in WSJT-X: links alles („Band Activity"),
+    // rechts nur, was auf der eigenen Stelle liegt oder an mich geht
+    // („Rx Frequency"). Ohne sie geht die eigene Stelle in einem
+    // vollen Band unter -- genau dort, wo man hinsehen muss.
+    QPlainTextEdit* m_listRx{nullptr};
+    QSplitter*      m_listenTeiler{nullptr};
+
+    // Die Signalbreite von FT8 und FT4 (50 Hz). Siehe zeigeZeile().
+    static constexpr int kRxFensterHz = 50;
     /// „CQ only": ein reiner ANSICHTS-Filter. Der Ablauf und die Funde
     /// fuer Panadapter/Logbuch laufen weiter ueber ALLE Zeilen -- wer
     /// dich ruft, darf nicht verschwinden, nur weil die Liste gerade
@@ -283,7 +294,9 @@ private:
     /// Haengt eine fertig gesetzte Zeile an die Liste -- gefiltert
     /// (siehe m_nurCq) und nach Dringlichkeit gefaerbt. `nachricht` ist
     /// der reine FT8-Text ohne die Spalten davor.
-    void zeigeZeile(const QString& zeile, const QString& nachricht);
+    // `tonHz` ist die Audiostelle des Fundes: sie entscheidet, ob die
+    // Zeile auch rechts erscheint.
+    void zeigeZeile(const QString& zeile, const QString& nachricht, int tonHz);
 
     /// Der zuletzt gehoerte Rauschabstand je Rufzeichen -- daraus
     /// bauen die Knoepfe Tx2/Tx3 ihren Rapport. Ohne ihn muesste man
