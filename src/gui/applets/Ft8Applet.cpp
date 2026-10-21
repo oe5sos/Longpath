@@ -185,7 +185,7 @@ void Ft8Applet::buildUI()
             // da, an der richtigen Stelle, sichtbar laut Qt, und doch
             // unsichtbar. Beim Zeigen das Blau des Hauses: anfassbar.
             "QPushButton { color: %1; background: transparent;"
-            " border: none; font-size: 14px; font-weight: bold; }"
+            " border: none; font-size: 13px; font-weight: bold; }"
             "QPushButton:hover { color: %2; }")
             .arg(Style::kTitleText, Style::kAccent));
         connect(zahnrad, &QPushButton::clicked, this,
