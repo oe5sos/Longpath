@@ -806,6 +806,26 @@ bool RotorLogbookPanel::connectRotorFromSettings(QString* err)
     ensureRotor();
     if (m_rotor->isConnected()) { return true; }
     AppSettings& s = AppSettings::instance();
+
+    // ── Der eigene Treiber braucht kein rotctld (2026-10-21) ─────────────
+    //
+    // ensureRotor() baut den Treiber nach `Rotor/Backend`, diese Funktion
+    // wusste davon aber nichts und startete rotctld trotzdem. Am Geraet
+    // sah das so aus: die App meldete „connected — GS-232 ueber
+    // 172.30.30.16:4001" UND hatte daneben einen rotctld-Prozess auf
+    // denselben Netzserver gelegt. Zwei Leser auf einer Leitung, und bei
+    // jedem Start ein weiterer Port -- das ist die Herkunft der drei
+    // rotctld-Leichen, die am selben Tag gefunden wurden.
+    //
+    // Hier frueh aussteigen: `connectToRotor()` weiss ueber
+    // setNetworkTarget/setPort schon, wohin es greifen muss.
+    if (s.value(QStringLiteral("Rotor/Backend"),
+                QStringLiteral("rotctld")).toString()
+            == QStringLiteral("gs232")) {
+        m_rotor->connectToRotor();
+        return true;
+    }
+
     // Dieselbe Voreinstellung wie der Dialog (lokaler rotctld).
     const bool local = s.value(kRotorUseSerialKey, true).toBool();
     if (local) {
