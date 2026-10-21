@@ -71,6 +71,7 @@ PureSignal::PureSignal(WdspEngine* engine,
     // Hier und nicht erst beim Einschalten: sie sollen auch dann
     // stimmen, wenn jemand nur den Zustand abfragt.
     loadStabilitySettings();
+    loadShow2ToneSetting();
 
     m_pollTimer.setInterval(kPollIntervalMs);
     m_pollTimer.setTimerType(Qt::CoarseTimer);
@@ -827,7 +828,35 @@ void PureSignal::setShow2ToneMeasurements(bool on)
     // UI-only mirror; the SpectrumWidget IMD overlay is Task 12.  From
     // Thetis PSForm.cs:968-971 chkShow2ToneMeasurements_CheckedChanged
     // [v2.10.3.13]: Display.ShowIMDMeasurments = chkShow2ToneMeasurements.Checked;
+
+    // ── Gemerkt, nicht vergessen (2026-10-21) ────────────────────────────
+    //
+    // Thetis haelt diesen Schalter nur im Fenster; Longpath legt ihn ab.
+    // Der Grund ist aus der Messpraxis: der Haken ist die Voraussetzung
+    // dafuer, dass die Zweiton-Messung ueberhaupt rechnet, und er sitzt
+    // hinter einem RECHTSKLICK auf PS-A. An einem Nachmittag mit vier
+    // App-Neustarts gingen dadurch drei Messlaeufe verloren -- jedes Mal
+    // wurde getastet, und jedes Mal mass niemand mit.
+    //
+    // Eine Abweichung von Thetis, bewusst: dort kostet ein vergessener
+    // Haken einen Mausklick, hier kostet er einen Sendedurchgang.
+    AppSettings::instance().setValue(
+        QStringLiteral("PsShow2ToneMeasurements"),
+        on ? QStringLiteral("True") : QStringLiteral("False"));
+
     emit show2ToneMeasurementsChanged(on);
+}
+
+// Beim Aufbau einmal aus den Einstellungen holen. Ohne Signal: zu diesem
+// Zeitpunkt haengt noch nichts daran, und die Oberflaeche liest den Wert
+// beim Bauen ihrer Kaestchen selbst.
+void PureSignal::loadShow2ToneSetting()
+{
+    m_show2Tone =
+        AppSettings::instance()
+            .value(QStringLiteral("PsShow2ToneMeasurements"),
+                   QStringLiteral("False"))
+            .toString() == QStringLiteral("True");
 }
 
 void PureSignal::setHwPeak(double peak)

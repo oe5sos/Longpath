@@ -466,6 +466,11 @@ public:
     // [v2.10.3.13] → Display.ShowIMDMeasurments = checked.  UI-only here;
     // the IMD-overlay wire-through is Task 12.
     void setShow2ToneMeasurements(bool on);
+
+    /// Holt den Haken beim Aufbau aus den Einstellungen. Longpath merkt
+    /// ihn sich, anders als Thetis -- siehe die Begruendung an
+    /// setShow2ToneMeasurements().
+    void loadShow2ToneSetting();
     // From Thetis PSForm.cs:792-803 PSpeak_TextChanged [v2.10.3.13] →
     // puresignal.SetPSHWPeak(_txachannel, value).  Stored for UI read-back.
     // (//MW0LGE attribution preserved — author tag from upstream

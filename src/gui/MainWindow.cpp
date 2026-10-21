@@ -5737,6 +5737,16 @@ void MainWindow::buildUI()
                         activeSpectrumWidget(),
                         &SpectrumWidget::setShowIMDMeasurements,
                         Qt::UniqueConnection);
+                // Den STAND einmal mitnehmen, nicht nur kuenftige
+                // Aenderungen (2026-10-21). Seit PureSignal den Haken
+                // ueber Neustarts merkt, steht er beim Verdrahten schon
+                // auf "an" -- und ein Signal, das nur bei Aenderungen
+                // kommt, hat dann nie eines gesendet. Folge am Geraet:
+                // die Einstellung stand gespeichert auf True, das
+                // Spektrum meldete showImd=false, und ein Messlauf ging
+                // ins Leere.
+                activeSpectrumWidget()->setShowIMDMeasurements(
+                    ps->show2ToneMeasurements());
             };
             wireSpectrumToPs(m_radioModel->pureSignal());
             connect(m_radioModel, &RadioModel::pureSignalCoordinatorReady,

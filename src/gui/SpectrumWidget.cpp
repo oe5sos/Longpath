@@ -8103,7 +8103,28 @@ void SpectrumWidget::drawTxFilterOverlay(QPainter& p, const QRect& specRect)
 // ---------------------------------------------------------------------------
 void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
 {
+    // ── Warum NICHTS gemessen wird, muss auch im Protokoll stehen ────────
+    //
+    // Gebaut 2026-10-21, nachdem ein Messlauf 22 Sekunden lang bei offenem
+    // Tor (mox/testIMD/showImd/duplex alle wahr) keine einzige Zeile
+    // lieferte und ich die Ursache nur raten konnte. Ein Ausstieg, der
+    // schweigt, ist von "laeuft nicht" nicht zu unterscheiden -- und man
+    // sucht die Ursache dann an der falschen Stelle.
+    //
+    // Alle Meldungen teilen sich einen Takt von einer Sekunde mit der
+    // Erfolgszeile weiter unten: diese Stelle laeuft mit der Bildrate.
+    static qint64 lastImdLogMs = 0;
+    const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+    const bool logNow = (nowMs - lastImdLogMs >= 1000);
+    auto melden = [&](const QString& text) {
+        if (logNow) {
+            lastImdLogMs = nowMs;
+            qCInfo(lcSpectrum).noquote() << "IMD Zweiton: no reading --" << text;
+        }
+    };
+
     if (!m_imdOverlay || m_renderedPixels.isEmpty()) {
+        melden(QStringLiteral("no spectrum rendered (window covered?)"));
         return;
     }
 
@@ -8113,6 +8134,7 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
     const auto [firstBin, lastBin] = visibleBinRange(m_renderedPixels.size());
     const int count = lastBin - firstBin + 1;
     if (count < 2) {
+        melden(QStringLiteral("only %1 visible bins").arg(count));
         return;
     }
 
@@ -8129,6 +8151,76 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
     Maximum f0L, f0U, imd3L, imd3U, imd5L, imd5U;
     if (!ImdOverlay::labelImdProducts(peaks,
                                       f0L, f0U, imd3L, imd3U, imd5L, imd5U)) {
+        // Die Zahl der Spitzen trennt die drei Faelle, die hier
+        // zusammenlaufen: gar kein Signal (0-1), die zwei Grundtoene zu
+        // eng beieinander (>=2, aber unter 10 Bildpunkten Abstand --
+        // Thetis display.cs:5520), oder die Seitenprodukte im Rauschen.
+        QString spitzen;
+        for (int i = 0; i < static_cast<int>(peaks.size()) && i < 6; ++i) {
+            spitzen += QStringLiteral(" x=%1/%2dBm")
+                           .arg(peaks[i].x).arg(peaks[i].dBm, 0, 'f', 1);
+        }
+        // ── Ablesen statt Suchen (Longpath-eigen, 2026-10-21) ────────────
+        //
+        // Thetis' Zuordnung verlangt ALLE sechs Produkte als erkannte
+        // Spitzen. Am 2026-10-21 am echten Sender gemessen: sobald
+        // PureSignal wirkt, verschwinden die IMD3-Produkte aus der
+        // Spitzenliste -- die Messung versagt also genau dann, wenn die
+        // Korrektur ihre Arbeit tut. Dieselbe Messreihe ohne Korrektur
+        // lieferte dagegen anstandslos 19,5 dB.
+        //
+        // Darum hier der zweite Weg: die Grundtoene sind die zwei
+        // staerksten Spitzen, ihr Abstand d legt fest, WO die Produkte
+        // liegen muessen (f0 -/+ d fuer IMD3, -/+ 2d fuer IMD5). Dort wird
+        // der Pegel schlicht ABGELESEN. Ist da nur Rauschen, ist die Zahl
+        // eine untere Schranke -- und als solche gekennzeichnet, damit
+        // niemand sie fuer eine Messung des Senders haelt.
+        //
+        // Bewusst ohne EMA: dies ist der Notweg fuer einen einzelnen
+        // Blick, nicht der geglaettete Messwert der Hauptanzeige.
+        if (peaks.size() >= 2) {
+            std::vector<Maximum> stark(peaks.begin(), peaks.end());
+            std::sort(stark.begin(), stark.end(),
+                      [](const Maximum& a, const Maximum& b) {
+                          return a.dBm > b.dBm;
+                      });
+            const int xa = std::min(stark[0].x, stark[1].x);
+            const int xb = std::max(stark[0].x, stark[1].x);
+            const int d  = xb - xa;
+
+            // Dieselbe Mindestbreite wie Thetis (display.cs:5520): unter
+            // zehn Bildpunkten sind es keine zwei Toene, sondern einer.
+            if (d > 10) {
+                // Ein schmales Fenster um die erwartete Stelle faengt die
+                // Rundung der Bin-Rechnung auf, ohne den Nachbarton
+                // einzusammeln.
+                auto pegelBei = [&](int bin) -> float {
+                    constexpr int kFenster = 2;
+                    float best = -200.0f;
+                    for (int k = bin - kFenster; k <= bin + kFenster; ++k) {
+                        if (k >= 0 && k < count) {
+                            best = std::max(best, visible[static_cast<size_t>(k)]);
+                        }
+                    }
+                    return best;
+                };
+                const float f0  = std::min(stark[0].dBm, stark[1].dBm);
+                const float i3  = std::max(pegelBei(xa - d), pegelBei(xb + d));
+                const float i5  = std::max(pegelBei(xa - 2 * d), pegelBei(xb + 2 * d));
+                melden(QStringLiteral(
+                           "read off (lower bound): f0=%1dBm "
+                           "IMD3=%2dB IMD5=%3dB  [%4 peak(s), d=%5 bins]")
+                           .arg(f0, 0, 'f', 1)
+                           .arg(f0 - i3, 0, 'f', 1)
+                           .arg(f0 - i5, 0, 'f', 1)
+                           .arg(peaks.size())
+                           .arg(d));
+                return;
+            }
+        }
+
+        melden(QStringLiteral("products not labelled; %1 peak(s) in %2 bins:%3")
+                   .arg(peaks.size()).arg(count).arg(spitzen));
         // Failure modes (Thetis display.cs:5666-5673 [v2.10.3.13] fallback
         // text "Peaks not found !") are intentionally silent here — the
         // user already sees a stale readout box from the previous frame
@@ -8155,9 +8247,7 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
     // display.cs:5589-5641 [v2.10.3.13], unveraendert uebernommen: dbc /
     // dbcMin in dBm, die beiden worst-Abstaende in dB, OIP3/OIP5 in dBm.
     {
-        static qint64 lastImdLogMs = 0;
-        const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
-        if (nowMs - lastImdLogMs >= 1000) {
+        if (logNow) {
             lastImdLogMs = nowMs;
             const ImdReadout& r = m_imdOverlay->readout();
             qCInfo(lcSpectrum).nospace()
