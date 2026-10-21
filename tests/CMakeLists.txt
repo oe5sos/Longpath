@@ -6158,6 +6158,11 @@ longpath_add_test(tst_recording_model)
 # traegt und ohne Radio einen Strich zeigt statt einer Null.
 longpath_add_test(tst_aufnahme_applet)
 
+# Das Fenster zum Anlegen (2026-10-21, Variante B). Nagelt fest, dass
+# ein Druck auf „Add" wirklich im Zeitplan ankommt -- add() hatte
+# ausserhalb der Prueflaeufe keinen einzigen Aufrufer.
+longpath_add_test(tst_zeitplan_fenster)
+
 longpath_add_test(tst_tx_bandbreiten_klickbar)
 
 longpath_add_test(tst_stationsrufzeichen)

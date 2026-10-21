@@ -20,6 +20,11 @@
 //                geschrieben mit Claude Opus 5 (Anthropic).
 // =================================================================
 
+#include <QApplication>
+#include <QComboBox>
+#include <QDateTimeEdit>
+#include <QSpinBox>
+#include <QTableWidget>
 #include <QDir>
 #include <QFontMetrics>
 #include <QLabel>
@@ -28,6 +33,7 @@
 
 #include "FensterFrist.h"
 #include "gui/MainWindow.h"
+#include "gui/RecordingScheduleWindow.h"
 #include "gui/applets/RecordingApplet.h"
 #include "models/RadioModel.h"
 #include "models/RecordingModel.h"
@@ -135,6 +141,83 @@ private slots:
         QVERIFY(bild.save(dir + QStringLiteral("/aufnahme-applet.png")));
         QVERIFY(mw.grab().toImage().save(
             dir + QStringLiteral("/aufnahme-im-fenster.png")));
+
+        // Und das Zeitplan-Fenster AUS DER ECHTEN APP heraus. Allein
+        // gebaut traegt es Qts Standardanstrich, weil ohne MainWindow
+        // kein Hausstil geladen ist -- so wuerde der Betreiber es nie
+        // sehen.
+        a->openExtendedSettings();
+        QWidget* plan = nullptr;
+        for (QWidget* w : QApplication::topLevelWidgets()) {
+            if (w->inherits("Longpath::RecordingScheduleWindow")) {
+                plan = w; break;
+            }
+        }
+        QVERIFY2(plan != nullptr,
+                 "das Zahnrad hat kein Zeitplan-Fenster geoeffnet");
+        plan->resize(440, 300);
+        QVERIFY(QTest::qWaitForWindowExposed(plan, kFensterFrist));
+
+        // Zwei Eintraege ueber die Bedienteile des echten Fensters --
+        // das prueft zugleich, dass sich die Liste auffrischt, und
+        // macht das Blatt aussagekraeftig.
+        auto* fenster = qobject_cast<RecordingScheduleWindow*>(plan);
+        QVERIFY(fenster != nullptr);
+        fenster->startFeld()->setDateTime(
+            QDateTime(QDate(2026, 10, 22), QTime(6, 0), QTimeZone::UTC));
+        fenster->minutenFeld()->setValue(30);
+        fenster->artFeld()->setCurrentIndex(0);
+        fenster->anlegenKnopf()->click();
+
+        fenster->startFeld()->setDateTime(
+            QDateTime(QDate(2026, 10, 23), QTime(18, 0), QTimeZone::UTC));
+        fenster->minutenFeld()->setValue(60);
+        fenster->artFeld()->setCurrentIndex(1);
+        fenster->anlegenKnopf()->click();
+
+        QCOMPARE(fenster->tabelle()->rowCount(), 2);
+        if (auto* z = qobject_cast<QPushButton*>(
+                fenster->tabelle()->cellWidget(1, 3))) {
+            z->click();   // der zweite still, damit beide Zustaende da sind
+        }
+        QTest::qWait(100);
+        QVERIFY(plan->grab().toImage().save(
+            dir + QStringLiteral("/zeitplan-im-hausstil.png")));
+        plan->close();
+    }
+
+    void dasZahnradOeffnetDenZeitplan()
+    {
+        MainWindow mw;
+        mw.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&mw, kFensterFrist));
+
+        RecordingApplet* a = mw.findChild<RecordingApplet*>();
+        QVERIFY(a != nullptr);
+
+        // Vorher gibt es keins.
+        int vorher = 0;
+        for (QWidget* w : QApplication::topLevelWidgets()) {
+            if (w->inherits("Longpath::RecordingScheduleWindow")) { ++vorher; }
+        }
+        QCOMPARE(vorher, 0);
+
+        a->openExtendedSettings();
+
+        int nachher = 0;
+        for (QWidget* w : QApplication::topLevelWidgets()) {
+            if (w->inherits("Longpath::RecordingScheduleWindow")) { ++nachher; }
+        }
+        QCOMPARE(nachher, 1);
+
+        // Zweimal druecken gibt kein zweites Fenster: zwei Ansichten
+        // auf dieselbe Liste laufen auseinander.
+        a->openExtendedSettings();
+        int nochmal = 0;
+        for (QWidget* w : QApplication::topLevelWidgets()) {
+            if (w->inherits("Longpath::RecordingScheduleWindow")) { ++nochmal; }
+        }
+        QCOMPARE(nochmal, 1);
     }
 };
 

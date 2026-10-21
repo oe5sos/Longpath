@@ -26,6 +26,8 @@
 
 #include "AppletWidget.h"
 
+#include <QPointer>
+
 class QLabel;
 class QPushButton;
 
@@ -45,6 +47,12 @@ public:
     QString appletTitle() const override { return QStringLiteral("Recording"); }
     void    syncFromModel() override;
 
+    /// Das Zahnrad im Panelkopf. Oeffnet das Zeitplan-Fenster -- dort
+    /// werden Eintraege angelegt, hier wird nur ihr Zustand gezeigt.
+    /// Kein Popup: darin wird getippt und eine Liste gelesen, das
+    /// ueberlebt kein `Qt::Popup`, das beim Klick daneben zugeht.
+    void    openExtendedSettings() override;
+
 private:
     void buildUI();
     void refreshState();
@@ -58,6 +66,8 @@ private:
     QPushButton* m_iqBtn{nullptr};
     QLabel*      m_iqClock{nullptr};
     QLabel*      m_iqNote{nullptr};
+
+    QPointer<class RecordingScheduleWindow> m_planFenster;
 
     QLabel*      m_planText{nullptr};
     QLabel*      m_planState{nullptr};

@@ -10,6 +10,7 @@
 
 #include "RecordingApplet.h"
 
+#include "gui/RecordingScheduleWindow.h"
 #include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
 #include "models/RecordingModel.h"
@@ -306,6 +307,25 @@ void RecordingApplet::refreshState()
                         && fehler.contains(QStringLiteral("I/Q"));
     m_iqNote->setText(QStringLiteral("no I/Q on this receiver"));
     m_iqNote->setVisible(iqNote);
+}
+
+void RecordingApplet::openExtendedSettings()
+{
+    if (!m_model) { return; }
+
+    // Eins reicht. Ein zweites Fenster auf dieselbe Liste waere zwei
+    // Ansichten desselben Zustands -- und die laufen auseinander.
+    if (m_planFenster) {
+        m_planFenster->show();
+        m_planFenster->raise();
+        m_planFenster->activateWindow();
+        return;
+    }
+
+    m_planFenster = new RecordingScheduleWindow(&m_model->recording(),
+                                                this);
+    m_planFenster->show();
+    m_planFenster->raise();
 }
 
 void RecordingApplet::syncFromModel()
