@@ -59,6 +59,18 @@ QString markerPath()
 
 int beginStart()
 {
+    // ── Eine Sonde zaehlt nicht mit (2026-10-21) ─────────────────────
+    //
+    // Gemessen: zwei Sonden hintereinander, jede nach wenigen Sekunden
+    // beendet (also vor `kSettleSeconds`), und der dritte Lauf fuhr
+    // OHNE die gespeicherte Anordnung und zeigte den Hinweiskasten --
+    // womit jede Messung an der Fensteranordnung wertlos war. Richtig
+    // ist das auch so nicht: der Waechter soll den Betreiber vor einer
+    // Anordnung schuetzen, die den Start umbringt. Eine Sonde mit
+    // eigenem Konfigurationsordner hat keine Anordnung zu schuetzen,
+    // sie sieht nur nach.
+    if (AppSettings::isSandbox()) { return 0; }
+
     // Was beim letzten Mal uebrigblieb: steht die Marke noch, ist jener
     // Start nicht durchgekommen.
     const int bisher = readMarker();
@@ -81,6 +93,12 @@ int failedStarts()
 
 bool shouldStartSafely()
 {
+    // Siehe beginStart(): in einer Sandbox gibt es keine Marke, die
+    // hochzaehlt -- und damit auch keinen sicheren Start. Ausdruecklich
+    // hier noch einmal, damit eine Marke, die von einem Lauf OHNE
+    // Sandbox im selben Ordner liegengeblieben ist, die Sonde nicht
+    // doch in den sicheren Start schickt.
+    if (AppSettings::isSandbox()) { return false; }
     return failedStarts() >= kSafeThreshold;
 }
 

@@ -925,7 +925,14 @@ MainWindow::MainWindow(QWidget* parent)
 
     // Den gespeicherten CAT-Schalterzustand erst jetzt anwenden: das
     // Binden von Ports gehoert nicht in den Aufbau eines Applets.
-    if (m_catApplet) { m_catApplet->stelleZustandWiederHer(); }
+    // Eine Sonde bleibt offline (2026-10-21): stelleZustandWiederHer()
+    // bindet die CAT-Kanaele und das Pseudoterminal. Zwei Laeufe, die
+    // sich um denselben Port streiten, sind schwer zu deuten -- und ein
+    // Fremdprogramm, das an der Sonde haengt, steuert das falsche
+    // Geraet. Siehe AppSettings::darfVonSelbstVerbinden().
+    if (m_catApplet && AppSettings::darfVonSelbstVerbinden()) {
+        m_catApplet->stelleZustandWiederHer();
+    }
 
     // Phase 3O Sub-Phase 10 Task 10c — host the menu bar + master-output
     // controls in a custom TitleBar strip. Must run AFTER buildMenuBar()
@@ -1306,7 +1313,12 @@ MainWindow::MainWindow(QWidget* parent)
             // shouldn't crash startup.
             bindAddr = QHostAddress(QHostAddress::LocalHost);
         }
-        if (enabled) {
+        // Eine Sonde bleibt offline (2026-10-21): ein isolierter Lauf
+        // bindet hier sonst den TCI-Port, und fremde Programme landen
+        // an der Sonde statt am Programm des Betreibers. Von Hand
+        // (Tools -> TCI Server) geht es weiter. Siehe
+        // AppSettings::darfVonSelbstVerbinden().
+        if (enabled && AppSettings::darfVonSelbstVerbinden()) {
             m_tciServer->start(bindAddr, port);
         }
     }

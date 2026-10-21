@@ -28,6 +28,9 @@
 // Modification history (Longpath):
 //   2026-08-23 — Angelegt fuer Longpath von Martin Fischer,
 //                KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-10-21 — Eine Sonde bleibt offline: isolierte Laeufe nehmen
+//                 von selbst keine Verbindung auf. Martin Fischer,
+//                 KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 #include "gui/MainWindow.h"
@@ -109,7 +112,11 @@ void MainWindow::setAsrEnabled(bool on)
     const bool autoStart = st.value(QStringLiteral("AsrAutoStartServer"),
                                     QStringLiteral("True")).toString()
                                .compare(QStringLiteral("True"), Qt::CaseInsensitive) == 0;
-    if (autoStart && WhisperServerLauncher::endpointIsLocal(url)) {
+    // Eine Sonde bleibt offline (2026-10-21): hier startet sonst ein
+    // eigener Whisper-Server als Prozess, samt Port. Siehe
+    // AppSettings::darfVonSelbstVerbinden().
+    if (autoStart && AppSettings::darfVonSelbstVerbinden()
+        && WhisperServerLauncher::endpointIsLocal(url)) {
         auto& launcher = WhisperServerLauncher::instance();
         if (launcher.state() != WhisperServerLauncher::State::Running
             && launcher.state() != WhisperServerLauncher::State::Starting) {

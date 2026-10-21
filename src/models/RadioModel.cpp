@@ -2803,6 +2803,24 @@ void RadioModel::onPskReporterSpotReceived(const DxSpot& spot)
 // stays a single call site.
 void RadioModel::restoreSpotClientAutoStartState()
 {
+    // ── Eine Sonde bleibt offline (2026-10-21) ───────────────────────
+    //
+    // Hier haengen acht Dienste, die sich beim Start von selbst
+    // anmelden -- und zwei davon mit dem RUFZEICHEN des Betreibers
+    // (DX-Cluster und Reverse Beacon). Eine Sonde, die das tut,
+    // wirft seine eigene Sitzung aus dem Cluster; gemessen am
+    // 2026-10-21, und schon einmal am 2026-09-17. Siehe
+    // AppSettings::darfVonSelbstVerbinden().
+    //
+    // Die EINE Stelle fuer alle acht: ein frueher Ausgang ist hier
+    // mehr wert als acht Abfragen weiter unten, von denen beim
+    // naechsten neunten Dienst eine fehlt.
+    if (!AppSettings::darfVonSelbstVerbinden()) {
+        qCInfo(lcDsp) << "Sandbox: die Spot-Dienste starten nicht von "
+                         "selbst (LONGPATH_CONFIG_DIR ist gesetzt)";
+        return;
+    }
+
     auto& s = AppSettings::instance();
     auto isTrue = [&s](const QString& key) {
         return s.value(key, QStringLiteral("False")).toString()

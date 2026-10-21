@@ -36,6 +36,17 @@
 // "Durchgekommen" heisst Laufzeit, nicht sauberes Beenden. Wer das
 // Programm hart abschiesst, hat keinen Startfehler -- mit dem sauberen
 // Beenden als Maßstab zaehlte jedes `kill` als Absturz.
+//
+// ── Eine Sonde zaehlt nicht mit (2026-10-21) ─────────────────────────
+//
+// In einer Sandbox (LONGPATH_CONFIG_DIR gesetzt) ist der Waechter
+// ABGESCHALTET: `beginStart()` schreibt keine Marke und liefert null,
+// `shouldStartSafely()` sagt immer nein. Gemessen: zwei Sonden
+// hintereinander, jede nach wenigen Sekunden beendet, und der dritte
+// Lauf fuhr ohne die gespeicherte Anordnung -- womit die Messung, um
+// die es ging (eben jene Anordnung), wertlos war. Der Waechter soll
+// den Betreiber vor einer Anordnung schuetzen, die den Start umbringt;
+// eine Sonde hat keine zu schuetzen, sie sieht nur nach.
 
 #include <QString>
 

@@ -2,6 +2,42 @@
 
 ## [Unreleased]
 
+### Eine Sonde bleibt offline
+
+Wer die laufende App zum Nachsehen startet, setzt dafuer
+`LONGPATH_CONFIG_DIR` auf einen eigenen Ordner. Das isoliert die
+Einstellungen seit dem 2026-09-17 — damals hatte eine Sonde die echten
+Einstellungen gelesen, sich mit dem Rufzeichen des Betreibers am
+DX-Cluster angemeldet und damit **seine** Sitzung hinausgeworfen.
+
+Am 2026-10-21 beim Nachsehen gemessen: der Schutz griff nur halb. Die
+Dateien waren isoliert, das Netz war es nie. Im Protokoll der Sonde:
+
+```
+DxClusterClient: connecting to "dxc.nc7j.com":7300 callsign= "OE5SOS"
+DxClusterClient: connecting to "telnet.reversebeacon.net":7000 callsign= "OE5SOS"
+Rotor: Rotator connected — rotctld ...
+```
+
+Jetzt nimmt ein isolierter Lauf von selbst keine Verbindung nach aussen
+auf und startet von selbst keinen Dienst: die acht Spot-Dienste
+(DX-Cluster, Reverse Beacon, WSJT-X, SpotCollector, POTA, SOTA, FreeDV
+Reporter, PSK Reporter) haengen an einem einzigen frueheren Ausgang, dazu
+kommen der Rotor samt `rotctld`, der TCI-Server, die CAT-Kanaele und der
+Whisper-Server. Was der Bediener in der Sonde von Hand anklickt, laeuft
+unveraendert — sie ist nicht gelaehmt, sie draengt sich nur nicht auf.
+
+Dazu der Startwaechter: er zaehlt eine Sonde nicht mehr mit. Zwei kurze
+Sonden hintereinander galten als zwei steckengebliebene Starts, und der
+dritte Lauf fuhr **ohne** die gespeicherte Anordnung hoch — womit die
+Messung, um die es ging, wertlos war.
+
+Der Prueflauf fuehrt beide Richtungen in einem Durchgang (ohne die
+Variable muessen die Dienste starten wie bisher), und die Gegenprobe ist
+dreifach gefahren: Wache ausgebaut, Wache immer an, und die
+Waechter-Ausnahme ausgebaut — jedes Mal fiel genau der dazugehoerige
+Fall.
+
 ## [0.8.0] - 2026-10-20
 
 ### Die FLEX-8400 laeuft (#277)

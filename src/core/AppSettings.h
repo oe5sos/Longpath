@@ -12,6 +12,9 @@
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
 //                 AppSettings XML persistence: key/value semantics (PascalCase keys, True/False string booleans, per-StationName nesting) port Thetis database.cs SaveVarsDictionary/RestoreVarsDictionary pattern; QXmlStream file I/O skeleton follows AetherSDR `src/core/AppSettings.{h,cpp}`.
+//   2026-10-21 — Eine Sonde bleibt offline: isolierte Laeufe nehmen
+//                 von selbst keine Verbindung auf. Martin Fischer,
+//                 KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 //=================================================================
@@ -242,6 +245,33 @@ public:
     // Dann auch eigene Zugangsdaten im Schluesselbund (CredentialStore):
     // ein Test-QSO darf nie ins echte QRZ-Logbuch hochgeladen werden.
     static bool isSandbox();
+
+    // ── Eine Sonde bleibt offline (2026-10-21) ───────────────────────
+    //
+    // Gemessen an einer Sonde, die mit gesetztem LONGPATH_CONFIG_DIR
+    // lief -- also voll isoliert, was die Dateien angeht:
+    //
+    //   DxClusterClient: connecting to "dxc.nc7j.com":7300 callsign= "OE5SOS"
+    //   DxClusterClient: connecting to "telnet.reversebeacon.net":7000 callsign= "OE5SOS"
+    //   Rotor: Rotator connected -- rotctld ...
+    //
+    // Das ist der Vorfall vom 2026-09-17 ein zweites Mal (siehe den
+    // langen Kommentar bei resolveConfigDir() in AppSettings.cpp): die
+    // Sonde meldete sich mit dem Rufzeichen des Betreibers an und warf
+    // damit SEINE Sitzung aus dem Cluster. Isoliert waren damals nur
+    // die Dateien; das Netz war es nie.
+    //
+    // Darum: in einer Sandbox nimmt Longpath von SELBST keine
+    // Verbindung nach aussen auf und startet von selbst keinen Dienst.
+    // Was der Bediener in diesem Lauf von Hand anklickt, laeuft
+    // unverändert -- die Sonde ist nicht gelähmt, sie drängt sich nur
+    // nicht auf.
+    //
+    // Nicht dasselbe wie isSandbox(), auch wenn es heute daraus folgt:
+    // getrennt benannt, weil die Frage eine andere ist ("darf dieser
+    // Lauf von selbst ins Netz") und weil die Aufrufstellen beim Lesen
+    // sagen sollen, WARUM sie schweigen.
+    static bool darfVonSelbstVerbinden();
 
     // Profile names are restricted to [A-Za-z0-9_-] and non-empty.
     // Anything else (path traversal, whitespace, separators) falls back

@@ -1214,6 +1214,13 @@ public:
     //
     // Safe to call multiple times. Each client's start method already
     // guards against double-start.
+    //
+    // In einer Sandbox (LONGPATH_CONFIG_DIR gesetzt) tut diese Funktion
+    // NICHTS -- eine Sonde, die sich mit dem Rufzeichen des Betreibers
+    // am Cluster anmeldet, wirft seine eigene Sitzung hinaus (gemessen
+    // 2026-10-21, und schon einmal 2026-09-17). Siehe
+    // AppSettings::darfVonSelbstVerbinden(). Von Hand bleibt in der
+    // Sonde alles erreichbar; nur von selbst passiert nichts.
     void restoreSpotClientAutoStartState();
 
     // ── Phase 3R Task I5: RadeChannel slot-graph wiring ─────────────────────
