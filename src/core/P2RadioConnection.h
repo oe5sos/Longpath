@@ -584,6 +584,22 @@ private:
     qint64  m_iqSeqWndStartMs{0};
     qint64  m_iqSeqLastCleanLogMs{0};
 
+    // Bitsonde je DDC (LONGPATH_DDC_BITPROBE=1), 2026-10-21.
+    //
+    // Upstream NereusSDR fand an einer Anvelina Pro 3, dass der DDC4-Strom
+    // beschaedigt ankommt: Bit 20 und 21 der 24-Bit-Probe sind bei etwa
+    // 13 % der nicht-negativen Werte gesetzt, waehrend DDC2/3/5 im selben
+    // Mitschnitt keinen einzigen solchen Wert haben. Das hebt den
+    // angezeigten Boden um ~58 dB und zeichnet einen Kamm.
+    // Die Sonde zaehlt genau das, damit die Frage an JEDEM Geraet mit einer
+    // Zahl beantwortet wird statt mit einem Blick auf den Wasserfall.
+    // Aus, kostet sie einen Sprung je Paket (nicht je Probe).
+    std::array<quint64, kMaxDdc> m_bitProbeSamples{};
+    std::array<quint64, kMaxDdc> m_bitProbeHits{};
+    std::array<double,  kMaxDdc> m_bitProbeSumSq{};
+    qint64 m_bitProbeLastLogMs{0};
+    static bool bitProbeEnabled();
+
     // Reorder/concealment stage between the port-1026 decoder and
     // TxMicSource (remote-bench fix 2026-08-11): late frames are
     // slotted back into sequence position, true losses concealed by

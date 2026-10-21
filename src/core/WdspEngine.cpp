@@ -456,7 +456,16 @@ RxChannel* WdspEngine::createRxChannel(int channelId,
     SetRXABandpassFreqs(channelId, -2850.0, -150.0);
     RXANBPSetFreqs(channelId, -2850.0, -150.0);
     SetRXAAGCMode(channelId, static_cast<int>(AGCMode::Med));
-    SetRXAAGCTop(channelId, 80.0);
+    // Max Gain und Fixed Gain muessen MIT gesaet werden, sonst laeuft WDSP
+    // auf seinen eigenen Erzeugungswerten (max_gain 10000.0 = 80 dB,
+    // fixed_gain 1000.0 = 60 dB; third_party/wdsp/src/rxa.c:380/382),
+    // waehrend RxChannel 90 bzw. 20 dB cached und seine Setter einen Wert
+    // gleich dem gecachten ueberspringen. Folge vor diesem Fix: AGC Off
+    // lief 40 dB zu heiss und Max Gain 10 dB zu niedrig — beides stumm.
+    // Uebernommen aus Upstream NereusSDR 26395cc24 / af7083e45 (2026.10.1).
+    // [WDSP-Aufruf wie in Thetis radio.cs:1013/1020-1021 [v2.10.3.13]]
+    SetRXAAGCTop(channelId, static_cast<double>(RxChannel::kDefaultAgcMaxGainDb));
+    SetRXAAGCFixed(channelId, static_cast<double>(RxChannel::kDefaultAgcFixedGainDb));
 
     // Dual-mono audio output. WDSP's create_panel default is copy=0
     // (binaural — I and Q carry separate phase-shifted content for
@@ -813,7 +822,16 @@ qint64 WdspEngine::rebuildRxChannel(int channelId, const ChannelConfig& cfg)
     SetRXABandpassFreqs(channelId, -2850.0, -150.0);
     RXANBPSetFreqs(channelId, -2850.0, -150.0);
     SetRXAAGCMode(channelId, static_cast<int>(AGCMode::Med));
-    SetRXAAGCTop(channelId, 80.0);
+    // Max Gain und Fixed Gain muessen MIT gesaet werden, sonst laeuft WDSP
+    // auf seinen eigenen Erzeugungswerten (max_gain 10000.0 = 80 dB,
+    // fixed_gain 1000.0 = 60 dB; third_party/wdsp/src/rxa.c:380/382),
+    // waehrend RxChannel 90 bzw. 20 dB cached und seine Setter einen Wert
+    // gleich dem gecachten ueberspringen. Folge vor diesem Fix: AGC Off
+    // lief 40 dB zu heiss und Max Gain 10 dB zu niedrig — beides stumm.
+    // Uebernommen aus Upstream NereusSDR 26395cc24 / af7083e45 (2026.10.1).
+    // [WDSP-Aufruf wie in Thetis radio.cs:1013/1020-1021 [v2.10.3.13]]
+    SetRXAAGCTop(channelId, static_cast<double>(RxChannel::kDefaultAgcMaxGainDb));
+    SetRXAAGCFixed(channelId, static_cast<double>(RxChannel::kDefaultAgcFixedGainDb));
     SetRXAPanelBinaural(channelId, 0);
 
     qCInfo(lcDsp) << "Rebuild: opened RX channel" << channelId

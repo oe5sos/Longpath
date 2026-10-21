@@ -150,6 +150,9 @@ class TestNotchChannelSync;
 // TNF Task 9: the MNF Settings page test primes the engine so it can open one
 // real RX channel and check the minimum-notch-width readout against it.
 class TestMnfSetupPage;
+// AGC-Saat beim Oeffnen: der Lauf oeffnet echte RX-Kanaele und liest die
+// angewandte Verstaerkung aus WDSP zurueck.
+class TestAgcSaatBeimOeffnen;
 #endif
 
 namespace Longpath {
@@ -851,6 +854,8 @@ private:
     friend class ::TstNrBackendsProcessAudio;
     // 2026-09-27: same friendship for the PB-SNR noise probe.
     friend class ::TstPbsnrNoiseProbe;
+    // AGC-Saat beim Oeffnen: dieselbe Freundschaft, echte RX-Kanaele.
+    friend class ::TestAgcSaatBeimOeffnen;
 #endif
 };
 

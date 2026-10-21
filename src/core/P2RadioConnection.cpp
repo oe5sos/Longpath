@@ -190,6 +190,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <algorithm>
 #include <bit>
 #include <cerrno>
+#include <cmath>
 #include <cstring>
 
 namespace Longpath {
@@ -1935,6 +1936,13 @@ void P2RadioConnection::applyDdcAssignment(const DdcAssignment& a)
                              << "rate[1]=" << a.rate[1]
                              << "rate[2]=" << a.rate[2]
                              << "rate[3]=" << a.rate[3]
+                             // Die Zeile hoerte bei DDC3 auf: die Rate eines
+                             // dritten Stroms stand nie im Protokoll, obwohl
+                             // genau dort die DDC-Reihenfolge entschieden wird
+                             // (Anvelina Pro 3, 2026-10-21).
+                             << "rate[4]=" << a.rate[4]
+                             << "rate[5]=" << a.rate[5]
+                             << "rate[6]=" << a.rate[6]
                              << "nDdc=" << a.nDdc
                              << "psFwdDdc=" << m_psFbDdc
                              << "psRevDdc=" << m_psTxMonDdc;
@@ -3201,6 +3209,15 @@ void P2RadioConnection::sendCmdTx()
 // --- Data Parsing ---
 // Porting from Thetis ReadUDPFrame:605-631 and ReadThreadMainLoop:790-808
 
+// Bitsonde: einmal gelesen, danach aus dem statischen Wert. Ein
+// Umgebungsschalter, kein Einstellungsschluessel — sie gehoert an die Bank,
+// nicht in die Oberflaeche.
+bool P2RadioConnection::bitProbeEnabled()
+{
+    static const bool on = qEnvironmentVariableIntValue("LONGPATH_DDC_BITPROBE") > 0;
+    return on;
+}
+
 void P2RadioConnection::processIqPacket(const QByteArray& data, int ddcIndex)
 {
     if (ddcIndex < 0 || ddcIndex >= kMaxDdc) {
@@ -3320,6 +3337,61 @@ void P2RadioConnection::processIqPacket(const QByteArray& data, int ddcIndex)
                     | (static_cast<qint32>(iqData[k + 4]) << 16)
                     | (static_cast<qint32>(iqData[k + 5]) << 8);
         buf[2 * i + 1] = static_cast<float>(qVal) / 2147483648.0f;
+    }
+
+    // Bitsonde (LONGPATH_DDC_BITPROBE=1) — siehe P2RadioConnection.h.
+    // Eigener Durchgang auf den ROHEN 24-Bit-Werten; die Umrechnung oben
+    // schiebt um 8 nach links, womit Bit 20/21 der Probe zu Bit 28/29 der
+    // qint32 werden. Hier wird die Probe selbst gelesen, damit die Zahlen
+    // mit upstreams Bankbefund vergleichbar bleiben.
+    if (bitProbeEnabled()) {
+        quint64 hits = 0;
+        double  sumSq = 0.0;
+        for (int i = 0, k = 0; i < spp; ++i, k += 6) {
+            const qint32 i24 = (static_cast<qint32>(iqData[k + 0]) << 16)
+                             | (static_cast<qint32>(iqData[k + 1]) << 8)
+                             |  static_cast<qint32>(iqData[k + 2]);
+            const qint32 q24 = (static_cast<qint32>(iqData[k + 3]) << 16)
+                             | (static_cast<qint32>(iqData[k + 4]) << 8)
+                             |  static_cast<qint32>(iqData[k + 5]);
+            // Nicht-negativ heisst Bit 23 aus; nur dort ist 0x300000 ein
+            // Befund und nicht einfach das Vorzeichen eines kleinen
+            // negativen Wertes.
+            if (((i24 & 0x800000) == 0 && (i24 & 0x300000) != 0)
+                || ((q24 & 0x800000) == 0 && (q24 & 0x300000) != 0)) {
+                ++hits;
+            }
+            const double fi = static_cast<double>(buf[2 * i + 0]);
+            const double fq = static_cast<double>(buf[2 * i + 1]);
+            sumSq += fi * fi + fq * fq;
+        }
+        m_bitProbeSamples[ddcIndex] += static_cast<quint64>(spp);
+        m_bitProbeHits[ddcIndex]    += hits;
+        m_bitProbeSumSq[ddcIndex]   += sumSq;
+
+        const qint64 nowProbe = QDateTime::currentMSecsSinceEpoch();
+        if (m_bitProbeLastLogMs == 0) {
+            m_bitProbeLastLogMs = nowProbe;
+        } else if (nowProbe - m_bitProbeLastLogMs >= 1000) {
+            for (int d = 0; d < kMaxDdc; ++d) {
+                if (m_bitProbeSamples[d] == 0) { continue; }
+                const double n   = static_cast<double>(m_bitProbeSamples[d]);
+                const double pct = 100.0 * static_cast<double>(m_bitProbeHits[d]) / n;
+                const double rms = std::sqrt(m_bitProbeSumSq[d] / (2.0 * n));
+                qCInfo(lcConnection).noquote() << QStringLiteral(
+                    "P2 Bitsonde: DDC%1 %2 Proben, Bit20/21 bei %3 "
+                    "(%4 %), RMS %5 dBFS")
+                    .arg(d)
+                    .arg(m_bitProbeSamples[d])
+                    .arg(m_bitProbeHits[d])
+                    .arg(pct, 0, 'f', 2)
+                    .arg(rms > 0.0 ? 20.0 * std::log10(rms) : -999.0, 0, 'f', 1);
+                m_bitProbeSamples[d] = 0;
+                m_bitProbeHits[d]    = 0;
+                m_bitProbeSumSq[d]   = 0.0;
+            }
+            m_bitProbeLastLogMs = nowProbe;
+        }
     }
 
     ++m_totalIqPackets;

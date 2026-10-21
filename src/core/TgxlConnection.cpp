@@ -197,6 +197,9 @@ void TgxlConnection::onConnected()
     qCDebug(lcTgxl) << "TgxlConnection: TCP connected, waiting for version line";
     m_connectedSinceMs = QDateTime::currentMSecsSinceEpoch();
     m_reconnectAttempts = 0;
+    // Ein `status`, den die alte Verbindung nie beantwortet hat, haelt auf
+    // dieser nichts zurueck.
+    m_statusGate.reset();
     // Bench-fix 2026-05-20: reset the version-received latch so the next
     // V-frame arrival re-arms the handshake and re-sets m_connected=true.
     // Without this, m_gotVersion stays sticky from the previous session
@@ -319,6 +322,9 @@ void TgxlConnection::processLine(const QString& line)
         if (pipe2 >= 0) {
             // Parse sequence number and hex status code.
             quint32 rseq = line.mid(1, pipe1 - 1).toUInt();
+            // Geantwortet — der naechste `status` darf hinaus
+            // (GeniusStatusGate.h).
+            m_statusGate.answered(rseq);
             QString hexStr = line.mid(pipe1 + 1, pipe2 - pipe1 - 1).trimmed();
             bool hexOk = false;
             uint hexCode = hexStr.toUInt(&hexOk, 16);
@@ -398,6 +404,12 @@ void TgxlConnection::processLine(const QString& line)
         int pipe = line.indexOf('|');
         if (pipe < 0) { return; }
 
+        // Der Tuner beantwortet `status` mit einem S-Rahmen
+        // (`S<seq>|status fwd=…`), nicht mit einem R-Rahmen — die
+        // Folgenummer steht hier genauso davor, und sie oeffnet das Tor
+        // fuer die naechste Abfrage (GeniusStatusGate.h).
+        m_statusGate.answered(line.mid(1, pipe - 1).toUInt());
+
         QString rest = line.mid(pipe + 1);
 
         // Find object name -- everything before first key=val
@@ -436,7 +448,16 @@ void TgxlConnection::processLine(const QString& line)
 // From AetherSDR src/core/TgxlConnection.cpp:154 [@0cd4559]
 quint32 TgxlConnection::sendCommand(const QString& cmd)
 {
+    // Eine `status`-Abfrage zur Zeit (GeniusStatusGate.h): die 5-Hz-Reihe,
+    // der Keepalive und jeder andere Rufer warten auf die Antwort zur
+    // vorigen. Es wird nichts aufgestaut — die naechste Abfrage fragt.
+    if (cmd == QLatin1String("status") && m_statusGate.answerPending()) {
+        return 0;
+    }
     quint32 seq = ++m_seq;
+    if (cmd == QLatin1String("status")) {
+        m_statusGate.sent(seq);
+    }
     QString line = QString("C%1|%2\n").arg(seq).arg(cmd);
     m_socket.write(line.toUtf8());
     qCDebug(lcTgxl) << "TgxlConnection: sent" << line.trimmed();
