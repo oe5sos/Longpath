@@ -7,6 +7,7 @@
 #include "Gs232Rotor.h"
 
 #include <QIODevice>
+#include <QTcpSocket>
 #include <QLoggingCategory>
 #include <QRegularExpression>
 #include <QTimer>
@@ -62,6 +63,12 @@ void Gs232Rotor::setPort(const QString& portName, int baudRate)
     m_baud     = baudRate > 0 ? baudRate : 9600;
 }
 
+void Gs232Rotor::setNetworkTarget(const QString& host, quint16 port)
+{
+    m_host    = host.trimmed();
+    m_netPort = port ? port : 4001;
+}
+
 void Gs232Rotor::setPollIntervalMs(int ms)
 {
     m_pollMs = qBound(100, ms, 10000);
@@ -70,6 +77,9 @@ void Gs232Rotor::setPollIntervalMs(int ms)
 
 QString Gs232Rotor::description() const
 {
+    if (!m_host.isEmpty()) {
+        return QStringLiteral("GS-232 über %1:%2").arg(m_host).arg(m_netPort);
+    }
     if (m_portName.isEmpty()) {
         return QStringLiteral("GS-232 (keine Schnittstelle gewählt)");
     }
@@ -139,8 +149,32 @@ void Gs232Rotor::connectToRotor()
 
     if (m_dev && m_dev->isOpen()) { return; }
 
+    // Netzserver schlaegt serielle Schnittstelle.
+    if (!m_host.isEmpty()) {
+        setState(State::Connecting);
+        auto* sock = new QTcpSocket(this);
+        m_dev     = sock;
+        m_ownsDev = true;
+        connect(sock, &QIODevice::readyRead, this, &Gs232Rotor::onReadyRead);
+        connect(sock, &QTcpSocket::connected, this, [this]() {
+            qCInfo(lcRotor) << "GS-232: Netzserver offen" << m_host << m_netPort;
+            setState(State::Idle);
+            m_poll->start();
+            poll();
+        });
+        connect(sock, &QTcpSocket::errorOccurred, this,
+                [this, sock](QAbstractSocket::SocketError) {
+                    const QString grund = sock->errorString();
+                    m_poll->stop();
+                    fail(QStringLiteral("%1:%2 nicht erreichbar: %3")
+                             .arg(m_host).arg(m_netPort).arg(grund));
+                });
+        sock->connectToHost(m_host, m_netPort);
+        return;
+    }
+
     if (m_portName.isEmpty()) {
-        fail(QStringLiteral("Keine serielle Schnittstelle gewählt."));
+        fail(QStringLiteral("Weder eine serielle Schnittstelle noch ein Netzziel gewählt."));
         return;
     }
 

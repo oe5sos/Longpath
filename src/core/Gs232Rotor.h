@@ -65,6 +65,19 @@ public:
     QString portName() const { return m_portName; }
     int baudRate() const { return m_baud; }
 
+    /// Derselbe Controller, aber ueber einen seriellen Netzserver
+    /// (ser2net, Moxa und Verwandte): die Bytes sind dieselben, nur der
+    /// Draht ist ein TCP-Strom. Gemessen an Martins Station am
+    /// 2026-10-21: der GS-232 haengt dort NICHT lokal, sondern auf
+    /// 172.30.30.16:4001, und rotctld wird mit genau diesem Ziel
+    /// gestartet (`-r 172.30.30.16:4001 -s 9600`). Ein Treiber nur fuer
+    /// lokale Schnittstellen haette diese Station nie erreicht.
+    ///
+    /// Gesetzt schlaegt das Netzziel die serielle Schnittstelle.
+    void setNetworkTarget(const QString& host, quint16 port = 4001);
+    QString host() const { return m_host; }
+    quint16 networkPort() const { return m_netPort; }
+
     /// Wie oft die Lage abgefragt wird. Wie beim rotctld-Weg 500 ms:
     /// ein Rotor dreht rund 5 Grad je Sekunde, schneller zu fragen
     /// bringt keine neue Zahl.
@@ -127,6 +140,8 @@ private:
     bool       m_ownsDev{true};
     QString    m_portName;
     int        m_baud{9600};
+    QString    m_host;
+    quint16    m_netPort{4001};
 
     QByteArray m_buffer;
     QTimer*    m_poll{nullptr};

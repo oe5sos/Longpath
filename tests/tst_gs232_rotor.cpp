@@ -256,6 +256,38 @@ private slots:
         s.setValue(QStringLiteral("Rotor/Backend"), vorher);
     }
 
+    // ── Am ECHTEN Gerät ─────────────────────────────────────────────
+    //
+    // Läuft nur, wenn LONGPATH_GS232_HOST gesetzt ist — sonst
+    // übersprungen, damit CI und jeder Rechner ohne Rotor grün bleiben.
+    // Es wird ausschließlich GELESEN: `C2` fragt die Lage, nichts dreht
+    // sich. Ein Fahrbefehl gehört nicht in einen Prüflauf.
+    void am_echten_geraet_wenn_eines_da_ist()
+    {
+        const QByteArray host = qgetenv("LONGPATH_GS232_HOST");
+        if (host.isEmpty()) {
+            QSKIP("kein LONGPATH_GS232_HOST gesetzt — kein Gerät am Tisch");
+        }
+        const quint16 port = static_cast<quint16>(
+            qEnvironmentVariableIntValue("LONGPATH_GS232_PORT") ?: 4001);
+
+        Gs232Rotor rotor;
+        rotor.setNetworkTarget(QString::fromLatin1(host), port);
+        QSignalSpy lage(&rotor, &Gs232Rotor::positionChanged);
+        QSignalSpy fehler(&rotor, &Gs232Rotor::errorOccurred);
+
+        rotor.connectToRotor();
+        QTRY_VERIFY_WITH_TIMEOUT(lage.count() > 0 || fehler.count() > 0, 8000);
+        if (fehler.count() > 0) {
+            QFAIL(qPrintable(fehler.at(0).at(0).toString()));
+        }
+        QVERIFY(rotor.hasFreshPosition());
+        qInfo() << "GS-232 am Draht:" << rotor.description()
+                << "meldet" << rotor.azimuth() << "Grad, Höhe"
+                << rotor.elevation();
+        rotor.disconnectFromRotor();
+    }
+
     void beschreibung_sagt_die_schnittstelle()
     {
         Gs232Rotor rotor;
