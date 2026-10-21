@@ -391,11 +391,26 @@ private slots:
         // dem Betreiber, nicht dem Prueflauf.
         rotor.moveTo(start);
         const bool zurueck = wartetBis(start);
-        qInfo() << "zurueck auf:" << rotor.azimuth() << "Grad";
+        // Den ENDSTAND nennen, nicht nur "angekommen": die Frist oben
+        // gibt bei zwei Grad Rest frei, und der Rotor laeuft danach noch
+        // etwas weiter. Am 2026-10-21 stand er darum am Ende auf 295,
+        // wo er mit 297 angefangen hatte -- der Lauf meldete trotzdem
+        // "zurueck", und genau diese Luecke schliesst die Zeile hier.
+        QTest::qWait(3000);          // ausrollen lassen
+        const double ende = rotor.azimuth();
+        double rest = std::fabs(ende - start);
+        if (rest > 180.0) { rest = 360.0 - rest; }
+        qInfo() << "zurueck auf:" << ende << "Grad -- Rest zum Ausgangswert:"
+                << rest << "Grad";
 
         rotor.disconnectFromRotor();
         QVERIFY2(angekommen, "der Rotor hat das Ziel nicht erreicht");
         QVERIFY2(zurueck, "der Rotor ist nicht auf den Ausgangswert zurueck");
+        // Mehr als fuenf Grad Rest waere kein Nachlauf mehr, sondern ein
+        // Fehler im Fahrbefehl.
+        QVERIFY2(rest <= 5.0,
+                 qPrintable(QStringLiteral("Rest zum Ausgangswert: %1 Grad")
+                                .arg(rest)));
     }
 
     void beschreibung_sagt_die_schnittstelle()

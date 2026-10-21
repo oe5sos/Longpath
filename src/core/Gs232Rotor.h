@@ -22,8 +22,12 @@
 //
 //   Abfrage   `C2\r`        -> `AZ=aaa EL=eee` (GS-232B; der ERC setzt
 //                              zwei Leerzeichen vor EL) oder
-//                              `+0aaa+0eee` (GS-232A, Hamlibs Form;
-//                              an keinem Geraet beobachtet)
+//                              `+0aaa+0eee` (GS-232A). Upstream notierte
+//                              dazu "an keinem Geraet beobachtet" -- an
+//                              Martins Controller IST es diese Form:
+//                              2026-10-21 roh mitgelesen, `+0295+0000`.
+//                              Die B-Form bleibt trotzdem drin, andere
+//                              Controller sprechen sie.
 //   Fahren    `Waaa eee\r`  -> je drei Ziffern, Hoehe 000 am reinen
 //                              Azimutrotor
 //   Halt      `S\r`
