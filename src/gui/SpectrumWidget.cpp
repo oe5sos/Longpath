@@ -8128,21 +8128,36 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
         return;
     }
 
-    // Peak-detect on the visible bin subset so the X coordinates we get
-    // back are bin offsets relative to firstBin.  Mirrors the existing
-    // drawSpectrum bin-to-pixel mapping at line 1564 [SpectrumWidget.cpp].
-    const auto [firstBin, lastBin] = visibleBinRange(m_renderedPixels.size());
-    const int count = lastBin - firstBin + 1;
+    // ── NICHT noch einmal zuschneiden (2026-10-21) ───────────────────────
+    //
+    // Hier stand `visibleBinRange(m_renderedPixels.size())` und ein
+    // Ausschnitt daraus. Das war ein ZWEITER Schnitt: m_renderedPixels
+    // ist laengst auf das sichtbare Fenster reduziert
+    // (m_centerHz +/- m_bandwidthHz/2, in Anzeigebreite) -- der
+    // Kommentar an der Spitzentext-Uhr weiter oben sagt es woertlich.
+    //
+    // Was der zweite Schnitt kostete, war an diesem Abend am Geraet zu
+    // sehen: die Grundtoene lagen mittig und ueberlebten, die
+    // IMD5-Produkte bei +/- 2d fielen heraus -- und weil Thetis'
+    // Zuordnung ALLE sechs Produkte verlangt, lieferte die Messung
+    // dann gar nichts. Stundenlang.
+    //
+    // Gefunden hat es nicht ich, sondern NereusSDR: im Upstream steht
+    // derselbe Befund unter demselben Namen, mit Zahlen --
+    // docs/architecture/2026-10-12-puresignal-imd-diagnosis.md,
+    // „double cropping": bei 192 kHz, 48 kHz sichtbarer Spanne und 800
+    // Proben blieben vom zweiten Schnitt nur die Indizes 300-500.
+    //
+    // Jetzt wird auf dem GANZEN sichtbaren Feld gesucht, und die
+    // Markierungen werden aus denselben Koordinaten abgebildet.
+    const int count = m_renderedPixels.size();
     if (count < 2) {
         melden(QStringLiteral("only %1 visible bins").arg(count));
         return;
     }
 
-    std::vector<float> visible;
-    visible.reserve(count);
-    for (int i = 0; i < count; ++i) {
-        visible.push_back(m_renderedPixels[firstBin + i]);
-    }
+    std::vector<float> visible(m_renderedPixels.begin(),
+                               m_renderedPixels.end());
 
     // From Thetis display.cs:5217 [v2.10.3.13]: trigger_delta = 10 dB.
     constexpr float kTriggerDelta = 10.0f;
