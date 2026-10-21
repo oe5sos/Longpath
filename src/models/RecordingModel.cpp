@@ -103,7 +103,29 @@ void RecordingModel::attach(RadioModel* radio)
     m_wav.attach(radio ? radio->audioEngine() : nullptr);
     m_iq.attach(radio);
 
+    // ── Den Takt erst hier anwerfen ──────────────────────────────────
+    //
+    // Ohne das stand er still: `recordingDue` war verdrahtet, aber
+    // niemand rief `start()`, also lief der Zeitgeber nie und
+    // gespeicherte Eintraege wurden nie gelesen. `scheduleRunning()`
+    // konnte darum NIE true werden -- die Anzeige „ARMED" war tot.
+    //
+    // Der Prueffall dazu rief `checkNow()` selbst auf. Er belegte die
+    // Verdrahtung und nicht den Betrieb: ein Waechter, wo ein Faenger
+    // gebraucht wird.
+    //
+    // An `attach` und nicht an den Baukasten, weil ein faelliger
+    // Eintrag ohne Radio nur eine Fehlermeldung erzeugen wuerde.
+    if (radio) {
+        m_schedule.loadFromSettings();
+        m_schedule.start();
+    } else {
+        m_schedule.stop();
+    }
+
     if (ready() != warReady) { emit readyChanged(ready()); }
+    emit scheduleRunningChanged(m_schedule.isRunning());
+    emit scheduleCountChanged(scheduleCount());
 }
 
 bool RecordingModel::sliceInfo(QString* freq, QString* mode,

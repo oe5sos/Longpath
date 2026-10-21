@@ -51,6 +51,31 @@ private slots:
         QCOMPARE(bereit.count(), 1);
     }
 
+    void derTaktLaeuftErstMitEinemRadio()
+    {
+        RecordingModel rec;
+
+        // Ohne Radio steht der Zeitgeber: ein faelliger Eintrag wuerde
+        // nur eine Fehlermeldung erzeugen.
+        QVERIFY(!rec.scheduleRunning());
+
+        RadioModel radio;
+        QSignalSpy lauf(&rec, &RecordingModel::scheduleRunningChanged);
+        rec.attach(&radio);
+
+        // DAS ist der Punkt: ohne loadFromSettings()+start() in attach()
+        // konnte scheduleRunning() NIE true werden -- die Anzeige
+        // „ARMED" im Applet war tot, und ein gespeicherter Eintrag
+        // waere nie gelesen worden.
+        QVERIFY2(rec.scheduleRunning(),
+                 "der Zeitplan laeuft nicht — dann feuert er auch nie");
+        QVERIFY(lauf.count() >= 1);
+
+        rec.attach(nullptr);
+        QVERIFY2(!rec.scheduleRunning(),
+                 "ohne Radio soll der Takt wieder stehen");
+    }
+
     void ohneRadioStartetNichtsUndSagtWarum()
     {
         RecordingModel rec;

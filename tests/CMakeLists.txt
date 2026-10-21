@@ -6167,6 +6167,11 @@ longpath_add_test(tst_b8_overlay_signals)
 # WAS fehlt.
 longpath_add_test(tst_recording_model)
 
+# Die Flaeche dazu (2026-10-21, Variante 1 vom Betreiber gewaehlt).
+# Nagelt fest, dass das Applet in der Spalte haengt, EINE Kennung
+# traegt und ohne Radio einen Strich zeigt statt einer Null.
+longpath_add_test(tst_aufnahme_applet)
+
 longpath_add_test(tst_tx_bandbreiten_klickbar)
 
 longpath_add_test(tst_stationsrufzeichen)

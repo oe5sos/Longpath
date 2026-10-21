@@ -1788,6 +1788,7 @@ private:
     class CwxApplet*        m_cwxApplet{nullptr};
     class DvkApplet*        m_dvkApplet{nullptr};
     class QsoRecorderApplet* m_qsoRecorderApplet{nullptr};
+    class RecordingApplet*   m_recordingApplet{nullptr};
 
     // ── KiwiSDR (Stufe 4, 2026-08-23) ──────────────────────────────
     //

@@ -10278,6 +10278,12 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
         // AudioEngine wird erst in start() aufgemacht.
         m_qsoRecorder.attach(m_audioEngine, m_txWorker.get());
 
+        // Dieselbe Stelle, derselbe Grund: erst hier steht die
+        // AudioEngine, und attach() ueberlebt einen
+        // Verbindungswechsel. Angeschlossen heisst auch hier NICHT
+        // aufnehmend -- der Abgriff geht erst in startAudio() auf.
+        m_recording.attach(this);
+
         // 3M-3a-iv: RxDspWorker::bufferSizesChanged → TxWorkerThread::setAntiVoxBlockGeometry.
         //
         // Aligns DEXP's antivox_size / antivox_rate with the post-
