@@ -64,6 +64,64 @@ private:
 
 private slots:
 
+    // ── Die Landspalte ───────────────────────────────────────────────
+    //
+    // Betreiber am 2026-10-21: „vielleicht kann man auch das land
+    // hinzufuegen." Der Auflaeser kannte es laengst; das Fenster
+    // benutzte den Namen nur fuer eine Farbe und warf ihn weg.
+    //
+    // Reine Funktion, darum ohne Fenster, ohne Logbuch und ohne
+    // cty.dat pruefbar.
+    void dieLandspalteStehtHinterDerNachricht()
+    {
+        const QString z = Ft8Applet::zeilentext(
+            QStringLiteral("121645"), 17, 1.0, 1506,
+            QStringLiteral("CQ PA3DJV JO33"), QStringLiteral("Netherlands"));
+        QVERIFY2(z.endsWith(QStringLiteral("Netherlands")), qPrintable(z));
+        QVERIFY2(z.contains(QStringLiteral("CQ PA3DJV JO33")), qPrintable(z));
+        // Die Zahlenspalten bleiben, wie sie waren.
+        QVERIFY2(z.startsWith(QStringLiteral("121645")), qPrintable(z));
+        QVERIFY2(z.contains(QStringLiteral("1506")), qPrintable(z));
+    }
+
+    void ohneLandBleibtDieZeileWieVorher()
+    {
+        // Leer heisst „nicht aufloesbar", nicht „kein Land". Dann darf
+        // die Zeile keinen Leerraum anhaengen, der wie eine leere
+        // Spalte aussieht.
+        const QString z = Ft8Applet::zeilentext(
+            QStringLiteral("121645"), 17, 1.0, 1506,
+            QStringLiteral("CQ PA3DJV JO33"), QString());
+        QCOMPARE(z, z.trimmed());
+        QVERIFY2(z.endsWith(QStringLiteral("CQ PA3DJV JO33")), qPrintable(z));
+    }
+
+    void dieLandspalteFluchtet()
+    {
+        // Der ganze Zweck einer Spalte: zwei Zeilen mit verschieden
+        // langen Nachrichten muessen das Land an derselben Stelle
+        // zeigen.
+        const QString kurz = Ft8Applet::zeilentext(
+            QStringLiteral("121645"), 17, 1.0, 1506,
+            QStringLiteral("TA2LA OH3OJ RR73"), QStringLiteral("Turkey"));
+        const QString lang = Ft8Applet::zeilentext(
+            QStringLiteral("121645"), 16, 1.2, 509,
+            QStringLiteral("VK4MDP EV1R"), QStringLiteral("Australia"));
+        QCOMPARE(kurz.indexOf(QStringLiteral("Turkey")),
+                 lang.indexOf(QStringLiteral("Australia")));
+    }
+
+    void eineUEBERLANGENachrichtWirdNichtAbgeschnitten()
+    {
+        // Lieber eine verrutschte Landspalte als eine halbe Nachricht.
+        const QString sehrLang = QStringLiteral("ON6LEO F5OYA/P JN13XX");
+        const QString z = Ft8Applet::zeilentext(
+            QStringLiteral("121645"), 17, 1.0, 1506, sehrLang,
+            QStringLiteral("Belgium"));
+        QVERIFY2(z.contains(sehrLang), qPrintable(z));
+        QVERIFY2(z.endsWith(QStringLiteral("Belgium")), qPrintable(z));
+    }
+
     // ── Die Reihenfolge der Zeilenarten ─────────────────────────────
     //
     // Vier Sorten, und die REIHENFOLGE ist die Aussage. Sie laesst

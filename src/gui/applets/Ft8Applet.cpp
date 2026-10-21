@@ -922,13 +922,14 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
         m_slice && m_slice->dspMode() == DSPMode::DIGL;
 
     for (const Ft8Decode& d : funde) {
-        // Spalten wie in WSJT-X „Band Activity".
-        const QString zeile = QStringLiteral("%1 %2 %3 %4  %5")
-            .arg(uhrzeit)
-            .arg(static_cast<int>(std::lround(d.snrDb)), 4)
-            .arg(d.dtSeconds, 5, 'f', 1)
-            .arg(static_cast<int>(std::lround(d.freqHz)), 5)
-            .arg(d.text);
+        // Spalten wie in WSJT-X „Band Activity", dahinter das Land.
+        const QString zeile = zeilentext(
+            uhrzeit,
+            static_cast<int>(std::lround(d.snrDb)),
+            d.dtSeconds,
+            static_cast<int>(std::lround(d.freqHz)),
+            d.text,
+            landFuer(senderCallsign(d.text)));
         zeigeZeile(zeile, d.text);
 
         // Der Fund geht an EINE Stelle: RadioModel verteilt ihn weiter
@@ -1004,6 +1005,53 @@ Ft8Applet::Zeilenart Ft8Applet::zeilenart(bool anMich, bool neuesLand,
     if (neuesLand) { return Zeilenart::NeuesLand; }
     if (istCq)     { return Zeilenart::Cq; }
     return Zeilenart::Gewoehnlich;
+}
+
+// Siehe Ft8Applet.h.
+QString Ft8Applet::zeilentext(const QString& uhrzeit, int snrDb,
+                              double dtSekunden, int hz,
+                              const QString& nachricht,
+                              const QString& land)
+{
+    // Breite der Nachrichtenspalte. 18 ist gemessen, nicht geraten:
+    // die laengste uebliche FT8-Nachricht ist ein Ruf mit Praefix und
+    // Suffix samt Feld („ON6LEO F5OYA/P JN13" = 19), die allermeisten
+    // bleiben darunter. Wer laenger ist, schiebt die Landspalte --
+    // das faellt auf und schneidet nichts ab.
+    constexpr int kNachrichtBreite = 19;
+
+    const QString spalten = QStringLiteral("%1 %2 %3 %4  %5")
+                                .arg(uhrzeit)
+                                .arg(snrDb, 4)
+                                .arg(dtSekunden, 5, 'f', 1)
+                                .arg(hz, 5)
+                                .arg(nachricht);
+    if (land.isEmpty()) { return spalten; }
+
+    // Nur auffuellen, wenn die Nachricht kuerzer ist -- `leftJustified`
+    // mit `truncate=false` laesst Laengeres stehen.
+    const QString breit = nachricht.leftJustified(kNachrichtBreite, QLatin1Char(' '));
+    return QStringLiteral("%1 %2 %3 %4  %5  %6")
+        .arg(uhrzeit)
+        .arg(snrDb, 4)
+        .arg(dtSekunden, 5, 'f', 1)
+        .arg(hz, 5)
+        .arg(breit, land);
+}
+
+QString Ft8Applet::landFuer(const QString& rufzeichen) const
+{
+    if (rufzeichen.isEmpty() || !m_model) { return {}; }
+    auto* dxcc = m_model->dxccColorProvider();
+    if (!dxcc) { return {}; }
+    // Absichtlich NICHT an `isEnabled()` gebunden: der Schalter gehoert
+    // der Faerbung. Den Namen des Landes zu lesen, ist keine Farbe --
+    // wer die Farben abschaltet, will deswegen nicht wissen, wen er
+    // hoert, und umgekehrt.
+    const QString praefix = dxcc->ctyDat().resolvePrimaryPrefix(rufzeichen);
+    if (praefix.isEmpty()) { return {}; }
+    const DxccEntity* e = dxcc->ctyDat().entityByPrefix(praefix);
+    return e ? e->name : QString();
 }
 
 void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht)

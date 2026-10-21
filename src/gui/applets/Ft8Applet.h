@@ -135,6 +135,31 @@ public:
     enum class Zeilenart { AnMich, NeuesLand, Cq, Gewoehnlich };
     static Zeilenart zeilenart(bool anMich, bool neuesLand, bool istCq);
 
+    /// Eine Zeile der Liste, zusammengesetzt. Spalten wie in WSJT-X
+    /// „Band Activity", dahinter das Land.
+    ///
+    /// Betreiber am 2026-10-21: „vielleicht kann man auch das land
+    /// hinzufuegen." Der Auflaeser kannte es die ganze Zeit -- das
+    /// Fenster benutzte den Namen nur, um eine Farbe zu waehlen, und
+    /// warf ihn dann weg.
+    ///
+    /// Die Nachricht wird auf feste Breite gebracht, sonst stuende das
+    /// Land bei jeder Zeile woanders und die Spalte waere keine. Ist
+    /// sie laenger, gewinnt die Nachricht: lieber eine verrutschte
+    /// Landspalte als eine abgeschnittene Nachricht.
+    ///
+    /// Statisch und ohne Zustand, damit die Spalten ohne Fenster,
+    /// ohne Logbuch und ohne cty.dat pruefbar sind.
+    static QString zeilentext(const QString& uhrzeit, int snrDb,
+                              double dtSekunden, int hz,
+                              const QString& nachricht,
+                              const QString& land);
+
+    /// Das Land zu einem Rufzeichen, oder leer. Leer heisst „nicht
+    /// aufloesbar" und nicht „kein Land" -- dann bleibt die Spalte
+    /// frei, statt etwas zu behaupten.
+    QString landFuer(const QString& rufzeichen) const;
+
     /// Das eigene Rufzeichen aus den Einstellungen. `User/Callsign`
     /// ist der kanonische Schluessel (SpotHubDialog schreibt ihn);
     /// `StationCallsign` ist der Rueckfall.
