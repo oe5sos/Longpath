@@ -8137,6 +8137,39 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
     }
     m_imdOverlay->updateReadout(f0L, f0U, imd3L, imd3U, imd5L, imd5U);
 
+    // ── Die Messung gehoert auch ins Protokoll (2026-10-21) ───────────────
+    //
+    // Bis hierher wurden IMD3/IMD5 nur ins Bild gemalt. Fuer die eine
+    // Frage, auf die es bei PureSignal ankommt -- sinken die
+    // Intermodulationsprodukte, wenn die Korrektur laeuft? -- braucht man
+    // sie als ZAHLEN, zweimal: einmal mit PS aus, einmal mit PS ein.
+    // Vom Bild abgelesen waere das Augenmass; hier ist es eine Reihe, die
+    // man nebeneinanderlegen kann.
+    //
+    // Gedrosselt auf eine Zeile je Sekunde: diese Stelle laeuft im
+    // Malvorgang, also mit der Bildrate. Ungedrosselt verdeckt sie jede
+    // andere Meldung -- derselbe Fehler, der 2026-08-16 schon einmal am
+    // PureSignal-Protokoll behoben werden musste.
+    //
+    // Die Werte sind die EMA-geglaetteten aus Thetis'
+    // display.cs:5589-5641 [v2.10.3.13], unveraendert uebernommen: dbc /
+    // dbcMin in dBm, die beiden worst-Abstaende in dB, OIP3/OIP5 in dBm.
+    {
+        static qint64 lastImdLogMs = 0;
+        const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+        if (nowMs - lastImdLogMs >= 1000) {
+            lastImdLogMs = nowMs;
+            const ImdReadout& r = m_imdOverlay->readout();
+            qCInfo(lcSpectrum).nospace()
+                << "IMD Zweiton: dbc=" << r.dbc
+                << " dbcMin=" << r.dbcMin
+                << " worstIMD3=" << r.worstImd3DBc
+                << " worstIMD5=" << r.worstImd5DBc
+                << " OIP3=" << r.oip3
+                << " OIP5=" << r.oip5;
+        }
+    }
+
     // Map bin indices -> pixel X using the same formula as drawSpectrum.
     const float xStep = static_cast<float>(specRect.width())
                       / static_cast<float>(count - 1);
