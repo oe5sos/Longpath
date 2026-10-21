@@ -1806,6 +1806,9 @@ private:
     // Anspruchspruefungen der beiden anderen fremden Quellen hinein,
     // sonst bindet eine von ihnen dieselbe Scheibe ein zweites Mal.
     int m_flexTargetSliceId{-1};
+    /// Wahr, wenn die Scheibe fuer die Flex von uns angelegt wurde —
+    /// dann raeumen wir sie beim Trennen auch wieder weg.
+    bool m_flexSliceWasCreated{false};
     // Der Frequenzausschnitt der Flex-Anzeige, in Hz. Er steht NICHT im
     // FFT-Paket — nur die Wasserfall-Kachel traegt ihre Frequenzen
     // (gemessen). Solange er unbekannt ist, wird nichts gezeichnet:

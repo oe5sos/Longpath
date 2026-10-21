@@ -810,12 +810,16 @@ void ConnectionPanel::updateStatusStrip()
             // wie ein Fehler. Deshalb steht hier, was wirklich laeuft.
             // Entwurf: docs/architecture/2026-10-18-flex-stufe1-design.md
             if (m_failureDetailLabel) { m_failureDetailLabel->setVisible(false); }
+            // 2026-10-21: der Satz stand noch auf Stufe 1 und sagte
+            // „no audio yet", nachdem Stufe 2 (Ton und Panadapter ueber
+            // VITA-49) laengst auf main war. Der Betreiber las ihn am
+            // laufenden Geraet und glaubte, es sei nichts gebaut.
             m_stripInfoLabel->setToolTip(
-                QStringLiteral("Stage 1 of the Flex driver: discovery and the "
-                               "command channel. Audio and panadapter streams "
-                               "(VITA-49) are not implemented yet."));
+                QStringLiteral("Flex driver: discovery, command channel, "
+                               "panadapter and audio over VITA-49. Transmit "
+                               "is not implemented."));
             m_stripInfoLabel->setText(
-                QStringLiteral("Connected — %1  (command channel only, no audio yet)")
+                QStringLiteral("Connected — %1  (receive only)")
                     .arg(m_radioModel->name()));
         } else {
             if (m_failureDetailLabel) { m_failureDetailLabel->setVisible(false); }

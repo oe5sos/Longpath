@@ -3479,6 +3479,15 @@ private:
     // und Ton schicken. Laeuft erst, wenn die GUI-Anmeldung durch ist:
     // ohne sie gibt es keinen Panadapter, dem der Strom gehoeren koennte.
     void startFlexStreams();
+    /// Richtet den Flex-Panadapter ein (Breite, Hoehe, dBm-Bereich) und
+    /// gibt denselben Maszstab an den Leser. Darf mehrfach laufen; wird
+    /// aus startFlexStreams UND aus dem Statuseingang gerufen, weil die
+    /// Kennung oft erst nach der Anmeldung eintrifft.
+    void applyFlexPanSetup();
+    /// Stellt den Ton der Scheibe her — aber erst, wenn der
+    /// Zustandsschub der Maschine gesagt hat, was dort steht, und nur
+    /// das, was wirklich im Weg ist.
+    void applyFlexAudioSetup();
 
     // Sub-components (owned, main thread)
     RadioDiscovery*  m_discovery{nullptr};
@@ -3487,7 +3496,21 @@ private:
     FlexVitaStream*      m_flexStream{nullptr};
     QString              m_flexPanId;        // „40000000"
     QString              m_flexAudioStreamId;
-    bool                 m_flexMuteLocalWasOn{false};
+    // Was die MASCHINE eingestellt hatte, einmal mitgelesen, bevor
+    // Longpath etwas umstellt — leer heisst „nie gelesen", und dann
+    // wird auch nichts zurueckgestellt (HAUSSTIL Regel 7: Unbekannt
+    // ist ein Strich, keine Null). Martins Geraet stand auf
+    // audio_level=37 und mute_local_audio_when_remote=0; die erste
+    // Fassung schrieb 50 hin und stellte beim Trennen eine 1 zurueck,
+    // die dort nie gestanden hatte.
+    QString              m_flexSliceId;           // „0"
+    QString              m_flexAudioLevelWas;
+    QString              m_flexAudioMuteWas;
+    QString              m_flexMuteLocalWas;
+    bool                 m_flexAudioWanted{false};
+    bool                 m_flexRestoreAudioLevel{false};
+    bool                 m_flexRestoreAudioMute{false};
+    bool                 m_flexRestoreMuteLocal{false};
     ReceiverManager* m_receiverManager{nullptr};
     AudioEngine*     m_audioEngine{nullptr};
     WdspEngine*      m_wdspEngine{nullptr};

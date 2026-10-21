@@ -145,8 +145,28 @@ void MainWindow::wireFlex()
             }
         }
         if (!ziel) {
-            qCWarning(lcFlexGui) << "keine freie Scheibe fuer den Flex-Ton — "
-                                    "Bild laeuft, Ton nicht";
+            // 2026-10-21 an Martins Station: ALLE Scheiben hingen an
+            // einem echten Geraet (`streamIndex() >= 0`), also war keine
+            // frei — und damit lief weder Ton NOCH Bild, denn beides
+            // haengt an dieser Zuordnung (der Panadapter ueber
+            // `setKiwiDisplaySource(true)` weiter unten). Die alte
+            // Warnung behauptete „Bild laeuft, Ton nicht"; das war
+            // falsch und hat eine Stunde Suche gekostet.
+            //
+            // Die Flex ist ein eigenes Geraet und wartet nicht darauf,
+            // dass eine Scheibe frei wird: sie bekommt ihre eigene.
+            // `suppressAutoStreamBinding` ist dabei Pflicht — ohne das
+            // greift `bindSliceToStream()` zu, die Scheibe bekommt
+            // einen echten `streamIndex()`, und die Sicherheitswache
+            // liest das als „ein wirkliches Geraet hat uebernommen"
+            // und schneidet genau den Weg ab, den wir gerade bauen.
+            const int neu = m_radioModel->addSlice(QString(), true);
+            ziel = (neu >= 0) ? m_radioModel->sliceById(neu) : nullptr;
+            m_flexSliceWasCreated = (ziel != nullptr);
+        }
+        if (!ziel) {
+            qCWarning(lcFlexGui) << "keine Scheibe fuer die Flex, und das "
+                                    "Anlegen misslang — weder Ton noch Bild";
             return;
         }
 
@@ -221,6 +241,12 @@ void MainWindow::wireFlex()
         }
         qCInfo(lcFlexGui) << "Flex-Ton von Scheibe" << m_flexTargetSliceId
                           << "geloest";
+        // Nur die eigene wieder wegraeumen. Eine Scheibe, die der
+        // Betreiber selbst hatte, bleibt stehen.
+        if (m_flexSliceWasCreated && m_radioModel) {
+            m_radioModel->removeSlice(m_flexTargetSliceId);
+        }
+        m_flexSliceWasCreated = false;
         m_flexTargetSliceId = -1;
         m_flexSpanLowHz = 0.0;
         m_flexSpanHighHz = 0.0;
