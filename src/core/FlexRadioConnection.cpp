@@ -662,8 +662,15 @@ void FlexRadioConnection::createDefaultSlice()
 // „slice create pan=<id> freq=<mhz> antenna=<ant> mode=<mode>".
 void FlexRadioConnection::createSliceOnPan(const QString& panId)
 {
+    // 2026-10-21, an Martins FLEX-8400 gemessen und von ihm GEHOERT,
+    // bevor es jemand gesucht hat: `antenna=ANT1` im Anlegen schaltet
+    // das Antennenrelais, auch wenn dort schon ANT1 steht — bei jedem
+    // Verbinden ein Klicken im Geraet. Die Antenne ist Sache der
+    // Maschine (CLAUDE.md, Radio-Authoritative Settings Policy): wir
+    // legen die Scheibe an und lassen das Relais, wo es steht. Die
+    // Vorlage in AetherSDR setzt sie mit, deshalb stand sie hier.
     const QString cmd =
-        QStringLiteral("slice create pan=%1 freq=%2 antenna=ANT1 mode=USB")
+        QStringLiteral("slice create pan=%1 freq=%2 mode=USB")
             .arg(panId)
             .arg(kDefaultSliceFreqMhz, 0, 'f', 6);
 

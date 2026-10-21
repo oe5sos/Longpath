@@ -23,6 +23,10 @@
 
 #include <QtTest>
 
+#include <algorithm>
+
+#include "models/RadioModel.h"
+
 #include <QByteArray>
 
 #include "core/FlexVitaReader.h"
@@ -562,6 +566,83 @@ private slots:
     }
 
     // ─── Die Lückenverfolgung ──────────────────────────────────────
+
+    // Der Faenger fuer den Befund vom 2026-10-21 an Martins
+    // FLEX-8400: die Flaeche war durchgehend blau, der Wasserfall
+    // durchgehend rot — jeder Messwert am oberen Anschlag.
+    //
+    // Ursache: ein FFT-Bin ist keine Leistung, sondern eine BILDZEILE.
+    // Longpath rechnete mit dem Teiler, den es sich GEWUENSCHT hatte
+    // (`ypixels=1000`, mit Code 0 quittiert), waehrend die Maschine
+    // im Zustandsschub unveraendert `y_pixels=20` meldete und auch so
+    // zeichnete. Zeilen 0..19 gegen einen Teiler von 999 ergeben
+    // -40,0 bis -38,3 dBm — bei einer Skala von -130 bis -40 ist das
+    // alles dieselbe oberste Bildzeile.
+    void falscheHoeheKlebtAllesAnDenOberenAnschlag()
+    {
+        constexpr double kMin = -130.0;
+        constexpr double kMax = -40.0;
+
+        // So, wie die Maschine wirklich zeichnet: 20 Zeilen.
+        QVector<quint16> zeilen;
+        for (quint16 i = 0; i < 20; ++i) { zeilen.append(i); }
+
+        // Mit der RICHTIGEN Hoehe spannt dieselbe Zeilenfolge die
+        // ganze Skala auf — oben -40, unten -130.
+        const QVector<float> richtig =
+            FlexVita::binsToDbm(zeilen, kMin, kMax, 20);
+        QCOMPARE(richtig.first(), float(kMax));
+        QCOMPARE(richtig.last(),  float(kMin));
+
+        // Mit der angenommenen Hoehe liegt alles innerhalb von zwei
+        // dB unter dem Maximum — ununterscheidbar, und genau das sah
+        // der Betreiber.
+        const QVector<float> falsch =
+            FlexVita::binsToDbm(zeilen, kMin, kMax, 1000);
+        for (const float wert : falsch) {
+            QVERIFY2(wert > kMax - 2.0,
+                     qPrintable(QStringLiteral("unerwartet gespreizt: %1")
+                                    .arg(double(wert))));
+        }
+
+        // Und der Beleg, dass die beiden Faelle wirklich verschieden
+        // sind: die Spreizung unterscheidet sich um mehr als 80 dB.
+        const auto spreizung = [](const QVector<float>& v) {
+            return double(*std::max_element(v.cbegin(), v.cend())
+                          - *std::min_element(v.cbegin(), v.cend()));
+        };
+        QVERIFY2(spreizung(richtig) - spreizung(falsch) > 80.0,
+                 "die falsche Hoehe faellt hier nicht auf — dann faengt "
+                 "dieser Prueflauf den Befund nicht");
+    }
+
+    // Die Schwelle, an der entschieden wird, ob eine gemeldete
+    // Bildhoehe ein Maszstab ist oder die Ruecksetzvorgabe der
+    // Maschine.
+    //
+    // From AetherSDR RadioModel.cpp:86 + :10994-11018 [@d58e2b8a] —
+    // dort steht die Regel und ihre Begruendung: eine kleine Zahl
+    // gehoert NICHT in den Dekoder, sonst klemmen die FFT-Bins in
+    // einen flachen Boden. Am 2026-10-21 habe ich genau das gebaut:
+    // die 8400 meldete `y_pixels=20`, ich nahm die 20 als Teiler, und
+    // das Bild hatte zwanzig Stufen auf neunzig Dezibel.
+    void vorgabehoeheIstKeinMaszstab()
+    {
+        // Was die 8400 nach dem Anlegen wirklich meldet.
+        QVERIFY2(RadioModel::flexHoeheIstVorgabe(20),
+                 "20 ist die Ruecksetzvorgabe der Maschine, kein Maszstab");
+        QVERIFY(RadioModel::flexHoeheIstVorgabe(1));
+        QVERIFY(RadioModel::flexHoeheIstVorgabe(50));
+
+        // Die Grenze selbst gehoert noch zur Vorgabe.
+        QVERIFY(RadioModel::flexHoeheIstVorgabe(100));
+        QVERIFY(!RadioModel::flexHoeheIstVorgabe(101));
+
+        // Und was ein Client bekommt, der wirklich ein Bild hat.
+        QVERIFY2(!RadioModel::flexHoeheIstVorgabe(700),
+                 "700 ist die Hoehe, um die AetherSDR bittet");
+        QVERIFY(!RadioModel::flexHoeheIstVorgabe(1000));
+    }
 
     void lueckenverfolgung()
     {

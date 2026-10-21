@@ -877,7 +877,22 @@ private slots:
         QVERIFY(b.contains(QStringLiteral("slice list")));
         QVERIFY(b.contains(QStringLiteral("display panafall create x=100 y=100")));
         QVERIFY(b.contains(QStringLiteral(
-            "slice create pan=40000000 freq=14.225000 antenna=ANT1 mode=USB")));
+            "slice create pan=40000000 freq=14.225000 mode=USB")));
+
+        // Der Faenger, nicht der Waechter: Martin HOERTE das Relais im
+        // FLEX-8400 bei jedem Verbinden klicken, 2026-10-21. Ursache war
+        // `antenna=ANT1` in genau dieser Zeile — die Maschine schaltet
+        // das Relais auch dann, wenn dort schon ANT1 steht. Kein Befehl
+        // aus der Anmeldung darf die Antenne anfassen; sie gehoert der
+        // Maschine (CLAUDE.md, Radio-Authoritative Settings Policy).
+        for (const QString& befehl : b) {
+            QVERIFY2(!befehl.contains(QStringLiteral("antenna=")),
+                     qPrintable(QStringLiteral("schaltet das Antennenrelais: ")
+                                + befehl));
+            QVERIFY2(!befehl.contains(QStringLiteral("rxant=")),
+                     qPrintable(QStringLiteral("schaltet das Antennenrelais: ")
+                                + befehl));
+        }
 
         // Die Reihenfolge, an der AetherSDR einmal haengen geblieben
         // ist: Programm VOR GUI, GUI VOR allem Weiteren.

@@ -70,6 +70,7 @@
 #include <QHostAddress>
 #include <QMap>
 #include <QObject>
+#include <QTimer>
 #include <QUdpSocket>
 #include <QVector>
 
@@ -106,6 +107,9 @@ public:
     // Zaehler fuer Diagnose und Pruefstaende.
     qint64 datagramsReceived() const { return m_datagrams; }
     qint64 datagramsIgnored() const { return m_ignored; }
+    /// Wieviele Pakete je VITA-Klasse angekommen sind. Fuer Prueflaeufe
+    /// und fuer die Frage „kommt ueberhaupt ein Bild?".
+    QMap<quint16, qint64> packetsPerClass() const { return m_proKlasse; }
 
     // Nur fuer Pruefstaende: schiebt ein Datagramm durch denselben Weg,
     // den der Socket nimmt.
@@ -126,6 +130,8 @@ private slots:
     void onReadyRead();
 
 private:
+    void berichteKlassen();
+
     void handleDatagram(const QByteArray& datagram);
 
     struct Scale {
@@ -144,6 +150,18 @@ private:
 
     qint64 m_datagrams{0};
     qint64 m_ignored{0};
+
+    // Was wirklich ankommt, nach Klasse getrennt. Ohne das ist jede
+    // Aussage ueber „es kommt kein Bild" geraten: der Strom hat bis
+    // 2026-10-21 GENAU EINE Protokollzeile gehabt, und die stand vor
+    // dem ersten Paket. Am 2026-10-21 hat das eine Stunde gekostet:
+    // „es kommt kein Bild" und „es kommt gar nichts" sehen von aussen
+    // gleich aus, und ohne diese Zaehler war beides nur geraten.
+    QMap<quint16, qint64> m_proKlasse;
+    QTimer m_bericht;
+    qint64 m_zuletztGemeldet{-1};
+    qint64 m_fftRahmen{0};
+    qint64 m_wasserfallZeilen{0};
 };
 
 }  // namespace Longpath

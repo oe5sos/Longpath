@@ -54,6 +54,9 @@ RadioInfo flexZeile()
     info.port         = 4992;
     info.maxReceivers = 2;
     info.adcCount     = 1;
+    // Die Flex meldet ihre Fassung als Punktfolge, nicht als Zahl —
+    // `firmwareVersion` bleibt deshalb 0. Genau das war die Falle.
+    info.firmwareText = QStringLiteral("4.3.16.42034");
     return info;
 }
 
@@ -105,6 +108,45 @@ private slots:
         // Spalte 4 = IP, Spalte 7 = In-Use.
         QCOMPARE(t->item(r, 4)->text(), QStringLiteral("172.30.30.12"));
         QCOMPARE(t->item(r, 7)->text(), QStringLiteral("free"));
+    }
+
+    // PR #286 hat drei Leser auf `firmwareText` gebracht und diesen
+    // Dialog uebersehen. Bis zum 2026-10-21 stand deshalb in der
+    // Spalte „Firmware" und in der Detailzeile eine 0, obwohl der Ruf
+    // der Maschine „4.3.16.42034" mitbrachte — der Betreiber sah es
+    // bei jedem Verbinden, einen Monat lang.
+    void dieFassungAusDemRufStehtInDerListe()
+    {
+        RadioModel model;
+        ConnectionPanel panel(&model);
+        QTableWidget* t = tabelle(panel);
+        QVERIFY(t != nullptr);
+
+        panel.onRadioDiscovered(flexZeile());
+        const int r = zeileMit(t, QStringLiteral("FLEX-8400"));
+        QVERIFY(r >= 0);
+
+        // Spalte 6 = Firmware.
+        QCOMPARE(t->item(r, 6)->text(), QStringLiteral("4.3.16.42034"));
+    }
+
+    // Eine Platine ohne Zahl ist ein Strich, keine Null (HAUSSTIL
+    // Regel 7). Eine 0 liest sich wie eine gemessene Fassung.
+    void ohneFassungStehtEinStrich()
+    {
+        RadioModel model;
+        ConnectionPanel panel(&model);
+        QTableWidget* t = tabelle(panel);
+        QVERIFY(t != nullptr);
+
+        RadioInfo ohne = flexZeile();
+        ohne.firmwareText.clear();
+        ohne.firmwareVersion = 0;
+        panel.onRadioDiscovered(ohne);
+
+        const int r = zeileMit(t, QStringLiteral("FLEX-8400"));
+        QVERIFY(r >= 0);
+        QCOMPARE(t->item(r, 6)->text(), QStringLiteral("—"));
     }
 
     void einZweiterRufFuehrtDieZeileNachStattSieZuVerdoppeln()

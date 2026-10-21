@@ -6801,9 +6801,67 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
         // zugleich die StreamID im VITA-Kopf — gemessen, siehe
         // docs/protocols/flex-vita49-gemessen.md §2.
         connect(m_flexConnection, &FlexRadioConnection::statusReceived,
-                this, [this](const QString& object, const QMap<QString, QString>&) {
+                this, [this](const QString& object,
+                             const QMap<QString, QString>& kv) {
             if (m_flexPanId.isEmpty() && object.startsWith(QLatin1String("display pan "))) {
                 m_flexPanId = object.split(QLatin1Char(' ')).value(2);
+                // Nachholen: beim Anmelden gab es die Kennung noch
+                // nicht, der Strom laeuft aber schon.
+                applyFlexPanSetup();
+            }
+
+            // Die Hoehe NACHLESEN statt sie anzunehmen.
+            //
+            // Ein FFT-Bin ist keine Leistung, sondern eine BILDZEILE:
+            // `binToDbm()` rechnet `maxDbm - (bin / (y_pixels-1)) *
+            // Spanne`. Der Teiler muss also der sein, mit dem die
+            // MASCHINE zeichnet — nicht der, den wir uns gewuenscht
+            // haben. Am 2026-10-21 an Martins FLEX-8400 gemessen: auf
+            // `display pan set ... ypixels=1000` antwortete sie mit
+            // Code 0 und meldete im Zustandsschub weiter `y_pixels=20`.
+            // Mit Zeilen 0..19 gegen einen Teiler von 999 landet JEDER
+            // Bin bei -40 dBm, dem oberen Anschlag: die Flaeche war
+            // durchgehend blau, der Wasserfall durchgehend rot.
+            //
+            // Also gilt, was die Maschine sagt, sobald sie es sagt.
+            // KEINE Bedingung auf `m_flexStream`: der Zustandsschub
+            // kommt, BEVOR der Strom existiert. Am 2026-10-21 gemessen
+            // — Status um .664, Anmeldung als GUI-Client um .689. Ein
+            // erster Versuch verlangte den Strom hier und warf die
+            // gemeldete Hoehe damit jedes Mal weg. Gemerkt wird immer,
+            // gesetzt nur, wenn es schon etwas zu setzen gibt;
+            // `applyFlexPanSetup()` holt es sonst nach.
+            if (object.startsWith(QLatin1String("display pan "))
+                && kv.contains(QStringLiteral("y_pixels"))) {
+                bool gelesen = false;
+                const int gemeldet =
+                    kv.value(QStringLiteral("y_pixels")).toInt(&gelesen);
+                if (gelesen && gemeldet > 0) {
+                    uebernimmFlexBildhoehe(gemeldet);
+                }
+            }
+
+            // Erst lesen, dann stellen. `sub radio all` / `sub slice all`
+            // bringen den Zustand der Maschine nach der Anmeldung — und
+            // das ist die EINZIGE Stelle, an der wir erfahren, was dort
+            // vorher stand. Was Longpath selbst schreibt, kommt danach
+            // als Echo zurueck; die Wache `m_flexAudioWanted` sorgt
+            // dafuer, dass wir nicht unseren eigenen Wert als „vorher"
+            // ablegen.
+            if (!m_flexAudioWanted) { return; }
+
+            if (object.startsWith(QLatin1String("radio"))
+                && kv.contains(QStringLiteral("mute_local_audio_when_remote"))) {
+                m_flexMuteLocalWas =
+                    kv.value(QStringLiteral("mute_local_audio_when_remote"));
+            }
+
+            if (object.startsWith(QLatin1String("slice "))
+                && kv.contains(QStringLiteral("audio_level"))) {
+                m_flexSliceId       = object.split(QLatin1Char(' ')).value(1);
+                m_flexAudioLevelWas = kv.value(QStringLiteral("audio_level"));
+                m_flexAudioMuteWas  = kv.value(QStringLiteral("audio_mute"));
+                applyFlexAudioSetup();
             }
         });
 
@@ -6859,6 +6917,77 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
 
 // Startet den VITA-49-Strom. Die Reihenfolge ist gemessen, nicht
 // geraten (docs/protocols/flex-vita49-gemessen.md §1 und §5).
+// ── Den Panadapter einrichten ────────────────────────────────────────
+//
+// Herausgezogen, weil es ZWEI Wege hierher gibt: `startFlexStreams()`,
+// wenn die Kennung schon dasteht, und den Statuseingang, wenn sie erst
+// danach kommt. Genau dieser zweite Weg fehlte -- die Funktion laeuft
+// auf `guiClientRegistered`, der Panadapter wird aber spaeter angelegt,
+// und so blieb die Maschine auf ihrer Vorgabe `x_pixels=50
+// y_pixels=20`. Am 2026-10-21 an Martins Geraet gemessen: Verbindung
+// sofort, Ton da, kein Wasserfall.
+//
+// Mehrfaches Rufen ist harmlos und beabsichtigt: dieselben Werte noch
+// einmal zu setzen aendert nichts.
+void RadioModel::applyFlexPanSetup()
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (!m_flexStream) { return; }
+    if (m_flexPanId.isEmpty()) { return; }
+
+    // Ohne Breite weiss die Maschine nicht, wie viele Bins sie schicken
+    // soll; `totalBins` folgt xpixels (gemessen: der Sprung von 50 auf
+    // 1024).
+    constexpr int kXPixels = 1024;
+    // From AetherSDR RadioModel.cpp:4966 [@d58e2b8a] — dieselbe Bitte
+    // wie der Vorlageclient: `xpixels=1024 ypixels=700`. 700 ist keine
+    // runde Zahl aus der Luft, sondern die eines Clients, der an
+    // dieser Maschinenfamilie nachweislich ein Bild bekommt; unsere
+    // 1000 war geraten.
+    constexpr int kYPixels = 700;
+    constexpr double kMinDbm = -130.0;
+    constexpr double kMaxDbm = -40.0;
+
+    m_flexConnection->sendCommand(
+        QStringLiteral("display pan set %1 xpixels=%2 ypixels=%3")
+            .arg(m_flexPanId).arg(kXPixels).arg(kYPixels));
+    m_flexConnection->sendCommand(
+        QStringLiteral("display pan set %1 min_dbm=%2 max_dbm=%3")
+            .arg(m_flexPanId).arg(kMinDbm).arg(kMaxDbm));
+
+    // Und derselbe Maszstab in den Leser. Das ist nicht doppelt
+    // gepflegt, sondern notwendig: die Maschine meldet `y_pixels` NIE
+    // zurueck (gemessen -- der Zustand bleibt auf `x_pixels=50
+    // y_pixels=20`, obwohl das Setzen wirkt). Es gibt kein Echo, auf
+    // das man warten koennte.
+    bool ok = false;
+    const quint32 panStream = m_flexPanId.toUInt(&ok, 16);
+    // Nur eine ECHTE gemeldete Hoehe gilt — eine Ruecksetzvorgabe
+    // landet hier nie, die faengt `uebernimmFlexBildhoehe()` ab.
+    const int hoehe = (m_flexYPixelsGemeldet > 0)
+                          ? m_flexYPixelsGemeldet : kYPixels;
+    if (ok) {
+        // Hat die Maschine schon gesagt, mit welcher Hoehe sie
+        // zeichnet, dann gilt IHRE Zahl — nicht die, um die wir eben
+        // gebeten haben. Ihr Zustandsschub kommt vor unserem
+        // `display pan set`, und sie quittiert den Befehl mit Code 0,
+        // ohne `y_pixels` zu aendern (2026-10-21 gemessen). Wer hier
+        // die Wunschzahl einsetzt, klebt jeden Bin an den oberen
+        // Anschlag.
+        m_flexStream->setYPixels(panStream, hoehe);
+        m_flexStream->setDbmRange(panStream, kMinDbm, kMaxDbm);
+    }
+    // Die Zahl melden, mit der WIRKLICH gerechnet wird — nicht die
+    // erbetene. Ein Protokollsatz, der die Absicht statt des Zustands
+    // meldet, hat am 2026-10-21 eine Stunde gekostet (der Kopfsatz der
+    // Verbindung stand auf Stufe 1, als Stufe 2 laengst lief).
+    qCInfo(lcConnection) << "Flex: Panadapter" << m_flexPanId
+                         << "eingerichtet" << kXPixels << "x" << hoehe
+                         << (m_flexYPixelsGemeldet >= 2
+                                 ? "(Hoehe von der Maschine gemeldet)"
+                                 : "(Hoehe erbeten, noch unbestaetigt)");
+}
+
 void RadioModel::startFlexStreams()
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) {
@@ -6895,35 +7024,22 @@ void RadioModel::startFlexStreams()
     //    dass er allein genuegt.
     m_flexConnection->sendCommand(QStringLiteral("client udpport %1").arg(port));
 
+    // Die Kennung kommt oft ERST SPAETER: diese Funktion laeuft auf
+    // `guiClientRegistered`, der Panadapter wird aber danach angelegt.
+    // Frueher blieb es dann bei der Warnung unten, und die Maschine
+    // behielt ihre Vorgabe `x_pixels=50 y_pixels=20` — gemessen am
+    // 2026-10-21 an Martins Geraet, der Betreiber sah Verbindung, aber
+    // keinen Wasserfall. Jetzt holt `applyFlexPanSetup()` es nach,
+    // sobald die Kennung eintrifft.
     if (m_flexPanId.isEmpty()) {
-        qCWarning(lcConnection) << "Flex: noch keine Panadapter-Kennung — "
-                                   "kein Bild, nur Ton";
+        qCInfo(lcConnection) << "Flex: Panadapter-Kennung noch nicht da — "
+                                "wird nachgeholt, sobald sie eintrifft";
     } else {
         // 3. Ohne Breite weiss die Maschine nicht, wie viele Bins sie
         //    schicken soll; `totalBins` folgt xpixels (gemessen: der
         //    Sprung von 50 auf 1024).
-        constexpr int kXPixels = 1024;
-        constexpr int kYPixels = 1000;
-        constexpr double kMinDbm = -130.0;
-        constexpr double kMaxDbm = -40.0;
-        m_flexConnection->sendCommand(
-            QStringLiteral("display pan set %1 xpixels=%2 ypixels=%3")
-                .arg(m_flexPanId).arg(kXPixels).arg(kYPixels));
-        m_flexConnection->sendCommand(
-            QStringLiteral("display pan set %1 min_dbm=%2 max_dbm=%3")
-                .arg(m_flexPanId).arg(kMinDbm).arg(kMaxDbm));
+        applyFlexPanSetup();
 
-        // Und derselbe Maszstab in den Leser. Das ist nicht doppelt
-        // gepflegt, sondern notwendig: die Maschine meldet `y_pixels`
-        // NIE zurueck (gemessen — der Zustand bleibt auf
-        // `x_pixels=50 y_pixels=20`, obwohl das Setzen wirkt). Es gibt
-        // kein Echo, auf das man warten koennte.
-        bool ok = false;
-        const quint32 panStream = m_flexPanId.toUInt(&ok, 16);
-        if (ok) {
-            m_flexStream->setYPixels(panStream, kYPixels);
-            m_flexStream->setDbmRange(panStream, kMinDbm, kMaxDbm);
-        }
     }
 
     // 4. Der Ton braucht einen EIGENEN Strom; `slice set audio_*` allein
@@ -6936,12 +7052,11 @@ void RadioModel::startFlexStreams()
     //    Station stumm, und der Betreiber sucht im Verstaerker.
     //    AetherSDR schiebt deshalb vorher eine 0 hin
     //    (RadioModel.cpp:8438-8443 [@d58e2b8a]); wir auch.
-    m_flexConnection->sendCommand(
-        QStringLiteral("radio set mute_local_audio_when_remote=0"));
-    m_flexMuteLocalWasOn = true;
+    //    Was dafuer am Ton der Scheibe umgestellt werden muss, steht
+    //    in `applyFlexAudioSetup()` — und laeuft erst, wenn der
+    //    Zustandsschub gesagt hat, was dort ueberhaupt steht.
+    m_flexAudioWanted = true;
 
-    m_flexConnection->sendCommand(QStringLiteral("slice set 0 audio_mute=0"));
-    m_flexConnection->sendCommand(QStringLiteral("slice set 0 audio_level=50"));
     // `compression=none` ist die LAN-Vorgabe (opus waere WAN) und
     // liefert die breite Klasse 0x03E3, float32-Stereo.
     m_flexConnection->sendCommand(
@@ -6957,6 +7072,107 @@ void RadioModel::startFlexStreams()
         });
 }
 
+// Der Ton der Maschine, mit dem kleinsten Eingriff, den es dafuer
+// gibt. Jede dieser drei Einstellungen gehoert dem Betreiber; wir
+// ruehren sie nur an, wenn sie den Ton WIRKLICH blockiert — und
+// merken uns genau dann, dass sie zurueckzustellen ist.
+//
+// `audio_level` bleibt deshalb unberuehrt, solange dort nicht 0 steht:
+// an Martins Geraet standen 37, und eine 50 hinzuschreiben ist eine
+// Aenderung an seiner Station, die niemand bestellt hat.
+// Eine gemeldete Bildhoehe einordnen.
+//
+// From AetherSDR RadioModel.cpp:10994-11018 [@d58e2b8a] — dort steht
+// die Regel, und ihre Begruendung im Wortlaut: „Tiny default/reset
+// values are handled below by re-pushing the real widget dimensions;
+// do not feed them to the decoder or most FFT bins clamp into a flat
+// floor until the next dimensions echo."
+//
+// Genau in diese Falle bin ich am 2026-10-21 gelaufen. Die 8400
+// meldete `y_pixels=20`, ich habe die 20 als Teiler genommen, und das
+// Bild wurde „richtig" im Sinne von nicht mehr uebersteuert — aber mit
+// zwanzig Stufen auf neunzig Dezibel, 4,5 dB je Stufe. Eine 20 ist
+// kein Messwert, sondern die Ruecksetzvorgabe der Maschine.
+//
+// From AetherSDR RadioModel.cpp:86 [@d58e2b8a] — die Schwelle.
+void RadioModel::uebernimmFlexBildhoehe(int gemeldet)
+{
+    // Ein zweistelliger Deckel: eine Maschine, die die Masze nie
+    // annimmt, soll keine endlose Schleife aus Melden und
+    // Hinschicken erzeugen.
+    constexpr int kHoechstensNachreichen = 5;
+
+    if (!flexHoeheIstVorgabe(gemeldet)) {
+        if (gemeldet == m_flexYPixelsGemeldet) { return; }
+        m_flexYPixelsGemeldet = gemeldet;
+        bool kennungOk = false;
+        const quint32 panStream = m_flexPanId.toUInt(&kennungOk, 16);
+        if (m_flexStream && kennungOk) {
+            m_flexStream->setYPixels(panStream, gemeldet);
+        }
+        qCInfo(lcConnection) << "Flex: die Maschine zeichnet mit y_pixels"
+                             << gemeldet << "— Hoehe uebernommen";
+        return;
+    }
+
+    // Ruecksetzvorgabe. NICHT als Teiler benutzen — die Masze noch
+    // einmal hinschicken und auf das Echo warten.
+    if (m_flexMasseNachgereicht >= kHoechstensNachreichen) {
+        return;
+    }
+    ++m_flexMasseNachgereicht;
+    qCWarning(lcConnection)
+        << "Flex: die Maschine meldet die Vorgabehoehe" << gemeldet
+        << "— das ist kein Maszstab. Masze werden nachgereicht ("
+        << m_flexMasseNachgereicht << "von" << kHoechstensNachreichen << ")";
+    applyFlexPanSetup();
+}
+
+void RadioModel::applyFlexAudioSetup()
+{
+    if (!m_flexAudioWanted) { return; }
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexSliceId.isEmpty()) { return; }
+    m_flexAudioWanted = false;
+
+    // ACHTUNG, Nebenwirkung auf die Station: steht die Firmware auf
+    // `mute_local_audio_when_remote=1`, SCHWEIGEN die Hardware-
+    // Ausgaenge des Geraets, sobald ein remote_audio_rx-Strom
+    // existiert. Wer das vergisst, macht die Station stumm, und der
+    // Betreiber sucht im Verstaerker. AetherSDR schiebt deshalb vorher
+    // eine 0 hin (RadioModel.cpp:8438-8443 [@d58e2b8a]); wir auch —
+    // aber nur, wenn dort wirklich eine 1 stand.
+    if (m_flexMuteLocalWas == QLatin1String("1")) {
+        m_flexConnection->sendCommand(
+            QStringLiteral("radio set mute_local_audio_when_remote=0"));
+        m_flexRestoreMuteLocal = true;
+    }
+
+    if (m_flexAudioMuteWas == QLatin1String("1")) {
+        m_flexConnection->sendCommand(
+            QStringLiteral("slice set %1 audio_mute=0").arg(m_flexSliceId));
+        m_flexRestoreAudioMute = true;
+    }
+
+    if (m_flexAudioLevelWas == QLatin1String("0")) {
+        constexpr int kAudioLevelWennStumm = 50;
+        m_flexConnection->sendCommand(
+            QStringLiteral("slice set %1 audio_level=%2")
+                .arg(m_flexSliceId).arg(kAudioLevelWennStumm));
+        m_flexRestoreAudioLevel = true;
+    }
+
+    const auto oderStrich = [](const QString& s) {
+        return s.isEmpty() ? QStringLiteral("—") : s;
+    };
+    qCInfo(lcConnection) << "Flex: Ton auf Scheibe" << m_flexSliceId
+                         << "— die Maschine hatte audio_level"
+                         << oderStrich(m_flexAudioLevelWas)
+                         << "audio_mute" << oderStrich(m_flexAudioMuteWas)
+                         << "mute_local_audio_when_remote"
+                         << oderStrich(m_flexMuteLocalWas);
+}
+
 void RadioModel::teardownFlexConnection()
 {
     if (!m_flexConnection) {
@@ -6968,16 +7184,46 @@ void RadioModel::teardownFlexConnection()
     // Station stumm, nachdem Longpath sich getrennt hat.
     if (m_flexConnection->isConnected()) {
         if (!m_flexAudioStreamId.isEmpty()) {
+            // Die Kennung aus `stream create` ist HEXADEZIMAL ohne
+            // Vorsatz („4000008"). Ohne `0x` liest die Maschine sie
+            // dezimal und antwortet „Invalid Stream ID" — der Strom
+            // bleibt stehen, und beim naechsten Verbinden liegt einer
+            // mehr auf dem Geraet. Gemessen 2026-10-21.
+            const QString kennung =
+                m_flexAudioStreamId.startsWith(QLatin1String("0x"))
+                    ? m_flexAudioStreamId
+                    : QStringLiteral("0x") + m_flexAudioStreamId;
             m_flexConnection->sendCommand(
-                QStringLiteral("stream remove %1").arg(m_flexAudioStreamId));
+                QStringLiteral("stream remove %1").arg(kennung));
         }
-        if (m_flexMuteLocalWasOn) {
+        // Zurueck auf den Wert der MASCHINE, nicht auf einen geratenen.
+        if (m_flexRestoreMuteLocal && !m_flexMuteLocalWas.isEmpty()) {
             m_flexConnection->sendCommand(
-                QStringLiteral("radio set mute_local_audio_when_remote=1"));
+                QStringLiteral("radio set mute_local_audio_when_remote=%1")
+                    .arg(m_flexMuteLocalWas));
+        }
+        if (m_flexRestoreAudioMute && !m_flexSliceId.isEmpty()) {
+            m_flexConnection->sendCommand(
+                QStringLiteral("slice set %1 audio_mute=%2")
+                    .arg(m_flexSliceId, m_flexAudioMuteWas));
+        }
+        if (m_flexRestoreAudioLevel && !m_flexSliceId.isEmpty()) {
+            m_flexConnection->sendCommand(
+                QStringLiteral("slice set %1 audio_level=%2")
+                    .arg(m_flexSliceId, m_flexAudioLevelWas));
         }
     }
     m_flexAudioStreamId.clear();
-    m_flexMuteLocalWasOn = false;
+    m_flexSliceId.clear();
+    m_flexAudioLevelWas.clear();
+    m_flexAudioMuteWas.clear();
+    m_flexMuteLocalWas.clear();
+    m_flexAudioWanted       = false;
+    m_flexRestoreAudioLevel = false;
+    m_flexRestoreAudioMute  = false;
+    m_flexRestoreMuteLocal  = false;
+    m_flexYPixelsGemeldet   = 0;
+    m_flexMasseNachgereicht = 0;
     m_flexPanId.clear();
 
     if (m_flexStream) {

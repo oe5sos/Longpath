@@ -362,6 +362,58 @@ QString connectionPanelGeometryKey()
 {
     return QStringLiteral("ConnectionPanelGeometryState");
 }
+
+// Die Platine, wie sie in der Liste steht — und daneben.
+//
+// 2026-10-21: die Tabelle hatte diese Liste schon und zeigte brav
+// „FLEX-8400", die Detailzeile darunter fragte aber `BoardCapsTable`
+// und schrieb „Unknown board (0x0e)". Beides vor denselben Augen, im
+// selben Dialog. Eine FLEX-8400 IST keine OpenHPSDR-Platine; dass die
+// Tabelle dort nichts findet, ist richtig — die Antwort darauf ist
+// nicht „unbekannt", sondern der Name, den wir sehr wohl kennen.
+QString platinenName(HPSDRHW board)
+{
+    switch (board) {
+        case HPSDRHW::Atlas:             return QStringLiteral("Atlas");
+        case HPSDRHW::Hermes:            return QStringLiteral("Hermes");
+        case HPSDRHW::HermesII:          return QStringLiteral("Hermes II");
+        case HPSDRHW::Angelia:           return QStringLiteral("Angelia");
+        case HPSDRHW::Orion:             return QStringLiteral("Orion");
+        case HPSDRHW::OrionMKII:         return QStringLiteral("Orion MkII");
+        case HPSDRHW::HermesLite:        return QStringLiteral("HL2");
+        case HPSDRHW::HermesLiteRxOnly:  return QStringLiteral("HL2 RX-only");
+        case HPSDRHW::Saturn:            return QStringLiteral("Saturn");
+        case HPSDRHW::SaturnMKII:        return QStringLiteral("Saturn MkII");
+        case HPSDRHW::HermesC10:         return QStringLiteral("HermesC10");  // From Thetis network.h:425 [v2.10.3.15] //N1GP G2E added (HermesC10) — within ±5 of cite: //MI0BOT (network.h:422 HermesLite) and //G8NJJ (network.h:423 Saturn) preserved per inline-tag-preservation rule
+        case HPSDRHW::Andromeda:         return QStringLiteral("Andromeda");
+        case HPSDRHW::SunSdr2Qrp:        return QStringLiteral("SunSDR2 QRP");
+        case HPSDRHW::Flex8400:          return QStringLiteral("FLEX-8400");
+        default:                         break;
+    }
+    return QStringLiteral("Unknown");
+}
+
+// Die Fassung, wie sie die Maschine meldet.
+//
+// `RadioInfo` fuehrt zwei Felder: `firmwareVersion` als Zahl (so
+// melden es die OpenHPSDR-Platinen) und `firmwareText` als Punktfolge
+// (so meldet es die Flex: „4.3.16.42034"). PR #286 hat drei Leser auf
+// den Textweg gebracht und diesen Dialog uebersehen — deshalb stand in
+// der Spalte „Firmware" und in der Detailzeile bis zum 2026-10-21
+// eine 0, waehrend der Ruf der Maschine die Fassung mitbrachte. Der
+// Betreiber sah sie bei jedem Verbinden.
+QString fassungsText(const RadioInfo& info)
+{
+    if (!info.firmwareText.isEmpty()) {
+        return info.firmwareText;
+    }
+    // „Unbekannt ist ein Strich, keine Null" (HAUSSTIL Regel 7): eine
+    // 0 ist hier keine Fassung, sondern die Abwesenheit einer.
+    if (info.firmwareVersion <= 0) {
+        return QStringLiteral("—");
+    }
+    return QString::number(info.firmwareVersion);
+}
 } // namespace
 
 void ConnectionPanel::saveGeometryState()
@@ -745,9 +797,24 @@ QWidget* ConnectionPanel::buildStatusStrip()
         "QLabel { color: #4a7ba8; font-size: 11px; }")));
     m_stripReconnectLabel->setVisible(false);
 
+    // Was hinter dieser Maske steht.
+    //
+    // Betreiberregel 2026-09-01: „ALLE fliegenden Fenster gehoeren
+    // hinter die ConnectMaske" — richtig, aber sie schwieg darueber.
+    // Am 2026-10-21 hat das eine Stunde gekostet: die Flex war
+    // verbunden, Bild und Ton liefen nachweislich (2581 Bildrahmen im
+    // Protokoll), und der Betreiber sah eine schwarze Flaeche, weil
+    // sein Panadapter ein schwebendes Fenster ist und damit hinter
+    // genau diesem Dialog lag. Ein Satz haette gereicht.
+    m_stripBehindMaskLabel = new QLabel(m_statusStrip);
+    m_stripBehindMaskLabel->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #4a7ba8; font-size: 11px; }")));
+    m_stripBehindMaskLabel->setVisible(false);
+
     stripLayout->addWidget(m_stripPillLabel);
     stripLayout->addWidget(m_stripInfoLabel);
     stripLayout->addWidget(m_stripReconnectLabel);
+    stripLayout->addWidget(m_stripBehindMaskLabel);
     stripLayout->addStretch();
 
     // Disconnect button — only visible when connected
@@ -810,12 +877,16 @@ void ConnectionPanel::updateStatusStrip()
             // wie ein Fehler. Deshalb steht hier, was wirklich laeuft.
             // Entwurf: docs/architecture/2026-10-18-flex-stufe1-design.md
             if (m_failureDetailLabel) { m_failureDetailLabel->setVisible(false); }
+            // 2026-10-21: der Satz stand noch auf Stufe 1 und sagte
+            // „no audio yet", nachdem Stufe 2 (Ton und Panadapter ueber
+            // VITA-49) laengst auf main war. Der Betreiber las ihn am
+            // laufenden Geraet und glaubte, es sei nichts gebaut.
             m_stripInfoLabel->setToolTip(
-                QStringLiteral("Stage 1 of the Flex driver: discovery and the "
-                               "command channel. Audio and panadapter streams "
-                               "(VITA-49) are not implemented yet."));
+                QStringLiteral("Flex driver: discovery, command channel, "
+                               "panadapter and audio over VITA-49. Transmit "
+                               "is not implemented."));
             m_stripInfoLabel->setText(
-                QStringLiteral("Connected — %1  (command channel only, no audio yet)")
+                QStringLiteral("Connected — %1  (receive only)")
                     .arg(m_radioModel->name()));
         } else {
             if (m_failureDetailLabel) { m_failureDetailLabel->setVisible(false); }
@@ -1038,23 +1109,7 @@ void ConnectionPanel::populateRow(int row, const RadioInfo& info)
 
     // Board string — HPSDRHW enum to friendly name
     QString boardStr;
-    switch (info.boardType) {
-        case HPSDRHW::Atlas:             boardStr = QStringLiteral("Atlas");       break;
-        case HPSDRHW::Hermes:            boardStr = QStringLiteral("Hermes");      break;
-        case HPSDRHW::HermesII:          boardStr = QStringLiteral("Hermes II");   break;
-        case HPSDRHW::Angelia:           boardStr = QStringLiteral("Angelia");     break;
-        case HPSDRHW::Orion:             boardStr = QStringLiteral("Orion");       break;
-        case HPSDRHW::OrionMKII:         boardStr = QStringLiteral("Orion MkII");  break;
-        case HPSDRHW::HermesLite:        boardStr = QStringLiteral("HL2");         break;
-        case HPSDRHW::HermesLiteRxOnly:  boardStr = QStringLiteral("HL2 RX-only"); break;
-        case HPSDRHW::Saturn:            boardStr = QStringLiteral("Saturn");      break;
-        case HPSDRHW::SaturnMKII:        boardStr = QStringLiteral("Saturn MkII"); break;
-        case HPSDRHW::HermesC10:         boardStr = QStringLiteral("HermesC10");   break;  // From Thetis network.h:425 [v2.10.3.15] //N1GP G2E added (HermesC10) — within ±5 of cite: //MI0BOT (network.h:422 HermesLite) and //G8NJJ (network.h:423 Saturn) preserved per inline-tag-preservation rule
-        case HPSDRHW::Andromeda:         boardStr = QStringLiteral("Andromeda");   break;
-        case HPSDRHW::SunSdr2Qrp:        boardStr = QStringLiteral("SunSDR2 QRP"); break;
-        case HPSDRHW::Flex8400:          boardStr = QStringLiteral("FLEX-8400");   break;
-        default:                         boardStr = QStringLiteral("Unknown");     break;
-    }
+    boardStr = platinenName(info.boardType);
 
     // Protocol string — ucRadioList.cs:1342 "Protocol-1" / "Protocol-2".
     // SunSdr isn't an OpenHPSDR protocol at all (design doc
@@ -1094,7 +1149,7 @@ void ConnectionPanel::populateRow(int row, const RadioInfo& info)
     m_radioTable->setItem(row, ColProtocol, makeItem(protoStr));
     m_radioTable->setItem(row, ColIp,       makeItem(info.address.toString()));
     m_radioTable->setItem(row, ColLastSeen, makeItem(lastSeenStr));
-    m_radioTable->setItem(row, ColFirmware, makeItem(QString::number(info.firmwareVersion)));
+    m_radioTable->setItem(row, ColFirmware, makeItem(fassungsText(info)));
     m_radioTable->setItem(row, ColInUse,    makeItem(inUseStr));
 
     // Center the status dot
@@ -1680,7 +1735,7 @@ void ConnectionPanel::updateDetailPanel()
     QString boardName = QString::fromLatin1(
         BoardCapsTable::forBoard(info.boardType).displayName);
     m_detailBoardLabel->setText(QStringLiteral("Board: %1 (0x%2)")
-        .arg(boardName)
+        .arg(platinenName(info.boardType))
         .arg(static_cast<int>(info.boardType), 2, 16, QLatin1Char('0')));
     // Same three-way distinction as populateRow()'s protoStr switch above
     // (:945-951) — SunSdr isn't P1 or P2 at all. This label used to fall
@@ -1698,7 +1753,7 @@ void ConnectionPanel::updateDetailPanel()
         default:                         detailProtoStr = QStringLiteral("P1");    break;
     }
     m_detailProtoLabel->setText(QStringLiteral("Protocol: %1").arg(detailProtoStr));
-    m_detailFwLabel->setText(QStringLiteral("Firmware: %1").arg(info.firmwareVersion));
+    m_detailFwLabel->setText(QStringLiteral("Firmware: %1").arg(fassungsText(info)));
     m_detailIpLabel->setText(QStringLiteral("IP: %1").arg(info.address.toString()));
     m_detailMacLabel->setText(QStringLiteral("MAC: %1").arg(info.macAddress));
 
@@ -1778,6 +1833,27 @@ void ConnectionPanel::onModelComboChanged(int index)
 
     setStatusText(QStringLiteral("Model set to %1 for %2")
         .arg(QString::fromLatin1(displayName(model)), info.macAddress));
+}
+
+void ConnectionPanel::setWindowsBehindMask(int count)
+{
+    if (!m_stripBehindMaskLabel) { return; }
+    if (count <= 0) {
+        m_stripBehindMaskLabel->setVisible(false);
+        m_stripBehindMaskLabel->clear();
+        m_stripBehindMaskLabel->setToolTip(QString());
+        return;
+    }
+    m_stripBehindMaskLabel->setText(
+        count == 1
+            ? QStringLiteral("· 1 window is behind this dialog — close to see it")
+            : QStringLiteral("· %1 windows are behind this dialog — close to see them")
+                  .arg(count));
+    m_stripBehindMaskLabel->setToolTip(
+        QStringLiteral("Floating windows — panadapter, meters, rotor, log — are "
+                       "hidden while this dialog is open, so it never opens on "
+                       "top of them. Closing it brings them all back."));
+    m_stripBehindMaskLabel->setVisible(true);
 }
 
 } // namespace Longpath
