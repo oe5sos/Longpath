@@ -112,6 +112,10 @@ struct RadioInfo {
     // Hardware
     HPSDRHW boardType{HPSDRHW::Unknown};
     int firmwareVersion{0};
+    // Lesbare Fassung, wenn die Maschine keine Zahl sendet, sondern eine
+    // Punktfolge (Flex: „4.3.16.42034"). Leer heisst: firmwareVersion
+    // benutzen. Nie beides gleichzeitig fuellen.
+    QString firmwareText;
     int adcCount{1};                     // Derived from boardType (1 or 2)
     int maxReceivers{4};                 // Board-dependent max simultaneous RX
 

@@ -7177,7 +7177,9 @@ void RadioModel::connectToRadio(const RadioInfo& info)
 
     m_name = info.displayName();
     m_model = QString::fromLatin1(m_hardwareProfile.caps->displayName);
-    m_version = QString::number(info.firmwareVersion);
+    m_version = info.firmwareText.isEmpty()
+                    ? QString::number(info.firmwareVersion)
+                    : info.firmwareText;
     emit infoChanged();
 
     // Configure ReceiverManager with hardware capabilities
@@ -15841,7 +15843,16 @@ QString RadioModel::connectionProtocolText() const
 
 QString RadioModel::connectionFirmwareText() const
 {
-    if (!isConnected() || m_lastRadioInfo.firmwareVersion <= 0) {
+    if (!isConnected()) {
+        return QStringLiteral("—");
+    }
+    // Maschinen, die keine Zahl senden (Flex), tragen die Fassung als
+    // Text. Ohne diesen Zweig stand hier ein Gedankenstrich, obwohl der
+    // Ruf „4.3.16.42034" geliefert hatte.
+    if (!m_lastRadioInfo.firmwareText.isEmpty()) {
+        return m_lastRadioInfo.firmwareText;
+    }
+    if (m_lastRadioInfo.firmwareVersion <= 0) {
         return QStringLiteral("—");
     }
     return QStringLiteral("v") + QString::number(m_lastRadioInfo.firmwareVersion);

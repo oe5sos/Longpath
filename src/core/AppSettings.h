@@ -285,6 +285,7 @@ public:
     //   radios/<macKey>/boardType       (int — HPSDRHW value)
     //   radios/<macKey>/protocol        (int — ProtocolVersion value)
     //   radios/<macKey>/firmwareVersion (int)
+    //   radios/<macKey>/firmwareText (QString, leer = Zahl benutzen)
     //   radios/<macKey>/pinToMac        (bool as "True"/"False")
     //   radios/<macKey>/lastSeen        (ISO 8601 UTC string)
     //   radios/lastConnected            (macKey string)
