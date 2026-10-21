@@ -124,6 +124,8 @@ mw0lge@grange-lane.co.uk
 #include <QAccessible>
 #include <QSignalBlocker>
 
+#include <algorithm>
+
 #include "gui/StyleConstants.h"
 
 namespace Longpath {
@@ -221,6 +223,17 @@ ConnectionPanel::ConnectionPanel(RadioModel* model, QWidget* parent)
     setWindowTitle(QStringLiteral("Connect to Radio"));
     setMinimumSize(800, 460);
     resize(900, 520);   // Vorgabe, bevor restoreGeometryState() greift
+    // Captured HERE, before restoreGeometryState() below can overwrite it
+    // with a previously-SAVED size -- a session that hit the "zu viel
+    // Platz oben" bug already wrote an inflated height to AppSettings via
+    // saveGeometryState() on close (unconditional saveGeometry() call), so
+    // growStatusStripToFitText() must measure growth against this fixed
+    // 520 code default, never against whatever restoreGeometryState() just
+    // loaded -- otherwise a bloated saved size becomes the new permanent
+    // floor even after this fix, instead of self-correcting back down the
+    // next time text height is (re)computed. See that method's own doc
+    // comment in the header for the rest of this story.
+    m_baseDialogHeight = height();
 
     buildUI();
     restoreGeometryState();
@@ -336,6 +349,23 @@ void ConnectionPanel::showEvent(QShowEvent* event)
     QDialog::showEvent(event);
     raise();
     activateWindow();
+
+    // Operator, 2026-09-15, live bench test: a connect-failure detail
+    // that arrived from RadioModel::connectAttemptFailed BEFORE this
+    // dialog was ever shown (e.g. an auto-reconnect attempt made and
+    // failed synchronously inside the constructor, before
+    // showConnectionPanel()'s show() call) left growStatusStripToFitText()
+    // measuring m_stripInfoLabel at width() == 0 (not yet laid out) --
+    // its own early-return skipped the resize, and nothing called it
+    // again afterwards, so the strip stayed stuck at its short initial
+    // height for this dialog instance's entire lifetime even though the
+    // failure text was already sitting there, clipped. Every ConnectionPanel
+    // is a fresh instance per open (Qt::WA_DeleteOnClose in
+    // MainWindow::showConnectionPanel()), so this can genuinely happen on
+    // the very first display. Re-running the check here, now that the
+    // dialog and its children definitely have real geometry, closes that
+    // gap without touching updateStatusStrip()'s own call sites.
+    growStatusStripToFitText();
 }
 
 namespace {
@@ -684,7 +714,13 @@ QWidget* ConnectionPanel::buildStatusStrip()
 {
     m_statusStrip = new QWidget(this);
     m_statusStrip->setObjectName(QStringLiteral("statusStrip"));
-    m_statusStrip->setFixedHeight(40);
+    // Was setFixedHeight(40) -- operator, 2026-09-15: a connect-failure
+    // detail message can be two lines (see growStatusStripToFitText()'s
+    // own doc comment in the header), and a hard-fixed height clipped the
+    // second line instead of the strip growing to fit it. Minimum, not
+    // fixed, keeps the normal single-line "Disconnected"/"Connected — ..."
+    // case exactly as tall as before.
+    m_statusStrip->setMinimumHeight(40);
     m_statusStrip->setStyleSheet(Style::themed(QStringLiteral(
         "QWidget#statusStrip {"
         "  background: #0a1a28;"
@@ -708,6 +744,11 @@ QWidget* ConnectionPanel::buildStatusStrip()
     m_stripInfoLabel = new QLabel(QStringLiteral("Disconnected"), m_statusStrip);
     m_stripInfoLabel->setStyleSheet(Style::themed(QStringLiteral(
         "QLabel { color: #8090a0; font-size: 13px; }")));
+    // A connect-failure detail (see growStatusStripToFitText()'s own doc
+    // comment) is a real two-sentence message, not one long word — word
+    // wrap plus that helper's explicit height calc is what keeps the
+    // whole thing on screen instead of running off the strip's right edge.
+    m_stripInfoLabel->setWordWrap(true);
 
     // Reconnect hint — shown when disconnected and a last-connected radio is known
     m_stripReconnectLabel = new QLabel(m_statusStrip);
@@ -847,6 +888,78 @@ void ConnectionPanel::updateStatusStrip()
             m_stripReconnectLabel->setVisible(false);
         }
     }
+
+    // Either branch above may have just set a longer m_stripInfoLabel
+    // text than the strip currently has room for (concretely: the
+    // Disconnected branch's two-sentence failure detail) -- see this
+    // method's own doc comment in the header for why that can't be left
+    // to automatic QHBoxLayout sizing.
+    growStatusStripToFitText();
+}
+
+// ---------------------------------------------------------------------------
+// growStatusStripToFitText — 2026-09-15
+// See ConnectionPanel.h's own doc comment on growStatusStripToFitText()
+// for the motivating bug (a two-sentence connect-failure explanation
+// clipped by m_statusStrip's old fixed 40px height).
+// ---------------------------------------------------------------------------
+
+void ConnectionPanel::growStatusStripToFitText()
+{
+    const int labelWidth = m_stripInfoLabel->width();
+    if (labelWidth <= 0) {
+        // Not laid out yet (e.g. this is the very first call, from the
+        // constructor, before the dialog has ever been shown) -- nothing
+        // to measure a wrap against, and the initial "Disconnected"
+        // placeholder text never needs more than one line anyway.
+        return;
+    }
+
+    const QFontMetrics fm(m_stripInfoLabel->font());
+    const int textHeight = fm.boundingRect(QRect(0, 0, labelWidth, 0), Qt::TextWordWrap,
+                                            m_stripInfoLabel->text())
+                                .height();
+    // +8 matches buildStatusStrip()'s own stripLayout->setContentsMargins(10, 4, 10, 4)
+    // top+bottom margins around the label.
+    const int neededStripHeight = std::max(kDefaultStatusStripHeight, textHeight + 8);
+    m_statusStrip->setMinimumHeight(neededStripHeight);
+
+    // Target dialog height is always recomputed from the fixed
+    // m_baseDialogHeight baseline plus exactly how much taller than the
+    // DEFAULT strip height the CURRENT text needs -- never incremented
+    // from whatever height() already happens to be. See this method's
+    // own doc comment on m_baseDialogHeight (header) for why the earlier
+    // incremental version accumulated blank space above the strip when
+    // called more than once for the same text (showEvent() and
+    // updateStatusStrip() can both fire for one connect-failure message).
+    // This version is idempotent: calling it five times in a row for the
+    // same text lands on the same target height every time, and calling
+    // it again after the window somehow ended up too tall (e.g. a
+    // bloated size restored from a previous buggy session's saved
+    // geometry) corrects it back down instead of only ever adding more.
+    const int extraNeeded = neededStripHeight - kDefaultStatusStripHeight;
+    const int targetDialogHeight = m_baseDialogHeight + extraNeeded;
+    if (targetDialogHeight == height()) {
+        return;
+    }
+
+    // Operator, 2026-09-15, first bench test of the original (delta-
+    // based) version of this fix: resizing the dialog synchronously,
+    // right here in the same call stack as the setMinimumHeight() above,
+    // left a stray second copy of the message text floating near the
+    // bottom of the window -- a rendering glitch, not a second widget
+    // (grep confirms this text is built in exactly one place,
+    // P1RadioConnection.cpp/P2RadioConnection.cpp). Qt hasn't run a
+    // layout pass over the new minimum height yet when resize() fires,
+    // so the taller window paints before mainLayout has repositioned the
+    // widgets below the strip into their new slots, and a stale fragment
+    // of the old frame's content is what's left on screen at the extra
+    // height until an unrelated repaint fixes it. Posting the resize to
+    // the next event-loop turn lets the pending layout settle first, so
+    // the resize happens as one clean frame. Still true with the
+    // idempotent target-height calc above -- only the "what height" math
+    // changed, not the "resize must be deferred" reasoning.
+    QTimer::singleShot(0, this, [this, targetDialogHeight]() { resize(width(), targetDialogHeight); });
 }
 
 // ---------------------------------------------------------------------------

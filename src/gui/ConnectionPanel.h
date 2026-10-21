@@ -182,6 +182,15 @@ private:
     void saveGeometryState();
     void restoreGeometryState();
     QWidget* buildStatusStrip();    // Phase 3Q Task 5 — top-of-panel connection status widget
+    // Operator, 2026-09-15: a connect-watchdog-timeout failure detail is a
+    // two-sentence, \n\n-joined German explanation (P1RadioConnection.cpp /
+    // P2RadioConnection.cpp) that does not fit m_statusStrip's original
+    // single-line 40px height — the second sentence was silently clipped.
+    // Grows (never shrinks, to avoid the window jumping smaller mid-scan)
+    // m_statusStrip and, if that alone is not enough room, this dialog
+    // itself so the whole message stays on screen. See updateStatusStrip()'s
+    // own call sites for why this can't just be left to automatic layout.
+    void growStatusStripToFitText();
     void setPillIconForRow(int row, const QString& mac);  // Pixmap pill icon (3Q polish)
     void updateButtonStates();
     void applyRowColor(int row, const RadioInfo& info);
@@ -209,6 +218,25 @@ private:
     QLabel*        m_stripInfoLabel{nullptr};
     QPushButton*   m_stripDisconnectBtn{nullptr};
     QLabel*        m_stripReconnectLabel{nullptr};
+
+    // Operator, 2026-09-15, second bench round on growStatusStripToFitText():
+    // "zu viel Platz oben" -- the FIRST version tracked growth as a running
+    // delta (resize(width(), height() + delta)) applied on top of whatever
+    // height() happened to already be. Called more than once in a row (this
+    // dialog's showEvent() and updateStatusStrip() can both trigger it for
+    // the same text within the same event-loop turn -- see their own call
+    // sites), each call's delta stacked on the PREVIOUS call's already-
+    // applied growth, so the dialog kept getting taller than the text ever
+    // needed, leaving unclaimed blank space above the strip (mainLayout
+    // puts the strip first, so extra height it doesn't itself carry the
+    // layout redistributes as if it were still that first item's inherent
+    // margin). Fixed by making the target dialog height a pure function of
+    // the CURRENT text need every time (recomputed from this fixed
+    // baseline, never incremented from whatever height() already is) --
+    // idempotent, and self-corrects an already-inflated window back down
+    // on the next call instead of only ever being able to grow further.
+    static constexpr int kDefaultStatusStripHeight = 40; // matches buildStatusStrip()'s removed setFixedHeight(40)
+    int m_baseDialogHeight{0}; // captured once in the ctor, right after the initial resize(900, 520)
 
     // Set from RadioModel::connectAttemptFailed, shown in place of the
     // plain "Disconnected" text until the next connect attempt starts or
