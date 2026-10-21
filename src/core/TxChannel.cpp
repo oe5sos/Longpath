@@ -883,11 +883,21 @@ bool TxChannel::stageRunning(Stage s) const
     case Stage::AlcMeter:  return txa[ch].alcmeter.p->run  != 0;
     // From TXA.c:394  run=1 — sip1 (siphon for TX spectrum)
     case Stage::Sip1:      return txa[ch].sip1.p->run      != 0;
-    // From TXA.c:405  run=1 (runcal) — calcc (PureSignal calibration, ON but unused until 3M-4)
-    // calcc struct uses 'runcal' not 'run' — from wdsp/calcc.h:34 [v2.10.3.13]
-    case Stage::Calcc:     return txa[ch].calcc.p->runcal  != 0;
+    // From TXA.c:405 — calcc (PureSignal-Kalibrierung).
+    //
+    // Seit PureSignal 3 (WDSP 2.11) ist `struct _calcc` auf calcc.c
+    // beschraenkt; ausserhalb ist CALCC nur ein undurchsichtiger Zeiger,
+    // `runcal` also von hier aus nicht mehr lesbar. Es gibt dafuer keinen
+    // Getter in der oeffentlichen Schnittstelle (calcc.h kennt nur
+    // create/destroy/flush/pscc, die Setter kommen aus wdsp.h).
+    //
+    // Hier wird deshalb NICHT geraten: die Zeile meldet unbekannt, wie
+    // es UsLew oben auch tut. Wer den Zustand der Kalibrierung braucht,
+    // liest ihn bei PureSignal (isPsEnabled / GetPSInfo), nicht an der
+    // Stufenliste.
+    case Stage::Calcc:     return false;
     // From TXA.c:424  run=0 — iqc (IQ correction)
-    case Stage::Iqc:       return txa[ch].iqc.p0->run      != 0;
+    case Stage::Iqc:       return txa[ch].iqc.p->run      != 0;
     // From TXA.c:434  run=0 — cfir (custom CIC FIR, turned on if needed)
     case Stage::Cfir:      return txa[ch].cfir.p->run      != 0;
     // From TXA.c:451  run=0 — rsmpout (output resampler, turned on if needed)
@@ -4789,12 +4799,18 @@ double TxChannel::getPSMaxTX()
 
 void TxChannel::setPSPtol(double ptol)
 {
-#ifdef HAVE_WDSP
-    if (txa[m_channelId].rsmpin.p == nullptr) return;
-    ::SetPSPtol(m_channelId, ptol);
-#else
+    // PureSignal 3 (WDSP 2.11) kennt diesen Regler nicht mehr: die
+    // Korrekturkurve kommt aus nurbs_fit/nurbs_spline statt aus einer
+    // Tabelle mit fester Stuetzstellenzahl, Toleranz- und
+    // Stabilisierungsschraube. Der Aufruf bleibt stehen, damit die Rufer
+    // uebersetzen, tut aber nichts und sagt das EINMAL ins Protokoll --
+    // ein stilles Nichts waere die schlechtere Haelfte von beidem.
+    static bool gemeldet = false;
+    if (!gemeldet) {
+        gemeldet = true;
+        qCInfo(lcDsp) << "PureSignal 3: ptol gibt es nicht mehr, der Wert bleibt ohne Wirkung";
+    }
     Q_UNUSED(ptol);
-#endif
 }
 
 void TxChannel::getPSDisp(double* x, double* ym, double* yc, double* ys,
@@ -4830,32 +4846,50 @@ void TxChannel::setPSFeedbackRate(int rate)
 
 void TxChannel::setPSPinMode(bool pin)
 {
-#ifdef HAVE_WDSP
-    if (txa[m_channelId].rsmpin.p == nullptr) return;
-    ::SetPSPinMode(m_channelId, pin ? 1 : 0);
-#else
+    // PureSignal 3 (WDSP 2.11) kennt diesen Regler nicht mehr: die
+    // Korrekturkurve kommt aus nurbs_fit/nurbs_spline statt aus einer
+    // Tabelle mit fester Stuetzstellenzahl, Toleranz- und
+    // Stabilisierungsschraube. Der Aufruf bleibt stehen, damit die Rufer
+    // uebersetzen, tut aber nichts und sagt das EINMAL ins Protokoll --
+    // ein stilles Nichts waere die schlechtere Haelfte von beidem.
+    static bool gemeldet = false;
+    if (!gemeldet) {
+        gemeldet = true;
+        qCInfo(lcDsp) << "PureSignal 3: PIN-Modus gibt es nicht mehr, der Schalter bleibt ohne Wirkung";
+    }
     Q_UNUSED(pin);
-#endif
 }
 
 void TxChannel::setPSMapMode(bool map)
 {
-#ifdef HAVE_WDSP
-    if (txa[m_channelId].rsmpin.p == nullptr) return;
-    ::SetPSMapMode(m_channelId, map ? 1 : 0);
-#else
+    // PureSignal 3 (WDSP 2.11) kennt diesen Regler nicht mehr: die
+    // Korrekturkurve kommt aus nurbs_fit/nurbs_spline statt aus einer
+    // Tabelle mit fester Stuetzstellenzahl, Toleranz- und
+    // Stabilisierungsschraube. Der Aufruf bleibt stehen, damit die Rufer
+    // uebersetzen, tut aber nichts und sagt das EINMAL ins Protokoll --
+    // ein stilles Nichts waere die schlechtere Haelfte von beidem.
+    static bool gemeldet = false;
+    if (!gemeldet) {
+        gemeldet = true;
+        qCInfo(lcDsp) << "PureSignal 3: MAP-Modus gibt es nicht mehr, der Schalter bleibt ohne Wirkung";
+    }
     Q_UNUSED(map);
-#endif
 }
 
 void TxChannel::setPSStabilize(bool stbl)
 {
-#ifdef HAVE_WDSP
-    if (txa[m_channelId].rsmpin.p == nullptr) return;
-    ::SetPSStabilize(m_channelId, stbl ? 1 : 0);
-#else
+    // PureSignal 3 (WDSP 2.11) kennt diesen Regler nicht mehr: die
+    // Korrekturkurve kommt aus nurbs_fit/nurbs_spline statt aus einer
+    // Tabelle mit fester Stuetzstellenzahl, Toleranz- und
+    // Stabilisierungsschraube. Der Aufruf bleibt stehen, damit die Rufer
+    // uebersetzen, tut aber nichts und sagt das EINMAL ins Protokoll --
+    // ein stilles Nichts waere die schlechtere Haelfte von beidem.
+    static bool gemeldet = false;
+    if (!gemeldet) {
+        gemeldet = true;
+        qCInfo(lcDsp) << "PureSignal 3: Stabilisierung gibt es nicht mehr, der Schalter bleibt ohne Wirkung";
+    }
     Q_UNUSED(stbl);
-#endif
 }
 
 void TxChannel::setPSIntsAndSpi(int ints, int spi)
@@ -4867,13 +4901,18 @@ void TxChannel::setPSIntsAndSpi(int ints, int spi)
     // build mode (matches m_lastPSFeedbackRate pattern at line 3833).
     m_lastPSInts = ints;
     m_lastPSSpi  = spi;
-#ifdef HAVE_WDSP
-    if (txa[m_channelId].rsmpin.p == nullptr) return;
-    ::SetPSIntsAndSpi(m_channelId, ints, spi);
-#else
-    Q_UNUSED(ints);
-    Q_UNUSED(spi);
-#endif
+    // PureSignal 3 (WDSP 2.11) kennt diesen Regler nicht mehr: die
+    // Korrekturkurve kommt aus nurbs_fit/nurbs_spline statt aus einer
+    // Tabelle mit fester Stuetzstellenzahl, Toleranz- und
+    // Stabilisierungsschraube. Der Aufruf bleibt stehen, damit die Rufer
+    // uebersetzen, tut aber nichts und sagt das EINMAL ins Protokoll --
+    // ein stilles Nichts waere die schlechtere Haelfte von beidem.
+    static bool gemeldet = false;
+    if (!gemeldet) {
+        gemeldet = true;
+        qCInfo(lcDsp) << "PureSignal 3: Stuetzstellen (ints/spi) gibt es nicht "
+                         "mehr, die Kurve kommt aus der NURB-Anpassung";
+    }
 }
 
 // Save / restore correction tables (Phase 3M-4 Task 7 follow-up — missed in

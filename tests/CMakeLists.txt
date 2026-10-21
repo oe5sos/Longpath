@@ -7887,6 +7887,12 @@ longpath_add_test(tst_fm_squelch_abbildung)
 #   R-Zweig anfasst, laesst den Tuner nach der ersten Abfrage stillstehen.
 longpath_add_test(tst_genius_status_tor)
 
+# tst_puresignal3_kette: traegt der Hub auf WDSP 2.11? Oeffnet einen ECHTEN
+#   Sendekanal, liest GetPSInfo und baut wieder ab -- mit Uhr darum, weil ein
+#   falscher POSIX-Ersatz fuer WaitForMultipleObjects den Steuerfaden
+#   doPSCorrChange im Abbau haengen liesse statt rot zu melden.
+longpath_add_test(tst_puresignal3_kette)
+
 # tst_gs232_rotor: der serielle GS-232A/B-Treiber ohne Rotor am Tisch
 #   (eine nachgestellte Leitung statt der Schnittstelle). Haelt die Befehlsform fest (drei Ziffern
 #   je Feld, 360 wird 0, Hoehe geklemmt statt gefaltet), beide Antwortformen,

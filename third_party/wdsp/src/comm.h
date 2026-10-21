@@ -47,6 +47,7 @@ warren@wpratt.com
 #include "anr.h"
 #include "apfshadow.h"
 #include "bandpass.h"
+#include "nurbs.h"   // PureSignal 3 (WDSP 2.11): calcc stuetzt sich darauf
 #include "calcc.h"
 #include "cblock.h"
 #include "cfcomp.h"

@@ -55,7 +55,7 @@ extern void print_window_gain (const char* filename, int wintype, double inv_coh
 
 extern void print_deviation (const char* filename, double dpmax, double rate);
 
-extern void doCalccPrintSamples(int channel);
+// doCalccPrintSamples entfaellt mit PureSignal 3 (WDSP 2.11) -- siehe utilities.c.
 
 void print_buffer_parameters (const char* filename, int channel);
 
@@ -97,3 +97,7 @@ extern void getFilterCurve(int id, int size, int w_type, int index_low, int inde
 extern void test_bfcu();
 
 #endif
+
+// WDSP 2.11 (PureSignal 3) — siehe utilities.c
+#include <stdint.h>
+extern char* uint32_to_bitstr(uint32_t n, char* buf);

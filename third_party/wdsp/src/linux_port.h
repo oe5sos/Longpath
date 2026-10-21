@@ -84,6 +84,9 @@ typedef pthread_mutex_t *LPCRITICAL_SECTION;
 #define Sleep(ms) usleep(ms*1000)
 
 #define CreateSemaphore(a,b,c,d) LinuxCreateSemaphore(a,b,c,d)
+// PureSignal 3 (WDSP 2.11) legt seine fuenf Semaphore mit der
+// W-Schreibweise an (calcc.c:1095). Gleicher Aufruf, breiter Name.
+#define CreateSemaphoreW(a,b,c,d) LinuxCreateSemaphore(a,b,c,(char*)(d))
 #define WaitForSingleObject(x, y) LinuxWaitForSingleObject(x, y)
 #define ReleaseSemaphore(x,y,z) LinuxReleaseSemaphore(x,y,z)
 #define SetEvent(x) LinuxSetEvent(x)
@@ -119,6 +122,23 @@ void wdsp_dprintf(const char *format, ...);
 #endif
 
 #define INFINITE -1
+
+// PureSignal 3 (WDSP 2.11): der Faden doPSCorrChange (calcc.c:1759) wartet
+// auf FUENF Semaphore gleichzeitig und handelt danach, WELCHE ausgeloest
+// hat. Unter Windows macht das WaitForMultipleObjects; auf POSIX gibt es
+// dafuer keinen Systemaufruf. Unsere Fassung reiht sem_trywait ueber alle
+// Griffe und legt sich zwischen den Durchgaengen kurz schlafen — das ist
+// ein Steuerfaden, der je Kalibrierung ein paar Mal etwas tut, kein
+// Abtastweg. `waitAll` ist NICHT umgesetzt (PureSignal ruft nur mit
+// FALSE); mit TRUE kommt WAIT_FAILED zurueck, statt still das Falsche zu
+// tun. Rueckgabe wie bei Windows: WAIT_OBJECT_0 + Index, WAIT_TIMEOUT
+// oder WAIT_FAILED.
+#define WAIT_OBJECT_0 0x00000000L
+#define WAIT_TIMEOUT  0x00000102L
+#define WAIT_FAILED   0xFFFFFFFFL
+
+unsigned int WaitForMultipleObjects(unsigned int count, sem_t** handles,
+                                    int waitAll, int ms);
 
 void QueueUserWorkItem(void *function,void *context,int flags);
 

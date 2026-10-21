@@ -1539,14 +1539,14 @@ double SetPSTXDelay(int channel, double delay);
 void SetPSHWPeak(int channel, double peak);
 void GetPSHWPeak(int channel, double* peak);
 void GetPSMaxTX(int channel, double* maxtx);
-void SetPSPtol(int channel, double ptol);
+// void SetPSPtol(int channel, double ptol);   // in PureSignal 3 entfallen
 void GetPSDisp(int channel, double* x, double* ym, double* yc, double* ys,
                double* cm, double* cc, double* cs);
 void SetPSFeedbackRate(int channel, int rate);
-void SetPSPinMode(int channel, int pin);
-void SetPSMapMode(int channel, int map);
-void SetPSStabilize(int channel, int stbl);
-void SetPSIntsAndSpi(int channel, int ints, int spi);
+// void SetPSPinMode(int channel, int pin);   // in PureSignal 3 (WDSP 2.11) entfallen
+// void SetPSMapMode(int channel, int map);   // in PureSignal 3 (WDSP 2.11) entfallen
+// void SetPSStabilize(int channel, int stbl);   // in PureSignal 3 (WDSP 2.11) entfallen
+// void SetPSIntsAndSpi(int channel, int ints, int spi);   // in PureSignal 3 (WDSP 2.11) entfallen
 
 // Save / restore the calcc correction tables to / from disk.  Both spawn a
 // detached thread inside calcc.c (PSSaveCorrection / PSRestoreCorrection at

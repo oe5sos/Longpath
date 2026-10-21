@@ -46,7 +46,12 @@ EXPECTED = {
     # Longpath-original stand-in for the generated weight arrays, whose
     # licence block now leads the file (it had been pushed past this
     # script's 2000-character window by the explanatory comment above it).
-    "gpl2-or-later": 143,
+    # 143 -> 152 (2026-10-21, PureSignal 3): WDSP 2.11 brachte
+    # extrapolate.c/.h, nurbs.c/.h, nurbs_fit.c/.h, nurbs_spline.c/.h und
+    # wdsp_align.h -- neun Dateien mit Warren Pratts eigener
+    # GPL-2-or-later-Kopfzeile. calcc/iqc wurden nur gehoben, nicht neu
+    # gezaehlt.
+    "gpl2-or-later": 152,
     "copyright-no-permission-block": 0,
     "no-header": 10,
 }
