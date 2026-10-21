@@ -3128,6 +3128,14 @@ target_link_libraries(tst_radio_discovery_probe PRIVATE Qt6::Network)
 longpath_add_test(tst_radio_discovery_scan_bound)
 target_link_libraries(tst_radio_discovery_scan_bound PRIVATE Qt6::Network)
 
+# Wieder angemeldet 2026-10-21: c0f962fb (#254) hat diese Zeile
+# beim Squash-Konflikt in dieser Datei mit entfernt. Der Prueflauf
+# wurde seither weiter GEBAUT -- nein, nicht einmal das: ohne
+# Eintrag wird er stillschweigend nicht uebersetzt. Vier Staende
+# traf es gleichzeitig.
+longpath_add_test(tst_suche_blockiert_den_start)
+target_link_libraries(tst_suche_blockiert_den_start PRIVATE Qt6::Network)
+
 # ── Phase 3Q Task 4: AddCustomRadioDialog — SKU model picker + action buttons ──
 # 4 tests: Auto-detect at index 0, all 16 SKUs present in modelCombo,
 # saveOfflineButton + probeButton objectNames accessible via findChild.
@@ -5389,6 +5397,15 @@ longpath_add_test(tst_abbau_ueberlebt)
 # 2026-10-15: moos.json nannte zwei Rollen, die es im Programm nicht
 # gibt — still uebergangen, also seit dem ersten Tag wirkungslos.
 longpath_add_test(tst_palette_ohne_tote_rollen)
+# Wieder angemeldet 2026-10-21: c0f962fb (#254) hat diese Zeile
+# beim Squash-Konflikt in dieser Datei mit entfernt. Der Prueflauf
+# wurde seither weiter GEBAUT -- nein, nicht einmal das: ohne
+# Eintrag wird er stillschweigend nicht uebersetzt. Vier Staende
+# traf es gleichzeitig.
+longpath_add_test(tst_palette_faerbt_das_fenster)
+target_compile_definitions(tst_palette_faerbt_das_fenster PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+
 # 2026-10-15: die Scheibenflagge ueber dem Panadapter, als Option —
 # dritter Anlauf um dieselbe Sache, siehe den Kopf der Datei.
 longpath_add_test(tst_scheibenflagge)
@@ -6123,6 +6140,15 @@ longpath_add_test(tst_b8_overlay_signals)
 # activating a profile pushes filter values into TransmitModel (filterChanged),
 # isActiveProfileModified detects drift and clears after saveActiveProfile.
 # Per docs/superpowers/plans/2026-05-01-tx-bandwidth.md §Task 2.
+# Wieder angemeldet 2026-10-21: c0f962fb (#254) hat diese Zeile
+# beim Squash-Konflikt in dieser Datei mit entfernt. Der Prueflauf
+# wurde seither weiter GEBAUT -- nein, nicht einmal das: ohne
+# Eintrag wird er stillschweigend nicht uebersetzt. Vier Staende
+# traf es gleichzeitig.
+longpath_add_test(tst_tx_bandbreiten_klickbar)
+
+longpath_add_test(tst_stationsrufzeichen)
+
 longpath_add_test(tst_tx_bandwidth_persistence)
 
 # ── Plan 4 Task 6 (D8): TX filter debounce + per-mode IQ-space mapping ────────
