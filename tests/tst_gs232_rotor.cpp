@@ -20,6 +20,8 @@
 
 #include "core/AppSettings.h"
 #include "core/Gs232Rotor.h"
+
+#include <cmath>
 #include "gui/widgets/RotorLogbookPanel.h"
 
 using namespace Longpath;
@@ -303,6 +305,112 @@ private slots:
                 << "meldet" << rotor.azimuth() << "Grad, Höhe"
                 << rotor.elevation();
         rotor.disconnectFromRotor();
+    }
+
+    // Der Verbinden-Knopf im Rotordialog kann den Treiber wechseln,
+    // waehrend das Fenster offen ist. Das ist der Mechanismus dahinter.
+    void treiberwechsel_im_laufenden_fenster()
+    {
+        AppSettings& s = AppSettings::instance();
+        const QString vorher = s.value(QStringLiteral("Rotor/Backend"),
+                                       QStringLiteral("rotctld")).toString();
+
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("rotctld"));
+        RotorLogbookPanel panel(nullptr, nullptr, nullptr);
+        panel.ensureRotorForTest();
+        QVERIFY(qobject_cast<Gs232Rotor*>(panel.rotorForTest()) == nullptr);
+        RotorController* alt = panel.rotorForTest();
+
+        // Umgestellt wie im Dialog: Einstellung schreiben, dann neu bauen.
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("gs232"));
+        s.setValue(QStringLiteral("Rotor/Host"), QStringLiteral("172.30.30.16"));
+        s.setValue(QStringLiteral("Rotor/NetPort"), 4001);
+        panel.rebuildRotorBackendForTest();
+
+        auto* neu = qobject_cast<Gs232Rotor*>(panel.rotorForTest());
+        QVERIFY(neu != nullptr);
+        QVERIFY(panel.rotorForTest() != alt);
+        QCOMPARE(neu->description(), QStringLiteral("GS-232 über 172.30.30.16:4001"));
+        QCOMPARE(neu->state(), RotorController::State::Disconnected);
+
+        // Und zurueck -- der Weg darf in beide Richtungen gehen.
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("rotctld"));
+        panel.rebuildRotorBackendForTest();
+        QVERIFY(qobject_cast<Gs232Rotor*>(panel.rotorForTest()) == nullptr);
+        QVERIFY(panel.rotorForTest() != nullptr);
+
+        s.setValue(QStringLiteral("Rotor/Host"), QString{});
+        s.setValue(QStringLiteral("Rotor/Backend"), vorher);
+    }
+
+    // ── Ein Fahrbefehl am ECHTEN Rotor ──────────────────────────────
+    //
+    // Braucht ZWEI Schalter: LONGPATH_GS232_HOST (wie der Lesetest) und
+    // zusätzlich LONGPATH_GS232_MOVE=1. Ohne den zweiten passiert hier
+    // nichts — dieser Lauf dreht eine echte Antenne, und das darf nicht
+    // aus Versehen geschehen.
+    //
+    // Er fährt fünf Grad weiter und danach auf den Ausgangswert zurück.
+    // Fünf Grad, weil es messbar ist und innerhalb jeder Keule liegt;
+    // zurück, weil die Antenne danach stehen soll, wo sie stand.
+    void fahrbefehl_am_echten_geraet()
+    {
+        const QByteArray host = qgetenv("LONGPATH_GS232_HOST");
+        if (host.isEmpty() || qEnvironmentVariableIntValue("LONGPATH_GS232_MOVE") != 1) {
+            QSKIP("kein LONGPATH_GS232_MOVE=1 — es wird nichts gedreht");
+        }
+        const quint16 port = static_cast<quint16>(
+            qEnvironmentVariableIntValue("LONGPATH_GS232_PORT") ?: 4001);
+
+        Gs232Rotor rotor;
+        rotor.setNetworkTarget(QString::fromLatin1(host), port);
+        QSignalSpy lage(&rotor, &Gs232Rotor::positionChanged);
+        rotor.connectToRotor();
+        QTRY_VERIFY_WITH_TIMEOUT(rotor.hasFreshPosition(), 8000);
+
+        const double start = rotor.azimuth();
+        const double ziel  = std::fmod(start + 5.0 + 360.0, 360.0);
+        qInfo() << "Rotor steht auf" << start << "Grad, fahre auf" << ziel;
+
+        auto wartetBis = [&](double soll) {
+            QElapsedTimer uhr; uhr.start();
+            while (uhr.elapsed() < 90000) {
+                QTest::qWait(500);
+                double d = std::fabs(rotor.azimuth() - soll);
+                if (d > 180.0) { d = 360.0 - d; }
+                if (d <= 2.0) { return true; }
+            }
+            return false;
+        };
+
+        rotor.moveTo(ziel);
+        const bool angekommen = wartetBis(ziel);
+        qInfo() << "nach dem Fahrbefehl:" << rotor.azimuth() << "Grad";
+
+        // Zurueck, auch wenn der Hinweg misslang -- die Antenne gehoert
+        // dem Betreiber, nicht dem Prueflauf.
+        rotor.moveTo(start);
+        const bool zurueck = wartetBis(start);
+        // Den ENDSTAND nennen, nicht nur "angekommen": die Frist oben
+        // gibt bei zwei Grad Rest frei, und der Rotor laeuft danach noch
+        // etwas weiter. Am 2026-10-21 stand er darum am Ende auf 295,
+        // wo er mit 297 angefangen hatte -- der Lauf meldete trotzdem
+        // "zurueck", und genau diese Luecke schliesst die Zeile hier.
+        QTest::qWait(3000);          // ausrollen lassen
+        const double ende = rotor.azimuth();
+        double rest = std::fabs(ende - start);
+        if (rest > 180.0) { rest = 360.0 - rest; }
+        qInfo() << "zurueck auf:" << ende << "Grad -- Rest zum Ausgangswert:"
+                << rest << "Grad";
+
+        rotor.disconnectFromRotor();
+        QVERIFY2(angekommen, "der Rotor hat das Ziel nicht erreicht");
+        QVERIFY2(zurueck, "der Rotor ist nicht auf den Ausgangswert zurueck");
+        // Mehr als fuenf Grad Rest waere kein Nachlauf mehr, sondern ein
+        // Fehler im Fahrbefehl.
+        QVERIFY2(rest <= 5.0,
+                 qPrintable(QStringLiteral("Rest zum Ausgangswert: %1 Grad")
+                                .arg(rest)));
     }
 
     void beschreibung_sagt_die_schnittstelle()
