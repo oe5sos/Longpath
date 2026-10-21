@@ -306,11 +306,12 @@ public:
     /// einer Anrufstelle, bleibt sie stehen (wer von Hand danebensteht,
     /// meint es so).
     ///
-    /// Oeffentlich fuer den Pruefstand: so laesst sich der Griff ohne
-    /// Mausklick in die Leiste fahren.
-public:
+    /// Auch fuer den Pruefstand da: so laesst sich der Griff ohne
+    /// Mausklick in die Leiste fahren. Der Abschnitt hier ist schon
+    /// oeffentlich -- ein eigenes `public:`/`private:` darum herum
+    /// kippte am 2026-10-21 alles DAHINTER auf privat und brach sieben
+    /// CI-Laeufe (`appletIsRegisteredForTest` war ploetzlich privat).
     void aufDigiStellen(Longpath::DigiFrequenzen::Digimodus modus);
-private:
 
     /// Dasselbe mit Nachlauf: waehrend eines Groessenzugs feuert
     /// resizeEvent bei jedem Pixel, und Fenster, die dabei im Takt
