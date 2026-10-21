@@ -187,7 +187,10 @@ This applies equally to:
 Verifier scripts (`scripts/verify-thetis-headers.py`,
 `scripts/verify-freedv-headers.py`, `scripts/check-new-ports.py`) are the
 safety net (Ring 3, in CI). The local pre-commit hook installed via
-`scripts/install-hooks.sh` runs the same scripts pre-push (Ring 2). The
+`scripts/install-hooks.sh` runs the same scripts **pre-commit** (Ring 2)
+— the installed hook is `scripts/git-hooks/pre-commit`; there is no
+pre-push hook. (Line 141 above already said pre-commit; this line said
+pre-push. Corrected 2026-10-21.) The
 primary control is this checklist.
 
 ### What Counts As "Guessing" (NEVER Do These)

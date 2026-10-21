@@ -83,10 +83,17 @@ jobs:
       - name: Verify freedv-gui port headers
         # CLAUDE.md nennt dieses Skript ausdruecklich als Ring-3-Netz
         # „in CI" -- neben verify-thetis-headers.py und
-        # check-new-ports.py. Es lief aber in KEINEM Workflow: ein
-        # Waechter, den niemand ruft. 14/14 Dateien gruen, das Einhaengen
-        # aendert also nichts am Zustand, nur daran, dass es auffaellt,
-        # wenn sich einer der 14 Koepfe verliert.
+        # check-new-ports.py. Es lief aber in KEINEM Workflow.
+        #
+        # Ring 2 ruft es: scripts/git-hooks/pre-commit hat es in seiner
+        # Liste. Das genuegt aber nicht, und zwar aus demselben Grund,
+        # der zwei Schritte weiter unten schon steht -- „squashed merges
+        # and rebases can introduce drift the hook never saw". Genau so
+        # sind in diesem PR vier Pruefstaende verschwunden.
+        #
+        # 14/14 Dateien gruen, das Einhaengen aendert also nichts am
+        # Zustand, nur daran, dass es auffaellt, wenn sich einer der 14
+        # Koepfe verliert.
         run: python3 scripts/verify-freedv-headers.py
 
       - name: Verify every test source is registered with CMake
