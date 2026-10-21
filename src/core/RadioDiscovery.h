@@ -98,7 +98,13 @@ enum class ProtocolVersion : int {
     Protocol1 = 1,
     Protocol2 = 2,
     SunSdr    = 3,
-    Flex      = 4
+    Flex      = 4,
+    // Keine Maschine, sondern eine Datei: `PlaybackRadioConnection`
+    // schiebt die I/Q-Proben einer aufgenommenen WAV-Datei in denselben
+    // Weg, den ein echtes Geraet speist (Phase 3M, Variante A des
+    // Plans). Nichts davon wird erkannt — eine solche RadioInfo
+    // entsteht nur, wenn der Betreiber eine Datei oeffnet.
+    Playback  = 5
 };
 
 // Information about a discovered OpenHPSDR radio.

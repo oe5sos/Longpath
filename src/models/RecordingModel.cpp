@@ -10,6 +10,8 @@
 
 #include "RecordingModel.h"
 
+#include <QFileInfo>
+
 #include <QDateTime>
 #include <QDir>
 #include <QLocale>
@@ -302,6 +304,67 @@ bool RecordingModel::startIq(const QString& path)
 void RecordingModel::stopIq()
 {
     m_iq.stop();
+}
+
+// ── Wiedergabe ───────────────────────────────────────────────────────
+//
+// Der ganze Weg liegt in RadioModel: es haelt die Verbindung, und eine
+// Wiedergabe IST eine Verbindung (ProtocolVersion::Playback). Dieses
+// Modell prueft nur, ob die Datei da und lesbar ist -- eine Fehlmeldung
+// eine Sekunde spaeter aus der Tiefe des Verbindungsaufbaus hilft
+// niemandem.
+bool RecordingModel::startPlayback(const QString& path)
+{
+    if (!m_radio) {
+        setLastError(QStringLiteral("No radio model attached."));
+        return false;
+    }
+    const QString p = path.trimmed();
+    if (p.isEmpty()) {
+        setLastError(QStringLiteral("No file given."));
+        return false;
+    }
+    QFileInfo fi(p);
+    if (!fi.exists() || !fi.isFile()) {
+        setLastError(QStringLiteral("File not found: %1").arg(p));
+        return false;
+    }
+    if (!fi.isReadable()) {
+        setLastError(QStringLiteral("File not readable: %1").arg(p));
+        return false;
+    }
+
+    QString err;
+    if (!m_radio->startPlaybackFromFile(p, &err)) {
+        setLastError(err.isEmpty() ? QStringLiteral("Playback refused.") : err);
+        return false;
+    }
+
+    setLastError(QString());
+    if (m_playbackFile != p) {
+        m_playbackFile = p;
+        emit playbackFileChanged(m_playbackFile);
+    }
+    if (!m_playing) {
+        m_playing = true;
+        emit playingChanged(true);
+    }
+    return true;
+}
+
+void RecordingModel::stopPlayback()
+{
+    if (m_radio && m_playing) {
+        m_radio->stopPlayback();
+    }
+    if (m_playing) {
+        m_playing = false;
+        emit playingChanged(false);
+    }
+    if (!m_playbackFile.isEmpty()) {
+        m_playbackFile.clear();
+        emit playbackFileChanged(m_playbackFile);
+    }
 }
 
 }  // namespace Longpath

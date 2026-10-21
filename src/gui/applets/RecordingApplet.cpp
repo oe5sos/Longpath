@@ -9,6 +9,8 @@
 // =================================================================
 
 #include "RecordingApplet.h"
+#include <QFileInfo>
+#include <QFileDialog>
 
 #include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
@@ -194,6 +196,35 @@ void RecordingApplet::buildUI()
         vbox->addWidget(m_iqNote);
     }
 
+    // ── Wiedergabe ───────────────────────────────────────────────────
+    vbox->addSpacing(6);
+    vbox->addWidget(gruppenKopf(body, QStringLiteral("Playback")));
+    {
+        auto* row = new QHBoxLayout;
+        row->setSpacing(6);
+
+        m_playBtn = styledButton(QStringLiteral("▶ Open…"), 82);
+        m_playBtn->setToolTip(QStringLiteral(
+            "Play an I/Q recording back through the whole chain — "
+            "same DSP, same waterfall, same audio as a live radio. "
+            "Replaces a running radio connection; a recording never "
+            "transmits."));
+        connect(m_playBtn, &QPushButton::clicked,
+                this, &RecordingApplet::onPlaybackClicked);
+        row->addWidget(m_playBtn);
+
+        m_playFile = new QLabel(QStringLiteral("——"), body);
+        QFont pf = m_playFile->font();
+        stupsPunktgroesse(pf, -1.0);
+        m_playFile->setFont(pf);
+        m_playFile->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                                      .arg(QLatin1String(Style::kTextInactive)));
+        row->addWidget(m_playFile);
+        row->addStretch(1);
+
+        vbox->addLayout(row);
+    }
+
     // ── Zeitplan ─────────────────────────────────────────────────────
     vbox->addSpacing(6);
     vbox->addWidget(gruppenKopf(body, QStringLiteral("Schedule")));
@@ -252,6 +283,25 @@ void RecordingApplet::onIqClicked()
     else                   { rec.startIq(); }
 }
 
+void RecordingApplet::onPlaybackClicked()
+{
+    if (m_model == nullptr) {
+        return;
+    }
+    RecordingModel& rec = m_model->recording();
+    if (rec.playing()) {
+        rec.stopPlayback();
+        return;
+    }
+    const QString pfad = QFileDialog::getOpenFileName(
+        this, QStringLiteral("Open recording"), rec.recordingFolder(),
+        QStringLiteral("Recordings (*.wav);;All files (*)"));
+    if (pfad.isEmpty()) {
+        return;
+    }
+    rec.startPlayback(pfad);
+}
+
 void RecordingApplet::refreshState()
 {
     if (!m_model) { return; }
@@ -280,6 +330,16 @@ void RecordingApplet::refreshState()
         QStringLiteral("QLabel { color: %1; }")
             .arg(QLatin1String(iqAn ? Style::kAmberText
                                     : Style::kTextInactive)));
+
+    const bool spielt = rec.playing();
+    m_playBtn->setText(spielt ? QStringLiteral("■ Stop")
+                              : QStringLiteral("▶ Open…"));
+    m_playFile->setText(spielt ? QFileInfo(rec.playbackFile()).fileName()
+                               : QStringLiteral("——"));
+    m_playFile->setStyleSheet(
+        QStringLiteral("QLabel { color: %1; }")
+            .arg(QLatin1String(spielt ? Style::kAmberText
+                                      : Style::kTextInactive)));
 
     const int n = rec.scheduleCount();
     m_planText->setText(n == 0 ? QStringLiteral("none")

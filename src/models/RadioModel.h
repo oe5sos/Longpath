@@ -2065,6 +2065,16 @@ public:
     void connectToRadio(const RadioInfo& info);
     void disconnectFromRadio();
 
+    // ── Phase 3M: eine Aufnahme als Quelle ───────────────────────────────────
+    // Oeffnet `path` und verbindet mit ProtocolVersion::Playback, damit die
+    // Datei denselben Weg speist wie ein Geraet (WDSP, FFT, Ton). Eine
+    // laufende Geraeteverbindung wird vorher geschlossen. false heisst: es
+    // laeuft nichts, und `error` sagt warum. Gesendet wird aus einer
+    // Aufnahme nie -- PlaybackRadioConnection nimmt MOX und TX-I/Q an und
+    // tut nichts damit.
+    bool startPlaybackFromFile(const QString& path, QString* error = nullptr);
+    void stopPlayback();
+
     // ── Phase 3M-0 Task 6: Ganymede PA-trip live state ───────────────────────
     // G8NJJ: handlers for Ganymede 500W PA protection
     // From Thetis Andromeda/Andromeda.cs:914-948 [v2.10.3.13]
@@ -3651,6 +3661,10 @@ private:
     VoiceKeyerStore m_voiceKeyer;
     QsoRecorderController m_qsoRecorder;
     RecordingModel        m_recording;
+    // Der Pfad wartet hier, bis die Fabrik die Verbindung gebaut hat:
+    // RadioConnection::create() kennt nur die RadioInfo, und die traegt
+    // keinen Dateinamen.
+    QString               m_playbackPath;
 
     // PennyLane external-control master toggle. Composes with OcMatrix (Phase 3P-D).
     // MAC and load() are called on connect. Phase 3P-F Task 5b.

@@ -293,6 +293,7 @@ warren@wpratt.com
 #include "core/RadioConnectionTeardown.h"
 #include "core/P1RadioConnection.h"
 #include "core/SunSdrRadioConnection.h"
+#include "core/PlaybackRadioConnection.h"
 #include "core/P2RadioConnection.h"
 #include "core/PsccPump.h"   // Phase 3M-4 Task 17 chunk C — pscc() driver
 #include "core/WidebandFftEngine.h"  // Phase 3F Sub-Epic F Task 5 — per-ADC wb FFT
@@ -7909,6 +7910,22 @@ void RadioModel::connectToRadio(const RadioInfo& info)
         return;
     }
     m_connection = conn.release();
+
+    // Phase 3M: eine Wiedergabe braucht ihre Datei, bevor sie laeuft.
+    // RadioConnection::create() kennt nur die RadioInfo, und die traegt
+    // keinen Dateinamen -- darum hier, an der einen Stelle, an der die
+    // Verbindung schon steht und noch nichts angelaufen ist.
+    if (info.protocol == ProtocolVersion::Playback) {
+        auto* pb = qobject_cast<PlaybackRadioConnection*>(m_connection);
+        QString pbError;
+        if (pb == nullptr || !pb->openRecording(m_playbackPath, &pbError)) {
+            qCWarning(lcConnection) << "Wiedergabe konnte" << m_playbackPath
+                                    << "nicht oeffnen:" << pbError;
+            teardownConnection();
+            return;
+        }
+    }
+
     m_connection->setHardwareProfile(m_hardwareProfile);
 
     // Phase B6' — per-board WDSP ChannelMaster-layer calls.
@@ -10027,6 +10044,76 @@ void RadioModel::disconnectFromRadio()
     // auch nicht ab. Ohne diese Zeile bliebe Longpath nach „Disconnect"
     // als GUI-Client auf der Maschine angemeldet.
     teardownFlexConnection();
+}
+
+// ── Phase 3M: eine Aufnahme als Quelle ───────────────────────────────────────
+//
+// Variante A des Plans: die Wiedergabe ist eine vollwertige
+// RadioConnection, keine Nebenleitung. Damit gehen Bild, Ton und DSP
+// denselben Weg wie an einem Geraet -- und es gibt keinen zweiten,
+// halben Weg, der auseinanderlaeuft.
+//
+// Die RadioInfo hier wird NICHT erkannt, sie wird gebaut: ein Name, der
+// in der Oberflaeche lesbar ist, keine Adresse, kein Boardtyp. Alles,
+// was aus einem Boardtyp folgt (Alex-Wege, ADC-Zahlen, PureSignal),
+// bleibt damit aus -- gewollt, denn hinter einer Datei ist keine
+// Maschine.
+bool RadioModel::startPlaybackFromFile(const QString& path, QString* error)
+{
+    const QString p = path.trimmed();
+    if (p.isEmpty()) {
+        if (error) { *error = QStringLiteral("No file given."); }
+        return false;
+    }
+
+    RadioInfo info;
+    info.name         = QStringLiteral("Recording");
+    info.macAddress   = QStringLiteral("00:00:00:00:00:00");
+    info.protocol     = ProtocolVersion::Playback;
+    info.boardType    = HPSDRHW::Unknown;
+    info.adcCount     = 1;
+    info.maxReceivers = 1;
+
+    // Die Datei ZUERST pruefen, dann erst verbinden. connectToRadio()
+    // faehrt den ganzen Hochlauf (WDSP-Wisdom, Faeden, Kanaele); eine
+    // Datei, die sich nicht oeffnen laesst, darf das nicht ausloesen --
+    // im Prueflauf blieb genau das stehen, und im Betrieb haette der
+    // Betreiber Sekunden gewartet, um „geht nicht" zu lesen.
+    {
+        PlaybackRadioConnection probe;
+        QString probeError;
+        if (!probe.openRecording(p, &probeError)) {
+            if (error) {
+                *error = probeError.isEmpty()
+                             ? QStringLiteral("Could not open the recording: %1").arg(p)
+                             : probeError;
+            }
+            return false;
+        }
+    }
+
+    m_playbackPath = p;
+    connectToRadio(info);
+
+    // connectToRadio bricht bei einer Datei, die sich nicht oeffnen
+    // laesst, mit teardownConnection() ab -- dann steht hier nichts.
+    if (m_connection == nullptr) {
+        m_playbackPath.clear();
+        if (error) {
+            *error = QStringLiteral("Could not open the recording: %1").arg(p);
+        }
+        return false;
+    }
+    return true;
+}
+
+void RadioModel::stopPlayback()
+{
+    if (m_connection != nullptr
+        && m_lastRadioInfo.protocol == ProtocolVersion::Playback) {
+        disconnectFromRadio();
+    }
+    m_playbackPath.clear();
 }
 
 void RadioModel::wireConnectionSignals(int wdspInSize)

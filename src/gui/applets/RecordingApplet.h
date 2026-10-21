@@ -50,6 +50,7 @@ private:
     void refreshState();
     void onAudioClicked();
     void onIqClicked();
+    void onPlaybackClicked();
 
     QPushButton* m_audioBtn{nullptr};
     QLabel*      m_audioClock{nullptr};
@@ -58,6 +59,9 @@ private:
     QPushButton* m_iqBtn{nullptr};
     QLabel*      m_iqClock{nullptr};
     QLabel*      m_iqNote{nullptr};
+
+    QPushButton* m_playBtn{nullptr};
+    QLabel*      m_playFile{nullptr};
 
     QLabel*      m_planText{nullptr};
     QLabel*      m_planState{nullptr};

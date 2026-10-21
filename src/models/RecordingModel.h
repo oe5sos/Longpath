@@ -101,6 +101,21 @@ public:
     Q_INVOKABLE bool startIq(const QString& path = QString());
     Q_INVOKABLE void stopIq();
 
+    // ── Wiedergabe einer Aufnahme ────────────────────────────────────
+    //
+    // Oeffnet `path` als Quelle und laesst Longpath daraus empfangen,
+    // als haenge ein Geraet dran: dieselbe Kette (WDSP, FFT, Ton),
+    // nur speist sie eine Datei. Eine laufende Geraeteverbindung wird
+    // dabei geschlossen -- zwei Quellen auf einem Weg gibt es nicht.
+    //
+    // Rueckgabe false heisst: es laeuft nichts, und lastError() sagt
+    // warum (keine Datei, nicht lesbar, kein RadioModel).
+    //
+    // Gesendet wird aus einer Aufnahme NIE: PlaybackRadioConnection
+    // nimmt `sendTxIq` und `setMox` an und tut nichts damit.
+    Q_INVOKABLE bool startPlayback(const QString& path);
+    Q_INVOKABLE void stopPlayback();
+
     /// Der Ordner, in dem Aufnahmen landen. Derselbe Ort, den die
     /// QSO-Aufnahme benutzt (AppSettings::dataDir() + "/recordings"),
     /// damit nicht zwei Aufnahmearten an zwei Stellen ablegen. Wird
@@ -129,9 +144,14 @@ public:
         return static_cast<int>(m_schedule.entries().size());
     }
 
-    bool    playing() const { return false; }
-    QString playbackFile() const { return QString(); }
-    bool    playbackAvailable() const { return false; }
+    bool    playing() const { return m_playing; }
+    QString playbackFile() const { return m_playbackFile; }
+    // Seit dem 2026-10-21 wahr: die Wiedergabe ist angeschlossen
+    // (`PlaybackRadioConnection` ueber `ProtocolVersion::Playback`).
+    // Vorher gab diese Zeile hart `false` zurueck -- die vier Klassen
+    // der Phase 3M waren gebaut und geprueft, aber niemand erzeugte
+    // sie. Siehe docs/MASTER-PLAN.md, Zeile 3M.
+    bool    playbackAvailable() const { return true; }
 
     bool    ready() const { return m_radio != nullptr; }
     QString lastError() const { return m_lastError; }
@@ -172,6 +192,8 @@ private:
     bool sliceInfo(QString* freq, QString* mode, QString* band) const;
 
     RadioModel* m_radio{nullptr};
+    bool        m_playing{false};
+    QString     m_playbackFile;
 
     WavRecorderController m_wav;
     IqRecorderController  m_iq;
