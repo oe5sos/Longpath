@@ -369,6 +369,29 @@ private slots:
         // Keine erfundene Firmwarezahl: die Maschine meldet
         // „4.3.16.42034", das passt in kein int.
         QCOMPARE(info.firmwareVersion, 0);
+
+        // ... sie geht aber als Text mit. Vorher wurde `version` aus dem
+        // Ruf gelesen und dann weggeworfen: der Wert stand nur in
+        // FlexBeacon, und niemand las ihn. Folge: die Anzeige zeigte
+        // einen Gedankenstrich und das Hilfsbuendel Firmware „0",
+        // obwohl die Maschine ihre Fassung gesendet hatte.
+        QCOMPARE(info.firmwareText, QStringLiteral("4.3.16.42034"));
+    }
+
+    void fehlendeFassungImRufLaesstDenTextLeer()
+    {
+        QString payload = QString::fromLatin1(kPayload8400);
+        payload.replace(QStringLiteral("version=4.3.16.42034"),
+                        QStringLiteral("version="));
+        const FlexBeacon b =
+            FlexDiscoveryWire::parseBeacon(beacon(payload.toLatin1().constData()));
+        const RadioInfo info = FlexDiscoveryWire::toRadioInfo(b, QHostAddress());
+
+        // Leer heisst „nimm die Zahl", nicht „zeige nichts". Ein leerer
+        // Text wuerde in connectionFirmwareText() den Gedankenstrich
+        // verdraengen und nichts an seine Stelle setzen.
+        QVERIFY(info.firmwareText.isEmpty());
+        QCOMPARE(info.firmwareVersion, 0);
     }
 
     void serienummerTraegtWennDieMacFehlt()

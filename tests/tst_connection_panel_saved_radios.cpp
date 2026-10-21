@@ -73,6 +73,46 @@ private slots:
         QCOMPARE(saved.pinToMac,        true);
     }
 
+    void flexTraegtDieLesbareFassungUeberDenRundlauf() {
+        AppSettings settings = makeSettings();
+        settings.clearSavedRadios();
+
+        // Eine Flex sendet keine Firmwarezahl, sondern „4.3.16.42034".
+        // Die Zahl bleibt 0, der Text traegt die Wahrheit -- und muss
+        // den Rundlauf ueberleben, sonst steht beim naechsten Start
+        // wieder ein Gedankenstrich da.
+        RadioInfo info;
+        info.name            = QStringLiteral("FLEX-8400 (Martin)");
+        info.macAddress      = QStringLiteral("00:1c:2d:05:34:28");
+        info.boardType       = HPSDRHW::Flex8400;
+        info.protocol        = ProtocolVersion::Flex;
+        info.port            = 4992;
+        info.firmwareVersion = 0;
+        info.firmwareText    = QStringLiteral("4.3.16.42034");
+        settings.saveRadio(info, /*pinToMac=*/true);
+
+        std::optional<SavedRadio> f =
+            settings.savedRadio(QStringLiteral("00:1c:2d:05:34:28"));
+        QVERIFY(f.has_value());
+        QCOMPARE(f->info.firmwareText,    QStringLiteral("4.3.16.42034"));
+        QCOMPARE(f->info.firmwareVersion, 0);
+    }
+
+    void eineZahlRadioBleibtOhneText() {
+        AppSettings settings = makeSettings();
+        settings.clearSavedRadios();
+        settings.saveRadio(makeHl2Info(), true);
+
+        std::optional<SavedRadio> hl2 =
+            settings.savedRadio(QStringLiteral("aa:bb:cc:11:22:33"));
+        QVERIFY(hl2.has_value());
+        // Gegenstueck: wer eine Zahl hat, bekommt keinen Text
+        // angeheftet. Sonst zeigte die Anzeige kuenftig einen leeren
+        // Text statt der 72.
+        QVERIFY(hl2->info.firmwareText.isEmpty());
+        QCOMPARE(hl2->info.firmwareVersion, 72);
+    }
+
     void saveMultipleAndRoundTrip() {
         AppSettings settings = makeSettings();
         settings.clearSavedRadios();

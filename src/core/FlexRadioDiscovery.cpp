@@ -263,8 +263,11 @@ RadioInfo toRadioInfo(const FlexBeacon& beacon, const QHostAddress& sender)
     info.hasPureSignal        = false;
 
     // Firmware: die Maschine sendet „4.3.16.42034", kein Zahlenfeld.
-    // firmwareVersion bleibt 0; die lesbare Fassung liegt im Beacon.
-    // Eine erfundene Zahl hier waere schlimmer als keine.
+    // firmwareVersion bleibt 0 — eine erfundene Zahl waere schlimmer als
+    // keine. Die lesbare Fassung geht als Text mit; sie stammt aus dem
+    // RUF, nicht aus dem Befehlskanal: der meldet die API-Fassung
+    // („V1.4.0.0"), nicht die der Maschine.
+    info.firmwareText = beacon.version;
 
     return info;
 }

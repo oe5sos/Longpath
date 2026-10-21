@@ -1156,6 +1156,7 @@ void AppSettings::saveRadio(const RadioInfo& info, bool pinToMac)
     m_settings.insert(prefix + QStringLiteral("protocol"),
                       QString::number(static_cast<int>(info.protocol)));
     m_settings.insert(prefix + QStringLiteral("firmwareVersion"), QString::number(info.firmwareVersion));
+    m_settings.insert(prefix + QStringLiteral("firmwareText"),    info.firmwareText);
     m_settings.insert(prefix + QStringLiteral("pinToMac"),        pinToMac   ? QStringLiteral("True") : QStringLiteral("False"));
     // "autoConnect" is intentionally no longer written here — the feature was
     // removed 2026-08-27 (operator decision, OE5SOS: it kept re-arming itself
@@ -1249,6 +1250,8 @@ std::optional<SavedRadio> AppSettings::savedRadio(const QString& macKey) const
                                                  QStringLiteral("1")).toInt());
     sr.info.firmwareVersion = m_settings.value(prefix + QStringLiteral("firmwareVersion"),
                                                QStringLiteral("0")).toInt();
+    sr.info.firmwareText    = m_settings.value(prefix + QStringLiteral("firmwareText"),
+                                               QString());
 
     // Saved-only flags
     sr.pinToMac = (m_settings.value(prefix + QStringLiteral("pinToMac"),
