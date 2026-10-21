@@ -99,7 +99,7 @@ void RecordingScheduleWindow::buildUI()
         // uebrig -- im Blatt standen leere Kaestchen.
         "QPushButton#zeitplanWeg {"
         "  background: transparent; border: none;"
-        "  padding: 0px; color: %6; font-size: 15px;"
+        "  padding: 0px; color: %6; font-size: 16px;"
         "}"
         "QPushButton#zeitplanWeg:hover { color: %2; }")
         .arg(QLatin1String(Style::kPanelBg),
