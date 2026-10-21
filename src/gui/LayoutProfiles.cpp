@@ -10,11 +10,14 @@
 //                 AI-assisted via Anthropic Claude (Cowork).
 //   2026-09-27 — startWithFirst(): beim Start immer Profil 1. Martin
 //                 Fischer, AI-assisted via Anthropic Claude.
+//   2026-10-21 — runApply(): das Anwenden ist eine EIGENE Bewegung.
+//                 Martin Fischer, AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "gui/LayoutProfiles.h"
 
 #include "core/AppSettings.h"
+#include "gui/WindowPlacement.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -213,6 +216,20 @@ void LayoutProfiles::captureIntoCurrent()
 void LayoutProfiles::runApply(const QVariantMap& state)
 {
     if (!m_apply) { return; }
+    // ── Das Anwenden ist eine EIGENE Bewegung (2026-10-21) ──────────
+    //
+    // m_apply() setzt die Geometrie jedes schwebenden Fensters. Fuer
+    // Longpath selbst ist das Platzieren, fuer Qt sieht es aus wie
+    // Ziehen -- und genau daran ist der Mindestabstand am 2026-10-15
+    // gescheitert (Betreiber, mit Bild: „warum ist das alles
+    // verstellt", siehe 5922f1b6). `EigeneBewegung` ist die Marke, mit
+    // der WindowPlacement die beiden unterscheidet; sie stand bis jetzt
+    // am Raster und am Herausholen aus dem Sperrstreifen, aber nicht
+    // hier, am Trichter JEDER Profilanwendung (Wechsel, Start, Import).
+    //
+    // m_applyingState darunter ist etwas anderes und bleibt: es haelt
+    // captureIntoCurrent() vom halb angewendeten Zwischenstand ab.
+    const EigeneBewegung wirSelbst;
     m_applyingState = true;
     m_apply(state);
     m_applyingState = false;
