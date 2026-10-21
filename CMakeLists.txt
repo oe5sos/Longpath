@@ -786,6 +786,7 @@ if(UNIX AND NOT APPLE)
 endif()
 
 set(MODEL_SOURCES
+    src/models/RecordingModel.cpp
     src/models/RadioModel.cpp
     src/models/RxDspWorker.cpp
     src/models/Band.cpp

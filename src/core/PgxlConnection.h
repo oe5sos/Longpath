@@ -22,6 +22,7 @@
 
 #include <QObject>
 #include <QTcpSocket>
+#include "GeniusStatusGate.h"
 #include <QTimer>
 #include <QByteArray>
 #include <QHash>
@@ -138,6 +139,9 @@ private:
     QTimer     m_pollTimer;
     QByteArray m_readBuf;
     quint32    m_seq{0};
+    // Eine `status`-Abfrage zur Zeit auf der Strecke zum Verstaerker:
+    // sonst legt das Geraet die Verbindung auf (GeniusStatusGate.h).
+    Longpath::GeniusStatusGate m_statusGate;
     bool       m_connected{false};
     bool       m_gotVersion{false};
     // PR #279 review #3 (2026-05-23): set true by disconnect() (user-

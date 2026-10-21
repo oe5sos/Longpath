@@ -1,5 +1,21 @@
 # Phase 3M — Recording / Playback: Implementation Plan
 
+**Stand 2026-10-21 (gemessen, nicht erinnert):** keine der vier Klassen
+wird irgendwo in `src/` konstruiert — jede Fundstelle ausserhalb der
+eigenen Dateien ist ein Kommentar. Das in §Deliverables vorgesehene
+`RecordingModel` (`src/models/`) wurde nie geschrieben. Sechs
+Prueflaeufe fahren die Klassen, sie funktionieren also; es fuehrt nur
+nichts zu ihnen. Die Oberflaeche ist nach §0.4 Absicht des Betreibers,
+der Befund ist also eine fehlende Flaeche und kein Fehler — aber
+CLAUDE.md fuehrte 3M als „Complete", und das war das falsche Wort.
+Gefunden mit `scripts/find-unsurfaced-features.py`, das vorher nie
+gelaufen war.
+
+Was auf einem anderen Weg SEHR WOHL erreichbar ist: die QSO-Aufnahme
+(`QsoRecorder` / `QsoRecorderController` / `QsoRecorderApplet`), die
+ueber denselben `WavStreamWriter` schreibt. Sie deckt weder I/Q noch
+den Zeitplan noch die Wiedergabe ab.
+
 **Status:** Phases A-D implemented (code-level; A/B/D previously build-verified at 807/807 tests, C added 2026-08-26 and syntax-clean but not yet build-verified — only the operator builds, per `CLAUDE.local.md`). Phase E.1 (unit-test sweep) pending the operator's next build; E.2/E.3 (live-bench and no-hardware checks) pending a real radio session.
 **Author:** Martin Fischer (OE5SOS), AI-assisted (Claude Code).
 **Date:** 2026-08-25.

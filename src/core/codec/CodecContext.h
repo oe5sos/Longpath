@@ -19,6 +19,7 @@
 
 #include <QtGlobal>
 #include <QMetaType>
+#include "../HpsdrModel.h"
 #include <cstdint>
 
 namespace Longpath {
@@ -46,6 +47,14 @@ struct SliceConfig {
 };
 
 struct CodecContext {
+    // Das logische Modell (nicht die Platine). P2 waehlt den Codec ueber
+    // HPSDRHW, eine Anvelina Pro 3 meldet sich aber als OrionMkII — ohne
+    // dieses Feld kann ein Codec die zwei nicht unterscheiden. Gebraucht
+    // fuer die DDC-Reihenfolge der Anvelina Pro 3 (kAnvelinaStreamToDdc in
+    // P2CodecOrionMkII.cpp), gesetzt von RadioModel::currentCodecContext()
+    // aus HardwareProfile::model. 2026-10-21.
+    HPSDRModel model {HPSDRModel::HPSDR};
+
     // ADC supply voltage in volts (33 or 50).
     // From Thetis cmaster.SetADCSupply(0, N) — clsHardwareSpecific.cs:85-191 [v2.10.3.15].
     //

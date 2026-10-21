@@ -183,7 +183,16 @@ void PgxlConnection::disconnect() {
 }
 
 quint32 PgxlConnection::sendCommand(const QString& cmd) {
+    // Eine `status`-Abfrage zur Zeit (GeniusStatusGate.h): die 5-Hz-Reihe,
+    // der Keepalive und jeder andere Rufer warten auf die Antwort zur
+    // vorigen. Es wird nichts aufgestaut — die naechste Abfrage fragt.
+    if (cmd == QLatin1String("status") && m_statusGate.answerPending()) {
+        return 0;
+    }
     quint32 seq = ++m_seq;
+    if (cmd == QLatin1String("status")) {
+        m_statusGate.sent(seq);
+    }
     QString line = QString("C%1|%2\n").arg(seq).arg(cmd);
     m_socket.write(line.toUtf8());
     qCDebug(lcPgxl) << "sent" << line.trimmed();
@@ -198,6 +207,9 @@ quint32 PgxlConnection::sendCommand(const QString& cmd) {
 void PgxlConnection::onConnected() {
     qCDebug(lcPgxl) << "TCP connected, waiting for version line";
     m_connectedSinceMs = QDateTime::currentMSecsSinceEpoch();
+    // Ein `status`, den die alte Verbindung nie beantwortet hat, haelt auf
+    // dieser nichts zurueck.
+    m_statusGate.reset();
     m_reconnectAttempts = 0;
     // Bench-fix 2026-05-20: reset the version-received latch so the next
     // V-frame arrival re-arms the handshake and re-sets m_connected=true.
@@ -537,6 +549,10 @@ void PgxlConnection::processLine(const QString& line) {
         if (pipe2 >= 0) {
             // Parse the sequence number from R<seq>.
             quint32 rseq = line.mid(1, pipe1 - 1).toUInt();
+            // Das Geraet hat geantwortet — damit darf der naechste
+            // `status` hinaus (GeniusStatusGate.h). Es zaehlt nur die
+            // Folgenummer, nicht was in der Antwort steht.
+            m_statusGate.answered(rseq);
             // Parse the hex status code.
             QString hexStr = line.mid(pipe1 + 1, pipe2 - pipe1 - 1).trimmed();
             bool hexOk = false;

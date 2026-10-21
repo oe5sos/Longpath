@@ -30,6 +30,9 @@
 //   2026-09-27 — fitFrameIntoArea(): Werkzeugfenster nie groesser als
 //                 der Schirm. Martin Fischer, AI-assisted via Anthropic
 //                 Claude.
+//   2026-10-21 — mitMindestabstand(): zwei Punkte Luft zwischen
+//                 schwebenden Fenstern, aber nur beim Ziehen. Martin
+//                 Fischer, AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include <functional>
@@ -81,6 +84,53 @@ QPoint snappedTopLeft(const QPoint& pos, int grid = kSnapGridPx);
 // Raster weiter hinaus.
 QRect snappedFrameRect(const QRect& frame, const QSize& minSize = QSize(),
                        int grid = kSnapGridPx);
+
+// ── Zwei Punkte Luft (2026-10-15 / 2026-10-21) ───────────────────────
+//
+// Betreiber 2026-10-15: „der pixelabstand automatisch zu allen fenstern
+// ist nicht da", und auf die Frage nach dem Mass: „ein minimaler
+// automatischer Abstand, vielleicht 2 pixel. x und y."
+//
+// Das Raster allein gibt ihn nicht: es rundet jede Kante fuer sich, und
+// zwei Fenster, deren gemeinsame Kante auf derselben Rasterlinie landet,
+// stossen danach BUENDIG aneinander -- seit das Raster am 2026-10-20 auf
+// 16 Punkte ging (#285), trifft das oefter als vorher.
+//
+// `wunsch` ist der schon gerasterte Rahmen des bewegten Fensters,
+// `nachbarn` sind die Rahmen der anderen sichtbaren Fenster. Heraus
+// kommt derselbe Rahmen, hoechstens um `abstand` verschoben (die Groesse
+// bleibt). Zwei Regeln halten das klein:
+//
+//  * Nachbar ist nur, wer sich in der ANDEREN Achse ueberlappt -- ein
+//    Fenster schraeg darueber steht nicht daneben.
+//  * Korrigiert wird nur rund um die Beruehrung: ein Spalt kleiner als
+//    `abstand`, aber hoechstens `maxUeberlappung` tief uebereinander.
+//    Was der Bediener absichtlich ueber ein anderes Fenster legt -- oder
+//    was im Hauptfenster liegt, das hier als Nachbar mitzaehlt --
+//    bleibt, wo es ist.
+//
+// `maxUeberlappung` ist eine HALBE Rasterzelle, und die Zahl ist an
+// Martins eigener Anordnung gemessen (Einstellungsdatei vom
+// 2026-10-21, Profil „Neu"): darin liegen „Asr" (x=576, Breite 272,
+// also bis 847) und „Frequency" (x=832) um genau 16 Punkte
+// uebereinander -- eine ganze Rasterzelle. Eine Schwelle von 16 haette
+// dieses Paar beim ersten Zug um 18 Punkte auseinandergerissen. Was
+// tiefer als eine halbe Zelle uebereinander liegt, ist gewollt; die
+// kleinen Reste darunter (2 Punkte, wenn ein Nachbar schon einmal
+// aufgeruckt wurde) sind es nicht.
+//
+// Bewusste Schwaeche: bei mehreren Nachbarn entscheidet der letzte in
+// der Liste, der ueberhaupt zutrifft. Zwischen zwei Fenstern mit weniger
+// als zwei Punkten Luft kann das Ergebnis also am einen kleben. Das
+// kostet beim Ziehen nichts (der naechste Zug korrigiert) und ein
+// Ausgleich ueber alle Nachbarn waere eine Platzsuche, nicht mehr ein
+// Abstand.
+//
+// Reiner Rechteck-Helfer, wie ausSperrstreifenSchieben() und aus
+// demselben Grund: am Schreibtisch vollstaendig pruefbar.
+QRect mitMindestabstand(const QRect& wunsch, const QList<QRect>& nachbarn,
+                        int abstand,
+                        int maxUeberlappung = kSnapGridPx / 2);
 
 // Von moveEvent() jeder schwebenden Fensterklasse mit einer Zeile
 // aufzurufen. Legt bei Bedarf einen einmaligen, an `w` gebundenen

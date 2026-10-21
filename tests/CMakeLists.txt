@@ -5249,6 +5249,7 @@ if(TEST tst_waterfall_after_pause)
     set_tests_properties(tst_waterfall_after_pause PROPERTIES RUN_SERIAL TRUE)
 endif()
 longpath_add_test(tst_window_grid_snap)
+longpath_add_test(tst_fenster_mindestabstand)
 longpath_add_test(tst_form_variants)
 if(TEST tst_form_variants)
     set_tests_properties(tst_form_variants PROPERTIES
@@ -6151,6 +6152,13 @@ longpath_add_test(tst_b8_overlay_signals)
 # wurde seither weiter GEBAUT -- nein, nicht einmal das: ohne
 # Eintrag wird er stillschweigend nicht uebersetzt. Vier Staende
 # traf es gleichzeitig.
+# ── Die Bindeschicht fuer Phase 3M (2026-10-21) ──────────────────────
+# Vier Klassen waren fertig und geprueft, aber niemand baute sie -- die
+# im Plan vorgesehene RecordingModel-Flaeche fehlte. Dieser Lauf nagelt
+# fest, dass sie VERWEIGERT, wo sie verweigern muss, und dabei sagt,
+# WAS fehlt.
+longpath_add_test(tst_recording_model)
+
 longpath_add_test(tst_tx_bandbreiten_klickbar)
 
 longpath_add_test(tst_stationsrufzeichen)
@@ -7846,6 +7854,30 @@ longpath_add_test(tst_kurven_streifen)
 #   dazu die Vorgabe selbst (beide AUS, am Widget und am Kaestchen) und die
 #   Unabhaengigkeit der zwei Schalter voneinander.
 longpath_add_test(tst_kurve_setup_schalter)
+
+# ── Rosinen aus Upstream 2026.10.1 (2026-10-21) ─────────────────────────
+# tst_agc_saat_beim_oeffnen: welche AGC-Verstaerkung ein frisch geoeffneter
+#   WDSP-Empfaenger WIRKLICH faehrt. WDSP oeffnet mit fixed_gain 60 dB und
+#   max_gain 80 dB (third_party/wdsp/src/rxa.c:380/382), RxChannel cached 20
+#   bzw. 90 dB und seine Setter kehren beim gecachten Wert frueh zurueck --
+#   also erreichte der Stoss der Scheibe WDSP nie. AGC Off lief 40 dB zu
+#   heiss. Der Lauf liest den Wert aus rxa[].agc zurueck, nicht aus unserem
+#   Cache, sonst prueft er nur sich selbst.
+longpath_add_test(tst_agc_saat_beim_oeffnen)
+
+# tst_fm_squelch_abbildung: die Abbildung Reglerstellung -> WDSP-Schwelle der
+#   FM-Rauschsperre (Thetis console.cs:47295-47304 [v2.10.3.15]) samt dem
+#   Waechter, der die Zahl bei WDSP fuer jede Applet-Stellung gegen die
+#   frueheren zwei Halbrechnungen festnagelt. Faellt er um, hat jemand eine
+#   der beiden Haelften angefasst.
+longpath_add_test(tst_fm_squelch_abbildung)
+
+# tst_genius_status_tor: eine `status`-Abfrage zur Zeit auf der Strecke zum
+#   Power Genius XL und zum Tuner Genius XL. Prueft das Tor selbst (haelt bis
+#   zur Antwort, gibt nach der Frist auf, oeffnet bei neuer Verbindung) UND
+#   beide Strecken, den Tuner ausdruecklich mit seinem S-Rahmen: wer nur den
+#   R-Zweig anfasst, laesst den Tuner nach der ersten Abfrage stillstehen.
+longpath_add_test(tst_genius_status_tor)
 
 # --------------------------------------------------------------------------
 # Aggregate "all_tests" target  (2026-05-26 KG4VCF dev-loop fix, from PR #291)

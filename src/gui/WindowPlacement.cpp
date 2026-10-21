@@ -9,10 +9,12 @@
 
 #include <QSet>
 #include "gui/MacFloatingWindowBehavior.h"
+#include "gui/StyleConstants.h"
 
 #include <algorithm>
 #include <cmath>
 
+#include <QApplication>
 #include <QGuiApplication>
 #include <QHash>
 #include <QLoggingCategory>
@@ -169,6 +171,66 @@ QRect snappedFrameRect(const QRect& frame, const QSize& minSize, int grid)
     return QRect(left, top, right - left, bottom - top);
 }
 
+QRect mitMindestabstand(const QRect& wunsch, const QList<QRect>& nachbarn,
+                        int abstand, int maxUeberlappung)
+{
+    if (abstand <= 0 || !wunsch.isValid()) { return wunsch; }
+
+    QRect ziel = wunsch;
+
+    // Halboffen gerechnet: zwei Bereiche ueberlappen, wenn der eine
+    // beginnt, bevor der andere endet. Beruehrende Kanten (a2 == b1)
+    // sind KEINE Ueberlappung -- sonst waere jedes Fenster, das mit
+    // einer Ecke anstoesst, in beiden Achsen Nachbar und bekaeme zwei
+    // Korrekturen fuer eine Beruehrung.
+    const auto ueberlappt = [](int a1, int a2, int b1, int b2) {
+        return a1 < b2 && b1 < a2;
+    };
+    // Trifft der Spalt den schmalen Bereich um die Beruehrung? Der Spalt
+    // ist die Luft zwischen beiden Kanten: 2 heisst zwei Punkte Luft,
+    // 0 buendig, -5 fuenf Punkte uebereinander.
+    const auto zuNah = [abstand, maxUeberlappung](int spalt) {
+        return spalt < abstand && spalt >= -maxUeberlappung;
+    };
+
+    for (const QRect& o : nachbarn) {
+        if (!o.isValid() || o.isEmpty()) { continue; }
+        // Eines ganz im anderen ist kein Nebeneinander, sondern ein
+        // Uebereinander -- und der haeufigste Fall davon ist ein
+        // schwebendes Fenster auf dem Hauptfenster.
+        if (o.contains(ziel) || ziel.contains(o)) { continue; }
+
+        // Waagerechte Nachbarschaft: die Fenster ueberlappen senkrecht.
+        if (ueberlappt(ziel.top(), ziel.bottom() + 1, o.top(), o.bottom() + 1)) {
+            if (ziel.left() >= o.left()) {
+                if (zuNah(ziel.left() - o.right() - 1)) {
+                    ziel.moveLeft(o.right() + 1 + abstand);
+                }
+            } else {
+                if (zuNah(o.left() - ziel.right() - 1)) {
+                    ziel.moveLeft(o.left() - abstand - ziel.width());
+                }
+            }
+        }
+
+        // Senkrechte Nachbarschaft: die Fenster ueberlappen waagerecht.
+        // Gerechnet auf dem schon waagerecht korrigierten `ziel`: ist es
+        // seitlich weggeruecht, steht es nicht mehr darueber.
+        if (ueberlappt(ziel.left(), ziel.right() + 1, o.left(), o.right() + 1)) {
+            if (ziel.top() >= o.top()) {
+                if (zuNah(ziel.top() - o.bottom() - 1)) {
+                    ziel.moveTop(o.bottom() + 1 + abstand);
+                }
+            } else {
+                if (zuNah(o.top() - ziel.bottom() - 1)) {
+                    ziel.moveTop(o.top() - abstand - ziel.height());
+                }
+            }
+        }
+    }
+    return ziel;
+}
+
 namespace {
 std::function<void(QWidget*)> s_zugmelder;
 // Wieviele `EigeneBewegung` gerade leben. Ein Zaehler, nicht ein
@@ -273,9 +335,72 @@ QRect ausSperrstreifenSchieben(const QRect& wunsch,
     return r;
 }
 
+// ── „Der Bediener zieht gerade" ──────────────────────────────────────
+//
+// Am 2026-10-15 stand der Mindestabstand schon einmal hier und musste
+// wieder heraus (5922f1b6). Betreiber, mit einem Bild: „warum ist das
+// alles verstellt". Die Funktion lief bei JEDEM moveEvent, also auch
+// waehrend das Layoutprofil seine Fenster setzt -- dort liegen Fenster
+// fuer einen Moment uebereinander, sie schob sie auseinander, und die
+// Anordnung war zerlegt. Der Ausbau-Commit nannte auch, was fehlte:
+// „Eine Mindestabstand-Automatik braucht also einen Zustand ('der
+// Bediener zieht gerade'), den WindowPlacement nicht hat."
+//
+// Das ist dieser Zustand. Zwei Bedingungen, die sich gegenseitig
+// abdecken, weil jede fuer sich ein Loch hat:
+//
+//  1. KEINE `EigeneBewegung`. Wer selbst schiebt, sagt es -- das Raster
+//     hier, das Herausholen aus dem Sperrstreifen, und seit heute
+//     `LayoutProfiles::runApply()`, der Trichter JEDER Profilanwendung
+//     (Wechsel, Start, Import). Das Loch: Qt liefert nach einem
+//     `setGeometry()` auf manchen Fensterarten noch ein spaetes,
+//     asynchrones moveEvent -- das kommt an, wenn die `EigeneBewegung`
+//     schon gestorben ist.
+//  2. MEHR ALS ZWEI Meldungen mit wirklich veraenderter Lage. Genau die
+//     Unterscheidung aus #280 („die ERSTE Meldung eines Fensters zaehlt
+//     nicht", „nur, wenn sich die Lage WIRKLICH geaendert hat"), nur
+//     eine Stufe strenger: ein Platzieren bewegt ein Fenster einmal,
+//     mit dem spaeten Nachhall zweimal. Ein Zug am Titelbalken schickt
+//     Dutzende Meldungen, da ist die Schwelle in Millisekunden erreicht.
+//
+// Die Spur haelt NUR Zahlen und ein Rechteck, nie einen Zugriff auf das
+// Fenster: ein toter Schluessel ist darum harmlos. Aufgeraeumt wird er
+// trotzdem, zusammen mit Timer und letztem Rasterversuch.
+//
+// Zurueckgesetzt wird erst, wenn das Fenster steht (Ziel == Lage) --
+// ABSICHTLICH nicht bei der eigenen Bewegung, die das Ruecken selbst
+// ausloest. Sonst fiele das Tor zwischen Ruecken und Nachhall zu, das
+// naechste Rastern zoege das Fenster auf die Rasterlinie zurueck, und
+// die zwei Punkte waeren nach einem Augenblick wieder weg (gemessen:
+// mit Raster 16 und Abstand 2 ist die Rasterlinie genau die buendige
+// Kante, von der wir gerade weggeruckt sind).
+namespace {
+struct Zugspur {
+    QRect letzteLage;
+    int bewegungen = 0;
+};
+QHash<QWidget*, Zugspur> s_zugspur;
+constexpr int kZugMindestMeldungen = 3;
+}
+
 void snapToGridAfterSettle(QWidget* w, int grid, int delayMs, bool snapSize)
 {
     if (!w) { return; }
+
+    {
+        Zugspur& spur = s_zugspur[w];
+        const QRect jetzt = w->frameGeometry();
+        if (!w->isVisible()) {
+            // Was man nicht sieht, zieht niemand. Qt schickt die
+            // aufgestauten Lageereignisse, BEVOR ein Fenster sichtbar
+            // wird (siehe meldeZug()); ohne diese Zeile sahen allein sie
+            // schon wie ein Zug aus.
+            spur.bewegungen = 0;
+        } else if (s_eigeneBewegungen == 0 && jetzt != spur.letzteLage) {
+            ++spur.bewegungen;
+        }
+        spur.letzteLage = jetzt;
+    }
 
     // Ein Debounce-Timer je Fenster, angelegt beim ersten Aufruf und an
     // `w` gebunden (QObject-Elternschaft), damit keine der vier
@@ -357,14 +482,43 @@ void snapToGridAfterSettle(QWidget* w, int grid, int delayMs, bool snapSize)
                 while (bottom - top < qMax(grid, minFrame.height()))  { bottom += grid; }
                 target = QRect(left, top, right - left, bottom - top);
             }
+            // ── Und dann zwei Punkte Luft, aber nur beim Ziehen ──────
+            //
+            // NACH dem Raster und nach der Flaechengrenze: der Abstand
+            // ist die feinere Regel und darf das Ergebnis der groberen
+            // um zwei Punkte korrigieren, nicht umgekehrt.
+            if (s_zugspur.value(w).bewegungen >= kZugMindestMeldungen) {
+                QList<QRect> nachbarn;
+                for (const QWidget* other : QApplication::topLevelWidgets()) {
+                    if (other == w || !other->isVisible() || other->isMinimized()) {
+                        continue;
+                    }
+                    // Menues, Hinweisfenster und Werkzeugspitzen stehen
+                    // nicht „neben" etwas -- sie liegen kurz darueber.
+                    const Qt::WindowType art = other->windowType();
+                    if (art == Qt::Popup || art == Qt::ToolTip
+                        || art == Qt::SplashScreen) {
+                        continue;
+                    }
+                    nachbarn << other->frameGeometry();
+                }
+                target = mitMindestabstand(target, nachbarn, Style::kPanelGapPx);
+            }
             if (target == frame) {
                 s_lastSnapAttempt.remove(w);   // gelungen
+                s_zugspur[w].bewegungen = 0;   // der Zug ist zu Ende
                 return;
             }
             // Steht das Fenster nach einem Versuch nicht dort, und waere
             // der Versuch derselbe: das System haelt es fest (Menueleiste,
             // Dock, Bildschirmrand). Nicht weiter draengen.
-            if (s_lastSnapAttempt.value(w) == target) { return; }
+            if (s_lastSnapAttempt.value(w) == target) {
+                // Auch das ist ein Ende -- das Fenster steht, wo es
+                // stehen kann. Der Zug gilt als vorbei, sonst zaehlte
+                // die naechste einzelne Meldung auf dieser Zahl weiter.
+                s_zugspur[w].bewegungen = 0;
+                return;
+            }
             s_lastSnapAttempt.insert(w, target);
             // Ein Aufruf fuer Lage und Groesse: move() und resize()
             // einzeln loesten zwei Runden aus. setGeometry() meint den
@@ -377,6 +531,7 @@ void snapToGridAfterSettle(QWidget* w, int grid, int delayMs, bool snapSize)
         QObject::connect(w, &QObject::destroyed, w, [w]() {
             timers.remove(w);
             s_lastSnapAttempt.remove(w);
+            s_zugspur.remove(w);
         });
     }
     timer->start(delayMs);

@@ -44,6 +44,12 @@
 //                disconnected after the 2 s connect watchdog because the
 //                G2-class branch placed RX1 on DDC2 instead of DDC0.
 //                J.J. Boyd (KG4VCF), AI-assisted via Anthropic Claude Code.
+//   2026-10-21 — Anvelina Pro 3: der dritte und vierte Strom nehmen DDC5
+//                und DDC6, DDC4 kommt zuletzt. Der DDC4-Strom dieses
+//                Geraets kommt beschaedigt an; gefunden an der Bank von
+//                J.J. Boyd (KG4VCF) im Upstream NereusSDR (47f6b1fab,
+//                2026-10-12, Fassung 2026.10.1) und hier uebernommen.
+//                Uebernahme: Longpath, KI-gestuetzt via Anthropic Claude Code.
 // =================================================================
 //
 // === Verbatim Thetis Console/console.cs header (lines 1-50) ===
@@ -1110,6 +1116,9 @@ DdcAssignment P2CodecOrionMkII::applyDdcAssignment(
     //   Slice C (index 2) -> DDC4    [Longpath extension: idle Thetis DDC4 slot]
     //   Slice D (index 3) -> DDC5    [Longpath extension: idle Thetis DDC5 slot]
     //   Slice E (index 4) -> DDC6    [Longpath extension: idle Thetis DDC6 slot]
+    // Auf einer Anvelina Pro 3 nehmen die drei Erweiterungsstroeme DDC5,
+    // DDC6 und DDC4 in dieser Reihenfolge (kAnvelinaStreamToDdc unten, mit
+    // dem Bankbefund).
     // DDC0/DDC1 reserved for PS feedback pair or Diversity sync pair.
     //
     // From Thetis console.cs:8199 [v2.10.3.15]:
@@ -1135,6 +1144,36 @@ DdcAssignment P2CodecOrionMkII::applyDdcAssignment(
     // [2.10.3.13]MW0LGE p1 !  [verbatim from console.cs:8247 — P1-only Rate[0] path]
     static constexpr int kStreamToDdc[5] = {2, 3, 4, 5, 6};
 
+    // Anvelina Pro 3: der dritte und vierte Strom nehmen DDC5 und DDC6,
+    // DDC4 wird zuletzt belegt. Longpath-eigene Reihenfolge, kein
+    // Thetis-Port — Thetis schaltet DDC4 bis DDC6 auf dieser Familie
+    // ueberhaupt nie ein.
+    //
+    // Befund (Upstream NereusSDR 47f6b1fab, Bank von KG4VCF am
+    // 2026-10-11/12, Anvelina Pro 3 auf Protokoll 2, vier Empfaenger zu
+    // 1536 kHz): im DDC4-Strom sind Bit 20 und 21 der 24-Bit-Probe bei
+    // etwa 13 % der nicht-negativen I- und Q-Werte gesetzt, waehrend
+    // DDC2, DDC3 und DDC5 im selben Mitschnitt keinen einzigen solchen
+    // Wert haben. Auf der Anzeige ist das ein Kamm ueber einem Boden, der
+    // ~58 dB zu hoch steht, auf jedem Band. Was Longpath fuer DDC4
+    // sendet, ist dieselbe Einrichtung wie fuer DDC5 — der Fehler sitzt
+    // also nicht im Befehl.
+    //
+    // Die Wahl ist auf dem Draht frei: die Gateware baut die Empfaenger 1
+    // bis NR-1 als gleiche Instanzen EINES Moduls
+    // (// From n1gp-Anvelina_PROIII Orion.v:1921-1956 [@8e86a61] —
+    // generate-Schleife, `receiver2 receiver_instX` fuer c > 0; NR = 8 in
+    // Orion.v:958) und liest ADC-Wahl und Rate jedes Empfaengers in einer
+    // einzigen Schleife gleich ein
+    // (// From n1gp-Anvelina_PROIII Rx_specific_C&C.v:215-223 [@8e86a61]).
+    // Jedes andere Modell behaelt DDC2 bis DDC6 in Reihe.
+    //
+    // DDC6 ist an diesem Geraet nicht mitgeschnitten. DDC4 bleibt in der
+    // Tabelle, damit ein fuenfter Strom noch einen Empfaenger bekommt.
+    static constexpr int kAnvelinaStreamToDdc[5] = {2, 3, 5, 6, 4};
+    const int* const streamToDdc = (ctx.model == HPSDRModel::ANVELINAPRO3)
+        ? kAnvelinaStreamToDdc : kStreamToDdc;
+
     // ADC control from Thetis console.cs:8249 [v2.10.3.15]:
     //   cntrl1 = rx_adc_ctrl1 & 0xff;  (default rx_adc_ctrl1=4, console.cs:15099)
     //   cntrl2 = rx_adc_ctrl2 & 0x3f;  (default rx_adc_ctrl2=0, console.cs:15135)
@@ -1150,10 +1189,11 @@ DdcAssignment P2CodecOrionMkII::applyDdcAssignment(
     // Populate DDC assignments for active streams.
     // For stream 0 -> DDC2: matches Thetis's rx1 on DDC2.
     // For stream 1 -> DDC3: matches Thetis's rx2_enabled DDC3 addendum.
-    // For streams 2-4 -> DDC4-6: Longpath extension into Thetis's idle slots.
+    // For streams 2-4 -> DDC4-6: Longpath extension into Thetis's idle slots
+    // (DDC5, DDC6, DDC4 auf einer Anvelina Pro 3; siehe kAnvelinaStreamToDdc).
     for (int i = 0; i < 5; ++i) {
         if (!slices[i].live) { continue; }
-        const int ddc = kStreamToDdc[i];
+        const int ddc = streamToDdc[i];
         // Phase 3F Sub-Epic I Task 7b: publish the mapping explicitly.
         a.streamDdc[i] = ddc;
         a.ddcEnable |= (1 << ddc);

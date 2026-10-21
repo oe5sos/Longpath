@@ -75,6 +75,8 @@ private slots:
         QVERIFY(s->fmsqEnabled());
         QCOMPARE(s->ssqlEnabled(), ssqlBefore);
         slider->setValue(50);
+        // Die Scheibe haelt die Daempfung -0,4*n (siehe
+        // RxChannel::fmsqThresholdForWdsp); 50 -> -20 dB -> Schwelle 0,1.
         QCOMPARE(s->fmsqThresh(), -20.0);
 
         // Anderswo wie bisher die Sprach-Sperre; der Knopf zeigt je Betriebsart.

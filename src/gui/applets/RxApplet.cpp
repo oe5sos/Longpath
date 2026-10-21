@@ -2207,13 +2207,20 @@ void RxApplet::applyColumnDirection()
 //     //[2.10.3.5]MW0LGE convert to a 0-100 scale from a -160 to 0 scale
 //     nValue = (int)(((ptbSquelch.Value + 160) / 160f) * 100f);
 //     FMSquelchThreshold = (float)Math.Pow(10.0, -2.0 * nValue / 100.0);
-// Longpaths Regler laeuft schon auf der 0-100-Skala (wie nValue).
-// SliceModel haelt die Schwelle in dB (RxChannel: linear = 10^(dB/20)),
-// also dB = -0.4 * n.
+// Longpaths Regler laeuft schon auf der 0-100-Skala (wie nValue);
+// SliceModel haelt sie als Daempfung -0,4*n, also 0 .. -40. Die Abbildung
+// auf die WDSP-Schwelle macht ALLEIN RxChannel::fmsqThresholdForWdsp —
+// bis zum 2026-10-21 rechnete dort ein `10^(dB/20)`, das nur ZUSAMMEN mit
+// diesen -0,4 Thetis' Zahl ergab und einzeln keinen Sinn hatte; das steht
+// jetzt dort begruendet. Thetis' eigene Reglerstellung -160..0 wird hier
+// absichtlich nicht nachgebaut: ihre Umrechnung schneidet auf Ganzzahlen
+// ab und ist nicht umkehrbar (Stellung -156,8 kommt als n = 1 heraus,
+// nicht als 2 — am 2026-10-21 im Pruefstand gemessen), und gespeicherte
+// Empfangsprofile tragen unsere Zahlen schon.
 // ---------------------------------------------------------------------------
 double RxApplet::fmSquelchDbFromSlider(int n)
 {
-    return -0.4 * static_cast<double>(n);
+    return -0.4 * static_cast<double>(qBound(0, n, 100));
 }
 
 int RxApplet::fmSquelchSliderFromDb(double dB)
