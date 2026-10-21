@@ -3488,6 +3488,26 @@ private:
     /// Zustandsschub der Maschine gesagt hat, was dort steht, und nur
     /// das, was wirklich im Weg ist.
     void applyFlexAudioSetup();
+    /// Was die Maschine als `y_pixels` meldet, einordnen: ein echter
+    /// Wert wird zum Teiler, eine Ruecksetzvorgabe loest ein erneutes
+    /// Hinschicken der Masze aus.
+    void uebernimmFlexBildhoehe(int gemeldet);
+
+public:
+    /// Ist diese gemeldete Bildhoehe die Ruecksetzvorgabe der Maschine
+    /// und damit KEIN Maszstab?
+    ///
+    /// From AetherSDR RadioModel.cpp:86 + :10994-11018 [@d58e2b8a] —
+    /// Schwelle 100. Oeffentlich, weil genau diese Grenze der Grund
+    /// ist, warum das Bild entweder stimmt oder zwanzig Stufen hat;
+    /// eine stille „Vereinfachung" soll am Prueflauf auffallen.
+    static bool flexHoeheIstVorgabe(int gemeldet)
+    {
+        constexpr int kVorgabeSchwelle = 100;
+        return gemeldet <= kVorgabeSchwelle;
+    }
+
+private:
 
     // Sub-components (owned, main thread)
     RadioDiscovery*  m_discovery{nullptr};
@@ -3517,6 +3537,10 @@ private:
     /// gegen ein `display pan set`, das sie mit Code 0 quittiert und
     /// dann ignoriert hat (am 2026-10-21 genau so gemessen).
     int                  m_flexYPixelsGemeldet{0};
+    /// Wie oft die Masze nach einer Ruecksetzvorgabe neu hingeschickt
+    /// wurden. Gedeckelt, damit eine Maschine, die sie nie annimmt,
+    /// keine endlose Schleife erzeugt.
+    int                  m_flexMasseNachgereicht{0};
     ReceiverManager* m_receiverManager{nullptr};
     AudioEngine*     m_audioEngine{nullptr};
     WdspEngine*      m_wdspEngine{nullptr};

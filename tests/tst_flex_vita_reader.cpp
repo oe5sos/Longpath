@@ -25,6 +25,8 @@
 
 #include <algorithm>
 
+#include "models/RadioModel.h"
+
 #include <QByteArray>
 
 #include "core/FlexVitaReader.h"
@@ -612,6 +614,34 @@ private slots:
         QVERIFY2(spreizung(richtig) - spreizung(falsch) > 80.0,
                  "die falsche Hoehe faellt hier nicht auf — dann faengt "
                  "dieser Prueflauf den Befund nicht");
+    }
+
+    // Die Schwelle, an der entschieden wird, ob eine gemeldete
+    // Bildhoehe ein Maszstab ist oder die Ruecksetzvorgabe der
+    // Maschine.
+    //
+    // From AetherSDR RadioModel.cpp:86 + :10994-11018 [@d58e2b8a] —
+    // dort steht die Regel und ihre Begruendung: eine kleine Zahl
+    // gehoert NICHT in den Dekoder, sonst klemmen die FFT-Bins in
+    // einen flachen Boden. Am 2026-10-21 habe ich genau das gebaut:
+    // die 8400 meldete `y_pixels=20`, ich nahm die 20 als Teiler, und
+    // das Bild hatte zwanzig Stufen auf neunzig Dezibel.
+    void vorgabehoeheIstKeinMaszstab()
+    {
+        // Was die 8400 nach dem Anlegen wirklich meldet.
+        QVERIFY2(RadioModel::flexHoeheIstVorgabe(20),
+                 "20 ist die Ruecksetzvorgabe der Maschine, kein Maszstab");
+        QVERIFY(RadioModel::flexHoeheIstVorgabe(1));
+        QVERIFY(RadioModel::flexHoeheIstVorgabe(50));
+
+        // Die Grenze selbst gehoert noch zur Vorgabe.
+        QVERIFY(RadioModel::flexHoeheIstVorgabe(100));
+        QVERIFY(!RadioModel::flexHoeheIstVorgabe(101));
+
+        // Und was ein Client bekommt, der wirklich ein Bild hat.
+        QVERIFY2(!RadioModel::flexHoeheIstVorgabe(700),
+                 "700 ist die Hoehe, um die AetherSDR bittet");
+        QVERIFY(!RadioModel::flexHoeheIstVorgabe(1000));
     }
 
     void lueckenverfolgung()

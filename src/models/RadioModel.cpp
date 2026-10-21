@@ -6818,18 +6818,8 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                 bool gelesen = false;
                 const int gemeldet =
                     kv.value(QStringLiteral("y_pixels")).toInt(&gelesen);
-                if (gelesen && gemeldet >= 2
-                    && gemeldet != m_flexYPixelsGemeldet) {
-                    m_flexYPixelsGemeldet = gemeldet;
-                    qCInfo(lcConnection)
-                        << "Flex: die Maschine zeichnet mit y_pixels"
-                        << gemeldet << "— Hoehe nachgezogen";
-                    bool kennungOk = false;
-                    const quint32 panStream =
-                        m_flexPanId.toUInt(&kennungOk, 16);
-                    if (m_flexStream && kennungOk) {
-                        m_flexStream->setYPixels(panStream, gemeldet);
-                    }
+                if (gelesen && gemeldet > 0) {
+                    uebernimmFlexBildhoehe(gemeldet);
                 }
             }
 
@@ -6931,7 +6921,12 @@ void RadioModel::applyFlexPanSetup()
     // soll; `totalBins` folgt xpixels (gemessen: der Sprung von 50 auf
     // 1024).
     constexpr int kXPixels = 1024;
-    constexpr int kYPixels = 1000;
+    // From AetherSDR RadioModel.cpp:4966 [@d58e2b8a] — dieselbe Bitte
+    // wie der Vorlageclient: `xpixels=1024 ypixels=700`. 700 ist keine
+    // runde Zahl aus der Luft, sondern die eines Clients, der an
+    // dieser Maschinenfamilie nachweislich ein Bild bekommt; unsere
+    // 1000 war geraten.
+    constexpr int kYPixels = 700;
     constexpr double kMinDbm = -130.0;
     constexpr double kMaxDbm = -40.0;
 
@@ -6949,7 +6944,9 @@ void RadioModel::applyFlexPanSetup()
     // das man warten koennte.
     bool ok = false;
     const quint32 panStream = m_flexPanId.toUInt(&ok, 16);
-    const int hoehe = (m_flexYPixelsGemeldet >= 2)
+    // Nur eine ECHTE gemeldete Hoehe gilt — eine Ruecksetzvorgabe
+    // landet hier nie, die faengt `uebernimmFlexBildhoehe()` ab.
+    const int hoehe = (m_flexYPixelsGemeldet > 0)
                           ? m_flexYPixelsGemeldet : kYPixels;
     if (ok) {
         // Hat die Maschine schon gesagt, mit welcher Hoehe sie
@@ -7065,6 +7062,54 @@ void RadioModel::startFlexStreams()
 // `audio_level` bleibt deshalb unberuehrt, solange dort nicht 0 steht:
 // an Martins Geraet standen 37, und eine 50 hinzuschreiben ist eine
 // Aenderung an seiner Station, die niemand bestellt hat.
+// Eine gemeldete Bildhoehe einordnen.
+//
+// From AetherSDR RadioModel.cpp:10994-11018 [@d58e2b8a] — dort steht
+// die Regel, und ihre Begruendung im Wortlaut: „Tiny default/reset
+// values are handled below by re-pushing the real widget dimensions;
+// do not feed them to the decoder or most FFT bins clamp into a flat
+// floor until the next dimensions echo."
+//
+// Genau in diese Falle bin ich am 2026-10-21 gelaufen. Die 8400
+// meldete `y_pixels=20`, ich habe die 20 als Teiler genommen, und das
+// Bild wurde „richtig" im Sinne von nicht mehr uebersteuert — aber mit
+// zwanzig Stufen auf neunzig Dezibel, 4,5 dB je Stufe. Eine 20 ist
+// kein Messwert, sondern die Ruecksetzvorgabe der Maschine.
+//
+// From AetherSDR RadioModel.cpp:86 [@d58e2b8a] — die Schwelle.
+void RadioModel::uebernimmFlexBildhoehe(int gemeldet)
+{
+    // Ein zweistelliger Deckel: eine Maschine, die die Masze nie
+    // annimmt, soll keine endlose Schleife aus Melden und
+    // Hinschicken erzeugen.
+    constexpr int kHoechstensNachreichen = 5;
+
+    if (!flexHoeheIstVorgabe(gemeldet)) {
+        if (gemeldet == m_flexYPixelsGemeldet) { return; }
+        m_flexYPixelsGemeldet = gemeldet;
+        bool kennungOk = false;
+        const quint32 panStream = m_flexPanId.toUInt(&kennungOk, 16);
+        if (m_flexStream && kennungOk) {
+            m_flexStream->setYPixels(panStream, gemeldet);
+        }
+        qCInfo(lcConnection) << "Flex: die Maschine zeichnet mit y_pixels"
+                             << gemeldet << "— Hoehe uebernommen";
+        return;
+    }
+
+    // Ruecksetzvorgabe. NICHT als Teiler benutzen — die Masze noch
+    // einmal hinschicken und auf das Echo warten.
+    if (m_flexMasseNachgereicht >= kHoechstensNachreichen) {
+        return;
+    }
+    ++m_flexMasseNachgereicht;
+    qCWarning(lcConnection)
+        << "Flex: die Maschine meldet die Vorgabehoehe" << gemeldet
+        << "— das ist kein Maszstab. Masze werden nachgereicht ("
+        << m_flexMasseNachgereicht << "von" << kHoechstensNachreichen << ")";
+    applyFlexPanSetup();
+}
+
 void RadioModel::applyFlexAudioSetup()
 {
     if (!m_flexAudioWanted) { return; }
@@ -7160,6 +7205,7 @@ void RadioModel::teardownFlexConnection()
     m_flexRestoreAudioMute  = false;
     m_flexRestoreMuteLocal  = false;
     m_flexYPixelsGemeldet   = 0;
+    m_flexMasseNachgereicht = 0;
     m_flexPanId.clear();
 
     if (m_flexStream) {
