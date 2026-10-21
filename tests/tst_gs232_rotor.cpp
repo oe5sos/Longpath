@@ -305,6 +305,42 @@ private slots:
         rotor.disconnectFromRotor();
     }
 
+    // Der Verbinden-Knopf im Rotordialog kann den Treiber wechseln,
+    // waehrend das Fenster offen ist. Das ist der Mechanismus dahinter.
+    void treiberwechsel_im_laufenden_fenster()
+    {
+        AppSettings& s = AppSettings::instance();
+        const QString vorher = s.value(QStringLiteral("Rotor/Backend"),
+                                       QStringLiteral("rotctld")).toString();
+
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("rotctld"));
+        RotorLogbookPanel panel(nullptr, nullptr, nullptr);
+        panel.ensureRotorForTest();
+        QVERIFY(qobject_cast<Gs232Rotor*>(panel.rotorForTest()) == nullptr);
+        RotorController* alt = panel.rotorForTest();
+
+        // Umgestellt wie im Dialog: Einstellung schreiben, dann neu bauen.
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("gs232"));
+        s.setValue(QStringLiteral("Rotor/Host"), QStringLiteral("172.30.30.16"));
+        s.setValue(QStringLiteral("Rotor/NetPort"), 4001);
+        panel.rebuildRotorBackendForTest();
+
+        auto* neu = qobject_cast<Gs232Rotor*>(panel.rotorForTest());
+        QVERIFY(neu != nullptr);
+        QVERIFY(panel.rotorForTest() != alt);
+        QCOMPARE(neu->description(), QStringLiteral("GS-232 über 172.30.30.16:4001"));
+        QCOMPARE(neu->state(), RotorController::State::Disconnected);
+
+        // Und zurueck -- der Weg darf in beide Richtungen gehen.
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("rotctld"));
+        panel.rebuildRotorBackendForTest();
+        QVERIFY(qobject_cast<Gs232Rotor*>(panel.rotorForTest()) == nullptr);
+        QVERIFY(panel.rotorForTest() != nullptr);
+
+        s.setValue(QStringLiteral("Rotor/Host"), QString{});
+        s.setValue(QStringLiteral("Rotor/Backend"), vorher);
+    }
+
     void beschreibung_sagt_die_schnittstelle()
     {
         Gs232Rotor rotor;

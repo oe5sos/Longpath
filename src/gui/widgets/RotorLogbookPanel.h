@@ -194,6 +194,9 @@ private:
     // stays demonstrable — but the status line says which it is.
     void openRotorSetupDialog();
     void ensureRotor();
+    /// Den Rotortreiber wechseln (rotctld <-> GS-232 direkt), waehrend
+    /// das Fenster offen ist -- siehe RotorLogbookPanel.cpp.
+    void rebuildRotorBackend();
     void beginTurn();
     void haltTurn();
     // Hide rows from the bottom of the priority list as height runs
@@ -226,6 +229,9 @@ public:
     /// Treiber aus der Einstellung `Rotor/Backend` entsteht.
     void ensureRotorForTest() { ensureRotor(); }
     RotorController* rotorForTest() const { return m_rotor; }
+    /// Prüfstandsnaht zum Treiberwechsel, den der Verbinden-Knopf im
+    /// Rotordialog auslöst.
+    void rebuildRotorBackendForTest() { rebuildRotorBackend(); }
 #endif
 
     /// Das Ziel-Menue bauen, ohne es aufzuklappen. Fuer Pruefungen:

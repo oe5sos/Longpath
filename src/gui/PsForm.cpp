@@ -59,6 +59,7 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "PsForm.h"
+#include "StyleConstants.h"
 
 #include <QCheckBox>
 #include <QCloseEvent>
@@ -386,6 +387,42 @@ void PsForm::buildUi()
     m_comboTint->setCurrentIndex(0);
     m_comboTint->setToolTip(tr("FOR EXPERIMENTATION. - LEAVE AT 0.5dB."));
     body->addWidget(m_comboTint, 3, 3);
+
+    // ── Was PureSignal 3 nicht mehr kennt ────────────────────────────
+    //
+    // PIN, MAP, STBL, Relax Tolerance und TINT stellten die Tabelle mit
+    // den festen Stuetzstellen ein, aus der WDSP 1.29 die Korrekturkurve
+    // baute. PureSignal 3 (WDSP 2.11) bildet sie als NURB-Anpassung
+    // (nurbs_fit/nurbs_spline) -- die Setter dahinter gibt es nicht mehr,
+    // die Schalter wuerden also nur so TUN, als taeten sie etwas.
+    //
+    // Sie bleiben stehen statt zu verschwinden: wer sie kennt, soll
+    // sehen, dass es sie gab und warum sie weg sind, statt sie einmal
+    // vergeblich zu suchen. Entscheidung des Betreibers am Entwurfsblatt
+    // (2026-10-21, Fassung A von drei).
+    for (QWidget* w : { static_cast<QWidget*>(m_chkPin),
+                        static_cast<QWidget*>(m_chkMap),
+                        static_cast<QWidget*>(m_chkStbl),
+                        static_cast<QWidget*>(m_chkRelaxPtol),
+                        static_cast<QWidget*>(m_lblTint),
+                        static_cast<QWidget*>(m_comboTint) }) {
+        if (!w) { continue; }
+        w->setEnabled(false);
+        w->setToolTip(tr("PureSignal 3 fits the correction as a NURB curve; "
+                         "this control set up the old fixed-point table and "
+                         "has no effect any more."));
+    }
+
+    m_lblNoPs3 = new QLabel(
+        tr("PIN, MAP, STBL, Relax Tolerance and TINT set up the fixed-point "
+           "table of PureSignal 1. PureSignal 3 fits a NURB curve instead."),
+        this);
+    m_lblNoPs3->setObjectName(QStringLiteral("lblPSNoPs3"));
+    m_lblNoPs3->setWordWrap(true);
+    m_lblNoPs3->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; }")
+        .arg(QString::fromLatin1(Longpath::Style::kTextSecondary)));
+    body->addWidget(m_lblNoPs3, 4, 2, 1, 2);
 
     outer->addLayout(body);
 

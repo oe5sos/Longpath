@@ -7899,6 +7899,19 @@ longpath_add_test(tst_puresignal3_kette)
 #   und die zwei Faelle, in denen NICHTS als Peilung gelten darf: eine halbe
 #   Zeile und alles, was keine ist.
 longpath_add_test(tst_gs232_rotor)
+
+# tst_ps3_entwurfsblaetter: kein Pruefstand, ein Zeichenwerkzeug -- rendert
+#   das ECHTE PsForm in drei Fassungen als Entwurfsblaetter (144 dpi), damit
+#   der Betreiber am Bild entscheidet, was mit den fuenf Reglern geschieht,
+#   die PureSignal 3 nicht mehr kennt. Ohne LONGPATH_GRAB_DIR uebersprungen.
+longpath_add_test(tst_ps3_entwurfsblaetter)
+
+# tst_ps3_bedienung: haelt fest, was am Entwurfsblatt entschieden wurde --
+#   die fuenf Regler, die PureSignal 3 nicht mehr kennt, sind ABGESCHALTET
+#   und sichtbar (nicht versteckt), tragen einen Grund, und die Zeile
+#   darunter nennt ihn. Dazu die Gegenprobe, dass der Umbau nicht die halbe
+#   Seite mit abgeschaltet hat.
+longpath_add_test(tst_ps3_bedienung)
 # --------------------------------------------------------------------------
 # Aggregate "all_tests" target  (2026-05-26 KG4VCF dev-loop fix, from PR #291)
 # --------------------------------------------------------------------------

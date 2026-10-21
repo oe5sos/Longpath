@@ -245,6 +245,10 @@ private:
     QDoubleSpinBox* m_spinCalDelay{nullptr}; // PSForm.designer.cs:776-806 udPSCalWait
     QSpinBox*       m_spinAmpDelay{nullptr}; // PSForm.designer.cs:386-414 udPSPhnum
     QLabel*         m_lblTint{nullptr};      // PSForm.designer.cs:108-117 lblPSTint
+    /// Die eine Zeile, die sagt, warum die fuenf Regler daneben grau
+    /// sind (PureSignal 3 bildet die Kurve als NURB-Anpassung,
+    /// 2026-10-21).
+    QLabel*         m_lblNoPs3{nullptr};
     QComboBox*      m_comboTint{nullptr};    // PSForm.designer.cs:160-174 comboPSTint
 
     // Bottom row

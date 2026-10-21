@@ -1181,6 +1181,28 @@ void RotorLogbookPanel::haltTurn()
     m_dial->setState(RotorDialWidget::State::Targeted);
 }
 
+// Den Treiber wechseln, waehrend das Fenster offen ist.
+//
+// ensureRotor() legt den Rotor EINMAL an; die Wahl im Dialog kann ihn
+// danach aendern. Statt das ganze Fenster neu zu bauen wird hier der
+// alte abgebaut und ensureRotor() noch einmal gerufen -- die
+// Verdrahtung entsteht dort an einer Stelle, nicht an zweien.
+//
+// Qt loest die Verbindungen des alten Objekts beim Loeschen selbst;
+// was der Dialog an SEINE Anzeige gehaengt hat, haengt danach ins
+// Leere und wird vom Rufer neu gesetzt.
+void RotorLogbookPanel::rebuildRotorBackend()
+{
+    if (m_rotor) {
+        m_rotor->disconnectFromRotor();
+        if (m_radio) { m_radio->setRotor(nullptr); }
+        m_rotor->deleteLater();
+        m_rotor   = nullptr;
+        m_rotctld = nullptr;
+    }
+    ensureRotor();
+}
+
 void RotorLogbookPanel::ensureRotor()
 {
     if (m_rotor) { return; }
@@ -1397,6 +1419,19 @@ void RotorLogbookPanel::openRotorSetupDialog()
     // know the second exists; anyone already running rotctld their own
     // way, or with the controller on another machine, needs the second
     // and would be blocked without it.
+    // Zwei Fragen nacheinander statt einer Liste mit allem drin: erst
+    // WER faehrt, dann WIE er angeschlossen ist. Entscheidung des
+    // Betreibers am Entwurfsblatt (2026-10-21, Fassung B von drei) --
+    // so steht immer nur da, was gilt, statt eines dauerhaft grauen
+    // Feldes daneben.
+    auto* driverBox = new QComboBox(&dlg);
+    driverBox->addItem(QStringLiteral("Hamlib (rotctld) — every rotator Hamlib knows"));
+    driverBox->addItem(QStringLiteral("GS-232 direct — Yaesu GS-232A/B, no Hamlib"));
+    driverBox->setCurrentIndex(
+        s.value(QStringLiteral("Rotor/Backend"), QStringLiteral("rotctld"))
+            .toString().trimmed().toLower() == QStringLiteral("gs232") ? 1 : 0);
+    col->addWidget(driverBox);
+
     auto* modeBox = new QComboBox(&dlg);
     modeBox->addItem(QStringLiteral("Controller on this computer"));
     modeBox->addItem(QStringLiteral("rotctld already running (network)"));
@@ -1454,7 +1489,8 @@ void RotorLogbookPanel::openRotorSetupDialog()
     const int savedModel = s.value(kRotorModelKey, 601).toInt();
     const int at = modelCombo->findData(savedModel);
     modelCombo->setCurrentIndex(at >= 0 ? at : 0);
-    localForm->addRow(QStringLiteral("Controller"), modelCombo);
+    auto* modelLabel = new QLabel(QStringLiteral("Controller"), localBox);
+    localForm->addRow(modelLabel, modelCombo);
 
     auto* otherEdit = new QLineEdit(QString::number(savedModel), localBox);
     otherEdit->setPlaceholderText(QStringLiteral("rotctl --list shows them all"));
@@ -1607,10 +1643,29 @@ void RotorLogbookPanel::openRotorSetupDialog()
     };
 
     auto refreshUi = [&]() {
+        const bool gs232 = driverBox->currentIndex() == 1;
         const bool local = modeBox->currentIndex() == 0;
+
+        // Die zweite Zeile heisst je nach Treiber etwas anderes: bei
+        // Hamlib geht es darum, WO rotctld laeuft, beim direkten Weg
+        // darum, WORAN der Controller haengt.
+        {
+            QSignalBlocker b(modeBox);
+            modeBox->setItemText(0, gs232
+                ? QStringLiteral("Serial port on this computer")
+                : QStringLiteral("Controller on this computer"));
+            modeBox->setItemText(1, gs232
+                ? QStringLiteral("Serial server on the network (ser2net, Moxa …)")
+                : QStringLiteral("rotctld already running (network)"));
+        }
+
         localBox->setVisible(local);
         netBox->setVisible(!local);
-        otherEdit->setVisible(local
+        // Modellwahl, Hamlib-Kasten und der Hinweis dazu gehoeren allein
+        // zum rotctld-Weg: der direkte Treiber kennt nur GS-232A/B.
+        modelLabel->setVisible(!gs232);
+        modelCombo->setVisible(!gs232);
+        otherEdit->setVisible(!gs232 && local
                               && modelCombo->currentData().toInt() < 0);
 
         const int id = currentModel();
@@ -1624,7 +1679,8 @@ void RotorLogbookPanel::openRotorSetupDialog()
         // ── What to say about Hamlib ─────────────────────────────────
         const bool installed = !hamlibVersion.isEmpty();
         const bool installing = installer.isRunning();
-        hamlibBox->setVisible(local);
+        hamlibBox->setVisible(local && !gs232);
+        noteLabel->setVisible(noteLabel->isVisible() && !gs232);
 
         if (!installed) {
             hamlibLabel->setText(QStringLiteral(
@@ -1678,7 +1734,9 @@ void RotorLogbookPanel::openRotorSetupDialog()
         // Offering Connect with no rotctld to run only produces a
         // puzzling failure; the install button above is the thing to
         // press.
-        connectBtn->setEnabled(!local || installed);
+        // Der direkte Weg braucht kein Hamlib -- der Knopf darf dort
+        // immer.
+        connectBtn->setEnabled(gs232 || !local || installed);
         status->setText(m_rotor->isConnected()
             ? QStringLiteral("Connected — %1").arg(m_rotor->description())
             : QStringLiteral("Not connected"));
@@ -1686,6 +1744,8 @@ void RotorLogbookPanel::openRotorSetupDialog()
     refreshUi();
 
     connect(modeBox, &QComboBox::currentIndexChanged, &dlg,
+            [&](int) { refreshUi(); });
+    connect(driverBox, &QComboBox::currentIndexChanged, &dlg,
             [&](int) { refreshUi(); });
     connect(modelCombo, &QComboBox::currentIndexChanged, &dlg,
             [&](int) { refreshUi(); });
@@ -1713,6 +1773,37 @@ void RotorLogbookPanel::openRotorSetupDialog()
 
         const bool local = modeBox->currentIndex() == 0;
         s.setValue(kRotorUseSerialKey, local);
+
+        // ── Der direkte GS-232-Weg ───────────────────────────────────
+        //
+        // Kein rotctld, kein Hamlib: Longpath spricht den Controller
+        // selbst an, seriell oder ueber einen seriellen Netzserver
+        // (Gs232Rotor.h). Der Treiber steht beim Oeffnen des Fensters
+        // fest, also wird er hier gewechselt, wenn die Wahl eine andere
+        // ist als das, was gerade laeuft.
+        if (driverBox->currentIndex() == 1) {
+            s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("gs232"));
+            if (local) {
+                s.setValue(QStringLiteral("Rotor/SerialPort"),
+                           portCombo->currentText().trimmed());
+                s.setValue(QStringLiteral("Rotor/BaudRate"),
+                           baudCombo->currentText().trimmed());
+                s.setValue(QStringLiteral("Rotor/Host"), QString{});
+            } else {
+                s.setValue(QStringLiteral("Rotor/Host"), hostEdit->text().trimmed());
+                s.setValue(QStringLiteral("Rotor/NetPort"),
+                           portEdit->text().trimmed().isEmpty()
+                               ? QStringLiteral("4001")
+                               : portEdit->text().trimmed());
+            }
+            m_rotorProc.stop();          // der alte Weg braucht ihn nicht mehr
+            rebuildRotorBackend();
+            m_rotor->connectToRotor();
+            refreshUi();
+            return;
+        }
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("rotctld"));
+        rebuildRotorBackend();
 
         if (local) {
             const int model = currentModel();
