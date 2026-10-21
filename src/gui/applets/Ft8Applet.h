@@ -34,6 +34,7 @@
 #pragma once
 
 #include "AppletWidget.h"
+#include "core/DigiFrequenzen.h"
 
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Ablauf.h"
@@ -249,6 +250,17 @@ signals:
     /// Datei, eine Doppelt-Regel, ein Hochladen.
     void qsoFertig(const Longpath::LogEntry& eintrag);
 
+    /// Im Dekoder wurde FT8 oder FT4 gewaehlt und die Skala soll
+    /// mitgehen. Betreiber 2026-10-21: „bei doppelklick oder klick auf
+    /// ft8 und ft4 muss er automatisch auf die richtige frequenz
+    /// springen".
+    ///
+    /// Das Applet stellt die Frequenz NICHT selbst: zur Anrufstelle
+    /// gehoeren auch Betriebsart und Filter, und beides zusammen steht
+    /// bereits in MainWindow::aufDigiStellen(). Zwei Fassungen
+    /// derselben Entscheidung waeren eine zu viel.
+    void digiFrequenzGewuenscht(DigiFrequenzen::Digimodus modus);
+
 protected:
     /// Doppelklick in die Fundliste: die Zeile wird zur Antwort im
     /// Eingabefeld. Gesendet wird dadurch NICHTS — der Druck auf den
@@ -261,6 +273,12 @@ private slots:
 
 private:
     void buildUI();
+
+    /// Das Blatt hinter dem ⚙ in der Kopfzeile: eigenes Rufzeichen und
+    /// Locator. Betreiber 2026-10-21: „sollt in der taksleiste im
+    /// decoder eine optionsmöglichkeit geben" -- und die Optionen
+    /// gehoeren bei ihm immer rechts oben in den Panelkopf.
+    void zeigeOptionen();
     void updateAudioTap();
     void updateStatus();
 

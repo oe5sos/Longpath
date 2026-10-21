@@ -7400,6 +7400,13 @@ void MainWindow::populateDefaultMeter()
     // und Hochladen. Hier wird nichts selbst geschrieben — sonst
     // stuende dasselbe QSO zweimal im Logbuch und nur einmal auf dem
     // Server.
+    // Die FT8/FT4-Knoepfe IM Dekoder stellen auch die Skala -- denselben
+    // Weg wie die Knoepfe in der Kommandoleiste (2026-10-21). Bis dahin
+    // schalteten sie nur das Verfahren um, und der Betreiber stand
+    // weiter auf der Frequenz, auf der er gerade war.
+    connect(m_ft8Applet, &Ft8Applet::digiFrequenzGewuenscht,
+            this, &MainWindow::aufDigiStellen);
+
     connect(m_ft8Applet, &Ft8Applet::qsoFertig, this,
             [this](const LogEntry& e) {
         if (RotorLogbookPanel* p = ensureRotorPanel()) {
