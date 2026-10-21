@@ -6145,6 +6145,13 @@ longpath_add_test(tst_b8_overlay_signals)
 # wurde seither weiter GEBAUT -- nein, nicht einmal das: ohne
 # Eintrag wird er stillschweigend nicht uebersetzt. Vier Staende
 # traf es gleichzeitig.
+# ── Die Bindeschicht fuer Phase 3M (2026-10-21) ──────────────────────
+# Vier Klassen waren fertig und geprueft, aber niemand baute sie -- die
+# im Plan vorgesehene RecordingModel-Flaeche fehlte. Dieser Lauf nagelt
+# fest, dass sie VERWEIGERT, wo sie verweigern muss, und dabei sagt,
+# WAS fehlt.
+longpath_add_test(tst_recording_model)
+
 longpath_add_test(tst_tx_bandbreiten_klickbar)
 
 longpath_add_test(tst_stationsrufzeichen)
