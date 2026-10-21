@@ -7401,6 +7401,11 @@ void MainWindow::populateDefaultMeter()
     // und Hochladen. Hier wird nichts selbst geschrieben — sonst
     // stuende dasselbe QSO zweimal im Logbuch und nur einmal auf dem
     // Server.
+    // Die Knoepfe FT8/FT4 IM Fenster richten das Geraet genauso her
+    // wie die Pillen in der Leiste -- es waeren sonst zwei Stellen mit
+    // demselben Namen und verschiedener Wirkung.
+    connect(m_ft8Applet, &Ft8Applet::digiGewuenscht, this,
+            &MainWindow::aufDigiStellen);
     connect(m_ft8Applet, &Ft8Applet::qsoFertig, this,
             [this](const LogEntry& e) {
         if (RotorLogbookPanel* p = ensureRotorPanel()) {
@@ -15001,6 +15006,18 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
     if (m_appletVis) {
         m_appletVis->setVisible(QStringLiteral("Ft8Decoder"), true);
         bringAppletToFront(QStringLiteral("Ft8Decoder"));
+    }
+
+    // 5. Und der Dekoder hoert auf dieselbe Betriebsart.
+    //
+    //    Ohne das stellte ein Druck auf FT4 in der Leiste zwar die
+    //    Skala auf 14.080, liess den Dekoder aber auf FT8 -- 15 s
+    //    Fenster auf einem Band, das im 7,5-s-Takt sendet. Das Fenster
+    //    haette geschwiegen, und niemand haette gewusst, warum.
+    if (m_ft8Applet) {
+        m_ft8Applet->setProtocol(modus == DigiFrequenzen::Digimodus::Ft4
+                                     ? Ft8Decoder::Protocol::Ft4
+                                     : Ft8Decoder::Protocol::Ft8);
     }
 }
 

@@ -250,6 +250,11 @@ public:
     /// schalten -- der Besitz bleibt beim Fenster.
     class AppletVisibilityController* appletVisibilityForTest() const
     { return m_appletVis; }
+    /// Das FT8/FT4-Fenster, fuer den Pruefstand. KEIN eigenes
+    /// `public:`/`private:` um diesen Block legen -- der Abschnitt ist
+    /// schon oeffentlich, und ein Paar darum kippte am 2026-10-21
+    /// alles dahinter auf privat (sieben rote CI-Laeufe).
+    class Ft8Applet* ft8AppletForTest() const { return m_ft8Applet; }
 
 
     // ── Der Schutzrahmen (2026-10-14) ────────────────────────────────
