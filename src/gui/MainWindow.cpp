@@ -387,6 +387,7 @@ warren@wpratt.com
 #include "applets/CwDecoderApplet.h"
 #include "applets/Ft8Applet.h"
 #include "applets/QsoRecorderApplet.h"
+#include "applets/RecordingApplet.h"
 #include "applets/KiwiSdrApplet.h"
 #include "KiwiWaterfallPanel.h"
 #include "applets/AsrApplet.h"
@@ -7439,6 +7440,19 @@ void MainWindow::populateDefaultMeter()
     m_qsoRecorderApplet = new QsoRecorderApplet(m_radioModel, nullptr);
     panel->addApplet(m_qsoRecorderApplet);
 
+    // RecordingApplet — Ton, I/Q und Zeitplan (Phase 3M, 2026-10-21).
+    //
+    // Direkt neben der QSO-Aufnahme, weil beide in denselben Ordner
+    // schreiben: wer eine Aufnahme sucht, soll nicht zwei Panels
+    // aufmachen muessen.
+    //
+    // Der Betreiber hat diese Form am 2026-10-21 aus drei
+    // Entwurfsblaettern gewaehlt (Variante 1, eigenes Applet). Die
+    // vier Klassen dahinter lagen seit August gebaut und geprueft im
+    // Baum, ohne dass sie irgendwer konstruierte.
+    m_recordingApplet = new RecordingApplet(m_radioModel, nullptr);
+    panel->addApplet(m_recordingApplet);
+
     // ── KiwiSDR (Stufe 4, 2026-08-23) ───────────────────────────────
     //
     // Der Betreiber am 2026-08-22: "kiwi sdr wäre auch eine tolle
@@ -8183,6 +8197,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
     m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
     m_appletsById[QStringLiteral("QsoRec")]     = m_qsoRecorderApplet;
+    m_appletsById[QStringLiteral("Rec")]        = m_recordingApplet;
     m_appletsById[QStringLiteral("BwFilter")]   = m_bwFilterApplet;
     m_appletsById[QStringLiteral("PureSignal")] = m_pureSignalApplet;
     m_appletsById[QStringLiteral("Amp")]        = m_ampApplet;
@@ -8310,6 +8325,8 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Voice Keyer"),  true);
     m_appletVis->registerApplet(QStringLiteral("QsoRec"),
                                 QStringLiteral("QSO Recorder"), true);
+    m_appletVis->registerApplet(QStringLiteral("Rec"),
+                                QStringLiteral("Recording"),    true);
     m_appletVis->registerApplet(QStringLiteral("BwFilter"),
                                 QStringLiteral("Bandwidth Filter"), true);
     m_appletVis->registerApplet(QStringLiteral("PureSignal"),
@@ -8475,6 +8492,12 @@ void MainWindow::populateDefaultMeter()
         {QStringLiteral("dvk"), QStringLiteral("sprachspeicher"),
          QStringLiteral("ansage"), QStringLiteral("cq"),
          QStringLiteral("voice keyer"), QStringLiteral("wav")});
+    m_appletVis->describeApplet(QStringLiteral("Rec"),
+        QStringLiteral("Aufnahme"),
+        {QStringLiteral("aufnahme"), QStringLiteral("recording"),
+         QStringLiteral("iq"), QStringLiteral("i/q"),
+         QStringLiteral("zeitplan"), QStringLiteral("schedule"),
+         QStringLiteral("wav"), QStringLiteral("mitschnitt")});
     m_appletVis->describeApplet(QStringLiteral("QsoRec"),
         QStringLiteral("Aufnahme"),
         {QStringLiteral("aufnahme"), QStringLiteral("recorder"),

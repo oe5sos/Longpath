@@ -73,6 +73,7 @@
 #include "core/CouplerZero.h"
 #include "core/audio/VoiceKeyer.h"
 #include "core/audio/QsoRecorderController.h"
+#include "RecordingModel.h"
 #include "core/PgxlConnection.h"
 #include "core/Rf2ksConnection.h"
 #include "core/SpeConnection.h"
@@ -476,6 +477,13 @@ public:
     // damit sie einen Verbindungswechsel ueberlebt.
     QsoRecorderController& qsoRecorder() { return m_qsoRecorder; }
     const QsoRecorderController& qsoRecorder() const { return m_qsoRecorder; }
+
+    /// Die Aufnahme aus Phase 3M (Ton, I/Q, Zeitplan). Liegt hier und
+    /// nicht im Fenster, aus demselben Grund wie der QSO-Mitschnitt
+    /// eine Zeile hoeher: eine Flaeche darf verschwinden, eine
+    /// laufende Aufnahme nicht.
+    RecordingModel& recording() { return m_recording; }
+    const RecordingModel& recording() const { return m_recording; }
 
     const ApolloController& apolloController()        const { return m_apolloController; }
     ApolloController&       apolloControllerMutable()       { return m_apolloController; }
@@ -3582,6 +3590,7 @@ private:
     ApolloController m_apolloController;
     VoiceKeyerStore m_voiceKeyer;
     QsoRecorderController m_qsoRecorder;
+    RecordingModel        m_recording;
 
     // PennyLane external-control master toggle. Composes with OcMatrix (Phase 3P-D).
     // MAC and load() are called on connect. Phase 3P-F Task 5b.
