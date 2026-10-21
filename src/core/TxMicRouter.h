@@ -65,6 +65,20 @@ public:
     /// `dst` is guaranteed non-null and large enough to hold `n`
     /// floats when called by TxChannel.
     virtual int pullSamples(float* dst, int n) = 0;
+
+    /// Liefert diese Quelle gerade einen EIGENEN Ton, der das Mikrofon
+    /// ersetzen muss?
+    ///
+    /// Gebraucht seit dem 2026-10-21: die Sendepumpe ist seit dem
+    /// 2026-04-28 GESCHOBEN (`AudioEngine` -> `driveOneTxBlock`) und
+    /// holt nicht mehr aus diesem Router. FT8 und RTTY haengten ihren
+    /// Ton aber genau hier ein -- der Sender wurde getastet, und es
+    /// ging NICHTS hinaus. Der Sendefaden fragt jetzt zuerst hier, wie
+    /// er es fuer TCI, RADE und VAX laengst tut.
+    ///
+    /// Vorgabe `false`: eine gewoehnliche Mikrofonquelle ersetzt
+    /// nichts.
+    virtual bool eigeneTonquelleAktiv() const { return false; }
 };
 
 /// 3M-1a stub: emits zero-padded samples.

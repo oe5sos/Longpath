@@ -3617,6 +3617,10 @@ longpath_add_test(tst_tx_channel_production_loop)
 # zero fill verification, repeated-call consistency, and virtual dispatch
 # via TxMicRouter base pointer.
 longpath_add_test(tst_tx_mic_router)
+# 2026-10-21: am Geraet gefunden -- FT8 tastete, und es ging nichts
+# hinaus. Die eigene Tonquelle muss das Mikrofon ERSETZEN, nicht nur
+# angemeldet sein.
+longpath_add_test(tst_eigene_tonquelle_ersetzt_das_mikrofon)
 
 # ── Phase 3M-1a Task G.1: RadioModel ownership + wiring integration ──────────
 # Verifies:
