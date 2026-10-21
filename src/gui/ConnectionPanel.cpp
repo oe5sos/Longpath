@@ -1295,8 +1295,38 @@ void ConnectionPanel::onConnectionStateChanged()
 // Source: clsDiscoveredRadioPicker.cs — "Start Discovery" drives NIC scan
 void ConnectionPanel::onScanClicked()
 {
-    m_radioModel->discovery()->startDiscovery();
-    setStatusText(QStringLiteral("Searching for radios..."));
+    RadioDiscovery* disc = m_radioModel->discovery();
+    disc->startDiscovery();
+
+    // Zusaetzlich jedes GESPEICHERTE Geraet gezielt fragen.
+    //
+    // Der Rundruf allein genuegt nicht: er bleibt im eigenen Subnetz.
+    // Am 2026-10-21 stand die ANVELINA PRO 3 des Betreibers auf
+    // 172.30.30.26, sein Rechner auf 192.168.78.x -- die Zeile im
+    // Dialog blieb grau, "saved", "never seen", obwohl das Geraet lief.
+    // Gemessen: es antwortet auf Ping (3/3, 40 ms, kein ARP-Eintrag --
+    // also ueber den Router) und auf eine gezielte P2-Abfrage an
+    // 172.30.30.26:1024 sofort mit 60 Bytes, MAC 68:27:19:98:cb:71,
+    // Board 0x05. Nur der Rundruf kam dort nie an.
+    //
+    // probeAddress() kann genau das und war schon da -- aber nur am
+    // Menuepunkt Connect (Strg+K) und im Dialog "Add Manually".
+    // Wer auf Scan drueckt, meint seine eigenen Geraete; die stehen in
+    // den Einstellungen, mit Adresse. Also werden sie gefragt.
+    const QList<SavedRadio> saved = AppSettings::instance().savedRadios();
+    int gefragt = 0;
+    for (const SavedRadio& sr : saved) {
+        if (sr.info.address.isNull()) {
+            continue;   // von Hand ohne Adresse angelegt -- nichts zu fragen
+        }
+        disc->probeAddress(sr.info.address, sr.info.port);
+        ++gefragt;
+    }
+
+    setStatusText(gefragt > 0
+        ? QStringLiteral("Searching for radios... (plus %1 saved address(es) asked directly)")
+              .arg(gefragt)
+        : QStringLiteral("Searching for radios..."));
     m_scanBtn->setEnabled(false);  // re-enabled by discoveryFinished slot
 }
 

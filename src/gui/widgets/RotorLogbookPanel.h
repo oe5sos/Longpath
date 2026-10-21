@@ -48,6 +48,7 @@ namespace Longpath {
 class QrzClient;
 class QrzLogbookUploader;
 class QsoUploader;
+class RotorController;
 class RotctldClient;
 class RadioModel;
 class GlobeWidget;
@@ -219,6 +220,14 @@ private:
     void contextMenuEvent(QContextMenuEvent* ev) override;
 
 public:
+#ifdef LONGPATH_BUILD_TESTS
+    /// Prüfstandsnaht: den Rotor anlegen, ohne dass jemand auf
+    /// "Verbinden" klickt — damit ein Lauf belegen kann, WELCHER
+    /// Treiber aus der Einstellung `Rotor/Backend` entsteht.
+    void ensureRotorForTest() { ensureRotor(); }
+    RotorController* rotorForTest() const { return m_rotor; }
+#endif
+
     /// Das Ziel-Menue bauen, ohne es aufzuklappen. Fuer Pruefungen:
     /// exec() haelt die Runde an.
     void buildAimMenu(QMenu& menu, const QPoint& globalPos);
@@ -313,7 +322,14 @@ private:
 
     // The rotator link, and the timer that stands in for one. Exactly
     // one of the two drives the needle at any moment.
-    RotctldClient* m_rotor{nullptr};
+    // Der Rotor, wie ihn dieses Fenster bedient: seit 2026-10-21 die
+    // Schnittstelle, nicht mehr der rotctld-Weg allein. m_rotctld zeigt
+    // auf DASSELBE Objekt, wenn der rotctld-Weg gewaehlt ist, und ist
+    // sonst leer — alles, was nur rotctld kann (Adresse, Port, der
+    // Wachhund auf den Dienst), haengt an diesem Zeiger und nicht an
+    // m_rotor.
+    RotorController* m_rotor{nullptr};
+    RotctldClient*   m_rotctld{nullptr};
     // Der zuletzt protokollierte Status -- damit nur WECHSEL ins
     // Protokoll gehen, nicht jede Wiederholung (siehe setStatus()).
     QString        m_letzterStatus;

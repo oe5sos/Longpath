@@ -3116,6 +3116,12 @@ longpath_add_test(tst_connection_state)
 longpath_add_test(tst_radio_discovery_probe)
 target_link_libraries(tst_radio_discovery_probe PRIVATE Qt6::Network)
 
+# Der Scan muss die gespeicherten Geräte auch GEZIELT fragen -- sonst
+# bleiben Geräte in einem anderen Subnetz unsichtbar (ANVELINA PRO 3,
+# 2026-10-21). Siehe den Kopf der Datei.
+longpath_add_test(tst_scan_fragt_gespeicherte_geraete)
+target_link_libraries(tst_scan_fragt_gespeicherte_geraete PRIVATE Qt6::Network)
+
 # ── 2026-09-09: quietPollAttempt() deadline safety net ────────────────────────
 # 3 tests: a flooded loopback socket (always "readable") still terminates via
 # the QDeadlineTimer bound instead of hanging (the actual CI-only 120s GUI
@@ -5243,6 +5249,7 @@ if(TEST tst_waterfall_after_pause)
     set_tests_properties(tst_waterfall_after_pause PROPERTIES RUN_SERIAL TRUE)
 endif()
 longpath_add_test(tst_window_grid_snap)
+longpath_add_test(tst_fenster_mindestabstand)
 longpath_add_test(tst_form_variants)
 if(TEST tst_form_variants)
     set_tests_properties(tst_form_variants PROPERTIES
@@ -7878,6 +7885,12 @@ longpath_add_test(tst_genius_status_tor)
 #   doPSCorrChange im Abbau haengen liesse statt rot zu melden.
 longpath_add_test(tst_puresignal3_kette)
 
+# tst_gs232_rotor: der serielle GS-232A/B-Treiber ohne Rotor am Tisch
+#   (eine nachgestellte Leitung statt der Schnittstelle). Haelt die Befehlsform fest (drei Ziffern
+#   je Feld, 360 wird 0, Hoehe geklemmt statt gefaltet), beide Antwortformen,
+#   und die zwei Faelle, in denen NICHTS als Peilung gelten darf: eine halbe
+#   Zeile und alles, was keine ist.
+longpath_add_test(tst_gs232_rotor)
 # --------------------------------------------------------------------------
 # Aggregate "all_tests" target  (2026-05-26 KG4VCF dev-loop fix, from PR #291)
 # --------------------------------------------------------------------------

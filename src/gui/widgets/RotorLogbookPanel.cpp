@@ -48,6 +48,7 @@
 #include "core/Maidenhead.h"
 #include "core/QrzClient.h"
 #include "core/QrzLogbookUploader.h"
+#include "core/Gs232Rotor.h"
 #include "core/RotctldClient.h"
 #include "core/RotctldProcess.h"
 #include "core/RotorModels.h"
@@ -811,7 +812,7 @@ bool RotorLogbookPanel::connectRotorFromSettings(QString* err)
             return false;
         }
         const quint16 port = m_rotorProc.listenPort();
-        m_rotor->setTarget(QStringLiteral("127.0.0.1"), port);
+        if (m_rotctld) { m_rotctld->setTarget(QStringLiteral("127.0.0.1"), port); }
         s.setValue(kRotorHostKey, QStringLiteral("127.0.0.1"));
         s.setValue(kRotorPortKey, port);
     } else {
@@ -821,7 +822,7 @@ bool RotorLogbookPanel::connectRotorFromSettings(QString* err)
             if (err) { *err = QStringLiteral("no rotctld address set up (Rotor…)"); }
             return false;
         }
-        m_rotor->setTarget(host, port ? port : 4533);
+        if (m_rotctld) { m_rotctld->setTarget(host, port ? port : 4533); }
     }
     m_rotor->connectToRotor();
     return true;
@@ -1173,16 +1174,53 @@ void RotorLogbookPanel::haltTurn()
 void RotorLogbookPanel::ensureRotor()
 {
     if (m_rotor) { return; }
-    m_rotor = new RotctldClient(this);
+
+    // Welcher Weg zum Rotor? Vorgabe bleibt rotctld — wer nichts
+    // einstellt, merkt von dieser Weiche nichts. `gs232` faehrt den
+    // Yaesu GS-232A/B direkt an der seriellen Schnittstelle, ohne
+    // Hamlib dazwischen (Gs232Rotor.h).
+    {
+        AppSettings& sb = AppSettings::instance();
+        const QString weg = sb.value(QStringLiteral("Rotor/Backend"),
+                                     QStringLiteral("rotctld"))
+                                .toString().trimmed().toLower();
+        if (weg == QStringLiteral("gs232")) {
+            auto* gs232 = new Gs232Rotor(this);
+            gs232->setPort(
+                sb.value(QStringLiteral("Rotor/SerialPort"), QString{}).toString(),
+                sb.value(QStringLiteral("Rotor/BaudRate"), 9600).toInt());
+            // Ein Netzziel schlaegt die serielle Schnittstelle. An dieser
+            // Station ist das der Normalfall und nicht die Ausnahme: der
+            // GS-232 haengt auf einem seriellen Netzserver, nicht an
+            // /dev/tty* (gemessen 2026-10-21, siehe Gs232Rotor.h).
+            const QString host =
+                sb.value(QStringLiteral("Rotor/Host"), QString{}).toString().trimmed();
+            if (!host.isEmpty()) {
+                gs232->setNetworkTarget(
+                    host,
+                    static_cast<quint16>(
+                        sb.value(QStringLiteral("Rotor/NetPort"), 4001).toInt()));
+            }
+            m_rotor   = gs232;
+            m_rotctld = nullptr;
+        }
+    }
+
+    if (!m_rotor) {
+        m_rotctld = new RotctldClient(this);
+        m_rotor   = m_rotctld;
+    }
     // Beim Modell anmelden, damit der TCI-Server ihn erreicht, ohne in
     // dieses Fenster zu greifen (RadioModel::rotor()). Angelegt und
     // bedient wird er weiter hier; das Modell haelt nur einen QPointer.
     if (m_radio) { m_radio->setRotor(m_rotor); }
 
     AppSettings& s = AppSettings::instance();
-    m_rotor->setTarget(
-        s.value(kRotorHostKey, QString{}).toString(),
-        static_cast<quint16>(s.value(kRotorPortKey, 4533).toInt()));
+    if (m_rotctld) {
+        m_rotctld->setTarget(
+            s.value(kRotorHostKey, QString{}).toString(),
+            static_cast<quint16>(s.value(kRotorPortKey, 4533).toInt()));
+    }
 
     // The rotator's own reading drives the second needle. Nothing else
     // may write it while a rotator is connected, or the dial would show
@@ -1204,8 +1242,15 @@ void RotorLogbookPanel::ensureRotor()
     // Az/el rotators: the reported elevation appears on the dial. The
     // signal only fires when the value actually changes, so an
     // azimuth-only rotator never triggers the readout.
-    connect(m_rotor, &RotctldClient::elevationChanged, this,
-            [this](double el) { m_dial->setElevation(el); });
+    if (m_rotctld) {
+        connect(m_rotctld, &RotctldClient::elevationChanged, this,
+                [this](double el) { m_dial->setElevation(el); });
+    } else if (auto* seriell = qobject_cast<Gs232Rotor*>(m_rotor)) {
+        // Der serielle Treiber meldet die Hoehe mit demselben Signalnamen,
+        // aber aus seiner eigenen Klasse.
+        connect(seriell, &Gs232Rotor::elevationChanged, this,
+                [this](double el) { m_dial->setElevation(el); });
+    }
 
     connect(m_rotor, &RotorController::stateChanged, this,
             [this](RotorController::State st) {
@@ -1248,7 +1293,8 @@ void RotorLogbookPanel::ensureRotor()
     // command for good. Reconnecting the client to a hung daemon just
     // repeats the watchdog cut every few seconds. The daemon is ours,
     // so bounce it; the client's own retry then finds the fresh one.
-    connect(m_rotor, &RotctldClient::replyTimedOut, this, [this]() {
+    if (m_rotctld) {
+        connect(m_rotctld, &RotctldClient::replyTimedOut, this, [this]() {
         if (!m_rotorProc.isRunning()) { return; }
         QString err;
         if (!m_rotorProc.restart(&err)) {
@@ -1256,11 +1302,12 @@ void RotorLogbookPanel::ensureRotor()
                           .arg(err), true);
             return;
         }
-        m_rotor->setTarget(QStringLiteral("127.0.0.1"),
-                           m_rotorProc.listenPort());
+        m_rotctld->setTarget(QStringLiteral("127.0.0.1"),
+                             m_rotorProc.listenPort());
         setStatus(QStringLiteral("Rotator stopped answering — "
                                  "restarted rotctld"), true);
-    });
+        });
+    }
 
     // rotctld quitting by itself was never surfaced: Hamlib's reason
     // (bad model number, device not there, port taken) went to a
@@ -1519,11 +1566,11 @@ void RotorLogbookPanel::openRotorSetupDialog()
     auto* netBox = new QWidget(&dlg);
     auto* netForm = new QFormLayout(netBox);
     netForm->setContentsMargins(0, 0, 0, 0);
-    auto* hostEdit = new QLineEdit(m_rotor->host(), netBox);
+    auto* hostEdit = new QLineEdit(m_rotctld ? m_rotctld->host() : QString{}, netBox);
     hostEdit->setPlaceholderText(
         QStringLiteral("address running rotctld, e.g. 192.168.1.20"));
     netForm->addRow(QStringLiteral("Host"), hostEdit);
-    auto* portEdit = new QLineEdit(QString::number(m_rotor->port()), netBox);
+    auto* portEdit = new QLineEdit(QString::number(m_rotctld ? m_rotctld->port() : 4533), netBox);
     portEdit->setPlaceholderText(QStringLiteral("4533"));
     netForm->addRow(QStringLiteral("Port"), portEdit);
     col->addWidget(netBox);
@@ -1694,14 +1741,14 @@ void RotorLogbookPanel::openRotorSetupDialog()
             // The port actually bound — 4533 unless something else
             // had it (see RotctldProcess::start).
             const quint16 port = m_rotorProc.listenPort();
-            m_rotor->setTarget(QStringLiteral("127.0.0.1"), port);
+            if (m_rotctld) { m_rotctld->setTarget(QStringLiteral("127.0.0.1"), port); }
             s.setValue(kRotorHostKey, QStringLiteral("127.0.0.1"));
             s.setValue(kRotorPortKey, port);
         } else {
             const QString host = hostEdit->text().trimmed();
             const quint16 port =
                 static_cast<quint16>(portEdit->text().trimmed().toUInt());
-            m_rotor->setTarget(host, port ? port : 4533);
+            if (m_rotctld) { m_rotctld->setTarget(host, port ? port : 4533); }
             s.setValue(kRotorHostKey, host);
             s.setValue(kRotorPortKey, port ? port : 4533);
         }

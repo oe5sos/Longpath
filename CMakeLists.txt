@@ -1171,6 +1171,7 @@ set(GUI_SOURCES
     src/core/CloudlogUploader.cpp
     src/core/AdifNetworkUploader.cpp
     src/core/RotctldClient.cpp
+    src/core/Gs232Rotor.cpp
     src/core/RotctldProcess.cpp
     src/core/HamlibInstaller.cpp
 

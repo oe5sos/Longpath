@@ -98,6 +98,9 @@ namespace Longpath {
 enum class ToastSeverity : int;
 
 class RadioModel;
+/// Defined in gui/WindowPlacement.h; nur als Zeiger gehalten
+/// (m_aufbauBewegung), damit dieser Kopf keinen weiteren Kopf zieht.
+class EigeneBewegung;
 class SideAreaWindow;
 class ConnectionPanel;
 class SupportDialog;
@@ -1545,6 +1548,16 @@ private:
     /// showMaximized(), der Wechsel des Rahmens. Ohne dieses Flag stand
     /// der Schutzrahmen-Hinweis schon beim Start da (2026-10-17).
     bool m_fensterAufbauFertig{false};
+    /// Und solange der Aufbau laeuft, ist jede Fensterbewegung eine
+    /// EIGENE: dieselbe Marke, die das Raster und das Herausholen aus
+    /// dem Sperrstreifen setzen (`EigeneBewegung` in WindowPlacement.h).
+    /// m_fensterAufbauFertig darueber schweigt nur den Schutzrahmen-
+    /// Hinweis; der Mindestabstand sitzt in WindowPlacement, das
+    /// MainWindow nicht kennt und nicht kennen soll -- es liest diese
+    /// Marke. Gehalten vom Konstruktor bis zu derselben Stelle, an der
+    /// das Flag gesetzt wird; stirbt mit dem Fenster, falls es die nie
+    /// erreicht (Prueffaelle bauen mehrere nacheinander).
+    std::unique_ptr<EigeneBewegung> m_aufbauBewegung;
 
     // View > Vollbild (2026-09-08, Betreiber: "es sollte auch im
     // gernellen fenster die möglichkeit geben, immer auf full screen
