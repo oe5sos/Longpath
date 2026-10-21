@@ -378,6 +378,49 @@ private slots:
         QCOMPARE(info.firmwareText, QStringLiteral("4.3.16.42034"));
     }
 
+    void messwertDefinitionenTrennenMitRaute()
+    {
+        // Echte Zeile, am 2026-10-21 an der 8400 mitgeschnitten
+        // (Fassung 4.3.16.42034) nach `sub meter all`.
+        const FlexLine l = FlexCommandWire::parseLine(QStringLiteral(
+            "S4ED321C5|meter 1.src=COD-#1.num=1#1.nam=MICPEAK#"
+            "1.low=-150.0#1.hi=20.0#"
+            "1.desc=Signal strength of MIC output in CODEC#"
+            "1.unit=dBFS#1.fps=40#"));
+
+        QCOMPARE(l.type, FlexLineType::Status);
+        QCOMPARE(l.object, QStringLiteral("meter"));
+
+        // An Leerzeichen zerlegt zerfiel das in Unsinn: aus der
+        // Beschreibung wurden die nackten Woerter „MIC=", „in=", „of=",
+        // „output=", „strength=", und `1.desc` trug nur „Signal".
+        QCOMPARE(l.kvs.value(QStringLiteral("1.nam")),
+                 QStringLiteral("MICPEAK"));
+        QCOMPARE(l.kvs.value(QStringLiteral("1.unit")),
+                 QStringLiteral("dBFS"));
+        QCOMPARE(l.kvs.value(QStringLiteral("1.low")),
+                 QStringLiteral("-150.0"));
+        QCOMPARE(l.kvs.value(QStringLiteral("1.desc")),
+                 QStringLiteral("Signal strength of MIC output in CODEC"));
+        QVERIFY2(!l.kvs.contains(QStringLiteral("strength")),
+                 "die Beschreibung ist wieder in Woerter zerfallen");
+        QCOMPARE(l.kvs.size(), 8);
+    }
+
+    void leerzeichenRuempfeBleibenWieSieWaren()
+    {
+        // Gegenstueck: der ueblichere Fall darf sich NICHT aendern.
+        const FlexLine l = FlexCommandWire::parseLine(QStringLiteral(
+            "S12345678|slice 0 freq=14.225000 mode=USB filter_lo=-1500"));
+        QCOMPARE(l.object, QStringLiteral("slice 0"));
+        QCOMPARE(l.kvs.value(QStringLiteral("freq")),
+                 QStringLiteral("14.225000"));
+        QCOMPARE(l.kvs.value(QStringLiteral("mode")), QStringLiteral("USB"));
+        QCOMPARE(l.kvs.value(QStringLiteral("filter_lo")),
+                 QStringLiteral("-1500"));
+        QCOMPARE(l.kvs.size(), 3);
+    }
+
     void fehlendeFassungImRufLaesstDenTextLeer()
     {
         QString payload = QString::fromLatin1(kPayload8400);

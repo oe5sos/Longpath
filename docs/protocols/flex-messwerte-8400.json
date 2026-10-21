@@ -1,0 +1,592 @@
+{
+ "1": {
+  "src": "COD-",
+  "num": "1",
+  "nam": "MICPEAK",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of MIC output in CODEC",
+  "unit": "dBFS",
+  "fps": "40"
+ },
+ "2": {
+  "src": "COD-",
+  "num": "2",
+  "nam": "MIC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Average Signal strength of MIC ouput in CODEC",
+  "unit": "dBFS",
+  "fps": "20"
+ },
+ "3": {
+  "src": "TX-",
+  "num": "5",
+  "nam": "HWALC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Voltage present at the Hardware ALC RCA Plug",
+  "unit": "dBFS",
+  "fps": "20"
+ },
+ "4": {
+  "src": "RAD",
+  "num": "334",
+  "nam": "+13.8A",
+  "low": "10.5",
+  "hi": "15.0",
+  "desc": "Main radio input voltage at PA",
+  "unit": "Volts",
+  "fps": "0"
+ },
+ "5": {
+  "src": "RAD",
+  "num": "300",
+  "nam": "PACURRENT",
+  "low": "0.0",
+  "hi": "10.0",
+  "desc": "PA current",
+  "unit": "Amps",
+  "fps": "0"
+ },
+ "6": {
+  "src": "RAD",
+  "num": "0",
+  "nam": "+13.8B",
+  "low": "10.5",
+  "hi": "15.0",
+  "desc": "Main radio input voltage at CPU (continuous)",
+  "unit": "Volts",
+  "fps": "0"
+ },
+ "7": {
+  "src": "RAD",
+  "num": "3",
+  "nam": "MAINFAN",
+  "low": "0.0",
+  "hi": "8192.0",
+  "desc": "Main radio fan RPM",
+  "unit": "RPM",
+  "fps": "0"
+ },
+ "8": {
+  "src": "TX-",
+  "num": "1",
+  "nam": "FWDPWR",
+  "low": "0.0",
+  "hi": "53.0",
+  "desc": "RF Power Forward",
+  "unit": "dBm",
+  "fps": "20"
+ },
+ "9": {
+  "src": "TX-",
+  "num": "2",
+  "nam": "REFPWR",
+  "low": "0.0",
+  "hi": "53.0",
+  "desc": "RF Power Reflected",
+  "unit": "dBm",
+  "fps": "20"
+ },
+ "10": {
+  "src": "TX-",
+  "num": "3",
+  "nam": "SWR",
+  "low": "1.0",
+  "hi": "999.0",
+  "desc": "RF SWR",
+  "unit": "SWR",
+  "fps": "20"
+ },
+ "11": {
+  "src": "TX-",
+  "num": "4",
+  "nam": "PATEMP",
+  "low": "0.0",
+  "hi": "120.0",
+  "desc": "PA Temperature",
+  "unit": "degC",
+  "fps": "0"
+ },
+ "12": {
+  "src": "SLC",
+  "num": "0",
+  "nam": "24kHz",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "24kHz broadband slice receiver signal level",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "13": {
+  "src": "SLC",
+  "num": "0",
+  "nam": "OSC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal Strength after OSC",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "14": {
+  "src": "SLC",
+  "num": "0",
+  "nam": "NB",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal Strength after NB",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "15": {
+  "src": "SLC",
+  "num": "0",
+  "nam": "ESC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal Strength after ESC",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "16": {
+  "src": "SLC",
+  "num": "0",
+  "nam": "LEVEL",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals in the filter passband",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "17": {
+  "src": "SLC",
+  "num": "0",
+  "nam": "TNF",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after TNF",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "18": {
+  "src": "SLC",
+  "num": "0",
+  "nam": "ANF",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after ANF",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "19": {
+  "src": "SLC",
+  "num": "0",
+  "nam": "SQUELCH",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after SQUELCH",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "20": {
+  "src": "SLC",
+  "num": "0",
+  "nam": "AGC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after AGC",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "21": {
+  "src": "SLC",
+  "num": "0",
+  "nam": "NR",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after NR",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "22": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "CODEC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of CODEC output",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "23": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "TXAGC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength post AGC/FIXED GAIN",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "24": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "SC_MIC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of MIC output",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "25": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "AFTEREQ",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals after the EQ",
+  "unit": "dBFS",
+  "fps": "20"
+ },
+ "26": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "COMPPEAK",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals just before CLIPPER (Compression)",
+  "unit": "dBFS",
+  "fps": "20"
+ },
+ "27": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "SC_FILT_1",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after Filter 1",
+  "unit": "dBFS",
+  "fps": "20"
+ },
+ "28": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "ALC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals after SW ALC (SSB Peak)",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "29": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "RM_TX_AGC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals after RM TX AGC",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "30": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "SC_FILT_2",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after Filter 2",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "31": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "TX_AGC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals after TX AGC",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "32": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "B4RAMP",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals before the ramp",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "33": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "AFRAMP",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals after the ramp",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "34": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "POST_P",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after all processing is done but before attenuation for power control",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "35": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "ATTN_FPGA",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals after Fine Tune, HW ALC, SWR Foldback attenuation (FPGA)",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "36": {
+  "src": "SLC",
+  "num": "1",
+  "nam": "24kHz",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "24kHz broadband slice receiver signal level",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "37": {
+  "src": "SLC",
+  "num": "1",
+  "nam": "OSC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal Strength after OSC",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "38": {
+  "src": "SLC",
+  "num": "1",
+  "nam": "NB",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal Strength after NB",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "39": {
+  "src": "SLC",
+  "num": "1",
+  "nam": "ESC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal Strength after ESC",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "40": {
+  "src": "SLC",
+  "num": "1",
+  "nam": "LEVEL",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals in the filter passband",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "41": {
+  "src": "SLC",
+  "num": "1",
+  "nam": "TNF",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after TNF",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "42": {
+  "src": "SLC",
+  "num": "1",
+  "nam": "ANF",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after ANF",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "43": {
+  "src": "SLC",
+  "num": "1",
+  "nam": "SQUELCH",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after SQUELCH",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "44": {
+  "src": "SLC",
+  "num": "1",
+  "nam": "AGC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after AGC",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "45": {
+  "src": "SLC",
+  "num": "1",
+  "nam": "NR",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after NR",
+  "unit": "dBm",
+  "fps": "10"
+ },
+ "46": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "CODEC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of CODEC output",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "47": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "TXAGC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength post AGC/FIXED GAIN",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "48": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "SC_MIC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of MIC output",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "49": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "AFTEREQ",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals after the EQ",
+  "unit": "dBFS",
+  "fps": "20"
+ },
+ "50": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "COMPPEAK",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals just before CLIPPER (Compression)",
+  "unit": "dBFS",
+  "fps": "20"
+ },
+ "51": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "SC_FILT_1",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after Filter 1",
+  "unit": "dBFS",
+  "fps": "20"
+ },
+ "52": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "ALC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals after SW ALC (SSB Peak)",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "53": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "RM_TX_AGC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals after RM TX AGC",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "54": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "SC_FILT_2",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after Filter 2",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "55": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "TX_AGC",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals after TX AGC",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "56": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "B4RAMP",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals before the ramp",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "57": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "AFRAMP",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals after the ramp",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "58": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "POST_P",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength after all processing is done but before attenuation for power control",
+  "unit": "dBFS",
+  "fps": "10"
+ },
+ "59": {
+  "src": "TX-",
+  "num": "0",
+  "nam": "ATTN_FPGA",
+  "low": "-150.0",
+  "hi": "20.0",
+  "desc": "Signal strength of signals after Fine Tune, HW ALC, SWR Foldback attenuation (FPGA)",
+  "unit": "dBFS",
+  "fps": "10"
+ }
+}

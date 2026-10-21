@@ -43,8 +43,26 @@ namespace FlexCommandWire {
 QMap<QString, QString> parseKVs(const QString& body)
 {
     QMap<QString, QString> result;
-    // Rumpf sieht aus wie: "freq=14.225000 mode=USB filter_lo=-1500 filter_hi=1500"
-    for (const QString& token : body.split(' ', Qt::SkipEmptyParts)) {
+    // Rumpf sieht ueblicherweise so aus:
+    //   "freq=14.225000 mode=USB filter_lo=-1500 filter_hi=1500"
+    //
+    // Es gibt aber einen zweiten Trenner. Gemessen am 2026-10-21 nach
+    // `sub meter all`:
+    //
+    //   meter 1.src=COD-#1.num=1#1.nam=MICPEAK#1.low=-150.0#1.hi=20.0#
+    //   1.desc=Signal strength of MIC output in CODEC#1.unit=dBFS#
+    //
+    // Hier trennt '#', und ein Wert (`desc`) enthaelt LEERZEICHEN. An
+    // Leerzeichen zerlegt zerfiel die Zeile in Unsinn -- aus der
+    // Beschreibung wurden die nackten Woerter `MIC=`, `in=`, `of=`,
+    // `output=`, `strength=`, und `desc` trug nur das erste Wort.
+    //
+    // Die Unterscheidung ist der Trenner selbst: wo '#' vorkommt, ist
+    // es das Trennzeichen. Ein Leerzeichen-Rumpf enthaelt keins.
+    const QChar trenner = body.contains(QLatin1Char('#'))
+                              ? QLatin1Char('#')
+                              : QLatin1Char(' ');
+    for (const QString& token : body.split(trenner, Qt::SkipEmptyParts)) {
         const int eq = token.indexOf('=');
         if (eq < 0) {
             // nacktes Wort — mit leerem Wert ablegen, damit der Leser
