@@ -135,6 +135,27 @@ private slots:
                  qPrintable(rechts2));
     }
 
+    void einBlattZumAnsehen()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        applet.sendeTonFeldForTest()->setValue(1500);
+        applet.resize(620, 420);
+        applet.show();
+        QTest::qWait(40);
+        speise(applet, QStringLiteral("CQ DL1ABC JN49"), 1500.0f);
+        speise(applet, QStringLiteral("OE5SOS DL1ABC -07"), 320.0f);
+        speise(applet, QStringLiteral("CQ OK1XYZ JO70"), 1890.0f);
+        speise(applet, QStringLiteral("CQ SP9ABC JO90"), 905.0f);
+        speise(applet, QStringLiteral("DL1ABC OE5SOS RR73"), 1520.0f);
+        speise(applet, QStringLiteral("CQ EA7XYZ IM76"), 2210.0f);
+        QTest::qWait(60);
+        const QString pfad = QDir::tempPath()
+                             + QStringLiteral("/longpath-zwei-spalten.png");
+        QVERIFY(applet.grab().save(pfad));
+        qInfo() << "Blatt:" << pfad;
+    }
+
     void dieStelleWandertMit()
     {
         RadioModel radio;

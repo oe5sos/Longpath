@@ -1158,6 +1158,10 @@ void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
         c.movePosition(QTextCursor::End);
         if (!liste->document()->isEmpty()) { c.insertBlock(); }
         c.insertText(zeile, f);
+        // Ans Ende der Zeile zu schreiben schiebt die Ansicht mit --
+        // dann steht die Uhrzeit links ausserhalb des Fensters, und
+        // man sieht die Spalte, die man am wenigsten braucht. Gesehen
+        // im gerenderten Blatt am 2026-10-21.
     };
 
     anhaengen(m_list);
