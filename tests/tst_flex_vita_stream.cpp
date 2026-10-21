@@ -150,15 +150,45 @@ private slots:
 
         strom.ingestDatagramForTesting(QByteArray("irgendwas"));
         strom.ingestDatagramForTesting(QByteArray(28, '\0'));
-        // Richtiger Satzbau, aber eine Klasse, die Stufe 2 nicht baut
-        // (Messwerte 0x8002 — nicht gemessen, also nicht geraten).
-        QByteArray messwerte = roh(G::kFftKopfA);
-        messwerte[14] = char(0x80); messwerte[15] = char(0x02);
-        strom.ingestDatagramForTesting(messwerte);
+        // Richtiger Satzbau, aber eine Klasse, die es auf dieser
+        // Maschine gar nicht gibt.
+        //
+        // Hier stand bis zum 2026-10-21 die Messwertklasse 0x8002,
+        // begruendet mit „nicht gemessen, also nicht geraten". Sie ist
+        // inzwischen gemessen UND gebaut (§5b des Messblatts), taugt
+        // also nicht mehr als Beispiel fuer fremden Verkehr — der
+        // eigene Fall darunter prueft sie jetzt.
+        QByteArray fremd = roh(G::kFftKopfA);
+        fremd[14] = char(0xBE); fremd[15] = char(0xEF);
+        strom.ingestDatagramForTesting(fremd);
 
         QCOMPARE(spektrum.count(), 0);
         QCOMPARE(strom.datagramsReceived(), 3);
         QCOMPARE(strom.datagramsIgnored(), 3);
+    }
+
+    // Messwerte sind seit dem 2026-10-21 gemessen und gebaut: ein
+    // Paket der Klasse 0x8002 ist kein fremder Verkehr mehr, und
+    // seine Paare kommen heraus.
+    void messwerteKommenHeraus()
+    {
+        FlexVitaStream strom;
+        QSignalSpy messwerte(&strom, &FlexVitaStream::meterSamplesReady);
+
+        QByteArray p = roh(G::kFftKopfA).left(FlexVita::kHeaderBytes);
+        p[14] = char(0x80); p[15] = char(0x02);
+        // Index 10 (`SWR`) mit Rohwert 128 — am Geraet genau 1,000.
+        p.append(char(0x00)); p.append(char(0x0A));
+        p.append(char(0x00)); p.append(char(0x80));
+        strom.ingestDatagramForTesting(p);
+
+        QCOMPARE(messwerte.count(), 1);
+        QCOMPARE(strom.datagramsIgnored(), 0);
+        const auto werte =
+            messwerte.at(0).at(1).value<QVector<FlexVita::FlexMeterSample>>();
+        QCOMPARE(werte.size(), 1);
+        QCOMPARE(werte.at(0).index, quint16(10));
+        QCOMPARE(werte.at(0).raw,   qint16(128));
     }
 
     void derMassstabKommtVonAussen()
