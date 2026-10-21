@@ -20,8 +20,14 @@ private slots:
     // Jede Kante fuer sich aufs Raster, nicht Ecke + Groesse.
     void everyEdgeSnaps()
     {
+        // Nachgerechnet fuer kSnapGridPx = 16 (kaufmaennisch, lround):
+        // links  lround(900/16)=56  -> 896   oben   lround(100/16)=6  ->  96
+        // rechts lround(1230/16)=77 -> 1232  unten  lround(600/16)=38 -> 608
+        // Mit der alten Weite 8 ergibt dieselbe Rechnung 904/104/328/496,
+        // also genau die Zahlen, die bis zum 2026-10-20 hier standen --
+        // die Erwartung ist gerechnet, nicht vom Lauf abgeschrieben.
         const QRect r = snappedFrameRect(QRect(900, 100, 330, 500));
-        QCOMPARE(r, QRect(904, 104, 328, 496));
+        QCOMPARE(r, QRect(896, 96, 336, 512));
         QCOMPARE(r.x() % kSnapGridPx, 0);
         QCOMPARE(r.y() % kSnapGridPx, 0);
         QCOMPARE((r.x() + r.width()) % kSnapGridPx, 0);
