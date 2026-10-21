@@ -1,3 +1,6 @@
+// no-port-check: vendored upstream TAPR WDSP 2.11 (PureSignal 3) — kein
+// Longpath-Port von Thetis. Quelle `wdsp 2.11/Source/iqc.c` @ e69de50d1d702216098019013899ad87534c64e0;
+// Zeilenstand und Herkunftswechsel in WDSP-PROVENANCE.md.
 // =================================================================
 // third_party/wdsp/src/iqc.c  (Longpath)
 // =================================================================
