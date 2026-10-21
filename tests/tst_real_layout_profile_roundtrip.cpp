@@ -149,7 +149,8 @@ QRect distinctiveRectFor(const QString& id)
     const int w = 320 + int((h / 6400) % 100);
     const int ht = 190 + int((h / 640000) % 90);
     // Seit 2026-09-03 (851c9e08) schnappen schwebende Fenster nach dem
-    // Loslassen aufs 8-Punkt-Raster (snapToGridAfterSettle, 180 ms) --
+    // Loslassen aufs Raster (snapToGridAfterSettle, 180 ms; Weite in
+    // kSnapGridPx, seit dem 2026-10-20 sechzehn Punkte) --
     // und zwar VOR geometrySettled() (400 ms), also steht im Profil immer
     // die geschnappte Lage (74 -> 72, 87 -> 88, 52 -> 56: genau die
     // Abweichungen, an denen dieser Test seither scheiterte). Eine Ecke,

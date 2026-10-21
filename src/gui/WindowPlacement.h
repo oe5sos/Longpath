@@ -56,8 +56,15 @@ namespace Longpath {
 // gekommen ist -- ein Rueckstoss durch das Runden selbst loest genau
 // eine weitere, dann bereits treffende Runde aus, kein Endlosdreh.
 //
+// Die Weite: 16 Punkte. Bis zum 2026-10-20 waren es 8, und das war zu
+// fein -- zwei Fenster konnten um einen halben Schritt versetzt stehen
+// und sahen trotzdem "eingerastet" aus. Betreiber am 2026-10-20, mit
+// einem Bild von AetherSDR daneben: "aether hat einen groesseren
+// raster, der auch sehr gut passt, bei uns gehoert dieser ein bisschen
+// groesser."
+//
 // Reiner Punkt-Helfer, keine Fensteroperation selbst.
-constexpr int kSnapGridPx = 8;
+constexpr int kSnapGridPx = 16;
 QPoint snappedTopLeft(const QPoint& pos, int grid = kSnapGridPx);
 
 // ── Kanten statt Ecke (2026-09-26) ────────────────────────────────────
