@@ -307,19 +307,43 @@ private slots:
                  Qt::WindowFlags{});
     }
 
-    // ── Test 10: PIN toggle forwards to PureSignal::setPinMode ───────────────
-
-    void pinCheckBoxForwardsToPureSignalSetPinMode()
+    // ── Test 10: PIN — abgeschaltet im Formular, Modellweg bleibt ───────────
+    //
+    // Umgebaut 2026-10-21. Vorher klickte dieser Lauf chkPSPin an und
+    // erwartete pinModeChanged. Seit dem Hub auf WDSP 2.11 kennt die
+    // Maschine keinen Pin-Modus mehr (PureSignal 3 passt eine NURB-Kurve
+    // an, statt eine Festkomma-Tafel zu fuehren), und das Kaestchen ist
+    // ABGESCHALTET statt versteckt -- so entschieden am Entwurfsblatt,
+    // festgehalten in tst_ps3_bedienung.
+    //
+    // Ein Klick auf ein abgeschaltetes Kaestchen tut nichts, also meldete
+    // der Lauf rot. Er war damit kein Fehlalarm, sondern genau richtig:
+    // die Bedienung hat sich geaendert. Der Lauf prueft jetzt beides --
+    // dass das Kaestchen nicht mehr bedienbar ist UND dass der Weg ins
+    // Modell weiter traegt, denn eine WIEDERHERGESTELLTE Loesung aus der
+    // Zeit vor 2.11 bringt diese Einstellung mit.
+    void pinCheckBoxIsDisabledUnderPs3ButModelPathStillWorks()
     {
         TxChannel tx(kTxChannelId);
         PureSignal ps(nullptr, &tx, nullptr, nullptr, nullptr, nullptr);
         PsForm form(nullptr, &ps);
 
-        QSignalSpy spy(&ps, &PureSignal::pinModeChanged);
         auto* chk = form.findChild<QCheckBox*>(QStringLiteral("chkPSPin"));
         QVERIFY(chk);
-        // Default checked → click un-checks.
+        QVERIFY2(!chk->isEnabled(), "chkPSPin soll unter PS3 abgeschaltet sein");
+        QVERIFY2(chk->isVisibleTo(&form), "abgeschaltet, nicht versteckt");
+        QVERIFY2(!chk->toolTip().isEmpty(), "ohne Grund abgeschaltet ist zu wenig");
+
+        // Gegenprobe: der Klick verpufft wirklich. Waere das Kaestchen
+        // doch bedienbar, muesste die Zeile darueber rot melden -- diese
+        // hier faengt den Fall, dass jemand das Abschalten entfernt und
+        // isEnabled() durch ein setCheckable(false) ersetzt.
+        QSignalSpy spy(&ps, &PureSignal::pinModeChanged);
         chk->click();
+        QCOMPARE(spy.count(), 0);
+
+        // Der Modellweg selbst ist unberuehrt.
+        ps.setPinMode(false);
         QCOMPARE(spy.count(), 1);
         QCOMPARE(ps.pinMode(), false);
     }

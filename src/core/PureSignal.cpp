@@ -30,8 +30,10 @@
 
 #include <QDateTime>
 #include <QLoggingCategory>
+#include <QStringList>
 
 #include <cmath>
+#include <iterator>
 
 namespace Longpath {
 
@@ -1024,6 +1026,135 @@ void PureSignal::pollTimerTick()
     processNewInfo(newInfo);
 }
 
+// Die zehn Zustaende der PureSignal-Maschine beim Namen.
+//
+// From WDSP calcc.c:1878-1890 [@e69de50d] enum _calcc_state:
+//   LRESET, LWAIT, LMOXDELAY, LSETUP, LCOLLECT, MOXCHECK, LCALC,
+//   LDELAY, LSTAYON, LTURNON
+//
+// Die Reihenfolge ist die Nummerierung -- eine "8" im Protokoll ist
+// LSTAYON (Korrektur laeuft), eine "6" ist LCALC (es wird gerechnet).
+// Ohne diese Tabelle muss man beim Lesen jedes Protokolls im
+// Fremdquelltext nachzaehlen.
+static const char* calccStateName(int state)
+{
+    static constexpr const char* kNames[] = {
+        "LRESET", "LWAIT", "LMOXDELAY", "LSETUP", "LCOLLECT",
+        "MOXCHECK", "LCALC", "LDELAY", "LSTAYON", "LTURNON",
+    };
+    constexpr int kCount = static_cast<int>(std::size(kNames));
+    if (state < 0 || state >= kCount) {
+        return "?";
+    }
+    return kNames[state];
+}
+
+// ── PureSignal 3: die Bitfelder als Satz ──────────────────────────────────
+//
+// Verbatim aus dem Kopf von third_party/wdsp/src/calcc.h [@e69de50d],
+// Abschnitt "'info' assignments". Die vier Kurvenbauer (rx-Skala,
+// Betrag, Cosinus, Sinus) teilen sich die unteren vier Bits; die oberen
+// zwei sind je Bauer verschieden. info[6] kommt aus scheck().
+//
+// Reihenfolge der Meldungen: erst die harten Fehler (Fit/Spline
+// gescheitert), dann die Guetewarnungen, dann die Schlusspruefung. So
+// steht in der Zeile zuerst das, was man wirklich abstellen muss.
+// Die Worte sind die von calcc.h, nicht uebersetzt: derselbe Satz geht ins
+// Protokoll UND als Hinweistext an die Kalibriertabelle (Oberflaeche ist
+// durchgehend englisch), und wer ihn liest, soll ihn im Fremdquelltext
+// wiederfinden, ohne ruecküberzusetzen.
+QString PureSignal::describeSolutionBits(const int* info)
+{
+    if (info == nullptr) {
+        return QStringLiteral("(no data)");
+    }
+
+    QStringList reasons;
+
+    // info[0] — builder for rx_scale
+    //   0b0001 = Extrapolate_Res.confidence ('0' good; '1' reverted to linear)
+    if ((info[0] & 0b0001) != 0) {
+        reasons << QStringLiteral("rx_scale: extrapolation not confident, reverted to linear");
+    }
+
+    // info[1..3] — builders for cm (Betrag), cc (Cosinus), cs (Sinus).
+    // Die unteren vier Bits sind in allen drei gleich belegt:
+    //   0b0001 = nf_fit() Failed.        [NURB Curve]
+    //   0b0010 = nf_fit() Quality bad.   [NURB Curve]
+    //   0b0100 = ns_build() Failed.      [Spline]
+    //   0b1000 = ns_build() Quality bad. [Spline]
+    struct Builder { int idx; const char* name; };
+    static constexpr Builder kBuilders[3] = {
+        { 1, "cm (magnitude)" },
+        { 2, "cc (cosine)" },
+        { 3, "cs (sine)" },
+    };
+    for (const Builder& b : kBuilders) {
+        const int bits = info[b.idx];
+        const QString who = QString::fromLatin1(b.name);
+        if ((bits & 0b0001) != 0) {
+            reasons << QStringLiteral("%1: nf_fit() failed [NURB curve]").arg(who);
+        }
+        if ((bits & 0b0010) != 0) {
+            reasons << QStringLiteral("%1: nf_fit() quality bad [NURB curve]").arg(who);
+        }
+        if ((bits & 0b0100) != 0) {
+            reasons << QStringLiteral("%1: ns_build() failed [spline]").arg(who);
+        }
+        if ((bits & 0b1000) != 0) {
+            reasons << QStringLiteral("%1: ns_build() quality bad [spline]").arg(who);
+        }
+    }
+
+    // Die oberen zwei Bits sind je Bauer EIGEN -- nicht gemeinsam
+    // behandeln, sonst meldet man dem Betreiber die falsche Ursache:
+    //   info[1]: 0b00010000 = count_extrema() Failed
+    //            0b00100000 = MAG Cold Start Error
+    //   info[2]: 0b00010000 = sin^2 + cos^2 Error
+    //            0b00100000 = COS Cold Start Error
+    //   info[3]: 0b00010000 = sin^2 + cos^2 Error
+    //            0b00100000 = SIN Cold Start Error
+    if ((info[1] & 0b00010000) != 0) {
+        reasons << QStringLiteral("cm (magnitude): count_extrema() failed");
+    }
+    if ((info[1] & 0b00100000) != 0) {
+        reasons << QStringLiteral("cm (magnitude): cold start error");
+    }
+    if ((info[2] & 0b00010000) != 0 || (info[3] & 0b00010000) != 0) {
+        reasons << QStringLiteral("sin^2 + cos^2 error");
+    }
+    if ((info[2] & 0b00100000) != 0) {
+        reasons << QStringLiteral("cc (cosine): cold start error");
+    }
+    if ((info[3] & 0b00100000) != 0) {
+        reasons << QStringLiteral("cs (sine): cold start error");
+    }
+
+    // info[6] — scheck(), Final Solution Checks
+    //   0b0001 = New-Old Soln Compare Check
+    //   0b0010 = Can't Fill Buckets, Probable Over-Drive
+    //
+    // Bit 1 setzt calcc.c AUSSERDEM an zwei Stellen NACH dem memcpy
+    // (calcc.c:2008 und 2049 [@e69de50d]), wenn
+    // top_bucket_useful_frac() unter DEADLOCK_MIN_FRAC = 0.06 liegt.
+    // Darum kann es zusammen mit einem gestiegenen info[5] auftreten:
+    // die Loesung war rechnerisch in Ordnung, aber der oberste Eimer
+    // traegt nichts mehr -- und die Maschine geht nach LRESET statt die
+    // Korrektur einzuschalten. Genau das sieht man von aussen als
+    // "cor.cnt steigt, aber es wird nie korrigiert".
+    if ((info[6] & 0b0001) != 0) {
+        reasons << QStringLiteral("scheck(): new-old solution compare check");
+    }
+    if ((info[6] & 0b0010) != 0) {
+        reasons << QStringLiteral("scheck(): can't fill buckets, probable over-drive");
+    }
+
+    if (reasons.isEmpty()) {
+        return QStringLiteral("no findings");
+    }
+    return reasons.join(QStringLiteral("; "));
+}
+
 void PureSignal::processNewInfo(const int newInfo[16])
 {
     // From Thetis PSForm.cs:555-728 timer1code [v2.10.3.13].  Skeleton:
@@ -1089,17 +1220,40 @@ void PureSignal::processNewInfo(const int newInfo[16])
         // as the number we believe we pushed.
         const double hwPeak = m_tx ? m_tx->getPSHWPeak() : -1.0;
         const double maxTx  = m_tx ? m_tx->getPSMaxTX()  : -1.0;
+        // Die Zeile liest info[] mit den Bedeutungen von WDSP 2.11
+        // (PureSignal 3), nicht mit denen von 1.29. Der wichtigste
+        // Unterschied steht in zwei Zahlen nebeneinander:
+        //
+        //   ok=   info[5]  nur gelungene Loesungen
+        //   try=  info[7]  jeder Versuch
+        //
+        // Stehen beide gleich, rechnet die Maschine sauber durch. Bleibt
+        // ok zurueck, sagt reason= warum -- das ist der Grund, warum
+        // diese Zeile ueberhaupt umgebaut wurde: vorher hiess info[5]
+        // bei uns "calCount" und niemand konnte unterscheiden, ob ein
+        // Durchgang gelungen oder nur versucht worden war.
+        //
+        // bits= ist das Rohmuster, damit eine Zeile im Protokoll auch
+        // dann noch auswertbar ist, wenn describeSolutionBits() spaeter
+        // andere Worte waehlt.
+        const QString reason = PureSignal::describeSolutionBits(newInfo);
         qCInfo(lcDsp).nospace()
             << "PureSignal info[]: state=" << newInfo[15]
+            << '/' << calccStateName(newInfo[15])
             << " corrApplied=" << newInfo[14]
-            << " calCount=" << newInfo[5]
+            << " ok=" << newInfo[5]
+            << " try=" << newInfo[7]
             << " feedbackLevel=" << newInfo[4]
-            << " dogCount=" << newInfo[13]
+            << " bits=[" << newInfo[0] << ',' << newInfo[1] << ','
+                         << newInfo[2] << ',' << newInfo[3] << ','
+                         << newInfo[6] << ']'
+            << " fileErr=" << newInfo[12]
             << " hwPeak=" << hwPeak
             << " maxTX=" << maxTx
             << " binReach=" << (hwPeak > 0.0 ? maxTx / hwPeak : -1.0)
             << " (mox=" << moxNow
-            << " autoCal=" << m_autoCalEnabled << ")";
+            << " autoCal=" << m_autoCalEnabled << ")"
+            << " reason=" << reason;
     }
 
     // From Thetis PSForm.cs:1097-1098 [v2.10.3.13] CalibrationAttemptsChanged
@@ -1239,6 +1393,9 @@ void PureSignal::processNewInfo(const int newInfo[16])
     if (!m_tx) {
         std::memcpy(m_oldInfo, newInfo, sizeof(m_oldInfo));
         std::memcpy(m_info, newInfo, sizeof(m_info));
+        if (changed) {
+            emit psDiagnosticsChanged();
+        }
         return;
     }
 
@@ -1493,6 +1650,14 @@ void PureSignal::processNewInfo(const int newInfo[16])
     // PSForm.cs:1079-1081 [v2.10.3.13].
     std::memcpy(m_oldInfo, newInfo, sizeof(m_oldInfo));
     std::memcpy(m_info, newInfo, sizeof(m_info));
+
+    // Erst JETZT melden: psDiagnosticsChanged ist dafuer da, dass PsForm
+    // die Tabelle ueber infoAt() neu liest, und infoAt() liest m_info --
+    // das zwei Zeilen darueber gerade erst beschrieben wurde. Ein Signal
+    // weiter oben haette die Anzeige um eine Runde hinterherlaufen lassen.
+    if (changed) {
+        emit psDiagnosticsChanged();
+    }
 }
 
 // ── Auto-attention tick (timer2code port) ─────────────────────────────────

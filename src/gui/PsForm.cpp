@@ -576,7 +576,8 @@ QGroupBox* PsForm::buildCalibrationInfoGroup(QWidget* parent)
     // Column 0: bldr.* row labels + lblPSInfo0..3
     auto* lblBldrRx = new QLabel(tr("bldr.rx"), grp);
     lblBldrRx->setToolTip(tr(
-        "Indicator:  build of feedback magnitude curve.  (Normal = 0)"));
+        "Indicator:  build of feedback magnitude curve.  (Normal = 0)\n\n"
+        "0b0001 extrapolation not confident, reverted to linear"));
     g->addWidget(lblBldrRx, 0, 0);
     m_lblInfo0 = makeIndicatorLabel(QStringLiteral("lblPSInfo0"));
     m_lblInfo0->setToolTip(lblBldrRx->toolTip());
@@ -584,7 +585,13 @@ QGroupBox* PsForm::buildCalibrationInfoGroup(QWidget* parent)
 
     auto* lblBldrCm = new QLabel(tr("bldr.cm"), grp);
     lblBldrCm->setToolTip(tr(
-        "Indicator:  build of magnitude correction curve.  (Normal = 0)"));
+        "Indicator:  build of magnitude correction curve.  (Normal = 0)\n\n"
+        "0b0001 nf_fit() failed [NURB curve]\n"
+        "0b0010 nf_fit() quality bad [NURB curve]\n"
+        "0b0100 ns_build() failed [spline]\n"
+        "0b1000 ns_build() quality bad [spline]\n"
+        "0b00010000 count_extrema() failed\n"
+        "0b00100000 MAG cold start error"));
     g->addWidget(lblBldrCm, 1, 0);
     m_lblInfo1 = makeIndicatorLabel(QStringLiteral("lblPSInfo1"));
     m_lblInfo1->setToolTip(lblBldrCm->toolTip());
@@ -592,7 +599,13 @@ QGroupBox* PsForm::buildCalibrationInfoGroup(QWidget* parent)
 
     auto* lblBldrCc = new QLabel(tr("bldr.cc"), grp);
     lblBldrCc->setToolTip(tr(
-        "Indicator:  build of cosine correction curve.  (Normal = 0)"));
+        "Indicator:  build of cosine correction curve.  (Normal = 0)\n\n"
+        "0b0001 nf_fit() failed [NURB curve]\n"
+        "0b0010 nf_fit() quality bad [NURB curve]\n"
+        "0b0100 ns_build() failed [spline]\n"
+        "0b1000 ns_build() quality bad [spline]\n"
+        "0b00010000 sin^2 + cos^2 error\n"
+        "0b00100000 COS cold start error"));
     g->addWidget(lblBldrCc, 2, 0);
     m_lblInfo2 = makeIndicatorLabel(QStringLiteral("lblPSInfo2"));
     m_lblInfo2->setToolTip(lblBldrCc->toolTip());
@@ -600,7 +613,13 @@ QGroupBox* PsForm::buildCalibrationInfoGroup(QWidget* parent)
 
     auto* lblBldrCs = new QLabel(tr("bldr.cs"), grp);
     lblBldrCs->setToolTip(tr(
-        "Indicator:  build of sine correction curve.  (Normal = 0)"));
+        "Indicator:  build of sine correction curve.  (Normal = 0)\n\n"
+        "0b0001 nf_fit() failed [NURB curve]\n"
+        "0b0010 nf_fit() quality bad [NURB curve]\n"
+        "0b0100 ns_build() failed [spline]\n"
+        "0b1000 ns_build() quality bad [spline]\n"
+        "0b00010000 sin^2 + cos^2 error\n"
+        "0b00100000 SIN cold start error"));
     g->addWidget(lblBldrCs, 3, 0);
     m_lblInfo3 = makeIndicatorLabel(QStringLiteral("lblPSInfo3"));
     m_lblInfo3->setToolTip(lblBldrCs->toolTip());
@@ -626,7 +645,13 @@ QGroupBox* PsForm::buildCalibrationInfoGroup(QWidget* parent)
     auto* lblSlnChk = new QLabel(tr("sln.chk"), grp);
     lblSlnChk->setToolTip(tr(
         "Indicator:  code indicating evaluation of correction solution. "
-        "(Normal = 0)"));
+        "(Normal = 0)\n\n"
+        "0b0001 new-old solution compare check\n"
+        "0b0010 can't fill buckets, probable over-drive\n\n"
+        "The 2 can appear together with a rising cor.cnt: calcc.c:2008/2049 "
+        "sets it AFTER the solve, when the top bucket drops below 6 % useful "
+        "fraction. The solution was arithmetically sound, but the engine "
+        "goes to LRESET instead of switching the correction on."));
     g->addWidget(lblSlnChk, 2, 2);
     m_lblInfo6 = makeIndicatorLabel(QStringLiteral("lblPSInfo6"));
     m_lblInfo6->setToolTip(lblSlnChk->toolTip());
@@ -642,11 +667,33 @@ QGroupBox* PsForm::buildCalibrationInfoGroup(QWidget* parent)
 
     auto* lblCorCnt = new QLabel(tr("cor.cnt"), grp);
     lblCorCnt->setToolTip(tr(
-        "Indicator:  cumulative number of new correction solutions."));
+        "Indicator:  cumulative number of new correction solutions.")
+        + QStringLiteral("\n\n")
+        + tr("PureSignal 3 (WDSP 2.11): SUCCESSFUL solutions only "
+             "(info[5], calcc.c:1758). Attempts are the row below. When "
+             "cor.cnt lags try.cnt, bldr.* and sln.chk say why."));
     g->addWidget(lblCorCnt, 4, 2);
     m_lblInfo5 = makeIndicatorLabel(QStringLiteral("lblPSInfo5"));
     m_lblInfo5->setToolTip(lblCorCnt->toolTip());
     g->addWidget(m_lblInfo5, 4, 3);
+
+    // ── try.cnt: info[7], neu mit PureSignal 3 ────────────────────────────
+    //
+    // Thetis' Formular kennt dieses Feld nicht -- unter WDSP 1.29 gab es
+    // nichts zu unterscheiden, weil info[5] bei jedem Durchgang stieg.
+    // Seit calcc.c:1154 [@e69de50d] zaehlt binfo[7] die Versuche und
+    // binfo[5] nur die gelungenen. Ohne beide Zahlen nebeneinander kann
+    // man am Geraet nicht sehen, ob die Maschine gar nicht rechnet oder
+    // ob sie rechnet und die Loesung verwirft -- das sind zwei voellig
+    // verschiedene Fehlersuchen.
+    auto* lblTryCnt = new QLabel(tr("try.cnt"), grp);
+    lblTryCnt->setToolTip(tr(
+        "Indicator:  cumulative number of attempted calibrations "
+        "(info[7], calcc.c:1154).  Normal: rises in step with cor.cnt."));
+    g->addWidget(lblTryCnt, 5, 2);
+    m_lblInfo7 = makeIndicatorLabel(QStringLiteral("lblPSInfo7"));
+    m_lblInfo7->setToolTip(lblTryCnt->toolTip());
+    g->addWidget(m_lblInfo7, 5, 3);
 
     // Column 2: GetPk / SetPk labels + read-only mirror labels
     auto* lblGetPk = new QLabel(tr("GetPk"), grp);
@@ -735,6 +782,12 @@ void PsForm::wireToPureSignal()
             this, &PsForm::refreshCoBadge);
     connect(m_pureSignal, &PureSignal::calibrationCountChanged,
             this, &PsForm::onCalibrationCountChanged);
+    // Unter PureSignal 3 steigt info[5] nur bei gelungenen Loesungen; die
+    // Tabelle darf daher nicht allein an calibrationCountChanged haengen,
+    // sonst steht sie still, waehrend jeder Versuch scheitert. Siehe die
+    // Begruendung am Signal in PureSignal.h.
+    connect(m_pureSignal, &PureSignal::psDiagnosticsChanged,
+            this, &PsForm::refreshCalibrationInfo);
     connect(m_pureSignal, &PureSignal::feedbackColourChanged,
             this, &PsForm::onFeedbackColourChanged);
 }
@@ -1175,6 +1228,17 @@ void PsForm::onCalibrationCountChanged(int count)
     if (m_lblInfo5) {
         m_lblInfo5->setText(QString::number(count));
     }
+    refreshCalibrationInfo();
+}
+
+// ── Die ganze Kalibriertabelle auffrischen ────────────────────────────────
+//
+// Herausgezogen 2026-10-21 aus onCalibrationCountChanged. Dort hing die
+// Tabelle am Zaehler info[5], was unter WDSP 1.29 ging (der stieg bei
+// jedem Durchgang) und unter PureSignal 3 nicht mehr geht (er steigt nur
+// bei gelungenen Loesungen, calcc.c:1758 [@e69de50d]).
+void PsForm::refreshCalibrationInfo()
+{
     if (!m_pureSignal) {
         return;
     }
@@ -1182,7 +1246,9 @@ void PsForm::onCalibrationCountChanged(int count)
     if (m_lblInfo1)  { m_lblInfo1->setText(QString::number(m_pureSignal->infoAt(1)));  }
     if (m_lblInfo2)  { m_lblInfo2->setText(QString::number(m_pureSignal->infoAt(2)));  }
     if (m_lblInfo3)  { m_lblInfo3->setText(QString::number(m_pureSignal->infoAt(3)));  }
+    if (m_lblInfo5)  { m_lblInfo5->setText(QString::number(m_pureSignal->infoAt(5)));  }
     if (m_lblInfo6)  { m_lblInfo6->setText(QString::number(m_pureSignal->infoAt(6)));  }
+    if (m_lblInfo7)  { m_lblInfo7->setText(QString::number(m_pureSignal->infoAt(7)));  }
     if (m_lblInfo13) { m_lblInfo13->setText(QString::number(m_pureSignal->infoAt(13))); }
     if (m_lblInfo15) { m_lblInfo15->setText(QString::number(m_pureSignal->infoAt(15))); }
     if (m_lblGetPSpeak) {
@@ -1190,6 +1256,20 @@ void PsForm::onCalibrationCountChanged(int count)
         //   lblPSHWPeak.Text = puresignal.HWPeak.ToString("F4");
         const double peak = m_pureSignal->getHwPeak();
         m_lblGetPSpeak->setText(QString::number(peak, 'f', 4));
+    }
+
+    // Der Grund steht als Hinweistext an der Gruppe, nicht als weitere
+    // Zeile im Raster: er ist ein ganzer Satz und waere im Gitter nicht
+    // lesbar. Wer die Zahlen nicht deuten kann, faehrt mit der Maus
+    // darueber und bekommt sie in Worten.
+    if (m_grpCalInfo) {
+        int snapshot[16] = {};
+        for (int i = 0; i < 16; ++i) {
+            snapshot[i] = m_pureSignal->infoAt(i);
+        }
+        m_grpCalInfo->setToolTip(
+            tr("Last evaluation: %1").arg(
+                PureSignal::describeSolutionBits(snapshot)));
     }
 }
 

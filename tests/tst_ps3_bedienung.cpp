@@ -25,6 +25,7 @@
 #include <QtTest/QtTest>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QGridLayout>
 #include <QLabel>
 
 #include "gui/PsForm.h"
@@ -76,6 +77,40 @@ private slots:
             QVERIFY2(w != nullptr, name);
             QVERIFY2(w->isEnabled(), name);
         }
+    }
+
+    void die_versuchszahl_steht_neben_der_loesungszahl()
+    {
+        // try.cnt ist ein Longpath-Zusatz, kein Thetis-Feld: ohne ihn
+        // kann man am Geraet nicht unterscheiden, ob gar nicht gerechnet
+        // wird oder ob gerechnet und verworfen wird.
+        RadioModel rm;
+        PsForm form(&rm, nullptr);
+        auto* cor = form.findChild<QLabel*>(QStringLiteral("lblPSInfo5"));
+        auto* versuch = form.findChild<QLabel*>(QStringLiteral("lblPSInfo7"));
+        QVERIFY(cor != nullptr);
+        QVERIFY2(versuch != nullptr, "try.cnt fehlt im Kalibrierraster");
+
+        // Und er steht wirklich daneben, nicht irgendwo: dieselbe Spalte,
+        // eine Zeile tiefer. Sonst liest man die zwei Zahlen nicht als
+        // Paar, und genau darum geht es bei ihnen.
+        //
+        // Gefragt wird das Raster, nicht der Bildpunkt: ein Formular, das
+        // nie gezeigt wurde, hat fuer BEIDE Felder y() == 0 -- der erste
+        // Versuch dieses Laufs fiel genau darauf um und haette jede
+        // Anordnung durchgelassen, sobald man ihn "repariert" haette.
+        QCOMPARE(versuch->parentWidget(), cor->parentWidget());
+        auto* raster = qobject_cast<QGridLayout*>(
+            cor->parentWidget()->layout());
+        QVERIFY(raster != nullptr);
+        int zeileCor = -1, spalteCor = -1, zeileVer = -1, spalteVer = -1;
+        int spanne = 0;
+        raster->getItemPosition(raster->indexOf(cor),
+                                &zeileCor, &spalteCor, &spanne, &spanne);
+        raster->getItemPosition(raster->indexOf(versuch),
+                                &zeileVer, &spalteVer, &spanne, &spanne);
+        QCOMPARE(spalteVer, spalteCor);
+        QCOMPARE(zeileVer, zeileCor + 1);
     }
 };
 

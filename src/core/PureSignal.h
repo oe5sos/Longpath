@@ -295,6 +295,30 @@ public:
         return (idx >= 0 && idx < 16) ? m_info[idx] : 0;
     }
 
+    // ── PureSignal 3 (WDSP 2.11): was die sechzehn Felder BEDEUTEN ────────
+    //
+    // Bis WDSP 1.29 war info[] im Wesentlichen ein Zaehlwerk. PureSignal 3
+    // belegt die ersten acht Felder neu: sie kommen per
+    //   memcpy (a->info, a->binfo, 8 * sizeof (int));
+    // aus dem Rechenwerk (calcc.c:2036 [@e69de50d]) und tragen BITS, die
+    // sagen, WORAN eine Loesung scheitert -- nicht nur, dass sie scheitert.
+    //
+    // Zwei Zaehler, die man nicht verwechseln darf:
+    //   info[7]  jeder Versuch        (binfo[7]++ am Anfang von calc(),
+    //                                  calcc.c:1154 [@e69de50d])
+    //   info[5]  nur die GELUNGENEN   (binfo[5]++ nur bei scOK,
+    //                                  calcc.c:1758 [@e69de50d])
+    // scOK ist genau dann wahr, wenn info[0..3] UND info[6] alle null sind
+    // (calcc.c:1748-1749 [@e69de50d]). Steigt also info[5] nicht mit
+    // info[7] mit, dann sagt das Bitmuster in info[0..3]/[6], warum.
+    //
+    // Die Bedeutungen der Bits stehen im Kopf von calcc.h [@e69de50d],
+    // Abschnitt "'info' assignments"; describeSolutionBits() gibt sie als
+    // Satz zurueck. Mit `info` ist ein Feld von 16 Werten gemeint; kuerzere
+    // Felder sind ein Programmierfehler.
+    static QString describeSolutionBits(const int* info);
+
+
     // ANAN-G2E bench-fix 2026-05-23 (JJ Boyd): Thetis PSForm.cs:614
     // timer1code [v2.10.3.13]:
     //   lblPSHWPeak.Text = puresignal.HWPeak.ToString("F4");
@@ -539,6 +563,21 @@ signals:
     void stabilityActionChanged(Longpath::PsCorrectionAction action);
 
     void calibrationCountChanged(int);
+
+    // ── Die Kalibriertabelle braucht einen eigenen Takt (2026-10-21) ───────
+    //
+    // Bis WDSP 1.29 stieg info[5] bei JEDEM Durchgang, und PsForm hat die
+    // ganze Tabelle an calibrationCountChanged gehaengt -- ein Feld als
+    // Taktgeber fuer neun. Unter PureSignal 3 steigt info[5] nur noch bei
+    // GELUNGENEN Loesungen (calcc.c:1758 [@e69de50d]). Damit fror die
+    // Tabelle genau dann ein, wenn jeder Versuch scheitert -- also in dem
+    // einen Fall, fuer den sie gebaut ist.
+    //
+    // psDiagnosticsChanged kommt, sobald irgendeines der sechzehn Felder
+    // sich geaendert hat (hasInfoChanged), und ist damit das Gegenstueck zu
+    // Thetis' Zeitgeber, der in PSForm.cs:555-728 [v2.10.3.13] jede Runde
+    // alle Felder frisch liest.
+    void psDiagnosticsChanged();
     void feedbackColourChanged(QColor);
     void invertRedBlueChanged(bool);
     void hideFeedbackChanged(bool);

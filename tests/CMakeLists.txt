@@ -7891,6 +7891,11 @@ longpath_add_test(tst_genius_status_tor)
 #   Sendekanal, liest GetPSInfo und baut wieder ab -- mit Uhr darum, weil ein
 #   falscher POSIX-Ersatz fuer WaitForMultipleObjects den Steuerfaden
 #   doPSCorrChange im Abbau haengen liesse statt rot zu melden.
+#   Dazu seit 2026-10-21 die Deutung der sechzehn Felder: dass die oberen
+#   zwei Bits je Kurvenbauer WOANDERS hingehoeren, dass ein gestiegener
+#   Loesungszaehler den Grund nicht verdeckt, und die Gegenprobe zum neuen
+#   Takt der Kalibriertabelle (nur info[7] bewegt sich -> psDiagnosticsChanged
+#   kommt, calibrationCountChanged NICHT -- der alte Taktgeber waere still).
 longpath_add_test(tst_puresignal3_kette)
 
 # tst_gs232_rotor: der serielle GS-232A/B-Treiber ohne Rotor am Tisch
@@ -7903,14 +7908,18 @@ longpath_add_test(tst_gs232_rotor)
 # tst_ps3_entwurfsblaetter: kein Pruefstand, ein Zeichenwerkzeug -- rendert
 #   das ECHTE PsForm in drei Fassungen als Entwurfsblaetter (144 dpi), damit
 #   der Betreiber am Bild entscheidet, was mit den fuenf Reglern geschieht,
-#   die PureSignal 3 nicht mehr kennt. Ohne LONGPATH_GRAB_DIR uebersprungen.
+#   die PureSignal 3 nicht mehr kennt. Braucht LONGPATH_GRAB_DIR UND
+#   LONGPATH_ENTWURF=1 -- die CI setzt den ersten global (ci.yml), also
+#   waere er allein kein Schalter, sondern eine Falle.
 longpath_add_test(tst_ps3_entwurfsblaetter)
 
 # tst_ps3_bedienung: haelt fest, was am Entwurfsblatt entschieden wurde --
 #   die fuenf Regler, die PureSignal 3 nicht mehr kennt, sind ABGESCHALTET
 #   und sichtbar (nicht versteckt), tragen einen Grund, und die Zeile
 #   darunter nennt ihn. Dazu die Gegenprobe, dass der Umbau nicht die halbe
-#   Seite mit abgeschaltet hat.
+#   Seite mit abgeschaltet hat, und die Lage von try.cnt (info[7]) im
+#   Kalibrierraster -- am RASTER gepruefte Lage, nicht am Bildpunkt: ein
+#   Formular, das nie gezeigt wurde, hat fuer alle Felder y() == 0.
 longpath_add_test(tst_ps3_bedienung)
 # --------------------------------------------------------------------------
 # Aggregate "all_tests" target  (2026-05-26 KG4VCF dev-loop fix, from PR #291)

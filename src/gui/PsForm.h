@@ -202,6 +202,12 @@ private slots:
 private:
     void buildUi();
     QGroupBox* buildCalibrationInfoGroup(QWidget* parent);
+
+    /// Liest die ganze Kalibriertabelle neu aus PureSignal::infoAt().
+    /// Haengt an PureSignal::psDiagnosticsChanged, nicht am Zaehler
+    /// info[5] -- der steigt unter PureSignal 3 nur bei gelungenen
+    /// Loesungen und waere als Taktgeber genau im Fehlerfall still.
+    void refreshCalibrationInfo();
     void wireToPureSignal();
     void syncFromPureSignal();
     void setAdvancedMode(bool collapsed);
@@ -265,6 +271,11 @@ private:
     QLabel*    m_lblInfo3{nullptr};              // PSForm.designer.cs:642-653 lblPSInfo3  (bldr.cs)
     QLabel*    m_lblInfo5{nullptr};              // PSForm.designer.cs:481-492 lblPSInfo5  (cor.cnt)
     QLabel*    m_lblInfo6{nullptr};              // PSForm.designer.cs:529-540 lblPSInfo6  (sln.chk)
+    // try.cnt -- Longpath-Zusatz, kein Thetis-Feld. info[7] zaehlt seit
+    // PureSignal 3 die VERSUCHE (calcc.c:1154 [@e69de50d]); ohne diese
+    // Zahl neben cor.cnt kann man "rechnet nicht" und "rechnet, verwirft
+    // aber" am Geraet nicht auseinanderhalten.
+    QLabel*    m_lblInfo7{nullptr};              // (try.cnt)
     QLabel*    m_lblInfo13{nullptr};             // PSForm.designer.cs:505-516 lblPSInfo13 (dg.cnt)
     QLabel*    m_lblInfo15{nullptr};             // PSForm.designer.cs:618-629 lblPSInfo15 (state)
     QLabel*    m_lblGetPSpeak{nullptr};          // PSForm.designer.cs:553-561 GetPSpeak (read-only)

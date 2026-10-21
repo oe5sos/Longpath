@@ -128,6 +128,14 @@ private slots:
     {
         const QString dir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
         if (dir.isEmpty()) { QSKIP("LONGPATH_GRAB_DIR nicht gesetzt"); }
+        // LONGPATH_GRAB_DIR allein genuegt NICHT als Schalter: die CI
+        // setzt es global fuer ihre Haenger-Diagnose (ci.yml:877). Damit
+        // lief dieses Zeichenwerkzeug dort mit und warf den Linux-Lauf
+        // um -- ein Werkzeug, das Blaetter malt, hat in der CI nichts
+        // verloren. Zweiter, ausdruecklicher Schalter.
+        if (qEnvironmentVariableIntValue("LONGPATH_ENTWURF") != 1) {
+            QSKIP("kein LONGPATH_ENTWURF=1 — Zeichenwerkzeug, kein Prüflauf");
+        }
         QDir().mkpath(dir);
 
         // Ohne den Hausstil rendert Qt das Fenster im hellen Systemstil
@@ -204,7 +212,9 @@ private slots:
     void rotorblaetter()
     {
         const QString dir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
-        if (dir.isEmpty()) { QSKIP("LONGPATH_GRAB_DIR nicht gesetzt"); }
+        if (dir.isEmpty() || qEnvironmentVariableIntValue("LONGPATH_ENTWURF") != 1) {
+            QSKIP("kein LONGPATH_ENTWURF=1 — Zeichenwerkzeug, kein Prüflauf");
+        }
 
         auto bauDialog = [](const QString& titel) {
             auto* dlg = new QDialog;
