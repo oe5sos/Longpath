@@ -9,6 +9,7 @@
 // =================================================================
 
 #include "RecordingApplet.h"
+#include "../RecordingScheduleDialog.h"
 #include <QFileInfo>
 #include <QFileDialog>
 
@@ -239,6 +240,16 @@ void RecordingApplet::buildUI()
         row->addWidget(m_planText);
         row->addStretch(1);
 
+        // Der Weg zur Bedienung: ohne ihn kann man einen Eintrag nur
+        // in der Einstellungsdatei anlegen -- der Zeitplan lief seit
+        // August, aber niemand kam an ihn heran.
+        m_planBtn = styledButton(QStringLiteral("Plan…"), 62);
+        m_planBtn->setToolTip(QStringLiteral(
+            "Open the schedule: one entry per recording, UTC."));
+        connect(m_planBtn, &QPushButton::clicked,
+                this, &RecordingApplet::onPlanClicked);
+        row->addWidget(m_planBtn);
+
         m_planState = new QLabel(body);
         QFont pf = m_planState->font();
         stupsPunktgroesse(pf, -1.0);
@@ -302,6 +313,22 @@ void RecordingApplet::onPlaybackClicked()
     rec.startPlayback(pfad);
 }
 
+void RecordingApplet::onPlanClicked()
+{
+    if (m_model == nullptr) {
+        return;
+    }
+    // Ein Fenster, nicht zehn: ein zweiter Klick holt das vorhandene
+    // nach vorn.
+    if (m_planDialog == nullptr) {
+        m_planDialog = new RecordingScheduleDialog(&m_model->recording(), this);
+        m_planDialog->setAttribute(Qt::WA_DeleteOnClose, false);
+    }
+    m_planDialog->show();
+    m_planDialog->raise();
+    m_planDialog->activateWindow();
+}
+
 void RecordingApplet::refreshState()
 {
     if (!m_model) { return; }
@@ -337,6 +364,11 @@ void RecordingApplet::refreshState()
     // man ins Leere. Laeuft gerade eine, bleibt er an: Stoppen muss
     // immer gehen.
     m_playBtn->setEnabled(bereit || spielt);
+    // Dieselbe Regel fuer den Zeitplan: ohne Radio feuert er nicht,
+    // also laesst sich der Plan auch nicht sinnvoll anlegen. Der
+    // Dialog sagt es zusaetzlich — fuer den Fall, dass das Geraet
+    // waehrend der Planung verschwindet.
+    m_planBtn->setEnabled(bereit);
     m_playBtn->setText(spielt ? QStringLiteral("■ Stop")
                               : QStringLiteral("▶ Open…"));
     m_playFile->setText(spielt ? QFileInfo(rec.playbackFile()).fileName()

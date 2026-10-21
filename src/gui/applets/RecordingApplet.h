@@ -51,6 +51,7 @@ private:
     void onAudioClicked();
     void onIqClicked();
     void onPlaybackClicked();
+    void onPlanClicked();
 
     QPushButton* m_audioBtn{nullptr};
     QLabel*      m_audioClock{nullptr};
@@ -61,6 +62,8 @@ private:
     QLabel*      m_iqNote{nullptr};
 
     QPushButton* m_playBtn{nullptr};
+    QPushButton* m_planBtn{nullptr};
+    class RecordingScheduleDialog* m_planDialog{nullptr};
     QLabel*      m_playFile{nullptr};
 
     QLabel*      m_planText{nullptr};
