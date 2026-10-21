@@ -30,6 +30,7 @@ struct BoardCapabilities;
 struct RadioInfo;
 class TciServer;
 class CatTciServerPage;
+class CatTcpIpPage;        // Phase 3K: rigctld-Bruecke
 
 // Main settings dialog with tree-based navigation.
 // Left pane: QTreeWidget with top-level category items.
@@ -43,6 +44,9 @@ class CatTciServerPage;
 class SetupDialog : public QDialog {
     Q_OBJECT
 public:
+    /// Phase 3K: Status der rigctld-Bruecke (von MainWindow).
+    void setRigctldStatus(bool running, quint16 port, int clients);
+
     explicit SetupDialog(RadioModel* model, QWidget* parent = nullptr);
 
     // Navigate to a page by its label text (e.g. "AGC/ALC").
@@ -56,6 +60,12 @@ public:
     void setTciServer(class Longpath::TciServer* server);
 
 signals:
+    // Phase 3K: die Seite schreibt den Wert in AppSettings,
+    // MainWindow startet/stoppt den rigctld-Server.
+    void rigctldEnableToggled(bool on, quint16 port);
+    void rigctldBindOrPortChanged(const QString& bindAddress, quint16 port);
+    void rigctldPttAllowedToggled(bool allowed);
+
     // Phase 3M-3a-ii Batch 6 (Task 3): forwarded from CfcSetupPage's
     // [Configure CFC bands…] button.  MainWindow connects this to the
     // TxApplet::requestOpenCfcDialog() slot so the modeless TxCfcDialog
@@ -104,6 +114,10 @@ private slots:
     void onCurrentRadioChanged(const RadioInfo& info);
 
 private:
+    CatTcpIpPage* m_rigctldPage = nullptr;
+    bool    m_rigctldRunning = false;
+    quint16 m_rigctldPort    = 0;
+    int     m_rigctldClients = 0;
     void buildTree();
 
     // Phase 8 of #167: applies BoardCapabilities to the PA category +

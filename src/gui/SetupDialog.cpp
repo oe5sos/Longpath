@@ -806,7 +806,21 @@ void SetupDialog::buildTree()
     registerPage(cat, "SPE Expert",   [this] { return new SpePage(m_model); });
     registerPage(cat, "KPA500",       [this] { return new Kpa500Page(m_model); });
     registerPage(cat, "ACOM",         [this] { return new AcomPage(m_model); });
-    registerPage(cat, "TCP/IP CAT",   [] { return new CatTcpIpPage;       });
+    // Phase 3K: die Seite fuehrt die rigctld-Bruecke. Signale weiterleiten
+    // wie beim TCI-Server, und den letzten Statusstand nachspielen, damit
+    // der erste Besuch nicht "stopped" behauptet, wenn der Server laeuft.
+    registerPage(cat, "TCP/IP CAT", [this]() -> QWidget* {
+        auto* page = new CatTcpIpPage;
+        m_rigctldPage = page;
+        connect(page, &CatTcpIpPage::rigctldEnableToggled,
+                this, &SetupDialog::rigctldEnableToggled);
+        connect(page, &CatTcpIpPage::rigctldBindOrPortChanged,
+                this, &SetupDialog::rigctldBindOrPortChanged);
+        connect(page, &CatTcpIpPage::rigctldPttAllowedToggled,
+                this, &SetupDialog::rigctldPttAllowedToggled);
+        page->setRigctldStatus(m_rigctldRunning, m_rigctldPort, m_rigctldClients);
+        return page;
+    });
     registerPage(cat, "MIDI Control", [] { return new CatMidiControlPage;  });
 
     tick("CAT & Network");
@@ -913,6 +927,20 @@ void SetupDialog::applyPaVisibility(const BoardCapabilities& caps)
     }
     if (m_paValuesPage) {
         m_paValuesPage->applyCapabilityVisibility(caps);
+    }
+}
+
+
+// Phase 3K: Status der rigctld-Bruecke. Wird von MainWindow bei jedem
+// Start/Stop und bei jeder Aenderung der Clientzahl gerufen -- auch
+// bevor die Seite je geoeffnet wurde.
+void SetupDialog::setRigctldStatus(bool running, quint16 port, int clients)
+{
+    m_rigctldRunning = running;
+    m_rigctldPort    = port;
+    m_rigctldClients = clients;
+    if (m_rigctldPage) {
+        m_rigctldPage->setRigctldStatus(running, port, clients);
     }
 }
 

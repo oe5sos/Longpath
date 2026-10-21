@@ -300,6 +300,7 @@ warren@wpratt.com
 #include "core/TxChannel.h"  // H.2: setTxChannel wiring
 #include "core/ReceiverManager.h"
 #include "core/AppSettings.h"
+#include "core/RigctldServer.h"   // Phase 3K: Hamlib-Bruecke
 #include "core/StartWatch.h"
 #include "core/UiScale.h"
 #include "core/BuildIdentity.h"
@@ -937,6 +938,38 @@ MainWindow::MainWindow(QWidget* parent)
     // Geraet. Siehe AppSettings::darfVonSelbstVerbinden().
     if (m_catApplet && AppSettings::darfVonSelbstVerbinden()) {
         m_catApplet->stelleZustandWiederHer();
+    }
+
+    // -- Phase 3K: rigctld-Bruecke (vom Zweig fix/discovery-quietpolls-
+    // thetis-parity nach main geholt, 2026-10-21) --------------------------
+    // Gleiche Bauart wie der TCI-Autostart: Einstellung lesen, Adresse
+    // pruefen, starten. Das Sendetor wird NUR gesetzt, wenn es ausdruecklich
+    // eingeschaltet ist; RigctldServer::start laesst es ohnehin geschlossen.
+    // Eine Sonde bleibt offline: ein isolierter Lauf band hier sonst den
+    // Port, und ein Fremdprogramm landete an der Sonde statt am Programm
+    // des Betreibers. Von Hand (Setup -> CAT -> TCP/IP CAT) geht es weiter.
+    {
+        auto& s = AppSettings::instance();
+        m_rigctldServer = new RigctldServer(m_radioModel, this);
+
+        const bool enabled = s.value(QStringLiteral("RigctldEnabled"),
+                                     QStringLiteral("False")).toString()
+                             == QStringLiteral("True");
+        const quint16 port = static_cast<quint16>(
+            s.value(QStringLiteral("RigctldPort"),
+                    QStringLiteral("4532")).toString().toUShort());
+        const QString bindStr = s.value(QStringLiteral("RigctldBindAddress"),
+                                        QStringLiteral("127.0.0.1")).toString();
+        QHostAddress bindAddr;
+        if (!bindAddr.setAddress(bindStr)) {
+            bindAddr = QHostAddress(QHostAddress::LocalHost);
+        }
+        if (enabled && AppSettings::darfVonSelbstVerbinden()
+            && m_rigctldServer->start(bindAddr, port)) {
+            m_rigctldServer->setPttAllowed(
+                s.value(QStringLiteral("RigctldAllowPtt"),
+                        QStringLiteral("False")).toString() == QStringLiteral("True"));
+        }
     }
 
     // Phase 3O Sub-Phase 10 Task 10c — host the menu bar + master-output
@@ -13812,6 +13845,65 @@ void MainWindow::setVoltsAmpsVisible(bool visible)
 // ---------------------------------------------------------------------------
 void MainWindow::wireSetupDialog(SetupDialog* dialog)
 {
+    // -- Phase 3K: rigctld-Bruecke -----------------------------------------
+    // Einschalten startet und stoppt sofort, Adress-/Portwechsel startet
+    // einen laufenden Server neu, und der Status geht zurueck in den Dialog.
+    if (m_rigctldServer) {
+        connect(dialog, &SetupDialog::rigctldEnableToggled,
+                this, [this](bool on, quint16 port) {
+                    if (!on) {
+                        m_rigctldServer->stop();
+                        return;
+                    }
+                    auto& s = AppSettings::instance();
+                    const QString bindStr = s.value(
+                        QStringLiteral("RigctldBindAddress"),
+                        QStringLiteral("127.0.0.1")).toString();
+                    QHostAddress bindAddr;
+                    if (!bindAddr.setAddress(bindStr)) {
+                        bindAddr = QHostAddress(QHostAddress::LocalHost);
+                    }
+                    if (m_rigctldServer->start(bindAddr, port)) {
+                        // stop() schliesst das Sendetor; die eigene
+                        // Einstellung danach wieder anlegen.
+                        m_rigctldServer->setPttAllowed(
+                            s.value(QStringLiteral("RigctldAllowPtt"),
+                                    QStringLiteral("False")).toString()
+                            == QStringLiteral("True"));
+                    }
+                });
+        connect(dialog, &SetupDialog::rigctldBindOrPortChanged,
+                this, [this](const QString& bindStr, quint16 port) {
+                    if (!m_rigctldServer->isListening()) {
+                        return;
+                    }
+                    QHostAddress bindAddr;
+                    if (!bindAddr.setAddress(bindStr)) {
+                        bindAddr = QHostAddress(QHostAddress::LocalHost);
+                    }
+                    const bool ptt = m_rigctldServer->pttAllowed();
+                    m_rigctldServer->stop();
+                    if (m_rigctldServer->start(bindAddr, port)) {
+                        m_rigctldServer->setPttAllowed(ptt);
+                    }
+                });
+        connect(dialog, &SetupDialog::rigctldPttAllowedToggled,
+                this, [this](bool allowed) {
+                    m_rigctldServer->setPttAllowed(allowed);
+                });
+
+        const auto pushStatus = [this, dialog]() {
+            dialog->setRigctldStatus(m_rigctldServer->isListening(),
+                                     m_rigctldServer->port(),
+                                     m_rigctldServer->clientCount());
+        };
+        pushStatus();
+        connect(m_rigctldServer, &RigctldServer::listeningChanged,
+                dialog, [pushStatus](bool) { pushStatus(); });
+        connect(m_rigctldServer, &RigctldServer::clientCountChanged,
+                dialog, [pushStatus](int) { pushStatus(); });
+    }
+
     if (!dialog) { return; }
 
     // ── Vor die schwebenden Fenster, nicht dahinter ──────────────────

@@ -558,6 +558,7 @@ set(CORE_SOURCES
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CatProtocol.cpp
+    src/core/RigctldServer.cpp
     src/core/ThetisProfilImport.cpp
     src/core/CatPuffer.cpp
     src/core/CatPtyServer.cpp

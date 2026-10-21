@@ -301,6 +301,17 @@ public:
 
     // AGC mode string per slice. Canonical values: "off","long","slow","fast","custom","normal".
     // From Thetis TCIServer.cs:4658-4671 [v2.10.3.13] — handleAgcMode.
+    // Signal strength in dBm, for rigctld's STRENGTH level and the CAT
+    // SM command. -200 stands for "no WDSP channel".
+    Q_INVOKABLE double rxSignalDbm(int slice) const
+    {
+        return (slice >= 0 && slice < 2) ? m_rxSignalDbm[slice] : -200.0;
+    }
+    void setRxSignalDbmForTest(int slice, double dbm)
+    {
+        if (slice >= 0 && slice < 2) { m_rxSignalDbm[slice] = dbm; }
+    }
+
     Q_INVOKABLE void setAgcMode(int slice, const QString& mode)
     {
         if (slice >= 0 && slice < 2) { m_agcMode[slice] = mode; }
@@ -588,6 +599,7 @@ public:
         m_rxAnf = {};
         m_rxNr = {};
         m_rxNrIndex = { 1, 1 };
+        m_rxSignalDbm = { -200.0, -200.0 };
         m_agcMode = { QStringLiteral("normal"), QStringLiteral("normal") };
         m_agcGain = {};
         m_sqlEnable = {};
@@ -646,6 +658,7 @@ private:
     std::array<bool, 2> m_rxAnf{};
     std::array<bool, 2> m_rxNr{};
     std::array<int, 2>  m_rxNrIndex{1, 1};
+    std::array<double, 2>  m_rxSignalDbm{-200.0, -200.0};
     std::array<QString, 2> m_agcMode{QStringLiteral("normal"), QStringLiteral("normal")};
     std::array<int, 2> m_agcGain{};
     std::array<bool, 2> m_sqlEnable{};
