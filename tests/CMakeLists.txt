@@ -3153,6 +3153,12 @@ longpath_add_test(tst_add_custom_radio_dialog)
 # Longpath-original; no Thetis attribution needed.
 longpath_add_test(tst_connection_panel_state_pills)
 
+# Die Connect-Maske sagt, was hinter ihr liegt. Ohne diesen Satz hat
+# der Betreiber am 2026-10-21 eine Stunde im Funkgeraet gesucht,
+# waehrend sein Panadapter als verstecktes Schwebefenster hinter dem
+# Dialog stand — Bild und Ton liefen nachweislich.
+longpath_add_test(tst_maske_sagt_was_dahinter_liegt)
+
 # ── Phase 3Q Task 12: AppSettings::migrateRadioKey — synthetic → real-MAC ────
 # 6 tests: core migration (name+autoConnect), pinToMac preserved, same-key no-op,
 # absent-key no-op, IP+port preserved, no orphan keys after migration.

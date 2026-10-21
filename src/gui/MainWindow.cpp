@@ -15325,6 +15325,16 @@ void MainWindow::hideFloatingWindowsBehindConnectMask()
         m_sideArea->hide();
         m_floatingContainersHiddenPreConnect.append(m_sideArea.data());
     }
+
+    // Und es dem Dialog sagen. Die Regel „alles hinter die Maske" ist
+    // richtig; dass sie darueber schwieg, war der Fehler — der
+    // Betreiber sah am 2026-10-21 eine schwarze Flaeche und suchte eine
+    // Stunde lang im Funkgeraet, waehrend sein Panadapter als
+    // verstecktes Schwebefenster hinter genau diesem Dialog stand.
+    if (m_connectionPanel) {
+        m_connectionPanel->setWindowsBehindMask(
+            int(m_floatingContainersHiddenPreConnect.size()));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -15383,6 +15393,7 @@ void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
         if (w) { w->show(); w->raise(); restoredAny = true; }
     }
     m_floatingContainersHiddenPreConnect.clear();
+    if (m_connectionPanel) { m_connectionPanel->setWindowsBehindMask(0); }
 
     // Die eben gezeigten Fenster liegen jetzt vorne -- auch vor einem
     // offenen Logbuch, das der Betreiber vor sich hatte. Beim Start war

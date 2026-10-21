@@ -1809,6 +1809,11 @@ private:
     /// Wahr, wenn die Scheibe fuer die Flex von uns angelegt wurde —
     /// dann raeumen wir sie beim Trennen auch wieder weg.
     bool m_flexSliceWasCreated{false};
+    /// Warum das Flex-Bild gerade nicht gezeichnet wird — damit die
+    /// Meldung einmal je Grund kommt und nicht 25 Mal je Sekunde.
+    enum class FlexBildGrund { Unbekannt, KeinAusschnitt, KeinFenster,
+                               FremdquelleAus, Zeichnet };
+    FlexBildGrund m_flexBildGrund{FlexBildGrund::Unbekannt};
     // Der Frequenzausschnitt der Flex-Anzeige, in Hz. Er steht NICHT im
     // FFT-Paket — nur die Wasserfall-Kachel traegt ihre Frequenzen
     // (gemessen). Solange er unbekannt ist, wird nichts gezeichnet:

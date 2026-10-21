@@ -745,9 +745,24 @@ QWidget* ConnectionPanel::buildStatusStrip()
         "QLabel { color: #4a7ba8; font-size: 11px; }")));
     m_stripReconnectLabel->setVisible(false);
 
+    // Was hinter dieser Maske steht.
+    //
+    // Betreiberregel 2026-09-01: „ALLE fliegenden Fenster gehoeren
+    // hinter die ConnectMaske" — richtig, aber sie schwieg darueber.
+    // Am 2026-10-21 hat das eine Stunde gekostet: die Flex war
+    // verbunden, Bild und Ton liefen nachweislich (2581 Bildrahmen im
+    // Protokoll), und der Betreiber sah eine schwarze Flaeche, weil
+    // sein Panadapter ein schwebendes Fenster ist und damit hinter
+    // genau diesem Dialog lag. Ein Satz haette gereicht.
+    m_stripBehindMaskLabel = new QLabel(m_statusStrip);
+    m_stripBehindMaskLabel->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #4a7ba8; font-size: 11px; }")));
+    m_stripBehindMaskLabel->setVisible(false);
+
     stripLayout->addWidget(m_stripPillLabel);
     stripLayout->addWidget(m_stripInfoLabel);
     stripLayout->addWidget(m_stripReconnectLabel);
+    stripLayout->addWidget(m_stripBehindMaskLabel);
     stripLayout->addStretch();
 
     // Disconnect button — only visible when connected
@@ -1782,6 +1797,27 @@ void ConnectionPanel::onModelComboChanged(int index)
 
     setStatusText(QStringLiteral("Model set to %1 for %2")
         .arg(QString::fromLatin1(displayName(model)), info.macAddress));
+}
+
+void ConnectionPanel::setWindowsBehindMask(int count)
+{
+    if (!m_stripBehindMaskLabel) { return; }
+    if (count <= 0) {
+        m_stripBehindMaskLabel->setVisible(false);
+        m_stripBehindMaskLabel->clear();
+        m_stripBehindMaskLabel->setToolTip(QString());
+        return;
+    }
+    m_stripBehindMaskLabel->setText(
+        count == 1
+            ? QStringLiteral("· 1 window is behind this dialog — close to see it")
+            : QStringLiteral("· %1 windows are behind this dialog — close to see them")
+                  .arg(count));
+    m_stripBehindMaskLabel->setToolTip(
+        QStringLiteral("Floating windows — panadapter, meters, rotor, log — are "
+                       "hidden while this dialog is open, so it never opens on "
+                       "top of them. Closing it brings them all back."));
+    m_stripBehindMaskLabel->setVisible(true);
 }
 
 } // namespace Longpath

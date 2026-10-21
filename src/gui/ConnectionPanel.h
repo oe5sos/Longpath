@@ -113,6 +113,12 @@ public:
 
     /// Fuer Pruefstaende: Leistentext und die Erklaerung darunter.
     QLabel* stripInfoLabelForTest() const { return m_stripInfoLabel; }
+    QLabel* behindMaskLabelForTest() const { return m_stripBehindMaskLabel; }
+
+    /// Wieviele schwebende Fenster gerade hinter dieser Maske liegen.
+    /// 0 blendet den Hinweis aus. Der Aufrufer ist MainWindow — nur es
+    /// weiss, was es versteckt hat.
+    void setWindowsBehindMask(int count);
     QLabel* failureDetailLabelForTest() const { return m_failureDetailLabel; }
 
     // Update the connection status display.
@@ -211,6 +217,7 @@ private:
     QWidget*       m_statusStrip{nullptr};
     QLabel*        m_stripPillLabel{nullptr};
     QLabel*        m_stripInfoLabel{nullptr};
+    QLabel*        m_stripBehindMaskLabel{nullptr};
     QPushButton*   m_stripDisconnectBtn{nullptr};
     QLabel*        m_stripReconnectLabel{nullptr};
     // Die Erklaerung zu einem Fehlschlag: mehrzeilig UNTER der Leiste,
