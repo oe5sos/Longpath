@@ -173,7 +173,24 @@ private slots:
     void messwerteKommenHeraus()
     {
         FlexVitaStream strom;
-        QSignalSpy messwerte(&strom, &FlexVitaStream::meterSamplesReady);
+
+        // Die Werte DIREKT auffangen statt ueber QSignalSpy.
+        //
+        // Ein Spy legt den Nutztyp als QVariant ab und braucht ihn
+        // dafuer im Metasystem. Qt 6.11 (macOS) meldet ihn von selbst
+        // an, die aeltere Fassung der Linux-CI nicht — der Fall war
+        // dort am 2026-10-21 rot, waehrend er hier gruen blieb, und
+        // ausgelesen wurde ein leerer Vorgabewert statt der Paare.
+        // Der Typ ist jetzt zwar angemeldet (Q_DECLARE_METATYPE in
+        // FlexVitaReader.h), aber ein Prueffall soll nicht daran
+        // haengen: hier zaehlt, was aus dem Strom kommt.
+        int rufe = 0;
+        QVector<FlexVita::FlexMeterSample> werte;
+        QObject::connect(&strom, &FlexVitaStream::meterSamplesReady,
+                         [&](quint32, const QVector<FlexVita::FlexMeterSample>& w) {
+            ++rufe;
+            werte = w;
+        });
 
         QByteArray p = roh(G::kFftKopfA).left(FlexVita::kHeaderBytes);
         p[14] = char(0x80); p[15] = char(0x02);
@@ -182,10 +199,8 @@ private slots:
         p.append(char(0x00)); p.append(char(0x80));
         strom.ingestDatagramForTesting(p);
 
-        QCOMPARE(messwerte.count(), 1);
+        QCOMPARE(rufe, 1);
         QCOMPARE(strom.datagramsIgnored(), 0);
-        const auto werte =
-            messwerte.at(0).at(1).value<QVector<FlexVita::FlexMeterSample>>();
         QCOMPARE(werte.size(), 1);
         QCOMPARE(werte.at(0).index, quint16(10));
         QCOMPARE(werte.at(0).raw,   qint16(128));

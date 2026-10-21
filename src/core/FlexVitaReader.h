@@ -245,6 +245,21 @@ QVector<FlexMeterSample> meterSamples(const QByteArray& datagram);
 // einer Zahl, die gut aussieht und geraten ist (HAUSSTIL Regel 7).
 std::optional<double> meterScaled(qint16 raw, const QString& unit);
 
+}  // namespace FlexVita
+}  // namespace Longpath
+
+// Der Nutztyp des Signals `meterSamplesReady` muss dem Metasystem
+// bekannt sein. macOS baut hier gegen Qt 6.11 und kam ohne aus; die
+// Linux-CI baut gegen eine aeltere Fassung und fiel darueber — ein
+// `QSignalSpy` liest den Wert dann als leeren Vorgabewert aus. Fuer
+// eine Verbindung ueber Fadengrenzen braucht Qt die Anmeldung
+// ausserdem immer.
+Q_DECLARE_METATYPE(Longpath::FlexVita::FlexMeterSample)
+Q_DECLARE_METATYPE(QVector<Longpath::FlexVita::FlexMeterSample>)
+
+namespace Longpath {
+namespace FlexVita {
+
 
 // From AetherSDR VitaBinCoverage.h:23-48 [@d58e2b8a] —
 // hasZeroFilledFftGrowthSuffix(). Eine FLEX-8600 mit Firmware 4.2.18
