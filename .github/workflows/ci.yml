@@ -80,6 +80,17 @@ jobs:
         # sobald irgendwo eine zweite Schreibweise entsteht.
         run: python3 scripts/check-applet-ids.py
 
+      - name: Verify every test source is registered with CMake
+        # tests/CMakeLists.txt wird NICHT geglobbt (Absicht). Preis:
+        # wer den Eintrag verliert, verliert den Prueflauf LAUTLOS --
+        # kein rotes Licht, kein uebersprungener Test, er existiert
+        # einfach nicht mehr. Zweimal durch einen Squash-Konflikt in
+        # genau dieser Datei passiert: tst_rtty_senden (#262) und vier
+        # weitere, die c0f962fb (#254) mit entfernt hat und die fuenf
+        # Tage unbemerkt fehlten -- darunter der Waechter fuer einen
+        # gemessenen Startblocker (4656 ms -> 1 ms, #251).
+        run: python3 scripts/verify-tests-registered.py
+
       - name: Verify provenance tables match the source tree
         # Already enforced in pre-commit Ring 2. Re-run in CI Ring 3
         # because squashed merges and rebases can introduce drift the
