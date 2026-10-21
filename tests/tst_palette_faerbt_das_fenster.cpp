@@ -22,13 +22,18 @@
 //
 // Das Grundrauschen wird mitgemessen (zwei Bilder OHNE Wechsel):
 // Wasserfall und Uhr laufen weiter, ein paar Punkte aendern sich
-// immer. Der Wechsel muss deutlich darueber liegen, sonst ist er
-// keiner.
+// immer. Gezaehlt wird der Wechsel darum nur auf den Punkten, die in
+// diesen zwei Ruhebildern GLEICH waren -- siehe
+// anteilAndersAufRuhigen(); auf dem macOS-Runner der CI flackert ein
+// Fuenftel des Fensters, und eine Schranke „mal drei" kippte daran.
 //
 // =================================================================
 // Modification history (Longpath):
 //   2026-10-15 — Original fuer Longpath von Martin Fischer (OE5SOS),
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-10-21 — Der Wechsel wird auf den RUHIGEN Bildpunkten gezaehlt
+//                 statt gegen das Dreifache des Rauschens. Martin
+//                 Fischer, KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 #include <QtTest>
@@ -70,6 +75,61 @@ double anteilAnders(const QImage& a, const QImage& b)
         }
     }
     return gesamt > 0 ? double(anders) / double(gesamt) : -1.0;
+}
+
+// ── Nur die ruhigen Bildpunkte zaehlen (2026-10-21) ──────────────────
+//
+// `anteilAnders` ueber das GANZE Bild und daneben eine Schranke „das
+// Dreifache des Grundrauschens" ist eine Rechnung, die am lauten Ende
+// kippt. Gemessen am 2026-10-21, derselbe Lauf, dieselbe Fassung:
+//
+//   |                   | hier (offscreen) | macOS-Runner der CI |
+//   |-------------------|------------------|---------------------|
+//   | Grundrauschen     |  0,02 %          | 19,58 %             |
+//   | nach dem Wechsel  | 29,25 %          | 48,02 %             |
+//   | Schranke 3x       |  0,06 % -> gruen | 58,74 % -> ROT      |
+//
+// Der Wechsel hat auf dem Runner also 48 % der Flaeche gefaerbt -- und
+// der Lauf nannte das „kaum ueber dem Rauschen". Die Palette war in
+// Ordnung, die Rechnung nicht: Rauschen und Wechsel liegen auf
+// derselben Flaeche und teils auf denselben Punkten, ein Faktor darauf
+// vergleicht Aepfel mit sich selbst. (Belegt: derselbe Fehlschlag mit
+// denselben Zahlen auf `main` bei 6ab5b2c2b, Lauf 39551195490 --
+// er haengt an der Maschine, nicht an einem Zweig.)
+//
+// Darum wird das Rauschen nicht mehr multipliziert, sondern
+// AUSGESCHLOSSEN: gezaehlt wird nur auf den Punkten, die zwischen den
+// zwei Ruhebildern GLEICH waren. Was flackert, ist damit draussen,
+// und die Aussage „der Wechsel ist deutlich mehr als das Flackern"
+// braucht keinen Faktor mehr.
+//
+// `ruhige` nimmt die Zahl der verglichenen Punkte auf -- bei einem
+// Fenster, das fast ganz flackert, waere das Mass sonst leise wertlos.
+double anteilAndersAufRuhigen(const QImage& ruhe1, const QImage& ruhe2,
+                              const QImage& nachher, qint64* ruhige)
+{
+    if (ruhige) { *ruhige = 0; }
+    if (ruhe1.size() != ruhe2.size() || ruhe1.size() != nachher.size()
+        || ruhe1.isNull()) {
+        return -1.0;
+    }
+    const QImage a = ruhe1.convertToFormat(QImage::Format_ARGB32);
+    const QImage b = ruhe2.convertToFormat(QImage::Format_ARGB32);
+    const QImage c = nachher.convertToFormat(QImage::Format_ARGB32);
+    qint64 ruhig = 0;
+    qint64 anders = 0;
+    for (int zeile = 0; zeile < a.height(); ++zeile) {
+        const QRgb* pa = reinterpret_cast<const QRgb*>(a.constScanLine(zeile));
+        const QRgb* pb = reinterpret_cast<const QRgb*>(b.constScanLine(zeile));
+        const QRgb* pc = reinterpret_cast<const QRgb*>(c.constScanLine(zeile));
+        for (int s = 0; s < a.width(); ++s) {
+            if (pa[s] != pb[s]) { continue; }   // flackert -- zaehlt nicht
+            ++ruhig;
+            if (pc[s] != pa[s]) { ++anders; }
+        }
+    }
+    if (ruhige) { *ruhige = ruhig; }
+    return ruhig > 0 ? double(anders) / double(ruhig) : -1.0;
 }
 
 } // namespace
@@ -182,11 +242,33 @@ private slots:
                      "kein Palettenwechsel")
                          .arg(gewechselt * 100.0, 0, 'f', 2)
                          .arg(rauschen * 100.0, 0, 'f', 2)));
-        QVERIFY2(gewechselt > rauschen * 3.0,
-                 qPrintable(QStringLiteral("Wechsel %1 %% kaum ueber dem "
-                                           "Rauschen %2 %%")
-                                .arg(gewechselt * 100.0, 0, 'f', 2)
-                                .arg(rauschen * 100.0, 0, 'f', 2)));
+        // Und jetzt dasselbe ohne das Flackern: nur auf den Punkten,
+        // die zwischen den zwei Ruhebildern gleich waren. Siehe
+        // anteilAndersAufRuhigen() -- dort steht, warum hier keine
+        // Schranke „mal drei" mehr steht.
+        qint64 ruhige = 0;
+        const double aufRuhigen =
+            anteilAndersAufRuhigen(ruhe1, ruhe2, nachher, &ruhige);
+        qInfo() << "ruhige Bildpunkte:" << ruhige
+                << "— davon anders:"
+                << QString::number(aufRuhigen * 100.0, 'f', 2) << "%";
+        QVERIFY2(aufRuhigen >= 0.0, "Bilder nicht vergleichbar");
+
+        // Ein Fenster, das fast ganz flackert, laesst nichts zu messen
+        // uebrig -- dann ist das Ergebnis kein Befund (ein Fuenftel der
+        // Flaeche muss ruhig sein; auf dem Runner waren es vier
+        // Fuenftel).
+        const qint64 gesamtPunkte = qint64(ruhe1.width()) * ruhe1.height();
+        QVERIFY2(ruhige * 5 >= gesamtPunkte,
+                 qPrintable(QStringLiteral("nur %1 von %2 Bildpunkten lagen "
+                                           "still — zu wenig zum Messen")
+                                .arg(ruhige).arg(gesamtPunkte)));
+
+        QVERIFY2(aufRuhigen > 0.05,
+                 qPrintable(QStringLiteral(
+                     "auf den ruhigen Bildpunkten haben sich nur %1 %% "
+                     "geaendert — das ist kein Palettenwechsel")
+                         .arg(aufRuhigen * 100.0, 0, 'f', 2)));
 
     }
 
