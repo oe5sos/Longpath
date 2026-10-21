@@ -129,6 +129,7 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     // in der Vorlage und bei Thetis.
     buildBandGroup(row);
     buildModeGroup(row);
+    buildDigiGroup(row);
     buildFilterGroup(row);
     buildStepGroup(row);
     buildNrGroup(row);
@@ -516,6 +517,62 @@ void CommandBar::buildModeGroup(QHBoxLayout* row)
     // Leiste würde lügen.
     addOverflow(g, m_allModes,
                 [this](DSPMode m) { pushModeToModel(m); });
+
+}
+
+// ── Digital: eine eigene Gruppe, nicht zwei Pillen mehr bei Mode ─────
+//
+// Betreiber am 2026-10-21, vor der Antenne stehend: „ich will, sobald
+// ich auf ft8 klicke, dass alles automatisch funktioniert", „ich will
+// nicht die freq suchen", „quasi wie jtdx".
+//
+// Zuerst standen FT8 und FT4 als zwei weitere Pillen bei Mode. Das
+// fiel in der CI sofort auf, und zu Recht: `tst_command_bar` haelt
+// fest, dass JEDE Gruppe genau kVisiblePerGroup Pillen zeigt -- „drei
+// vorne, der Rest im Menue" ist der ganze Grund, warum diese Leiste
+// schmaler ist als die Filterwand im RX-Panel.
+//
+// Eine eigene Gruppe ist ohnehin das Richtigere: es sind keine
+// Betriebsarten des Geraets. Das Geraet steht dabei auf DIGU; was FT8
+// von FT4 unterscheidet, ist die Anrufstelle und der Dekoder, nicht
+// die Demodulation. Zwei Pillen, kein „…" -- mehr gibt es nicht.
+// Nur diese eine Gruppe nachziehen.
+//
+// Eine eigene Funktion und nicht `pullFromModel()`, weil sie an
+// `frequencyChanged` haengt: beim Drehen am Knopf kommt das Signal
+// dutzendfach je Sekunde, und die ganze Leiste neu zu stellen waere
+// dafuer zu teuer. Hier sind es zwei Knoepfe.
+void CommandBar::aktualisiereDigiLampe()
+{
+    Group* g = group(QStringLiteral("Digi"));
+    if (!g) { return; }
+    if (!m_slice) { setActive(*g, QString()); return; }
+
+    const DSPMode m = m_slice->dspMode();
+    const bool datenmodus = (m == DSPMode::DIGU || m == DSPMode::DIGL);
+    QString label;
+    if (datenmodus) {
+        using DigiFrequenzen::Digimodus;
+        const auto f = qint64(m_slice->frequency());
+        if (DigiFrequenzen::stehtSchonDort(f, Digimodus::Ft8)) {
+            label = QStringLiteral("FT8");
+        } else if (DigiFrequenzen::stehtSchonDort(f, Digimodus::Ft4)) {
+            label = QStringLiteral("FT4");
+        }
+    }
+    setActive(*g, label);
+}
+
+void CommandBar::buildDigiGroup(QHBoxLayout* row)
+{
+    Group& g = addGroup(QStringLiteral("Digi"), row);
+    for (const auto& eintrag : {
+             std::pair{QStringLiteral("FT8"), DigiFrequenzen::Digimodus::Ft8},
+             std::pair{QStringLiteral("FT4"), DigiFrequenzen::Digimodus::Ft4}}) {
+        QPushButton* b = addPill(g, eintrag.first);
+        connect(b, &QPushButton::clicked, this,
+                [this, modus = eintrag.second]() { emit digiRequested(modus); });
+    }
 }
 
 void CommandBar::buildBandGroup(QHBoxLayout* row)
@@ -635,6 +692,13 @@ void CommandBar::attach(SliceModel* slice)
                        this, [this](NrSlot) { pullFromModel(); });
     m_links << connect(slice, &SliceModel::bandChanged,
                        this, [this](Longpath::Band) { pullFromModel(); });
+    // Die Digi-Lampe haengt an der genauen Frequenz, nicht nur am
+    // Band: innerhalb von 20 m entscheidet sie zwischen FT8 (14.074),
+    // FT4 (14.080) und „keins von beiden". Darum hier das feine
+    // Signal -- aber nur fuer diese Gruppe, siehe
+    // aktualisiereDigiLampe().
+    m_links << connect(slice, &SliceModel::frequencyChanged,
+                       this, [this](double) { aktualisiereDigiLampe(); });
     pullFromModel();
 }
 
@@ -1130,6 +1194,18 @@ void CommandBar::pullFromModel()
             setActive(*g, label);
         }
     }
+
+    // ── Digital leuchtet, wenn es WIRKLICH laeuft ───────────────────
+    //
+    // Anders als Band oder Mode hat diese Gruppe einen Aus-Zustand:
+    // wer SSB faehrt, macht weder FT8 noch FT4, und dann darf hier
+    // nichts leuchten. (Dieselbe Begruendung wie bei NR, und
+    // tst_command_bar nimmt die Gruppe aus derselben Regel aus.)
+    //
+    // „Laeuft" heisst nicht „DIGU eingestellt": in DIGU sitzt man auch
+    // auf PSK oder Olivia. Es heisst Datenmodus UND Skala auf der
+    // Anrufstelle -- genau die zwei Dinge, die der Griff herstellt.
+    aktualisiereDigiLampe();
 
     if (Group* g = group(QStringLiteral("Mode"))) {
         const DSPMode cur = m_slice->dspMode();

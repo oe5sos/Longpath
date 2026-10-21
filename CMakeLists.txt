@@ -550,6 +550,7 @@ set(CORE_SOURCES
     src/core/AcomProtocol.cpp
     src/core/AcomConnection.cpp
     src/core/CwDecoder.cpp
+    src/core/DigiFrequenzen.cpp
     src/core/Ft8Decoder.cpp
     src/core/Ft8Ablauf.cpp
     src/core/Ft8Stream.cpp

@@ -78,6 +78,7 @@
 #include <QPointer>
 
 #include "core/WdspTypes.h"
+#include "core/DigiFrequenzen.h"
 #include <QTimer>
 #include <QHash>
 #include <QMap>
@@ -245,6 +246,10 @@ public:
     class KiwiSdrManager* kiwiSdrManagerForTest() const
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
+    /// Die Fensterverwaltung, fuer den Pruefstand. Nur lesen und
+    /// schalten -- der Besitz bleibt beim Fenster.
+    class AppletVisibilityController* appletVisibilityForTest() const
+    { return m_appletVis; }
 
 
     // ── Der Schutzrahmen (2026-10-14) ────────────────────────────────
@@ -295,6 +300,21 @@ public:
     /// beruehren -- auch nicht an solchen auf einem zweiten Schirm.
     /// Gibt zurueck, wie viele verschoben wurden (fuer Prueffaelle).
     int schwebendeAusDemSchutzrahmenHolen();
+
+    /// Das Geraet auf FT8 oder FT4 herrichten -- in einem Griff.
+    ///
+    /// Betriebsart DIGU, Skala auf die Anrufstelle des Bandes, Filter
+    /// weit genug fuer den ganzen Durchlass, Dekoderfenster auf. Was
+    /// schon stimmt, wird nicht angefasst; steht die Skala bereits auf
+    /// einer Anrufstelle, bleibt sie stehen (wer von Hand danebensteht,
+    /// meint es so).
+    ///
+    /// Auch fuer den Pruefstand da: so laesst sich der Griff ohne
+    /// Mausklick in die Leiste fahren. Der Abschnitt hier ist schon
+    /// oeffentlich -- ein eigenes `public:`/`private:` darum herum
+    /// kippte am 2026-10-21 alles DAHINTER auf privat und brach sieben
+    /// CI-Laeufe (`appletIsRegisteredForTest` war ploetzlich privat).
+    void aufDigiStellen(Longpath::DigiFrequenzen::Digimodus modus);
 
     /// Dasselbe mit Nachlauf: waehrend eines Groessenzugs feuert
     /// resizeEvent bei jedem Pixel, und Fenster, die dabei im Takt
