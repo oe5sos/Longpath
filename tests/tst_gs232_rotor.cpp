@@ -235,6 +235,7 @@ private slots:
         s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("gs232"));
         s.setValue(QStringLiteral("Rotor/SerialPort"),
                    QStringLiteral("/dev/tty.usbserial-PRUEF"));
+        s.setValue(QStringLiteral("Rotor/Host"), QString{});
         {
             RotorLogbookPanel panel(nullptr, nullptr, nullptr);
             panel.ensureRotorForTest();
@@ -242,6 +243,22 @@ private slots:
             QCOMPARE(panel.rotorForTest()->description(),
                      QStringLiteral("GS-232 /dev/tty.usbserial-PRUEF, 9600 Bd"));
         }
+
+        // Und mit Netzziel gewinnt das Netz -- der Fall dieser Station.
+        s.setValue(QStringLiteral("Rotor/Host"), QStringLiteral("172.30.30.16"));
+        s.setValue(QStringLiteral("Rotor/NetPort"), 4001);
+        {
+            RotorLogbookPanel panel(nullptr, nullptr, nullptr);
+            panel.ensureRotorForTest();
+            auto* gs = qobject_cast<Gs232Rotor*>(panel.rotorForTest());
+            QVERIFY(gs != nullptr);
+            QCOMPARE(gs->description(),
+                     QStringLiteral("GS-232 über 172.30.30.16:4001"));
+            // Angelegt heisst NICHT verbunden: der Lauf macht hier keine
+            // Verbindung zur Station auf.
+            QCOMPARE(gs->state(), RotorController::State::Disconnected);
+        }
+        s.setValue(QStringLiteral("Rotor/Host"), QString{});
 
         // Und die Vorgabe bleibt der rotctld-Weg: wer nichts einstellt,
         // merkt von der Weiche nichts.

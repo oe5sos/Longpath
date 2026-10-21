@@ -1185,11 +1185,23 @@ void RotorLogbookPanel::ensureRotor()
                                      QStringLiteral("rotctld"))
                                 .toString().trimmed().toLower();
         if (weg == QStringLiteral("gs232")) {
-            auto* seriell = new Gs232Rotor(this);
-            seriell->setPort(
+            auto* gs232 = new Gs232Rotor(this);
+            gs232->setPort(
                 sb.value(QStringLiteral("Rotor/SerialPort"), QString{}).toString(),
                 sb.value(QStringLiteral("Rotor/BaudRate"), 9600).toInt());
-            m_rotor   = seriell;
+            // Ein Netzziel schlaegt die serielle Schnittstelle. An dieser
+            // Station ist das der Normalfall und nicht die Ausnahme: der
+            // GS-232 haengt auf einem seriellen Netzserver, nicht an
+            // /dev/tty* (gemessen 2026-10-21, siehe Gs232Rotor.h).
+            const QString host =
+                sb.value(QStringLiteral("Rotor/Host"), QString{}).toString().trimmed();
+            if (!host.isEmpty()) {
+                gs232->setNetworkTarget(
+                    host,
+                    static_cast<quint16>(
+                        sb.value(QStringLiteral("Rotor/NetPort"), 4001).toInt()));
+            }
+            m_rotor   = gs232;
             m_rotctld = nullptr;
         }
     }
