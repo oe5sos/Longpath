@@ -1,3 +1,7 @@
+// no-port-check: vendored upstream TAPR WDSP — sein Kopf, Stand v1.29 mit
+// Teilabgleich: die PureSignal-Stellen stehen seit 2026-10-21 auf 2.11
+// (EIN IQ-Korrektor statt p0/p1, create_calcc mit acht statt siebzehn
+// Werten). Zeilenstand und Begruendung in WDSP-PROVENANCE.md.
 /*  TXA.h
 
 This file is part of a program that implements a Software-Defined Radio.

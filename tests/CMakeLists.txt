@@ -7879,6 +7879,12 @@ longpath_add_test(tst_fm_squelch_abbildung)
 #   R-Zweig anfasst, laesst den Tuner nach der ersten Abfrage stillstehen.
 longpath_add_test(tst_genius_status_tor)
 
+# tst_gs232_rotor: der serielle GS-232A/B-Treiber ohne Rotor am Tisch
+#   (eine nachgestellte Leitung statt der Schnittstelle). Haelt die Befehlsform fest (drei Ziffern
+#   je Feld, 360 wird 0, Hoehe geklemmt statt gefaltet), beide Antwortformen,
+#   und die zwei Faelle, in denen NICHTS als Peilung gelten darf: eine halbe
+#   Zeile und alles, was keine ist.
+longpath_add_test(tst_gs232_rotor)
 # --------------------------------------------------------------------------
 # Aggregate "all_tests" target  (2026-05-26 KG4VCF dev-loop fix, from PR #291)
 # --------------------------------------------------------------------------
