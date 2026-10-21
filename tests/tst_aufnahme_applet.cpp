@@ -91,7 +91,11 @@ private slots:
             QVERIFY2(l->text() != QStringLiteral("00:00"),
                      "eine Uhr zeigt 00:00 statt eines Strichs");
         }
-        QCOMPARE(striche, 2);   // Ton und I/Q
+        // Drei seit dem 2026-10-21: Ton, I/Q und die Wiedergabe. Der
+        // Strich in der Wiedergabezeile steht fuer „keine Datei
+        // offen" -- ein leeres Feld waere kein Zustand, ein Dateiname
+        // waere gelogen.
+        QCOMPARE(striche, 3);   // Ton, I/Q, Wiedergabe
 
         // Und sie muessen LESBAR sein. Beim ersten Bau waren diese
         // Uhren 2 px breit: die Grundschrift der Applets ist ueber

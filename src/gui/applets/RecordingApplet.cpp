@@ -332,6 +332,11 @@ void RecordingApplet::refreshState()
                                     : Style::kTextInactive)));
 
     const bool spielt = rec.playing();
+    // Ohne Radio geht keine Wiedergabe (RecordingModel::startPlayback
+    // verweigert sie) -- dann muss der Knopf AUS sein, sonst klickt
+    // man ins Leere. Laeuft gerade eine, bleibt er an: Stoppen muss
+    // immer gehen.
+    m_playBtn->setEnabled(bereit || spielt);
     m_playBtn->setText(spielt ? QStringLiteral("■ Stop")
                               : QStringLiteral("▶ Open…"));
     m_playFile->setText(spielt ? QFileInfo(rec.playbackFile()).fileName()
