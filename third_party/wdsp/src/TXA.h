@@ -153,8 +153,10 @@ struct _txa
 	} calcc;
 	struct
 	{
-		IQC p0, p1;
-		// p0 for dsp-synchronized reference, p1 for other
+		// PureSignal 3 (WDSP 2.11) fuehrt nur noch EINEN Korrektor:
+		// die Doppelung p0/p1 (dsp-synchronisierte Referenz gegen die
+		// andere) ist in 2.11 entfallen.
+		IQC p;
 	} iqc;
 	struct
 	{

@@ -1,19 +1,24 @@
 // =================================================================
-// third_party/wdsp/src/iqc.h  (NereusSDR)
+// third_party/wdsp/src/iqc.h  (Longpath)
 // =================================================================
 //
-// Ported from Thetis source:
-//   Project Files/Source/wdsp/iqc.h @ v2.10.3.13 (commit 501e3f5)
-//   Verbatim vendor alongside iqc.c (Phase 3M-4 Task 2).  No
-//   NereusSDR-level edits.  Original NR0V GPLv2-or-later license
-//   header preserved verbatim below.
+// Verbatim vendor of TAPR OpenHPSDR-wdsp **2.11** (PureSignal 3):
+//   `wdsp 2.11/Source/iqc.h` @ e69de50d1d702216098019013899ad87534c64e0
+// Keine Longpath-Aenderungen am Quelltext ausser dem Fallenlassen von
+// `__declspec(dllexport)` (statischer Bau, siehe WDSP-PROVENANCE.md).
+// Die urspruengliche GPLv2-or-later-Kopfzeile von NR0V steht unveraendert
+// darunter.
+//
+// Modification history (Longpath):
+//   2026-10-21 — PureSignal 3: aus 1.29 (Thetis-Stand) auf 2.11 gehoben.
+//                Longpath, KI-gestuetzt via Anthropic Claude Code.
 // =================================================================
 
 /*  iqc.h
 
 This file is part of a program that implements a Software-Defined Radio.
 
-Copyright (C) 2013 Warren Pratt, NR0V
+Copyright (C) 2013, 2026 Warren Pratt, NR0V
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -29,57 +34,37 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-The author can be reached by email at
+The author can be reached by email at  
 
-warren@wpratt.com
+warren@pratt.one
 
 */
 
-// =================================================================
-// Modification history (Longpath):
-//   2026-05-06 — Phase 3M-4 Task 2: vendored verbatim from Thetis
-//                v2.10.3.13 @501e3f51 by J.J. Boyd (KG4VCF), with
-//                AI-assisted source-first protocol via Anthropic
-//                Claude Code. No source-level modifications.
-//                Cross-platform compatibility via existing
-//                third_party/wdsp/src/linux_port.h shim.
-//   2026-05-06 — Phase 3M-4 Task 3 attribution fix: NereusSDR-block
-//                "Ported from Thetis source" preamble added above the
-//                original NR0V license header, mirroring cfcomp.h.
-// =================================================================
 #ifndef _iqc_h
 #define _iqc_h
-
+#include "nurbs_spline.h"
 typedef struct _iqc
 {
+	NS_Spline   *m_spline[2], *c_spline[2], *s_spline[2];
+	CurveEMA    m_calavg[2], c_calavg[2], s_calavg[2];
+	double      m_prev_y[2], c_prev_y[2], s_prev_y[2];
+
 	volatile long run;
 	volatile long busy;
 	int size;
 	double* in;
 	double* out;
 	double rate;
-	int ints;
-	double* t;
 	int cset;
-	double* cm[2];
-	double* cc[2];
-	double* cs[2];
 	double tup;
 	double* cup;
 	int count;
 	int ntup;
 	int state;
-	struct
-	{
-		int spi;
-		int* cpi;
-		int full_ints;
-		int count;
-		CRITICAL_SECTION cs;
-	} dog;
+	
 } iqc, *IQC;
 
-extern IQC create_iqc (int run, int size, double* in, double* out, double rate, int ints, double tup, int spi);
+extern IQC create_iqc(int run, int size, double* in, double* out, double rate, double tup);
 
 extern void destroy_iqc (IQC a);
 
@@ -93,24 +78,23 @@ extern void setSamplerate_iqc (IQC a, int rate);
 
 extern void setSize_iqc (IQC a, int size);
 
-extern void size_iqc (IQC a);
-
-extern void desize_iqc (IQC a);
-
 // TXA Properties
 
-extern __declspec (dllexport)  void GetTXAiqcValues (int channel, double* cm, double* cc, double* cs);
+extern void GetTXAiqcValues(int channel, 
+	NS_Spline** m_spline, CurveEMA* m_calavg, double* m_prev_y,
+	NS_Spline** c_spline, CurveEMA* c_calavg, double* c_prev_y,
+	NS_Spline** s_spline, CurveEMA* s_calavg, double* s_prev_y);
 
-extern __declspec (dllexport)  void SetTXAiqcValues (int channel, double* cm, double* cc, double* cs);
+extern void SetTXAiqcSwap(int channel, 
+	NS_Spline* m_spline, CurveEMA* m_calavg, double m_prev_y,
+	NS_Spline* c_spline, CurveEMA* c_calavg, double c_prev_y,
+	NS_Spline* s_spline, CurveEMA* s_calavg, double s_prev_y);
 
-extern __declspec (dllexport)  void SetTXAiqcSwap (int channel, double* cm, double* cc, double* cs);
+extern void SetTXAiqcStart(int channel, 
+	NS_Spline* m_spline, CurveEMA* m_calavg, double m_prev_y,
+	NS_Spline* c_spline, CurveEMA* c_calavg, double c_prev_y,
+	NS_Spline* s_spline, CurveEMA* s_calavg, double s_prev_y);
 
-extern __declspec (dllexport)  void SetTXAiqcStart (int channel, double* cm, double* cc, double* cs);
-
-extern __declspec (dllexport)  void SetTXAiqcEnd (int channel);
-
-void GetTXAiqcDogCount (int channel, int* count);
-
-void SetTXAiqcDogCount (int channel, int  count);
+extern void SetTXAiqcEnd (int channel);
 
 #endif

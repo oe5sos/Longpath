@@ -68,6 +68,32 @@ void DeleteCriticalSection(pthread_mutex_t *mutex) {
 	pthread_mutex_destroy(mutex);
 }
 
+// Siehe linux_port.h: Ersatz fuer WaitForMultipleObjects, nur fuer
+// PureSignal 3s Steuerfaden. Durchgangsabstand 2 ms — bei INFINITE wird
+// unbegrenzt weitergereiht, sonst bis die Frist abgelaufen ist.
+unsigned int WaitForMultipleObjects(unsigned int count, sem_t** handles,
+                                    int waitAll, int ms) {
+	if (waitAll || count == 0 || handles == 0) {
+		return WAIT_FAILED;
+	}
+	const int kSchrittMs = 2;
+	int verbleibend = ms;
+	for (;;) {
+		for (unsigned int i = 0; i < count; i++) {
+			if (handles[i] != 0 && sem_trywait(handles[i]) == 0) {
+				return WAIT_OBJECT_0 + i;
+			}
+		}
+		if (ms != INFINITE) {
+			if (verbleibend <= 0) {
+				return WAIT_TIMEOUT;
+			}
+			verbleibend -= kSchrittMs;
+		}
+		usleep(kSchrittMs * 1000);
+	}
+}
+
 int LinuxWaitForSingleObject(sem_t *sem,int ms) {
 	int result=0;
 	if(ms==INFINITE) {

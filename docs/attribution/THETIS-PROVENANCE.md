@@ -419,10 +419,6 @@ Discovery-reply hex fixtures are covered by `tests/fixtures/discovery/README.md`
 | third_party/wdsp/src/sbnr.h | Project Files/Source/wdsp/sbnr.h | full | port | thetis-samphire | Byte-for-byte import at v2.10.3.13 @ 501e3f51. Public API for SBNR stage. |
 | third_party/wdsp/src/cfcomp.c | Project Files/Source/wdsp/cfcomp.c | full | port | thetis-no-samphire | Partial sync to Thetis v2.10.3.13 @ 501e3f5 for Qg/Qe parametric-EQ tail-mix updates required by 3M-3a-ii CFC port. NR0V (Warren Pratt) + MW0LGE inline tags preserved; no Samphire algorithmic contributions but Samphire dual-licensing block carried verbatim from upstream. Detailed line-level sync record in WDSP-PROVENANCE.md "Partial sync record" section. |
 | third_party/wdsp/src/cfcomp.h | Project Files/Source/wdsp/cfcomp.h | full | port | thetis-no-samphire | Partial sync to Thetis v2.10.3.13 @ 501e3f5 for Qg/Qe alongside cfcomp.c. Header mirrors cfcomp.c. NR0V only — no Samphire contributions and no dual-licensing block in upstream cfcomp.h. |
-| third_party/wdsp/src/calcc.c | Project Files/Source/wdsp/calcc.c | full | port | thetis-no-samphire | Vendored verbatim from Thetis v2.10.3.13 @ 501e3f5 for Phase 3M-4 Task 2 (PureSignal calcc engine) — TAPR v1.29 has no calcc/iqc, the entire PS subsystem must come from Thetis. NR0V (Warren Pratt) only — no Samphire contributions or dual-license block in upstream calcc.c. WDSP-PROVENANCE.md "Partial sync record" carries the matching line-level entry. |
-| third_party/wdsp/src/calcc.h | Project Files/Source/wdsp/calcc.h | full | port | thetis-no-samphire | Vendored alongside calcc.c (Phase 3M-4 Task 2). Header mirrors calcc.c. NR0V only. |
-| third_party/wdsp/src/iqc.c | Project Files/Source/wdsp/iqc.c | full | port | thetis-no-samphire | Vendored verbatim from Thetis v2.10.3.13 @ 501e3f5 for Phase 3M-4 Task 2 (PureSignal iqc adaptive-predistortion driver) — TAPR v1.29 has no calcc/iqc. NR0V (Warren Pratt) only — no Samphire contributions or dual-license block. |
-| third_party/wdsp/src/iqc.h | Project Files/Source/wdsp/iqc.h | full | port | thetis-no-samphire | Vendored alongside iqc.c (Phase 3M-4 Task 2). Header mirrors iqc.c. NR0V only. |
 | src/core/audio/QsoRecorder.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 88-108 | reference | MW0LGE | RecordingDetails-Feldauswahl fuer die JSON-Beschreibung; kein Zeilenport |
 | src/core/audio/VoiceKeyer.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | full | reference | MW0LGE | Sprachspeicher-Verhalten als Vorbild; NereusSDR-original |
 | src/core/audio/WavFile.h | Project Files/Source/Console/clsAudioRecordPlayback.cs | 3070-3572 | reference | MW0LGE | Umfang (WAV + Beschreibung) als Vorbild; Leser/Schreiber NereusSDR-original |
@@ -506,3 +502,12 @@ column 2 (not column 1) so the header-verifier script does not scan them.
 | Same as .cpp | src/gui/applets/ClientChainApplet.h | NereusSDR-original applet header; see .cpp |
 | Setup → Network → TCI Server page — NereusSDR-original Setup UI; 6 group boxes, 17 AppSettings keys | src/gui/setup/CatNetworkSetupPages.cpp | NereusSDR-native Setup page; TCI server settings surfaced from Thetis frmOptions/TCIServer section but no .Designer.cs code ported |
 | Same as .cpp | src/gui/setup/CatNetworkSetupPages.h | NereusSDR-original Setup page header; see .cpp |
+
+## Abgegeben an WDSP-PROVENANCE.md (2026-10-21)
+
+`third_party/wdsp/src/calcc.{c,h}` und `iqc.{c,h}` standen hier, weil der
+PureSignal-Kern bis dahin nur ueber Thetis zu bekommen war (TAPR 1.29
+hatte kein calcc/iqc). Mit PureSignal 3 kommen sie als Verbatim-Vendor
+aus TAPR `OpenHPSDR-wdsp` **2.11** @ `e69de50d` und sind damit keine
+Thetis-Ports mehr. Der Eintrag steht jetzt in WDSP-PROVENANCE.md; diese
+Zeile haelt fest, dass die Dateien einmal ueber Thetis kamen.

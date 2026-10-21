@@ -305,34 +305,16 @@ void print_deviation (const char* filename, double dpmax, double rate)
 	}
 }
 
-void __cdecl CalccPrintSamples (void *pargs)
-{
-	int i;
-	double env_tx, env_rx;
-	int channel = (int)(uintptr_t)pargs;
-	CALCC a = txa[channel].calcc.p;
-	FILE* file;
-	if (file = fopen("samples.txt", "w"))
-	{
-		fprintf(file, "\n");
-		for (i = 0; i < a->nsamps; i++)
-		{
-			env_tx = sqrt(a->txs[2 * i + 0] * a->txs[2 * i + 0] + a->txs[2 * i + 1] * a->txs[2 * i + 1]);
-			env_rx = sqrt(a->rxs[2 * i + 0] * a->rxs[2 * i + 0] + a->rxs[2 * i + 1] * a->rxs[2 * i + 1]);
-			fprintf(file, "%.12f  %.12f  %.12f      %.12f  %.12f  %.12f\n",
-				a->txs[2 * i + 0], a->txs[2 * i + 1], env_tx,
-				a->rxs[2 * i + 0], a->rxs[2 * i + 1], env_rx);
-		}
-		fflush(file);
-		fclose(file);
-	}
-	_endthread();
-}
-
-void doCalccPrintSamples(int channel)
-{	// no sample buffering - use in single cal mode
-	_beginthread(CalccPrintSamples, 0, (void *)(uintptr_t)channel);
-}
+// CalccPrintSamples / doCalccPrintSamples entfernt (2026-10-21, PureSignal 3).
+//
+// Die zwei Debug-Helfer schrieben die Kalibrierproben nach "samples.txt"
+// und griffen dafuer in `struct _calcc` (a->nsamps, a->txs, a->rxs).
+// WDSP 2.11 kapselt diesen Aufbau in calcc.c; ausserhalb ist CALCC nur
+// noch ein undurchsichtiger Zeiger, und die Helfer uebersetzen dort nicht
+// mehr. Upstream 2.11 hat sie aus utilities.c ebenfalls ganz entfernt
+// (`wdsp 2.11/Source/utilities.c` nennt calcc mit keinem Wort).
+// In Longpath rief sie ohnehin nichts auf -- nur die Deklaration in
+// utilities.h stand noch da, die mit entfaellt.
 
 void print_anb_parms (const char* filename, ANB a)
 {
@@ -648,3 +630,35 @@ void test_bfcu()
 	_aligned_free(segment);
 	destroy_bfcu(0);
 }
+
+// ── Teilabgleich auf WDSP 2.11 (PureSignal 3) ───────────────────────
+// calcc.c 2.11 schreibt seine Diagnosezeilen mit diesem Helfer; unsere
+// utilities.c steht sonst weiter auf 1.29. Verbatim aus
+// `wdsp 2.11/Source/utilities.c`, siehe WDSP-PROVENANCE.md.
+#include <stdint.h>
+
+// Converts a uint32_t to a binary string representation; buf must have space for 
+// at least 43 characters (3 for "0b ", 32 for bits, and 1 for null terminator, 7 for
+// spaces between groups of 4 bits).
+// The string can then be printed to the Visual Studio Debug Window using dprintf, e.g.:
+char* uint32_to_bitstr(uint32_t n, char* buf) 
+{
+	int char_idx = 0;
+	buf[char_idx++] = '0';
+	buf[char_idx++] = 'b';
+	buf[char_idx++] = ' ';
+
+	for (int i = 31; i >= 0; i--) 
+	{
+		buf[char_idx++] = ((n >> i) & 1) ? '1' : '0';
+
+		// Optional: Add spaces every 4 bits for readability
+		if (i > 0 && i % 4 == 0) 
+		{
+			buf[char_idx++] = ' ';
+		}
+	}
+	buf[char_idx] = '\0';
+	return buf;
+}
+

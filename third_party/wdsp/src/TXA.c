@@ -402,34 +402,33 @@ void create_txa (int channel)
 		16384,										// fft size for spectrum
 		1);											// specmode
 
-	txa[channel].calcc.p = create_calcc (			
+	// PureSignal 3 (WDSP 2.11): create_calcc nimmt acht statt siebzehn
+	// Werten. Weggefallen sind ints/spi (feste Stuetzstellentabelle),
+	// ptol, pin mode, map mode, stbl mode, pin samples und alpha — die
+	// Kurve kommt jetzt aus nurbs_fit/nurbs_spline, nicht mehr aus einer
+	// Tabelle mit Toleranz- und Stabilisierungsreglern.
+	// Uebernommen aus `wdsp 2.11/Source/TXA.c`.
+	txa[channel].calcc.p = create_calcc(
 		channel,									// channel number
 		1,											// run calibration
 		1024,										// input buffer size
 		ch[channel].in_rate,						// samplerate
-		16,											// ints
-		256,										// spi
 		(1.0 / 0.4072),								// hw_scale
 		0.1,										// mox delay
 		0.0,										// loop delay
-		0.8,										// ptol
-		0,											// mox
-		0,											// solidmox
-		1,											// pin mode
-		1,											// map mode
-		0,											// stbl mode
-		256,										// pin samples
-		0.9);										// alpha
+		0);											// mox
 
-	txa[channel].iqc.p0 = txa[channel].iqc.p1 = create_iqc (
+	// PureSignal 3 (WDSP 2.11): ein Korrektor statt p0/p1, und
+	// create_iqc nimmt weder `ints` noch `spi` — die Stuetzstellen der
+	// Korrektur liegen jetzt in der NURB-Kurve (nurbs_fit.c), nicht mehr
+	// in einer festen Tabelle. Uebernommen aus `wdsp 2.11/Source/TXA.c`.
+	txa[channel].iqc.p = create_iqc(
 		0,											// run
 		ch[channel].dsp_size,						// size
 		txa[channel].midbuff,						// input buffer
 		txa[channel].midbuff,						// output buffer
 		(double)ch[channel].dsp_rate,				// sample rate
-		16,											// ints
-		0.005,										// changeover time
-		256);										// spi
+		0.005);										// changeover time
 
 	txa[channel].cfir.p = create_cfir(
 		0,											// run
@@ -485,7 +484,7 @@ void destroy_txa (int channel)
 	destroy_resample (txa[channel].rsmpout.p);
 	destroy_cfir(txa[channel].cfir.p);
 	destroy_calcc (txa[channel].calcc.p);
-	destroy_iqc (txa[channel].iqc.p0);
+	destroy_iqc (txa[channel].iqc.p);
 	destroy_siphon (txa[channel].sip1.p);
 	destroy_meter (txa[channel].alcmeter.p);
 	destroy_uslew (txa[channel].uslew.p);
@@ -548,7 +547,7 @@ void flush_txa (int channel)
 	flush_uslew (txa[channel].uslew.p);
 	flush_meter (txa[channel].alcmeter.p);
 	flush_siphon (txa[channel].sip1.p);
-	flush_iqc (txa[channel].iqc.p0);
+	flush_iqc (txa[channel].iqc.p);
 	flush_cfir(txa[channel].cfir.p);
 	flush_resample (txa[channel].rsmpout.p);
 	flush_meter (txa[channel].outmeter.p);
@@ -584,7 +583,7 @@ void xtxa (int channel)
 	xuslew (txa[channel].uslew.p);					// up-slew for AM, FM, and gens
 	xmeter (txa[channel].alcmeter.p);				// ALC Meter
 	xsiphon (txa[channel].sip1.p, 0);				// siphon data for display
-	xiqc (txa[channel].iqc.p0);						// PureSignal correction
+	xiqc (txa[channel].iqc.p);						// PureSignal correction
 	xcfir(txa[channel].cfir.p);						// compensating FIR filter (used Protocol_2 only)
 	xresample (txa[channel].rsmpout.p);				// output resampler
 	xmeter (txa[channel].outmeter.p);				// output meter
@@ -657,7 +656,7 @@ void setDSPSamplerate_txa (int channel)
 	setSamplerate_uslew (txa[channel].uslew.p, ch[channel].dsp_rate);
 	setSamplerate_meter (txa[channel].alcmeter.p, ch[channel].dsp_rate);
 	setSamplerate_siphon (txa[channel].sip1.p, ch[channel].dsp_rate);
-	setSamplerate_iqc (txa[channel].iqc.p0, ch[channel].dsp_rate);
+	setSamplerate_iqc (txa[channel].iqc.p, ch[channel].dsp_rate);
 	setSamplerate_cfir (txa[channel].cfir.p, ch[channel].dsp_rate);
 	// output resampler
 	setBuffers_resample (txa[channel].rsmpout.p, txa[channel].midbuff, txa[channel].outbuff);
@@ -731,8 +730,8 @@ void setDSPBuffsize_txa (int channel)
 	setSize_meter (txa[channel].alcmeter.p, ch[channel].dsp_size);
 	setBuffers_siphon (txa[channel].sip1.p, txa[channel].midbuff);
 	setSize_siphon (txa[channel].sip1.p, ch[channel].dsp_size);
-	setBuffers_iqc (txa[channel].iqc.p0, txa[channel].midbuff, txa[channel].midbuff);
-	setSize_iqc (txa[channel].iqc.p0, ch[channel].dsp_size);
+	setBuffers_iqc (txa[channel].iqc.p, txa[channel].midbuff, txa[channel].midbuff);
+	setSize_iqc (txa[channel].iqc.p, ch[channel].dsp_size);
 	setBuffers_cfir (txa[channel].cfir.p, txa[channel].midbuff, txa[channel].midbuff);
 	setSize_cfir (txa[channel].cfir.p, ch[channel].dsp_size);
 	// output resampler

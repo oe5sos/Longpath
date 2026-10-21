@@ -238,3 +238,44 @@ These wrappers are authored by NereusSDR contributors and carry NereusSDR (GPLv3
 4. **NereusSDR port** ← JJ Boyd KG4VCF + contributors, GPLv3 (with Thetis upstream attribution preserved in source headers)
 
 Per compliance notice §6.1, the WDSP attribution is already preserved in the source tree headers and in NereusSDR wrapper source comments pointing to the Thetis contributor chain.
+
+## PureSignal 3 — Hub von 1.29 auf WDSP 2.11 (2026-10-21)
+
+Pin: TAPR `OpenHPSDR-wdsp` @ `e69de50d1d702216098019013899ad87534c64e0` („Release Version 2.11").
+
+| `third_party/wdsp/src/calcc.c` | Verbatim vendor von WDSP **2.11** (PureSignal 3), `__declspec(dllexport)` fallengelassen (statischer Bau) | `wdsp 2.11/Source/calcc.c` @ `e69de50d1d702216098019013899ad87534c64e0` | 2026-10-21 |
+| `third_party/wdsp/src/calcc.h` | Verbatim vendor von WDSP **2.11** (PureSignal 3), `__declspec(dllexport)` fallengelassen (statischer Bau) | `wdsp 2.11/Source/calcc.h` @ `e69de50d1d702216098019013899ad87534c64e0` | 2026-10-21 |
+| `third_party/wdsp/src/iqc.c` | Verbatim vendor von WDSP **2.11** (PureSignal 3), `__declspec(dllexport)` fallengelassen (statischer Bau) | `wdsp 2.11/Source/iqc.c` @ `e69de50d1d702216098019013899ad87534c64e0` | 2026-10-21 |
+| `third_party/wdsp/src/iqc.h` | Verbatim vendor von WDSP **2.11** (PureSignal 3), `__declspec(dllexport)` fallengelassen (statischer Bau) | `wdsp 2.11/Source/iqc.h` @ `e69de50d1d702216098019013899ad87534c64e0` | 2026-10-21 |
+| `third_party/wdsp/src/nurbs.c` | Verbatim vendor von WDSP **2.11** (PureSignal 3), `__declspec(dllexport)` fallengelassen (statischer Bau) | `wdsp 2.11/Source/nurbs.c` @ `e69de50d1d702216098019013899ad87534c64e0` | 2026-10-21 |
+| `third_party/wdsp/src/nurbs.h` | Verbatim vendor von WDSP **2.11** (PureSignal 3), `__declspec(dllexport)` fallengelassen (statischer Bau) | `wdsp 2.11/Source/nurbs.h` @ `e69de50d1d702216098019013899ad87534c64e0` | 2026-10-21 |
+| `third_party/wdsp/src/nurbs_fit.c` | Verbatim vendor von WDSP **2.11** (PureSignal 3), `__declspec(dllexport)` fallengelassen (statischer Bau) | `wdsp 2.11/Source/nurbs_fit.c` @ `e69de50d1d702216098019013899ad87534c64e0` | 2026-10-21 |
+| `third_party/wdsp/src/nurbs_fit.h` | Verbatim vendor von WDSP **2.11** (PureSignal 3), `__declspec(dllexport)` fallengelassen (statischer Bau) | `wdsp 2.11/Source/nurbs_fit.h` @ `e69de50d1d702216098019013899ad87534c64e0` | 2026-10-21 |
+| `third_party/wdsp/src/nurbs_spline.c` | Verbatim vendor von WDSP **2.11** (PureSignal 3), `__declspec(dllexport)` fallengelassen (statischer Bau) | `wdsp 2.11/Source/nurbs_spline.c` @ `e69de50d1d702216098019013899ad87534c64e0` | 2026-10-21 |
+| `third_party/wdsp/src/nurbs_spline.h` | Verbatim vendor von WDSP **2.11** (PureSignal 3), `__declspec(dllexport)` fallengelassen (statischer Bau) | `wdsp 2.11/Source/nurbs_spline.h` @ `e69de50d1d702216098019013899ad87534c64e0` | 2026-10-21 |
+| `third_party/wdsp/src/extrapolate.c` | Verbatim vendor von WDSP **2.11** (PureSignal 3), `__declspec(dllexport)` fallengelassen (statischer Bau) | `wdsp 2.11/Source/extrapolate.c` @ `e69de50d1d702216098019013899ad87534c64e0` | 2026-10-21 |
+| `third_party/wdsp/src/extrapolate.h` | Verbatim vendor von WDSP **2.11** (PureSignal 3), `__declspec(dllexport)` fallengelassen (statischer Bau) | `wdsp 2.11/Source/extrapolate.h` @ `e69de50d1d702216098019013899ad87534c64e0` | 2026-10-21 |
+| `third_party/wdsp/src/wdsp_align.h` | Verbatim vendor von WDSP **2.11** (PureSignal 3), `__declspec(dllexport)` fallengelassen (statischer Bau) | `wdsp 2.11/Source/wdsp_align.h` @ `e69de50d1d702216098019013899ad87534c64e0` | 2026-10-21 |
+
+Dazu hand-gemerged (NICHT ueberschrieben, weil bei uns abgewichen):
+`TXA.c`/`TXA.h` (PS3 fuehrt EINEN IQ-Korrektor statt `p0`/`p1`;
+`create_calcc` nimmt acht statt siebzehn Werte), `comm.h` (`nurbs.h`),
+`linux_port.{h,c}` (`CreateSemaphoreW`, und ein POSIX-Ersatz fuer
+`WaitForMultipleObjects`, den PureSignal 3s Steuerfaden braucht),
+`utilities.{c,h}` (Teilabgleich: `uint32_to_bitstr`).
+
+`utilities.c`: die zwei Debug-Helfer `CalccPrintSamples` /
+`doCalccPrintSamples` sind entfallen. Sie schrieben Kalibrierproben nach
+`samples.txt` und griffen dafuer in `struct _calcc`, den 2.11 kapselt;
+upstream 2.11 hat sie aus `utilities.c` ebenfalls ganz entfernt, und in
+Longpath rief sie nichts auf.
+
+**C++-Seite:** `SetPSIntsAndSpi`, `SetPSMapMode`, `SetPSPinMode`,
+`SetPSPtol` und `SetPSStabilize` gibt es in PureSignal 3 nicht mehr (die
+Korrekturkurve kommt aus der NURB-Anpassung statt aus einer Tabelle mit
+Stuetzstellenzahl, Toleranz- und Stabilisierungsschraube), ebenso wenig
+`psccF`. Die Wrapper in `TxChannel` bleiben stehen, damit ihre Rufer
+uebersetzen, tun aber nichts und sagen das einmal ins Protokoll. **Die
+zugehoerigen Bedienelemente im PureSignal-Fenster sind damit wirkungslos
+und muessen noch ausgegraut werden — das ist Gestaltung und gehoert dem
+Betreiber.**

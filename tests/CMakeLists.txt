@@ -7872,6 +7872,12 @@ longpath_add_test(tst_fm_squelch_abbildung)
 #   R-Zweig anfasst, laesst den Tuner nach der ersten Abfrage stillstehen.
 longpath_add_test(tst_genius_status_tor)
 
+# tst_puresignal3_kette: traegt der Hub auf WDSP 2.11? Oeffnet einen ECHTEN
+#   Sendekanal, liest GetPSInfo und baut wieder ab -- mit Uhr darum, weil ein
+#   falscher POSIX-Ersatz fuer WaitForMultipleObjects den Steuerfaden
+#   doPSCorrChange im Abbau haengen liesse statt rot zu melden.
+longpath_add_test(tst_puresignal3_kette)
+
 # --------------------------------------------------------------------------
 # Aggregate "all_tests" target  (2026-05-26 KG4VCF dev-loop fix, from PR #291)
 # --------------------------------------------------------------------------

@@ -153,6 +153,9 @@ class TestMnfSetupPage;
 // AGC-Saat beim Oeffnen: der Lauf oeffnet echte RX-Kanaele und liest die
 // angewandte Verstaerkung aus WDSP zurueck.
 class TestAgcSaatBeimOeffnen;
+// PureSignal 3: der Lauf oeffnet einen echten Sendekanal und baut ihn
+// wieder ab, um die NURB-Anpassung und den Steuerfaden zu pruefen.
+class TestPureSignal3Kette;
 #endif
 
 namespace Longpath {
@@ -856,6 +859,8 @@ private:
     friend class ::TstPbsnrNoiseProbe;
     // AGC-Saat beim Oeffnen: dieselbe Freundschaft, echte RX-Kanaele.
     friend class ::TestAgcSaatBeimOeffnen;
+    // PureSignal 3: dieselbe Freundschaft, echter Sendekanal.
+    friend class ::TestPureSignal3Kette;
 #endif
 };
 
