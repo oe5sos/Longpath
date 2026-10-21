@@ -147,14 +147,19 @@ private slots:
         QCOMPARE(s.handleLine(QStringLiteral("V VFOB")), QStringLiteral("RPRT -1\n"));
     }
 
-    void split_can_be_read_but_not_set()
+    void split_wird_angenommen_und_gelesen()
     {
-        // Longpath deleted the split setter on purpose (RadioModel.h on
-        // split()); the supported client setting is "Fake It".
+        // Dieser Fall hiess bis zum 2026-10-21 „split_can_be_read_but_
+        // not_set" und nagelte die Absage fest (`RPRT -11`, „Fake It"
+        // auf der Clientseite). Jetzt nimmt die Bruecke Split an und
+        // bildet es auf XIT ab -- also dreht sich der Prueffall mit,
+        // statt stehenzubleiben.
         TestMockRadioModel mock;
         RigctldServer s(&mock);
         QCOMPARE(s.handleLine(QStringLiteral("s")), QStringLiteral("0\nVFOB\n"));
-        QCOMPARE(s.handleLine(QStringLiteral("S 1 VFOB")), QStringLiteral("RPRT -11\n"));
+        QCOMPARE(s.handleLine(QStringLiteral("S 1 VFOB")),
+                 QStringLiteral("RPRT 0\n"));
+        QVERIFY(mock.xitEnable());
     }
 
     // ── The transmit gate ───────────────────────────────────────────────────
@@ -331,6 +336,70 @@ private slots:
         // The range lists' vfo mask has to match what the client is on,
         // or Hamlib finds no range to validate against and refuses.
         QVERIFY(state.contains(QStringLiteral("0x17e00007")));
+    }
+
+    // ── Split, abgebildet auf XIT ───────────────────────────────────────────
+    //
+    // Der Entwurf (Phase 3F §3) ersetzt Split durch XIT fuer +/- 10 kHz.
+    // Bis zum 2026-10-21 lehnte die Bruecke `S` schlicht ab, und der
+    // Betreiber musste in N1MM/DXLog auf „Fake It" -- ein DX, das 2 kHz
+    // hoeher hoert, war aus dem Logprogramm heraus nicht zu arbeiten.
+
+    void split_schaltet_xit_ein_und_wieder_aus()
+    {
+        TestMockRadioModel mock;
+        RigctldServer s(&mock);
+
+        QCOMPARE(s.handleLine(QStringLiteral("S 1 VFOB")),
+                 QStringLiteral("RPRT 0\n"));
+        QVERIFY2(mock.xitEnable(), "Split an, aber XIT blieb aus");
+
+        // Aus heisst aus -- und der Versatz darf nicht stehenbleiben,
+        // sonst sendet der naechste Einschaltvorgang daneben.
+        mock.setXitOffset(2000);
+        QCOMPARE(s.handleLine(QStringLiteral("S 0 VFOA")),
+                 QStringLiteral("RPRT 0\n"));
+        QVERIFY(!mock.xitEnable());
+        QCOMPARE(mock.xitOffset(), 0);
+    }
+
+    void die_sendefrequenz_wird_zum_xit_versatz()
+    {
+        TestMockRadioModel mock;
+        mock.setVfoHz(0, 0, 14'250'000);
+        RigctldServer s(&mock);
+
+        // 2 kHz hoeher hoeren -- der Normalfall im Pile-up.
+        QCOMPARE(s.handleLine(QStringLiteral("I 14252000")),
+                 QStringLiteral("RPRT 0\n"));
+        QCOMPARE(mock.xitOffset(), 2000);
+        QVERIFY(mock.xitEnable());
+
+        // Und zurueckgelesen kommt wieder die Sendefrequenz, nicht der
+        // Versatz: der Client rechnet nicht nach.
+        QCOMPARE(s.handleLine(QStringLiteral("i")),
+                 QStringLiteral("14252000\n"));
+
+        // Auch nach unten.
+        QCOMPARE(s.handleLine(QStringLiteral("I 14248500")),
+                 QStringLiteral("RPRT 0\n"));
+        QCOMPARE(mock.xitOffset(), -1500);
+    }
+
+    void weiter_als_xit_reicht_wird_abgelehnt_statt_gekappt()
+    {
+        TestMockRadioModel mock;
+        mock.setVfoHz(0, 0, 14'250'000);
+        RigctldServer s(&mock);
+        s.handleLine(QStringLiteral("I 14252000"));
+        QCOMPARE(mock.xitOffset(), 2000);
+
+        // 25 kHz hoeher: das kann XIT nicht. Ein gekappter Versatz
+        // hiesse, auf einer anderen Frequenz zu senden als der Client
+        // glaubt -- also Absage, und der alte Wert bleibt stehen.
+        QCOMPARE(s.handleLine(QStringLiteral("I 14275000")),
+                 QStringLiteral("RPRT -1\n"));
+        QCOMPARE(mock.xitOffset(), 2000);
     }
 
     // ── Against the real model, not the mock ────────────────────────────────

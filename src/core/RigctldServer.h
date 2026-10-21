@@ -102,8 +102,17 @@ private:
     QString handleSetPtt(const QStringList& args);
     QString handleGetSplit();
     QString handleSetSplit(const QStringList& args);
+    QString handleGetSplitFreq();
+    QString handleSetSplitFreq(const QStringList& args);
     QString handleGetLevel(const QStringList& args);
     QString dumpState() const;
+
+    // Der Sendeversatz, den ein Client als „Split" bestellt, wird auf
+    // XIT abgebildet -- so sieht es der Entwurf vor (Phase 3F §3:
+    // „split is replaced with XIT for plus or minus 10 kHz tuning
+    // offset"). Weiter als das reicht XIT nicht; ein groesserer Wunsch
+    // wird abgelehnt, statt still danebenzuliegen.
+    static constexpr int kXitSpanHz = 10000;
 
     // Hamlib mode token <-> Longpath mode name.
     static QString  hamlibModeFromLongpath(const QString& longpathMode);

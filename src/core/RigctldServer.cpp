@@ -261,6 +261,12 @@ QString RigctldServer::handleLine(const QString& line)
     if (cmd == QStringLiteral("S") || cmd == QStringLiteral("set_split_vfo")) {
         return handleSetSplit(parts);
     }
+    if (cmd == QStringLiteral("i") || cmd == QStringLiteral("get_split_freq")) {
+        return handleGetSplitFreq();
+    }
+    if (cmd == QStringLiteral("I") || cmd == QStringLiteral("set_split_freq")) {
+        return handleSetSplitFreq(parts);
+    }
     if (cmd == QStringLiteral("l") || cmd == QStringLiteral("get_level")) {
         return handleGetLevel(parts);
     }
@@ -431,11 +437,78 @@ QString RigctldServer::handleGetSplit()
 // implemented instead of pretending to have switched something.
 QString RigctldServer::handleSetSplit(const QStringList& args)
 {
-    Q_UNUSED(args);
-    qCInfo(lcRigctld) << "RigctldServer: set_split_vfo refused — Longpath has "
-                         "no split; use XIT or a second slice (\"Fake It\" on "
-                         "the client side)";
-    return kRprtNotImpl;
+    // Split IST hier XIT. Der Entwurf sagt es so (Phase 3F §3: „split
+    // is replaced with XIT for plus or minus 10 kHz tuning offset"),
+    // und fuer den Betrieb heisst es: ein DX, das 2 kHz hoeher hoert,
+    // laesst sich jetzt aus N1MM, DXLog oder WSJT-X heraus arbeiten --
+    // vorher bekam der Client eine Absage und musste auf „Fake It".
+    //
+    // Was NICHT geht, bleibt klar benannt: zwei wirklich unabhaengige
+    // VFOs. Weiter als +/- 10 kHz reicht XIT nicht, und ein Wunsch
+    // darueber hinaus wird abgelehnt statt stillschweigend gekappt.
+    if (args.isEmpty()) {
+        return kRprtRefused;
+    }
+    const bool on = (args.at(0).trimmed() != QStringLiteral("0"));
+    QMetaObject::invokeMethod(m_radio, "setXitEnable", Qt::DirectConnection,
+                              Q_ARG(bool, on));
+    if (!on) {
+        // Aus heisst aus: ein stehengebliebener Versatz waere die
+        // naechste Ueberraschung beim naechsten Einschalten.
+        QMetaObject::invokeMethod(m_radio, "setXitOffset", Qt::DirectConnection,
+                                  Q_ARG(int, 0));
+    }
+    qCInfo(lcRigctld) << "RigctldServer: split" << (on ? "on" : "off")
+                      << "(via XIT)";
+    return kRprtOk;
+}
+
+QString RigctldServer::handleGetSplitFreq()
+{
+    qint64 hz = 0;
+    QMetaObject::invokeMethod(m_radio, "vfoHz", Qt::DirectConnection,
+                              Q_RETURN_ARG(qint64, hz),
+                              Q_ARG(int, 0), Q_ARG(int, 0));
+    int xit = 0;
+    QMetaObject::invokeMethod(m_radio, "xitOffset", Qt::DirectConnection,
+                              Q_RETURN_ARG(int, xit));
+    // Die Sendefrequenz ist die Empfangsfrequenz plus Versatz -- auch
+    // dann, wenn XIT gerade aus ist: dann ist der Versatz null.
+    return QStringLiteral("%1\n").arg(hz + xit);
+}
+
+QString RigctldServer::handleSetSplitFreq(const QStringList& args)
+{
+    if (args.isEmpty()) {
+        return kRprtRefused;
+    }
+    bool ok = false;
+    const qint64 txHz = args.at(0).toLongLong(&ok);
+    if (!ok || txHz <= 0) {
+        return kRprtRefused;
+    }
+
+    qint64 rxHz = 0;
+    QMetaObject::invokeMethod(m_radio, "vfoHz", Qt::DirectConnection,
+                              Q_RETURN_ARG(qint64, rxHz),
+                              Q_ARG(int, 0), Q_ARG(int, 0));
+    const qint64 versatz = txHz - rxHz;
+    if (versatz > kXitSpanHz || versatz < -kXitSpanHz) {
+        // Ehrliche Absage mit der Zahl: ein gekappter Versatz hiesse,
+        // auf einer anderen Frequenz zu senden als der Client glaubt.
+        qCWarning(lcRigctld)
+            << "RigctldServer: set_split_freq" << txHz << "is" << versatz
+            << "Hz away — beyond XIT's +/-" << kXitSpanHz << "Hz; refused";
+        return kRprtRefused;
+    }
+
+    QMetaObject::invokeMethod(m_radio, "setXitOffset", Qt::DirectConnection,
+                              Q_ARG(int, static_cast<int>(versatz)));
+    QMetaObject::invokeMethod(m_radio, "setXitEnable", Qt::DirectConnection,
+                              Q_ARG(bool, versatz != 0));
+    qCInfo(lcRigctld) << "RigctldServer: split TX" << txHz
+                      << "=> XIT" << versatz << "Hz";
+    return kRprtOk;
 }
 
 QString RigctldServer::handleGetLevel(const QStringList& args)

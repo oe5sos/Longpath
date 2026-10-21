@@ -30,8 +30,8 @@ Die Einstellungen wirken sofort, ohne Neustart.
 ## Im steuernden Programm
 
 **N1MM / DXLog:** Gerät „Hamlib NET rigctl", Adresse `127.0.0.1:4532`.
-Split auf **„None" oder „Fake It"** stellen — Longpath hat kein Split
-(dazu unten mehr).
+Split auf **„Rig"** stellen, solange der Versatz unter 10 kHz bleibt
+(dazu unten mehr); darüber „None" oder „Fake It".
 
 **WSJT-X:** Settings → Radio → Rig: *Hamlib NET rigctl*, Network Server
 `127.0.0.1:4532`. PTT Method: **VOX**, solange das Sendetor zu ist; auf
@@ -46,10 +46,14 @@ Lesen und Stellen von **Frequenz**, **Modus mit Durchlassbreite**, VFO,
 Sperre, S-Meter und der Feinabstimmung (RIT/XIT). Der Statussatz `IF;`
 trägt alles auf einmal, so wie ein TS-2000 ihn schickt.
 
-**Split gibt es nicht.** Longpath hat keinen Split-Schalter; der
-dokumentierte Ersatz ist XIT oder eine zweite Scheibe. Ein Programm, das
-Split verlangt, bekommt eine ehrliche Absage — stell es dort auf „Fake
-It", dann tut es dasselbe über die Frequenz.
+**Split läuft über XIT — bis ±10 kHz.** Longpath hat keine zwei
+unabhängigen VFOs, aber die Brücke nimmt `set_split_vfo` und
+`set_split_freq` an und rechnet den Sendeversatz in XIT um. Für den
+Normalfall im Pile-up (das DX hört 2 kHz höher) reicht das: in N1MM
+oder DXLog **Split „Rig"** statt „Fake It", und die Sendefrequenz steht.
+Wer weiter weg senden will als 10 kHz, bekommt eine ehrliche Absage
+statt eines stillschweigend gekappten Versatzes — dafür braucht es die
+zweite Scheibe aus Phase 3F.
 
 **Das Senden** nimmt denselben Weg wie jede andere Sendequelle, mit dem
 Bandplan-Wächter davor. Entkeyen geht immer, auch bei gesperrtem Tor;

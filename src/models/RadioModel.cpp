@@ -15222,16 +15222,18 @@ bool RadioModel::hasQuickMemory() const
 
 bool RadioModel::split(int rx) const
 {
-    // Phase 3F deletes the `setSplit` stub per design §3: split is replaced
-    // with XIT for plus or minus 10 kHz tuning offset, or addSliceOnPan to
-    // create a second slice for full retune. The query stays at false so
-    // TciProtocol's init burst can still emit `split_enable:rx,false;` for
-    // wire-protocol stability with WSJT-X / N1MM / Log4OM ("Split Operation:
-    // None/Fake It").  See
-    // docs/architecture/2026-05-26-phase3f-multi-pan-multi-slice-design.md
-    // section 3 ("VFO A/B / split: not implemented").
+    // Phase 3F §3: „split is replaced with XIT for plus or minus 10 kHz
+    // tuning offset". Seit dem 2026-10-21 wird genau das auch
+    // BEANTWORTET: wer XIT anhat, sendet auf einer anderen Frequenz als
+    // er hoert -- das IST Split, und ein Client, dem wir hier `false`
+    // melden, zeigt seinem Benutzer das Gegenteil dessen an, was das
+    // Geraet tut. Die rigctld-Bruecke bildet `S`/`I` auf XIT ab
+    // (RigctldServer::handleSetSplit / handleSetSplitFreq).
+    //
+    // Zwei wirklich unabhaengige VFOs gibt es weiterhin nicht; dafuer
+    // bleibt es bei der zweiten Scheibe aus Phase 3F.
     (void)rx;
-    return false;
+    return xitEnable();
 }
 
 // ---------------------------------------------------------------------------
