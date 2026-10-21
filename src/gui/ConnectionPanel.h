@@ -114,6 +114,7 @@ public:
     /// Fuer Pruefstaende: Leistentext und die Erklaerung darunter.
     QLabel* stripInfoLabelForTest() const { return m_stripInfoLabel; }
     QLabel* behindMaskLabelForTest() const { return m_stripBehindMaskLabel; }
+    QPushButton* closeButtonForTest() const { return m_closeBtn; }
 
     /// Wieviele schwebende Fenster gerade hinter dieser Maske liegen.
     /// 0 blendet den Hinweis aus. Der Aufrufer ist MainWindow — nur es

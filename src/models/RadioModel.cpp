@@ -6792,6 +6792,47 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                 applyFlexPanSetup();
             }
 
+            // Die Hoehe NACHLESEN statt sie anzunehmen.
+            //
+            // Ein FFT-Bin ist keine Leistung, sondern eine BILDZEILE:
+            // `binToDbm()` rechnet `maxDbm - (bin / (y_pixels-1)) *
+            // Spanne`. Der Teiler muss also der sein, mit dem die
+            // MASCHINE zeichnet — nicht der, den wir uns gewuenscht
+            // haben. Am 2026-10-21 an Martins FLEX-8400 gemessen: auf
+            // `display pan set ... ypixels=1000` antwortete sie mit
+            // Code 0 und meldete im Zustandsschub weiter `y_pixels=20`.
+            // Mit Zeilen 0..19 gegen einen Teiler von 999 landet JEDER
+            // Bin bei -40 dBm, dem oberen Anschlag: die Flaeche war
+            // durchgehend blau, der Wasserfall durchgehend rot.
+            //
+            // Also gilt, was die Maschine sagt, sobald sie es sagt.
+            // KEINE Bedingung auf `m_flexStream`: der Zustandsschub
+            // kommt, BEVOR der Strom existiert. Am 2026-10-21 gemessen
+            // — Status um .664, Anmeldung als GUI-Client um .689. Ein
+            // erster Versuch verlangte den Strom hier und warf die
+            // gemeldete Hoehe damit jedes Mal weg. Gemerkt wird immer,
+            // gesetzt nur, wenn es schon etwas zu setzen gibt;
+            // `applyFlexPanSetup()` holt es sonst nach.
+            if (object.startsWith(QLatin1String("display pan "))
+                && kv.contains(QStringLiteral("y_pixels"))) {
+                bool gelesen = false;
+                const int gemeldet =
+                    kv.value(QStringLiteral("y_pixels")).toInt(&gelesen);
+                if (gelesen && gemeldet >= 2
+                    && gemeldet != m_flexYPixelsGemeldet) {
+                    m_flexYPixelsGemeldet = gemeldet;
+                    qCInfo(lcConnection)
+                        << "Flex: die Maschine zeichnet mit y_pixels"
+                        << gemeldet << "— Hoehe nachgezogen";
+                    bool kennungOk = false;
+                    const quint32 panStream =
+                        m_flexPanId.toUInt(&kennungOk, 16);
+                    if (m_flexStream && kennungOk) {
+                        m_flexStream->setYPixels(panStream, gemeldet);
+                    }
+                }
+            }
+
             // Erst lesen, dann stellen. `sub radio all` / `sub slice all`
             // bringen den Zustand der Maschine nach der Anmeldung — und
             // das ist die EINZIGE Stelle, an der wir erfahren, was dort
@@ -6908,12 +6949,28 @@ void RadioModel::applyFlexPanSetup()
     // das man warten koennte.
     bool ok = false;
     const quint32 panStream = m_flexPanId.toUInt(&ok, 16);
+    const int hoehe = (m_flexYPixelsGemeldet >= 2)
+                          ? m_flexYPixelsGemeldet : kYPixels;
     if (ok) {
-        m_flexStream->setYPixels(panStream, kYPixels);
+        // Hat die Maschine schon gesagt, mit welcher Hoehe sie
+        // zeichnet, dann gilt IHRE Zahl — nicht die, um die wir eben
+        // gebeten haben. Ihr Zustandsschub kommt vor unserem
+        // `display pan set`, und sie quittiert den Befehl mit Code 0,
+        // ohne `y_pixels` zu aendern (2026-10-21 gemessen). Wer hier
+        // die Wunschzahl einsetzt, klebt jeden Bin an den oberen
+        // Anschlag.
+        m_flexStream->setYPixels(panStream, hoehe);
         m_flexStream->setDbmRange(panStream, kMinDbm, kMaxDbm);
     }
+    // Die Zahl melden, mit der WIRKLICH gerechnet wird — nicht die
+    // erbetene. Ein Protokollsatz, der die Absicht statt des Zustands
+    // meldet, hat am 2026-10-21 eine Stunde gekostet (der Kopfsatz der
+    // Verbindung stand auf Stufe 1, als Stufe 2 laengst lief).
     qCInfo(lcConnection) << "Flex: Panadapter" << m_flexPanId
-                         << "eingerichtet" << kXPixels << "x" << kYPixels;
+                         << "eingerichtet" << kXPixels << "x" << hoehe
+                         << (m_flexYPixelsGemeldet >= 2
+                                 ? "(Hoehe von der Maschine gemeldet)"
+                                 : "(Hoehe erbeten, noch unbestaetigt)");
 }
 
 void RadioModel::startFlexStreams()
@@ -7102,6 +7159,7 @@ void RadioModel::teardownFlexConnection()
     m_flexRestoreAudioLevel = false;
     m_flexRestoreAudioMute  = false;
     m_flexRestoreMuteLocal  = false;
+    m_flexYPixelsGemeldet   = 0;
     m_flexPanId.clear();
 
     if (m_flexStream) {

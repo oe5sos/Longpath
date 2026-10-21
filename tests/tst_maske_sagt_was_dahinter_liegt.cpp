@@ -30,6 +30,8 @@
 // das Schild leer und unsichtbar, und beide Faelle unten fallen um.
 
 #include <QLabel>
+#include <QPointer>
+#include <QPushButton>
 #include <QObject>
 #include <QtTest>
 

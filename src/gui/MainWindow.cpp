@@ -15331,6 +15331,14 @@ void MainWindow::hideFloatingWindowsBehindConnectMask()
     // Betreiber sah am 2026-10-21 eine schwarze Flaeche und suchte eine
     // Stunde lang im Funkgeraet, waehrend sein Panadapter als
     // verstecktes Schwebefenster hinter genau diesem Dialog stand.
+    qWarning() << "[ConnectMaske] versteckt:"
+               << m_floatingContainersHiddenPreConnect.size() << "Fenster";
+    for (const QPointer<QWidget>& w
+         : std::as_const(m_floatingContainersHiddenPreConnect)) {
+        if (w) {
+            qWarning() << "[ConnectMaske]   -" << w->metaObject()->className();
+        }
+    }
     if (m_connectionPanel) {
         m_connectionPanel->setWindowsBehindMask(
             int(m_floatingContainersHiddenPreConnect.size()));
@@ -15369,8 +15377,14 @@ void MainWindow::hideFloatingWindowsBehindConnectMask()
 // ---------------------------------------------------------------------------
 void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
 {
-    if (m_shuttingDown) { return; }
-    if (m_connectionPanel && m_connectionPanel->isVisible()) { return; }
+    if (m_shuttingDown) {
+        qWarning() << "[ConnectMaske] zurueckholen uebersprungen: Abbau laeuft";
+        return;
+    }
+    if (m_connectionPanel && m_connectionPanel->isVisible()) {
+        qWarning() << "[ConnectMaske] zurueckholen vertagt: die Maske steht noch";
+        return;
+    }
 
     // Der Rotor/Log-Einmalhaken merkt sich hier nur den Wunsch (siehe
     // Konstruktor); gezeigt wird er an derselben Stelle wie alles andere,
@@ -15388,10 +15402,27 @@ void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
     // QPointer haelt fest, ob eines inzwischen ganz geschlossen (nicht nur
     // versteckt) wurde -- dann bleibt es aus, statt aus dem Nichts
     // wiederzukommen.
+    int geholt = 0;
+    int verloren = 0;
     for (const QPointer<QWidget>& w
          : std::as_const(m_floatingContainersHiddenPreConnect)) {
-        if (w) { w->show(); w->raise(); restoredAny = true; }
+        if (w) {
+            w->show(); w->raise(); restoredAny = true;
+            ++geholt;
+            qWarning() << "[ConnectMaske] zurueck:"
+                              << w->metaObject()->className()
+                              << "sichtbar jetzt=" << w->isVisible();
+        } else {
+            // Ein QPointer, der null geworden ist: das Fenster wurde
+            // zwischendurch geloescht. Genau das passiert, wenn das
+            // Layoutprofil einen Panadapter neu schweben laesst — das
+            // ALTE PanFloatingWindow steht dann noch in dieser Liste,
+            // das neue in keiner.
+            ++verloren;
+        }
     }
+    qWarning() << "[ConnectMaske] zu;" << geholt << "zurueckgeholt,"
+                      << verloren << "inzwischen geloescht";
     m_floatingContainersHiddenPreConnect.clear();
     if (m_connectionPanel) { m_connectionPanel->setWindowsBehindMask(0); }
 
@@ -15409,6 +15440,18 @@ void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
 
 void MainWindow::showConnectionPanel()
 {
+    // 2026-10-21: der Betreiber meldete „es steht auch immer wieder
+    // connect nach dem ich connect habe" — die Maske geht von selbst
+    // wieder auf, und jedes Mal raeumt sie sein Layout weg. WER sie
+    // oeffnet, stand nirgends. Jetzt schon.
+    qWarning() << "[ConnectMaske] auf; verbunden="
+                      << (m_radioModel
+                          && m_radioModel->connectionState()
+                                 == ConnectionState::Connected)
+                      << "schon da=" << (m_connectionPanel != nullptr)
+                      << "bereits versteckt="
+                      << m_floatingContainersHiddenPreConnect.size();
+
     // Maske auf, Fenster weg -- egal, WER sie oeffnet (automatisch
     // nach einer Trennung oder von Hand ueber Menue/Klick auf die
     // Statuszeile). Vorher galt das nur fuer den automatischen Weg.
@@ -15460,6 +15503,14 @@ void MainWindow::showConnectionPanel()
             restoreFloatingWindowsHiddenBehindConnectMask();
         });
     }
+    // Der Hinweis erst JETZT: beim Verstecken weiter oben gibt es den
+    // Dialog noch gar nicht (er wird darunter erst angelegt), und ein
+    // `setWindowsBehindMask()` auf einen Nullzeiger verpufft — mein
+    // eigener Fehler vom 2026-10-21, gefunden daran, dass der Hinweis
+    // am Geraet nie erschien.
+    m_connectionPanel->setWindowsBehindMask(
+        int(m_floatingContainersHiddenPreConnect.size()));
+
     m_connectionPanel->show();
     m_connectionPanel->raise();
     m_connectionPanel->activateWindow();

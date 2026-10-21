@@ -3511,6 +3511,12 @@ private:
     bool                 m_flexRestoreAudioLevel{false};
     bool                 m_flexRestoreAudioMute{false};
     bool                 m_flexRestoreMuteLocal{false};
+    /// Die Bildhoehe, mit der die MASCHINE zeichnet — der Teiler in
+    /// `binToDbm()`. 0 heisst: sie hat noch nichts dazu gesagt, dann
+    /// gilt unsere Wunschzahl. Sagt sie etwas, GILT IHRE ZAHL — auch
+    /// gegen ein `display pan set`, das sie mit Code 0 quittiert und
+    /// dann ignoriert hat (am 2026-10-21 genau so gemessen).
+    int                  m_flexYPixelsGemeldet{0};
     ReceiverManager* m_receiverManager{nullptr};
     AudioEngine*     m_audioEngine{nullptr};
     WdspEngine*      m_wdspEngine{nullptr};
