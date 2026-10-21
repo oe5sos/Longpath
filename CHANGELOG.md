@@ -4,6 +4,58 @@
 
 ## [0.8.0] - 2026-10-20
 
+### Die FLEX-8400 laeuft (#277)
+
+Longpath spricht eine weitere Geraetefamilie. Die 8400 steht in der
+Geraeteliste, Longpath meldet sich als Bedienstelle an, liest die
+Frequenz, und Ton und Bild kommen am Geraet heraus — gegen die echte
+Maschine auf 172.30.30.12 gemessen, nicht gegen einen Nachbau:
+**14.100000 MHz** gelesen, der Ton mit **24012,3 Hz** ueber 24 Sekunden
+nachgemessen.
+
+Der Haken war nicht der, den ich erwartet hatte. Bei Flex rechnet das
+**Radio** — 33 Stellen in `RadioModel` fuehren den Empfangsweg heute
+durch WDSP, und die muessten alle umgangen werden. Mussten sie nicht:
+die Naht liegt im Baum schon **zweimal** (KiwiSDR, SunSDR). Eine
+Flex-Scheibe ist eine Scheibe ohne `RxChannel`, der fertige Ton geht bei
+`AudioEngine::rxBlockReady` hinein und die fertigen Bildpunkte bei
+`SpectrumWidget::updateKiwiSpectrumDbm`. Keine der 34 Funktionen wurde
+angefasst.
+
+Der eigentliche Haken lag im Protokoll: `slice list` kommt **leer**
+zurueck, solange niemand als Bedienstelle angemeldet ist. Eine Scheibe
+existiert bei Flex erst, wenn ein GUI-Client sie angelegt hat. Longpath
+meldet sich also mit `client gui <uuid>` an, legt bei Bedarf selbst Pan
+und Scheibe an — und die Maschine schiebt ihren Zustand **vor** der
+Anmeldeantwort heraus, was jeder Leser aushalten muss, der die Antwort
+abwartet.
+
+Gemessen und aufgeschrieben (`docs/protocols/flex-vita49-gemessen.md`),
+weil vier Fallen darin stecken, die man nicht raet:
+
+* Die Zahlen im Bildstrom sind **Y-Bildpunkte**, keine dBm. Die
+  Umrechnung teilt durch `yPixels - 1`, und die Maschine echot
+  `y_pixels` **nie** zurueck — der Maßstab muss mitgefuehrt werden.
+* Frequenzen im Wasserfallsatz sind **Hz × 2²⁰**, Festkomma.
+* Die vier Null-Bytes am Ende sind **Fuellung, kein VITA-Anhang**. Wer
+  nach Datagrammlaenge zaehlt, erfindet ein Signal mit Vollaussteuerung.
+* Die VITA-Zeitstempel **stehen still**. Sie taugen nicht zum Ordnen.
+
+Eine Nebenwirkung, die man wissen muss: ein `remote_audio_rx`-Strom
+**stummt die Lautsprecher am Geraet**. Longpath setzt darum
+`mute_local_audio_when_remote=0`, bevor es den Strom bestellt, und
+stellt den alten Wert beim Abbau wieder her.
+
+**Nicht gebaut, weil nicht gemessen:** die schmale Tonklasse `0x0123`
+und die Messwerte `0x8002`. Beide sind im Protokolldokument als offen
+vermerkt. Senden kann Longpath mit der 8400 nicht — Stufe 1 und 2 sind
+Empfang.
+
+88 Prueffaelle, davon welche gegen echte aufgezeichnete Pakete
+(`tests/flex_vita_golden.h`) und welche gegen eine Gegenstelle auf einem
+echten Socket. Herkunft: Gestalt aus AetherSDR, Zeile fuer Zeile in
+`docs/attribution/AETHERSDR-PORTS.md` eingetragen.
+
 ### Der Schutzrahmen greift jetzt beim Start
 
 Betreiber am frisch gestarteten Fenster: „Bandwidth Filter", „TX" und
