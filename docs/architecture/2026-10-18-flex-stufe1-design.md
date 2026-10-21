@@ -517,10 +517,16 @@ Was **wirklich** noch offen ist, und nur das:
   Stationsnetz; in der Nacht vom 2026-10-20 stand der Mac auf
   `192.168.78.153`, die 8400 war nicht erreichbar. Nicht gemessen heißt
   nicht gebaut — wer das aufgreift, schneidet zuerst mit.
-* Punkt 3 oben: der Blick auf das echte Fenster mit der Zeile in der
-  Geräteliste fehlt weiter.
-* Punkt 4 oben: die Fassungsanzeige (`V1.4.0.0` vs.
-  `version=4.3.16.42034`) ist noch nicht entschieden.
+* ~~Punkt 3 oben: der Blick auf das echte Fenster.~~ **Erledigt am
+  2026-10-21** — der Betreiber am laufenden Programm: „ich sehe
+  übrigens flex schon zum auswählen bei den radios". Im Dock lag
+  `main@50d1211bf`. Damit ist die Zeile nicht mehr nur durch
+  `tst_flex_zeile_in_der_geraeteliste` belegt, sondern gesehen.
+* ~~Punkt 4 oben: die Fassungsanzeige.~~ **Entschieden und gebaut** in
+  PR #286: die Fassung kommt aus dem **Ruf** (`4.3.16.42034`), nicht
+  aus dem Kanal (der meldet die API-Fassung `V1.4.0.0`). Getragen wird
+  sie in `RadioInfo::firmwareText` neben der Zahl; leer heißt „nimm die
+  Zahl".
 * **Senden** ist nicht dabei. Stufe 1 und 2 sind Empfang.
 
 ---
