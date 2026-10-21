@@ -14961,7 +14961,31 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
     //    nicht -- das ist die Nutzerspalte, und die steht womoeglich
     //    noch aus einer Sitzung ohne Digital auf „aus".
     if (m_appletVis) {
-        m_appletVis->setVisible(QStringLiteral("Ft8Decoder"), true);
+        // ensureVisible statt setVisible: letzteres steigt aus, wenn der
+        // gemerkte Zustand schon „sichtbar" sagt -- und genau dann war
+        // das Panel am Geraet trotzdem weg. Siehe die Begruendung an
+        // AppletVisibilityController::ensureVisible.
+        m_appletVis->ensureVisible(QStringLiteral("Ft8Decoder"));
+    }
+
+    // 5. Und nach VORNE. Sichtbar allein genuegt nicht: steht das Panel
+    //    in einem schwebenden Behaelter, liegt es weiter hinter dem
+    //    Hauptfenster, und der Betreiber drueckt FT8 und sieht nichts.
+    //    Gemeldet 2026-10-21: „wenn ich ft8 oder ft4 klicke muss
+    //    automatisch das panel von digi in den vordergrund kommen".
+    //
+    //    Nur anheben, nicht die Tastatur nehmen (activateWindow): wer
+    //    gerade ein Rufzeichen tippt, soll beim Bandwechsel nicht den
+    //    Schreibplatz verlieren. Dasselbe Muster wie
+    //    RotorLogbookPanel::raiseLogbookIfOpen, dort eine Zeile mehr,
+    //    weil das Logbuch auf Zuruf geoeffnet wird und dann auch
+    //    beschrieben werden soll.
+    if (m_ft8Applet && m_ft8Applet->isVisible()) {
+        if (QWidget* fenster = m_ft8Applet->window()) {
+            if (fenster != this && fenster->isVisible()) {
+                fenster->raise();
+            }
+        }
     }
 }
 

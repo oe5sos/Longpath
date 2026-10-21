@@ -83,6 +83,18 @@ public slots:
     // User preference — persisted to AppSettings.
     void setVisible(const QString& id, bool visible);
 
+    /// Sichtbar machen UND das Panel neu anwenden -- auch wenn der
+    /// gemerkte Zustand schon „sichtbar" sagt.
+    ///
+    /// setVisible() steigt bei unveraendertem Wert frueh aus, und genau
+    /// das ist am 2026-10-21 aufgefallen: ein Panel liess sich ueber das
+    /// × an seiner Kopfzeile schliessen, ohne dass der gemerkte Zustand
+    /// mitging. In den Einstellungen stand weiter
+    /// AppletFt8DecoderVisible=True, das Panel war weg, und jeder
+    /// weitere setVisible(true) verpuffte. Der Betreiber drueckte FT8
+    /// und bekam nichts.
+    void ensureVisible(const QString& id);
+
     // Capability gate — NOT persisted. Lets the controller hide an
     // applet (and grey its menu entry) when an external feature flag
     // says the applet shouldn't be reachable. Example: when the 4O3A
