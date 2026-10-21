@@ -16920,6 +16920,12 @@ Longpath::CodecContext RadioModel::currentCodecContext() const
     // 1-ADC SKU is never handed an ADC1 selector.
     ctx.adcCtrl = Longpath::defaultRxAdcCtrl(boardCapabilities().adcCount);
 
+    // Das logische Modell, vor dem Testsitz gesetzt, damit der erzwungene
+    // Zustand dieselbe Modellkennung sieht wie der Betrieb. Eine Anvelina
+    // Pro 3 meldet sich als OrionMkII; nur dieses Feld unterscheidet sie
+    // (siehe kAnvelinaStreamToDdc in P2CodecOrionMkII.cpp).
+    ctx.model = m_hardwareProfile.model;
+
     if (m_ddcCtxForTest) {
         ctx.mox           = m_ddcCtxMoxForTest;
         ctx.puresignalRun = m_ddcCtxPsForTest;

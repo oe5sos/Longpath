@@ -358,6 +358,113 @@ private slots:
         QCOMPARE(a.rate[2], 192000);
         QCOMPARE(a.nDdc, 1);
     }
+
+    // ── Anvelina Pro 3: DDC5/DDC6 vor DDC4 (2026-10-21) ───────────────────
+    //
+    // Der DDC4-Strom dieses Geraets kommt beschaedigt an (Bankbefund im
+    // Upstream NereusSDR 47f6b1fab; Begruendung und Gateware-Belege stehen
+    // bei kAnvelinaStreamToDdc in P2CodecOrionMkII.cpp). Die Reihenfolge
+    // lautet daher DDC2, DDC3, DDC5, DDC6, DDC4.
+
+    void anvelina_pro3_p2_third_stream_takes_ddc5_not_ddc4()
+    {
+        P2CodecOrionMkII codec;
+        CodecContext ctx{};
+        ctx.model = HPSDRModel::ANVELINAPRO3;
+        std::array<SliceConfig, 5> slices{};
+        for (int i = 0; i < 3; ++i) {
+            slices[i].live = true;
+            slices[i].sampleRateHz = 192000;
+            slices[i].antennaIndex = 1;
+        }
+        slices[0].txBound = true;
+
+        const auto a = codec.applyDdcAssignment(ctx, slices);
+
+        QCOMPARE(a.streamDdc[0], 2);
+        QCOMPARE(a.streamDdc[1], 3);
+        QCOMPARE(a.streamDdc[2], 5);
+        // DDC2 + DDC3 + DDC5 an, DDC4 aus — genau das ist der Fix.
+        QCOMPARE(a.ddcEnable & 0x7c, 0x2c);
+        QCOMPARE(a.rate[5], 192000);
+        QCOMPARE(a.rate[4], 0);
+        QCOMPARE(a.nDdc, 3);
+    }
+
+    void anvelina_pro3_p2_fourth_stream_takes_ddc6()
+    {
+        P2CodecOrionMkII codec;
+        CodecContext ctx{};
+        ctx.model = HPSDRModel::ANVELINAPRO3;
+        std::array<SliceConfig, 5> slices{};
+        for (int i = 0; i < 4; ++i) {
+            slices[i].live = true;
+            slices[i].sampleRateHz = 96000;
+            slices[i].antennaIndex = 1;
+        }
+        slices[0].txBound = true;
+
+        const auto a = codec.applyDdcAssignment(ctx, slices);
+
+        QCOMPARE(a.streamDdc[3], 6);
+        QCOMPARE(a.ddcEnable & 0x7c, 0x6c);   // DDC2,3,5,6 — DDC4 bleibt aus
+        QCOMPARE(a.rate[4], 0);
+        QCOMPARE(a.nDdc, 4);
+    }
+
+    void anvelina_pro3_p2_fifth_stream_still_gets_ddc4()
+    {
+        // DDC4 bleibt in der Tabelle: ein fuenfter Strom braucht einen
+        // Empfaenger, und ein beschaedigter ist besser als keiner.
+        P2CodecOrionMkII codec;
+        CodecContext ctx{};
+        ctx.model = HPSDRModel::ANVELINAPRO3;
+        std::array<SliceConfig, 5> slices{};
+        for (int i = 0; i < 5; ++i) {
+            slices[i].live = true;
+            slices[i].sampleRateHz = 48000;
+            slices[i].antennaIndex = 1;
+        }
+        slices[0].txBound = true;
+
+        const auto a = codec.applyDdcAssignment(ctx, slices);
+
+        QCOMPARE(a.streamDdc[4], 4);
+        QCOMPARE(a.ddcEnable & 0x7c, 0x7c);   // alle fuenf
+        QCOMPARE(a.nDdc, 5);
+    }
+
+    void every_other_model_keeps_ddc4_for_the_third_stream()
+    {
+        // Gegenprobe in die andere Richtung: ohne das Modell Anvelina Pro 3
+        // darf sich NICHTS verschieben. Faellt dieser Lauf um, hat der Fix
+        // alle 2-ADC-Geraete umgestellt statt nur eines.
+        const HPSDRModel others[] = {HPSDRModel::ORIONMKII,
+                                     HPSDRModel::ANAN7000D,
+                                     HPSDRModel::ANAN8000D,
+                                     HPSDRModel::ANAN_G2,
+                                     HPSDRModel::ANAN_G2_1K};
+        for (const HPSDRModel m : others) {
+            P2CodecOrionMkII codec;
+            CodecContext ctx{};
+            ctx.model = m;
+            std::array<SliceConfig, 5> slices{};
+            for (int i = 0; i < 3; ++i) {
+                slices[i].live = true;
+                slices[i].sampleRateHz = 192000;
+                slices[i].antennaIndex = 1;
+            }
+            slices[0].txBound = true;
+
+            const auto a = codec.applyDdcAssignment(ctx, slices);
+
+            QCOMPARE(a.streamDdc[2], 4);
+            QCOMPARE(a.ddcEnable & 0x7c, 0x1c);  // DDC2,3,4
+            QCOMPARE(a.rate[4], 192000);
+            QCOMPARE(a.rate[5], 0);
+        }
+    }
+
     // ── Task 8: P1CodecStandard (Hermes / ANAN10 / ANAN100 / ANAN_G2E) ─────────
     //
     // Porting from Thetis console.cs:8387-8455 [v2.10.3.15] UpdateDDCs() Hermes-class
