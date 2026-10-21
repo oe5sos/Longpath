@@ -1605,24 +1605,39 @@ double getTau_nnet (NNET n)
 	return n->tau;
 }
 
+/* 2026-09-15: n->df is only ever allocated once nnet_build() reaches
+   create_dfhead() (see create_nnet_slot() above) -- a model that fails
+   to build (e.g. its .bin file is missing, so it stays in "passing
+   audio through" mode) leaves n->ready = 0 and n->df = 0, exactly the
+   state destroy_nnet()/flush_nnet()/run_nnet()/setFloor_nnet() etc. all
+   already guard against a few lines away. These four were the only
+   n->df touch points in this file missing that same if (n->ready)
+   check, which crashed SetRXANNRAlpha() (NNR_ALL_MODELS iterates every
+   allocated slot, including slot 0, which nnr.c's calc_nnr() always
+   allocates whether or not its build actually succeeded) on a null
+   pointer the moment any RX channel with no NNR model file present
+   connected -- confirmed via a symbolicated crash report
+   (EXC_BAD_ACCESS / KERN_INVALID_ADDRESS at n->df's own null-plus-
+   offset address, setAlpha_dfhead frame). Matches this file's own
+   established guard style (see setFloor_nnet() just below). */
 void setAlpha_nnet (NNET n, double alpha)
 {
-	setAlpha_dfhead (n->df, alpha);
+	if (n->ready) setAlpha_dfhead (n->df, alpha);
 }
 
 double getAlpha_nnet (NNET n)
 {
-	return getAlpha_dfhead (n->df);
+	return n->ready ? getAlpha_dfhead (n->df) : 0.0;
 }
 
 void setKnee_nnet (NNET n, double knee_db)
 {
-	setKnee_dfhead (n->df, knee_db);
+	if (n->ready) setKnee_dfhead (n->df, knee_db);
 }
 
 double getKnee_nnet (NNET n)
 {
-	return getKnee_dfhead (n->df);
+	return n->ready ? getKnee_dfhead (n->df) : 0.0;
 }
 
 void setFloor_nnet (NNET n, double floor_db)
