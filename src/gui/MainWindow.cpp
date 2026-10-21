@@ -2263,17 +2263,37 @@ void MainWindow::bringAppletToFront(const QString& id)
             return;
         }
         QWidget* front = m_floatingApplets.value(id, nullptr);
+        QString weg = QStringLiteral("floating");
         if (!front) {
             AppletWidget* a = m_appletsById.value(id, nullptr);
-            if (!a || !m_appletPanel) { return; }
+            if (!a || !m_appletPanel) {
+                qCInfo(lcContainer).nospace()
+                    << "bringAppletToFront(" << id << "): no applet/column";
+                return;
+            }
             QWidget* host = a->window();
             if (host && host != this) {
                 // Die Spalte schwebt selbst (Container-Fenster).
                 front = host;
+                weg = QStringLiteral("container window");
             } else if (appletHiddenInColumn(a)) {
                 detachApplet(a, m_appletPanel->appletPosition(a));
                 front = m_floatingApplets.value(id, nullptr);
+                weg = QStringLiteral("detached");
+            } else {
+                weg = QStringLiteral("in column, counts as visible");
             }
+            // Warum der Weg so ausfiel -- ohne diese Zahlen ist von
+            // aussen nicht zu unterscheiden, ob das Applet fehlt, schon
+            // vorn liegt oder nur fuer verdeckt gehalten wird.
+            qCInfo(lcContainer).nospace()
+                << "bringAppletToFront(" << id << "): " << weg
+                << " appletVisible=" << a->isVisible()
+                << " hidden=" << appletHiddenInColumn(a)
+                << " front=" << (front != nullptr);
+        } else {
+            qCInfo(lcContainer).nospace()
+                << "bringAppletToFront(" << id << "): " << weg;
         }
         if (front) {
             front->show();
@@ -14975,22 +14995,53 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
         m_appletVis->ensureVisible(QStringLiteral("Ft8Decoder"));
     }
 
-    // 5. Und nach VORNE. Sichtbar allein genuegt nicht: steht das Panel
-    //    in einem schwebenden Behaelter, liegt es weiter hinter dem
-    //    Hauptfenster, und der Betreiber drueckt FT8 und sieht nichts.
-    //    Gemeldet 2026-10-21: „wenn ich ft8 oder ft4 klicke muss
-    //    automatisch das panel von digi in den vordergrund kommen".
+    // 5. Und nach VORNE -- mit bringAppletToFront(), nicht mit einem
+    //    eigenen raise().
     //
-    //    Nur anheben, nicht die Tastatur nehmen (activateWindow): wer
-    //    gerade ein Rufzeichen tippt, soll beim Bandwechsel nicht den
-    //    Schreibplatz verlieren. Dasselbe Muster wie
-    //    RotorLogbookPanel::raiseLogbookIfOpen, dort eine Zeile mehr,
-    //    weil das Logbuch auf Zuruf geoeffnet wird und dann auch
-    //    beschrieben werden soll.
-    if (m_ft8Applet && m_ft8Applet->isVisible()) {
-        if (QWidget* fenster = m_ft8Applet->window()) {
-            if (fenster != this && fenster->isVisible()) {
-                fenster->raise();
+    //    Hier stand erst ein handgeschriebenes
+    //    `m_ft8Applet->window()->raise()`. Am Geraet zeigte sich, dass
+    //    das zu wenig ist: der Dekoder liegt in der Spalte des
+    //    Hauptfensters und faellt dort auf Streifenhoehe zusammen --
+    //    sichtbar, angehoben, und trotzdem nur eine Kopfzeile ohne
+    //    Inhalt. Der Betreiber sah am 2026-10-21 genau das („sehe keinen
+    //    decoder", „der muss sofort in den vordergrund treten").
+    //
+    //    bringAppletToFront() kann beides, und es gab es schon: Fenster
+    //    heben, und wenn das Applet in der Spalte verdeckt oder
+    //    zusammengefallen ist, loest es als eigenes Fenster obenauf ab.
+    //    Es ist genau fuer diesen Fall gebaut -- „Einschalten per
+    //    Menue/Plus", und ein Druck auf FT8 ist nichts anderes.
+    bringAppletToFront(QStringLiteral("Ft8Decoder"));
+
+    // 6. PureSignal aus. Betreiber 2026-10-21: „also FT8 würde ich
+    //    vorschlagen, kein pure signal, automatisch aus".
+    //
+    //    Der Grund steht im Signal selbst: FT8 und FT4 sind
+    //    Frequenzumtastung mit KONSTANTER Huellkurve. PureSignal lernt
+    //    seine Kennlinie aber genau aus der Huellkurve -- aus der
+    //    Frage, wie die Endstufe bei kleinen und bei grossen
+    //    Amplituden antwortet. Ohne diese Spanne kommt keine Loesung
+    //    zustande, und die Maschine haelt endlos zurueck: der
+    //    Betreiber sah waehrend des Sendens „PS wartet" in der
+    //    Statuszeile (PsaIndicatorWidget, PsCorrectionAction::Withhold)
+    //    und fragte zu Recht, ob PureSignal hier nicht besser aus sei.
+    //
+    //    Dazu kommt der Preis: eingeschaltet wirft PureSignal beim
+    //    Tasten zwei zusaetzliche 192-kHz-Stroeme an (gemessen:
+    //    cfg.rate[0] und rate[1] gehen von 0 auf 192000). Auf einem
+    //    WLAN, das an diesem Abend zwischen 2 und 12 % Paketverlust
+    //    zeigte, ist das kein Nichts.
+    //
+    //    forceAutoCalDisable() ist der Weg, den Thetis dafuer hat
+    //    (console.cs:43703 ForcePureSignalAutoCalDisable
+    //    [v2.10.3.13]) -- kein eigener Schalter, sondern derselbe, den
+    //    der [PS-A]-Haken umlegt. Wieder EIN schaltet niemand
+    //    automatisch: wer PureSignal in SSB will, drueckt PS-A, und
+    //    das soll eine Entscheidung bleiben, keine Nebenwirkung.
+    if (m_radioModel) {
+        if (PureSignal* ps = m_radioModel->pureSignal()) {
+            if (ps->isAutoCalEnabled()) {
+                ps->forceAutoCalDisable();
             }
         }
     }
