@@ -80,6 +80,15 @@ jobs:
         # sobald irgendwo eine zweite Schreibweise entsteht.
         run: python3 scripts/check-applet-ids.py
 
+      - name: Verify freedv-gui port headers
+        # CLAUDE.md nennt dieses Skript ausdruecklich als Ring-3-Netz
+        # „in CI" -- neben verify-thetis-headers.py und
+        # check-new-ports.py. Es lief aber in KEINEM Workflow: ein
+        # Waechter, den niemand ruft. 14/14 Dateien gruen, das Einhaengen
+        # aendert also nichts am Zustand, nur daran, dass es auffaellt,
+        # wenn sich einer der 14 Koepfe verliert.
+        run: python3 scripts/verify-freedv-headers.py
+
       - name: Verify every test source is registered with CMake
         # tests/CMakeLists.txt wird NICHT geglobbt (Absicht). Preis:
         # wer den Eintrag verliert, verliert den Prueflauf LAUTLOS --
