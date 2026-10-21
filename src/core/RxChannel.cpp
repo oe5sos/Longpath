@@ -1541,17 +1541,71 @@ void RxChannel::setFmsqEnabled(bool enabled)
 #endif
 }
 
+namespace {
+// FM-Rauschsperre: unsere Reglerdaempfung -> Thetis' 0..100 -> WDSP-Schwelle.
+//
+// From Thetis console.cs:47295-47304 [v2.10.3.15]
+//   if (_rx1_dsp_mode == DSPMode.FM) //FM Squelch
+//   //nValue = ptbSquelch.Value; // 0-100
+//   //[2.10.3.5]MW0LGE convert to a 0-100 scale from a -160 to 0 scale
+//   nValue = (int)(((ptbSquelch.Value + 160) / 160f) * 100f);
+//   radio.GetDSPRX(0, 0).FMSquelchThreshold = (float)Math.Pow(10.0, -2.0 * nValue / 100.0);
+// Der zweite Empfaenger macht dasselbe in console.cs:47645-47653.
+//
+// Thetis' Regler laeuft -160..0 und wird auf 0..100 eingedampft; Longpaths
+// SQL-Regler IST die 0..100-Skala (RxApplet), und SliceModel::fmsqThresh
+// haelt sie als Daempfung -0,4*n, also 0 .. -40. Das ist bewusst NICHT
+// Thetis' -160..0: dessen Umrechnung schneidet auf Ganzzahlen ab und ist
+// damit nicht umkehrbar (gemessen am 2026-10-21: Stellung -156,8 kommt
+// als n = 1 heraus, nicht als 2), und gespeicherte Empfangsprofile
+// tragen unsere Zahlen schon.
+constexpr double kFmsqDbPerScaleStep  =   -0.4;   // 100 Schritte auf 40 dB
+constexpr double kFmsqScaleMaximum    =  100.0;
+constexpr double kFmsqExponentScale   =   -2.0;
+constexpr double kFmsqExponentDivisor =  100.0;
+} // namespace
+
+int RxChannel::fmsqScaleValue(double dB)
+{
+    // Thetis' nValue: 0 = Sperre oeffnet am leichtesten, 100 = dichtestes.
+    const double n = dB / kFmsqDbPerScaleStep;
+    return static_cast<int>(std::clamp(std::round(n), 0.0, kFmsqScaleMaximum));
+}
+
+double RxChannel::fmsqThresholdForWdsp(double dB)
+{
+    const int nValue = fmsqScaleValue(dB);
+
+    // From Thetis console.cs:47303-47304 [v2.10.3.15]
+    // //[2.10.3.5]MW0LGE convert to a 0-100 scale from a -160 to 0 scale
+    //   [verbatim aus console.cs:47297 — der Marker gehoert zu dieser Umrechnung]
+    // Thetis engt das Ergebnis auf float ein (die Eigenschaft
+    // FMSquelchThreshold, radio.cs:1278), bevor SetRXAFMSQThreshold es
+    // wieder auf double weitet — dieselbe Verengung hier, damit die Zahl
+    // bitgleich dieselbe ist.
+    return static_cast<double>(static_cast<float>(
+        std::pow(10.0, kFmsqExponentScale * nValue / kFmsqExponentDivisor)));
+}
+
 void RxChannel::setFmsqThresh(double dB)
 {
 #ifdef HAVE_WDSP
-    // From Thetis Project Files/Source/Console/radio.cs:1274-1291
+    // From Thetis Project Files/Source/Console/radio.cs:1278-1291 [v2.10.3.15]
     //   WDSP.SetRXAFMSQThreshold(WDSP.id(thread, subrx), value)
-    //   Thetis fm_squelch_threshold = 1.0f is LINEAR (0..1 scale).
-    //   SliceModel stores in dB domain (m_fmsqThresh = -150.0 default).
-    //   Convert dB → linear before passing to WDSP.
-    //   -150.0 dB → ~3.16e-8 (effectively muted = squelch open on FM)
-    // WDSP third_party/wdsp/src/fmsq.c:244 — assigns threshold directly to tail_thresh (linear)
-    const double linear = std::pow(10.0, dB / 20.0);
+    // WDSP third_party/wdsp/src/fmsq.c legt den Wert als tail_thresh ab und
+    // das 0,9-fache als unmute_thresh; die Sperre OEFFNET, solange der
+    // Rauschmittelwert UNTER unmute_thresh liegt. Eine kleinere Schwelle
+    // heisst also DICHTER, nicht offener.
+    //
+    // Die Zeile hier rechnete bis zum 2026-10-21 `10^(dB/20)` und nannte
+    // das Ergebnis fuer die Vorgabe -150 dB „squelch open" — es war das
+    // Gegenteil: 3,16e-8, siebeneinhalb Skalenpunkte HINTER dem dichtesten
+    // Ende, waehrend der Regler 100 anzeigte. Zusammen mit RxApplets
+    // -0,4*n kam fuer jede Reglerstellung Thetis' Zahl heraus, fuer die
+    // Vorgabe aber nicht, und die FM-Sperre blieb zu, bis der Regler
+    // einmal angefasst wurde. Jetzt steht die Abbildung an EINER Stelle
+    // und quantisiert wie Thetis auf n.
+    const double linear = fmsqThresholdForWdsp(dB);
     SetRXAFMSQThreshold(m_channelId, linear);
 #else
     Q_UNUSED(dB);

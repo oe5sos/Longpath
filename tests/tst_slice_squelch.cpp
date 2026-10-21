@@ -222,11 +222,15 @@ private slots:
     // ── fmsqThresh ───────────────────────────────────────────────────────────
 
     void fmsqThreshDefaultValue() {
-        // SliceModel default -150.0 dB (maps to ~3.16e-8 linear; near squelch open)
-        // Note: Thetis fm_squelch_threshold = 1.0f is linear — conversion happens
-        // in RxChannel::setFmsqThresh via pow(10.0, dB/20.0)
+        // Vorgabe ist das dichteste Ende UNSERER Skala (0 .. -40, also
+        // SQL-Regler 0..100 mal -0,4): -40 dB => n = 100 => Schwelle 0,01.
+        // Das ist Thetis' Vorgabe (ptbSquelch.Value = 0,
+        // console.designer.cs:7578 [v2.10.3.15]) in unseren Zahlen.
+        // Vorher stand hier -150, was ungeklemmt als 3,16e-8 an WDSP ging:
+        // 7,5 Punkte HINTER dem Skalenende, waehrend der Regler 100 zeigte,
+        // und die FM-Sperre blieb zu, bis der Regler angefasst wurde.
         SliceModel s;
-        QCOMPARE(s.fmsqThresh(), -150.0);
+        QCOMPARE(s.fmsqThresh(), -40.0);
     }
 
     void setFmsqThreshStoresValue() {

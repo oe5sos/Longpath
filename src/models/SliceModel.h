@@ -1517,7 +1517,7 @@ private:
     bool   m_amsqEnabled{false};      // Neutral default — feature off at start
     double m_amsqThresh{-150.0};      // From Thetis radio.cs:1164-1165 — rx_squelch_threshold = -150.0f (AM reuses same field)
     bool   m_fmsqEnabled{false};      // Neutral default — feature off at start
-    double m_fmsqThresh{-150.0};      // dB domain (plan default); Thetis radio.cs:1274-1275 stores fm_squelch_threshold = 1.0f on a different (linear 0..1) scale. Scale reconciliation deferred to Stage 2 gate.
+    double m_fmsqThresh{-40.0};       // Daempfung 0 .. -40 (SQL-Regler 0..100 mal -0,4, siehe RxChannel::fmsqThresholdForWdsp). -40 ist das dichteste Ende und entspricht Thetis' Vorgabe: rx1_fm_squelch_threshold_scroll = 0 (console.cs:171 [v2.10.3.15]) bzw. ptbSquelch.Value = 0 (console.designer.cs:7578) => n = 100 => Schwelle 0,01. Die alte Vorgabe -150 lag ausserhalb dieser Skala und schickte 3,16e-8, also 7,5 Punkte HINTER dem dichtesten Ende, waehrend der Regler 100 anzeigte.
     int    m_agcThreshold{-20};       // Thetis default — citation pending Stage 2 gate (no explicit default found in radio.cs AGCThreshold)
     int    m_agcHang{250};            // From Thetis radio.cs:1056-1057 — rx_agc_hang = 250 ms
     int    m_agcSlope{0};             // From Thetis radio.cs:1107-1108 — rx_agc_slope = 0 dB
