@@ -3116,6 +3116,12 @@ longpath_add_test(tst_connection_state)
 longpath_add_test(tst_radio_discovery_probe)
 target_link_libraries(tst_radio_discovery_probe PRIVATE Qt6::Network)
 
+# Der Scan muss die gespeicherten Geräte auch GEZIELT fragen -- sonst
+# bleiben Geräte in einem anderen Subnetz unsichtbar (ANVELINA PRO 3,
+# 2026-10-21). Siehe den Kopf der Datei.
+longpath_add_test(tst_scan_fragt_gespeicherte_geraete)
+target_link_libraries(tst_scan_fragt_gespeicherte_geraete PRIVATE Qt6::Network)
+
 # ── 2026-09-09: quietPollAttempt() deadline safety net ────────────────────────
 # 3 tests: a flooded loopback socket (always "readable") still terminates via
 # the QDeadlineTimer bound instead of hanging (the actual CI-only 120s GUI
