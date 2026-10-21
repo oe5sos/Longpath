@@ -280,6 +280,12 @@ bool AppSettings::isSandbox()
     return !qEnvironmentVariable("LONGPATH_CONFIG_DIR").trimmed().isEmpty();
 }
 
+bool AppSettings::darfVonSelbstVerbinden()
+{
+    // Siehe die Begruendung am Kopf dieser Funktion in AppSettings.h.
+    return !isSandbox();
+}
+
 QString AppSettings::resolveSettingsPath(const QString& profile)
 {
     return resolveConfigDir(profile) + QStringLiteral("/") + appFileBaseName()

@@ -8,6 +8,9 @@
 // Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-10-21 — Eine Sonde bleibt offline: ein isolierter Lauf startet
+//                 rotctld nicht von selbst. Martin Fischer,
+//                 KI-gestuetzt ueber Anthropic Claude.
 //   2026-08-10 — workSpot() entry point for "Turn rotor to <call>" from
 //                 the Spot Hub. Enter in the callsign field now only
 //                 looks the station up (it used to also start the
@@ -778,7 +781,14 @@ void RotorLogbookPanel::buildUi()
     // Longpath jetzt von selbst -- nur lesen, nie drehen. Ist der Rotor
     // nicht erreichbar (anderes Netz, ausgeschaltet), steht das in der
     // Statuszeile, und Logbuch und Radar zeigen "not connected".
-    if (AppSettings::instance().value(kRotorConnectOnStartKey, QStringLiteral("False"))
+    //
+    // Eine Sonde bleibt offline (2026-10-21): ein isolierter Lauf
+    // startet hier sonst `rotctld` als eigenen Prozess und verbindet
+    // sich mit dem Rotor des Betreibers -- gemessen. Siehe
+    // AppSettings::darfVonSelbstVerbinden(). Von Hand (Rotor... ->
+    // Connect) geht es in der Sonde weiter.
+    if (AppSettings::darfVonSelbstVerbinden()
+        && AppSettings::instance().value(kRotorConnectOnStartKey, QStringLiteral("False"))
             .toString() == QStringLiteral("True")) {
         QTimer::singleShot(1500, this, [this]() {
             QString err;
