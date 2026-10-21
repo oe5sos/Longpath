@@ -58,6 +58,7 @@
 // =================================================================
 
 #include "core/WdspTypes.h"
+#include "core/DigiFrequenzen.h"
 #include "models/Band.h"
 
 #include <QList>
@@ -89,6 +90,15 @@ signals:
     /// Aus dem Schnellregler heraus: die Einstellungsseite dieser
     /// Rauschminderung oeffnen. Wird vom MainWindow verdrahtet.
     void openNrSetupRequested(Longpath::NrSlot slot);
+
+    /// „Digital" gewaehlt: Betriebsart, Anrufstelle, Filter und das
+    /// Dekoderfenster sollen sich selbst stellen.
+    ///
+    /// Betreiber am 2026-10-21 vor der Antenne: „ich will nicht die
+    /// freq suchen", „quasi wie jtdx". Die Leiste weiss nur, WAS
+    /// gewuenscht ist; das Herrichten gehoert MainWindow, weil es
+    /// Scheibe, Filter und die Fensterverwaltung zugleich braucht.
+    void digiRequested(Longpath::DigiFrequenzen::Digimodus modus);
 
 public:
     explicit CommandBar(QWidget* parent = nullptr);

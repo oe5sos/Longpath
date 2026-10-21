@@ -4814,6 +4814,8 @@ void MainWindow::buildUI()
             [this](Longpath::Band band) {
         if (m_radioModel) { m_radioModel->onBandButtonClicked(band); }
     });
+    connect(m_commandBar, &CommandBar::digiRequested, this,
+            &MainWindow::aufDigiStellen);
     auto* centre = new QWidget(this);
 
     // Profilschiene: seit dem 2026-10-06 WAAGRECHT in der Kommandoleiste,
@@ -14873,6 +14875,65 @@ QList<QRect> MainWindow::schutzrahmen() const
         if (unten.isValid()) { sperren << unten; }
     }
     return sperren;
+}
+
+// ── Digital in einem Griff ───────────────────────────────────────────
+//
+// Betreiber am 2026-10-21, mit der Antenne schon am Geraet: „ich will,
+// sobald ich auf ft8 klicke, dass alles automatisch funktioniert",
+// „ich will nicht die freq suchen", „quasi wie jtdx".
+//
+// Vorher brauchte es drei Handgriffe in drei verschiedenen Ecken --
+// Betriebsart auf DIGU, Skala auf die Anrufstelle, Filter weit --, und
+// erst danach war der Dekoder ueberhaupt anwaehlbar. Wer einen davon
+// vergass, sah ein graues „FT8 Decoder OFF" und keinen Hinweis darauf,
+// was fehlt. Das ist keine Bedienung, das ist eine Bastelanleitung.
+//
+// Vier Schritte, und jeder fasst nur an, was noetig ist:
+void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
+{
+    SliceModel* slice = m_radioModel ? m_radioModel->activeSlice() : nullptr;
+    if (!slice) { return; }
+
+    // 1. Betriebsart. FT8 und FT4 laufen im oberen Seitenband -- so
+    //    fuehren WSJT-X und JTDX die Anrufstellen, und so stehen die
+    //    Zahlen in DigiFrequenzen.
+    if (slice->dspMode() != DSPMode::DIGU) {
+        slice->setDspMode(DSPMode::DIGU);
+    }
+
+    // 2. Die Anrufstelle des Bandes, auf dem er GERADE steht. Kein
+    //    Bandwechsel: wer auf 20 m ist, will FT8 auf 20 m.
+    //
+    //    Steht die Skala schon auf einer Anrufstelle, bleibt sie --
+    //    sonst risse ein zweiter Druck auf denselben Knopf jemanden
+    //    weg, der sich absichtlich danebengestellt hat. Und gibt es
+    //    fuer das Band keine (60 m kennt kein FT4, GEN gar nichts),
+    //    bleibt sie ebenfalls: lieber stehenbleiben als irgendwohin
+    //    stellen.
+    const double jetztHz = slice->frequency();
+    if (!DigiFrequenzen::stehtSchonDort(qint64(jetztHz), modus)) {
+        const Band band = bandFromFrequency(jetztHz);
+        const qint64 ziel = DigiFrequenzen::anruffrequenz(band, modus);
+        if (ziel > 0) { slice->setFrequency(double(ziel)); }
+    }
+
+    // 3. Das Filter. Der Dekoder sieht 0 bis 3000 Hz an; ein
+    //    CW-Filter von 400 Hz schneidet ihm neun Zehntel davon weg.
+    //    Die untere Kante bleibt bei 200 Hz -- darunter steht nur
+    //    Netzbrumm, und kein FT8-Ton liegt dort.
+    constexpr int kDigiTiefHz = 200;
+    constexpr int kDigiHochHz = 3000;
+    if (slice->filterLow() != kDigiTiefHz)  { slice->setFilterLow(kDigiTiefHz); }
+    if (slice->filterHigh() != kDigiHochHz) { slice->setFilterHigh(kDigiHochHz); }
+
+    // 4. Das Fenster. Die Freigabe stellt die Modusachse gleich selbst
+    //    (rebindRttyRadeAvailability), aber SICHTBAR wird es davon
+    //    nicht -- das ist die Nutzerspalte, und die steht womoeglich
+    //    noch aus einer Sitzung ohne Digital auf „aus".
+    if (m_appletVis) {
+        m_appletVis->setVisible(QStringLiteral("Ft8Decoder"), true);
+    }
 }
 
 void MainWindow::schutzrahmenNachziehen()

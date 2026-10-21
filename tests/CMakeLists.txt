@@ -5412,6 +5412,13 @@ longpath_add_test(tst_scheibenflagge)
 # 2026-10-15: FT8/FT4 nativ — Nachricht hin, Nachricht zurueck, ohne
 # Tondatei und ohne Funkgeraet.
 longpath_add_test(tst_ft8_dekodiert)
+# 2026-10-21: wo FT8 und FT4 auf jedem Band liegen -- „ich will nicht
+# die freq suchen". Reine Tafel, ohne Fenster und ohne Funkgeraet.
+longpath_add_test(tst_digi_frequenzen)
+# 2026-10-21: und dass EIN Druck auf FT8 das Geraet wirklich
+# herrichtet -- Modus, Anrufstelle, Filter, Fenster. Mit Fenster,
+# darum nicht APPLESS.
+longpath_add_test(tst_digi_in_einem_griff)
 # 2026-10-15: FT8 am laufenden Ton — die Fenstergrenze ist der Punkt.
 longpath_add_test(tst_ft8_am_ton)
 # 2026-10-15: die Sendeseite, geschlossene Schleife — Text hinein,

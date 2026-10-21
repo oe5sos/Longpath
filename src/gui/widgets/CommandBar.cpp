@@ -516,6 +516,25 @@ void CommandBar::buildModeGroup(QHBoxLayout* row)
     // Leiste würde lügen.
     addOverflow(g, m_allModes,
                 [this](DSPMode m) { pushModeToModel(m); });
+
+    // ── FT8 und FT4 als eigene Pillen ────────────────────────────────
+    //
+    // Betreiber am 2026-10-21, vor der Antenne stehend: „ich will,
+    // sobald ich auf ft8 klicke, dass alles automatisch funktioniert",
+    // „ich will nicht die freq suchen", „quasi wie jtdx".
+    //
+    // Es sind strenggenommen keine Betriebsarten des Geraets -- das
+    // Geraet steht dabei auf DIGU. Sie stehen trotzdem HIER, weil der
+    // Bediener sie genau so sucht: neben LSB und CWL, nicht in einem
+    // Menue unter einem anderen Namen. Was dahinter geschieht (Modus,
+    // Anrufstelle, Filter, Dekoderfenster), richtet MainWindow her.
+    for (const auto& eintrag : {
+             std::pair{QStringLiteral("FT8"), DigiFrequenzen::Digimodus::Ft8},
+             std::pair{QStringLiteral("FT4"), DigiFrequenzen::Digimodus::Ft4}}) {
+        QPushButton* b = addPill(g, eintrag.first);
+        connect(b, &QPushButton::clicked, this,
+                [this, modus = eintrag.second]() { emit digiRequested(modus); });
+    }
 }
 
 void CommandBar::buildBandGroup(QHBoxLayout* row)
