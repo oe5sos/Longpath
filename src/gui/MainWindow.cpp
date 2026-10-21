@@ -591,6 +591,10 @@ void catSetzeSperre(Longpath::SliceModel* sl, bool an)
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , m_radioModel(new RadioModel(this))
+    // Solange der Aufbau laeuft, platziert das Programm -- es zieht
+    // nicht. Siehe m_aufbauBewegung in MainWindow.h; abgelegt wird die
+    // Marke an derselben Stelle, an der m_fensterAufbauFertig wahr wird.
+    , m_aufbauBewegung(std::make_unique<EigeneBewegung>())
 {
     // ── 2026-08-10: WSJT-X auto-logging ──────────────────────────────
     // When WSJT-X logs a QSO it broadcasts the finished ADIF record;
@@ -9690,7 +9694,10 @@ void MainWindow::populateDefaultMeter()
         // Ab hier zaehlt eine Fensterbewegung als Ziehen. Nicht sofort:
         // showMaximized() loest selbst noch Bewegungen aus, und die
         // Container folgen in derselben Runde.
-        QTimer::singleShot(0, this, [this]() { m_fensterAufbauFertig = true; });
+        QTimer::singleShot(0, this, [this]() {
+            m_fensterAufbauFertig = true;
+            m_aufbauBewegung.reset();
+        });
 
         // ── Den Schutzrahmen EINMAL nach dem Aufbau anwenden ─────────
         //

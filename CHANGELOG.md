@@ -37,6 +37,41 @@ Variable muessen die Dienste starten wie bisher), und die Gegenprobe ist
 dreifach gefahren: Wache ausgebaut, Wache immer an, und die
 Waechter-Ausnahme ausgebaut — jedes Mal fiel genau der dazugehoerige
 Fall.
+### Zwei Punkte Luft zwischen den Fenstern
+
+Betreiber, 2026-10-15: „der pixelabstand automatisch zu allen fenstern
+ist nicht da", und zum Mass: „ein minimaler automatischer Abstand,
+vielleicht 2 pixel. x und y."
+
+Das Einrasten gibt ihn nicht her. Es rundet jede Kante fuer sich, und
+zwei Fenster, deren gemeinsame Kante auf derselben Rasterlinie landet,
+stossen danach **buendig** aneinander — seit das Raster am 2026-10-20 auf
+16 Punkte ging, haeufiger als vorher. Jetzt rueckt ein Fenster, das beim
+Ziehen einem Nachbarn zu nah kommt, auf dieselben zwei Punkte auf, die
+im Hauptfenster zwischen den Feldern stehen.
+
+Der Abstand stand am 2026-10-15 schon einmal im Baum und musste am
+selben Abend wieder heraus — Martins Bild dazu: „warum ist das alles
+verstellt". Er lief bei **jedem** Lageereignis, also auch waehrend das
+Layoutprofil seine Fenster setzt; dort liegen Fenster fuer einen Moment
+uebereinander, und er schob sie auseinander. Was damals fehlte, war der
+Zustand „der Bediener zieht gerade". Den gibt es seit #280, und er ist
+jetzt zweifach: `LayoutProfiles::runApply()` — der Trichter jeder
+Profilanwendung, ob Wechsel, Start oder Import — und der ganze
+Fensteraufbau halten die Marke `EigeneBewegung`, und zusaetzlich zaehlt
+erst die dritte Lagemeldung eines Fensters als Zug. Ein Platzieren
+bewegt ein Fenster einmal, ein Zug am Titelbalken dutzendmal.
+
+Und eine Schwelle, gemessen statt geraten: korrigiert wird nur rund um
+die Beruehrung, hoechstens eine halbe Rasterzelle tief. In Martins
+eigener Anordnung liegen „Asr" und „Frequency" um genau 16 Punkte
+uebereinander — eine groessere Schwelle haette dieses Paar beim ersten
+Zug um 18 Punkte auseinandergerissen.
+
+Der Prueflauf fuehrt beide Faelle gegeneinander, und die Gegenprobe ist
+gefahren: ohne den Abstand faellt „beim Ziehen rueckt es auf", mit dem
+Abstand aber ohne das Tor — der Fassung vom 15.10. — faellt „das
+Platzieren verstellt nichts".
 
 ## [0.8.0] - 2026-10-20
 
