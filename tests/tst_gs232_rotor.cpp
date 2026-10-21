@@ -20,6 +20,8 @@
 
 #include "core/AppSettings.h"
 #include "core/Gs232Rotor.h"
+
+#include <cmath>
 #include "gui/widgets/RotorLogbookPanel.h"
 
 using namespace Longpath;
@@ -339,6 +341,61 @@ private slots:
 
         s.setValue(QStringLiteral("Rotor/Host"), QString{});
         s.setValue(QStringLiteral("Rotor/Backend"), vorher);
+    }
+
+    // ── Ein Fahrbefehl am ECHTEN Rotor ──────────────────────────────
+    //
+    // Braucht ZWEI Schalter: LONGPATH_GS232_HOST (wie der Lesetest) und
+    // zusätzlich LONGPATH_GS232_MOVE=1. Ohne den zweiten passiert hier
+    // nichts — dieser Lauf dreht eine echte Antenne, und das darf nicht
+    // aus Versehen geschehen.
+    //
+    // Er fährt fünf Grad weiter und danach auf den Ausgangswert zurück.
+    // Fünf Grad, weil es messbar ist und innerhalb jeder Keule liegt;
+    // zurück, weil die Antenne danach stehen soll, wo sie stand.
+    void fahrbefehl_am_echten_geraet()
+    {
+        const QByteArray host = qgetenv("LONGPATH_GS232_HOST");
+        if (host.isEmpty() || qEnvironmentVariableIntValue("LONGPATH_GS232_MOVE") != 1) {
+            QSKIP("kein LONGPATH_GS232_MOVE=1 — es wird nichts gedreht");
+        }
+        const quint16 port = static_cast<quint16>(
+            qEnvironmentVariableIntValue("LONGPATH_GS232_PORT") ?: 4001);
+
+        Gs232Rotor rotor;
+        rotor.setNetworkTarget(QString::fromLatin1(host), port);
+        QSignalSpy lage(&rotor, &Gs232Rotor::positionChanged);
+        rotor.connectToRotor();
+        QTRY_VERIFY_WITH_TIMEOUT(rotor.hasFreshPosition(), 8000);
+
+        const double start = rotor.azimuth();
+        const double ziel  = std::fmod(start + 5.0 + 360.0, 360.0);
+        qInfo() << "Rotor steht auf" << start << "Grad, fahre auf" << ziel;
+
+        auto wartetBis = [&](double soll) {
+            QElapsedTimer uhr; uhr.start();
+            while (uhr.elapsed() < 90000) {
+                QTest::qWait(500);
+                double d = std::fabs(rotor.azimuth() - soll);
+                if (d > 180.0) { d = 360.0 - d; }
+                if (d <= 2.0) { return true; }
+            }
+            return false;
+        };
+
+        rotor.moveTo(ziel);
+        const bool angekommen = wartetBis(ziel);
+        qInfo() << "nach dem Fahrbefehl:" << rotor.azimuth() << "Grad";
+
+        // Zurueck, auch wenn der Hinweg misslang -- die Antenne gehoert
+        // dem Betreiber, nicht dem Prueflauf.
+        rotor.moveTo(start);
+        const bool zurueck = wartetBis(start);
+        qInfo() << "zurueck auf:" << rotor.azimuth() << "Grad";
+
+        rotor.disconnectFromRotor();
+        QVERIFY2(angekommen, "der Rotor hat das Ziel nicht erreicht");
+        QVERIFY2(zurueck, "der Rotor ist nicht auf den Ausgangswert zurueck");
     }
 
     void beschreibung_sagt_die_schnittstelle()
