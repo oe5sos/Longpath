@@ -336,8 +336,24 @@ public:
     int agcHangThreshold() const { return m_agcHangThreshold.load(); }
     void setAgcHangThreshold(int val);
 
+    // Die Fixed Gain (AGC Off), mit der ein neuer Kanal anfaengt, in dB.
+    // WdspEngine saet sie bei JEDEM Oeffnen in WDSP, weil WDSPs eigene
+    // Vorgabe eine andere ist (fixed_gain 1000.0 = 60 dB,
+    // third_party/wdsp/src/rxa.c:382) und setAgcFixedGain einen Wert
+    // gleich dem gecachten ueberspringt.
+    // From Thetis Project Files/Source/Console/setup.designer.cs:39320 [v2.10.3.13]
+    //   udDSPAGCFixedGaindB.Value = 20
+    static constexpr int kDefaultAgcFixedGainDb = 20;
+
     int agcFixedGain() const { return m_agcFixedGain.load(); }
     void setAgcFixedGain(int dB);
+
+    // Die AGC Max Gain, mit der ein neuer Kanal anfaengt, in dB. Ebenfalls
+    // bei jedem Oeffnen gesaet: WDSPs Vorgabe ist max_gain 10000.0 = 80 dB
+    // (third_party/wdsp/src/rxa.c:380), Thetis faehrt 90.
+    // From Thetis Project Files/Source/Console/setup.designer.cs:39245 [v2.10.3.13]
+    //   udDSPAGCMaxGaindB.Value = 90
+    static constexpr int kDefaultAgcMaxGainDb = 90;
 
     int agcMaxGain() const { return m_agcMaxGain.load(); }
     void setAgcMaxGain(int dB);
@@ -629,11 +645,12 @@ public:
     void setAmsqThresh(double dB);
 
     // Squelch — FM (WDSP FMSQ module)
-    // From Thetis Project Files/Source/Console/radio.cs:1274-1329
-    // WDSP: third_party/wdsp/src/fmsq.c:236,244
-    // threshold: linear 0..1 (Thetis fm_squelch_threshold = 1.0f, NOT dB)
-    // SliceModel m_fmsqThresh{-150.0} is in dB and must be converted:
-    //   linear = pow(10.0, dB / 20.0)
+    // From Thetis Project Files/Source/Console/radio.cs:1274-1329 [v2.10.3.15]
+    // WDSP: third_party/wdsp/src/fmsq.c — nimmt eine LINEARE Schwelle
+    // (Thetis fm_squelch_threshold = 1.0f, nicht dB).
+    // SliceModel::fmsqThresh haelt die Daempfung 0 .. -40 (Longpaths
+    // SQL-Regler 0..100 mal -0,4); setFmsqThresh schickt
+    // fmsqThresholdForWdsp(dB), das wie Thetis auf n quantisiert.
     bool fmsqEnabled() const { return m_fmsqEnabled.load(); }
     void setFmsqEnabled(bool enabled);
     /// Die CTCSS-Kerbe beim Empfang auf den gewaehlten Ton (2026-09-27).
@@ -646,7 +663,16 @@ public:
     /// -> SetRXAFMDeviation, Voreinstellung 5000.0.
     void setFmDeviation(double hz);
     double fmDeviationForTest() const { return m_fmDeviationHz; }
-    void setFmsqThresh(double dB);  // converts dB → linear before WDSP call
+    void setFmsqThresh(double dB);  // Daempfung 0 .. -40, fuer WDSP abgebildet
+    /// Thetis' 0..100-Zahl zu unserer Daempfung: n = -dB / 0,4 (0 =
+    /// oeffnet am leichtesten, 100 = dichtestes).
+    static int fmsqScaleValue(double dB);
+    /// Die Schwelle, die setFmsqThresh an SetRXAFMSQThreshold gibt:
+    /// 10^(-2n/100), also 1,0 bei 0 dB und 0,01 bei -40 dB.
+    /// From Thetis console.cs:47303-47304 [v2.10.3.15].
+    /// //[2.10.3.5]MW0LGE convert to a 0-100 scale from a -160 to 0 scale
+    ///   [verbatim aus console.cs:47297 — Marker dieser Umrechnung]
+    static double fmsqThresholdForWdsp(double dB);
 
     // --- Empfangs-Equalizer (WDSP eqp, RXA-Durchlauf) ------------------------
     //
@@ -1201,9 +1227,9 @@ private:
     // hangThreshold: From Thetis v2.10.3.13 setup.designer.cs:39418
     std::atomic<int> m_agcHangThreshold{0};
     // fixedGain: From Thetis v2.10.3.13 setup.designer.cs:39320
-    std::atomic<int> m_agcFixedGain{20};
+    std::atomic<int> m_agcFixedGain{kDefaultAgcFixedGainDb};
     // maxGain: From Thetis v2.10.3.13 setup.designer.cs:39245
-    std::atomic<int> m_agcMaxGain{90};
+    std::atomic<int> m_agcMaxGain{kDefaultAgcMaxGainDb};
 
     // ----- NR state (Sub-epic C-1) -----
     // From Thetis console.cs:43297-43450 SelectNR() [v2.10.3.13]
