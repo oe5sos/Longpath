@@ -7910,6 +7910,14 @@ longpath_add_test(tst_puresignal3_kette)
 #   Zeile und alles, was keine ist.
 longpath_add_test(tst_gs232_rotor)
 
+# tst_rotor_ohne_rotctld: der eigene GS-232-Treiber darf kein rotctld
+#   starten. Am 2026-10-21 am Geraet aufgefallen -- die App war ueber den
+#   eigenen Treiber verbunden UND hatte daneben rotctld auf denselben
+#   Netzserver gelegt; weil der Port bei jedem Start neu vergeben wird,
+#   sammelten sich drei Instanzen an. Mit Gegenprobe, dass der
+#   rotctld-Weg unveraendert erreichbar bleibt.
+longpath_add_test(tst_rotor_ohne_rotctld)
+
 # tst_ps3_entwurfsblaetter: kein Pruefstand, ein Zeichenwerkzeug -- rendert
 #   das ECHTE PsForm in drei Fassungen als Entwurfsblaetter (144 dpi), damit
 #   der Betreiber am Bild entscheidet, was mit den fuenf Reglern geschieht,
