@@ -105,9 +105,9 @@ private slots:
         const auto knoepfe = applet.findChildren<QPushButton*>();
         int zahnraeder = 0;
         for (QPushButton* b : knoepfe) {
-            if (b->text() == QStringLiteral("\u2699")) {
+            if (b->text() == QStringLiteral("...")) {
                 ++zahnraeder;
-                qInfo() << "Zahnrad:" << b->geometry() << "sichtbar"
+                qInfo() << "Optionsknopf:" << b->geometry() << "sichtbar"
                         << b->isVisible() << "Elternteil"
                         << (b->parentWidget() ? b->parentWidget()->metaObject()->className() : "-");
             }

@@ -157,8 +157,26 @@ void Ft8Applet::buildUI()
     // oben im Panelkopf.
     QWidget* leiste = appletTitleBar(QStringLiteral("FT8 DECODER"));
     if (auto* kopf = qobject_cast<QHBoxLayout*>(leiste->layout())) {
-        auto* zahnrad = new QPushButton(QStringLiteral("\u2699"), leiste);
-        zahnrad->setFixedSize(20, 18);
+        // Der Knopf traegt "...", nicht ⚙ (2026-10-21).
+        //
+        // Hergeleitet, nicht geraten: eine Probe mit magenta Hintergrund
+        // zeigte, dass der Knopf GEZEICHNET wird -- 176 Bildpunkte an
+        // der richtigen Stelle -- nur sein Zeichen nicht. Weder ⚙
+        // (U+2699) noch ⋯ (U+22EF) kommen an; die Schrift dieser Taste
+        // kennt sie nicht, obwohl das ⋮⋮ des Griffs daneben (ein QLabel,
+        // keine Taste) anstandslos erscheint.
+        //
+        // "..." ist ausserdem die Form, die in der Kommandoleiste schon
+        // fuer "mehr davon" steht (Band, Mode, Filter). Die Stelle --
+        // rechts oben im Panelkopf -- ist die Regel des Betreibers, das
+        // Zeichen war es nie.
+        auto* zahnrad = new QPushButton(QStringLiteral("..."), leiste);
+        // 16x14 wie der geteilte Optionsknopf in GridCellWidget: die
+        // Kopfzeile ist kTitleBarH = 16 Punkte hoch, ein 18 Punkte
+        // hoher Knopf passt NICHT hinein und wurde am 2026-10-21
+        // schlicht nicht gezeichnet.
+        zahnrad->setFixedSize(26, 15);
+        zahnrad->setCursor(Qt::PointingHandCursor);
         zahnrad->setToolTip(tr("Callsign and grid square"));
         zahnrad->setStyleSheet(QStringLiteral(
             // Ruhend in der Schrift der Kopfzeile, nicht in der des
@@ -167,7 +185,7 @@ void Ft8Applet::buildUI()
             // da, an der richtigen Stelle, sichtbar laut Qt, und doch
             // unsichtbar. Beim Zeigen das Blau des Hauses: anfassbar.
             "QPushButton { color: %1; background: transparent;"
-            " border: none; font-size: 13px; }"
+            " border: none; font-size: 14px; font-weight: bold; }"
             "QPushButton:hover { color: %2; }")
             .arg(Style::kTitleText, Style::kAccent));
         connect(zahnrad, &QPushButton::clicked, this,
