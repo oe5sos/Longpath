@@ -259,11 +259,20 @@ private slots:
         m_mw->setSideAreaEnabledForTest(true);
         SideAreaWindow* area = m_mw->sideAreaForTest();
         QVERIFY(area);
-        // Rasterfeste Werte (2026-09-26): Fenster rasten jetzt an allen
-        // vier Kanten auf 8 px ein, krumme Werte (900/330) zog das
-        // Raster nach dem Setzen auf 904/328.
-        constexpr int kAreaW = 328;
-        area->setGeometry(904, 104, kAreaW, 496);
+        // Rasterfeste Werte (2026-09-26, auf 16 umgerechnet am
+        // 2026-10-20): Fenster rasten an allen vier Kanten ein, krumme
+        // Werte zieht das Raster nach dem Setzen zurecht. Alle vier
+        // Kanten hier sind durch kSnapGridPx teilbar (896 = 56·16,
+        // 96 = 6·16, rechts 1232 = 77·16, unten 608 = 38·16), damit
+        // nichts nachwandert und die Rechnung unten aufgeht.
+        //
+        // Mit der alten Weite 8 standen hier 904/104/328/496. Dieselben
+        // Zahlen ergaben mit 16 ein Nachrasten von 904 auf 912 und
+        // damit eine um 8 schmalere Flaeche -- der Lauf meldete 1080
+        // statt 1088. Nicht die Erwartung ist falsch gewesen, sondern
+        // die Eingangswerte.
+        constexpr int kAreaW = 336;
+        area->setGeometry(896, 96, kAreaW, 512);
 
         auto* stack = m_mw->findChild<PanadapterStack*>();
         auto* pan = m_mw->findChild<PanadapterApplet*>();
@@ -273,7 +282,7 @@ private slots:
         QTest::qWait(300);
         PanFloatingWindow* win = stack->floatingWindowForTest(pan->panId());
         QVERIFY(win);
-        win->setGeometry(96, 152, 800, 304);   // rechter Rand 896: 8 px Luft
+        win->setGeometry(96, 144, 784, 304);   // rechter Rand 880: 16 px Luft
         QTest::qWait(50);
         const int w0 = win->width();
 
@@ -283,10 +292,10 @@ private slots:
         QCOMPARE(win->width(), w0);
 
         // Ein Panadapter, der NICHT angrenzt, bleibt, wie er ist.
-        win->setGeometry(96, 152, 600, 304);
+        win->setGeometry(96, 144, 592, 304);   // rechter Rand 688: weit weg
         QTest::qWait(50);
         area->setCollapsed(true);
-        QCOMPARE(win->width(), 600);
+        QCOMPARE(win->width(), 592);
         area->setCollapsed(false);
 
         // Wieder andocken: ein beim Abbau noch schwebender Panadapter
