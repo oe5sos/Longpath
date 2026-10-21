@@ -251,6 +251,8 @@ private:
     void setActive(Group& g, const QString& label);
 
     void buildModeGroup(QHBoxLayout* row);
+    void buildDigiGroup(QHBoxLayout* row);
+    void aktualisiereDigiLampe();
     void buildStepGroup(QHBoxLayout* row);
 
     // ── Filter und Rauschminderung, 2026-08-21 ───────────────────────

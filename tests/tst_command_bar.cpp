@@ -230,13 +230,50 @@ private slots:
         const QStringList g = bar.groups();
         // RATE kam am 2026-09-24 dazu, "neben NR usw.": keine Wahl, eine
         // Anzeige -- darum ganz ans Ende.
-        QCOMPARE(g.size(), 6);
+        // DIGI kam am 2026-10-21 dazu, auf Ansage des Betreibers vor
+        // der Antenne („ich will nicht die freq suchen", „quasi wie
+        // jtdx") -- und zwar NEBEN Mode, nicht darin: die Leiste zeigt
+        // je Gruppe genau drei Pillen, und FT8/FT4 sind ohnehin keine
+        // Betriebsarten des Geraets, sondern eine Anrufstelle samt
+        // Dekoder ueber DIGU.
+        QCOMPARE(g.size(), 7);
         QCOMPARE(g.at(0), QStringLiteral("Band"));
         QCOMPARE(g.at(1), QStringLiteral("Mode"));
-        QCOMPARE(g.at(2), QStringLiteral("Filter"));
-        QCOMPARE(g.at(3), QStringLiteral("Step"));
-        QCOMPARE(g.at(4), QStringLiteral("NR"));
-        QCOMPARE(g.at(5), QStringLiteral("Rate"));
+        QCOMPARE(g.at(2), QStringLiteral("Digi"));
+        QCOMPARE(g.at(3), QStringLiteral("Filter"));
+        QCOMPARE(g.at(4), QStringLiteral("Step"));
+        QCOMPARE(g.at(5), QStringLiteral("NR"));
+        QCOMPARE(g.at(6), QStringLiteral("Rate"));
+    }
+
+    // ── DIGI leuchtet nur, wenn es wirklich laeuft ───────────────────
+    void digiLeuchtetNurAufDerAnrufstelle()
+    {
+        // Ein Knopf, der schon bei DIGU angeht, luegt: in DIGU sitzt
+        // man auch auf PSK oder Olivia. Angehen darf er, wenn beides
+        // stimmt -- Datenmodus UND Anrufstelle.
+        SliceModel slice;
+        CommandBar bar;
+        bar.attach(&slice);
+
+        slice.setDspMode(DSPMode::USB);
+        slice.setFrequency(14'074'000.0);
+        QVERIFY2(bar.activePill(QStringLiteral("Digi")).isEmpty(),
+                 "leuchtet in SSB, nur weil die Frequenz passt");
+
+        slice.setDspMode(DSPMode::DIGU);
+        slice.setFrequency(14'200'000.0);
+        QVERIFY2(bar.activePill(QStringLiteral("Digi")).isEmpty(),
+                 "leuchtet in DIGU, obwohl weit weg von jeder Stelle");
+
+        slice.setFrequency(14'074'000.0);
+        QCOMPARE(bar.activePill(QStringLiteral("Digi")),
+                 QStringLiteral("FT8"));
+
+        // Gleiches Band, andere Stelle -- und die Leiste sagt es.
+        slice.setFrequency(14'080'000.0);
+        QCOMPARE(bar.activePill(QStringLiteral("Digi")),
+                 QStringLiteral("FT4"));
     }
 
     // ── RATE ─────────────────────────────────────────────────────────
@@ -365,7 +402,13 @@ private slots:
         // RATE ist ebenfalls ausgenommen: sie ist eine Anzeige, keine
         // Wahl, und hat gar keine Pillen (2026-09-24).
         for (const QString& g : bar.groups()) {
-            if (g == QStringLiteral("NR") || g == QStringLiteral("Rate")) { continue; }
+            // DIGI ist aus demselben Grund ausgenommen wie NR: es
+            // gibt einen Aus-Zustand. Wer SSB faehrt, macht weder FT8
+            // noch FT4 — zu verlangen, dass dort immer eine Pille
+            // leuchtet, hiesse zu verlangen, dass immer ein
+            // Datenmodus laeuft (2026-10-21).
+            if (g == QStringLiteral("NR") || g == QStringLiteral("Rate")
+                || g == QStringLiteral("Digi")) { continue; }
             int lit = 0;
             for (const QString& p : bar.pillsIn(g)) {
                 if (bar.activePill(g) == p) { ++lit; }
