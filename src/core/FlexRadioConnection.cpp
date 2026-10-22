@@ -235,6 +235,13 @@ QString setSliceFilterCommand(const QString& sliceId, int lowHz, int highHz)
         .arg(sliceId).arg(lowHz).arg(highHz);
 }
 
+QString setPanCenterCommand(const QString& panId, double hz)
+{
+    if (panId.isEmpty() || !(hz > 0.0)) { return QString(); }
+    return QStringLiteral("display pan set %1 center=%2")
+        .arg(panId).arg(hz / 1.0e6, 0, 'f', 6);
+}
+
 QString normalizedFlexId(QString text)
 {
     text = text.trimmed();

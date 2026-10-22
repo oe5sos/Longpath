@@ -2879,6 +2879,11 @@ signals:
                                double lowFreqMhz, double highFreqMhz,
                                quint32 autoBlackLevel);
     // Ton: float32 Stereo verschraenkt, 24 kHz (gemessen 24 012,3 Hz).
+    /// Der Ausschnitt, den die Maschine fuer ihren Panadapter angibt
+    /// (Hertz). Massgeblich fuer die FFT-Bins — NICHT die Breite der
+    /// Wasserfallkachel, die ihren eigenen Rand hat.
+    void flexAusschnittGeaendert(double tiefHz, double hochHz);
+
     void flexAudioSamplesReady(quint32 streamId,
                                const QVector<float>& interleavedStereo);
 
@@ -3669,6 +3674,11 @@ private:
     double               m_flexZuletztGestellteHz{0.0};
     /// Dasselbe fuer Betriebsart und Filterflanken.
     QString              m_flexZuletztGestellteArt;
+    /// Der Ausschnitt, den die Wasserfallkachel zuletzt meldete
+    /// (Hertz). `tuneFlexSlice` erkennt daran, wann die Scheibe aus
+    /// dem Bild laeuft.
+    double               m_flexAusschnittTiefHz{0.0};
+    double               m_flexAusschnittHochHz{0.0};
     /// Nachzutragen, solange die Scheibennummer der Maschine fehlt.
     DSPMode              m_flexArtNachzutragen{DSPMode::USB};
     bool                 m_flexHatArtNachzutragen{false};

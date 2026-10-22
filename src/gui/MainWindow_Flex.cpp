@@ -384,57 +384,45 @@ void MainWindow::wireFlex()
     // Frequenzen. Bis eine Zeile durch ist, gibt es also keinen
     // Ausschnitt, und dann wird nichts gezeichnet — lieber kein Bild
     // als ein Bild an der falschen Frequenz.
-    connect(m_radioModel, &RadioModel::flexWaterfallRowReady, this,
-            [this](quint32, const QVector<quint16>&,
-                   double lowFreqMhz, double highFreqMhz, quint32) {
-        if (m_shuttingDown) { return; }
-        m_flexSpanLowHz  = lowFreqMhz * 1.0e6;
-        m_flexSpanHighHz = highFreqMhz * 1.0e6;
+    // ── Der Ausschnitt kommt vom Panadapter der Maschine ────────────
+    //
+    // Bis zum 2026-10-22 kam er aus der WASSERFALLKACHEL, und die hat
+    // ihre eigene Bin-Zahl und ihren eigenen Rand: am Geraet gemessen
+    // 230,6 kHz, waehrend der Panadapter 200 kHz breit war. Ueber den
+    // falschen Ausschnitt gespannt steht jedes Signal bis zu 15 kHz
+    // neben seiner Frequenz.
+    connect(m_radioModel, &RadioModel::flexAusschnittGeaendert, this,
+            [this](double tiefHz, double hochHz) {
+        if (m_shuttingDown || !(hochHz > tiefHz)) { return; }
+        m_flexSpanLowHz  = tiefHz;
+        m_flexSpanHighHz = hochHz;
 
-        // Einmal je Verbindung die Breite der fremden Quelle
-        // uebernehmen.
-        //
-        // 2026-10-22 am Geraet: die Flex lieferte 13,8692–14,3304 MHz,
-        // also 461 kHz — und das Fenster stand auf 48 kHz. Der
-        // Betreiber sah ein Zehntel des Ausschnitts, stark gezoomt,
-        // und darin war nichts. Die Daten trugen 22 dB Hub.
-        //
-        // NUR einmal: danach gehoert der Zoom wieder ihm. Wer
-        // hineinzoomt, soll nicht bei der naechsten Wasserfallzeile
-        // wieder herausgerissen werden.
-        if (!m_flexAusschnittUebernommen
-            && m_flexSpanHighHz > m_flexSpanLowHz) {
-            if (SpectrumWidget* sw = m_radioModel
-                    ? m_radioModel->spectrumWidget() : nullptr) {
+        // Das Fenster folgt dem Ausschnitt der Maschine — auch wenn er
+        // sich spaeter aendert (Bandwechsel, Zoom am Geraet, oder weil
+        // `tuneFlexSlice` den Panadapter nachgezogen hat).
+        if (SpectrumWidget* sw = m_radioModel
+                ? m_radioModel->spectrumWidget() : nullptr) {
+            const double mitte  = (tiefHz + hochHz) * 0.5;
+            const double breite = hochHz - tiefHz;
+            sw->setFrequencyRange(mitte, breite);
+            if (!m_flexAusschnittUebernommen) {
                 m_flexAusschnittUebernommen = true;
-                const double mitte  = (m_flexSpanLowHz + m_flexSpanHighHz) * 0.5;
-                const double breite = m_flexSpanHighHz - m_flexSpanLowHz;
-                sw->setFrequencyRange(mitte, breite);
-
-                // Und die Wasserfallschwellen dem Rauschteppich
-                // nachfuehren lassen.
-                //
-                // Die gespeicherten Schwellen stammen vom eigenen
-                // Geraet; die Flex liefert ganz andere Pegel, und
-                // dann faerbt der Wasserfall alles in einer Farbe —
-                // am 2026-10-22 durchgehend rot. Die NF-AGC ist genau
-                // dafuer gebaut. Sie wird gemeldet, nicht heimlich
-                // gesetzt: es ist eine Anzeigeeinstellung des
-                // Betreibers, und er soll wissen, dass sie an ist.
                 if (!sw->waterfallNFAGCEnabled()) {
                     sw->setWaterfallNFAGCEnabled(true);
-                    qCInfo(lcFlexGui)
-                        << "Flex-Bild: Wasserfall-Automatik (NF-AGC) "
-                           "eingeschaltet — die gespeicherten Schwellen "
-                           "passen nicht zu den Pegeln der Flex";
                 }
-                qCInfo(lcFlexGui).nospace()
-                    << "Flex-Bild: Fensterbreite auf den Ausschnitt gesetzt — "
-                    << (breite / 1.0e3) << " kHz um "
-                    << (mitte / 1.0e6) << " MHz";
             }
+            qCInfo(lcFlexGui).nospace()
+                << "Flex-Bild: Ausschnitt der Maschine uebernommen — "
+                << (breite / 1.0e3) << " kHz um " << (mitte / 1.0e6)
+                << " MHz";
         }
     });
+
+    // Die Wasserfallkachel traegt die Zeilen; ihr Frequenzbereich wird
+    // NICHT mehr gelesen (siehe `flexAusschnittGeaendert` oben). Sie
+    // hat ihre eigene Bin-Zahl und ihren eigenen Rand — gemessen 230,6
+    // kHz gegen 200 kHz Panadapterbreite, also bis zu 15 kHz Versatz
+    // fuer jedes Signal.
 
     connect(m_radioModel, &RadioModel::flexSpectrumReady, this,
             [this](quint32, const QVector<float>& dbm) {

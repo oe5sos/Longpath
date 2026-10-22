@@ -188,6 +188,23 @@ QString setSliceModeCommand(const QString& sliceId, const QString& mode);
 // sie in `filter_lo`/`filter_hi` zurueckmeldet.
 QString setSliceFilterCommand(const QString& sliceId, int lowHz, int highHz);
 
+// ── Den Panadapter der Maschine mitnehmen (2026-10-22) ───────────────
+//
+// `slice tune` traegt `autopan=0`, damit die Maschine das Bild bei
+// jedem Dreh nicht neu zentriert — unser Ausschnitt haengt an der
+// Wasserfallkachel und wuerde sonst springen. Der Preis: stimmt der
+// Betreiber WEIT ab, laeuft die Scheibe aus dem Ausschnitt heraus.
+//
+// Gemessen am Geraet, 2026-10-22, 21:22: die Scheibe stand auf
+// 14.382279 MHz, der Panadapter zeigte 230 kHz um 14.0999 MHz, also
+// 13,985–14,215. Der Betreiber hoerte an einer Stelle und sah eine
+// andere, 170 kHz daneben: „aber keine signale".
+//
+// From AetherSDR FlexBackend.cpp:420 [@d58e2b8a] —
+//   sendSlice("display pan set %1 center=%2")
+// Megahertz mit sechs Nachkommastellen, wie bei `slice tune`.
+QString setPanCenterCommand(const QString& panId, double hz);
+
 // From AetherSDR RadioStatusOwnership.h:48-60 [@d58e2b8a] —
 // parsePanafallCreatePanId(). Die Antwort auf „display panafall
 // create" traegt die Kennung mal als `pan=`, mal als `id=`, mal nackt

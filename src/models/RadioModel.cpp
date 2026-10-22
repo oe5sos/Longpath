@@ -6896,6 +6896,44 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                 }
             }
 
+            // ── Der Ausschnitt gehoert dem Panadapter, nicht der Kachel ──
+            //
+            // Bis zum 2026-10-22 nahm das Bild seine Breite aus der
+            // WASSERFALLKACHEL: `lowFreq + binBandwidth * totalBins`
+            // (FlexVitaReader.cpp:506). Die Kachel hat aber ihre eigene
+            // Bin-Zahl und ihren eigenen Rand — am Geraet gemessen
+            // meldete sie 13,9846–14,2152 MHz, also 230,6 kHz, waehrend
+            // die Maschine fuer ihren Panadapter `center=14.100000
+            // bandwidth=0.200000` angab, also 200 kHz.
+            //
+            // Die 4096 FFT-Bins gehoeren zum PANADAPTER. Ueber 230,6
+            // statt 200 kHz gespannt steht jedes Signal bis zu 15 kHz
+            // neben seiner Frequenz — und wer weiss, wo eine Station
+            // sein muss, findet sie dort nicht.
+            if (object.startsWith(QLatin1String("display pan "))
+                && kv.contains(QStringLiteral("center"))
+                && kv.contains(QStringLiteral("bandwidth"))) {
+                bool okMitte = false, okBreite = false;
+                const double mitteMhz =
+                    kv.value(QStringLiteral("center")).toDouble(&okMitte);
+                const double breiteMhz =
+                    kv.value(QStringLiteral("bandwidth")).toDouble(&okBreite);
+                if (okMitte && okBreite && breiteMhz > 0.0) {
+                    const double tief = (mitteMhz - breiteMhz * 0.5) * 1.0e6;
+                    const double hoch = (mitteMhz + breiteMhz * 0.5) * 1.0e6;
+                    if (!qFuzzyCompare(tief, m_flexAusschnittTiefHz)
+                        || !qFuzzyCompare(hoch, m_flexAusschnittHochHz)) {
+                        m_flexAusschnittTiefHz = tief;
+                        m_flexAusschnittHochHz = hoch;
+                        qCInfo(lcConnection).nospace()
+                            << "Flex: Ausschnitt der Maschine "
+                            << (tief / 1.0e6) << "–" << (hoch / 1.0e6)
+                            << " MHz (" << (breiteMhz * 1.0e3) << " kHz)";
+                        emit flexAusschnittGeaendert(tief, hoch);
+                    }
+                }
+            }
+
             // Erst lesen, dann stellen. `sub radio all` / `sub slice all`
             // bringen den Zustand der Maschine nach der Anmeldung — und
             // das ist die EINZIGE Stelle, an der wir erfahren, was dort
@@ -7110,6 +7148,10 @@ void RadioModel::startFlexStreams()
         connect(m_flexStream, &FlexVitaStream::waterfallRowReady,
                 this, [this](quint32 id, const QVector<quint16>& v,
                              double lo, double hi, quint32 ab) {
+            // Der Ausschnitt kommt NICHT von hier: die Kachel hat ihre
+            // eigene Bin-Zahl und ihren eigenen Rand (gemessen 230,6
+            // kHz gegen 200 kHz Panadapterbreite). Er wird aus dem
+            // `display pan`-Zustand gelesen, siehe dort.
             emit flexWaterfallRowReady(id, v, lo, hi, ab);
         });
         connect(m_flexStream, &FlexVitaStream::meterSamplesReady, this,
@@ -7330,6 +7372,42 @@ void RadioModel::tuneFlexSlice(double hz)
     const QString befehl = FlexCommandWire::tuneSliceCommand(m_flexSliceId, hz);
     if (befehl.isEmpty()) { return; }
     m_flexConnection->sendCommand(befehl);
+
+    // ── Und das Bild mitnehmen, wenn die Scheibe hinauslaeuft ───────
+    //
+    // `autopan=0` oben haelt das Bild beim Drehen ruhig — unser
+    // Ausschnitt haengt an der Wasserfallkachel und wuerde sonst bei
+    // jedem Dreh springen. Der Preis: bei einem WEITEN Sprung steht
+    // die Scheibe irgendwann neben dem Bild.
+    //
+    // Gemessen am 2026-10-22 um 21:22: Scheibe auf 14.382279 MHz,
+    // Panadapter auf 230 kHz um 14.0999 MHz. Der Betreiber hoerte an
+    // einer Stelle und sah eine andere, 170 kHz daneben: „aber keine
+    // signale". Es waren welche da — nur nicht im Bild.
+    //
+    // Darum: solange die neue Frequenz im mittleren Teil des
+    // Ausschnitts bleibt, geschieht nichts. Erst am Rand (die
+    // aeuszeren 15 Prozent) wird der Panadapter nachgezogen. So
+    // springt das Bild beim Feinabstimmen nicht, folgt aber einem
+    // Bandwechsel.
+    if (m_flexPanId.isEmpty()
+        || !(m_flexAusschnittHochHz > m_flexAusschnittTiefHz)) {
+        return;
+    }
+    const double breite = m_flexAusschnittHochHz - m_flexAusschnittTiefHz;
+    const double rand   = breite * 0.15;
+    if (hz > m_flexAusschnittTiefHz + rand
+        && hz < m_flexAusschnittHochHz - rand) {
+        return;   // noch gut im Bild
+    }
+    const QString mitte =
+        FlexCommandWire::setPanCenterCommand(m_flexPanId, hz);
+    if (mitte.isEmpty()) { return; }
+    qCInfo(lcConnection).nospace()
+        << "Flex: Scheibe laeuft aus dem Bild (" << (hz / 1.0e6)
+        << " MHz, Ausschnitt " << (m_flexAusschnittTiefHz / 1.0e6) << "–"
+        << (m_flexAusschnittHochHz / 1.0e6) << ") — Panadapter nachgezogen";
+    m_flexConnection->sendCommand(mitte);
 }
 
 void RadioModel::setFlexSliceMode(DSPMode mode)

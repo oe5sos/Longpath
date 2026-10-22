@@ -876,6 +876,28 @@ private slots:
         QVERIFY(setSliceFilterCommand(QString(), 100, 2900).isEmpty());
     }
 
+    // ── Der Panadapter muss der Scheibe folgen (2026-10-22) ─────────
+    //
+    // `slice tune` traegt `autopan=0`, damit das Bild beim Drehen
+    // nicht springt. Bei einem WEITEN Sprung stand die Scheibe dann
+    // aber neben dem Bild: am Geraet um 21:22 gemessen, Scheibe auf
+    // 14.382279 MHz, Panadapter auf 230 kHz um 14.0999 MHz. Der
+    // Betreiber hoerte an einer Stelle und sah eine andere, 170 kHz
+    // daneben.
+    //
+    // From AetherSDR FlexBackend.cpp:420 [@d58e2b8a].
+    void panadapterMitteBefehl()
+    {
+        using FlexCommandWire::setPanCenterCommand;
+
+        QCOMPARE(setPanCenterCommand(QStringLiteral("0x40000000"),
+                                     14'225'000.0),
+                 QStringLiteral("display pan set 0x40000000 center=14.225000"));
+
+        QVERIFY(setPanCenterCommand(QString(), 14'225'000.0).isEmpty());
+        QVERIFY(setPanCenterCommand(QStringLiteral("0x40000000"), 0.0).isEmpty());
+    }
+
     void scheibenlisteAusDerAntwort()
     {
         using FlexCommandWire::sliceListFromReply;
