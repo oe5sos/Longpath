@@ -1385,6 +1385,27 @@ void PhoneCwApplet::wireControls()
     // draw the marker line.  Do NOT wire this slider to
     // TxChannel::setDexpAttackThreshold or any WDSP setter.
     if (m_dexpSlider) {
+        // ── Die Marke muss den WIRKLICHEN Schwellwert zeigen ────────────
+        //
+        // Der Regler stand fest auf seinem Bauwert (-50 dB) und wusste vom
+        // echten DEXP-Schwellwert nichts. Der liegt in
+        // TransmitModel::voxThresholdDb, wird im Mikrofonprofil unter
+        // "Dexp_Threshold" gespeichert (MicProfileManager.cpp:95) und
+        // ueberlebt damit jeden Neustart -- die Marke daneben nicht. Nach
+        // jedem Start, und nach jeder Aenderung im Setup, zeigte die
+        // Markierung auf dem Pegelmesser also an der falschen Stelle.
+        //
+        // Upstream NereusSDR hat denselben Mangel nach 2026.10.0 behoben
+        // ("Keep the DEXP threshold marker across restarts", #332).
+        //
+        // Angezeigt wird jetzt der Modellwert; das Ziehen bleibt wie es
+        // war (nur die Marke, kein WDSP-Setter) -- das Stellen gehoert
+        // weiter ins Setup, siehe der Hinweis darueber.
+        if (m_model) {
+            const int modelThreshold = m_model->transmitModel().voxThresholdDb();
+            QSignalBlocker block(m_dexpSlider);
+            m_dexpSlider->setValue(modelThreshold);
+        }
         m_dexpThresholdMarkerDb = static_cast<double>(m_dexpSlider->value());
         if (m_dexpPeakMeter) {
             // Map -160..0 dB → 0..1 (Thetis console.cs:28974 scaling).
@@ -1405,6 +1426,19 @@ void PhoneCwApplet::wireControls()
                 m_dexpLabel->setText(QStringLiteral("%1 dB").arg(dB));
             }
         });
+
+        // Und die Gegenrichtung: aendert das Setup den Schwellwert, zieht
+        // die Marke nach. Ohne das stimmt sie nur bis zur ersten
+        // Aenderung im Setup-Dialog.
+        if (m_model) {
+            connect(&m_model->transmitModel(), &TransmitModel::voxThresholdDbChanged,
+                    this, [this](int dB) {
+                        if (!m_dexpSlider || m_dexpSlider->value() == dB) {
+                            return;
+                        }
+                        m_dexpSlider->setValue(dB);   // zieht die Marke ueber valueChanged nach
+                    });
+        }
     }
 
     // ── Right-click on DEXP [ON] → emit openSetupRequested ───────────────────

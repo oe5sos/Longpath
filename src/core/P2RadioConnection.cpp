@@ -324,14 +324,38 @@ P2RadioConnection::~P2RadioConnection()
 // Porting from Thetis nativeInitMetis() network.c:84
 // Creates a single UDP socket, matching Thetis listenSock
 
+// Bind the UDP socket. Split out of init() so the failure path has a
+// name and a test can take it.
+bool P2RadioConnection::bindSocket()
+{
+    // From Thetis nativeInitMetis:203 — bind to any available port
+    return m_socket && m_socket->bind(QHostAddress::Any, 0);
+}
+
 void P2RadioConnection::init()
 {
     m_socket = new QUdpSocket(this);
 
-    // From Thetis nativeInitMetis:203 — bind to any available port
-    if (!m_socket->bind(QHostAddress::Any, 0)) {
-        qCWarning(lcConnection) << "P2: Failed to bind UDP socket";
-        return;
+    // The bind used to return early on failure, BEFORE the timers below
+    // were created -- and every later connect walked straight into
+    // m_keepAliveTimer->start() on a null pointer. Upstream NereusSDR
+    // fixed the same thing after 2026.10.0 ("Avoid a crash on the next
+    // connection attempt when the initial Protocol 1 or 2 UDP socket
+    // could not bind"); we had inherited it. A bind on port 0 is rare to
+    // fail, but file-descriptor exhaustion and a firewall that denies
+    // the socket both do it, and the answer must be an error, not a
+    // crash.
+    m_socketBound = bindSocket();
+    if (!m_socketBound) {
+        qCWarning(lcConnection) << "P2: Failed to bind UDP socket —"
+                                << (m_socket ? m_socket->errorString() : QString());
+        emit errorOccurred(RadioConnectionError::SocketBindFailure,
+                           QStringLiteral("Could not bind the Protocol 2 UDP socket: %1")
+                               .arg(m_socket ? m_socket->errorString()
+                                             : QStringLiteral("no socket")));
+        // Fall through on purpose: the timers below still get created so
+        // nothing downstream holds a null pointer, and connectToRadio()
+        // retries the bind before refusing.
     }
 
     // From Thetis nativeInitMetis:163-194 — socket buffer sizing
@@ -657,6 +681,24 @@ void P2RadioConnection::connectToRadio(const RadioInfo& info)
 {
     if (m_running) {
         disconnect();
+    }
+
+    // The socket may never have bound (see init()). Try once more -- a
+    // transient cause may be gone -- and refuse the connection cleanly if
+    // it still fails, rather than running into a half-built object.
+    if (!m_socketBound) {
+        m_socketBound = bindSocket();
+        if (!m_socketBound) {
+            const QString why = m_socket ? m_socket->errorString()
+                                         : QStringLiteral("no socket");
+            qCWarning(lcConnection) << "P2: refusing to connect, socket not bound —" << why;
+            emit errorOccurred(RadioConnectionError::SocketBindFailure,
+                               QStringLiteral("Could not bind the Protocol 2 UDP socket: %1")
+                                   .arg(why));
+            emit connectFailed(ConnectFailure::Unreachable,
+                               QStringLiteral("UDP socket could not be bound: %1").arg(why));
+            return;
+        }
     }
 
     m_radioInfo = info;
