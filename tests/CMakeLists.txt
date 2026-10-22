@@ -5460,6 +5460,8 @@ longpath_add_test(tst_ft8_senden)
 # Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die
 # Verdrahtung, nicht die Rechnung.
 longpath_add_test(tst_ft8_flaeche)
+# Die zweite Spalte „Rx Frequency" neben „Band Activity" (2026-10-21).
+longpath_add_test(tst_ft8_zwei_spalten)
 longpath_add_test(tst_ft8_wasserfall)
 # 2026-10-15: und wie lange ein ganzes Fenster rechnet — die Zahl
 # entscheidet, ob das im Faden der Oberflaeche laufen darf.
