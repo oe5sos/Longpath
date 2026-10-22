@@ -18262,6 +18262,25 @@ void MainWindow::onConnectionStateChanged()
     updateAddPanButtonState();
 
     if (m_radioModel->isConnected()) {
+        // Phase 3Q Task 5 — Selbstschluss: eine Sekunde nach dem
+        // Verbinden geht die Maske zu, wenn sie noch offen ist.
+        //
+        // Stand bis zum 2026-10-22 weiter unten in diesem Zweig,
+        // hinter mehreren `m_radioModel->connection()`-Zugriffen. Die
+        // gibt es nur bei OpenHPSDR; bei der FLEX-8400 wurde der
+        // Selbstschluss also nie erreicht, die Maske blieb stehen —
+        // und mit ihr blieb der Panadapter versteckt, weil alle
+        // schwebenden Fenster hinter ihr liegen. Gemeldet am Geraet:
+        // „aber maske verschwindet nicht".
+        if (m_connectionPanel && m_connectionPanel->isVisible()) {
+            QTimer::singleShot(1000, this, [this]() {
+                if (m_connectionPanel && m_connectionPanel->isVisible()
+                    && m_radioModel->isConnected()) {
+                    m_connectionPanel->accept();
+                }
+            });
+        }
+
         // Betreiber 2026-09-01: "diese fliegenden Fenster sind zu
         // löschen auf der Connect Seite" -- Meter-/Applet-Fenster, die
         // der else-Zweig unten bei einer Trennung MITTEN in der

@@ -6770,6 +6770,25 @@ void RadioModel::removePanadapter(int index)
 // steht in docs/architecture/2026-10-18-flex-stufe1-design.md.
 void RadioModel::connectFlexRadio(const RadioInfo& info)
 {
+    // Schon verbunden? Dann ist ein zweites Verbinden kein Verbinden,
+    // sondern ein Trennen.
+    //
+    // Am 2026-10-22 am Geraet gesehen: Bild und Messwerte liefen seit
+    // vier Minuten, der Betreiber klickte Connect, und im Protokoll
+    // stand in derselben Millisekunde
+    //   „Flex: verbinde nach …" / „Flex-Ton abgeschaltet" /
+    //   „Flex-Ton von Scheibe 0 geloest" / „TCP getrennt".
+    // Fuer ihn sah das aus wie „verbindet nicht" — in Wahrheit hat der
+    // Klick die laufende Verbindung abgeraeumt.
+    if (m_flexConnection && m_flexConnection->isConnected()
+        && m_lastRadioInfo.address == info.address) {
+        qCInfo(lcConnection) << "Flex: schon verbunden mit"
+                             << info.address.toString()
+                             << "— der Klick bleibt folgenlos";
+        setConnectionState(ConnectionState::Connected);
+        return;
+    }
+
     if (!m_flexConnection) {
         m_flexConnection = new FlexRadioConnection(this);
 
@@ -7149,7 +7168,12 @@ void RadioModel::uebernimmFlexBildhoehe(int gemeldet)
     // Ein zweistelliger Deckel: eine Maschine, die die Masze nie
     // annimmt, soll keine endlose Schleife aus Melden und
     // Hinschicken erzeugen.
-    constexpr int kHoechstensNachreichen = 5;
+    // Zwei Versuche, nicht fuenf: Martins FLEX-8400 schickt den
+    // `display pan`-Zustand nach dem Anmelden genau DREIMAL
+    // (2026-10-22 gemessen). Ein Deckel von 5 wuerde nie erreicht,
+    // und dann bliebe es bei der erbetenen Hoehe — also bei einem
+    // uebersteuerten Bild.
+    constexpr int kHoechstensNachreichen = 2;
 
     if (!flexHoeheIstVorgabe(gemeldet)) {
         if (gemeldet == m_flexYPixelsGemeldet) { return; }
@@ -7164,9 +7188,31 @@ void RadioModel::uebernimmFlexBildhoehe(int gemeldet)
         return;
     }
 
-    // Ruecksetzvorgabe. NICHT als Teiler benutzen — die Masze noch
-    // einmal hinschicken und auf das Echo warten.
+    // Ruecksetzvorgabe. Erst die Masze noch einmal hinschicken und auf
+    // das Echo warten — AetherSDRs Regel, und richtig, SOLANGE ein
+    // Echo kommt.
+    //
+    // An Martins FLEX-8400 kommt keines: sie meldet dreimal
+    // `y_pixels=20` und nach dem Nachreichen nie etwas anderes
+    // (2026-10-22 gemessen). Dann ist die 20 keine Vorgabe mehr,
+    // sondern die Wahrheit ueber diese Maschine — und mit 700 als
+    // Teiler sieht der Betreiber eine voll ausgeschlagene Flaeche und
+    // einen roten Wasserfall. Also: nach dem letzten Versuch die
+    // gemeldete Zahl nehmen. Ein grobes Bild ist ein Bild; ein
+    // uebersteuertes ist keines.
     if (m_flexMasseNachgereicht >= kHoechstensNachreichen) {
+        if (m_flexYPixelsGemeldet != gemeldet) {
+            m_flexYPixelsGemeldet = gemeldet;
+            bool kennungOk = false;
+            const quint32 panStream = m_flexPanId.toUInt(&kennungOk, 16);
+            if (m_flexStream && kennungOk) {
+                m_flexStream->setYPixels(panStream, gemeldet);
+            }
+            qCWarning(lcConnection)
+                << "Flex: die Maschine bleibt bei y_pixels" << gemeldet
+                << "— nach" << kHoechstensNachreichen
+                << "Versuchen wird damit gerechnet (grobes Bild)";
+        }
         return;
     }
     ++m_flexMasseNachgereicht;

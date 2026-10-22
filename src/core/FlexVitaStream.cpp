@@ -20,6 +20,8 @@
 #include <QNetworkDatagram>
 #include <QStringList>
 
+#include <algorithm>
+
 namespace Longpath {
 
 Q_LOGGING_CATEGORY(lcFlexStream, "longpath.flex.strom", QtInfoMsg)
@@ -185,6 +187,25 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
         // Der Maszstab kommt von der Stelle, die ihn gesetzt hat — die
         // Maschine meldet y_pixels nicht zurueck (siehe Kopf).
         ++m_fftRahmen;
+        // Einmal die ROHWERTE melden. Bis hierher war alles Modell:
+        // „ein Bin ist eine Bildzeile 0…y_pixels-1". Stimmt das nicht,
+        // nuetzt der richtigste Teiler nichts (2026-10-22: mit der von
+        // der Maschine gemeldeten 20 blieb das Bild voll ausgeschlagen).
+        if (m_fftRahmen == 1 && !rahmen->bins.isEmpty()) {
+            quint16 kleinster = rahmen->bins.first();
+            quint16 groesster = rahmen->bins.first();
+            double summe = 0.0;
+            for (const quint16 b : rahmen->bins) {
+                kleinster = std::min(kleinster, b);
+                groesster = std::max(groesster, b);
+                summe += b;
+            }
+            qCInfo(lcFlexStream).nospace()
+                << "Strom: Rohwerte des ersten Bildrahmens — "
+                << rahmen->bins.size() << " Bins, kleinster " << kleinster
+                << ", groesster " << groesster << ", Mittel "
+                << (summe / rahmen->bins.size());
+        }
         const Scale s = m_scales.value(rahmen->streamId);
         emit spectrumReady(rahmen->streamId,
                            FlexVita::binsToDbm(rahmen->bins,
