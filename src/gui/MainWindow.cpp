@@ -3572,11 +3572,71 @@ void MainWindow::pushConnectionStateToPans()
     }
 }
 
+// ---------------------------------------------------------------------------
+// wireImdOverlayForPan / wireImdOverlayForAllPans
+//
+// Befund 4 aus NereusSDRs PureSignal-Entwurfsblatt vom 2026-10-12: die
+// Zustaende des Zweiton-Felds (MOX, Zweitongenerator, Messhaken) waren
+// einmalig an activeSpectrumWidget() gebunden -- also an Pan 0, und zwar
+// an das OBJEKT, nicht an den Ausdruck. Auf jedem anderen Pan blieb das
+// Tor damit fuer immer zu.
+//
+// Alle drei Verbindungen tragen Qt::UniqueConnection, damit der Fanout
+// mehrfach laufen darf: beim Bauen des Fensters, wenn PureSignal spaeter
+// bereitsteht, und fuer jeden spaeter angelegten Pan.
+// ---------------------------------------------------------------------------
+void MainWindow::wireImdOverlayForPan(SpectrumWidget* sw)
+{
+    if (!sw || !m_radioModel) { return; }
+
+    if (MoxController* mox = m_radioModel->moxController()) {
+        connect(mox, &MoxController::moxStateChanged,
+                sw, &SpectrumWidget::setMoxOverlay,
+                static_cast<Qt::ConnectionType>(Qt::QueuedConnection
+                                                | Qt::UniqueConnection));
+    }
+    if (TwoToneController* tt = m_radioModel->twoToneController()) {
+        connect(tt, &TwoToneController::twoToneActiveChanged,
+                sw, &SpectrumWidget::setTestingIMD,
+                Qt::UniqueConnection);
+    }
+    if (PureSignal* ps = m_radioModel->pureSignal()) {
+        connect(ps, &PureSignal::show2ToneMeasurementsChanged,
+                sw, &SpectrumWidget::setShowIMDMeasurements,
+                Qt::UniqueConnection);
+        // Den STAND einmal mitnehmen, nicht nur kuenftige Aenderungen
+        // (2026-10-21). Seit PureSignal den Haken ueber Neustarts merkt,
+        // steht er beim Verdrahten schon auf "an" -- und ein Signal, das
+        // nur bei Aenderungen kommt, hat dann nie eines gesendet. Folge am
+        // Geraet: die Einstellung stand gespeichert auf True, das Spektrum
+        // meldete showImd=false, und ein Messlauf ging ins Leere.
+        sw->setShowIMDMeasurements(ps->show2ToneMeasurements());
+    }
+}
+
+void MainWindow::wireImdOverlayForAllPans()
+{
+    if (m_panStack) {
+        for (auto* applet : m_panStack->allApplets()) {
+            if (!applet) { continue; }
+            if (SpectrumWidget* sw = m_panStack->spectrum(applet->panId())) {
+                wireImdOverlayForPan(sw);
+            }
+        }
+    }
+    // Der aktive Pan auch dann, wenn es noch keinen Stapel gibt (Start,
+    // Pruefstand).
+    wireImdOverlayForPan(activeSpectrumWidget());
+}
+
 void MainWindow::wireSpectrumForPan(SpectrumWidget* sw, const QString& panId)
 {
     if (!sw || !m_radioModel) { return; }
 
     configureSpectrumForPanForTest(sw, panId);
+
+    // Befund 4: das Zweiton-Feld auch auf diesem Pan (2026-10-22).
+    wireImdOverlayForPan(sw);
 
     // Seed the new pan with the CURRENT connection state. Without this a pan
     // created after connect sits at the Disconnected default until the next
@@ -5698,62 +5758,40 @@ void MainWindow::buildUI()
         // Qt::QueuedConnection: MoxController and SpectrumWidget both live on
         // the main thread but a queued connection is used to match the deferred
         // pattern established for the hardwareFlipped connect above.
-        if (activeSpectrumWidget()) {
-            connect(mox, &MoxController::moxStateChanged,
-                    activeSpectrumWidget(), &SpectrumWidget::setMoxOverlay,
-                    Qt::QueuedConnection);
-        }
+        // Befund 4 (2026-10-22): ebenfalls ueber alle Pans statt nur Pan 0 --
+        // ohne das zeigte jeder zweite Pan beim Senden keinen roten Rand
+        // und hielt das Zweiton-Tor geschlossen. wireImdOverlayForPan()
+        // macht denselben Connect mit Qt::UniqueConnection, also doppelt
+        // sich hier nichts.
+        wireImdOverlayForAllPans();
 
         // ── Phase 3M-4 Task 12: SpectrumWidget IMD overlay state wiring ──────
         // From Thetis display.cs:5008 [v2.10.3.13] show condition:
         //   show_imd_measurements = local_mox && _testing_imd
         //                           && _show_imd_measurements && displayduplex;
-        // local_mox is already wired above. Wire the other two flags from
-        // their authoritative coordinators:
         //   testing_imd            <- TwoToneController::twoToneActiveChanged
-        //                              (mirrors Thetis Display.TestingIMD,
+        //                              (Display.TestingIMD,
         //                              display.cs:296-302 [v2.10.3.13])
         //   show_imd_measurements  <- PureSignal::show2ToneMeasurementsChanged
-        //                              (mirrors Thetis Display.ShowIMDMeasurments,
+        //                              (Display.ShowIMDMeasurments,
         //                              display.cs:304-311 [v2.10.3.13])
         // displayduplex stays at SpectrumWidget's default (true) — see header.
-        if (activeSpectrumWidget()) {
-            if (auto* tt = m_radioModel->twoToneController()) {
-                connect(tt, &TwoToneController::twoToneActiveChanged,
-                        activeSpectrumWidget(), &SpectrumWidget::setTestingIMD);
-            }
-            // Phase 3M-4 bench-fix: PureSignal coordinator is late-bound
-            // during WDSP-init — at MainWindow build time it's typically
-            // nullptr, so the connection below never gets made and the
-            // IMD overlay show condition stays at m_showIMDMeasurements=
-            // false even after the user checks chkShow2ToneMeasurements.
-            // Subscribe to RadioModel::pureSignalCoordinatorReady so we
-            // re-attempt the connect when the coordinator becomes available.
-            // Mirrors the pattern in PureSignalApplet.cpp:118-123 +
-            // PsaIndicatorWidget bench-fix.
-            auto wireSpectrumToPs = [this](PureSignal* ps) {
-                if (!ps || !activeSpectrumWidget()) { return; }
-                connect(ps, &PureSignal::show2ToneMeasurementsChanged,
-                        activeSpectrumWidget(),
-                        &SpectrumWidget::setShowIMDMeasurements,
-                        Qt::UniqueConnection);
-                // Den STAND einmal mitnehmen, nicht nur kuenftige
-                // Aenderungen (2026-10-21). Seit PureSignal den Haken
-                // ueber Neustarts merkt, steht er beim Verdrahten schon
-                // auf "an" -- und ein Signal, das nur bei Aenderungen
-                // kommt, hat dann nie eines gesendet. Folge am Geraet:
-                // die Einstellung stand gespeichert auf True, das
-                // Spektrum meldete showImd=false, und ein Messlauf ging
-                // ins Leere.
-                activeSpectrumWidget()->setShowIMDMeasurements(
-                    ps->show2ToneMeasurements());
-            };
-            wireSpectrumToPs(m_radioModel->pureSignal());
-            connect(m_radioModel, &RadioModel::pureSignalCoordinatorReady,
-                    this, [wireSpectrumToPs](PureSignal* ps) {
-                        wireSpectrumToPs(ps);
-                    });
-        }
+        //
+        // ── Befund 4 (2026-10-22): nicht mehr an activeSpectrumWidget() ──────
+        //
+        // Diese drei Verbindungen hingen an dem, was activeSpectrumWidget()
+        // BEIM VERDRAHTEN zurueckgab -- Pan 0. connect() bindet das Objekt,
+        // nicht den Ausdruck: auf jedem anderen Pan blieb das Zweiton-Tor
+        // also fuer immer zu. Dieselbe Falle, die weiter oben bei
+        // wireSpectrumForPan beschrieben ist, und derselbe Befund, den
+        // NereusSDR in seinem Entwurfsblatt als "legacy
+        // activeSpectrumWidget binding" notiert hat.
+        //
+        // Jetzt ueber alle Pans, und ein spaeter angelegter Pan bekommt es
+        // in wireSpectrumForPan.
+        wireImdOverlayForAllPans();
+        connect(m_radioModel, &RadioModel::pureSignalCoordinatorReady,
+                this, [this](PureSignal*) { wireImdOverlayForAllPans(); });
 
         // ── 3M-1c Phase L.3: VFO TX badge routing ─────────────────────────────
         //

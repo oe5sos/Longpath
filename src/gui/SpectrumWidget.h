@@ -1817,6 +1817,31 @@ public:
 #endif
     }
 
+    // ── Naehte fuer die drei Befunde vom 2026-10-22 ──────────────────────
+    //
+    // Befund 3: lief die Analyse? Ohne jeden Malvorgang zu erzwingen.
+    bool imdAnalysisValidForTest() const { return m_imdAnalysisValid; }
+    // Befund 4: steht das Zweiton-Tor auf DIESEM Pan offen?
+    bool testingIMDForTest() const { return m_testingIMD; }
+    // Das Messwerk selbst, damit der Lauf den EMA-Stand lesen kann. Als
+    // Zeiger, damit ImdOverlay.h nicht in diese Kopfdatei muss.
+    const ImdOverlay* imdOverlayForTest() const { return m_imdOverlay; }
+    // Befund 6: die dynamische Schicht, in der Marken und Messfeld liegen.
+    // Auf einem Bau ohne GPU gibt es keine Textur -- dann immer false,
+    // genau wie bei overlayStaticDirtyForTest().
+    bool overlayDynamicDirtyForTest() const {
+#ifdef LONGPATH_GPU_SPECTRUM
+        return m_overlayDynamicDirty;
+#else
+        return false;
+#endif
+    }
+    void clearOverlayDynamicDirtyForTest() {
+#ifdef LONGPATH_GPU_SPECTRUM
+        m_overlayDynamicDirty = false;
+#endif
+    }
+
 signals:
     /// Weitergereicht vom Rechtsklick-Menue (2026-08-18).
     void openSetupPageRequested(const QString& page);
@@ -2170,6 +2195,19 @@ private:
     // Called from paintEvent (CPU path) and from the GPU overlay rebuild
     // (live, uncached because spectrum changes every frame).
     void drawImdOverlay(QPainter& p, const QRect& specRect);
+
+    // ── Befund 3 von NereusSDRs PureSignal-Diagnose (2026-10-22) ─────────
+    //
+    // Die Zweiton-Analyse lief bis heute IM Malvorgang, also mit der
+    // Bildrate und nur bei Neuzeichnung. analyseImd() loest sie davon:
+    // sie laeuft genau einmal je Spektrumsbild, am Ende von
+    // updateSpectrumLinear(), wo m_renderedPixels endgueltig ist.
+    // drawImdOverlay() liest nur noch das Ergebnis.
+    void analyseImd();
+
+    // Befund 6: entwertet die zwischengespeicherte GPU-Overlay-Schicht,
+    // in der Marken und Messfeld liegen. Siehe die Erklaerung in der .cpp.
+    void entwerteImdSchicht();
 
     // Shared audio→IQ-space conversion used by both draw methods.
     // Returns {iqLowHz, iqHighHz} signed offsets from the VFO center.
@@ -3133,6 +3171,17 @@ private:
     // the header.  Raw pointer with QObject parenting is the established
     // pattern for SpectrumWidget owned helpers.
     ImdOverlay* m_imdOverlay{nullptr};
+
+    // Ergebnis der letzten Zweiton-Analyse, abgelegt von analyseImd() und
+    // gelesen von drawImdOverlay(). Als nackte Zahlen statt als
+    // ImdOverlay::Maximum, damit ImdOverlay.h nicht in diese Kopfdatei
+    // muss (gleiche Begruendung wie beim Zeiger darueber).
+    // Reihenfolge: f0L, f0U, IMD3L, IMD3U, IMD5L, IMD5U.
+    static constexpr int kImdProductCount = 6;
+    bool  m_imdAnalysisValid{false};
+    int   m_imdAnalysisBins{0};
+    float m_imdProductDbm[kImdProductCount]{};
+    int   m_imdProductBin[kImdProductCount]{};
 
     // ---- TX filter overlay range + mode (Plan 4 D9, Cluster E) ----
     // Audio-Hz edges of the TX passband; updated by setTxFilterRange().
