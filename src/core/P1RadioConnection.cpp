@@ -598,14 +598,35 @@ P1RadioConnection::~P1RadioConnection()
 // Source: P2RadioConnection::init() pattern — socket + timer created here,
 // not in constructor, to ensure thread affinity is correct.
 // ---------------------------------------------------------------------------
+// Bind the UDP socket. Split out of init() so the failure path has a
+// name and a test can take it.
+bool P1RadioConnection::bindSocket()
+{
+    return m_socket && m_socket->bind(QHostAddress::Any, 0);
+}
+
 void P1RadioConnection::init()
 {
     // Source: networkproto1.c:203 [v2.10.3.13] equivalent — bind to any available port
     m_socket = new QUdpSocket(this);
 
-    if (!m_socket->bind(QHostAddress::Any, 0)) {
-        qCWarning(lcConnection) << "P1: Failed to bind UDP socket";
-        return;
+    // The bind used to return early on failure, BEFORE the timers below
+    // were created -- and every later connect walked straight into
+    // m_watchdogTimer->start() on a null pointer. Same bug as in P2, and
+    // the same one upstream NereusSDR fixed after 2026.10.0 ("Avoid a
+    // crash on the next connection attempt when the initial Protocol 1 or
+    // 2 UDP socket could not bind").
+    m_socketBound = bindSocket();
+    if (!m_socketBound) {
+        qCWarning(lcConnection) << "P1: Failed to bind UDP socket —"
+                                << (m_socket ? m_socket->errorString() : QString());
+        emit errorOccurred(RadioConnectionError::SocketBindFailure,
+                           QStringLiteral("Could not bind the Protocol 1 UDP socket: %1")
+                               .arg(m_socket ? m_socket->errorString()
+                                             : QStringLiteral("no socket")));
+        // Fall through on purpose: the timers below still get created so
+        // nothing downstream holds a null pointer, and connectToRadio()
+        // retries the bind before refusing.
     }
 
     // 2026-05-26 KG4VCF bench fix: bumped recv buffer from Thetis's
@@ -695,6 +716,24 @@ void P1RadioConnection::init()
 // ---------------------------------------------------------------------------
 void P1RadioConnection::connectToRadio(const RadioInfo& info)
 {
+    // The socket may never have bound (see init()). Try once more -- a
+    // transient cause may be gone -- and refuse the connection cleanly if
+    // it still fails, rather than running into a half-built object.
+    if (!m_socketBound) {
+        m_socketBound = bindSocket();
+        if (!m_socketBound) {
+            const QString why = m_socket ? m_socket->errorString()
+                                         : QStringLiteral("no socket");
+            qCWarning(lcConnection) << "P1: refusing to connect, socket not bound —" << why;
+            emit errorOccurred(RadioConnectionError::SocketBindFailure,
+                               QStringLiteral("Could not bind the Protocol 1 UDP socket: %1")
+                                   .arg(why));
+            emit connectFailed(ConnectFailure::Unreachable,
+                               QStringLiteral("UDP socket could not be bound: %1").arg(why));
+            return;
+        }
+    }
+
     if (m_running) {
         disconnect();
     }

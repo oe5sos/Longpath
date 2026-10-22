@@ -100,7 +100,8 @@ TxVoiceCheckDialog::~TxVoiceCheckDialog()
         m_radio->txChannel()->setMicTapEnabled(false);
     }
     if (m_radio && m_radio->txWorker()) {
-        m_radio->txWorker()->setVoiceTapEnabled(false);
+        m_radio->txWorker()->setVoiceTapUser(
+            TxWorkerThread::VoiceTapUser::VoiceCheck, false);
     }
     closeDirectMic();
     QObject::disconnect(m_micTap);
@@ -1020,7 +1021,7 @@ void TxVoiceCheckDialog::startRecording()
         m_procRecorder.feed(samples, frames);
     }, Qt::DirectConnection);
 
-    worker->setVoiceTapEnabled(true);
+    worker->setVoiceTapUser(TxWorkerThread::VoiceTapUser::VoiceCheck, true);
     tx->setMicTapEnabled(true);   // the level meter's tap, unchanged
 
     // Quiet the band for the whole record-then-listen cycle, exactly
@@ -1051,7 +1052,8 @@ void TxVoiceCheckDialog::stopRecording()
     m_procRecorder.stop();
 
     if (m_radio && m_radio->txWorker()) {
-        m_radio->txWorker()->setVoiceTapEnabled(false);
+        m_radio->txWorker()->setVoiceTapUser(
+            TxWorkerThread::VoiceTapUser::VoiceCheck, false);
     }
     QObject::disconnect(m_micTap);
     QObject::disconnect(m_procTap);

@@ -145,10 +145,53 @@ public:
     /// TxChannel::writesToRadio().
     void setStripChain(StripChain* chain);
 
-    // Voice-check tap gate (see the pre/postStripAudioReady signals).
-    // Thread-safe: atomic store, read once per block on the worker.
-    void setVoiceTapEnabled(bool on)
-    { m_voiceTapEnabled.store(on, std::memory_order_release); }
+    // ── Wer den Sprachabgriff braucht ────────────────────────────────
+    //
+    // Hier stand ein einzelnes bool mit `setVoiceTapEnabled(bool)`, und
+    // das war am 2026-10-22 doppelt falsch:
+    //
+    //  1. Der QSO-Mitschnitt schaltete es NIE ein. Er haengt an
+    //     preStripAudioReady, dieses Signal feuert nur bei gesetztem
+    //     Abgriff, und eingeschaltet haben ihn allein das
+    //     Sprachpruef-Fenster und das DVK-Applet. Also blieb die
+    //     eigene Spur im QSO-Mitschnitt STILL -- genau die Haelfte,
+    //     die der Betreiber am 2026-08-19 ausdruecklich wollte
+    //     („wichtig ist, dass man sich selbst aber auch die andere
+    //     station hoert!").
+    //
+    //  2. Ein `false` von irgendwem schaltete ihn allen ab. Wer
+    //     waehrend eines laufenden Mitschnitts das Sprachpruef-Fenster
+    //     oeffnete und wieder zumachte, verlor ab da seine eigene
+    //     Stimme in der Aufnahme.
+    //
+    // Darum eine Maske statt eines Schalters: jeder Nutzer traegt sein
+    // eigenes Bit, der Abgriff laeuft solange EINES steht. Kein
+    // Zaehler -- die vorhandenen Rufe sind unausgeglichen (das
+    // Sprachpruef-Fenster schaltet an zwei Stellen aus, an einer ein),
+    // und ein Zaehler wuerde darunter unterlaufen. Ein Bit zweimal zu
+    // loeschen ist dagegen harmlos.
+    enum class VoiceTapUser : unsigned {
+        VoiceCheck   = 1u << 0,   // TxVoiceCheckDialog
+        Dvk          = 1u << 1,   // DvkApplet
+        QsoRecording = 1u << 2,   // QsoRecorderController
+    };
+
+    /// Thread-safe: ein fetch_or / fetch_and, vom Arbeitsfaden einmal
+    /// je Block gelesen.
+    void setVoiceTapUser(VoiceTapUser who, bool on)
+    {
+        const unsigned bit = static_cast<unsigned>(who);
+        if (on) {
+            m_voiceTapUsers.fetch_or(bit, std::memory_order_release);
+        } else {
+            m_voiceTapUsers.fetch_and(~bit, std::memory_order_release);
+        }
+    }
+
+    /// Laeuft der Abgriff? Fuer den Prueflauf, der die Verdrahtung
+    /// belegt statt nur den Mitschneider.
+    bool voiceTapEnabled() const
+    { return m_voiceTapUsers.load(std::memory_order_acquire) != 0u; }
 
     /// Phase 3R K-bench: set / clear the RadeChannel the worker emits
     /// RADE mic blocks toward when m_currentTxPath == Rade.  Wired by
@@ -216,9 +259,9 @@ signals:
     ///
     /// **DirectConnection ONLY**, same contract as TxChannel's taps:
     /// the pointers are this worker's own scratch buffers, overwritten
-    /// on the next block. Both gated on one atomic
-    /// (setVoiceTapEnabled), so the cost while the voice check is
-    /// closed is one relaxed load.
+    /// on the next block. Both gated on one atomic mask
+    /// (setVoiceTapUser), so the cost while nobody listens is one
+    /// relaxed load.
     void preStripAudioReady(const float* samples, int frames);
     void postStripAudioReady(const float* samples, int frames);
 
@@ -474,7 +517,9 @@ private:
     // Voice-check tap gate + scratch (see the signals). The scratch
     // holds the PRE-strip copy across the strip's in-place processing
     // of m_in; the post-strip emit reads m_in again. Audio-thread only.
-    std::atomic<bool>  m_voiceTapEnabled{false};
+    // Bitmaske der Nutzer des Sprachabgriffs -- siehe
+    // setVoiceTapUser(). 0 = niemand hoert zu.
+    std::atomic<unsigned> m_voiceTapUsers{0u};
     std::vector<float> m_voiceTapBuf;
 
     // Diagnostic (2026-08-11 monitor-crackle hunt): a short pullTxMic

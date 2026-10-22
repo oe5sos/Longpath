@@ -10531,9 +10531,20 @@ void RadioModel::wireConnectionSignals(int wdspInSize)
     // main thread.  Qt::AutoConnection would queue across threads automatically,
     // but explicit QueuedConnection documents the intent and is always correct
     // for cross-thread slot dispatch.
+    //
+    // The report goes through handleMicPttFromRadio with the session it
+    // belongs to, NOT straight into MoxController: a queued call that was
+    // already posted is still delivered after its connection is gone, so
+    // a mic_ptt=1 from the dying session would otherwise key the
+    // replacement session. Upstream NereusSDR fixed the same thing after
+    // 2026.10.0 (#335); we inherited the wiring that allows it.
     if (m_moxController) {
+        ++m_radioSession;
+        const quint64 session = m_radioSession;
         connect(m_connection, &RadioConnection::micPttFromRadio,
-                m_moxController, &MoxController::onMicPttFromRadio,
+                this, [this, session](bool pressed) {
+                    handleMicPttFromRadio(session, pressed);
+                },
                 Qt::QueuedConnection);
     }
 
@@ -13931,6 +13942,13 @@ void RadioModel::teardownConnection()
     QObject::disconnect(m_connection, nullptr, m_receiverManager, nullptr);
     QObject::disconnect(m_receiverManager, nullptr, this, nullptr);
 
+    // Retire the radio session. Disconnecting is not enough for the
+    // queued mic-PTT report: a call posted before the disconnect is
+    // still delivered afterwards, and would key the next session.
+    // handleMicPttFromRadio drops anything that does not carry the
+    // current number.
+    retireRadioSession();
+
     // ── Phase 3F Sub-Epic I closeout, defect F1 ─────────────────────────
     //
     // Unbind every slice so the next connect actually re-binds it. The DSP
@@ -15969,6 +15987,21 @@ int RadioModel::diguOffset() const
 }
 
 // ---------------------------------------------------------------------------
+
+// Gate for the radio's own mic-PTT bit -- see the declaration for why a
+// stale report can arrive at all.
+void RadioModel::handleMicPttFromRadio(quint64 session, bool pressed)
+{
+    if (session != m_radioSession) {
+        qCWarning(lcConnection) << "RadioModel: dropped mic PTT" << pressed
+                           << "from radio session" << session
+                           << "— current session is" << m_radioSession;
+        return;
+    }
+    if (m_moxController) {
+        m_moxController->onMicPttFromRadio(pressed);
+    }
+}
 // completeTuneOff — Thetis-faithful TUN-off completion (issue #177).
 //
 // Invoked from a QTimer::singleShot(m_tuneOffSettleMs) chained off

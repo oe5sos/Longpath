@@ -1041,7 +1041,8 @@ void TxWorkerThread::dispatchOneBlock()
     // The analysis take: the mic as delivered, before the strip. See
     // the signal doc in the header for the whole story; the flag keeps
     // the disabled cost at one relaxed load.
-    const bool voiceTap = m_voiceTapEnabled.load(std::memory_order_acquire);
+    const bool voiceTap =
+        m_voiceTapUsers.load(std::memory_order_acquire) != 0u;
 
     // Pump cadence diagnostic (2026-08-11 "stockend" bench): while the
     // voice tap is on, count dispatch ticks and report per 5 s. A

@@ -91,7 +91,7 @@ void DvkApplet::startRecording(int index)
                        [this](const float* samples, int frames) {
         m_recorder->feed(samples, frames);
     }, Qt::DirectConnection);
-    worker->setVoiceTapEnabled(true);
+    worker->setVoiceTapUser(TxWorkerThread::VoiceTapUser::Dvk, true);
 
     m_recordingSlot = index;
     applyRowStyle(index);
@@ -113,7 +113,8 @@ void DvkApplet::finishRecording()
     // Verbindung loesen. Andersherum liefe der Abgriff noch, waehrend
     // niemand mehr zuhoert.
     if (m_model && m_model->txWorker()) {
-        m_model->txWorker()->setVoiceTapEnabled(false);
+        m_model->txWorker()->setVoiceTapUser(
+            TxWorkerThread::VoiceTapUser::Dvk, false);
     }
     QObject::disconnect(m_micTap);
     m_recorder->stop();

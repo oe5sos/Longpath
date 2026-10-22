@@ -3249,6 +3249,27 @@ target_compile_definitions(tst_tci_mulaw PRIVATE LONGPATH_BUILD_TESTS)
 # LONGPATH_BLATT_PNG=<pfad> zusaetzlich ein Blatt zum Ansehen.
 longpath_add_test(tst_tci_remote_access_page)
 
+# ── Upstream-Abgleich 2026-10-12: DEXP-Schwellenmarke ──────────────────────
+# Die Marke auf dem DEXP-Pegelmesser kam vom Reglerbauwert (-50 dB) und
+# wusste vom echten Schwellwert (TransmitModel::voxThresholdDb, im
+# Mikrofonprofil gespeichert) nichts -- nach jedem Start und nach jeder
+# Aenderung im Setup zeigte sie an der falschen Stelle. Upstream hat
+# denselben Mangel nach 2026.10.0 behoben (#332).
+longpath_add_test(tst_dexp_threshold_marker)
+# ── Upstream-Abgleich 2026-10-12: Absturz nach fehlgeschlagenem Bind ────────
+# init() legte die Timer erst NACH dem Bind an und kehrte bei einem
+# Bindfehler vorher zurueck -- der naechste Verbindungsversuch lief dann in
+# einen Nullzeiger. Upstream hat denselben Fehler nach 2026.10.0 behoben.
+# Der Pruefstand leitet beide Verbindungsklassen ab und laesst den Bind
+# scheitern; ohne die Behebung stuerzt er ab statt rot zu werden.
+longpath_add_test(tst_socket_bind_failure)
+target_link_libraries(tst_socket_bind_failure PRIVATE Qt6::Network)
+
+# ── Upstream-Abgleich 2026-10-12: Tasten durch eine tote Sitzung ────────────
+# Ein mic_ptt=1, das Qt aus einer schon getrennten Verbindung noch
+# ausliefert, tastete die ERSATZ-Sitzung. Upstream #335.
+longpath_add_test(tst_mic_ptt_session_gate)
+
 # ── Phase 3J-1 closeout Item 4 (2026-05-12): per-(band, mode) filter ────────
 # Pins the contract that SliceModel::setDspMode saves the current filter
 # under (currentBand, OLD mode) and restores from (currentBand, NEW mode)
@@ -5946,6 +5967,13 @@ longpath_add_test(tst_audio_tap_ring)
 longpath_add_test(tst_audio_engine_tap_teardown_race)
 
 longpath_add_test(tst_qso_recorder_controller)
+
+# ── Hoert mich der QSO-Mitschnitt? (2026-10-22) ────────────────────────────
+# Der Prueflauf darueber schreibt DIREKT in die Ringe und belegt damit den
+# Mitschneider, nie die Verdrahtung. Dieser hier faengt, was dort durchfiel:
+# der Sprachabgriff im Sendefaden stand mit Vorgabe aus und wurde vom
+# Mitschnitt nie eingeschaltet -- die eigene Spur blieb still.
+longpath_add_test(tst_qso_mitschnitt_hoert_mich)
 longpath_add_test(tst_qso_recorder_applet)
 longpath_add_test(tst_wav_player)
 longpath_add_test(tst_filter_constrain)
