@@ -43,8 +43,26 @@ namespace FlexCommandWire {
 QMap<QString, QString> parseKVs(const QString& body)
 {
     QMap<QString, QString> result;
-    // Rumpf sieht aus wie: "freq=14.225000 mode=USB filter_lo=-1500 filter_hi=1500"
-    for (const QString& token : body.split(' ', Qt::SkipEmptyParts)) {
+    // Rumpf sieht ueblicherweise so aus:
+    //   "freq=14.225000 mode=USB filter_lo=-1500 filter_hi=1500"
+    //
+    // Es gibt aber einen zweiten Trenner. Gemessen am 2026-10-21 nach
+    // `sub meter all`:
+    //
+    //   meter 1.src=COD-#1.num=1#1.nam=MICPEAK#1.low=-150.0#1.hi=20.0#
+    //   1.desc=Signal strength of MIC output in CODEC#1.unit=dBFS#
+    //
+    // Hier trennt '#', und ein Wert (`desc`) enthaelt LEERZEICHEN. An
+    // Leerzeichen zerlegt zerfiel die Zeile in Unsinn -- aus der
+    // Beschreibung wurden die nackten Woerter `MIC=`, `in=`, `of=`,
+    // `output=`, `strength=`, und `desc` trug nur das erste Wort.
+    //
+    // Die Unterscheidung ist der Trenner selbst: wo '#' vorkommt, ist
+    // es das Trennzeichen. Ein Leerzeichen-Rumpf enthaelt keins.
+    const QChar trenner = body.contains(QLatin1Char('#'))
+                              ? QLatin1Char('#')
+                              : QLatin1Char(' ');
+    for (const QString& token : body.split(trenner, Qt::SkipEmptyParts)) {
         const int eq = token.indexOf('=');
         if (eq < 0) {
             // nacktes Wort — mit leerem Wert ablegen, damit der Leser
@@ -549,6 +567,15 @@ void FlexRadioConnection::onGuiClientAccepted(const QString& body)
     // Protokollgrund). Stufe 1 braucht genau eines davon.
     sendCommand(QStringLiteral("sub slice all"));
 
+    // Die Messwerte bestellen. Ohne das schickt die Maschine die
+    // Klasse 0x8002 gar nicht — am 2026-10-21 gemessen: nach
+    // `sub meter all` kamen 653 Pakete in 22 Sekunden, davor keines
+    // (docs/protocols/flex-vita49-gemessen.md §5b). Die Antwort ist
+    // je Messwert eine Statuszeile mit Name, Einheit und Bereich; sie
+    // ist mit `#` getrennt statt mit Leerzeichen, was `parseKVs` seit
+    // #297 beruecksichtigt.
+    sendCommand(QStringLiteral("sub meter all"));
+
     queryAndRecoverSlices();
 }
 
@@ -644,8 +671,15 @@ void FlexRadioConnection::createDefaultSlice()
 // „slice create pan=<id> freq=<mhz> antenna=<ant> mode=<mode>".
 void FlexRadioConnection::createSliceOnPan(const QString& panId)
 {
+    // 2026-10-21, an Martins FLEX-8400 gemessen und von ihm GEHOERT,
+    // bevor es jemand gesucht hat: `antenna=ANT1` im Anlegen schaltet
+    // das Antennenrelais, auch wenn dort schon ANT1 steht — bei jedem
+    // Verbinden ein Klicken im Geraet. Die Antenne ist Sache der
+    // Maschine (CLAUDE.md, Radio-Authoritative Settings Policy): wir
+    // legen die Scheibe an und lassen das Relais, wo es steht. Die
+    // Vorlage in AetherSDR setzt sie mit, deshalb stand sie hier.
     const QString cmd =
-        QStringLiteral("slice create pan=%1 freq=%2 antenna=ANT1 mode=USB")
+        QStringLiteral("slice create pan=%1 freq=%2 mode=USB")
             .arg(panId)
             .arg(kDefaultSliceFreqMhz, 0, 'f', 6);
 

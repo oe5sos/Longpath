@@ -29,6 +29,7 @@
 
 #include "core/DigiFrequenzen.h"
 #include "gui/MainWindow.h"
+#include "gui/applets/Ft8Applet.h"
 #include "gui/applets/AppletVisibilityController.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -130,6 +131,30 @@ private slots:
 
         QCOMPARE(qint64(s->frequency()), qint64(5'357'000));
         QCOMPARE(s->dspMode(), DSPMode::DIGU);
+    }
+
+    void derDekoderHoertAufDieselbeBetriebsart()
+    {
+        // Betreiber am 2026-10-21: „bei ft4 und ft8 muss er glaube ich
+        // auch die frequenz anpassen und aendern." Es gab zwei Stellen
+        // mit demselben Namen und verschiedener Wirkung: die Pillen in
+        // der Leiste stellten das Geraet, die Knoepfe IM Fenster den
+        // Dekoder -- und keiner tat beides.
+        //
+        // Ohne das stellte ein Druck auf FT4 die Skala auf 14.080 und
+        // liess den Dekoder auf FT8: 15-s-Fenster auf einem Band, das
+        // im 7,5-s-Takt sendet. Das Fenster haette geschwiegen, und
+        // niemand haette gewusst, warum.
+        MainWindow mw;
+        QVERIFY(scheibe(mw) != nullptr);
+        Ft8Applet* ft8 = mw.ft8AppletForTest();
+        QVERIFY2(ft8 != nullptr, "kein FT8-Fenster");
+
+        mw.aufDigiStellen(Digimodus::Ft4);
+        QCOMPARE(ft8->protocol(), Ft8Decoder::Protocol::Ft4);
+
+        mw.aufDigiStellen(Digimodus::Ft8);
+        QCOMPARE(ft8->protocol(), Ft8Decoder::Protocol::Ft8);
     }
 
     void dasDekoderfensterWirdSichtbar()

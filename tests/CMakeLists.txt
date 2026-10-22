@@ -1852,6 +1852,12 @@ longpath_add_test(tst_fm_deviation)
 longpath_add_test(tst_rx_equalizer)
 longpath_add_test(tst_cat_protokoll)
 longpath_add_test(tst_cat_server)
+# Phase 3K, erster Schritt: die rigctld-Bruecke gegen den Mock. Die
+# Befehlsfolge stammt nicht aus Hamlib-Quellen, sondern aus einem
+# Mitschnitt von `rigctl -m 2` gegen `rigctld -m 1` durch einen
+# mitlesenden Proxy (2026-10-11, Hamlib 4.7.2) --
+# docs/architecture/2026-10-11-rigctld-verification/README.md.
+longpath_add_test(tst_rigctld_server TestMockRadioModel.cpp)
 longpath_add_test(tst_cat_zz)
 longpath_add_test(tst_schutzrahmen)
 longpath_add_test(tst_neues_feld_schaltet_sich_nicht_ein)
@@ -3153,6 +3159,12 @@ longpath_add_test(tst_add_custom_radio_dialog)
 # Longpath-original; no Thetis attribution needed.
 longpath_add_test(tst_connection_panel_state_pills)
 
+# Die Connect-Maske sagt, was hinter ihr liegt. Ohne diesen Satz hat
+# der Betreiber am 2026-10-21 eine Stunde im Funkgeraet gesucht,
+# waehrend sein Panadapter als verstecktes Schwebefenster hinter dem
+# Dialog stand — Bild und Ton liefen nachweislich.
+longpath_add_test(tst_maske_sagt_was_dahinter_liegt)
+
 # ── Phase 3Q Task 12: AppSettings::migrateRadioKey — synthetic → real-MAC ────
 # 6 tests: core migration (name+autoConnect), pinToMac preserved, same-key no-op,
 # absent-key no-op, IP+port preserved, no orphan keys after migration.
@@ -3617,6 +3629,10 @@ longpath_add_test(tst_tx_channel_production_loop)
 # zero fill verification, repeated-call consistency, and virtual dispatch
 # via TxMicRouter base pointer.
 longpath_add_test(tst_tx_mic_router)
+# 2026-10-21: am Geraet gefunden -- FT8 tastete, und es ging nichts
+# hinaus. Die eigene Tonquelle muss das Mikrofon ERSETZEN, nicht nur
+# angemeldet sein.
+longpath_add_test(tst_eigene_tonquelle_ersetzt_das_mikrofon)
 
 # ── Phase 3M-1a Task G.1: RadioModel ownership + wiring integration ──────────
 # Verifies:
@@ -5419,6 +5435,9 @@ longpath_add_test(tst_scheibenflagge)
 # 2026-10-15: FT8/FT4 nativ — Nachricht hin, Nachricht zurueck, ohne
 # Tondatei und ohne Funkgeraet.
 longpath_add_test(tst_ft8_dekodiert)
+# 2026-10-21: die Subtraktion aus MSHV -- zieht sie ein Signal heraus,
+# und kommt darunter ein zweites zum Vorschein?
+longpath_add_test(tst_ft8_subtraktion)
 # 2026-10-21: wo FT8 und FT4 auf jedem Band liegen -- „ich will nicht
 # die freq suchen". Reine Tafel, ohne Fenster und ohne Funkgeraet.
 longpath_add_test(tst_digi_frequenzen)
@@ -5441,6 +5460,8 @@ longpath_add_test(tst_ft8_senden)
 # Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die
 # Verdrahtung, nicht die Rechnung.
 longpath_add_test(tst_ft8_flaeche)
+# Die zweite Spalte „Rx Frequency" neben „Band Activity" (2026-10-21).
+longpath_add_test(tst_ft8_zwei_spalten)
 longpath_add_test(tst_ft8_wasserfall)
 # 2026-10-15: und wie lange ein ganzes Fenster rechnet — die Zahl
 # entscheidet, ob das im Faden der Oberflaeche laufen darf.
@@ -5546,7 +5567,7 @@ longpath_add_test(tst_applet_visibility_controller)
 
 # tst_ft8_kopfzeile_blatt: zwei Dinge unter einem Dach. Ein echter
 #   Pruefstand -- die FT8/FT4-Knoepfe IM Dekoder verlangen die Skala
-#   (digiFrequenzGewuenscht); der Lauf kann ohne diese Aenderung gar nicht
+#   (digiGewuenscht); der Lauf kann ohne diese Aenderung gar nicht
 #   uebersetzen, das ist seine Gegenprobe. Und ein Zeichenwerkzeug, das
 #   die Kopfzeile samt Optionsknopf als Blatt rendert; es braucht
 #   LONGPATH_GRAB_DIR UND LONGPATH_ENTWURF=1 (die CI setzt den ersten
@@ -6177,6 +6198,15 @@ longpath_add_test(tst_b8_overlay_signals)
 # fest, dass sie VERWEIGERT, wo sie verweigern muss, und dabei sagt,
 # WAS fehlt.
 longpath_add_test(tst_recording_model)
+
+# Die Flaeche dazu (2026-10-21, Variante 1 vom Betreiber gewaehlt).
+# Nagelt fest, dass das Applet in der Spalte haengt, EINE Kennung
+# traegt und ohne Radio einen Strich zeigt statt einer Null.
+longpath_add_test(tst_aufnahme_applet)
+# Die Bedienung des Zeitplans (2026-10-22): bis dahin lief der
+# Scheduler, aber niemand kam an ihn heran.
+longpath_add_test(tst_aufnahme_zeitplan)
+longpath_add_test(tst_wiedergabe_nimmt_nur_iq)
 
 longpath_add_test(tst_tx_bandbreiten_klickbar)
 
@@ -7916,6 +7946,14 @@ longpath_add_test(tst_puresignal3_kette)
 #   Zeile und alles, was keine ist.
 longpath_add_test(tst_gs232_rotor)
 
+# tst_rotor_ohne_rotctld: der eigene GS-232-Treiber darf kein rotctld
+#   starten. Am 2026-10-21 am Geraet aufgefallen -- die App war ueber den
+#   eigenen Treiber verbunden UND hatte daneben rotctld auf denselben
+#   Netzserver gelegt; weil der Port bei jedem Start neu vergeben wird,
+#   sammelten sich drei Instanzen an. Mit Gegenprobe, dass der
+#   rotctld-Weg unveraendert erreichbar bleibt.
+longpath_add_test(tst_rotor_ohne_rotctld)
+
 # tst_ps3_entwurfsblaetter: kein Pruefstand, ein Zeichenwerkzeug -- rendert
 #   das ECHTE PsForm in drei Fassungen als Entwurfsblaetter (144 dpi), damit
 #   der Betreiber am Bild entscheidet, was mit den fuenf Reglern geschieht,
@@ -7932,6 +7970,18 @@ longpath_add_test(tst_ps3_entwurfsblaetter)
 #   Kalibrierraster -- am RASTER gepruefte Lage, nicht am Bildpunkt: ein
 #   Formular, das nie gezeigt wurde, hat fuer alle Felder y() == 0.
 longpath_add_test(tst_ps3_bedienung)
+
+# tst_zweiton_ausserhalb_malvorgang: die drei Befunde aus NereusSDRs
+# PureSignal-Diagnose, die am 2026-10-22 bei uns behoben wurden -- die
+# Analyse ausserhalb des Malvorgangs (3), das Zweiton-Tor auf JEDEM Pan
+# (4), und die Entwertung der zwischengespeicherten Overlay-Schicht (6).
+# Gegenproben gegen 11c2008ef stehen im Kopf der Datei.
+longpath_add_test(tst_zweiton_ausserhalb_malvorgang)
+
+# tst_anzeigeregler_auf_jedem_pan: sieben Regler der Panadapter-Knopfleiste
+# wirkten nur auf Pan 0, weil nur dessen Leiste verdrahtet war -- gefunden
+# beim Nachsehen zu Befund 4. Gegenproben im Kopf der Datei.
+longpath_add_test(tst_anzeigeregler_auf_jedem_pan)
 # --------------------------------------------------------------------------
 # Aggregate "all_tests" target  (2026-05-26 KG4VCF dev-loop fix, from PR #291)
 # --------------------------------------------------------------------------

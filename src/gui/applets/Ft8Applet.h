@@ -36,6 +36,7 @@
 #include "AppletWidget.h"
 #include "core/DigiFrequenzen.h"
 
+#include "core/DigiFrequenzen.h"
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Ablauf.h"
 #include "models/LogEntry.h"
@@ -50,6 +51,7 @@
 
 class QLabel;
 class QPlainTextEdit;
+class QSplitter;
 class QSpinBox;
 
 namespace Longpath { class Ft8Wasserfall; }
@@ -230,6 +232,7 @@ public:
     // Fuer den Pruefstand.
     Ft8Stream*      streamForTest() const { return m_stream; }
     QPlainTextEdit* listForTest()   const { return m_list; }
+    QPlainTextEdit* listRxForTest() const { return m_listRx; }
     QLabel*         statusForTest() const { return m_status; }
     QLabel*         lastLabelForTest() const { return m_lastLabel; }
     QPushButton*    nurCqButtonForTest() const { return m_nurCqBtn; }
@@ -248,18 +251,17 @@ signals:
     /// Ein QSO ist vollstaendig. Es geht denselben Weg wie eines aus
     /// WSJT-X (MainWindow -> RotorLogbookPanel::logExternalQso): eine
     /// Datei, eine Doppelt-Regel, ein Hochladen.
+    /// Die Knoepfe FT8/FT4 IM Fenster gedrueckt.
+    ///
+    /// Betreiber am 2026-10-21: „bei ft4 und ft8 muss er glaube ich auch
+    /// die frequenz anpassen und aendern." Es gab zwei Stellen, an denen
+    /// man FT8 und FT4 waehlen konnte, und nur eine davon stellte das
+    /// Geraet. Das Fenster kennt die Anrufstellen nicht und soll sie
+    /// nicht kennen -- es meldet den Wunsch, MainWindow richtet her.
+    void digiGewuenscht(Longpath::DigiFrequenzen::Digimodus modus);
+
     void qsoFertig(const Longpath::LogEntry& eintrag);
 
-    /// Im Dekoder wurde FT8 oder FT4 gewaehlt und die Skala soll
-    /// mitgehen. Betreiber 2026-10-21: „bei doppelklick oder klick auf
-    /// ft8 und ft4 muss er automatisch auf die richtige frequenz
-    /// springen".
-    ///
-    /// Das Applet stellt die Frequenz NICHT selbst: zur Anrufstelle
-    /// gehoeren auch Betriebsart und Filter, und beides zusammen steht
-    /// bereits in MainWindow::aufDigiStellen(). Zwei Fassungen
-    /// derselben Entscheidung waeren eine zu viel.
-    void digiFrequenzGewuenscht(DigiFrequenzen::Digimodus modus);
 
 protected:
     /// Doppelklick in die Fundliste: die Zeile wird zur Antwort im
@@ -293,6 +295,15 @@ private:
     QLabel*         m_lastLabel{nullptr};
     QProgressBar*   m_fill{nullptr};
     QPlainTextEdit* m_list{nullptr};
+    // Zweite Spalte wie in WSJT-X: links alles („Band Activity"),
+    // rechts nur, was auf der eigenen Stelle liegt oder an mich geht
+    // („Rx Frequency"). Ohne sie geht die eigene Stelle in einem
+    // vollen Band unter -- genau dort, wo man hinsehen muss.
+    QPlainTextEdit* m_listRx{nullptr};
+    QSplitter*      m_listenTeiler{nullptr};
+
+    // Die Signalbreite von FT8 und FT4 (50 Hz). Siehe zeigeZeile().
+    static constexpr int kRxFensterHz = 50;
     /// „CQ only": ein reiner ANSICHTS-Filter. Der Ablauf und die Funde
     /// fuer Panadapter/Logbuch laufen weiter ueber ALLE Zeilen -- wer
     /// dich ruft, darf nicht verschwinden, nur weil die Liste gerade
@@ -301,7 +312,9 @@ private:
     /// Haengt eine fertig gesetzte Zeile an die Liste -- gefiltert
     /// (siehe m_nurCq) und nach Dringlichkeit gefaerbt. `nachricht` ist
     /// der reine FT8-Text ohne die Spalten davor.
-    void zeigeZeile(const QString& zeile, const QString& nachricht);
+    // `tonHz` ist die Audiostelle des Fundes: sie entscheidet, ob die
+    // Zeile auch rechts erscheint.
+    void zeigeZeile(const QString& zeile, const QString& nachricht, int tonHz);
 
     /// Der zuletzt gehoerte Rauschabstand je Rufzeichen -- daraus
     /// bauen die Knoepfe Tx2/Tx3 ihren Rapport. Ohne ihn muesste man

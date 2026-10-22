@@ -250,6 +250,11 @@ public:
     /// schalten -- der Besitz bleibt beim Fenster.
     class AppletVisibilityController* appletVisibilityForTest() const
     { return m_appletVis; }
+    /// Das FT8/FT4-Fenster, fuer den Pruefstand. KEIN eigenes
+    /// `public:`/`private:` um diesen Block legen -- der Abschnitt ist
+    /// schon oeffentlich, und ein Paar darum kippte am 2026-10-21
+    /// alles dahinter auf privat (sieben rote CI-Laeufe).
+    class Ft8Applet* ft8AppletForTest() const { return m_ft8Applet; }
 
 
     // ── Der Schutzrahmen (2026-10-14) ────────────────────────────────
@@ -644,6 +649,14 @@ private slots:
     /// wireSpectrumSliceControls below, because pan-0 needs those and does not
     /// come through here.
     void wireSpectrumForPan(class SpectrumWidget* sw, const QString& panId);
+    // Befund 4 (2026-10-22): die Zustaende des Zweiton-Felds je Pan statt
+    // einmalig an activeSpectrumWidget(). Siehe die Erklaerung in der .cpp.
+    void wireImdOverlayForPan(class SpectrumWidget* sw);
+    void wireImdOverlayForAllPans();
+    // Die sieben Anzeigeregler der Knopfleiste, je Pan an das eigene
+    // Spektrum statt einmalig an activeSpectrumWidget() (2026-10-22).
+    void wireDisplayControlsForPan(class SpectrumOverlayPanel* panel,
+                                   class SpectrumWidget* sw);
 
     /// Wire the four spectrum controls that act on a slice: click-to-tune,
     /// filter-edge drag, pan drag, CTUN toggle.
@@ -1776,6 +1789,7 @@ private:
     // connection per past slice.
     QList<QMetaObject::Connection> m_rttyRadeLinks;
     /// Der CAT-Server (2026-10-11). Vier Kanaele, nur auf 127.0.0.1.
+    class RigctldServer* m_rigctldServer{nullptr};  // Phase 3K: Hamlib-Bruecke
     class CatServer*    m_catServer{nullptr};
     class CatPtyServer* m_catPtyServer{nullptr};
     class EqApplet* m_eqApplet{nullptr};
@@ -1788,6 +1802,7 @@ private:
     class CwxApplet*        m_cwxApplet{nullptr};
     class DvkApplet*        m_dvkApplet{nullptr};
     class QsoRecorderApplet* m_qsoRecorderApplet{nullptr};
+    class RecordingApplet*   m_recordingApplet{nullptr};
 
     // ── KiwiSDR (Stufe 4, 2026-08-23) ──────────────────────────────
     //
@@ -1826,6 +1841,14 @@ private:
     // Anspruchspruefungen der beiden anderen fremden Quellen hinein,
     // sonst bindet eine von ihnen dieselbe Scheibe ein zweites Mal.
     int m_flexTargetSliceId{-1};
+    /// Wahr, wenn die Scheibe fuer die Flex von uns angelegt wurde —
+    /// dann raeumen wir sie beim Trennen auch wieder weg.
+    bool m_flexSliceWasCreated{false};
+    /// Warum das Flex-Bild gerade nicht gezeichnet wird — damit die
+    /// Meldung einmal je Grund kommt und nicht 25 Mal je Sekunde.
+    enum class FlexBildGrund { Unbekannt, KeinAusschnitt, KeinFenster,
+                               FremdquelleAus, Zeichnet };
+    FlexBildGrund m_flexBildGrund{FlexBildGrund::Unbekannt};
     // Der Frequenzausschnitt der Flex-Anzeige, in Hz. Er steht NICHT im
     // FFT-Paket — nur die Wasserfall-Kachel traegt ihre Frequenzen
     // (gemessen). Solange er unbekannt ist, wird nichts gezeichnet:

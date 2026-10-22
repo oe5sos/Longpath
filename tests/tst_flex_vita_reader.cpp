@@ -23,6 +23,12 @@
 
 #include <QtTest>
 
+#include <algorithm>
+
+#include <QPair>
+
+#include "models/RadioModel.h"
+
 #include <QByteArray>
 
 #include "core/FlexVitaReader.h"
@@ -54,6 +60,31 @@ QByteArray fftPaket(const char* kopfHex, const char* ersteBinsHex,
         p.append(static_cast<char>(fuellwert & 0xFF));
     }
     p.append(QByteArray(4, '\0'));   // die echte Füllung
+    return p;
+}
+
+// Ein Messwertpaket (Klasse 0x8002).
+//
+// ACHTUNG, und das gehoert in den Prueflauf: der KOPF ist hier
+// NACHGEBAUT, nicht mitgeschnitten. Die Messreihe vom 2026-10-21 hat
+// Zahlen und Aufbau des Rumpfs festgehalten (653 Pakete, Rumpf immer
+// durch 4 teilbar), aber kein vollstaendiges Datagramm. Geprueft wird
+// also der RUMPF gegen gemessene Werte; der Kopf stammt aus dem
+// FFT-Mitschnitt, mit der Paketklasse auf 0x8002 gesetzt.
+QByteArray messwertPaket(const QVector<QPair<quint16, qint16>>& paare)
+{
+    QByteArray p = roh(LongpathTest::FlexVitaGolden::kFftKopfA)
+                       .left(FlexVita::kHeaderBytes);
+    // Byte 14/15: die Paketklasse (siehe FlexVitaReader.cpp:66).
+    p[14] = static_cast<char>(0x80);
+    p[15] = static_cast<char>(0x02);
+    for (const auto& pa : paare) {
+        p.append(static_cast<char>((pa.first >> 8) & 0xFF));
+        p.append(static_cast<char>(pa.first & 0xFF));
+        const quint16 roh16 = static_cast<quint16>(pa.second);
+        p.append(static_cast<char>((roh16 >> 8) & 0xFF));
+        p.append(static_cast<char>(roh16 & 0xFF));
+    }
     return p;
 }
 
@@ -562,6 +593,148 @@ private slots:
     }
 
     // ─── Die Lückenverfolgung ──────────────────────────────────────
+
+    // Der Faenger fuer den Befund vom 2026-10-21 an Martins
+    // FLEX-8400: die Flaeche war durchgehend blau, der Wasserfall
+    // durchgehend rot — jeder Messwert am oberen Anschlag.
+    //
+    // Ursache: ein FFT-Bin ist keine Leistung, sondern eine BILDZEILE.
+    // Longpath rechnete mit dem Teiler, den es sich GEWUENSCHT hatte
+    // (`ypixels=1000`, mit Code 0 quittiert), waehrend die Maschine
+    // im Zustandsschub unveraendert `y_pixels=20` meldete und auch so
+    // zeichnete. Zeilen 0..19 gegen einen Teiler von 999 ergeben
+    // -40,0 bis -38,3 dBm — bei einer Skala von -130 bis -40 ist das
+    // alles dieselbe oberste Bildzeile.
+    void falscheHoeheKlebtAllesAnDenOberenAnschlag()
+    {
+        constexpr double kMin = -130.0;
+        constexpr double kMax = -40.0;
+
+        // So, wie die Maschine wirklich zeichnet: 20 Zeilen.
+        QVector<quint16> zeilen;
+        for (quint16 i = 0; i < 20; ++i) { zeilen.append(i); }
+
+        // Mit der RICHTIGEN Hoehe spannt dieselbe Zeilenfolge die
+        // ganze Skala auf — oben -40, unten -130.
+        const QVector<float> richtig =
+            FlexVita::binsToDbm(zeilen, kMin, kMax, 20);
+        QCOMPARE(richtig.first(), float(kMax));
+        QCOMPARE(richtig.last(),  float(kMin));
+
+        // Mit der angenommenen Hoehe liegt alles innerhalb von zwei
+        // dB unter dem Maximum — ununterscheidbar, und genau das sah
+        // der Betreiber.
+        const QVector<float> falsch =
+            FlexVita::binsToDbm(zeilen, kMin, kMax, 1000);
+        for (const float wert : falsch) {
+            QVERIFY2(wert > kMax - 2.0,
+                     qPrintable(QStringLiteral("unerwartet gespreizt: %1")
+                                    .arg(double(wert))));
+        }
+
+        // Und der Beleg, dass die beiden Faelle wirklich verschieden
+        // sind: die Spreizung unterscheidet sich um mehr als 80 dB.
+        const auto spreizung = [](const QVector<float>& v) {
+            return double(*std::max_element(v.cbegin(), v.cend())
+                          - *std::min_element(v.cbegin(), v.cend()));
+        };
+        QVERIFY2(spreizung(richtig) - spreizung(falsch) > 80.0,
+                 "die falsche Hoehe faellt hier nicht auf — dann faengt "
+                 "dieser Prueflauf den Befund nicht");
+    }
+
+    // Die Schwelle, an der entschieden wird, ob eine gemeldete
+    // Bildhoehe ein Maszstab ist oder die Ruecksetzvorgabe der
+    // Maschine.
+    //
+    // From AetherSDR RadioModel.cpp:86 + :10994-11018 [@d58e2b8a] —
+    // dort steht die Regel und ihre Begruendung: eine kleine Zahl
+    // gehoert NICHT in den Dekoder, sonst klemmen die FFT-Bins in
+    // einen flachen Boden. Am 2026-10-21 habe ich genau das gebaut:
+    // die 8400 meldete `y_pixels=20`, ich nahm die 20 als Teiler, und
+    // das Bild hatte zwanzig Stufen auf neunzig Dezibel.
+    // ── Messwerte, Klasse 0x8002 ──────────────────────────────────
+    //
+    // Alle Zahlen hier stammen aus der Messreihe vom 2026-10-21 an
+    // Martins FLEX-8400 (docs/protocols/flex-vita49-gemessen.md §5b),
+    // nicht aus einer Herleitung.
+    void messwertePaareWerdenGelesen()
+    {
+        const QByteArray p = messwertPaket({{10, 128}, {1, -11469}});
+        const auto werte = FlexVita::meterSamples(p);
+        QCOMPARE(werte.size(), 2);
+        // Index 10 heisst `SWR` und kam als roh 128.
+        QCOMPARE(werte.at(0).index, quint16(10));
+        QCOMPARE(werte.at(0).raw,   qint16(128));
+        // Index 1 heisst `MICPEAK`; negative Rohwerte muessen als
+        // VORZEICHENBEHAFTET gelesen werden, sonst wird aus -89,6 dBFS
+        // ein Wert um +422.
+        QCOMPARE(werte.at(1).index, quint16(1));
+        QCOMPARE(werte.at(1).raw,   qint16(-11469));
+    }
+
+    // Der Rumpf war in allen 653 gemessenen Paketen durch 4 teilbar.
+    // Ein Rest heisst, dass wir den Aufbau falsch verstanden haben —
+    // dann lieber nichts melden als ein halbes Paar.
+    void einAngebrochenesPaarWirdVerworfen()
+    {
+        QByteArray p = messwertPaket({{10, 128}});
+        p.append(static_cast<char>(0x00));   // ein Byte zu viel
+        QVERIFY(FlexVita::meterSamples(p).isEmpty());
+    }
+
+    // DER Fund aus §5b, den man nicht raten darf.
+    void derTeilerHaengtAnDerEinheit()
+    {
+        // dB-artig und SWR: /128. `SWR` roh 128 ergab genau 1,000.
+        QCOMPARE(*FlexVita::meterScaled(128, QStringLiteral("SWR")), 1.0);
+        QCOMPARE(*FlexVita::meterScaled(0, QStringLiteral("dBm")), 0.0);
+        QVERIFY(qFuzzyCompare(
+            *FlexVita::meterScaled(-19200, QStringLiteral("dBFS")), -150.0));
+
+        // Volts: /256 — belegt ueber den erklaerten Bereich 10,5…15,0.
+        // `+13.8A` kam als roh 3495.
+        const double a = *FlexVita::meterScaled(3495, QStringLiteral("Volts"));
+        QVERIFY2(a > 10.5 && a < 15.0,
+                 qPrintable(QStringLiteral("13,8-V-Schiene ausserhalb: %1")
+                                .arg(a)));
+        QVERIFY(qFuzzyCompare(a, 3495.0 / 256.0));
+
+        // Die Gegenprobe, die den Fund ueberhaupt erst ergab: mit /128
+        // laege dieselbe Schiene bei 27,3 V — weit ausserhalb.
+        QVERIFY(3495.0 / 128.0 > 15.0);
+    }
+
+    // „Unbekannt ist ein Strich, keine Null" (HAUSSTIL Regel 7).
+    // Fuer degC, RPM und Amps liegen BEIDE Teiler im erklaerten
+    // Bereich; der Bereich entscheidet dort also nichts, und eine
+    // Zahl auszugeben hiesse, eine Messung zu behaupten, die niemand
+    // gemacht hat.
+    void unbelegteEinheitenGebenKeineZahl()
+    {
+        QVERIFY(!FlexVita::meterScaled(1505, QStringLiteral("degC")));
+        QVERIFY(!FlexVita::meterScaled(1060, QStringLiteral("RPM")));
+        QVERIFY(!FlexVita::meterScaled(300,  QStringLiteral("Amps")));
+        QVERIFY(!FlexVita::meterScaled(1,    QStringLiteral("Unsinn")));
+    }
+
+    void vorgabehoeheIstKeinMaszstab()
+    {
+        // Was die 8400 nach dem Anlegen wirklich meldet.
+        QVERIFY2(RadioModel::flexHoeheIstVorgabe(20),
+                 "20 ist die Ruecksetzvorgabe der Maschine, kein Maszstab");
+        QVERIFY(RadioModel::flexHoeheIstVorgabe(1));
+        QVERIFY(RadioModel::flexHoeheIstVorgabe(50));
+
+        // Die Grenze selbst gehoert noch zur Vorgabe.
+        QVERIFY(RadioModel::flexHoeheIstVorgabe(100));
+        QVERIFY(!RadioModel::flexHoeheIstVorgabe(101));
+
+        // Und was ein Client bekommt, der wirklich ein Bild hat.
+        QVERIFY2(!RadioModel::flexHoeheIstVorgabe(700),
+                 "700 ist die Hoehe, um die AetherSDR bittet");
+        QVERIFY(!RadioModel::flexHoeheIstVorgabe(1000));
+    }
 
     void lueckenverfolgung()
     {

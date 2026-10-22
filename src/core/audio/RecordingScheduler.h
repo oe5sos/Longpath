@@ -75,6 +75,25 @@ public:
     // Matches Thetis's own cadence (design doc §3) — see file header.
     static constexpr int kPollIntervalMs = 60'000;
 
+    // ── Wie spaet ist zu spaet ───────────────────────────────────────
+    //
+    // Gefunden am 2026-10-22: `m_fired` wird beim Laden geleert und
+    // nie gespeichert, und checkNow() feuerte bei jedem
+    // `now >= startAt`. Wer eine Viertelstunde auf 03:00 plante und
+    // Longpath am naechsten Mittag startete, bekam die Aufnahme
+    // SOFORT -- Stunden zu spaet, ohne ein Wort darueber.
+    //
+    // Fuer einen Eintrag MIT Dauer ist die Grenze hergeleitet und
+    // keine Wahl: eine Viertelstunde ab 03:00 ist nach 03:15 vorbei,
+    // da gibt es nichts mehr aufzunehmen, was gewollt war.
+    //
+    // Fuer „offenes Ende" (Dauer 0) gibt es kein Fenster, also
+    // braucht es eine ZAHL -- und die ist geraten, nicht gemessen:
+    // eine Stunde. Eine halbe Stunde nach dem geplanten Start ist die
+    // Aufnahme noch die gewollte, der naechste Tag nicht. Wenn der
+    // Betreiber das anders sieht, ist DAS hier die Stelle.
+    static constexpr int kNachlaufOffenesEndeMin = 60;
+
     explicit RecordingScheduler(QObject* parent = nullptr);
 
     // Reads every `Recording/Scheduled/*` entry from AppSettings.

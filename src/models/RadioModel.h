@@ -73,6 +73,7 @@
 #include "core/CouplerZero.h"
 #include "core/audio/VoiceKeyer.h"
 #include "core/audio/QsoRecorderController.h"
+#include "RecordingModel.h"
 #include "core/PgxlConnection.h"
 #include "core/Rf2ksConnection.h"
 #include "core/SpeConnection.h"
@@ -476,6 +477,13 @@ public:
     // damit sie einen Verbindungswechsel ueberlebt.
     QsoRecorderController& qsoRecorder() { return m_qsoRecorder; }
     const QsoRecorderController& qsoRecorder() const { return m_qsoRecorder; }
+
+    /// Die Aufnahme aus Phase 3M (Ton, I/Q, Zeitplan). Liegt hier und
+    /// nicht im Fenster, aus demselben Grund wie der QSO-Mitschnitt
+    /// eine Zeile hoeher: eine Flaeche darf verschwinden, eine
+    /// laufende Aufnahme nicht.
+    RecordingModel& recording() { return m_recording; }
+    const RecordingModel& recording() const { return m_recording; }
 
     const ApolloController& apolloController()        const { return m_apolloController; }
     ApolloController&       apolloControllerMutable()       { return m_apolloController; }
@@ -2057,6 +2065,16 @@ public:
     void connectToRadio(const RadioInfo& info);
     void disconnectFromRadio();
 
+    // ── Phase 3M: eine Aufnahme als Quelle ───────────────────────────────────
+    // Oeffnet `path` und verbindet mit ProtocolVersion::Playback, damit die
+    // Datei denselben Weg speist wie ein Geraet (WDSP, FFT, Ton). Eine
+    // laufende Geraeteverbindung wird vorher geschlossen. false heisst: es
+    // laeuft nichts, und `error` sagt warum. Gesendet wird aus einer
+    // Aufnahme nie -- PlaybackRadioConnection nimmt MOX und TX-I/Q an und
+    // tut nichts damit.
+    bool startPlaybackFromFile(const QString& path, QString* error = nullptr);
+    void stopPlayback();
+
     // ── Phase 3M-0 Task 6: Ganymede PA-trip live state ───────────────────────
     // G8NJJ: handlers for Ganymede 500W PA protection
     // From Thetis Andromeda/Andromeda.cs:914-948 [v2.10.3.13]
@@ -3486,6 +3504,35 @@ private:
     // und Ton schicken. Laeuft erst, wenn die GUI-Anmeldung durch ist:
     // ohne sie gibt es keinen Panadapter, dem der Strom gehoeren koennte.
     void startFlexStreams();
+    /// Richtet den Flex-Panadapter ein (Breite, Hoehe, dBm-Bereich) und
+    /// gibt denselben Maszstab an den Leser. Darf mehrfach laufen; wird
+    /// aus startFlexStreams UND aus dem Statuseingang gerufen, weil die
+    /// Kennung oft erst nach der Anmeldung eintrifft.
+    void applyFlexPanSetup();
+    /// Stellt den Ton der Scheibe her — aber erst, wenn der
+    /// Zustandsschub der Maschine gesagt hat, was dort steht, und nur
+    /// das, was wirklich im Weg ist.
+    void applyFlexAudioSetup();
+    /// Was die Maschine als `y_pixels` meldet, einordnen: ein echter
+    /// Wert wird zum Teiler, eine Ruecksetzvorgabe loest ein erneutes
+    /// Hinschicken der Masze aus.
+    void uebernimmFlexBildhoehe(int gemeldet);
+
+public:
+    /// Ist diese gemeldete Bildhoehe die Ruecksetzvorgabe der Maschine
+    /// und damit KEIN Maszstab?
+    ///
+    /// From AetherSDR RadioModel.cpp:86 + :10994-11018 [@d58e2b8a] —
+    /// Schwelle 100. Oeffentlich, weil genau diese Grenze der Grund
+    /// ist, warum das Bild entweder stimmt oder zwanzig Stufen hat;
+    /// eine stille „Vereinfachung" soll am Prueflauf auffallen.
+    static bool flexHoeheIstVorgabe(int gemeldet)
+    {
+        constexpr int kVorgabeSchwelle = 100;
+        return gemeldet <= kVorgabeSchwelle;
+    }
+
+private:
 
     // Sub-components (owned, main thread)
     RadioDiscovery*  m_discovery{nullptr};
@@ -3494,7 +3541,37 @@ private:
     FlexVitaStream*      m_flexStream{nullptr};
     QString              m_flexPanId;        // „40000000"
     QString              m_flexAudioStreamId;
-    bool                 m_flexMuteLocalWasOn{false};
+    // Was die MASCHINE eingestellt hatte, einmal mitgelesen, bevor
+    // Longpath etwas umstellt — leer heisst „nie gelesen", und dann
+    // wird auch nichts zurueckgestellt (HAUSSTIL Regel 7: Unbekannt
+    // ist ein Strich, keine Null). Martins Geraet stand auf
+    // audio_level=37 und mute_local_audio_when_remote=0; die erste
+    // Fassung schrieb 50 hin und stellte beim Trennen eine 1 zurueck,
+    // die dort nie gestanden hatte.
+    QString              m_flexSliceId;           // „0"
+    QString              m_flexAudioLevelWas;
+    QString              m_flexAudioMuteWas;
+    QString              m_flexMuteLocalWas;
+    bool                 m_flexAudioWanted{false};
+    bool                 m_flexRestoreAudioLevel{false};
+    bool                 m_flexRestoreAudioMute{false};
+    bool                 m_flexRestoreMuteLocal{false};
+    /// Die Bildhoehe, mit der die MASCHINE zeichnet — der Teiler in
+    /// `binToDbm()`. 0 heisst: sie hat noch nichts dazu gesagt, dann
+    /// gilt unsere Wunschzahl. Sagt sie etwas, GILT IHRE ZAHL — auch
+    /// gegen ein `display pan set`, das sie mit Code 0 quittiert und
+    /// dann ignoriert hat (am 2026-10-21 genau so gemessen).
+    int                  m_flexYPixelsGemeldet{0};
+    /// Wie oft die Masze nach einer Ruecksetzvorgabe neu hingeschickt
+    /// wurden. Gedeckelt, damit eine Maschine, die sie nie annimmt,
+    /// keine endlose Schleife erzeugt.
+    int                  m_flexMasseNachgereicht{0};
+    /// Index (1…59) -> {Name, Einheit} aus den `meter`-Statuszeilen.
+    /// Ohne diese Tabelle ist ein Messwertpaket eine Zahlenreihe ohne
+    /// Bedeutung: das Paket traegt weder Namen noch Einheit, und der
+    /// Teiler haengt an der Einheit.
+    QHash<int, QPair<QString, QString>> m_flexMesswertNamen;
+    qint64               m_flexMesswertZuletztGemeldet{0};
     ReceiverManager* m_receiverManager{nullptr};
     AudioEngine*     m_audioEngine{nullptr};
     WdspEngine*      m_wdspEngine{nullptr};
@@ -3589,6 +3666,11 @@ private:
     ApolloController m_apolloController;
     VoiceKeyerStore m_voiceKeyer;
     QsoRecorderController m_qsoRecorder;
+    RecordingModel        m_recording;
+    // Der Pfad wartet hier, bis die Fabrik die Verbindung gebaut hat:
+    // RadioConnection::create() kennt nur die RadioInfo, und die traegt
+    // keinen Dateinamen.
+    QString               m_playbackPath;
 
     // PennyLane external-control master toggle. Composes with OcMatrix (Phase 3P-D).
     // MAC and load() are called on connect. Phase 3P-F Task 5b.

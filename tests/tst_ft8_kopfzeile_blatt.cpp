@@ -60,7 +60,7 @@ private slots:
         RadioModel rm;
         Ft8Applet applet(&rm, nullptr);
 
-        QSignalSpy wunsch(&applet, &Ft8Applet::digiFrequenzGewuenscht);
+        QSignalSpy wunsch(&applet, &Ft8Applet::digiGewuenscht);
 
         auto* ft4 = applet.findChild<QPushButton*>();
         QVERIFY(ft4 != nullptr);

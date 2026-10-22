@@ -18,6 +18,7 @@
 
 #include <QLoggingCategory>
 #include <QNetworkDatagram>
+#include <QStringList>
 
 namespace Longpath {
 
@@ -65,7 +66,53 @@ quint16 FlexVitaStream::start(const QHostAddress& radioAddress)
                              << ":" << kRadioPort
                              << "— hoere auf eigenem Port" << m_localPort;
     }
+
+    // Alle fuenf Sekunden sagen, WAS ankommt. Ein Strom, der schweigt,
+    // und ein Strom, der nur Ton bringt, sehen von aussen gleich aus —
+    // und genau diese zwei Faelle hat am 2026-10-21 niemand
+    // auseinanderhalten koennen, weil hier nichts protokolliert wurde.
+    m_proKlasse.clear();
+    m_bericht.setInterval(5000);
+    m_bericht.callOnTimeout(this, [this] { berichteKlassen(); });
+    m_bericht.start();
     return m_localPort;
+}
+
+// Eine Zeile je Bericht, und nur wenn sich seit der letzten etwas
+// bewegt hat — ein stehender Strom soll das Protokoll nicht fluten.
+void FlexVitaStream::berichteKlassen()
+{
+    if (m_datagrams == m_zuletztGemeldet) {
+        return;
+    }
+    m_zuletztGemeldet = m_datagrams;
+
+    QStringList teile;
+    for (auto it = m_proKlasse.cbegin(); it != m_proKlasse.cend(); ++it) {
+        const QString name = [k = it.key()] () -> QString {
+            switch (static_cast<FlexVitaClass>(k)) {
+            case FlexVitaClass::PanadapterFft:  return QStringLiteral("Bild-FFT");
+            case FlexVitaClass::WaterfallTile:  return QStringLiteral("Wasserfall");
+            case FlexVitaClass::NarrowAudio:    return QStringLiteral("Ton");
+            case FlexVitaClass::ReducedBwAudio: return QStringLiteral("Ton schmal");
+            case FlexVitaClass::Meter:          return QStringLiteral("Messwerte");
+            default: break;
+            }
+            return k == 0 ? QStringLiteral("unlesbar")
+                          : QStringLiteral("0x%1").arg(k, 4, 16, QLatin1Char('0'));
+        }();
+        teile << QStringLiteral("%1 %2").arg(name).arg(it.value());
+    }
+    // Die zweite Zeile ist die wichtigere: Pakete kommen an, lange
+    // bevor daraus ein Rahmen wird. Steht hier 0, waehrend oben
+    // Tausende stehen, dann liegt es am Zusammensetzen, nicht am Netz.
+    qCInfo(lcFlexStream) << "Strom:" << m_datagrams << "Pakete —"
+                         << qPrintable(teile.join(QStringLiteral(", ")));
+    qCInfo(lcFlexStream) << "Strom: daraus fertig —"
+                         << m_fftRahmen << "Bildrahmen,"
+                         << m_wasserfallZeilen << "Wasserfallzeilen;"
+                         << "Maszstab gesetzt fuer" << m_scales.size()
+                         << "Strom-Kennung(en)";
 }
 
 void FlexVitaStream::stop()
@@ -124,8 +171,10 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
     const FlexVita::Header h = FlexVita::parseHeader(datagram);
     if (!h.valid) {
         ++m_ignored;
+        ++m_proKlasse[0];   // 0 = unlesbarer Kopf
         return;
     }
+    ++m_proKlasse[static_cast<quint16>(h.packetClass)];
 
     switch (static_cast<FlexVitaClass>(h.packetClass)) {
     case FlexVitaClass::PanadapterFft: {
@@ -135,6 +184,7 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
         }
         // Der Maszstab kommt von der Stelle, die ihn gesetzt hat — die
         // Maschine meldet y_pixels nicht zurueck (siehe Kopf).
+        ++m_fftRahmen;
         const Scale s = m_scales.value(rahmen->streamId);
         emit spectrumReady(rahmen->streamId,
                            FlexVita::binsToDbm(rahmen->bins,
@@ -147,6 +197,7 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
         if (!zeile) {
             return;
         }
+        ++m_wasserfallZeilen;
         emit waterfallRowReady(zeile->streamId, zeile->values,
                                zeile->lowFreqMhz, zeile->highFreqMhz,
                                zeile->autoBlackLevel);
@@ -162,8 +213,19 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
         break;
     }
 
+    case FlexVitaClass::Meter: {
+        // Seit 2026-10-21 gemessen und damit baubar (§5b des
+        // Messblatts). Der Strom liefert nur Index und Rohwert; was
+        // ein Index heisst und wie er zu teilen ist, weiss erst der
+        // Aufrufer aus den `meter`-Statuszeilen.
+        const auto werte = FlexVita::meterSamples(datagram);
+        if (!werte.isEmpty()) {
+            emit meterSamplesReady(h.streamId, werte);
+        }
+        break;
+    }
+
     case FlexVitaClass::ReducedBwAudio:
-    case FlexVitaClass::Meter:
         // Nicht gemessen, also nicht gebaut. Die schmale Tonklasse
         // kommt erst mit `client set send_reduced_bw_dax=1`, und das
         // schickt Longpath nicht; Messwerte hat der Messlauf nie

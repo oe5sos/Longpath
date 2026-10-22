@@ -297,7 +297,10 @@ void AboutDialog::buildUI()
         // ein Fork, der die Namen seiner Vorgaenger herausnimmt, waere
         // ein Diebstahl mit Extraschritten.
         "Longpath (fork of NereusSDR):",
-        "  OE5SOS, Martin Fischer (fork, UI, free-canvas layout)",
+        "  OE5SOS, Martin Fischer (fork; SunSDR2-QRP, GS-232, FT8/RTTY/CW,",
+        "                          freie Flaeche, Sendeton-Werkbank, Logbuch)",
+        "",
+        "  Copyright (C) 2026 Martin Fischer, OE5SOS — siehe AUTHORS.md",
     };
 
     for (const auto* entry : kRoster) {

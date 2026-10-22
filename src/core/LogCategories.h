@@ -10,6 +10,7 @@ namespace Longpath {
 // Logging categories for Longpath.
 // Usage: qCDebug(lcDiscovery) << "message";
 Q_DECLARE_LOGGING_CATEGORY(lcDiscovery)
+Q_DECLARE_LOGGING_CATEGORY(lcRigctld)   // Phase 3K: Hamlib-Bruecke
 
 // KiwiSDR (2026-08-23, portiert aus AetherSDR). Eigene Kategorie, weil
 // ein fremder Empfaenger im Netz eine eigene Fehlersuche verlangt: er

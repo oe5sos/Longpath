@@ -300,6 +300,7 @@ warren@wpratt.com
 #include "core/TxChannel.h"  // H.2: setTxChannel wiring
 #include "core/ReceiverManager.h"
 #include "core/AppSettings.h"
+#include "core/RigctldServer.h"   // Phase 3K: Hamlib-Bruecke
 #include "core/StartWatch.h"
 #include "core/UiScale.h"
 #include "core/BuildIdentity.h"
@@ -387,6 +388,7 @@ warren@wpratt.com
 #include "applets/CwDecoderApplet.h"
 #include "applets/Ft8Applet.h"
 #include "applets/QsoRecorderApplet.h"
+#include "applets/RecordingApplet.h"
 #include "applets/KiwiSdrApplet.h"
 #include "KiwiWaterfallPanel.h"
 #include "applets/AsrApplet.h"
@@ -936,6 +938,38 @@ MainWindow::MainWindow(QWidget* parent)
     // Geraet. Siehe AppSettings::darfVonSelbstVerbinden().
     if (m_catApplet && AppSettings::darfVonSelbstVerbinden()) {
         m_catApplet->stelleZustandWiederHer();
+    }
+
+    // -- Phase 3K: rigctld-Bruecke (vom Zweig fix/discovery-quietpolls-
+    // thetis-parity nach main geholt, 2026-10-21) --------------------------
+    // Gleiche Bauart wie der TCI-Autostart: Einstellung lesen, Adresse
+    // pruefen, starten. Das Sendetor wird NUR gesetzt, wenn es ausdruecklich
+    // eingeschaltet ist; RigctldServer::start laesst es ohnehin geschlossen.
+    // Eine Sonde bleibt offline: ein isolierter Lauf band hier sonst den
+    // Port, und ein Fremdprogramm landete an der Sonde statt am Programm
+    // des Betreibers. Von Hand (Setup -> CAT -> TCP/IP CAT) geht es weiter.
+    {
+        auto& s = AppSettings::instance();
+        m_rigctldServer = new RigctldServer(m_radioModel, this);
+
+        const bool enabled = s.value(QStringLiteral("RigctldEnabled"),
+                                     QStringLiteral("False")).toString()
+                             == QStringLiteral("True");
+        const quint16 port = static_cast<quint16>(
+            s.value(QStringLiteral("RigctldPort"),
+                    QStringLiteral("4532")).toString().toUShort());
+        const QString bindStr = s.value(QStringLiteral("RigctldBindAddress"),
+                                        QStringLiteral("127.0.0.1")).toString();
+        QHostAddress bindAddr;
+        if (!bindAddr.setAddress(bindStr)) {
+            bindAddr = QHostAddress(QHostAddress::LocalHost);
+        }
+        if (enabled && AppSettings::darfVonSelbstVerbinden()
+            && m_rigctldServer->start(bindAddr, port)) {
+            m_rigctldServer->setPttAllowed(
+                s.value(QStringLiteral("RigctldAllowPtt"),
+                        QStringLiteral("False")).toString() == QStringLiteral("True"));
+        }
     }
 
     // Phase 3O Sub-Phase 10 Task 10c — host the menu bar + master-output
@@ -3592,11 +3626,71 @@ void MainWindow::pushConnectionStateToPans()
     }
 }
 
+// ---------------------------------------------------------------------------
+// wireImdOverlayForPan / wireImdOverlayForAllPans
+//
+// Befund 4 aus NereusSDRs PureSignal-Entwurfsblatt vom 2026-10-12: die
+// Zustaende des Zweiton-Felds (MOX, Zweitongenerator, Messhaken) waren
+// einmalig an activeSpectrumWidget() gebunden -- also an Pan 0, und zwar
+// an das OBJEKT, nicht an den Ausdruck. Auf jedem anderen Pan blieb das
+// Tor damit fuer immer zu.
+//
+// Alle drei Verbindungen tragen Qt::UniqueConnection, damit der Fanout
+// mehrfach laufen darf: beim Bauen des Fensters, wenn PureSignal spaeter
+// bereitsteht, und fuer jeden spaeter angelegten Pan.
+// ---------------------------------------------------------------------------
+void MainWindow::wireImdOverlayForPan(SpectrumWidget* sw)
+{
+    if (!sw || !m_radioModel) { return; }
+
+    if (MoxController* mox = m_radioModel->moxController()) {
+        connect(mox, &MoxController::moxStateChanged,
+                sw, &SpectrumWidget::setMoxOverlay,
+                static_cast<Qt::ConnectionType>(Qt::QueuedConnection
+                                                | Qt::UniqueConnection));
+    }
+    if (TwoToneController* tt = m_radioModel->twoToneController()) {
+        connect(tt, &TwoToneController::twoToneActiveChanged,
+                sw, &SpectrumWidget::setTestingIMD,
+                Qt::UniqueConnection);
+    }
+    if (PureSignal* ps = m_radioModel->pureSignal()) {
+        connect(ps, &PureSignal::show2ToneMeasurementsChanged,
+                sw, &SpectrumWidget::setShowIMDMeasurements,
+                Qt::UniqueConnection);
+        // Den STAND einmal mitnehmen, nicht nur kuenftige Aenderungen
+        // (2026-10-21). Seit PureSignal den Haken ueber Neustarts merkt,
+        // steht er beim Verdrahten schon auf "an" -- und ein Signal, das
+        // nur bei Aenderungen kommt, hat dann nie eines gesendet. Folge am
+        // Geraet: die Einstellung stand gespeichert auf True, das Spektrum
+        // meldete showImd=false, und ein Messlauf ging ins Leere.
+        sw->setShowIMDMeasurements(ps->show2ToneMeasurements());
+    }
+}
+
+void MainWindow::wireImdOverlayForAllPans()
+{
+    if (m_panStack) {
+        for (auto* applet : m_panStack->allApplets()) {
+            if (!applet) { continue; }
+            if (SpectrumWidget* sw = m_panStack->spectrum(applet->panId())) {
+                wireImdOverlayForPan(sw);
+            }
+        }
+    }
+    // Der aktive Pan auch dann, wenn es noch keinen Stapel gibt (Start,
+    // Pruefstand).
+    wireImdOverlayForPan(activeSpectrumWidget());
+}
+
 void MainWindow::wireSpectrumForPan(SpectrumWidget* sw, const QString& panId)
 {
     if (!sw || !m_radioModel) { return; }
 
     configureSpectrumForPanForTest(sw, panId);
+
+    // Befund 4: das Zweiton-Feld auch auf diesem Pan (2026-10-22).
+    wireImdOverlayForPan(sw);
 
     // Seed the new pan with the CURRENT connection state. Without this a pan
     // created after connect sits at the Disconnected default until the next
@@ -3819,6 +3913,56 @@ void MainWindow::refreshMeterPollerSlices()
     m_meterPoller->setSliceChannels(ids);
 }
 
+// ---------------------------------------------------------------------------
+// wireDisplayControlsForPan
+//
+// Die sieben Anzeigeregler der Panadapter-Knopfleiste, je Pan an das
+// Spektrum DIESES Pans. Vorher hingen sie einmalig an
+// activeSpectrumWidget() -- also an Pan 0, und zwar am OBJEKT, nicht am
+// Ausdruck. Dieselbe Falle wie bei Befund 4 (Zweiton-Tor) und bei den
+// Scheiben-Bedienelementen, die wireSpectrumSliceControls schon je Pan
+// fuehrt.
+//
+// `sw` statt `activeSpectrumWidget()` ist hier der ganze Unterschied:
+// der Empfaenger steht beim connect fest und muss deshalb der eigene
+// sein. Qt::UniqueConnection, weil ensureOverlayPanels() bei jedem
+// Layoutwechsel laeuft -- der Vorlauf dort legt eine Leiste nur einmal
+// je Pan an, aber ein doppelter Connect waere hier ein doppelter
+// Reglerweg und damit ein Sprung um den zweifachen Wert.
+// ---------------------------------------------------------------------------
+void MainWindow::wireDisplayControlsForPan(SpectrumOverlayPanel* panel,
+                                           SpectrumWidget* sw)
+{
+    if (!panel || !sw) { return; }
+
+    // B8 Task 20: Wasserfall-Farbverstaerkung, Schwarzpunkt, Farbtafel.
+    connect(panel, &SpectrumOverlayPanel::wfColorGainChanged,
+            sw, &SpectrumWidget::setWfColorGain, Qt::UniqueConnection);
+    connect(panel, &SpectrumOverlayPanel::wfBlackLevelChanged,
+            sw, &SpectrumWidget::setWfBlackLevel, Qt::UniqueConnection);
+    connect(panel, &SpectrumOverlayPanel::colorSchemeChanged,
+            sw, [sw](int idx) {
+        // colorSchemeChanged carries a raw combo index (int); setWfColorScheme
+        // takes the WfColorScheme enum — adapt with a bounds-checked cast.
+        const int schemeCount = static_cast<int>(WfColorScheme::Count);
+        sw->setWfColorScheme(
+            static_cast<WfColorScheme>(qBound(0, idx, schemeCount - 1)));
+    });
+    connect(panel, &SpectrumOverlayPanel::spectrumRenderModeChanged,
+            sw, [sw](int idx) {
+        sw->setSpectrumRenderMode(
+            idx == 1 ? SpectrumRenderMode::Mode3D : SpectrumRenderMode::Mode2D);
+    });
+
+    // B8 Task 21/22 + Nachtrag: Frequenz am Zeiger, Fuellfarbe, Deckkraft.
+    connect(panel, &SpectrumOverlayPanel::cursorFreqVisibleChanged,
+            sw, &SpectrumWidget::setCursorFreqVisible, Qt::UniqueConnection);
+    connect(panel, &SpectrumOverlayPanel::fillColorChanged,
+            sw, &SpectrumWidget::setFillColor, Qt::UniqueConnection);
+    connect(panel, &SpectrumOverlayPanel::fillAlphaChanged,
+            sw, &SpectrumWidget::setFillAlpha, Qt::UniqueConnection);
+}
+
 void MainWindow::ensureOverlayPanels()
 {
     if (!m_panStack || !m_radioModel) { return; }
@@ -3928,6 +4072,19 @@ void MainWindow::ensureOverlayPanels()
             }
             m_radioModel->onBandButtonClicked(bandFromName(name));
         });
+
+        // ── Die Anzeigeregler gehoeren an DIESEN Pan (2026-10-22) ────────
+        //
+        // Gefunden beim Nachsehen zu Befund 4 (Zweiton-Tor an Pan 0).
+        // Jeder Pan bekommt oben seine eigene Knopfleiste, verdrahtet war
+        // aber nur m_overlayPanel -- die von Pan 0, und zwar gegen
+        // activeSpectrumWidget(), also wieder Pan 0. Jedes der sieben
+        // Signale kam im ganzen Programm genau einmal vor. Folge am
+        // Geraet: im Zweipan-Bild bewegte der Regler im Flyout des
+        // zweiten Pans nichts, weil die Leiste dieses Pans an keinem
+        // Empfaenger hing. Gemessen am 2026-10-22: alle sieben Werte
+        // blieben auf der Vorgabe stehen.
+        wireDisplayControlsForPan(panel, sw);
 
         // Pan-0's strip stays the one the display-settings wiring targets.
         if (m_overlayPanel == nullptr || panId == QStringLiteral("pan-0")) {
@@ -5718,62 +5875,40 @@ void MainWindow::buildUI()
         // Qt::QueuedConnection: MoxController and SpectrumWidget both live on
         // the main thread but a queued connection is used to match the deferred
         // pattern established for the hardwareFlipped connect above.
-        if (activeSpectrumWidget()) {
-            connect(mox, &MoxController::moxStateChanged,
-                    activeSpectrumWidget(), &SpectrumWidget::setMoxOverlay,
-                    Qt::QueuedConnection);
-        }
+        // Befund 4 (2026-10-22): ebenfalls ueber alle Pans statt nur Pan 0 --
+        // ohne das zeigte jeder zweite Pan beim Senden keinen roten Rand
+        // und hielt das Zweiton-Tor geschlossen. wireImdOverlayForPan()
+        // macht denselben Connect mit Qt::UniqueConnection, also doppelt
+        // sich hier nichts.
+        wireImdOverlayForAllPans();
 
         // ── Phase 3M-4 Task 12: SpectrumWidget IMD overlay state wiring ──────
         // From Thetis display.cs:5008 [v2.10.3.13] show condition:
         //   show_imd_measurements = local_mox && _testing_imd
         //                           && _show_imd_measurements && displayduplex;
-        // local_mox is already wired above. Wire the other two flags from
-        // their authoritative coordinators:
         //   testing_imd            <- TwoToneController::twoToneActiveChanged
-        //                              (mirrors Thetis Display.TestingIMD,
+        //                              (Display.TestingIMD,
         //                              display.cs:296-302 [v2.10.3.13])
         //   show_imd_measurements  <- PureSignal::show2ToneMeasurementsChanged
-        //                              (mirrors Thetis Display.ShowIMDMeasurments,
+        //                              (Display.ShowIMDMeasurments,
         //                              display.cs:304-311 [v2.10.3.13])
         // displayduplex stays at SpectrumWidget's default (true) — see header.
-        if (activeSpectrumWidget()) {
-            if (auto* tt = m_radioModel->twoToneController()) {
-                connect(tt, &TwoToneController::twoToneActiveChanged,
-                        activeSpectrumWidget(), &SpectrumWidget::setTestingIMD);
-            }
-            // Phase 3M-4 bench-fix: PureSignal coordinator is late-bound
-            // during WDSP-init — at MainWindow build time it's typically
-            // nullptr, so the connection below never gets made and the
-            // IMD overlay show condition stays at m_showIMDMeasurements=
-            // false even after the user checks chkShow2ToneMeasurements.
-            // Subscribe to RadioModel::pureSignalCoordinatorReady so we
-            // re-attempt the connect when the coordinator becomes available.
-            // Mirrors the pattern in PureSignalApplet.cpp:118-123 +
-            // PsaIndicatorWidget bench-fix.
-            auto wireSpectrumToPs = [this](PureSignal* ps) {
-                if (!ps || !activeSpectrumWidget()) { return; }
-                connect(ps, &PureSignal::show2ToneMeasurementsChanged,
-                        activeSpectrumWidget(),
-                        &SpectrumWidget::setShowIMDMeasurements,
-                        Qt::UniqueConnection);
-                // Den STAND einmal mitnehmen, nicht nur kuenftige
-                // Aenderungen (2026-10-21). Seit PureSignal den Haken
-                // ueber Neustarts merkt, steht er beim Verdrahten schon
-                // auf "an" -- und ein Signal, das nur bei Aenderungen
-                // kommt, hat dann nie eines gesendet. Folge am Geraet:
-                // die Einstellung stand gespeichert auf True, das
-                // Spektrum meldete showImd=false, und ein Messlauf ging
-                // ins Leere.
-                activeSpectrumWidget()->setShowIMDMeasurements(
-                    ps->show2ToneMeasurements());
-            };
-            wireSpectrumToPs(m_radioModel->pureSignal());
-            connect(m_radioModel, &RadioModel::pureSignalCoordinatorReady,
-                    this, [wireSpectrumToPs](PureSignal* ps) {
-                        wireSpectrumToPs(ps);
-                    });
-        }
+        //
+        // ── Befund 4 (2026-10-22): nicht mehr an activeSpectrumWidget() ──────
+        //
+        // Diese drei Verbindungen hingen an dem, was activeSpectrumWidget()
+        // BEIM VERDRAHTEN zurueckgab -- Pan 0. connect() bindet das Objekt,
+        // nicht den Ausdruck: auf jedem anderen Pan blieb das Zweiton-Tor
+        // also fuer immer zu. Dieselbe Falle, die weiter oben bei
+        // wireSpectrumForPan beschrieben ist, und derselbe Befund, den
+        // NereusSDR in seinem Entwurfsblatt als "legacy
+        // activeSpectrumWidget binding" notiert hat.
+        //
+        // Jetzt ueber alle Pans, und ein spaeter angelegter Pan bekommt es
+        // in wireSpectrumForPan.
+        wireImdOverlayForAllPans();
+        connect(m_radioModel, &RadioModel::pureSignalCoordinatorReady,
+                this, [this](PureSignal*) { wireImdOverlayForAllPans(); });
 
         // ── 3M-1c Phase L.3: VFO TX badge routing ─────────────────────────────
         //
@@ -6359,26 +6494,13 @@ void MainWindow::buildUI()
         connect(m_overlayPanel, &SpectrumOverlayPanel::clarityRetuneRequested,
                 m_clarityController, &ClarityController::retuneNow);
 
-        // B8 Task 20: wire Display-flyout orphaned signals to SpectrumWidget.
-        // These three signals were emitted but never connected — moving the
-        // WF Gain / WF Black Level sliders and the Scheme combo did nothing.
-        connect(m_overlayPanel, &SpectrumOverlayPanel::wfColorGainChanged,
-                activeSpectrumWidget(), &SpectrumWidget::setWfColorGain);
-        connect(m_overlayPanel, &SpectrumOverlayPanel::wfBlackLevelChanged,
-                activeSpectrumWidget(), &SpectrumWidget::setWfBlackLevel);
-        connect(m_overlayPanel, &SpectrumOverlayPanel::colorSchemeChanged,
-                activeSpectrumWidget(), [this](int idx) {
-            // colorSchemeChanged carries a raw combo index (int); setWfColorScheme
-            // takes the WfColorScheme enum — adapt with a bounds-checked cast.
-            const int schemeCount = static_cast<int>(WfColorScheme::Count);
-            activeSpectrumWidget()->setWfColorScheme(
-                static_cast<WfColorScheme>(qBound(0, idx, schemeCount - 1)));
-        });
-        connect(m_overlayPanel, &SpectrumOverlayPanel::spectrumRenderModeChanged,
-                activeSpectrumWidget(), [this](int idx) {
-            activeSpectrumWidget()->setSpectrumRenderMode(
-                idx == 1 ? SpectrumRenderMode::Mode3D : SpectrumRenderMode::Mode2D);
-        });
+        // B8 Task 20 (Wasserfall-Verstaerkung, Schwarzpunkt, Farbtafel) und
+        // Task 21/22 (Frequenz am Zeiger, Fuellfarbe, Deckkraft) standen
+        // bis zum 2026-10-22 hier -- einmalig, gegen m_overlayPanel (die
+        // Leiste von Pan 0) und activeSpectrumWidget() (ebenfalls Pan 0).
+        // Sie liegen jetzt in wireDisplayControlsForPan(), die
+        // ensureOverlayPanels() fuer JEDEN Pan aufruft, Pan 0 eingeschlossen.
+        // Hier stehenzulassen haette Pan 0 doppelt verdrahtet.
         // Der Panadapter hat seinen Modus laengst aus den Einstellungen
         // geladen (loadSettings in ensureOverlayPanels); das Panel wusste
         // davon nichts und zeigte nach jedem Start "2D", auch wenn 3D
@@ -6484,20 +6606,6 @@ void MainWindow::buildUI()
                 [fitSegments]() { fitSegments(true); });
         connect(m_overlayPanel, &SpectrumOverlayPanel::zoomSegment, this,
                 [fitSegments]() { fitSegments(false); });
-
-        // B8 Task 21: wire Cursor Freq toggle to SpectrumWidget visibility guard.
-        connect(m_overlayPanel, &SpectrumOverlayPanel::cursorFreqVisibleChanged,
-                activeSpectrumWidget(), &SpectrumWidget::setCursorFreqVisible);
-
-        // B8 Task 22: wire Fill Color button to SpectrumWidget::setFillColor.
-        connect(m_overlayPanel, &SpectrumOverlayPanel::fillColorChanged,
-                activeSpectrumWidget(), &SpectrumWidget::setFillColor);
-
-        // B8 fix-up: wire Fill Alpha slider to SpectrumWidget::setFillAlpha.
-        // The slider emitted fillAlphaChanged but had no connect — opacity
-        // never reached the renderer.
-        connect(m_overlayPanel, &SpectrumOverlayPanel::fillAlphaChanged,
-                activeSpectrumWidget(), &SpectrumWidget::setFillAlpha);
 
         // B8 Task 24: wire "More Display Options →" link to Setup → Display.
         // Rechtsklick auf den Panadapter -> Setup-Seite. Derselbe Weg,
@@ -7420,13 +7528,17 @@ void MainWindow::populateDefaultMeter()
     // und Hochladen. Hier wird nichts selbst geschrieben — sonst
     // stuende dasselbe QSO zweimal im Logbuch und nur einmal auf dem
     // Server.
-    // Die FT8/FT4-Knoepfe IM Dekoder stellen auch die Skala -- denselben
-    // Weg wie die Knoepfe in der Kommandoleiste (2026-10-21). Bis dahin
-    // schalteten sie nur das Verfahren um, und der Betreiber stand
-    // weiter auf der Frequenz, auf der er gerade war.
-    connect(m_ft8Applet, &Ft8Applet::digiFrequenzGewuenscht,
-            this, &MainWindow::aufDigiStellen);
-
+    // Die Knoepfe FT8/FT4 IM Fenster richten das Geraet genauso her
+    // wie die Pillen in der Leiste -- es waeren sonst zwei Stellen mit
+    // demselben Namen und verschiedener Wirkung.
+    //
+    // Beim Zusammenfuehren am 2026-10-22: dieser Weg war auf zwei
+    // Zweigen parallel gebaut worden, hier als digiFrequenzGewuenscht
+    // und auf main als digiGewuenscht. Beide haengen am selben Knopf,
+    // beide rufen aufDigiStellen -- zusammen also zweimal je Druck.
+    // mains Name bleibt, der zweite ist entfernt.
+    connect(m_ft8Applet, &Ft8Applet::digiGewuenscht, this,
+            &MainWindow::aufDigiStellen);
     connect(m_ft8Applet, &Ft8Applet::qsoFertig, this,
             [this](const LogEntry& e) {
         if (RotorLogbookPanel* p = ensureRotorPanel()) {
@@ -7489,6 +7601,19 @@ void MainWindow::populateDefaultMeter()
     // sie bleiben beide Spuren still und der Kopf sagt „no radio".
     m_qsoRecorderApplet = new QsoRecorderApplet(m_radioModel, nullptr);
     panel->addApplet(m_qsoRecorderApplet);
+
+    // RecordingApplet — Ton, I/Q und Zeitplan (Phase 3M, 2026-10-21).
+    //
+    // Direkt neben der QSO-Aufnahme, weil beide in denselben Ordner
+    // schreiben: wer eine Aufnahme sucht, soll nicht zwei Panels
+    // aufmachen muessen.
+    //
+    // Der Betreiber hat diese Form am 2026-10-21 aus drei
+    // Entwurfsblaettern gewaehlt (Variante 1, eigenes Applet). Die
+    // vier Klassen dahinter lagen seit August gebaut und geprueft im
+    // Baum, ohne dass sie irgendwer konstruierte.
+    m_recordingApplet = new RecordingApplet(m_radioModel, nullptr);
+    panel->addApplet(m_recordingApplet);
 
     // ── KiwiSDR (Stufe 4, 2026-08-23) ───────────────────────────────
     //
@@ -8234,6 +8359,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
     m_appletsById[QStringLiteral("Dvk")]        = m_dvkApplet;
     m_appletsById[QStringLiteral("QsoRec")]     = m_qsoRecorderApplet;
+    m_appletsById[QStringLiteral("Rec")]        = m_recordingApplet;
     m_appletsById[QStringLiteral("BwFilter")]   = m_bwFilterApplet;
     m_appletsById[QStringLiteral("PureSignal")] = m_pureSignalApplet;
     m_appletsById[QStringLiteral("Amp")]        = m_ampApplet;
@@ -8361,6 +8487,8 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Voice Keyer"),  true);
     m_appletVis->registerApplet(QStringLiteral("QsoRec"),
                                 QStringLiteral("QSO Recorder"), true);
+    m_appletVis->registerApplet(QStringLiteral("Rec"),
+                                QStringLiteral("Recording"),    true);
     m_appletVis->registerApplet(QStringLiteral("BwFilter"),
                                 QStringLiteral("Bandwidth Filter"), true);
     m_appletVis->registerApplet(QStringLiteral("PureSignal"),
@@ -8526,6 +8654,12 @@ void MainWindow::populateDefaultMeter()
         {QStringLiteral("dvk"), QStringLiteral("sprachspeicher"),
          QStringLiteral("ansage"), QStringLiteral("cq"),
          QStringLiteral("voice keyer"), QStringLiteral("wav")});
+    m_appletVis->describeApplet(QStringLiteral("Rec"),
+        QStringLiteral("Aufnahme"),
+        {QStringLiteral("aufnahme"), QStringLiteral("recording"),
+         QStringLiteral("iq"), QStringLiteral("i/q"),
+         QStringLiteral("zeitplan"), QStringLiteral("schedule"),
+         QStringLiteral("wav"), QStringLiteral("mitschnitt")});
     m_appletVis->describeApplet(QStringLiteral("QsoRec"),
         QStringLiteral("Aufnahme"),
         {QStringLiteral("aufnahme"), QStringLiteral("recorder"),
@@ -13816,6 +13950,65 @@ void MainWindow::setVoltsAmpsVisible(bool visible)
 // ---------------------------------------------------------------------------
 void MainWindow::wireSetupDialog(SetupDialog* dialog)
 {
+    // -- Phase 3K: rigctld-Bruecke -----------------------------------------
+    // Einschalten startet und stoppt sofort, Adress-/Portwechsel startet
+    // einen laufenden Server neu, und der Status geht zurueck in den Dialog.
+    if (m_rigctldServer) {
+        connect(dialog, &SetupDialog::rigctldEnableToggled,
+                this, [this](bool on, quint16 port) {
+                    if (!on) {
+                        m_rigctldServer->stop();
+                        return;
+                    }
+                    auto& s = AppSettings::instance();
+                    const QString bindStr = s.value(
+                        QStringLiteral("RigctldBindAddress"),
+                        QStringLiteral("127.0.0.1")).toString();
+                    QHostAddress bindAddr;
+                    if (!bindAddr.setAddress(bindStr)) {
+                        bindAddr = QHostAddress(QHostAddress::LocalHost);
+                    }
+                    if (m_rigctldServer->start(bindAddr, port)) {
+                        // stop() schliesst das Sendetor; die eigene
+                        // Einstellung danach wieder anlegen.
+                        m_rigctldServer->setPttAllowed(
+                            s.value(QStringLiteral("RigctldAllowPtt"),
+                                    QStringLiteral("False")).toString()
+                            == QStringLiteral("True"));
+                    }
+                });
+        connect(dialog, &SetupDialog::rigctldBindOrPortChanged,
+                this, [this](const QString& bindStr, quint16 port) {
+                    if (!m_rigctldServer->isListening()) {
+                        return;
+                    }
+                    QHostAddress bindAddr;
+                    if (!bindAddr.setAddress(bindStr)) {
+                        bindAddr = QHostAddress(QHostAddress::LocalHost);
+                    }
+                    const bool ptt = m_rigctldServer->pttAllowed();
+                    m_rigctldServer->stop();
+                    if (m_rigctldServer->start(bindAddr, port)) {
+                        m_rigctldServer->setPttAllowed(ptt);
+                    }
+                });
+        connect(dialog, &SetupDialog::rigctldPttAllowedToggled,
+                this, [this](bool allowed) {
+                    m_rigctldServer->setPttAllowed(allowed);
+                });
+
+        const auto pushStatus = [this, dialog]() {
+            dialog->setRigctldStatus(m_rigctldServer->isListening(),
+                                     m_rigctldServer->port(),
+                                     m_rigctldServer->clientCount());
+        };
+        pushStatus();
+        connect(m_rigctldServer, &RigctldServer::listeningChanged,
+                dialog, [pushStatus](bool) { pushStatus(); });
+        connect(m_rigctldServer, &RigctldServer::clientCountChanged,
+                dialog, [pushStatus](int) { pushStatus(); });
+    }
+
     if (!dialog) { return; }
 
     // ── Vor die schwebenden Fenster, nicht dahinter ──────────────────
@@ -14983,10 +15176,25 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
     if (slice->filterLow() != kDigiTiefHz)  { slice->setFilterLow(kDigiTiefHz); }
     if (slice->filterHigh() != kDigiHochHz) { slice->setFilterHigh(kDigiHochHz); }
 
-    // 4. Das Fenster. Die Freigabe stellt die Modusachse gleich selbst
-    //    (rebindRttyRadeAvailability), aber SICHTBAR wird es davon
-    //    nicht -- das ist die Nutzerspalte, und die steht womoeglich
-    //    noch aus einer Sitzung ohne Digital auf „aus".
+    // 4. Das Fenster -- und zwar WIRKLICH vor Augen.
+    //
+    //    Betreiber am 2026-10-21, nach dem ersten Versuch: „es muss
+    //    sofort das fenster automatisch aufgehen, sobald ich auf ft4
+    //    oder ft8 klicke." Das tat es nicht, und zwar aus zwei
+    //    Gruenden uebereinander:
+    //
+    //      1. `setVisible()` kehrt sofort zurueck, wenn der Wert sich
+    //         nicht aendert. Stand die Nutzerspalte schon auf „an" und
+    //         fehlte nur die Freigabe, geschah hier NICHTS -- kein
+    //         Signal, kein Fenster.
+    //      2. Und selbst wenn es feuert, heisst „sichtbar" nur, dass
+    //         die Huelle in der rechten Spalte haengt. Die kann
+    //         weggerollt oder von schwebenden Fenstern verdeckt sein.
+    //         Der Bediener meint ein FENSTER.
+    //
+    //    `bringAppletToFront()` ist genau dafuer da (sein Kopf sagt:
+    //    „nur fuer Einschalten per Menue/Plus") -- und ein Druck auf
+    //    FT8 ist genau das.
     if (m_appletVis) {
         // ensureVisible statt setVisible: letzteres steigt aus, wenn der
         // gemerkte Zustand schon „sichtbar" sagt -- und genau dann war
@@ -15044,6 +15252,19 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
                 ps->forceAutoCalDisable();
             }
         }
+    }
+
+    // 7. Und der Dekoder hoert auf dieselbe Betriebsart (von main,
+    //    2026-10-22).
+    //
+    //    Ohne das stellte ein Druck auf FT4 in der Leiste zwar die
+    //    Skala auf 14.080, liess den Dekoder aber auf FT8 -- 15 s
+    //    Fenster auf einem Band, das im 7,5-s-Takt sendet. Das Fenster
+    //    haette geschwiegen, und niemand haette gewusst, warum.
+    if (m_ft8Applet) {
+        m_ft8Applet->setProtocol(modus == DigiFrequenzen::Digimodus::Ft4
+                                     ? Ft8Decoder::Protocol::Ft4
+                                     : Ft8Decoder::Protocol::Ft8);
     }
 }
 
@@ -15490,6 +15711,24 @@ void MainWindow::hideFloatingWindowsBehindConnectMask()
         m_sideArea->hide();
         m_floatingContainersHiddenPreConnect.append(m_sideArea.data());
     }
+
+    // Und es dem Dialog sagen. Die Regel „alles hinter die Maske" ist
+    // richtig; dass sie darueber schwieg, war der Fehler — der
+    // Betreiber sah am 2026-10-21 eine schwarze Flaeche und suchte eine
+    // Stunde lang im Funkgeraet, waehrend sein Panadapter als
+    // verstecktes Schwebefenster hinter genau diesem Dialog stand.
+    qWarning() << "[ConnectMaske] versteckt:"
+               << m_floatingContainersHiddenPreConnect.size() << "Fenster";
+    for (const QPointer<QWidget>& w
+         : std::as_const(m_floatingContainersHiddenPreConnect)) {
+        if (w) {
+            qWarning() << "[ConnectMaske]   -" << w->metaObject()->className();
+        }
+    }
+    if (m_connectionPanel) {
+        m_connectionPanel->setWindowsBehindMask(
+            int(m_floatingContainersHiddenPreConnect.size()));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -15524,8 +15763,14 @@ void MainWindow::hideFloatingWindowsBehindConnectMask()
 // ---------------------------------------------------------------------------
 void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
 {
-    if (m_shuttingDown) { return; }
-    if (m_connectionPanel && m_connectionPanel->isVisible()) { return; }
+    if (m_shuttingDown) {
+        qWarning() << "[ConnectMaske] zurueckholen uebersprungen: Abbau laeuft";
+        return;
+    }
+    if (m_connectionPanel && m_connectionPanel->isVisible()) {
+        qWarning() << "[ConnectMaske] zurueckholen vertagt: die Maske steht noch";
+        return;
+    }
 
     // Der Rotor/Log-Einmalhaken merkt sich hier nur den Wunsch (siehe
     // Konstruktor); gezeigt wird er an derselben Stelle wie alles andere,
@@ -15543,11 +15788,29 @@ void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
     // QPointer haelt fest, ob eines inzwischen ganz geschlossen (nicht nur
     // versteckt) wurde -- dann bleibt es aus, statt aus dem Nichts
     // wiederzukommen.
+    int geholt = 0;
+    int verloren = 0;
     for (const QPointer<QWidget>& w
          : std::as_const(m_floatingContainersHiddenPreConnect)) {
-        if (w) { w->show(); w->raise(); restoredAny = true; }
+        if (w) {
+            w->show(); w->raise(); restoredAny = true;
+            ++geholt;
+            qWarning() << "[ConnectMaske] zurueck:"
+                              << w->metaObject()->className()
+                              << "sichtbar jetzt=" << w->isVisible();
+        } else {
+            // Ein QPointer, der null geworden ist: das Fenster wurde
+            // zwischendurch geloescht. Genau das passiert, wenn das
+            // Layoutprofil einen Panadapter neu schweben laesst — das
+            // ALTE PanFloatingWindow steht dann noch in dieser Liste,
+            // das neue in keiner.
+            ++verloren;
+        }
     }
+    qWarning() << "[ConnectMaske] zu;" << geholt << "zurueckgeholt,"
+                      << verloren << "inzwischen geloescht";
     m_floatingContainersHiddenPreConnect.clear();
+    if (m_connectionPanel) { m_connectionPanel->setWindowsBehindMask(0); }
 
     // Die eben gezeigten Fenster liegen jetzt vorne -- auch vor einem
     // offenen Logbuch, das der Betreiber vor sich hatte. Beim Start war
@@ -15563,6 +15826,18 @@ void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
 
 void MainWindow::showConnectionPanel()
 {
+    // 2026-10-21: der Betreiber meldete „es steht auch immer wieder
+    // connect nach dem ich connect habe" — die Maske geht von selbst
+    // wieder auf, und jedes Mal raeumt sie sein Layout weg. WER sie
+    // oeffnet, stand nirgends. Jetzt schon.
+    qWarning() << "[ConnectMaske] auf; verbunden="
+                      << (m_radioModel
+                          && m_radioModel->connectionState()
+                                 == ConnectionState::Connected)
+                      << "schon da=" << (m_connectionPanel != nullptr)
+                      << "bereits versteckt="
+                      << m_floatingContainersHiddenPreConnect.size();
+
     // Maske auf, Fenster weg -- egal, WER sie oeffnet (automatisch
     // nach einer Trennung oder von Hand ueber Menue/Klick auf die
     // Statuszeile). Vorher galt das nur fuer den automatischen Weg.
@@ -15614,6 +15889,14 @@ void MainWindow::showConnectionPanel()
             restoreFloatingWindowsHiddenBehindConnectMask();
         });
     }
+    // Der Hinweis erst JETZT: beim Verstecken weiter oben gibt es den
+    // Dialog noch gar nicht (er wird darunter erst angelegt), und ein
+    // `setWindowsBehindMask()` auf einen Nullzeiger verpufft — mein
+    // eigener Fehler vom 2026-10-21, gefunden daran, dass der Hinweis
+    // am Geraet nie erschien.
+    m_connectionPanel->setWindowsBehindMask(
+        int(m_floatingContainersHiddenPreConnect.size()));
+
     m_connectionPanel->show();
     m_connectionPanel->raise();
     m_connectionPanel->activateWindow();

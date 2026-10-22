@@ -610,6 +610,12 @@ public:
     //   per user preference and BoardCapabilities. See TxMicRouter.h §TODO.
     void setMicRouter(TxMicRouter* router);
 
+    /// Der angemeldete Router. Die Sendepumpe ist seit dem 2026-04-28
+    /// geschoben und holt NICHT mehr von hier -- der Sendefaden fragt
+    /// ihn aber, ob eine eigene Tonquelle (FT8/FT4, RTTY) das Mikrofon
+    /// ersetzen muss. Siehe TxMicRouter::eigeneTonquelleAktiv().
+    TxMicRouter* micRouter() const { return m_micRouter; }
+
     // ── Channel state (3M-1a C.4) ────────────────────────────────────────────
     //
     // Activate or deactivate the WDSP TXA channel.

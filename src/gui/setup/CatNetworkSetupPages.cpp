@@ -1076,31 +1076,42 @@ void CatTcpIpPage::buildUI()
 {
     setStyleSheet(QString::fromLatin1(Style::kPageStyle));
 
-    auto* group = new QGroupBox(QStringLiteral("TCP CAT"), this);
+    auto& settings = AppSettings::instance();
+
+    auto* group = new QGroupBox(QStringLiteral("rigctld (Hamlib network CAT)"), this);
     group->setStyleSheet(QString::fromLatin1(Style::kGroupBoxStyle));
 
     auto* grid = new QGridLayout(group);
     grid->setSpacing(6);
 
-    // Enable toggle
-    m_enableCheck = new QCheckBox(QStringLiteral("Enable TCP/IP CAT Server"), group);
+    // -- Enable ------------------------------------------------------------
+    m_enableCheck = new QCheckBox(QStringLiteral("Enable rigctld server"), group);
     m_enableCheck->setStyleSheet(QString::fromLatin1(Style::kCheckBoxStyle));
-    m_enableCheck->setDisabled(true);
-    m_enableCheck->setToolTip(QStringLiteral("NYI — TCP CAT server enable"));
+    m_enableCheck->setChecked(
+        settings.value(QStringLiteral("RigctldEnabled"),
+                       QStringLiteral("False")).toString() == QStringLiteral("True"));
+    m_enableCheck->setToolTip(QStringLiteral(
+        "Lets logging, contest and digital-mode programs control Longpath "
+        "over Hamlib's rigctld protocol (N1MM, DXLog, WSJT-X: rig = "
+        "\"Hamlib NET rigctl\")."));
     grid->addWidget(m_enableCheck, 0, 0, 1, 2);
 
-    // Bind IP
+    // -- Bind IP -----------------------------------------------------------
     auto* ipLabel = new QLabel(QStringLiteral("Bind IP:"), group);
     ipLabel->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
     grid->addWidget(ipLabel, 1, 0);
 
-    m_bindIpEdit = new QLineEdit(QStringLiteral("0.0.0.0"), group);
+    m_bindIpEdit = new QLineEdit(
+        settings.value(QStringLiteral("RigctldBindAddress"),
+                       QStringLiteral("127.0.0.1")).toString(), group);
     m_bindIpEdit->setStyleSheet(Style::lineEditStyle());
-    m_bindIpEdit->setDisabled(true);
-    m_bindIpEdit->setToolTip(QStringLiteral("NYI — bind IP address"));
+    m_bindIpEdit->setToolTip(QStringLiteral(
+        "127.0.0.1 keeps the server on this computer. 0.0.0.0 exposes it to "
+        "the whole network -- only do that on a network you trust: anything "
+        "that can reach the port can tune the radio."));
     grid->addWidget(m_bindIpEdit, 1, 1);
 
-    // Port
+    // -- Port --------------------------------------------------------------
     auto* portLabel = new QLabel(QStringLiteral("Port:"), group);
     portLabel->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
     grid->addWidget(portLabel, 2, 0);
@@ -1108,18 +1119,101 @@ void CatTcpIpPage::buildUI()
     m_portSpin = new QSpinBox(group);
     m_portSpin->setStyleSheet(Style::spinBoxStyle());
     m_portSpin->setRange(1024, 65535);
-    m_portSpin->setValue(4532);
-    m_portSpin->setDisabled(true);
-    m_portSpin->setToolTip(QStringLiteral("NYI — TCP CAT port (default 4532 / rigctld)"));
+    m_portSpin->setValue(settings.value(QStringLiteral("RigctldPort"),
+                                        QStringLiteral("4532")).toInt());
+    m_portSpin->setToolTip(QStringLiteral(
+        "4532 is what every Hamlib client tries first. Change it only if a "
+        "real rigctld is already running here."));
     grid->addWidget(m_portSpin, 2, 1);
 
-    // Status
+    // -- Transmit gate -----------------------------------------------------
+    m_pttCheck = new QCheckBox(QStringLiteral("Allow transmit (PTT) over rigctld"),
+                               group);
+    m_pttCheck->setStyleSheet(QString::fromLatin1(Style::kCheckBoxStyle));
+    m_pttCheck->setChecked(
+        settings.value(QStringLiteral("RigctldAllowPtt"),
+                       QStringLiteral("False")).toString() == QStringLiteral("True"));
+    m_pttCheck->setToolTip(QStringLiteral(
+        "Off: a client may read and tune, but not key the radio -- its PTT "
+        "request is refused. On: PTT takes the same path as every other "
+        "transmit source, band-plan check included. Off again after every "
+        "stop of the server."));
+    grid->addWidget(m_pttCheck, 3, 0, 1, 2);
+
+    // -- Status ------------------------------------------------------------
     m_statusLabel = new QLabel(QStringLiteral("Status: stopped"), group);
     m_statusLabel->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
-    grid->addWidget(m_statusLabel, 3, 0, 1, 2);
+    grid->addWidget(m_statusLabel, 4, 0, 1, 2);
 
-    contentLayout()->addWidget(group);
-    contentLayout()->addStretch();
+    // -- Wo der Kenwood-Kanal steht ----------------------------------------
+    // Nicht hier: seine Schalter sitzen im CAT-Applet (TCP + Pseudo-
+    // terminal). Der Satz steht da, damit niemand ihn auf dieser Seite
+    // sucht -- und damit nicht jemand einen zweiten Schalter dafuer baut.
+    auto* catHint = new QLabel(
+        QStringLiteral("Kenwood CAT (TCP + serial): see the CAT applet."), this);
+    catHint->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
+
+    // -- Wiring ------------------------------------------------------------
+    connect(m_enableCheck, &QCheckBox::toggled, this, [this](bool on) {
+        AppSettings::instance().setValue(
+            QStringLiteral("RigctldEnabled"),
+            on ? QStringLiteral("True") : QStringLiteral("False"));
+        emit rigctldEnableToggled(on, quint16(m_portSpin->value()));
+    });
+
+    connect(m_bindIpEdit, &QLineEdit::editingFinished, this, [this]() {
+        const QString addr = m_bindIpEdit->text().trimmed();
+        QHostAddress parsed;
+        if (!parsed.setAddress(addr)) {
+            // Put the stored value back rather than persisting something the
+            // server cannot bind to.
+            m_bindIpEdit->setText(
+                AppSettings::instance().value(QStringLiteral("RigctldBindAddress"),
+                                              QStringLiteral("127.0.0.1")).toString());
+            return;
+        }
+        AppSettings::instance().setValue(QStringLiteral("RigctldBindAddress"), addr);
+        emit rigctldBindOrPortChanged(addr, quint16(m_portSpin->value()));
+    });
+
+    connect(m_portSpin, &QSpinBox::valueChanged, this, [this](int v) {
+        AppSettings::instance().setValue(QStringLiteral("RigctldPort"),
+                                         QString::number(v));
+        emit rigctldBindOrPortChanged(m_bindIpEdit->text().trimmed(), quint16(v));
+    });
+
+    connect(m_pttCheck, &QCheckBox::toggled, this, [this](bool on) {
+        AppSettings::instance().setValue(
+            QStringLiteral("RigctldAllowPtt"),
+            on ? QStringLiteral("True") : QStringLiteral("False"));
+        emit rigctldPttAllowedToggled(on);
+    });
+
+    // SetupPage legt im Konstruktor schon einen Stretch ans Ende des
+    // contentLayout, und addSection() haengt Gruppen DAVOR ein
+    // (SetupPage.cpp). Ein schlichtes addWidget haengt dagegen HINTER den
+    // Stretch -- dann steht der Dehnraum oben und der ganze Inhalt klebt
+    // am unteren Rand. Genau so sah diese Seite aus, seit sie angelegt
+    // wurde. Gesehen im gerenderten Blatt am 2026-10-11.
+    contentLayout()->insertWidget(contentLayout()->count() - 1, group);
+    contentLayout()->insertWidget(contentLayout()->count() - 1, catHint);
+}
+
+void CatTcpIpPage::setRigctldStatus(bool running, quint16 port, int clients)
+{
+    if (!m_statusLabel) {
+        return;
+    }
+    if (!running) {
+        m_statusLabel->setText(QStringLiteral("Status: stopped"));
+        return;
+    }
+    m_statusLabel->setText(
+        clients == 0
+            ? QStringLiteral("Status: listening on port %1, no client").arg(port)
+            : QStringLiteral("Status: listening on port %1, %2 client%3")
+                  .arg(port).arg(clients).arg(clients == 1 ? QString()
+                                                           : QStringLiteral("s")));
 }
 
 // ---------------------------------------------------------------------------

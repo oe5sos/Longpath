@@ -99,6 +99,7 @@
 #include "AudioEngine.h"
 #include "RadeChannel.h"
 #include "TxChannel.h"
+#include "TxMicRouter.h"
 #include "audio/RealtimeAudioPriority.h"
 #include "audio/TxMicSource.h"
 #include "core/strip/StripChain.h"
@@ -845,7 +846,44 @@ void TxWorkerThread::dispatchOneBlock()
     // RADE pump on the input side already drained the mic block to
     // feed RadeChannel::txEncode (Step 1 above); the WDSP TXA chain
     // below must see ONLY the RADE audio.
+    // ── Die eigenen Tonquellen: FT8/FT4 und RTTY ─────────────────────
+    //
+    // Gefunden am 2026-10-21 am laufenden Geraet. Der Betreiber
+    // tastete CQ auf FT8, und es ging NICHTS hinaus: `mox=true` fuer
+    // volle 15 s im Protokoll, dabei `maxTX=0` in jeder Zeile --
+    // Traeger getastet, null Modulation.
+    //
+    // Die Ursache steht seit dem 2026-04-28 im Kopf von TxChannel:
+    // „driven and no longer pulls from m_micRouter". Die Sendepumpe
+    // wurde damals von ZIEHEN auf SCHIEBEN umgestellt. FT8 (2026-10-15)
+    // und RTTY (2026-10-16) haengten ihren Ton aber in genau diesen
+    // Router -- ein Ende, aus dem niemand mehr holt.
+    //
+    // Warum es im Pruefstand nie auffiel: `tst_ft8_senden` faehrt eine
+    // geschlossene Schleife und holt die Proben DIREKT an der Quelle.
+    // Er belegt den Erzeuger, nicht die Verdrahtung. Dieselbe
+    // Fehlerklasse wie der Dekoder, der gebaut und unerreichbar war.
+    //
+    // Hier also derselbe Uebersteuerungszweig, den TCI, RADE und VAX
+    // laengst haben, und mit derselben Regel: eine kurze Lieferung
+    // wird mit Stille aufgefuellt, damit kein Mikrofonton durchleckt.
+    TxMicRouter* eigene =
+        m_txChannel != nullptr ? m_txChannel->micRouter() : nullptr;
     if (path != TxPath::Rade
+        && eigene != nullptr && eigene->eigeneTonquelleAktiv()) {
+        m_pcMicSpliceWasActive = false;
+        const int got = eigene->pullSamples(m_pcMicBuf.data(), kBlockFrames);
+        const int n   = std::clamp(got, 0, kBlockFrames);
+        for (int i = 0; i < n; ++i) {
+            m_in[static_cast<size_t>(2 * i + 0)] =
+                static_cast<double>(m_pcMicBuf[static_cast<size_t>(i)]);
+            m_in[static_cast<size_t>(2 * i + 1)] = 0.0;
+        }
+        for (int i = n; i < kBlockFrames; ++i) {
+            m_in[static_cast<size_t>(2 * i + 0)] = 0.0;
+            m_in[static_cast<size_t>(2 * i + 1)] = 0.0;
+        }
+    } else if (path != TxPath::Rade
         && m_audioEngine != nullptr && m_audioEngine->isVaxMicOverrideActive()) {
         // A later VAX→PC switch must re-flush the PC ring on its next
         // rising edge; see the PC branch below.

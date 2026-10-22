@@ -818,14 +818,20 @@ jobs:
         shell: bash
         # 2026-05-12 (PR #238 review P1 #4): drop --no-tests=ignore so
         # a configure that produces zero tests fails loud.  Linux is
-        # configured with LONGPATH_BUILD_TESTS=ON above; macOS + Windows
-        # still configure with tests OFF (the test suite uses Linux-
-        # specific PortAudio / Qt 6.4 fakes that haven't been ported
-        # to the macOS / mingw paths yet — separate scope).  So
-        # macOS + Windows still pass through with zero tests for now;
-        # ctest exits 0 with a warning instead of erroring out because
-        # there's no test list to run against.  Linux is the source-of-
-        # truth gate for the test suite.
+        # configured with LONGPATH_BUILD_TESTS=ON above.
+        #
+        # 2026-10-21 — THIS COMMENT WAS STALE and said the opposite of
+        # what the step does.  It claimed "macOS + Windows still
+        # configure with tests OFF ... pass through with zero tests".
+        # macOS has had `-DLONGPATH_BUILD_TESTS=ON` plus
+        # LONGPATH_TEST_SHARDS/SHARD in its own Configure step for a
+        # while (see "Configure (macOS)" above), builds `all_tests`,
+        # and runs `ctest` in the macOS branch below.  Only **Windows**
+        # still configures without tests, which is why Windows alone
+        # keeps --no-tests=ignore.  Corrected while tracking down why
+        # the macOS shards take 31-42 minutes each: they are doing real
+        # work, not passing through.  Linux remains the widest gate
+        # (4 shards against macOS's 2), not the only one.
         #
         # QT_QPA_PLATFORM=offscreen: GitHub runners are headless so
         # Qt widgets can't create native windows.  The offscreen

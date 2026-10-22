@@ -552,12 +552,14 @@ set(CORE_SOURCES
     src/core/CwDecoder.cpp
     src/core/DigiFrequenzen.cpp
     src/core/Ft8Decoder.cpp
+    src/core/Ft8Subtract.cpp
     src/core/Ft8Ablauf.cpp
     src/core/Ft8Stream.cpp
     src/core/Ft8Tx.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CatProtocol.cpp
+    src/core/RigctldServer.cpp
     src/core/ThetisProfilImport.cpp
     src/core/CatPuffer.cpp
     src/core/CatPtyServer.cpp
@@ -1256,6 +1258,8 @@ set(GUI_SOURCES
     src/gui/applets/CwDecoderApplet.cpp
     src/gui/applets/Ft8Applet.cpp
     src/gui/applets/QsoRecorderApplet.cpp
+    src/gui/applets/RecordingApplet.cpp
+    src/gui/RecordingScheduleDialog.cpp
     src/gui/applets/BandwidthFilterApplet.cpp
     src/gui/applets/CatApplet.cpp
     src/gui/applets/TunerApplet.cpp

@@ -145,8 +145,28 @@ void MainWindow::wireFlex()
             }
         }
         if (!ziel) {
-            qCWarning(lcFlexGui) << "keine freie Scheibe fuer den Flex-Ton — "
-                                    "Bild laeuft, Ton nicht";
+            // 2026-10-21 an Martins Station: ALLE Scheiben hingen an
+            // einem echten Geraet (`streamIndex() >= 0`), also war keine
+            // frei — und damit lief weder Ton NOCH Bild, denn beides
+            // haengt an dieser Zuordnung (der Panadapter ueber
+            // `setKiwiDisplaySource(true)` weiter unten). Die alte
+            // Warnung behauptete „Bild laeuft, Ton nicht"; das war
+            // falsch und hat eine Stunde Suche gekostet.
+            //
+            // Die Flex ist ein eigenes Geraet und wartet nicht darauf,
+            // dass eine Scheibe frei wird: sie bekommt ihre eigene.
+            // `suppressAutoStreamBinding` ist dabei Pflicht — ohne das
+            // greift `bindSliceToStream()` zu, die Scheibe bekommt
+            // einen echten `streamIndex()`, und die Sicherheitswache
+            // liest das als „ein wirkliches Geraet hat uebernommen"
+            // und schneidet genau den Weg ab, den wir gerade bauen.
+            const int neu = m_radioModel->addSlice(QString(), true);
+            ziel = (neu >= 0) ? m_radioModel->sliceById(neu) : nullptr;
+            m_flexSliceWasCreated = (ziel != nullptr);
+        }
+        if (!ziel) {
+            qCWarning(lcFlexGui) << "keine Scheibe fuer die Flex, und das "
+                                    "Anlegen misslang — weder Ton noch Bild";
             return;
         }
 
@@ -198,11 +218,79 @@ void MainWindow::wireFlex()
     connect(m_radioModel, &RadioModel::flexSpectrumReady, this,
             [this](quint32, const QVector<float>& dbm) {
         if (m_shuttingDown || dbm.isEmpty()) { return; }
+
+        // 2026-10-21: bis hierher war jeder Befund belegt — die Pakete
+        // kommen an, die Rahmen entstehen, der Maszstab steht, die
+        // Maschine hat `display pan set ... 1024 x 1000` mit Code 0
+        // quittiert. Gezeichnet wurde trotzdem nichts, und WELCHES der
+        // drei Tore unten zuschlaegt, war von auszen nicht zu sehen.
+        // Also sagt es das Protokoll — einmal je Grund, nicht je
+        // Rahmen (es kommen 25 in der Sekunde).
+        const auto meldeEinmal = [this](FlexBildGrund grund, const char* text) {
+            if (m_flexBildGrund == grund) { return; }
+            m_flexBildGrund = grund;
+            qCInfo(lcFlexGui) << "Flex-Bild:" << text;
+        };
+
         if (m_flexSpanHighHz <= m_flexSpanLowHz) {
-            return;   // noch kein Ausschnitt bekannt (siehe oben)
+            meldeEinmal(FlexBildGrund::KeinAusschnitt,
+                        "kein Ausschnitt — es kam noch keine Wasserfallzeile "
+                        "mit Frequenzen, also waere jedes Bild an der "
+                        "falschen Stelle");
+            return;
         }
         SpectrumWidget* sw = m_radioModel ? m_radioModel->spectrumWidget() : nullptr;
-        if (!sw || !sw->kiwiDisplaySource()) { return; }
+        if (!sw) {
+            meldeEinmal(FlexBildGrund::KeinFenster,
+                        "kein Panadapter-Fenster da (RadioModel::spectrumWidget "
+                        "ist leer) — es gibt nichts, worauf gezeichnet wird");
+            return;
+        }
+        if (!sw->kiwiDisplaySource()) {
+            meldeEinmal(FlexBildGrund::FremdquelleAus,
+                        "das Fenster nimmt keine fremde Quelle an "
+                        "(kiwiDisplaySource ist aus)");
+            return;
+        }
+        if (m_flexBildGrund != FlexBildGrund::Zeichnet) {
+            // Einmal, beim ersten gezeichneten Rahmen: WOHIN gemalt
+            // wird. „Wird gezeichnet" und „ist zu sehen" sind zweierlei
+            // — ein unsichtbares Fenster, eine Flaeche der Groesze null
+            // oder ein Ausschnitt neben den Daten sehen alle gleich aus,
+            // naemlich schwarz.
+            const auto mhz = [](double hz) { return hz / 1.0e6; };
+            qCInfo(lcFlexGui).nospace()
+                << "Flex-Bild: " << dbm.size() << " Bins, Ausschnitt "
+                << mhz(m_flexSpanLowHz) << "–" << mhz(m_flexSpanHighHz)
+                << " MHz; Fenster zeigt " << mhz(sw->centerFrequency())
+                << " MHz Mitte, " << mhz(sw->bandwidth()) << " MHz breit; "
+                << "sichtbar=" << sw->isVisible()
+                << " Groesze=" << sw->width() << "x" << sw->height();
+
+            // Die Elternkette, wenn die Flaeche unsichtbar ist.
+            //
+            // `isVisible()` ist falsch, sobald IRGENDEIN Vorfahr
+            // versteckt ist — die Flaeche selbst kann dabei tadellos
+            // dastehen. Welche Ebene zu ist, sieht man nur, wenn man
+            // die Kette hinauflaeuft; am 2026-10-21 hat das Raten
+            // daran eine Stunde gekostet (memory
+            // longpath-pruefstand-fensterbreite-xvfb sagt dasselbe:
+            // Elternkette melden, nicht die Endzahl).
+            if (!sw->isVisible()) {
+                int ebene = 0;
+                for (QWidget* w = sw; w; w = w->parentWidget(), ++ebene) {
+                    qCInfo(lcFlexGui).nospace()
+                        << "Flex-Bild: Elternkette " << ebene << ": "
+                        << w->metaObject()->className()
+                        << " \"" << w->objectName() << "\""
+                        << " sichtbar=" << w->isVisible()
+                        << " versteckt=" << w->isHidden()
+                        << " Fenster=" << w->isWindow()
+                        << " Lage=" << w->geometry();
+                }
+            }
+        }
+        meldeEinmal(FlexBildGrund::Zeichnet, "wird gezeichnet");
         sw->updateKiwiSpectrumDbm(dbm, m_flexSpanLowHz, m_flexSpanHighHz);
     });
 
@@ -221,6 +309,12 @@ void MainWindow::wireFlex()
         }
         qCInfo(lcFlexGui) << "Flex-Ton von Scheibe" << m_flexTargetSliceId
                           << "geloest";
+        // Nur die eigene wieder wegraeumen. Eine Scheibe, die der
+        // Betreiber selbst hatte, bleibt stehen.
+        if (m_flexSliceWasCreated && m_radioModel) {
+            m_radioModel->removeSlice(m_flexTargetSliceId);
+        }
+        m_flexSliceWasCreated = false;
         m_flexTargetSliceId = -1;
         m_flexSpanLowHz = 0.0;
         m_flexSpanHighHz = 0.0;

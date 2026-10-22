@@ -301,10 +301,191 @@ dieselbe Form, die `AudioEngine::feedKiwiSdrAudioData` schon
 entgegennimmt (`pcm24kStereoFloat`) — der Tonweg aus §5.1 des Entwurfs
 passt also ohne Umbau.
 
-Nicht gemessen: die schmale Klasse `0x0123` (int16-Mono, reduzierte
-Bandbreite — kommt mit `client set send_reduced_bw_dax=1`) und die
-Messwerte `0x8002`. Abwesenheit ist keine Aussage; dazu ist hier nichts
-belegt.
+Nachtrag 2026-10-21: der Ton hat eine **zweite** Klasse — siehe §5a.
+
+---
+
+## 5a. Paketklasse 0x8005 — Ton, Opus-komprimiert
+
+*Gemessen am 2026-10-21 an derselben Maschine (Fassung 4.3.16.42034,
+API 1.4.0.0).*
+
+`stream create type=remote_audio_rx compression=none` liefert `0x03E3`
+(§5). Mit **`compression=opus`** kommt stattdessen eine Klasse, die in
+keiner Unterlage steht, die wir hatten:
+
+| | |
+| --- | --- |
+| Klassenkennung | `0x8005` (Bytes 14–15, OUI `00001c2d534c` davor) |
+| Takt | **100,0 Pakete/s** — gemessen 1224 Pakete in 12 229 ms |
+| Rahmendauer | 10 ms (aus dem Takt) |
+| Datagramm | 89…130 Byte, Median 96 |
+| Nutzlast | 61…102 Byte, Median 68 — variable Bitrate |
+| Kopf | dieselben 28 Byte wie alle Klassen (§2) |
+
+### Die Falle: die Längenangabe im Kopf SCHNEIDET AB
+
+Das Längenfeld (Bytes 2–3) zählt **32-Bit-Wörter**. Eine Opus-Nutzlast
+ist aber nicht wortweise lang. Gemessen an 400 Paketen:
+
+| Datagramm minus (Wörter × 4) | Pakete |
+| --- | --- |
+| +0 Byte | 155 |
+| +1 Byte | 91 |
+| +2 Byte | 85 |
+| +3 Byte | 69 |
+
+Wer die Nutzlast nach dem Kopffeld abschneidet, verliert bei **245 von
+400 Paketen** (61 %) ein bis drei Byte — und verstümmelt damit den
+Opus-Rahmen. **Hier ist die Datagrammlänge maßgeblich, nicht der Kopf.**
+
+Das ist die **Umkehrung** der Falle aus §6: bei `0x8003`/`0x8004` sind
+die vier letzten Byte Füllung, und wer dort nach Datagrammlänge zählt,
+erfindet Signale mit Vollausschlag. Die Regel hängt also an der Klasse,
+nicht am Protokoll.
+
+---
+
+## 5b. Paketklasse 0x8002 — Messwerte
+
+*Gemessen am 2026-10-21: 653 Pakete in 22 s, nach `sub meter all`.*
+
+**Aufbau:** 28 Byte Kopf, danach Paare aus **Kennung (u16, groß-endig)**
+und **Rohwert (i16, groß-endig)**. Der Rumpf ist **immer** durch 4
+teilbar (653 von 653 Paketen); die Zahl der Paare je Paket schwankt
+(Datagramme 44…156 Byte), weil nur geänderte Werte mitkommen.
+
+### Der Teiler hängt an der EINHEIT — nicht ein Teiler für alles
+
+Das ist der Fund, den man nicht raten darf. 44 von 46 beobachteten
+Werten liegen mit `/128` in ihrem erklärten Bereich — die zwei
+Spannungen nicht:
+
+| Messwert | roh | `/128` | `/256` | Bereich |
+| --- | --- | --- | --- | --- |
+| `+13.8A` | 3495 | 27,305 V ✗ | **13,652 V** ✓ | 10,5…15,0 |
+| `+13.8B` | 3641 | 28,445 V ✗ | **14,223 V** ✓ | 10,5…15,0 |
+
+* **dBm, dBFS, SWR: `/128`** — belegt. `SWR` kam als roh 128 = genau
+  1,000, und die dB-Werte landen auf glatten Grenzen (−150,000;
+  −120,000; 0,000).
+* **Volts: `/256`** — belegt über den erklärten Bereich: `/128` liegt
+  für beide Schienen **außerhalb**, `/256` innerhalb, und 13,65 V bzw.
+  14,22 V ist genau das, was eine 13,8-V-Schiene liest.
+* **degC, RPM, Amps: NICHT belegt.** Beide Teiler liegen im erklärten
+  Bereich, der Bereich entscheidet hier also nichts. Nach Plausibilität
+  wäre `PATEMP` roh 1505 mit `/64` = 23,5 °C (Zimmertemperatur, Gerät
+  im Leerlauf) und `MAINFAN` roh 1060 ungeteilt = 1060 U/min. Belegen
+  würde das erst eine Änderung, die man herbeiführt — den Sender
+  tasten, bis die Endstufe warm wird. Das ist hier nicht geschehen.
+
+### Die Kennung im Paket ist der LAUFENDE INDEX, nicht `num`
+
+Jede Definition trägt beides. Die Zahl im Datenpaket ist der Index aus
+der Statuszeile (1…59), nicht das Feld `num`. Belegt durch die
+Zuordnung: Index 10 lieferte genau 1,000 und heißt `SWR`; Index 1
+lieferte −89,6 dBFS und heißt `MICPEAK`.
+
+`num` ist dagegen der **Scheibenindex** bei Scheibenmesswerten — die
+Blöcke 12…21 (`num=0`) und 36…45 (`num=1`) sind derselbe
+Empfangsweg für Scheibe 0 bzw. 1.
+
+### Woher die Definitionen kommen
+
+Nach `sub meter all` schickt die Maschine je Messwert **eine
+Statuszeile**, und zwar mit `#` getrennt statt mit Leerzeichen:
+
+```
+S4ED321C5|meter 1.src=COD-#1.num=1#1.nam=MICPEAK#1.low=-150.0#1.hi=20.0#1.desc=Signal strength of MIC output in CODEC#1.unit=dBFS#1.fps=40#
+```
+
+**Das zerreißt unseren eigenen Leser.** `FlexCommandWire::parseLine`
+trennt an Leerzeichen; `desc` enthält aber welche. Aus der Zeile oben
+wurde bei uns `MIC=`, `in=`, `of=`, `output=`, `strength=` — Unsinn.
+Gemeldet am 2026-10-21, siehe den eigenen Eintrag unten.
+
+### Die 59 Messwerte dieser Maschine
+
+| Index | num | Name | Einheit | low | hi |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 1 | `MICPEAK` | dBFS | -150.0 | 20.0 |
+| 2 | 2 | `MIC` | dBFS | -150.0 | 20.0 |
+| 3 | 5 | `HWALC` | dBFS | -150.0 | 20.0 |
+| 4 | 334 | `+13.8A` | Volts | 10.5 | 15.0 |
+| 5 | 300 | `PACURRENT` | Amps | 0.0 | 10.0 |
+| 6 | 0 | `+13.8B` | Volts | 10.5 | 15.0 |
+| 7 | 3 | `MAINFAN` | RPM | 0.0 | 8192.0 |
+| 8 | 1 | `FWDPWR` | dBm | 0.0 | 53.0 |
+| 9 | 2 | `REFPWR` | dBm | 0.0 | 53.0 |
+| 10 | 3 | `SWR` | SWR | 1.0 | 999.0 |
+| 11 | 4 | `PATEMP` | degC | 0.0 | 120.0 |
+| 12 | 0 | `24kHz` | dBm | -150.0 | 20.0 |
+| 13 | 0 | `OSC` | dBm | -150.0 | 20.0 |
+| 14 | 0 | `NB` | dBm | -150.0 | 20.0 |
+| 15 | 0 | `ESC` | dBm | -150.0 | 20.0 |
+| 16 | 0 | `LEVEL` | dBm | -150.0 | 20.0 |
+| 17 | 0 | `TNF` | dBm | -150.0 | 20.0 |
+| 18 | 0 | `ANF` | dBm | -150.0 | 20.0 |
+| 19 | 0 | `SQUELCH` | dBm | -150.0 | 20.0 |
+| 20 | 0 | `AGC` | dBm | -150.0 | 20.0 |
+| 21 | 0 | `NR` | dBm | -150.0 | 20.0 |
+| 22 | 0 | `CODEC` | dBFS | -150.0 | 20.0 |
+| 23 | 0 | `TXAGC` | dBFS | -150.0 | 20.0 |
+| 24 | 0 | `SC_MIC` | dBFS | -150.0 | 20.0 |
+| 25 | 0 | `AFTEREQ` | dBFS | -150.0 | 20.0 |
+| 26 | 0 | `COMPPEAK` | dBFS | -150.0 | 20.0 |
+| 27 | 0 | `SC_FILT_1` | dBFS | -150.0 | 20.0 |
+| 28 | 0 | `ALC` | dBFS | -150.0 | 20.0 |
+| 29 | 0 | `RM_TX_AGC` | dBFS | -150.0 | 20.0 |
+| 30 | 0 | `SC_FILT_2` | dBFS | -150.0 | 20.0 |
+| 31 | 0 | `TX_AGC` | dBFS | -150.0 | 20.0 |
+| 32 | 0 | `B4RAMP` | dBFS | -150.0 | 20.0 |
+| 33 | 0 | `AFRAMP` | dBFS | -150.0 | 20.0 |
+| 34 | 0 | `POST_P` | dBFS | -150.0 | 20.0 |
+| 35 | 0 | `ATTN_FPGA` | dBFS | -150.0 | 20.0 |
+| 36 | 1 | `24kHz` | dBm | -150.0 | 20.0 |
+| 37 | 1 | `OSC` | dBm | -150.0 | 20.0 |
+| 38 | 1 | `NB` | dBm | -150.0 | 20.0 |
+| 39 | 1 | `ESC` | dBm | -150.0 | 20.0 |
+| 40 | 1 | `LEVEL` | dBm | -150.0 | 20.0 |
+| 41 | 1 | `TNF` | dBm | -150.0 | 20.0 |
+| 42 | 1 | `ANF` | dBm | -150.0 | 20.0 |
+| 43 | 1 | `SQUELCH` | dBm | -150.0 | 20.0 |
+| 44 | 1 | `AGC` | dBm | -150.0 | 20.0 |
+| 45 | 1 | `NR` | dBm | -150.0 | 20.0 |
+| 46 | 0 | `CODEC` | dBFS | -150.0 | 20.0 |
+| 47 | 0 | `TXAGC` | dBFS | -150.0 | 20.0 |
+| 48 | 0 | `SC_MIC` | dBFS | -150.0 | 20.0 |
+| 49 | 0 | `AFTEREQ` | dBFS | -150.0 | 20.0 |
+| 50 | 0 | `COMPPEAK` | dBFS | -150.0 | 20.0 |
+| 51 | 0 | `SC_FILT_1` | dBFS | -150.0 | 20.0 |
+| 52 | 0 | `ALC` | dBFS | -150.0 | 20.0 |
+| 53 | 0 | `RM_TX_AGC` | dBFS | -150.0 | 20.0 |
+| 54 | 0 | `SC_FILT_2` | dBFS | -150.0 | 20.0 |
+| 55 | 0 | `TX_AGC` | dBFS | -150.0 | 20.0 |
+| 56 | 0 | `B4RAMP` | dBFS | -150.0 | 20.0 |
+| 57 | 0 | `AFRAMP` | dBFS | -150.0 | 20.0 |
+| 58 | 0 | `POST_P` | dBFS | -150.0 | 20.0 |
+| 59 | 0 | `ATTN_FPGA` | dBFS | -150.0 | 20.0 |
+
+---
+
+## 5c. `0x0123` — dreimal versucht, nicht erschienen
+
+Die schmale Klasse (int16-Mono) steht in unseren Notizen als „kommt mit
+`client set send_reduced_bw_dax=1`". **Auf dieser Maschine kommt sie
+nicht.** Drei Anläufe am 2026-10-21, alle mit Rückgabe 0 auf die
+Befehle:
+
+| Anlauf | Ergebnis |
+| --- | --- |
+| `send_reduced_bw_dax=1` + `remote_audio_rx compression=none` | weiter `0x03E3` |
+| `slice set 0 dax=1` + `stream create type=dax_rx dax_channel=1` | weiter `0x03E3` |
+| `remote_audio_rx compression=opus` | **`0x8005`** (§5a) |
+
+Das ist eine Aussage über **diese** Fassung (4.3.16.42034 / API
+1.4.0.0) und diese drei Wege — nicht über das Protokoll. Wer sie sucht,
+hat drei Wege weniger zu probieren.
 
 ---
 

@@ -3613,8 +3613,21 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     // (paintPassbandOverSurface) und muss mit der Flaeche Schritt
     // halten — ohne diesen Zweig wuerde sie ohne Peak-Hold/Blobs/
     // Rauschflur nie neu gemalt.
+    // ── Befund 6 (2026-10-22): das Zweiton-Feld fehlte in dieser Liste ──
+    //
+    // Die IMD-Marken und das Messfeld werden im GPU-Weg in dieselbe
+    // dynamische Schicht gemalt (siehe den Aufruf in der
+    // Overlay-Neubau-Schleife). Sie standen aber nicht in dieser
+    // Bedingung: ohne Spitzenhalten, Spitzenblasen, Rauschflur oder
+    // 3D-Modus wurde die Schicht nie fuer veraltet erklaert -- die Marken
+    // blieben also auf dem Stand des Bildes, in dem die Schicht zuletzt
+    // aus einem ANDEREN Grund neu gebaut wurde. NereusSDR hat denselben
+    // Befund als "GPU gate-off invalidation gap" notiert.
+    const bool imdTorOffen = m_moxOverlay && m_testingIMD
+                          && m_showIMDMeasurements && m_displayDuplex;
     if (m_activePeakHold.enabled() || m_peakBlobs.enabled()
         || m_showNoiseFloor
+        || imdTorOffen
         || m_renderMode == SpectrumRenderMode::Mode3D) {
         const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
         // 2026-05-26 KG4VCF dual-layer overlay split: peak-hold trace
@@ -3650,6 +3663,20 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     // available so MainWindow can push the slice's passband peak into the
     // MaxBin detector. See peakDbmInSlicePassband for the rationale.
     emit spectrumFrameRendered();
+
+    // ── Zweiton-Analyse: hier, nicht im Malvorgang (2026-10-22) ──────────
+    //
+    // Befund 3 aus NereusSDRs PureSignal-Entwurfsblatt vom 2026-10-12.
+    // Dieselbe Torbedingung wie beim Malen (Thetis display.cs:5008
+    // [v2.10.3.13]) -- aber einmal je Spektrumsbild statt einmal je
+    // Neuzeichnung. Faellt das Tor, verfaellt das letzte Ergebnis, damit
+    // der Malvorgang keine alten Marken weiterzeichnet.
+    if (m_moxOverlay && m_testingIMD && m_showIMDMeasurements
+            && m_displayDuplex) {
+        analyseImd();
+    } else {
+        m_imdAnalysisValid = false;
+    }
 }
 
 // 2026-05-22 bench fix: maxBin meter accuracy.
@@ -7021,6 +7048,26 @@ void SpectrumWidget::setMoxOverlay(bool isTx)
 //   PureSignal::show2ToneMeasurementsChanged   -> setShowIMDMeasurements
 // Mirrors Thetis Display.TestingIMD (display.cs:296-302 [v2.10.3.13]) and
 // Display.ShowIMDMeasurments (display.cs:304-311 [v2.10.3.13]).
+// ── Befund 6: Entwertung der zwischengespeicherten Zweiton-Schicht ──────
+//
+// Im GPU-Weg liegen Marken und Messfeld in m_overlayDynamic, einer
+// Textur, die nur bei gesetztem m_overlayDynamicDirty neu gebaut wird.
+// update() allein macht daraus kein neues Bild. Jeder Schalter, der das
+// Zweiton-Tor bewegt, muss die Schicht deshalb von Hand entwerten --
+// sonst bleibt beim Torschluss das letzte Messfeld stehen, und beim
+// Toroeffnen erscheint es erst, wenn irgendetwas anderes die Schicht
+// erneuert.
+//
+// Ausserhalb des GPU-Baus ein reines update(), wie markOverlayDirty().
+void SpectrumWidget::entwerteImdSchicht()
+{
+#ifdef LONGPATH_GPU_SPECTRUM
+    m_overlayDynamicDirty = true;
+    m_overlayDynamicDirtyMs = 0;  // nicht an der 30-Hz-Bremse haengen bleiben
+#endif
+    update();
+}
+
 void SpectrumWidget::setTestingIMD(bool on)
 {
     if (m_testingIMD == on) {
@@ -7030,6 +7077,10 @@ void SpectrumWidget::setTestingIMD(bool on)
     if (!on && m_imdOverlay) {
         m_imdOverlay->reset();  // EMA reset, see setMoxOverlay note above.
     }
+    // Befund 6 (2026-10-22): update() allein genuegt im GPU-Weg nicht --
+    // die Marken liegen in einer zwischengespeicherten Textur. Ohne diese
+    // Entwertung blieb beim Torschluss das alte Messfeld stehen.
+    entwerteImdSchicht();
     qCInfo(lcSpectrum) << "IMD overlay gate: mox=" << m_moxOverlay
                        << "testIMD=" << m_testingIMD
                        << "showImd=" << m_showIMDMeasurements
@@ -7047,6 +7098,7 @@ void SpectrumWidget::setShowIMDMeasurements(bool on)
     if (!on && m_imdOverlay) {
         m_imdOverlay->reset();
     }
+    entwerteImdSchicht();  // Befund 6, siehe setTestingIMD.
     qCInfo(lcSpectrum) << "IMD overlay gate: mox=" << m_moxOverlay
                        << "testIMD=" << m_testingIMD
                        << "showImd=" << m_showIMDMeasurements
@@ -8101,7 +8153,30 @@ void SpectrumWidget::drawTxFilterOverlay(QPainter& p, const QRect& specRect)
 //   :5650-5685  3-column readout text (delegated to
 //                  ImdOverlay::formatReadout)
 // ---------------------------------------------------------------------------
-void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
+// ---------------------------------------------------------------------------
+// analyseImd()
+//
+// ── Die Messung gehoert nicht in den Malvorgang (2026-10-22) ─────────────
+//
+// Bis heute stand dieser ganze Block in drawImdOverlay(), lief also mit
+// der Bildrate und nur dann, wenn Qt gerade neu zeichnete. Damit hing
+// sowohl der EMA-Takt als auch die Protokollzeile davon ab, WANN gemalt
+// wurde -- bei verdecktem Fenster gar nicht, bei GPU-Weg anders als bei
+// CPU-Weg. Das erklaert die Messreihen vom 2026-10-21, in denen Werte
+// mal kamen und mal nicht.
+//
+// NereusSDR hat denselben Befund in seinem Entwurfsblatt vom 2026-10-12
+// unter "paint-driven analysis" notiert. Behoben wie dort beschrieben:
+// die Analyse laeuft jetzt genau einmal je Spektrumsbild, am Ende von
+// updateSpectrumLinear(), wo m_renderedPixels endgueltig ist. Der
+// Malvorgang liest nur noch das Ergebnis.
+//
+// Die Produkte liegen in m_imdProductDbm/m_imdProductBin in der Reihenfolge
+// f0L, f0U, IMD3L, IMD3U, IMD5L, IMD5U (siehe kImdProduct* in der
+// Kopfdatei) -- als nackte Zahlen, damit ImdOverlay.h nicht in die
+// Kopfdatei muss (Begruendung dort bei m_imdOverlay).
+// ---------------------------------------------------------------------------
+void SpectrumWidget::analyseImd()
 {
     // ── Warum NICHTS gemessen wird, muss auch im Protokoll stehen ────────
     //
@@ -8125,6 +8200,7 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
 
     if (!m_imdOverlay || m_renderedPixels.isEmpty()) {
         melden(QStringLiteral("no spectrum rendered (window covered?)"));
+        m_imdAnalysisValid = false;
         return;
     }
 
@@ -8153,6 +8229,7 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
     const int count = m_renderedPixels.size();
     if (count < 2) {
         melden(QStringLiteral("only %1 visible bins").arg(count));
+        m_imdAnalysisValid = false;
         return;
     }
 
@@ -8230,6 +8307,7 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
                            .arg(f0 - i5, 0, 'f', 1)
                            .arg(peaks.size())
                            .arg(d));
+                m_imdAnalysisValid = false;
                 return;
             }
         }
@@ -8240,6 +8318,7 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
         // text "Peaks not found !") are intentionally silent here — the
         // user already sees a stale readout box from the previous frame
         // until peaks return.  A future polish PR can render a hint.
+        m_imdAnalysisValid = false;
         return;
     }
     m_imdOverlay->updateReadout(f0L, f0U, imd3L, imd3U, imd5L, imd5U);
@@ -8274,6 +8353,41 @@ void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
                 << " OIP5=" << r.oip5;
         }
     }
+
+
+    // Ergebnis fuer den Malvorgang ablegen.
+    const Maximum* prod[6] = { &f0L, &f0U, &imd3L, &imd3U, &imd5L, &imd5U };
+    for (int i = 0; i < 6; ++i) {
+        m_imdProductDbm[i] = prod[i]->dBm;
+        m_imdProductBin[i] = prod[i]->x;
+    }
+    m_imdAnalysisBins  = count;
+    m_imdAnalysisValid = true;
+}
+
+// ---------------------------------------------------------------------------
+// drawImdOverlay()
+//
+// Malt nur noch. Gemessen wird in analyseImd(), einmal je Spektrumsbild.
+// ---------------------------------------------------------------------------
+void SpectrumWidget::drawImdOverlay(QPainter& p, const QRect& specRect)
+{
+    if (!m_imdOverlay || !m_imdAnalysisValid || m_imdAnalysisBins < 2) {
+        return;
+    }
+    const int count = m_imdAnalysisBins;
+    auto produkt = [this](int i) {
+        Maximum m;
+        m.dBm = m_imdProductDbm[i];
+        m.x   = m_imdProductBin[i];
+        return m;
+    };
+    const Maximum f0L   = produkt(0);
+    const Maximum f0U   = produkt(1);
+    const Maximum imd3L = produkt(2);
+    const Maximum imd3U = produkt(3);
+    const Maximum imd5L = produkt(4);
+    const Maximum imd5U = produkt(5);
 
     // Map bin indices -> pixel X using the same formula as drawSpectrum.
     const float xStep = static_cast<float>(specRect.width())

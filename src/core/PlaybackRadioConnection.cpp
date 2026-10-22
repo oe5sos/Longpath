@@ -14,6 +14,8 @@
 
 #include "PlaybackRadioConnection.h"
 
+#include "core/audio/WavRecorder.h"   // kWavSourceOffTheAir
+
 #include <QLoggingCategory>
 
 #include <algorithm>
@@ -53,8 +55,35 @@ bool PlaybackRadioConnection::openRecording(const QString& wavPath, QString* err
         return false;
     }
 
+    // ── Ist das ueberhaupt eine I/Q-Aufnahme? ────────────────────
+    //
+    // Gefunden am 2026-10-22: hier stand nur die Pruefung auf
+    // „lesbare Stereo-WAV mit Abtastrate". Eine TONaufnahme
+    // (WavRecorder, der Knopf eine Zeile ueber der Wiedergabe im
+    // Aufnahme-Applet) ist genau das -- Stereo, 48 kHz, derselbe
+    // Ordner, dasselbe Namensmuster. Sie wurde geladen, die
+    // Verbindung meldete Connected, und 48-kHz-Ton lief als I/Q
+    // durch FFT und WDSP: Rauschen im Wasserfall, kein Wort darueber.
+    //
+    // Der Beizettel sagt es. Abgelehnt wird NUR, wenn er positiv eine
+    // Tonaufnahme nennt -- ein FEHLENDER Beizettel ist keine Aussage
+    // (alte Aufnahmen und von Hand kopierte Dateien haben keinen),
+    // und daraus eine zu machen hiesse, brauchbare Aufnahmen
+    // wegzuweisen.
+    const IqRecordingInfo zettel = readIqRecordingDescription(wavPath);
+    if (zettel.source == QString(kWavSourceOffTheAir)) {
+        if (error) {
+            *error = QStringLiteral(
+                "that is an audio recording — playback needs an I/Q "
+                "recording (the Record button in the I/Q row)");
+        }
+        qCWarning(lcPlayback) << "Playback: refused" << wavPath
+                              << "— audio recording, not I/Q";
+        return false;
+    }
+
     m_data = std::move(data);
-    m_meta = readIqRecordingDescription(wavPath);
+    m_meta = zettel;
     // readIqRecordingDescription() reads sampleRate from the sidecar
     // JSON independently of the WAV header; if the sidecar is missing
     // or stale, trust the WAV header itself (m_data.sampleRate) since
