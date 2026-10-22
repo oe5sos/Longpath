@@ -261,8 +261,8 @@ void Ft8Applet::buildUI()
     m_tonFeld->setValue(m_sendeTonHz);
     m_tonFeld->setFont(Style::monoFont(font(), Style::kFontSmall));
     m_tonFeld->setToolTip(tr(
-        "Where in the passband you transmit. Pick a clear spot: with "
-        "Auto on, every call goes out here."));
+        "Where in the passband you transmit. Pick a clear spot — "
+        "every call of yours goes out here."));
     connect(m_tonFeld, &QSpinBox::valueChanged, this, [this](int hz) {
         m_sendeTonHz = hz;
         AppSettings::instance().setValue(QLatin1String(kSendeTonSchluessel), hz);
@@ -423,8 +423,8 @@ void Ft8Applet::buildUI()
     // (starteAlsAnrufer, dreizehn Prueffaelle) — nur rief sie
     // niemand auf. Antworten ging per Doppelklick, selbst CQ rufen
     // gar nicht. Dieser Knopf schliesst das, mit demselben Verhalten
-    // wie der Doppelklick: ohne „Auto" legt er den Ruf nur ins Feld,
-    // mit „Auto" faengt der Ablauf an.
+    // wie der Doppelklick: er faengt den Ablauf an und laesst ihn
+    // bis 73 laufen.
     // ── Tx1..Tx6 ────────────────────────────────────────────────────
     //
     // Eine Reihe ueber dem Textfeld. Jeder Knopf LEGT den Satz nur ins
@@ -455,8 +455,9 @@ void Ft8Applet::buildUI()
 
     m_cqRufenBtn = styledButton(tr("CQ"), 40);
     m_cqRufenBtn->setToolTip(tr(
-        "Put your own CQ call in the box.\nWith Auto on, start calling "
-        "CQ and run the QSO sequence."));
+        "Call CQ. It repeats by itself for as many periods as the "
+        "box beside it says, and stops as soon as somebody answers.\n"
+        "From there the QSO runs through to 73. Stop ends it."));
     connect(m_cqRufenBtn, &QPushButton::clicked, this, [this]() {
         const QString ruf = cqRuf(eigenesRufzeichen(), eigenerLocator());
         if (ruf.isEmpty()) {
