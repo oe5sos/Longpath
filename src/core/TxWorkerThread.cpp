@@ -869,6 +869,23 @@ void TxWorkerThread::dispatchOneBlock()
     // wird mit Stille aufgefuellt, damit kein Mikrofonton durchleckt.
     TxMicRouter* eigene =
         m_txChannel != nullptr ? m_txChannel->micRouter() : nullptr;
+
+    // ── Was hier liegt, ist kein Mikrofon mehr ───────────────────────
+    //
+    // Ab diesem Punkt steht fest, WOHER der Block kommt. Der
+    // Sendeton-Kanalzug weiter unten muss das wissen: er ist fuer eine
+    // STIMME gebaut (Roehrensaettigung, Kompressor, De-Esser,
+    // Entzerrer), und ein fertig moduliertes Datensignal uebersteht
+    // das nicht. Siehe die Stelle selbst.
+    //
+    // RADE zaehlt mit: sein Sprachmodell hat oben bereits ein fertiges
+    // Basisband nach m_in geschrieben, und alle anderen
+    // Uebersteuerungszweige hier tragen deshalb schon ein
+    // `path != TxPath::Rade`.
+    const bool datenSignal =
+        path == TxPath::Rade
+        || (eigene != nullptr && eigene->eigeneTonquelleAktiv());
+
     if (path != TxPath::Rade
         && eigene != nullptr && eigene->eigeneTonquelleAktiv()) {
         m_pcMicSpliceWasActive = false;
@@ -1079,7 +1096,33 @@ void TxWorkerThread::dispatchOneBlock()
         emit preStripAudioReady(m_voiceTapBuf.data(), kBlockFrames);
     }
 
-    if (m_stripChain != nullptr && m_stripChain->isEnabled()
+    // ── Der Kanalzug fasst nur Stimmen an ────────────────────────────
+    //
+    // `datenSignal` ist die zweite Bedingung, und sie fehlte bis zum
+    // 2026-10-22. Gefunden beim Suchen nach einem FT8-Signal, das
+    // niemand aufnahm.
+    //
+    // Der Kanalzug ist fuer eine Stimme gebaut: Roehrensaettigung,
+    // Kompressor mit Begrenzer, De-Esser, Entzerrer. Auf einer Stimme
+    // ist das Klangarbeit. Auf einem fertig modulierten Signal ist es
+    // Zerstoerung -- FT8 ist GFSK mit konstanter Huellkurve, und genau
+    // diese Huellkurve ist das, woran die Stufen arbeiten. Was
+    // herauskommt, ist breiter als es darf und auf der Gegenseite
+    // nicht mehr zu dekodieren. Die Endstufe zieht trotzdem Strom,
+    // also sieht es nach aussen aus wie eine gelungene Sendung.
+    //
+    // Heute faellt es nicht auf, weil `StripChain::m_enabled` auf
+    // false steht und StripSettings::restore() den Hauptschalter nicht
+    // wiederherstellt -- er ist nach jedem Start aus. Wer ihn fuer SSB
+    // einschaltet und danach auf FT8 geht, sendet aber Muell, ohne
+    // dass irgendetwas warnt. Das ist kein Zustand, den eine
+    // Einstellung herbeifuehren darf.
+    //
+    // Die anderen Wege haben diese Trennung laengst: TCI kehrt weiter
+    // oben mit `return` zurueck (WSJT-X-Ton sieht den Kanalzug nie),
+    // und jeder Uebersteuerungszweig traegt sein `path != TxPath::Rade`.
+    // Nur hier fehlte sie.
+    if (m_stripChain != nullptr && m_stripChain->isEnabled() && !datenSignal
         && static_cast<int>(m_stripBuf.size()) >= kBlockFrames) {
         for (int i = 0; i < kBlockFrames; ++i) {
             m_stripBuf[static_cast<size_t>(i)] =

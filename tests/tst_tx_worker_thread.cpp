@@ -81,6 +81,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstring>
+#include <cmath>
 #include <vector>
 
 #include "core/AudioEngine.h"
@@ -90,6 +91,8 @@
 #include "core/audio/TxMicSource.h"
 
 #include "fakes/FakeAudioBus.h"
+#include "core/TxMicRouter.h"
+#include "core/strip/StripChain.h"
 
 using namespace Longpath;
 
@@ -329,6 +332,111 @@ private slots:
             QCOMPARE(in[2 * i + 1], 0.0);  // Q always zero
         }
 
+        src.stop();
+    }
+
+    // ── 6b. Der Kanalzug fasst ein Datensignal nicht an ────────────────
+    //
+    // Gefunden am 2026-10-22 beim Suchen nach einem FT8-Signal, das
+    // niemand aufnahm: der Sendeton-Kanalzug lief ueber JEDEN Block,
+    // gegated nur durch `isEnabled()`. Er ist fuer eine Stimme gebaut
+    // -- Roehrensaettigung, Kompressor, De-Esser, Entzerrer -- und ein
+    // fertig moduliertes FT8-Signal uebersteht das nicht.
+    //
+    // Geprueft wird mit der einfachsten Stufe, die sich nachrechnen
+    // laesst: +6 dB Eingangsverstaerkung. Ginge der Block durch den
+    // Kanalzug, stuende hinterher etwa das Doppelte in m_in.
+    //
+    // Der Fall darunter (6c) ist kein Beiwerk: ohne ihn bestuende
+    // dieser Lauf auch dann, wenn der Kanalzug ueberhaupt nichts tut.
+    void kanalzug_laesstDatensignalInRuhe()
+    {
+        AudioEngine engine;
+        TxChannel ch(kChannelId, kBufSize, kBufSize);
+        MockConnection conn;
+        ch.setConnection(&conn);
+        ch.setRunning(true);
+
+        // Eine eigene Tonquelle, wie FT8 und RTTY sie stellen: sie
+        // meldet sich als solche und liefert einen bekannten Wert.
+        struct DatenQuelle : TxMicRouter {
+            int pullSamples(float* out, int frames) override
+            {
+                for (int i = 0; i < frames; ++i) { out[i] = 0.5f; }
+                return frames;
+            }
+            bool eigeneTonquelleAktiv() const override { return true; }
+        } quelle;
+        ch.setMicRouter(&quelle);
+
+        StripChain kette;
+        kette.prepare(48000.0);
+        kette.setInputGainDb(6.0f);
+        kette.setEnabled(true);
+        QVERIFY(kette.isEnabled());
+
+        TxMicSource src;
+        src.start();
+
+        TxWorkerThread w;
+        w.setTxChannel(&ch);
+        w.setAudioEngine(&engine);
+        w.setMicSource(&src);
+        w.setStripChain(&kette);
+
+        std::vector<float> radio(kBufSize, 0.3f);
+        src.inbound(radio.data(), kBufSize);
+        w.tickForTest();
+        QCOMPARE(conn.callCount.load(), 1);
+
+        const auto& in = ch.inForTest();
+        QCOMPARE(static_cast<int>(in.size()), 2 * kBufSize);
+        for (int i = 0; i < kBufSize; ++i) {
+            QCOMPARE(in[2 * i + 0], static_cast<double>(0.5f));
+            QCOMPARE(in[2 * i + 1], 0.0);
+        }
+        src.stop();
+    }
+
+    // ── 6c. Gegenprobe: bei einer STIMME greift derselbe Kanalzug ──────
+    //
+    // Derselbe Aufbau, nur ohne eigene Tonquelle. Haette 6b recht,
+    // weil der Kanalzug gar nichts tut, faellt dieser hier.
+    void kanalzug_greiftBeiEinerStimme()
+    {
+        AudioEngine engine;
+        TxChannel ch(kChannelId, kBufSize, kBufSize);
+        MockConnection conn;
+        ch.setConnection(&conn);
+        ch.setRunning(true);
+
+        StripChain kette;
+        kette.prepare(48000.0);
+        kette.setInputGainDb(6.0f);
+        kette.setEnabled(true);
+
+        TxMicSource src;
+        src.start();
+
+        TxWorkerThread w;
+        w.setTxChannel(&ch);
+        w.setAudioEngine(&engine);
+        w.setMicSource(&src);
+        w.setStripChain(&kette);
+
+        std::vector<float> radio(kBufSize, 0.3f);
+        src.inbound(radio.data(), kBufSize);
+        w.tickForTest();
+        QCOMPARE(conn.callCount.load(), 1);
+
+        const auto& in = ch.inForTest();
+        bool veraendert = false;
+        for (int i = 0; i < kBufSize; ++i) {
+            if (std::abs(in[2 * i + 0] - 0.3) > 1e-4) { veraendert = true; break; }
+        }
+        QVERIFY2(veraendert,
+                 "der Kanalzug muss eine Stimme veraendern -- sonst sagt "
+                 "6b nichts darueber, dass er ein Datensignal in Ruhe laesst");
         src.stop();
     }
 
