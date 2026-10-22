@@ -44,7 +44,29 @@ während FT8 zuhört.
 
 ## Änderungen am Upstream
 
-**Keine** an den übernommenen Dateien — sie sind Byte für Byte gleich.
+**Eine, in `ft8/decode.c`** (2026-10-22). Alle übrigen übernommenen
+Dateien sind Byte für Byte gleich.
+
+`ft8_decode_multi_symbols()` legte sein Zwischenfeld als Array
+variabler Länge an:
+
+```c
+float s2[n_tones];
+```
+
+Das ist C99 und für GCC und Clang kein Problem. Der
+Microsoft-Compiler kennt es nicht und lehnt es ab (C2057 / C2466 /
+C2133). Aufgefallen am 2026-10-22 beim ersten Windows-Paket seit dem
+2026-10-07 — und so lange unbemerkt, weil `ci.yml` Windows mit **MinGW**
+baut und grün war, während `release.yml` mit **MSVC** baut und abbrach.
+
+Ersetzt durch ein Feld fester Größe mit Wachposten. Die Grenze ist
+nicht geschätzt: die Funktion behandelt `n_syms` 1, 2 und 3 (`j1`,
+`j2`, `j3`) und kann strukturell nichts darüber, denn die letzte Summe
+hat genau drei Glieder. Damit ist `n_tones <= 512`. Das Verhalten für
+jede Eingabe, die der Upstream erzeugt, ist unverändert; der
+Wachposten steht nur für eine künftige Fassung mit mehr Symbolen da.
+Die Begründung steht auch im Quelltext an der Stelle selbst.
 
 **Eine Ergänzung:** `common/gfsk.{c,h}`. Die beiden Funktionen
 `gfsk_pulse()` und `synth_gfsk()` stehen im Upstream nur im
