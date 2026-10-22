@@ -44,29 +44,51 @@ während FT8 zuhört.
 
 ## Änderungen am Upstream
 
-**Eine, in `ft8/decode.c`** (2026-10-22). Alle übrigen übernommenen
-Dateien sind Byte für Byte gleich.
+**Arrays variabler Länge, an drei Stellen** (2026-10-22). Alle übrigen
+übernommenen Dateien sind Byte für Byte gleich.
 
-`ft8_decode_multi_symbols()` legte sein Zwischenfeld als Array
-variabler Länge an:
+| Datei | Feld | Ersetzt durch |
+| --- | --- | --- |
+| `ft8/decode.c:516` | `float s2[n_tones]` | feste Größe 512 + Wachposten |
+| `common/monitor.c:142-143` | `timedata[me->nfft]`, `freqdata[me->nfft/2+1]` | `malloc`/`free`, einmal je Aufruf |
+| `common/gfsk.c:60,68` | `dphi[n_wave + 2*n_spsym]`, `pulse[3*n_spsym]` | `malloc`/`free`, einmal je Aussendung |
 
-```c
-float s2[n_tones];
-```
+Arrays variabler Länge sind C99. GCC und Clang übersetzen sie, der
+Microsoft-Compiler kennt sie nicht und lehnt sie ab (C2057 / C2466 /
+C2133).
 
-Das ist C99 und für GCC und Clang kein Problem. Der
-Microsoft-Compiler kennt es nicht und lehnt es ab (C2057 / C2466 /
-C2133). Aufgefallen am 2026-10-22 beim ersten Windows-Paket seit dem
-2026-10-07 — und so lange unbemerkt, weil `ci.yml` Windows mit **MinGW**
-baut und grün war, während `release.yml` mit **MSVC** baut und abbrach.
+**Warum es erst jetzt auffiel:** `ci.yml` baut Windows mit **MinGW**
+(GCC) und war bei jedem PR grün; `release.yml` baut mit **MSVC** und
+brach ab. Zwei Compiler, ein Plattformname — die CI kann einen
+MSVC-Bruch grundsätzlich nicht fangen. Gemerkt am 2026-10-22 beim ersten
+Windows-Paket seit dem 2026-10-07.
 
-Ersetzt durch ein Feld fester Größe mit Wachposten. Die Grenze ist
-nicht geschätzt: die Funktion behandelt `n_syms` 1, 2 und 3 (`j1`,
-`j2`, `j3`) und kann strukturell nichts darüber, denn die letzte Summe
-hat genau drei Glieder. Damit ist `n_tones <= 512`. Das Verhalten für
-jede Eingabe, die der Upstream erzeugt, ist unverändert; der
-Wachposten steht nur für eine künftige Fassung mit mehr Symbolen da.
-Die Begründung steht auch im Quelltext an der Stelle selbst.
+**Warum zweimal gesucht wurde:** der erste Durchgang fand nur
+`decode.c`, weil er mit einem Suchmuster suchte. Der zweite ließ den
+Compiler suchen (`-Wvla` über `compile_commands.json`) und fand alle
+fünf Stellen im Baum — die zwei weiteren hier, dazu drei in
+`rade`, `libspecbleach` und PortAudios CoreAudio-Teil, die Windows
+nicht betreffen (sie lagen schon im Baum, als Windows zuletzt
+erfolgreich baute). Dabei noch eine Falle: `-w` steht in den
+Bau-Zeilen dieser Dateien und übersteuert jedes später angehängte
+`-W...`; ohne es zu entfernen meldet der Compiler nichts.
+
+**Zu den Grenzen:** in `decode.c` ist sie nachweisbar — die Funktion
+behandelt `n_syms` 1, 2 und 3 (`j1`, `j2`, `j3`) und kann strukturell
+nichts darüber, denn die letzte Summe hat genau drei Glieder, also
+`n_tones <= 512`. In `monitor.c` und `gfsk.c` gibt es keine solche
+Grenze (sie hängen an Abtastrate und Symboldauer), darum dort der
+Haufen statt einer geratenen Zahl. Es kostet nichts: `monitor_process()`
+belegt einmal je Tonblock (bei FT8 rund 40 ms) statt je Teilblock, und
+`synth_gfsk()` läuft einmal je Aussendung.
+
+Das Verhalten ist unverändert. Belegt durch die Prüfläufe auf clang:
+`tst_ft8_dekodiert` 8, `tst_ft8_subtraktion` 9, `tst_ft8_am_ton` 9,
+`tst_ft8_senden` 38, `tst_ft8_rechenzeit` 3 — alle grün. `gfsk.c` sitzt
+dabei auf beiden Seiten: der Prüfstand erzeugt sein Signal damit, und
+gesendet wird damit auch.
+
+Die Begründung steht an jeder der drei Stellen auch im Quelltext.
 
 **Eine Ergänzung:** `common/gfsk.{c,h}`. Die beiden Funktionen
 `gfsk_pulse()` und `synth_gfsk()` stehen im Upstream nur im
