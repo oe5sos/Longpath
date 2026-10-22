@@ -474,23 +474,22 @@ void Ft8Applet::buildUI()
     sendRow->addWidget(m_cqBtn);
 
     m_stopBtn = styledButton(tr("Stop"), 48);
+    m_stopBtn->setToolTip(tr("Stop transmitting and drop the QSO "
+                             "sequence."));
     m_stopBtn->setEnabled(false);
-    connect(m_stopBtn, &QPushButton::clicked, this, [this]() { abbrechen(); });
+    // „Stop" heisst Stop. abbrechen() allein nimmt nur das laufende
+    // Fenster zurueck — der Ablauf blieb stehen und waere beim
+    // naechsten passenden Fund von selbst weitergelaufen. Seit der
+    // Doppelklick den Ablauf immer startet, ist das der einzige Weg
+    // hinaus, und er muss halten.
+    connect(m_stopBtn, &QPushButton::clicked, this, [this]() {
+        m_ablauf.abbrechen();
+        m_cqVersucheOffen = 0;
+        abbrechen();
+        zeigeAblauf();
+    });
     sendRow->addWidget(m_stopBtn);
 
-    // Der Schalter fuer den Ablauf. Steht aus, und das ist Absicht:
-    // eingeschaltet sendet das Programm ohne weiteren Druck, bis das
-    // QSO fertig ist oder aufgegeben wird.
-    m_autoBtn = styledButton(tr("Auto"), 48);
-    m_autoBtn->setCheckable(true);
-    m_autoBtn->setChecked(false);
-    m_autoBtn->setToolTip(tr(
-        "Run the QSO sequence by itself after a double-click on a "
-        "decode.\nOff: a double-click only fills the message box."));
-    connect(m_autoBtn, &QPushButton::toggled, this, [this](bool an) {
-        if (!an) { m_ablauf.abbrechen(); zeigeAblauf(); }
-    });
-    sendRow->addWidget(m_autoBtn);
     root->addLayout(sendRow);
 
     auto* foot = new QHBoxLayout();
@@ -693,18 +692,65 @@ void Ft8Applet::zeigeAblauf()
 // Die Regel steht hier als statische Funktion, nicht im
 // Mausereignis: so laesst sie sich ohne Fenster und ohne Maus
 // pruefen, und der Doppelklick ist nur der Ausloeser.
+// ── Der Locator der Gegenstation, falls die Nachricht einen hat ──────
+//
+// „CQ HA1BF JN86" hat einen, „OE5SOS DL1ABC -12" nicht — dort waere
+// das letzte Wort der Rapport. Bisher ging das letzte Wort
+// ungeprueft weiter und stand als Feld im Logbuch; mit der
+// Landspalte stand dort sogar „Hungary".
+//
+// Geprueft wird die Form eines Maidenhead-Feldes: zwei Buchstaben,
+// zwei Ziffern. Mehr braucht eine FT8-Nachricht vom Standardtyp
+// nicht, und weniger reicht nicht aus, um es von „R-09" oder „+02"
+// zu unterscheiden.
+QString Ft8Applet::locatorAusNachricht(const QString& nachricht)
+{
+    const QString letztes =
+        nachricht.simplified().section(QLatin1Char(' '), -1).toUpper();
+    if (letztes.size() != 4) { return {}; }
+    if (!letztes.at(0).isLetter() || !letztes.at(1).isLetter()) { return {}; }
+    if (!letztes.at(2).isDigit() || !letztes.at(3).isDigit()) { return {}; }
+    return letztes;
+}
+
+// ── Die Nachricht aus einer Anzeigezeile ─────────────────────────────
+//
+// Die Spalten stehen in zeilentext(): vier Zahlenfelder (mit
+// FUEHRENDEN Leerzeichen auf feste Breite gebracht), dann die
+// Nachricht, dann — durch ZWEI Leerzeichen getrennt — das Land.
+//
+// Das Land kam mit #311 dazu, und seitdem log `section(' ', 4)` nach
+// einem simplified(): es lieferte „CQ HA1BF JN86 Hungary" statt „CQ
+// HA1BF JN86", und `section(' ', -1)` gab „Hungary" als Locator aus.
+// Innerhalb einer FT8-Nachricht stehen nie zwei Leerzeichen
+// hintereinander, also trennt das erste Doppelte sauber; ohne
+// Landspalte gibt es keines und die Zeile bleibt, wie sie ist.
+QString Ft8Applet::nachrichtAusZeile(const QString& zeile)
+{
+    int feld = 0;
+    int i = 0;
+    const int n = zeile.size();
+    while (i < n && feld < 4) {
+        while (i < n && zeile.at(i).isSpace())  { ++i; }
+        while (i < n && !zeile.at(i).isSpace()) { ++i; }
+        ++feld;
+    }
+    while (i < n && zeile.at(i).isSpace()) { ++i; }
+    if (i >= n) { return {}; }
+
+    QString rest = zeile.mid(i);
+    const int trenner = rest.indexOf(QStringLiteral("  "));
+    if (trenner > 0) { rest = rest.left(trenner); }
+    return rest.trimmed();
+}
+
 QString Ft8Applet::antwortAuf(const QString& zeile,
                               const QString& meinRuf,
                               const QString& meinLocator)
 {
     if (meinRuf.trimmed().isEmpty()) { return {}; }
 
-    // Spalten wie in onDecoded(): HHMMSS dB DT Freq Nachricht. Die
-    // Zahlen sind mit arg(..., breite) auf feste Breite gebracht, also
-    // mit FUEHRENDEN Leerzeichen — simplified() macht daraus einfache
-    // Trenner, danach ist die Nachricht alles ab dem fuenften Feld.
-    const QString sauber = zeile.simplified();
-    const QString nachricht = sauber.section(QLatin1Char(' '), 4);
+    const QString nachricht = nachrichtAusZeile(zeile);
     if (nachricht.isEmpty()) { return {}; }
 
     const QString seinRuf = senderCallsign(nachricht);
@@ -882,17 +928,24 @@ bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
             m_textFeld->setText(antwort);
             m_textFeld->setFocus();
 
-            // Mit Auto faengt hier der Ablauf an: dieselbe Antwort,
-            // aber danach macht er von selbst weiter.
-            if (m_autoBtn && m_autoBtn->isChecked() && !m_sendet) {
+            // Ein Doppelklick nimmt das QSO an — und ab hier laeuft es
+            // bis 73 von selbst. Betreiber am 2026-10-22: „wichtig ist
+            // auch, dass nach der annahme des qso das qso automatisch
+            // anlaeuft bis 73."
+            //
+            // Davor stand hier der Schalter „Auto", und er stand aus:
+            // der Doppelklick legte die Antwort nur ins Feld, gesendet
+            // wurde nichts. Derselbe Fehlgriff wie beim CQ-Knopf
+            // (#315). Angehalten wird mit „Stop".
+            if (!m_sendet) {
+                const QString nachricht = nachrichtAusZeile(c.selectedText());
                 const QString sauber = c.selectedText().simplified();
-                const QString nachricht = sauber.section(QLatin1Char(' '), 4);
                 const int snr = sauber.section(QLatin1Char(' '), 1, 1).toInt();
                 m_qsoGemeldet = false;
-                const QString seinLoc = sauber.section(QLatin1Char(' '), -1);
                 m_ablauf.starteAlsAntworter(senderCallsign(nachricht),
                                             eigenesRufzeichen(),
-                                            eigenerLocator(), snr, seinLoc);
+                                            eigenerLocator(), snr,
+                                            locatorAusNachricht(nachricht));
                 ablaufSchritt();
             }
         }
