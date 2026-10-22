@@ -21,6 +21,8 @@ private slots:
     void setVisible_idempotent_no_emit_on_same_value();
     void registeredIds_returns_insertion_order();
     void displayName_round_trip();
+    void ensureVisible_meldet_auch_ohne_wechsel();
+    void ensureVisible_respektiert_die_verfuegbarkeit();
 };
 
 void TstAppletVisibilityController::default_visible_when_no_settings_key()
@@ -104,6 +106,57 @@ void TstAppletVisibilityController::displayName_round_trip()
     QCOMPARE(c.displayName(QStringLiteral("PhoneCw")),
              QStringLiteral("Phone / CW"));
     QCOMPARE(c.displayName(QStringLiteral("Unknown")), QString{});
+}
+
+// ── ensureVisible: melden, auch wenn sich nichts geaendert hat ───────
+//
+// Am 2026-10-21 am Geraet aufgefallen: das FT8-Panel liess sich ueber
+// das × an seiner Kopfzeile schliessen, ohne dass der gemerkte Zustand
+// mitging. In den Einstellungen stand weiter
+// AppletFt8DecoderVisible=True, das Panel war weg -- und jeder Druck auf
+// FT8 verpuffte, weil setVisible() bei unveraendertem Wert frueh
+// aussteigt. Nur MainWindow::applyAppletVisibility blendet das Fenster
+// wirklich ein, und das haengt an diesem Signal.
+void TstAppletVisibilityController::ensureVisible_meldet_auch_ohne_wechsel()
+{
+    AppletVisibilityController c;
+    c.registerApplet(QStringLiteral("Ft8Decoder"),
+                     QStringLiteral("FT8 Decoder"), true);
+    QVERIFY(c.isVisible(QStringLiteral("Ft8Decoder")));
+
+    QSignalSpy sichtbar(&c, &AppletVisibilityController::visibilityChanged);
+    QSignalSpy wirksam(&c,
+                       &AppletVisibilityController::effectiveVisibilityChanged);
+
+    // Gegenprobe zuerst: der alte Weg schweigt -- das IST der Fehler.
+    c.setVisible(QStringLiteral("Ft8Decoder"), true);
+    QCOMPARE(sichtbar.count(), 0);
+    QCOMPARE(wirksam.count(), 0);
+
+    // Und der neue meldet trotzdem.
+    c.ensureVisible(QStringLiteral("Ft8Decoder"));
+    QCOMPARE(sichtbar.count(), 1);
+    QCOMPARE(wirksam.count(), 1);
+    QCOMPARE(wirksam.at(0).at(1).toBool(), true);
+}
+
+// Ein Panel, das die Modusachse gerade NICHT freigibt, darf auch
+// ensureVisible nicht aufzwingen -- sonst stuende der FT8-Dekoder in CW
+// im Bild. Die Nutzerspalte wird gesetzt, die wirksame Sichtbarkeit
+// bleibt aus.
+void TstAppletVisibilityController::ensureVisible_respektiert_die_verfuegbarkeit()
+{
+    AppletVisibilityController c;
+    c.registerApplet(QStringLiteral("Ft8Decoder"),
+                     QStringLiteral("FT8 Decoder"), true);
+    c.setAvailable(QStringLiteral("Ft8Decoder"), false);
+
+    QSignalSpy wirksam(&c,
+                       &AppletVisibilityController::effectiveVisibilityChanged);
+    c.ensureVisible(QStringLiteral("Ft8Decoder"));
+
+    QCOMPARE(wirksam.count(), 1);
+    QCOMPARE(wirksam.at(0).at(1).toBool(), false);
 }
 
 QTEST_MAIN(TstAppletVisibilityController)

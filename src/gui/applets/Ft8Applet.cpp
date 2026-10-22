@@ -14,8 +14,12 @@
 #include "core/Ft8Stream.h"
 #include "core/Ft8Tx.h"
 #include "models/Band.h"
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QFormLayout>
 #include <QDateTime>
 #include "core/AppSettings.h"
+#include "core/DigiFrequenzen.h"
 #include "core/DxccColorProvider.h"
 #include "core/DxccWorkedStatus.h"
 #include "gui/widgets/Ft8Wasserfall.h"
@@ -143,7 +147,54 @@ Ft8Applet::~Ft8Applet()
 void Ft8Applet::buildUI()
 {
     auto* root = new QVBoxLayout(this);
-    root->addWidget(appletTitleBar(QStringLiteral("FT8 DECODER")));
+
+    // ── Das ⚙ rechts oben in der Kopfzeile ───────────────────────────
+    //
+    // Betreiber 2026-10-21: „sollt in der taksleiste im decoder eine
+    // optionsmöglichkeit geben". Vorausgegangen war die Frage, WO man
+    // Rufzeichen und Locator eintraegt -- die Antwort war bis dahin
+    // „irgendwo im Setup, oder im Spot Hub", und das ist keine.
+    //
+    // Die Stelle ist seine Regel vom 2026-09-20: Optionen immer rechts
+    // oben im Panelkopf.
+    QWidget* leiste = appletTitleBar(QStringLiteral("FT8 DECODER"));
+    if (auto* kopf = qobject_cast<QHBoxLayout*>(leiste->layout())) {
+        // Der Knopf traegt "...", nicht ⚙ (2026-10-21).
+        //
+        // Hergeleitet, nicht geraten: eine Probe mit magenta Hintergrund
+        // zeigte, dass der Knopf GEZEICHNET wird -- 176 Bildpunkte an
+        // der richtigen Stelle -- nur sein Zeichen nicht. Weder ⚙
+        // (U+2699) noch ⋯ (U+22EF) kommen an; die Schrift dieser Taste
+        // kennt sie nicht, obwohl das ⋮⋮ des Griffs daneben (ein QLabel,
+        // keine Taste) anstandslos erscheint.
+        //
+        // "..." ist ausserdem die Form, die in der Kommandoleiste schon
+        // fuer "mehr davon" steht (Band, Mode, Filter). Die Stelle --
+        // rechts oben im Panelkopf -- ist die Regel des Betreibers, das
+        // Zeichen war es nie.
+        auto* zahnrad = new QPushButton(QStringLiteral("..."), leiste);
+        // 16x14 wie der geteilte Optionsknopf in GridCellWidget: die
+        // Kopfzeile ist kTitleBarH = 16 Punkte hoch, ein 18 Punkte
+        // hoher Knopf passt NICHT hinein und wurde am 2026-10-21
+        // schlicht nicht gezeichnet.
+        zahnrad->setFixedSize(26, 15);
+        zahnrad->setCursor(Qt::PointingHandCursor);
+        zahnrad->setToolTip(tr("Callsign and grid square"));
+        zahnrad->setStyleSheet(QStringLiteral(
+            // Ruhend in der Schrift der Kopfzeile, nicht in der des
+            // Griffs: mit kTextScale (#7e7e85) auf diesem Grund war der
+            // Knopf im Entwurfsblatt schlicht NICHT zu sehen -- er war
+            // da, an der richtigen Stelle, sichtbar laut Qt, und doch
+            // unsichtbar. Beim Zeigen das Blau des Hauses: anfassbar.
+            "QPushButton { color: %1; background: transparent;"
+            " border: none; font-size: 13px; font-weight: bold; }"
+            "QPushButton:hover { color: %2; }")
+            .arg(Style::kTitleText, Style::kAccent));
+        connect(zahnrad, &QPushButton::clicked, this,
+                &Ft8Applet::zeigeOptionen);
+        kopf->addWidget(zahnrad);
+    }
+    root->addWidget(leiste);
 
     // ── Kopfzeile: Verfahren + Zustand ──────────────────────────────
     auto* head = new QHBoxLayout();
@@ -692,6 +743,52 @@ QString Ft8Applet::aktuellerPartner() const
     const QString erstes =
         m_textFeld->text().trimmed().section(QLatin1Char(' '), 0, 0).toUpper();
     return erstes == QLatin1String("CQ") ? QString{} : erstes;
+}
+
+// ── Das Blatt hinter dem ⚙ ──────────────────────────────────────────
+//
+// Zwei Felder, mehr nicht: ohne Rufzeichen kann der Dekoder kein CQ
+// bauen, ohne Locator keinen Rapport mit Feld.
+//
+// Geschrieben werden BEIDE Schluesselpaare. `User/Callsign` ist der
+// kanonische (den liest dieser Dekoder, den schreibt der Spot Hub),
+// `StationCallsign` lesen vier andere Stellen -- QSO-Karte, KiwiSDR,
+// der FlexRadio-Rundruf und das Logbuch. Wer hier eintraegt, soll
+// nicht hinterher feststellen, dass die Haelfte des Programms sein
+// Rufzeichen nicht kennt. Genau das war am 2026-10-21 der Fall:
+// `User/Callsign` stand auf OE5SOS, das Setup-Feld war leer.
+void Ft8Applet::zeigeOptionen()
+{
+    auto& s = AppSettings::instance();
+
+    QDialog blatt(this);
+    blatt.setWindowTitle(tr("FT8 Decoder"));
+    auto* form = new QFormLayout(&blatt);
+
+    auto* ruf = new QLineEdit(eigenesRufzeichen(), &blatt);
+    ruf->setPlaceholderText(QStringLiteral("OE5SOS"));
+    form->addRow(tr("Callsign"), ruf);
+
+    auto* loc = new QLineEdit(eigenerLocator(), &blatt);
+    loc->setPlaceholderText(QStringLiteral("JN67VV"));
+    loc->setToolTip(tr("Four or six characters. The decoder sends the "
+                       "first four in CQ calls."));
+    form->addRow(tr("Grid square"), loc);
+
+    auto* knoepfe = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &blatt);
+    form->addRow(knoepfe);
+    connect(knoepfe, &QDialogButtonBox::accepted, &blatt, &QDialog::accept);
+    connect(knoepfe, &QDialogButtonBox::rejected, &blatt, &QDialog::reject);
+
+    if (blatt.exec() != QDialog::Accepted) { return; }
+
+    const QString neuerRuf = ruf->text().trimmed().toUpper();
+    const QString neuerLoc = loc->text().trimmed().toUpper();
+    s.setValue(QStringLiteral("User/Callsign"), neuerRuf);
+    s.setValue(QStringLiteral("StationCallsign"), neuerRuf);
+    s.setValue(QStringLiteral("User/GridSquare"), neuerLoc);
+    s.setValue(QStringLiteral("StationGridSquare"), neuerLoc);
 }
 
 QString Ft8Applet::eigenesRufzeichen()

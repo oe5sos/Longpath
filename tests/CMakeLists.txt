@@ -5565,6 +5565,17 @@ endif()
 # -- AppletVisibilityController: state, persistence, signal emission --
 longpath_add_test(tst_applet_visibility_controller)
 
+# tst_ft8_kopfzeile_blatt: zwei Dinge unter einem Dach. Ein echter
+#   Pruefstand -- die FT8/FT4-Knoepfe IM Dekoder verlangen die Skala
+#   (digiGewuenscht); der Lauf kann ohne diese Aenderung gar nicht
+#   uebersetzen, das ist seine Gegenprobe. Und ein Zeichenwerkzeug, das
+#   die Kopfzeile samt Optionsknopf als Blatt rendert; es braucht
+#   LONGPATH_GRAB_DIR UND LONGPATH_ENTWURF=1 (die CI setzt den ersten
+#   global) und ueberspringt sich sonst. ACHTUNG: offscreen fehlen die
+#   Schriften, das ⚙ wird auf dem Blatt NICHT gezeichnet -- der Knopf ist
+#   trotzdem da, der Lauf weist ihn ueber findChildren nach.
+longpath_add_test(tst_ft8_kopfzeile_blatt)
+
 # -- Two-way sync between top-menu and banner-menu applet toggles --
 longpath_add_test(tst_applet_visibility_menu_wiring)
 

@@ -2297,17 +2297,37 @@ void MainWindow::bringAppletToFront(const QString& id)
             return;
         }
         QWidget* front = m_floatingApplets.value(id, nullptr);
+        QString weg = QStringLiteral("floating");
         if (!front) {
             AppletWidget* a = m_appletsById.value(id, nullptr);
-            if (!a || !m_appletPanel) { return; }
+            if (!a || !m_appletPanel) {
+                qCInfo(lcContainer).nospace()
+                    << "bringAppletToFront(" << id << "): no applet/column";
+                return;
+            }
             QWidget* host = a->window();
             if (host && host != this) {
                 // Die Spalte schwebt selbst (Container-Fenster).
                 front = host;
+                weg = QStringLiteral("container window");
             } else if (appletHiddenInColumn(a)) {
                 detachApplet(a, m_appletPanel->appletPosition(a));
                 front = m_floatingApplets.value(id, nullptr);
+                weg = QStringLiteral("detached");
+            } else {
+                weg = QStringLiteral("in column, counts as visible");
             }
+            // Warum der Weg so ausfiel -- ohne diese Zahlen ist von
+            // aussen nicht zu unterscheiden, ob das Applet fehlt, schon
+            // vorn liegt oder nur fuer verdeckt gehalten wird.
+            qCInfo(lcContainer).nospace()
+                << "bringAppletToFront(" << id << "): " << weg
+                << " appletVisible=" << a->isVisible()
+                << " hidden=" << appletHiddenInColumn(a)
+                << " front=" << (front != nullptr);
+        } else {
+            qCInfo(lcContainer).nospace()
+                << "bringAppletToFront(" << id << "): " << weg;
         }
         if (front) {
             front->show();
@@ -7511,6 +7531,12 @@ void MainWindow::populateDefaultMeter()
     // Die Knoepfe FT8/FT4 IM Fenster richten das Geraet genauso her
     // wie die Pillen in der Leiste -- es waeren sonst zwei Stellen mit
     // demselben Namen und verschiedener Wirkung.
+    //
+    // Beim Zusammenfuehren am 2026-10-22: dieser Weg war auf zwei
+    // Zweigen parallel gebaut worden, hier als digiFrequenzGewuenscht
+    // und auf main als digiGewuenscht. Beide haengen am selben Knopf,
+    // beide rufen aufDigiStellen -- zusammen also zweimal je Druck.
+    // mains Name bleibt, der zweite ist entfernt.
     connect(m_ft8Applet, &Ft8Applet::digiGewuenscht, this,
             &MainWindow::aufDigiStellen);
     connect(m_ft8Applet, &Ft8Applet::qsoFertig, this,
@@ -15170,11 +15196,66 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
     //    „nur fuer Einschalten per Menue/Plus") -- und ein Druck auf
     //    FT8 ist genau das.
     if (m_appletVis) {
-        m_appletVis->setVisible(QStringLiteral("Ft8Decoder"), true);
-        bringAppletToFront(QStringLiteral("Ft8Decoder"));
+        // ensureVisible statt setVisible: letzteres steigt aus, wenn der
+        // gemerkte Zustand schon „sichtbar" sagt -- und genau dann war
+        // das Panel am Geraet trotzdem weg. Siehe die Begruendung an
+        // AppletVisibilityController::ensureVisible.
+        m_appletVis->ensureVisible(QStringLiteral("Ft8Decoder"));
     }
 
-    // 5. Und der Dekoder hoert auf dieselbe Betriebsart.
+    // 5. Und nach VORNE -- mit bringAppletToFront(), nicht mit einem
+    //    eigenen raise().
+    //
+    //    Hier stand erst ein handgeschriebenes
+    //    `m_ft8Applet->window()->raise()`. Am Geraet zeigte sich, dass
+    //    das zu wenig ist: der Dekoder liegt in der Spalte des
+    //    Hauptfensters und faellt dort auf Streifenhoehe zusammen --
+    //    sichtbar, angehoben, und trotzdem nur eine Kopfzeile ohne
+    //    Inhalt. Der Betreiber sah am 2026-10-21 genau das („sehe keinen
+    //    decoder", „der muss sofort in den vordergrund treten").
+    //
+    //    bringAppletToFront() kann beides, und es gab es schon: Fenster
+    //    heben, und wenn das Applet in der Spalte verdeckt oder
+    //    zusammengefallen ist, loest es als eigenes Fenster obenauf ab.
+    //    Es ist genau fuer diesen Fall gebaut -- „Einschalten per
+    //    Menue/Plus", und ein Druck auf FT8 ist nichts anderes.
+    bringAppletToFront(QStringLiteral("Ft8Decoder"));
+
+    // 6. PureSignal aus. Betreiber 2026-10-21: „also FT8 würde ich
+    //    vorschlagen, kein pure signal, automatisch aus".
+    //
+    //    Der Grund steht im Signal selbst: FT8 und FT4 sind
+    //    Frequenzumtastung mit KONSTANTER Huellkurve. PureSignal lernt
+    //    seine Kennlinie aber genau aus der Huellkurve -- aus der
+    //    Frage, wie die Endstufe bei kleinen und bei grossen
+    //    Amplituden antwortet. Ohne diese Spanne kommt keine Loesung
+    //    zustande, und die Maschine haelt endlos zurueck: der
+    //    Betreiber sah waehrend des Sendens „PS wartet" in der
+    //    Statuszeile (PsaIndicatorWidget, PsCorrectionAction::Withhold)
+    //    und fragte zu Recht, ob PureSignal hier nicht besser aus sei.
+    //
+    //    Dazu kommt der Preis: eingeschaltet wirft PureSignal beim
+    //    Tasten zwei zusaetzliche 192-kHz-Stroeme an (gemessen:
+    //    cfg.rate[0] und rate[1] gehen von 0 auf 192000). Auf einem
+    //    WLAN, das an diesem Abend zwischen 2 und 12 % Paketverlust
+    //    zeigte, ist das kein Nichts.
+    //
+    //    forceAutoCalDisable() ist der Weg, den Thetis dafuer hat
+    //    (console.cs:43703 ForcePureSignalAutoCalDisable
+    //    [v2.10.3.13]) -- kein eigener Schalter, sondern derselbe, den
+    //    der [PS-A]-Haken umlegt. Wieder EIN schaltet niemand
+    //    automatisch: wer PureSignal in SSB will, drueckt PS-A, und
+    //    das soll eine Entscheidung bleiben, keine Nebenwirkung.
+    if (m_radioModel) {
+        if (PureSignal* ps = m_radioModel->pureSignal()) {
+            if (ps->isAutoCalEnabled()) {
+                ps->forceAutoCalDisable();
+            }
+        }
+    }
+
+    // 7. Und der Dekoder hoert auf dieselbe Betriebsart (von main,
+    //    2026-10-22).
     //
     //    Ohne das stellte ein Druck auf FT4 in der Leiste zwar die
     //    Skala auf 14.080, liess den Dekoder aber auf FT8 -- 15 s

@@ -94,6 +94,23 @@ void AppletVisibilityController::setVisible(const QString& id, bool visible)
     }
 }
 
+void AppletVisibilityController::ensureVisible(const QString& id)
+{
+    auto it = m_entries.find(id);
+    if (it == m_entries.end()) { return; }
+
+    it->visible = true;
+    AppSettings::instance().setValue(settingsKey(id), QStringLiteral("True"));
+
+    // Beide Meldungen IMMER, nicht nur bei einem Wechsel. Das ist der
+    // ganze Unterschied zu setVisible(): wer hier landet, hat nicht
+    // „umgeschaltet", sondern verlangt, dass das Panel jetzt da ist --
+    // und der Empfaenger (MainWindow::applyAppletVisibility) ist die
+    // einzige Stelle, die das Fenster tatsaechlich einblendet.
+    emit visibilityChanged(id, true);
+    emit effectiveVisibilityChanged(id, it->available);
+}
+
 void AppletVisibilityController::setAvailable(const QString& id, bool available)
 {
     auto it = m_entries.find(id);

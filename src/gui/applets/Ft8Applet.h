@@ -34,6 +34,7 @@
 #pragma once
 
 #include "AppletWidget.h"
+#include "core/DigiFrequenzen.h"
 
 #include "core/DigiFrequenzen.h"
 #include "core/Ft8Decoder.h"
@@ -261,6 +262,7 @@ signals:
 
     void qsoFertig(const Longpath::LogEntry& eintrag);
 
+
 protected:
     /// Doppelklick in die Fundliste: die Zeile wird zur Antwort im
     /// Eingabefeld. Gesendet wird dadurch NICHTS — der Druck auf den
@@ -273,6 +275,12 @@ private slots:
 
 private:
     void buildUI();
+
+    /// Das Blatt hinter dem ⚙ in der Kopfzeile: eigenes Rufzeichen und
+    /// Locator. Betreiber 2026-10-21: „sollt in der taksleiste im
+    /// decoder eine optionsmöglichkeit geben" -- und die Optionen
+    /// gehoeren bei ihm immer rechts oben in den Panelkopf.
+    void zeigeOptionen();
     void updateAudioTap();
     void updateStatus();
 
