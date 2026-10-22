@@ -272,6 +272,46 @@ void Ft8Applet::buildUI()
 
     head->addSpacing(8);
 
+    // ── Wie viele Runden der Dekoder ueber ein Fenster geht ──────────
+    //
+    // WSJT-X hat dasselbe als „Decode: Fast / Normal / Deep", JTDX
+    // ebenso. Zwei ist die Vorgabe: nach der ersten Runde werden die
+    // gefundenen Signale abgezogen, damit schwaechere darunter
+    // auffindbar werden (core/Ft8Subtract.h, portiert aus MSHV).
+    //
+    // Der Knopf sitzt hier und nicht in einer Einstellseite, weil er
+    // die Gegenprobe AN DER ANTENNE moeglich macht: was die zweite
+    // Runde am Pruefstand leistet, ist belegt -- was sie auf dem Band
+    // leistet, sieht man nur, wenn man dieselbe Minute einmal so und
+    // einmal so hoeren kann, ohne das Programm neu zu starten.
+    auto* rundenBez = new QLabel(tr("Passes"), this);
+    rundenBez->setFont(Style::monoFont(font(), Style::kFontSmall));
+    rundenBez->setStyleSheet(QStringLiteral("color: %1;")
+                                 .arg(Style::kTextSecondary));
+    head->addWidget(rundenBez);
+
+    m_rundenFeld = new QSpinBox(this);
+    m_rundenFeld->setRange(1, 3);
+    m_rundenFeld->setValue(AppSettings::instance()
+                               .value(QStringLiteral("Ft8/Durchgaenge"),
+                                      QStringLiteral("2"))
+                               .toInt());
+    m_rundenFeld->setFixedWidth(46);
+    m_rundenFeld->setFont(Style::monoFont(font(), Style::kFontSmall));
+    m_rundenFeld->setToolTip(tr(
+        "How often the decoder goes over the same period. After each "
+        "pass the signals it found are subtracted, so weaker ones "
+        "underneath become readable.\n1 is one pass, no subtraction. "
+        "More passes cost a little more time per period."));
+    connect(m_rundenFeld, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, [](int n) {
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Durchgaenge"),
+                                         QString::number(n));
+    });
+    head->addWidget(m_rundenFeld);
+
+    head->addSpacing(8);
+
     m_status = new QLabel(QStringLiteral("—"), this);
     m_status->setFont(Style::monoFont(font(), Style::kFontSmall));
     m_status->setStyleSheet(QStringLiteral("color: %1;").arg(Style::kTextSecondary));
