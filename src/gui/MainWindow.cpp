@@ -8494,8 +8494,14 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Voice Keyer"),  true);
     m_appletVis->registerApplet(QStringLiteral("QsoRec"),
                                 QStringLiteral("QSO Recorder"), true);
+    // Vorgabe AUS (2026-10-22). Mit `true` meldete sich die Aufnahme
+    // bei jedem Start selbst an und stand dem Betreiber dauerhaft im
+    // Bild — „im hintergrund ist auch immer der recorder". Dieselbe
+    // Falle wie bei der Zeus-Uebernahme: ein neues Applet mit Vorgabe
+    // true schaltet sich selbst ein. Wer aufnehmen will, holt es ueber
+    // View > Containers > Applets; wer nicht, sieht es nie.
     m_appletVis->registerApplet(QStringLiteral("Rec"),
-                                QStringLiteral("Recording"),    true);
+                                QStringLiteral("Recording"),    false);
     m_appletVis->registerApplet(QStringLiteral("BwFilter"),
                                 QStringLiteral("Bandwidth Filter"), true);
     m_appletVis->registerApplet(QStringLiteral("PureSignal"),

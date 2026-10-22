@@ -1852,6 +1852,9 @@ private:
     /// nicht zurueckfunken. Sonst antwortet jeder Zustandsschub mit
     /// einem `slice tune`, der den naechsten Schub ausloest.
     bool m_flexApplyingRemoteState{false};
+    /// Einmal je Verbindung: die Fensterbreite auf den Ausschnitt der
+    /// Flex stellen. Danach gehoert der Zoom wieder dem Betreiber.
+    bool m_flexAusschnittUebernommen{false};
     /// Warum das Flex-Bild gerade nicht gezeichnet wird — damit die
     /// Meldung einmal je Grund kommt und nicht 25 Mal je Sekunde.
     enum class FlexBildGrund { Unbekannt, KeinAusschnitt, KeinFenster,

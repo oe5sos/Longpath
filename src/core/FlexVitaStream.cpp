@@ -110,6 +110,12 @@ void FlexVitaStream::berichteKlassen()
     // Tausende stehen, dann liegt es am Zusammensetzen, nicht am Netz.
     qCInfo(lcFlexStream) << "Strom:" << m_datagrams << "Pakete —"
                          << qPrintable(teile.join(QStringLiteral(", ")));
+    if (m_fftRahmen > 0) {
+        qCInfo(lcFlexStream).nospace()
+            << "Strom: Bins ueber alle " << m_fftRahmen << " Rahmen — "
+            << m_binKleinsterJe << " bis " << m_binGroessterJe
+            << " (" << (m_binGroessterJe - m_binKleinsterJe) << " Stufen)";
+    }
     qCInfo(lcFlexStream) << "Strom: daraus fertig —"
                          << m_fftRahmen << "Bildrahmen,"
                          << m_wasserfallZeilen << "Wasserfallzeilen;"
@@ -196,6 +202,18 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
         // einen Uebergangsrahmen, in dem jeder neue Bin null ist
         // (dokumentiert in FlexVitaReader.h). Am 2026-10-22 gemessen:
         // Rahmen 1 war durchgehend null. Also spaeter nachsehen.
+        // Ueber ALLE Rahmen mitfuehren, nicht nur den einen.
+        //
+        // 2026-10-22: ein einzelner Rahmen zeigte 17,6 dB Hub,
+        // SmartSDR am selben Band 50. Spitzen sind kurz — wer einen
+        // Augenblick misst, misst die Pause zwischen ihnen mit.
+        if (!rahmen->bins.isEmpty()) {
+            for (const quint16 b : rahmen->bins) {
+                m_binKleinsterJe = std::min(m_binKleinsterJe, b);
+                m_binGroessterJe = std::max(m_binGroessterJe, b);
+            }
+        }
+
         if ((m_fftRahmen == 50 || m_fftRahmen == 500)
             && !rahmen->bins.isEmpty()) {
             quint16 kleinster = rahmen->bins.first();

@@ -6991,6 +6991,21 @@ void RadioModel::applyFlexPanSetup()
     m_flexConnection->sendCommand(
         QStringLiteral("display pan set %1 xpixels=%2 ypixels=%3")
             .arg(m_flexPanId).arg(kXPixels).arg(kYPixels));
+    // Mittelung AUS.
+    //
+    // 2026-10-22 nebeneinander gemessen: SmartSDR zeigte am selben
+    // Band Teppich bei -120 dBm und Spitzen bei -70, also rund 50 dB
+    // Hub. Longpath las 14 dB — dieselben Daten, flachgedrueckt.
+    // Unser Panadapter stand laut Zustandsschub auf `average=50`, und
+    // eine Mittelung ueber fuenfzig Durchgaenge buegelt genau die
+    // SSB-Spitzen weg, die kommen und gehen.
+    //
+    // Die Mittelung ist Sache der Anzeige, nicht der Maschine:
+    // Longpath glaettet selbst (Display-Einstellungen), und zweimal
+    // mitteln heisst zweimal Spitzen verlieren.
+    m_flexConnection->sendCommand(
+        QStringLiteral("display pan set %1 average=0").arg(m_flexPanId));
+
     m_flexConnection->sendCommand(
         QStringLiteral("display pan set %1 min_dbm=%2 max_dbm=%3")
             .arg(m_flexPanId).arg(kMinDbm).arg(kMaxDbm));

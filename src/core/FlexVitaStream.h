@@ -167,6 +167,8 @@ private:
     qint64 m_zuletztGemeldet{-1};
     qint64 m_fftRahmen{0};
     qint64 m_wasserfallZeilen{0};
+    quint16 m_binKleinsterJe{65535};
+    quint16 m_binGroessterJe{0};
 };
 
 }  // namespace Longpath
