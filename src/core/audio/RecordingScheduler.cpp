@@ -199,6 +199,19 @@ void RecordingScheduler::checkNow(const QDateTime& nowUtc)
 
         if (!alreadyFired) {
             if (e.startAtUtc.isValid() && nowUtc >= e.startAtUtc) {
+                // Zu spaet? Dann gar nicht -- siehe
+                // kNachlaufOffenesEndeMin im Kopf. Der Eintrag wird
+                // trotzdem als gefeuert vermerkt (aber OHNE firedAt,
+                // sonst kaeme spaeter ein Stopp fuer etwas, das nie
+                // lief): ein verpasster Eintrag bleibt verpasst, er
+                // lauert nicht bis zum naechsten Start.
+                const int nachlaufMin = e.durationMinutes > 0
+                                            ? e.durationMinutes
+                                            : kNachlaufOffenesEndeMin;
+                if (e.startAtUtc.secsTo(nowUtc) >= nachlaufMin * 60) {
+                    m_fired.push_back(e.id);
+                    continue;
+                }
                 m_fired.push_back(e.id);
                 m_firedAt.push_back({e.id, nowUtc});
                 emit recordingDue(e.id, e);
