@@ -128,12 +128,45 @@ std::array<float, DssRenderer::kCols> resampledRawRow(
         // Peak-preserving downsample (or upsample by nearest-max over a
         // fractional window): a narrow carrier landing between display
         // columns must not vanish because a plain average smeared it.
-        const double step = static_cast<double>(n) / DssRenderer::kCols;
+        //
+        // ── GLEICH BREITE Fenster, sonst entsteht ein Lattenzaun ─────
+        //
+        // Hier stand `[floor(c*step), ceil((c+1)*step))`. Bei einem
+        // krummen Verhaeltnis — bei Martins Fenster 2270 Punkte auf
+        // 768 Spalten, also 2,956 — ist dieses Fenster mal drei und
+        // mal vier Werte breit. Das Maximum ueber vier Werte liegt im
+        // Mittel HOEHER als ueber drei, und welche Spalte welches
+        // Fenster bekommt, haengt nur am Index: in JEDER Zeile
+        // dieselben Spalten.
+        //
+        // Gemessen am 2026-10-22 mit 96 unabhaengigen Rauschzeilen:
+        //   Fensterbreiten          36x drei, 732x vier
+        //   Korrelation Breite <-> Spaltenmittel   +0,44
+        //   Welligkeit der Spaltenmittel            0,236
+        // und mit gleich breiten Fenstern 0,101 — der Rest ist die
+        // Ueberlappung benachbarter Fenster und kein fester Versatz.
+        //
+        // Allein waere das ein halbes dB und unsichtbar. Im 3D-Bild
+        // ist es das nicht: die Glaettung schleift das Rauschen weg
+        // und laesst den festen Anteil stehen, und `zCurve` spreizt
+        // genau am Rauschteppich — dort sind 1 dB rund 3 Bildpunkte.
+        // Ueber 96 gestapelte Zeilen wird daraus eine durchgehende
+        // Rippe nach hinten. Der Betreiber sah ein Band voller
+        // Stationen, wo keine waren („keine signale obwohl
+        // wasserfall", „hier hat es was von grund auf").
+        //
+        // Also: feste Breite `ceil(step)`, Anfang bei `round(c*step)`.
+        // Der Abstand zweier Anfaenge bleibt damit hoechstens so gross
+        // wie das Fenster — es wird kein Wert uebersprungen, und ein
+        // schmaler Traeger kann nicht verschwinden. Beim Aufweiten
+        // (step < 1) ist die Breite 1, also genau das Verhalten von
+        // vorher.
+        const double step  = static_cast<double>(n) / DssRenderer::kCols;
+        const int    breit = std::max(1, static_cast<int>(std::ceil(step)));
         for (int c = 0; c < DssRenderer::kCols; ++c) {
-            int i0 = static_cast<int>(std::floor(c * step));
-            int i1 = static_cast<int>(std::ceil((c + 1) * step));
-            i0 = std::clamp(i0, 0, n - 1);
-            i1 = std::clamp(i1, i0 + 1, n);
+            int i0 = static_cast<int>(std::lround(c * step));
+            i0 = std::clamp(i0, 0, std::max(0, n - breit));
+            const int i1 = std::min(n, i0 + breit);
             float mx = std::isfinite(binsDbm[i0]) ? binsDbm[i0] : fallback;
             for (int i = i0 + 1; i < i1; ++i) {
                 if (std::isfinite(binsDbm[i])) {

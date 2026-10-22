@@ -6016,9 +6016,30 @@ void SpectrumWidget::composeWaterfallActiveThresholds(const QVector<float>& wfPi
     // setClarityWaterfallThresholds() and must survive between rows.
     // Matches the Thetis "high_threshold = waterfall_high_threshold"
     // seed at display.cs:6575 [v2.10.3.13].
-    if (!m_clarityActive) {
+    // ── Clarity ohne Boden faellt auf die eigenen Schwellen zurueck ──
+    //
+    // Hier gab es nur zwei Zweige: Clarity aus -> Nutzerschwellen,
+    // Clarity an MIT Boden -> verschobene Clarity-Schwellen. Der
+    // dritte Fall — Clarity AN, aber ohne Boden — fiel durch beide
+    // hindurch und liess `m_wfActive*` auf dem Stand stehen, den das
+    // letzte Geraet hinterlassen hatte.
+    //
+    // Genau das trat am 2026-10-22 an der FLEX-8400 ein: Clarity wird
+    // ausschliesslich aus `primaryFftEngine()` gefuettert, und die
+    // gibt es beim Flex nicht. Der Wasserfall war durchgehend
+    // EINFARBIG ROT — bei Farbschema 0 die oberste Palettenstufe.
+    //
+    // Gefuettert wird Clarity jetzt auch vom Flex (MainWindow_Flex).
+    // Diese Wache bleibt trotzdem: eine fremde Quelle, die den Boden
+    // nicht liefert, soll ein brauchbares Bild geben und nicht das
+    // Erbe des Vorgaengers.
+    const bool clarityHatBoden = std::isfinite(m_clarityFloorDbm);
+    if (!m_clarityActive || !clarityHatBoden) {
         m_wfActiveLowThreshold  = m_wfLowThreshold;
         m_wfActiveHighThreshold = m_wfHighThreshold;
+    }
+    if (!m_clarityActive) {
+        // schon gesetzt
     } else if (std::isfinite(m_clarityFloorDbm)
                && std::isfinite(m_clarityLow) && std::isfinite(m_clarityHigh)) {
         // ── Clarity am eigenen Bild verankern (2026-09-25) ───────────
@@ -12196,10 +12217,32 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // the "not yet measured" sentinel default (-200).
             const float floorBase = (m_nfLerpAverage > -199.0f)
                 ? m_nfLerpAverage : (m_refLevel - m_dynamicRange);
-            // -6 dB matches AetherSDR's default "3D Floor" offset
-            // (m_dssFloorOffsetDb) -- no dedicated slider yet, see
-            // DssRenderer.h for what this first port left out.
-            const float floorDbm = std::round(floorBase * 2.0f) / 2.0f - 6.0f;
+            // ── Der Flur gehoert UEBER den Rauschteppich ────────────
+            //
+            // Hier stand `- 6.0f`, nach AetherSDRs Vorgabe fuer „3D
+            // Floor" (m_dssFloorOffsetDb). Dort gibt es dazu einen
+            // Regler, bei uns nicht (siehe DssRenderer.h) — und mit
+            // dem Flur 6 dB UNTER dem Teppich bekommt der Teppich
+            // selbst rund 14 Prozent der vollen Rippenhoehe. 96
+            // solcher Zeilen uebereinander ergeben einen Wald aus
+            // Rippen, und der Betreiber liest ihn als Stationen:
+            // „keine signale obwohl wasserfall", „hier hat es was von
+            // grund auf" (2026-10-22).
+            //
+            // Gemessen mit einem echten Rahmen seiner FLEX-8400
+            // (tests/data/flex_rahmen_20m.csv) durch denselben
+            // Zeichenweg, Welligkeit der Spaltenhelligkeit:
+            //   Flur −6 dB   0,30   Wald, kein Signal erkennbar
+            //   Flur  0 dB   …      noch dicht
+            //   Flur +3 dB   …      flacher Teppich, ~10 Signale klar
+            //   Flur +6 dB   …      flach, nur noch 3 Signale
+            // +3 dB ist der Punkt, an dem der Teppich liegenbleibt und
+            // auch SCHWACHE Signale noch stehen. Mehr wuerde sie mit
+            // abschneiden.
+            //
+            // Ein Regler dafuer fehlt weiterhin — wer ihn baut, nimmt
+            // diesen Wert als Vorgabe.
+            const float floorDbm = std::round(floorBase * 2.0f) / 2.0f + 3.0f;
             const float rangeDb = m_dynamicRange;
             const quint64 paletteToken =
                 (static_cast<quint64>(m_wfColorScheme) << 32)

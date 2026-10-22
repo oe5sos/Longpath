@@ -71,6 +71,7 @@
 #include "core/KiwiSdrManager.h"
 #include "gui/meters/MeterPoller.h"
 #include "gui/ConnectionPanel.h"
+#include "core/ClarityController.h"
 #include <QTimer>
 #include "gui/SpectrumWidget.h"
 #include "models/RadioModel.h"
@@ -511,6 +512,28 @@ void MainWindow::wireFlex()
             }
         }
         meldeEinmal(FlexBildGrund::Zeichnet, "wird gezeichnet");
+
+        // ── Clarity muss diese Bins auch sehen (2026-10-22) ──────────
+        //
+        // Clarity bekam seine Bins bis heute AUSSCHLIESZLICH aus
+        // `primaryFftEngine()`, also aus dem eigenen Funkgeraet. Bei
+        // der Flex gibt es die nicht — sie rechnet selbst. Clarity war
+        // damit eingeschaltet (`ClarityEnabled=True` in Martins
+        // Profil) und ohne Boden, und `composeWaterfallActiveThresholds`
+        // liesz die Schwellen auf dem Stand stehen, den das letzte
+        // eigene Geraet hinterlassen hatte.
+        //
+        // Folge am Geraet: der Wasserfall war durchgehend EINFARBIG
+        // ROT — Rot ist bei Farbschema 0 die oberste Palettenstufe,
+        // also der Anschlag. Dieselbe Fehlerklasse ist in
+        // `composeWaterfallActiveThresholds` schon beschrieben
+        // („an einer SunSDR2 QRP ohne Antenne … der Wasserfall wurde
+        // ganz rot"), nur kam sie dort von einem FALSCHEN Boden und
+        // hier von gar keinem.
+        if (m_clarityController) {
+            m_clarityController->feedBins(dbm);
+        }
+
         sw->updateKiwiSpectrumDbm(dbm, m_flexSpanLowHz, m_flexSpanHighHz);
     });
 
