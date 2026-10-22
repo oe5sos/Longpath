@@ -1,8 +1,110 @@
 # Changelog
 
-## [Unreleased]
+## [0.8.1] - 2026-10-22
 
-### Eine Sonde bleibt offline
+36 Staende seit 0.8.0. Der Anlass fuer die Veroeffentlichung ist das
+**Windows-Paket**: es war seit dem 2026-10-07 zurueckgehalten, weil
+niemand es am Geraet pruefen konnte -- seit dem 2026-10-22 steht ein
+Windows-Rechner zum Messen bereit, und damit faellt der Grund weg.
+
+### Windows
+
+- **Die Pakete sind wieder dabei** (#320) -- Installer und portable ZIP.
+  `build-windows` kam unveraendert aus dem Stand vor der Streichung
+  zurueck; der Veroeffentlichungs-Job hatte sie die ganze Zeit noch
+  erwartet, nur der Bau fehlte. **Ungeprueft:** eine Tonstoerung mit der
+  ANAN-10 ist offen, sie aeussert sich als gleichmaessiges Knistern --
+  also Aussetzer im Ausgabeweg, nicht Verzerrung. Eine Spur gibt es: auf
+  dem Mac spricht Longpath ueber einen eigenen CoreAudio-Treiber, auf
+  Linux ueber PipeWire, unter Windows faellt der Ton auf PortAudio
+  zurueck. Dort wurde dieselbe Stoerung auf dem Mac geloest.
+
+### FT8 und FT4
+
+- **FT8 tastete den Sender und modulierte nichts** (#305).
+- **Das Dekoder-Panel kommt jetzt wirklich nach vorne** (#307) -- und
+  PureSignal schaltet sich bei FT8/FT4 selbst aus: Frequenzumtastung hat
+  eine konstante Huellkurve, aus der keine Kennlinie zu lernen ist.
+- **Digital in einem Griff** (#294) -- FT8 und FT4 richten Frequenz,
+  Betriebsart und Panel selbst her.
+- **Zwei Spalten im Fenster, wie in WSJT-X** (#311).
+- **Der Dekoder geht zweimal ueber das Fenster und zieht dazwischen ab**
+  (#313) -- mehr Dekodierungen auf einem belegten Band.
+- **Der CQ-Knopf ruft CQ** (#315) -- und tastet nur so lange wie das
+  Signal.
+
+### PureSignal
+
+- **PureSignal 3 auf WDSP 2.11 statt 1.29** (#298) -- NURB-Kurve statt
+  Stuetzstellentabelle.
+- **Die Zweiton-Messung laeuft nicht mehr im Malvorgang** (#314). Fuenf
+  der sechs bestaetigten Befunde aus NereusSDRs neuerem
+  PureSignal-Interface sind damit erledigt, ohne eine seiner 14 Dateien
+  zu holen; der sechste (DUP-Vorgabe) trifft Longpath nicht. Dazu kam
+  beim Nachsehen heraus, dass sieben Anzeigeregler der
+  Panadapter-Knopfleiste nur auf Pan 0 wirkten.
+
+### FLEX-8400
+
+- **Am Geraet: Wasserfall, Ton, und das Klicken im Relais** (#300).
+- **Die zwei offenen Paketklassen gemessen -- und eine dritte gefunden**
+  (#297).
+- **Die Messwerte lesen, und nur das melden, was belegt ist** (#312).
+- **Die Fassung aus dem Ruf wurde gelesen und weggeworfen** (#286).
+
+### Rotor
+
+- **Yaesu GS-232A/B direkt** (#299) -- seriell und ueber einen
+  Netzserver, am Geraet gelesen.
+- **Der eigene Treiber startet kein rotctld mehr** (#304).
+- **Zwei Gestaltungsfragen entschieden** (#303) -- graue Regler, zwei
+  Fragen am Rotor.
+
+### Aufnahme
+
+- **Die Bindeschicht: RecordingModel** (#289) -- der Unterbau war
+  gebaut, aber von nichts erreichbar.
+- **Die Aufnahme bekommt eine Flaeche** (#291).
+- **Eine Aufnahme laesst sich jetzt abspielen** (#309).
+- **"Complete" war das falsche Wort** (#288) -- der Stand im Plan
+  richtiggestellt.
+
+### Steuerung von aussen
+
+- **Die rigctld-Bruecke kommt nach main** (#308) -- Logbuch- und
+  Contestprogramme koennen Longpath steuern, Split laeuft ueber XIT.
+
+### Fenster
+
+- **Zwei Punkte Luft zwischen den schwebenden Fenstern** (#292) -- beim
+  Ziehen, nicht beim Platzieren.
+- **Das Einrasten wird groeber: 16 statt 8 Punkte** (#285).
+
+### Behoben
+
+- **Zwei Knoepfe mit demselben Namen, nur einer wirkte** (#310).
+- **Das Land stand nicht in der Liste** (#302) -- der Aufloeser kannte es
+  die ganze Zeit.
+- **Der Acom-Wachtakt hatte drei Rahmen Spielraum, jetzt zwanzig**
+  (#306).
+- **Der Scan fragt die gespeicherten Geraete auch gezielt** (#295).
+- **Drei Fehler aus einem Zweig, der nie einen PR hatte** (#316) --
+  Bind-Absturz, Tasten durch eine tote Sitzung, DEXP-Marke.
+- **Vier Rosinen aus Upstream 2026.10.1** (#290) -- eine davon am Geraet
+  widerlegt: AGC Off lief 40 dB zu heiss, die FM-Squelch-Vorgabe lag
+  hinter der Skala.
+- **v0.8.0: der Flex-Treiber fehlte im Bericht** (#282).
+
+### Pruefstaende und Werkzeug
+
+- **Vier Pruefstaende waren still** (#287) -- ihre Anmeldung war bei
+  einem Squash verloren gegangen, fuenf Tage unbemerkt.
+- **Pruefstaende laufen offscreen, auch lokal** (#283).
+- **main war rot: der Palettenlauf misst das Zappeln mit** (#293) -- der
+  CI-Laeufer hat keine GPU.
+- **Das Merge-Tor liest den Lauf, nicht die Pruefliste** (#301).
+
+### Eine Sonde bleibt offline (#296)
 
 Wer die laufende App zum Nachsehen startet, setzt dafuer
 `LONGPATH_CONFIG_DIR` auf einen eigenen Ordner. Das isoliert die
