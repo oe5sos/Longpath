@@ -1,0 +1,205 @@
+# ======================================================================
+# MESSLAUF — nicht zum Behalten gedacht
+# ======================================================================
+#
+# Die Frage: bauen und laufen die C++-Pruefstaende auf Windows?
+#
+# ci.yml behauptet seit dem 2026-08-09 (c6b3eaa7f), die Attrappen seien
+# "genuinely unported (mingw paths)". Diese Datei fragt die Maschine statt
+# den Kommentar. Sie aendert ci.yml NICHT an.
+#
+# Aufbau so, dass EIN Lauf alles sagt:
+#   1. Konfigurieren mit -DLONGPATH_BUILD_TESTS=ON  -> wieviele Pruefstaende
+#      melden sich auf Windows ueberhaupt an (ctest -N)?
+#   2. App bauen (bringt LongpathObjs + den gemeinsamen PCH).
+#   3. ALLE Pruefstands-Uebersetzungseinheiten uebersetzen, OHNE zu linken,
+#      mit `ninja -k 0` -- so bricht der Lauf nicht beim ersten Fehler ab,
+#      sondern meldet jeden einzelnen.
+#   4. Eine Handvoll namentlich genannter Kernlogik-Pruefstaende LINKEN und
+#      FAHREN -- das ist die zweite offene Frage (Linken gegen LongpathObjs,
+#      ws2_32 haengt in CMakeLists.txt:1514 nur am App-Ziel).
+#
+# Jeder Messschritt ist continue-on-error: ein roter Schritt darf die
+# spaeteren Messungen nicht verhindern.
+# ======================================================================
+
+name: Windows-Messung (Pruefstaende)
+
+on:
+  push:
+    branches:
+      - 'ci/windows-pruefstaende'
+      - 'ci/windows-pruefstaende-**'
+  workflow_dispatch:
+
+jobs:
+  messung:
+    runs-on: windows-latest
+    name: Windows-Messung
+    timeout-minutes: 300
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Abhaengigkeiten: wortgleich zu ci.yml's Windows-Zweig ────────
+      - name: Install Qt (Windows)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.*'
+          host: windows
+          target: desktop
+          arch: win64_mingw
+          modules: 'qtmultimedia qtshadertools qtwebsockets'
+          tools: 'tools_mingw1310'
+          cache: true
+
+      - name: Install Ninja (Windows)
+        run: choco install ninja -y
+
+      - name: Download FFTW3 (Windows)
+        shell: bash
+        run: |
+          mkdir -p third_party/fftw3/{include,lib,bin}
+          curl -L -o /tmp/fftw3.zip "https://fftw.org/pub/fftw/fftw-3.3.5-dll64.zip"
+          cd /tmp && unzip -o fftw3.zip -d fftw3
+          cp /tmp/fftw3/fftw3.h $GITHUB_WORKSPACE/third_party/fftw3/include/
+          cp /tmp/fftw3/libfftw3-3.dll $GITHUB_WORKSPACE/third_party/fftw3/bin/
+          cp /tmp/fftw3/libfftw3-3.def $GITHUB_WORKSPACE/third_party/fftw3/lib/
+
+      # ── 1. Konfigurieren MIT Pruefstaenden ───────────────────────────
+      - name: 1 — Konfigurieren mit LONGPATH_BUILD_TESTS=ON
+        id: konfig
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DLONGPATH_GPU_SPECTRUM=ON \
+            -DLONGPATH_BUILD_TESTS=ON 2>&1 | tee konfig.log
+
+      - name: 1b — Wieviele Pruefstaende melden sich auf Windows an
+        if: always()
+        continue-on-error: true
+        shell: bash
+        working-directory: build
+        run: |
+          ctest -N 2>&1 | tee ../ctest-N.log | tail -5
+          echo "── Zahl der angemeldeten Pruefstaende ──"
+          grep -cE '^[[:space:]]*Test[[:space:]]+#' ../ctest-N.log || true
+
+      # ── 2. Die App bauen (LongpathObjs + PCH) ────────────────────────
+      - name: 2 — App bauen
+        id: app
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake --build build -j$NUMBER_OF_PROCESSORS 2>&1 | tail -40
+
+      # ── 3. Alle Pruefstands-Quellen UEBERSETZEN, nicht linken ────────
+      #
+      # Ninja kennt jede Objektdatei als eigenes Ziel. Die Liste kommt
+      # aus `ninja -t targets all`, nicht aus einer Namensregel -- so
+      # faellt keine Datei durch, die anders heisst als ihr Ziel, und
+      # die zusaetzlichen Quellen (tests/fakes/) sind mit drin.
+      #
+      # -k 0 heisst: weitermachen, egal wieviel bricht. xargs stueckelt
+      # die Liste, weil Windows die Befehlszeile bei 32767 Zeichen
+      # abschneidet und 1077 Pfade darueber liegen.
+      - name: 3 — Alle Pruefstands-Quellen uebersetzen (ohne Linken)
+        id: uebersetzen
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          cd build
+          ninja -t targets all | grep -oE '^tests/CMakeFiles/[^:]+\.obj' | sort -u > ../obj-ziele.txt
+          echo "Objektziele unter tests/: $(wc -l < ../obj-ziele.txt)"
+          head -3 ../obj-ziele.txt
+          set +e
+          xargs -n 150 -a ../obj-ziele.txt ninja -k 0 > ../uebersetzen.log 2>&1
+          RC=$?
+          set -e
+          echo "ninja-Rueckgabe: $RC"
+          tail -20 ../uebersetzen.log
+
+      - name: 3b — Was beim Uebersetzen gebrochen ist, nach Datei
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          echo "── Zahl der Fehlerzeilen ──"
+          grep -cE '(^|[^a-zA-Z])(error|fatal error):' uebersetzen.log || echo 0
+          echo
+          echo "── Betroffene Dateien (eindeutig) ──"
+          grep -oE '[A-Za-z0-9_./\\-]+\.(cpp|h|hpp):[0-9]+:[0-9]+: (fatal )?error:' uebersetzen.log \
+            | sed -E 's/:[0-9]+:[0-9]+:.*//' | sort | uniq -c | sort -rn | head -60
+          echo
+          echo "── Fehlende Header (fatal error: X: No such file) ──"
+          grep -oE "fatal error: [^:]+: No such file" uebersetzen.log | sort | uniq -c | sort -rn | head -30
+          echo
+          echo "── Erste 120 Fehlerzeilen im Wortlaut ──"
+          grep -nE '(^|[^a-zA-Z])(error|fatal error):' uebersetzen.log | head -120
+          echo
+          echo "── FAILED-Zeilen von ninja (welches Ziel) ──"
+          grep -E '^FAILED:' uebersetzen.log | sed -E 's#^FAILED: ##' | head -60
+          echo "FAILED-Ziele insgesamt: $(grep -cE '^FAILED:' uebersetzen.log || echo 0)"
+
+      # ── 4. Eine Handvoll Kernlogik-Pruefstaende LINKEN und FAHREN ────
+      #
+      # Namentlich, nicht nach Muster: diese fuenf brauchen keine
+      # Oberflaeche (QTEST_APPLESS_MAIN laut tests/CMakeLists.txt) und
+      # keinen Datenträgerpfad. Wenn das Linken gegen LongpathObjs auf
+      # Windows grundsaetzlich bricht (etwa an ws2_32, das in
+      # CMakeLists.txt:1514 nur am App-Ziel haengt), sagt es sich hier.
+      - name: 4 — Fuenf Kernlogik-Pruefstaende linken
+        id: linken
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          ninja -C build -k 0 \
+            tst_amateur_bands \
+            tst_adif_log \
+            tst_beam_heading \
+            tst_callsign_cache \
+            tst_alex_filter_map > linken.log 2>&1
+          RC=$?
+          set -e
+          echo "ninja-Rueckgabe: $RC"
+          echo "── undefinierte Verweise (eindeutig) ──"
+          grep -oE "undefined reference to \`[^']+'" linken.log | sort | uniq -c | sort -rn | head -40
+          echo
+          tail -60 linken.log
+
+      - name: 4b — Dieselben fuenf fahren
+        if: always()
+        continue-on-error: true
+        shell: bash
+        working-directory: build
+        run: |
+          echo "=== ohne QT_QPA_PLATFORM (Windows-Vorgabe, so steht es in tests/CMakeLists.txt:117) ==="
+          ctest --output-on-failure -R 'tst_amateur_bands|tst_adif_log|tst_beam_heading|tst_callsign_cache|tst_alex_filter_map' 2>&1 | tail -40
+          echo
+          echo "=== mit QT_QPA_PLATFORM=offscreen ==="
+          QT_QPA_PLATFORM=offscreen ctest --output-on-failure -R 'tst_amateur_bands|tst_adif_log|tst_beam_heading|tst_callsign_cache|tst_alex_filter_map' 2>&1 | tail -40
+          echo
+          echo "=== gibt es das offscreen-Plugin auf Windows ueberhaupt? ==="
+          ls "$QT_ROOT_DIR/plugins/platforms/" 2>/dev/null || ls "$Qt6_DIR/../../plugins/platforms/" 2>/dev/null || echo "Plugin-Ordner nicht gefunden"
+
+      - name: Protokolle hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-messung-protokolle
+          path: |
+            konfig.log
+            ctest-N.log
+            uebersetzen.log
+            linken.log
+            obj-ziele.txt
+          retention-days: 14
+          if-no-files-found: warn
