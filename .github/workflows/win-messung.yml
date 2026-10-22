@@ -33,6 +33,10 @@ on:
       - 'ci/windows-pruefstaende-**'
   workflow_dispatch:
 
+concurrency:
+  group: win-messung-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   messung:
     runs-on: windows-latest
@@ -90,9 +94,16 @@ jobs:
         shell: bash
         run: |
           set +e
-          cmake --build build -j$NUMBER_OF_PROCESSORS -k 0 --target all_tests \
-            > testbau.log 2>&1
+          # -k 0 ist eine ninja-Flagge, nicht eine von cmake. In Lauf
+          # 39768259011 stand sie vor `--` und cmake hat mit "Unknown
+          # argument -k" abgebrochen: 0 Binaerdateien gebaut, 0 Fehler
+          # gemeldet, alles gruen -- ein Messlauf, der nichts gemessen
+          # hat und trotzdem wie Ordnung aussah.
+          cmake --build build -j$NUMBER_OF_PROCESSORS --target all_tests \
+            -- -k 0 > testbau.log 2>&1
           echo "Rueckgabe: $?"
+          echo "── Kopf des Bauprotokolls (faengt einen cmake-Usage-Fehler) ──"
+          head -5 testbau.log
           echo "── Zahl der Pruefstandsbinaerdateien ──"
           ls build/tests/*.exe 2>/dev/null | wc -l
           echo "── DLLs neben den Pruefstaenden (das ist die Behebung) ──"
