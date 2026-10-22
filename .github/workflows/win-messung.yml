@@ -98,54 +98,28 @@ jobs:
           set -o pipefail
           cmake --build build -j$NUMBER_OF_PROCESSORS 2>&1 | tail -40
 
-      # ── 3. Alle Pruefstands-Quellen UEBERSETZEN, nicht linken ────────
+      # ── 3. NUR die zwei Dateien, die im ersten Lauf gebrochen sind ───
       #
-      # Ninja kennt jede Objektdatei als eigenes Ziel. Die Liste kommt
-      # aus `ninja -t targets all`, nicht aus einer Namensregel -- so
-      # faellt keine Datei durch, die anders heisst als ihr Ziel, und
-      # die zusaetzlichen Quellen (tests/fakes/) sind mit drin.
-      #
-      # -k 0 heisst: weitermachen, egal wieviel bricht. xargs stueckelt
-      # die Liste, weil Windows die Befehlszeile bei 32767 Zeichen
-      # abschneidet und 1077 Pfade darueber liegen.
-      - name: 3 — Alle Pruefstands-Quellen uebersetzen (ohne Linken)
-        id: uebersetzen
+      # Lauf 39749806756 hat alle 2178 Objektziele unter tests/ uebersetzt
+      # (57 min) und GENAU ZWEI Fehler gemeldet:
+      #   tst_radio_discovery_scan_bound.cpp:33  arpa/inet.h: No such file
+      #   tst_sendefehler_deutung.cpp:72         'EHOSTDOWN' not declared
+      # Die Vollmessung noch einmal zu fahren kostet 57 min und sagt
+      # nichts Neues. Hier stehen nur die zwei -- als Gegenprobe zur
+      # Behebung.
+      - name: 3 — Die zwei behobenen Dateien uebersetzen
         if: always()
         continue-on-error: true
         shell: bash
         run: |
-          cd build
-          ninja -t targets all | grep -oE '^tests/CMakeFiles/[^:]+\.obj' | sort -u > ../obj-ziele.txt
-          echo "Objektziele unter tests/: $(wc -l < ../obj-ziele.txt)"
-          head -3 ../obj-ziele.txt
           set +e
-          xargs -n 150 -a ../obj-ziele.txt ninja -k 0 > ../uebersetzen.log 2>&1
-          RC=$?
-          set -e
-          echo "ninja-Rueckgabe: $RC"
-          tail -20 ../uebersetzen.log
-
-      - name: 3b — Was beim Uebersetzen gebrochen ist, nach Datei
-        if: always()
-        continue-on-error: true
-        shell: bash
-        run: |
-          echo "── Zahl der Fehlerzeilen ──"
+          ninja -C build -k 0 \
+            tests/CMakeFiles/tst_radio_discovery_scan_bound.dir/tst_radio_discovery_scan_bound.cpp.obj \
+            tests/CMakeFiles/tst_sendefehler_deutung.dir/tst_sendefehler_deutung.cpp.obj \
+            2>&1 | tee uebersetzen.log
+          echo "ninja-Rueckgabe: ${PIPESTATUS[0]}"
+          echo "── Fehlerzeilen ──"
           grep -cE '(^|[^a-zA-Z])(error|fatal error):' uebersetzen.log || echo 0
-          echo
-          echo "── Betroffene Dateien (eindeutig) ──"
-          grep -oE '[A-Za-z0-9_./\\-]+\.(cpp|h|hpp):[0-9]+:[0-9]+: (fatal )?error:' uebersetzen.log \
-            | sed -E 's/:[0-9]+:[0-9]+:.*//' | sort | uniq -c | sort -rn | head -60
-          echo
-          echo "── Fehlende Header (fatal error: X: No such file) ──"
-          grep -oE "fatal error: [^:]+: No such file" uebersetzen.log | sort | uniq -c | sort -rn | head -30
-          echo
-          echo "── Erste 120 Fehlerzeilen im Wortlaut ──"
-          grep -nE '(^|[^a-zA-Z])(error|fatal error):' uebersetzen.log | head -120
-          echo
-          echo "── FAILED-Zeilen von ninja (welches Ziel) ──"
-          grep -E '^FAILED:' uebersetzen.log | sed -E 's#^FAILED: ##' | head -60
-          echo "FAILED-Ziele insgesamt: $(grep -cE '^FAILED:' uebersetzen.log || echo 0)"
 
       # ── 4. Eine Handvoll Kernlogik-Pruefstaende LINKEN und FAHREN ────
       #
@@ -166,29 +140,84 @@ jobs:
             tst_adif_log \
             tst_beam_heading \
             tst_callsign_cache \
-            tst_alex_filter_map > linken.log 2>&1
+            tst_alex_filter_map \
+            tst_sendefehler_deutung \
+            tst_radio_discovery_scan_bound > linken.log 2>&1
           RC=$?
           set -e
           echo "ninja-Rueckgabe: $RC"
           echo "── undefinierte Verweise (eindeutig) ──"
-          grep -oE "undefined reference to \`[^']+'" linken.log | sort | uniq -c | sort -rn | head -40
+          grep -oE "undefined reference to \`[^']+'" linken.log | sort | uniq -c | sort -rn | head -40 || echo "(keine undefinierten Verweise)"
           echo
           tail -60 linken.log
 
-      - name: 4b — Dieselben fuenf fahren
+      # ── 4b. WARUM haengen die Binaerdateien? ─────────────────────────
+      #
+      # Im ersten Lauf haben alle fuenf gelinkten Pruefstaende nach 120 s
+      # Zeitueberschreitung gemeldet -- nicht rot, sondern haengend, alle
+      # fuenf mit derselben Zahl. Das sieht nicht nach Prueflogik aus,
+      # sondern nach dem Programmstart. Erste Vermutung: eine fehlende
+      # DLL. Windows zeigt dafuer einen Fehlerdialog, und ein Dialog auf
+      # einem Laeufer ohne Bediener haengt bis zum Zeitlimit.
+      #
+      # Das wird hier GEMESSEN, nicht geraten: welche DLLs die
+      # Binaerdatei braucht, wo jede einzelne davon liegt, und dann
+      # derselbe Lauf dreimal -- wie er ist, mit erweitertem PATH, und
+      # mit offscreen dazu.
+      - name: 4b — Welche DLLs braucht ein Pruefstand, und wo liegen sie
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          EXE=build/tests/tst_amateur_bands.exe
+          ls -la "$EXE"
+          echo "── Eingebundene DLLs ──"
+          objdump -p "$EXE" | grep -i 'DLL Name' | sort -u
+          echo
+          echo "── Wo liegt jede davon? ──"
+          QTBIN="$QT_ROOT_DIR/bin"
+          MINGWBIN="$IQTA_TOOLS/mingw1310_64/bin"
+          for d in $(objdump -p "$EXE" | grep -i 'DLL Name' | sed -E 's/.*DLL Name: *//' | sort -u); do
+            FUND=""
+            for ort in "build" "build/tests" "$QTBIN" "$MINGWBIN" \
+                       "third_party/fftw3/bin" "C:/Windows/System32"; do
+              if [ -f "$ort/$d" ]; then FUND="$ort"; break; fi
+            done
+            printf '%-28s %s\n' "$d" "${FUND:-NICHT GEFUNDEN}"
+          done
+          echo
+          echo "── Liegt der Qt-Binaerordner im PATH? ──"
+          echo "$PATH" | tr ':' '\n' | grep -iE 'Qt|mingw' || echo "nein"
+          echo
+          echo "── Plattform-Plugins von Qt auf Windows ──"
+          ls "$QT_ROOT_DIR/plugins/platforms/" || true
+
+      - name: 4c — Dieselben fuenf fahren, dreimal
         if: always()
         continue-on-error: true
         shell: bash
         working-directory: build
         run: |
-          echo "=== ohne QT_QPA_PLATFORM (Windows-Vorgabe, so steht es in tests/CMakeLists.txt:117) ==="
-          ctest --output-on-failure -R 'tst_amateur_bands|tst_adif_log|tst_beam_heading|tst_callsign_cache|tst_alex_filter_map' 2>&1 | tail -40
+          set +e
+          MUSTER='tst_amateur_bands|tst_adif_log|tst_beam_heading|tst_callsign_cache|tst_alex_filter_map'
+          echo "=== a) wie es ist (Windows-Vorgabe, tests/CMakeLists.txt:117) ==="
+          ctest --output-on-failure --timeout 25 -R "$MUSTER" 2>&1 | tail -25
+          echo "Rueckgabe: $?"
           echo
-          echo "=== mit QT_QPA_PLATFORM=offscreen ==="
-          QT_QPA_PLATFORM=offscreen ctest --output-on-failure -R 'tst_amateur_bands|tst_adif_log|tst_beam_heading|tst_callsign_cache|tst_alex_filter_map' 2>&1 | tail -40
+          echo "=== b) PATH um Qt-, MinGW-, FFTW- und Bauordner erweitert ==="
+          export PATH="$QT_ROOT_DIR/bin:$IQTA_TOOLS/mingw1310_64/bin:$GITHUB_WORKSPACE/third_party/fftw3/bin:$GITHUB_WORKSPACE/build:$PATH"
+          ctest --output-on-failure --timeout 25 -R "$MUSTER" 2>&1 | tail -25
+          echo "Rueckgabe: $?"
           echo
-          echo "=== gibt es das offscreen-Plugin auf Windows ueberhaupt? ==="
-          ls "$QT_ROOT_DIR/plugins/platforms/" 2>/dev/null || ls "$Qt6_DIR/../../plugins/platforms/" 2>/dev/null || echo "Plugin-Ordner nicht gefunden"
+          echo "=== c) dasselbe mit QT_QPA_PLATFORM=offscreen ==="
+          QT_QPA_PLATFORM=offscreen ctest --output-on-failure --timeout 25 -R "$MUSTER" 2>&1 | tail -25
+          echo "Rueckgabe: $?"
+          echo
+          echo "=== d) und die zwei behobenen dazu ==="
+          QT_QPA_PLATFORM=offscreen ctest --output-on-failure --timeout 25 \
+            -R 'tst_sendefehler_deutung|tst_radio_discovery_scan_bound' 2>&1 | tail -30
+          echo "Rueckgabe: $?"
 
       - name: Protokolle hochladen
         if: always()
