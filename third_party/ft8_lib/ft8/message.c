@@ -6,6 +6,33 @@
 #define LOG_LEVEL LOG_WARN
 #include "debug.h"
 
+// ── Longpath-Abweichung (2026-10-22): stpcpy fuer MSVC ──────────────────
+//
+// ftx_message_decode_std() unten benutzt stpcpy(). Das ist POSIX und in
+// den C-Bibliotheken von GCC und Clang enthalten, in der von Microsoft
+// nicht -- der Binder meldet dort:
+//
+//     ft8_static.lib(message.c.obj) : error LNK2019: unresolved external
+//         symbol stpcpy referenced in function ftx_message_decode_std
+//     Longpath.exe : fatal error LNK1120: 1 unresolved externals
+//
+// Derselbe Grund wie bei den Arrays variabler Laenge in decode.c,
+// monitor.c und gfsk.c (siehe FT8LIB-PROVENANCE.md): die CI baut Windows
+// mit MinGW und sieht es nicht, das Release baut mit MSVC.
+//
+// Der Ersatz haelt denselben Vertrag: src nach dst kopieren, einschliesslich
+// der abschliessenden Null, und den Zeiger AUF diese Null zurueckgeben.
+// Nur fuer MSVC uebersetzt -- ueberall sonst bleibt die Bibliothek
+// unberuehrt und benutzt ihr eigenes stpcpy.
+#ifdef _MSC_VER
+static char* stpcpy(char* dst, const char* src)
+{
+    size_t len = strlen(src);
+    memcpy(dst, src, len + 1);
+    return dst + len;
+}
+#endif
+
 #define MAX22    ((uint32_t)4194304ul)
 #define NTOKENS  ((uint32_t)2063592ul)
 #define MAXGRID4 ((uint16_t)32400ul)

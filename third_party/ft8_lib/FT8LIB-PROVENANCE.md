@@ -44,14 +44,29 @@ während FT8 zuhört.
 
 ## Änderungen am Upstream
 
-**Arrays variabler Länge, an drei Stellen** (2026-10-22). Alle übrigen
-übernommenen Dateien sind Byte für Byte gleich.
+**Vier Stellen, alle wegen MSVC** (2026-10-22). Alle übrigen übernommenen
+Dateien sind Byte für Byte gleich.
 
-| Datei | Feld | Ersetzt durch |
+| Datei | Was | Ersetzt durch |
 | --- | --- | --- |
 | `ft8/decode.c:516` | `float s2[n_tones]` | feste Größe 512 + Wachposten |
 | `common/monitor.c:142-143` | `timedata[me->nfft]`, `freqdata[me->nfft/2+1]` | `malloc`/`free`, einmal je Aufruf |
 | `common/gfsk.c:60,68` | `dphi[n_wave + 2*n_spsym]`, `pulse[3*n_spsym]` | `malloc`/`free`, einmal je Aussendung |
+| `ft8/message.c` | `stpcpy()` (POSIX, fehlt in MSVCs Bibliothek) | Ersatz unter `#ifdef _MSC_VER` |
+
+Die erste Gruppe sind Arrays variabler Länge, die vierte ein fehlendes
+Symbol beim Binden:
+
+```
+ft8_static.lib(message.c.obj) : error LNK2019: unresolved external
+    symbol stpcpy referenced in function ftx_message_decode_std
+Longpath.exe : fatal error LNK1120: 1 unresolved externals
+```
+
+Der Ersatz hält denselben Vertrag — kopieren einschließlich Null,
+Zeiger **auf** die Null zurück — und ist gegen das echte `stpcpy`
+nachgerechnet (gleicher Rückgabeversatz, gleiches Ergebnis). Er wird nur
+für MSVC übersetzt; überall sonst bleibt die Bibliothek unberührt.
 
 Arrays variabler Länge sind C99. GCC und Clang übersetzen sie, der
 Microsoft-Compiler kennt sie nicht und lehnt sie ab (C2057 / C2466 /
