@@ -7959,6 +7959,18 @@ longpath_add_test(tst_ps3_entwurfsblaetter)
 #   Kalibrierraster -- am RASTER gepruefte Lage, nicht am Bildpunkt: ein
 #   Formular, das nie gezeigt wurde, hat fuer alle Felder y() == 0.
 longpath_add_test(tst_ps3_bedienung)
+
+# tst_zweiton_ausserhalb_malvorgang: die drei Befunde aus NereusSDRs
+# PureSignal-Diagnose, die am 2026-10-22 bei uns behoben wurden -- die
+# Analyse ausserhalb des Malvorgangs (3), das Zweiton-Tor auf JEDEM Pan
+# (4), und die Entwertung der zwischengespeicherten Overlay-Schicht (6).
+# Gegenproben gegen 11c2008ef stehen im Kopf der Datei.
+longpath_add_test(tst_zweiton_ausserhalb_malvorgang)
+
+# tst_anzeigeregler_auf_jedem_pan: sieben Regler der Panadapter-Knopfleiste
+# wirkten nur auf Pan 0, weil nur dessen Leiste verdrahtet war -- gefunden
+# beim Nachsehen zu Befund 4. Gegenproben im Kopf der Datei.
+longpath_add_test(tst_anzeigeregler_auf_jedem_pan)
 # --------------------------------------------------------------------------
 # Aggregate "all_tests" target  (2026-05-26 KG4VCF dev-loop fix, from PR #291)
 # --------------------------------------------------------------------------

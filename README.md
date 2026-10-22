@@ -26,6 +26,11 @@
 > [`docs/attribution/`](docs/attribution/) — `THETIS-PROVENANCE.md`,
 > `AETHERSDR-PORTS.md`, `FREEDV-GUI-PROVENANCE.md`, `ASSETS.md`.
 >
+> > **Copyright © 2026 Martin Fischer, OE5SOS** — für die Longpath-eigene
+> Arbeit (590 Quelldateien, die keine Portierung sind). Wer woran
+> Urheberrecht hat, steht in [`AUTHORS.md`](AUTHORS.md); die Vermerke
+> der Upstreams bleiben davon unberührt.
+>
 > Longpath is licensed under the **GNU General Public License**, as its
 > upstreams require. See [`LICENSE`](LICENSE).
 >

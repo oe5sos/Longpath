@@ -23,6 +23,27 @@ verify-no-gui-dsp-access.py now guards).
 Only the controls that TARGET A SLICE are listed. Display-only wiring
 (dbmRangeChangeRequested and friends) has no slice to get wrong and is
 deliberately not covered.
+
+Zweite Regel, 2026-10-22: dieselbe Falle in der ANDEREN Richtung.
+Display-only wiring hat keine Scheibe, aber es hat einen PAN -- und der
+war falsch. Sieben Regler der Knopfleiste (Wasserfall-Verstaerkung,
+Schwarzpunkt, Farbtafel, 2D/3D, Frequenz am Zeiger, Fuellfarbe,
+Deckkraft) waren einmalig an activeSpectrumWidget() als EMPFAENGER
+gebunden, also an Pan 0. Jedes der sieben Signale kam im ganzen Programm
+genau einmal vor; im Zweipan-Bild bewegte der Regler im Flyout des
+zweiten Pans nichts. Gemessen am 2026-10-22 in
+tests/tst_anzeigeregler_auf_jedem_pan.cpp: alle sieben Werte blieben auf
+der Vorgabe stehen. Behoben in
+MainWindow::wireDisplayControlsForPan(panel, sw).
+
+Diese Regel prueft deshalb den EMPFAENGER: ein Setter aus der Liste
+unten darf nicht ueber activeSpectrumWidget() verdrahtet werden.
+
+Noch NICHT abgedeckt, weil es dort nicht um einen Mangel, sondern um
+eine Gestaltungsfrage geht -- welcher Pan soll es zeigen:
+  * setTxFilterRange    (das TX-Filterband; MainWindow.cpp ~5941)
+  * onNoiseFloorChanged (das rauschflurgefuehrte Raster; ~5970)
+Wer das entscheidet, nimmt sie hier mit auf.
 """
 import pathlib
 import re
@@ -51,8 +72,37 @@ PATTERN = re.compile(
 )
 PER_PAN_SENDER = "sw"
 
+# Anzeige-Setter, die je Pan verdrahtet werden muessen. Hier ist
+# SpectrumWidget der EMPFAENGER, also steht das Ziel beim connect fest --
+# und darf deshalb nicht activeSpectrumWidget() sein.
+PER_PAN_DISPLAY_SLOTS = (
+    "setWfColorGain",
+    "setWfBlackLevel",
+    "setWfColorScheme",
+    "setSpectrumRenderMode",
+    "setCursorFreqVisible",
+    "setFillColor",
+    "setFillAlpha",
+)
+
+# Als Empfaenger: `activeSpectrumWidget()` direkt vor einem dieser Setter.
+RECEIVER_PATTERN = re.compile(
+    r"activeSpectrumWidget\s*\(\s*\)\s*,\s*&SpectrumWidget::("
+    + "|".join(PER_PAN_DISPLAY_SLOTS) + r")\b"
+)
+
+# Und der Lambda-Umweg, der die beiden Enum-Setter frueher nahm:
+# `connect(panel, &…::colorSchemeChanged, activeSpectrumWidget(), [this]…)`
+# mit dem Setter IM Rumpf. Eine Zeile, die activeSpectrumWidget() als
+# Empfaenger nennt UND irgendwo einen dieser Setter aufruft, reicht.
+LAMBDA_PATTERN = re.compile(
+    r"activeSpectrumWidget\s*\(\s*\)\s*->\s*("
+    + "|".join(PER_PAN_DISPLAY_SLOTS) + r")\s*\("
+)
+
 def main() -> int:
     failures = []
+    receiver_failures = []
     for path in sorted(GUI.rglob("*.cpp")):
         rel = path.relative_to(ROOT).as_posix()
         for num, line in enumerate(path.read_text().splitlines(), 1):
@@ -62,6 +112,19 @@ def main() -> int:
             m = PATTERN.search(line)
             if m and m.group(1) != PER_PAN_SENDER:
                 failures.append(f"{rel}:{num}: {stripped}")
+            r = RECEIVER_PATTERN.search(line) or LAMBDA_PATTERN.search(line)
+            if r:
+                receiver_failures.append(
+                    f"{rel}:{num}: {r.group(1)} -- {stripped}")
+    if receiver_failures:
+        print("[spectrum-wiring] Anzeige-Setter muessen je Pan verdrahtet "
+              "werden, nicht ueber activeSpectrumWidget().")
+        print("Wire them in MainWindow::wireDisplayControlsForPan(panel, sw), "
+              "die ensureOverlayPanels() fuer JEDEN Pan aufruft -- sonst "
+              "bewegt der Regler im Flyout jedes zweiten Pans nichts "
+              "(gemessen 2026-10-22).")
+        for f in receiver_failures:
+            print(f"  {f}")
     if failures:
         print("[spectrum-wiring] Slice controls must be wired per pan, not "
               "through activeSpectrumWidget().")
@@ -70,9 +133,10 @@ def main() -> int:
               "signal instead of capturing one slice at connect time.")
         for f in failures:
             print(f"  {f}")
+    if failures or receiver_failures:
         return 1
-    print("[spectrum-wiring] OK: no slice control wired to "
-          "activeSpectrumWidget()")
+    print("[spectrum-wiring] OK: no slice control and no per-pan display "
+          "setter wired to activeSpectrumWidget()")
     return 0
 
 if __name__ == "__main__":

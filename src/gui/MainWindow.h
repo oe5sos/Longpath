@@ -649,6 +649,14 @@ private slots:
     /// wireSpectrumSliceControls below, because pan-0 needs those and does not
     /// come through here.
     void wireSpectrumForPan(class SpectrumWidget* sw, const QString& panId);
+    // Befund 4 (2026-10-22): die Zustaende des Zweiton-Felds je Pan statt
+    // einmalig an activeSpectrumWidget(). Siehe die Erklaerung in der .cpp.
+    void wireImdOverlayForPan(class SpectrumWidget* sw);
+    void wireImdOverlayForAllPans();
+    // Die sieben Anzeigeregler der Knopfleiste, je Pan an das eigene
+    // Spektrum statt einmalig an activeSpectrumWidget() (2026-10-22).
+    void wireDisplayControlsForPan(class SpectrumOverlayPanel* panel,
+                                   class SpectrumWidget* sw);
 
     /// Wire the four spectrum controls that act on a slice: click-to-tune,
     /// filter-edge drag, pan drag, CTUN toggle.
