@@ -25,6 +25,7 @@
 // =================================================================
 
 #include <QtTest>
+#include <QSpinBox>
 
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Tx.h"
@@ -79,6 +80,33 @@ private:
     }
 
 private slots:
+
+    // ── Nur so lange tasten, wie das Signal dauert ───────────────────
+    //
+    // Betreiber am 2026-10-22, nach dem ersten Sendeversuch: „hat zu
+    // lange gedauert." Gemessen im Protokoll des Geraets: `mox=true`
+    // von 06:17:30,295 bis 06:17:45,170 = 14,9 s, obwohl ein
+    // FT8-Signal 12,64 s dauert. Die zwei Sekunden danach gehen nicht
+    // nur verloren -- in ihnen laeuft der Empfang nicht, und das
+    // naechste Fenster beginnt unmittelbar.
+    void dieSendedauerIstDasSignalNichtDasFenster()
+    {
+        QCOMPARE(Ft8Tx::signalMs(Ft8Decoder::Protocol::Ft8), 12640);
+        QCOMPARE(Ft8Tx::signalMs(Ft8Decoder::Protocol::Ft4), 5040);
+
+        // Und sie ist KUERZER als das Fenster -- sonst waere nichts
+        // gewonnen.
+        QVERIFY(Ft8Tx::signalMs(Ft8Decoder::Protocol::Ft8)
+                < Ft8Tx::fensterMs(Ft8Decoder::Protocol::Ft8));
+        QVERIFY(Ft8Tx::signalMs(Ft8Decoder::Protocol::Ft4)
+                < Ft8Tx::fensterMs(Ft8Decoder::Protocol::Ft4));
+
+        // Zwei Sekunden Luft bleiben bei FT8 mindestens -- genug, um
+        // rechtzeitig auf Empfang zurueck zu sein.
+        QVERIFY2(Ft8Tx::fensterMs(Ft8Decoder::Protocol::Ft8)
+                     - Ft8Tx::signalMs(Ft8Decoder::Protocol::Ft8) >= 2000,
+                 "weniger als zwei Sekunden Luft vor dem naechsten Fenster");
+    }
 
     // ── Tx1..Tx6 ────────────────────────────────────────────────────
     //
@@ -757,7 +785,19 @@ private slots:
 
     // Ohne „Auto" legt der Knopf den Ruf nur ins Feld — dieselbe
     // Grenze wie beim Doppelklick.
-    void ohneAutoFuelltDerCqKnopfNurDasFeld()
+    // ── Der CQ-Knopf ruft CQ ─────────────────────────────────────────
+    //
+    // Hier stand bis zum 2026-10-22 das Gegenteil: `ohneAutoFuellt
+    // DerCqKnopfNurDasFeld` hielt fest, dass ein Druck auf CQ NUR den
+    // Text ins Feld schreibt und nur bei eingeschaltetem „Auto" etwas
+    // sendet.
+    //
+    // Der Betreiber hat das am Geraet verworfen: „der cq ruf
+    // funktioniert nicht." Und er hat recht -- ein Knopf mit der
+    // Aufschrift CQ, der nicht ruft, ist kein Knopf, sondern eine
+    // Textschablone. Der alte Lauf wird darum nicht geloescht, sondern
+    // umgedreht, damit die Umkehr in der Geschichte steht.
+    void derCqKnopfRuftWirklichCq()
     {
         RadioModel radio;
         radio.installFt8TxForTest();
@@ -768,16 +808,34 @@ private slots:
                                          QStringLiteral("JN67VV"));
 
         QVERIFY(applet.cqRufenButtonForTest());
-        QVERIFY(!applet.autoButtonForTest()->isChecked());
+        QVERIFY2(!applet.autoButtonForTest()->isChecked(),
+                 "Auto ist aus -- und der Ruf muss trotzdem laufen");
 
         applet.cqRufenButtonForTest()->click();
 
         QCOMPARE(applet.textFeldForTest()->text(),
                  QStringLiteral("CQ OE5SOS JN67"));
-        QVERIFY2(!applet.ablaufForTest().laeuft(),
-                 "ohne Auto darf kein Ablauf anlaufen");
-        QVERIFY2(!applet.sendetGerade(),
-                 "ohne Auto darf nichts gesendet werden");
+        QVERIFY2(applet.ablaufForTest().laeuft(),
+                 "CQ gedrueckt, und es laeuft kein Ruf");
+        QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::RufeCq);
+    }
+
+    void dieZahlDerVersucheIstWaehlbarUndBleibt()
+    {
+        // Betreiber am 2026-10-22: „man soll auch entscheiden koennen,
+        // wie oft er das automatisch probiert."
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        {
+            Ft8Applet applet(&radio);
+            QVERIFY(applet.cqVersucheSpinForTest());
+            applet.cqVersucheSpinForTest()->setValue(4);
+        }
+        // Ueber einen Neustart des Fensters hinweg -- eine Einstellung,
+        // die man jedes Mal neu machen muss, ist keine.
+        Ft8Applet wieder(&radio);
+        QVERIFY(wieder.cqVersucheSpinForTest());
+        QCOMPARE(wieder.cqVersucheSpinForTest()->value(), 4);
     }
 
     // Mit „Auto" faengt der Ablauf als ANRUFER an.

@@ -117,6 +117,30 @@ public:
         return p == Ft8Decoder::Protocol::Ft4 ? 7500 : 15000;
     }
 
+    /// Wie lange das SIGNAL dauert -- nicht das Fenster.
+    ///
+    /// Gemessen am 2026-10-22 am Geraet: der Sender war 14,9 s
+    /// getastet (`mox=true` 06:17:30,295 bis 06:17:45,170), obwohl ein
+    /// FT8-Signal nur 12,64 s lang ist. Betreiber: „hat zu lange
+    /// gedauert." Er kam dadurch zu spaet auf Empfang zurueck, um die
+    /// Antwort im naechsten Fenster noch ganz zu hoeren.
+    ///
+    /// 79 Symbole zu 0,16 s bei FT8, 105 zu 0,048 s bei FT4 -- die
+    /// Zahlen stehen in ft8_lib (`ft8/constants.h`: FT8_NN,
+    /// FT8_SYMBOL_PERIOD) und werden hier nicht neu erfunden.
+    static int signalMs(Ft8Decoder::Protocol p)
+    {
+        // From ft8_lib ft8/constants.h [@9fec6ca]:
+        //   #define FT8_SYMBOL_PERIOD (0.160f)   #define FT8_NN (79)
+        //   #define FT4_SYMBOL_PERIOD (0.048f)   #define FT4_NN (105)
+        // Hier als Zahlen statt als Einbindung: eine C-Kopfdatei aus
+        // third_party in eine oeffentliche Qt-Kopfdatei zu ziehen,
+        // zoege sie durch das halbe Programm.
+        return p == Ft8Decoder::Protocol::Ft4
+                   ? static_cast<int>(105 * 0.048 * 1000.0 + 0.5)   // 5040 ms
+                   : static_cast<int>(79 * 0.160 * 1000.0 + 0.5);   // 12640 ms
+    }
+
     /// Nummer des Fensters seit der vollen Minute (0..3 bei FT8).
     static int fensterNummer(qint64 utcMs, Ft8Decoder::Protocol p)
     {
