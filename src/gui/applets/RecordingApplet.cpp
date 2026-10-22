@@ -304,9 +304,15 @@ void RecordingApplet::onPlaybackClicked()
         rec.stopPlayback();
         return;
     }
+    // I/Q zuerst, und zwar sichtbar: Ton- und I/Q-Aufnahmen liegen im
+    // selben Ordner und sehen gleich aus. Seit dem 2026-10-22 traegt
+    // die I/Q-Aufnahme „_iq" im Namen -- aeltere nicht, darum bleibt
+    // der zweite Filter. Greift jemand doch zur Tonaufnahme, sagt die
+    // Wiedergabe es ihm (PlaybackRadioConnection::openRecording).
     const QString pfad = QFileDialog::getOpenFileName(
-        this, QStringLiteral("Open recording"), rec.recordingFolder(),
-        QStringLiteral("Recordings (*.wav);;All files (*)"));
+        this, QStringLiteral("Open I/Q recording"), rec.recordingFolder(),
+        QStringLiteral("I/Q recordings (*_iq.wav);;"
+                       "All recordings (*.wav);;All files (*)"));
     if (pfad.isEmpty()) {
         return;
     }

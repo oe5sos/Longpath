@@ -111,6 +111,10 @@ struct IqRecordingInfo {
     QString   band;        // "20m"
     int       sampleRate{0};
     double    seconds{0.0};
+    // Was im Beizettel unter "source" stand. LEER heisst: kein
+    // Beizettel oder keine Angabe -- das ist KEINE Aussage ueber die
+    // Art der Aufnahme, und niemand darf daraus eine machen.
+    QString   source;
 };
 
 // Gegenstueck zu IqRecorder::stop(). Bei Fehlern kommt ein leerer

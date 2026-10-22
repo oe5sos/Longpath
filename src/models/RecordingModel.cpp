@@ -159,8 +159,12 @@ QString RecordingModel::recordingFolder() const
     return dir;
 }
 
-QString RecordingModel::suggestedPath(const QString& suffix) const
+QString RecordingModel::suggestedPath(const QString& suffix,
+                                      const QString& kennung) const
 {
+    const QString marke = kennung.isEmpty()
+                              ? QString()
+                              : QLatin1Char('_') + kennung;
     QString freq;
     QString mode;
     QString band;
@@ -170,11 +174,11 @@ QString RecordingModel::suggestedPath(const QString& suffix) const
                           + QStringLiteral("Z");
 
     if (!sliceInfo(&freq, &mode, &band)) {
-        return recordingFolder() + QLatin1Char('/') + stamp
+        return recordingFolder() + QLatin1Char('/') + stamp + marke
                + QLatin1Char('.') + suffix;
     }
     return recordingFolder() + QLatin1Char('/') + stamp
-           + QLatin1Char('_') + band + QLatin1Char('_') + mode
+           + QLatin1Char('_') + band + QLatin1Char('_') + mode + marke
            + QLatin1Char('.') + suffix;
 }
 
@@ -280,8 +284,12 @@ bool RecordingModel::startIq(const QString& path)
     m_iq.setStreamIndex(slice->streamIndex());
     m_iq.setSampleRate(rate);
 
+    // Die Kennung „iq" ist nicht Zierde: ohne sie waehlt eine
+    // gleichzeitig laufende Tonaufnahme dieselbe Datei, und im
+    // Dateiwaehler der Wiedergabe sieht man den Unterschied nicht.
     const QString ziel = path.isEmpty()
-                             ? suggestedPath(QStringLiteral("wav"))
+                             ? suggestedPath(QStringLiteral("wav"),
+                                             QStringLiteral("iq"))
                              : path;
 
     QString fehler;

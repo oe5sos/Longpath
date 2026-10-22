@@ -125,7 +125,16 @@ public:
     /// Ein Vorschlag, kein Zwang: <Ordner>/<UTC>_<Band>_<Mode>.<suffix>,
     /// z. B. „20261021-134500Z_20m_LSB.wav". UTC, weil eine Aufnahme
     /// ueber Mitternacht sonst zweimal denselben Namen traegt.
-    Q_INVOKABLE QString suggestedPath(const QString& suffix) const;
+    /// Ein Vorschlag fuer den Dateinamen: Zeitstempel, Band, Betriebsart.
+    ///
+    /// `kennung` haengt sich vor die Endung. Ton und I/Q riefen das bis
+    /// zum 2026-10-22 BEIDE ohne Kennung auf -- gleicher Ordner,
+    /// gleiches Muster, gleiche Sekunde, dieselbe Datei: wer beides
+    /// zugleich startete, verlor die erste Aufnahme. Und im
+    /// Dateiwaehler der Wiedergabe liess sich die eine Sorte von der
+    /// anderen nicht unterscheiden.
+    Q_INVOKABLE QString suggestedPath(const QString& suffix,
+                                      const QString& kennung = QString()) const;
 
     // ── Eigenschaften ────────────────────────────────────────────────
     bool    audioRecording() const { return m_wav.isRecording(); }
