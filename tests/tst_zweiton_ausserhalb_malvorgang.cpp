@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
+// no-port-check: Longpath-eigener Prueflauf, kein Port. Die eine
+// Thetis-Nennung (display.cs:5008) steht als Herkunft der
+// Torbedingung in einem Kommentar -- es wird kein Thetis-Code
+// uebersetzt, sondern Longpath-Verhalten geprueft.
+//
 // ── Drei Befunde aus NereusSDRs PureSignal-Diagnose, bei uns nachgeprueft ──
 //
 // NereusSDR hat am 2026-10-12 in seinem Entwurfsblatt sechs bestaetigte

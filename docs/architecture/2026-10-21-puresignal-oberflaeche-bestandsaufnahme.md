@@ -88,3 +88,60 @@ Unsere 14-dB-Messung am echten Sender ist insofern mehr, als Upstream
 hat — ihre Absolutwerte sind durch denselben doppelten Zuschnitt
 entwertet gewesen, unsere auch. Siehe
 `longpath-puresignal-imd-gemessen` in der Erinnerung.
+
+---
+
+## Nachtrag 2026-10-22 — Upstreams sechs Befunde, bei uns nachgeprüft
+
+Die Bestandsaufnahme oben zählt 14 Dateien und 4801 Zeilen auf, die von
+NereusSDRs neuerem PureSignal-Interface zu holen wären. Der Betreiber hat
+die Schätzung von drei bis fünf Tagen zu Recht angezweifelt
+(„warum 3-5 Tage, wenn es eigentlich schon gut läuft"). Statt zu
+kopieren wurde deshalb umgekehrt vorgegangen: Upstreams eigene Diagnose
+lesen (`2026-10-12-puresignal-refresh-design.md`, Abschnitt *Confirmed
+source findings*), jeden der sechs Befunde bei uns nachprüfen, und nur
+beheben, was wirklich fehlt.
+
+| | Befund | bei uns | behoben |
+| --- | --- | --- | --- |
+| 1 | Doppelter Zuschnitt des sichtbaren Bereichs | vorhanden | 2026-10-21 (`31a594c5e`) |
+| 2 | Alle-sechs-Gating, stilles Versagen | vorhanden | 2026-10-21 (Diagnose + Ablesen als untere Schranke) |
+| 3 | Analyse und EMA laufen im Malvorgang | vorhanden | 2026-10-22 (`analyseImd()`) |
+| 4 | Bindung an `activeSpectrumWidget()` statt je Pan | vorhanden | 2026-10-22 (`wireImdOverlayForPan()`) |
+| 5 | DUP-Vorgabe weicht ab | **trifft uns nicht** | — |
+| 6 | GPU-Textur wird beim Torschluss nicht entwertet | vorhanden | 2026-10-22 (`entwerteImdSchicht()`) |
+
+### Zu Befund 5
+
+Upstreams neuerer `MoxDisplayController` fährt DUP aus. Bei uns steht
+`m_displayDuplex{true}`, und das ist Absicht: der Panadapter bleibt beim
+Senden live und zeigt den Rückweg — genau das, was Thetis' „duplex"-Modus
+tut, wenn `DisplayDuplex=true` die Rückweg-DDC auf das RX1-Fenster legt
+(Begründung steht an der Stelle selbst in `SpectrumWidget.h`). Auf `false`
+gesetzt stünde das Zweiton-Tor aus Thetis `display.cs:5008` dauerhaft zu
+und die ganze Messung wäre tot. Hier liegt keine Lücke, sondern eine
+Architekturentscheidung — eine Übernahme wäre eine Regression.
+
+### Was das für die 14 Dateien heißt
+
+Von den sechs bestätigten Mängeln, um deren Behebung Upstreams neueres
+Interface gebaut ist, sind nach dem 22.10. **fünf bei uns beseitigt und
+einer gegenstandslos** — ohne eine einzige der 14 Dateien zu holen. Die
+Eingriffe betrafen drei Dateien, die wir schon hatten
+(`SpectrumWidget.{h,cpp}`, `MainWindow.{h,cpp}`), und kosteten zusammen
+keinen halben Tag.
+
+Damit ist der Port nicht mehr eine Frage der Fehlerbehebung, sondern eine
+Frage der **Oberfläche**: Upstreams Inspektor, die verbundene AmpView und
+die IMD-Schiene sind Bedienelemente, die wir so nicht haben. Ob sie
+gebaut werden, ist eine Gestaltungsentscheidung des Betreibers und keine
+technische Notwendigkeit mehr.
+
+### Eine Lücke im Prüfnetz, nebenbei gefunden
+
+`scripts/verify-no-captured-slice-spectrum-wiring.py` meldet wörtlich
+„no slice control wired to activeSpectrumWidget()" — und war grün,
+während Befund 4 genau diese Bindung hatte. Das Skript prüft nur
+Scheiben-Bedienelemente, nicht Anzeigezustände wie MOX, Zweitongenerator
+oder Messhaken. Wer die Prüfung ausweitet, findet mit einiger
+Wahrscheinlichkeit weitere Einmal-Bindungen derselben Art.
