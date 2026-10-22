@@ -140,6 +140,11 @@ public:
     /// „JN86" ist einer, „R-09" und „+02" sind keine.
     static QString locatorAusNachricht(const QString& nachricht);
 
+    /// Was ich gerade sende, in die rechte Spalte („Rx Frequency").
+    /// Wie in WSJT-X: links steht das Band, rechts das eigene
+    /// Gespraech — die Antworten an mich standen dort schon.
+    void zeigeEigeneSendung(const QString& nachricht);
+
     /// Welcher Sorte ist eine Zeile? Die REIHENFOLGE ist die Aussage:
     ///
     ///   1. AnMich      -- jemand ruft DICH. Schlaegt alles.
@@ -253,6 +258,11 @@ public:
     Ft8Stream*      streamForTest() const { return m_stream; }
     QPlainTextEdit* listForTest()   const { return m_list; }
     QPlainTextEdit* listRxForTest() const { return m_listRx; }
+    /// Der Zeitgeber, der auf den Beginn des eigenen Fensters wartet.
+    /// Ein Prueflauf stellt ihn auf 0 und laesst ihn ablaufen — nur so
+    /// wird der Sendeweg wirklich gefahren und nicht nur die Methode
+    /// am Ende davon gerufen.
+    QTimer* sendeTimerForTest() const { return m_sendeTimer; }
     QLabel*         statusForTest() const { return m_status; }
     QLabel*         lastLabelForTest() const { return m_lastLabel; }
     QPushButton*    nurCqButtonForTest() const { return m_nurCqBtn; }

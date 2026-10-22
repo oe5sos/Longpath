@@ -994,7 +994,8 @@ void Ft8Applet::sendeNachricht(const QString& text)
         m_sendeTimer->setSingleShot(true);
     }
     m_sendeTimer->disconnect();
-    connect(m_sendeTimer, &QTimer::timeout, this, [this]() {
+    const QString gesendet = sauber;
+    connect(m_sendeTimer, &QTimer::timeout, this, [this, gesendet]() {
         if (!m_sendet || !m_model) { return; }
         Ft8TxSource* q = m_model->ft8TxSource();
         auto* router = m_model->micRouter();
@@ -1041,6 +1042,7 @@ void Ft8Applet::sendeNachricht(const QString& text)
             return;
         }
         if (m_status) { m_status->setText(tr("transmitting")); }
+        zeigeEigeneSendung(gesendet);
 
         // Nur so lange tasten, wie das SIGNAL dauert -- nicht das
         // ganze Fenster.
@@ -1309,6 +1311,45 @@ QString Ft8Applet::landFuer(const QString& rufzeichen) const
     if (praefix.isEmpty()) { return {}; }
     const DxccEntity* e = dxcc->ctyDat().entityByPrefix(praefix);
     return e ? e->name : QString();
+}
+
+// ── Was ICH gesendet habe, in die rechte Spalte ──────────────────────
+//
+// Betreiber am 2026-10-22: „sehe ich auch rechts, wenn ein qso zu
+// stande kommt." Die Antworten an ihn standen dort schon -- jede
+// Zeile mit dem eigenen Rufzeichen geht nach rechts, egal auf welcher
+// Tonlage. Was fehlte, war die eigene Haelfte des Gespraechs: ein QSO
+// laeuft jetzt von selbst ab, und ohne die eigenen Zuege steht rechts
+// nur, was der andere sagt.
+//
+// Wie in WSJT-X: in die rechte Spalte, nicht in die linke -- links
+// steht, was auf dem BAND los ist, und das eigene Signal gehoert
+// nicht dazu. Die Spalten sind dieselben, nur steht „Tx" an der
+// Stelle des Rapports und die Laufzeit bleibt leer; beides hat bei
+// einer eigenen Sendung keinen Wert.
+//
+// Die Farbe ist das Messing der Sendetaste (kTxKeyBorder), nicht
+// Rot: „kein kraeftiges Rot als Zustandsfarbe" gilt hier wie dort.
+void Ft8Applet::zeigeEigeneSendung(const QString& nachricht)
+{
+    if (m_listRx == nullptr || nachricht.trimmed().isEmpty()) { return; }
+
+    const QString zeile = QStringLiteral("%1 %2 %3 %4  %5")
+                              .arg(QDateTime::currentDateTimeUtc()
+                                       .toString(QStringLiteral("hhmmss")))
+                              .arg(tr("Tx"), 4)
+                              .arg(QString(), 5)
+                              .arg(m_sendeTonHz, 5)
+                              .arg(nachricht.trimmed());
+
+    QTextCharFormat f;
+    f.setForeground(QColor(QString::fromLatin1(Style::kTxKeyBorder)));
+    f.setFontWeight(QFont::Bold);
+
+    QTextCursor c(m_listRx->document());
+    c.movePosition(QTextCursor::End);
+    if (!m_listRx->document()->isEmpty()) { c.insertBlock(); }
+    c.insertText(zeile, f);
 }
 
 void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,

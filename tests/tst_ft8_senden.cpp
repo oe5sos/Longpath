@@ -26,6 +26,7 @@
 
 #include <QtTest>
 #include <QSpinBox>
+#include <QTimer>
 
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Tx.h"
@@ -564,6 +565,79 @@ private slots:
                  Ft8Ablauf::Zustand::RufeAn);
         QVERIFY2(applet.sendetGerade(),
                  "der erste Zug muss auf sein Fenster warten");
+        applet.abbrechen();
+    }
+
+    // ── Das eigene Gespraech steht rechts ───────────────────────────
+    //
+    // Betreiber am 2026-10-22: „sehe ich auch rechts, wenn ein qso zu
+    // stande kommt." Die Antworten AN ihn standen dort schon (jede
+    // Zeile mit dem eigenen Rufzeichen geht nach rechts). Gefehlt hat
+    // die eigene Haelfte -- und seit das QSO von selbst laeuft,
+    // stuende rechts sonst nur, was der andere sagt.
+    void dieEigeneSendungStehtRechts()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        QVERIFY(applet.listRxForTest());
+        QVERIFY(applet.listRxForTest()->toPlainText().isEmpty());
+
+        applet.zeigeEigeneSendung(QStringLiteral("DL1ABC OE5SOS JN67"));
+
+        const QString rechts = applet.listRxForTest()->toPlainText();
+        QVERIFY2(rechts.contains(QStringLiteral("DL1ABC OE5SOS JN67")),
+                 "die eigene Sendung muss rechts stehen");
+        QVERIFY2(rechts.contains(QStringLiteral("Tx")),
+                 "sie muss als eigene Sendung erkennbar sein");
+
+        // Und links NICHT: dort steht, was auf dem Band los ist, und
+        // das eigene Signal gehoert nicht dazu.
+        QVERIFY2(!applet.listForTest()->toPlainText()
+                      .contains(QStringLiteral("DL1ABC OE5SOS JN67")),
+                 "die eigene Sendung gehoert nicht in die Bandspalte");
+
+        // Leeres bleibt leer -- sonst stuende nach jedem Fehlversuch
+        // eine Zeile mit nichts drin.
+        applet.zeigeEigeneSendung(QStringLiteral("   "));
+        QCOMPARE(applet.listRxForTest()->toPlainText(), rechts);
+    }
+
+    // ── Und der Sendeweg ruft sie wirklich ──────────────────────────
+    //
+    // Der Lauf darueber ruft zeigeEigeneSendung() SELBST — er belegt
+    // damit, was die Methode tut, aber nicht, dass jemand sie ruft.
+    // Entfernt man den Aufruf aus dem Sendeweg, bleibt er gruen. Also
+    // hier derselbe Weg wie im Betrieb: senden, den Zeitgeber auf 0
+    // stellen und ablaufen lassen.
+    void derSendewegSchreibtDieZeileWirklich()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        applet.sendeNachricht(QStringLiteral("CQ OE5SOS JN67"));
+        QVERIFY2(applet.sendetGerade(), "die Sendung muss eingeplant sein");
+
+        QTimer* t = applet.sendeTimerForTest();
+        QVERIFY(t);
+        QVERIFY2(t->isActive(), "der Zeitgeber muss auf das Fenster warten");
+        t->stop();
+        t->start(0);
+
+        QTRY_VERIFY_WITH_TIMEOUT(
+            applet.listRxForTest()->toPlainText()
+                .contains(QStringLiteral("CQ OE5SOS JN67")), 3000);
+
         applet.abbrechen();
     }
 
