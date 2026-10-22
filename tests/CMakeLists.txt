@@ -81,6 +81,29 @@ function(_longpath_derive_test_labels out_var src_file)
             list(APPEND _labels "gui")
         endif()
     endforeach()
+
+    # ── Marke "appless": braucht dieser Pruefstand eine Oberflaeche? ──
+    #
+    # QTEST_APPLESS_MAIN heisst: kein QApplication, kein QWidget, kein
+    # Schirm -- reine Kernlogik. QTEST_MAIN heisst das Gegenteil.
+    # Dieselbe Herleitung wie oben, aus der Datei selbst gelesen statt
+    # aus einer Tabelle, die jemand pflegen muss.
+    #
+    # Wozu (2026-10-22): die Windows-CI faehrt genau diese Teilmenge.
+    # Dass ein Pruefstand mit Oberflaeche dort traegt, ist eine eigene
+    # Frage -- auf Linux braucht es dafuer xvfb, auf macOS das
+    # offscreen-Plugin, und auf Windows ist beides nicht geprueft. Eine
+    # BENANNTE Teilmenge, die laeuft, ist mehr als eine ganze Reihe,
+    # die es nicht tut.
+    #
+    # `ctest -L appless` faehrt sie, `tests_appless` baut sie -- das
+    # Ziel entsteht wie jedes andere Markenziel weiter unten.
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/${src_file}" _appless
+         REGEX "QTEST_APPLESS_MAIN")
+    if(_appless)
+        list(APPEND _labels "appless")
+    endif()
+
     list(REMOVE_DUPLICATES _labels)
     if(NOT _labels)
         set(_labels "unclassified")
@@ -8306,8 +8329,29 @@ endforeach()
 # gar nicht über longpath_add_test() laufen, sondern direkt mit
 # add_test() registriert werden.
 #
-# Windows bleibt ausgenommen: dort fährt die CI bis heute ohne offscreen
-# und ist grün -- ohne Not wird daran nichts geändert.
+# ── Windows, richtiggestellt am 2026-10-22 ──────────────────────────
+#
+# Hier stand: „Windows bleibt ausgenommen: dort fährt die CI bis heute
+# ohne offscreen und ist grün -- ohne Not wird daran nichts geändert."
+# Der erste Halbsatz war keine Messung: die Windows-CI fuhr NULL
+# Pruefstaende, das Grün war der App-Bau. Eine Plattform, auf der
+# nichts läuft, ist nicht „grün ohne offscreen" -- sie ist ohne
+# Aussage. Siehe [[feedback-abwesenheit-ist-keine-aussage]].
+#
+# Jetzt ist es gemessen (Lauf 39762280534, dieselben fünf
+# Kernlogik-Pruefstaende, derselbe Bauordner):
+#     ohne offscreen:  5 von 5 Passed, 0,66 s
+#     mit  offscreen:  5 von 5 Passed, 0,31 s
+# Das Plugin ist da (qoffscreen.dll liegt in Qt 6.8.3 für Windows bei,
+# neben qwindows.dll, qminimal.dll und qdirect2d.dll).
+#
+# Es bleibt trotzdem bei der Systemvorgabe, aber aus einem anderen
+# Grund als dem, der hier stand: die Windows-CI fährt die Marke
+# `appless`, und appless heisst QTEST_APPLESS_MAIN -- kein
+# QApplication, also gar kein Schirmweg zu wählen. Die Frage stellt
+# sich erst, wenn Pruefstaende MIT Oberfläche dazukommen; die 0,31 s
+# oben sagen, dass offscreen dann wahrscheinlich die richtige Antwort
+# ist, aber geprueft ist das an keinem einzigen Fenster.
 #
 # Wer zusehen will: -DLONGPATH_TEST_PLATFORM=cocoa (oder leer für die
 # Systemvorgabe).
