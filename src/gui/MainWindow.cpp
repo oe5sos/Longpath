@@ -3859,6 +3859,56 @@ void MainWindow::refreshMeterPollerSlices()
     m_meterPoller->setSliceChannels(ids);
 }
 
+// ---------------------------------------------------------------------------
+// wireDisplayControlsForPan
+//
+// Die sieben Anzeigeregler der Panadapter-Knopfleiste, je Pan an das
+// Spektrum DIESES Pans. Vorher hingen sie einmalig an
+// activeSpectrumWidget() -- also an Pan 0, und zwar am OBJEKT, nicht am
+// Ausdruck. Dieselbe Falle wie bei Befund 4 (Zweiton-Tor) und bei den
+// Scheiben-Bedienelementen, die wireSpectrumSliceControls schon je Pan
+// fuehrt.
+//
+// `sw` statt `activeSpectrumWidget()` ist hier der ganze Unterschied:
+// der Empfaenger steht beim connect fest und muss deshalb der eigene
+// sein. Qt::UniqueConnection, weil ensureOverlayPanels() bei jedem
+// Layoutwechsel laeuft -- der Vorlauf dort legt eine Leiste nur einmal
+// je Pan an, aber ein doppelter Connect waere hier ein doppelter
+// Reglerweg und damit ein Sprung um den zweifachen Wert.
+// ---------------------------------------------------------------------------
+void MainWindow::wireDisplayControlsForPan(SpectrumOverlayPanel* panel,
+                                           SpectrumWidget* sw)
+{
+    if (!panel || !sw) { return; }
+
+    // B8 Task 20: Wasserfall-Farbverstaerkung, Schwarzpunkt, Farbtafel.
+    connect(panel, &SpectrumOverlayPanel::wfColorGainChanged,
+            sw, &SpectrumWidget::setWfColorGain, Qt::UniqueConnection);
+    connect(panel, &SpectrumOverlayPanel::wfBlackLevelChanged,
+            sw, &SpectrumWidget::setWfBlackLevel, Qt::UniqueConnection);
+    connect(panel, &SpectrumOverlayPanel::colorSchemeChanged,
+            sw, [sw](int idx) {
+        // colorSchemeChanged carries a raw combo index (int); setWfColorScheme
+        // takes the WfColorScheme enum — adapt with a bounds-checked cast.
+        const int schemeCount = static_cast<int>(WfColorScheme::Count);
+        sw->setWfColorScheme(
+            static_cast<WfColorScheme>(qBound(0, idx, schemeCount - 1)));
+    });
+    connect(panel, &SpectrumOverlayPanel::spectrumRenderModeChanged,
+            sw, [sw](int idx) {
+        sw->setSpectrumRenderMode(
+            idx == 1 ? SpectrumRenderMode::Mode3D : SpectrumRenderMode::Mode2D);
+    });
+
+    // B8 Task 21/22 + Nachtrag: Frequenz am Zeiger, Fuellfarbe, Deckkraft.
+    connect(panel, &SpectrumOverlayPanel::cursorFreqVisibleChanged,
+            sw, &SpectrumWidget::setCursorFreqVisible, Qt::UniqueConnection);
+    connect(panel, &SpectrumOverlayPanel::fillColorChanged,
+            sw, &SpectrumWidget::setFillColor, Qt::UniqueConnection);
+    connect(panel, &SpectrumOverlayPanel::fillAlphaChanged,
+            sw, &SpectrumWidget::setFillAlpha, Qt::UniqueConnection);
+}
+
 void MainWindow::ensureOverlayPanels()
 {
     if (!m_panStack || !m_radioModel) { return; }
@@ -3968,6 +4018,19 @@ void MainWindow::ensureOverlayPanels()
             }
             m_radioModel->onBandButtonClicked(bandFromName(name));
         });
+
+        // ── Die Anzeigeregler gehoeren an DIESEN Pan (2026-10-22) ────────
+        //
+        // Gefunden beim Nachsehen zu Befund 4 (Zweiton-Tor an Pan 0).
+        // Jeder Pan bekommt oben seine eigene Knopfleiste, verdrahtet war
+        // aber nur m_overlayPanel -- die von Pan 0, und zwar gegen
+        // activeSpectrumWidget(), also wieder Pan 0. Jedes der sieben
+        // Signale kam im ganzen Programm genau einmal vor. Folge am
+        // Geraet: im Zweipan-Bild bewegte der Regler im Flyout des
+        // zweiten Pans nichts, weil die Leiste dieses Pans an keinem
+        // Empfaenger hing. Gemessen am 2026-10-22: alle sieben Werte
+        // blieben auf der Vorgabe stehen.
+        wireDisplayControlsForPan(panel, sw);
 
         // Pan-0's strip stays the one the display-settings wiring targets.
         if (m_overlayPanel == nullptr || panId == QStringLiteral("pan-0")) {
@@ -6377,26 +6440,13 @@ void MainWindow::buildUI()
         connect(m_overlayPanel, &SpectrumOverlayPanel::clarityRetuneRequested,
                 m_clarityController, &ClarityController::retuneNow);
 
-        // B8 Task 20: wire Display-flyout orphaned signals to SpectrumWidget.
-        // These three signals were emitted but never connected — moving the
-        // WF Gain / WF Black Level sliders and the Scheme combo did nothing.
-        connect(m_overlayPanel, &SpectrumOverlayPanel::wfColorGainChanged,
-                activeSpectrumWidget(), &SpectrumWidget::setWfColorGain);
-        connect(m_overlayPanel, &SpectrumOverlayPanel::wfBlackLevelChanged,
-                activeSpectrumWidget(), &SpectrumWidget::setWfBlackLevel);
-        connect(m_overlayPanel, &SpectrumOverlayPanel::colorSchemeChanged,
-                activeSpectrumWidget(), [this](int idx) {
-            // colorSchemeChanged carries a raw combo index (int); setWfColorScheme
-            // takes the WfColorScheme enum — adapt with a bounds-checked cast.
-            const int schemeCount = static_cast<int>(WfColorScheme::Count);
-            activeSpectrumWidget()->setWfColorScheme(
-                static_cast<WfColorScheme>(qBound(0, idx, schemeCount - 1)));
-        });
-        connect(m_overlayPanel, &SpectrumOverlayPanel::spectrumRenderModeChanged,
-                activeSpectrumWidget(), [this](int idx) {
-            activeSpectrumWidget()->setSpectrumRenderMode(
-                idx == 1 ? SpectrumRenderMode::Mode3D : SpectrumRenderMode::Mode2D);
-        });
+        // B8 Task 20 (Wasserfall-Verstaerkung, Schwarzpunkt, Farbtafel) und
+        // Task 21/22 (Frequenz am Zeiger, Fuellfarbe, Deckkraft) standen
+        // bis zum 2026-10-22 hier -- einmalig, gegen m_overlayPanel (die
+        // Leiste von Pan 0) und activeSpectrumWidget() (ebenfalls Pan 0).
+        // Sie liegen jetzt in wireDisplayControlsForPan(), die
+        // ensureOverlayPanels() fuer JEDEN Pan aufruft, Pan 0 eingeschlossen.
+        // Hier stehenzulassen haette Pan 0 doppelt verdrahtet.
         // Der Panadapter hat seinen Modus laengst aus den Einstellungen
         // geladen (loadSettings in ensureOverlayPanels); das Panel wusste
         // davon nichts und zeigte nach jedem Start "2D", auch wenn 3D
@@ -6502,20 +6552,6 @@ void MainWindow::buildUI()
                 [fitSegments]() { fitSegments(true); });
         connect(m_overlayPanel, &SpectrumOverlayPanel::zoomSegment, this,
                 [fitSegments]() { fitSegments(false); });
-
-        // B8 Task 21: wire Cursor Freq toggle to SpectrumWidget visibility guard.
-        connect(m_overlayPanel, &SpectrumOverlayPanel::cursorFreqVisibleChanged,
-                activeSpectrumWidget(), &SpectrumWidget::setCursorFreqVisible);
-
-        // B8 Task 22: wire Fill Color button to SpectrumWidget::setFillColor.
-        connect(m_overlayPanel, &SpectrumOverlayPanel::fillColorChanged,
-                activeSpectrumWidget(), &SpectrumWidget::setFillColor);
-
-        // B8 fix-up: wire Fill Alpha slider to SpectrumWidget::setFillAlpha.
-        // The slider emitted fillAlphaChanged but had no connect — opacity
-        // never reached the renderer.
-        connect(m_overlayPanel, &SpectrumOverlayPanel::fillAlphaChanged,
-                activeSpectrumWidget(), &SpectrumWidget::setFillAlpha);
 
         // B8 Task 24: wire "More Display Options →" link to Setup → Display.
         // Rechtsklick auf den Panadapter -> Setup-Seite. Derselbe Weg,
