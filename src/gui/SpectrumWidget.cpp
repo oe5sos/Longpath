@@ -3425,6 +3425,40 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
                             0.0,
                             m_renderedPixels);
 
+    // ── Was kommt eigentlich herein? (2026-10-22) ────────────────────
+    //
+    // Alle dreissig Sekunden eine Zeile mit dem Median und dem
+    // staerksten Punkt des gezeichneten Spektrums, in dBm. Fuer JEDES
+    // Funkgeraet, weil beide Wege hier durchlaufen.
+    //
+    // Der Grund: am 2026-10-22 meldete der Betreiber „hier ist nichts,
+    // es muessten hunderte stationen sein", und die Frage, ob das
+    // Geraet nichts hoert oder Longpath nichts zeigt, war nur ueber
+    // einen Mitschnitt und eine Auswertung von Hand zu beantworten.
+    // Gemessen wurde dann: ueber 461 kHz kein Punkt ueber −98 dBm, bei
+    // einem Rauschteppich von −118,5 dBm. Ein 20-m-Band am Abend hat
+    // Stationen bei −80 bis −50 dBm.
+    //
+    // Mit dieser Zeile steht dieselbe Auskunft im Protokoll, und zwei
+    // Funkgeraete lassen sich nebeneinander legen, ohne etwas
+    // einzubauen.
+    if (!m_renderedPixels.isEmpty()) {
+        const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+        if (jetzt - m_bandBerichtZuletztMs > 30000) {
+            m_bandBerichtZuletztMs = jetzt;
+            QVector<float> sortiert = m_renderedPixels;
+            std::sort(sortiert.begin(), sortiert.end());
+            const float median = sortiert[sortiert.size() / 2];
+            const float p99    = sortiert[sortiert.size() * 99 / 100];
+            const float spitze = sortiert.last();
+            qCInfo(lcSpectrum).nospace()
+                << "Band: Rauschteppich " << median << " dBm, 99. Perzentil "
+                << p99 << " dBm, staerkster Punkt " << spitze
+                << " dBm (Hub " << (spitze - median) << " dB ueber "
+                << (bandwidth() / 1.0e3) << " kHz)";
+        }
+    }
+
     // FFT-replan crossfade (Option A from the 2026-05-08 design).  For the
     // first kReplanFadeFrames after a resolution change, blend the
     // avenger's output with the frozen pre-replan trace using a linear

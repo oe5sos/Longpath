@@ -2375,7 +2375,10 @@ private:
     // model (each ANALYZER_INFO[] entry has its own DetType + AvMode).
     QVector<float> m_fullLinearBins;       // FFTEngine input cache (|X[k]|²)
     QVector<float> m_displayLinearPixels;  // spectrum detector output (linear)
-    QVector<float> m_renderedPixels;       // spectrum avenger output (dBm)
+    QVector<float> m_renderedPixels;
+    /// Zeitpunkt der letzten Bandmeldung (alle 30 s, siehe
+    /// updateSpectrumLinear).
+    qint64 m_bandBerichtZuletztMs{0};       // spectrum avenger output (dBm)
     QVector<float> m_wfDisplayLinearPixels; // waterfall detector output (linear)
     QVector<float> m_wfRenderedPixels;     // waterfall avenger output (dBm)
     int m_displayWidthOverrideForTest{0};  // 0 = off; see setDisplayWidthOverrideForTest()
