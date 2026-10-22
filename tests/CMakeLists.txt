@@ -8006,6 +8006,11 @@ longpath_add_test(tst_ps3_bedienung)
 # Gegenproben gegen 11c2008ef stehen im Kopf der Datei.
 longpath_add_test(tst_zweiton_ausserhalb_malvorgang)
 
+# tst_tondiagnose_ueberall: der Eintrag "Diagnose audio backend" stand
+# hinter #if defined(Q_OS_LINUX) -- auf Windows, wo die Tonstoerung offen
+# ist, gab es gar keine Diagnose. Gegenprobe im Kopf der Datei.
+longpath_add_test(tst_tondiagnose_ueberall)
+
 # tst_anzeigeregler_auf_jedem_pan: sieben Regler der Panadapter-Knopfleiste
 # wirkten nur auf Pan 0, weil nur dessen Leiste verdrahtet war -- gefunden
 # beim Nachsehen zu Befund 4. Gegenproben im Kopf der Datei.

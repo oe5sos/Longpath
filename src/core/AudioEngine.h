@@ -364,6 +364,16 @@ public:
     const IAudioBus* speakersBusForTest() const { return m_speakersBus.get(); }
     void ensureSpeakersOpenForTest() { ensureSpeakersOpen(); }
 
+    /// ── Fuer die Tondiagnose (2026-10-22) ────────────────────────────
+    ///
+    /// Keine Pruef-Naht, sondern Bedienung: die Tondiagnose unter Help
+    /// zeigt Geraet, Schnittstelle, Rate und die Aussetzerzaehler. Bis
+    /// heute standen diese Zahlen nur im Protokoll, und auf Windows kam
+    /// man ohne PowerShell nicht heran -- am 2026-10-22 kostete genau das
+    /// einen Abend, weil der Betreiber jede Zahl von Hand holen musste.
+    const IAudioBus* speakersBus() const { return m_speakersBus.get(); }
+    const IAudioBus* txInputBus()  const { return m_txInputBus.get(); }
+
     // Test seam — inject a fake IAudioBus into the TX-input slot so unit
     // tests can exercise pullTxMic without standing up a real PortAudio
     // capture device. Takes ownership of `bus`.

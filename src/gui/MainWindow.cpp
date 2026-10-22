@@ -430,6 +430,7 @@ warren@wpratt.com
 
 #include <QNetworkInterface>
 #include "core/AudioEngine.h"
+#include "core/audio/PortAudioBus.h"
 #include "core/ClientPuduMonitor.h"
 #include "core/TxWorkerThread.h"
 #include "core/strip/StripChain.h"
@@ -494,6 +495,9 @@ warren@wpratt.com
 #include <QPushButton>
 #include <QCursor>
 #include <QClipboard>
+#include <QPlainTextEdit>
+#include <QScrollBar>
+#include <QSysInfo>
 #include <QDesktopServices>
 #include <QUrl>
 #include <QNetworkAccessManager>
@@ -1320,7 +1324,10 @@ MainWindow::MainWindow(QWidget* parent)
         && AppSettings::instance().value(QStringLiteral("Audio/LinuxFirstRunSeen"),
                                           QStringLiteral("False")).toString()
                != QStringLiteral("True")) {
-        QTimer::singleShot(0, this, &MainWindow::showAudioDiagnoseDialog);
+        // Nicht showAudioDiagnoseDialog(): die Funktion zeigt seit dem
+        // 2026-10-22 den plattformuebergreifenden Messbericht. Der
+        // Erststart unter Linux will weiter die PipeWire-Erstfassung.
+        QTimer::singleShot(0, this, &MainWindow::showLinuxAudioFirstRunDialog);
     }
 #endif
 
@@ -11970,13 +11977,17 @@ void MainWindow::buildMenuBar()
 
     helpMenu->addSeparator();
 
-#if defined(Q_OS_LINUX)
-    // PipeWire / pactl diagnostic dialog — Linux-only feature.
+    // ── Tondiagnose, jetzt ueberall (2026-10-22) ─────────────────────
+    //
+    // Stand bis heute hinter `#if defined(Q_OS_LINUX)` und zeigte dort die
+    // PipeWire-Erstfassung. Auf Windows -- wo die Tonstoerung mit der
+    // ANAN-10 seit Wochen offen ist -- gab es gar nichts, und der
+    // Betreiber musste jede Zahl mit PowerShell aus dem Protokoll holen.
+    // Die Begruendung steht ausfuehrlich bei showAudioDiagnoseDialog().
     helpMenu->addAction(QStringLiteral("&Diagnose audio backend…"),
                         this, &MainWindow::showAudioDiagnoseDialog);
 
     helpMenu->addSeparator();
-#endif
 
     // Betreiber 2026-09-21: "unter Help moechte ich den automatischen
     // Downloader/Installer der neuersten Version. Ein Klick, Installation
@@ -18076,37 +18087,159 @@ void MainWindow::takeShutdownBackupIfWanted()
     SettingsBackup::takeAutomaticBackupIfWanted(s, QStringLiteral("Shutdown"));
 }
 
-void MainWindow::showAudioDiagnoseDialog()
+// Der PipeWire-Erststart unter Linux — bis zum 2026-10-22 war das der
+// Rumpf von showAudioDiagnoseDialog(). Er ist unveraendert geblieben und
+// nur herausgeloest, weil die Diagnose jetzt etwas anderes zeigt und auf
+// jeder Plattform steht.
+void MainWindow::showLinuxAudioFirstRunDialog()
 {
 #if defined(Q_OS_LINUX)
-    // 2026-09-09: this is the actual cause of the CI-only 120s GUI-test
-    // timeouts investigated in
-    // docs/architecture/2026-09-09-ci-discovery-hang-investigation.md — NOT
-    // RadioDiscovery (that fix stands on its own merits but turned out not
-    // to be the culprit here). dlg->exec() below is modal and has no
-    // internal timeout; on a headless test binary this is scheduled
-    // unconditionally (MainWindow's ctor, guarded only on
-    // `linuxBackend() == None` — true on every Linux CI runner, which has
-    // no ALSA/JACK device at all — and on `Audio/LinuxFirstRunSeen` never
-    // having been set, true on every fresh QStandardPaths test sandbox).
-    // Nothing in an automated run ever clicks Dismiss, so exec() blocks
-    // forever and only CTest's own external 120s TIMEOUT ever ends it —
-    // matching, test for test, every one of the (far more than originally
-    // reported) MainWindow-constructing tests that were hanging.
-    // QStandardPaths::isTestModeEnabled() is true in every test binary
-    // (tests/TestSandboxInit.cpp sets it before main()) and never true in
-    // a real install, so this guard is a no-op for actual users.
+    // Siehe docs/architecture/2026-09-09-ci-discovery-hang-investigation.md:
+    // dlg->exec() ist modal und hat keine Frist; auf einem Pruefstand ohne
+    // Tongeraet klickt niemand "Dismiss", und nur CTests 120-s-Decke
+    // beendete es. isTestModeEnabled() ist in jedem Pruefstand wahr und in
+    // einer echten Installation nie.
     if (QStandardPaths::isTestModeEnabled()) {
         return;
     }
+    if (!m_radioModel) { return; }
     AudioEngine* eng = m_radioModel->audioEngine();
-    if (!eng) {
-        return;
-    }
+    if (!eng) { return; }
     auto* dlg = new VaxLinuxFirstRunDialog(eng, this);
     dlg->setAttribute(Qt::WA_DeleteOnClose);
     dlg->exec();
 #endif
+}
+
+// ── Tondiagnose: jetzt auf JEDER Plattform (2026-10-22) ────────────────
+//
+// Bis heute gab es diesen Eintrag nur unter Linux (`#if defined(Q_OS_LINUX)`),
+// und er zeigte dort die PipeWire-Erstfassung. Auf Windows und macOS stand
+// nichts zur Verfuegung.
+//
+// Das hat am 2026-10-22 einen Abend gekostet: der Betreiber hoerte auf
+// Windows ein gleichmaessiges Knistern ("als wuerde ein Maschinengewehr
+// schiessen"), und jede einzelne Zahl, die die Ursache eingrenzt --
+// Geraet, Schnittstelle, ausgehandelte Rate, Latenz, Aussetzerzaehler --
+// musste er von Hand mit PowerShell aus dem Protokoll holen. Dreimal kam
+// dabei ein Protokoll OHNE Verbindung, in dem der Ton nie offen war und
+// darum keine der Zeilen stand. Der Fehler lag nicht bei ihm: ein
+// Programm, das diese Zahlen kennt, soll sie zeigen.
+//
+// Der entscheidende Unterschied steht hier als eigene Zeile: PortAudios
+// eigener Unterlauf (das Geraet lief leer) gegen unseren Ring-Unterlauf
+// (uns ging der Stoff aus). Beide zusammen trennen "die Zufuhr stockt"
+// von "die Ausgabe kommt zu spaet" -- zwei verschiedene Ursachen, die
+// ohne diese Trennung gleich klingen.
+void MainWindow::showAudioDiagnoseDialog()
+{
+    // Dieselbe Wache wie zuvor: QStandardPaths::isTestModeEnabled() ist in
+    // jedem Pruefstand wahr und in einer echten Installation nie. Ein
+    // modales exec() ohne Frist hat 2026-09-09 die halbe GUI-Pruefreihe
+    // in CTests 120-s-Decke laufen lassen (siehe
+    // docs/architecture/2026-09-09-ci-discovery-hang-investigation.md).
+    if (QStandardPaths::isTestModeEnabled()) {
+        return;
+    }
+    if (!m_radioModel) { return; }
+    AudioEngine* eng = m_radioModel->audioEngine();
+    if (!eng) { return; }
+
+    auto* dlg = new QDialog(this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->setWindowTitle(QStringLiteral("Audio diagnostics"));
+    dlg->resize(640, 420);
+
+    auto* text = new QPlainTextEdit(dlg);
+    text->setReadOnly(true);
+    QFont mono(QStringLiteral("Menlo"));
+    mono.setStyleHint(QFont::Monospace);
+    // Benannte Stufe statt eigener Zahl: verify-style-drift haelt die
+    // Schriftleiter in StyleConstants.h und schlaegt bei jeder neuen
+    // namenlosen Groesse an.
+    mono.setPixelSize(Style::kFontSmall);
+    text->setFont(mono);
+
+    // Einen Bus beschreiben. Die Zaehler gibt es nur am PortAudioBus; die
+    // anderen Baender (VAX, PipeWire) liefern wenigstens Format und Name.
+    auto beschreibe = [](const QString& titel, const IAudioBus* bus) {
+        QString t = titel + QStringLiteral("\n");
+        if (bus == nullptr) {
+            return t + QStringLiteral("  not configured\n");
+        }
+        const AudioFormat f = bus->negotiatedFormat();
+        t += QStringLiteral("  backend   : %1\n").arg(bus->backendName().isEmpty()
+                 ? QStringLiteral("(unknown)") : bus->backendName());
+        t += QStringLiteral("  open      : %1\n").arg(bus->isOpen() ? QStringLiteral("yes")
+                                                                    : QStringLiteral("NO"));
+        t += QStringLiteral("  format    : %1 Hz, %2 ch\n").arg(f.sampleRate).arg(f.channels);
+        t += QStringLiteral("  queued    : %1 frames\n").arg(bus->queuedFrames());
+        if (const auto* pa = dynamic_cast<const PortAudioBus*>(bus)) {
+            // Die eine Unterscheidung, auf die es ankommt.
+            t += QStringLiteral("  device underflow (PortAudio): %1\n")
+                     .arg(pa->paOutputUnderflowEvents());
+            t += QStringLiteral("  ring underrun  (our feed)  : %1\n")
+                     .arg(pa->ringUnderrunEvents());
+            t += QStringLiteral("  ring overrun   (too fast)  : %1 (%2 samples)\n")
+                     .arg(pa->ringOverrunEvents()).arg(pa->ringOverrunSamples());
+        }
+        if (!bus->errorString().isEmpty()) {
+            t += QStringLiteral("  error     : %1\n").arg(bus->errorString());
+        }
+        return t;
+    };
+
+    auto bericht = [eng, beschreibe]() {
+        QString t;
+        t += QStringLiteral("Longpath %1 — %2\n\n")
+                 .arg(QCoreApplication::applicationVersion())
+                 .arg(QSysInfo::prettyProductName());
+        t += beschreibe(QStringLiteral("Speakers (output)"), eng->speakersBus());
+        t += QStringLiteral("\n");
+        t += beschreibe(QStringLiteral("TX input (microphone)"), eng->txInputBus());
+        t += QStringLiteral("\n");
+        t += QStringLiteral(
+                 "Reading it:\n"
+                 "  device underflow > 0 — we delivered too late to the OS;\n"
+                 "      try a larger buffer size or another driver API.\n"
+                 "  ring underrun    > 0 — the DSP side ran dry; the fault is\n"
+                 "      upstream of the audio device (network, decoding).\n"
+                 "  both 0 but audio is broken — the samples themselves are\n"
+                 "      wrong, not the timing.\n");
+        return t;
+    };
+
+    text->setPlainText(bericht());
+
+    // Eine Sekunde Takt: die Zaehler sollen beim Zuhoeren mitlaufen.
+    auto* takt = new QTimer(dlg);
+    takt->setInterval(1000);
+    connect(takt, &QTimer::timeout, dlg, [text, bericht]() {
+        const int pos = text->verticalScrollBar()->value();
+        text->setPlainText(bericht());
+        text->verticalScrollBar()->setValue(pos);
+    });
+    takt->start();
+
+    auto* kopieren = new QPushButton(QStringLiteral("Copy"), dlg);
+    connect(kopieren, &QPushButton::clicked, dlg, [text]() {
+        QGuiApplication::clipboard()->setText(text->toPlainText());
+    });
+    auto* schliessen = new QPushButton(QStringLiteral("Close"), dlg);
+    connect(schliessen, &QPushButton::clicked, dlg, &QDialog::accept);
+
+    auto* knopfreihe = new QHBoxLayout;
+    knopfreihe->addWidget(kopieren);
+    knopfreihe->addStretch();
+    knopfreihe->addWidget(schliessen);
+
+    auto* lay = new QVBoxLayout(dlg);
+    lay->addWidget(text);
+    lay->addLayout(knopfreihe);
+
+    // Nicht modal: der Betreiber soll waehrend des Zuhoerens hineinsehen
+    // koennen, ohne das Hauptfenster zu sperren.
+    dlg->show();
 }
 
 void MainWindow::onConnectionStateChanged()

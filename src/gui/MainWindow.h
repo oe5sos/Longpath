@@ -733,6 +733,8 @@ private slots:
     void showConnectionPanel();
     void showSupportDialog();
     void showAudioDiagnoseDialog();
+    /// Der PipeWire-Erststart unter Linux (2026-10-22 herausgeloest).
+    void showLinuxAudioFirstRunDialog();
     void showFeatureRequestDialog();
     void showFeatureRequestDialogImpl();
     // Phase 3M-4 Task 8: open the modeless PureSignal dialog (Tools menu).
