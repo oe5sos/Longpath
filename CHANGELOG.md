@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.8.2] - 2026-10-22
+
+Ein Punkt, und er betrifft Windows.
+
+### Tondiagnose auf jeder Plattform (#326)
+
+Der Eintrag **Help → „Diagnose audio backend…"** stand hinter
+`#if defined(Q_OS_LINUX)`. Auf Windows -- wo die Tonstoerung mit der
+ANAN-10 seit Wochen offen ist -- gab es damit **gar keine** Tondiagnose.
+
+Am 2026-10-22 hat das einen Abend gekostet: der Betreiber hoerte ein
+gleichmaessiges Knistern („als wuerde ein Maschinengewehr schiessen"),
+und jede Zahl, die die Ursache eingrenzt, musste er mit PowerShell aus
+dem Protokoll holen -- dreimal kam dabei ein Lauf ohne Verbindung, in
+dem der Ton nie offen war.
+
+Der Dialog zeigt je Band (Lautsprecher, Mikrofon) Schnittstelle,
+Zustand, ausgehandelte Rate und Kanalzahl, Fuellstand, und die drei
+Zaehler, die die Ursachen trennen:
+
+| Zaehler | Bedeutung |
+| --- | --- |
+| `device underflow` | das Geraet lief leer -- wir lieferten zu spaet |
+| `ring underrun` | uns ging der Stoff aus -- die Zufuhr stockt |
+| `ring overrun` | wir schrieben schneller, als gelesen wurde |
+
+Er laeuft im Sekundentakt mit, ist nicht modal, und hat einen
+Kopieren-Knopf. Der PipeWire-Erststart unter Linux ist unveraendert als
+eigene Funktion herausgeloest.
+
+**Das Knistern selbst ist damit NICHT behoben.** Treiberschnittstelle,
+Puffergroesse und Geraeterate aendern nichts; das Protokoll zeigt den
+Ausgang korrekt auf 48000 Hz. Dieser Dialog ist das Instrument fuer den
+naechsten Versuch, nicht die Behebung.
+
 ## [0.8.1] - 2026-10-22
 
 36 Staende seit 0.8.0. Der Anlass fuer die Veroeffentlichung ist das
