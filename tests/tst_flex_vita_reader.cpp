@@ -25,6 +25,8 @@
 
 #include <algorithm>
 
+#include <QPair>
+
 #include "models/RadioModel.h"
 
 #include <QByteArray>
@@ -58,6 +60,31 @@ QByteArray fftPaket(const char* kopfHex, const char* ersteBinsHex,
         p.append(static_cast<char>(fuellwert & 0xFF));
     }
     p.append(QByteArray(4, '\0'));   // die echte Füllung
+    return p;
+}
+
+// Ein Messwertpaket (Klasse 0x8002).
+//
+// ACHTUNG, und das gehoert in den Prueflauf: der KOPF ist hier
+// NACHGEBAUT, nicht mitgeschnitten. Die Messreihe vom 2026-10-21 hat
+// Zahlen und Aufbau des Rumpfs festgehalten (653 Pakete, Rumpf immer
+// durch 4 teilbar), aber kein vollstaendiges Datagramm. Geprueft wird
+// also der RUMPF gegen gemessene Werte; der Kopf stammt aus dem
+// FFT-Mitschnitt, mit der Paketklasse auf 0x8002 gesetzt.
+QByteArray messwertPaket(const QVector<QPair<quint16, qint16>>& paare)
+{
+    QByteArray p = roh(LongpathTest::FlexVitaGolden::kFftKopfA)
+                       .left(FlexVita::kHeaderBytes);
+    // Byte 14/15: die Paketklasse (siehe FlexVitaReader.cpp:66).
+    p[14] = static_cast<char>(0x80);
+    p[15] = static_cast<char>(0x02);
+    for (const auto& pa : paare) {
+        p.append(static_cast<char>((pa.first >> 8) & 0xFF));
+        p.append(static_cast<char>(pa.first & 0xFF));
+        const quint16 roh16 = static_cast<quint16>(pa.second);
+        p.append(static_cast<char>((roh16 >> 8) & 0xFF));
+        p.append(static_cast<char>(roh16 & 0xFF));
+    }
     return p;
 }
 
@@ -626,6 +653,71 @@ private slots:
     // einen flachen Boden. Am 2026-10-21 habe ich genau das gebaut:
     // die 8400 meldete `y_pixels=20`, ich nahm die 20 als Teiler, und
     // das Bild hatte zwanzig Stufen auf neunzig Dezibel.
+    // ── Messwerte, Klasse 0x8002 ──────────────────────────────────
+    //
+    // Alle Zahlen hier stammen aus der Messreihe vom 2026-10-21 an
+    // Martins FLEX-8400 (docs/protocols/flex-vita49-gemessen.md §5b),
+    // nicht aus einer Herleitung.
+    void messwertePaareWerdenGelesen()
+    {
+        const QByteArray p = messwertPaket({{10, 128}, {1, -11469}});
+        const auto werte = FlexVita::meterSamples(p);
+        QCOMPARE(werte.size(), 2);
+        // Index 10 heisst `SWR` und kam als roh 128.
+        QCOMPARE(werte.at(0).index, quint16(10));
+        QCOMPARE(werte.at(0).raw,   qint16(128));
+        // Index 1 heisst `MICPEAK`; negative Rohwerte muessen als
+        // VORZEICHENBEHAFTET gelesen werden, sonst wird aus -89,6 dBFS
+        // ein Wert um +422.
+        QCOMPARE(werte.at(1).index, quint16(1));
+        QCOMPARE(werte.at(1).raw,   qint16(-11469));
+    }
+
+    // Der Rumpf war in allen 653 gemessenen Paketen durch 4 teilbar.
+    // Ein Rest heisst, dass wir den Aufbau falsch verstanden haben —
+    // dann lieber nichts melden als ein halbes Paar.
+    void einAngebrochenesPaarWirdVerworfen()
+    {
+        QByteArray p = messwertPaket({{10, 128}});
+        p.append(static_cast<char>(0x00));   // ein Byte zu viel
+        QVERIFY(FlexVita::meterSamples(p).isEmpty());
+    }
+
+    // DER Fund aus §5b, den man nicht raten darf.
+    void derTeilerHaengtAnDerEinheit()
+    {
+        // dB-artig und SWR: /128. `SWR` roh 128 ergab genau 1,000.
+        QCOMPARE(*FlexVita::meterScaled(128, QStringLiteral("SWR")), 1.0);
+        QCOMPARE(*FlexVita::meterScaled(0, QStringLiteral("dBm")), 0.0);
+        QVERIFY(qFuzzyCompare(
+            *FlexVita::meterScaled(-19200, QStringLiteral("dBFS")), -150.0));
+
+        // Volts: /256 — belegt ueber den erklaerten Bereich 10,5…15,0.
+        // `+13.8A` kam als roh 3495.
+        const double a = *FlexVita::meterScaled(3495, QStringLiteral("Volts"));
+        QVERIFY2(a > 10.5 && a < 15.0,
+                 qPrintable(QStringLiteral("13,8-V-Schiene ausserhalb: %1")
+                                .arg(a)));
+        QVERIFY(qFuzzyCompare(a, 3495.0 / 256.0));
+
+        // Die Gegenprobe, die den Fund ueberhaupt erst ergab: mit /128
+        // laege dieselbe Schiene bei 27,3 V — weit ausserhalb.
+        QVERIFY(3495.0 / 128.0 > 15.0);
+    }
+
+    // „Unbekannt ist ein Strich, keine Null" (HAUSSTIL Regel 7).
+    // Fuer degC, RPM und Amps liegen BEIDE Teiler im erklaerten
+    // Bereich; der Bereich entscheidet dort also nichts, und eine
+    // Zahl auszugeben hiesse, eine Messung zu behaupten, die niemand
+    // gemacht hat.
+    void unbelegteEinheitenGebenKeineZahl()
+    {
+        QVERIFY(!FlexVita::meterScaled(1505, QStringLiteral("degC")));
+        QVERIFY(!FlexVita::meterScaled(1060, QStringLiteral("RPM")));
+        QVERIFY(!FlexVita::meterScaled(300,  QStringLiteral("Amps")));
+        QVERIFY(!FlexVita::meterScaled(1,    QStringLiteral("Unsinn")));
+    }
+
     void vorgabehoeheIstKeinMaszstab()
     {
         // Was die 8400 nach dem Anlegen wirklich meldet.

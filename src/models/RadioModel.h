@@ -3556,6 +3556,12 @@ private:
     /// wurden. Gedeckelt, damit eine Maschine, die sie nie annimmt,
     /// keine endlose Schleife erzeugt.
     int                  m_flexMasseNachgereicht{0};
+    /// Index (1…59) -> {Name, Einheit} aus den `meter`-Statuszeilen.
+    /// Ohne diese Tabelle ist ein Messwertpaket eine Zahlenreihe ohne
+    /// Bedeutung: das Paket traegt weder Namen noch Einheit, und der
+    /// Teiler haengt an der Einheit.
+    QHash<int, QPair<QString, QString>> m_flexMesswertNamen;
+    qint64               m_flexMesswertZuletztGemeldet{0};
     ReceiverManager* m_receiverManager{nullptr};
     AudioEngine*     m_audioEngine{nullptr};
     WdspEngine*      m_wdspEngine{nullptr};

@@ -5429,6 +5429,9 @@ longpath_add_test(tst_scheibenflagge)
 # 2026-10-15: FT8/FT4 nativ — Nachricht hin, Nachricht zurueck, ohne
 # Tondatei und ohne Funkgeraet.
 longpath_add_test(tst_ft8_dekodiert)
+# 2026-10-21: die Subtraktion aus MSHV -- zieht sie ein Signal heraus,
+# und kommt darunter ein zweites zum Vorschein?
+longpath_add_test(tst_ft8_subtraktion)
 # 2026-10-21: wo FT8 und FT4 auf jedem Band liegen -- „ich will nicht
 # die freq suchen". Reine Tafel, ohne Fenster und ohne Funkgeraet.
 longpath_add_test(tst_digi_frequenzen)

@@ -213,8 +213,19 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
         break;
     }
 
+    case FlexVitaClass::Meter: {
+        // Seit 2026-10-21 gemessen und damit baubar (§5b des
+        // Messblatts). Der Strom liefert nur Index und Rohwert; was
+        // ein Index heisst und wie er zu teilen ist, weiss erst der
+        // Aufrufer aus den `meter`-Statuszeilen.
+        const auto werte = FlexVita::meterSamples(datagram);
+        if (!werte.isEmpty()) {
+            emit meterSamplesReady(h.streamId, werte);
+        }
+        break;
+    }
+
     case FlexVitaClass::ReducedBwAudio:
-    case FlexVitaClass::Meter:
         // Nicht gemessen, also nicht gebaut. Die schmale Tonklasse
         // kommt erst mit `client set send_reduced_bw_dax=1`, und das
         // schickt Longpath nicht; Messwerte hat der Messlauf nie

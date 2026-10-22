@@ -35,6 +35,7 @@
 
 #include "AppletWidget.h"
 
+#include "core/DigiFrequenzen.h"
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Ablauf.h"
 #include "models/LogEntry.h"
@@ -249,6 +250,15 @@ signals:
     /// Ein QSO ist vollstaendig. Es geht denselben Weg wie eines aus
     /// WSJT-X (MainWindow -> RotorLogbookPanel::logExternalQso): eine
     /// Datei, eine Doppelt-Regel, ein Hochladen.
+    /// Die Knoepfe FT8/FT4 IM Fenster gedrueckt.
+    ///
+    /// Betreiber am 2026-10-21: „bei ft4 und ft8 muss er glaube ich auch
+    /// die frequenz anpassen und aendern." Es gab zwei Stellen, an denen
+    /// man FT8 und FT4 waehlen konnte, und nur eine davon stellte das
+    /// Geraet. Das Fenster kennt die Anrufstellen nicht und soll sie
+    /// nicht kennen -- es meldet den Wunsch, MainWindow richtet her.
+    void digiGewuenscht(Longpath::DigiFrequenzen::Digimodus modus);
+
     void qsoFertig(const Longpath::LogEntry& eintrag);
 
 protected:

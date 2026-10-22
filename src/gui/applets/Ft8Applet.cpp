@@ -153,6 +153,7 @@ void Ft8Applet::buildUI()
     m_ft8Btn->setChecked(true);
     m_ft8Btn->setToolTip(tr("15 second periods (FT8)"));
     connect(m_ft8Btn, &QPushButton::clicked, this, [this]() {
+        emit digiGewuenscht(DigiFrequenzen::Digimodus::Ft8);
         setProtocol(Ft8Decoder::Protocol::Ft8);
     });
     head->addWidget(m_ft8Btn);
@@ -161,6 +162,7 @@ void Ft8Applet::buildUI()
     m_ft4Btn->setCheckable(true);
     m_ft4Btn->setToolTip(tr("7.5 second periods (FT4)"));
     connect(m_ft4Btn, &QPushButton::clicked, this, [this]() {
+        emit digiGewuenscht(DigiFrequenzen::Digimodus::Ft4);
         setProtocol(Ft8Decoder::Protocol::Ft4);
     });
     head->addWidget(m_ft4Btn);

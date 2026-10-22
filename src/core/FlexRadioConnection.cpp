@@ -567,6 +567,15 @@ void FlexRadioConnection::onGuiClientAccepted(const QString& body)
     // Protokollgrund). Stufe 1 braucht genau eines davon.
     sendCommand(QStringLiteral("sub slice all"));
 
+    // Die Messwerte bestellen. Ohne das schickt die Maschine die
+    // Klasse 0x8002 gar nicht — am 2026-10-21 gemessen: nach
+    // `sub meter all` kamen 653 Pakete in 22 Sekunden, davor keines
+    // (docs/protocols/flex-vita49-gemessen.md §5b). Die Antwort ist
+    // je Messwert eine Statuszeile mit Name, Einheit und Bereich; sie
+    // ist mit `#` getrennt statt mit Leerzeichen, was `parseKVs` seit
+    // #297 beruecksichtigt.
+    sendCommand(QStringLiteral("sub meter all"));
+
     queryAndRecoverSlices();
 }
 

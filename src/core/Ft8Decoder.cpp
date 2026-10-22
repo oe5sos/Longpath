@@ -10,6 +10,7 @@
 // =================================================================
 
 #include "core/Ft8Decoder.h"
+#include "core/Ft8Subtract.h"
 
 #include <QByteArray>
 
@@ -54,8 +55,21 @@ ftx_protocol_t toFtx(Ft8Decoder::Protocol p)
 
 } // namespace
 
-QVector<Ft8Decode> Ft8Decoder::decodeBlock(const float* samples, int count,
-                                           Protocol protocol)
+namespace {
+
+/// Was eine Runde zum Abziehen hinterlaesst: die Toene des Fundes und
+/// wo er lag. Mehr braucht Ft8Subtract nicht.
+struct Abzug {
+    std::vector<uint8_t> toene;
+    double f0Hz{0.0};
+    double dtSekunden{0.0};
+};
+
+/// Eine Runde ueber das Fenster. Das war bis zum 2026-10-21 der ganze
+/// Dekoder; jetzt ist es die innere Runde von decodeBlock().
+QVector<Ft8Decode> eineRunde(const float* samples, int count,
+                             Ft8Decoder::Protocol protocol,
+                             std::vector<Abzug>* abzuege)
 {
     QVector<Ft8Decode> out;
     if (!samples || count <= 0) { return out; }
@@ -63,7 +77,7 @@ QVector<Ft8Decode> Ft8Decoder::decodeBlock(const float* samples, int count,
     monitor_config_t cfg{};
     cfg.f_min       = kFMin;
     cfg.f_max       = kFMax;
-    cfg.sample_rate = kSampleRate;
+    cfg.sample_rate = Ft8Decoder::kSampleRate;
     cfg.time_osr    = kTimeOsr;
     cfg.freq_osr    = kFreqOsr;
     cfg.protocol    = toFtx(protocol);
@@ -130,10 +144,89 @@ QVector<Ft8Decode> Ft8Decoder::decodeBlock(const float* samples, int count,
                        + static_cast<float>(kand->time_sub) / wf->time_osr)
                       * mon.symbol_period;
         d.text      = QString::fromLatin1(text).trimmed();
-        if (!d.text.isEmpty()) { out.append(d); }
+        if (d.text.isEmpty()) { continue; }
+        out.append(d);
+
+        // Fuer den naechsten Durchgang: dieselbe Nachricht wieder in
+        // Toene zuruecksetzen. Das ist die Rueckrichtung, die wir fuer
+        // das Senden ohnehin schon haben -- hier dient sie dazu, das
+        // gefundene Signal aus der Aufnahme herauszurechnen.
+        if (abzuege != nullptr && protocol == Ft8Decoder::Protocol::Ft8) {
+            Abzug ab;
+            ab.toene.assign(FT8_NN, 0);
+            ft8_encode(nachricht.payload, ab.toene.data());
+            ab.f0Hz       = double(d.freqHz);
+            ab.dtSekunden = double(d.dtSeconds);
+            abzuege->push_back(std::move(ab));
+        }
     }
 
     monitor_free(&mon);
+    return out;
+}
+
+} // namespace
+
+// ── Mehrere Durchgaenge mit Subtraktion ──────────────────────────────
+//
+// Warum ueberhaupt: WSJT-X und JTDX gehen MEHRFACH ueber dasselbe
+// Fenster und ziehen nach jedem Durchgang die gefundenen Signale ab.
+// Darunter werden schwaechere Stationen ueberhaupt erst auffindbar --
+// der Unterschied zwischen zwoelf und fuenfundzwanzig Stationen je
+// Durchgang. `ft8_lib` kann das von sich aus nicht; das Verfahren
+// kommt aus MSHV (siehe core/Ft8Subtract.h).
+//
+// Belegt in tests/tst_ft8_subtraktion: zwei Stationen auf DERSELBEN
+// Tonlage, die schwaechere 12 dB darunter. Vor dem Abziehen findet der
+// Dekoder nur die starke, danach die schwache.
+QVector<Ft8Decode> Ft8Decoder::decodeBlock(const float* samples, int count,
+                                           Protocol protocol,
+                                           int durchgaenge)
+{
+    std::vector<Abzug> abzuege;
+    QVector<Ft8Decode> out = eineRunde(samples, count, protocol, &abzuege);
+
+    // FT4 bleibt einrundig: Ft8Subtract rechnet mit 79 Symbolen zu
+    // 1920 Proben, und das ist FT8. Lieber eine Runde als ein falsch
+    // abgezogenes Signal -- das erzeugte eine Stoerung, wo vorher ein
+    // echtes Signal stand.
+    if (protocol != Protocol::Ft8 || durchgaenge <= 1 || abzuege.empty()) {
+        return out;
+    }
+    if (count < 15 * kSampleRate) { return out; }
+
+    // Ab hier auf einer KOPIE: der Aufrufer hat uns seine Aufnahme nur
+    // geliehen, und der Abzug veraendert sie.
+    std::vector<float> arbeit(samples, samples + count);
+
+    for (int runde = 2; runde <= durchgaenge; ++runde) {
+        bool etwasAbgezogen = false;
+        for (const Abzug& ab : abzuege) {
+            if (Ft8Subtract::zieheAb(arbeit.data(), int(arbeit.size()),
+                                     ab.toene.data(), int(ab.toene.size()),
+                                     ab.f0Hz, ab.dtSekunden)) {
+                etwasAbgezogen = true;
+            }
+        }
+        if (!etwasAbgezogen) { break; }
+
+        abzuege.clear();
+        const QVector<Ft8Decode> weitere =
+            eineRunde(arbeit.data(), int(arbeit.size()), protocol, &abzuege);
+        if (weitere.isEmpty()) { break; }
+
+        // Nur das Neue anhaengen. Dieselbe Nachricht faellt in beiden
+        // Runden an, wenn der Abzug sie nicht ganz erwischt hat.
+        int neue = 0;
+        for (const Ft8Decode& d : weitere) {
+            bool schonDa = false;
+            for (const Ft8Decode& alt : out) {
+                if (alt.text == d.text) { schonDa = true; break; }
+            }
+            if (!schonDa) { out.append(d); ++neue; }
+        }
+        if (neue == 0) { break; }   // nichts Neues mehr zu holen
+    }
     return out;
 }
 
