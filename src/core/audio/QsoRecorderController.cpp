@@ -4,6 +4,14 @@
 //
 // Longpath-original. Begruendung steht im Header.
 //
+// Independently implemented from Thetis clsAudioRecordPlayback.cs --
+// Verhalten und Feldauswahl abgeleitet, KEIN C#-Code uebernommen; was
+// hier anders ist, steht in QsoRecorderController.h. Der Satz stand
+// bisher weiter unten bei der Speicherplatz-Wache; dort faellt er aus
+// dem 160-Zeilen-Kopffenster von scripts/check-new-ports.py, sobald
+// oben etwas dazukommt -- und eine Herkunftsangabe, die von der
+// Zeilennummer abhaengt, ist keine.
+//
 // =================================================================
 // Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
@@ -61,7 +69,25 @@ void QsoRecorderController::attach(AudioEngine* audio, TxWorkerThread* tx)
         // des Sendefadens, der beim naechsten Block ueberschrieben wird.
         // Eine eingereihte Verbindung wuerde den ZEIGER kopieren, nicht
         // den Ton — derselbe Vertrag wie bei antiVoxBlockReady.
-        m_micTap = connect(m_tx, &TxWorkerThread::preStripAudioReady, this,
+        //
+        // ── post, nicht pre (2026-10-22) ─────────────────────────────
+        //
+        // Hier hing der Mitschnitt an `preStripAudioReady`: dem
+        // Mikrofon, wie es hereinkommt, VOR Entzerrer, Leveler, CFC
+        // und ALC. Man hoerte sich also roh -- nicht so, wie die
+        // Gegenstation einen gehoert hat. In der Aufnahme eines
+        // GESPRAECHS gehoert die Seite, die hinausgegangen ist.
+        //
+        // `postStripAudioReady` traegt denselben Block nach
+        // StripChain::processMono und ist bei abgeschaltetem
+        // Aufbereiter mit pre IDENTISCH (TxWorkerThread.h) -- der
+        // Wechsel kann also nichts verlieren, nur hinzufuegen.
+        //
+        // Reihenfolge ist sicher: der Sendefaden sendet pre zuerst und
+        // schreibt danach denselben Zwischenspeicher fuer post neu
+        // (TxWorkerThread.cpp:1139) -- wir lesen also den
+        // aufbereiteten Stand.
+        m_micTap = connect(m_tx, &TxWorkerThread::postStripAudioReady, this,
                            [this](const float* samples, int frames) {
             if (m_recorder.isRecording()) {
                 m_txRing.write(samples, frames);
@@ -100,6 +126,20 @@ bool QsoRecorderController::start(const QString& wavPath,
     // still, und niemand wuesste warum.
     if (m_audio) { m_audio->setQsoTap(&m_rxRing, m_sliceId); }
 
+    // ── Und das Tor fuer die EIGENE Stimme ───────────────────────────
+    //
+    // Das fehlte bis zum 2026-10-22. Der Abgriff im Sendefaden steht
+    // mit Vorgabe aus; eingeschaltet haben ihn nur das
+    // Sprachpruef-Fenster und das DVK-Applet. Also feuerte
+    // postStripAudioReady waehrend eines QSO-Mitschnitts gar nicht,
+    // die rechte Spur blieb still, und die Aufnahme war genau das
+    // halbe Gespraech -- obwohl der Betreiber beide Seiten verlangt
+    // hatte (QsoRecorder.h, 2026-08-19).
+    if (m_tx) {
+        m_tx->setVoiceTapUser(
+            TxWorkerThread::VoiceTapUser::QsoRecording, true);
+    }
+
     m_drainTimer.start();
     m_spaceTimer.start();
     emit recordingChanged(true);
@@ -113,6 +153,10 @@ void QsoRecorderController::stop()
     // Erst das Tor zu, dann das letzte Mal abholen: was noch im
     // Zwischenspeicher liegt, gehoert zur Aufnahme.
     if (m_audio) { m_audio->setQsoTap(nullptr, -1); }
+    if (m_tx) {
+        m_tx->setVoiceTapUser(
+            TxWorkerThread::VoiceTapUser::QsoRecording, false);
+    }
     m_drainTimer.stop();
     m_spaceTimer.stop();
     drain();

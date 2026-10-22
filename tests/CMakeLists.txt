@@ -5956,6 +5956,13 @@ longpath_add_test(tst_audio_tap_ring)
 longpath_add_test(tst_audio_engine_tap_teardown_race)
 
 longpath_add_test(tst_qso_recorder_controller)
+
+# ── Hoert mich der QSO-Mitschnitt? (2026-10-22) ────────────────────────────
+# Der Prueflauf darueber schreibt DIREKT in die Ringe und belegt damit den
+# Mitschneider, nie die Verdrahtung. Dieser hier faengt, was dort durchfiel:
+# der Sprachabgriff im Sendefaden stand mit Vorgabe aus und wurde vom
+# Mitschnitt nie eingeschaltet -- die eigene Spur blieb still.
+longpath_add_test(tst_qso_mitschnitt_hoert_mich)
 longpath_add_test(tst_qso_recorder_applet)
 longpath_add_test(tst_wav_player)
 longpath_add_test(tst_filter_constrain)
