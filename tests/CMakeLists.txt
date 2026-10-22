@@ -5459,6 +5459,12 @@ longpath_add_test(tst_ft8_dekodiert)
 # 2026-10-21: die Subtraktion aus MSHV -- zieht sie ein Signal heraus,
 # und kommt darunter ein zweites zum Vorschein?
 longpath_add_test(tst_ft8_subtraktion)
+
+# ── MSHVs Multi Answering (2026-10-22) ────────────────────────────────────
+# Faehrt den Sender gegen den EIGENEN Dekoder: drei Nachrichten in ein
+# Fenster, alle drei muessen wieder herauskommen. Das prueft Packung,
+# Tonlage, Summierung und Pegel in einem Lauf.
+longpath_add_test(tst_ft8_multi_answering)
 # 2026-10-21: wo FT8 und FT4 auf jedem Band liegen -- „ich will nicht
 # die freq suchen". Reine Tafel, ohne Fenster und ohne Funkgeraet.
 longpath_add_test(tst_digi_frequenzen)
