@@ -1846,6 +1846,12 @@ private:
     /// Wahr, wenn die Scheibe fuer die Flex von uns angelegt wurde —
     /// dann raeumen wir sie beim Trennen auch wieder weg.
     bool m_flexSliceWasCreated{false};
+    /// Echo-Wachposten fuer die Flex, dasselbe Muster wie
+    /// `m_sunSdrApplyingRemoteState`: waehrend ein Zustand VON der
+    /// Maschine in die Scheibe geschrieben wird, darf die Scheibe
+    /// nicht zurueckfunken. Sonst antwortet jeder Zustandsschub mit
+    /// einem `slice tune`, der den naechsten Schub ausloest.
+    bool m_flexApplyingRemoteState{false};
     /// Warum das Flex-Bild gerade nicht gezeichnet wird — damit die
     /// Meldung einmal je Grund kommt und nicht 25 Mal je Sekunde.
     enum class FlexBildGrund { Unbekannt, KeinAusschnitt, KeinFenster,

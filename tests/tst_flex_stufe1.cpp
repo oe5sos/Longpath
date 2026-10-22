@@ -795,6 +795,38 @@ private slots:
                     QStringLiteral("pan=0x40000000,waterfall=0x42000000")).isEmpty());
     }
 
+    // Der Befehl, mit dem Longpath die Flex abstimmt.
+    //
+    // Bis zum 2026-10-22 gab es ihn nicht: die Frequenz der Maschine
+    // erreichte Longpaths VFO nie (`flexSliceFrequencyChanged` wurde
+    // ausgesendet und von niemandem gehoert), und drehen liess sich
+    // die Maschine gar nicht.
+    void abstimmbefehlTraegtAutopanNull()
+    {
+        using FlexCommandWire::tuneSliceCommand;
+
+        // Hertz hinein, Megahertz mit sechs Nachkommastellen hinaus —
+        // dieselbe Schreibweise, in der die Maschine meldet.
+        QCOMPARE(tuneSliceCommand(QStringLiteral("0"), 14'225'000.0),
+                 QStringLiteral("slice tune 0 14.225000 autopan=0"));
+        QCOMPARE(tuneSliceCommand(QStringLiteral("1"), 7'108'700.0),
+                 QStringLiteral("slice tune 1 7.108700 autopan=0"));
+
+        // Der Faenger: OHNE `autopan=0` zentriert die Maschine den
+        // Panadapter neu. Unser Bild haengt am Ausschnitt, den die
+        // Wasserfallkachel meldet — der sprengt dann mit jeder
+        // Abstimmung weg (From AetherSDR SliceModel.cpp:124
+        // [@d58e2b8a]).
+        QVERIFY2(tuneSliceCommand(QStringLiteral("0"), 14'225'000.0)
+                     .endsWith(QStringLiteral("autopan=0")),
+                 "ohne autopan=0 zentriert die Maschine den Panadapter neu");
+
+        // Unsinn gibt keinen Befehl, nicht einen halben.
+        QVERIFY(tuneSliceCommand(QString(), 14'225'000.0).isEmpty());
+        QVERIFY(tuneSliceCommand(QStringLiteral("0"), 0.0).isEmpty());
+        QVERIFY(tuneSliceCommand(QStringLiteral("0"), -1.0).isEmpty());
+    }
+
     void scheibenlisteAusDerAntwort()
     {
         using FlexCommandWire::sliceListFromReply;

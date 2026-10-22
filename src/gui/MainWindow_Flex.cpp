@@ -171,6 +171,16 @@ void MainWindow::wireFlex()
         }
 
         m_flexTargetSliceId = ziel->sliceIndex();
+
+        // Von innen nach aussen. Erst HIER verdrahtet, weil es die
+        // Zielscheibe vorher nicht gibt; `UniqueConnection`, damit ein
+        // zweites Anmelden nicht doppelt sendet.
+        connect(ziel, &SliceModel::frequencyChanged, this,
+                [this](double hz) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            m_radioModel->tuneFlexSlice(hz);
+        }, Qt::UniqueConnection);
         if (AudioEngine* ae = m_radioModel->audioEngine()) {
             // Opportunistisch im Mix: ein Netzaussetzer zum Flex darf
             // nicht den ganzen Ton anhalten.
@@ -183,6 +193,30 @@ void MainWindow::wireFlex()
         if (SpectrumWidget* sw = m_radioModel->spectrumWidget()) {
             sw->setKiwiDisplaySource(true);
         }
+    });
+
+    // ── Frequenz, beide Richtungen ──────────────────────────────────
+    //
+    // Bis zum 2026-10-22 ging hier gar nichts: `flexSliceFrequencyChanged`
+    // wurde ausgesendet und von niemandem gehoert. Der VFO zeigte nie,
+    // worauf die Maschine stand, und drehen liess sie sich nicht.
+    //
+    // Die Sicherheitsregel gilt auch hier, nicht nur fuer Ton und Bild:
+    // gesteuert wird ausschliesslich ueber `flexControllableSlice()`,
+    // also nie eine Scheibe mit echter DDC-Bindung
+    // (`streamIndex() >= 0`). Der SunSDR-Durchgang vom 2026-08-24 wurde
+    // genau deshalb nachgeschaerft — eine Fassung, die nur die Steuerung
+    // absicherte, war zu wenig.
+    connect(m_radioModel, &RadioModel::flexSliceFrequencyChanged, this,
+            [this](int, double hz) {
+        if (m_shuttingDown) { return; }
+        SliceModel* slice = flexControllableSlice();
+        if (!slice) { return; }
+        // Von der Maschine nach innen: dabei die Wache setzen, sonst
+        // schickt die Scheibe die eben empfangene Frequenz zurueck.
+        m_flexApplyingRemoteState = true;
+        slice->setFrequency(hz);
+        m_flexApplyingRemoteState = false;
     });
 
     // ── Ton ─────────────────────────────────────────────────────────

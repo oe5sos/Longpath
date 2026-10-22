@@ -149,6 +149,18 @@ int sliceIdFromObject(const QString& object);
 // immer die achtstellige Kleinschreibung; unlesbar ⇒ leer.
 QString normalizedFlexId(QString text);
 
+// Der Befehl, der eine Scheibe abstimmt.
+//
+// From AetherSDR SliceModel.cpp:124 [@d58e2b8a] — Form und das
+// `autopan=0`: „SmartSDR pcap confirms: scroll-wheel uses
+// 'slice tune <id> <freq> autopan=0'". Ohne `autopan=0` zentriert die
+// Maschine den Panadapter neu; unser Bild haengt aber am Ausschnitt,
+// den die Wasserfallkachel meldet, und der springt dann mit.
+//
+// Hertz hinein, Megahertz mit sechs Nachkommastellen hinaus — dieselbe
+// Schreibweise, in der die Maschine Frequenzen meldet.
+QString tuneSliceCommand(const QString& sliceId, double hz);
+
 // From AetherSDR RadioStatusOwnership.h:48-60 [@d58e2b8a] —
 // parsePanafallCreatePanId(). Die Antwort auf „display panafall
 // create" traegt die Kennung mal als `pan=`, mal als `id=`, mal nackt

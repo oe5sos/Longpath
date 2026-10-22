@@ -199,6 +199,16 @@ QByteArray buildCommand(quint32 seq, const QString& command)
 
 // From AetherSDR RadioStatusOwnership.h:27-41 [@d58e2b8a] —
 // normalizedFlexId().
+QString tuneSliceCommand(const QString& sliceId, double hz)
+{
+    if (sliceId.isEmpty() || !(hz > 0.0)) {
+        return QString();
+    }
+    return QStringLiteral("slice tune %1 %2 autopan=0")
+        .arg(sliceId)
+        .arg(hz / 1.0e6, 0, 'f', 6);
+}
+
 QString normalizedFlexId(QString text)
 {
     text = text.trimmed();

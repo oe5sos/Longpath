@@ -3539,6 +3539,24 @@ private:
     /// Zustandsschub der Maschine gesagt hat, was dort steht, und nur
     /// das, was wirklich im Weg ist.
     void applyFlexAudioSetup();
+
+public:
+    /// Die Flex auf eine Frequenz stellen (Hertz).
+    ///
+    /// Bis zum 2026-10-22 ging die Steuerung nur in eine Richtung —
+    /// und auch die nur halb: `flexSliceFrequencyChanged` wurde
+    /// ausgesendet und von niemandem gehoert. Longpaths VFO zeigte
+    /// also nie, worauf die Maschine steht, und drehen liess sie sich
+    /// gar nicht.
+    ///
+    /// From AetherSDR SliceModel.cpp:124 [@d58e2b8a] — die Befehlsform
+    /// samt `autopan=0`: „SmartSDR pcap confirms: scroll-wheel uses
+    /// 'slice tune <id> <freq> autopan=0'". Das `autopan=0` ist hier
+    /// nicht Beiwerk — ohne es zentriert die Maschine den Panadapter
+    /// neu, und der Ausschnitt, an dem unser Bild haengt, springt.
+    void tuneFlexSlice(double hz);
+
+private:
     /// Was die Maschine als `y_pixels` meldet, einordnen: ein echter
     /// Wert wird zum Teiler, eine Ruecksetzvorgabe loest ein erneutes
     /// Hinschicken der Masze aus.
@@ -3592,6 +3610,9 @@ private:
     /// wurden. Gedeckelt, damit eine Maschine, die sie nie annimmt,
     /// keine endlose Schleife erzeugt.
     int                  m_flexMasseNachgereicht{0};
+    /// Zuletzt an die Maschine geschickte Frequenz (Hertz), damit
+    /// ihr Zustandsschub nicht denselben Befehl wieder ausloest.
+    double               m_flexZuletztGestellteHz{0.0};
     /// Index (1…59) -> {Name, Einheit} aus den `meter`-Statuszeilen.
     /// Ohne diese Tabelle ist ein Messwertpaket eine Zahlenreihe ohne
     /// Bedeutung: das Paket traegt weder Namen noch Einheit, und der

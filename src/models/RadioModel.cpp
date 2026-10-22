@@ -7214,6 +7214,26 @@ void RadioModel::uebernimmFlexBildhoehe(int gemeldet)
     applyFlexPanSetup();
 }
 
+// From AetherSDR SliceModel.cpp:124 [@d58e2b8a] —
+// „slice tune <id> <freq> autopan=0", sechs Nachkommastellen in MHz.
+void RadioModel::tuneFlexSlice(double hz)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexSliceId.isEmpty()) { return; }
+    if (!(hz > 0.0)) { return; }
+
+    // Dieselbe Frequenz nicht noch einmal schicken: die Maschine
+    // antwortet auf jeden `slice tune` mit einem Zustandsschub, und der
+    // landet wieder hier. Ohne diese Wache dreht sich das im Kreis.
+    constexpr double kGleichbisHz = 0.5;
+    if (std::abs(hz - m_flexZuletztGestellteHz) < kGleichbisHz) { return; }
+    m_flexZuletztGestellteHz = hz;
+
+    const QString befehl = FlexCommandWire::tuneSliceCommand(m_flexSliceId, hz);
+    if (befehl.isEmpty()) { return; }
+    m_flexConnection->sendCommand(befehl);
+}
+
 void RadioModel::applyFlexAudioSetup()
 {
     if (!m_flexAudioWanted) { return; }
@@ -7310,6 +7330,7 @@ void RadioModel::teardownFlexConnection()
     m_flexRestoreMuteLocal  = false;
     m_flexYPixelsGemeldet   = 0;
     m_flexMasseNachgereicht = 0;
+    m_flexZuletztGestellteHz = 0.0;
     m_flexPanId.clear();
 
     if (m_flexStream) {
