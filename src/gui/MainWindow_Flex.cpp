@@ -69,6 +69,7 @@
 // Fuer den Anspruchs-Abgleich: Kiwi fuehrt seine Zuordnung in einer
 // eigenen Tabelle, nicht ueber streamIndex().
 #include "core/KiwiSdrManager.h"
+#include "gui/meters/MeterPoller.h"
 #include "gui/SpectrumWidget.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -182,11 +183,56 @@ void MainWindow::wireFlex()
             m_radioModel->tuneFlexSlice(hz);
         }, Qt::UniqueConnection);
         if (AudioEngine* ae = m_radioModel->audioEngine()) {
+            // ── Den Ausgang anwerfen (2026-10-22) ────────────────────
+            //
+            // `AudioEngine::start()` oeffnet den Lautsprecherausgang und
+            // laesst den Abfluss aus dem MasterMixer anlaufen. Im ganzen
+            // Programm steht der Aufruf an genau EINER Stelle: im
+            // WDSP-Init-Rueckruf nach dem Verbinden mit einem EIGENEN
+            // Funkgeraet (RadioModel.cpp). Beim Flex gibt es den nicht —
+            // die Maschine rechnet selbst —, also lief der Ausgang nie
+            // an.
+            //
+            // Gemessen am 2026-10-22 an Martins FLEX-8400: der Ton kam
+            // bis in die Mischung und weiter nicht. Sonde am Abfluss,
+            // alle fuenf Sekunden:
+            //   Scheibe 0, mixed 256, Spitze 0,07, Vol 0,82,
+            //   Stumm false, Leerdrains 0, Bus FALSE
+            // Alles richtig bis zum letzten Schritt, und dort kein
+            // offener Ausgang. Der Betreiber hoerte eine Stunde lang
+            // nichts, obwohl die Maschine 30 987 Tonpakete geschickt
+            // hatte.
+            //
+            // SunSDR hat denselben Griff und dieselbe Begruendung
+            // (MainWindow_SunSdr.cpp, 2026-08-24) — beim Flex ist er
+            // schlicht vergessen worden. `start()` schuetzt sich gegen
+            // doppeltes Anlaufen (`if (m_running) return;`), ist hier
+            // also gefahrlos: laeuft der Ausgang schon durch ein eigenes
+            // Geraet, geschieht nichts.
+            ae->start();
             // Opportunistisch im Mix: ein Netzaussetzer zum Flex darf
             // nicht den ganzen Ton anhalten.
             ae->setFlexAudioSourceEnabled(m_flexTargetSliceId, true);
         }
         qCInfo(lcFlexGui) << "Flex-Ton auf Scheibe" << m_flexTargetSliceId;
+
+        // ── Den Messwert-Umlauf anwerfen (2026-10-22) ────────────────
+        //
+        // Er wird sonst NUR aus `WdspEngine::initializedChanged`
+        // gestartet, und auch dort nur, wenn `rxChannelForSlice(0)`
+        // etwas liefert. Beim Flex gibt es diese Kette nicht — die
+        // Maschine rechnet selbst —, also lief der Umlauf nie, und das
+        // S-Meter blieb ohne Zeiger stehen, obwohl die Maschine den
+        // Pegel dreissigmal in der Sekunde schickt.
+        //
+        // `start()` auf einem schon laufenden Zeitgeber ist folgenlos;
+        // die fremde Quelle (MainWindow, setFremdeEmpfangsquelle) gibt
+        // ohne Flex-Messwert `nullopt`, der WDSP-Weg bleibt also
+        // unberuehrt.
+        if (m_meterPoller) { m_meterPoller->start(); }
+        if (m_radioModel->meterPoller() == nullptr && m_meterPoller) {
+            m_radioModel->setMeterPoller(m_meterPoller);
+        }
 
         // Der Panadapter zeigt ab jetzt die fremde Quelle; Bins vom
         // (nicht vorhandenen) Geraet werden damit verworfen.

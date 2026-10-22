@@ -181,6 +181,12 @@ void MeterPoller::setWdspEngine(WdspEngine* engine)
 //
 // Set by MainWindow once during RadioModel wiring; refreshed at every poll
 // tick (the callable is cheap; see RadioModel::rxMeterOffsetDb).
+void MeterPoller::setFremdeEmpfangsquelle(
+    std::function<std::optional<double>()> q)
+{
+    m_fremdeEmpfangsquelle = std::move(q);
+}
+
 void MeterPoller::setRxOffsetSource(std::function<double()> source)
 {
     m_rxOffsetSource = std::move(source);
@@ -349,6 +355,27 @@ void MeterPoller::poll()
     if (m_inTx) {
         pollTxMeters();
         return;  // don't poll RX meters while transmitting
+    }
+
+    // ── Fremde Empfangsquelle schlaegt WDSP ──────────────────────────
+    //
+    // Vor dem `m_rxChannel`-Tor, weil es genau das Tor ist, an dem die
+    // Anzeige beim Flex stehenblieb. Liefert die Quelle eine Zahl, ist
+    // sie die Messung — die Maschine hat sie gerechnet, nicht wir —
+    // und der WDSP-Weg wird uebersprungen. Die ADC- und AGC-Kennungen
+    // fallen damit weg; sie sind Groessen der eigenen Kette und haetten
+    // an einem fremden Radio keine Bedeutung.
+    if (m_fremdeEmpfangsquelle) {
+        if (const auto dbm = m_fremdeEmpfangsquelle()) {
+            dispatch(MeterBinding::SignalPeak,   *dbm);
+            dispatch(MeterBinding::SignalAvg,    *dbm);
+            dispatch(MeterBinding::SignalMaxBin, *dbm);
+            emit smeterUpdated(*dbm);
+            for (int sliceId : m_sliceChannels) {
+                emit sliceSmeterUpdated(sliceId, *dbm);
+            }
+            return;
+        }
     }
 
     if (!m_rxChannel) { return; }

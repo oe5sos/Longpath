@@ -7904,6 +7904,12 @@ longpath_add_test(tst_flex_vita_reader)
 # zurueckmeldet. Datagramme aus echten Koepfen gebaut.
 longpath_add_test(tst_flex_vita_stream)
 
+# 2026-10-22, zwei Befunde am Geraet: kein Ton trotz 30 987 Tonpaketen,
+# und ein S-Meter ohne Zeiger. Beide mit derselben Wurzel — die
+# Flex-Scheibe ist absichtlich ungebunden, und alles, was an einer
+# gebundenen Scheibe haengt, lief fuer sie nie an.
+longpath_add_test(tst_flex_ton_und_pegel)
+
 # 2026-09-25: Rendering-Pruefstand (ohne LONGPATH_GRAB_DIR uebersprungen),
 # die Retina-Spaltenzusammenfassung und die Frequenzskalen-Beschriftung,
 # die er gefunden hat.

@@ -284,6 +284,18 @@ public:
     FlexRadioConnection* flexConnection() { return m_flexConnection; }
     // Der VITA-49-Strom. Nur belegt, solange ein Flex verbunden ist.
     FlexVitaStream* flexStream() { return m_flexStream; }
+
+    /// Empfangspegel der Flex-Scheibe in dBm, oder nichts.
+    ///
+    /// Beim Flex rechnet die Maschine: die WDSP-Empfangskette ist leer,
+    /// und der S-Meter-Umlauf (MeterPoller) liest genau sie. Der
+    /// Betreiber sah darum am 2026-10-22 ein totes S-Meter, obwohl die
+    /// Maschine den Pegel laufend schickt (Messwert `LEVEL`, `src=SLC`).
+    ///
+    /// `nullopt`, wenn seit zwei Sekunden kein Messwertpaket kam. Ein
+    /// eingefrorener Zeiger behauptet eine Messung, die nicht mehr
+    /// stattfindet; lieber gar keine Anzeige.
+    std::optional<double> flexPegelDbm() const;
     ReceiverManager*  receiverManager()  { return m_receiverManager; }
     AudioEngine*      audioEngine()      { return m_audioEngine; }
     WdspEngine*       wdspEngine()       { return m_wdspEngine; }
@@ -3618,7 +3630,17 @@ private:
     /// Bedeutung: das Paket traegt weder Namen noch Einheit, und der
     /// Teiler haengt an der Einheit.
     QHash<int, QPair<QString, QString>> m_flexMesswertNamen;
+    /// Index -> `src` derselben Zeilen (SLC, COD, RAD, TX-, …).
+    /// Ohne die Quelle ist `LEVEL` nicht eindeutig: die Maschine fuehrt
+    /// mehrere Messwerte mit demselben Namen, und nur der mit `src=SLC`
+    /// ist der Empfangspegel einer Scheibe.
+    QHash<int, QString>  m_flexMesswertQuellen;
     qint64               m_flexMesswertZuletztGemeldet{0};
+    /// Letzter Empfangspegel der Flex-Scheibe (dBm) und sein Zeitpunkt.
+    /// Der S-Meter-Umlauf liest WDSP, und beim Flex rechnet das Radio —
+    /// dort steht nichts. Darum kommt die Zahl von der Maschine.
+    double               m_flexPegelDbm{0.0};
+    qint64               m_flexPegelStempel{0};
     ReceiverManager* m_receiverManager{nullptr};
     AudioEngine*     m_audioEngine{nullptr};
     WdspEngine*      m_wdspEngine{nullptr};

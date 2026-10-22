@@ -240,6 +240,8 @@ warren@wpratt.com
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 
+#include <optional>
+
 #include "MainWindow.h"
 #include "gui/MacVollflaeche.h"
 #include "gui/DxccSpotColours.h"
@@ -7113,6 +7115,16 @@ void MainWindow::populateDefaultMeter()
         // sit in raw ADC dBFS instead of at-antenna dBm.
         m_meterPoller->setRxOffsetSource([rm = m_radioModel]() -> double {
             return rm ? rm->rxMeterOffsetDb() : 0.0;
+        });
+
+        // Und die fremde Empfangsquelle: bei einem Radio, das selbst
+        // rechnet, kommt der Pegel von der Maschine. Dauerhaft gesetzt,
+        // nicht beim Verbinden ein- und beim Trennen ausgehaengt — die
+        // Quelle gibt `nullopt`, wenn kein Flex-Messwert ankommt, und
+        // dann gilt wieder der WDSP-Weg.
+        m_meterPoller->setFremdeEmpfangsquelle(
+            [rm = m_radioModel]() -> std::optional<double> {
+            return rm ? rm->flexPegelDbm() : std::nullopt;
         });
     }
 

@@ -6867,6 +6867,8 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                         m_flexMesswertNamen[idx].first = it.value();
                     } else if (feld == QLatin1String("unit")) {
                         m_flexMesswertNamen[idx].second = it.value();
+                    } else if (feld == QLatin1String("src")) {
+                        m_flexMesswertQuellen[idx] = it.value();
                     }
                 }
             }
@@ -6969,6 +6971,18 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
 //
 // Mehrfaches Rufen ist harmlos und beabsichtigt: dieselben Werte noch
 // einmal zu setzen aendert nichts.
+std::optional<double> RadioModel::flexPegelDbm() const
+{
+    if (m_flexPegelStempel == 0) { return std::nullopt; }
+    // Zwei Sekunden: die Maschine schickt rund 30 Messwertpakete je
+    // Sekunde, eine Luecke von zwei Sekunden ist also ein Ausfall und
+    // keine Schwankung.
+    if (QDateTime::currentMSecsSinceEpoch() - m_flexPegelStempel > 2000) {
+        return std::nullopt;
+    }
+    return m_flexPegelDbm;
+}
+
 void RadioModel::applyFlexPanSetup()
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
@@ -6978,7 +6992,19 @@ void RadioModel::applyFlexPanSetup()
     // Ohne Breite weiss die Maschine nicht, wie viele Bins sie schicken
     // soll; `totalBins` folgt xpixels (gemessen: der Sprung von 50 auf
     // 1024).
-    constexpr int kXPixels = 1024;
+    // 4096 statt 1024 Punkte.
+    //
+    // Von der Flex kommt kein I/Q, sondern ihr fertig gezeichnetes
+    // Bild — die Aufloesung ist also das, worum wir bitten. Mit 1024
+    // Punkten auf 461 kHz sind das 450 Hz je Punkt, und der
+    // Bandbreitenfilter (8 kHz Fenster) bekam 18 Punkte: daraus wird
+    // keine Kurve. Mit 4096 sind es 112 Hz je Punkt und 71 Punkte im
+    // selben Fenster.
+    //
+    // Am 2026-10-22 als Wunsch des Betreibers eingebaut; ob die
+    // Maschine 4096 annimmt, sagt die Zeile „N Bins" im Protokoll —
+    // sie zeigt, was WIRKLICH kommt, nicht was wir erbeten haben.
+    constexpr int kXPixels = 4096;
     // From AetherSDR RadioModel.cpp:4966 [@d58e2b8a] — dieselbe Bitte
     // wie der Vorlageclient: `xpixels=1024 ypixels=700`. 700 ist keine
     // runde Zahl aus der Luft, sondern die eines Clients, der an
@@ -7061,9 +7087,33 @@ void RadioModel::startFlexStreams()
         });
         connect(m_flexStream, &FlexVitaStream::meterSamplesReady, this,
                 [this](quint32, const QVector<FlexVita::FlexMeterSample>& w) {
+            const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+
+            // ── Der Empfangspegel, aus JEDEM Paket ───────────────────
+            //
+            // Vor der Drossel: sie dient nur dem Protokoll. Das S-Meter
+            // braucht den Wert zehnmal in der Sekunde, nicht einmal in
+            // fuenf.
+            //
+            // `LEVEL` allein genuegt nicht als Schluessel — die Maschine
+            // fuehrt mehrere Messwerte unter diesem Namen (gemessen am
+            // 2026-10-22: LEVEL, TNF, ANF, SQUELCH standen in einer
+            // Zeile auf demselben Wert). Der Empfangspegel einer
+            // Scheibe ist der mit `src=SLC`.
+            for (const auto& s : w) {
+                if (!m_flexMesswertQuellen.value(s.index)
+                         .startsWith(QLatin1String("SLC"))) { continue; }
+                const auto def = m_flexMesswertNamen.value(s.index);
+                if (def.first != QLatin1String("LEVEL")) { continue; }
+                if (const auto wert = FlexVita::meterScaled(s.raw, def.second)) {
+                    m_flexPegelDbm     = *wert;
+                    m_flexPegelStempel = jetzt;
+                }
+                break;
+            }
+
             // Hoechstens alle fuenf Sekunden eine Zeile: die Maschine
             // schiebt rund 30 Pakete je Sekunde.
-            const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
             if (jetzt - m_flexMesswertZuletztGemeldet < 5000) { return; }
             m_flexMesswertZuletztGemeldet = jetzt;
 
