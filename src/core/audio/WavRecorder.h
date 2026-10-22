@@ -103,6 +103,15 @@ namespace Longpath {
 // RecordingDetails (clsAudioRecordPlayback.cs:88-108 [@852bf0e]),
 // ohne die MP3- und Gegenstations-Felder — die gehoeren zu einem QSO,
 // nicht zu einem allgemeinen Mitschnitt.
+// Was im Beizettel unter "source" steht, wenn diese Klasse die
+// Aufnahme geschrieben hat. Die Wiedergabe (PlaybackRadioConnection)
+// liest genau dieses Wort, um eine Tonaufnahme von einer I/Q-Aufnahme
+// zu unterscheiden -- beide sind Stereo-WAV im selben Ordner, und bis
+// zum 2026-10-22 lief eine Tonaufnahme als Rauschen durch FFT und
+// WDSP, ohne ein Wort darueber. Darum steht das Wort hier und nicht
+// zweimal im Quelltext.
+inline constexpr QLatin1StringView kWavSourceOffTheAir{"off the air"};
+
 struct WavRecordingInfo {
     QDateTime utcStart;
     QString   frequency;   // "14.205.000"

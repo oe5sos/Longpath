@@ -174,6 +174,7 @@ IqRecordingInfo readIqRecordingDescription(const QString& wavPath)
     info.band       = j.value(QStringLiteral("band")).toString();
     info.sampleRate = j.value(QStringLiteral("sampleRate")).toInt();
     info.seconds    = j.value(QStringLiteral("seconds")).toDouble();
+    info.source     = j.value(QStringLiteral("source")).toString();
     return info;
 }
 

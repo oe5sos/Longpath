@@ -1259,6 +1259,7 @@ set(GUI_SOURCES
     src/gui/applets/Ft8Applet.cpp
     src/gui/applets/QsoRecorderApplet.cpp
     src/gui/applets/RecordingApplet.cpp
+    src/gui/RecordingScheduleDialog.cpp
     src/gui/applets/BandwidthFilterApplet.cpp
     src/gui/applets/CatApplet.cpp
     src/gui/applets/TunerApplet.cpp

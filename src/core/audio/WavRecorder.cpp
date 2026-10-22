@@ -119,7 +119,8 @@ void WavRecorder::stop()
              m_saveFloat32 ? QStringLiteral("IEEE float32")
                            : QStringLiteral("PCM 16-bit, dithered"));
     j.insert(QStringLiteral("seconds"), m_info.seconds);
-    j.insert(QStringLiteral("source"), QStringLiteral("off the air"));
+    j.insert(QStringLiteral("source"),
+             QString(kWavSourceOffTheAir));
 
     QString jsonPath = m_path;
     if (jsonPath.endsWith(QStringLiteral(".wav"), Qt::CaseInsensitive)) {

@@ -9,6 +9,9 @@
 // =================================================================
 
 #include "RecordingApplet.h"
+#include "../RecordingScheduleDialog.h"
+#include <QFileInfo>
+#include <QFileDialog>
 
 #include "gui/StyleConstants.h"
 #include "models/RadioModel.h"
@@ -194,6 +197,35 @@ void RecordingApplet::buildUI()
         vbox->addWidget(m_iqNote);
     }
 
+    // ── Wiedergabe ───────────────────────────────────────────────────
+    vbox->addSpacing(6);
+    vbox->addWidget(gruppenKopf(body, QStringLiteral("Playback")));
+    {
+        auto* row = new QHBoxLayout;
+        row->setSpacing(6);
+
+        m_playBtn = styledButton(QStringLiteral("▶ Open…"), 82);
+        m_playBtn->setToolTip(QStringLiteral(
+            "Play an I/Q recording back through the whole chain — "
+            "same DSP, same waterfall, same audio as a live radio. "
+            "Replaces a running radio connection; a recording never "
+            "transmits."));
+        connect(m_playBtn, &QPushButton::clicked,
+                this, &RecordingApplet::onPlaybackClicked);
+        row->addWidget(m_playBtn);
+
+        m_playFile = new QLabel(QStringLiteral("——"), body);
+        QFont pf = m_playFile->font();
+        stupsPunktgroesse(pf, -1.0);
+        m_playFile->setFont(pf);
+        m_playFile->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                                      .arg(QLatin1String(Style::kTextInactive)));
+        row->addWidget(m_playFile);
+        row->addStretch(1);
+
+        vbox->addLayout(row);
+    }
+
     // ── Zeitplan ─────────────────────────────────────────────────────
     vbox->addSpacing(6);
     vbox->addWidget(gruppenKopf(body, QStringLiteral("Schedule")));
@@ -207,6 +239,16 @@ void RecordingApplet::buildUI()
                 .arg(QLatin1String(Style::kTextSecondary)));
         row->addWidget(m_planText);
         row->addStretch(1);
+
+        // Der Weg zur Bedienung: ohne ihn kann man einen Eintrag nur
+        // in der Einstellungsdatei anlegen -- der Zeitplan lief seit
+        // August, aber niemand kam an ihn heran.
+        m_planBtn = styledButton(QStringLiteral("Plan…"), 62);
+        m_planBtn->setToolTip(QStringLiteral(
+            "Open the schedule: one entry per recording, UTC."));
+        connect(m_planBtn, &QPushButton::clicked,
+                this, &RecordingApplet::onPlanClicked);
+        row->addWidget(m_planBtn);
 
         m_planState = new QLabel(body);
         QFont pf = m_planState->font();
@@ -252,6 +294,47 @@ void RecordingApplet::onIqClicked()
     else                   { rec.startIq(); }
 }
 
+void RecordingApplet::onPlaybackClicked()
+{
+    if (m_model == nullptr) {
+        return;
+    }
+    RecordingModel& rec = m_model->recording();
+    if (rec.playing()) {
+        rec.stopPlayback();
+        return;
+    }
+    // I/Q zuerst, und zwar sichtbar: Ton- und I/Q-Aufnahmen liegen im
+    // selben Ordner und sehen gleich aus. Seit dem 2026-10-22 traegt
+    // die I/Q-Aufnahme „_iq" im Namen -- aeltere nicht, darum bleibt
+    // der zweite Filter. Greift jemand doch zur Tonaufnahme, sagt die
+    // Wiedergabe es ihm (PlaybackRadioConnection::openRecording).
+    const QString pfad = QFileDialog::getOpenFileName(
+        this, QStringLiteral("Open I/Q recording"), rec.recordingFolder(),
+        QStringLiteral("I/Q recordings (*_iq.wav);;"
+                       "All recordings (*.wav);;All files (*)"));
+    if (pfad.isEmpty()) {
+        return;
+    }
+    rec.startPlayback(pfad);
+}
+
+void RecordingApplet::onPlanClicked()
+{
+    if (m_model == nullptr) {
+        return;
+    }
+    // Ein Fenster, nicht zehn: ein zweiter Klick holt das vorhandene
+    // nach vorn.
+    if (m_planDialog == nullptr) {
+        m_planDialog = new RecordingScheduleDialog(&m_model->recording(), this);
+        m_planDialog->setAttribute(Qt::WA_DeleteOnClose, false);
+    }
+    m_planDialog->show();
+    m_planDialog->raise();
+    m_planDialog->activateWindow();
+}
+
 void RecordingApplet::refreshState()
 {
     if (!m_model) { return; }
@@ -280,6 +363,26 @@ void RecordingApplet::refreshState()
         QStringLiteral("QLabel { color: %1; }")
             .arg(QLatin1String(iqAn ? Style::kAmberText
                                     : Style::kTextInactive)));
+
+    const bool spielt = rec.playing();
+    // Ohne Radio geht keine Wiedergabe (RecordingModel::startPlayback
+    // verweigert sie) -- dann muss der Knopf AUS sein, sonst klickt
+    // man ins Leere. Laeuft gerade eine, bleibt er an: Stoppen muss
+    // immer gehen.
+    m_playBtn->setEnabled(bereit || spielt);
+    // Dieselbe Regel fuer den Zeitplan: ohne Radio feuert er nicht,
+    // also laesst sich der Plan auch nicht sinnvoll anlegen. Der
+    // Dialog sagt es zusaetzlich — fuer den Fall, dass das Geraet
+    // waehrend der Planung verschwindet.
+    m_planBtn->setEnabled(bereit);
+    m_playBtn->setText(spielt ? QStringLiteral("■ Stop")
+                              : QStringLiteral("▶ Open…"));
+    m_playFile->setText(spielt ? QFileInfo(rec.playbackFile()).fileName()
+                               : QStringLiteral("——"));
+    m_playFile->setStyleSheet(
+        QStringLiteral("QLabel { color: %1; }")
+            .arg(QLatin1String(spielt ? Style::kAmberText
+                                      : Style::kTextInactive)));
 
     const int n = rec.scheduleCount();
     m_planText->setText(n == 0 ? QStringLiteral("none")

@@ -147,6 +147,74 @@ private slots:
         QCOMPARE(dueSpy.takeFirst().at(0).toInt(), id);
     }
 
+    // ── Ueberfaellig: NICHT nachtraeglich feuern ──────────────────
+    //
+    // Gefunden am 2026-10-22, nachdem der Zeitplan eine Flaeche bekam
+    // (#309): `m_fired` wird in loadFromSettings() geleert und nie
+    // gespeichert, und checkNow() feuerte bei jedem `now >= startAt`.
+    // Wer eine Viertelstunde auf 03:00 plante und Longpath am
+    // naechsten Mittag startete, bekam die Aufnahme SOFORT -- Stunden
+    // zu spaet, ohne ein Wort. Solange niemand Eintraege anlegen
+    // konnte, hatte der Fehler kein Opfer; seit dem Dialog hat er eins.
+    void einUeberfaelligerEintragFeuertNichtNachtraeglich()
+    {
+        RecordingScheduler sched;
+        const QDateTime start =
+            Longpath::Zeit::utc(QDate(2026, 9, 1), QTime(3, 0));
+        sched.add(someEntry(start, 15));
+
+        QSignalSpy dueSpy(&sched, &RecordingScheduler::recordingDue);
+
+        // Zwei Stunden spaeter -- das Fenster 03:00..03:15 ist vorbei.
+        sched.checkNow(start.addSecs(2 * 3600));
+        QCOMPARE(dueSpy.count(), 0);
+
+        // Und auch spaeter nicht mehr: ein verpasster Eintrag bleibt
+        // verpasst, er lauert nicht.
+        sched.checkNow(start.addSecs(3 * 3600));
+        QCOMPARE(dueSpy.count(), 0);
+    }
+
+    void eineKurzeVerspaetungFeuertNoch()
+    {
+        // Ein Neustart, ein hakender Rechner: fuenf Minuten in ein
+        // Viertelstundenfenster hinein ist die Aufnahme noch die, die
+        // gewollt war.
+        RecordingScheduler sched;
+        const QDateTime start =
+            Longpath::Zeit::utc(QDate(2026, 9, 1), QTime(3, 0));
+        const int id = sched.add(someEntry(start, 15));
+
+        QSignalSpy dueSpy(&sched, &RecordingScheduler::recordingDue);
+        sched.checkNow(start.addSecs(5 * 60));
+        QCOMPARE(dueSpy.count(), 1);
+        QCOMPARE(dueSpy.takeFirst().at(0).toInt(), id);
+    }
+
+    void offenesEndeHatEinenNachlauf()
+    {
+        // Dauer 0 heisst „bis ich sie beende" -- daraus laesst sich
+        // kein Fenster ableiten, also braucht es eine Zahl. Eine
+        // halbe Stunde zu spaet ist noch brauchbar, der naechste Tag
+        // nicht.
+        const QDateTime start =
+            Longpath::Zeit::utc(QDate(2026, 9, 1), QTime(3, 0));
+        {
+            RecordingScheduler sched;
+            sched.add(someEntry(start, 0));
+            QSignalSpy dueSpy(&sched, &RecordingScheduler::recordingDue);
+            sched.checkNow(start.addSecs(30 * 60));
+            QCOMPARE(dueSpy.count(), 1);
+        }
+        {
+            RecordingScheduler sched;
+            sched.add(someEntry(start, 0));
+            QSignalSpy dueSpy(&sched, &RecordingScheduler::recordingDue);
+            sched.checkNow(start.addSecs(24 * 3600));
+            QCOMPARE(dueSpy.count(), 0);
+        }
+    }
+
     void firesOnlyOnceEvenIfStillPastDueLater()
     {
         RecordingScheduler sched;

@@ -6190,6 +6190,10 @@ longpath_add_test(tst_recording_model)
 # Nagelt fest, dass das Applet in der Spalte haengt, EINE Kennung
 # traegt und ohne Radio einen Strich zeigt statt einer Null.
 longpath_add_test(tst_aufnahme_applet)
+# Die Bedienung des Zeitplans (2026-10-22): bis dahin lief der
+# Scheduler, aber niemand kam an ihn heran.
+longpath_add_test(tst_aufnahme_zeitplan)
+longpath_add_test(tst_wiedergabe_nimmt_nur_iq)
 
 longpath_add_test(tst_tx_bandbreiten_klickbar)
 

@@ -16,10 +16,13 @@
 // =================================================================
 
 #include <QSignalSpy>
+#include <QTemporaryFile>
 #include <QtTest>
 
 #include "models/RadioModel.h"
 #include "models/RecordingModel.h"
+#include "core/PlaybackRadioConnection.h"
+#include "core/RadioConnection.h"
 #include "models/SliceModel.h"
 
 using namespace Longpath;
@@ -230,15 +233,83 @@ private slots:
         QCOMPARE(verlust.count(), 1);
     }
 
-    void dieWiedergabeIstEhrlichAbwesend()
+    void dieWiedergabeIstJetztAngeschlossen()
+    {
+        // Diese Zeile hiess bis zum 2026-10-21 „die Wiedergabe ist
+        // ehrlich abwesend" und nagelte fest, dass playbackAvailable()
+        // false meldet. Jetzt gibt es den Zweig in
+        // RadioConnection::create(), also muss sie wahr sein -- und der
+        // Prueffall dreht sich mit, statt stehenzubleiben.
+        RecordingModel rec;
+        QVERIFY(rec.playbackAvailable());
+        QVERIFY(!rec.playing());
+        QVERIFY(rec.playbackFile().isEmpty());
+    }
+
+    void dieFabrikBautFuerPlaybackDieDateiverbindung()
+    {
+        RadioInfo info;
+        info.protocol = ProtocolVersion::Playback;
+        auto conn = RadioConnection::create(info);
+        QVERIFY2(conn != nullptr, "die Fabrik kennt Playback nicht");
+        QVERIFY2(qobject_cast<PlaybackRadioConnection*>(conn.get()) != nullptr,
+                 "Playback liefert die falsche Klasse");
+
+        // Gegenprobe: ein echtes Protokoll darf NICHT die
+        // Dateiverbindung bekommen.
+        RadioInfo p2;
+        p2.protocol = ProtocolVersion::Protocol2;
+        auto other = RadioConnection::create(p2);
+        QVERIFY(other != nullptr);
+        QVERIFY(qobject_cast<PlaybackRadioConnection*>(other.get()) == nullptr);
+    }
+
+    void ohneDateiUndOhneRadioStartetKeineWiedergabe()
     {
         RecordingModel rec;
-        // PlaybackRadioConnection braucht einen Zweig in
-        // RadioConnection::create() (Plan §6) -- eine Entscheidung am
-        // Verbindungsweg, nicht in einer Bindeschicht. Solange die
-        // fehlt, sagt die Eigenschaft das, statt einen Zustand zu
-        // erfinden, auf den eine Flaeche dann wartet.
-        QVERIFY(!rec.playbackAvailable());
+        QVERIFY(!rec.startPlayback(QString()));
+        QVERIFY(!rec.playing());
+        QVERIFY2(rec.lastError().contains(QStringLiteral("radio")),
+                 qPrintable(rec.lastError()));
+
+        RadioModel radio;
+        rec.attach(&radio);
+        QVERIFY(!rec.startPlayback(QString()));
+        QVERIFY2(rec.lastError().contains(QStringLiteral("file")),
+                 qPrintable(rec.lastError()));
+    }
+
+    void eineFehlendeDateiWirdBenanntStattVerschluckt()
+    {
+        RadioModel radio;
+        RecordingModel rec;
+        rec.attach(&radio);
+
+        const QString fehlt = QDir::tempPath()
+                              + QStringLiteral("/longpath-gibt-es-nicht.wav");
+        QVERIFY(!QFileInfo::exists(fehlt));
+        QVERIFY(!rec.startPlayback(fehlt));
+        QVERIFY(!rec.playing());
+        QVERIFY2(rec.lastError().contains(fehlt), qPrintable(rec.lastError()));
+    }
+
+    void eineUnbrauchbareDateiLaesstKeineWiedergabeZurueck()
+    {
+        RadioModel radio;
+        RecordingModel rec;
+        rec.attach(&radio);
+
+        // Eine Datei, die es gibt, aber keine Aufnahme ist: der
+        // Verbindungsaufbau muss abbrechen UND nichts zuruecklassen.
+        // Ohne den Abbruch in connectToRadio() stuende hier eine
+        // Verbindung ohne Quelle -- die Oberflaeche zeigte „verbunden",
+        // und nie kaeme ein Ton.
+        QTemporaryFile f(QDir::tempPath() + QStringLiteral("/longpath-XXXXXX.wav"));
+        QVERIFY(f.open());
+        f.write("das ist kein WAV");
+        f.flush();
+
+        QVERIFY(!rec.startPlayback(f.fileName()));
         QVERIFY(!rec.playing());
         QVERIFY(rec.playbackFile().isEmpty());
     }

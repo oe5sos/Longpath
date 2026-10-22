@@ -10,6 +10,8 @@
 
 #include "RecordingModel.h"
 
+#include <QFileInfo>
+
 #include <QDateTime>
 #include <QDir>
 #include <QLocale>
@@ -157,8 +159,12 @@ QString RecordingModel::recordingFolder() const
     return dir;
 }
 
-QString RecordingModel::suggestedPath(const QString& suffix) const
+QString RecordingModel::suggestedPath(const QString& suffix,
+                                      const QString& kennung) const
 {
+    const QString marke = kennung.isEmpty()
+                              ? QString()
+                              : QLatin1Char('_') + kennung;
     QString freq;
     QString mode;
     QString band;
@@ -168,11 +174,11 @@ QString RecordingModel::suggestedPath(const QString& suffix) const
                           + QStringLiteral("Z");
 
     if (!sliceInfo(&freq, &mode, &band)) {
-        return recordingFolder() + QLatin1Char('/') + stamp
+        return recordingFolder() + QLatin1Char('/') + stamp + marke
                + QLatin1Char('.') + suffix;
     }
     return recordingFolder() + QLatin1Char('/') + stamp
-           + QLatin1Char('_') + band + QLatin1Char('_') + mode
+           + QLatin1Char('_') + band + QLatin1Char('_') + mode + marke
            + QLatin1Char('.') + suffix;
 }
 
@@ -278,8 +284,12 @@ bool RecordingModel::startIq(const QString& path)
     m_iq.setStreamIndex(slice->streamIndex());
     m_iq.setSampleRate(rate);
 
+    // Die Kennung „iq" ist nicht Zierde: ohne sie waehlt eine
+    // gleichzeitig laufende Tonaufnahme dieselbe Datei, und im
+    // Dateiwaehler der Wiedergabe sieht man den Unterschied nicht.
     const QString ziel = path.isEmpty()
-                             ? suggestedPath(QStringLiteral("wav"))
+                             ? suggestedPath(QStringLiteral("wav"),
+                                             QStringLiteral("iq"))
                              : path;
 
     QString fehler;
@@ -302,6 +312,67 @@ bool RecordingModel::startIq(const QString& path)
 void RecordingModel::stopIq()
 {
     m_iq.stop();
+}
+
+// ── Wiedergabe ───────────────────────────────────────────────────────
+//
+// Der ganze Weg liegt in RadioModel: es haelt die Verbindung, und eine
+// Wiedergabe IST eine Verbindung (ProtocolVersion::Playback). Dieses
+// Modell prueft nur, ob die Datei da und lesbar ist -- eine Fehlmeldung
+// eine Sekunde spaeter aus der Tiefe des Verbindungsaufbaus hilft
+// niemandem.
+bool RecordingModel::startPlayback(const QString& path)
+{
+    if (!m_radio) {
+        setLastError(QStringLiteral("No radio model attached."));
+        return false;
+    }
+    const QString p = path.trimmed();
+    if (p.isEmpty()) {
+        setLastError(QStringLiteral("No file given."));
+        return false;
+    }
+    QFileInfo fi(p);
+    if (!fi.exists() || !fi.isFile()) {
+        setLastError(QStringLiteral("File not found: %1").arg(p));
+        return false;
+    }
+    if (!fi.isReadable()) {
+        setLastError(QStringLiteral("File not readable: %1").arg(p));
+        return false;
+    }
+
+    QString err;
+    if (!m_radio->startPlaybackFromFile(p, &err)) {
+        setLastError(err.isEmpty() ? QStringLiteral("Playback refused.") : err);
+        return false;
+    }
+
+    setLastError(QString());
+    if (m_playbackFile != p) {
+        m_playbackFile = p;
+        emit playbackFileChanged(m_playbackFile);
+    }
+    if (!m_playing) {
+        m_playing = true;
+        emit playingChanged(true);
+    }
+    return true;
+}
+
+void RecordingModel::stopPlayback()
+{
+    if (m_radio && m_playing) {
+        m_radio->stopPlayback();
+    }
+    if (m_playing) {
+        m_playing = false;
+        emit playingChanged(false);
+    }
+    if (!m_playbackFile.isEmpty()) {
+        m_playbackFile.clear();
+        emit playbackFileChanged(m_playbackFile);
+    }
 }
 
 }  // namespace Longpath
