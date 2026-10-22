@@ -8028,6 +8028,76 @@ get_property(_all_tests GLOBAL PROPERTY LONGPATH_ALL_TESTS)
 add_custom_target(all_tests DEPENDS ${_all_tests})
 
 # --------------------------------------------------------------------------
+# Windows: die DLLs neben die Pruefstaende legen  (2026-10-22)
+# --------------------------------------------------------------------------
+# GEMESSEN im Lauf 39762280534 auf windows-latest, und es war nicht zu
+# erraten: fuenf gelinkte Kernlogik-Pruefstaende meldeten alle fuenf
+# Zeitueberschreitung nach 120 s -- nicht rot, haengend. Dieselben fuenf,
+# derselbe Bauordner, nur mit PATH um zwei Ordner erweitert:
+#
+#     ohne:  5 von 5 ***Timeout 120.01 sec
+#     mit:   5 von 5 Passed, 0,66 s insgesamt
+#
+# Es war also nie die Prueflogik, sondern der Programmstart. Zwei DLLs
+# liegen in Ordnern, die auf dem Laeufer in keinem Suchweg stehen:
+#
+#     librade.dll        build/                  (POST_BUILD-Kopie, aber
+#                                                 neben Longpath.exe, nicht
+#                                                 neben build/tests/)
+#     libfftw3-3.dll     third_party/fftw3/bin/  (gar nie kopiert)
+#     libfftw3f-3.dll    third_party/fftw3/bin/
+#
+# Qt6*.dll und die MinGW-Laufzeit sind in der CI ueber den PATH da
+# (install-qt-action setzt ihn) -- die beiden oben nicht.
+#
+# Fehlt eine DLL, zeigt Windows einen Fehlerdialog. Auf einem Laeufer
+# ohne Bediener klickt den niemand weg, also steht der Vorgang bis zum
+# Zeitlimit. Das ist der Grund, warum es wie ein Haenger aussieht und
+# nicht wie ein Startfehler -- und warum man die Ursache im Pruefstand
+# gesucht haette, wo sie nicht ist.
+#
+# Warum KOPIEREN und nicht PATH setzen: Windows durchsucht immer zuerst
+# den Ordner der ausfuehrbaren Datei selbst, ohne PATH, ohne
+# Umgebungsvariable, auch wenn jemand den Pruefstand von Hand startet.
+# ENVIRONMENT_MODIFICATION waere die Alternative, braucht aber CMake
+# 3.22 -- dieses Projekt steht auf 3.20.
+if(WIN32)
+    set(_longpath_test_dlls "")
+    if(TARGET rade)
+        list(APPEND _longpath_test_dlls "$<TARGET_FILE:rade>")
+    endif()
+    foreach(_dll IN ITEMS libfftw3-3.dll libfftw3f-3.dll)
+        if(EXISTS "${CMAKE_SOURCE_DIR}/third_party/fftw3/bin/${_dll}")
+            list(APPEND _longpath_test_dlls
+                 "${CMAKE_SOURCE_DIR}/third_party/fftw3/bin/${_dll}")
+        endif()
+    endforeach()
+    if(DFNR_DLL AND EXISTS "${DFNR_DLL}")
+        list(APPEND _longpath_test_dlls "${DFNR_DLL}")
+    endif()
+
+    if(_longpath_test_dlls)
+        add_custom_target(longpath_test_dlls
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${_longpath_test_dlls} "${CMAKE_CURRENT_BINARY_DIR}"
+            COMMENT "DLLs neben die Pruefstaende legen (Windows)"
+            VERBATIM)
+        # An all_tests UND an jeden einzelnen Pruefstand: wer
+        # `--target tst_x` baut und ihn dann von Hand startet, soll
+        # nicht in denselben 120-s-Haenger laufen.
+        add_dependencies(all_tests longpath_test_dlls)
+        foreach(_t IN LISTS _all_tests)
+            add_dependencies(${_t} longpath_test_dlls)
+        endforeach()
+    else()
+        message(WARNING
+            "Windows: keine DLL zum Kopieren gefunden. Die Pruefstaende "
+            "werden beim Start haengen, falls librade.dll oder libfftw3*.dll "
+            "in keinem Suchweg stehen -- siehe den Kommentar hier.")
+    endif()
+endif()
+
+# --------------------------------------------------------------------------
 # Per-label build aggregates: tests_core / tests_models / tests_gui / ...
 # --------------------------------------------------------------------------
 # One buildable target per derived ctest label, so the documented subset
