@@ -424,13 +424,46 @@ void Ft8Applet::buildUI()
             return;
         }
         if (m_textFeld) { m_textFeld->setText(ruf); }
-        if (m_autoBtn && m_autoBtn->isChecked() && !m_sendet) {
-            m_qsoGemeldet = false;
-            m_ablauf.starteAlsAnrufer(eigenesRufzeichen(), eigenerLocator());
-            ablaufSchritt();
-        }
+        if (m_sendet) { return; }
+
+        // Ein Knopf namens CQ ruft CQ.
+        //
+        // Betreiber am 2026-10-22: „der cq ruf funktioniert nicht."
+        // Er tat bis dahin nur eines: den Text ins Feld schreiben.
+        // Gesendet wurde nur, wenn zufaellig „Auto" an war -- sonst
+        // musste man danach noch „Send" druecken. Das ist nicht, was
+        // der Knopf verspricht.
+        m_qsoGemeldet = false;
+        m_ablauf.starteAlsAnrufer(eigenesRufzeichen(), eigenerLocator());
+        m_cqVersucheOffen = m_cqVersucheSpin ? m_cqVersucheSpin->value() : 1;
+        ablaufSchritt();
     });
     sendRow->addWidget(m_cqRufenBtn);
+
+    // Wie oft von selbst. Betreiber am 2026-10-22: „man soll auch
+    // entscheiden koennen, wie oft er das automatisch probiert."
+    //
+    // Zehn ist die Vorgabe und keine erfundene Zahl: zehn Durchgaenge
+    // sind zweieinhalb Minuten auf derselben Stelle -- lange genug,
+    // dass jemand antwortet, kurz genug, dass ein vergessener Ruf
+    // nicht den ganzen Abend laeuft.
+    m_cqVersucheSpin = new QSpinBox(this);
+    m_cqVersucheSpin->setRange(1, 30);
+    m_cqVersucheSpin->setValue(AppSettings::instance()
+                                   .value(QStringLiteral("Ft8/CqVersuche"),
+                                          QStringLiteral("10"))
+                                   .toInt());
+    m_cqVersucheSpin->setPrefix(tr("x"));
+    m_cqVersucheSpin->setFixedWidth(56);
+    m_cqVersucheSpin->setToolTip(tr(
+        "How many periods a CQ call repeats by itself.\nIt stops "
+        "earlier when somebody answers, or on Stop."));
+    connect(m_cqVersucheSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, [](int v) {
+        AppSettings::instance().setValue(QStringLiteral("Ft8/CqVersuche"),
+                                         QString::number(v));
+    });
+    sendRow->addWidget(m_cqVersucheSpin);
 
     m_cqBtn = styledButton(tr("Send"), 56);
     m_cqBtn->setToolTip(tr("Send this message once, in the next own "
@@ -531,7 +564,27 @@ void Ft8Applet::syncFromModel()
 void Ft8Applet::fensterZuEnde()
 {
     abbrechen();
-    if (!m_ablauf.laeuft()) { zeigeAblauf(); return; }
+    if (!m_ablauf.laeuft()) {
+        m_cqVersucheOffen = 0;
+        zeigeAblauf();
+        return;
+    }
+
+    // Ein laufender CQ-Ruf: noch einmal, solange Versuche offen sind.
+    // Antwortet jemand, uebernimmt der Ablauf von selbst -- dann steht
+    // er nicht mehr im Anruferzustand, und diese Stelle greift nicht.
+    if (m_cqVersucheOffen > 0) {
+        --m_cqVersucheOffen;
+        if (m_cqVersucheOffen == 0
+            && m_ablauf.zustand() == Ft8Ablauf::Zustand::RufeCq) {
+            m_ablauf.abbrechen();
+            if (m_status) {
+                m_status->setText(tr("CQ finished — nobody answered"));
+            }
+            zeigeAblauf();
+            return;
+        }
+    }
     m_ablauf.fensterVerstrichen();
     if (m_ablauf.laeuft()) {
         ablaufSchritt();
@@ -936,10 +989,21 @@ void Ft8Applet::sendeNachricht(const QString& text)
         }
         if (m_status) { m_status->setText(tr("transmitting")); }
 
-        // Das Fenster laeuft; danach alles zurueck. Ein Zuschlag von
-        // 300 ms, damit der letzte Ton draussen ist, bevor der Sender
+        // Nur so lange tasten, wie das SIGNAL dauert -- nicht das
+        // ganze Fenster.
+        //
+        // Gemessen am 2026-10-22 am Geraet: der Sender blieb 14,9 s an
+        // (`mox=true` 06:17:30,295 bis 06:17:45,170), obwohl ein
+        // FT8-Signal 12,64 s lang ist. Betreiber: „hat zu lange
+        // gedauert." Die zwei Sekunden danach gehen nicht nur
+        // verloren -- in ihnen laeuft der Empfang nicht, und bei FT8
+        // beginnt das naechste Fenster unmittelbar. Wer zu spaet
+        // zurueckkommt, hoert den Anfang der Antwort nicht.
+        //
+        // Der Zuschlag von 300 ms bleibt: er sorgt dafuer, dass der
+        // letzte Ton wirklich draussen ist, bevor der Sender
         // abschaltet.
-        QTimer::singleShot(Ft8Tx::fensterMs(protocol()) + 300, this,
+        QTimer::singleShot(Ft8Tx::signalMs(protocol()) + 300, this,
                            [this]() { fensterZuEnde(); });
     });
     m_sendeTimer->start(static_cast<int>(wartet));

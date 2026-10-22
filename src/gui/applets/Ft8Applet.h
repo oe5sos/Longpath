@@ -219,6 +219,8 @@ public:
     /// „Send"-Knopf (m_cqBtn), der Name ist dort eine Altlast.
     QPushButton* cqRufenButtonForTest() const { return m_cqRufenBtn; }
     const Ft8Ablauf& ablaufForTest() const { return m_ablauf; }
+    /// Der Zaehler fuer die CQ-Versuche, fuer den Pruefstand.
+    class QSpinBox* cqVersucheSpinForTest() const { return m_cqVersucheSpin; }
     /// Einen Fund einspeisen, als waere er dekodiert worden — der
     /// einzige Weg, auf dem der Ablauf vorankommt, also auch der
     /// einzige, auf dem er sich pruefen laesst.
@@ -376,6 +378,15 @@ private:
     /// von Ft8Ablauf gebaut und geprueft, aber von nirgends
     /// erreichbar: starteAlsAnrufer() hatte keinen einzigen Aufrufer.
     QPushButton* m_cqRufenBtn{nullptr};
+
+    /// Wie oft ein CQ-Ruf von selbst wiederholt wird, und wie viele
+    /// Versuche noch offen sind.
+    ///
+    /// Betreiber am 2026-10-22: „der cq ruf funktioniert nicht" (er
+    /// fuellte nur das Textfeld) und „man soll auch entscheiden
+    /// koennen, wie oft er das automatisch probiert".
+    class QSpinBox* m_cqVersucheSpin{nullptr};
+    int m_cqVersucheOffen{0};
     void fensterZuEnde();
     void meldeFertigesQso();
     void ablaufSchritt();
