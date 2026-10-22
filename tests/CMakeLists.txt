@@ -1852,6 +1852,12 @@ longpath_add_test(tst_fm_deviation)
 longpath_add_test(tst_rx_equalizer)
 longpath_add_test(tst_cat_protokoll)
 longpath_add_test(tst_cat_server)
+# Phase 3K, erster Schritt: die rigctld-Bruecke gegen den Mock. Die
+# Befehlsfolge stammt nicht aus Hamlib-Quellen, sondern aus einem
+# Mitschnitt von `rigctl -m 2` gegen `rigctld -m 1` durch einen
+# mitlesenden Proxy (2026-10-11, Hamlib 4.7.2) --
+# docs/architecture/2026-10-11-rigctld-verification/README.md.
+longpath_add_test(tst_rigctld_server TestMockRadioModel.cpp)
 longpath_add_test(tst_cat_zz)
 longpath_add_test(tst_schutzrahmen)
 longpath_add_test(tst_neues_feld_schaltet_sich_nicht_ein)

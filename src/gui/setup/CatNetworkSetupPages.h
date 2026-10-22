@@ -185,8 +185,10 @@ private:
 
 // ---------------------------------------------------------------------------
 // CAT > TCP/IP CAT
-// Enable toggle, bind IP, port spinner, status label.
-// All controls are NYI / disabled.
+// Die rigctld-Bruecke: Einschalter, Bindeadresse, Port, Sendetor, Status.
+// Der Kenwood-CAT-Kanal sitzt NICHT hier, sondern im CAT-Applet (dort
+// stehen seine Schalter samt Pseudoterminal) -- ein Schalter an zwei
+// Orten laeuft auseinander.
 // ---------------------------------------------------------------------------
 class CatTcpIpPage : public SetupPage {
     Q_OBJECT
@@ -194,10 +196,27 @@ class CatTcpIpPage : public SetupPage {
 public:
     explicit CatTcpIpPage(QWidget* parent = nullptr);
 
+    /// Live status from MainWindow. Idempotent.
+    void setRigctldStatus(bool running, quint16 port, int clients);
+
+signals:
+    /// Operator toggled the enable checkbox. `port` is the value shown
+    /// in the spinbox, already persisted.
+    void rigctldEnableToggled(bool on, quint16 port);
+
+    /// Bind address or port changed. MainWindow restarts a running
+    /// server in place; when stopped, the values just wait in
+    /// AppSettings for the next start.
+    void rigctldBindOrPortChanged(const QString& bindAddress, quint16 port);
+
+    /// Operator opened or closed the transmit gate.
+    void rigctldPttAllowedToggled(bool allowed);
+
 private:
     QCheckBox* m_enableCheck{nullptr};
     QLineEdit* m_bindIpEdit{nullptr};
     QSpinBox*  m_portSpin{nullptr};
+    QCheckBox* m_pttCheck{nullptr};
     QLabel*    m_statusLabel{nullptr};
 
     void buildUI();

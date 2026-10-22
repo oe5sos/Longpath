@@ -1781,6 +1781,7 @@ private:
     // connection per past slice.
     QList<QMetaObject::Connection> m_rttyRadeLinks;
     /// Der CAT-Server (2026-10-11). Vier Kanaele, nur auf 127.0.0.1.
+    class RigctldServer* m_rigctldServer{nullptr};  // Phase 3K: Hamlib-Bruecke
     class CatServer*    m_catServer{nullptr};
     class CatPtyServer* m_catPtyServer{nullptr};
     class EqApplet* m_eqApplet{nullptr};

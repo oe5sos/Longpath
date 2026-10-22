@@ -11,6 +11,7 @@ namespace Longpath {
 
 // --- Category Definitions ---
 Q_LOGGING_CATEGORY(lcDiscovery,  "longpath.discovery")
+Q_LOGGING_CATEGORY(lcRigctld,    "longpath.rigctld")
 Q_LOGGING_CATEGORY(lcConnection, "longpath.connection")
 Q_LOGGING_CATEGORY(lcKiwiSdr, "longpath.kiwisdr")
 Q_LOGGING_CATEGORY(lcKiwiSdrAudio, "longpath.kiwi.sdr.audio")
