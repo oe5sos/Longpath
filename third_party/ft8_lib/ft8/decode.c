@@ -513,7 +513,34 @@ static void ft8_decode_multi_symbols(const WF_ELEM_T* wf, int num_bins, int n_sy
     const int n_bits = 3 * n_syms;
     const int n_tones = (1 << n_bits);
 
-    float s2[n_tones];
+    // ── Longpath-Abweichung (2026-10-22): kein Array variabler Laenge ──
+    //
+    // Upstream schreibt hier `float s2[n_tones];`. Das ist ein Array
+    // variabler Laenge (C99, VLA). GCC und Clang uebersetzen das, der
+    // Microsoft-Compiler nicht -- er lehnt es mit C2057 / C2466 / C2133
+    // ab ("expected constant expression", "cannot allocate an array of
+    // constant size 0", "'s2': unknown size").
+    //
+    // Gemerkt am 2026-10-22, als das erste Windows-Paket seit dem
+    // 2026-10-07 gebaut wurde. Dass es so lange unbemerkt blieb, hat
+    // einen Grund: `ci.yml` baut Windows mit MinGW (GCC, `win64_mingw` +
+    // `tools_mingw1310`) und war gruen, `release.yml` baut mit MSVC
+    // (`ilammy/msvc-dev-cmd`) und brach ab. Zwei Compiler, ein
+    // Plattformname.
+    //
+    // Die Obergrenze ist nicht geschaetzt, sondern steht in dieser
+    // Funktion selbst: sie behandelt n_syms 1, 2 und 3 (j1, j2, j3) und
+    // kann strukturell nichts darueber -- die letzte Summe weiter unten
+    // hat genau drei Glieder. Damit ist n_bits <= 9 und n_tones <= 512.
+    // Der Wachposten darunter kann nach dieser Struktur nicht greifen;
+    // er steht da, damit eine kuenftige Upstream-Fassung mit mehr
+    // Symbolen nicht ueber das Ende schreibt.
+    enum { kLongpathMaxTones = 512 };  // 1 << (3 * 3)
+    if (n_tones > kLongpathMaxTones)
+    {
+        return;
+    }
+    float s2[kLongpathMaxTones];
 
     for (int j = 0; j < n_tones; ++j)
     {
