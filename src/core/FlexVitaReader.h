@@ -208,6 +208,59 @@ QVector<float> binsToDbm(const QVector<quint16>& bins,
 // gegen ein bekanntes Signal geprueft ist.
 float tileColourValue(quint16 raw);
 
+// ── Messwerte, Paketklasse 0x8002 ───────────────────────────────────
+//
+// Am 2026-10-21 an Martins FLEX-8400 gemessen: 653 Pakete in 22 s
+// nach `sub meter all` (docs/protocols/flex-vita49-gemessen.md §5b).
+//
+// Aufbau: 28 Byte Kopf, danach Paare aus Kennung (u16 gross-endig)
+// und Rohwert (i16 gross-endig). Der Rumpf war in allen 653 Paketen
+// durch 4 teilbar; die Zahl der Paare schwankt (44…156 Byte), weil
+// nur GEAENDERTE Werte mitkommen.
+//
+// Die Kennung ist der LAUFENDE INDEX aus der Statuszeile (1…59),
+// NICHT das Feld `num`. Belegt: Index 10 lieferte genau 1,000 und
+// heisst `SWR`, Index 1 lieferte -89,6 dBFS und heisst `MICPEAK`.
+// `num` ist bei Scheibenmesswerten der Scheibenindex.
+struct FlexMeterSample {
+    quint16 index{0};   // 1…59, der laufende Index der Statuszeile
+    qint16  raw{0};     // unskaliert, wie er auf dem Draht stand
+};
+
+QVector<FlexMeterSample> meterSamples(const QByteArray& datagram);
+
+// Der Teiler haengt an der EINHEIT, nicht am Paket.
+//
+// Das ist der Fund, den man nicht raten darf (§5b): 44 von 46
+// beobachteten Werten liegen mit /128 in ihrem erklaerten Bereich —
+// die zwei Spannungen nicht. `+13.8A` roh 3495 ergibt mit /128
+// 27,3 V (ausserhalb von 10,5…15,0) und mit /256 13,65 V. Das ist
+// genau das, was eine 13,8-V-Schiene liest.
+//
+// Fuer degC, RPM und Amps ist NICHTS belegt: dort liegen beide
+// Teiler im erklaerten Bereich, der Bereich entscheidet also nichts.
+// Belegen wuerde das erst eine herbeigefuehrte Aenderung (senden,
+// bis die Endstufe warm wird) — nicht geschehen. Deshalb gibt
+// `meterScaled` fuer diese Einheiten `std::nullopt` zurueck statt
+// einer Zahl, die gut aussieht und geraten ist (HAUSSTIL Regel 7).
+std::optional<double> meterScaled(qint16 raw, const QString& unit);
+
+}  // namespace FlexVita
+}  // namespace Longpath
+
+// Der Nutztyp des Signals `meterSamplesReady` muss dem Metasystem
+// bekannt sein. macOS baut hier gegen Qt 6.11 und kam ohne aus; die
+// Linux-CI baut gegen eine aeltere Fassung und fiel darueber — ein
+// `QSignalSpy` liest den Wert dann als leeren Vorgabewert aus. Fuer
+// eine Verbindung ueber Fadengrenzen braucht Qt die Anmeldung
+// ausserdem immer.
+Q_DECLARE_METATYPE(Longpath::FlexVita::FlexMeterSample)
+Q_DECLARE_METATYPE(QVector<Longpath::FlexVita::FlexMeterSample>)
+
+namespace Longpath {
+namespace FlexVita {
+
+
 // From AetherSDR VitaBinCoverage.h:23-48 [@d58e2b8a] —
 // hasZeroFilledFftGrowthSuffix(). Eine FLEX-8600 mit Firmware 4.2.18
 // schickt nach einer x_pixels-VERGROESSERUNG einen Uebergangsrahmen:

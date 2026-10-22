@@ -123,6 +123,11 @@ signals:
     void waterfallRowReady(quint32 streamId, const QVector<quint16>& values,
                            double lowFreqMhz, double highFreqMhz,
                            quint32 autoBlackLevel);
+    /// Messwerte der Maschine: Paare aus laufendem Index (1…59) und
+    /// Rohwert. Der Teiler haengt an der EINHEIT und steht in den
+    /// `meter`-Statuszeilen, nicht im Paket.
+    void meterSamplesReady(quint32 streamId,
+                           const QVector<FlexVita::FlexMeterSample>& werte);
     // Ton: big-endian float32 Stereo verschraenkt, 24 kHz (gemessen).
     void audioSamplesReady(quint32 streamId, const QVector<float>& interleavedStereo);
 

@@ -119,6 +119,13 @@ public:
     /// Called from the WDSP audio thread — lock-free, no allocation.
     int pullSamples(float* dst, int n) override;
 
+    /// Siehe TxMicRouter::eigeneTonquelleAktiv(). Wahr genau dann, wenn
+    /// FT8/FT4 oder RTTY gewaehlt IST und die Quelle auch angemeldet
+    /// wurde -- ohne angemeldete Quelle faellt dieser Router auf das
+    /// Mikrofon zurueck (siehe pullSamples), und dann waere es
+    /// falsch, den Sendefaden das Mikrofon abklemmen zu lassen.
+    bool eigeneTonquelleAktiv() const override;
+
     /// User-facing source selection.
     ///
     /// The request is applied immediately when:

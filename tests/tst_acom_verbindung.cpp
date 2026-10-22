@@ -337,8 +337,6 @@ void TstAcomVerbindung::derWachtaktSchaltetDieTelemetrieWiederEin()
 
     // Und solange Rahmen kommen, wird NICHT dauernd nachgeschaltet --
     // der Wachtakt soll die Leitung nicht mit 0x92 zupflastern.
-    const int ruhigVorher = m_amp->einschaltbefehle();
-
     // An die RAHMEN gebunden, nicht an die Uhr (2026-10-18).
     //
     // Hier stand `QTest::qWait(300)`. Der Wachtakt laeuft im Prueflauf
@@ -353,8 +351,48 @@ void TstAcomVerbindung::derWachtaktSchaltetDieTelemetrieWiederEin()
     // nachgeschaltet". Also wird genau das abgewartet: fuenf
     // eingegangene Telemetrie-Rahmen. Damit ist die Bedingung erfuellt,
     // die der Satz voraussetzt, und die Uhr spielt keine Rolle mehr.
+    // ── Warum hier der Wachtakt weiter gestellt wird (2026-10-21) ──
+    //
+    // Die Bindung an die Rahmen allein hat nicht gereicht: der Fall ist
+    // am 2026-10-21 in der CI auf macOS wieder umgefallen, 1 von 526,
+    // und hat einen PR-Umlauf gekostet, der mit ihm nichts zu tun
+    // hatte.
+    //
+    // Der Wachtakt fragt „kam seit dem letzten Takt ein Rahmen?". Im
+    // Prueflauf schiebt der Kunstverstaerker alle 10 ms und der
+    // Wachtakt stand auf 30 ms — drei Rahmen Spielraum. Unter Last
+    // (Gesamtlauf mit -j4 auf einem geteilten CI-Laeufer) ist eine
+    // 30-ms-Luecke nichts Besonderes. Der Wachtakt schaltet dann
+    // VOELLIG RICHTIG nach, und der Fall faellt trotzdem.
+    //
+    // Zwei Bedingungen muss die Aussage erfuellen, und beide stehen
+    // hier zusammen, weil die naheliegende Behebung die zweite
+    // zerstoert:
+    //
+    //   1. Spielraum je Rahmen. Bei 200 ms Takt und 10 ms Rahmen sind
+    //      es zwanzig statt drei — ein Rahmen muesste zwanzigmal zu
+    //      spaet kommen.
+    //   2. Es muss ueberhaupt ein Takt in das Fenster fallen. Wer den
+    //      Takt einfach auf 1000 ms stellt und fuenf Rahmen abwartet
+    //      (50 ms), prueft GAR NICHTS mehr: der Wachtakt haette in
+    //      dieser Zeit nie geschlagen, und der Fall waere auch mit
+    //      einem kaputten Wachtakt gruen.
+    //
+    // 60 Rahmen sind bei 10 ms mindestens 600 ms, also mindestens drei
+    // Takte. Unter Last kommen die Rahmen langsamer — dann sind es
+    // mehr Takte, nie weniger. Die Aussage bleibt also scharf.
+    constexpr int kWachtaktFuerDieseAussageMs = 200;
+    constexpr int kRahmenMindestens           = 60;
+    m_verb->setKeepaliveIntervalMs(kWachtaktFuerDieseAussageMs);
+
+    // ERST weiterstellen, DANN ablesen. Andersherum kann der alte
+    // 30-ms-Takt zwischen dem Ablesen und dem Weiterstellen noch
+    // einmal schlagen — und das waere ein Zaehler, der schon beim
+    // Start der Messung veraltet ist.
+    const int ruhigVorher = m_amp->einschaltbefehle();
+
     QSignalSpy fluss(m_verb, &AcomConnection::telemetryUpdated);
-    QTRY_VERIFY_WITH_TIMEOUT(fluss.count() >= 5, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(fluss.count() >= kRahmenMindestens, 10000);
     QCOMPARE(m_amp->einschaltbefehle(), ruhigVorher);
 }
 

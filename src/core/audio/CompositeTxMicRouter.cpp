@@ -75,6 +75,18 @@ void CompositeTxMicRouter::setVaxSource(VaxTxMicSource* source)
     m_vaxSource.store(source, std::memory_order_release);
 }
 
+bool CompositeTxMicRouter::eigeneTonquelleAktiv() const
+{
+    const MicSource q = m_activeSource.load(std::memory_order_acquire);
+    if (q == MicSource::Ft8) {
+        return m_ft8Source.load(std::memory_order_acquire) != nullptr;
+    }
+    if (q == MicSource::Rtty) {
+        return m_rttySource.load(std::memory_order_acquire) != nullptr;
+    }
+    return false;
+}
+
 void CompositeTxMicRouter::setFt8Source(TxMicRouter* source)
 {
     m_ft8Source.store(source, std::memory_order_release);

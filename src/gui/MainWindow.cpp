@@ -7401,6 +7401,11 @@ void MainWindow::populateDefaultMeter()
     // und Hochladen. Hier wird nichts selbst geschrieben — sonst
     // stuende dasselbe QSO zweimal im Logbuch und nur einmal auf dem
     // Server.
+    // Die Knoepfe FT8/FT4 IM Fenster richten das Geraet genauso her
+    // wie die Pillen in der Leiste -- es waeren sonst zwei Stellen mit
+    // demselben Namen und verschiedener Wirkung.
+    connect(m_ft8Applet, &Ft8Applet::digiGewuenscht, this,
+            &MainWindow::aufDigiStellen);
     connect(m_ft8Applet, &Ft8Applet::qsoFertig, this,
             [this](const LogEntry& e) {
         if (RotorLogbookPanel* p = ensureRotorPanel()) {
@@ -14979,12 +14984,40 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
     if (slice->filterLow() != kDigiTiefHz)  { slice->setFilterLow(kDigiTiefHz); }
     if (slice->filterHigh() != kDigiHochHz) { slice->setFilterHigh(kDigiHochHz); }
 
-    // 4. Das Fenster. Die Freigabe stellt die Modusachse gleich selbst
-    //    (rebindRttyRadeAvailability), aber SICHTBAR wird es davon
-    //    nicht -- das ist die Nutzerspalte, und die steht womoeglich
-    //    noch aus einer Sitzung ohne Digital auf „aus".
+    // 4. Das Fenster -- und zwar WIRKLICH vor Augen.
+    //
+    //    Betreiber am 2026-10-21, nach dem ersten Versuch: „es muss
+    //    sofort das fenster automatisch aufgehen, sobald ich auf ft4
+    //    oder ft8 klicke." Das tat es nicht, und zwar aus zwei
+    //    Gruenden uebereinander:
+    //
+    //      1. `setVisible()` kehrt sofort zurueck, wenn der Wert sich
+    //         nicht aendert. Stand die Nutzerspalte schon auf „an" und
+    //         fehlte nur die Freigabe, geschah hier NICHTS -- kein
+    //         Signal, kein Fenster.
+    //      2. Und selbst wenn es feuert, heisst „sichtbar" nur, dass
+    //         die Huelle in der rechten Spalte haengt. Die kann
+    //         weggerollt oder von schwebenden Fenstern verdeckt sein.
+    //         Der Bediener meint ein FENSTER.
+    //
+    //    `bringAppletToFront()` ist genau dafuer da (sein Kopf sagt:
+    //    „nur fuer Einschalten per Menue/Plus") -- und ein Druck auf
+    //    FT8 ist genau das.
     if (m_appletVis) {
         m_appletVis->setVisible(QStringLiteral("Ft8Decoder"), true);
+        bringAppletToFront(QStringLiteral("Ft8Decoder"));
+    }
+
+    // 5. Und der Dekoder hoert auf dieselbe Betriebsart.
+    //
+    //    Ohne das stellte ein Druck auf FT4 in der Leiste zwar die
+    //    Skala auf 14.080, liess den Dekoder aber auf FT8 -- 15 s
+    //    Fenster auf einem Band, das im 7,5-s-Takt sendet. Das Fenster
+    //    haette geschwiegen, und niemand haette gewusst, warum.
+    if (m_ft8Applet) {
+        m_ft8Applet->setProtocol(modus == DigiFrequenzen::Digimodus::Ft4
+                                     ? Ft8Decoder::Protocol::Ft4
+                                     : Ft8Decoder::Protocol::Ft8);
     }
 }
 
