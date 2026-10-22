@@ -3583,6 +3583,33 @@ public:
     /// neu, und der Ausschnitt, an dem unser Bild haengt, springt.
     void tuneFlexSlice(double hz);
 
+    /// Die Betriebsart der Flex-Scheibe stellen.
+    ///
+    /// Bis zum 2026-10-22 war `slice tune` der EINZIGE Befehl, den
+    /// Longpath an eine Flex-Scheibe schicken konnte. Die Betriebsart
+    /// wurde einmal beim Verbinden gesetzt und danach nie wieder: die
+    /// Bedienung zeigte LSB, die Maschine stand auf USB. Der
+    /// Betreiber hoerte Stationen, aber keine verstaendliche Sprache —
+    /// „als waere es eine andere modulation". Er hatte recht, es WAR
+    /// eine andere.
+    ///
+    /// Longpaths Namen und die der Maschine decken sich nicht: CWL und
+    /// CWU heiszen dort beide `CW`, und DSB, SPEC, DRM sowie die
+    /// RADE-Betriebsarten gibt es nicht. Was kein Gegenstueck hat,
+    /// wird NICHT geschickt — eine abgewiesene Betriebsart liesze die
+    /// Scheibe im alten Zustand und die Anzeige im neuen, also wieder
+    /// zwei Wahrheiten.
+    void setFlexSliceMode(DSPMode mode);
+
+    /// Die Filterflanken der Flex-Scheibe stellen (Hertz, bezogen auf
+    /// die Traegerfrequenz — genau wie `filter_lo`/`filter_hi` im
+    /// Scheibenzustand).
+    ///
+    /// Derselbe Befund wie bei der Betriebsart, gemeldet in einem
+    /// Atemzug: „und der bandfilter zeigt auch zu wenig an". Die
+    /// Flanken standen in Longpath und nirgends sonst.
+    void setFlexSliceFilter(int lowHz, int highHz);
+
 private:
     /// Was die Maschine als `y_pixels` meldet, einordnen: ein echter
     /// Wert wird zum Teiler, eine Ruecksetzvorgabe loest ein erneutes
@@ -3640,6 +3667,16 @@ private:
     /// Zuletzt an die Maschine geschickte Frequenz (Hertz), damit
     /// ihr Zustandsschub nicht denselben Befehl wieder ausloest.
     double               m_flexZuletztGestellteHz{0.0};
+    /// Dasselbe fuer Betriebsart und Filterflanken.
+    QString              m_flexZuletztGestellteArt;
+    /// Nachzutragen, solange die Scheibennummer der Maschine fehlt.
+    DSPMode              m_flexArtNachzutragen{DSPMode::USB};
+    bool                 m_flexHatArtNachzutragen{false};
+    int                  m_flexFlankeTiefNachzutragen{0};
+    int                  m_flexFlankeHochNachzutragen{0};
+    bool                 m_flexHatFlankenNachzutragen{false};
+    int                  m_flexZuletztGestellteFlankeTief{0};
+    int                  m_flexZuletztGestellteFlankeHoch{0};
     /// Index (1…59) -> {Name, Einheit} aus den `meter`-Statuszeilen.
     /// Ohne diese Tabelle ist ein Messwertpaket eine Zahlenreihe ohne
     /// Bedeutung: das Paket traegt weder Namen noch Einheit, und der

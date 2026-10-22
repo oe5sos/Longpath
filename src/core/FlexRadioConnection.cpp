@@ -209,6 +209,32 @@ QString tuneSliceCommand(const QString& sliceId, double hz)
         .arg(hz / 1.0e6, 0, 'f', 6);
 }
 
+QString setSliceModeCommand(const QString& sliceId, const QString& mode)
+{
+    if (sliceId.isEmpty()) { return QString(); }
+    // Die Liste der Maschine, nicht unsere. Ein Name, den sie nicht
+    // kennt, wird abgewiesen und laesst die Scheibe im alten Zustand —
+    // also gar nicht erst schicken.
+    static const QStringList kKennt = {
+        QStringLiteral("LSB"),  QStringLiteral("USB"),
+        QStringLiteral("AM"),   QStringLiteral("CW"),
+        QStringLiteral("DIGL"), QStringLiteral("DIGU"),
+        QStringLiteral("SAM"),  QStringLiteral("FM"),
+        QStringLiteral("NFM"),  QStringLiteral("DFM"),
+        QStringLiteral("RTTY"),
+    };
+    const QString gross = mode.trimmed().toUpper();
+    if (!kKennt.contains(gross)) { return QString(); }
+    return QStringLiteral("slice set %1 mode=%2").arg(sliceId, gross);
+}
+
+QString setSliceFilterCommand(const QString& sliceId, int lowHz, int highHz)
+{
+    if (sliceId.isEmpty() || highHz <= lowHz) { return QString(); }
+    return QStringLiteral("filt %1 %2 %3")
+        .arg(sliceId).arg(lowHz).arg(highHz);
+}
+
 QString normalizedFlexId(QString text)
 {
     text = text.trimmed();

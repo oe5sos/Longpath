@@ -7910,6 +7910,14 @@ longpath_add_test(tst_flex_vita_stream)
 # gebundenen Scheibe haengt, lief fuer sie nie an.
 longpath_add_test(tst_flex_ton_und_pegel)
 
+# 2026-10-22: der „Lattenzaun" im Panadapter. Ein echter Rahmen von
+# Martins FLEX-8400 geht durch denselben Zeichenweg wie im Programm,
+# und das Ergebnis wird auf Regelmaeszigkeit gemessen.
+longpath_add_test(tst_panadapter_lattenzaun)
+target_compile_definitions(tst_panadapter_lattenzaun PRIVATE
+    LONGPATH_BUILD_TESTS
+    LONGPATH_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
+
 # 2026-09-25: Rendering-Pruefstand (ohne LONGPATH_GRAB_DIR uebersprungen),
 # die Retina-Spaltenzusammenfassung und die Frequenzskalen-Beschriftung,
 # die er gefunden hat.

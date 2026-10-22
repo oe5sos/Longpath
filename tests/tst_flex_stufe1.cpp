@@ -827,6 +827,55 @@ private slots:
         QVERIFY(tuneSliceCommand(QStringLiteral("0"), -1.0).isEmpty());
     }
 
+    // ── Betriebsart und Filterbreite (2026-10-22) ────────────────────
+    //
+    // Bis heute war `slice tune` der EINZIGE Befehl an eine
+    // Flex-Scheibe. Der Betreiber hoerte Stationen, aber keine
+    // verstaendliche Sprache: „als waere es eine andere modulation".
+    // Longpath zeigte LSB, die Maschine stand auf USB — die
+    // Betriebsart wurde nur beim Verbinden gesetzt und danach nie.
+    void betriebsartbefehl()
+    {
+        using FlexCommandWire::setSliceModeCommand;
+
+        QCOMPARE(setSliceModeCommand(QStringLiteral("0"),
+                                     QStringLiteral("LSB")),
+                 QStringLiteral("slice set 0 mode=LSB"));
+        QCOMPARE(setSliceModeCommand(QStringLiteral("2"),
+                                     QStringLiteral("digu")),
+                 QStringLiteral("slice set 2 mode=DIGU"));
+
+        // Nur was die Maschine in ihrer eigenen `mode_list` fuehrt.
+        // Ein unbekannter Name wird abgewiesen und liesze die Scheibe
+        // im alten Zustand, die Anzeige aber im neuen — also wieder
+        // zwei Wahrheiten. Lieber gar nichts schicken.
+        QVERIFY(setSliceModeCommand(QStringLiteral("0"),
+                                    QStringLiteral("CWL")).isEmpty());
+        QVERIFY(setSliceModeCommand(QStringLiteral("0"),
+                                    QStringLiteral("SPEC")).isEmpty());
+        QVERIFY(setSliceModeCommand(QString(),
+                                    QStringLiteral("USB")).isEmpty());
+    }
+
+    // From AetherSDR SliceModel.cpp:231-232 [@d58e2b8a]:
+    //   // FlexAPI: "filt <id> <low_hz> <high_hz>"
+    void filterbefehl()
+    {
+        using FlexCommandWire::setSliceFilterCommand;
+
+        QCOMPARE(setSliceFilterCommand(QStringLiteral("0"), 100, 2900),
+                 QStringLiteral("filt 0 100 2900"));
+        QCOMPARE(setSliceFilterCommand(QStringLiteral("1"), -2900, -100),
+                 QStringLiteral("filt 1 -2900 -100"));
+
+        // Verdrehte oder gleiche Flanken geben keinen Befehl: die
+        // Maschine wuerde ihn abweisen, und die Anzeige stuende
+        // danach auf etwas anderes als die Scheibe.
+        QVERIFY(setSliceFilterCommand(QStringLiteral("0"), 2900, 100).isEmpty());
+        QVERIFY(setSliceFilterCommand(QStringLiteral("0"), 100, 100).isEmpty());
+        QVERIFY(setSliceFilterCommand(QString(), 100, 2900).isEmpty());
+    }
+
     void scheibenlisteAusDerAntwort()
     {
         using FlexCommandWire::sliceListFromReply;

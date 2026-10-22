@@ -8519,6 +8519,35 @@ void MainWindow::populateDefaultMeter()
     // Falle wie bei der Zeus-Uebernahme: ein neues Applet mit Vorgabe
     // true schaltet sich selbst ein. Wer aufnehmen will, holt es ueber
     // View > Containers > Applets; wer nicht, sieht es nie.
+    // ── Die Aufnahme geht EINMAL aus, auch im alten Profil ──────────
+    //
+    // `registerApplet(..., false)` ist nur die Vorgabe fuer ein Profil,
+    // das den Schluessel noch nicht hat. Martins Profil hatte ihn auf
+    // `True`, und beim Beenden schreibt das Profil zurueck — eine
+    // Aenderung an der Datei war beim naechsten Schliessen also wieder
+    // weg. Der Betreiber hat die Aufnahme am 2026-10-22 DREIMAL
+    // weggeschickt („wie oft wolltest du das recording schon
+    // entfernen", „SIEHST DU DAS RECORDING??????????????????????"),
+    // und zweimal habe ich nur die Vorgabe geaendert.
+    //
+    // Darum hier ein Einmal-Schalter: beim ersten Start mit dieser
+    // Fassung wird der gespeicherte Wert auf `False` gesetzt und der
+    // Schalter umgelegt. Wer die Aufnahme danach selbst wieder
+    // einschaltet (View > Containers > Applets), behaelt sie — der
+    // Schalter liegt dann schon um und greift nie wieder.
+    {
+        auto& einst = AppSettings::instance();
+        const QString schalter =
+            QStringLiteral("AppletRecEinmaligAusgeschaltet2026_10_22");
+        if (einst.value(schalter, QString{}).toString()
+                != QStringLiteral("True")) {
+            einst.setValue(QStringLiteral("AppletRecVisible"),
+                           QStringLiteral("False"));
+            einst.setValue(schalter, QStringLiteral("True"));
+            qCInfo(lcConnection) << "Aufnahme-Applet einmalig ausgeschaltet "
+                            "(Betreiberwunsch 2026-10-22)";
+        }
+    }
     m_appletVis->registerApplet(QStringLiteral("Rec"),
                                 QStringLiteral("Recording"),    false);
     m_appletVis->registerApplet(QStringLiteral("BwFilter"),

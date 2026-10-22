@@ -1856,6 +1856,9 @@ private:
     /// Von Hand gehalten, weil `Qt::UniqueConnection` bei einer Lambda
     /// nicht greift und dort still GAR NICHTS verbindet.
     QMetaObject::Connection m_flexAbstimmBand;
+    /// Dasselbe fuer Betriebsart und Filterflanken.
+    QMetaObject::Connection m_flexArtBand;
+    QMetaObject::Connection m_flexFilterBand;
     /// Einmal je Verbindung: die Fensterbreite auf den Ausschnitt der
     /// Flex stellen. Danach gehoert der Zoom wieder dem Betreiber.
     bool m_flexAusschnittUebernommen{false};

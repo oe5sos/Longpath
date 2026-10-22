@@ -161,6 +161,33 @@ QString normalizedFlexId(QString text);
 // Schreibweise, in der die Maschine Frequenzen meldet.
 QString tuneSliceCommand(const QString& sliceId, double hz);
 
+// ── Betriebsart und Filterbreite (2026-10-22) ────────────────────────
+//
+// Bis heute war `slice tune` der EINZIGE Befehl, den Longpath an eine
+// Flex-Scheibe schicken konnte. Betriebsart und Filterflanken gingen
+// nie hinaus: die Bedienung zeigte LSB und 2,9 kHz, die Maschine blieb
+// auf dem, was beim Verbinden gesetzt wurde. Der Betreiber am
+// 2026-10-22, nachdem das Abstimmen endlich durchkam: „aber reine
+// stimmen hoere ich nicht", „als waere es eine andere modulation",
+// „und der bandfilter zeigt auch zu wenig an". Beides derselbe Grund.
+//
+// Am Geraet gemessen war der Ton dabei makellos — 0–2,75 kHz,
+// scharfe Kante bei 3 kHz, ueber 4 kHz nur −79 dB am Lautsprecher.
+// Richtig demoduliert, nur in der falschen Seitenbandlage.
+//
+// Namen der Betriebsarten aus der Maschine selbst (`mode_list` im
+// Scheibenzustand): LSB, USB, AM, CW, DIGL, DIGU, SAM, FM, NFM, DFM,
+// RTTY. Eine Betriebsart, die nicht darin steht, gibt einen leeren
+// Befehl — lieber nichts schicken als die Scheibe verstellen.
+QString setSliceModeCommand(const QString& sliceId, const QString& mode);
+
+// From AetherSDR SliceModel.cpp:231-232 [@d58e2b8a]:
+//   // FlexAPI: "filt <id> <low_hz> <high_hz>"
+//   sendCommand(QString("filt %1 %2 %3").arg(m_id).arg(low).arg(high));
+// Flanken in Hertz, bezogen auf die Traegerfrequenz, wie die Maschine
+// sie in `filter_lo`/`filter_hi` zurueckmeldet.
+QString setSliceFilterCommand(const QString& sliceId, int lowHz, int highHz);
+
 // From AetherSDR RadioStatusOwnership.h:48-60 [@d58e2b8a] —
 // parsePanafallCreatePanId(). Die Antwort auf „display panafall
 // create" traegt die Kennung mal als `pan=`, mal als `id=`, mal nackt

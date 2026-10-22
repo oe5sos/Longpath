@@ -227,6 +227,40 @@ void MainWindow::wireFlex()
             }
             m_radioModel->tuneFlexSlice(hz);
         });
+
+        // ── Betriebsart und Filterbreite, derselbe Weg ──────────────
+        //
+        // Bis zum 2026-10-22 ging nur die Frequenz hinaus — und auch
+        // die nicht (siehe oben). Mit dem Abstimmen allein hoerte der
+        // Betreiber Stationen, aber keine verstaendliche Sprache:
+        // „als waere es eine andere modulation". Das war sie auch.
+        // Longpath zeigte LSB, die Maschine stand auf USB, weil die
+        // Betriebsart nur EINMAL beim Verbinden gesetzt wurde.
+        //
+        // Dieselbe Wache wie bei der Frequenz: ein Zustandsschub der
+        // Maschine darf den Befehl nicht zurueckwerfen, und eine
+        // Scheibe mit echter DDC-Bindung wird nie gefuettert.
+        disconnect(m_flexArtBand);
+        m_flexArtBand = connect(ziel, &SliceModel::dspModeChanged, this,
+                [this](DSPMode art) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            m_radioModel->setFlexSliceMode(art);
+        });
+
+        disconnect(m_flexFilterBand);
+        m_flexFilterBand = connect(ziel, &SliceModel::filterChanged, this,
+                [this](int tief, int hoch) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            m_radioModel->setFlexSliceFilter(tief, hoch);
+        });
+
+        // Und einmal gleich jetzt, damit die Maschine mit dem
+        // uebereinstimmt, was im Fenster steht — sonst gilt der
+        // Unterschied bis zum ersten Drehen weiter.
+        m_radioModel->setFlexSliceMode(ziel->dspMode());
+        m_radioModel->setFlexSliceFilter(ziel->filterLow(), ziel->filterHigh());
         if (AudioEngine* ae = m_radioModel->audioEngine()) {
             // ── Den Ausgang anwerfen (2026-10-22) ────────────────────
             //

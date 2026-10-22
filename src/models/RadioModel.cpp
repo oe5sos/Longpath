@@ -6917,6 +6917,20 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                 m_flexAudioLevelWas = kv.value(QStringLiteral("audio_level"));
                 m_flexAudioMuteWas  = kv.value(QStringLiteral("audio_mute"));
                 applyFlexAudioSetup();
+
+                // Was ohne Scheibennummer nicht hinausgehen konnte,
+                // geht jetzt hinaus — siehe setFlexSliceMode().
+                if (!m_flexSliceId.isEmpty()) {
+                    if (m_flexHatArtNachzutragen) {
+                        m_flexHatArtNachzutragen = false;
+                        setFlexSliceMode(m_flexArtNachzutragen);
+                    }
+                    if (m_flexHatFlankenNachzutragen) {
+                        m_flexHatFlankenNachzutragen = false;
+                        setFlexSliceFilter(m_flexFlankeTiefNachzutragen,
+                                           m_flexFlankeHochNachzutragen);
+                    }
+                }
             }
         });
 
@@ -7314,6 +7328,80 @@ void RadioModel::tuneFlexSlice(double hz)
     m_flexZuletztGestellteHz = hz;
 
     const QString befehl = FlexCommandWire::tuneSliceCommand(m_flexSliceId, hz);
+    if (befehl.isEmpty()) { return; }
+    m_flexConnection->sendCommand(befehl);
+}
+
+void RadioModel::setFlexSliceMode(DSPMode mode)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    // ── Die Scheibennummer kommt ERST SPAETER ────────────────────────
+    //
+    // Dieselbe Falle wie beim Panadapter: die Verdrahtung laeuft auf
+    // `guiClientRegistered`, die Nummer der Scheibe steht aber erst im
+    // Zustandsschub danach. Am 2026-10-22 gingen Betriebsart und
+    // Filter darum ins Leere, und die Maschine blieb auf dem, was beim
+    // Verbinden gesetzt worden war. Gemerkt und nachgeholt, statt
+    // verworfen.
+    if (m_flexSliceId.isEmpty()) {
+        m_flexArtNachzutragen = mode;
+        m_flexHatArtNachzutragen = true;
+        return;
+    }
+
+    // Longpaths Namen auf die der Maschine. Die Liste der Maschine
+    // steht in ihrem eigenen Scheibenzustand (`mode_list`): LSB, USB,
+    // AM, CW, DIGL, DIGU, SAM, FM, NFM, DFM, RTTY.
+    QString name;
+    switch (mode) {
+    case DSPMode::LSB:  name = QStringLiteral("LSB");  break;
+    case DSPMode::USB:  name = QStringLiteral("USB");  break;
+    case DSPMode::AM:   name = QStringLiteral("AM");   break;
+    case DSPMode::SAM:  name = QStringLiteral("SAM");  break;
+    case DSPMode::FM:   name = QStringLiteral("FM");   break;
+    case DSPMode::DIGU: name = QStringLiteral("DIGU"); break;
+    case DSPMode::DIGL: name = QStringLiteral("DIGL"); break;
+    // Die Maschine kennt nur EIN CW; die Seitenbandlage liegt bei ihr
+    // am Mithoerton, nicht an der Betriebsart.
+    case DSPMode::CWL:
+    case DSPMode::CWU:  name = QStringLiteral("CW");   break;
+    // Ohne Gegenstueck: DSB, SPEC, DRM, RADE-U, RADE-L. Lieber nichts
+    // schicken, als die Scheibe auf etwas anderes zu stellen.
+    default: break;
+    }
+    if (name.isEmpty()) {
+        qCInfo(lcConnection) << "Flex: Betriebsart"
+                             << SliceModel::modeName(mode)
+                             << "hat an der Maschine kein Gegenstueck —"
+                                " nicht geschickt";
+        return;
+    }
+    if (name == m_flexZuletztGestellteArt) { return; }
+    m_flexZuletztGestellteArt = name;
+
+    const QString befehl =
+        FlexCommandWire::setSliceModeCommand(m_flexSliceId, name);
+    if (befehl.isEmpty()) { return; }
+    m_flexConnection->sendCommand(befehl);
+}
+
+void RadioModel::setFlexSliceFilter(int lowHz, int highHz)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (highHz <= lowHz) { return; }
+    if (m_flexSliceId.isEmpty()) {   // siehe setFlexSliceMode()
+        m_flexFlankeTiefNachzutragen = lowHz;
+        m_flexFlankeHochNachzutragen = highHz;
+        m_flexHatFlankenNachzutragen = true;
+        return;
+    }
+    if (lowHz == m_flexZuletztGestellteFlankeTief
+        && highHz == m_flexZuletztGestellteFlankeHoch) { return; }
+    m_flexZuletztGestellteFlankeTief = lowHz;
+    m_flexZuletztGestellteFlankeHoch = highHz;
+
+    const QString befehl =
+        FlexCommandWire::setSliceFilterCommand(m_flexSliceId, lowHz, highHz);
     if (befehl.isEmpty()) { return; }
     m_flexConnection->sendCommand(befehl);
 }
