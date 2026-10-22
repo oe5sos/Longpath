@@ -67,9 +67,16 @@ public:
     /// `samples` sind Monoproben bei kSampleRate, ueblicherweise ein
     /// volles Fenster (15 s FT8, 7,5 s FT4). Kuerzer geht auch — dann
     /// faellt entsprechend weniger an.
+    /// `durchgaenge` ist die Zahl der Runden ueber dasselbe Fenster.
+    /// Nach jeder Runde werden die gefundenen Signale aus einer KOPIE
+    /// der Aufnahme herausgerechnet, damit schwaechere darunter
+    /// auffindbar werden (siehe core/Ft8Subtract.h). 1 = wie frueher,
+    /// ohne Abzug. Fuer FT4 gilt immer 1 -- die Subtraktion rechnet
+    /// mit FT8-Massen.
     static QVector<Ft8Decode> decodeBlock(const float* samples,
                                           int count,
-                                          Protocol protocol = Protocol::Ft8);
+                                          Protocol protocol = Protocol::Ft8,
+                                          int durchgaenge = 2);
 
     /// Dieselbe Rechnung rueckwaerts, fuer den Pruefstand und spaeter
     /// fuer das Senden: Nachricht -> Tonproben.

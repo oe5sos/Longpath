@@ -6831,6 +6831,26 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
             // gemeldete Hoehe damit jedes Mal weg. Gemerkt wird immer,
             // gesetzt nur, wenn es schon etwas zu setzen gibt;
             // `applyFlexPanSetup()` holt es sonst nach.
+            // Die Messwert-Tabelle fuellen. Die Maschine schickt je
+            // Messwert eine Zeile der Form
+            //   meter 1.src=COD-#1.num=1#1.nam=MICPEAK#1.unit=dBFS#…
+            // also Schluessel mit dem Index als Vorsatz.
+            if (object.startsWith(QLatin1String("meter"))) {
+                for (auto it = kv.cbegin(); it != kv.cend(); ++it) {
+                    const int punkt = it.key().indexOf(QLatin1Char('.'));
+                    if (punkt <= 0) { continue; }
+                    bool ok = false;
+                    const int idx = it.key().left(punkt).toInt(&ok);
+                    if (!ok) { continue; }
+                    const QString feld = it.key().mid(punkt + 1);
+                    if (feld == QLatin1String("nam")) {
+                        m_flexMesswertNamen[idx].first = it.value();
+                    } else if (feld == QLatin1String("unit")) {
+                        m_flexMesswertNamen[idx].second = it.value();
+                    }
+                }
+            }
+
             if (object.startsWith(QLatin1String("display pan "))
                 && kv.contains(QStringLiteral("y_pixels"))) {
                 bool gelesen = false;
@@ -7004,6 +7024,34 @@ void RadioModel::startFlexStreams()
                              double lo, double hi, quint32 ab) {
             emit flexWaterfallRowReady(id, v, lo, hi, ab);
         });
+        connect(m_flexStream, &FlexVitaStream::meterSamplesReady, this,
+                [this](quint32, const QVector<FlexVita::FlexMeterSample>& w) {
+            // Hoechstens alle fuenf Sekunden eine Zeile: die Maschine
+            // schiebt rund 30 Pakete je Sekunde.
+            const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+            if (jetzt - m_flexMesswertZuletztGemeldet < 5000) { return; }
+            m_flexMesswertZuletztGemeldet = jetzt;
+
+            QStringList teile;
+            for (const auto& s : w) {
+                const auto def = m_flexMesswertNamen.value(s.index);
+                if (def.first.isEmpty()) { continue; }
+                const auto wert = FlexVita::meterScaled(s.raw, def.second);
+                // Unbelegte Einheiten bekommen einen Strich und den
+                // Rohwert — keine Zahl, die eine Messung behauptet.
+                teile << (wert
+                    ? QStringLiteral("%1 %2 %3").arg(def.first)
+                          .arg(*wert, 0, 'f', 3).arg(def.second)
+                    : QStringLiteral("%1 — (roh %2 %3)").arg(def.first)
+                          .arg(s.raw).arg(def.second));
+            }
+            if (!teile.isEmpty()) {
+                qCInfo(lcConnection) << "Flex-Messwerte:"
+                                     << qPrintable(teile.join(
+                                            QStringLiteral(", ")));
+            }
+        });
+
         connect(m_flexStream, &FlexVitaStream::audioSamplesReady,
                 this, [this](quint32 id, const QVector<float>& s) {
             emit flexAudioSamplesReady(id, s);
