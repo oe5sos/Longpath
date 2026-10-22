@@ -232,6 +232,16 @@ eingeschaltete Teilmenge; wer ihn angeht, fängt bei der Frage an, ob der
 Winsock-Flutfaden die Steckdose unter Windows überhaupt dauerhaft lesbar
 macht — die ganze Prüflogik hängt daran.
 
+**Alles hier ist MinGW, nicht MSVC.** `ci.yml` baut Windows mit MinGW
+(`win64_mingw` + `tools_mingw1310`), `release.yml` mit MSVC
+(`ilammy/msvc-dev-cmd`). Zwei Compiler, ein Plattformname. Am selben Tag
+hat das zugeschlagen: der Release-Lauf zu v0.8.1 brach in `build-windows`
+an einem C99-Array variabler Länge in `third_party/ft8_lib/ft8/decode.c`
+ab (MSVC C2057/C2466/C2133), während die CI bei jedem PR grün war —
+siehe #322. Diese Messung und die eingeschaltete Teilmenge sagen über
+MSVC **nichts**. Wer MSVC mit abdecken will, braucht einen eigenen
+Durchgang; das gehört nicht hierher.
+
 **Die Zahl 451 in `ci.yml` ist überall veraltet.** Sie steht an acht
 Stellen in Kommentaren und stammt vom Mai 2026; angemeldet sind 1077
 über `longpath_add_test()` plus ein Dutzend direkt, insgesamt 1084 auf
@@ -242,11 +252,15 @@ Linkzeit) und gehören in einen eigenen Durchgang, nicht in diesen.
 ## Nicht angefasst
 
 **Die ANAN-10-Tonverzerrung unter Windows** (CHANGELOG 0.6.3-rc1, seit
-zwei Anläufen unverstanden). Sie ist der Grund, warum seit dem
-2026-10-07 keine Windows-Pakete mehr ausgeliefert werden
-(`release.yml`-Kopf). Sie braucht das echte Gerät und steht ausdrücklich
-nicht in diesem Stand — dass die Prüfstände auf Windows laufen, sagt
-über sie nichts.
+zwei Anläufen unverstanden). Sie war der Grund, warum vom 2026-10-07 bis
+heute keine Windows-Pakete ausgeliefert wurden; sie ist weiter offen. Sie
+braucht das echte Gerät und steht ausdrücklich nicht in diesem Stand —
+dass die Prüfstände auf Windows laufen, sagt über sie nichts. Keiner der
+189 appless-Prüfstände fasst den Audioweg am Gerät an.
 
-**Die Auslieferung.** `release.yml` bleibt unverändert: hier wird nur die
-Prüfung eingeschaltet, nicht die Paketherstellung wieder aufgenommen.
+**Die Auslieferung.** `release.yml` bleibt unverändert. Sie hat sich
+heute ohnehin von selbst bewegt: der Betreiber hat die Windows-Pakete
+wieder eingeschaltet (#320), weil er jetzt einen Windows-Rechner zur
+Hand hat und selbst messen kann. Das Paket ist dort ausdrücklich „zum
+Ausprobieren da, nicht als geprüft erklärt". Dieser Stand ändert daran
+nichts — er schaltet die Prüfung ein, nicht die Paketherstellung.

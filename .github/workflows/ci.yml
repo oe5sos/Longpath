@@ -405,6 +405,15 @@ jobs:
         # Fenster. Sie sind der Teil, bei dem Windows und die anderen
         # beiden dasselbe tun sollten.
         #
+        # GRENZE dieser Messung: sie ist MinGW, nicht MSVC. Dieser Job
+        # baut mit win64_mingw + tools_mingw1310, release.yml mit MSVC
+        # (ilammy/msvc-dev-cmd) -- zwei Compiler, ein Plattformname. Am
+        # 2026-10-22 hat das zugeschlagen: #322, ein C99-Array
+        # variabler Laenge in third_party/ft8_lib/ft8/decode.c, von
+        # GCC uebersetzt, von MSVC nicht (C2057/C2466/C2133), und
+        # dieser Job war bei jedem PR gruen. Was hier eingeschaltet
+        # wird, sagt ueber MSVC NICHTS.
+        #
         # OFFEN und Martins Entscheidung: sollen auch Pruefstaende mit
         # OBERFLAECHE auf Windows laufen? Dann braucht es einen
         # Schirmweg (Linux nutzt xvfb, macOS das offscreen-Plugin;
