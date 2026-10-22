@@ -184,6 +184,56 @@ QVector<float> binsToDbm(const QVector<quint16>& bins,
 }
 
 // From AetherSDR PanadapterStream.cpp:1093-1095 [@d58e2b8a].
+QVector<FlexMeterSample> meterSamples(const QByteArray& datagram)
+{
+    QVector<FlexMeterSample> out;
+    const Header h = parseHeader(datagram);
+    if (!h.valid) {
+        return out;
+    }
+    const int rumpf = datagram.size() - kHeaderBytes;
+    // In allen 653 gemessenen Paketen war der Rumpf durch 4 teilbar.
+    // Ein Rest heisst: wir haben den Aufbau falsch verstanden oder das
+    // Paket ist beschaedigt — dann lieber nichts melden als die
+    // Haelfte eines Paares.
+    if (rumpf <= 0 || (rumpf % 4) != 0) {
+        return out;
+    }
+    const uchar* p = reinterpret_cast<const uchar*>(datagram.constData())
+                     + kHeaderBytes;
+    const int paare = rumpf / 4;
+    out.reserve(paare);
+    for (int i = 0; i < paare; ++i) {
+        FlexMeterSample s;
+        s.index = qFromBigEndian<quint16>(p + i * 4);
+        s.raw   = static_cast<qint16>(qFromBigEndian<quint16>(p + i * 4 + 2));
+        out.append(s);
+    }
+    return out;
+}
+
+std::optional<double> meterScaled(qint16 raw, const QString& unit)
+{
+    // Belegt (§5b): dB-artige Werte und SWR durch 128.
+    // `SWR` kam als roh 128 = genau 1,000; die dB-Werte landeten auf
+    // glatten Grenzen (-150,000; -120,000; 0,000).
+    if (unit.compare(QLatin1String("dBm"), Qt::CaseInsensitive) == 0
+        || unit.compare(QLatin1String("dBFS"), Qt::CaseInsensitive) == 0
+        || unit.compare(QLatin1String("SWR"), Qt::CaseInsensitive) == 0) {
+        return static_cast<double>(raw) / 128.0;
+    }
+    // Belegt (§5b) ueber den erklaerten Bereich: /128 liegt fuer beide
+    // Schienen ausserhalb von 10,5…15,0, /256 innerhalb.
+    if (unit.compare(QLatin1String("Volts"), Qt::CaseInsensitive) == 0) {
+        return static_cast<double>(raw) / 256.0;
+    }
+    // degC, RPM, Amps und alles Unbekannte: NICHT belegt. Dort liegen
+    // beide Teiler im erklaerten Bereich, der Bereich entscheidet also
+    // nichts. Eine Zahl auszugeben, die nur plausibel aussieht, waere
+    // eine Messung behaupten, die niemand gemacht hat.
+    return std::nullopt;
+}
+
 float tileColourValue(quint16 raw)
 {
     return static_cast<float>(static_cast<qint16>(raw)) / 128.0f;
