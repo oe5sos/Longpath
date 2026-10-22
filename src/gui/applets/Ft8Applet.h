@@ -121,6 +121,30 @@ public:
                               const QString& meinRuf,
                               const QString& meinLocator);
 
+    /// Die Nachricht aus einer Anzeigezeile — ohne die Landspalte.
+    ///
+    /// Seit der Landspalte (#311) steht hinter der Nachricht der
+    /// Landesname. `simplified()` plus `section(' ', 4)` nimmt ihn
+    /// mit, und `section(' ', -1)` liefert dann „Hungary" statt
+    /// „JN86". Das traf den Doppelklick an zwei Stellen.
+    ///
+    /// Die Spalten stehen fest (siehe zeilentext()): vier Zahlenfelder,
+    /// dann die Nachricht, dann — durch ZWEI Leerzeichen getrennt —
+    /// das Land. Innerhalb einer FT8-Nachricht stehen nie zwei
+    /// Leerzeichen hintereinander, also trennt das erste Doppelte
+    /// sauber. Ohne Landspalte bleibt die Zeile unveraendert.
+    static QString nachrichtAusZeile(const QString& zeile);
+
+    /// Der Locator der Gegenstation, oder leer. Geprueft wird die Form
+    /// eines Maidenhead-Feldes (zwei Buchstaben, zwei Ziffern) —
+    /// „JN86" ist einer, „R-09" und „+02" sind keine.
+    static QString locatorAusNachricht(const QString& nachricht);
+
+    /// Was ich gerade sende, in die rechte Spalte („Rx Frequency").
+    /// Wie in WSJT-X: links steht das Band, rechts das eigene
+    /// Gespraech — die Antworten an mich standen dort schon.
+    void zeigeEigeneSendung(const QString& nachricht);
+
     /// Welcher Sorte ist eine Zeile? Die REIHENFOLGE ist die Aussage:
     ///
     ///   1. AnMich      -- jemand ruft DICH. Schlaegt alles.
@@ -213,7 +237,6 @@ public:
     // Fuer den Pruefstand.
     QPushButton* cqButtonForTest()  const { return m_cqBtn; }
     QPushButton* stopButtonForTest() const { return m_stopBtn; }
-    QPushButton* autoButtonForTest() const { return m_autoBtn; }
     /// Der „CQ"-Knopf, der den eigenen Ruf einsetzt. Nicht zu
     /// verwechseln mit cqButtonForTest() — das ist seit #244 der
     /// „Send"-Knopf (m_cqBtn), der Name ist dort eine Altlast.
@@ -235,6 +258,11 @@ public:
     Ft8Stream*      streamForTest() const { return m_stream; }
     QPlainTextEdit* listForTest()   const { return m_list; }
     QPlainTextEdit* listRxForTest() const { return m_listRx; }
+    /// Der Zeitgeber, der auf den Beginn des eigenen Fensters wartet.
+    /// Ein Prueflauf stellt ihn auf 0 und laesst ihn ablaufen — nur so
+    /// wird der Sendeweg wirklich gefahren und nicht nur die Methode
+    /// am Ende davon gerufen.
+    QTimer* sendeTimerForTest() const { return m_sendeTimer; }
     QLabel*         statusForTest() const { return m_status; }
     QLabel*         lastLabelForTest() const { return m_lastLabel; }
     QPushButton*    nurCqButtonForTest() const { return m_nurCqBtn; }
@@ -363,18 +391,22 @@ private:
     // senden WAERE. Gesendet wird hier — mit Bandplanpruefung und
     // Tasten, wie bei jedem anderen Druck auf „Send" auch.
     //
-    // m_autoBtn ist der Schalter dafuer und steht aus. Ohne ihn legt
-    // ein Doppelklick die Antwort nur ins Feld (siehe antwortAuf);
-    // mit ihm faengt der Ablauf an und sendet, bis er fertig ist,
-    // aufgibt oder angehalten wird.
+    // Ein Doppelklick auf einen Fund nimmt das QSO an, und ab da
+    // laeuft es bis 73 von selbst. Betreiber am 2026-10-22: „wichtig
+    // ist auch, dass nach der annahme des qso das qso automatisch
+    // anlaeuft bis 73."
+    //
+    // Bis dahin sass davor der Schalter „Auto", und er stand aus:
+    // ein Doppelklick legte die Antwort nur ins Feld. Das war
+    // derselbe Fehlgriff wie beim CQ-Knopf (#315) -- ein Knopf, der
+    // nicht tut, was er verspricht. Der Schalter ist weg; angehalten
+    // wird mit „Stop", und der haelt jetzt auch den Ablauf an.
     Ft8Ablauf    m_ablauf;
     /// Ein QSO wird genau EINMAL gemeldet. zeigeAblauf() laeuft bei
     /// jedem Schritt, und der Zustand bleibt auf Fertig stehen — ohne
     /// diese Wache stuende dasselbe QSO mehrfach im Logbuch.
     bool         m_qsoGemeldet{false};
-    QPushButton* m_autoBtn{nullptr};
-    /// „CQ": legt den eigenen Ruf ins Feld. Mit Auto faengt damit der
-    /// Ablauf als ANRUFER an — bis zum 2026-10-16 war diese Haelfte
+    /// „CQ": ruft CQ und faengt damit den Ablauf als ANRUFER an — bis zum 2026-10-16 war diese Haelfte
     /// von Ft8Ablauf gebaut und geprueft, aber von nirgends
     /// erreichbar: starteAlsAnrufer() hatte keinen einzigen Aufrufer.
     QPushButton* m_cqRufenBtn{nullptr};

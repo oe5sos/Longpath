@@ -26,6 +26,7 @@
 
 #include <QtTest>
 #include <QSpinBox>
+#include <QTimer>
 
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Tx.h"
@@ -523,20 +524,26 @@ private slots:
                  QStringLiteral("DL1ABC OE5SOS"));
     }
 
-    // ── Der Schalter „Auto" entscheidet, ob von selbst gesendet wird ─
+    // ── Ein Doppelklick nimmt das QSO an ────────────────────────────
     //
-    // Ohne ihn legt ein Doppelklick die Antwort nur ins Feld. Mit ihm
-    // faengt der Ablauf an. Das ist die Grenze zwischen „das Programm
-    // schlaegt vor" und „das Programm sendet", und sie wird hier
-    // beidseitig festgehalten.
+    // UMGEKEHRT am 2026-10-22. Hier stand bis dahin
+    // `ohneAutoFuelltDerDoppelklickNurDasFeld`, und der hielt fest:
+    // ohne den Schalter „Auto" legt ein Doppelklick die Antwort nur
+    // ins Feld, gesendet wird nichts.
+    //
+    // Betreiber: „wichtig ist auch, dass nach der annahme des qso das
+    // qso automatisch anlaeuft bis 73." Damit ist die Grenze, die der
+    // alte Prueflauf huetete, keine mehr — ein Doppelklick IST die
+    // Annahme. Der Schalter ist weg, angehalten wird mit „Stop".
     //
     // Der Doppelklick geht per sendEvent an den viewport: QTest-Klicks
     // verpuffen ohne Schirm, und dieser Lauf hat keinen.
-    void ohneAutoFuelltDerDoppelklickNurDasFeld()
+    void derDoppelklickNimmtDasQsoAn()
     {
         RadioModel radio;
         radio.installFt8TxForTest();
         Ft8Applet applet(&radio);
+        applet.setProtocol(Ft8Decoder::Protocol::Ft4);
         AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
                                          QStringLiteral("OE5SOS"));
         AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
@@ -547,21 +554,101 @@ private slots:
         liste->setPlainText(
             QStringLiteral("120000   -8   0.2  1500  CQ DL1ABC JO31"));
 
-        QVERIFY2(applet.autoButtonForTest()
-                     && !applet.autoButtonForTest()->isChecked(),
-                 "Auto muss AUS voreingestellt sein");
-
         doppelklickInDieListe(applet);
 
         QCOMPARE(applet.textFeldForTest()->text(),
                  QStringLiteral("DL1ABC OE5SOS JN67"));
-        QVERIFY2(!applet.ablaufForTest().laeuft(),
-                 "ohne Auto darf kein Ablauf anlaufen");
-        QVERIFY2(!applet.sendetGerade(),
-                 "ohne Auto darf nichts gesendet werden");
+        QVERIFY2(applet.ablaufForTest().laeuft(),
+                 "ein Doppelklick muss den Ablauf starten");
+        QCOMPARE(applet.ablaufForTest().partner(), QStringLiteral("DL1ABC"));
+        QCOMPARE(applet.ablaufForTest().zustand(),
+                 Ft8Ablauf::Zustand::RufeAn);
+        QVERIFY2(applet.sendetGerade(),
+                 "der erste Zug muss auf sein Fenster warten");
+        applet.abbrechen();
     }
 
-    void mitAutoFaengtDerAblaufAn()
+    // ── Das eigene Gespraech steht rechts ───────────────────────────
+    //
+    // Betreiber am 2026-10-22: „sehe ich auch rechts, wenn ein qso zu
+    // stande kommt." Die Antworten AN ihn standen dort schon (jede
+    // Zeile mit dem eigenen Rufzeichen geht nach rechts). Gefehlt hat
+    // die eigene Haelfte -- und seit das QSO von selbst laeuft,
+    // stuende rechts sonst nur, was der andere sagt.
+    void dieEigeneSendungStehtRechts()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        QVERIFY(applet.listRxForTest());
+        QVERIFY(applet.listRxForTest()->toPlainText().isEmpty());
+
+        applet.zeigeEigeneSendung(QStringLiteral("DL1ABC OE5SOS JN67"));
+
+        const QString rechts = applet.listRxForTest()->toPlainText();
+        QVERIFY2(rechts.contains(QStringLiteral("DL1ABC OE5SOS JN67")),
+                 "die eigene Sendung muss rechts stehen");
+        QVERIFY2(rechts.contains(QStringLiteral("Tx")),
+                 "sie muss als eigene Sendung erkennbar sein");
+
+        // Und links NICHT: dort steht, was auf dem Band los ist, und
+        // das eigene Signal gehoert nicht dazu.
+        QVERIFY2(!applet.listForTest()->toPlainText()
+                      .contains(QStringLiteral("DL1ABC OE5SOS JN67")),
+                 "die eigene Sendung gehoert nicht in die Bandspalte");
+
+        // Leeres bleibt leer -- sonst stuende nach jedem Fehlversuch
+        // eine Zeile mit nichts drin.
+        applet.zeigeEigeneSendung(QStringLiteral("   "));
+        QCOMPARE(applet.listRxForTest()->toPlainText(), rechts);
+    }
+
+    // ── Und der Sendeweg ruft sie wirklich ──────────────────────────
+    //
+    // Der Lauf darueber ruft zeigeEigeneSendung() SELBST — er belegt
+    // damit, was die Methode tut, aber nicht, dass jemand sie ruft.
+    // Entfernt man den Aufruf aus dem Sendeweg, bleibt er gruen. Also
+    // hier derselbe Weg wie im Betrieb: senden, den Zeitgeber auf 0
+    // stellen und ablaufen lassen.
+    void derSendewegSchreibtDieZeileWirklich()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        applet.sendeNachricht(QStringLiteral("CQ OE5SOS JN67"));
+        QVERIFY2(applet.sendetGerade(), "die Sendung muss eingeplant sein");
+
+        QTimer* t = applet.sendeTimerForTest();
+        QVERIFY(t);
+        QVERIFY2(t->isActive(), "der Zeitgeber muss auf das Fenster warten");
+        t->stop();
+        t->start(0);
+
+        QTRY_VERIFY_WITH_TIMEOUT(
+            applet.listRxForTest()->toPlainText()
+                .contains(QStringLiteral("CQ OE5SOS JN67")), 3000);
+
+        applet.abbrechen();
+    }
+
+    // ── „Stop" heisst Stop ──────────────────────────────────────────
+    //
+    // Seit der Doppelklick den Ablauf immer startet, ist dieser Knopf
+    // der einzige Weg hinaus. Er rief bis zum 2026-10-22 nur
+    // abbrechen() — das nimmt das laufende Fenster zurueck, laesst
+    // den Ablauf aber stehen, und der naechste passende Fund haette
+    // ihn von selbst weiterlaufen lassen.
+    void derStopKnopfHaeltDenAblaufAn()
     {
         RadioModel radio;
         radio.installFt8TxForTest();
@@ -574,23 +661,64 @@ private slots:
 
         applet.listForTest()->setPlainText(
             QStringLiteral("120000   -8   0.2  1500  CQ DL1ABC JO31"));
-        applet.autoButtonForTest()->setChecked(true);
-
         doppelklickInDieListe(applet);
+        QVERIFY(applet.ablaufForTest().laeuft());
 
-        QVERIFY2(applet.ablaufForTest().laeuft(),
-                 "mit Auto muss der Ablauf anlaufen");
-        QCOMPARE(applet.ablaufForTest().partner(), QStringLiteral("DL1ABC"));
-        QCOMPARE(applet.ablaufForTest().zustand(),
-                 Ft8Ablauf::Zustand::RufeAn);
-        QVERIFY2(applet.sendetGerade(),
-                 "der erste Zug muss auf sein Fenster warten");
+        QVERIFY(applet.stopButtonForTest());
+        applet.stopButtonForTest()->click();
 
-        // Und der Schalter haelt ihn auch wieder an — sonst gaebe es
-        // keinen Weg zurueck ausser dem Stop-Knopf.
-        applet.autoButtonForTest()->setChecked(false);
-        QVERIFY(!applet.ablaufForTest().laeuft());
-        applet.abbrechen();
+        QVERIFY2(!applet.ablaufForTest().laeuft(),
+                 "nach Stop darf kein Ablauf mehr laufen");
+        QVERIFY2(!applet.sendetGerade(), "nach Stop darf nichts senden");
+
+        // Gegenprobe gegen das stille Weiterlaufen: ein Fund, der den
+        // Ablauf vorher weitergebracht haette, darf nichts mehr tun.
+        Ft8Decode d;
+        d.text   = QStringLiteral("OE5SOS DL1ABC -12");
+        d.snrDb  = -7.0;
+        d.freqHz = 1500.0;
+        applet.fundForTest(d);
+        QVERIFY2(!applet.sendetGerade(),
+                 "ein Fund nach Stop darf den Sender nicht wieder tasten");
+    }
+
+    // ── Die Landspalte verdirbt den Locator nicht ───────────────────
+    //
+    // Seit #311 steht hinter der Nachricht das Land. Der Doppelklick
+    // las den Locator als LETZTES WORT der Zeile — und das war ab da
+    // „Hungary", nicht „JN86". Derselbe Griff holte auch die
+    // Nachricht selbst, also stand das Land mit drin.
+    void dieLandspalteVerdirbtDenLocatorNicht()
+    {
+        // Genau die Zeile, die zeilentext() baut: Nachricht auf 19
+        // aufgefuellt, dann zwei Leerzeichen, dann das Land.
+        const QString mitLand = Ft8Applet::zeilentext(
+            QStringLiteral("084200"), 13, 1.2, 1297,
+            QStringLiteral("CQ HA1BF JN86"), QStringLiteral("Hungary"));
+
+        QCOMPARE(Ft8Applet::nachrichtAusZeile(mitLand),
+                 QStringLiteral("CQ HA1BF JN86"));
+        QCOMPARE(Ft8Applet::locatorAusNachricht(
+                     Ft8Applet::nachrichtAusZeile(mitLand)),
+                 QStringLiteral("JN86"));
+
+        // Ohne Landspalte unveraendert.
+        const QString ohneLand = Ft8Applet::zeilentext(
+            QStringLiteral("084200"), 13, 1.2, 1297,
+            QStringLiteral("CQ HA1BF JN86"), QString());
+        QCOMPARE(Ft8Applet::nachrichtAusZeile(ohneLand),
+                 QStringLiteral("CQ HA1BF JN86"));
+
+        // Und ein Rapport ist kein Locator.
+        QVERIFY(Ft8Applet::locatorAusNachricht(
+                    QStringLiteral("OE5SOS DL1ABC R-09")).isEmpty());
+        QVERIFY(Ft8Applet::locatorAusNachricht(
+                    QStringLiteral("OE5SOS DL1ABC -12")).isEmpty());
+
+        // Auch die Antwort darf das Land nicht mitnehmen.
+        QCOMPARE(Ft8Applet::antwortAuf(mitLand, QStringLiteral("OE5SOS"),
+                                       QStringLiteral("JN67VV")),
+                 QStringLiteral("HA1BF OE5SOS JN67"));
     }
 
     // ── Der Logbucheintrag eines fertigen QSOs ──────────────────────
@@ -690,7 +818,6 @@ private slots:
 
         applet.listForTest()->setPlainText(
             QStringLiteral("120000   -8   0.2  1500  CQ DL1ABC JO31"));
-        applet.autoButtonForTest()->setChecked(true);
         doppelklickInDieListe(applet);
         QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::RufeAn);
         QCOMPARE(applet.ablaufForTest().partnerLocator(),
@@ -808,9 +935,6 @@ private slots:
                                          QStringLiteral("JN67VV"));
 
         QVERIFY(applet.cqRufenButtonForTest());
-        QVERIFY2(!applet.autoButtonForTest()->isChecked(),
-                 "Auto ist aus -- und der Ruf muss trotzdem laufen");
-
         applet.cqRufenButtonForTest()->click();
 
         QCOMPARE(applet.textFeldForTest()->text(),
@@ -838,8 +962,9 @@ private slots:
         QCOMPARE(wieder.cqVersucheSpinForTest()->value(), 4);
     }
 
-    // Mit „Auto" faengt der Ablauf als ANRUFER an.
-    void mitAutoRuftDerKnopfWirklichCq()
+    // Der CQ-Knopf faengt den Ablauf als ANRUFER an und wartet auf
+    // sein Fenster.
+    void derCqKnopfWartetAufSeinFenster()
     {
         RadioModel radio;
         radio.installFt8TxForTest();
@@ -850,7 +975,6 @@ private slots:
         AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
                                          QStringLiteral("JN67VV"));
 
-        applet.autoButtonForTest()->setChecked(true);
         applet.cqRufenButtonForTest()->click();
 
         QVERIFY2(applet.ablaufForTest().laeuft(), "der Ablauf muss anlaufen");
@@ -860,7 +984,6 @@ private slots:
         QVERIFY2(applet.sendetGerade(),
                  "der Ruf muss auf sein Fenster warten");
 
-        applet.autoButtonForTest()->setChecked(false);
         applet.abbrechen();
     }
 
@@ -878,7 +1001,6 @@ private slots:
                                          QStringLiteral("JN67VV"));
 
         QSignalSpy gemeldet(&applet, &Ft8Applet::qsoFertig);
-        applet.autoButtonForTest()->setChecked(true);
         applet.cqRufenButtonForTest()->click();
         QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::RufeCq);
 
@@ -910,7 +1032,6 @@ private slots:
         QCOMPARE(e.rstSent, QStringLiteral("-07"));   // was ich von ihm mass
         QCOMPARE(e.rstRcvd, QStringLiteral("-15"));   // was er mir gab
 
-        applet.autoButtonForTest()->setChecked(false);
         applet.abbrechen();
     }
 
