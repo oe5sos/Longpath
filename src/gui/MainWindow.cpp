@@ -3820,6 +3820,13 @@ void MainWindow::wireSpectrumSliceControls(SpectrumWidget* sw,
     connect(sw, &SpectrumWidget::frequencyClicked, this,
             [this, panId](double hz) {
         SliceModel* s = sliceForPan(panId);
+        // Billig und leise: es ist ein Bedienereignis. Half am
+        // 2026-10-22, den toten Abstimmweg zu finden — ohne diese
+        // Zeile sah „Klick kommt nicht an" genauso aus wie „Klick
+        // kommt an, wird aber nicht weitergereicht".
+        qCDebug(lcConnection) << "Klick im Panadapter" << panId << hz
+                          << "Scheibe" << (s ? s->sliceIndex() : -1)
+                          << "gesperrt" << (s && s->locked());
         if (!s) { return; }
 
         // ── Eine Sperre muss sich melden ────────────────────────────
@@ -18278,6 +18285,25 @@ void MainWindow::onConnectionStateChanged()
     // Task B4: +PAN dims (and its tooltip explains why) on every
     // connection-state transition, connected or not.
     updateAddPanButtonState();
+
+    // ── Der Selbstschluss der Maske, VOR dem HPSDR-Zweig ────────────
+    //
+    // `isConnected()` kennt nur `m_connection`, also OpenHPSDR. Bei
+    // der Flex ist der Zeiger null, der ganze Zweig darunter faellt
+    // aus — und mit ihm der Selbstschluss. Der Betreiber musste am
+    // 2026-10-22 jedes Mal von Hand „Close" druecken: „warum muss ich
+    // immer close klicken um auf das funkgeraet zu kommen". Bis dahin
+    // lagen alle schwebenden Fenster hinter der Maske, der Panadapter
+    // mit ihnen.
+    if (m_radioModel->istIrgendwieVerbunden()
+        && m_connectionPanel && m_connectionPanel->isVisible()) {
+        QTimer::singleShot(1000, this, [this]() {
+            if (m_connectionPanel && m_connectionPanel->isVisible()
+                && m_radioModel->istIrgendwieVerbunden()) {
+                m_connectionPanel->accept();
+            }
+        });
+    }
 
     if (m_radioModel->isConnected()) {
         // Phase 3Q Task 5 — Selbstschluss: eine Sekunde nach dem

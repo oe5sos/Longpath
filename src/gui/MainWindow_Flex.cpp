@@ -70,6 +70,8 @@
 // eigenen Tabelle, nicht ueber streamIndex().
 #include "core/KiwiSdrManager.h"
 #include "gui/meters/MeterPoller.h"
+#include "gui/ConnectionPanel.h"
+#include <QTimer>
 #include "gui/SpectrumWidget.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -173,15 +175,58 @@ void MainWindow::wireFlex()
 
         m_flexTargetSliceId = ziel->sliceIndex();
 
+        // ── Und sie muss die AKTIVE Scheibe sein (2026-10-22) ────────
+        //
+        // `RadioModel::onBandButtonClicked` — der Weg jedes Band- und
+        // Frequenzwechsels — beginnt mit `activeSlice()` und kehrt ohne
+        // ein Wort um, wenn es keine gibt. Beim Flex legen wir die
+        // Scheibe selbst an; aktiv wird sie dabei nicht. Folge am
+        // Geraet am 2026-10-22: der Betreiber drehte einen Abend lang
+        // an Band und Frequenz, und an die Maschine ging NULL Mal ein
+        // `slice tune`. Sie stand die ganze Zeit auf 14.100.
+        m_radioModel->setActiveSliceById(m_flexTargetSliceId);
+
         // Von innen nach aussen. Erst HIER verdrahtet, weil es die
-        // Zielscheibe vorher nicht gibt; `UniqueConnection`, damit ein
-        // zweites Anmelden nicht doppelt sendet.
-        connect(ziel, &SliceModel::frequencyChanged, this,
+        // Zielscheibe vorher nicht gibt.
+        //
+        // ── `Qt::UniqueConnection` geht nicht mit einer Lambda ───────
+        //
+        // Hier stand `Qt::UniqueConnection`, damit ein zweites Anmelden
+        // nicht doppelt sendet. Qt unterstuetzt das aber NUR fuer
+        // Zeiger auf Elementfunktionen; bei einer Lambda scheitert
+        // `connect()` still und gibt eine leere Verbindung zurueck —
+        // es wird GAR NICHTS verbunden.
+        //
+        // Folge am Geraet, 2026-10-22, ein ganzer Abend: der Betreiber
+        // drehte an Band und Frequenz, die Anzeige folgte, und an die
+        // Maschine ging in sechs Laeufen NULL Mal ein `slice tune`. Die
+        // Flex stand die ganze Zeit auf 14.100 USB — dort ist nur
+        // Rauschen, und genau das hat er gehoert. Gemessen:
+        //   Klick im Panadapter "pan-0" 1.41747e+07 Scheibe 0
+        //   gesperrt false
+        // und danach kein Mucks mehr.
+        //
+        // Das Doppelte wird jetzt von Hand verhindert: die alte
+        // Verbindung wird vor der neuen geloest.
+        disconnect(m_flexAbstimmBand);
+        m_flexAbstimmBand = connect(ziel, &SliceModel::frequencyChanged, this,
                 [this](double hz) {
             if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
-            if (!flexControllableSlice()) { return; }
+            // Sagt, WARUM nicht abgestimmt wird. Ohne das sieht ein
+            // nicht durchgereichter Drehknopf genauso aus wie einer,
+            // der gar nicht erst ankommt (2026-10-22, eine Stunde).
+            if (!flexControllableSlice()) {
+                SliceModel* s = m_radioModel
+                    ? m_radioModel->sliceById(m_flexTargetSliceId) : nullptr;
+                qCWarning(lcFlexGui)
+                    << "Abstimmen verworfen — Zielscheibe"
+                    << m_flexTargetSliceId
+                    << "vorhanden" << (s != nullptr)
+                    << "streamIndex" << (s ? s->streamIndex() : -999);
+                return;
+            }
             m_radioModel->tuneFlexSlice(hz);
-        }, Qt::UniqueConnection);
+        });
         if (AudioEngine* ae = m_radioModel->audioEngine()) {
             // ── Den Ausgang anwerfen (2026-10-22) ────────────────────
             //
@@ -215,6 +260,23 @@ void MainWindow::wireFlex()
             ae->setFlexAudioSourceEnabled(m_flexTargetSliceId, true);
         }
         qCInfo(lcFlexGui) << "Flex-Ton auf Scheibe" << m_flexTargetSliceId;
+
+        // ── Die Maske geht von selbst zu (2026-10-22) ───────────────
+        //
+        // Der Selbstschluss haengt an `onConnectionStateChanged`, und
+        // das kommt von der OpenHPSDR-Verbindung. Die Flex hat keine,
+        // also blieb die Maske stehen, und hinter ihr lagen ALLE
+        // schwebenden Fenster samt Panadapter. Der Betreiber:
+        // „warum muss ich immer close klicken um auf das funkgeraet zu
+        // kommen". Hier ist die Stelle, an der die Flex wirklich steht.
+        QTimer::singleShot(1000, this, [this]() {
+            if (m_shuttingDown) { return; }
+            if (m_connectionPanel && m_connectionPanel->isVisible()
+                && m_radioModel && m_radioModel->istIrgendwieVerbunden()) {
+                qCInfo(lcFlexGui) << "Verbindungsmaske schliesst sich selbst";
+                m_connectionPanel->accept();
+            }
+        });
 
         // ── Den Messwert-Umlauf anwerfen (2026-10-22) ────────────────
         //

@@ -168,6 +168,66 @@ private slots:
         // tst_audio_engine_multi_slice_mix.
     }
 
+    // ── 1b. Qt::UniqueConnection auf eine Lambda ─────────────────────
+    //
+    // Der teuerste Fehler des Abends. Die Verbindung Scheibe -> Flex
+    // stand als
+    //   connect(ziel, &SliceModel::frequencyChanged, this,
+    //           [this](double hz){ ... }, Qt::UniqueConnection);
+    // Qt unterstuetzt `UniqueConnection` NUR fuer Zeiger auf
+    // Elementfunktionen. Bei einer Lambda scheitert `connect()` still
+    // und gibt eine leere Verbindung zurueck — verbunden wird GAR
+    // NICHTS. Am Geraet: der Betreiber drehte einen Abend lang an Band
+    // und Frequenz, die Anzeige folgte brav, und an die Maschine ging
+    // in sechs Laeufen NULL Mal ein `slice tune`. Die Flex stand die
+    // ganze Zeit auf 14.100 USB, wo nur Rauschen ist.
+    //
+    // Dieser Fall haelt die Eigenschaft von Qt fest, nicht unsere
+    // Verdrahtung: er ist die Begruendung dafuer, dass im Flex-Weg
+    // `disconnect(handle)` steht statt `UniqueConnection`.
+
+    void uniqueConnectionVerbindetLambdaNicht()
+    {
+        QObject sender;
+        QObject ziel;
+        int rufe = 0;
+
+        const auto verbindung = QObject::connect(
+            &sender, &QObject::objectNameChanged, &ziel,
+            [&rufe](const QString&) { ++rufe; }, Qt::UniqueConnection);
+
+        QVERIFY2(!verbindung,
+                 "Qt verbindet eine Lambda mit UniqueConnection nicht — "
+                 "faellt das je weg, darf der Flex-Weg wieder darauf "
+                 "bauen.");
+
+        sender.setObjectName(QStringLiteral("x"));
+        QCOMPARE(rufe, 0);
+    }
+
+    // Und die Form, die der Flex-Weg jetzt benutzt: von Hand geloest,
+    // dann neu verbunden. Zweimal einrichten darf nicht doppelt senden.
+    void handgehalteneVerbindungSendetNurEinmal()
+    {
+        QObject sender;
+        QObject ziel;
+        int rufe = 0;
+        QMetaObject::Connection band;
+
+        const auto richteEin = [&]() {
+            QObject::disconnect(band);
+            band = QObject::connect(&sender, &QObject::objectNameChanged,
+                                    &ziel, [&rufe](const QString&) { ++rufe; });
+            QVERIFY(band);
+        };
+
+        richteEin();
+        richteEin();
+
+        sender.setObjectName(QStringLiteral("y"));
+        QCOMPARE(rufe, 1);
+    }
+
     // ── 2. Das S-Meter ───────────────────────────────────────────────
 
     void fremdeQuelleTraegtDenPegelOhneWdsp()

@@ -2965,6 +2965,12 @@ bool RadioModel::isConnected() const
     return m_connection && m_connection->isConnected();
 }
 
+bool RadioModel::istIrgendwieVerbunden() const
+{
+    if (isConnected()) { return true; }
+    return m_flexConnection && m_flexConnection->isConnected();
+}
+
 void RadioModel::setStepAttController(StepAttenuatorController* c)
 {
     // Phase 4 Agent 4A of issue #167 — propagate to TransmitModel so the
@@ -6657,8 +6663,15 @@ void RadioModel::onBandButtonClicked(Band band)
 {
     SliceModel* slice = activeSlice();
     if (!slice) {
-        // No active slice (pre-connection, between-slice teardown, etc.).
-        // Silent — avoids log spam from UI events firing during startup.
+        // Nicht mehr stumm (2026-10-22). Das Schweigen hier hat einen
+        // Abend gekostet: beim Flex gab es keine aktive Scheibe, jeder
+        // Banddruck lief ins Leere, und am Bildschirm sah es aus, als
+        // habe das Band gewechselt — die Maschine blieb stehen.
+        // `qCDebug` genuegt: es ist ein Bedienereignis, kein Fehler,
+        // und beim Hochfahren kommen davon einige.
+        qCDebug(lcConnection)
+            << "Band" << bandLabel(band)
+            << "verworfen: keine aktive Scheibe";
         return;
     }
 
@@ -7283,6 +7296,12 @@ void RadioModel::uebernimmFlexBildhoehe(int gemeldet)
 // „slice tune <id> <freq> autopan=0", sechs Nachkommastellen in MHz.
 void RadioModel::tuneFlexSlice(double hz)
 {
+    qCDebug(lcConnection) << "tuneFlexSlice" << hz
+                         << "verbindung" << (m_flexConnection != nullptr)
+                         << "steht" << (m_flexConnection
+                                        && m_flexConnection->isConnected())
+                         << "scheibenkennung" << m_flexSliceId
+                         << "zuletzt" << m_flexZuletztGestellteHz;
     if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
     if (m_flexSliceId.isEmpty()) { return; }
     if (!(hz > 0.0)) { return; }

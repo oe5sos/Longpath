@@ -1589,6 +1589,21 @@ public:
 
     bool isConnected() const;
 
+    /// Steht IRGENDEINE Funkverbindung — eigenes Geraet ODER Flex.
+    ///
+    /// `isConnected()` kennt nur `m_connection`, also OpenHPSDR. Bei
+    /// der FLEX-8400 ist der Zeiger null, und damit war jeder
+    /// `if (isConnected())`-Zweig fuer sie tot. Einer davon ist der
+    /// Selbstschluss der Verbindungsmaske: der Betreiber musste am
+    /// 2026-10-22 jedes Mal von Hand „Close" druecken, um ueberhaupt
+    /// an das Funkgeraet zu kommen — und bis dahin lagen alle
+    /// schwebenden Fenster hinter der Maske.
+    ///
+    /// Bewusst NEBEN `isConnected()` und nicht darin: die neunzehn
+    /// Aufrufer von `isConnected()` greifen teils gleich danach auf
+    /// `connection()` zu, und das gibt es beim Flex nicht.
+    bool istIrgendwieVerbunden() const;
+
     // ── Phase 3Q sub-PR-3: NetworkDiagnosticsDialog text accessors ───────────
     // Each returns an em-dash placeholder ("—") when disconnected.
     // m_connectionStartedAt is set in setConnectionState() on the

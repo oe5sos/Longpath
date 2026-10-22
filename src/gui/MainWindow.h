@@ -1852,6 +1852,10 @@ private:
     /// nicht zurueckfunken. Sonst antwortet jeder Zustandsschub mit
     /// einem `slice tune`, der den naechsten Schub ausloest.
     bool m_flexApplyingRemoteState{false};
+    /// Die Verbindung Scheibe -> Flex (Abstimmen nach aussen).
+    /// Von Hand gehalten, weil `Qt::UniqueConnection` bei einer Lambda
+    /// nicht greift und dort still GAR NICHTS verbindet.
+    QMetaObject::Connection m_flexAbstimmBand;
     /// Einmal je Verbindung: die Fensterbreite auf den Ausschnitt der
     /// Flex stellen. Danach gehoert der Zoom wieder dem Betreiber.
     bool m_flexAusschnittUebernommen{false};
