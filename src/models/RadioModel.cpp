@@ -7188,31 +7188,22 @@ void RadioModel::uebernimmFlexBildhoehe(int gemeldet)
         return;
     }
 
-    // Ruecksetzvorgabe. Erst die Masze noch einmal hinschicken und auf
-    // das Echo warten — AetherSDRs Regel, und richtig, SOLANGE ein
-    // Echo kommt.
+    // Ruecksetzvorgabe — und zwar eine, die LUEGT.
     //
-    // An Martins FLEX-8400 kommt keines: sie meldet dreimal
-    // `y_pixels=20` und nach dem Nachreichen nie etwas anderes
-    // (2026-10-22 gemessen). Dann ist die 20 keine Vorgabe mehr,
-    // sondern die Wahrheit ueber diese Maschine — und mit 700 als
-    // Teiler sieht der Betreiber eine voll ausgeschlagene Flaeche und
-    // einen roten Wasserfall. Also: nach dem letzten Versuch die
-    // gemeldete Zahl nehmen. Ein grobes Bild ist ein Bild; ein
-    // uebersteuertes ist keines.
+    // Am 2026-10-22 an der FLEX-8400 gemessen: sie meldet im Status
+    // dauerhaft `y_pixels=20`, zeichnet aber mit den erbetenen 700.
+    // Beleg aus dem Strom selbst, Rahmen 50: die 1024 Bins laufen von
+    // 531 bis 553 (Mittel 540). In 0…19 passt das nicht, in 0…699
+    // schon — und ergibt dort einen Rauschteppich um -110 dBm, also
+    // genau das, was eine ruhige 20-m-Bandmitte liefert.
+    //
+    // Ein Zwischenstand dieser Datei nahm nach zwei Versuchen die
+    // gemeldete 20 als Teiler. Damit klemmt JEDER Bin auf den
+    // Bodenwert, und der Betreiber sah eine durchgehend blaue Flaeche.
+    // Die gemeldete Zahl gilt also NICHT, solange sie eine Vorgabe
+    // ist — das ist wieder genau AetherSDRs Regel
+    // (RadioModel.cpp:10994-11018 [@d58e2b8a]), und sie hat recht.
     if (m_flexMasseNachgereicht >= kHoechstensNachreichen) {
-        if (m_flexYPixelsGemeldet != gemeldet) {
-            m_flexYPixelsGemeldet = gemeldet;
-            bool kennungOk = false;
-            const quint32 panStream = m_flexPanId.toUInt(&kennungOk, 16);
-            if (m_flexStream && kennungOk) {
-                m_flexStream->setYPixels(panStream, gemeldet);
-            }
-            qCWarning(lcConnection)
-                << "Flex: die Maschine bleibt bei y_pixels" << gemeldet
-                << "— nach" << kHoechstensNachreichen
-                << "Versuchen wird damit gerechnet (grobes Bild)";
-        }
         return;
     }
     ++m_flexMasseNachgereicht;

@@ -191,7 +191,13 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
         // „ein Bin ist eine Bildzeile 0…y_pixels-1". Stimmt das nicht,
         // nuetzt der richtigste Teiler nichts (2026-10-22: mit der von
         // der Maschine gemeldeten 20 blieb das Bild voll ausgeschlagen).
-        if (m_fftRahmen == 1 && !rahmen->bins.isEmpty()) {
+        // Rahmen 1 ist NICHT aussagekraeftig: nach einer
+        // x_pixels-Vergroesserung (50 -> 1024) schickt die Maschine
+        // einen Uebergangsrahmen, in dem jeder neue Bin null ist
+        // (dokumentiert in FlexVitaReader.h). Am 2026-10-22 gemessen:
+        // Rahmen 1 war durchgehend null. Also spaeter nachsehen.
+        if ((m_fftRahmen == 50 || m_fftRahmen == 500)
+            && !rahmen->bins.isEmpty()) {
             quint16 kleinster = rahmen->bins.first();
             quint16 groesster = rahmen->bins.first();
             double summe = 0.0;
@@ -201,7 +207,7 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
                 summe += b;
             }
             qCInfo(lcFlexStream).nospace()
-                << "Strom: Rohwerte des ersten Bildrahmens — "
+                << "Strom: Rohwerte von Rahmen " << m_fftRahmen << " — "
                 << rahmen->bins.size() << " Bins, kleinster " << kleinster
                 << ", groesster " << groesster << ", Mittel "
                 << (summe / rahmen->bins.size());
