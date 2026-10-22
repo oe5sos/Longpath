@@ -11,6 +11,9 @@
 
 #include "common/gfsk.h"
 
+// Fuer malloc/free in synth_gfsk() — siehe die Longpath-Abweichung dort.
+#include <stdlib.h>
+
 // Das Beispielprogramm zieht seine LOG-Makros aus ft8/debug.h; hier
 // genauso, damit die beiden Funktionen Zeile fuer Zeile unveraendert
 // bleiben koennen.
@@ -57,7 +60,30 @@ void synth_gfsk(const uint8_t* symbols, int n_sym, float f0, float symbol_bt, fl
     // Compute the smoothed frequency waveform.
     // Length = (nsym+2)*n_spsym samples, first and last symbols extended
     float dphi_peak = 2 * M_PI * hmod / n_spsym;
-    float dphi[n_wave + 2 * n_spsym];
+
+    // ── Longpath-Abweichung (2026-10-22): keine Arrays variabler Laenge ──
+    //
+    // Upstream legt die beiden Felder auf dem Stapel an:
+    //
+    //     float dphi[n_wave + 2 * n_spsym];
+    //     float pulse[3 * n_spsym];
+    //
+    // Arrays variabler Laenge (C99) -- GCC und Clang koennen das, der
+    // Microsoft-Compiler nicht (C2057 / C2466 / C2133). Begruendung und
+    // Vorgeschichte stehen in FT8LIB-PROVENANCE.md.
+    //
+    // Auf dem Haufen statt mit fester Obergrenze: n_spsym haengt an der
+    // Abtastrate und der Symboldauer, eine nachweisbare Grenze gibt es
+    // also nicht. Es kostet auch nichts -- synth_gfsk() laeuft einmal je
+    // Aussendung, nicht je Block.
+    float* dphi  = (float*)malloc(sizeof(float) * (size_t)(n_wave + 2 * n_spsym));
+    float* pulse = (float*)malloc(sizeof(float) * (size_t)(3 * n_spsym));
+    if (dphi == NULL || pulse == NULL)
+    {
+        free(dphi);
+        free(pulse);
+        return;
+    }
 
     // Shift frequency up by f0
     for (int i = 0; i < n_wave + 2 * n_spsym; ++i)
@@ -65,7 +91,6 @@ void synth_gfsk(const uint8_t* symbols, int n_sym, float f0, float symbol_bt, fl
         dphi[i] = 2 * M_PI * f0 / signal_rate;
     }
 
-    float pulse[3 * n_spsym];
     gfsk_pulse(n_spsym, symbol_bt, pulse);
 
     for (int i = 0; i < n_sym; ++i)
@@ -100,4 +125,7 @@ void synth_gfsk(const uint8_t* symbols, int n_sym, float f0, float symbol_bt, fl
         signal[i] *= env;
         signal[n_wave - 1 - i] *= env;
     }
+
+    free(dphi);
+    free(pulse);
 }
