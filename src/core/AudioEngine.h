@@ -338,6 +338,25 @@ public:
     // the lazy PortAudio path (creates a default-config PortAudioBus).
     void setVaxEnabled(int channel, bool on);
 
+    // ── Fuer die Tondiagnose (2026-10-22) ────────────────────────────
+    //
+    // Keine Pruef-Naht, sondern Bedienung: der Dialog unter Help zeigt
+    // Geraet, Schnittstelle, Rate und die Aussetzerzaehler.
+    //
+    // Steht BEWUSST vor `#ifdef LONGPATH_BUILD_TESTS`. Der erste Anlauf
+    // legte die beiden neben speakersBusForTest(), also INNERHALB des
+    // Pruefbau-Blocks. Lokal war gruen, weil hier mit
+    // -DLONGPATH_BUILD_TESTS=ON gebaut wird; der Release-Bau schaltet
+    // Pruefstaende ab, und damit verschwanden die Zugriffe mitsamt dem
+    // Block. Alle drei Plattformen brachen ab:
+    //
+    //   error: 'class Longpath::AudioEngine' has no member named
+    //          'speakersBus'
+    //
+    // Dieselbe Falle wie 2026-10-16 bei einem `...ForTest` ohne Waechter.
+    const IAudioBus* speakersBus() const { return m_speakersBus.get(); }
+    const IAudioBus* txInputBus()  const { return m_txInputBus.get(); }
+
 #ifdef LONGPATH_BUILD_TESTS
     // Test seam — inject a fake IAudioBus into a VAX slot so unit tests
     // can exercise the rxBlockReady tee without standing up a real
@@ -363,16 +382,6 @@ public:
     /// toter Strom als "geoeffnet" durchging.
     const IAudioBus* speakersBusForTest() const { return m_speakersBus.get(); }
     void ensureSpeakersOpenForTest() { ensureSpeakersOpen(); }
-
-    /// ── Fuer die Tondiagnose (2026-10-22) ────────────────────────────
-    ///
-    /// Keine Pruef-Naht, sondern Bedienung: die Tondiagnose unter Help
-    /// zeigt Geraet, Schnittstelle, Rate und die Aussetzerzaehler. Bis
-    /// heute standen diese Zahlen nur im Protokoll, und auf Windows kam
-    /// man ohne PowerShell nicht heran -- am 2026-10-22 kostete genau das
-    /// einen Abend, weil der Betreiber jede Zahl von Hand holen musste.
-    const IAudioBus* speakersBus() const { return m_speakersBus.get(); }
-    const IAudioBus* txInputBus()  const { return m_txInputBus.get(); }
 
     // Test seam — inject a fake IAudioBus into the TX-input slot so unit
     // tests can exercise pullTxMic without standing up a real PortAudio
