@@ -123,6 +123,26 @@ void FlexVitaStream::berichteKlassen()
                          << "Strom-Kennung(en)";
 }
 
+qint64 FlexVitaStream::sendeTxPaket(const QByteArray& paket)
+{
+    if (paket.isEmpty() || m_radioAddress.isNull()) { return 0; }
+    if (m_socket.state() != QAbstractSocket::BoundState) { return 0; }
+    const qint64 gesendet =
+        m_socket.writeDatagram(paket, m_radioAddress, kTxPort);
+    if (gesendet > 0) {
+        ++m_txPaketeGesendet;
+    } else {
+        // Nur die ersten paar melden: bei 187 Paketen je Sekunde
+        // ertraenkt eine Warnung je Paket das Protokoll.
+        static int gemeldet = 0;
+        if (++gemeldet <= 5) {
+            qCWarning(lcFlexStream) << "Sendepaket nicht hinausgegangen:"
+                                    << m_socket.errorString();
+        }
+    }
+    return gesendet;
+}
+
 void FlexVitaStream::stop()
 {
     if (m_socket.state() != QAbstractSocket::UnconnectedState) {

@@ -1856,6 +1856,12 @@ private:
     /// Von Hand gehalten, weil `Qt::UniqueConnection` bei einer Lambda
     /// nicht greift und dort still GAR NICHTS verbindet.
     QMetaObject::Connection m_flexAbstimmBand;
+    // Senden ueber die Flex (Stufe 2).
+    QMetaObject::Connection m_flexMoxBand;
+    QMetaObject::Connection m_flexTuneBand;
+    QMetaObject::Connection m_flexLeistungBand;
+    QMetaObject::Connection m_flexAbstimmleistungBand;
+    QMetaObject::Connection m_flexSendetBand;
     /// Dasselbe fuer Betriebsart und Filterflanken.
     QMetaObject::Connection m_flexArtBand;
     QMetaObject::Connection m_flexFilterBand;
@@ -1868,6 +1874,17 @@ private:
     /// Betreibers weg (2026-10-23).
     double m_flexFensterMitteHz{0.0};
     double m_flexFensterBreiteHz{0.0};
+
+    // ── Senden ueber die Flex (2026-10-23, Stufe 2) ──────────────────
+    /// Die Mikrofonpumpe. Laeuft NUR, solange getastet ist.
+    QTimer* m_flexSendePumpe{nullptr};
+    /// Mono aus `AudioEngine::pullTxMic`, bevor es verdoppelt wird.
+    QVector<float> m_flexMikMono;
+    /// Dasselbe als Stereo, wie die Maschine es erwartet.
+    QVector<float> m_flexMikStereo;
+    /// Haben wir selbst getastet? Trennt unser `xmit` von der Taste am
+    /// Mikrofon der Maschine, die genauso in der Verriegelung ankommt.
+    bool m_flexSelbstGetastet{false};
     /// Warum das Flex-Bild gerade nicht gezeichnet wird — damit die
     /// Meldung einmal je Grund kommt und nicht 25 Mal je Sekunde.
     enum class FlexBildGrund { Unbekannt, KeinAusschnitt, KeinFenster,
@@ -1935,6 +1952,11 @@ private:
     // DDC-Bindung (streamIndex() >= 0) fuettern oder steuern.
     class SliceModel* flexControllableSlice() const;
     void wireFlex();
+
+    /// Das Senden ueber die Flex verdrahten (Stufe 2). Tastet nichts —
+    /// es haengt nur MOX, TUNE und die Leistungsregler an die Maschine
+    /// und richtet die Mikrofonpumpe ein.
+    void verdrahteFlexSenden();
     // Gibt die aktuelle Zielscheibe vollstaendig frei -- Ton, Panadapter-
     // Zuordnung, Ausgangssteuerung -- und setzt m_sunSdrTargetSliceId auf
     // -1 zurueck. Aufgerufen, wenn die Scheibe geloescht wird oder eine

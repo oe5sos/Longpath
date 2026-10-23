@@ -53,9 +53,31 @@
 // „reclaim-eviction guard", RadioModel.cpp:6580 [@d58e2b8a] — hier
 // nicht portiert, weil Stufe 1 sich nicht wiederverbindet).
 //
-// Was Stufe 1 trotzdem NICHT tut: senden. Kein `xmit`, keine
-// TX-Scheibe, keine Leistung. Die Interlock-Meldung der Maschine
-// (`state=RECEIVE tx_allowed=0`) wird gelesen, nie geschrieben.
+// Was Stufe 1 NICHT tat: senden. Kein `xmit`, keine TX-Scheibe, keine
+// Leistung; die Interlock-Meldung der Maschine (`state=RECEIVE
+// tx_allowed=0`) wurde gelesen, nie benutzt.
+//
+// ── Stufe 2: senden (2026-10-23) ────────────────────────────────────
+//
+// Der Betreiber hat danach gefragt. Jetzt gibt es: `xmit`, die
+// Sendescheibe (`slice set <n> tx=1`), Sende- und Abstimmleistung,
+// den Abstimmtraeger, den Sendetonstrom (`stream create type=dax_tx`)
+// samt Paketbau, und die Verriegelung als TOR davor statt als blosze
+// Meldung.
+//
+// Drei Dinge, die man dabei nicht raten darf und die am Geraet Zeit
+// kosten, wenn man sie uebersieht:
+//
+//   1. Ohne Sendescheibe weist die Maschine `xmit` ab.
+//   2. Ohne `transmit set dax=1` nimmt sie das Mikrofon an ihrer
+//      eigenen Buchse und wirft jedes unserer Tonpakete weg — getastet
+//      wird, gesendet wird Stille.
+//   3. Der Sendeton geht an UDP-Port 4991, nicht an 4992; 4992 ist nur
+//      die Anmeldung, aus der die Maschine unsere Adresse lernt.
+//
+// Was Stufe 2 weiterhin nicht tut: CW tasten, PureSignal, Mithoeren
+// ueber die Maschine. Und sie tastet nie von selbst — jede Taste
+// kommt vom Betreiber.
 //
 // Was daraus folgt: diese Klasse ist KEINE RadioConnection-Unterklasse.
 // Die Basis dort ist durch und durch OpenHPSDR (Alex-Antennenwege,
@@ -243,6 +265,79 @@ QString setWaterfallSetupCommand(const QString& waterfallId, bool rueckfall);
 // parsePanafallCreatePanId(). Die Antwort auf „display panafall
 // create" traegt die Kennung mal als `pan=`, mal als `id=`, mal nackt
 // als erstes Glied einer Kommaliste. Alle drei Formen werden gelesen.
+// ── Senden (2026-10-23, Stufe 2) ─────────────────────────────────────
+//
+// Bis heute stand im Kopf dieser Datei: „Was Stufe 1 trotzdem NICHT
+// tut: senden. Kein `xmit`, keine TX-Scheibe, keine Leistung." Der
+// Betreiber hat danach gefragt, und hier ist der Draht dazu.
+//
+// Alle Befehle sind reine Zeichenketten — sie gehen nirgendwohin, bis
+// jemand sie durch `sendCommand` schickt. Das ist Absicht: so laesst
+// sich der Wortlaut pruefen, ohne eine Maschine zu tasten.
+
+// From AetherSDR FlexBackend.cpp:438 [@d58e2b8a] —
+//   send(QStringLiteral("xmit %1").arg(key ? 1 : 0));
+// Das Tasten selbst. Die Entscheidung, OB getastet werden darf, faellt
+// darueber (Verriegelung, Betriebsart, Eigentuemer der Sendescheibe);
+// dieser Befehl uebersetzt sie nur.
+QString xmitCommand(bool tasten);
+
+// From AetherSDR RadioModel.cpp:3077 [@d58e2b8a] —
+//   QStringLiteral("slice set %1 tx=1").arg(restoreSliceId)
+// Welche Scheibe sendet. Die Maschine fuehrt genau eine; `tx=0` nimmt
+// ihr das Senden, ohne eine andere zu bestimmen.
+QString setSliceTxCommand(const QString& sliceId, bool sendet);
+
+// Sendeleistung und Abstimmleistung in Prozent, wie die Maschine sie
+// im `transmit`-Zustand meldet (`rfpower=`, `tunepower=`).
+//
+// From AetherSDR FlexBackend.cpp:853-854 [@d58e2b8a] — dort werden
+// beide auf 0..100 geklemmt. Hier ebenso: ausserhalb liegende Werte
+// weist die Maschine ab, und ein abgewiesener Befehl laesst die
+// Leistung auf dem alten Wert stehen, was schlimmer ist als nichts.
+QString setRfPowerCommand(int prozent);
+QString setTunePowerCommand(int prozent);
+
+// Der Abstimmtraeger. `transmit tune 1` taktet mit `tunepower`, nicht
+// mit `rfpower`.
+//
+// From AetherSDR RadioModel.cpp:2307 [@d58e2b8a] —
+//   if (cmd == "transmit tune 1" || cmd == "atu start")
+QString tuneCommand(bool an);
+
+// ── Der Sendeton braucht einen eigenen Strom ─────────────────────────
+//
+// Die Flex rechnet selbst: es geht kein fertiges Sendesignal hinaus,
+// sondern Mikrofonton. Der laeuft als VITA-49-Strom vom Typ `dax_tx`
+// zur Maschine — erst anlegen, dann traegt die Antwort die Kennung,
+// die in jedes Paket gehoert.
+//
+// From AetherSDR RadioModel.cpp:11374 [@d58e2b8a] —
+//   sendCmd("stream create type=dax_tx", ...)
+// ── Ohne `dax=1` verfaellt jedes Tonpaket ────────────────────────────
+//
+// Die Maschine nimmt den Sendeton NUR dann aus unserem Strom, wenn der
+// Senderzweig auf DAX steht. Sonst benutzt sie das Mikrofon an ihrer
+// eigenen Buchse und wirft jedes unserer Pakete weg — getastet wird,
+// gesendet wird Stille.
+//
+// From AetherSDR AudioEngine.cpp:8954 [@d58e2b8a]:
+//   „Do NOT emit daxRouteRequested(0) here — dax=0 tells the radio to
+//    use the physical mic and discard every dax_tx packet, producing
+//    no TX waveform."
+// und TransmitModel.cpp:570 [@d58e2b8a] fuer den Wortlaut.
+QString setDaxRouteCommand(bool ueberDax);
+
+QString createDaxTxStreamCommand();
+
+// Die Antwort auf `stream create` traegt die Stromkennung — mal als
+// `stream_id=`, mal nackt, mal mit `0x` davor. Null heisst „nicht
+// gelesen"; eine Null ist auch keine gueltige Kennung.
+//
+// From AetherSDR RadioStatusOwnership::parseCreateResponseStreamId
+// [@d58e2b8a].
+quint32 streamIdFromCreateReply(const QString& body);
+
 QString panIdFromCreateReply(const QString& body);
 
 // Die Antwort auf „slice list" ist eine Kommaliste von Nummern, und
