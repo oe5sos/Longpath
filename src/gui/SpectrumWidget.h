@@ -2760,6 +2760,7 @@ private:
     // Kachelbreite; ein Wechsel setzt es zurueck.
     QVector<float>     m_fremdeWfMittel;
     qint64             m_fremdeWfMittelMs{0};
+    qint64             m_kachelBerichtZuletztMs{0};
     double             m_fremdeWfMittelTiefHz{0.0};
     double             m_fremdeWfMittelHochHz{0.0};
     QThread*           m_waterfallTickerThread{nullptr};

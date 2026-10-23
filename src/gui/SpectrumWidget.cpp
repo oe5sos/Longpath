@@ -3532,11 +3532,33 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
             const float median = sortiert[sortiert.size() / 2];
             const float p99    = sortiert[sortiert.size() * 99 / 100];
             const float spitze = sortiert.last();
+            // ── Wo steht die Spitze? (2026-10-23) ────────────────
+            //
+            // Betreiber: „unten rot, oben nichts … ev. verschoben?"
+            // Der Wasserfall kommt bei der Flex aus der KACHEL, die
+            // Kurve darueber aus der Bild-FFT — zwei Stroeme mit je
+            // eigenem Frequenzbereich. Ob die beiden
+            // uebereinanderliegen, sieht man nur, wenn beide sagen,
+            // bei WELCHER Frequenz ihre Spitze steht. `m_renderedPixels`
+            // liegt in Bildpunkten, die Umrechnung ist also dieselbe
+            // wie beim Zeichnen.
+            int spitzeX = 0;
+            for (int i = 1; i < m_renderedPixels.size(); ++i) {
+                if (m_renderedPixels[i] > m_renderedPixels[spitzeX]) {
+                    spitzeX = i;
+                }
+            }
+            const double spitzeHz = m_centerHz - m_bandwidthHz * 0.5
+                + (m_renderedPixels.size() > 1
+                   ? m_bandwidthHz * spitzeX / (m_renderedPixels.size() - 1)
+                   : 0.0);
             qCInfo(lcSpectrum).nospace()
                 << "Band: Rauschteppich " << median << " dBm, 99. Perzentil "
                 << p99 << " dBm, staerkster Punkt " << spitze
                 << " dBm (Hub " << (spitze - median) << " dB ueber "
-                << (bandwidth() / 1.0e3) << " kHz)";
+                << (bandwidth() / 1.0e3) << " kHz), Spitze bei "
+                << (spitzeHz / 1.0e6) << " MHz (Punkt " << spitzeX
+                << " von " << m_renderedPixels.size() << ")";
         }
     }
 
@@ -6645,6 +6667,73 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
         stufen[x] = static_cast<quint8>(std::lround(stufe * 255.0f));
         scanline[x] = waterfallColorForIntensityF(stufe, m_wfColorScheme,
                                                   m_wfLowColor);
+    }
+
+    // ── Und wo steht die Spitze der KACHEL? (2026-10-23) ────────────
+    //
+    // Gegenstueck zur Bandmeldung oben, in derselben Einheit
+    // (Bildpunkt und Frequenz). Stehen die beiden Spitzen an
+    // verschiedenen Frequenzen, liegen die zwei Stroeme der Flex nicht
+    // uebereinander — genau die Frage des Betreibers.
+    if (jetzt - m_kachelBerichtZuletztMs > 30000) {
+        m_kachelBerichtZuletztMs = jetzt;
+        int sx = 0;
+        for (int i = 1; i < breite; ++i) {
+            if (stufen[i] > stufen[sx]) { sx = i; }
+        }
+        const double sHz = fensterTief + sx * hzProPunkt;
+
+        // ── Liegen die beiden Stroeme uebereinander? ─────────────
+        //
+        // „kann es sein, dass das versetzt ist". Pixel im Bild zu
+        // vergleichen ist Raten — der 3D-Flur hat Perspektive, ein
+        // Kamm im Hintergrund steht nicht ueber seiner Frequenz.
+        // Also die beiden Zeilen gegeneinander schieben und die
+        // Verschiebung melden, bei der sie am besten passen.
+        // Beide liegen in Bildpunkten derselben Flaeche, nur in
+        // verschiedener Aufloesung (Bildpunktverhaeltnis).
+        QString versatz = QStringLiteral(", Versatz nicht messbar");
+        if (!m_renderedPixels.isEmpty() && breite > 64) {
+            const int n = breite;
+            const int m = m_renderedPixels.size();
+            auto kurve = [&](int i) -> double {   // Pan auf Kachelbreite
+                const double f = double(i) * (m - 1) / double(n - 1);
+                const int a = qBound(0, int(f), m - 1);
+                return m_renderedPixels[a];
+            };
+            // Beide auf Mittelwert null, sonst gewinnt der Gleichanteil.
+            QVector<double> A(n), B(n);
+            double sa = 0.0, sb = 0.0;
+            for (int i = 0; i < n; ++i) {
+                A[i] = stufen[i]; B[i] = kurve(i); sa += A[i]; sb += B[i];
+            }
+            sa /= n; sb /= n;
+            for (int i = 0; i < n; ++i) { A[i] -= sa; B[i] -= sb; }
+            const int maxLag = n / 10;
+            int besterLag = 0; double bestes = -1.0e30;
+            for (int lag = -maxLag; lag <= maxLag; ++lag) {
+                double sum = 0.0; int zahl = 0;
+                for (int i = qMax(0, -lag); i < qMin(n, n - lag); ++i) {
+                    sum += A[i] * B[i + lag]; ++zahl;
+                }
+                if (zahl > 0) {
+                    sum /= zahl;
+                    if (sum > bestes) { bestes = sum; besterLag = lag; }
+                }
+            }
+            versatz = QStringLiteral(", bester Versatz %1 Punkte = %2 kHz")
+                          .arg(besterLag)
+                          .arg(besterLag * hzProPunkt / 1.0e3, 0, 'f', 2);
+        }
+
+        qCInfo(lcSpectrum).nospace()
+            << "Kachel: Bereich " << (lowHz / 1.0e6) << "–"
+            << (highHz / 1.0e6) << " MHz ueber " << zeile.size()
+            << " Bins, Fenster " << (fensterTief / 1.0e6) << "–"
+            << ((fensterTief + m_bandwidthHz) / 1.0e6)
+            << " MHz, Spitze bei " << (sHz / 1.0e6) << " MHz (Punkt "
+            << sx << " von " << breite << ", Stufe " << stufen[sx] << ")"
+            << versatz;
     }
 
     appendHistoryRow(stufen, jetzt);
