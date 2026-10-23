@@ -585,6 +585,49 @@ void MainWindow::wireFlex()
         }
         sw->zeigeFremdeWasserfallzeile(intensitaet, lowFreqMhz * 1.0e6,
                                        highFreqMhz * 1.0e6);
+
+        // ── Die Kachel sagt, wo die Mitte steht (2026-10-23) ─────────
+        //
+        // Betreiber: „ich glaube, es ist hier wieder versetzt". Die
+        // Kreuzkorrelation im Protokoll gab ihm recht: 0 kHz direkt
+        // nach dem Verbinden, +7,4 kHz nach seinem Abstimmen, und
+        // dann stabil dort.
+        //
+        // Gemessen, woran es liegt: die beiden Stroeme waren nicht
+        // mehr KONZENTRISCH. Direkt nach dem Verbinden lag die Kachel
+        // symmetrisch um das Fenster (20,9394–21,17 gegen
+        // 20,9548–21,1548 — je 15 kHz Ueberstand links und rechts,
+        // Versatz 0). Nach dem Abstimmen stand sie 33 kHz links und
+        // 2,6 kHz rechts darueber hinaus, die Mitten also 18 kHz
+        // auseinander — und das blieb so, zwei Berichte im Abstand von
+        // 30 Sekunden.
+        //
+        // Die Kachel traegt ihren Bereich in JEDEM Paket; der
+        // Panadapter traegt gar keinen (nachgesehen: das Unterfeld
+        // 0x8003 hat nur Bin-Nummern), sein Ausschnitt kommt aus dem
+        // Zustandsschub der Maschine, und der hing hier fest.
+        //
+        // Also die MITTE von der Kachel nehmen und die BREITE weiter
+        // vom Zustand — die Breite stimmt dort (200 kHz gegen 230,6
+        // der Kachel, das war der Grund, ueberhaupt auf den Zustand
+        // umzustellen). Erst ab 1 kHz Unterschied, damit die
+        // Nachfuehrung nicht bei jedem Paket zappelt.
+        if (m_flexSpanHighHz > m_flexSpanLowHz) {
+            const double kachelMitte =
+                (lowFreqMhz + highFreqMhz) * 0.5e6;
+            const double panMitte =
+                (m_flexSpanLowHz + m_flexSpanHighHz) * 0.5;
+            const double breite = m_flexSpanHighHz - m_flexSpanLowHz;
+            if (std::abs(kachelMitte - panMitte) > 1000.0) {
+                qCInfo(lcFlexGui).nospace()
+                    << "Flex: Kachelmitte " << (kachelMitte / 1.0e6)
+                    << " MHz gegen Panadaptermitte " << (panMitte / 1.0e6)
+                    << " MHz — nachgezogen";
+                m_flexSpanLowHz  = kachelMitte - breite * 0.5;
+                m_flexSpanHighHz = kachelMitte + breite * 0.5;
+                sw->setFrequencyRange(kachelMitte, breite);
+            }
+        }
     });
 
     connect(m_radioModel, &RadioModel::flexSpectrumReady, this,
