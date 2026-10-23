@@ -220,6 +220,23 @@ QString setPanCenterCommand(const QString& panId, double hz);
 // Panafall-Adressierung. `black_level=0` statt 15, weil es bei
 // abgeschaltetem `auto_black` der Handwert der Maschine ist und wir
 // ohnehin selbst faerben.
+//
+// ── `line_duration` ist KEINE Millisekundenzahl ──────────────────────
+//
+// From AetherSDR WaterfallRate.h [@d58e2b8a]: es ist eine RATE von 1
+// bis 100, KLEIN ist LANGSAM und GROSZ ist SCHNELL — an echter
+// Flex-Hardware gemessen (AetherSDR #3070/#3104). FlexLib tippt das
+// Feld als Millisekunden, und wer das woertlich nimmt, dreht den
+// Regler um.
+//
+// Martins Maschine stand auf 80 und lieferte 12,5 Zeilen je Sekunde;
+// bei einem Wasserfall von rund 150 Bildzeilen sind das ZWOELF
+// Sekunden, bis er voll ist. Der Betreiber am 2026-10-23: „dauert
+// extrem lange bis bis kommt mit wasserfall". Mit 100 sind es 25
+// Zeilen je Sekunde, also sechs Sekunden — am Geraet nachgemessen.
+//
+// Nur ueber die Panafall-Adressierung: `display waterfall set …
+// line_duration=…` weist die Maschine ab (Code 50000016, gemessen).
 QString setWaterfallSetupCommand(const QString& waterfallId, bool rueckfall);
 
 // From AetherSDR RadioStatusOwnership.h:48-60 [@d58e2b8a] —

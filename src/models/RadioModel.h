@@ -3682,6 +3682,10 @@ private:
     /// Die Kennung des Wasserfallstroms, aus `waterfall=` im
     /// Panadapter-Zustand.
     QString              m_flexWasserfallId;
+    /// Mitte und Breite des Panadapters, EINZELN gemerkt: die Maschine
+    /// schickt beim Drehen nur `center=`, nicht beides zusammen.
+    double               m_flexPanMitteMhz{0.0};
+    double               m_flexPanBreiteMhz{0.0};
     /// Der Ausschnitt, den die Wasserfallkachel zuletzt meldete
     /// (Hertz). `tuneFlexSlice` erkennt daran, wann die Scheibe aus
     /// dem Bild laeuft.

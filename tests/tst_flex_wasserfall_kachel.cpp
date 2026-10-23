@@ -173,11 +173,13 @@ private slots:
 
         QCOMPARE(setWaterfallSetupCommand(QStringLiteral("0x42000000"), false),
                  QStringLiteral("display panafall set 0x42000000 "
-                                "auto_black=0 black_level=0 color_gain=50"));
+                                "auto_black=0 black_level=0 color_gain=50 "
+                                "line_duration=100"));
         // Rueckfall fuer Fassungen ohne Panafall-Adressierung.
         QCOMPARE(setWaterfallSetupCommand(QStringLiteral("0x42000000"), true),
                  QStringLiteral("display waterfall set 0x42000000 "
-                                "auto_black=0 black_level=0 color_gain=50"));
+                                "auto_black=0 black_level=0 color_gain=50 "
+                                "line_duration=100"));
         QVERIFY(setWaterfallSetupCommand(QString(), false).isEmpty());
     }
 

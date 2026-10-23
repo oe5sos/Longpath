@@ -9386,9 +9386,32 @@ void MainWindow::populateDefaultMeter()
                     // Nur bekannte Kennungen. Eine Aufnahme von vor
                     // einem Update kann Widgets nennen, die es nicht
                     // mehr gibt — der Controller soll sie nicht anlegen.
-                    if (m_appletVis->registeredIds().contains(it.key())) {
-                        m_appletVis->setVisible(it.key(), it.value().toBool());
+                    if (!m_appletVis->registeredIds().contains(it.key())) {
+                        continue;
                     }
+                    // ── Die Aufnahme folgt dem Profil NICHT ─────────
+                    //
+                    // Sie kam dreimal zurueck („SIEHST DU DAS
+                    // RECORDING??????????????????????", 2026-10-22),
+                    // und jedes Mal von hier: das Profil traegt eine
+                    // eigene Sichtbarkeits-Karte und spielt sie ueber
+                    // den Applet-Schluessel hinweg zurueck. Den
+                    // Einmal-Schalter hat sie damit ueberfahren.
+                    //
+                    // Also gilt fuer sie NUR die ausdrueckliche Ansage
+                    // des Betreibers (View > Containers > Applets).
+                    // Fehlt die, bleibt sie aus — auch wenn ein altes
+                    // Profil sie nennt.
+                    if (it.key() == QStringLiteral("Rec")
+                        && AppSettings::instance()
+                               .value(QStringLiteral(
+                                          "AppletRecVomBetreiberGewollt"),
+                                      QStringLiteral("False"))
+                               .toString() != QStringLiteral("True")) {
+                        m_appletVis->setVisible(it.key(), false);
+                        continue;
+                    }
+                    m_appletVis->setVisible(it.key(), it.value().toBool());
                 }
 
                 // ── Abgelöste Applets ───────────────────────────────
@@ -11646,6 +11669,20 @@ void MainWindow::buildMenuBar()
 
             connect(act, &QAction::toggled, this, [this, id](bool checked) {
                 if (m_appletVis) { m_appletVis->setVisible(id, checked); }
+                // ── Der Wille des Betreibers, getrennt gemerkt ──────
+                //
+                // Die Aufnahme kam dreimal zurueck, weil das
+                // LAYOUTPROFIL eine eigene Sichtbarkeits-Karte traegt
+                // und sie beim Anwenden ueber den Applet-Schluessel
+                // hinweg zurueckspielt. Ein Haken HIER ist dagegen
+                // eine Ansage, und nur sie zaehlt (siehe die
+                // Profilschleife, „Rec").
+                if (id == QStringLiteral("Rec")) {
+                    AppSettings::instance().setValue(
+                        QStringLiteral("AppletRecVomBetreiberGewollt"),
+                        checked ? QStringLiteral("True")
+                                : QStringLiteral("False"));
+                }
                 if (checked) { bringAppletToFront(id); }
                 // Betreiber 2026-08-30, ueber einen Regressionstest
                 // gefunden: dieser Weg fehlte im Gegensatz zum

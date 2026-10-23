@@ -6931,14 +6931,36 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
             // neben seiner Frequenz — und wer weiss, wo eine Station
             // sein muss, findet sie dort nicht.
             if (object.startsWith(QLatin1String("display pan "))
-                && kv.contains(QStringLiteral("center"))
-                && kv.contains(QStringLiteral("bandwidth"))) {
+                && (kv.contains(QStringLiteral("center"))
+                    || kv.contains(QStringLiteral("bandwidth")))) {
+                // ── Die Maschine schickt TEILMELDUNGEN ──────────────
+                //
+                // Hier stand `contains(center) && contains(bandwidth)`.
+                // Beim Drehen schickt die Flex aber nur `center=`, und
+                // damit griff die Bedingung NIE. Am Geraet gemessen am
+                // 2026-10-23: die Maschine stand auf 7.288 MHz, das
+                // Fenster noch auf dem Ausschnitt von vor zwei
+                // Minuten (7.121). Auf dem Schirm standen daraufhin
+                // drei verschiedene Frequenzen nebeneinander, und der
+                // Wasserfall war rechts schwarz, weil die Kachel das
+                // Fenster nur noch zum Teil ueberdeckte.
+                //
+                // Also beide Werte EINZELN merken und bei jeder
+                // Aenderung neu rechnen.
                 bool okMitte = false, okBreite = false;
-                const double mitteMhz =
-                    kv.value(QStringLiteral("center")).toDouble(&okMitte);
-                const double breiteMhz =
-                    kv.value(QStringLiteral("bandwidth")).toDouble(&okBreite);
-                if (okMitte && okBreite && breiteMhz > 0.0) {
+                if (kv.contains(QStringLiteral("center"))) {
+                    const double m =
+                        kv.value(QStringLiteral("center")).toDouble(&okMitte);
+                    if (okMitte && m > 0.0) { m_flexPanMitteMhz = m; }
+                }
+                if (kv.contains(QStringLiteral("bandwidth"))) {
+                    const double b =
+                        kv.value(QStringLiteral("bandwidth")).toDouble(&okBreite);
+                    if (okBreite && b > 0.0) { m_flexPanBreiteMhz = b; }
+                }
+                const double mitteMhz  = m_flexPanMitteMhz;
+                const double breiteMhz = m_flexPanBreiteMhz;
+                if (mitteMhz > 0.0 && breiteMhz > 0.0) {
                     const double tief = (mitteMhz - breiteMhz * 0.5) * 1.0e6;
                     const double hoch = (mitteMhz + breiteMhz * 0.5) * 1.0e6;
                     if (!qFuzzyCompare(tief, m_flexAusschnittTiefHz)
