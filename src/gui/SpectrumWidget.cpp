@@ -6707,8 +6707,11 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
         // zaehlt tst_oberflaeche_englisch als Beschriftung mit (die
         // Decke steht bei 9). Protokolltexte gehen darum direkt in den
         // Strom, nicht ueber eine zusammengesetzte Zeichenkette.
-        bool versatzMessbar = false;
-        int  besterLag = 0;
+        bool   versatzMessbar = false;
+        int    besterLag  = 0;
+        double zweitRel   = 0.0;
+        double beiNull    = 0.0;
+        double bestWert   = 0.0;
         if (!m_renderedPixels.isEmpty() && breite > 64) {
             const int n = breite;
             const int m = m_renderedPixels.size();
@@ -6727,6 +6730,7 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
             for (int i = 0; i < n; ++i) { A[i] -= sa; B[i] -= sb; }
             const int maxLag = n / 10;
             double bestes = -1.0e30;
+            QVector<double> werte(2 * maxLag + 1, -1.0e30);
             for (int lag = -maxLag; lag <= maxLag; ++lag) {
                 double sum = 0.0; int zahl = 0;
                 for (int i = qMax(0, -lag); i < qMin(n, n - lag); ++i) {
@@ -6734,9 +6738,30 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
                 }
                 if (zahl > 0) {
                     sum /= zahl;
+                    werte[lag + maxLag] = sum;
                     if (sum > bestes) { bestes = sum; besterLag = lag; }
                 }
             }
+            // ── Wie deutlich ist das Ergebnis? (2026-10-23) ──────
+            //
+            // Dieselbe Lage ergab im Abstand von 30 s einmal -8 und
+            // einmal +107 Punkte. Auf einem Band mit vielen aehnlichen
+            // Signalen rastet die Kreuzkorrelation auf dem falschen
+            // Nachbarn ein, und dann steht eine erfundene Zahl im
+            // Protokoll, auf die ich prompt eine Behebung gebaut habe.
+            //
+            // Also den zweitbesten Gipfel AUSZERHALB der Umgebung des
+            // besten mitmelden. Liegt er fast gleichauf, ist die
+            // Messung nichts wert und sagt das auch.
+            double zweitbestes = -1.0e30;
+            for (int lag = -maxLag; lag <= maxLag; ++lag) {
+                if (std::abs(lag - besterLag) <= 10) { continue; }
+                zweitbestes = std::max(zweitbestes, werte[lag + maxLag]);
+            }
+            zweitRel = (bestes > 0.0 && zweitbestes > -1.0e29)
+                ? zweitbestes / bestes : 0.0;
+            beiNull = werte[maxLag];
+            bestWert = bestes;
             versatzMessbar = true;
         }
 
@@ -6751,7 +6776,11 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
             qCInfo(lcSpectrum).nospace()
                 << "Kachel gegen Spektrum: bester Versatz " << besterLag
                 << " Punkte = " << (besterLag * hzProPunkt / 1.0e3)
-                << " kHz";
+                << " kHz; zweitbester Gipfel bei "
+                << (zweitRel * 100.0) << " % davon, Wert bei Versatz 0 "
+                << (bestWert > 0.0 ? beiNull / bestWert * 100.0 : 0.0)
+                << " %"
+                << (zweitRel > 0.8 ? " — NICHT eindeutig" : "");
         }
     }
 

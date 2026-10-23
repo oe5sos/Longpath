@@ -617,65 +617,30 @@ void MainWindow::wireFlex()
         sw->zeigeFremdeWasserfallzeile(intensitaet, lowFreqMhz * 1.0e6,
                                        highFreqMhz * 1.0e6);
 
-        // ── Die Kachel sagt, wo die Mitte steht (2026-10-23) ─────────
+        // ── KEIN Nachziehen der Mitte (2026-10-23, zurueckgebaut) ────
         //
-        // Betreiber: „ich glaube, es ist hier wieder versetzt". Die
-        // Kreuzkorrelation im Protokoll gab ihm recht: 0 kHz direkt
-        // nach dem Verbinden, +7,4 kHz nach seinem Abstimmen, und
-        // dann stabil dort.
+        // Hier stand ein Nachzug der Panadaptermitte auf die
+        // Kachelmitte. Er hat den gemessenen Versatz von 7,4 kHz
+        // scheinbar geheilt (0 bis 1 Punkt auf 15 m) — aber nur,
+        // solange er AUCH das Fenster mitzog. Ohne das sprang der
+        // Versatz auf +106 Punkte = +18,7 kHz, also schlechter als
+        // vorher. Und das Fenster darf er nicht anfassen: ohne CTUN
+        // ist die Fenstermitte die Empfangsfrequenz, und der Nachzug
+        // hat den Betreiber nachweislich verstimmt (sieben
+        // `tuneFlexSlice` in 150 ms).
         //
-        // Gemessen, woran es liegt: die beiden Stroeme waren nicht
-        // mehr KONZENTRISCH. Direkt nach dem Verbinden lag die Kachel
-        // symmetrisch um das Fenster (20,9394–21,17 gegen
-        // 20,9548–21,1548 — je 15 kHz Ueberstand links und rechts,
-        // Versatz 0). Nach dem Abstimmen stand sie 33 kHz links und
-        // 2,6 kHz rechts darueber hinaus, die Mitten also 18 kHz
-        // auseinander — und das blieb so, zwei Berichte im Abstand von
-        // 30 Sekunden.
+        // Damit ist die Annahme widerlegt, der Zustandsschub der
+        // Maschine sei schuld: die Bild-FFT deckt den Ausschnitt des
+        // ZUSTANDS, nicht den der Kachel. Was gemessen wurde, war
+        // etwas anderes — und die Messung selbst ist nicht zuverlaessig
+        // genug fuer so einen Schluss: dieselbe Lage ergab im Abstand
+        // von 30 s einmal -8 und einmal +107 Punkte. Auf einem Band
+        // mit vielen aehnlichen Signalen rastet die Kreuzkorrelation
+        // auf dem falschen Nachbarn ein.
         //
-        // Die Kachel traegt ihren Bereich in JEDEM Paket; der
-        // Panadapter traegt gar keinen (nachgesehen: das Unterfeld
-        // 0x8003 hat nur Bin-Nummern), sein Ausschnitt kommt aus dem
-        // Zustandsschub der Maschine, und der hing hier fest.
-        //
-        // Also die MITTE von der Kachel nehmen und die BREITE weiter
-        // vom Zustand — die Breite stimmt dort (200 kHz gegen 230,6
-        // der Kachel, das war der Grund, ueberhaupt auf den Zustand
-        // umzustellen). Erst ab 1 kHz Unterschied, damit die
-        // Nachfuehrung nicht bei jedem Paket zappelt.
-        const FlexVita::Ausschnitt neu = FlexVita::aufKachelZentriert(
-            m_flexSpanLowHz, m_flexSpanHighHz,
-            lowFreqMhz * 1.0e6, highFreqMhz * 1.0e6);
-        if (neu.geaendert) {
-            qCInfo(lcFlexGui).nospace()
-                << "Flex: Kachelmitte "
-                << ((lowFreqMhz + highFreqMhz) * 0.5)
-                << " MHz gegen Panadaptermitte "
-                << ((m_flexSpanLowHz + m_flexSpanHighHz) * 0.5e-6)
-                << " MHz — nachgezogen";
-            // ── Das FENSTER bleibt unangetastet (2026-10-23) ─────
-            //
-            // Hier stand erst `setFrequencyRange(mitte, breite)`, dann
-            // eine Verschiebung um denselben Betrag. Beides war
-            // falsch, und beides hat der Betreiber sofort gesehen:
-            // „verkleinert sich das display und ich muss wieder mit
-            // plus vergroeszern", „wenn ich vergroessere verschwindet
-            // meine ersichtliche bandbreite", „und die frequenz
-            // aendert sich".
-            //
-            // Das Letzte ist der Grund, warum das Fenster hier
-            // ueberhaupt nichts zu suchen hat: OHNE CTUN **IST** die
-            // Fenstermitte die Empfangsfrequenz. Wer sie verschiebt,
-            // stimmt ab. Im Protokoll stand das als Kette von sieben
-            // `tuneFlexSlice` in 150 ms, 14,2713 -> 14,2876 MHz.
-            //
-            // Gerichtet wird nur der AUSSCHNITT, mit dem die FFT auf
-            // das Fenster abgebildet wird — und genau dort sasz der
-            // gemessene Versatz von 7,4 kHz. Das Fenster gehoert dem
-            // Betreiber.
-            m_flexSpanLowHz  = neu.tiefHz;
-            m_flexSpanHighHz = neu.hochHz;
-        }
+        // Die Messung bleibt im Protokoll, aber sie meldet jetzt auch,
+        // wie DEUTLICH ihr bestes Ergebnis ist; erst daran laesst sich
+        // ein echter Versatz von einem Fehlgriff unterscheiden.
     });
 
     connect(m_radioModel, &RadioModel::flexSpectrumReady, this,
