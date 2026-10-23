@@ -7048,6 +7048,26 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                     }
                 }
             }
+
+            // ── Die Verriegelung der Maschine (2026-10-23, Stufe 2) ──
+            //
+            // Bis heute wurde sie nur gelesen, um sie zu ignorieren —
+            // im Kopf von FlexRadioConnection.h stand: „Die
+            // Interlock-Meldung der Maschine (`state=RECEIVE
+            // tx_allowed=0`) wird gelesen, nie geschrieben."
+            //
+            // Jetzt ist sie das Tor vor dem Tasten. Die Maschine sagt
+            // in `state`, wo sie steht, und in `tx_allowed`, ob sie
+            // ueberhaupt darf; `source` nennt den Ausloeser (SW fuer
+            // unser `xmit`, MIC/ACC/RCA fuer die Taste am Geraet).
+            //
+            // From AetherSDR RadioModel.cpp:10287-10370 [@d58e2b8a].
+            // Nicht uebernommen: die Eigentuemerrechnung ueber
+            // `tx_client_handle` (wir sind ein Client, kein
+            // Mehrclient-Betrieb) und die Mehrphasen-Benachrichtigung.
+            if (object.trimmed() == QLatin1String("interlock")) {
+                verarbeiteFlexVerriegelung(kv);
+            }
         });
 
         connect(m_flexConnection, &FlexRadioConnection::guiClientRegistered,
@@ -7173,6 +7193,228 @@ void RadioModel::uebernimmFlexPanMitte(double mitteMhz)
         << "Flex: Ausschnitt selbst nachgefuehrt " << (tief / 1.0e6)
         << "–" << (hoch / 1.0e6) << " MHz (die Maschine echot ihn nicht)";
     emit flexAusschnittGeaendert(tief, hoch);
+}
+
+// ── Senden ueber die Flex (2026-10-23, Stufe 2) ──────────────────────
+//
+// Die Reihenfolge ist nicht beliebig: ohne Sendescheibe weist die
+// Maschine `xmit` ab, und ohne ihre Freigabe (`interlock tx_allowed`)
+// tasten wir gar nicht erst. Das LOESEN laeuft durch kein Tor —
+// aufhoeren zu senden muss immer gehen, auch wenn gerade nichts
+// stimmt.
+
+bool RadioModel::sendeFlexBefehl(const QString& befehl)
+{
+    if (befehl.isEmpty()) { return false; }
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
+    m_flexConnection->sendCommand(befehl);
+    return true;
+}
+
+bool RadioModel::setzeFlexSendescheibe(const QString& sliceId)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
+    const QString befehl = FlexCommandWire::setSliceTxCommand(sliceId, true);
+    if (befehl.isEmpty()) { return false; }
+    m_flexConnection->sendCommand(befehl);
+    m_flexSendescheibenId = sliceId;
+    qCInfo(lcConnection).nospace()
+        << "Flex: Scheibe " << sliceId << " ist jetzt die Sendescheibe";
+    return true;
+}
+
+bool RadioModel::flexTasten(bool tasten)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) {
+        if (tasten) {
+            qCWarning(lcConnection) << "Flex: nicht getastet — keine Verbindung";
+        }
+        return false;
+    }
+
+    if (tasten) {
+        // ── Die drei Tore ────────────────────────────────────────────
+        //
+        // Jedes einzeln melden: „es sendet nicht" ohne Grund hat am
+        // 2026-10-22 einen Abend gekostet, als das Abstimmen still ins
+        // Leere lief.
+        if (m_flexSendescheibenId.isEmpty()) {
+            qCWarning(lcConnection)
+                << "Flex: nicht getastet — keine Sendescheibe gesetzt";
+            return false;
+        }
+        if (!m_flexDarfSenden) {
+            qCWarning(lcConnection).nospace()
+                << "Flex: nicht getastet — die Maschine sperrt ("
+                << (m_flexVerriegelungsLage.isEmpty()
+                        ? QStringLiteral("noch keine Verriegelungsmeldung")
+                        : m_flexVerriegelungsLage)
+                << (m_flexVerriegelungsGrund.isEmpty()
+                        ? QString()
+                        : QStringLiteral(", Grund ") + m_flexVerriegelungsGrund)
+                << ")";
+            return false;
+        }
+    }
+
+    m_flexConnection->sendCommand(FlexCommandWire::xmitCommand(tasten));
+    qCInfo(lcConnection) << "Flex:" << (tasten ? "getastet" : "geloest");
+    return true;
+}
+
+bool RadioModel::setzeFlexSendeleistung(int prozent)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
+    const QString befehl = FlexCommandWire::setRfPowerCommand(prozent);
+    if (befehl.isEmpty()) {
+        qCWarning(lcConnection) << "Flex: Sendeleistung" << prozent
+                                << "liegt ausserhalb 0..100 — nichts geschickt";
+        return false;
+    }
+    m_flexConnection->sendCommand(befehl);
+    return true;
+}
+
+bool RadioModel::setzeFlexAbstimmleistung(int prozent)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
+    const QString befehl = FlexCommandWire::setTunePowerCommand(prozent);
+    if (befehl.isEmpty()) {
+        qCWarning(lcConnection) << "Flex: Abstimmleistung" << prozent
+                                << "liegt ausserhalb 0..100 — nichts geschickt";
+        return false;
+    }
+    m_flexConnection->sendCommand(befehl);
+    return true;
+}
+
+bool RadioModel::flexAbstimmen(bool an)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
+    if (an && !m_flexDarfSenden) {
+        qCWarning(lcConnection)
+            << "Flex: nicht abgestimmt — die Maschine sperrt das Senden";
+        return false;
+    }
+    m_flexConnection->sendCommand(FlexCommandWire::tuneCommand(an));
+    qCInfo(lcConnection) << "Flex: Abstimmtraeger" << (an ? "an" : "aus");
+    return true;
+}
+
+void RadioModel::legeFlexSendetonstromAn()
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexSendetonstromId != 0) { return; }
+    m_flexConnection->sendCommand(
+        FlexCommandWire::createDaxTxStreamCommand(),
+        [this](int code, const QString& body) {
+            if (code != 0) {
+                qCWarning(lcConnection).nospace()
+                    << "Flex: Sendetonstrom nicht angelegt, Code "
+                    << QString::number(code, 16) << " — " << body;
+                return;
+            }
+            const quint32 id = FlexCommandWire::streamIdFromCreateReply(body);
+            if (id == 0) {
+                qCWarning(lcConnection)
+                    << "Flex: Antwort auf `stream create` ohne Kennung —" << body;
+                return;
+            }
+            m_flexSendetonstromId = id;
+            m_flexSendetonZaehler = 0;
+            qCInfo(lcConnection).nospace()
+                << "Flex: Sendetonstrom 0x" << QString::number(id, 16);
+        });
+}
+
+int RadioModel::sendeFlexMikrofonton(const float* stereoInterleaved, int frames)
+{
+    if (!stereoInterleaved || frames <= 0) { return 0; }
+    if (m_flexSendetonstromId == 0 || !m_flexStream) { return 0; }
+
+    // Die Maschine will Pakete fester Groesze. Was nicht aufgeht,
+    // bleibt bis zum naechsten Mal liegen — sonst entstuende bei jedem
+    // Aufruf eine Naht im Ton.
+    m_flexSendetonRest.reserve(m_flexSendetonRest.size() + frames * 2);
+    for (int i = 0; i < frames * 2; ++i) {
+        m_flexSendetonRest.append(stereoInterleaved[i]);
+    }
+
+    const int proPaket = FlexVita::kTxFramesProPaket * 2;
+    int pakete = 0;
+    int gelesen = 0;
+    while (m_flexSendetonRest.size() - gelesen >= proPaket) {
+        const QByteArray paket = FlexVita::buildTxAudioPacket(
+            m_flexSendetonstromId,
+            m_flexSendetonRest.constData() + gelesen,
+            FlexVita::kTxFramesProPaket,
+            m_flexSendetonZaehler);
+        if (m_flexStream->sendeTxPaket(paket) > 0) { ++pakete; }
+        gelesen += proPaket;
+    }
+    if (gelesen > 0) {
+        m_flexSendetonRest.remove(0, gelesen);
+    }
+    return pakete;
+}
+
+// ── Die Verriegelung der Maschine (2026-10-23, Stufe 2) ──────────────
+//
+// `state` ist die Lage, `tx_allowed` das Tor, `source` der Ausloeser.
+// Die Flex meldet das ungefragt, auch wenn jemand anderes tastet oder
+// die Taste am Mikrofon gedrueckt wird.
+//
+// Was hier NICHT passiert: tasten. Diese Stelle liest nur und hebt
+// den Stand auf; wer senden will, fragt vorher `flexDarfSenden()`.
+void RadioModel::verarbeiteFlexVerriegelung(const QMap<QString, QString>& kv)
+{
+    bool geaendert = false;
+
+    if (kv.contains(QStringLiteral("state"))) {
+        const QString lage = kv.value(QStringLiteral("state")).trimmed().toUpper();
+        if (lage != m_flexVerriegelungsLage) {
+            m_flexVerriegelungsLage = lage;
+            geaendert = true;
+        }
+        // Die Maschine sendet wirklich. Das ist NICHT dasselbe wie
+        // „wir haben getastet": die Taste am Mikrofon, ein Fusschalter
+        // oder ein zweiter Client kommen hier genauso an.
+        const bool sendet = (lage == QLatin1String("TRANSMITTING"));
+        if (sendet != m_flexSendetGerade) {
+            m_flexSendetGerade = sendet;
+            emit flexSendetGeaendert(sendet);
+        }
+    }
+
+    if (kv.contains(QStringLiteral("tx_allowed"))) {
+        const bool darf = kv.value(QStringLiteral("tx_allowed")).trimmed()
+                          != QStringLiteral("0");
+        if (darf != m_flexDarfSenden) {
+            m_flexDarfSenden = darf;
+            emit flexSendefreigabeGeaendert(darf);
+            geaendert = true;
+        }
+    }
+
+    if (kv.contains(QStringLiteral("source"))) {
+        m_flexVerriegelungsQuelle =
+            kv.value(QStringLiteral("source")).trimmed().toUpper();
+    }
+    if (kv.contains(QStringLiteral("reason"))) {
+        m_flexVerriegelungsGrund = kv.value(QStringLiteral("reason")).trimmed();
+    }
+
+    if (geaendert) {
+        qCInfo(lcConnection).nospace()
+            << "Flex-Verriegelung: " << m_flexVerriegelungsLage
+            << ", senden " << (m_flexDarfSenden ? "erlaubt" : "GESPERRT")
+            << (m_flexVerriegelungsQuelle.isEmpty()
+                    ? QString()
+                    : QStringLiteral(", Quelle ") + m_flexVerriegelungsQuelle)
+            << (m_flexVerriegelungsGrund.isEmpty()
+                    ? QString()
+                    : QStringLiteral(", Grund ") + m_flexVerriegelungsGrund);
+    }
 }
 
 void RadioModel::richteFlexWasserfallEin()

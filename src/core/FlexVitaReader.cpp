@@ -309,6 +309,49 @@ Ausschnitt aufKachelZentriert(double panTiefHz, double panHochHz,
     return a;
 }
 
+QByteArray buildTxAudioPacket(quint32 streamId,
+                              const float* stereoInterleaved,
+                              int frames,
+                              quint8& zaehler)
+{
+    if (streamId == 0 || !stereoInterleaved || frames <= 0) {
+        return QByteArray();
+    }
+
+    const int payloadBytes = frames * 2 * static_cast<int>(sizeof(float));
+    const int packetWords  = (payloadBytes / 4) + kTxHeaderWords;
+    QByteArray paket(packetWords * 4, '\0');
+    quint32* w = reinterpret_cast<quint32*>(paket.data());
+
+    quint32 kopf = 0;
+    kopf |= (0x1u << 28);                     // Pakettyp: IFDataWithStream
+    kopf |= (1u << 27);                       // C = 1 (Klassenkennung da)
+    // T = 0 (Bit 26): kein Nachspann
+    kopf |= (0x3u << 22);                     // TSI = 3 (Other)
+    kopf |= (0x1u << 20);                     // TSF = 1 (SampleCount)
+    kopf |= (static_cast<quint32>(zaehler & 0xF) << 16);
+    kopf |= static_cast<quint32>(packetWords & 0xFFFF);
+    w[0] = qToBigEndian(kopf);
+
+    w[1] = qToBigEndian(streamId);
+    w[2] = qToBigEndian(kFlexOui);
+    w[3] = qToBigEndian((static_cast<quint32>(kInfoClassSl) << 16)
+                        | kPacketClassIfNarrow);
+    w[4] = 0;   // Zeitstempel ganzzahlig
+    w[5] = 0;   // Zeitstempel Bruch, hoch
+    w[6] = 0;   // Zeitstempel Bruch, tief
+
+    quint32* rumpf = w + kTxHeaderWords;
+    for (int i = 0; i < frames * 2; ++i) {
+        quint32 roh = 0;
+        std::memcpy(&roh, &stereoInterleaved[i], sizeof(quint32));
+        rumpf[i] = qToBigEndian(roh);
+    }
+
+    zaehler = static_cast<quint8>((zaehler + 1) & 0xF);
+    return paket;
+}
+
 }  // namespace FlexVita
 
 // ─── FlexFftGrowthGuard ──────────────────────────────────────────────

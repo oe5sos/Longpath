@@ -432,6 +432,28 @@ void MainWindow::wireFlex()
         }
         qCInfo(lcFlexGui) << "Flex-Ton auf Scheibe" << m_flexTargetSliceId;
 
+        // ── Senden vorbereiten, NICHT tasten (2026-10-23, Stufe 2) ───
+        //
+        // Drei Dinge muessen stehen, bevor ein `xmit` ueberhaupt Sinn
+        // hat, und keines davon sendet:
+        //
+        //   1. Die Maschine muss wissen, WELCHE Scheibe sendet —
+        //      ohne `slice set <n> tx=1` weist sie `xmit` ab.
+        //   2. Der Sendetonstrom (`stream create type=dax_tx`) muss
+        //      angelegt sein; seine Kennung gehoert in jedes Tonpaket.
+        //   3. Der Senderzweig muss auf DAX stehen. Sonst nimmt die
+        //      Maschine das Mikrofon an ihrer eigenen Buchse und wirft
+        //      jedes unserer Pakete weg — getastet wird, gesendet wird
+        //      Stille (AetherSDR AudioEngine.cpp:8954 [@d58e2b8a]).
+        //
+        // Punkt 3 steht hier bewusst NICHT: `dax=1` nimmt dem
+        // Betreiber das Mikrofon an der Maschine weg, und das gehoert
+        // nicht ins Verbinden. Es wird erst beim Tasten gesetzt.
+        m_radioModel->setzeFlexSendescheibe(
+            QString::number(m_flexTargetSliceId));
+        m_radioModel->legeFlexSendetonstromAn();
+        verdrahteFlexSenden();
+
         // ── Die Maske geht von selbst zu (2026-10-22) ───────────────
         //
         // Der Selbstschluss haengt an `onConnectionStateChanged`, und
@@ -764,12 +786,164 @@ void MainWindow::wireFlex()
         if (m_flexSliceWasCreated && m_radioModel) {
             m_radioModel->removeSlice(m_flexTargetSliceId);
         }
+        // Senden abbauen (Stufe 2). Die Baender bleiben haengen, ihre
+        // Lambdas kehren aber ohne Zielscheibe sofort um; die Pumpe
+        // muss ausdruecklich stehen, sonst zieht sie weiter Mikrofonton
+        // und schickt ihn an eine Kennung, die es nicht mehr gibt.
+        if (m_flexSendePumpe) { m_flexSendePumpe->stop(); }
+        m_flexSelbstGetastet = false;
+
         m_flexSliceWasCreated = false;
         m_flexAusschnittUebernommen = false;
         m_flexTargetSliceId = -1;
         m_flexSpanLowHz = 0.0;
         m_flexSpanHighHz = 0.0;
     });
+}
+
+// ── Senden ueber die Flex (2026-10-23, Stufe 2) ──────────────────────
+//
+// Bis heute stand im Kopf von FlexRadioConnection.h: „Was Stufe 1
+// trotzdem NICHT tut: senden." Hier haengt es jetzt zusammen — und
+// zwar so, dass nichts davon von selbst tastet.
+//
+// Was anders ist als bei einem OpenHPSDR-Geraet: dort rechnet Longpath
+// das Sendesignal (WDSP, TxWorkerThread, I/Q hinaus). Die Flex rechnet
+// selbst. Es geht also KEIN fertiges Signal hinaus, sondern roher
+// Mikrofonton, und die Maschine macht daraus SSB. Deshalb haengt hier
+// auch nichts am TX-Kanal, sondern direkt an `AudioEngine::pullTxMic`.
+void MainWindow::verdrahteFlexSenden()
+{
+    if (!m_radioModel) { return; }
+
+    // ── Die Mikrofonpumpe ────────────────────────────────────────────
+    //
+    // 5 ms, wie die Pumpe des OpenHPSDR-Wegs (TxWorkerThread). Bei
+    // 48 kHz sind das 240 Rahmen je Durchgang; die Maschine will
+    // Pakete zu 128 Rahmen, der Rest bleibt in RadioModel liegen und
+    // geht beim naechsten Mal mit.
+    if (!m_flexSendePumpe) {
+        m_flexSendePumpe = new QTimer(this);
+        m_flexSendePumpe->setInterval(5);
+        m_flexSendePumpe->setTimerType(Qt::PreciseTimer);
+        connect(m_flexSendePumpe, &QTimer::timeout, this, [this]() {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            AudioEngine* ae = m_radioModel->audioEngine();
+            if (!ae) { return; }
+
+            constexpr int kRahmen = 480;   // 10 ms Vorrat bei 48 kHz
+            m_flexMikMono.resize(kRahmen);
+            const int geholt = ae->pullTxMic(m_flexMikMono.data(), kRahmen);
+            if (geholt <= 0) { return; }
+
+            // Mono hinein, Stereo hinaus: die Maschine erwartet zwei
+            // Kanaele je Rahmen (float32, Big-Endian im Paket).
+            m_flexMikStereo.resize(geholt * 2);
+            for (int i = 0; i < geholt; ++i) {
+                m_flexMikStereo[i * 2]     = m_flexMikMono[i];
+                m_flexMikStereo[i * 2 + 1] = m_flexMikMono[i];
+            }
+            m_radioModel->sendeFlexMikrofonton(m_flexMikStereo.constData(),
+                                               geholt);
+        });
+    }
+
+    // ── MOX ──────────────────────────────────────────────────────────
+    //
+    // Reihenfolge: erst den Senderzweig auf DAX, dann tasten. Umgekehrt
+    // sendet die erste Zehntelsekunde das Mikrofon an der Maschine —
+    // oder Stille, wenn dort keines steckt.
+    //
+    // `dax=0` wird beim Loesen NICHT geschickt. Die Vorlage sagt
+    // ausdruecklich warum (AetherSDR TciServer.cpp:3414 [@d58e2b8a]):
+    // der Zustandsschub der Maschine kommt verzoegert, und ein
+    // sofortiges Zuruecksetzen kreuzt ihn.
+    disconnect(m_flexMoxBand);
+    m_flexMoxBand = connect(&m_radioModel->transmitModel(),
+                            &TransmitModel::moxChanged, this,
+                            [this](bool an) {
+        if (m_shuttingDown || !m_radioModel) { return; }
+        if (m_flexTargetSliceId < 0) { return; }
+
+        if (an) {
+            m_radioModel->sendeFlexBefehl(
+                FlexCommandWire::setDaxRouteCommand(true));
+            m_flexSelbstGetastet = m_radioModel->flexTasten(true);
+            if (m_flexSelbstGetastet && m_flexSendePumpe) {
+                m_flexSendePumpe->start();
+            } else {
+                // Die Bedienung zeigt sonst „sendet", waehrend nichts
+                // hinausgeht. Der Grund steht im Protokoll.
+                m_radioModel->transmitModel().setMox(false);
+            }
+        } else {
+            if (m_flexSendePumpe) { m_flexSendePumpe->stop(); }
+            m_radioModel->flexTasten(false);
+            m_flexSelbstGetastet = false;
+        }
+    });
+
+    // ── TUNE ─────────────────────────────────────────────────────────
+    //
+    // Der Abstimmtraeger der Maschine, nicht unserer: er taktet mit
+    // `tunepower` und braucht weder Mikrofon noch DAX.
+    disconnect(m_flexTuneBand);
+    m_flexTuneBand = connect(&m_radioModel->transmitModel(),
+                             &TransmitModel::tuneChanged, this,
+                             [this](bool an) {
+        if (m_shuttingDown || !m_radioModel) { return; }
+        if (m_flexTargetSliceId < 0) { return; }
+        if (an && !m_radioModel->flexAbstimmen(true)) {
+            m_radioModel->transmitModel().setTune(false);
+        } else if (!an) {
+            m_radioModel->flexAbstimmen(false);
+        }
+    });
+
+    // ── Leistung ─────────────────────────────────────────────────────
+    //
+    // Die Maschine will Prozent, Longpath fuehrt Watt. Bei einer
+    // FLEX-8400 (100 W) ist das dieselbe Zahl; bei einem anderen Geraet
+    // waere es das nicht, und dann gehoert hier eine Umrechnung hin.
+    disconnect(m_flexLeistungBand);
+    m_flexLeistungBand = connect(&m_radioModel->transmitModel(),
+                                 &TransmitModel::powerChanged, this,
+                                 [this](int watt) {
+        if (m_shuttingDown || !m_radioModel || m_flexTargetSliceId < 0) {
+            return;
+        }
+        m_radioModel->setzeFlexSendeleistung(qBound(0, watt, 100));
+    });
+
+    disconnect(m_flexAbstimmleistungBand);
+    m_flexAbstimmleistungBand =
+        connect(&m_radioModel->transmitModel(),
+                &TransmitModel::tunePowerChanged, this,
+                [this](int watt) {
+        if (m_shuttingDown || !m_radioModel || m_flexTargetSliceId < 0) {
+            return;
+        }
+        m_radioModel->setzeFlexAbstimmleistung(qBound(0, watt, 100));
+    });
+
+    // ── Was die Maschine selbst meldet ───────────────────────────────
+    //
+    // Sie sendet auch, wenn jemand die Taste am Mikrofon drueckt oder
+    // der Fusschalter betaetigt wird. Dann haben WIR nicht getastet,
+    // und die Mikrofonpumpe darf nicht laufen — sonst mischt sich
+    // unser Ton in seinen.
+    disconnect(m_flexSendetBand);
+    m_flexSendetBand = connect(m_radioModel, &RadioModel::flexSendetGeaendert,
+                               this, [this](bool sendet) {
+        if (m_shuttingDown || !m_radioModel) { return; }
+        if (!sendet && m_flexSendePumpe) { m_flexSendePumpe->stop(); }
+        qCInfo(lcFlexGui).nospace()
+            << "Flex " << (sendet ? "SENDET" : "empfaengt")
+            << (m_flexSelbstGetastet ? " (von uns getastet)"
+                                     : " (nicht von uns)");
+    });
+
+    qCInfo(lcFlexGui) << "Flex-Senden verdrahtet — es wurde nichts getastet";
 }
 
 }  // namespace Longpath
