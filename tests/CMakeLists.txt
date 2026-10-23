@@ -145,6 +145,12 @@ endif()
 set(LONGPATH_TEST_PLATFORM "${_longpath_default_test_platform}" CACHE STRING
     "QT_QPA_PLATFORM für die Prüfstände; leer = Systemvorgabe")
 
+# Zeitgrenze je Prüfstand, in Sekunden. Begründung bei
+# set_tests_properties() in longpath_add_test() weiter unten.
+# 120 bleibt die Vorgabe für Linux, macOS und jeden lokalen Bau.
+set(LONGPATH_TEST_TIMEOUT "120" CACHE STRING
+    "Zeitgrenze je Prüfstand in Sekunden (ctest TIMEOUT)")
+
 function(longpath_add_test name)
     # Ein Test HINTER dem Sammelziel all_tests (unten) kommt nicht in
     # dessen Abhaengigkeiten: CI baut nur all_tests, ctest meldet ihn
@@ -242,10 +248,25 @@ function(longpath_add_test name)
     # test from an indefinite block into a failure. 120s is deliberately
     # generous: the slowest test in the suite as of 2026-07-25 is
     # tst_ps_feedback_channel at ~30s.
+    #
+    # ── Die Grenze ist jetzt einstellbar (2026-10-23) ────────────────
+    #
+    # Weil 120 s je Pruefstand auf einer Plattform, auf der VIELE
+    # haengen, kein Zeitlimit mehr ist, sondern eine Multiplikation:
+    # 189 Pruefstaende × 120 s sind 6,3 Stunden. Genau das ist auf
+    # Windows passiert -- der ctest-Schritt des Laufs 39812571171 lief
+    # ueber zweieinhalb Stunden und wurde abgebrochen, ohne ein
+    # Ergebnis zu liefern. Ein Lauf, der in sein eigenes Zeitlimit
+    # rennt, sagt NICHTS: er nennt nicht einmal die Namen der Haenger.
+    #
+    # `ctest --timeout` hilft dafuer nicht: diese Eigenschaft hier
+    # schlaegt den Kommandozeilenwert. Die Grenze muss also beim
+    # Konfigurieren fallen, und darum steht sie in einer
+    # Cache-Variablen.
     _longpath_derive_test_labels(_test_labels "${name}.cpp")
     set_tests_properties(${name} PROPERTIES
         LABELS "${_test_labels}"
-        TIMEOUT 120)
+        TIMEOUT ${LONGPATH_TEST_TIMEOUT})
 
     # Per-label build aggregates, so `ctest -L core` has a matching
     # `tests_core` target that actually builds what it is about to run.

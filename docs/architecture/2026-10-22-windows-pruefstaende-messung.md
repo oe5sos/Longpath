@@ -192,31 +192,85 @@ Daraus:
   Linken ≈ **2,5 h**, bei doppeltem Minutenpreis gegenüber Linux.
 * **ganze Reihe, vier Teile:** ≈ 1 h je Teil, vier Läufer parallel —
   gleiche Läuferzeit, schnellere Antwort.
-* **Teilmenge `appless` (189):** ~15 min App + ~10 min Übersetzen +
-  ~17 min Linken ≈ **45 min** auf einem Läufer.
+* **Teilmenge `appless` (189):** **85 min** für den Testbau, gemessen
+  (Lauf 39812571171) — nicht die 45 min, die ich aus den 21 s je
+  Binärdatei hochgerechnet hatte. Die 21 s stammten aus einem Bau von
+  fünf Zielen; bei 189 ist der Durchsatz schlechter, nicht besser.
+  Hochrechnen aus einer kleinen Stichprobe hat hier um den Faktor zwei
+  danebengelegen.
 
 Zum Vergleich steht heute der Windows-Auftrag bei 13 min.
 
 ## Was eingeschaltet ist
 
-Die Marke **`appless`** — jeder Prüfstand mit `QTEST_APPLESS_MAIN`, also
-ohne `QApplication` und ohne Fenster. Hergeleitet aus der Datei selbst,
-genau wie `core` / `models` / `gui`, nicht aus einer Tabelle, die jemand
-pflegen muss. Damit entstehen von allein `ctest -L appless` und das
-Bauziel `tests_appless`, auf allen drei Plattformen.
+### Erster Anlauf (2026-10-22): die Marke `appless` — eine Stufe zu grob
 
-**189 von 1084** tragen sie (auf macOS gezählt). Lokal auf macOS gebaut
-und gefahren: 189 von 189 grün in 236 s. 15 davon tragen auch die Marke
-`gui` — sie binden `gui/`-Kopfdateien ein, bauen aber kein
-`QApplication` auf.
+Die Marke **`appless`** ist jeder Prüfstand mit `QTEST_APPLESS_MAIN`,
+also ohne `QApplication` und ohne Fenster. Hergeleitet aus der Datei
+selbst, genau wie `core` / `models` / `gui`, nicht aus einer Tabelle, die
+jemand pflegen muss. Damit entstehen von allein `ctest -L appless` und
+das Bauziel `tests_appless`, auf allen drei Plattformen. **189 von 1084**
+tragen sie; lokal auf macOS: 189 von 189 grün in 236 s.
 
-Windows fährt `ctest --no-tests=error -L appless`. Das `error` statt des
-bisherigen `ignore` ist Absicht: findet ctest unter der Marke nichts,
-soll der Lauf **laut** abbrechen. Ein Tor, das nichts prüft und trotzdem
-grün meldet, ist genau der Fehler, den dieselbe Datei am 2026-05-12
-schon einmal beseitigt hat.
+Auf Windows war es zu viel auf einmal, und das ist gemessen (Lauf
+39812571171):
+
+```
+Bau der 189 Pruefstaende        85 min
+ctest                           >2,5 h, dann abgebrochen
+```
+
+Kein Ergebnis, und — das ist der eigentliche Fehler — **keine Namen**.
+Ein Lauf, der in sein eigenes Zeitlimit rennt, sagt nichts darüber, was
+gehangen hat. Der Windows-Auftrag lag vorher bei 13 min.
+
+Dass es hängt, liegt nicht am DLL-Ziel: in Lauf 39770533685 lagen die
+drei DLLs nachweislich neben den Binärdateien
+(`build/tests/libfftw3-3.dll`, `libfftw3f-3.dll`, `librade.dll`).
+Ausgeschlossen ist auch `QApplication` an sich — `tst_sendefehler_deutung`
+(QTEST_MAIN) lief dort in 0,07 s durch.
+
+### Zweiter Anlauf (2026-10-23): eine namentliche Liste
+
+Das Tor fährt jetzt **sechs** Prüfstände, für die ein Durchlauf auf
+`windows-latest` belegt ist (Lauf 39762280534 — die ersten fünf
+zusammen in 0,66 s, der sechste in 0,07 s):
+
+```
+tst_amateur_bands  tst_adif_log  tst_beam_heading
+tst_callsign_cache tst_alex_filter_map  tst_sendefehler_deutung
+```
+
+Das ist wenig. Es ist gemessen, es ist schnell, und es ist mehr als die
+Null, die bis zum 2026-10-22 dort stand.
+
+### Wie die Liste wächst — und warum sie das kann
+
+Die Zeitgrenze je Prüfstand ist jetzt einstellbar
+(`LONGPATH_TEST_TIMEOUT`, Vorgabe 120 wie bisher, auf Windows 30). Das
+ist der Unterschied zwischen einer Messung und einem Abbruch: 189 × 120 s
+sind 6,3 h, 189 × 30 s sind 95 min — und der Lauf **endet**, also nennt
+`ctest --output-on-failure` am Schluss jeden Hänger beim Namen.
+
+`ctest --timeout` hilft dafür nicht: die `TIMEOUT`-Eigenschaft aus
+`longpath_add_test()` schlägt den Kommandozeilenwert. Die Grenze muss
+beim Konfigurieren fallen.
+
+Der nächste Schritt ist also kein Rätselraten, sondern ein Lauf mit
+`--target tests_appless` und `-L appless`. Wer die Namen hat, hängt die
+Durchgelaufenen an die Liste und untersucht den Rest.
+
+Windows fährt `ctest --no-tests=error`. Das `error` statt des bisherigen
+`ignore` ist Absicht: findet ctest nichts, soll der Lauf **laut**
+abbrechen. Ein Tor, das nichts prüft und trotzdem grün meldet, ist genau
+der Fehler, den dieselbe Datei am 2026-05-12 schon einmal beseitigt hat.
 
 ## Was offen bleibt
+
+**Die 183 appless-Prüfstände, die nicht im Tor sind.** Sie übersetzen
+und linken auf Windows (belegt). Ob sie laufen, ist offen — der eine
+Lauf, der es gesagt hätte, rannte in sein Zeitlimit. Der Weg dorthin
+steht oben unter „Wie die Liste wächst".
 
 **Martins Entscheidung — Prüfstände mit Oberfläche auf Windows?** Dafür
 braucht es einen Schirmweg (Linux nutzt `xvfb`, macOS das
