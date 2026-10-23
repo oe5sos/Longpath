@@ -51,6 +51,9 @@ die Longpath-Datei übernommen:
 | `src/HvDecoderMs/decoderft8.cpp:90-120` (Filter + Kantenkorrektur) | `src/core/Ft8Subtract.cpp` | port |
 | `src/HvDecoderMs/decoderft8.cpp:272` (`K_SUB 1.9962`) | `src/core/Ft8Subtract.cpp` | Konstante |
 | `src/HvDecoderMs/decoderft8.cpp:335-336` (`nsym=79`, `nsps=1920`) | `src/core/Ft8Subtract.h` | Konstante |
+| `src/HvMsPlayer/libsound/HvGenFt8/gen_ft8.cpp:262` (`f0 = f_tx + 60.0*islot`, Klammer 100..5000 Hz) | `src/core/Ft8Tx.cpp` (`tonleiter`) | Verfahren + Konstanten |
+| `src/HvMsPlayer/libsound/HvGenFt8/gen_ft8.cpp:290` (`d_iwave[k1] += sin(phi)`) | `src/core/Ft8Tx.cpp` (`vorbereitenMehrere`) | Verfahren |
+| `src/HvMsPlayer/libsound/HvGenFt8/gen_ft8.cpp:303` (`d_iwave[z]/(double)nslots`) | `src/core/Ft8Tx.cpp` (`vorbereitenMehrere`) | Verfahren |
 
 ## Was bewusst NICHT portiert wurde
 
@@ -87,9 +90,36 @@ kostet ein FFT-Paar und findet die Stelle probengenau.
 | Zwei Stationen auf derselben Tonlage, die schwächere 12 dB darunter | eine Runde findet **1**, zwei Runden finden **2** |
 | Volles Band (15 Signale) | 15 gefunden, **228 ms** |
 
-## Was MSHV sonst noch könnte
+## Multi Answering — Stufe 1 übernommen (2026-10-22)
 
-Multi Answering (mehrere Stationen gleichzeitig abarbeiten) ist
-**nicht** portiert und war auch nicht beauftragt. Es greift in den
-Sendeweg, nicht in den Dekoder. Siehe die Notiz im Gedächtnis
-(`longpath-ft8-programme-vergleich`).
+Der Betreiber hat es am 2026-10-22 beauftragt („mshv wäre meine erste
+wahl, sofern möglich"), nachdem es am 2026-10-21 ausdrücklich noch
+nicht beauftragt war.
+
+**Übernommen ist das Verfahren der Tonerzeugung**, kein Code:
+
+| Was | Wert |
+| --- | --- |
+| Abstand zweier Plätze | **60 Hz** |
+| Grenzen | 100 … 5000 Hz |
+| Zusammenführung | alle Kurven in eine summiert |
+| Pegel | durch die **Zahl der Plätze** geteilt |
+
+Die Teilung ist kein Geschmack: der Sender hat eine Höchstamplitude.
+Zwei Plätze heißen **−6 dB je Station**, vier **−12 dB**. Wer das
+weglässt, übersteuert.
+
+Belegt im Rundlauf gegen den **eigenen** Dekoder
+(`tests/tst_ft8_multi_answering.cpp`): drei Nachrichten in ein Fenster,
+alle drei kommen wieder heraus.
+
+**Noch nicht übernommen:** die Ablaufsteuerung für mehrere QSOs
+gleichzeitig (MSHVs `hvmultianswermodw.cpp`, rund 3000 Zeilen, davon
+der größte Teil Fensterwerk) und die Fläche dafür. `Ft8Ablauf` ist eine
+reine Rechenvorschrift je QSO — mehrere davon nebeneinander ist der
+nächste Schritt, nicht dieser.
+
+**Was dabei zu bedenken ist:** mehrere überlagerte Signale haben keine
+konstante Hüllkurve mehr. Damit fällt der Grund weg, PureSignal bei
+FT8 abzuschalten — und es wird gebraucht, weil Überlagerung
+Intermodulation erzeugt.

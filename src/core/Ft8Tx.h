@@ -82,6 +82,51 @@ public:
                      float toneHz,
                      Ft8Decoder::Protocol protocol);
 
+    // ── Mehrere Stationen in einem Fenster (MSHV „Multi Answering") ──
+    //
+    // Betreiber am 2026-10-22: MSHV ist die erste Wahl, und MSHVs
+    // Besonderheit ist genau das -- mehrere Anrufer in DEMSELBEN
+    // Fenster abarbeiten statt nacheinander.
+    //
+    // Verfahren aus MSHV gelesen, nicht erfunden
+    // (`src/HvMsPlayer/libsound/HvGenFt8/gen_ft8.cpp:195-315`,
+    // Copyright 2018 Hrisimir Hristov LZ2HV, GPLv3 -- dieselbe Lizenz,
+    // unter der Longpath steht):
+    //
+    //   * je Platz ein eigener Ton, **60 Hz** auseinander
+    //     (`f0 = f_tx + 60.0*islot`, dort Zeile 262)
+    //   * begrenzt auf 100..5000 Hz (ebenda)
+    //   * alle Kurven in EINE summiert (`d_iwave[k1] += sin(phi)`)
+    //   * und am Ende durch die Zahl der Plaetze geteilt
+    //     (`8380000.0*(d_iwave[z]/(double)nslots)`, Zeile 303)
+    //
+    // Die Teilung ist der Preis und keine Wahl: der Sender hat eine
+    // Hoechstamplitude, und wer zwei Stationen gleichzeitig antwortet,
+    // gibt jeder 6 dB weniger, bei vier 12 dB. Nicht wegzurechnen --
+    // wer es anders macht, uebersteuert.
+    //
+    // Was DIESE Klasse weiterhin nicht tut: tasten. Siehe Kopf.
+    struct Platz {
+        QString text;
+        float   toneHz{0.0f};
+    };
+
+    /// Mehrere Nachrichten in ein Fenster legen. Leer oder nur eine ->
+    /// verhaelt sich wie `vorbereiten()`. Gibt false, sobald EINE der
+    /// Nachrichten nicht packbar ist: ein Fenster, in dem stillschweigend
+    /// eine Station fehlt, ist schlimmer als keines.
+    bool vorbereitenMehrere(const QVector<Platz>& plaetze,
+                            Ft8Decoder::Protocol protocol);
+
+    /// MSHVs Tonleiter: `grundTonHz`, dann je Platz 60 Hz hoeher,
+    /// begrenzt auf 100..5000 Hz. `anzahl` Plaetze.
+    static QVector<float> tonleiter(float grundTonHz, int anzahl);
+
+    /// Abstand zweier Plaetze, aus MSHV (gen_ft8.cpp:262).
+    static constexpr float kPlatzAbstandHz = 60.0f;
+    static constexpr float kMinTonHz = 100.0f;
+    static constexpr float kMaxTonHz = 5000.0f;
+
     /// Von vorn abspielen. Ohne vorbereitete Nachricht wirkungslos.
     void starten();
 

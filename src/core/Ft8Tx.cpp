@@ -12,6 +12,8 @@
 
 #include "core/Resampler.h"
 
+#include <QStringList>
+
 #include <algorithm>
 #include <cstring>
 
@@ -60,6 +62,86 @@ bool Ft8TxSource::vorbereiten(const QString& text,
 
     m_proben = std::move(aus);
     m_text = text;
+    m_pos.store(0, std::memory_order_release);
+    return !m_proben.isEmpty();
+}
+
+QVector<float> Ft8TxSource::tonleiter(float grundTonHz, int anzahl)
+{
+    // MSHV gen_ft8.cpp:262-264 [GPLv3, LZ2HV]:
+    //   double f0 = f_tx + (60.0*(double)islot);
+    //   if (f0<100.0)  f0=100.0;
+    //   if (f0>5000.0) f0=5000.0;
+    QVector<float> aus;
+    if (anzahl <= 0) { return aus; }
+    aus.reserve(anzahl);
+    for (int i = 0; i < anzahl; ++i) {
+        float f0 = grundTonHz + kPlatzAbstandHz * static_cast<float>(i);
+        if (f0 < kMinTonHz) { f0 = kMinTonHz; }
+        if (f0 > kMaxTonHz) { f0 = kMaxTonHz; }
+        aus.append(f0);
+    }
+    return aus;
+}
+
+bool Ft8TxSource::vorbereitenMehrere(const QVector<Platz>& plaetze,
+                                     Ft8Decoder::Protocol protocol)
+{
+    if (plaetze.isEmpty()) { return false; }
+    if (plaetze.size() == 1) {
+        return vorbereiten(plaetze.first().text, plaetze.first().toneHz, protocol);
+    }
+
+    abbrechen();
+
+    // Jede Nachricht fuer sich erzeugen, dann summieren. Erst ALLE
+    // rechnen und dann erst den Zustand anfassen: schlaegt die dritte
+    // fehl, soll nicht ein halbes Fenster stehenbleiben.
+    QVector<QVector<float>> einzeln;
+    einzeln.reserve(plaetze.size());
+    int laenge = 0;
+    QStringList texte;
+    for (const Platz& p : plaetze) {
+        QVector<float> bei12k;
+        if (!Ft8Decoder::encodeBlock(p.text, p.toneHz, protocol, &bei12k)) {
+            return false;
+        }
+        laenge = std::max(laenge, static_cast<int>(bei12k.size()));
+        einzeln.append(std::move(bei12k));
+        texte << p.text;
+    }
+
+    // Summieren und durch die Zahl der Plaetze teilen -- MSHV
+    // gen_ft8.cpp:290 (`d_iwave[k1] += sin(phi)`) und :303
+    // (`d_iwave[z]/(double)nslots`). Die Teilung ist kein Geschmack:
+    // der Sender hat eine Hoechstamplitude, und ohne sie uebersteuert
+    // jedes Fenster mit mehr als einer Station.
+    QVector<float> summe(laenge, 0.0f);
+    for (const QVector<float>& eine : einzeln) {
+        for (int i = 0; i < eine.size(); ++i) { summe[i] += eine[i]; }
+    }
+    const float teiler = static_cast<float>(einzeln.size());
+    for (int i = 0; i < laenge; ++i) { summe[i] /= teiler; }
+
+    if (!m_umtaster) {
+        m_umtaster = std::make_unique<Resampler>(
+            double(Ft8Decoder::kSampleRate), double(m_micRateHz), kBlock);
+    }
+
+    QVector<float> aus;
+    aus.reserve(summe.size() * (m_micRateHz / Ft8Decoder::kSampleRate + 1) + 64);
+    QVector<float> puffer(kBlock * 8 + 64);
+    for (int pos = 0; pos < summe.size(); pos += kBlock) {
+        const int n = std::min<int>(kBlock, summe.size() - pos);
+        const int geschrieben = m_umtaster->processInto(
+            summe.constData() + pos, n, puffer.data(), puffer.size());
+        for (int i = 0; i < geschrieben; ++i) { aus.append(puffer[i]); }
+    }
+
+    m_proben = std::move(aus);
+    // Die Anzeige soll sehen, dass mehrere drin sind -- MSHV trennt sie
+    // im eigenen Quelltext ebenfalls mit „#" (gen_ft8.cpp:209).
+    m_text = texte.join(QLatin1Char('#'));
     m_pos.store(0, std::memory_order_release);
     return !m_proben.isEmpty();
 }
