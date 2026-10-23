@@ -1846,6 +1846,28 @@ private:
     /// Wahr, wenn die Scheibe fuer die Flex von uns angelegt wurde —
     /// dann raeumen wir sie beim Trennen auch wieder weg.
     bool m_flexSliceWasCreated{false};
+    /// Echo-Wachposten fuer die Flex, dasselbe Muster wie
+    /// `m_sunSdrApplyingRemoteState`: waehrend ein Zustand VON der
+    /// Maschine in die Scheibe geschrieben wird, darf die Scheibe
+    /// nicht zurueckfunken. Sonst antwortet jeder Zustandsschub mit
+    /// einem `slice tune`, der den naechsten Schub ausloest.
+    bool m_flexApplyingRemoteState{false};
+    /// Die Verbindung Scheibe -> Flex (Abstimmen nach aussen).
+    /// Von Hand gehalten, weil `Qt::UniqueConnection` bei einer Lambda
+    /// nicht greift und dort still GAR NICHTS verbindet.
+    QMetaObject::Connection m_flexAbstimmBand;
+    /// Dasselbe fuer Betriebsart und Filterflanken.
+    QMetaObject::Connection m_flexArtBand;
+    QMetaObject::Connection m_flexFilterBand;
+    /// Einmal je Verbindung: die Fensterbreite auf den Ausschnitt der
+    /// Flex stellen. Danach gehoert der Zoom wieder dem Betreiber.
+    bool m_flexAusschnittUebernommen{false};
+    /// Der zuletzt von der Maschine gemeldete Ausschnitt. Dient dazu,
+    /// eine blosze Mittenverschiebung von einer echten Breitenaenderung
+    /// zu unterscheiden — sonst wirft jedes Abstimmen den Zoom des
+    /// Betreibers weg (2026-10-23).
+    double m_flexFensterMitteHz{0.0};
+    double m_flexFensterBreiteHz{0.0};
     /// Warum das Flex-Bild gerade nicht gezeichnet wird — damit die
     /// Meldung einmal je Grund kommt und nicht 25 Mal je Sekunde.
     enum class FlexBildGrund { Unbekannt, KeinAusschnitt, KeinFenster,

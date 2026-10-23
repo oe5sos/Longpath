@@ -153,6 +153,31 @@ private slots:
         QCOMPARE(slice.frequency(), 7100000.0);
         QCOMPARE(lastBand, Band::Band40m);
     }
+
+    // ── Das Seitenband haengt NICHT an setFrequency (2026-10-23) ────
+    //
+    // Hier standen drei Faelle, die die LSB-Regel direkt an
+    // `SliceModel::setFrequency` geprueft haben. Dort hat sie nicht
+    // hingehoert: `setDspMode` setzt die Filterbreite auf die Vorgabe
+    // der neuen Betriebsart zurueck, und mitten im Frequenzsetzen hat
+    // das die Ablage-Pruefstaende umgeworfen.
+    //
+    // Die Regel sitzt jetzt bei den drei Aufrufern, die wirklich eine
+    // Bandauswahl sind (RadioModel::richteSeitenbandAus beim Banddruck
+    // und beim Hochfahren, MainWindow_Flex beim Verbinden). Was hier
+    // bleibt, ist die Gegenprobe: eine blosze Frequenzaenderung darf
+    // die Betriebsart NICHT anfassen — sonst koennte man auf 40 m nie
+    // USB einstellen.
+    void eineFrequenzaenderung_laesstDieBetriebsartStehen()
+    {
+        SliceModel slice;
+        slice.setFrequency(7100000.0);
+        slice.setDspMode(DSPMode::USB);     // von Hand, auf 40 m
+        slice.setFrequency(7120000.0);      // innerhalb des Bandes
+        QCOMPARE(slice.dspMode(), DSPMode::USB);
+        slice.setFrequency(14200000.0);     // ueber die Bandgrenze
+        QCOMPARE(slice.dspMode(), DSPMode::USB);
+    }
 };
 
 QTEST_MAIN(TestBandChangeRecursionGuard)

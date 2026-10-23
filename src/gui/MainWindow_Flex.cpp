@@ -69,9 +69,14 @@
 // Fuer den Anspruchs-Abgleich: Kiwi fuehrt seine Zuordnung in einer
 // eigenen Tabelle, nicht ueber streamIndex().
 #include "core/KiwiSdrManager.h"
+#include "gui/meters/MeterPoller.h"
+#include "gui/ConnectionPanel.h"
+#include "core/ClarityController.h"
+#include <QTimer>
 #include "gui/SpectrumWidget.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "models/BandDefaults.h"
 
 #include <QLoggingCategory>
 
@@ -171,18 +176,326 @@ void MainWindow::wireFlex()
         }
 
         m_flexTargetSliceId = ziel->sliceIndex();
+
+        // ── Und sie muss die AKTIVE Scheibe sein (2026-10-22) ────────
+        //
+        // `RadioModel::onBandButtonClicked` — der Weg jedes Band- und
+        // Frequenzwechsels — beginnt mit `activeSlice()` und kehrt ohne
+        // ein Wort um, wenn es keine gibt. Beim Flex legen wir die
+        // Scheibe selbst an; aktiv wird sie dabei nicht. Folge am
+        // Geraet am 2026-10-22: der Betreiber drehte einen Abend lang
+        // an Band und Frequenz, und an die Maschine ging NULL Mal ein
+        // `slice tune`. Sie stand die ganze Zeit auf 14.100.
+        m_radioModel->setActiveSliceById(m_flexTargetSliceId);
+
+        // Von innen nach aussen. Erst HIER verdrahtet, weil es die
+        // Zielscheibe vorher nicht gibt.
+        //
+        // ── `Qt::UniqueConnection` geht nicht mit einer Lambda ───────
+        //
+        // Hier stand `Qt::UniqueConnection`, damit ein zweites Anmelden
+        // nicht doppelt sendet. Qt unterstuetzt das aber NUR fuer
+        // Zeiger auf Elementfunktionen; bei einer Lambda scheitert
+        // `connect()` still und gibt eine leere Verbindung zurueck —
+        // es wird GAR NICHTS verbunden.
+        //
+        // Folge am Geraet, 2026-10-22, ein ganzer Abend: der Betreiber
+        // drehte an Band und Frequenz, die Anzeige folgte, und an die
+        // Maschine ging in sechs Laeufen NULL Mal ein `slice tune`. Die
+        // Flex stand die ganze Zeit auf 14.100 USB — dort ist nur
+        // Rauschen, und genau das hat er gehoert. Gemessen:
+        //   Klick im Panadapter "pan-0" 1.41747e+07 Scheibe 0
+        //   gesperrt false
+        // und danach kein Mucks mehr.
+        //
+        // Das Doppelte wird jetzt von Hand verhindert: die alte
+        // Verbindung wird vor der neuen geloest.
+        disconnect(m_flexAbstimmBand);
+        m_flexAbstimmBand = connect(ziel, &SliceModel::frequencyChanged, this,
+                [this](double hz) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            // Sagt, WARUM nicht abgestimmt wird. Ohne das sieht ein
+            // nicht durchgereichter Drehknopf genauso aus wie einer,
+            // der gar nicht erst ankommt (2026-10-22, eine Stunde).
+            if (!flexControllableSlice()) {
+                SliceModel* s = m_radioModel
+                    ? m_radioModel->sliceById(m_flexTargetSliceId) : nullptr;
+                qCWarning(lcFlexGui)
+                    << "Abstimmen verworfen — Zielscheibe"
+                    << m_flexTargetSliceId
+                    << "vorhanden" << (s != nullptr)
+                    << "streamIndex" << (s ? s->streamIndex() : -999);
+                return;
+            }
+            m_radioModel->tuneFlexSlice(hz);
+        });
+
+        // ── Betriebsart und Filterbreite, derselbe Weg ──────────────
+        //
+        // Bis zum 2026-10-22 ging nur die Frequenz hinaus — und auch
+        // die nicht (siehe oben). Mit dem Abstimmen allein hoerte der
+        // Betreiber Stationen, aber keine verstaendliche Sprache:
+        // „als waere es eine andere modulation". Das war sie auch.
+        // Longpath zeigte LSB, die Maschine stand auf USB, weil die
+        // Betriebsart nur EINMAL beim Verbinden gesetzt wurde.
+        //
+        // Dieselbe Wache wie bei der Frequenz: ein Zustandsschub der
+        // Maschine darf den Befehl nicht zurueckwerfen, und eine
+        // Scheibe mit echter DDC-Bindung wird nie gefuettert.
+        disconnect(m_flexArtBand);
+        m_flexArtBand = connect(ziel, &SliceModel::dspModeChanged, this,
+                [this](DSPMode art) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            m_radioModel->setFlexSliceMode(art);
+        });
+
+        disconnect(m_flexFilterBand);
+        m_flexFilterBand = connect(ziel, &SliceModel::filterChanged, this,
+                [this](int tief, int hoch) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            m_radioModel->setFlexSliceFilter(tief, hoch);
+        });
+
+        // Und einmal gleich jetzt, damit die Maschine mit dem
+        // uebereinstimmt, was im Fenster steht — sonst gilt der
+        // Unterschied bis zum ersten Drehen weiter.
+        m_radioModel->setFlexSliceMode(ziel->dspMode());
+        m_radioModel->setFlexSliceFilter(ziel->filterLow(), ziel->filterHigh());
+
+        // ── Beim VERBINDEN gewinnt die MASCHINE ─────────────────────
+        //
+        // Zwei Dinge laufen hier gegeneinander: Longpath uebernimmt
+        // zuerst Frequenz und Ausschnitt der Maschine, danach stellt
+        // das Layoutprofil die gespeicherte Scheibe her — und die kann
+        // auf einem ganz anderen Band stehen. Am Geraet gemessen am
+        // 2026-10-23: die Maschine lieferte 7.065–7.265 MHz, das
+        // Fenster stand nach dem Profil auf 14.150–14.300. KEINE
+        // Ueberlappung, also hatte der Panadapter nichts zu zeichnen
+        // (Bandmeldung: Rauschteppich −600 dBm, Hub 0 dB). Der
+        // Betreiber: „oben alles schwarz".
+        //
+        // Der erste Versuch zog den PANADAPTER auf die Scheibe. Das
+        // war verkehrt herum und sofort zu merken: der Betreiber hoerte
+        // auf 80 m, und das Programm riss ihm die Maschine beim
+        // Starten auf die 20 m aus dem gespeicherten Profil. Wer das
+        // Geraet gerade von SmartSDR oder der Frontplatte aus benutzt,
+        // soll davon nichts merken.
+        //
+        // Also andersherum: nach dem Profilaufbau wird die Frequenz
+        // der MASCHINE in die Scheibe zurueckgeschrieben. Der
+        // Panadapter stimmt dann ohnehin, denn er steht dort schon.
+        // 1500 ms, weil der Profilaufbau in sechs Schritten laeuft und
+        // beim Messen rund 600 ms brauchte.
+        QTimer::singleShot(1500, this, [this]() {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            SliceModel* s = flexControllableSlice();
+            if (!s) { return; }
+            const double geraet = m_radioModel->flexGeraeteFrequenzHz();
+            if (!(geraet > 0.0)) { return; }
+            if (qFuzzyCompare(geraet, s->frequency())) { return; }
+            qCInfo(lcFlexGui).nospace()
+                << "Flex: das Profil stellte " << (s->frequency() / 1.0e6)
+                << " MHz her, die Maschine steht auf " << (geraet / 1.0e6)
+                << " MHz — die Maschine gewinnt";
+            // Die Wache setzen: sonst schickt die Scheibe die eben
+            // uebernommene Frequenz als Befehl zurueck.
+            m_flexApplyingRemoteState = true;
+            s->setFrequency(geraet);
+            m_flexApplyingRemoteState = false;
+
+            // ── Und das Seitenband zum neuen Band (2026-10-23) ───────
+            //
+            // Betreiber: „80 und 160 sowie 40 muessen immer automatisch
+            // bei bandauswahl LSB sein". Dass die Maschine hier die
+            // Frequenz durchsetzt, IST eine Bandauswahl — nur eine, die
+            // nicht ueber den Bandknopf laeuft und damit auch nicht
+            // ueber `SliceModel::restoreFromSettings`, wo die Regel
+            // sonst greift. Am Geraet kam 40 m deshalb in USB: das
+            // Profil stand auf 20 m, die Flex zog auf 7,148 MHz, und
+            // das USB des 20-m-Platzes blieb stehen.
+            //
+            // NICHT in `SliceModel::setFrequency` allgemein: `setDspMode`
+            // setzt dort die Filterbreite auf die Vorgabe der neuen
+            // Betriebsart zurueck und hat mitten im Wiederherstellen
+            // drei Pruefstaende der Ablage umgeworfen.
+            //
+            // Ohne Wache: diese Betriebsart SOLL zur Maschine hinaus.
+            const DSPMode gerichtet =
+                BandDefaults::korrigiereSeitenband(
+                    bandFromFrequency(geraet), s->dspMode());
+            if (gerichtet != s->dspMode()) {
+                qCInfo(lcFlexGui).nospace()
+                    << "Flex: " << bandLabel(bandFromFrequency(geraet))
+                    << " gehoert auf " << (gerichtet == DSPMode::LSB
+                                           ? "LSB" : "USB")
+                    << " — Seitenband gerichtet";
+                s->setDspMode(gerichtet);
+            }
+        });
+
+    // ── Betriebsart und Filterbreite, derselbe Weg ──────────────
+        //
+        // Bis zum 2026-10-22 ging nur die Frequenz hinaus — und auch
+        // die nicht (siehe oben). Mit dem Abstimmen allein hoerte der
+        // Betreiber Stationen, aber keine verstaendliche Sprache:
+        // „als waere es eine andere modulation". Das war sie auch.
+        // Longpath zeigte LSB, die Maschine stand auf USB, weil die
+        // Betriebsart nur EINMAL beim Verbinden gesetzt wurde.
+        //
+        // Dieselbe Wache wie bei der Frequenz: ein Zustandsschub der
+        // Maschine darf den Befehl nicht zurueckwerfen, und eine
+        // Scheibe mit echter DDC-Bindung wird nie gefuettert.
+        disconnect(m_flexArtBand);
+        m_flexArtBand = connect(ziel, &SliceModel::dspModeChanged, this,
+                [this](DSPMode art) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            m_radioModel->setFlexSliceMode(art);
+        });
+
+        disconnect(m_flexFilterBand);
+        m_flexFilterBand = connect(ziel, &SliceModel::filterChanged, this,
+                [this](int tief, int hoch) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            m_radioModel->setFlexSliceFilter(tief, hoch);
+        });
+
+        // Und einmal gleich jetzt, damit die Maschine mit dem
+        // uebereinstimmt, was im Fenster steht — sonst gilt der
+        // Unterschied bis zum ersten Drehen weiter.
+        m_radioModel->setFlexSliceMode(ziel->dspMode());
+        m_radioModel->setFlexSliceFilter(ziel->filterLow(), ziel->filterHigh());
+
+        // ── Panadapter und Scheibe muessen beim VERBINDEN zusammen ──
+        //
+        // Beim Verbinden laufen zwei Dinge gegeneinander: Longpath
+        // uebernimmt zuerst den Ausschnitt der Maschine, danach stellt
+        // das Layoutprofil die gespeicherte Scheibe wieder her — und
+        // die kann auf einem ganz anderen Band stehen.
+        //
+        // Am Geraet gemessen am 2026-10-23: die Maschine lieferte
+        // 7.065–7.265 MHz, das Fenster stand nach dem Profil auf
+        // 14.150–14.300. KEINE Ueberlappung, also hatte der
+        // Panadapter nichts zu zeichnen (Bandmeldung: Rauschteppich
+        // −600 dBm, Hub 0 dB) und der Wasserfall war einfarbig. Der
+        // Betreiber: „oben alles schwarz".
+        //
+        // Darum einmal nachziehen, NACHDEM das Profil durch ist. Die
+        // Scheibe gewinnt: sie ist das, was der Betreiber sieht und
+        // hoert. 1500 ms, weil der Profilaufbau in sechs Schritten
+        // laeuft und beim Messen rund 600 ms brauchte.
+        QTimer::singleShot(1500, this, [this]() {
+            if (m_shuttingDown) { return; }
+            SliceModel* s = flexControllableSlice();
+            if (!s || !m_radioModel) { return; }
+            const double hz = s->frequency();
+            if (!(hz > 0.0)) { return; }
+            qCInfo(lcFlexGui).nospace()
+                << "Flex: Panadapter auf die Scheibe gezogen — "
+                << (hz / 1.0e6) << " MHz";
+            m_radioModel->zieheFlexPanadapterAuf(hz);
+        });
         if (AudioEngine* ae = m_radioModel->audioEngine()) {
+            // ── Den Ausgang anwerfen (2026-10-22) ────────────────────
+            //
+            // `AudioEngine::start()` oeffnet den Lautsprecherausgang und
+            // laesst den Abfluss aus dem MasterMixer anlaufen. Im ganzen
+            // Programm steht der Aufruf an genau EINER Stelle: im
+            // WDSP-Init-Rueckruf nach dem Verbinden mit einem EIGENEN
+            // Funkgeraet (RadioModel.cpp). Beim Flex gibt es den nicht —
+            // die Maschine rechnet selbst —, also lief der Ausgang nie
+            // an.
+            //
+            // Gemessen am 2026-10-22 an Martins FLEX-8400: der Ton kam
+            // bis in die Mischung und weiter nicht. Sonde am Abfluss,
+            // alle fuenf Sekunden:
+            //   Scheibe 0, mixed 256, Spitze 0,07, Vol 0,82,
+            //   Stumm false, Leerdrains 0, Bus FALSE
+            // Alles richtig bis zum letzten Schritt, und dort kein
+            // offener Ausgang. Der Betreiber hoerte eine Stunde lang
+            // nichts, obwohl die Maschine 30 987 Tonpakete geschickt
+            // hatte.
+            //
+            // SunSDR hat denselben Griff und dieselbe Begruendung
+            // (MainWindow_SunSdr.cpp, 2026-08-24) — beim Flex ist er
+            // schlicht vergessen worden. `start()` schuetzt sich gegen
+            // doppeltes Anlaufen (`if (m_running) return;`), ist hier
+            // also gefahrlos: laeuft der Ausgang schon durch ein eigenes
+            // Geraet, geschieht nichts.
+            ae->start();
             // Opportunistisch im Mix: ein Netzaussetzer zum Flex darf
             // nicht den ganzen Ton anhalten.
             ae->setFlexAudioSourceEnabled(m_flexTargetSliceId, true);
         }
         qCInfo(lcFlexGui) << "Flex-Ton auf Scheibe" << m_flexTargetSliceId;
 
+        // ── Die Maske geht von selbst zu (2026-10-22) ───────────────
+        //
+        // Der Selbstschluss haengt an `onConnectionStateChanged`, und
+        // das kommt von der OpenHPSDR-Verbindung. Die Flex hat keine,
+        // also blieb die Maske stehen, und hinter ihr lagen ALLE
+        // schwebenden Fenster samt Panadapter. Der Betreiber:
+        // „warum muss ich immer close klicken um auf das funkgeraet zu
+        // kommen". Hier ist die Stelle, an der die Flex wirklich steht.
+        QTimer::singleShot(1000, this, [this]() {
+            if (m_shuttingDown) { return; }
+            if (m_connectionPanel && m_connectionPanel->isVisible()
+                && m_radioModel && m_radioModel->istIrgendwieVerbunden()) {
+                qCInfo(lcFlexGui) << "Verbindungsmaske schliesst sich selbst";
+                m_connectionPanel->accept();
+            }
+        });
+
+        // ── Den Messwert-Umlauf anwerfen (2026-10-22) ────────────────
+        //
+        // Er wird sonst NUR aus `WdspEngine::initializedChanged`
+        // gestartet, und auch dort nur, wenn `rxChannelForSlice(0)`
+        // etwas liefert. Beim Flex gibt es diese Kette nicht — die
+        // Maschine rechnet selbst —, also lief der Umlauf nie, und das
+        // S-Meter blieb ohne Zeiger stehen, obwohl die Maschine den
+        // Pegel dreissigmal in der Sekunde schickt.
+        //
+        // `start()` auf einem schon laufenden Zeitgeber ist folgenlos;
+        // die fremde Quelle (MainWindow, setFremdeEmpfangsquelle) gibt
+        // ohne Flex-Messwert `nullopt`, der WDSP-Weg bleibt also
+        // unberuehrt.
+        if (m_meterPoller) { m_meterPoller->start(); }
+        if (m_radioModel->meterPoller() == nullptr && m_meterPoller) {
+            m_radioModel->setMeterPoller(m_meterPoller);
+        }
+
         // Der Panadapter zeigt ab jetzt die fremde Quelle; Bins vom
         // (nicht vorhandenen) Geraet werden damit verworfen.
         if (SpectrumWidget* sw = m_radioModel->spectrumWidget()) {
             sw->setKiwiDisplaySource(true);
         }
+    });
+
+    // ── Frequenz, beide Richtungen ──────────────────────────────────
+    //
+    // Bis zum 2026-10-22 ging hier gar nichts: `flexSliceFrequencyChanged`
+    // wurde ausgesendet und von niemandem gehoert. Der VFO zeigte nie,
+    // worauf die Maschine stand, und drehen liess sie sich nicht.
+    //
+    // Die Sicherheitsregel gilt auch hier, nicht nur fuer Ton und Bild:
+    // gesteuert wird ausschliesslich ueber `flexControllableSlice()`,
+    // also nie eine Scheibe mit echter DDC-Bindung
+    // (`streamIndex() >= 0`). Der SunSDR-Durchgang vom 2026-08-24 wurde
+    // genau deshalb nachgeschaerft — eine Fassung, die nur die Steuerung
+    // absicherte, war zu wenig.
+    connect(m_radioModel, &RadioModel::flexSliceFrequencyChanged, this,
+            [this](int, double hz) {
+        if (m_shuttingDown) { return; }
+        SliceModel* slice = flexControllableSlice();
+        if (!slice) { return; }
+        // Von der Maschine nach innen: dabei die Wache setzen, sonst
+        // schickt die Scheibe die eben empfangene Frequenz zurueck.
+        m_flexApplyingRemoteState = true;
+        slice->setFrequency(hz);
+        m_flexApplyingRemoteState = false;
     });
 
     // ── Ton ─────────────────────────────────────────────────────────
@@ -207,12 +520,127 @@ void MainWindow::wireFlex()
     // Frequenzen. Bis eine Zeile durch ist, gibt es also keinen
     // Ausschnitt, und dann wird nichts gezeichnet — lieber kein Bild
     // als ein Bild an der falschen Frequenz.
+    // ── Der Ausschnitt kommt vom Panadapter der Maschine ────────────
+    //
+    // Bis zum 2026-10-22 kam er aus der WASSERFALLKACHEL, und die hat
+    // ihre eigene Bin-Zahl und ihren eigenen Rand: am Geraet gemessen
+    // 230,6 kHz, waehrend der Panadapter 200 kHz breit war. Ueber den
+    // falschen Ausschnitt gespannt steht jedes Signal bis zu 15 kHz
+    // neben seiner Frequenz.
+    connect(m_radioModel, &RadioModel::flexAusschnittGeaendert, this,
+            [this](double tiefHz, double hochHz) {
+        if (m_shuttingDown || !(hochHz > tiefHz)) { return; }
+        m_flexSpanLowHz  = tiefHz;
+        m_flexSpanHighHz = hochHz;
+
+        // Das Fenster folgt dem Ausschnitt der Maschine — auch wenn er
+        // sich spaeter aendert (Bandwechsel, Zoom am Geraet, oder weil
+        // `tuneFlexSlice` den Panadapter nachgezogen hat).
+        if (SpectrumWidget* sw = m_radioModel
+                ? m_radioModel->spectrumWidget() : nullptr) {
+            const double mitte  = (tiefHz + hochHz) * 0.5;
+            const double breite = hochHz - tiefHz;
+
+            // ── Den Zoom des Betreibers nicht wegwerfen (2026-10-23) ──
+            //
+            // Hier stand `setFrequencyRange(mitte, breite)` immer. Die
+            // Maschine schickt ihren Ausschnitt aber auch dann neu,
+            // wenn sich nur die MITTE geaendert hat — nach jedem
+            // Abstimmen, weil `tuneFlexSlice` den Panadapter nachzieht.
+            // Damit sprang das Fenster bei jedem Doppelklick im
+            // Panadapter auf die volle Breite zurueck. Betreiber:
+            // „verkleinert sich das display und ich muss wieder mit
+            // plus vergroeszern".
+            //
+            // Also: Breite nur uebernehmen, wenn die Maschine WIRKLICH
+            // eine andere schickt (oder beim ersten Mal). Sonst nur um
+            // dieselbe Strecke mitwandern und die eigene Breite
+            // behalten.
+            const double alteBreite = m_flexFensterBreiteHz;
+            if (!m_flexAusschnittUebernommen
+                || alteBreite <= 0.0
+                || std::abs(breite - alteBreite) > 1.0) {
+                sw->setFrequencyRange(mitte, breite);
+            }
+            // Sonst: NICHTS. Eine reine Mittenverschiebung der
+            // Maschine kommt fast immer davon, dass der Betreiber
+            // gerade selbst abgestimmt hat — ihm das Fenster
+            // hinterherzuziehen hiesze, seinen Zoom wegzuwerfen UND
+            // (ohne CTUN, wo die Fenstermitte die Frequenz IST) ihn
+            // ein zweites Mal zu verstimmen. Im Protokoll stand das
+            // als Kette von sieben `tuneFlexSlice` in 150 ms.
+            m_flexFensterMitteHz  = mitte;
+            m_flexFensterBreiteHz = breite;
+
+            if (!m_flexAusschnittUebernommen) {
+                m_flexAusschnittUebernommen = true;
+                if (!sw->waterfallNFAGCEnabled()) {
+                    sw->setWaterfallNFAGCEnabled(true);
+                }
+            }
+            qCInfo(lcFlexGui).nospace()
+                << "Flex-Bild: Ausschnitt der Maschine uebernommen — "
+                << (breite / 1.0e3) << " kHz um " << (mitte / 1.0e6)
+                << " MHz";
+        }
+    });
+
+    // ── Der Wasserfall kommt von der Maschine (2026-10-23) ──────────
+    //
+    // Die FLEX-8400 fuehrt ZWEI Bildstroeme, und AetherSDR zeichnet
+    // auch aus beiden (docs/protocols/flex-wasserfall-aethersdr.md):
+    //   0x8003  Spektrum, Bildzeilen -> dBm ueber y_pixels
+    //   0x8004  Wasserfall, qint16/128 -> INTENSITAET, mit eigenem
+    //           Frequenzbereich und eigenem Takt (`LineDurationMS`)
+    //
+    // Longpath zog bisher nur den ersten und baute den Wasserfall aus
+    // den FFT-Bins nach. Der Betreiber am 2026-10-22: „das rot ist
+    // eigenartig gewesen, auch die zeitliche laenge, bis der
+    // wasserfall anfaengt". Beides folgt aus fremdem Takt und fremden
+    // Schwellen.
+    //
+    // `FlexVita::tileColourValue()` gab es in Longpath schon —
+    // geschrieben, nie benutzt.
     connect(m_radioModel, &RadioModel::flexWaterfallRowReady, this,
-            [this](quint32, const QVector<quint16>&,
+            [this](quint32, const QVector<quint16>& roh,
                    double lowFreqMhz, double highFreqMhz, quint32) {
-        if (m_shuttingDown) { return; }
-        m_flexSpanLowHz  = lowFreqMhz * 1.0e6;
-        m_flexSpanHighHz = highFreqMhz * 1.0e6;
+        if (m_shuttingDown || roh.isEmpty()) { return; }
+        if (!(highFreqMhz > lowFreqMhz)) { return; }
+        SpectrumWidget* sw = m_radioModel ? m_radioModel->spectrumWidget()
+                                          : nullptr;
+        if (!sw || !sw->kiwiDisplaySource()) { return; }
+
+        QVector<float> intensitaet(roh.size());
+        for (int i = 0; i < roh.size(); ++i) {
+            intensitaet[i] = FlexVita::tileColourValue(roh[i]);
+        }
+        sw->zeigeFremdeWasserfallzeile(intensitaet, lowFreqMhz * 1.0e6,
+                                       highFreqMhz * 1.0e6);
+
+        // ── KEIN Nachziehen der Mitte (2026-10-23, zurueckgebaut) ────
+        //
+        // Hier stand ein Nachzug der Panadaptermitte auf die
+        // Kachelmitte. Er hat den gemessenen Versatz von 7,4 kHz
+        // scheinbar geheilt (0 bis 1 Punkt auf 15 m) — aber nur,
+        // solange er AUCH das Fenster mitzog. Ohne das sprang der
+        // Versatz auf +106 Punkte = +18,7 kHz, also schlechter als
+        // vorher. Und das Fenster darf er nicht anfassen: ohne CTUN
+        // ist die Fenstermitte die Empfangsfrequenz, und der Nachzug
+        // hat den Betreiber nachweislich verstimmt (sieben
+        // `tuneFlexSlice` in 150 ms).
+        //
+        // Damit ist die Annahme widerlegt, der Zustandsschub der
+        // Maschine sei schuld: die Bild-FFT deckt den Ausschnitt des
+        // ZUSTANDS, nicht den der Kachel. Was gemessen wurde, war
+        // etwas anderes — und die Messung selbst ist nicht zuverlaessig
+        // genug fuer so einen Schluss: dieselbe Lage ergab im Abstand
+        // von 30 s einmal -8 und einmal +107 Punkte. Auf einem Band
+        // mit vielen aehnlichen Signalen rastet die Kreuzkorrelation
+        // auf dem falschen Nachbarn ein.
+        //
+        // Die Messung bleibt im Protokoll, aber sie meldet jetzt auch,
+        // wie DEUTLICH ihr bestes Ergebnis ist; erst daran laesst sich
+        // ein echter Versatz von einem Fehlgriff unterscheiden.
     });
 
     connect(m_radioModel, &RadioModel::flexSpectrumReady, this,
@@ -291,6 +719,28 @@ void MainWindow::wireFlex()
             }
         }
         meldeEinmal(FlexBildGrund::Zeichnet, "wird gezeichnet");
+
+        // ── Clarity muss diese Bins auch sehen (2026-10-22) ──────────
+        //
+        // Clarity bekam seine Bins bis heute AUSSCHLIESZLICH aus
+        // `primaryFftEngine()`, also aus dem eigenen Funkgeraet. Bei
+        // der Flex gibt es die nicht — sie rechnet selbst. Clarity war
+        // damit eingeschaltet (`ClarityEnabled=True` in Martins
+        // Profil) und ohne Boden, und `composeWaterfallActiveThresholds`
+        // liesz die Schwellen auf dem Stand stehen, den das letzte
+        // eigene Geraet hinterlassen hatte.
+        //
+        // Folge am Geraet: der Wasserfall war durchgehend EINFARBIG
+        // ROT — Rot ist bei Farbschema 0 die oberste Palettenstufe,
+        // also der Anschlag. Dieselbe Fehlerklasse ist in
+        // `composeWaterfallActiveThresholds` schon beschrieben
+        // („an einer SunSDR2 QRP ohne Antenne … der Wasserfall wurde
+        // ganz rot"), nur kam sie dort von einem FALSCHEN Boden und
+        // hier von gar keinem.
+        if (m_clarityController) {
+            m_clarityController->feedBins(dbm);
+        }
+
         sw->updateKiwiSpectrumDbm(dbm, m_flexSpanLowHz, m_flexSpanHighHz);
     });
 
@@ -315,6 +765,7 @@ void MainWindow::wireFlex()
             m_radioModel->removeSlice(m_flexTargetSliceId);
         }
         m_flexSliceWasCreated = false;
+        m_flexAusschnittUebernommen = false;
         m_flexTargetSliceId = -1;
         m_flexSpanLowHz = 0.0;
         m_flexSpanHighHz = 0.0;

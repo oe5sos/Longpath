@@ -99,6 +99,58 @@ private slots:
         QCOMPARE(slice->dspMode(),   DSPMode::CWU);
     }
 
+    // ── Das Seitenband wird beim Banddruck gerichtet (2026-10-23) ───
+    //
+    // Betreiber: „80 und 160 sowie 40 muessen immer automatisch bei
+    // bandauswahl LSB sein". Die Startwerte sagen das beim ERSTEN
+    // Besuch; beim zweiten stellt das Gedaechtnis wieder her, was
+    // zuletzt dort lag — ein von Hand gedrehtes USB bliebe liegen.
+    void verdrehtes_seitenband_wird_beim_banddruck_gerichtet() {
+        RadioModel radio;
+        radio.addSlice();
+        radio.setActiveSlice(0);
+        SliceModel* slice = radio.sliceById(0);
+
+        // (1) 80 m besuchen, dort von Hand auf USB drehen.
+        slice->setFrequency(14100000.0);
+        slice->setDspMode(DSPMode::USB);
+        radio.onBandButtonClicked(Band::Band80m);
+        slice->setDspMode(DSPMode::USB);           // von Hand, falsch
+        QCOMPARE(slice->dspMode(), DSPMode::USB);
+
+        // (2) Weg und wieder hin: jetzt muss LSB stehen.
+        radio.onBandButtonClicked(Band::Band20m);
+        radio.onBandButtonClicked(Band::Band80m);
+        QCOMPARE(slice->dspMode(), DSPMode::LSB);
+
+        // (3) Und es muss VERHEILT sein, nicht bei jedem Druck neu
+        //     gerichtet werden: noch einmal weg und hin, ohne dass
+        //     jemand von Hand etwas dreht.
+        radio.onBandButtonClicked(Band::Band20m);
+        QCOMPARE(slice->dspMode(), DSPMode::USB);  // 20 m ist USB
+        radio.onBandButtonClicked(Band::Band80m);
+        QCOMPARE(slice->dspMode(), DSPMode::LSB);
+    }
+
+    void digital_ueberlebt_den_banddruck() {
+        // Ein auf 40 m abgelegtes DIGU gehoert zu FT8 und ist kein
+        // verdrehtes Seitenband.
+        RadioModel radio;
+        radio.addSlice();
+        radio.setActiveSlice(0);
+        SliceModel* slice = radio.sliceById(0);
+
+        slice->setFrequency(14100000.0);
+        slice->setDspMode(DSPMode::USB);
+        radio.onBandButtonClicked(Band::Band40m);
+        slice->setFrequency(7074000.0);
+        slice->setDspMode(DSPMode::DIGU);
+
+        radio.onBandButtonClicked(Band::Band20m);
+        radio.onBandButtonClicked(Band::Band40m);
+        QCOMPARE(slice->dspMode(), DSPMode::DIGU);
+    }
+
     void same_band_is_no_op() {
         RadioModel radio;
         radio.addSlice();

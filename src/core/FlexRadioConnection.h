@@ -149,6 +149,96 @@ int sliceIdFromObject(const QString& object);
 // immer die achtstellige Kleinschreibung; unlesbar ⇒ leer.
 QString normalizedFlexId(QString text);
 
+// Der Befehl, der eine Scheibe abstimmt.
+//
+// From AetherSDR SliceModel.cpp:124 [@d58e2b8a] — Form und das
+// `autopan=0`: „SmartSDR pcap confirms: scroll-wheel uses
+// 'slice tune <id> <freq> autopan=0'". Ohne `autopan=0` zentriert die
+// Maschine den Panadapter neu; unser Bild haengt aber am Ausschnitt,
+// den die Wasserfallkachel meldet, und der springt dann mit.
+//
+// Hertz hinein, Megahertz mit sechs Nachkommastellen hinaus — dieselbe
+// Schreibweise, in der die Maschine Frequenzen meldet.
+QString tuneSliceCommand(const QString& sliceId, double hz);
+
+// ── Betriebsart und Filterbreite (2026-10-22) ────────────────────────
+//
+// Bis heute war `slice tune` der EINZIGE Befehl, den Longpath an eine
+// Flex-Scheibe schicken konnte. Betriebsart und Filterflanken gingen
+// nie hinaus: die Bedienung zeigte LSB und 2,9 kHz, die Maschine blieb
+// auf dem, was beim Verbinden gesetzt wurde. Der Betreiber am
+// 2026-10-22, nachdem das Abstimmen endlich durchkam: „aber reine
+// stimmen hoere ich nicht", „als waere es eine andere modulation",
+// „und der bandfilter zeigt auch zu wenig an". Beides derselbe Grund.
+//
+// Am Geraet gemessen war der Ton dabei makellos — 0–2,75 kHz,
+// scharfe Kante bei 3 kHz, ueber 4 kHz nur −79 dB am Lautsprecher.
+// Richtig demoduliert, nur in der falschen Seitenbandlage.
+//
+// Namen der Betriebsarten aus der Maschine selbst (`mode_list` im
+// Scheibenzustand): LSB, USB, AM, CW, DIGL, DIGU, SAM, FM, NFM, DFM,
+// RTTY. Eine Betriebsart, die nicht darin steht, gibt einen leeren
+// Befehl — lieber nichts schicken als die Scheibe verstellen.
+QString setSliceModeCommand(const QString& sliceId, const QString& mode);
+
+// From AetherSDR SliceModel.cpp:231-232 [@d58e2b8a]:
+//   // FlexAPI: "filt <id> <low_hz> <high_hz>"
+//   sendCommand(QString("filt %1 %2 %3").arg(m_id).arg(low).arg(high));
+// Flanken in Hertz, bezogen auf die Traegerfrequenz, wie die Maschine
+// sie in `filter_lo`/`filter_hi` zurueckmeldet.
+QString setSliceFilterCommand(const QString& sliceId, int lowHz, int highHz);
+
+// ── Den Panadapter der Maschine mitnehmen (2026-10-22) ───────────────
+//
+// `slice tune` traegt `autopan=0`, damit die Maschine das Bild bei
+// jedem Dreh nicht neu zentriert — unser Ausschnitt haengt an der
+// Wasserfallkachel und wuerde sonst springen. Der Preis: stimmt der
+// Betreiber WEIT ab, laeuft die Scheibe aus dem Ausschnitt heraus.
+//
+// Gemessen am Geraet, 2026-10-22, 21:22: die Scheibe stand auf
+// 14.382279 MHz, der Panadapter zeigte 230 kHz um 14.0999 MHz, also
+// 13,985–14,215. Der Betreiber hoerte an einer Stelle und sah eine
+// andere, 170 kHz daneben: „aber keine signale".
+//
+// From AetherSDR FlexBackend.cpp:420 [@d58e2b8a] —
+//   sendSlice("display pan set %1 center=%2")
+// Megahertz mit sechs Nachkommastellen, wie bei `slice tune`.
+QString setPanCenterCommand(const QString& panId, double hz);
+
+// ── Der Wasserfallstrom wird getrennt eingerichtet (2026-10-23) ──────
+//
+// Er ist nicht der Panadapter: der Panadapter-Zustand nennt ihn als
+// `waterfall=0x42000000` neben `panadapter=0x40000000`, und er hat
+// eigene Einstellungen. Longpath hat sie nie angefasst — am Geraet
+// stand in ALLEN fuenf Statusmeldungen `auto_black=1`. Die Maschine
+// rechnet dann ihren eigenen Schwarzpunkt in die Kachel, gezielt auf
+// SmartSDRs Darstellung, waehrend wir obendrauf noch einmal schaetzen.
+//
+// From AetherSDR RadioModel::configureWaterfall [@d58e2b8a]:
+//   display panafall set <wfId> auto_black=0 black_level=15 color_gain=50
+// mit Rueckfall auf `display waterfall set` fuer Fassungen ohne
+// Panafall-Adressierung. `black_level=0` statt 15, weil es bei
+// abgeschaltetem `auto_black` der Handwert der Maschine ist und wir
+// ohnehin selbst faerben.
+//
+// ── `line_duration` ist KEINE Millisekundenzahl ──────────────────────
+//
+// From AetherSDR WaterfallRate.h [@d58e2b8a]: es ist eine RATE von 1
+// bis 100, KLEIN ist LANGSAM und GROSZ ist SCHNELL — an echter
+// Flex-Hardware gemessen (AetherSDR #3070/#3104). FlexLib tippt das
+// Feld als Millisekunden, und wer das woertlich nimmt, dreht den
+// Regler um.
+//
+// Martins Maschine stand auf 80 und lieferte 12,5 Zeilen je Sekunde;
+// bei einem Wasserfall von rund 150 Bildzeilen sind das ZWOELF
+// Sekunden, bis er voll ist. Der Betreiber am 2026-10-23: „dauert
+// extrem lange bis bis kommt mit wasserfall". Mit 100 sind es 25
+// Zeilen je Sekunde, also sechs Sekunden — am Geraet nachgemessen.
+//
+// Nur ueber die Panafall-Adressierung: `display waterfall set …
+// line_duration=…` weist die Maschine ab (Code 50000016, gemessen).
+QString setWaterfallSetupCommand(const QString& waterfallId, bool rueckfall);
+
 // From AetherSDR RadioStatusOwnership.h:48-60 [@d58e2b8a] —
 // parsePanafallCreatePanId(). Die Antwort auf „display panafall
 // create" traegt die Kennung mal als `pan=`, mal als `id=`, mal nackt

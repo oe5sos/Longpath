@@ -284,6 +284,18 @@ public:
     FlexRadioConnection* flexConnection() { return m_flexConnection; }
     // Der VITA-49-Strom. Nur belegt, solange ein Flex verbunden ist.
     FlexVitaStream* flexStream() { return m_flexStream; }
+
+    /// Empfangspegel der Flex-Scheibe in dBm, oder nichts.
+    ///
+    /// Beim Flex rechnet die Maschine: die WDSP-Empfangskette ist leer,
+    /// und der S-Meter-Umlauf (MeterPoller) liest genau sie. Der
+    /// Betreiber sah darum am 2026-10-22 ein totes S-Meter, obwohl die
+    /// Maschine den Pegel laufend schickt (Messwert `LEVEL`, `src=SLC`).
+    ///
+    /// `nullopt`, wenn seit zwei Sekunden kein Messwertpaket kam. Ein
+    /// eingefrorener Zeiger behauptet eine Messung, die nicht mehr
+    /// stattfindet; lieber gar keine Anzeige.
+    std::optional<double> flexPegelDbm() const;
     ReceiverManager*  receiverManager()  { return m_receiverManager; }
     AudioEngine*      audioEngine()      { return m_audioEngine; }
     WdspEngine*       wdspEngine()       { return m_wdspEngine; }
@@ -938,6 +950,11 @@ public:
     // Issue #118.
     void onBandButtonClicked(Longpath::Band band);
 
+    /// Richtet das Seitenband von `slice` nach `band` aus (160/80/40 m
+    /// auf LSB, darueber USB) und legt die Korrektur ab. Beruehrt nur
+    /// Sprechseitenbaender; CW, Digital, AM und FM bleiben stehen.
+    void richteSeitenbandAus(SliceModel* slice, Longpath::Band band);
+
     // Panadapter management (client-side)
     QList<PanadapterModel*> panadapters() const { return m_panadapters; }
     int addPanadapter();
@@ -1576,6 +1593,21 @@ signals:
 public:
 
     bool isConnected() const;
+
+    /// Steht IRGENDEINE Funkverbindung — eigenes Geraet ODER Flex.
+    ///
+    /// `isConnected()` kennt nur `m_connection`, also OpenHPSDR. Bei
+    /// der FLEX-8400 ist der Zeiger null, und damit war jeder
+    /// `if (isConnected())`-Zweig fuer sie tot. Einer davon ist der
+    /// Selbstschluss der Verbindungsmaske: der Betreiber musste am
+    /// 2026-10-22 jedes Mal von Hand „Close" druecken, um ueberhaupt
+    /// an das Funkgeraet zu kommen — und bis dahin lagen alle
+    /// schwebenden Fenster hinter der Maske.
+    ///
+    /// Bewusst NEBEN `isConnected()` und nicht darin: die neunzehn
+    /// Aufrufer von `isConnected()` greifen teils gleich danach auf
+    /// `connection()` zu, und das gibt es beim Flex nicht.
+    bool istIrgendwieVerbunden() const;
 
     // ── Phase 3Q sub-PR-3: NetworkDiagnosticsDialog text accessors ───────────
     // Each returns an em-dash placeholder ("—") when disconnected.
@@ -2852,6 +2884,11 @@ signals:
                                double lowFreqMhz, double highFreqMhz,
                                quint32 autoBlackLevel);
     // Ton: float32 Stereo verschraenkt, 24 kHz (gemessen 24 012,3 Hz).
+    /// Der Ausschnitt, den die Maschine fuer ihren Panadapter angibt
+    /// (Hertz). Massgeblich fuer die FFT-Bins — NICHT die Breite der
+    /// Wasserfallkachel, die ihren eigenen Rand hat.
+    void flexAusschnittGeaendert(double tiefHz, double hochHz);
+
     void flexAudioSamplesReady(quint32 streamId,
                                const QVector<float>& interleavedStereo);
 
@@ -3539,6 +3576,78 @@ private:
     /// Zustandsschub der Maschine gesagt hat, was dort steht, und nur
     /// das, was wirklich im Weg ist.
     void applyFlexAudioSetup();
+
+public:
+    /// Die Flex auf eine Frequenz stellen (Hertz).
+    ///
+    /// Bis zum 2026-10-22 ging die Steuerung nur in eine Richtung —
+    /// und auch die nur halb: `flexSliceFrequencyChanged` wurde
+    /// ausgesendet und von niemandem gehoert. Longpaths VFO zeigte
+    /// also nie, worauf die Maschine steht, und drehen liess sie sich
+    /// gar nicht.
+    ///
+    /// From AetherSDR SliceModel.cpp:124 [@d58e2b8a] — die Befehlsform
+    /// samt `autopan=0`: „SmartSDR pcap confirms: scroll-wheel uses
+    /// 'slice tune <id> <freq> autopan=0'". Das `autopan=0` ist hier
+    /// nicht Beiwerk — ohne es zentriert die Maschine den Panadapter
+    /// neu, und der Ausschnitt, an dem unser Bild haengt, springt.
+    void tuneFlexSlice(double hz);
+
+    /// Die Betriebsart der Flex-Scheibe stellen.
+    ///
+    /// Bis zum 2026-10-22 war `slice tune` der EINZIGE Befehl, den
+    /// Longpath an eine Flex-Scheibe schicken konnte. Die Betriebsart
+    /// wurde einmal beim Verbinden gesetzt und danach nie wieder: die
+    /// Bedienung zeigte LSB, die Maschine stand auf USB. Der
+    /// Betreiber hoerte Stationen, aber keine verstaendliche Sprache —
+    /// „als waere es eine andere modulation". Er hatte recht, es WAR
+    /// eine andere.
+    ///
+    /// Longpaths Namen und die der Maschine decken sich nicht: CWL und
+    /// CWU heiszen dort beide `CW`, und DSB, SPEC, DRM sowie die
+    /// RADE-Betriebsarten gibt es nicht. Was kein Gegenstueck hat,
+    /// wird NICHT geschickt — eine abgewiesene Betriebsart liesze die
+    /// Scheibe im alten Zustand und die Anzeige im neuen, also wieder
+    /// zwei Wahrheiten.
+    void setFlexSliceMode(DSPMode mode);
+
+    /// Die Filterflanken der Flex-Scheibe stellen (Hertz, bezogen auf
+    /// die Traegerfrequenz — genau wie `filter_lo`/`filter_hi` im
+    /// Scheibenzustand).
+    ///
+    /// Derselbe Befund wie bei der Betriebsart, gemeldet in einem
+    /// Atemzug: „und der bandfilter zeigt auch zu wenig an". Die
+    /// Flanken standen in Longpath und nirgends sonst.
+    void setFlexSliceFilter(int lowHz, int highHz);
+
+    /// Den Wasserfallstrom der Maschine einrichten. Er ist von ihrem
+    /// Panadapter GETRENNT und hat eigene Einstellungen; Longpath hat
+    /// sie bis zum 2026-10-23 nie angefasst.
+    void richteFlexWasserfallEin();
+
+    /// Den Panadapter der Maschine auf eine Frequenz ziehen, ohne
+    /// Randbedingung. Beim Verbinden gebraucht: Longpath uebernimmt
+    /// erst den Ausschnitt der Maschine, danach stellt das
+    /// Layoutprofil eine womoeglich ganz andere Scheibe her — ohne
+    /// diesen Griff haben die beiden keine Ueberlappung, und der
+    /// Panadapter hat nichts zu zeichnen.
+    void zieheFlexPanadapterAuf(double hz);
+
+    /// Die Frequenz, die die MASCHINE zuletzt gemeldet hat (Hertz).
+    /// Beim Verbinden gewinnt sie gegen das gespeicherte Profil: der
+    /// Betreiber hat die Maschine womoeglich gerade von SmartSDR oder
+    /// der Frontplatte aus benutzt, und ihn davon wegzuziehen ist das
+    /// Letzte, was ein Programm beim Starten tun soll.
+    double flexGeraeteFrequenzHz() const { return m_flexGeraeteFrequenzHz; }
+
+private:
+    /// Den selbst gesetzten Ausschnitt uebernehmen. Noetig, weil die
+    /// Maschine eine von uns gesetzte Panadaptermitte NICHT
+    /// zurueckechot — gemessen am 2026-10-23.
+    void uebernimmFlexPanMitte(double mitteMhz);
+public:
+
+private:
     /// Was die Maschine als `y_pixels` meldet, einordnen: ein echter
     /// Wert wird zum Teiler, eine Ruecksetzvorgabe loest ein erneutes
     /// Hinschicken der Masze aus.
@@ -3592,12 +3701,49 @@ private:
     /// wurden. Gedeckelt, damit eine Maschine, die sie nie annimmt,
     /// keine endlose Schleife erzeugt.
     int                  m_flexMasseNachgereicht{0};
+    /// Zuletzt an die Maschine geschickte Frequenz (Hertz), damit
+    /// ihr Zustandsschub nicht denselben Befehl wieder ausloest.
+    double               m_flexZuletztGestellteHz{0.0};
+    /// Dasselbe fuer Betriebsart und Filterflanken.
+    QString              m_flexZuletztGestellteArt;
+    /// Die Kennung des Wasserfallstroms, aus `waterfall=` im
+    /// Panadapter-Zustand.
+    QString              m_flexWasserfallId;
+    /// Mitte und Breite des Panadapters, EINZELN gemerkt: die Maschine
+    /// schickt beim Drehen nur `center=`, nicht beides zusammen.
+    double               m_flexPanMitteMhz{0.0};
+    double               m_flexPanBreiteMhz{0.0};
+    /// Zuletzt von der Maschine gemeldete Scheibenfrequenz (Hertz).
+    double               m_flexGeraeteFrequenzHz{0.0};
+    /// Der Ausschnitt, den die Wasserfallkachel zuletzt meldete
+    /// (Hertz). `tuneFlexSlice` erkennt daran, wann die Scheibe aus
+    /// dem Bild laeuft.
+    double               m_flexAusschnittTiefHz{0.0};
+    double               m_flexAusschnittHochHz{0.0};
+    /// Nachzutragen, solange die Scheibennummer der Maschine fehlt.
+    DSPMode              m_flexArtNachzutragen{DSPMode::USB};
+    bool                 m_flexHatArtNachzutragen{false};
+    int                  m_flexFlankeTiefNachzutragen{0};
+    int                  m_flexFlankeHochNachzutragen{0};
+    bool                 m_flexHatFlankenNachzutragen{false};
+    int                  m_flexZuletztGestellteFlankeTief{0};
+    int                  m_flexZuletztGestellteFlankeHoch{0};
     /// Index (1…59) -> {Name, Einheit} aus den `meter`-Statuszeilen.
     /// Ohne diese Tabelle ist ein Messwertpaket eine Zahlenreihe ohne
     /// Bedeutung: das Paket traegt weder Namen noch Einheit, und der
     /// Teiler haengt an der Einheit.
     QHash<int, QPair<QString, QString>> m_flexMesswertNamen;
+    /// Index -> `src` derselben Zeilen (SLC, COD, RAD, TX-, …).
+    /// Ohne die Quelle ist `LEVEL` nicht eindeutig: die Maschine fuehrt
+    /// mehrere Messwerte mit demselben Namen, und nur der mit `src=SLC`
+    /// ist der Empfangspegel einer Scheibe.
+    QHash<int, QString>  m_flexMesswertQuellen;
     qint64               m_flexMesswertZuletztGemeldet{0};
+    /// Letzter Empfangspegel der Flex-Scheibe (dBm) und sein Zeitpunkt.
+    /// Der S-Meter-Umlauf liest WDSP, und beim Flex rechnet das Radio —
+    /// dort steht nichts. Darum kommt die Zahl von der Maschine.
+    double               m_flexPegelDbm{0.0};
+    qint64               m_flexPegelStempel{0};
     ReceiverManager* m_receiverManager{nullptr};
     AudioEngine*     m_audioEngine{nullptr};
     WdspEngine*      m_wdspEngine{nullptr};

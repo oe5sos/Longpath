@@ -240,6 +240,8 @@ warren@wpratt.com
 // Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
 //============================================================================================//
 
+#include <optional>
+
 #include "MainWindow.h"
 #include "gui/MacVollflaeche.h"
 #include "gui/DxccSpotColours.h"
@@ -3818,6 +3820,13 @@ void MainWindow::wireSpectrumSliceControls(SpectrumWidget* sw,
     connect(sw, &SpectrumWidget::frequencyClicked, this,
             [this, panId](double hz) {
         SliceModel* s = sliceForPan(panId);
+        // Billig und leise: es ist ein Bedienereignis. Half am
+        // 2026-10-22, den toten Abstimmweg zu finden — ohne diese
+        // Zeile sah „Klick kommt nicht an" genauso aus wie „Klick
+        // kommt an, wird aber nicht weitergereicht".
+        qCDebug(lcConnection) << "Klick im Panadapter" << panId << hz
+                          << "Scheibe" << (s ? s->sliceIndex() : -1)
+                          << "gesperrt" << (s && s->locked());
         if (!s) { return; }
 
         // ── Eine Sperre muss sich melden ────────────────────────────
@@ -7114,6 +7123,16 @@ void MainWindow::populateDefaultMeter()
         m_meterPoller->setRxOffsetSource([rm = m_radioModel]() -> double {
             return rm ? rm->rxMeterOffsetDb() : 0.0;
         });
+
+        // Und die fremde Empfangsquelle: bei einem Radio, das selbst
+        // rechnet, kommt der Pegel von der Maschine. Dauerhaft gesetzt,
+        // nicht beim Verbinden ein- und beim Trennen ausgehaengt — die
+        // Quelle gibt `nullopt`, wenn kein Flex-Messwert ankommt, und
+        // dann gilt wieder der WDSP-Weg.
+        m_meterPoller->setFremdeEmpfangsquelle(
+            [rm = m_radioModel]() -> std::optional<double> {
+            return rm ? rm->flexPegelDbm() : std::nullopt;
+        });
     }
 
     // 2026-05-22 spectrum-calibration fix (Fix 1 from the S-meter / spectrum
@@ -8494,8 +8513,43 @@ void MainWindow::populateDefaultMeter()
                                 QStringLiteral("Voice Keyer"),  true);
     m_appletVis->registerApplet(QStringLiteral("QsoRec"),
                                 QStringLiteral("QSO Recorder"), true);
+    // Vorgabe AUS (2026-10-22). Mit `true` meldete sich die Aufnahme
+    // bei jedem Start selbst an und stand dem Betreiber dauerhaft im
+    // Bild — „im hintergrund ist auch immer der recorder". Dieselbe
+    // Falle wie bei der Zeus-Uebernahme: ein neues Applet mit Vorgabe
+    // true schaltet sich selbst ein. Wer aufnehmen will, holt es ueber
+    // View > Containers > Applets; wer nicht, sieht es nie.
+    // ── Die Aufnahme geht EINMAL aus, auch im alten Profil ──────────
+    //
+    // `registerApplet(..., false)` ist nur die Vorgabe fuer ein Profil,
+    // das den Schluessel noch nicht hat. Martins Profil hatte ihn auf
+    // `True`, und beim Beenden schreibt das Profil zurueck — eine
+    // Aenderung an der Datei war beim naechsten Schliessen also wieder
+    // weg. Der Betreiber hat die Aufnahme am 2026-10-22 DREIMAL
+    // weggeschickt („wie oft wolltest du das recording schon
+    // entfernen", „SIEHST DU DAS RECORDING??????????????????????"),
+    // und zweimal habe ich nur die Vorgabe geaendert.
+    //
+    // Darum hier ein Einmal-Schalter: beim ersten Start mit dieser
+    // Fassung wird der gespeicherte Wert auf `False` gesetzt und der
+    // Schalter umgelegt. Wer die Aufnahme danach selbst wieder
+    // einschaltet (View > Containers > Applets), behaelt sie — der
+    // Schalter liegt dann schon um und greift nie wieder.
+    {
+        auto& einst = AppSettings::instance();
+        const QString schalter =
+            QStringLiteral("AppletRecEinmaligAusgeschaltet2026_10_22");
+        if (einst.value(schalter, QString{}).toString()
+                != QStringLiteral("True")) {
+            einst.setValue(QStringLiteral("AppletRecVisible"),
+                           QStringLiteral("False"));
+            einst.setValue(schalter, QStringLiteral("True"));
+            qCInfo(lcConnection) << "Aufnahme-Applet einmalig ausgeschaltet "
+                            "(Betreiberwunsch 2026-10-22)";
+        }
+    }
     m_appletVis->registerApplet(QStringLiteral("Rec"),
-                                QStringLiteral("Recording"),    true);
+                                QStringLiteral("Recording"),    false);
     m_appletVis->registerApplet(QStringLiteral("BwFilter"),
                                 QStringLiteral("Bandwidth Filter"), true);
     m_appletVis->registerApplet(QStringLiteral("PureSignal"),
@@ -9332,9 +9386,32 @@ void MainWindow::populateDefaultMeter()
                     // Nur bekannte Kennungen. Eine Aufnahme von vor
                     // einem Update kann Widgets nennen, die es nicht
                     // mehr gibt — der Controller soll sie nicht anlegen.
-                    if (m_appletVis->registeredIds().contains(it.key())) {
-                        m_appletVis->setVisible(it.key(), it.value().toBool());
+                    if (!m_appletVis->registeredIds().contains(it.key())) {
+                        continue;
                     }
+                    // ── Die Aufnahme folgt dem Profil NICHT ─────────
+                    //
+                    // Sie kam dreimal zurueck („SIEHST DU DAS
+                    // RECORDING??????????????????????", 2026-10-22),
+                    // und jedes Mal von hier: das Profil traegt eine
+                    // eigene Sichtbarkeits-Karte und spielt sie ueber
+                    // den Applet-Schluessel hinweg zurueck. Den
+                    // Einmal-Schalter hat sie damit ueberfahren.
+                    //
+                    // Also gilt fuer sie NUR die ausdrueckliche Ansage
+                    // des Betreibers (View > Containers > Applets).
+                    // Fehlt die, bleibt sie aus — auch wenn ein altes
+                    // Profil sie nennt.
+                    if (it.key() == QStringLiteral("Rec")
+                        && AppSettings::instance()
+                               .value(QStringLiteral(
+                                          "AppletRecVomBetreiberGewollt"),
+                                      QStringLiteral("False"))
+                               .toString() != QStringLiteral("True")) {
+                        m_appletVis->setVisible(it.key(), false);
+                        continue;
+                    }
+                    m_appletVis->setVisible(it.key(), it.value().toBool());
                 }
 
                 // ── Abgelöste Applets ───────────────────────────────
@@ -11592,6 +11669,20 @@ void MainWindow::buildMenuBar()
 
             connect(act, &QAction::toggled, this, [this, id](bool checked) {
                 if (m_appletVis) { m_appletVis->setVisible(id, checked); }
+                // ── Der Wille des Betreibers, getrennt gemerkt ──────
+                //
+                // Die Aufnahme kam dreimal zurueck, weil das
+                // LAYOUTPROFIL eine eigene Sichtbarkeits-Karte traegt
+                // und sie beim Anwenden ueber den Applet-Schluessel
+                // hinweg zurueckspielt. Ein Haken HIER ist dagegen
+                // eine Ansage, und nur sie zaehlt (siehe die
+                // Profilschleife, „Rec").
+                if (id == QStringLiteral("Rec")) {
+                    AppSettings::instance().setValue(
+                        QStringLiteral("AppletRecVomBetreiberGewollt"),
+                        checked ? QStringLiteral("True")
+                                : QStringLiteral("False"));
+                }
                 if (checked) { bringAppletToFront(id); }
                 // Betreiber 2026-08-30, ueber einen Regressionstest
                 // gefunden: dieser Weg fehlte im Gegensatz zum
@@ -18261,7 +18352,45 @@ void MainWindow::onConnectionStateChanged()
     // connection-state transition, connected or not.
     updateAddPanButtonState();
 
+    // ── Der Selbstschluss der Maske, VOR dem HPSDR-Zweig ────────────
+    //
+    // `isConnected()` kennt nur `m_connection`, also OpenHPSDR. Bei
+    // der Flex ist der Zeiger null, der ganze Zweig darunter faellt
+    // aus — und mit ihm der Selbstschluss. Der Betreiber musste am
+    // 2026-10-22 jedes Mal von Hand „Close" druecken: „warum muss ich
+    // immer close klicken um auf das funkgeraet zu kommen". Bis dahin
+    // lagen alle schwebenden Fenster hinter der Maske, der Panadapter
+    // mit ihnen.
+    if (m_radioModel->istIrgendwieVerbunden()
+        && m_connectionPanel && m_connectionPanel->isVisible()) {
+        QTimer::singleShot(1000, this, [this]() {
+            if (m_connectionPanel && m_connectionPanel->isVisible()
+                && m_radioModel->istIrgendwieVerbunden()) {
+                m_connectionPanel->accept();
+            }
+        });
+    }
+
     if (m_radioModel->isConnected()) {
+        // Phase 3Q Task 5 — Selbstschluss: eine Sekunde nach dem
+        // Verbinden geht die Maske zu, wenn sie noch offen ist.
+        //
+        // Stand bis zum 2026-10-22 weiter unten in diesem Zweig,
+        // hinter mehreren `m_radioModel->connection()`-Zugriffen. Die
+        // gibt es nur bei OpenHPSDR; bei der FLEX-8400 wurde der
+        // Selbstschluss also nie erreicht, die Maske blieb stehen —
+        // und mit ihr blieb der Panadapter versteckt, weil alle
+        // schwebenden Fenster hinter ihr liegen. Gemeldet am Geraet:
+        // „aber maske verschwindet nicht".
+        if (m_connectionPanel && m_connectionPanel->isVisible()) {
+            QTimer::singleShot(1000, this, [this]() {
+                if (m_connectionPanel && m_connectionPanel->isVisible()
+                    && m_radioModel->isConnected()) {
+                    m_connectionPanel->accept();
+                }
+            });
+        }
+
         // Betreiber 2026-09-01: "diese fliegenden Fenster sind zu
         // löschen auf der Connect Seite" -- Meter-/Applet-Fenster, die
         // der else-Zweig unten bei einer Trennung MITTEN in der

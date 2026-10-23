@@ -199,6 +199,60 @@ QByteArray buildCommand(quint32 seq, const QString& command)
 
 // From AetherSDR RadioStatusOwnership.h:27-41 [@d58e2b8a] —
 // normalizedFlexId().
+QString tuneSliceCommand(const QString& sliceId, double hz)
+{
+    if (sliceId.isEmpty() || !(hz > 0.0)) {
+        return QString();
+    }
+    return QStringLiteral("slice tune %1 %2 autopan=0")
+        .arg(sliceId)
+        .arg(hz / 1.0e6, 0, 'f', 6);
+}
+
+QString setSliceModeCommand(const QString& sliceId, const QString& mode)
+{
+    if (sliceId.isEmpty()) { return QString(); }
+    // Die Liste der Maschine, nicht unsere. Ein Name, den sie nicht
+    // kennt, wird abgewiesen und laesst die Scheibe im alten Zustand —
+    // also gar nicht erst schicken.
+    static const QStringList kKennt = {
+        QStringLiteral("LSB"),  QStringLiteral("USB"),
+        QStringLiteral("AM"),   QStringLiteral("CW"),
+        QStringLiteral("DIGL"), QStringLiteral("DIGU"),
+        QStringLiteral("SAM"),  QStringLiteral("FM"),
+        QStringLiteral("NFM"),  QStringLiteral("DFM"),
+        QStringLiteral("RTTY"),
+    };
+    const QString gross = mode.trimmed().toUpper();
+    if (!kKennt.contains(gross)) { return QString(); }
+    return QStringLiteral("slice set %1 mode=%2").arg(sliceId, gross);
+}
+
+QString setSliceFilterCommand(const QString& sliceId, int lowHz, int highHz)
+{
+    if (sliceId.isEmpty() || highHz <= lowHz) { return QString(); }
+    return QStringLiteral("filt %1 %2 %3")
+        .arg(sliceId).arg(lowHz).arg(highHz);
+}
+
+QString setPanCenterCommand(const QString& panId, double hz)
+{
+    if (panId.isEmpty() || !(hz > 0.0)) { return QString(); }
+    return QStringLiteral("display pan set %1 center=%2")
+        .arg(panId).arg(hz / 1.0e6, 0, 'f', 6);
+}
+
+QString setWaterfallSetupCommand(const QString& waterfallId, bool rueckfall)
+{
+    if (waterfallId.isEmpty()) { return QString(); }
+    return QStringLiteral("display %1 set %2 "
+                          "auto_black=0 black_level=0 color_gain=50 "
+                          "line_duration=100")
+        .arg(rueckfall ? QStringLiteral("waterfall")
+                       : QStringLiteral("panafall"),
+             waterfallId);
+}
+
 QString normalizedFlexId(QString text)
 {
     text = text.trimmed();

@@ -2965,6 +2965,12 @@ bool RadioModel::isConnected() const
     return m_connection && m_connection->isConnected();
 }
 
+bool RadioModel::istIrgendwieVerbunden() const
+{
+    if (isConnected()) { return true; }
+    return m_flexConnection && m_flexConnection->isConnected();
+}
+
 void RadioModel::setStepAttController(StepAttenuatorController* c)
 {
     // Phase 4 Agent 4A of issue #167 — propagate to TransmitModel so the
@@ -6653,12 +6659,36 @@ bool RadioModel::setActiveSliceById(int sliceId)
     return true;
 }
 
+// Richtet das Seitenband einer Scheibe nach ihrem Band aus und legt
+// die Korrektur gleich ab, damit ein falscher Eintrag verheilt statt
+// beim naechsten Mal wiederzukommen. Siehe
+// BandDefaults::korrigiereSeitenband fuer die Regel selbst.
+void RadioModel::richteSeitenbandAus(SliceModel* slice, Band band)
+{
+    if (!slice) { return; }
+    const DSPMode gerichtet =
+        BandDefaults::korrigiereSeitenband(band, slice->dspMode());
+    if (gerichtet == slice->dspMode()) { return; }
+    qCInfo(lcConnection).nospace()
+        << "Seitenband gerichtet: " << bandLabel(band) << " gehoert auf "
+        << (gerichtet == DSPMode::LSB ? "LSB" : "USB");
+    slice->setDspMode(gerichtet);
+    slice->saveToSettings(band);
+}
+
 void RadioModel::onBandButtonClicked(Band band)
 {
     SliceModel* slice = activeSlice();
     if (!slice) {
-        // No active slice (pre-connection, between-slice teardown, etc.).
-        // Silent — avoids log spam from UI events firing during startup.
+        // Nicht mehr stumm (2026-10-22). Das Schweigen hier hat einen
+        // Abend gekostet: beim Flex gab es keine aktive Scheibe, jeder
+        // Banddruck lief ins Leere, und am Bildschirm sah es aus, als
+        // habe das Band gewechselt — die Maschine blieb stehen.
+        // `qCDebug` genuegt: es ist ein Bedienereignis, kein Fehler,
+        // und beim Hochfahren kommen davon einige.
+        qCDebug(lcConnection)
+            << "Band" << bandLabel(band)
+            << "verworfen: keine aktive Scheibe";
         return;
     }
 
@@ -6698,6 +6728,25 @@ void RadioModel::onBandButtonClicked(Band band)
     if (slice->hasSettingsFor(band)) {
         // Second+ visit: restore last-used state for the clicked band.
         slice->restoreFromSettings(band);
+
+        // ── Das Seitenband nach dem Band richten (2026-10-23) ──────
+        //
+        // Betreiber: „80 und 160 sowie 40 muessen immer automatisch
+        // bei bandauswahl LSB sein". Die Startwerte in BandDefaults
+        // sagen das schon, greifen aber nur beim ERSTEN Besuch; hier
+        // steht wieder, was zuletzt auf dem Band lag. Ein einmal von
+        // Hand gedrehtes USB bliebe sonst fuer immer liegen.
+        //
+        // NACH dem Wiederherstellen, nicht darin: dort haengt die
+        // Filterbreite am abgelegten Betriebsartenplatz, und eine
+        // Korrektur mittendrin hat die Ablage-Pruefstaende umgeworfen.
+        // `setDspMode` setzt die Filterbreite auf die Vorgabe der
+        // neuen Betriebsart — genau richtig, wenn die Seite kippt.
+        //
+        // Nur Sprechseitenbaender; ein auf 40 m abgelegtes DIGU
+        // gehoert zu FT8 und bleibt. Und gleich wieder ablegen, damit
+        // der falsche Eintrag verheilt.
+        richteSeitenbandAus(slice, band);
         // And put the restored rate on the DDC, not just on the menu.
         // Codex review round 7, PR #293: restoreFromSettings sets the
         // display property; this is the half that reaches the radio.
@@ -6770,6 +6819,25 @@ void RadioModel::removePanadapter(int index)
 // steht in docs/architecture/2026-10-18-flex-stufe1-design.md.
 void RadioModel::connectFlexRadio(const RadioInfo& info)
 {
+    // Schon verbunden? Dann ist ein zweites Verbinden kein Verbinden,
+    // sondern ein Trennen.
+    //
+    // Am 2026-10-22 am Geraet gesehen: Bild und Messwerte liefen seit
+    // vier Minuten, der Betreiber klickte Connect, und im Protokoll
+    // stand in derselben Millisekunde
+    //   „Flex: verbinde nach …" / „Flex-Ton abgeschaltet" /
+    //   „Flex-Ton von Scheibe 0 geloest" / „TCP getrennt".
+    // Fuer ihn sah das aus wie „verbindet nicht" — in Wahrheit hat der
+    // Klick die laufende Verbindung abgeraeumt.
+    if (m_flexConnection && m_flexConnection->isConnected()
+        && m_lastRadioInfo.address == info.address) {
+        qCInfo(lcConnection) << "Flex: schon verbunden mit"
+                             << info.address.toString()
+                             << "— der Klick bleibt folgenlos";
+        setConnectionState(ConnectionState::Connected);
+        return;
+    }
+
     if (!m_flexConnection) {
         m_flexConnection = new FlexRadioConnection(this);
 
@@ -6811,6 +6879,26 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                 applyFlexPanSetup();
             }
 
+            // ── Der Wasserfall ist ein EIGENER Strom (2026-10-23) ───
+            //
+            // Der Panadapter-Zustand nennt ihn: `waterfall=0x42000000`
+            // neben `panadapter=0x40000000`. Er hat eigene
+            // Einstellungen, und Longpath hat sie nie angefasst — am
+            // Geraet stand in ALLEN fuenf Statusmeldungen
+            // `auto_black=1`.
+            //
+            // Das heisst: die Maschine rechnet ihren eigenen
+            // Schwarzpunkt in die Kachel hinein, und zwar auf SmartSDRs
+            // Darstellung gezielt. Unsere Schaetzung sitzt dann
+            // obendrauf — zweimal dasselbe, aus zwei Haeusern.
+            // AetherSDR stellt ihn darum ausdruecklich ab
+            // (RadioModel::configureWaterfall [@d58e2b8a]).
+            if (m_flexWasserfallId.isEmpty()
+                && kv.contains(QStringLiteral("waterfall"))) {
+                m_flexWasserfallId = kv.value(QStringLiteral("waterfall"));
+                richteFlexWasserfallEin();
+            }
+
             // Die Hoehe NACHLESEN statt sie anzunehmen.
             //
             // Ein FFT-Bin ist keine Leistung, sondern eine BILDZEILE:
@@ -6848,6 +6936,8 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                         m_flexMesswertNamen[idx].first = it.value();
                     } else if (feld == QLatin1String("unit")) {
                         m_flexMesswertNamen[idx].second = it.value();
+                    } else if (feld == QLatin1String("src")) {
+                        m_flexMesswertQuellen[idx] = it.value();
                     }
                 }
             }
@@ -6859,6 +6949,66 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                     kv.value(QStringLiteral("y_pixels")).toInt(&gelesen);
                 if (gelesen && gemeldet > 0) {
                     uebernimmFlexBildhoehe(gemeldet);
+                }
+            }
+
+            // ── Der Ausschnitt gehoert dem Panadapter, nicht der Kachel ──
+            //
+            // Bis zum 2026-10-22 nahm das Bild seine Breite aus der
+            // WASSERFALLKACHEL: `lowFreq + binBandwidth * totalBins`
+            // (FlexVitaReader.cpp:506). Die Kachel hat aber ihre eigene
+            // Bin-Zahl und ihren eigenen Rand — am Geraet gemessen
+            // meldete sie 13,9846–14,2152 MHz, also 230,6 kHz, waehrend
+            // die Maschine fuer ihren Panadapter `center=14.100000
+            // bandwidth=0.200000` angab, also 200 kHz.
+            //
+            // Die 4096 FFT-Bins gehoeren zum PANADAPTER. Ueber 230,6
+            // statt 200 kHz gespannt steht jedes Signal bis zu 15 kHz
+            // neben seiner Frequenz — und wer weiss, wo eine Station
+            // sein muss, findet sie dort nicht.
+            if (object.startsWith(QLatin1String("display pan "))
+                && (kv.contains(QStringLiteral("center"))
+                    || kv.contains(QStringLiteral("bandwidth")))) {
+                // ── Die Maschine schickt TEILMELDUNGEN ──────────────
+                //
+                // Hier stand `contains(center) && contains(bandwidth)`.
+                // Beim Drehen schickt die Flex aber nur `center=`, und
+                // damit griff die Bedingung NIE. Am Geraet gemessen am
+                // 2026-10-23: die Maschine stand auf 7.288 MHz, das
+                // Fenster noch auf dem Ausschnitt von vor zwei
+                // Minuten (7.121). Auf dem Schirm standen daraufhin
+                // drei verschiedene Frequenzen nebeneinander, und der
+                // Wasserfall war rechts schwarz, weil die Kachel das
+                // Fenster nur noch zum Teil ueberdeckte.
+                //
+                // Also beide Werte EINZELN merken und bei jeder
+                // Aenderung neu rechnen.
+                bool okMitte = false, okBreite = false;
+                if (kv.contains(QStringLiteral("center"))) {
+                    const double m =
+                        kv.value(QStringLiteral("center")).toDouble(&okMitte);
+                    if (okMitte && m > 0.0) { m_flexPanMitteMhz = m; }
+                }
+                if (kv.contains(QStringLiteral("bandwidth"))) {
+                    const double b =
+                        kv.value(QStringLiteral("bandwidth")).toDouble(&okBreite);
+                    if (okBreite && b > 0.0) { m_flexPanBreiteMhz = b; }
+                }
+                const double mitteMhz  = m_flexPanMitteMhz;
+                const double breiteMhz = m_flexPanBreiteMhz;
+                if (mitteMhz > 0.0 && breiteMhz > 0.0) {
+                    const double tief = (mitteMhz - breiteMhz * 0.5) * 1.0e6;
+                    const double hoch = (mitteMhz + breiteMhz * 0.5) * 1.0e6;
+                    if (!qFuzzyCompare(tief, m_flexAusschnittTiefHz)
+                        || !qFuzzyCompare(hoch, m_flexAusschnittHochHz)) {
+                        m_flexAusschnittTiefHz = tief;
+                        m_flexAusschnittHochHz = hoch;
+                        qCInfo(lcConnection).nospace()
+                            << "Flex: Ausschnitt der Maschine "
+                            << (tief / 1.0e6) << "–" << (hoch / 1.0e6)
+                            << " MHz (" << (breiteMhz * 1.0e3) << " kHz)";
+                        emit flexAusschnittGeaendert(tief, hoch);
+                    }
                 }
             }
 
@@ -6883,6 +7033,20 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                 m_flexAudioLevelWas = kv.value(QStringLiteral("audio_level"));
                 m_flexAudioMuteWas  = kv.value(QStringLiteral("audio_mute"));
                 applyFlexAudioSetup();
+
+                // Was ohne Scheibennummer nicht hinausgehen konnte,
+                // geht jetzt hinaus — siehe setFlexSliceMode().
+                if (!m_flexSliceId.isEmpty()) {
+                    if (m_flexHatArtNachzutragen) {
+                        m_flexHatArtNachzutragen = false;
+                        setFlexSliceMode(m_flexArtNachzutragen);
+                    }
+                    if (m_flexHatFlankenNachzutragen) {
+                        m_flexHatFlankenNachzutragen = false;
+                        setFlexSliceFilter(m_flexFlankeTiefNachzutragen,
+                                           m_flexFlankeHochNachzutragen);
+                    }
+                }
             }
         });
 
@@ -6915,6 +7079,7 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
             // Bild (Entwurf Abschnitt 5). Eine Flex-Scheibe ist eine
             // Scheibe OHNE RxChannel, und die 34 WDSP-Stellen in dieser
             // Datei fragen alle nach einem.
+            m_flexGeraeteFrequenzHz = hz;
             emit flexSliceFrequencyChanged(sliceId, hz);
         });
 
@@ -6950,6 +7115,100 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
 //
 // Mehrfaches Rufen ist harmlos und beabsichtigt: dieselben Werte noch
 // einmal zu setzen aendert nichts.
+std::optional<double> RadioModel::flexPegelDbm() const
+{
+    if (m_flexPegelStempel == 0) { return std::nullopt; }
+    // Zwei Sekunden: die Maschine schickt rund 30 Messwertpakete je
+    // Sekunde, eine Luecke von zwei Sekunden ist also ein Ausfall und
+    // keine Schwankung.
+    if (QDateTime::currentMSecsSinceEpoch() - m_flexPegelStempel > 2000) {
+        return std::nullopt;
+    }
+    return m_flexPegelDbm;
+}
+
+void RadioModel::zieheFlexPanadapterAuf(double hz)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexPanId.isEmpty() || !(hz > 0.0)) { return; }
+    const QString befehl =
+        FlexCommandWire::setPanCenterCommand(m_flexPanId, hz);
+    if (befehl.isEmpty()) { return; }
+
+    // ── Die Maschine ECHOT die eigene Mitte NICHT ───────────────────
+    //
+    // Gemessen am 2026-10-23: auf `display pan set <id> center=14.225`
+    // antwortet sie mit `R<n>|0|` und schickt als Status
+    // `display pan <id> wide=0` — kein `center=`. Longpath konnte die
+    // selbst gesetzte Mitte also nie zurueckhoeren und blieb auf dem
+    // alten Ausschnitt stehen: 28 angenommene Befehle, und das Bild
+    // zeigte weiter 40 m, waehrend die Scheibe auf 20 m lief. Der
+    // Betreiber: „oben alles schwarz".
+    //
+    // Also selbst nachfuehren — aber erst, wenn die Maschine den
+    // Befehl ANGENOMMEN hat. Vorher waere es eine Behauptung.
+    m_flexConnection->sendCommand(befehl, [this, hz](int code, const QString&) {
+        if (code != 0) {
+            qCWarning(lcConnection)
+                << "Flex: Panadaptermitte abgelehnt, Code" << code;
+            return;
+        }
+        uebernimmFlexPanMitte(hz / 1.0e6);
+    });
+}
+
+void RadioModel::uebernimmFlexPanMitte(double mitteMhz)
+{
+    if (!(mitteMhz > 0.0) || !(m_flexPanBreiteMhz > 0.0)) { return; }
+    m_flexPanMitteMhz = mitteMhz;
+    const double tief = (mitteMhz - m_flexPanBreiteMhz * 0.5) * 1.0e6;
+    const double hoch = (mitteMhz + m_flexPanBreiteMhz * 0.5) * 1.0e6;
+    if (qFuzzyCompare(tief, m_flexAusschnittTiefHz)
+        && qFuzzyCompare(hoch, m_flexAusschnittHochHz)) {
+        return;
+    }
+    m_flexAusschnittTiefHz = tief;
+    m_flexAusschnittHochHz = hoch;
+    qCInfo(lcConnection).nospace()
+        << "Flex: Ausschnitt selbst nachgefuehrt " << (tief / 1.0e6)
+        << "–" << (hoch / 1.0e6) << " MHz (die Maschine echot ihn nicht)";
+    emit flexAusschnittGeaendert(tief, hoch);
+}
+
+void RadioModel::richteFlexWasserfallEin()
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexWasserfallId.isEmpty()) { return; }
+
+    // From AetherSDR RadioModel::configureWaterfall [@d58e2b8a]:
+    //   display panafall set <wfId> auto_black=0 black_level=15 color_gain=50
+    // mit Rueckfall auf `display waterfall set` fuer Fassungen, die die
+    // Panafall-Adressierung nicht kennen. Die Begruendung dort: der
+    // Schwarzpunkt der Maschine zielt auf SmartSDRs Darstellung, der
+    // Client rechnet seinen eigenen.
+    //
+    // `black_level=0` statt 15: bei abgeschaltetem `auto_black` ist es
+    // der Handwert der Maschine, und wir faerben ohnehin selbst — ein
+    // Wert ungleich null waere ein zweiter Eingriff, den niemand
+    // nachgemessen hat.
+    m_flexConnection->sendCommand(
+        FlexCommandWire::setWaterfallSetupCommand(m_flexWasserfallId, false),
+        [this](int code, const QString&) {
+            if (code == 0) {
+                qCInfo(lcConnection) << "Flex: Wasserfallstrom"
+                                     << m_flexWasserfallId
+                                     << "eingerichtet (auto_black aus)";
+                return;
+            }
+            qCInfo(lcConnection)
+                << "Flex: `display panafall set` abgelehnt (Code" << code
+                << ") — versuche `display waterfall set`";
+            m_flexConnection->sendCommand(
+                FlexCommandWire::setWaterfallSetupCommand(
+                    m_flexWasserfallId, true));
+        });
+}
+
 void RadioModel::applyFlexPanSetup()
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
@@ -6959,7 +7218,19 @@ void RadioModel::applyFlexPanSetup()
     // Ohne Breite weiss die Maschine nicht, wie viele Bins sie schicken
     // soll; `totalBins` folgt xpixels (gemessen: der Sprung von 50 auf
     // 1024).
-    constexpr int kXPixels = 1024;
+    // 4096 statt 1024 Punkte.
+    //
+    // Von der Flex kommt kein I/Q, sondern ihr fertig gezeichnetes
+    // Bild — die Aufloesung ist also das, worum wir bitten. Mit 1024
+    // Punkten auf 461 kHz sind das 450 Hz je Punkt, und der
+    // Bandbreitenfilter (8 kHz Fenster) bekam 18 Punkte: daraus wird
+    // keine Kurve. Mit 4096 sind es 112 Hz je Punkt und 71 Punkte im
+    // selben Fenster.
+    //
+    // Am 2026-10-22 als Wunsch des Betreibers eingebaut; ob die
+    // Maschine 4096 annimmt, sagt die Zeile „N Bins" im Protokoll —
+    // sie zeigt, was WIRKLICH kommt, nicht was wir erbeten haben.
+    constexpr int kXPixels = 4096;
     // From AetherSDR RadioModel.cpp:4966 [@d58e2b8a] — dieselbe Bitte
     // wie der Vorlageclient: `xpixels=1024 ypixels=700`. 700 ist keine
     // runde Zahl aus der Luft, sondern die eines Clients, der an
@@ -6972,6 +7243,21 @@ void RadioModel::applyFlexPanSetup()
     m_flexConnection->sendCommand(
         QStringLiteral("display pan set %1 xpixels=%2 ypixels=%3")
             .arg(m_flexPanId).arg(kXPixels).arg(kYPixels));
+    // Mittelung AUS.
+    //
+    // 2026-10-22 nebeneinander gemessen: SmartSDR zeigte am selben
+    // Band Teppich bei -120 dBm und Spitzen bei -70, also rund 50 dB
+    // Hub. Longpath las 14 dB — dieselben Daten, flachgedrueckt.
+    // Unser Panadapter stand laut Zustandsschub auf `average=50`, und
+    // eine Mittelung ueber fuenfzig Durchgaenge buegelt genau die
+    // SSB-Spitzen weg, die kommen und gehen.
+    //
+    // Die Mittelung ist Sache der Anzeige, nicht der Maschine:
+    // Longpath glaettet selbst (Display-Einstellungen), und zweimal
+    // mitteln heisst zweimal Spitzen verlieren.
+    m_flexConnection->sendCommand(
+        QStringLiteral("display pan set %1 average=0").arg(m_flexPanId));
+
     m_flexConnection->sendCommand(
         QStringLiteral("display pan set %1 min_dbm=%2 max_dbm=%3")
             .arg(m_flexPanId).arg(kMinDbm).arg(kMaxDbm));
@@ -7023,13 +7309,41 @@ void RadioModel::startFlexStreams()
         connect(m_flexStream, &FlexVitaStream::waterfallRowReady,
                 this, [this](quint32 id, const QVector<quint16>& v,
                              double lo, double hi, quint32 ab) {
+            // Der Ausschnitt kommt NICHT von hier: die Kachel hat ihre
+            // eigene Bin-Zahl und ihren eigenen Rand (gemessen 230,6
+            // kHz gegen 200 kHz Panadapterbreite). Er wird aus dem
+            // `display pan`-Zustand gelesen, siehe dort.
             emit flexWaterfallRowReady(id, v, lo, hi, ab);
         });
         connect(m_flexStream, &FlexVitaStream::meterSamplesReady, this,
                 [this](quint32, const QVector<FlexVita::FlexMeterSample>& w) {
+            const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+
+            // ── Der Empfangspegel, aus JEDEM Paket ───────────────────
+            //
+            // Vor der Drossel: sie dient nur dem Protokoll. Das S-Meter
+            // braucht den Wert zehnmal in der Sekunde, nicht einmal in
+            // fuenf.
+            //
+            // `LEVEL` allein genuegt nicht als Schluessel — die Maschine
+            // fuehrt mehrere Messwerte unter diesem Namen (gemessen am
+            // 2026-10-22: LEVEL, TNF, ANF, SQUELCH standen in einer
+            // Zeile auf demselben Wert). Der Empfangspegel einer
+            // Scheibe ist der mit `src=SLC`.
+            for (const auto& s : w) {
+                if (!m_flexMesswertQuellen.value(s.index)
+                         .startsWith(QLatin1String("SLC"))) { continue; }
+                const auto def = m_flexMesswertNamen.value(s.index);
+                if (def.first != QLatin1String("LEVEL")) { continue; }
+                if (const auto wert = FlexVita::meterScaled(s.raw, def.second)) {
+                    m_flexPegelDbm     = *wert;
+                    m_flexPegelStempel = jetzt;
+                }
+                break;
+            }
+
             // Hoechstens alle fuenf Sekunden eine Zeile: die Maschine
             // schiebt rund 30 Pakete je Sekunde.
-            const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
             if (jetzt - m_flexMesswertZuletztGemeldet < 5000) { return; }
             m_flexMesswertZuletztGemeldet = jetzt;
 
@@ -7149,7 +7463,12 @@ void RadioModel::uebernimmFlexBildhoehe(int gemeldet)
     // Ein zweistelliger Deckel: eine Maschine, die die Masze nie
     // annimmt, soll keine endlose Schleife aus Melden und
     // Hinschicken erzeugen.
-    constexpr int kHoechstensNachreichen = 5;
+    // Zwei Versuche, nicht fuenf: Martins FLEX-8400 schickt den
+    // `display pan`-Zustand nach dem Anmelden genau DREIMAL
+    // (2026-10-22 gemessen). Ein Deckel von 5 wuerde nie erreicht,
+    // und dann bliebe es bei der erbetenen Hoehe — also bei einem
+    // uebersteuerten Bild.
+    constexpr int kHoechstensNachreichen = 2;
 
     if (!flexHoeheIstVorgabe(gemeldet)) {
         if (gemeldet == m_flexYPixelsGemeldet) { return; }
@@ -7164,8 +7483,21 @@ void RadioModel::uebernimmFlexBildhoehe(int gemeldet)
         return;
     }
 
-    // Ruecksetzvorgabe. NICHT als Teiler benutzen — die Masze noch
-    // einmal hinschicken und auf das Echo warten.
+    // Ruecksetzvorgabe — und zwar eine, die LUEGT.
+    //
+    // Am 2026-10-22 an der FLEX-8400 gemessen: sie meldet im Status
+    // dauerhaft `y_pixels=20`, zeichnet aber mit den erbetenen 700.
+    // Beleg aus dem Strom selbst, Rahmen 50: die 1024 Bins laufen von
+    // 531 bis 553 (Mittel 540). In 0…19 passt das nicht, in 0…699
+    // schon — und ergibt dort einen Rauschteppich um -110 dBm, also
+    // genau das, was eine ruhige 20-m-Bandmitte liefert.
+    //
+    // Ein Zwischenstand dieser Datei nahm nach zwei Versuchen die
+    // gemeldete 20 als Teiler. Damit klemmt JEDER Bin auf den
+    // Bodenwert, und der Betreiber sah eine durchgehend blaue Flaeche.
+    // Die gemeldete Zahl gilt also NICHT, solange sie eine Vorgabe
+    // ist — das ist wieder genau AetherSDRs Regel
+    // (RadioModel.cpp:10994-11018 [@d58e2b8a]), und sie hat recht.
     if (m_flexMasseNachgereicht >= kHoechstensNachreichen) {
         return;
     }
@@ -7175,6 +7507,141 @@ void RadioModel::uebernimmFlexBildhoehe(int gemeldet)
         << "— das ist kein Maszstab. Masze werden nachgereicht ("
         << m_flexMasseNachgereicht << "von" << kHoechstensNachreichen << ")";
     applyFlexPanSetup();
+}
+
+// From AetherSDR SliceModel.cpp:124 [@d58e2b8a] —
+// „slice tune <id> <freq> autopan=0", sechs Nachkommastellen in MHz.
+void RadioModel::tuneFlexSlice(double hz)
+{
+    qCDebug(lcConnection) << "tuneFlexSlice" << hz
+                         << "verbindung" << (m_flexConnection != nullptr)
+                         << "steht" << (m_flexConnection
+                                        && m_flexConnection->isConnected())
+                         << "scheibenkennung" << m_flexSliceId
+                         << "zuletzt" << m_flexZuletztGestellteHz;
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexSliceId.isEmpty()) { return; }
+    if (!(hz > 0.0)) { return; }
+
+    // Dieselbe Frequenz nicht noch einmal schicken: die Maschine
+    // antwortet auf jeden `slice tune` mit einem Zustandsschub, und der
+    // landet wieder hier. Ohne diese Wache dreht sich das im Kreis.
+    constexpr double kGleichbisHz = 0.5;
+    if (std::abs(hz - m_flexZuletztGestellteHz) < kGleichbisHz) { return; }
+    m_flexZuletztGestellteHz = hz;
+
+    const QString befehl = FlexCommandWire::tuneSliceCommand(m_flexSliceId, hz);
+    if (befehl.isEmpty()) { return; }
+    m_flexConnection->sendCommand(befehl);
+
+    // ── Und das Bild mitnehmen, wenn die Scheibe hinauslaeuft ───────
+    //
+    // `autopan=0` oben haelt das Bild beim Drehen ruhig — unser
+    // Ausschnitt haengt an der Wasserfallkachel und wuerde sonst bei
+    // jedem Dreh springen. Der Preis: bei einem WEITEN Sprung steht
+    // die Scheibe irgendwann neben dem Bild.
+    //
+    // Gemessen am 2026-10-22 um 21:22: Scheibe auf 14.382279 MHz,
+    // Panadapter auf 230 kHz um 14.0999 MHz. Der Betreiber hoerte an
+    // einer Stelle und sah eine andere, 170 kHz daneben: „aber keine
+    // signale". Es waren welche da — nur nicht im Bild.
+    //
+    // Darum: solange die neue Frequenz im mittleren Teil des
+    // Ausschnitts bleibt, geschieht nichts. Erst am Rand (die
+    // aeuszeren 15 Prozent) wird der Panadapter nachgezogen. So
+    // springt das Bild beim Feinabstimmen nicht, folgt aber einem
+    // Bandwechsel.
+    if (m_flexPanId.isEmpty()
+        || !(m_flexAusschnittHochHz > m_flexAusschnittTiefHz)) {
+        return;
+    }
+    const double breite = m_flexAusschnittHochHz - m_flexAusschnittTiefHz;
+    const double rand   = breite * 0.15;
+    if (hz > m_flexAusschnittTiefHz + rand
+        && hz < m_flexAusschnittHochHz - rand) {
+        return;   // noch gut im Bild
+    }
+    qCInfo(lcConnection).nospace()
+        << "Flex: Scheibe laeuft aus dem Bild (" << (hz / 1.0e6)
+        << " MHz, Ausschnitt " << (m_flexAusschnittTiefHz / 1.0e6) << "–"
+        << (m_flexAusschnittHochHz / 1.0e6) << ") — Panadapter nachgezogen";
+    // Derselbe Griff wie beim Verbinden: die Maschine echot die
+    // eigene Mitte nicht zurueck (siehe zieheFlexPanadapterAuf).
+    zieheFlexPanadapterAuf(hz);
+}
+
+void RadioModel::setFlexSliceMode(DSPMode mode)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    // ── Die Scheibennummer kommt ERST SPAETER ────────────────────────
+    //
+    // Dieselbe Falle wie beim Panadapter: die Verdrahtung laeuft auf
+    // `guiClientRegistered`, die Nummer der Scheibe steht aber erst im
+    // Zustandsschub danach. Am 2026-10-22 gingen Betriebsart und
+    // Filter darum ins Leere, und die Maschine blieb auf dem, was beim
+    // Verbinden gesetzt worden war. Gemerkt und nachgeholt, statt
+    // verworfen.
+    if (m_flexSliceId.isEmpty()) {
+        m_flexArtNachzutragen = mode;
+        m_flexHatArtNachzutragen = true;
+        return;
+    }
+
+    // Longpaths Namen auf die der Maschine. Die Liste der Maschine
+    // steht in ihrem eigenen Scheibenzustand (`mode_list`): LSB, USB,
+    // AM, CW, DIGL, DIGU, SAM, FM, NFM, DFM, RTTY.
+    QString name;
+    switch (mode) {
+    case DSPMode::LSB:  name = QStringLiteral("LSB");  break;
+    case DSPMode::USB:  name = QStringLiteral("USB");  break;
+    case DSPMode::AM:   name = QStringLiteral("AM");   break;
+    case DSPMode::SAM:  name = QStringLiteral("SAM");  break;
+    case DSPMode::FM:   name = QStringLiteral("FM");   break;
+    case DSPMode::DIGU: name = QStringLiteral("DIGU"); break;
+    case DSPMode::DIGL: name = QStringLiteral("DIGL"); break;
+    // Die Maschine kennt nur EIN CW; die Seitenbandlage liegt bei ihr
+    // am Mithoerton, nicht an der Betriebsart.
+    case DSPMode::CWL:
+    case DSPMode::CWU:  name = QStringLiteral("CW");   break;
+    // Ohne Gegenstueck: DSB, SPEC, DRM, RADE-U, RADE-L. Lieber nichts
+    // schicken, als die Scheibe auf etwas anderes zu stellen.
+    default: break;
+    }
+    if (name.isEmpty()) {
+        qCInfo(lcConnection) << "Flex: Betriebsart"
+                             << SliceModel::modeName(mode)
+                             << "hat an der Maschine kein Gegenstueck —"
+                                " nicht geschickt";
+        return;
+    }
+    if (name == m_flexZuletztGestellteArt) { return; }
+    m_flexZuletztGestellteArt = name;
+
+    const QString befehl =
+        FlexCommandWire::setSliceModeCommand(m_flexSliceId, name);
+    if (befehl.isEmpty()) { return; }
+    m_flexConnection->sendCommand(befehl);
+}
+
+void RadioModel::setFlexSliceFilter(int lowHz, int highHz)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (highHz <= lowHz) { return; }
+    if (m_flexSliceId.isEmpty()) {   // siehe setFlexSliceMode()
+        m_flexFlankeTiefNachzutragen = lowHz;
+        m_flexFlankeHochNachzutragen = highHz;
+        m_flexHatFlankenNachzutragen = true;
+        return;
+    }
+    if (lowHz == m_flexZuletztGestellteFlankeTief
+        && highHz == m_flexZuletztGestellteFlankeHoch) { return; }
+    m_flexZuletztGestellteFlankeTief = lowHz;
+    m_flexZuletztGestellteFlankeHoch = highHz;
+
+    const QString befehl =
+        FlexCommandWire::setSliceFilterCommand(m_flexSliceId, lowHz, highHz);
+    if (befehl.isEmpty()) { return; }
+    m_flexConnection->sendCommand(befehl);
 }
 
 void RadioModel::applyFlexAudioSetup()
@@ -7273,6 +7740,7 @@ void RadioModel::teardownFlexConnection()
     m_flexRestoreMuteLocal  = false;
     m_flexYPixelsGemeldet   = 0;
     m_flexMasseNachgereicht = 0;
+    m_flexZuletztGestellteHz = 0.0;
     m_flexPanId.clear();
 
     if (m_flexStream) {
@@ -12791,6 +13259,9 @@ void RadioModel::loadSliceState(SliceModel* slice)
     m_lastBand = currentBand;
 
     slice->restoreFromSettings(currentBand);
+    // Beim Hochfahren dieselbe Regel wie beim Banddruck — siehe
+    // onBandButtonClicked.
+    richteSeitenbandAus(slice, currentBand);
 
     // Capture the restored rate for the post-bind re-apply (2026-08-12,
     // third round — the instrumented timeline shows why re-READING at

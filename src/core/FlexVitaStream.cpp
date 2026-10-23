@@ -20,6 +20,8 @@
 #include <QNetworkDatagram>
 #include <QStringList>
 
+#include <algorithm>
+
 namespace Longpath {
 
 Q_LOGGING_CATEGORY(lcFlexStream, "longpath.flex.strom", QtInfoMsg)
@@ -108,6 +110,12 @@ void FlexVitaStream::berichteKlassen()
     // Tausende stehen, dann liegt es am Zusammensetzen, nicht am Netz.
     qCInfo(lcFlexStream) << "Strom:" << m_datagrams << "Pakete —"
                          << qPrintable(teile.join(QStringLiteral(", ")));
+    if (m_fftRahmen > 0) {
+        qCInfo(lcFlexStream).nospace()
+            << "Strom: Bins ueber alle " << m_fftRahmen << " Rahmen — "
+            << m_binKleinsterJe << " bis " << m_binGroessterJe
+            << " (" << (m_binGroessterJe - m_binKleinsterJe) << " Stufen)";
+    }
     qCInfo(lcFlexStream) << "Strom: daraus fertig —"
                          << m_fftRahmen << "Bildrahmen,"
                          << m_wasserfallZeilen << "Wasserfallzeilen;"
@@ -185,6 +193,43 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
         // Der Maszstab kommt von der Stelle, die ihn gesetzt hat — die
         // Maschine meldet y_pixels nicht zurueck (siehe Kopf).
         ++m_fftRahmen;
+        // Einmal die ROHWERTE melden. Bis hierher war alles Modell:
+        // „ein Bin ist eine Bildzeile 0…y_pixels-1". Stimmt das nicht,
+        // nuetzt der richtigste Teiler nichts (2026-10-22: mit der von
+        // der Maschine gemeldeten 20 blieb das Bild voll ausgeschlagen).
+        // Rahmen 1 ist NICHT aussagekraeftig: nach einer
+        // x_pixels-Vergroesserung (50 -> 1024) schickt die Maschine
+        // einen Uebergangsrahmen, in dem jeder neue Bin null ist
+        // (dokumentiert in FlexVitaReader.h). Am 2026-10-22 gemessen:
+        // Rahmen 1 war durchgehend null. Also spaeter nachsehen.
+        // Ueber ALLE Rahmen mitfuehren, nicht nur den einen.
+        //
+        // 2026-10-22: ein einzelner Rahmen zeigte 17,6 dB Hub,
+        // SmartSDR am selben Band 50. Spitzen sind kurz — wer einen
+        // Augenblick misst, misst die Pause zwischen ihnen mit.
+        if (!rahmen->bins.isEmpty()) {
+            for (const quint16 b : rahmen->bins) {
+                m_binKleinsterJe = std::min(m_binKleinsterJe, b);
+                m_binGroessterJe = std::max(m_binGroessterJe, b);
+            }
+        }
+
+        if ((m_fftRahmen == 50 || m_fftRahmen == 500)
+            && !rahmen->bins.isEmpty()) {
+            quint16 kleinster = rahmen->bins.first();
+            quint16 groesster = rahmen->bins.first();
+            double summe = 0.0;
+            for (const quint16 b : rahmen->bins) {
+                kleinster = std::min(kleinster, b);
+                groesster = std::max(groesster, b);
+                summe += b;
+            }
+            qCInfo(lcFlexStream).nospace()
+                << "Strom: Rohwerte von Rahmen " << m_fftRahmen << " — "
+                << rahmen->bins.size() << " Bins, kleinster " << kleinster
+                << ", groesster " << groesster << ", Mittel "
+                << (summe / rahmen->bins.size());
+        }
         const Scale s = m_scales.value(rahmen->streamId);
         emit spectrumReady(rahmen->streamId,
                            FlexVita::binsToDbm(rahmen->bins,

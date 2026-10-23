@@ -1421,6 +1421,17 @@ public slots:
     void updateKiwiSpectrumDbm(const QVector<float>& binsDbm,
                                double lowHz, double highHz);
 
+    // ── Eine Wasserfallzeile der Maschine (2026-10-23) ───────────────
+    //
+    // Die FLEX-8400 schickt den Wasserfall als EIGENEN Strom
+    // (Paketklasse 0x8004) mit eigenem Frequenzbereich und eigenem
+    // Takt. Die Werte sind eine INTENSITAET (qint16/128, am Geraet +88
+    // bis +120) und KEINE dBm — darum eine eigene Methode und nicht
+    // `pushWaterfallRow`. Begruendung und Formel stehen dort und in
+    // docs/protocols/flex-wasserfall-aethersdr.md.
+    void zeigeFremdeWasserfallzeile(const QVector<float>& intensitaet,
+                                    double lowHz, double highHz);
+
     // Zeigt dieser Panadapter das Geraet oder den KiwiSDR? Solange er
     // auf KiwiSDR steht, werden Bins vom Geraet VERWORFEN — sonst
     // uebermalten sich zwei Quellen gegenseitig, und man saehe ein
@@ -1716,6 +1727,19 @@ public:
     // Chartreuse highlight branch.
     void setSelectedNotchIdForTest(int id) { m_selectedNotchId = id; }
     int renderedPixelCountForTest() const { return m_renderedPixels.size(); }
+    /// Die zuletzt geschriebene Wasserfallzeile als Stufen 0..255 —
+    /// genau das, was gefaerbt und in die Historie gelegt wurde.
+    /// Ohne diese Naht laesst sich nicht pruefen, WO ein Traeger im
+    /// Wasserfall landet und ob der Teppich am Anschlag steht.
+    const QVector<quint8>& wfZeilenstufenForTest() const {
+        return m_wfRowIntensity;
+    }
+    bool fremdeWasserfallquelleForTest() const {
+        return m_fremdeWasserfallquelle;
+    }
+    const QVector<float>& fremdeWfMittelForTest() const {
+        return m_fremdeWfMittel;
+    }
     int visibleBinCountForTest() const { return m_visibleBinCount; }
 
     // Pins updateSpectrumLinear()'s internal displayWidth (normally
@@ -2375,7 +2399,10 @@ private:
     // model (each ANALYZER_INFO[] entry has its own DetType + AvMode).
     QVector<float> m_fullLinearBins;       // FFTEngine input cache (|X[k]|²)
     QVector<float> m_displayLinearPixels;  // spectrum detector output (linear)
-    QVector<float> m_renderedPixels;       // spectrum avenger output (dBm)
+    QVector<float> m_renderedPixels;
+    /// Zeitpunkt der letzten Bandmeldung (alle 30 s, siehe
+    /// updateSpectrumLinear).
+    qint64 m_bandBerichtZuletztMs{0};       // spectrum avenger output (dBm)
     QVector<float> m_wfDisplayLinearPixels; // waterfall detector output (linear)
     QVector<float> m_wfRenderedPixels;     // waterfall avenger output (dBm)
     int m_displayWidthOverrideForTest{0};  // 0 = off; see setDisplayWidthOverrideForTest()
@@ -2719,6 +2746,23 @@ private:
     // bench session.
     QVector<float>     m_pendingWfPixelsDbm;
     bool               m_pendingWfPixelsDbmDirty{false};
+    /// Kommt der Wasserfall von der Maschine (Flex-Kachel)? Dann
+    /// schweigt der eigene, aus der FFT abgeleitete Weg — zwei
+    /// Schreiber auf demselben Bild gaeben ein Flackern aus zwei
+    /// Takten, und der Takt der Maschine ist der richtige.
+    bool               m_fremdeWasserfallquelle{false};
+    qint64             m_fremdeWasserfallZuletztMs{0};
+    /// Nachgefuehrter Rauschteppich der Kachel, in ihrer eigenen
+    /// Intensitaetseinheit. NaN = noch nicht geschaetzt.
+    float              m_fremderTeppich{std::numeric_limits<float>::quiet_NaN()};
+    // Laufendes Mittel der Kachelzeilen (zeitliche Mittelung des
+    // fremden Wasserfalls, 2026-10-23). Haelt die Groesse der
+    // Kachelbreite; ein Wechsel setzt es zurueck.
+    QVector<float>     m_fremdeWfMittel;
+    qint64             m_fremdeWfMittelMs{0};
+    qint64             m_kachelBerichtZuletztMs{0};
+    double             m_fremdeWfMittelTiefHz{0.0};
+    double             m_fremdeWfMittelHochHz{0.0};
     QThread*           m_waterfallTickerThread{nullptr};
     WaterfallTicker*   m_waterfallTicker{nullptr};
 

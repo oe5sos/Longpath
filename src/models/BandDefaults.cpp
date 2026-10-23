@@ -136,5 +136,46 @@ BandSeed seedFor(Band b)
     return { Band::GEN, 0.0, DSPMode::USB, false };
 }
 
+// ── Das Seitenband gehoert zum Band, nicht ins Gedaechtnis ──────────
+//
+// Die Startwerte oben tragen fuer 160/80/40 m schon LSB. Wirksam wird
+// das aber nur beim ERSTEN Besuch: danach stellt `onBandButtonClicked`
+// aus `SliceModel::restoreFromSettings` wieder her, was zuletzt auf
+// dem Band stand. Ein einziges von Hand gedrehtes USB — oder ein
+// Probelauf von mir — bleibt damit fuer immer im Band liegen. Genau
+// das hat der Betreiber gesehen.
+//
+// Die Grenze liegt bei 10 MHz: darunter LSB, darueber USB. Das ist
+// Amateurbrauch und steht so in keiner Thetis-Tabelle (Thetis legt es
+// je Bandstapel-Eintrag von Hand fest, siehe die Startwerte oben) —
+// hier als Regel, weil sie fuer alle Baender gilt und nicht nur fuer
+// die drei genannten.
+//
+// 60 m faellt unter die Grenze, ist aber kanalisiert USB (FCC
+// §97.303(h), und in AT ebenso). Das ist die eine Ausnahme.
+DSPMode seitenbandFuer(Band b)
+{
+    switch (b) {
+        case Band::Band160m:
+        case Band::Band80m:
+        case Band::Band40m:
+            return DSPMode::LSB;
+        default:
+            break;
+    }
+    // Alles andere -- einschliesslich 60 m und der Rundfunkbaender --
+    // nach oberem Seitenband. Die Baender ueber 10 MHz sind USB, und
+    // bei einem Rundfunkband spielt das Seitenband keine Rolle.
+    return DSPMode::USB;
+}
+
+DSPMode korrigiereSeitenband(Band b, DSPMode mode)
+{
+    if (mode != DSPMode::USB && mode != DSPMode::LSB) {
+        return mode;
+    }
+    return seitenbandFuer(b);
+}
+
 } // namespace BandDefaults
 } // namespace Longpath

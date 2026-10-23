@@ -7954,6 +7954,25 @@ longpath_add_test(tst_flex_vita_reader)
 # zurueckmeldet. Datagramme aus echten Koepfen gebaut.
 longpath_add_test(tst_flex_vita_stream)
 
+# 2026-10-22, zwei Befunde am Geraet: kein Ton trotz 30 987 Tonpaketen,
+# und ein S-Meter ohne Zeiger. Beide mit derselben Wurzel — die
+# Flex-Scheibe ist absichtlich ungebunden, und alles, was an einer
+# gebundenen Scheibe haengt, lief fuer sie nie an.
+longpath_add_test(tst_flex_ton_und_pegel)
+
+# 2026-10-23: der Wasserfall kommt bei der Flex aus einem EIGENEN
+# Strom (0x8004) mit eigener Intensitaetseinheit. Dieser Stand haelt
+# fest, dass er nicht in den dBm-Weg geraet.
+longpath_add_test(tst_flex_wasserfall_kachel)
+
+# 2026-10-22: der „Lattenzaun" im Panadapter. Ein echter Rahmen von
+# Martins FLEX-8400 geht durch denselben Zeichenweg wie im Programm,
+# und das Ergebnis wird auf Regelmaeszigkeit gemessen.
+longpath_add_test(tst_panadapter_lattenzaun)
+target_compile_definitions(tst_panadapter_lattenzaun PRIVATE
+    LONGPATH_BUILD_TESTS
+    LONGPATH_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
+
 # 2026-09-25: Rendering-Pruefstand (ohne LONGPATH_GRAB_DIR uebersprungen),
 # die Retina-Spaltenzusammenfassung und die Frequenzskalen-Beschriftung,
 # die er gefunden hat.

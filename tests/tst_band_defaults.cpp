@@ -86,6 +86,65 @@ private slots:
             QCOMPARE(s.mode, e.mode);
         }
     }
+
+    // ── Das Seitenband je Band (2026-10-23) ─────────────────────────
+    //
+    // Betreiber: „80 und 160 sowie 40 muessen immer automatisch bei
+    // bandauswahl LSB sein". Die Startwerte oben tragen das schon,
+    // greifen aber nur beim ERSTEN Besuch; danach stellt das
+    // Gedaechtnis je Band wieder her, was zuletzt dort stand.
+    void dieDreiUnterenBaenderSindLsb() {
+        QCOMPARE(BandDefaults::seitenbandFuer(Band::Band160m), DSPMode::LSB);
+        QCOMPARE(BandDefaults::seitenbandFuer(Band::Band80m),  DSPMode::LSB);
+        QCOMPARE(BandDefaults::seitenbandFuer(Band::Band40m),  DSPMode::LSB);
+        // 60 m liegt auch unter 10 MHz, ist aber kanalisiert USB.
+        QCOMPARE(BandDefaults::seitenbandFuer(Band::Band60m),  DSPMode::USB);
+        QCOMPARE(BandDefaults::seitenbandFuer(Band::Band20m),  DSPMode::USB);
+        QCOMPARE(BandDefaults::seitenbandFuer(Band::Band10m),  DSPMode::USB);
+    }
+
+    void eineVerdrehteSeite_wirdGerichtet() {
+        // Genau der Fall des Betreibers: USB lag auf 80 m.
+        QCOMPARE(BandDefaults::korrigiereSeitenband(Band::Band80m,
+                                                    DSPMode::USB),
+                 DSPMode::LSB);
+        QCOMPARE(BandDefaults::korrigiereSeitenband(Band::Band20m,
+                                                    DSPMode::LSB),
+                 DSPMode::USB);
+        // Richtig bleibt richtig.
+        QCOMPARE(BandDefaults::korrigiereSeitenband(Band::Band40m,
+                                                    DSPMode::LSB),
+                 DSPMode::LSB);
+    }
+
+    void cwUndDigitalBleibenStehen() {
+        // Ein auf 40 m abgelegtes DIGU gehoert zu FT8 — kein
+        // verdrehtes Seitenband. Dasselbe fuer CW, AM, FM.
+        const DSPMode fremd[] = { DSPMode::CWL, DSPMode::CWU,
+                                  DSPMode::DIGU, DSPMode::DIGL,
+                                  DSPMode::AM,  DSPMode::SAM,
+                                  DSPMode::FM };
+        for (DSPMode m : fremd) {
+            QCOMPARE(BandDefaults::korrigiereSeitenband(Band::Band40m, m), m);
+            QCOMPARE(BandDefaults::korrigiereSeitenband(Band::Band20m, m), m);
+        }
+    }
+
+    // Die Startwerte und die Regel muessen dasselbe sagen, sonst
+    // haengt das Seitenband davon ab, ob man zum ersten oder zum
+    // zweiten Mal auf das Band drueckt.
+    void startwerteUndRegelStimmenUeberein() {
+        for (int i = 0; i < static_cast<int>(Band::Count); ++i) {
+            const Band b = static_cast<Band>(i);
+            const BandSeed s = BandDefaults::seedFor(b);
+            if (!s.valid) { continue; }
+            if (s.mode != DSPMode::USB && s.mode != DSPMode::LSB) { continue; }
+            QVERIFY2(s.mode == BandDefaults::seitenbandFuer(b),
+                     qPrintable(QStringLiteral(
+                         "%1: Startwert und Regel widersprechen sich")
+                         .arg(bandLabel(b))));
+        }
+    }
 };
 
 QTEST_MAIN(TestBandDefaults)

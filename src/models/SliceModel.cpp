@@ -175,6 +175,7 @@
 #include "SliceModel.h"
 
 #include "Band.h"
+#include "BandDefaults.h"
 #include "core/AppSettings.h"
 #include "core/LogCategories.h"
 #include "core/RadeChannel.h"
@@ -275,6 +276,21 @@ void SliceModel::setFrequency(double freq)
         if (newBand != m_currentBand) {
             m_currentBand = newBand;
             emit bandChanged(newBand);
+
+            // Kein Seitenband-Richten HIER (2026-10-23, zurueckgebaut):
+            // `setDspMode` setzt die Filterbreite auf die Vorgabe der
+            // neuen Betriebsart zurueck. Mitten im Frequenzsetzen hat
+            // das drei Pruefstaende der Ablage umgeworfen
+            // (tst_slice_persistence_per_band,
+            // tst_slice_filter_per_band_per_mode_persistence,
+            // tst_tx_frequency_follows_tx_slice): die wiederhergestellte
+            // Filterbreite wurde gleich wieder ueberschrieben.
+            //
+            // Die Regel sitzt stattdessen an den beiden Stellen, an
+            // denen der BETREIBER ein Band auswaehlt: in
+            // `restoreFromSettings` (Banddruck und Hochfahren) und in
+            // MainWindow_Flex, wo die Maschine beim Verbinden ihre
+            // Frequenz durchsetzt.
         }
     }
 }
@@ -2944,6 +2960,20 @@ void SliceModel::restoreFromSettings(Band band)
         // defined value (WdspTypes.h).
         if (rawMode >= static_cast<int>(DSPMode::LSB) &&
             rawMode <= static_cast<int>(DSPMode::RADE_L)) {
+            // Das Seitenband wird hier NICHT gerichtet (2026-10-23,
+            // zurueckgebaut): dieser Weg stellt wieder her, was
+            // abgelegt wurde, und die Filterbreite haengt an der
+            // Betriebsart. Eine Korrektur mitten darin hat zwei
+            // Pruefstaende der Ablage umgeworfen
+            // (tst_slice_persistence_per_band,
+            // tst_slice_filter_per_band_per_mode_persistence): die
+            // Filterbreite kam aus dem Platz der KORRIGIERTEN
+            // Betriebsart statt aus dem abgelegten.
+            //
+            // Die Regel sitzt bei den Aufrufern, die wirklich eine
+            // Bandauswahl sind: RadioModel::onBandButtonClicked,
+            // RadioModel beim Hochfahren, und MainWindow_Flex, wo die
+            // Maschine ihre Frequenz durchsetzt.
             const DSPMode mode = static_cast<DSPMode>(rawMode);
             // Directly assign mode without calling setDspMode() (which also
             // resets the filter). Emit the signal manually to keep observers in sync.

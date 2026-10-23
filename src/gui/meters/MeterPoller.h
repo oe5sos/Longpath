@@ -62,6 +62,7 @@ mw0lge@grange-lane.co.uk
 #include "core/WdspTypes.h"
 
 #include <functional>  // std::function for setRxOffsetSource (RXOffset port)
+#include <optional>   // std::optional fuer setFremdeEmpfangsquelle
 
 #include <QObject>
 #include <QList>
@@ -218,6 +219,23 @@ public:
     //
     // Pass nullptr to detach (e.g. on RadioModel teardown).
     void setRxOffsetSource(std::function<double()> source);
+
+    // ── Fremde Empfangsquelle (2026-10-22) ───────────────────────────
+    //
+    // Der ganze Empfangszweig von `poll()` liest `m_rxChannel`, also
+    // WDSP. Bei einem Radio, das SELBST rechnet, steht dort nichts: die
+    // Flex schickt fertigen Ton und ihre eigenen Messwerte, eine
+    // WDSP-Empfangskette gibt es nicht. `poll()` kehrte darum bei
+    // `!m_rxChannel` frueh zurueck, und der Betreiber sah am
+    // 2026-10-22 ein totes S-Meter, obwohl die Maschine den Pegel
+    // dreissigmal in der Sekunde schickte.
+    //
+    // Die Quelle wird je Umlauf einmal gefragt und muss billig sein
+    // (RadioModel::flexPegelDbm() ist ein Feld und ein Zeitvergleich).
+    // Gibt sie `nullopt`, bleibt es beim WDSP-Weg — so faellt die
+    // Anzeige beim Abstecken des Flex zurueck und friert nicht ein.
+    // `nullptr` haengt sie ganz ab.
+    void setFremdeEmpfangsquelle(std::function<std::optional<double>()> q);
 
 public slots:
     // Switch between RX and TX meter polling.
@@ -382,6 +400,7 @@ private:
     // poll() SignalPeak/SignalAvg loop and the smeterUpdated emit.
     // See setRxOffsetSource() doc for Thetis console.cs:46821 cite.
     std::function<double()> m_rxOffsetSource;
+    std::function<std::optional<double>()> m_fremdeEmpfangsquelle;
 };
 
 } // namespace Longpath

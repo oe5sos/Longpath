@@ -81,5 +81,22 @@ namespace BandDefaults {
 /// `valid == false` — callers must handle the XVTR no-op path.
 BandSeed seedFor(Band b);
 
+/// Das Seitenband, das auf `b` gesprochen wird — LSB unter 10 MHz,
+/// USB darueber (Amateurbrauch, nicht aus Thetis).
+///
+/// Betreiber am 2026-10-23: „80 und 160 sowie 40 muessen immer
+/// automatisch bei bandauswahl LSB sein". Die Startwerte oben sagen
+/// das bereits; das Gedaechtnis je Band kann es aber mit einem
+/// einmal von Hand eingestellten USB ueberschreiben, und dann bleibt
+/// es falsch. `korrigiereSeitenband` ist die Regel dazu.
+DSPMode seitenbandFuer(Band b);
+
+/// Richtet `mode` auf das Seitenband von `b` aus und gibt es zurueck.
+///
+/// Greift NUR, wenn `mode` selbst ein Sprechseitenband ist (USB oder
+/// LSB). CW, Digital, AM, FM und RADE bleiben unberuehrt: ein auf 40 m
+/// abgelegtes DIGU gehoert zu FT8 und ist kein verdrehtes Seitenband.
+DSPMode korrigiereSeitenband(Band b, DSPMode mode);
+
 } // namespace BandDefaults
 } // namespace Longpath

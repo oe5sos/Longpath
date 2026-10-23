@@ -795,6 +795,109 @@ private slots:
                     QStringLiteral("pan=0x40000000,waterfall=0x42000000")).isEmpty());
     }
 
+    // Der Befehl, mit dem Longpath die Flex abstimmt.
+    //
+    // Bis zum 2026-10-22 gab es ihn nicht: die Frequenz der Maschine
+    // erreichte Longpaths VFO nie (`flexSliceFrequencyChanged` wurde
+    // ausgesendet und von niemandem gehoert), und drehen liess sich
+    // die Maschine gar nicht.
+    void abstimmbefehlTraegtAutopanNull()
+    {
+        using FlexCommandWire::tuneSliceCommand;
+
+        // Hertz hinein, Megahertz mit sechs Nachkommastellen hinaus —
+        // dieselbe Schreibweise, in der die Maschine meldet.
+        QCOMPARE(tuneSliceCommand(QStringLiteral("0"), 14'225'000.0),
+                 QStringLiteral("slice tune 0 14.225000 autopan=0"));
+        QCOMPARE(tuneSliceCommand(QStringLiteral("1"), 7'108'700.0),
+                 QStringLiteral("slice tune 1 7.108700 autopan=0"));
+
+        // Der Faenger: OHNE `autopan=0` zentriert die Maschine den
+        // Panadapter neu. Unser Bild haengt am Ausschnitt, den die
+        // Wasserfallkachel meldet — der sprengt dann mit jeder
+        // Abstimmung weg (From AetherSDR SliceModel.cpp:124
+        // [@d58e2b8a]).
+        QVERIFY2(tuneSliceCommand(QStringLiteral("0"), 14'225'000.0)
+                     .endsWith(QStringLiteral("autopan=0")),
+                 "ohne autopan=0 zentriert die Maschine den Panadapter neu");
+
+        // Unsinn gibt keinen Befehl, nicht einen halben.
+        QVERIFY(tuneSliceCommand(QString(), 14'225'000.0).isEmpty());
+        QVERIFY(tuneSliceCommand(QStringLiteral("0"), 0.0).isEmpty());
+        QVERIFY(tuneSliceCommand(QStringLiteral("0"), -1.0).isEmpty());
+    }
+
+    // ── Betriebsart und Filterbreite (2026-10-22) ────────────────────
+    //
+    // Bis heute war `slice tune` der EINZIGE Befehl an eine
+    // Flex-Scheibe. Der Betreiber hoerte Stationen, aber keine
+    // verstaendliche Sprache: „als waere es eine andere modulation".
+    // Longpath zeigte LSB, die Maschine stand auf USB — die
+    // Betriebsart wurde nur beim Verbinden gesetzt und danach nie.
+    void betriebsartbefehl()
+    {
+        using FlexCommandWire::setSliceModeCommand;
+
+        QCOMPARE(setSliceModeCommand(QStringLiteral("0"),
+                                     QStringLiteral("LSB")),
+                 QStringLiteral("slice set 0 mode=LSB"));
+        QCOMPARE(setSliceModeCommand(QStringLiteral("2"),
+                                     QStringLiteral("digu")),
+                 QStringLiteral("slice set 2 mode=DIGU"));
+
+        // Nur was die Maschine in ihrer eigenen `mode_list` fuehrt.
+        // Ein unbekannter Name wird abgewiesen und liesze die Scheibe
+        // im alten Zustand, die Anzeige aber im neuen — also wieder
+        // zwei Wahrheiten. Lieber gar nichts schicken.
+        QVERIFY(setSliceModeCommand(QStringLiteral("0"),
+                                    QStringLiteral("CWL")).isEmpty());
+        QVERIFY(setSliceModeCommand(QStringLiteral("0"),
+                                    QStringLiteral("SPEC")).isEmpty());
+        QVERIFY(setSliceModeCommand(QString(),
+                                    QStringLiteral("USB")).isEmpty());
+    }
+
+    // From AetherSDR SliceModel.cpp:231-232 [@d58e2b8a]:
+    //   // FlexAPI: "filt <id> <low_hz> <high_hz>"
+    void filterbefehl()
+    {
+        using FlexCommandWire::setSliceFilterCommand;
+
+        QCOMPARE(setSliceFilterCommand(QStringLiteral("0"), 100, 2900),
+                 QStringLiteral("filt 0 100 2900"));
+        QCOMPARE(setSliceFilterCommand(QStringLiteral("1"), -2900, -100),
+                 QStringLiteral("filt 1 -2900 -100"));
+
+        // Verdrehte oder gleiche Flanken geben keinen Befehl: die
+        // Maschine wuerde ihn abweisen, und die Anzeige stuende
+        // danach auf etwas anderes als die Scheibe.
+        QVERIFY(setSliceFilterCommand(QStringLiteral("0"), 2900, 100).isEmpty());
+        QVERIFY(setSliceFilterCommand(QStringLiteral("0"), 100, 100).isEmpty());
+        QVERIFY(setSliceFilterCommand(QString(), 100, 2900).isEmpty());
+    }
+
+    // ── Der Panadapter muss der Scheibe folgen (2026-10-22) ─────────
+    //
+    // `slice tune` traegt `autopan=0`, damit das Bild beim Drehen
+    // nicht springt. Bei einem WEITEN Sprung stand die Scheibe dann
+    // aber neben dem Bild: am Geraet um 21:22 gemessen, Scheibe auf
+    // 14.382279 MHz, Panadapter auf 230 kHz um 14.0999 MHz. Der
+    // Betreiber hoerte an einer Stelle und sah eine andere, 170 kHz
+    // daneben.
+    //
+    // From AetherSDR FlexBackend.cpp:420 [@d58e2b8a].
+    void panadapterMitteBefehl()
+    {
+        using FlexCommandWire::setPanCenterCommand;
+
+        QCOMPARE(setPanCenterCommand(QStringLiteral("0x40000000"),
+                                     14'225'000.0),
+                 QStringLiteral("display pan set 0x40000000 center=14.225000"));
+
+        QVERIFY(setPanCenterCommand(QString(), 14'225'000.0).isEmpty());
+        QVERIFY(setPanCenterCommand(QStringLiteral("0x40000000"), 0.0).isEmpty());
+    }
+
     void scheibenlisteAusDerAntwort()
     {
         using FlexCommandWire::sliceListFromReply;

@@ -676,6 +676,24 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
         // ALWAYS push on tick.  Empty-cache guard so we do nothing
         // before the very first FFT.
         m_pendingWfPixelsDbmDirty = false;
+        // ── Nur EIN Schreiber auf dem Bild (2026-10-23) ─────────────
+        //
+        // Liefert die Maschine eigene Wasserfallzeilen (Flex,
+        // Paketklasse 0x8004), schweigt der aus der FFT abgeleitete
+        // Weg. Zwei Schreiber gaeben ein Flackern aus zwei Takten —
+        // und der Takt der Maschine ist der richtige, sie bestimmt ihn
+        // mit `LineDurationMS`.
+        //
+        // Zwei Sekunden Nachlauf: reisst der Kachelstrom ab, uebernimmt
+        // der eigene Weg wieder, statt das Bild stehenzulassen.
+        if (m_fremdeWasserfallquelle) {
+            if (QDateTime::currentMSecsSinceEpoch()
+                    - m_fremdeWasserfallZuletztMs < 2000) {
+                return;
+            }
+            m_fremdeWasserfallquelle = false;
+            m_fremderTeppich = std::numeric_limits<float>::quiet_NaN();
+        }
         if (!m_pendingWfPixelsDbm.isEmpty()) {
             pushWaterfallRow(m_pendingWfPixelsDbm);
         }
@@ -2372,6 +2390,51 @@ void SpectrumWidget::processNoiseFloor()
     //       averageSum += fastPow10Raw(max_copy);
     //       averageCount++;
     //   }
+    // ── Ein Sprung ist kein Kriechen (2026-10-23) ───────────────────
+    //
+    // Betreiber: „dauert noch immer bis oben der wasserfall angezeigt
+    // wird", und davor „oben alles schwarz" — nach dem Verbinden steht
+    // die 3D-Flaeche lange in Orange, bis sie umspringt.
+    //
+    // Es ist nicht die Anzeige, es ist diese Schaetzung. Findet die
+    // Schleife unten zu wenige ruhige Punkte, kriecht sie mit 1 dB je
+    // Rahmen hoch (3 dB im Schnellanlauf) — Thetis display.cs:5893,
+    // und fuer eine Abweichung von ein paar dB auch richtig. Beim
+    // Verbinden ist die Abweichung aber keine Abweichung, sondern eine
+    // andere Welt: der Startwert liegt auf dem Merkwert -200 dBm, und
+    // bis der erste Rahmen kommt melden die leeren Rahmen -173 dBm.
+    // Von dort auf einen echten Teppich um -98 sind es siebzig bis
+    // hundert Rahmen. Solange liegt der Farbanker viel zu tief und
+    // ALLES steht am oberen Ende der Rampe: Orange.
+    //
+    // Also: liegt die Schaetzung mehr als 20 dB unter dem RUHIGEN
+    // Mittel dieses Rahmens, dann springen statt kriechen. 20 dB ist
+    // weit mehr, als ein belegtes Band den ruhigen Teil anhebt (auf
+    // 80 m gemessen rund 9 dB), und weit weniger als der Abstand beim
+    // Verbinden. Die Regelung darunter bleibt unveraendert; das hier
+    // setzt nur den Ausgangspunkt, von dem sie nachzieht.
+    //
+    // Das ruhige Mittel, nicht das volle: ein einzelnes starkes
+    // Signal darf den Ausgangspunkt nicht hochziehen. Zwei Durchgaenge,
+    // wie beim Teppich der Flex-Kachel.
+    {
+        double summe = 0.0;
+        for (int i = 0; i < width; ++i) { summe += src[i]; }
+        const double mittel = summe / width;
+        double tiefSumme = 0.0; int tiefZahl = 0;
+        for (int i = 0; i < width; ++i) {
+            if (src[i] <= mittel) { tiefSumme += src[i]; ++tiefZahl; }
+        }
+        const float ruhig = tiefZahl > 0
+            ? static_cast<float>(tiefSumme / tiefZahl)
+            : static_cast<float>(mittel);
+        if (std::isfinite(ruhig) && ruhig > -199.0f && ruhig < 60.0f
+            && m_nfFftBinAverage < ruhig - 20.0f) {
+            m_nfFftBinAverage = ruhig;
+            m_nfLerpAverage   = ruhig;
+        }
+    }
+
     // currentAverage = previous-frame fftBinAverage (the running estimate);
     // bins below it are the "quiet" ones we want to characterise.
     const float currentAverage = m_nfFftBinAverage;
@@ -3291,7 +3354,25 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
 
     // Ankunft stempeln: der Wasserfall entscheidet daran, ob er noch
     // etwas zu zeigen hat (siehe pushWaterfallRow).
+    const qint64 vorigeAnkunft = m_lastSpectrumArrivalMs;
     m_lastSpectrumArrivalMs = QDateTime::currentMSecsSinceEpoch();
+
+    // ── Ein wieder anlaufender Strom ist ein Bandwechsel ────────────
+    //
+    // Der Schnellanlauf der Rauschteppich-Schaetzung haengt bisher an
+    // einem Frequenzsprung ueber 500 kHz oder an MOX (MainWindow
+    // :6336/:6471). Ein Geraet, das sich gerade VERBINDET, kommt in
+    // keiner der beiden vor — dabei ist genau das der Fall, in dem die
+    // Schaetzung von nichts auf ein ganzes Band umstellen muss.
+    //
+    // Nach einer Pause von ueber zwei Sekunden (dieselbe Schwelle, mit
+    // der pushWaterfallRow den Strom fuer abgerissen haelt) also den
+    // Schnellanlauf setzen. Beim allerersten Rahmen nicht noetig: den
+    // setzt processNoiseFloor inzwischen direkt.
+    if (vorigeAnkunft > 0
+        && m_lastSpectrumArrivalMs - vorigeAnkunft > 2000) {
+        setNoiseFloorFastAttack(true);
+    }
 
     Q_UNUSED(receiverId);
     if (binsLinear.isEmpty()) { return; }
@@ -3424,6 +3505,62 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
                             false,
                             0.0,
                             m_renderedPixels);
+
+    // ── Was kommt eigentlich herein? (2026-10-22) ────────────────────
+    //
+    // Alle dreissig Sekunden eine Zeile mit dem Median und dem
+    // staerksten Punkt des gezeichneten Spektrums, in dBm. Fuer JEDES
+    // Funkgeraet, weil beide Wege hier durchlaufen.
+    //
+    // Der Grund: am 2026-10-22 meldete der Betreiber „hier ist nichts,
+    // es muessten hunderte stationen sein", und die Frage, ob das
+    // Geraet nichts hoert oder Longpath nichts zeigt, war nur ueber
+    // einen Mitschnitt und eine Auswertung von Hand zu beantworten.
+    // Gemessen wurde dann: ueber 461 kHz kein Punkt ueber −98 dBm, bei
+    // einem Rauschteppich von −118,5 dBm. Ein 20-m-Band am Abend hat
+    // Stationen bei −80 bis −50 dBm.
+    //
+    // Mit dieser Zeile steht dieselbe Auskunft im Protokoll, und zwei
+    // Funkgeraete lassen sich nebeneinander legen, ohne etwas
+    // einzubauen.
+    if (!m_renderedPixels.isEmpty()) {
+        const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+        if (jetzt - m_bandBerichtZuletztMs > 30000) {
+            m_bandBerichtZuletztMs = jetzt;
+            QVector<float> sortiert = m_renderedPixels;
+            std::sort(sortiert.begin(), sortiert.end());
+            const float median = sortiert[sortiert.size() / 2];
+            const float p99    = sortiert[sortiert.size() * 99 / 100];
+            const float spitze = sortiert.last();
+            // ── Wo steht die Spitze? (2026-10-23) ────────────────
+            //
+            // Betreiber: „unten rot, oben nichts … ev. verschoben?"
+            // Der Wasserfall kommt bei der Flex aus der KACHEL, die
+            // Kurve darueber aus der Bild-FFT — zwei Stroeme mit je
+            // eigenem Frequenzbereich. Ob die beiden
+            // uebereinanderliegen, sieht man nur, wenn beide sagen,
+            // bei WELCHER Frequenz ihre Spitze steht. `m_renderedPixels`
+            // liegt in Bildpunkten, die Umrechnung ist also dieselbe
+            // wie beim Zeichnen.
+            int spitzeX = 0;
+            for (int i = 1; i < m_renderedPixels.size(); ++i) {
+                if (m_renderedPixels[i] > m_renderedPixels[spitzeX]) {
+                    spitzeX = i;
+                }
+            }
+            const double spitzeHz = m_centerHz - m_bandwidthHz * 0.5
+                + (m_renderedPixels.size() > 1
+                   ? m_bandwidthHz * spitzeX / (m_renderedPixels.size() - 1)
+                   : 0.0);
+            qCInfo(lcSpectrum).nospace()
+                << "Band: Rauschteppich " << median << " dBm, 99. Perzentil "
+                << p99 << " dBm, staerkster Punkt " << spitze
+                << " dBm (Hub " << (spitze - median) << " dB ueber "
+                << (bandwidth() / 1.0e3) << " kHz), Spitze bei "
+                << (spitzeHz / 1.0e6) << " MHz (Punkt " << spitzeX
+                << " von " << m_renderedPixels.size() << ")";
+        }
+    }
 
     // FFT-replan crossfade (Option A from the 2026-05-08 design).  For the
     // first kReplanFadeFrames after a resolution change, blend the
@@ -6016,9 +6153,41 @@ void SpectrumWidget::composeWaterfallActiveThresholds(const QVector<float>& wfPi
     // setClarityWaterfallThresholds() and must survive between rows.
     // Matches the Thetis "high_threshold = waterfall_high_threshold"
     // seed at display.cs:6575 [v2.10.3.13].
-    if (!m_clarityActive) {
+    // ── Clarity ohne Boden faellt auf die eigenen Schwellen zurueck ──
+    //
+    // Hier gab es nur zwei Zweige: Clarity aus -> Nutzerschwellen,
+    // Clarity an MIT Boden -> verschobene Clarity-Schwellen. Der
+    // dritte Fall — Clarity AN, aber ohne Boden — fiel durch beide
+    // hindurch und liess `m_wfActive*` auf dem Stand stehen, den das
+    // letzte Geraet hinterlassen hatte.
+    //
+    // Genau das trat am 2026-10-22 an der FLEX-8400 ein: Clarity wird
+    // ausschliesslich aus `primaryFftEngine()` gefuettert, und die
+    // gibt es beim Flex nicht. Der Wasserfall war durchgehend
+    // EINFARBIG ROT — bei Farbschema 0 die oberste Palettenstufe.
+    //
+    // Gefuettert wird Clarity jetzt auch vom Flex (MainWindow_Flex).
+    // Diese Wache bleibt trotzdem: eine fremde Quelle, die den Boden
+    // nicht liefert, soll ein brauchbares Bild geben und nicht das
+    // Erbe des Vorgaengers.
+    //
+    // NACHTRAG 2026-10-23: das ist eine BEWUSSTE Vertragsaenderung
+    // gegenueber dem Aufruf mit zwei Argumenten, der seine Schwellen
+    // bis zum 2026-10-22 unberuehrt stehen liess. Die CI hat sie
+    // gefunden (tst_waterfall_clarity_anchor fiel um, lokal gruen,
+    // weil ctest die ALTE Testbinaerdatei fuhr — siehe memory
+    // feedback-falsches-gruen-alte-binaerdateien). Der Vertrag bleibt
+    // geaendert: ohne gemessenen Boden sind Clarity's absolute
+    // Schwellen nicht belastbar, und in der Fassung bringt sie
+    // niemand mehr auf diesem Weg herein — `MainWindow.cpp:6095` ruft
+    // immer mit Boden. Der Pruefstand sagt jetzt den neuen Vertrag.
+    const bool clarityHatBoden = std::isfinite(m_clarityFloorDbm);
+    if (!m_clarityActive || !clarityHatBoden) {
         m_wfActiveLowThreshold  = m_wfLowThreshold;
         m_wfActiveHighThreshold = m_wfHighThreshold;
+    }
+    if (!m_clarityActive) {
+        // schon gesetzt
     } else if (std::isfinite(m_clarityFloorDbm)
                && std::isfinite(m_clarityLow) && std::isfinite(m_clarityHigh)) {
         // ── Clarity am eigenen Bild verankern (2026-09-25) ───────────
@@ -6247,6 +6416,378 @@ float SpectrumWidget::wfRowSourceReduce(const QVector<float>& src, int x, float 
         }
         return m;
     }
+    }
+}
+
+// ── Eine Wasserfallzeile der Maschine (2026-10-23) ──────────────────
+//
+// Die FLEX-8400 fuehrt ZWEI Bildstroeme, und AetherSDR zeichnet auch
+// aus beiden (docs/protocols/flex-wasserfall-aethersdr.md):
+//   0x8003  Panadapter-FFT    Bildzeile -> dBm ueber y_pixels
+//   0x8004  Wasserfallkachel  qint16/128 -> INTENSITAET, mit eigenem
+//           Frequenzbereich und eigenem Takt (`LineDurationMS`)
+//
+// Longpath zog bisher nur den ersten und leitete den Wasserfall aus
+// den FFT-Bins ab — mit eigenem Zeitgeber und eigenen Schwellen. Der
+// Betreiber am 2026-10-22: „das rot ist eigenartig gewesen, auch die
+// zeitliche laenge, bis der wasserfall anfaengt". Beides folgt daraus.
+//
+// ── Die Falle, und warum diese Methode nicht pushWaterfallRow ist ──
+//
+// Die Kachelwerte sind KEINE dBm. Am Geraet gemessen liegen sie bei
+// +88 bis +120; `pushWaterfallRow` vergleicht gegen Schwellen um
+// −120…−60. Dort hineingegeben stuenden sie sofort am oberen
+// Anschlag — also genau das Rot, das behoben werden soll. (Genau das
+// habe ich am 2026-10-22 erst gebaut und wieder herausgenommen.)
+// Longpath haelt das schon fest:
+// `kachelwerteSindEinFarbmassstabKeineDbm` in tst_flex_vita_reader.
+//
+// Gefaerbt wird darum in der INTENSITAETSDOMAENE, nach AetherSDRs
+// `intensityToWaterfallLevel` (SpectrumWidget.cpp:8393 [@d58e2b8a]),
+// Fall 2 — der selbst geschaetzte. Den radio-seitigen Schwarzpunkt
+// nutzt AetherSDR ausdruecklich nur auf Wunsch des Betreibers, mit
+// der Begruendung, er ziele auf SmartSDRs andere Darstellung.
+//
+//   schwarz = Rauschteppich der Kachel
+//   spanne  = max(1, 120 − Farbverstaerkung × 0,91)
+//   stufe   = clamp((wert − schwarz) / spanne, 0, 1)
+//
+// Der Rauschteppich wird wie dort geschaetzt: Mittel ueber jeden
+// achten Bin, dann Mittel der Bins UNTER diesem Mittel.
+void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitaet,
+                                                double lowHz, double highHz)
+{
+    if (intensitaet.isEmpty() || !(highHz > lowHz)) { return; }
+    if (m_waterfall.isNull()) { return; }
+    if (m_wfStopOnTx && m_activePeakHold.txActive()) { return; }
+
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    m_fremdeWasserfallquelle    = true;
+    m_fremdeWasserfallZuletztMs = jetzt;
+    m_wfLastPushMs              = jetzt;
+
+    // ── Zeitliche Mittelung (2026-10-23) ────────────────────────────
+    //
+    // Der Betreiber im Vergleich mit der Anvelina: „oben schaut es
+    // nach strichen aus, flex nach punkten", und nach dem Wechsel von
+    // Maximum auf Mittel je Bildpunkt: „unten ist es nach wie vor
+    // sehr pixelig".
+    //
+    // Es war nie die Breite, sondern die ZEIT. Der abgeleitete Weg
+    // laeuft durch `SpectrumAvenger` und mittelt ueber die Frames
+    // (beim Betreiber Log Recursive, 400 ms) — benachbarte Zeilen
+    // haengen dadurch zusammen, und daraus werden die Striche. Die
+    // Flex-Kachel ging ungemittelt aufs Bild: jede Zeile ihr eigenes
+    // Rauschen, also Punkte.
+    //
+    // Hier dieselbe Mittelung, aber ueber die GEMESSENE Zeit statt
+    // ueber die Bildrate: die Kachel kommt im Takt der Maschine
+    // (`line_duration`), nicht im Takt des Fensters, ein fps-basiertes
+    // Alpha waere also am falschen Nenner. Alpha = exp(-dt/tau) mit
+    // dem tau des Betreibers; dieselbe Form wie Thetis
+    // specHPSDR.cs:358, nur mit echtem dt.
+    //
+    // Die Kachelwerte sind bereits logarithmisch (dB/128), die
+    // Mittelung hier ist damit das Log Recursive seiner Einstellung,
+    // nicht die lineare Variante.
+    const bool mitteln = (m_waterfallAveraging != SpectrumAveraging::None);
+    if (!mitteln
+        || m_fremdeWfMittel.size() != intensitaet.size()
+        || !qFuzzyCompare(m_fremdeWfMittelTiefHz, lowHz)
+        || !qFuzzyCompare(m_fremdeWfMittelHochHz, highHz)
+        || m_fremdeWfMittelMs <= 0
+        || jetzt - m_fremdeWfMittelMs > 2000) {
+        // Abgeschaltet, Aussetzer -- oder der Ausschnitt der Kachel
+        // hat sich geaendert (Bandwechsel, Zoom). Dann neu anfangen:
+        // weiterrechnen zoege ein altes Band ins neue hinein, und
+        // weil die Kachelbreite dabei gleich bleiben kann, faengt die
+        // Groessenpruefung allein das NICHT.
+        m_fremdeWfMittel = intensitaet;
+    } else {
+        const double dtSek = std::max<qint64>(1, jetzt - m_fremdeWfMittelMs)
+                             / 1000.0;
+        const double tauSek = std::max(1, m_waterfallAverageTimeMs) / 1000.0;
+        const float alt = static_cast<float>(
+            qBound(0.0, std::exp(-dtSek / tauSek), 1.0));
+        const float neu = 1.0f - alt;
+        float* m = m_fremdeWfMittel.data();
+        for (int i = 0; i < intensitaet.size(); ++i) {
+            m[i] = neu * intensitaet[i] + alt * m[i];
+        }
+    }
+    m_fremdeWfMittelMs     = jetzt;
+    m_fremdeWfMittelTiefHz = lowHz;
+    m_fremdeWfMittelHochHz = highHz;
+    const QVector<float>& zeile = m_fremdeWfMittel;
+
+    // ── Der Rauschteppich der Kachel ────────────────────────────────
+    double summe = 0.0; int zahl = 0;
+    for (int i = 0; i < zeile.size(); i += 8) {
+        summe += zeile[i]; ++zahl;
+    }
+    if (zahl == 0) { return; }
+    const double mittel = summe / zahl;
+    double tiefSumme = 0.0; int tiefZahl = 0;
+    for (int i = 0; i < zeile.size(); i += 8) {
+        if (zeile[i] <= mittel) { tiefSumme += zeile[i]; ++tiefZahl; }
+    }
+    const float teppich = tiefZahl > 0 ? float(tiefSumme / tiefZahl)
+                                       : float(mittel);
+    // Langsam nachfuehren, damit eine einzelne laute Zeile das Bild
+    // nicht aufhellt. 0,05 wie in der Vorlage.
+    //
+    // Beim SENDEN eingefroren, ebenfalls wie dort: das eigene Signal
+    // wuerde den Teppich hochziehen, und nach dem Loslassen stuende
+    // das Band minutenlang zu dunkel.
+    constexpr float kAlpha = 0.05f;
+    if (!m_activePeakHold.txActive()) {
+        m_fremderTeppich = std::isfinite(m_fremderTeppich)
+            ? kAlpha * teppich + (1.0f - kAlpha) * m_fremderTeppich
+            : teppich;
+    } else if (!std::isfinite(m_fremderTeppich)) {
+        m_fremderTeppich = teppich;   // beim ersten Mal muss er stehen
+    }
+
+    const float spanne = std::max(1.0f, 120.0f - m_wfColorGain * 0.91f);
+
+    // ── Der Teppich gehoert NICHT auf Schwarz (2026-10-23) ──────────
+    //
+    // Hier stand der Rauschteppich als Schwarzpunkt, wie in der
+    // Vorlage („Use noise floor directly as threshold — noise maps to
+    // black"). Dann liegt der ganze Teppich auf Stufe 0, und seine
+    // Textur verschwindet. Der Betreiber: „der teppich sollte nicht
+    // so dunkel sein", „hier ist das blau unten und oben das gleiche",
+    // „jedenfalls heller".
+    //
+    // Die Farbtabelle ist dieselbe wie in NereusSDR (nachgesehen,
+    // kDefaultStops Stufe fuer Stufe gleich) — es lag nie an ihr,
+    // sondern am Anlegepunkt. Also den Schwarzpunkt um ein Stueck
+    // UNTER den Teppich legen, damit er selbst im unteren Blau liegt
+    // und seine Struktur sichtbar bleibt; Signale steigen von dort
+    // durch Cyan, Gruen und Gelb.
+    //
+    // Anteilig an der Spanne, nicht in festen Einheiten: sonst haengt
+    // die Helligkeit an der Farbverstaerkung.
+    constexpr float kTeppichAufDerRampe = 0.18f;
+    const float schwarz = m_fremderTeppich - spanne * kTeppichAufDerRampe;
+
+    // ── Auf die Fensterbreite abbilden ──────────────────────────────
+    //
+    // Ausschnitt der Kachel und des Fensters muessen NICHT
+    // uebereinstimmen: die Maschine schickt ihre eigene Breite
+    // (gemessen 230,6 kHz gegen 200 kHz Panadapterbreite), und der
+    // Betreiber darf zoomen.
+    const int breite = m_waterfall.width();
+    if (breite <= 0) { return; }
+    const int h = m_waterfall.height();
+    m_wfWriteRow = (m_wfWriteRow - 1 + h) % h;
+#ifdef LONGPATH_GPU_SPECTRUM
+    ++m_wfRowsSinceUpload;
+#endif
+    QRgb* scanline = reinterpret_cast<QRgb*>(m_waterfall.scanLine(m_wfWriteRow));
+    m_wfRowIntensity.resize(breite);
+    quint8* stufen = m_wfRowIntensity.data();
+
+    const double fensterTief  = m_centerHz - m_bandwidthHz * 0.5;
+    const double hzProPunkt   = m_bandwidthHz / breite;
+    const double hzProBin     = (highHz - lowHz) / zeile.size();
+    const float  kleinster    = *std::min_element(zeile.cbegin(),
+                                                  zeile.cend());
+
+    for (int x = 0; x < breite; ++x) {
+        const double hzA = fensterTief + x * hzProPunkt;
+        const double hzB = hzA + hzProPunkt;
+        int a = static_cast<int>(std::floor((hzA - lowHz) / hzProBin));
+        int b = static_cast<int>(std::ceil((hzB - lowHz) / hzProBin)) - 1;
+        float wert;
+        if (b < 0 || a >= static_cast<int>(zeile.size())) {
+            // Ausserhalb dessen, was die Kachel abdeckt: der tiefste
+            // Wert der Zeile. Null waere hier ein KRAEFTIGES Signal.
+            wert = kleinster;
+        } else {
+            const int letzter = static_cast<int>(zeile.size()) - 1;
+            a = std::clamp(a, 0, letzter);
+            b = std::clamp(b, a, letzter);
+            // ── Der Melder des Betreibers, nicht mein eigener ───
+            //
+            // Hier stand erst das Maximum (Rendering-Werkbank
+            // 2026-09-25: ein schmaler Traeger darf nicht zwischen
+            // zwei Bildpunkte fallen), dann am 2026-10-23 das Mittel
+            // gegen die Koernung. Beides war meine Wahl, und beide
+            // Male die falsche Baustelle: die Koernung sass in der
+            // ZEIT, nicht in der Breite (siehe die Mittelung oben).
+            //
+            // Nachgesehen, was der abgeleitete Weg tut, den der
+            // Betreiber als Vorbild nennt: er laeuft durch
+            // `applySpectrumDetector` mit SEINER Einstellung —
+            // `DisplayWaterfallDetector`, bei ihm Sample. Der
+            // Kachelweg hat sie bisher ignoriert. Also dieselbe Wahl
+            // auch hier, damit „wie bei der Anvelina" wirklich
+            // dasselbe heisst.
+            //
+            // Kein invEnb: das ist die Fensterkorrektur UNSERER FFT.
+            // Die Kachel kommt fertig von der Maschine.
+            const int n = b - a + 1;
+            switch (m_waterfallDetector) {
+                case SpectrumDetector::Peak: {
+                    wert = zeile[a];
+                    for (int i = a + 1; i <= b; ++i) {
+                        wert = std::max(wert, zeile[i]);
+                    }
+                    break;
+                }
+                case SpectrumDetector::Rosenfell: {
+                    // Vereinfacht gegenueber SpectrumDetector.cpp:118:
+                    // dort traegt `prev_maxi` ueber die Bildpunkte
+                    // hinweg. Stieg UND fiel es im Fenster, nimmt der
+                    // ungerade Bildpunkt das Maximum, der gerade das
+                    // Minimum — so entsteht die Rosenfell-Struktur.
+                    float mini = zeile[a], maxi = zeile[a];
+                    bool stieg = false, fiel = false;
+                    for (int i = a + 1; i <= b; ++i) {
+                        mini = std::min(mini, zeile[i]);
+                        maxi = std::max(maxi, zeile[i]);
+                        if (zeile[i] > zeile[i - 1]) { stieg = true; }
+                        if (zeile[i] < zeile[i - 1]) { fiel  = true; }
+                    }
+                    wert = (stieg && fiel) ? ((x & 1) ? maxi : mini) : maxi;
+                    break;
+                }
+                case SpectrumDetector::Sample: {
+                    // Die MITTE des Fensters, wie
+                    // SpectrumDetector.cpp:192 (`bins[i - bcount/2]`).
+                    wert = zeile[a + n / 2];
+                    break;
+                }
+                case SpectrumDetector::Average:
+                case SpectrumDetector::RMS:
+                case SpectrumDetector::Count:
+                default: {
+                    // RMS faellt auf das Mittel: die Kachelwerte sind
+                    // logarithmisch (dB/128), eine Quadratsumme darauf
+                    // haette keine Bedeutung.
+                    double summeBins = 0.0;
+                    for (int i = a; i <= b; ++i) { summeBins += zeile[i]; }
+                    wert = static_cast<float>(summeBins / n);
+                    break;
+                }
+            }
+        }
+        const float stufe = std::clamp((wert - schwarz) / spanne,
+                                       0.0f, 1.0f);
+        stufen[x] = static_cast<quint8>(std::lround(stufe * 255.0f));
+        scanline[x] = waterfallColorForIntensityF(stufe, m_wfColorScheme,
+                                                  m_wfLowColor);
+    }
+
+    // ── Und wo steht die Spitze der KACHEL? (2026-10-23) ────────────
+    //
+    // Gegenstueck zur Bandmeldung oben, in derselben Einheit
+    // (Bildpunkt und Frequenz). Stehen die beiden Spitzen an
+    // verschiedenen Frequenzen, liegen die zwei Stroeme der Flex nicht
+    // uebereinander — genau die Frage des Betreibers.
+    if (jetzt - m_kachelBerichtZuletztMs > 30000) {
+        m_kachelBerichtZuletztMs = jetzt;
+        int sx = 0;
+        for (int i = 1; i < breite; ++i) {
+            if (stufen[i] > stufen[sx]) { sx = i; }
+        }
+        const double sHz = fensterTief + sx * hzProPunkt;
+
+        // ── Liegen die beiden Stroeme uebereinander? ─────────────
+        //
+        // „kann es sein, dass das versetzt ist". Pixel im Bild zu
+        // vergleichen ist Raten — der 3D-Flur hat Perspektive, ein
+        // Kamm im Hintergrund steht nicht ueber seiner Frequenz.
+        // Also die beiden Zeilen gegeneinander schieben und die
+        // Verschiebung melden, bei der sie am besten passen.
+        // Beide liegen in Bildpunkten derselben Flaeche, nur in
+        // verschiedener Aufloesung (Bildpunktverhaeltnis).
+        // Kein QStringLiteral mit deutschem Text in src/gui: den
+        // zaehlt tst_oberflaeche_englisch als Beschriftung mit (die
+        // Decke steht bei 9). Protokolltexte gehen darum direkt in den
+        // Strom, nicht ueber eine zusammengesetzte Zeichenkette.
+        bool   versatzMessbar = false;
+        int    besterLag  = 0;
+        double zweitRel   = 0.0;
+        double beiNull    = 0.0;
+        double bestWert   = 0.0;
+        if (!m_renderedPixels.isEmpty() && breite > 64) {
+            const int n = breite;
+            const int m = m_renderedPixels.size();
+            auto kurve = [&](int i) -> double {   // Pan auf Kachelbreite
+                const double f = double(i) * (m - 1) / double(n - 1);
+                const int a = qBound(0, int(f), m - 1);
+                return m_renderedPixels[a];
+            };
+            // Beide auf Mittelwert null, sonst gewinnt der Gleichanteil.
+            QVector<double> A(n), B(n);
+            double sa = 0.0, sb = 0.0;
+            for (int i = 0; i < n; ++i) {
+                A[i] = stufen[i]; B[i] = kurve(i); sa += A[i]; sb += B[i];
+            }
+            sa /= n; sb /= n;
+            for (int i = 0; i < n; ++i) { A[i] -= sa; B[i] -= sb; }
+            const int maxLag = n / 10;
+            double bestes = -1.0e30;
+            QVector<double> werte(2 * maxLag + 1, -1.0e30);
+            for (int lag = -maxLag; lag <= maxLag; ++lag) {
+                double sum = 0.0; int zahl = 0;
+                for (int i = qMax(0, -lag); i < qMin(n, n - lag); ++i) {
+                    sum += A[i] * B[i + lag]; ++zahl;
+                }
+                if (zahl > 0) {
+                    sum /= zahl;
+                    werte[lag + maxLag] = sum;
+                    if (sum > bestes) { bestes = sum; besterLag = lag; }
+                }
+            }
+            // ── Wie deutlich ist das Ergebnis? (2026-10-23) ──────
+            //
+            // Dieselbe Lage ergab im Abstand von 30 s einmal -8 und
+            // einmal +107 Punkte. Auf einem Band mit vielen aehnlichen
+            // Signalen rastet die Kreuzkorrelation auf dem falschen
+            // Nachbarn ein, und dann steht eine erfundene Zahl im
+            // Protokoll, auf die ich prompt eine Behebung gebaut habe.
+            //
+            // Also den zweitbesten Gipfel AUSZERHALB der Umgebung des
+            // besten mitmelden. Liegt er fast gleichauf, ist die
+            // Messung nichts wert und sagt das auch.
+            double zweitbestes = -1.0e30;
+            for (int lag = -maxLag; lag <= maxLag; ++lag) {
+                if (std::abs(lag - besterLag) <= 10) { continue; }
+                zweitbestes = std::max(zweitbestes, werte[lag + maxLag]);
+            }
+            zweitRel = (bestes > 0.0 && zweitbestes > -1.0e29)
+                ? zweitbestes / bestes : 0.0;
+            beiNull = werte[maxLag];
+            bestWert = bestes;
+            versatzMessbar = true;
+        }
+
+        qCInfo(lcSpectrum).nospace()
+            << "Kachel: Bereich " << (lowHz / 1.0e6) << "–"
+            << (highHz / 1.0e6) << " MHz ueber " << zeile.size()
+            << " Bins, Fenster " << (fensterTief / 1.0e6) << "–"
+            << ((fensterTief + m_bandwidthHz) / 1.0e6)
+            << " MHz, Spitze bei " << (sHz / 1.0e6) << " MHz (Punkt "
+            << sx << " von " << breite << ", Stufe " << stufen[sx] << ")";
+        if (versatzMessbar) {
+            qCInfo(lcSpectrum).nospace()
+                << "Kachel gegen Spektrum: bester Versatz " << besterLag
+                << " Punkte = " << (besterLag * hzProPunkt / 1.0e3)
+                << " kHz; zweitbester Gipfel bei "
+                << (zweitRel * 100.0) << " % davon, Wert bei Versatz 0 "
+                << (bestWert > 0.0 ? beiNull / bestWert * 100.0 : 0.0)
+                << " %"
+                << (zweitRel > 0.8 ? " — NICHT eindeutig" : "");
+        }
+    }
+
+    appendHistoryRow(stufen, jetzt);
+    if (!m_wfLive) {
+        rebuildWaterfallViewport();
+        markOverlayDirty();
     }
 }
 
@@ -12196,10 +12737,50 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // the "not yet measured" sentinel default (-200).
             const float floorBase = (m_nfLerpAverage > -199.0f)
                 ? m_nfLerpAverage : (m_refLevel - m_dynamicRange);
-            // -6 dB matches AetherSDR's default "3D Floor" offset
-            // (m_dssFloorOffsetDb) -- no dedicated slider yet, see
-            // DssRenderer.h for what this first port left out.
-            const float floorDbm = std::round(floorBase * 2.0f) / 2.0f - 6.0f;
+            // ── Der Flur gehoert UEBER den Rauschteppich ────────────
+            //
+            // Hier stand `- 6.0f`, nach AetherSDRs Vorgabe fuer „3D
+            // Floor" (m_dssFloorOffsetDb). Dort gibt es dazu einen
+            // Regler, bei uns nicht (siehe DssRenderer.h) — und mit
+            // dem Flur 6 dB UNTER dem Teppich bekommt der Teppich
+            // selbst rund 14 Prozent der vollen Rippenhoehe. 96
+            // solcher Zeilen uebereinander ergeben einen Wald aus
+            // Rippen, und der Betreiber liest ihn als Stationen:
+            // „keine signale obwohl wasserfall", „hier hat es was von
+            // grund auf" (2026-10-22).
+            //
+            // Gemessen mit einem echten Rahmen seiner FLEX-8400
+            // (tests/data/flex_rahmen_20m.csv) durch denselben
+            // Zeichenweg, Welligkeit der Spaltenhelligkeit:
+            //   Flur −6 dB   0,30   Wald, kein Signal erkennbar
+            //   Flur  0 dB   …      noch dicht
+            //   Flur +3 dB   …      flacher Teppich, ~10 Signale klar
+            //   Flur +6 dB   …      flach, nur noch 3 Signale
+            // ── Nachgemessen am 2026-10-23: 0 dB, nicht +3 ──────────
+            //
+            // +3 dB stand hier einen Tag lang. Es war an einem gut
+            // belegten Band gemessen, und auf einem RUHIGEN schneidet
+            // es alles weg: die Bandmeldung zeigte Rauschteppich
+            // −104,4 dBm und 99. Perzentil −103,8 dBm, also 0,6 dB
+            // dazwischen. Der Betreiber: „die farbe veraendert sich so
+            // automatisch ins dunkle, dass man dann oben gar nichts
+            // mehr sieht".
+            //
+            // Dieselbe Messreihe gab die Antwort schon her (Hoehe der
+            // Flaeche je Spalte, gegen eine ebene Flaeche = 150 px):
+            //
+            //   Flur     p10   p50   p90   max
+            //   −6 dB    158   161   163   168   Wald
+            //    0 dB    150   152   156   162   <- Teppich fast flach,
+            //                                       Signale am hoechsten
+            //   +3 dB    150   150   150   159
+            //   +6 dB    150   150   150   154
+            //
+            // Bei 0 dB traegt der Teppich zwei Bildpunkte und das
+            // staerkste Signal zwoelf — bei +3 nur noch neun. Null
+            // behaelt also MEHR Signal bei fast demselben flachen
+            // Teppich. Ein Regler dafuer fehlt weiterhin.
+            const float floorDbm = std::round(floorBase * 2.0f) / 2.0f;
             const float rangeDb = m_dynamicRange;
             const quint64 paletteToken =
                 (static_cast<quint64>(m_wfColorScheme) << 32)
@@ -12207,9 +12788,26 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // Reuses the classic waterfall's own palette (not a second,
             // separately-maintained one) so the 3D surface always matches
             // whichever waterfall colour scheme is active.
-            auto palette = [this, floorDbm, rangeDb](float dbm) -> QRgb {
+            // ── Hoehe und Farbe brauchen VERSCHIEDENE Anker ──────────
+            //
+            // `floorDbm` taugt fuer die HOEHE: der Rauschteppich soll
+            // an der Grundlinie liegen, sonst wird aus ihm ein Wald
+            // von Rippen (2026-10-22). Fuer die FARBE ist derselbe
+            // Anker falsch — er legt den Teppich auf Stufe 0, also auf
+            // SCHWARZ, und zwischen den Signalen klafft ein Loch. Der
+            // Betreiber am 2026-10-23: „schaue oben, zwischen den
+            // signalen ist es schwarz".
+            //
+            // Es ist derselbe Fehler, den der Wasserfall einen Commit
+            // vorher hatte, nur an der zweiten Stelle. Also derselbe
+            // Griff und derselbe Anteil: der Farbflur liegt 18 Prozent
+            // der Spanne UNTER dem Hoehenflur, damit der Teppich im
+            // unteren Blau liegt und seine Struktur zeigt.
+            constexpr float kTeppichAufDerRampe = 0.18f;
+            const float farbFloorDbm = floorDbm - rangeDb * kTeppichAufDerRampe;
+            auto palette = [this, farbFloorDbm, rangeDb](float dbm) -> QRgb {
                 const float f = rangeDb > 0.0f
-                    ? qBound(0.0f, (dbm - floorDbm) / rangeDb, 1.0f) : 0.0f;
+                    ? qBound(0.0f, (dbm - farbFloorDbm) / rangeDb, 1.0f) : 0.0f;
                 return waterfallColorForIntensityF(f, m_wfColorScheme, m_wfLowColor);
             };
             // 0.70 -- AetherSDR's fixed default zCurve (m_dssZCurve).
