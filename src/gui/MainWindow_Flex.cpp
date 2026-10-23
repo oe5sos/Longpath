@@ -263,6 +263,82 @@ void MainWindow::wireFlex()
         m_radioModel->setFlexSliceMode(ziel->dspMode());
         m_radioModel->setFlexSliceFilter(ziel->filterLow(), ziel->filterHigh());
 
+        // ── Beim VERBINDEN gewinnt die MASCHINE ─────────────────────
+        //
+        // Zwei Dinge laufen hier gegeneinander: Longpath uebernimmt
+        // zuerst Frequenz und Ausschnitt der Maschine, danach stellt
+        // das Layoutprofil die gespeicherte Scheibe her — und die kann
+        // auf einem ganz anderen Band stehen. Am Geraet gemessen am
+        // 2026-10-23: die Maschine lieferte 7.065–7.265 MHz, das
+        // Fenster stand nach dem Profil auf 14.150–14.300. KEINE
+        // Ueberlappung, also hatte der Panadapter nichts zu zeichnen
+        // (Bandmeldung: Rauschteppich −600 dBm, Hub 0 dB). Der
+        // Betreiber: „oben alles schwarz".
+        //
+        // Der erste Versuch zog den PANADAPTER auf die Scheibe. Das
+        // war verkehrt herum und sofort zu merken: der Betreiber hoerte
+        // auf 80 m, und das Programm riss ihm die Maschine beim
+        // Starten auf die 20 m aus dem gespeicherten Profil. Wer das
+        // Geraet gerade von SmartSDR oder der Frontplatte aus benutzt,
+        // soll davon nichts merken.
+        //
+        // Also andersherum: nach dem Profilaufbau wird die Frequenz
+        // der MASCHINE in die Scheibe zurueckgeschrieben. Der
+        // Panadapter stimmt dann ohnehin, denn er steht dort schon.
+        // 1500 ms, weil der Profilaufbau in sechs Schritten laeuft und
+        // beim Messen rund 600 ms brauchte.
+        QTimer::singleShot(1500, this, [this]() {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            SliceModel* s = flexControllableSlice();
+            if (!s) { return; }
+            const double geraet = m_radioModel->flexGeraeteFrequenzHz();
+            if (!(geraet > 0.0)) { return; }
+            if (qFuzzyCompare(geraet, s->frequency())) { return; }
+            qCInfo(lcFlexGui).nospace()
+                << "Flex: das Profil stellte " << (s->frequency() / 1.0e6)
+                << " MHz her, die Maschine steht auf " << (geraet / 1.0e6)
+                << " MHz — die Maschine gewinnt";
+            // Die Wache setzen: sonst schickt die Scheibe die eben
+            // uebernommene Frequenz als Befehl zurueck.
+            m_flexApplyingRemoteState = true;
+            s->setFrequency(geraet);
+            m_flexApplyingRemoteState = false;
+        });
+
+    // ── Betriebsart und Filterbreite, derselbe Weg ──────────────
+        //
+        // Bis zum 2026-10-22 ging nur die Frequenz hinaus — und auch
+        // die nicht (siehe oben). Mit dem Abstimmen allein hoerte der
+        // Betreiber Stationen, aber keine verstaendliche Sprache:
+        // „als waere es eine andere modulation". Das war sie auch.
+        // Longpath zeigte LSB, die Maschine stand auf USB, weil die
+        // Betriebsart nur EINMAL beim Verbinden gesetzt wurde.
+        //
+        // Dieselbe Wache wie bei der Frequenz: ein Zustandsschub der
+        // Maschine darf den Befehl nicht zurueckwerfen, und eine
+        // Scheibe mit echter DDC-Bindung wird nie gefuettert.
+        disconnect(m_flexArtBand);
+        m_flexArtBand = connect(ziel, &SliceModel::dspModeChanged, this,
+                [this](DSPMode art) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            m_radioModel->setFlexSliceMode(art);
+        });
+
+        disconnect(m_flexFilterBand);
+        m_flexFilterBand = connect(ziel, &SliceModel::filterChanged, this,
+                [this](int tief, int hoch) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            m_radioModel->setFlexSliceFilter(tief, hoch);
+        });
+
+        // Und einmal gleich jetzt, damit die Maschine mit dem
+        // uebereinstimmt, was im Fenster steht — sonst gilt der
+        // Unterschied bis zum ersten Drehen weiter.
+        m_radioModel->setFlexSliceMode(ziel->dspMode());
+        m_radioModel->setFlexSliceFilter(ziel->filterLow(), ziel->filterHigh());
+
         // ── Panadapter und Scheibe muessen beim VERBINDEN zusammen ──
         //
         // Beim Verbinden laufen zwei Dinge gegeneinander: Longpath

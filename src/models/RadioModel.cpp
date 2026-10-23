@@ -7043,6 +7043,7 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
             // Bild (Entwurf Abschnitt 5). Eine Flex-Scheibe ist eine
             // Scheibe OHNE RxChannel, und die 34 WDSP-Stellen in dieser
             // Datei fragen alle nach einem.
+            m_flexGeraeteFrequenzHz = hz;
             emit flexSliceFrequencyChanged(sliceId, hz);
         });
 

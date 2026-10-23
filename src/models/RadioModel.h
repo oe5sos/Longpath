@@ -3628,6 +3628,13 @@ public:
     /// Panadapter hat nichts zu zeichnen.
     void zieheFlexPanadapterAuf(double hz);
 
+    /// Die Frequenz, die die MASCHINE zuletzt gemeldet hat (Hertz).
+    /// Beim Verbinden gewinnt sie gegen das gespeicherte Profil: der
+    /// Betreiber hat die Maschine womoeglich gerade von SmartSDR oder
+    /// der Frontplatte aus benutzt, und ihn davon wegzuziehen ist das
+    /// Letzte, was ein Programm beim Starten tun soll.
+    double flexGeraeteFrequenzHz() const { return m_flexGeraeteFrequenzHz; }
+
 private:
     /// Den selbst gesetzten Ausschnitt uebernehmen. Noetig, weil die
     /// Maschine eine von uns gesetzte Panadaptermitte NICHT
@@ -3701,6 +3708,8 @@ private:
     /// schickt beim Drehen nur `center=`, nicht beides zusammen.
     double               m_flexPanMitteMhz{0.0};
     double               m_flexPanBreiteMhz{0.0};
+    /// Zuletzt von der Maschine gemeldete Scheibenfrequenz (Hertz).
+    double               m_flexGeraeteFrequenzHz{0.0};
     /// Der Ausschnitt, den die Wasserfallkachel zuletzt meldete
     /// (Hertz). `tuneFlexSlice` erkennt daran, wann die Scheibe aus
     /// dem Bild laeuft.
