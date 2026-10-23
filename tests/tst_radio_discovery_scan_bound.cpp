@@ -30,16 +30,55 @@
 #include <chrono>
 #include <thread>
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
+// ── Die rohe Steckdose, auf beiden Systemen (2026-10-22) ────────────
+//
+// Die beiden Flutfaeden unten brauchen eine Steckdose AUSSERHALB von Qt
+// (die Begruendung steht bei floodLoopbackPort). Dafuer gibt es keinen
+// gemeinsamen Satz Kopfdateien: unter Windows liegt alles in
+// <winsock2.h>, unter Unix in vier POSIX-Dateien. Genau daran ist diese
+// Datei als einzige der 1082 beim Windows-Messlauf vom 2026-10-22
+// gescheitert ("fatal error: arpa/inet.h: No such file or directory").
+#if defined(Q_OS_WIN)
+#  include <winsock2.h>
+#  include <ws2tcpip.h>
+#else
+#  include <arpa/inet.h>
+#  include <netinet/in.h>
+#  include <sys/socket.h>
+#  include <unistd.h>
+#endif
 
 #include "core/RadioDiscovery.h"
 
 using namespace Longpath;
 
 namespace {
+
+// Eine Steckdose ist unter Windows ein `SOCKET` -- VORZEICHENLOS. Die
+// uebliche Pruefung `fd < 0` ist dort immer falsch und laesst einen
+// gescheiterten ::socket() durch; INVALID_SOCKET ist der richtige
+// Vergleich. Darum fuehrt diese Datei einen eigenen Namen dafuer statt
+// `int`.
+#if defined(Q_OS_WIN)
+using Steckdose = SOCKET;
+constexpr Steckdose kKeineSteckdose = INVALID_SOCKET;
+inline void steckdoseSchliessen(Steckdose s) { ::closesocket(s); }
+
+// Winsock liefert erst nach einem WSAStartup je Prozess eine Steckdose.
+// Qt ruft es fuer sich selbst auf, aber die Flutfaeden starten
+// moeglicherweise, bevor Qt eine eigene Steckdose angelegt hat -- also
+// hier ausdruecklich. Der Aufruf ist zaehlend, mehrfach also harmlos.
+struct WinsockWache {
+    WinsockWache()  { WSADATA d{}; WSAStartup(MAKEWORD(2, 2), &d); }
+    ~WinsockWache() { WSACleanup(); }
+};
+#else
+using Steckdose = int;
+constexpr Steckdose kKeineSteckdose = -1;
+inline void steckdoseSchliessen(Steckdose s) { ::close(s); }
+
+struct WinsockWache {};   // auf Unix gibt es nichts anzumelden
+#endif
 
 // Sends a 1-byte UDP datagram to 127.0.0.1:`port` roughly every 500us until
 // `stop` flips true. Runs on its own std::thread with a plain POSIX socket:
@@ -48,8 +87,9 @@ namespace {
 // would never fire while that code is asleep inside waitForReadyRead().
 void floodLoopbackPort(quint16 port, std::atomic<bool>* stop)
 {
-    const int fd = ::socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd < 0) {
+    const WinsockWache wache;
+    const Steckdose fd = ::socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd == kKeineSteckdose) {
         return;
     }
     sockaddr_in addr{};
@@ -58,11 +98,12 @@ void floodLoopbackPort(quint16 port, std::atomic<bool>* stop)
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     const char payload = 0;
     while (!stop->load(std::memory_order_relaxed)) {
-        ::sendto(fd, &payload, sizeof(payload), 0,
-                 reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
+        ::sendto(fd, &payload, static_cast<int>(sizeof(payload)), 0,
+                 reinterpret_cast<const sockaddr*>(&addr),
+                 static_cast<int>(sizeof(addr)));
         std::this_thread::sleep_for(std::chrono::microseconds(500));
     }
-    ::close(fd);
+    steckdoseSchliessen(fd);
 }
 
 // Sends exactly one 1-byte UDP datagram to 127.0.0.1:`port` after sleeping
@@ -94,8 +135,9 @@ void sendSingleDatagramAfterDelay(quint16 port, int delayMs,
 {
     if (laeuft != nullptr) { laeuft->store(true, std::memory_order_release); }
     std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
-    const int fd = ::socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd < 0) {
+    const WinsockWache wache;
+    const Steckdose fd = ::socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd == kKeineSteckdose) {
         return;
     }
     sockaddr_in addr{};
@@ -103,9 +145,10 @@ void sendSingleDatagramAfterDelay(quint16 port, int delayMs,
     addr.sin_port = htons(port);
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     const char payload = 0;
-    ::sendto(fd, &payload, sizeof(payload), 0,
-             reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
-    ::close(fd);
+    ::sendto(fd, &payload, static_cast<int>(sizeof(payload)), 0,
+             reinterpret_cast<const sockaddr*>(&addr),
+             static_cast<int>(sizeof(addr)));
+    steckdoseSchliessen(fd);
 }
 
 } // namespace

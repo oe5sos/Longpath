@@ -35,6 +35,27 @@
 
 #include <cerrno>
 
+// ── Die Nummern kommen aus dem Pruefling, nicht von Hand (2026-10-22) ──
+//
+// Vorher standen hier die POSIX-Namen fest im Quelltext (EPERM, EACCES,
+// EHOSTDOWN ...). Unter MinGW gibt es EHOSTDOWN nicht, und genau daran
+// ist diese Datei im Windows-Messlauf vom 2026-10-22 gescheitert:
+// "error: 'EHOSTDOWN' was not declared in this scope".
+//
+// Bemerkenswert dabei: SendeFehler.h loest dasselbe Problem seit dem
+// 2026-10-04 und sagt es im Kommentar auch ("EHOSTDOWN fehlt unter
+// MinGW -- daran scheiterte der Windows-Bau") -- es fuehrt je System
+// eine eigene Tabelle (WSAE* gegen E*). Der Pruefstand hat die Tabelle
+// nachgebaut statt sie zu benutzen, und damit genau die Doppelfuehrung
+// eingebaut, gegen die der Kommentar dort geschrieben ist.
+//
+// Jetzt liest er die Tabellen des Prueflings. Zwei Gewinne: er
+// uebersetzt auf beiden Systemen, und eine neue Nummer in SendeFehler.h
+// wird hier ab sofort mitgeprueft, ohne dass jemand zwei Stellen pflegt.
+using Longpath::Netz::kEigenerFehler;
+using Longpath::Netz::kKeinWeg;
+using Longpath::Netz::kVerweigert;
+using Longpath::Netz::kWarteschlange;
 using Longpath::Netz::sendeFehlerDeutung;
 
 class TstSendeFehlerDeutung : public QObject
@@ -51,7 +72,7 @@ private slots:
 
 void TstSendeFehlerDeutung::berechtigungWirdAlsBerechtigungErkannt()
 {
-    for (int nr : {EPERM, EACCES}) {
+    for (int nr : kVerweigert) {
         const QString t = sendeFehlerDeutung(nr);
         QVERIFY2(!t.isEmpty(), qPrintable(QString("errno %1 ohne Deutung").arg(nr)));
         QVERIFY2(t.contains(QStringLiteral("verweigert")),
@@ -69,7 +90,7 @@ void TstSendeFehlerDeutung::keinWegIstKeineVerweigerung()
     // keinen Weg", nicht "du darfst nicht" — und wer es als Verweigerung
     // meldet, schickt den Bediener in die Systemeinstellungen, wo nichts zu
     // finden ist.
-    for (int nr : {EHOSTUNREACH, ENETUNREACH, EHOSTDOWN}) {
+    for (int nr : kKeinWeg) {
         const QString t = sendeFehlerDeutung(nr);
         QVERIFY2(!t.isEmpty(), qPrintable(QString("errno %1 ohne Deutung").arg(nr)));
         QVERIFY2(t.contains(QStringLiteral("keinen Weg")), qPrintable(t));
@@ -83,7 +104,7 @@ void TstSendeFehlerDeutung::keinWegIstKeineVerweigerung()
 
 void TstSendeFehlerDeutung::warteschlangeWirdNichtMitBerechtigungVerwechselt()
 {
-    for (int nr : {ENOBUFS, EAGAIN}) {
+    for (int nr : kWarteschlange) {
         const QString t = sendeFehlerDeutung(nr);
         QVERIFY(!t.isEmpty());
         QVERIFY2(t.contains(QStringLiteral("Funkstrecke")), qPrintable(t));
@@ -96,7 +117,7 @@ void TstSendeFehlerDeutung::eigenerFehlerWirdNichtDemNetzAngelastet()
 {
     // Ein ungueltiger Socket ist ein Fehler in Longpath. Wer den dem Netz
     // anlastet, sucht tagelang am falschen Ende.
-    for (int nr : {EBADF, ENOTSOCK, EAFNOSUPPORT, EINVAL}) {
+    for (int nr : kEigenerFehler) {
         const QString t = sendeFehlerDeutung(nr);
         QVERIFY(!t.isEmpty());
         QVERIFY2(t.contains(QStringLiteral("Longpath")), qPrintable(t));

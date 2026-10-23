@@ -81,6 +81,29 @@ function(_longpath_derive_test_labels out_var src_file)
             list(APPEND _labels "gui")
         endif()
     endforeach()
+
+    # ── Marke "appless": braucht dieser Pruefstand eine Oberflaeche? ──
+    #
+    # QTEST_APPLESS_MAIN heisst: kein QApplication, kein QWidget, kein
+    # Schirm -- reine Kernlogik. QTEST_MAIN heisst das Gegenteil.
+    # Dieselbe Herleitung wie oben, aus der Datei selbst gelesen statt
+    # aus einer Tabelle, die jemand pflegen muss.
+    #
+    # Wozu (2026-10-22): die Windows-CI faehrt genau diese Teilmenge.
+    # Dass ein Pruefstand mit Oberflaeche dort traegt, ist eine eigene
+    # Frage -- auf Linux braucht es dafuer xvfb, auf macOS das
+    # offscreen-Plugin, und auf Windows ist beides nicht geprueft. Eine
+    # BENANNTE Teilmenge, die laeuft, ist mehr als eine ganze Reihe,
+    # die es nicht tut.
+    #
+    # `ctest -L appless` faehrt sie, `tests_appless` baut sie -- das
+    # Ziel entsteht wie jedes andere Markenziel weiter unten.
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/${src_file}" _appless
+         REGEX "QTEST_APPLESS_MAIN")
+    if(_appless)
+        list(APPEND _labels "appless")
+    endif()
+
     list(REMOVE_DUPLICATES _labels)
     if(NOT _labels)
         set(_labels "unclassified")
@@ -8033,6 +8056,76 @@ get_property(_all_tests GLOBAL PROPERTY LONGPATH_ALL_TESTS)
 add_custom_target(all_tests DEPENDS ${_all_tests})
 
 # --------------------------------------------------------------------------
+# Windows: die DLLs neben die Pruefstaende legen  (2026-10-22)
+# --------------------------------------------------------------------------
+# GEMESSEN im Lauf 39762280534 auf windows-latest, und es war nicht zu
+# erraten: fuenf gelinkte Kernlogik-Pruefstaende meldeten alle fuenf
+# Zeitueberschreitung nach 120 s -- nicht rot, haengend. Dieselben fuenf,
+# derselbe Bauordner, nur mit PATH um zwei Ordner erweitert:
+#
+#     ohne:  5 von 5 ***Timeout 120.01 sec
+#     mit:   5 von 5 Passed, 0,66 s insgesamt
+#
+# Es war also nie die Prueflogik, sondern der Programmstart. Zwei DLLs
+# liegen in Ordnern, die auf dem Laeufer in keinem Suchweg stehen:
+#
+#     librade.dll        build/                  (POST_BUILD-Kopie, aber
+#                                                 neben Longpath.exe, nicht
+#                                                 neben build/tests/)
+#     libfftw3-3.dll     third_party/fftw3/bin/  (gar nie kopiert)
+#     libfftw3f-3.dll    third_party/fftw3/bin/
+#
+# Qt6*.dll und die MinGW-Laufzeit sind in der CI ueber den PATH da
+# (install-qt-action setzt ihn) -- die beiden oben nicht.
+#
+# Fehlt eine DLL, zeigt Windows einen Fehlerdialog. Auf einem Laeufer
+# ohne Bediener klickt den niemand weg, also steht der Vorgang bis zum
+# Zeitlimit. Das ist der Grund, warum es wie ein Haenger aussieht und
+# nicht wie ein Startfehler -- und warum man die Ursache im Pruefstand
+# gesucht haette, wo sie nicht ist.
+#
+# Warum KOPIEREN und nicht PATH setzen: Windows durchsucht immer zuerst
+# den Ordner der ausfuehrbaren Datei selbst, ohne PATH, ohne
+# Umgebungsvariable, auch wenn jemand den Pruefstand von Hand startet.
+# ENVIRONMENT_MODIFICATION waere die Alternative, braucht aber CMake
+# 3.22 -- dieses Projekt steht auf 3.20.
+if(WIN32)
+    set(_longpath_test_dlls "")
+    if(TARGET rade)
+        list(APPEND _longpath_test_dlls "$<TARGET_FILE:rade>")
+    endif()
+    foreach(_dll IN ITEMS libfftw3-3.dll libfftw3f-3.dll)
+        if(EXISTS "${CMAKE_SOURCE_DIR}/third_party/fftw3/bin/${_dll}")
+            list(APPEND _longpath_test_dlls
+                 "${CMAKE_SOURCE_DIR}/third_party/fftw3/bin/${_dll}")
+        endif()
+    endforeach()
+    if(DFNR_DLL AND EXISTS "${DFNR_DLL}")
+        list(APPEND _longpath_test_dlls "${DFNR_DLL}")
+    endif()
+
+    if(_longpath_test_dlls)
+        add_custom_target(longpath_test_dlls
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${_longpath_test_dlls} "${CMAKE_CURRENT_BINARY_DIR}"
+            COMMENT "DLLs neben die Pruefstaende legen (Windows)"
+            VERBATIM)
+        # An all_tests UND an jeden einzelnen Pruefstand: wer
+        # `--target tst_x` baut und ihn dann von Hand startet, soll
+        # nicht in denselben 120-s-Haenger laufen.
+        add_dependencies(all_tests longpath_test_dlls)
+        foreach(_t IN LISTS _all_tests)
+            add_dependencies(${_t} longpath_test_dlls)
+        endforeach()
+    else()
+        message(WARNING
+            "Windows: keine DLL zum Kopieren gefunden. Die Pruefstaende "
+            "werden beim Start haengen, falls librade.dll oder libfftw3*.dll "
+            "in keinem Suchweg stehen -- siehe den Kommentar hier.")
+    endif()
+endif()
+
+# --------------------------------------------------------------------------
 # Per-label build aggregates: tests_core / tests_models / tests_gui / ...
 # --------------------------------------------------------------------------
 # One buildable target per derived ctest label, so the documented subset
@@ -8241,8 +8334,29 @@ endforeach()
 # gar nicht über longpath_add_test() laufen, sondern direkt mit
 # add_test() registriert werden.
 #
-# Windows bleibt ausgenommen: dort fährt die CI bis heute ohne offscreen
-# und ist grün -- ohne Not wird daran nichts geändert.
+# ── Windows, richtiggestellt am 2026-10-22 ──────────────────────────
+#
+# Hier stand: „Windows bleibt ausgenommen: dort fährt die CI bis heute
+# ohne offscreen und ist grün -- ohne Not wird daran nichts geändert."
+# Der erste Halbsatz war keine Messung: die Windows-CI fuhr NULL
+# Pruefstaende, das Grün war der App-Bau. Eine Plattform, auf der
+# nichts läuft, ist nicht „grün ohne offscreen" -- sie ist ohne
+# Aussage. Siehe [[feedback-abwesenheit-ist-keine-aussage]].
+#
+# Jetzt ist es gemessen (Lauf 39762280534, dieselben fünf
+# Kernlogik-Pruefstaende, derselbe Bauordner):
+#     ohne offscreen:  5 von 5 Passed, 0,66 s
+#     mit  offscreen:  5 von 5 Passed, 0,31 s
+# Das Plugin ist da (qoffscreen.dll liegt in Qt 6.8.3 für Windows bei,
+# neben qwindows.dll, qminimal.dll und qdirect2d.dll).
+#
+# Es bleibt trotzdem bei der Systemvorgabe, aber aus einem anderen
+# Grund als dem, der hier stand: die Windows-CI fährt die Marke
+# `appless`, und appless heisst QTEST_APPLESS_MAIN -- kein
+# QApplication, also gar kein Schirmweg zu wählen. Die Frage stellt
+# sich erst, wenn Pruefstaende MIT Oberfläche dazukommen; die 0,31 s
+# oben sagen, dass offscreen dann wahrscheinlich die richtige Antwort
+# ist, aber geprueft ist das an keinem einzigen Fenster.
 #
 # Wer zusehen will: -DLONGPATH_TEST_PLATFORM=cocoa (oder leer für die
 # Systemvorgabe).
