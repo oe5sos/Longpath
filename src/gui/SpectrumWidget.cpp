@@ -676,6 +676,24 @@ SpectrumWidget::SpectrumWidget(QWidget* parent)
         // ALWAYS push on tick.  Empty-cache guard so we do nothing
         // before the very first FFT.
         m_pendingWfPixelsDbmDirty = false;
+        // ── Nur EIN Schreiber auf dem Bild (2026-10-23) ─────────────
+        //
+        // Liefert die Maschine eigene Wasserfallzeilen (Flex,
+        // Paketklasse 0x8004), schweigt der aus der FFT abgeleitete
+        // Weg. Zwei Schreiber gaeben ein Flackern aus zwei Takten —
+        // und der Takt der Maschine ist der richtige, sie bestimmt ihn
+        // mit `LineDurationMS`.
+        //
+        // Zwei Sekunden Nachlauf: reisst der Kachelstrom ab, uebernimmt
+        // der eigene Weg wieder, statt das Bild stehenzulassen.
+        if (m_fremdeWasserfallquelle) {
+            if (QDateTime::currentMSecsSinceEpoch()
+                    - m_fremdeWasserfallZuletztMs < 2000) {
+                return;
+            }
+            m_fremdeWasserfallquelle = false;
+            m_fremderTeppich = std::numeric_limits<float>::quiet_NaN();
+        }
         if (!m_pendingWfPixelsDbm.isEmpty()) {
             pushWaterfallRow(m_pendingWfPixelsDbm);
         }
@@ -6302,6 +6320,133 @@ float SpectrumWidget::wfRowSourceReduce(const QVector<float>& src, int x, float 
         }
         return m;
     }
+    }
+}
+
+// ── Eine Wasserfallzeile der Maschine (2026-10-23) ──────────────────
+//
+// Die FLEX-8400 fuehrt ZWEI Bildstroeme, und AetherSDR zeichnet auch
+// aus beiden (docs/protocols/flex-wasserfall-aethersdr.md):
+//   0x8003  Panadapter-FFT    Bildzeile -> dBm ueber y_pixels
+//   0x8004  Wasserfallkachel  qint16/128 -> INTENSITAET, mit eigenem
+//           Frequenzbereich und eigenem Takt (`LineDurationMS`)
+//
+// Longpath zog bisher nur den ersten und leitete den Wasserfall aus
+// den FFT-Bins ab — mit eigenem Zeitgeber und eigenen Schwellen. Der
+// Betreiber am 2026-10-22: „das rot ist eigenartig gewesen, auch die
+// zeitliche laenge, bis der wasserfall anfaengt". Beides folgt daraus.
+//
+// ── Die Falle, und warum diese Methode nicht pushWaterfallRow ist ──
+//
+// Die Kachelwerte sind KEINE dBm. Am Geraet gemessen liegen sie bei
+// +88 bis +120; `pushWaterfallRow` vergleicht gegen Schwellen um
+// −120…−60. Dort hineingegeben stuenden sie sofort am oberen
+// Anschlag — also genau das Rot, das behoben werden soll. (Genau das
+// habe ich am 2026-10-22 erst gebaut und wieder herausgenommen.)
+// Longpath haelt das schon fest:
+// `kachelwerteSindEinFarbmassstabKeineDbm` in tst_flex_vita_reader.
+//
+// Gefaerbt wird darum in der INTENSITAETSDOMAENE, nach AetherSDRs
+// `intensityToWaterfallLevel` (SpectrumWidget.cpp:8393 [@d58e2b8a]),
+// Fall 2 — der selbst geschaetzte. Den radio-seitigen Schwarzpunkt
+// nutzt AetherSDR ausdruecklich nur auf Wunsch des Betreibers, mit
+// der Begruendung, er ziele auf SmartSDRs andere Darstellung.
+//
+//   schwarz = Rauschteppich der Kachel
+//   spanne  = max(1, 120 − Farbverstaerkung × 0,91)
+//   stufe   = clamp((wert − schwarz) / spanne, 0, 1)
+//
+// Der Rauschteppich wird wie dort geschaetzt: Mittel ueber jeden
+// achten Bin, dann Mittel der Bins UNTER diesem Mittel.
+void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitaet,
+                                                double lowHz, double highHz)
+{
+    if (intensitaet.isEmpty() || !(highHz > lowHz)) { return; }
+    if (m_waterfall.isNull()) { return; }
+    if (m_wfStopOnTx && m_activePeakHold.txActive()) { return; }
+
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    m_fremdeWasserfallquelle    = true;
+    m_fremdeWasserfallZuletztMs = jetzt;
+    m_wfLastPushMs              = jetzt;
+
+    // ── Der Rauschteppich der Kachel ────────────────────────────────
+    double summe = 0.0; int zahl = 0;
+    for (int i = 0; i < intensitaet.size(); i += 8) {
+        summe += intensitaet[i]; ++zahl;
+    }
+    if (zahl == 0) { return; }
+    const double mittel = summe / zahl;
+    double tiefSumme = 0.0; int tiefZahl = 0;
+    for (int i = 0; i < intensitaet.size(); i += 8) {
+        if (intensitaet[i] <= mittel) { tiefSumme += intensitaet[i]; ++tiefZahl; }
+    }
+    const float teppich = tiefZahl > 0 ? float(tiefSumme / tiefZahl)
+                                       : float(mittel);
+    // Langsam nachfuehren, damit eine einzelne laute Zeile das Bild
+    // nicht aufhellt — dieselbe Groessenordnung wie beim eigenen Weg.
+    constexpr float kAlpha = 0.05f;
+    m_fremderTeppich = std::isfinite(m_fremderTeppich)
+        ? kAlpha * teppich + (1.0f - kAlpha) * m_fremderTeppich
+        : teppich;
+
+    const float spanne = std::max(1.0f, 120.0f - m_wfColorGain * 0.91f);
+
+    // ── Auf die Fensterbreite abbilden ──────────────────────────────
+    //
+    // Ausschnitt der Kachel und des Fensters muessen NICHT
+    // uebereinstimmen: die Maschine schickt ihre eigene Breite
+    // (gemessen 230,6 kHz gegen 200 kHz Panadapterbreite), und der
+    // Betreiber darf zoomen.
+    const int breite = m_waterfall.width();
+    if (breite <= 0) { return; }
+    const int h = m_waterfall.height();
+    m_wfWriteRow = (m_wfWriteRow - 1 + h) % h;
+#ifdef LONGPATH_GPU_SPECTRUM
+    ++m_wfRowsSinceUpload;
+#endif
+    QRgb* scanline = reinterpret_cast<QRgb*>(m_waterfall.scanLine(m_wfWriteRow));
+    m_wfRowIntensity.resize(breite);
+    quint8* stufen = m_wfRowIntensity.data();
+
+    const double fensterTief  = m_centerHz - m_bandwidthHz * 0.5;
+    const double hzProPunkt   = m_bandwidthHz / breite;
+    const double hzProBin     = (highHz - lowHz) / intensitaet.size();
+    const float  kleinster    = *std::min_element(intensitaet.cbegin(),
+                                                  intensitaet.cend());
+
+    for (int x = 0; x < breite; ++x) {
+        const double hzA = fensterTief + x * hzProPunkt;
+        const double hzB = hzA + hzProPunkt;
+        int a = static_cast<int>(std::floor((hzA - lowHz) / hzProBin));
+        int b = static_cast<int>(std::ceil((hzB - lowHz) / hzProBin)) - 1;
+        float wert;
+        if (b < 0 || a >= static_cast<int>(intensitaet.size())) {
+            // Ausserhalb dessen, was die Kachel abdeckt: der tiefste
+            // Wert der Zeile. Null waere hier ein KRAEFTIGES Signal.
+            wert = kleinster;
+        } else {
+            const int letzter = static_cast<int>(intensitaet.size()) - 1;
+            a = std::clamp(a, 0, letzter);
+            b = std::clamp(b, a, letzter);
+            // Maximum, damit ein schmaler Traeger nicht zwischen zwei
+            // Bildpunkte faellt.
+            wert = intensitaet[a];
+            for (int i = a + 1; i <= b; ++i) {
+                wert = std::max(wert, intensitaet[i]);
+            }
+        }
+        const float stufe = std::clamp((wert - m_fremderTeppich) / spanne,
+                                       0.0f, 1.0f);
+        stufen[x] = static_cast<quint8>(std::lround(stufe * 255.0f));
+        scanline[x] = waterfallColorForIntensityF(stufe, m_wfColorScheme,
+                                                  m_wfLowColor);
+    }
+
+    appendHistoryRow(stufen, jetzt);
+    if (!m_wfLive) {
+        rebuildWaterfallViewport();
+        markOverlayDirty();
     }
 }
 

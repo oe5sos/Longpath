@@ -7910,6 +7910,11 @@ longpath_add_test(tst_flex_vita_stream)
 # gebundenen Scheibe haengt, lief fuer sie nie an.
 longpath_add_test(tst_flex_ton_und_pegel)
 
+# 2026-10-23: der Wasserfall kommt bei der Flex aus einem EIGENEN
+# Strom (0x8004) mit eigener Intensitaetseinheit. Dieser Stand haelt
+# fest, dass er nicht in den dBm-Weg geraet.
+longpath_add_test(tst_flex_wasserfall_kachel)
+
 # 2026-10-22: der „Lattenzaun" im Panadapter. Ein echter Rahmen von
 # Martins FLEX-8400 geht durch denselben Zeichenweg wie im Programm,
 # und das Ergebnis wird auf Regelmaeszigkeit gemessen.

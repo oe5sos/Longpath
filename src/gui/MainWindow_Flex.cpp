@@ -418,23 +418,38 @@ void MainWindow::wireFlex()
         }
     });
 
-    // ── Der Wasserfall der Maschine: erforscht, NICHT gebaut ────────
+    // ── Der Wasserfall kommt von der Maschine (2026-10-23) ──────────
     //
     // Die FLEX-8400 fuehrt ZWEI Bildstroeme, und AetherSDR zeichnet
-    // auch aus beiden. Longpath zieht nur den ersten und baut den
-    // Wasserfall aus den FFT-Bins nach — daher der fremde Takt und
-    // die fremden Schwellen, die der Betreiber am 2026-10-22 sah
-    // („das rot ist eigenartig gewesen, auch die zeitliche laenge,
-    // bis der wasserfall anfaengt").
+    // auch aus beiden (docs/protocols/flex-wasserfall-aethersdr.md):
+    //   0x8003  Spektrum, Bildzeilen -> dBm ueber y_pixels
+    //   0x8004  Wasserfall, qint16/128 -> INTENSITAET, mit eigenem
+    //           Frequenzbereich und eigenem Takt (`LineDurationMS`)
     //
-    // Der Weg ist nachgelesen und steht in
-    // docs/protocols/flex-wasserfall-aethersdr.md. Gebaut ist er
-    // NICHT, und zwar aus einem Grund: die Kachelwerte sind KEINE
-    // dBm. Sie sind ein Intensitaetsmass (qint16/128, am Geraet
-    // gemessen +88 bis +120), und AetherSDR faerbt sie in einer
-    // eigenen Domaene ein. In Longpaths dBm-Weg gegeben stuenden sie
-    // sofort am oberen Anschlag — also genau das Rot, das behoben
-    // werden soll.
+    // Longpath zog bisher nur den ersten und baute den Wasserfall aus
+    // den FFT-Bins nach. Der Betreiber am 2026-10-22: „das rot ist
+    // eigenartig gewesen, auch die zeitliche laenge, bis der
+    // wasserfall anfaengt". Beides folgt aus fremdem Takt und fremden
+    // Schwellen.
+    //
+    // `FlexVita::tileColourValue()` gab es in Longpath schon —
+    // geschrieben, nie benutzt.
+    connect(m_radioModel, &RadioModel::flexWaterfallRowReady, this,
+            [this](quint32, const QVector<quint16>& roh,
+                   double lowFreqMhz, double highFreqMhz, quint32) {
+        if (m_shuttingDown || roh.isEmpty()) { return; }
+        if (!(highFreqMhz > lowFreqMhz)) { return; }
+        SpectrumWidget* sw = m_radioModel ? m_radioModel->spectrumWidget()
+                                          : nullptr;
+        if (!sw || !sw->kiwiDisplaySource()) { return; }
+
+        QVector<float> intensitaet(roh.size());
+        for (int i = 0; i < roh.size(); ++i) {
+            intensitaet[i] = FlexVita::tileColourValue(roh[i]);
+        }
+        sw->zeigeFremdeWasserfallzeile(intensitaet, lowFreqMhz * 1.0e6,
+                                       highFreqMhz * 1.0e6);
+    });
 
     connect(m_radioModel, &RadioModel::flexSpectrumReady, this,
             [this](quint32, const QVector<float>& dbm) {

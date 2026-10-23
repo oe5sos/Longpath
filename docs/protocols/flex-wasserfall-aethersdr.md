@@ -145,15 +145,29 @@ Der Panadapter hat also eine **eigene Antennenwahl**, getrennt von der
 Scheibe. An Martins Geraet standen beide auf ANT1, aber das ist eine
 Falle, auf die man sehen muss.
 
-## Was daraus zu bauen waere
+## Was davon gebaut ist
 
-1. **Wasserfall aus der Kachel** statt aus der FFT. Braucht einen
-   eigenen Eingang am Fenster, der in der INTENSITAETSDOMAENE faerbt
-   (Fall 2 oben), nicht in dBm. Damit kommen der Takt der Maschine
-   (`LineDurationMS`) und ein Schwarzpunkt, der zum Band passt.
-   Dabei darf nur EIN Schreiber auf dem Bild sein: der abgeleitete Weg
-   muss schweigen, solange Kacheln kommen.
-2. **`band=` und `bandwidth=`** mitschicken, damit der Panadapter dem
+**Der Kachelweg steht** (2026-10-23). `SpectrumWidget::
+zeigeFremdeWasserfallzeile()` nimmt eine Kachelzeile an, bildet sie
+auf die Fensterbreite ab (Maximum je Bildpunkt, damit ein schmaler
+Traeger nicht zwischen zwei Punkte faellt) und faerbt sie in der
+INTENSITAETSDOMAENE nach Fall 2 oben. Solange Kacheln kommen,
+schweigt der aus der FFT abgeleitete Weg; nach zwei Sekunden ohne
+Kachel uebernimmt er wieder.
+
+Gemessen im Pruefstand `tst_flex_wasserfall_kachel`:
+
+| | Teppich | Traeger bei 14.125 MHz |
+|---|---|---|
+| in der Intensitaetsdomaene | hoechste Stufe **8** von 255 | Stufe 64 an Punkt **726**, erwartet 727 |
+| in dBm (der Fehler) | jeder Punkt **255** von 255 | Stufe 255 an Punkt **0** |
+
+Die untere Zeile ist die Gegenprobe, und sie ist genau das
+einfarbige Bild am oberen Anschlag — bei Farbschema 0 also Rot.
+
+## Was noch zu bauen waere
+
+1. **`band=` und `bandwidth=`** mitschicken, damit der Panadapter dem
    Bandwechsel folgt und nicht auf dem stehenbleibt, was zuletzt
    jemand eingestellt hat (gemessen: 200 kHz um 14.100, waehrend die
    Scheibe auf 14.382 stand).
