@@ -6458,24 +6458,25 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
             const int letzter = static_cast<int>(intensitaet.size()) - 1;
             a = std::clamp(a, 0, letzter);
             b = std::clamp(b, a, letzter);
-            // ── Maximum, NICHT Interpolation ────────────────────
+            // ── MITTEL, nicht Maximum (2026-10-23) ──────────────
             //
-            // Hier weiche ich bewusst von der Vorlage ab: AetherSDR
-            // tastet den naechsten Bin ab und interpoliert linear
-            // (SpectrumWidget.cpp:8512-8521 [@d58e2b8a]). Liegen mehr
-            // Bins als Bildpunkte an — bei Martins Geraet 4096 Bins
-            // auf rund 1150 Punkte —, faellt ein schmaler Traeger
-            // damit in der Mehrzahl der Faelle ganz heraus.
+            // Hier stand das Maximum ueber die Bins, mit dem Argument,
+            // ein schmaler Traeger duerfe nicht zwischen zwei
+            // Bildpunkte fallen (Rendering-Werkbank 2026-09-25). Das
+            // Argument gilt — der Preis war aber sichtbar: das Maximum
+            // ueber rund dreieinhalb Bins hebt gerade die
+            // RAUSCHSPITZEN hervor, und der Wasserfall wurde koernig.
+            // Der Betreiber im Vergleich mit der Anvelina: „oben
+            // schaut es nach strichen aus, flex nach punkten".
             //
-            // Longpath hat denselben Fall am 2026-09-25 schon einmal
-            // entschieden (Rendering-Werkbank, `wfRowSourceReduce`):
-            // „ein schmaler Traeger (CW, FT8, Bake) lag in der Haelfte
-            // der Faelle genau in der verworfenen Spalte: gestrichelt
-            // oder unsichtbar". Die Entscheidung gilt hier genauso.
-            wert = intensitaet[a];
-            for (int i = a + 1; i <= b; ++i) {
-                wert = std::max(wert, intensitaet[i]);
-            }
+            // Das Mittel erhaelt die Energie, hebt keine Spitze heraus
+            // und laesst einen Traeger ueber mehrere Bins stehen. Ein
+            // Traeger in EINEM Bin von dreieinhalb wird um gut 5 dB
+            // verduennt; scharf steht er weiterhin im Spektrum
+            // darueber, das seinen eigenen Detektor hat.
+            double summeBins = 0.0;
+            for (int i = a; i <= b; ++i) { summeBins += intensitaet[i]; }
+            wert = static_cast<float>(summeBins / (b - a + 1));
         }
         const float stufe = std::clamp((wert - schwarz) / spanne,
                                        0.0f, 1.0f);
