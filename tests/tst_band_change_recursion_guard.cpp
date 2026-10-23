@@ -153,6 +153,60 @@ private slots:
         QCOMPARE(slice.frequency(), 7100000.0);
         QCOMPARE(lastBand, Band::Band40m);
     }
+
+    // ── Das Seitenband folgt dem Band (2026-10-23) ──────────────────
+    //
+    // Betreiber: „80 und 160 sowie 40 muessen immer automatisch bei
+    // bandauswahl LSB sein". Am Geraet kam es trotzdem falsch: die
+    // Flex zog beim Verbinden auf 7,148 MHz, das Band sprang von 20 m
+    // auf 40 m — und weil das kein Banddruck war, lief es an
+    // `restoreFromSettings` vorbei und das USB des 20-m-Platzes blieb
+    // stehen. Hier der Weg ueber die Frequenz.
+    void dieFrequenzAllein_richtetDasSeitenband()
+    {
+        SliceModel slice;
+        slice.setFrequency(14200000.0);
+        slice.setDspMode(DSPMode::USB);
+        QCOMPARE(slice.dspMode(), DSPMode::USB);
+
+        slice.setFrequency(7148000.0);      // 20 m -> 40 m
+        QCOMPARE(slice.dspMode(), DSPMode::LSB);
+
+        slice.setFrequency(3778000.0);      // 40 m -> 80 m
+        QCOMPARE(slice.dspMode(), DSPMode::LSB);
+
+        slice.setFrequency(1840000.0);      // 80 m -> 160 m
+        QCOMPARE(slice.dspMode(), DSPMode::LSB);
+
+        slice.setFrequency(14200000.0);     // und wieder hinauf
+        QCOMPARE(slice.dspMode(), DSPMode::USB);
+    }
+
+    void cwUndDigitalUeberlebenDenBandwechsel()
+    {
+        // Ein auf 40 m abgelegtes DIGU gehoert zu FT8 und ist kein
+        // verdrehtes Seitenband.
+        SliceModel slice;
+        slice.setFrequency(14074000.0);
+        slice.setDspMode(DSPMode::DIGU);
+        slice.setFrequency(7074000.0);      // 20 m -> 40 m
+        QCOMPARE(slice.dspMode(), DSPMode::DIGU);
+
+        slice.setDspMode(DSPMode::CWL);
+        slice.setFrequency(3560000.0);      // 40 m -> 80 m
+        QCOMPARE(slice.dspMode(), DSPMode::CWL);
+    }
+
+    // Gegenprobe: INNERHALB eines Bandes darf die Regel nicht
+    // zuschlagen — sonst koennte man auf 40 m nie USB einstellen.
+    void innerhalbDesBandes_bleibtDieWahlStehen()
+    {
+        SliceModel slice;
+        slice.setFrequency(7100000.0);
+        slice.setDspMode(DSPMode::USB);     // von Hand, auf 40 m
+        slice.setFrequency(7120000.0);      // kein Bandwechsel
+        QCOMPARE(slice.dspMode(), DSPMode::USB);
+    }
 };
 
 QTEST_MAIN(TestBandChangeRecursionGuard)

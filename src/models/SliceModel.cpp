@@ -276,6 +276,24 @@ void SliceModel::setFrequency(double freq)
         if (newBand != m_currentBand) {
             m_currentBand = newBand;
             emit bandChanged(newBand);
+
+            // ── Das Seitenband gehoert zum Band (2026-10-23) ───────
+            //
+            // Betreiber: „80 und 160 sowie 40 muessen immer automatisch
+            // bei bandauswahl LSB sein". `restoreFromSettings` richtet
+            // es beim Banddruck und beim Hochfahren — aber nicht, wenn
+            // das Band durch die FREQUENZ wechselt. Genau so kam es an
+            // seinem Geraet wieder falsch: die Flex zog beim Verbinden
+            // auf 7,148 MHz, das Band sprang von 20 m auf 40 m, und das
+            // USB des 20-m-Platzes blieb stehen.
+            //
+            // Aus seiner Sicht ist das dieselbe Bandauswahl, also
+            // dieselbe Regel. Nur Sprechseitenbaender werden gerichtet.
+            const DSPMode gerichtet =
+                BandDefaults::korrigiereSeitenband(newBand, m_dspMode);
+            if (gerichtet != m_dspMode) {
+                setDspMode(gerichtet);
+            }
         }
     }
 }
