@@ -12488,9 +12488,26 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // Reuses the classic waterfall's own palette (not a second,
             // separately-maintained one) so the 3D surface always matches
             // whichever waterfall colour scheme is active.
-            auto palette = [this, floorDbm, rangeDb](float dbm) -> QRgb {
+            // ── Hoehe und Farbe brauchen VERSCHIEDENE Anker ──────────
+            //
+            // `floorDbm` taugt fuer die HOEHE: der Rauschteppich soll
+            // an der Grundlinie liegen, sonst wird aus ihm ein Wald
+            // von Rippen (2026-10-22). Fuer die FARBE ist derselbe
+            // Anker falsch — er legt den Teppich auf Stufe 0, also auf
+            // SCHWARZ, und zwischen den Signalen klafft ein Loch. Der
+            // Betreiber am 2026-10-23: „schaue oben, zwischen den
+            // signalen ist es schwarz".
+            //
+            // Es ist derselbe Fehler, den der Wasserfall einen Commit
+            // vorher hatte, nur an der zweiten Stelle. Also derselbe
+            // Griff und derselbe Anteil: der Farbflur liegt 18 Prozent
+            // der Spanne UNTER dem Hoehenflur, damit der Teppich im
+            // unteren Blau liegt und seine Struktur zeigt.
+            constexpr float kTeppichAufDerRampe = 0.18f;
+            const float farbFloorDbm = floorDbm - rangeDb * kTeppichAufDerRampe;
+            auto palette = [this, farbFloorDbm, rangeDb](float dbm) -> QRgb {
                 const float f = rangeDb > 0.0f
-                    ? qBound(0.0f, (dbm - floorDbm) / rangeDb, 1.0f) : 0.0f;
+                    ? qBound(0.0f, (dbm - farbFloorDbm) / rangeDb, 1.0f) : 0.0f;
                 return waterfallColorForIntensityF(f, m_wfColorScheme, m_wfLowColor);
             };
             // 0.70 -- AetherSDR's fixed default zCurve (m_dssZCurve).
