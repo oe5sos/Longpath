@@ -950,6 +950,11 @@ public:
     // Issue #118.
     void onBandButtonClicked(Longpath::Band band);
 
+    /// Richtet das Seitenband von `slice` nach `band` aus (160/80/40 m
+    /// auf LSB, darueber USB) und legt die Korrektur ab. Beruehrt nur
+    /// Sprechseitenbaender; CW, Digital, AM und FM bleiben stehen.
+    void richteSeitenbandAus(SliceModel* slice, Longpath::Band band);
+
     // Panadapter management (client-side)
     QList<PanadapterModel*> panadapters() const { return m_panadapters; }
     int addPanadapter();

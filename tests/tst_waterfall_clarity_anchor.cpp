@@ -150,15 +150,42 @@ private slots:
         QVERIFY2(lvl > 0.1f && lvl < 0.4f, "nach einem Bandwechsel sofort richtig, nicht erst nach Sekunden");
     }
 
-    // Ohne Boden (zwei Argumente) bleibt alles wie bisher.
-    void twoArgumentCallKeepsTheOldBehaviour()
+    // ── Ohne Boden gelten die Nutzerschwellen (2026-10-22) ──────────
+    //
+    // Hier stand bis zum 2026-10-22 das Gegenteil: „ohne Boden (zwei
+    // Argumente) bleibt alles wie bisher", also Clarity's Schwellen
+    // ungeprueft uebernehmen. An der FLEX-8400 war genau das der
+    // Fehler — Clarity wurde dort gar nicht gefuettert, `m_clarityLow/
+    // High` hielten die Werte des VORIGEN Geraets, und der Wasserfall
+    // war durchgehend einfarbig rot (oberste Palettenstufe).
+    //
+    // Der Vertrag ist bewusst geaendert: ohne gemessenen Boden sind
+    // Clarity's absolute Schwellen nicht belastbar, also gelten die
+    // Schwellen des Betreibers. In der Fassung kommt auch niemand mehr
+    // ohne Boden herein — MainWindow.cpp:6095 ruft immer mit.
+    //
+    // Der Pruefstand steht hier und nicht nur in
+    // tst_panadapter_lattenzaun::clarityOhneBodenFaelltZurueck, weil
+    // ich am 2026-10-23 versucht habe, den alten Vertrag
+    // wiederherzustellen, ohne zu merken, dass zwei Pruefstaende
+    // einander widersprachen.
+    void withoutFloorTheUserThresholdsWin()
     {
         SpectrumWidget w;
+        w.setWfLowThreshold(-120.0f);
+        w.setWfHighThreshold(-40.0f);
         w.setClarityActive(true);
-        w.setClarityWaterfallThresholds(-150.0f, -10.0f);
+        w.setClarityWaterfallThresholds(-150.0f, -10.0f);   // zwei Argumente
         w.composeWaterfallActiveThresholds(row(-120.0f, -100.0f));
-        QCOMPARE(w.wfActiveLowThreshold(), -150.0f);
-        QCOMPARE(w.wfActiveHighThreshold(), -10.0f);
+        QCOMPARE(w.wfActiveLowThreshold(), -120.0f);
+        QCOMPARE(w.wfActiveHighThreshold(), -40.0f);
+
+        // Gegenprobe: MIT Boden verankert Clarity wieder selbst, und
+        // dann gelten die Nutzerschwellen NICHT.
+        w.setClarityWaterfallThresholds(-150.0f, -10.0f, -118.0f);
+        w.composeWaterfallActiveThresholds(row(-120.0f, -100.0f));
+        QVERIFY2(!qFuzzyCompare(w.wfActiveLowThreshold(), -120.0f),
+                 "mit Boden muss Clarity wieder fuehren");
     }
 };
 

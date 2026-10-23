@@ -76,6 +76,7 @@
 #include "gui/SpectrumWidget.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "models/BandDefaults.h"
 
 #include <QLoggingCategory>
 
@@ -303,6 +304,35 @@ void MainWindow::wireFlex()
             m_flexApplyingRemoteState = true;
             s->setFrequency(geraet);
             m_flexApplyingRemoteState = false;
+
+            // ── Und das Seitenband zum neuen Band (2026-10-23) ───────
+            //
+            // Betreiber: „80 und 160 sowie 40 muessen immer automatisch
+            // bei bandauswahl LSB sein". Dass die Maschine hier die
+            // Frequenz durchsetzt, IST eine Bandauswahl — nur eine, die
+            // nicht ueber den Bandknopf laeuft und damit auch nicht
+            // ueber `SliceModel::restoreFromSettings`, wo die Regel
+            // sonst greift. Am Geraet kam 40 m deshalb in USB: das
+            // Profil stand auf 20 m, die Flex zog auf 7,148 MHz, und
+            // das USB des 20-m-Platzes blieb stehen.
+            //
+            // NICHT in `SliceModel::setFrequency` allgemein: `setDspMode`
+            // setzt dort die Filterbreite auf die Vorgabe der neuen
+            // Betriebsart zurueck und hat mitten im Wiederherstellen
+            // drei Pruefstaende der Ablage umgeworfen.
+            //
+            // Ohne Wache: diese Betriebsart SOLL zur Maschine hinaus.
+            const DSPMode gerichtet =
+                BandDefaults::korrigiereSeitenband(
+                    bandFromFrequency(geraet), s->dspMode());
+            if (gerichtet != s->dspMode()) {
+                qCInfo(lcFlexGui).nospace()
+                    << "Flex: " << bandLabel(bandFromFrequency(geraet))
+                    << " gehoert auf " << (gerichtet == DSPMode::LSB
+                                           ? "LSB" : "USB")
+                    << " — Seitenband gerichtet";
+                s->setDspMode(gerichtet);
+            }
         });
 
     // ── Betriebsart und Filterbreite, derselbe Weg ──────────────

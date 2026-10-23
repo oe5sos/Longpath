@@ -277,23 +277,20 @@ void SliceModel::setFrequency(double freq)
             m_currentBand = newBand;
             emit bandChanged(newBand);
 
-            // ── Das Seitenband gehoert zum Band (2026-10-23) ───────
+            // Kein Seitenband-Richten HIER (2026-10-23, zurueckgebaut):
+            // `setDspMode` setzt die Filterbreite auf die Vorgabe der
+            // neuen Betriebsart zurueck. Mitten im Frequenzsetzen hat
+            // das drei Pruefstaende der Ablage umgeworfen
+            // (tst_slice_persistence_per_band,
+            // tst_slice_filter_per_band_per_mode_persistence,
+            // tst_tx_frequency_follows_tx_slice): die wiederhergestellte
+            // Filterbreite wurde gleich wieder ueberschrieben.
             //
-            // Betreiber: „80 und 160 sowie 40 muessen immer automatisch
-            // bei bandauswahl LSB sein". `restoreFromSettings` richtet
-            // es beim Banddruck und beim Hochfahren — aber nicht, wenn
-            // das Band durch die FREQUENZ wechselt. Genau so kam es an
-            // seinem Geraet wieder falsch: die Flex zog beim Verbinden
-            // auf 7,148 MHz, das Band sprang von 20 m auf 40 m, und das
-            // USB des 20-m-Platzes blieb stehen.
-            //
-            // Aus seiner Sicht ist das dieselbe Bandauswahl, also
-            // dieselbe Regel. Nur Sprechseitenbaender werden gerichtet.
-            const DSPMode gerichtet =
-                BandDefaults::korrigiereSeitenband(newBand, m_dspMode);
-            if (gerichtet != m_dspMode) {
-                setDspMode(gerichtet);
-            }
+            // Die Regel sitzt stattdessen an den beiden Stellen, an
+            // denen der BETREIBER ein Band auswaehlt: in
+            // `restoreFromSettings` (Banddruck und Hochfahren) und in
+            // MainWindow_Flex, wo die Maschine beim Verbinden ihre
+            // Frequenz durchsetzt.
         }
     }
 }
@@ -2963,21 +2960,21 @@ void SliceModel::restoreFromSettings(Band band)
         // defined value (WdspTypes.h).
         if (rawMode >= static_cast<int>(DSPMode::LSB) &&
             rawMode <= static_cast<int>(DSPMode::RADE_L)) {
-            // ── Das Seitenband nach dem Band richten (2026-10-23) ──
+            // Das Seitenband wird hier NICHT gerichtet (2026-10-23,
+            // zurueckgebaut): dieser Weg stellt wieder her, was
+            // abgelegt wurde, und die Filterbreite haengt an der
+            // Betriebsart. Eine Korrektur mitten darin hat zwei
+            // Pruefstaende der Ablage umgeworfen
+            // (tst_slice_persistence_per_band,
+            // tst_slice_filter_per_band_per_mode_persistence): die
+            // Filterbreite kam aus dem Platz der KORRIGIERTEN
+            // Betriebsart statt aus dem abgelegten.
             //
-            // Betreiber: „80 und 160 sowie 40 muessen immer automatisch
-            // bei bandauswahl LSB sein". Die Startwerte in
-            // BandDefaults sagen das schon, greifen aber nur beim
-            // ERSTEN Besuch; hier steht wieder, was zuletzt auf dem
-            // Band lag. Ein einmal von Hand gedrehtes USB — oder ein
-            // Probelauf von mir — bliebe sonst fuer immer liegen, und
-            // zwar auch ueber das Beenden hinweg: diese Stelle ist
-            // auch der Weg beim Hochfahren.
-            //
-            // Nur Sprechseitenbaender werden gerichtet; ein auf 40 m
-            // abgelegtes DIGU gehoert zu FT8 und bleibt.
-            const DSPMode mode = BandDefaults::korrigiereSeitenband(
-                band, static_cast<DSPMode>(rawMode));
+            // Die Regel sitzt bei den Aufrufern, die wirklich eine
+            // Bandauswahl sind: RadioModel::onBandButtonClicked,
+            // RadioModel beim Hochfahren, und MainWindow_Flex, wo die
+            // Maschine ihre Frequenz durchsetzt.
+            const DSPMode mode = static_cast<DSPMode>(rawMode);
             // Directly assign mode without calling setDspMode() (which also
             // resets the filter). Emit the signal manually to keep observers in sync.
             if (m_dspMode != mode) {

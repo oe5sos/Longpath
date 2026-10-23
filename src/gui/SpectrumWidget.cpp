@@ -6170,6 +6170,17 @@ void SpectrumWidget::composeWaterfallActiveThresholds(const QVector<float>& wfPi
     // Diese Wache bleibt trotzdem: eine fremde Quelle, die den Boden
     // nicht liefert, soll ein brauchbares Bild geben und nicht das
     // Erbe des Vorgaengers.
+    //
+    // NACHTRAG 2026-10-23: das ist eine BEWUSSTE Vertragsaenderung
+    // gegenueber dem Aufruf mit zwei Argumenten, der seine Schwellen
+    // bis zum 2026-10-22 unberuehrt stehen liess. Die CI hat sie
+    // gefunden (tst_waterfall_clarity_anchor fiel um, lokal gruen,
+    // weil ctest die ALTE Testbinaerdatei fuhr — siehe memory
+    // feedback-falsches-gruen-alte-binaerdateien). Der Vertrag bleibt
+    // geaendert: ohne gemessenen Boden sind Clarity's absolute
+    // Schwellen nicht belastbar, und in der Fassung bringt sie
+    // niemand mehr auf diesem Weg herein — `MainWindow.cpp:6095` ruft
+    // immer mit Boden. Der Pruefstand sagt jetzt den neuen Vertrag.
     const bool clarityHatBoden = std::isfinite(m_clarityFloorDbm);
     if (!m_clarityActive || !clarityHatBoden) {
         m_wfActiveLowThreshold  = m_wfLowThreshold;
@@ -6692,7 +6703,12 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
         // Verschiebung melden, bei der sie am besten passen.
         // Beide liegen in Bildpunkten derselben Flaeche, nur in
         // verschiedener Aufloesung (Bildpunktverhaeltnis).
-        QString versatz = QStringLiteral(", Versatz nicht messbar");
+        // Kein QStringLiteral mit deutschem Text in src/gui: den
+        // zaehlt tst_oberflaeche_englisch als Beschriftung mit (die
+        // Decke steht bei 9). Protokolltexte gehen darum direkt in den
+        // Strom, nicht ueber eine zusammengesetzte Zeichenkette.
+        bool versatzMessbar = false;
+        int  besterLag = 0;
         if (!m_renderedPixels.isEmpty() && breite > 64) {
             const int n = breite;
             const int m = m_renderedPixels.size();
@@ -6710,7 +6726,7 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
             sa /= n; sb /= n;
             for (int i = 0; i < n; ++i) { A[i] -= sa; B[i] -= sb; }
             const int maxLag = n / 10;
-            int besterLag = 0; double bestes = -1.0e30;
+            double bestes = -1.0e30;
             for (int lag = -maxLag; lag <= maxLag; ++lag) {
                 double sum = 0.0; int zahl = 0;
                 for (int i = qMax(0, -lag); i < qMin(n, n - lag); ++i) {
@@ -6721,9 +6737,7 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
                     if (sum > bestes) { bestes = sum; besterLag = lag; }
                 }
             }
-            versatz = QStringLiteral(", bester Versatz %1 Punkte = %2 kHz")
-                          .arg(besterLag)
-                          .arg(besterLag * hzProPunkt / 1.0e3, 0, 'f', 2);
+            versatzMessbar = true;
         }
 
         qCInfo(lcSpectrum).nospace()
@@ -6732,8 +6746,13 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
             << " Bins, Fenster " << (fensterTief / 1.0e6) << "–"
             << ((fensterTief + m_bandwidthHz) / 1.0e6)
             << " MHz, Spitze bei " << (sHz / 1.0e6) << " MHz (Punkt "
-            << sx << " von " << breite << ", Stufe " << stufen[sx] << ")"
-            << versatz;
+            << sx << " von " << breite << ", Stufe " << stufen[sx] << ")";
+        if (versatzMessbar) {
+            qCInfo(lcSpectrum).nospace()
+                << "Kachel gegen Spektrum: bester Versatz " << besterLag
+                << " Punkte = " << (besterLag * hzProPunkt / 1.0e3)
+                << " kHz";
+        }
     }
 
     appendHistoryRow(stufen, jetzt);

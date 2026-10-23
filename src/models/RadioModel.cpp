@@ -6659,6 +6659,23 @@ bool RadioModel::setActiveSliceById(int sliceId)
     return true;
 }
 
+// Richtet das Seitenband einer Scheibe nach ihrem Band aus und legt
+// die Korrektur gleich ab, damit ein falscher Eintrag verheilt statt
+// beim naechsten Mal wiederzukommen. Siehe
+// BandDefaults::korrigiereSeitenband fuer die Regel selbst.
+void RadioModel::richteSeitenbandAus(SliceModel* slice, Band band)
+{
+    if (!slice) { return; }
+    const DSPMode gerichtet =
+        BandDefaults::korrigiereSeitenband(band, slice->dspMode());
+    if (gerichtet == slice->dspMode()) { return; }
+    qCInfo(lcConnection).nospace()
+        << "Seitenband gerichtet: " << bandLabel(band) << " gehoert auf "
+        << (gerichtet == DSPMode::LSB ? "LSB" : "USB");
+    slice->setDspMode(gerichtet);
+    slice->saveToSettings(band);
+}
+
 void RadioModel::onBandButtonClicked(Band band)
 {
     SliceModel* slice = activeSlice();
@@ -6712,10 +6729,24 @@ void RadioModel::onBandButtonClicked(Band band)
         // Second+ visit: restore last-used state for the clicked band.
         slice->restoreFromSettings(band);
 
-        // Das Seitenband richtet `restoreFromSettings` selbst — siehe
-        // dort und BandDefaults::korrigiereSeitenband. Hier bewusst
-        // nichts mehr: zwei Stellen fuer dieselbe Regel waeren eine zu
-        // viel, und der Weg beim Hochfahren laeuft NICHT hier durch.
+        // ── Das Seitenband nach dem Band richten (2026-10-23) ──────
+        //
+        // Betreiber: „80 und 160 sowie 40 muessen immer automatisch
+        // bei bandauswahl LSB sein". Die Startwerte in BandDefaults
+        // sagen das schon, greifen aber nur beim ERSTEN Besuch; hier
+        // steht wieder, was zuletzt auf dem Band lag. Ein einmal von
+        // Hand gedrehtes USB bliebe sonst fuer immer liegen.
+        //
+        // NACH dem Wiederherstellen, nicht darin: dort haengt die
+        // Filterbreite am abgelegten Betriebsartenplatz, und eine
+        // Korrektur mittendrin hat die Ablage-Pruefstaende umgeworfen.
+        // `setDspMode` setzt die Filterbreite auf die Vorgabe der
+        // neuen Betriebsart — genau richtig, wenn die Seite kippt.
+        //
+        // Nur Sprechseitenbaender; ein auf 40 m abgelegtes DIGU
+        // gehoert zu FT8 und bleibt. Und gleich wieder ablegen, damit
+        // der falsche Eintrag verheilt.
+        richteSeitenbandAus(slice, band);
         // And put the restored rate on the DDC, not just on the menu.
         // Codex review round 7, PR #293: restoreFromSettings sets the
         // display property; this is the half that reaches the radio.
@@ -13228,6 +13259,9 @@ void RadioModel::loadSliceState(SliceModel* slice)
     m_lastBand = currentBand;
 
     slice->restoreFromSettings(currentBand);
+    // Beim Hochfahren dieselbe Regel wie beim Banddruck — siehe
+    // onBandButtonClicked.
+    richteSeitenbandAus(slice, currentBand);
 
     // Capture the restored rate for the post-bind re-apply (2026-08-12,
     // third round — the instrumented timeline shows why re-READING at
