@@ -6400,6 +6400,27 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
 
     const float spanne = std::max(1.0f, 120.0f - m_wfColorGain * 0.91f);
 
+    // ── Der Teppich gehoert NICHT auf Schwarz (2026-10-23) ──────────
+    //
+    // Hier stand der Rauschteppich als Schwarzpunkt, wie in der
+    // Vorlage („Use noise floor directly as threshold — noise maps to
+    // black"). Dann liegt der ganze Teppich auf Stufe 0, und seine
+    // Textur verschwindet. Der Betreiber: „der teppich sollte nicht
+    // so dunkel sein", „hier ist das blau unten und oben das gleiche",
+    // „jedenfalls heller".
+    //
+    // Die Farbtabelle ist dieselbe wie in NereusSDR (nachgesehen,
+    // kDefaultStops Stufe fuer Stufe gleich) — es lag nie an ihr,
+    // sondern am Anlegepunkt. Also den Schwarzpunkt um ein Stueck
+    // UNTER den Teppich legen, damit er selbst im unteren Blau liegt
+    // und seine Struktur sichtbar bleibt; Signale steigen von dort
+    // durch Cyan, Gruen und Gelb.
+    //
+    // Anteilig an der Spanne, nicht in festen Einheiten: sonst haengt
+    // die Helligkeit an der Farbverstaerkung.
+    constexpr float kTeppichAufDerRampe = 0.18f;
+    const float schwarz = m_fremderTeppich - spanne * kTeppichAufDerRampe;
+
     // ── Auf die Fensterbreite abbilden ──────────────────────────────
     //
     // Ausschnitt der Kachel und des Fensters muessen NICHT
@@ -6456,7 +6477,7 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
                 wert = std::max(wert, intensitaet[i]);
             }
         }
-        const float stufe = std::clamp((wert - m_fremderTeppich) / spanne,
+        const float stufe = std::clamp((wert - schwarz) / spanne,
                                        0.0f, 1.0f);
         stufen[x] = static_cast<quint8>(std::lround(stufe * 255.0f));
         scanline[x] = waterfallColorForIntensityF(stufe, m_wfColorScheme,

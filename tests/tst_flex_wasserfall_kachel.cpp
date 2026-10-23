@@ -102,6 +102,13 @@ private slots:
 
         // Waere die Intensitaet als dBm gelesen worden, stuende JEDER
         // Punkt auf 255 — das ist das einfarbige Rot.
+        // Und nicht am unteren Anschlag: der Teppich soll seine
+        // Struktur zeigen, nicht schwarz sein („der teppich sollte
+        // nicht so dunkel sein", 2026-10-23).
+        QVERIFY2(mittel > 15.0,
+                 qPrintable(QStringLiteral("Der Rauschteppich steht im "
+                     "Mittel auf %1 von 255 — zu dunkel, seine Struktur "
+                     "ist nicht zu sehen.").arg(mittel, 0, 'f', 1)));
         QVERIFY2(mittel < 200.0,
                  qPrintable(QStringLiteral("Der Rauschteppich steht im "
                      "Mittel auf %1 von 255 — das Bild ist einfarbig.")
