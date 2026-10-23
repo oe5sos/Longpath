@@ -11,6 +11,15 @@
 #include "core/Ft8Stream.h"
 
 #include "core/Resampler.h"
+#include "core/AppSettings.h"
+
+#include <QLoggingCategory>
+
+// Fuer die Messung am Band: wie viele Funde ein Fenster hergibt und
+// mit wie vielen Runden. Standardmaessig an (QtInfoMsg), weil eine
+// Zeile je 15 s niemandem wehtut und die Gegenprobe sonst nur aus
+// dem Gedaechtnis des Betreibers bestuende.
+Q_LOGGING_CATEGORY(lcFt8, "longpath.ft8", QtInfoMsg)
 
 namespace Longpath {
 namespace {
@@ -118,9 +127,42 @@ void Ft8Stream::schliesseFenster(qint64 neuerBeginnMs)
             versatz = qMin(Ft8Decoder::kSampleRate * kFt4BlockVersatzMs / 1000,
                            m_fenster.size());
         }
+        // ── Wie viele Runden ueber dasselbe Fenster ──────────────────
+        //
+        // Zwei ist die Vorgabe: nach der ersten Runde werden die
+        // gefundenen Signale abgezogen, damit schwaechere darunter
+        // auffindbar werden (core/Ft8Subtract.h, portiert aus MSHV).
+        //
+        // Einstellbar, weil die Gegenprobe sonst nicht zu fahren ist.
+        // Am Pruefstand ist belegt, was die zweite Runde leistet (ein
+        // abgezogenes Signal ist 34,3 dB leiser; zwei Stationen auf
+        // derselben Tonlage werden zu zweien statt zu einer). Was sie
+        // AN DER ANTENNE leistet, ist damit NICHT belegt -- dafuer
+        // muss dieselbe Station dieselbe Minute einmal mit einer und
+        // einmal mit zwei Runden hoeren, und ohne diesen Schalter
+        // gaebe es dafuer keinen Weg.
+        //
+        // `Ft8/Durchgaenge` wird bei jedem Fenster frisch gelesen:
+        // umstellen soll ohne Neustart gehen, sonst vergleicht man
+        // zwei verschiedene Minuten mit zwei verschiedenen Baendern.
+        int durchgaenge = AppSettings::instance()
+                              .value(QStringLiteral("Ft8/Durchgaenge"),
+                                     QStringLiteral("2"))
+                              .toInt();
+        if (durchgaenge < 1) { durchgaenge = 1; }
+        if (durchgaenge > 3) { durchgaenge = 3; }
+
         const auto funde = Ft8Decoder::decodeBlock(m_fenster.constData() + versatz,
                                                    m_fenster.size() - versatz,
-                                                   m_protocol);
+                                                   m_protocol,
+                                                   durchgaenge);
+        qCInfo(lcFt8).noquote()
+            << QStringLiteral("Fenster: %1 Funde, %2 Runde(n), %3")
+                   .arg(funde.size())
+                   .arg(durchgaenge)
+                   .arg(m_protocol == Ft8Decoder::Protocol::Ft4
+                            ? QStringLiteral("FT4") : QStringLiteral("FT8"));
+
         // Auch leer melden: ein stilles Fenster ist eine Aussage, ein
         // ausbleibendes Fenster ein Fehler. Siehe Ft8Stream.h.
         emit decoded(funde, beginn);
