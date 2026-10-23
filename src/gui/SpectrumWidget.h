@@ -1737,6 +1737,9 @@ public:
     bool fremdeWasserfallquelleForTest() const {
         return m_fremdeWasserfallquelle;
     }
+    const QVector<float>& fremdeWfMittelForTest() const {
+        return m_fremdeWfMittel;
+    }
     int visibleBinCountForTest() const { return m_visibleBinCount; }
 
     // Pins updateSpectrumLinear()'s internal displayWidth (normally
@@ -2752,6 +2755,13 @@ private:
     /// Nachgefuehrter Rauschteppich der Kachel, in ihrer eigenen
     /// Intensitaetseinheit. NaN = noch nicht geschaetzt.
     float              m_fremderTeppich{std::numeric_limits<float>::quiet_NaN()};
+    // Laufendes Mittel der Kachelzeilen (zeitliche Mittelung des
+    // fremden Wasserfalls, 2026-10-23). Haelt die Groesse der
+    // Kachelbreite; ein Wechsel setzt es zurueck.
+    QVector<float>     m_fremdeWfMittel;
+    qint64             m_fremdeWfMittelMs{0};
+    double             m_fremdeWfMittelTiefHz{0.0};
+    double             m_fremdeWfMittelHochHz{0.0};
     QThread*           m_waterfallTickerThread{nullptr};
     WaterfallTicker*   m_waterfallTicker{nullptr};
 

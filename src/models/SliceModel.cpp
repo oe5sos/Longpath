@@ -175,6 +175,7 @@
 #include "SliceModel.h"
 
 #include "Band.h"
+#include "BandDefaults.h"
 #include "core/AppSettings.h"
 #include "core/LogCategories.h"
 #include "core/RadeChannel.h"
@@ -2944,7 +2945,21 @@ void SliceModel::restoreFromSettings(Band band)
         // defined value (WdspTypes.h).
         if (rawMode >= static_cast<int>(DSPMode::LSB) &&
             rawMode <= static_cast<int>(DSPMode::RADE_L)) {
-            const DSPMode mode = static_cast<DSPMode>(rawMode);
+            // ── Das Seitenband nach dem Band richten (2026-10-23) ──
+            //
+            // Betreiber: „80 und 160 sowie 40 muessen immer automatisch
+            // bei bandauswahl LSB sein". Die Startwerte in
+            // BandDefaults sagen das schon, greifen aber nur beim
+            // ERSTEN Besuch; hier steht wieder, was zuletzt auf dem
+            // Band lag. Ein einmal von Hand gedrehtes USB — oder ein
+            // Probelauf von mir — bliebe sonst fuer immer liegen, und
+            // zwar auch ueber das Beenden hinweg: diese Stelle ist
+            // auch der Weg beim Hochfahren.
+            //
+            // Nur Sprechseitenbaender werden gerichtet; ein auf 40 m
+            // abgelegtes DIGU gehoert zu FT8 und bleibt.
+            const DSPMode mode = BandDefaults::korrigiereSeitenband(
+                band, static_cast<DSPMode>(rawMode));
             // Directly assign mode without calling setDspMode() (which also
             // resets the filter). Emit the signal manually to keep observers in sync.
             if (m_dspMode != mode) {

@@ -461,6 +461,72 @@ private slots:
                      .arg(amAnschlag).arg(wf.size())));
     }
 
+
+    // ── Der Farbanker muss sofort stehen (2026-10-23) ───────────────
+    //
+    // Betreiber: „dauert noch immer bis oben der wasserfall angezeigt
+    // wird". Die Flaeche IST sofort da — sie steht nur minutenlang in
+    // Orange, weil die Rauschteppich-Schaetzung vom Merkwert -200 dBm
+    // mit 1 dB je Rahmen hochkriecht. Mit dem echten Rahmen des
+    // Betreibers (Teppich um -98) waeren das rund hundert Rahmen.
+    void dieSchaetzungSpringtStattZuKriechen()
+    {
+        SpectrumWidget sw;
+        sw.resize(1200, 600);
+        sw.setKiwiDisplaySource(true);
+        sw.setFrequencyRange(14.100e6, 200.0e3);
+        sw.setSpectrumAveraging(SpectrumAveraging::None);
+
+        // Vor dem ersten Rahmen steht der Merkwert.
+        QVERIFY2(sw.nfFftBinAverageForTest() < -190.0f, qPrintable(
+            QStringLiteral("Startwert ist nicht der Merkwert: %1")
+                .arg(sw.nfFftBinAverageForTest())));
+
+        sw.updateKiwiSpectrumDbm(m_rahmen, 14.000e6, 14.200e6);
+        const float nachEinem = sw.nfFftBinAverageForTest();
+        qInfo().nospace() << "Rauschteppich-Schaetzung nach EINEM Rahmen: "
+                          << nachEinem << " dBm";
+
+        // Gegen den Teppich DIESES Rahmens gerechnet, nicht gegen
+        // eine Wunschzahl: der Messrahmen stammt vom Geraet und sein
+        // Teppich ist, was er ist.
+        double summe = 0.0;
+        for (float v : m_rahmen) { summe += v; }
+        const double mittel = summe / m_rahmen.size();
+        double tief = 0.0; int tiefZahl = 0;
+        for (float v : m_rahmen) {
+            if (v <= mittel) { tief += v; ++tiefZahl; }
+        }
+        const float teppich = static_cast<float>(tief / tiefZahl);
+        qInfo().nospace() << "Teppich des Messrahmens: " << teppich << " dBm";
+
+        // Nach einem einzigen Rahmen muss die Schaetzung dort sein,
+        // nicht hundert Rahmen davon entfernt. 10 dB Spielraum, weil
+        // der Zeichenweg die Bins auf Bildpunkte zusammenfasst.
+        QVERIFY2(std::abs(nachEinem - teppich) < 10.0f, qPrintable(
+            QStringLiteral("nach einem Rahmen bei %1 dBm, Teppich des "
+                           "Rahmens %2 dBm").arg(nachEinem).arg(teppich)));
+        // Und die Gegenprobe zum Merkwert: ohne den Sprung stuende sie
+        // nach einem Rahmen noch bei -199 (1 dB je Rahmen).
+        QVERIFY2(nachEinem > -190.0f, "die Schaetzung kriecht noch");
+
+        // Gegenprobe: NACH dem Einschwingen darf die Regelung nicht
+        // mehr springen. Ein einzelnes starkes Signal im Rahmen darf
+        // die Schaetzung nicht mitreissen — sonst habe ich die
+        // Nachfuehrung kaputtgemacht statt den Start beschleunigt.
+        QVector<float> mitSignal = m_rahmen;
+        for (int i = 2000; i < 2100; ++i) { mitSignal[i] = -20.0f; }
+        for (int n = 0; n < 5; ++n) {
+            sw.updateKiwiSpectrumDbm(mitSignal, 14.000e6, 14.200e6);
+        }
+        const float mitSignalDbm = sw.nfFftBinAverageForTest();
+        qInfo().nospace() << "nach 5 Rahmen MIT starkem Signal: "
+                          << mitSignalDbm << " dBm";
+        QVERIFY2(std::abs(mitSignalDbm - nachEinem) < 6.0f, qPrintable(
+            QStringLiteral("ein starkes Signal zieht die Schaetzung mit: "
+                           "%1 gegen %2").arg(mitSignalDbm).arg(nachEinem)));
+    }
+
 private:
     QVector<float> m_rahmen;
 };

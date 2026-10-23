@@ -201,6 +201,202 @@ private slots:
         // Longpaths dBm-Wasserfall stuende alles am oberen Anschlag.
         QVERIFY(FlexVita::tileColourValue(11438) > 0.0f);
     }
+
+    // ── 4. Die zeitliche Mittelung (2026-10-23) ──────────────────────
+    //
+    // Der Betreiber im Vergleich mit der Anvelina: „oben schaut es nach
+    // strichen aus, flex nach punkten", und nach dem Wechsel von
+    // Maximum auf Mittel JE BILDPUNKT: „unten ist es nach wie vor sehr
+    // pixelig". Es lag an der ZEIT: der abgeleitete Weg mittelt ueber
+    // die Frames, die Kachel ging ungemittelt aufs Bild.
+    //
+    // Gemessen wird das, was man sieht: die Streuung der Stufen von
+    // Zeile zu Zeile an derselben Stelle. Rauschen allein muss ruhig
+    // werden.
+    void dieMittelungBeruhigtDasRauschen()
+    {
+        // Ein Teppich mit WECHSELNDEM Rauschen, zweimal durchgefahren:
+        // einmal ohne Mittelung, einmal mit. Dieselben Zahlen, damit
+        // nur die Mittelung den Unterschied macht.
+        auto streuung = [this](SpectrumAveraging art) -> double {
+            SpectrumWidget sw;
+            sw.setWaterfallAveraging(art);
+            sw.setWaterfallAverageTimeMs(400);
+            richteEin(sw, 14.100e6, 200.0e3);
+
+            QVector<double> vorher;
+            double summeAbstand = 0.0; int zahl = 0;
+            quint32 saat = 12345;
+            for (int zeileNr = 0; zeileNr < 24; ++zeileNr) {
+                QVector<float> k(2048);
+                for (int i = 0; i < 2048; ++i) {
+                    // Eigener Zufall, damit der Lauf wiederholbar ist.
+                    saat = saat * 1103515245u + 12345u;
+                    const float r = float((saat >> 16) & 0x7fff) / 32767.0f;
+                    k[i] = 96.0f + 6.0f * (r - 0.5f);
+                }
+                sw.zeigeFremdeWasserfallzeile(k, 14.000e6, 14.200e6);
+                const auto stufen = sw.wfZeilenstufenForTest();
+                if (stufen.isEmpty()) { return -1.0; }
+                QVector<double> jetztStufen;
+                for (int x = 0; x < stufen.size(); x += 37) {
+                    jetztStufen.append(stufen[x]);
+                }
+                if (!vorher.isEmpty() && zeileNr > 6) {
+                    for (int i = 0; i < jetztStufen.size(); ++i) {
+                        summeAbstand += std::abs(jetztStufen[i] - vorher[i]);
+                        ++zahl;
+                    }
+                }
+                vorher = jetztStufen;
+                QTest::qWait(25);   // Kachel-Takt, damit dt echt ist
+            }
+            return zahl > 0 ? summeAbstand / zahl : 0.0;
+        };
+
+        const double ohne = streuung(SpectrumAveraging::None);
+        const double mit  = streuung(SpectrumAveraging::LogRecursive);
+        QVERIFY2(ohne >= 0.0 && mit >= 0.0,
+                 "keine Zeilenstufen — das Fenster hat kein Wasserfallbild");
+        qInfo().nospace() << "Zeilenabstand ohne Mittelung " << ohne
+                          << ", mit " << mit;
+
+        // Die Gegenprobe steht im selben Lauf: ohne Mittelung MUSS es
+        // zappeln, sonst messe ich nicht die Mittelung, sondern ein
+        // flaches Bild.
+        QVERIFY2(ohne > 3.0, qPrintable(QStringLiteral(
+            "ohne Mittelung zappelt es nicht (%1) — der Pruefstand "
+            "misst dann nichts").arg(ohne)));
+        QVERIFY2(mit < ohne * 0.6, qPrintable(QStringLiteral(
+            "Mittelung beruhigt zu wenig: %1 gegen %2").arg(mit).arg(ohne)));
+    }
+
+    // Und der Traeger muss die Mittelung UEBERLEBEN: sie darf das
+    // Bild beruhigen, nicht einebnen.
+    void derTraegerUeberlebtDieMittelung()
+    {
+        SpectrumWidget sw;
+        sw.setWaterfallAveraging(SpectrumAveraging::LogRecursive);
+        sw.setWaterfallAverageTimeMs(400);
+        richteEin(sw, 14.100e6, 200.0e3);
+
+        sw.zeigeFremdeWasserfallzeile(kachel(2048, 1024), 14.000e6,
+                                      14.200e6);
+        int woErste = -1;
+        const int ersteZeile = hoechsteStufe(sw.wfZeilenstufenForTest(),
+                                             &woErste);
+        for (int i = 0; i < 20; ++i) {
+            QTest::qWait(25);
+            sw.zeigeFremdeWasserfallzeile(kachel(2048, 1024), 14.000e6,
+                                          14.200e6);
+        }
+        const auto stufen = sw.wfZeilenstufenForTest();
+        int wo = -1;
+        const int hoch = hoechsteStufe(stufen, &wo);
+        // Kachelmitte -> 14,100 MHz -> Fenstermitte.
+        const double soll = stufen.size() * 0.5;
+        qInfo().nospace() << "Traeger: erste Zeile Stufe " << ersteZeile
+                          << ", nach 20 gemittelten Stufe " << hoch
+                          << " bei " << wo << " (Soll " << soll << ")";
+        QVERIFY(std::abs(wo - soll) < stufen.size() * 0.02);
+
+        // Der Vergleich gegen die UNGEMITTELTE erste Zeile, nicht gegen
+        // eine Wunschzahl: ein stehender Traeger darf durch die
+        // Mittelung nichts verlieren. (Seine absolute Hoehe haengt am
+        // Mittel JE BILDPUNKT — ein Traeger in einem Bin von knapp
+        // zwei wird dort verduennt, das ist der bewusste Preis vom
+        // selben Tag und nicht die Mittelung hier.)
+        QVERIFY2(hoch >= ersteZeile - 2, qPrintable(QStringLiteral(
+            "Traeger eingeebnet: %1 nach Mittelung gegen %2 davor")
+            .arg(hoch).arg(ersteZeile)));
+
+        // Und er muss sich weiterhin vom Teppich abheben.
+        double teppich = 0.0; int zahl = 0;
+        for (int x = 0; x < stufen.size(); ++x) {
+            if (std::abs(x - wo) > 20) { teppich += stufen[x]; ++zahl; }
+        }
+        teppich = zahl > 0 ? teppich / zahl : 0.0;
+        qInfo().nospace() << "Teppich um ihn herum: " << teppich;
+        QVERIFY2(hoch > teppich + 30.0, qPrintable(QStringLiteral(
+            "Traeger hebt sich nicht ab: %1 gegen Teppich %2")
+            .arg(hoch).arg(teppich)));
+    }
+
+    // Ein Bandwechsel darf das alte Band nicht mitziehen. Die
+    // Kachelbreite bleibt dabei gleich, die Groessenpruefung allein
+    // faengt es also NICHT.
+    void einAusschnittswechselSetztDieMittelungZurueck()
+    {
+        SpectrumWidget sw;
+        sw.setWaterfallAveraging(SpectrumAveraging::LogRecursive);
+        sw.setWaterfallAverageTimeMs(400);
+        richteEin(sw, 14.100e6, 200.0e3);
+
+        for (int i = 0; i < 10; ++i) {
+            sw.zeigeFremdeWasserfallzeile(kachel(2048, 1024), 14.000e6,
+                                          14.200e6);
+            QTest::qWait(25);
+        }
+        // Gleiche Breite, anderer Ausschnitt, Traeger an anderer Stelle.
+        QVector<float> neu = kachel(2048, 512);
+        sw.zeigeFremdeWasserfallzeile(neu, 3.600e6, 3.800e6);
+        const auto& mittel = sw.fremdeWfMittelForTest();
+        QCOMPARE(mittel.size(), neu.size());
+        for (int i = 0; i < neu.size(); i += 101) {
+            QCOMPARE(mittel[i], neu[i]);   // zurueckgesetzt, nicht gemischt
+        }
+    }
+
+    // ── 5. Der Melder ist der des Betreibers ────────────────────────
+    //
+    // Der Kachelweg hat `DisplayWaterfallDetector` bis zum 2026-10-23
+    // ignoriert und selbst entschieden (erst Maximum, dann Mittel).
+    // Beim Betreiber steht Sample. „Wie bei der Anvelina" heisst nur
+    // dann dasselbe, wenn beide Wege dieselbe Einstellung lesen.
+    void derMelderDesBetreibersGiltAuchFuerDieKachel()
+    {
+        // Ein Zahnmuster: jeder zweite Bin hoch. Knapp zwei Bins
+        // fallen auf einen Bildpunkt, also enthaelt fast jedes Fenster
+        // einen hohen und einen tiefen Bin. Peak nimmt dann IMMER den
+        // hohen, Sample den mittleren (mal hoch, mal tief), das Mittel
+        // liegt dazwischen. Gemessen wird das Mittel der ganzen Zeile,
+        // nicht ihr Hoechstwert: der ist bei Peak und Sample gleich,
+        // sobald Sample einen hohen Bin ERWISCHT.
+        auto zeilenmittel = [this](SpectrumDetector art) -> double {
+            SpectrumWidget sw;
+            sw.setWaterfallDetector(art);
+            sw.setWaterfallAveraging(SpectrumAveraging::None);
+            richteEin(sw, 14.100e6, 200.0e3);
+            QVector<float> k(2048);
+            for (int i = 0; i < k.size(); ++i) {
+                k[i] = (i & 1) ? 112.0f : 96.0f;
+            }
+            sw.zeigeFremdeWasserfallzeile(k, 14.000e6, 14.200e6);
+            const auto stufen = sw.wfZeilenstufenForTest();
+            if (stufen.isEmpty()) { return -1.0; }
+            double summe = 0.0;
+            for (quint8 v : stufen) { summe += v; }
+            return summe / stufen.size();
+        };
+
+        const double mitPeak   = zeilenmittel(SpectrumDetector::Peak);
+        const double mitSample = zeilenmittel(SpectrumDetector::Sample);
+        const double mitMittel = zeilenmittel(SpectrumDetector::Average);
+        qInfo().nospace() << "Zeilenmittel — Peak " << mitPeak
+                          << ", Sample " << mitSample
+                          << ", Mittel " << mitMittel;
+        QVERIFY(mitPeak >= 0.0 && mitSample >= 0.0 && mitMittel >= 0.0);
+
+        // Peak nimmt die Zaehne, das Mittel glaettet sie.
+        QVERIFY2(mitPeak > mitMittel + 5.0, qPrintable(QStringLiteral(
+            "Peak (%1) hebt sich nicht vom Mittel (%2) ab — die "
+            "Einstellung wird nicht gelesen").arg(mitPeak).arg(mitMittel)));
+        // Und Sample liest EINEN Bin, nimmt also nicht durchgehend den
+        // hohen: es muss unter Peak liegen.
+        QVERIFY2(mitSample < mitPeak - 2.0, qPrintable(QStringLiteral(
+            "Sample (%1) verhaelt sich wie Peak (%2)")
+            .arg(mitSample).arg(mitPeak)));
+    }
 };
 
 QTEST_MAIN(TstFlexWasserfallKachel)

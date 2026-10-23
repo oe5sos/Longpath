@@ -2390,6 +2390,51 @@ void SpectrumWidget::processNoiseFloor()
     //       averageSum += fastPow10Raw(max_copy);
     //       averageCount++;
     //   }
+    // ── Ein Sprung ist kein Kriechen (2026-10-23) ───────────────────
+    //
+    // Betreiber: „dauert noch immer bis oben der wasserfall angezeigt
+    // wird", und davor „oben alles schwarz" — nach dem Verbinden steht
+    // die 3D-Flaeche lange in Orange, bis sie umspringt.
+    //
+    // Es ist nicht die Anzeige, es ist diese Schaetzung. Findet die
+    // Schleife unten zu wenige ruhige Punkte, kriecht sie mit 1 dB je
+    // Rahmen hoch (3 dB im Schnellanlauf) — Thetis display.cs:5893,
+    // und fuer eine Abweichung von ein paar dB auch richtig. Beim
+    // Verbinden ist die Abweichung aber keine Abweichung, sondern eine
+    // andere Welt: der Startwert liegt auf dem Merkwert -200 dBm, und
+    // bis der erste Rahmen kommt melden die leeren Rahmen -173 dBm.
+    // Von dort auf einen echten Teppich um -98 sind es siebzig bis
+    // hundert Rahmen. Solange liegt der Farbanker viel zu tief und
+    // ALLES steht am oberen Ende der Rampe: Orange.
+    //
+    // Also: liegt die Schaetzung mehr als 20 dB unter dem RUHIGEN
+    // Mittel dieses Rahmens, dann springen statt kriechen. 20 dB ist
+    // weit mehr, als ein belegtes Band den ruhigen Teil anhebt (auf
+    // 80 m gemessen rund 9 dB), und weit weniger als der Abstand beim
+    // Verbinden. Die Regelung darunter bleibt unveraendert; das hier
+    // setzt nur den Ausgangspunkt, von dem sie nachzieht.
+    //
+    // Das ruhige Mittel, nicht das volle: ein einzelnes starkes
+    // Signal darf den Ausgangspunkt nicht hochziehen. Zwei Durchgaenge,
+    // wie beim Teppich der Flex-Kachel.
+    {
+        double summe = 0.0;
+        for (int i = 0; i < width; ++i) { summe += src[i]; }
+        const double mittel = summe / width;
+        double tiefSumme = 0.0; int tiefZahl = 0;
+        for (int i = 0; i < width; ++i) {
+            if (src[i] <= mittel) { tiefSumme += src[i]; ++tiefZahl; }
+        }
+        const float ruhig = tiefZahl > 0
+            ? static_cast<float>(tiefSumme / tiefZahl)
+            : static_cast<float>(mittel);
+        if (std::isfinite(ruhig) && ruhig > -199.0f && ruhig < 60.0f
+            && m_nfFftBinAverage < ruhig - 20.0f) {
+            m_nfFftBinAverage = ruhig;
+            m_nfLerpAverage   = ruhig;
+        }
+    }
+
     // currentAverage = previous-frame fftBinAverage (the running estimate);
     // bins below it are the "quiet" ones we want to characterise.
     const float currentAverage = m_nfFftBinAverage;
@@ -3309,7 +3354,25 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
 
     // Ankunft stempeln: der Wasserfall entscheidet daran, ob er noch
     // etwas zu zeigen hat (siehe pushWaterfallRow).
+    const qint64 vorigeAnkunft = m_lastSpectrumArrivalMs;
     m_lastSpectrumArrivalMs = QDateTime::currentMSecsSinceEpoch();
+
+    // ── Ein wieder anlaufender Strom ist ein Bandwechsel ────────────
+    //
+    // Der Schnellanlauf der Rauschteppich-Schaetzung haengt bisher an
+    // einem Frequenzsprung ueber 500 kHz oder an MOX (MainWindow
+    // :6336/:6471). Ein Geraet, das sich gerade VERBINDET, kommt in
+    // keiner der beiden vor — dabei ist genau das der Fall, in dem die
+    // Schaetzung von nichts auf ein ganzes Band umstellen muss.
+    //
+    // Nach einer Pause von ueber zwei Sekunden (dieselbe Schwelle, mit
+    // der pushWaterfallRow den Strom fuer abgerissen haelt) also den
+    // Schnellanlauf setzen. Beim allerersten Rahmen nicht noetig: den
+    // setzt processNoiseFloor inzwischen direkt.
+    if (vorigeAnkunft > 0
+        && m_lastSpectrumArrivalMs - vorigeAnkunft > 2000) {
+        setNoiseFloorFastAttack(true);
+    }
 
     Q_UNUSED(receiverId);
     if (binsLinear.isEmpty()) { return; }
@@ -6370,16 +6433,70 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
     m_fremdeWasserfallZuletztMs = jetzt;
     m_wfLastPushMs              = jetzt;
 
+    // ── Zeitliche Mittelung (2026-10-23) ────────────────────────────
+    //
+    // Der Betreiber im Vergleich mit der Anvelina: „oben schaut es
+    // nach strichen aus, flex nach punkten", und nach dem Wechsel von
+    // Maximum auf Mittel je Bildpunkt: „unten ist es nach wie vor
+    // sehr pixelig".
+    //
+    // Es war nie die Breite, sondern die ZEIT. Der abgeleitete Weg
+    // laeuft durch `SpectrumAvenger` und mittelt ueber die Frames
+    // (beim Betreiber Log Recursive, 400 ms) — benachbarte Zeilen
+    // haengen dadurch zusammen, und daraus werden die Striche. Die
+    // Flex-Kachel ging ungemittelt aufs Bild: jede Zeile ihr eigenes
+    // Rauschen, also Punkte.
+    //
+    // Hier dieselbe Mittelung, aber ueber die GEMESSENE Zeit statt
+    // ueber die Bildrate: die Kachel kommt im Takt der Maschine
+    // (`line_duration`), nicht im Takt des Fensters, ein fps-basiertes
+    // Alpha waere also am falschen Nenner. Alpha = exp(-dt/tau) mit
+    // dem tau des Betreibers; dieselbe Form wie Thetis
+    // specHPSDR.cs:358, nur mit echtem dt.
+    //
+    // Die Kachelwerte sind bereits logarithmisch (dB/128), die
+    // Mittelung hier ist damit das Log Recursive seiner Einstellung,
+    // nicht die lineare Variante.
+    const bool mitteln = (m_waterfallAveraging != SpectrumAveraging::None);
+    if (!mitteln
+        || m_fremdeWfMittel.size() != intensitaet.size()
+        || !qFuzzyCompare(m_fremdeWfMittelTiefHz, lowHz)
+        || !qFuzzyCompare(m_fremdeWfMittelHochHz, highHz)
+        || m_fremdeWfMittelMs <= 0
+        || jetzt - m_fremdeWfMittelMs > 2000) {
+        // Abgeschaltet, Aussetzer -- oder der Ausschnitt der Kachel
+        // hat sich geaendert (Bandwechsel, Zoom). Dann neu anfangen:
+        // weiterrechnen zoege ein altes Band ins neue hinein, und
+        // weil die Kachelbreite dabei gleich bleiben kann, faengt die
+        // Groessenpruefung allein das NICHT.
+        m_fremdeWfMittel = intensitaet;
+    } else {
+        const double dtSek = std::max<qint64>(1, jetzt - m_fremdeWfMittelMs)
+                             / 1000.0;
+        const double tauSek = std::max(1, m_waterfallAverageTimeMs) / 1000.0;
+        const float alt = static_cast<float>(
+            qBound(0.0, std::exp(-dtSek / tauSek), 1.0));
+        const float neu = 1.0f - alt;
+        float* m = m_fremdeWfMittel.data();
+        for (int i = 0; i < intensitaet.size(); ++i) {
+            m[i] = neu * intensitaet[i] + alt * m[i];
+        }
+    }
+    m_fremdeWfMittelMs     = jetzt;
+    m_fremdeWfMittelTiefHz = lowHz;
+    m_fremdeWfMittelHochHz = highHz;
+    const QVector<float>& zeile = m_fremdeWfMittel;
+
     // ── Der Rauschteppich der Kachel ────────────────────────────────
     double summe = 0.0; int zahl = 0;
-    for (int i = 0; i < intensitaet.size(); i += 8) {
-        summe += intensitaet[i]; ++zahl;
+    for (int i = 0; i < zeile.size(); i += 8) {
+        summe += zeile[i]; ++zahl;
     }
     if (zahl == 0) { return; }
     const double mittel = summe / zahl;
     double tiefSumme = 0.0; int tiefZahl = 0;
-    for (int i = 0; i < intensitaet.size(); i += 8) {
-        if (intensitaet[i] <= mittel) { tiefSumme += intensitaet[i]; ++tiefZahl; }
+    for (int i = 0; i < zeile.size(); i += 8) {
+        if (zeile[i] <= mittel) { tiefSumme += zeile[i]; ++tiefZahl; }
     }
     const float teppich = tiefZahl > 0 ? float(tiefSumme / tiefZahl)
                                        : float(mittel);
@@ -6440,9 +6557,9 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
 
     const double fensterTief  = m_centerHz - m_bandwidthHz * 0.5;
     const double hzProPunkt   = m_bandwidthHz / breite;
-    const double hzProBin     = (highHz - lowHz) / intensitaet.size();
-    const float  kleinster    = *std::min_element(intensitaet.cbegin(),
-                                                  intensitaet.cend());
+    const double hzProBin     = (highHz - lowHz) / zeile.size();
+    const float  kleinster    = *std::min_element(zeile.cbegin(),
+                                                  zeile.cend());
 
     for (int x = 0; x < breite; ++x) {
         const double hzA = fensterTief + x * hzProPunkt;
@@ -6450,33 +6567,78 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
         int a = static_cast<int>(std::floor((hzA - lowHz) / hzProBin));
         int b = static_cast<int>(std::ceil((hzB - lowHz) / hzProBin)) - 1;
         float wert;
-        if (b < 0 || a >= static_cast<int>(intensitaet.size())) {
+        if (b < 0 || a >= static_cast<int>(zeile.size())) {
             // Ausserhalb dessen, was die Kachel abdeckt: der tiefste
             // Wert der Zeile. Null waere hier ein KRAEFTIGES Signal.
             wert = kleinster;
         } else {
-            const int letzter = static_cast<int>(intensitaet.size()) - 1;
+            const int letzter = static_cast<int>(zeile.size()) - 1;
             a = std::clamp(a, 0, letzter);
             b = std::clamp(b, a, letzter);
-            // ── MITTEL, nicht Maximum (2026-10-23) ──────────────
+            // ── Der Melder des Betreibers, nicht mein eigener ───
             //
-            // Hier stand das Maximum ueber die Bins, mit dem Argument,
-            // ein schmaler Traeger duerfe nicht zwischen zwei
-            // Bildpunkte fallen (Rendering-Werkbank 2026-09-25). Das
-            // Argument gilt — der Preis war aber sichtbar: das Maximum
-            // ueber rund dreieinhalb Bins hebt gerade die
-            // RAUSCHSPITZEN hervor, und der Wasserfall wurde koernig.
-            // Der Betreiber im Vergleich mit der Anvelina: „oben
-            // schaut es nach strichen aus, flex nach punkten".
+            // Hier stand erst das Maximum (Rendering-Werkbank
+            // 2026-09-25: ein schmaler Traeger darf nicht zwischen
+            // zwei Bildpunkte fallen), dann am 2026-10-23 das Mittel
+            // gegen die Koernung. Beides war meine Wahl, und beide
+            // Male die falsche Baustelle: die Koernung sass in der
+            // ZEIT, nicht in der Breite (siehe die Mittelung oben).
             //
-            // Das Mittel erhaelt die Energie, hebt keine Spitze heraus
-            // und laesst einen Traeger ueber mehrere Bins stehen. Ein
-            // Traeger in EINEM Bin von dreieinhalb wird um gut 5 dB
-            // verduennt; scharf steht er weiterhin im Spektrum
-            // darueber, das seinen eigenen Detektor hat.
-            double summeBins = 0.0;
-            for (int i = a; i <= b; ++i) { summeBins += intensitaet[i]; }
-            wert = static_cast<float>(summeBins / (b - a + 1));
+            // Nachgesehen, was der abgeleitete Weg tut, den der
+            // Betreiber als Vorbild nennt: er laeuft durch
+            // `applySpectrumDetector` mit SEINER Einstellung —
+            // `DisplayWaterfallDetector`, bei ihm Sample. Der
+            // Kachelweg hat sie bisher ignoriert. Also dieselbe Wahl
+            // auch hier, damit „wie bei der Anvelina" wirklich
+            // dasselbe heisst.
+            //
+            // Kein invEnb: das ist die Fensterkorrektur UNSERER FFT.
+            // Die Kachel kommt fertig von der Maschine.
+            const int n = b - a + 1;
+            switch (m_waterfallDetector) {
+                case SpectrumDetector::Peak: {
+                    wert = zeile[a];
+                    for (int i = a + 1; i <= b; ++i) {
+                        wert = std::max(wert, zeile[i]);
+                    }
+                    break;
+                }
+                case SpectrumDetector::Rosenfell: {
+                    // Vereinfacht gegenueber SpectrumDetector.cpp:118:
+                    // dort traegt `prev_maxi` ueber die Bildpunkte
+                    // hinweg. Stieg UND fiel es im Fenster, nimmt der
+                    // ungerade Bildpunkt das Maximum, der gerade das
+                    // Minimum — so entsteht die Rosenfell-Struktur.
+                    float mini = zeile[a], maxi = zeile[a];
+                    bool stieg = false, fiel = false;
+                    for (int i = a + 1; i <= b; ++i) {
+                        mini = std::min(mini, zeile[i]);
+                        maxi = std::max(maxi, zeile[i]);
+                        if (zeile[i] > zeile[i - 1]) { stieg = true; }
+                        if (zeile[i] < zeile[i - 1]) { fiel  = true; }
+                    }
+                    wert = (stieg && fiel) ? ((x & 1) ? maxi : mini) : maxi;
+                    break;
+                }
+                case SpectrumDetector::Sample: {
+                    // Die MITTE des Fensters, wie
+                    // SpectrumDetector.cpp:192 (`bins[i - bcount/2]`).
+                    wert = zeile[a + n / 2];
+                    break;
+                }
+                case SpectrumDetector::Average:
+                case SpectrumDetector::RMS:
+                case SpectrumDetector::Count:
+                default: {
+                    // RMS faellt auf das Mittel: die Kachelwerte sind
+                    // logarithmisch (dB/128), eine Quadratsumme darauf
+                    // haette keine Bedeutung.
+                    double summeBins = 0.0;
+                    for (int i = a; i <= b; ++i) { summeBins += zeile[i]; }
+                    wert = static_cast<float>(summeBins / n);
+                    break;
+                }
+            }
         }
         const float stufe = std::clamp((wert - schwarz) / spanne,
                                        0.0f, 1.0f);

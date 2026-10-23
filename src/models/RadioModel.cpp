@@ -6711,6 +6711,11 @@ void RadioModel::onBandButtonClicked(Band band)
     if (slice->hasSettingsFor(band)) {
         // Second+ visit: restore last-used state for the clicked band.
         slice->restoreFromSettings(band);
+
+        // Das Seitenband richtet `restoreFromSettings` selbst — siehe
+        // dort und BandDefaults::korrigiereSeitenband. Hier bewusst
+        // nichts mehr: zwei Stellen fuer dieselbe Regel waeren eine zu
+        // viel, und der Weg beim Hochfahren laeuft NICHT hier durch.
         // And put the restored rate on the DDC, not just on the menu.
         // Codex review round 7, PR #293: restoreFromSettings sets the
         // display property; this is the half that reaches the radio.
