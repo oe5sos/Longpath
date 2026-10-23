@@ -136,12 +136,40 @@ void monitor_process(monitor_t* me, const float* frame)
     int offset = me->wf.num_blocks * me->wf.block_stride;
     int frame_pos = 0;
 
+    // ── Longpath-Abweichung (2026-10-22): keine Arrays variabler Laenge ──
+    //
+    // Upstream legt die beiden Felder im Schleifenrumpf an:
+    //
+    //     kiss_fft_scalar timedata[me->nfft];
+    //     kiss_fft_cpx freqdata[me->nfft / 2 + 1];
+    //
+    // Das sind Arrays variabler Laenge (C99). GCC und Clang koennen das,
+    // der Microsoft-Compiler nicht (C2057 / C2466 / C2133). Begruendung
+    // und Vorgeschichte stehen in FT8LIB-PROVENANCE.md; dieselbe Sache
+    // war am selben Tag schon in ft8/decode.c zu behandeln.
+    //
+    // Hier als Belegung auf dem Haufen statt mit fester Obergrenze: eine
+    // nachweisbare Grenze gibt es nicht -- me->nfft kommt aus der
+    // Monitor-Einstellung. Dafuer kostet es nichts: me->nfft steht fuer
+    // die Lebensdauer des Monitors fest, also wird EINMAL je Aufruf
+    // belegt statt je Teilblock, und monitor_process() laeuft nur einmal
+    // je Tonblock (bei FT8 rund 40 ms). Die Felder werden vor jedem
+    // Gebrauch vollstaendig geschrieben, die Belegung muss also nicht
+    // genullt werden -- wie beim Upstream auf dem Stapel.
+    kiss_fft_scalar* timedata =
+        (kiss_fft_scalar*)malloc(sizeof(kiss_fft_scalar) * (size_t)me->nfft);
+    kiss_fft_cpx* freqdata =
+        (kiss_fft_cpx*)malloc(sizeof(kiss_fft_cpx) * (size_t)(me->nfft / 2 + 1));
+    if (timedata == NULL || freqdata == NULL)
+    {
+        free(timedata);
+        free(freqdata);
+        return;
+    }
+
     // Loop over block subdivisions
     for (int time_sub = 0; time_sub < me->wf.time_osr; ++time_sub)
     {
-        kiss_fft_scalar timedata[me->nfft];
-        kiss_fft_cpx freqdata[me->nfft / 2 + 1];
-
         // Shift the new data into analysis frame
         for (int pos = 0; pos < me->nfft - me->subblock_size; ++pos)
         {
@@ -187,6 +215,9 @@ void monitor_process(monitor_t* me, const float* frame)
             }
         }
     }
+
+    free(timedata);
+    free(freqdata);
 
     ++me->wf.num_blocks;
 }
