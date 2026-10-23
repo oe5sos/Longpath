@@ -23,6 +23,7 @@
 
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Stream.h"
+#include "core/AppSettings.h"
 
 using namespace Longpath;
 
@@ -176,6 +177,88 @@ private slots:
 
     /// Steht die Uhr, wird kein Fenster geschlossen — und nichts
     /// gemeldet. Das ist die Gegenprobe zur Grenze.
+    // ── Die Zahl der Runden wirkt bis in den Strom ──────────────────
+    //
+    // `Ft8/Durchgaenge` gibt es, damit die Gegenprobe AN DER ANTENNE
+    // zu fahren ist: dieselbe Minute einmal mit einer Runde und
+    // einmal mit zweien. Am Pruefstand ist belegt, was die zweite
+    // Runde kann (tst_ft8_subtraktion); hier wird belegt, dass der
+    // Schalter sie wirklich erreicht -- sonst stellte man am Geraet
+    // etwas um, das nirgends ankommt.
+    //
+    // Zwei Stationen auf DERSELBEN Tonlage, die zweite 12 dB leiser:
+    // mit einer Runde findet der Dekoder eine, mit zweien beide.
+    void dieZahlDerRundenWirktBisInDenStrom()
+    {
+        const QString laut  = QStringLiteral("CQ OE5SOS JN78");
+        const QString leise = QStringLiteral("CQ DL1ABC JO31");
+
+        // Wie im Subtraktions-Prueflauf: die schwaechere Station liegt
+        // nicht nur leiser, sondern auch ZEITLICH versetzt -- so geht
+        // es auf einem vollen Band zu. Genau uebereinander waere der
+        // pathologische Fall, den auch WSJT-X nicht trennt.
+        QVector<float> m1, m2;
+        QVERIFY(Ft8Decoder::encodeBlock(laut, 1500.0f,
+                                        Ft8Decoder::Protocol::Ft8, &m1));
+        QVERIFY(Ft8Decoder::encodeBlock(leise, 1500.0f,
+                                        Ft8Decoder::Protocol::Ft8, &m2));
+
+        constexpr int kVersatz = 4800;   // 0,4 s bei 12 kHz
+        QVector<float> mono = m1;
+        mono.resize(qMax(m1.size(), m2.size() + kVersatz));
+        for (int i = 0; i < m2.size(); ++i) {
+            const int z = i + kVersatz;
+            if (z < mono.size()) { mono[z] += 0.25f * m2.at(i); }
+        }
+
+        // Dasselbe grobe Hochtasten wie in fensterAlsStereo48k().
+        QVector<float> a;
+        a.reserve(mono.size() * 8);
+        for (float v : mono) {
+            for (int k = 0; k < 4; ++k) { a << v << v; }
+        }
+
+        const auto funde = [&a](int runden) {
+            AppSettings::instance().setValue(
+                QStringLiteral("Ft8/Durchgaenge"), QString::number(runden));
+            Ft8Stream strom;
+            qint64 jetzt = 999999990000LL;
+            strom.setClock([&jetzt]() { return jetzt; });
+            QSignalSpy spion(&strom, &Ft8Stream::decoded);
+            const int stueck = 4096;
+            for (int pos = 0; pos + 2 * stueck <= a.size(); pos += 2 * stueck) {
+                strom.feedAudio(a.constData() + pos, stueck);
+            }
+            jetzt += 15000;
+            strom.feedAudio(a.constData(), stueck);
+            QStringList wortlaute;
+            if (spion.count() == 1) {
+                for (const Ft8Decode& d :
+                     spion.at(0).at(0).value<QVector<Ft8Decode>>()) {
+                    wortlaute << d.text;
+                }
+            }
+            return wortlaute;
+        };
+
+        const QStringList eine = funde(1);
+        const QStringList zwei = funde(2);
+        qInfo().noquote() << "eine Runde:" << eine.join(QLatin1String(" | "));
+        qInfo().noquote() << "zwei Runden:" << zwei.join(QLatin1String(" | "));
+
+        QVERIFY2(eine.contains(laut), "die laute Station fehlt schon bei einer Runde");
+        QVERIFY2(!eine.contains(leise),
+                 "eine Runde darf die leise Station NICHT finden -- "
+                 "sonst sagt dieser Lauf nichts ueber den Schalter");
+        QVERIFY2(zwei.contains(laut) && zwei.contains(leise),
+                 "zwei Runden muessen beide finden");
+
+        // Zuruecksetzen, sonst traegt die Einstellung in den naechsten
+        // Lauf hinein.
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Durchgaenge"),
+                                         QStringLiteral("2"));
+    }
+
     void ohneGrenzuebertrittNichts()
     {
         const QVector<float> ton =

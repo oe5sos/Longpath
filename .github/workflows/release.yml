@@ -22,9 +22,21 @@ name: Release
 #
 # WICHTIG, solange die Tonverzerrung nicht aufgeklaert ist: das Paket ist
 # zum Ausprobieren da, nicht als geprueft erklaert. Die Website muss das
-# sagen. Dazu laeuft die Arbeit, die Prueflaeufe auf Windows ueberhaupt
-# erst zum Laufen zu bringen (in `ci.yml` baut Windows bis heute nur die
-# Anwendung, keinen einzigen Prueflauf).
+# sagen.
+#
+# Nachtrag vom selben Tag: die hier erwaehnte Arbeit an den
+# Prueflaeufen ist eingetroffen. `ci.yml` faehrt auf Windows jetzt die
+# Marke `appless` -- 189 Pruefstaende reiner Kernlogik, ohne
+# QApplication. Der Satz „baut Windows bis heute nur die Anwendung,
+# keinen einzigen Prueflauf" stimmt also nicht mehr.
+#
+# Fuer DIESE Datei aendert das trotzdem nichts, und zwar aus einem
+# Grund, der hier stehen muss: `ci.yml` baut Windows mit MinGW, dieser
+# Job mit MSVC. Die Prueflaeufe dort decken den Compiler NICHT ab, mit
+# dem das Paket gebaut wird -- siehe #322, wo genau diese Luecke das
+# v0.8.1-Paket aufgehalten hat. Und keiner der 189 fasst den Audioweg
+# am Geraet an, die Tonverzerrung bleibt also unberuehrt.
+# Messwerte: docs/architecture/2026-10-22-windows-pruefstaende-messung.md
 
 on:
   push:

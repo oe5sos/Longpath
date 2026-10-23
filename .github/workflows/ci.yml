@@ -318,9 +318,11 @@ jobs:
   # --------------------------------------------------------------------
   # Per-platform build + C++ test gate.
   #
-  # Linux and macOS both build and run the C++ test suite; Windows still
-  # builds the app alone, because its test fakes are genuinely unported
-  # (mingw paths) and that is separate work.
+  # Linux und macOS bauen und fahren die ganze Reihe. Windows faehrt
+  # seit dem 2026-10-22 eine BENANNTE Teilmenge: die Marke `appless`,
+  # also jeden Pruefstand mit QTEST_APPLESS_MAIN -- reine Kernlogik,
+  # kein QApplication, kein Fenster. Pruefstaende mit Oberflaeche sind
+  # dort eine eigene, offene Frage (siehe unten).
   #
   # macOS was added 2026-08-09. Until then it configured with tests OFF
   # on the grounds that the fakes were Linux-specific — which was true of
@@ -354,13 +356,93 @@ jobs:
         # is enough to stay near the Linux shards' wall-clock without
         # quadrupling the bill.
         #
-        # Windows stays single-job and test-free: its fakes really are
-        # unported (mingw paths), and that is a separate piece of work
-        # from this one.
+        # ── Windows, nachgemessen am 2026-10-22 ──────────────────
         #
-        # `shard` / `shards` are unset for Windows, so CMake's
-        # LONGPATH_TEST_SHARDS defaults to 0 — no sharding, and moot there
-        # because it builds no tests.
+        # Hier stand bis heute: „Windows stays single-job and test-free:
+        # its fakes really are unported (mingw paths), and that is a
+        # separate piece of work from this one." Der Satz ist vom
+        # 2026-08-09 (c6b3eaa7f) und WIDERLEGT. Drei Laeufe auf
+        # windows-latest (MinGW 13.1, Qt 6.8.3):
+        #
+        #   39749806756  1082 Pruefstaende melden sich auf Windows an.
+        #                Alle 2178 Objektziele unter tests/ uebersetzt,
+        #                ohne zu linken, mit `ninja -k 0` (57 min).
+        #                GENAU ZWEI Fehler, nicht „die Attrappen":
+        #                  tst_radio_discovery_scan_bound.cpp:33
+        #                      fatal error: arpa/inet.h: No such file
+        #                  tst_sendefehler_deutung.cpp:72
+        #                      'EHOSTDOWN' was not declared in this scope
+        #                Also 1080 von 1082 unveraendert uebersetzbar.
+        #                Linken traegt (ninja 0, 105 s fuer fuenf, keine
+        #                undefinierten Verweise).
+        #   39762280534  Beide behoben, beide uebersetzen. Die fuenf
+        #                gelinkten Pruefstaende hingen vorher alle in
+        #                ***Timeout 120 s -- Ursache war der
+        #                DLL-Suchpfad, nicht die Prueflogik: ohne
+        #                PATH-Erweiterung 5/5 Timeout, mit 5/5 Passed
+        #                in 0,66 s. Behoben in tests/CMakeLists.txt
+        #                (Ziel longpath_test_dlls).
+        #   39768259011  Die ganze Reihe in vier Teilen, gefahren.
+        #
+        # Die ATTRAPPEN waren nie das Hindernis. tests/fakes/ sind 528
+        # Zeilen in drei Dateien, darin keine einzige
+        # Praeprozessor-Bedingung, kein Q_OS_*, kein POSIX-Header, kein
+        # Pfad. Sie sind von April 2026 und plattformfrei; der Satz oben
+        # war schon beim Schreiben falsch und stand 74 Tage.
+        #
+        # Was Windows WIRKLICH von Linux/macOS trennt, ist der Preis:
+        # dort laeuft absichtlich KEIN Uebersetzungszwischenspeicher
+        # (kein sccache, Begruendung weiter unten bei „Windows
+        # intentionally skips sccache"). Jeder Lauf uebersetzt und linkt
+        # kalt. Gemessen: 21 s je Pruefstandsbinaerdatei beim Linken,
+        # 2178 Objektziele in 57 min. Eine ganze Reihe auf Windows
+        # kostet rund 2,5 h Laeuferzeit je Lauf -- bei doppeltem
+        # Minutenpreis gegenueber Linux.
+        #
+        # Darum eine Teilmenge statt alles. Der erste Anlauf
+        # (2026-10-22) nahm dafuer die Marke `appless` -- 189 der 1084
+        # Pruefstaende tragen QTEST_APPLESS_MAIN, brauchen also kein
+        # QApplication und kein Fenster.
+        #
+        # Das war EINE Stufe zu grob, und auch das ist gemessen: Lauf
+        # 39812571171 baute die 189 in 85 min und lief dann ueber
+        # zweieinhalb Stunden im ctest, ohne ein Ergebnis zu liefern.
+        # Seit dem 2026-10-23 faehrt dieser Job darum eine NAMENTLICHE
+        # Liste von sechs Pruefstaenden, fuer die ein Durchlauf auf
+        # windows-latest belegt ist -- siehe den Bauschritt weiter
+        # unten, dort stehen Liste und Beleg.
+        #
+        # Die Marke `appless` und das Ziel `tests_appless` bleiben: sie
+        # sind der Weg, die Liste zu erweitern, und mit
+        # LONGPATH_TEST_TIMEOUT=30 ist ein solcher Lauf jetzt begrenzt
+        # und nennt jeden Haenger beim Namen.
+        #
+        # GRENZE dieser Messung: sie ist MinGW, nicht MSVC. Dieser Job
+        # baut mit win64_mingw + tools_mingw1310, release.yml mit MSVC
+        # (ilammy/msvc-dev-cmd) -- zwei Compiler, ein Plattformname. Am
+        # 2026-10-22 hat das zugeschlagen: #322, ein C99-Array
+        # variabler Laenge in third_party/ft8_lib/ft8/decode.c, von
+        # GCC uebersetzt, von MSVC nicht (C2057/C2466/C2133), und
+        # dieser Job war bei jedem PR gruen. Was hier eingeschaltet
+        # wird, sagt ueber MSVC NICHTS.
+        #
+        # OFFEN, erster Punkt: die 183 appless-Pruefstaende, die hier
+        # NICHT gefahren werden. Sie uebersetzen und linken auf Windows
+        # (belegt), aber ob sie laufen, ist offen -- der eine Lauf, der
+        # es haette sagen koennen, rannte in sein Zeitlimit. Der naechste
+        # Schritt ist ein Lauf mit `-L appless`, nicht eine Vermutung.
+        #
+        # OFFEN, zweiter Punkt, und Martins Entscheidung: sollen auch
+        # Pruefstaende mit OBERFLAECHE auf Windows laufen? Dann braucht es einen
+        # Schirmweg (Linux nutzt xvfb, macOS das offscreen-Plugin;
+        # qoffscreen.dll liegt auf Windows in Qt 6.8.3 bei, geprueft am
+        # 2026-10-22) und mehr Laeuferzeit -- bei vier Teilen rund eine
+        # Stunde je Teil. Hier ist bis dahin die sparsame Annahme
+        # eingebaut.
+        #
+        # `shard` / `shards` sind fuer Windows nicht gesetzt, CMakes
+        # LONGPATH_TEST_SHARDS bleibt also 0 -- kein Aufteilen, weil die
+        # Teilmenge klein genug ist.
         include:
           - os: ubuntu-24.04
             name: Linux x64 (1/4)
@@ -688,9 +770,28 @@ jobs:
           # ShaderTools or Gui private modules. v0.1.1 silently shipped
           # without GPU spectrum because this flag was implicit; never
           # again.
+          #
+          # LONGPATH_BUILD_TESTS=ON seit dem 2026-10-22 -- zum ersten
+          # Mal auf Windows. Das Konfigurieren mit Pruefstaenden war
+          # dort nie das Problem: es lief im ersten Messlauf
+          # (39749806756) auf Anhieb durch und meldete 1082
+          # Pruefstaende. Gebaut und gefahren wird davon die Marke
+          # `appless` -- siehe den Matrix-Kommentar oben.
+          #
+          # LONGPATH_TEST_TIMEOUT=30 statt der Vorgabe 120 (2026-10-23).
+          # Nicht aus Ungeduld: 120 s je Pruefstand sind auf einer
+          # Plattform, auf der viele haengen, kein Zeitlimit mehr,
+          # sondern eine Multiplikation. Der ctest-Schritt des Laufs
+          # 39812571171 lief damit ueber zweieinhalb Stunden und wurde
+          # abgebrochen, OHNE die Namen der Haenger zu nennen -- ein
+          # Lauf, der in sein eigenes Zeitlimit rennt, sagt nichts.
+          # Der langsamste Pruefstand dieser Teilmenge braucht auf
+          # macOS 3,13 s (tst_voice_analyzer), 30 s sind also reichlich.
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DLONGPATH_GPU_SPECTRUM=ON
+            -DLONGPATH_GPU_SPECTRUM=ON \
+            -DLONGPATH_BUILD_TESTS=ON \
+            -DLONGPATH_TEST_TIMEOUT=30
 
       # ------------------------------------------------------------------
       # Build
@@ -712,11 +813,17 @@ jobs:
       # test definitions but no binaries and reports every one as
       # "Not Run" -- which exits 0 and would silently pass.
       #
-      # Gated on Linux to match the configure step: only the Linux job
-      # passes -DLONGPATH_BUILD_TESTS=ON (ci.yml:458), and `all_tests` is
-      # created by tests/CMakeLists.txt, which is only add_subdirectory'd
-      # when that option is ON.  Asking for the target elsewhere would
-      # fail with "No rule to make target".
+      # Gated on Linux because the Linux step below needs its own
+      # -j1 / -g1 reasoning; macOS and Windows have their own steps.
+      #
+      # 2026-10-22: hier stand „only the Linux job passes
+      # -DLONGPATH_BUILD_TESTS=ON (ci.yml:458)". Das war schon seit dem
+      # 2026-08-09 falsch (macOS setzt es auch) und ist es jetzt
+      # doppelt: alle drei Plattformen konfigurieren mit Pruefstaenden.
+      # Richtig bleibt der Grund fuer die Trennung: `all_tests` wird in
+      # tests/CMakeLists.txt angelegt, das nur bei eingeschalteter
+      # Option ueberhaupt dazugenommen wird -- ohne sie bricht
+      # `--target all_tests` mit „No rule to make target" ab.
       - name: Build test executables (Linux)
         if: runner.os == 'Linux'
         # ── Beim LINKEN sparsamer sein (2026-10-16) ─────────────────
@@ -810,6 +917,50 @@ jobs:
         if: runner.os == 'macOS'
         run: cmake --build build -j$(sysctl -n hw.ncpu) --target all_tests
 
+      # ── Windows: eine NAMENTLICHE Liste, kein Sammelziel ─────────────
+      #
+      # Hier stand bis zum 2026-10-23 `--target tests_appless`, also die
+      # Marke `appless` mit 189 Pruefstaenden. Das war zu viel auf
+      # einmal, und zwar gemessen:
+      #
+      #   Lauf 39812571171, Windows: 85 min fuer den Bau der 189, dann
+      #   lief ctest ueber zweieinhalb Stunden und wurde abgebrochen.
+      #   Kein Ergebnis, keine Namen. Der Windows-Auftrag lag vorher bei
+      #   13 min.
+      #
+      # Ein Tor, das Stunden braucht und am Ende nichts sagt, ist kein
+      # Tor. Darum jetzt die Liste, fuer die ein BELEG vorliegt: diese
+      # sechs sind im Lauf 39762280534 auf windows-latest tatsaechlich
+      # durchgelaufen -- die ersten fuenf in 0,66 s zusammen,
+      # tst_sendefehler_deutung in 0,07 s.
+      #
+      # Das ist wenig. Es ist aber gemessen, es ist schnell, und es ist
+      # unendlich mehr als die Null, die hier bis zum 2026-10-22 stand.
+      #
+      # ── Wie die Liste waechst ────────────────────────────────────────
+      #
+      # Nicht durch Raten. Ein Lauf mit `--target tests_appless` und
+      # `-L appless` (beides steht weiter zur Verfuegung) ist jetzt
+      # durch LONGPATH_TEST_TIMEOUT=30 auf rund 95 min begrenzt und
+      # nennt im Fehlerfall JEDEN Haenger beim Namen. Wer die Namen hat,
+      # haengt die durchgelaufenen hier an und untersucht den Rest.
+      # Messwerte und offene Fragen:
+      # docs/architecture/2026-10-22-windows-pruefstaende-messung.md
+      #
+      # Jedes dieser Ziele zieht longpath_test_dlls mit, das die DLLs
+      # neben die Pruefstaende legt (tests/CMakeLists.txt).
+      - name: Build test executables (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cmake --build build -j$NUMBER_OF_PROCESSORS --target \
+            tst_amateur_bands \
+            tst_adif_log \
+            tst_beam_heading \
+            tst_callsign_cache \
+            tst_alex_filter_map \
+            tst_sendefehler_deutung
+
       # ------------------------------------------------------------------
       # Test
       # ------------------------------------------------------------------
@@ -833,6 +984,12 @@ jobs:
         # work, not passing through.  Linux remains the widest gate
         # (4 shards against macOS's 2), not the only one.
         #
+        # (Auch dieser Absatz ist inzwischen ueberholt -- Windows
+        # konfiguriert seit dem 2026-10-22 mit Pruefstaenden. Er bleibt
+        # stehen, weil er das Muster festhaelt: ein Kommentar, der eine
+        # Plattform fuer testfrei erklaert, ueberlebt den Zustand, den
+        # er beschreibt. Der aktuelle Stand steht weiter unten.)
+        #
         # QT_QPA_PLATFORM=offscreen: GitHub runners are headless so
         # Qt widgets can't create native windows.  The offscreen
         # platform plugin lets GUI-backed tests (QApplication +
@@ -854,8 +1011,26 @@ jobs:
         # PortAudio has to cope with "no devices" rather than asserting
         # a successful open, exactly as on Linux.
         #
-        # Windows alone keeps --no-tests=ignore, because it alone still
-        # configures without tests.
+        # 2026-10-22 — und DIESER Satz ist jetzt auch ueberholt. Hier
+        # stand: „Windows alone keeps --no-tests=ignore, because it
+        # alone still configures without tests." Windows konfiguriert
+        # seit heute MIT Pruefstaenden und faehrt die Marke `appless`.
+        # Statt --no-tests=ignore steht dort jetzt --no-tests=error:
+        # findet ctest unter der Marke nichts, soll der Lauf LAUT
+        # abbrechen und nicht gruen durchlaufen. Genau dieser Fall --
+        # ein Tor, das nichts prueft und trotzdem gruen meldet -- ist
+        # der Fehler, den dieselbe Datei 2026-05-12 schon einmal
+        # beseitigt hat.
+        #
+        # Ohne QT_QPA_PLATFORM: fuenf der sechs sind appless, haben
+        # also kein QApplication, und die Wahl des Schirmwegs betrifft
+        # sie nicht. Der sechste (tst_sendefehler_deutung, QTEST_MAIN)
+        # lief dort trotzdem in 0,07 s durch -- ein QApplication kommt
+        # auf dem Laeufer also hoch.
+        # Im Messlauf 39762280534 sind dieselben fuenf beide Wege
+        # gefahren -- ohne offscreen 5/5 Passed in 0,66 s, mit
+        # offscreen 5/5 Passed in 0,31 s. Fuer Pruefstaende MIT
+        # Oberflaeche ist die Frage offen; siehe den Matrix-Kommentar.
         run: |
           if [ "${{ runner.os }}" = "Linux" ]; then
             export QT_QPA_PLATFORM=offscreen
@@ -912,7 +1087,22 @@ jobs:
             export QT_QPA_PLATFORM=offscreen
             ctest --output-on-failure
           else
-            ctest --output-on-failure --no-tests=ignore
+            # Windows. Die sechs namentlich, passend zum Bauschritt
+            # oben -- `-L appless` waere die ganze Marke und damit 183
+            # Binaerdateien, die hier gar nicht gebaut sind (ctest
+            # meldete sie als "Not Run", was mit --no-tests=error nicht
+            # einmal auffaellt, weil die Marke ja Treffer hat).
+            #
+            # Die PATH-Erweiterung ist der GEMESSENE Weg: im Lauf
+            # 39762280534 liefen dieselben Pruefstaende ohne sie 5 von 5
+            # in die Zeitgrenze und mit ihr 5 von 5 durch, in 0,66 s.
+            # Das Kopierziel longpath_test_dlls deckt denselben Fall ab
+            # und ist der Weg, der auch bei einem von Hand gestarteten
+            # Pruefstand greift -- aber belegt ist die PATH-Variante,
+            # also steht sie hier. Beides zusammen schadet nicht.
+            export PATH="$QT_ROOT_DIR/bin:$IQTA_TOOLS/mingw1310_64/bin:$GITHUB_WORKSPACE/third_party/fftw3/bin:$GITHUB_WORKSPACE/build:$PATH"
+            ctest --output-on-failure --no-tests=error -R \
+              '^(tst_amateur_bands|tst_adif_log|tst_beam_heading|tst_callsign_cache|tst_alex_filter_map|tst_sendefehler_deutung)$'
           fi
 
       - name: Upload hang-diagnostics (Linux, on failure)
@@ -989,8 +1179,8 @@ jobs:
   # 49d10dc8 nicht mehr von Grund auf baubar.
   #
   # Gemeldet hat es niemand, weil JEDER bestehende Job dieser Datei mit
-  # -DLONGPATH_BUILD_TESTS=ON konfiguriert (ci.yml:537, :563, und der
-  # Windows-Zweig). CMakeLists.txt:1691 reicht das Makro an
+  # -DLONGPATH_BUILD_TESTS=ON konfiguriert (Configure Linux / macOS /
+  # Windows). CMakeLists.txt:1691 reicht das Makro an
   # LongpathObjs weiter, also übersetzte die CI immer eine
   # Objektbibliothek, in der die Funktion existiert. 678 grüne Tests,
   # jedes Mal, über Wochen.

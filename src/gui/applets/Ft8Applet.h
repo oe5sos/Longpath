@@ -267,6 +267,7 @@ public:
     QLabel*         lastLabelForTest() const { return m_lastLabel; }
     QPushButton*    nurCqButtonForTest() const { return m_nurCqBtn; }
     QSpinBox*       sendeTonFeldForTest() const { return m_tonFeld; }
+    QSpinBox*       rundenFeldForTest() const { return m_rundenFeld; }
     Longpath::Ft8Wasserfall* wasserfallForTest() const { return m_wasserfall; }
     int             sendeTonHzForTest() const { return m_sendeTonHz; }
     QPushButton*    ft8ButtonForTest() const { return m_ft8Btn; }
@@ -363,6 +364,9 @@ private:
     /// wer sich eine freie Stelle gesucht hat, will sie beim naechsten
     /// Start wiederhaben.
     QSpinBox* m_tonFeld{nullptr};
+    /// Wie viele Runden der Dekoder ueber ein Fenster geht (1..3).
+    /// Vorgabe 2; siehe core/Ft8Subtract.h.
+    QSpinBox*    m_rundenFeld{nullptr};
     /// Der Streifen ueber der Fundliste. Zeigt den Durchlassbereich und
     /// nimmt per Klick die Sendestelle entgegen -- ohne ihn waere die
     /// waehlbare Sendestelle eine Zahl ohne Blick aufs Band.
