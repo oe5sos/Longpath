@@ -12435,13 +12435,31 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             //   Flur  0 dB   …      noch dicht
             //   Flur +3 dB   …      flacher Teppich, ~10 Signale klar
             //   Flur +6 dB   …      flach, nur noch 3 Signale
-            // +3 dB ist der Punkt, an dem der Teppich liegenbleibt und
-            // auch SCHWACHE Signale noch stehen. Mehr wuerde sie mit
-            // abschneiden.
+            // ── Nachgemessen am 2026-10-23: 0 dB, nicht +3 ──────────
             //
-            // Ein Regler dafuer fehlt weiterhin — wer ihn baut, nimmt
-            // diesen Wert als Vorgabe.
-            const float floorDbm = std::round(floorBase * 2.0f) / 2.0f + 3.0f;
+            // +3 dB stand hier einen Tag lang. Es war an einem gut
+            // belegten Band gemessen, und auf einem RUHIGEN schneidet
+            // es alles weg: die Bandmeldung zeigte Rauschteppich
+            // −104,4 dBm und 99. Perzentil −103,8 dBm, also 0,6 dB
+            // dazwischen. Der Betreiber: „die farbe veraendert sich so
+            // automatisch ins dunkle, dass man dann oben gar nichts
+            // mehr sieht".
+            //
+            // Dieselbe Messreihe gab die Antwort schon her (Hoehe der
+            // Flaeche je Spalte, gegen eine ebene Flaeche = 150 px):
+            //
+            //   Flur     p10   p50   p90   max
+            //   −6 dB    158   161   163   168   Wald
+            //    0 dB    150   152   156   162   <- Teppich fast flach,
+            //                                       Signale am hoechsten
+            //   +3 dB    150   150   150   159
+            //   +6 dB    150   150   150   154
+            //
+            // Bei 0 dB traegt der Teppich zwei Bildpunkte und das
+            // staerkste Signal zwoelf — bei +3 nur noch neun. Null
+            // behaelt also MEHR Signal bei fast demselben flachen
+            // Teppich. Ein Regler dafuer fehlt weiterhin.
+            const float floorDbm = std::round(floorBase * 2.0f) / 2.0f;
             const float rangeDb = m_dynamicRange;
             const quint64 paletteToken =
                 (static_cast<quint64>(m_wfColorScheme) << 32)

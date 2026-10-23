@@ -262,6 +262,36 @@ void MainWindow::wireFlex()
         // Unterschied bis zum ersten Drehen weiter.
         m_radioModel->setFlexSliceMode(ziel->dspMode());
         m_radioModel->setFlexSliceFilter(ziel->filterLow(), ziel->filterHigh());
+
+        // ── Panadapter und Scheibe muessen beim VERBINDEN zusammen ──
+        //
+        // Beim Verbinden laufen zwei Dinge gegeneinander: Longpath
+        // uebernimmt zuerst den Ausschnitt der Maschine, danach stellt
+        // das Layoutprofil die gespeicherte Scheibe wieder her — und
+        // die kann auf einem ganz anderen Band stehen.
+        //
+        // Am Geraet gemessen am 2026-10-23: die Maschine lieferte
+        // 7.065–7.265 MHz, das Fenster stand nach dem Profil auf
+        // 14.150–14.300. KEINE Ueberlappung, also hatte der
+        // Panadapter nichts zu zeichnen (Bandmeldung: Rauschteppich
+        // −600 dBm, Hub 0 dB) und der Wasserfall war einfarbig. Der
+        // Betreiber: „oben alles schwarz".
+        //
+        // Darum einmal nachziehen, NACHDEM das Profil durch ist. Die
+        // Scheibe gewinnt: sie ist das, was der Betreiber sieht und
+        // hoert. 1500 ms, weil der Profilaufbau in sechs Schritten
+        // laeuft und beim Messen rund 600 ms brauchte.
+        QTimer::singleShot(1500, this, [this]() {
+            if (m_shuttingDown) { return; }
+            SliceModel* s = flexControllableSlice();
+            if (!s || !m_radioModel) { return; }
+            const double hz = s->frequency();
+            if (!(hz > 0.0)) { return; }
+            qCInfo(lcFlexGui).nospace()
+                << "Flex: Panadapter auf die Scheibe gezogen — "
+                << (hz / 1.0e6) << " MHz";
+            m_radioModel->zieheFlexPanadapterAuf(hz);
+        });
         if (AudioEngine* ae = m_radioModel->audioEngine()) {
             // ── Den Ausgang anwerfen (2026-10-22) ────────────────────
             //

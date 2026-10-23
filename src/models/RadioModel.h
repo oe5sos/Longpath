@@ -3620,6 +3620,21 @@ public:
     /// sie bis zum 2026-10-23 nie angefasst.
     void richteFlexWasserfallEin();
 
+    /// Den Panadapter der Maschine auf eine Frequenz ziehen, ohne
+    /// Randbedingung. Beim Verbinden gebraucht: Longpath uebernimmt
+    /// erst den Ausschnitt der Maschine, danach stellt das
+    /// Layoutprofil eine womoeglich ganz andere Scheibe her — ohne
+    /// diesen Griff haben die beiden keine Ueberlappung, und der
+    /// Panadapter hat nichts zu zeichnen.
+    void zieheFlexPanadapterAuf(double hz);
+
+private:
+    /// Den selbst gesetzten Ausschnitt uebernehmen. Noetig, weil die
+    /// Maschine eine von uns gesetzte Panadaptermitte NICHT
+    /// zurueckechot — gemessen am 2026-10-23.
+    void uebernimmFlexPanMitte(double mitteMhz);
+public:
+
 private:
     /// Was die Maschine als `y_pixels` meldet, einordnen: ein echter
     /// Wert wird zum Teiler, eine Ruecksetzvorgabe loest ein erneutes

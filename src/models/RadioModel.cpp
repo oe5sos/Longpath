@@ -7090,6 +7090,54 @@ std::optional<double> RadioModel::flexPegelDbm() const
     return m_flexPegelDbm;
 }
 
+void RadioModel::zieheFlexPanadapterAuf(double hz)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexPanId.isEmpty() || !(hz > 0.0)) { return; }
+    const QString befehl =
+        FlexCommandWire::setPanCenterCommand(m_flexPanId, hz);
+    if (befehl.isEmpty()) { return; }
+
+    // ── Die Maschine ECHOT die eigene Mitte NICHT ───────────────────
+    //
+    // Gemessen am 2026-10-23: auf `display pan set <id> center=14.225`
+    // antwortet sie mit `R<n>|0|` und schickt als Status
+    // `display pan <id> wide=0` — kein `center=`. Longpath konnte die
+    // selbst gesetzte Mitte also nie zurueckhoeren und blieb auf dem
+    // alten Ausschnitt stehen: 28 angenommene Befehle, und das Bild
+    // zeigte weiter 40 m, waehrend die Scheibe auf 20 m lief. Der
+    // Betreiber: „oben alles schwarz".
+    //
+    // Also selbst nachfuehren — aber erst, wenn die Maschine den
+    // Befehl ANGENOMMEN hat. Vorher waere es eine Behauptung.
+    m_flexConnection->sendCommand(befehl, [this, hz](int code, const QString&) {
+        if (code != 0) {
+            qCWarning(lcConnection)
+                << "Flex: Panadaptermitte abgelehnt, Code" << code;
+            return;
+        }
+        uebernimmFlexPanMitte(hz / 1.0e6);
+    });
+}
+
+void RadioModel::uebernimmFlexPanMitte(double mitteMhz)
+{
+    if (!(mitteMhz > 0.0) || !(m_flexPanBreiteMhz > 0.0)) { return; }
+    m_flexPanMitteMhz = mitteMhz;
+    const double tief = (mitteMhz - m_flexPanBreiteMhz * 0.5) * 1.0e6;
+    const double hoch = (mitteMhz + m_flexPanBreiteMhz * 0.5) * 1.0e6;
+    if (qFuzzyCompare(tief, m_flexAusschnittTiefHz)
+        && qFuzzyCompare(hoch, m_flexAusschnittHochHz)) {
+        return;
+    }
+    m_flexAusschnittTiefHz = tief;
+    m_flexAusschnittHochHz = hoch;
+    qCInfo(lcConnection).nospace()
+        << "Flex: Ausschnitt selbst nachgefuehrt " << (tief / 1.0e6)
+        << "–" << (hoch / 1.0e6) << " MHz (die Maschine echot ihn nicht)";
+    emit flexAusschnittGeaendert(tief, hoch);
+}
+
 void RadioModel::richteFlexWasserfallEin()
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
@@ -7476,14 +7524,13 @@ void RadioModel::tuneFlexSlice(double hz)
         && hz < m_flexAusschnittHochHz - rand) {
         return;   // noch gut im Bild
     }
-    const QString mitte =
-        FlexCommandWire::setPanCenterCommand(m_flexPanId, hz);
-    if (mitte.isEmpty()) { return; }
     qCInfo(lcConnection).nospace()
         << "Flex: Scheibe laeuft aus dem Bild (" << (hz / 1.0e6)
         << " MHz, Ausschnitt " << (m_flexAusschnittTiefHz / 1.0e6) << "–"
         << (m_flexAusschnittHochHz / 1.0e6) << ") — Panadapter nachgezogen";
-    m_flexConnection->sendCommand(mitte);
+    // Derselbe Griff wie beim Verbinden: die Maschine echot die
+    // eigene Mitte nicht zurueck (siehe zieheFlexPanadapterAuf).
+    zieheFlexPanadapterAuf(hz);
 }
 
 void RadioModel::setFlexSliceMode(DSPMode mode)

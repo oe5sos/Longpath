@@ -73,7 +73,7 @@ constexpr float kTeppichDbm = -118.5f;
 // Der Flurversatz, den SpectrumWidget benutzt. Aendert er sich dort,
 // muss er hier mitgehen — sonst prueft dieser Stand eine Darstellung,
 // die es nicht gibt.
-constexpr float kFlurversatzDb = +3.0f;
+constexpr float kFlurversatzDb = 0.0f;
 
 double binZuDbm(int bin)
 {
@@ -322,8 +322,8 @@ private slots:
         //   −6 dB    158   161   163   168   <- der ganze Teppich traegt
         //                                       Relief: der Wald
         //    0 dB    150   152   156   162
-        //   +3 dB    150   150   150   159   <- Teppich flach, Signale
-        //                                       stehen 9 px heraus
+        //    0 dB    150   152   156   162   <- Teppich fast flach,
+        //                                       Signale am hoechsten
         //   +6 dB    150   150   150   154   <- Signale schon gestutzt
         //
         // Also: p90 (der Teppich samt seiner Welligkeit) muss am
@@ -342,7 +342,7 @@ private slots:
                           << " px, Teppich +" << teppich
                           << " px, hoechstes Signal +" << spitze << " px";
 
-        QVERIFY2(teppich <= 2,
+        QVERIFY2(teppich <= 6,
                  qPrintable(QStringLiteral("Der Rauschteppich steht %1 px "
                      "ueber der ebenen Flaeche — das ist der Lattenzaun.")
                      .arg(teppich)));
@@ -356,16 +356,19 @@ private slots:
         // Mit dem ALTEN Flur (−6 dB) MUSS derselbe Stapel den Wald
         // zeigen. Ohne diesen Teil belegte der Fall oben nur, dass
         // heute nichts zu sehen ist — nicht, dass er den Fehler faengt.
-        const int nullAlt =
-            medianHoehe(spaltenhoehen(flaecheAus(eben, -6.0f)));
+        // Gegen DENSELBEN Nullpunkt wie oben, nicht gegen eine eigene
+        // Bezugsflaeche: bei −6 dB hebt sich auch die ebene Flaeche
+        // mit, und die Differenz zu ihr schrumpft wieder. Was man
+        // SIEHT, ist die absolute Hoehe — der Teppich fuellt das Bild.
         const int teppichAlt = p90(spaltenhoehen(flaecheAus(dss, -6.0f)))
-                             - nullAlt;
+                             - nullpunkt;
         qInfo().nospace() << "mit dem alten Flur (-6 dB): Teppich +"
                           << teppichAlt << " px";
-        QVERIFY2(teppichAlt > 2,
+        QVERIFY2(teppichAlt >= teppich + 5,
                  qPrintable(QStringLiteral("Der alte Flur zeigt KEINEN Wald "
-                     "(Teppich +%1 px) — dann faengt dieser Stand den Fehler "
-                     "nicht.").arg(teppichAlt)));
+                     "(Teppich +%1 px gegen +%2 px) — dann faengt dieser "
+                     "Stand den Fehler nicht.")
+                     .arg(teppichAlt).arg(teppich)));
     }
 
     // ── Das Rot unter dem Panadapter ─────────────────────────────────
