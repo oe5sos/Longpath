@@ -3615,6 +3615,11 @@ public:
     /// Flanken standen in Longpath und nirgends sonst.
     void setFlexSliceFilter(int lowHz, int highHz);
 
+    /// Den Wasserfallstrom der Maschine einrichten. Er ist von ihrem
+    /// Panadapter GETRENNT und hat eigene Einstellungen; Longpath hat
+    /// sie bis zum 2026-10-23 nie angefasst.
+    void richteFlexWasserfallEin();
+
 private:
     /// Was die Maschine als `y_pixels` meldet, einordnen: ein echter
     /// Wert wird zum Teiler, eine Ruecksetzvorgabe loest ein erneutes
@@ -3674,6 +3679,9 @@ private:
     double               m_flexZuletztGestellteHz{0.0};
     /// Dasselbe fuer Betriebsart und Filterflanken.
     QString              m_flexZuletztGestellteArt;
+    /// Die Kennung des Wasserfallstroms, aus `waterfall=` im
+    /// Panadapter-Zustand.
+    QString              m_flexWasserfallId;
     /// Der Ausschnitt, den die Wasserfallkachel zuletzt meldete
     /// (Hertz). `tuneFlexSlice` erkennt daran, wann die Scheibe aus
     /// dem Bild laeuft.

@@ -165,6 +165,48 @@ Gemessen im Pruefstand `tst_flex_wasserfall_kachel`:
 Die untere Zeile ist die Gegenprobe, und sie ist genau das
 einfarbige Bild am oberen Anschlag — bei Farbschema 0 also Rot.
 
+## Der Wasserfall ist ein EIGENER Strom
+
+Der Panadapter-Zustand nennt ihn: `waterfall=0x42000000` neben
+`panadapter=0x40000000`. Er hat **eigene Einstellungen**, und Longpath
+hat sie bis zum 2026-10-23 nie angefasst. An Martins Geraet gemessen:
+
+```
+display waterfall 0x42000000 … x_pixels=4096 line_duration=80
+                               color_gain=50 auto_black=1 black_level=0
+```
+
+`x_pixels` folgt dem Panadapter (gut), `line_duration` taktet die
+Zeilen (80 ms) — aber **`auto_black=1` stand in ALLEN fuenf
+Statusmeldungen**. Die Maschine rechnet dann ihren eigenen
+Schwarzpunkt in die Kachel, gezielt auf SmartSDRs Darstellung,
+waehrend der Client obendrauf noch einmal schaetzt.
+
+AetherSDR stellt ihn darum ausdruecklich ab
+(`RadioModel::configureWaterfall`):
+
+```
+display panafall set <wfId> auto_black=0 black_level=15 color_gain=50
+```
+
+mit Rueckfall auf `display waterfall set <wfId> …` fuer Fassungen ohne
+Panafall-Adressierung. Longpath schickt das jetzt auch, mit
+`black_level=0` statt 15 — bei abgeschaltetem `auto_black` ist das der
+Handwert der Maschine, und gefaerbt wird ohnehin im Client.
+
+## Eine bewusste Abweichung von der Vorlage
+
+AetherSDR tastet beim Abbilden auf die Fensterbreite den naechsten Bin
+ab und interpoliert linear (SpectrumWidget.cpp:8512-8521). Longpath
+nimmt das MAXIMUM ueber die Bins, die auf den Bildpunkt fallen.
+
+Grund: bei Martins Geraet liegen 4096 Bins auf rund 1150 Bildpunkten.
+Mit Abtastung faellt ein schmaler Traeger in der Mehrzahl der Faelle
+ganz heraus. Longpath hat denselben Fall am 2026-09-25 schon einmal
+entschieden (`wfRowSourceReduce`, Rendering-Werkbank): „ein schmaler
+Traeger (CW, FT8, Bake) lag in der Haelfte der Faelle genau in der
+verworfenen Spalte: gestrichelt oder unsichtbar".
+
 ## Was noch zu bauen waere
 
 1. **`band=` und `bandwidth=`** mitschicken, damit der Panadapter dem

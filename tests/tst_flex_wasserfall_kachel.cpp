@@ -30,6 +30,7 @@
 
 #include "gui/SpectrumWidget.h"
 #include "core/FlexVitaReader.h"
+#include "core/FlexRadioConnection.h"
 
 #include <algorithm>
 #include <cmath>
@@ -154,6 +155,30 @@ private slots:
         sw.zeigeFremdeWasserfallzeile(kachel(2048, 500), 14.000e6, 14.200e6);
         QVERIFY2(sw.fremdeWasserfallquelleForTest(),
                  "nach einer Kachel muss der abgeleitete Weg schweigen");
+    }
+
+    // ── Der Wasserfall ist ein EIGENER Strom ────────────────────────
+    //
+    // Der Panadapter-Zustand nennt ihn (`waterfall=0x42000000` neben
+    // `panadapter=0x40000000`), und er hat eigene Einstellungen.
+    // Longpath hat sie nie angefasst: am Geraet stand in ALLEN fuenf
+    // Statusmeldungen `auto_black=1`, also rechnete die Maschine ihren
+    // eigenen Schwarzpunkt in die Kachel — auf SmartSDRs Darstellung
+    // gezielt, waehrend wir obendrauf noch einmal schaetzen.
+    //
+    // From AetherSDR RadioModel::configureWaterfall [@d58e2b8a].
+    void wasserfallstromWirdEingerichtet()
+    {
+        using FlexCommandWire::setWaterfallSetupCommand;
+
+        QCOMPARE(setWaterfallSetupCommand(QStringLiteral("0x42000000"), false),
+                 QStringLiteral("display panafall set 0x42000000 "
+                                "auto_black=0 black_level=0 color_gain=50"));
+        // Rueckfall fuer Fassungen ohne Panafall-Adressierung.
+        QCOMPARE(setWaterfallSetupCommand(QStringLiteral("0x42000000"), true),
+                 QStringLiteral("display waterfall set 0x42000000 "
+                                "auto_black=0 black_level=0 color_gain=50"));
+        QVERIFY(setWaterfallSetupCommand(QString(), false).isEmpty());
     }
 
     // ── Die Umrechnung selbst, als Beleg fuer die Einheit ────────────

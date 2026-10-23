@@ -242,6 +242,16 @@ QString setPanCenterCommand(const QString& panId, double hz)
         .arg(panId).arg(hz / 1.0e6, 0, 'f', 6);
 }
 
+QString setWaterfallSetupCommand(const QString& waterfallId, bool rueckfall)
+{
+    if (waterfallId.isEmpty()) { return QString(); }
+    return QStringLiteral("display %1 set %2 "
+                          "auto_black=0 black_level=0 color_gain=50")
+        .arg(rueckfall ? QStringLiteral("waterfall")
+                       : QStringLiteral("panafall"),
+             waterfallId);
+}
+
 QString normalizedFlexId(QString text)
 {
     text = text.trimmed();

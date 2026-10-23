@@ -6384,11 +6384,19 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
     const float teppich = tiefZahl > 0 ? float(tiefSumme / tiefZahl)
                                        : float(mittel);
     // Langsam nachfuehren, damit eine einzelne laute Zeile das Bild
-    // nicht aufhellt — dieselbe Groessenordnung wie beim eigenen Weg.
+    // nicht aufhellt. 0,05 wie in der Vorlage.
+    //
+    // Beim SENDEN eingefroren, ebenfalls wie dort: das eigene Signal
+    // wuerde den Teppich hochziehen, und nach dem Loslassen stuende
+    // das Band minutenlang zu dunkel.
     constexpr float kAlpha = 0.05f;
-    m_fremderTeppich = std::isfinite(m_fremderTeppich)
-        ? kAlpha * teppich + (1.0f - kAlpha) * m_fremderTeppich
-        : teppich;
+    if (!m_activePeakHold.txActive()) {
+        m_fremderTeppich = std::isfinite(m_fremderTeppich)
+            ? kAlpha * teppich + (1.0f - kAlpha) * m_fremderTeppich
+            : teppich;
+    } else if (!std::isfinite(m_fremderTeppich)) {
+        m_fremderTeppich = teppich;   // beim ersten Mal muss er stehen
+    }
 
     const float spanne = std::max(1.0f, 120.0f - m_wfColorGain * 0.91f);
 
@@ -6429,8 +6437,20 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
             const int letzter = static_cast<int>(intensitaet.size()) - 1;
             a = std::clamp(a, 0, letzter);
             b = std::clamp(b, a, letzter);
-            // Maximum, damit ein schmaler Traeger nicht zwischen zwei
-            // Bildpunkte faellt.
+            // ── Maximum, NICHT Interpolation ────────────────────
+            //
+            // Hier weiche ich bewusst von der Vorlage ab: AetherSDR
+            // tastet den naechsten Bin ab und interpoliert linear
+            // (SpectrumWidget.cpp:8512-8521 [@d58e2b8a]). Liegen mehr
+            // Bins als Bildpunkte an — bei Martins Geraet 4096 Bins
+            // auf rund 1150 Punkte —, faellt ein schmaler Traeger
+            // damit in der Mehrzahl der Faelle ganz heraus.
+            //
+            // Longpath hat denselben Fall am 2026-09-25 schon einmal
+            // entschieden (Rendering-Werkbank, `wfRowSourceReduce`):
+            // „ein schmaler Traeger (CW, FT8, Bake) lag in der Haelfte
+            // der Faelle genau in der verworfenen Spalte: gestrichelt
+            // oder unsichtbar". Die Entscheidung gilt hier genauso.
             wert = intensitaet[a];
             for (int i = a + 1; i <= b; ++i) {
                 wert = std::max(wert, intensitaet[i]);

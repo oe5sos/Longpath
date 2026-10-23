@@ -6843,6 +6843,26 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                 applyFlexPanSetup();
             }
 
+            // ── Der Wasserfall ist ein EIGENER Strom (2026-10-23) ───
+            //
+            // Der Panadapter-Zustand nennt ihn: `waterfall=0x42000000`
+            // neben `panadapter=0x40000000`. Er hat eigene
+            // Einstellungen, und Longpath hat sie nie angefasst — am
+            // Geraet stand in ALLEN fuenf Statusmeldungen
+            // `auto_black=1`.
+            //
+            // Das heisst: die Maschine rechnet ihren eigenen
+            // Schwarzpunkt in die Kachel hinein, und zwar auf SmartSDRs
+            // Darstellung gezielt. Unsere Schaetzung sitzt dann
+            // obendrauf — zweimal dasselbe, aus zwei Haeusern.
+            // AetherSDR stellt ihn darum ausdruecklich ab
+            // (RadioModel::configureWaterfall [@d58e2b8a]).
+            if (m_flexWasserfallId.isEmpty()
+                && kv.contains(QStringLiteral("waterfall"))) {
+                m_flexWasserfallId = kv.value(QStringLiteral("waterfall"));
+                richteFlexWasserfallEin();
+            }
+
             // Die Hoehe NACHLESEN statt sie anzunehmen.
             //
             // Ein FFT-Bin ist keine Leistung, sondern eine BILDZEILE:
@@ -7046,6 +7066,40 @@ std::optional<double> RadioModel::flexPegelDbm() const
         return std::nullopt;
     }
     return m_flexPegelDbm;
+}
+
+void RadioModel::richteFlexWasserfallEin()
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexWasserfallId.isEmpty()) { return; }
+
+    // From AetherSDR RadioModel::configureWaterfall [@d58e2b8a]:
+    //   display panafall set <wfId> auto_black=0 black_level=15 color_gain=50
+    // mit Rueckfall auf `display waterfall set` fuer Fassungen, die die
+    // Panafall-Adressierung nicht kennen. Die Begruendung dort: der
+    // Schwarzpunkt der Maschine zielt auf SmartSDRs Darstellung, der
+    // Client rechnet seinen eigenen.
+    //
+    // `black_level=0` statt 15: bei abgeschaltetem `auto_black` ist es
+    // der Handwert der Maschine, und wir faerben ohnehin selbst — ein
+    // Wert ungleich null waere ein zweiter Eingriff, den niemand
+    // nachgemessen hat.
+    m_flexConnection->sendCommand(
+        FlexCommandWire::setWaterfallSetupCommand(m_flexWasserfallId, false),
+        [this](int code, const QString&) {
+            if (code == 0) {
+                qCInfo(lcConnection) << "Flex: Wasserfallstrom"
+                                     << m_flexWasserfallId
+                                     << "eingerichtet (auto_black aus)";
+                return;
+            }
+            qCInfo(lcConnection)
+                << "Flex: `display panafall set` abgelehnt (Code" << code
+                << ") — versuche `display waterfall set`";
+            m_flexConnection->sendCommand(
+                FlexCommandWire::setWaterfallSetupCommand(
+                    m_flexWasserfallId, true));
+        });
 }
 
 void RadioModel::applyFlexPanSetup()

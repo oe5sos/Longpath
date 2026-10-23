@@ -205,6 +205,23 @@ QString setSliceFilterCommand(const QString& sliceId, int lowHz, int highHz);
 // Megahertz mit sechs Nachkommastellen, wie bei `slice tune`.
 QString setPanCenterCommand(const QString& panId, double hz);
 
+// ── Der Wasserfallstrom wird getrennt eingerichtet (2026-10-23) ──────
+//
+// Er ist nicht der Panadapter: der Panadapter-Zustand nennt ihn als
+// `waterfall=0x42000000` neben `panadapter=0x40000000`, und er hat
+// eigene Einstellungen. Longpath hat sie nie angefasst — am Geraet
+// stand in ALLEN fuenf Statusmeldungen `auto_black=1`. Die Maschine
+// rechnet dann ihren eigenen Schwarzpunkt in die Kachel, gezielt auf
+// SmartSDRs Darstellung, waehrend wir obendrauf noch einmal schaetzen.
+//
+// From AetherSDR RadioModel::configureWaterfall [@d58e2b8a]:
+//   display panafall set <wfId> auto_black=0 black_level=15 color_gain=50
+// mit Rueckfall auf `display waterfall set` fuer Fassungen ohne
+// Panafall-Adressierung. `black_level=0` statt 15, weil es bei
+// abgeschaltetem `auto_black` der Handwert der Maschine ist und wir
+// ohnehin selbst faerben.
+QString setWaterfallSetupCommand(const QString& waterfallId, bool rueckfall);
+
 // From AetherSDR RadioStatusOwnership.h:48-60 [@d58e2b8a] —
 // parsePanafallCreatePanId(). Die Antwort auf „display panafall
 // create" traegt die Kennung mal als `pan=`, mal als `id=`, mal nackt
