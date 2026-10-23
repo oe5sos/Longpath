@@ -418,11 +418,23 @@ void MainWindow::wireFlex()
         }
     });
 
-    // Die Wasserfallkachel traegt die Zeilen; ihr Frequenzbereich wird
-    // NICHT mehr gelesen (siehe `flexAusschnittGeaendert` oben). Sie
-    // hat ihre eigene Bin-Zahl und ihren eigenen Rand — gemessen 230,6
-    // kHz gegen 200 kHz Panadapterbreite, also bis zu 15 kHz Versatz
-    // fuer jedes Signal.
+    // ── Der Wasserfall der Maschine: erforscht, NICHT gebaut ────────
+    //
+    // Die FLEX-8400 fuehrt ZWEI Bildstroeme, und AetherSDR zeichnet
+    // auch aus beiden. Longpath zieht nur den ersten und baut den
+    // Wasserfall aus den FFT-Bins nach — daher der fremde Takt und
+    // die fremden Schwellen, die der Betreiber am 2026-10-22 sah
+    // („das rot ist eigenartig gewesen, auch die zeitliche laenge,
+    // bis der wasserfall anfaengt").
+    //
+    // Der Weg ist nachgelesen und steht in
+    // docs/protocols/flex-wasserfall-aethersdr.md. Gebaut ist er
+    // NICHT, und zwar aus einem Grund: die Kachelwerte sind KEINE
+    // dBm. Sie sind ein Intensitaetsmass (qint16/128, am Geraet
+    // gemessen +88 bis +120), und AetherSDR faerbt sie in einer
+    // eigenen Domaene ein. In Longpaths dBm-Weg gegeben stuenden sie
+    // sofort am oberen Anschlag — also genau das Rot, das behoben
+    // werden soll.
 
     connect(m_radioModel, &RadioModel::flexSpectrumReady, this,
             [this](quint32, const QVector<float>& dbm) {
