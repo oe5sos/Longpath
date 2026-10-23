@@ -291,6 +291,24 @@ QVector<float> narrowAudioSamples(const QByteArray& datagram)
     return out;
 }
 
+Ausschnitt aufKachelZentriert(double panTiefHz, double panHochHz,
+                              double kachelTiefHz, double kachelHochHz,
+                              double schwelleHz)
+{
+    Ausschnitt a{panTiefHz, panHochHz, false};
+    if (!(panHochHz > panTiefHz) || !(kachelHochHz > kachelTiefHz)) {
+        return a;
+    }
+    const double kachelMitte = (kachelTiefHz + kachelHochHz) * 0.5;
+    const double panMitte    = (panTiefHz + panHochHz) * 0.5;
+    if (std::abs(kachelMitte - panMitte) <= schwelleHz) { return a; }
+    const double breite = panHochHz - panTiefHz;
+    a.tiefHz    = kachelMitte - breite * 0.5;
+    a.hochHz    = kachelMitte + breite * 0.5;
+    a.geaendert = true;
+    return a;
+}
+
 }  // namespace FlexVita
 
 // ─── FlexFftGrowthGuard ──────────────────────────────────────────────

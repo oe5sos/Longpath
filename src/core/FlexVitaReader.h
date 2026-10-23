@@ -208,6 +208,31 @@ QVector<float> binsToDbm(const QVector<quint16>& bins,
 // gegen ein bekanntes Signal geprueft ist.
 float tileColourValue(quint16 raw);
 
+/// Ein Frequenzausschnitt in Hz.
+struct Ausschnitt {
+    double tiefHz  = 0.0;
+    double hochHz  = 0.0;
+    bool   geaendert = false;   ///< true, wenn nachgezogen wurde
+};
+
+/// Zieht den Panadapter-Ausschnitt auf die Mitte der Wasserfallkachel
+/// nach und behaelt seine BREITE.
+///
+/// Die Maschine fuehrt zwei Bildstroeme. Die Kachel (0x8004) traegt
+/// ihren Frequenzbereich in jedem Paket; der Panadapter (0x8003) traegt
+/// gar keinen — sein Unterfeld hat nur Bin-Nummern, und der Ausschnitt
+/// kommt aus dem Zustandsschub. Haengt der fest, stehen die beiden
+/// Bilder nicht mehr uebereinander: am 2026-10-23 an der FLEX-8400
+/// gemessen 7,4 kHz, stabil ueber zwei Berichte.
+///
+/// Die Breite bleibt die des Zustands (200 kHz gegen 230,6 der Kachel);
+/// nur die Mitte kommt von der Kachel. Unterhalb von `schwelleHz` wird
+/// nichts angefasst, damit die Nachfuehrung nicht bei jedem Paket
+/// zappelt.
+Ausschnitt aufKachelZentriert(double panTiefHz, double panHochHz,
+                              double kachelTiefHz, double kachelHochHz,
+                              double schwelleHz = 1000.0);
+
 // ── Messwerte, Paketklasse 0x8002 ───────────────────────────────────
 //
 // Am 2026-10-21 an Martins FLEX-8400 gemessen: 653 Pakete in 22 s

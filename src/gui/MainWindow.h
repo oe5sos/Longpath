@@ -1862,6 +1862,12 @@ private:
     /// Einmal je Verbindung: die Fensterbreite auf den Ausschnitt der
     /// Flex stellen. Danach gehoert der Zoom wieder dem Betreiber.
     bool m_flexAusschnittUebernommen{false};
+    /// Der zuletzt von der Maschine gemeldete Ausschnitt. Dient dazu,
+    /// eine blosze Mittenverschiebung von einer echten Breitenaenderung
+    /// zu unterscheiden — sonst wirft jedes Abstimmen den Zoom des
+    /// Betreibers weg (2026-10-23).
+    double m_flexFensterMitteHz{0.0};
+    double m_flexFensterBreiteHz{0.0};
     /// Warum das Flex-Bild gerade nicht gezeichnet wird — damit die
     /// Meldung einmal je Grund kommt und nicht 25 Mal je Sekunde.
     enum class FlexBildGrund { Unbekannt, KeinAusschnitt, KeinFenster,

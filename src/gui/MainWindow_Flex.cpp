@@ -540,7 +540,38 @@ void MainWindow::wireFlex()
                 ? m_radioModel->spectrumWidget() : nullptr) {
             const double mitte  = (tiefHz + hochHz) * 0.5;
             const double breite = hochHz - tiefHz;
-            sw->setFrequencyRange(mitte, breite);
+
+            // ── Den Zoom des Betreibers nicht wegwerfen (2026-10-23) ──
+            //
+            // Hier stand `setFrequencyRange(mitte, breite)` immer. Die
+            // Maschine schickt ihren Ausschnitt aber auch dann neu,
+            // wenn sich nur die MITTE geaendert hat — nach jedem
+            // Abstimmen, weil `tuneFlexSlice` den Panadapter nachzieht.
+            // Damit sprang das Fenster bei jedem Doppelklick im
+            // Panadapter auf die volle Breite zurueck. Betreiber:
+            // „verkleinert sich das display und ich muss wieder mit
+            // plus vergroeszern".
+            //
+            // Also: Breite nur uebernehmen, wenn die Maschine WIRKLICH
+            // eine andere schickt (oder beim ersten Mal). Sonst nur um
+            // dieselbe Strecke mitwandern und die eigene Breite
+            // behalten.
+            const double alteBreite = m_flexFensterBreiteHz;
+            if (!m_flexAusschnittUebernommen
+                || alteBreite <= 0.0
+                || std::abs(breite - alteBreite) > 1.0) {
+                sw->setFrequencyRange(mitte, breite);
+            }
+            // Sonst: NICHTS. Eine reine Mittenverschiebung der
+            // Maschine kommt fast immer davon, dass der Betreiber
+            // gerade selbst abgestimmt hat — ihm das Fenster
+            // hinterherzuziehen hiesze, seinen Zoom wegzuwerfen UND
+            // (ohne CTUN, wo die Fenstermitte die Frequenz IST) ihn
+            // ein zweites Mal zu verstimmen. Im Protokoll stand das
+            // als Kette von sieben `tuneFlexSlice` in 150 ms.
+            m_flexFensterMitteHz  = mitte;
+            m_flexFensterBreiteHz = breite;
+
             if (!m_flexAusschnittUebernommen) {
                 m_flexAusschnittUebernommen = true;
                 if (!sw->waterfallNFAGCEnabled()) {
@@ -612,21 +643,38 @@ void MainWindow::wireFlex()
         // der Kachel, das war der Grund, ueberhaupt auf den Zustand
         // umzustellen). Erst ab 1 kHz Unterschied, damit die
         // Nachfuehrung nicht bei jedem Paket zappelt.
-        if (m_flexSpanHighHz > m_flexSpanLowHz) {
-            const double kachelMitte =
-                (lowFreqMhz + highFreqMhz) * 0.5e6;
-            const double panMitte =
-                (m_flexSpanLowHz + m_flexSpanHighHz) * 0.5;
-            const double breite = m_flexSpanHighHz - m_flexSpanLowHz;
-            if (std::abs(kachelMitte - panMitte) > 1000.0) {
-                qCInfo(lcFlexGui).nospace()
-                    << "Flex: Kachelmitte " << (kachelMitte / 1.0e6)
-                    << " MHz gegen Panadaptermitte " << (panMitte / 1.0e6)
-                    << " MHz — nachgezogen";
-                m_flexSpanLowHz  = kachelMitte - breite * 0.5;
-                m_flexSpanHighHz = kachelMitte + breite * 0.5;
-                sw->setFrequencyRange(kachelMitte, breite);
-            }
+        const FlexVita::Ausschnitt neu = FlexVita::aufKachelZentriert(
+            m_flexSpanLowHz, m_flexSpanHighHz,
+            lowFreqMhz * 1.0e6, highFreqMhz * 1.0e6);
+        if (neu.geaendert) {
+            qCInfo(lcFlexGui).nospace()
+                << "Flex: Kachelmitte "
+                << ((lowFreqMhz + highFreqMhz) * 0.5)
+                << " MHz gegen Panadaptermitte "
+                << ((m_flexSpanLowHz + m_flexSpanHighHz) * 0.5e-6)
+                << " MHz — nachgezogen";
+            // ── Das FENSTER bleibt unangetastet (2026-10-23) ─────
+            //
+            // Hier stand erst `setFrequencyRange(mitte, breite)`, dann
+            // eine Verschiebung um denselben Betrag. Beides war
+            // falsch, und beides hat der Betreiber sofort gesehen:
+            // „verkleinert sich das display und ich muss wieder mit
+            // plus vergroeszern", „wenn ich vergroessere verschwindet
+            // meine ersichtliche bandbreite", „und die frequenz
+            // aendert sich".
+            //
+            // Das Letzte ist der Grund, warum das Fenster hier
+            // ueberhaupt nichts zu suchen hat: OHNE CTUN **IST** die
+            // Fenstermitte die Empfangsfrequenz. Wer sie verschiebt,
+            // stimmt ab. Im Protokoll stand das als Kette von sieben
+            // `tuneFlexSlice` in 150 ms, 14,2713 -> 14,2876 MHz.
+            //
+            // Gerichtet wird nur der AUSSCHNITT, mit dem die FFT auf
+            // das Fenster abgebildet wird — und genau dort sasz der
+            // gemessene Versatz von 7,4 kHz. Das Fenster gehoert dem
+            // Betreiber.
+            m_flexSpanLowHz  = neu.tiefHz;
+            m_flexSpanHighHz = neu.hochHz;
         }
     });
 

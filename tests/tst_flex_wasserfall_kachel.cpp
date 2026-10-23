@@ -397,6 +397,67 @@ private slots:
             "Sample (%1) verhaelt sich wie Peak (%2)")
             .arg(mitSample).arg(mitPeak)));
     }
+
+    // ── 6. Die Kachel sagt, wo die Mitte steht (2026-10-23) ─────────
+    //
+    // Betreiber: „ich glaube, es ist hier wieder versetzt". Die
+    // Kreuzkorrelation im Protokoll gab ihm recht: 0 kHz nach dem
+    // Verbinden, +7,4 kHz nach seinem Abstimmen, stabil ueber zwei
+    // Berichte.
+    //
+    // Ursache: die beiden Stroeme standen nicht mehr konzentrisch.
+    // Die Kachel traegt ihren Bereich in JEDEM Paket, der Panadapter
+    // traegt gar keinen (sein Unterfeld hat nur Bin-Nummern) — sein
+    // Ausschnitt kommt aus dem Zustandsschub der Maschine, und der
+    // hing fest.
+    void dieKachelZiehtDenPanadapterNach()
+    {
+        // Die gemessenen Zahlen vom Geraet, 15 m, 14:16:12:
+        // Kachel 21,1304–21,361 (Mitte 21,2457),
+        // Panadapter 21,1636–21,3636 (Mitte 21,2636).
+        const auto a = FlexVita::aufKachelZentriert(
+            21.1636e6, 21.3636e6, 21.1304e6, 21.361e6);
+        QVERIFY(a.geaendert);
+        // Die BREITE bleibt die des Zustands — 200 kHz, nicht die
+        // 230,6 der Kachel. Genau darum geht der Ausschnitt ueberhaupt
+        // ueber den Zustand und nicht ueber die Kachel.
+        QVERIFY(qAbs((a.hochHz - a.tiefHz) - 200.0e3) < 1.0);
+        // Und die Mitte ist jetzt die der Kachel.
+        QVERIFY(qAbs((a.tiefHz + a.hochHz) * 0.5 - 21.2457e6) < 100.0);
+    }
+
+    void konzentrischBleibtUnangetastet()
+    {
+        // Die Zahlen vom selben Geraet um 14:15:12, als der Versatz
+        // 0 war: Kachel symmetrisch um das Fenster, je 15 kHz
+        // Ueberstand. Da darf nichts nachgezogen werden.
+        const auto a = FlexVita::aufKachelZentriert(
+            20.9548e6, 21.1548e6, 20.9394e6, 21.17e6);
+        QVERIFY2(!a.geaendert, "konzentrisch — nichts nachzuziehen");
+        QCOMPARE(a.tiefHz, 20.9548e6);
+        QCOMPARE(a.hochHz, 21.1548e6);
+    }
+
+    void unterDerSchwelle_wirdNichtGezappelt()
+    {
+        // 500 Hz Unterschied: darunter bleibt alles stehen, sonst
+        // zoege jedes Paket das Bild ein Stueck.
+        const auto a = FlexVita::aufKachelZentriert(
+            21.100e6, 21.300e6, 21.1005e6, 21.3005e6);
+        QVERIFY(!a.geaendert);
+        // 2 kHz: darueber wird nachgezogen.
+        const auto b = FlexVita::aufKachelZentriert(
+            21.100e6, 21.300e6, 21.102e6, 21.302e6);
+        QVERIFY(b.geaendert);
+    }
+
+    void unbrauchbareBereiche_aendernNichts()
+    {
+        QVERIFY(!FlexVita::aufKachelZentriert(0.0, 0.0, 21.1e6, 21.3e6)
+                     .geaendert);
+        QVERIFY(!FlexVita::aufKachelZentriert(21.1e6, 21.3e6, 0.0, 0.0)
+                     .geaendert);
+    }
 };
 
 QTEST_MAIN(TstFlexWasserfallKachel)
