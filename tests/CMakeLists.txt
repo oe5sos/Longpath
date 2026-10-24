@@ -5520,6 +5520,16 @@ longpath_add_test(tst_ft8_mehrfach)
 # schlimmer als keine. Gegenprobe im Kopf der Datei.
 longpath_add_test(tst_ft8_spaltenkopf)
 
+# tst_ft8_platzband: das Band der laufenden QSOs (Gestaltungsrunde
+# 2026-10-24). Prueft Verhalten, nicht Aussehen; legt mit
+# LONGPATH_ENTWURF=1 zusaetzlich ein Blatt ab.
+longpath_add_test(tst_ft8_platzband)
+
+# tst_ft8_mehrfach_verdrahtung: haelt fest, dass das FENSTER Ft8Mehrfach
+# auch benutzt -- eine fertige Maschine, die von nirgends erreichbar ist,
+# gab es hier schon einmal (3M Aufnahme).
+longpath_add_test(tst_ft8_mehrfach_verdrahtung)
+
 # tst_ft8_entwurfsblaetter: Zeichenwerkzeug fuer die Gestaltungsrunde am
 # FT8-Fenster (Betreiber: „schaut derzeit noch sehr einfach aus").
 # Ueberspringt sich ohne LONGPATH_GRAB_DIR + LONGPATH_ENTWURF=1.
