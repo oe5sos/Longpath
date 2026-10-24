@@ -177,6 +177,10 @@ public:
     ///
     /// Statisch und ohne Zustand, damit die Spalten ohne Fenster,
     /// ohne Logbuch und ohne cty.dat pruefbar sind.
+    /// Die Spaltenueberschrift ueber den Listen. Baut auf DENSELBEN
+    /// Breiten wie zeilentext() -- siehe die Begruendung dort.
+    static QString spaltenkopf();
+
     static QString zeilentext(const QString& uhrzeit, int snrDb,
                               double dtSekunden, int hz,
                               const QString& nachricht,
