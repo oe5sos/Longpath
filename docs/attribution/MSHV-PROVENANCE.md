@@ -123,3 +123,25 @@ nächste Schritt, nicht dieser.
 konstante Hüllkurve mehr. Damit fällt der Grund weg, PureSignal bei
 FT8 abzuschalten — und es wird gebraucht, weil Überlagerung
 Intermodulation erzeugt.
+
+## Stufe 2 — das Modell der Plätze (2026-10-24)
+
+Gelesen, nicht übersetzt: `src/HvTxW/hvmultianswermodw.h` [2.76.7]
+hält zwei Listen nebeneinander — `LsQueue` (wer angerufen hat und
+wartet) und `LsNow` (wer gerade abgearbeitet wird) — dazu
+
+```
+#define MAXSL 6   //2.71 old=5     (Zeile 137)
+```
+
+als harte Obergrenze und einen Regler darunter (`SBslots`).
+
+`src/core/Ft8Mehrfach.{h,cpp}` übernimmt **das Modell**, keinen
+Quelltext: `kMaxPlaetze = 6`, Warteschlange, Nachrücken beim
+Freiwerden, keine Doppelten. Die 2990 Zeilen von
+`hvmultianswermodw.cpp` sind nicht geholt — sie hängen an MSHVs
+eigener Oberfläche und an Dingen, die Longpath anders löst.
+
+Die Obergrenze ist kein Geschmack: der Pegel wird durch die Zahl der
+Plätze geteilt (`gen_ft8.cpp:303`, siehe oben). Sechs Plätze sind
+−15,6 dB je Station.

@@ -5509,6 +5509,11 @@ longpath_add_test(tst_ft8_subtraktion)
 # Fenster, alle drei muessen wieder herauskommen. Das prueft Packung,
 # Tonlage, Summierung und Pegel in einem Lauf.
 longpath_add_test(tst_ft8_multi_answering)
+
+# tst_ft8_mehrfach: Stufe 2 von MSHVs Multi Answering -- die Buchhaltung
+# vor der Sendeseite. Drei QSOs nebeneinander durch, Warteschlange,
+# Nachruecken, keine Doppelten. Gegenprobe im Kopf der Datei.
+longpath_add_test(tst_ft8_mehrfach)
 # 2026-10-21: wo FT8 und FT4 auf jedem Band liegen -- „ich will nicht
 # die freq suchen". Reine Tafel, ohne Fenster und ohne Funkgeraet.
 longpath_add_test(tst_digi_frequenzen)
