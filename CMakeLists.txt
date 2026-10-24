@@ -554,6 +554,7 @@ set(CORE_SOURCES
     src/core/Ft8Decoder.cpp
     src/core/Ft8Subtract.cpp
     src/core/Ft8Ablauf.cpp
+    src/core/Ft8Mehrfach.cpp
     src/core/Ft8Stream.cpp
     src/core/Ft8Tx.cpp
     src/core/BeamHeading.cpp
