@@ -39,6 +39,7 @@
 #include "core/DigiFrequenzen.h"
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Ablauf.h"
+#include "core/Ft8Mehrfach.h"
 #include "models/LogEntry.h"
 #include "core/Ft8Tx.h"
 
@@ -55,6 +56,7 @@ class QSplitter;
 class QSpinBox;
 
 namespace Longpath { class Ft8Wasserfall; }
+namespace Longpath { class Ft8PlatzBand; }
 class QProgressBar;
 class QLineEdit;
 class QPushButton;
@@ -181,6 +183,17 @@ public:
     /// Breiten wie zeilentext() -- siehe die Begruendung dort.
     static QString spaltenkopf();
 
+    /// Das Band der laufenden QSOs auffrischen. Ohne Multi Answering
+    /// leert es sich und verschwindet.
+    void zeigePlaetze();
+
+    /// Einmal je Fenster: die Plaetze weiterdrehen, fertige QSOs ins
+    /// Logbuch, und was als naechstes hinausgeht gesammelt senden.
+    void plaetzeFensterZuEnde();
+
+    /// Mehrere Nachrichten in EIN Fenster legen (Stufe 1, #323).
+    void sendeMehrere(const QVector<Ft8TxSource::Platz>& plaetze);
+
     static QString zeilentext(const QString& uhrzeit, int snrDb,
                               double dtSekunden, int hz,
                               const QString& nachricht,
@@ -246,6 +259,9 @@ public:
     /// „Send"-Knopf (m_cqBtn), der Name ist dort eine Altlast.
     QPushButton* cqRufenButtonForTest() const { return m_cqRufenBtn; }
     const Ft8Ablauf& ablaufForTest() const { return m_ablauf; }
+    const Ft8Mehrfach& mehrfachForTest() const { return m_mehrfach; }
+    bool mehrfachAnForTest() const { return m_mehrfachAn; }
+    Longpath::Ft8PlatzBand* platzBandForTest() const { return m_platzBand; }
     /// Der Zaehler fuer die CQ-Versuche, fuer den Pruefstand.
     class QSpinBox* cqVersucheSpinForTest() const { return m_cqVersucheSpin; }
     /// Einen Fund einspeisen, als waere er dekodiert worden — der
@@ -375,6 +391,20 @@ private:
     /// nimmt per Klick die Sendestelle entgegen -- ohne ihn waere die
     /// waehlbare Sendestelle eine Zahl ohne Blick aufs Band.
     Longpath::Ft8Wasserfall* m_wasserfall{nullptr};
+
+    // ── Multi Answering (2026-10-24) ─────────────────────────────────
+    //
+    // MSHV hat dafuer einen Schalter (`Multi_answer_mod`,
+    // main_ms.cpp:1951) und keinen Dauerbetrieb -- aus gutem Grund:
+    // mehrere Stationen gleichzeitig teilen die Sendeleistung, und wer
+    // ein einzelnes QSO fuehrt, will das nicht. Darum ab Werk AUS.
+    //
+    // Der Einzelbetrieb laeuft unveraendert ueber m_ablauf. m_mehrfach
+    // kommt NUR dazu, wenn der Schalter an ist; damit bleibt der Weg,
+    // der seit Wochen laeuft, unberuehrt.
+    Longpath::Ft8PlatzBand* m_platzBand{nullptr};
+    Ft8Mehrfach             m_mehrfach;
+    bool                    m_mehrfachAn{false};
     int m_sendeTonHz{1500};
 
     QPushButton* m_nurCqBtn{nullptr};
