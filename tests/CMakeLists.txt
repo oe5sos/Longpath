@@ -5514,6 +5514,16 @@ longpath_add_test(tst_ft8_multi_answering)
 # vor der Sendeseite. Drei QSOs nebeneinander durch, Warteschlange,
 # Nachruecken, keine Doppelten. Gegenprobe im Kopf der Datei.
 longpath_add_test(tst_ft8_mehrfach)
+
+# tst_ft8_spaltenkopf: die Spaltenueberschrift muss auf dasselbe Raster
+# fallen wie die Zahlen darunter -- eine verrutschte Ueberschrift ist
+# schlimmer als keine. Gegenprobe im Kopf der Datei.
+longpath_add_test(tst_ft8_spaltenkopf)
+
+# tst_ft8_entwurfsblaetter: Zeichenwerkzeug fuer die Gestaltungsrunde am
+# FT8-Fenster (Betreiber: „schaut derzeit noch sehr einfach aus").
+# Ueberspringt sich ohne LONGPATH_GRAB_DIR + LONGPATH_ENTWURF=1.
+longpath_add_test(tst_ft8_entwurfsblaetter)
 # 2026-10-21: wo FT8 und FT4 auf jedem Band liegen -- „ich will nicht
 # die freq suchen". Reine Tafel, ohne Fenster und ohne Funkgeraet.
 longpath_add_test(tst_digi_frequenzen)

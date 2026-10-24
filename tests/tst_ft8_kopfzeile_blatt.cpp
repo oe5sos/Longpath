@@ -86,6 +86,27 @@ private slots:
                  DigiFrequenzen::Digimodus::Ft8);
     }
 
+    // Der Ist-Zustand in Arbeitsgroesse -- Ausgangspunkt fuer die
+    // Gestaltungsrunde vom 2026-10-24 („schaut derzeit noch sehr
+    // einfach aus").
+    void ist_zustand_voll()
+    {
+        const QString dir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+        if (dir.isEmpty()
+            || qEnvironmentVariable("LONGPATH_ENTWURF") != QStringLiteral("1")) {
+            QSKIP("braucht LONGPATH_GRAB_DIR und LONGPATH_ENTWURF=1");
+        }
+        RadioModel rm;
+        Ft8Applet applet(&rm, nullptr);
+        applet.resize(880, 560);
+        applet.show();
+        QTest::qWait(600);
+        const QImage bild = applet.grab().toImage();
+        const QString pfad = dir + QStringLiteral("/ft8-ist.png");
+        QVERIFY2(bild.save(pfad), qPrintable(pfad));
+        qInfo() << "Blatt:" << pfad << bild.size();
+    }
+
     void kopfzeile_mit_zahnrad()
     {
         const QString dir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
