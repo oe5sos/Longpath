@@ -50,6 +50,21 @@ public:
     static constexpr int kSendeMinHz = 200;
     static constexpr int kSendeMaxHz = 2800;
 
+    /// Hoehe der Frequenzskala unten. Platz fuer Strich und Zahl in
+    /// kFontMicro, nicht mehr.
+    static constexpr int kSkalaHoehe = 14;
+
+    /// Abstand zweier Sendeplaetze bei Multi Answering, aus MSHV
+    /// (gen_ft8.cpp:262). Dieselbe Zahl wie Ft8TxSource::
+    /// kPlatzAbstandHz -- hier noch einmal, damit das Bild nicht von
+    /// der Sendeseite abhaengt.
+    static constexpr int kPlatzAbstandHz = 60;
+
+    /// Wie viele Sendeplaetze gerade belegt sind (1 = der gewoehnliche
+    /// Fall). Zeichnet die weiteren Marken leiser daneben.
+    void setzePlaetze(int n);
+    int  plaetze() const { return m_plaetze; }
+
     explicit Ft8Wasserfall(QWidget* parent = nullptr);
     ~Ft8Wasserfall() override;
 
@@ -76,6 +91,7 @@ public:
     int   spektrumSpaltenForTest() const { return m_spektrum.size(); }
     float spektrumMaxForTest() const;
     int   sammlerForTest() const { return m_sammler.size(); }
+    int   plaetzeForTest() const { return m_plaetze; }
 
 signals:
     /// Ein Klick in den Streifen. Das Fenster zieht sein Feld nach.
@@ -96,6 +112,7 @@ private:
     QVector<float> m_spektrum;       ///< dB je Bildspalte, 0..1 normiert
     QImage         m_wasserfall;
     int            m_sendeTonHz{1500};
+    int            m_plaetze{1};
 
     float*         m_fftEin{nullptr};
     fftwf_complex* m_fftAus{nullptr};

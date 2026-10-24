@@ -188,7 +188,8 @@ void Ft8Wasserfall::paintEvent(QPaintEvent*)
 
     // Der Wasserfall unten.
     if (!m_wasserfall.isNull()) {
-        p.drawImage(QRect(0, spektrumHoehe, breite, height() - spektrumHoehe),
+        p.drawImage(QRect(0, spektrumHoehe, breite,
+                          height() - spektrumHoehe - kSkalaHoehe),
                     m_wasserfall);
     }
 
@@ -211,10 +212,43 @@ void Ft8Wasserfall::paintEvent(QPaintEvent*)
                QStringLiteral("%1").arg(m_sendeTonHz));
 
     // Tausenderstriche, damit die Stelle ablesbar ist.
+    // ── Die weiteren Sendeplaetze (2026-10-24) ───────────────────────
+    //
+    // Bei Multi Answering liegen sie je 60 Hz hoeher (MSHV
+    // gen_ft8.cpp:262). Sie werden leiser gezeichnet als die eigene
+    // Sendestelle: man soll sehen, WO man noch sendet, ohne dass es
+    // mit der Hauptmarke um Aufmerksamkeit streitet.
+    if (m_plaetze > 1) {
+        QColor leise(QString::fromLatin1(Style::kGreenText));
+        leise.setAlpha(110);
+        p.setPen(QPen(leise, 1, Qt::DotLine));
+        for (int i = 1; i < m_plaetze; ++i) {
+            const int hz = m_sendeTonHz + i * kPlatzAbstandHz;
+            if (hz > kSendeMaxHz) { break; }
+            const double px = hzZuX(hz, breite);
+            p.drawLine(QPointF(px, 0), QPointF(px, height() - kSkalaHoehe));
+        }
+    }
+
+    // ── Frequenzskala (2026-10-24) ───────────────────────────────────
+    //
+    // Vorher standen hier nur vier Striche von 4 px Hoehe, ohne eine
+    // einzige Zahl -- man sah, DASS eine Teilung da ist, aber nicht
+    // welche. Der Betreiber am 2026-10-24: „uebersichtlich,
+    // professionell, einfach, high end". Eine Skala ohne Zahlen ist
+    // keins davon.
+    const int skalaY = height() - kSkalaHoehe;
+    p.fillRect(QRect(0, skalaY, breite, kSkalaHoehe),
+               QColor(QString::fromLatin1(Style::kPanelBg)));
     p.setPen(QColor(QString::fromLatin1(Style::kTextTertiary)));
-    for (int hz = 500; hz < kMaxHz; hz += 500) {
+    QFont beschriftung = p.font();
+    beschriftung.setPixelSize(Style::kFontMicro);
+    p.setFont(beschriftung);
+    for (int hz = 400; hz < kMaxHz; hz += 400) {
         const double gx = hzZuX(hz, breite);
-        p.drawLine(QPointF(gx, height() - 4), QPointF(gx, height()));
+        p.drawLine(QPointF(gx, skalaY), QPointF(gx, skalaY + 3));
+        p.drawText(QRectF(gx - 22, skalaY + 3, 44, kSkalaHoehe - 3),
+                   Qt::AlignHCenter | Qt::AlignTop, QString::number(hz));
     }
 }
 
@@ -241,3 +275,12 @@ void Ft8Wasserfall::mousePressEvent(QMouseEvent* e)
 // paintEvent zeichnet nur so viele Spalten, wie es hat.
 
 } // namespace Longpath
+
+// Siehe Ft8Wasserfall.h.
+void Longpath::Ft8Wasserfall::setzePlaetze(int n)
+{
+    const int neu = std::max(1, n);
+    if (neu == m_plaetze) { return; }
+    m_plaetze = neu;
+    update();
+}

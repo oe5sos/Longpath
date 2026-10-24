@@ -390,6 +390,25 @@ void Ft8Applet::buildUI()
         kopf->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
                                 .arg(Style::kTextInactive));
         v->addWidget(kopf);
+
+        // ── Die Spaltenueberschrift (2026-10-24) ────────────────────
+        //
+        // Vier Zahlenfelder ohne Beschriftung: man sah sie, aber nicht
+        // welches der Rapport ist und welches die Tonlage. Die Breiten
+        // kommen aus spaltenkopf(), das dieselben Ausdruecke benutzt
+        // wie zeilentext() -- darum stehen Ueberschrift und Zahlen
+        // wirklich untereinander und nicht nur ungefaehr.
+        //
+        // Dieselbe Schrift wie die Liste, sonst waere die Ausrichtung
+        // Zufall: eine Proportionalschrift haette hier andere
+        // Zeichenbreiten.
+        auto* spaltenZeile = new QLabel(spaltenkopf(), huelle);
+        spaltenZeile->setFont(Style::monoFont(font(), Style::kFontSmall));
+        spaltenZeile->setStyleSheet(QStringLiteral("QLabel { color: %1;"
+                                                   " padding-left: 4px; }")
+                                        .arg(Style::kTextTertiary));
+        v->addWidget(spaltenZeile);
+
         v->addWidget(liste, 1);
         return huelle;
     };
@@ -1305,6 +1324,27 @@ Ft8Applet::Zeilenart Ft8Applet::zeilenart(bool anMich, bool neuesLand,
     if (neuesLand) { return Zeilenart::NeuesLand; }
     if (istCq)     { return Zeilenart::Cq; }
     return Zeilenart::Gewoehnlich;
+}
+
+// ── Die Spaltenueberschrift (2026-10-24) ─────────────────────────────
+//
+// Bis heute stand ueber den Listen nur „Band Activity" und
+// „Rx Frequency" -- man sah vier Zahlenfelder und musste raten, welches
+// der Rapport ist und welches die Tonlage. Betreiber am 2026-10-24:
+// „uebersichtlich, professionell, einfach, high end".
+//
+// Die Breiten sind NICHT abgeschrieben, sondern dieselben Ausdruecke
+// wie in zeilentext() darunter. Wer dort eine Spalte aendert, aendert
+// sie hier mit -- zwei Wahrheiten waeren hier besonders teuer, weil die
+// Verschiebung erst am Geraet auffaellt.
+QString Ft8Applet::spaltenkopf()
+{
+    return QStringLiteral("%1 %2 %3 %4  %5")
+        .arg(QStringLiteral("UTC   "))     // wie "HHmmss"
+        .arg(QStringLiteral("dB"),   4)
+        .arg(QStringLiteral("DT"),   5)
+        .arg(QStringLiteral("Hz"),   5)
+        .arg(QStringLiteral("Message"));
 }
 
 // Siehe Ft8Applet.h.
