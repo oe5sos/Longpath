@@ -15444,7 +15444,25 @@ void RadioModel::setTune(bool on)
         // Guard: if not connected, emit tuneRefused and bail out.  m_audioEngine
         // null-check mirrors Thetis's PowerOn check (power-on requires the audio
         // engine to be live, which presupposes a live connection).
-        if (!isConnected() || !m_audioEngine) {
+        // ── `isConnected()` kennt die Flex nicht (2026-10-27) ──────────────
+        //
+        // Hier stand `isConnected()`, und das ist NUR die
+        // OpenHPSDR-Verbindung (`m_connection`). An einer FLEX-8400 ist
+        // es false, obwohl die Maschine laeuft, Ton liefert und ein
+        // Bild zeichnet — dieselbe Falle, die am 2026-10-22 die
+        // Verbindungsmaske offen stehen liess. Dafuer gibt es seitdem
+        // `istIrgendwieVerbunden()`.
+        //
+        // Folge am Geraet: der Betreiber drueckte TUNE, dieser Zweig
+        // kehrte um, `TransmitModel::setTune` wurde NIE gerufen, also
+        // feuerte `tuneChanged` nicht, also lief der Flex-Griff nicht
+        // — und im Protokoll stand kein einziges Wort. Dreimal „geht
+        // nicht", und der Fehler lag drei Ebenen ueber dem, was ich
+        // jedes Mal nachgesehen habe.
+        if (!istIrgendwieVerbunden() || !m_audioEngine) {
+            qCWarning(lcConnection).nospace()
+                << "TUNE abgelehnt: verbunden " << istIrgendwieVerbunden()
+                << ", Tonmaschine " << (m_audioEngine != nullptr);
             emit tuneRefused(QStringLiteral("Power must be on to enable Tune."));
             return;
         }

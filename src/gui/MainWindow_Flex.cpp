@@ -871,6 +871,17 @@ void MainWindow::verdrahteFlexSenden()
             return;
         }
 
+        // ── Nicht waehrend des Abstimmens tasten (2026-10-27) ────
+        //
+        // `transmit tune 1` laesst die Maschine ihren eigenen Traeger
+        // machen und tastet sich dabei selbst. Kaeme jetzt noch
+        // `xmit 1` samt Mikrofonpumpe dazu, lagen Traeger und Sprache
+        // gleichzeitig am Sender. Wer TUNE drueckt, will den Traeger.
+        if (an && m_radioModel->transmitModel().isTune()) {
+            qCInfo(lcFlexGui) << "MOX waehrend TUNE ignoriert";
+            return;
+        }
+
         if (an) {
             m_radioModel->sendeFlexBefehl(
                 FlexCommandWire::setDaxRouteCommand(true));
