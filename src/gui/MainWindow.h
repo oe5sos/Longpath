@@ -1862,6 +1862,9 @@ private:
     QMetaObject::Connection m_flexLeistungBand;
     QMetaObject::Connection m_flexAbstimmleistungBand;
     QMetaObject::Connection m_flexSendetBand;
+    /// Der Blick des Betreibers zieht den Panadapter der Maschine nach.
+    QMetaObject::Connection m_flexBlickBand;
+    QTimer* m_flexPanNachzug{nullptr};
     /// Dasselbe fuer Betriebsart und Filterflanken.
     QMetaObject::Connection m_flexArtBand;
     QMetaObject::Connection m_flexFilterBand;

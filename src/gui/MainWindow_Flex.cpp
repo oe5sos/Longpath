@@ -454,6 +454,58 @@ void MainWindow::wireFlex()
         m_radioModel->legeFlexSendetonstromAn();
         verdrahteFlexSenden();
 
+        // ── Die Maschine folgt dem Blick des Betreibers (2026-10-27) ─
+        //
+        // Betreiber: „immer beim verschieben kommt es zu den
+        // problemen". Und so entstehen sie: schiebt er das Bild, wandert
+        // `m_centerHz` — der Wasserfall folgt mit (die Kachel wird ueber
+        // die Frequenz abgebildet), die Bild-FFT aber deckt weiterhin
+        // nur den Ausschnitt der MASCHINE. Je weiter er schiebt, desto
+        // weniger ueberlappen die beiden, und am Ende steht im
+        // Wasserfall etwas, wovon das Spektrum nichts weiss.
+        //
+        // Richtig ist, dass die Maschine dem Blick folgt: bei SmartSDR
+        // IST der Panadapter das Fenster. Also seine Mitte hinausgeben.
+        //
+        // Entprellt: beim Ziehen kommt `centerChanged` je Bildpunkt,
+        // und jeder Befehl waere ein Umlauf zur Maschine. 250 ms nach
+        // dem letzten Ruck genuegt — der Bildstrom laeuft derweil
+        // weiter, nur eben noch auf dem alten Ausschnitt.
+        if (!m_flexPanNachzug) {
+            m_flexPanNachzug = new QTimer(this);
+            m_flexPanNachzug->setSingleShot(true);
+            m_flexPanNachzug->setInterval(250);
+            connect(m_flexPanNachzug, &QTimer::timeout, this, [this]() {
+                if (m_shuttingDown || !m_radioModel) { return; }
+                if (m_flexTargetSliceId < 0) { return; }
+                SpectrumWidget* sw = m_radioModel->spectrumWidget();
+                if (!sw) { return; }
+                const double mitte = sw->centerFrequency();
+                const double panMitte =
+                    (m_flexSpanLowHz + m_flexSpanHighHz) * 0.5;
+                // Unter einem Zehntel der Breite nicht nachziehen: das
+                // waere ein Befehl fuer eine Verschiebung, die man
+                // ohnehin nicht sieht.
+                const double breite = m_flexSpanHighHz - m_flexSpanLowHz;
+                if (!(breite > 0.0)
+                    || std::abs(mitte - panMitte) < breite * 0.1) {
+                    return;
+                }
+                qCInfo(lcFlexGui).nospace()
+                    << "Flex: Panadapter folgt dem Bild — " << (mitte / 1.0e6)
+                    << " MHz (war " << (panMitte / 1.0e6) << ")";
+                m_radioModel->zieheFlexPanadapterAuf(mitte);
+            });
+        }
+        disconnect(m_flexBlickBand);
+        if (SpectrumWidget* sw = m_radioModel->spectrumWidget()) {
+            m_flexBlickBand = connect(sw, &SpectrumWidget::centerChanged,
+                                      this, [this](double) {
+                if (m_shuttingDown || m_flexTargetSliceId < 0) { return; }
+                if (m_flexPanNachzug) { m_flexPanNachzug->start(); }
+            });
+        }
+
         // ── Die Maske geht von selbst zu (2026-10-22) ───────────────
         //
         // Der Selbstschluss haengt an `onConnectionStateChanged`, und
