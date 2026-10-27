@@ -458,6 +458,106 @@ private slots:
         QVERIFY(!FlexVita::aufKachelZentriert(21.1e6, 21.3e6, 0.0, 0.0)
                      .geaendert);
     }
+
+    // ── 7. Beide Bilder bei ZOOM (2026-10-27) ───────────────────────
+    //
+    // Betreiber: „leider ist das untere und das obere Signal im
+    // Wasserfall nicht auf allen frequenzen gleich … teilweise passt
+    // er, teilweise nicht."
+    //
+    // Am Geraet ist das schwer zu fassen, weil beide Bilder nur dann
+    // vergleichbar sind, wenn in beiden dasselbe Signal steht. Hier
+    // steht in beiden DERSELBE Traeger, an derselben Frequenz, und
+    // gefragt ist nur: landet er auf demselben Bildpunkt?
+    //
+    // Gefahren wird es bei VOLLER Breite und bei Zoom. Der Zoom ist
+    // der Fall, der die beiden Wege wirklich trennt: die Kachel wird
+    // ueber die Frequenz abgebildet, die Bild-FFT ueber einen
+    // Bin-Ausschnitt (`visibleBinRange`), und der wird auf GANZE Bins
+    // aufgerundet.
+    void beideBilderTreffenDenselbenPunkt()
+    {
+        auto lauf = [this](double fensterBreiteHz, double fensterMitteHz,
+                           const char* was) {
+            SpectrumWidget sw;
+            sw.setWaterfallAveraging(SpectrumAveraging::None);
+            sw.setWaterfallDetector(SpectrumDetector::Peak);
+            sw.setSpectrumAveraging(SpectrumAveraging::None);
+            sw.setKiwiDisplaySource(true);
+            sw.resize(1200, 600);
+            sw.show();
+            QTest::qWait(300);
+
+            // Ausschnitt der Maschine: 200 kHz um 14,100 MHz.
+            const double tief = 14.000e6, hoch = 14.200e6;
+            // Der Traeger steht 40 kHz ueber der Mitte.
+            const double traegerHz = 14.140e6;
+
+            sw.setFrequencyRange(fensterMitteHz, fensterBreiteHz);
+
+            // Die Bild-FFT: 4096 Bins ueber den Ausschnitt.
+            const int bins = 4096;
+            QVector<float> dbm(bins, -120.0f);
+            const int tBin = int((traegerHz - tief) / ((hoch - tief) / bins));
+            dbm[tBin] = -40.0f;
+            for (int n = 0; n < 3; ++n) {
+                sw.updateKiwiSpectrumDbm(dbm, tief, hoch);
+            }
+            const QVector<float> px = sw.renderedPixels();
+
+            // Die Kachel: derselbe Traeger, eigene Binzahl und ein
+            // etwas breiterer Bereich — so schickt die Maschine sie.
+            const double kTief = 14.000e6 - 15.0e3;
+            const double kHoch = 14.200e6 + 15.0e3;
+            const int kBins = 2460;
+            QVector<float> kach(kBins, 96.0f);
+            kach[int((traegerHz - kTief) / ((kHoch - kTief) / kBins))] = 120.0f;
+            sw.zeigeFremdeWasserfallzeile(kach, kTief, kHoch);
+            const QVector<quint8> stufen = sw.wfZeilenstufenForTest();
+
+            if (px.isEmpty() || stufen.isEmpty()) { return -1.0; }
+
+            int pxMax = 0;
+            for (int i = 1; i < px.size(); ++i) {
+                if (px[i] > px[pxMax]) { pxMax = i; }
+            }
+            int wfMax = 0;
+            for (int i = 1; i < stufen.size(); ++i) {
+                if (stufen[i] > stufen[wfMax]) { wfMax = i; }
+            }
+            // Beide auf denselben Maszstab: Anteil der Breite.
+            const double pxAnteil = double(pxMax) / qMax(1, px.size() - 1);
+            const double wfAnteil = double(wfMax) / qMax(1, stufen.size() - 1);
+            const double abstandHz = (pxAnteil - wfAnteil) * fensterBreiteHz;
+            qInfo().nospace()
+                << was << ": Spektrum bei " << pxAnteil
+                << ", Kachel bei " << wfAnteil
+                << " — Abstand " << (abstandHz / 1.0e3) << " kHz";
+            return abstandHz;
+        };
+
+        // Volle Breite: Fenster = Ausschnitt der Maschine.
+        const double vollBreite = lauf(200.0e3, 14.100e6, "volle Breite");
+        // Gezoomt: zehnfach, UM DEN TRAEGER — sonst liegt er gar nicht
+        // im Bild, und beide Wege melden brav ihren Bildpunkt null.
+        const double gezoomt    = lauf(20.0e3,  14.140e6, "zehnfach gezoomt");
+        QVERIFY2(vollBreite > -1.0e9 && gezoomt > -1.0e9,
+                 "kein Bild — das Fenster hat keine Flaeche");
+
+        // Bei voller Breite muessen sie uebereinanderliegen; ein
+        // Bildpunkt ist 167 Hz breit, zwei davon sind die Decke.
+        QVERIFY2(std::abs(vollBreite) < 400.0, qPrintable(
+            QStringLiteral("volle Breite: %1 Hz auseinander")
+                .arg(vollBreite)));
+
+        // Und gezoomt genauso. Hier ist ein Bildpunkt nur noch 17 Hz
+        // breit, also darf der Abstand in HERTZ nicht wachsen — er
+        // waere sonst ein Maszstabsfehler, der mit dem Zoom aufgeht.
+        QVERIFY2(std::abs(gezoomt) < 400.0, qPrintable(
+            QStringLiteral("gezoomt: %1 Hz auseinander (volle Breite "
+                           "%2 Hz) — der Abstand waechst mit dem Zoom")
+                .arg(gezoomt).arg(vollBreite)));
+    }
 };
 
 QTEST_MAIN(TstFlexWasserfallKachel)

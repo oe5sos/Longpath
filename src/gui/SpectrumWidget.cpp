@@ -6709,8 +6709,10 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
         // Strom, nicht ueber eine zusammengesetzte Zeichenkette.
         bool   versatzMessbar = false;
         int    besterLag  = 0;
-        int    lagLinks   = 0;
-        int    lagRechts  = 0;
+        int    lagLinks     = 0;
+        int    lagRechts    = 0;
+        double sicherLinks  = 0.0;
+        double sicherRechts = 0.0;
         double faktor     = 1.0;
         double zweitRel   = 0.0;
         double beiNull    = 0.0;
@@ -6788,11 +6790,20 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
             //   linker ≈ MINUS rechter     -> reiner Maszstabsfehler
             // und aus dem Unterschied faellt der Faktor ab, mit dem
             // die Bild-FFT auf das Fenster gespannt wird.
-            auto halbLag = [&](int von, int bis) -> int {
+            // Die Haelften brauchen ihre EIGENE Sicherheitsangabe —
+            // dieselbe Lehre wie beim vollen Lauf, eine Ebene tiefer.
+            // Am 2026-10-27 meldete die rechte Haelfte in zwei von
+            // vier Berichten 110 bzw. 95 Punkte, waehrend der volle
+            // Lauf eindeutig 0 sagte: auf einer Haelfte ohne kraeftiges
+            // Signal rastet die Korrelation irgendwo ein. Ohne diese
+            // Zahl haette ich daraus wieder einen Befund gemacht.
+            auto halbLag = [&](int von, int bis, double* sicherheit) -> int {
+                if (sicherheit) { *sicherheit = 0.0; }
                 const int len = bis - von;
                 if (len < 64) { return 0; }
                 const int grenze = qMin(maxLag, len / 4);
                 int best = 0; double bw = -1.0e30;
+                QVector<double> hw(2 * grenze + 1, -1.0e30);
                 for (int lag = -grenze; lag <= grenze; ++lag) {
                     double sum = 0.0; int zahl = 0;
                     for (int i = qMax(von, von - lag);
@@ -6801,13 +6812,22 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
                     }
                     if (zahl > 0) {
                         sum /= zahl;
+                        hw[lag + grenze] = sum;
                         if (sum > bw) { bw = sum; best = lag; }
                     }
                 }
+                double zweit = -1.0e30;
+                for (int lag = -grenze; lag <= grenze; ++lag) {
+                    if (std::abs(lag - best) <= 10) { continue; }
+                    zweit = std::max(zweit, hw[lag + grenze]);
+                }
+                if (sicherheit && bw > 0.0 && zweit > -1.0e29) {
+                    *sicherheit = zweit / bw;
+                }
                 return best;
             };
-            lagLinks  = halbLag(0, n / 2);
-            lagRechts = halbLag(n / 2, n);
+            lagLinks  = halbLag(0, n / 2, &sicherLinks);
+            lagRechts = halbLag(n / 2, n, &sicherRechts);
             // Der Maszstab, der die beiden Haelften zur Deckung
             // braechte: die Haelften liegen im Mittel n/4 links und
             // rechts der Mitte, ihr Lag-Unterschied ist also
@@ -6833,8 +6853,13 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
                 << (zweitRel > 0.8 ? " — NICHT eindeutig" : "");
             qCInfo(lcSpectrum).nospace()
                 << "Kachel gegen Spektrum, haelftenweise: links "
-                << lagLinks << " Punkte, rechts " << lagRechts
-                << " Punkte — Maszstab " << faktor
+                << lagLinks << " Punkte (zweitbester "
+                << (sicherLinks * 100.0) << " %), rechts " << lagRechts
+                << " Punkte (zweitbester " << (sicherRechts * 100.0)
+                << " %)"
+                << ((sicherLinks > 0.8 || sicherRechts > 0.8)
+                        ? " — NICHT eindeutig" : "")
+                << " — Maszstab " << faktor
                 << " (Fenster " << (m_bandwidthHz / 1.0e3)
                 << " kHz, Kachel " << ((highHz - lowHz) / 1.0e3)
                 << " kHz, Verhaeltnis "
