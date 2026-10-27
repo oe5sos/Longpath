@@ -38,6 +38,7 @@
 #include "core/Ft8Stream.h"
 #include "core/audio/AudioTapRing.h"
 #include "gui/applets/Ft8Applet.h"
+#include "core/AppSettings.h"
 #include "models/RadioModel.h"
 #include "models/RxDecodeModel.h"
 #include "models/SpotModel.h"
@@ -234,6 +235,61 @@ private slots:
 
         QVERIFY2(applet.listForTest()->toPlainText()
                      .contains(QStringLiteral("CQ DL1ABC JN49")),
+                 qPrintable(applet.listForTest()->toPlainText()));
+    }
+
+    // ── „New DXCC": ein Ruf an MICH kommt durch jeden Filter ────────
+    //
+    // Das ist die Falle, die einen Filter von einem Fehler trennt. Wer
+    // gerufen wird und es nicht sieht, weil ein Haken sitzt, verliert
+    // ein QSO.
+    //
+    // Ohne cty.dat und ohne Logbuch sagt der Aufloeser zu NICHTS „neu"
+    // -- genau deshalb ist dieser Lauf aussagekraeftig: er faehrt den
+    // haertesten Fall, in dem der Filter alles wegnimmt, was nicht an
+    // mich geht.
+    void neueLaenderFiltertAberNichtDenRufAnMich()
+    {
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        QVERIFY(slice);
+        slice->setFrequency(14074000.0);
+        applet.setSlice(slice);
+
+        QVERIFY2(applet.nurNeueLaenderButtonForTest(), "der Knopf fehlt");
+        applet.nurNeueLaenderButtonForTest()->click();
+        QVERIFY(applet.nurNeueLaenderButtonForTest()->isChecked());
+
+        const int vorher = radio.rxDecodeModel()->decodes().size();
+        const QDateTime fenster =
+            QDateTime::fromMSecsSinceEpoch(999999990000LL, QTimeZone::UTC);
+
+        // 1. Ein fremdes CQ -- ohne Logbuch kein „neues Land", also weg.
+        QMetaObject::invokeMethod(
+            &applet, "onDecoded", Qt::DirectConnection,
+            Q_ARG(QVector<Longpath::Ft8Decode>,
+                  einFund(QStringLiteral("CQ DL1ABC JN49"))),
+            Q_ARG(QDateTime, fenster));
+        QVERIFY2(!applet.listForTest()->toPlainText()
+                     .contains(QStringLiteral("CQ DL1ABC JN49")),
+                 qPrintable(applet.listForTest()->toPlainText()));
+
+        // ... aber im Modell steht er. Der Filter ist ANSICHT.
+        QCOMPARE(radio.rxDecodeModel()->decodes().size(), vorher + 1);
+
+        // 2. Ein Ruf an mich -- der kommt IMMER durch.
+        QMetaObject::invokeMethod(
+            &applet, "onDecoded", Qt::DirectConnection,
+            Q_ARG(QVector<Longpath::Ft8Decode>,
+                  einFund(QStringLiteral("OE5SOS DL1ABC -12"))),
+            Q_ARG(QDateTime, fenster));
+        QVERIFY2(applet.listForTest()->toPlainText()
+                     .contains(QStringLiteral("OE5SOS DL1ABC")),
                  qPrintable(applet.listForTest()->toPlainText()));
     }
 

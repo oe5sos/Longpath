@@ -240,6 +240,31 @@ void Ft8Applet::buildUI()
     });
     head->addWidget(m_nurCqBtn);
 
+    // ── „New DXCC only" (2026-10-27) ────────────────────────────────
+    //
+    // Das letzte Stueck aus dem Vergleich vom 2026-10-21, das JTDX hat
+    // und wir nicht. Der Auflaeser dafuer liegt laengst im Modell --
+    // er faerbt die neuen Laender in diesem Fenster schon ein. Hier
+    // wird er nur zum zweiten Mal gefragt, statt eine eigene Liste zu
+    // fuehren.
+    //
+    // Der Landesname kommt aus cty.dat und steht ohnehin schon in der
+    // Zeile. Ob ein Land NEU ist, weiss aber erst der Abgleich mit dem
+    // Logbuch (DxccWorkedStatus); fehlt es, meldet der Aufloeser gar
+    // nichts und der Filter zeigt nur noch Rufe an die eigene Station.
+    // Das sieht aus wie ein Fehler und ist keiner -- darum steht es im
+    // Hinweis am Knopf. Am 2026-10-27 im Prueflauf genau so gesehen.
+    m_nurNeueLaenderBtn = blueToggle(tr("New DXCC"), 78);
+    m_nurNeueLaenderBtn->setCheckable(true);
+    m_nurNeueLaenderBtn->setToolTip(
+        tr("Show only countries not yet in the log. Needs an ADIF log — "
+           "without one nothing counts as new and only calls to your own "
+           "station remain. Those always get through."));
+    connect(m_nurNeueLaenderBtn, &QPushButton::clicked, this, [this](bool an) {
+        m_nurNeueLaender = an;
+    });
+    head->addWidget(m_nurNeueLaenderBtn);
+
     head->addSpacing(8);
 
     // ── Die Sendestelle ─────────────────────────────────────────────
@@ -1408,13 +1433,14 @@ void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
     const bool istCq = nachricht.trimmed().toUpper().startsWith(
         QStringLiteral("CQ"));
 
-    // Der Filter gilt NUR fuer die Ansicht -- und auch dort nicht fuer
-    // eine Zeile, die an mich geht.
-    if (m_nurCq && !istCq && !anMich) { return; }
-
     // Ein Land, das noch nie im Logbuch stand? Der Auflaeser steht
     // schon im Modell -- derselbe, der die Funde im Panadapter
     // einfaerbt. Also DIESELBE Palette, keine zweite erfunden.
+    //
+    // Steht seit dem 2026-10-27 VOR den Filtern: „New DXCC only"
+    // braucht die Antwort, um ueberhaupt filtern zu koennen. Vorher
+    // stieg der CQ-Filter davor aus, und das Land war an dieser Stelle
+    // noch unbekannt.
     bool neuesLand = false;
     QColor landFarbe;
     const QString senderRuf = senderCallsign(nachricht);
@@ -1432,6 +1458,18 @@ void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
             }
         }
     }
+
+    // ── Die Ansichtsfilter (2026-10-27) ──────────────────────────────
+    //
+    // Beide gelten NUR fuer die Ansicht. Der Ablauf bekommt weiter
+    // jeden Fund (siehe m_nurCq in Ft8Applet.h): sonst verschwaende
+    // ein laufendes QSO, sobald ein Haken sitzt.
+    //
+    // Eine Zeile, die an MICH geht, kommt durch jeden Filter. Wer
+    // gerufen wird und es nicht sieht, weil ein Haken sitzt, verliert
+    // ein QSO -- das ist kein Filter mehr, sondern ein Fehler.
+    if (m_nurCq && !istCq && !anMich) { return; }
+    if (m_nurNeueLaender && !neuesLand && !anMich) { return; }
 
     QTextCharFormat f;
     const Zeilenart art = zeilenart(anMich, neuesLand, istCq);
