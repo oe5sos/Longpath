@@ -483,12 +483,31 @@ void MainWindow::wireFlex()
                 const double mitte = sw->centerFrequency();
                 const double panMitte =
                     (m_flexSpanLowHz + m_flexSpanHighHz) * 0.5;
-                // Unter einem Zehntel der Breite nicht nachziehen: das
-                // waere ein Befehl fuer eine Verschiebung, die man
-                // ohnehin nicht sieht.
+                // ── Das Totband muss KLEIN sein (2026-10-27) ─────
+                //
+                // Hier stand ein Zehntel der Breite, „eine
+                // Verschiebung, die man ohnehin nicht sieht". Man
+                // sieht sie doch — nur nicht als Verschiebung,
+                // sondern als DEHNUNG.
+                //
+                // Gemessen: Fenster 7,0961 MHz, Panadapter der
+                // Maschine 7,0788 — 17,3 kHz Unterschied, knapp unter
+                // dem alten Totband von 20 kHz. Das Fenster ragt damit
+                // oben ueber die Bild-FFT hinaus, `visibleBinRange`
+                // klemmt den Bin-Ausschnitt am letzten Bin ab, und der
+                // geklemmte Rest (182,7 statt 200 kHz) wird ueber die
+                // GANZE Breite gezogen. Das ergibt einen Maszstab von
+                // 200/182,7 = 1,095 mit dem Drehpunkt am linken Rand —
+                // gemessen 1,072, linke Haelfte 42 Punkte Versatz,
+                // rechte 83. Genau die Form, die der Betreiber als
+                // „nicht auf allen frequenzen gleich" beschreibt, und
+                // genau der Fall „immer beim verschieben".
+                //
+                // Ein Prozent reicht: 2 kHz Rest ergeben einen
+                // Maszstab von 1,01, also am Bildrand ein Kilohertz.
                 const double breite = m_flexSpanHighHz - m_flexSpanLowHz;
                 if (!(breite > 0.0)
-                    || std::abs(mitte - panMitte) < breite * 0.1) {
+                    || std::abs(mitte - panMitte) < breite * 0.01) {
                     return;
                 }
                 qCInfo(lcFlexGui).nospace()

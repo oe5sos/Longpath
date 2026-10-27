@@ -572,6 +572,77 @@ private slots:
                     .arg(b.name).arg(zoom).arg(voll)));
         }
     }
+
+    // ── 8. Ein Fenster neben der FFT wird GEDEHNT (2026-10-27) ──────
+    //
+    // Der eigentliche Fund hinter „immer beim verschieben kommt es zu
+    // den problemen". Ragt das Fenster ueber den Bereich der Bild-FFT
+    // hinaus, klemmt `visibleBinRange` den Bin-Ausschnitt ab — und der
+    // geklemmte Rest wird ueber die GANZE Breite gezogen. Das ist kein
+    // Versatz, sondern eine Dehnung mit Drehpunkt am Rand: links
+    // stimmt es fast, rechts immer weniger.
+    //
+    // Am Geraet gemessen (19:12): Fenster 7,0961 MHz, FFT um 7,0788 —
+    // 17,3 kHz daneben, Maszstab 1,072, linke Haelfte 42 Punkte
+    // Versatz, rechte 83.
+    //
+    // Dieser Stand haelt fest, dass es ueberhaupt passiert, und wie
+    // stark. Behoben wird es, indem der Panadapter der Maschine dem
+    // Fenster eng folgt (Totband 1 % statt 10 %), nicht hier.
+    void einFensterNebenDerFftWirdGedehnt()
+    {
+        SpectrumWidget sw;
+        sw.setWaterfallAveraging(SpectrumAveraging::None);
+        sw.setSpectrumAveraging(SpectrumAveraging::None);
+        sw.setKiwiDisplaySource(true);
+        sw.resize(1200, 600);
+        sw.show();
+        QTest::qWait(300);
+
+        // Die FFT deckt 7,000–7,200; der Traeger steht bei 7,040.
+        const double tief = 7.000e6, hoch = 7.200e6;
+        const double traegerHz = 7.040e6;
+        const int bins = 4096;
+        QVector<float> dbm(bins, -120.0f);
+        dbm[int((traegerHz - tief) / ((hoch - tief) / bins))] = -40.0f;
+
+        auto wo = [&](double fensterMitte) {
+            sw.setFrequencyRange(fensterMitte, 200.0e3);
+            for (int n = 0; n < 3; ++n) {
+                sw.updateKiwiSpectrumDbm(dbm, tief, hoch);
+            }
+            const QVector<float> px = sw.renderedPixels();
+            if (px.isEmpty()) { return -1.0; }
+            int m = 0;
+            for (int i = 1; i < px.size(); ++i) { if (px[i] > px[m]) { m = i; } }
+            // Zurueck in Hertz, so wie das Fenster es behauptet.
+            return fensterMitte - 100.0e3
+                   + double(m) / (px.size() - 1) * 200.0e3;
+        };
+
+        // Deckungsgleich: der Traeger steht an seiner Frequenz.
+        const double genau = wo(7.100e6);
+        QVERIFY(genau > 0.0);
+        qInfo().nospace() << "Fenster deckungsgleich: Traeger bei "
+                          << (genau / 1.0e6) << " MHz (soll 7.04)";
+        QVERIFY2(std::abs(genau - traegerHz) < 500.0, qPrintable(
+            QStringLiteral("deckungsgleich schon daneben: %1 Hz")
+                .arg(genau - traegerHz)));
+
+        // 17,3 kHz daneben — die Lage, die am Geraet stand.
+        const double daneben = wo(7.100e6 + 17.3e3);
+        QVERIFY(daneben > 0.0);
+        qInfo().nospace() << "Fenster 17,3 kHz daneben: Traeger bei "
+                          << (daneben / 1.0e6) << " MHz, also "
+                          << ((daneben - traegerHz) / 1.0e3) << " kHz falsch";
+
+        // Und das ist die Aussage: es IST falsch, und zwar deutlich.
+        // Keine Decke nach oben — dieser Stand beschreibt, was ohne
+        // engen Nachzug passiert, er fordert es nicht.
+        QVERIFY2(std::abs(daneben - traegerHz) > 1000.0, qPrintable(
+            QStringLiteral("erwartet eine sichtbare Dehnung, gemessen "
+                           "%1 Hz").arg(daneben - traegerHz)));
+    }
 };
 
 QTEST_MAIN(TstFlexWasserfallKachel)
