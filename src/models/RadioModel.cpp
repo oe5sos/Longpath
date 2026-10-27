@@ -7708,6 +7708,20 @@ void RadioModel::startFlexStreams()
                 // der neue Ruecklauf schon drin.
                 if (refW) { m_radioStatus.setReflectedPower(*refW); }
                 if (fwdW) { m_radioStatus.setForwardPower(*fwdW); }
+
+                // Einmal melden, dass ueberhaupt etwas ankommt. Am
+                // 2026-10-27 lagen in der einen Messwertzeile FWDPWR
+                // und REFPWR, in der naechsten nicht — die Maschine
+                // schickt die Sendemesswerte nicht in jedem Paket.
+                // Ohne diese Zeile ist „der Balken bleibt leer" nicht
+                // von „es kommt nichts" zu unterscheiden.
+                if (fwdW && !m_flexLeistungGesehen) {
+                    m_flexLeistungGesehen = true;
+                    qCInfo(lcConnection).nospace()
+                        << "Flex-Sendeleistung zum ersten Mal: " << *fwdW
+                        << " W vorwaerts, "
+                        << (refW ? *refW : 0.0) << " W rueckwaerts";
+                }
             }
 
             // Hoechstens alle fuenf Sekunden eine Zeile: die Maschine

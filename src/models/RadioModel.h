@@ -3798,6 +3798,7 @@ private:
     bool                 m_flexDarfSenden{false};
     bool                 m_flexVerriegelungGehoert{false};
     bool                 m_flexVerriegelungGezeigt{false};
+    bool                 m_flexLeistungGesehen{false};
     /// Welche Zustandsarten die Maschine schon geschickt hat — je Art
     /// eine Protokollzeile, damit „kommt das ueberhaupt an?" ohne
     /// Mitschnitt zu beantworten ist.
