@@ -355,6 +355,12 @@ public:
     double centerFrequency() const { return m_centerHz; }
     double bandwidth() const { return m_bandwidthHz; }
 
+    /// Ob je ein Ausschnitt GESETZT wurde — nicht bloss die Vorgabe.
+    /// Die Kopfzeile des Panadapters haengt daran: eine Frequenz ohne
+    /// Radio waere eine Behauptung, eine FALSCHE ueber dem richtigen
+    /// Bild ist schlimmer (2026-10-27).
+    bool hatAusschnitt() const { return m_ausschnittGesetzt; }
+
     /// Width the dBm scale strip reserves along the right edge, 0 when hidden.
     ///
     /// Public so a parent laying widgets over this one can keep clear of it.
@@ -2430,6 +2436,9 @@ private:
 
     // ---- Frequency range ----
     double m_centerHz{14225000.0};    // 14.225 MHz default
+    // Ob je ein Ausschnitt GESETZT wurde — die Vorgabe oben zaehlt
+    // nicht. Die Kopfzeile des Panadapters haengt daran (2026-10-27).
+    bool   m_ausschnittGesetzt{false};
     double m_bandwidthHz{192000.0};   // 192 kHz default (P1 base sample rate)
     double m_ddcCenterHz{14225000.0};   // DDC hardware center frequency
     double m_sampleRateHz{768000.0};    // DDC sample rate
