@@ -83,6 +83,20 @@ public:
     // Empty when Hamlib is missing — an empty list is not an assertion
     // that no rotators exist, and callers must not treat it as one.
     static QVector<HamlibRotorEntry> supportedModels();
+
+    // Dasselbe fuer Funkgeraete, aus `rigctl --list` (2026-10-27, fuer
+    // das Begleitgeraet am Transverter). Dieselbe Tabelle, dieselben
+    // Spalten -- `rotctl --list` und `rigctl --list` unterscheiden sich
+    // nur in der Kopfzeile ("Rot #" gegen "Rig #"), die parseModelList
+    // ohnehin nicht liest.
+    //
+    // Zur Laufzeit geholt und nicht einprogrammiert, und das ist
+    // wichtig: die Modellnummern wandern zwischen Hamlib-Fassungen.
+    // Eine Tabelle im Quelltext waere irgendwann falsch, ohne dass es
+    // jemand merkt -- beim Contestprogramm gaben drei Websuchen am
+    // 2026-10-15 drei verschiedene Nummern fuer den TS-590.
+    static QVector<HamlibRotorEntry> supportedRigs();
+
     static QVector<HamlibRotorEntry> parseModelList(const QString& listOutput);
 
     // ── Installing ───────────────────────────────────────────────────

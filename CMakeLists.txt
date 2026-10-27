@@ -1113,6 +1113,7 @@ set(GUI_SOURCES
     src/gui/setup/TransmitSetupPages.cpp
     src/gui/setup/AppearanceSetupPages.cpp
     src/gui/setup/CatNetworkSetupPages.cpp
+    src/gui/setup/CompanionRigPage.cpp
     src/gui/setup/PgxlAdvancedPage.cpp
     src/gui/setup/TgxlAdvancedPage.cpp
     src/gui/setup/PgxlInterlockPage.cpp
@@ -1176,8 +1177,15 @@ set(GUI_SOURCES
     src/core/AdifNetworkUploader.cpp
     src/core/RotctldClient.cpp
     src/core/Gs232Rotor.cpp
+    src/core/HamlibDaemonProcess.cpp
     src/core/RotctldProcess.cpp
+    src/core/RigctldProcess.cpp
+    src/core/RigctldClient.cpp
     src/core/HamlibInstaller.cpp
+
+    # Transverter: was das ZF-Geraet zeigt, ist nicht, was auf der
+    # Antenne liegt. Reine Rechnung, ohne Geraet pruefbar.
+    src/core/TransverterSetup.cpp
 
     # ── Nereus Audio Channel Strip — DSP (ported from AetherSDR) ──
     #

@@ -1096,6 +1096,18 @@ longpath_add_test(tst_slice_model_vax)
 
 longpath_add_test(tst_transmit_model_tx_owner)
 
+# Transverter: die Umrechnung ZF <-> Antenne, und vor allem der
+# Fall, in dem NICHT gerechnet werden darf.
+longpath_add_test(tst_transverter_versatz)
+
+# Der CAT-Client gegen ein gefaelschtes rigctld: die Parser, der
+# Haenger-Fall der Vorlage, und die Zusage, nie zu tasten.
+longpath_add_test(tst_rigctld_client)
+
+# Die Einstellseite fuer das Begleitgeraet: gebaut, bedient und
+# abgelichtet, ohne Geraet und ohne Schirm.
+longpath_add_test(tst_begleitgeraet_seite)
+
 # ── Phase 3M-1a G.3: TransmitModel tunePowerByBand[14] per-MAC persistence ──
 longpath_add_test(tst_transmit_model_tune_power)
 
