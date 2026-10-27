@@ -7331,7 +7331,22 @@ bool RadioModel::setzeFlexAbstimmleistung(int prozent)
 
 bool RadioModel::flexAbstimmen(bool an)
 {
-    if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
+    // ── Jede Umkehr wird LAUT (2026-10-27) ───────────────────────────
+    //
+    // Der Betreiber drueckte TUNE, und im Protokoll stand nichts —
+    // weder „abgestimmt" noch „nicht abgestimmt". Eine stille Umkehr
+    // ist in so einer Kette dasselbe wie gar kein Code: man sieht
+    // nicht, an welcher der fuenf Stellen es endet.
+    qCInfo(lcConnection).nospace()
+        << "Flex-Abstimmen angefragt: " << (an ? "an" : "aus")
+        << ", Verbindung " << (m_flexConnection ? "da" : "FEHLT")
+        << ", steht " << (m_flexConnection && m_flexConnection->isConnected())
+        << ", Verriegelung gehoert " << m_flexVerriegelungGehoert
+        << ", darf senden " << m_flexDarfSenden;
+    if (!m_flexConnection || !m_flexConnection->isConnected()) {
+        qCWarning(lcConnection) << "Flex: nicht abgestimmt — keine Verbindung";
+        return false;
+    }
     // Dieselbe Trennung wie beim Tasten: nur ein gehoertes Nein ist
     // ein Nein. Siehe `flexTasten`.
     if (an && m_flexVerriegelungGehoert && !m_flexDarfSenden) {

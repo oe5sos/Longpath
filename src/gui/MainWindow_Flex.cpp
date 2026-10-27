@@ -862,8 +862,14 @@ void MainWindow::verdrahteFlexSenden()
     m_flexMoxBand = connect(&m_radioModel->transmitModel(),
                             &TransmitModel::moxChanged, this,
                             [this](bool an) {
+        qCInfo(lcFlexGui).nospace()
+            << "MOX gedrueckt: " << (an ? "an" : "aus")
+            << ", Zielscheibe " << m_flexTargetSliceId;
         if (m_shuttingDown || !m_radioModel) { return; }
-        if (m_flexTargetSliceId < 0) { return; }
+        if (m_flexTargetSliceId < 0) {
+            qCWarning(lcFlexGui) << "MOX verworfen: keine Flex-Zielscheibe";
+            return;
+        }
 
         if (an) {
             m_radioModel->sendeFlexBefehl(
@@ -891,8 +897,15 @@ void MainWindow::verdrahteFlexSenden()
     m_flexTuneBand = connect(&m_radioModel->transmitModel(),
                              &TransmitModel::tuneChanged, this,
                              [this](bool an) {
+        qCInfo(lcFlexGui).nospace()
+            << "TUNE gedrueckt: " << (an ? "an" : "aus")
+            << ", Zielscheibe " << m_flexTargetSliceId
+            << ", Abbau " << m_shuttingDown;
         if (m_shuttingDown || !m_radioModel) { return; }
-        if (m_flexTargetSliceId < 0) { return; }
+        if (m_flexTargetSliceId < 0) {
+            qCWarning(lcFlexGui) << "TUNE verworfen: keine Flex-Zielscheibe";
+            return;
+        }
         if (an && !m_radioModel->flexAbstimmen(true)) {
             m_radioModel->transmitModel().setTune(false);
         } else if (!an) {
