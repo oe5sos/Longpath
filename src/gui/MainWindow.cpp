@@ -18353,6 +18353,27 @@ void MainWindow::showAudioDiagnoseDialog()
 
 void MainWindow::onConnectionStateChanged()
 {
+    // ── Nicht mehr ins halb abgebaute Fenster greifen (2026-10-27) ───
+    //
+    // Abgestuerzt am Geraet, EXC_BAD_ACCESS, Bericht
+    // Longpath-2026-10-27-193030.ips. Der Faden:
+    //
+    //   FlexRadioConnection::onSocketDisconnected()
+    //     -> RadioModel::connectFlexRadio-Lambda
+    //     -> RadioModel::setConnectionState
+    //     -> connectionStateChanged
+    //     -> MainWindow::onConnectionStateChanged()   <- hier
+    //
+    // Beim Beenden faellt die TCP-Verbindung zur Flex, die Meldung
+    // laeuft durch, und dieses Fenster raeumt sich gerade ab. Dieselbe
+    // Klasse wie die vier Stellen vom 2026-10-15 (memory
+    // longpath-abbau-absturz-klasse): das Kind meldet sein Ende, der
+    // Rumpf greift in halb Abgebautes. Dieselbe Wache.
+    //
+    // Der Betreiber: „hat bis zum schluss gepasst, leider danach
+    // aufgehaengt."
+    if (m_shuttingDown) { return; }
+
     // Phase 3Q-8: forward state to the spectrum widgets for the disconnect
     // overlay.
     //
