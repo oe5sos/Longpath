@@ -7445,7 +7445,39 @@ void RadioModel::verarbeiteFlexVerriegelung(const QMap<QString, QString>& kv)
         }
     }
 
-    m_flexVerriegelungGehoert = true;
+    // ── „Gehoert" heisst: sie hat ueber DAS FELD gesprochen ──────────
+    //
+    // Erst hiesz „gehoert" nur: irgendeine Verriegelungszeile kam an.
+    // Am 2026-10-27 um 17:45:13 stand damit im Protokoll
+    //
+    //   Verriegelung gehoert true, darf senden false
+    //   Flex: nicht abgestimmt — die Maschine sperrt das Senden "" ""
+    //
+    // — Lage und Grund LEER. Die Maschine hatte also eine
+    // Verriegelungszeile geschickt, in der weder `state` noch
+    // `tx_allowed` stand, und mein Tor las erneut den Vorgabewert
+    // false als Verbot. Derselbe Fehler, eine Ebene tiefer.
+    //
+    // Also: gehoert ist nur, was ueber `tx_allowed` wirklich gesagt
+    // wurde. Alles andere bleibt Schweigen — und Schweigen ist kein
+    // Verbot.
+    if (!m_flexVerriegelungGehoert
+        && kv.contains(QStringLiteral("tx_allowed"))) {
+        m_flexVerriegelungGehoert = true;
+    }
+
+    // Beim ERSTEN Mal die ganze Zeile zeigen. „Welche Felder schickt
+    // sie eigentlich?" war aus dem Protokoll bisher nicht zu
+    // beantworten, und genau daran haengt das Tor.
+    if (!m_flexVerriegelungGezeigt) {
+        m_flexVerriegelungGezeigt = true;
+        QStringList felder;
+        for (auto it = kv.cbegin(); it != kv.cend(); ++it) {
+            felder << (it.key() + QLatin1Char('=') + it.value());
+        }
+        qCInfo(lcConnection) << "Flex-Verriegelung, erste Meldung:"
+                             << felder.join(QLatin1Char(' '));
+    }
 
     if (kv.contains(QStringLiteral("tx_allowed"))) {
         const bool darf = kv.value(QStringLiteral("tx_allowed")).trimmed()
@@ -7643,6 +7675,39 @@ void RadioModel::startFlexStreams()
                     m_flexPegelStempel = jetzt;
                 }
                 break;
+            }
+
+            // ── Sendeleistung und Stehwelle (2026-10-27) ────────────
+            //
+            // Betreiber, nachdem TUNE endlich durchkam: „tune
+            // funktioniert, zeigt aber keinen wert an".
+            //
+            // Die Balken FWD und SWR haengen an
+            // `RadioStatus::powerChanged`, und das fuettert sonst die
+            // PA-Abfrage des OpenHPSDR-Wegs (Thetis PollPAPWR). Bei der
+            // Flex gibt es die nicht — die Maschine misst selbst und
+            // schickt es im Messwertstrom mit: FWDPWR, REFPWR, SWR.
+            // Sie standen bisher nur in der Protokollzeile.
+            //
+            // Einheit: die Maschine meldet dBm, die Balken wollen
+            // WATT. W = 10^((dBm-30)/10).
+            {
+                std::optional<double> fwdW, refW;
+                for (const auto& s : w) {
+                    const auto def = m_flexMesswertNamen.value(s.index);
+                    if (def.first != QLatin1String("FWDPWR")
+                        && def.first != QLatin1String("REFPWR")) { continue; }
+                    const auto dbm = FlexVita::meterScaled(s.raw, def.second);
+                    if (!dbm) { continue; }
+                    const double watt = std::pow(10.0, (*dbm - 30.0) / 10.0);
+                    if (def.first == QLatin1String("FWDPWR")) { fwdW = watt; }
+                    else                                      { refW = watt; }
+                }
+                // Ruecklauf zuerst: `setForwardPower` rechnet die
+                // Stehwelle aus beiden, und so steht beim Emittieren
+                // der neue Ruecklauf schon drin.
+                if (refW) { m_radioStatus.setReflectedPower(*refW); }
+                if (fwdW) { m_radioStatus.setForwardPower(*fwdW); }
             }
 
             // Hoechstens alle fuenf Sekunden eine Zeile: die Maschine

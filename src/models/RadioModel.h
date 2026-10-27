@@ -3797,6 +3797,7 @@ private:
     // Senden ueber die Flex (Stufe 2). Vorgabe: gesperrt.
     bool                 m_flexDarfSenden{false};
     bool                 m_flexVerriegelungGehoert{false};
+    bool                 m_flexVerriegelungGezeigt{false};
     /// Welche Zustandsarten die Maschine schon geschickt hat — je Art
     /// eine Protokollzeile, damit „kommt das ueberhaupt an?" ohne
     /// Mitschnitt zu beantworten ist.

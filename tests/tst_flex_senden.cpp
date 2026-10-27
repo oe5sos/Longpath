@@ -264,13 +264,30 @@ private slots:
         QCOMPARE(radio.flexVerriegelungGehoert(), true);
         QCOMPARE(radio.flexDarfSenden(), false);
 
-        // Auch eine Meldung OHNE `tx_allowed` zaehlt als gehoert —
-        // die Maschine spricht, sie sagt nur zu diesem Feld nichts.
+        // ── Und eine Ebene tiefer derselbe Fehler (2026-10-27) ──────
+        //
+        // Hier stand: eine Meldung OHNE `tx_allowed` zaehlt auch als
+        // gehoert. Am Geraet kam genau so eine — weder `state` noch
+        // `tx_allowed` darin — und das Tor las wieder den Vorgabewert
+        // false als Verbot:
+        //
+        //   Verriegelung gehoert true, darf senden false
+        //   nicht abgestimmt — die Maschine sperrt das Senden "" ""
+        //
+        // „Gehoert" heisst jetzt: sie hat ueber DAS FELD gesprochen.
+        // Alles andere bleibt Schweigen, und Schweigen ist kein Verbot.
         RadioModel zweite;
         zweite.verarbeiteFlexVerriegelung({
             { QStringLiteral("state"), QStringLiteral("RECEIVE") },
         });
+        QCOMPARE(zweite.flexVerriegelungGehoert(), false);
+
+        // Erst mit dem Feld.
+        zweite.verarbeiteFlexVerriegelung({
+            { QStringLiteral("tx_allowed"), QStringLiteral("1") },
+        });
         QCOMPARE(zweite.flexVerriegelungGehoert(), true);
+        QCOMPARE(zweite.flexDarfSenden(), true);
     }
 
     void dieVerriegelungWirdGelesen()
@@ -317,6 +334,24 @@ private slots:
         QCOMPARE(radio.flexSendetGerade(), false);
         QCOMPARE(sendet.count(), 1);
         QCOMPARE(sendet.takeFirst().at(0).toBool(), false);
+    }
+
+    // ── dBm in Watt, fuer die Balken (2026-10-27) ───────────────────
+    //
+    // Betreiber: „tune funktioniert, zeigt aber keinen wert an". Die
+    // Flex misst selbst und schickt FWDPWR/REFPWR im Messwertstrom —
+    // in dBm. Die Balken wollen Watt. Die Umrechnung steht in
+    // RadioModel; hier wird sie an den Zahlen festgenagelt, die am
+    // Geraet vorkommen.
+    void dbmInWatt()
+    {
+        auto watt = [](double dbm) { return std::pow(10.0, (dbm - 30.0) / 10.0); };
+        // Die Zahl aus Martins Protokoll bei Ruhe.
+        QVERIFY(watt(0.0) < 0.002);            // 0 dBm = 1 mW
+        // 1 W, 10 W, 100 W.
+        QVERIFY(std::abs(watt(30.0) - 1.0)   < 0.001);
+        QVERIFY(std::abs(watt(40.0) - 10.0)  < 0.01);
+        QVERIFY(std::abs(watt(50.0) - 100.0) < 0.1);
     }
 
     void derGrundWirdMitgenommen()
