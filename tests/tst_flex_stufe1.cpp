@@ -978,6 +978,19 @@ private slots:
         QVERIFY(b.contains(QStringLiteral("client station Longpath")));
         QVERIFY(b.contains(QStringLiteral("sub slice all")));
         QVERIFY(b.contains(QStringLiteral("slice list")));
+
+        // ── Die Sendeebene muss bestellt sein (2026-10-27) ──────────
+        //
+        // Ohne `sub tx all` schickt die Maschine NIE einen
+        // `interlock`-Zustand. Stufe 1 brauchte ihn nicht; seit
+        // Stufe 2 ist er das Tor vor dem Tasten — und ein Tor, das nie
+        // eine Freigabe hoert, bleibt fuer immer zu. Genau daran
+        // scheiterte der erste Sendeversuch des Betreibers: „TUNE ist
+        // aber nicht gegangen", ohne dass eine Zeile Code falsch
+        // aussah.
+        QVERIFY2(b.contains(QStringLiteral("sub tx all")),
+                 "ohne `sub tx all` kommt nie eine Verriegelungsmeldung, "
+                 "und ohne die wird nie getastet");
         QVERIFY(b.contains(QStringLiteral("display panafall create x=100 y=100")));
         QVERIFY(b.contains(QStringLiteral(
             "slice create pan=40000000 freq=14.225000 mode=USB")));

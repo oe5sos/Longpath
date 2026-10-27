@@ -2690,6 +2690,12 @@ public slots:
     void updateFreedvReporterVisibility();
 
 signals:
+    // ── Senden ueber die Flex (2026-10-23, Stufe 2) ──────────────────
+    /// Die MASCHINE hat das Senden erlaubt oder gesperrt.
+    void flexSendefreigabeGeaendert(bool darf);
+    /// Die Maschine sendet / sendet nicht mehr — gleich wer getastet hat.
+    void flexSendetGeaendert(bool sendet);
+
     void infoChanged();
     // Phase 3Q-1: parametrized — state passed so UI consumers can act without
     // a secondary RadioModel::connectionState() read under race conditions.
@@ -3640,11 +3646,83 @@ public:
     /// Letzte, was ein Programm beim Starten tun soll.
     double flexGeraeteFrequenzHz() const { return m_flexGeraeteFrequenzHz; }
 
+    // ── Senden ueber die Flex (2026-10-23, Stufe 2) ──────────────────
+    //
+    // Nichts davon tastet von selbst. `flexDarfSenden()` ist das Tor,
+    // das die MASCHINE aufmacht (`interlock tx_allowed`), und
+    // `flexSendetGerade()` sagt, ob sie wirklich sendet — auch dann,
+    // wenn jemand die Taste am Mikrofon drueckt oder ein zweiter
+    // Client tastet.
+
+    /// Die Maschine erlaubt das Senden, so wie sie es zuletzt gemeldet
+    /// hat. Siehe auch `flexVerriegelungGehoert()`: ohne Meldung ist
+    /// dieser Wert eine VERMUTUNG, kein Befund.
+    bool flexDarfSenden() const { return m_flexDarfSenden; }
+
+    /// Ob ueberhaupt je eine Verriegelungsmeldung kam. Trennt „die
+    /// Maschine sagt nein" von „die Maschine hat nichts gesagt" —
+    /// zwei Dinge, die am 2026-10-27 einen Abend gekostet haben, weil
+    /// das Tasttor sie fuer dasselbe hielt.
+    bool flexVerriegelungGehoert() const { return m_flexVerriegelungGehoert; }
+
+    /// Die Maschine sendet gerade — gleich wer sie getastet hat.
+    bool flexSendetGerade() const { return m_flexSendetGerade; }
+
+    /// Die rohe Lage der Verriegelung (RECEIVE, PTT_REQUESTED,
+    /// TRANSMITTING, UNKEY_REQUESTED, TIMEOUT, STUCK_INPUT, TX_FAULT …)
+    /// und, wenn die Maschine einen nennt, der Grund.
+    QString flexVerriegelungsLage() const { return m_flexVerriegelungsLage; }
+    QString flexVerriegelungsGrund() const { return m_flexVerriegelungsGrund; }
+    QString flexVerriegelungsQuelle() const { return m_flexVerriegelungsQuelle; }
+
+    /// Einen fertigen Flex-Befehl hinausschicken. Fuer die Faelle, in
+    /// denen der Aufrufer den Wortlaut aus FlexCommandWire schon hat.
+    /// Gibt false zurueck, wenn keine Verbindung steht.
+    bool sendeFlexBefehl(const QString& befehl);
+
+    /// Tasten. Gibt true zurueck, wenn der Befehl hinausging.
+    ///
+    /// Beim Tasten (true) wird vorher geprueft: Verbindung da,
+    /// Sendescheibe gesetzt, und die Maschine hat das Senden erlaubt.
+    /// Beim LOESEN (false) wird NICHTS geprueft — ein Befehl, der
+    /// aufhoert zu senden, geht immer hinaus.
+    bool flexTasten(bool tasten);
+
+    /// Die Scheibe bestimmen, die senden soll. Ohne das weist die
+    /// Maschine `xmit` ab.
+    bool setzeFlexSendescheibe(const QString& sliceId);
+    QString flexSendescheibe() const { return m_flexSendescheibenId; }
+
+    /// Sende- und Abstimmleistung in Prozent (0..100).
+    bool setzeFlexSendeleistung(int prozent);
+    bool setzeFlexAbstimmleistung(int prozent);
+
+    /// Der Abstimmtraeger. Taktet mit der Abstimmleistung.
+    bool flexAbstimmen(bool an);
+
+    /// Den Sendetonstrom anlegen lassen. Die Antwort traegt die
+    /// Kennung, die danach in jedes Tonpaket gehoert.
+    void legeFlexSendetonstromAn();
+    quint32 flexSendetonstromId() const { return m_flexSendetonstromId; }
+
+    /// Ein Stueck Mikrofonton an die Maschine. `stereoInterleaved`
+    /// sind `frames` Rahmen zu zwei Kanaelen, Fliesskomma -1..+1.
+    /// Gibt die Zahl gesendeter Pakete zurueck.
+    int sendeFlexMikrofonton(const float* stereoInterleaved, int frames);
+
+    /// Die Verriegelungsmeldung der Maschine auswerten. Liest nur und
+    /// tastet nichts — oeffentlich, damit ein Pruefstand das Tor vor
+    /// dem Tasten pruefen kann, ohne ein Funkgeraet anzufassen (und
+    /// ohne einen `#ifdef`-Wächter, der lokal gruen und in der CI rot
+    /// ist; siehe memory longpath-pch-verdeckt-fehlende-deklaration).
+    void verarbeiteFlexVerriegelung(const QMap<QString, QString>& kv);
+
 private:
     /// Den selbst gesetzten Ausschnitt uebernehmen. Noetig, weil die
     /// Maschine eine von uns gesetzte Panadaptermitte NICHT
     /// zurueckechot — gemessen am 2026-10-23.
     void uebernimmFlexPanMitte(double mitteMhz);
+
 public:
 
 private:
@@ -3715,6 +3793,24 @@ private:
     double               m_flexPanBreiteMhz{0.0};
     /// Zuletzt von der Maschine gemeldete Scheibenfrequenz (Hertz).
     double               m_flexGeraeteFrequenzHz{0.0};
+
+    // Senden ueber die Flex (Stufe 2). Vorgabe: gesperrt.
+    bool                 m_flexDarfSenden{false};
+    bool                 m_flexVerriegelungGehoert{false};
+    bool                 m_flexVerriegelungGezeigt{false};
+    bool                 m_flexLeistungGesehen{false};
+    /// Welche Zustandsarten die Maschine schon geschickt hat — je Art
+    /// eine Protokollzeile, damit „kommt das ueberhaupt an?" ohne
+    /// Mitschnitt zu beantworten ist.
+    QSet<QString>        m_flexGesehenenArten;
+    bool                 m_flexSendetGerade{false};
+    QString              m_flexVerriegelungsLage;
+    QString              m_flexVerriegelungsGrund;
+    QString              m_flexVerriegelungsQuelle;
+    QString              m_flexSendescheibenId;
+    quint32              m_flexSendetonstromId{0};
+    quint8               m_flexSendetonZaehler{0};
+    QVector<float>       m_flexSendetonRest;
     /// Der Ausschnitt, den die Wasserfallkachel zuletzt meldete
     /// (Hertz). `tuneFlexSlice` erkennt daran, wann die Scheibe aus
     /// dem Bild laeuft.

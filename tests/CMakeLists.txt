@@ -7969,6 +7969,7 @@ longpath_add_test(tst_flex_ton_und_pegel)
 # Strom (0x8004) mit eigener Intensitaetseinheit. Dieser Stand haelt
 # fest, dass er nicht in den dBm-Weg geraet.
 longpath_add_test(tst_flex_wasserfall_kachel)
+longpath_add_test(tst_flex_senden)
 
 # 2026-10-22: der „Lattenzaun" im Panadapter. Ein echter Rahmen von
 # Martins FLEX-8400 geht durch denselben Zeichenweg wie im Programm,

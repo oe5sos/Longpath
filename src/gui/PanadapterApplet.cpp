@@ -218,11 +218,51 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
 
     // Die Mitte laeuft mit. Ohne Verbindung steht nur der Name da —
     // eine Frequenz ohne Radio waere eine Behauptung.
-    connect(m_spectrum, &SpectrumWidget::frequencyRangeChanged, this,
-            [this](double centerHz, double) {
+    auto zeigeMitte = [this](double centerHz) {
         m_titleLabel->setText(QString::fromUtf8("PANADAPTER \xc2\xb7 %1 MHz")
             .arg(centerHz / 1.0e6, 0, 'f', 6));
-    });
+    };
+    connect(m_spectrum, &SpectrumWidget::frequencyRangeChanged, this,
+            [zeigeMitte](double centerHz, double) { zeigeMitte(centerHz); });
+
+    // ── Die Mitte wandert auch auf dem ANDEREN Weg (2026-10-27) ──────
+    //
+    // Gemessen, nachdem die Flaeche jeden gesetzten Ausschnitt meldet:
+    // `setFrequencyRange` ist nicht die einzige Stelle, die
+    // `m_centerHz` bewegt. VIER weitere schreiben ihn direkt —
+    // Zoomziehen auf den VFO, das Nachscrollen an den beiden
+    // Bildraendern (Thetis console.cs:31371, W2PA) und
+    // `recenterOnVfo`. Alle vier melden `centerChanged`, keine
+    // `frequencyRangeChanged`.
+    //
+    // Die Kopfzeile hing nur am zweiten Signal. Darum stand am Geraet
+    // „PANADAPTER · 14.105191 MHz" ueber einer Skala von 7,13 bis
+    // 7,21: die Skala malt aus `m_centerHz`, der dem VFO gefolgt war,
+    // die Kopfzeile aus dem letzten Wert, der durch
+    // `setFrequencyRange` kam.
+    //
+    // Sie haengt jetzt an beiden. Nicht umgekehrt — aus den vier
+    // Stellen zusaetzlich `frequencyRangeChanged` zu werfen, haette
+    // alles mitgezogen, was daran haengt (Ablage, Weitbandrechnung),
+    // und zwar bei jedem gescrollten Bildpunkt.
+    connect(m_spectrum, &SpectrumWidget::centerChanged, this,
+            [zeigeMitte](double centerHz) { zeigeMitte(centerHz); });
+
+    // ── Kein Setzen beim Bauen (2026-10-27, verworfen) ───────────────
+    //
+    // Hier stand ein Griff, der die Kopfzeile gleich beim Bauen aus
+    // der Flaeche fuellt. Er war eine VERMUTUNG ueber die Ursache von
+    // „PANADAPTER · 14.105191 MHz" ueber einer Skala von 7,13 bis
+    // 7,21 MHz — und er hat den Pruefstand umgeworfen, der sagt: ohne
+    // Radio steht NUR der Name da. Zu Recht: beim Bauen steht in der
+    // Flaeche die Vorgabe, nicht das Band des Betreibers.
+    //
+    // Die Ursache ist damit offen. Was feststeht: die Skala malt aus
+    // `m_centerHz` (hzToX), die Kopfzeile liest denselben Wert ueber
+    // `frequencyRangeChanged` — sie koennen nur auseinanderlaufen,
+    // wenn eine Aenderung das Signal nicht erreicht. Die Flaeche
+    // meldet jeden gesetzten Ausschnitt jetzt mit ihrem Namen ins
+    // Protokoll; der naechste Lauf am Geraet zeigt, welcher fehlt.
 
     // Phase 3F Sub-Epic E Task 2: per-pan status overlay in top-right.
     // Positioned manually in resizeEvent so the spectrum host owns the full

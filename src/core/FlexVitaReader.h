@@ -233,6 +233,39 @@ Ausschnitt aufKachelZentriert(double panTiefHz, double panHochHz,
                               double kachelTiefHz, double kachelHochHz,
                               double schwelleHz = 1000.0);
 
+// ── Der Sendeton hinaus (2026-10-23, Stufe 2) ────────────────────────
+//
+// Die Flex rechnet selbst. Es geht also kein fertiges Sendesignal
+// hinaus wie bei OpenHPSDR, sondern Mikrofonton — als VITA-49-Paket
+// auf einem Strom vom Typ `dax_tx`, den die Maschine auf Befehl
+// anlegt (siehe `createDaxTxStreamCommand`).
+//
+// Der Kopf ist NICHT derselbe wie beim Empfang: dort kommt
+// `ExtDataWithStream` (Pakettyp 3), hier geht `IFDataWithStream`
+// (Pakettyp 1) hinaus, mit sieben Kopfwoertern statt der 28 Byte des
+// Empfangskopfes.
+//
+// From AetherSDR AudioEngine.cpp:8770-8826 [@d58e2b8a] —
+// buildVitaTxPacket(), Feld fuer Feld:
+//   Bit 31-28 Pakettyp 1, Bit 27 C=1, Bit 26 T=0,
+//   Bit 23-22 TSI=3 (Other), Bit 21-20 TSF=1 (SampleCount),
+//   Bit 19-16 Rollzaehler, Bit 15-0 Paketlaenge in Woertern.
+// Danach Stromkennung, OUI, Klassencodes, drei Zeitstempelwoerter
+// (alle null), dann float32 stereo in Big-Endian.
+//
+// `zaehler` laeuft 0..15 und wird vom Aufrufer gehalten; jedes Paket
+// erhoeht ihn. 128 Rahmen je Paket, wie in der Vorlage
+// (TX_SAMPLES_PER_PACKET).
+constexpr int    kTxFramesProPaket = 128;
+constexpr int    kTxHeaderWords    = 7;
+constexpr quint32 kFlexOui         = 0x001C2D;
+constexpr quint16 kPacketClassIfNarrow = 0x03E3;
+
+QByteArray buildTxAudioPacket(quint32 streamId,
+                              const float* stereoInterleaved,
+                              int frames,
+                              quint8& zaehler);
+
 // ── Messwerte, Paketklasse 0x8002 ───────────────────────────────────
 //
 // Am 2026-10-21 an Martins FLEX-8400 gemessen: 653 Pakete in 22 s

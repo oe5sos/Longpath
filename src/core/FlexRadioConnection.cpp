@@ -274,6 +274,74 @@ QString normalizedFlexId(QString text)
 
 // From AetherSDR RadioStatusOwnership.h:48-60 [@d58e2b8a] —
 // parsePanafallCreatePanId().
+// ── Senden (2026-10-23, Stufe 2) ─────────────────────────────────────
+
+QString xmitCommand(bool tasten)
+{
+    return QStringLiteral("xmit %1").arg(tasten ? 1 : 0);
+}
+
+QString setSliceTxCommand(const QString& sliceId, bool sendet)
+{
+    if (sliceId.isEmpty()) { return QString(); }
+    return QStringLiteral("slice set %1 tx=%2").arg(sliceId).arg(sendet ? 1 : 0);
+}
+
+QString setRfPowerCommand(int prozent)
+{
+    if (prozent < 0 || prozent > 100) { return QString(); }
+    return QStringLiteral("transmit set rfpower=%1").arg(prozent);
+}
+
+QString setTunePowerCommand(int prozent)
+{
+    if (prozent < 0 || prozent > 100) { return QString(); }
+    return QStringLiteral("transmit set tunepower=%1").arg(prozent);
+}
+
+QString tuneCommand(bool an)
+{
+    return QStringLiteral("transmit tune %1").arg(an ? 1 : 0);
+}
+
+QString setDaxRouteCommand(bool ueberDax)
+{
+    return QStringLiteral("transmit set dax=%1").arg(ueberDax ? 1 : 0);
+}
+
+QString createDaxTxStreamCommand()
+{
+    return QStringLiteral("stream create type=dax_tx");
+}
+
+quint32 streamIdFromCreateReply(const QString& body)
+{
+    auto lies = [](QString text) -> quint32 {
+        text = text.trimmed();
+        if (text.isEmpty()) { return 0; }
+        bool ok = false;
+        const quint32 id = text.startsWith(QStringLiteral("0x"), Qt::CaseInsensitive)
+            ? text.mid(2).toUInt(&ok, 16)
+            : text.toUInt(&ok, 16);
+        return ok ? id : 0;
+    };
+
+    const QMap<QString, QString> kvs = parseKVs(body);
+    for (const QString& name : { QStringLiteral("stream_id"),
+                                 QStringLiteral("stream"),
+                                 QStringLiteral("id") }) {
+        if (kvs.contains(name)) {
+            const quint32 id = lies(kvs.value(name));
+            if (id != 0) { return id; }
+        }
+    }
+
+    // Nackt, als erstes Glied einer Kommaliste — dieselbe Form, in der
+    // auch `display panafall create` antwortet.
+    const QStringList parts = body.trimmed().split(QLatin1Char(','));
+    return parts.isEmpty() ? 0 : lies(parts.constFirst());
+}
+
 QString panIdFromCreateReply(const QString& body)
 {
     const QMap<QString, QString> kvs = parseKVs(body);
@@ -629,6 +697,25 @@ void FlexRadioConnection::onGuiClientAccepted(const QString& body)
     // ist mit `#` getrennt statt mit Leerzeichen, was `parseKVs` seit
     // #297 beruecksichtigt.
     sendCommand(QStringLiteral("sub meter all"));
+
+    // ── Ohne das kommt NIE eine Verriegelungsmeldung (2026-10-27) ───
+    //
+    // Die Maschine schickt den `interlock`-Zustand nur an Clients, die
+    // die Sendeebene bestellt haben. Stufe 1 brauchte sie nicht und
+    // bestellte sie nicht — mit Stufe 2 ist sie das TOR vor dem
+    // Tasten, und ein Tor, das nie eine Freigabe hoert, bleibt fuer
+    // immer zu.
+    //
+    // Genau daran scheiterte der erste Sendeversuch des Betreibers am
+    // 2026-10-27: „TUNE ist aber nicht gegangen". `flexAbstimmen` und
+    // `flexTasten` fragen `m_flexDarfSenden`, und das stand mangels
+    // Meldung auf seinem Vorgabewert false. Ein stilles Nein, das in
+    // keiner Zeile Code falsch aussieht.
+    //
+    // From AetherSDR RadioModel.cpp:6596 [@d58e2b8a] — `sub tx all`
+    // steht dort in derselben Reihe wie `sub slice all` und
+    // `sub meter all`.
+    sendCommand(QStringLiteral("sub tx all"));
 
     queryAndRecoverSlices();
 }

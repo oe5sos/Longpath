@@ -458,6 +458,191 @@ private slots:
         QVERIFY(!FlexVita::aufKachelZentriert(21.1e6, 21.3e6, 0.0, 0.0)
                      .geaendert);
     }
+
+    // ── 7. Beide Bilder bei ZOOM (2026-10-27) ───────────────────────
+    //
+    // Betreiber: „leider ist das untere und das obere Signal im
+    // Wasserfall nicht auf allen frequenzen gleich … teilweise passt
+    // er, teilweise nicht."
+    //
+    // Am Geraet ist das schwer zu fassen, weil beide Bilder nur dann
+    // vergleichbar sind, wenn in beiden dasselbe Signal steht. Hier
+    // steht in beiden DERSELBE Traeger, an derselben Frequenz, und
+    // gefragt ist nur: landet er auf demselben Bildpunkt?
+    //
+    // Gefahren wird es bei VOLLER Breite und bei Zoom. Der Zoom ist
+    // der Fall, der die beiden Wege wirklich trennt: die Kachel wird
+    // ueber die Frequenz abgebildet, die Bild-FFT ueber einen
+    // Bin-Ausschnitt (`visibleBinRange`), und der wird auf GANZE Bins
+    // aufgerundet.
+    void beideBilderTreffenDenselbenPunkt()
+    {
+        auto lauf = [this](double fensterBreiteHz, double fensterMitteHz,
+                           double bandMitteHz, const char* was) {
+            SpectrumWidget sw;
+            sw.setWaterfallAveraging(SpectrumAveraging::None);
+            sw.setWaterfallDetector(SpectrumDetector::Peak);
+            sw.setSpectrumAveraging(SpectrumAveraging::None);
+            sw.setKiwiDisplaySource(true);
+            sw.resize(1200, 600);
+            sw.show();
+            QTest::qWait(300);
+
+            // Ausschnitt der Maschine: 200 kHz um die Bandmitte.
+            const double tief = bandMitteHz - 100.0e3;
+            const double hoch = bandMitteHz + 100.0e3;
+            // Der Traeger steht 40 kHz ueber der Mitte.
+            const double traegerHz = bandMitteHz + 40.0e3;
+
+            sw.setFrequencyRange(fensterMitteHz, fensterBreiteHz);
+
+            // Die Bild-FFT: 4096 Bins ueber den Ausschnitt.
+            const int bins = 4096;
+            QVector<float> dbm(bins, -120.0f);
+            const int tBin = int((traegerHz - tief) / ((hoch - tief) / bins));
+            dbm[tBin] = -40.0f;
+            for (int n = 0; n < 3; ++n) {
+                sw.updateKiwiSpectrumDbm(dbm, tief, hoch);
+            }
+            const QVector<float> px = sw.renderedPixels();
+
+            // Die Kachel: derselbe Traeger, eigene Binzahl und ein
+            // etwas breiterer Bereich — so schickt die Maschine sie.
+            const double kTief = tief - 15.0e3;
+            const double kHoch = hoch + 15.0e3;
+            const int kBins = 2460;
+            QVector<float> kach(kBins, 96.0f);
+            kach[int((traegerHz - kTief) / ((kHoch - kTief) / kBins))] = 120.0f;
+            sw.zeigeFremdeWasserfallzeile(kach, kTief, kHoch);
+            const QVector<quint8> stufen = sw.wfZeilenstufenForTest();
+
+            if (px.isEmpty() || stufen.isEmpty()) { return -1.0; }
+
+            int pxMax = 0;
+            for (int i = 1; i < px.size(); ++i) {
+                if (px[i] > px[pxMax]) { pxMax = i; }
+            }
+            int wfMax = 0;
+            for (int i = 1; i < stufen.size(); ++i) {
+                if (stufen[i] > stufen[wfMax]) { wfMax = i; }
+            }
+            // Beide auf denselben Maszstab: Anteil der Breite.
+            const double pxAnteil = double(pxMax) / qMax(1, px.size() - 1);
+            const double wfAnteil = double(wfMax) / qMax(1, stufen.size() - 1);
+            const double abstandHz = (pxAnteil - wfAnteil) * fensterBreiteHz;
+            qInfo().nospace()
+                << was << ": Spektrum bei " << pxAnteil
+                << ", Kachel bei " << wfAnteil
+                << " — Abstand " << (abstandHz / 1.0e3) << " kHz";
+            return abstandHz;
+        };
+
+        // ── Auf jedem Band (2026-10-27) ──────────────────────────
+        //
+        // Betreiber: „messe bitte, auch auf unterschiedlichen
+        // baendern". Am Geraet haengt so eine Messung davon ab, ob
+        // gerade in beiden Bildhaelften etwas steht; hier steht
+        // ueberall derselbe Traeger, und die Frage ist blosz, ob die
+        // Abbildung ueber den ganzen Kurzwellenbereich traegt.
+        struct Band { double mitte; const char* name; };
+        const Band baender[] = {
+            { 1.840e6,  "160 m" }, { 3.650e6,  "80 m" },
+            { 7.150e6,  "40 m" },  { 14.200e6, "20 m" },
+            { 21.200e6, "15 m" },  { 28.500e6, "10 m" },
+        };
+        for (const Band& b : baender) {
+            const double voll = lauf(200.0e3, b.mitte, b.mitte,
+                                     QStringLiteral("%1, volle Breite")
+                                         .arg(b.name).toUtf8().constData());
+            const double zoom = lauf(20.0e3, b.mitte + 40.0e3, b.mitte,
+                                     QStringLiteral("%1, zehnfach")
+                                         .arg(b.name).toUtf8().constData());
+            QVERIFY2(voll > -1.0e9 && zoom > -1.0e9,
+                     "kein Bild — das Fenster hat keine Flaeche");
+            // Ein Bildpunkt ist bei voller Breite 167 Hz breit, zwei
+            // davon sind die Decke. Gezoomt ist er nur noch 17 Hz
+            // breit; der Abstand in HERTZ darf trotzdem nicht wachsen,
+            // sonst waere es ein Maszstabsfehler, der mit dem Zoom
+            // aufgeht.
+            QVERIFY2(std::abs(voll) < 400.0, qPrintable(
+                QStringLiteral("%1 volle Breite: %2 Hz auseinander")
+                    .arg(b.name).arg(voll)));
+            QVERIFY2(std::abs(zoom) < 400.0, qPrintable(
+                QStringLiteral("%1 gezoomt: %2 Hz auseinander (voll %3 Hz)")
+                    .arg(b.name).arg(zoom).arg(voll)));
+        }
+    }
+
+    // ── 8. Ein Fenster neben der FFT wird GEDEHNT (2026-10-27) ──────
+    //
+    // Der eigentliche Fund hinter „immer beim verschieben kommt es zu
+    // den problemen". Ragt das Fenster ueber den Bereich der Bild-FFT
+    // hinaus, klemmt `visibleBinRange` den Bin-Ausschnitt ab — und der
+    // geklemmte Rest wird ueber die GANZE Breite gezogen. Das ist kein
+    // Versatz, sondern eine Dehnung mit Drehpunkt am Rand: links
+    // stimmt es fast, rechts immer weniger.
+    //
+    // Am Geraet gemessen (19:12): Fenster 7,0961 MHz, FFT um 7,0788 —
+    // 17,3 kHz daneben, Maszstab 1,072, linke Haelfte 42 Punkte
+    // Versatz, rechte 83.
+    //
+    // Dieser Stand haelt fest, dass es ueberhaupt passiert, und wie
+    // stark. Behoben wird es, indem der Panadapter der Maschine dem
+    // Fenster eng folgt (Totband 1 % statt 10 %), nicht hier.
+    void einFensterNebenDerFftWirdGedehnt()
+    {
+        SpectrumWidget sw;
+        sw.setWaterfallAveraging(SpectrumAveraging::None);
+        sw.setSpectrumAveraging(SpectrumAveraging::None);
+        sw.setKiwiDisplaySource(true);
+        sw.resize(1200, 600);
+        sw.show();
+        QTest::qWait(300);
+
+        // Die FFT deckt 7,000–7,200; der Traeger steht bei 7,040.
+        const double tief = 7.000e6, hoch = 7.200e6;
+        const double traegerHz = 7.040e6;
+        const int bins = 4096;
+        QVector<float> dbm(bins, -120.0f);
+        dbm[int((traegerHz - tief) / ((hoch - tief) / bins))] = -40.0f;
+
+        auto wo = [&](double fensterMitte) {
+            sw.setFrequencyRange(fensterMitte, 200.0e3);
+            for (int n = 0; n < 3; ++n) {
+                sw.updateKiwiSpectrumDbm(dbm, tief, hoch);
+            }
+            const QVector<float> px = sw.renderedPixels();
+            if (px.isEmpty()) { return -1.0; }
+            int m = 0;
+            for (int i = 1; i < px.size(); ++i) { if (px[i] > px[m]) { m = i; } }
+            // Zurueck in Hertz, so wie das Fenster es behauptet.
+            return fensterMitte - 100.0e3
+                   + double(m) / (px.size() - 1) * 200.0e3;
+        };
+
+        // Deckungsgleich: der Traeger steht an seiner Frequenz.
+        const double genau = wo(7.100e6);
+        QVERIFY(genau > 0.0);
+        qInfo().nospace() << "Fenster deckungsgleich: Traeger bei "
+                          << (genau / 1.0e6) << " MHz (soll 7.04)";
+        QVERIFY2(std::abs(genau - traegerHz) < 500.0, qPrintable(
+            QStringLiteral("deckungsgleich schon daneben: %1 Hz")
+                .arg(genau - traegerHz)));
+
+        // 17,3 kHz daneben — die Lage, die am Geraet stand.
+        const double daneben = wo(7.100e6 + 17.3e3);
+        QVERIFY(daneben > 0.0);
+        qInfo().nospace() << "Fenster 17,3 kHz daneben: Traeger bei "
+                          << (daneben / 1.0e6) << " MHz, also "
+                          << ((daneben - traegerHz) / 1.0e3) << " kHz falsch";
+
+        // Und das ist die Aussage: es IST falsch, und zwar deutlich.
+        // Keine Decke nach oben — dieser Stand beschreibt, was ohne
+        // engen Nachzug passiert, er fordert es nicht.
+        QVERIFY2(std::abs(daneben - traegerHz) > 1000.0, qPrintable(
+            QStringLiteral("erwartet eine sichtbare Dehnung, gemessen "
+                           "%1 Hz").arg(daneben - traegerHz)));
+    }
 };
 
 QTEST_MAIN(TstFlexWasserfallKachel)

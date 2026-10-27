@@ -100,6 +100,27 @@ public:
     bool    isRunning() const;
     quint16 localPort() const { return m_localPort; }
 
+    // ── Der Sendeton hinaus (2026-10-23, Stufe 2) ────────────────────
+    //
+    // Dieselbe Buchse wie der Empfang, aber an Port 4991 statt 4992:
+    // die Anmeldung geht an 4992 (dort lernt die Maschine unsere
+    // Adresse), die VITA-Pakete gehen an 4991.
+    //
+    // From AetherSDR PanadapterStream.cpp:285 [@d58e2b8a] —
+    //   m_radioPort = 4991;   // „Store radio address for sendToRadio
+    //                         //  (DAX TX path)"
+    //
+    // Gibt die Zahl gesendeter Bytes zurueck, 0 wenn nichts hinausging
+    // (keine Adresse, Buchse zu, leeres Paket). Der Aufrufer darf das
+    // ignorieren; gezaehlt wird es trotzdem, damit „es geht nichts
+    // hinaus" nicht erst am Geraet auffaellt.
+    qint64 sendeTxPaket(const QByteArray& paket);
+
+    /// Wie viele Sendepakete bisher hinausgingen. Nur zum Ablesen.
+    qint64 txPaketeGesendet() const { return m_txPaketeGesendet; }
+
+    static constexpr quint16 kTxPort = 4991;
+
     // Der Maszstab je Strom. Siehe Kopf: es gibt kein Echo.
     void setYPixels(quint32 streamId, int yPixels);
     void setDbmRange(quint32 streamId, double minDbm, double maxDbm);
@@ -148,6 +169,7 @@ private:
     QUdpSocket m_socket;
     QHostAddress m_radioAddress;
     quint16 m_localPort{0};
+    qint64 m_txPaketeGesendet{0};
 
     FlexFftAssembler  m_fft;
     FlexTileAssembler m_tiles;

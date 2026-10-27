@@ -14343,9 +14343,27 @@ void MainWindow::wireSliceToSpectrum()
     const double loadedBw = activeSpectrumWidget()->bandwidth();
     const double initialBw = (loadedBw >= 10000.0 && loadedBw <= 768000.0)
                              ? loadedBw : 768000.0;
-    activeSpectrumWidget()->setFrequencyRange(freq, initialBw);
-    activeSpectrumWidget()->setDdcCenterFrequency(freq);
-    activeSpectrumWidget()->setSampleRate(768000.0);
+    // ── Nicht ueber ein fremdes Bild schreiben (2026-10-27) ──────────
+    //
+    // Diese drei Zeilen setzen den Ausschnitt aus der Scheibe und
+    // melden der Flaeche eine DDC-Mitte und 768 kHz Abtastrate — beides
+    // gilt nur fuer ein OpenHPSDR-Geraet, bei dem Longpath selbst
+    // rechnet. Bei der Flex rechnet die Maschine, und ihr Ausschnitt
+    // steht schon in der Flaeche.
+    //
+    // Im Protokoll des Betreibers sah das so aus:
+    //   18:55:36.933  Ausschnitt gesetzt auf "Pan_pan-0": 7.175 MHz
+    //   18:55:37.009  Ausschnitt gesetzt auf "Pan_pan-0": 14.225 MHz
+    // — 76 ms nach dem Ausschnitt der Maschine kam die Vorgabe des
+    // Profils darueber, samt einer Abtastrate, die das Flex-Bild gar
+    // nicht hat. `setDdcCenterFrequency`/`setSampleRate` sind beim
+    // Flex die Abbildung der Bild-FFT; sie hier zu ueberschreiben
+    // heisst, das Spektrum an die falsche Frequenz zu haengen.
+    if (!activeSpectrumWidget()->kiwiDisplaySource()) {
+        activeSpectrumWidget()->setFrequencyRange(freq, initialBw);
+        activeSpectrumWidget()->setDdcCenterFrequency(freq);
+        activeSpectrumWidget()->setSampleRate(768000.0);
+    }
     activeSpectrumWidget()->setVfoFrequency(freq);
     activeSpectrumWidget()->setFilterOffset(slice->filterLow(), slice->filterHigh());
     activeSpectrumWidget()->setStepSize(slice->stepHz());
@@ -18335,6 +18353,27 @@ void MainWindow::showAudioDiagnoseDialog()
 
 void MainWindow::onConnectionStateChanged()
 {
+    // ── Nicht mehr ins halb abgebaute Fenster greifen (2026-10-27) ───
+    //
+    // Abgestuerzt am Geraet, EXC_BAD_ACCESS, Bericht
+    // Longpath-2026-10-27-193030.ips. Der Faden:
+    //
+    //   FlexRadioConnection::onSocketDisconnected()
+    //     -> RadioModel::connectFlexRadio-Lambda
+    //     -> RadioModel::setConnectionState
+    //     -> connectionStateChanged
+    //     -> MainWindow::onConnectionStateChanged()   <- hier
+    //
+    // Beim Beenden faellt die TCP-Verbindung zur Flex, die Meldung
+    // laeuft durch, und dieses Fenster raeumt sich gerade ab. Dieselbe
+    // Klasse wie die vier Stellen vom 2026-10-15 (memory
+    // longpath-abbau-absturz-klasse): das Kind meldet sein Ende, der
+    // Rumpf greift in halb Abgebautes. Dieselbe Wache.
+    //
+    // Der Betreiber: „hat bis zum schluss gepasst, leider danach
+    // aufgehaengt."
+    if (m_shuttingDown) { return; }
+
     // Phase 3Q-8: forward state to the spectrum widgets for the disconnect
     // overlay.
     //

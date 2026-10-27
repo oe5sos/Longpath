@@ -7048,6 +7048,43 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                     }
                 }
             }
+
+            // ── Die Verriegelung der Maschine (2026-10-23, Stufe 2) ──
+            //
+            // Bis heute wurde sie nur gelesen, um sie zu ignorieren —
+            // im Kopf von FlexRadioConnection.h stand: „Die
+            // Interlock-Meldung der Maschine (`state=RECEIVE
+            // tx_allowed=0`) wird gelesen, nie geschrieben."
+            //
+            // Jetzt ist sie das Tor vor dem Tasten. Die Maschine sagt
+            // in `state`, wo sie steht, und in `tx_allowed`, ob sie
+            // ueberhaupt darf; `source` nennt den Ausloeser (SW fuer
+            // unser `xmit`, MIC/ACC/RCA fuer die Taste am Geraet).
+            //
+            // From AetherSDR RadioModel.cpp:10287-10370 [@d58e2b8a].
+            // Nicht uebernommen: die Eigentuemerrechnung ueber
+            // `tx_client_handle` (wir sind ein Client, kein
+            // Mehrclient-Betrieb) und die Mehrphasen-Benachrichtigung.
+            // ── Was schickt die Maschine ueberhaupt? (2026-10-27) ───
+            //
+            // Je Objektart EINMAL eine Zeile. Am 2026-10-27 stand die
+            // Frage „kommt `interlock` an oder nicht?" im Raum, und sie
+            // war aus dem Protokoll NICHT zu beantworten: wer nichts
+            // meldet, meldet auch nicht, dass er nichts bekommt.
+            // Einmal je Art kostet nichts und beantwortet es beim
+            // naechsten Verbinden in einer Zeile.
+            {
+                const QString art = object.trimmed().section(QLatin1Char(' '), 0, 0);
+                if (!art.isEmpty() && !m_flexGesehenenArten.contains(art)) {
+                    m_flexGesehenenArten.insert(art);
+                    qCInfo(lcConnection) << "Flex-Zustandsart zum ersten Mal:"
+                                         << art;
+                }
+            }
+
+            if (object.trimmed() == QLatin1String("interlock")) {
+                verarbeiteFlexVerriegelung(kv);
+            }
         });
 
         connect(m_flexConnection, &FlexRadioConnection::guiClientRegistered,
@@ -7173,6 +7210,304 @@ void RadioModel::uebernimmFlexPanMitte(double mitteMhz)
         << "Flex: Ausschnitt selbst nachgefuehrt " << (tief / 1.0e6)
         << "–" << (hoch / 1.0e6) << " MHz (die Maschine echot ihn nicht)";
     emit flexAusschnittGeaendert(tief, hoch);
+}
+
+// ── Senden ueber die Flex (2026-10-23, Stufe 2) ──────────────────────
+//
+// Die Reihenfolge ist nicht beliebig: ohne Sendescheibe weist die
+// Maschine `xmit` ab, und ohne ihre Freigabe (`interlock tx_allowed`)
+// tasten wir gar nicht erst. Das LOESEN laeuft durch kein Tor —
+// aufhoeren zu senden muss immer gehen, auch wenn gerade nichts
+// stimmt.
+
+bool RadioModel::sendeFlexBefehl(const QString& befehl)
+{
+    if (befehl.isEmpty()) { return false; }
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
+    m_flexConnection->sendCommand(befehl);
+    return true;
+}
+
+bool RadioModel::setzeFlexSendescheibe(const QString& sliceId)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
+    const QString befehl = FlexCommandWire::setSliceTxCommand(sliceId, true);
+    if (befehl.isEmpty()) { return false; }
+    m_flexConnection->sendCommand(befehl);
+    m_flexSendescheibenId = sliceId;
+    qCInfo(lcConnection).nospace()
+        << "Flex: Scheibe " << sliceId << " ist jetzt die Sendescheibe";
+    return true;
+}
+
+bool RadioModel::flexTasten(bool tasten)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) {
+        if (tasten) {
+            qCWarning(lcConnection) << "Flex: nicht getastet — keine Verbindung";
+        }
+        return false;
+    }
+
+    if (tasten) {
+        // ── Die drei Tore ────────────────────────────────────────────
+        //
+        // Jedes einzeln melden: „es sendet nicht" ohne Grund hat am
+        // 2026-10-22 einen Abend gekostet, als das Abstimmen still ins
+        // Leere lief.
+        if (m_flexSendescheibenId.isEmpty()) {
+            qCWarning(lcConnection)
+                << "Flex: nicht getastet — keine Sendescheibe gesetzt";
+            return false;
+        }
+        // ── Abwesenheit ist keine Aussage (2026-10-27) ───────────
+        //
+        // Hier stand `if (!m_flexDarfSenden) return false;` — und das
+        // hat jeden Sendeversuch des Betreibers verschluckt. Nicht,
+        // weil die Maschine nein sagte, sondern weil sie GAR NICHTS
+        // sagte: ihr `interlock`-Zustand kam nie an, und der
+        // Vorgabewert false wurde als Verbot gelesen.
+        //
+        // „TUNE ist aber nicht gegangen", dann „geht nicht" — und im
+        // Protokoll keine einzige Verriegelungszeile.
+        //
+        // Richtig ist die Trennung: hat die Maschine je gesprochen?
+        //   - Ja, und sie sagt nein  -> wir tasten nicht.
+        //   - Ja, und sie sagt ja    -> wir tasten.
+        //   - Nie gesprochen         -> wir tasten und lassen SIE
+        //     entscheiden. Die Flex hat ihre eigene Verriegelung; sie
+        //     sendet nicht, wenn sie nicht darf. Unser Tor war von
+        //     Anfang an nur ein zweites Schloss vor ihrem.
+        //
+        // Siehe memory feedback-abwesenheit-ist-keine-aussage: fehlende
+        // Daten nicht als Befund lesen. Ich habe genau das getan.
+        if (m_flexVerriegelungGehoert && !m_flexDarfSenden) {
+            qCWarning(lcConnection).nospace()
+                << "Flex: nicht getastet — die Maschine sperrt ("
+                << m_flexVerriegelungsLage
+                << (m_flexVerriegelungsGrund.isEmpty()
+                        ? QString()
+                        : QStringLiteral(", Grund ") + m_flexVerriegelungsGrund)
+                << ")";
+            return false;
+        }
+        if (!m_flexVerriegelungGehoert) {
+            qCWarning(lcConnection)
+                << "Flex: getastet, OHNE je eine Verriegelungsmeldung "
+                   "gehoert zu haben — die Maschine entscheidet selbst";
+        }
+    }
+
+    m_flexConnection->sendCommand(FlexCommandWire::xmitCommand(tasten));
+    qCInfo(lcConnection) << "Flex:" << (tasten ? "getastet" : "geloest");
+    return true;
+}
+
+bool RadioModel::setzeFlexSendeleistung(int prozent)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
+    const QString befehl = FlexCommandWire::setRfPowerCommand(prozent);
+    if (befehl.isEmpty()) {
+        qCWarning(lcConnection) << "Flex: Sendeleistung" << prozent
+                                << "liegt ausserhalb 0..100 — nichts geschickt";
+        return false;
+    }
+    m_flexConnection->sendCommand(befehl);
+    return true;
+}
+
+bool RadioModel::setzeFlexAbstimmleistung(int prozent)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
+    const QString befehl = FlexCommandWire::setTunePowerCommand(prozent);
+    if (befehl.isEmpty()) {
+        qCWarning(lcConnection) << "Flex: Abstimmleistung" << prozent
+                                << "liegt ausserhalb 0..100 — nichts geschickt";
+        return false;
+    }
+    m_flexConnection->sendCommand(befehl);
+    return true;
+}
+
+bool RadioModel::flexAbstimmen(bool an)
+{
+    // ── Jede Umkehr wird LAUT (2026-10-27) ───────────────────────────
+    //
+    // Der Betreiber drueckte TUNE, und im Protokoll stand nichts —
+    // weder „abgestimmt" noch „nicht abgestimmt". Eine stille Umkehr
+    // ist in so einer Kette dasselbe wie gar kein Code: man sieht
+    // nicht, an welcher der fuenf Stellen es endet.
+    qCInfo(lcConnection).nospace()
+        << "Flex-Abstimmen angefragt: " << (an ? "an" : "aus")
+        << ", Verbindung " << (m_flexConnection ? "da" : "FEHLT")
+        << ", steht " << (m_flexConnection && m_flexConnection->isConnected())
+        << ", Verriegelung gehoert " << m_flexVerriegelungGehoert
+        << ", darf senden " << m_flexDarfSenden;
+    if (!m_flexConnection || !m_flexConnection->isConnected()) {
+        qCWarning(lcConnection) << "Flex: nicht abgestimmt — keine Verbindung";
+        return false;
+    }
+    // Dieselbe Trennung wie beim Tasten: nur ein gehoertes Nein ist
+    // ein Nein. Siehe `flexTasten`.
+    if (an && m_flexVerriegelungGehoert && !m_flexDarfSenden) {
+        qCWarning(lcConnection)
+            << "Flex: nicht abgestimmt — die Maschine sperrt das Senden"
+            << m_flexVerriegelungsLage << m_flexVerriegelungsGrund;
+        return false;
+    }
+    m_flexConnection->sendCommand(FlexCommandWire::tuneCommand(an));
+    qCInfo(lcConnection) << "Flex: Abstimmtraeger" << (an ? "an" : "aus");
+    return true;
+}
+
+void RadioModel::legeFlexSendetonstromAn()
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexSendetonstromId != 0) { return; }
+    m_flexConnection->sendCommand(
+        FlexCommandWire::createDaxTxStreamCommand(),
+        [this](int code, const QString& body) {
+            if (code != 0) {
+                qCWarning(lcConnection).nospace()
+                    << "Flex: Sendetonstrom nicht angelegt, Code "
+                    << QString::number(code, 16) << " — " << body;
+                return;
+            }
+            const quint32 id = FlexCommandWire::streamIdFromCreateReply(body);
+            if (id == 0) {
+                qCWarning(lcConnection)
+                    << "Flex: Antwort auf `stream create` ohne Kennung —" << body;
+                return;
+            }
+            m_flexSendetonstromId = id;
+            m_flexSendetonZaehler = 0;
+            qCInfo(lcConnection).nospace()
+                << "Flex: Sendetonstrom 0x" << QString::number(id, 16);
+        });
+}
+
+int RadioModel::sendeFlexMikrofonton(const float* stereoInterleaved, int frames)
+{
+    if (!stereoInterleaved || frames <= 0) { return 0; }
+    if (m_flexSendetonstromId == 0 || !m_flexStream) { return 0; }
+
+    // Die Maschine will Pakete fester Groesze. Was nicht aufgeht,
+    // bleibt bis zum naechsten Mal liegen — sonst entstuende bei jedem
+    // Aufruf eine Naht im Ton.
+    m_flexSendetonRest.reserve(m_flexSendetonRest.size() + frames * 2);
+    for (int i = 0; i < frames * 2; ++i) {
+        m_flexSendetonRest.append(stereoInterleaved[i]);
+    }
+
+    const int proPaket = FlexVita::kTxFramesProPaket * 2;
+    int pakete = 0;
+    int gelesen = 0;
+    while (m_flexSendetonRest.size() - gelesen >= proPaket) {
+        const QByteArray paket = FlexVita::buildTxAudioPacket(
+            m_flexSendetonstromId,
+            m_flexSendetonRest.constData() + gelesen,
+            FlexVita::kTxFramesProPaket,
+            m_flexSendetonZaehler);
+        if (m_flexStream->sendeTxPaket(paket) > 0) { ++pakete; }
+        gelesen += proPaket;
+    }
+    if (gelesen > 0) {
+        m_flexSendetonRest.remove(0, gelesen);
+    }
+    return pakete;
+}
+
+// ── Die Verriegelung der Maschine (2026-10-23, Stufe 2) ──────────────
+//
+// `state` ist die Lage, `tx_allowed` das Tor, `source` der Ausloeser.
+// Die Flex meldet das ungefragt, auch wenn jemand anderes tastet oder
+// die Taste am Mikrofon gedrueckt wird.
+//
+// Was hier NICHT passiert: tasten. Diese Stelle liest nur und hebt
+// den Stand auf; wer senden will, fragt vorher `flexDarfSenden()`.
+void RadioModel::verarbeiteFlexVerriegelung(const QMap<QString, QString>& kv)
+{
+    bool geaendert = false;
+
+    if (kv.contains(QStringLiteral("state"))) {
+        const QString lage = kv.value(QStringLiteral("state")).trimmed().toUpper();
+        if (lage != m_flexVerriegelungsLage) {
+            m_flexVerriegelungsLage = lage;
+            geaendert = true;
+        }
+        // Die Maschine sendet wirklich. Das ist NICHT dasselbe wie
+        // „wir haben getastet": die Taste am Mikrofon, ein Fusschalter
+        // oder ein zweiter Client kommen hier genauso an.
+        const bool sendet = (lage == QLatin1String("TRANSMITTING"));
+        if (sendet != m_flexSendetGerade) {
+            m_flexSendetGerade = sendet;
+            emit flexSendetGeaendert(sendet);
+        }
+    }
+
+    // ── „Gehoert" heisst: sie hat ueber DAS FELD gesprochen ──────────
+    //
+    // Erst hiesz „gehoert" nur: irgendeine Verriegelungszeile kam an.
+    // Am 2026-10-27 um 17:45:13 stand damit im Protokoll
+    //
+    //   Verriegelung gehoert true, darf senden false
+    //   Flex: nicht abgestimmt — die Maschine sperrt das Senden "" ""
+    //
+    // — Lage und Grund LEER. Die Maschine hatte also eine
+    // Verriegelungszeile geschickt, in der weder `state` noch
+    // `tx_allowed` stand, und mein Tor las erneut den Vorgabewert
+    // false als Verbot. Derselbe Fehler, eine Ebene tiefer.
+    //
+    // Also: gehoert ist nur, was ueber `tx_allowed` wirklich gesagt
+    // wurde. Alles andere bleibt Schweigen — und Schweigen ist kein
+    // Verbot.
+    if (!m_flexVerriegelungGehoert
+        && kv.contains(QStringLiteral("tx_allowed"))) {
+        m_flexVerriegelungGehoert = true;
+    }
+
+    // Beim ERSTEN Mal die ganze Zeile zeigen. „Welche Felder schickt
+    // sie eigentlich?" war aus dem Protokoll bisher nicht zu
+    // beantworten, und genau daran haengt das Tor.
+    if (!m_flexVerriegelungGezeigt) {
+        m_flexVerriegelungGezeigt = true;
+        QStringList felder;
+        for (auto it = kv.cbegin(); it != kv.cend(); ++it) {
+            felder << (it.key() + QLatin1Char('=') + it.value());
+        }
+        qCInfo(lcConnection) << "Flex-Verriegelung, erste Meldung:"
+                             << felder.join(QLatin1Char(' '));
+    }
+
+    if (kv.contains(QStringLiteral("tx_allowed"))) {
+        const bool darf = kv.value(QStringLiteral("tx_allowed")).trimmed()
+                          != QStringLiteral("0");
+        if (darf != m_flexDarfSenden) {
+            m_flexDarfSenden = darf;
+            emit flexSendefreigabeGeaendert(darf);
+            geaendert = true;
+        }
+    }
+
+    if (kv.contains(QStringLiteral("source"))) {
+        m_flexVerriegelungsQuelle =
+            kv.value(QStringLiteral("source")).trimmed().toUpper();
+    }
+    if (kv.contains(QStringLiteral("reason"))) {
+        m_flexVerriegelungsGrund = kv.value(QStringLiteral("reason")).trimmed();
+    }
+
+    if (geaendert) {
+        qCInfo(lcConnection).nospace()
+            << "Flex-Verriegelung: " << m_flexVerriegelungsLage
+            << ", senden " << (m_flexDarfSenden ? "erlaubt" : "GESPERRT")
+            << (m_flexVerriegelungsQuelle.isEmpty()
+                    ? QString()
+                    : QStringLiteral(", Quelle ") + m_flexVerriegelungsQuelle)
+            << (m_flexVerriegelungsGrund.isEmpty()
+                    ? QString()
+                    : QStringLiteral(", Grund ") + m_flexVerriegelungsGrund);
+    }
 }
 
 void RadioModel::richteFlexWasserfallEin()
@@ -7340,6 +7675,53 @@ void RadioModel::startFlexStreams()
                     m_flexPegelStempel = jetzt;
                 }
                 break;
+            }
+
+            // ── Sendeleistung und Stehwelle (2026-10-27) ────────────
+            //
+            // Betreiber, nachdem TUNE endlich durchkam: „tune
+            // funktioniert, zeigt aber keinen wert an".
+            //
+            // Die Balken FWD und SWR haengen an
+            // `RadioStatus::powerChanged`, und das fuettert sonst die
+            // PA-Abfrage des OpenHPSDR-Wegs (Thetis PollPAPWR). Bei der
+            // Flex gibt es die nicht — die Maschine misst selbst und
+            // schickt es im Messwertstrom mit: FWDPWR, REFPWR, SWR.
+            // Sie standen bisher nur in der Protokollzeile.
+            //
+            // Einheit: die Maschine meldet dBm, die Balken wollen
+            // WATT. W = 10^((dBm-30)/10).
+            {
+                std::optional<double> fwdW, refW;
+                for (const auto& s : w) {
+                    const auto def = m_flexMesswertNamen.value(s.index);
+                    if (def.first != QLatin1String("FWDPWR")
+                        && def.first != QLatin1String("REFPWR")) { continue; }
+                    const auto dbm = FlexVita::meterScaled(s.raw, def.second);
+                    if (!dbm) { continue; }
+                    const double watt = std::pow(10.0, (*dbm - 30.0) / 10.0);
+                    if (def.first == QLatin1String("FWDPWR")) { fwdW = watt; }
+                    else                                      { refW = watt; }
+                }
+                // Ruecklauf zuerst: `setForwardPower` rechnet die
+                // Stehwelle aus beiden, und so steht beim Emittieren
+                // der neue Ruecklauf schon drin.
+                if (refW) { m_radioStatus.setReflectedPower(*refW); }
+                if (fwdW) { m_radioStatus.setForwardPower(*fwdW); }
+
+                // Einmal melden, dass ueberhaupt etwas ankommt. Am
+                // 2026-10-27 lagen in der einen Messwertzeile FWDPWR
+                // und REFPWR, in der naechsten nicht — die Maschine
+                // schickt die Sendemesswerte nicht in jedem Paket.
+                // Ohne diese Zeile ist „der Balken bleibt leer" nicht
+                // von „es kommt nichts" zu unterscheiden.
+                if (fwdW && !m_flexLeistungGesehen) {
+                    m_flexLeistungGesehen = true;
+                    qCInfo(lcConnection).nospace()
+                        << "Flex-Sendeleistung zum ersten Mal: " << *fwdW
+                        << " W vorwaerts, "
+                        << (refW ? *refW : 0.0) << " W rueckwaerts";
+                }
             }
 
             // Hoechstens alle fuenf Sekunden eine Zeile: die Maschine
@@ -15141,7 +15523,25 @@ void RadioModel::setTune(bool on)
         // Guard: if not connected, emit tuneRefused and bail out.  m_audioEngine
         // null-check mirrors Thetis's PowerOn check (power-on requires the audio
         // engine to be live, which presupposes a live connection).
-        if (!isConnected() || !m_audioEngine) {
+        // ── `isConnected()` kennt die Flex nicht (2026-10-27) ──────────────
+        //
+        // Hier stand `isConnected()`, und das ist NUR die
+        // OpenHPSDR-Verbindung (`m_connection`). An einer FLEX-8400 ist
+        // es false, obwohl die Maschine laeuft, Ton liefert und ein
+        // Bild zeichnet — dieselbe Falle, die am 2026-10-22 die
+        // Verbindungsmaske offen stehen liess. Dafuer gibt es seitdem
+        // `istIrgendwieVerbunden()`.
+        //
+        // Folge am Geraet: der Betreiber drueckte TUNE, dieser Zweig
+        // kehrte um, `TransmitModel::setTune` wurde NIE gerufen, also
+        // feuerte `tuneChanged` nicht, also lief der Flex-Griff nicht
+        // — und im Protokoll stand kein einziges Wort. Dreimal „geht
+        // nicht", und der Fehler lag drei Ebenen ueber dem, was ich
+        // jedes Mal nachgesehen habe.
+        if (!istIrgendwieVerbunden() || !m_audioEngine) {
+            qCWarning(lcConnection).nospace()
+                << "TUNE abgelehnt: verbunden " << istIrgendwieVerbunden()
+                << ", Tonmaschine " << (m_audioEngine != nullptr);
             emit tuneRefused(QStringLiteral("Power must be on to enable Tune."));
             return;
         }

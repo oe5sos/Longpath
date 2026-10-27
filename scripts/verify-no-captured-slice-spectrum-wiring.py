@@ -72,6 +72,21 @@ PATTERN = re.compile(
 )
 PER_PAN_SENDER = "sw"
 
+# Eine zweite Schreibweise, die per Bau schon je Pan ist: das Applet
+# verdrahtet SEINE EIGENE Flaeche. `PanadapterApplet::m_spectrum` wird
+# im Konstruktor desselben Applets angelegt und gehoert genau einem
+# Pan -- die Verwechslung, gegen die diese Regel steht (ein Griff, der
+# fuer immer auf pan-0 zeigt), ist dort gar nicht moeglich.
+#
+# Eingefuehrt am 2026-10-27, weil die Kopfzeile des Panadapters
+# `centerChanged` braucht: vier Stellen bewegen die Mitte, ohne durch
+# `setFrequencyRange` zu gehen, und ohne dieses Signal stand am Geraet
+# „PANADAPTER 14.105191 MHz" ueber einer Skala von 7,13 bis 7,21 MHz.
+#
+# Bewusst an die DATEI gebunden, nicht an den Namen allein: `m_spectrum`
+# anderswo bleibt verboten.
+EIGENE_FLAECHE = {"src/gui/PanadapterApplet.cpp": "m_spectrum"}
+
 # Anzeige-Setter, die je Pan verdrahtet werden muessen. Hier ist
 # SpectrumWidget der EMPFAENGER, also steht das Ziel beim connect fest --
 # und darf deshalb nicht activeSpectrumWidget() sein.
@@ -110,7 +125,8 @@ def main() -> int:
             if stripped.startswith("//") or stripped.startswith("*"):
                 continue
             m = PATTERN.search(line)
-            if m and m.group(1) != PER_PAN_SENDER:
+            if (m and m.group(1) != PER_PAN_SENDER
+                    and m.group(1) != EIGENE_FLAECHE.get(rel)):
                 failures.append(f"{rel}:{num}: {stripped}")
             r = RECEIVER_PATTERN.search(line) or LAMBDA_PATTERN.search(line)
             if r:

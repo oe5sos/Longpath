@@ -86,6 +86,34 @@ private slots:
             for (int i = 0; i < 5; ++i) { QCoreApplication::processEvents(); }
         }
 
+        // ── Und die Meldung, die beim Beenden noch hereinkommt ──
+        //
+        // Am 2026-10-27 ist genau das abgestuerzt (EXC_BAD_ACCESS,
+        // Longpath-2026-10-27-193030.ips): beim Beenden faellt die
+        // TCP-Verbindung zur Flex,
+        // `FlexRadioConnection::onSocketDisconnected` meldet es,
+        // RadioModel setzt den Verbindungszustand — und
+        // `MainWindow::onConnectionStateChanged` greift in ein
+        // Fenster, das sich gerade abraeumt.
+        //
+        // Hier wird dieselbe Reihenfolge hergestellt: schliessen
+        // (dabei setzt `closeEvent` die Wache), dann die Meldung
+        // nachschicken.
+        //
+        // EHRLICH GESAGT reproduziert dieser Lauf den Absturz NICHT:
+        // mit entfernter Wache ist er genauso gruen. Es fehlt die
+        // lebende Flex-Verbindung, deren Buchse beim Beenden faellt —
+        // ohne sie zeigt `pushConnectionStateToPans()` auf nichts
+        // Abgebautes. Die Wache steht also auf dem Absturzbericht,
+        // nicht auf diesem Stand. Er bleibt trotzdem: er faehrt den
+        // Weg wenigstens ab, und wenn jemand dort spaeter etwas
+        // einbaut, das auch ohne Geraet stolpert, faellt es auf.
+        mw->close();
+        for (int i = 0; i < 5; ++i) { QCoreApplication::processEvents(); }
+        QVERIFY(QMetaObject::invokeMethod(mw, "onConnectionStateChanged",
+                                          Qt::DirectConnection));
+        for (int i = 0; i < 5; ++i) { QCoreApplication::processEvents(); }
+
         qInfo() << "Fenster offen, Hinweis steht — jetzt abbauen";
 
         // DAS ist die Pruefung. Stuerzt es hier, meldet der Lauf
