@@ -95,6 +95,29 @@ private slots:
                  "die Kopfzeile ist beim ersten Wert stehengeblieben");
     }
 
+    // ── Die Mitte wandert auch auf dem anderen Weg (2026-10-27) ─────
+    //
+    // `setFrequencyRange` ist nicht die einzige Stelle, die die Mitte
+    // bewegt: vier weitere schreiben sie direkt und melden
+    // `centerChanged` — Zoomziehen, das Nachscrollen an den beiden
+    // Bildraendern, `recenterOnVfo`. Hing die Kopfzeile nur am
+    // Ausschnittssignal, stand am Geraet „PANADAPTER · 14.105191 MHz"
+    // ueber einer Skala von 7,13 bis 7,21 MHz.
+    void dieKopfzeileFolgtAuchDemNachscrollen()
+    {
+        PanadapterApplet pan(QStringLiteral("pan-0"));
+        QVERIFY(pan.spectrumWidget());
+        pan.spectrumWidget()->setFrequencyRange(14.225000e6, 200000.0);
+        QVERIFY(pan.titleLabel()->text().contains(QStringLiteral("14.225000")));
+
+        // Der VFO zieht die Mitte mit — ohne `setFrequencyRange`.
+        pan.spectrumWidget()->setVfoFrequency(7.199042e6);
+        pan.spectrumWidget()->recenterOnVfo();
+        QVERIFY2(pan.titleLabel()->text().contains(QStringLiteral("7.199042")),
+                 qPrintable(QStringLiteral("Kopfzeile zeigt: %1")
+                                .arg(pan.titleLabel()->text())));
+    }
+
     // ── Der Schalter im Kopf ─────────────────────────────────────────
     //
     // Entwurf 4 (2026-08-19): der Kopf traegt EINEN Schalter fuer beide

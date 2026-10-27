@@ -225,6 +225,29 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     connect(m_spectrum, &SpectrumWidget::frequencyRangeChanged, this,
             [zeigeMitte](double centerHz, double) { zeigeMitte(centerHz); });
 
+    // ── Die Mitte wandert auch auf dem ANDEREN Weg (2026-10-27) ──────
+    //
+    // Gemessen, nachdem die Flaeche jeden gesetzten Ausschnitt meldet:
+    // `setFrequencyRange` ist nicht die einzige Stelle, die
+    // `m_centerHz` bewegt. VIER weitere schreiben ihn direkt —
+    // Zoomziehen auf den VFO, das Nachscrollen an den beiden
+    // Bildraendern (Thetis console.cs:31371, W2PA) und
+    // `recenterOnVfo`. Alle vier melden `centerChanged`, keine
+    // `frequencyRangeChanged`.
+    //
+    // Die Kopfzeile hing nur am zweiten Signal. Darum stand am Geraet
+    // „PANADAPTER · 14.105191 MHz" ueber einer Skala von 7,13 bis
+    // 7,21: die Skala malt aus `m_centerHz`, der dem VFO gefolgt war,
+    // die Kopfzeile aus dem letzten Wert, der durch
+    // `setFrequencyRange` kam.
+    //
+    // Sie haengt jetzt an beiden. Nicht umgekehrt — aus den vier
+    // Stellen zusaetzlich `frequencyRangeChanged` zu werfen, haette
+    // alles mitgezogen, was daran haengt (Ablage, Weitbandrechnung),
+    // und zwar bei jedem gescrollten Bildpunkt.
+    connect(m_spectrum, &SpectrumWidget::centerChanged, this,
+            [zeigeMitte](double centerHz) { zeigeMitte(centerHz); });
+
     // ── Kein Setzen beim Bauen (2026-10-27, verworfen) ───────────────
     //
     // Hier stand ein Griff, der die Kopfzeile gleich beim Bauen aus
