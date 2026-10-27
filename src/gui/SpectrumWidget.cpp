@@ -6839,6 +6839,26 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
                 << " kHz, Kachel " << ((highHz - lowHz) / 1.0e3)
                 << " kHz, Verhaeltnis "
                 << ((highHz - lowHz) / qMax(1.0, m_bandwidthHz)) << ")";
+            // ── Und wovon die BILD-FFT ausgeht (2026-10-27) ──────
+            //
+            // Die fehlende Zahl in allen bisherigen Messungen: der
+            // Ausschnitt, auf den die Bild-FFT gespannt wird. Er steht
+            // in `m_ddcCenterHz`/`m_sampleRateHz`, gesetzt aus dem
+            // Zustandsschub der Maschine — waehrend die Kachel ihren
+            // eigenen Bereich in jedem Paket mitbringt. Stimmen die
+            // beiden Mitten nicht ueberein, liegen die Bilder
+            // auseinander, und zwar je nach Abstimmung verschieden
+            // weit. Genau das meldet der Betreiber: „nicht auf allen
+            // frequenzen gleich".
+            qCInfo(lcSpectrum).nospace()
+                << "Bild-FFT geht aus von " << ((m_ddcCenterHz
+                        - m_sampleRateHz * 0.5) / 1.0e6)
+                << "–" << ((m_ddcCenterHz + m_sampleRateHz * 0.5) / 1.0e6)
+                << " MHz (Mitte " << (m_ddcCenterHz / 1.0e6)
+                << "), Kachelmitte " << ((lowHz + highHz) * 0.5e-6)
+                << " MHz, Unterschied "
+                << (((lowHz + highHz) * 0.5 - m_ddcCenterHz) / 1.0e3)
+                << " kHz";
         }
     }
 
