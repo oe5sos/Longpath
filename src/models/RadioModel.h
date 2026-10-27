@@ -3654,9 +3654,16 @@ public:
     // wenn jemand die Taste am Mikrofon drueckt oder ein zweiter
     // Client tastet.
 
-    /// Die Maschine erlaubt das Senden. Vorgabe ist FALSE: solange
-    /// keine Verriegelungsmeldung kam, wird nicht getastet.
+    /// Die Maschine erlaubt das Senden, so wie sie es zuletzt gemeldet
+    /// hat. Siehe auch `flexVerriegelungGehoert()`: ohne Meldung ist
+    /// dieser Wert eine VERMUTUNG, kein Befund.
     bool flexDarfSenden() const { return m_flexDarfSenden; }
+
+    /// Ob ueberhaupt je eine Verriegelungsmeldung kam. Trennt „die
+    /// Maschine sagt nein" von „die Maschine hat nichts gesagt" —
+    /// zwei Dinge, die am 2026-10-27 einen Abend gekostet haben, weil
+    /// das Tasttor sie fuer dasselbe hielt.
+    bool flexVerriegelungGehoert() const { return m_flexVerriegelungGehoert; }
 
     /// Die Maschine sendet gerade — gleich wer sie getastet hat.
     bool flexSendetGerade() const { return m_flexSendetGerade; }
@@ -3789,6 +3796,11 @@ private:
 
     // Senden ueber die Flex (Stufe 2). Vorgabe: gesperrt.
     bool                 m_flexDarfSenden{false};
+    bool                 m_flexVerriegelungGehoert{false};
+    /// Welche Zustandsarten die Maschine schon geschickt hat — je Art
+    /// eine Protokollzeile, damit „kommt das ueberhaupt an?" ohne
+    /// Mitschnitt zu beantworten ist.
+    QSet<QString>        m_flexGesehenenArten;
     bool                 m_flexSendetGerade{false};
     QString              m_flexVerriegelungsLage;
     QString              m_flexVerriegelungsGrund;

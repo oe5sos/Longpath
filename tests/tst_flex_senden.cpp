@@ -240,6 +240,39 @@ private slots:
                  "ohne Verbindung darf kein Abstimmtraeger hinausgehen");
     }
 
+    // ── Abwesenheit ist keine Aussage (2026-10-27) ──────────────────
+    //
+    // Der Fehler, der den ersten Sendeversuch des Betreibers zweimal
+    // verschluckt hat: das Tasttor las den VORGABEWERT von
+    // `flexDarfSenden()` als Verbot. Die Maschine hatte aber gar
+    // nichts gesagt — ihr `interlock`-Zustand kam nie an (wir hatten
+    // `sub tx all` nie bestellt).
+    //
+    // Jetzt trennt `flexVerriegelungGehoert()` die beiden Faelle:
+    // ein gehoertes Nein sperrt, Schweigen nicht.
+    void schweigenIstKeinVerbot()
+    {
+        RadioModel radio;
+        QCOMPARE(radio.flexVerriegelungGehoert(), false);
+        QCOMPARE(radio.flexDarfSenden(), false);
+
+        // Nach einer Meldung ist es ein echter Befund.
+        radio.verarbeiteFlexVerriegelung({
+            { QStringLiteral("state"), QStringLiteral("RECEIVE") },
+            { QStringLiteral("tx_allowed"), QStringLiteral("0") },
+        });
+        QCOMPARE(radio.flexVerriegelungGehoert(), true);
+        QCOMPARE(radio.flexDarfSenden(), false);
+
+        // Auch eine Meldung OHNE `tx_allowed` zaehlt als gehoert —
+        // die Maschine spricht, sie sagt nur zu diesem Feld nichts.
+        RadioModel zweite;
+        zweite.verarbeiteFlexVerriegelung({
+            { QStringLiteral("state"), QStringLiteral("RECEIVE") },
+        });
+        QCOMPARE(zweite.flexVerriegelungGehoert(), true);
+    }
+
     void dieVerriegelungWirdGelesen()
     {
         RadioModel radio;

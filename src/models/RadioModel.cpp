@@ -7065,6 +7065,23 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
             // Nicht uebernommen: die Eigentuemerrechnung ueber
             // `tx_client_handle` (wir sind ein Client, kein
             // Mehrclient-Betrieb) und die Mehrphasen-Benachrichtigung.
+            // ── Was schickt die Maschine ueberhaupt? (2026-10-27) ───
+            //
+            // Je Objektart EINMAL eine Zeile. Am 2026-10-27 stand die
+            // Frage „kommt `interlock` an oder nicht?" im Raum, und sie
+            // war aus dem Protokoll NICHT zu beantworten: wer nichts
+            // meldet, meldet auch nicht, dass er nichts bekommt.
+            // Einmal je Art kostet nichts und beantwortet es beim
+            // naechsten Verbinden in einer Zeile.
+            {
+                const QString art = object.trimmed().section(QLatin1Char(' '), 0, 0);
+                if (!art.isEmpty() && !m_flexGesehenenArten.contains(art)) {
+                    m_flexGesehenenArten.insert(art);
+                    qCInfo(lcConnection) << "Flex-Zustandsart zum ersten Mal:"
+                                         << art;
+                }
+            }
+
             if (object.trimmed() == QLatin1String("interlock")) {
                 verarbeiteFlexVerriegelung(kv);
             }
@@ -7243,17 +7260,41 @@ bool RadioModel::flexTasten(bool tasten)
                 << "Flex: nicht getastet — keine Sendescheibe gesetzt";
             return false;
         }
-        if (!m_flexDarfSenden) {
+        // ── Abwesenheit ist keine Aussage (2026-10-27) ───────────
+        //
+        // Hier stand `if (!m_flexDarfSenden) return false;` — und das
+        // hat jeden Sendeversuch des Betreibers verschluckt. Nicht,
+        // weil die Maschine nein sagte, sondern weil sie GAR NICHTS
+        // sagte: ihr `interlock`-Zustand kam nie an, und der
+        // Vorgabewert false wurde als Verbot gelesen.
+        //
+        // „TUNE ist aber nicht gegangen", dann „geht nicht" — und im
+        // Protokoll keine einzige Verriegelungszeile.
+        //
+        // Richtig ist die Trennung: hat die Maschine je gesprochen?
+        //   - Ja, und sie sagt nein  -> wir tasten nicht.
+        //   - Ja, und sie sagt ja    -> wir tasten.
+        //   - Nie gesprochen         -> wir tasten und lassen SIE
+        //     entscheiden. Die Flex hat ihre eigene Verriegelung; sie
+        //     sendet nicht, wenn sie nicht darf. Unser Tor war von
+        //     Anfang an nur ein zweites Schloss vor ihrem.
+        //
+        // Siehe memory feedback-abwesenheit-ist-keine-aussage: fehlende
+        // Daten nicht als Befund lesen. Ich habe genau das getan.
+        if (m_flexVerriegelungGehoert && !m_flexDarfSenden) {
             qCWarning(lcConnection).nospace()
                 << "Flex: nicht getastet — die Maschine sperrt ("
-                << (m_flexVerriegelungsLage.isEmpty()
-                        ? QStringLiteral("noch keine Verriegelungsmeldung")
-                        : m_flexVerriegelungsLage)
+                << m_flexVerriegelungsLage
                 << (m_flexVerriegelungsGrund.isEmpty()
                         ? QString()
                         : QStringLiteral(", Grund ") + m_flexVerriegelungsGrund)
                 << ")";
             return false;
+        }
+        if (!m_flexVerriegelungGehoert) {
+            qCWarning(lcConnection)
+                << "Flex: getastet, OHNE je eine Verriegelungsmeldung "
+                   "gehoert zu haben — die Maschine entscheidet selbst";
         }
     }
 
@@ -7291,9 +7332,12 @@ bool RadioModel::setzeFlexAbstimmleistung(int prozent)
 bool RadioModel::flexAbstimmen(bool an)
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
-    if (an && !m_flexDarfSenden) {
+    // Dieselbe Trennung wie beim Tasten: nur ein gehoertes Nein ist
+    // ein Nein. Siehe `flexTasten`.
+    if (an && m_flexVerriegelungGehoert && !m_flexDarfSenden) {
         qCWarning(lcConnection)
-            << "Flex: nicht abgestimmt — die Maschine sperrt das Senden";
+            << "Flex: nicht abgestimmt — die Maschine sperrt das Senden"
+            << m_flexVerriegelungsLage << m_flexVerriegelungsGrund;
         return false;
     }
     m_flexConnection->sendCommand(FlexCommandWire::tuneCommand(an));
@@ -7385,6 +7429,8 @@ void RadioModel::verarbeiteFlexVerriegelung(const QMap<QString, QString>& kv)
             emit flexSendetGeaendert(sendet);
         }
     }
+
+    m_flexVerriegelungGehoert = true;
 
     if (kv.contains(QStringLiteral("tx_allowed"))) {
         const bool darf = kv.value(QStringLiteral("tx_allowed")).trimmed()
