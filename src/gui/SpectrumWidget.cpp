@@ -1620,6 +1620,24 @@ void SpectrumWidget::setFrequencyRange(double centerHz, double bandwidthHz)
     // chain. The "off" direction also fires here when the operator
     // zooms back inside the listenable island.
     recomputeExtendedMode();
+
+    // ── Jeden gesetzten Ausschnitt melden (2026-10-27) ───────────────
+    //
+    // Am Geraet stand „PANADAPTER · 14.105191 MHz" ueber einer Skala
+    // von 7,13 bis 7,21 MHz. Kopfzeile und Skala lesen DENSELBEN Wert
+    // (`m_centerHz`, ueber hzToX bzw. ueber dieses Signal) — sie
+    // koennen also nur auseinanderlaufen, wenn eine Aenderung das
+    // Signal nicht erreicht. Welche, zeigt diese Zeile.
+    //
+    // qCInfo, nicht qCDebug: die Kategorie steht auf QtInfoMsg, eine
+    // Debug-Zeile waere stumm, und eine stumme Messung ist keine. Sie
+    // kostet nichts — ein Ausschnitt wird gesetzt, wenn der Betreiber
+    // zoomt oder das Band wechselt, nicht je Bildrahmen.
+    qCInfo(lcSpectrum).nospace()
+        << "Ausschnitt gesetzt auf \"" << m_persistKey << "\": "
+        << (m_centerHz / 1.0e6) << " MHz, " << (m_bandwidthHz / 1.0e3)
+        << " kHz";
+
     emit frequencyRangeChanged(m_centerHz, m_bandwidthHz);
 }
 
