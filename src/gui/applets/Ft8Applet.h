@@ -266,6 +266,7 @@ public:
     QLabel*         statusForTest() const { return m_status; }
     QLabel*         lastLabelForTest() const { return m_lastLabel; }
     QPushButton*    nurCqButtonForTest() const { return m_nurCqBtn; }
+    QPushButton*    nurNeueLaenderButtonForTest() const { return m_nurNeueLaenderBtn; }
     QSpinBox*       sendeTonFeldForTest() const { return m_tonFeld; }
     QSpinBox*       rundenFeldForTest() const { return m_rundenFeld; }
     Longpath::Ft8Wasserfall* wasserfallForTest() const { return m_wasserfall; }
@@ -374,7 +375,13 @@ private:
     int m_sendeTonHz{1500};
 
     QPushButton* m_nurCqBtn{nullptr};
+    QPushButton* m_nurNeueLaenderBtn{nullptr};
     bool m_nurCq{false};
+    /// „New DXCC": derselbe Ansichtsfilter fuer Laender, die noch nie
+    /// im Logbuch standen. Gefragt wird der Aufloeser im Modell --
+    /// derselbe, der die Zeilen hier schon einfaerbt. Ein Ruf an die
+    /// eigene Station kommt auch hier durch.
+    bool m_nurNeueLaender{false};
     QPushButton*    m_ft8Btn{nullptr};
     QPushButton*    m_ft4Btn{nullptr};
     QPushButton*    m_clearBtn{nullptr};
