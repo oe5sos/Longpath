@@ -698,6 +698,25 @@ void FlexRadioConnection::onGuiClientAccepted(const QString& body)
     // #297 beruecksichtigt.
     sendCommand(QStringLiteral("sub meter all"));
 
+    // ── Ohne das kommt NIE eine Verriegelungsmeldung (2026-10-27) ───
+    //
+    // Die Maschine schickt den `interlock`-Zustand nur an Clients, die
+    // die Sendeebene bestellt haben. Stufe 1 brauchte sie nicht und
+    // bestellte sie nicht — mit Stufe 2 ist sie das TOR vor dem
+    // Tasten, und ein Tor, das nie eine Freigabe hoert, bleibt fuer
+    // immer zu.
+    //
+    // Genau daran scheiterte der erste Sendeversuch des Betreibers am
+    // 2026-10-27: „TUNE ist aber nicht gegangen". `flexAbstimmen` und
+    // `flexTasten` fragen `m_flexDarfSenden`, und das stand mangels
+    // Meldung auf seinem Vorgabewert false. Ein stilles Nein, das in
+    // keiner Zeile Code falsch aussieht.
+    //
+    // From AetherSDR RadioModel.cpp:6596 [@d58e2b8a] — `sub tx all`
+    // steht dort in derselben Reihe wie `sub slice all` und
+    // `sub meter all`.
+    sendCommand(QStringLiteral("sub tx all"));
+
     queryAndRecoverSlices();
 }
 

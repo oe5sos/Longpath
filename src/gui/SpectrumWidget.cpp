@@ -6709,6 +6709,9 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
         // Strom, nicht ueber eine zusammengesetzte Zeichenkette.
         bool   versatzMessbar = false;
         int    besterLag  = 0;
+        int    lagLinks   = 0;
+        int    lagRechts  = 0;
+        double faktor     = 1.0;
         double zweitRel   = 0.0;
         double beiNull    = 0.0;
         double bestWert   = 0.0;
@@ -6763,6 +6766,53 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
             beiNull = werte[maxLag];
             bestWert = bestes;
             versatzMessbar = true;
+
+            // ── Verschiebung oder MASZSTAB? (2026-10-27) ─────────
+            //
+            // Betreiber: „leider ist das untere und das obere Signal
+            // im Wasserfall nicht auf allen frequenzen gleich. oft
+            // ist es nach wie vor versetzt."
+            //
+            // „Nicht auf allen Frequenzen gleich" ist die Auskunft,
+            // auf die es ankommt: eine Verschiebung ist ueberall
+            // gleich gross, ein MASZSTABSFEHLER waechst mit dem
+            // Abstand von der Mitte. Ein einziger bester Versatz kann
+            // die beiden nicht trennen — er mittelt sie zu einer Zahl,
+            // die dann je nachdem, wo gerade die staerksten Signale
+            // stehen, anders ausfaellt. Genau das habe ich am
+            // 2026-10-23 gesehen (0 kHz, dann +7,4 kHz, dann +18,7)
+            // und faelschlich fuer einen wandernden Versatz gehalten.
+            //
+            // Also BEIDE Haelften einzeln korrelieren. Dann gilt:
+            //   linker ≈ rechter Versatz   -> reine Verschiebung
+            //   linker ≈ MINUS rechter     -> reiner Maszstabsfehler
+            // und aus dem Unterschied faellt der Faktor ab, mit dem
+            // die Bild-FFT auf das Fenster gespannt wird.
+            auto halbLag = [&](int von, int bis) -> int {
+                const int len = bis - von;
+                if (len < 64) { return 0; }
+                const int grenze = qMin(maxLag, len / 4);
+                int best = 0; double bw = -1.0e30;
+                for (int lag = -grenze; lag <= grenze; ++lag) {
+                    double sum = 0.0; int zahl = 0;
+                    for (int i = qMax(von, von - lag);
+                         i < qMin(bis, bis - lag); ++i) {
+                        sum += A[i] * B[i + lag]; ++zahl;
+                    }
+                    if (zahl > 0) {
+                        sum /= zahl;
+                        if (sum > bw) { bw = sum; best = lag; }
+                    }
+                }
+                return best;
+            };
+            lagLinks  = halbLag(0, n / 2);
+            lagRechts = halbLag(n / 2, n);
+            // Der Maszstab, der die beiden Haelften zur Deckung
+            // braechte: die Haelften liegen im Mittel n/4 links und
+            // rechts der Mitte, ihr Lag-Unterschied ist also
+            // (Faktor - 1) * n/2.
+            faktor = 1.0 + double(lagRechts - lagLinks) / (double(n) * 0.5);
         }
 
         qCInfo(lcSpectrum).nospace()
@@ -6781,6 +6831,14 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
                 << (bestWert > 0.0 ? beiNull / bestWert * 100.0 : 0.0)
                 << " %"
                 << (zweitRel > 0.8 ? " — NICHT eindeutig" : "");
+            qCInfo(lcSpectrum).nospace()
+                << "Kachel gegen Spektrum, haelftenweise: links "
+                << lagLinks << " Punkte, rechts " << lagRechts
+                << " Punkte — Maszstab " << faktor
+                << " (Fenster " << (m_bandwidthHz / 1.0e3)
+                << " kHz, Kachel " << ((highHz - lowHz) / 1.0e3)
+                << " kHz, Verhaeltnis "
+                << ((highHz - lowHz) / qMax(1.0, m_bandwidthHz)) << ")";
         }
     }
 
