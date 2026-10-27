@@ -478,7 +478,7 @@ private slots:
     void beideBilderTreffenDenselbenPunkt()
     {
         auto lauf = [this](double fensterBreiteHz, double fensterMitteHz,
-                           const char* was) {
+                           double bandMitteHz, const char* was) {
             SpectrumWidget sw;
             sw.setWaterfallAveraging(SpectrumAveraging::None);
             sw.setWaterfallDetector(SpectrumDetector::Peak);
@@ -488,10 +488,11 @@ private slots:
             sw.show();
             QTest::qWait(300);
 
-            // Ausschnitt der Maschine: 200 kHz um 14,100 MHz.
-            const double tief = 14.000e6, hoch = 14.200e6;
+            // Ausschnitt der Maschine: 200 kHz um die Bandmitte.
+            const double tief = bandMitteHz - 100.0e3;
+            const double hoch = bandMitteHz + 100.0e3;
             // Der Traeger steht 40 kHz ueber der Mitte.
-            const double traegerHz = 14.140e6;
+            const double traegerHz = bandMitteHz + 40.0e3;
 
             sw.setFrequencyRange(fensterMitteHz, fensterBreiteHz);
 
@@ -507,8 +508,8 @@ private slots:
 
             // Die Kachel: derselbe Traeger, eigene Binzahl und ein
             // etwas breiterer Bereich — so schickt die Maschine sie.
-            const double kTief = 14.000e6 - 15.0e3;
-            const double kHoch = 14.200e6 + 15.0e3;
+            const double kTief = tief - 15.0e3;
+            const double kHoch = hoch + 15.0e3;
             const int kBins = 2460;
             QVector<float> kach(kBins, 96.0f);
             kach[int((traegerHz - kTief) / ((kHoch - kTief) / kBins))] = 120.0f;
@@ -536,27 +537,40 @@ private slots:
             return abstandHz;
         };
 
-        // Volle Breite: Fenster = Ausschnitt der Maschine.
-        const double vollBreite = lauf(200.0e3, 14.100e6, "volle Breite");
-        // Gezoomt: zehnfach, UM DEN TRAEGER — sonst liegt er gar nicht
-        // im Bild, und beide Wege melden brav ihren Bildpunkt null.
-        const double gezoomt    = lauf(20.0e3,  14.140e6, "zehnfach gezoomt");
-        QVERIFY2(vollBreite > -1.0e9 && gezoomt > -1.0e9,
-                 "kein Bild — das Fenster hat keine Flaeche");
-
-        // Bei voller Breite muessen sie uebereinanderliegen; ein
-        // Bildpunkt ist 167 Hz breit, zwei davon sind die Decke.
-        QVERIFY2(std::abs(vollBreite) < 400.0, qPrintable(
-            QStringLiteral("volle Breite: %1 Hz auseinander")
-                .arg(vollBreite)));
-
-        // Und gezoomt genauso. Hier ist ein Bildpunkt nur noch 17 Hz
-        // breit, also darf der Abstand in HERTZ nicht wachsen — er
-        // waere sonst ein Maszstabsfehler, der mit dem Zoom aufgeht.
-        QVERIFY2(std::abs(gezoomt) < 400.0, qPrintable(
-            QStringLiteral("gezoomt: %1 Hz auseinander (volle Breite "
-                           "%2 Hz) — der Abstand waechst mit dem Zoom")
-                .arg(gezoomt).arg(vollBreite)));
+        // ── Auf jedem Band (2026-10-27) ──────────────────────────
+        //
+        // Betreiber: „messe bitte, auch auf unterschiedlichen
+        // baendern". Am Geraet haengt so eine Messung davon ab, ob
+        // gerade in beiden Bildhaelften etwas steht; hier steht
+        // ueberall derselbe Traeger, und die Frage ist blosz, ob die
+        // Abbildung ueber den ganzen Kurzwellenbereich traegt.
+        struct Band { double mitte; const char* name; };
+        const Band baender[] = {
+            { 1.840e6,  "160 m" }, { 3.650e6,  "80 m" },
+            { 7.150e6,  "40 m" },  { 14.200e6, "20 m" },
+            { 21.200e6, "15 m" },  { 28.500e6, "10 m" },
+        };
+        for (const Band& b : baender) {
+            const double voll = lauf(200.0e3, b.mitte, b.mitte,
+                                     QStringLiteral("%1, volle Breite")
+                                         .arg(b.name).toUtf8().constData());
+            const double zoom = lauf(20.0e3, b.mitte + 40.0e3, b.mitte,
+                                     QStringLiteral("%1, zehnfach")
+                                         .arg(b.name).toUtf8().constData());
+            QVERIFY2(voll > -1.0e9 && zoom > -1.0e9,
+                     "kein Bild — das Fenster hat keine Flaeche");
+            // Ein Bildpunkt ist bei voller Breite 167 Hz breit, zwei
+            // davon sind die Decke. Gezoomt ist er nur noch 17 Hz
+            // breit; der Abstand in HERTZ darf trotzdem nicht wachsen,
+            // sonst waere es ein Maszstabsfehler, der mit dem Zoom
+            // aufgeht.
+            QVERIFY2(std::abs(voll) < 400.0, qPrintable(
+                QStringLiteral("%1 volle Breite: %2 Hz auseinander")
+                    .arg(b.name).arg(voll)));
+            QVERIFY2(std::abs(zoom) < 400.0, qPrintable(
+                QStringLiteral("%1 gezoomt: %2 Hz auseinander (voll %3 Hz)")
+                    .arg(b.name).arg(zoom).arg(voll)));
+        }
     }
 };
 

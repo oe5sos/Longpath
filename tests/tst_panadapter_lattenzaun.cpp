@@ -527,6 +527,65 @@ private slots:
                            "%1 gegen %2").arg(mitSignalDbm).arg(nachEinem)));
     }
 
+
+    // ── Was die Perspektive mit der Frequenz macht (2026-10-27) ─────
+    //
+    // Betreiber, ueber Wasserfall und 3D-Flaeche: „nicht auf allen
+    // frequenzen gleich … teilweise passt er, teilweise nicht."
+    //
+    // In den DATEN steckt kein Versatz — am Geraet gemessen (Mitten
+    // auf 94 Hz gleich, Kreuzkorrelation 0) und im Pruefstand auf
+    // sechs Baendern (0 Hz voll, 69 Hz zehnfach gezoomt). Was bleibt,
+    // ist die Geometrie der 3D-Flaeche, und die ist gross:
+    //
+    // Jede Zeile wird schmaler nach hinten (`kBackWidthFrac`) und
+    // symmetrisch eingerueckt. Ein Signal am Anteil p der Breite
+    // landet also bei
+    //     x(Tiefe) = W(1-f)/2 + p*W*f,     f = Zeilenbreitenanteil
+    // vorne (f=1) bei p*W, hinten (f=0,6) bei 0,2W + 0,6pW. Der
+    // Unterschied ist
+    //     0,4 * W * (0,5 - p)
+    // — null in der Mitte, und am Rand (p=0 oder 1) ein Fuenftel der
+    // ganzen Fensterbreite.
+    //
+    // Bei 200 kHz Fenster sind das VIERZIG kHz. Wer den Kamm im
+    // Hintergrund mit der Spalte im Wasserfall vergleicht, sieht also
+    // am Rand einen Versatz, der in den Zahlen nicht existiert — und
+    // in der Mitte keinen. Genau die Form, die der Betreiber
+    // beschreibt.
+    //
+    // Dieser Stand haelt die Rechnung an den Konstanten des Malwerks
+    // fest, damit sie nicht still auseinanderlaufen.
+    void diePerspektiveVerschiebtBisZuEinemFuenftel()
+    {
+        const double f    = DssRenderer::kBackWidthFrac;
+        const double voll = 200.0e3;   // uebliche Fensterbreite am Flex
+
+        auto versatzHz = [f, voll](double p) {
+            // x(f) - x(1), in Anteilen der Breite, mal der Breite.
+            return (1.0 - f) * (0.5 - p) * voll;
+        };
+
+        qInfo().nospace() << "3D-Perspektive bei " << (voll / 1.0e3)
+                          << " kHz Fenster: Rand links "
+                          << (versatzHz(0.0) / 1.0e3) << " kHz, Mitte "
+                          << versatzHz(0.5) << " Hz, Rand rechts "
+                          << (versatzHz(1.0) / 1.0e3) << " kHz";
+
+        // In der Mitte steht der Kamm ueber seiner Frequenz.
+        QVERIFY(std::abs(versatzHz(0.5)) < 1.0);
+        // Am Rand um ein Fuenftel der Breite daneben — und zwar nach
+        // INNEN, in beide Richtungen symmetrisch.
+        QVERIFY(versatzHz(0.0) > 0.0);
+        QVERIFY(versatzHz(1.0) < 0.0);
+        QVERIFY(std::abs(std::abs(versatzHz(0.0)) - std::abs(versatzHz(1.0)))
+                < 1.0);
+        QVERIFY2(std::abs(versatzHz(0.0) - 0.2 * voll) < 1.0, qPrintable(
+            QStringLiteral("Randversatz %1 Hz, erwartet ein Fuenftel "
+                           "(%2 Hz) — kBackWidthFrac ist %3")
+                .arg(versatzHz(0.0)).arg(0.2 * voll).arg(f)));
+    }
+
 private:
     QVector<float> m_rahmen;
 };
