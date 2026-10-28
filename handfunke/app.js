@@ -2597,10 +2597,15 @@ function schleife(t) {
   // ohne hoerbaren Ton hat am 2026-09-30 eine ganze Messreihe wertlos
   // gemacht. Faellt der Ton aus, steht das hier — und nicht nur in einer
   // Konsole, die auf einem Telefon niemand sieht.
+  // Ueber den Fernweg zaehlt `link.rate.audio` das, was aus dem
+  // Opus-Dekoder HERAUSKOMMT (48 kHz Int16), nicht das, was uebertragen
+  // wurde. Die Leitung selbst weiss es besser und sagt es hier.
+  const fern = link.ws && link.ws.ton === 'opus' ? link.ws : null;
+  const tonKbs = fern ? fern.tonKbs : r.audio;
   $('fussTon').textContent = state.tonFehler
     ? state.tonFehler
     : !state.node ? 'Ton aus — auf TON EIN tippen'
-    : (r.audio ? r.audio + ' kB/s ton'
+    : (tonKbs ? tonKbs + ' kB/s ton' + (fern ? ' (opus)' : '')
                  + (state.tonWeg === 'scriptprocessor' ? ' (ersatzweg)' : '')
                : '');
   // Stottert der Ton gerade, steht das da — sonst sucht man es im Funkgeraet.

@@ -164,6 +164,13 @@ export class FernLeitung extends EventTarget {
     this.onopen = this.onmessage = this.onclose = this.onerror = null;
     this.weg = '';                  // 'direkt', 'stun' oder 'relay' -- fuer die Anzeige
     this.ton = '';                  // 'opus' oder 'roh' -- fuer die Fusszeile
+    // Was WIRKLICH ueber die Leitung ging. Noetig, weil `tci.js` erst
+    // zaehlt, was aus dem Dekoder herauskommt: ein Opus-Block von 4 kB/s
+    // wird dort als 96 kB/s Int16 gezaehlt, und die Ersparnis waere
+    // nirgends zu sehen.
+    this.tonKbs = 0;
+    this._tonBytes = 0;
+    this._tonSeit = 0;
     this._opus = null;              // der AudioDecoder, wenn Opus laeuft
     this._opusRate = 0;
     this._pc = null;
@@ -348,6 +355,16 @@ export class FernLeitung extends EventTarget {
     const rate = sicht.getUint16(4, true) * 50;
     const empfaenger = sicht.getUint8(8);
     const paket = new Uint8Array(puffer, OPUS_KOPF);
+
+    // Vor dem Dekodieren zaehlen -- danach ist die Zahl eine andere.
+    this._tonBytes += puffer.byteLength;
+    const jetzt = performance.now();
+    if (!this._tonSeit) { this._tonSeit = jetzt; }
+    else if (jetzt - this._tonSeit >= 1000) {
+      this.tonKbs = Math.round(this._tonBytes / (jetzt - this._tonSeit));
+      this._tonBytes = 0;
+      this._tonSeit = jetzt;
+    }
 
     if (this._opus === null || this._opusRate !== rate) {
       this._opusRate = rate;
