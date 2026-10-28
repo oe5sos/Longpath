@@ -31,6 +31,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import secrets
 from dataclasses import dataclass
 from typing import Any
@@ -58,6 +59,12 @@ ANMELDE_FRIST_S = 15.0
 
 # Der Kanal heisst so; ein anderer wird nicht angenommen.
 KANAL = "longpath-tci"
+
+# Die Taktung der Tonbloecke abschaltbar, damit sich die Gegenprobe
+# gegen die alte Fassung fahren laesst: ein guter Wert ohne Gegenprobe
+# belegt nichts. Im Betrieb immer an; nur der Pruefstand setzt
+# LONGPATH_TONTAKT=0.
+TAKTUNG = os.environ.get("LONGPATH_TONTAKT", "1") != "0"
 
 
 def anmelde_transkript(aufforderung: bytes) -> bytes:
@@ -185,6 +192,18 @@ class Sitzung:
             await self.schliesse()
             return
 
+        # ZUERST den Umkodierer, DANN die Verbindung zu Longpath: in
+        # `_oeffne_longpath` wird int16 angefordert und die Tonpumpe
+        # gestartet, und beides haengt an `self.ton`. In der anderen
+        # Reihenfolge lief alles scheinbar richtig -- die Station meldete
+        # sogar "kann Opus" --, aber der Ton kam weiter als Float32
+        # stereo durch, ungetaktet und unkodiert. Am 2026-10-28 so
+        # gemessen: 170 Rahmen "tci strom1 typ3 kan2", kein einziges
+        # Opus-Paket.
+        if "opus" in kann:
+            self.ton = Umkodierer()
+            log.info("%s kann Opus -- der Tonstrom wird umkodiert", self.geraet.name)
+
         try:
             await self._oeffne_longpath()
         except Exception as e:
@@ -192,10 +211,6 @@ class Sitzung:
             self._sende_kanal(json.dumps({"typ": "fehler", "grund": "kein Longpath"}))
             await self.schliesse()
             return
-
-        if "opus" in kann:
-            self.ton = Umkodierer()
-            log.info("%s kann Opus -- der Tonstrom wird umkodiert", self.geraet.name)
 
         self.angemeldet = True
         if self.geraeteliste is not None:
@@ -259,7 +274,7 @@ class Sitzung:
         self._longpath = await asyncio.wait_for(
             websockets.connect(url, max_size=None), timeout=5.0
         )
-        if self.ton is not None:
+        if self.ton is not None and TAKTUNG:
             self._tonschlange = asyncio.Queue()
             self._tontakt = asyncio.ensure_future(self._tonpumpe())
             # Opus aus mu-law zu rechnen waere doppelt verlustbehaftet,
@@ -286,7 +301,10 @@ class Sitzung:
                         # gehen NICHT sofort hinaus, sondern in den Takt
                         # (siehe _tonpumpe).
                         for r in neu:
-                            self._tonschlange.put_nowait(r)
+                            if self._tonschlange is not None:
+                                self._tonschlange.put_nowait(r)
+                            else:
+                                self._sende_kanal(r)   # alte Fassung
                         continue
                 self._sende_kanal(nachricht)
         except Exception as e:

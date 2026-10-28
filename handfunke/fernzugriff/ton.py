@@ -126,6 +126,11 @@ class Umkodierer:
             return None
         kopf = _KOPF.unpack_from(roh, 0)
         empfaenger, rate, typ, laenge, strom = kopf[0], kopf[1], kopf[2], kopf[5], kopf[6]
+        # Die Kanalzahl steht im Kopf -- und sie zu uebergehen ist genau
+        # der Fehler, der am 2026-09-30 den Ton doppelt so schnell laufen
+        # liess: `length` zaehlt ALLE Werte des Rahmens, nicht die je
+        # Kanal. Bei Stereo sind das halb so viele Zeitpunkte.
+        kanaele = kopf[7] if kopf[7] in (1, 2) else 1
         if strom != TON_STROM:
             return None
         if typ != TYP_INT16:
@@ -140,7 +145,18 @@ class Umkodierer:
         n = min(laenge, (len(roh) - KOPF) // 2)
         if n <= 0:
             return None
-        werte = np.frombuffer(roh, dtype="<i2", count=n, offset=KOPF)
+        if kanaele == 2:
+            n -= n % 2
+            if n <= 0:
+                return None
+            paare = np.frombuffer(roh, dtype="<i2", count=n, offset=KOPF)
+            # Auf mono mischen, nicht einen Kanal wegwerfen: die Seite
+            # bittet um mono, und beide Kanaele tragen bei Longpath
+            # dasselbe Signal mit moeglicherweise anderer Lautstaerke.
+            werte = ((paare[0::2].astype(np.int32)
+                      + paare[1::2].astype(np.int32)) // 2).astype(np.int16)
+        else:
+            werte = np.frombuffer(roh, dtype="<i2", count=n, offset=KOPF)
         self.roh_bytes += len(roh)
 
         self._rest = np.concatenate((self._rest, werte))

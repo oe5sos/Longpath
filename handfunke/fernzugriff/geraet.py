@@ -54,8 +54,15 @@ log = logging.getLogger("fernzugriff.geraet")
 class Geraeteseite:
     """Ein Telefon, das eine Station von aussen erreicht."""
 
-    def __init__(self, dienst_url: str, schluesselpfad: Path, station_id: str) -> None:
+    def __init__(self, dienst_url: str, schluesselpfad: Path, station_id: str,
+                 kann: list[str] | None = None) -> None:
         self.url = dienst_url
+        # Was dieses Geraet der Station beim Anmelden ueber sich sagt.
+        # Ein Pruefstand meldet hier "opus", OHNE einen Dekoder zu haben:
+        # fuer eine Messung am Datenkanal zaehlen die Ankunftszeiten der
+        # Pakete, nicht ihr Inhalt -- und so entsteht kein Ton, der
+        # jemandem im Zimmer auf die Nerven geht.
+        self.kann = list(kann or [])
         self.privat = lade_schluessel(Path(schluesselpfad))
         self.oeffentlich = self.privat.public_key()
         self.ident = geraete_id(self.oeffentlich)
@@ -164,6 +171,7 @@ class Geraeteseite:
                             self.anmeldeschluessel,
                             anmelde_transkript(unb64url(m["aufforderung"])),
                         ),
+                        "kann": self.kann,
                     },
                     separators=(",", ":"),
                 )
