@@ -53,7 +53,14 @@
 //                                    gemessen). Dazu istHinauswurf():
 //                                    die Begruendung des Knotens wird
 //                                    nicht mehr stillschweigend
-//                                    verworfen. KI-gestuetzt ueber
+//                                    verworfen. Und
+//                                    protokollOeffnungsart(): das
+//                                    Mitschreiben wird nur noch bei
+//                                    einer Verbindung geleert, die der
+//                                    Betreiber selbst anstoesst -- ein
+//                                    Wiederanlauf schreibt fort, sonst
+//                                    loescht gerade ein Sturm seine
+//                                    eigenen Belege. KI-gestuetzt ueber
 //                                    Anthropic Claude Code.
 
 #pragma once
@@ -117,6 +124,14 @@ public:
     static bool istHinauswurfForTest(const QString& line) {
         return istHinauswurf(line);
     }
+    // Wie das Mitschreiben geoeffnet wird. Rein, damit die
+    // Unterscheidung ohne Datei und ohne Knoten zu pruefen ist.
+    static QIODevice::OpenMode protokollOeffnungsartForTest(bool wiederanlauf) {
+        return protokollOeffnungsart(wiederanlauf);
+    }
+    // Kommt das naechste onConnected von einem selbsttaetigen
+    // Wiederanlauf?
+    bool istWiederanlaufForTest() const { return m_naechsterIstWiederanlauf; }
     void stripTelnetIACForTest(QByteArray& buf) const {
         stripTelnetIACBuffer(buf);
     }
@@ -167,6 +182,20 @@ private:
     // Grund dafuer.
     static bool istHinauswurf(const QString& line);
 
+    // ── Warum das Mitschreiben nicht bei jedem Versuch geleert wird ──
+    //
+    // Bis zum 2026-10-28 wurde die Datei bei JEDER Verbindung mit
+    // `Truncate` geoeffnet. Die Absicht war richtig: eine Datei je
+    // Sitzung, damit sie nicht endlos waechst. Die Wirkung war es
+    // nicht — bei 216 Neuverbindungen in 223 min loeschte das
+    // Mitschreiben damit genau die Belege, die man zum Verstehen des
+    // Sturms gebraucht haette. Vom Vormittag war nichts mehr zu holen.
+    //
+    // Eine Sitzung endet nicht mit dem Socket. Geleert wird deshalb
+    // nur, wenn der Betreiber selbst verbindet; ein selbsttaetiger
+    // Wiederanlauf schreibt an dieselbe Datei weiter.
+    static QIODevice::OpenMode protokollOeffnungsart(bool wiederanlauf);
+
     QTcpSocket* m_socket;
     QByteArray  m_readBuffer;
     QTimer*     m_reconnectTimer;
@@ -185,6 +214,9 @@ private:
     int     m_quietFailures{0};
     bool    m_intentionalDisconnect{false};
     int     m_reconnectAttempts{0};
+    // Siehe protokollOeffnungsart(): nur eine Verbindung, die der
+    // Betreiber selbst anstoesst, leert das Mitschreiben.
+    bool    m_naechsterIstWiederanlauf{false};
 
     static constexpr int MaxReconnectDelayMs    = 60000;
     static constexpr int InitialReconnectDelayMs = 5000;

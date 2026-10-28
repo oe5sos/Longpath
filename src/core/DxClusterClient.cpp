@@ -44,7 +44,14 @@
 //                                    gemessen). Dazu istHinauswurf():
 //                                    die Begruendung des Knotens wird
 //                                    nicht mehr stillschweigend
-//                                    verworfen. KI-gestuetzt ueber
+//                                    verworfen. Und
+//                                    protokollOeffnungsart(): das
+//                                    Mitschreiben wird nur noch bei
+//                                    einer Verbindung geleert, die der
+//                                    Betreiber selbst anstoesst -- ein
+//                                    Wiederanlauf schreibt fort, sonst
+//                                    loescht gerade ein Sturm seine
+//                                    eigenen Belege. KI-gestuetzt ueber
 //                                    Anthropic Claude Code.
 
 #include "DxClusterClient.h"
@@ -143,6 +150,7 @@ void DxClusterClient::connectToCluster(const QString& host, quint16 port, const 
 void DxClusterClient::disconnect()
 {
     m_intentionalDisconnect = true;
+    m_naechsterIstWiederanlauf = false;   // der naechste ist ein neuer
     m_reconnectTimer->stop();
     m_stableTimer->stop();
     if (m_connected) {
@@ -184,15 +192,22 @@ void DxClusterClient::onConnected()
     // (Verzoegerung = 1<<0 = 5 s) -> wieder von vorn. 4730 Protokollzeilen
     // in zweidreiviertel Stunden, mehr als die Haelfte des ganzen Logs.
     //
-    // Ein offener Socket ist noch keine brauchbare Sitzung. Der Zaehler
-    // faellt deshalb erst, wenn die Anmeldung durch ist -- siehe
-    // markLoggedIn().
+    // Ein offener Socket ist noch keine brauchbare Sitzung. Und am
+    // 2026-10-28 zeigte sich, dass die ANMELDUNG es auch noch nicht
+    // ist: der Knoten nimmt sie an und wirft bei doppeltem Rufzeichen
+    // 8,8 s spaeter hinaus. Der Zaehler faellt deshalb erst, wenn die
+    // Sitzung gehalten hat -- siehe StableSessionMs und
+    // onSessionStable().
 
-    // Open log file (truncate on each new connection)
+    // Mitschreiben: geleert wird nur bei einer Verbindung, die der
+    // Betreiber selbst anstoesst -- siehe protokollOeffnungsart().
+    const bool wiederanlauf = m_naechsterIstWiederanlauf;
+    m_naechsterIstWiederanlauf = false;
+
     m_logFile.close();
     m_logFile.setFileName(logFilePath());
     QDir().mkpath(QFileInfo(m_logFile).absolutePath());
-    if (m_logFile.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+    if (m_logFile.open(protokollOeffnungsart(wiederanlauf))) {
         m_logFile.write(QString("--- Connected to %1:%2 at %3 ---\n")
             .arg(m_host).arg(m_port)
             .arg(QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd HH:mm:ss UTC"))
@@ -239,6 +254,14 @@ void DxClusterClient::onSessionStable()
 
 // Am 2026-10-28 am Knoten dxc.nc7j.com:7300 live mitgeschrieben; die
 // Begruendung steht an der Deklaration.
+QIODevice::OpenMode DxClusterClient::protokollOeffnungsart(bool wiederanlauf)
+{
+    const QIODevice::OpenMode grund =
+        QIODevice::WriteOnly | QIODevice::Text;
+    return wiederanlauf ? (grund | QIODevice::Append)
+                        : (grund | QIODevice::Truncate);
+}
+
 bool DxClusterClient::istHinauswurf(const QString& line)
 {
     return line.contains(QLatin1String("this instance is disconnected"),
@@ -278,6 +301,9 @@ void DxClusterClient::onDisconnected()
                                << delay / 1000 << "s";
         }
         qCDebug(lcSpots) << "DxClusterClient: reconnecting in" << delay << "ms";
+        // Das naechste onConnected gehoert zu DIESER Sitzung, nicht zu
+        // einer neuen: das Mitschreiben wird dann nicht geleert.
+        m_naechsterIstWiederanlauf = true;
         m_reconnectTimer->start(delay);
         m_reconnectAttempts++;
     }

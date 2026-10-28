@@ -46,6 +46,8 @@
 
 #include <QtTest/QtTest>
 
+#include <QFile>
+
 #include "core/DxClusterClient.h"
 
 using namespace Longpath;
@@ -138,6 +140,75 @@ private slots:
         QVERIFY(DxClusterClient::istHinauswurfForTest(
             QStringLiteral("Reconnected as OE5SOS at 84.113.40.38, "
                            "this instance is disconnected")));
+    }
+
+    // ─── Das Mitschreiben ueberlebt den Sturm ───────────────────────
+
+    void nurEineVerbindungDesBetreibersLeertDasMitschreiben()
+    {
+        // Bis zum 2026-10-28 wurde bei JEDER Verbindung geleert. Bei
+        // 216 Neuverbindungen loeschte das Mitschreiben damit genau
+        // die Belege, die den Sturm erklaert haetten.
+        const auto neu  = DxClusterClient::protokollOeffnungsartForTest(false);
+        const auto fort = DxClusterClient::protokollOeffnungsartForTest(true);
+
+        QVERIFY(neu.testFlag(QIODevice::Truncate));
+        QVERIFY(!neu.testFlag(QIODevice::Append));
+
+        QVERIFY(fort.testFlag(QIODevice::Append));
+        QVERIFY2(!fort.testFlag(QIODevice::Truncate),
+                 "ein selbsttaetiger Wiederanlauf leert das Mitschreiben "
+                 "-- dann ist beim naechsten Sturm wieder nichts zu holen");
+
+        // Beide schreiben, und beide als Text.
+        for (const auto& m : {neu, fort}) {
+            QVERIFY(m.testFlag(QIODevice::WriteOnly));
+            QVERIFY(m.testFlag(QIODevice::Text));
+        }
+    }
+
+    void einWiederanlaufWeissDassErEinerIst()
+    {
+        DxClusterClient c;
+        c.setLogFileName(QStringLiteral("tst_wiederanlauf.log"));
+
+        // Die erste Verbindung ist keine Fortsetzung.
+        QVERIFY(!c.istWiederanlaufForTest());
+
+        QMetaObject::invokeMethod(&c, "onConnected", Qt::DirectConnection);
+        QMetaObject::invokeMethod(&c, "onDisconnected", Qt::DirectConnection);
+        QVERIFY2(c.istWiederanlaufForTest(),
+                 "nach einem unbeabsichtigten Abriss steht ein Wiederanlauf "
+                 "an -- der darf das Mitschreiben nicht leeren");
+
+        // Und das naechste onConnected verbraucht die Fahne wieder.
+        QMetaObject::invokeMethod(&c, "onConnected", Qt::DirectConnection);
+        QVERIFY(!c.istWiederanlaufForTest());
+
+        // Der Beleg auf Dateiebene: nach Verbindung -> Abriss ->
+        // Wiederanlauf muessen BEIDE Kopfzeilen in der Datei stehen.
+        // Mit der alten Fassung stand nur die letzte darin, und genau
+        // deshalb war vom Sturm des Vormittags nichts mehr zu holen.
+        QFile f(c.logFilePath());
+        QVERIFY2(f.open(QIODevice::ReadOnly | QIODevice::Text),
+                 qPrintable(QStringLiteral("Mitschreibdatei nicht lesbar: %1")
+                                .arg(c.logFilePath())));
+        const QString inhalt = QString::fromUtf8(f.readAll());
+        QCOMPARE(inhalt.count(QStringLiteral("--- Connected to")), 2);
+    }
+
+    void gewolltesTrennenBeendetDieSitzung()
+    {
+        // Wer selbst trennt, faengt beim naechsten Mal neu an -- dann
+        // SOLL geleert werden.
+        DxClusterClient c;
+        c.setLogFileName(QStringLiteral("tst_wiederanlauf.log"));
+        QMetaObject::invokeMethod(&c, "onConnected", Qt::DirectConnection);
+        QMetaObject::invokeMethod(&c, "onDisconnected", Qt::DirectConnection);
+        QVERIFY(c.istWiederanlaufForTest());
+
+        c.disconnect();
+        QVERIFY(!c.istWiederanlaufForTest());
     }
 
     void einSpotIstKeinHinauswurf()
