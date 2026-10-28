@@ -31,6 +31,7 @@ class TstStartWatch : public QObject
     Q_OBJECT
 
 private slots:
+    void initTestCase();
     void init();
     void cleanupTestCase();
     void ohneMarkeIstAllesInOrdnung();
@@ -43,16 +44,46 @@ private slots:
     void dieMarkeLiegtNichtInDenEinstellungen();
     void derHinweisSagtWasPassiertIst();
     void dasHauptfensterFaehrtWirklichSicherHoch();
+
+private:
+    /// Der Wert, mit dem der Pruefbetrieb gestartet ist.
+    QString m_beimStart;
 };
+
+// ── Dieser Lauf gehoert auf die ANDERE Seite der Wache ──────────────
+//
+// Seit dem 2026-10-28 setzt TestSandboxInit LONGPATH_CONFIG_DIR, und
+// StartWatch macht unter isSandbox() mit Absicht nichts: beginStart()
+// gibt 0 zurueck, shouldUseSafeStart() falsch. „Eine Sonde mit eigenem
+// Konfigurationsordner hat keine Anordnung zu schuetzen, sie sieht nur
+// nach" (StartWatch.cpp).
+//
+// Das ist richtig -- und dieser Pruefstand prueft genau das Zaehlwerk,
+// das dort uebersprungen wird. Er muss die Wache also ausdruecklich
+// umgehen. StartWatch schreibt nur eine Marke in eine Datei, geht also
+// an kein Netz und an keine Hardware.
+//
+// Dass er das vorher nicht MUSSTE, ist der Befund: der ganze
+// Pruefbetrieb stand auf der falschen Seite.
+void TstStartWatch::initTestCase()
+{
+    m_beimStart = qEnvironmentVariable("LONGPATH_CONFIG_DIR");
+}
 
 void TstStartWatch::init()
 {
+    qunsetenv("LONGPATH_CONFIG_DIR");
     StartWatch::reset();
 }
 
 void TstStartWatch::cleanupTestCase()
 {
     StartWatch::reset();
+    if (m_beimStart.isEmpty()) {
+        qunsetenv("LONGPATH_CONFIG_DIR");
+    } else {
+        qputenv("LONGPATH_CONFIG_DIR", m_beimStart.toUtf8());
+    }
 }
 
 void TstStartWatch::ohneMarkeIstAllesInOrdnung()

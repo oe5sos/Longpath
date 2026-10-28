@@ -66,14 +66,41 @@ class TestSpotAutoStart : public QObject {
 
 private slots:
 
+    // ── Dieser Lauf gehoert auf die ANDERE Seite der Wache ──────────
+    //
+    // Seit dem 2026-10-28 setzt TestSandboxInit LONGPATH_CONFIG_DIR,
+    // und damit nimmt restoreSpotClientAutoStartState() den frueh
+    // gesetzten Ausgang (RadioModel.cpp: „ein frueher Ausgang ist hier
+    // mehr wert als acht Abfragen weiter unten"). Es startet dann
+    // nichts -- und dieser Pruefstand prueft genau, WAS es startet.
+    //
+    // Er muss die Wache also ausdruecklich umgehen, so wie
+    // tst_sonde_bleibt_offline es fuer seine Gegenprobe tut. Das ist
+    // vertretbar, weil alle Adressen hier unter .example.org liegen:
+    // eine fuer genau diesen Zweck reservierte Zone, hinter der kein
+    // Dienst steht.
+    //
+    // Dass dieser Pruefstand vorher nichts umgehen MUSSTE, ist der
+    // Befund: der ganze Pruefbetrieb stand auf der falschen Seite.
+    void initTestCase()
+    {
+        m_beimStart = qEnvironmentVariable("LONGPATH_CONFIG_DIR");
+    }
+
     void init()
     {
         testSettings().clear();
+        qunsetenv("LONGPATH_CONFIG_DIR");
     }
 
     void cleanup()
     {
         testSettings().clear();
+        if (m_beimStart.isEmpty()) {
+            qunsetenv("LONGPATH_CONFIG_DIR");
+        } else {
+            qputenv("LONGPATH_CONFIG_DIR", m_beimStart.toUtf8());
+        }
     }
 
     // ── DxCluster ───────────────────────────────────────────────────────
@@ -283,6 +310,10 @@ private slots:
         QVERIFY(model.pskReporter() != nullptr);
         QVERIFY(!model.pskReporter()->isListening());
     }
+
+private:
+    /// Der Wert, mit dem der Pruefbetrieb gestartet ist.
+    QString m_beimStart;
 };
 
 QTEST_GUILESS_MAIN(TestSpotAutoStart)

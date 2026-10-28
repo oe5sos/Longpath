@@ -78,8 +78,23 @@ private:
 
 private slots:
 
+    // ── Diese Faelle pruefen die STANDARD-Pfadauflösung ─────────────
+    //
+    // Seit dem 2026-10-28 setzt TestSandboxInit LONGPATH_CONFIG_DIR, und
+    // AppSettings::resolveConfigDir() nimmt dann genau diesen Ordner --
+    // das ist der Zweck der Variablen. Hier wird aber geprueft, wohin
+    // ohne Ueberschreibung aufgeloest wird, also ueber
+    // QStandardPaths. Beides ist richtig, es sind zwei Wege; fuer den
+    // mit Variable ist tst_sandbox_data_dir zustaendig.
+    //
+    // Darum hier abschalten und beim Verlassen zurueckstellen. Das ist
+    // keine Lockerung: an kein Netz und an keine Hardware geht dieser
+    // Lauf so oder so, er rechnet Pfade aus.
     void initTestCase()
     {
+        m_beimStart = qEnvironmentVariable("LONGPATH_CONFIG_DIR");
+        qunsetenv("LONGPATH_CONFIG_DIR");
+
         // Sauber anfangen: Reste aus einem frueheren Lauf wuerden die
         // Uebernahme davon abhalten, ueberhaupt zu laufen.
         QDir(configRoot() + QStringLiteral("/Longpath")).removeRecursively();
@@ -138,6 +153,19 @@ private slots:
         QVERIFY2(text.contains(QStringLiteral("NEU")),
                  "die neue Datei wurde von der alten uebermalt");
     }
+
+    void cleanupTestCase()
+    {
+        if (m_beimStart.isEmpty()) {
+            qunsetenv("LONGPATH_CONFIG_DIR");
+        } else {
+            qputenv("LONGPATH_CONFIG_DIR", m_beimStart.toUtf8());
+        }
+    }
+
+private:
+    /// Der Wert, mit dem der Pruefbetrieb gestartet ist.
+    QString m_beimStart;
 };
 
 QTEST_MAIN(TestSettingsMigrationLongpath)

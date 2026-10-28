@@ -81,9 +81,43 @@ void stelleSchluesselEin(quint16 wsjtxPort, quint16 sammlerPort)
 class TstSondeBleibtOffline : public QObject { Q_OBJECT
 private slots:
 
+    // ── Der Pruefbetrieb selbst ist jetzt isoliert (2026-10-28) ──────
+    //
+    // Bis heute setzte NIEMAND LONGPATH_CONFIG_DIR im Pruefbetrieb:
+    // nicht TestSandboxInit, nicht tools/run_tests.sh. In jedem
+    // gewoehnlichen ctest-Lauf war darfVonSelbstVerbinden() also wahr
+    // -- also genau der Zustand, gegen den dieser Pruefstand
+    // geschrieben wurde, nur eine Stufe hoeher. Die Wache war da, der
+    // Pruefbetrieb stand aber auf der falschen Seite davon.
+    //
+    // Seit TestSandboxInit die Variable setzt, laeuft jedes
+    // Pruefprogramm isoliert. DAS ist die Zusicherung, und sie wird
+    // hier festgenagelt -- ohne dass dieser Fall die Variable selbst
+    // setzt, denn dann prueft er nur sich.
+    //
+    // In initTestCase(), weil cleanup() unten den Wert zurueckstellt
+    // und ein spaeterer Fall ihn also schon beruehrt haben koennte.
+    void initTestCase()
+    {
+        m_beimStart = qEnvironmentVariable("LONGPATH_CONFIG_DIR");
+        QVERIFY2(!m_beimStart.trimmed().isEmpty(),
+                 "Der Pruefbetrieb setzt LONGPATH_CONFIG_DIR nicht -- dann "
+                 "darf jedes Pruefprogramm von selbst ins Netz. Siehe "
+                 "tests/TestSandboxInit.cpp.");
+        QVERIFY(AppSettings::isSandbox());
+        QVERIFY(!AppSettings::darfVonSelbstVerbinden());
+    }
+
+    // Zurueck auf den Startwert, NICHT loeschen. Geloescht liefe jeder
+    // Fall nach dem ersten un-isoliert -- und das ist das, was gerade
+    // behoben wurde.
     void cleanup()
     {
-        qunsetenv("LONGPATH_CONFIG_DIR");
+        if (m_beimStart.isEmpty()) {
+            qunsetenv("LONGPATH_CONFIG_DIR");
+        } else {
+            qputenv("LONGPATH_CONFIG_DIR", m_beimStart.toUtf8());
+        }
     }
 
     // Der Schalter selbst: er haengt an der Umgebung, nicht an einer
@@ -200,6 +234,10 @@ private slots:
                  "ohne Sandbox muss der sichere Start greifen");
         StartWatch::reset();
     }
+
+private:
+    /// Der Wert, mit dem der Pruefbetrieb gestartet ist.
+    QString m_beimStart;
 };
 
 QTEST_MAIN(TstSondeBleibtOffline)
