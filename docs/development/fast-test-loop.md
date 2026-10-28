@@ -212,6 +212,36 @@ on macOS it resolves elsewhere (see `src/core/AppSettings.cpp:112-118`):
 If you are verifying that a test did not touch it, check the right one. A
 check against the wrong path silently "passes" while proving nothing.
 
+### And the network, not just the files (2026-10-28)
+
+`TestSandboxInit` now also sets `LONGPATH_CONFIG_DIR`, to a temporary
+directory of its own per process. That makes
+`AppSettings::darfVonSelbstVerbinden()` false, so nothing in a test run
+connects out, binds a port or starts a service on its own.
+
+Until then nobody set that variable in a test run, so every test binary
+was allowed to. See
+`docs/architecture/2026-10-28-pruefstaende-netzdicht.md`.
+
+Two consequences when you write or debug a test:
+
+- **A test that needs the auto-start path must opt out**, by unsetting
+  the variable for its duration and restoring it afterwards — see
+  `tst_spot_auto_start` and `tst_start_watch`. Only do that when the
+  thing under test is the decision itself, and say in a comment why it
+  is safe.
+- **Each process now has its own settings file.** The qttest sandbox is
+  shared across binaries in a run, and ctest runs them with `-j`; the
+  per-process directory removes that coupling. Do not rely on a value
+  one test binary wrote being visible in another.
+
+A live keychain run needs both variables now, because `CredentialStore`
+deliberately skips the legacy migration in a sandbox:
+
+```sh
+LONGPATH_KEYCHAIN_LIVE=1 LONGPATH_CONFIG_DIR= ./tst_credential_store_migration
+```
+
 ## Why the suite is slow, structurally
 
 Linking dominates: about 32 minutes of the 37 is the linker, not the tests.
