@@ -242,11 +242,9 @@ void FFTEngine::feedIQ(const QVector<float>& interleavedIQ)
     // Sprung an der Nahtstelle ist breitbandig und malt einen Schmierer
     // ueber das ganze Bild. requestWindowReset() setzt die Fahne von
     // irgendeinem Faden, abgeholt wird sie hier, auf dem Faden, dem das
-    // Fenster gehoert.
-    if (m_windowResetPending.exchange(false)) {
-        m_iqWritePos = 0;
-        m_windowResets.fetch_add(1);
-    }
+    // Fenster gehoert — mit den zwei Schranken, die requestWindowReset()
+    // beschreibt.
+    applyPendingWindowReset();
 
     // Apply any pending FFT size change (coalesces rapid slider drags)
     int pending = m_pendingFftSize.exchange(0);
@@ -272,6 +270,14 @@ void FFTEngine::feedIQ(const QVector<float>& interleavedIQ)
             }
             m_decimationCounter = (m_decimationCounter + 1) % dec;
         }
+        // NereusSDR-original (2026-10-23): Eingang seit dem letzten Bild,
+        // fuer die Schranke gegen das einfrierende Bild. Uebersprungene
+        // Paare zaehlen mit — sie gehen in der Zeit zwischen zwei Bildern
+        // genauso vorbei.
+        ++m_pairsSinceFrame;
+        // NereusSDR-original (2026-10-24): Eingang seit der letzten
+        // Luecke, fuer die Regel zur verlustbehafteten Strecke.
+        ++m_pairsSinceGap;
         if (m_iqWritePos >= m_currentFftSize) {
             // Buffer full -- process and shift overlap region back to head.
             processFrame();
@@ -297,6 +303,56 @@ void FFTEngine::feedIQ(const QVector<float>& interleavedIQ)
 #else
     Q_UNUSED(interleavedIQ);
 #endif
+}
+
+bool FFTEngine::applyPendingWindowReset()
+{
+    if (!m_windowResetPending.exchange(false)) {
+        return false;
+    }
+    // Beide Schranken stehen im Wortlaut bei requestWindowReset(). Kurz:
+    // (1) kam seit kGapResetStallFrameIntervals Bildabstaenden kein Bild,
+    // waere das Bild eingefroren; (2) lag die letzte Luecke weniger als
+    // kGapLossyLinkWindows Fenster zurueck, ist die Strecke
+    // verlustbehaftet und das Bild wuerde kriechen. In beiden Faellen
+    // geht die Luecke mit leichtem Schmierer durch.
+    //
+    // Waehrend sich das Fenster nach einer Verwerfung neu fuellt und noch
+    // kein Bild kam (m_refillingAfterReset), entscheidet allein (1) —
+    // sonst wuerde die eigene Verwerfung die Strecke als verlustbehaftet
+    // ausweisen und jede weitere Luecke durchlassen.
+    const bool verlustbehaftet = !m_refillingAfterReset
+        && m_pairsSinceGap
+            < static_cast<qint64>(kGapLossyLinkWindows) * m_currentFftSize;
+    const bool eingefroren = m_pairsSinceFrame
+        >= static_cast<qint64>(kGapResetStallFrameIntervals) * frameIntervalPairs();
+    m_pairsSinceGap = 0;
+    if (verlustbehaftet || eingefroren) {
+        m_windowResetsSkipped.fetch_add(1);
+        return false;
+    }
+    m_iqWritePos = 0;
+    m_refillingAfterReset = true;
+    m_windowResets.fetch_add(1);
+    return true;
+}
+
+qint64 FFTEngine::frameIntervalPairs() const
+{
+    // NereusSDR-original (2026-10-23): der Vorschub, den processFrame()
+    // zwischen zwei Bildern nimmt, in dezimierten Eingangspaaren. Auf die
+    // FFT-Groesse geklemmt, weil ein Fenster nicht weiter springt als es
+    // lang ist.
+    const double sr  = m_sampleRate.load();
+    const int    fps = qMax(1, m_targetFps.load());
+    qint64 vorschub = (sr > 0.0)
+        ? static_cast<qint64>(std::llround(sr / static_cast<double>(fps)))
+        : static_cast<qint64>(m_currentFftSize);
+    vorschub = std::max<qint64>(1, vorschub);
+    if (m_currentFftSize > 0) {
+        vorschub = std::min<qint64>(vorschub, m_currentFftSize);
+    }
+    return vorschub;
 }
 
 void FFTEngine::replanFft()
@@ -547,7 +603,15 @@ void FFTEngine::processFrame()
     // its remaining batch samples when processFrame returned without
     // running the FFT.  This preserves the overlap region across the
     // (rare) cap fire.
-    if (m_frameTimerStarted && m_frameTimer.elapsed() < 5) {
+    // NereusSDR-original (2026-10-26): im Pruefstand liest die Sperre
+    // eine gestellte Uhr statt der eigenen. Ohne sie laufen mehrere
+    // feedIQ() hintereinander in Mikrosekunden alle in diese Sperre, und
+    // ein Prueflauf kann die Zeit zwischen zwei Bildern nicht fahren,
+    // ohne wirklich zu schlafen.
+    const qint64 seitDemLetztenBild = m_frameGapClockForTest
+        ? (m_frameGapClockForTest() - m_frameGapTestStampMs)
+        : m_frameTimer.elapsed();
+    if (m_frameTimerStarted && seitDemLetztenBild < 5) {
         return;  // buffer stays full; next feedIQ call retries
     }
 
@@ -613,7 +677,17 @@ void FFTEngine::processFrame()
 
     // Restart frame timer
     m_frameTimer.restart();
+    if (m_frameGapClockForTest) {
+        m_frameGapTestStampMs = m_frameGapClockForTest();
+    }
     m_frameTimerStarted = true;
+    // NereusSDR-original (2026-10-23): die Schranke gegen das
+    // einfrierende Bild zaehlt von hier.
+    m_pairsSinceFrame = 0;
+    // NereusSDR-original (2026-10-24): ein Bild nach einer Verwerfung
+    // beendet das Nachfuellen — damit greift die Regel zur
+    // verlustbehafteten Strecke wieder.
+    m_refillingAfterReset = false;
 
     // Emit both signals in lock-step.  fftReady serves chrome / AGC
     // consumers that need full-band dBm (ClarityController, NoiseFloorTracker);

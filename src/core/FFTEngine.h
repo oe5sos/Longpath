@@ -65,6 +65,8 @@
 #include <QElapsedTimer>
 
 #include <atomic>
+#include <functional>
+#include <limits>
 
 #ifdef HAVE_FFTW3
 #include <fftw3.h>
@@ -205,10 +207,73 @@ public slots:
     ///
     /// Darf von JEDEM Faden gerufen werden: sie setzt nur eine Fahne, die
     /// feedIQ() auf seinem eigenen Faden abholt.
+    ///
+    /// Die Verwerfung ist BESCHRAENKT, und zwar aus zwei gemessenen
+    /// Gruenden (beide von NereusSDR an unserem Port gefunden, Rosinen
+    /// vom 2026-10-23 und 2026-10-24):
+    ///
+    ///   1. Jede Verwerfung laesst das naechste Bild auf ein GANZES
+    ///      neues Fenster warten. Eine Strecke, die oefter als einmal je
+    ///      Fenster ein Paket verliert, wird also nie fertig — das Bild
+    ///      friert auf seinem letzten Stand ein. Darum: nach
+    ///      kGapResetStallFrameIntervals Bildabstaenden ohne Bild wird
+    ///      die naechste Luecke durchgelassen.
+    ///   2. Selbst mit (1) kroch das Bild, wenn die Luecken ein bis
+    ///      wenige Fenster auseinander lagen: jede fand den Lauf schon
+    ///      beendet, verwarf wieder und kostete ein ganzes Fenster an
+    ///      Bildern (bei 262144 FFT und einem Verlust je 1,56 s rund
+    ///      4 Bilder/s). Darum: wer innerhalb der letzten
+    ///      kGapLossyLinkWindows Fenster schon eine Luecke hatte, gilt
+    ///      als verlustbehaftet, und seine naechste Luecke geht mit
+    ///      leichtem Schmierer durch statt das Fenster zu raeumen.
+    ///
+    /// Auf einer gesunden Strecke wirft eine einzelne Luecke das Fenster
+    /// weiterhin weg. Waehrend sich das Fenster nach einer Verwerfung
+    /// neu fuellt und noch kein Bild kam, entscheidet allein (1).
     void requestWindowReset() { m_windowResetPending.store(true); }
 
     /// Wie oft ein Fenster deshalb verworfen wurde (Diagnose).
     quint64 windowResets() const { return m_windowResets.load(); }
+
+public:
+    /// Wie oft eine Luecke stattdessen DURCHGELASSEN wurde, weil eine
+    /// der beiden Schranken aus requestWindowReset() griff (Diagnose).
+    quint64 windowResetsSkipped() const { return m_windowResetsSkipped.load(); }
+
+    /// Die Schranke gegen das einfrierende Bild, in Bildabstaenden: kam
+    /// so lange kein Bild, geht die naechste Luecke durch. Ein
+    /// Bildabstand ist der Vorschub, den processFrame() zwischen zwei
+    /// Bildern nimmt — sampleRate / outputFps Werte, hoechstens die
+    /// FFT-Groesse.
+    static constexpr int kGapResetStallFrameIntervals = 3;
+
+    /// Wie frisch eine Luecke sein muss, damit die Strecke als
+    /// verlustbehaftet gilt — in Fenstern (also FFT-Groesse, in
+    /// Eingangspaaren), gezaehlt von der letzten Luecke, ob verworfen
+    /// oder durchgelassen. Warum 4: Luecken bis zu vier Fenster
+    /// auseinander schmieren ohnehin alle, der Wasserfall behaelt so
+    /// seine Bildrate, waehrend eine Verwerfung je Luecke ein ganzes
+    /// Fenster an Bildern kosten wuerde. Eine gesunde Strecke, die
+    /// gelegentlich ein Paket verliert — weiter als vier Fenster
+    /// auseinander —, verwirft weiterhin.
+    static constexpr int kGapLossyLinkWindows = 4;
+
+    /// Eine anliegende requestWindowReset()-Fahne JETZT abholen, statt
+    /// beim naechsten feedIQ(). Nur auf dem Arbeitsfaden dieser
+    /// Maschine. Gibt true, wenn das Fenster wirklich verworfen wurde,
+    /// und false, wenn keine Fahne anlag oder eine Schranke die Luecke
+    /// durchgelassen hat (requestWindowReset() sagt, wann).
+    bool applyPendingWindowReset();
+
+    /// Pruefstand-Naht, NereusSDR-original (2026-10-26): die Uhr in ms,
+    /// die der 5-ms-Mindestabstand zwischen zwei Bildern anstelle seines
+    /// eigenen Taktgebers liest. Vor dem ersten Eingang setzen; gelesen
+    /// wird sie auf dem Arbeitsfaden. Damit kann ein Prueflauf die Zeit
+    /// zwischen zwei Bildern fahren, ohne wirklich zu schlafen.
+    void setFrameGapClockForTest(std::function<qint64()> clock)
+    {
+        m_frameGapClockForTest = std::move(clock);
+    }
 
 signals:
     // Emitted when a new FFT frame is ready.
@@ -252,6 +317,11 @@ signals:
     void spectrumSettingsChanged(int receiverId);
 
 private:
+    /// Der Vorschub zwischen zwei Bildern, in dezimierten
+    /// Eingangspaaren — der Taktmass fuer
+    /// kGapResetStallFrameIntervals. NereusSDR-original.
+    qint64 frameIntervalPairs() const;
+
     void replanFft();
     void computeWindow();
     void processFrame();
@@ -342,6 +412,22 @@ private:
     int m_iqWritePos{0};  // write position in sample pairs
     std::atomic<bool>    m_windowResetPending{false};  // von requestWindowReset()
     std::atomic<quint64> m_windowResets{0};            // nur Diagnose
+    std::atomic<quint64> m_windowResetsSkipped{0};     // nur Diagnose
+
+    // Die zwei Schranken aus requestWindowReset(). Nur der Arbeitsfaden
+    // dieser Maschine liest und schreibt sie, darum ohne std::atomic.
+    qint64 m_pairsSinceFrame{0};        // Eingang seit dem letzten Bild
+    // Startwert hoch, nicht 0: vor der ERSTEN Luecke gibt es keine
+    // vorige, der Zaehler muss also weiter zurueckstehen als jedes
+    // kGapLossyLinkWindows-Fenster — sonst gilt die Strecke schon
+    // beim ersten Loch als verlustbehaftet und verwirft nie.
+    // max()/2, damit das paarweise Hochzaehlen nicht ueberlaeuft.
+    qint64 m_pairsSinceGap{std::numeric_limits<qint64>::max() / 2};
+    bool   m_refillingAfterReset{false};  // Fenster fuellt sich nach einer Verwerfung
+
+    // Pruefstand-Naht fuer den 5-ms-Mindestabstand (s. oben).
+    std::function<qint64()> m_frameGapClockForTest;
+    qint64 m_frameGapTestStampMs{0};
 
     // Output rate limiting
     QElapsedTimer m_frameTimer;
