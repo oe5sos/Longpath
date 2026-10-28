@@ -45,6 +45,7 @@ from aiortc import (
 
 from geraete import Geraet, Geraeteliste
 from kennung import b64url, pruefe_unterschrift, unb64url
+from ton import Umkodierer
 
 log = logging.getLogger("fernzugriff.sitzung")
 
@@ -87,6 +88,12 @@ class Sitzung:
         self.geraet = geraet
         self.ziel = ziel
         self.geraeteliste = geraeteliste
+        # Der Umkodierer entsteht erst, wenn das Geraet beim Anmelden
+        # sagt, dass es Opus kann. Wer das nicht sagt, bekommt den
+        # Tonstrom unveraendert -- im eigenen WLAN ist mu-law voellig in
+        # Ordnung, und ein Geraet ohne sicheren Kontext hat gar keinen
+        # Dekoder (siehe ton.py).
+        self.ton: Umkodierer | None = None
         self.pc = RTCPeerConnection(RTCConfiguration(_eisserver(stun, turn)))
         self.angemeldet = False
         self._aufforderung = secrets.token_bytes(32)
@@ -167,6 +174,7 @@ class Sitzung:
             await self.schliesse()
             return
 
+        kann = m.get("kann") or []
         oeff = self.geraet.oeffentlich()
         if not pruefe_unterschrift(oeff, anmelde_transkript(self._aufforderung), signatur):
             # Kein zweiter Versuch auf derselben Verbindung: sonst waere
@@ -183,10 +191,16 @@ class Sitzung:
             await self.schliesse()
             return
 
+        if "opus" in kann:
+            self.ton = Umkodierer()
+            log.info("%s kann Opus -- der Tonstrom wird umkodiert", self.geraet.name)
+
         self.angemeldet = True
         if self.geraeteliste is not None:
             self.geraeteliste.gesehen(self.geraet.ident)
-        self._sende_kanal(json.dumps({"typ": "offen"}, separators=(",", ":")))
+        self._sende_kanal(json.dumps(
+            {"typ": "offen", "ton": "opus" if self.ton else "roh"},
+            separators=(",", ":")))
         log.info("%s ist drin", self.geraet.name)
 
     # -- Die Bruecke -----------------------------------------------------
@@ -203,12 +217,31 @@ class Sitzung:
         self._longpath = await asyncio.wait_for(
             websockets.connect(url, max_size=None), timeout=5.0
         )
+        if self.ton is not None:
+            # Opus aus mu-law zu rechnen waere doppelt verlustbehaftet,
+            # also int16 anfordern -- ueber Loopback kostet das nichts.
+            #
+            # Das verstellt NICHTS fuer andere: in Longpath gehoert das
+            # Tonformat der Sitzung, nicht dem Programm (TciServer.cpp,
+            # "Das Format gehoert in Longpath der SITZUNG"). Ein
+            # gleichzeitig laufendes WSJT-X und Martins Seite im eigenen
+            # Netz behalten ihres.
+            await self._longpath.send("audio_stream_sample_type:int16;")
         self._pumpe = asyncio.ensure_future(self._von_longpath())
 
     async def _von_longpath(self) -> None:
-        """Alles, was Longpath sagt, in den Kanal."""
+        """Alles, was Longpath sagt, in den Kanal -- den Ton kleingerechnet."""
         try:
             async for nachricht in self._longpath:
+                if self.ton is not None and isinstance(nachricht, (bytes, bytearray)):
+                    neu = self.ton.rahmen(bytes(nachricht))
+                    if neu is not None:
+                        # Ein Eingangsrahmen ergibt null, einen oder
+                        # mehrere Opus-Rahmen: Opus arbeitet in festen
+                        # Bloecken, der Tonstrom kommt in anderen.
+                        for r in neu:
+                            self._sende_kanal(r)
+                        continue
                 self._sende_kanal(nachricht)
         except Exception as e:
             log.info("Longpath weg: %s", e)

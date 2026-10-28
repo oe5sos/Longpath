@@ -60,6 +60,23 @@ const PRAEFIX_ANMELDUNG = TEXT.encode('Longpath fernzugriff anmeldung v1\n');
 
 const KANAL = 'longpath-tci';
 
+// ── Opus ──────────────────────────────────────────────────────────────────
+//
+// Der Ton ist der teuerste Teil der Strecke: 24,9 kB/s roh, 13,3 als
+// mu-law, 4,0 als Opus (am 2026-10-28 gemessen). Die Station rechnet ihn
+// um, sobald dieses Telefon beim Anmelden sagt, dass es Opus kann.
+//
+// `AudioDecoder` ist `[SecureContext]` -- auf `http://172.30.30.x` gibt
+// es ihn nicht, und genau daran ist Opus im September gescheitert. Von
+// einem https-Ort gibt es ihn. Wer ihn nicht hat, bekommt weiter mu-law,
+// und zwar ohne dass irgendwo etwas einzustellen waere.
+const OPUS_MARKE = 0x4c504f31;   // "LPO1", im Kopf der Station
+const OPUS_KOPF = 10;
+
+function kannOpus() {
+  return typeof AudioDecoder !== 'undefined' && typeof AudioData !== 'undefined';
+}
+
 // ── Der Geraeteschluessel ───────────────────────────────────────────────────
 
 const DB = 'longpath-fernzugriff';
@@ -146,6 +163,9 @@ export class FernLeitung extends EventTarget {
     this.readyState = 0;            // CONNECTING
     this.onopen = this.onmessage = this.onclose = this.onerror = null;
     this.weg = '';                  // 'direkt', 'stun' oder 'relay' -- fuer die Anzeige
+    this.ton = '';                  // 'opus' oder 'roh' -- fuer die Fusszeile
+    this._opus = null;              // der AudioDecoder, wenn Opus laeuft
+    this._opusRate = 0;
     this._pc = null;
     this._kanal = null;
     this._ws = null;
@@ -262,6 +282,12 @@ export class FernLeitung extends EventTarget {
         await this._anmelden(kanal, ich, ev.data);
         return;
       }
+      // Ein Opus-Rahmen wird hier aufgeloest und als gewoehnlicher
+      // TCI-Tonrahmen weitergereicht; alles andere geht durch.
+      if (this.ton === 'opus' && ev.data instanceof ArrayBuffer
+          && this._opusRahmen(ev.data)) {
+        return;
+      }
       this.onmessage?.({ data: ev.data });
     };
     kanal.onclose = () => this._zu(1006, 'der Kanal ging zu');
@@ -278,8 +304,11 @@ export class FernLeitung extends EventTarget {
       kanal.send(JSON.stringify({
         typ: 'anmeldung',
         signatur: await unterschreibe(ich.privat, transkript),
+        kann: kannOpus() ? ['opus'] : [],
       }));
     } else if (m.typ === 'offen') {
+      this.ton = m.ton || 'roh';
+      if (this.ton === 'opus') { this._richteOpusEin(); }
       this._angemeldet = true;
       this.readyState = 1;          // OPEN
       this.weg = await this._welcherWeg();
@@ -290,6 +319,86 @@ export class FernLeitung extends EventTarget {
       this.onopen?.({});
     } else if (m.typ === 'fehler') {
       this._fehler(new Error(m.grund || 'die Station sagt ab'));
+    }
+  }
+
+  // ── Der Opus-Weg ────────────────────────────────────────────────────────
+
+  _richteOpusEin() {
+    // Der Dekoder wird beim ERSTEN Paket eingerichtet, nicht hier: erst
+    // dann steht die Abtastrate fest, und sie steht im Kopf der Station.
+    this._opus = null;
+    this._opusRate = 0;
+  }
+
+  /**
+   * Einen Opus-Rahmen der Station in einen gewoehnlichen TCI-Tonrahmen
+   * verwandeln, damit `tci.js` nichts davon merkt.
+   *
+   * **Opus gibt immer 48 kHz zurueck**, gleich womit es gefuettert wurde.
+   * Das ist kein Fehler, sondern wie libopus arbeitet, und hier sogar
+   * guenstig: der AudioContext laeuft ohnehin auf 48 kHz, das Hochrechnen
+   * von 12 entfaellt. Der gebaute Rahmen traegt darum 48000 als Rate.
+   */
+  _opusRahmen(puffer) {
+    const sicht = new DataView(puffer);
+    if (sicht.byteLength < OPUS_KOPF || sicht.getUint32(0, false) !== OPUS_MARKE) {
+      return false;
+    }
+    const rate = sicht.getUint16(4, true) * 50;
+    const empfaenger = sicht.getUint8(8);
+    const paket = new Uint8Array(puffer, OPUS_KOPF);
+
+    if (this._opus === null || this._opusRate !== rate) {
+      this._opusRate = rate;
+      this._opus = new AudioDecoder({
+        output: (daten) => this._opusAusgabe(daten, empfaenger),
+        error: (e) => {
+          console.warn('Opus-Dekoder:', e);
+          // Nicht die Verbindung abbrechen: ohne Ton laesst sich immer
+          // noch sehen und bedienen.
+          this._opus = null;
+        },
+      });
+      this._opus.configure({ codec: 'opus', sampleRate: rate, numberOfChannels: 1 });
+    }
+    try {
+      this._opus.decode(new EncodedAudioChunk({
+        type: 'key',          // jeder Opus-Rahmen steht fuer sich
+        timestamp: 0,
+        data: paket,
+      }));
+    } catch (e) {
+      console.warn('Opus-Paket verworfen:', e);
+    }
+    return true;
+  }
+
+  _opusAusgabe(daten, empfaenger) {
+    try {
+      const n = daten.numberOfFrames;
+      const f32 = new Float32Array(n);
+      daten.copyTo(f32, { planeIndex: 0, format: 'f32-planar' });
+      const i16 = new Int16Array(n);
+      for (let i = 0; i < n; i++) {
+        const v = f32[i];
+        i16[i] = Math.max(-32768, Math.min(32767, Math.round(v * 32767)));
+      }
+      // Ein gewoehnlicher TCI-Rahmen: 64-Byte-Kopf, Int16, Tonstrom.
+      const aus = new ArrayBuffer(64 + i16.byteLength);
+      const kopf = new Uint32Array(aus, 0, 16);
+      kopf[0] = empfaenger;
+      kopf[1] = daten.sampleRate;
+      kopf[2] = 0;            // Int16
+      kopf[5] = n;
+      kopf[6] = 1;            // Tonstrom
+      kopf[7] = 1;            // ein Kanal
+      new Int16Array(aus, 64).set(i16);
+      this.onmessage?.({ data: aus });
+    } catch (e) {
+      console.warn('Opus-Ausgabe verworfen:', e);
+    } finally {
+      daten.close();
     }
   }
 
