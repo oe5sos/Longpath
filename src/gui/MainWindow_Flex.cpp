@@ -258,11 +258,45 @@ void MainWindow::wireFlex()
             m_radioModel->setFlexSliceFilter(tief, hoch);
         });
 
+        // ── Rauschminderung: der Knopf schaltet die MASCHINE ────────
+        //
+        // Der Betreiber am 2026-10-28: „ich kann zwar klicken, aber
+        // kein unterschied zu hören." Flex-Ton kommt fertig
+        // demoduliert in den Mischer; Longpaths NR/NB/ANF sitzen im
+        // WDSP-Empfangskanal, den dieser Ton nie durchläuft. Also
+        // gehen die drei Schalter dorthin, wo gerechnet wird.
+        //
+        // Longpath kennt vier Verfahren und einen Dreifachschalter für
+        // den Austaster, die Maschine je einen Schalter. Übersetzt
+        // wird auf AN/AUS: welches Verfahren im Gerät läuft, bestimmt
+        // das Gerät — eine NR2-Marke an einem fremden Algorithmus wäre
+        // eine Beschriftung, die nichts bedeutet.
+        auto rauschHinaus = [this]() {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            SliceModel* s = m_radioModel
+                ? m_radioModel->sliceById(m_flexTargetSliceId) : nullptr;
+            if (!s) { return; }
+            m_radioModel->setFlexSliceNoise(s->activeNr() != NrSlot::Off,
+                                            s->nbMode() != NbMode::Off,
+                                            s->anfEnabled());
+        };
+        disconnect(m_flexNrBand);
+        m_flexNrBand = connect(ziel, &SliceModel::activeNrChanged, this,
+                               [rauschHinaus](NrSlot) { rauschHinaus(); });
+        disconnect(m_flexNbBand);
+        m_flexNbBand = connect(ziel, &SliceModel::nbModeChanged, this,
+                               [rauschHinaus](NbMode) { rauschHinaus(); });
+        disconnect(m_flexAnfBand);
+        m_flexAnfBand = connect(ziel, &SliceModel::anfEnabledChanged, this,
+                                [rauschHinaus](bool) { rauschHinaus(); });
+
         // Und einmal gleich jetzt, damit die Maschine mit dem
         // uebereinstimmt, was im Fenster steht — sonst gilt der
         // Unterschied bis zum ersten Drehen weiter.
         m_radioModel->setFlexSliceMode(ziel->dspMode());
         m_radioModel->setFlexSliceFilter(ziel->filterLow(), ziel->filterHigh());
+        rauschHinaus();
 
         // ── Beim VERBINDEN gewinnt die MASCHINE ─────────────────────
         //
@@ -495,6 +529,39 @@ void MainWindow::wireFlex()
         // schickt die Scheibe die eben empfangene Frequenz zurueck.
         m_flexApplyingRemoteState = true;
         slice->setFrequency(hz);
+        m_flexApplyingRemoteState = false;
+    });
+
+    // ── Rückweg: die Maschine sagt, was wirklich an ist ─────────────
+    //
+    // Nötig, weil der Schalter auch an der Maschine selbst oder in
+    // SmartSDR umgelegt werden kann — und weil beim Verbinden gilt,
+    // was dort steht, nicht was im Fenster steht. Die Wache
+    // `m_flexApplyingRemoteState` hält den Hinweg an, solange wir den
+    // Zustand der Maschine übernehmen; sonst käme unser eigenes Echo
+    // als neuer Befehl zurück.
+    connect(m_radioModel, &RadioModel::flexSliceNoiseChanged, this,
+            [this](bool nr, bool nb, bool anf) {
+        if (m_shuttingDown) { return; }
+        SliceModel* slice = flexControllableSlice();
+        if (!slice) { return; }
+        m_flexApplyingRemoteState = true;
+        // AUS ist eindeutig, AN nicht: die Maschine nennt ihr
+        // Verfahren nicht, und Longpath hat vier. Steht hier schon
+        // eines, bleibt es stehen — nur der leere Fall bekommt eine
+        // Marke, damit der Knopf überhaupt leuchtet. NR2 ist die, die
+        // das RX-Feld auch sonst als Erstes anbietet.
+        if (!nr) {
+            slice->setActiveNr(NrSlot::Off);
+        } else if (slice->activeNr() == NrSlot::Off) {
+            slice->setActiveNr(NrSlot::NR2);
+        }
+        if (!nb) {
+            slice->setNbMode(NbMode::Off);
+        } else if (slice->nbMode() == NbMode::Off) {
+            slice->setNbMode(NbMode::NB);
+        }
+        slice->setAnfEnabled(anf);
         m_flexApplyingRemoteState = false;
     });
 

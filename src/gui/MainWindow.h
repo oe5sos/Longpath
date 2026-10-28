@@ -1864,6 +1864,12 @@ private:
     /// Dasselbe fuer Betriebsart und Filterflanken.
     QMetaObject::Connection m_flexArtBand;
     QMetaObject::Connection m_flexFilterBand;
+    /// Rauschminderung, Störaustaster, Kerbfilter → Maschine
+    /// (2026-10-28). Drei Bänder, ein Befehl: siehe
+    /// RadioModel::setFlexSliceNoise.
+    QMetaObject::Connection m_flexNrBand;
+    QMetaObject::Connection m_flexNbBand;
+    QMetaObject::Connection m_flexAnfBand;
     /// Einmal je Verbindung: die Fensterbreite auf den Ausschnitt der
     /// Flex stellen. Danach gehoert der Zoom wieder dem Betreiber.
     bool m_flexAusschnittUebernommen{false};

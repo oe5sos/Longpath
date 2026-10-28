@@ -827,6 +827,43 @@ private slots:
         QVERIFY(tuneSliceCommand(QStringLiteral("0"), -1.0).isEmpty());
     }
 
+    // ── Rauschminderung in die Maschine (2026-10-28) ─────────────────
+    //
+    // Der Betreiber: „ich kann zwar klicken, aber kein unterschied zu
+    // hören." Flex-Ton kommt fertig demoduliert in den Mischer und
+    // läuft nie durch den WDSP-Empfangskanal, in dem Longpaths
+    // NR/NB/ANF sitzen. Der Knopf schaltet deshalb jetzt die
+    // Rauschminderung DER MASCHINE.
+    void rauschbefehlTraegtAlleDrei()
+    {
+        using FlexCommandWire::setSliceNoiseCommand;
+
+        QCOMPARE(setSliceNoiseCommand(QStringLiteral("0"), true, false, false),
+                 QStringLiteral("slice set 0 nr=1 nb=0 anf=0"));
+        QCOMPARE(setSliceNoiseCommand(QStringLiteral("1"), false, true, true),
+                 QStringLiteral("slice set 1 nr=0 nb=1 anf=1"));
+        QCOMPARE(setSliceNoiseCommand(QStringLiteral("0"), false, false, false),
+                 QStringLiteral("slice set 0 nr=0 nb=0 anf=0"));
+
+        // EIN Befehl für alle drei, nicht drei einzelne: so kann kein
+        // halber Zustand entstehen, wenn einer verloren geht.
+        const QString b = setSliceNoiseCommand(QStringLiteral("0"),
+                                               true, true, true);
+        QCOMPARE(b.count(QStringLiteral("slice set")), 1);
+        QVERIFY(b.contains(QStringLiteral("nr=1")));
+        QVERIFY(b.contains(QStringLiteral("nb=1")));
+        QVERIFY(b.contains(QStringLiteral("anf=1")));
+
+        // Die Pegel bleiben draußen: sie stehen in der Maschine, und
+        // ein mitgeschickter Wert überschriebe die Einstellung des
+        // Betreibers bei jedem Knopfdruck.
+        QVERIFY2(!b.contains(QStringLiteral("_level")),
+                 "nr_level/nb_level/anf_level gehoeren der Maschine");
+
+        // Ohne Scheibennummer kein Befehl, nicht ein halber.
+        QVERIFY(setSliceNoiseCommand(QString(), true, true, true).isEmpty());
+    }
+
     // ── Betriebsart und Filterbreite (2026-10-22) ────────────────────
     //
     // Bis heute war `slice tune` der EINZIGE Befehl an eine
