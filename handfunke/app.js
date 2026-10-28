@@ -211,6 +211,85 @@ function starten(adresse) {
   link.connect(schema + mitPort);
 }
 
+// ── Koppeln mit einem Tipp ────────────────────────────────────────────────
+//
+// Fuer den Zugang von draussen muss dieses Telefon einmal bei der
+// Station angemeldet sein. Frueher hiess das: 122 Zeichen Schluessel
+// abtippen. Jetzt oeffnet die Station ein Fenster (`fuehren.py
+// --koppeln-offen`), und waehrend es offen ist, genuegt dieser Knopf.
+//
+// Der Knopf zeigt sich nur, wenn wirklich ein Fenster offen ist --
+// sonst waere er die meiste Zeit ein Knopf, der nichts tut.
+const KOPPEL_PORT = 8790;
+
+function koppelstelle() {
+  // Dieselbe Maschine wie die Seite, eigener Port.
+  const host = location.hostname || '127.0.0.1';
+  return `${location.protocol}//${host}:${KOPPEL_PORT}/koppeln`;
+}
+
+async function koppelLage() {
+  try {
+    const a = await fetch(koppelstelle(), {
+      method: 'POST', body: '{}', signal: AbortSignal.timeout(2500),
+    });
+    return await a.json();
+  } catch (e) { return null; }
+}
+
+async function koppelnTippen() {
+  const m = $('koppelmeldung');
+  // WebCrypto braucht einen sicheren Kontext. Ohne ihn gibt es keinen
+  // Geraeteschluessel und damit keinen Fernzugriff — das hier zu
+  // verschweigen hiesse, den Bediener raten zu lassen, warum nichts
+  // passiert.
+  if (!window.isSecureContext || !window.crypto?.subtle) {
+    m.style.color = 'var(--warn)';
+    m.textContent = 'Dafür muss die Seite über https kommen. '
+      + 'Über http fehlt dem Telefon der Schlüsselspeicher.';
+    return;
+  }
+  m.style.color = 'var(--text3)';
+  m.textContent = 'koppelt …';
+  try {
+    const { geraeteschluessel } = await import('./fernzugriff.js');
+    const ich = await geraeteschluessel();
+    const a = await fetch(koppelstelle(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        schluessel: ich.schluesselText,
+        name: 'Telefon',
+        art: 'phone',
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    const e = await a.json();
+    if (e.ok) {
+      m.style.color = 'var(--ok, var(--text3))';
+      m.textContent = 'Gekoppelt. Von draußen genügt jetzt die Stations-Id.';
+      $('koppelknopf').style.display = 'none';
+    } else {
+      m.style.color = 'var(--warn)';
+      m.textContent = e.grund || 'Das hat nicht geklappt.';
+    }
+  } catch (e) {
+    m.style.color = 'var(--warn)';
+    m.textContent = 'Die Station antwortet nicht. Läuft dort ein Koppelfenster?';
+  }
+}
+
+$('koppelknopf').addEventListener('click', koppelnTippen);
+
+// Einmal beim Laden nachsehen, ob gerade ein Fenster offen ist.
+koppelLage().then((l) => {
+  if (l && l.offen) {
+    $('koppelknopf').style.display = '';
+    $('koppelmeldung').textContent =
+        `Die Station nimmt dieses Telefon auf (noch ${l.rest} s).`;
+  }
+});
+
 $('verbinden').addEventListener('click', () => starten($('adresse').value));
 $('adresse').addEventListener('keydown', (e) => { if (e.key === 'Enter') starten($('adresse').value); });
 $('adresse').value = gespeichert() || (eigenerHost() ? eigenerHost() + ':' + PORT_TCI : '');

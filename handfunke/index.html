@@ -250,6 +250,14 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
          spellcheck="false" placeholder="Token (nur über Netz nötig)">
   <div class="fehler" id="fehler"></div>
   <button id="verbinden">Verbinden</button>
+  <!-- Fuer den Zugang von draussen: dieses Telefon einmal im eigenen
+       Netz bei der Station anmelden. Der Knopf erscheint nur, wenn die
+       Station ein Koppelfenster offen hat -- sonst waere er die meiste
+       Zeit ein Knopf, der nichts tut. -->
+  <button id="koppelknopf" style="display:none;margin-top:10px;
+          background:transparent;border:1px solid var(--line);
+          color:var(--text2)">Dieses Telefon koppeln</button>
+  <div class="fehler" id="koppelmeldung" style="color:var(--text3)"></div>
 </div>
 
 <!-- ton-kern.js zuerst: app.js braucht TonKern fuer den Rueckfall auf
