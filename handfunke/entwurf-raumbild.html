@@ -14,6 +14,7 @@
       http://127.0.0.1:8791/entwurf-raumbild.html?variante=a
 
   Varianten: a = volle Tiefe, b = halbe Tiefe, c = Kurve über Raumbild.
+  Mit `&tci=127.0.0.1:50001` gegen das laufende Longpath statt der Attrappe.
 -->
 <style>
   :root { --pan-bg:#08080a; }
@@ -127,6 +128,18 @@ function malen() {
 }
 setInterval(malen, 100);
 
-link.connect('ws://127.0.0.1:50099');
-setTimeout(() => { link.send('start'); link.send('spectrum_start:0,375'); }, 800);
+// Vorgabe ist die Attrappe; `?tci=127.0.0.1:50001` zeigt auf das
+// laufende Longpath, also auf echtes Signal an der Antenne.
+const ziel = new URLSearchParams(location.search).get('tci') || '127.0.0.1:50099';
+// Erst auf `ready` warten, dann abonnieren -- eine feste Wartezeit ist
+// beim echten Longpath zu kurz, und der Befehl braucht ALLE vier Werte
+// (trx, Punkte, Bilder je Sekunde, Spanne in Hertz), sonst verwirft er
+// ihn antwortlos. Beim ersten Anlauf gegen das echte Geraet genau so
+// passiert: Verbindung stand, Spektrum kam nie.
+link.addEventListener('ready', () => {
+  link.send('start');
+  link.send(`spectrum_start:0,${cRaum.width / 2},12,48000`);
+});
+window.__link = link;   // nur fuer die Messung am Entwurfsblatt
+link.connect('ws://' + ziel);
 </script>
