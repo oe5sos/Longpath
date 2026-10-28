@@ -20,6 +20,7 @@
 #include <QFormLayout>
 #include <QDateTime>
 #include "core/AppSettings.h"
+#include <QLoggingCategory>
 #include "core/DigiFrequenzen.h"
 #include "core/DxccColorProvider.h"
 #include "core/DxccWorkedStatus.h"
@@ -51,6 +52,18 @@
 #include <cmath>
 #include <cstdlib>
 #include <vector>
+
+// Dieselbe Kategorie wie der Dekoderstrom („longpath.ft8"), eigener
+// Zeiger: Ft8Stream.cpp meldet sie nicht ueber einen Kopf an, und
+// zwei Objekte mit demselben Namen sind in Qt zulaessig.
+//
+// Warum es sie hier ueberhaupt braucht: der Sendeweg schrieb bis zum
+// 2026-10-28 KEINE einzige Zeile. Er setzte nur eine Statuszeile, und
+// die wird vom Takt („last period: N") binnen 200 ms ueberschrieben.
+// Der Betreiber sah einen Send-Knopf, der nichts tut, und im
+// Protokoll stand nichts — eine Stunde Suche fuer einen Fall, den
+// eine Zeile beantwortet haette.
+Q_LOGGING_CATEGORY(lcFt8Senden, "longpath.ft8", QtInfoMsg)
 
 namespace Longpath {
 
@@ -965,24 +978,20 @@ void Ft8Applet::zeigeOptionen()
     s.setValue(QStringLiteral("StationGridSquare"), neuerLoc);
 }
 
+// Beide lesen ueber die gemeinsame Rueckfallkette der Station
+// (AppSettings::stationCallsign / stationGridSquare). Hier stand bis
+// zum 2026-10-28 eine eigene, kuerzere Kette — und die kannte nur die
+// zwei kanonischen Schluessel, also genau die beiden, die in Martins
+// Einstellungen leer waren. Siehe AppSettings.cpp, dort steht der
+// Hergang.
 QString Ft8Applet::eigenesRufzeichen()
 {
-    auto& s = AppSettings::instance();
-    QString ruf = s.value(QStringLiteral("User/Callsign")).toString().trimmed();
-    if (ruf.isEmpty()) {
-        ruf = s.value(QStringLiteral("StationCallsign")).toString().trimmed();
-    }
-    return ruf.toUpper();
+    return AppSettings::stationCallsign().toUpper();
 }
 
 QString Ft8Applet::eigenerLocator()
 {
-    auto& s = AppSettings::instance();
-    QString loc = s.value(QStringLiteral("User/GridSquare")).toString().trimmed();
-    if (loc.isEmpty()) {
-        loc = s.value(QStringLiteral("StationGridSquare")).toString().trimmed();
-    }
-    return loc.toUpper();
+    return AppSettings::stationGridSquare().toUpper();
 }
 
 bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
@@ -1031,24 +1040,49 @@ bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
 
 void Ft8Applet::sendeNachricht(const QString& text)
 {
-    if (m_sendet) { return; }
+    if (m_sendet) {
+        qCInfo(lcFt8Senden) << "Senden abgelehnt: es laeuft schon eine Sendung";
+        return;
+    }
     const QString sauber = text.trimmed().toUpper();
     if (sauber.isEmpty()) {
+        qCInfo(lcFt8Senden) << "Senden abgelehnt: das Textfeld ist leer"
+                            << "(Rufzeichen gesetzt:"
+                            << !eigenesRufzeichen().isEmpty() << ")";
         if (m_status) { m_status->setText(tr("nothing to send")); }
         return;
     }
-    if (!m_model || !m_model->ft8TxSource() || !m_model->micRouter()) {
+
+    // ── Der Mikrofon-Router ist NICHT mehr Bedingung (2026-10-28) ────
+    //
+    // Hier stand `|| !m_model->micRouter()`. Der Router gehoert zum
+    // eigenen WDSP-Sendekanal; die Flex hat keinen, sie rechnet
+    // selbst. Also brach jeder Sendeversuch an der Flex hier ab —
+    // stumm, weil die Statuszeile sofort ueberschrieben wird.
+    //
+    // Gebraucht wird nur die Tonquelle. Wer den Ton abholt, ist eine
+    // Frage des Funkgeraets: beim eigenen der Router, beim Flex die
+    // Sendepumpe in MainWindow_Flex.cpp.
+    if (!m_model || !m_model->ft8TxSource()) {
+        qCWarning(lcFt8Senden)
+            << "Senden abgelehnt: keine Tonquelle (Modell"
+            << (m_model != nullptr) << ", Ft8TxSource"
+            << (m_model && m_model->ft8TxSource() != nullptr) << ")";
         if (m_status) { m_status->setText(tr("no transmit path")); }
         return;
     }
 
     Ft8TxSource* quelle = m_model->ft8TxSource();
     if (!quelle->vorbereiten(sauber, float(m_sendeTonHz), protocol())) {
+        qCWarning(lcFt8Senden).noquote()
+            << "Senden abgelehnt: ft8_lib kann \"" + sauber + "\" nicht packen";
         if (m_status) {
             m_status->setText(tr("cannot encode “%1”").arg(sauber));
         }
         return;
     }
+    qCInfo(lcFt8Senden).noquote()
+        << "Senden vorbereitet:" << sauber << "auf" << m_sendeTonHz << "Hz";
 
     // Wann faengt mein naechstes Fenster an? Die Gegenperiode zu der,
     // in der gehoert wird — wer in derselben sendet, hoert sich selbst
@@ -1073,13 +1107,20 @@ void Ft8Applet::sendeNachricht(const QString& text)
     connect(m_sendeTimer, &QTimer::timeout, this, [this, gesendet]() {
         if (!m_sendet || !m_model) { return; }
         Ft8TxSource* q = m_model->ft8TxSource();
-        auto* router = m_model->micRouter();
-        if (!q || !router) { abbrechen(); return; }
+        if (!q) {
+            qCWarning(lcFt8Senden) << "Tonquelle zwischendurch verschwunden";
+            abbrechen();
+            return;
+        }
 
         // Erst den Weg legen, dann tasten: andersherum ginge der
-        // Sender mit dem Mikrofon auf, nicht mit dem Ton.
-        m_quelleVorher = static_cast<int>(router->activeSource());
-        router->setActiveSource(MicSource::Ft8);
+        // Sender mit dem Mikrofon auf, nicht mit dem Ton. Ohne Router
+        // (Flex) entfaellt das Umlegen — dort holt die Sendepumpe die
+        // Proben direkt aus der Quelle.
+        if (auto* router = m_model->micRouter()) {
+            m_quelleVorher = static_cast<int>(router->activeSource());
+            router->setActiveSource(MicSource::Ft8);
+        }
         q->starten();
 
         // ── Wenn der Bandplan nein sagt, nicht weitermachen ──────────

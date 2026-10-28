@@ -7244,6 +7244,19 @@ std::optional<double> RadioModel::flexPegelDbm() const
     return m_flexPegelDbm;
 }
 
+void RadioModel::stelleFt8SenderBereit()
+{
+    if (!m_ft8TxSource) {
+        m_ft8TxSource = std::make_unique<Ft8TxSource>(48000);
+    }
+    // Am Mikrofon-Router nur anmelden, wenn es ihn gibt. Beim Flex
+    // gibt es ihn nicht, und er wird auch nicht gebraucht: dort holt
+    // die Sendepumpe die Proben direkt aus dieser Quelle.
+    if (m_compositeMicRouter) {
+        m_compositeMicRouter->setFt8Source(m_ft8TxSource.get());
+    }
+}
+
 void RadioModel::zieheFlexPanadapterAuf(double hz)
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }

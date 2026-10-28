@@ -65,6 +65,7 @@
 #include "gui/MainWindow.h"
 
 #include "core/AudioEngine.h"
+#include "core/Ft8Tx.h"
 #include "core/FlexVitaStream.h"
 // Fuer den Anspruchs-Abgleich: Kiwi fuehrt seine Zuordnung in einer
 // eigenen Tabelle, nicht ueber streamIndex().
@@ -513,6 +514,9 @@ void MainWindow::wireFlex()
         m_radioModel->setzeFlexSendescheibe(
             QString::number(m_flexTargetSliceId));
         m_radioModel->legeFlexSendetonstromAn();
+        // Der FT8-Sender gehoert hierher, nicht in den WDSP-Aufbau:
+        // den gibt es beim Flex nicht. Still, bis jemand sendet.
+        m_radioModel->stelleFt8SenderBereit();
         verdrahteFlexSenden();
 
         // ── Die Maschine folgt dem Blick des Betreibers (2026-10-27) ─
@@ -1008,7 +1012,35 @@ void MainWindow::verdrahteFlexSenden()
 
             constexpr int kRahmen = 480;   // 10 ms Vorrat bei 48 kHz
             m_flexMikMono.resize(kRahmen);
-            const int geholt = ae->pullTxMic(m_flexMikMono.data(), kRahmen);
+
+            // ── Wer gerade spricht (2026-10-28) ──────────────────────
+            //
+            // Bis heute holte diese Pumpe IMMER aus der
+            // Mikrofonbuchse. Der FT8-Ton entsteht aber in
+            // `Ft8TxSource` und lief beim eigenen Funkgeraet ueber den
+            // Mikrofon-Router in den WDSP-Sendekanal — den die Flex
+            // nicht hat. Er kam hier also nie an: Send gedrueckt,
+            // Traeger an, Stille hinaus.
+            //
+            // AetherSDR hat dieselbe Klasse Fehler einmal von der
+            // anderen Seite gehabt (AudioEngine.h:128-136 [@d58e2b8a]:
+            // „the gate silently disabled the test tone as well, since
+            // the tone is injected inside that callback") — ein Tor,
+            // das fuer den Strom gedacht war, machte den erzeugten Ton
+            // mit stumm. Daraus die Lehre, nicht der Code: die
+            // erzeugte Quelle braucht einen eigenen Weg, der nicht an
+            // der Mikrofonbuchse haengt.
+            //
+            // Reihenfolge: laeuft FT8, gewinnt FT8. Das Mikrofon ist
+            // in dem Augenblick ohnehin nicht gemeint, und zwei
+            // Quellen zu mischen hiesze, sich selbst zu stoeren.
+            int geholt = 0;
+            if (Ft8TxSource* ft8 = m_radioModel->ft8TxSource();
+                ft8 && ft8->laeuft()) {
+                geholt = ft8->pullSamples(m_flexMikMono.data(), kRahmen);
+            } else {
+                geholt = ae->pullTxMic(m_flexMikMono.data(), kRahmen);
+            }
             if (geholt <= 0) { return; }
 
             // Mono hinein, Stereo hinaus: die Maschine erwartet zwei

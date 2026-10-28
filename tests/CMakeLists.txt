@@ -8027,6 +8027,18 @@ longpath_add_test(tst_flex_ton_und_pegel)
 longpath_add_test(tst_flex_wasserfall_kachel)
 longpath_add_test(tst_flex_senden)
 
+# -- Flex: der Fehlerweg sagt jetzt etwas ---------------------------------
+# „Disconnected — Unknown error" im Verbindungsfenster, 2026-10-28 20:41,
+# dreimal in Folge; eine Millisekunde zwischen Wahl und Fehler, und als
+# Begruendung ein Schulterzucken. Zwei Wiederholversuche desselben Laufs
+# meldeten danach GAR NICHTS (keine Frist: der Zustand haengt auf
+# Connecting, wenn der Handschlag ausbleibt). Geprueft werden beide
+# Mangel: Klartext + Nummer + Ziel in der Meldung, und die neue Frist.
+# Der abgewiesene Fall laeuft ueber einen eben geschlossenen Port auf
+# 127.0.0.1 — echter Socketfehler, kein Netz nach draussen.
+# Quelle: Longpath-original.
+longpath_add_test(tst_flex_verbindungsfehler)
+
 # 2026-10-22: der „Lattenzaun" im Panadapter. Ein echter Rahmen von
 # Martins FLEX-8400 geht durch denselben Zeichenweg wie im Programm,
 # und das Ergebnis wird auf Regelmaeszigkeit gemessen.

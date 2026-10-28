@@ -1214,6 +1214,21 @@ public:
     /// (2026-10-15). Siehe core/Ft8Tx.h.
     Ft8TxSource* ft8TxSource() const { return m_ft8TxSource.get(); }
 
+    // ── Die FT8-Quelle gibt es auch ohne eigenen Sendekanal (2026-10-28) ─
+    //
+    // `m_ft8TxSource` entstand bisher an EINER Stelle: im WDSP-Aufbau
+    // nach dem Verbinden mit einem eigenen Funkgeraet. Bei der Flex
+    // laeuft der nie — sie rechnet selbst. Also war die Quelle null,
+    // `Ft8Applet::sendeNachricht()` brach mit „no transmit path" ab,
+    // und weil diese Zeile 200 ms spaeter vom Takt ueberschrieben
+    // wird, sah der Betreiber am 2026-10-28 nur einen Send-Knopf, der
+    // nichts tat.
+    //
+    // Anlegen heisst nicht senden: die Quelle ist still, bis jemand
+    // `vorbereiten()` + `starten()` ruft, und getastet wird sie hier
+    // ueberhaupt nicht.
+    void stelleFt8SenderBereit();
+
     /// Der eigene RTTY-Sender, oder null vor dem Verbinden
     /// (2026-10-16). Siehe core/RttyTx.h.
     RttyTxSource* rttyTxSource() const { return m_rttyTxSource.get(); }
