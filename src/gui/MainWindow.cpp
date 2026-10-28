@@ -13638,7 +13638,8 @@ void MainWindow::offerPaletteRestart(const QString& paletteName)
     // Pruefbinaerdateien setzen diese Fahne.
     if (QStandardPaths::isTestModeEnabled()) { return; }
 
-    QMessageBox box(this);
+    ScopedChildWidget<QMessageBox> dlgOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMessageBox& box = *dlgOwner.get();
     box.setWindowTitle(tr("Palette"));
     box.setIcon(QMessageBox::Question);
     box.setText(tr("“%1” is now the chosen palette.").arg(paletteName));
@@ -13673,7 +13674,9 @@ void MainWindow::offerPaletteRestart(const QString& paletteName)
     box.addButton(tr("Later"), QMessageBox::RejectRole);
     box.setDefaultButton(now);
     box.exec();
-    if (box.clickedButton() != now) { return; }
+    // Stirbt das Fenster in exec(), ist der Dialog mit ihm fort -- und
+    // restartNow() griffe in eine Leiche.
+    if (!dlgOwner || box.clickedButton() != now) { return; }
 
     restartNow();
 }

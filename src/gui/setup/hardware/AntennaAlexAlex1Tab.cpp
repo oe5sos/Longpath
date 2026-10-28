@@ -69,6 +69,7 @@
 #include "core/BoardCapabilities.h"
 #include "core/HpsdrModel.h"
 #include "gui/StyleConstants.h"
+#include "gui/ScopedChildWidget.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -394,7 +395,8 @@ AntennaAlexAlex1Tab::AntennaAlexAlex1Tab(RadioModel* model, QWidget* parent)
             // as the default focus and Common.MB_TOPMOST flag.
             QMessageBox::StandardButton choice = QMessageBox::Cancel;
             if (m_imdAutoResult == ImdAutoResult::None) {
-                QMessageBox box(QMessageBox::Warning,
+                // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+                ScopedChildWidget<QMessageBox> dlgOwner(QMessageBox::Warning,
                     tr("PureSignal Issue"),
                     tr("Including the BPFs during a PureSignal transmission may "
                        "produce passive Inter-Modulation Distortion in the "
@@ -408,9 +410,13 @@ AntennaAlexAlex1Tab::AntennaAlexAlex1Tab(RadioModel* model, QWidget* parent)
                        "the BPFs when transmitting a PureSignal based signal. "
                        "It is not recommended."),
                     QMessageBox::Ok | QMessageBox::Cancel, this);
+                QMessageBox& box = *dlgOwner.get();
                 box.setDefaultButton(QMessageBox::Cancel);          // Button2 per Thetis
                 box.setWindowFlag(Qt::WindowStaysOnTopHint);        // MB_TOPMOST per Thetis
                 choice = static_cast<QMessageBox::StandardButton>(box.exec());
+                // Stirbt die Seite in exec(), ist der Dialog mit ihr fort
+                // -- und m_hpfBypassOnPs unten eine Leiche.
+                if (!dlgOwner) { return; }
             } else {
                 choice = (m_imdAutoResult == ImdAutoResult::Ok)
                              ? QMessageBox::Ok

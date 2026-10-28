@@ -16,6 +16,7 @@
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QPainter>
+#include <QPointer>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 #include "models/RadioModel.h"
@@ -254,8 +255,11 @@ void InstrumentApplet::forEachInstrument(
 void InstrumentApplet::contextMenuEvent(QContextMenuEvent* ev)
 {
     QMenu* menu = buildContextMenu(window());   // am Fenster, siehe AmpApplet::contextMenuEvent()
+    QPointer<QMenu> stillAlive(menu);   // das Fenster kann in exec() sterben
     menu->exec(ev->globalPos());
-    menu->deleteLater();
+    if (stillAlive) {
+        stillAlive->deleteLater();
+    }
 }
 
 // Der geteilte ⚙-Knopf (GridCellWidget) traegt none Klick-Koordinate,
@@ -263,8 +267,11 @@ void InstrumentApplet::contextMenuEvent(QContextMenuEvent* ev)
 void InstrumentApplet::openExtendedSettings()
 {
     QMenu* menu = buildContextMenu(window());   // am Fenster, siehe AmpApplet::contextMenuEvent()
+    QPointer<QMenu> stillAlive(menu);   // das Fenster kann in exec() sterben
     menu->exec(mapToGlobal(rect().center()));
-    menu->deleteLater();
+    if (stillAlive) {
+        stillAlive->deleteLater();
+    }
 }
 
 QMenu* InstrumentApplet::buildContextMenu(QWidget* parent)

@@ -757,7 +757,8 @@ void VaxChannelCard::onAutoDetectClicked()
                 const QString devName   = cable.deviceName;
                 connect(act, &QAction::triggered, this,
                         [this, devName, srcChannel]() {
-                    QMessageBox confirm(this);
+                    ScopedChildWidget<QMessageBox> dlgOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+                    QMessageBox& confirm = *dlgOwner.get();
                     confirm.setWindowTitle(QStringLiteral("Reassign cable?"));
                     confirm.setText(
                         QStringLiteral("Reassign %1 from VAX %2 to VAX %3?"
@@ -768,7 +769,10 @@ void VaxChannelCard::onAutoDetectClicked()
                     confirm.setStandardButtons(
                         QMessageBox::Ok | QMessageBox::Cancel);
                     confirm.setDefaultButton(QMessageBox::Cancel);
-                    if (confirm.exec() != QMessageBox::Ok) {
+                    const int answer = confirm.exec();
+                    // Stirbt die Seite in exec(), ist der Dialog mit ihr
+                    // fort -- und die parent()-Kette unten eine Leiche.
+                    if (!dlgOwner || answer != QMessageBox::Ok) {
                         return;
                     }
 

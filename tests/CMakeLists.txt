@@ -5570,6 +5570,12 @@ target_compile_definitions(tst_palette_ohne_tote_rollen PRIVATE
     LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(tst_oberflaeche_englisch PRIVATE
     LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+# 2026-10-28: Die Menues gingen 2026-09-22 durch ScopedChildWidget, die
+# DIALOGE nicht -- sechs QMessageBox standen noch auf dem Stapel, dazu
+# sechs Haufen-Menues, die von Hand freigegeben wurden. Beide Decken: 0.
+longpath_add_test(tst_kein_kind_auf_dem_stapel)
+target_compile_definitions(tst_kein_kind_auf_dem_stapel PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 # 2026-10-14: HAUSSTIL.md sagt „Nie Radius 3" -- elf standen trotzdem im
 # Quelltext. Dieser Lauf liest die Quellen und haelt die Regel nach;
 # QSlider::groove ist die eine begruendete Ausnahme.

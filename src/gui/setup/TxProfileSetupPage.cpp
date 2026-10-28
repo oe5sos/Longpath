@@ -19,6 +19,7 @@
 #include "core/ThetisProfilImport.h"
 #include "models/RadioModel.h"
 #include "gui/StyleConstants.h"
+#include "gui/ScopedChildWidget.h"
 
 #include <QFile>
 #include <QFileDialog>
@@ -538,7 +539,8 @@ void TxProfileSetupPage::onImportClicked()
     // Ein Bericht und kein stilles "fertig": was eingelesen wurde, was
     // umbenannt werden musste und was liegengeblieben ist, entscheidet
     // der Betreiber -- aber nur, wenn er es sieht.
-    QMessageBox k(this);
+    ScopedChildWidget<QMessageBox> dlgOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMessageBox& k = *dlgOwner.get();
     k.setWindowTitle(tr("Import Thetis profiles"));
     k.setIcon(QMessageBox::Information);
     k.setText(bericht.section(QLatin1Char('\n'), 0, 0));
