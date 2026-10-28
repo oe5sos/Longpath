@@ -88,6 +88,7 @@
 #include "setup/AppearanceSetupPages.h"
 // CAT & Network
 #include "setup/CatNetworkSetupPages.h"
+#include "setup/CompanionRigPage.h"
 // Phase 3P-II Phase 4 Task 78: PGXL Advanced page
 #include "setup/PgxlAdvancedPage.h"
 // Phase 3P-II Phase 4 Task 85: TGXL Advanced page
@@ -821,6 +822,12 @@ void SetupDialog::buildTree()
         page->setRigctldStatus(m_rigctldRunning, m_rigctldPort, m_rigctldClients);
         return page;
     });
+    // Die andere Richtung als "TCP/IP CAT" darueber: dort steuern
+    // fremde Programme Longpath, hier folgt Longpath einem fremden
+    // Geraet. Fuer die Transverter-Station -- das Funkgeraet ist die
+    // ZF und sendet, Longpath haengt am ZF-Ausgang und zeigt das Band.
+    registerPage(cat, "Companion Rig",
+                 [this] { return new CompanionRigPage(m_model); });
     registerPage(cat, "MIDI Control", [] { return new CatMidiControlPage;  });
 
     tick("CAT & Network");

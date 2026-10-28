@@ -206,6 +206,13 @@ QVector<HamlibRotorEntry> HamlibInstaller::supportedModels()
     return parseModelList(runCapture(rotctl, {QStringLiteral("--list")}));
 }
 
+QVector<HamlibRotorEntry> HamlibInstaller::supportedRigs()
+{
+    const QString rigctl = findExecutable(QStringLiteral("rigctl"));
+    if (rigctl.isEmpty()) { return {}; }
+    return parseModelList(runCapture(rigctl, {QStringLiteral("--list")}));
+}
+
 // ── Installing ───────────────────────────────────────────────────────
 
 QStringList HamlibInstaller::installCommand()

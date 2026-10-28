@@ -1113,6 +1113,7 @@ set(GUI_SOURCES
     src/gui/setup/TransmitSetupPages.cpp
     src/gui/setup/AppearanceSetupPages.cpp
     src/gui/setup/CatNetworkSetupPages.cpp
+    src/gui/setup/CompanionRigPage.cpp
     src/gui/setup/PgxlAdvancedPage.cpp
     src/gui/setup/TgxlAdvancedPage.cpp
     src/gui/setup/PgxlInterlockPage.cpp
@@ -1176,8 +1177,20 @@ set(GUI_SOURCES
     src/core/AdifNetworkUploader.cpp
     src/core/RotctldClient.cpp
     src/core/Gs232Rotor.cpp
+    src/core/HamlibDaemonProcess.cpp
     src/core/RotctldProcess.cpp
+    src/core/RigctldProcess.cpp
+    src/core/RigctldClient.cpp
     src/core/HamlibInstaller.cpp
+
+    # Das Begleitgeraet, so lange wie das Programm: Besitzer der
+    # Dauerverbindung. Die Einstellseite bedient es, statt eine zweite
+    # Verbindung auf dasselbe rigctld aufzumachen.
+    src/core/CompanionRigController.cpp
+
+    # Transverter: was das ZF-Geraet zeigt, ist nicht, was auf der
+    # Antenne liegt. Reine Rechnung, ohne Geraet pruefbar.
+    src/core/TransverterSetup.cpp
 
     # ── Nereus Audio Channel Strip — DSP (ported from AetherSDR) ──
     #
@@ -2215,6 +2228,21 @@ endif()
 #   ./build/tci_probe ws://127.0.0.1:40001 12
 add_executable(tci_probe EXCLUDE_FROM_ALL tools/tci_probe.cpp)
 target_link_libraries(tci_probe PRIVATE Qt6::Core Qt6::WebSockets)
+
+# ── Begleitgeraet-Sonde (2026-10-28) ──────────────────────────────────
+#
+# WERKZEUG, kein Programmteil. Die ganze CAT-Kette gegen ein ECHTES
+# rigctld (Hamlibs Dummy-Geraet, Modell 1), nicht gegen den
+# selbstgebauten Server aus tst_rigctld_client: faengt Zeilenenden,
+# Reihenfolge, Begruessung und die Form der RPRT-Antworten, die ein
+# Server, den wir selbst geschrieben haben, nicht faengt.
+#
+#   cmake --build build --target begleitgeraet_probe
+#   ./build/begleitgeraet_probe
+add_executable(begleitgeraet_probe EXCLUDE_FROM_ALL
+    tools/begleitgeraet_probe.cpp)
+target_link_libraries(begleitgeraet_probe PRIVATE
+    LongpathObjs Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network)
 
 # ── SunSDR-TX-Pacer-Jitter-Sonde (Schritt 5, 2026-09-02) ──────────────
 #

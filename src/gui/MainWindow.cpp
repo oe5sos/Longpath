@@ -978,6 +978,15 @@ MainWindow::MainWindow(QWidget* parent)
         }
     }
 
+    // ── Das Begleitgeraet (2026-10-28) ───────────────────────────────
+    //
+    // Der Controller gehoert RadioModel und lebt so lange wie das
+    // Programm; hier wird nur verdrahtet und -- wenn der Bediener es
+    // eingeschaltet hat -- verbunden. starteWennGewuenscht() fragt
+    // selbst nach darfVonSelbstVerbinden(), darum steht hier kein
+    // zweites Mal derselbe Schalter.
+    verdrahteBegleitgeraet();
+
     // Phase 3O Sub-Phase 10 Task 10c — host the menu bar + master-output
     // controls in a custom TitleBar strip. Must run AFTER buildMenuBar()
     // so the menu is fully populated with actions before we re-parent it.
@@ -3850,6 +3859,26 @@ void MainWindow::wireSpectrumSliceControls(SpectrumWidget* sw,
             return;
         }
         s->setFrequency(hz);
+
+        // ── Und das Begleitgeraet mit (2026-10-28) ───────────────────
+        //
+        // Der Klick geht in BEIDE Richtungen: Longpaths eigene Scheibe
+        // und, wenn eingeschaltet, das fremde Funkgeraet. Das ist der
+        // Nutzen des Panadapters an einer ZF-Station -- der Betreiber
+        // sieht das Signal hier und hoert es dort.
+        //
+        // Nur hier, nicht bei jeder Frequenzaenderung der Scheibe. Ein
+        // Band- oder Speicherwechsel, ein Drehknopf, ein Spot: das
+        // alles bewegt die Scheibe ebenfalls, und wuerde man das
+        // weiterschicken, liefen Programm und Geraet gegeneinander,
+        // sobald das Geraet auch zurueckmeldet. Ein Klick ist eine
+        // Ansage des Bedieners, kein Zustand.
+        //
+        // Die Zahl geht unverwandelt hinueber: hz ist eine Frequenz auf
+        // DIESER Achse, also die ZF, und genau die will das Geraet.
+        if (m_radioModel && m_radioModel->companionRig()) {
+            m_radioModel->companionRig()->stimmeAbZf(std::llround(hz));
+        }
     });
 
     // Drag a filter edge on this pan.
@@ -19528,6 +19557,69 @@ void MainWindow::showFeatureRequestDialogImpl()
     QApplication::clipboard()->setText(kPrompt);
 
     dlg->show();
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Das Begleitgeraet: Marke, Klick, Dauerverbindung  (2026-10-28)
+// ───────────────────────────────────────────────────────────────────────────
+//
+// Die Marke in jedem Panadapter zeigt, wo das fremde Funkgeraet steht.
+// An ALLE Panadapter, nicht nur den aktiven: der Betreiber faehrt
+// Contest mit mehreren Fenstern, und eine Marke, die nur in einem davon
+// auftaucht, ist schlimmer als keine -- sie sagt dann "hier nicht",
+// obwohl das Geraet sehr wohl dort steht.
+//
+// Was hier NICHT passiert: die Frequenz des Geraets wird nicht in eine
+// Scheibe geschrieben. Longpath folgt dem Geraet mit dem Auge, nicht
+// mit dem Empfaenger. Sonst waere der Klick-Weg (siehe
+// wireSpectrumSliceControls) ein Kreis.
+void MainWindow::verdrahteBegleitgeraet()
+{
+    if (!m_radioModel) { return; }
+    auto* rig = m_radioModel->companionRig();
+    if (!rig) { return; }
+
+    auto malMarke = [this]() {
+        if (!m_panStack || !m_radioModel) { return; }
+        auto* r = m_radioModel->companionRig();
+        if (!r) { return; }
+
+        const bool   zeigen = r->verbunden();
+        const qint64 zf     = r->zfFrequenzHz();
+
+        for (PanadapterApplet* applet : m_panStack->allApplets()) {
+            if (applet && applet->spectrumWidget()) {
+                applet->spectrumWidget()->setCompanionMarker(zeigen, zf);
+            }
+        }
+    };
+
+    connect(rig, &CompanionRigController::zfFrequenzGeaendert,
+            this, [malMarke](qint64) { malMarke(); });
+    connect(rig, &CompanionRigController::verbindungGeaendert,
+            this, [malMarke](bool) { malMarke(); });
+
+    // Der Versatz steht nicht in der Geometrie, aber in jeder Zahl, die
+    // gemalt wird: Achse, Bandplan, Schild an der Marke. Aendert der
+    // Bediener ihn, muss alles einmal neu durch.
+    connect(rig, &CompanionRigController::versatzGeaendert, this, [this]() {
+        if (!m_panStack) { return; }
+        for (PanadapterApplet* applet : m_panStack->allApplets()) {
+            if (applet && applet->spectrumWidget()) {
+                applet->spectrumWidget()->update();
+            }
+        }
+    });
+
+    // Probleme in die Statuszeile, nicht in einen Dialog. Ein
+    // Begleitgeraet, das gerade aus ist, ist kein Zwischenfall -- und
+    // ein Dialog mitten im Contest ist einer.
+    connect(rig, &CompanionRigController::problem, this,
+            [this](const QString& text) {
+        showToast(text, ToastSeverity::Info, 6000);
+    });
+
+    rig->starteWennGewuenscht();
 }
 
 } // namespace Longpath

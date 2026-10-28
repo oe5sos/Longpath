@@ -9,6 +9,7 @@
 // =================================================================
 
 #include "Ft8Applet.h"
+#include "core/TransverterSetup.h"
 
 #include "core/AudioEngine.h"
 #include "core/Ft8Stream.h"
@@ -693,6 +694,14 @@ LogEntry Ft8Applet::logEintrag(const Ft8Ablauf& ablauf,
                                                   : double(sendeTonHz));
     e.freqMHz = hz / 1.0e6;
     e.band    = bandLabel(bandFromFrequency(hz));
+
+    // ── Transverter (2026-10-28) ─────────────────────────────
+    //
+    // Steht einer davor, traegt der Satz die Frequenz der ANTENNE
+    // und deren ADIF-Bandnamen. Ohne Transverter gibt
+    // logbuchFrequenz() false zurueck und die zwei Zeilen darueber
+    // bleiben, wie sie waren.
+    TransverterSetup::logbuchFrequenz(std::llround(hz), &e.freqMHz, &e.band);
 
     // ADIF kennt FT8 und FT4 als eigene Betriebsarten — kein SUBMODE.
     e.mode = p == Ft8Decoder::Protocol::Ft4

@@ -120,6 +120,7 @@
 // Vollstaendig noetig: QPointer<T> kann T nicht vorwaerts deklariert
 // benutzen (static_cast auf QObject*). Der Kopf ist winzig.
 #include "core/RotorController.h"
+#include "core/CompanionRigController.h"
 #include <QHash>
 #include <QObject>
 #include <QMap>
@@ -1156,6 +1157,26 @@ public:
     // hier nachher nullptr statt einer Leiche.
     RotorController*      rotor()               const { return m_rotor; }
     void setRotor(RotorController* r)                 { m_rotor = r; }
+
+    // ── Das Begleitgeraet (2026-10-28) ──────────────────────────────
+    //
+    // Hier BESITZ, nicht Registrierung -- anders als beim Rotor eine
+    // Zeile darueber. Der Grund dort war, dass der Rotor am Mast des
+    // Betreibers haengt und eine Besitzumstellung eine
+    // Architekturaenderung an einem laufenden Geraet gewesen waere.
+    // Das Begleitgeraet ist neu und haengt an nichts: es kann von
+    // Anfang an dort liegen, wo es hingehoert.
+    //
+    // Der Unterschied ist nicht akademisch. Stufe 1 hatte die
+    // Verbindung in der Einstellseite, und eine SetupPage wird bei
+    // jedem Oeffnen neu gebaut: die Verbindung war beim ersten Blick
+    // auf eine andere Seite weg.
+    //
+    // Angelegt im Ctor, NICHT verbunden. Verbunden wird in
+    // MainWindow, nachdem die Oberflaeche steht -- und auch dann nur,
+    // wenn der Bediener es eingeschaltet hat und dieser Lauf von
+    // selbst ins Netz darf.
+    CompanionRigController* companionRig() const { return m_companionRig.get(); }
     // 2026-05-12 bench fix: moved from SpotHubDialog ownership so the
     // table stays populated from app start regardless of whether the
     // dialog is open.  Spots from auto-connected sources were
@@ -4506,6 +4527,8 @@ private:
     std::unique_ptr<SpotModel>            m_spotModel;
     // Registriert von RotorLogbookPanel, nicht besessen -- siehe rotor().
     QPointer<RotorController>             m_rotor;
+    // Besessen -- siehe companionRig().
+    std::unique_ptr<CompanionRigController> m_companionRig;
     std::unique_ptr<SpotTableModel>       m_spotTableModel;
     std::unique_ptr<FreeDVStationModel>   m_freeDvStationModel;
     std::unique_ptr<RxDecodeModel>        m_rxDecodeModel;

@@ -1898,6 +1898,10 @@ RadioModel::RadioModel(QObject* parent)
     auto& s = AppSettings::instance();
 
     m_spotModel           = std::make_unique<SpotModel>(this);
+    // Das Begleitgeraet. Legt beim Anlegen den Transverter-Versatz als
+    // prozessweite Fassung ab (die Anzeige liest ihn dort), verbindet
+    // aber nicht -- das tut MainWindow, wenn die Oberflaeche steht.
+    m_companionRig        = std::make_unique<CompanionRigController>(this);
     // 2026-05-12 bench fix: SpotTableModel ownership moved from
     // SpotHubDialog so it stays populated from app start.  Prior
     // behaviour: the table only existed once the user opened

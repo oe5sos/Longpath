@@ -32,6 +32,7 @@
 // =================================================================
 
 #include "RotorLogbookPanel.h"
+#include "core/TransverterSetup.h"
 
 #include <QLoggingCategory>
 #include "gui/ScopedChildWidget.h"
@@ -2349,6 +2350,15 @@ LogEntry RotorLogbookPanel::draftFromRadio(const QString& call) const
     if (SliceModel* s = m_radio ? m_radio->activeSlice() : nullptr) {
         e.freqMHz = s->frequency() / 1e6;
         e.band    = bandLabel(bandFromFrequency(s->frequency()));
+
+        // ── Transverter (2026-10-28) ─────────────────────────────
+        //
+        // Steht einer davor, traegt der Satz die Frequenz der ANTENNE
+        // und deren ADIF-Bandnamen. Ohne Transverter gibt
+        // logbuchFrequenz() false zurueck und die zwei Zeilen darueber
+        // bleiben, wie sie waren.
+        TransverterSetup::logbuchFrequenz(std::llround(s->frequency()),
+                                          &e.freqMHz, &e.band);
 
         // ADIF has no LSB/USB mode — those are submodes of SSB, and a
         // record with MODE=LSB is rejected or silently rewritten.

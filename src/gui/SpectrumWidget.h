@@ -351,6 +351,23 @@ public:
 
     // ---- Frequency range ----
     void setFrequencyRange(double centerHz, double bandwidthHz);
+
+    // ── Das Begleitgeraet (2026-10-28) ──────────────────────────────
+    //
+    // Die Marke sitzt dort, wo das fremde Funkgeraet steht. Die
+    // Frequenz kommt in der ZF -- also in der Achse dieses Widgets --,
+    // NICHT auf der Antenne: ein Transverter gehoert in die Beschriftung,
+    // nicht in die Geometrie. Wer hier eine Antennenfrequenz hineingibt,
+    // malt die Marke 116 MHz neben das Signal.
+    //
+    // Sie fuehrt Longpaths eigene Scheibe nicht. Das waere ein Kreis,
+    // sobald der Klick in die andere Richtung geht -- die Scheibe
+    // schickte dem Geraet eine Frequenz, das Geraet meldete sie zurueck,
+    // und beide liefen davon.
+    void setCompanionMarker(bool shown, qint64 ifHz,
+                            const QString& label = QString{});
+    bool   companionMarkerShown() const { return m_companionShown; }
+    qint64 companionMarkerHz()    const { return m_companionIfHz; }
     void setCenterFrequency(double centerHz);
     double centerFrequency() const { return m_centerHz; }
     double bandwidth() const { return m_bandwidthHz; }
@@ -1646,6 +1663,24 @@ public:
         drawSpotMarkers(p, specRect);
     }
 
+    // ── Begleitgeraet: Marke, Achse, Bandplan (2026-10-28) ──────────
+    //
+    // Ohne #ifdef-Waechter, wie drawSpotMarkersForTest darueber. Ein
+    // "...ForTest" hinter einem Waechter uebersetzt lokal durch den
+    // vorkompilierten Kopf und faellt erst in der CI um -- der Fall vom
+    // 2026-10-16, nachzulesen in docs.
+    void drawCompanionMarkerForTest(QPainter& p, const QRect& specRect) {
+        drawCompanionMarker(p, specRect);
+    }
+    void drawBandPlanForTest(QPainter& p, const QRect& specRect) {
+        drawBandPlan(p, specRect);
+    }
+    double rfFuerAnzeigeForTest(double ifHz) const { return rfFuerAnzeige(ifHz); }
+    double zfFuerAchseForTest(double rfHz)  const { return zfFuerAchse(rfHz); }
+    static QString freqScaleLabelForTest(double hz, double stepHz) {
+        return freqScaleLabel(hz, stepHz);
+    }
+
     // Phase 3J-2 + 3R M2 test seams. Read-only views into the Spot
     // Display knob state so the M2 round-trip test can pin the
     // loadSpotDisplaySettings push-path without driving a paint cycle.
@@ -2110,6 +2145,27 @@ private:
     void drawFreqScale(QPainter& p, const QRect& r);
     void drawDbmScale(QPainter& p, const QRect& specRect);
     void drawBandPlan(QPainter& p, const QRect& specRect);
+
+    /// Die Marke des Begleitgeraets: eine senkrechte Linie und die
+    /// Frequenz daran. Warm, nicht blau -- der Hausstil haelt Blau
+    /// fuer Anfassbares, und diese Zahl ist gemessen, nicht gestellt.
+    void drawCompanionMarker(QPainter& p, const QRect& specRect);
+
+    // ── ZF und Antenne (2026-10-28) ─────────────────────────────────
+    //
+    // Zwei Stellen in diesem Widget zeigen Zahlen, die der Betreiber
+    // mit dem Band vergleicht: die Frequenzachse und die Bandplan-
+    // Abschnitte. Mit einem Transverter davor liegen beide um den
+    // Versatz daneben.
+    //
+    // Der Zweig wird nur betreten, wenn ein Transverter aktiv ist.
+    // Ohne ihn kommt bitgleich dieselbe Zahl zurueck, die hereinkam --
+    // kein llround, keine Umrechnung. Das ist Absicht: dieses Widget
+    // malt den Panadapter eines Geraets am Mast des Betreibers, und
+    // eine Aenderung, die "eigentlich nichts tut", tut im Zweifel doch
+    // etwas.
+    double rfFuerAnzeige(double ifHz) const;
+    double zfFuerAchse(double rfHz) const;
     void drawSquelchLine(QPainter& p, const QRect& specRect);
     void drawTuneGuide(QPainter& p, const QRect& specRect);
     // Rauschboden -> Schwellenvorschlag. Ruft am Ende von
@@ -2790,6 +2846,11 @@ private:
     FreqLabelAlign m_freqLabelAlign{FreqLabelAlign::Center};
 
     Longpath::BandPlanManager* m_bandPlanMgr{nullptr};   // non-owning
+
+    // Begleitgeraet: wo es steht (in der ZF) und wie es heisst.
+    bool    m_companionShown{false};
+    qint64  m_companionIfHz{0};
+    QString m_companionLabel;
     int                          m_bandPlanFontSize{6};   // 0 = off; AetherSDR default
     bool                         m_squelchLineVisible{false};
     double                       m_squelchDbm{-150.0};

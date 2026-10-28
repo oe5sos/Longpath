@@ -8,19 +8,16 @@
 //
 // Starts Hamlib's rotctld so the operator does not have to.
 //
-// The rotator link speaks to rotctld over TCP, which is the right
-// design — it is one protocol for sixty controllers, it works over the
-// network, and it is somebody else's job to keep up with new hardware.
-// But it made the installation instructions "open a terminal and run
-// rotctld -m 603 -r /dev/tty.usbserial-1410 -T 0.0.0.0", which is a
-// reasonable thing to ask of a developer and not of someone who wants
-// to point an antenna.
+// Der Rumpf dieser Klasse steht seit dem 2026-10-27 in
+// HamlibDaemonProcess: Suche nach dem Programm, Portwahl, Start,
+// Abbruch, Neustart, der Grund aus Hamlibs stderr. Hier bleibt nur
+// noch, WELCHER Daemon gemeint ist -- rotctld auf 4533. Der Anlass
+// war der CAT-Weg (RigctldProcess), der denselben Rumpf braucht; eine
+// Abschrift waere die zweite Stelle gewesen, an der jede kuenftige
+// Behebung haette landen muessen.
 //
-// So: pick the controller from a list, pick the port, press Connect.
-// This starts rotctld on the loopback interface, and stops it again on
-// the way out. An operator who already runs rotctld their own way is
-// not affected — that path is still there and still preferred when it
-// is already running.
+// Die statischen Funktionen bleiben unter diesem Namen erreichbar,
+// damit kein Aufrufer und kein Pruefstand angefasst werden muss.
 //
 // =================================================================
 // Modification history (Longpath):
@@ -33,109 +30,26 @@
 //                 longer fires for a stop this object asked for.
 //                 AI-assisted via Anthropic Claude (Claude Code),
 //                 operator Martin Fischer.
+//   2026-10-27 — Rumpf nach HamlibDaemonProcess ausgelagert; diese
+//                 Klasse ist jetzt die rotctld-Auspraegung davon.
+//                 Verhalten unveraendert. KI-gestuetzt ueber
+//                 Anthropic Claude Code.
 // =================================================================
 
-#include <QObject>
-#include <QProcess>
-#include <QString>
-#include <QStringList>
+#include "core/HamlibDaemonProcess.h"
 
 namespace Longpath {
 
-class RotctldProcess : public QObject {
+class RotctldProcess : public HamlibDaemonProcess {
     Q_OBJECT
 public:
+    /// rotctlds Vorgabeport.
+    static constexpr quint16 kDefaultPort = 4533;
+
     explicit RotctldProcess(QObject* parent = nullptr);
-    ~RotctldProcess() override;
 
-    // Where rotctld lives, or empty if it cannot be found.
-    //
-    // PATH alone is not enough: a GUI application launched from Finder
-    // inherits a PATH without /opt/homebrew/bin, so Hamlib installed
-    // with brew is invisible to it while being perfectly present in the
-    // operator's terminal. That discrepancy would read as "the software
-    // cannot find something I can see", which is worse than a plain
-    // absence.
+    /// Wo rotctld liegt, oder leer. Siehe findBinaryNamed().
     static QString findBinary();
-
-    // The command line, built where it can be checked. Public because
-    // the dialog shows it to the operator: a person who can see the
-    // exact command can run it by hand when the automatic path fails,
-    // and can paste it into a bug report.
-    static QStringList arguments(int hamlibModel, const QString& device,
-                                 int baud, quint16 listenPort);
-
-    bool isRunning() const;
-
-    // Der GRUND aus Hamlibs stderr, in einer Zeile fuer die Statusleiste.
-    //
-    // Warum nicht einfach die letzte Zeile: Hamlib schliesst mit „IO
-    // error" ab, und genau das stand am 2026-10-06 in Martins Protokoll
-    // unter „Rotator: rotctld exited". Die Zeile darueber hiess
-    //
-    //     connect to 192.168.x.16:4001 failed, (trying next interface):
-    //     Network error 60: Operation timed out
-    //
-    // -- also Adresse UND Ursache. „IO error" sagt nichts, und wer nichts
-    // erfaehrt, sucht beim Programm statt beim Kabel.
-    //
-    // Darum in zwei Stufen: zuerst die letzte Zeile, die eine Ursache
-    // nennt (zeitueberschritten, abgewiesen, nicht vorhanden, belegt,
-    // keine Berechtigung), dann die letzte, die von einem Fehlschlag
-    // spricht UND dabei etwas benennt (Rechner, Port, Pfad, Nummer), und
-    // erst zuletzt die letzte nichtleere Zeile.
-    //
-    // Die Bedingung „benennt etwas" hat der Pruefstand erzwungen: „IO
-    // error" steht bei Hamlib immer zuletzt und enthaelt das Wort
-    // „error", also gewann es in der zweiten Stufe jedes Mal gegen die
-    // Zeile, die tatsaechlich etwas sagte.
-    // Oeffentlich und ohne Zustand, damit es ohne Oberflaeche und ohne
-    // laufenden Prozess pruefbar ist.
-    static QString grundAus(const QString& stderrText);
-
-    // Start rotctld. Returns false and fills `error` if the binary is
-    // missing or the process refuses to start; a rotctld that starts
-    // and then exits reports through exited() instead, because that
-    // failure arrives later.
-    //
-    // `listenPort` is the port to prefer. If something already holds
-    // it, a free one is taken instead — read listenPort() afterwards
-    // for the port actually in use. 2026-09-16: found live — a rotctld
-    // from an earlier, crashed session was still sitting on 4533 with
-    // the wrong device; the new rotctld could not bind, exited at once,
-    // and the client then happily talked to the stale one, which never
-    // answered. Sidestepping the port is the fix that needs nothing
-    // from the operator; killing strangers' processes is not ours to do.
-    bool start(int hamlibModel, const QString& device, int baud,
-               quint16 listenPort, QString* error);
-
-    // The port the running (or last started) rotctld listens on.
-    quint16 listenPort() const { return m_listenPort; }
-
-    void stop();
-
-    // Everything start() needs, kept so the owner can bounce the daemon
-    // without re-collecting it: a rotctld whose link to the controller
-    // has died (the ARCO drops a silent GS-232A session after ~20 s)
-    // never recovers on its own and has to be started afresh.
-    bool restart(QString* error);
-
-signals:
-    // rotctld stopped on its own. Carries whatever it wrote to stderr,
-    // which is where Hamlib puts the reason — a wrong model number or a
-    // serial port that is not there both come out here and nowhere
-    // else. Not emitted for a stop() this object asked for.
-    void exited(int exitCode, const QString& stderrText);
-
-private:
-    QProcess m_proc;
-    quint16  m_listenPort{0};
-    bool     m_stopRequested{false};
-
-    int     m_model{0};
-    QString m_device;
-    int     m_baud{0};
-    quint16 m_preferredPort{0};
 };
 
 } // namespace Longpath

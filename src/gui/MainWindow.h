@@ -680,6 +680,11 @@ private slots:
     void wireSpectrumSliceControls(class SpectrumWidget* sw,
                                    const QString& panId);
 
+    /// Begleitgeraet: Marke in jeden Panadapter, Fehler in die
+    /// Statuszeile, und -- wenn eingeschaltet -- die Dauerverbindung
+    /// aufnehmen. Einmal aus dem Ctor, nachdem die Oberflaeche steht.
+    void verdrahteBegleitgeraet();
+
     /// Push the live connection state into every pan's spectrum widget.
     /// SpectrumWidget::mousePressEvent returns early when it believes the
     /// radio is disconnected, so a widget that never receives this is inert to
