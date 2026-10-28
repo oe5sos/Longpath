@@ -5,9 +5,9 @@ Massgeblich ist `docs/architecture/2026-09-23-rendezvous-v1.md` (Abschnitte
 widersprechen, hat das Dokument recht und dieses Modul den Fehler.
 
 Was hier steht, ist die eine Haelfte des Wegs von aussen: die Station
-meldet sich beim Rendezvous an und haelt die Verbindung. Was sie mit einer
-Einfuehrung tut, wenn eine kommt, steht noch nicht hier -- das ist der
-naechste Schritt.
+meldet sich beim Rendezvous an, haelt die Verbindung, und beantwortet
+Einfuehrungen von Geraeten, die sie kennt. Die Sitzung selbst -- der
+Datenkanal und die Bruecke zu Longpath -- steht in `sitzung.py`.
 
 **Warum die Verbindung offen bleibt.** Der Dienst kennt keine Adressen; er
 erreicht die Station nur ueber die Verbindung, die sie selbst geoeffnet
@@ -28,6 +28,8 @@ from typing import Any, Callable
 
 import websockets
 
+from geraete import Geraeteliste
+from sitzung import Ziel, beantworte
 from kennung import (
     lade_schluessel,
     registrier_transkript,
@@ -61,6 +63,8 @@ class Lage:
     stun: list[str] = field(default_factory=list)
     nonce: bytes = b""
     letzter_fehler: str = ""
+    sitzungen: int = 0
+    turn_bis: int = 0
 
 
 class Station:
@@ -76,8 +80,16 @@ class Station:
         schluesselpfad: Path,
         beim_wechsel: Callable[[Lage], None] | None = None,
         nameplate: bool = True,
+        geraete: Geraeteliste | None = None,
+        ziel: Ziel | None = None,
     ) -> None:
         self.url = dienst_url
+        self.geraete = geraete if geraete is not None else Geraeteliste(
+            Path(schluesselpfad).with_name("geraete.json")
+        )
+        self.ziel = ziel if ziel is not None else Ziel()
+        self._sitzungen: dict[str, Any] = {}
+        self._turn: dict | None = None
         self.privat = lade_schluessel(Path(schluesselpfad))
         self.oeffentlich = self.privat.public_key()
         self.lage = Lage(ident=rendezvous_id(self.oeffentlich))
@@ -182,7 +194,23 @@ class Station:
         while True:
             nachricht = await self._lies()
             art = nachricht["type"]
-            if art == "nameplate":
+            if art == "introduction":
+                # Nicht abwarten: eine Einfuehrung zu beantworten dauert
+                # (ICE sammelt), und in der Zeit muessen die Kandidaten
+                # der Gegenseite schon hereinkommen duerfen.
+                asyncio.ensure_future(self._nimm_einfuehrung(nachricht))
+            elif art == "credentials":
+                self._merke_turn(nachricht.get("turn"))
+            elif art == "relay.grant":
+                # Der WebSocket-Relay aus Abschnitt 12. Noch nicht gebaut;
+                # die Zugangsdaten laufen in zwei Minuten ab, also wird
+                # hier nichts aufgehoben.
+                log.info("Relay angeboten (noch nicht gebaut)")
+            elif art == "candidate":
+                asyncio.ensure_future(self._nimm_kandidat(nachricht))
+            elif art == "introduction.end":
+                self._beende_einfuehrung(nachricht.get("from"), nachricht.get("code", "?"))
+            elif art == "nameplate":
                 self.lage.nummer = nachricht["nameplate"]
                 self._melde()
                 log.info("Nummer %s", self.lage.nummer)
@@ -236,6 +264,123 @@ class Station:
             pause += random.uniform(0, pause * 0.25)
             log.info("weg (%s); in %.1f s wieder", grund, pause)
             await asyncio.sleep(pause)
+
+
+    # -- Einfuehrungen ---------------------------------------------------
+
+    def _merke_turn(self, turn: dict | None) -> None:
+        """Die TURN-Zugangsdaten aufheben -- fuer die NAECHSTE Einfuehrung.
+
+        Der Dienst praegt sie erst, wenn die Station ihre Antwort schon
+        abgeschickt hat (Abschnitt 6.3), und aiortc sammelt seine
+        Kandidaten beim Erzeugen der Antwort, nicht danach. Fuer die
+        Sitzung, die sie ausgeloest hat, kommen sie also zu spaet.
+
+        Sie gelten 24 Stunden (`turn_ttl_seconds`), und darum sind sie fuer
+        die naechste frueh genug: die erste Verbindung nach einem Neustart
+        kommt mit dem durch, was das Telefon an TURN hat (es bekommt seine
+        Zugangsdaten rechtzeitig, in der `answer`), jede weitere hat auf
+        beiden Seiten welche.
+        """
+        if not turn or not turn.get("urls"):
+            return
+        self._turn = turn
+        self.lage.turn_bis = turn.get("expires", 0)
+        self._melde()
+
+    async def _nimm_einfuehrung(self, nachricht: dict) -> None:
+        """Ein Geraet klopft an (6.3).
+
+        Wer nicht gekoppelt ist, bekommt **keine Antwort** -- nicht einmal
+        eine Absage. Eine Absage wuerde verraten, welche Geraete die
+        Station kennt (Abschnitt 6.4); Schweigen sieht von aussen genauso
+        aus wie eine Station, die gerade nicht hinhoert.
+        """
+        woher = nachricht.get("from")
+        geraet = self.geraete.pruefe_einfuehrung(
+            nachricht.get("device", ""),
+            self.lage.ident,
+            unb64url(nachricht["nonce"]),
+            nachricht.get("deviceSignature", ""),
+        )
+        if geraet is None:
+            log.warning(
+                "Einfuehrung %s abgewiesen (Geraet %s)",
+                (woher or "?")[:8],
+                (nachricht.get("device") or "?")[:8],
+            )
+            return
+
+        log.info("Einfuehrung von %s", geraet.name)
+        try:
+            sitzung, antwort_sdp = await beantworte(
+                nachricht["offer"],
+                geraet,
+                self.ziel,
+                self.lage.stun,
+                self._turn,
+                self.geraete,
+            )
+        except Exception:
+            log.exception("die Antwort ist nicht zustande gekommen")
+            return
+
+        self._sitzungen[woher] = sitzung
+        await self._sende(
+            {
+                "type": "answer",
+                "to": woher,
+                "answer": antwort_sdp,
+                # true heisst: der Dienst soll Zugangsdaten praegen. Ohne
+                # sie kommt kein Telefon durch ein Mobilfunknetz.
+                "turn": True,
+            }
+        )
+        # Die Sitzung lebt jetzt fuer sich; wenn sie endet, raeumt sie sich
+        # aus der Liste.
+        asyncio.ensure_future(self._halte_sitzung(woher, sitzung))
+
+    async def _halte_sitzung(self, woher: str, sitzung) -> None:
+        try:
+            await sitzung.warte_auf_ende()
+        finally:
+            if self._sitzungen.get(woher) is sitzung:
+                del self._sitzungen[woher]
+            self.lage.sitzungen = len(self._sitzungen)
+            self._melde()
+
+    async def _nimm_kandidat(self, nachricht: dict) -> None:
+        """Einen ICE-Kandidaten der Gegenseite einhaengen.
+
+        Ein leerer Kandidat ist das Ende der Reihe und wird nicht
+        eingehaengt (Abschnitt 5.2).
+        """
+        sitzung = self._sitzungen.get(nachricht.get("from"))
+        if sitzung is None:
+            return
+        text = nachricht.get("candidate", "")
+        if not text:
+            return
+        try:
+            from aiortc.sdp import candidate_from_sdp
+
+            kandidat = candidate_from_sdp(text)
+            # Der Dienst traegt die Zuordnung nicht; aiortc braucht sie.
+            # Bei einem Angebot mit genau einem Medienstrang ist sie 0.
+            kandidat.sdpMLineIndex = 0
+            await sitzung.pc.addIceCandidate(kandidat)
+        except Exception as e:
+            log.info("Kandidat verworfen: %s", e)
+
+    def _beende_einfuehrung(self, woher: str | None, code: str) -> None:
+        """Das Ende einer Einfuehrung beendet NICHT die Sitzung.
+
+        Der uebliche Fall ist genau das: das Telefon schliesst seine
+        Rendezvous-Verbindung, sobald die Sitzung steht, und wir bekommen
+        `clientLeft` (Abschnitt 6.3). Wer hier die Sitzung mit abraeumt,
+        wirft jede Verbindung nach ein paar Sekunden wieder hinaus.
+        """
+        log.info("Einfuehrung %s zu Ende: %s", (woher or "?")[:8], code)
 
 
 class FehlerVomDienst(Exception):

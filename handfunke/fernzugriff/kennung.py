@@ -175,3 +175,35 @@ def lade_oeffentlich(text: str) -> ec.EllipticCurvePublicKey:
     if spki_der(schluessel) != der:
         raise ValueError("SPKI ist nicht kanonisch")
     return schluessel
+
+
+# ── Die Geraeteseite ────────────────────────────────────────────────────
+
+# Abschnitt 4.4. 23 ASCII-Byte, der Zeilenvorschub mitgezaehlt.
+PRAEFIX_INTRODUCE = b"NereusSDR introduce v1\n"
+
+
+def geraete_id(oeffentlich: ec.EllipticCurvePublicKey) -> str:
+    """Die Id eines Geraets: SHA-256 ueber sein SPKI DER, base64url (43 Zeichen).
+
+    Anders als die Rendezvous-Id der Station steht hier kein Praefix davor
+    (Station-Link, Abschnitt 3.5) -- wer das verwechselt, baut eine Id, die
+    nirgends passt.
+    """
+    return b64url(hashlib.sha256(spki_der(oeffentlich)).digest())
+
+
+def einfuehr_transkript(station_id: str, nonce: bytes) -> bytes:
+    """Was ein Geraet unterschreibt, um sich einzufuehren (4.4).
+
+    `station_id` sind die 26 ASCII-Zeichen der Rendezvous-Id, `nonce` die
+    32 ROHEN Byte aus dem hello DER EINFUEHRENDEN VERBINDUNG -- nicht die
+    der eigenen. Der Dienst setzt sie aus seinem eigenen Vermerk ein, nie
+    aus etwas, das der Client geschickt hat.
+    """
+    roh = station_id.encode("ascii")
+    if len(roh) != ID_LAENGE:
+        raise ValueError(f"Station-Id ist {len(roh)} Zeichen lang, erwartet sind {ID_LAENGE}")
+    if len(nonce) != 32:
+        raise ValueError(f"nonce ist {len(nonce)} Byte lang, erwartet sind 32")
+    return PRAEFIX_INTRODUCE + roh + nonce

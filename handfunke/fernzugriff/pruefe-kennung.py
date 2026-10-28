@@ -113,6 +113,60 @@ def pruefe_unterschriften() -> int:
     return schlecht
 
 
+def pruefe_einfuehrung() -> int:
+    """introduce-signature.json: die Unterschrift, mit der ein Geraet anklopft.
+
+    Faellt die Haelfte des Weges von aussen: wer hier zu grosszuegig ist,
+    laesst jeden herein, der eine fremde Einfuehrung mitgehoert hat.
+    """
+    from kennung import PRAEFIX_INTRODUCE, einfuehr_transkript, geraete_id
+
+    d = json.loads((VEKTOREN / "introduce-signature.json").read_text())
+    schlecht = 0
+
+    if len(PRAEFIX_INTRODUCE) != 23:
+        fehler(f"Praefix ist {len(PRAEFIX_INTRODUCE)} Byte lang, erwartet sind 23")
+        schlecht += 1
+
+    # Das Transkript, falls der Vektor es nennt.
+    if "transcriptHex" in d:
+        erwartet = bytes.fromhex(d["transcriptHex"])
+        hier = einfuehr_transkript(d["stationId"], unb64url(d["nonce"]))
+        if hier != erwartet:
+            fehler(f"Transkript {hier.hex()} statt {erwartet.hex()}")
+            schlecht += 1
+
+    # Die Geraete-Id steht ohne Praefix -- eine haeufige Verwechslung.
+    if "device" in d and "id" in d["device"]:
+        oeff = lade_oeffentlich(d["device"]["publicKey"])
+        hier = geraete_id(oeff)
+        if hier != d["device"]["id"]:
+            fehler(f"Geraete-Id {hier} statt {d['device']['id']}")
+            schlecht += 1
+
+    faelle = d.get("signatures") or d.get("cases") or []
+    for i, fall in enumerate(faelle):
+        erwartet_gut = bool(fall["valid"])
+        schluessel = fall.get("publicKey", d["device"]["publicKey"])
+        station = fall.get("stationId", d.get("stationId"))
+        nonce_text = fall.get("nonce", d.get("nonce"))
+        try:
+            oeff = lade_oeffentlich(schluessel)
+            transkript = einfuehr_transkript(station, unb64url(nonce_text))
+        except ValueError:
+            hier = False
+        else:
+            hier = pruefe_unterschrift(oeff, transkript, fall["signature"])
+        if hier != erwartet_gut:
+            fehler(
+                f"Fall {i} ({fall.get('name', '?')}, "
+                f"{fall.get('why', 'gueltig')}): {hier} statt {erwartet_gut}"
+            )
+            schlecht += 1
+    print(f"introduce-signature: {len(faelle)} Faelle, {schlecht} falsch")
+    return schlecht
+
+
 def pruefe_rundlauf() -> int:
     """Ein eigener Schluessel, selbst unterschrieben, selbst geprueft.
 
@@ -153,7 +207,13 @@ def main() -> int:
     if not VEKTOREN.is_dir():
         print(f"Vektoren fehlen: {VEKTOREN}")
         return 2
-    schlecht = pruefe_praefix() + pruefe_id() + pruefe_unterschriften() + pruefe_rundlauf()
+    schlecht = (
+        pruefe_praefix()
+        + pruefe_id()
+        + pruefe_unterschriften()
+        + pruefe_einfuehrung()
+        + pruefe_rundlauf()
+    )
     print()
     print("ALLES GRUEN" if schlecht == 0 else f"{schlecht} Abweichungen")
     return 0 if schlecht == 0 else 1
