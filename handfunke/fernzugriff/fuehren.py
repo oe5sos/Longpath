@@ -10,13 +10,18 @@ schlimmer als keiner.
 
 Geraete aufnehmen und wieder loswerden:
 
-    python3 handfunke/fernzugriff/fuehren.py --koppeln <schluessel> --name "Martins iPhone"
+    python3 handfunke/fernzugriff/fuehren.py --koppeln <schluessel> --name "iPhone"
     python3 handfunke/fernzugriff/fuehren.py --zeigen
     python3 handfunke/fernzugriff/fuehren.py --widerrufen <id>
 
-Den Schluessel zeigt die Seite im Kopplungsblatt. Das ist der Weg, bis
-die Kopplung per Code gebaut ist -- dann genuegt eine Nummer und zwei
-Woerter, und nichts muss mehr abgetippt werden.
+Bequemer geht es mit einem Tipp: `--koppeln-offen` oeffnet beim Start
+ein Fenster, und waehrend es offen ist, nimmt die Station den Schluessel
+eines Telefons AUS DEM EIGENEN NETZ entgegen -- auf der Seite ein Knopf
+statt 122 abgetippter Zeichen. Die Schranken stehen in `koppeln.py`.
+
+Bis die Kopplung per Code gebaut ist (SPAKE2, fuer die es im Browser
+derzeit nichts Geprueftes gibt), koppelt man also einmal zu Hause.
+Danach traegt der Fernzugriff von ueberall.
 """
 
 from __future__ import annotations
@@ -30,8 +35,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from geraete import Geraeteliste  # noqa: E402
+from koppeln import Koppelstelle, antwort  # noqa: E402
 from sitzung import Ziel  # noqa: E402
 from station import Station  # noqa: E402
+
+log = logging.getLogger("fernzugriff.fuehren")
 
 # Neben dem Schluessel der Seite, ausserhalb des Quellbaums.
 ORT = Path.home() / ".config" / "longpath-fernzugriff"
@@ -49,6 +57,43 @@ def zeige(lage) -> None:  # noqa: ANN001
     print("  ".join(teile), flush=True)
 
 
+def _starte_koppelstelle(stelle, port: int) -> None:
+    """Die Koppelstelle als kleiner HTTP-Dienst, in einem eigenen Faden.
+
+    Sie laeuft NEBEN der Station und nicht in ihr: die Station haelt eine
+    Verbindung, die nicht abreissen darf, und ein Webdienst in derselben
+    Schleife waere ein Weg, sie aufzuhalten.
+    """
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Griff(BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802
+            laenge = int(self.headers.get("Content-Length") or 0)
+            rumpf = self.rfile.read(min(laenge, 4096))
+            kode, aus = antwort(stelle, rumpf, self.client_address[0])
+            self.send_response(kode)
+            self.send_header("Content-Type", "application/json")
+            # Die Seite kommt von einem anderen Port.
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Length", str(len(aus)))
+            self.end_headers()
+            self.wfile.write(aus)
+
+        def do_OPTIONS(self):  # noqa: N802
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.end_headers()
+
+        def log_message(self, *_a):
+            pass   # das Protokoll fuehrt die Koppelstelle selbst
+
+    dienst = ThreadingHTTPServer(("0.0.0.0", port), Griff)
+    threading.Thread(target=dienst.serve_forever, daemon=True).start()
+    log.info("Koppelstelle auf Port %d", port)
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--dienst", help="wss://… des Rendezvous")
@@ -60,6 +105,10 @@ def main() -> int:
     p.add_argument("--name", default="Telefon")
     p.add_argument("--zeigen", action="store_true", help="die Geraete auflisten")
     p.add_argument("--widerrufen", metavar="ID", help="ein Geraet entfernen")
+    p.add_argument("--koppeln-offen", action="store_true",
+                   help="beim Start ein Koppelfenster oeffnen (eigenes Netz, einmalig)")
+    p.add_argument("--koppel-port", type=int, default=8790,
+                   help="Port der Koppelstelle (Vorgabe: %(default)s)")
     p.add_argument("--leise", action="store_true")
     a = p.parse_args()
 
@@ -90,6 +139,13 @@ def main() -> int:
 
     if not a.dienst:
         p.error("ohne --dienst gibt es keinen Weg von draussen")
+
+    stelle = Koppelstelle(liste)
+    if getattr(a, "koppeln_offen", False):
+        stelle.oeffne()
+        print(f"Koppelfenster offen: auf der Seite auf KOPPELN tippen "
+              f"(noch {stelle.rest_s:.0f} s)")
+    _starte_koppelstelle(stelle, a.koppel_port)
 
     st = Station(
         a.dienst,
