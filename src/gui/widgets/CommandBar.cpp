@@ -1117,7 +1117,27 @@ void CommandBar::pushNrToModel(NrSlot slot)
 
 void CommandBar::pushModeToModel(DSPMode m)
 {
+    // ── Ein Druck auf DIGU/DIGL ist ein Druck auf „Digimodus" ────────
+    //
+    // Betreiber 2026-10-28: „sobald ich auf digi klicke muss das digi
+    // fenster automatisch aufgehen und die frequenz dort auch
+    // hinspringen".
+    //
+    // Bis dahin tat dieser Knopf nur eines: die Betriebsart stellen.
+    // Wer am Geraet auf DIGU drueckte, stand danach in DIGU -- auf der
+    // Frequenz, auf der er vorher war, ohne Dekoderfenster. Die ganze
+    // Herrichtung (Anrufstelle, Filter, Fenster nach vorne) hing allein
+    // an den Pillen FT8/FT4 daneben, und das ist ein Unterschied, den
+    // man dem Knopf nicht ansieht.
+    //
+    // Das Signal geht HINAUS, statt hier zu handeln: welche Anrufstelle
+    // und welches Fenster, weiss das Hauptfenster
+    // (MainWindow::aufDigiStellen) -- die Leiste kennt weder Baender
+    // noch Applets.
+    const bool digimodus = (m == DSPMode::DIGU || m == DSPMode::DIGL);
+
     if (m_slice) { m_slice->setDspMode(m); }
+    if (digimodus) { emit digimodusGewaehlt(); }
     // Nicht selbst umschalten: das Modell meldet die Änderung zurück,
     // und wenn es sie ablehnt, soll die Leiste den alten Zustand
     // zeigen und nicht den gewünschten. Ein Knopf, der immer angeht,

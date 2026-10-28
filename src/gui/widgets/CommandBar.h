@@ -100,7 +100,21 @@ signals:
     /// Scheibe, Filter und die Fensterverwaltung zugleich braucht.
     void digiRequested(Longpath::DigiFrequenzen::Digimodus modus);
 
+    /// Der Bediener hat DIGU oder DIGL gewaehlt. Traegt KEINEN Modus:
+    /// welcher Digimodus zuletzt gemeint war, weiss das Hauptfenster.
+    /// Siehe die Begruendung bei pushModeToModel().
+    void digimodusGewaehlt();
+
 public:
+    /// Pruef-Naht (2026-10-28): dieselbe Stelle, die das
+    /// Ueberlaufmenue benutzt. Noetig, weil DIGU/DIGL nicht unter den
+    /// drei sichtbaren Pillen sind und `QMenu::exec()` einen Lauf auf
+    /// macOS endlos haengen laesst (siehe
+    /// docs/architecture/2026-10-15-pruefstaende-und-der-schirm.md).
+    /// Ein Lauf, der das Signal selbst sendet, pruefte nur die Haelfte
+    /// dahinter -- genau das ist mir hier erst passiert.
+    void waehleBetriebsartForTest(DSPMode m) { pushModeToModel(m); }
+
     explicit CommandBar(QWidget* parent = nullptr);
     ~CommandBar() override;
 

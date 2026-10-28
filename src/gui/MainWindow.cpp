@@ -5053,7 +5053,22 @@ void MainWindow::buildUI()
         if (m_radioModel) { m_radioModel->onBandButtonClicked(band); }
     });
     connect(m_commandBar, &CommandBar::digiRequested, this,
-            &MainWindow::aufDigiStellen);
+            [this](DigiFrequenzen::Digimodus modus) {
+        m_letzterDigiModus = modus;      // fuer den DIGU-Knopf daneben
+        aufDigiStellen(modus);
+    });
+
+    // ── DIGU/DIGL richtet genauso her wie FT8/FT4 (2026-10-28) ───────
+    //
+    // Betreiber: „sobald ich auf digi klicke muss das digi fenster
+    // automatisch aufgehen und die frequenz dort auch hinspringen".
+    //
+    // Welcher der beiden Digimodi gemeint ist, sagt der Knopf nicht --
+    // also der zuletzt benutzte, und ab Werk FT8. Wer gestern FT4
+    // gefahren hat, landet mit einem Druck auf DIGU wieder dort.
+    connect(m_commandBar, &CommandBar::digimodusGewaehlt, this, [this]() {
+        aufDigiStellen(m_letzterDigiModus);
+    });
     auto* centre = new QWidget(this);
 
     // Profilschiene: seit dem 2026-10-06 WAAGRECHT in der Kommandoleiste,
@@ -7593,7 +7608,10 @@ void MainWindow::populateDefaultMeter()
     // beide rufen aufDigiStellen -- zusammen also zweimal je Druck.
     // mains Name bleibt, der zweite ist entfernt.
     connect(m_ft8Applet, &Ft8Applet::digiGewuenscht, this,
-            &MainWindow::aufDigiStellen);
+            [this](DigiFrequenzen::Digimodus modus) {
+        m_letzterDigiModus = modus;
+        aufDigiStellen(modus);
+    });
     connect(m_ft8Applet, &Ft8Applet::qsoFertig, this,
             [this](const LogEntry& e) {
         if (RotorLogbookPanel* p = ensureRotorPanel()) {
