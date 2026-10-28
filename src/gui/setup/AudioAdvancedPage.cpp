@@ -11,6 +11,7 @@
 
 #include "AudioAdvancedPage.h"
 #include "gui/StyleConstants.h"
+#include "gui/ScopedChildWidget.h"
 
 #include "core/AppSettings.h"
 #include "core/AudioEngine.h"
@@ -535,7 +536,8 @@ void AudioAdvancedPage::buildResetSection()
 void AudioAdvancedPage::onResetClicked()
 {
     // Addendum §2.5 — verbatim confirm modal copy.
-    QMessageBox dlg(this);
+    ScopedChildWidget<QMessageBox> dlgOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMessageBox& dlg = *dlgOwner.get();
     dlg.setWindowTitle(QStringLiteral("Reset all audio to defaults?"));
     dlg.setText(QStringLiteral("Reset all audio to defaults?"));
     dlg.setInformativeText(
@@ -559,7 +561,8 @@ void AudioAdvancedPage::onResetClicked()
 
     dlg.exec();
 
-    if (dlg.clickedButton() != resetBtn) {
+    // Stirbt die Seite in exec(), ist der Dialog mit ihr fort.
+    if (!dlgOwner || dlg.clickedButton() != resetBtn) {
         return;
     }
 

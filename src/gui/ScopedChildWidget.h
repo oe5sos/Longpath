@@ -14,6 +14,9 @@
 //   2026-09-22 — Uebernommen fuer Longpath von Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude. Namensraum geaendert,
 //                 Begruendung ausgeschrieben.
+//   2026-10-28 — Weiterleitender Konstruktor, damit auch Dialoge mit
+//                 mehrstelligem Konstruktor durch den Halter gehen.
+//                 Martin Fischer (OE5SOS), AI-assisted via Anthropic Claude.
 // =================================================================
 //
 // Ein QMenu oder QDialog auf dem Stapel, dessen Elternteil waehrend
@@ -39,6 +42,9 @@
 
 #pragma once
 
+#include <concepts>
+#include <utility>
+
 #include <QPointer>
 #include <QWidget>
 
@@ -47,8 +53,18 @@ namespace Longpath {
 template <typename Widget>
 class ScopedChildWidget final {
 public:
-    explicit ScopedChildWidget(QWidget* parent)
-        : m_widget(new Widget(parent))
+    // Reicht durch, was der Aufrufer angibt. Die einstellige Form
+    // ScopedChildWidget<QMenu>(this) ist der Normalfall; die mehrstellige
+    // braucht jeder Dialog, der sein Elternteil erst am Ende nimmt, etwa
+    // QMessageBox(Icon, Titel, Text, Knoepfe, parent).
+    //
+    // `constructible_from` haelt den Kopierkonstruktor heraus: ein QMenu
+    // laesst sich nicht aus einem ScopedChildWidget bauen, also greift
+    // diese Vorlage dort nicht und das geloeschte Kopieren bleibt stehen.
+    template <typename... Args>
+        requires std::constructible_from<Widget, Args...>
+    explicit ScopedChildWidget(Args&&... args)
+        : m_widget(new Widget(std::forward<Args>(args)...))
     {
     }
 

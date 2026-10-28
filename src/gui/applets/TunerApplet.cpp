@@ -44,6 +44,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
+#include <QPointer>
 #include <QPushButton>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -667,8 +668,11 @@ void TunerApplet::setTgxlConnected(bool connected)
 void TunerApplet::contextMenuEvent(QContextMenuEvent* ev)
 {
     QMenu* menu = buildContextMenu(window());   // am Fenster, siehe AmpApplet::contextMenuEvent()
+    QPointer<QMenu> stillAlive(menu);   // das Fenster kann in exec() sterben
     menu->exec(ev->globalPos());
-    menu->deleteLater();
+    if (stillAlive) {
+        stillAlive->deleteLater();
+    }
 }
 
 QMenu* TunerApplet::buildContextMenu(QObject* menuParent)

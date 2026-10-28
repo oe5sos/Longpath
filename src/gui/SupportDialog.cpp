@@ -1,5 +1,6 @@
 #include "SupportDialog.h"
 #include "gui/styles/ThemeQss.h"
+#include "gui/ScopedChildWidget.h"
 #include "StyleConstants.h"
 #include "core/LogCategories.h"
 #include "core/SupportBundle.h"
@@ -340,7 +341,8 @@ void SupportDialog::onCreateBundle()
     m_statusLabel->setText(QStringLiteral("Bundle created: %1").arg(QFileInfo(path).fileName()));
 
     // Ask user what to do
-    QMessageBox msgBox(this);
+    ScopedChildWidget<QMessageBox> dlgOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMessageBox& msgBox = *dlgOwner.get();
     msgBox.setWindowTitle(QStringLiteral("Support Bundle Created"));
     msgBox.setText(QStringLiteral("Support bundle saved to:\n%1").arg(path));
     msgBox.setInformativeText(QStringLiteral(
@@ -360,6 +362,9 @@ void SupportDialog::onCreateBundle()
     auto* issueBtn = msgBox.addButton(QStringLiteral("File an Issue"), QMessageBox::ActionRole);
     msgBox.addButton(QMessageBox::Close);
     msgBox.exec();
+
+    // Stirbt dieses Fenster in exec(), ist der Dialog mit ihm fort.
+    if (!dlgOwner) { return; }
 
     if (msgBox.clickedButton() == openBtn) {
         SupportBundle::openBundleFolder();

@@ -16,6 +16,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
+#include <QPointer>
 #include <QStyle>
 #include <QVBoxLayout>
 
@@ -392,8 +393,11 @@ QMenu* Rf2ksApplet::buildContextMenu(QObject* menuParent)
 void Rf2ksApplet::contextMenuEvent(QContextMenuEvent* ev)
 {
     auto* menu = buildContextMenu(window());   // am Fenster, siehe AmpApplet::contextMenuEvent()
+    QPointer<QMenu> stillAlive(menu);   // das Fenster kann in exec() sterben
     menu->exec(ev->globalPos());
-    delete menu;
+    if (stillAlive) {
+        stillAlive->deleteLater();
+    }
 }
 
 } // namespace Longpath
