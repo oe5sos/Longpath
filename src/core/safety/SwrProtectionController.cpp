@@ -136,45 +136,48 @@ void SwrProtectionController::setTunePowerSliderValue(int value) noexcept
 
 void SwrProtectionController::ingest(float fwdW, float revW, bool tuneActive) noexcept
 {
-    // From Thetis console.cs:25933-26120 [v2.10.3.13] (PollPAPWR loop)
+    // From Thetis console.cs:25991-26159 [v2.10.3.15] (PollPAPWR, keyed).
     // Upstream tags preserved: //N1GP (from cited console.cs:26006) [v2.10.3.15]
     // Verbatim inline tags from the cited range preserved per CLAUDE.md:
-    //   console.cs:25961  case HPSDRModel.REDPITAYA: //DH1KLM
-    //   console.cs:25980  //[2.10.3.6]MW0LGE modifications to use setup config for swr
-    //   console.cs:25985  // in following 'if', K2UE recommends not checking open antenna
-    //   console.cs:25987  //-W2PA Changed to allow 35w - some amplifier tuners need about 30w
-    //   console.cs:25989  //[2.10.3.6]MW0LGE ignored if tuning, and returned the 10.0f
-    //   console.cs:26064  // K2UE idea:  try to determine if Hi-Z or Lo-Z load
+    //   console.cs:26010  case HPSDRModel.REDPITAYA: //DH1KLM
+    //   console.cs:26029  //[2.10.3.6]MW0LGE modifications to use setup config for swr
+    //   console.cs:26034  // in following 'if', K2UE recommends not checking open antenna
+    //   console.cs:26036  //-W2PA Changed to allow 35w - some amplifier tuners need about 30w
+    //   console.cs:26038  //[2.10.3.6]MW0LGE ignored if tuning, and returned the 10.0f
+    //   console.cs:26113  // K2UE idea:  try to determine if Hi-Z or Lo-Z load
+    //
+    // 2026-10-28: the whole sample is worked out first and the changes go
+    // out once at the end, so a single sample can no longer emit a
+    // transient value on its way to its final one.
+    const float prevFactor   = m_protectFactor;
+    const bool  prevHighSwr  = m_highSwr;
+    const bool  prevWindBack = m_windBackLatched;
+    const bool  prevOpen     = m_openAntennaDetected;
 
-    if (!m_enabled) {
-        // When protection is disabled, always pass-through at full power
-        // and clear all latched/observable state so re-enable starts clean.
-        // (Codex P2 follow-up to PR #139: previously left m_windBackLatched,
-        //  m_openAntennaDetected, and m_tripCount stale; phantom fault
-        //  state would survive into the re-enabled path.)
-        if (m_protectFactor != 1.0f) {
-            m_protectFactor = 1.0f;
-            emit protectFactorChanged(m_protectFactor);
-        }
-        if (m_highSwr) {
-            m_highSwr = false;
-            emit highSwrChanged(m_highSwr);
-        }
-        if (m_windBackLatched) {
-            m_windBackLatched = false;
-            emit windBackLatchedChanged(false);
-        }
-        if (m_openAntennaDetected) {
-            m_openAntennaDetected = false;
-            emit openAntennaDetectedChanged(false);
-        }
-        m_tripCount = 0;
-        return;
-    }
+    // ── Protection off is not an early return ─────────────────────────────
+    //
+    // 2026-10-28. It used to be: `if (!m_enabled) { … clear everything …
+    // return; }`, which cleared the windback latch as well. Thetis does
+    // not. `swrprotection` gates the three places that can CREATE a fault
+    // -- the open-antenna check (console.cs:26037), the trip
+    // (console.cs:26118) and the latch (console.cs:26134) -- but the line
+    // that APPLIES an engaged latch is ungated:
+    //
+    //     if (_wind_back_engaged)
+    //     {
+    //         NetworkIO.SWRProtect = 0.01f;
+    //
+    // and `_wind_back_engaged` is reset in UIMOXChangedFalse, nowhere
+    // else. So once the drive is folded back to one percent, unticking
+    // SWR protection does not lift it; only going back to receive does.
+    //
+    // That difference matters at the key: the old early return let the
+    // operator clear a real foldback mid-transmission by unticking a box,
+    // and go straight back to full drive into whatever caused it.
 
     // ── SWR computation ───────────────────────────────────────────────────
-    // From Thetis console.cs:25972-25978 [v2.10.3.13]
-    // Tag preserved: //[2.10.3.6]MW0LGE (console.cs:25980 — SWR/tune config)
+    // From Thetis console.cs:26021-26027 [v2.10.3.15]
+    // Upstream tags preserved: //MW0LGE (from cited console.cs:26029) [v2.10.3.15]
 
     float swr = 1.0f;
     float rho = std::sqrt(revW / fwdW);
@@ -184,157 +187,162 @@ void SwrProtectionController::ingest(float fwdW, float revW, bool tuneActive) no
         swr = (1.0f + rho) / (1.0f - rho);
     }
 
-    // Both fwd and rev ≤ 2W floor → clamp SWR to 1.0
-    // console.cs:25978 [v2.10.3.13]
+    // Both fwd and rev <= 2W floor -> clamp SWR to 1.0
+    // console.cs:26027 [v2.10.3.15]
     if ((fwdW <= kLowPowerFloor && revW <= kLowPowerFloor) || swr < 1.0f) {
         swr = 1.0f;
     }
 
     // ── Open-antenna heuristic ────────────────────────────────────────────
-    // console.cs:25989-26009 [v2.10.3.6]MW0LGE
-    // in following 'if', K2UE recommends not checking open antenna for the 8000 model
-    // if (swrprotection && alex_fwd > 10.0f && (alex_fwd - alex_rev) < 1.0f)
-    //-W2PA Changed to allow 35w - some amplifier tuners need about 30w to reliably start working
-    //if (swrprotection && alex_fwd > 35.0f && (alex_fwd - alex_rev) < 1.0f
-    // [2.10.3.6]MW0LGE ignored if tuning, and returned the 10.0f
-    if (!tuneActive && fwdW > kOpenAntennaFwdMin && (fwdW - revW) < kOpenAntennaDeltaMax) {
-        // open ant condition
+    // From Thetis console.cs:26031-26048 [v2.10.3.15]:
+    //       // open antenna connection dectection, ignored if tuning or 8000 model
+    //
+    //       // in following 'if', K2UE recommends not checking open antenna for the 8000 model
+    //       // if (swrprotection && alex_fwd > 10.0f && (alex_fwd - alex_rev) < 1.0f)
+    //       //-W2PA Changed to allow 35w - some amplifier tuners need about 30w to reliably start working
+    //       //if (swrprotection && alex_fwd > 35.0f && (alex_fwd - alex_rev) < 1.0f
+    //       if (!chkTUN.Checked && (swrprotection && alex_fwd > 10.0f && (alex_fwd - alex_rev) < 1.0f //[2.10.3.6]MW0LGE ignored if tuning, and returned the 10.0f
+    //           && HardwareSpecific.Model != HPSDRModel.ANAN8000D)) // open ant condition
+    //       {
+    //           swr = 50.0f;
+    //           NetworkIO.SWRProtect = 0.01f;
+    //           chkMOX.Checked = false;
+    //           ... checkAntennaWarning(); ...
+    //           goto end;
+    //       }
+    //
+    // `chkMOX.Checked = false` and the warning are the caller's: the
+    // controller reports the condition through openAntennaDetected() and
+    // RadioModel::handlePaTelemetry drops the key on it. The ANAN-8000D
+    // exclusion is not modelled -- no 8000D is in use here, and adding a
+    // model argument for a board nobody has would be guesswork about
+    // which SKUs the exclusion should cover.
+    bool openAntenna = false;
+    if (!tuneActive && m_enabled && fwdW > kOpenAntennaFwdMin
+        && (fwdW - revW) < kOpenAntennaDeltaMax) {
+        // open ant condition  [original inline comment from console.cs:26039]
         swr = kOpenAntennaSwr;
-
-        m_measuredSwr = swr;
-
-        bool prevOpen = m_openAntennaDetected;
-        m_openAntennaDetected = true;
-
-        float prevFactor = m_protectFactor;
         m_protectFactor = kWindBackFactor;
-
-        bool prevHighSwr = m_highSwr;
         m_highSwr = true;
-
-        if (prevFactor != m_protectFactor) {
-            emit protectFactorChanged(m_protectFactor);
-        }
-        if (prevHighSwr != m_highSwr) {
-            emit highSwrChanged(m_highSwr);
-        }
-        if (prevOpen != m_openAntennaDetected) {
-            emit openAntennaDetectedChanged(m_openAntennaDetected);
-        }
-        return;
+        openAntenna = true;
     }
 
-    // Clear open-antenna flag when condition no longer holds
-    if (m_openAntennaDetected) {
-        m_openAntennaDetected = false;
-        emit openAntennaDetectedChanged(false);
-    }
-
-    // ── Measurement mode ──────────────────────────────────────────────────
-    // Longpath-original; see the header for why this is not a hole in
-    // the protection. Publishes the reading, acts on nothing.
-    if (m_measurementMode && !m_windBackLatched
-        && fwdW <= kMeasurementCeilingW) {
-        m_tripCount = 0;
-
-        if (m_protectFactor != 1.0f) {
-            m_protectFactor = 1.0f;
-            emit protectFactorChanged(m_protectFactor);
-        }
-        if (m_highSwr) {
-            m_highSwr = false;
-            emit highSwrChanged(false);
-        }
-
-        m_measuredSwr = (std::isnan(swr) || std::isinf(swr) || swr < 1.0f)
-                            ? 1.0f : swr;
-        return;
-    }
-
-    // ── Tune-time bypass ──────────────────────────────────────────────────
-    // console.cs:26020-26057 [v2.10.3.13]
-    bool swrPass = false;
-    if (tuneActive && m_disableOnTune) {
-        // alex_fwd >= 1.0f && alex_fwd <= _tunePowerSwrIgnore && tunePowerSliderValue <= 70
-        // console.cs:26047-26053 [v2.10.3.13]
-        if (fwdW >= 1.0f && fwdW <= m_tunePowerSwrIgnore && m_tunePowerSliderValue <= 70) {
-            swrPass = true;
-        }
-    }
-
-    // ── Trip detection + foldback / windback ──────────────────────────────
-    // console.cs:26067-26091 [v2.10.3.13]
-
-    // alex_fwd_limit floor: suppresses false trips during TX ramp-up.
-    // console.cs:26064-26067 [v2.10.3.13]:
-    //   float alex_fwd_limit = 5.0f;
-    //   if (HardwareSpecific.Model == HPSDRModel.ANAN8000D)        // K2UE idea:  try to determine if Hi-Z or Lo-Z load
-    //       alex_fwd_limit = 2.0f * (float)ptbPWR.Value;        //    by comparing alex_fwd with power setting
-    //   if (swr > _swrProtectionLimit && alex_fwd > alex_fwd_limit && swrprotection && !swr_pass)
-    if (swr > m_limit && fwdW > m_alexFwdLimit && !swrPass) {
-        m_tripCount++;
-        if (m_tripCount >= kTripDebounceCount) {
-            // console.cs:26070-26075 [v2.10.3.13]
+    if (!openAntenna) {
+        // ── Measurement mode ──────────────────────────────────────────────
+        // Longpath-original; see the header for why this is not a hole in
+        // the protection. Publishes the reading, acts on nothing.
+        if (m_measurementMode && !m_windBackLatched
+            && fwdW <= kMeasurementCeilingW) {
             m_tripCount = 0;
-
-            float newFactor = m_limit / (swr + 1.0f);
-            bool prevHighSwr = m_highSwr;
-            m_highSwr = true;
-
-            float prevFactor = m_protectFactor;
-            m_protectFactor = newFactor;
-
-            if (prevFactor != m_protectFactor) {
-                emit protectFactorChanged(m_protectFactor);
+            m_protectFactor = 1.0f;
+            m_highSwr = false;
+        } else {
+            // ── Tune-time bypass ──────────────────────────────────────────
+            // From Thetis console.cs:26067-26106 [v2.10.3.15]:
+            //   if (alex_fwd >= 1.0f && alex_fwd <= _tunePowerSwrIgnore && tunePowerSliderValue <= 70)
+            //   {
+            //       swr_pass = true;
+            //   }
+            //   else swr_pass = false;
+            bool swrPass = false;
+            if (tuneActive && m_disableOnTune) {
+                if (fwdW >= 1.0f && fwdW <= m_tunePowerSwrIgnore
+                    && m_tunePowerSliderValue <= 70) {
+                    swrPass = true;
+                }
             }
-            if (prevHighSwr != m_highSwr) {
-                emit highSwrChanged(m_highSwr);
+
+            // ── Trip detection + foldback ─────────────────────────────────
+            // From Thetis console.cs:26112-26131 [v2.10.3.15]:
+            //   float alex_fwd_limit = 5.0f;
+            //   if (HardwareSpecific.Model == HPSDRModel.ANAN8000D)        // K2UE idea:  try to determine if Hi-Z or Lo-Z load
+            //       alex_fwd_limit = 2.0f * (float)ptbPWR.Value;        //    by comparing alex_fwd with power setting
+            //
+            //   if (swr > _swrProtectionLimit && alex_fwd > alex_fwd_limit && swrprotection && !swr_pass)
+            //   {
+            //       high_swr_count++;
+            //       if (high_swr_count >= 4)
+            //       {
+            //           high_swr_count = 0;
+            //           NetworkIO.SWRProtect = (float)(_swrProtectionLimit / (swr + 1.0f));
+            //           HighSWR = true;
+            //       }
+            //   }
+            //   else
+            //   {
+            //       high_swr_count = 0;
+            //       NetworkIO.SWRProtect = 1.0f;
+            //       HighSWR = false;
+            //   }
+            // The caller sets alex_fwd_limit through setAlexFwdLimit before
+            // each sample.
+            if (swr > m_limit && fwdW > m_alexFwdLimit && m_enabled && !swrPass) {
+                m_tripCount++;
+                if (m_tripCount >= kTripDebounceCount) {
+                    m_tripCount = 0;
+                    m_protectFactor = m_limit / (swr + 1.0f);
+                    m_highSwr = true;
+                }
+            } else {
+                // Thetis clears all three here unconditionally and the
+                // catch-all below puts 0.01 back when the latch holds.
+                // The one Longpath difference is HighSWR: Thetis has a
+                // second display flag for a folded-back drive
+                // (Display.PowerFoldedBack) and we do not -- highSwr is
+                // what lights the overlay and the TX applet's LED -- so
+                // while the latch holds and protection is on, it stays
+                // up. Unticking protection clears it, as upstream.
+                m_tripCount = 0;
+                m_protectFactor = 1.0f;
+                if (!m_enabled || !m_windBackLatched) {
+                    m_highSwr = false;
+                }
+            }
+
+            // ── Catch-all: windback latch ─────────────────────────────────
+            // From Thetis console.cs:26133-26142 [v2.10.3.15]:
+            //   //catch all
+            //   if (swrprotection && _swr_wind_back_power & !_wind_back_engaged && HighSWR) _wind_back_engaged = true; // this and NetworkIO.SWRProtect reset in UIMOXChangedFalse
+            //   if (_wind_back_engaged)
+            //   {
+            //       NetworkIO.SWRProtect = 0.01f;
+            //       Display.PowerFoldedBack = true;
+            //   }
+            if (m_enabled && m_windBackEnabled && !m_windBackLatched && m_highSwr) {
+                m_windBackLatched = true;
+            }
+            if (m_windBackLatched) {
+                m_protectFactor = kWindBackFactor;
             }
         }
-        // (below 4 trips: factor unchanged until trip debounce fires)
-    } else if (!m_windBackLatched) {
-        // Below limit and not latched: full power, clear trip counter
-        // console.cs:26078-26082 [v2.10.3.13]
-        m_tripCount = 0;
-
-        float prevFactor = m_protectFactor;
-        bool prevHighSwr = m_highSwr;
-
-        m_protectFactor = 1.0f;
-        m_highSwr = false;
-
-        if (prevFactor != m_protectFactor) {
-            emit protectFactorChanged(m_protectFactor);
-        }
-        if (prevHighSwr != m_highSwr) {
-            emit highSwrChanged(m_highSwr);
-        }
     }
 
-    // ── Catch-all: windback latch ─────────────────────────────────────────
-    // console.cs:26083-26090 [v2.10.3.13]
-    // if (swrprotection && _swr_wind_back_power & !_wind_back_engaged && HighSWR)
-    //     _wind_back_engaged = true; // this and NetworkIO.SWRProtect reset in UIMOXChangedFalse
-    if (m_windBackEnabled && !m_windBackLatched && m_highSwr) {
-        m_windBackLatched = true;
-        emit windBackLatchedChanged(true);
-    }
-
-    if (m_windBackLatched) {
-        // console.cs:26087-26088 [v2.10.3.13]
-        float prevFactor = m_protectFactor;
-        m_protectFactor = kWindBackFactor;
-        if (prevFactor != m_protectFactor) {
-            emit protectFactorChanged(m_protectFactor);
-        }
-    }
-
-    // ── Store measured SWR ────────────────────────────────────────────────
-    // console.cs:26096-26099 [v2.10.3.13] (alex_swr assignment after end: label)
+    // ── end: store measured SWR ───────────────────────────────────────────
+    // From Thetis console.cs:26143-26149 [v2.10.3.15]:
+    //   end:
+    //       swr_pass = false;
+    //       if (float.IsNaN(swr) || float.IsInfinity(swr) || swr < 1.0f)
+    //           alex_swr = 1.0f;
+    //       else
+    //           alex_swr = swr;
     if (std::isnan(swr) || std::isinf(swr) || swr < 1.0f) {
         m_measuredSwr = 1.0f;
     } else {
         m_measuredSwr = swr;
+    }
+    m_openAntennaDetected = openAntenna;
+
+    if (prevFactor != m_protectFactor) {
+        emit protectFactorChanged(m_protectFactor);
+    }
+    if (prevHighSwr != m_highSwr) {
+        emit highSwrChanged(m_highSwr);
+    }
+    if (prevWindBack != m_windBackLatched) {
+        emit windBackLatchedChanged(m_windBackLatched);
+    }
+    if (prevOpen != m_openAntennaDetected) {
+        emit openAntennaDetectedChanged(m_openAntennaDetected);
     }
 }
 
@@ -355,13 +363,27 @@ bool SwrProtectionController::measurementMode() const noexcept
 
 void SwrProtectionController::onMoxOff() noexcept
 {
-    // From Thetis console.cs:29191-29195 [v2.10.3.13] (UIMOXChangedFalse)
+    // From Thetis console.cs:29241-29246 [v2.10.3.15] (UIMOXChangedFalse)
     //   //[2.10.3.7]MW0LGE reset
     //   NetworkIO.SWRProtect = 1.0f;
     //   _wind_back_engaged = false;
     //   Display.PowerFoldedBack = false;
     //   Audio.HighSWRScale = 1.0;
     //   HighSWR = false;
+    //
+    // Those five, and nothing else. Two things used to be reset here that
+    // Thetis leaves alone, both corrected 2026-10-28:
+    //
+    //   high_swr_count -- Thetis carries the trip count across the unkey.
+    //     Unkeying at three trips and keying straight back into the same
+    //     mismatch therefore folds the drive back on the next sample
+    //     instead of granting a fresh run of four. Zeroing it here handed
+    //     the operator a new debounce window every time he tapped the key.
+    //
+    //   alex_swr -- the measured SWR is a READING, not a latch. Thetis
+    //     assigns it only at the `end:` label of a keyed sample, so it
+    //     holds its last value through receive. Resetting it to 1.00 here
+    //     wiped exactly the number the operator unkeyed in order to read.
 
     float prevFactor = m_protectFactor;
     bool prevHighSwr = m_highSwr;
@@ -372,8 +394,6 @@ void SwrProtectionController::onMoxOff() noexcept
     m_highSwr             = false;
     m_windBackLatched     = false;
     m_openAntennaDetected = false;
-    m_tripCount           = 0;
-    m_measuredSwr         = 1.0f;
 
     if (prevFactor != m_protectFactor) {
         emit protectFactorChanged(m_protectFactor);
