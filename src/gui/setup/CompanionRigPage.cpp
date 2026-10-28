@@ -16,6 +16,8 @@
 #include "core/HamlibInstaller.h"
 #include "core/RigctldClient.h"
 #include "core/RigctldProcess.h"
+#include "core/CompanionRigController.h"
+#include "models/RadioModel.h"
 #include "gui/StyleConstants.h"
 
 #include <QCheckBox>
@@ -78,8 +80,9 @@ qint64 CompanionRigPage::mhzZuHz(double mhz)
     return static_cast<qint64>(std::llround(mhz * 1000000.0));
 }
 
-CompanionRigPage::CompanionRigPage(QWidget* parent)
+CompanionRigPage::CompanionRigPage(RadioModel* model, QWidget* parent)
     : SetupPage(QStringLiteral("Companion Rig"), parent)
+    , m_model(model)
 {
     setStyleSheet(QString::fromLatin1(Style::kPageStyle));
 
@@ -496,12 +499,54 @@ void CompanionRigPage::speichereTransverter()
 {
     m_tv.save();
     m_tvText->setText(m_tv.describe());
+
+    // Die prozessweite Fassung nachziehen: ohne das traegt die Anzeige
+    // bis zum naechsten Programmstart den alten Versatz -- und das
+    // waere die unangenehme Art von Fehler, weil alles plausibel
+    // aussieht und nur um 116 MHz daneben liegt.
+    if (auto* r = regler()) {
+        r->einstellungenGeaendert();
+    } else {
+        TransverterSetup::setCurrent(m_tv);
+    }
+
     emit transverterChanged(m_tv);
+}
+
+CompanionRigController* CompanionRigPage::regler() const
+{
+    return m_model ? m_model->companionRig() : nullptr;
 }
 
 void CompanionRigPage::starteTest()
 {
     speichereCat();
+
+    // ── Die eine Verbindung, nicht eine zweite ───────────────────────
+    //
+    // Gibt es die Dauerverbindung, wird SIE bedient. Sonst stehen nach
+    // einem Klick auf „Test" zwei Clients an einem rigctld, das in der
+    // Reihenfolge der Befehle antwortet und nicht weiss, wer gefragt
+    // hat: beide bekommen Teile der Antworten des anderen, und die
+    // Frequenz springt.
+    if (auto* r = regler()) {
+        connect(r, &CompanionRigController::problem, this,
+                &CompanionRigPage::zeigeStatus, Qt::UniqueConnection);
+        connect(r, &CompanionRigController::zfFrequenzGeaendert, this,
+                [this](qint64) {
+            if (auto* rr = regler()) { zeigeStatus(rr->beschreibung()); }
+        }, Qt::UniqueConnection);
+        connect(r, &CompanionRigController::verbindungGeaendert, this,
+                [this](bool) {
+            if (auto* rr = regler()) { zeigeStatus(rr->beschreibung()); }
+        }, Qt::UniqueConnection);
+
+        r->einstellungenGeaendert();
+        if (!r->verbunden()) { r->verbinde(); }
+        zeigeStatus(r->beschreibung());
+        m_test->setText(QStringLiteral("Stop test"));
+        return;
+    }
 
     QString host = m_host->text().trimmed();
     quint16 port = static_cast<quint16>(m_port->value());
@@ -565,6 +610,14 @@ void CompanionRigPage::starteTest()
 
 void CompanionRigPage::beendeTest()
 {
+    // Die Dauerverbindung wird hier NICHT getrennt: der Bediener hat
+    // sie eingeschaltet, nicht diese Seite. Ein Dialog, der beim
+    // Schliessen die Verbindung zum Funkgeraet mitnimmt, waere genau
+    // der Fehler, den Stufe 2 behebt.
+    if (regler()) {
+        if (m_test) { m_test->setText(QStringLiteral("Test")); }
+        return;
+    }
     if (m_client) {
         m_client->disconnectFromRig();
         m_client.reset();

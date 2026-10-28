@@ -124,6 +124,67 @@ struct TransverterSetup {
     // Schluessel: Transverter/Enabled, /IfLowHz, /IfHighHz, /OffsetHz.
     static TransverterSetup load();
     void save() const;
+
+    // ── Die eine Fassung, die die Anzeige liest (2026-10-28) ────────
+    //
+    // Den Versatz braucht nicht ein Ort, sondern vier: die Zahl in der
+    // VFO-Anzeige, die Frequenzachse im Panadapter, die Bandplan-
+    // Abschnitte darin und der Logbucheintrag. Alle vier liegen weit
+    // auseinander -- VfoDisplayItem entsteht tief im Instrumenten-
+    // system (ItemGroup), wo es keinen Weg gibt, ihm beim Anlegen
+    // etwas mitzugeben, ohne die Eigenschaftsmasken und die
+    // Speicherung mit anzufassen.
+    //
+    // Darum eine prozessweite Fassung, wie AppSettings::instance() es
+    // vormacht: EINE Stationseinstellung, von vielen gelesen, von
+    // genau einer Stelle geschrieben (CompanionRigController, nachdem
+    // er geladen oder der Bediener gespeichert hat).
+    //
+    // Nur vom Hauptfaden aus. Alle vier Leser malen oder schreiben
+    // Logbuch, und beides laeuft dort.
+    //
+    // Der Pruefstand setzt sie direkt -- das ist der Grund, warum
+    // setCurrent() oeffentlich ist und nicht nur der Controller sie
+    // kennt: so laesst sich "aus wenn aus" ohne Einstellungsdatei
+    // belegen.
+    static const TransverterSetup& current();
+    static void setCurrent(const TransverterSetup& t);
+
+    /// Kurzweg fuer die Anzeige: ZF -> RF nach der aktuellen Fassung.
+    /// Ist kein Transverter aktiv, kommt die Zahl unveraendert zurueck.
+    static qint64 displayHz(qint64 ifHz) { return current().rfFrequencyHz(ifHz); }
+
+    /// Kurzweg fuer die Gegenrichtung: RF -> ZF. Fuer alles, was eine
+    /// Antennenfrequenz auf die Achse des Panadapters legen muss --
+    /// die Bandplan-Abschnitte zum Beispiel.
+    static qint64 panHz(qint64 rfHz) { return current().ifFrequencyHz(rfHz); }
+
+    // ── Das Logbuch (2026-10-28) ────────────────────────────────────
+    //
+    // Longpaths Band-Aufzaehlung endet bei 6 m (darum das ZF-Fenster
+    // und kein Bandpaar, siehe oben). bandFromFrequency(144300000) hat
+    // also keinen Eintrag -- und ein ADIF-Satz ohne BAND oder mit
+    // BAND=10M bei einer 144-MHz-Frequenz ist falsch, nicht nur
+    // unschoen: der Satz wandert in ein Diplom-Programm.
+    //
+    // Hier steht deshalb eine kleine, geschlossene Tabelle der
+    // ADIF-Bandnamen -- NICHT eine neue Bandverwaltung fuer Longpath.
+    // Sie wird nur betreten, wenn ein Transverter aktiv ist, sie
+    // entscheidet nichts ueber das Senden, und sie kennt genau die
+    // Baender, die ein Transverter ausgibt.
+    //
+    /// ADIF-Bandname fuer eine ANTENNENfrequenz ("2m", "70cm", …),
+    /// oder leer, wenn keiner passt.
+    static QString adifBand(qint64 rfHz);
+
+    /// Frequenz und Band fuer einen Logbucheintrag.
+    ///
+    /// Gibt false zurueck, wenn kein Transverter im Spiel ist. Dann
+    /// bleibt *mhz und *band unberuehrt und der Aufrufer behaelt seine
+    /// eigene Rechnung -- bitgleich wie vorher. Das ist der Zweck
+    /// dieser Form: an den Aufrufstellen soll NICHTS passieren, solange
+    /// niemand einen Transverter eingestellt hat.
+    static bool logbuchFrequenz(qint64 ifHz, double* mhz, QString* band);
 };
 
 } // namespace Longpath

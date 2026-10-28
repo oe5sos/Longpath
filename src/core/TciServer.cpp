@@ -24,6 +24,7 @@
 #ifdef HAVE_WEBSOCKETS
 
 #include "TciServer.h"
+#include "core/TransverterSetup.h"
 #include "TciClientSession.h"
 #include "TciProtocol.h"
 #include "TciSendQueue.h"
@@ -3102,6 +3103,13 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                     // -- derselben Stelle, die `log_dup:` fragt. Siehe dort,
                     // warum das EINE Stelle sein muss.
                     bandUndModeDerScheibe(&e.band, &e.mode);
+
+                    // Transverter (2026-10-28): danach, nicht davor --
+                    // bandUndModeDerScheibe() setzt e.band aus der ZF,
+                    // und erst hier wird daraus das Band der Antenne.
+                    // Ohne Transverter tut die Zeile nichts.
+                    TransverterSetup::logbuchFrequenz(
+                        std::llround(sl->frequency()), &e.freqMHz, &e.band);
                     const QString m = SliceModel::modeName(sl->dspMode());
                     if (e.mode == QLatin1String("SSB")
                         && (m == QLatin1String("LSB")

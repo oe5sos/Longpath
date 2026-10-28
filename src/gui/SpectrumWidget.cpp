@@ -132,6 +132,7 @@
 #include "dbm_strip_math.h"
 #include "popup_placement.h"
 #include "models/BandPlanManager.h"
+#include "core/TransverterSetup.h"
 #include "models/NotchModel.h"
 #include "spectrum/SpectrumDetector.h"
 
@@ -4144,6 +4145,8 @@ void SpectrumWidget::paintEvent(QPaintEvent* event)
         drawDbmScale(p, QRect(0, 0, w, specH));
     }
     drawBandPlan(p, specRect);
+    // Nach dem Bandplan, damit die Linie ueber dem Streifen liegt.
+    drawCompanionMarker(p, specRect);
     // Sub-epic E: time-scale + LIVE button on the right edge of the
     // waterfall area (always painted; widens automatically when paused).
     // Use a full-width wfRect (not the clipped `wfRect` at line 1141) so the
@@ -5345,7 +5348,10 @@ void SpectrumWidget::drawFreqScale(QPainter& p, const QRect& r)
     double startFreq = std::ceil((m_centerHz - m_bandwidthHz / 2.0) / freqStep) * freqStep;
     for (double f = startFreq; f < m_centerHz + m_bandwidthHz / 2.0; f += freqStep) {
         int x = hzToX(f, r);
-        const QString label = freqScaleLabel(f, freqStep);
+        // Die Achse beschriftet die Antenne, nicht die ZF. Der
+        // Teilungsabstand bleibt in der ZF -- der Versatz verschiebt,
+        // er dehnt nicht, also sitzen die Striche weiter richtig.
+        const QString label = freqScaleLabel(rfFuerAnzeige(f), freqStep);
 
         // Cached QStaticText render — see m_freqLabelCache comment in
         // SpectrumWidget.h.  Working set grows as the user pans but
@@ -5480,14 +5486,104 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
     }
 }
 
+// ── ZF und Antenne ──────────────────────────────────────────────────
+
+double SpectrumWidget::rfFuerAnzeige(double ifHz) const
+{
+    const auto& tv = Longpath::TransverterSetup::current();
+    if (!tv.active()) { return ifHz; }
+    return static_cast<double>(tv.rfFrequencyHz(std::llround(ifHz)));
+}
+
+double SpectrumWidget::zfFuerAchse(double rfHz) const
+{
+    const auto& tv = Longpath::TransverterSetup::current();
+    if (!tv.active()) { return rfHz; }
+    return static_cast<double>(tv.ifFrequencyHz(std::llround(rfHz)));
+}
+
+// ── Die Marke des Begleitgeraets ────────────────────────────────────
+
+void SpectrumWidget::setCompanionMarker(bool shown, qint64 ifHz,
+                                        const QString& label)
+{
+    if (m_companionShown == shown && m_companionIfHz == ifHz
+        && m_companionLabel == label) {
+        return;
+    }
+    m_companionShown = shown;
+    m_companionIfHz  = ifHz;
+    m_companionLabel = label;
+    update();
+}
+
+void SpectrumWidget::drawCompanionMarker(QPainter& p, const QRect& specRect)
+{
+    if (!m_companionShown || m_companionIfHz <= 0) { return; }
+
+    const int x = hzToX(static_cast<double>(m_companionIfHz), specRect);
+    if (x < specRect.left() || x > specRect.right()) { return; }
+
+    // Warm und duenn. Der Hausstil laesst Farbe hoechstens zwei Prozent
+    // der Flaeche bedecken: eine Linie und ein kurzes Schild halten das
+    // mit Abstand ein, ein gefuellter Streifen nicht. Warm und nicht
+    // blau, weil Blau im Hausstil das Anfassbare ist -- diese Zahl ist
+    // gemessen, nicht gestellt.
+    const QColor warm = roleColor("companion-rig", Style::kAmberText);
+
+    p.setPen(QPen(warm, 1, Qt::DashLine));
+    p.drawLine(x, specRect.top(), x, specRect.bottom());
+
+    // Die Zahl am Schild ist die der ANTENNE. Das ist der ganze Grund,
+    // warum es den Transverter-Versatz gibt: der Betreiber liest hier
+    // 144.300, waehrend die Achse darunter in der ZF laeuft. Steht kein
+    // Transverter davor, sind beide gleich und niemand merkt etwas.
+    QString text = m_companionLabel;
+    if (text.isEmpty()) {
+        text = QString::number(
+            rfFuerAnzeige(static_cast<double>(m_companionIfHz)) / 1.0e6,
+            'f', 3);
+    }
+
+    // 9, nicht 10: die Schriftleiter des Hausstils kennt 9 und 11, und
+    // die Frequenzachse darunter laeuft auf 11. Das Schild soll
+    // kleiner sein als die Achse, also die Stufe darunter -- und nicht
+    // ein Zwischenwert, den verify-style-drift zu Recht anmerkt.
+    QFont schrift = p.font();
+    schrift.setPixelSize(9);
+    p.setFont(schrift);
+
+    const QFontMetrics fm(schrift);
+    const int tw = fm.horizontalAdvance(text) + 8;
+    const int th = fm.height() + 2;
+
+    // Nach links kippen, wenn rechts kein Platz mehr ist -- sonst steht
+    // das Schild halb ausserhalb und ist nicht zu lesen.
+    int tx = x + 3;
+    if (tx + tw > specRect.right()) { tx = x - 3 - tw; }
+    const QRect schild(tx, specRect.top() + 2, tw, th);
+
+    p.setPen(Qt::NoPen);
+    p.setBrush(roleColor("app-bg", Style::kAppBg, 200));
+    p.drawRect(schild);
+    p.setPen(warm);
+    p.drawText(schild, Qt::AlignCenter, text);
+}
+
 void SpectrumWidget::drawBandPlan(QPainter& p, const QRect& specRect)
 {
     if (!m_bandPlanMgr || m_bandPlanFontSize <= 0) {
         return;
     }
 
-    const double startMhz = m_centerHz / 1.0e6 - (m_bandwidthHz / 2.0) / 1.0e6;
-    const double endMhz   = m_centerHz / 1.0e6 + (m_bandwidthHz / 2.0) / 1.0e6;
+    // Das Fenster, gegen das die Abschnitte geprueft werden, liegt auf
+    // der ANTENNE: mit einem Transverter davor sieht der Betreiber ein
+    // 2-m-Band, auch wenn dieses Widget eine 28-MHz-Achse malt. Ohne
+    // Transverter sind beide Zeilen bitgleich die alten.
+    const double startMhz =
+        rfFuerAnzeige(m_centerHz - m_bandwidthHz / 2.0) / 1.0e6;
+    const double endMhz   =
+        rfFuerAnzeige(m_centerHz + m_bandwidthHz / 2.0) / 1.0e6;
     const int    bandH    = m_bandPlanFontSize + 4;
     const int    bandY    = specRect.bottom() - bandH + 1;
 
@@ -5497,8 +5593,13 @@ void SpectrumWidget::drawBandPlan(QPainter& p, const QRect& specRect)
             continue;
         }
 
-        const int x1 = hzToX(std::max(seg.lowMhz,  startMhz) * 1.0e6, specRect);
-        const int x2 = hzToX(std::min(seg.highMhz, endMhz)   * 1.0e6, specRect);
+        // Und zurueck: der Abschnitt ist eine Antennenfrequenz, die Achse
+        // eine ZF. zfFuerAchse() ist ohne Transverter die Gleichheit,
+        // der Ausdruck also derselbe wie vorher.
+        const int x1 = hzToX(
+            zfFuerAchse(std::max(seg.lowMhz,  startMhz) * 1.0e6), specRect);
+        const int x2 = hzToX(
+            zfFuerAchse(std::min(seg.highMhz, endMhz)   * 1.0e6), specRect);
         if (x2 <= x1) {
             continue;
         }
@@ -12023,6 +12124,10 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 drawImdOverlay(p, specRect);
             }
             drawBandPlan(p, specRect);
+            // Und auch hier -- genau der Fehler, vor dem der Block
+            // darunter warnt: der QPainter-Weg oben ist die
+            // Rueckfallebene, dieser hier malt im Betrieb.
+            drawCompanionMarker(p, specRect);
 
             // ── Auch HIER, nicht nur im CPU-Weg ──────────────────────
             //

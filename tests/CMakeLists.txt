@@ -1108,6 +1108,18 @@ longpath_add_test(tst_rigctld_client)
 # abgelichtet, ohne Geraet und ohne Schirm.
 longpath_add_test(tst_begleitgeraet_seite)
 
+# Die Dauerverbindung: nicht von selbst verbinden, nicht sich selbst
+# befragen, und der Versatz beim Laden.
+longpath_add_test(tst_begleitgeraet_regler)
+
+# Der Versatz dort, wo er vor dem Betreiber landet -- und vor allem:
+# dass OHNE Transverter bitgleich nichts passiert.
+longpath_add_test(tst_transverter_anzeige)
+
+# Die Marke im Panadapter: wo sie sitzt (in der ZF) und was daran
+# steht (auf der Antenne) -- zwei Dinge, die man leicht vertauscht.
+longpath_add_test(tst_begleitgeraet_marke)
+
 # ── Phase 3M-1a G.3: TransmitModel tunePowerByBand[14] per-MAC persistence ──
 longpath_add_test(tst_transmit_model_tune_power)
 

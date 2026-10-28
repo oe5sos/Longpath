@@ -53,6 +53,8 @@ mw0lge@grange-lane.co.uk
 //============================================================================================//
 
 #include "VfoDisplayItem.h"
+
+#include "core/TransverterSetup.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QWheelEvent>
@@ -63,6 +65,20 @@ VfoDisplayItem::VfoDisplayItem(QObject* parent) : MeterItem(parent) {}
 
 QString VfoDisplayItem::formatFrequency(int64_t hz) const
 {
+    // ── Die Zahl der Antenne, nicht die der ZF (2026-10-28) ─────────
+    //
+    // Steht ein Transverter davor, liegt Longpaths Empfaenger auf
+    // 28,3 MHz und das Signal auf 144,3 MHz. Die grosse Zahl ist die,
+    // die der Betreiber im Contest ansagt und ins Logbuch schreibt --
+    // also die der Antenne. Ohne Transverter kommt derselbe Wert
+    // zurueck, der hereinkam.
+    //
+    // Das Rad darunter (digitWeightAt) bleibt unberuehrt und bleibt
+    // richtig: der Versatz verschiebt um ganze MHz, die kHz- und
+    // Hz-Stellen decken sich also, und eine MHz-Stelle bewegt die
+    // Anzeige um genau so viel wie den Empfaenger.
+    hz = Longpath::TransverterSetup::displayHz(hz);
+
     const int mhz = static_cast<int>(hz / 1000000);
     const int khz = static_cast<int>((hz / 1000) % 1000);
     const int h   = static_cast<int>(hz % 1000);
@@ -103,7 +119,36 @@ void VfoDisplayItem::paint(QPainter& p, int widgetW, int widgetH)
     freqFont.setBold(true);
     p.setFont(freqFont);
     p.setPen(m_freqColour);
-    p.drawText(freqRect, Qt::AlignVCenter | Qt::AlignLeft, formatFrequency(m_frequencyHz));
+    const QString freqText = formatFrequency(m_frequencyHz);
+    p.drawText(freqRect, Qt::AlignVCenter | Qt::AlignLeft, freqText);
+
+    // ── Das Schild, ohne das die Zahl luegen wuerde ──────────────────
+    //
+    // Die Zahl oben ist mit Transverter die der ANTENNE. Longpaths
+    // EIGENER Sender steht dabei auf der ZF, und BandPlanGuard -- die
+    // Autoritaet fuer das Senden -- sieht ebenfalls die ZF. Das ist
+    // richtig so: der Waechter bewacht Longpaths Sender, nicht den des
+    // fremden Geraets.
+    //
+    // Nur darf der Betreiber dann nicht "144.300" lesen und glauben,
+    // Longpath sende dort. Darum dieses kurze, warme Schild: es sagt,
+    // dass die Zahl umgerechnet ist. Warm, weil der Hausstil Blau fuer
+    // das Anfassbare haelt; klein, weil Farbe zwei Prozent nicht
+    // ueberschreiten soll; und kein Rot, weil es keine Warnung ist,
+    // sondern eine Auskunft.
+    const auto& tv = Longpath::TransverterSetup::current();
+    if (tv.active() && tv.coversIf(m_frequencyHz)) {
+        QFont trvFont = freqFont;
+        trvFont.setPixelSize(qMax(9, freqFont.pixelSize() / 3));
+        trvFont.setBold(false);
+        p.setFont(trvFont);
+        p.setPen(QColor(0xd8, 0xa5, 0x5f));   // kAmberText
+        const QFontMetrics fmF(freqFont);
+        p.drawText(QRect(freqRect.left() + fmF.horizontalAdvance(freqText) + 4,
+                         freqRect.top(), 40, freqRect.height()),
+                   Qt::AlignVCenter | Qt::AlignLeft, QStringLiteral("TRV"));
+        p.setFont(freqFont);
+    }
 
     // Split indicator
     if (m_split) {

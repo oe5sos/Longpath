@@ -826,7 +826,8 @@ void SetupDialog::buildTree()
     // fremde Programme Longpath, hier folgt Longpath einem fremden
     // Geraet. Fuer die Transverter-Station -- das Funkgeraet ist die
     // ZF und sendet, Longpath haengt am ZF-Ausgang und zeigt das Band.
-    registerPage(cat, "Companion Rig", [] { return new CompanionRigPage; });
+    registerPage(cat, "Companion Rig",
+                 [this] { return new CompanionRigPage(m_model); });
     registerPage(cat, "MIDI Control", [] { return new CatMidiControlPage;  });
 
     tick("CAT & Network");

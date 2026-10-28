@@ -54,11 +54,26 @@ namespace Longpath {
 
 class RigctldClient;
 class RigctldProcess;
+class CompanionRigController;
+class RadioModel;
 
 class CompanionRigPage : public SetupPage {
     Q_OBJECT
 public:
-    explicit CompanionRigPage(QWidget* parent = nullptr);
+    // ── Warum das Modell hier hereinkommt (2026-10-28) ────────────
+    //
+    // Stufe 1 hatte den Knopf „Test" mit einem EIGENEN RigctldClient
+    // bedient. Das war fuer einen Test in Ordnung und fuer alles
+    // andere falsch: die Dauerverbindung gehoert dem Modell, und zwei
+    // Clients auf demselben rigctld teilen sich die Antworten -- es
+    // antwortet in der Reihenfolge der Befehle, nicht nach Absender.
+    //
+    // Mit einem Modell bedient diese Seite also die EINE Verbindung.
+    // Ohne (der Pruefstand baut die Seite nackt) bleibt der alte Weg
+    // mit eigenem Client: so laesst sich die Seite ohne halbes
+    // Programm pruefen.
+    explicit CompanionRigPage(RadioModel* model = nullptr,
+                              QWidget* parent = nullptr);
     ~CompanionRigPage() override;
 
     // ── Fuer den Pruefstand, und weil es ohne Oberflaeche pruefbar
@@ -114,6 +129,11 @@ private:
     QDoubleSpinBox* m_tvBis{nullptr};
     QDoubleSpinBox* m_tvVersatz{nullptr};
     QLabel*         m_tvText{nullptr};
+
+    RadioModel* m_model{nullptr};
+
+    /// Die Dauerverbindung, wenn es eine gibt. Nicht besessen.
+    CompanionRigController* regler() const;
 
     TransverterSetup m_tv;
     bool m_fuellt{false};   ///< Felder werden gerade aus den Werten gefuellt
