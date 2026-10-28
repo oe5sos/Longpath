@@ -1902,6 +1902,21 @@ private:
     QTimer* m_flexSendePumpe{nullptr};
     /// Mono aus `AudioEngine::pullTxMic`, bevor es verdoppelt wird.
     QVector<float> m_flexMikMono;
+    // Hoechste Spitze, die der erzeugte FT8-Ton bisher an die Flex
+    // gegeben hat. Nur fuer die eine Protokollzeile je Sendung.
+    float m_flexFt8Spitze{0.0f};
+
+    // ── Wie lange der Empfang nach dem Loesen schweigt (2026-10-28) ──
+    //
+    // Am 2026-10-28 verlor der FT8-Dekoder ganze Hoerperioden: drei
+    // Fenster hintereinander „0 Funde", dann wieder 17. Gegengerechnet
+    // mit dem Wasserfall lag jede leere Hoerperiode in einem Zeitraum
+    // ohne eine einzige Zeile. Was fehlte, war die Zahl: wie lange
+    // genau vom Loesen bis zum ersten Empfangssample. Raten hilft hier
+    // nicht — 15 Sekunden Hoerperiode entscheiden ueber alles oder
+    // nichts.
+    qint64 m_flexLoesenMs{0};     ///< Zeitpunkt des letzten „MOX aus"
+    int    m_flexTonImSenden{0};  ///< Tonpakete WAEHREND des Sendens
     /// Dasselbe als Stereo, wie die Maschine es erwartet.
     QVector<float> m_flexMikStereo;
     /// Haben wir selbst getastet? Trennt unser `xmit` von der Taste am
