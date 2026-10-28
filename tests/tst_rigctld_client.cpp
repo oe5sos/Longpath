@@ -327,14 +327,39 @@ private slots:
         c.connectToRig();
         QTRY_VERIFY_WITH_TIMEOUT(c.isConnected(), 3000);
 
+        // Erst laufen lassen, bis der gefaelschte Server wirklich
+        // Befehle gesehen hat. isConnected() wird im connected-Zweig
+        // wahr, und derselbe Zweig schickt sofort das erste „f": wer
+        // direkt danach trennt und zaehlt, nimmt den Stand, waehrend
+        // dieses „f" noch auf der Leitung liegt. Es landet dann im
+        // Wartefenster danach und sieht wie ein Befehl nach dem Trennen
+        // aus. Hier gruen, in der CI rot -- der Unterschied war nur,
+        // wann das Ereignisrad den Lesewunsch des Servers zustellt.
+        // (2026-10-27.)
+        QTRY_VERIFY_WITH_TIMEOUT(server.befehle.size() >= 2, 3000);
+
         c.disconnectFromRig();
         QCOMPARE(c.state(), RigctldClient::State::Disconnected);
         QVERIFY(!c.hasFreshFrequency());
 
         // Kein Wiederanlauf hinter dem Ruecken: wer getrennt hat, hat
-        // getrennt.
+        // getrennt. Der Zaehlerstand erst, nachdem das Rad einmal
+        // durchgelaufen ist -- dann ist nichts mehr unterwegs, und was
+        // im Fenster danach ankommt, hat der Client selbst geschickt.
+        QTest::qWait(100);
         const int vorher = server.befehle.size();
         QTest::qWait(300);
+        QCOMPARE(server.befehle.size(), vorher);
+
+        // Und laenger als die Wiederanlauffrist. Die 300 ms oben fangen
+        // den Takt, aber nicht den Weg, der nach einem Abbruch die
+        // Verbindung zurueckholt: der wartet kRetryAfterDropMs. Ein
+        // disconnectFromRig(), das m_wanted stehen liesse, waere im
+        // kurzen Fenster unsichtbar und holte das Geraet drei Sekunden
+        // spaeter von selbst zurueck -- bei einem Geraet an einer
+        // Endstufe die falsche Richtung.
+        QTest::qWait(RigctldClient::kRetryAfterDropMs + 500);
+        QCOMPARE(c.state(), RigctldClient::State::Disconnected);
         QCOMPARE(server.befehle.size(), vorher);
     }
 
