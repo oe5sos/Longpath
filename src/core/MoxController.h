@@ -147,6 +147,7 @@
 #pragma once
 
 #include <QObject>
+#include <QString>
 #include <QTimer>
 #include <functional>
 #include <limits>
@@ -281,6 +282,29 @@ public:
     // contract.
     using MoxCheckFn = std::function<safety::BandPlanGuard::MoxCheckResult()>;
     void setMoxCheck(MoxCheckFn check);
+
+    // ── Key-block latch (2026-10-28) ─────────────────────────────────────────
+    //
+    // Bolts the key shut until it is released. Set by the SWR protection's
+    // open-antenna branch, which has just dropped MOX
+    // (RadioModel::handlePaTelemetry, Thetis `chkMOX.Checked = false;`
+    // console.cs:26041-26043 [v2.10.3.15]).
+    //
+    // A deliberate departure from Thetis. There, dropping the key in
+    // PollPAPWR leaves PollPTT (console.cs:25470-25555 [v2.10.3.15]) free
+    // to key again from a still-held source on its very next pass -- and
+    // RadioConnection reports mic PTT on EVERY status frame, 50 to 100 times
+    // a second (see onMicPttFromRadio). So a held PTT into an open feedline
+    // becomes key, trip, drop, key, trip, drop, dozens of times a second.
+    // The latch stops that chatter. Letting go of the key, or any other
+    // source asking for MOX off, clears it; the next press keys normally.
+    //
+    // It sits with the BandPlanGuard check because that is the one gate
+    // every key source passes through -- mic PTT, VOX, CAT, TCI, the MOX
+    // button, TUNE and two-tone all arrive here as setMox(true).
+    void latchKeyBlock(const QString& reason);
+    void releaseKeyBlock();
+    bool keyBlockLatched() const noexcept;
 
     // ── Setter ───────────────────────────────────────────────────────────────
     // setPttMode: idempotent; emits pttModeChanged on actual transition.
@@ -1065,6 +1089,11 @@ private:
     // setMox(true) consults this BEFORE Codex P2 safety effects. If the check
     // returns !ok, moxRejected is emitted and setMox returns early.
     MoxCheckFn m_moxCheck;
+
+    // Key-block latch -- see latchKeyBlock(). The reason travels with it so
+    // the refusal that reaches the operator names the fault, not the gate.
+    bool    m_keyBlockLatched = false;
+    QString m_keyBlockReason;
 
     // ── Phase 3P-II Task 87: TxInterlockPolicy gate ───────────────────────────
     // Non-owning pointer. Null by default; set by RadioModel after both

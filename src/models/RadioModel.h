@@ -516,6 +516,11 @@ public:
     // Phase 3M-0 Task 17: safety controller accessors.
     // SwrProtectionController and TxInhibitMonitor are QObject-owned by RadioModel.
     // BandPlanGuard is a plain value class (no Qt parent).
+    /// Thetis' checkAntennaWarning in einer Zeile: der Text, mit dem der
+    /// Schluessel bei offener Antenne faellt und zugeriegelt bleibt.
+    /// Cite: console.cs:26166-26174 [v2.10.3.15].
+    static QString openAntennaWarningText();
+
     safety::SwrProtectionController& swrProt() noexcept { return m_swrProt; }
     const safety::SwrProtectionController& swrProt() const noexcept { return m_swrProt; }
     safety::TxInhibitMonitor& txInhibit() noexcept { return m_txInhibit; }
@@ -2019,6 +2024,21 @@ public:
         m_forceTxForTest = false;
     }
 
+    // Derselbe Weg OHNE die TX-Vortaeuschung (2026-10-28).
+    //
+    // Die Naht darueber heisst "tu als wuerde gesendet", und genau das
+    // macht sie fuer das MOX-Tor der SWR-Rechnung unsichtbar. Dieser
+    // Zwilling laesst das Tor zu, damit sich pruefen laesst, dass ein
+    // Nachlauf-Rahmen nach dem Unkey den gemessenen Stehwert NICHT mehr
+    // auf 1,00 zurueckstellt -- Thetis' `if (_mox)`
+    // (console.cs:25991 [v2.10.3.15]).
+    void handlePaTelemetryNotKeyedForTest(quint16 fwdRaw, quint16 revRaw,
+                                          quint16 exciterRaw, quint16 userAdc0Raw,
+                                          quint16 userAdc1Raw, quint16 supplyRaw) {
+        handlePaTelemetry(fwdRaw, revRaw, exciterRaw,
+                          userAdc0Raw, userAdc1Raw, supplyRaw);
+    }
+
     // P1 full-parity §3.5 test seam — pure-function counterpart of the
     // percent-to-wire-byte SWR-foldback formula inlined at every
     // setTxDrive call site (voice powerChanged lambda, TUNE-engage,
@@ -2711,6 +2731,12 @@ public slots:
     void updateFreedvReporterVisibility();
 
 signals:
+    /// Die SWR-Ueberwachung hat eine offene Antenne erkannt, abgetastet und
+    /// den Schluessel zugeriegelt. MainWindow zeigt den Text im Warnstreifen
+    /// -- derselbe Weg wie bei moxRejected und den Bandplan-Absagen.
+    /// Cite: console.cs:26166-26174 [v2.10.3.15] (checkAntennaWarning).
+    void openAntennaWarning(const QString& text);
+
     // ── Senden ueber die Flex (2026-10-23, Stufe 2) ──────────────────
     /// Die MASCHINE hat das Senden erlaubt oder gesperrt.
     void flexSendefreigabeGeaendert(bool darf);

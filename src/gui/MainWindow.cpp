@@ -6877,6 +6877,20 @@ void MainWindow::buildUI()
         });
     }
 
+    // ── Offene Antenne: die Warnung aus Thetis (2026-10-28) ─────────────────
+    //
+    // The SWR protection saw nearly all the forward power coming back,
+    // dropped the key and bolted it shut until the operator lets go. Thetis
+    // puts up a modal MessageBox here (checkAntennaWarning,
+    // console.cs:26166-26174 [v2.10.3.15]); this is the same words through
+    // the same strip every other refused key already uses, and it stays up
+    // longer than the 3 s refusals because the operator has to walk to the
+    // antenna, not just retune.
+    connect(m_radioModel, &RadioModel::openAntennaWarning,
+            this, [this](const QString& text) {
+        showToast(text, ToastSeverity::Warning, 10000);
+    });
+
     // ── Phase 3M-0 Task 17: safety controller → status-bar wiring ────────────
     //
     // Wire PA Fwd/Rev/SWR telemetry into MeterPoller's cache so PA power
