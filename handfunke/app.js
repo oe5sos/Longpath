@@ -234,6 +234,57 @@ function starten(adresse) {
   link.connect(schema + mitPort);
 }
 
+// ── Raumbild statt Wasserfall ─────────────────────────────────────────────
+//
+// Dieselbe Ansicht, die Longpath am Mac hat (`src/gui/DssRenderer.cpp`):
+// gestaffelte Zeilen statt einer rollenden Flaeche. Sie ersetzt den
+// Wasserfall im unteren Feld; die Kurve darueber bleibt, wie sie ist --
+// das war Variante C der Entwurfsblaetter.
+//
+// Die Farben kommen aus derselben Rampe wie der Wasserfall. Zwei
+// Farbquellen fuer dieselbe Groesse waeren die sicherste Art, sie
+// auseinanderlaufen zu lassen.
+let raumbild = null;          // erst beim ersten Einschalten geladen
+const raumAn = () => { try { return localStorage.getItem('handfunke.raumbild') === '1'; }
+                       catch (e) { return false; } };
+const raumMerken = (v) => { try { localStorage.setItem('handfunke.raumbild', v ? '1' : '0'); }
+                            catch (e) {} };
+let raumZeigen = raumAn();
+
+async function raumbildHolen() {
+  if (raumbild) { return raumbild; }
+  const { Raumbild } = await import('./raumbild.js');
+  raumbild = new Raumbild();
+  return raumbild;
+}
+
+async function raumUmschalten() {
+  raumZeigen = !raumZeigen;
+  raumMerken(raumZeigen);
+  $('raumknopf').classList.toggle('an', raumZeigen);
+  if (raumZeigen) {
+    await raumbildHolen();
+  } else {
+    // Beim Zurueckschalten die Flaeche leeren: sonst steht das letzte
+    // Raumbild unter dem anlaufenden Wasserfall.
+    wfCtx.clearRect(0, 0, wf.width, wf.height);
+  }
+  zeichneBild();
+}
+
+$('raumknopf').addEventListener('click', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  raumUmschalten();
+}, { passive: false });
+// Die Abstimmgeste liegt darunter -- die Beruehrung darf sie nicht erreichen.
+$('raumknopf').addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+
+if (raumZeigen) {
+  $('raumknopf').classList.add('an');
+  raumbildHolen();
+}
+
 // ── Koppeln mit einem Tipp ────────────────────────────────────────────────
 //
 // Fuer den Zugang von draussen muss dieses Telefon einmal bei der
@@ -819,6 +870,9 @@ function mitteVerfolgen() {
  *  Schnitt liegt, und das Bild bleibt sichtbar, bis das Alte unten
  *  herausgewandert ist. */
 function wasserfallSchnitt() {
+  // Das Raumbild ist dieselbe Historie, nur anders gezeigt: was fuer den
+  // Wasserfall ein Schnitt ist, ist fuer das Raumbild einer.
+  if (raumbild) { raumbild.leeren(); }
   try {
     wfCtx.fillStyle = 'rgba(216,165,95,.55)';   // Bernstein, wie alles Gemessene
     wfCtx.fillRect(0, 0, wf.width, 2);
@@ -1041,6 +1095,24 @@ function zeichneBild() {
       panCtx.globalAlpha = 1;
       panCtx.textAlign = 'left';
     }
+  }
+
+  // Raumbild: dieselben Zeilen, nur anders gezeigt. Die Spanne ist die
+  // des Wasserfalls, damit beide Ansichten dasselbe Band zeigen.
+  if (raumZeigen && raumbild) {
+    const rLo = state.wfBoden - 3, rHi = rLo + 42;
+    while (neueZeilen > 0) {
+      neueZeilen--;
+      raumbild.zeileAufnehmen(spitze.subarray ? spitze.subarray(0, W) : spitze);
+    }
+    raumbild.malen(wfCtx, wf.width, wf.height, {
+      bodenDbm: rLo,
+      spanneDb: rHi - rLo,
+      zKurve: 0.7,
+      palette: (db) => rampe((db - rLo) / (rHi - rLo)),
+      grund: rampe(0),
+    });
+    return;
   }
 
   // Wasserfall: je eingetroffenem Spektrum eine Zeile — nicht je Bild.
