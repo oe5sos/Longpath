@@ -1712,6 +1712,12 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
                 // `verarbeite` denselben Zeiger unveraendert zurueck --
                 // dann kostet das hier eine Abfrage und sonst nichts.
                 if (m_rxDrift) {
+                    // Eine angekuendigte Luecke (eigene Sendung) wird
+                    // hier abgeraeumt, bevor der Regler sie sieht.
+                    if (m_rxDriftZuruecksetzen.exchange(
+                            false, std::memory_order_acq_rel)) {
+                        m_rxDrift->zuruecksetzen();
+                    }
                     const auto ang = m_rxDrift->verarbeite(
                         rahmen, anzahl, speakersBus->queuedFrames(),
                         RxRatenAngleich::ringRahmenFuer(

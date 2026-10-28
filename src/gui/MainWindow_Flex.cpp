@@ -65,6 +65,8 @@
 #include "gui/MainWindow.h"
 
 #include "core/AudioEngine.h"
+#include "core/Ft8Tx.h"
+#include "core/MoxController.h"
 #include "core/FlexVitaStream.h"
 // Fuer den Anspruchs-Abgleich: Kiwi fuehrt seine Zuordnung in einer
 // eigenen Tabelle, nicht ueber streamIndex().
@@ -73,6 +75,8 @@
 #include "gui/ConnectionPanel.h"
 #include "core/ClarityController.h"
 #include <QTimer>
+#include <cmath>
+#include <algorithm>
 #include "gui/SpectrumWidget.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -513,6 +517,9 @@ void MainWindow::wireFlex()
         m_radioModel->setzeFlexSendescheibe(
             QString::number(m_flexTargetSliceId));
         m_radioModel->legeFlexSendetonstromAn();
+        // Der FT8-Sender gehoert hierher, nicht in den WDSP-Aufbau:
+        // den gibt es beim Flex nicht. Still, bis jemand sendet.
+        m_radioModel->stelleFt8SenderBereit();
         verdrahteFlexSenden();
 
         // ── Die Maschine folgt dem Blick des Betreibers (2026-10-27) ─
@@ -699,6 +706,22 @@ void MainWindow::wireFlex()
     connect(m_radioModel, &RadioModel::flexAudioSamplesReady, this,
             [this](quint32, const QVector<float>& verschraenkt) {
         if (verschraenkt.isEmpty()) { return; }
+
+        // Zwei Zahlen, die aus dem Protokoll bisher nicht zu holen
+        // waren: kommt waehrend des Sendens ueberhaupt Ton, und wie
+        // lange schweigt er nach dem Loesen?
+        if (m_flexSelbstGetastet) {
+            ++m_flexTonImSenden;
+        } else if (m_flexLoesenMs > 0) {
+            const qint64 luecke =
+                QDateTime::currentMSecsSinceEpoch() - m_flexLoesenMs;
+            m_flexLoesenMs = 0;
+            qCInfo(lcFlexGui).nospace()
+                << "Flex: Empfang nach dem Loesen wieder da — " << luecke
+                << " ms" << (luecke > 2000 ? "  (Hoerperiode angeknabbert)"
+                                           : "");
+        }
+
         SliceModel* slice = flexControllableSlice();
         if (!slice) { return; }
         AudioEngine* ae = m_radioModel ? m_radioModel->audioEngine() : nullptr;
@@ -1008,8 +1031,77 @@ void MainWindow::verdrahteFlexSenden()
 
             constexpr int kRahmen = 480;   // 10 ms Vorrat bei 48 kHz
             m_flexMikMono.resize(kRahmen);
-            const int geholt = ae->pullTxMic(m_flexMikMono.data(), kRahmen);
+
+            // ── Wer gerade spricht (2026-10-28) ──────────────────────
+            //
+            // Bis heute holte diese Pumpe IMMER aus der
+            // Mikrofonbuchse. Der FT8-Ton entsteht aber in
+            // `Ft8TxSource` und lief beim eigenen Funkgeraet ueber den
+            // Mikrofon-Router in den WDSP-Sendekanal — den die Flex
+            // nicht hat. Er kam hier also nie an: Send gedrueckt,
+            // Traeger an, Stille hinaus.
+            //
+            // AetherSDR hat dieselbe Klasse Fehler einmal von der
+            // anderen Seite gehabt (AudioEngine.h:128-136 [@d58e2b8a]:
+            // „the gate silently disabled the test tone as well, since
+            // the tone is injected inside that callback") — ein Tor,
+            // das fuer den Strom gedacht war, machte den erzeugten Ton
+            // mit stumm. Daraus die Lehre, nicht der Code: die
+            // erzeugte Quelle braucht einen eigenen Weg, der nicht an
+            // der Mikrofonbuchse haengt.
+            //
+            // Reihenfolge: laeuft FT8, gewinnt FT8. Das Mikrofon ist
+            // in dem Augenblick ohnehin nicht gemeint, und zwei
+            // Quellen zu mischen hiesze, sich selbst zu stoeren.
+            int geholt = 0;
+            bool vonFt8 = false;
+            if (Ft8TxSource* ft8 = m_radioModel->ft8TxSource();
+                ft8 && ft8->laeuft()) {
+                geholt = ft8->pullSamples(m_flexMikMono.data(), kRahmen);
+                vonFt8 = true;
+            } else {
+                geholt = ae->pullTxMic(m_flexMikMono.data(), kRahmen);
+            }
             if (geholt <= 0) { return; }
+
+            // ── Der erzeugte Ton braucht Luft nach oben (2026-10-28) ─
+            //
+            // Erste Sendung ueber die Flex, am Geraet gemessen:
+            //
+            //   MICPEAK 3.008 dBFS, MIC -0.727 dBFS, HWALC 0.000 dBFS
+            //
+            // Drei Dezibel UEBER Vollaussteuerung. Auf dem eigenen Weg
+            // sitzt vor dem Sender die ganze WDSP-Kette mit ihrer
+            // Verstaerkungsstufe; hier geht der Ton roh an die
+            // Maschine, und `Ft8Decoder::encodeBlock` rechnet ihn auf
+            // Vollaussteuerung. FT8 hat eine konstante Huellkurve —
+            // Spitze und Effektivwert liegen beieinander —, deshalb
+            // genuegt ein fester Faktor; die Klammer darunter ist der
+            // Riegel, falls eine Quelle doch einmal lauter kommt.
+            //
+            // −9 dB bringt die gemessene Spitze auf rund −6 dBFS.
+            // Gedaempft wird NUR der erzeugte Ton: das Mikrofon hat
+            // seine eigene Aussteuerung und ist hier nicht gemeint.
+            if (vonFt8) {
+                constexpr float kFt8Pegel = 0.355f;   // −9,0 dB
+                constexpr float kGrenze   = 0.5f;     // −6,0 dBFS
+                float spitze = 0.0f;
+                for (int i = 0; i < geholt; ++i) {
+                    float v = m_flexMikMono[i] * kFt8Pegel;
+                    v = std::clamp(v, -kGrenze, kGrenze);
+                    m_flexMikMono[i] = v;
+                    spitze = std::max(spitze, std::abs(v));
+                }
+                // Einmal je Sendung in die Akte: beim naechsten Mal
+                // wird gemessen, nicht geschaetzt.
+                if (spitze > m_flexFt8Spitze) {
+                    m_flexFt8Spitze = spitze;
+                    qCInfo(lcFlexGui).nospace()
+                        << "FT8-Sendepegel: Spitze " << spitze << " ("
+                        << (20.0 * std::log10(std::max(spitze, 1.0e-6f)))
+                        << " dBFS vor der Maschine)";
+                }
+            }
 
             // Mono hinein, Stereo hinaus: die Maschine erwartet zwei
             // Kanaele je Rahmen (float32, Big-Endian im Paket).
@@ -1033,10 +1125,34 @@ void MainWindow::verdrahteFlexSenden()
     // ausdruecklich warum (AetherSDR TciServer.cpp:3414 [@d58e2b8a]):
     // der Zustandsschub der Maschine kommt verzoegert, und ein
     // sofortiges Zuruecksetzen kreuzt ihn.
-    disconnect(m_flexMoxBand);
-    m_flexMoxBand = connect(&m_radioModel->transmitModel(),
-                            &TransmitModel::moxChanged, this,
-                            [this](bool an) {
+    // ── An WELCHER Leitung getastet wird (2026-10-28) ────────────────
+    //
+    // Hier stand `TransmitModel::moxChanged`. Das feuert aber nur,
+    // solange es KEINEN MoxController gibt:
+    //
+    //   RadioModel::setMox(bool on) {
+    //       if (m_moxController) { m_moxController->setMox(on); }
+    //       else                 { m_transmitModel.setMox(on);  }
+    //   }
+    //
+    // Mit Controller — also immer im Betrieb — lief das Tasten
+    // vollstaendig an der Flex vorbei. Am 2026-10-28 um 21:14 stand
+    // deshalb im Protokoll NULL mal „MOX gedrueckt", waehrend die
+    // Bedienung MOX zeigte, ON AIR rot war und die Maschine
+    // MICPEAK −120 dBFS und FWDPWR 0,000 dBm meldete: getastet nach
+    // Meinung des Programms, in Wahrheit nie. PSK Reporter hatte in
+    // 15 Minuten keine einzige Meldung.
+    //
+    // Das galt fuer JEDEN Weg, nicht nur FT8 — auch der MOX-Knopf
+    // geht ueber RadioModel::setMox. Nur TUNE funktionierte, weil der
+    // an `isTune` haengt, einer anderen Eigenschaft. Genau das stand
+    // als „TUNE belegt, Sprechversuch offen" im Arbeitsstand: der
+    // Sprechversuch waere ebenso stumm geblieben.
+    //
+    // `hardwareFlipped` ist die richtige Leitung — an ihr haengt auch
+    // das eigene Funkgeraet (RadioModel.cpp:944) — und sie heiszt, was
+    // sie tut: jetzt die Hardware umlegen.
+    const auto tasten = [this](bool an) {
         qCInfo(lcFlexGui).nospace()
             << "MOX gedrueckt: " << (an ? "an" : "aus")
             << ", Zielscheibe " << m_flexTargetSliceId;
@@ -1060,6 +1176,8 @@ void MainWindow::verdrahteFlexSenden()
         if (an) {
             m_radioModel->sendeFlexBefehl(
                 FlexCommandWire::setDaxRouteCommand(true));
+            m_flexTonImSenden = 0;
+            m_flexLoesenMs    = 0;
             m_flexSelbstGetastet = m_radioModel->flexTasten(true);
             if (m_flexSelbstGetastet && m_flexSendePumpe) {
                 m_flexSendePumpe->start();
@@ -1072,8 +1190,34 @@ void MainWindow::verdrahteFlexSenden()
             if (m_flexSendePumpe) { m_flexSendePumpe->stop(); }
             m_radioModel->flexTasten(false);
             m_flexSelbstGetastet = false;
+            // Ab hier laeuft die Uhr: die naechste Hoerperiode ist nur
+            // dann zu gebrauchen, wenn der Empfang rechtzeitig
+            // zurueckkommt.
+            m_flexLoesenMs = QDateTime::currentMSecsSinceEpoch();
+            qCInfo(lcFlexGui) << "Flex: waehrend des Sendens kamen"
+                              << m_flexTonImSenden << "Tonpakete";
+
+            // Die Sendepause ist KEINE Taktabweichung. Ohne diese
+            // Zeile liest der Driftausgleich den leergelaufenen
+            // Ausgangspuffer als solche und taktet die folgende
+            // Hoerperiode um 1700 ppm daneben — siehe AudioEngine.h,
+            // m_rxDriftZuruecksetzen.
+            if (AudioEngine* ae = m_radioModel->audioEngine()) {
+                ae->rxDriftNeuAnfangen();
+            }
         }
-    });
+    };
+
+    disconnect(m_flexMoxBand);
+    if (MoxController* mox = m_radioModel->moxController()) {
+        m_flexMoxBand = connect(mox, &MoxController::hardwareFlipped,
+                                this, tasten);
+    } else {
+        // Ohne Controller ist der Riegel im TransmitModel die
+        // Wahrheit — derselbe Rueckfall wie in RadioModel::setMox().
+        m_flexMoxBand = connect(&m_radioModel->transmitModel(),
+                                &TransmitModel::moxChanged, this, tasten);
+    }
 
     // ── TUNE ─────────────────────────────────────────────────────────
     //

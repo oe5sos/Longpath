@@ -508,6 +508,15 @@ public:
     /// geteilter Ring haette einen Leser zu wenig.
     void setFt8Tap(AudioTapRing* ring, int sliceId);
 
+    /// Den RX-Driftausgleich beim naechsten Tonblock neu anfangen
+    /// lassen. Aufzurufen, wenn eine BEKANNTE Luecke im Empfangston
+    /// liegt -- eine eigene Sendung etwa -- damit der Regler sie nicht
+    /// als Taktabweichung liest. Siehe m_rxDriftZuruecksetzen.
+    void rxDriftNeuAnfangen()
+    {
+        m_rxDriftZuruecksetzen.store(true, std::memory_order_release);
+    }
+
     void rxBlockReady(int sliceId, const float* samples, int frames);
 
     // ── KiwiSDR-Ton (Stufe 5, 2026-08-23) ───────────────────────────
@@ -1060,6 +1069,23 @@ private:
     // gehoert nicht ungefragt eingeschaltet; `RxDriftAusgleich=True`
     // schaltet ihn ein, und danach entscheidet das Ohr.
     std::unique_ptr<RxRatenAngleich> m_rxDrift;
+
+    // ── Der Driftausgleich darf eine Sendepause nicht als Drift lesen ─
+    //
+    // Waehrend einer eigenen Sendung kommt kein Empfangston; der
+    // Ausgangspuffer wird derweil leergezogen. Das ERSTE Paket danach
+    // zeigt dem Regler einen leeren Ring, er liest daraus einen
+    // riesigen Verbrauch und reiszt das Verhaeltnis hoch -- am
+    // 2026-10-28 auf 1,001745 (1744 ppm) und 0,998784 (-1216 ppm),
+    // wo ein echter Quarz um wenige ppm abweicht. Mit diesem
+    // Verhaeltnis wird die ganze folgende Hoerperiode umgetastet, und
+    // FT8 vertraegt das nicht: drei Hoerfenster hintereinander
+    // "0 Funde", dann wieder 17.
+    //
+    // Gesetzt wird aus dem Hauptfaden, gelesen und geloescht im
+    // Tonfaden -- `zuruecksetzen()` selbst fasst Zustand an, den der
+    // Tonfaden benutzt, und gehoert deshalb nicht in einen fremden.
+    std::atomic<bool> m_rxDriftZuruecksetzen{false};
     std::unique_ptr<IAudioBus> m_headphonesBus;
     std::unique_ptr<IAudioBus> m_txInputBus;
 

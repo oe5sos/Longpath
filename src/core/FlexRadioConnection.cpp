@@ -430,6 +430,11 @@ FlexRadioConnection::FlexRadioConnection(QObject* parent)
             this, &FlexRadioConnection::onSocketErrorOccurred);
     connect(&m_socket, &QTcpSocket::readyRead,
             this, &FlexRadioConnection::onReadyRead);
+
+    m_connectTimer.setSingleShot(true);
+    m_connectTimer.setInterval(kConnectTimeoutMs);
+    connect(&m_connectTimer, &QTimer::timeout,
+            this, &FlexRadioConnection::onConnectTimeout);
 }
 
 FlexRadioConnection::~FlexRadioConnection()
@@ -451,8 +456,20 @@ void FlexRadioConnection::connectToRadio(const QHostAddress& address, quint16 po
     m_pending.clear();
     m_guiRegistered = false;
 
+    // Ein Socket, der im Fehler steht oder noch auf einen Handschlag
+    // wartet, nimmt kein connectToHost() mehr an und meldet dazu
+    // nichts. Am 2026-10-28 blieben zwei Wiederholversuche genau
+    // deshalb stumm — kein „TCP steht", kein Fehler, nichts.
+    if (m_socket.state() != QAbstractSocket::UnconnectedState) {
+        m_socket.abort();
+    }
+
+    m_targetAddress = address;
+    m_targetPort    = port;
+
     qCInfo(lcFlexCmd) << "verbinde nach" << address.toString() << ":" << port;
     setState(State::Connecting);
+    m_connectTimer.start();
     m_socket.connectToHost(address, port);
 }
 
@@ -501,6 +518,7 @@ quint32 FlexRadioConnection::sendCommand(const QString& command)
 
 void FlexRadioConnection::onSocketConnected()
 {
+    m_connectTimer.stop();
     m_socket.setSocketOption(QAbstractSocket::LowDelayOption, 1);
     qCInfo(lcFlexCmd) << "TCP steht;" << "warte auf V/H";
     // Noch NICHT Connected: die Maschine schickt zuerst V (Fassung) und
@@ -511,16 +529,89 @@ void FlexRadioConnection::onSocketConnected()
 
 void FlexRadioConnection::onSocketDisconnected()
 {
+    m_connectTimer.stop();
     qCInfo(lcFlexCmd) << "TCP getrennt";
     m_handle = 0;
     setState(State::Disconnected);
     emit disconnected();
 }
 
-void FlexRadioConnection::onSocketErrorOccurred(QAbstractSocket::SocketError)
+QString FlexRadioConnection::socketErrorText(QAbstractSocket::SocketError error)
 {
-    const QString msg = m_socket.errorString();
-    qCWarning(lcFlexCmd) << "Socketfehler:" << msg;
+    switch (error) {
+    case QAbstractSocket::ConnectionRefusedError:
+        return QObject::tr("Verbindung abgewiesen — auf dem Port hoert nichts");
+    case QAbstractSocket::RemoteHostClosedError:
+        return QObject::tr("Die Maschine hat aufgelegt");
+    case QAbstractSocket::HostNotFoundError:
+        return QObject::tr("Adresse nicht gefunden");
+    case QAbstractSocket::SocketTimeoutError:
+        return QObject::tr("Keine Antwort — Frist abgelaufen");
+    case QAbstractSocket::NetworkError:
+        return QObject::tr("Netz nicht erreichbar — Kabel, WLAN oder Route");
+    case QAbstractSocket::SocketAccessError:
+        return QObject::tr("Betriebssystem verweigert den Socket");
+    case QAbstractSocket::SocketResourceError:
+        return QObject::tr("Keine Socketmittel frei");
+    case QAbstractSocket::AddressInUseError:
+        return QObject::tr("Adresse schon belegt");
+    case QAbstractSocket::SocketAddressNotAvailableError:
+        return QObject::tr("Adresse auf dieser Maschine nicht verfuegbar");
+    case QAbstractSocket::UnsupportedSocketOperationError:
+        return QObject::tr("Diese Socketoperation traegt das System nicht");
+    case QAbstractSocket::UnfinishedSocketOperationError:
+        return QObject::tr("Vorige Socketoperation laeuft noch");
+    case QAbstractSocket::DatagramTooLargeError:
+        return QObject::tr("Datagramm zu gross");
+    case QAbstractSocket::UnknownSocketError:
+        // Qt kennt den errno nicht und schreibt „Unknown error". Mehr
+        // als die Nummer gibt es hier nicht — aber das Ziel und der
+        // Zustand stehen in der Meldung, und das ist der Unterschied
+        // zwischen einer Spur und einem Schulterzucken.
+        return QObject::tr("Socketfehler ohne Zuordnung (errno unbekannt)");
+    default:
+        break;
+    }
+    return QObject::tr("Socketfehler %1").arg(static_cast<int>(error));
+}
+
+void FlexRadioConnection::onSocketErrorOccurred(QAbstractSocket::SocketError error)
+{
+    m_connectTimer.stop();
+
+    // Drei Stuecke statt einem: was Qt sagt, was die Nummer bedeutet,
+    // und wohin ueberhaupt gewaehlt wurde. Die Nummer selbst kommt mit,
+    // damit ein Protokoll auch ohne diese Tabelle auswertbar bleibt.
+    const QString ziel = m_targetPort != 0
+        ? QStringLiteral("%1:%2").arg(m_targetAddress.toString()).arg(m_targetPort)
+        : QStringLiteral("—");
+    const QString msg = QStringLiteral("%1 (%2, Nr. %3, Ziel %4)")
+                            .arg(socketErrorText(error),
+                                 m_socket.errorString(),
+                                 QString::number(static_cast<int>(error)),
+                                 ziel);
+
+    qCWarning(lcFlexCmd) << "Socketfehler:" << msg
+                         << "Socketzustand" << static_cast<int>(m_socket.state());
+    setState(State::Error);
+    emit errorOccurred(msg);
+}
+
+void FlexRadioConnection::onConnectTimeout()
+{
+    // Der Handschlag kam nicht zustande und der Socket schweigt. Ohne
+    // diese Frist bleibt der Zustand fuer immer auf Connecting stehen
+    // und das Verbindungsfenster zeigt gar nichts an.
+    const QString ziel = QStringLiteral("%1:%2")
+                             .arg(m_targetAddress.toString())
+                             .arg(m_targetPort);
+    const QString msg = QObject::tr("Keine Antwort von %1 nach %2 s")
+                            .arg(ziel)
+                            .arg(kConnectTimeoutMs / 1000);
+
+    qCWarning(lcFlexCmd) << "Verbindungsfrist abgelaufen:" << msg
+                         << "Socketzustand" << static_cast<int>(m_socket.state());
+    m_socket.abort();
     setState(State::Error);
     emit errorOccurred(msg);
 }

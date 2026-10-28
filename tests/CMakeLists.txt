@@ -8027,6 +8027,28 @@ longpath_add_test(tst_flex_ton_und_pegel)
 longpath_add_test(tst_flex_wasserfall_kachel)
 longpath_add_test(tst_flex_senden)
 
+# -- Flex: der Fehlerweg sagt jetzt etwas ---------------------------------
+# „Disconnected — Unknown error" im Verbindungsfenster, 2026-10-28 20:41,
+# dreimal in Folge; eine Millisekunde zwischen Wahl und Fehler, und als
+# Begruendung ein Schulterzucken. Zwei Wiederholversuche desselben Laufs
+# meldeten danach GAR NICHTS (keine Frist: der Zustand haengt auf
+# Connecting, wenn der Handschlag ausbleibt). Geprueft werden beide
+# Mangel: Klartext + Nummer + Ziel in der Meldung, und die neue Frist.
+# Der abgewiesene Fall laeuft ueber einen eben geschlossenen Port auf
+# 127.0.0.1 — echter Socketfehler, kein Netz nach draussen.
+# Quelle: Longpath-original.
+longpath_add_test(tst_flex_verbindungsfehler)
+
+# -- FT8: Rufzeichen, die nur als Hash kommen -----------------------------
+# Longpath uebergab ft8_lib bis zum 2026-10-28 `nullptr` als Hashtabelle.
+# Die Bibliothek schreibt dann wortwoertlich `<...>` statt des
+# Rufzeichens (message.c:734) -- bei Sonderrufzeichen im Alltag, und beim
+# EU-VHF-Contestsatz (i3=5) waeren BEIDE Rufzeichen betroffen.
+# Geprueft wird durch die Bibliothek selbst (packen, auspacken), mit
+# Gegenprobe bei geleerter Tabelle.
+# Quelle: Longpath-original.
+longpath_add_test(tst_ft8_rufzeichen)
+
 # 2026-10-22: der „Lattenzaun" im Panadapter. Ein echter Rahmen von
 # Martins FLEX-8400 geht durch denselben Zeichenweg wie im Programm,
 # und das Ergebnis wird auf Regelmaeszigkeit gemessen.
