@@ -45,7 +45,7 @@ from aiortc import (
 
 from geraete import Geraet, Geraeteliste
 from kennung import b64url, pruefe_unterschrift, unb64url
-from ton import Umkodierer
+from ton import Umkodierer, lies_kopf
 
 log = logging.getLogger("fernzugriff.sitzung")
 
@@ -94,6 +94,8 @@ class Sitzung:
         # Ordnung, und ein Geraet ohne sicheren Kontext hat gar keinen
         # Dekoder (siehe ton.py).
         self.ton: Umkodierer | None = None
+        self._tontakt: asyncio.Task | None = None
+        self._tonschlange: asyncio.Queue | None = None
         self.pc = RTCPeerConnection(RTCConfiguration(_eisserver(stun, turn)))
         self.angemeldet = False
         self._aufforderung = secrets.token_bytes(32)
@@ -205,6 +207,46 @@ class Sitzung:
 
     # -- Die Bruecke -----------------------------------------------------
 
+    async def _tonpumpe(self) -> None:
+        """Die Opus-Bloecke im Takt ihrer eigenen Dauer ausgeben.
+
+        **Warum das noetig ist, gemessen statt vermutet** (2026-10-28, im
+        Browser an der Ankunftsstelle): Soll waren 20 ms Abstand. Von
+        1044 Paketen kamen **374 im selben Augenblick wie das vorige**
+        (unter 2 ms) und 151 nach einer Luecke von ueber 50 ms; der
+        Mittelwert lag bei 46,6 ms. Die Bloecke kamen also in Zweier- und
+        Dreierschueben alle ~46 ms statt einzeln alle 20.
+        Der Vorrat der Tonkette reicht dafuer nicht, und genau das war
+        das Stocken -- nicht die Datenmenge, wie ich zuerst vermutet
+        hatte (bei einem Zwanzigstel der Daten stockte es unveraendert).
+
+        Die Pumpe kostet keine zusaetzliche Verzoegerung: sie gibt jeden
+        Block zu der Zeit aus, die er ohnehin darstellt. Was sie aufholen
+        muss, holt sie auf -- faellt die Schlange zurueck, geht der
+        naechste Block sofort hinaus statt nach einer weiteren Pause.
+        """
+        schlange = self._tonschlange
+        naechste = None
+        while True:
+            rahmen = await schlange.get()
+            if rahmen is None:
+                return
+            jetzt = asyncio.get_running_loop().time()
+            if naechste is None or jetzt > naechste + 0.5:
+                # Erster Block, oder die Uhr ist weit weggelaufen (eine
+                # Pause im Strom): neu aufsetzen statt einen Schwall
+                # nachzuschieben.
+                naechste = jetzt
+            else:
+                warten = naechste - jetzt
+                if warten > 0:
+                    await asyncio.sleep(warten)
+            self._sende_kanal(rahmen)
+            # Die Dauer steht im Block selbst: Werte durch Abtastrate.
+            kopf = lies_kopf(rahmen)
+            dauer = (kopf[1] / kopf[0]) if kopf and kopf[0] else 0.02
+            naechste += dauer
+
     async def _oeffne_longpath(self) -> None:
         url = self.ziel.url
         if self.ziel.token:
@@ -218,6 +260,8 @@ class Sitzung:
             websockets.connect(url, max_size=None), timeout=5.0
         )
         if self.ton is not None:
+            self._tonschlange = asyncio.Queue()
+            self._tontakt = asyncio.ensure_future(self._tonpumpe())
             # Opus aus mu-law zu rechnen waere doppelt verlustbehaftet,
             # also int16 anfordern -- ueber Loopback kostet das nichts.
             #
@@ -237,10 +281,12 @@ class Sitzung:
                     neu = self.ton.rahmen(bytes(nachricht))
                     if neu is not None:
                         # Ein Eingangsrahmen ergibt null, einen oder
-                        # mehrere Opus-Rahmen: Opus arbeitet in festen
-                        # Bloecken, der Tonstrom kommt in anderen.
+                        # mehrere Opus-Bloecke: Opus arbeitet in festen
+                        # Bloecken, der Tonstrom kommt in anderen. Sie
+                        # gehen NICHT sofort hinaus, sondern in den Takt
+                        # (siehe _tonpumpe).
                         for r in neu:
-                            self._sende_kanal(r)
+                            self._tonschlange.put_nowait(r)
                         continue
                 self._sende_kanal(nachricht)
         except Exception as e:
@@ -278,6 +324,9 @@ class Sitzung:
         if self._pumpe is not None:
             self._pumpe.cancel()
             self._pumpe = None
+        if self._tontakt is not None:
+            self._tontakt.cancel()
+            self._tontakt = None
         if self._longpath is not None:
             try:
                 await self._longpath.close()
