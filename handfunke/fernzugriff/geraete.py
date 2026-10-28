@@ -51,6 +51,7 @@ class Geraeteliste:
     def __init__(self, pfad: Path) -> None:
         self.pfad = Path(pfad)
         self._geraete: dict[str, Geraet] = {}
+        self._stand = -1.0
         self._lies()
 
     # -- Platte -----------------------------------------------------------
@@ -58,10 +59,27 @@ class Geraeteliste:
     def _lies(self) -> None:
         if not self.pfad.exists():
             return
+        self._stand = self.pfad.stat().st_mtime
         roh = json.loads(self.pfad.read_text())
+        self._geraete = {}
         for eintrag in roh.get("geraete", []):
             g = Geraet(**eintrag)
             self._geraete[g.ident] = g
+
+    def _lies_wenn_neuer(self) -> None:
+        """Die Liste neu einlesen, wenn sie sich geaendert hat.
+
+        Ohne das muesste die Station neu gestartet werden, um ein Telefon
+        aufzunehmen -- und ein Neustart wirft jede laufende Sitzung
+        hinaus. Gekoppelt wird aus einem zweiten Aufruf heraus, der nur
+        die Datei schreibt.
+        """
+        try:
+            jetzt = self.pfad.stat().st_mtime
+        except OSError:
+            return
+        if jetzt != self._stand:
+            self._lies()
 
     def _schreibe(self) -> None:
         self.pfad.parent.mkdir(parents=True, exist_ok=True)
@@ -77,6 +95,7 @@ class Geraeteliste:
                 ensure_ascii=False,
             )
         os.replace(neben, self.pfad)
+        self._stand = self.pfad.stat().st_mtime
 
     # -- Fragen -----------------------------------------------------------
 
@@ -102,6 +121,7 @@ class Geraeteliste:
         annimmt, gar nicht -- sonst verriete sie, welche Geraete gekoppelt
         sind (Abschnitt 6.4).
         """
+        self._lies_wenn_neuer()
         geraet = self._geraete.get(ident)
         if geraet is None:
             return None

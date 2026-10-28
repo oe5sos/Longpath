@@ -133,8 +133,67 @@ const merken = (v) => { try { localStorage.setItem('handfunke.adresse', v); } ca
 const tokenLesen  = () => { try { return localStorage.getItem('handfunke.token') || ''; } catch (e) { return ''; } };
 const tokenMerken = (v) => { try { localStorage.setItem('handfunke.token', v); } catch (e) {} };
 
+// ── Von draussen ───────────────────────────────────────────────────────────
+//
+// Im eigenen Netz steht im Adressfeld ein Rechner. Von unterwegs steht
+// dort die Stations-Id: 26 Zeichen aus a-z und 2-7, die Longpath im
+// Kopplungsblatt zeigt. Sie ist keine Adresse -- die Station ist darunter
+// erreichbar, wo auch immer sie gerade steht.
+//
+// Der Vermittlungsdienst ist eine Einstellung und keine Eingabe: er
+// aendert sich nie, die Id auch nicht. Wer beides zugleich angeben will,
+// schreibt `dienst#id`.
+const DIENST_VORGABE = '';
+const dienstLesen = () => {
+  try { return localStorage.getItem('handfunke.dienst') || DIENST_VORGABE; }
+  catch (e) { return DIENST_VORGABE; }
+};
+const dienstMerken = (v) => {
+  try { localStorage.setItem('handfunke.dienst', v); } catch (e) {}
+};
+
+const IST_STATION_ID = /^[a-z2-7]{26}$/;
+
+/**
+ * Zerlegt eine Eingabe, die eine Stations-Id enthaelt.
+ *
+ * Gibt `null` zurueck, wenn gar keine Id darin steckt (dann ist es eine
+ * gewoehnliche Adresse), sonst `{adresse}` oder `{fehler}`. Beides zu
+ * trennen ist noetig, weil eine Id ohne Dienst ein Fehler ist und nicht
+ * still als Rechnername weiterlaufen darf.
+ */
+function fernadresse(eingabe) {
+  let dienst = '', ident = '';
+  const raute = eingabe.lastIndexOf('#');
+  if (raute >= 0) {
+    dienst = eingabe.slice(0, raute).trim();
+    ident = eingabe.slice(raute + 1).trim();
+  } else if (IST_STATION_ID.test(eingabe)) {
+    dienst = dienstLesen();
+    ident = eingabe;
+  }
+  if (!IST_STATION_ID.test(ident)) { return null; }
+  if (!dienst) {
+    return { fehler: 'Fuer den Zugang von draussen fehlt der Vermittlungsdienst. '
+      + 'Einmal als dienst#id eingeben, dann merkt die Seite ihn sich.' };
+  }
+  if (!/^wss?:\/\//.test(dienst)) { dienst = 'wss://' + dienst; }
+  dienstMerken(dienst);
+  return { adresse: 'fern:' + dienst + '#' + ident };
+}
+
 function starten(adresse) {
-  const a = adresse.trim().replace(/^wss?:\/\//, '');
+  const roh = adresse.trim();
+  const fern = fernadresse(roh);
+  if (fern) {
+    if (fern.fehler) { $('fehler').textContent = fern.fehler; return; }
+    merken(roh);
+    $('fehler').textContent = '';
+    $('koppeln').classList.remove('an');
+    link.connect(fern.adresse);
+    return;
+  }
+  const a = roh.replace(/^wss?:\/\//, '');
   if (!a) { $('fehler').textContent = 'Bitte eine Adresse eingeben.'; return; }
   const mitPort = /:\d+$/.test(a) ? a : a + ':50001';
   merken(mitPort);

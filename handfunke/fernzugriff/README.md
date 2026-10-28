@@ -35,16 +35,47 @@ ausserhalb des Quellbaums:
 ~/Longpath/rendezvous-venv/bin/python handfunke/fernzugriff/pruefe-kennung.py
 ```
 
+| `sitzung.py` | Die WebRTC-Verbindung, die zweite Pruefung und die Bruecke zu Longpaths TCI |
+| `geraete.py` | Welche Telefone herein duerfen |
+| `geraet.py` | Die Geraeteseite in Python — die Vorlage fuer `../fernzugriff.js` |
+| `fuehren.py` | Das Betriebsprogramm: Station fahren, Geraete koppeln und widerrufen |
+| `pruefe-rundlauf.py` | Der ganze Weg gegen einen echten Dienst und die TCI-Attrappe |
+
+## Fahren
+
+```bash
+# Die Station, dauerhaft:
+python3 handfunke/fernzugriff/fuehren.py --dienst wss://rv.example.com/
+
+# Ein Telefon aufnehmen (den Schluessel zeigt die Seite):
+python3 handfunke/fernzugriff/fuehren.py --koppeln <schluessel> --name "iPhone"
+python3 handfunke/fernzugriff/fuehren.py --zeigen
+```
+
+Im Telefon steht dann im Adressfeld nur noch die Stations-Id: 26 Zeichen
+aus `a-z` und `2-7`. Beim ersten Mal `dienst#id`, danach merkt die Seite
+sich den Dienst.
+
 ## Was noch fehlt
 
-1. **Einfuehrungen beantworten** (Abschnitt 6.3) — ohne das kommt kein
-   Telefon durch, es sieht nur, dass die Station online ist.
-2. **Der Transport.** Eine ICE-Verbindung, und wo die nicht durchkommt,
-   der WebSocket-Relay aus Abschnitt 12. Darin dann TCI.
+1. **Ein Rendezvous im Internet.** Ohne ihn nuetzt der ganze Weg nichts;
+   er ist die einzige Voraussetzung, die nicht in diesem Baum liegt.
+   `rendezvous/README.md` ist das ganze Rezept (Caddy, coturn, zwei
+   systemd-Dienste).
+2. **Der WebSocket-Relay** aus Abschnitt 12. Die Station nimmt das
+   Angebot entgegen und laesst es liegen. Ohne ihn bleibt der Weg durch
+   Netze, die nur Web durchlassen, zu — TURN deckt die meisten anderen.
 3. **Die Kopplung per Code** (Station-Link, Abschnitt 3.6) — die Nummer
    mit zwei Woertern, `7-anvil-harbor`, ueber SPAKE2+EE. Erst damit
-   braucht ein neues Telefon das Heimnetz nie mehr. Bis dahin koppelt man
-   wie heute im eigenen Netz.
+   braucht ein neues Telefon das Heimnetz nie mehr. Bis dahin wird der
+   Schluessel einmal von Hand uebergeben.
+4. **Ein eigener Kanal fuer den Ton.** Gemessen am 2026-10-28 gegen die
+   Attrappe: in zehn Fenstern zu zwei Sekunden stockte der Ton einmal,
+   bei 41 kB/s und 1,5 % Rechenlast an der Station. Es ist also kein
+   Engpass beim Rechnen. Der Verdacht liegt auf dem Kanal selbst: er ist
+   geordnet und verlaesslich, und damit haelt ein nachgelieferter Rahmen
+   alle folgenden auf. Richtig waere ein zweiter Kanal fuer den Ton,
+   ungeordnet und ohne Wiederholung — nachgewiesen ist das aber nicht.
 
 ## Zwei Dinge, die man wissen muss
 
