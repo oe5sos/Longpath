@@ -33,6 +33,19 @@
 //                                    filter are byte-for-byte from
 //                                    upstream. AI tooling: Anthropic
 //                                    Claude Code.
+//   2026-10-28  Martin Fischer (OE5SOS)  Der Wiederanlauf-Zaehler
+//                                    faellt erst, wenn die Sitzung
+//                                    StableSessionMs ueberlebt hat --
+//                                    die Anmeldung allein genuegt
+//                                    nicht, weil ein DXSpider-Knoten
+//                                    sie annimmt und bei doppeltem
+//                                    Rufzeichen 8,8 s spaeter
+//                                    hinauswirft (216 Versuche
+//                                    gemessen). Dazu istHinauswurf():
+//                                    die Begruendung des Knotens wird
+//                                    nicht mehr stillschweigend
+//                                    verworfen. KI-gestuetzt ueber
+//                                    Anthropic Claude Code.
 
 #include "DxClusterClient.h"
 #include "core/AppSettings.h"
@@ -52,6 +65,7 @@ DxClusterClient::DxClusterClient(QObject* parent)
     : QObject(parent)
     , m_socket(new QTcpSocket(this))
     , m_reconnectTimer(new QTimer(this))
+    , m_stableTimer(new QTimer(this))
 {
     connect(m_socket, &QTcpSocket::connected,    this, &DxClusterClient::onConnected);
     connect(m_socket, &QTcpSocket::disconnected, this, &DxClusterClient::onDisconnected);
@@ -61,6 +75,9 @@ DxClusterClient::DxClusterClient(QObject* parent)
 
     m_reconnectTimer->setSingleShot(true);
     connect(m_reconnectTimer, &QTimer::timeout, this, &DxClusterClient::onReconnectTimer);
+
+    m_stableTimer->setSingleShot(true);
+    connect(m_stableTimer, &QTimer::timeout, this, &DxClusterClient::onSessionStable);
 }
 
 // From AetherSDR src/core/DxClusterClient.cpp:27-34 [@0cd4559]
@@ -68,6 +85,7 @@ DxClusterClient::~DxClusterClient()
 {
     m_intentionalDisconnect = true;
     m_reconnectTimer->stop();
+    m_stableTimer->stop();
     m_logFile.close();
     if (m_socket->state() != QAbstractSocket::UnconnectedState) {
         m_socket->abort();
@@ -126,6 +144,7 @@ void DxClusterClient::disconnect()
 {
     m_intentionalDisconnect = true;
     m_reconnectTimer->stop();
+    m_stableTimer->stop();
     if (m_connected) {
         m_socket->write("bye\r\n");
         m_socket->flush();
@@ -189,9 +208,41 @@ void DxClusterClient::onConnected()
 void DxClusterClient::markLoggedIn()
 {
     m_loggedIn = true;
+
+    // Hier faellt der Zaehler NICHT. Der Knoten nimmt die Anmeldung an
+    // und wirft 8,8 s spaeter hinaus, wenn ein zweiter Anschluss
+    // dasselbe Rufzeichen fuehrt -- siehe StableSessionMs. Erst eine
+    // Sitzung, die eine Minute haelt, ist ein Erfolg.
+    m_stableTimer->start(StableSessionMs);
+}
+
+// Die Sitzung hat die Standzeit ueberlebt: jetzt zaehlt sie als
+// gelungen, und die Treppe darf von vorn beginnen. Hier fallen auch
+// die Zaehler der Protokoll-Zusammenfassung -- vorher loeschte jeder
+// Zyklus m_lastFailureMsg, weshalb dieselbe Steckdosenmeldung am
+// 2026-10-28 214 Mal durchkam statt zusammengefasst zu werden.
+void DxClusterClient::onSessionStable()
+{
+    if (!m_loggedIn) {
+        return;
+    }
+    if (m_reconnectAttempts > 0) {
+        qCInfo(lcSpots) << "DxClusterClient: Sitzung haelt seit"
+                        << StableSessionMs / 1000 << "s --"
+                        << m_reconnectAttempts
+                        << "Versuche abgeraeumt, Treppe zurueckgesetzt";
+    }
     m_reconnectAttempts = 0;
     m_quietFailures = 0;
     m_lastFailureMsg.clear();
+}
+
+// Am 2026-10-28 am Knoten dxc.nc7j.com:7300 live mitgeschrieben; die
+// Begruendung steht an der Deklaration.
+bool DxClusterClient::istHinauswurf(const QString& line)
+{
+    return line.contains(QLatin1String("this instance is disconnected"),
+                         Qt::CaseInsensitive);
 }
 
 // From AetherSDR src/core/DxClusterClient.cpp:114-131 [@0cd4559]
@@ -201,6 +252,8 @@ void DxClusterClient::onDisconnected()
     bool wasConnected = m_connected;
     m_connected = false;
     m_loggedIn = false;
+    // Eine Sitzung, die hier endet, hat die Standzeit nicht erreicht.
+    m_stableTimer->stop();
 
     if (wasConnected) {
         emit disconnected();
@@ -346,6 +399,25 @@ void DxClusterClient::handleLine(const QString& line)
         m_socket->write((m_callsign + "\r\n").toLatin1());
         markLoggedIn();
         qCInfo(lcSpots) << "DxClusterClient: sent callsign" << m_callsign;
+        return;
+    }
+
+    // Der Knoten sagt uns, WARUM er auflegt -- und bis zum 2026-10-28
+    // fiel genau diese Zeile hier durch, weil sie kein Spot ist. Ohne
+    // sie sieht der Betreiber 216 Neuverbindungen ohne einen Grund.
+    // Das ist nichts, was ein Programm beheben kann: solange zwei
+    // Anschluesse dasselbe Rufzeichen fuehren, werfen sie sich
+    // abwechselnd hinaus. Man muss es SEHEN.
+    if (istHinauswurf(line)) {
+        qCWarning(lcSpots)
+            << "DxClusterClient: der Knoten" << m_host
+            << "hat uns hinausgeworfen -- ein anderer Anschluss hat sich"
+            << "mit demselben Rufzeichen" << m_callsign << "angemeldet."
+            << "Ein DXSpider-Knoten laesst nur eine Sitzung je Rufzeichen"
+            << "zu; zwei Anschluesse werfen sich endlos abwechselnd"
+            << "hinaus. Entweder den anderen beenden oder ihm ein"
+            << "eigenes Kennzeichen geben (etwa" << m_callsign + QStringLiteral("-2") << ").";
+        qCInfo(lcSpots) << "DxClusterClient: Wortlaut des Knotens:" << line;
         return;
     }
 
