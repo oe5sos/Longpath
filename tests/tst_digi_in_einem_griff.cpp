@@ -31,6 +31,8 @@
 #include "gui/MainWindow.h"
 #include "gui/applets/Ft8Applet.h"
 #include "gui/applets/AppletVisibilityController.h"
+#include "gui/widgets/CommandBar.h"
+#include <QPushButton>
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -38,6 +40,22 @@ using namespace Longpath;
 using Longpath::DigiFrequenzen::Digimodus;
 
 namespace {
+
+/// Einen Knopf der Kommandoleiste an seiner Beschriftung finden.
+///
+/// NICHT das Signal von Hand senden: dann prueft der Lauf nur die
+/// Haelfte hinter dem Signal, und ein fehlendes `emit` faellt nicht
+/// auf. Genau so war der erste Entwurf dieses Laufs am 2026-10-28 --
+/// die Gegenprobe blieb gruen, obwohl das Signal entfernt war.
+QPushButton* knopf(MainWindow& mw, const QString& text)
+{
+    CommandBar* leiste = mw.commandBarForTest();
+    if (!leiste) { return nullptr; }
+    for (QPushButton* b : leiste->findChildren<QPushButton*>()) {
+        if (b->text() == text) { return b; }
+    }
+    return nullptr;
+}
 
 /// Die aktive Scheibe des Fensters -- notfalls eine angelegt.
 ///
@@ -65,6 +83,65 @@ private slots:
     void initTestCase()
     {
         QStandardPaths::setTestModeEnabled(true);
+    }
+
+    // ── DIGU richtet genauso her wie FT8 (2026-10-28) ───────────────
+    //
+    // Betreiber am Geraet: „sobald ich auf digi klicke muss das digi
+    // fenster automatisch aufgehen und die frequenz dort auch
+    // hinspringen". Bis dahin stellte dieser Knopf NUR die
+    // Betriebsart -- man stand danach in DIGU auf der alten Frequenz,
+    // ohne Dekoderfenster, und sah dem Knopf den Unterschied zu den
+    // Pillen FT8/FT4 daneben nicht an.
+    //
+    // Geprueft wird ueber das SIGNAL der Leiste, nicht durch einen
+    // Aufruf von aufDigiStellen(): die Frage ist ja gerade, ob der Weg
+    // vom Knopf dorthin existiert.
+    //
+    // Gegenprobe (2026-10-28): ohne das `emit digimodusGewaehlt()` in
+    // CommandBar::pushModeToModel bleibt die Frequenz auf 14.225 --
+    // genau der Stand, den der Betreiber am Geraet hatte.
+    void diguKnopfStelltAuchDieFrequenz()
+    {
+        MainWindow mw;
+        SliceModel* s = scheibe(mw);
+        QVERIFY2(s != nullptr, "keine aktive Scheibe");
+
+        CommandBar* leiste = mw.commandBarForTest();
+        QVERIFY2(leiste != nullptr, "keine Kommandoleiste");
+
+        s->setDspMode(DSPMode::USB);
+        s->setFrequency(14'225'000.0);
+
+        // Derselbe Weg, den das Ueberlaufmenue nimmt -- NICHT das
+        // Signal von Hand (siehe waehleBetriebsartForTest).
+        leiste->waehleBetriebsartForTest(DSPMode::DIGU);
+
+        QCOMPARE(s->dspMode(), DSPMode::DIGU);
+        QCOMPARE(qint64(s->frequency()), qint64(14'074'000));
+    }
+
+    // Wer zuletzt FT4 gefahren hat, landet mit DIGU wieder dort -- der
+    // Knopf traegt keinen Modus, also muss sich das Fenster den
+    // letzten merken.
+    void diguNimmtDenZuletztBenutztenDigimodus()
+    {
+        MainWindow mw;
+        SliceModel* s = scheibe(mw);
+        QVERIFY(s != nullptr);
+        CommandBar* leiste = mw.commandBarForTest();
+        QVERIFY(leiste != nullptr);
+        QPushButton* ft4 = knopf(mw, QStringLiteral("FT4"));
+        QVERIFY2(ft4 != nullptr, "kein FT4-Knopf");
+
+        s->setFrequency(14'225'000.0);
+        ft4->click();                       // echter Knopf, FT4 ist sichtbar
+        QCOMPARE(qint64(s->frequency()), qint64(14'080'000));
+
+        // Woanders hin, dann nur DIGU -- es muss wieder FT4 sein.
+        s->setFrequency(14'225'000.0);
+        leiste->waehleBetriebsartForTest(DSPMode::DIGU);
+        QCOMPARE(qint64(s->frequency()), qint64(14'080'000));
     }
 
     void einDruckStelltModusFrequenzUndFilter()

@@ -11,6 +11,9 @@
 // Modification history (Longpath):
 //   2026-10-18 — Ported to Longpath by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork).
+//   2026-10-28 — Frist nach Netzweg + Zaehler an der blinden Stelle,
+//                 Martin Fischer, KI-gestuetzt ueber Anthropic Claude
+//                 Code.
 // =================================================================
 
 #include "FlexRadioDiscovery.h"
@@ -276,6 +279,28 @@ RadioInfo toRadioInfo(const FlexBeacon& beacon, const QHostAddress& sender)
 
 // ─── FlexRadioDiscovery ──────────────────────────────────────────────
 
+// Abweichung zu AetherSDR, hergeleitet aus der Messung vom 2026-10-28;
+// die Zahlen stehen im Kopf der .h.
+int FlexRadioDiscovery::staleTimeoutFor(RadioLinkKind kind)
+{
+    switch (kind) {
+    case RadioLinkKind::Wireless:
+        // Broadcast ueber WLAN wird nicht quittiert.
+        return kStaleTimeoutWirelessMs;
+    case RadioLinkKind::Virtual:
+        // Tunnel und Bruecken verwerfen Broadcast genauso gern.
+        return kStaleTimeoutWirelessMs;
+    case RadioLinkKind::Unknown:
+        // Im Zweifel Luft geben, nicht Strenge: siehe die Begruendung
+        // an der Deklaration.
+        return kStaleTimeoutWirelessMs;
+    case RadioLinkKind::Wired:
+    case RadioLinkKind::Loopback:
+        break;
+    }
+    return kStaleTimeoutMs;
+}
+
 FlexRadioDiscovery::FlexRadioDiscovery(QObject* parent)
     : QObject(parent)
 {
@@ -284,6 +309,12 @@ FlexRadioDiscovery::FlexRadioDiscovery(QObject* parent)
 
     // From AetherSDR RadioDiscovery.cpp:49-50 [@d58e2b8a] — gefegt wird
     // doppelt so oft wie die Frist lang ist.
+    //
+    // Der Takt bleibt an der KURZEN Frist haengen, auch wenn eine
+    // Maschine die lange bekommt: er gibt nur die Koernigkeit, mit der
+    // eine abgelaufene Frist auffaellt. Am Takt der langen Frist zu
+    // fegen hiesse, eine Maschine am Kabel bis zu 20 s zu spaet als
+    // verschwunden zu melden.
     m_staleTimer.setInterval(kStaleTimeoutMs / 2);
     connect(&m_staleTimer, &QTimer::timeout,
             this, &FlexRadioDiscovery::onStaleCheck);
@@ -343,6 +374,11 @@ void FlexRadioDiscovery::setOwnAddressesForTesting(const QList<QHostAddress>& ad
     m_ownAddressesOverride = addresses;
 }
 
+void FlexRadioDiscovery::setLinkKindForTesting(RadioLinkKind kind)
+{
+    m_linkKindOverride = kind;
+}
+
 void FlexRadioDiscovery::onReadyRead()
 {
     while (m_socket.hasPendingDatagrams()) {
@@ -359,7 +395,13 @@ void FlexRadioDiscovery::handleDatagram(const QByteArray& data,
 {
     const FlexBeacon beacon = FlexDiscoveryWire::parseBeacon(data);
     if (!beacon.valid) {
-        return;   // kein Flex-Ruf — anderer Verkehr auf 4992
+        // Kein Flex-Ruf — anderer Verkehr auf 4992, ODER ein Ruf, den
+        // dieser Leser nicht versteht. Von hier aus ist das nicht zu
+        // unterscheiden, also wird es nur gezaehlt; die
+        // „verloren"-Zeile traegt die Zahl dann hinaus. Siehe die
+        // Begruendung an m_nichtGelesen.
+        ++m_nichtGelesen;
+        return;
     }
     if (beacon.serial.isEmpty()) {
         qCWarning(lcFlexRx) << "Ruf ohne Seriennummer von"
@@ -382,7 +424,20 @@ void FlexRadioDiscovery::handleDatagram(const QByteArray& data,
         return;
     }
 
-    m_lastSeen[info.macAddress] = QDateTime::currentMSecsSinceEpoch();
+    // Welche Frist gilt fuer DIESE Maschine? Gemessen wird an der
+    // Adresse, unter der Longpath sie auch anrufen wuerde.
+    const RadioLinkKind kind =
+        m_linkKindOverride ? *m_linkKindOverride
+                           : radioLinkKindFor(info.address,
+                                              QNetworkInterface::allInterfaces());
+
+    Gesehen& g = m_lastSeen[info.macAddress];
+    g.zuletztMs = QDateTime::currentMSecsSinceEpoch();
+    g.fristMs   = staleTimeoutFor(kind);
+
+    // Ein gelesener Ruf hebt den Verdacht gegen den Leser auf.
+    m_nichtGelesen = 0;
+
     upsertRadio(info);
 }
 
@@ -421,19 +476,27 @@ void FlexRadioDiscovery::upsertRadio(const RadioInfo& info)
 // From AetherSDR RadioDiscovery.cpp:282-298 [@d58e2b8a] — onStaleCheck().
 void FlexRadioDiscovery::onStaleCheck()
 {
-    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    sweepStale(QDateTime::currentMSecsSinceEpoch());
+}
+
+void FlexRadioDiscovery::sweepStale(qint64 now)
+{
     QStringList lost;
 
     for (auto it = m_lastSeen.cbegin(); it != m_lastSeen.cend(); ++it) {
-        if (now - it.value() > kStaleTimeoutMs) {
+        if (now - it.value().zuletztMs > it.value().fristMs) {
             lost.append(it.key());
         }
     }
 
     for (const QString& mac : lost) {
+        const int frist = m_lastSeen.value(mac).fristMs;
         m_lastSeen.remove(mac);
         m_radios.removeIf([&](const RadioInfo& r) { return r.macAddress == mac; });
-        qCInfo(lcFlexRx) << "verloren:" << mac;
+        qCInfo(lcFlexRx) << "verloren:" << mac
+                         << "— Frist" << frist << "ms,"
+                         << m_nichtGelesen
+                         << "ungelesene Datagramme auf 4992 seit dem letzten Ruf";
         emit radioLost(mac);
     }
 }

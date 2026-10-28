@@ -5053,7 +5053,22 @@ void MainWindow::buildUI()
         if (m_radioModel) { m_radioModel->onBandButtonClicked(band); }
     });
     connect(m_commandBar, &CommandBar::digiRequested, this,
-            &MainWindow::aufDigiStellen);
+            [this](DigiFrequenzen::Digimodus modus) {
+        m_letzterDigiModus = modus;      // fuer den DIGU-Knopf daneben
+        aufDigiStellen(modus);
+    });
+
+    // ── DIGU/DIGL richtet genauso her wie FT8/FT4 (2026-10-28) ───────
+    //
+    // Betreiber: „sobald ich auf digi klicke muss das digi fenster
+    // automatisch aufgehen und die frequenz dort auch hinspringen".
+    //
+    // Welcher der beiden Digimodi gemeint ist, sagt der Knopf nicht --
+    // also der zuletzt benutzte, und ab Werk FT8. Wer gestern FT4
+    // gefahren hat, landet mit einem Druck auf DIGU wieder dort.
+    connect(m_commandBar, &CommandBar::digimodusGewaehlt, this, [this]() {
+        aufDigiStellen(m_letzterDigiModus);
+    });
     auto* centre = new QWidget(this);
 
     // Profilschiene: seit dem 2026-10-06 WAAGRECHT in der Kommandoleiste,
@@ -7607,7 +7622,10 @@ void MainWindow::populateDefaultMeter()
     // beide rufen aufDigiStellen -- zusammen also zweimal je Druck.
     // mains Name bleibt, der zweite ist entfernt.
     connect(m_ft8Applet, &Ft8Applet::digiGewuenscht, this,
-            &MainWindow::aufDigiStellen);
+            [this](DigiFrequenzen::Digimodus modus) {
+        m_letzterDigiModus = modus;
+        aufDigiStellen(modus);
+    });
     connect(m_ft8Applet, &Ft8Applet::qsoFertig, this,
             [this](const LogEntry& e) {
         if (RotorLogbookPanel* p = ensureRotorPanel()) {
@@ -15307,8 +15325,31 @@ QList<QRect> MainWindow::schutzrahmen() const
 // Vier Schritte, und jeder fasst nur an, was noetig ist:
 void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
 {
+    // ── Diese Stelle MELDET, was sie tut (2026-10-28) ────────────────
+    //
+    // Sie tat es bis heute nicht, und das hat am Geraet einen Abend
+    // gekostet: der Betreiber drueckte FT8, die Skala blieb stehen, und
+    // im Protokoll stand dazu kein Wort. Zwanzig Minuten Quelltextlesen
+    // ergaben, dass die ganze Kette in Ordnung ist -- was man in zwei
+    // Sekunden gesehen haette, wenn sie etwas gesagt haette.
+    //
+    // Dieselbe Klasse wie die Zweiton-Messung und das Platzband: ein
+    // Ausstieg, der schweigt, ist von „laeuft nicht" nicht zu
+    // unterscheiden, und man sucht dann an der falschen Stelle.
+    // lcContainer, weil MainWindow in dieser Datei ohnehin darueber
+    // meldet; eine eigene Kategorie fuer drei Zeilen waere eine mehr,
+    // die man beim Suchen kennen muesste.
+    const QString wasName = (modus == DigiFrequenzen::Digimodus::Ft4)
+                                ? QStringLiteral("FT4")
+                                : QStringLiteral("FT8");
+
     SliceModel* slice = m_radioModel ? m_radioModel->activeSlice() : nullptr;
-    if (!slice) { return; }
+    if (!slice) {
+        qCWarning(lcContainer).noquote()
+            << wasName << "verlangt, aber es gibt keine aktive Scheibe —"
+            << "nichts gestellt.";
+        return;
+    }
 
     // 1. Betriebsart. FT8 und FT4 laufen im oberen Seitenband -- so
     //    fuehren WSJT-X und JTDX die Anrufstellen, und so stehen die
@@ -15327,10 +15368,30 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
     //    bleibt sie ebenfalls: lieber stehenbleiben als irgendwohin
     //    stellen.
     const double jetztHz = slice->frequency();
-    if (!DigiFrequenzen::stehtSchonDort(qint64(jetztHz), modus)) {
+    if (DigiFrequenzen::stehtSchonDort(qint64(jetztHz), modus)) {
+        qCInfo(lcContainer).noquote()
+            << wasName << "— steht schon auf einer Anrufstelle ("
+            << QString::number(jetztHz / 1e6, 'f', 6)
+            << "MHz), Skala bleibt.";
+    } else {
         const Band band = bandFromFrequency(jetztHz);
         const qint64 ziel = DigiFrequenzen::anruffrequenz(band, modus);
-        if (ziel > 0) { slice->setFrequency(double(ziel)); }
+        if (ziel > 0) {
+            qCInfo(lcContainer).noquote()
+                << wasName << "— Scheibe" << slice->sliceIndex() << "von"
+                << QString::number(jetztHz / 1e6, 'f', 6) << "auf"
+                << QString::number(double(ziel) / 1e6, 'f', 6) << "MHz.";
+            slice->setFrequency(double(ziel));
+        } else {
+            // 60 m kennt kein FT4, GEN gar nichts. Stehenbleiben ist
+            // richtig -- aber es muss dastehen, sonst sieht es aus wie
+            // ein Fehler.
+            qCWarning(lcContainer).noquote()
+                << wasName << "— fuer dieses Band ("
+                << bandLabel(band) << ") gibt es keine Anrufstelle,"
+                << "Skala bleibt auf"
+                << QString::number(jetztHz / 1e6, 'f', 6) << "MHz.";
+        }
     }
 
     // 3. Das Filter. Der Dekoder sieht 0 bis 3000 Hz an; ein

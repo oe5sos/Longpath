@@ -56,7 +56,10 @@
 // =================================================================
 // Modification history (Longpath):
 //   2026-10-18 — Ported to Longpath by Martin Fischer, AI-assisted via
-//                 Anthropic Claude (Cowork). Namespace AetherSDR →
+//                 Anthropic Claude (Cowork).
+//   2026-10-28 — Frist nach Netzweg + Zaehler an der blinden Stelle,
+//                 Martin Fischer, KI-gestuetzt ueber Anthropic Claude
+//                 Code. Namespace AetherSDR →
 //                 Longpath. Stufe 1 des Flex-Treibers: nur Erkennung,
 //                 keine Stroeme. Kopfpruefung neu (siehe oben);
 //                 Schluesselsatz gegen die echte 8400 erweitert;
@@ -66,6 +69,7 @@
 // =================================================================
 
 #include "RadioDiscovery.h"   // RadioInfo, ProtocolVersion
+#include "RadioLinkKind.h"    // radioLinkKindFor()
 
 #include <QByteArray>
 #include <QHostAddress>
@@ -75,6 +79,8 @@
 #include <QString>
 #include <QTimer>
 #include <QUdpSocket>
+
+#include <optional>
 
 namespace Longpath {
 
@@ -166,7 +172,50 @@ class FlexRadioDiscovery : public QObject {
 
 public:
     // From AetherSDR RadioDiscovery.h:91-96 [@d58e2b8a] — STALE_TIMEOUT_MS.
+    // Gilt bei Longpath nur noch fuer das KABEL, siehe darunter.
     static constexpr int kStaleTimeoutMs = 5000;
+
+    // ── Abweichung zu AetherSDR: die Frist haengt am Netzweg ─────────
+    //
+    // Gemessen am 2026-10-28 an OE5SOS' FLEX-8400, 3 h 44 min
+    // durchgehend mitgeschrieben (der Mac auf en0 = WLAN,
+    // 172.30.30.110, das Geraet auf 172.30.30.12):
+    //
+    //   374 Mal „verloren"/„gefunden" in 223 Minuten — alle 36 s eines.
+    //   Kuerzeste Standzeit 5,02 s, also genau diese Frist.
+    //   Kuerzeste Luecke zwischen „verloren" und „gefunden": 10 ms.
+    //   21,2 % der Laufzeit stand die Maschine als „offline" in der
+    //   Liste; ohne die fuenf langen Abwesenheiten noch 8,1 %.
+    //
+    // Zehn Millisekunden heisst: das Geraet war nie weg, der Ruf war
+    // nur unterwegs. Flex ruft per Broadcast aus, und Broadcast ueber
+    // WLAN wird nicht quittiert, laeuft auf der langsamsten Grundrate
+    // und faellt reihenweise aus — derselbe Befund wie in
+    // RadioLinkKind.h vom 2026-08-23: „Ein Verlust in dieser
+    // Groessenordnung ist dort das Normale."
+    //
+    // Was es kostet, ist nicht nur Protokollrauschen:
+    // ConnectionPanel::onRadioLost faerbt die Zeile grau und schreibt
+    // „offline" hinein, und updateButtonStates() macht den
+    // Verbinden-Knopf an einer Zeile mit „offline" FEST. Jede zwoelfte
+    // Minute war er also tot.
+    //
+    // Die Zahl ist aus den gemessenen Rufluecken abgeleitet, nicht
+    // geschaetzt. Sie sind zweigipflig: 98 % liegen bei <= 20,1 s,
+    // danach springt es auf 196 s. Zwischen WLAN-Verlust und echter
+    // Abwesenheit liegt eine Groessenordnung Luft. 20 s nehmen 98 %
+    // des Flatterns weg (374 → 8) und erkennen jede der fuenf echten
+    // Abwesenheiten weiter.
+    static constexpr int kStaleTimeoutWirelessMs = 20000;
+
+    /// Welche Frist fuer eine Maschine an dieser Art Strecke gilt.
+    ///
+    /// Unbekannt bekommt die LANGE Frist, anders als
+    /// radioLinkWarning(), das im Zweifel schweigt. Der Grund ist die
+    /// Richtung des Schadens: eine Zeile, die zu lange stehenbleibt,
+    /// kostet nichts — ein falsches „offline" nimmt dem Betreiber den
+    /// Verbinden-Knopf weg.
+    static int staleTimeoutFor(RadioLinkKind kind);
 
     explicit FlexRadioDiscovery(QObject* parent = nullptr);
     ~FlexRadioDiscovery() override;
@@ -176,6 +225,12 @@ public:
     bool isListening() const;
 
     QList<RadioInfo> discoveredRadios() const { return m_radios; }
+
+    /// Wie viele Datagramme auf 4992 der Leser seit dem letzten
+    /// gelesenen Ruf NICHT als Flex-Ruf lesen konnte. Siehe
+    /// m_nichtGelesen: 0 heisst „es kam wirklich nichts", alles
+    /// darueber zeigt auf den Leser statt auf die Luft.
+    quint64 ungeleseneDatagramme() const { return m_nichtGelesen; }
 
     // Nur fuer Pruefstaende: schiebt ein Datagramm durch denselben Weg,
     // den der Socket nimmt, ohne Netz.
@@ -188,6 +243,17 @@ public:
     // Rechner gerade hat — auf dem Bauknecht andere als hier.
     void setOwnAddressesForTesting(const QList<QHostAddress>& addresses);
 
+    // Nur fuer Pruefstaende: setzt den Netzweg fest. QNetworkInterface
+    // laesst sich nicht bauen, also ist das die einzige Naht, an der
+    // die Frist ohne echtes WLAN zu pruefen ist.
+    void setLinkKindForTesting(RadioLinkKind kind);
+
+    // Nur fuer Pruefstaende: fegt mit einem GEGEBENEN Zeitpunkt statt
+    // mit der Uhr. Ohne das muesste ein Pruefstand die laengste Frist
+    // wirklich abwarten — zwanzig Sekunden je Fall. Inline hier, damit
+    // keine Definition in der .cpp ohne Deklaration dasteht.
+    void sweepStaleForTesting(qint64 nowMs) { sweepStale(nowMs); }
+
 signals:
     void radioDiscovered(const Longpath::RadioInfo& info);
     void radioUpdated(const Longpath::RadioInfo& info);
@@ -198,6 +264,7 @@ private slots:
     void onStaleCheck();
 
 private:
+    void sweepStale(qint64 nowMs);
     void handleDatagram(const QByteArray& data, const QHostAddress& sender);
     bool isOwnAddress(const QHostAddress& sender) const;
     void upsertRadio(const RadioInfo& info);
@@ -205,9 +272,33 @@ private:
     QUdpSocket m_socket;
     QTimer     m_staleTimer;
     QList<RadioInfo>      m_radios;
-    QMap<QString, qint64> m_lastSeen;   // MAC → ms seit Epoche
+
+    // Wann zuletzt gehoert — und welche Frist fuer DIESE Maschine
+    // gilt. Die Frist steht hier und nicht am Programm, weil zwei
+    // Geraete an verschiedenen Schnittstellen haengen koennen: eines
+    // am Kabel, eines im WLAN.
+    struct Gesehen {
+        qint64 zuletztMs = 0;
+        int    fristMs   = kStaleTimeoutMs;
+    };
+    QMap<QString, Gesehen> m_lastSeen;   // MAC → ...
+
+    // Datagramme auf 4992, die parseBeacon NICHT als Flex-Ruf lesen
+    // konnte, seit der letzte Ruf ankam.
+    //
+    // Der Grund fuer den Zaehler: handleDatagram kehrt bei
+    // `!beacon.valid` stillschweigend um. Ein Ruf, den unser Leser
+    // nicht versteht, sieht im Protokoll damit genau aus wie ein Ruf,
+    // der nie kam — und diese beiden Ursachen brauchen
+    // entgegengesetzte Behebungen. Die Zahl steht deshalb in der
+    // „verloren"-Zeile: ist sie 0, war wirklich nichts da; ist sie es
+    // nicht, liegt es am Leser.
+    quint64 m_nichtGelesen = 0;
+
     // Leer = bei QNetworkInterface erfragen. Im Pruefstand gesetzt.
     QList<QHostAddress> m_ownAddressesOverride;
+    // Ungesetzt = messen. Im Pruefstand gesetzt.
+    std::optional<RadioLinkKind> m_linkKindOverride;
 };
 
 }  // namespace Longpath

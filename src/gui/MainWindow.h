@@ -246,6 +246,9 @@ public:
     class KiwiSdrManager* kiwiSdrManagerForTest() const
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
+    /// Die Kommandoleiste, damit ein Lauf ihre Knoepfe wirklich
+    /// druecken kann statt die Wirkung nachzubauen.
+    class CommandBar* commandBarForTest() const { return m_commandBar; }
     /// Die Fensterverwaltung, fuer den Pruefstand. Nur lesen und
     /// schalten -- der Besitz bleibt beim Fenster.
     class AppletVisibilityController* appletVisibilityForTest() const
@@ -320,6 +323,11 @@ public:
     /// kippte am 2026-10-21 alles DAHINTER auf privat und brach sieben
     /// CI-Laeufe (`appletIsRegisteredForTest` war ploetzlich privat).
     void aufDigiStellen(Longpath::DigiFrequenzen::Digimodus modus);
+
+    /// Welcher Digimodus zuletzt gemeint war. Der DIGU/DIGL-Knopf in
+    /// der Leiste traegt keinen -- er richtet mit diesem her.
+    Longpath::DigiFrequenzen::Digimodus m_letzterDigiModus{
+        Longpath::DigiFrequenzen::Digimodus::Ft8};
 
     /// Dasselbe mit Nachlauf: waehrend eines Groessenzugs feuert
     /// resizeEvent bei jedem Pixel, und Fenster, die dabei im Takt
@@ -1873,6 +1881,12 @@ private:
     /// Dasselbe fuer Betriebsart und Filterflanken.
     QMetaObject::Connection m_flexArtBand;
     QMetaObject::Connection m_flexFilterBand;
+    /// Rauschminderung, Störaustaster, Kerbfilter → Maschine
+    /// (2026-10-28). Drei Bänder, ein Befehl: siehe
+    /// RadioModel::setFlexSliceNoise.
+    QMetaObject::Connection m_flexNrBand;
+    QMetaObject::Connection m_flexNbBand;
+    QMetaObject::Connection m_flexAnfBand;
     /// Einmal je Verbindung: die Fensterbreite auf den Ausschnitt der
     /// Flex stellen. Danach gehoert der Zoom wieder dem Betreiber.
     bool m_flexAusschnittUebernommen{false};

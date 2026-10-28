@@ -7061,6 +7061,39 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
             // als Echo zurueck; die Wache `m_flexAudioWanted` sorgt
             // dafuer, dass wir nicht unseren eigenen Wert als „vorher"
             // ablegen.
+            // ── Rückweg: was die Maschine über ihr Rauschen sagt ──
+            //
+            // VOR der Wache darunter: die lässt nach dem ersten
+            // Tonaufbau jeden weiteren Scheibenschub fallen, und genau
+            // in denen stehen die Schalter, wenn jemand an der
+            // Maschine oder in SmartSDR dreht. Ohne das zeigte der
+            // Knopf, was Longpath zuletzt wollte, statt dessen, was
+            // das Gerät tut — wieder zwei Wahrheiten (2026-10-28).
+            if (object.startsWith(QLatin1String("slice "))
+                && (kv.contains(QStringLiteral("nr"))
+                    || kv.contains(QStringLiteral("nb"))
+                    || kv.contains(QStringLiteral("anf")))) {
+                // Fehlt ein Schlüssel im Schub, gilt der zuletzt
+                // bekannte Stand — ein Teilschub darf die anderen
+                // beiden nicht ausschalten.
+                auto lies = [&kv](const char* name, bool bisher) {
+                    const QString k = QString::fromLatin1(name);
+                    return kv.contains(k) ? (kv.value(k).trimmed() == QLatin1String("1"))
+                                          : bisher;
+                };
+                const bool nr  = lies("nr",  m_flexZuletztNr);
+                const bool nb  = lies("nb",  m_flexZuletztNb);
+                const bool anf = lies("anf", m_flexZuletztAnf);
+                if (nr != m_flexZuletztNr || nb != m_flexZuletztNb
+                    || anf != m_flexZuletztAnf || !m_flexRauschGeschickt) {
+                    m_flexZuletztNr  = nr;
+                    m_flexZuletztNb  = nb;
+                    m_flexZuletztAnf = anf;
+                    m_flexRauschGeschickt = true;
+                    emit flexSliceNoiseChanged(nr, nb, anf);
+                }
+            }
+
             if (!m_flexAudioWanted) { return; }
 
             if (object.startsWith(QLatin1String("radio"))
@@ -7087,6 +7120,11 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                         m_flexHatFlankenNachzutragen = false;
                         setFlexSliceFilter(m_flexFlankeTiefNachzutragen,
                                            m_flexFlankeHochNachzutragen);
+                    }
+                    if (m_flexHatRauschNachzutragen) {
+                        m_flexHatRauschNachzutragen = false;
+                        setFlexSliceNoise(m_flexZuletztNr, m_flexZuletztNb,
+                                          m_flexZuletztAnf);
                     }
                 }
             }
@@ -8065,6 +8103,39 @@ void RadioModel::setFlexSliceFilter(int lowHz, int highHz)
     const QString befehl =
         FlexCommandWire::setSliceFilterCommand(m_flexSliceId, lowHz, highHz);
     if (befehl.isEmpty()) { return; }
+    m_flexConnection->sendCommand(befehl);
+}
+
+void RadioModel::setFlexSliceNoise(bool nr, bool nb, bool anf)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexSliceId.isEmpty()) {   // siehe setFlexSliceMode()
+        m_flexZuletztNr  = nr;
+        m_flexZuletztNb  = nb;
+        m_flexZuletztAnf = anf;
+        m_flexHatRauschNachzutragen = true;
+        return;
+    }
+    // Einmal MUSS es hinaus, auch wenn alles aus ist: sonst bliebe
+    // eine Maschine, die mit eingeschalteter Rauschminderung dasteht,
+    // auf ihrem Wert, waehrend Longpath „aus" zeigt. Danach nur noch
+    // bei echter Aenderung.
+    if (m_flexRauschGeschickt
+        && nr == m_flexZuletztNr
+        && nb == m_flexZuletztNb
+        && anf == m_flexZuletztAnf) {
+        return;
+    }
+    m_flexZuletztNr  = nr;
+    m_flexZuletztNb  = nb;
+    m_flexZuletztAnf = anf;
+    m_flexRauschGeschickt = true;
+
+    const QString befehl =
+        FlexCommandWire::setSliceNoiseCommand(m_flexSliceId, nr, nb, anf);
+    if (befehl.isEmpty()) { return; }
+    qCInfo(lcConnection) << "Flex: Rauschminderung — nr" << nr
+                         << "nb" << nb << "anf" << anf;
     m_flexConnection->sendCommand(befehl);
 }
 

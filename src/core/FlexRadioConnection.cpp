@@ -235,6 +235,21 @@ QString setSliceFilterCommand(const QString& sliceId, int lowHz, int highHz)
         .arg(sliceId).arg(lowHz).arg(highHz);
 }
 
+QString setSliceNoiseCommand(const QString& sliceId,
+                             bool nr, bool nb, bool anf)
+{
+    if (sliceId.isEmpty()) { return QString(); }
+    // Ein Befehl für alle drei Schalter. Die Maschine nimmt mehrere
+    // Schlüssel in einem `slice set` an und antwortet mit einem
+    // Zustandsschub, der alle drei zurückmeldet — damit kommt der
+    // Rückweg von selbst.
+    return QStringLiteral("slice set %1 nr=%2 nb=%3 anf=%4")
+        .arg(sliceId)
+        .arg(nr ? 1 : 0)
+        .arg(nb ? 1 : 0)
+        .arg(anf ? 1 : 0);
+}
+
 QString setPanCenterCommand(const QString& panId, double hz)
 {
     if (panId.isEmpty() || !(hz > 0.0)) { return QString(); }

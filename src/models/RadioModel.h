@@ -2928,6 +2928,11 @@ signals:
     // das Radio, und wohin Ton und Bild gehen, entscheidet Stufe 2
     // (docs/architecture/2026-10-18-flex-stufe1-design.md §5).
     void flexSliceFrequencyChanged(int sliceId, double frequencyHz);
+    /// Was die Maschine über ihre eigene Rauschminderung meldet.
+    /// Kommt aus jedem Scheiben-Zustandsschub, der `nr=`, `nb=` oder
+    /// `anf=` trägt — auch dann, wenn jemand an der Maschine selbst
+    /// oder in SmartSDR geschaltet hat.
+    void flexSliceNoiseChanged(bool nr, bool nb, bool anf);
     // Die Maschine hat Longpath als GUI-Client angenommen.
     void flexGuiClientRegistered(const QString& guiClientId);
     // Fertiger FFT-Rahmen in dBm, und die Wasserfallzeile (roh, ein
@@ -3673,6 +3678,16 @@ public:
     /// Flanken standen in Longpath und nirgends sonst.
     void setFlexSliceFilter(int lowHz, int highHz);
 
+    /// Rauschminderung, Störaustaster und Kerbfilter der Flex-Scheibe
+    /// stellen — also in der MASCHINE, nicht in WDSP.
+    ///
+    /// Der Betreiber am 2026-10-28: „ich kann zwar klicken, aber kein
+    /// unterschied zu hören." Flex-Ton kommt fertig demoduliert in den
+    /// Mischer und läuft nie durch den WDSP-Empfangskanal, in dem
+    /// Longpaths NR/NB/ANF sitzen. Der Knopf ging an, das Rauschen
+    /// blieb. Jetzt geht er dorthin, wo gerechnet wird.
+    void setFlexSliceNoise(bool nr, bool nb, bool anf);
+
     /// Den Wasserfallstrom der Maschine einrichten. Er ist von ihrem
     /// Panadapter GETRENNT und hat eigene Einstellungen; Longpath hat
     /// sie bis zum 2026-10-23 nie angefasst.
@@ -3869,6 +3884,15 @@ private:
     int                  m_flexFlankeTiefNachzutragen{0};
     int                  m_flexFlankeHochNachzutragen{0};
     bool                 m_flexHatFlankenNachzutragen{false};
+    /// Rauschminderung: zuletzt geschickt und, solange die
+    /// Scheibennummer fehlt, nachzutragen. Vorgabe aus: eine Maschine,
+    /// die beim Verbinden etwas anderes meldet, korrigiert das über
+    /// den Rückweg.
+    bool                 m_flexZuletztNr{false};
+    bool                 m_flexZuletztNb{false};
+    bool                 m_flexZuletztAnf{false};
+    bool                 m_flexHatRauschNachzutragen{false};
+    bool                 m_flexRauschGeschickt{false};
     int                  m_flexZuletztGestellteFlankeTief{0};
     int                  m_flexZuletztGestellteFlankeHoch{0};
     /// Index (1…59) -> {Name, Einheit} aus den `meter`-Statuszeilen.

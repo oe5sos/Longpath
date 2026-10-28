@@ -619,6 +619,11 @@ set(CORE_SOURCES
     src/core/ReceivePresentationSync.cpp
     src/core/WdspEngine.cpp
     src/core/RxChannel.cpp
+    # Rauschminderung fuer Ton, der schon demoduliert ankommt (Flex,
+    # Kiwi, TCI). Siehe den Kopf der Datei: NR1/NR2/NR4 sind
+    # WDSP-Einheiten und haben dort kein Gegenstueck, NR3 (rnnoise) und
+    # MNR (Apple) schon.
+    src/core/ExternalAudioNr.cpp
     src/core/dsp/FftwPlannerLock.cpp
     src/core/TxChannel.cpp
     src/core/RadeChannel.cpp
