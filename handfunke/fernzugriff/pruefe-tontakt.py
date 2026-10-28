@@ -2,6 +2,7 @@
 """Misst, ob die Tonbloecke gleichmaessig ankommen -- mit und ohne Taktung.
 
     python3 handfunke/fernzugriff/pruefe-tontakt.py
+    python3 handfunke/fernzugriff/pruefe-tontakt.py --longpath 127.0.0.1:50001
 
 **Still.** Es wird kein Ton abgespielt: gemessen werden die Ankunftszeiten
 der Pakete am Datenkanal, nicht ihr Inhalt. Dafuer meldet die
@@ -123,7 +124,7 @@ async def miss(url: str, station_id: str, schluessel: Path) -> dict:
     }
 
 
-async def lauf() -> None:
+async def lauf(longpath: str | None = None) -> None:
     rv_port, tci_port = freier_port(), freier_port()
     url = f"ws://127.0.0.1:{rv_port}/"
     with tempfile.TemporaryDirectory() as tmp:
@@ -133,10 +134,19 @@ async def lauf() -> None:
             conf = f.name
 
         ergebnisse = {}
+        # Gegen Longpath am echten Geraet statt gegen die Attrappe: nur
+        # dort kommt der Ton in Echtzeit, und nur dann sagt die Messung
+        # etwas ueber die Taktung.
+        if longpath:
+            tci_ziel = longpath
+            tci_hintergrund = contextlib.nullcontext()
+        else:
+            tci_ziel = f"127.0.0.1:{tci_port}"
+            tci_hintergrund = laeuft([sys.executable, str(ATTRAPPE), "--port", str(tci_port)],
+                                     WURZEL, tci_port, "die Attrappe")
+
         with laeuft([sys.executable, "-m", "nereus_rendezvous", "--config", conf],
-                    DIENST, rv_port, "der Dienst"), \
-             laeuft([sys.executable, str(ATTRAPPE), "--port", str(tci_port)],
-                    WURZEL, tci_port, "die Attrappe"):
+                    DIENST, rv_port, "der Dienst"), tci_hintergrund:
 
             liste = Geraeteliste(tmp / "geraete.json")
             telefon_schluessel = tmp / "telefon.pem"
@@ -147,7 +157,7 @@ async def lauf() -> None:
             for name, takt in (("ohne Taktung (alt)", "0"), ("mit Taktung (neu)", "1")):
                 proc = subprocess.Popen(
                     [sys.executable, str(WURZEL / "handfunke" / "fernzugriff" / "fuehren.py"),
-                     "--dienst", url, "--longpath", f"ws://127.0.0.1:{tci_port}",
+                     "--dienst", url, "--longpath", f"ws://{tci_ziel}",
                      "--ort", str(tmp), "--leise"],
                     env={**os.environ, "LONGPATH_TONTAKT": takt},
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -201,7 +211,13 @@ async def lauf() -> None:
 
 
 def main() -> int:
-    asyncio.run(lauf())
+    longpath = None
+    if "--longpath" in sys.argv:
+        i = sys.argv.index("--longpath")
+        if i + 1 < len(sys.argv):
+            longpath = sys.argv[i + 1]
+        print(f"gegen Longpath auf {longpath}")
+    asyncio.run(lauf(longpath))
     print()
     print("ALLES GRUEN" if schlecht == 0 else f"{schlecht} Abweichungen")
     return 0 if schlecht == 0 else 1

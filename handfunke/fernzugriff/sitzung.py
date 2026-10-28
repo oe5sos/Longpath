@@ -274,9 +274,7 @@ class Sitzung:
         self._longpath = await asyncio.wait_for(
             websockets.connect(url, max_size=None), timeout=5.0
         )
-        if self.ton is not None and TAKTUNG:
-            self._tonschlange = asyncio.Queue()
-            self._tontakt = asyncio.ensure_future(self._tonpumpe())
+        if self.ton is not None:
             # Opus aus mu-law zu rechnen waere doppelt verlustbehaftet,
             # also int16 anfordern -- ueber Loopback kostet das nichts.
             #
@@ -285,7 +283,16 @@ class Sitzung:
             # "Das Format gehoert in Longpath der SITZUNG"). Ein
             # gleichzeitig laufendes WSJT-X und Martins Seite im eigenen
             # Netz behalten ihres.
+            #
+            # Das steht BEWUSST ausserhalb des Taktungsblocks darunter:
+            # haengt es mit daran, bekommt die Gegenprobe
+            # (LONGPATH_TONTAKT=0) Float32 statt int16 und damit gar
+            # keine Opus-Pakete -- gemessen am 2026-10-28, zweimal
+            # "kein einziges Tonpaket" fuer die alte Fassung.
             await self._longpath.send("audio_stream_sample_type:int16;")
+        if self.ton is not None and TAKTUNG:
+            self._tonschlange = asyncio.Queue()
+            self._tontakt = asyncio.ensure_future(self._tonpumpe())
         self._pumpe = asyncio.ensure_future(self._von_longpath())
 
     async def _von_longpath(self) -> None:
