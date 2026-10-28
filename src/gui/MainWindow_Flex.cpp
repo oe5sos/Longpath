@@ -277,9 +277,36 @@ void MainWindow::wireFlex()
             SliceModel* s = m_radioModel
                 ? m_radioModel->sliceById(m_flexTargetSliceId) : nullptr;
             if (!s) { return; }
-            m_radioModel->setFlexSliceNoise(s->activeNr() != NrSlot::Off,
-                                            s->nbMode() != NbMode::Off,
-                                            s->anfEnabled());
+
+            // ── Wer rechnet: die Maschine oder Longpath? ─────────────
+            //
+            // Betreiber am 2026-10-28: „aber jeder nr sollte anders
+            // funktionieren! das ist bei anvelina ja schon!" Also
+            // teilen sich die Steckplaetze auf:
+            //
+            //   NR1 / NR2 / NR4  die Maschine (anr, emnr und sbnr sind
+            //                    WDSP-Einheiten und haben auf fertigem
+            //                    Ton kein Gegenstueck)
+            //   NR3              rnnoise in Longpath
+            //   MNR              Apple Accelerate in Longpath
+            //
+            // Nie beide zugleich: zwei Minderungen hintereinander
+            // klingen nach Eimer, und keiner der beiden Regler wuerde
+            // dann noch das tun, was auf ihm steht.
+            const NrSlot gewaehlt = s->activeNr();
+            const bool eigenesVerfahren =
+                (gewaehlt == NrSlot::NR3 || gewaehlt == NrSlot::MNR);
+
+            if (AudioEngine* ae = m_radioModel->audioEngine()) {
+                ae->setExternalAudioNr(s->sliceIndex(),
+                                       eigenesVerfahren ? gewaehlt : NrSlot::Off,
+                                       1.0f);
+            }
+
+            m_radioModel->setFlexSliceNoise(
+                gewaehlt != NrSlot::Off && !eigenesVerfahren,
+                s->nbMode() != NbMode::Off,
+                s->anfEnabled());
         };
         disconnect(m_flexNrBand);
         m_flexNrBand = connect(ziel, &SliceModel::activeNrChanged, this,
@@ -551,9 +578,19 @@ void MainWindow::wireFlex()
         // eines, bleibt es stehen — nur der leere Fall bekommt eine
         // Marke, damit der Knopf überhaupt leuchtet. NR2 ist die, die
         // das RX-Feld auch sonst als Erstes anbietet.
+        // Läuft ein Verfahren von Longpath (NR3, MNR), steht der
+        // Schalter der Maschine mit Absicht auf 0 — ihr `nr=0` darf
+        // die Wahl des Betreibers dann NICHT ausknipsen. Ohne diese
+        // Ausnahme schaltete sich NR3 im selben Atemzug wieder ab, in
+        // dem es eingeschaltet wurde: wir stellen die Maschine aus,
+        // sie meldet aus, und die Meldung loeschte die Marke
+        // (2026-10-28).
+        const NrSlot steht = slice->activeNr();
+        const bool eigenesVerfahren =
+            (steht == NrSlot::NR3 || steht == NrSlot::MNR);
         if (!nr) {
-            slice->setActiveNr(NrSlot::Off);
-        } else if (slice->activeNr() == NrSlot::Off) {
+            if (!eigenesVerfahren) { slice->setActiveNr(NrSlot::Off); }
+        } else if (steht == NrSlot::Off) {
             slice->setActiveNr(NrSlot::NR2);
         }
         if (!nb) {

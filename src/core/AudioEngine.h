@@ -111,6 +111,8 @@
 #include "audio/MasterMixer.h"
 #include "audio/RxRatenAngleich.h"
 #include "strip/MicSpectrum.h"
+// NrSlot und der Rauschzweig fuer fremden Ton (2026-10-28).
+#include "WdspTypes.h"
 
 #if defined(Q_OS_LINUX)
 #  include "core/audio/LinuxAudioBackend.h"
@@ -173,6 +175,8 @@ class SliceModel;
 // summing point so the cancellation reference matches the audio actually
 // leaving the speakers.  This is a tap-point relocation only; the WDSP
 // DEXP block and TxChannel::sendAntiVoxData wrapper stay unchanged.
+class ExternalAudioNr;   // src/core/ExternalAudioNr.h
+
 class AudioEngine : public QObject {
     Q_OBJECT
 
@@ -592,6 +596,28 @@ public:
     void setFlexAudioSourceEnabled(int sliceId, bool enabled);
     void removeFlexAudioSource(int sliceId);
     bool flexAudioEnabled(int sliceId) const;
+
+    /// Rauschminderung für Ton, der schon demoduliert ankommt
+    /// (Flex, Kiwi, TCI) — 2026-10-28.
+    ///
+    /// Der Betreiber: „aber jeder nr sollte anders funktionieren! das
+    /// ist bei anvelina ja schon!" Stimmt: dort laufen vier
+    /// WDSP-Verfahren. Fremder Ton läuft nie durch WDSP, also gab es
+    /// dort gar keines. Diese Stufe legt die beiden Verfahren, die auf
+    /// TON arbeiten können (NR3 rnnoise, MNR Apple), hinter den
+    /// Wandler auf 48 kHz. NR1/NR2/NR4 sind WDSP-Einheiten und bleiben
+    /// draussen — siehe ExternalAudioNr.h.
+    ///
+    /// `amount` 0..1. Ein Steckplatz ohne Gegenstück schaltet die
+    /// Stufe ab; dann kostet sie nichts.
+    void setExternalAudioNr(int sliceId, NrSlot slot, float amount);
+    /// Den Zweig einer Scheibe vergessen (Scheibe weg, Quelle weg).
+    void removeExternalAudioNr(int sliceId);
+
+    /// Den Rauschzweig auf einen fertigen 48-kHz-Block anwenden.
+    /// Gemeinsam fuer Flex und Kiwi; ohne gewaehltes Verfahren ein
+    /// Rueckkehrbefehl.
+    void wendeFremdtonRauschenAn(int sliceId, QByteArray& block);
 
     /// TX-monitor block consumer. Called via Qt::DirectConnection from
     /// TxChannel::sip1OutputReady on the audio thread. When monitor is
@@ -1077,6 +1103,9 @@ private:
         int rateHz = 0;
     };
     std::map<int, FlexResamplerSlot> m_flexResamplers;
+    /// Je Scheibe ein Rauschzweig für fremden Ton. Angelegt erst,
+    /// wenn ein Verfahren gewählt wird — siehe setExternalAudioNr.
+    std::map<int, std::unique_ptr<ExternalAudioNr>> m_externalAudioNr;
     std::set<int> m_flexEnabledSlices;
 
     // Second mixer whose output is the anti-VOX reference, not the speakers.

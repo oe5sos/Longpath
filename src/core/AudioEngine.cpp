@@ -114,6 +114,8 @@
 // =================================================================
 
 #include "AudioEngine.h"
+
+#include "ExternalAudioNr.h"
 #include "core/audio/AudioTapRing.h"
 #include "core/Resampler.h"   // KiwiSDR-Ton: 24 kHz -> 48 kHz
 
@@ -2363,11 +2365,14 @@ void AudioEngine::feedKiwiSdrAudioData(int sliceId,
                  .first;
     }
 
-    const QByteArray out = it->second->processStereoToStereo(in, frames);
+    QByteArray out = it->second->processStereoToStereo(in, frames);
     if (out.isEmpty()) {
         return;   // der Wandler haelt noch zurueck; das ist normal
     }
     const int outFrames = out.size() / int(sizeof(float) * 2);
+    // Derselbe Rauschzweig wie beim Flex-Ton (2026-10-28): fremde
+    // Demodulation, also kein WDSP, also hier.
+    wendeFremdtonRauschenAn(sliceId, out);
     rxBlockReady(sliceId,
                  reinterpret_cast<const float*>(out.constData()),
                  outFrames);
@@ -2435,15 +2440,31 @@ void AudioEngine::feedSunSdrAudioData(int sliceId, const float* interleavedStere
         it = m_sunSdrResamplers.insert_or_assign(sliceId, std::move(slot)).first;
     }
 
-    const QByteArray out =
+    QByteArray out =
         it->second.resampler->processStereoToStereo(interleavedStereo, frames);
     if (out.isEmpty()) {
         return;   // der Wandler haelt noch zurueck; das ist normal
     }
     const int outFrames = out.size() / int(sizeof(float) * 2);
+    // Rauschminderung HIER, nicht frueher: erst hinter dem Wandler
+    // liegt der Ton in den 48 kHz, die beide Verfahren erwarten
+    // (2026-10-28). Ohne gewaehltes Verfahren faellt der Aufruf weg.
+    wendeFremdtonRauschenAn(sliceId, out);
     rxBlockReady(sliceId,
                  reinterpret_cast<const float*>(out.constData()),
                  outFrames);
+}
+
+// Gemeinsam fuer jede fremde Quelle — Flex wie Kiwi. Ein zweiter Weg
+// daneben waere genau die Unstimmigkeit, die das Kiwi-Entwurfsblatt
+// ausdruecklich vermeiden wollte („ohne zweites Regelwerk daneben").
+void AudioEngine::wendeFremdtonRauschenAn(int sliceId, QByteArray& block)
+{
+    auto nr = m_externalAudioNr.find(sliceId);
+    if (nr == m_externalAudioNr.end() || !nr->second->isActive()) { return; }
+    const int frames = block.size() / int(sizeof(float) * 2);
+    if (frames <= 0) { return; }
+    nr->second->process(reinterpret_cast<float*>(block.data()), frames);
 }
 
 // ─── Flex-Ton ────────────────────────────────────────────────────────
@@ -2480,6 +2501,26 @@ void AudioEngine::removeFlexAudioSource(int sliceId)
     // alter Zustand auf einem neuen Empfaenger gibt beim ersten Block
     // ein Knacken.
     m_flexResamplers.erase(sliceId);
+}
+
+void AudioEngine::setExternalAudioNr(int sliceId, NrSlot slot, float amount)
+{
+    auto it = m_externalAudioNr.find(sliceId);
+    if (it == m_externalAudioNr.end()) {
+        // Kein Zweig und nichts zu tun: gar nicht erst anlegen. Jeder
+        // Zweig haelt ein rnnoise-Modell oder FFT-Plaene.
+        if (slot == NrSlot::Off) { return; }
+        it = m_externalAudioNr
+                 .emplace(sliceId, std::make_unique<ExternalAudioNr>())
+                 .first;
+    }
+    it->second->setAmount(amount);
+    it->second->setSlot(slot);
+}
+
+void AudioEngine::removeExternalAudioNr(int sliceId)
+{
+    m_externalAudioNr.erase(sliceId);
 }
 
 void AudioEngine::feedFlexAudioData(int sliceId, const float* interleavedStereo,
