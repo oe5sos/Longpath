@@ -143,8 +143,30 @@ const tokenMerken = (v) => { try { localStorage.setItem('handfunke.token', v); }
 // Der Vermittlungsdienst ist eine Einstellung und keine Eingabe: er
 // aendert sich nie, die Id auch nicht. Wer beides zugleich angeben will,
 // schreibt `dienst#id`.
+// Kommt die Seite selbst von einem Rendezvous-Server, ist der Dienst
+// genau dort -- dann muss niemand etwas eintippen ausser der Id.
+//
+// Das ist der Fall, auf den der ganze Weg hinauslaeuft: der Server
+// liefert die Seite mit aus (siehe fernzugriff/SERVER.md). Damit faellt
+// dreierlei zusammen -- von draussen erreichbar, sicherer Kontext (und
+// damit Mikrofon, AudioWorklet und der Opus-Dekoder), und keine
+// Einstellung, die man vergessen kann.
+//
+// Nur ueber https, und nicht auf einer privaten Adresse: eine Seite von
+// 172.30.30.x oder localhost ist der Rechner im Shack, nicht der
+// Vermittler.
+const PRIVAT = /^(localhost$|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)/;
+
+function dienstVomOrt() {
+  if (location.protocol !== 'https:') { return ''; }
+  if (PRIVAT.test(location.hostname)) { return ''; }
+  return 'wss://' + location.host + '/';
+}
+
 const DIENST_VORGABE = '';
 const dienstLesen = () => {
+  const vomOrt = dienstVomOrt();
+  if (vomOrt) { return vomOrt; }
   try { return localStorage.getItem('handfunke.dienst') || DIENST_VORGABE; }
   catch (e) { return DIENST_VORGABE; }
 };
@@ -175,7 +197,8 @@ function fernadresse(eingabe) {
   if (!IST_STATION_ID.test(ident)) { return null; }
   if (!dienst) {
     return { fehler: 'Fuer den Zugang von draussen fehlt der Vermittlungsdienst. '
-      + 'Einmal als dienst#id eingeben, dann merkt die Seite ihn sich.' };
+      + 'Einmal als dienst#id eingeben, dann merkt die Seite ihn sich. '
+      + '(Kommt die Seite vom Vermittler selbst, entfaellt das.)' };
   }
   if (!/^wss?:\/\//.test(dienst)) { dienst = 'wss://' + dienst; }
   dienstMerken(dienst);

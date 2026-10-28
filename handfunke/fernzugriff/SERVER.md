@@ -92,7 +92,51 @@ ufw allow 61000:65535/udp
 ufw enable
 ```
 
+## Die Seite gleich mit ausliefern
+
+Der Server sollte auch die App selbst ausliefern, unter `/app/`. Das
+löst drei Dinge auf einmal, die sonst einzeln im Weg stehen:
+
+* **Von draußen erreichbar.** Heute kommt die Seite von
+  `172.30.30.x` — von unterwegs also gar nicht.
+* **Sicherer Kontext.** Der Schlüsselspeicher des Browsers
+  (`crypto.subtle`) gibt es nur über https. Ohne ihn kein
+  Geräteschlüssel, also **kein Fernzugriff** — und auch kein
+  Mikrofon, kein AudioWorklet und kein Opus-Dekoder. Am Telefon
+  gemessen: `sicher=false` in jeder Selbstmeldung von 172.30.30.x.
+* **Keine Einstellung, die man vergessen kann.** Kommt die Seite vom
+  Vermittler, nimmt sie ihn automatisch als Dienst (`dienstVomOrt()`
+  in `app.js`) — im Telefon steht dann nur noch die Stations-Id.
+
+Die Seite ist statisch; es genügt, den Ordner hinzulegen. In den
+`Caddyfile`-Block des Dienstes, VOR dessen `handle`-Blöcken:
+
+```
+handle_path /app/* {
+    root * /var/www/longpath-app
+    file_server
+    header Cache-Control "no-cache"
+}
+```
+
+Der Pfad muss `/app/` sein und nicht `/`: dort liegt der Rendezvous
+selbst, und WebSockets lassen sich in Caddy nicht sauber heraussortieren
+(das Rezept sagt warum — Apples Client schreibt `Upgrade: WebSocket`,
+und Caddy vergleicht Kopfzeilen genau).
+
+Hinlegen, von hier aus:
+
+```bash
+rsync -a --delete --exclude 'fernzugriff/' --exclude '*.py' --exclude 'pruefe-*' \
+      handfunke/ root@rv.longpath.at:/var/www/longpath-app/
+```
+
+Die `.py`-Dateien bleiben hier: die Attrappe, der Seitenserver und der
+Vermittler gehören auf den Mac im Shack, nicht auf einen Server im
+Internet.
+
 ## Was danach im Telefon steht
 
-Nur noch die Stations-Id, 26 Zeichen. Beim allerersten Mal einmal
+Nur noch die Stations-Id, 26 Zeichen — mehr nicht, wenn die Seite vom
+Server kommt. Kommt sie weiter aus dem Heimnetz, beim allerersten Mal
 `rv.longpath.at#<id>`, damit die Seite sich den Dienst merkt.
