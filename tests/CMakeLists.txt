@@ -7427,6 +7427,18 @@ longpath_add_test(tst_pgxl_connection_save)
 longpath_add_test(tst_flex_radio_discovery_broadcaster)
 longpath_add_test(tst_kein_phantom_flex)
 
+# ── Die Frist der Flex-Suche folgt dem Netzweg (2026-10-28) ──────────────
+# Gemessen: 374 Mal „verloren"/„gefunden" in 223 Minuten, kuerzeste
+# Standzeit 5,02 s (= die Frist), kuerzeste Luecke 10 ms, 21,2 % der
+# Laufzeit „offline" in der Liste -- und eine „offline"-Zeile macht den
+# Verbinden-Knopf fest. Broadcast ueber WLAN wird nicht quittiert.
+# Tests: staleTimeoutFor je Weg (Kabel/Loopback 5 s, WLAN/Virtual/
+#   Unbekannt 20 s); im Durchlauf ueberlebt eine 10-s-Luecke im WLAN und
+#   faellt am Kabel auf; der Zaehler fuer ungelesene Datagramme auf 4992
+#   (die blinde Stelle in handleDatagram) zaehlt und wird von einem
+#   gelesenen Ruf zurueckgesetzt.
+longpath_add_test(tst_flex_suche_frist)
+
 # ── Per-radio peripherals refactor (2026-05-26) ──────────────────────────
 # Verifies the RadioModel::peripheralValue / setPeripheralValue helpers
 # and the one-shot migration that folds legacy globals (RfKit_* /
