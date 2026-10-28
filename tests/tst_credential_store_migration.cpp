@@ -12,6 +12,18 @@
 // nur mit LONGPATH_KEYCHAIN_LIVE=1, sonst uebersprungen. Der Eintrag
 // heisst eindeutig und wird am Ende in beiden Namen geloescht.
 //
+// ACHTUNG fuer den Livelauf (2026-10-28): seit TestSandboxInit
+// LONGPATH_CONFIG_DIR setzt, laeuft jedes Pruefprogramm als Sandbox --
+// und CredentialStore ueberspringt den Umzug dort mit Absicht („Nie aus
+// einer Sandbox -- sie wuerde die echten alten Eintraege loeschen").
+// Wer diesen Lauf also wirklich am Schluesselbund fahren will, muss
+// BEIDES tun:
+//
+//     LONGPATH_KEYCHAIN_LIVE=1 LONGPATH_CONFIG_DIR= ./tst_credential_store_migration
+//
+// Ohne das Zweite wird der Umzug nicht versucht und der Fall faellt um,
+// ohne dass am CredentialStore etwas kaputt ist.
+//
 // =================================================================
 // Modification history (Longpath):
 //   2026-09-21 -- Created for Longpath by Martin Fischer (OE5SOS),
