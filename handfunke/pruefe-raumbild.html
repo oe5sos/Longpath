@@ -1,0 +1,73 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Gegenprobe Raumbild</title>
+<!--
+  Die Gegenprobe: dieselben 96 Spektrumzeilen, einmal von raumbild.js
+  gemalt und einmal von Longpaths eigenem DssRenderer am Mac. Ohne sie
+  waere "sieht aus wie am Mac" eine Behauptung.
+
+  Die beiden Dateien, die sie braucht, sind nicht im Baum (zu gross, und
+  sie gehoeren zu einem Messlauf, nicht zum Programm):
+
+  1. `zeilen-pruef.json` -- 96 Zeilen vom laufenden Geraet oder von der
+     Attrappe. Der Spektrumstrom traegt EIN Byte je Wert, dBm+200
+     (sampleType 100); mit Float32 gelesen kommt Unsinn heraus.
+  2. `cpp-pruef.png` -- dieselben Zeilen durch `src/gui/DssRenderer.cpp`,
+     mit einem eigenstaendigen Werkzeug gegen Homebrew-Qt6 uebersetzt
+     (`pkg-config Qt6Gui Qt6Core`), kein Teil des Projektbaus.
+
+  Stand 2026-10-28, 750x470, zKurve 0,7: 51,1 % der Bildpunkte genau
+  gleich, 42,5 % bis acht Stufen daneben, 6,4 % darueber, mittlere
+  Abweichung 2,99 von 255. Der Rest sitzt an den Kaemmen: die Fassung am
+  Mac mischt dort Teildeckungen, diese malt ganze Bildpunkte.
+-->
+<body style="margin:0;background:#000">
+<canvas id="c" width="750" height="470"></canvas>
+<script type="module">
+import { Raumbild } from './raumbild.js';
+const STOPS = [[0,[8,8,10]],[.30,[12,12,14]],[.48,[44,44,49]],[.64,[88,88,94]],
+               [.78,[129,123,92]],[.92,[216,165,95]],[1,[242,242,236]]];
+const zeilen = await (await fetch('./zeilen-pruef.json')).json();
+const letzte = [...zeilen[zeilen.length-1]].sort((a,b)=>a-b);
+const boden = letzte[Math.floor(letzte.length*0.2)] - 4;
+const spanne = Math.max(25, letzte[Math.floor(letzte.length*0.995)] - boden + 6);
+function palette(dbm) {
+  let t = (dbm - boden) / spanne; t = t<0?0:t>1?1:t;
+  for (let i=1;i<STOPS.length;i++) if (t<=STOPS[i][0]) {
+    const [a,ca]=STOPS[i-1],[b,cb]=STOPS[i],k=(t-a)/(b-a);
+    return [ca[0]+(cb[0]-ca[0])*k, ca[1]+(cb[1]-ca[1])*k, ca[2]+(cb[2]-ca[2])*k];
+  }
+  return STOPS[STOPS.length-1][1];
+}
+const r = new Raumbild();
+for (const z of zeilen) { r.zeileAufnehmen(Float32Array.from(z)); }
+const ctx = document.getElementById('c').getContext('2d');
+r.malen(ctx, 750, 470, { bodenDbm: boden, spanneDb: spanne, zKurve: 0.7, palette, grund: [8,8,10] });
+window.__png = document.getElementById('c').toDataURL('image/png');
+
+// Gegenprobe: dasselbe Bild, gemalt von Longpaths eigenem DssRenderer
+// mit genau diesen Zeilen. Pixel fuer Pixel vergleichen.
+// createImageBitmap statt Image + decode(): decode() wartet auf das
+// Zeichnen und haengt in einem verborgenen Tab endlos -- beim ersten
+// Anlauf genau so passiert.
+const bild = await createImageBitmap(await (await fetch('./cpp-pruef.png')).blob());
+const h = document.createElement('canvas');
+h.width = 750; h.height = 470;
+const hc = h.getContext('2d');
+hc.drawImage(bild, 0, 0);
+const a = ctx.getImageData(0,0,750,470).data;
+const b = hc.getImageData(0,0,750,470).data;
+let gleich = 0, nah = 0, weit = 0, groessteAbweichung = 0, summe = 0;
+for (let i = 0; i < a.length; i += 4) {
+  const d = Math.max(Math.abs(a[i]-b[i]), Math.abs(a[i+1]-b[i+1]), Math.abs(a[i+2]-b[i+2]));
+  summe += d;
+  if (d === 0) gleich++; else if (d <= 8) nah++; else weit++;
+  if (d > groessteAbweichung) groessteAbweichung = d;
+}
+const n = a.length / 4;
+window.__werte = { boden, spanne, zeilen: r.zeilenZahl,
+  gleich: (100*gleich/n).toFixed(1) + '%',
+  bis8: (100*nah/n).toFixed(1) + '%',
+  darueber: (100*weit/n).toFixed(2) + '%',
+  groessteAbweichung, mittlereAbweichung: (summe/n).toFixed(2) };
+</script>

@@ -1,0 +1,132 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Entwurf — Raumbild</title>
+<!--
+  Ein Entwurfsblatt, kein Teil der App.
+
+  Zeigt die räumliche Spektrumansicht in der Größe, die sie auf dem
+  Telefon hätte, mit echten Daten aus der TCI-Attrappe und genau der
+  Farbrampe, die der Wasserfall heute benutzt.
+
+      python3 handfunke/attrappe.py --port 50099
+      python3 handfunke/handfunke-server.py 8791
+      http://127.0.0.1:8791/entwurf-raumbild.html?variante=a
+
+  Varianten: a = volle Tiefe, b = halbe Tiefe, c = Kurve über Raumbild.
+-->
+<style>
+  :root { --pan-bg:#08080a; }
+  html,body { margin:0; background:#000; color:#9a9aa2;
+              font:12px/1.5 -apple-system,BlinkMacSystemFont,sans-serif; }
+  .blatt { width:375px; margin:0 auto; padding:16px 0 24px; }
+  h1 { font-size:13px; font-weight:600; letter-spacing:.08em;
+       text-transform:uppercase; color:#d8a55f; margin:0 0 4px; }
+  p.hinweis { margin:0 0 12px; color:#58585e; }
+  .rahmen { border:1px solid #2c2c31; border-radius:10px; overflow:hidden;
+            background:var(--pan-bg); }
+  canvas { display:block; width:375px; }
+  .fuss { margin-top:8px; color:#58585e; display:flex; justify-content:space-between; }
+</style>
+<div class="blatt">
+  <h1 id="titel">Raumbild</h1>
+  <p class="hinweis" id="hinweis">wirkliche Größe, 375 Punkte breit</p>
+  <div class="rahmen">
+    <canvas id="kurve" width="750" height="120" style="height:60px;display:none"></canvas>
+    <canvas id="raum" width="750" height="470" style="height:235px"></canvas>
+  </div>
+  <div class="fuss"><span id="lage">verbinde …</span><span id="takt"></span></div>
+</div>
+<script type="module">
+import { TciLink } from './tci.js';
+import { Raumbild, ZEILEN_SICHTBAR } from './raumbild.js';
+
+// Die Rampe ist dieselbe wie in app.js (Longpaths „Muted“: app-bg,
+// panel, border, text-inactive, instrument-glow-hi, measured,
+// instrument-face). Hier als Kopie, weil das Blatt nichts an der App
+// ändern soll — zusammengeführt wird erst, wenn die Gestaltung steht.
+const STOPS = [[0,[8,8,10]],[.30,[12,12,14]],[.48,[44,44,49]],[.64,[88,88,94]],
+               [.78,[129,123,92]],[.92,[216,165,95]],[1,[242,242,236]]];
+const GRUND = [8,8,10];
+
+let boden = -130, spanne = 60;
+function palette(dbm) {
+  let t = (dbm - boden) / spanne;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  for (let i = 1; i < STOPS.length; i++) {
+    if (t <= STOPS[i][0]) {
+      const [a, ca] = STOPS[i-1], [b, cb] = STOPS[i], k = (t - a) / (b - a);
+      return [ca[0]+(cb[0]-ca[0])*k, ca[1]+(cb[1]-ca[1])*k, ca[2]+(cb[2]-ca[2])*k];
+    }
+  }
+  return STOPS[STOPS.length-1][1];
+}
+
+const variante = new URLSearchParams(location.search).get('variante') || 'a';
+const raum = new Raumbild();
+const cRaum = document.getElementById('raum');
+const cKurve = document.getElementById('kurve');
+const ctxR = cRaum.getContext('2d');
+const ctxK = cKurve.getContext('2d');
+ctxR.imageSmoothingEnabled = false;
+
+if (variante === 'b') {
+  document.getElementById('titel').textContent = 'Raumbild — halbe Tiefe';
+  document.getElementById('hinweis').textContent = '48 Zeilen statt 96 — ruhiger, flacher';
+} else if (variante === 'c') {
+  document.getElementById('titel').textContent = 'Kurve über Raumbild';
+  document.getElementById('hinweis').textContent = 'wie heute Spektrum über Wasserfall';
+  cKurve.style.display = 'block';
+  cRaum.height = 350; cRaum.style.height = '175px';
+}
+const tiefe = (variante === 'b') ? 48 : ZEILEN_SICHTBAR;
+
+let letzte = null, zeilen = 0, t0 = performance.now();
+
+const link = new TciLink();
+link.addEventListener('spectrum', (e) => {
+  const v = e.detail.vals;
+  if (!v.length) { return; }
+  letzte = v;
+  // Den Rauschboden aus dem unteren Fünftel schätzen, wie es der
+  // Wasserfall in der App auch tut: ein fester Wert wäre bei jedem
+  // Gerät falsch.
+  const s = Array.from(v).sort((a,b) => a-b);
+  boden = s[Math.floor(s.length * 0.2)] - 4;
+  spanne = Math.max(25, s[Math.floor(s.length * 0.995)] - boden + 6);
+  raum.zeileAufnehmen(v);
+  zeilen++;
+});
+
+let zuletztGemalt = -1;
+function malen() {
+  if (raum.zeilenZahl && zeilen !== zuletztGemalt) {
+    zuletztGemalt = zeilen;
+    const alt = raum.zeilen.length;
+    if (tiefe < ZEILEN_SICHTBAR && alt > tiefe) { raum.zeilen.length = tiefe; }
+    raum.malen(ctxR, cRaum.width, cRaum.height,
+               { bodenDbm: boden, spanneDb: spanne, zKurve: 0.7, palette, grund: GRUND });
+  }
+  if (variante === 'c' && letzte) {
+    const W = cKurve.width, H = cKurve.height;
+    ctxK.fillStyle = 'rgb(8,8,10)'; ctxK.fillRect(0,0,W,H);
+    ctxK.strokeStyle = 'rgb(216,165,95)'; ctxK.lineWidth = 2;
+    ctxK.beginPath();
+    for (let x = 0; x < W; x++) {
+      const i = Math.floor(x * letzte.length / W);
+      const t = Math.max(0, Math.min(1, (letzte[i] - boden) / spanne));
+      const y = H - t * (H - 4) - 2;
+      x ? ctxK.lineTo(x, y) : ctxK.moveTo(x, y);
+    }
+    ctxK.stroke();
+  }
+  document.getElementById('lage').textContent =
+      link.ready ? `${raum.zeilenZahl} Zeilen` : 'verbinde …';
+  const s = (performance.now() - t0) / 1000;
+  document.getElementById('takt').textContent = s > 1 ? (zeilen / s).toFixed(1) + ' Zeilen/s' : '';
+}
+setInterval(malen, 100);
+
+link.connect('ws://127.0.0.1:50099');
+setTimeout(() => { link.send('start'); link.send('spectrum_start:0,375'); }, 800);
+</script>
