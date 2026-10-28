@@ -8039,6 +8039,16 @@ longpath_add_test(tst_flex_senden)
 # Quelle: Longpath-original.
 longpath_add_test(tst_flex_verbindungsfehler)
 
+# -- FT8: Rufzeichen, die nur als Hash kommen -----------------------------
+# Longpath uebergab ft8_lib bis zum 2026-10-28 `nullptr` als Hashtabelle.
+# Die Bibliothek schreibt dann wortwoertlich `<...>` statt des
+# Rufzeichens (message.c:734) -- bei Sonderrufzeichen im Alltag, und beim
+# EU-VHF-Contestsatz (i3=5) waeren BEIDE Rufzeichen betroffen.
+# Geprueft wird durch die Bibliothek selbst (packen, auspacken), mit
+# Gegenprobe bei geleerter Tabelle.
+# Quelle: Longpath-original.
+longpath_add_test(tst_ft8_rufzeichen)
+
 # 2026-10-22: der „Lattenzaun" im Panadapter. Ein echter Rahmen von
 # Martins FLEX-8400 geht durch denselben Zeichenweg wie im Programm,
 # und das Ergebnis wird auf Regelmaeszigkeit gemessen.
