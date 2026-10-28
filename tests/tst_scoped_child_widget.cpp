@@ -20,6 +20,7 @@
 
 #include <QtTest/QtTest>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPointer>
 #include <QWidget>
 
@@ -75,6 +76,42 @@ private slots:
         QVERIFY2(bool(owner), "Frisch gebaut muss der Halter etwas halten");
         delete parent;
         QVERIFY2(!owner, "Nach dem Tod des Elternteils muss der Halter leer melden");
+    }
+
+    // Der weiterleitende Konstruktor (2026-10-28): ein Dialog, der
+    // sein Elternteil erst als letztes Argument nimmt, muss genauso
+    // durch den Halter gehen koennen wie ein QMenu.
+    void theForwardingConstructorBuildsAMultiArgChild()
+    {
+        QWidget parent;
+        ScopedChildWidget<QMessageBox> owner(
+            QMessageBox::Warning, QStringLiteral("Titel"),
+            QStringLiteral("Text"),
+            QMessageBox::Ok | QMessageBox::Cancel, &parent);
+        QVERIFY(bool(owner));
+        QCOMPARE(owner.get()->parentWidget(), &parent);
+        QCOMPARE(owner.get()->icon(), QMessageBox::Warning);
+        QCOMPARE(owner.get()->text(), QStringLiteral("Text"));
+        QVERIFY(owner.get()->standardButtons() & QMessageBox::Cancel);
+    }
+
+    // Und er schuetzt genauso: stirbt das Elternteil, meldet der
+    // Halter leer und gibt beim Rahmenausgang nichts mehr frei.
+    void theForwardingConstructorIsGuardedToo()
+    {
+        QPointer<QMessageBox> watch;
+        {
+            auto* parent = new QWidget();
+            ScopedChildWidget<QMessageBox> owner(
+                QMessageBox::Information, QStringLiteral("T"),
+                QStringLiteral("X"), QMessageBox::Ok, parent);
+            watch = owner.get();
+            QVERIFY(watch != nullptr);
+            delete parent;
+            QVERIFY2(watch.isNull(), "Qt hat den Dialog nicht mitgenommen");
+            QVERIFY2(!owner, "Der Halter haelt noch etwas, das es nicht mehr gibt");
+        }
+        QVERIFY(watch.isNull());
     }
 
     void theChildStaysUsableWhileTheParentLives()

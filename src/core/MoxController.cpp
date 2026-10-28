@@ -484,6 +484,24 @@ void MoxController::setTune(bool on)
 // ---------------------------------------------------------------------------
 void MoxController::setMox(bool on)
 {
+    // ── Key-block latch (2026-10-28) ─────────────────────────────────────────
+    //
+    // Above everything else, including the idempotent guard: a request for
+    // MOX OFF releases the latch even though MOX is already off (the SWR
+    // protection dropped it). That is what makes "until it is released"
+    // work -- a held mic PTT only ever produces setMox(true), so nothing
+    // clears the latch while the key is down, and the first setMox(false)
+    // after it comes up does.
+    //
+    // RadioModel therefore sets the latch AFTER its own setMox(false), not
+    // before, or it would release what it had just set.
+    if (!on) {
+        releaseKeyBlock();
+    } else if (m_keyBlockLatched) {
+        emit moxRejected(m_keyBlockReason);
+        return;
+    }
+
     // ── K.2: BandPlanGuard pre-check (BEFORE Codex P2 safety effects) ────────
     //
     // When a MoxCheckFn is installed and the caller is requesting TX-on,
@@ -682,6 +700,30 @@ void MoxController::stopAllTimers()
 void MoxController::runMoxSafetyEffects(bool /*newMox*/)
 {
     // intentionally empty in 3M-1a — see comment above
+}
+
+// ---------------------------------------------------------------------------
+// Key-block latch — see the declaration in MoxController.h for why it
+// exists and why it departs from Thetis here.
+// ---------------------------------------------------------------------------
+void MoxController::latchKeyBlock(const QString& reason)
+{
+    m_keyBlockLatched = true;
+    m_keyBlockReason = reason;
+}
+
+void MoxController::releaseKeyBlock()
+{
+    // No early return on the already-released case: this runs on every
+    // setMox(false), several times a second in places, and clearing two
+    // members that are already clear is cheaper than branching on them.
+    m_keyBlockLatched = false;
+    m_keyBlockReason.clear();
+}
+
+bool MoxController::keyBlockLatched() const noexcept
+{
+    return m_keyBlockLatched;
 }
 
 // ---------------------------------------------------------------------------

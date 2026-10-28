@@ -26,6 +26,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
+#include <QPointer>
 #include <QVBoxLayout>
 
 namespace Longpath {
@@ -250,8 +251,11 @@ void AmpApplet::contextMenuEvent(QContextMenuEvent* ev)
     // („... must be a top level window."). Damit traegt es das Menuegrau
     // #1a1a1e statt des geerbten #08080a -- Martin: „hell wie alle anderen".
     QMenu* menu = buildContextMenu(window());
+    QPointer<QMenu> stillAlive(menu);   // das Fenster kann in exec() sterben
     menu->exec(ev->globalPos());
-    menu->deleteLater();
+    if (stillAlive) {
+        stillAlive->deleteLater();
+    }
 }
 
 QMenu* AmpApplet::buildContextMenu(QObject* menuParent)

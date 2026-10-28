@@ -30,6 +30,7 @@
 #include <QAction>
 #include <QContextMenuEvent>
 #include <QMenu>
+#include <QPointer>
 #include <QResizeEvent>
 #include <QVBoxLayout>
 #include "gui/styles/ThemeQss.h"
@@ -523,8 +524,13 @@ void PanadapterApplet::contextMenuEvent(QContextMenuEvent* event)
     // traegt den Panadapter), und ein Menue daran bekam von Qt keinen
     // Fensterbezug („... must be a top level window.").
     QMenu* menu = buildContextMenu(window());
+    // Das Fenster kann waehrend exec() sterben; dann hat Qt das Menue als
+    // sein Kind schon geholt und der Zeiger hier ist tot.
+    QPointer<QMenu> stillAlive(menu);
     menu->exec(event->globalPos());
-    menu->deleteLater();
+    if (stillAlive) {
+        stillAlive->deleteLater();
+    }
 }
 
 // Task B5 (bottom-banner + pan-menu epic, design doc s8.5): "Add slice on

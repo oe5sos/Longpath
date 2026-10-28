@@ -945,6 +945,44 @@ RadioModel::RadioModel(QObject* parent)
             this, &RadioModel::onMoxHardwareFlipped,
             Qt::QueuedConnection);
 
+    // ── Die SWR-Freigabe bei JEDEM Unkey (2026-10-28) ─────────────────────
+    //
+    // From Thetis console.cs:29241-29246 [v2.10.3.15] (UIMOXChangedFalse):
+    //   //[2.10.3.7]MW0LGE reset
+    //   NetworkIO.SWRProtect = 1.0f;
+    //   _wind_back_engaged = false;
+    //
+    // Thetis runs UIMOXChangedFalse synchronously at the end of its MOX
+    // handler. Our TX-to-RX path is a timer walk, so there is no "end of
+    // the handler" to hang it on:
+    //
+    //   * moxChanged / the end of the walk is wrong: setMox calls
+    //     stopAllTimers() on every new transition, so a re-key inside the
+    //     30 ms flush window cancels the timers and the release never runs.
+    //     The drive would then stay at one percent for the whole next
+    //     transmission.
+    //   * hardwareFlipped, where this used to sit, is a
+    //     Qt::QueuedConnection -- the release waits for the event loop.
+    //
+    // moxChanging is emitted synchronously inside setMox, after the
+    // idempotent guard (so it is a real unkey, not a repeat) and before
+    // MOX is committed. Nothing can get between the unkey and the release.
+    //
+    // That is earlier than Thetis, which releases after the hardware
+    // unkey. The difference is bounded: the factor this restores is read
+    // by pumpAudioVolume, which runs on a drive change and not on this
+    // reset, so the folded-back drive byte already on the wire stays on
+    // the wire until something sets the drive again. What it does mean,
+    // honestly stated: during the 30 ms flush the protection is already
+    // released, and because the poll below is gated on MOX, a high SWR
+    // in that tail is not acted on.
+    connect(m_moxController, &MoxController::moxChanging,
+            this, [this](int, bool oldMox, bool newMox) {
+        if (oldMox && !newMox) {
+            m_swrProt.onMoxOff();
+        }
+    });
+
     // Phase 3M-4 Task 17 chunk A — wire MOX state into ReceiverManager so
     // the per-board codec re-emits PsDdcConfig on TX/RX transitions.  The
     // codec output flow is:
@@ -11764,9 +11802,64 @@ void RadioModel::handlePaTelemetry(quint16 fwdRaw, quint16 revRaw,
     // skew the foldback math; raw bridge watts are the canonical input
     // Thetis uses for protection (console.cs alex_fwd path is independent
     // of CalibratedPAPower).
-    m_swrProt.ingest(static_cast<float>(fwdW),
-                     static_cast<float>(revW),
-                     m_transmitModel.isTune());
+    //
+    // ── Der Schutz rechnet nur am Schlüssel (2026-10-28) ──────────────────
+    //
+    // From Thetis console.cs:25991 [v2.10.3.15] (PollPAPWR):
+    //   while (chkPower.Checked)
+    //   {
+    //       if (_mox)
+    //       {
+    //           ... the whole SWR block ...
+    //
+    // Everything above is gated on `_mox` in Thetis and was not gated
+    // here. The radio keeps sending high-priority status frames after the
+    // unkey, carrying the last coupler sample plus noise; each one was fed
+    // in, read as fwd≈0/rev≈0, clamped to SWR 1.0, and ran the clean-sample
+    // branch. Two consequences, both now gone:
+    //
+    //   * the measured SWR snapped to 1.00 the instant the key came up --
+    //     precisely the number the operator unkeyed in order to read.
+    //   * the trip count and the fold-back were being cleared by samples
+    //     taken while nothing was transmitting, which is not a measurement
+    //     of anything.
+    //
+    // isMox() and not state() == MoxState::Tx: Thetis's `_mox` is the
+    // committed flag, which is already true during its rf_delay, and
+    // isMox() is ours. m_forceTxForTest keeps the existing test seam.
+    const bool keyedForSwrPoll =
+        m_forceTxForTest || (m_moxController && m_moxController->isMox());
+    if (keyedForSwrPoll) {
+        m_swrProt.ingest(static_cast<float>(fwdW),
+                         static_cast<float>(revW),
+                         m_transmitModel.isTune());
+
+        // ── Offene Antenne: abtasten, zuriegeln, warnen ───────────────────
+        //
+        // Upstream tags preserved: //-W2PA (from cited console.cs:26036)
+        //   //MW0LGE (from cited console.cs:26038) [v2.10.3.15]
+        // From Thetis console.cs:26041-26057 [v2.10.3.15]:
+        //   swr = 50.0f;
+        //   NetworkIO.SWRProtect = 0.01f;
+        //   chkMOX.Checked = false;
+        //   ... checkAntennaWarning(); ...
+        //
+        // Until 2026-10-28 the controller set openAntennaDetected() and
+        // NOBODY read it -- grep over the whole of src/ found the flag's
+        // only mentions inside the controller and its own test. The drive
+        // was folded back to one percent and the transmitter kept running
+        // into a feedline that was reporting nearly all its power back.
+        //
+        // The latch goes on AFTER the unkey, not before: setMox(false)
+        // releases it (see MoxController::setMox), so setting it first
+        // would clear it again in the same breath.
+        if (m_swrProt.openAntennaDetected() && m_moxController
+            && m_moxController->isMox()) {
+            m_moxController->setMox(false);
+            m_moxController->latchKeyBlock(openAntennaWarningText());
+            emit openAntennaWarning(openAntennaWarningText());
+        }
+    }
 
     // 2026-08-13 SWR sweep analyzer: same raw-scaled watts the
     // protection controller sees (see the fwdW-not-fwdWCal note above —
@@ -11777,6 +11870,27 @@ void RadioModel::handlePaTelemetry(quint16 fwdRaw, quint16 revRaw,
         // why a failed sweep has to be able to name the unscaled count.
         m_swrSweep->ingestTelemetry(fwdW, revW, fwdRaw, revRaw);
     }
+}
+
+// ---------------------------------------------------------------------------
+// openAntennaWarningText — Thetis's checkAntennaWarning, caption and text.
+//
+// From Thetis console.cs:26166-26174 [v2.10.3.15]:
+//   private void checkAntennaWarning()
+//   {
+//       MessageBox.Show("Please check your antenna connection.",
+//       "High SWR condition detected",
+//
+// Thetis puts up a modal, topmost MessageBox from inside its poll loop.
+// Longpath shows it the way it shows every other refused or stopped key --
+// the transient warning strip MainWindow already uses for moxRejected and
+// for the band-plan refusals. Same words, both halves of the dialog joined
+// into the one line the strip has room for.
+// ---------------------------------------------------------------------------
+QString RadioModel::openAntennaWarningText()
+{
+    return QStringLiteral("High SWR condition detected. "
+                          "Please check your antenna connection.");
 }
 
 // Issue #182 — TransmitModel::micPttDisabled → RadioConnection wire bit.
@@ -17004,23 +17118,20 @@ void RadioModel::completeTuneOff()
 
 void RadioModel::onMoxHardwareFlipped(bool isTx)
 {
-    // ── Step 0 — release the SWR windback latch on the way back to RX ──
+    // ── The SWR release used to sit here; it now hangs on moxChanging ──
     //
-    // 2026-08-14. This was missing entirely. SwrProtectionController
-    // latches m_windBackLatched and pins the drive at 1 % "until
-    // onMoxOff()", and nothing in the application had ever called
-    // onMoxOff() — only a unit test did. So the first POWER FOLD BACK
-    // of a session was permanent: every later transmission went out at
-    // one percent, the red overlay stayed painted over the spectrum,
-    // and the only cure was quitting the app.
+    // 2026-08-14 put `if (!isTx) m_swrProt.onMoxOff();` at the top of
+    // this slot, because nothing in the program had ever called onMoxOff()
+    // and the first POWER FOLD BACK of a session was therefore permanent.
+    // That was the right fix and it stands; only the edge has moved.
     //
-    // Thetis clears it in UIMOXChangedFalse, which is this edge. It goes
-    // ahead of every early return below on purpose: a latch whose
-    // release depends on a bound TX slice being present is a latch that
-    // will one day fail to release.
-    if (!isTx) {
-        m_swrProt.onMoxOff();
-    }
+    // 2026-10-28: this slot hangs on hardwareFlipped through a
+    // Qt::QueuedConnection (see the connect in the constructor), so the
+    // release ran on a later turn of the event loop than the unkey that
+    // asked for it. moxChanging is emitted synchronously inside setMox,
+    // on every real transition, before MOX is committed -- so the release
+    // cannot be left sitting in the event queue while something else
+    // keys again. See the handler in the constructor for the full note.
 
     // Step 1 — Alex antenna routing.  Resolves which TX/RX antenna ports
     // engage for the current band and tx/rx state.  AlexController state

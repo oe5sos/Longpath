@@ -201,18 +201,37 @@ void TestSwrProtectionController::perSampleFoldback_oneTrip_windBackDisabled_fac
              qPrintable(QString("expected ~0.5, got %1").arg(factor)));
 }
 
-// Codex P2 follow-up to PR #139: when protection is disabled mid-flight while
-// the windback latch / open-antenna flag / trip count are non-default, the
-// disabled-path early-return MUST clear all of them. Previously only
-// m_protectFactor and m_highSwr were reset; the latch and trip-count would
-// survive into the re-enabled path, immediately re-asserting phantom fault
-// state.
+// Was der Aus-Zweig loescht und was nicht.
+//
+// Der Fall kommt von einem Codex-P2-Nachgang zu PR #139 und verlangte, der
+// Aus-Zweig MUESSE Riegel, Trippzaehler und den Befund offene Antenne
+// mitloeschen. Am 2026-10-28 gegen Thetis nachgezogen und umgedreht: ein
+// EINGERASTETER Rueckfahrriegel bleibt, bis MOX faellt. Die Begruendung
+// steht im Rumpf.
 void TestSwrProtectionController::setEnabled_false_clearsLatchedState()
 {
-    // Drive the controller into latched + open-antenna state.
-    // Two-step: 4 trips engage the windback latch (per console.cs:26069);
-    // a follow-up open-antenna sample (fwd=15, fwd-rev<1, console.cs:25989)
-    // sets m_openAntennaDetected on top.
+    // ── Umgeschrieben 2026-10-28: der Fall pruefte das Gegenteil ──────────
+    //
+    // Er hiess, der Aus-Zweig MUESSE Riegel, Trippzaehler und den Befund
+    // offene Antenne loeschen, "or phantom fault state would survive into
+    // the re-enabled path". Thetis macht das nicht. `swrprotection` sperrt
+    // dort die drei Stellen, die einen Fehler ANLEGEN koennen -- die
+    // Pruefung auf offene Antenne (console.cs:26037 [v2.10.3.15]), den
+    // Tripp (26118) und das Einrasten (26134) -- aber die Zeile, die einen
+    // EINGERASTETEN Riegel anwendet, ist ungesperrt:
+    //
+    //     if (_wind_back_engaged)
+    //     {
+    //         NetworkIO.SWRProtect = 0.01f;
+    //
+    // und `_wind_back_engaged` wird nur in UIMOXChangedFalse geloescht.
+    //
+    // Das ist kein Schoenheitsfehler. Mit dem alten Verhalten konnte man
+    // eine echte Rueckfahrt auf ein Prozent mitten im Senden aufheben,
+    // indem man einen Haken wegnahm, und ging mit voller Ansteuerung in
+    // genau das zurueck, was sie ausgeloest hatte. Der Name bleibt (die
+    // Liste oben verweist darauf); er beschreibt jetzt, WAS der Aus-Zweig
+    // loescht und was nicht.
     m_ctrl->setWindBackEnabled(true);
     for (int i = 0; i < 4; ++i) {
         m_ctrl->ingest(100.0f, 25.0f, false); // SWR=3 > limit=2 → trip
@@ -232,29 +251,35 @@ void TestSwrProtectionController::setEnabled_false_clearsLatchedState()
     QSignalSpy highSpy(m_ctrl, &SwrProtectionController::highSwrChanged);
     QSignalSpy factorSpy(m_ctrl, &SwrProtectionController::protectFactorChanged);
 
-    // Disable protection mid-flight, then ingest (which would normally
-    // re-trigger trip / open-antenna in enabled mode).
     m_ctrl->setEnabled(false);
     m_ctrl->ingest(100.0f, 25.0f, false);
 
-    // All four observable flags must be clear.
+    // Was der Aus-Zweig loescht: den Befund offene Antenne (die Pruefung
+    // laeuft nicht mehr, also meldet sie nichts) und HighSWR.
     QVERIFY(!m_ctrl->openAntennaDetected());
-    QVERIFY(!m_ctrl->windBackLatched());
     QVERIFY(!m_ctrl->highSwr());
-    QCOMPARE(m_ctrl->protectFactor(), 1.0f);
-
-    // Each transition emitted exactly once on disable.
-    QCOMPARE(windSpy.count(), 1);
-    QCOMPARE(windSpy.at(0).at(0).toBool(), false);
     QCOMPARE(openSpy.count(), 1);
     QCOMPARE(openSpy.at(0).at(0).toBool(), false);
     QCOMPARE(highSpy.count(), 1);
     QCOMPARE(highSpy.at(0).at(0).toBool(), false);
-    QCOMPARE(factorSpy.count(), 1);
-    QCOMPARE(factorSpy.at(0).at(0).toFloat(), 1.0f);
 
-    // Re-enable + ingest something safe → still clean (no phantom latch
-    // resurrects from stale state).
+    // Was er NICHT loescht: den eingerasteten Riegel und damit das eine
+    // Prozent. Die Ansteuerung bleibt unten -- kein Signal, weil sich
+    // nichts bewegt hat.
+    QVERIFY2(m_ctrl->windBackLatched(),
+             "Schutz abschalten hat den eingerasteten Riegel gelost -- "
+             "Thetis wendet _wind_back_engaged ungesperrt an "
+             "(console.cs:26138-26142 [v2.10.3.15])");
+    QCOMPARE(m_ctrl->protectFactor(), 0.01f);
+    QCOMPARE(windSpy.count(), 0);
+    QCOMPARE(factorSpy.count(), 0);
+
+    // Erst der Unkey hebt ihn -- und danach ist auch mit wieder
+    // eingeschaltetem Schutz nichts Altes uebrig.
+    m_ctrl->onMoxOff();
+    QCOMPARE(m_ctrl->protectFactor(), 1.0f);
+    QVERIFY(!m_ctrl->windBackLatched());
+
     m_ctrl->setEnabled(true);
     m_ctrl->ingest(100.0f, 0.0f, false);
     QVERIFY(!m_ctrl->windBackLatched());

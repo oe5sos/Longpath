@@ -18,6 +18,15 @@
 //                Ports PollPAPWR (console.cs:25933-26120 [v2.10.3.13])
 //                and UIMOXChangedFalse reset (console.cs:29191-29195
 //                [v2.10.3.13]).
+//   2026-10-28 - Nach Thetis nachgezogen: die Freigabe laeuft jetzt bei
+//                JEDEM Unkey (RadioModel haengt sie an moxChanging statt an
+//                hardwareFlipped), onMoxOff() behaelt Trippzaehler und
+//                gemessenen Stehwert wie UIMOXChangedFalse
+//                (console.cs:29241-29246 [v2.10.3.15]), und abgeschaltete
+//                Schutzfunktion hebt einen eingerasteten Rueckfahrriegel
+//                NICHT mehr auf (console.cs:26134-26142 [v2.10.3.15]).
+//                Dazu: der Befund offene Antenne wird jetzt ueberhaupt
+//                gelesen -- RadioModel tastet darauf ab und riegelt zu.
 // =================================================================
 
 // --- From console.cs ---
@@ -84,9 +93,15 @@ namespace Longpath::safety {
 ///   Cite: console.cs:26070 [v2.10.3.13] (high_swr_count >= 4),
 ///         console.cs:26083-26090 [v2.10.3.13] (catch-all windback block).
 ///
-/// Open-antenna heuristic: fwd > 10W and (fwd-rev) < 1W → swr=50, factor=0.01,
-///   highSwr=true, openAntennaDetected=true.
-///   Cite: console.cs:25989-26009 [v2.10.3.6]MW0LGE.
+/// Open-antenna heuristic: fwd > 10W and (fwd-rev) < 1W, not tuning → swr=50,
+///   factor=0.01, highSwr=true, openAntennaDetected=true.
+///   Dropping the key and warning the operator is the CALLER's half of this,
+///   as it is in Thetis (`chkMOX.Checked = false;` + checkAntennaWarning()):
+///   RadioModel::handlePaTelemetry reads openAntennaDetected(), unkeys and
+///   bolts the key shut until it is released. Until 2026-10-28 nothing in
+///   the program read this flag at all -- the controller folded the drive
+///   back to one percent and kept transmitting into an open feedline.
+///   Cite: console.cs:26031-26048 [v2.10.3.15].
 ///
 /// Tune-time bypass: disableOnTune=true + tuneActive=true + fwd in [1, tunePowerSwrIgnore]
 ///   + tunePowerSliderValue ≤ 70 → factor=1.0, highSwr cleared.
@@ -96,8 +111,10 @@ namespace Longpath::safety {
 ///   ANAN-8000D) for a trip to fire. Suppresses false trips during TX ramp-up.
 ///   Cite: console.cs:26067 [v2.10.3.13].
 ///
-/// onMoxOff() resets all latches and emits changes.
-///   Cite: console.cs:29191-29195 [v2.10.3.13] (UIMOXChangedFalse).
+/// onMoxOff() resets the latches and emits changes -- but keeps the trip
+///   count and the measured SWR, the two things UIMOXChangedFalse does not
+///   touch. See the comment on the definition for what each one costs.
+///   Cite: console.cs:29241-29246 [v2.10.3.15] (UIMOXChangedFalse).
 ///
 /// The controller is inert (signals only, no radio I/O) until 3M-1a wires it.
 class SwrProtectionController : public QObject
@@ -107,7 +124,15 @@ public:
     explicit SwrProtectionController(QObject* parent = nullptr);
 
     /// Enable or disable the entire SWR protection subsystem.
-    /// When disabled, ingest() always sets factor=1.0 and clears all flags.
+    ///
+    /// Off means no NEW fault can be created: the open-antenna check, the
+    /// trip and the latch all stand down (Thetis gates each on
+    /// `swrprotection`). It does NOT lift a windback that has already
+    /// engaged -- Thetis applies `_wind_back_engaged` ungated
+    /// (console.cs:26138-26142 [v2.10.3.15]) and clears it only in
+    /// UIMOXChangedFalse, so a folded-back drive comes back at the unkey
+    /// and not by unticking a box mid-transmission. Corrected 2026-10-28;
+    /// until then ingest() returned early and wiped the latch.
     void setEnabled(bool on) noexcept;
     bool isEnabled() const noexcept;
 
