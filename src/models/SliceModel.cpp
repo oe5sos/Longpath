@@ -695,35 +695,6 @@ int currentCwPitch()
 constexpr int kDiguClickTuneOffset = 1500;
 constexpr int kDiglClickTuneOffset = 2210;
 
-/// Liegt `hz` im Amateurband `band` der eingestellten Region? Wenn
-/// nicht, die Vorgabe des Bandes. Siehe restoreFromSettings().
-///
-/// GEN, WWV und XVTR sind keine Amateurbaender — dort wird nichts
-/// gerueckt, und die Pruefung sagt das auch so.
-double frequenzImBand(Band band, double hz)
-{
-    double tief = 0.0, hoch = 0.0;
-    if (!bandRangeHz(band, tief, hoch)) { return hz; }
-
-    const safety::RegionChoice wahl = safety::configuredRegion();
-    const DSPMode art = BandDefaults::seitenbandFuer(band);
-    static const safety::BandPlanGuard wache;
-
-    const bool drin =
-        wahl.configured
-            ? wache.isValidTxFreq(wahl.region, static_cast<std::int64_t>(hz),
-                                  art, /*extended=*/false)
-            : (hz >= tief && hz <= hoch);
-    if (drin) { return hz; }
-
-    const double vorgabe = BandDefaults::seedFor(band).frequencyHz;
-    qCInfo(lcDsp).nospace()
-        << "Bandgedaechtnis " << bandKeyName(band) << ": " << (hz / 1.0e6)
-        << " MHz liegt auszerhalb des Bandes — es wird die Vorgabe "
-        << (vorgabe / 1.0e6) << " MHz genommen";
-    return vorgabe;
-}
-
 } // namespace
 
 int SliceModel::defaultLowCut()
@@ -2969,7 +2940,7 @@ void SliceModel::restoreFromSettings(Band band)
     // im Band, und genau das war der Fehler.
     if (s.contains(bp + QStringLiteral("Frequency"))) {
         const double gemerkt = s.value(bp + QStringLiteral("Frequency")).toDouble();
-        setFrequency(frequenzImBand(band, gemerkt));
+        setFrequency(BandDefaults::frequenzImBand(band, gemerkt));
     }
     if (s.contains(bp + QStringLiteral("AgcThreshold"))) {
         setAgcThreshold(s.value(bp + QStringLiteral("AgcThreshold")).toInt());

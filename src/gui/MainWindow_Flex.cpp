@@ -74,6 +74,7 @@
 #include "gui/meters/MeterPoller.h"
 #include "gui/ConnectionPanel.h"
 #include "core/ClarityController.h"
+#include "core/AppSettings.h"
 #include <QTimer>
 #include <cmath>
 #include <algorithm>
@@ -364,11 +365,64 @@ void MainWindow::wireFlex()
                 << "Flex: das Profil stellte " << (s->frequency() / 1.0e6)
                 << " MHz her, die Maschine steht auf " << (geraet / 1.0e6)
                 << " MHz — die Maschine gewinnt";
-            // Die Wache setzen: sonst schickt die Scheibe die eben
-            // uebernommene Frequenz als Befehl zurueck.
-            m_flexApplyingRemoteState = true;
-            s->setFrequency(geraet);
-            m_flexApplyingRemoteState = false;
+            // ── Aber nicht auszerhalb des Bandes (2026-10-29) ───────
+            //
+            // Betreiber, an diesem Abend zum sechsten Mal: „wieder
+            // falsches band". Die Maschine stand auf 7.3086 MHz — in
+            // Region 1 kein 40 m mehr, sondern Rundfunk. „Die Maschine
+            // gewinnt" hielt ihn also zuverlaessig dort fest, wo er
+            // nicht sein wollte, und die Flex meldete folgerichtig
+            // `NOT_READY reason=OUT_OF_BAND`.
+            //
+            // Die Regel, die er genannt hat: „bandwechsel sollte immer
+            // in das amateurfunkband springen, nicht daneben." Also
+            // gewinnt die Maschine nur, solange sie auf einer
+            // Amateurfrequenz steht. Steht sie daneben, zieht Longpath
+            // sie auf das, was im Gedaechtnis des zuletzt benutzten
+            // Bandes steht — und wenn auch das daneben liegt, auf die
+            // Startfrequenz des Bandes.
+            //
+            // Von Hand darf er weiterhin hinfahren, wohin er will:
+            // dieser Griff sitzt nur im Verbinden.
+            const Band bandDerMaschine = bandFromFrequency(geraet);
+            double tief = 0.0, hoch = 0.0;
+            const bool aufAmateurband = bandRangeHz(bandDerMaschine, tief, hoch);
+            double ziel = aufAmateurband
+                              ? BandDefaults::frequenzImBand(bandDerMaschine, geraet)
+                              : 0.0;
+
+            if (!aufAmateurband) {
+                const auto letztes =
+                    SliceModel::loadLastBandFromSettings(s->sliceIndex());
+                const Band zurueck = letztes.value_or(Band::Band40m);
+                const QString schluessel =
+                    QStringLiteral("Slice%1/Band%2/Frequency")
+                        .arg(s->sliceIndex())
+                        .arg(bandKeyName(zurueck));
+                const double gemerkt =
+                    AppSettings::instance().value(schluessel, 0.0).toDouble();
+                ziel = BandDefaults::frequenzImBand(
+                    zurueck,
+                    gemerkt > 0.0 ? gemerkt
+                                  : BandDefaults::seedFor(zurueck).frequencyHz);
+                qCWarning(lcFlexGui).nospace()
+                    << "Flex: die Maschine steht auf " << (geraet / 1.0e6)
+                    << " MHz — kein Amateurband. Es wird auf "
+                    << (ziel / 1.0e6) << " MHz gestellt ("
+                    << bandKeyName(zurueck) << ", zuletzt benutzt)";
+            }
+
+            if (ziel > 0.0 && !qFuzzyCompare(ziel, geraet)) {
+                // OHNE Wache: das soll als Befehl an die Maschine
+                // hinausgehen, sie steht ja falsch.
+                s->setFrequency(ziel);
+            } else {
+                // Die Wache setzen: sonst schickt die Scheibe die eben
+                // uebernommene Frequenz als Befehl zurueck.
+                m_flexApplyingRemoteState = true;
+                s->setFrequency(geraet);
+                m_flexApplyingRemoteState = false;
+            }
 
             // ── Und das Seitenband zum neuen Band (2026-10-23) ───────
             //
