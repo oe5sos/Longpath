@@ -1917,6 +1917,20 @@ private:
     // nichts.
     qint64 m_flexLoesenMs{0};     ///< Zeitpunkt des letzten „MOX aus"
     int    m_flexTonImSenden{0};  ///< Tonpakete WAEHREND des Sendens
+
+    // ── Was JE SENDUNG wirklich hinausging (2026-10-29) ──────────────
+    //
+    // `m_flexFt8Spitze` darueber ist ein Hoechststand ueber die ganze
+    // Laufzeit und meldet sich nur, wenn er steigt — nach der ersten
+    // Sendung also nie wieder. Am 2026-10-29 fehlte genau deshalb die
+    // Antwort auf die eine Frage, an der alles hing: hat Longpath
+    // nichts geschickt, oder hat die Maschine nichts angenommen?
+    // (Gemessen war nur ihre Seite: MICPEAK −150 dBFS im vierten
+    // Durchgang gegen −5,98 dBFS im fuenften.) Diese drei werden je
+    // Sendung zurueckgesetzt und je Sendung gemeldet.
+    int    m_flexTxProben{0};     ///< Proben an die Maschine, diese Sendung
+    int    m_flexTxVomMik{0};     ///< Zuege, die am Mikrofon statt an FT8 hingen
+    float  m_flexTxSpitze{0.0f};  ///< Spitze dieser Sendung, nach der Daempfung
     /// Dasselbe als Stereo, wie die Maschine es erwartet.
     QVector<float> m_flexMikStereo;
     /// Haben wir selbst getastet? Trennt unser `xmit` von der Taste am

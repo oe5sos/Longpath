@@ -1061,6 +1061,7 @@ void MainWindow::verdrahteFlexSenden()
                 vonFt8 = true;
             } else {
                 geholt = ae->pullTxMic(m_flexMikMono.data(), kRahmen);
+                ++m_flexTxVomMik;
             }
             if (geholt <= 0) { return; }
 
@@ -1092,6 +1093,7 @@ void MainWindow::verdrahteFlexSenden()
                     m_flexMikMono[i] = v;
                     spitze = std::max(spitze, std::abs(v));
                 }
+                m_flexTxSpitze = std::max(m_flexTxSpitze, spitze);
                 // Einmal je Sendung in die Akte: beim naechsten Mal
                 // wird gemessen, nicht geschaetzt.
                 if (spitze > m_flexFt8Spitze) {
@@ -1112,6 +1114,7 @@ void MainWindow::verdrahteFlexSenden()
             }
             m_radioModel->sendeFlexMikrofonton(m_flexMikStereo.constData(),
                                                geholt);
+            m_flexTxProben += geholt;
         });
     }
 
@@ -1178,6 +1181,9 @@ void MainWindow::verdrahteFlexSenden()
                 FlexCommandWire::setDaxRouteCommand(true));
             m_flexTonImSenden = 0;
             m_flexLoesenMs    = 0;
+            m_flexTxProben    = 0;
+            m_flexTxVomMik    = 0;
+            m_flexTxSpitze    = 0.0f;
             m_flexSelbstGetastet = m_radioModel->flexTasten(true);
             if (m_flexSelbstGetastet && m_flexSendePumpe) {
                 m_flexSendePumpe->start();
@@ -1196,6 +1202,24 @@ void MainWindow::verdrahteFlexSenden()
             m_flexLoesenMs = QDateTime::currentMSecsSinceEpoch();
             qCInfo(lcFlexGui) << "Flex: waehrend des Sendens kamen"
                               << m_flexTonImSenden << "Tonpakete";
+
+            // ── Was WIR hinausgeschickt haben ────────────────────────
+            //
+            // Die Gegenprobe zu den Messwerten der Maschine. Steht
+            // hier eine volle Zahl und dort MICPEAK −150 dBFS, hat sie
+            // nichts angenommen; steht hier null, haben wir nichts
+            // geschickt. Am 2026-10-29 war das nicht zu entscheiden,
+            // weil es diese Zeile noch nicht gab.
+            //
+            // 12,64 s FT8 bei 24 kHz sind rund 303.000 Proben.
+            qCInfo(lcFlexGui).nospace()
+                << "Flex-Senden: " << m_flexTxProben
+                << " Proben hinaus, Spitze "
+                << (m_flexTxSpitze > 0.0f
+                        ? 20.0 * std::log10(m_flexTxSpitze)
+                        : -150.0)
+                << " dBFS, " << m_flexTxVomMik
+                << " Zuege am Mikrofon statt an FT8";
 
             // Die Sendepause ist KEINE Taktabweichung. Ohne diese
             // Zeile liest der Driftausgleich den leergelaufenen
@@ -1268,6 +1292,32 @@ void MainWindow::verdrahteFlexSenden()
         }
         m_radioModel->setzeFlexAbstimmleistung(qBound(0, watt, 100));
     });
+
+    // ── Einmal nachziehen, statt auf eine Reglerbewegung zu warten ───
+    //
+    // Die zwei Baender darueber haengen an `powerChanged` /
+    // `tunePowerChanged` — sie feuern nur, wenn der Regler BEWEGT
+    // wird. Beim Anmelden ging also nie eine Leistung an die Maschine,
+    // und sie behielt, was ein anderer Client zuletzt gesetzt hatte.
+    //
+    // Am 2026-10-29 stand sie dadurch auf 1 %: der Betreiber sah
+    // „Power 1" und „POWER 0 W" in einer Oberflaeche, die 10 W
+    // anzeigte. Jede Erklaerung dafuer lag am falschen Ende (Ton,
+    // Verriegelung, Pegel) — die Zahl war einfach nie hinausgegangen.
+    //
+    // Hier wird nichts entschieden, nur gesagt, was Longpath schon
+    // fuehrt. Der Wert selbst kommt aus den Einstellungen des
+    // Betreibers und bleibt seiner.
+    {
+        const TransmitModel& tm = m_radioModel->transmitModel();
+        const int sendeWatt  = qBound(0, tm.power(), 100);
+        const int stimmWatt  = qBound(0, tm.tunePower(), 100);
+        m_radioModel->setzeFlexSendeleistung(sendeWatt);
+        m_radioModel->setzeFlexAbstimmleistung(stimmWatt);
+        qCInfo(lcFlexGui).nospace()
+            << "Flex: Leistung nachgezogen — senden " << sendeWatt
+            << " %, abstimmen " << stimmWatt << " %";
+    }
 
     // ── Was die Maschine selbst meldet ───────────────────────────────
     //
