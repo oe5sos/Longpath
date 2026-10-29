@@ -1151,6 +1151,45 @@ void MainWindow::verdrahteFlexSenden()
                         << (20.0 * std::log10(std::max(spitze, 1.0e-6f)))
                         << " dBFS vor der Maschine)";
                 }
+            } else {
+                // ── Das Messloch am Mikrofonweg (2026-10-29) ────────
+                //
+                // Die Spitze wurde bis heute NUR im FT8-Zweig
+                // gerechnet. Am Mikrofonweg blieb `m_flexTxSpitze` auf
+                // null, und die Zusammenfassung meldete nach jeder
+                // Sprechprobe „Spitze -150 dBFS".
+                //
+                // Das hat mich am 2026-10-29 eine Stunde gekostet: ich
+                // habe die nicht gemessene Null als Befund gelesen und
+                // dem Betreiber gesagt, es ginge Stille hinaus —
+                // waehrend die Maschine im selben Augenblick MICPEAK
+                // +2,54 dBFS und FWDPWR 35,36 dBm (3,4 W) meldete. Der
+                // Ton war da; nur diese Zeile sah ihn nicht.
+                //
+                // Dazu der Riegel: +2,54 dBFS sind zweieinhalb
+                // Dezibel UEBER Vollaussteuerung. Auf dem eigenen Weg
+                // sitzt vor dem Sender die ganze WDSP-Kette; hier geht
+                // der Ton roh an die Maschine. −1 dBFS laesst normale
+                // Sprache unberuehrt und nimmt nur die Spitzen, die
+                // der Wandler der Flex ohnehin nicht mehr darstellen
+                // kann.
+                constexpr float kMikGrenze = 0.891f;   // −1,0 dBFS
+                float roh = 0.0f;
+                for (int i = 0; i < geholt; ++i) {
+                    roh = std::max(roh, std::abs(m_flexMikMono[i]));
+                    m_flexMikMono[i] = std::clamp(m_flexMikMono[i],
+                                                  -kMikGrenze, kMikGrenze);
+                }
+                m_flexTxSpitze = std::max(m_flexTxSpitze, roh);
+                if (roh > kMikGrenze && !m_flexMikZuLaut) {
+                    m_flexMikZuLaut = true;
+                    qCWarning(lcFlexGui).nospace()
+                        << "Flex-Senden: das Mikrofon steht zu hoch — "
+                        << "Spitze " << (20.0 * std::log10(roh))
+                        << " dBFS vor der Maschine, begrenzt auf −1 dBFS. "
+                        << "Die Aussteuerung gehoert an die Quelle, nicht "
+                        << "hierher.";
+                }
             }
 
             // Mono hinein, Stereo hinaus: die Maschine erwartet zwei
@@ -1233,6 +1272,7 @@ void MainWindow::verdrahteFlexSenden()
             m_flexTxProben    = 0;
             m_flexTxVomMik    = 0;
             m_flexTxSpitze    = 0.0f;
+            m_flexMikZuLaut   = false;
             m_flexSendeGeliefert  = 0;
             m_flexSendeRueckstand = 0;
             m_flexSendeUhr.start();
@@ -1285,6 +1325,30 @@ void MainWindow::verdrahteFlexSenden()
                 << (double(m_flexTxProben) / sollRahmen)
                 << "-fach, groeszter Rueckstand "
                 << (m_flexSendeRueckstand / 48) << " ms";
+
+            // ── Eine stille Sendung ist ein Befund ───────────────────
+            //
+            // 2026-10-29, am Gerät: 664 Tonpakete hinaus, und die
+            // Maschine machte 45 mW statt Leistung. Der offene Eingang
+            // war „BoomAudio", ein virtuelles Gerät ohne Ton — der
+            // Betreiber sah „es geht nicht" und suchte bei der Flex.
+            //
+            // Diese Prüfung trägt erst, seit die Spitze auch am
+            // Mikrofonweg gemessen wird (siehe oben): vorher stand
+            // hier bei JEDER Sprechprobe eine Null, und eine Warnung,
+            // die immer kommt, ist keine.
+            //
+            // Ein echtes Mikrofon liefert immer Rauschen; exakt nichts
+            // liefert nur ein Eingang, der nichts hört. Die Schwelle
+            // liegt bei −120 dBFS, weit unter jedem Grundrauschen.
+            if (m_flexTxProben > 0 && m_flexTxSpitze < 1.0e-6f) {
+                qCWarning(lcFlexGui).noquote()
+                    << QStringLiteral(
+                           "Flex-Senden: der Sendeton war die ganze "
+                           "Sendung über still — es ging ein Träger ohne "
+                           "Modulation hinaus. Der offene Eingang steht "
+                           "im Protokoll als \"input via …\".");
+            }
 
             // Die Sendepause ist KEINE Taktabweichung. Ohne diese
             // Zeile liest der Driftausgleich den leergelaufenen

@@ -1944,6 +1944,9 @@ private:
     int    m_flexTxProben{0};     ///< Proben an die Maschine, diese Sendung
     int    m_flexTxVomMik{0};     ///< Zuege, die am Mikrofon statt an FT8 hingen
     float  m_flexTxSpitze{0.0f};  ///< Spitze dieser Sendung, nach der Daempfung
+    /// Einmal je Sendung melden, wenn das Mikrofon ueber −1 dBFS kam.
+    /// Ohne das stuende die Zeile bei jedem Pumpentakt im Protokoll.
+    bool   m_flexMikZuLaut{false};
 
     // ── Die Pumpe braucht eine Uhr (2026-10-29) ──────────────────────
     //
