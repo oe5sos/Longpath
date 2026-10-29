@@ -101,8 +101,10 @@ private slots:
             QStringLiteral("TxRfPowerSlider"));
         QVERIFY(slider != nullptr);
 
-        // Pre-condition: Band20m is at the default 50 W.
-        QCOMPARE(rm.transmitModel().powerForBand(Band::Band20m), 50);
+        // Pre-condition: Band20m is at the default (5 % seit dem
+        // 2026-10-29, siehe TransmitModel::kVorgabeLeistungProzent).
+        QCOMPARE(rm.transmitModel().powerForBand(Band::Band20m),
+                 TransmitModel::kVorgabeLeistungProzent);
 
         // Drive a slider event — same path the user takes.
         slider->setValue(75);
@@ -159,8 +161,10 @@ private slots:
         auto* slider = applet.findChild<QSlider*>(
             QStringLiteral("TxRfPowerSlider"));
         QVERIFY(slider != nullptr);
-        // Construct-time default is 100 (TxApplet.cpp:281).
-        QCOMPARE(slider->value(), 100);
+        // Construct-time default. Stand hier 100; seit dem 2026-10-29
+        // zieht der Regler schon beim Bau die Vorgabe des Modells
+        // (TransmitModel::kVorgabeLeistungProzent), und die ist 5.
+        QCOMPARE(slider->value(), TransmitModel::kVorgabeLeistungProzent);
 
         // Bootstrap call — same as MainWindow.cpp:1578 with pan0 on Band20m.
         applet.setCurrentBand(Band::Band20m);
@@ -244,8 +248,10 @@ private slots:
         QCOMPARE(reloaded.powerForBand(Band::Band6m),  8);
 
         // Untouched bands remain at the default.
-        QCOMPARE(reloaded.powerForBand(Band::Band80m), 50);
-        QCOMPARE(reloaded.powerForBand(Band::Band10m), 50);
+        QCOMPARE(reloaded.powerForBand(Band::Band80m),
+                 TransmitModel::kVorgabeLeistungProzent);
+        QCOMPARE(reloaded.powerForBand(Band::Band10m),
+                 TransmitModel::kVorgabeLeistungProzent);
     }
 
     // ── 6. powerByBandChanged signal fires on slider events ─────────────────
@@ -305,9 +311,11 @@ private slots:
             QStringLiteral("TxRfPowerSlider"));
         QVERIFY(slider != nullptr);
 
-        // Pre-condition: stored values for both bands at default 50 W.
-        QCOMPARE(rm.transmitModel().powerForBand(Band::Band40m), 50);
-        QCOMPARE(rm.transmitModel().powerForBand(Band::Band20m), 50);
+        // Pre-condition: stored values for both bands at the default.
+        QCOMPARE(rm.transmitModel().powerForBand(Band::Band40m),
+                 TransmitModel::kVorgabeLeistungProzent);
+        QCOMPARE(rm.transmitModel().powerForBand(Band::Band20m),
+                 TransmitModel::kVorgabeLeistungProzent);
 
         // User moves the slider while panadapter shows 20m.  The TX
         // band per RadioModel.cpp:903-905 is still 40m (the slice
@@ -316,7 +324,8 @@ private slots:
 
         QCOMPARE(rm.transmitModel().powerForBand(Band::Band40m), 85);
         // Pan band's slot must NOT be touched.
-        QCOMPARE(rm.transmitModel().powerForBand(Band::Band20m), 50);
+        QCOMPARE(rm.transmitModel().powerForBand(Band::Band20m),
+                 TransmitModel::kVorgabeLeistungProzent);
     }
 
     // ── 8. CTUN pan: setCurrentBand recall ignores non-TX-band updates ─────

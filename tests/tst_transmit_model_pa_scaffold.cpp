@@ -44,12 +44,17 @@ private slots:
     // §1  Per-band normal-mode power array
     // =========================================================================
 
-    // §1.1 — powerForBand() default 50 W on every band on first init.
-    void powerForBand_defaultsTo50WForAllBands() {
+    // §1.1 — powerForBand() default on every band on first init.
+    //
+    // War 50 (Thetis console.cs:1813-1814 [v2.10.3.13]). Seit dem
+    // 2026-10-29 ist es `kVorgabeLeistungProzent` — Betreiber: „bitte
+    // leistung auf 5 watt standard reduzieren, ist immer auf 50."
+    void powerForBand_defaultsToVorgabeForAllBands() {
         TransmitModel t;
         // Per-band normal-mode power covers HF amateur + GEN/WWV/XVTR (14).
         for (int i = 0; i < static_cast<int>(Band::SwlFirst); ++i) {
-            QCOMPARE(t.powerForBand(static_cast<Band>(i)), 50);
+            QCOMPARE(t.powerForBand(static_cast<Band>(i)),
+                     TransmitModel::kVorgabeLeistungProzent);
         }
     }
 
@@ -78,6 +83,47 @@ private slots:
         QCOMPARE(args.at(1).toInt(), 75);
     }
 
+    // ── Die alte Vorgabe wird einmal nachgezogen (2026-10-29) ───────
+    //
+    // Eine neue Vorgabe greift nur dort, wo noch nichts steht. In
+    // Martins Einstellungen stand die ALTE 50 bereits ausgeschrieben —
+    // drei Geraete, 33 Baender —, und dort haette sich nichts
+    // geaendert: „ist immer auf 50."
+    //
+    // Was der Betreiber selbst gesetzt hat, bleibt stehen. Eine
+    // Vorgabe ist kein Riegel.
+    void dieAlteVorgabeWirdEinmalNachgezogen() {
+        const QString mac = QStringLiteral("cc:dd:ee:44:55:66");
+        AppSettings& s = AppSettings::instance();
+        const QString pfx =
+            QStringLiteral("hardware/%1/powerByBand/").arg(mac);
+
+        // So sah es bei ihm aus: fast alles auf der alten 50, ein Band
+        // von Hand heruntergedreht.
+        s.setValue(pfx + QStringLiteral("20m"), QStringLiteral("50"));
+        s.setValue(pfx + QStringLiteral("80m"), QStringLiteral("50"));
+        s.setValue(pfx + QStringLiteral("40m"), QStringLiteral("8"));
+        s.setValue(QStringLiteral("hardware/%1/powerByBand"
+                                  "AufVorgabeGezogen").arg(mac),
+                   QStringLiteral("0"));
+
+        TransmitModel t;
+        t.loadFromSettings(mac);
+        QCOMPARE(t.powerForBand(Band::Band20m),
+                 TransmitModel::kVorgabeLeistungProzent);
+        QCOMPARE(t.powerForBand(Band::Band80m),
+                 TransmitModel::kVorgabeLeistungProzent);
+        QVERIFY2(t.powerForBand(Band::Band40m) == 8,
+                 "ein selbst gesetzter Wert darf nicht angefasst werden");
+
+        // Und ein zweites Mal passiert nichts mehr: wer jetzt wieder
+        // auf 50 dreht, will die 50.
+        t.setPowerForBand(Band::Band20m, 50);
+        TransmitModel t2;
+        t2.loadFromSettings(mac);
+        QCOMPARE(t2.powerForBand(Band::Band20m), 50);
+    }
+
     // §1.4 — powerForBand round-trips via per-MAC AppSettings.
     void powerForBand_persistsPerMac() {
         const QString mac = QStringLiteral("aa:bb:cc:11:22:33");
@@ -97,8 +143,9 @@ private slots:
         QCOMPARE(t2.powerForBand(Band::Band20m), 75);
         QCOMPARE(t2.powerForBand(Band::Band40m), 30);
         QCOMPARE(t2.powerForBand(Band::Band6m),  10);
-        // Bands we didn't set should still be 50 W default.
-        QCOMPARE(t2.powerForBand(Band::Band80m), 50);
+        // Bands we didn't set should still be at the default.
+        QCOMPARE(t2.powerForBand(Band::Band80m),
+                 TransmitModel::kVorgabeLeistungProzent);
     }
 
     // =========================================================================

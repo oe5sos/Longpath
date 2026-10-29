@@ -343,7 +343,10 @@ TransmitModel::TransmitModel(QObject* parent)
     //  separate band-max ceiling array we do NOT port here — Phase 3C's
     //  setPowerUsingTargetDbm math kernel sources its slider value from
     //  this powerByBand array, the ceiling check is independent.)
-    m_powerByBand.fill(50);
+    //
+    // Die 50 ist seit dem 2026-10-29 nicht mehr unsere Vorgabe —
+    // warum, steht bei `kVorgabeLeistungProzent` in TransmitModel.h.
+    m_powerByBand.fill(kVorgabeLeistungProzent);
 }
 
 TransmitModel::~TransmitModel() = default;
@@ -1676,18 +1679,56 @@ void TransmitModel::loadFromSettings(const QString& mac)
     // scope (hardware/<mac>/powerByBand/), parallel to tunePowerByBand —
     // not nested under tx/.  Default 50 W per band on first init.
     // From Thetis console.cs:1813-1814 [v2.10.3.13] — power_by_band default.
+    //
+    // Die Vorgabe ist seit dem 2026-10-29 `kVorgabeLeistungProzent`
+    // (5 %) statt der 50 — siehe TransmitModel.h.
     {
         const QString powerPfx =
             QStringLiteral("hardware/%1/powerByBand/").arg(mac);
+        const QString vorgabe = QString::number(kVorgabeLeistungProzent);
+
+        // ── Die alte Vorgabe einmalig nachziehen (2026-10-29) ─────────
+        //
+        // Eine neue Vorgabe greift nur dort, wo noch nichts steht. In
+        // Martins Einstellungen stand die ALTE 50 bereits ausgeschrieben
+        // — bei drei Geraeten und 33 Baendern —, und dort haette sich
+        // nichts geaendert: „ist immer auf 50."
+        //
+        // Also einmal je Geraet: was noch genau auf der alten Vorgabe
+        // steht, bekommt die neue. Was der Betreiber selbst gesetzt hat
+        // (bei ihm 2, 3, 5, 6, 8, 35), bleibt unberuehrt — eine
+        // Vorgabe ist kein Riegel.
+        constexpr int kAlteVorgabe = 50;
+        const QString merker = QStringLiteral("hardware/%1/powerByBand"
+                                              "AufVorgabeGezogen").arg(mac);
+        const bool schonGezogen =
+            s.value(merker, QStringLiteral("0")).toInt() != 0;
+
+        int gezogen = 0;
         for (int i = 0; i < kBandCount; ++i) {
             const Band band = static_cast<Band>(i);
             const QString key = powerPfx + bandKeyName(band);
-            const int v = s.value(key, QStringLiteral("50")).toInt();
+            int v = s.value(key, vorgabe).toInt();
+            if (!schonGezogen && v == kAlteVorgabe) {
+                v = kVorgabeLeistungProzent;
+                s.setValue(key, vorgabe);
+                ++gezogen;
+            }
             // Direct assignment (bypass setPowerForBand) — load is the
             // canonical state restore; setter would re-persist, emit, and
             // clamp.  We clamp here ourselves to keep AppSettings tampering
             // safe.
             m_powerByBand[static_cast<std::size_t>(i)] = std::clamp(v, 0, 100);
+        }
+        if (!schonGezogen) {
+            s.setValue(merker, QStringLiteral("1"));
+            if (gezogen > 0) {
+                qInfo().nospace()
+                    << "Sendeleistung: " << gezogen << " Baender von "
+                    << kAlteVorgabe << " % auf die neue Vorgabe "
+                    << kVorgabeLeistungProzent << " % gezogen (" << mac
+                    << "); selbst gesetzte Werte blieben stehen";
+            }
         }
     }
 
