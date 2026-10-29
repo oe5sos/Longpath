@@ -437,6 +437,10 @@ private:
     /// und Sprache hat keine konstante Huellkurve.
     bool     m_inTx{false};
     double   m_fwdPeakW{0.0};
+    /// Bis wann nach dem Loesen keine Leistungswerte angenommen
+    /// werden (Uhrzeit in ms). Der Messwertstrom der Flex laeuft
+    /// dem Loesen hinterher, siehe wireControls().
+    qint64   m_fwdSperreBisMs{0};
     // 3. RF Power
     QSlider* m_rfPowerSlider  = nullptr;
     QLabel*  m_rfPowerValue   = nullptr;

@@ -187,6 +187,7 @@
 #include <QLabel>
 #include <QMenu>
 #include <QPushButton>
+#include <QDateTime>
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QSpinBox>
@@ -920,6 +921,35 @@ void TxApplet::wireControls()
         // (MainWindow Connect 2, KG4VCF-Befund 2026-05-25).
         if (m_model && m_model->isAnyExternalAmpInOperate()) { return; }
 
+        // ── Nach dem Loesen kommen noch Werte von vorhin (2026-10-29) ──
+        //
+        // Betreiber: „dann klicke ich auf off mox und es sendet noch
+        // weiter". Gemessen hat er recht gesehen und doch nicht:
+        //
+        //   20:43:16.454  MOX aus
+        //   20:43:16.455  Flex: geloest
+        //   20:43:16.456  Empfang nach dem Loesen wieder da — 1 ms
+        //
+        // Der Befehl ging in derselben Millisekunde hinaus und die
+        // Maschine hoerte sofort auf. Ihr MESSWERTSTROM aber laeuft
+        // hinterher: nach dem Loesen treffen noch Pakete ein, die die
+        // Sendeleistung von vorhin tragen, und die schieben den Balken
+        // wieder hoch. Am Schirm sieht das aus wie ein Sender, der
+        // nicht aufhoert — bei einer Endstufe in der Leitung ist das
+        // kein Schoenheitsfehler.
+        //
+        // Also anderthalb Sekunden lang nichts annehmen. Ein Tasten
+        // von der Maschine aus (Taste am Mikrofon) kommt danach wieder
+        // durch; es dauert nur kurz laenger, bis der Balken folgt.
+        if (!m_inTx && m_fwdSperreBisMs > 0) {
+            if (QDateTime::currentMSecsSinceEpoch() < m_fwdSperreBisMs) {
+                m_fwdPowerSmoothedW = 0.0;
+                if (m_swrGauge) { m_swrGauge->setValue(1.0); }
+                return;
+            }
+            m_fwdSperreBisMs = 0;
+        }
+
         // ── Waehrend des Sendens die SPITZE halten (2026-10-29) ─────
         //
         // Betreiber, an der FLEX-8400: „leider sieht man die werte
@@ -1004,7 +1034,12 @@ void TxApplet::wireControls()
             // vorhin da (siehe den Spitzenwerthalt oben).
             m_inTx = active;
             m_fwdPeakW = 0.0;
-            if (active) { return; }      // rising-edge: smoothing takes over
+            if (active) {
+                m_fwdSperreBisMs = 0;
+                return;                  // rising-edge: smoothing takes over
+            }
+            // Siehe oben: der Messwertstrom laeuft dem Loesen nach.
+            m_fwdSperreBisMs = QDateTime::currentMSecsSinceEpoch() + 1500;
             m_fwdPowerSmoothedW = 0.0;
             if (m_fwdPowerGauge) { m_fwdPowerGauge->setValue(0.0); }
             if (m_swrGauge)      { m_swrGauge->setValue(1.0); }
