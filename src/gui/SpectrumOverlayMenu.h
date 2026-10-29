@@ -72,6 +72,10 @@ public:
     /// Wasserfall-Reglern, und wird beim Oeffnen nachgezogen.
     void setSpectrumRenderModeIndex(int renderModeIndex);
 
+    /// Nachziehen beim Oeffnen, wie der Modus darueber: true = die
+    /// 3D-Flaeche ist frequenztreu (jede Zeile volle Breite).
+    void setDss3dTrueScale(bool on);
+
 signals:
     void wfColorGainChanged(int gain);
     void wfBlackLevelChanged(int level);
@@ -85,6 +89,10 @@ signals:
     void panFillChanged(bool on);
     /// 0 = 2D (Trasse + Wasserfall), 1 = 3D (gestapelte Trassen).
     void spectrumRenderModeChanged(int mode);
+    /// true = jede Zeile der 3D-Flaeche behaelt die volle Breite, eine
+    /// Spitze steht also ueber ihrer Frequenz und deckt sich mit dem
+    /// Wasserfall darunter.
+    void dss3dTrueScaleChanged(bool on);
     void refLevelChanged(float dBm);
     void dynRangeChanged(float dB);
     void ctunChanged(bool enabled);
@@ -115,6 +123,7 @@ private:
     QSlider*   m_fillAlphaSlider{nullptr};
     QCheckBox* m_panFillCheck{nullptr};
     QComboBox* m_renderModeCombo{nullptr};
+    QCheckBox* m_trueScaleCheck{nullptr};
     QSlider*   m_refLevelSlider{nullptr};
     QSlider*   m_dynRangeSlider{nullptr};
     QLabel*    m_wfGainLabel{nullptr};

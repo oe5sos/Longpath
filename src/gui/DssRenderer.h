@@ -99,6 +99,15 @@ public:
     // GPU height-map path can apply the SAME formulas from a uniform block
     // — single source of truth, CPU and GPU can't drift apart.
     static constexpr float kBackWidthFrac     = 0.60f;  // back row width / front
+    // Frequency-true depth: every row keeps the full width, so a column is
+    // the same frequency in every row and a carrier stands straight above
+    // its place on the scale. Measured on the operator's picture
+    // (2026-10-28): with kBackWidthFrac a carrier at 14.0758 MHz drew its
+    // ridge at 14.1066 -- 31 kHz toward the centre, because the back row is
+    // only 60 % as wide. The waterfall underneath never narrows, so the two
+    // pictures disagreed by that much. Depth is then carried by the rise to
+    // the back, the haze and the dimming alone.
+    static constexpr float kTrueScaleWidthFrac = 1.0f;
     static constexpr float kDepthSpanFrac     = 0.58f;  // baseline rise to the back
     static constexpr float kFrontMaxRidgeFrac = 0.46f;  // front ridge height / plot H
     static constexpr float kHaze              = 0.16f;  // fade toward bg with depth
@@ -111,6 +120,12 @@ public:
     // impulse rejection, and a light temporal blend, then store it as the
     // newest (front) trace.
     void pushRow(const QVector<float>& binsDbm);
+
+    // Width of the back row relative to the front one. kBackWidthFrac is
+    // the ported AetherSDR perspective; kTrueScaleWidthFrac keeps every row
+    // frequency-true. Values outside [0.3, 1.0] are clamped.
+    void setBackWidthFrac(float frac);
+    float backWidthFrac() const { return m_backWidthFrac; }
 
     void invalidate() { m_dirty = true; }
     bool hasData() const { return m_count > 0; }
@@ -146,6 +161,7 @@ private:
 
     // Circular store: m_head indexes the newest row.
     std::array<std::array<float, kCols>, kRows> m_rows{};
+    float m_backWidthFrac = kTrueScaleWidthFrac;  // see setBackWidthFrac
     int  m_head  = 0;   // index of the newest row
     int  m_count = 0;   // number of valid rows (0..kRows)
     bool m_dirty = true;

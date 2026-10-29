@@ -988,6 +988,9 @@ void SpectrumWidget::loadSettings()
 
     int renderMode = readInt(QStringLiteral("DisplaySpectrumRenderMode"), 0);
     m_renderMode = static_cast<SpectrumRenderMode>(qBound(0, renderMode, 1));
+    m_dss3dTrueScale = readBool(QStringLiteral("Display3DTrueScale"), true);
+    m_dss.setBackWidthFrac(m_dss3dTrueScale ? DssRenderer::kTrueScaleWidthFrac
+                                            : DssRenderer::kBackWidthFrac);
 
     // Phase 3G-8 commit 3: spectrum renderer state.
     // DisplayAverageMode + DisplayAverageAlpha are retired keys (v0.3.0
@@ -1391,6 +1394,8 @@ void SpectrumWidget::saveSettings()
               m_overlayPanelExpanded ? QStringLiteral("True") : QStringLiteral("False"));
     writeInt(QStringLiteral("DisplayWfColorScheme"), static_cast<int>(m_wfColorScheme));
     writeInt(QStringLiteral("DisplaySpectrumRenderMode"), static_cast<int>(m_renderMode));
+    s.setValue(settingsKey(QStringLiteral("Display3DTrueScale"), m_panIndex),
+              m_dss3dTrueScale ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayCtunEnabled"), m_panIndex),
               m_ctunEnabled ? QStringLiteral("True") : QStringLiteral("False"));
 
@@ -1747,6 +1752,19 @@ void SpectrumWidget::setSpectrumRenderMode(SpectrumRenderMode mode)
     // DssRenderer.h). Also frees the CPU work of building a QImage nobody
     // sees while the mode is off.
     m_dss.clear();
+    m_dss3dNeedsUpload = true;
+    update();
+}
+
+void SpectrumWidget::setDss3dTrueScale(bool on)
+{
+    if (m_dss3dTrueScale == on) { return; }
+    m_dss3dTrueScale = on;
+    m_dss.setBackWidthFrac(on ? DssRenderer::kTrueScaleWidthFrac
+                              : DssRenderer::kBackWidthFrac);
+    scheduleSettingsSave();
+    // The stored rows stay valid -- only their geometry changes -- so the
+    // surface redraws from the same history instead of starting empty.
     m_dss3dNeedsUpload = true;
     update();
 }
@@ -10100,6 +10118,8 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                         setSpectrumRenderMode(idx == 1 ? SpectrumRenderMode::Mode3D
                                                        : SpectrumRenderMode::Mode2D);
                     });
+            connect(m_overlayMenu, &SpectrumOverlayMenu::dss3dTrueScaleChanged,
+                    this, [this](bool on) { setDss3dTrueScale(on); });
             connect(m_overlayMenu, &SpectrumOverlayMenu::panFillChanged,
                     this, [this](bool v) { m_panFill = v; update(); scheduleSettingsSave(); });
             connect(m_overlayMenu, &SpectrumOverlayMenu::refLevelChanged,
@@ -10128,6 +10148,7 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         // war (siehe setSpectrumRenderModeIndex dort).
         m_overlayMenu->setSpectrumRenderModeIndex(
             m_renderMode == SpectrumRenderMode::Mode3D ? 1 : 0);
+        m_overlayMenu->setDss3dTrueScale(m_dss3dTrueScale);
         // The frequency under the cursor, captured at popup time: the
         // popup outlives the press, and by the time the button is clicked
         // the pointer has moved onto the popup itself.
