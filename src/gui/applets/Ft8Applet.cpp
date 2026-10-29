@@ -516,6 +516,11 @@ void Ft8Applet::buildUI()
         m_qsoGemeldet = false;
         m_ablauf.starteAlsAnrufer(eigenesRufzeichen(), eigenerLocator());
         m_cqVersucheOffen = m_cqVersucheSpin ? m_cqVersucheSpin->value() : 1;
+
+        // Dieselbe Zahl auch dem Ablauf sagen. Ohne diese Zeile zaehlte
+        // er fuer sich bis fuenf und brach ab, waehrend hier noch elf
+        // Versuche offen standen (gemessen am 2026-10-29, 12:47:12).
+        m_ablauf.setzeCqWiederholungen(m_cqVersucheOffen);
         ablaufSchritt();
     });
     sendRow->addWidget(m_cqRufenBtn);

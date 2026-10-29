@@ -76,7 +76,29 @@ public:
     /// Wie oft dieselbe Nachricht ohne passende Antwort wiederholt
     /// wird, bevor aufgegeben wird. WSJT-X nimmt hier voreingestellt
     /// ebenfalls eine kleine Zahl; mehr hilft selten und sendet lange.
+    ///
+    /// Gilt fuer die Zuege MITTEN im QSO. Fuer den CQ-Ruf selbst
+    /// entscheidet der Betreiber -- siehe `setzeCqWiederholungen`.
     static constexpr int kMaxWiederholungen = 5;
+
+    /// Wie oft ein CQ-Ruf sich wiederholt, bevor der Ablauf aufgibt.
+    ///
+    /// ── Warum das getrennt ist (2026-10-29) ─────────────────────────
+    ///
+    /// Es gab zwei Zaehler fuer dieselbe Sache, und der kleinere hat
+    /// gewonnen -- der, den der Betreiber nicht sehen konnte. Im
+    /// Fenster stand „x16"; der Ruf brach nach der FUENFTEN Sendung ab,
+    /// weil `fensterVerstrichen()` hier starr `kMaxWiederholungen`
+    /// nahm. Am Geraet gemessen (Protokoll 2026-10-29, 12:45:00 bis
+    /// 12:47:12): genau fuenf Sendungen, danach kein „Senden
+    /// vorbereitet" mehr. Betreiber, zweimal: „anschliessend wieder
+    /// keine Leistung nach dem dritten oder vierten Durchgang".
+    ///
+    /// Die Zahl des Betreibers gilt jetzt fuer den Ruf. Die Fuenf
+    /// bleibt, wo sie hingehoert: ein hoeflicher Zug im laufenden QSO
+    /// wird nicht sechzehnmal wiederholt.
+    void setzeCqWiederholungen(int n);
+    int  cqWiederholungen() const { return m_cqWiederholungen; }
 
     /// Ich antworte auf ein gehoertes CQ.
     /// `snr` ist das, was ICH von ihm gemessen habe — es wird spaeter
@@ -158,6 +180,7 @@ private:
     int     m_reportGesendet{kKeinReport};
     int     m_reportEmpfangen{kKeinReport};
     int     m_wiederholungen{0};
+    int     m_cqWiederholungen{kMaxWiederholungen};
 };
 
 } // namespace Longpath

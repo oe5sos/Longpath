@@ -11,6 +11,7 @@
 // =================================================================
 #include "Ft8Ablauf.h"
 
+#include <QtGlobal>
 #include <QRegularExpression>
 #include <QStringList>
 
@@ -271,9 +272,21 @@ void Ft8Ablauf::fensterVerstrichen()
     }
 
     ++m_wiederholungen;
-    if (m_wiederholungen >= kMaxWiederholungen) {
+
+    // Der CQ-Ruf laeuft so oft, wie der Betreiber es im Fenster
+    // eingestellt hat; alles andere bleibt bei den fuenf Zuegen.
+    const int grenze = m_zustand == Zustand::RufeCq ? m_cqWiederholungen
+                                                    : kMaxWiederholungen;
+    if (m_wiederholungen >= grenze) {
         m_zustand = Zustand::Abgebrochen;
     }
+}
+
+void Ft8Ablauf::setzeCqWiederholungen(int n)
+{
+    // Eine Null oder etwas Negatives wuerde den Ruf im ersten Fenster
+    // abwuergen; die Obergrenze ist dieselbe wie im Drehfeld.
+    m_cqWiederholungen = qBound(1, n, 30);
 }
 
 void Ft8Ablauf::abbrechen()
