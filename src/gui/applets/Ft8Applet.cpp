@@ -1101,6 +1101,25 @@ void Ft8Applet::sendeNachricht(const QString& text)
     if (!m_sendeTimer) {
         m_sendeTimer = new QTimer(this);
         m_sendeTimer->setSingleShot(true);
+        // ── Genau, nicht grob (2026-10-29) ───────────────────────────
+        //
+        // Qt gibt jedem Taktgeber ab 20 ms von sich aus
+        // `Qt::CoarseTimer` und erlaubt sich dabei, bis zu FUENF
+        // PROZENT des Intervalls zu frueh zu wecken — damit mehrere
+        // Taktgeber gemeinsam aufwachen koennen. Bei FT8 wird hier auf
+        // die naechste Fenstergrenze gewartet, und das sind bis zu
+        // 17,8 s. Fuenf Prozent davon sind 0,89 s.
+        //
+        // Am Geraet gemessen (Protokoll 2026-10-29, 07:02 bis 07:04,
+        // fuenf Sendungen): MOX ging bei :29,21 an statt bei :30,00 —
+        // 0,779 / 0,787 / 0,786 / 0,786 / 0,786 s zu frueh, jedes Mal.
+        // Die Rechnung in `Ft8Tx::bisZumNaechsten` war dabei richtig;
+        // der Taktgeber hat sie verworfen. Betreiber: „die empfangs
+        // und sendezeit stimmt nicht."
+        //
+        // Die Systemuhr war es nicht: `sntp time.apple.com` meldete
+        // im selben Augenblick +37 ms.
+        m_sendeTimer->setTimerType(Qt::PreciseTimer);
     }
     m_sendeTimer->disconnect();
     const QString gesendet = sauber;
@@ -1174,8 +1193,17 @@ void Ft8Applet::sendeNachricht(const QString& text)
         // Der Zuschlag von 300 ms bleibt: er sorgt dafuer, dass der
         // letzte Ton wirklich draussen ist, bevor der Sender
         // abschaltet.
-        QTimer::singleShot(Ft8Tx::signalMs(protocol()) + 300, this,
-                           [this]() { fensterZuEnde(); });
+        // Auch hier genau: ein Grobtimer duerfte bis zu 0,65 s zu
+        // frueh abschalten und damit den Schluss des Signals
+        // abschneiden (siehe `setTimerType` oben).
+        QTimer* schluss = new QTimer(this);
+        schluss->setSingleShot(true);
+        schluss->setTimerType(Qt::PreciseTimer);
+        connect(schluss, &QTimer::timeout, this, [this, schluss]() {
+            schluss->deleteLater();
+            fensterZuEnde();
+        });
+        schluss->start(Ft8Tx::signalMs(protocol()) + 300);
     });
     m_sendeTimer->start(static_cast<int>(wartet));
 }

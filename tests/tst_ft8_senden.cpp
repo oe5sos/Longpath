@@ -27,6 +27,7 @@
 #include <QtTest>
 #include <QSpinBox>
 #include <QTimer>
+#include <QDateTime>
 
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Tx.h"
@@ -637,6 +638,62 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(
             applet.listRxForTest()->toPlainText()
                 .contains(QStringLiteral("CQ OE5SOS JN67")), 3000);
+
+        applet.abbrechen();
+    }
+
+    // ── Der Sendetaktgeber muss GENAU sein ──────────────────────────
+    //
+    // Qt gibt jedem Taktgeber ab 20 ms von sich aus `Qt::CoarseTimer`
+    // und erlaubt sich dabei, bis zu fuenf Prozent des Intervalls zu
+    // frueh zu wecken. Bei FT8 wird hier auf die naechste
+    // Fenstergrenze gewartet — bis zu 17,8 s, also bis zu 0,89 s
+    // Vorlauf.
+    //
+    // Am Geraet gemessen (2026-10-29, 07:02 bis 07:04, fuenf
+    // Sendungen): MOX ging bei :29,21 an statt bei :30,00 — 0,779 /
+    // 0,787 / 0,786 / 0,786 / 0,786 s zu frueh, jedes Mal dieselbe
+    // Groesze. Die Rechnung in `Ft8Tx::bisZumNaechsten` war dabei
+    // richtig (der Lauf `derZeitplanStimmt` darueber belegt sie); der
+    // Taktgeber hat sie verworfen. Die Systemuhr war es nicht, `sntp`
+    // meldete im selben Augenblick +37 ms.
+    //
+    // Die Gegenprobe steht im Lauf selbst: ein frischer Taktgeber
+    // bekommt Qts Vorgabe, und die ist NICHT genau. Ohne die Zeile im
+    // Sendeweg stuende hier dasselbe.
+    void derSendetaktgeberIstGenau()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        // Gegenprobe zuerst: so waere es ohne die Einstellung.
+        QTimer vorgabe;
+        vorgabe.setSingleShot(true);
+        QCOMPARE(vorgabe.timerType(), Qt::CoarseTimer);
+
+        applet.sendeNachricht(QStringLiteral("CQ OE5SOS JN67"));
+        QVERIFY2(applet.sendetGerade(), "die Sendung muss eingeplant sein");
+
+        QTimer* t = applet.sendeTimerForTest();
+        QVERIFY(t);
+        QCOMPARE(t->timerType(), Qt::PreciseTimer);
+
+        // Und die bestellte Wartezeit muss auf einer Fenstergrenze
+        // enden. 15 s teilen die Minute, also liegt jede Grenze auf
+        // :00, :15, :30 oder :45 — der Rest gegen 15 000 ms ist null.
+        const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+        const qint64 ziel  = jetzt + t->remainingTime();
+        const qint64 rest  = ziel % 15000;
+        // Zwischen dem Einplanen und dieser Zeile liegt Rechenzeit;
+        // 150 ms Spiel sind dafuer, nicht fuer den Taktgeber.
+        QVERIFY2(rest < 150 || rest > 14850,
+                 qPrintable(QStringLiteral("Ziel liegt %1 ms neben der "
+                                           "Fenstergrenze").arg(rest)));
 
         applet.abbrechen();
     }
