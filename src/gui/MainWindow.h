@@ -1993,6 +1993,12 @@ private:
     // (gemessen). Solange er unbekannt ist, wird nichts gezeichnet:
     // lieber kein Bild als ein Bild an der falschen Frequenz.
     double m_flexSpanLowHz{0.0};
+    /// Das letzte Empfangsbild, das beim Senden stehenbleibt, samt
+    /// dem Ausschnitt, zu dem es gehoert. Siehe MainWindow_Flex.cpp,
+    /// „Beim Senden das Bandbild halten".
+    QVector<float> m_flexBildFrost;
+    double m_flexBildFrostLowHz{0.0};
+    double m_flexBildFrostHighHz{0.0};
     double m_flexSpanHighHz{0.0};
 
     // ── SunSDR-Bild (2026-08-24) ──────────────────────────────────────

@@ -961,7 +961,52 @@ void MainWindow::wireFlex()
             m_clarityController->feedBins(dbm);
         }
 
-        sw->updateKiwiSpectrumDbm(dbm, m_flexSpanLowHz, m_flexSpanHighHz);
+        // ── Beim Senden das Bandbild halten (2026-10-29) ─────────────
+        //
+        // Betreiber: „wenn ich sende ist alles blau, das sollte so
+        // aber nicht sein."
+        //
+        // Er hat recht gesehen und die Maschine macht nichts falsch:
+        // beim Tasten schlieszt die Flex ihren Empfaenger
+        // (`full_duplex_enabled=0`, an der Maschine abgefragt), und was
+        // dann noch im Bild steht, ist die eigene Aussendung und
+        // sonst Rauschen. An einer Antenne waere es auch nicht anders
+        // zu machen: das eigene Signal macht den Empfaenger taub.
+        //
+        // Also wird das letzte Empfangsbild festgehalten und die
+        // Sendung darueber gelegt — je Bin der groeszere der beiden
+        // Werte. Das Band bleibt stehen, wo es war, und das eigene
+        // Signal waechst sichtbar hinein.
+        //
+        // Festgehalten wird nur, solange der Ausschnitt derselbe ist:
+        // wer waehrend des Sendens die Scheibe verschiebt, bekaeme
+        // sonst ein Bild von einer anderen Stelle des Bandes
+        // untergelegt.
+        const bool sendet = m_radioModel->flexSendetGerade()
+                            || m_flexSelbstGetastet;
+        const bool gleicherAusschnitt =
+            m_flexBildFrostLowHz == m_flexSpanLowHz
+            && m_flexBildFrostHighHz == m_flexSpanHighHz
+            && m_flexBildFrost.size() == dbm.size();
+
+        if (!sendet) {
+            m_flexBildFrost        = dbm;
+            m_flexBildFrostLowHz   = m_flexSpanLowHz;
+            m_flexBildFrostHighHz  = m_flexSpanHighHz;
+            sw->updateKiwiSpectrumDbm(dbm, m_flexSpanLowHz, m_flexSpanHighHz);
+            return;
+        }
+
+        if (!gleicherAusschnitt || m_flexBildFrost.isEmpty()) {
+            sw->updateKiwiSpectrumDbm(dbm, m_flexSpanLowHz, m_flexSpanHighHz);
+            return;
+        }
+
+        QVector<float> gelegt = m_flexBildFrost;
+        for (int i = 0; i < gelegt.size(); ++i) {
+            gelegt[i] = std::max(gelegt[i], dbm[i]);
+        }
+        sw->updateKiwiSpectrumDbm(gelegt, m_flexSpanLowHz, m_flexSpanHighHz);
     });
 
     // ── Aufraeumen beim Trennen ─────────────────────────────────────
