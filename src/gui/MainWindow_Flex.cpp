@@ -1010,16 +1010,45 @@ void MainWindow::wireFlex()
 // selbst. Es geht also KEIN fertiges Signal hinaus, sondern roher
 // Mikrofonton, und die Maschine macht daraus SSB. Deshalb haengt hier
 // auch nichts am TX-Kanal, sondern direkt an `AudioEngine::pullTxMic`.
+// ── Was jetzt faellig ist ────────────────────────────────────────────
+//
+// Die ganze Behebung vom 2026-10-29 in vier Zeilen: nicht „ein Schlag,
+// ein fester Block", sondern „so viel, wie die Uhr sagt". Siehe
+// MainWindow.h bei `m_flexSendeUhr` fuer die Messung, die dahinter
+// steht.
+qint64 MainWindow::flexFaelligeRahmen(qint64 nsecsVerstrichen,
+                                      qint64 geliefert,
+                                      qint64 rateHz,
+                                      qint64 maxRahmen)
+{
+    if (nsecsVerstrichen < 0 || rateHz <= 0 || maxRahmen <= 0) { return 0; }
+    const qint64 faellig = (nsecsVerstrichen * rateHz) / 1000000000LL;
+    const qint64 offen   = faellig - geliefert;
+    if (offen <= 0) { return 0; }
+    return std::min(offen, maxRahmen);
+}
+
 void MainWindow::verdrahteFlexSenden()
 {
     if (!m_radioModel) { return; }
 
     // ── Die Mikrofonpumpe ────────────────────────────────────────────
     //
-    // 5 ms, wie die Pumpe des OpenHPSDR-Wegs (TxWorkerThread). Bei
-    // 48 kHz sind das 240 Rahmen je Durchgang; die Maschine will
-    // Pakete zu 128 Rahmen, der Rest bleibt in RadioModel liegen und
-    // geht beim naechsten Mal mit.
+    // 5 ms, wie die Pumpe des OpenHPSDR-Wegs (TxWorkerThread). Die
+    // Maschine will Pakete zu 128 Rahmen, der Rest bleibt in
+    // RadioModel liegen und geht beim naechsten Mal mit.
+    //
+    // ── Die Uhr gibt den Takt, nicht der Taktgeber (2026-10-29) ──────
+    //
+    // Hier standen starre 480 Rahmen je Schlag. Das war zweierlei
+    // falsch: 480 sind zehn Millisekunden, nicht fuenf — und vor allem
+    // kommt der Schlag auf einem malenden Hauptfaden nicht alle 5 ms.
+    // Gemessen wurden 8,7 bis 34 ms, und damit ging der Ton zwischen
+    // 0,27- und 1,15-fach schnell hinaus (siehe MainWindow.h bei
+    // `m_flexSendeUhr`).
+    //
+    // Der Sendeton ist ein Echtzeitstrom. Also wird gerechnet, was
+    // faellig ist, statt zu zaehlen, wie oft geweckt wurde.
     if (!m_flexSendePumpe) {
         m_flexSendePumpe = new QTimer(this);
         m_flexSendePumpe->setInterval(5);
@@ -1029,7 +1058,26 @@ void MainWindow::verdrahteFlexSenden()
             AudioEngine* ae = m_radioModel->audioEngine();
             if (!ae) { return; }
 
-            constexpr int kRahmen = 480;   // 10 ms Vorrat bei 48 kHz
+            // Der Sendeweg laeuft auf 48 kHz (RadioModel.cpp:2648,
+            // `Ft8TxSource(48000)`).
+            constexpr qint64 kRateHz = 48000;
+
+            // Hoechstens 100 ms auf einen Schlag. Ein langer Haenger
+            // soll aufgeholt werden, aber nicht als eine halbe Sekunde
+            // Ton in einem Schwall: der Rueckstand bleibt im Zaehler
+            // stehen und geht beim naechsten Schlag mit.
+            constexpr qint64 kMaxRahmen = kRateHz / 10;
+
+            if (!m_flexSendeUhr.isValid()) { return; }
+            const qint64 offen = flexFaelligeRahmen(
+                m_flexSendeUhr.nsecsElapsed(), m_flexSendeGeliefert,
+                kRateHz, kMaxRahmen);
+            if (offen <= 0) { return; }
+            m_flexSendeRueckstand = std::max(
+                m_flexSendeRueckstand,
+                (m_flexSendeUhr.nsecsElapsed() * kRateHz) / 1000000000LL
+                    - m_flexSendeGeliefert);
+            const int kRahmen = int(offen);
             m_flexMikMono.resize(kRahmen);
 
             // ── Wer gerade spricht (2026-10-28) ──────────────────────
@@ -1114,7 +1162,8 @@ void MainWindow::verdrahteFlexSenden()
             }
             m_radioModel->sendeFlexMikrofonton(m_flexMikStereo.constData(),
                                                geholt);
-            m_flexTxProben += geholt;
+            m_flexTxProben      += geholt;
+            m_flexSendeGeliefert += geholt;
         });
     }
 
@@ -1184,6 +1233,9 @@ void MainWindow::verdrahteFlexSenden()
             m_flexTxProben    = 0;
             m_flexTxVomMik    = 0;
             m_flexTxSpitze    = 0.0f;
+            m_flexSendeGeliefert  = 0;
+            m_flexSendeRueckstand = 0;
+            m_flexSendeUhr.start();
             m_flexSelbstGetastet = m_radioModel->flexTasten(true);
             if (m_flexSelbstGetastet && m_flexSendePumpe) {
                 m_flexSendePumpe->start();
@@ -1194,6 +1246,9 @@ void MainWindow::verdrahteFlexSenden()
             }
         } else {
             if (m_flexSendePumpe) { m_flexSendePumpe->stop(); }
+            const qint64 getastetMs = m_flexSendeUhr.isValid()
+                                          ? m_flexSendeUhr.elapsed() : 0;
+            m_flexSendeUhr.invalidate();
             m_radioModel->flexTasten(false);
             m_flexSelbstGetastet = false;
             // Ab hier laeuft die Uhr: die naechste Hoerperiode ist nur
@@ -1212,6 +1267,13 @@ void MainWindow::verdrahteFlexSenden()
             // weil es diese Zeile noch nicht gab.
             //
             // 12,64 s FT8 bei 24 kHz sind rund 303.000 Proben.
+            //
+            // Dazu seit dem 2026-10-29 die GESCHWINDIGKEIT: der
+            // Sendeton ist ein Echtzeitstrom, und eine Eins davor
+            // heiszt, dass er so hinausging, wie er gemeint war.
+            // Stand hier 0,27, kam beim Gegenueber ein auf das
+            // Vierfache gedehntes Signal an — oder gar keines.
+            const double sollRahmen = std::max(1.0, double(getastetMs) * 48.0);
             qCInfo(lcFlexGui).nospace()
                 << "Flex-Senden: " << m_flexTxProben
                 << " Proben hinaus, Spitze "
@@ -1219,7 +1281,10 @@ void MainWindow::verdrahteFlexSenden()
                         ? 20.0 * std::log10(m_flexTxSpitze)
                         : -150.0)
                 << " dBFS, " << m_flexTxVomMik
-                << " Zuege am Mikrofon statt an FT8";
+                << " Zuege am Mikrofon statt an FT8, Tempo "
+                << (double(m_flexTxProben) / sollRahmen)
+                << "-fach, groeszter Rueckstand "
+                << (m_flexSendeRueckstand / 48) << " ms";
 
             // Die Sendepause ist KEINE Taktabweichung. Ohne diese
             // Zeile liest der Driftausgleich den leergelaufenen
