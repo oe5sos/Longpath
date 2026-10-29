@@ -294,6 +294,44 @@ private slots:
         QCOMPARE(zweite.flexDarfSenden(), true);
     }
 
+    // ── Die Aussteuerung des Mikrofonwegs (2026-10-29) ──────────────
+    //
+    // Am Geraet gemessen, dasselbe Programm und dieselbe Einstellung,
+    // nur ein anderes Mikrofon:
+    //
+    //   18:56  MICPEAK  +2,54 dBFS  ->  FWDPWR 35,4 dBm = 3,4 W
+    //   20:15  MICPEAK  −9,72 dBFS  ->  FWDPWR 18,6 dBm = 73 mW
+    //
+    // Der Flex-Sendeweg hat als einziger keine Verstaerkungsstufe —
+    // der Ton geht roh an die Maschine. Hier wird der Regler
+    // festgenagelt: Grenzen, Vorgabe und dass er nur bei einer echten
+    // Aenderung meldet.
+    void dieMikrofonaussteuerungHaeltIhreGrenzen()
+    {
+        RadioModel radio;
+        QSignalSpy gain(&radio, &RadioModel::flexMikGainGeaendert);
+
+        // Vorgabe ist 0 dB: roh hinaus, wie vor dem 2026-10-29.
+        QCOMPARE(radio.flexMikGainDb(), 0);
+
+        radio.setzeFlexMikGainDb(12);
+        QCOMPARE(radio.flexMikGainDb(), 12);
+        QCOMPARE(gain.count(), 1);
+        QCOMPARE(gain.takeFirst().at(0).toInt(), 12);
+
+        // Derselbe Wert noch einmal ist keine Aenderung.
+        radio.setzeFlexMikGainDb(12);
+        QCOMPARE(gain.count(), 0);
+
+        // Oben und unten geklemmt. Ueber +30 dB braucht es den Regler
+        // nicht mehr — dort faengt der Riegel bei −1 dBFS in der Pumpe
+        // ohnehin alles ab.
+        radio.setzeFlexMikGainDb(999);
+        QCOMPARE(radio.flexMikGainDb(), 30);
+        radio.setzeFlexMikGainDb(-999);
+        QCOMPARE(radio.flexMikGainDb(), -20);
+    }
+
     void dieVerriegelungWirdGelesen()
     {
         RadioModel radio;

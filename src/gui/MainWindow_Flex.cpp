@@ -1174,11 +1174,17 @@ void MainWindow::verdrahteFlexSenden()
                 // der Wandler der Flex ohnehin nicht mehr darstellen
                 // kann.
                 constexpr float kMikGrenze = 0.891f;   // −1,0 dBFS
+                // Die Aussteuerung von Hand (siehe RadioModel.h,
+                // flexMikGainDb()). 0 dB heiszt: roh hinaus, wie bisher.
+                const int gainDb = m_radioModel->flexMikGainDb();
+                const float faktor =
+                    (gainDb == 0) ? 1.0f
+                                  : std::pow(10.0f, float(gainDb) / 20.0f);
                 float roh = 0.0f;
                 for (int i = 0; i < geholt; ++i) {
-                    roh = std::max(roh, std::abs(m_flexMikMono[i]));
-                    m_flexMikMono[i] = std::clamp(m_flexMikMono[i],
-                                                  -kMikGrenze, kMikGrenze);
+                    const float v = m_flexMikMono[i] * faktor;
+                    roh = std::max(roh, std::abs(v));
+                    m_flexMikMono[i] = std::clamp(v, -kMikGrenze, kMikGrenze);
                 }
                 m_flexTxSpitze = std::max(m_flexTxSpitze, roh);
                 if (roh > kMikGrenze && !m_flexMikZuLaut) {

@@ -433,6 +433,70 @@ void TxApplet::buildUI()
         m_tunePwrSlider->setFixedHeight(16);
         mess->addLayout(row);
     }
+
+    // ── Mikrofonaussteuerung, nur am Flex-Weg (2026-10-29) ──────────────────
+    //
+    // Der Flex-Sendeweg geht an keiner WDSP-Kette vorbei, sondern roh
+    // von der Mikrofonbuchse an die Maschine — und hat deshalb als
+    // einziger Sendeweg gar keine Verstaerkungsstufe. Am Geraet
+    // gemessen: dasselbe Programm, dieselbe Einstellung, zwei
+    // Mikrofone, +2,54 dBFS gegen −9,72 dBFS, 3,4 W gegen 73 mW.
+    //
+    // Darum steht der Regler hier und nirgends sonst: an den anderen
+    // Geraeten macht die Kette das, und zwei Regler fuer dieselbe Sache
+    // waeren einer zu viel. Er zeigt sich erst, wenn eine Flex
+    // verbunden ist (siehe zeigeFlexMikRegler()).
+    {
+        m_flexMikSlider = new QSlider(Qt::Horizontal, this);
+        m_flexMikSlider->setRange(-20, 30);
+        m_flexMikSlider->setValue(0);
+        m_flexMikSlider->setAccessibleName(QStringLiteral("Flex mic gain"));
+        m_flexMikSlider->setObjectName(QStringLiteral("TxFlexMicGainSlider"));
+        m_flexMikSlider->setToolTip(
+            QStringLiteral("Microphone gain for the FlexRadio transmit path "
+                           "(dB). The radio does the SSB processing itself; "
+                           "this only sets how hot Longpath feeds it. Peaks "
+                           "are limited at -1 dBFS."));
+
+        m_flexMikValue = new QLabel(QStringLiteral("0 dB"), this);
+        auto* row = sliderRow(QStringLiteral("Mic"), m_flexMikSlider,
+                              m_flexMikValue, kTxLabelW);
+        m_flexMikValue->setFixedWidth(46);
+        m_flexMikSlider->setFixedHeight(16);
+        mess->addLayout(row);
+
+        m_flexMikRow = row;
+        m_flexMikSlider->setVisible(false);
+        m_flexMikValue->setVisible(false);
+
+        connect(m_flexMikSlider, &QSlider::valueChanged, this, [this](int db) {
+            m_flexMikValue->setText(QStringLiteral("%1 dB").arg(db));
+            if (m_model) { m_model->setzeFlexMikGainDb(db); }
+        });
+
+        // Sichtbar wird der Regler, sobald eine Flex sich angemeldet
+        // hat, und wieder unsichtbar beim Trennen. Ein Regler, der an
+        // einem ANAN nichts tut, gehoert dort auch nicht hin.
+        if (m_model) {
+            auto zeige = [this](bool an) {
+                if (!m_flexMikSlider) { return; }
+                m_flexMikSlider->setVisible(an);
+                m_flexMikValue->setVisible(an);
+                if (an && m_model) {
+                    const QSignalBlocker sperre(m_flexMikSlider);
+                    m_flexMikSlider->setValue(m_model->flexMikGainDb());
+                    m_flexMikValue->setText(
+                        QStringLiteral("%1 dB").arg(m_model->flexMikGainDb()));
+                }
+            };
+            connect(m_model, &RadioModel::flexGuiClientRegistered, this,
+                    [zeige](const QString&) { zeige(true); });
+            connect(m_model, &RadioModel::connectionStateChanged, this,
+                    [zeige](ConnectionState lage) {
+                if (lage == ConnectionState::Disconnected) { zeige(false); }
+            });
+        }
+    }
     oben->addLayout(mess, 1);
 
     // ── Die Sendetasten ─────────────────────────────────────────────────────
@@ -855,6 +919,31 @@ void TxApplet::wireControls()
         // Dieselbe Torschaltung wie bei der analogen Anzeige
         // (MainWindow Connect 2, KG4VCF-Befund 2026-05-25).
         if (m_model && m_model->isAnyExternalAmpInOperate()) { return; }
+
+        // ── Waehrend des Sendens die SPITZE halten (2026-10-29) ─────
+        //
+        // Betreiber, an der FLEX-8400: „leider sieht man die werte
+        // nicht bei fwd konstant". Zwei Gruende, die sich addieren:
+        //
+        //   * Die Flex schickt FWDPWR NICHT in jedem Messwertpaket
+        //     (RadioModel.cpp, derselbe Befund vom 2026-10-27). Die
+        //     Glaettung laeuft also zwischendurch auf den alten Wert
+        //     zu und faellt ab, obwohl gesendet wird.
+        //   * SSB hat keine konstante Huellkurve. Eine Glaettung ueber
+        //     Sprache zeigt irgendetwas zwischen Null und Spitze — und
+        //     nie die Zahl, die einen Funker interessiert.
+        //
+        // Ein Leistungsmesser am Sender zeigt darum PEP: die hoechste
+        // Spitze, und die bleibt stehen. Hier ist es die Spitze SEIT
+        // DEM TASTEN; beim Loesen faellt sie auf null zurueck (die
+        // Flanke darunter macht das schon).
+        if (m_inTx) {
+            if (fwdW > m_fwdPeakW) { m_fwdPeakW = fwdW; }
+            m_fwdPowerSmoothedW = m_fwdPeakW;
+            if (m_swrGauge) { m_swrGauge->setValue(swr); }
+            return;
+        }
+
         constexpr double kAlpha = 0.30;
         m_fwdPowerSmoothedW = kAlpha * fwdW + (1.0 - kAlpha) * m_fwdPowerSmoothedW;
         if (m_swrGauge) {
@@ -910,6 +999,11 @@ void TxApplet::wireControls()
     if (m_model && m_model->moxController()) {
         connect(m_model->moxController(), &MoxController::moxStateChanged,
                 this, [this](bool active) {
+            // Die Spitze gilt je Sendung: beim Tasten faengt sie bei
+            // null an, sonst stuende beim naechsten Mal noch die von
+            // vorhin da (siehe den Spitzenwerthalt oben).
+            m_inTx = active;
+            m_fwdPeakW = 0.0;
             if (active) { return; }      // rising-edge: smoothing takes over
             m_fwdPowerSmoothedW = 0.0;
             if (m_fwdPowerGauge) { m_fwdPowerGauge->setValue(0.0); }

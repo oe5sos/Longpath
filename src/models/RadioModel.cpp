@@ -623,6 +623,15 @@ RadioModel::RadioModel(QObject* parent)
         }
     }
 
+    // Die Aussteuerung des Flex-Mikrofonwegs, siehe RadioModel.h.
+    // Sie gehoert dem Betreiber und nicht der Maschine: sie sagt, wie
+    // heisz LONGPATH die Flex fuettert, nicht was die Flex damit tut.
+    {
+        const auto& s = AppSettings::instance();
+        m_flexMikGainDb = std::clamp(
+            s.value(QStringLiteral("FlexMikGainDb"), 0).toInt(), -20, 30);
+    }
+
     // Sprachspeicher: Ordner neben die Einstellungsdatei legen und
     // laden. Neben die Einstellungen und nicht in den Programmordner —
     // dort ueberlebt er ein Neuinstallieren, und genau das erwartet
@@ -7407,6 +7416,25 @@ bool RadioModel::setzeFlexSendeleistung(int prozent)
     }
     m_flexConnection->sendCommand(befehl);
     return true;
+}
+
+// Siehe RadioModel.h, flexMikGainDb(): die Zahlen, aus denen dieser
+// Regler entstanden ist, stehen dort.
+void RadioModel::setzeFlexMikGainDb(int db)
+{
+    // −20 dB macht ein zu heiszes Mikrofon brauchbar, +30 dB reicht
+    // vom gemessenen −9,7 dBFS bis an die Vollaussteuerung und darueber
+    // hinaus; weiter oben faengt der Riegel in der Pumpe es ohnehin ab.
+    const int geklemmt = std::clamp(db, -20, 30);
+    if (geklemmt == m_flexMikGainDb) { return; }
+    m_flexMikGainDb = geklemmt;
+
+    auto& s = AppSettings::instance();
+    s.setValue(QStringLiteral("FlexMikGainDb"), QString::number(geklemmt));
+    scheduleSettingsSave();
+
+    qCInfo(lcConnection) << "Flex: Mikrofonaussteuerung" << geklemmt << "dB";
+    emit flexMikGainGeaendert(geklemmt);
 }
 
 bool RadioModel::setzeFlexAbstimmleistung(int prozent)
