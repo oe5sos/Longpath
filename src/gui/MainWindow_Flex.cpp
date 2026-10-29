@@ -456,11 +456,53 @@ void MainWindow::wireFlex()
             if (m_shuttingDown) { return; }
             SliceModel* s = flexControllableSlice();
             if (!s || !m_radioModel) { return; }
-            const double hz = s->frequency();
+            // ── Die Maschine gibt die Frequenz vor (2026-10-29) ─────
+            //
+            // Hier stand `s->frequency()`. Am Geraet gemessen, zwei
+            // Starts hintereinander:
+            //
+            //   Geraet 7.1790 MHz -> Scheibe las 7.2590 MHz
+            //   Geraet 7.3086 MHz -> Scheibe las 7.3886 MHz
+            //
+            // Jedes Mal genau 80 kHz mehr, und jedes Mal drei
+            // Millisekunden NACHDEM der Zwilling oben die Frequenz der
+            // Maschine in die Scheibe zurueckgeschrieben hatte. Woher
+            // die 80 kHz kommen, ist noch offen — der Nachzug schob
+            // damit aber das Geraet aus dem Band, und der Betreiber
+            // stand beim Start fuenfmal hintereinander auszerhalb.
+            //
+            // Also wird hier genommen, was die Maschine SELBST sagt.
+            // Dieselbe Regel steht drei Zeilen hoeher: die Maschine
+            // gewinnt. Nur die Scheibe zu fragen hiesz, dem Profil zu
+            // glauben statt dem Geraet.
+            const double geraet = m_radioModel->flexGeraeteFrequenzHz();
+            const double hz = (geraet > 0.0) ? geraet : s->frequency();
             if (!(hz > 0.0)) { return; }
+            if (geraet > 0.0 && !qFuzzyCompare(geraet, s->frequency())) {
+                qCWarning(lcFlexGui).nospace()
+                    << "Flex: Scheibe und Maschine gehen auseinander — "
+                    << "Scheibe " << (s->frequency() / 1.0e6)
+                    << " MHz, Maschine " << (geraet / 1.0e6)
+                    << " MHz; es gilt die Maschine";
+                // Und die Scheibe nachziehen, sonst zeigt die Bedienung
+                // eine Frequenz an, auf der die Maschine nicht steht —
+                // und schickt sie beim ersten Handgriff als Befehl
+                // hinaus. Die Wache verhindert genau dieses Echo.
+                m_flexApplyingRemoteState = true;
+                s->setFrequency(geraet);
+                m_flexApplyingRemoteState = false;
+            }
+            // Welche Scheibe, und was die Maschine selbst sagt: am
+            // 2026-10-29 zog dieser Nachzug den Panadapter auf 7.259
+            // MHz, obwohl die Maschine sechs Millisekunden vorher mit
+            // 7.179 MHz gemeldet wurde („die Maschine gewinnt"). Ohne
+            // die Kennung ist nicht zu sehen, ob hier eine ANDERE
+            // Scheibe gelesen wird als die, die den Wert bekam.
             qCInfo(lcFlexGui).nospace()
                 << "Flex: Panadapter auf die Scheibe gezogen — "
-                << (hz / 1.0e6) << " MHz";
+                << (hz / 1.0e6) << " MHz (Scheibe " << s->sliceIndex()
+                << ", Geraet steht auf "
+                << (m_radioModel->flexGeraeteFrequenzHz() / 1.0e6) << " MHz)";
             m_radioModel->zieheFlexPanadapterAuf(hz);
         });
         if (AudioEngine* ae = m_radioModel->audioEngine()) {

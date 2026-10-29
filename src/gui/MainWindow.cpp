@@ -7870,6 +7870,14 @@ void MainWindow::populateDefaultMeter()
             qCInfo(lcConnection) << "KIWI-Kachel ignoriert: an der Flex kommt das "
                              "Panadapterbild ueber diesen Weg — ausschalten "
                              "hiesze, den Panadapter abzuschalten";
+            // Die Kachel hat sich beim Druecken selbst umgelegt. Ohne
+            // diese Zeile bliebe sie umgelegt stehen, waehrend der
+            // Schalter dahinter an ist — der Betreiber am 2026-10-29:
+            // „der kiwi button haengt". Ein Knopf, der nichts tut, muss
+            // wenigstens aussehen, als taete er nichts.
+            if (m_frequencyApplet) {
+                m_frequencyApplet->setKiwiState(sw->kiwiDisplaySource());
+            }
             return;
         }
 
