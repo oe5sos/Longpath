@@ -1058,9 +1058,36 @@ void MainWindow::verdrahteFlexSenden()
             AudioEngine* ae = m_radioModel->audioEngine();
             if (!ae) { return; }
 
-            // Der Sendeweg laeuft auf 48 kHz (RadioModel.cpp:2648,
-            // `Ft8TxSource(48000)`).
-            constexpr qint64 kRateHz = 48000;
+            // ── Die Maschine nimmt 24 kHz (2026-10-29) ──────────────
+            //
+            // Hier stand 48000, weil die Quellen mit 48 kHz liefern
+            // (RadioModel.cpp:2648, `Ft8TxSource(48000)`). Der
+            // DAX-Sendestrom der Flex laeuft aber auf 24 kHz — und
+            // eine Maschine, die zu viele Proben bekommt, wirft keine
+            // weg: sie spielt sie ab, halb so schnell.
+            //
+            // Am Geraet gemessen, zwei Sendungen hintereinander, mit
+            // einer zweiten Verbindung an der Verriegelung mitgelesen:
+            //
+            //   getastet 7,19 s -> 346.635 Proben -> Nachlauf 7,65 s
+            //   getastet 3,83 s -> 182.624 Proben -> Nachlauf 3,98 s
+            //
+            //   346.635 / 24.000 = 14,4 s Spielzeit, 7,2 s davon
+            //   waehrend des Tastens -> 7,2 s bleiben uebrig.
+            //
+            // Der Nachlauf ist also genau die Sendung noch einmal. Der
+            // Betreiber hoerte das als „alles zeitverzoegert", sah es
+            // als „ich loese MOX und es sendet noch weiter" und als
+            // „driftet ab". Seine Stimme ging eine Oktave zu tief und
+            // doppelt so lang hinaus.
+            //
+            // Hinein kommen weiter 48 kHz, hinaus gehen 24: je zwei
+            // Proben werden gemittelt. Der Sendeweg ist auf 2,9 kHz
+            // begrenzt, da ist nichts zu falten.
+            constexpr qint64 kEingangHz = 48000;
+            constexpr qint64 kRateHz    = 24000;   // was die Maschine nimmt
+            static_assert(kEingangHz == 2 * kRateHz,
+                          "die Mittelung unten halbiert genau");
 
             // Hoechstens 100 ms auf einen Schlag. Ein langer Haenger
             // soll aufgeholt werden, aber nicht als eine halbe Sekunde
@@ -1077,7 +1104,9 @@ void MainWindow::verdrahteFlexSenden()
                 m_flexSendeRueckstand,
                 (m_flexSendeUhr.nsecsElapsed() * kRateHz) / 1000000000LL
                     - m_flexSendeGeliefert);
-            const int kRahmen = int(offen);
+            // `offen` zaehlt in AUSGANGSrahmen (24 kHz). Geholt wird
+            // das Doppelte, gemittelt wird unten.
+            const int kRahmen = int(offen) * 2;
             m_flexMikMono.resize(kRahmen);
 
             // ── Wer gerade spricht (2026-10-28) ──────────────────────
@@ -1198,17 +1227,29 @@ void MainWindow::verdrahteFlexSenden()
                 }
             }
 
+            // ── 48 kHz hinein, 24 kHz hinaus ────────────────────────
+            //
+            // Je zwei Proben zu einer gemittelt — derselbe billige
+            // Zweipunktfilter, den AetherSDR auf der anderen Seite
+            // benutzt (AudioEngine.cpp:1774 [@d58e2b8a], 48->24 fuer
+            // den CW-Abgriff). Der Sendeweg ist auf 2,9 kHz begrenzt,
+            // da faltet nichts zurueck.
+            //
             // Mono hinein, Stereo hinaus: die Maschine erwartet zwei
             // Kanaele je Rahmen (float32, Big-Endian im Paket).
-            m_flexMikStereo.resize(geholt * 2);
-            for (int i = 0; i < geholt; ++i) {
-                m_flexMikStereo[i * 2]     = m_flexMikMono[i];
-                m_flexMikStereo[i * 2 + 1] = m_flexMikMono[i];
+            const int hinaus = geholt / 2;
+            if (hinaus <= 0) { return; }
+            m_flexMikStereo.resize(hinaus * 2);
+            for (int i = 0; i < hinaus; ++i) {
+                const float s = 0.5f * (m_flexMikMono[2 * i]
+                                        + m_flexMikMono[2 * i + 1]);
+                m_flexMikStereo[i * 2]     = s;
+                m_flexMikStereo[i * 2 + 1] = s;
             }
             m_radioModel->sendeFlexMikrofonton(m_flexMikStereo.constData(),
-                                               geholt);
-            m_flexTxProben      += geholt;
-            m_flexSendeGeliefert += geholt;
+                                               hinaus);
+            m_flexTxProben      += hinaus;
+            m_flexSendeGeliefert += hinaus;
         });
     }
 
@@ -1319,7 +1360,12 @@ void MainWindow::verdrahteFlexSenden()
             // heiszt, dass er so hinausging, wie er gemeint war.
             // Stand hier 0,27, kam beim Gegenueber ein auf das
             // Vierfache gedehntes Signal an — oder gar keines.
-            const double sollRahmen = std::max(1.0, double(getastetMs) * 48.0);
+            // 24 Rahmen je Millisekunde, nicht 48: die Maschine nimmt
+            // 24 kHz (siehe die Pumpe oben). Bis zum 2026-10-29 stand
+            // hier 48, und das Tempo las sich als 1,0 — waehrend in
+            // Wahrheit doppelt so viel hinausging, wie die Maschine
+            // abspielen konnte.
+            const double sollRahmen = std::max(1.0, double(getastetMs) * 24.0);
             qCInfo(lcFlexGui).nospace()
                 << "Flex-Senden: " << m_flexTxProben
                 << " Proben hinaus, Spitze "
@@ -1330,7 +1376,7 @@ void MainWindow::verdrahteFlexSenden()
                 << " Zuege am Mikrofon statt an FT8, Tempo "
                 << (double(m_flexTxProben) / sollRahmen)
                 << "-fach, groeszter Rueckstand "
-                << (m_flexSendeRueckstand / 48) << " ms";
+                << (m_flexSendeRueckstand / 24) << " ms";
 
             // ── Eine stille Sendung ist ein Befund ───────────────────
             //

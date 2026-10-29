@@ -3772,6 +3772,11 @@ public:
     bool setzeFlexSendescheibe(const QString& sliceId);
     QString flexSendescheibe() const { return m_flexSendescheibenId; }
 
+    /// Haengt gerade eine FlexRadio an? Nicht dasselbe wie
+    /// `isConnected()`: es gibt mehrere Geraeteklassen, und an der
+    /// Flex kommen Bild und Ton ueber ganz andere Wege.
+    bool istFlexVerbunden() const;
+
     /// Sende- und Abstimmleistung in Prozent (0..100).
     bool setzeFlexSendeleistung(int prozent);
     bool setzeFlexAbstimmleistung(int prozent);

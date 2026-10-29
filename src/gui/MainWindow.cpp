@@ -7845,6 +7845,34 @@ void MainWindow::populateDefaultMeter()
         if (!slice) { return; }
         SpectrumWidget* sw = spectrumForSlice(slice);
         if (!sw) { return; }
+
+        // ── An der Flex haengt das Bild an genau diesem Schalter ────
+        //
+        // Betreiber am 2026-10-29: „habe auf kiwi im panadapter
+        // geklickt und der wasserfall stoppte". Genau so steht es im
+        // Protokoll, eine Sekunde nach dem Klick:
+        //
+        //   Flex-Bild: das Fenster nimmt keine fremde Quelle an
+        //              (kiwiDisplaySource ist aus)
+        //
+        // Die Flex rechnet ihr Panadapterbild selbst; es kommt ueber
+        // denselben Weg herein wie ein KiwiSDR und wird beim Verbinden
+        // mit `setKiwiDisplaySource(true)` aufgemacht
+        // (MainWindow_Flex.cpp:634). Die Kachel schaltete damit nicht
+        // eine zweite Quelle zu, sondern die einzige ab — ein Klick,
+        // und der Panadapter steht.
+        //
+        // Solange eine Flex das Bild liefert, bleibt der Schalter also
+        // an. Der Klick ist dann keine Umschaltung, sondern ein
+        // Selbstschuss.
+        if (m_radioModel && m_radioModel->istFlexVerbunden()
+            && sw->kiwiDisplaySource()) {
+            qCInfo(lcConnection) << "KIWI-Kachel ignoriert: an der Flex kommt das "
+                             "Panadapterbild ueber diesen Weg — ausschalten "
+                             "hiesze, den Panadapter abzuschalten";
+            return;
+        }
+
         sw->setKiwiDisplaySource(!sw->kiwiDisplaySource());
         if (m_frequencyApplet) {
             m_frequencyApplet->setKiwiState(sw->kiwiDisplaySource());

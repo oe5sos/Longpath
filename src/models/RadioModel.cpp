@@ -7330,6 +7330,11 @@ bool RadioModel::sendeFlexBefehl(const QString& befehl)
     return true;
 }
 
+bool RadioModel::istFlexVerbunden() const
+{
+    return m_flexConnection != nullptr && m_flexConnection->isConnected();
+}
+
 bool RadioModel::setzeFlexSendescheibe(const QString& sliceId)
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
