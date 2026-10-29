@@ -352,6 +352,12 @@ QByteArray buildTxAudioPacket(quint32 streamId,
     return paket;
 }
 
+int fehlendeNachZaehler(quint8 vorher, quint8 jetzt)
+{
+    // Erwartet waere vorher+1; alles darueber ist die Luecke.
+    return (int(jetzt) - int(vorher) - 1) & 0xF;
+}
+
 }  // namespace FlexVita
 
 // ─── FlexFftGrowthGuard ──────────────────────────────────────────────

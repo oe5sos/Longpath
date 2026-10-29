@@ -16,6 +16,7 @@
 
 #include "FlexVitaStream.h"
 
+#include <QDateTime>
 #include <QLoggingCategory>
 #include <QNetworkDatagram>
 #include <QStringList>
@@ -74,10 +75,77 @@ quint16 FlexVitaStream::start(const QHostAddress& radioAddress)
     // und genau diese zwei Faelle hat am 2026-10-21 niemand
     // auseinanderhalten koennen, weil hier nichts protokolliert wurde.
     m_proKlasse.clear();
+    m_straenge.clear();
+    m_verlorenGesamt = 0;
+    m_verlorenGemeldet = 0;
+    m_uhr.start();
     m_bericht.setInterval(5000);
     m_bericht.callOnTimeout(this, [this] { berichteKlassen(); });
     m_bericht.start();
     return m_localPort;
+}
+
+// Ein Schritt je Paket: Zaehlersprung und Ankunftsabstand. Beides
+// braucht einen Zustand JE STROM — siehe die Begruendung am `Strang`.
+void FlexVitaStream::zaehleLuecke(const FlexVita::Header& h)
+{
+    const quint64 schluessel =
+        (static_cast<quint64>(h.packetClass) << 32) | h.streamId;
+    Strang& st = m_straenge[schluessel];
+    if (st.pakete == 0) {
+        st.klasse = static_cast<quint16>(h.packetClass);
+        st.strom  = h.streamId;
+    }
+    ++st.pakete;
+
+    const qint64 jetztNs = m_uhr.isValid() ? m_uhr.nsecsElapsed() : -1;
+    if (st.letzteAnkunftNs >= 0 && jetztNs > st.letzteAnkunftNs) {
+        const qint64 abstand = jetztNs - st.letzteAnkunftNs;
+        if (abstand > st.groessteLueckeNs) {
+            st.groessteLueckeNs = abstand;
+            st.groessteLueckeUm =
+                QDateTime::currentDateTime().toString(QStringLiteral("HH:mm:ss"));
+        }
+    }
+    st.letzteAnkunftNs = jetztNs;
+
+    // Das erste Paket hat keinen Vorgaenger; daraus eine Luecke zu
+    // rechnen hiesse, Abwesenheit als Befund zu lesen.
+    if (!st.gesehen) {
+        st.gesehen = true;
+        st.letzterZaehler = h.counter;
+        return;
+    }
+    const int fehlend =
+        FlexVita::fehlendeNachZaehler(st.letzterZaehler, h.counter);
+    st.letzterZaehler = h.counter;
+    if (fehlend > 0) {
+        st.verloren += fehlend;
+        ++st.spruenge;
+        m_verlorenGesamt += fehlend;
+    }
+}
+
+QVector<FlexVitaStream::Luecken> FlexVitaStream::luecken() const
+{
+    QVector<Luecken> raus;
+    raus.reserve(m_straenge.size());
+    for (auto it = m_straenge.cbegin(); it != m_straenge.cend(); ++it) {
+        const Strang& st = it.value();
+        Luecken l;
+        l.klasse           = st.klasse;
+        l.strom            = st.strom;
+        l.pakete           = st.pakete;
+        l.verloren         = st.verloren;
+        l.spruenge         = st.spruenge;
+        l.groessteLueckeMs = st.groessteLueckeNs / 1000000LL;
+        l.groessteLueckeUm = st.groessteLueckeUm;
+        raus.push_back(l);
+    }
+    std::sort(raus.begin(), raus.end(), [] (const Luecken& a, const Luecken& b) {
+        return a.klasse != b.klasse ? a.klasse < b.klasse : a.strom < b.strom;
+    });
+    return raus;
 }
 
 // Eine Zeile je Bericht, und nur wenn sich seit der letzten etwas
@@ -121,6 +189,39 @@ void FlexVitaStream::berichteKlassen()
                          << m_wasserfallZeilen << "Wasserfallzeilen;"
                          << "Maszstab gesetzt fuer" << m_scales.size()
                          << "Strom-Kennung(en)";
+
+    // Die Luecken. Immer eine Zeile, auch wenn nichts fehlt: eine
+    // saubere Null ist der Befund, der die naechste These toetet.
+    QStringList lueckenTeile;
+    for (const Luecken& l : luecken()) {
+        if (l.pakete < 2) { continue; }
+        lueckenTeile << QStringLiteral("0x%1/%2: %3 verloren in %4 Spruengen, "
+                                       "groeszte Pause %5 ms um %6")
+                            .arg(l.klasse, 4, 16, QLatin1Char('0'))
+                            .arg(l.strom, 0, 16)
+                            .arg(l.verloren)
+                            .arg(l.spruenge)
+                            .arg(l.groessteLueckeMs)
+                            .arg(l.groessteLueckeUm.isEmpty()
+                                     ? QStringLiteral("\u2014")
+                                     : l.groessteLueckeUm);
+    }
+    if (!lueckenTeile.isEmpty()) {
+        qCInfo(lcFlexStream).nospace()
+            << "Strom: Luecken — " << m_verlorenGesamt
+            << " Pakete fehlen insgesamt; "
+            << qPrintable(lueckenTeile.join(QStringLiteral(" | ")));
+    }
+    // Ein Sprung im laufenden Betrieb ist der Augenblick, der erklaert,
+    // warum gerade nichts zu hoeren war — der soll nicht erst im
+    // Fuenf-Sekunden-Bericht auftauchen, sondern mit eigener Zeile.
+    if (m_verlorenGesamt > m_verlorenGemeldet) {
+        qCWarning(lcFlexStream).nospace()
+            << "Strom: " << (m_verlorenGesamt - m_verlorenGemeldet)
+            << " Pakete in den letzten 5 s verloren — das ist der Netzweg, "
+            << "nicht die Maschine";
+        m_verlorenGemeldet = m_verlorenGesamt;
+    }
 }
 
 qint64 FlexVitaStream::sendeTxPaket(const QByteArray& paket)
@@ -203,6 +304,7 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
         return;
     }
     ++m_proKlasse[static_cast<quint16>(h.packetClass)];
+    zaehleLuecke(h);
 
     switch (static_cast<FlexVitaClass>(h.packetClass)) {
     case FlexVitaClass::PanadapterFft: {
