@@ -398,6 +398,23 @@ public:
     /// summit tunes at one watt and has no choice about it.
     static constexpr int kDefaultTunePowerW = 1;
 
+    /// Vorgabe der Sendeleistung je Band, in Prozent der vollen
+    /// Leistung der Maschine.
+    ///
+    /// ── Warum nicht die 50 aus Thetis (2026-10-29) ──────────────────
+    ///
+    /// Thetis setzt hier 50 (console.cs:1813-1814 [v2.10.3.13]) und
+    /// nennt das selbst „safety-first"; von 50 dreht man hinauf. Fuer
+    /// diese Station ist das zu viel: davor haengt eine Endstufe, und
+    /// die uebliche Arbeit ist FT8 mit kleiner Leistung.
+    ///
+    /// Betreiber am 2026-10-29: „bitte leistung auf 5 watt standard
+    /// reduzieren, ist immer auf 50."
+    ///
+    /// Es ist eine VORGABE, kein Riegel: jeder Bandwert, den der
+    /// Betreiber selbst gesetzt hat, bleibt stehen.
+    static constexpr int kVorgabeLeistungProzent = 5;
+
     /// Hard ceiling on tune power, in watts.
     ///
     /// 2026-08-14, OE5SOS: "tunen nur mit 1 Watt! Max mit 5 Watt!"
@@ -2156,7 +2173,7 @@ signals:
 private:
     bool m_mox{false};
     bool m_tune{false};
-    int m_power{100};
+    int m_power{kVorgabeLeistungProzent};
 
     // ── TX filter bandwidth (Plan 4 D1) ────────────────────────────────────
     // Defaults 100/2900 — USB voice typical SSB (Longpath-original, Plan 4

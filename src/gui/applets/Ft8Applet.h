@@ -431,6 +431,10 @@ private:
     class QSpinBox* m_cqVersucheSpin{nullptr};
     int m_cqVersucheOffen{0};
     void fensterZuEnde();
+
+    /// CQ und Send zeigen, was gerade laeuft — nicht, was zuletzt
+    /// geklickt wurde.
+    void zeigeKnopfzustand();
     void meldeFertigesQso();
     void ablaufSchritt();
     void zeigeAblauf();

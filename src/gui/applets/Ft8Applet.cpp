@@ -472,6 +472,11 @@ void Ft8Applet::buildUI()
     txReihe->setSpacing(3);
     for (int n = 1; n <= 6; ++n) {
         QPushButton* b = styledButton(QStringLiteral("Tx%1").arg(n), 34);
+        // Ein Augenblicksknopf, kein Schalter: er legt einen Satz ins
+        // Feld und ist damit fertig. `styledButton` macht jeden Knopf
+        // einrastbar — hier blieb er danach blau stehen und sah aus
+        // wie ein Zustand, den es nicht gibt.
+        b->setCheckable(false);
         b->setToolTip(tr("Put standard message Tx%1 in the box.").arg(n));
         connect(b, &QPushButton::clicked, this, [this, n]() {
             const QString gegen = aktuellerPartner();
@@ -492,7 +497,13 @@ void Ft8Applet::buildUI()
     txReihe->addStretch(1);
     root->addLayout(txReihe);
 
-    m_cqRufenBtn = styledButton(tr("CQ"), 40);
+    // `blueToggle` statt `styledButton`: nur der erste haengt die
+    // Blaufuellung des eingerasteten Knopfes an (Style::blueCheckedStyle).
+    // Ohne sie aendert `setChecked` nichts Sichtbares — genau das meldete
+    // der Betreiber am 2026-10-29: „der button sollte sich auch farblich
+    // aendern, wenn er geklickt ist." Dieselbe Fuellung tragen FT8/FT4
+    // darueber und die Bandwahl in der Kopfleiste.
+    m_cqRufenBtn = blueToggle(tr("CQ"), 40);
     m_cqRufenBtn->setToolTip(tr(
         "Call CQ. It repeats by itself for as many periods as the "
         "box beside it says, and stops as soon as somebody answers.\n"
@@ -516,7 +527,13 @@ void Ft8Applet::buildUI()
         m_qsoGemeldet = false;
         m_ablauf.starteAlsAnrufer(eigenesRufzeichen(), eigenerLocator());
         m_cqVersucheOffen = m_cqVersucheSpin ? m_cqVersucheSpin->value() : 1;
+
+        // Dieselbe Zahl auch dem Ablauf sagen. Ohne diese Zeile zaehlte
+        // er fuer sich bis fuenf und brach ab, waehrend hier noch elf
+        // Versuche offen standen (gemessen am 2026-10-29, 12:47:12).
+        m_ablauf.setzeCqWiederholungen(m_cqVersucheOffen);
         ablaufSchritt();
+        zeigeKnopfzustand();
     });
     sendRow->addWidget(m_cqRufenBtn);
 
@@ -545,7 +562,7 @@ void Ft8Applet::buildUI()
     });
     sendRow->addWidget(m_cqVersucheSpin);
 
-    m_cqBtn = styledButton(tr("Send"), 56);
+    m_cqBtn = blueToggle(tr("Send"), 56);
     m_cqBtn->setToolTip(tr("Send this message once, in the next own "
                            "period. No auto-sequencing."));
     connect(m_cqBtn, &QPushButton::clicked, this, [this]() {
@@ -554,6 +571,7 @@ void Ft8Applet::buildUI()
     sendRow->addWidget(m_cqBtn);
 
     m_stopBtn = styledButton(tr("Stop"), 48);
+    m_stopBtn->setCheckable(false);    // haelt an, rastet nicht ein
     m_stopBtn->setToolTip(tr("Stop transmitting and drop the QSO "
                              "sequence."));
     m_stopBtn->setEnabled(false);
@@ -579,6 +597,7 @@ void Ft8Applet::buildUI()
     foot->addWidget(m_lastLabel);
     foot->addStretch(1);
     m_clearBtn = styledButton(tr("Clear"), 60);
+    m_clearBtn->setCheckable(false);   // leert die Liste, rastet nicht ein
     connect(m_clearBtn, &QPushButton::clicked, this, [this]() {
         m_list->clear();
         if (m_listRx) { m_listRx->clear(); }
@@ -755,6 +774,7 @@ void Ft8Applet::meldeFertigesQso()
 
 void Ft8Applet::zeigeAblauf()
 {
+    zeigeKnopfzustand();
     if (!m_status) { return; }
     switch (m_ablauf.zustand()) {
         case Ft8Ablauf::Zustand::Fertig:
@@ -1093,6 +1113,7 @@ void Ft8Applet::sendeNachricht(const QString& text)
     m_sendet = true;
     if (m_cqBtn)   { m_cqBtn->setEnabled(false); }
     if (m_stopBtn) { m_stopBtn->setEnabled(true); }
+    zeigeKnopfzustand();
     if (m_status) {
         m_status->setText(tr("sending in %1 s")
                               .arg(wartet / 1000.0, 0, 'f', 1));
@@ -1228,7 +1249,31 @@ void Ft8Applet::abbrechen()
     m_sendet = false;
     if (m_cqBtn)   { m_cqBtn->setEnabled(true); }
     if (m_stopBtn) { m_stopBtn->setEnabled(false); }
+    zeigeKnopfzustand();
     updateStatus();
+}
+
+// ── Was die Knoepfe zeigen ───────────────────────────────────────────
+//
+// Betreiber am 2026-10-29: „der button sollte sich auch farblich
+// aendern, wenn er geklickt ist."
+//
+// Nicht „geklickt" ist hier das Richtige, sondern „laeuft". Ein
+// einrastbarer Knopf kippt beim Klick von selbst um und bliebe danach
+// stehen, auch wenn der Ruf laengst aufgegeben hat — er zeigte dann,
+// was zuletzt gedrueckt wurde, statt was gerade geschieht. Also wird
+// der Zustand hier aus dem Ablauf gelesen und gesetzt.
+//
+// Blau ist im Hausstil das Anfassbare und das Aktive; die Knoepfe
+// nehmen dieselbe Fuellung wie FT8/FT4 oder die Bandwahl darueber.
+void Ft8Applet::zeigeKnopfzustand()
+{
+    const bool ruftCq = m_ablauf.laeuft();
+    if (m_cqRufenBtn) { m_cqRufenBtn->setChecked(ruftCq); }
+    // „Send" leuchtet nur beim Einzelschuss: waehrend eines Ablaufs
+    // ist er ohnehin gesperrt, und zwei leuchtende Knoepfe waeren eine
+    // Frage statt einer Antwort.
+    if (m_cqBtn) { m_cqBtn->setChecked(m_sendet && !ruftCq); }
 }
 
 void Ft8Applet::updateStatus()

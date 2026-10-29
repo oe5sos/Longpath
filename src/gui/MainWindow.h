@@ -79,6 +79,7 @@
 
 #include "core/WdspTypes.h"
 #include "core/DigiFrequenzen.h"
+#include <QElapsedTimer>
 #include <QTimer>
 #include <QHash>
 #include <QMap>
@@ -246,6 +247,18 @@ public:
     class KiwiSdrManager* kiwiSdrManagerForTest() const
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
+
+    /// Wie viele Rahmen des Sendetons jetzt faellig sind.
+    ///
+    /// Herausgezogen, damit die Rechnung einen Prueffall haben kann:
+    /// sie entscheidet, ob der Ton in Echtzeit hinausgeht oder gedehnt
+    /// (siehe `m_flexSendeUhr`). `maxRahmen` deckelt den einzelnen
+    /// Schwall; der Rest bleibt faellig und geht beim naechsten Schlag
+    /// mit, sodass ein Haenger aufgeholt und nicht verschluckt wird.
+    static qint64 flexFaelligeRahmen(qint64 nsecsVerstrichen,
+                                     qint64 geliefert,
+                                     qint64 rateHz,
+                                     qint64 maxRahmen);
     /// Die Kommandoleiste, damit ein Lauf ihre Knoepfe wirklich
     /// druecken kann statt die Wirkung nachzubauen.
     class CommandBar* commandBarForTest() const { return m_commandBar; }
@@ -1931,6 +1944,37 @@ private:
     int    m_flexTxProben{0};     ///< Proben an die Maschine, diese Sendung
     int    m_flexTxVomMik{0};     ///< Zuege, die am Mikrofon statt an FT8 hingen
     float  m_flexTxSpitze{0.0f};  ///< Spitze dieser Sendung, nach der Daempfung
+
+    // ── Die Pumpe braucht eine Uhr (2026-10-29) ──────────────────────
+    //
+    // Der Sendeton ist ein Echtzeitstrom: was die Pumpe an die Maschine
+    // gibt, spielt die Maschine ab. Die Pumpe hatte aber keine
+    // Zeitreferenz — sie schob bei JEDEM Taktschlag starr 480 Rahmen
+    // hinaus, ganz gleich, wann der Schlag kam. Auf einem Hauptfaden,
+    // der nebenher Wasserfall, Spektrum und Kachel malt, kommt er
+    // nicht alle 5 ms.
+    //
+    // Am Geraet gemessen (Protokoll 2026-10-29, 13:05 bis 13:07, vier
+    // Sendungen von je 12,94 s). Hinausgehen muessten 621.120 Rahmen:
+    //
+    //     180.000 Rahmen = 13,9 kHz = 0,29-fache Geschwindigkeit
+    //     332.640 Rahmen = 25,7 kHz = 0,54-fache
+    //     165.600 Rahmen = 12,8 kHz = 0,27-fache
+    //     716.160 Rahmen = 55,3 kHz = 1,15-fache
+    //
+    // Der Ton ging also mal auf ein Viertel gedehnt, mal zu schnell
+    // hinaus, und vom 15-s-Fenster kam oft nur das erste Drittel an.
+    // Dasselbe erklaert den spaeten Anfang: bis die Pumpe durch die
+    // fuehrende Stille der Wellenform war, vergingen 3,6 s statt 0,5 —
+    // „FT8-Sendepegel" meldete den ersten Ton um 13:05:33,655, getastet
+    // war um 13:05:30,033. Betreiber: „leistung kommt zeitversetzt."
+    //
+    // Jetzt zaehlt nicht mehr der Taktschlag, sondern die Uhr: je
+    // Schlag geht genau so viel hinaus, wie seit dem Tasten faellig
+    // geworden ist. Ein spaeter Schlag holt auf, ein frueher wartet.
+    QElapsedTimer m_flexSendeUhr;      ///< laeuft ab dem Tasten
+    qint64 m_flexSendeGeliefert{0};    ///< Rahmen, die schon hinaus sind
+    qint64 m_flexSendeRueckstand{0};   ///< groeszter Rueckstand, Rahmen
     /// Dasselbe als Stereo, wie die Maschine es erwartet.
     QVector<float> m_flexMikStereo;
     /// Haben wir selbst getastet? Trennt unser `xmit` von der Taste am

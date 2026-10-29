@@ -399,11 +399,15 @@ void TxApplet::buildUI()
     {
         m_rfPowerSlider = new QSlider(Qt::Horizontal, this);
         m_rfPowerSlider->setRange(0, 100);
-        m_rfPowerSlider->setValue(100);
+        // Dieselbe Vorgabe wie im Modell. Hier stand 100 — ueberschrieben
+        // wurde es gleich darauf ohnehin, aber bis dahin zeigte die
+        // Bedienung volle Leistung an.
+        m_rfPowerSlider->setValue(TransmitModel::kVorgabeLeistungProzent);
         m_rfPowerSlider->setAccessibleName(QStringLiteral("RF power"));
         m_rfPowerSlider->setObjectName(QStringLiteral("TxRfPowerSlider"));
 
-        m_rfPowerValue = new QLabel(QStringLiteral("100"), this);
+        m_rfPowerValue = new QLabel(
+            QString::number(TransmitModel::kVorgabeLeistungProzent), this);
         auto* row = sliderRow(tr("Power"), m_rfPowerSlider,
                               m_rfPowerValue, kTxLabelW);
         // Auf dem HL2 steht hier „-7.5 dB" statt einer nackten Zahl —

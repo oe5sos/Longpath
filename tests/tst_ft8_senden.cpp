@@ -705,6 +705,72 @@ private slots:
     // abbrechen() — das nimmt das laufende Fenster zurueck, laesst
     // den Ablauf aber stehen, und der naechste passende Fund haette
     // ihn von selbst weiterlaufen lassen.
+    // ── Der CQ-Knopf zeigt, dass er laeuft ──────────────────────────
+    //
+    // Betreiber am 2026-10-29: „der button sollte sich auch farblich
+    // aendern, wenn er geklickt ist." Im Hausstil ist das die
+    // Blaufuellung des eingerasteten Knopfes — also `isChecked`.
+    //
+    // Gegenprobe zur alten Fassung: dort setzte niemand den Zustand.
+    // Ein einrastbarer Knopf kippte beim Klick zwar um, blieb danach
+    // aber stehen, auch wenn der Ruf laengst aufgegeben hatte.
+    void derCqKnopfZeigtDenLaufendenRuf()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        QPushButton* cq = applet.cqRufenButtonForTest();
+        QVERIFY(cq);
+        QVERIFY2(!cq->isChecked(), "vor dem Klick darf nichts leuchten");
+
+        // Einrasten allein genuegt nicht: ohne die Blaufuellung aus
+        // `blueToggle` sieht man den Zustand nicht. Das war der
+        // eigentliche Befund — der Knopf hing an `styledButton`.
+        QVERIFY2(cq->styleSheet().contains(QStringLiteral(":checked")),
+                 "der CQ-Knopf hat keine Farbe fuer den eingerasteten "
+                 "Zustand");
+
+        cq->click();
+        QVERIFY2(cq->isChecked(),
+                 "waehrend der Ruf laeuft, muss der Knopf leuchten");
+
+        // Und er geht wieder aus, wenn der Betreiber Stop drueckt.
+        QPushButton* stop = nullptr;
+        for (QPushButton* b : applet.findChildren<QPushButton*>()) {
+            if (b->text() == QStringLiteral("Stop")) { stop = b; break; }
+        }
+        QVERIFY(stop);
+        stop->click();
+        QVERIFY2(!cq->isChecked(),
+                 "nach Stop darf der Knopf nicht weiterleuchten");
+    }
+
+    // Augenblickstasten rasten nicht ein: Tx1-Tx6 legen einen Satz ins
+    // Feld und sind fertig. Bliebe einer blau stehen, zeigte er einen
+    // Zustand, den es nicht gibt.
+    void dieTxKnoepfeRastenNichtEin()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        const QList<QPushButton*> knoepfe =
+            applet.findChildren<QPushButton*>();
+        int geprueft = 0;
+        for (QPushButton* b : knoepfe) {
+            if (!b->text().startsWith(QStringLiteral("Tx"))) { continue; }
+            QVERIFY2(!b->isCheckable(),
+                     qPrintable(QStringLiteral("%1 rastet ein")
+                                    .arg(b->text())));
+            ++geprueft;
+        }
+        QCOMPARE(geprueft, 6);
+    }
+
     void derStopKnopfHaeltDenAblaufAn()
     {
         RadioModel radio;

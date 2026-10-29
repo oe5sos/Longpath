@@ -231,6 +231,59 @@ private slots:
         QCOMPARE(a.wiederholungen(), 0);
     }
 
+    // ── Der CQ-Ruf laeuft so oft, wie der Betreiber sagt ────────────
+    //
+    // Gegenprobe zur alten Fassung: dort zaehlte `fensterVerstrichen`
+    // starr bis `kMaxWiederholungen` (fuenf), auch wenn im Fenster
+    // „x16" stand. Am Geraet gemessen (2026-10-29, 12:45:00 bis
+    // 12:47:12): genau fuenf Sendungen, danach war Schluss.
+    void derCqRufFolgtDerEingestelltenZahl()
+    {
+        Ft8Ablauf a;
+        a.setzeCqWiederholungen(16);
+        a.starteAlsAnrufer(QStringLiteral("OE5SOS"), QStringLiteral("JN67"));
+        QCOMPARE(a.zustand(), Z::RufeCq);
+
+        // Die Fuenf, an der die alte Fassung abbrach, muss durchlaufen.
+        for (int i = 1; i < 16; ++i) {
+            a.fensterVerstrichen();
+            QVERIFY2(a.laeuft(), qPrintable(
+                QStringLiteral("nach %1 CQ-Fenstern schon aufgegeben "
+                               "(eingestellt waren 16)").arg(i)));
+        }
+        a.fensterVerstrichen();
+        QCOMPARE(a.zustand(), Z::Abgebrochen);
+    }
+
+    // Und das Gegenstueck: mitten im QSO bleibt es bei den fuenf
+    // Zuegen, ganz gleich was fuer den Ruf eingestellt ist.
+    void dieEingestellteZahlGiltNurFuerDenRuf()
+    {
+        Ft8Ablauf a;
+        a.setzeCqWiederholungen(30);
+        a.starteAlsAntworter(QStringLiteral("DL1ABC"),
+                             QStringLiteral("OE5SOS"),
+                             QStringLiteral("JN67"), -12);
+        for (int i = 1; i < Ft8Ablauf::kMaxWiederholungen; ++i) {
+            a.fensterVerstrichen();
+            QVERIFY(a.laeuft());
+        }
+        a.fensterVerstrichen();
+        QCOMPARE(a.zustand(), Z::Abgebrochen);
+    }
+
+    // Eine Null wuerde den Ruf im ersten Fenster abwuergen.
+    void unsinnigeZahlenWerdenEingefangen()
+    {
+        Ft8Ablauf a;
+        a.setzeCqWiederholungen(0);
+        QCOMPARE(a.cqWiederholungen(), 1);
+        a.setzeCqWiederholungen(-3);
+        QCOMPARE(a.cqWiederholungen(), 1);
+        a.setzeCqWiederholungen(999);
+        QCOMPARE(a.cqWiederholungen(), 30);
+    }
+
     void abbrechenHaeltSofortAn()
     {
         Ft8Ablauf a;

@@ -8026,6 +8026,7 @@ longpath_add_test(tst_flex_ton_und_pegel)
 # fest, dass er nicht in den dBm-Weg geraet.
 longpath_add_test(tst_flex_wasserfall_kachel)
 longpath_add_test(tst_flex_senden)
+longpath_add_test(tst_flex_sendetakt)
 
 # -- Flex: der Fehlerweg sagt jetzt etwas ---------------------------------
 # „Disconnected — Unknown error" im Verbindungsfenster, 2026-10-28 20:41,
