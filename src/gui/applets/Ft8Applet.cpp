@@ -825,8 +825,17 @@ void Ft8Applet::buildUI()
     // Doppelklick den Ablauf immer startet, ist das der einzige Weg
     // hinaus, und er muss halten.
     connect(m_stopBtn, &QPushButton::clicked, this, [this]() {
-        // Stop heiszt Stop: auch der Wiederanlauf nach einem QSO.
+        // Stop heiszt Stop: auch der Wiederanlauf nach einem QSO --
+        // und auch die Plaetze.
+        //
+        // `m_mehrfach.abbrechen()` fehlte (Durchsicht 2026-10-30).
+        // Ohne das liefen die Plaetze weiter: `fensterZuEnde` sah
+        // `aktive() > 0`, sendete und kam gar nicht erst zu dem
+        // angehaltenen Einzelablauf. Ein Stop, der nicht stoppt, ist
+        // schlimmer als kein Stop -- man drueckt ihn und glaubt, es
+        // sei vorbei.
         m_cqAutomatik = false;
+        m_mehrfach.abbrechen();
         m_ablauf.abbrechen();
         m_cqVersucheOffen = 0;
         abbrechen();
@@ -846,6 +855,15 @@ void Ft8Applet::buildUI()
 
 void Ft8Applet::setProtocol(Ft8Decoder::Protocol p)
 {
+    // ── Die gehoerten Tonlagen gelten nicht mehr (2026-10-30) ───
+    //
+    // Der Wechsel FT8 <-> FT4 zieht die Scheibe auf eine andere
+    // Frequenz (7.074 -> 7.0475 MHz auf 40 m). Eine Tonlage ist aber
+    // relativ zur Scheibe: was eben noch bei 1500 Hz lag, liegt jetzt
+    // ganz woanders. Die Stellensuche wuerde sonst auf Zahlen
+    // arbeiten, die nichts mehr bedeuten.
+    m_toeneJePeriode.clear();
+
     if (m_stream) { m_stream->setProtocol(p); }
     const bool ft4 = (p == Ft8Decoder::Protocol::Ft4);
     if (m_ft8Btn) { m_ft8Btn->setChecked(!ft4); }
@@ -899,6 +917,48 @@ void Ft8Applet::syncFromModel()
 void Ft8Applet::fensterZuEnde()
 {
     abbrechen();
+
+    // ── Mehrere Plaetze: jeder bekommt sein Fenster ──────────
+    //
+    // Dieser Block fehlte, bis er bei der Durchsicht am 2026-10-30
+    // auffiel: eine Ersetzung war still fehlgeschlagen, und damit
+    // drehte Multi Answering seine Plaetze NIE weiter und schrieb NIE
+    // ein QSO ins Logbuch. Gesendet haette es, aber kein Zug waere je
+    // vorangekommen.
+    //
+    // `fensterVerstrichen` reicht es an alle laufenden Ablaeufe weiter
+    // und raeumt danach auf; `nimmFertige` liefert jedes fertige QSO
+    // GENAU EINMAL -- darum geht es von hier direkt ins Logbuch und
+    // nicht ueber `meldeFertigesQso`, das fuer den einzelnen Ablauf
+    // gedacht ist und mit `m_qsoGemeldet` gegen Doppelmeldung sichert.
+    if (mehrfachAn()) {
+        m_mehrfach.fensterVerstrichen();
+        for (const Ft8Ablauf& fertig : m_mehrfach.nimmFertige()) {
+            emit qsoFertig(logEintrag(
+                fertig, m_slice ? m_slice->frequency() : 0.0,
+                m_slice && m_slice->dspMode() == DSPMode::DIGL,
+                protocol(), eigenerLocator(), m_sendeTonHz));
+            qCInfo(lcFt8Senden).noquote()
+                << "QSO fertig (Platz):" << fertig.partner();
+        }
+        if (m_mehrfach.aktive() > 0) {
+            // Den CQ-Ruf MITDREHEN, nicht einfrieren: er geht als
+            // eigener Platz mit hinaus (siehe `sendeMehrfach`), also
+            // muss auch sein Zaehler laufen. Sonst stuende er nach
+            // zehn abgearbeiteten Anrufern immer noch bei Versuch 1
+            // und riefe bis zum Abend.
+            if (m_ablauf.laeuft()
+                && m_ablauf.zustand() == Ft8Ablauf::Zustand::RufeCq) {
+                if (m_cqVersucheOffen > 0) { --m_cqVersucheOffen; }
+                m_ablauf.fensterVerstrichen();
+                if (m_cqVersucheOffen == 0) { m_ablauf.abbrechen(); }
+            }
+            sendeMehrfach();
+            return;
+        }
+        // Kein Platz mehr belegt: zurueck in den gewoehnlichen Weg,
+        // damit ein laufender CQ-Ruf weitergeht.
+    }
     if (!m_ablauf.laeuft()) {
         m_cqVersucheOffen = 0;
         zeigeAblauf();
@@ -1048,7 +1108,36 @@ void Ft8Applet::sendeMehrfach()
     if (m_sendet) { return; }
     m_mehrfach.setEigeneDaten(eigenesRufzeichen(), eigenerLocator());
     m_mehrfach.setGrundtonHz(float(m_sendeTonHz));
-    const QVector<Ft8TxSource::Platz> plaetze = m_mehrfach.naechsteNachrichten();
+    QVector<Ft8TxSource::Platz> plaetze = m_mehrfach.naechsteNachrichten();
+
+    // ── Der CQ-Ruf ist ein Platz, kein zweiter Ablauf ─────────
+    //
+    // Bei der Durchsicht am 2026-10-30 gefunden: mit Plaetzen liefen
+    // ZWEI Zustandsmaschinen nebeneinander. Der CQ-Knopf startet
+    // `m_ablauf` als Anrufer; antwortet dann jemand, nimmt ihn
+    // `m_mehrfach` auf -- und von da an bediente `fensterZuEnde` nur
+    // noch die Plaetze. Rufen UND Abarbeiten gleichzeitig ist aber
+    // genau der Sinn der Sache; MSHV haelt dafuer einen Platz frei.
+    //
+    // Solange der Ruf laeuft und ein Platz frei ist, geht er als
+    // eigener Platz mit hinaus. Ist alles belegt, schweigt das CQ --
+    // wer sechs Stationen gleichzeitig abarbeitet, braucht keine
+    // siebte.
+    if (m_ablauf.laeuft()
+        && m_ablauf.zustand() == Ft8Ablauf::Zustand::RufeCq
+        && plaetze.size() < m_plaetze) {
+        const QString cq = m_ablauf.naechsteNachricht();
+        if (!cq.isEmpty()) {
+            const QVector<float> toene =
+                Ft8TxSource::tonleiter(float(m_sendeTonHz), m_plaetze);
+            Ft8TxSource::Platz p;
+            p.text   = cq;
+            p.toneHz = plaetze.size() < toene.size()
+                           ? toene[plaetze.size()] : float(m_sendeTonHz);
+            plaetze.push_back(p);
+        }
+    }
+
     if (plaetze.isEmpty()) { return; }
 
     QStringList zeilen;
