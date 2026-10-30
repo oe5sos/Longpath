@@ -1393,12 +1393,57 @@ void MainWindow::verdrahteFlexSenden()
             // genuegt ein fester Faktor; die Klammer darunter ist der
             // Riegel, falls eine Quelle doch einmal lauter kommt.
             //
-            // −9 dB bringt die gemessene Spitze auf rund −6 dBFS.
+            // ── Nachgemessen am 2026-10-30: es waren 6 dB zu viel ──
+            //
+            // Gegen einen Ueberschuss von 3 dB standen hier 9 dB. Was
+            // das am Band bedeutet, hat der Betreiber gesehen:
+            //
+            //   Regler 20  ->  FWDPWR 37,0 dBm =  5,0 W
+            //   Regler 79  ->  FWDPWR 43,0 dBm = 19,9 W
+            //
+            // Jedes Mal ein Viertel der Reglerzahl. Betreiber dazu:
+            // „10 watt sollen 10 watt sein."
+            //
+            // Die Zahl, die der Regler schickt, ist richtig --
+            // `transmit set rfpower=79` geht woertlich so hinaus. Sie
+            // verliert sich hier davor, denn `rfpower` sagt der
+            // Maschine, was sie bei VOLLAUSSTEUERUNG liefern soll. Wer
+            // sie mit −9 dB ansteuert, bekommt nicht, was auf dem
+            // Regler steht.
+            //
+            // Die Messung von damals, Zeile fuer Zeile:
+            //
+            //   MICPEAK  3,008 dBFS   <- 3 dB zu hoch, das war der Anlass
+            //   MIC     -0,727 dBFS   <- lag schon richtig
+            //   HWALC    0,000 dBFS   <- die ALC regelte gar nicht
+            //
+            // Der Anlass war der Spitzenwert, nicht die Aussteuerung.
+            // −3 dB raeumt ihn aus und laesst alles andere stehen.
+            //
+            // Die Klammer muss mitwandern. Bei 0,707 gegen eine Grenze
+            // von 0,5 waere JEDE Probe geklemmt worden -- ein
+            // abgeschnittener FT8-Ton ist kein leiserer Ton, sondern
+            // ein breiter: die Ecken erzeugen Seitenbaender, die der
+            // Nachbarkanal abbekommt. Sie steht jetzt knapp unter
+            // Vollaussteuerung und faengt nur noch, wofuer sie gedacht
+            // war: eine Quelle, die unerwartet lauter kommt.
+            //
             // Gedaempft wird NUR der erzeugte Ton: das Mikrofon hat
             // seine eigene Aussteuerung und ist hier nicht gemeint.
             if (vonFt8) {
-                constexpr float kFt8Pegel = 0.355f;   // −9,0 dB
-                constexpr float kGrenze   = 0.5f;     // −6,0 dBFS
+                constexpr float kFt8Pegel = 0.707f;   // −3,0 dB
+                constexpr float kGrenze   = 0.95f;    // −0,4 dBFS
+                // Die Falle, die beim Heben des Pegels fast
+                // zugeschnappt waere, kann jetzt nicht mehr
+                // zuschnappen: liegt der Pegel ueber der Klammer, wird
+                // JEDE Probe geklemmt, und der Ton geht breit statt
+                // leise hinaus. Das faellt beim Uebersetzen auf, nicht
+                // erst am Band. Gegenprobe gefahren: mit 0,99 gegen
+                // 0,5 bricht der Bau mit genau diesem Satz ab.
+                static_assert(kFt8Pegel <= kGrenze,
+                              "Der Sendepegel liegt ueber der Klammer — "
+                              "jede Probe wuerde geklemmt und der Ton "
+                              "ginge verzerrt und breit hinaus.");
                 float spitze = 0.0f;
                 for (int i = 0; i < geholt; ++i) {
                     float v = m_flexMikMono[i] * kFt8Pegel;
