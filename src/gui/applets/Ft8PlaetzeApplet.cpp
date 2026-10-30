@@ -292,12 +292,18 @@ Ft8PlaetzeApplet::Ft8PlaetzeApplet(RadioModel* model, QWidget* parent)
     lay->setContentsMargins(0, 0, 0, 0);
     lay->setSpacing(0);
 
-    // Der leere Zustand sagt, WAS zu tun ist. „Keine Plaetze" waere
-    // eine Feststellung; der Betreiber will wissen, wo der Schalter
-    // sitzt.
-    m_leer = new QLabel(tr("No slots in use.\n\n"
+    // ── Der leere Zustand sagt die Wahrheit (2026-10-30) ───────
+    //
+    // Er stand zuerst da als „Set slots to 2 or more" -- und das war
+    // irrefuehrend. Betreiber: „fuer was benoetige ich den ft8 slot".
+    // Das Panel fuellt sich AUCH mit einem Platz: mit dem laufenden
+    // Partner und mit der Warteschlange. Leer ist es nur, solange
+    // ueberhaupt nichts laeuft.
+    m_leer = new QLabel(tr("Nothing running.\n\n"
+                           "While a QSO is going, this shows who you are "
+                           "working and who is waiting for you.\n\n"
                            "Set “slots” in the FT8 window to 2 or more "
-                           "to work several callers at once."), this);
+                           "to work several callers at the same time."), this);
     m_leer->setWordWrap(true);
     m_leer->setAlignment(Qt::AlignTop | Qt::AlignLeft);
     m_leer->setContentsMargins(14, 14, 14, 14);
