@@ -60,6 +60,13 @@
 
 #include "BandDefaults.h"
 
+#include "Band.h"
+#include "core/LogCategories.h"
+#include "core/safety/BandPlanGuard.h"
+#include "core/safety/RegionSetting.h"
+
+#include <cstdint>
+
 namespace Longpath {
 namespace BandDefaults {
 
@@ -175,6 +182,30 @@ DSPMode korrigiereSeitenband(Band b, DSPMode mode)
         return mode;
     }
     return seitenbandFuer(b);
+}
+
+// Siehe BandDefaults.h: die Zahlen und der Befund stehen dort.
+double frequenzImBand(Band b, double hz)
+{
+    double tief = 0.0, hoch = 0.0;
+    if (!bandRangeHz(b, tief, hoch)) { return hz; }
+
+    const safety::RegionChoice wahl = safety::configuredRegion();
+    static const safety::BandPlanGuard wache;
+    const bool drin =
+        wahl.configured
+            ? wache.isValidTxFreq(wahl.region, static_cast<std::int64_t>(hz),
+                                  seitenbandFuer(b), /*extended=*/false)
+            : (hz >= tief && hz <= hoch);
+    if (drin) { return hz; }
+
+    const BandSeed saat = seedFor(b);
+    if (!saat.valid) { return hz; }
+    qCInfo(lcDsp).nospace()
+        << "Bandgedaechtnis " << bandKeyName(b) << ": " << (hz / 1.0e6)
+        << " MHz liegt auszerhalb des Bandes — es wird die Vorgabe "
+        << (saat.frequencyHz / 1.0e6) << " MHz genommen";
+    return saat.frequencyHz;
 }
 
 } // namespace BandDefaults

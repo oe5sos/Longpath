@@ -256,9 +256,11 @@ private slots:
         QCOMPARE(radio.flexVerriegelungGehoert(), false);
         QCOMPARE(radio.flexDarfSenden(), false);
 
-        // Nach einer Meldung ist es ein echter Befund.
+        // Nach einer Meldung ist es ein echter Befund — und RECEIVE
+        // ist KEIN Verbot, siehe dieVerriegelungWirdGelesen().
         radio.verarbeiteFlexVerriegelung({
-            { QStringLiteral("state"), QStringLiteral("RECEIVE") },
+            { QStringLiteral("state"), QStringLiteral("NOT_READY") },
+            { QStringLiteral("reason"), QStringLiteral("OUT_OF_BAND") },
             { QStringLiteral("tx_allowed"), QStringLiteral("0") },
         });
         QCOMPARE(radio.flexVerriegelungGehoert(), true);
@@ -274,20 +276,60 @@ private slots:
         //   Verriegelung gehoert true, darf senden false
         //   nicht abgestimmt — die Maschine sperrt das Senden "" ""
         //
-        // „Gehoert" heisst jetzt: sie hat ueber DAS FELD gesprochen.
-        // Alles andere bleibt Schweigen, und Schweigen ist kein Verbot.
+        // „Gehoert" heisst: sie hat ueber DIE LAGE gesprochen. Eine
+        // Zeile ohne `state` ist Schweigen, und Schweigen ist kein
+        // Verbot. (Bis zum 2026-10-29 haengte das an `tx_allowed` —
+        // siehe dieVerriegelungWirdGelesen(), warum das falsch war.)
         RadioModel zweite;
         zweite.verarbeiteFlexVerriegelung({
-            { QStringLiteral("state"), QStringLiteral("RECEIVE") },
+            { QStringLiteral("tx_allowed"), QStringLiteral("0") },
         });
         QCOMPARE(zweite.flexVerriegelungGehoert(), false);
 
-        // Erst mit dem Feld.
+        // Erst mit der Lage.
         zweite.verarbeiteFlexVerriegelung({
-            { QStringLiteral("tx_allowed"), QStringLiteral("1") },
+            { QStringLiteral("state"), QStringLiteral("RECEIVE") },
         });
         QCOMPARE(zweite.flexVerriegelungGehoert(), true);
         QCOMPARE(zweite.flexDarfSenden(), true);
+    }
+
+    // ── Die Aussteuerung des Mikrofonwegs (2026-10-29) ──────────────
+    //
+    // Am Geraet gemessen, dasselbe Programm und dieselbe Einstellung,
+    // nur ein anderes Mikrofon:
+    //
+    //   18:56  MICPEAK  +2,54 dBFS  ->  FWDPWR 35,4 dBm = 3,4 W
+    //   20:15  MICPEAK  −9,72 dBFS  ->  FWDPWR 18,6 dBm = 73 mW
+    //
+    // Der Flex-Sendeweg hat als einziger keine Verstaerkungsstufe —
+    // der Ton geht roh an die Maschine. Hier wird der Regler
+    // festgenagelt: Grenzen, Vorgabe und dass er nur bei einer echten
+    // Aenderung meldet.
+    void dieMikrofonaussteuerungHaeltIhreGrenzen()
+    {
+        RadioModel radio;
+        QSignalSpy gain(&radio, &RadioModel::flexMikGainGeaendert);
+
+        // Vorgabe ist 0 dB: roh hinaus, wie vor dem 2026-10-29.
+        QCOMPARE(radio.flexMikGainDb(), 0);
+
+        radio.setzeFlexMikGainDb(12);
+        QCOMPARE(radio.flexMikGainDb(), 12);
+        QCOMPARE(gain.count(), 1);
+        QCOMPARE(gain.takeFirst().at(0).toInt(), 12);
+
+        // Derselbe Wert noch einmal ist keine Aenderung.
+        radio.setzeFlexMikGainDb(12);
+        QCOMPARE(gain.count(), 0);
+
+        // Oben und unten geklemmt. Ueber +30 dB braucht es den Regler
+        // nicht mehr — dort faengt der Riegel bei −1 dBFS in der Pumpe
+        // ohnehin alles ab.
+        radio.setzeFlexMikGainDb(999);
+        QCOMPARE(radio.flexMikGainDb(), 30);
+        radio.setzeFlexMikGainDb(-999);
+        QCOMPARE(radio.flexMikGainDb(), -20);
     }
 
     void dieVerriegelungWirdGelesen()
@@ -296,23 +338,53 @@ private slots:
         QSignalSpy freigabe(&radio, &RadioModel::flexSendefreigabeGeaendert);
         QSignalSpy sendet(&radio, &RadioModel::flexSendetGeaendert);
 
-        // So meldet sich die Maschine, wenn sie NICHT senden darf.
+        // ── `tx_allowed` ist nicht die Erlaubnis (2026-10-29) ───────
+        //
+        // Am Geraet mitgelesen, mit einer zweiten Verbindung neben
+        // Longpath:
+        //
+        //   19:52:31  state=NOT_READY  reason=OUT_OF_BAND  tx_allowed=0
+        //   19:56:12  state=RECEIVE    reason=             tx_allowed=0
+        //
+        // Die Scheibe lag beim Verbinden ausserhalb des Bandes — das
+        // erste Nein war richtig. Danach stand sie auf 7,177 MHz, die
+        // Maschine ging auf RECEIVE und schickte weiter `tx_allowed=0`.
+        // Im Ruhezustand ist das Feld IMMER 0; es sagt „es wird gerade
+        // nicht gesendet", nicht „du darfst nicht".
+        //
+        // Der Betreiber bekam daraufhin weder TUNE noch MOX, und zwar
+        // dauerhaft — und davor ging beides nur deshalb, weil
+        // ueberhaupt keine Verriegelungsmeldung ankam.
+        //
+        // Deshalb entscheidet die LAGE.
+        radio.verarbeiteFlexVerriegelung({
+            { QStringLiteral("state"), QStringLiteral("NOT_READY") },
+            { QStringLiteral("reason"), QStringLiteral("OUT_OF_BAND") },
+            { QStringLiteral("tx_allowed"), QStringLiteral("0") },
+        });
+        QCOMPARE(radio.flexDarfSenden(), false);
+        QCOMPARE(radio.flexVerriegelungsLage(), QStringLiteral("NOT_READY"));
+        QCOMPARE(radio.flexVerriegelungsGrund(), QStringLiteral("OUT_OF_BAND"));
+        QCOMPARE(freigabe.count(), 0);   // war schon gesperrt
+
+        // Der Ruhezustand der Maschine: RECEIVE mit tx_allowed=0.
+        // Genau die Zeile, die das Tor bis zum 2026-10-29 zugehalten
+        // hat — sie ist eine Freigabe.
         radio.verarbeiteFlexVerriegelung({
             { QStringLiteral("state"), QStringLiteral("RECEIVE") },
             { QStringLiteral("tx_allowed"), QStringLiteral("0") },
         });
-        QCOMPARE(radio.flexDarfSenden(), false);
-        QCOMPARE(radio.flexVerriegelungsLage(), QStringLiteral("RECEIVE"));
-        QCOMPARE(freigabe.count(), 0);   // war schon gesperrt
+        QCOMPARE(radio.flexDarfSenden(), true);
+        QCOMPARE(freigabe.count(), 1);
+        QCOMPARE(freigabe.takeFirst().at(0).toBool(), true);
 
-        // Und so, wenn sie darf.
+        // Und so, wenn eine Tastanfrage ansteht.
         radio.verarbeiteFlexVerriegelung({
             { QStringLiteral("state"), QStringLiteral("READY") },
             { QStringLiteral("tx_allowed"), QStringLiteral("1") },
         });
         QCOMPARE(radio.flexDarfSenden(), true);
-        QCOMPARE(freigabe.count(), 1);
-        QCOMPARE(freigabe.takeFirst().at(0).toBool(), true);
+        QCOMPARE(freigabe.count(), 0);   // war schon frei
 
         // Sie sendet.
         radio.verarbeiteFlexVerriegelung({

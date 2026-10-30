@@ -12,6 +12,8 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QStandardPaths>
+#include <QHostAddress>
+#include <QTcpServer>
 #include <QTcpSocket>
 #include <QUrl>
 #include <QDebug>
@@ -85,6 +87,34 @@ bool WhisperServerLauncher::portInUse(const QString& endpoint, int timeoutMs)
     if (host.isEmpty()) { host = QStringLiteral("127.0.0.1"); }
     int port = url.port();
     if (port <= 0) { port = 8080; }
+
+    // ── Binden statt verbinden (2026-10-30) ─────────────────────────
+    //
+    // Hier stand ein TCP-Connect mit Zeitgrenze. Am 2026-10-30 log der
+    // auf dem macOS-Laeufer der CI: er meldete Erfolg auf Ports, auf
+    // denen nachweislich niemand lauschte, und riss drei Pruefstaende
+    // auf einen Streich mit (Lauf 41020438997). Fuer einen Benutzer
+    // waere derselbe Fehler schwerer: Longpath haette den Dienst nie
+    // gestartet und „da antwortet schon jemand" gemeldet.
+    //
+    // Wer einen Port binden kann, hat bewiesen, dass dort niemand
+    // lauscht. Das entscheidet der Kern oertlich, ohne Paket auf der
+    // Leitung und ohne Wartezeit. SO_REUSEADDR (das Qt beim Lauschen
+    // setzt) erlaubt dabei KEIN zweites Binden auf einen aktiv
+    // lauschenden Port — auch dann nicht, wenn der andere mit
+    // SO_REUSEPORT gebunden hat, also genau im Fall von whisper-server.
+    const QHostAddress adresse(host);
+    if (!adresse.isNull()) {
+        QTcpServer probe;
+        if (probe.listen(adresse, static_cast<quint16>(port))) {
+            probe.close();
+            return false;
+        }
+        return true;
+    }
+
+    // Ein Name statt einer Adresse (also ein fremder Rechner): dort
+    // laesst sich nichts binden, da bleibt nur der Anruf.
     QTcpSocket probe;
     probe.connectToHost(host, static_cast<quint16>(port));
     const bool open = probe.waitForConnected(timeoutMs);

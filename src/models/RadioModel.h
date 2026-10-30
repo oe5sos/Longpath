@@ -2755,6 +2755,8 @@ signals:
     // ── Senden ueber die Flex (2026-10-23, Stufe 2) ──────────────────
     /// Die MASCHINE hat das Senden erlaubt oder gesperrt.
     void flexSendefreigabeGeaendert(bool darf);
+    /// Die Aussteuerung des Flex-Mikrofonwegs hat sich geaendert.
+    void flexMikGainGeaendert(int db);
     /// Die Maschine sendet / sendet nicht mehr — gleich wer getastet hat.
     void flexSendetGeaendert(bool sendet);
 
@@ -3770,9 +3772,35 @@ public:
     bool setzeFlexSendescheibe(const QString& sliceId);
     QString flexSendescheibe() const { return m_flexSendescheibenId; }
 
+    /// Haengt gerade eine FlexRadio an? Nicht dasselbe wie
+    /// `isConnected()`: es gibt mehrere Geraeteklassen, und an der
+    /// Flex kommen Bild und Ton ueber ganz andere Wege.
+    bool istFlexVerbunden() const;
+
     /// Sende- und Abstimmleistung in Prozent (0..100).
     bool setzeFlexSendeleistung(int prozent);
     bool setzeFlexAbstimmleistung(int prozent);
+
+    /// ── Die Aussteuerung des Mikrofonwegs (2026-10-29) ──────────────
+    ///
+    /// Der Flex-Sendeweg haengt an KEINER WDSP-Kette: der Ton geht roh
+    /// von `AudioEngine::pullTxMic` an die Maschine. Damit gibt es auf
+    /// diesem Weg auch keine Verstaerkungsstufe — und am Geraet
+    /// gemessen heiszt das beides:
+    ///
+    ///   18:56  MICPEAK  +2,54 dBFS  ->  FWDPWR 35,4 dBm = 3,4 W
+    ///   20:15  MICPEAK  −9,72 dBFS  ->  FWDPWR 18,6 dBm = 73 mW
+    ///
+    /// Dasselbe Programm, dieselbe Einstellung, zwei verschiedene
+    /// Mikrofone: einmal zweieinhalb Dezibel ueber Vollaussteuerung,
+    /// einmal zehn darunter. Leistung folgt dem Quadrat, also liegen
+    /// zwischen den beiden fast siebzehn Dezibel Ausgangsleistung.
+    ///
+    /// Der Regler ist von Hand, nicht automatisch: „ich glaube, wir
+    /// lassen das automatische verbessern" (Betreiber, 2026-10-09).
+    /// Der Riegel bei −1 dBFS in der Pumpe bleibt dahinter stehen.
+    int flexMikGainDb() const { return m_flexMikGainDb; }
+    void setzeFlexMikGainDb(int db);
 
     /// Der Abstimmtraeger. Taktet mit der Abstimmleistung.
     bool flexAbstimmen(bool an);
@@ -3873,6 +3901,9 @@ private:
 
     // Senden ueber die Flex (Stufe 2). Vorgabe: gesperrt.
     bool                 m_flexDarfSenden{false};
+    /// Aussteuerung des Flex-Mikrofonwegs in dB, siehe
+    /// setzeFlexMikGainDb(). 0 heiszt: roh hinaus, wie bisher.
+    int                  m_flexMikGainDb{0};
     bool                 m_flexVerriegelungGehoert{false};
     bool                 m_flexVerriegelungGezeigt{false};
     bool                 m_flexLeistungGesehen{false};

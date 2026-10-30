@@ -61,6 +61,20 @@ struct PortAudioConfig {
     bool    exclusiveMode = false;  // WASAPI only
 };
 
+/// Heiszt dieses Aufnahmegeraet nach einem echten Mikrofon?
+///
+/// Die virtuellen Eingaenge (Teams, Zoom, BlackHole, Boom, DAX/VAX,
+/// Splashtop …) sind zu viele und zu wechselhaft fuer eine Sperrliste;
+/// stattdessen wird die Namenskonvention der Hardware erkannt. Steht
+/// hier false, darf das Geraet nie ueber eine „Vorgabe" gewinnen: es
+/// liefert mit grosser Wahrscheinlichkeit Stille, und eine Sendung aus
+/// Stille sieht am Funkgeraet genauso aus wie eine richtige.
+///
+/// Die Namen kommen in der SPRACHE DES SYSTEMS — siehe die Markerliste
+/// in PortAudioBus.cpp und den dort angeschriebenen Befund vom
+/// 2026-10-29.
+bool istHardwareMikrofonName(const QString& name);
+
 class PortAudioBus : public IAudioBus {
 public:
     PortAudioBus();

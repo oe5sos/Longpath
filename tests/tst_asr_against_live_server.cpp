@@ -21,6 +21,7 @@
 #include <QTcpSocket>
 
 #include "asr/RemoteAsrBackend.h"
+#include "PortProbe.h"
 
 #include <cmath>
 
@@ -28,11 +29,14 @@ using namespace Longpath;
 
 namespace {
 
+// Binden statt verbinden — siehe tests/PortProbe.h. Der frueher hier
+// stehende Connect meldete am 2026-10-30 auf dem CI-Laeufer einen
+// Server auf 8080, den es nicht gab: der Fall lief weiter und fiel dann
+// mit „Connection refused" um, also genau die Falschmeldung, die der
+// Kopf dieses Prueflaufs ausschliessen wollte.
 bool serverIsUp(quint16 port = 8080)
 {
-    QTcpSocket sock;
-    sock.connectToHost(QStringLiteral("127.0.0.1"), port);
-    return sock.waitForConnected(300);
+    return LongpathTest::portHasListener(port);
 }
 
 // Eine Sekunde Ton bei 16 kHz. Kein Sprachsignal — es geht um Format

@@ -1624,6 +1624,13 @@ target_compile_definitions(tst_rxapplet_att_range PRIVATE LONGPATH_BUILD_TESTS)
 # combinations, and prefix independence (Speakers vs Headphones).
 longpath_add_test(tst_audio_device_config_roundtrip)
 
+# ── Mikrofon-Namen in der Sprache des Systems (2026-10-29) ───────────────────
+# Am Geraet gemessen: ein nicht angestecktes Headset in den Einstellungen, und
+# die Ersatzsuche nahm „BoomAudio" -- die Flex sendete 664 Tonpakete mit Spitze
+# -150 dBFS. Die Hardware-Erkennung kannte nur englische Namen, die Eingaenge
+# des Betreibers heiszen „Externes Mikrofon" / „MacBook Air-Mikrofon".
+longpath_add_test(tst_mikrofon_namen)
+
 # ── Phase 3O Sub-Phase 12 Task 12.2 Step 0: AudioEngine speakers live-reconfig ─
 # Verifies speakersConfigChanged / headphonesConfigChanged / txInputConfigChanged
 # / vaxConfigChanged signals, mutex safety in rxBlockReady (try_lock), and

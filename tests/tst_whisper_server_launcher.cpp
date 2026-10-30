@@ -9,24 +9,22 @@
 #include <QDir>
 #include <QFile>
 #include <QSignalSpy>
+#include <QCoreApplication>
 #include <QTcpServer>
 #include <QTemporaryDir>
 #include "asr/WhisperServerLauncher.h"
+#include "PortProbe.h"
 
 using namespace Longpath;
 using S = WhisperServerLauncher::State;
 
+// Der eigene Port kommt jetzt aus tests/PortProbe.h — binden statt
+// verbinden. Warum, steht dort: am 2026-10-30 fielen drei Faelle dieses
+// Prueflaufs um, weil ein TCP-Connect auf dem CI-Laeufer Erfolg meldete,
+// wo niemand lauschte (Lauf 41020438997). Dieselbe Luege traf
+// tst_asr_against_live_server und tst_tci_client_against_live_device.
 namespace {
-/// Ein Port, auf dem gerade niemand lauscht — auf dem Rechner des
-/// Betreibers steht ein Login-Dienst auf 8080, also nie fest 8080.
-quint16 freePort()
-{
-    QTcpServer s;
-    if (!s.listen(QHostAddress::LocalHost, 0)) { return 0; }
-    const quint16 p = s.serverPort();
-    s.close();
-    return p;
-}
+quint16 freePort() { return LongpathTest::freeLocalPort(); }
 } // namespace
 
 class TestWhisperServerLauncher : public QObject
