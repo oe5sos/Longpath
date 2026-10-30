@@ -263,6 +263,7 @@ warren@wpratt.com
 #include <QColorDialog>
 #include "core/KiwiSdrManager.h"
 #include "core/FFTRouter.h"
+#include "core/FensterRandScroll.h"
 #include "StyleConstants.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -3896,7 +3897,26 @@ void MainWindow::wireSpectrumSliceControls(SpectrumWidget* sw,
         SliceModel* s = sliceForPan(panId);
         if (!s) { return; }
         if (!sw->ctunEnabled()) {
-            s->setFrequency(centerHz);
+            // ── Nur ein Zug ist ein Befehl (2026-10-30) ─────────────
+            //
+            // Hier stand `s->setFrequency(centerHz)` fuer JEDE
+            // Mittenaenderung. Das Fenster scrollt aber auch von
+            // selbst mit, wenn der VFO in den Randstreifen laeuft
+            // (Thetis-Regel in setVfoFrequency) — und dessen neue
+            // Mitte liegt um Breite/2 − Rand neben dem VFO, bei
+            // 200 kHz genau 80 kHz. Zurueckgeschrieben wurde daraus
+            // eine Rueckkopplung: der VFO sprang dem Fenster
+            // nachtraeglich um 80 kHz hinterher.
+            //
+            // Beim Verbinden mit der FLEX-8400 war genau das der seit
+            // dem 2026-10-29 gesuchte Versatz; am OpenHPSDR-Geraet
+            // fiel er nicht auf, weil dort CTUN im Regelfall EIN ist
+            // und dieser Zweig nie laeuft. Rechnung und Messung:
+            // core/FensterRandScroll.h.
+            if (FensterRandScroll::mitteIstAbstimmbefehl(
+                    false, sw->mitteFolgtDemVfo())) {
+                s->setFrequency(centerHz);
+            }
             return;
         }
         const int stream = s->streamIndex();

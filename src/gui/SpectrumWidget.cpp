@@ -13375,7 +13375,21 @@ void SpectrumWidget::setVfoFrequency(double hz)
         }
 
         if (needsScroll) {
+            // ── Dieses Nachscrollen ist KEIN Zug (2026-10-30) ───────
+            //
+            // Die neue Mitte liegt um Breite/2 − Rand neben dem VFO —
+            // bei 200 kHz genau 80 kHz. Schreibt sie jemand als
+            // Abstimmbefehl in die Scheibe zurueck, zieht das Fenster
+            // den VFO um diese 80 kHz hinter sich her, obwohl der VFO
+            // schon richtig stand. Genau das geschah beim Verbinden
+            // mit der FLEX-8400, vier Mal gemessen. Die Rechnung steht
+            // in core/FensterRandScroll.h.
+            //
+            // Darum die Fahne: der Empfaenger des Signals kann den
+            // eigenen Nachlauf vom Zug des Bedienenden unterscheiden.
+            m_mitteFolgtDemVfo = true;
             emit centerChanged(m_centerHz);
+            m_mitteFolgtDemVfo = false;
         }
     }
 
