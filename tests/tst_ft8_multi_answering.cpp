@@ -395,6 +395,32 @@ private slots:
                  "die alten Tonlagen gelten auf der neuen Frequenz nicht");
     }
 
+
+    // 5. Zwei Nachrichten duerfen nie auf derselben Tonlage liegen.
+    //
+    // Beim Durchdenken am 2026-10-30 gefunden: das CQ bekam
+    // `toene[plaetze.size()]`, aber `Ft8Mehrfach` vergibt seine Toene
+    // nach dem Index im eigenen Feld. Faellt ein aktiver Ablauf mit
+    // leerer Nachricht heraus, stimmen die Zahlen nicht mehr ueberein
+    // -- und das CQ laege auf der Tonlage einer laufenden Station.
+    // Zwei Nachrichten auf einem Ton ueberlagern sich zu Matsch, und
+    // beide sind weg.
+    void keineZweiNachrichtenAufDerselbenTonlage()
+    {
+        const QVector<float> toene = Ft8TxSource::tonleiter(1500.0f, 6);
+        QCOMPARE(toene.size(), 6);
+        for (int i = 0; i < toene.size(); ++i) {
+            for (int j = i + 1; j < toene.size(); ++j) {
+                QVERIFY2(!qFuzzyCompare(toene[i] + 1.0f, toene[j] + 1.0f),
+                         qPrintable(QStringLiteral("Ton %1 und %2 sind "
+                                                   "gleich: %3")
+                                        .arg(i).arg(j).arg(toene[i])));
+            }
+        }
+        // Und der Abstand ist der, mit dem MSHV arbeitet.
+        QCOMPARE(toene[1] - toene[0], Ft8TxSource::kPlatzAbstandHz);
+    }
+
 };
 
 QTEST_MAIN(TstFt8MultiAnswering)

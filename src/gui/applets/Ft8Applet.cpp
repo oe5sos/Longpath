@@ -1133,13 +1133,36 @@ void Ft8Applet::sendeMehrfach()
         && plaetze.size() < m_plaetze) {
         const QString cq = m_ablauf.naechsteNachricht();
         if (!cq.isEmpty()) {
+            // Die erste Tonlage der Leiter, die KEIN Platz benutzt.
+            //
+            // Nicht `toene[plaetze.size()]`: `Ft8Mehrfach` vergibt
+            // seine Toene nach dem Index im eigenen Feld, und das
+            // enthaelt nur die aktiven Ablaeufe. Faellt einer von
+            // ihnen mit leerer Nachricht heraus, stimmt die Zahl der
+            // Eintraege nicht mehr mit den vergebenen Indizes
+            // ueberein -- und das CQ laege auf derselben Tonlage wie
+            // eine laufende Station. Zwei Nachrichten auf einem Ton
+            // ueberlagern sich zu Matsch, und beide sind weg.
             const QVector<float> toene =
-                Ft8TxSource::tonleiter(float(m_sendeTonHz), m_plaetze);
-            Ft8TxSource::Platz p;
-            p.text   = cq;
-            p.toneHz = plaetze.size() < toene.size()
-                           ? toene[plaetze.size()] : float(m_sendeTonHz);
-            plaetze.push_back(p);
+                Ft8TxSource::tonleiter(float(m_sendeTonHz),
+                                       Ft8Mehrfach::kMaxPlaetze);
+            float frei = 0.0f;
+            for (const float t : toene) {
+                bool belegtVonPlatz = false;
+                for (const Ft8TxSource::Platz& p : plaetze) {
+                    if (qFuzzyCompare(p.toneHz + 1.0f, t + 1.0f)) {
+                        belegtVonPlatz = true;
+                        break;
+                    }
+                }
+                if (!belegtVonPlatz) { frei = t; break; }
+            }
+            if (frei > 0.0f) {
+                Ft8TxSource::Platz p;
+                p.text   = cq;
+                p.toneHz = frei;
+                plaetze.push_back(p);
+            }
         }
     }
 
