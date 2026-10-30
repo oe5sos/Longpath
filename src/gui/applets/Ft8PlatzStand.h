@@ -60,4 +60,15 @@ struct Ft8PlaetzeStand {
     bool sendet{false};
 };
 
+/// Hat dieser Stand ueberhaupt etwas zu zeigen?
+///
+/// Eine Funktion, kein Ausdruck an drei Stellen: das Panel fragt es
+/// (leerer Hinweis oder Kacheln), und MainWindow fragt es, um das
+/// Panel ueberhaupt erst aufzumachen. Zwei Stellen mit derselben
+/// Regel laufen auseinander.
+inline bool hatInhalt(const Ft8PlaetzeStand& s)
+{
+    return !s.plaetze.isEmpty() || !s.wartende.isEmpty();
+}
+
 }  // namespace Longpath

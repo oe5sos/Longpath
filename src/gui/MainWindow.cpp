@@ -7651,6 +7651,33 @@ void MainWindow::populateDefaultMeter()
     connect(m_ft8Applet, &Ft8Applet::plaetzeGeaendert,
             m_ft8PlaetzeApplet, &Ft8PlaetzeApplet::zeigeStand);
 
+    // ── Es zeigt sich, sobald es etwas zu zeigen hat ──────────
+    //
+    // Betreiber am 2026-10-30, nachdem er das Panel leer vorfand:
+    // „waere schoen, wenn man das immer siehst, sobald ...".
+    //
+    // Ab Werk ist es aus, und das bleibt richtig: mit einem Platz und
+    // ohne QSO hat es nichts zu sagen. Aber wer es nie aufmacht, sieht
+    // auch nie, dass zwei Stationen auf ihn warten -- und das war
+    // heute der Fall (F5PZT und OE3TVJ um 16:09, nur im Protokoll).
+    //
+    // GENAU EINMAL je Sitzung. Ein Fenster, das nach jedem Zumachen
+    // wieder aufgeht, ist keine Hilfe mehr, sondern eine Zumutung;
+    // wer es weghaben will, soll es weghaben koennen.
+    connect(m_ft8Applet, &Ft8Applet::plaetzeGeaendert, this,
+            [this](const Longpath::Ft8PlaetzeStand& st) {
+        if (m_ft8SlotsSchonGezeigt || !hatInhalt(st)) { return; }
+        m_ft8SlotsSchonGezeigt = true;
+        if (!m_appletVis
+            || m_appletVis->isEffectivelyVisible(QStringLiteral("Ft8Slots"))) {
+            return;
+        }
+        qCInfo(lcContainer).noquote()
+            << "FT8 Slots aufgemacht: " << st.plaetze.size()
+            << "Platz/Plaetze," << st.wartende.size() << "wartend";
+        m_appletVis->ensureVisible(QStringLiteral("Ft8Slots"));
+    });
+
     // EqApplet — Equalizer, Empfang und Senden (eingehaengt 2026-10-11).
     //
     // Es stand hier als Geister-Applet mit der Bedingung "TODO 3I-3: TX/RX

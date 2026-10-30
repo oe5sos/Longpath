@@ -143,6 +143,36 @@ private slots:
         QVERIFY(panel.flaecheForTest()->stand().plaetze.size() == 1);
     }
 
+    // ── Wann es sich von selbst zeigen soll ───────────────────────
+    //
+    // Betreiber am 2026-10-30: „waere schoen, wenn man das immer
+    // siehst, sobald ...". `hatInhalt()` ist die eine Regel dafuer --
+    // das Panel fragt sie (Hinweis oder Kacheln) und MainWindow
+    // fragt sie (aufmachen oder nicht). Zwei Stellen mit derselben
+    // Regel laufen auseinander.
+    void hatInhaltIstDieEineRegel()
+    {
+        Ft8PlaetzeStand leer;
+        QVERIFY2(!hatInhalt(leer), "ohne alles hat es nichts zu zeigen");
+
+        // Ein laufendes QSO reicht -- auch mit einem einzigen Platz.
+        Ft8PlaetzeStand mitQso;
+        mitQso.plaetzeGesamt = 1;
+        Ft8PlatzStand z;
+        z.partner = QStringLiteral("HB9ZHK");
+        mitQso.plaetze.append(z);
+        QVERIFY(hatInhalt(mitQso));
+
+        // Und ein Wartender allein reicht AUCH -- genau der Fall vom
+        // 2026-10-30, als F5PZT und OE3TVJ im Protokoll standen und
+        // nirgends sonst.
+        Ft8PlaetzeStand nurWartend;
+        nurWartend.wartende.append(
+            Ft8WartenderStand{QStringLiteral("F5PZT"), QString(), 9});
+        QVERIFY2(hatInhalt(nurWartend),
+                 "ein Wartender ohne laufendes QSO ist auch Inhalt");
+    }
+
     // Das Panel waechst mit der Zahl der Plaetze, statt eine feste
     // Hoehe zu behaupten -- bei sechs Plaetzen waere die Haelfte
     // abgeschnitten.

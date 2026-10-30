@@ -1819,6 +1819,10 @@ private:
     class CwDecoderApplet*   m_cwDecoderApplet{nullptr};
     class Ft8Applet*         m_ft8Applet{nullptr};
     class Ft8PlaetzeApplet*  m_ft8PlaetzeApplet{nullptr};
+    /// Das Plaetze-Panel wird genau EINMAL je Sitzung von selbst
+    /// aufgemacht, sobald es etwas zu zeigen hat. Wer es danach
+    /// zumacht, behaelt es zu.
+    bool                     m_ft8SlotsSchonGezeigt{false};
     // Torn down and rebuilt on every rebindRttyRadeAvailability() call --
     // same QMetaObject::Connection-list idiom CommandBar::attach() uses,
     // so the dspModeChanged listener below never accumulates one dangling

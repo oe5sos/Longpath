@@ -319,7 +319,7 @@ Ft8PlaetzeApplet::Ft8PlaetzeApplet(RadioModel* model, QWidget* parent)
 
 void Ft8PlaetzeApplet::zeigeStand(const Longpath::Ft8PlaetzeStand& s)
 {
-    const bool etwas = !s.plaetze.isEmpty() || !s.wartende.isEmpty();
+    const bool etwas = hatInhalt(s);
     m_leer->setVisible(!etwas);
     m_flaeche->setVisible(etwas);
     m_flaeche->setzeStand(s);
