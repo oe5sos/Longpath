@@ -320,6 +320,13 @@ public:
     /// derselbe Zugang.
     QPushButton*    nurCqButtonForTest() const { return m_sichtCq; }
     QPushButton*    nurNeueLaenderButtonForTest() const { return m_sichtNeuesLand; }
+    /// Der Knopf „New grid" (2026-10-30). Er war als einziger der
+    /// sechs Sichten ohne Pruefzugang -- und damit war der Weg
+    /// Logbuch -> `istNeu` -> Zeilenart -> Anzeige nicht fahrbar.
+    QPushButton*    sichtNeuesGridButtonForTest() const { return m_sichtNeuesGrid; }
+    /// Die gearbeiteten Grossfelder, um im Lauf ein Logbuch zu
+    /// stellen statt eine ADIF-Datei unterzuschieben.
+    GridsGearbeitet& gridsForTest() { return m_grids; }
     QPushButton*    sichtAllesButtonForTest() const { return m_sichtAlles; }
     QPushButton*    sichtAnMichButtonForTest() const { return m_sichtAnMich; }
     QPushButton*    sichtFreqButtonForTest() const { return m_sichtFreq; }
