@@ -778,8 +778,24 @@ void MainWindow::wireFlex()
         disconnect(m_flexBlickBand);
         if (SpectrumWidget* sw = m_radioModel->spectrumWidget()) {
             m_flexBlickBand = connect(sw, &SpectrumWidget::centerChanged,
-                                      this, [this](double) {
+                                      this, [this, sw](double) {
                 if (m_shuttingDown || m_flexTargetSliceId < 0) { return; }
+                // ── Nur ein Zug wirft den Nachzug an (2026-10-30) ───
+                //
+                // Scrollt das Fenster nur dem VFO an den Rand nach, so
+                // ist seine neue Mitte 80 kHz neben der Scheibe — und
+                // der Nachzug zog den Panadapter der Maschine genau
+                // dorthin, gegen die Zentrierung, die `RadioModel`
+                // gerade erst gesendet hatte. Am Geraet gemessen, der
+                // Wechsel auf FT8 um 16:06:04: die spaetere Quittung
+                // gewann, das Signal stand wieder neben der Mitte.
+                //
+                // Stoppen genuegt nicht — der Nachzug hatte seinen
+                // Befehl da schon gesendet. Er darf nicht anlaufen.
+                if (!FlexFensterZug::nachzugWirdAngeworfen(
+                        sw->mitteFolgtDemVfo())) {
+                    return;
+                }
                 if (m_flexPanNachzug) { m_flexPanNachzug->start(); }
             });
         }
