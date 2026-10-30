@@ -28,6 +28,8 @@
 
 #include <QMenu>
 
+#include "gui/styles/AppTheme.h"
+
 using namespace Longpath;
 
 class TstProfilschieneBindung : public QObject
@@ -35,6 +37,14 @@ class TstProfilschieneBindung : public QObject
     Q_OBJECT
 
 private slots:
+    void initTestCase()
+    {
+        // Wie in tst_profilschiene_richtung: die Schiene malt sich
+        // ueber Stylesheets, und ohne Grundlage sieht sie auf jedem
+        // Rechner anders aus.
+        applyAppBaselineQss(*qApp);
+    }
+
     // ── Der gemeldete Fall ────────────────────────────────────────
     void einHakenAufUseForFt8BindetDasProfil()
     {
@@ -47,7 +57,7 @@ private slots:
         ProfileRail schiene(&lp, Qt::Horizontal);
 
         QVERIFY2(schiene.waehleImMenueForTest(QStringLiteral("FT8"),
-                                              QStringLiteral("Use for FT8")),
+                                              ProfileRail::Eintrag::UseForFt8),
                  "den Menuepunkt gibt es nicht oder er loest nichts aus");
 
         QVERIFY2(lp.isBoundToDigi(QStringLiteral("FT8"),
@@ -69,12 +79,12 @@ private slots:
         ProfileRail schiene(&lp, Qt::Horizontal);
 
         QVERIFY(schiene.waehleImMenueForTest(QStringLiteral("FT8"),
-                                             QStringLiteral("Use for FT8")));
+                                             ProfileRail::Eintrag::UseForFt8));
         QVERIFY(lp.isBoundToDigi(QStringLiteral("FT8"),
                                  DigiFrequenzen::Digimodus::Ft8));
 
         QVERIFY(schiene.waehleImMenueForTest(QStringLiteral("FT8"),
-                                             QStringLiteral("Use for FT8")));
+                                             ProfileRail::Eintrag::UseForFt8));
         QVERIFY2(!lp.isBoundToDigi(QStringLiteral("FT8"),
                                    DigiFrequenzen::Digimodus::Ft8),
                  "der zweite Klick muss sie wieder loesen");
@@ -108,7 +118,7 @@ private slots:
         ProfileRail schiene(&lp, Qt::Horizontal);
 
         QVERIFY(schiene.waehleImMenueForTest(QStringLiteral("P"),
-                                             QStringLiteral("Use for FT8")));
+                                             ProfileRail::Eintrag::UseForFt8));
         QVERIFY(lp.isBoundToDigi(QStringLiteral("P"),
                                  DigiFrequenzen::Digimodus::Ft8));
         QVERIFY(!lp.isBoundToDigi(QStringLiteral("P"),

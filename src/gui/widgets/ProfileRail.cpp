@@ -17,6 +17,7 @@
 #include "gui/StyleConstants.h"
 #include "gui/widgets/CommandBar.h"
 
+#include <QDebug>
 #include <QEvent>
 #include <QMenu>
 #include <QPointer>
@@ -468,16 +469,26 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
 }
 
 bool ProfileRail::waehleImMenueForTest(const QString& profil,
-                                       const QString& eintrag)
+                                       Eintrag eintrag)
 {
-    QMenu menu;
+    // Das Menue haengt am Fenster, wie beim echten Rechtsklick --
+    // ein elternloses QMenu waere ein eigenes Top-Level-Fenster, und
+    // davon haelt diese Klasse sich fern (siehe `showMenuFor`).
+    QMenu menu(window() ? window() : this);
     const Menueteile teile = baueMenue(profil, menu);
-    for (QAction* a : menu.actions()) {
-        if (a->text() != eintrag) { continue; }
-        if (a->isCheckable()) { a->setChecked(!a->isChecked()); }
-        return werteMenueAus(a, teile, profil);
+    QAction* ziel = nullptr;
+    switch (eintrag) {
+        case Eintrag::UseForFt8: ziel = teile.ft8; break;
+        case Eintrag::UseForFt4: ziel = teile.ft4; break;
+        case Eintrag::Save:      ziel = teile.save; break;
+        case Eintrag::Rename:    ziel = teile.ren; break;
+        case Eintrag::Delete:    ziel = teile.del; break;
     }
-    return false;
+    if (!ziel) { return false; }
+    // Den Haken umlegen, wie es der Klick tut -- QMenu::exec()
+    // schaltet einen checkable Eintrag beim Ausloesen selbst um.
+    if (ziel->isCheckable()) { ziel->setChecked(!ziel->isChecked()); }
+    return werteMenueAus(ziel, teile, profil);
 }
 
 QStringList ProfileRail::badges() const { return m_order; }

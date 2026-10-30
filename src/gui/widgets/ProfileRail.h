@@ -193,10 +193,17 @@ private:
                        const QString& name);
 
 public:
+    /// Welcher Eintrag gewaehlt wird. KEINE Textsuche: die
+    /// Beschriftungen gehen durch `tr()`, und ein Lauf, der sie
+    /// vergleicht, faellt um, sobald eine Uebersetzung geladen ist
+    /// oder Qt ein Mnemonic anhaengt -- auf dem einen Rechner gruen,
+    /// auf dem anderen rot, und der Grund steht nirgends.
+    enum class Eintrag { UseForFt8, UseForFt4, Save, Rename, Delete };
+
     /// Nur fuer Prueflaeufe: den Menueweg fahren, ohne `exec()`.
     /// Baut das Menue wie beim Rechtsklick, haekelt den Eintrag an
-    /// oder ab und wertet ihn aus. False, wenn es ihn nicht gibt.
-    bool waehleImMenueForTest(const QString& profil, const QString& eintrag);
+    /// oder ab und wertet ihn aus. False, wenn er nichts ausloest.
+    bool waehleImMenueForTest(const QString& profil, Eintrag eintrag);
     /// Das Menue bauen, ohne es zu zeigen -- fuer den Prueflauf, der
     /// nachsieht, ob ein Haken richtig dasteht.
     Menueteile baueMenueForTest(const QString& name, class QMenu& menu)
