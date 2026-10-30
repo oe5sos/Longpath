@@ -496,6 +496,76 @@ private slots:
         const float dbm = spektrum.at(0).at(1).value<QVector<float>>().at(0);
         QVERIFY(dbm > -80.0f);
     }
+
+    // ── Die eigene Sendung ist kein Netzverlust (2026-10-30) ──────
+    //
+    // Im Protokoll des Betreibers stand:
+    //
+    //     groeszte Pause 13422 ms um 13:52:13
+    //
+    // 13,2 s -- genau seine FT8-Tastung. Waehrend er sendet, schickt
+    // die Maschine kein Bild. Das als Netzverlust zu melden
+    // verfaelscht das Instrument, das genau dafuer gebaut wurde, den
+    // Netzweg zu beurteilen.
+    //
+    // Der Zaehler hat VIER Bit und laeuft nach sechzehn Paketen um.
+    // Ueber einem Umlauf sagt sein Sprung nichts mehr: aus 2500
+    // fehlenden Paketen wird eine Zahl zwischen 1 und 15.
+    void eineLangePauseIstKeineLuecke()
+    {
+        FlexVitaStream s;
+        const quint16 klasse = quint16(FlexVitaClass::NarrowAudio);
+        const quint32 strom  = 0x4000008;
+
+        // Erst ein ruhiger Lauf, damit der uebliche Abstand steht.
+        // Darunter wird NICHTS als Unterbrechung gewertet -- eine
+        // Schwelle aus zwei Messwerten waere geraten.
+        qint64 t = 0;
+        for (int i = 0; i < 80; ++i) {
+            s.pruefeZaehlerForTest(klasse, strom, quint8(i & 0xF), t);
+            t += 5'000'000LL;          // 5 ms, wie der Tonstrom
+        }
+        const auto vorher = s.luecken();
+        QCOMPARE(vorher.size(), 1);
+        QCOMPARE(vorher.first().verloren, 0);
+        QCOMPARE(vorher.first().unterbrechungen, 0);
+
+        // Jetzt die Sendung: 13,2 s Pause. Der Zaehler ist in der
+        // Zeit 165-mal umgelaufen und steht auf irgendeinem Wert.
+        t += 13'200'000'000LL;
+        s.pruefeZaehlerForTest(klasse, strom, quint8(7), t);
+
+        const auto nachher = s.luecken();
+        QCOMPARE(nachher.size(), 1);
+        QVERIFY2(nachher.first().unterbrechungen == 1,
+                 "die lange Pause wurde nicht als Unterbrechung erkannt");
+        QVERIFY2(nachher.first().verloren == 0,
+                 "die eigene Sendung wurde als Netzverlust gezaehlt");
+        QVERIFY(nachher.first().laengsteUnterbrechungMs >= 13'000);
+    }
+
+    // Die Gegenprobe: eine KURZE Luecke zaehlt weiterhin als
+    // Verlust. Ohne sie waere die Trennung oben eine Taubstellung.
+    void einekurzeLueckeZaehltWeiterhin()
+    {
+        FlexVitaStream s;
+        const quint16 klasse = quint16(FlexVitaClass::NarrowAudio);
+        const quint32 strom  = 0x4000008;
+
+        qint64 t = 0;
+        for (int i = 0; i < 80; ++i) {
+            s.pruefeZaehlerForTest(klasse, strom, quint8(i & 0xF), t);
+            t += 5'000'000LL;
+        }
+        // Drei Pakete fehlen, der Abstand bleibt klein (20 ms).
+        t += 20'000'000LL;
+        s.pruefeZaehlerForTest(klasse, strom, quint8((80 + 3) & 0xF), t);
+
+        const auto l = s.luecken();
+        QCOMPARE(l.size(), 1);
+        QCOMPARE(l.first().verloren, qint64(3));
+        QCOMPARE(l.first().unterbrechungen, qint64(0));
+    }
 };
 
 QTEST_MAIN(TestFlexVitaStream)

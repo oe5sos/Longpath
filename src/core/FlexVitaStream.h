@@ -161,11 +161,42 @@ public:
         qint64  spruenge{0};      ///< wie oft der Zaehler sprang
         qint64  groessteLueckeMs{0};
         QString groessteLueckeUm; ///< Uhrzeit dazu, sonst ist sie nichts wert
+        /// Pausen ueber einem Zaehlerumlauf -- KEIN Netzverlust.
+        /// Die eigene Sendung ist die haeufigste davon.
+        qint64  unterbrechungen{0};
+        qint64  laengsteUnterbrechungMs{0};
     };
     /// Je Stromkennung ein Eintrag, nach Klasse sortiert.
     QVector<Luecken> luecken() const;
     /// Summe der Zaehlerspruenge ueber alle Stroeme.
     qint64 verlorenePaketeGesamt() const { return m_verlorenGesamt; }
+
+    /// ── Wann eine Pause keine Luecke ist (2026-10-30) ───────────
+    ///
+    /// Der Zaehler im VITA-Kopf hat VIER Bit und laeuft nach
+    /// sechzehn Paketen um -- beim Tonstrom in 86 ms. Ist die Pause
+    /// laenger, hat er mindestens einmal umgeschlagen, und sein
+    /// Sprung sagt nichts mehr: aus 2500 fehlenden Paketen wird
+    /// eine Zahl zwischen 1 und 15.
+    ///
+    /// Gemessen am 2026-10-30 im Protokoll des Betreibers:
+    ///
+    ///     groeszte Pause 13422 ms um 13:52:13
+    ///
+    /// 13,2 s -- das ist genau seine FT8-Tastung. Waehrend er sendet,
+    /// schickt die Maschine kein Bild; das als Netzverlust zu
+    /// melden, verfaelscht das Instrument, das genau dafuer gebaut
+    /// wurde, den Netzweg zu beurteilen.
+    ///
+    /// Solche Pausen zaehlen jetzt getrennt als `unterbrechungen`.
+    /// Die Schwelle ist das Sechzehnfache des ueblichen Abstands,
+    /// also genau ein Zaehlerumlauf -- nicht eine feste
+    /// Millisekundenzahl, denn die vier Stroeme laufen verschieden
+    /// schnell (Ton 187 Pakete/s, Wasserfall deutlich weniger).
+    static constexpr int kUmlaufFaktor = 16;
+    /// Bis der mittlere Abstand steht, wird nichts als Unterbrechung
+    /// gewertet: eine Schwelle aus zwei Messwerten ist geraten.
+    static constexpr int kMindestPaketeFuerMittel = 32;
 
     // ── Lueckenfuellung im Tonweg (2026-10-30) ───────────────────
     //
@@ -186,6 +217,18 @@ public:
     // Nur fuer Pruefstaende: schiebt ein Datagramm durch denselben Weg,
     // den der Socket nimmt.
     void ingestDatagramForTesting(const QByteArray& datagram);
+
+    /// Nur fuer Prueflaeufe: einen Zaehlerstand mit vorgegebener Zeit
+    /// einspeisen, ohne Datagramm und ohne Uhr.
+    void pruefeZaehlerForTest(quint16 klasse, quint32 strom,
+                              quint8 zaehler, qint64 jetztNs)
+    {
+        FlexVita::Header h{};
+        h.packetClass = klasse;
+        h.streamId    = strom;
+        h.counter     = zaehler;
+        zaehleLuecke(h, jetztNs);
+    }
 
 signals:
     // Fertiger FFT-Rahmen, schon in dBm umgerechnet.
@@ -253,13 +296,28 @@ private:
         qint64  letzteAnkunftNs{-1};
         qint64  groessteLueckeNs{0};
         QString groessteLueckeUm;
+        /// Der uebliche Abstand zwischen zwei Paketen, gleitend
+        /// gemittelt. Daraus ergibt sich, ab wann eine Pause keine
+        /// Luecke mehr ist, sondern eine Unterbrechung -- siehe
+        /// `kUmlaufFaktor` und `unterbrechungen`.
+        qint64  mittelAbstandNs{0};
+        /// Pausen, die laenger waren als ein Zaehlerumlauf. Ihr
+        /// Zaehlersprung ist bedeutungslos und wird NICHT als
+        /// Verlust gezaehlt.
+        qint64  unterbrechungen{0};
+        qint64  laengsteUnterbrechungNs{0};
     };
     /// Ab wann ein Abstand keine Luecke mehr ist, sondern eine
     /// Unterbrechung (Senden, Bandwechsel, Neuverbindung). 200 ms
     /// sind rund vierzig Paketabstaende und damit weit jenseits
     /// dessen, was die Decke von acht Paketen ueberhaupt fuellt.
     static constexpr qint64 kUnterbrechungAbNs = 200LL * 1000000LL;
-    void zaehleLuecke(const FlexVita::Header& h);
+    /// `jetztNsVorgabe` < 0 heisst: die eigene Uhr fragen.
+    /// Ein Prueflauf gibt sie vor -- eine Klasse mit eigener Uhr
+    /// laesst sich nur in Echtzeit pruefen, und eine Pause von
+    /// 13 Sekunden waere dann ein Prueflauf von 13 Sekunden.
+    void zaehleLuecke(const FlexVita::Header& h,
+                      qint64 jetztNsVorgabe = -1);
     bool m_lueckenfuellung{true};
     QMap<quint32, FlexVita::Lueckenzustand> m_tonLuecken;  ///< je Tonstrom
     qint64 m_gefuellteRahmen{0};
