@@ -176,8 +176,11 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     m_btn3d = new QPushButton(QStringLiteral("2D"), head);
     m_btn3d->setFixedSize(34, 24);
     m_btn3d->setCursor(Qt::PointingHandCursor);
-    m_btn3d->setToolTip(QStringLiteral(
-        "Flache Darstellung oder Raumbild \u2014 schaltet zwischen 2D und 3D"));
+    // Englisch, wie die ganze Oberflaeche \u2014 die deutsche Fassung
+    // gehoert nach translations/longpath_de.ts, nicht hierher
+    // (tst_oberflaeche_englisch haelt die Decke bei 9).
+    m_btn3d->setToolTip(tr("Flat trace or 3D surface \u2014 switches the "
+                           "panadapter between 2D and 3D"));
     m_btn3d->setObjectName(QStringLiteral("panHeader3dToggle"));
     headLay->addWidget(m_btn3d);
 
