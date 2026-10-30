@@ -8051,6 +8051,14 @@ longpath_add_test(tst_flex_frequenzspur)
 # Betreibers (2026-10-23) muss ihn ueberleben.
 longpath_add_test(tst_flex_fensterzug)
 
+# -- Die 80 kHz, nachgerechnet --------------------------------------------
+# Der Versatz beim Flex-Verbinden war Breite/2 − Breite·Randanteil, also
+# bei 200 kHz genau 80 kHz: die neue Fenstermitte, nachdem das Fenster dem
+# VFO an den Rand nachgescrollt ist. Zurueckgeschrieben als Abstimmbefehl
+# wurde daraus eine Rueckkopplung. Dieser Stand haelt die Zahl und das
+# Urteil fest (core/FensterRandScroll.h).
+longpath_add_test(tst_fenster_randscroll)
+
 # -- Flex: der Fehlerweg sagt jetzt etwas ---------------------------------
 # „Disconnected — Unknown error" im Verbindungsfenster, 2026-10-28 20:41,
 # dreimal in Folge; eine Millisekunde zwischen Wahl und Fehler, und als
