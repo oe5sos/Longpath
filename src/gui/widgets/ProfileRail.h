@@ -46,6 +46,7 @@
 #include <QHash>
 #include <QPointer>
 #include <QString>
+#include <QAction>
 #include <QWidget>
 
 class QBoxLayout;
@@ -160,6 +161,48 @@ signals:
 
 private:
     void showMenuFor(const QString& name, const QPoint& globalPos);
+
+    // ── Menue bauen und auswerten, getrennt (2026-10-30) ─────────
+    //
+    // Weil es anders nicht zu pruefen ist. `showMenuFor` ruft
+    // `QMenu::exec()`, und das dreht auf macOS eine Cocoa-Schleife,
+    // in der weder Taktgeber noch gepostete Ereignisse ankommen
+    // (siehe docs/architecture/2026-10-15-pruefstaende-und-der-schirm.md).
+    // Ein Prueflauf kann den Menueweg darum nur fahren, wenn Aufbau
+    // und Auswertung nicht in derselben Funktion stecken.
+    //
+    // Anlass: der Betreiber meldete am 2026-10-30 „verklinkung
+    // funktioniert nicht", und ich konnte nicht sagen, ob der
+    // Menuepunkt gar nicht erscheint, nichts ausloest oder nicht
+    // gespeichert wird -- fuer alle drei gab es keinen Lauf.
+    struct Menueteile {
+        QAction* save{nullptr};
+        QAction* exportToDesktop{nullptr};
+        QAction* importFromDesktop{nullptr};
+        QAction* ft8{nullptr};
+        QAction* ft4{nullptr};
+        QAction* ren{nullptr};
+        QAction* dup{nullptr};
+        QAction* del{nullptr};
+        QAction* verschieben{nullptr};
+    };
+    Menueteile baueMenue(const QString& name, class QMenu& menu);
+    /// Was der gewaehlte Eintrag ausloest. Gibt true, wenn er
+    /// bedient wurde.
+    bool werteMenueAus(QAction* chosen, const Menueteile& teile,
+                       const QString& name);
+
+public:
+    /// Nur fuer Prueflaeufe: den Menueweg fahren, ohne `exec()`.
+    /// Baut das Menue wie beim Rechtsklick, haekelt den Eintrag an
+    /// oder ab und wertet ihn aus. False, wenn es ihn nicht gibt.
+    bool waehleImMenueForTest(const QString& profil, const QString& eintrag);
+    /// Das Menue bauen, ohne es zu zeigen -- fuer den Prueflauf, der
+    /// nachsieht, ob ein Haken richtig dasteht.
+    Menueteile baueMenueForTest(const QString& name, class QMenu& menu)
+    { return baueMenue(name, menu); }
+
+private:
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;

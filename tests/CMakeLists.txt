@@ -5988,6 +5988,7 @@ longpath_add_test(tst_widget_picker)
 #    Umschalten verwirft den Umbau, Loeschen laesst das Fenster
 #    herrenlos, die Bindung raet --
 longpath_add_test(tst_layout_profiles)
+longpath_add_test(tst_profilschiene_bindung)
 
 # -- Der Rundgang durch ein ECHTES MainWindow, nicht durch ein blosses
 #    QVariantMap an Haken (das deckt tst_layout_profiles.cpp bereits ab,

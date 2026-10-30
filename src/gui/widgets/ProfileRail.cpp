@@ -340,6 +340,112 @@ bool ProfileRail::eventFilter(QObject* watched, QEvent* event)
     return QWidget::eventFilter(watched, event);
 }
 
+// Das Menue bauen -- OHNE es zu zeigen. Siehe ProfileRail.h,
+// `Menueteile`: nur so laesst sich der Weg ohne Maus pruefen.
+ProfileRail::Menueteile ProfileRail::baueMenue(const QString& name,
+                                               QMenu& menu)
+{
+    Menueteile t;
+    // Der volle Name als Überschrift. Auf dem Abzeichen steht nur ein
+    // Buchstabe, und ein Menü mit „Löschen“ über einem „C“ ist zu wenig
+    // Auskunft für etwas, das nicht rückgängig zu machen ist.
+    QAction* title = menu.addAction(name);
+    title->setEnabled(false);
+    menu.addSeparator();
+
+    t.save = menu.addAction(tr("Save now"));
+    // captureIntoCurrent() sichert immer das AKTIVE Profil, gleich, auf
+    // welches Abzeichen man rechtsklickt -- der Menuepunkt darf also nur
+    // dort erscheinen, sonst waere "Jetzt sichern" auf einem anderen
+    // Abzeichen ein Versprechen, das der Aufruf gar nicht einloest.
+    t.save->setEnabled(m_profiles && m_profiles->current() == name);
+    t.exportToDesktop = menu.addAction(tr("Save to Desktop…"));
+    t.importFromDesktop = menu.addAction(tr("Load from Desktop…"));
+    menu.addSeparator();
+
+    // ── An FT8 oder FT4 binden (2026-10-30) ──────────────────────
+    //
+    // Betreiber: „und wenn bei ft8 klick automatisch ein eigenes
+    // profil erscheint?" — „dies wuerde ich vorher anlegen."
+    //
+    // `LayoutProfiles::bindDigi` kann das seit heute, `profileFor`
+    // konnte es laengst -- nur rief es niemand, und darum war die
+    // ganze Bindung (auch die an Band und Betriebsart) unerreichbar.
+    t.ft8 = menu.addAction(tr("Use for FT8"));
+    t.ft4 = menu.addAction(tr("Use for FT4"));
+    for (QAction* a : {t.ft8, t.ft4}) { a->setCheckable(true); }
+    if (m_profiles) {
+        t.ft8->setChecked(m_profiles->isBoundToDigi(
+            name, DigiFrequenzen::Digimodus::Ft8));
+        t.ft4->setChecked(m_profiles->isBoundToDigi(
+            name, DigiFrequenzen::Digimodus::Ft4));
+    }
+    t.ft8->setToolTip(tr("Switch to this layout when FT8 is selected.\n"
+                         "The current layout is saved first."));
+    t.ft4->setToolTip(tr("Switch to this layout when FT4 is selected.\n"
+                         "The current layout is saved first."));
+
+    menu.addSeparator();
+    t.ren = menu.addAction(tr("Rename…"));
+    t.dup = menu.addAction(tr("Duplicate…"));
+    menu.addSeparator();
+    t.del = menu.addAction(tr("Delete"));
+    // Das letzte Profil lässt sich nicht löschen. Ohne Profil gehört
+    // das Fenster keinem, und die nächste Umgestaltung landete nirgends.
+    t.del->setEnabled(m_profiles && m_profiles->names().size() > 1);
+
+    // ── Wohin die Schiene gehoert, entscheidet der Betreiber ─────────
+    //
+    // 2026-10-06, nachdem sie von links in die Leiste gewandert war:
+    // „macht sinn, dass man dies individuell verschieben und anpassen
+    // kann". Also nicht neu festgenagelt, sondern hier umschaltbar --
+    // an der Stelle, an der man ohnehin rechtsklickt, statt in einer
+    // Einstellungsseite, die man erst finden muss.
+    menu.addSeparator();
+    t.verschieben = menu.addAction(
+        m_richtung == Qt::Horizontal
+            ? tr("Rail to the left edge")
+            : tr("Rail into the top bar"));
+    return t;
+}
+
+bool ProfileRail::werteMenueAus(QAction* chosen, const Menueteile& t,
+                                const QString& name)
+{
+    if (!chosen) { return false; }
+    if (chosen == t.ft8 || chosen == t.ft4) {
+        if (!m_profiles) {
+            // Frueher schwieg diese Stelle. Ein Haken, der nichts tut
+            // und nichts sagt, ist von „geht nicht" nicht zu
+            // unterscheiden -- der Betreiber hat am 2026-10-30 genau
+            // das gemeldet.
+            qWarning() << "[ProfileRail] Bindung nicht gesetzt:"
+                       << "keine Profilverwaltung";
+            return false;
+        }
+        const auto was = (chosen == t.ft4)
+                             ? DigiFrequenzen::Digimodus::Ft4
+                             : DigiFrequenzen::Digimodus::Ft8;
+        m_profiles->bindDigi(name, was, chosen->isChecked());
+        qInfo() << "[ProfileRail] Profil" << name
+                << (chosen == t.ft4 ? "<-> FT4" : "<-> FT8")
+                << (chosen->isChecked() ? "gebunden" : "geloest");
+        return true;
+    }
+    if (chosen == t.save) { emit saveRequested(name); return true; }
+    if (chosen == t.exportToDesktop) { emit exportRequested(name); return true; }
+    if (chosen == t.importFromDesktop) { emit importRequested(name); return true; }
+    if (chosen == t.ren) { emit renameRequested(name); return true; }
+    if (chosen == t.dup) { emit duplicateRequested(name); return true; }
+    if (chosen == t.del) { emit removeRequested(name); return true; }
+    if (chosen == t.verschieben) {
+        emit placementToggleRequested(m_richtung == Qt::Horizontal
+                                          ? Qt::Vertical : Qt::Horizontal);
+        return true;
+    }
+    return false;
+}
+
 void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
 {
     // Am Hauptfenster, nicht an der Leiste (2026-09-27): die Leiste hat
@@ -350,72 +456,7 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
     const QPointer<ProfileRail> self(this);
     QMenu& menu = *menuOwner.get();
-    // Der volle Name als Überschrift. Auf dem Abzeichen steht nur ein
-    // Buchstabe, und ein Menü mit „Löschen“ über einem „C“ ist zu wenig
-    // Auskunft für etwas, das nicht rückgängig zu machen ist.
-    QAction* title = menu.addAction(name);
-    title->setEnabled(false);
-    menu.addSeparator();
-
-    QAction* save = menu.addAction(tr("Save now"));
-    // captureIntoCurrent() sichert immer das AKTIVE Profil, gleich, auf
-    // welches Abzeichen man rechtsklickt -- der Menuepunkt darf also nur
-    // dort erscheinen, sonst waere "Jetzt sichern" auf einem anderen
-    // Abzeichen ein Versprechen, das der Aufruf gar nicht einloest.
-    save->setEnabled(m_profiles && m_profiles->current() == name);
-    QAction* exportToDesktop = menu.addAction(tr("Save to Desktop…"));
-    QAction* importFromDesktop = menu.addAction(tr("Load from Desktop…"));
-    menu.addSeparator();
-
-    // ── An FT8 oder FT4 binden (2026-10-30) ──────────────────────
-    //
-    // Betreiber: „und wenn bei ft8 klick automatisch ein eigenes
-    // profil erscheint?" — „dies wuerde ich vorher anlegen."
-    //
-    // Direkt ueber `m_profiles` statt ueber ein Signal, anders als
-    // alle Punkte darueber: die brauchen einen Dialog und gehoeren
-    // darum dem Fenster. Hier wird ein Haken gesetzt, mehr nicht.
-    //
-    // `LayoutProfiles::bindDigi` kann das seit heute, `profileFor`
-    // konnte es laengst -- nur rief es niemand, und darum war die
-    // ganze Bindung (auch die an Band und Betriebsart) unerreichbar.
-    QAction* ft8 = menu.addAction(tr("Use for FT8"));
-    QAction* ft4 = menu.addAction(tr("Use for FT4"));
-    for (QAction* a : {ft8, ft4}) { a->setCheckable(true); }
-    if (m_profiles) {
-        ft8->setChecked(m_profiles->isBoundToDigi(
-            name, DigiFrequenzen::Digimodus::Ft8));
-        ft4->setChecked(m_profiles->isBoundToDigi(
-            name, DigiFrequenzen::Digimodus::Ft4));
-    }
-    const QString wink =
-        tr("Switch to this layout when FT8 is selected.\n"
-           "The current layout is saved first.");
-    ft8->setToolTip(wink);
-    ft4->setToolTip(tr("Switch to this layout when FT4 is selected.\n"
-                       "The current layout is saved first."));
-
-    menu.addSeparator();
-    QAction* ren = menu.addAction(tr("Rename…"));
-    QAction* dup = menu.addAction(tr("Duplicate…"));
-    menu.addSeparator();
-    QAction* del = menu.addAction(tr("Delete"));
-    // Das letzte Profil lässt sich nicht löschen. Ohne Profil gehört
-    // das Fenster keinem, und die nächste Umgestaltung landete nirgends.
-    del->setEnabled(m_profiles && m_profiles->names().size() > 1);
-
-    // ── Wohin die Schiene gehoert, entscheidet der Betreiber ─────────
-    //
-    // 2026-10-06, nachdem sie von links in die Leiste gewandert war:
-    // „macht sinn, dass man dies individuell verschieben und anpassen
-    // kann". Also nicht neu festgenagelt, sondern hier umschaltbar --
-    // an der Stelle, an der man ohnehin rechtsklickt, statt in einer
-    // Einstellungsseite, die man erst finden muss.
-    menu.addSeparator();
-    QAction* verschieben = menu.addAction(
-        m_richtung == Qt::Horizontal
-            ? tr("Rail to the left edge")
-            : tr("Rail into the top bar"));
+    const Menueteile teile = baueMenue(name, menu);
 
     QAction* chosen = menu.exec(globalPos);
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
@@ -423,25 +464,20 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     // Weil das Menue am Hauptfenster haengt, kann die Leiste auch allein
     // gestorben sein: dafuer `self`.
     if (!menuOwner || !self) { return; }
-    if (chosen == ft8 || chosen == ft4) {
-        if (m_profiles) {
-            const auto was = (chosen == ft4)
-                                 ? DigiFrequenzen::Digimodus::Ft4
-                                 : DigiFrequenzen::Digimodus::Ft8;
-            m_profiles->bindDigi(name, was, chosen->isChecked());
-        }
-        return;
+    werteMenueAus(chosen, teile, name);
+}
+
+bool ProfileRail::waehleImMenueForTest(const QString& profil,
+                                       const QString& eintrag)
+{
+    QMenu menu;
+    const Menueteile teile = baueMenue(profil, menu);
+    for (QAction* a : menu.actions()) {
+        if (a->text() != eintrag) { continue; }
+        if (a->isCheckable()) { a->setChecked(!a->isChecked()); }
+        return werteMenueAus(a, teile, profil);
     }
-    if (chosen == save)      { emit saveRequested(name); }
-    else if (chosen == exportToDesktop) { emit exportRequested(name); }
-    else if (chosen == importFromDesktop) { emit importRequested(name); }
-    else if (chosen == ren)  { emit renameRequested(name); }
-    else if (chosen == dup)  { emit duplicateRequested(name); }
-    else if (chosen == del)  { emit removeRequested(name); }
-    else if (chosen == verschieben) {
-        emit placementToggleRequested(m_richtung == Qt::Horizontal
-                                          ? Qt::Vertical : Qt::Horizontal);
-    }
+    return false;
 }
 
 QStringList ProfileRail::badges() const { return m_order; }
