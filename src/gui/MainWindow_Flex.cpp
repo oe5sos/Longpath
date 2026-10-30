@@ -289,30 +289,44 @@ void MainWindow::wireFlex()
             // eine Spur, die bei jedem Handgriff schreit, ist Laerm.
             const bool verdaechtig = FlexFrequenzSpur::istVersatz(
                 hz, geraet, m_flexApplyingRemoteState);
-            // qCWarning/qCInfo sind Makros mit einer for-Schleife,
-            // also keine Ausdruecke — der Satz wird gebaut und dann
-            // EINMAL ausgegeben, laut oder leise.
+            // Die Worte gehoeren in die `<<`-Kette, nicht in eine
+            // QString-Variable (2026-10-30). `tst_oberflaeche_englisch`
+            // sucht in src/gui nach deutschem Text in tr() /
+            // QStringLiteral() und neutralisiert dabei Zeilen, die mit
+            // `qC` oder `<<` beginnen — also genau die Protokollzeilen.
+            // Ein `QString satz = QStringLiteral("… von der Maschine")`
+            // steht auszerhalb dieser Ausnahme und zaehlte als deutsche
+            // Beschriftung: die Decke 9 ging auf 11, zwei Scherben rot.
+            // Dieselbe Falle wie am Morgen desselben Tages bei der
+            // Sprechblase des 2D/3D-Knopfes — nur ist das hier wirklich
+            // ein Protokolltext, also wird er wie jeder andere in
+            // dieser Datei geschrieben.
             const auto mhz = [](double v) {
                 return QString::number(v / 1.0e6, 'f', 6);
             };
-            QString satz =
-                QStringLiteral("Flex-Spur: Scheibe %1  %2 -> %3 MHz "
-                               "(%4 kHz), Wache %5, Maschine meldet %6 MHz, "
-                               "Fenster %7 MHz")
-                    .arg(m_flexTargetSliceId)
-                    .arg(mhz(vorher), mhz(hz))
-                    .arg(QString::number((hz - vorher) / 1.0e3, 'f', 3),
-                         m_flexApplyingRemoteState
-                             ? QStringLiteral("gesetzt (von der Maschine)")
-                             : QStringLiteral("offen (vom Programm)"),
-                         mhz(geraet), mhz(fenster));
+            const auto khz = [](double v) {
+                return QString::number(v / 1.0e3, 'f', 3);
+            };
             if (verdaechtig) {
-                satz += QStringLiteral(" — DAS IST DER VERSATZ: %1 kHz "
-                                       "neben der Maschine")
-                            .arg(QString::number(abstand / 1.0e3, 'f', 3));
-                qCWarning(lcFlexGui).noquote() << satz;
+                // Verdaechtig heiszt per Definition: die Wache war offen.
+                qCWarning(lcFlexGui).noquote().nospace()
+                    << "Flex-Spur: Scheibe " << m_flexTargetSliceId << "  "
+                    << mhz(vorher) << " -> " << mhz(hz) << " MHz ("
+                    << khz(hz - vorher) << " kHz), Wache offen (vom "
+                    << "Programm), Maschine meldet " << mhz(geraet)
+                    << " MHz, Fenster " << mhz(fenster)
+                    << " MHz — DAS IST DER VERSATZ: " << khz(abstand)
+                    << " kHz neben der Maschine";
             } else {
-                qCInfo(lcFlexGui).noquote() << satz;
+                qCInfo(lcFlexGui).noquote().nospace()
+                    << "Flex-Spur: Scheibe " << m_flexTargetSliceId << "  "
+                    << mhz(vorher) << " -> " << mhz(hz) << " MHz ("
+                    << khz(hz - vorher) << " kHz), Wache "
+                    << (m_flexApplyingRemoteState
+                            ? "gesetzt (von der Maschine)"
+                            : "offen (vom Programm)")
+                    << ", Maschine meldet " << mhz(geraet)
+                    << " MHz, Fenster " << mhz(fenster) << " MHz";
             }
         });
 
