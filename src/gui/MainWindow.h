@@ -271,6 +271,8 @@ public:
     /// schon oeffentlich, und ein Paar darum kippte am 2026-10-21
     /// alles dahinter auf privat (sieben rote CI-Laeufe).
     class Ft8Applet* ft8AppletForTest() const { return m_ft8Applet; }
+    class Ft8PlaetzeApplet* ft8PlaetzeAppletForTest() const
+    { return m_ft8PlaetzeApplet; }
 
 
     // ── Der Schutzrahmen (2026-10-14) ────────────────────────────────
@@ -1811,6 +1813,7 @@ private:
     class RttyDecoderApplet* m_rttyDecoderApplet{nullptr};
     class CwDecoderApplet*   m_cwDecoderApplet{nullptr};
     class Ft8Applet*         m_ft8Applet{nullptr};
+    class Ft8PlaetzeApplet*  m_ft8PlaetzeApplet{nullptr};
     // Torn down and rebuilt on every rebindRttyRadeAvailability() call --
     // same QMetaObject::Connection-list idiom CommandBar::attach() uses,
     // so the dspModeChanged listener below never accumulates one dangling

@@ -1288,6 +1288,7 @@ set(GUI_SOURCES
     src/gui/applets/RttyDecoderApplet.cpp
     src/gui/applets/CwDecoderApplet.cpp
     src/gui/applets/Ft8Applet.cpp
+    src/gui/applets/Ft8PlaetzeApplet.cpp
     src/gui/applets/QsoRecorderApplet.cpp
     src/gui/applets/RecordingApplet.cpp
     src/gui/RecordingScheduleDialog.cpp

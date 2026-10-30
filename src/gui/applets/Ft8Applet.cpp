@@ -2042,6 +2042,114 @@ void Ft8Applet::zeigeArbeit()
                                    : QString();
         m_arbeitZug->setText(zug.isEmpty() ? tr("—") : zug);
     }
+
+    // Dieselbe Gelegenheit nutzt das Plaetze-Panel: es haengt an
+    // genau den Zustandswechseln, die auch die Arbeitsleiste
+    // bewegen.
+    meldeStand();
+}
+
+// ── Der Stand fuer das Plaetze-Panel ─────────────────────────────────
+//
+// Betreiber am 2026-10-30: „ich will sehen, sobald ein qso oder
+// mehrere vielleicht seitlich im eigenen fenster zu sehen sind."
+//
+// Gebaut wird er HIER, nicht dort: `Ft8Mehrfach` und
+// `Ft8Warteschlange` gehoeren diesem Applet, und zwei Fenster, die
+// beide hineingreifen, haetten jedes seine eigene Meinung darueber,
+// welcher Zug gerade dran ist.
+
+// Der Zug, wie das Fenster ihn nennt -- „Tx2", „RR73", „CQ". NICHT
+// `Ft8Ablauf::zustandName()`: das sind die technischen Namen
+// („SendeRReport"), gut fuer Prueflaeufe und falsch auf einer
+// Kachel, die 48 Punkte breit ist.
+QString Ft8Applet::zugKurz(Ft8Ablauf::Zustand z)
+{
+    using Z = Ft8Ablauf::Zustand;
+    switch (z) {
+        case Z::RufeCq:       return QStringLiteral("CQ");
+        case Z::RufeAn:       return QStringLiteral("Tx1");
+        case Z::SendeReport:  return QStringLiteral("Tx2");
+        case Z::SendeRReport: return QStringLiteral("Tx3");
+        case Z::SendeRR73:    return QStringLiteral("RR73");
+        case Z::Sende73:      return QStringLiteral("73");
+        case Z::Fertig:       return tr("done");
+        case Z::Ruht:
+        case Z::Abgebrochen:  return QString();
+    }
+    return QString();
+}
+
+int Ft8Applet::stufeFuer(Ft8Ablauf::Zustand z)
+{
+    using Z = Ft8Ablauf::Zustand;
+    switch (z) {
+        case Z::Ruht:         return 0;
+        case Z::RufeCq:       return 0;
+        case Z::RufeAn:       return 1;
+        case Z::SendeReport:  return 2;
+        case Z::SendeRReport: return 3;
+        case Z::SendeRR73:    return 4;
+        case Z::Sende73:      return 5;
+        case Z::Fertig:       return 5;
+        case Z::Abgebrochen:  return 0;
+    }
+    return 0;
+}
+
+Ft8PlaetzeStand Ft8Applet::baueStand() const
+{
+    Ft8PlaetzeStand st;
+    st.plaetzeGesamt = m_plaetze;
+    st.sendet        = m_sendet;
+
+    auto ausAblauf = [this](const Ft8Ablauf& a, int tonHz) {
+        Ft8PlatzStand z;
+        z.partner   = a.partner();
+        z.land      = z.partner.isEmpty() ? QString() : landFuer(z.partner);
+        z.tonHz     = tonHz;
+        z.zug       = zugKurz(a.zustand());
+        z.gesendet  = a.gesendeterReport();
+        z.empfangen = a.empfangenerReport();
+        z.stufe     = stufeFuer(a.zustand());
+        return z;
+    };
+
+    if (mehrfachAn()) {
+        for (const Ft8Mehrfach::Belegung& b : m_mehrfach.belegung()) {
+            Ft8PlatzStand z;
+            z.partner = b.partner;
+            z.land    = z.partner.isEmpty() ? QString() : landFuer(z.partner);
+            z.tonHz   = int(b.toneHz);
+            z.stufe   = stufeFuer(b.zustand);
+            z.zug     = zugKurz(b.zustand);
+            st.plaetze.append(z);
+        }
+    }
+    // Der CQ-Ruf ist ein Platz, kein zweiter Ablauf -- genau wie beim
+    // Senden (siehe `sendeMehrfach`). Darum steht er in derselben
+    // Liste und nicht daneben.
+    if (m_ablauf.laeuft()) {
+        st.plaetze.append(ausAblauf(m_ablauf, m_sendeTonHz));
+    }
+
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    for (const Ft8Warteschlange::Wartend& w : m_schlange.alle()) {
+        if ((jetzt - w.seitMs) >= Ft8Warteschlange::kHaltbarkeitMs) {
+            continue;
+        }
+        Ft8WartenderStand ws;
+        ws.partner = w.partner;
+        ws.land    = landFuer(w.partner);
+        ws.snr     = w.snr;
+        st.wartende.append(ws);
+    }
+    return st;
+}
+
+void Ft8Applet::meldeStand()
+{
+    emit plaetzeGeaendert(baueStand());
 }
 
 // Der Absender einer FT8-Nachricht.

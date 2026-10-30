@@ -42,6 +42,7 @@
 #include "models/LogEntry.h"
 #include "core/Ft8Mehrfach.h"
 #include "core/Ft8Warteschlange.h"
+#include "Ft8PlatzStand.h"
 #include "core/Ft8Tonwahl.h"
 #include "core/Ft8Tx.h"
 
@@ -267,6 +268,20 @@ public:
     /// Zeitgeber nach bis zu 15 s — im Prueflauf waere das eine
     /// Viertelminute Warten je Zug.
     void fensterZuEndeForTest() { fensterZuEnde(); }
+    /// Der Stand der Plaetze, wie ihn `Ft8PlaetzeApplet` zeigt.
+    /// Oeffentlich fuer den Prueflauf -- sonst waere nur geprueft,
+    /// DASS gerechnet wird, nicht WAS ankommt.
+    Ft8PlaetzeStand plaetzeStandForTest() const { return baueStand(); }
+
+    // ── Zwei reine Abbildungen ──────────────────────────────
+    //
+    // Zustand -> was auf der Kachel steht. Oeffentlich, weil sie ohne
+    // Fenster, ohne Modell und ohne Geraet pruefbar sind -- und weil
+    // genau diese Uebersetzung sonst im Panel noch einmal entstuende.
+    /// Wie weit das QSO ist: 0..5, einer je Strich im Blatt.
+    static int stufeFuer(Ft8Ablauf::Zustand z);
+    /// Der Zug, wie das Fenster ihn nennt: „Tx2", „RR73", „CQ".
+    static QString zugKurz(Ft8Ablauf::Zustand z);
     /// Die Warteschlange, damit ein Prueflauf nachsehen kann, ob ein
     /// Anruf wirklich ankommt. Ohne diesen Zugang waere nur die
     /// Einheit geprueft, nicht ihr Anschluss -- und genau so lag
@@ -318,6 +333,12 @@ public:
     static QString senderCallsign(const QString& message);
 
 signals:
+    /// Der Stand der Plaetze hat sich geaendert. `Ft8PlaetzeApplet`
+    /// haengt daran -- das ist der EINZIGE Weg dorthin. Zwei Fenster,
+    /// die beide in `Ft8Mehrfach` hineingreifen, haetten jedes seine
+    /// eigene Meinung darueber, welcher Zug gerade dran ist.
+    void plaetzeGeaendert(const Longpath::Ft8PlaetzeStand& stand);
+
     /// Ein QSO ist vollstaendig. Es geht denselben Weg wie eines aus
     /// WSJT-X (MainWindow -> RotorLogbookPanel::logExternalQso): eine
     /// Datei, eine Doppelt-Regel, ein Hochladen.
@@ -534,6 +555,12 @@ private:
     QSpinBox*    m_plaetzeSpin{nullptr};
     int          m_plaetze{1};
     bool mehrfachAn() const { return m_plaetze > 1; }
+    /// Den Stand fuer das Plaetze-Panel bauen und melden.
+    Ft8PlaetzeStand baueStand() const;
+    void meldeStand();
+    /// Wie weit ein QSO ist: 0..5, einer je Zug. Fuer die fuenf
+    /// Striche im Blatt.
+
     /// Was in diesem Fenster auf allen Plaetzen hinausginge.
     void sendeMehrfach();
     /// Die Tonlage, die der Betreiber hatte, bevor Hound sie ueber

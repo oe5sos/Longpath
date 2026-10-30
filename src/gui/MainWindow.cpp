@@ -389,6 +389,7 @@ warren@wpratt.com
 #include "applets/RttyDecoderApplet.h"
 #include "applets/CwDecoderApplet.h"
 #include "applets/Ft8Applet.h"
+#include "applets/Ft8PlaetzeApplet.h"
 #include "applets/QsoRecorderApplet.h"
 #include "applets/RecordingApplet.h"
 #include "applets/KiwiSdrApplet.h"
@@ -7633,6 +7634,23 @@ void MainWindow::populateDefaultMeter()
         }
     });
 
+    // Ft8PlaetzeApplet (2026-10-30) -- was auf den Plaetzen laeuft.
+    //
+    // `Ft8Mehrfach::belegung()` rechnete die Belegung seit dem
+    // 2026-10-24 aus, und niemand las sie: mit `slots 3` gingen drei
+    // Signale hinaus, und der Betreiber sah keines davon. Dieselbe
+    // Art Luecke wie Multi Answering selbst.
+    //
+    // Es haengt NUR an diesem einen Signal. Selbst in `Ft8Mehrfach`
+    // hineinzugreifen waere der kuerzere Weg und der falsche: dann
+    // haetten zwei Fenster jedes seine eigene Meinung darueber,
+    // welcher Zug gerade dran ist.
+    m_ft8PlaetzeApplet = new Ft8PlaetzeApplet(m_radioModel, nullptr);
+    panel->addApplet(m_ft8PlaetzeApplet);
+    m_ft8PlaetzeApplet->setVisible(false);
+    connect(m_ft8Applet, &Ft8Applet::plaetzeGeaendert,
+            m_ft8PlaetzeApplet, &Ft8PlaetzeApplet::zeigeStand);
+
     // EqApplet — Equalizer, Empfang und Senden (eingehaengt 2026-10-11).
     //
     // Es stand hier als Geister-Applet mit der Bedingung "TODO 3I-3: TX/RX
@@ -8477,6 +8495,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Eq")]         = m_eqApplet;
     m_appletsById[QStringLiteral("Cat")]        = m_catApplet;
     m_appletsById[QStringLiteral("Ft8Decoder")] = m_ft8Applet;
+    m_appletsById[QStringLiteral("Ft8Slots")]   = m_ft8PlaetzeApplet;
     m_appletsById[QStringLiteral("Eq")]         = m_eqApplet;
     m_appletsById[QStringLiteral("Cat")]        = m_catApplet;
     m_appletsById[QStringLiteral("Vax")]        = m_vaxApplet;
@@ -8569,6 +8588,11 @@ void MainWindow::populateDefaultMeter()
     // FT8/FT4: dieselbe Form, gehaengt an die Datenmodi (2026-10-15).
     m_appletVis->registerApplet(QStringLiteral("Ft8Decoder"),
                                 QStringLiteral("FT8 Decoder"), true);
+    // Ab Werk AUS: mit einem Platz (der Voreinstellung) hat es nichts
+    // zu zeigen. Wer `slots` hochstellt, holt es sich dazu -- und
+    // bekommt dann auch den Hinweis, falls er es leer vorfindet.
+    m_appletVis->registerApplet(QStringLiteral("Ft8Slots"),
+                                QStringLiteral("FT8 Slots"), false);
     // Equalizer (eingehaengt 2026-10-11). **NICHT sichtbar ab Werk**
     // (geaendert 2026-10-14).
     //
