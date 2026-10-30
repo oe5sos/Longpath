@@ -174,6 +174,11 @@ public:
     static Zeilenart zeilenart(bool anMich, bool neuesLand, bool neuesGrid,
                                bool istCq);
 
+    /// Die Spaltenueberschrift ueber der Fundliste. Aus DENSELBEN
+    /// Breiten wie `zeilentext` -- zwei Stellen mit eigenen Zahlen
+    /// liefen beim ersten Spaltenwechsel auseinander.
+    static QString spaltenkopf();
+
     /// Eine Zeile der Liste, zusammengesetzt. Spalten wie in WSJT-X
     /// „Band Activity", dahinter das Land.
     ///
@@ -487,6 +492,7 @@ private:
     QPushButton* m_sichtNeuesLand{nullptr};
     QPushButton* m_sichtFreq{nullptr};
     QLabel*      m_fundZahl{nullptr};
+    QLabel*      m_spaltenkopf{nullptr};
 
     // ── Die Arbeitsleiste (Entwurf C, 2026-10-30) ────────────
     //

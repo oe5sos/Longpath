@@ -188,6 +188,36 @@ private slots:
                  qPrintable(kopf));
     }
 
+    // ── Die Spaltenkoepfe (2026-10-30) ───────────────────────────
+    //
+    // Betreiber: „die staerke des signals sollte auch in einer
+    // eigenen spalten sein." Sie IST eine -- es fehlte die
+    // Ueberschrift. Entscheidend ist, dass Kopf und Zeile DIESELBEN
+    // Breiten benutzen: zwei Stellen mit eigenen Zahlen liefen beim
+    // ersten Spaltenwechsel auseinander.
+    void derSpaltenkopfStehtUeberDenSpalten()
+    {
+        const QString kopf = Ft8Applet::spaltenkopf();
+        QVERIFY2(kopf.contains(QStringLiteral("dB")), qPrintable(kopf));
+        QVERIFY(kopf.contains(QStringLiteral("DT")));
+        QVERIFY(kopf.contains(QStringLiteral("Freq")));
+
+        // Die Zahl steht unter ihrer Ueberschrift. Gemessen am ENDE
+        // der Spalte, weil beide rechtsbuendig stehen -- und mit
+        // einem Rauschabstand, der in der Zeile sonst nirgends
+        // vorkommt. Mein erster Versuch suchte „8" und fand die Acht
+        // in „191845".
+        const QString zeile = Ft8Applet::zeilentext(
+            QStringLiteral("191845"), -7, 1.0, 2406,
+            QStringLiteral("LZ1ZF SP4DIS KO13"), QString());
+        QCOMPARE(kopf.indexOf(QStringLiteral("dB")) + 2,
+                 zeile.indexOf(QStringLiteral("-7")) + 2);
+        QCOMPARE(kopf.indexOf(QStringLiteral("Freq")) + 4,
+                 zeile.indexOf(QStringLiteral("2406")) + 4);
+        QCOMPARE(kopf.indexOf(QStringLiteral("DT")) + 2,
+                 zeile.indexOf(QStringLiteral("1.0")) + 3);
+    }
+
     // ── Die Landspalte ───────────────────────────────────────────────
     //
     // Betreiber am 2026-10-21: „vielleicht kann man auch das land

@@ -76,7 +76,18 @@ int Ft8PlaetzeFlaeche::noetigeHoehe() const
     if (!m_stand.wartende.isEmpty()) {
         h += 28 + m_stand.wartende.size() * 22 + 10;
     }
-    return qMax(h, 60);
+    // ── Die Untergrenze ist kein Geschmack (2026-10-30) ─────────
+    //
+    // `AppletFloatingWindow::applyDefaultSize()` rechnet die
+    // Fenstergroesse aus `sizeHint()`. Beim Abloesen ist das Applet
+    // noch versteckt, und ein verstecktes Widget verlangt fast
+    // nichts -- der Betreiber bekam eine Titelleiste ohne Inhalt:
+    // „ein eigenes fenster erscheint hier aber nicht", mit einem
+    // 20 Punkte hohen Streifen im Bild.
+    //
+    // 150 ist der leere Hinweistext in lesbarer Breite. Eine Kachel
+    // braucht 100, und darunter faengt das Fenster an zu luegen.
+    return qMax(h, 150);
 }
 
 QSize Ft8PlaetzeFlaeche::sizeHint() const
@@ -310,6 +321,12 @@ Ft8PlaetzeApplet::Ft8PlaetzeApplet(RadioModel* model, QWidget* parent)
     m_leer->setStyleSheet(QStringLiteral("color: %1; font-size: 11px;")
                               .arg(QString::fromLatin1(Style::kTextScale)));
     lay->addWidget(m_leer);
+
+    // Auch das Applet, nicht nur die Flaeche: beim Abloesen fragt
+    // `applyDefaultSize()` DAS Applet, und das reicht die Frage an
+    // seine Anordnung weiter -- die bei verstecktem Inhalt fast
+    // nichts verlangt.
+    setMinimumHeight(150);
 
     m_flaeche = new Ft8PlaetzeFlaeche(this);
     m_flaeche->hide();

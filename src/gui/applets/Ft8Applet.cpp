@@ -581,6 +581,20 @@ void Ft8Applet::buildUI()
     sichtReihe->addWidget(m_clearBtn);
     root->addLayout(sichtReihe);
 
+    // ── Die Spaltenkoepfe (2026-10-30) ──────────────────────────
+    //
+    // Betreiber: „die staerke des signals sollte auch in einer
+    // eigenen spalten sein." Sie ist eine -- die zweite. Ohne
+    // Ueberschrift war nur nicht zu sehen, welche der vier Zahlen
+    // welche ist. WSJT-X schreibt sie ueber die Liste, und genau
+    // dort hat er sie gesucht.
+    m_spaltenkopf = new QLabel(spaltenkopf(), this);
+    m_spaltenkopf->setFont(Style::monoFont(font(), Style::kFontSmall));
+    m_spaltenkopf->setStyleSheet(
+        QStringLiteral("QLabel { color: %1; padding: 0 0 2px 6px; }")
+            .arg(QString::fromLatin1(Style::kTextInactive)));
+    root->addWidget(m_spaltenkopf);
+
     root->addWidget(m_list, 1);
 
     // ── Fusszeile ───────────────────────────────────────────────────
@@ -1642,7 +1656,28 @@ bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
             // der Doppelklick legte die Antwort nur ins Feld, gesendet
             // wurde nichts. Derselbe Fehlgriff wie beim CQ-Knopf
             // (#315). Angehalten wird mit „Stop".
-            if (!m_sendet) {
+            //
+            // ── Auch WAEHREND einer Sendung (2026-10-30) ─────
+            //
+            // Hier stand `if (!m_sendet)`, und das verschluckte jeden
+            // Doppelklick, der in eine laufende Sendung fiel.
+            // Betreiber: „doppelklick loest kein automatisches qso
+            // aus."
+            //
+            // Bei FT8 ist das die Haelfte der Zeit: 13,2 s von 15
+            // wird getastet, und wer in der Liste etwas sieht,
+            // klickt genau dann. Der Druck war weg, ohne dass
+            // irgendwo etwas stand.
+            //
+            // Der Ablauf wird jetzt IMMER gesetzt. Geht gerade etwas
+            // hinaus, laeuft es aus -- und der neue Zug uebernimmt
+            // beim naechsten Fenster. Dafuer gibt es die
+            // Zug-in-der-Frist-Pruefung seit dem 2026-10-28: sie
+            // fragt nach der Dekoderfrist noch einmal, was wirklich
+            // zu senden ist. `ablaufSchritt()` kehrt bei laufender
+            // Sendung von selbst um, es geht also nichts doppelt
+            // hinaus.
+            {
                 const QString nachricht = nachrichtAusZeile(c.selectedText());
                 const QString sauber = c.selectedText().simplified();
                 const int snr = sauber.section(QLatin1Char(' '), 1, 1).toInt();
@@ -2417,6 +2452,30 @@ QString Ft8Applet::zeilentext(const QString& uhrzeit, int snrDb,
         .arg(dtSekunden, 5, 'f', 1)
         .arg(hz, 5)
         .arg(breit, land);
+}
+
+// ── Die Spaltenkoepfe (2026-10-30) ───────────────────────────────────
+//
+// Betreiber: „die staerke des signals sollte auch in einer eigenen
+// spalten sein." Sie IST eine -- die zweite. Ohne Ueberschrift ist
+// nur nicht zu sehen, welche der vier Zahlen welche ist:
+//
+//     191845    8    1.0   2406   LZ1ZF SP4DIS KO13   Poland
+//
+// WSJT-X schreibt sie ueber die Liste („UTC  dB  DT  Freq  Message"),
+// und genau dort hat er sie gesucht. Gebaut aus DENSELBEN Breiten wie
+// `zeilentext` -- zwei Stellen mit eigenen Zahlen waeren beim ersten
+// Spaltenwechsel auseinandergelaufen.
+QString Ft8Applet::spaltenkopf()
+{
+    // `zeilentext` baut "%1 %2 %3 %4  %5": Uhrzeit, dann vier Stellen
+    // fuer dB, fuenf fuer DT, fuenf fuer Hz.
+    return QStringLiteral("%1 %2 %3 %4  %5")
+        .arg(QStringLiteral("UTC   "))
+        .arg(tr("dB"), 4)
+        .arg(tr("DT"), 5)
+        .arg(tr("Freq"), 5)
+        .arg(tr("Message"));
 }
 
 QString Ft8Applet::landFuer(const QString& rufzeichen) const
