@@ -190,10 +190,13 @@ void Ft8PlaetzeFlaeche::maleKachel(QPainter& p, int y, int nummer,
 
     // Die Tonlage rechts oben. Grau, nicht warm: sie ist eine
     // Einstellung, keine Messung.
-    QFont mono = font();
-    mono.setFamily(QStringLiteral("Menlo"));
-    mono.setPointSizeF(9.5);
-    p.setFont(mono);
+    // `Style::monoFont` statt `setFamily("Menlo")`: Menlo gibt es nur
+    // auf dem Mac. Qt nimmt anderswo klaglos die naechstbeste Schrift,
+    // und das ist nicht zwingend eine dicktengleiche -- dann stehen
+    // die Zahlen nicht mehr untereinander, und genau dafuer ist die
+    // Mono-Schrift hier da. `tst_schriftfamilien` liest den Quelltext
+    // und faengt es (2026-10-30, auf dem Linux-Shard).
+    p.setFont(Style::monoFont(font(), 13));
     p.setPen(farbe(Style::kTextSecondary));
     p.drawText(QRect(r.right() - 76, r.top() + 8, 68, 14),
                Qt::AlignRight | Qt::AlignVCenter,
@@ -216,8 +219,7 @@ void Ft8PlaetzeFlaeche::maleKachel(QPainter& p, int y, int nummer,
     if (z.gesendet  != -99) { teile << tr("sent %1").arg(rapport(z.gesendet)); }
     if (z.empfangen != -99) { teile << tr("rcvd %1").arg(rapport(z.empfangen)); }
     if (!teile.isEmpty()) {
-        mono.setPointSizeF(9.0);
-        p.setFont(mono);
+        p.setFont(Style::monoFont(font(), 12));
         p.setPen(farbe(Style::kLabelMid));
         p.drawText(QRect(tx, r.top() + 50, w - 40, 14),
                    Qt::AlignLeft | Qt::AlignVCenter,
@@ -265,10 +267,7 @@ void Ft8PlaetzeFlaeche::maleWartende(QPainter& p, int y)
         p.drawText(QRect(kRandX + 100, yy, w - 160, 16),
                    Qt::AlignLeft | Qt::AlignVCenter, wart.land);
 
-        QFont mono = font();
-        mono.setFamily(QStringLiteral("Menlo"));
-        mono.setPointSizeF(9.0);
-        p.setFont(mono);
+        p.setFont(Style::monoFont(font(), 12));
         p.setPen(farbe(Style::kTextScale));
         p.drawText(QRect(kRandX + w - 50, yy, 44, 16),
                    Qt::AlignRight | Qt::AlignVCenter, rapport(wart.snr));
