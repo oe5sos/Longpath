@@ -1915,6 +1915,14 @@ public:
     }
 
 signals:
+    /// Die Darstellungsart hat gewechselt (2D/3D).
+    ///
+    /// Es gab dafuer kein Signal: wer die Art von auszen umstellt —
+    /// das Ueberblendmenue, der Schnellknopf in der Kopfleiste des
+    /// Panadapters — konnte vom anderen Weg nichts erfahren, und die
+    /// Beschriftung blieb stehen.
+    void spectrumRenderModeChanged(Longpath::SpectrumRenderMode mode);
+
     /// Weitergereicht vom Rechtsklick-Menue (2026-08-18).
     void openSetupPageRequested(const QString& page);
 

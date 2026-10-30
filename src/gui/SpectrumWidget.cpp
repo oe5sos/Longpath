@@ -988,6 +988,11 @@ void SpectrumWidget::loadSettings()
 
     int renderMode = readInt(QStringLiteral("DisplaySpectrumRenderMode"), 0);
     m_renderMode = static_cast<SpectrumRenderMode>(qBound(0, renderMode, 1));
+    // Auch das Wiederherstellen ist ein Wechsel (2026-10-30): der
+    // Schnellumschalter in der Kopfleiste des Panadapters liest seine
+    // Beschriftung aus diesem Wert. Ohne das Signal stand dort beim
+    // Start „2D", waehrend das Raumbild lief — am Geraet gesehen.
+    emit spectrumRenderModeChanged(m_renderMode);
     m_dss3dTrueScale = readBool(QStringLiteral("Display3DTrueScale"), true);
     m_dss.setBackWidthFrac(m_dss3dTrueScale ? DssRenderer::kTrueScaleWidthFrac
                                             : DssRenderer::kBackWidthFrac);
@@ -1745,6 +1750,7 @@ void SpectrumWidget::setSpectrumRenderMode(SpectrumRenderMode mode)
     if (m_renderMode == mode) { return; }
     m_renderMode = mode;
     scheduleSettingsSave();
+    emit spectrumRenderModeChanged(mode);
 
     // Start the 3D surface's ring buffer empty rather than carrying rows
     // pushed while it was off (and possibly against a since-changed
