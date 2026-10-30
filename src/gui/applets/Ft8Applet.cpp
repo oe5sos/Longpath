@@ -1039,7 +1039,12 @@ void Ft8Applet::merkeAnrufFallsNoetig(const QString& nachricht, int snr)
                               locatorAusNachricht(nachricht), jetzt)) {
         qCInfo(lcFt8Senden).noquote()
             << "Anruf gemerkt:" << anrufer << "— wartet als Nummer"
-            << m_schlange.wartende(jetzt);
+            << m_schlange.wartende(jetzt) << "— aus:" << nachricht;
+        // Sofort sichtbar machen, nicht erst beim naechsten
+        // Zustandswechsel: wer ruft, soll auf der Stelle im Kopf der
+        // Liste stehen.
+        zeigeFundZahl();
+        meldeStand();
     }
 }
 
@@ -2552,11 +2557,30 @@ void Ft8Applet::zeigeFundZahl()
                               ? tr("%1 decodes").arg(m_zeilen.size())
                               : tr("%1 of %2").arg(m_lineCount)
                                     .arg(m_zeilen.size());
-    m_fundZahl->setText(m_lastPeriodCount < 0
-                            ? liste
-                            : QStringLiteral("%1 \u00b7 %2")
-                                  .arg(liste,
-                                       tr("%1 last").arg(m_lastPeriodCount)));
+    QString text = m_lastPeriodCount < 0
+                       ? liste
+                       : QStringLiteral("%1 \u00b7 %2")
+                             .arg(liste,
+                                  tr("%1 last").arg(m_lastPeriodCount));
+
+    // ── Wer wartet, muss sichtbar sein ──────────────────────
+    //
+    // Am 2026-10-30 im Betrieb aufgefallen, eine Minute nachdem die
+    // Warteschlange zum ersten Mal lief:
+    //
+    //   16:09:00  Anruf gemerkt: F5PZT  — wartet als Nummer 1
+    //   16:09:00  Anruf gemerkt: OE3TVJ — wartet als Nummer 2
+    //
+    // Beide standen im Protokoll und nirgends sonst. Das Plaetze-Panel
+    // zeigt sie, aber das ist ab Werk aus -- wer es nicht geoeffnet
+    // hat, sieht nicht, dass zwei Stationen auf ihn warten. Eine
+    // Warteschlange, die niemand sieht, ist keine.
+    const int warten =
+        m_schlange.wartende(QDateTime::currentMSecsSinceEpoch());
+    if (warten > 0) {
+        text += QStringLiteral(" \u00b7 ") + tr("%1 waiting").arg(warten);
+    }
+    m_fundZahl->setText(text);
 }
 
 void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,

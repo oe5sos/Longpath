@@ -144,6 +144,50 @@ private slots:
         QCOMPARE(applet.schlangeForTest().wartende(jetzt), 1);
     }
 
+    // ── Und man SIEHT, dass jemand wartet ─────────────────────────
+    //
+    // Am 2026-10-30 im Betrieb aufgefallen, eine Minute nachdem die
+    // Schlange zum ersten Mal lief: F5PZT und OE3TVJ warteten, und
+    // beide standen im Protokoll und nirgends sonst. Das
+    // Plaetze-Panel zeigt sie, ist aber ab Werk aus. Eine
+    // Warteschlange, die niemand sieht, ist keine.
+    void dieZahlDerWartendenStehtImKopfDerListe()
+    {
+        AppSettings::instance().setValue(QStringLiteral("StationCallsign"),
+                                         QStringLiteral("OE5SOS"));
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        QVERIFY(slice);
+        slice->setFrequency(7074000.0);
+        applet.setSlice(slice);
+
+        QVERIFY(applet.lastLabelForTest());
+        QVERIFY2(!applet.lastLabelForTest()->text()
+                      .contains(QStringLiteral("waiting")),
+                 "ohne Wartende steht dort nichts von Wartenden");
+
+        applet.ablaufForTestSchreibend().starteMitAnrufer(
+            QStringLiteral("HB9ZHK"), QStringLiteral("OE5SOS"),
+            QStringLiteral("JN67"), 18, QString());
+
+        const QDateTime fenster =
+            QDateTime::fromMSecsSinceEpoch(999999990000LL, QTimeZone::UTC);
+        // Die beiden echten Rufzeichen aus dem Protokoll von 16:09.
+        for (const QString& t : {QStringLiteral("OE5SOS F5PZT JN12"),
+                                 QStringLiteral("OE5SOS OE3TVJ JN78")}) {
+            QMetaObject::invokeMethod(
+                &applet, "onDecoded", Qt::DirectConnection,
+                Q_ARG(QVector<Longpath::Ft8Decode>, einFund(t)),
+                Q_ARG(QDateTime, fenster));
+        }
+
+        const QString kopf = applet.lastLabelForTest()->text();
+        QVERIFY2(kopf.contains(QStringLiteral("2 waiting")),
+                 qPrintable(kopf));
+    }
+
     // ── Die Landspalte ───────────────────────────────────────────────
     //
     // Betreiber am 2026-10-21: „vielleicht kann man auch das land
