@@ -427,7 +427,12 @@ private slots:
             Q_ARG(QDateTime, QDateTime::currentDateTimeUtc()));
 
         QCOMPARE(applet.lastPeriodCountForTest(), 0);
-        QVERIFY2(applet.lastLabelForTest()->text().endsWith(QStringLiteral("0")),
+        // Die Zahl steht jetzt neben den Pillen, nicht mehr in einer
+        // eigenen Fusszeile am anderen Ende des Panels. Was geprueft
+        // wird, ist unveraendert: eine leere Periode meldet NULL
+        // Funde, nicht „noch nichts".
+        QVERIFY2(applet.lastLabelForTest()->text()
+                     .contains(QStringLiteral("0 last")),
                  qPrintable(applet.lastLabelForTest()->text()));
         QVERIFY(applet.listForTest()->toPlainText().isEmpty());
     }

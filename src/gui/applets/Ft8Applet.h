@@ -270,7 +270,12 @@ public:
     /// am Ende davon gerufen.
     QTimer* sendeTimerForTest() const { return m_sendeTimer; }
     QLabel*         statusForTest() const { return m_status; }
-    QLabel*         lastLabelForTest() const { return m_lastLabel; }
+    /// Hiesz bis zum 2026-10-30 „last period: N" und stand in einer
+    /// eigenen Fusszeile, am anderen Ende des Panels als die Zahl der
+    /// Zeilen in der Liste. Beide stehen jetzt nebeneinander rechts
+    /// neben den Pillen -- es sind zwei verschiedene Zahlen, auch wenn
+    /// sie bei frischer Liste gleich aussehen.
+    QLabel*         lastLabelForTest() const { return m_fundZahl; }
     /// Hiesz bis zum 2026-10-30 „CQ only" und war ein Haken in der
     /// Kopfzeile; jetzt ist es die Pille „CQ". Derselbe Zweck,
     /// derselbe Zugang.
@@ -336,8 +341,6 @@ private:
     int     m_lineCount{0};
 
     QLabel*         m_status{nullptr};
-    QLabel*         m_lastLabel{nullptr};
-    QProgressBar*   m_fill{nullptr};
     // ── Der Zeilenspeicher (2026-10-30) ───────────────────
     //
     // Bis dahin ging jeder Fund direkt in die Textflaeche, und die

@@ -452,17 +452,13 @@ void Ft8Applet::buildUI()
     m_wasserfall->setVisible(m_wasserfallAn);
     if (m_wasserfallBtn) { m_wasserfallBtn->setChecked(m_wasserfallAn); }
 
-    m_fill = new QProgressBar(this);
-    m_fill->setRange(0, 100);
-    m_fill->setValue(0);
-    m_fill->setTextVisible(false);
-    m_fill->setFixedHeight(4);
-    m_fill->setStyleSheet(QStringLiteral(
-        "QProgressBar { background: %1; border: none; }"
-        "QProgressBar::chunk { background: %2; }")
-        .arg(Style::kInsetBg, Style::kAccent));
-    root->addWidget(m_fill);
-
+    // ── Der Fuellstand sitzt jetzt in der Arbeitsleiste (30.10.) ──
+    //
+    // Hier stand ein vier Pixel hoher Fortschrittsbalken ueber der
+    // Liste, der dasselbe zeigte wie der Fensterbalken unten -- nur
+    // ohne die Marken fuer Signalanfang und -ende, und an einer
+    // Stelle, an der niemand hinsieht. Am laufenden Geraet standen
+    // beide uebereinander im Bild.
     root->addWidget(divider());
 
     // ── Die Liste ───────────────────────────────────────────────────
@@ -532,6 +528,16 @@ void Ft8Applet::buildUI()
     m_fundZahl->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
                                   .arg(Style::kTextInactive));
     sichtReihe->addWidget(m_fundZahl);
+
+    m_clearBtn = styledButton(tr("Clear"), 54);
+    m_clearBtn->setCheckable(false);   // leert die Liste, rastet nicht ein
+    connect(m_clearBtn, &QPushButton::clicked, this, [this]() {
+        // Auch den Speicher: sonst kaeme beim naechsten Pillendruck
+        // alles zurueck, was gerade geloescht wurde.
+        m_zeilen.clear();
+        zeichneListe();
+    });
+    sichtReihe->addWidget(m_clearBtn);
     root->addLayout(sichtReihe);
 
     root->addWidget(m_list, 1);
@@ -750,22 +756,12 @@ void Ft8Applet::buildUI()
 
     root->addLayout(sendRow);
 
-    auto* foot = new QHBoxLayout();
-    m_lastLabel = new QLabel(tr("last period: —"), this);
-    m_lastLabel->setFont(Style::monoFont(font(), Style::kFontCaption));
-    m_lastLabel->setStyleSheet(QStringLiteral("color: %1;").arg(Style::kTextTertiary));
-    foot->addWidget(m_lastLabel);
-    foot->addStretch(1);
-    m_clearBtn = styledButton(tr("Clear"), 60);
-    m_clearBtn->setCheckable(false);   // leert die Liste, rastet nicht ein
-    connect(m_clearBtn, &QPushButton::clicked, this, [this]() {
-        // Auch den Speicher: sonst kaeme beim naechsten Pillendruck
-        // alles zurueck, was gerade geloescht wurde.
-        m_zeilen.clear();
-        zeichneListe();
-    });
-    foot->addWidget(m_clearBtn);
-    root->addLayout(foot);
+    // ── Keine Fusszeile mehr (30.10.) ──────────────────
+    //
+    // Dort stand „last period: 23", waehrend rechts neben den Pillen
+    // „23 decodes" steht -- dieselbe Zahl, zweimal, am laufenden
+    // Geraet nebeneinander im Bild. „Clear" gehoert ohnehin neben die
+    // Liste, die es leert.
 }
 
 void Ft8Applet::setProtocol(Ft8Decoder::Protocol p)
@@ -1546,11 +1542,6 @@ void Ft8Applet::updateStatus()
     const double sekunden = static_cast<double>(imFenster)
                             / Ft8Decoder::kSampleRate;
     const double voll = m_stream->slotMs() / 1000.0;
-    if (m_fill) {
-        m_fill->setValue(voll > 0.0
-            ? qBound(0, static_cast<int>(100.0 * sekunden / voll), 100)
-            : 0);
-    }
 
     // ── Die Uhr steht unten, nicht oben (2026-10-30) ────────
     //
@@ -1560,15 +1551,12 @@ void Ft8Applet::updateStatus()
     // stehen, WAS gerade los ist. Ohne laufenden Ablauf (und damit
     // ohne Arbeitsleiste) bleibt es bei der Uhr: eine leere Zeile
     // waere schlechter als eine, die wenigstens den Takt zeigt.
+    // Die Uhr steht in der Arbeitsleiste, und nur dort. Am laufenden
+    // Geraet stand sie zweimal im Bild: oben im Panelkopf und unten.
+    // Oben bleibt, WAS zuletzt los war -- im Leerlauf, wie viele Funde
+    // die letzte Periode brachte.
     if (!m_ablauf.laeuft() && !m_sendet) {
-        m_status->setText(QStringLiteral("%1 / %2 s")
-                              .arg(sekunden, 0, 'f', 1)
-                              .arg(voll, 0, 'f', 1));
-    }
-    if (m_lastLabel) {
-        m_lastLabel->setText(m_lastPeriodCount < 0
-            ? tr("last period: —")
-            : tr("last period: %1").arg(m_lastPeriodCount));
+        m_status->setText(tr("listening"));
     }
 
     // Die Arbeitsleiste laeuft mit derselben Uhr: sie zeigt denselben
@@ -1703,6 +1691,7 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
 {
     m_lastPeriodCount = funde.size();
     updateStatus();
+    zeigeFundZahl();
     if (funde.isEmpty()) { return; }
 
     const QString uhrzeit = periodStart.toUTC().toString(QStringLiteral("HHmmss"));
@@ -2006,10 +1995,21 @@ void Ft8Applet::zeichneListe()
 void Ft8Applet::zeigeFundZahl()
 {
     if (!m_fundZahl) { return; }
-    m_fundZahl->setText(m_sicht == Sicht::Alles
-                            ? tr("%1 decodes").arg(m_zeilen.size())
-                            : tr("%1 of %2").arg(m_lineCount)
-                                  .arg(m_zeilen.size()));
+    // Zwei Zahlen, und sie sind NICHT dasselbe: wie viel in der Liste
+    // steht, und was die letzte Periode gebracht hat. Beim Aufraeumen
+    // am 2026-10-30 habe ich sie erst fuer eine Dopplung gehalten --
+    // sie standen im Bild des Betreibers nur zufaellig gleich, weil
+    // die Liste frisch war. Jetzt stehen sie nebeneinander, statt an
+    // zwei Enden des Panels.
+    const QString liste = m_sicht == Sicht::Alles
+                              ? tr("%1 decodes").arg(m_zeilen.size())
+                              : tr("%1 of %2").arg(m_lineCount)
+                                    .arg(m_zeilen.size());
+    m_fundZahl->setText(m_lastPeriodCount < 0
+                            ? liste
+                            : QStringLiteral("%1 \u00b7 %2")
+                                  .arg(liste,
+                                       tr("%1 last").arg(m_lastPeriodCount)));
 }
 
 void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
