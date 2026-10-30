@@ -5577,12 +5577,15 @@ longpath_add_test(tst_ft8_am_ton)
 longpath_add_test(tst_ft8_ablauf)
 
 longpath_add_test(tst_ft8_senden)
+longpath_add_test(tst_ft8_sendeplan)
+longpath_add_test(tst_ft8_tonwahl)
+longpath_add_test(tst_ft8_dxpedition)
 # 2026-10-15: FT8 im PROGRAMM — Abgriff, Flaeche, Eintrag. Dekoder und
 # Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die
 # Verdrahtung, nicht die Rechnung.
 longpath_add_test(tst_ft8_flaeche)
 # Die zweite Spalte „Rx Frequency" neben „Band Activity" (2026-10-21).
-longpath_add_test(tst_ft8_zwei_spalten)
+longpath_add_test(tst_ft8_sicht_meine_frequenz)
 longpath_add_test(tst_ft8_wasserfall)
 # 2026-10-15: und wie lange ein ganzes Fenster rechnet — die Zahl
 # entscheidet, ob das im Faden der Oberflaeche laufen darf.
@@ -8021,6 +8024,7 @@ longpath_add_test(tst_flex_vita_reader)
 # der Maszstab MUSS von aussen kommen, weil die Maschine y_pixels nie
 # zurueckmeldet. Datagramme aus echten Koepfen gebaut.
 longpath_add_test(tst_flex_vita_stream)
+longpath_add_test(tst_flex_lueckenfuellung)
 
 # 2026-10-22, zwei Befunde am Geraet: kein Ton trotz 30 987 Tonpaketen,
 # und ein S-Meter ohne Zeiger. Beide mit derselben Wurzel — die

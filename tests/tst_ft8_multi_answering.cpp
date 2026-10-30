@@ -34,7 +34,15 @@
 
 #include <QtTest>
 
+#include <QSignalSpy>
+#include <QPushButton>
+#include <QSpinBox>
+
 #include "core/Ft8Decoder.h"
+#include "gui/applets/Ft8Applet.h"
+#include "models/RadioModel.h"
+#include "models/LogEntry.h"
+#include "core/AppSettings.h"
 #include "core/Ft8Tx.h"
 
 using namespace Longpath;
@@ -179,6 +187,240 @@ private slots:
         QVERIFY2(!ging, "eine unpackbare Nachricht ging durch");
         QVERIFY2(!quelle.laeuft(), "es laeuft trotz Fehlschlag");
     }
+
+    // ── Und jetzt ist es auch ERREICHBAR (2026-10-30) ───────────────
+    //
+    // Die Faelle darueber pruefen `Ft8Mehrfach` und
+    // `Ft8TxSource::vorbereitenMehrere` fuer sich. Beide waren seit
+    // dem Bau (#323/#333/#335) vollstaendig und gruen -- und wurden
+    // von NIEMANDEM gerufen: sie kamen nur in ihrer eigenen Datei und
+    // in diesen Prueflaeufen vor. In der Bilanz gegen MSHV stand
+    // trotzdem „gebaut".
+    //
+    // Betreiber am 2026-10-30: „wie funktioniert mshv nun bei mir" --
+    // und beim Nachsehen war die Antwort: gar nicht. Diese Faelle
+    // nageln den Anschluss fest, damit das nicht noch einmal
+    // unbemerkt abreiszt.
+
+    void dasAppletHatEinenSchalterDafuer()
+    {
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Plaetze"),
+                                         QStringLiteral("1"));
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        QVERIFY2(applet.plaetzeSpinForTest(), "der Schalter fehlt");
+        QCOMPARE(applet.plaetzeSpinForTest()->minimum(), 1);
+        QCOMPARE(applet.plaetzeSpinForTest()->maximum(),
+                 Ft8Mehrfach::kMaxPlaetze);
+        // Ab Werk AUS: die Sendeleistung wird geteilt, das waehlt
+        // niemand versehentlich.
+        QCOMPARE(applet.plaetzeSpinForTest()->value(), 1);
+    }
+
+    void derSchalterStelltDieZahlDerPlaetzeDurch()
+    {
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Plaetze"),
+                                         QStringLiteral("1"));
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        QCOMPARE(applet.mehrfachForTest().plaetze(), 1);
+        applet.plaetzeSpinForTest()->setValue(3);
+        QCOMPARE(applet.mehrfachForTest().plaetze(), 3);
+    }
+
+    void zweiAnruferLandenAufZweiPlaetzen()
+    {
+        AppSettings::instance().setValue(QStringLiteral("StationCallsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Plaetze"),
+                                         QStringLiteral("3"));
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        QCOMPARE(applet.mehrfachForTest().plaetze(), 3);
+
+        const auto fund = [&applet](const char* text, double snr) {
+            Ft8Decode d;
+            d.text   = QString::fromLatin1(text);
+            d.snrDb  = snr;
+            d.freqHz = 1500.0;
+            applet.fundForTest(d);
+        };
+
+        fund("OE5SOS DL1ABC JO31", -7.0);
+        fund("OE5SOS SP9XYZ JO90", -12.0);
+        QCOMPARE(applet.mehrfachForTest().aktive(), 2);
+        QVERIFY(applet.mehrfachForTest().kennt(QStringLiteral("DL1ABC")));
+        QVERIFY(applet.mehrfachForTest().kennt(QStringLiteral("SP9XYZ")));
+
+        // GEGENPROBE: derselbe Ruf noch einmal legt keinen zweiten
+        // Platz an -- sonst antwortete man demselben zweimal in
+        // demselben Fenster, auf zwei Toenen.
+        fund("OE5SOS DL1ABC JO31", -7.0);
+        QCOMPARE(applet.mehrfachForTest().aktive(), 2);
+    }
+
+    // Und die Gegenprobe zum Schalter: mit EINEM Platz bleibt alles
+    // beim einzelnen Ablauf. Ohne diesen Lauf belegt der Fall
+    // darueber nicht, dass der Schalter etwas aendert.
+    void mitEinemPlatzLaeuftDerGewoehnlicheWeg()
+    {
+        AppSettings::instance().setValue(QStringLiteral("StationCallsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Plaetze"),
+                                         QStringLiteral("1"));
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+
+        Ft8Decode d;
+        d.text   = QStringLiteral("OE5SOS DL1ABC JO31");
+        d.snrDb  = -7.0;
+        d.freqHz = 1500.0;
+        applet.fundForTest(d);
+
+        QCOMPARE(applet.mehrfachForTest().aktive(), 0);
+    }
+
+
+    // ── Vier Fehler aus der Durchsicht vom 2026-10-30 ───────────────
+    //
+    // Alle vier wurden eine Stunde nach dem Anschluss gefunden, beim
+    // ruhigen Durchlesen. Sie haben hier ihren Prueffall, damit
+    // keiner davon still zurueckkommt.
+
+    // 1. Der schwerste: der Block in `fensterZuEnde` war NIE
+    //    geschrieben worden (eine Ersetzung war still
+    //    fehlgeschlagen). Multi Answering sendete, aber kein Zug kam
+    //    je voran und kein QSO landete im Logbuch.
+    void einPlatzKommtUeberDasFensterVoran()
+    {
+        AppSettings::instance().setValue(QStringLiteral("StationCallsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67"));
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Plaetze"),
+                                         QStringLiteral("3"));
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+
+        Ft8Decode d;
+        d.text   = QStringLiteral("OE5SOS DL1ABC JO31");
+        d.snrDb  = -7.0;
+        d.freqHz = 1500.0;
+        applet.fundForTest(d);
+        QCOMPARE(applet.mehrfachForTest().aktive(), 1);
+
+        // Ein Fenster vergeht, ohne dass etwas kam: der Zaehler des
+        // Platzes muss laufen. Ohne den fehlenden Block geschah hier
+        // GAR NICHTS.
+        const auto vorher = applet.mehrfachForTest().belegung();
+        QCOMPARE(vorher.size(), 1);
+        for (int i = 0; i < 6; ++i) { applet.fensterZuEndeForTest(); }
+        QVERIFY2(applet.mehrfachForTest().aktive() == 0,
+                 "nach sechs leeren Fenstern muss der Platz aufgeben");
+    }
+
+    void einFertigesQsoAufEinemPlatzLandetImLogbuch()
+    {
+        AppSettings::instance().setValue(QStringLiteral("StationCallsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67"));
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Plaetze"),
+                                         QStringLiteral("3"));
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        QSignalSpy gemeldet(&applet, &Ft8Applet::qsoFertig);
+
+        const auto fund = [&applet](const char* t, double snr) {
+            Ft8Decode d;
+            d.text   = QString::fromLatin1(t);
+            d.snrDb  = snr;
+            d.freqHz = 1500.0;
+            applet.fundForTest(d);
+        };
+
+        fund("OE5SOS DL1ABC JO31", -7.0);     // er ruft mich
+        fund("OE5SOS DL1ABC R-15", -7.0);     // er bestaetigt
+        fund("OE5SOS DL1ABC RR73", -7.0);     // und ist fertig
+        applet.fensterZuEndeForTest();
+
+        QCOMPARE(gemeldet.count(), 1);
+        const auto e = gemeldet.first().first().value<LogEntry>();
+        QCOMPARE(e.call, QStringLiteral("DL1ABC"));
+    }
+
+    // 2. Stop hielt die Plaetze nicht an.
+    void stopHaeltAuchDiePlaetzeAn()
+    {
+        AppSettings::instance().setValue(QStringLiteral("StationCallsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Plaetze"),
+                                         QStringLiteral("3"));
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+
+        Ft8Decode d;
+        d.text   = QStringLiteral("OE5SOS DL1ABC JO31");
+        d.snrDb  = -7.0;
+        d.freqHz = 1500.0;
+        applet.fundForTest(d);
+        QCOMPARE(applet.mehrfachForTest().aktive(), 1);
+
+        applet.stopButtonForTest()->click();
+        QCOMPARE(applet.mehrfachForTest().aktive(), 0);
+    }
+
+    // 3. Der Protokollwechsel liess die gehoerten Tonlagen stehen.
+    void derProtokollwechselVergisstDieTonlagen()
+    {
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Plaetze"),
+                                         QStringLiteral("1"));
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+
+        Ft8Decode d;
+        d.text   = QStringLiteral("CQ DL1ABC JO31");
+        d.snrDb  = -7.0;
+        d.freqHz = 1500.0;
+        applet.fundForTest(d);
+        QVERIFY(!applet.belegteToeneForTest().isEmpty());
+
+        // FT4 liegt auf einer anderen Frequenz -- 1500 Hz dort ist
+        // eine andere Stelle im Band.
+        applet.setProtocol(Ft8Decoder::Protocol::Ft4);
+        QVERIFY2(applet.belegteToeneForTest().isEmpty(),
+                 "die alten Tonlagen gelten auf der neuen Frequenz nicht");
+    }
+
+
+    // 5. Zwei Nachrichten duerfen nie auf derselben Tonlage liegen.
+    //
+    // Beim Durchdenken am 2026-10-30 gefunden: das CQ bekam
+    // `toene[plaetze.size()]`, aber `Ft8Mehrfach` vergibt seine Toene
+    // nach dem Index im eigenen Feld. Faellt ein aktiver Ablauf mit
+    // leerer Nachricht heraus, stimmen die Zahlen nicht mehr ueberein
+    // -- und das CQ laege auf der Tonlage einer laufenden Station.
+    // Zwei Nachrichten auf einem Ton ueberlagern sich zu Matsch, und
+    // beide sind weg.
+    void keineZweiNachrichtenAufDerselbenTonlage()
+    {
+        const QVector<float> toene = Ft8TxSource::tonleiter(1500.0f, 6);
+        QCOMPARE(toene.size(), 6);
+        for (int i = 0; i < toene.size(); ++i) {
+            for (int j = i + 1; j < toene.size(); ++j) {
+                QVERIFY2(!qFuzzyCompare(toene[i] + 1.0f, toene[j] + 1.0f),
+                         qPrintable(QStringLiteral("Ton %1 und %2 sind "
+                                                   "gleich: %3")
+                                        .arg(i).arg(j).arg(toene[i])));
+            }
+        }
+        // Und der Abstand ist der, mit dem MSHV arbeitet.
+        QCOMPARE(toene[1] - toene[0], Ft8TxSource::kPlatzAbstandHz);
+    }
+
 };
 
 QTEST_MAIN(TstFt8MultiAnswering)

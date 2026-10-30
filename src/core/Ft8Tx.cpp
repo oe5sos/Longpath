@@ -146,10 +146,14 @@ bool Ft8TxSource::vorbereitenMehrere(const QVector<Platz>& plaetze,
     return !m_proben.isEmpty();
 }
 
-void Ft8TxSource::starten()
+void Ft8TxSource::starten(qint64 abMs)
 {
     if (m_proben.isEmpty()) { return; }
-    m_pos.store(0, std::memory_order_release);
+    // Probenposition, nicht Rahmenposition: die Quelle ist mono.
+    const qint64 ab = (abMs * m_micRateHz) / 1000;
+    const int start = static_cast<int>(
+        qBound<qint64>(0, ab, qint64(m_proben.size())));
+    m_pos.store(start, std::memory_order_release);
     m_laeuft.store(true, std::memory_order_release);
 }
 

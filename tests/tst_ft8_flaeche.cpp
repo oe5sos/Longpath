@@ -37,6 +37,7 @@
 #include "core/AudioEngine.h"
 #include "core/Ft8Stream.h"
 #include "core/audio/AudioTapRing.h"
+#include "core/Ft8Ablauf.h"
 #include "gui/applets/Ft8Applet.h"
 #include "core/AppSettings.h"
 #include "models/RadioModel.h"
@@ -427,7 +428,12 @@ private slots:
             Q_ARG(QDateTime, QDateTime::currentDateTimeUtc()));
 
         QCOMPARE(applet.lastPeriodCountForTest(), 0);
-        QVERIFY2(applet.lastLabelForTest()->text().endsWith(QStringLiteral("0")),
+        // Die Zahl steht jetzt neben den Pillen, nicht mehr in einer
+        // eigenen Fusszeile am anderen Ende des Panels. Was geprueft
+        // wird, ist unveraendert: eine leere Periode meldet NULL
+        // Funde, nicht „noch nichts".
+        QVERIFY2(applet.lastLabelForTest()->text()
+                     .contains(QStringLiteral("0 last")),
                  qPrintable(applet.lastLabelForTest()->text()));
         QVERIFY(applet.listForTest()->toPlainText().isEmpty());
     }
@@ -604,18 +610,186 @@ private slots:
         QVERIFY(!applet.stopButtonForTest()->isEnabled());
     }
 
+    // ── Hound zieht die Tonlage hoch, und gibt sie zurueck ──────────
+    //
+    // „Hounds transmitting below f0+1000 Hz will not be answered."
+    // Lieber hochziehen als warnen: eine Warnung, die man wegklickt,
+    // laesst einen stundenlang ins Leere rufen.
+    //
+    // Der zweite Teil kommt vom laufenden Geraet (2026-10-30): der
+    // Betreiber hat Hound ein- und wieder ausgeschaltet, und seine
+    // 837 Hz waren weg. Eine Einstellung, die ich fuer eine
+    // Betriebsart hochziehe, gehoert ihm zurueck.
+    void houndZiehtDieTonlageHochUndGibtSieZurueck()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        QVERIFY(applet.sendeTonFeldForTest());
+        QVERIFY(applet.houndButtonForTest());
+
+        applet.sendeTonFeldForTest()->setValue(837);
+        applet.houndButtonForTest()->click();
+        QVERIFY2(applet.sendeTonFeldForTest()->value()
+                     >= Ft8Ablauf::kHoundMinTonHz,
+                 qPrintable(QStringLiteral("blieb bei %1 Hz")
+                                .arg(applet.sendeTonFeldForTest()->value())));
+
+        applet.houndButtonForTest()->click();
+        QCOMPARE(applet.sendeTonFeldForTest()->value(), 837);
+    }
+
+    // GEGENPROBE: wer schon hoch genug steht, wird nicht angefasst --
+    // und bekommt beim Ausschalten auch nichts „zurueckgegeben".
+    void eineHoheTonlageBleibtUnberuehrt()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        applet.sendeTonFeldForTest()->setValue(2100);
+        applet.houndButtonForTest()->click();
+        QCOMPARE(applet.sendeTonFeldForTest()->value(), 2100);
+        applet.houndButtonForTest()->click();
+        QCOMPARE(applet.sendeTonFeldForTest()->value(), 2100);
+    }
+
+    // ── Die freie Sendestelle (2026-10-30) ──────────────────────────
+    //
+    // Longpath-eigen: weder WSJT-X noch MSHV suchen eine freie Stelle.
+    // Diese Faelle pruefen den ANSCHLUSS -- die Rechnung selbst liegt
+    // in tst_ft8_tonwahl. Genau dieser Anschluss hat bei Multi
+    // Answering monatelang gefehlt, ohne dass es auffiel.
+
+    void derKnopfFuerDieFreieStelleIstDa()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        QVERIFY2(applet.freieStelleButtonForTest(), "der Knopf fehlt");
+        QVERIFY(!applet.freieStelleButtonForTest()->isCheckable());
+    }
+
+    void gehoerteStationenLandenInDerBelegungsliste()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        QVERIFY(applet.belegteToeneForTest().isEmpty());
+
+        QVector<Longpath::Ft8Decode> funde;
+        for (const int hz : {500, 900, 1800}) {
+            Ft8Decode d;
+            d.text   = QStringLiteral("CQ DL1ABC JO31");
+            d.snrDb  = -10.0;
+            d.freqHz = double(hz);
+            funde.append(d);
+        }
+        QMetaObject::invokeMethod(
+            &applet, "onDecoded", Qt::DirectConnection,
+            Q_ARG(QVector<Longpath::Ft8Decode>, funde),
+            Q_ARG(QDateTime, QDateTime::currentDateTimeUtc()));
+
+        const QVector<int> belegt = applet.belegteToeneForTest();
+        QCOMPARE(belegt.size(), 3);
+        QVERIFY(belegt.contains(900));
+    }
+
+    void aufEinerBelegtenStelleWirdAusgewichen()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        applet.sendeTonFeldForTest()->setValue(1500);
+
+        Ft8Decode d;
+        d.text   = QStringLiteral("CQ DL1ABC JO31");
+        d.snrDb  = -10.0;
+        d.freqHz = 1500.0;
+        applet.fundForTest(d);
+
+        QVERIFY2(applet.sucheFreieStelleForTest(true),
+                 "auf 1500 lag jemand, es haette ausweichen muessen");
+        QVERIFY(applet.sendeTonFeldForTest()->value() != 1500);
+    }
+
+    // GEGENPROBE: auf einer freien Stelle wird NICHT gewechselt. Wer
+    // einen ruft, sucht ihn dort, wo er zuletzt war.
+    void aufEinerFreienStelleBleibtEs()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        applet.sendeTonFeldForTest()->setValue(1500);
+
+        Ft8Decode d;
+        d.text   = QStringLiteral("CQ DL1ABC JO31");
+        d.snrDb  = -10.0;
+        d.freqHz = 700.0;        // weit weg von 1500
+        applet.fundForTest(d);
+
+        QVERIFY(!applet.sucheFreieStelleForTest(true));
+        QCOMPARE(applet.sendeTonFeldForTest()->value(), 1500);
+    }
+
+    // Und ohne einen einzigen Fund wird gar nichts verschoben --
+    // Abwesenheit ist keine Aussage.
+    void ohneFundeWirdNichtsVerschoben()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        applet.sendeTonFeldForTest()->setValue(1500);
+        QVERIFY(!applet.sucheFreieStelleForTest(false));
+        QCOMPARE(applet.sendeTonFeldForTest()->value(), 1500);
+    }
+
     void dieFlaecheLaesstSichAbbilden()
     {
         const QString grabDir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
         if (grabDir.isEmpty()) { QSKIP("LONGPATH_GRAB_DIR nicht gesetzt"); }
         RadioModel radio;
         Ft8Applet applet(&radio);
-        applet.resize(320, 260);
-        QMetaObject::invokeMethod(
-            &applet, "onDecoded", Qt::DirectConnection,
-            Q_ARG(QVector<Longpath::Ft8Decode>,
-                  einFund(QStringLiteral("CQ OE5SOS JN78"))),
-            Q_ARG(QDateTime, QDateTime::currentDateTimeUtc()));
+        // Groesze aus der Umgebung, damit dasselbe Werkzeug fuer
+        // Gestaltungsblaetter taugt: dort zaehlt die WIRKLICHE Groesze
+        // des Panels, nicht ein Briefmarkenabzug.
+        const int breite = qEnvironmentVariableIntValue("LONGPATH_GRAB_W");
+        const int hoehe  = qEnvironmentVariableIntValue("LONGPATH_GRAB_H");
+        applet.resize(breite > 0 ? breite : 320, hoehe > 0 ? hoehe : 260);
+
+        // Mehrere Funde, damit die Liste aussieht wie im Betrieb --
+        // eine Zeile zeigt nicht, wo die Spalten klemmen. Die drei
+        // Sorten, die das Applet unterschiedlich faerbt, sind dabei:
+        // an mich gerichtet, ein CQ, und ein fremdes QSO.
+        const char* zeilen[] = {
+            "CQ OE5SOS JN78",
+            "CQ DL1ABC JO31",
+            "OE5SOS DL1ABC -07",
+            "JA1XYZ W1AW RR73",
+            "CQ DX IK6CGO JN63",
+            "OE5SOS PD8O R-15",
+            "CQ RA3TKS KO85",
+            "F6HUK EA3IZF 73",
+        };
+        int i = 0;
+        for (const char* z : zeilen) {
+            QVector<Longpath::Ft8Decode> f =
+                einFund(QString::fromLatin1(z));
+            if (!f.isEmpty()) {
+                f[0].snrDb  = -3.0 - double(i) * 2.5;
+                f[0].freqHz = 500.0 + double(i) * 237.0;
+                f[0].dtSeconds = 0.1 + double(i % 3) * 0.2;
+            }
+            QMetaObject::invokeMethod(
+                &applet, "onDecoded", Qt::DirectConnection,
+                Q_ARG(QVector<Longpath::Ft8Decode>, f),
+                Q_ARG(QDateTime, QDateTime::currentDateTimeUtc()));
+            ++i;
+        }
+        // Mit LONGPATH_GRAB_QSO=1 laeuft ein QSO: die Arbeitsleiste
+        // zeigt erst dann, wofuer sie da ist. Ein Blatt im Leerlauf
+        // beurteilt die leere Haelfte.
+        if (qEnvironmentVariableIntValue("LONGPATH_GRAB_QSO") != 0) {
+            applet.ablaufForTestSchreibend().starteAlsAntworter(
+                QStringLiteral("PD8O"), QStringLiteral("OE5SOS"),
+                QStringLiteral("JN67"), -15,
+                QStringLiteral("JO22"));
+            applet.ablaufForTestSchreibend().verarbeite(
+                QStringLiteral("OE5SOS PD8O R-15"), -15);
+            applet.zeigeAblaufForTest();
+        }
         const QPixmap pm = applet.grab();
         QVERIFY(!pm.isNull());
         QVERIFY(pm.save(grabDir + QStringLiteral("/longpath-grab-Ft8Applet.png")));

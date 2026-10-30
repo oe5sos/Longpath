@@ -44,8 +44,9 @@ während FT8 zuhört.
 
 ## Änderungen am Upstream
 
-**Vier Stellen, alle wegen MSVC** (2026-10-22). Alle übrigen übernommenen
-Dateien sind Byte für Byte gleich.
+**Vier Stellen wegen MSVC** (2026-10-22) **und eine Erweiterung**
+(2026-10-30). Alle übrigen übernommenen Dateien sind Byte für Byte
+gleich.
 
 | Datei | Was | Ersetzt durch |
 | --- | --- | --- |
@@ -53,6 +54,43 @@ Dateien sind Byte für Byte gleich.
 | `common/monitor.c:142-143` | `timedata[me->nfft]`, `freqdata[me->nfft/2+1]` | `malloc`/`free`, einmal je Aufruf |
 | `common/gfsk.c:60,68` | `dphi[n_wave + 2*n_spsym]`, `pulse[3*n_spsym]` | `malloc`/`free`, einmal je Aussendung |
 | `ft8/message.c` | `stpcpy()` (POSIX, fehlt in MSVCs Bibliothek) | Ersatz unter `#ifdef _MSC_VER` |
+
+### Erweiterung: Nachrichtentyp 0.1 (DXpedition Mode) — 2026-10-30
+
+| Datei | Was |
+| --- | --- |
+| `ft8/message.c` | neue Funktion `ftx_message_decode_dxpedition()` + ein `case` im `switch` von `ftx_message_decode()` |
+| `ft8/message.h` | Deklaration dazu |
+
+Upstream kennt den Typ (`FTX_MESSAGE_TYPE_DXPEDITION` wird von
+`ftx_message_get_type()` korrekt erkannt), **dekodiert ihn aber
+nicht**: der `switch` lässt ihn in den `default`-Zweig laufen und gibt
+`FTX_MESSAGE_RC_ERROR_TYPE` zurück. Jede Nachricht einer
+DX-Expedition im Fox-Betrieb fiel damit still durch, und der Hound sah
+nie, dass er aufgerufen wurde — von außen nicht von „die Expedition
+ist nicht zu hören" zu unterscheiden.
+
+Der Aufbau ist nicht geraten, sondern aus WSJT-X übernommen:
+
+> From WSJT-X `lib/77bit/packjt77.f90:309-329` [v2.7.0] —
+> `read(c77,1010) n28a,n28b,n10,n5` / `1010 format(2b28,b10,b5)` /
+> `irpt=2*n5 - 30` /
+> `msg=trim(call_1)//' RR73; '//trim(call_2)//' '//trim(call_3)//' '//crpt`
+
+Zwei Stellen, an denen man sich vertut, und beide haben einen eigenen
+Prüffall in `tests/tst_ft8_dxpedition.cpp`:
+
+* **Der Rapport läuft in ZWEI-dB-Schritten** (`irpt = 2*n5 - 30`). Wer
+  einen Schritt von 1 dB annimmt, liest jeden Rapport halb so groß und
+  um 15 dB verschoben.
+* **Das dritte Rufzeichen ist nur ein 10-Bit-Hash.** Ohne Eintrag in
+  der Hash-Tabelle steht dort `<...>` — das ist kein Fehler, sondern
+  alles, was im Paket steht.
+
+Die Rufzeichenfelder im Prüfstand kommen aus ft8_libs **eigenem**
+Packer (`ftx_message_encode_std`), nicht aus einer eigenen Rechnung:
+ein reiner Rundlauf wäre grün, auch wenn die Bitreihenfolge nicht die
+von WSJT-X ist — derselbe Fehler in beide Richtungen hebt sich auf.
 
 Die erste Gruppe sind Arrays variabler Länge, die vierte ein fehlendes
 Symbol beim Binden:

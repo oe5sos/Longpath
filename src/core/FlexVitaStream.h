@@ -65,8 +65,10 @@
 //                 Hauptfaden) und das Neubinden nach Port-Streit.
 // =================================================================
 
+#include "FlexLueckenfuellung.h"
 #include "FlexVitaReader.h"
 
+#include <QElapsedTimer>
 #include <QHostAddress>
 #include <QMap>
 #include <QObject>
@@ -132,6 +134,55 @@ public:
     /// und fuer die Frage „kommt ueberhaupt ein Bild?".
     QMap<quint16, qint64> packetsPerClass() const { return m_proKlasse; }
 
+    // ── Luecken im Strom (2026-10-29) ─────────────────────────
+    //
+    // Zwei Zahlen, und sie trennen zwei Ursachen, die von aussen
+    // gleich aussehen:
+    //
+    //   `verloren`   Spruenge im Rollzaehler — Pakete sind unterwegs
+    //                abgeblieben. Das ist das Netz.
+    //   `luecke`     Zeit zwischen zwei Paketen, ohne Zaehlersprung —
+    //                die Maschine hat nichts geschickt. Das ist nicht
+    //                das Netz.
+    //
+    // Am 2026-10-29 fiel der Empfang zweimal ganz aus (99. Perzentil
+    // von −68,3 auf −101,0 dBm in 30 s) und es gab kein Instrument,
+    // das diese Frage beantwortet haette. Jetzt gibt es eines.
+    //
+    // ACHTUNG beim Lesen: waehrend des Sendens schickt die Maschine
+    // keinen Empfangston. Die groesste Luecke faellt dann mit dem
+    // Tasten zusammen und ist KEIN Befund — darum steht die Uhrzeit
+    // daneben.
+    struct Luecken {
+        quint16 klasse{0};
+        quint32 strom{0};
+        qint64  pakete{0};
+        qint64  verloren{0};      ///< untere Schranke, siehe fehlendeNachZaehler
+        qint64  spruenge{0};      ///< wie oft der Zaehler sprang
+        qint64  groessteLueckeMs{0};
+        QString groessteLueckeUm; ///< Uhrzeit dazu, sonst ist sie nichts wert
+    };
+    /// Je Stromkennung ein Eintrag, nach Klasse sortiert.
+    QVector<Luecken> luecken() const;
+    /// Summe der Zaehlerspruenge ueber alle Stroeme.
+    qint64 verlorenePaketeGesamt() const { return m_verlorenGesamt; }
+
+    // ── Lueckenfuellung im Tonweg (2026-10-30) ───────────────────
+    //
+    // Fehlt ein Tonpaket, folgt ohne Fuellung auf die letzte Probe des
+    // einen unmittelbar die erste des naechsten: die Welle springt
+    // (Knacken) und der Ton laeuft um die fehlende Zeit zu kurz. Die
+    // Fuellung schiebt die Zeit als ausgeblendete Stille wieder ein.
+    // Sie erfindet keinen Ton — siehe FlexLueckenfuellung.h.
+    //
+    // Vorgabe an. `start()` holt den Wert aus AppSettings
+    // (`FlexAudioLueckenfuellung`); ohne `start()` — also im
+    // Pruefstand — bleibt es bei der Vorgabe.
+    void setzeLueckenfuellung(bool an) { m_lueckenfuellung = an; }
+    bool lueckenfuellung() const { return m_lueckenfuellung; }
+    /// Wieviele Rahmen die Fuellung bisher eingeschoben hat.
+    qint64 gefuellteRahmen() const { return m_gefuellteRahmen; }
+
     // Nur fuer Pruefstaende: schiebt ein Datagramm durch denselben Weg,
     // den der Socket nimmt.
     void ingestDatagramForTesting(const QByteArray& datagram);
@@ -185,6 +236,38 @@ private:
     // „es kommt kein Bild" und „es kommt gar nichts" sehen von aussen
     // gleich aus, und ohne diese Zaehler war beides nur geraten.
     QMap<quint16, qint64> m_proKlasse;
+
+    // Ein Strang je Stromkennung: der Rollzaehler laeuft JE STROM, nicht
+    // je Klasse. Mit zwei Scheiben kaemen sonst zwei verschraenkte
+    // Zaehler zusammen und jeder zweite Schritt saehe wie ein Verlust
+    // aus — ein Instrument, das Phantome erzeugt, ist schlimmer als
+    // keines.
+    struct Strang {
+        quint16 klasse{0};
+        quint32 strom{0};
+        quint8  letzterZaehler{0};
+        bool    gesehen{false};
+        qint64  pakete{0};
+        qint64  verloren{0};
+        qint64  spruenge{0};
+        qint64  letzteAnkunftNs{-1};
+        qint64  groessteLueckeNs{0};
+        QString groessteLueckeUm;
+    };
+    /// Ab wann ein Abstand keine Luecke mehr ist, sondern eine
+    /// Unterbrechung (Senden, Bandwechsel, Neuverbindung). 200 ms
+    /// sind rund vierzig Paketabstaende und damit weit jenseits
+    /// dessen, was die Decke von acht Paketen ueberhaupt fuellt.
+    static constexpr qint64 kUnterbrechungAbNs = 200LL * 1000000LL;
+    void zaehleLuecke(const FlexVita::Header& h);
+    bool m_lueckenfuellung{true};
+    QMap<quint32, FlexVita::Lueckenzustand> m_tonLuecken;  ///< je Tonstrom
+    qint64 m_gefuellteRahmen{0};
+    QMap<quint64, Strang> m_straenge;   ///< Schluessel: Klasse<<32 | Strom
+    QElapsedTimer m_uhr;
+    qint64 m_verlorenGesamt{0};
+    qint64 m_verlorenGemeldet{0};
+
     QTimer m_bericht;
     qint64 m_zuletztGemeldet{-1};
     qint64 m_fftRahmen{0};
