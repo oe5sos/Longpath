@@ -2424,12 +2424,17 @@ void MainWindow::zeigeFt8SlotsFenster()
     // hat es eben eingeblendet.
     if (m_floatingApplets.contains(id)) { return; }
 
-    // Steht die Spalte offen, ist es dort zu sehen und bleibt es.
-    if (m_appletPanel && m_appletPanel->isVisible()) { return; }
+    // Und sonst: ist es JETZT zu sehen? Nicht „steht die Spalte
+    // offen" -- ein Panel kann in einer offenen Spalte stecken und
+    // trotzdem ausgeblendet sein. `QWidget::isVisible()` ist wahr,
+    // wenn das Widget und alle seine Eltern sichtbar sind; das ist
+    // die einzige Frage, auf die es ankommt.
+    if (!m_ft8PlaetzeApplet || !m_appletPanel) { return; }
+    if (m_ft8PlaetzeApplet->isVisible()) { return; }
 
-    if (!m_appletPanel || !m_ft8PlaetzeApplet) { return; }
     qCInfo(lcContainer).noquote()
-        << "FT8 Slots: die Spalte ist zu, also als eigenes Fenster";
+        << "FT8 Slots: in der Spalte nicht zu sehen, also als "
+           "eigenes Fenster";
     detachApplet(m_ft8PlaetzeApplet,
                  m_appletPanel->appletPosition(m_ft8PlaetzeApplet));
 }
@@ -7718,8 +7723,21 @@ void MainWindow::populateDefaultMeter()
         // fährt sie ohne Fenster, mit der Zeit von Hand.
         if (QStandardPaths::isTestModeEnabled()) { return; }
 
-        const QString id = QStringLiteral("Ft8Slots");
-        const bool sichtbar = m_appletVis->isEffectivelyVisible(id);
+        // ── Das WIDGET fragen, nicht den Merker (2026-10-30) ──
+        //
+        // Hier stand `m_appletVis->isEffectivelyVisible(id)`, und
+        // damit tat die Automatik gar nichts: in den Einstellungen
+        // stand seit dem vorigen Versuch `AppletFt8SlotsVisible=True`,
+        // also hielt sie das Panel fuer offen. Der Betreiber sah ein
+        // laufendes QSO und kein Fenster -- zum zweiten Mal, und das
+        // Protokoll schwieg diesmal ganz.
+        //
+        // `QWidget::isVisible()` ist wahr, wenn das Widget UND alle
+        // seine Eltern sichtbar sind. Das ist die Wahrheit ueber den
+        // Schirm, und nur sie zaehlt hier. Der Merker sagt, was der
+        // Betreiber WILL; er sagt nicht, was zu sehen ist.
+        const bool sichtbar = m_ft8PlaetzeApplet
+                              && m_ft8PlaetzeApplet->isVisible();
         switch (m_ft8SlotsAutomatik.pruefe(
                     hatInhalt(st), sichtbar,
                     QDateTime::currentMSecsSinceEpoch())) {
@@ -7734,7 +7752,7 @@ void MainWindow::populateDefaultMeter()
                     << "FT8 Slots zu: seit"
                     << (PanelAutomatik::kNachlaufMs / 1000)
                     << "s nichts mehr zu zeigen";
-                m_appletVis->setVisible(id, false);
+                m_appletVis->setVisible(QStringLiteral("Ft8Slots"), false);
                 break;
             case PanelAutomatik::Tat::Nichts:
                 break;
@@ -11831,7 +11849,7 @@ void MainWindow::buildMenuBar()
                 // Fenster, die man hinzufuegt.
                 if (id == QLatin1String(kChromeOverlayId)) { continue; }
                 if (id == QLatin1String(kChromeStatusId))  { continue; }
-                m_appletVis->setVisible(id, false);
+                m_appletVis->setVisible(QStringLiteral("Ft8Slots"), false);
             }
         });
     }
