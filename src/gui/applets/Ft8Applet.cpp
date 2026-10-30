@@ -13,6 +13,7 @@
 
 #include "core/AudioEngine.h"
 #include "core/Ft8Stream.h"
+#include "core/Ft8Ablauf.h"
 #include "core/Ft8Tx.h"
 #include "gui/widgets/Ft8Fensterbalken.h"
 #include "models/Band.h"
@@ -261,6 +262,47 @@ void Ft8Applet::buildUI()
         setProtocol(Ft8Decoder::Protocol::Ft4);
     });
     head->addWidget(m_ft4Btn);
+
+    // ── Hound: eine DX-Expedition rufen (2026-10-30) ──────────
+    //
+    // Im Fox-Betrieb laeuft ein QSO anders: den Schluss macht die
+    // Expedition, und wer unter 1000 Hz sendet, wird gar nicht erst
+    // beantwortet. Der Ablauf dafuer steht in `Ft8Ablauf::
+    // starteAlsHound`; hier wird nur gesagt, dass er gelten soll.
+    //
+    // Ein Schalter, keine Erkennung: ob eine Station im Fox-Betrieb
+    // laeuft, steht erst in ihrem 0.1-Satz -- und den hoert man erst,
+    // wenn sie jemanden AUFRUFT. Bis dahin sieht ein Fox-CQ wie jedes
+    // andere aus. Der Betreiber weiss es vorher, die Maschine nicht.
+    m_houndBtn = blueToggle(tr("Hound"), 58);
+    m_houndBtn->setToolTip(
+        tr("Call a DXpedition running in Fox mode: the Fox closes the "
+           "QSO, and a Hound transmitting below 1000 Hz is not "
+           "answered — the transmit tone is raised if needed."));
+    connect(m_houndBtn, &QPushButton::clicked, this, [this](bool an) {
+        m_houndBetrieb = an;
+        AppSettings::instance().setValue(
+            QStringLiteral("Ft8/Hound"),
+            an ? QStringLiteral("True") : QStringLiteral("False"));
+        if (an && m_tonFeld
+            && m_tonFeld->value() < Ft8Ablauf::kHoundMinTonHz) {
+            // Lieber hochziehen als warnen: eine Warnung, die man
+            // wegklickt, laesst einen stundenlang ins Leere rufen.
+            const int alt = m_tonFeld->value();
+            m_tonFeld->setValue(Ft8Ablauf::kHoundMinTonHz + 500);
+            if (m_status) {
+                m_status->setText(tr("tone %1 → %2 Hz (Hounds below "
+                                     "1000 are not answered)")
+                                      .arg(alt).arg(m_tonFeld->value()));
+            }
+        }
+    });
+    m_houndBetrieb = AppSettings::instance()
+                         .value(QStringLiteral("Ft8/Hound"),
+                                QStringLiteral("False")).toString()
+                     == QStringLiteral("True");
+    m_houndBtn->setChecked(m_houndBetrieb);
+    head->addWidget(m_houndBtn);
 
     head->addSpacing(8);
 
@@ -1210,6 +1252,15 @@ bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
                 // Eine Einzelentscheidung: danach nicht von selbst
                 // weiter CQ rufen.
                 m_cqAutomatik = false;
+                if (m_houndBetrieb) {
+                    // Im Fox-Betrieb ruft man die Expedition; den
+                    // Schluss macht sie. Siehe `starteAlsHound`.
+                    m_ablauf.starteAlsHound(senderCallsign(nachricht),
+                                            eigenesRufzeichen(),
+                                            eigenerLocator());
+                    ablaufSchritt();
+                    return true;
+                }
                 m_ablauf.starteAlsAntworter(senderCallsign(nachricht),
                                             eigenesRufzeichen(),
                                             eigenerLocator(), snr,

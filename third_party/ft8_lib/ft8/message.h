@@ -110,6 +110,14 @@ typedef struct
 
 void ftx_message_init(ftx_message_t* msg);
 
+/// 0.1 DXpedition Mode (Fox/Hound). Longpath-Erweiterung 2026-10-30:
+/// upstream laesst diesen Typ in den default-Zweig laufen, und der
+/// Hound sieht nie, dass er aufgerufen wurde. Schreibt den fertigen
+/// Satz nach `message` -- er passt nicht in die drei 14-Byte-Felder.
+ftx_message_rc_t ftx_message_decode_dxpedition(const ftx_message_t* msg,
+    ftx_callsign_hash_interface_t* hash_if, char* message,
+    ftx_field_t field_types[FTX_MAX_MESSAGE_FIELDS]);
+
 uint8_t ftx_message_get_i3(const ftx_message_t* msg);
 uint8_t ftx_message_get_n3(const ftx_message_t* msg);
 ftx_message_type_t ftx_message_get_type(const ftx_message_t* msg);

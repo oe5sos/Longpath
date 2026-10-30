@@ -452,6 +452,12 @@ private:
 
     /// Der Wasserfall nahm ein Viertel der Hoehe und lebt erst, wenn
     /// Ton hereinkommt. Jetzt abschaltbar; die Wahl bleibt erhalten.
+    /// Fox-Betrieb: ein Schalter, keine Erkennung. Ob eine Station im
+    /// Fox-Betrieb laeuft, steht erst in ihrem 0.1-Satz, und den hoert
+    /// man erst, wenn sie jemanden aufruft.
+    QPushButton* m_houndBtn{nullptr};
+    bool         m_houndBetrieb{false};
+
     QPushButton* m_wasserfallBtn{nullptr};
     bool         m_wasserfallAn{true};
 

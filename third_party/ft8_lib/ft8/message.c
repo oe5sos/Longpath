@@ -450,6 +450,15 @@ ftx_message_rc_t ftx_message_decode(const ftx_message_t* msg, ftx_callsign_hash_
         field3 = NULL;
         rc = FTX_MESSAGE_RC_OK;
         break;
+    case FTX_MESSAGE_TYPE_DXPEDITION:
+        // Schreibt den fertigen Satz direkt: er passt nicht in die
+        // drei 14-Byte-Felder (siehe ftx_message_decode_dxpedition).
+        rc = ftx_message_decode_dxpedition(msg, hash_if, message,
+                                           offsets->types);
+        field1 = NULL;
+        field2 = NULL;
+        field3 = NULL;
+        break;
     default:
         // not handled yet
         field1 = NULL;
@@ -523,6 +532,110 @@ ftx_message_rc_t ftx_message_decode_std(const ftx_message_t* msg, ftx_callsign_h
     }
 
     LOG(LOG_INFO, "Decoded standard (type %d) message [%s] [%s] [%s]\n", i3, call_to, call_de, extra);
+    return FTX_MESSAGE_RC_OK;
+}
+
+// ----------------------------------------------------------------------------
+// 0.1  DXpedition Mode (Fox/Hound) -- Longpath-Erweiterung 2026-10-30
+// ----------------------------------------------------------------------------
+//
+// Upstream laesst diesen Typ im switch von ftx_message_decode() in den
+// default-Zweig laufen (FTX_MESSAGE_RC_ERROR_TYPE): jede Nachricht einer
+// DX-Expedition im Fox-Betrieb faellt dort still durch, und der Hound
+// sieht nie, dass er aufgerufen wurde.
+//
+// Der Aufbau kommt aus WSJT-X, nicht aus einer Vermutung:
+//
+// From WSJT-X lib/77bit/packjt77.f90:309-329 [v2.7.0] --
+//     else if(i3.eq.0 .and. n3.eq.1) then
+//   ! 0.1  K1ABC RR73; W9XYZ <KH1/KH7Z> -11   28 28 10 5       71
+//        read(c77,1010) n28a,n28b,n10,n5
+//   1010 format(2b28,b10,b5)
+//        irpt=2*n5 - 30
+//        ...
+//        msg=trim(call_1)//' RR73; '//trim(call_2)//' '//trim(call_3)//' '//crpt
+//
+// Die beiden Punkte, an denen man sich vertut:
+//   * Der Rapport laeuft in ZWEI-dB-Schritten (irpt = 2*n5 - 30), nicht
+//     in einem. n5 = 0..31 ergibt -30..+32 dB.
+//   * Das dritte Rufzeichen ist nur ein 10-Bit-Hash. Ohne Eintrag in der
+//     Hash-Tabelle steht dort "<...>" -- das ist kein Fehler, sondern
+//     alles, was im Paket steht. WSJT-X setzt an dieser Stelle das
+//     eigene bzw. das eingestellte DX-Rufzeichen ein, wenn der Hash
+//     passt; dieselbe Tabelle nutzt ft8_lib ueber hash_if.
+//
+// Der zusammengesetzte Satz passt nicht in die drei 14-Byte-Felder, die
+// ftx_message_decode() sonst benutzt (ein 13-stelliges Rufzeichen plus
+// " RR73;" sind 19 Zeichen). Darum schreibt dieser Dekoder den fertigen
+// Text direkt, und der Aufrufer setzt field1 = NULL.
+ftx_message_rc_t ftx_message_decode_dxpedition(const ftx_message_t* msg,
+    ftx_callsign_hash_interface_t* hash_if, char* message,
+    ftx_field_t field_types[FTX_MAX_MESSAGE_FIELDS])
+{
+    char call_1[14], call_2[14], call_3[14];
+
+    // 28 + 28 + 10 + 5 Bit, gross-endig ab Bit 0 der Nutzlast.
+    uint32_t n28a = ((uint32_t)msg->payload[0] << 20);
+    n28a |= ((uint32_t)msg->payload[1] << 12);
+    n28a |= ((uint32_t)msg->payload[2] << 4);
+    n28a |= ((uint32_t)msg->payload[3] >> 4);
+
+    uint32_t n28b = ((uint32_t)(msg->payload[3] & 0x0Fu) << 24);
+    n28b |= ((uint32_t)msg->payload[4] << 16);
+    n28b |= ((uint32_t)msg->payload[5] << 8);
+    n28b |= ((uint32_t)msg->payload[6]);
+
+    uint16_t n10 = ((uint16_t)msg->payload[7] << 2);
+    n10 |= ((uint16_t)msg->payload[8] >> 6);
+
+    uint8_t n5 = (msg->payload[8] >> 1) & 0x1Fu;
+
+    LOG(LOG_DEBUG, "decode_dxpedition() n28a=%d n28b=%d n10=%d n5=%d\n",
+        n28a, n28b, n10, n5);
+
+    // Beide Rufzeichen sind Standardrufzeichen (i3 = 0 verhindert die
+    // Sonderfaelle in unpack28, die es nur bei i3 = 1 gibt).
+    ftx_field_t feld = FTX_FIELD_UNKNOWN;
+    if (unpack28(n28a, 0, 0, hash_if, call_1, &feld) < 0)
+    {
+        return FTX_MESSAGE_RC_ERROR_CALLSIGN1;
+    }
+    field_types[0] = feld;
+    if (unpack28(n28b, 0, 0, hash_if, call_2, &feld) < 0)
+    {
+        return FTX_MESSAGE_RC_ERROR_CALLSIGN2;
+    }
+    field_types[1] = feld;
+
+    // Der Fox: nur als 10-Bit-Hash im Paket. lookup_callsign setzt
+    // "<...>", wenn er nicht bekannt ist -- genau wie WSJT-X.
+    lookup_callsign(hash_if, FTX_CALLSIGN_HASH_10_BITS, n10, call_3);
+    field_types[2] = FTX_FIELD_CALL;
+
+    int irpt = 2 * (int)n5 - 30;
+
+    char* p = message;
+    p = append_string(p, call_1);
+    p = append_string(p, " RR73; ");
+    p = append_string(p, call_2);
+    p = append_string(p, " ");
+    p = append_string(p, call_3);
+    p = append_string(p, " ");
+    if (irpt >= 0)
+    {
+        *p++ = '+';
+    }
+    else
+    {
+        *p++ = '-';
+        irpt = -irpt;
+    }
+    // Zwei Stellen mit fuehrender Null, wie WSJT-X (format i3.2).
+    *p++ = (char)('0' + ((irpt / 10) % 10));
+    *p++ = (char)('0' + (irpt % 10));
+    *p = '\0';
+
+    LOG(LOG_INFO, "Decoded DXpedition message [%s]\n", message);
     return FTX_MESSAGE_RC_OK;
 }
 

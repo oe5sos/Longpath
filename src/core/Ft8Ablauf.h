@@ -58,7 +58,8 @@ class Ft8Ablauf
 public:
     enum class Rolle {
         Anrufer,     ///< ich rufe CQ und werde angerufen
-        Antworter    ///< ich antworte auf ein gehoertes CQ
+        Antworter,   ///< ich antworte auf ein gehoertes CQ
+        Hound        ///< ich rufe eine DX-Expedition im Fox-Betrieb
     };
 
     enum class Zustand {
@@ -112,6 +113,46 @@ public:
     /// Ich rufe CQ. Der Partner ergibt sich aus der ersten Antwort.
     void starteAlsAnrufer(const QString& meinRuf,
                           const QString& meinLocator);
+
+    // ── Hound: eine DX-Expedition im Fox-Betrieb rufen ─────────
+    //
+    // From WSJT-X lib/DXped_Operations.txt [v2.7.0] — der Ablauf, Zug
+    // fuer Zug, mit dem Beispiel von dort (Fox = KH1DX):
+    //
+    //     Fox                        Hound
+    //     CQ KH1DX AJ10
+    //                                KH1DX K1ABC FN42
+    //     K1ABC KH1DX -13
+    //                                KH1DX K1ABC R-11
+    //     K1ABC RR73; W9XYZ <KH1DX> -17
+    //                                (fertig, ins Logbuch)
+    //
+    // Drei Dinge sind anders als bei einem gewoehnlichen QSO, und
+    // jedes davon hat hier seinen Grund:
+    //
+    //  1. **Der Fox darf gehasht ankommen.** Sein Rapport kann als
+    //     „K1ABC <KH1DX> -13" kommen; die spitzen Klammern heiszen,
+    //     dass im Paket nur ein Hash stand (siehe
+    //     `ftx_message_decode_dxpedition` in ft8_lib).
+    //  2. **Den Schluss macht der Fox**, nicht ich. Auf mein „R-11"
+    //     folgt kein 73 von mir, sondern sein „K1ABC RR73; …" — und
+    //     das ist der Augenblick fuer das Logbuch.
+    //  3. **Ich sende ueber 1000 Hz.** From WSJT-X
+    //     lib/DXped_Operations.txt:16-17 [v2.7.0] — „Hounds call in
+    //     2nd sequence, 1000-5000 Hz above f0. Hounds transmitting
+    //     below f0+1000 Hz will not be answered." Das ist nicht Sache
+    //     dieser Klasse (sie kennt keine Frequenz), aber es gehoert
+    //     zur Rolle und steht darum hier: wer darunter sendet, ruft
+    //     ins Leere.
+    void starteAlsHound(const QString& fox,
+                        const QString& meinRuf,
+                        const QString& meinLocator);
+
+    bool istHound() const { return m_rolle == Rolle::Hound; }
+
+    /// Die kleinste Tonlage, auf der ein Hound ueberhaupt beantwortet
+    /// wird. Siehe oben; die Zahl steht in WSJT-X' eigener Vorschrift.
+    static constexpr int kHoundMinTonHz = 1000;
 
     /// Was im naechsten Fenster zu senden waere, oder leer.
     QString naechsteNachricht() const;

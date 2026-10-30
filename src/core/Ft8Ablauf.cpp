@@ -121,6 +121,26 @@ void Ft8Ablauf::starteAlsAnrufer(const QString& meinRuf,
     m_zustand = m_meinRuf.isEmpty() ? Zustand::Ruht : Zustand::RufeCq;
 }
 
+void Ft8Ablauf::starteAlsHound(const QString& fox,
+                               const QString& meinRuf,
+                               const QString& meinLocator)
+{
+    m_rolle           = Rolle::Hound;
+    m_partner         = fox.trimmed().toUpper();
+    // Die spitzen Klammern sind die Schreibweise fuer „kam als Hash"
+    // (siehe `ftx_message_decode_dxpedition`) -- im Satz, den ich
+    // SENDE, haben sie nichts verloren.
+    m_partner.remove(QLatin1Char('<')).remove(QLatin1Char('>'));
+    m_partnerLocator.clear();
+    m_meinRuf         = meinRuf.trimmed().toUpper();
+    m_meinLocator     = meinLocator.trimmed().left(4).toUpper();
+    m_reportGesendet  = kKeinReport;
+    m_reportEmpfangen = kKeinReport;
+    m_wiederholungen  = 0;
+    m_zustand = (m_meinRuf.isEmpty() || m_partner.isEmpty())
+                    ? Zustand::Ruht : Zustand::RufeAn;
+}
+
 bool Ft8Ablauf::laeuft() const
 {
     switch (m_zustand) {
@@ -177,7 +197,15 @@ bool Ft8Ablauf::anMich(const QString& nachricht, QString* vonWem) const
                                                Qt::SkipEmptyParts);
     if (f.size() < 2) { return false; }
     if (f.at(0) != m_meinRuf) { return false; }
-    if (vonWem) { *vonWem = f.at(1); }
+    // Der Absender kann in spitzen Klammern stehen: dann kam sein
+    // Rufzeichen als Hash im Paket, nicht als Text (0.1-Format, und
+    // auch der Standardsatz kennt gehashte Rufzeichen). „<KH1DX>" und
+    // „KH1DX" sind dieselbe Station -- wer das nicht zusammenfuehrt,
+    // laesst den Fox genau in dem Augenblick fallen, in dem er einen
+    // aufruft.
+    QString wer = f.at(1);
+    wer.remove(QLatin1Char('<')).remove(QLatin1Char('>'));
+    if (vonWem) { *vonWem = wer; }
     return true;
 }
 
@@ -188,14 +216,26 @@ bool Ft8Ablauf::verarbeite(const QString& nachricht, int snr)
     QString vonWem;
     if (!anMich(nachricht, &vonWem)) { return false; }
 
-    // Laeuft das QSO schon mit jemandem, zaehlt nur dieser. Sonst
-    // koennte ein Dritter, der gleichzeitig ruft, den Ablauf
-    // uebernehmen.
-    if (!m_partner.isEmpty() && vonWem != m_partner) { return false; }
-
     const QStringList f =
         nachricht.simplified().toUpper().split(QLatin1Char(' '),
                                                Qt::SkipEmptyParts);
+
+    // ── Der Abschluss des Fox steht nicht im ueblichen Satzbau ───
+    //
+    // „K1ABC RR73; W9XYZ <KH1DX> -17": an der Stelle des Absenders
+    // steht „RR73;", und dahinter die NAECHSTE Station. Der Vergleich
+    // darunter wuerde den Satz darum wegwerfen -- und zwar genau den
+    // einen, der sagt, dass ich im Logbuch der Expedition stehe.
+    const bool foxSchluss =
+        m_rolle == Rolle::Hound && f.size() >= 2
+        && f.at(1).startsWith(QStringLiteral("RR73"));
+
+    // Laeuft das QSO schon mit jemandem, zaehlt nur dieser. Sonst
+    // koennte ein Dritter, der gleichzeitig ruft, den Ablauf
+    // uebernehmen.
+    if (!foxSchluss && !m_partner.isEmpty() && vonWem != m_partner) {
+        return false;
+    }
     const QString letztes = f.size() >= 3 ? f.at(2) : QString();
 
     switch (m_zustand) {
@@ -214,6 +254,20 @@ bool Ft8Ablauf::verarbeite(const QString& nachricht, int snr)
             if (r == kKeinReport) { return false; }
             m_reportEmpfangen = r;
             m_wiederholungen  = 0;
+            // Als Hound geht es IMMER ueber den bestaetigten Rapport:
+            // den Schluss macht der Fox, nicht ich (siehe
+            // `starteAlsHound`). Wer hier auf RR73 abbiegt, sendet
+            // einen Satz, auf den die Expedition nicht wartet.
+            if (m_rolle == Rolle::Hound) {
+                // Mein Rapport AN den Fox ist das, was ich von ihm
+                // gemessen habe -- und das ist erst jetzt bekannt.
+                // Beim Antworter kommt dieselbe Zahl beim Start
+                // herein (aus der angeklickten Zeile); der Hound
+                // startet, ohne den Fox gehoert zu haben.
+                m_reportGesendet = snr;
+                m_zustand = Zustand::SendeRReport;
+                return true;
+            }
             // Hat er meinen Rapport schon bestaetigt (R-09), kann ich
             // gleich zum Schluss; sonst bestaetige ich seinen.
             m_zustand = istBestaetigterRapport(letztes)
@@ -237,6 +291,25 @@ bool Ft8Ablauf::verarbeite(const QString& nachricht, int snr)
             return false;
         }
         case Zustand::SendeRReport: {
+            // ── Der Fox schlieszt ab (2026-10-30) ────────────
+            //
+            // Sein Satz sieht anders aus als jeder andere:
+            //   „K1ABC RR73; W9XYZ <KH1DX> -17"
+            // Mein Rufzeichen steht vorn, dahinter „RR73;" -- und
+            // danach steht schon die NAECHSTE Station, nicht mehr
+            // meine. Darum wird hier das ZWEITE Feld geprueft, nicht
+            // das dritte wie sonst.
+            //
+            // From WSJT-X lib/DXped_Operations.txt:148-150 [v2.7.0] --
+            // „AutoSeq will watch for a message that starts with
+            // 'MyCall RR73; ...'. When that is received, you're in his
+            // log."
+            if (m_rolle == Rolle::Hound && f.size() >= 2
+                && f.at(1).startsWith(QStringLiteral("RR73"))) {
+                m_wiederholungen = 0;
+                m_zustand        = Zustand::Fertig;
+                return true;
+            }
             if (istSchluss(letztes)) {
                 m_wiederholungen = 0;
                 m_zustand        = Zustand::Sende73;
