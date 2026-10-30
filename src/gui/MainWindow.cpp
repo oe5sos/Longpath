@@ -7743,9 +7743,20 @@ void MainWindow::populateDefaultMeter()
         // kein Spaltenzustand.
         auto* fenster = m_floatingApplets.value(id, nullptr);
         const bool sichtbar = fenster && fenster->isVisible();
-        switch (m_ft8SlotsAutomatik.pruefe(
-                    hatInhalt(st), sichtbar,
-                    QDateTime::currentMSecsSinceEpoch())) {
+        // Jede Entscheidung in die Akte. Beim naechsten „da ist kein
+        // fenster aufgegangen" steht hier, WORAN es lag, statt dass
+        // wieder geraten wird.
+        const auto tat = m_ft8SlotsAutomatik.pruefe(
+            hatInhalt(st), sichtbar, QDateTime::currentMSecsSinceEpoch());
+        if (tat == PanelAutomatik::Tat::Nichts) {
+            qCDebug(lcContainer).nospace()
+                << "FT8 Slots: nichts zu tun (Inhalt=" << hatInhalt(st)
+                << ", Fenster=" << (fenster != nullptr)
+                << ", sichtbar=" << sichtbar
+                << ", gehoert dem Betreiber="
+                << m_ft8SlotsAutomatik.gehoertDemBetreiber() << ")";
+        }
+        switch (tat) {
             case PanelAutomatik::Tat::Aufmachen:
                 qCInfo(lcContainer).noquote()
                     << "FT8 Slots auf:" << st.plaetze.size()

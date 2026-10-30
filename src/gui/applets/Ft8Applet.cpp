@@ -1985,6 +1985,18 @@ void Ft8Applet::updateStatus()
 // aus `zeigeAblauf()` -- also bei jedem Zustandswechsel des Ablaufs.
 void Ft8Applet::zeigeArbeit()
 {
+    // Den Stand ZUERST melden, nicht am Ende (2026-10-30).
+    //
+    // Der Ausstieg darunter gilt der Arbeitsleiste: gibt es sie
+    // nicht, ist nichts zu beschriften. Das Plaetze-Panel haengt
+    // aber nicht an der Leiste, sondern am Ablauf -- und bekam
+    // dadurch nichts, sobald die Leiste fehlte.
+    //
+    // Gesucht habe ich das an vier Stellen (Merker, Qt-Sichtbarkeit,
+    // Fensterliste, Spaltenzustand), und es lag an einem `return`
+    // zwei Zeilen weiter oben.
+    meldeStand();
+
     if (!m_arbeit) { return; }
 
     using Z = Ft8Ablauf::Zustand;
@@ -2048,10 +2060,6 @@ void Ft8Applet::zeigeArbeit()
         m_arbeitZug->setText(zug.isEmpty() ? tr("—") : zug);
     }
 
-    // Dieselbe Gelegenheit nutzt das Plaetze-Panel: es haengt an
-    // genau den Zustandswechseln, die auch die Arbeitsleiste
-    // bewegen.
-    meldeStand();
 }
 
 // ── Der Stand fuer das Plaetze-Panel ─────────────────────────────────
