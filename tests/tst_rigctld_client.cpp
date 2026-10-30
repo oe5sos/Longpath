@@ -281,10 +281,40 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(server.frequenz, 144325000, 3000);
 
         // Ohne Verbindung wird nichts geschickt und nichts geworfen.
+        //
+        // ── Erst zur Ruhe kommen lassen (2026-10-30) ─────────────────
+        //
+        // Hier stand die Marke `vorher` unmittelbar nach dem Trennen.
+        // Das zaehlte einen Befehl mit, den der Client noch VOR dem
+        // Trennen geschrieben hatte und den der Stellvertreter erst
+        // beim naechsten Durchlauf der Ereignisschleife aus seinem
+        // Puffer liest: `QTRY_COMPARE` oben kehrt zurueck, sobald die
+        // Frequenz stimmt -- die Quittung kann den Client in derselben
+        // Runde erreichen, der Abfragetakt feuert, und das `f` liegt
+        // dann unbemerkt auf der Leitung.
+        //
+        // Gemessen im macOS-Lauf 41079204797 (Auftrag 124210899718):
+        // „Actual (server.befehle.size()): 3 / Expected (vorher): 2".
+        // Auf dieser Maschine nicht nachstellbar, 36 Laeufe, auch
+        // zwoelffach parallel -- das Protokoll des Laeufers ist der
+        // Beleg, nicht meine Wiederholung.
+        //
+        // Der Client selbst ist in Ordnung: `setFrequencyHz` prueft
+        // `isConnected()`, und `disconnectFromRig()` ruft
+        // `QTcpSocket::abort()`, verwirft also auch Ungesendetes.
         c.disconnectFromRig();
+
+        int letzte = -1;
+        for (int i = 0; i < 40 && letzte != server.befehle.size(); ++i) {
+            letzte = server.befehle.size();
+            QTest::qWait(25);
+        }
+
         const int vorher = server.befehle.size();
         c.setFrequencyHz(144400000);
-        QTest::qWait(100);
+        // Laenger als ein Abfragetakt (200 ms): ein Takt, der doch noch
+        // laeuft, faellt hier auf.
+        QTest::qWait(300);
         QCOMPARE(server.befehle.size(), vorher);
     }
 
