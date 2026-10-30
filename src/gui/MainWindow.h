@@ -1891,6 +1891,11 @@ private:
     /// Der Blick des Betreibers zieht den Panadapter der Maschine nach.
     QMetaObject::Connection m_flexBlickBand;
     QTimer* m_flexPanNachzug{nullptr};
+    /// Die Spur: WER schiebt die Scheibe im Verbindungsfenster?
+    /// Siehe MainWindow_Flex.cpp, "Die Spur der Frequenz".
+    QMetaObject::Connection m_flexFreqSpur;
+    qint64  m_flexSpurBisMs{0};
+    double  m_flexSpurLetzteHz{0.0};
     /// Dasselbe fuer Betriebsart und Filterflanken.
     QMetaObject::Connection m_flexArtBand;
     QMetaObject::Connection m_flexFilterBand;
