@@ -16,6 +16,8 @@
 
 #include "gui/LayoutProfiles.h"
 
+#include <algorithm>
+
 #include "core/AppSettings.h"
 #include "gui/WindowPlacement.h"
 
@@ -364,12 +366,47 @@ bool LayoutProfiles::isBoundToMode(const QString& name, DSPMode m) const
     return p && p->modes.contains(static_cast<int>(m));
 }
 
+// ── Die Bindung liegt ZWEIMAL (2026-10-30) ───────────────────────────
+//
+// Einmal im Profilsatz, wie Baender und Betriebsarten -- und einmal
+// als eigener Schluessel in AppSettings.
+//
+// Das ist keine Dopplung aus Bequemlichkeit, sondern gegen einen
+// gemessenen Verlust. Der Profilsatz wird als EIN JSON geschrieben:
+// wer ihn speichert, schreibt alle Felder, die er kennt -- und nur
+// die. Eine Fassung ohne `digis` loescht es beim ersten Speichern,
+// stillschweigend.
+//
+// Am 2026-10-30 genau so passiert: der Auto-Install hatte dem
+// Betreiber zwischendurch `main` untergeschoben, main kannte das
+// Feld nicht, und nach dem naechsten Start stand in allen drei
+// Profilen `digis=None`. Er klickte zweimal FT8, nichts geschah,
+// und im Protokoll stand kein Wort -- weil nichts zu melden war:
+// die Bindung existierte nicht mehr.
+//
+// Der eigene Schluessel ist ein eigener XML-Knoten. Eine fremde
+// Fassung schreibt ihn nicht und loescht ihn darum auch nicht.
+// Faellt das Feld im Profilsatz aus, holt `load()` es von dort
+// zurueck.
+namespace {
+QString digiSchluessel(const QString& profil)
+{
+    return QStringLiteral("LayoutProfileDigi/%1").arg(profil);
+}
+}  // namespace
+
 void LayoutProfiles::bindDigi(const QString& name, DigiFrequenzen::Digimodus d, bool on)
 {
     Profile* p = find(name);
     if (!p) { return; }
     if (on) { p->digis.insert(static_cast<int>(d)); }
     else    { p->digis.remove(static_cast<int>(d)); }
+
+    QStringList zahlen;
+    for (int v : p->digis) { zahlen << QString::number(v); }
+    std::sort(zahlen.begin(), zahlen.end());
+    AppSettings::instance().setValue(digiSchluessel(name),
+                                     zahlen.join(QLatin1Char(',')));
     save();
 }
 
@@ -525,6 +562,20 @@ void LayoutProfiles::load()
         }
         for (const QJsonValue& d : o.value(QStringLiteral("digis")).toArray()) {
             p.digis.insert(d.toInt());
+        }
+        // Fehlt das Feld (ein Satz von vor dem 2026-10-30 ODER einer,
+        // den eine Fassung ohne `digis` geschrieben hat), aus dem
+        // eigenen Schluessel zurueckholen. Siehe `bindDigi`.
+        if (p.digis.isEmpty()) {
+            const QString roh =
+                AppSettings::instance()
+                    .value(digiSchluessel(name), QString()).toString();
+            for (const QString& t : roh.split(QLatin1Char(','),
+                                              Qt::SkipEmptyParts)) {
+                bool ok = false;
+                const int v = t.toInt(&ok);
+                if (ok) { p.digis.insert(v); }
+            }
         }
         loaded.append(p);
         order << name;

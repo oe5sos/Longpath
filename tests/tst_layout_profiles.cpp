@@ -480,6 +480,48 @@ private slots:
                  QStringLiteral("FT4-Fenster"));
     }
 
+    // ── Die Bindung ueberlebt eine fremde Fassung (2026-10-30) ───
+    //
+    // Der Profilsatz wird als EIN JSON geschrieben: wer ihn
+    // speichert, schreibt alle Felder, die er kennt -- und nur die.
+    // Eine Fassung ohne `digis` loescht es beim ersten Speichern,
+    // stillschweigend.
+    //
+    // Am 2026-10-30 genau so passiert: der Auto-Install hatte dem
+    // Betreiber `main` untergeschoben, main kannte das Feld nicht,
+    // und danach stand in allen Profilen `digis=None`. Er klickte
+    // zweimal FT8 -- „es oeffnet nur den decoder, nicht das profil".
+    void dieDigiBindungUeberlebtEinenFremdenSpeichervorgang()
+    {
+        {
+            LayoutProfiles lp;
+            lp.create(QStringLiteral("FT8"));
+            lp.bindDigi(QStringLiteral("FT8"),
+                        DigiFrequenzen::Digimodus::Ft8, true);
+            lp.save();
+        }
+
+        // Jetzt schreibt eine FREMDE Fassung den Satz zurueck --
+        // nachgestellt, indem „digis" aus dem JSON entfernt wird.
+        auto& s = AppSettings::instance();
+        const QString schluessel = QStringLiteral("LayoutProfiles");
+        QString roh = s.value(schluessel, QString()).toString();
+        QVERIFY(!roh.isEmpty());
+        QVERIFY2(roh.contains(QStringLiteral("digis")),
+                 "ohne digis im Satz prueft dieser Lauf nichts");
+        roh.replace(QStringLiteral("\"digis\":[0]"),
+                    QStringLiteral("\"digis\":[]"));
+        s.setValue(schluessel, roh);
+
+        // Und trotzdem ist sie da.
+        LayoutProfiles wieder;
+        wieder.load();
+        QVERIFY2(wieder.isBoundToDigi(QStringLiteral("FT8"),
+                                      DigiFrequenzen::Digimodus::Ft8),
+                 "die Bindung hat den fremden Speichervorgang nicht "
+                 "ueberlebt");
+    }
+
     // Ein Profil ohne jede Bindung bleibt, was es war: eines, das
     // nie von selbst greift.
     void ohneBindungGreiftNichts()
