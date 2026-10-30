@@ -9980,7 +9980,30 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         // already accepts either.
         const bool notchCtrlHeld =
             (event->modifiers() & (Qt::ControlModifier | Qt::MetaModifier)) != 0;
-        if (notchCtrlHeld && my < specH && mx <= specRect.right()) {
+
+        // ── Auf einem Notch wird keiner angelegt (2026-10-30) ────────
+        //
+        // Betreiber: „control und klick erzeugt einen notchfilter. er
+        // muss aber auch wieder entfernt werden können."
+        //
+        // Auf dem Mac IST Ctrl-Klick der Rechtsklick — die Geste, mit
+        // der man am Trackpad ein Kontextmenue aufmacht —, und Qt
+        // meldet den Ctrl-Modifier mit. Der Zweig hier kam vor dem
+        // Treffertest und kehrte zurueck: jeder Ctrl-Klick legte einen
+        // Notch an, auch der auf einen bestehenden, und das Menue mit
+        // `Remove Notch` war von dieser Geste aus nie erreichbar.
+        // Anlegen ging, entfernen nie — und wer am Trackpad sitzt, hat
+        // keine zweite Taste, um daran vorbeizukommen.
+        //
+        // Also: liegt unter dem Zeiger schon ein Notch, gewinnt das
+        // Menue. Nur auf freier Flaeche entsteht ein neuer. Die
+        // Thetis-Belegung (console.cs:49614 [v2.10.3.15], Ctrl +
+        // Rechtsklick legt an) bleibt damit, wo sie gemeint war.
+        const bool aufNotch =
+            (my < specH && mx <= specRect.right())
+            && notchAtPixel(mx, specRect) >= 0;
+
+        if (notchCtrlHeld && !aufNotch && my < specH && mx <= specRect.right()) {
             const bool narrow = (event->modifiers() & Qt::ShiftModifier) != 0;
             emit notchCreateRequested(xToHz(mx, specRect), narrow);
             event->accept();
