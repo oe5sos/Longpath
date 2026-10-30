@@ -108,10 +108,11 @@ void FlexVitaStream::zaehleLuecke(const FlexVita::Header& h)
     ++st.pakete;
 
     const qint64 jetztNs = m_uhr.isValid() ? m_uhr.nsecsElapsed() : -1;
+    qint64 abstandNs = 0;
     if (st.letzteAnkunftNs >= 0 && jetztNs > st.letzteAnkunftNs) {
-        const qint64 abstand = jetztNs - st.letzteAnkunftNs;
-        if (abstand > st.groessteLueckeNs) {
-            st.groessteLueckeNs = abstand;
+        abstandNs = jetztNs - st.letzteAnkunftNs;
+        if (abstandNs > st.groessteLueckeNs) {
+            st.groessteLueckeNs = abstandNs;
             st.groessteLueckeUm =
                 QDateTime::currentDateTime().toString(QStringLiteral("HH:mm:ss"));
         }
@@ -137,8 +138,39 @@ void FlexVitaStream::zaehleLuecke(const FlexVita::Header& h)
         // eingeschoben werden, damit die Welle nicht springt. Die
         // Decke steht in FlexLueckenfuellung.h und ist Absicht — eine
         // halbe Sekunde Stille glatt zu buegeln waere Vertuschung.
+        //
+        // ── Eine UNTERBRECHUNG ist keine Luecke (2026-10-30) ─────
+        //
+        // Waehrend des Sendens schickt die Maschine keinen
+        // Empfangston. Das erste Paket danach kommt dreizehn Sekunden
+        // spaeter, und der 4-Bit-Zaehler ist in der Zeit laengst
+        // mehrfach umgelaufen — sein Sprung ist dann eine Zufallszahl
+        // zwischen 0 und 15, kein Verlust.
+        //
+        // Am Geraet gemessen: die Fuellung schob nach jeder Sendung
+        // bis zu acht Pakete (43 ms) Stille ein, die niemand verloren
+        // hatte. Ueber 35 Minuten Rufbetrieb waren das **3034 ms**,
+        // und jede davon verschiebt die Zeitachse des Empfangs gegen
+        // die Wirklichkeit.
+        //
+        // Darum: nur fuellen, wenn der Abstand zum letzten Paket noch
+        // nach Paketabstand aussieht. Bei 187 Paketen je Sekunde sind
+        // das 5,3 ms; die Decke von acht Paketen deckt 43 ms. Wer
+        // laenger weg war, war nicht "weg", sondern abgeschaltet.
         if (static_cast<FlexVitaClass>(h.packetClass)
-                == FlexVitaClass::NarrowAudio) {
+                == FlexVitaClass::NarrowAudio
+            && (abstandNs == 0 || abstandNs <= kUnterbrechungAbNs)) {
+            // `abstandNs == 0` heisst NICHT „gleichzeitig", sondern
+            // „keine Zeitangabe" -- die Uhr laeuft erst ab `start()`,
+            // und ein Prueflauf, der Datagramme direkt einspeist, hat
+            // keine. Abwesenheit ist keine Aussage: ohne Zeit wird
+            // gefuellt wie bisher, die Unterbrechungspruefung greift
+            // nur, wenn eine Zeit WIRKLICH dasteht.
+            //
+            // Beim ersten Anlauf stand hier `abstandNs > 0`, und
+            // damit waere die Fuellung ueberall dort ausgefallen, wo
+            // keine Uhr laeuft. Die Gegenprobe
+            // `ohnePauseWirdDerselbeSprungGefuellt` hat es gefangen.
             FlexVita::Lueckenzustand& lz = m_tonLuecken[h.streamId];
             lz.offeneLuecken = std::min(lz.offeneLuecken + fehlend,
                                         FlexVita::kMaxGefuellteLuecken);

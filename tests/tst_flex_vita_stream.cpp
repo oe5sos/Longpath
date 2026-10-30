@@ -405,6 +405,58 @@ private slots:
         QCOMPARE(strom.verlorenePaketeGesamt(), qint64(0));
     }
 
+    // ── Eine Unterbrechung ist keine Luecke (2026-10-30) ────────────
+    //
+    // Waehrend des Sendens schickt die Maschine keinen Empfangston.
+    // Das erste Paket danach kommt dreizehn Sekunden spaeter, und der
+    // 4-Bit-Zaehler ist in der Zeit laengst mehrfach umgelaufen --
+    // sein Sprung ist dann eine Zufallszahl, kein Verlust.
+    //
+    // Am Geraet gemessen (2026-10-30): die Fuellung schob nach jeder
+    // Sendung bis zu acht Pakete Stille ein, die niemand verloren
+    // hatte. Ueber 35 Minuten Rufbetrieb waren das 3034 ms, und jede
+    // davon verschiebt die Zeitachse des Empfangs.
+    void nachEinerLangenPauseWirdNichtGefuellt()
+    {
+        FlexVitaStream strom;
+        // Die Uhr laeuft erst ab `start()`. Ohne sie gibt es keinen
+        // Abstand zu messen, und dann wird gefuellt wie bisher --
+        // genau so soll es sein (siehe `zaehleLuecke`), aber dieser
+        // Fall braucht die Zeit.
+        QVERIFY(strom.start(QHostAddress::LocalHost) != 0);
+        // Ein paar Pakete am Stueck, damit es einen Rand gibt.
+        for (int i = 0; i < 4; ++i) {
+            strom.ingestDatagramForTesting(tonMit(quint8(i), 0x04000008u));
+        }
+        const qint64 vorher = strom.gefuellteRahmen();
+
+        // Jetzt eine lange Pause -- im Pruefstand durch Warten, denn
+        // die Uhr ist dieselbe, die der Strom benutzt.
+        QTest::qWait(250);
+
+        // Ein Paket mit grossem Zaehlersprung: sieht aus wie Verlust,
+        // ist aber das erste nach der Unterbrechung.
+        strom.ingestDatagramForTesting(tonMit(12, 0x04000008u));
+        QCOMPARE(strom.gefuellteRahmen(), vorher);
+    }
+
+    // GEGENPROBE: derselbe Sprung OHNE Pause wird sehr wohl gefuellt.
+    // Ohne diesen Lauf belegt der Fall darueber nicht, dass die PAUSE
+    // den Unterschied macht -- er waere auch gruen, wenn gar nie
+    // gefuellt wuerde.
+    void ohnePauseWirdDerselbeSprungGefuellt()
+    {
+        FlexVitaStream strom;
+        for (int i = 0; i < 4; ++i) {
+            strom.ingestDatagramForTesting(tonMit(quint8(i), 0x04000008u));
+        }
+        const qint64 vorher = strom.gefuellteRahmen();
+        // Zaehler springt von 3 auf 12: acht fehlen.
+        strom.ingestDatagramForTesting(tonMit(12, 0x04000008u));
+        QVERIFY2(strom.gefuellteRahmen() > vorher,
+                 "ohne Pause muss die Fuellung greifen");
+    }
+
     void unsinnigerMassstabWirdNichtUebernommen()
     {
         FlexVitaStream strom;

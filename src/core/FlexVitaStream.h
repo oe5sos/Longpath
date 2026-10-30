@@ -254,6 +254,11 @@ private:
         qint64  groessteLueckeNs{0};
         QString groessteLueckeUm;
     };
+    /// Ab wann ein Abstand keine Luecke mehr ist, sondern eine
+    /// Unterbrechung (Senden, Bandwechsel, Neuverbindung). 200 ms
+    /// sind rund vierzig Paketabstaende und damit weit jenseits
+    /// dessen, was die Decke von acht Paketen ueberhaupt fuellt.
+    static constexpr qint64 kUnterbrechungAbNs = 200LL * 1000000LL;
     void zaehleLuecke(const FlexVita::Header& h);
     bool m_lueckenfuellung{true};
     QMap<quint32, FlexVita::Lueckenzustand> m_tonLuecken;  ///< je Tonstrom

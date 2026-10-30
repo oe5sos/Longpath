@@ -594,9 +594,14 @@ void Ft8Applet::buildUI()
     m_arbeit = new QWidget(this);
     // Ein Messingstrich links: dieselbe Rolle wie der Panelakzent im
     // Kopf — hier faengt etwas an, das gemessen wird.
+    //
+    // Radius 6, nicht 3. HAUSSTIL.md: „Nie Radius 3. Das ist der
+    // Qt-Standardwert und laesst alles nach Qt aussehen." Der
+    // Prueflauf tst_hausstil_radius faengt das -- und hat es bei
+    // dieser Leiste auch getan (2026-10-30).
     m_arbeit->setStyleSheet(QStringLiteral(
         "QWidget { background: %1; border: 1px solid %2;"
-        " border-left: 3px solid %3; border-radius: 3px; }")
+        " border-left: 3px solid %3; border-radius: 6px; }")
         .arg(Style::kPanelBg, Style::kBorder, Style::kTxKeyBottom));
     auto* arbeit = new QGridLayout(m_arbeit);
     arbeit->setContentsMargins(10, 6, 10, 7);
