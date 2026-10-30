@@ -254,6 +254,9 @@ private:
     QLabel*                 m_grip {nullptr};
     QPushButton*            m_btnFloat {nullptr};
     QPushButton*            m_btnOptions {nullptr};
+    /// Schnellumschalter 2D/3D in der Kopfleiste; zeigt den Zustand,
+    /// nicht das Ziel (siehe PanadapterApplet.cpp).
+    QPushButton*            m_btn3d {nullptr};
     /// Sichtbarkeit der FUELLFARBE in Prozent (100 = nur Fuellfarbe,
     /// 0 = nur Bild) — dieselbe Zaehlweise wie SpectrumWidget und der
     /// Regler unter Setup -> Display. Nur fuer den Haken im Menue; der
