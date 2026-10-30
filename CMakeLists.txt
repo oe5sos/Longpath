@@ -562,6 +562,7 @@ set(CORE_SOURCES
     # noch MSHV tun das (2026-10-30)
     src/core/Ft8Tonwahl.cpp
     src/core/Ft8Warteschlange.cpp
+    src/core/GridsGearbeitet.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CatProtocol.cpp

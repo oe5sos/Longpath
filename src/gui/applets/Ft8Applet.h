@@ -42,6 +42,7 @@
 #include "models/LogEntry.h"
 #include "core/Ft8Mehrfach.h"
 #include "core/Ft8Warteschlange.h"
+#include "core/GridsGearbeitet.h"
 #include "Ft8PlatzStand.h"
 #include "core/Ft8Tonwahl.h"
 #include "core/Ft8Tx.h"
@@ -166,8 +167,12 @@ public:
     ///
     /// Statisch, damit die Reihenfolge ohne Fenster, ohne Logbuch und
     /// ohne cty.dat pruefbar ist.
-    enum class Zeilenart { AnMich, NeuesLand, Cq, Gewoehnlich };
-    static Zeilenart zeilenart(bool anMich, bool neuesLand, bool istCq);
+    /// `NeuesGrid` steht zwischen Land und CQ: ein Land, das fehlt,
+    /// ist mehr wert als ein Feld, das fehlt -- und beides mehr als
+    /// ein beliebiges CQ.
+    enum class Zeilenart { AnMich, NeuesLand, NeuesGrid, Cq, Gewoehnlich };
+    static Zeilenart zeilenart(bool anMich, bool neuesLand, bool neuesGrid,
+                               bool istCq);
 
     /// Eine Zeile der Liste, zusammengesetzt. Spalten wie in WSJT-X
     /// „Band Activity", dahinter das Land.
@@ -403,6 +408,7 @@ private:
         bool    anMich{false};
         bool    istCq{false};
         bool    neuesLand{false};
+        bool    neuesGrid{false};
         QColor  landFarbe;
         bool    eigeneSendung{false};
     };
@@ -413,7 +419,8 @@ private:
     /// zwei Filter gleichzeitig ergeben Faelle, die niemand im Kopf
     /// behaelt (und „CQ only" + „New DXCC only" zeigte frueher die
     /// Schnittmenge, ohne dass das irgendwo stand).
-    enum class Sicht { Alles, AnMich, Cq, NeuesLand, MeineFrequenz };
+    enum class Sicht { Alles, AnMich, Cq, NeuesLand, NeuesGrid,
+                       MeineFrequenz };
     Sicht m_sicht{Sicht::Alles};
     /// Die Liste aus dem Speicher neu zeichnen.
     void zeichneListe();
@@ -544,6 +551,12 @@ private:
     /// Gilt AUCH mit einem Platz, anders als die Schlange in
     /// `m_mehrfach`. Betreiber am 2026-10-30: „Antworten muessen
     /// immer automatisch sofort funktionieren, ohne meine Beihilfe."
+    /// Welche Grossfelder schon im Logbuch stehen. Betreiber am
+    /// 2026-10-30: „interessant waere zu sehen, welche grids ich
+    /// noch nicht habe und diese dann zb blau zu markieren."
+    GridsGearbeitet  m_grids;
+    QPushButton*     m_sichtNeuesGrid{nullptr};
+
     Ft8Warteschlange m_schlange;
     /// Den naechsten Wartenden anrufen. Gibt true, wenn einer da war.
     bool rufeNaechstenWartenden();

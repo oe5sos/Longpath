@@ -15,6 +15,7 @@
 #include "core/Ft8Stream.h"
 #include "core/Ft8Ablauf.h"
 #include "core/Ft8Tx.h"
+#include "core/LogbookDatei.h"
 #include "gui/widgets/Ft8Fensterbalken.h"
 #include "models/Band.h"
 #include <QDialog>
@@ -530,12 +531,35 @@ void Ft8Applet::buildUI()
     m_sichtAnMich = sichtKnopf(tr("To me"),     Sicht::AnMich, 54);
     m_sichtCq     = sichtKnopf(tr("CQ"),        Sicht::Cq, 38);
     m_sichtNeuesLand = sichtKnopf(tr("New DXCC"), Sicht::NeuesLand, 72);
+    // Betreiber am 2026-10-30: „somit sehe ich dann, was ich noch
+    // benoetige." Derselbe Knopf wie „New DXCC", eine Stufe kleiner.
+    m_sichtNeuesGrid = sichtKnopf(tr("New grid"), Sicht::NeuesGrid, 66);
     m_sichtFreq   = sichtKnopf(tr("My freq"),   Sicht::MeineFrequenz, 62);
     m_sichtAlles->setChecked(true);
     m_sichtAnMich->setToolTip(tr("Only messages addressed to you."));
     m_sichtCq->setToolTip(tr("Only CQ calls."));
     m_sichtNeuesLand->setToolTip(tr("Only countries that are not in the "
                                     "log yet."));
+    m_sichtNeuesGrid->setToolTip(tr("Only grid squares that are not in "
+                                    "the log yet.\nBlue in the list."));
+
+    // ── Das Logbuch einmal lesen (2026-10-30) ────────────────────
+    //
+    // Hier und nicht in `MainWindow`: die Markierung gehoert diesem
+    // Fenster, und ein Fenster, das seine eigene Auskunft von einer
+    // Verdrahtung abhaengig macht, ist genau das, was heute dreimal
+    // stillschweigend ausgefallen ist.
+    //
+    // Einmal beim Bauen. Die Datei waechst um ein QSO je Minute;
+    // sie bei jedem Fund neu zu lesen waere Aufwand ohne Gewinn --
+    // frische QSOs kommen ueber `merke()` dazu (siehe
+    // `meldeFertigesQso`).
+    {
+        const int gelesen = m_grids.liesAus(LogbookDatei::pfad());
+        qCInfo(lcFt8Senden).noquote()
+            << "Grossfelder aus dem Logbuch:" << m_grids.anzahl()
+            << "verschiedene aus" << gelesen << "Eintraegen";
+    }
     m_sichtFreq->setToolTip(tr("Decodes within 50 Hz of your transmit "
                                "tone, plus anything addressed to you — "
                                "what the second column used to show."));
@@ -1303,6 +1327,10 @@ void Ft8Applet::meldeFertigesQso()
 {
     if (m_qsoGemeldet || m_ablauf.partner().isEmpty()) { return; }
     m_qsoGemeldet = true;
+    // Das Feld ist ab jetzt gearbeitet -- ohne auf das naechste
+    // Lesen der Datei zu warten. Sonst bliebe die Station, die eben
+    // im Logbuch landete, bis zum Neustart blau.
+    m_grids.merke(m_ablauf.partnerLocator());
     emit qsoFertig(logEintrag(m_ablauf,
                               m_slice ? m_slice->frequency() : 0.0,
                               m_slice && m_slice->dspMode() == DSPMode::DIGL,
@@ -2348,10 +2376,13 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
 // faltet mehrfache Leerzeichen zusammen -- die Spalten (Zeit, dB, DT,
 // Hz) stuenden danach nicht mehr untereinander.
 Ft8Applet::Zeilenart Ft8Applet::zeilenart(bool anMich, bool neuesLand,
-                                         bool istCq)
+                                         bool neuesGrid, bool istCq)
 {
     if (anMich)    { return Zeilenart::AnMich; }
     if (neuesLand) { return Zeilenart::NeuesLand; }
+    // Zwischen Land und CQ: ein fehlendes Land ist mehr wert als ein
+    // fehlendes Feld, und beides mehr als ein beliebiges CQ.
+    if (neuesGrid) { return Zeilenart::NeuesGrid; }
     if (istCq)     { return Zeilenart::Cq; }
     return Zeilenart::Gewoehnlich;
 }
@@ -2470,6 +2501,7 @@ bool Ft8Applet::inSicht(const Fundzeile& z) const
     case Sicht::AnMich: return z.anMich;
     case Sicht::Cq:     return z.istCq || z.anMich;
     case Sicht::NeuesLand: return z.neuesLand || z.anMich;
+    case Sicht::NeuesGrid: return z.neuesGrid || z.anMich;
     case Sicht::MeineFrequenz:
         // Dieselbe Regel wie frueher die rechte Spalte: das Fenster
         // ist die Signalbreite von FT8/FT4 (50 Hz), kein gegriffener
@@ -2499,7 +2531,8 @@ void Ft8Applet::haengeAn(const Fundzeile& z)
         f.setForeground(QColor(QString::fromLatin1(Style::kTxKeyBorder)));
         f.setFontWeight(QFont::Bold);
     } else {
-        const Zeilenart art = zeilenart(z.anMich, z.neuesLand, z.istCq);
+        const Zeilenart art = zeilenart(z.anMich, z.neuesLand,
+                                        z.neuesGrid, z.istCq);
         if (art == Zeilenart::AnMich) {
             f.setForeground(QColor(QString::fromLatin1(Style::kGreenText)));
             f.setFontWeight(QFont::Bold);
@@ -2511,6 +2544,23 @@ void Ft8Applet::haengeAn(const Fundzeile& z)
                                 : QColor(QString::fromLatin1(
                                       Style::kAmberText)));
             f.setFontWeight(QFont::Bold);
+        } else if (art == Zeilenart::NeuesGrid) {
+            // ── Blau fuer ein Grossfeld, das fehlt (2026-10-30) ──
+            //
+            // Betreiber: „interessant waere zu sehen, welche grids ich
+            // noch nicht habe und diese dann zb blau zu markieren" --
+            // „somit sehe ich dann, was ich noch benoetige."
+            //
+            // Die Farbe ist seine Wahl. Im Hausstil ist Blau sonst
+            // „anfassbar" und Warm „gemessen"; hier traegt es eine
+            // Auskunft. Das ist eine bewusste Ausnahme und keine
+            // Nachlaessigkeit: er hat sie genannt, und sie trennt die
+            // Felder sauber vom Bernstein der Laender und CQs.
+            //
+            // NICHT fett: ein neues Land ist mehr wert als ein neues
+            // Feld, und wenn beides fett waere, hoben sich die
+            // Stufen gegenseitig auf.
+            f.setForeground(QColor(QString::fromLatin1(Style::kAccent)));
         } else if (art == Zeilenart::Cq) {
             f.setForeground(QColor(QString::fromLatin1(Style::kAmberText)));
         } else {
@@ -2649,6 +2699,21 @@ void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
                 z.landFarbe = dxcc->colorForSpot(senderRuf, mhz, modus);
             }
         }
+    }
+
+    // ── Fehlt mir dieses Grossfeld? (2026-10-30) ─────────────
+    //
+    // Der Locator steht bei FT8 in der Nachricht selbst
+    // („CQ G4MHJ IO83"); nachschlagen muss ihn niemand. Steht keiner
+    // drin -- bei jedem Rapport und jedem RR73 --, ist die Zeile
+    // nicht neu, sondern stumm: `GridsGearbeitet::istNeu` gibt dann
+    // false, und das ist Absicht.
+    //
+    // `leer()` schuetzt vor der schlimmsten Form: ohne gelesenes
+    // Logbuch waere JEDES Feld neu, und die Markierung sagte nichts
+    // mehr. Dann lieber keine.
+    if (!m_grids.leer()) {
+        z.neuesGrid = m_grids.istNeu(locatorAusNachricht(nachricht));
     }
 
     // Gemerkt wird JEDE Zeile, gezeigt nur die, die in die Sicht

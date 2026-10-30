@@ -262,18 +262,32 @@ private slots:
     {
         using Art = Ft8Applet::Zeilenart;
 
-        // an mich + neues Land + CQ -> an mich gewinnt
-        QCOMPARE(Ft8Applet::zeilenart(true, true, true), Art::AnMich);
-        // an mich allein
-        QCOMPARE(Ft8Applet::zeilenart(true, false, false), Art::AnMich);
+        // an mich schlaegt alles
+        QCOMPARE(Ft8Applet::zeilenart(true, true, true, true), Art::AnMich);
+        QCOMPARE(Ft8Applet::zeilenart(true, false, false, false),
+                 Art::AnMich);
         // neues Land OHNE CQ -> trotzdem hervorgehoben
-        QCOMPARE(Ft8Applet::zeilenart(false, true, false), Art::NeuesLand);
+        QCOMPARE(Ft8Applet::zeilenart(false, true, false, false),
+                 Art::NeuesLand);
         // neues Land MIT CQ -> das Land schlaegt das CQ
-        QCOMPARE(Ft8Applet::zeilenart(false, true, true), Art::NeuesLand);
+        QCOMPARE(Ft8Applet::zeilenart(false, true, false, true),
+                 Art::NeuesLand);
+        // ── Das neue Grossfeld (2026-10-30) ───────────────────
+        //
+        // Zwischen Land und CQ. Ein fehlendes LAND ist mehr wert als
+        // ein fehlendes Feld -- wer beides hat, will das Land sehen.
+        QCOMPARE(Ft8Applet::zeilenart(false, true, true, false),
+                 Art::NeuesLand);
+        QCOMPARE(Ft8Applet::zeilenart(false, false, true, false),
+                 Art::NeuesGrid);
+        // ... und es schlaegt das CQ, aus demselben Grund wie das Land.
+        QCOMPARE(Ft8Applet::zeilenart(false, false, true, true),
+                 Art::NeuesGrid);
         // nur CQ
-        QCOMPARE(Ft8Applet::zeilenart(false, false, true), Art::Cq);
+        QCOMPARE(Ft8Applet::zeilenart(false, false, false, true), Art::Cq);
         // ein fremdes QSO
-        QCOMPARE(Ft8Applet::zeilenart(false, false, false), Art::Gewoehnlich);
+        QCOMPARE(Ft8Applet::zeilenart(false, false, false, false),
+                 Art::Gewoehnlich);
     }
 
     // ── Die Sendestelle ist waehlbar und bleibt ─────────────────────
