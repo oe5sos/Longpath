@@ -55,6 +55,12 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
    neuen sieht aus wie zwei Programme.
    Die Weichzeichnung bleibt hier als einzige der Seite — dieses Blatt
    steht still, es kostet also nichts je Bild. */
+.raumknopf{position:absolute;left:6px;bottom:6px;z-index:3;
+  min-width:30px;height:22px;padding:0 7px;border-radius:7px;
+  background:rgba(8,8,10,.72);border:1px solid var(--line);
+  color:var(--text3);font:600 11px/1 inherit;letter-spacing:.06em;
+  -webkit-tap-highlight-color:transparent}
+.raumknopf.an{color:var(--accent);border-color:var(--accent)}
 #koppeln{position:fixed;inset:0;z-index:9;display:none;
   background:
     radial-gradient(120% 60% at 50% 12%, rgba(23,33,43,.97) 0%, rgba(11,13,16,.97) 52%, rgba(8,8,10,.98) 100%);
@@ -122,6 +128,11 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <div class="cursor"></div>
   <!-- Feinschritt: liegt IM Bild, rechts oben, und haelt seine Beruehrungen
        von der Abstimmgeste darunter fern (app.js). -->
+  <!-- Raumbild statt Wasserfall. Liegt links UNTEN: links oben stehen die
+       Pegelzahlen des Panadapters, die der Knopf dort verdeckt hat.
+       Seine Beruehrungen haelt er wie der Feinschritt von der
+       Abstimmgeste darunter fern. -->
+  <button class="raumknopf" id="raumknopf" aria-label="Wasserfall oder Raumbild">3D</button>
   <div class="feinschritt" id="feinschritt">
     <button id="feinAb"  aria-label="100 Hz tiefer">−</button>
     <span>100 Hz</span>
@@ -250,6 +261,14 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
          spellcheck="false" placeholder="Token (nur über Netz nötig)">
   <div class="fehler" id="fehler"></div>
   <button id="verbinden">Verbinden</button>
+  <!-- Fuer den Zugang von draussen: dieses Telefon einmal im eigenen
+       Netz bei der Station anmelden. Der Knopf erscheint nur, wenn die
+       Station ein Koppelfenster offen hat -- sonst waere er die meiste
+       Zeit ein Knopf, der nichts tut. -->
+  <button id="koppelknopf" style="display:none;margin-top:10px;
+          background:transparent;border:1px solid var(--line);
+          color:var(--text2)">Dieses Telefon koppeln</button>
+  <div class="fehler" id="koppelmeldung" style="color:var(--text3)"></div>
 </div>
 
 <!-- ton-kern.js zuerst: app.js braucht TonKern fuer den Rueckfall auf

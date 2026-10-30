@@ -3,6 +3,11 @@
 // Kein Bauwerkzeug, keine Abhaengigkeiten. Laeuft in Safari auf dem iPhone
 // genauso wie im Pruefbrowser.
 //
+// Der Draht ist im eigenen Netz ein WebSocket und von draussen eine
+// WebRTC-Verbindung durch den Rendezvous (fernzugriff.js). Beide sehen von
+// hier aus gleich aus — darum steht unten `oeffneLeitung(url)` statt
+// `new WebSocket(url)`, und sonst hat sich an dieser Datei nichts geaendert.
+//
 // Der Binaerrahmen ist byte-genau der aus TciBinaryFrame.h:
 //   64-Byte-Kopf, 16 x uint32 little-endian
 //   Offset  0 receiver · 4 sampleRate · 8 sampleType · 20 length · 24 streamType
@@ -13,6 +18,8 @@
 // unbrauchbar; Longpath fuellt sie korrekt. Wir verlassen uns trotzdem nicht
 // darauf und nehmen die Raten aus dem Textkanal — dann laeuft die Seite auch
 // gegen Thetis und ExpertSDR.
+
+import { oeffneLeitung } from './fernzugriff.js';
 
 export const HDR = 64;
 
@@ -123,7 +130,7 @@ export class TciLink extends EventTarget {
     clearTimeout(this.retryTimer);
 
     let ws;
-    try { ws = new WebSocket(this.url); }
+    try { ws = oeffneLeitung(this.url); }
     catch (e) { this._retry(); return; }
     ws.binaryType = 'arraybuffer';
     this.ws = ws;
