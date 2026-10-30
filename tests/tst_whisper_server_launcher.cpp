@@ -13,52 +13,18 @@
 #include <QTcpServer>
 #include <QTemporaryDir>
 #include "asr/WhisperServerLauncher.h"
+#include "PortProbe.h"
 
 using namespace Longpath;
 using S = WhisperServerLauncher::State;
 
+// Der eigene Port kommt jetzt aus tests/PortProbe.h — binden statt
+// verbinden. Warum, steht dort: am 2026-10-30 fielen drei Faelle dieses
+// Prueflaufs um, weil ein TCP-Connect auf dem CI-Laeufer Erfolg meldete,
+// wo niemand lauschte (Lauf 41020438997). Dieselbe Luege traf
+// tst_asr_against_live_server und tst_tci_client_against_live_device.
 namespace {
-/// Ein Port, auf dem gerade niemand lauscht — auf dem Rechner des
-/// Betreibers steht ein Login-Dienst auf 8080, also nie fest 8080.
-/// Ein Port, den kein anderer Prueflauf gleichzeitig erwischt.
-///
-/// Hier stand `listen(…, 0)`: das System sucht einen freien Port, der
-/// Prueflauf schlieszt ihn sofort wieder und benutzt ihn erst danach.
-/// Zwischen „frei gefunden" und „benutzt" liegt ein Fenster, und ctest
-/// faehrt die Prueflaeufe PARALLEL — alle fragen dieselbe Vergabe, und
-/// die faengt bei allen an derselben Stelle an.
-///
-/// Auf dem CI-Laeufer ist genau das passiert (2026-10-29, macOS Apple
-/// Silicon 1/2): der Starter fand auf „seinem" Port schon einen
-/// Lauscher und meldete `External` statt `Failed`, und
-/// `anExistingListenerIsUsedNotDoubled` sah `portInUse` als wahr,
-/// bevor der Prueflauf ueberhaupt etwas gestartet hatte.
-///
-/// Jetzt bekommt jeder Prozess seinen eigenen Bereich (aus der
-/// Prozessnummer) und bindet jeden Kandidaten, bevor er ihn nennt. Das
-/// Fenster bleibt, aber zwei Prueflaeufe stolpern nicht mehr
-/// uebereinander, weil sie gar nicht erst in dieselbe Ecke greifen.
-quint16 freePort()
-{
-    const quint16 basis =
-        quint16(20000 + (QCoreApplication::applicationPid() % 20000));
-    for (quint16 i = 0; i < 400; ++i) {
-        const int kandidat = int(basis) + int(i);
-        if (kandidat > 65535) { break; }
-        QTcpServer s;
-        if (s.listen(QHostAddress::LocalHost, quint16(kandidat))) {
-            s.close();
-            return quint16(kandidat);
-        }
-    }
-    // Als letzte Rettung die Vergabe des Systems — besser ein enges
-    // Fenster als gar kein Port.
-    QTcpServer s;
-    if (!s.listen(QHostAddress::LocalHost, 0)) { return 0; }
-    const quint16 p = s.serverPort();
-    s.close();
-    return p;
-}
+quint16 freePort() { return LongpathTest::freeLocalPort(); }
 } // namespace
 
 class TestWhisperServerLauncher : public QObject

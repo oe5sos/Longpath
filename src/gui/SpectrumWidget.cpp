@@ -988,6 +988,11 @@ void SpectrumWidget::loadSettings()
 
     int renderMode = readInt(QStringLiteral("DisplaySpectrumRenderMode"), 0);
     m_renderMode = static_cast<SpectrumRenderMode>(qBound(0, renderMode, 1));
+    // Auch das Wiederherstellen ist ein Wechsel (2026-10-30): der
+    // Schnellumschalter in der Kopfleiste des Panadapters liest seine
+    // Beschriftung aus diesem Wert. Ohne das Signal stand dort beim
+    // Start „2D", waehrend das Raumbild lief — am Geraet gesehen.
+    emit spectrumRenderModeChanged(m_renderMode);
     m_dss3dTrueScale = readBool(QStringLiteral("Display3DTrueScale"), true);
     m_dss.setBackWidthFrac(m_dss3dTrueScale ? DssRenderer::kTrueScaleWidthFrac
                                             : DssRenderer::kBackWidthFrac);
@@ -1745,6 +1750,7 @@ void SpectrumWidget::setSpectrumRenderMode(SpectrumRenderMode mode)
     if (m_renderMode == mode) { return; }
     m_renderMode = mode;
     scheduleSettingsSave();
+    emit spectrumRenderModeChanged(mode);
 
     // Start the 3D surface's ring buffer empty rather than carrying rows
     // pushed while it was off (and possibly against a since-changed
@@ -9974,7 +9980,30 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         // already accepts either.
         const bool notchCtrlHeld =
             (event->modifiers() & (Qt::ControlModifier | Qt::MetaModifier)) != 0;
-        if (notchCtrlHeld && my < specH && mx <= specRect.right()) {
+
+        // ── Auf einem Notch wird keiner angelegt (2026-10-30) ────────
+        //
+        // Betreiber: „control und klick erzeugt einen notchfilter. er
+        // muss aber auch wieder entfernt werden können."
+        //
+        // Auf dem Mac IST Ctrl-Klick der Rechtsklick — die Geste, mit
+        // der man am Trackpad ein Kontextmenue aufmacht —, und Qt
+        // meldet den Ctrl-Modifier mit. Der Zweig hier kam vor dem
+        // Treffertest und kehrte zurueck: jeder Ctrl-Klick legte einen
+        // Notch an, auch der auf einen bestehenden, und das Menue mit
+        // `Remove Notch` war von dieser Geste aus nie erreichbar.
+        // Anlegen ging, entfernen nie — und wer am Trackpad sitzt, hat
+        // keine zweite Taste, um daran vorbeizukommen.
+        //
+        // Also: liegt unter dem Zeiger schon ein Notch, gewinnt das
+        // Menue. Nur auf freier Flaeche entsteht ein neuer. Die
+        // Thetis-Belegung (console.cs:49614 [v2.10.3.15], Ctrl +
+        // Rechtsklick legt an) bleibt damit, wo sie gemeint war.
+        const bool aufNotch =
+            (my < specH && mx <= specRect.right())
+            && notchAtPixel(mx, specRect) >= 0;
+
+        if (notchCtrlHeld && !aufNotch && my < specH && mx <= specRect.right()) {
             const bool narrow = (event->modifiers() & Qt::ShiftModifier) != 0;
             emit notchCreateRequested(xToHz(mx, specRect), narrow);
             event->accept();
