@@ -2641,6 +2641,14 @@ longpath_add_test(tst_band_plan_guard_mox_rejection)
 # console.cs:29191-29195 [v2.10.3.13] (UIMOXChangedFalse).
 longpath_add_test(tst_swr_protection_controller)
 longpath_add_test(tst_swr_riegel)
+# `jederSendewegFragtDenRiegel` liest die Quelle: ohne echtes Geraet
+# kommt kein Lauf an das vierte Tor. Ohne diese Zeile ueberspringt er
+# sich STILL -- und ein uebersprungener Lauf ist gruen, ohne etwas zu
+# belegen (am 2026-10-30 zweimal in dieselbe Falle getreten).
+if(TEST tst_swr_riegel)
+    set_tests_properties(tst_swr_riegel PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 
 # ── 2026-10-28: Freigabe bei jedem Unkey + Riegel nach offener Antenne ─────
 # Zwei Luecken gegen Thetis geschlossen. Erstens: onMoxOff() loeschte den

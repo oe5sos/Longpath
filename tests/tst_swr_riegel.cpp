@@ -172,6 +172,64 @@ private slots:
             QStringLiteral("FlexSwrGrenze"),
             QString::number(SwrRiegel::kVorgabeGrenze));
     }
+    // ── Jeder Sendeweg fragt den Riegel (2026-10-30) ─────────────
+    //
+    // Gefunden bei der Durchsicht desselben Abends: der Riegel hing
+    // nur an `flexTasten()`. `flexAbstimmen()` ist der ZWEITE
+    // Sendeweg -- TUNE schickt einen Dauertraeger, und das ist der
+    // Fall, in dem die Stehwelle am meisten zaehlt, denn man stimmt
+    // ab, WEIL die Anpassung nicht stimmt. Ein FT8-Durchgang endet
+    // nach 13,2 s von selbst; ein Abstimmtraeger laeuft, bis ihn
+    // jemand loest.
+    //
+    // Ohne echtes Geraet kommt kein Lauf an das vierte Tor (ohne
+    // `m_flexConnection` kehrt beides vorher um). Darum liest dieser
+    // Fall die Quelle. Sein Nutzen ist der DRITTE Sendeweg, den
+    // morgen jemand baut: dann faellt er.
+    void jederSendewegFragtDenRiegel()
+    {
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+        QFile f(QString::fromLocal8Bit(root)
+                + QStringLiteral("/src/models/RadioModel.cpp"));
+        QVERIFY2(f.open(QIODevice::ReadOnly), qPrintable(f.fileName()));
+        const QString src = QString::fromUtf8(f.readAll());
+
+        // Es gibt GENAU zwei Stellen, die den Sender tasten. Kommt
+        // eine dritte hinzu, faellt dieser Lauf -- und wer ihn liest,
+        // weiss warum.
+        const int tastend =
+            src.count(QStringLiteral("FlexCommandWire::xmitCommand("))
+            + src.count(QStringLiteral("FlexCommandWire::tuneCommand("));
+        QCOMPARE(tastend, 2);
+
+        // Und beide fragen vorher den Riegel. Je Funktionsrumpf
+        // geprueft, nicht datei-weit: eine Abfrage irgendwo in der
+        // Datei sagt nichts darueber, ob SIE auf diesem Weg liegt.
+        const QStringList wege{QStringLiteral("bool RadioModel::flexTasten("),
+                               QStringLiteral("bool RadioModel::flexAbstimmen(")};
+        for (const QString& kopf : wege) {
+            const int a = src.indexOf(kopf);
+            QVERIFY2(a >= 0, qPrintable(kopf));
+            // Bis zur naechsten Funktion auf Spaltenanfang.
+            int e = src.indexOf(QStringLiteral("\n}\n"), a);
+            QVERIFY(e > a);
+            const QString rumpf = src.mid(a, e - a);
+            QVERIFY2(rumpf.contains(QStringLiteral("m_flexSwrRiegel.darfTasten")),
+                     qPrintable(kopf + QStringLiteral(
+                         " tastet den Sender, ohne die Stehwelle zu fragen")));
+        }
+
+        // Der Bruch waehrend der Sendung muss BEIDE Wege loesen:
+        // `xmit 0` beendet keinen Abstimmtraeger.
+        const int bruch = src.indexOf(QStringLiteral("SENDUNG GEBROCHEN"));
+        QVERIFY(bruch > 0);
+        const QString danach = src.mid(bruch, 1200);
+        QVERIFY2(danach.contains(QStringLiteral("flexTasten(false)")),
+                 "der Bruch loest das Tasten nicht");
+        QVERIFY2(danach.contains(QStringLiteral("flexAbstimmen(false)")),
+                 "der Bruch laesst einen laufenden Abstimmtraeger stehen");
+    }
 };
 
 QTEST_MAIN(TstSwrRiegel)

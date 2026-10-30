@@ -7522,6 +7522,31 @@ bool RadioModel::flexAbstimmen(bool an)
             << m_flexVerriegelungsLage << m_flexVerriegelungsGrund;
         return false;
     }
+    // ── Auch der Abstimmtraeger ist Senden (2026-10-30) ──────────
+    //
+    // Gefunden bei der Durchsicht desselben Abends, an dem der Riegel
+    // entstand: ich hatte EINEN Sendeweg abgedeckt (`flexTasten`) und
+    // den zweiten nicht gesucht. TUNE schickt einen DAUERTRAEGER --
+    // der Fall, in dem die Stehwelle am meisten zaehlt, denn man
+    // stimmt ab, WEIL die Anpassung nicht stimmt.
+    //
+    // Betreiber: „Sollte SWR ueber 2,5 sein, bitte nicht senden!"
+    // Das gilt hier genauso, und schaerfer: ein FT8-Durchgang endet
+    // nach 13,2 s von selbst, ein Abstimmtraeger laeuft, bis ihn
+    // jemand loest.
+    if (an) {
+        const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+        if (!m_flexSwrRiegel.darfTasten(jetzt)) {
+            qCWarning(lcConnection).noquote()
+                << "Flex: nicht abgestimmt —"
+                << m_flexSwrRiegel.grund(jetzt);
+            emit flexSwrGesperrt(m_flexSwrRiegel.letzteSwr(),
+                                 m_flexSwrRiegel.grenze());
+            return false;
+        }
+        m_flexSwrRiegel.zuruecksetzen();
+    }
+
     m_flexConnection->sendCommand(FlexCommandWire::tuneCommand(an));
     qCInfo(lcConnection) << "Flex: Abstimmtraeger" << (an ? "an" : "aus");
     return true;
@@ -7927,7 +7952,18 @@ void RadioModel::startFlexStreams()
                             << m_radioStatus.swrRatio() << " ueber der Grenze "
                             << m_flexSwrRiegel.grenze() << " bei "
                             << *fwdW << " W";
+                        // BEIDE Wege loesen. `xmit 0` beendet keinen
+                        // Abstimmtraeger -- der braucht
+                        // `transmit tune 0`. Bis zur Durchsicht des
+                        // 2026-10-30 stand hier nur das Tasten, und
+                        // damit lief ein TUNE in eine Fehlanpassung
+                        // unbegrenzt weiter, obwohl der Riegel schon
+                        // gegriffen hatte. An eine Maschine, die nicht
+                        // abstimmt, ist der Befehl ein Nichts; im
+                        // Zweifel gewinnt die Sicherheit
+                        // (CLAUDE.local.md).
                         flexTasten(false);
+                        flexAbstimmen(false);
                         emit flexSwrGesperrt(float(m_radioStatus.swrRatio()),
                                              m_flexSwrRiegel.grenze());
                     }
