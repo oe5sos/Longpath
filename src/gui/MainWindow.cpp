@@ -454,6 +454,7 @@ warren@wpratt.com
 
 #include <QApplication>
 #include <QGuiApplication>
+#include <QScopedValueRollback>
 #include <QScreen>
 #include <QSlider>
 #include <QCloseEvent>
@@ -2436,6 +2437,113 @@ void MainWindow::zeigeFt8SlotsFenster()
         << "FT8 Slots: kein eigenes Fenster, also abgeloest";
     detachApplet(m_ft8PlaetzeApplet,
                  m_appletPanel->appletPosition(m_ft8PlaetzeApplet));
+}
+
+// ── Ein Durchgang der Plaetze-Automatik ──────────────────────────────
+//
+// Entscheiden (`PanelAutomatik`) und ausfuehren (Fenster auf/zu). Das
+// Prueflauf-Tor sitzt beim Aufrufer, nicht hier -- damit ein Lauf
+// diesen Weg ueberhaupt fahren KANN. Bis zum 2026-10-30 stand das Tor
+// am Anfang des Anschlusses, und damit war der ganze Weg in keinem
+// Lauf erreichbar: fuenf Ursachen sind nacheinander durch genau diese
+// Luecke gefallen, und jede hat dem Betreiber einen Neustart gekostet.
+void MainWindow::ft8SlotsAutomatikSchritt(bool inhalt, int qsos,
+                                          int wartende, qint64 jetztMs)
+{
+    if (!m_appletVis) { return; }
+
+    // ── Was heiszt „offen"? (2026-10-30) ─────────────────────────
+    //
+    // Dritter Anlauf, und die ersten beiden waren beide zu klug:
+    //
+    //   1. `isEffectivelyVisible()` -- der Merker. Er stand auf True
+    //      vom vorigen, ins Leere gelaufenen Versuch, also hielt die
+    //      Automatik das Panel fuer offen und tat nichts. Das
+    //      Protokoll schwieg ganz.
+    //   2. `QWidget::isVisible()` -- die Qt-Sichtbarkeit. Auch wahr:
+    //      das Applet steckt in der Appletspalte, die im Layout liegt
+    //      und keine Breite hat. Sichtbar im Sinne von Qt, unsichtbar
+    //      im Sinne des Betreibers.
+    //
+    // Beide Male meldete er dasselbe: „wieder kein eigenes fenster".
+    // Und genau das ist die Frage, die zaehlt. Sein Wunsch war „wenn
+    // hier die FENSTER eigens aufgehen"; ob ein Panel ein eigenes
+    // Fenster hat, steht ohne Umweg in `m_floatingApplets` -- keine
+    // Qt-Sichtbarkeit, kein Merker, kein Spaltenzustand.
+    const QString id = QStringLiteral("Ft8Slots");
+    auto* fenster = m_floatingApplets.value(id, nullptr);
+    const bool sichtbar = fenster && fenster->isVisible();
+
+    // Jede Entscheidung in die Akte. Beim naechsten „da ist kein
+    // fenster aufgegangen" steht hier, WORAN es lag, statt dass
+    // wieder geraten wird.
+    const auto tat = m_ft8SlotsAutomatik.pruefe(inhalt, sichtbar, jetztMs);
+    if (tat == PanelAutomatik::Tat::Nichts) {
+        qCDebug(lcContainer).nospace()
+            << "FT8 Slots: nichts zu tun (Inhalt=" << inhalt
+            << ", Fenster=" << (fenster != nullptr)
+            << ", sichtbar=" << sichtbar
+            << ", gehoert dem Betreiber="
+            << m_ft8SlotsAutomatik.gehoertDemBetreiber() << ")";
+        return;
+    }
+
+    // ── Der eigene Griff ist kein Griff des Betreibers ───────────
+    //
+    // Gefunden bei der Durchsicht des 2026-10-30, und es war der
+    // SECHSTE Grund, warum sich das Panel nicht regte:
+    //
+    //   zeigeFt8SlotsFenster() -> AppletVisibilityController::
+    //   ensureVisible() -> visibilityChanged (das feuert dort IMMER,
+    //   mit Absicht) -> der Anschluss -> betreiberHatGegriffen()
+    //
+    // Die Automatik machte das Panel also genau einmal auf und
+    // schaltete sich dabei im selben Durchgang selbst ab. Regel 2
+    // (nach der Nachlaufzeit wieder zu) konnte nie greifen -- und
+    // „wieder auf, sobald der Naechste ruft" auch nicht, sobald der
+    // Betreiber es einmal zugemacht hatte. Genau das Verhalten des
+    // Vorgaengers `m_ft8SlotsSchonGezeigt`, den dieser Weg ersetzen
+    // sollte; dass oben noch „GENAU EINMAL je Sitzung" stand, hat es
+    // verdeckt.
+    //
+    // Darum derselbe Merker, den das Haus fuer Rueckkopplungen
+    // benutzt (CLAUDE.md, „GUI<->Model Sync"). Ein `QSignalBlocker`
+    // waere falsch: `applyAppletVisibility` haengt am selben Signal
+    // und ist die EINZIGE Stelle, die das Fenster einblendet.
+    const QScopedValueRollback<bool> eigenerGriff(
+        m_ft8SlotsAutomatikSchaltet, true);
+
+    switch (tat) {
+        case PanelAutomatik::Tat::Aufmachen:
+            qCInfo(lcContainer).noquote()
+                << "FT8 Slots auf:" << qsos
+                << "QSO(s)," << wartende << "wartend";
+            zeigeFt8SlotsFenster();
+            break;
+        case PanelAutomatik::Tat::Zumachen:
+            qCInfo(lcContainer).noquote()
+                << "FT8 Slots zu: seit"
+                << (PanelAutomatik::kNachlaufMs / 1000)
+                << "s nichts mehr zu zeigen";
+            // Zumachen heiszt: das Fenster schliessen. Das dockt es
+            // zurueck in die Spalte, wo es niemandem im Weg steht.
+            if (fenster) { fenster->close(); }
+            m_appletVis->setVisible(id, false);
+            break;
+        case PanelAutomatik::Tat::Nichts:
+            break;
+    }
+}
+
+bool MainWindow::ft8SlotsHatFensterForTest() const
+{
+    auto* f = m_floatingApplets.value(QStringLiteral("Ft8Slots"), nullptr);
+    return f && f->isVisible();
+}
+
+QWidget* MainWindow::ft8SlotsFensterForTest() const
+{
+    return m_floatingApplets.value(QStringLiteral("Ft8Slots"), nullptr);
 }
 
 void MainWindow::applyAppletVisibility(const QString& id, bool effective)
@@ -7720,12 +7828,14 @@ void MainWindow::populateDefaultMeter()
     // auch nie, dass zwei Stationen auf ihn warten -- und das war
     // heute der Fall (F5PZT und OE3TVJ um 16:09, nur im Protokoll).
     //
-    // GENAU EINMAL je Sitzung. Ein Fenster, das nach jedem Zumachen
-    // wieder aufgeht, ist keine Hilfe mehr, sondern eine Zumutung;
-    // wer es weghaben will, soll es weghaben koennen.
+    // Auf UND zu, nicht einmal je Sitzung: hier stand zuerst ein
+    // `m_ft8SlotsSchonGezeigt`, das nach dem ersten Mal nie wieder
+    // anlief. Der Betreiber wollte es anders („schoen waere, wenn hier
+    // die fenster eigens aufgehen und danach wieder zu gehen"), also
+    // entscheidet `PanelAutomatik` -- drei Regeln, und die dritte gibt
+    // das Panel dem Betreiber, sobald er selbst greift.
     connect(m_ft8Applet, &Ft8Applet::plaetzeGeaendert, this,
             [this](const Longpath::Ft8PlaetzeStand& st) {
-        if (!m_appletVis) { return; }
 
         // ── Nicht im Prueflauf (2026-10-30) ─────────────────
         //
@@ -7739,64 +7849,16 @@ void MainWindow::populateDefaultMeter()
         //
         // Die REGEL selbst bleibt geprueft: `tst_panel_automatik`
         // fährt sie ohne Fenster, mit der Zeit von Hand.
+        // Das Tor sitzt HIER und nicht in der Entscheidung: so faehrt
+        // ein Prueflauf `ft8SlotsAutomatikSchritt` selbst, mit der
+        // Zeit von Hand. Vorher lag es am Anfang des Anschlusses --
+        // und damit war der ganze Weg in keinem Lauf erreichbar.
         if (QStandardPaths::isTestModeEnabled()) { return; }
 
-        // ── Was heiszt „offen"? (2026-10-30) ──────────────────
-        //
-        const QString id = QStringLiteral("Ft8Slots");
-        // Dritter Anlauf, und die ersten beiden waren beide zu klug:
-        //
-        //   1. `isEffectivelyVisible()` -- der Merker. Er stand auf
-        //      True vom vorigen, ins Leere gelaufenen Versuch, also
-        //      hielt die Automatik das Panel fuer offen und tat
-        //      nichts. Das Protokoll schwieg ganz.
-        //   2. `QWidget::isVisible()` -- die Qt-Sichtbarkeit. Auch
-        //      wahr: das Applet steckt in der Appletspalte, die im
-        //      Layout liegt und keine Breite hat. Sichtbar im Sinne
-        //      von Qt, unsichtbar im Sinne des Betreibers.
-        //
-        // Beide Male meldete er dasselbe: „wieder kein eigenes
-        // fenster". Und genau das ist die Frage, die zaehlt. Sein
-        // Wunsch war „wenn hier die FENSTER eigens aufgehen"; ob ein
-        // Panel ein eigenes Fenster hat, steht ohne Umweg in
-        // `m_floatingApplets` -- keine Qt-Sichtbarkeit, kein Merker,
-        // kein Spaltenzustand.
-        auto* fenster = m_floatingApplets.value(id, nullptr);
-        const bool sichtbar = fenster && fenster->isVisible();
-        // Jede Entscheidung in die Akte. Beim naechsten „da ist kein
-        // fenster aufgegangen" steht hier, WORAN es lag, statt dass
-        // wieder geraten wird.
-        const auto tat = m_ft8SlotsAutomatik.pruefe(
-            hatInhalt(st), sichtbar, QDateTime::currentMSecsSinceEpoch());
-        if (tat == PanelAutomatik::Tat::Nichts) {
-            qCDebug(lcContainer).nospace()
-                << "FT8 Slots: nichts zu tun (Inhalt=" << hatInhalt(st)
-                << ", Fenster=" << (fenster != nullptr)
-                << ", sichtbar=" << sichtbar
-                << ", gehoert dem Betreiber="
-                << m_ft8SlotsAutomatik.gehoertDemBetreiber() << ")";
-        }
-        switch (tat) {
-            case PanelAutomatik::Tat::Aufmachen:
-                qCInfo(lcContainer).noquote()
-                    << "FT8 Slots auf:" << st.plaetze.size()
-                    << "QSO(s)," << st.wartende.size() << "wartend";
-                zeigeFt8SlotsFenster();
-                break;
-            case PanelAutomatik::Tat::Zumachen:
-                qCInfo(lcContainer).noquote()
-                    << "FT8 Slots zu: seit"
-                    << (PanelAutomatik::kNachlaufMs / 1000)
-                    << "s nichts mehr zu zeigen";
-                // Zumachen heiszt: das Fenster schliessen. Das dockt
-                // es zurueck in die Spalte, wo es niemandem im Weg
-                // steht.
-                if (fenster) { fenster->close(); }
-                m_appletVis->setVisible(id, false);
-                break;
-            case PanelAutomatik::Tat::Nichts:
-                break;
-        }
+        ft8SlotsAutomatikSchritt(hatInhalt(st),
+                                 static_cast<int>(st.plaetze.size()),
+                                 static_cast<int>(st.wartende.size()),
+                                 QDateTime::currentMSecsSinceEpoch());
     });
 
 
@@ -8648,9 +8710,19 @@ void MainWindow::populateDefaultMeter()
     // Start, und Regel 3 der `PanelAutomatik` haette nie gegriffen.
     // Beim Lesen faellt so etwas nicht auf: der Aufruf sieht an
     // beiden Stellen gleich aus.
+    //
+    // UND: nur, wenn es wirklich er war. `zeigeFt8SlotsFenster()` geht
+    // ueber `ensureVisible()`, und das feuert `visibilityChanged`
+    // IMMER (mit Absicht, siehe dort) -- ohne den Merker hielt dieser
+    // Anschluss also jedes eigene Aufmachen fuer einen Griff des
+    // Betreibers und schaltete die Automatik im ERSTEN Durchgang ab.
+    // Gefunden bei der Durchsicht des 2026-10-30, sechster Grund in
+    // Folge, warum sich das Panel nicht regte.
     connect(m_appletVis, &AppletVisibilityController::visibilityChanged,
             this, [this](const QString& id, bool) {
-        if (id == QStringLiteral("Ft8Slots")) {
+        if (id == QStringLiteral("Ft8Slots")
+            && !m_ft8SlotsAutomatikSchaltet
+            && !m_sichtbarkeitOhneBetreiber) {
             m_ft8SlotsAutomatik.betreiberHatGegriffen();
         }
     });
@@ -9549,6 +9621,32 @@ void MainWindow::populateDefaultMeter()
             },
             // ── herstellen ───────────────────────────────────────────
             [this](const QVariantMap& s) {
+                // ── Eine Anordnung ist kein Griff ───────────────────
+                //
+                // Gemessen am 2026-10-30 mit einem Rueckverfolger, und
+                // es war der SIEBTE Grund in Folge, warum sich das
+                // Plaetze-Panel nicht regte:
+                //
+                //   MainWindow() -> buildUI() -> applyCurrent()
+                //   -> DIESES Lambda -> setVisible("Ft8Slots", ...)
+                //   -> visibilityChanged -> betreiberHatGegriffen()
+                //
+                // Bei JEDEM Start, in dem ein Profil gilt, galt das
+                // Panel damit als Eigentum des Betreibers, bevor er
+                // etwas angefasst hatte -- und die Automatik lief nie
+                // an. Beim Betreiber traf es doppelt: er hat sich ein
+                // FT8-Profil angelegt, das auf den FT8-Klick geladen
+                // wird (`profilNachstellen`), also erschlug ausgerechnet
+                // der Klick die Automatik, die er haben wollte. Sein
+                // Satz dazu: „die einzelnen qso fenster habe ich bis
+                // dato nie gesehen."
+                //
+                // Der Merker liegt um das GANZE Anwenden und nicht nur
+                // um den einen gemessenen Weg: so faengt er auch den
+                // achten Grund, den ich noch nicht kenne.
+                const QScopedValueRollback<bool> nichtDerBetreiber(
+                    m_sichtbarkeitOhneBetreiber, true);
+
                 // Betreiber 2026-09-01, nach einem Haenger/OOM-Verdacht
                 // beim Profilwechsel: unbedingte Schritt-Marken, damit
                 // ein kuenftiger Haenger im Log exakt zeigt, VOR welchem
@@ -11889,7 +11987,13 @@ void MainWindow::buildMenuBar()
                 // Fenster, die man hinzufuegt.
                 if (id == QLatin1String(kChromeOverlayId)) { continue; }
                 if (id == QLatin1String(kChromeStatusId))  { continue; }
-                m_appletVis->setVisible(QStringLiteral("Ft8Slots"), false);
+                // `id`, nicht eine feste Kennung. Hier stand vom
+                // 2026-10-30 bis zur Durchsicht desselben Tages
+                // `QStringLiteral("Ft8Slots")` -- ein Unfall beim
+                // Ersetzen, der aus „Hide every window" ein „schalte
+                // fuenfzigmal dasselbe Panel aus" machte. Die leere
+                // Flaeche blieb voll, und niemand sah warum.
+                m_appletVis->setVisible(id, false);
             }
         });
     }

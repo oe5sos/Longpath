@@ -5527,6 +5527,11 @@ longpath_add_test(tst_skala_enden_lesbar)
 longpath_add_test(tst_feldbetrieb)
 # 2026-10-15: zwei Abstuerze beim Beenden in zwei Stunden, beide
 # „Kind meldet sein Ende, Rumpf greift ins halb abgebaute Fenster".
+# Der WEG zum Plaetze-Fenster, im echten MainWindow gefahren. Sechs
+# Ursachen sind am 2026-10-30 nacheinander durch diese Luecke gefallen,
+# weil es nur Laeufe fuer die Flaeche und fuer die Regeln gab -- den
+# Anschluss zwischen beiden fuhr niemand.
+longpath_add_test(tst_ft8_plaetze_weg)
 longpath_add_test(tst_abbau_ueberlebt)
 # 2026-10-15: moos.json nannte zwei Rollen, die es im Programm nicht
 # gibt — still uebergangen, also seit dem ersten Tag wirkungslos.
