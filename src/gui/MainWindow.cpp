@@ -15733,6 +15733,35 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
         m_commandBar->setzeDigiDekoder(m_ft8Applet != nullptr, modus);
     }
 
+    // 7b. Und das BILD zeigt den Bereich, in dem FT8 stattfindet
+    //     (2026-10-30).
+    //
+    //     Betreiber, mit einem auf 7,8 kHz gezoomten Panadapter vor
+    //     Augen, waehrend der Empfaenger 32 kHz weiter stand:
+    //     „interessant ist hier nur der reine ft8 - ft4 bereich" --
+    //     „dieser soll auch automatisch zu sehen sein und
+    //     gespeichert."
+    //
+    //     Gespeichert wird er von selbst: der Ausschnitt steht im
+    //     Layoutprofil, und `SpectrumWidget` legt die Zoomstufe
+    //     ohnehin ab (Phase 3G-12).
+    //
+    //     NUR der Ausschnitt. `setDdcCenterFrequency` und
+    //     `setSampleRate` bleiben unangetastet -- bei der Flex rechnet
+    //     die Maschine, und sie hier zu ueberschreiben haenge das
+    //     Spektrum an die falsche Frequenz (siehe die Notiz weiter
+    //     unten, 2026-10-27).
+    if (auto* sw = activeSpectrumWidget()) {
+        const auto a = DigiFrequenzen::bildausschnitt(
+            qint64(slice->frequency()));
+        if (a.breiteHz > 0.0) {
+            sw->setFrequencyRange(a.mitteHz, a.breiteHz);
+            qCInfo(lcContainer).noquote()
+                << wasName << "— Bild auf" << (a.mitteHz / 1.0e6)
+                << "MHz," << (a.breiteHz / 1.0e3) << "kHz";
+        }
+    }
+
     // 8. Und das Fenster stellt sich mit um (2026-10-30).
     //
     //    Betreiber: „und wenn bei ft8 klick automatisch ein eigenes

@@ -246,6 +246,50 @@ private slots:
         QVERIFY2(vis->isVisible(QStringLiteral("Ft8Decoder")),
                  "das Fenster bleibt aus, obwohl FT8 gewaehlt wurde");
     }
+
+    // ── Der Bildausschnitt (2026-10-30) ───────────────────────────
+    //
+    // Betreiber, mit einem auf 7,8 kHz gezoomten Panadapter, waehrend
+    // der Empfaenger 32 kHz weiter auf der Anrufstelle stand:
+    // „interessant ist hier nur der reine ft8 - ft4 bereich".
+    void derBildausschnittDecktDenDurchlassbereich()
+    {
+        using namespace DigiFrequenzen;
+        const auto a = bildausschnitt(7'074'000);
+
+        // ── Die Mitte liegt NICHT auf der Anrufstelle ─────────
+        //
+        // Dort ist nichts. Die Skalenfrequenz ist der TRAEGER; die
+        // Signale liegen darueber, im Durchlassbereich. Eine Mitte
+        // auf der Anrufstelle haette die halbe Flaeche auf leeres
+        // Band gelegt und die obersten Signale abgeschnitten.
+        QVERIFY2(a.mitteHz > 7'074'000.0,
+                 "die Mitte darf nicht auf dem Traeger liegen");
+        QCOMPARE(a.mitteHz, 7'074'000.0
+                            + (kDurchlassVonHz + kDurchlassBisHz) / 2.0);
+
+        // Der ganze Durchlassbereich passt hinein, mit Luft.
+        const double unten = a.mitteHz - a.breiteHz / 2.0;
+        const double oben  = a.mitteHz + a.breiteHz / 2.0;
+        QVERIFY(unten <= 7'074'000.0 + kDurchlassVonHz);
+        QVERIFY(oben  >= 7'074'000.0 + kDurchlassBisHz);
+
+        // Und er ist schmal genug, dass man die Signale sieht --
+        // unter 10 kHz, nicht die 200 kHz der Bild-FFT.
+        QVERIFY2(a.breiteHz < 10'000.0,
+                 "zu breit, dann sieht man die Toene nicht mehr");
+    }
+
+    // Null heisst „ich weiss es nicht" -- dann bleibt das Bild
+    // stehen, statt irgendwohin zu springen. Dieselbe Regel wie bei
+    // `anruffrequenz`.
+    void ohneFrequenzBleibtDasBildStehen()
+    {
+        const auto a = DigiFrequenzen::bildausschnitt(0);
+        QCOMPARE(a.breiteHz, 0.0);
+        const auto b = DigiFrequenzen::bildausschnitt(-1);
+        QCOMPARE(b.breiteHz, 0.0);
+    }
 };
 
 QTEST_MAIN(TstDigiInEinemGriff)
