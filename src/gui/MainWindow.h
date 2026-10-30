@@ -1943,6 +1943,9 @@ private:
     QMetaObject::Connection m_flexLeistungBand;
     QMetaObject::Connection m_flexAbstimmleistungBand;
     QMetaObject::Connection m_flexSendetBand;
+    /// Die SWR-Sperre meldet sich am Schirm. Ohne diesen Band
+    /// griff sie stumm -- siehe MainWindow_Flex.cpp.
+    QMetaObject::Connection m_flexSwrBand;
     /// Der Blick des Betreibers zieht den Panadapter der Maschine nach.
     QMetaObject::Connection m_flexBlickBand;
     QTimer* m_flexPanNachzug{nullptr};

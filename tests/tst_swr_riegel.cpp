@@ -230,6 +230,36 @@ private slots:
         QVERIFY2(danach.contains(QStringLiteral("flexAbstimmen(false)")),
                  "der Bruch laesst einen laufenden Abstimmtraeger stehen");
     }
+
+    // ── Eine stumme Sperre ist ein Defekt (2026-10-30) ───────────
+    //
+    // `flexSwrGesperrt` hatte den ganzen Nachmittag KEINEN Empfaenger:
+    // dreimal ausgesendet, niemand hoerte zu. Der Riegel hielt den
+    // Sender an, und der Betreiber haette „sendet nicht" gemeldet,
+    // ohne je zu erfahren, dass es die Sperre war -- genau der Abend,
+    // den die vier Tore in `flexTasten` mit ihren einzelnen Meldungen
+    // vermeiden sollen.
+    //
+    // Achter Fall „gebaut und unerreichbar" an diesem Tag.
+    void dieSperreMeldetSichAmSchirm()
+    {
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+        QFile f(QString::fromLocal8Bit(root)
+                + QStringLiteral("/src/gui/MainWindow_Flex.cpp"));
+        QVERIFY2(f.open(QIODevice::ReadOnly), qPrintable(f.fileName()));
+        const QString gui = QString::fromUtf8(f.readAll());
+
+        const int a = gui.indexOf(QStringLiteral("RadioModel::flexSwrGesperrt"));
+        QVERIFY2(a > 0, "das Sperrsignal hat keinen Empfaenger — die Sperre "
+                        "greift stumm");
+        // Und sie sagt es sichtbar, nicht nur im Protokoll.
+        const QString rumpf = gui.mid(a, 900);
+        QVERIFY2(rumpf.contains(QStringLiteral("showToast")),
+                 "der Empfaenger schreibt nur ins Protokoll");
+        QVERIFY2(rumpf.contains(QStringLiteral("ToastSeverity::Error")),
+                 "eine Sicherheitssperre ist kein Hinweis am Rand");
+    }
 };
 
 QTEST_MAIN(TstSwrRiegel)

@@ -63,6 +63,7 @@
 // =================================================================
 
 #include "gui/MainWindow.h"
+#include "gui/widgets/StatusToast.h"
 
 #include "core/AudioEngine.h"
 #include "core/Ft8Tx.h"
@@ -1836,6 +1837,36 @@ void MainWindow::verdrahteFlexSenden()
             << "Flex " << (sendet ? "SENDET" : "empfaengt")
             << (m_flexSelbstGetastet ? " (von uns getastet)"
                                      : " (nicht von uns)");
+    });
+
+    // ── Die Sperre muss sagen, dass sie es war (2026-10-30) ──────
+    //
+    // `flexSwrGesperrt` gab es seit heute Nachmittag und es hatte
+    // KEINEN Empfaenger: dreimal ausgesendet, niemand hoerte zu. Die
+    // Sperre griff stumm, und eine stumme Sicherheitssperre ist von
+    // einem Defekt nicht zu unterscheiden -- der Betreiber meldet
+    // „sendet nicht", und der Abend geht mit Raten hin. Genau das
+    // steht als Lehre schon ueber den vier Toren in `flexTasten`:
+    // „Jedes einzeln melden: ‚es sendet nicht' ohne Grund hat am
+    // 2026-10-22 einen Abend gekostet."
+    //
+    // `Error` ist die richtige Stufe, woertlich: „A protection or
+    // interlock actively blocked the operator" (`StatusToast.h:43`).
+    // Und das SWR-Rot bleibt kraeftig -- die Ausnahme vom Hausstil,
+    // nicht sein Versaeumnis (CLAUDE.local.md).
+    //
+    // 8 s, weil 13,2 s FT8-Tastung und eine halbe Minute zwischen
+    // zwei Durchgaengen liegen: der Hinweis soll noch stehen, wenn er
+    // hinsieht, und weg sein, bevor der naechste kommt.
+    disconnect(m_flexSwrBand);
+    m_flexSwrBand = connect(m_radioModel, &RadioModel::flexSwrGesperrt,
+                            this, [this](float swr, float grenze) {
+        if (m_shuttingDown) { return; }
+        showToast(tr("Not transmitting — SWR %1 is above the %2 limit. "
+                     "Check antenna and feedline.")
+                      .arg(swr, 0, 'f', 1)
+                      .arg(grenze, 0, 'f', 1),
+                  ToastSeverity::Error, 8000);
     });
 
     qCInfo(lcFlexGui) << "Flex-Senden verdrahtet — es wurde nichts getastet";
