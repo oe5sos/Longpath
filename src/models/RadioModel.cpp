@@ -630,6 +630,20 @@ RadioModel::RadioModel(QObject* parent)
         const auto& s = AppSettings::instance();
         m_flexMikGainDb = std::clamp(
             s.value(QStringLiteral("FlexMikGainDb"), 0).toInt(), -20, 30);
+
+        // Die Stehwellengrenze, ueber der nicht mehr gesendet wird.
+        // Vorgabe 2,5 — die Zahl des Betreibers vom 2026-10-30.
+        bool ok = false;
+        const float g = s.value(QStringLiteral("FlexSwrGrenze"),
+                                QString::number(
+                                    safety::SwrRiegel::kVorgabeGrenze))
+                            .toString().toFloat(&ok);
+        m_flexSwrRiegel.setzeGrenze(
+            ok ? g : safety::SwrRiegel::kVorgabeGrenze);
+        m_flexSwrRiegel.setzeAn(
+            s.value(QStringLiteral("FlexSwrRiegelAn"),
+                    QStringLiteral("True")).toString()
+            != QLatin1String("False"));
     }
 
     // Sprachspeicher: Ordner neben die Einstellungsdatei legen und
@@ -7403,6 +7417,30 @@ bool RadioModel::flexTasten(bool tasten)
                 << "Flex: getastet, OHNE je eine Verriegelungsmeldung "
                    "gehoert zu haben — die Maschine entscheidet selbst";
         }
+
+        // ── Das vierte Tor: die Stehwelle (2026-10-30) ───────────
+        //
+        // Betreiber: „Sollte SWR ueber 2,5 sein, bitte nicht senden!"
+        //
+        // Der Wert stammt aus der LETZTEN Sendung — zwischen zwei
+        // Sendungen flieszt nichts und die Bruecke misst 1,0. Genau
+        // so ist es gemeint: war die letzte Sendung in eine
+        // Fehlanpassung, geht die naechste gar nicht erst los.
+        //
+        // Wurde nie gemessen, wird nicht gesperrt. Siehe `SwrRiegel`.
+        {
+            const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+            if (!m_flexSwrRiegel.darfTasten(jetzt)) {
+                qCWarning(lcConnection).noquote()
+                    << "Flex: nicht getastet —"
+                    << m_flexSwrRiegel.grund(jetzt);
+                emit flexSwrGesperrt(m_flexSwrRiegel.letzteSwr(),
+                                     m_flexSwrRiegel.grenze());
+                return false;
+            }
+            // Eine neue Sendung faengt ohne alten Bruch an.
+            m_flexSwrRiegel.zuruecksetzen();
+        }
     }
 
     m_flexConnection->sendCommand(FlexCommandWire::xmitCommand(tasten));
@@ -7864,6 +7902,33 @@ void RadioModel::startFlexStreams()
                 // der neue Ruecklauf schon drin.
                 if (refW) { m_radioStatus.setReflectedPower(*refW); }
                 if (fwdW) { m_radioStatus.setForwardPower(*fwdW); }
+
+                // ── Der zweite Riegel: waehrend der Sendung ──────
+                //
+                // Vor dem Tasten zu pruefen reicht nicht. FT8 tastet
+                // 13,2 s am Stueck; eine Antenne, die waehrenddessen
+                // abreiszt, oder ein Relais, das nicht umlegt, wuerde
+                // den Sender eine ganze Sendung lang in die
+                // Fehlanpassung treiben.
+                //
+                // Die Maschine meldet die Stehwelle selbst mit; bis
+                // heute stand sie nur in der Protokollzeile und in
+                // zwei Balken. Niemand griff ein.
+                if (fwdW && m_radioStatus.swrRatio() > 0.0) {
+                    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+                    if (m_flexSwrRiegel.messung(
+                            float(m_radioStatus.swrRatio()),
+                            float(*fwdW), jetzt)) {
+                        qCWarning(lcConnection).nospace()
+                            << "Flex: SENDUNG GEBROCHEN — Stehwelle "
+                            << m_radioStatus.swrRatio() << " ueber der Grenze "
+                            << m_flexSwrRiegel.grenze() << " bei "
+                            << *fwdW << " W";
+                        flexTasten(false);
+                        emit flexSwrGesperrt(float(m_radioStatus.swrRatio()),
+                                             m_flexSwrRiegel.grenze());
+                    }
+                }
 
                 // Einmal melden, dass ueberhaupt etwas ankommt. Am
                 // 2026-10-27 lagen in der einen Messwertzeile FWDPWR

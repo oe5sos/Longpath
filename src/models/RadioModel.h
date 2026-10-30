@@ -111,6 +111,7 @@
 #include "core/DdcAssignment.h"       // DdcAssignment (Phase 3F Sub-Epic B Task 16)
 #include "core/SkuUiProfile.h"  // issue #257 — setLastBandForTest passes the SKU into refreshAntennasFromAlex
 #include "core/safety/SwrProtectionController.h"
+#include "core/safety/SwrRiegel.h"
 #include "core/safety/TxInhibitMonitor.h"
 #include "core/safety/BandPlanGuard.h"
 
@@ -337,6 +338,14 @@ public:
     // Setters called by connection layer on each status packet.
     // Backed by Phase 3P-H Task 1 RadioStatus model.
     // Phase 3P-H Task 2.
+    /// Der Stehwellenriegel -- lesbar fuer die Oberflaeche (sie zeigt
+    /// die Grenze an) und fuer den Prueflauf, der nachsieht, ob die
+    /// Zahl aus den Einstellungen ueberhaupt ankommt. Eine Einheit,
+    /// die geprueft ist, aber nicht angeschlossen, ist nichts wert --
+    /// genau das war heute schon einmal der Fall (Multi Answering).
+    const safety::SwrRiegel& flexSwrRiegel() const { return m_flexSwrRiegel; }
+    safety::SwrRiegel&       flexSwrRiegel()       { return m_flexSwrRiegel; }
+
     const RadioStatus& radioStatus()        const { return m_radioStatus; }
     RadioStatus&       radioStatus()              { return m_radioStatus; }
 
@@ -2757,6 +2766,11 @@ signals:
     void flexSendefreigabeGeaendert(bool darf);
     /// Die Aussteuerung des Flex-Mikrofonwegs hat sich geaendert.
     void flexMikGainGeaendert(int db);
+    /// Der Stehwellenriegel hat zugemacht: entweder wurde gar nicht
+    /// erst getastet, oder eine laufende Sendung wurde gebrochen.
+    /// Betreiber am 2026-10-30: „Sollte SWR ueber 2,5 sein, bitte
+    /// nicht senden!" Siehe `safety::SwrRiegel`.
+    void flexSwrGesperrt(float swr, float grenze);
     /// Die Maschine sendet / sendet nicht mehr — gleich wer getastet hat.
     void flexSendetGeaendert(bool sendet);
 
@@ -3905,6 +3919,11 @@ private:
     /// setzeFlexMikGainDb(). 0 heiszt: roh hinaus, wie bisher.
     int                  m_flexMikGainDb{0};
     bool                 m_flexVerriegelungGehoert{false};
+    /// „Sollte SWR ueber 2,5 sein, bitte nicht senden!" (Betreiber,
+    /// 2026-10-30). Zwei Riegel: einer vor dem Tasten in
+    /// `flexTasten()`, einer bei jeder Messung — FT8 tastet 13,2 s am
+    /// Stueck, da reicht die Pruefung davor nicht.
+    safety::SwrRiegel    m_flexSwrRiegel;
     bool                 m_flexVerriegelungGezeigt{false};
     bool                 m_flexLeistungGesehen{false};
     /// Welche Zustandsarten die Maschine schon geschickt hat — je Art

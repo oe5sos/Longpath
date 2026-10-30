@@ -2640,6 +2640,7 @@ longpath_add_test(tst_band_plan_guard_mox_rejection)
 # Ports Thetis console.cs:25933-26120 [v2.10.3.13] (PollPAPWR) and
 # console.cs:29191-29195 [v2.10.3.13] (UIMOXChangedFalse).
 longpath_add_test(tst_swr_protection_controller)
+longpath_add_test(tst_swr_riegel)
 
 # ── 2026-10-28: Freigabe bei jedem Unkey + Riegel nach offener Antenne ─────
 # Zwei Luecken gegen Thetis geschlossen. Erstens: onMoxOff() loeschte den
