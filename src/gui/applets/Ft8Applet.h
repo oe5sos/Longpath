@@ -40,6 +40,7 @@
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Ablauf.h"
 #include "models/LogEntry.h"
+#include "core/Ft8Mehrfach.h"
 #include "core/Ft8Tx.h"
 
 #include <QDateTime>
@@ -234,6 +235,11 @@ public:
     static QString eigenerLocator();
 
     void sendeNachricht(const QString& text);
+    /// Mit mehreren Plaetzen: die Summe mehrerer Saetze, jeder auf
+    /// seiner Tonlage (Multi Answering). `text` ist dann nur noch die
+    /// Zeile fuer die Anzeige.
+    void sendeNachricht(const QString& text,
+                        const QVector<Ft8TxSource::Platz>& plaetze);
     void abbrechen();
     bool sendetGerade() const { return m_sendet; }
 
@@ -286,6 +292,8 @@ public:
     QPushButton*    sichtFreqButtonForTest() const { return m_sichtFreq; }
     QSpinBox*       sendeTonFeldForTest() const { return m_tonFeld; }
     QPushButton*    houndButtonForTest() const { return m_houndBtn; }
+    QSpinBox*       plaetzeSpinForTest() const { return m_plaetzeSpin; }
+    const Ft8Mehrfach& mehrfachForTest() const { return m_mehrfach; }
     QSpinBox*       rundenFeldForTest() const { return m_rundenFeld; }
     Longpath::Ft8Wasserfall* wasserfallForTest() const { return m_wasserfall; }
     int             sendeTonHzForTest() const { return m_sendeTonHz; }
@@ -461,6 +469,28 @@ private:
     /// man erst, wenn sie jemanden aufruft.
     QPushButton* m_houndBtn{nullptr};
     bool         m_houndBetrieb{false};
+
+    // ── Multi Answering (2026-10-30 angeschlossen) ───────────
+    //
+    // `Ft8Mehrfach` und `Ft8TxSource::vorbereitenMehrere` lagen seit
+    // dem Bau (#323/#333/#335) vollstaendig und geprueft im Baum --
+    // und wurden von NIEMANDEM gerufen. Beide kamen nur in ihrer
+    // eigenen Datei und im jeweiligen Prueflauf vor. In der Bilanz
+    // gegen MSHV stand trotzdem „gebaut"; am 2026-10-30 fragte der
+    // Betreiber „wie funktioniert mshv nun bei mir", und beim
+    // Nachsehen war die Antwort: gar nicht.
+    //
+    // Ein Platz heisst eine Station, die gleichzeitig abgearbeitet
+    // wird. Vorgabe 1 = aus, denn die Sendeleistung wird GETEILT:
+    // zwei Plaetze sind −6 dB je Station, drei −9,5, sechs −15,6
+    // (MSHV `gen_ft8.cpp:303`). Bei 5 W und drei Plaetzen bleiben
+    // 1,7 W je Station.
+    Ft8Mehrfach  m_mehrfach;
+    QSpinBox*    m_plaetzeSpin{nullptr};
+    int          m_plaetze{1};
+    bool mehrfachAn() const { return m_plaetze > 1; }
+    /// Was in diesem Fenster auf allen Plaetzen hinausginge.
+    void sendeMehrfach();
     /// Die Tonlage, die der Betreiber hatte, bevor Hound sie ueber
     /// 1000 Hz zog. 0 heisst: nichts zurueckzugeben.
     int          m_tonVorHound{0};

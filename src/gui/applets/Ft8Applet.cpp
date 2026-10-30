@@ -748,6 +748,45 @@ void Ft8Applet::buildUI()
     m_cqVersucheSpin->setToolTip(tr(
         "How many periods a CQ call repeats by itself.\nIt stops "
         "earlier when somebody answers, or on Stop."));
+
+    // ── Multi Answering: wie viele gleichzeitig (2026-10-30) ─────
+    //
+    // MSHVs Kernmerkmal. Die Technik lag seit #323/#333/#335 fertig
+    // und geprueft im Baum und wurde von niemandem gerufen — hier ist
+    // der Anschluss.
+    //
+    // Vorgabe 1 = aus. Die Sendeleistung wird GETEILT: zwei Plaetze
+    // sind −6 dB je Station, drei −9,5, sechs −15,6 (MSHV
+    // `gen_ft8.cpp:303`, und die Teilung ist kein Geschmack — der
+    // Sender hat eine Hoechstamplitude). Bei 5 W und drei Plaetzen
+    // bleiben 1,7 W je Station.
+    m_plaetzeSpin = new QSpinBox(this);
+    m_plaetzeSpin->setRange(1, Ft8Mehrfach::kMaxPlaetze);
+    m_plaetzeSpin->setValue(AppSettings::instance()
+                                .value(QStringLiteral("Ft8/Plaetze"),
+                                       QStringLiteral("1"))
+                                .toInt());
+    m_plaetzeSpin->setPrefix(tr("slots "));
+    m_plaetzeSpin->setMinimumWidth(m_plaetzeSpin->sizeHint().width());
+    m_plaetzeSpin->setToolTip(tr(
+        "Work several callers at once (MSHV\u2019s Multi Answering).\n"
+        "The transmit power is SHARED: 2 slots are \u22126 dB each, "
+        "3 are \u22129.5, 6 are \u221215.6.\n1 means off."));
+    m_plaetze = qBound(1, m_plaetzeSpin->value(), Ft8Mehrfach::kMaxPlaetze);
+    m_mehrfach.setPlaetze(m_plaetze);
+    connect(m_plaetzeSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+            this, [this](int v) {
+        m_plaetze = v;
+        m_mehrfach.setPlaetze(v);
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Plaetze"),
+                                         QString::number(v));
+        if (m_status && v > 1) {
+            // Die Zahl, die man wissen muss, bevor man sendet.
+            const double dB = -10.0 * std::log10(double(v));
+            m_status->setText(tr("%1 slots \u2014 %2 dB each")
+                                  .arg(v).arg(dB, 0, 'f', 1));
+        }
+    });
     connect(m_cqVersucheSpin, QOverload<int>::of(&QSpinBox::valueChanged),
             this, [](int v) {
         AppSettings::instance().setValue(QStringLiteral("Ft8/CqVersuche"),
@@ -902,11 +941,34 @@ void Ft8Applet::starteCqRuf()
 
 void Ft8Applet::ablaufSchritt()
 {
+    // Mit mehreren Plaetzen entscheidet `Ft8Mehrfach`, was hinausgeht
+    // -- der einzelne Ablauf ist dann nur noch einer von mehreren.
+    if (mehrfachAn() && m_mehrfach.aktive() > 0) {
+        sendeMehrfach();
+        return;
+    }
     const QString was = m_ablauf.naechsteNachricht();
     zeigeAblauf();
     if (was.isEmpty() || m_sendet) { return; }
     if (m_textFeld) { m_textFeld->setText(was); }
     sendeNachricht(was);
+}
+
+// ── Ein Fenster, mehrere Stationen ─────────────────────
+void Ft8Applet::sendeMehrfach()
+{
+    if (m_sendet) { return; }
+    m_mehrfach.setEigeneDaten(eigenesRufzeichen(), eigenerLocator());
+    m_mehrfach.setGrundtonHz(float(m_sendeTonHz));
+    const QVector<Ft8TxSource::Platz> plaetze = m_mehrfach.naechsteNachrichten();
+    if (plaetze.isEmpty()) { return; }
+
+    QStringList zeilen;
+    for (const Ft8TxSource::Platz& p : plaetze) { zeilen << p.text; }
+    const QString anzeige = zeilen.join(QStringLiteral(" | "));
+    if (m_textFeld) { m_textFeld->setText(anzeige); }
+    zeigeArbeit();
+    sendeNachricht(anzeige, plaetze);
 }
 
 // ── Ein fertiges QSO ins Logbuch ─────────────────────────────────────
@@ -1300,6 +1362,12 @@ bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
 
 void Ft8Applet::sendeNachricht(const QString& text)
 {
+    sendeNachricht(text, {});
+}
+
+void Ft8Applet::sendeNachricht(const QString& text,
+                               const QVector<Ft8TxSource::Platz>& plaetze)
+{
     if (m_sendet) {
         qCInfo(lcFt8Senden) << "Senden abgelehnt: es laeuft schon eine Sendung";
         return;
@@ -1333,6 +1401,31 @@ void Ft8Applet::sendeNachricht(const QString& text)
     }
 
     Ft8TxSource* quelle = m_model->ft8TxSource();
+
+    // ── Ein Fenster, mehrere Stationen (Multi Answering) ───────
+    //
+    // Mit mehreren Plaetzen geht nicht EIN Satz hinaus, sondern die
+    // Summe mehrerer -- jeder auf seiner eigenen Tonlage. Der Rest
+    // des Sendewegs (Sendeplan, Taktgeber, Tasten) ist identisch:
+    // darum steht hier nur das Packen anders, nicht der ganze Weg
+    // noch einmal.
+    if (!plaetze.isEmpty()) {
+        if (!quelle->vorbereitenMehrere(plaetze, protocol())) {
+            qCWarning(lcFt8Senden)
+                << "Senden abgelehnt: ft8_lib kann die" << plaetze.size()
+                << "Plaetze nicht packen";
+            if (m_status) { m_status->setText(tr("cannot encode slots")); }
+            return;
+        }
+        QStringList was;
+        for (const Ft8TxSource::Platz& p : plaetze) {
+            was << QStringLiteral("%1@%2").arg(p.text)
+                       .arg(int(p.toneHz));
+        }
+        qCInfo(lcFt8Senden).noquote()
+            << "Senden vorbereitet (" << plaetze.size() << "Plaetze):"
+            << was.join(QStringLiteral(" | "));
+    } else {
     if (!quelle->vorbereiten(sauber, float(m_sendeTonHz), protocol())) {
         qCWarning(lcFt8Senden).noquote()
             << "Senden abgelehnt: ft8_lib kann \"" + sauber + "\" nicht packen";
@@ -1343,6 +1436,7 @@ void Ft8Applet::sendeNachricht(const QString& text)
     }
     qCInfo(lcFt8Senden).noquote()
         << "Senden vorbereitet:" << sauber << "auf" << m_sendeTonHz << "Hz";
+    }
 
     // Wann faengt mein naechstes Fenster an? Die Gegenperiode zu der,
     // in der gehoert wird — wer in derselben sendet, hoert sich selbst
@@ -1758,9 +1852,32 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
         // (2026-10-15).
         // Bringt der Fund den Ablauf weiter, ist der naechste Zug
         // faellig — das ist der einzige Weg, auf dem er vorankommt.
-        if (m_ablauf.laeuft()
-            && m_ablauf.verarbeite(d.text,
-                                   static_cast<int>(std::lround(d.snrDb)))) {
+        const int snr = static_cast<int>(std::lround(d.snrDb));
+
+        // ── Multi Answering (2026-10-30 angeschlossen) ─────────
+        //
+        // Mit mehreren Plaetzen fuehrt `Ft8Mehrfach` die Ablaeufe, und
+        // jeder gehoerte Satz geht an ALLE -- jeder prueft selbst, ob
+        // er ihn angeht. Ruft mich jemand, der noch nicht dabei ist,
+        // bekommt er einen freien Platz oder stellt sich an.
+        if (mehrfachAn()) {
+            m_mehrfach.setEigeneDaten(eigenesRufzeichen(), eigenerLocator());
+            bool bewegt = m_mehrfach.verarbeite(d.text, snr) > 0;
+            const QString anrufer = senderCallsign(d.text);
+            const QString meiner  = eigenesRufzeichen();
+            const bool gehtAnMich =
+                !meiner.isEmpty()
+                && d.text.toUpper()
+                       .split(QLatin1Char(' '), Qt::SkipEmptyParts)
+                       .contains(meiner);
+            if (gehtAnMich && !anrufer.isEmpty()
+                && !m_mehrfach.kennt(anrufer)) {
+                bewegt = m_mehrfach.nimmAnrufer(
+                             anrufer, snr,
+                             locatorAusNachricht(d.text)) || bewegt;
+            }
+            if (bewegt) { ablaufSchritt(); }
+        } else if (m_ablauf.laeuft() && m_ablauf.verarbeite(d.text, snr)) {
             ablaufSchritt();
         }
 
