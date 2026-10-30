@@ -417,6 +417,51 @@ private slots:
         QCOMPARE(Ft8Ablauf::kHoundMinTonHz, 1000);
     }
 
+    // ── Der Abschied am 2026-10-30 ────────────────────────────────
+    //
+    // Im Betrieb aufgefallen, nicht von einem roten Prueflauf: nach
+    // dem fertigen QSO mit HB9ZHK kam sein „73", und der Anrufer nahm
+    // es als neuen Anruf. Viermal derselbe Rapport ins Leere.
+    void einDreiundsiebzigIstKeinAnrufAufMeinCq()
+    {
+        Ft8Ablauf a;
+        a.starteAlsAnrufer(QStringLiteral("OE5SOS"),
+                           QStringLiteral("JN67"));
+        QCOMPARE(a.zustand(), Z::RufeCq);
+
+        // Genau die Zeile aus dem Fenster, Spalte fuer Spalte.
+        QVERIFY(!a.verarbeite(QStringLiteral("OE5SOS HB9ZHK 73"), 16));
+        QCOMPARE(a.zustand(), Z::RufeCq);
+        QVERIFY(a.partner().isEmpty());
+
+        // Dasselbe fuer die beiden anderen Schlussworte.
+        QVERIFY(!a.verarbeite(QStringLiteral("OE5SOS HB9ZHK RR73"), 16));
+        QVERIFY(!a.verarbeite(QStringLiteral("OE5SOS HB9ZHK RRR"), 16));
+        QCOMPARE(a.zustand(), Z::RufeCq);
+        QVERIFY(a.partner().isEmpty());
+    }
+
+    // Die Gegenprobe: ein echter Anruf wird weiterhin genommen --
+    // sonst waere das „Nein" oben kein Fortschritt, sondern Taubheit.
+    void einEchterAnrufGehtWeiterhinDurch()
+    {
+        Ft8Ablauf a;
+        a.starteAlsAnrufer(QStringLiteral("OE5SOS"),
+                           QStringLiteral("JN67"));
+        QVERIFY(a.verarbeite(QStringLiteral("OE5SOS PD4RJ JO33"), 12));
+        QCOMPARE(a.zustand(), Z::SendeReport);
+        QCOMPARE(a.partner(), QStringLiteral("PD4RJ"));
+        QCOMPARE(a.partnerLocator(), QStringLiteral("JO33"));
+
+        // Auch der Anruf ohne Locator (nicht-Standard-Rufzeichen).
+        Ft8Ablauf b;
+        b.starteAlsAnrufer(QStringLiteral("OE5SOS"),
+                           QStringLiteral("JN67"));
+        QVERIFY(b.verarbeite(QStringLiteral("OE5SOS 9A6T"), 11));
+        QCOMPARE(b.zustand(), Z::SendeReport);
+        QCOMPARE(b.partner(), QStringLiteral("9A6T"));
+    }
+
     void ohneFoxRufzeichenFaengtNichtsAn()
     {
         Ft8Ablauf a;

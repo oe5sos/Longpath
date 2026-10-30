@@ -66,6 +66,84 @@ private:
 
 private slots:
 
+    // ── Die Warteschlange ist auch ANGESCHLOSSEN ────────────────────
+    //
+    // Nicht „gibt es", sondern „kommt dort an". Genau diese Pruefung
+    // fehlte bei Multi Answering, und darum lag es Monate fertig und
+    // unerreichbar da (2026-10-30).
+    //
+    // Gefahren wird der gemessene Fall vom 2026-10-30: waehrend des
+    // QSOs mit HB9ZHK rief PD4RJ dreimal und wurde nie beantwortet.
+    void einAnrufWaehrendDesQsosLandetInDerSchlange()
+    {
+        AppSettings::instance().setValue(QStringLiteral("StationCallsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("StationGridSquare"),
+                                         QStringLiteral("JN67"));
+
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        QVERIFY(slice);
+        slice->setFrequency(7074000.0);
+        applet.setSlice(slice);
+
+        // Ein QSO laeuft: HB9ZHK hat auf mein CQ geantwortet.
+        applet.ablaufForTestSchreibend().starteMitAnrufer(
+            QStringLiteral("HB9ZHK"), QStringLiteral("OE5SOS"),
+            QStringLiteral("JN67"), 18, QStringLiteral("JN47"));
+        QCOMPARE(applet.ablaufForTest().partner(),
+                 QStringLiteral("HB9ZHK"));
+
+        const QDateTime fenster =
+            QDateTime::fromMSecsSinceEpoch(999999990000LL, QTimeZone::UTC);
+
+        // Jetzt ruft PD4RJ dazwischen -- dreimal, wie gemessen.
+        for (int i = 0; i < 3; ++i) {
+            QMetaObject::invokeMethod(
+                &applet, "onDecoded", Qt::DirectConnection,
+                Q_ARG(QVector<Longpath::Ft8Decode>,
+                      einFund(QStringLiteral("OE5SOS PD4RJ JO33"), 12.0f)),
+                Q_ARG(QDateTime, fenster));
+        }
+        // Und 9A6T, ohne Locator.
+        QMetaObject::invokeMethod(
+            &applet, "onDecoded", Qt::DirectConnection,
+            Q_ARG(QVector<Longpath::Ft8Decode>,
+                  einFund(QStringLiteral("OE5SOS 9A6T"), 11.0f)),
+            Q_ARG(QDateTime, fenster));
+
+        const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+        QCOMPARE(applet.schlangeForTest().wartende(jetzt), 2);
+
+        // Der Partner des laufenden QSOs steht NICHT in der Schlange.
+        QMetaObject::invokeMethod(
+            &applet, "onDecoded", Qt::DirectConnection,
+            Q_ARG(QVector<Longpath::Ft8Decode>,
+                  einFund(QStringLiteral("OE5SOS HB9ZHK R-14"), 16.0f)),
+            Q_ARG(QDateTime, fenster));
+        QCOMPARE(applet.schlangeForTest().wartende(jetzt), 2);
+
+        // Und ein Abschied legt niemanden an.
+        QMetaObject::invokeMethod(
+            &applet, "onDecoded", Qt::DirectConnection,
+            Q_ARG(QVector<Longpath::Ft8Decode>,
+                  einFund(QStringLiteral("OE5SOS DL9XYZ 73"), 5.0f)),
+            Q_ARG(QDateTime, fenster));
+        QCOMPARE(applet.schlangeForTest().wartende(jetzt), 2);
+
+        // Jetzt der zweite Teil: der naechste Wartende wird gerufen --
+        // und zwar mit dem RAPPORT, nicht mit meinem Locator.
+        QVERIFY(applet.rufeNaechstenWartendenForTest());
+        QCOMPARE(applet.ablaufForTest().partner(), QStringLiteral("PD4RJ"));
+        QCOMPARE(applet.ablaufForTest().zustand(),
+                 Ft8Ablauf::Zustand::SendeReport);
+        QCOMPARE(applet.ablaufForTest().naechsteNachricht(),
+                 QStringLiteral("PD4RJ OE5SOS +12"));
+        QCOMPARE(applet.schlangeForTest().wartende(jetzt), 1);
+    }
+
     // ── Die Landspalte ───────────────────────────────────────────────
     //
     // Betreiber am 2026-10-21: „vielleicht kann man auch das land

@@ -41,6 +41,7 @@
 #include "core/Ft8Ablauf.h"
 #include "models/LogEntry.h"
 #include "core/Ft8Mehrfach.h"
+#include "core/Ft8Warteschlange.h"
 #include "core/Ft8Tonwahl.h"
 #include "core/Ft8Tx.h"
 
@@ -266,6 +267,12 @@ public:
     /// Zeitgeber nach bis zu 15 s — im Prueflauf waere das eine
     /// Viertelminute Warten je Zug.
     void fensterZuEndeForTest() { fensterZuEnde(); }
+    /// Die Warteschlange, damit ein Prueflauf nachsehen kann, ob ein
+    /// Anruf wirklich ankommt. Ohne diesen Zugang waere nur die
+    /// Einheit geprueft, nicht ihr Anschluss -- und genau so lag
+    /// Multi Answering monatelang unerreichbar da (2026-10-30).
+    const Ft8Warteschlange& schlangeForTest() const { return m_schlange; }
+    bool rufeNaechstenWartendenForTest() { return rufeNaechstenWartenden(); }
     QLineEdit*   textFeldForTest()  const { return m_textFeld; }
 
     // Fuer den Pruefstand.
@@ -509,6 +516,19 @@ private:
     /// Eine freie Sendestelle suchen und setzen. Gibt true, wenn
     /// gewechselt wurde.
     bool sucheFreieStelle(bool nurWennBelegt);
+
+    /// Wer mich gerufen hat, waehrend ich beschaeftigt war -- und
+    /// wer gerade gearbeitet wurde.
+    ///
+    /// Gilt AUCH mit einem Platz, anders als die Schlange in
+    /// `m_mehrfach`. Betreiber am 2026-10-30: „Antworten muessen
+    /// immer automatisch sofort funktionieren, ohne meine Beihilfe."
+    Ft8Warteschlange m_schlange;
+    /// Den naechsten Wartenden anrufen. Gibt true, wenn einer da war.
+    bool rufeNaechstenWartenden();
+    /// Einen gehoerten Anruf in die Schlange legen, wenn er gerade
+    /// nicht bedient werden kann.
+    void merkeAnrufFallsNoetig(const QString& nachricht, int snr);
 
     Ft8Mehrfach  m_mehrfach;
     QSpinBox*    m_plaetzeSpin{nullptr};

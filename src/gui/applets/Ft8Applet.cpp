@@ -1002,6 +1002,65 @@ void Ft8Applet::fensterZuEnde()
 // hat eine davon `setzeCqWiederholungen` vergessen -- und der Ruf
 // brach nach fuenf statt nach den eingestellten sechzehn ab
 // (2026-10-29).
+// ── Wer gerufen hat, kommt dran ──────────────────────────────────────
+//
+// Beide Haelften der Warteschlange haengen hier. Sie gelten AUCH mit
+// einem Platz -- `Ft8Mehrfach` hat eine eigene Schlange, aber die
+// laeuft nur, wenn `mehrfachAn()` an ist.
+
+void Ft8Applet::merkeAnrufFallsNoetig(const QString& nachricht, int snr)
+{
+    const QString meiner = eigenesRufzeichen();
+    if (meiner.isEmpty()) { return; }
+
+    const QStringList f = nachricht.toUpper()
+                              .split(QLatin1Char(' '), Qt::SkipEmptyParts);
+    // An mich gerichtet heisst: mein Rufzeichen steht VORNE. Steht es
+    // weiter hinten, bin ich darin nur erwaehnt (etwa im Schluss eines
+    // Fox: „K1ABC RR73; W9XYZ <KH1DX> -17").
+    if (f.size() < 2 || f.first() != meiner) { return; }
+
+    const QString anrufer = f.at(1);
+    if (anrufer.isEmpty() || anrufer == meiner) { return; }
+
+    // Ein Abschied ist kein Anruf -- dieselbe Regel wie in
+    // `Ft8Ablauf::verarbeite`, und darum auch dieselbe Funktion.
+    if (f.size() >= 3 && Ft8Ablauf::istAbschied(f.at(2))) { return; }
+
+    // Mein aktueller Partner steht nicht in der Schlange: mit ihm
+    // laeuft gerade ein QSO.
+    if (!m_ablauf.partner().isEmpty() && anrufer == m_ablauf.partner()) {
+        return;
+    }
+    if (mehrfachAn() && m_mehrfach.kennt(anrufer)) { return; }
+
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    if (m_schlange.merkeAnruf(anrufer, snr,
+                              locatorAusNachricht(nachricht), jetzt)) {
+        qCInfo(lcFt8Senden).noquote()
+            << "Anruf gemerkt:" << anrufer << "— wartet als Nummer"
+            << m_schlange.wartende(jetzt);
+    }
+}
+
+bool Ft8Applet::rufeNaechstenWartenden()
+{
+    if (m_sendet) { return false; }
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    const Ft8Warteschlange::Wartend w = m_schlange.nimmNaechsten(jetzt);
+    if (w.partner.isEmpty()) { return false; }
+
+    m_qsoGemeldet = false;
+    // Er hat MICH gerufen, also beginnt es mit dem Rapport.
+    m_ablauf.starteMitAnrufer(w.partner, eigenesRufzeichen(),
+                              eigenerLocator(), w.snr, w.locator);
+    qCInfo(lcFt8Senden).noquote()
+        << "Aus der Schlange:" << w.partner << "— noch"
+        << m_schlange.wartende(jetzt) << "wartend";
+    ablaufSchritt();
+    return true;
+}
+
 void Ft8Applet::starteCqRuf()
 {
     // ── Nicht in ein laufendes QSO hineinrufen (2026-10-30) ─────
@@ -1269,7 +1328,21 @@ void Ft8Applet::zeigeAblauf()
             // Nur wenn der Ruf vom Knopf kam. Ein Doppelklick in die
             // Liste ist eine Einzelentscheidung: danach wird nicht von
             // selbst CQ gerufen.
+            // In die Karenz, damit er nicht gleich noch einmal
+            // gearbeitet wird -- der zweite Riegel neben
+            // `Ft8Ablauf::istAbschied` (2026-10-30, HB9ZHK).
+            m_schlange.merkeGearbeitet(wer, QDateTime::currentMSecsSinceEpoch());
+
             if (m_cqAutomatik && !m_sendet) {
+                // ── Erst die Wartenden, dann wieder CQ ────────
+                //
+                // Wer mich waehrend des QSOs gerufen hat, steht in
+                // der Schlange. Ihn anzurufen ist immer besser als
+                // ein neues CQ: er hat schon gezeigt, dass er mich
+                // hoert, und er wartet. Am 2026-10-30 riefen PD4RJ
+                // und 9A6T zusammen fuenfmal und bekamen nie eine
+                // Antwort, weil es diese Zeilen nicht gab.
+                if (rufeNaechstenWartenden()) { break; }
                 qCInfo(lcFt8Senden).noquote()
                     << "QSO mit" << wer << "fertig — rufe weiter CQ";
                 starteCqRuf();
@@ -2084,6 +2157,10 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
             if (bewegt) { ablaufSchritt(); }
         } else if (m_ablauf.laeuft() && m_ablauf.verarbeite(d.text, snr)) {
             ablaufSchritt();
+        } else {
+            // Er ruft mich, aber gerade geht es nicht: ein QSO laeuft,
+            // oder der Ablauf ruht. Dann merken statt fallen lassen.
+            merkeAnrufFallsNoetig(d.text, snr);
         }
 
         const QString ruf = senderCallsign(d.text);
