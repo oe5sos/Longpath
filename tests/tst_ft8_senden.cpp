@@ -34,6 +34,7 @@
 #include "core/Ft8Ablauf.h"
 #include "models/LogEntry.h"
 #include "core/AppSettings.h"
+#include <QMenu>
 #include <QPushButton>
 #include <QLineEdit>
 #include <QPlainTextEdit>
@@ -586,27 +587,37 @@ private slots:
         AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
                                          QStringLiteral("JN67VV"));
 
-        QVERIFY(applet.listRxForTest());
-        QVERIFY(applet.listRxForTest()->toPlainText().isEmpty());
+        QVERIFY(applet.listForTest());
+        QVERIFY(applet.listForTest()->toPlainText().isEmpty());
 
         applet.zeigeEigeneSendung(QStringLiteral("DL1ABC OE5SOS JN67"));
 
-        const QString rechts = applet.listRxForTest()->toPlainText();
-        QVERIFY2(rechts.contains(QStringLiteral("DL1ABC OE5SOS JN67")),
-                 "die eigene Sendung muss rechts stehen");
-        QVERIFY2(rechts.contains(QStringLiteral("Tx")),
+        // ── Die eigene Sendung steht in JEDER Sicht (2026-10-30) ──
+        //
+        // Bis dahin stand sie in der rechten Spalte und links NICHT:
+        // „dort steht, was auf dem Band los ist, und das eigene Signal
+        // gehoert nicht dazu." Mit einer Liste ist das anders herum
+        // richtig: die eigene Sendung IST der Zusammenhang, in dem die
+        // Antwort gelesen wird. Wer sie ausblendet, sieht ein QSO als
+        // Folge fremder Saetze.
+        const QString liste = applet.listForTest()->toPlainText();
+        QVERIFY2(liste.contains(QStringLiteral("DL1ABC OE5SOS JN67")),
+                 "die eigene Sendung muss in der Liste stehen");
+        QVERIFY2(liste.contains(QStringLiteral("Tx")),
                  "sie muss als eigene Sendung erkennbar sein");
 
-        // Und links NICHT: dort steht, was auf dem Band los ist, und
-        // das eigene Signal gehoert nicht dazu.
-        QVERIFY2(!applet.listForTest()->toPlainText()
-                      .contains(QStringLiteral("DL1ABC OE5SOS JN67")),
-                 "die eigene Sendung gehoert nicht in die Bandspalte");
+        // Auch in einer eingeschraenkten Sicht — sie kommt durch jede.
+        applet.sichtAnMichButtonForTest()->click();
+        QVERIFY2(applet.listForTest()->toPlainText()
+                     .contains(QStringLiteral("DL1ABC OE5SOS JN67")),
+                 "die eigene Sendung darf von keiner Sicht wegfallen");
+        applet.sichtAllesButtonForTest()->click();
 
         // Leeres bleibt leer -- sonst stuende nach jedem Fehlversuch
         // eine Zeile mit nichts drin.
+        const QString vorher = applet.listForTest()->toPlainText();
         applet.zeigeEigeneSendung(QStringLiteral("   "));
-        QCOMPARE(applet.listRxForTest()->toPlainText(), rechts);
+        QCOMPARE(applet.listForTest()->toPlainText(), vorher);
     }
 
     // ── Und der Sendeweg ruft sie wirklich ──────────────────────────
@@ -636,7 +647,7 @@ private slots:
         t->start(0);
 
         QTRY_VERIFY_WITH_TIMEOUT(
-            applet.listRxForTest()->toPlainText()
+            applet.listForTest()->toPlainText()
                 .contains(QStringLiteral("CQ OE5SOS JN67")), 3000);
 
         applet.abbrechen();
@@ -763,25 +774,45 @@ private slots:
                  "nach Stop darf der Knopf nicht weiterleuchten");
     }
 
-    // Augenblickstasten rasten nicht ein: Tx1-Tx6 legen einen Satz ins
-    // Feld und sind fertig. Bliebe einer blau stehen, zeigte er einen
-    // Zustand, den es nicht gibt.
-    void dieTxKnoepfeRastenNichtEin()
+    // Tx1-Tx6 sitzen seit dem 2026-10-30 hinter „Manual" (Entwurf C):
+    // sechs gleich aussehende Knoepfe in einer Reihe sind Handbetrieb,
+    // und Handbetrieb ist beim automatischen Durchlauf die Ausnahme.
+    //
+    // Was dabei gleich bleiben MUSS: sie legen einen Satz ins Feld und
+    // sind fertig. Ein Menueeintrag kann gar nicht einrasten -- aber
+    // die sechs muessen vollzaehlig da sein, sonst waeren sie beim
+    // Umbau still verschwunden.
+    void dieSechsStandardsaetzeStehenUnterManual()
     {
         RadioModel radio;
         radio.installFt8TxForTest();
         Ft8Applet applet(&radio);
-        const QList<QPushButton*> knoepfe =
-            applet.findChildren<QPushButton*>();
+
+        QPushButton* hand = nullptr;
+        for (QPushButton* b : applet.findChildren<QPushButton*>()) {
+            if (b->text() == QStringLiteral("Manual")) { hand = b; break; }
+        }
+        QVERIFY2(hand, "der Knopf „Manual\" fehlt");
+        QVERIFY2(!hand->isCheckable(), "Manual rastet ein");
+        QVERIFY2(hand->menu(), "Manual hat kein Menue");
+
         int geprueft = 0;
-        for (QPushButton* b : knoepfe) {
-            if (!b->text().startsWith(QStringLiteral("Tx"))) { continue; }
-            QVERIFY2(!b->isCheckable(),
-                     qPrintable(QStringLiteral("%1 rastet ein")
-                                    .arg(b->text())));
+        for (QAction* a : hand->menu()->actions()) {
+            if (!a->text().startsWith(QStringLiteral("Tx"))) { continue; }
+            QVERIFY2(!a->isCheckable(),
+                     qPrintable(QStringLiteral("%1 rastet ein").arg(a->text())));
             ++geprueft;
         }
         QCOMPARE(geprueft, 6);
+
+        // Und in der Reihe steht keiner mehr -- sonst gaebe es sie
+        // zweimal, und die zweite waere die, die niemand pflegt.
+        for (QPushButton* b : applet.findChildren<QPushButton*>()) {
+            QVERIFY2(!b->text().startsWith(QStringLiteral("Tx"))
+                         || b->text() == QStringLiteral("TX Hz"),
+                     qPrintable(QStringLiteral("%1 steht noch als Knopf da")
+                                    .arg(b->text())));
+        }
     }
 
     void derStopKnopfHaeltDenAblaufAn()

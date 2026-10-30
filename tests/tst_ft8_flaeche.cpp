@@ -610,12 +610,54 @@ private slots:
         if (grabDir.isEmpty()) { QSKIP("LONGPATH_GRAB_DIR nicht gesetzt"); }
         RadioModel radio;
         Ft8Applet applet(&radio);
-        applet.resize(320, 260);
-        QMetaObject::invokeMethod(
-            &applet, "onDecoded", Qt::DirectConnection,
-            Q_ARG(QVector<Longpath::Ft8Decode>,
-                  einFund(QStringLiteral("CQ OE5SOS JN78"))),
-            Q_ARG(QDateTime, QDateTime::currentDateTimeUtc()));
+        // Groesze aus der Umgebung, damit dasselbe Werkzeug fuer
+        // Gestaltungsblaetter taugt: dort zaehlt die WIRKLICHE Groesze
+        // des Panels, nicht ein Briefmarkenabzug.
+        const int breite = qEnvironmentVariableIntValue("LONGPATH_GRAB_W");
+        const int hoehe  = qEnvironmentVariableIntValue("LONGPATH_GRAB_H");
+        applet.resize(breite > 0 ? breite : 320, hoehe > 0 ? hoehe : 260);
+
+        // Mehrere Funde, damit die Liste aussieht wie im Betrieb --
+        // eine Zeile zeigt nicht, wo die Spalten klemmen. Die drei
+        // Sorten, die das Applet unterschiedlich faerbt, sind dabei:
+        // an mich gerichtet, ein CQ, und ein fremdes QSO.
+        const char* zeilen[] = {
+            "CQ OE5SOS JN78",
+            "CQ DL1ABC JO31",
+            "OE5SOS DL1ABC -07",
+            "JA1XYZ W1AW RR73",
+            "CQ DX IK6CGO JN63",
+            "OE5SOS PD8O R-15",
+            "CQ RA3TKS KO85",
+            "F6HUK EA3IZF 73",
+        };
+        int i = 0;
+        for (const char* z : zeilen) {
+            QVector<Longpath::Ft8Decode> f =
+                einFund(QString::fromLatin1(z));
+            if (!f.isEmpty()) {
+                f[0].snrDb  = -3.0 - double(i) * 2.5;
+                f[0].freqHz = 500.0 + double(i) * 237.0;
+                f[0].dtSeconds = 0.1 + double(i % 3) * 0.2;
+            }
+            QMetaObject::invokeMethod(
+                &applet, "onDecoded", Qt::DirectConnection,
+                Q_ARG(QVector<Longpath::Ft8Decode>, f),
+                Q_ARG(QDateTime, QDateTime::currentDateTimeUtc()));
+            ++i;
+        }
+        // Mit LONGPATH_GRAB_QSO=1 laeuft ein QSO: die Arbeitsleiste
+        // zeigt erst dann, wofuer sie da ist. Ein Blatt im Leerlauf
+        // beurteilt die leere Haelfte.
+        if (qEnvironmentVariableIntValue("LONGPATH_GRAB_QSO") != 0) {
+            applet.ablaufForTestSchreibend().starteAlsAntworter(
+                QStringLiteral("PD8O"), QStringLiteral("OE5SOS"),
+                QStringLiteral("JN67"), -15,
+                QStringLiteral("JO22"));
+            applet.ablaufForTestSchreibend().verarbeite(
+                QStringLiteral("OE5SOS PD8O R-15"), -15);
+            applet.zeigeAblaufForTest();
+        }
         const QPixmap pm = applet.grab();
         QVERIFY(!pm.isNull());
         QVERIFY(pm.save(grabDir + QStringLiteral("/longpath-grab-Ft8Applet.png")));

@@ -14,6 +14,7 @@
 #include "core/AudioEngine.h"
 #include "core/Ft8Stream.h"
 #include "core/Ft8Tx.h"
+#include "gui/widgets/Ft8Fensterbalken.h"
 #include "models/Band.h"
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -34,8 +35,10 @@
 #include "models/RxDecodeModel.h"
 #include "models/SliceModel.h"
 
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMenu>
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QSplitter>
@@ -270,41 +273,33 @@ void Ft8Applet::buildUI()
     // CQ-Zeilen.
     //
     // Nur die Ansicht wird gefiltert. Der Ablauf bekommt weiter jeden
-    // Fund (siehe m_nurCq in Ft8Applet.h): sonst verschwaende ein
+    // Fund (siehe `inSicht`): sonst verschwaende ein
     // laufendes QSO, sobald der Haken sitzt.
-    m_nurCqBtn = blueToggle(tr("CQ only"), 64);
-    m_nurCqBtn->setCheckable(true);
-    m_nurCqBtn->setToolTip(tr("Show only CQ calls. The QSO still runs "
-                              "on every decode."));
-    connect(m_nurCqBtn, &QPushButton::clicked, this, [this](bool an) {
-        m_nurCq = an;
-    });
-    head->addWidget(m_nurCqBtn);
+    // ── Die zwei Haken sind Pillen geworden (2026-10-30) ──────
+    //
+    // „CQ only" und „New DXCC only" standen hier als zwei Haken in der
+    // Kopfzeile, waehrend unten vier Pillen dasselbe taten. Zwei
+    // Filtersysteme nebeneinander sind eines zu viel: zwei Haken
+    // gleichzeitig ergaben die Schnittmenge, ohne dass das irgendwo
+    // stand, und die Kopfzeile wurde so breit, dass das Panel sich bei
+    // 460 Punkten nicht mehr zeichnen liesz (im gerenderten Blatt
+    // gemessen: 706 statt 460).
+    //
+    // Beides steckt jetzt in den Pillen unter dem Kopf. Die Zugaenge
+    // `nurCqButtonForTest` / `nurNeueLaenderButtonForTest` zeigen
+    // dorthin — derselbe Zweck, dieselbe Pruefung.
 
-    // ── „New DXCC only" (2026-10-27) ────────────────────────────────
-    //
-    // Das letzte Stueck aus dem Vergleich vom 2026-10-21, das JTDX hat
-    // und wir nicht. Der Auflaeser dafuer liegt laengst im Modell --
-    // er faerbt die neuen Laender in diesem Fenster schon ein. Hier
-    // wird er nur zum zweiten Mal gefragt, statt eine eigene Liste zu
-    // fuehren.
-    //
-    // Der Landesname kommt aus cty.dat und steht ohnehin schon in der
-    // Zeile. Ob ein Land NEU ist, weiss aber erst der Abgleich mit dem
-    // Logbuch (DxccWorkedStatus); fehlt es, meldet der Aufloeser gar
-    // nichts und der Filter zeigt nur noch Rufe an die eigene Station.
-    // Das sieht aus wie ein Fehler und ist keiner -- darum steht es im
-    // Hinweis am Knopf. Am 2026-10-27 im Prueflauf genau so gesehen.
-    m_nurNeueLaenderBtn = blueToggle(tr("New DXCC"), 78);
-    m_nurNeueLaenderBtn->setCheckable(true);
-    m_nurNeueLaenderBtn->setToolTip(
-        tr("Show only countries not yet in the log. Needs an ADIF log — "
-           "without one nothing counts as new and only calls to your own "
-           "station remain. Those always get through."));
-    connect(m_nurNeueLaenderBtn, &QPushButton::clicked, this, [this](bool an) {
-        m_nurNeueLaender = an;
+    m_wasserfallBtn = blueToggle(tr("Waterfall"), 72);
+    m_wasserfallBtn->setToolTip(tr("Show the waterfall above the list."));
+    connect(m_wasserfallBtn, &QPushButton::clicked, this, [this](bool an) {
+        m_wasserfallAn = an;
+        if (m_wasserfall) { m_wasserfall->setVisible(an); }
+        AppSettings::instance().setValue(
+            QStringLiteral("Ft8/Wasserfall"),
+            an ? QStringLiteral("True") : QStringLiteral("False"));
     });
-    head->addWidget(m_nurNeueLaenderBtn);
+    head->addWidget(m_wasserfallBtn);
+    // Der Knopf zeigt, was gilt — die Wahl steht in AppSettings.
 
     head->addSpacing(8);
 
@@ -402,6 +397,19 @@ void Ft8Applet::buildUI()
             });
     root->addWidget(m_wasserfall);
 
+    // ── Der Wasserfall ist abschaltbar (Entwurf C, 2026-10-30) ───
+    //
+    // Er nahm ein Viertel der Hoehe und stand im gerenderten Blatt
+    // leer da — er lebt erst, wenn Ton hereinkommt. Wer ihn braucht,
+    // schaltet ihn ein; wer die Liste braucht, bekommt den Platz.
+    // Die Wahl bleibt erhalten.
+    m_wasserfallAn = AppSettings::instance()
+                         .value(QStringLiteral("Ft8/Wasserfall"),
+                                QStringLiteral("True")).toString()
+                     == QStringLiteral("True");
+    m_wasserfall->setVisible(m_wasserfallAn);
+    if (m_wasserfallBtn) { m_wasserfallBtn->setChecked(m_wasserfallAn); }
+
     m_fill = new QProgressBar(this);
     m_fill->setRange(0, 100);
     m_fill->setValue(0);
@@ -434,39 +442,57 @@ void Ft8Applet::buildUI()
     // nur, was auf der eigenen Stelle liegt oder an mich geht. In
     // einem vollen Band ist die linke Liste nach zwei Durchgaengen
     // voll -- die eine Zeile, auf die es ankommt, scrollt weg.
-    m_listRx = new QPlainTextEdit(this);
-    m_listRx->setReadOnly(true);
-    m_listRx->viewport()->installEventFilter(this);
-    m_listRx->setToolTip(tr("Decodes on your own frequency, and anything "
-                            "addressed to you. Double-click to answer."));
-    m_listRx->setFont(Style::monoFont(font(), Style::kFontSmall));
-    m_listRx->setMinimumHeight(120);
-    m_listRx->setLineWrapMode(QPlainTextEdit::NoWrap);
-    m_listRx->setStyleSheet(m_list->styleSheet());
 
-    // Die Ueberschriften stehen ueber den Listen, nicht in ihnen: eine
-    // Kopfzeile IN einer Textflaeche scrollt mit weg.
-    const auto spalte = [this](QPlainTextEdit* liste, const QString& titel) {
-        auto* huelle = new QWidget(this);
-        auto* v = new QVBoxLayout(huelle);
-        v->setContentsMargins(0, 0, 0, 0);
-        v->setSpacing(2);
-        auto* kopf = new QLabel(titel, huelle);
-        kopf->setFont(Style::monoFont(font(), Style::kFontMicro));
-        kopf->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
-                                .arg(Style::kTextInactive));
-        v->addWidget(kopf);
-        v->addWidget(liste, 1);
-        return huelle;
+    // ── Eine Liste statt zweier (Entwurf C, 2026-10-30) ───────
+    //
+    // Bis dahin standen „Band Activity" und „Rx Frequency"
+    // nebeneinander, wie in WSJT-X. Im Panel sind das zwei Spalten zu
+    // je 214 Punkten, und dort passt die Zeile nicht hinein: im
+    // gerenderten Blatt vom 2026-10-30 stand „Austr…" und „Fed." statt
+    // des Landes, und rechts fehlte das Ende der Nachricht. Dazu zeigte
+    // die rechte Spalte meistens dieselben Zeilen noch einmal.
+    //
+    // Jetzt eine Liste ueber die ganze Breite, und welche Zeilen zu
+    // sehen sind, sagen vier Pillen. „Meine Frequenz" ist die alte
+    // rechte Spalte — dieselbe Regel (eigene Tonlage ± 50 Hz, oder an
+    // mich gerichtet), nur als Sicht statt als zweites Fenster.
+    //
+    // Betreiber am 2026-10-30, nach drei Entwurfsblaettern: „c bitte".
+    auto* sichtReihe = new QHBoxLayout();
+    sichtReihe->setSpacing(3);
+    const auto sichtKnopf = [this, sichtReihe](const QString& text,
+                                               Sicht welche, int breite) {
+        QPushButton* b = blueToggle(text, breite);
+        b->setCheckable(true);
+        connect(b, &QPushButton::clicked, this, [this, welche]() {
+            m_sicht = welche;
+            zeichneListe();
+        });
+        sichtReihe->addWidget(b);
+        return b;
     };
+    m_sichtAlles  = sichtKnopf(tr("All"),       Sicht::Alles, 46);
+    m_sichtAnMich = sichtKnopf(tr("To me"),     Sicht::AnMich, 54);
+    m_sichtCq     = sichtKnopf(tr("CQ"),        Sicht::Cq, 38);
+    m_sichtNeuesLand = sichtKnopf(tr("New DXCC"), Sicht::NeuesLand, 72);
+    m_sichtFreq   = sichtKnopf(tr("My freq"),   Sicht::MeineFrequenz, 62);
+    m_sichtAlles->setChecked(true);
+    m_sichtAnMich->setToolTip(tr("Only messages addressed to you."));
+    m_sichtCq->setToolTip(tr("Only CQ calls."));
+    m_sichtNeuesLand->setToolTip(tr("Only countries that are not in the "
+                                    "log yet."));
+    m_sichtFreq->setToolTip(tr("Decodes within 50 Hz of your transmit "
+                               "tone, plus anything addressed to you — "
+                               "what the second column used to show."));
+    sichtReihe->addStretch(1);
+    m_fundZahl = new QLabel(QString(), this);
+    m_fundZahl->setFont(Style::monoFont(font(), Style::kFontMicro));
+    m_fundZahl->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                                  .arg(Style::kTextInactive));
+    sichtReihe->addWidget(m_fundZahl);
+    root->addLayout(sichtReihe);
 
-    m_listenTeiler = new QSplitter(Qt::Horizontal, this);
-    m_listenTeiler->addWidget(spalte(m_list,   tr("Band Activity")));
-    m_listenTeiler->addWidget(spalte(m_listRx, tr("Rx Frequency")));
-    m_listenTeiler->setStretchFactor(0, 3);
-    m_listenTeiler->setStretchFactor(1, 2);
-    m_listenTeiler->setChildrenCollapsible(false);
-    root->addWidget(m_listenTeiler, 1);
+    root->addWidget(m_list, 1);
 
     // ── Fusszeile ───────────────────────────────────────────────────
     // ── Senden ──────────────────────────────────────────────────────
@@ -482,6 +508,7 @@ void Ft8Applet::buildUI()
         " padding: 2px 4px; }")
         .arg(Style::kInsetBg, Style::kTextPrimary, Style::kInsetBorder));
     sendRow->addWidget(m_textFeld, 1);
+    // (der „Manual"-Knopf kommt weiter unten dazu)
 
     // ── CQ rufen ────────────────────────────────────────────────────
     //
@@ -491,21 +518,91 @@ void Ft8Applet::buildUI()
     // gar nicht. Dieser Knopf schliesst das, mit demselben Verhalten
     // wie der Doppelklick: er faengt den Ablauf an und laesst ihn
     // bis 73 laufen.
-    // ── Tx1..Tx6 ────────────────────────────────────────────────────
+    // ── Die Arbeitsleiste (Entwurf C, 2026-10-30) ────────────
     //
-    // Eine Reihe ueber dem Textfeld. Jeder Knopf LEGT den Satz nur ins
-    // Feld -- gesendet wird weiterhin erst mit „Send".
-    auto* txReihe = new QHBoxLayout();
-    txReihe->setSpacing(3);
+    // Was beim automatischen Durchlauf zaehlt, steht unten, wo die
+    // Hand ist: mit wem, welcher Zug, was danach kommt, wie weit das
+    // Fenster. Vorher stand davon nichts im Panel — der Zustand war
+    // nur aus der Statuszeile zu erraten, und der Fensterfortschritt
+    // stand grau im Panelkopf, an der unauffaelligsten Stelle fuer das
+    // einzige Ding, das sich dauernd bewegt.
+    m_arbeit = new QWidget(this);
+    // Ein Messingstrich links: dieselbe Rolle wie der Panelakzent im
+    // Kopf — hier faengt etwas an, das gemessen wird.
+    m_arbeit->setStyleSheet(QStringLiteral(
+        "QWidget { background: %1; border: 1px solid %2;"
+        " border-left: 3px solid %3; border-radius: 3px; }")
+        .arg(Style::kPanelBg, Style::kBorder, Style::kTxKeyBottom));
+    auto* arbeit = new QGridLayout(m_arbeit);
+    arbeit->setContentsMargins(10, 6, 10, 7);
+    arbeit->setHorizontalSpacing(8);
+    arbeit->setVerticalSpacing(4);
+
+    const auto schild = [this](const QString& t, const char* farbe,
+                               int groesse, bool fett = false) {
+        auto* l = new QLabel(t, m_arbeit);
+        QFont f = font();
+        f.setPointSize(groesse);
+        f.setBold(fett);
+        l->setFont(f);
+        l->setStyleSheet(QStringLiteral("QLabel { color: %1; border: none; }")
+                             .arg(QString::fromLatin1(farbe)));
+        return l;
+    };
+
+    auto* kopfReihe = new QHBoxLayout();
+    kopfReihe->setSpacing(7);
+    m_arbeitZustand = schild(tr("idle"), Style::kTextSecondary,
+                             Style::kFontSmall);
+    m_arbeitPartner = schild(QString(), Style::kTextPrimary,
+                             Style::kFontSub, true);
+    m_arbeitLand    = schild(QString(), Style::kTextInactive,
+                             Style::kFontSmall);
+    kopfReihe->addWidget(m_arbeitZustand);
+    kopfReihe->addWidget(m_arbeitPartner);
+    kopfReihe->addWidget(m_arbeitLand);
+    kopfReihe->addStretch(1);
+    m_arbeitUhr = schild(QString(), Style::kTextInactive, Style::kFontSmall);
+    m_arbeitUhr->setFont(Style::monoFont(font(), Style::kFontSmall));
+    kopfReihe->addWidget(m_arbeitUhr);
+    arbeit->addLayout(kopfReihe, 0, 0, 1, 2);
+
+    // Der naechste Zug im Klartext — dieselbe Schrift wie die Funde,
+    // damit man ihn als FT8-Satz liest und nicht als Beschriftung.
+    m_arbeitZug = new QLabel(QString(), m_arbeit);
+    m_arbeitZug->setFont(Style::monoFont(font(), Style::kFontSmall));
+    m_arbeitZug->setStyleSheet(QStringLiteral(
+        "QLabel { background: %1; color: %2; border: 1px solid %3;"
+        " padding: 3px 6px; border-radius: 2px; }")
+        .arg(Style::kInsetBg, Style::kTxKeyBorder, Style::kInsetBorder));
+    arbeit->addWidget(m_arbeitZug, 1, 0);
+
+    m_arbeitDanach = schild(QString(), Style::kTextSecondary,
+                            Style::kFontCaption);
+    m_arbeitDanach->setMinimumWidth(118);
+    m_arbeitDanach->setWordWrap(true);
+    arbeit->addWidget(m_arbeitDanach, 1, 1, 2, 1, Qt::AlignTop);
+
+    m_arbeitBalken = new Ft8Fensterbalken(m_arbeit);
+    m_arbeitBalken->setFixedHeight(10);
+    arbeit->addWidget(m_arbeitBalken, 2, 0);
+    arbeit->setColumnStretch(0, 1);
+
+    root->addWidget(m_arbeit);
+
+    // ── Tx1..Tx6 hinter einem Knopf ─────────────────────
+    //
+    // Sechs gleich aussehende Knoepfe in einer Reihe sind Handbetrieb,
+    // und Handbetrieb ist beim automatischen Durchlauf die Ausnahme.
+    // Sie legen den Satz weiterhin nur ins Feld — gesendet wird mit
+    // „Send".
+    m_handBtn = styledButton(tr("Manual"), 86);
+    m_handBtn->setCheckable(false);
+    m_handBtn->setToolTip(tr("The six standard messages Tx1…Tx6."));
+    auto* handMenu = new QMenu(m_handBtn);
     for (int n = 1; n <= 6; ++n) {
-        QPushButton* b = styledButton(QStringLiteral("Tx%1").arg(n), 34);
-        // Ein Augenblicksknopf, kein Schalter: er legt einen Satz ins
-        // Feld und ist damit fertig. `styledButton` macht jeden Knopf
-        // einrastbar — hier blieb er danach blau stehen und sah aus
-        // wie ein Zustand, den es nicht gibt.
-        b->setCheckable(false);
-        b->setToolTip(tr("Put standard message Tx%1 in the box.").arg(n));
-        connect(b, &QPushButton::clicked, this, [this, n]() {
+        QAction* a = handMenu->addAction(QStringLiteral("Tx%1").arg(n));
+        connect(a, &QAction::triggered, this, [this, n]() {
             const QString gegen = aktuellerPartner();
             const QString was = txKnopfNachricht(
                 n, gegen, eigenesRufzeichen(), eigenerLocator(),
@@ -519,10 +616,10 @@ void Ft8Applet::buildUI()
             }
             if (m_textFeld) { m_textFeld->setText(was); }
         });
-        txReihe->addWidget(b);
+        m_txAktionen[n - 1] = a;
     }
-    txReihe->addStretch(1);
-    root->addLayout(txReihe);
+    m_handBtn->setMenu(handMenu);
+    sendRow->insertWidget(0, m_handBtn);
 
     // `blueToggle` statt `styledButton`: nur der erste haengt die
     // Blaufuellung des eingerasteten Knopfes an (Style::blueCheckedStyle).
@@ -620,9 +717,10 @@ void Ft8Applet::buildUI()
     m_clearBtn = styledButton(tr("Clear"), 60);
     m_clearBtn->setCheckable(false);   // leert die Liste, rastet nicht ein
     connect(m_clearBtn, &QPushButton::clicked, this, [this]() {
-        m_list->clear();
-        if (m_listRx) { m_listRx->clear(); }
-        m_lineCount = 0;
+        // Auch den Speicher: sonst kaeme beim naechsten Pillendruck
+        // alles zurueck, was gerade geloescht wurde.
+        m_zeilen.clear();
+        zeichneListe();
     });
     foot->addWidget(m_clearBtn);
     root->addLayout(foot);
@@ -817,6 +915,7 @@ void Ft8Applet::meldeFertigesQso()
 void Ft8Applet::zeigeAblauf()
 {
     zeigeKnopfzustand();
+    zeigeArbeit();
     if (!m_status) { return; }
     switch (m_ablauf.zustand()) {
         case Ft8Ablauf::Zustand::Fertig: {
@@ -1402,16 +1501,106 @@ void Ft8Applet::updateStatus()
             : 0);
     }
 
-    // Kurz halten: die Applet-Spalte ist schmal, und eine abgeschnittene
-    // Zeile ist schlimmer als eine knappe (im ersten Bild vom 15.10.
-    // stand „letztes Fenster: 1" halb ausserhalb).
-    m_status->setText(QStringLiteral("%1 / %2 s")
-                          .arg(sekunden, 0, 'f', 1)
-                          .arg(voll, 0, 'f', 1));
+    // ── Die Uhr steht unten, nicht oben (2026-10-30) ────────
+    //
+    // Hier stand jede Sekunde „0.0 / 15.0 s" — und ueberschrieb
+    // damit jede Meldung, die der Ablauf gerade hinterlassen hatte.
+    // Seit Entwurf C traegt die Arbeitsleiste die Uhr; oben bleibt
+    // stehen, WAS gerade los ist. Ohne laufenden Ablauf (und damit
+    // ohne Arbeitsleiste) bleibt es bei der Uhr: eine leere Zeile
+    // waere schlechter als eine, die wenigstens den Takt zeigt.
+    if (!m_ablauf.laeuft() && !m_sendet) {
+        m_status->setText(QStringLiteral("%1 / %2 s")
+                              .arg(sekunden, 0, 'f', 1)
+                              .arg(voll, 0, 'f', 1));
+    }
     if (m_lastLabel) {
         m_lastLabel->setText(m_lastPeriodCount < 0
             ? tr("last period: —")
             : tr("last period: %1").arg(m_lastPeriodCount));
+    }
+
+    // Die Arbeitsleiste laeuft mit derselben Uhr: sie zeigt denselben
+    // Stand, nur dort, wo man hinsieht.
+    if (m_arbeitBalken) {
+        m_arbeitBalken->setzeStand(voll > 0.0 ? sekunden / voll : 0.0,
+                                   m_sendet);
+    }
+    if (m_arbeitUhr) {
+        m_arbeitUhr->setText(QStringLiteral("%1 / %2 s")
+                                 .arg(sekunden, 0, 'f', 1)
+                                 .arg(voll, 0, 'f', 1));
+    }
+}
+
+// ── Die Arbeitsleiste nachziehen ─────────────────────────────────────
+//
+// Sie sagt dasselbe wie die Statuszeile, aber als Satz, den man im
+// Vorbeigehen liest: mit wem, welcher Zug, was danach kommt. Gerufen
+// aus `zeigeAblauf()` -- also bei jedem Zustandswechsel des Ablaufs.
+void Ft8Applet::zeigeArbeit()
+{
+    if (!m_arbeit) { return; }
+
+    using Z = Ft8Ablauf::Zustand;
+    const Z z        = m_ablauf.zustand();
+    const QString wer = m_ablauf.partner();
+    const bool laeuft = m_ablauf.laeuft();
+
+    QString zustand;
+    QString danach;
+    switch (z) {
+    case Z::Ruht:
+        zustand = tr("idle");
+        danach  = tr("press CQ, or double-click a line");
+        break;
+    case Z::RufeCq:
+        zustand = m_cqVersucheOffen > 0
+                      ? tr("calling CQ · %1 left").arg(m_cqVersucheOffen)
+                      : tr("calling CQ");
+        danach  = tr("waiting for an answer");
+        break;
+    case Z::RufeAn:
+        zustand = tr("calling");
+        danach  = tr("waiting for his report");
+        break;
+    case Z::SendeReport:
+        zustand = tr("QSO with");
+        danach  = tr("then his confirmation");
+        break;
+    case Z::SendeRReport:
+        zustand = tr("QSO with");
+        danach  = tr("then his RR73");
+        break;
+    case Z::SendeRR73:
+    case Z::Sende73:
+        zustand = tr("QSO with");
+        danach  = m_cqAutomatik ? tr("then the log, then CQ again")
+                                : tr("then into the log");
+        break;
+    case Z::Fertig:
+        zustand = tr("complete");
+        danach  = m_cqAutomatik ? tr("logged · calling CQ again")
+                                : tr("logged");
+        break;
+    case Z::Abgebrochen:
+        zustand = wer.isEmpty() ? tr("stopped") : tr("gave up");
+        danach  = QString();
+        break;
+    }
+
+    if (m_arbeitZustand) { m_arbeitZustand->setText(zustand); }
+    if (m_arbeitPartner) { m_arbeitPartner->setText(wer); }
+    if (m_arbeitLand) {
+        m_arbeitLand->setText(wer.isEmpty() ? QString() : landFuer(wer));
+    }
+    if (m_arbeitDanach) { m_arbeitDanach->setText(danach); }
+    if (m_arbeitZug) {
+        // Was wirklich hinausgeht: bei laufender Sendung steht es
+        // schon im Feld, sonst fragt der Ablauf.
+        const QString zug = laeuft ? m_ablauf.naechsteNachricht()
+                                   : QString();
+        m_arbeitZug->setText(zug.isEmpty() ? tr("—") : zug);
     }
 }
 
@@ -1633,51 +1822,170 @@ QString Ft8Applet::landFuer(const QString& rufzeichen) const
 // Rot: „kein kraeftiges Rot als Zustandsfarbe" gilt hier wie dort.
 void Ft8Applet::zeigeEigeneSendung(const QString& nachricht)
 {
-    if (m_listRx == nullptr || nachricht.trimmed().isEmpty()) { return; }
+    if (nachricht.trimmed().isEmpty()) { return; }
 
-    const QString zeile = QStringLiteral("%1 %2 %3 %4  %5")
-                              .arg(QDateTime::currentDateTimeUtc()
-                                       .toString(QStringLiteral("hhmmss")))
-                              .arg(tr("Tx"), 4)
-                              .arg(QString(), 5)
-                              .arg(m_sendeTonHz, 5)
-                              .arg(nachricht.trimmed());
+    Fundzeile z;
+    z.text = QStringLiteral("%1 %2 %3 %4  %5")
+                 .arg(QDateTime::currentDateTimeUtc()
+                          .toString(QStringLiteral("hhmmss")))
+                 .arg(tr("Tx"), 4)
+                 .arg(QString(), 5)
+                 .arg(m_sendeTonHz, 5)
+                 .arg(nachricht.trimmed());
+    z.nachricht     = nachricht.trimmed();
+    z.tonHz         = m_sendeTonHz;
+    z.eigeneSendung = true;
+    merkeZeile(z);
+}
 
+// ── Eine Zeile merken und, wenn sie in die Sicht gehoert, zeigen ────
+void Ft8Applet::merkeZeile(const Fundzeile& z)
+{
+    m_zeilen.append(z);
+    if (m_zeilen.size() > kMaxZeilen) {
+        m_zeilen.remove(0, m_zeilen.size() - kMaxZeilen);
+        // Beim Abschneiden muss die ganze Liste neu, sonst stuenden
+        // Zeilen darin, die es im Speicher nicht mehr gibt.
+        zeichneListe();
+        return;
+    }
+    if (inSicht(z)) {
+        haengeAn(z);
+        ++m_lineCount;
+        if (m_list) {
+            m_list->moveCursor(QTextCursor::End);
+            m_list->ensureCursorVisible();
+        }
+    }
+    zeigeFundZahl();
+}
+
+bool Ft8Applet::inSicht(const Fundzeile& z) const
+{
+    // Die eigene Sendung steht ueberall: sie IST der Zusammenhang,
+    // in dem die Antwort gelesen wird.
+    if (z.eigeneSendung) { return true; }
+    switch (m_sicht) {
+    case Sicht::Alles:  break;
+    case Sicht::AnMich: return z.anMich;
+    case Sicht::Cq:     return z.istCq || z.anMich;
+    case Sicht::NeuesLand: return z.neuesLand || z.anMich;
+    case Sicht::MeineFrequenz:
+        // Dieselbe Regel wie frueher die rechte Spalte: das Fenster
+        // ist die Signalbreite von FT8/FT4 (50 Hz), kein gegriffener
+        // Wert. Schmaler, und ein Fund am Rand des eigenen Signals
+        // fehlt; breiter, und es fuellt sich mit Nachbarn.
+        return z.anMich || std::abs(z.tonHz - m_sendeTonHz) <= kRxFensterHz;
+    }
+    // „Alles" heiszt alles. Bis zum 2026-10-30 lagen hier noch zwei
+    // Haken aus der Kopfzeile darueber, und zwei Filtersysteme
+    // nebeneinander ergaben Faelle, die niemand im Kopf behaelt.
+    //
+    // Die Regel, die bleibt: eine Zeile, die an MICH geht, kommt
+    // durch jede Sicht. Wer gerufen wird und es nicht sieht, weil ein
+    // Filter sitzt, verliert ein QSO -- das ist kein Filter mehr,
+    // sondern ein Fehler. Darum steht `|| z.anMich` in jedem Fall
+    // oben.
+    return true;
+}
+
+void Ft8Applet::haengeAn(const Fundzeile& z)
+{
+    if (!m_list) { return; }
     QTextCharFormat f;
-    f.setForeground(QColor(QString::fromLatin1(Style::kTxKeyBorder)));
-    f.setFontWeight(QFont::Bold);
-
-    QTextCursor c(m_listRx->document());
+    if (z.eigeneSendung) {
+        // Die Farbe ist das Messing der Sendetaste, nicht Rot: „kein
+        // kraeftiges Rot als Zustandsfarbe" gilt hier wie dort.
+        f.setForeground(QColor(QString::fromLatin1(Style::kTxKeyBorder)));
+        f.setFontWeight(QFont::Bold);
+    } else {
+        const Zeilenart art = zeilenart(z.anMich, z.neuesLand, z.istCq);
+        if (art == Zeilenart::AnMich) {
+            f.setForeground(QColor(QString::fromLatin1(Style::kGreenText)));
+            f.setFontWeight(QFont::Bold);
+        } else if (art == Zeilenart::NeuesLand) {
+            // Fett wie „an mich": ein neues Land uebersieht man sonst
+            // in zwanzig Zeilen je Fenster.
+            f.setForeground(z.landFarbe.isValid()
+                                ? z.landFarbe
+                                : QColor(QString::fromLatin1(
+                                      Style::kAmberText)));
+            f.setFontWeight(QFont::Bold);
+        } else if (art == Zeilenart::Cq) {
+            f.setForeground(QColor(QString::fromLatin1(Style::kAmberText)));
+        } else {
+            f.setForeground(QColor(QString::fromLatin1(Style::kTextPrimary)));
+        }
+    }
+    QTextCursor c(m_list->document());
     c.movePosition(QTextCursor::End);
-    if (!m_listRx->document()->isEmpty()) { c.insertBlock(); }
-    c.insertText(zeile, f);
+    if (!m_list->document()->isEmpty()) { c.insertBlock(); }
+    c.insertText(z.text, f);
+    // Ans Ende der Zeile zu schreiben schiebt die Ansicht mit -- dann
+    // steht die Uhrzeit links ausserhalb des Fensters, und man sieht
+    // die Spalte, die man am wenigsten braucht. Gesehen im
+    // gerenderten Blatt am 2026-10-21.
+}
+
+// Die ganze Liste aus dem Speicher. Laeuft bei jedem Pillendruck --
+// vierhundert Zeilen sind dafuer schnell genug, und alles andere
+// hiesse, zwei Wahrheiten zu fuehren.
+void Ft8Applet::zeichneListe()
+{
+    if (m_sichtAlles)  { m_sichtAlles->setChecked(m_sicht == Sicht::Alles); }
+    if (m_sichtAnMich) { m_sichtAnMich->setChecked(m_sicht == Sicht::AnMich); }
+    if (m_sichtCq)     { m_sichtCq->setChecked(m_sicht == Sicht::Cq); }
+    if (m_sichtNeuesLand) { m_sichtNeuesLand->setChecked(
+                                m_sicht == Sicht::NeuesLand); }
+    if (m_sichtFreq)   { m_sichtFreq->setChecked(m_sicht
+                                                 == Sicht::MeineFrequenz); }
+    if (!m_list) { return; }
+    m_list->clear();
+    m_lineCount = 0;
+    for (const Fundzeile& z : m_zeilen) {
+        if (!inSicht(z)) { continue; }
+        haengeAn(z);
+        ++m_lineCount;
+    }
+    m_list->moveCursor(QTextCursor::End);
+    m_list->ensureCursorVisible();
+    zeigeFundZahl();
+}
+
+void Ft8Applet::zeigeFundZahl()
+{
+    if (!m_fundZahl) { return; }
+    m_fundZahl->setText(m_sicht == Sicht::Alles
+                            ? tr("%1 decodes").arg(m_zeilen.size())
+                            : tr("%1 of %2").arg(m_lineCount)
+                                  .arg(m_zeilen.size()));
 }
 
 void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
                            int tonHz)
 {
-    if (!m_list) { return; }
+    Fundzeile z;
+    z.text      = zeile;
+    z.nachricht = nachricht;
+    z.tonHz     = tonHz;
 
     const QString ruf = eigenesRufzeichen();
     // Wortgrenzen, nicht contains(): „OE5SOS" steckt auch in
     // „OE5SOSX", und das ist eine andere Station.
-    const bool anMich =
+    z.anMich =
         !ruf.isEmpty()
         && nachricht.toUpper().split(QLatin1Char(' '),
                                      Qt::SkipEmptyParts).contains(ruf);
-    const bool istCq = nachricht.trimmed().toUpper().startsWith(
+    z.istCq = nachricht.trimmed().toUpper().startsWith(
         QStringLiteral("CQ"));
 
-    // Ein Land, das noch nie im Logbuch stand? Der Auflaeser steht
+    // Ein Land, das noch nie im Logbuch stand? Der Aufloeser steht
     // schon im Modell -- derselbe, der die Funde im Panadapter
     // einfaerbt. Also DIESELBE Palette, keine zweite erfunden.
     //
-    // Steht seit dem 2026-10-27 VOR den Filtern: „New DXCC only"
-    // braucht die Antwort, um ueberhaupt filtern zu koennen. Vorher
-    // stieg der CQ-Filter davor aus, und das Land war an dieser Stelle
-    // noch unbekannt.
-    bool neuesLand = false;
-    QColor landFarbe;
+    // Steht hier und nicht in `inSicht`: die Abfrage kostet, und mit
+    // dem Zeilenspeicher wuerde sie sonst bei jedem Pillendruck fuer
+    // vierhundert Zeilen neu laufen.
     const QString senderRuf = senderCallsign(nachricht);
     if (m_model && m_model->dxccColorProvider() && !senderRuf.isEmpty()) {
         auto* dxcc = m_model->dxccColorProvider();
@@ -1686,69 +1994,20 @@ void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
             const QString modus = protocol() == Ft8Decoder::Protocol::Ft4
                                       ? QStringLiteral("FT4")
                                       : QStringLiteral("FT8");
-            neuesLand = dxcc->statusForSpot(senderRuf, mhz, modus)
-                        == DxccStatus::NewDxcc;
-            if (neuesLand) {
-                landFarbe = dxcc->colorForSpot(senderRuf, mhz, modus);
+            z.neuesLand = dxcc->statusForSpot(senderRuf, mhz, modus)
+                          == DxccStatus::NewDxcc;
+            if (z.neuesLand) {
+                z.landFarbe = dxcc->colorForSpot(senderRuf, mhz, modus);
             }
         }
     }
 
-    // ── Die Ansichtsfilter (2026-10-27) ──────────────────────────────
-    //
-    // Beide gelten NUR fuer die Ansicht. Der Ablauf bekommt weiter
-    // jeden Fund (siehe m_nurCq in Ft8Applet.h): sonst verschwaende
-    // ein laufendes QSO, sobald ein Haken sitzt.
-    //
-    // Eine Zeile, die an MICH geht, kommt durch jeden Filter. Wer
-    // gerufen wird und es nicht sieht, weil ein Haken sitzt, verliert
-    // ein QSO -- das ist kein Filter mehr, sondern ein Fehler.
-    if (m_nurCq && !istCq && !anMich) { return; }
-    if (m_nurNeueLaender && !neuesLand && !anMich) { return; }
-
-    QTextCharFormat f;
-    const Zeilenart art = zeilenart(anMich, neuesLand, istCq);
-    if (art == Zeilenart::AnMich) {
-        f.setForeground(QColor(QString::fromLatin1(Style::kGreenText)));
-        f.setFontWeight(QFont::Bold);
-    } else if (art == Zeilenart::NeuesLand) {
-        // Fett wie „an mich": ein neues Land uebersieht man sonst in
-        // zwanzig Zeilen je Fenster.
-        f.setForeground(landFarbe.isValid()
-                            ? landFarbe
-                            : QColor(QString::fromLatin1(Style::kAmberText)));
-        f.setFontWeight(QFont::Bold);
-    } else if (art == Zeilenart::Cq) {
-        f.setForeground(QColor(QString::fromLatin1(Style::kAmberText)));
-    } else {
-        f.setForeground(QColor(QString::fromLatin1(Style::kTextPrimary)));
-    }
-
-    const auto anhaengen = [&f, &zeile](QPlainTextEdit* liste) {
-        QTextCursor c(liste->document());
-        c.movePosition(QTextCursor::End);
-        if (!liste->document()->isEmpty()) { c.insertBlock(); }
-        c.insertText(zeile, f);
-        // Ans Ende der Zeile zu schreiben schiebt die Ansicht mit --
-        // dann steht die Uhrzeit links ausserhalb des Fensters, und
-        // man sieht die Spalte, die man am wenigsten braucht. Gesehen
-        // im gerenderten Blatt am 2026-10-21.
-    };
-
-    anhaengen(m_list);
-    ++m_lineCount;
-
-    // Rechte Spalte („Rx Frequency"): was auf der eigenen Stelle liegt
-    // -- oder an mich geht, egal wo. Das Fenster ist die Signalbreite
-    // von FT8/FT4 (50 Hz), nicht ein gegriffener Wert: schmaler, und
-    // ein Fund am Rand des eigenen Signals fehlt; breiter, und die
-    // Spalte fuellt sich mit Nachbarn.
-    if (m_listRx != nullptr) {
-        const int abstand = std::abs(tonHz - m_sendeTonHz);
-        if (anMich || abstand <= kRxFensterHz) {
-            anhaengen(m_listRx);
-        }
-    }
+    // Gemerkt wird JEDE Zeile, gezeigt nur die, die in die Sicht
+    // gehoert. Bis zum 2026-10-30 wurde hier gefiltert und verworfen
+    // -- wer „CQ only" einschaltete, sah das Band unveraendert, bis
+    // die naechste Periode durch war, und beim Ausschalten kam das
+    // Verworfene nie zurueck.
+    merkeZeile(z);
 }
 
 } // namespace Longpath

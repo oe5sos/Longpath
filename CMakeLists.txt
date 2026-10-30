@@ -895,6 +895,9 @@ set(GUI_SOURCES
     src/gui/widgets/CenterMarkSlider.h
     src/gui/widgets/DexpPeakMeter.h
     src/gui/widgets/DexpPeakMeter.cpp
+    # Wie weit das FT8-Fenster ist, mit den Marken fuer Signalanfang
+    # und -ende (Entwurf C, 2026-10-30)
+    src/gui/widgets/Ft8Fensterbalken.cpp
     src/gui/widgets/DspParamPopup.cpp
     src/gui/widgets/DspQuickPopups.cpp
     src/gui/widgets/DspQuickPopups.h

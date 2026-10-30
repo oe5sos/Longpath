@@ -5576,7 +5576,7 @@ longpath_add_test(tst_ft8_sendeplan)
 # Verdrahtung, nicht die Rechnung.
 longpath_add_test(tst_ft8_flaeche)
 # Die zweite Spalte „Rx Frequency" neben „Band Activity" (2026-10-21).
-longpath_add_test(tst_ft8_zwei_spalten)
+longpath_add_test(tst_ft8_sicht_meine_frequenz)
 longpath_add_test(tst_ft8_wasserfall)
 # 2026-10-15: und wie lange ein ganzes Fenster rechnet — die Zahl
 # entscheidet, ob das im Faden der Oberflaeche laufen darf.

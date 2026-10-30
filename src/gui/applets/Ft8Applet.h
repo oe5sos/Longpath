@@ -45,16 +45,19 @@
 #include <QDateTime>
 #include <QPointer>
 #include <QHash>
+#include <QColor>
 #include <QVector>
 
 #include <memory>
 
+class QAction;
 class QLabel;
 class QPlainTextEdit;
 class QSplitter;
 class QSpinBox;
 
 namespace Longpath { class Ft8Wasserfall; }
+namespace Longpath { class Ft8Fensterbalken; }
 class QProgressBar;
 class QLineEdit;
 class QPushButton;
@@ -242,6 +245,10 @@ public:
     /// „Send"-Knopf (m_cqBtn), der Name ist dort eine Altlast.
     QPushButton* cqRufenButtonForTest() const { return m_cqRufenBtn; }
     const Ft8Ablauf& ablaufForTest() const { return m_ablauf; }
+    /// Nur fuer Werkzeuge und Prueflaeufe: den Ablauf von aussen in
+    /// einen Zustand bringen, um die Arbeitsleiste abzubilden.
+    Ft8Ablauf& ablaufForTestSchreibend() { return m_ablauf; }
+    void zeigeAblaufForTest() { zeigeAblauf(); }
     /// Der Zaehler fuer die CQ-Versuche, fuer den Pruefstand.
     class QSpinBox* cqVersucheSpinForTest() const { return m_cqVersucheSpin; }
     /// Einen Fund einspeisen, als waere er dekodiert worden — der
@@ -257,7 +264,6 @@ public:
     // Fuer den Pruefstand.
     Ft8Stream*      streamForTest() const { return m_stream; }
     QPlainTextEdit* listForTest()   const { return m_list; }
-    QPlainTextEdit* listRxForTest() const { return m_listRx; }
     /// Der Zeitgeber, der auf den Beginn des eigenen Fensters wartet.
     /// Ein Prueflauf stellt ihn auf 0 und laesst ihn ablaufen — nur so
     /// wird der Sendeweg wirklich gefahren und nicht nur die Methode
@@ -265,8 +271,14 @@ public:
     QTimer* sendeTimerForTest() const { return m_sendeTimer; }
     QLabel*         statusForTest() const { return m_status; }
     QLabel*         lastLabelForTest() const { return m_lastLabel; }
-    QPushButton*    nurCqButtonForTest() const { return m_nurCqBtn; }
-    QPushButton*    nurNeueLaenderButtonForTest() const { return m_nurNeueLaenderBtn; }
+    /// Hiesz bis zum 2026-10-30 „CQ only" und war ein Haken in der
+    /// Kopfzeile; jetzt ist es die Pille „CQ". Derselbe Zweck,
+    /// derselbe Zugang.
+    QPushButton*    nurCqButtonForTest() const { return m_sichtCq; }
+    QPushButton*    nurNeueLaenderButtonForTest() const { return m_sichtNeuesLand; }
+    QPushButton*    sichtAllesButtonForTest() const { return m_sichtAlles; }
+    QPushButton*    sichtAnMichButtonForTest() const { return m_sichtAnMich; }
+    QPushButton*    sichtFreqButtonForTest() const { return m_sichtFreq; }
     QSpinBox*       sendeTonFeldForTest() const { return m_tonFeld; }
     QSpinBox*       rundenFeldForTest() const { return m_rundenFeld; }
     Longpath::Ft8Wasserfall* wasserfallForTest() const { return m_wasserfall; }
@@ -326,13 +338,56 @@ private:
     QLabel*         m_status{nullptr};
     QLabel*         m_lastLabel{nullptr};
     QProgressBar*   m_fill{nullptr};
+    // ── Der Zeilenspeicher (2026-10-30) ───────────────────
+    //
+    // Bis dahin ging jeder Fund direkt in die Textflaeche, und die
+    // Filter wirkten nur auf NEUE Zeilen: wer „CQ only" einschaltete,
+    // sah das Band unveraendert, bis die naechste Periode durch war.
+    // Mit den Pillen aus Entwurf C faellt das sofort auf — also wird
+    // behalten, was gefunden wurde, und die Liste bei jedem
+    // Filterwechsel neu gezeichnet.
+    //
+    // Gespeichert wird das ERGEBNIS der Einordnung, nicht die
+    // Nachricht allein: „neues Land" kostet eine Abfrage im
+    // DXCC-Aufloeser, und die soll nicht bei jedem Pillendruck
+    // hundertmal neu laufen.
+    struct Fundzeile {
+        QString text;        ///< die fertige Zeile, Spalten schon gesetzt
+        QString nachricht;   ///< der reine FT8-Satz
+        int     tonHz{0};
+        bool    anMich{false};
+        bool    istCq{false};
+        bool    neuesLand{false};
+        QColor  landFarbe;
+        bool    eigeneSendung{false};
+    };
+    QVector<Fundzeile> m_zeilen;
+    static constexpr int kMaxZeilen = 400;
+
+    /// Welche Zeilen zu sehen sind. Eine Pille, nicht vier Haken:
+    /// zwei Filter gleichzeitig ergeben Faelle, die niemand im Kopf
+    /// behaelt (und „CQ only" + „New DXCC only" zeigte frueher die
+    /// Schnittmenge, ohne dass das irgendwo stand).
+    enum class Sicht { Alles, AnMich, Cq, NeuesLand, MeineFrequenz };
+    Sicht m_sicht{Sicht::Alles};
+    /// Die Liste aus dem Speicher neu zeichnen.
+    void zeichneListe();
+    /// Gehoert diese Zeile in die aktuelle Sicht?
+    bool inSicht(const Fundzeile& z) const;
+    /// Eine Zeile in den Speicher und, wenn sie passt, in die Liste.
+    void merkeZeile(const Fundzeile& z);
+    /// Eine Zeile unten an die Textflaeche haengen, richtig gefaerbt.
+    void haengeAn(const Fundzeile& z);
+    /// „10 Funde" bzw. „3 von 10" rechts neben den Pillen.
+    void zeigeFundZahl();
+    /// Die Arbeitsleiste nachziehen: mit wem, welcher Zug, was danach.
+    void zeigeArbeit();
+
     QPlainTextEdit* m_list{nullptr};
     // Zweite Spalte wie in WSJT-X: links alles („Band Activity"),
     // rechts nur, was auf der eigenen Stelle liegt oder an mich geht
     // („Rx Frequency"). Ohne sie geht die eigene Stelle in einem
     // vollen Band unter -- genau dort, wo man hinsehen muss.
-    QPlainTextEdit* m_listRx{nullptr};
-    QSplitter*      m_listenTeiler{nullptr};
 
     // Die Signalbreite von FT8 und FT4 (50 Hz). Siehe zeigeZeile().
     static constexpr int kRxFensterHz = 50;
@@ -374,14 +429,37 @@ private:
     Longpath::Ft8Wasserfall* m_wasserfall{nullptr};
     int m_sendeTonHz{1500};
 
-    QPushButton* m_nurCqBtn{nullptr};
-    QPushButton* m_nurNeueLaenderBtn{nullptr};
-    bool m_nurCq{false};
-    /// „New DXCC": derselbe Ansichtsfilter fuer Laender, die noch nie
-    /// im Logbuch standen. Gefragt wird der Aufloeser im Modell --
-    /// derselbe, der die Zeilen hier schon einfaerbt. Ein Ruf an die
-    /// eigene Station kommt auch hier durch.
-    bool m_nurNeueLaender{false};
+    QPushButton* m_sichtAlles{nullptr};
+    QPushButton* m_sichtAnMich{nullptr};
+    QPushButton* m_sichtCq{nullptr};
+    QPushButton* m_sichtNeuesLand{nullptr};
+    QPushButton* m_sichtFreq{nullptr};
+    QLabel*      m_fundZahl{nullptr};
+
+    // ── Die Arbeitsleiste (Entwurf C, 2026-10-30) ────────────
+    //
+    // Was beim automatischen Durchlauf zaehlt, steht unten, wo die
+    // Hand ist: mit wem, welcher Zug, was danach, wie weit das
+    // Fenster. Betreiber am 2026-10-30 zu Entwurf C: „c bitte".
+    QWidget* m_arbeit{nullptr};
+    QLabel*  m_arbeitPartner{nullptr};
+    QLabel*  m_arbeitLand{nullptr};
+    QLabel*  m_arbeitZustand{nullptr};
+    QLabel*  m_arbeitZug{nullptr};
+    QLabel*  m_arbeitDanach{nullptr};
+    QLabel*  m_arbeitUhr{nullptr};
+    Longpath::Ft8Fensterbalken* m_arbeitBalken{nullptr};
+
+    /// Der Wasserfall nahm ein Viertel der Hoehe und lebt erst, wenn
+    /// Ton hereinkommt. Jetzt abschaltbar; die Wahl bleibt erhalten.
+    QPushButton* m_wasserfallBtn{nullptr};
+    bool         m_wasserfallAn{true};
+
+    /// Die sechs Standardsaetze, jetzt hinter einem Knopf statt als
+    /// sechs gleich aussehende Knoepfe in einer Reihe.
+    QPushButton* m_handBtn{nullptr};
+    QAction*     m_txAktionen[6]{};
+
     QPushButton*    m_ft8Btn{nullptr};
     QPushButton*    m_ft4Btn{nullptr};
     QPushButton*    m_clearBtn{nullptr};
