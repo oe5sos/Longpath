@@ -1347,6 +1347,13 @@ public slots:
     // ---- CTUN mode (SmartSDR-style independent pan) ----
     void setCtunEnabled(bool enabled);
     bool ctunEnabled() const { return m_ctunEnabled; }
+
+    /// true, solange das zuletzt gesendete `centerChanged` nur davon
+    /// kam, dass das Fenster dem VFO an den Rand nachgescrollt ist —
+    /// also KEIN Zug des Bedienenden. Wer daraus einen Abstimmbefehl
+    /// macht, baut eine Rueckkopplung von Breite/2 − Rand (bei 200 kHz
+    /// genau 80 kHz). Herleitung: core/FensterRandScroll.h.
+    bool mitteFolgtDemVfo() const { return m_mitteFolgtDemVfo; }
     void recenterOnVfo();
 
     // ---- Tuning step ----
@@ -2937,6 +2944,8 @@ private:
     bool   m_ctunEnabled{true};  // true = SmartSDR-style (pan independent of VFO)
     enum class VfoOffScreen { None, Left, Right };
     VfoOffScreen m_vfoOffScreen{VfoOffScreen::None};
+    /// Siehe mitteFolgtDemVfo(): nur waehrend des Nachscrollens gesetzt.
+    bool         m_mitteFolgtDemVfo{false};
     void drawOffScreenIndicator(QPainter& p, const QRect& specRect, const QRect& wfRect);
 
     // ---- Mouse tracking overlay (QRhiWidget macOS workaround) ----

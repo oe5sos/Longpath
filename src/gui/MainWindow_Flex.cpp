@@ -79,6 +79,7 @@
 #include <cmath>
 
 #include "core/FlexFrequenzSpur.h"
+#include "core/FlexFensterZug.h"
 #include <algorithm>
 #include "gui/SpectrumWidget.h"
 #include "models/RadioModel.h"
@@ -765,8 +766,7 @@ void MainWindow::wireFlex()
                 // Ein Prozent reicht: 2 kHz Rest ergeben einen
                 // Maszstab von 1,01, also am Bildrand ein Kilohertz.
                 const double breite = m_flexSpanHighHz - m_flexSpanLowHz;
-                if (!(breite > 0.0)
-                    || std::abs(mitte - panMitte) < breite * 0.01) {
+                if (!FlexFensterZug::nachzugZieht(mitte, panMitte, breite)) {
                     return;
                 }
                 qCInfo(lcFlexGui).nospace()
@@ -778,8 +778,24 @@ void MainWindow::wireFlex()
         disconnect(m_flexBlickBand);
         if (SpectrumWidget* sw = m_radioModel->spectrumWidget()) {
             m_flexBlickBand = connect(sw, &SpectrumWidget::centerChanged,
-                                      this, [this](double) {
+                                      this, [this, sw](double) {
                 if (m_shuttingDown || m_flexTargetSliceId < 0) { return; }
+                // ── Nur ein Zug wirft den Nachzug an (2026-10-30) ───
+                //
+                // Scrollt das Fenster nur dem VFO an den Rand nach, so
+                // ist seine neue Mitte 80 kHz neben der Scheibe — und
+                // der Nachzug zog den Panadapter der Maschine genau
+                // dorthin, gegen die Zentrierung, die `RadioModel`
+                // gerade erst gesendet hatte. Am Geraet gemessen, der
+                // Wechsel auf FT8 um 16:06:04: die spaetere Quittung
+                // gewann, das Signal stand wieder neben der Mitte.
+                //
+                // Stoppen genuegt nicht — der Nachzug hatte seinen
+                // Befehl da schon gesendet. Er darf nicht anlaufen.
+                if (!FlexFensterZug::nachzugWirdAngeworfen(
+                        sw->mitteFolgtDemVfo())) {
+                    return;
+                }
                 if (m_flexPanNachzug) { m_flexPanNachzug->start(); }
             });
         }
@@ -939,10 +955,19 @@ void MainWindow::wireFlex()
     // falschen Ausschnitt gespannt steht jedes Signal bis zu 15 kHz
     // neben seiner Frequenz.
     connect(m_radioModel, &RadioModel::flexAusschnittGeaendert, this,
-            [this](double tiefHz, double hochHz) {
+            [this](double tiefHz, double hochHz, bool eigenerZug) {
         if (m_shuttingDown || !(hochHz > tiefHz)) { return; }
         m_flexSpanLowHz  = tiefHz;
         m_flexSpanHighHz = hochHz;
+
+        // ── Unser eigener Zug schlaegt den Nachzug (2026-10-30) ───
+        //
+        // Steht hier ein Zug von uns, dann ist er die juengere
+        // Entscheidung, und ein noch laufender Nachzug wuerde ihn
+        // zurueckdrehen. Genau das stand im Protokoll: 41.632 auf
+        // 7.074 gezogen, 41.890 wieder auf 7.154 zurueck. Die
+        // Herleitung steht in core/FlexFensterZug.h.
+        if (eigenerZug && m_flexPanNachzug) { m_flexPanNachzug->stop(); }
 
         // Das Fenster folgt dem Ausschnitt der Maschine — auch wenn er
         // sich spaeter aendert (Bandwechsel, Zoom am Geraet, oder weil
@@ -967,11 +992,26 @@ void MainWindow::wireFlex()
             // eine andere schickt (oder beim ersten Mal). Sonst nur um
             // dieselbe Strecke mitwandern und die eigene Breite
             // behalten.
+            // ── Fremder Zug oder eigener (2026-10-30) ──────────
+            //
+            // Bis heute hing das nur an der Breite, und damit blieb
+            // das Fenster auch bei UNSEREM eigenen Zug stehen — der
+            // Nachzug schob den Panadapter danach wieder auf das
+            // Fenster zurueck, und der Betreiber stand beim Start
+            // 80 kHz neben dem Band. Das Urteil liegt jetzt geprueft
+            // in core/FlexFensterZug.h; dort steht auch die Messung.
             const double alteBreite = m_flexFensterBreiteHz;
-            if (!m_flexAusschnittUebernommen
-                || alteBreite <= 0.0
-                || std::abs(breite - alteBreite) > 1.0) {
+            const bool folgt = FlexFensterZug::fensterFolgt(
+                breite, alteBreite, m_flexAusschnittUebernommen,
+                eigenerZug);
+            const bool nimmtBreite = FlexFensterZug::fensterNimmtBreite(
+                breite, alteBreite, m_flexAusschnittUebernommen,
+                eigenerZug);
+            if (folgt && nimmtBreite) {
                 sw->setFrequencyRange(mitte, breite);
+            } else if (folgt) {
+                // Nur die Mitte: die Breite ist die des Betreibers.
+                sw->setCenterFrequency(mitte);
             }
             // Sonst: NICHTS. Eine reine Mittenverschiebung der
             // Maschine kommt fast immer davon, dass der Betreiber

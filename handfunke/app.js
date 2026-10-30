@@ -133,8 +133,90 @@ const merken = (v) => { try { localStorage.setItem('handfunke.adresse', v); } ca
 const tokenLesen  = () => { try { return localStorage.getItem('handfunke.token') || ''; } catch (e) { return ''; } };
 const tokenMerken = (v) => { try { localStorage.setItem('handfunke.token', v); } catch (e) {} };
 
+// ── Von draussen ───────────────────────────────────────────────────────────
+//
+// Im eigenen Netz steht im Adressfeld ein Rechner. Von unterwegs steht
+// dort die Stations-Id: 26 Zeichen aus a-z und 2-7, die Longpath im
+// Kopplungsblatt zeigt. Sie ist keine Adresse -- die Station ist darunter
+// erreichbar, wo auch immer sie gerade steht.
+//
+// Der Vermittlungsdienst ist eine Einstellung und keine Eingabe: er
+// aendert sich nie, die Id auch nicht. Wer beides zugleich angeben will,
+// schreibt `dienst#id`.
+// Kommt die Seite selbst von einem Rendezvous-Server, ist der Dienst
+// genau dort -- dann muss niemand etwas eintippen ausser der Id.
+//
+// Das ist der Fall, auf den der ganze Weg hinauslaeuft: der Server
+// liefert die Seite mit aus (siehe fernzugriff/SERVER.md). Damit faellt
+// dreierlei zusammen -- von draussen erreichbar, sicherer Kontext (und
+// damit Mikrofon, AudioWorklet und der Opus-Dekoder), und keine
+// Einstellung, die man vergessen kann.
+//
+// Nur ueber https, und nicht auf einer privaten Adresse: eine Seite von
+// 172.30.30.x oder localhost ist der Rechner im Shack, nicht der
+// Vermittler.
+const PRIVAT = /^(localhost$|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)/;
+
+function dienstVomOrt() {
+  if (location.protocol !== 'https:') { return ''; }
+  if (PRIVAT.test(location.hostname)) { return ''; }
+  return 'wss://' + location.host + '/';
+}
+
+const DIENST_VORGABE = '';
+const dienstLesen = () => {
+  const vomOrt = dienstVomOrt();
+  if (vomOrt) { return vomOrt; }
+  try { return localStorage.getItem('handfunke.dienst') || DIENST_VORGABE; }
+  catch (e) { return DIENST_VORGABE; }
+};
+const dienstMerken = (v) => {
+  try { localStorage.setItem('handfunke.dienst', v); } catch (e) {}
+};
+
+const IST_STATION_ID = /^[a-z2-7]{26}$/;
+
+/**
+ * Zerlegt eine Eingabe, die eine Stations-Id enthaelt.
+ *
+ * Gibt `null` zurueck, wenn gar keine Id darin steckt (dann ist es eine
+ * gewoehnliche Adresse), sonst `{adresse}` oder `{fehler}`. Beides zu
+ * trennen ist noetig, weil eine Id ohne Dienst ein Fehler ist und nicht
+ * still als Rechnername weiterlaufen darf.
+ */
+function fernadresse(eingabe) {
+  let dienst = '', ident = '';
+  const raute = eingabe.lastIndexOf('#');
+  if (raute >= 0) {
+    dienst = eingabe.slice(0, raute).trim();
+    ident = eingabe.slice(raute + 1).trim();
+  } else if (IST_STATION_ID.test(eingabe)) {
+    dienst = dienstLesen();
+    ident = eingabe;
+  }
+  if (!IST_STATION_ID.test(ident)) { return null; }
+  if (!dienst) {
+    return { fehler: 'Fuer den Zugang von draussen fehlt der Vermittlungsdienst. '
+      + 'Einmal als dienst#id eingeben, dann merkt die Seite ihn sich. '
+      + '(Kommt die Seite vom Vermittler selbst, entfaellt das.)' };
+  }
+  if (!/^wss?:\/\//.test(dienst)) { dienst = 'wss://' + dienst; }
+  dienstMerken(dienst);
+  return { adresse: 'fern:' + dienst + '#' + ident };
+}
+
 function starten(adresse) {
-  const a = adresse.trim().replace(/^wss?:\/\//, '');
+  const roh = adresse.trim();
+  const fern = fernadresse(roh);
+  if (fern) {
+    if (fern.fehler) { $('fehler').textContent = fern.fehler; return; }
+    merken(roh);
+    $('fehler').textContent = '';
+    $('koppeln').classList.remove('an');
+    link.connect(fern.adresse);
+    return;
+  }
+  const a = roh.replace(/^wss?:\/\//, '');
   if (!a) { $('fehler').textContent = 'Bitte eine Adresse eingeben.'; return; }
   const mitPort = /:\d+$/.test(a) ? a : a + ':50001';
   merken(mitPort);
@@ -151,6 +233,136 @@ function starten(adresse) {
   const schema = (location.protocol === 'https:') ? 'wss://' : 'ws://';
   link.connect(schema + mitPort);
 }
+
+// ── Raumbild statt Wasserfall ─────────────────────────────────────────────
+//
+// Dieselbe Ansicht, die Longpath am Mac hat (`src/gui/DssRenderer.cpp`):
+// gestaffelte Zeilen statt einer rollenden Flaeche. Sie ersetzt den
+// Wasserfall im unteren Feld; die Kurve darueber bleibt, wie sie ist --
+// das war Variante C der Entwurfsblaetter.
+//
+// Die Farben kommen aus derselben Rampe wie der Wasserfall. Zwei
+// Farbquellen fuer dieselbe Groesse waeren die sicherste Art, sie
+// auseinanderlaufen zu lassen.
+let raumbild = null;          // erst beim ersten Einschalten geladen
+const raumAn = () => { try { return localStorage.getItem('handfunke.raumbild') === '1'; }
+                       catch (e) { return false; } };
+const raumMerken = (v) => { try { localStorage.setItem('handfunke.raumbild', v ? '1' : '0'); }
+                            catch (e) {} };
+let raumZeigen = raumAn();
+
+async function raumbildHolen() {
+  if (raumbild) { return raumbild; }
+  const { Raumbild } = await import('./raumbild.js');
+  raumbild = new Raumbild();
+  return raumbild;
+}
+
+async function raumUmschalten() {
+  raumZeigen = !raumZeigen;
+  raumMerken(raumZeigen);
+  $('raumknopf').classList.toggle('an', raumZeigen);
+  if (raumZeigen) {
+    await raumbildHolen();
+  } else {
+    // Beim Zurueckschalten die Flaeche leeren: sonst steht das letzte
+    // Raumbild unter dem anlaufenden Wasserfall.
+    wfCtx.clearRect(0, 0, wf.width, wf.height);
+  }
+  zeichneBild();
+}
+
+$('raumknopf').addEventListener('click', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  raumUmschalten();
+}, { passive: false });
+// Die Abstimmgeste liegt darunter -- die Beruehrung darf sie nicht erreichen.
+$('raumknopf').addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+
+if (raumZeigen) {
+  $('raumknopf').classList.add('an');
+  raumbildHolen();
+}
+
+// ── Koppeln mit einem Tipp ────────────────────────────────────────────────
+//
+// Fuer den Zugang von draussen muss dieses Telefon einmal bei der
+// Station angemeldet sein. Frueher hiess das: 122 Zeichen Schluessel
+// abtippen. Jetzt oeffnet die Station ein Fenster (`fuehren.py
+// --koppeln-offen`), und waehrend es offen ist, genuegt dieser Knopf.
+//
+// Der Knopf zeigt sich nur, wenn wirklich ein Fenster offen ist --
+// sonst waere er die meiste Zeit ein Knopf, der nichts tut.
+const KOPPEL_PORT = 8790;
+
+function koppelstelle() {
+  // Dieselbe Maschine wie die Seite, eigener Port.
+  const host = location.hostname || '127.0.0.1';
+  return `${location.protocol}//${host}:${KOPPEL_PORT}/koppeln`;
+}
+
+async function koppelLage() {
+  try {
+    const a = await fetch(koppelstelle(), {
+      method: 'POST', body: '{}', signal: AbortSignal.timeout(2500),
+    });
+    return await a.json();
+  } catch (e) { return null; }
+}
+
+async function koppelnTippen() {
+  const m = $('koppelmeldung');
+  // WebCrypto braucht einen sicheren Kontext. Ohne ihn gibt es keinen
+  // Geraeteschluessel und damit keinen Fernzugriff — das hier zu
+  // verschweigen hiesse, den Bediener raten zu lassen, warum nichts
+  // passiert.
+  if (!window.isSecureContext || !window.crypto?.subtle) {
+    m.style.color = 'var(--warn)';
+    m.textContent = 'Dafür muss die Seite über https kommen. '
+      + 'Über http fehlt dem Telefon der Schlüsselspeicher.';
+    return;
+  }
+  m.style.color = 'var(--text3)';
+  m.textContent = 'koppelt …';
+  try {
+    const { geraeteschluessel } = await import('./fernzugriff.js');
+    const ich = await geraeteschluessel();
+    const a = await fetch(koppelstelle(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        schluessel: ich.schluesselText,
+        name: 'Telefon',
+        art: 'phone',
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    const e = await a.json();
+    if (e.ok) {
+      m.style.color = 'var(--ok, var(--text3))';
+      m.textContent = 'Gekoppelt. Von draußen genügt jetzt die Stations-Id.';
+      $('koppelknopf').style.display = 'none';
+    } else {
+      m.style.color = 'var(--warn)';
+      m.textContent = e.grund || 'Das hat nicht geklappt.';
+    }
+  } catch (e) {
+    m.style.color = 'var(--warn)';
+    m.textContent = 'Die Station antwortet nicht. Läuft dort ein Koppelfenster?';
+  }
+}
+
+$('koppelknopf').addEventListener('click', koppelnTippen);
+
+// Einmal beim Laden nachsehen, ob gerade ein Fenster offen ist.
+koppelLage().then((l) => {
+  if (l && l.offen) {
+    $('koppelknopf').style.display = '';
+    $('koppelmeldung').textContent =
+        `Die Station nimmt dieses Telefon auf (noch ${l.rest} s).`;
+  }
+});
 
 $('verbinden').addEventListener('click', () => starten($('adresse').value));
 $('adresse').addEventListener('keydown', (e) => { if (e.key === 'Enter') starten($('adresse').value); });
@@ -658,6 +870,9 @@ function mitteVerfolgen() {
  *  Schnitt liegt, und das Bild bleibt sichtbar, bis das Alte unten
  *  herausgewandert ist. */
 function wasserfallSchnitt() {
+  // Das Raumbild ist dieselbe Historie, nur anders gezeigt: was fuer den
+  // Wasserfall ein Schnitt ist, ist fuer das Raumbild einer.
+  if (raumbild) { raumbild.leeren(); }
   try {
     wfCtx.fillStyle = 'rgba(216,165,95,.55)';   // Bernstein, wie alles Gemessene
     wfCtx.fillRect(0, 0, wf.width, 2);
@@ -880,6 +1095,24 @@ function zeichneBild() {
       panCtx.globalAlpha = 1;
       panCtx.textAlign = 'left';
     }
+  }
+
+  // Raumbild: dieselben Zeilen, nur anders gezeigt. Die Spanne ist die
+  // des Wasserfalls, damit beide Ansichten dasselbe Band zeigen.
+  if (raumZeigen && raumbild) {
+    const rLo = state.wfBoden - 3, rHi = rLo + 42;
+    while (neueZeilen > 0) {
+      neueZeilen--;
+      raumbild.zeileAufnehmen(spitze.subarray ? spitze.subarray(0, W) : spitze);
+    }
+    raumbild.malen(wfCtx, wf.width, wf.height, {
+      bodenDbm: rLo,
+      spanneDb: rHi - rLo,
+      zKurve: 0.7,
+      palette: (db) => rampe((db - rLo) / (rHi - rLo)),
+      grund: rampe(0),
+    });
+    return;
   }
 
   // Wasserfall: je eingetroffenem Spektrum eine Zeile — nicht je Bild.
@@ -2538,10 +2771,15 @@ function schleife(t) {
   // ohne hoerbaren Ton hat am 2026-09-30 eine ganze Messreihe wertlos
   // gemacht. Faellt der Ton aus, steht das hier — und nicht nur in einer
   // Konsole, die auf einem Telefon niemand sieht.
+  // Ueber den Fernweg zaehlt `link.rate.audio` das, was aus dem
+  // Opus-Dekoder HERAUSKOMMT (48 kHz Int16), nicht das, was uebertragen
+  // wurde. Die Leitung selbst weiss es besser und sagt es hier.
+  const fern = link.ws && link.ws.ton === 'opus' ? link.ws : null;
+  const tonKbs = fern ? fern.tonKbs : r.audio;
   $('fussTon').textContent = state.tonFehler
     ? state.tonFehler
     : !state.node ? 'Ton aus — auf TON EIN tippen'
-    : (r.audio ? r.audio + ' kB/s ton'
+    : (tonKbs ? tonKbs + ' kB/s ton' + (fern ? ' (opus)' : '')
                  + (state.tonWeg === 'scriptprocessor' ? ' (ersatzweg)' : '')
                : '');
   // Stottert der Ton gerade, steht das da — sonst sucht man es im Funkgeraet.
