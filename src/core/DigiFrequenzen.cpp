@@ -76,3 +76,17 @@ bool stehtSchonDort(qint64 skalenfrequenzHz, Digimodus modus,
 }
 
 } // namespace Longpath::DigiFrequenzen
+
+namespace Longpath::DigiFrequenzen {
+
+Bildausschnitt bildausschnitt(qint64 skalenfrequenzHz)
+{
+    Bildausschnitt a;
+    if (skalenfrequenzHz <= 0) { return a; }
+    a.mitteHz = double(skalenfrequenzHz)
+                + (kDurchlassVonHz + kDurchlassBisHz) / 2.0;
+    a.breiteHz = (kDurchlassBisHz - kDurchlassVonHz) + 2.0 * kLuftHz;
+    return a;
+}
+
+}  // namespace Longpath::DigiFrequenzen

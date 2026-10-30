@@ -2424,17 +2424,15 @@ void MainWindow::zeigeFt8SlotsFenster()
     // hat es eben eingeblendet.
     if (m_floatingApplets.contains(id)) { return; }
 
-    // Und sonst: ist es JETZT zu sehen? Nicht „steht die Spalte
-    // offen" -- ein Panel kann in einer offenen Spalte stecken und
-    // trotzdem ausgeblendet sein. `QWidget::isVisible()` ist wahr,
-    // wenn das Widget und alle seine Eltern sichtbar sind; das ist
-    // die einzige Frage, auf die es ankommt.
+    // Sonst: abloesen. KEINE weitere Bedingung mehr -- weder
+    // `isVisible()` noch „steht die Spalte offen". Beide waren wahr,
+    // waehrend der Betreiber nichts sah, und beide haben hier je
+    // einen Anlauf gekostet. Wer hierher kommt, hat kein Fenster;
+    // das ist Grund genug, eines zu machen.
     if (!m_ft8PlaetzeApplet || !m_appletPanel) { return; }
-    if (m_ft8PlaetzeApplet->isVisible()) { return; }
 
     qCInfo(lcContainer).noquote()
-        << "FT8 Slots: in der Spalte nicht zu sehen, also als "
-           "eigenes Fenster";
+        << "FT8 Slots: kein eigenes Fenster, also abgeloest";
     detachApplet(m_ft8PlaetzeApplet,
                  m_appletPanel->appletPosition(m_ft8PlaetzeApplet));
 }
@@ -7723,21 +7721,28 @@ void MainWindow::populateDefaultMeter()
         // fährt sie ohne Fenster, mit der Zeit von Hand.
         if (QStandardPaths::isTestModeEnabled()) { return; }
 
-        // ── Das WIDGET fragen, nicht den Merker (2026-10-30) ──
+        // ── Was heiszt „offen"? (2026-10-30) ──────────────────
         //
-        // Hier stand `m_appletVis->isEffectivelyVisible(id)`, und
-        // damit tat die Automatik gar nichts: in den Einstellungen
-        // stand seit dem vorigen Versuch `AppletFt8SlotsVisible=True`,
-        // also hielt sie das Panel fuer offen. Der Betreiber sah ein
-        // laufendes QSO und kein Fenster -- zum zweiten Mal, und das
-        // Protokoll schwieg diesmal ganz.
+        const QString id = QStringLiteral("Ft8Slots");
+        // Dritter Anlauf, und die ersten beiden waren beide zu klug:
         //
-        // `QWidget::isVisible()` ist wahr, wenn das Widget UND alle
-        // seine Eltern sichtbar sind. Das ist die Wahrheit ueber den
-        // Schirm, und nur sie zaehlt hier. Der Merker sagt, was der
-        // Betreiber WILL; er sagt nicht, was zu sehen ist.
-        const bool sichtbar = m_ft8PlaetzeApplet
-                              && m_ft8PlaetzeApplet->isVisible();
+        //   1. `isEffectivelyVisible()` -- der Merker. Er stand auf
+        //      True vom vorigen, ins Leere gelaufenen Versuch, also
+        //      hielt die Automatik das Panel fuer offen und tat
+        //      nichts. Das Protokoll schwieg ganz.
+        //   2. `QWidget::isVisible()` -- die Qt-Sichtbarkeit. Auch
+        //      wahr: das Applet steckt in der Appletspalte, die im
+        //      Layout liegt und keine Breite hat. Sichtbar im Sinne
+        //      von Qt, unsichtbar im Sinne des Betreibers.
+        //
+        // Beide Male meldete er dasselbe: „wieder kein eigenes
+        // fenster". Und genau das ist die Frage, die zaehlt. Sein
+        // Wunsch war „wenn hier die FENSTER eigens aufgehen"; ob ein
+        // Panel ein eigenes Fenster hat, steht ohne Umweg in
+        // `m_floatingApplets` -- keine Qt-Sichtbarkeit, kein Merker,
+        // kein Spaltenzustand.
+        auto* fenster = m_floatingApplets.value(id, nullptr);
+        const bool sichtbar = fenster && fenster->isVisible();
         switch (m_ft8SlotsAutomatik.pruefe(
                     hatInhalt(st), sichtbar,
                     QDateTime::currentMSecsSinceEpoch())) {
@@ -7752,7 +7757,11 @@ void MainWindow::populateDefaultMeter()
                     << "FT8 Slots zu: seit"
                     << (PanelAutomatik::kNachlaufMs / 1000)
                     << "s nichts mehr zu zeigen";
-                m_appletVis->setVisible(QStringLiteral("Ft8Slots"), false);
+                // Zumachen heiszt: das Fenster schliessen. Das dockt
+                // es zurueck in die Spalte, wo es niemandem im Weg
+                // steht.
+                if (fenster) { fenster->close(); }
+                m_appletVis->setVisible(id, false);
                 break;
             case PanelAutomatik::Tat::Nichts:
                 break;
