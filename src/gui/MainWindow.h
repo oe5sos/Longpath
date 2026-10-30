@@ -1174,6 +1174,10 @@ private:
     void setFreeCanvasMode(bool on);
     bool freeCanvasMode() const { return m_freeCanvasMode; }
 
+    /// Das Plaetze-Panel wirklich sichtbar machen -- notfalls als
+    /// eigenes Fenster, wenn die Appletspalte zu ist. Siehe dort.
+    void zeigeFt8SlotsFenster();
+
     void detachApplet(AppletWidget* applet, int dockIndex,
                       const QRect& rect = QRect(),
                       const QString& screenKey = QString());

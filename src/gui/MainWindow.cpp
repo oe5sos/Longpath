@@ -2399,6 +2399,41 @@ bool MainWindow::appletHiddenInColumn(QWidget* applet, bool countScrolledAway) c
     return coveredFraction(onScreen, covers) >= 0.25;
 }
 
+// ── Das Plaetze-Panel wirklich SICHTBAR machen (2026-10-30) ──────────
+//
+// `ensureVisible()` allein reicht nicht, und der Betreiber hat genau
+// das gemeldet: „da ist kein fenster aufgegangen", waehrend im
+// Protokoll „FT8 Slots auf: 1 QSO(s)" stand und in den Einstellungen
+// `AppletFt8SlotsVisible=True`.
+//
+// Der Grund: er hatte das Panel vorher zugemacht, dadurch war es
+// wieder ANGEDOCKT. `ensureVisible` machte es brav sichtbar -- in der
+// Appletspalte, die in seinem FT8-Profil gar nicht zu sehen ist. Ein
+// Panel, das in einer unsichtbaren Spalte sichtbar ist, ist unsichtbar.
+//
+// Sein Wunsch war „wenn hier die FENSTER eigens aufgehen". Also als
+// Fenster: hat es keines und steht es in der Spalte, wird es
+// abgeloest. Dort, wo es zuletzt stand -- `AppletFensterMasse` haelt
+// die Groesse, das Layoutprofil die Lage.
+void MainWindow::zeigeFt8SlotsFenster()
+{
+    const QString id = QStringLiteral("Ft8Slots");
+    if (m_appletVis) { m_appletVis->ensureVisible(id); }
+
+    // Hat es schon ein Fenster, genuegt das -- applyAppletVisibility
+    // hat es eben eingeblendet.
+    if (m_floatingApplets.contains(id)) { return; }
+
+    // Steht die Spalte offen, ist es dort zu sehen und bleibt es.
+    if (m_appletPanel && m_appletPanel->isVisible()) { return; }
+
+    if (!m_appletPanel || !m_ft8PlaetzeApplet) { return; }
+    qCInfo(lcContainer).noquote()
+        << "FT8 Slots: die Spalte ist zu, also als eigenes Fenster";
+    detachApplet(m_ft8PlaetzeApplet,
+                 m_appletPanel->appletPosition(m_ft8PlaetzeApplet));
+}
+
 void MainWindow::applyAppletVisibility(const QString& id, bool effective)
 {
     // ── Die eigenen Fenster ──────────────────────────────────────────
@@ -7668,6 +7703,21 @@ void MainWindow::populateDefaultMeter()
     connect(m_ft8Applet, &Ft8Applet::plaetzeGeaendert, this,
             [this](const Longpath::Ft8PlaetzeStand& st) {
         if (!m_appletVis) { return; }
+
+        // ── Nicht im Prueflauf (2026-10-30) ─────────────────
+        //
+        // Ein Panel, das von selbst aufgeht, ist in einem Lauf ohne
+        // Schirm ein Fenster, das niemand wieder zumacht.
+        // `isTestModeEnabled()` ist in jedem Prueflauf wahr und bei
+        // keinem Betreiber -- dasselbe Tor, mit dem am 2026-09-09
+        // der Linux-Hänger von 26 GUI-Laeufen behoben wurde
+        // (showAudioDiagnoseDialog, docs/architecture/
+        // 2026-09-09-ci-discovery-hang-investigation.md).
+        //
+        // Die REGEL selbst bleibt geprueft: `tst_panel_automatik`
+        // fährt sie ohne Fenster, mit der Zeit von Hand.
+        if (QStandardPaths::isTestModeEnabled()) { return; }
+
         const QString id = QStringLiteral("Ft8Slots");
         const bool sichtbar = m_appletVis->isEffectivelyVisible(id);
         switch (m_ft8SlotsAutomatik.pruefe(
@@ -7677,7 +7727,7 @@ void MainWindow::populateDefaultMeter()
                 qCInfo(lcContainer).noquote()
                     << "FT8 Slots auf:" << st.plaetze.size()
                     << "QSO(s)," << st.wartende.size() << "wartend";
-                m_appletVis->ensureVisible(id);
+                zeigeFt8SlotsFenster();
                 break;
             case PanelAutomatik::Tat::Zumachen:
                 qCInfo(lcContainer).noquote()
@@ -7691,17 +7741,6 @@ void MainWindow::populateDefaultMeter()
         }
     });
 
-    // Greift der Betreiber selbst zum Schalter, gehoert das Panel
-    // ihm -- ab dann macht die Automatik es weder auf noch zu.
-    // Ohne das waere es ein Fenster, das sich gegen seinen Besitzer
-    // wehrt: zumacht, waehrend er hineinsieht, oder aufgeht, nachdem
-    // er es weggeklickt hat.
-    connect(m_appletVis, &AppletVisibilityController::visibilityChanged,
-            this, [this](const QString& id, bool) {
-        if (id == QStringLiteral("Ft8Slots")) {
-            m_ft8SlotsAutomatik.betreiberHatGegriffen();
-        }
-    });
 
     // EqApplet — Equalizer, Empfang und Senden (eingehaengt 2026-10-11).
     //
@@ -8537,6 +8576,26 @@ void MainWindow::populateDefaultMeter()
         .toString() == QStringLiteral("True");
 
     m_appletVis = new AppletVisibilityController(this);
+
+    // ── Greift der Betreiber selbst, gehoert das Panel ihm ──────
+    //
+    // Ab dann macht die Automatik es weder auf noch zu. Ohne das
+    // waere es ein Fenster, das sich gegen seinen Besitzer wehrt:
+    // zumacht, waehrend er hineinsieht, oder aufgeht, nachdem er es
+    // weggeklickt hat.
+    //
+    // Diese Zeilen standen zuerst 890 Zeilen weiter oben, neben dem
+    // `new Ft8PlaetzeApplet` -- und `m_appletVis` war dort noch
+    // nullptr. Die Verbindung kam nie zustande, Qt warnte bei jedem
+    // Start, und Regel 3 der `PanelAutomatik` haette nie gegriffen.
+    // Beim Lesen faellt so etwas nicht auf: der Aufruf sieht an
+    // beiden Stellen gleich aus.
+    connect(m_appletVis, &AppletVisibilityController::visibilityChanged,
+            this, [this](const QString& id, bool) {
+        if (id == QStringLiteral("Ft8Slots")) {
+            m_ft8SlotsAutomatik.betreiberHatGegriffen();
+        }
+    });
 
     m_appletsById[QStringLiteral("Rx")]         = m_rxApplet;
     m_appletsById[QStringLiteral("Tx")]         = m_txApplet;
