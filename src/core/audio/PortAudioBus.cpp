@@ -26,6 +26,47 @@
 
 namespace Longpath {
 
+// Capture-only: positive name marker for hardware mics. Used to prefer
+// the actual hardware microphone over any virtual device that may
+// appear in the system enumeration (Teams Audio, ZoomAudioDevice,
+// BlackHole, Boom, Longpath/AetherSDR VAX/DAX, Splashtop, etc.). The
+// virtual-mic landscape is too varied to enumerate every vendor in
+// a deny-list, so we match the hardware naming convention instead.
+bool istHardwareMikrofonName(const QString& name)
+{
+    static const char* kHardwareMicMarkers[] = {
+        "Microphone",  // CoreAudio default name for built-in / USB mics
+        "Built-in",
+        "Internal",
+        "Mic Input",
+        // ── Die Namen kommen in der Sprache des Systems ─────────────
+        //
+        // Gemessen am Geraet des Betreibers, 2026-10-29: seine
+        // Eingaenge heiszen „Externes Mikrofon" und „MacBook
+        // Air-Mikrofon". Kein einziger englischer Marker traf, also
+        // fiel die ganze Kette bis auf „erstes Geraet der Liste" durch
+        // — und das war „BoomAudio", ein virtuelles.
+        //
+        // Die Flex bekam daraufhin 664 Tonpakete mit Spitze −150 dBFS:
+        // getastet, und digitale Stille hinaus. TUNE ging (den Traeger
+        // macht die Maschine selbst), Sprache nicht.
+        //
+        // „Micro" allein waere zu breit: „Microsoft Teams Audio" ist
+        // genau das virtuelle Geraet, das hier nicht gewinnen darf.
+        "Mikrofon",    // de, sv, da, nb, pl, tr
+        "Micrófono",   // es
+        "Microfono",   // it
+        "Microfoon",   // nl
+        "Microfone",   // pt
+    };
+    for (const char* marker : kHardwareMicMarkers) {
+        if (name.contains(QString::fromUtf8(marker), Qt::CaseInsensitive)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 namespace {
 
 // Resolve a PortAudio device index from a PortAudioConfig, with a robust
@@ -70,18 +111,7 @@ PaDeviceIndex resolveDevice(const PortAudioConfig& inCfg,
     // virtual-mic landscape is too varied to enumerate every vendor in
     // a deny-list, so we match the hardware naming convention instead.
     const auto isHardwareMicName = [](const QString& name) -> bool {
-        static const char* kHardwareMicMarkers[] = {
-            "Microphone",  // CoreAudio default name for built-in / USB mics
-            "Built-in",
-            "Internal",
-            "Mic Input",
-        };
-        for (const char* marker : kHardwareMicMarkers) {
-            if (name.contains(QLatin1String(marker), Qt::CaseInsensitive)) {
-                return true;
-            }
-        }
-        return false;
+        return istHardwareMikrofonName(name);
     };
 
     // For CAPTURE on macOS, prefer a hardware-named device BEFORE trusting
@@ -90,8 +120,7 @@ PaDeviceIndex resolveDevice(const PortAudioConfig& inCfg,
     //   1. MacBook Pro / Built-in / Internal — strong hardware match
     //   2. anything else with "Microphone" but NOT "iPhone" (Continuity
     //      Camera mics are often unavailable when iPhone is disconnected)
-#ifdef __APPLE__
-    if (!wantOutput && effectiveCfg.deviceName.isEmpty()) {
+    const auto bevorzugtesMikrofon = [deviceCount, &isHardwareMicName]() -> QString {
         QString tier1, tier2;
         for (int i = 0; i < deviceCount; ++i) {
             const PaDeviceInfo* di = Pa_GetDeviceInfo(i);
@@ -106,8 +135,13 @@ PaDeviceIndex resolveDevice(const PortAudioConfig& inCfg,
                 tier2 = n;
             }
         }
-        if (!tier1.isEmpty()) effectiveCfg.deviceName = tier1;
-        else if (!tier2.isEmpty()) effectiveCfg.deviceName = tier2;
+        return tier1.isEmpty() ? tier2 : tier1;
+    };
+
+#ifdef __APPLE__
+    if (!wantOutput && effectiveCfg.deviceName.isEmpty()) {
+        const QString bevorzugt = bevorzugtesMikrofon();
+        if (!bevorzugt.isEmpty()) { effectiveCfg.deviceName = bevorzugt; }
     }
 #endif
     // Die gespeicherte Host-API-Wahl zurueckuebersetzen.
@@ -211,6 +245,37 @@ PaDeviceIndex resolveDevice(const PortAudioConfig& inCfg,
                    .arg(wanted,
                         wantOutput ? QStringLiteral("output")
                                    : QStringLiteral("input"));
+
+        // ── Ein fehlendes Mikrofon darf nicht ins Virtuelle führen ──
+        //
+        // (2026-10-29) Die Hardware-Suche oben lief nur, solange GAR
+        // KEIN Name eingetragen war — also genau dann nicht, wenn sie
+        // gebraucht wird. Beim Betreiber stand ein Headset in den
+        // Einstellungen, das nicht angesteckt war; von hier fiel die
+        // Kette auf die Vorgaben durch und landete bei einem virtuellen
+        // Eingang, der Stille liefert. Gesendet wurde trotzdem.
+        //
+        // Darum hier noch einmal dieselbe Suche: lieber ein anderes
+        // echtes Mikrofon als ein Gerät, das nichts hört.
+        if (!wantOutput) {
+            const QString bevorzugt = bevorzugtesMikrofon();
+            if (!bevorzugt.isEmpty()) {
+                for (int i = 0; i < deviceCount; ++i) {
+                    const PaDeviceInfo* di = Pa_GetDeviceInfo(i);
+                    if (!directionOk(di) || di->name == nullptr) { continue; }
+                    if (QString::fromUtf8(di->name)
+                            .compare(bevorzugt, Qt::CaseInsensitive) != 0) {
+                        continue;
+                    }
+                    qCWarning(lcAudio).noquote()
+                        << QStringLiteral("Stattdessen das Mikrofon \"%1\" "
+                                          "— ein virtueller Eingang würde "
+                                          "still senden.")
+                               .arg(bevorzugt);
+                    return i;
+                }
+            }
+        }
     }
 
     // 2. Host-API default.

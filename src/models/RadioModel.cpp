@@ -623,6 +623,15 @@ RadioModel::RadioModel(QObject* parent)
         }
     }
 
+    // Die Aussteuerung des Flex-Mikrofonwegs, siehe RadioModel.h.
+    // Sie gehoert dem Betreiber und nicht der Maschine: sie sagt, wie
+    // heisz LONGPATH die Flex fuettert, nicht was die Flex damit tut.
+    {
+        const auto& s = AppSettings::instance();
+        m_flexMikGainDb = std::clamp(
+            s.value(QStringLiteral("FlexMikGainDb"), 0).toInt(), -20, 30);
+    }
+
     // Sprachspeicher: Ordner neben die Einstellungsdatei legen und
     // laden. Neben die Einstellungen und nicht in den Programmordner —
     // dort ueberlebt er ein Neuinstallieren, und genau das erwartet
@@ -7321,6 +7330,11 @@ bool RadioModel::sendeFlexBefehl(const QString& befehl)
     return true;
 }
 
+bool RadioModel::istFlexVerbunden() const
+{
+    return m_flexConnection != nullptr && m_flexConnection->isConnected();
+}
+
 bool RadioModel::setzeFlexSendescheibe(const QString& sliceId)
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
@@ -7407,6 +7421,25 @@ bool RadioModel::setzeFlexSendeleistung(int prozent)
     }
     m_flexConnection->sendCommand(befehl);
     return true;
+}
+
+// Siehe RadioModel.h, flexMikGainDb(): die Zahlen, aus denen dieser
+// Regler entstanden ist, stehen dort.
+void RadioModel::setzeFlexMikGainDb(int db)
+{
+    // −20 dB macht ein zu heiszes Mikrofon brauchbar, +30 dB reicht
+    // vom gemessenen −9,7 dBFS bis an die Vollaussteuerung und darueber
+    // hinaus; weiter oben faengt der Riegel in der Pumpe es ohnehin ab.
+    const int geklemmt = std::clamp(db, -20, 30);
+    if (geklemmt == m_flexMikGainDb) { return; }
+    m_flexMikGainDb = geklemmt;
+
+    auto& s = AppSettings::instance();
+    s.setValue(QStringLiteral("FlexMikGainDb"), QString::number(geklemmt));
+    scheduleSettingsSave();
+
+    qCInfo(lcConnection) << "Flex: Mikrofonaussteuerung" << geklemmt << "dB";
+    emit flexMikGainGeaendert(geklemmt);
 }
 
 bool RadioModel::setzeFlexAbstimmleistung(int prozent)
@@ -7554,8 +7587,30 @@ void RadioModel::verarbeiteFlexVerriegelung(const QMap<QString, QString>& kv)
     // Also: gehoert ist nur, was ueber `tx_allowed` wirklich gesagt
     // wurde. Alles andere bleibt Schweigen — und Schweigen ist kein
     // Verbot.
+    // ── Nachtrag 2026-10-29: `tx_allowed` ist nicht die Erlaubnis ───
+    //
+    // Am Geraet gemessen, mit einer zweiten Verbindung neben Longpath
+    // mitgelesen:
+    //
+    //   19:52:31  state=NOT_READY  reason=OUT_OF_BAND  tx_allowed=0
+    //   19:56:12  state=RECEIVE    reason=            tx_allowed=0
+    //
+    // Die Scheibe lag beim Verbinden ausserhalb des Bandes; das erste
+    // Nein war richtig. Danach stand sie auf 7,177 MHz, die Maschine
+    // ging auf RECEIVE — und schickte weiter `tx_allowed=0`.
+    //
+    // `tx_allowed` heiszt bei dieser Maschine NICHT „du darfst
+    // tasten", sondern „es wird gerade gesendet / die Taste ist
+    // durchgelassen". Im Ruhezustand ist es immer 0. Ein Tor, das
+    // darauf wartet, geht nie wieder auf: der Betreiber bekam weder
+    // TUNE noch MOX, und davor ging beides nur deshalb, weil ueberhaupt
+    // keine Verriegelungsmeldung ankam.
+    //
+    // Die Erlaubnis steht in der LAGE. Gesperrt wird bei einer echten
+    // Stoerung — sonst wird getastet, und die Maschine hat ohnehin ihre
+    // eigene Verriegelung hinter unserer.
     if (!m_flexVerriegelungGehoert
-        && kv.contains(QStringLiteral("tx_allowed"))) {
+        && kv.contains(QStringLiteral("state"))) {
         m_flexVerriegelungGehoert = true;
     }
 
@@ -7572,9 +7627,17 @@ void RadioModel::verarbeiteFlexVerriegelung(const QMap<QString, QString>& kv)
                              << felder.join(QLatin1Char(' '));
     }
 
-    if (kv.contains(QStringLiteral("tx_allowed"))) {
-        const bool darf = kv.value(QStringLiteral("tx_allowed")).trimmed()
-                          != QStringLiteral("0");
+    // Die Lagen, in denen die Maschine wirklich nicht senden kann.
+    // Alles andere — RECEIVE, READY, PTT_REQUESTED, TRANSMITTING,
+    // UNKEY_REQUESTED — ist Betrieb und kein Verbot.
+    if (kv.contains(QStringLiteral("state"))) {
+        static const QSet<QString> kSperrendeLagen = {
+            QStringLiteral("NOT_READY"),     // z. B. Grund OUT_OF_BAND
+            QStringLiteral("TIMEOUT"),       // Sendezeitdeckel gelaufen
+            QStringLiteral("STUCK_INPUT"),   // Taste haengt
+            QStringLiteral("BOOT"),          // faehrt noch hoch
+        };
+        const bool darf = !kSperrendeLagen.contains(m_flexVerriegelungsLage);
         if (darf != m_flexDarfSenden) {
             m_flexDarfSenden = darf;
             emit flexSendefreigabeGeaendert(darf);

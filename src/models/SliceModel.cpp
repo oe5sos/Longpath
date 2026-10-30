@@ -181,6 +181,8 @@
 #include "core/RadeChannel.h"
 #include "core/WdspEngine.h"
 #include "core/accessories/AlexController.h"
+#include "core/safety/BandPlanGuard.h"
+#include "core/safety/RegionSetting.h"
 #include "core/SkuUiProfile.h"  // issue #257 — rxOnlyLabels lookup in refreshAntennasFromAlex
 #include "models/RadioModel.h"
 
@@ -2915,8 +2917,30 @@ void SliceModel::restoreFromSettings(Band band)
     // ── Per-band DSP state ────────────────────────────────────────────────────
     // Each key: if absent, leave the current SliceModel default unchanged.
 
+    // ── Ein Bandwechsel landet IM Band (2026-10-29) ──────────────────
+    //
+    // Betreiber: „bandwechsel sollte immer in das amateurfunkband
+    // springen, nicht daneben." Und davor, am selben Abend: „ich starte
+    // immer auszerhalb des amateurfunkbereich!"
+    //
+    // Im Gedaechtnis stand `Slice0/Band40m/Frequency = 7225000`. Das
+    // ist in Region 1 kein 40-m-Band mehr (7,000–7,200), sondern der
+    // Rundfunkbereich darueber. Longpath holte es zurueck, die Flex
+    // meldete beim Verbinden `NOT_READY reason=OUT_OF_BAND`, und an
+    // dem Abend ging weder TUNE noch MOX.
+    //
+    // Gehoert hat er dort gern — das Gedaechtnis je Band ist aber
+    // dafuer da, die Stelle IM BAND zu halten, an der man zuletzt war.
+    // Liegt der gemerkte Wert auszerhalb, ist der Eintrag fuer dieses
+    // Band unbrauchbar, und die Vorgabe des Bandes ist richtiger als
+    // eine Frequenz, auf der nicht gesendet werden darf.
+    //
+    // Geprueft wird gegen die eingestellte Region (hier „Europe"),
+    // nicht gegen die Region-2-Tabelle in Band.h: nach der waere 7,225
+    // im Band, und genau das war der Fehler.
     if (s.contains(bp + QStringLiteral("Frequency"))) {
-        setFrequency(s.value(bp + QStringLiteral("Frequency")).toDouble());
+        const double gemerkt = s.value(bp + QStringLiteral("Frequency")).toDouble();
+        setFrequency(BandDefaults::frequenzImBand(band, gemerkt));
     }
     if (s.contains(bp + QStringLiteral("AgcThreshold"))) {
         setAgcThreshold(s.value(bp + QStringLiteral("AgcThreshold")).toInt());
