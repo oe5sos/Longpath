@@ -8035,6 +8035,13 @@ longpath_add_test(tst_flex_wasserfall_kachel)
 longpath_add_test(tst_flex_senden)
 longpath_add_test(tst_flex_sendetakt)
 
+# 2026-10-30: der 80-kHz-Versatz beim Verbinden ist offen, und das
+# Protokoll nannte nie, WER die Scheibe verstellt. Die Spur in
+# MainWindow_Flex.cpp nennt ihn; dieser Stand prueft ihr Urteil in
+# BEIDEN Richtungen — sie muss den Versatz fangen und bei jedem
+# gewoehnlichen Handgriff schweigen.
+longpath_add_test(tst_flex_frequenzspur)
+
 # -- Flex: der Fehlerweg sagt jetzt etwas ---------------------------------
 # „Disconnected — Unknown error" im Verbindungsfenster, 2026-10-28 20:41,
 # dreimal in Folge; eine Millisekunde zwischen Wahl und Fehler, und als

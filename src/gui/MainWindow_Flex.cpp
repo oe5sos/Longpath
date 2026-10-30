@@ -77,6 +77,8 @@
 #include "core/AppSettings.h"
 #include <QTimer>
 #include <cmath>
+
+#include "core/FlexFrequenzSpur.h"
 #include <algorithm>
 #include "gui/SpectrumWidget.h"
 #include "models/RadioModel.h"
@@ -235,7 +237,86 @@ void MainWindow::wireFlex()
             m_radioModel->tuneFlexSlice(hz);
         });
 
-        // ── Betriebsart und Filterbreite, derselbe Weg ──────────────
+        // ── Die Spur der Frequenz (2026-10-30) ──────────────────────
+        //
+        // Der offene Befund vom 2026-10-29: beim Verbinden steht die
+        // Scheibe reproduzierbar neben der Maschine, und zwar jedes Mal um
+        // dieselben 80 kHz.
+        //
+        //     Geraet 7.1790 MHz -> Scheibe las 7.2590 MHz
+        //     Geraet 7.3086 MHz -> Scheibe las 7.3886 MHz
+        //     Geraet 7.0740 MHz -> Scheibe las 7.1540 MHz   (30.10., 10:03)
+        //
+        // Durch Lesen ist es nicht zu klaeren, und zwar aus einem
+        // belegbaren Grund: im Protokoll steht jede Meldung der MASCHINE
+        // ("Scheibe 0 auf 7074000 Hz", FlexRadioConnection), aber keine
+        // einzige Zeile darueber, wer die Scheibe im Programm verstellt.
+        // Am 30.10. meldete die Maschine 7.074 und blieb dort — der
+        // Versatz entstand also auf unserer Seite, zwischen zwei Zeilen,
+        // die sechs Millisekunden auseinander liegen.
+        //
+        // Also wird gemessen statt vermutet. Fuenfzehn Sekunden nach dem
+        // Verbinden bekommt jede Frequenzaenderung der Scheibe eine Zeile:
+        // alt, neu, Unterschied, der Stand der Wache (gesetzt = der Wert
+        // kam von der Maschine, offen = das Programm selbst hat
+        // geschrieben), dazu was die Maschine in diesem Augenblick meldet
+        // und wo das Fenster steht. Der erste Start nach dieser Aenderung
+        // benennt den Schreiber.
+        //
+        // Danach ist still: die Frist laeuft ab, und ohne Aenderung sagt
+        // die Spur nichts. Siehe auch
+        // feedback-abwesenheit-ist-keine-aussage — ein Lauf ohne Zeile
+        // heiszt "nichts hat geschoben", nicht "die Spur hat versagt".
+        disconnect(m_flexFreqSpur);
+        m_flexSpurBisMs = QDateTime::currentMSecsSinceEpoch() + 15000;
+        m_flexSpurLetzteHz = ziel->frequency();
+        m_flexFreqSpur = connect(ziel, &SliceModel::frequencyChanged, this,
+                [this](double hz) {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            if (QDateTime::currentMSecsSinceEpoch() > m_flexSpurBisMs) { return; }
+            const double vorher = m_flexSpurLetzteHz;
+            m_flexSpurLetzteHz = hz;
+            if (qFuzzyCompare(vorher, hz)) { return; }
+            const double geraet = m_radioModel->flexGeraeteFrequenzHz();
+            double fenster = 0.0;
+            if (SpectrumWidget* sw = m_radioModel->spectrumWidget()) {
+                fenster = sw->centerFrequency();
+            }
+            const double abstand = (geraet > 0.0) ? (hz - geraet) : 0.0;
+            // Laut werden, wenn das Programm selbst von der Maschine
+            // weglaeuft: genau das ist der gesuchte Fall. Das Urteil
+            // steht in FlexFrequenzSpur.h, weil es geprueft wird —
+            // eine Spur, die bei jedem Handgriff schreit, ist Laerm.
+            const bool verdaechtig = FlexFrequenzSpur::istVersatz(
+                hz, geraet, m_flexApplyingRemoteState);
+            // qCWarning/qCInfo sind Makros mit einer for-Schleife,
+            // also keine Ausdruecke — der Satz wird gebaut und dann
+            // EINMAL ausgegeben, laut oder leise.
+            const auto mhz = [](double v) {
+                return QString::number(v / 1.0e6, 'f', 6);
+            };
+            QString satz =
+                QStringLiteral("Flex-Spur: Scheibe %1  %2 -> %3 MHz "
+                               "(%4 kHz), Wache %5, Maschine meldet %6 MHz, "
+                               "Fenster %7 MHz")
+                    .arg(m_flexTargetSliceId)
+                    .arg(mhz(vorher), mhz(hz))
+                    .arg(QString::number((hz - vorher) / 1.0e3, 'f', 3),
+                         m_flexApplyingRemoteState
+                             ? QStringLiteral("gesetzt (von der Maschine)")
+                             : QStringLiteral("offen (vom Programm)"),
+                         mhz(geraet), mhz(fenster));
+            if (verdaechtig) {
+                satz += QStringLiteral(" — DAS IST DER VERSATZ: %1 kHz "
+                                       "neben der Maschine")
+                            .arg(QString::number(abstand / 1.0e3, 'f', 3));
+                qCWarning(lcFlexGui).noquote() << satz;
+            } else {
+                qCInfo(lcFlexGui).noquote() << satz;
+            }
+        });
+
+    // ── Betriebsart und Filterbreite, derselbe Weg ──────────────
         //
         // Bis zum 2026-10-22 ging nur die Frequenz hinaus — und auch
         // die nicht (siehe oben). Mit dem Abstimmen allein hoerte der
