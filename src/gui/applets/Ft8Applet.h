@@ -285,6 +285,7 @@ public:
     QPushButton*    sichtAnMichButtonForTest() const { return m_sichtAnMich; }
     QPushButton*    sichtFreqButtonForTest() const { return m_sichtFreq; }
     QSpinBox*       sendeTonFeldForTest() const { return m_tonFeld; }
+    QPushButton*    houndButtonForTest() const { return m_houndBtn; }
     QSpinBox*       rundenFeldForTest() const { return m_rundenFeld; }
     Longpath::Ft8Wasserfall* wasserfallForTest() const { return m_wasserfall; }
     int             sendeTonHzForTest() const { return m_sendeTonHz; }
@@ -460,6 +461,9 @@ private:
     /// man erst, wenn sie jemanden aufruft.
     QPushButton* m_houndBtn{nullptr};
     bool         m_houndBetrieb{false};
+    /// Die Tonlage, die der Betreiber hatte, bevor Hound sie ueber
+    /// 1000 Hz zog. 0 heisst: nichts zurueckzugeben.
+    int          m_tonVorHound{0};
 
     QPushButton* m_wasserfallBtn{nullptr};
     bool         m_wasserfallAn{true};

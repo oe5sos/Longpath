@@ -284,16 +284,33 @@ void Ft8Applet::buildUI()
         AppSettings::instance().setValue(
             QStringLiteral("Ft8/Hound"),
             an ? QStringLiteral("True") : QStringLiteral("False"));
-        if (an && m_tonFeld
-            && m_tonFeld->value() < Ft8Ablauf::kHoundMinTonHz) {
-            // Lieber hochziehen als warnen: eine Warnung, die man
-            // wegklickt, laesst einen stundenlang ins Leere rufen.
-            const int alt = m_tonFeld->value();
-            m_tonFeld->setValue(Ft8Ablauf::kHoundMinTonHz + 500);
+        if (!m_tonFeld) { return; }
+        if (an) {
+            if (m_tonFeld->value() < Ft8Ablauf::kHoundMinTonHz) {
+                // Lieber hochziehen als warnen: eine Warnung, die man
+                // wegklickt, laesst einen stundenlang ins Leere rufen.
+                m_tonVorHound = m_tonFeld->value();
+                m_tonFeld->setValue(Ft8Ablauf::kHoundMinTonHz + 500);
+                if (m_status) {
+                    m_status->setText(tr("tone %1 → %2 Hz (Hounds below "
+                                         "1000 are not answered)")
+                                          .arg(m_tonVorHound)
+                                          .arg(m_tonFeld->value()));
+                }
+            }
+        } else if (m_tonVorHound > 0) {
+            // ── Und zurueck (2026-10-30) ───────────────────
+            //
+            // Am Geraet gesehen: der Betreiber hat Hound ein- und
+            // wieder ausgeschaltet, und seine 837 Hz waren weg -- 1500
+            // blieben stehen. Eine Einstellung, die ich fuer eine
+            // Betriebsart hochziehe, gebe ich zurueck, wenn die
+            // Betriebsart endet. Sie gehoert ihm, nicht mir.
+            const int zurueck = m_tonVorHound;
+            m_tonVorHound = 0;
+            m_tonFeld->setValue(zurueck);
             if (m_status) {
-                m_status->setText(tr("tone %1 → %2 Hz (Hounds below "
-                                     "1000 are not answered)")
-                                      .arg(alt).arg(m_tonFeld->value()));
+                m_status->setText(tr("tone back to %1 Hz").arg(zurueck));
             }
         }
     });

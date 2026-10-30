@@ -37,6 +37,7 @@
 #include "core/AudioEngine.h"
 #include "core/Ft8Stream.h"
 #include "core/audio/AudioTapRing.h"
+#include "core/Ft8Ablauf.h"
 #include "gui/applets/Ft8Applet.h"
 #include "core/AppSettings.h"
 #include "models/RadioModel.h"
@@ -607,6 +608,47 @@ private slots:
         QVERIFY(!applet.sendetGerade());
         QVERIFY(applet.cqButtonForTest()->isEnabled());
         QVERIFY(!applet.stopButtonForTest()->isEnabled());
+    }
+
+    // ── Hound zieht die Tonlage hoch, und gibt sie zurueck ──────────
+    //
+    // „Hounds transmitting below f0+1000 Hz will not be answered."
+    // Lieber hochziehen als warnen: eine Warnung, die man wegklickt,
+    // laesst einen stundenlang ins Leere rufen.
+    //
+    // Der zweite Teil kommt vom laufenden Geraet (2026-10-30): der
+    // Betreiber hat Hound ein- und wieder ausgeschaltet, und seine
+    // 837 Hz waren weg. Eine Einstellung, die ich fuer eine
+    // Betriebsart hochziehe, gehoert ihm zurueck.
+    void houndZiehtDieTonlageHochUndGibtSieZurueck()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        QVERIFY(applet.sendeTonFeldForTest());
+        QVERIFY(applet.houndButtonForTest());
+
+        applet.sendeTonFeldForTest()->setValue(837);
+        applet.houndButtonForTest()->click();
+        QVERIFY2(applet.sendeTonFeldForTest()->value()
+                     >= Ft8Ablauf::kHoundMinTonHz,
+                 qPrintable(QStringLiteral("blieb bei %1 Hz")
+                                .arg(applet.sendeTonFeldForTest()->value())));
+
+        applet.houndButtonForTest()->click();
+        QCOMPARE(applet.sendeTonFeldForTest()->value(), 837);
+    }
+
+    // GEGENPROBE: wer schon hoch genug steht, wird nicht angefasst --
+    // und bekommt beim Ausschalten auch nichts „zurueckgegeben".
+    void eineHoheTonlageBleibtUnberuehrt()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        applet.sendeTonFeldForTest()->setValue(2100);
+        applet.houndButtonForTest()->click();
+        QCOMPARE(applet.sendeTonFeldForTest()->value(), 2100);
+        applet.houndButtonForTest()->click();
+        QCOMPARE(applet.sendeTonFeldForTest()->value(), 2100);
     }
 
     void dieFlaecheLaesstSichAbbilden()
