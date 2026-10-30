@@ -8042,6 +8042,15 @@ longpath_add_test(tst_flex_sendetakt)
 # gewoehnlichen Handgriff schweigen.
 longpath_add_test(tst_flex_frequenzspur)
 
+# -- Flex: wer gibt die Mitte vor, Fenster oder Maschine? -----------------
+# Die 80 kHz vom 2026-10-29 sind erklaert, und zwar vom Protokoll des
+# laufenden Betriebs vom 2026-10-30: Longpath zog den Panadapter auf die
+# Frequenz der Maschine (41.632, 7.074 MHz), und 76 ms spaeter zog der
+# Nachzug ihn auf das Fenster zurueck (41.890, 7.154 MHz). Dieser Stand
+# prueft beide Richtungen: der eigene Zug muss stehen, und der Zoom des
+# Betreibers (2026-10-23) muss ihn ueberleben.
+longpath_add_test(tst_flex_fensterzug)
+
 # -- Flex: der Fehlerweg sagt jetzt etwas ---------------------------------
 # „Disconnected — Unknown error" im Verbindungsfenster, 2026-10-28 20:41,
 # dreimal in Folge; eine Millisekunde zwischen Wahl und Fehler, und als

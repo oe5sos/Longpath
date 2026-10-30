@@ -7058,7 +7058,7 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                             << "Flex: Ausschnitt der Maschine "
                             << (tief / 1.0e6) << "–" << (hoch / 1.0e6)
                             << " MHz (" << (breiteMhz * 1.0e3) << " kHz)";
-                        emit flexAusschnittGeaendert(tief, hoch);
+                        emit flexAusschnittGeaendert(tief, hoch, false);
                     }
                 }
             }
@@ -7311,7 +7311,10 @@ void RadioModel::uebernimmFlexPanMitte(double mitteMhz)
     qCInfo(lcConnection).nospace()
         << "Flex: Ausschnitt selbst nachgefuehrt " << (tief / 1.0e6)
         << "–" << (hoch / 1.0e6) << " MHz (die Maschine echot ihn nicht)";
-    emit flexAusschnittGeaendert(tief, hoch);
+    // `true`: dieser Ausschnitt ist UNSER Zug, nicht der der
+    // Maschine. Das Fenster folgt ihm darum mit der Mitte, und der
+    // Nachzug zieht ihn nicht zurueck (core/FlexFensterZug.h).
+    emit flexAusschnittGeaendert(tief, hoch, true);
 }
 
 // ── Senden ueber die Flex (2026-10-23, Stufe 2) ──────────────────────

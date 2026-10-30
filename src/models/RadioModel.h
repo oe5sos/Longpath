@@ -2962,7 +2962,14 @@ signals:
     /// Der Ausschnitt, den die Maschine fuer ihren Panadapter angibt
     /// (Hertz). Massgeblich fuer die FFT-Bins — NICHT die Breite der
     /// Wasserfallkachel, die ihren eigenen Rand hat.
-    void flexAusschnittGeaendert(double tiefHz, double hochHz);
+    ///
+    /// `eigenerZug` sagt, WER ihn verstellt hat: false, wenn die
+    /// Meldung von der Maschine kommt, true, wenn Longpath selbst
+    /// gezogen hat (`zieheFlexPanadapterAuf`). Ohne diesen
+    /// Unterschied zieht das Fenster den eigenen Zug wieder zurueck —
+    /// siehe core/FlexFensterZug.h, gemessen am 2026-10-30.
+    void flexAusschnittGeaendert(double tiefHz, double hochHz,
+                                 bool eigenerZug);
 
     void flexAudioSamplesReady(quint32 streamId,
                                const QVector<float>& interleavedStereo);
