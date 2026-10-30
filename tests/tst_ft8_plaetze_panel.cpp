@@ -124,6 +124,29 @@ private slots:
         QCOMPARE(st.wartende.size(), 2);
         QCOMPARE(st.wartende.at(0).partner, QStringLiteral("PD4RJ"));
         QCOMPARE(st.wartende.at(1).partner, QStringLiteral("9A6T"));
+
+        // ── Ein Blatt davon, wenn eines verlangt wird ────────────
+        //
+        // Der Betreiber hat dieses Panel GEFUELLT noch nie gesehen
+        // (sieben Gruende, alle am 2026-10-30). Hier steht der
+        // Zustand, den er sehen will, also kann hier auch das Bild
+        // entstehen.
+        //
+        // NUR bei gesetztem `LONGPATH_GRAB_OUT`. Ohne die Variable
+        // passiert nichts -- am 2026-10-15 ist ein Abgriff-Lauf in
+        // der CI rot geworden, weil er ohne sie trotzdem malen
+        // wollte. Der Fall oben bleibt davon unberuehrt.
+        const QByteArray ziel = qgetenv("LONGPATH_GRAB_OUT");
+        if (!ziel.isEmpty()) {
+            panel.resize(360, panel.sizeHint().height());
+            panel.show();
+            QVERIFY(QTest::qWaitForWindowExposed(&panel, 20000));
+            const QPixmap bild = panel.grab();
+            const QString weg = QString::fromLocal8Bit(ziel);
+            QVERIFY2(bild.save(weg), qPrintable(weg));
+            qInfo().noquote() << "Blatt abgelegt:" << weg
+                              << bild.width() << "x" << bild.height();
+        }
     }
 
     // Leer heisst leer: ohne Plaetze und ohne Wartende steht der
