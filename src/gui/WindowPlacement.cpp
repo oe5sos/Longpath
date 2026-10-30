@@ -40,9 +40,39 @@ void ensureOnVisibleScreen(QWidget* w, QWidget* anchor, QSize minSize)
     const int minW = minSize.width();
     const int minH = minSize.height();
 
+    // ── Genug, um es wieder greifen zu koennen (2026-10-30) ─────
+    //
+    // Hier stand `intersects()`: EIN Bildpunkt Ueberlappung zaehlte als
+    // sichtbar. Ein Fenster, das zu 99 % ueber die Kante haengt, galt
+    // damit als in Ordnung -- und wurde bei jedem Start wieder genau
+    // dorthin gesetzt.
+    //
+    // Das stand seit 2026-08-16 als „Schwaeche 2" im Kopf von
+    // WindowPlacement.h, samt der Groeszenordnung, die stattdessen
+    // gelten sollte: „eine Mindestflaeche in der Groessenordnung von
+    // 80 x 40 px, also genug, um das Fenster mit der Maus wieder
+    // hereinziehen zu koennen." Dieselben zwei Zahlen benutzt
+    // `nearAnchor` weiter unten schon -- es gab sie also im selben
+    // Unterprogramm zweimal, einmal angewandt und einmal nur als
+    // Vorschlag im Kommentar.
+    //
+    // Am 2026-10-30 am Geraet gesehen: das FT8-Panel stand links
+    // ueber der Schirmkante, der Fenstertitel war auf „T8 DECODER"
+    // abgeschnitten.
+    //
+    // Die Mindestflaeche wird am FENSTER gedeckelt: ein Fenster, das
+    // selbst schmaler als 80 Punkte ist, koennte die Bedingung sonst
+    // nie erfuellen und wuerde bei jedem Start in die Mitte gezogen.
+    static constexpr int kMinSichtbarW = 80;
+    static constexpr int kMinSichtbarH = 40;
+    const int noetigW = qMin(kMinSichtbarW, g.width());
+    const int noetigH = qMin(kMinSichtbarH, g.height());
+
     bool onScreen = false;
     for (QScreen* s : QGuiApplication::screens()) {
-        if (s && s->availableGeometry().intersects(g)) {
+        if (!s) { continue; }
+        const QRect sichtbar = s->availableGeometry().intersected(g);
+        if (sichtbar.width() >= noetigW && sichtbar.height() >= noetigH) {
             onScreen = true;
             break;
         }
