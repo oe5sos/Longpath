@@ -334,6 +334,17 @@ Ft8PlaetzeApplet::Ft8PlaetzeApplet(RadioModel* model, QWidget* parent)
     lay->addStretch(1);
 }
 
+QSize Ft8PlaetzeApplet::sizeHint() const
+{
+    // Breit genug fuer „HB9ZHK · Switzerland · 1790 Hz · RR73" in
+    // einer Zeile, hoch genug fuer zwei Kacheln. Steht mehr darin,
+    // waechst die Flaeche von selbst (`noetigeHoehe`), und das
+    // Fenster laesst sich ziehen -- die Groesse merkt sich
+    // `AppletFensterMasse`.
+    const int inhalt = m_flaeche ? m_flaeche->noetigeHoehe() : 150;
+    return QSize(320, qMax(inhalt, 2 * Ft8PlaetzeFlaeche::kKachelH + 40));
+}
+
 void Ft8PlaetzeApplet::zeigeStand(const Longpath::Ft8PlaetzeStand& s)
 {
     const bool etwas = hatInhalt(s);

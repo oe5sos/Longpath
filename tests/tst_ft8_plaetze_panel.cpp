@@ -173,6 +173,41 @@ private slots:
                  "ein Wartender ohne laufendes QSO ist auch Inhalt");
     }
 
+    // ── Das Fenster darf nicht als Streifen aufgehen ──────────────
+    //
+    // `AppletFloatingWindow::applyDefaultSize()` fragt `sizeHint()`,
+    // NICHT `minimumHeight()`. Und der Vorgabe-sizeHint eines
+    // Applets ist die Summe seiner Anordnung, in der ein VERSTECKTES
+    // Widget gar nicht mitzaehlt -- im leeren Zustand ist die
+    // Flaeche versteckt.
+    //
+    // Der Betreiber bekam darum am 2026-10-30 eine Titelleiste von
+    // zwanzig Punkten ohne Inhalt: „ein eigenes fenster erscheint
+    // hier aber nicht", und spaeter „die einzelnen qso fenster habe
+    // ich bis dato nie gesehen".
+    void derSizeHintTraegtZweiKacheln()
+    {
+        RadioModel radio;
+        Ft8PlaetzeApplet panel(&radio);
+
+        // Leer -- und trotzdem gross genug fuer ein Fenster.
+        panel.zeigeStand(Ft8PlaetzeStand{});
+        QVERIFY2(panel.sizeHint().height()
+                     >= 2 * Ft8PlaetzeFlaeche::kKachelH,
+                 qPrintable(QStringLiteral("leer: %1 Punkte")
+                                .arg(panel.sizeHint().height())));
+        QVERIFY(panel.sizeHint().width() >= 300);
+
+        // Mit drei Kacheln waechst er.
+        Ft8PlaetzeStand st;
+        for (int i = 0; i < 3; ++i) { st.plaetze.append(Ft8PlatzStand{}); }
+        panel.zeigeStand(st);
+        QVERIFY2(panel.sizeHint().height()
+                     >= 3 * Ft8PlaetzeFlaeche::kKachelH,
+                 qPrintable(QStringLiteral("drei Plaetze: %1 Punkte")
+                                .arg(panel.sizeHint().height())));
+    }
+
     // Das Panel waechst mit der Zahl der Plaetze, statt eine feste
     // Hoehe zu behaupten -- bei sechs Plaetzen waere die Haelfte
     // abgeschnitten.

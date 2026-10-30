@@ -93,6 +93,20 @@ public slots:
     /// Vom `Ft8Applet` her. Einziger Weg herein.
     void zeigeStand(const Longpath::Ft8PlaetzeStand& s);
 
+    /// Wie hoch das Fenster sein muss, wenn es abgeloest wird.
+    ///
+    /// `AppletFloatingWindow::applyDefaultSize()` fragt `sizeHint()`
+    /// -- NICHT `minimumHeight()`. Und der Vorgabe-sizeHint eines
+    /// Applets ist die Summe seiner Anordnung, in der ein
+    /// VERSTECKTES Widget gar nicht mitzaehlt: im leeren Zustand ist
+    /// die Flaeche versteckt, also blieb nur das Hinweisschild, und
+    /// der Betreiber bekam am 2026-10-30 eine Titelleiste von
+    /// zwanzig Punkten Hoehe ohne Inhalt.
+    ///
+    /// Darum die Hoehe hier selbst sagen, statt sie ausrechnen zu
+    /// lassen.
+    QSize sizeHint() const override;
+
 public:
     Ft8PlaetzeFlaeche* flaecheForTest() const { return m_flaeche; }
 
