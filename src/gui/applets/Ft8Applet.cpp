@@ -731,8 +731,20 @@ void Ft8Applet::buildUI()
                                    .value(QStringLiteral("Ft8/CqVersuche"),
                                           QStringLiteral("10"))
                                    .toInt());
+    // ── Breit genug fuer zwei Stellen (2026-10-30) ───────────
+    //
+    // Hier stand `setFixedWidth(56)`. Am Geraet stand darin „x1" —
+    // die zweite Stelle war weg, obwohl 16 eingestellt waren.
+    // Betreiber: „neben dem CQ ist ein Fenster - anzahl der
+    // wiederholungen. dies kann man nicht sehen!"
+    //
+    // Keine feste Zahl mehr: der Bereich geht bis 30, das Praefix ist
+    // ein Zeichen, und wie breit das in der jeweiligen Schrift ist,
+    // weiss die Schrift besser als ich. `sizeHint()` rechnet es aus
+    // dem groeszten Wert samt Praefix und Pfeilen — eine feste Breite
+    // ueberschreibt genau diese Rechnung.
     m_cqVersucheSpin->setPrefix(tr("x"));
-    m_cqVersucheSpin->setFixedWidth(56);
+    m_cqVersucheSpin->setMinimumWidth(m_cqVersucheSpin->sizeHint().width());
     m_cqVersucheSpin->setToolTip(tr(
         "How many periods a CQ call repeats by itself.\nIt stops "
         "earlier when somebody answers, or on Stop."));
