@@ -8014,6 +8014,7 @@ longpath_add_test(tst_flex_vita_reader)
 # der Maszstab MUSS von aussen kommen, weil die Maschine y_pixels nie
 # zurueckmeldet. Datagramme aus echten Koepfen gebaut.
 longpath_add_test(tst_flex_vita_stream)
+longpath_add_test(tst_flex_lueckenfuellung)
 
 # 2026-10-22, zwei Befunde am Geraet: kein Ton trotz 30 987 Tonpaketen,
 # und ein S-Meter ohne Zeiger. Beide mit derselben Wurzel — die

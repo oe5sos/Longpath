@@ -16,6 +16,8 @@
 
 #include "FlexVitaStream.h"
 
+#include "AppSettings.h"
+
 #include <QDateTime>
 #include <QLoggingCategory>
 #include <QNetworkDatagram>
@@ -76,6 +78,13 @@ quint16 FlexVitaStream::start(const QHostAddress& radioAddress)
     // auseinanderhalten koennen, weil hier nichts protokolliert wurde.
     m_proKlasse.clear();
     m_straenge.clear();
+    m_tonLuecken.clear();
+    m_gefuellteRahmen = 0;
+    m_lueckenfuellung =
+        AppSettings::instance()
+            .value(QStringLiteral("FlexAudioLueckenfuellung"),
+                   QStringLiteral("True")).toString()
+        == QStringLiteral("True");
     m_verlorenGesamt = 0;
     m_verlorenGemeldet = 0;
     m_uhr.start();
@@ -123,6 +132,17 @@ void FlexVitaStream::zaehleLuecke(const FlexVita::Header& h)
         st.verloren += fehlend;
         ++st.spruenge;
         m_verlorenGesamt += fehlend;
+
+        // Fuer den Tonweg: was fehlt, soll als Stille wieder
+        // eingeschoben werden, damit die Welle nicht springt. Die
+        // Decke steht in FlexLueckenfuellung.h und ist Absicht — eine
+        // halbe Sekunde Stille glatt zu buegeln waere Vertuschung.
+        if (static_cast<FlexVitaClass>(h.packetClass)
+                == FlexVitaClass::NarrowAudio) {
+            FlexVita::Lueckenzustand& lz = m_tonLuecken[h.streamId];
+            lz.offeneLuecken = std::min(lz.offeneLuecken + fehlend,
+                                        FlexVita::kMaxGefuellteLuecken);
+        }
     }
 }
 
@@ -211,6 +231,12 @@ void FlexVitaStream::berichteKlassen()
             << "Strom: Luecken — " << m_verlorenGesamt
             << " Pakete fehlen insgesamt; "
             << qPrintable(lueckenTeile.join(QStringLiteral(" | ")));
+    }
+    if (m_gefuellteRahmen > 0) {
+        qCInfo(lcFlexStream).nospace()
+            << "Strom: Lueckenfuellung hat " << (m_gefuellteRahmen / 24)
+            << " ms Stille eingeschoben — so viel Ton fehlte, und so "
+            << "viel laenger stimmt die Zeitachse jetzt";
     }
     // Ein Sprung im laufenden Betrieb ist der Augenblick, der erklaert,
     // warum gerade nichts zu hoeren war — der soll nicht erst im
@@ -376,7 +402,18 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
         if (werte.isEmpty()) {
             return;
         }
-        emit audioSamplesReady(h.streamId, werte);
+        // Fehlende Pakete als ausgeblendete Stille wieder einschieben.
+        // Ohne das springt die Welle (Knacken) UND der Ton laeuft um
+        // die fehlende Zeit zu kurz — bei den am 2026-10-29 gemessenen
+        // 1,2 % sind das 0,7 s auf die Minute.
+        FlexVita::Lueckenzustand& lz = m_tonLuecken[h.streamId];
+        const int vorher = werte.size();
+        const QVector<float> gefuellt =
+            FlexVita::fuelleLuecke(werte, lz, m_lueckenfuellung);
+        if (gefuellt.size() > vorher) {
+            m_gefuellteRahmen += (gefuellt.size() - vorher) / 2;
+        }
+        emit audioSamplesReady(h.streamId, gefuellt);
         break;
     }
 

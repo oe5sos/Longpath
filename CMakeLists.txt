@@ -744,6 +744,9 @@ set(CORE_SOURCES
     src/core/FlexVitaReader.cpp
     # Der Sockel darum: ein UDP-Port fuer alles, Anmeldung per Null-Byte
     src/core/FlexVitaStream.cpp
+    # Fehlende Tonpakete als Stille wieder einschieben, statt die Welle
+    # springen zu lassen (gemessen 2026-10-29: 1,2 % Verlust ueber WLAN)
+    src/core/FlexLueckenfuellung.cpp
     # Multi-homed-host source-IP picker (PGXL/TGXL/broadcaster per-peer
     # route probe + socket source bind)
     src/core/RouteProbe.cpp

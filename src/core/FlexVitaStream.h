@@ -65,6 +65,7 @@
 //                 Hauptfaden) und das Neubinden nach Port-Streit.
 // =================================================================
 
+#include "FlexLueckenfuellung.h"
 #include "FlexVitaReader.h"
 
 #include <QElapsedTimer>
@@ -166,6 +167,22 @@ public:
     /// Summe der Zaehlerspruenge ueber alle Stroeme.
     qint64 verlorenePaketeGesamt() const { return m_verlorenGesamt; }
 
+    // ── Lueckenfuellung im Tonweg (2026-10-30) ───────────────────
+    //
+    // Fehlt ein Tonpaket, folgt ohne Fuellung auf die letzte Probe des
+    // einen unmittelbar die erste des naechsten: die Welle springt
+    // (Knacken) und der Ton laeuft um die fehlende Zeit zu kurz. Die
+    // Fuellung schiebt die Zeit als ausgeblendete Stille wieder ein.
+    // Sie erfindet keinen Ton — siehe FlexLueckenfuellung.h.
+    //
+    // Vorgabe an. `start()` holt den Wert aus AppSettings
+    // (`FlexAudioLueckenfuellung`); ohne `start()` — also im
+    // Pruefstand — bleibt es bei der Vorgabe.
+    void setzeLueckenfuellung(bool an) { m_lueckenfuellung = an; }
+    bool lueckenfuellung() const { return m_lueckenfuellung; }
+    /// Wieviele Rahmen die Fuellung bisher eingeschoben hat.
+    qint64 gefuellteRahmen() const { return m_gefuellteRahmen; }
+
     // Nur fuer Pruefstaende: schiebt ein Datagramm durch denselben Weg,
     // den der Socket nimmt.
     void ingestDatagramForTesting(const QByteArray& datagram);
@@ -238,6 +255,9 @@ private:
         QString groessteLueckeUm;
     };
     void zaehleLuecke(const FlexVita::Header& h);
+    bool m_lueckenfuellung{true};
+    QMap<quint32, FlexVita::Lueckenzustand> m_tonLuecken;  ///< je Tonstrom
+    qint64 m_gefuellteRahmen{0};
     QMap<quint64, Strang> m_straenge;   ///< Schluessel: Klasse<<32 | Strom
     QElapsedTimer m_uhr;
     qint64 m_verlorenGesamt{0};
