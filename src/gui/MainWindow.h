@@ -79,6 +79,8 @@
 
 #include "core/WdspTypes.h"
 #include "core/DigiFrequenzen.h"
+#include "gui/applets/PanelAutomatik.h"
+
 #include <QElapsedTimer>
 #include <QTimer>
 #include <QHash>
@@ -1819,10 +1821,11 @@ private:
     class CwDecoderApplet*   m_cwDecoderApplet{nullptr};
     class Ft8Applet*         m_ft8Applet{nullptr};
     class Ft8PlaetzeApplet*  m_ft8PlaetzeApplet{nullptr};
-    /// Das Plaetze-Panel wird genau EINMAL je Sitzung von selbst
-    /// aufgemacht, sobald es etwas zu zeigen hat. Wer es danach
-    /// zumacht, behaelt es zu.
-    bool                     m_ft8SlotsSchonGezeigt{false};
+    /// Das Plaetze-Panel geht von selbst auf, wenn etwas laeuft, und
+    /// nach einer Nachlaufzeit wieder zu. Betreiber am 2026-10-30:
+    /// „schoen waere, wenn hier die fenster eigens aufgehen und
+    /// danach wieder zu gehen." Siehe `PanelAutomatik`.
+    PanelAutomatik           m_ft8SlotsAutomatik;
     // Torn down and rebuilt on every rebindRttyRadeAvailability() call --
     // same QMetaObject::Connection-list idiom CommandBar::attach() uses,
     // so the dspModeChanged listener below never accumulates one dangling

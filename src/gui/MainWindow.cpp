@@ -390,6 +390,7 @@ warren@wpratt.com
 #include "applets/CwDecoderApplet.h"
 #include "applets/Ft8Applet.h"
 #include "applets/Ft8PlaetzeApplet.h"
+#include "applets/PanelAutomatik.h"
 #include "applets/QsoRecorderApplet.h"
 #include "applets/RecordingApplet.h"
 #include "applets/KiwiSdrApplet.h"
@@ -7666,16 +7667,40 @@ void MainWindow::populateDefaultMeter()
     // wer es weghaben will, soll es weghaben koennen.
     connect(m_ft8Applet, &Ft8Applet::plaetzeGeaendert, this,
             [this](const Longpath::Ft8PlaetzeStand& st) {
-        if (m_ft8SlotsSchonGezeigt || !hatInhalt(st)) { return; }
-        m_ft8SlotsSchonGezeigt = true;
-        if (!m_appletVis
-            || m_appletVis->isEffectivelyVisible(QStringLiteral("Ft8Slots"))) {
-            return;
+        if (!m_appletVis) { return; }
+        const QString id = QStringLiteral("Ft8Slots");
+        const bool sichtbar = m_appletVis->isEffectivelyVisible(id);
+        switch (m_ft8SlotsAutomatik.pruefe(
+                    hatInhalt(st), sichtbar,
+                    QDateTime::currentMSecsSinceEpoch())) {
+            case PanelAutomatik::Tat::Aufmachen:
+                qCInfo(lcContainer).noquote()
+                    << "FT8 Slots auf:" << st.plaetze.size()
+                    << "QSO(s)," << st.wartende.size() << "wartend";
+                m_appletVis->ensureVisible(id);
+                break;
+            case PanelAutomatik::Tat::Zumachen:
+                qCInfo(lcContainer).noquote()
+                    << "FT8 Slots zu: seit"
+                    << (PanelAutomatik::kNachlaufMs / 1000)
+                    << "s nichts mehr zu zeigen";
+                m_appletVis->setVisible(id, false);
+                break;
+            case PanelAutomatik::Tat::Nichts:
+                break;
         }
-        qCInfo(lcContainer).noquote()
-            << "FT8 Slots aufgemacht: " << st.plaetze.size()
-            << "Platz/Plaetze," << st.wartende.size() << "wartend";
-        m_appletVis->ensureVisible(QStringLiteral("Ft8Slots"));
+    });
+
+    // Greift der Betreiber selbst zum Schalter, gehoert das Panel
+    // ihm -- ab dann macht die Automatik es weder auf noch zu.
+    // Ohne das waere es ein Fenster, das sich gegen seinen Besitzer
+    // wehrt: zumacht, waehrend er hineinsieht, oder aufgeht, nachdem
+    // er es weggeklickt hat.
+    connect(m_appletVis, &AppletVisibilityController::visibilityChanged,
+            this, [this](const QString& id, bool) {
+        if (id == QStringLiteral("Ft8Slots")) {
+            m_ft8SlotsAutomatik.betreiberHatGegriffen();
+        }
     });
 
     // EqApplet — Equalizer, Empfang und Senden (eingehaengt 2026-10-11).

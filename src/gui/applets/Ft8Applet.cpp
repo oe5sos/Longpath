@@ -2575,6 +2575,25 @@ void Ft8Applet::zeigeFundZahl()
     // zeigt sie, aber das ist ab Werk aus -- wer es nicht geoeffnet
     // hat, sieht nicht, dass zwei Stationen auf ihn warten. Eine
     // Warteschlange, die niemand sieht, ist keine.
+    // ── Wie viele QSOs laufen (2026-10-30) ──────────────────
+    //
+    // Betreiber: „so sehe ich nicht, ob und wie viele qso gleich
+    // ablaufen und welches wie weit sie sind."
+    //
+    // Das Plaetze-Panel zeigt beides ausfuehrlich, ist aber nicht
+    // immer offen. Die ZAHL gehoert darum auch hierher -- sie
+    // beantwortet „laeuft ueberhaupt was" ohne ein zweites Fenster.
+    // Wie weit jedes ist, bleibt dem Panel: fuenf Striche je QSO
+    // passen in keine Kopfzeile.
+    const int laufend = mehrfachAn()
+                            ? m_mehrfach.aktive()
+                            : (m_ablauf.laeuft()
+                               && !m_ablauf.partner().isEmpty() ? 1 : 0);
+    if (laufend > 0) {
+        text += QStringLiteral(" \u00b7 ")
+                + (laufend == 1 ? tr("1 QSO") : tr("%1 QSOs").arg(laufend));
+    }
+
     const int warten =
         m_schlange.wartende(QDateTime::currentMSecsSinceEpoch());
     if (warten > 0) {

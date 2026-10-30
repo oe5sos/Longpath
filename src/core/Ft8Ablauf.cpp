@@ -271,6 +271,36 @@ bool Ft8Ablauf::verarbeite(const QString& nachricht, int snr)
             // keines. Wer sich verabschiedet, wird nicht angerufen.
             if (Ft8Ablauf::istAbschied(letztes)) { return false; }
 
+            // ── Er ist schon weiter als ich (2026-10-30) ──────
+            //
+            // Am Geraet gemessen, FT4 auf 40 m:
+            //
+            //   19:00:21 … 19:01:20  DL7ACA OE5SOS +13   (fuenfmal)
+            //            -> aufgegeben, CQ laeuft weiter
+            //   19:01:52  OE5SOS DL7ACA R-13
+            //
+            // Seine Antwort kam 32 s nach meiner letzten Sendung --
+            // da hatte der Ablauf laengst aufgegeben und rief wieder
+            // CQ. Das „R" vor der Zahl heiszt aber: er HAT meinen
+            // Rapport, er bestaetigt ihn. Ihm jetzt noch einmal einen
+            // Rapport zu schicken wirft das QSO um einen ganzen Zug
+            // zurueck -- und bei einer Station, die ohnehin schwer
+            // durchkommt, heiszt das meistens: gar kein QSO.
+            //
+            // Ihm fehlt nur noch das RR73. Dieselbe Unterscheidung
+            // trifft `Zustand::RufeAn` seit jeher
+            // (`istBestaetigterRapport`); hier fehlte sie.
+            //
+            // Betreiber dazu: „das muss alles automatisch laufen."
+            if (istBestaetigterRapport(letztes)) {
+                m_partner         = vonWem;
+                m_reportGesendet  = snr;
+                m_reportEmpfangen = rapportAus(letztes);
+                m_wiederholungen  = 0;
+                m_zustand         = Zustand::SendeRR73;
+                return true;
+            }
+
             // Jemand antwortet auf mein CQ — mit Locator oder blank.
             m_partner        = vonWem;
             if (wieLocator(letztes)) { m_partnerLocator = letztes; }
