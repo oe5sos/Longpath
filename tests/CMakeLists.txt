@@ -8039,6 +8039,14 @@ longpath_add_test(tst_flex_wasserfall_kachel)
 longpath_add_test(tst_flex_senden)
 longpath_add_test(tst_flex_sendetakt)
 
+# 2026-10-30: dreiundzwanzig Mal „getastet, OHNE je eine
+# Verriegelungsmeldung gehoert zu haben" in einem Protokoll von
+# vierzig Minuten. Am Geraet nachgemessen kommt die Lage sehr wohl.
+# Dieser Stand fuehrt die GEMESSENEN Zeilen durch den eigenen Leser
+# — tst_flex_senden prueft nur die Auswertung handgeschriebener
+# Schluesselpaare dahinter.
+longpath_add_test(tst_flex_verriegelung_am_draht)
+
 # 2026-10-30: der 80-kHz-Versatz beim Verbinden ist offen, und das
 # Protokoll nannte nie, WER die Scheibe verstellt. Die Spur in
 # MainWindow_Flex.cpp nennt ihn; dieser Stand prueft ihr Urteil in

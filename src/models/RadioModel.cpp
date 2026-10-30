@@ -7103,41 +7103,28 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                 }
             }
 
-            if (!m_flexAudioWanted) { return; }
-
-            if (object.startsWith(QLatin1String("radio"))
-                && kv.contains(QStringLiteral("mute_local_audio_when_remote"))) {
-                m_flexMuteLocalWas =
-                    kv.value(QStringLiteral("mute_local_audio_when_remote"));
-            }
-
-            if (object.startsWith(QLatin1String("slice "))
-                && kv.contains(QStringLiteral("audio_level"))) {
-                m_flexSliceId       = object.split(QLatin1Char(' ')).value(1);
-                m_flexAudioLevelWas = kv.value(QStringLiteral("audio_level"));
-                m_flexAudioMuteWas  = kv.value(QStringLiteral("audio_mute"));
-                applyFlexAudioSetup();
-
-                // Was ohne Scheibennummer nicht hinausgehen konnte,
-                // geht jetzt hinaus — siehe setFlexSliceMode().
-                if (!m_flexSliceId.isEmpty()) {
-                    if (m_flexHatArtNachzutragen) {
-                        m_flexHatArtNachzutragen = false;
-                        setFlexSliceMode(m_flexArtNachzutragen);
-                    }
-                    if (m_flexHatFlankenNachzutragen) {
-                        m_flexHatFlankenNachzutragen = false;
-                        setFlexSliceFilter(m_flexFlankeTiefNachzutragen,
-                                           m_flexFlankeHochNachzutragen);
-                    }
-                    if (m_flexHatRauschNachzutragen) {
-                        m_flexHatRauschNachzutragen = false;
-                        setFlexSliceNoise(m_flexZuletztNr, m_flexZuletztNb,
-                                          m_flexZuletztAnf);
-                    }
-                }
-            }
-
+            // ── Die Verriegelung gehoert VOR das Tontor (2026-10-30) ─
+            //
+            // Hier stand bis heute nur `if (!m_flexAudioWanted) return;`
+            // — und alles, was unten folgte, lag dahinter: die
+            // Verriegelung der Maschine ebenso wie die Zeile „welche
+            // Zustandsart kam zum ersten Mal". Der Ton ist ein Wunsch
+            // des Betreibers; die Lage der Maschine ist eine
+            // Sicherheitsfrage. Beides am selben Schalter war falsch.
+            //
+            // Gemessen im Protokoll vom 2026-10-30
+            // (longpath-20261030-182157.log): dreiundzwanzig Mal
+            // „getastet, OHNE je eine Verriegelungsmeldung gehoert zu
+            // haben", bei jeder FT8-Sendung, vierzig Minuten lang. Am
+            // Geraet nachgemessen schickt die Flex die Lage sehr wohl,
+            // 0,20 s nach dem Anmelden und danach bei jeder Aenderung:
+            //
+            //   interlock tx_client_handle=0x00000000 state=READY
+            //             reason= source= tx_allowed=1 amplifier=
+            //   interlock ... state=NOT_READY reason=OUT_OF_PA_RANGE
+            //
+            // Siehe tests/tst_flex_verriegelung_am_draht.cpp, das diese
+            // Zeilen durch den Leser fuehrt.
             // ── Die Verriegelung der Maschine (2026-10-23, Stufe 2) ──
             //
             // Bis heute wurde sie nur gelesen, um sie zu ignorieren —
@@ -7173,6 +7160,41 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
 
             if (object.trimmed() == QLatin1String("interlock")) {
                 verarbeiteFlexVerriegelung(kv);
+            }
+
+            if (!m_flexAudioWanted) { return; }
+
+            if (object.startsWith(QLatin1String("radio"))
+                && kv.contains(QStringLiteral("mute_local_audio_when_remote"))) {
+                m_flexMuteLocalWas =
+                    kv.value(QStringLiteral("mute_local_audio_when_remote"));
+            }
+
+            if (object.startsWith(QLatin1String("slice "))
+                && kv.contains(QStringLiteral("audio_level"))) {
+                m_flexSliceId       = object.split(QLatin1Char(' ')).value(1);
+                m_flexAudioLevelWas = kv.value(QStringLiteral("audio_level"));
+                m_flexAudioMuteWas  = kv.value(QStringLiteral("audio_mute"));
+                applyFlexAudioSetup();
+
+                // Was ohne Scheibennummer nicht hinausgehen konnte,
+                // geht jetzt hinaus — siehe setFlexSliceMode().
+                if (!m_flexSliceId.isEmpty()) {
+                    if (m_flexHatArtNachzutragen) {
+                        m_flexHatArtNachzutragen = false;
+                        setFlexSliceMode(m_flexArtNachzutragen);
+                    }
+                    if (m_flexHatFlankenNachzutragen) {
+                        m_flexHatFlankenNachzutragen = false;
+                        setFlexSliceFilter(m_flexFlankeTiefNachzutragen,
+                                           m_flexFlankeHochNachzutragen);
+                    }
+                    if (m_flexHatRauschNachzutragen) {
+                        m_flexHatRauschNachzutragen = false;
+                        setFlexSliceNoise(m_flexZuletztNr, m_flexZuletztNb,
+                                          m_flexZuletztAnf);
+                    }
+                }
             }
         });
 
