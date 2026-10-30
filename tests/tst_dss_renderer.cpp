@@ -11,6 +11,9 @@
 
 #include "gui/DssRenderer.h"
 
+#include <cmath>
+#include <cstdlib>
+
 using namespace Longpath;
 
 namespace {
@@ -37,6 +40,8 @@ private slots:
     void higherNearerTraceHidesTheFartherOneCompletely();
     void deferredCrestPartialBlendsOverTheFartherCurtain();
     void scaleStripStaysTransparent();
+    void trueScaleKeepsACarrierAboveItsOwnFrequency();
+    void perspectiveMovesTheSameCarrierTowardTheCentre();
 };
 
 void TestDssRenderer::emptyRendererHasNoData()
@@ -309,6 +314,89 @@ void TestDssRenderer::scaleStripStaysTransparent()
     QCOMPARE(qAlpha(tall.pixel(100, 0)), 255);
     QCOMPARE(qAlpha(tall.pixel(100, 1)), 0);
     QCOMPARE(qAlpha(tall.pixel(100, 399)), 0);
+}
+
+namespace {
+// x of the TOPMOST painted pixel in the picture. With every row carrying
+// the same single carrier, that is the carrier in the farthest (highest)
+// row -- exactly the row the perspective displaces the most.
+int xOfHighestPaintedPixel(const QImage& img, const QColor& bg)
+{
+    for (int y = 0; y < img.height(); ++y) {
+        for (int x = 0; x < img.width(); ++x) {
+            const QColor c(img.pixel(x, y));
+            const int d = std::abs(c.red()   - bg.red())
+                        + std::abs(c.green() - bg.green())
+                        + std::abs(c.blue()  - bg.blue());
+            if (d > 24) { return x; }
+        }
+    }
+    return -1;
+}
+
+// One loud column, everything else at the noise floor.
+QVector<float> carrierRow(int column, float floorDbm, float rangeDb)
+{
+    QVector<float> row(DssRenderer::kCols, floorDbm);
+    row[column] = floorDbm + rangeDb;
+    return row;
+}
+}  // namespace
+
+// Betreiber 2026-10-28, mit Bild: im Wasserfall stand der Traeger auf
+// 14.0758 MHz, in der 3D-Flaeche auf 14.1066 -- 31 kHz daneben. Das ist
+// die geerbte Perspektive, kein Verdrahtungsfehler. Frequenztreu steht
+// die Spitze in JEDER Zeile ueber derselben Spalte.
+void TestDssRenderer::trueScaleKeepsACarrierAboveItsOwnFrequency()
+{
+    const float floorDbm = -100.0f;
+    const float rangeDb  = 50.0f;
+    const int   column   = 100;          // links der Mitte (kCols/2 = 384)
+    const QColor bg(0, 0, 0);
+    auto palette = [](float) -> QRgb { return qRgb(255, 0, 0); };
+
+    DssRenderer dss;
+    dss.setBackWidthFrac(DssRenderer::kTrueScaleWidthFrac);
+    QCOMPARE(dss.backWidthFrac(), DssRenderer::kTrueScaleWidthFrac);
+    for (int i = 0; i < DssRenderer::kVisibleRows; ++i) {
+        dss.pushRow(carrierRow(column, floorDbm, rangeDb));
+    }
+
+    // W == kCols, also ist Spalte c in der vordersten Zeile x == c.
+    const QImage& img = dss.image(QSize(DssRenderer::kCols, 300), 0,
+                                  floorDbm, rangeDb, 1.0f, palette, 1, bg);
+    const int x = xOfHighestPaintedPixel(img, bg);
+    QVERIFY2(x >= 0, "nichts gezeichnet");
+    QVERIFY2(std::abs(x - column) <= 3,
+             qPrintable(QStringLiteral("hinterste Zeile bei x=%1 statt %2")
+                            .arg(x).arg(column)));
+}
+
+// Die Gegenprobe: mit der geerbten Perspektive wandert derselbe Traeger
+// deutlich zur Mitte. Ohne sie belegte der Prueflauf oben nichts.
+void TestDssRenderer::perspectiveMovesTheSameCarrierTowardTheCentre()
+{
+    const float floorDbm = -100.0f;
+    const float rangeDb  = 50.0f;
+    const int   column   = 100;
+    const QColor bg(0, 0, 0);
+    auto palette = [](float) -> QRgb { return qRgb(255, 0, 0); };
+
+    DssRenderer dss;
+    dss.setBackWidthFrac(DssRenderer::kBackWidthFrac);
+    for (int i = 0; i < DssRenderer::kVisibleRows; ++i) {
+        dss.pushRow(carrierRow(column, floorDbm, rangeDb));
+    }
+
+    const QImage& img = dss.image(QSize(DssRenderer::kCols, 300), 0,
+                                  floorDbm, rangeDb, 1.0f, palette, 1, bg);
+    const int x = xOfHighestPaintedPixel(img, bg);
+    QVERIFY2(x >= 0, "nichts gezeichnet");
+    // Rechnung: depthFrac ~ 95/96, rowWidthFrac ~ 0.604, inset ~ 152 px,
+    // also x ~ 152 + 100 * 464/767 ~ 212.
+    QVERIFY2(x > column + 80,
+             qPrintable(QStringLiteral("Perspektive verschob nur auf x=%1")
+                            .arg(x)));
 }
 
 QTEST_MAIN(TestDssRenderer)

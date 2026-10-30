@@ -432,12 +432,25 @@ private:
     // to keep the displayed value calm — RadioStatus::powerChanged fires
     // ~twice per hardware sample, which makes raw values visibly jittery).
     double   m_fwdPowerSmoothedW{0.0};
+    /// Spitzenwerthalt waehrend einer Sendung (PEP), siehe
+    /// wireControls(): die Flex schickt FWDPWR nicht in jedem Paket,
+    /// und Sprache hat keine konstante Huellkurve.
+    bool     m_inTx{false};
+    double   m_fwdPeakW{0.0};
+    /// Bis wann nach dem Loesen keine Leistungswerte angenommen
+    /// werden (Uhrzeit in ms). Der Messwertstrom der Flex laeuft
+    /// dem Loesen hinterher, siehe wireControls().
+    qint64   m_fwdSperreBisMs{0};
     // 3. RF Power
     QSlider* m_rfPowerSlider  = nullptr;
     QLabel*  m_rfPowerValue   = nullptr;
     // 4. Tune Power
     QSlider* m_tunePwrSlider  = nullptr;
     QLabel*  m_tunePwrValue   = nullptr;
+    /// Nur am Flex-Sendeweg sichtbar, siehe zeigeFlexMikRegler().
+    QSlider*     m_flexMikSlider = nullptr;
+    QLabel*      m_flexMikValue  = nullptr;
+    QHBoxLayout* m_flexMikRow    = nullptr;
     // ── 4b. VOX row (3M-3a-iii bench polish 2026-05-04) ───────────────────
     // Relocated from PhoneCwApplet (Phone tab Control #10).  Layout:
     //   [VOX btn 48px] [Threshold slider + DexpPeakMeter stack][-N dB inset]

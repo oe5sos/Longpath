@@ -556,6 +556,13 @@ private slots:
     //
     // Dieser Stand haelt die Rechnung an den Konstanten des Malwerks
     // fest, damit sie nicht still auseinanderlaufen.
+    //
+    // Nachtrag 2026-10-28: der Betreiber schickte das Bild noch einmal
+    // („wieder....."), gemessen 31 kHz bei einem Traeger 75 kHz neben
+    // der Mitte. Seitdem gibt es den frequenztreuen Weg
+    // (`DssRenderer::kTrueScaleWidthFrac`, Haken „True frequency
+    // scale" im Rechtsklickblatt, Vorgabe an) — die Rechnung hier gilt
+    // weiter fuer den perspektivischen.
     void diePerspektiveVerschiebtBisZuEinemFuenftel()
     {
         const double f    = DssRenderer::kBackWidthFrac;

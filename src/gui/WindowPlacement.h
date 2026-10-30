@@ -172,9 +172,10 @@ void snapToGridAfterSettle(QWidget* w, int grid = kSnapGridPx,
 ///
 /// ── Zwei bekannte Schwächen, bewusst stehen gelassen ────────────────
 ///
-/// Beide stammen aus dem Ursprung und werden hier NICHT behoben, weil
-/// eine Verhaltensänderung an dieser Stelle jedes freistehende Fenster
-/// betrifft. Wer sie angeht, tut es als eigenen Schritt:
+/// Beide stammen aus dem Ursprung. Eine Verhaltensänderung an dieser
+/// Stelle betrifft JEDES freistehende Fenster — wer eine angeht, tut
+/// es als eigenen Schritt, mit Gegenprobe. Die zweite ist am
+/// 2026-10-30 so angegangen worden; die erste steht weiter offen:
 ///
 ///  1. `(0,0)` wird als „keine Geometrie" gelesen. Das ist ein gültiger
 ///     Wert, der als Sonderfall missbraucht wird: auf einem Aufbau mit
@@ -184,12 +185,16 @@ void snapToGridAfterSettle(QWidget* w, int grid = kSnapGridPx,
 ///     eigenes Feld „Geometrie vorhanden ja/nein" im gespeicherten
 ///     Satz, statt einen Wert doppelt zu belegen.
 ///
-///  2. Der Sichtbarkeitstest ist `intersects()` — ein Bildpunkt
-///     Überlappung zählt als sichtbar. Ein Fenster, das zu 99 % über
-///     die Kante hängt, gilt damit als in Ordnung. Sinnvoll wäre eine
-///     Mindestfläche in der Grössenordnung von 80 × 40 px, also
-///     genug, um das Fenster mit der Maus wieder hereinziehen zu
-///     können.
+///  2. ~~Der Sichtbarkeitstest ist `intersects()`~~ — **behoben am
+///     2026-10-30.** Ein Bildpunkt Überlappung zählte als sichtbar,
+///     ein Fenster, das zu 99 % über die Kante hing, galt als in
+///     Ordnung. Am Gerät gesehen: das FT8-Panel stand links über der
+///     Schirmkante, der Titel war auf „T8 DECODER" abgeschnitten.
+///     Jetzt gilt die Mindestfläche, die hier schon vorgeschlagen
+///     war — 80 × 40 px, dieselben zwei Zahlen, die `nearAnchor` im
+///     selben Unterprogramm längst benutzte. Am Fenster gedeckelt:
+///     ein Fenster, das selbst schmaler ist, könnte die Bedingung
+///     sonst nie erfüllen.
 void ensureOnVisibleScreen(QWidget* w, QWidget* anchor, QSize minSize);
 
 // ── Liegt etwas darueber? ────────────────────────────────────────────

@@ -623,6 +623,15 @@ RadioModel::RadioModel(QObject* parent)
         }
     }
 
+    // Die Aussteuerung des Flex-Mikrofonwegs, siehe RadioModel.h.
+    // Sie gehoert dem Betreiber und nicht der Maschine: sie sagt, wie
+    // heisz LONGPATH die Flex fuettert, nicht was die Flex damit tut.
+    {
+        const auto& s = AppSettings::instance();
+        m_flexMikGainDb = std::clamp(
+            s.value(QStringLiteral("FlexMikGainDb"), 0).toInt(), -20, 30);
+    }
+
     // Sprachspeicher: Ordner neben die Einstellungsdatei legen und
     // laden. Neben die Einstellungen und nicht in den Programmordner —
     // dort ueberlebt er ein Neuinstallieren, und genau das erwartet
@@ -7061,6 +7070,39 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
             // als Echo zurueck; die Wache `m_flexAudioWanted` sorgt
             // dafuer, dass wir nicht unseren eigenen Wert als „vorher"
             // ablegen.
+            // ── Rückweg: was die Maschine über ihr Rauschen sagt ──
+            //
+            // VOR der Wache darunter: die lässt nach dem ersten
+            // Tonaufbau jeden weiteren Scheibenschub fallen, und genau
+            // in denen stehen die Schalter, wenn jemand an der
+            // Maschine oder in SmartSDR dreht. Ohne das zeigte der
+            // Knopf, was Longpath zuletzt wollte, statt dessen, was
+            // das Gerät tut — wieder zwei Wahrheiten (2026-10-28).
+            if (object.startsWith(QLatin1String("slice "))
+                && (kv.contains(QStringLiteral("nr"))
+                    || kv.contains(QStringLiteral("nb"))
+                    || kv.contains(QStringLiteral("anf")))) {
+                // Fehlt ein Schlüssel im Schub, gilt der zuletzt
+                // bekannte Stand — ein Teilschub darf die anderen
+                // beiden nicht ausschalten.
+                auto lies = [&kv](const char* name, bool bisher) {
+                    const QString k = QString::fromLatin1(name);
+                    return kv.contains(k) ? (kv.value(k).trimmed() == QLatin1String("1"))
+                                          : bisher;
+                };
+                const bool nr  = lies("nr",  m_flexZuletztNr);
+                const bool nb  = lies("nb",  m_flexZuletztNb);
+                const bool anf = lies("anf", m_flexZuletztAnf);
+                if (nr != m_flexZuletztNr || nb != m_flexZuletztNb
+                    || anf != m_flexZuletztAnf || !m_flexRauschGeschickt) {
+                    m_flexZuletztNr  = nr;
+                    m_flexZuletztNb  = nb;
+                    m_flexZuletztAnf = anf;
+                    m_flexRauschGeschickt = true;
+                    emit flexSliceNoiseChanged(nr, nb, anf);
+                }
+            }
+
             if (!m_flexAudioWanted) { return; }
 
             if (object.startsWith(QLatin1String("radio"))
@@ -7087,6 +7129,11 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                         m_flexHatFlankenNachzutragen = false;
                         setFlexSliceFilter(m_flexFlankeTiefNachzutragen,
                                            m_flexFlankeHochNachzutragen);
+                    }
+                    if (m_flexHatRauschNachzutragen) {
+                        m_flexHatRauschNachzutragen = false;
+                        setFlexSliceNoise(m_flexZuletztNr, m_flexZuletztNb,
+                                          m_flexZuletztAnf);
                     }
                 }
             }
@@ -7206,6 +7253,19 @@ std::optional<double> RadioModel::flexPegelDbm() const
     return m_flexPegelDbm;
 }
 
+void RadioModel::stelleFt8SenderBereit()
+{
+    if (!m_ft8TxSource) {
+        m_ft8TxSource = std::make_unique<Ft8TxSource>(48000);
+    }
+    // Am Mikrofon-Router nur anmelden, wenn es ihn gibt. Beim Flex
+    // gibt es ihn nicht, und er wird auch nicht gebraucht: dort holt
+    // die Sendepumpe die Proben direkt aus dieser Quelle.
+    if (m_compositeMicRouter) {
+        m_compositeMicRouter->setFt8Source(m_ft8TxSource.get());
+    }
+}
+
 void RadioModel::zieheFlexPanadapterAuf(double hz)
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
@@ -7268,6 +7328,11 @@ bool RadioModel::sendeFlexBefehl(const QString& befehl)
     if (!m_flexConnection || !m_flexConnection->isConnected()) { return false; }
     m_flexConnection->sendCommand(befehl);
     return true;
+}
+
+bool RadioModel::istFlexVerbunden() const
+{
+    return m_flexConnection != nullptr && m_flexConnection->isConnected();
 }
 
 bool RadioModel::setzeFlexSendescheibe(const QString& sliceId)
@@ -7356,6 +7421,25 @@ bool RadioModel::setzeFlexSendeleistung(int prozent)
     }
     m_flexConnection->sendCommand(befehl);
     return true;
+}
+
+// Siehe RadioModel.h, flexMikGainDb(): die Zahlen, aus denen dieser
+// Regler entstanden ist, stehen dort.
+void RadioModel::setzeFlexMikGainDb(int db)
+{
+    // −20 dB macht ein zu heiszes Mikrofon brauchbar, +30 dB reicht
+    // vom gemessenen −9,7 dBFS bis an die Vollaussteuerung und darueber
+    // hinaus; weiter oben faengt der Riegel in der Pumpe es ohnehin ab.
+    const int geklemmt = std::clamp(db, -20, 30);
+    if (geklemmt == m_flexMikGainDb) { return; }
+    m_flexMikGainDb = geklemmt;
+
+    auto& s = AppSettings::instance();
+    s.setValue(QStringLiteral("FlexMikGainDb"), QString::number(geklemmt));
+    scheduleSettingsSave();
+
+    qCInfo(lcConnection) << "Flex: Mikrofonaussteuerung" << geklemmt << "dB";
+    emit flexMikGainGeaendert(geklemmt);
 }
 
 bool RadioModel::setzeFlexAbstimmleistung(int prozent)
@@ -7503,8 +7587,30 @@ void RadioModel::verarbeiteFlexVerriegelung(const QMap<QString, QString>& kv)
     // Also: gehoert ist nur, was ueber `tx_allowed` wirklich gesagt
     // wurde. Alles andere bleibt Schweigen — und Schweigen ist kein
     // Verbot.
+    // ── Nachtrag 2026-10-29: `tx_allowed` ist nicht die Erlaubnis ───
+    //
+    // Am Geraet gemessen, mit einer zweiten Verbindung neben Longpath
+    // mitgelesen:
+    //
+    //   19:52:31  state=NOT_READY  reason=OUT_OF_BAND  tx_allowed=0
+    //   19:56:12  state=RECEIVE    reason=            tx_allowed=0
+    //
+    // Die Scheibe lag beim Verbinden ausserhalb des Bandes; das erste
+    // Nein war richtig. Danach stand sie auf 7,177 MHz, die Maschine
+    // ging auf RECEIVE — und schickte weiter `tx_allowed=0`.
+    //
+    // `tx_allowed` heiszt bei dieser Maschine NICHT „du darfst
+    // tasten", sondern „es wird gerade gesendet / die Taste ist
+    // durchgelassen". Im Ruhezustand ist es immer 0. Ein Tor, das
+    // darauf wartet, geht nie wieder auf: der Betreiber bekam weder
+    // TUNE noch MOX, und davor ging beides nur deshalb, weil ueberhaupt
+    // keine Verriegelungsmeldung ankam.
+    //
+    // Die Erlaubnis steht in der LAGE. Gesperrt wird bei einer echten
+    // Stoerung — sonst wird getastet, und die Maschine hat ohnehin ihre
+    // eigene Verriegelung hinter unserer.
     if (!m_flexVerriegelungGehoert
-        && kv.contains(QStringLiteral("tx_allowed"))) {
+        && kv.contains(QStringLiteral("state"))) {
         m_flexVerriegelungGehoert = true;
     }
 
@@ -7521,9 +7627,17 @@ void RadioModel::verarbeiteFlexVerriegelung(const QMap<QString, QString>& kv)
                              << felder.join(QLatin1Char(' '));
     }
 
-    if (kv.contains(QStringLiteral("tx_allowed"))) {
-        const bool darf = kv.value(QStringLiteral("tx_allowed")).trimmed()
-                          != QStringLiteral("0");
+    // Die Lagen, in denen die Maschine wirklich nicht senden kann.
+    // Alles andere — RECEIVE, READY, PTT_REQUESTED, TRANSMITTING,
+    // UNKEY_REQUESTED — ist Betrieb und kein Verbot.
+    if (kv.contains(QStringLiteral("state"))) {
+        static const QSet<QString> kSperrendeLagen = {
+            QStringLiteral("NOT_READY"),     // z. B. Grund OUT_OF_BAND
+            QStringLiteral("TIMEOUT"),       // Sendezeitdeckel gelaufen
+            QStringLiteral("STUCK_INPUT"),   // Taste haengt
+            QStringLiteral("BOOT"),          // faehrt noch hoch
+        };
+        const bool darf = !kSperrendeLagen.contains(m_flexVerriegelungsLage);
         if (darf != m_flexDarfSenden) {
             m_flexDarfSenden = darf;
             emit flexSendefreigabeGeaendert(darf);
@@ -8065,6 +8179,39 @@ void RadioModel::setFlexSliceFilter(int lowHz, int highHz)
     const QString befehl =
         FlexCommandWire::setSliceFilterCommand(m_flexSliceId, lowHz, highHz);
     if (befehl.isEmpty()) { return; }
+    m_flexConnection->sendCommand(befehl);
+}
+
+void RadioModel::setFlexSliceNoise(bool nr, bool nb, bool anf)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexSliceId.isEmpty()) {   // siehe setFlexSliceMode()
+        m_flexZuletztNr  = nr;
+        m_flexZuletztNb  = nb;
+        m_flexZuletztAnf = anf;
+        m_flexHatRauschNachzutragen = true;
+        return;
+    }
+    // Einmal MUSS es hinaus, auch wenn alles aus ist: sonst bliebe
+    // eine Maschine, die mit eingeschalteter Rauschminderung dasteht,
+    // auf ihrem Wert, waehrend Longpath „aus" zeigt. Danach nur noch
+    // bei echter Aenderung.
+    if (m_flexRauschGeschickt
+        && nr == m_flexZuletztNr
+        && nb == m_flexZuletztNb
+        && anf == m_flexZuletztAnf) {
+        return;
+    }
+    m_flexZuletztNr  = nr;
+    m_flexZuletztNb  = nb;
+    m_flexZuletztAnf = anf;
+    m_flexRauschGeschickt = true;
+
+    const QString befehl =
+        FlexCommandWire::setSliceNoiseCommand(m_flexSliceId, nr, nb, anf);
+    if (befehl.isEmpty()) { return; }
+    qCInfo(lcConnection) << "Flex: Rauschminderung — nr" << nr
+                         << "nb" << nb << "anf" << anf;
     m_flexConnection->sendCommand(befehl);
 }
 

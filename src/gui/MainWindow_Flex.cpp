@@ -65,6 +65,8 @@
 #include "gui/MainWindow.h"
 
 #include "core/AudioEngine.h"
+#include "core/Ft8Tx.h"
+#include "core/MoxController.h"
 #include "core/FlexVitaStream.h"
 // Fuer den Anspruchs-Abgleich: Kiwi fuehrt seine Zuordnung in einer
 // eigenen Tabelle, nicht ueber streamIndex().
@@ -72,7 +74,12 @@
 #include "gui/meters/MeterPoller.h"
 #include "gui/ConnectionPanel.h"
 #include "core/ClarityController.h"
+#include "core/AppSettings.h"
 #include <QTimer>
+#include <cmath>
+
+#include "core/FlexFrequenzSpur.h"
+#include <algorithm>
 #include "gui/SpectrumWidget.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -230,7 +237,100 @@ void MainWindow::wireFlex()
             m_radioModel->tuneFlexSlice(hz);
         });
 
-        // ── Betriebsart und Filterbreite, derselbe Weg ──────────────
+        // ── Die Spur der Frequenz (2026-10-30) ──────────────────────
+        //
+        // Der offene Befund vom 2026-10-29: beim Verbinden steht die
+        // Scheibe reproduzierbar neben der Maschine, und zwar jedes Mal um
+        // dieselben 80 kHz.
+        //
+        //     Geraet 7.1790 MHz -> Scheibe las 7.2590 MHz
+        //     Geraet 7.3086 MHz -> Scheibe las 7.3886 MHz
+        //     Geraet 7.0740 MHz -> Scheibe las 7.1540 MHz   (30.10., 10:03)
+        //
+        // Durch Lesen ist es nicht zu klaeren, und zwar aus einem
+        // belegbaren Grund: im Protokoll steht jede Meldung der MASCHINE
+        // ("Scheibe 0 auf 7074000 Hz", FlexRadioConnection), aber keine
+        // einzige Zeile darueber, wer die Scheibe im Programm verstellt.
+        // Am 30.10. meldete die Maschine 7.074 und blieb dort — der
+        // Versatz entstand also auf unserer Seite, zwischen zwei Zeilen,
+        // die sechs Millisekunden auseinander liegen.
+        //
+        // Also wird gemessen statt vermutet. Fuenfzehn Sekunden nach dem
+        // Verbinden bekommt jede Frequenzaenderung der Scheibe eine Zeile:
+        // alt, neu, Unterschied, der Stand der Wache (gesetzt = der Wert
+        // kam von der Maschine, offen = das Programm selbst hat
+        // geschrieben), dazu was die Maschine in diesem Augenblick meldet
+        // und wo das Fenster steht. Der erste Start nach dieser Aenderung
+        // benennt den Schreiber.
+        //
+        // Danach ist still: die Frist laeuft ab, und ohne Aenderung sagt
+        // die Spur nichts. Siehe auch
+        // feedback-abwesenheit-ist-keine-aussage — ein Lauf ohne Zeile
+        // heiszt "nichts hat geschoben", nicht "die Spur hat versagt".
+        disconnect(m_flexFreqSpur);
+        m_flexSpurBisMs = QDateTime::currentMSecsSinceEpoch() + 15000;
+        m_flexSpurLetzteHz = ziel->frequency();
+        m_flexFreqSpur = connect(ziel, &SliceModel::frequencyChanged, this,
+                [this](double hz) {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            if (QDateTime::currentMSecsSinceEpoch() > m_flexSpurBisMs) { return; }
+            const double vorher = m_flexSpurLetzteHz;
+            m_flexSpurLetzteHz = hz;
+            if (qFuzzyCompare(vorher, hz)) { return; }
+            const double geraet = m_radioModel->flexGeraeteFrequenzHz();
+            double fenster = 0.0;
+            if (SpectrumWidget* sw = m_radioModel->spectrumWidget()) {
+                fenster = sw->centerFrequency();
+            }
+            const double abstand = (geraet > 0.0) ? (hz - geraet) : 0.0;
+            // Laut werden, wenn das Programm selbst von der Maschine
+            // weglaeuft: genau das ist der gesuchte Fall. Das Urteil
+            // steht in FlexFrequenzSpur.h, weil es geprueft wird —
+            // eine Spur, die bei jedem Handgriff schreit, ist Laerm.
+            const bool verdaechtig = FlexFrequenzSpur::istVersatz(
+                hz, geraet, m_flexApplyingRemoteState);
+            // Die Worte gehoeren in die `<<`-Kette, nicht in eine
+            // QString-Variable (2026-10-30). `tst_oberflaeche_englisch`
+            // sucht in src/gui nach deutschem Text in tr() /
+            // QStringLiteral() und neutralisiert dabei Zeilen, die mit
+            // `qC` oder `<<` beginnen — also genau die Protokollzeilen.
+            // Ein `QString satz = QStringLiteral("… von der Maschine")`
+            // steht auszerhalb dieser Ausnahme und zaehlte als deutsche
+            // Beschriftung: die Decke 9 ging auf 11, zwei Scherben rot.
+            // Dieselbe Falle wie am Morgen desselben Tages bei der
+            // Sprechblase des 2D/3D-Knopfes — nur ist das hier wirklich
+            // ein Protokolltext, also wird er wie jeder andere in
+            // dieser Datei geschrieben.
+            const auto mhz = [](double v) {
+                return QString::number(v / 1.0e6, 'f', 6);
+            };
+            const auto khz = [](double v) {
+                return QString::number(v / 1.0e3, 'f', 3);
+            };
+            if (verdaechtig) {
+                // Verdaechtig heiszt per Definition: die Wache war offen.
+                qCWarning(lcFlexGui).noquote().nospace()
+                    << "Flex-Spur: Scheibe " << m_flexTargetSliceId << "  "
+                    << mhz(vorher) << " -> " << mhz(hz) << " MHz ("
+                    << khz(hz - vorher) << " kHz), Wache offen (vom "
+                    << "Programm), Maschine meldet " << mhz(geraet)
+                    << " MHz, Fenster " << mhz(fenster)
+                    << " MHz — DAS IST DER VERSATZ: " << khz(abstand)
+                    << " kHz neben der Maschine";
+            } else {
+                qCInfo(lcFlexGui).noquote().nospace()
+                    << "Flex-Spur: Scheibe " << m_flexTargetSliceId << "  "
+                    << mhz(vorher) << " -> " << mhz(hz) << " MHz ("
+                    << khz(hz - vorher) << " kHz), Wache "
+                    << (m_flexApplyingRemoteState
+                            ? "gesetzt (von der Maschine)"
+                            : "offen (vom Programm)")
+                    << ", Maschine meldet " << mhz(geraet)
+                    << " MHz, Fenster " << mhz(fenster) << " MHz";
+            }
+        });
+
+    // ── Betriebsart und Filterbreite, derselbe Weg ──────────────
         //
         // Bis zum 2026-10-22 ging nur die Frequenz hinaus — und auch
         // die nicht (siehe oben). Mit dem Abstimmen allein hoerte der
@@ -258,11 +358,72 @@ void MainWindow::wireFlex()
             m_radioModel->setFlexSliceFilter(tief, hoch);
         });
 
+        // ── Rauschminderung: der Knopf schaltet die MASCHINE ────────
+        //
+        // Der Betreiber am 2026-10-28: „ich kann zwar klicken, aber
+        // kein unterschied zu hören." Flex-Ton kommt fertig
+        // demoduliert in den Mischer; Longpaths NR/NB/ANF sitzen im
+        // WDSP-Empfangskanal, den dieser Ton nie durchläuft. Also
+        // gehen die drei Schalter dorthin, wo gerechnet wird.
+        //
+        // Longpath kennt vier Verfahren und einen Dreifachschalter für
+        // den Austaster, die Maschine je einen Schalter. Übersetzt
+        // wird auf AN/AUS: welches Verfahren im Gerät läuft, bestimmt
+        // das Gerät — eine NR2-Marke an einem fremden Algorithmus wäre
+        // eine Beschriftung, die nichts bedeutet.
+        auto rauschHinaus = [this]() {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            SliceModel* s = m_radioModel
+                ? m_radioModel->sliceById(m_flexTargetSliceId) : nullptr;
+            if (!s) { return; }
+
+            // ── Wer rechnet: die Maschine oder Longpath? ─────────────
+            //
+            // Betreiber am 2026-10-28: „aber jeder nr sollte anders
+            // funktionieren! das ist bei anvelina ja schon!" Also
+            // teilen sich die Steckplaetze auf:
+            //
+            //   NR1 / NR2 / NR4  die Maschine (anr, emnr und sbnr sind
+            //                    WDSP-Einheiten und haben auf fertigem
+            //                    Ton kein Gegenstueck)
+            //   NR3              rnnoise in Longpath
+            //   MNR              Apple Accelerate in Longpath
+            //
+            // Nie beide zugleich: zwei Minderungen hintereinander
+            // klingen nach Eimer, und keiner der beiden Regler wuerde
+            // dann noch das tun, was auf ihm steht.
+            const NrSlot gewaehlt = s->activeNr();
+            const bool eigenesVerfahren =
+                (gewaehlt == NrSlot::NR3 || gewaehlt == NrSlot::MNR);
+
+            if (AudioEngine* ae = m_radioModel->audioEngine()) {
+                ae->setExternalAudioNr(s->sliceIndex(),
+                                       eigenesVerfahren ? gewaehlt : NrSlot::Off,
+                                       1.0f);
+            }
+
+            m_radioModel->setFlexSliceNoise(
+                gewaehlt != NrSlot::Off && !eigenesVerfahren,
+                s->nbMode() != NbMode::Off,
+                s->anfEnabled());
+        };
+        disconnect(m_flexNrBand);
+        m_flexNrBand = connect(ziel, &SliceModel::activeNrChanged, this,
+                               [rauschHinaus](NrSlot) { rauschHinaus(); });
+        disconnect(m_flexNbBand);
+        m_flexNbBand = connect(ziel, &SliceModel::nbModeChanged, this,
+                               [rauschHinaus](NbMode) { rauschHinaus(); });
+        disconnect(m_flexAnfBand);
+        m_flexAnfBand = connect(ziel, &SliceModel::anfEnabledChanged, this,
+                                [rauschHinaus](bool) { rauschHinaus(); });
+
         // Und einmal gleich jetzt, damit die Maschine mit dem
         // uebereinstimmt, was im Fenster steht — sonst gilt der
         // Unterschied bis zum ersten Drehen weiter.
         m_radioModel->setFlexSliceMode(ziel->dspMode());
         m_radioModel->setFlexSliceFilter(ziel->filterLow(), ziel->filterHigh());
+        rauschHinaus();
 
         // ── Beim VERBINDEN gewinnt die MASCHINE ─────────────────────
         //
@@ -299,11 +460,64 @@ void MainWindow::wireFlex()
                 << "Flex: das Profil stellte " << (s->frequency() / 1.0e6)
                 << " MHz her, die Maschine steht auf " << (geraet / 1.0e6)
                 << " MHz — die Maschine gewinnt";
-            // Die Wache setzen: sonst schickt die Scheibe die eben
-            // uebernommene Frequenz als Befehl zurueck.
-            m_flexApplyingRemoteState = true;
-            s->setFrequency(geraet);
-            m_flexApplyingRemoteState = false;
+            // ── Aber nicht auszerhalb des Bandes (2026-10-29) ───────
+            //
+            // Betreiber, an diesem Abend zum sechsten Mal: „wieder
+            // falsches band". Die Maschine stand auf 7.3086 MHz — in
+            // Region 1 kein 40 m mehr, sondern Rundfunk. „Die Maschine
+            // gewinnt" hielt ihn also zuverlaessig dort fest, wo er
+            // nicht sein wollte, und die Flex meldete folgerichtig
+            // `NOT_READY reason=OUT_OF_BAND`.
+            //
+            // Die Regel, die er genannt hat: „bandwechsel sollte immer
+            // in das amateurfunkband springen, nicht daneben." Also
+            // gewinnt die Maschine nur, solange sie auf einer
+            // Amateurfrequenz steht. Steht sie daneben, zieht Longpath
+            // sie auf das, was im Gedaechtnis des zuletzt benutzten
+            // Bandes steht — und wenn auch das daneben liegt, auf die
+            // Startfrequenz des Bandes.
+            //
+            // Von Hand darf er weiterhin hinfahren, wohin er will:
+            // dieser Griff sitzt nur im Verbinden.
+            const Band bandDerMaschine = bandFromFrequency(geraet);
+            double tief = 0.0, hoch = 0.0;
+            const bool aufAmateurband = bandRangeHz(bandDerMaschine, tief, hoch);
+            double ziel = aufAmateurband
+                              ? BandDefaults::frequenzImBand(bandDerMaschine, geraet)
+                              : 0.0;
+
+            if (!aufAmateurband) {
+                const auto letztes =
+                    SliceModel::loadLastBandFromSettings(s->sliceIndex());
+                const Band zurueck = letztes.value_or(Band::Band40m);
+                const QString schluessel =
+                    QStringLiteral("Slice%1/Band%2/Frequency")
+                        .arg(s->sliceIndex())
+                        .arg(bandKeyName(zurueck));
+                const double gemerkt =
+                    AppSettings::instance().value(schluessel, 0.0).toDouble();
+                ziel = BandDefaults::frequenzImBand(
+                    zurueck,
+                    gemerkt > 0.0 ? gemerkt
+                                  : BandDefaults::seedFor(zurueck).frequencyHz);
+                qCWarning(lcFlexGui).nospace()
+                    << "Flex: die Maschine steht auf " << (geraet / 1.0e6)
+                    << " MHz — kein Amateurband. Es wird auf "
+                    << (ziel / 1.0e6) << " MHz gestellt ("
+                    << bandKeyName(zurueck) << ", zuletzt benutzt)";
+            }
+
+            if (ziel > 0.0 && !qFuzzyCompare(ziel, geraet)) {
+                // OHNE Wache: das soll als Befehl an die Maschine
+                // hinausgehen, sie steht ja falsch.
+                s->setFrequency(ziel);
+            } else {
+                // Die Wache setzen: sonst schickt die Scheibe die eben
+                // uebernommene Frequenz als Befehl zurueck.
+                m_flexApplyingRemoteState = true;
+                s->setFrequency(geraet);
+                m_flexApplyingRemoteState = false;
+            }
 
             // ── Und das Seitenband zum neuen Band (2026-10-23) ───────
             //
@@ -391,11 +605,53 @@ void MainWindow::wireFlex()
             if (m_shuttingDown) { return; }
             SliceModel* s = flexControllableSlice();
             if (!s || !m_radioModel) { return; }
-            const double hz = s->frequency();
+            // ── Die Maschine gibt die Frequenz vor (2026-10-29) ─────
+            //
+            // Hier stand `s->frequency()`. Am Geraet gemessen, zwei
+            // Starts hintereinander:
+            //
+            //   Geraet 7.1790 MHz -> Scheibe las 7.2590 MHz
+            //   Geraet 7.3086 MHz -> Scheibe las 7.3886 MHz
+            //
+            // Jedes Mal genau 80 kHz mehr, und jedes Mal drei
+            // Millisekunden NACHDEM der Zwilling oben die Frequenz der
+            // Maschine in die Scheibe zurueckgeschrieben hatte. Woher
+            // die 80 kHz kommen, ist noch offen — der Nachzug schob
+            // damit aber das Geraet aus dem Band, und der Betreiber
+            // stand beim Start fuenfmal hintereinander auszerhalb.
+            //
+            // Also wird hier genommen, was die Maschine SELBST sagt.
+            // Dieselbe Regel steht drei Zeilen hoeher: die Maschine
+            // gewinnt. Nur die Scheibe zu fragen hiesz, dem Profil zu
+            // glauben statt dem Geraet.
+            const double geraet = m_radioModel->flexGeraeteFrequenzHz();
+            const double hz = (geraet > 0.0) ? geraet : s->frequency();
             if (!(hz > 0.0)) { return; }
+            if (geraet > 0.0 && !qFuzzyCompare(geraet, s->frequency())) {
+                qCWarning(lcFlexGui).nospace()
+                    << "Flex: Scheibe und Maschine gehen auseinander — "
+                    << "Scheibe " << (s->frequency() / 1.0e6)
+                    << " MHz, Maschine " << (geraet / 1.0e6)
+                    << " MHz; es gilt die Maschine";
+                // Und die Scheibe nachziehen, sonst zeigt die Bedienung
+                // eine Frequenz an, auf der die Maschine nicht steht —
+                // und schickt sie beim ersten Handgriff als Befehl
+                // hinaus. Die Wache verhindert genau dieses Echo.
+                m_flexApplyingRemoteState = true;
+                s->setFrequency(geraet);
+                m_flexApplyingRemoteState = false;
+            }
+            // Welche Scheibe, und was die Maschine selbst sagt: am
+            // 2026-10-29 zog dieser Nachzug den Panadapter auf 7.259
+            // MHz, obwohl die Maschine sechs Millisekunden vorher mit
+            // 7.179 MHz gemeldet wurde („die Maschine gewinnt"). Ohne
+            // die Kennung ist nicht zu sehen, ob hier eine ANDERE
+            // Scheibe gelesen wird als die, die den Wert bekam.
             qCInfo(lcFlexGui).nospace()
                 << "Flex: Panadapter auf die Scheibe gezogen — "
-                << (hz / 1.0e6) << " MHz";
+                << (hz / 1.0e6) << " MHz (Scheibe " << s->sliceIndex()
+                << ", Geraet steht auf "
+                << (m_radioModel->flexGeraeteFrequenzHz() / 1.0e6) << " MHz)";
             m_radioModel->zieheFlexPanadapterAuf(hz);
         });
         if (AudioEngine* ae = m_radioModel->audioEngine()) {
@@ -452,6 +708,9 @@ void MainWindow::wireFlex()
         m_radioModel->setzeFlexSendescheibe(
             QString::number(m_flexTargetSliceId));
         m_radioModel->legeFlexSendetonstromAn();
+        // Der FT8-Sender gehoert hierher, nicht in den WDSP-Aufbau:
+        // den gibt es beim Flex nicht. Still, bis jemand sendet.
+        m_radioModel->stelleFt8SenderBereit();
         verdrahteFlexSenden();
 
         // ── Die Maschine folgt dem Blick des Betreibers (2026-10-27) ─
@@ -591,10 +850,69 @@ void MainWindow::wireFlex()
         m_flexApplyingRemoteState = false;
     });
 
+    // ── Rückweg: die Maschine sagt, was wirklich an ist ─────────────
+    //
+    // Nötig, weil der Schalter auch an der Maschine selbst oder in
+    // SmartSDR umgelegt werden kann — und weil beim Verbinden gilt,
+    // was dort steht, nicht was im Fenster steht. Die Wache
+    // `m_flexApplyingRemoteState` hält den Hinweg an, solange wir den
+    // Zustand der Maschine übernehmen; sonst käme unser eigenes Echo
+    // als neuer Befehl zurück.
+    connect(m_radioModel, &RadioModel::flexSliceNoiseChanged, this,
+            [this](bool nr, bool nb, bool anf) {
+        if (m_shuttingDown) { return; }
+        SliceModel* slice = flexControllableSlice();
+        if (!slice) { return; }
+        m_flexApplyingRemoteState = true;
+        // AUS ist eindeutig, AN nicht: die Maschine nennt ihr
+        // Verfahren nicht, und Longpath hat vier. Steht hier schon
+        // eines, bleibt es stehen — nur der leere Fall bekommt eine
+        // Marke, damit der Knopf überhaupt leuchtet. NR2 ist die, die
+        // das RX-Feld auch sonst als Erstes anbietet.
+        // Läuft ein Verfahren von Longpath (NR3, MNR), steht der
+        // Schalter der Maschine mit Absicht auf 0 — ihr `nr=0` darf
+        // die Wahl des Betreibers dann NICHT ausknipsen. Ohne diese
+        // Ausnahme schaltete sich NR3 im selben Atemzug wieder ab, in
+        // dem es eingeschaltet wurde: wir stellen die Maschine aus,
+        // sie meldet aus, und die Meldung loeschte die Marke
+        // (2026-10-28).
+        const NrSlot steht = slice->activeNr();
+        const bool eigenesVerfahren =
+            (steht == NrSlot::NR3 || steht == NrSlot::MNR);
+        if (!nr) {
+            if (!eigenesVerfahren) { slice->setActiveNr(NrSlot::Off); }
+        } else if (steht == NrSlot::Off) {
+            slice->setActiveNr(NrSlot::NR2);
+        }
+        if (!nb) {
+            slice->setNbMode(NbMode::Off);
+        } else if (slice->nbMode() == NbMode::Off) {
+            slice->setNbMode(NbMode::NB);
+        }
+        slice->setAnfEnabled(anf);
+        m_flexApplyingRemoteState = false;
+    });
+
     // ── Ton ─────────────────────────────────────────────────────────
     connect(m_radioModel, &RadioModel::flexAudioSamplesReady, this,
             [this](quint32, const QVector<float>& verschraenkt) {
         if (verschraenkt.isEmpty()) { return; }
+
+        // Zwei Zahlen, die aus dem Protokoll bisher nicht zu holen
+        // waren: kommt waehrend des Sendens ueberhaupt Ton, und wie
+        // lange schweigt er nach dem Loesen?
+        if (m_flexSelbstGetastet) {
+            ++m_flexTonImSenden;
+        } else if (m_flexLoesenMs > 0) {
+            const qint64 luecke =
+                QDateTime::currentMSecsSinceEpoch() - m_flexLoesenMs;
+            m_flexLoesenMs = 0;
+            qCInfo(lcFlexGui).nospace()
+                << "Flex: Empfang nach dem Loesen wieder da — " << luecke
+                << " ms" << (luecke > 2000 ? "  (Hoerperiode angeknabbert)"
+                                           : "");
+        }
+
         SliceModel* slice = flexControllableSlice();
         if (!slice) { return; }
         AudioEngine* ae = m_radioModel ? m_radioModel->audioEngine() : nullptr;
@@ -834,7 +1152,52 @@ void MainWindow::wireFlex()
             m_clarityController->feedBins(dbm);
         }
 
-        sw->updateKiwiSpectrumDbm(dbm, m_flexSpanLowHz, m_flexSpanHighHz);
+        // ── Beim Senden das Bandbild halten (2026-10-29) ─────────────
+        //
+        // Betreiber: „wenn ich sende ist alles blau, das sollte so
+        // aber nicht sein."
+        //
+        // Er hat recht gesehen und die Maschine macht nichts falsch:
+        // beim Tasten schlieszt die Flex ihren Empfaenger
+        // (`full_duplex_enabled=0`, an der Maschine abgefragt), und was
+        // dann noch im Bild steht, ist die eigene Aussendung und
+        // sonst Rauschen. An einer Antenne waere es auch nicht anders
+        // zu machen: das eigene Signal macht den Empfaenger taub.
+        //
+        // Also wird das letzte Empfangsbild festgehalten und die
+        // Sendung darueber gelegt — je Bin der groeszere der beiden
+        // Werte. Das Band bleibt stehen, wo es war, und das eigene
+        // Signal waechst sichtbar hinein.
+        //
+        // Festgehalten wird nur, solange der Ausschnitt derselbe ist:
+        // wer waehrend des Sendens die Scheibe verschiebt, bekaeme
+        // sonst ein Bild von einer anderen Stelle des Bandes
+        // untergelegt.
+        const bool sendet = m_radioModel->flexSendetGerade()
+                            || m_flexSelbstGetastet;
+        const bool gleicherAusschnitt =
+            m_flexBildFrostLowHz == m_flexSpanLowHz
+            && m_flexBildFrostHighHz == m_flexSpanHighHz
+            && m_flexBildFrost.size() == dbm.size();
+
+        if (!sendet) {
+            m_flexBildFrost        = dbm;
+            m_flexBildFrostLowHz   = m_flexSpanLowHz;
+            m_flexBildFrostHighHz  = m_flexSpanHighHz;
+            sw->updateKiwiSpectrumDbm(dbm, m_flexSpanLowHz, m_flexSpanHighHz);
+            return;
+        }
+
+        if (!gleicherAusschnitt || m_flexBildFrost.isEmpty()) {
+            sw->updateKiwiSpectrumDbm(dbm, m_flexSpanLowHz, m_flexSpanHighHz);
+            return;
+        }
+
+        QVector<float> gelegt = m_flexBildFrost;
+        for (int i = 0; i < gelegt.size(); ++i) {
+            gelegt[i] = std::max(gelegt[i], dbm[i]);
+        }
+        sw->updateKiwiSpectrumDbm(gelegt, m_flexSpanLowHz, m_flexSpanHighHz);
     });
 
     // ── Aufraeumen beim Trennen ─────────────────────────────────────
@@ -883,16 +1246,45 @@ void MainWindow::wireFlex()
 // selbst. Es geht also KEIN fertiges Signal hinaus, sondern roher
 // Mikrofonton, und die Maschine macht daraus SSB. Deshalb haengt hier
 // auch nichts am TX-Kanal, sondern direkt an `AudioEngine::pullTxMic`.
+// ── Was jetzt faellig ist ────────────────────────────────────────────
+//
+// Die ganze Behebung vom 2026-10-29 in vier Zeilen: nicht „ein Schlag,
+// ein fester Block", sondern „so viel, wie die Uhr sagt". Siehe
+// MainWindow.h bei `m_flexSendeUhr` fuer die Messung, die dahinter
+// steht.
+qint64 MainWindow::flexFaelligeRahmen(qint64 nsecsVerstrichen,
+                                      qint64 geliefert,
+                                      qint64 rateHz,
+                                      qint64 maxRahmen)
+{
+    if (nsecsVerstrichen < 0 || rateHz <= 0 || maxRahmen <= 0) { return 0; }
+    const qint64 faellig = (nsecsVerstrichen * rateHz) / 1000000000LL;
+    const qint64 offen   = faellig - geliefert;
+    if (offen <= 0) { return 0; }
+    return std::min(offen, maxRahmen);
+}
+
 void MainWindow::verdrahteFlexSenden()
 {
     if (!m_radioModel) { return; }
 
     // ── Die Mikrofonpumpe ────────────────────────────────────────────
     //
-    // 5 ms, wie die Pumpe des OpenHPSDR-Wegs (TxWorkerThread). Bei
-    // 48 kHz sind das 240 Rahmen je Durchgang; die Maschine will
-    // Pakete zu 128 Rahmen, der Rest bleibt in RadioModel liegen und
-    // geht beim naechsten Mal mit.
+    // 5 ms, wie die Pumpe des OpenHPSDR-Wegs (TxWorkerThread). Die
+    // Maschine will Pakete zu 128 Rahmen, der Rest bleibt in
+    // RadioModel liegen und geht beim naechsten Mal mit.
+    //
+    // ── Die Uhr gibt den Takt, nicht der Taktgeber (2026-10-29) ──────
+    //
+    // Hier standen starre 480 Rahmen je Schlag. Das war zweierlei
+    // falsch: 480 sind zehn Millisekunden, nicht fuenf — und vor allem
+    // kommt der Schlag auf einem malenden Hauptfaden nicht alle 5 ms.
+    // Gemessen wurden 8,7 bis 34 ms, und damit ging der Ton zwischen
+    // 0,27- und 1,15-fach schnell hinaus (siehe MainWindow.h bei
+    // `m_flexSendeUhr`).
+    //
+    // Der Sendeton ist ein Echtzeitstrom. Also wird gerechnet, was
+    // faellig ist, statt zu zaehlen, wie oft geweckt wurde.
     if (!m_flexSendePumpe) {
         m_flexSendePumpe = new QTimer(this);
         m_flexSendePumpe->setInterval(5);
@@ -902,20 +1294,198 @@ void MainWindow::verdrahteFlexSenden()
             AudioEngine* ae = m_radioModel->audioEngine();
             if (!ae) { return; }
 
-            constexpr int kRahmen = 480;   // 10 ms Vorrat bei 48 kHz
+            // ── Die Maschine nimmt 24 kHz (2026-10-29) ──────────────
+            //
+            // Hier stand 48000, weil die Quellen mit 48 kHz liefern
+            // (RadioModel.cpp:2648, `Ft8TxSource(48000)`). Der
+            // DAX-Sendestrom der Flex laeuft aber auf 24 kHz — und
+            // eine Maschine, die zu viele Proben bekommt, wirft keine
+            // weg: sie spielt sie ab, halb so schnell.
+            //
+            // Am Geraet gemessen, zwei Sendungen hintereinander, mit
+            // einer zweiten Verbindung an der Verriegelung mitgelesen:
+            //
+            //   getastet 7,19 s -> 346.635 Proben -> Nachlauf 7,65 s
+            //   getastet 3,83 s -> 182.624 Proben -> Nachlauf 3,98 s
+            //
+            //   346.635 / 24.000 = 14,4 s Spielzeit, 7,2 s davon
+            //   waehrend des Tastens -> 7,2 s bleiben uebrig.
+            //
+            // Der Nachlauf ist also genau die Sendung noch einmal. Der
+            // Betreiber hoerte das als „alles zeitverzoegert", sah es
+            // als „ich loese MOX und es sendet noch weiter" und als
+            // „driftet ab". Seine Stimme ging eine Oktave zu tief und
+            // doppelt so lang hinaus.
+            //
+            // Hinein kommen weiter 48 kHz, hinaus gehen 24: je zwei
+            // Proben werden gemittelt. Der Sendeweg ist auf 2,9 kHz
+            // begrenzt, da ist nichts zu falten.
+            constexpr qint64 kEingangHz = 48000;
+            constexpr qint64 kRateHz    = 24000;   // was die Maschine nimmt
+            static_assert(kEingangHz == 2 * kRateHz,
+                          "die Mittelung unten halbiert genau");
+
+            // Hoechstens 100 ms auf einen Schlag. Ein langer Haenger
+            // soll aufgeholt werden, aber nicht als eine halbe Sekunde
+            // Ton in einem Schwall: der Rueckstand bleibt im Zaehler
+            // stehen und geht beim naechsten Schlag mit.
+            constexpr qint64 kMaxRahmen = kRateHz / 10;
+
+            if (!m_flexSendeUhr.isValid()) { return; }
+            const qint64 offen = flexFaelligeRahmen(
+                m_flexSendeUhr.nsecsElapsed(), m_flexSendeGeliefert,
+                kRateHz, kMaxRahmen);
+            if (offen <= 0) { return; }
+            m_flexSendeRueckstand = std::max(
+                m_flexSendeRueckstand,
+                (m_flexSendeUhr.nsecsElapsed() * kRateHz) / 1000000000LL
+                    - m_flexSendeGeliefert);
+            // `offen` zaehlt in AUSGANGSrahmen (24 kHz). Geholt wird
+            // das Doppelte, gemittelt wird unten.
+            const int kRahmen = int(offen) * 2;
             m_flexMikMono.resize(kRahmen);
-            const int geholt = ae->pullTxMic(m_flexMikMono.data(), kRahmen);
+
+            // ── Wer gerade spricht (2026-10-28) ──────────────────────
+            //
+            // Bis heute holte diese Pumpe IMMER aus der
+            // Mikrofonbuchse. Der FT8-Ton entsteht aber in
+            // `Ft8TxSource` und lief beim eigenen Funkgeraet ueber den
+            // Mikrofon-Router in den WDSP-Sendekanal — den die Flex
+            // nicht hat. Er kam hier also nie an: Send gedrueckt,
+            // Traeger an, Stille hinaus.
+            //
+            // AetherSDR hat dieselbe Klasse Fehler einmal von der
+            // anderen Seite gehabt (AudioEngine.h:128-136 [@d58e2b8a]:
+            // „the gate silently disabled the test tone as well, since
+            // the tone is injected inside that callback") — ein Tor,
+            // das fuer den Strom gedacht war, machte den erzeugten Ton
+            // mit stumm. Daraus die Lehre, nicht der Code: die
+            // erzeugte Quelle braucht einen eigenen Weg, der nicht an
+            // der Mikrofonbuchse haengt.
+            //
+            // Reihenfolge: laeuft FT8, gewinnt FT8. Das Mikrofon ist
+            // in dem Augenblick ohnehin nicht gemeint, und zwei
+            // Quellen zu mischen hiesze, sich selbst zu stoeren.
+            int geholt = 0;
+            bool vonFt8 = false;
+            if (Ft8TxSource* ft8 = m_radioModel->ft8TxSource();
+                ft8 && ft8->laeuft()) {
+                geholt = ft8->pullSamples(m_flexMikMono.data(), kRahmen);
+                vonFt8 = true;
+            } else {
+                geholt = ae->pullTxMic(m_flexMikMono.data(), kRahmen);
+                ++m_flexTxVomMik;
+            }
             if (geholt <= 0) { return; }
 
+            // ── Der erzeugte Ton braucht Luft nach oben (2026-10-28) ─
+            //
+            // Erste Sendung ueber die Flex, am Geraet gemessen:
+            //
+            //   MICPEAK 3.008 dBFS, MIC -0.727 dBFS, HWALC 0.000 dBFS
+            //
+            // Drei Dezibel UEBER Vollaussteuerung. Auf dem eigenen Weg
+            // sitzt vor dem Sender die ganze WDSP-Kette mit ihrer
+            // Verstaerkungsstufe; hier geht der Ton roh an die
+            // Maschine, und `Ft8Decoder::encodeBlock` rechnet ihn auf
+            // Vollaussteuerung. FT8 hat eine konstante Huellkurve —
+            // Spitze und Effektivwert liegen beieinander —, deshalb
+            // genuegt ein fester Faktor; die Klammer darunter ist der
+            // Riegel, falls eine Quelle doch einmal lauter kommt.
+            //
+            // −9 dB bringt die gemessene Spitze auf rund −6 dBFS.
+            // Gedaempft wird NUR der erzeugte Ton: das Mikrofon hat
+            // seine eigene Aussteuerung und ist hier nicht gemeint.
+            if (vonFt8) {
+                constexpr float kFt8Pegel = 0.355f;   // −9,0 dB
+                constexpr float kGrenze   = 0.5f;     // −6,0 dBFS
+                float spitze = 0.0f;
+                for (int i = 0; i < geholt; ++i) {
+                    float v = m_flexMikMono[i] * kFt8Pegel;
+                    v = std::clamp(v, -kGrenze, kGrenze);
+                    m_flexMikMono[i] = v;
+                    spitze = std::max(spitze, std::abs(v));
+                }
+                m_flexTxSpitze = std::max(m_flexTxSpitze, spitze);
+                // Einmal je Sendung in die Akte: beim naechsten Mal
+                // wird gemessen, nicht geschaetzt.
+                if (spitze > m_flexFt8Spitze) {
+                    m_flexFt8Spitze = spitze;
+                    qCInfo(lcFlexGui).nospace()
+                        << "FT8-Sendepegel: Spitze " << spitze << " ("
+                        << (20.0 * std::log10(std::max(spitze, 1.0e-6f)))
+                        << " dBFS vor der Maschine)";
+                }
+            } else {
+                // ── Das Messloch am Mikrofonweg (2026-10-29) ────────
+                //
+                // Die Spitze wurde bis heute NUR im FT8-Zweig
+                // gerechnet. Am Mikrofonweg blieb `m_flexTxSpitze` auf
+                // null, und die Zusammenfassung meldete nach jeder
+                // Sprechprobe „Spitze -150 dBFS".
+                //
+                // Das hat mich am 2026-10-29 eine Stunde gekostet: ich
+                // habe die nicht gemessene Null als Befund gelesen und
+                // dem Betreiber gesagt, es ginge Stille hinaus —
+                // waehrend die Maschine im selben Augenblick MICPEAK
+                // +2,54 dBFS und FWDPWR 35,36 dBm (3,4 W) meldete. Der
+                // Ton war da; nur diese Zeile sah ihn nicht.
+                //
+                // Dazu der Riegel: +2,54 dBFS sind zweieinhalb
+                // Dezibel UEBER Vollaussteuerung. Auf dem eigenen Weg
+                // sitzt vor dem Sender die ganze WDSP-Kette; hier geht
+                // der Ton roh an die Maschine. −1 dBFS laesst normale
+                // Sprache unberuehrt und nimmt nur die Spitzen, die
+                // der Wandler der Flex ohnehin nicht mehr darstellen
+                // kann.
+                constexpr float kMikGrenze = 0.891f;   // −1,0 dBFS
+                // Die Aussteuerung von Hand (siehe RadioModel.h,
+                // flexMikGainDb()). 0 dB heiszt: roh hinaus, wie bisher.
+                const int gainDb = m_radioModel->flexMikGainDb();
+                const float faktor =
+                    (gainDb == 0) ? 1.0f
+                                  : std::pow(10.0f, float(gainDb) / 20.0f);
+                float roh = 0.0f;
+                for (int i = 0; i < geholt; ++i) {
+                    const float v = m_flexMikMono[i] * faktor;
+                    roh = std::max(roh, std::abs(v));
+                    m_flexMikMono[i] = std::clamp(v, -kMikGrenze, kMikGrenze);
+                }
+                m_flexTxSpitze = std::max(m_flexTxSpitze, roh);
+                if (roh > kMikGrenze && !m_flexMikZuLaut) {
+                    m_flexMikZuLaut = true;
+                    qCWarning(lcFlexGui).nospace()
+                        << "Flex-Senden: das Mikrofon steht zu hoch — "
+                        << "Spitze " << (20.0 * std::log10(roh))
+                        << " dBFS vor der Maschine, begrenzt auf −1 dBFS. "
+                        << "Die Aussteuerung gehoert an die Quelle, nicht "
+                        << "hierher.";
+                }
+            }
+
+            // ── 48 kHz hinein, 24 kHz hinaus ────────────────────────
+            //
+            // Je zwei Proben zu einer gemittelt — derselbe billige
+            // Zweipunktfilter, den AetherSDR auf der anderen Seite
+            // benutzt (AudioEngine.cpp:1774 [@d58e2b8a], 48->24 fuer
+            // den CW-Abgriff). Der Sendeweg ist auf 2,9 kHz begrenzt,
+            // da faltet nichts zurueck.
+            //
             // Mono hinein, Stereo hinaus: die Maschine erwartet zwei
             // Kanaele je Rahmen (float32, Big-Endian im Paket).
-            m_flexMikStereo.resize(geholt * 2);
-            for (int i = 0; i < geholt; ++i) {
-                m_flexMikStereo[i * 2]     = m_flexMikMono[i];
-                m_flexMikStereo[i * 2 + 1] = m_flexMikMono[i];
+            const int hinaus = geholt / 2;
+            if (hinaus <= 0) { return; }
+            m_flexMikStereo.resize(hinaus * 2);
+            for (int i = 0; i < hinaus; ++i) {
+                const float s = 0.5f * (m_flexMikMono[2 * i]
+                                        + m_flexMikMono[2 * i + 1]);
+                m_flexMikStereo[i * 2]     = s;
+                m_flexMikStereo[i * 2 + 1] = s;
             }
             m_radioModel->sendeFlexMikrofonton(m_flexMikStereo.constData(),
-                                               geholt);
+                                               hinaus);
+            m_flexTxProben      += hinaus;
+            m_flexSendeGeliefert += hinaus;
         });
     }
 
@@ -929,10 +1499,34 @@ void MainWindow::verdrahteFlexSenden()
     // ausdruecklich warum (AetherSDR TciServer.cpp:3414 [@d58e2b8a]):
     // der Zustandsschub der Maschine kommt verzoegert, und ein
     // sofortiges Zuruecksetzen kreuzt ihn.
-    disconnect(m_flexMoxBand);
-    m_flexMoxBand = connect(&m_radioModel->transmitModel(),
-                            &TransmitModel::moxChanged, this,
-                            [this](bool an) {
+    // ── An WELCHER Leitung getastet wird (2026-10-28) ────────────────
+    //
+    // Hier stand `TransmitModel::moxChanged`. Das feuert aber nur,
+    // solange es KEINEN MoxController gibt:
+    //
+    //   RadioModel::setMox(bool on) {
+    //       if (m_moxController) { m_moxController->setMox(on); }
+    //       else                 { m_transmitModel.setMox(on);  }
+    //   }
+    //
+    // Mit Controller — also immer im Betrieb — lief das Tasten
+    // vollstaendig an der Flex vorbei. Am 2026-10-28 um 21:14 stand
+    // deshalb im Protokoll NULL mal „MOX gedrueckt", waehrend die
+    // Bedienung MOX zeigte, ON AIR rot war und die Maschine
+    // MICPEAK −120 dBFS und FWDPWR 0,000 dBm meldete: getastet nach
+    // Meinung des Programms, in Wahrheit nie. PSK Reporter hatte in
+    // 15 Minuten keine einzige Meldung.
+    //
+    // Das galt fuer JEDEN Weg, nicht nur FT8 — auch der MOX-Knopf
+    // geht ueber RadioModel::setMox. Nur TUNE funktionierte, weil der
+    // an `isTune` haengt, einer anderen Eigenschaft. Genau das stand
+    // als „TUNE belegt, Sprechversuch offen" im Arbeitsstand: der
+    // Sprechversuch waere ebenso stumm geblieben.
+    //
+    // `hardwareFlipped` ist die richtige Leitung — an ihr haengt auch
+    // das eigene Funkgeraet (RadioModel.cpp:944) — und sie heiszt, was
+    // sie tut: jetzt die Hardware umlegen.
+    const auto tasten = [this](bool an) {
         qCInfo(lcFlexGui).nospace()
             << "MOX gedrueckt: " << (an ? "an" : "aus")
             << ", Zielscheibe " << m_flexTargetSliceId;
@@ -956,6 +1550,15 @@ void MainWindow::verdrahteFlexSenden()
         if (an) {
             m_radioModel->sendeFlexBefehl(
                 FlexCommandWire::setDaxRouteCommand(true));
+            m_flexTonImSenden = 0;
+            m_flexLoesenMs    = 0;
+            m_flexTxProben    = 0;
+            m_flexTxVomMik    = 0;
+            m_flexTxSpitze    = 0.0f;
+            m_flexMikZuLaut   = false;
+            m_flexSendeGeliefert  = 0;
+            m_flexSendeRueckstand = 0;
+            m_flexSendeUhr.start();
             m_flexSelbstGetastet = m_radioModel->flexTasten(true);
             if (m_flexSelbstGetastet && m_flexSendePumpe) {
                 m_flexSendePumpe->start();
@@ -966,10 +1569,96 @@ void MainWindow::verdrahteFlexSenden()
             }
         } else {
             if (m_flexSendePumpe) { m_flexSendePumpe->stop(); }
+            const qint64 getastetMs = m_flexSendeUhr.isValid()
+                                          ? m_flexSendeUhr.elapsed() : 0;
+            m_flexSendeUhr.invalidate();
             m_radioModel->flexTasten(false);
             m_flexSelbstGetastet = false;
+            // Ab hier laeuft die Uhr: die naechste Hoerperiode ist nur
+            // dann zu gebrauchen, wenn der Empfang rechtzeitig
+            // zurueckkommt.
+            m_flexLoesenMs = QDateTime::currentMSecsSinceEpoch();
+            qCInfo(lcFlexGui) << "Flex: waehrend des Sendens kamen"
+                              << m_flexTonImSenden << "Tonpakete";
+
+            // ── Was WIR hinausgeschickt haben ────────────────────────
+            //
+            // Die Gegenprobe zu den Messwerten der Maschine. Steht
+            // hier eine volle Zahl und dort MICPEAK −150 dBFS, hat sie
+            // nichts angenommen; steht hier null, haben wir nichts
+            // geschickt. Am 2026-10-29 war das nicht zu entscheiden,
+            // weil es diese Zeile noch nicht gab.
+            //
+            // 12,64 s FT8 bei 24 kHz sind rund 303.000 Proben.
+            //
+            // Dazu seit dem 2026-10-29 die GESCHWINDIGKEIT: der
+            // Sendeton ist ein Echtzeitstrom, und eine Eins davor
+            // heiszt, dass er so hinausging, wie er gemeint war.
+            // Stand hier 0,27, kam beim Gegenueber ein auf das
+            // Vierfache gedehntes Signal an — oder gar keines.
+            // 24 Rahmen je Millisekunde, nicht 48: die Maschine nimmt
+            // 24 kHz (siehe die Pumpe oben). Bis zum 2026-10-29 stand
+            // hier 48, und das Tempo las sich als 1,0 — waehrend in
+            // Wahrheit doppelt so viel hinausging, wie die Maschine
+            // abspielen konnte.
+            const double sollRahmen = std::max(1.0, double(getastetMs) * 24.0);
+            qCInfo(lcFlexGui).nospace()
+                << "Flex-Senden: " << m_flexTxProben
+                << " Proben hinaus, Spitze "
+                << (m_flexTxSpitze > 0.0f
+                        ? 20.0 * std::log10(m_flexTxSpitze)
+                        : -150.0)
+                << " dBFS, " << m_flexTxVomMik
+                << " Zuege am Mikrofon statt an FT8, Tempo "
+                << (double(m_flexTxProben) / sollRahmen)
+                << "-fach, groeszter Rueckstand "
+                << (m_flexSendeRueckstand / 24) << " ms";
+
+            // ── Eine stille Sendung ist ein Befund ───────────────────
+            //
+            // 2026-10-29, am Gerät: 664 Tonpakete hinaus, und die
+            // Maschine machte 45 mW statt Leistung. Der offene Eingang
+            // war „BoomAudio", ein virtuelles Gerät ohne Ton — der
+            // Betreiber sah „es geht nicht" und suchte bei der Flex.
+            //
+            // Diese Prüfung trägt erst, seit die Spitze auch am
+            // Mikrofonweg gemessen wird (siehe oben): vorher stand
+            // hier bei JEDER Sprechprobe eine Null, und eine Warnung,
+            // die immer kommt, ist keine.
+            //
+            // Ein echtes Mikrofon liefert immer Rauschen; exakt nichts
+            // liefert nur ein Eingang, der nichts hört. Die Schwelle
+            // liegt bei −120 dBFS, weit unter jedem Grundrauschen.
+            if (m_flexTxProben > 0 && m_flexTxSpitze < 1.0e-6f) {
+                qCWarning(lcFlexGui).noquote()
+                    << QStringLiteral(
+                           "Flex-Senden: der Sendeton war die ganze "
+                           "Sendung über still — es ging ein Träger ohne "
+                           "Modulation hinaus. Der offene Eingang steht "
+                           "im Protokoll als \"input via …\".");
+            }
+
+            // Die Sendepause ist KEINE Taktabweichung. Ohne diese
+            // Zeile liest der Driftausgleich den leergelaufenen
+            // Ausgangspuffer als solche und taktet die folgende
+            // Hoerperiode um 1700 ppm daneben — siehe AudioEngine.h,
+            // m_rxDriftZuruecksetzen.
+            if (AudioEngine* ae = m_radioModel->audioEngine()) {
+                ae->rxDriftNeuAnfangen();
+            }
         }
-    });
+    };
+
+    disconnect(m_flexMoxBand);
+    if (MoxController* mox = m_radioModel->moxController()) {
+        m_flexMoxBand = connect(mox, &MoxController::hardwareFlipped,
+                                this, tasten);
+    } else {
+        // Ohne Controller ist der Riegel im TransmitModel die
+        // Wahrheit — derselbe Rueckfall wie in RadioModel::setMox().
+        m_flexMoxBand = connect(&m_radioModel->transmitModel(),
+                                &TransmitModel::moxChanged, this, tasten);
+    }
 
     // ── TUNE ─────────────────────────────────────────────────────────
     //
@@ -1020,6 +1709,32 @@ void MainWindow::verdrahteFlexSenden()
         }
         m_radioModel->setzeFlexAbstimmleistung(qBound(0, watt, 100));
     });
+
+    // ── Einmal nachziehen, statt auf eine Reglerbewegung zu warten ───
+    //
+    // Die zwei Baender darueber haengen an `powerChanged` /
+    // `tunePowerChanged` — sie feuern nur, wenn der Regler BEWEGT
+    // wird. Beim Anmelden ging also nie eine Leistung an die Maschine,
+    // und sie behielt, was ein anderer Client zuletzt gesetzt hatte.
+    //
+    // Am 2026-10-29 stand sie dadurch auf 1 %: der Betreiber sah
+    // „Power 1" und „POWER 0 W" in einer Oberflaeche, die 10 W
+    // anzeigte. Jede Erklaerung dafuer lag am falschen Ende (Ton,
+    // Verriegelung, Pegel) — die Zahl war einfach nie hinausgegangen.
+    //
+    // Hier wird nichts entschieden, nur gesagt, was Longpath schon
+    // fuehrt. Der Wert selbst kommt aus den Einstellungen des
+    // Betreibers und bleibt seiner.
+    {
+        const TransmitModel& tm = m_radioModel->transmitModel();
+        const int sendeWatt  = qBound(0, tm.power(), 100);
+        const int stimmWatt  = qBound(0, tm.tunePower(), 100);
+        m_radioModel->setzeFlexSendeleistung(sendeWatt);
+        m_radioModel->setzeFlexAbstimmleistung(stimmWatt);
+        qCInfo(lcFlexGui).nospace()
+            << "Flex: Leistung nachgezogen — senden " << sendeWatt
+            << " %, abstimmen " << stimmWatt << " %";
+    }
 
     // ── Was die Maschine selbst meldet ───────────────────────────────
     //

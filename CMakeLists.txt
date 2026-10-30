@@ -552,11 +552,15 @@ set(CORE_SOURCES
     src/core/CwDecoder.cpp
     src/core/DigiFrequenzen.cpp
     src/core/Ft8Decoder.cpp
+    src/core/Ft8Rufzeichen.cpp
     src/core/Ft8Subtract.cpp
     src/core/Ft8Ablauf.cpp
     src/core/Ft8Mehrfach.cpp
     src/core/Ft8Stream.cpp
     src/core/Ft8Tx.cpp
+    # Eine freie Sendestelle suchen -- Longpath-eigen, weder WSJT-X
+    # noch MSHV tun das (2026-10-30)
+    src/core/Ft8Tonwahl.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CatProtocol.cpp
@@ -619,6 +623,11 @@ set(CORE_SOURCES
     src/core/ReceivePresentationSync.cpp
     src/core/WdspEngine.cpp
     src/core/RxChannel.cpp
+    # Rauschminderung fuer Ton, der schon demoduliert ankommt (Flex,
+    # Kiwi, TCI). Siehe den Kopf der Datei: NR1/NR2/NR4 sind
+    # WDSP-Einheiten und haben dort kein Gegenstueck, NR3 (rnnoise) und
+    # MNR (Apple) schon.
+    src/core/ExternalAudioNr.cpp
     src/core/dsp/FftwPlannerLock.cpp
     src/core/TxChannel.cpp
     src/core/RadeChannel.cpp
@@ -738,6 +747,9 @@ set(CORE_SOURCES
     src/core/FlexVitaReader.cpp
     # Der Sockel darum: ein UDP-Port fuer alles, Anmeldung per Null-Byte
     src/core/FlexVitaStream.cpp
+    # Fehlende Tonpakete als Stille wieder einschieben, statt die Welle
+    # springen zu lassen (gemessen 2026-10-29: 1,2 % Verlust ueber WLAN)
+    src/core/FlexLueckenfuellung.cpp
     # Multi-homed-host source-IP picker (PGXL/TGXL/broadcaster per-peer
     # route probe + socket source bind)
     src/core/RouteProbe.cpp
@@ -886,6 +898,9 @@ set(GUI_SOURCES
     src/gui/widgets/CenterMarkSlider.h
     src/gui/widgets/DexpPeakMeter.h
     src/gui/widgets/DexpPeakMeter.cpp
+    # Wie weit das FT8-Fenster ist, mit den Marken fuer Signalanfang
+    # und -ende (Entwurf C, 2026-10-30)
+    src/gui/widgets/Ft8Fensterbalken.cpp
     src/gui/widgets/DspParamPopup.cpp
     src/gui/widgets/DspQuickPopups.cpp
     src/gui/widgets/DspQuickPopups.h

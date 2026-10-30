@@ -43,6 +43,7 @@
 #include "core/Ft8Decoder.h"
 #include "core/TxMicRouter.h"
 
+#include <QtGlobal>
 #include <QDateTime>
 #include <QString>
 #include <QVector>
@@ -127,8 +128,17 @@ public:
     static constexpr float kMinTonHz = 100.0f;
     static constexpr float kMaxTonHz = 5000.0f;
 
-    /// Von vorn abspielen. Ohne vorbereitete Nachricht wirkungslos.
-    void starten();
+    /// Abspielen, ab `abMs` Millisekunden in der Wellenform.
+    ///
+    /// `abMs = 0` spielt von vorn — dann steht die fuehrende Stille
+    /// der Wellenform vorne dran (1180 ms bei FT8, siehe
+    /// `Ft8Tx::stilleMs`). Wer spaeter tastet, ueberspringt genau so
+    /// viel davon und haelt damit den Zeitversatz, statt ihn zu
+    /// vergroeszern. Die Rechnung steht in `Ft8Tx::sendeplan`.
+    ///
+    /// Ohne vorbereitete Nachricht wirkungslos. Ein `abMs`, das ueber
+    /// das Fenster hinausreicht, wird eingefangen.
+    void starten(qint64 abMs = 0);
 
     /// Sofort aufhoeren. Der Rest des Fensters bleibt still.
     void abbrechen();
@@ -184,6 +194,90 @@ public:
         return p == Ft8Decoder::Protocol::Ft4
                    ? static_cast<int>(105 * 0.048 * 1000.0 + 0.5)   // 5040 ms
                    : static_cast<int>(79 * 0.160 * 1000.0 + 0.5);   // 12640 ms
+    }
+
+    /// Fuehrende Stille der Wellenform, in Millisekunden.
+    ///
+    /// ft8_lib zentriert das Signal im Fenster:
+    ///   From ft8_lib demo/gen_ft8.c:160-186 [@9fec6ca] —
+    ///   `num_silence = (num_total_samples - num_samples) / 2`,
+    /// nachgebaut in `Ft8Decoder::encodeBlock`. Bei FT8 sind das
+    /// (15000 − 12640) / 2 = 1180 ms, bei FT4 (7500 − 5040) / 2 = 1230.
+    ///
+    /// WSJT-X sendet NICHT zentriert, sondern laesst das Signal ~0,5 s
+    /// nach der Fenstergrenze beginnen. Wer die Wellenform von vorn
+    /// abspielt, liegt also 0,68 s hinter der Norm — und wer dazu nur
+    /// `signalMs` lang tastet, schneidet das Ende ab. Siehe
+    /// `sendeplan()`.
+    static int stilleMs(Ft8Decoder::Protocol p)
+    {
+        return (fensterMs(p) - signalMs(p)) / 2;
+    }
+
+    /// Die drei Zeiten einer Sendung, alle ab der Fenstergrenze.
+    struct Sendeplan {
+        qint64 tastenNachMs{0};   ///< so lange nach der Grenze warten
+        qint64 probenAbMs{0};     ///< ab hier aus der Wellenform ziehen
+        qint64 tastdauerMs{0};    ///< so lange getastet bleiben
+        qint64 tonBeiMs{0};       ///< wann der erste Ton hinausgeht
+    };
+
+    // ── Warum es diese Rechnung gibt (2026-10-30) ───────────────
+    //
+    // Drei Dinge gingen vorher jedes fuer sich schief, und sie haengen
+    // an derselben Zahl — den 1180 ms fuehrender Stille:
+    //
+    //  1. **Das Signalende wurde abgeschnitten.** Getastet wurde
+    //     `signalMs + 300` = 12 940 ms ab der Fenstergrenze, aber das
+    //     Signal begann erst bei 1180 ms und lief bis 13 820. Am
+    //     Geraet gemessen (Protokoll 2026-10-30, 07:09:30,003 getastet
+    //     bis 07:09:42,945 geloest, erster Ton 07:09:31,185): die
+    //     letzten 880 ms fehlten, also 5,5 von 79 Symbolen. Das
+    //     Verfahren verkraftet das teilweise — aber es kostet
+    //     Empfindlichkeit, und es erklaert, warum derselbe Zug
+    //     dreimal hinausmusste.
+    //
+    //  2. **Der Zeitversatz lag bei +0,68 s** gegenueber der
+    //     WSJT-X-Norm (Signal 0,5 s nach der Grenze). Dekodierbar,
+    //     aber am Rand des Gewohnten.
+    //
+    //  3. **Der Zug kam ein ganzes Fenster zu spaet.** Der Dekoder ist
+    //     erst ~40 ms NACH dem Fensterende fertig (gemessen:
+    //     07:09:30,039), getastet wurde 3 ms danach. Die Antwort der
+    //     Gegenstation kam also immer zu spaet fuer dieses Fenster,
+    //     und jeder Zug kostete 30 s statt 15.
+    //
+    // Die fuehrende Stille ist der Platz, in dem alle drei zu
+    // beheben sind: spaeter tasten (Punkt 3), dafuer entsprechend
+    // weiter vorn aus der Wellenform ziehen (Punkt 2), und so lange
+    // tasten, wie das Signal WIRKLICH braucht (Punkt 1).
+    //
+    // `dekoderFristMs`  wie lange nach der Fenstergrenze auf den
+    //                   Dekoder gewartet wird
+    // `zielVersatzMs`   wo das Signal beginnen soll (WSJT-X: 500)
+    // `reserveMs`       Nachlauf, damit der letzte Ton draussen ist
+    static Sendeplan sendeplan(Ft8Decoder::Protocol p,
+                               qint64 dekoderFristMs,
+                               qint64 zielVersatzMs,
+                               qint64 reserveMs)
+    {
+        Sendeplan s;
+        const qint64 stille = stilleMs(p);
+        const qint64 frist  = qBound<qint64>(0, dekoderFristMs, stille);
+
+        // Der Zielversatz kann nicht kleiner sein als die Frist: vor
+        // dem Tasten geht kein Ton hinaus.
+        const qint64 ziel = qBound(frist, zielVersatzMs, stille + frist);
+
+        s.tastenNachMs = frist;
+        // Ab wo aus der Wellenform: so viel von der Stille
+        // ueberspringen, dass der Ton genau beim Zielversatz kommt.
+        s.probenAbMs   = stille + frist - ziel;
+        s.tonBeiMs     = ziel;
+        // Getastet wird, bis das Signal durch ist — gerechnet vom
+        // ZIELVERSATZ, nicht von der Fenstergrenze.
+        s.tastdauerMs  = ziel + signalMs(p) + reserveMs - frist;
+        return s;
     }
 
     /// Nummer des Fensters seit der vollen Minute (0..3 bei FT8).

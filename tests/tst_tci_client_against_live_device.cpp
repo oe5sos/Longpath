@@ -23,6 +23,7 @@
 #include <QTcpSocket>
 
 #include "core/TciClient.h"
+#include "PortProbe.h"
 
 using namespace Longpath;
 
@@ -32,13 +33,14 @@ constexpr const char* kHost = "127.0.0.1";
 constexpr quint16     kPort = 40001;
 constexpr int         kWaitMs = 8000;
 
+// Binden statt verbinden — siehe tests/PortProbe.h. Der frueher hier
+// stehende Connect meldete am 2026-10-30 auf dem CI-Laeufer einen
+// TCI-Anbieter auf 40001, den es nicht gab; die beiden Faelle liefen
+// weiter und fielen mit „Connection refused" um, statt sich wie
+// vorgesehen zu ueberspringen.
 bool tciPortIsOpen()
 {
-    QTcpSocket probe;
-    probe.connectToHost(QString::fromLatin1(kHost), kPort);
-    const bool up = probe.waitForConnected(1000);
-    probe.close();
-    return up;
+    return LongpathTest::portHasListener(kPort);
 }
 
 } // namespace

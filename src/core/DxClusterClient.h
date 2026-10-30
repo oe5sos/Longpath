@@ -42,6 +42,26 @@
 //                                    DxClusterClient objects for the two
 //                                    sources). AI tooling: Anthropic
 //                                    Claude Code.
+//   2026-10-28  Martin Fischer (OE5SOS)  Der Wiederanlauf-Zaehler
+//                                    faellt erst, wenn die Sitzung
+//                                    StableSessionMs ueberlebt hat --
+//                                    die Anmeldung allein genuegt
+//                                    nicht, weil ein DXSpider-Knoten
+//                                    sie annimmt und bei doppeltem
+//                                    Rufzeichen 8,8 s spaeter
+//                                    hinauswirft (216 Versuche
+//                                    gemessen). Dazu istHinauswurf():
+//                                    die Begruendung des Knotens wird
+//                                    nicht mehr stillschweigend
+//                                    verworfen. Und
+//                                    protokollOeffnungsart(): das
+//                                    Mitschreiben wird nur noch bei
+//                                    einer Verbindung geleert, die der
+//                                    Betreiber selbst anstoesst -- ein
+//                                    Wiederanlauf schreibt fort, sonst
+//                                    loescht gerade ein Sturm seine
+//                                    eigenen Belege. KI-gestuetzt ueber
+//                                    Anthropic Claude Code.
 
 #pragma once
 
@@ -96,6 +116,22 @@ public:
     // genau das tat sie bis zum 2026-10-14 nicht.
     int reconnectAttemptsForTest() const { return m_reconnectAttempts; }
     void markLoggedInForTest() { markLoggedIn(); }
+    // Die Sitzung hat die Standzeit ueberlebt. Erst DAS setzt die
+    // Treppe zurueck -- siehe die Begruendung an StableSessionMs.
+    void markSessionStableForTest() { onSessionStable(); }
+    // Erkennt die Hinauswurf-Zeile eines DXSpider-Knotens. Rein, damit
+    // sie ohne Steckdose und ohne Knoten zu pruefen ist.
+    static bool istHinauswurfForTest(const QString& line) {
+        return istHinauswurf(line);
+    }
+    // Wie das Mitschreiben geoeffnet wird. Rein, damit die
+    // Unterscheidung ohne Datei und ohne Knoten zu pruefen ist.
+    static QIODevice::OpenMode protokollOeffnungsartForTest(bool wiederanlauf) {
+        return protokollOeffnungsart(wiederanlauf);
+    }
+    // Kommt das naechste onConnected von einem selbsttaetigen
+    // Wiederanlauf?
+    bool istWiederanlaufForTest() const { return m_naechsterIstWiederanlauf; }
     void stripTelnetIACForTest(QByteArray& buf) const {
         stripTelnetIACBuffer(buf);
     }
@@ -113,6 +149,7 @@ private slots:
     void onReadyRead();
     void onSocketError(QAbstractSocket::SocketError err);
     void onReconnectTimer();
+    void onSessionStable();
 
 private:
     // Die Anmeldung ist durch -- erst hier faellt der Wiederanlauf-Zaehler.
@@ -130,9 +167,39 @@ private:
     // socket.
     static void stripTelnetIACBuffer(QByteArray& buf);
 
+    // ── „Ein anderer hat sich mit deinem Rufzeichen angemeldet" ──────
+    //
+    // DXSpider laesst genau EINE Sitzung je Rufzeichen zu. Meldet sich
+    // ein zweiter Anschluss an, schickt der Knoten dem aelteren
+    //
+    //   „Reconnected as OE5SOS at 84.113.40.38, this instance is
+    //    disconnected"
+    //
+    // und legt auf. Am 2026-10-28 am Knoten dxc.nc7j.com:7300 live
+    // mitgeschrieben. Bis dahin fiel diese Zeile durch handleLine()
+    // hindurch -- sie ist kein Spot, also wurde sie stillschweigend
+    // verworfen, und der Betreiber sah 216 Neuverbindungen ohne einen
+    // Grund dafuer.
+    static bool istHinauswurf(const QString& line);
+
+    // ── Warum das Mitschreiben nicht bei jedem Versuch geleert wird ──
+    //
+    // Bis zum 2026-10-28 wurde die Datei bei JEDER Verbindung mit
+    // `Truncate` geoeffnet. Die Absicht war richtig: eine Datei je
+    // Sitzung, damit sie nicht endlos waechst. Die Wirkung war es
+    // nicht — bei 216 Neuverbindungen in 223 min loeschte das
+    // Mitschreiben damit genau die Belege, die man zum Verstehen des
+    // Sturms gebraucht haette. Vom Vormittag war nichts mehr zu holen.
+    //
+    // Eine Sitzung endet nicht mit dem Socket. Geleert wird deshalb
+    // nur, wenn der Betreiber selbst verbindet; ein selbsttaetiger
+    // Wiederanlauf schreibt an dieselbe Datei weiter.
+    static QIODevice::OpenMode protokollOeffnungsart(bool wiederanlauf);
+
     QTcpSocket* m_socket;
     QByteArray  m_readBuffer;
     QTimer*     m_reconnectTimer;
+    QTimer*     m_stableTimer;
     QFile       m_logFile;
 
     QString m_logFileName{"dxcluster.log"};
@@ -147,10 +214,32 @@ private:
     int     m_quietFailures{0};
     bool    m_intentionalDisconnect{false};
     int     m_reconnectAttempts{0};
+    // Siehe protokollOeffnungsart(): nur eine Verbindung, die der
+    // Betreiber selbst anstoesst, leert das Mitschreiben.
+    bool    m_naechsterIstWiederanlauf{false};
 
     static constexpr int MaxReconnectDelayMs    = 60000;
     static constexpr int InitialReconnectDelayMs = 5000;
     static constexpr int ConnectTimeoutMs        = 10000;
+
+    // ── Wann eine Sitzung als brauchbar gilt ─────────────────────────
+    //
+    // Am 2026-10-14 stand dasselbe schon einmal im Protokoll: 680
+    // Versuche, alle 14 s, „The remote host closed the connection", und
+    // die Treppe erreichte nie Stufe 2. Damals setzte onConnected()
+    // zurueck, und die Behebung schob den Punkt auf markLoggedIn().
+    //
+    // Am 2026-10-28 war es wieder da: 216 Versuche in 223 min, wieder
+    // alle 14 s. Der Grund ist derselbe Fehler eine Station weiter --
+    // die ANMELDUNG gelingt jedes Mal. Der Knoten nimmt uns an und
+    // wirft uns 8,8 s spaeter hinaus (gemessener Median), also fiel der
+    // Zaehler in JEDEM Zyklus auf 0 und die Wartezeit blieb bei 5 s.
+    //
+    // Eine Anmeldung, die neun Sekunden haelt, ist kein Erfolg. Der
+    // Zaehler faellt deshalb erst, wenn die Sitzung eine Minute
+    // ueberlebt hat -- deutlich mehr als die gemessenen 8,8 s und
+    // gleich dem Deckel der Treppe.
+    static constexpr int StableSessionMs         = 60000;
 };
 
 } // namespace Longpath

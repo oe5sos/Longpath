@@ -10,6 +10,7 @@
 // =================================================================
 
 #include "core/Ft8Decoder.h"
+#include "core/Ft8Rufzeichen.h"
 #include "core/Ft8Subtract.h"
 
 #include <QByteArray>
@@ -126,8 +127,14 @@ QVector<Ft8Decode> eineRunde(const float* samples, int count,
 
         char text[FTX_MAX_MESSAGE_LENGTH] = {0};
         ftx_message_offsets_t offsets{};
-        if (ftx_message_decode(&nachricht, nullptr, text, &offsets)
-                != FTX_MESSAGE_RC_OK) {
+        // Die Rufzeichen-Hashtabelle. Hier stand `nullptr`, und damit
+        // kam jedes gehashte Rufzeichen als `<...>` heraus — siehe
+        // Ft8Rufzeichen.h.
+        if (ftx_message_decode(
+                &nachricht,
+                static_cast<ftx_callsign_hash_interface_t*>(
+                    ft8RufzeichenSchnittstelle()),
+                text, &offsets) != FTX_MESSAGE_RC_OK) {
             continue;   // entpackt nicht — dann steht auch nichts da
         }
 

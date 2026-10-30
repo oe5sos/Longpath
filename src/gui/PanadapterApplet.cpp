@@ -160,14 +160,47 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     // Nur das Haeufige steht im Menue. Der letzte Eintrag fuehrt in
     // den Setup-Dialog — ein Menue, das ALLES kann, waere wieder der
     // Dialog, nur schlechter.
+    // \u2500\u2500 2D/3D ohne Umweg (2026-10-30) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    //
+    // Betreiber: \u201eich m\u00f6chte dort auch viel schneller \u2014 als eigenen
+    // Punkt \u2014 das Umstellen von 2D auf 3D haben."
+    //
+    // Bisher lag es im Ueberblendmenue des Panadapters: aufklappen,
+    // suchen, waehlen. Es ist aber der Griff, den man beim Hinsehen
+    // macht, nicht beim Einrichten \u2014 also gehoert er neben das
+    // Zahnrad, als eigener Knopf, der gleich zeigt, was gerade laeuft.
+    //
+    // Die Beschriftung nennt den ZUSTAND, nicht das Ziel: steht dort
+    // \u201e3D", ist 3D an. Ein Knopf, der sein Ziel nennt, liest sich beim
+    // zweiten Hinsehen falsch herum.
+    m_btn3d = new QPushButton(QStringLiteral("2D"), head);
+    m_btn3d->setFixedSize(34, 24);
+    m_btn3d->setCursor(Qt::PointingHandCursor);
+    // Englisch, wie die ganze Oberflaeche \u2014 die deutsche Fassung
+    // gehoert nach translations/longpath_de.ts, nicht hierher
+    // (tst_oberflaeche_englisch haelt die Decke bei 9).
+    m_btn3d->setToolTip(tr("Flat trace or 3D surface \u2014 switches the "
+                           "panadapter between 2D and 3D"));
+    m_btn3d->setObjectName(QStringLiteral("panHeader3dToggle"));
+    headLay->addWidget(m_btn3d);
+
     m_btnOptions = new QPushButton(QStringLiteral("\u2699"), head);
-    m_btnOptions->setFixedSize(22, 18);
+    // \u2500\u2500 Das Zahnrad war ein Punkt (2026-10-30) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    //
+    // Betreiber: \u201ebitte im Panadapter das Symbol f\u00fcr Option
+    // vergr\u00f6ssern, dies ist nur ein kleiner Punkt."
+    //
+    // 22x18 bei 11 px Schriftgrad \u2014 das Zahnrad fiel darin auf wenige
+    // Bildpunkte zusammen und war auf dem Retina-Schirm kaum als
+    // Zahnrad zu erkennen. Jetzt 30x24 bei 17 px; es bleibt der
+    // kleinste Knopf der Leiste, aber man sieht, was er ist.
+    m_btnOptions->setFixedSize(30, 24);
     m_btnOptions->setCursor(Qt::PointingHandCursor);
     m_btnOptions->setToolTip(QStringLiteral(
         "Anzeige: Hintergrundbild, Deckkraft, Grundfarbe"));
-    m_btnOptions->setStyleSheet(QStringLiteral(
+    const QString kKopfKnopf = QStringLiteral(
         "QPushButton { background: %1; border: 1px solid %2;"
-        "  border-radius: 4px; color: %3; font-size: 11px; padding: 0; }"
+        "  border-radius: 4px; color: %3; font-size: %7px; padding: 0; }"
         "QPushButton:hover { background: %4; color: %5;"
         "  border-color: %6; }")
         .arg(QLatin1String(Style::kButtonBg),
@@ -175,7 +208,9 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
              QLatin1String(Style::kTextSecondary),
              QLatin1String(Style::kButtonHover),
              QLatin1String(Style::kTextPrimary),
-             QLatin1String(Style::kAccent)));
+             QLatin1String(Style::kAccent));
+    m_btnOptions->setStyleSheet(kKopfKnopf.arg(17));
+    m_btn3d->setStyleSheet(kKopfKnopf.arg(12));
     headLay->addWidget(m_btnOptions);
     connect(m_btnOptions, &QPushButton::clicked, this, [this]() {
         QMenu* m = buildDisplayMenu(window());   // am Fenster, siehe contextMenuEvent()
@@ -183,6 +218,30 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
             QPoint(0, m_btnOptions->height())));
         m->deleteLater();
     });
+
+    // Den Knopf an die Flaeche haengen: er zeigt ihren Zustand und
+    // stellt ihn um, und er folgt ihr auch dann, wenn jemand die Art
+    // ueber das Ueberblendmenue wechselt.
+    if (m_spectrum) {
+        const auto zeige = [this]() {
+            if (!m_btn3d || !m_spectrum) { return; }
+            const bool raum = m_spectrum->spectrumRenderMode()
+                              == SpectrumRenderMode::Mode3D;
+            m_btn3d->setText(raum ? QStringLiteral("3D")
+                                  : QStringLiteral("2D"));
+        };
+        zeige();
+        connect(m_spectrum, &SpectrumWidget::spectrumRenderModeChanged,
+                this, [zeige](SpectrumRenderMode) { zeige(); });
+        connect(m_btn3d, &QPushButton::clicked, this, [this]() {
+            if (!m_spectrum) { return; }
+            const bool raum = m_spectrum->spectrumRenderMode()
+                              == SpectrumRenderMode::Mode3D;
+            m_spectrum->setSpectrumRenderMode(raum
+                                                  ? SpectrumRenderMode::Mode2D
+                                                  : SpectrumRenderMode::Mode3D);
+        });
+    }
 
     m_btnFloat = new QPushButton(QStringLiteral("\u2197"), head);
     m_btnFloat->setFixedSize(22, 18);
@@ -474,7 +533,24 @@ void PanadapterApplet::repositionStatusOverlay()
     // that column, and the status strip accepts mouse events for its own
     // badges, so any overlap makes the arrows both hard to read and hard to
     // hit.
-    const int reserved = m_spectrum ? m_spectrum->reservedRightEdgeWidth() : 0;
+    int reserved = m_spectrum ? m_spectrum->reservedRightEdgeWidth() : 0;
+
+    // ── Und frei von den Knoepfen der Kopfleiste (2026-10-30) ───────
+    //
+    // Der Streifen liegt in derselben Zeile wie Zahnrad und
+    // Schnellumschalter. Solange das Zahnrad 22 Punkt breit war, ging
+    // es sich gerade aus; mit dem groeszeren Zahnrad und dem neuen
+    // 2D/3D-Knopf schob sich die KIWI-Kachel darueber — am Geraet
+    // gesehen: der Umschalter lugte nur noch oben heraus.
+    //
+    // Also wird auch deren Platz freigehalten. Der linke Rand des
+    // ersten Knopfes ist die Grenze; was rechts davon liegt, gehoert
+    // der Kopfleiste.
+    if (m_btn3d && m_btn3d->isVisible()) {
+        const int links = m_btn3d->mapTo(this, QPoint(0, 0)).x();
+        reserved = std::max(reserved, std::max(0, width() - links + 6));
+    }
+
     m_statusOverlay->setGeometry(width() - hint.width() - 8 - reserved, 8,
                                  hint.width(), hint.height());
 }

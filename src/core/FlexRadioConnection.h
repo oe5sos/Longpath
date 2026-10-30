@@ -106,6 +106,7 @@
 #include <QObject>
 #include <QString>
 #include <QTcpSocket>
+#include <QTimer>
 
 #include <functional>
 #include <optional>
@@ -209,6 +210,32 @@ QString setSliceModeCommand(const QString& sliceId, const QString& mode);
 // Flanken in Hertz, bezogen auf die Traegerfrequenz, wie die Maschine
 // sie in `filter_lo`/`filter_hi` zurueckmeldet.
 QString setSliceFilterCommand(const QString& sliceId, int lowHz, int highHz);
+
+// ── Rauschminderung, Störaustaster, Kerbfilter (2026-10-28) ──────────
+//
+// Der Betreiber: „ich kann zwar klicken, aber kein unterschied zu
+// hören." Belegt an seinem Protokoll: er hört den FLEX, und
+// Flex-Ton kommt FERTIG DEMODULIERT herein (`feedFlexAudio` ->
+// Mischer). Longpaths eigene Rauschminderung sitzt im
+// WDSP-Empfangskanal, den dieser Ton nie durchläuft — NR1..NR4, NB,
+// SNB und ANF konnten dort also gar nichts tun. Ein Knopf, der angeht
+// und nichts tut, ist eine Lüge mit Rückmeldung (dieselbe Regel, nach
+// der CommandBar DFNR und BNR versteckt, wenn der Bau sie nicht hat).
+//
+// Also dorthin, wo die Rechnung wirklich passiert: in die Maschine.
+// SmartSDR führt je Scheibe `nr`, `nb` und `anf` als Schalter — genau
+// die drei, die Longpath anbietet. Ein einziger `slice set` trägt
+// alle drei; das hält Knopf und Gerät in einem Schritt beieinander,
+// statt drei Befehle hinauszuschicken, von denen einer verloren gehen
+// kann.
+//
+// Die Pegel (`nr_level`, `nb_level`, `anf_level`) bleiben bewusst
+// unangetastet: sie stehen in der Maschine und überleben dort auch
+// Longpath. Wer sie verstellen will, tut das an der Maschine — hier
+// würde ein mitgeschickter Wert die Einstellung des Betreibers bei
+// jedem Knopfdruck überschreiben.
+QString setSliceNoiseCommand(const QString& sliceId,
+                             bool nr, bool nb, bool anf);
 
 // ── Den Panadapter der Maschine mitnehmen (2026-10-22) ───────────────
 //
@@ -423,6 +450,30 @@ public:
     // den der Socket nimmt.
     void ingestLineForTesting(const QString& line) { processLine(line); }
 
+    // Wie lange auf das Zustandekommen der TCP-Verbindung gewartet
+    // wird. Qt hat hier keine eigene Frist: bleibt der Dreiweg-Handschlag
+    // aus, meldet der Socket weder connected() noch errorOccurred(), und
+    // der Zustand haengt auf Connecting — am 2026-10-28 dreimal in Folge
+    // genau so im Protokoll, ohne eine einzige Zeile dazu.
+    static constexpr int kConnectTimeoutMs = 10'000;
+
+    // Der Klartext zu einem Socketfehler. QAbstractSocket::errorString()
+    // liefert fuer alles, was es nicht kennt, „Unknown error" — das stand
+    // am 2026-10-28 im Protokoll und im Verbindungsfenster und sagte
+    // beides nichts. Die Nummer kennt den Fall; sie wird hier benannt.
+    static QString socketErrorText(QAbstractSocket::SocketError error);
+
+    // Nur fuer Pruefstaende: laesst die Verbindungsfrist ablaufen, ohne
+    // auf ein Blackhole im Netz warten zu muessen. Absichtlich NICHT
+    // hinter #ifdef LONGPATH_BUILD_TESTS — eine Erklaerung, die nur im
+    // Pruefbau steht, bricht den Freigabebau (2026-10-16, #330).
+    void triggerConnectTimeoutForTesting(const QHostAddress& address, quint16 port)
+    {
+        m_targetAddress = address;
+        m_targetPort    = port;
+        onConnectTimeout();
+    }
+
 signals:
     void stateChanged(Longpath::FlexRadioConnection::State state);
     void connected();
@@ -457,6 +508,7 @@ private slots:
     void onSocketDisconnected();
     void onSocketErrorOccurred(QAbstractSocket::SocketError error);
     void onReadyRead();
+    void onConnectTimeout();
 
 private:
     void processLine(const QString& line);
@@ -468,6 +520,9 @@ private:
     void createSliceOnPan(const QString& panId);
 
     QTcpSocket m_socket;
+    QTimer     m_connectTimer;
+    QHostAddress m_targetAddress;
+    quint16      m_targetPort{0};
     QByteArray m_readBuffer;
     State      m_state{State::Disconnected};
     quint32    m_handle{0};

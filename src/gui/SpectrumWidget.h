@@ -438,6 +438,13 @@ public:
     // ---- 3D stacked-trace view ----
     void setSpectrumRenderMode(SpectrumRenderMode mode);
     SpectrumRenderMode spectrumRenderMode() const { return m_renderMode; }
+    /// True: every row of the surface keeps the full width, so a ridge
+    /// stands above the frequency it belongs to and matches the waterfall
+    /// underneath. False: AetherSDR's perspective, which pulls older rows
+    /// toward the centre (up to 31 kHz on a 200 kHz window, measured
+    /// 2026-10-28) -- prettier, but the two pictures then disagree.
+    void setDss3dTrueScale(bool on);
+    bool dss3dTrueScale() const { return m_dss3dTrueScale; }
 
     // ---- Waterfall settings ----
     void setWfColorScheme(WfColorScheme scheme);
@@ -1908,6 +1915,14 @@ public:
     }
 
 signals:
+    /// Die Darstellungsart hat gewechselt (2D/3D).
+    ///
+    /// Es gab dafuer kein Signal: wer die Art von auszen umstellt —
+    /// das Ueberblendmenue, der Schnellknopf in der Kopfleiste des
+    /// Panadapters — konnte vom anderen Weg nichts erfahren, und die
+    /// Beschriftung blieb stehen.
+    void spectrumRenderModeChanged(Longpath::SpectrumRenderMode mode);
+
     /// Weitergereicht vom Rechtsklick-Menue (2026-08-18).
     void openSetupPageRequested(const QString& page);
 
@@ -2473,6 +2488,7 @@ private:
     // Fed from m_renderedPixels (see updateSpectrumLinear) only while
     // m_renderMode is Mode3D -- no cost to sessions that never enable it.
     SpectrumRenderMode m_renderMode{SpectrumRenderMode::Mode2D};
+    bool m_dss3dTrueScale{true};   // see setDss3dTrueScale
     DssRenderer m_dss;
     bool m_dss3dNeedsUpload{false};  // set on pushRow, cleared after GPU upload
 

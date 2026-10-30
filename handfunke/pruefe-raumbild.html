@@ -16,10 +16,17 @@
      mit einem eigenstaendigen Werkzeug gegen Homebrew-Qt6 uebersetzt
      (`pkg-config Qt6Gui Qt6Core`), kein Teil des Projektbaus.
 
-  Stand 2026-10-28, 750x470, zKurve 0,7: 51,1 % der Bildpunkte genau
-  gleich, 42,5 % bis acht Stufen daneben, 6,4 % darueber, mittlere
-  Abweichung 2,99 von 255. Der Rest sitzt an den Kaemmen: die Fassung am
-  Mac mischt dort Teildeckungen, diese malt ganze Bildpunkte.
+  Stand 2026-10-30 gegen die frequenztreue Fassung (PR #344), 750x470,
+  zKurve 0,7: 41,2 % der Bildpunkte genau gleich, 53,2 % bis acht Stufen
+  daneben, 5,5 % darueber, mittlere Abweichung 3,12 von 255. Der Rest
+  sitzt an den Kaemmen: die Fassung am Mac mischt dort Teildeckungen,
+  diese malt ganze Bildpunkte.
+
+  **Die Gegenprobe zur Nachziehung** (BREITE_HINTEN wieder auf 0,60, also
+  die alte Verjuengung, gegen dieselbe neue C++-Fassung): mittlere
+  Abweichung 7,07 statt 3,12, und 11,6 % statt 5,5 % der Punkte weiter
+  als acht Stufen daneben. Die Nachziehung halbiert den Abstand -- ohne
+  sie waere das Bild im Telefon nicht mehr dasselbe wie am Mac.
 -->
 <body style="margin:0;background:#000">
 <canvas id="c" width="750" height="470"></canvas>

@@ -231,6 +231,59 @@ private slots:
         QCOMPARE(a.wiederholungen(), 0);
     }
 
+    // ── Der CQ-Ruf laeuft so oft, wie der Betreiber sagt ────────────
+    //
+    // Gegenprobe zur alten Fassung: dort zaehlte `fensterVerstrichen`
+    // starr bis `kMaxWiederholungen` (fuenf), auch wenn im Fenster
+    // „x16" stand. Am Geraet gemessen (2026-10-29, 12:45:00 bis
+    // 12:47:12): genau fuenf Sendungen, danach war Schluss.
+    void derCqRufFolgtDerEingestelltenZahl()
+    {
+        Ft8Ablauf a;
+        a.setzeCqWiederholungen(16);
+        a.starteAlsAnrufer(QStringLiteral("OE5SOS"), QStringLiteral("JN67"));
+        QCOMPARE(a.zustand(), Z::RufeCq);
+
+        // Die Fuenf, an der die alte Fassung abbrach, muss durchlaufen.
+        for (int i = 1; i < 16; ++i) {
+            a.fensterVerstrichen();
+            QVERIFY2(a.laeuft(), qPrintable(
+                QStringLiteral("nach %1 CQ-Fenstern schon aufgegeben "
+                               "(eingestellt waren 16)").arg(i)));
+        }
+        a.fensterVerstrichen();
+        QCOMPARE(a.zustand(), Z::Abgebrochen);
+    }
+
+    // Und das Gegenstueck: mitten im QSO bleibt es bei den fuenf
+    // Zuegen, ganz gleich was fuer den Ruf eingestellt ist.
+    void dieEingestellteZahlGiltNurFuerDenRuf()
+    {
+        Ft8Ablauf a;
+        a.setzeCqWiederholungen(30);
+        a.starteAlsAntworter(QStringLiteral("DL1ABC"),
+                             QStringLiteral("OE5SOS"),
+                             QStringLiteral("JN67"), -12);
+        for (int i = 1; i < Ft8Ablauf::kMaxWiederholungen; ++i) {
+            a.fensterVerstrichen();
+            QVERIFY(a.laeuft());
+        }
+        a.fensterVerstrichen();
+        QCOMPARE(a.zustand(), Z::Abgebrochen);
+    }
+
+    // Eine Null wuerde den Ruf im ersten Fenster abwuergen.
+    void unsinnigeZahlenWerdenEingefangen()
+    {
+        Ft8Ablauf a;
+        a.setzeCqWiederholungen(0);
+        QCOMPARE(a.cqWiederholungen(), 1);
+        a.setzeCqWiederholungen(-3);
+        QCOMPARE(a.cqWiederholungen(), 1);
+        a.setzeCqWiederholungen(999);
+        QCOMPARE(a.cqWiederholungen(), 30);
+    }
+
     void abbrechenHaeltSofortAn()
     {
         Ft8Ablauf a;
@@ -271,6 +324,106 @@ private slots:
         QVERIFY(a.verarbeite(QStringLiteral("OE5SOS DL1ABC R-09"), -12));
         QCOMPARE(a.zustand(), Z::SendeRR73);
         QCOMPARE(a.empfangenerReport(), -9);
+    }
+
+    // ── Hound: eine DX-Expedition im Fox-Betrieb rufen ───────
+    //
+    // Der Ablauf Zug fuer Zug aus WSJT-X' eigener Vorschrift
+    // (lib/DXped_Operations.txt [v2.7.0], Fox = KH1DX).
+
+    void derHoundRuftDieExpedition()
+    {
+        Ft8Ablauf a;
+        a.starteAlsHound(QStringLiteral("KH1DX"),
+                         QStringLiteral("K1ABC"), QStringLiteral("FN42"));
+        QCOMPARE(a.zustand(), Z::RufeAn);
+        QVERIFY(a.istHound());
+        QCOMPARE(a.naechsteNachricht(), QStringLiteral("KH1DX K1ABC FN42"));
+    }
+
+    void derFoxDarfGehashtAnkommen()
+    {
+        // „K1ABC <KH1DX> -13" ist derselbe Fox wie „K1ABC KH1DX -13".
+        // Die spitzen Klammern heiszen nur, dass im Paket ein Hash
+        // stand. Wer das nicht zusammenfuehrt, laesst die Expedition
+        // genau in dem Augenblick fallen, in dem sie einen aufruft.
+        Ft8Ablauf a;
+        a.starteAlsHound(QStringLiteral("KH1DX"),
+                         QStringLiteral("K1ABC"), QStringLiteral("FN42"));
+        QVERIFY(a.verarbeite(QStringLiteral("K1ABC <KH1DX> -13"), -11));
+        QCOMPARE(a.zustand(), Z::SendeRReport);
+        QCOMPARE(a.empfangenerReport(), -13);
+    }
+
+    void derHoundGehtNieAufRR73()
+    {
+        // Den Schluss macht der Fox. Ein Hound, der RR73 sendet,
+        // schickt einen Satz, auf den die Expedition nicht wartet --
+        // und haelt dabei einen Platz im Pileup besetzt.
+        Ft8Ablauf a;
+        a.starteAlsHound(QStringLiteral("KH1DX"),
+                         QStringLiteral("K1ABC"), QStringLiteral("FN42"));
+        QVERIFY(a.verarbeite(QStringLiteral("K1ABC KH1DX -13"), -11));
+        QCOMPARE(a.zustand(), Z::SendeRReport);
+        QCOMPARE(a.naechsteNachricht(), QStringLiteral("KH1DX K1ABC R-11"));
+
+        // GEGENPROBE: als gewoehnlicher Antworter biegt ein schon
+        // bestaetigter Rapport sehr wohl auf RR73 ab. Ohne diesen Lauf
+        // belegt der Fall darueber nicht, dass die Rolle etwas aendert.
+        Ft8Ablauf b;
+        b.starteAlsAntworter(QStringLiteral("DL1ABC"),
+                             QStringLiteral("K1ABC"),
+                             QStringLiteral("FN42"), -11);
+        QVERIFY(b.verarbeite(QStringLiteral("K1ABC DL1ABC R-13"), -11));
+        QCOMPARE(b.zustand(), Z::SendeRR73);
+    }
+
+    void derFoxSchliesztAbUndDasIstDasLogbuch()
+    {
+        Ft8Ablauf a;
+        a.starteAlsHound(QStringLiteral("KH1DX"),
+                         QStringLiteral("K1ABC"), QStringLiteral("FN42"));
+        QVERIFY(a.verarbeite(QStringLiteral("K1ABC KH1DX -13"), -11));
+        QCOMPARE(a.zustand(), Z::SendeRReport);
+
+        // Sein Abschluss: mein Rufzeichen vorn, „RR73;" dahinter, und
+        // danach steht schon die NAECHSTE Station.
+        QVERIFY(a.verarbeite(
+            QStringLiteral("K1ABC RR73; W9XYZ <KH1DX> -17"), -11));
+        QCOMPARE(a.zustand(), Z::Fertig);
+        QCOMPARE(a.partner(), QStringLiteral("KH1DX"));
+        QCOMPARE(a.empfangenerReport(), -13);
+    }
+
+    void einFremderAbschlussGehtMichNichtsAn()
+    {
+        // Derselbe Satz, aber fuer W9XYZ. Er steht im Band und darf
+        // mein QSO nicht beenden -- sonst logge ich ein QSO, das die
+        // Expedition nie mit mir gefuehrt hat.
+        Ft8Ablauf a;
+        a.starteAlsHound(QStringLiteral("KH1DX"),
+                         QStringLiteral("K1ABC"), QStringLiteral("FN42"));
+        QVERIFY(a.verarbeite(QStringLiteral("K1ABC KH1DX -13"), -11));
+        QVERIFY(!a.verarbeite(
+            QStringLiteral("W9XYZ RR73; G4AAA <KH1DX> -12"), -11));
+        QCOMPARE(a.zustand(), Z::SendeRReport);
+    }
+
+    void dieHoundGrenzeStehtBeiTausendHertz()
+    {
+        // From WSJT-X lib/DXped_Operations.txt:16-17 [v2.7.0] --
+        // „Hounds call in 2nd sequence, 1000-5000 Hz above f0. Hounds
+        // transmitting below f0+1000 Hz will not be answered."
+        QCOMPARE(Ft8Ablauf::kHoundMinTonHz, 1000);
+    }
+
+    void ohneFoxRufzeichenFaengtNichtsAn()
+    {
+        Ft8Ablauf a;
+        a.starteAlsHound(QString(), QStringLiteral("K1ABC"),
+                         QStringLiteral("FN42"));
+        QCOMPARE(a.zustand(), Z::Ruht);
+        QVERIFY(!a.laeuft());
     }
 };
 

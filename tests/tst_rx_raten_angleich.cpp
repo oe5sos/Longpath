@@ -104,7 +104,45 @@ private slots:
     void derZeitgeberMeldetJedenAufruf();
     void inSchuebenLaeuftDieSchaetzungInDenAnschlag();   // Gegenprobe
     void derGezaehlteVerbrauchHaeltSchuebeAus();
+
+    // ── Die eigene Sendung ist keine Drift (2026-10-28) ──────────────
+    void eineSendepauseReisztDasVerhaeltnisHoch();   // Gegenprobe
+    void nachZuruecksetzenBleibtDasVerhaeltnisRuhig();
 };
+
+namespace {
+
+/// Faehrt den Angleich erst in den eingeschwungenen Zustand, laesst
+/// dann eine SENDEPAUSE zu: kein Ton hinein, der Verbraucher zieht den
+/// Puffer leer. Danach laeuft der Ton wieder an.
+///
+/// `zuruecksetzenVorher` entscheidet, ob dem Angleich gesagt wird, dass
+/// die Luecke angekuendigt war.
+double verhaeltnisNachSendepause(bool zuruecksetzenVorher)
+{
+    RxRatenAngleich a(kRate, 2);
+    const std::vector<float> block = stereoBlock(kBlock);
+
+    // Einschwingen bei genau passendem Takt: Fuellstand bleibt am Ziel.
+    for (int i = 0; i < 400; ++i) {
+        a.verarbeite(block.data(), kBlock, kZiel, kRing);
+    }
+
+    // Die Sendung: 13 s ohne einen einzigen Tonblock. `verarbeite` wird
+    // in dieser Zeit gar nicht gerufen -- der Ausgangspuffer laeuft
+    // leer, ohne dass der Regler etwas davon erfaehrt.
+    if (zuruecksetzenVorher) {
+        a.zuruecksetzen();
+    }
+
+    // Der Ton laeuft wieder an, und der Ring ist leer.
+    for (int i = 0; i < 50; ++i) {
+        a.verarbeite(block.data(), kBlock, 0, kRing);
+    }
+    return a.verhaeltnis();
+}
+
+}  // namespace
 
 void TstRxRatenAngleich::unbekannterFuellstandGehtUnveraendertDurch()
 {
@@ -416,6 +454,34 @@ void TstRxRatenAngleich::derGezaehlteVerbrauchHaeltSchuebeAus()
                                        "trotzdem weggelaufen")
                             .arg(r.verhaeltnis, 0, 'f', 9)));
 }
+
+// Ohne die Ankuendigung liest der Regler den leergelaufenen Puffer als
+// Taktabweichung. Am 2026-10-28 stand dafuer im Protokoll
+// „Verhaeltnis 1.001744617 (1744.62 ppm)" -- wo ein echter Quarz um
+// wenige ppm abweicht. Diese Gegenprobe haelt fest, dass es ohne den
+// Eingriff wirklich passiert; ohne sie belegt der Fall darunter nichts.
+void TstRxRatenAngleich::eineSendepauseReisztDasVerhaeltnisHoch()
+{
+    const double var = verhaeltnisNachSendepause(false);
+    const double ppm = (var - 1.0) * 1e6;
+    QVERIFY2(std::abs(ppm) > 300.0,
+             qPrintable(QStringLiteral("erwartet: laeuft weg; gemessen %1 ppm")
+                            .arg(ppm, 0, 'f', 2)));
+}
+
+// Mit der Ankuendigung faengt der Regler neu an, statt die Luecke
+// nachzuregeln. Entscheidend fuer FT8: die Hoerperiode nach der
+// eigenen Sendung muss mit richtigem Takt ankommen, sonst dekodiert
+// sie nichts.
+void TstRxRatenAngleich::nachZuruecksetzenBleibtDasVerhaeltnisRuhig()
+{
+    const double var = verhaeltnisNachSendepause(true);
+    const double ppm = (var - 1.0) * 1e6;
+    QVERIFY2(std::abs(ppm) < 300.0,
+             qPrintable(QStringLiteral("erwartet: ruhig; gemessen %1 ppm")
+                            .arg(ppm, 0, 'f', 2)));
+}
+
 
 QTEST_MAIN(TstRxRatenAngleich)
 #include "tst_rx_raten_angleich.moc"

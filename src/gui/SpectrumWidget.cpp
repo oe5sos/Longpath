@@ -988,6 +988,14 @@ void SpectrumWidget::loadSettings()
 
     int renderMode = readInt(QStringLiteral("DisplaySpectrumRenderMode"), 0);
     m_renderMode = static_cast<SpectrumRenderMode>(qBound(0, renderMode, 1));
+    // Auch das Wiederherstellen ist ein Wechsel (2026-10-30): der
+    // Schnellumschalter in der Kopfleiste des Panadapters liest seine
+    // Beschriftung aus diesem Wert. Ohne das Signal stand dort beim
+    // Start „2D", waehrend das Raumbild lief — am Geraet gesehen.
+    emit spectrumRenderModeChanged(m_renderMode);
+    m_dss3dTrueScale = readBool(QStringLiteral("Display3DTrueScale"), true);
+    m_dss.setBackWidthFrac(m_dss3dTrueScale ? DssRenderer::kTrueScaleWidthFrac
+                                            : DssRenderer::kBackWidthFrac);
 
     // Phase 3G-8 commit 3: spectrum renderer state.
     // DisplayAverageMode + DisplayAverageAlpha are retired keys (v0.3.0
@@ -1391,6 +1399,8 @@ void SpectrumWidget::saveSettings()
               m_overlayPanelExpanded ? QStringLiteral("True") : QStringLiteral("False"));
     writeInt(QStringLiteral("DisplayWfColorScheme"), static_cast<int>(m_wfColorScheme));
     writeInt(QStringLiteral("DisplaySpectrumRenderMode"), static_cast<int>(m_renderMode));
+    s.setValue(settingsKey(QStringLiteral("Display3DTrueScale"), m_panIndex),
+              m_dss3dTrueScale ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayCtunEnabled"), m_panIndex),
               m_ctunEnabled ? QStringLiteral("True") : QStringLiteral("False"));
 
@@ -1740,6 +1750,7 @@ void SpectrumWidget::setSpectrumRenderMode(SpectrumRenderMode mode)
     if (m_renderMode == mode) { return; }
     m_renderMode = mode;
     scheduleSettingsSave();
+    emit spectrumRenderModeChanged(mode);
 
     // Start the 3D surface's ring buffer empty rather than carrying rows
     // pushed while it was off (and possibly against a since-changed
@@ -1747,6 +1758,19 @@ void SpectrumWidget::setSpectrumRenderMode(SpectrumRenderMode mode)
     // DssRenderer.h). Also frees the CPU work of building a QImage nobody
     // sees while the mode is off.
     m_dss.clear();
+    m_dss3dNeedsUpload = true;
+    update();
+}
+
+void SpectrumWidget::setDss3dTrueScale(bool on)
+{
+    if (m_dss3dTrueScale == on) { return; }
+    m_dss3dTrueScale = on;
+    m_dss.setBackWidthFrac(on ? DssRenderer::kTrueScaleWidthFrac
+                              : DssRenderer::kBackWidthFrac);
+    scheduleSettingsSave();
+    // The stored rows stay valid -- only their geometry changes -- so the
+    // surface redraws from the same history instead of starting empty.
     m_dss3dNeedsUpload = true;
     update();
 }
@@ -9956,7 +9980,30 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         // already accepts either.
         const bool notchCtrlHeld =
             (event->modifiers() & (Qt::ControlModifier | Qt::MetaModifier)) != 0;
-        if (notchCtrlHeld && my < specH && mx <= specRect.right()) {
+
+        // ── Auf einem Notch wird keiner angelegt (2026-10-30) ────────
+        //
+        // Betreiber: „control und klick erzeugt einen notchfilter. er
+        // muss aber auch wieder entfernt werden können."
+        //
+        // Auf dem Mac IST Ctrl-Klick der Rechtsklick — die Geste, mit
+        // der man am Trackpad ein Kontextmenue aufmacht —, und Qt
+        // meldet den Ctrl-Modifier mit. Der Zweig hier kam vor dem
+        // Treffertest und kehrte zurueck: jeder Ctrl-Klick legte einen
+        // Notch an, auch der auf einen bestehenden, und das Menue mit
+        // `Remove Notch` war von dieser Geste aus nie erreichbar.
+        // Anlegen ging, entfernen nie — und wer am Trackpad sitzt, hat
+        // keine zweite Taste, um daran vorbeizukommen.
+        //
+        // Also: liegt unter dem Zeiger schon ein Notch, gewinnt das
+        // Menue. Nur auf freier Flaeche entsteht ein neuer. Die
+        // Thetis-Belegung (console.cs:49614 [v2.10.3.15], Ctrl +
+        // Rechtsklick legt an) bleibt damit, wo sie gemeint war.
+        const bool aufNotch =
+            (my < specH && mx <= specRect.right())
+            && notchAtPixel(mx, specRect) >= 0;
+
+        if (notchCtrlHeld && !aufNotch && my < specH && mx <= specRect.right()) {
             const bool narrow = (event->modifiers() & Qt::ShiftModifier) != 0;
             emit notchCreateRequested(xToHz(mx, specRect), narrow);
             event->accept();
@@ -10100,6 +10147,8 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                         setSpectrumRenderMode(idx == 1 ? SpectrumRenderMode::Mode3D
                                                        : SpectrumRenderMode::Mode2D);
                     });
+            connect(m_overlayMenu, &SpectrumOverlayMenu::dss3dTrueScaleChanged,
+                    this, [this](bool on) { setDss3dTrueScale(on); });
             connect(m_overlayMenu, &SpectrumOverlayMenu::panFillChanged,
                     this, [this](bool v) { m_panFill = v; update(); scheduleSettingsSave(); });
             connect(m_overlayMenu, &SpectrumOverlayMenu::refLevelChanged,
@@ -10128,6 +10177,7 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         // war (siehe setSpectrumRenderModeIndex dort).
         m_overlayMenu->setSpectrumRenderModeIndex(
             m_renderMode == SpectrumRenderMode::Mode3D ? 1 : 0);
+        m_overlayMenu->setDss3dTrueScale(m_dss3dTrueScale);
         // The frequency under the cursor, captured at popup time: the
         // popup outlives the press, and by the time the button is clicked
         // the pointer has moved onto the popup itself.

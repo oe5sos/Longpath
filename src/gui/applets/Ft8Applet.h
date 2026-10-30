@@ -40,21 +40,26 @@
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Ablauf.h"
 #include "models/LogEntry.h"
+#include "core/Ft8Mehrfach.h"
+#include "core/Ft8Tonwahl.h"
 #include "core/Ft8Tx.h"
 
 #include <QDateTime>
 #include <QPointer>
 #include <QHash>
+#include <QColor>
 #include <QVector>
 
 #include <memory>
 
+class QAction;
 class QLabel;
 class QPlainTextEdit;
 class QSplitter;
 class QSpinBox;
 
 namespace Longpath { class Ft8Wasserfall; }
+namespace Longpath { class Ft8Fensterbalken; }
 class QProgressBar;
 class QLineEdit;
 class QPushButton;
@@ -231,6 +236,11 @@ public:
     static QString eigenerLocator();
 
     void sendeNachricht(const QString& text);
+    /// Mit mehreren Plaetzen: die Summe mehrerer Saetze, jeder auf
+    /// seiner Tonlage (Multi Answering). `text` ist dann nur noch die
+    /// Zeile fuer die Anzeige.
+    void sendeNachricht(const QString& text,
+                        const QVector<Ft8TxSource::Platz>& plaetze);
     void abbrechen();
     bool sendetGerade() const { return m_sendet; }
 
@@ -242,6 +252,10 @@ public:
     /// „Send"-Knopf (m_cqBtn), der Name ist dort eine Altlast.
     QPushButton* cqRufenButtonForTest() const { return m_cqRufenBtn; }
     const Ft8Ablauf& ablaufForTest() const { return m_ablauf; }
+    /// Nur fuer Werkzeuge und Prueflaeufe: den Ablauf von aussen in
+    /// einen Zustand bringen, um die Arbeitsleiste abzubilden.
+    Ft8Ablauf& ablaufForTestSchreibend() { return m_ablauf; }
+    void zeigeAblaufForTest() { zeigeAblauf(); }
     /// Der Zaehler fuer die CQ-Versuche, fuer den Pruefstand.
     class QSpinBox* cqVersucheSpinForTest() const { return m_cqVersucheSpin; }
     /// Einen Fund einspeisen, als waere er dekodiert worden — der
@@ -257,17 +271,34 @@ public:
     // Fuer den Pruefstand.
     Ft8Stream*      streamForTest() const { return m_stream; }
     QPlainTextEdit* listForTest()   const { return m_list; }
-    QPlainTextEdit* listRxForTest() const { return m_listRx; }
     /// Der Zeitgeber, der auf den Beginn des eigenen Fensters wartet.
     /// Ein Prueflauf stellt ihn auf 0 und laesst ihn ablaufen — nur so
     /// wird der Sendeweg wirklich gefahren und nicht nur die Methode
     /// am Ende davon gerufen.
     QTimer* sendeTimerForTest() const { return m_sendeTimer; }
     QLabel*         statusForTest() const { return m_status; }
-    QLabel*         lastLabelForTest() const { return m_lastLabel; }
-    QPushButton*    nurCqButtonForTest() const { return m_nurCqBtn; }
-    QPushButton*    nurNeueLaenderButtonForTest() const { return m_nurNeueLaenderBtn; }
+    /// Hiesz bis zum 2026-10-30 „last period: N" und stand in einer
+    /// eigenen Fusszeile, am anderen Ende des Panels als die Zahl der
+    /// Zeilen in der Liste. Beide stehen jetzt nebeneinander rechts
+    /// neben den Pillen -- es sind zwei verschiedene Zahlen, auch wenn
+    /// sie bei frischer Liste gleich aussehen.
+    QLabel*         lastLabelForTest() const { return m_fundZahl; }
+    /// Hiesz bis zum 2026-10-30 „CQ only" und war ein Haken in der
+    /// Kopfzeile; jetzt ist es die Pille „CQ". Derselbe Zweck,
+    /// derselbe Zugang.
+    QPushButton*    nurCqButtonForTest() const { return m_sichtCq; }
+    QPushButton*    nurNeueLaenderButtonForTest() const { return m_sichtNeuesLand; }
+    QPushButton*    sichtAllesButtonForTest() const { return m_sichtAlles; }
+    QPushButton*    sichtAnMichButtonForTest() const { return m_sichtAnMich; }
+    QPushButton*    sichtFreqButtonForTest() const { return m_sichtFreq; }
     QSpinBox*       sendeTonFeldForTest() const { return m_tonFeld; }
+    QPushButton*    houndButtonForTest() const { return m_houndBtn; }
+    QSpinBox*       plaetzeSpinForTest() const { return m_plaetzeSpin; }
+    QPushButton*    freieStelleButtonForTest() const { return m_freieStelleBtn; }
+    QVector<int>    belegteToeneForTest() const { return belegteToene(); }
+    bool            sucheFreieStelleForTest(bool nurWennBelegt)
+                        { return sucheFreieStelle(nurWennBelegt); }
+    const Ft8Mehrfach& mehrfachForTest() const { return m_mehrfach; }
     QSpinBox*       rundenFeldForTest() const { return m_rundenFeld; }
     Longpath::Ft8Wasserfall* wasserfallForTest() const { return m_wasserfall; }
     int             sendeTonHzForTest() const { return m_sendeTonHz; }
@@ -324,15 +355,56 @@ private:
     int     m_lineCount{0};
 
     QLabel*         m_status{nullptr};
-    QLabel*         m_lastLabel{nullptr};
-    QProgressBar*   m_fill{nullptr};
+    // ── Der Zeilenspeicher (2026-10-30) ───────────────────
+    //
+    // Bis dahin ging jeder Fund direkt in die Textflaeche, und die
+    // Filter wirkten nur auf NEUE Zeilen: wer „CQ only" einschaltete,
+    // sah das Band unveraendert, bis die naechste Periode durch war.
+    // Mit den Pillen aus Entwurf C faellt das sofort auf — also wird
+    // behalten, was gefunden wurde, und die Liste bei jedem
+    // Filterwechsel neu gezeichnet.
+    //
+    // Gespeichert wird das ERGEBNIS der Einordnung, nicht die
+    // Nachricht allein: „neues Land" kostet eine Abfrage im
+    // DXCC-Aufloeser, und die soll nicht bei jedem Pillendruck
+    // hundertmal neu laufen.
+    struct Fundzeile {
+        QString text;        ///< die fertige Zeile, Spalten schon gesetzt
+        QString nachricht;   ///< der reine FT8-Satz
+        int     tonHz{0};
+        bool    anMich{false};
+        bool    istCq{false};
+        bool    neuesLand{false};
+        QColor  landFarbe;
+        bool    eigeneSendung{false};
+    };
+    QVector<Fundzeile> m_zeilen;
+    static constexpr int kMaxZeilen = 400;
+
+    /// Welche Zeilen zu sehen sind. Eine Pille, nicht vier Haken:
+    /// zwei Filter gleichzeitig ergeben Faelle, die niemand im Kopf
+    /// behaelt (und „CQ only" + „New DXCC only" zeigte frueher die
+    /// Schnittmenge, ohne dass das irgendwo stand).
+    enum class Sicht { Alles, AnMich, Cq, NeuesLand, MeineFrequenz };
+    Sicht m_sicht{Sicht::Alles};
+    /// Die Liste aus dem Speicher neu zeichnen.
+    void zeichneListe();
+    /// Gehoert diese Zeile in die aktuelle Sicht?
+    bool inSicht(const Fundzeile& z) const;
+    /// Eine Zeile in den Speicher und, wenn sie passt, in die Liste.
+    void merkeZeile(const Fundzeile& z);
+    /// Eine Zeile unten an die Textflaeche haengen, richtig gefaerbt.
+    void haengeAn(const Fundzeile& z);
+    /// „10 Funde" bzw. „3 von 10" rechts neben den Pillen.
+    void zeigeFundZahl();
+    /// Die Arbeitsleiste nachziehen: mit wem, welcher Zug, was danach.
+    void zeigeArbeit();
+
     QPlainTextEdit* m_list{nullptr};
     // Zweite Spalte wie in WSJT-X: links alles („Band Activity"),
     // rechts nur, was auf der eigenen Stelle liegt oder an mich geht
     // („Rx Frequency"). Ohne sie geht die eigene Stelle in einem
     // vollen Band unter -- genau dort, wo man hinsehen muss.
-    QPlainTextEdit* m_listRx{nullptr};
-    QSplitter*      m_listenTeiler{nullptr};
 
     // Die Signalbreite von FT8 und FT4 (50 Hz). Siehe zeigeZeile().
     static constexpr int kRxFensterHz = 50;
@@ -374,14 +446,88 @@ private:
     Longpath::Ft8Wasserfall* m_wasserfall{nullptr};
     int m_sendeTonHz{1500};
 
-    QPushButton* m_nurCqBtn{nullptr};
-    QPushButton* m_nurNeueLaenderBtn{nullptr};
-    bool m_nurCq{false};
-    /// „New DXCC": derselbe Ansichtsfilter fuer Laender, die noch nie
-    /// im Logbuch standen. Gefragt wird der Aufloeser im Modell --
-    /// derselbe, der die Zeilen hier schon einfaerbt. Ein Ruf an die
-    /// eigene Station kommt auch hier durch.
-    bool m_nurNeueLaender{false};
+    QPushButton* m_sichtAlles{nullptr};
+    QPushButton* m_sichtAnMich{nullptr};
+    QPushButton* m_sichtCq{nullptr};
+    QPushButton* m_sichtNeuesLand{nullptr};
+    QPushButton* m_sichtFreq{nullptr};
+    QLabel*      m_fundZahl{nullptr};
+
+    // ── Die Arbeitsleiste (Entwurf C, 2026-10-30) ────────────
+    //
+    // Was beim automatischen Durchlauf zaehlt, steht unten, wo die
+    // Hand ist: mit wem, welcher Zug, was danach, wie weit das
+    // Fenster. Betreiber am 2026-10-30 zu Entwurf C: „c bitte".
+    QWidget* m_arbeit{nullptr};
+    QLabel*  m_arbeitPartner{nullptr};
+    QLabel*  m_arbeitLand{nullptr};
+    QLabel*  m_arbeitZustand{nullptr};
+    QLabel*  m_arbeitZug{nullptr};
+    QLabel*  m_arbeitDanach{nullptr};
+    QLabel*  m_arbeitUhr{nullptr};
+    Longpath::Ft8Fensterbalken* m_arbeitBalken{nullptr};
+
+    /// Der Wasserfall nahm ein Viertel der Hoehe und lebt erst, wenn
+    /// Ton hereinkommt. Jetzt abschaltbar; die Wahl bleibt erhalten.
+    /// Fox-Betrieb: ein Schalter, keine Erkennung. Ob eine Station im
+    /// Fox-Betrieb laeuft, steht erst in ihrem 0.1-Satz, und den hoert
+    /// man erst, wenn sie jemanden aufruft.
+    QPushButton* m_houndBtn{nullptr};
+    bool         m_houndBetrieb{false};
+
+    // ── Multi Answering (2026-10-30 angeschlossen) ───────────
+    //
+    // `Ft8Mehrfach` und `Ft8TxSource::vorbereitenMehrere` lagen seit
+    // dem Bau (#323/#333/#335) vollstaendig und geprueft im Baum --
+    // und wurden von NIEMANDEM gerufen. Beide kamen nur in ihrer
+    // eigenen Datei und im jeweiligen Prueflauf vor. In der Bilanz
+    // gegen MSHV stand trotzdem „gebaut"; am 2026-10-30 fragte der
+    // Betreiber „wie funktioniert mshv nun bei mir", und beim
+    // Nachsehen war die Antwort: gar nicht.
+    //
+    // Ein Platz heisst eine Station, die gleichzeitig abgearbeitet
+    // wird. Vorgabe 1 = aus, denn die Sendeleistung wird GETEILT:
+    // zwei Plaetze sind −6 dB je Station, drei −9,5, sechs −15,6
+    // (MSHV `gen_ft8.cpp:303`). Bei 5 W und drei Plaetzen bleiben
+    // 1,7 W je Station.
+    // ── Wo gerade jemand liegt (2026-10-30) ────────────────
+    //
+    // Die Tonlagen der zuletzt gehoerten Stationen. Daraus sucht
+    // `Ft8Tonwahl::freieTonlage` eine Stelle, auf der man nicht in ein
+    // laufendes QSO hineinruft.
+    //
+    // Nur die letzten Perioden: wer vor fuenf Minuten dort lag, ist
+    // laengst weg, und eine Liste, die nie vergisst, haelt das ganze
+    // Band fuer belegt.
+    QVector<QVector<int>> m_toeneJePeriode;
+    static constexpr int kPeriodenImGedaechtnis = 3;
+    QVector<int> belegteToene() const;
+    /// Die Grenzen, in denen gesendet werden darf -- beim Hound ab
+    /// 1000 Hz (siehe `Ft8Ablauf::kHoundMinTonHz`).
+    int tonUntergrenze() const;
+    QPushButton* m_freieStelleBtn{nullptr};
+    /// Eine freie Sendestelle suchen und setzen. Gibt true, wenn
+    /// gewechselt wurde.
+    bool sucheFreieStelle(bool nurWennBelegt);
+
+    Ft8Mehrfach  m_mehrfach;
+    QSpinBox*    m_plaetzeSpin{nullptr};
+    int          m_plaetze{1};
+    bool mehrfachAn() const { return m_plaetze > 1; }
+    /// Was in diesem Fenster auf allen Plaetzen hinausginge.
+    void sendeMehrfach();
+    /// Die Tonlage, die der Betreiber hatte, bevor Hound sie ueber
+    /// 1000 Hz zog. 0 heisst: nichts zurueckzugeben.
+    int          m_tonVorHound{0};
+
+    QPushButton* m_wasserfallBtn{nullptr};
+    bool         m_wasserfallAn{true};
+
+    /// Die sechs Standardsaetze, jetzt hinter einem Knopf statt als
+    /// sechs gleich aussehende Knoepfe in einer Reihe.
+    QPushButton* m_handBtn{nullptr};
+    QAction*     m_txAktionen[6]{};
+
     QPushButton*    m_ft8Btn{nullptr};
     QPushButton*    m_ft4Btn{nullptr};
     QPushButton*    m_clearBtn{nullptr};
@@ -417,6 +563,10 @@ private:
     /// jedem Schritt, und der Zustand bleibt auf Fertig stehen — ohne
     /// diese Wache stuende dasselbe QSO mehrfach im Logbuch.
     bool         m_qsoGemeldet{false};
+    /// Laeuft der Ruf vom CQ-Knopf? Dann geht es nach einem fertigen
+    /// QSO von selbst weiter. Ein Doppelklick in die Fundliste ist
+    /// eine Einzelentscheidung und setzt das zurueck, „Stop“ ebenso.
+    bool         m_cqAutomatik{false};
     /// „CQ": ruft CQ und faengt damit den Ablauf als ANRUFER an — bis zum 2026-10-16 war diese Haelfte
     /// von Ft8Ablauf gebaut und geprueft, aber von nirgends
     /// erreichbar: starteAlsAnrufer() hatte keinen einzigen Aufrufer.
@@ -431,6 +581,13 @@ private:
     class QSpinBox* m_cqVersucheSpin{nullptr};
     int m_cqVersucheOffen{0};
     void fensterZuEnde();
+
+    /// CQ und Send zeigen, was gerade laeuft — nicht, was zuletzt
+    /// geklickt wurde.
+    void zeigeKnopfzustand();
+    /// Einen CQ-Ruf anfangen. Eine Stelle fuer den Knopf UND fuer den
+    /// Wiederanlauf nach einem fertigen QSO.
+    void starteCqRuf();
     void meldeFertigesQso();
     void ablaufSchritt();
     void zeigeAblauf();

@@ -1624,6 +1624,13 @@ target_compile_definitions(tst_rxapplet_att_range PRIVATE LONGPATH_BUILD_TESTS)
 # combinations, and prefix independence (Speakers vs Headphones).
 longpath_add_test(tst_audio_device_config_roundtrip)
 
+# ── Mikrofon-Namen in der Sprache des Systems (2026-10-29) ───────────────────
+# Am Geraet gemessen: ein nicht angestecktes Headset in den Einstellungen, und
+# die Ersatzsuche nahm „BoomAudio" -- die Flex sendete 664 Tonpakete mit Spitze
+# -150 dBFS. Die Hardware-Erkennung kannte nur englische Namen, die Eingaenge
+# des Betreibers heiszen „Externes Mikrofon" / „MacBook Air-Mikrofon".
+longpath_add_test(tst_mikrofon_namen)
+
 # ── Phase 3O Sub-Phase 12 Task 12.2 Step 0: AudioEngine speakers live-reconfig ─
 # Verifies speakersConfigChanged / headphonesConfigChanged / txInputConfigChanged
 # / vaxConfigChanged signals, mutex safety in rxBlockReady (try_lock), and
@@ -5570,12 +5577,15 @@ longpath_add_test(tst_ft8_am_ton)
 longpath_add_test(tst_ft8_ablauf)
 
 longpath_add_test(tst_ft8_senden)
+longpath_add_test(tst_ft8_sendeplan)
+longpath_add_test(tst_ft8_tonwahl)
+longpath_add_test(tst_ft8_dxpedition)
 # 2026-10-15: FT8 im PROGRAMM — Abgriff, Flaeche, Eintrag. Dekoder und
 # Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die
 # Verdrahtung, nicht die Rechnung.
 longpath_add_test(tst_ft8_flaeche)
 # Die zweite Spalte „Rx Frequency" neben „Band Activity" (2026-10-21).
-longpath_add_test(tst_ft8_zwei_spalten)
+longpath_add_test(tst_ft8_sicht_meine_frequenz)
 longpath_add_test(tst_ft8_wasserfall)
 # 2026-10-15: und wie lange ein ganzes Fenster rechnet — die Zahl
 # entscheidet, ob das im Faden der Oberflaeche laufen darf.
@@ -7447,6 +7457,18 @@ longpath_add_test(tst_pgxl_connection_save)
 longpath_add_test(tst_flex_radio_discovery_broadcaster)
 longpath_add_test(tst_kein_phantom_flex)
 
+# ── Die Frist der Flex-Suche folgt dem Netzweg (2026-10-28) ──────────────
+# Gemessen: 374 Mal „verloren"/„gefunden" in 223 Minuten, kuerzeste
+# Standzeit 5,02 s (= die Frist), kuerzeste Luecke 10 ms, 21,2 % der
+# Laufzeit „offline" in der Liste -- und eine „offline"-Zeile macht den
+# Verbinden-Knopf fest. Broadcast ueber WLAN wird nicht quittiert.
+# Tests: staleTimeoutFor je Weg (Kabel/Loopback 5 s, WLAN/Virtual/
+#   Unbekannt 20 s); im Durchlauf ueberlebt eine 10-s-Luecke im WLAN und
+#   faellt am Kabel auf; der Zaehler fuer ungelesene Datagramme auf 4992
+#   (die blinde Stelle in handleDatagram) zaehlt und wird von einem
+#   gelesenen Ruf zurueckgesetzt.
+longpath_add_test(tst_flex_suche_frist)
+
 # ── Per-radio peripherals refactor (2026-05-26) ──────────────────────────
 # Verifies the RadioModel::peripheralValue / setPeripheralValue helpers
 # and the one-shot migration that folds legacy globals (RfKit_* /
@@ -8002,6 +8024,7 @@ longpath_add_test(tst_flex_vita_reader)
 # der Maszstab MUSS von aussen kommen, weil die Maschine y_pixels nie
 # zurueckmeldet. Datagramme aus echten Koepfen gebaut.
 longpath_add_test(tst_flex_vita_stream)
+longpath_add_test(tst_flex_lueckenfuellung)
 
 # 2026-10-22, zwei Befunde am Geraet: kein Ton trotz 30 987 Tonpaketen,
 # und ein S-Meter ohne Zeiger. Beide mit derselben Wurzel — die
@@ -8014,6 +8037,36 @@ longpath_add_test(tst_flex_ton_und_pegel)
 # fest, dass er nicht in den dBm-Weg geraet.
 longpath_add_test(tst_flex_wasserfall_kachel)
 longpath_add_test(tst_flex_senden)
+longpath_add_test(tst_flex_sendetakt)
+
+# 2026-10-30: der 80-kHz-Versatz beim Verbinden ist offen, und das
+# Protokoll nannte nie, WER die Scheibe verstellt. Die Spur in
+# MainWindow_Flex.cpp nennt ihn; dieser Stand prueft ihr Urteil in
+# BEIDEN Richtungen — sie muss den Versatz fangen und bei jedem
+# gewoehnlichen Handgriff schweigen.
+longpath_add_test(tst_flex_frequenzspur)
+
+# -- Flex: der Fehlerweg sagt jetzt etwas ---------------------------------
+# „Disconnected — Unknown error" im Verbindungsfenster, 2026-10-28 20:41,
+# dreimal in Folge; eine Millisekunde zwischen Wahl und Fehler, und als
+# Begruendung ein Schulterzucken. Zwei Wiederholversuche desselben Laufs
+# meldeten danach GAR NICHTS (keine Frist: der Zustand haengt auf
+# Connecting, wenn der Handschlag ausbleibt). Geprueft werden beide
+# Mangel: Klartext + Nummer + Ziel in der Meldung, und die neue Frist.
+# Der abgewiesene Fall laeuft ueber einen eben geschlossenen Port auf
+# 127.0.0.1 — echter Socketfehler, kein Netz nach draussen.
+# Quelle: Longpath-original.
+longpath_add_test(tst_flex_verbindungsfehler)
+
+# -- FT8: Rufzeichen, die nur als Hash kommen -----------------------------
+# Longpath uebergab ft8_lib bis zum 2026-10-28 `nullptr` als Hashtabelle.
+# Die Bibliothek schreibt dann wortwoertlich `<...>` statt des
+# Rufzeichens (message.c:734) -- bei Sonderrufzeichen im Alltag, und beim
+# EU-VHF-Contestsatz (i3=5) waeren BEIDE Rufzeichen betroffen.
+# Geprueft wird durch die Bibliothek selbst (packen, auspacken), mit
+# Gegenprobe bei geleerter Tabelle.
+# Quelle: Longpath-original.
+longpath_add_test(tst_ft8_rufzeichen)
 
 # 2026-10-22: der „Lattenzaun" im Panadapter. Ein echter Rahmen von
 # Martins FLEX-8400 geht durch denselben Zeichenweg wie im Programm,

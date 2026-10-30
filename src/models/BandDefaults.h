@@ -98,5 +98,18 @@ DSPMode seitenbandFuer(Band b);
 /// abgelegtes DIGU gehoert zu FT8 und ist kein verdrehtes Seitenband.
 DSPMode korrigiereSeitenband(Band b, DSPMode mode);
 
+/// Liegt `hz` im Amateurband `b` der EINGESTELLTEN Region? Wenn ja,
+/// unveraendert zurueck; wenn nein, die Startfrequenz des Bandes.
+///
+/// Fuer GEN, WWV und XVTR — und wenn `hz` ueberhaupt in keinem Band
+/// liegt — bleibt `hz` stehen: dort gibt es nichts zu ruecken.
+///
+/// Geprueft wird gegen die eingestellte Region, nicht gegen die
+/// Region-2-Tabelle in Band.h. Der Unterschied ist keine Feinheit:
+/// 7,225 MHz ist nach Region 2 im 40-m-Band und nach Region 1 nicht,
+/// und genau darauf stand das Geraet des Betreibers am 2026-10-29,
+/// als die Flex `NOT_READY reason=OUT_OF_BAND` meldete.
+double frequenzImBand(Band b, double hz);
+
 } // namespace BandDefaults
 } // namespace Longpath

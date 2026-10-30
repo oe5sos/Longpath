@@ -111,6 +111,8 @@
 #include "audio/MasterMixer.h"
 #include "audio/RxRatenAngleich.h"
 #include "strip/MicSpectrum.h"
+// NrSlot und der Rauschzweig fuer fremden Ton (2026-10-28).
+#include "WdspTypes.h"
 
 #if defined(Q_OS_LINUX)
 #  include "core/audio/LinuxAudioBackend.h"
@@ -173,6 +175,8 @@ class SliceModel;
 // summing point so the cancellation reference matches the audio actually
 // leaving the speakers.  This is a tap-point relocation only; the WDSP
 // DEXP block and TxChannel::sendAntiVoxData wrapper stay unchanged.
+class ExternalAudioNr;   // src/core/ExternalAudioNr.h
+
 class AudioEngine : public QObject {
     Q_OBJECT
 
@@ -504,6 +508,15 @@ public:
     /// geteilter Ring haette einen Leser zu wenig.
     void setFt8Tap(AudioTapRing* ring, int sliceId);
 
+    /// Den RX-Driftausgleich beim naechsten Tonblock neu anfangen
+    /// lassen. Aufzurufen, wenn eine BEKANNTE Luecke im Empfangston
+    /// liegt -- eine eigene Sendung etwa -- damit der Regler sie nicht
+    /// als Taktabweichung liest. Siehe m_rxDriftZuruecksetzen.
+    void rxDriftNeuAnfangen()
+    {
+        m_rxDriftZuruecksetzen.store(true, std::memory_order_release);
+    }
+
     void rxBlockReady(int sliceId, const float* samples, int frames);
 
     // ── KiwiSDR-Ton (Stufe 5, 2026-08-23) ───────────────────────────
@@ -592,6 +605,28 @@ public:
     void setFlexAudioSourceEnabled(int sliceId, bool enabled);
     void removeFlexAudioSource(int sliceId);
     bool flexAudioEnabled(int sliceId) const;
+
+    /// Rauschminderung für Ton, der schon demoduliert ankommt
+    /// (Flex, Kiwi, TCI) — 2026-10-28.
+    ///
+    /// Der Betreiber: „aber jeder nr sollte anders funktionieren! das
+    /// ist bei anvelina ja schon!" Stimmt: dort laufen vier
+    /// WDSP-Verfahren. Fremder Ton läuft nie durch WDSP, also gab es
+    /// dort gar keines. Diese Stufe legt die beiden Verfahren, die auf
+    /// TON arbeiten können (NR3 rnnoise, MNR Apple), hinter den
+    /// Wandler auf 48 kHz. NR1/NR2/NR4 sind WDSP-Einheiten und bleiben
+    /// draussen — siehe ExternalAudioNr.h.
+    ///
+    /// `amount` 0..1. Ein Steckplatz ohne Gegenstück schaltet die
+    /// Stufe ab; dann kostet sie nichts.
+    void setExternalAudioNr(int sliceId, NrSlot slot, float amount);
+    /// Den Zweig einer Scheibe vergessen (Scheibe weg, Quelle weg).
+    void removeExternalAudioNr(int sliceId);
+
+    /// Den Rauschzweig auf einen fertigen 48-kHz-Block anwenden.
+    /// Gemeinsam fuer Flex und Kiwi; ohne gewaehltes Verfahren ein
+    /// Rueckkehrbefehl.
+    void wendeFremdtonRauschenAn(int sliceId, QByteArray& block);
 
     /// TX-monitor block consumer. Called via Qt::DirectConnection from
     /// TxChannel::sip1OutputReady on the audio thread. When monitor is
@@ -1034,6 +1069,23 @@ private:
     // gehoert nicht ungefragt eingeschaltet; `RxDriftAusgleich=True`
     // schaltet ihn ein, und danach entscheidet das Ohr.
     std::unique_ptr<RxRatenAngleich> m_rxDrift;
+
+    // ── Der Driftausgleich darf eine Sendepause nicht als Drift lesen ─
+    //
+    // Waehrend einer eigenen Sendung kommt kein Empfangston; der
+    // Ausgangspuffer wird derweil leergezogen. Das ERSTE Paket danach
+    // zeigt dem Regler einen leeren Ring, er liest daraus einen
+    // riesigen Verbrauch und reiszt das Verhaeltnis hoch -- am
+    // 2026-10-28 auf 1,001745 (1744 ppm) und 0,998784 (-1216 ppm),
+    // wo ein echter Quarz um wenige ppm abweicht. Mit diesem
+    // Verhaeltnis wird die ganze folgende Hoerperiode umgetastet, und
+    // FT8 vertraegt das nicht: drei Hoerfenster hintereinander
+    // "0 Funde", dann wieder 17.
+    //
+    // Gesetzt wird aus dem Hauptfaden, gelesen und geloescht im
+    // Tonfaden -- `zuruecksetzen()` selbst fasst Zustand an, den der
+    // Tonfaden benutzt, und gehoert deshalb nicht in einen fremden.
+    std::atomic<bool> m_rxDriftZuruecksetzen{false};
     std::unique_ptr<IAudioBus> m_headphonesBus;
     std::unique_ptr<IAudioBus> m_txInputBus;
 
@@ -1077,6 +1129,9 @@ private:
         int rateHz = 0;
     };
     std::map<int, FlexResamplerSlot> m_flexResamplers;
+    /// Je Scheibe ein Rauschzweig für fremden Ton. Angelegt erst,
+    /// wenn ein Verfahren gewählt wird — siehe setExternalAudioNr.
+    std::map<int, std::unique_ptr<ExternalAudioNr>> m_externalAudioNr;
     std::set<int> m_flexEnabledSlices;
 
     // Second mixer whose output is the anti-VOX reference, not the speakers.

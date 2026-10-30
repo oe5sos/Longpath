@@ -266,6 +266,26 @@ QByteArray buildTxAudioPacket(quint32 streamId,
                               int frames,
                               quint8& zaehler);
 
+// ── Was der Rollzaehler ueber Verluste sagt ──────────────────────────
+//
+// Jedes Empfangspaket traegt in Bit 19-16 einen Zaehler 0..15, je
+// Stromkennung fortlaufend. Er wurde bis 2026-10-29 gelesen
+// (`Header::counter`) und nirgends ausgewertet — damit war „der Ton
+// setzt aus" nicht von „die Maschine schickt nichts" zu trennen.
+//
+// Rueckgabe: wie viele Pakete zwischen `vorher` und `jetzt` fehlen,
+// 0..15.
+//
+// Die Grenze, die dazugehoert, und ohne die die Zahl mehr behauptet
+// als sie weiss:
+//   * Ein Verlust von GENAU 16, 32, … ist unsichtbar. Der Zaehler
+//     laeuft bei 187 Paketen je Sekunde in 86 ms einmal um.
+//   * Ab 8 fehlenden ist nicht mehr zu unterscheiden, ob Pakete
+//     fehlen oder zwei vertauscht ankamen (UDP darf umsortieren).
+// Die Zahl ist also eine UNTERE Schranke, kein Messwert. Sie taugt
+// fuer „es fehlt was" und nicht fuer „es fehlen genau so viele".
+int fehlendeNachZaehler(quint8 vorher, quint8 jetzt);
+
 // ── Messwerte, Paketklasse 0x8002 ───────────────────────────────────
 //
 // Am 2026-10-21 an Martins FLEX-8400 gemessen: 653 Pakete in 22 s

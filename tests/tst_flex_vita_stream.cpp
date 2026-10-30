@@ -58,6 +58,31 @@ QByteArray mitRahmenindex(QByteArray p, quint32 index)
     return p;
 }
 
+// Den Rollzaehler setzen: Bit 19-16 von Wort 0, also das untere
+// Halbbyte von Byte 1.
+QByteArray mitZaehler(QByteArray p, quint8 zaehler)
+{
+    p[1] = static_cast<char>((quint8(p[1]) & 0xF0) | (zaehler & 0x0F));
+    return p;
+}
+
+// Die Stromkennung setzen: Wort 1, Byte 4-7, gross-endig.
+QByteArray mitStrom(QByteArray p, quint32 strom)
+{
+    p[4] = static_cast<char>((strom >> 24) & 0xFF);
+    p[5] = static_cast<char>((strom >> 16) & 0xFF);
+    p[6] = static_cast<char>((strom >> 8) & 0xFF);
+    p[7] = static_cast<char>(strom & 0xFF);
+    return p;
+}
+
+QByteArray tonMit(quint8 zaehler, quint32 strom)
+{
+    QByteArray p = roh(LongpathTest::FlexVitaGolden::kTonKopf);
+    p.append(QByteArray(1024, '\0'));
+    return mitZaehler(mitStrom(p, strom), zaehler);
+}
+
 QByteArray kachelPaket(const char* kopfHex, int breite, quint16 wert)
 {
     QByteArray p = roh(kopfHex);
@@ -276,6 +301,160 @@ private slots:
         strom.ingestDatagramForTesting(
             mitRahmenindex(fftPaket(G::kFftKopfB, 354, 501), 7));
         QCOMPARE(spektrum.count(), 2);
+    }
+
+    // ── Luecken im Strom (2026-10-29) ────────────────────────
+    //
+    // Der Rollzaehler wurde seit dem Port gelesen und nie ausgewertet.
+    // Am 2026-10-29 fiel der Empfang zweimal ganz aus, und es gab kein
+    // Instrument, das „Pakete fehlen unterwegs" von „die Maschine
+    // schickt nichts" getrennt haette.
+
+    void derRollzaehlerSagtWasFehlt()
+    {
+        using FlexVita::fehlendeNachZaehler;
+        // Der normale Schritt: nichts fehlt.
+        QCOMPARE(fehlendeNachZaehler(0, 1), 0);
+        QCOMPARE(fehlendeNachZaehler(14, 15), 0);
+        // Ueber den Umlauf hinweg zaehlt er genauso.
+        QCOMPARE(fehlendeNachZaehler(15, 0), 0);
+        QCOMPARE(fehlendeNachZaehler(0, 2), 1);
+        QCOMPARE(fehlendeNachZaehler(14, 1), 2);
+        QCOMPARE(fehlendeNachZaehler(13, 0), 2);
+        // Und die Grenze, die im Kopf der Funktion steht: ein Verlust
+        // von genau 16 ist unsichtbar. Das ist keine Macke des Codes,
+        // das ist die Breite des Zaehlers — wer die Zahl liest, muss
+        // wissen, dass sie eine untere Schranke ist.
+        QCOMPARE(fehlendeNachZaehler(7, 7), 15);
+    }
+
+    void einLueckenloserStromMeldetKeinenVerlust()
+    {
+        FlexVitaStream strom;
+        for (int i = 0; i < 40; ++i) {
+            strom.ingestDatagramForTesting(
+                tonMit(quint8(i & 0x0F), 0x04000008u));
+        }
+        QCOMPARE(strom.verlorenePaketeGesamt(), qint64(0));
+        const auto l = strom.luecken();
+        QCOMPARE(l.size(), 1);
+        QCOMPARE(l.at(0).pakete, qint64(40));
+        QCOMPARE(l.at(0).verloren, qint64(0));
+        QCOMPARE(l.at(0).spruenge, qint64(0));
+    }
+
+    void einSprungImZaehlerWirdGezaehlt()
+    {
+        FlexVitaStream strom;
+        const quint8 folge[] = {0, 1, 4, 5, 6, 9};   // 2 + 2 fehlen
+        for (const quint8 z : folge) {
+            strom.ingestDatagramForTesting(tonMit(z, 0x04000008u));
+        }
+        QCOMPARE(strom.verlorenePaketeGesamt(), qint64(4));
+        const auto l = strom.luecken();
+        QCOMPARE(l.size(), 1);
+        QCOMPARE(l.at(0).verloren, qint64(4));
+        QCOMPARE(l.at(0).spruenge, qint64(2));
+    }
+
+    // Die Falle, die ein Instrument zur Phantommaschine macht: der
+    // Zaehler laeuft JE STROM. Mit zwei Scheiben kommen zwei
+    // verschraenkte Zaehler an, und wer sie in einen Topf wirft, misst
+    // bei jedem zweiten Paket einen Verlust, der nie stattfand.
+    void zweiStroemeStoerenSichNicht()
+    {
+        FlexVitaStream strom;
+        for (int i = 0; i < 16; ++i) {
+            strom.ingestDatagramForTesting(
+                tonMit(quint8(i & 0x0F), 0x04000008u));
+            strom.ingestDatagramForTesting(
+                tonMit(quint8(i & 0x0F), 0x04000009u));
+        }
+        QCOMPARE(strom.verlorenePaketeGesamt(), qint64(0));
+        QCOMPARE(strom.luecken().size(), 2);
+    }
+
+    // GEGENPROBE zum vorigen: in EINEN Topf geworfen ergibt dieselbe
+    // Folge lauter Verluste. Ohne diesen Lauf belegt die Null oben
+    // nichts — sie koennte auch heissen, dass gar nicht gezaehlt wird.
+    void inEinenTopfGeworfenErgaebeLauterPhantome()
+    {
+        quint8 letzter = 0;
+        bool   gesehen = false;
+        qint64 verloren = 0;
+        for (int i = 0; i < 16; ++i) {
+            for (int s = 0; s < 2; ++s) {
+                const quint8 z = quint8(i & 0x0F);
+                if (gesehen) {
+                    verloren += FlexVita::fehlendeNachZaehler(letzter, z);
+                }
+                letzter = z;
+                gesehen = true;
+            }
+        }
+        QVERIFY2(verloren > 100,
+                 "Ein gemeinsamer Zaehler muesste Phantome erzeugen; "
+                 "tut er das nicht, prueft der Fall darueber nichts.");
+    }
+
+    void dasErstePaketIstKeineLuecke()
+    {
+        FlexVitaStream strom;
+        // Zaehler 9 als Erstes — ohne Vorgaenger ist das keine Aussage.
+        strom.ingestDatagramForTesting(tonMit(9, 0x04000008u));
+        QCOMPARE(strom.verlorenePaketeGesamt(), qint64(0));
+    }
+
+    // ── Eine Unterbrechung ist keine Luecke (2026-10-30) ────────────
+    //
+    // Waehrend des Sendens schickt die Maschine keinen Empfangston.
+    // Das erste Paket danach kommt dreizehn Sekunden spaeter, und der
+    // 4-Bit-Zaehler ist in der Zeit laengst mehrfach umgelaufen --
+    // sein Sprung ist dann eine Zufallszahl, kein Verlust.
+    //
+    // Am Geraet gemessen (2026-10-30): die Fuellung schob nach jeder
+    // Sendung bis zu acht Pakete Stille ein, die niemand verloren
+    // hatte. Ueber 35 Minuten Rufbetrieb waren das 3034 ms, und jede
+    // davon verschiebt die Zeitachse des Empfangs.
+    void nachEinerLangenPauseWirdNichtGefuellt()
+    {
+        FlexVitaStream strom;
+        // Die Uhr laeuft erst ab `start()`. Ohne sie gibt es keinen
+        // Abstand zu messen, und dann wird gefuellt wie bisher --
+        // genau so soll es sein (siehe `zaehleLuecke`), aber dieser
+        // Fall braucht die Zeit.
+        QVERIFY(strom.start(QHostAddress::LocalHost) != 0);
+        // Ein paar Pakete am Stueck, damit es einen Rand gibt.
+        for (int i = 0; i < 4; ++i) {
+            strom.ingestDatagramForTesting(tonMit(quint8(i), 0x04000008u));
+        }
+        const qint64 vorher = strom.gefuellteRahmen();
+
+        // Jetzt eine lange Pause -- im Pruefstand durch Warten, denn
+        // die Uhr ist dieselbe, die der Strom benutzt.
+        QTest::qWait(250);
+
+        // Ein Paket mit grossem Zaehlersprung: sieht aus wie Verlust,
+        // ist aber das erste nach der Unterbrechung.
+        strom.ingestDatagramForTesting(tonMit(12, 0x04000008u));
+        QCOMPARE(strom.gefuellteRahmen(), vorher);
+    }
+
+    // GEGENPROBE: derselbe Sprung OHNE Pause wird sehr wohl gefuellt.
+    // Ohne diesen Lauf belegt der Fall darueber nicht, dass die PAUSE
+    // den Unterschied macht -- er waere auch gruen, wenn gar nie
+    // gefuellt wuerde.
+    void ohnePauseWirdDerselbeSprungGefuellt()
+    {
+        FlexVitaStream strom;
+        for (int i = 0; i < 4; ++i) {
+            strom.ingestDatagramForTesting(tonMit(quint8(i), 0x04000008u));
+        }
+        const qint64 vorher = strom.gefuellteRahmen();
+        // Zaehler springt von 3 auf 12: acht fehlen.
+        strom.ingestDatagramForTesting(tonMit(12, 0x04000008u));
+        QVERIFY2(strom.gefuellteRahmen() > vorher,
+                 "ohne Pause muss die Fuellung greifen");
     }
 
     void unsinnigerMassstabWirdNichtUebernommen()

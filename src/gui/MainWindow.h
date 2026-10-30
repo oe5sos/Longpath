@@ -79,6 +79,7 @@
 
 #include "core/WdspTypes.h"
 #include "core/DigiFrequenzen.h"
+#include <QElapsedTimer>
 #include <QTimer>
 #include <QHash>
 #include <QMap>
@@ -246,6 +247,21 @@ public:
     class KiwiSdrManager* kiwiSdrManagerForTest() const
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
+
+    /// Wie viele Rahmen des Sendetons jetzt faellig sind.
+    ///
+    /// Herausgezogen, damit die Rechnung einen Prueffall haben kann:
+    /// sie entscheidet, ob der Ton in Echtzeit hinausgeht oder gedehnt
+    /// (siehe `m_flexSendeUhr`). `maxRahmen` deckelt den einzelnen
+    /// Schwall; der Rest bleibt faellig und geht beim naechsten Schlag
+    /// mit, sodass ein Haenger aufgeholt und nicht verschluckt wird.
+    static qint64 flexFaelligeRahmen(qint64 nsecsVerstrichen,
+                                     qint64 geliefert,
+                                     qint64 rateHz,
+                                     qint64 maxRahmen);
+    /// Die Kommandoleiste, damit ein Lauf ihre Knoepfe wirklich
+    /// druecken kann statt die Wirkung nachzubauen.
+    class CommandBar* commandBarForTest() const { return m_commandBar; }
     /// Die Fensterverwaltung, fuer den Pruefstand. Nur lesen und
     /// schalten -- der Besitz bleibt beim Fenster.
     class AppletVisibilityController* appletVisibilityForTest() const
@@ -320,6 +336,11 @@ public:
     /// kippte am 2026-10-21 alles DAHINTER auf privat und brach sieben
     /// CI-Laeufe (`appletIsRegisteredForTest` war ploetzlich privat).
     void aufDigiStellen(Longpath::DigiFrequenzen::Digimodus modus);
+
+    /// Welcher Digimodus zuletzt gemeint war. Der DIGU/DIGL-Knopf in
+    /// der Leiste traegt keinen -- er richtet mit diesem her.
+    Longpath::DigiFrequenzen::Digimodus m_letzterDigiModus{
+        Longpath::DigiFrequenzen::Digimodus::Ft8};
 
     /// Dasselbe mit Nachlauf: waehrend eines Groessenzugs feuert
     /// resizeEvent bei jedem Pixel, und Fenster, die dabei im Takt
@@ -1870,9 +1891,20 @@ private:
     /// Der Blick des Betreibers zieht den Panadapter der Maschine nach.
     QMetaObject::Connection m_flexBlickBand;
     QTimer* m_flexPanNachzug{nullptr};
+    /// Die Spur: WER schiebt die Scheibe im Verbindungsfenster?
+    /// Siehe MainWindow_Flex.cpp, "Die Spur der Frequenz".
+    QMetaObject::Connection m_flexFreqSpur;
+    qint64  m_flexSpurBisMs{0};
+    double  m_flexSpurLetzteHz{0.0};
     /// Dasselbe fuer Betriebsart und Filterflanken.
     QMetaObject::Connection m_flexArtBand;
     QMetaObject::Connection m_flexFilterBand;
+    /// Rauschminderung, Störaustaster, Kerbfilter → Maschine
+    /// (2026-10-28). Drei Bänder, ein Befehl: siehe
+    /// RadioModel::setFlexSliceNoise.
+    QMetaObject::Connection m_flexNrBand;
+    QMetaObject::Connection m_flexNbBand;
+    QMetaObject::Connection m_flexAnfBand;
     /// Einmal je Verbindung: die Fensterbreite auf den Ausschnitt der
     /// Flex stellen. Danach gehoert der Zoom wieder dem Betreiber.
     bool m_flexAusschnittUebernommen{false};
@@ -1888,6 +1920,69 @@ private:
     QTimer* m_flexSendePumpe{nullptr};
     /// Mono aus `AudioEngine::pullTxMic`, bevor es verdoppelt wird.
     QVector<float> m_flexMikMono;
+    // Hoechste Spitze, die der erzeugte FT8-Ton bisher an die Flex
+    // gegeben hat. Nur fuer die eine Protokollzeile je Sendung.
+    float m_flexFt8Spitze{0.0f};
+
+    // ── Wie lange der Empfang nach dem Loesen schweigt (2026-10-28) ──
+    //
+    // Am 2026-10-28 verlor der FT8-Dekoder ganze Hoerperioden: drei
+    // Fenster hintereinander „0 Funde", dann wieder 17. Gegengerechnet
+    // mit dem Wasserfall lag jede leere Hoerperiode in einem Zeitraum
+    // ohne eine einzige Zeile. Was fehlte, war die Zahl: wie lange
+    // genau vom Loesen bis zum ersten Empfangssample. Raten hilft hier
+    // nicht — 15 Sekunden Hoerperiode entscheiden ueber alles oder
+    // nichts.
+    qint64 m_flexLoesenMs{0};     ///< Zeitpunkt des letzten „MOX aus"
+    int    m_flexTonImSenden{0};  ///< Tonpakete WAEHREND des Sendens
+
+    // ── Was JE SENDUNG wirklich hinausging (2026-10-29) ──────────────
+    //
+    // `m_flexFt8Spitze` darueber ist ein Hoechststand ueber die ganze
+    // Laufzeit und meldet sich nur, wenn er steigt — nach der ersten
+    // Sendung also nie wieder. Am 2026-10-29 fehlte genau deshalb die
+    // Antwort auf die eine Frage, an der alles hing: hat Longpath
+    // nichts geschickt, oder hat die Maschine nichts angenommen?
+    // (Gemessen war nur ihre Seite: MICPEAK −150 dBFS im vierten
+    // Durchgang gegen −5,98 dBFS im fuenften.) Diese drei werden je
+    // Sendung zurueckgesetzt und je Sendung gemeldet.
+    int    m_flexTxProben{0};     ///< Proben an die Maschine, diese Sendung
+    int    m_flexTxVomMik{0};     ///< Zuege, die am Mikrofon statt an FT8 hingen
+    float  m_flexTxSpitze{0.0f};  ///< Spitze dieser Sendung, nach der Daempfung
+    /// Einmal je Sendung melden, wenn das Mikrofon ueber −1 dBFS kam.
+    /// Ohne das stuende die Zeile bei jedem Pumpentakt im Protokoll.
+    bool   m_flexMikZuLaut{false};
+
+    // ── Die Pumpe braucht eine Uhr (2026-10-29) ──────────────────────
+    //
+    // Der Sendeton ist ein Echtzeitstrom: was die Pumpe an die Maschine
+    // gibt, spielt die Maschine ab. Die Pumpe hatte aber keine
+    // Zeitreferenz — sie schob bei JEDEM Taktschlag starr 480 Rahmen
+    // hinaus, ganz gleich, wann der Schlag kam. Auf einem Hauptfaden,
+    // der nebenher Wasserfall, Spektrum und Kachel malt, kommt er
+    // nicht alle 5 ms.
+    //
+    // Am Geraet gemessen (Protokoll 2026-10-29, 13:05 bis 13:07, vier
+    // Sendungen von je 12,94 s). Hinausgehen muessten 621.120 Rahmen:
+    //
+    //     180.000 Rahmen = 13,9 kHz = 0,29-fache Geschwindigkeit
+    //     332.640 Rahmen = 25,7 kHz = 0,54-fache
+    //     165.600 Rahmen = 12,8 kHz = 0,27-fache
+    //     716.160 Rahmen = 55,3 kHz = 1,15-fache
+    //
+    // Der Ton ging also mal auf ein Viertel gedehnt, mal zu schnell
+    // hinaus, und vom 15-s-Fenster kam oft nur das erste Drittel an.
+    // Dasselbe erklaert den spaeten Anfang: bis die Pumpe durch die
+    // fuehrende Stille der Wellenform war, vergingen 3,6 s statt 0,5 —
+    // „FT8-Sendepegel" meldete den ersten Ton um 13:05:33,655, getastet
+    // war um 13:05:30,033. Betreiber: „leistung kommt zeitversetzt."
+    //
+    // Jetzt zaehlt nicht mehr der Taktschlag, sondern die Uhr: je
+    // Schlag geht genau so viel hinaus, wie seit dem Tasten faellig
+    // geworden ist. Ein spaeter Schlag holt auf, ein frueher wartet.
+    QElapsedTimer m_flexSendeUhr;      ///< laeuft ab dem Tasten
+    qint64 m_flexSendeGeliefert{0};    ///< Rahmen, die schon hinaus sind
+    qint64 m_flexSendeRueckstand{0};   ///< groeszter Rueckstand, Rahmen
     /// Dasselbe als Stereo, wie die Maschine es erwartet.
     QVector<float> m_flexMikStereo;
     /// Haben wir selbst getastet? Trennt unser `xmit` von der Taste am
@@ -1903,6 +1998,12 @@ private:
     // (gemessen). Solange er unbekannt ist, wird nichts gezeichnet:
     // lieber kein Bild als ein Bild an der falschen Frequenz.
     double m_flexSpanLowHz{0.0};
+    /// Das letzte Empfangsbild, das beim Senden stehenbleibt, samt
+    /// dem Ausschnitt, zu dem es gehoert. Siehe MainWindow_Flex.cpp,
+    /// „Beim Senden das Bandbild halten".
+    QVector<float> m_flexBildFrost;
+    double m_flexBildFrostLowHz{0.0};
+    double m_flexBildFrostHighHz{0.0};
     double m_flexSpanHighHz{0.0};
 
     // ── SunSDR-Bild (2026-08-24) ──────────────────────────────────────

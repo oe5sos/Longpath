@@ -2,6 +2,7 @@
 
 #include <QVector>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <vector>
@@ -278,6 +279,15 @@ const QImage& DssRenderer::image(const QSize& px, int scaleStripPx,
     return m_cache;
 }
 
+void DssRenderer::setBackWidthFrac(float frac)
+{
+    const float f = std::clamp(std::isfinite(frac) ? frac : kTrueScaleWidthFrac,
+                               0.3f, 1.0f);
+    if (f == m_backWidthFrac) { return; }
+    m_backWidthFrac = f;
+    m_dirty = true;
+}
+
 void DssRenderer::rebuild(const QSize& px, int scaleStripPx, float floorDbm,
                           float rangeDb, float zCurve, const PaletteFn& palette,
                           const QColor& bgFill)
@@ -357,11 +367,17 @@ void DssRenderer::rebuild(const QSize& px, int scaleStripPx, float floorDbm,
     // occlusion here instead of overpainting.
     for (int age = 0; age < visibleRowCount(); ++age) {
         const double depthFrac    = age / denom;
-        const double rowWidthFrac = 1.0 - depthFrac * (1.0 - kBackWidthFrac);
+        const double rowWidthFrac = 1.0 - depthFrac * (1.0 - m_backWidthFrac);
         const double inset        = W * (1.0 - rowWidthFrac) * 0.5;
         const double rowW         = W - 2.0 * inset;
         const double baselineY    = bottomY - depthFrac * depthSpan;
-        const double maxRidge     = frontMaxRidge * rowWidthFrac;
+        // Ridge height shrinks with depth on its own account, NOT with the
+        // row width. Tied to the width it worked only as long as the rows
+        // narrowed: at full width (frequency-true) a loud back row would
+        // reach 0.42*H - 0.46*H above the floor, i.e. off the top of the
+        // plot, and the strongest signals would lose their crest.
+        const double ridgeFrac    = 1.0 - depthFrac * (1.0 - kBackWidthFrac);
+        const double maxRidge     = frontMaxRidge * ridgeFrac;
         const double dim          = kMinDim + (1.0 - kMinDim) * (1.0 - depthFrac);
 
         const auto& row = rowAt(age);

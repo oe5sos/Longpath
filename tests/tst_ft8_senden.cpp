@@ -27,12 +27,14 @@
 #include <QtTest>
 #include <QSpinBox>
 #include <QTimer>
+#include <QDateTime>
 
 #include "core/Ft8Decoder.h"
 #include "core/Ft8Tx.h"
 #include "core/Ft8Ablauf.h"
 #include "models/LogEntry.h"
 #include "core/AppSettings.h"
+#include <QMenu>
 #include <QPushButton>
 #include <QLineEdit>
 #include <QPlainTextEdit>
@@ -585,27 +587,37 @@ private slots:
         AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
                                          QStringLiteral("JN67VV"));
 
-        QVERIFY(applet.listRxForTest());
-        QVERIFY(applet.listRxForTest()->toPlainText().isEmpty());
+        QVERIFY(applet.listForTest());
+        QVERIFY(applet.listForTest()->toPlainText().isEmpty());
 
         applet.zeigeEigeneSendung(QStringLiteral("DL1ABC OE5SOS JN67"));
 
-        const QString rechts = applet.listRxForTest()->toPlainText();
-        QVERIFY2(rechts.contains(QStringLiteral("DL1ABC OE5SOS JN67")),
-                 "die eigene Sendung muss rechts stehen");
-        QVERIFY2(rechts.contains(QStringLiteral("Tx")),
+        // ── Die eigene Sendung steht in JEDER Sicht (2026-10-30) ──
+        //
+        // Bis dahin stand sie in der rechten Spalte und links NICHT:
+        // „dort steht, was auf dem Band los ist, und das eigene Signal
+        // gehoert nicht dazu." Mit einer Liste ist das anders herum
+        // richtig: die eigene Sendung IST der Zusammenhang, in dem die
+        // Antwort gelesen wird. Wer sie ausblendet, sieht ein QSO als
+        // Folge fremder Saetze.
+        const QString liste = applet.listForTest()->toPlainText();
+        QVERIFY2(liste.contains(QStringLiteral("DL1ABC OE5SOS JN67")),
+                 "die eigene Sendung muss in der Liste stehen");
+        QVERIFY2(liste.contains(QStringLiteral("Tx")),
                  "sie muss als eigene Sendung erkennbar sein");
 
-        // Und links NICHT: dort steht, was auf dem Band los ist, und
-        // das eigene Signal gehoert nicht dazu.
-        QVERIFY2(!applet.listForTest()->toPlainText()
-                      .contains(QStringLiteral("DL1ABC OE5SOS JN67")),
-                 "die eigene Sendung gehoert nicht in die Bandspalte");
+        // Auch in einer eingeschraenkten Sicht — sie kommt durch jede.
+        applet.sichtAnMichButtonForTest()->click();
+        QVERIFY2(applet.listForTest()->toPlainText()
+                     .contains(QStringLiteral("DL1ABC OE5SOS JN67")),
+                 "die eigene Sendung darf von keiner Sicht wegfallen");
+        applet.sichtAllesButtonForTest()->click();
 
         // Leeres bleibt leer -- sonst stuende nach jedem Fehlversuch
         // eine Zeile mit nichts drin.
+        const QString vorher = applet.listForTest()->toPlainText();
         applet.zeigeEigeneSendung(QStringLiteral("   "));
-        QCOMPARE(applet.listRxForTest()->toPlainText(), rechts);
+        QCOMPARE(applet.listForTest()->toPlainText(), vorher);
     }
 
     // ── Und der Sendeweg ruft sie wirklich ──────────────────────────
@@ -635,8 +647,77 @@ private slots:
         t->start(0);
 
         QTRY_VERIFY_WITH_TIMEOUT(
-            applet.listRxForTest()->toPlainText()
+            applet.listForTest()->toPlainText()
                 .contains(QStringLiteral("CQ OE5SOS JN67")), 3000);
+
+        applet.abbrechen();
+    }
+
+    // ── Der Sendetaktgeber muss GENAU sein ──────────────────────────
+    //
+    // Qt gibt jedem Taktgeber ab 20 ms von sich aus `Qt::CoarseTimer`
+    // und erlaubt sich dabei, bis zu fuenf Prozent des Intervalls zu
+    // frueh zu wecken. Bei FT8 wird hier auf die naechste
+    // Fenstergrenze gewartet — bis zu 17,8 s, also bis zu 0,89 s
+    // Vorlauf.
+    //
+    // Am Geraet gemessen (2026-10-29, 07:02 bis 07:04, fuenf
+    // Sendungen): MOX ging bei :29,21 an statt bei :30,00 — 0,779 /
+    // 0,787 / 0,786 / 0,786 / 0,786 s zu frueh, jedes Mal dieselbe
+    // Groesze. Die Rechnung in `Ft8Tx::bisZumNaechsten` war dabei
+    // richtig (der Lauf `derZeitplanStimmt` darueber belegt sie); der
+    // Taktgeber hat sie verworfen. Die Systemuhr war es nicht, `sntp`
+    // meldete im selben Augenblick +37 ms.
+    //
+    // Die Gegenprobe steht im Lauf selbst: ein frischer Taktgeber
+    // bekommt Qts Vorgabe, und die ist NICHT genau. Ohne die Zeile im
+    // Sendeweg stuende hier dasselbe.
+    void derSendetaktgeberIstGenau()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        // Gegenprobe zuerst: so waere es ohne die Einstellung.
+        QTimer vorgabe;
+        vorgabe.setSingleShot(true);
+        QCOMPARE(vorgabe.timerType(), Qt::CoarseTimer);
+
+        applet.sendeNachricht(QStringLiteral("CQ OE5SOS JN67"));
+        QVERIFY2(applet.sendetGerade(), "die Sendung muss eingeplant sein");
+
+        QTimer* t = applet.sendeTimerForTest();
+        QVERIFY(t);
+        QCOMPARE(t->timerType(), Qt::PreciseTimer);
+
+        // Und die bestellte Wartezeit muss auf einer Fenstergrenze
+        // enden -- plus der Dekoderfrist. 15 s teilen die Minute, also
+        // liegt jede Grenze auf :00, :15, :30 oder :45.
+        //
+        // ── Die Frist gehoert dazu (2026-10-30) ──────────────────────
+        //
+        // Bis dahin stand hier „der Rest gegen 15 000 ms ist null".
+        // Seit dem Sendeplan wird 250 ms NACH der Grenze getastet: der
+        // Dekoder ist erst ~40 ms nach dem Fensterende fertig, und
+        // ohne diese Frist kam die Antwort der Gegenstation immer ein
+        // ganzes Fenster zu spaet. Die Frist wird aus der fuehrenden
+        // Stille der Wellenform genommen, nicht hinten angehaengt --
+        // der Ton geht zur selben Zeit hinaus wie vorher. Siehe
+        // `Ft8Tx::sendeplan` und tst_ft8_sendeplan.
+        const Ft8Tx::Sendeplan plan =
+            Ft8Tx::sendeplan(Ft8Decoder::Protocol::Ft8, 250, 500, 300);
+        const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+        const qint64 ziel  = jetzt + t->remainingTime() - plan.tastenNachMs;
+        const qint64 rest  = ziel % 15000;
+        // Zwischen dem Einplanen und dieser Zeile liegt Rechenzeit;
+        // 150 ms Spiel sind dafuer, nicht fuer den Taktgeber.
+        QVERIFY2(rest < 150 || rest > 14850,
+                 qPrintable(QStringLiteral("Ziel liegt %1 ms neben der "
+                                           "Fenstergrenze").arg(rest)));
 
         applet.abbrechen();
     }
@@ -648,6 +729,92 @@ private slots:
     // abbrechen() — das nimmt das laufende Fenster zurueck, laesst
     // den Ablauf aber stehen, und der naechste passende Fund haette
     // ihn von selbst weiterlaufen lassen.
+    // ── Der CQ-Knopf zeigt, dass er laeuft ──────────────────────────
+    //
+    // Betreiber am 2026-10-29: „der button sollte sich auch farblich
+    // aendern, wenn er geklickt ist." Im Hausstil ist das die
+    // Blaufuellung des eingerasteten Knopfes — also `isChecked`.
+    //
+    // Gegenprobe zur alten Fassung: dort setzte niemand den Zustand.
+    // Ein einrastbarer Knopf kippte beim Klick zwar um, blieb danach
+    // aber stehen, auch wenn der Ruf laengst aufgegeben hatte.
+    void derCqKnopfZeigtDenLaufendenRuf()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        QPushButton* cq = applet.cqRufenButtonForTest();
+        QVERIFY(cq);
+        QVERIFY2(!cq->isChecked(), "vor dem Klick darf nichts leuchten");
+
+        // Einrasten allein genuegt nicht: ohne die Blaufuellung aus
+        // `blueToggle` sieht man den Zustand nicht. Das war der
+        // eigentliche Befund — der Knopf hing an `styledButton`.
+        QVERIFY2(cq->styleSheet().contains(QStringLiteral(":checked")),
+                 "der CQ-Knopf hat keine Farbe fuer den eingerasteten "
+                 "Zustand");
+
+        cq->click();
+        QVERIFY2(cq->isChecked(),
+                 "waehrend der Ruf laeuft, muss der Knopf leuchten");
+
+        // Und er geht wieder aus, wenn der Betreiber Stop drueckt.
+        QPushButton* stop = nullptr;
+        for (QPushButton* b : applet.findChildren<QPushButton*>()) {
+            if (b->text() == QStringLiteral("Stop")) { stop = b; break; }
+        }
+        QVERIFY(stop);
+        stop->click();
+        QVERIFY2(!cq->isChecked(),
+                 "nach Stop darf der Knopf nicht weiterleuchten");
+    }
+
+    // Tx1-Tx6 sitzen seit dem 2026-10-30 hinter „Manual" (Entwurf C):
+    // sechs gleich aussehende Knoepfe in einer Reihe sind Handbetrieb,
+    // und Handbetrieb ist beim automatischen Durchlauf die Ausnahme.
+    //
+    // Was dabei gleich bleiben MUSS: sie legen einen Satz ins Feld und
+    // sind fertig. Ein Menueeintrag kann gar nicht einrasten -- aber
+    // die sechs muessen vollzaehlig da sein, sonst waeren sie beim
+    // Umbau still verschwunden.
+    void dieSechsStandardsaetzeStehenUnterManual()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+
+        QPushButton* hand = nullptr;
+        for (QPushButton* b : applet.findChildren<QPushButton*>()) {
+            if (b->text() == QStringLiteral("Manual")) { hand = b; break; }
+        }
+        QVERIFY2(hand, "der Knopf „Manual\" fehlt");
+        QVERIFY2(!hand->isCheckable(), "Manual rastet ein");
+        QVERIFY2(hand->menu(), "Manual hat kein Menue");
+
+        int geprueft = 0;
+        for (QAction* a : hand->menu()->actions()) {
+            if (!a->text().startsWith(QStringLiteral("Tx"))) { continue; }
+            QVERIFY2(!a->isCheckable(),
+                     qPrintable(QStringLiteral("%1 rastet ein").arg(a->text())));
+            ++geprueft;
+        }
+        QCOMPARE(geprueft, 6);
+
+        // Und in der Reihe steht keiner mehr -- sonst gaebe es sie
+        // zweimal, und die zweite waere die, die niemand pflegt.
+        for (QPushButton* b : applet.findChildren<QPushButton*>()) {
+            QVERIFY2(!b->text().startsWith(QStringLiteral("Tx"))
+                         || b->text() == QStringLiteral("TX Hz"),
+                     qPrintable(QStringLiteral("%1 steht noch als Knopf da")
+                                    .arg(b->text())));
+        }
+    }
+
     void derStopKnopfHaeltDenAblaufAn()
     {
         RadioModel radio;
@@ -1021,10 +1188,19 @@ private slots:
         QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::SendeRR73);
         QCOMPARE(gemeldet.count(), 0);
 
-        // Das gesendete RR73 schliesst das QSO ab.
+        // Das gesendete RR73 schliesst das QSO ab -- und weil der Ruf
+        // vom CQ-Knopf kam, geht es ohne Klick weiter.
+        //
+        // Betreiber am 2026-10-30: „Der Durchlauf muss automatisch
+        // ablaufen, so schnell wie moeglich ohne mein klicken bei
+        // einem QSO. Danach automatisch ins Logbuch." Bis dahin blieb
+        // der Ablauf in `Fertig` stehen und es war still, bis jemand
+        // wieder drueckte.
         applet.fensterZuEndeForTest();
-        QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::Fertig);
-        QCOMPARE(gemeldet.count(), 1);
+        QCOMPARE(gemeldet.count(), 1);          // erst ins Logbuch
+        QCOMPARE(applet.ablaufForTest().zustand(),
+                 Ft8Ablauf::Zustand::RufeCq);   // dann weiter rufen
+        QVERIFY(applet.ablaufForTest().partner().isEmpty());
 
         const auto e = gemeldet.first().first().value<LogEntry>();
         QCOMPARE(e.call, QStringLiteral("DL1ABC"));

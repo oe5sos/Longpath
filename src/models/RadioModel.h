@@ -1214,6 +1214,21 @@ public:
     /// (2026-10-15). Siehe core/Ft8Tx.h.
     Ft8TxSource* ft8TxSource() const { return m_ft8TxSource.get(); }
 
+    // ── Die FT8-Quelle gibt es auch ohne eigenen Sendekanal (2026-10-28) ─
+    //
+    // `m_ft8TxSource` entstand bisher an EINER Stelle: im WDSP-Aufbau
+    // nach dem Verbinden mit einem eigenen Funkgeraet. Bei der Flex
+    // laeuft der nie — sie rechnet selbst. Also war die Quelle null,
+    // `Ft8Applet::sendeNachricht()` brach mit „no transmit path" ab,
+    // und weil diese Zeile 200 ms spaeter vom Takt ueberschrieben
+    // wird, sah der Betreiber am 2026-10-28 nur einen Send-Knopf, der
+    // nichts tat.
+    //
+    // Anlegen heisst nicht senden: die Quelle ist still, bis jemand
+    // `vorbereiten()` + `starten()` ruft, und getastet wird sie hier
+    // ueberhaupt nicht.
+    void stelleFt8SenderBereit();
+
     /// Der eigene RTTY-Sender, oder null vor dem Verbinden
     /// (2026-10-16). Siehe core/RttyTx.h.
     RttyTxSource* rttyTxSource() const { return m_rttyTxSource.get(); }
@@ -2740,6 +2755,8 @@ signals:
     // ── Senden ueber die Flex (2026-10-23, Stufe 2) ──────────────────
     /// Die MASCHINE hat das Senden erlaubt oder gesperrt.
     void flexSendefreigabeGeaendert(bool darf);
+    /// Die Aussteuerung des Flex-Mikrofonwegs hat sich geaendert.
+    void flexMikGainGeaendert(int db);
     /// Die Maschine sendet / sendet nicht mehr — gleich wer getastet hat.
     void flexSendetGeaendert(bool sendet);
 
@@ -2928,6 +2945,11 @@ signals:
     // das Radio, und wohin Ton und Bild gehen, entscheidet Stufe 2
     // (docs/architecture/2026-10-18-flex-stufe1-design.md §5).
     void flexSliceFrequencyChanged(int sliceId, double frequencyHz);
+    /// Was die Maschine über ihre eigene Rauschminderung meldet.
+    /// Kommt aus jedem Scheiben-Zustandsschub, der `nr=`, `nb=` oder
+    /// `anf=` trägt — auch dann, wenn jemand an der Maschine selbst
+    /// oder in SmartSDR geschaltet hat.
+    void flexSliceNoiseChanged(bool nr, bool nb, bool anf);
     // Die Maschine hat Longpath als GUI-Client angenommen.
     void flexGuiClientRegistered(const QString& guiClientId);
     // Fertiger FFT-Rahmen in dBm, und die Wasserfallzeile (roh, ein
@@ -3673,6 +3695,16 @@ public:
     /// Flanken standen in Longpath und nirgends sonst.
     void setFlexSliceFilter(int lowHz, int highHz);
 
+    /// Rauschminderung, Störaustaster und Kerbfilter der Flex-Scheibe
+    /// stellen — also in der MASCHINE, nicht in WDSP.
+    ///
+    /// Der Betreiber am 2026-10-28: „ich kann zwar klicken, aber kein
+    /// unterschied zu hören." Flex-Ton kommt fertig demoduliert in den
+    /// Mischer und läuft nie durch den WDSP-Empfangskanal, in dem
+    /// Longpaths NR/NB/ANF sitzen. Der Knopf ging an, das Rauschen
+    /// blieb. Jetzt geht er dorthin, wo gerechnet wird.
+    void setFlexSliceNoise(bool nr, bool nb, bool anf);
+
     /// Den Wasserfallstrom der Maschine einrichten. Er ist von ihrem
     /// Panadapter GETRENNT und hat eigene Einstellungen; Longpath hat
     /// sie bis zum 2026-10-23 nie angefasst.
@@ -3740,9 +3772,35 @@ public:
     bool setzeFlexSendescheibe(const QString& sliceId);
     QString flexSendescheibe() const { return m_flexSendescheibenId; }
 
+    /// Haengt gerade eine FlexRadio an? Nicht dasselbe wie
+    /// `isConnected()`: es gibt mehrere Geraeteklassen, und an der
+    /// Flex kommen Bild und Ton ueber ganz andere Wege.
+    bool istFlexVerbunden() const;
+
     /// Sende- und Abstimmleistung in Prozent (0..100).
     bool setzeFlexSendeleistung(int prozent);
     bool setzeFlexAbstimmleistung(int prozent);
+
+    /// ── Die Aussteuerung des Mikrofonwegs (2026-10-29) ──────────────
+    ///
+    /// Der Flex-Sendeweg haengt an KEINER WDSP-Kette: der Ton geht roh
+    /// von `AudioEngine::pullTxMic` an die Maschine. Damit gibt es auf
+    /// diesem Weg auch keine Verstaerkungsstufe — und am Geraet
+    /// gemessen heiszt das beides:
+    ///
+    ///   18:56  MICPEAK  +2,54 dBFS  ->  FWDPWR 35,4 dBm = 3,4 W
+    ///   20:15  MICPEAK  −9,72 dBFS  ->  FWDPWR 18,6 dBm = 73 mW
+    ///
+    /// Dasselbe Programm, dieselbe Einstellung, zwei verschiedene
+    /// Mikrofone: einmal zweieinhalb Dezibel ueber Vollaussteuerung,
+    /// einmal zehn darunter. Leistung folgt dem Quadrat, also liegen
+    /// zwischen den beiden fast siebzehn Dezibel Ausgangsleistung.
+    ///
+    /// Der Regler ist von Hand, nicht automatisch: „ich glaube, wir
+    /// lassen das automatische verbessern" (Betreiber, 2026-10-09).
+    /// Der Riegel bei −1 dBFS in der Pumpe bleibt dahinter stehen.
+    int flexMikGainDb() const { return m_flexMikGainDb; }
+    void setzeFlexMikGainDb(int db);
 
     /// Der Abstimmtraeger. Taktet mit der Abstimmleistung.
     bool flexAbstimmen(bool an);
@@ -3843,6 +3901,9 @@ private:
 
     // Senden ueber die Flex (Stufe 2). Vorgabe: gesperrt.
     bool                 m_flexDarfSenden{false};
+    /// Aussteuerung des Flex-Mikrofonwegs in dB, siehe
+    /// setzeFlexMikGainDb(). 0 heiszt: roh hinaus, wie bisher.
+    int                  m_flexMikGainDb{0};
     bool                 m_flexVerriegelungGehoert{false};
     bool                 m_flexVerriegelungGezeigt{false};
     bool                 m_flexLeistungGesehen{false};
@@ -3869,6 +3930,15 @@ private:
     int                  m_flexFlankeTiefNachzutragen{0};
     int                  m_flexFlankeHochNachzutragen{0};
     bool                 m_flexHatFlankenNachzutragen{false};
+    /// Rauschminderung: zuletzt geschickt und, solange die
+    /// Scheibennummer fehlt, nachzutragen. Vorgabe aus: eine Maschine,
+    /// die beim Verbinden etwas anderes meldet, korrigiert das über
+    /// den Rückweg.
+    bool                 m_flexZuletztNr{false};
+    bool                 m_flexZuletztNb{false};
+    bool                 m_flexZuletztAnf{false};
+    bool                 m_flexHatRauschNachzutragen{false};
+    bool                 m_flexRauschGeschickt{false};
     int                  m_flexZuletztGestellteFlankeTief{0};
     int                  m_flexZuletztGestellteFlankeHoch{0};
     /// Index (1…59) -> {Name, Einheit} aus den `meter`-Statuszeilen.

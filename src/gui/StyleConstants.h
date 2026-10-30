@@ -385,6 +385,15 @@ constexpr auto kTxKeyDimTop     = "#7a5a2c";
 constexpr auto kTxKeyDimBottom  = "#634c24";
 constexpr auto kTxKeyDimBorder  = "#9a763c";
 
+// Eine Marke IM versenkten Feld, die nur andeuten soll, wo etwas
+// anfaengt und aufhoert — im FT8-Fensterbalken sind das Signalanfang
+// und -ende. Dunkles Messing: dieselbe Familie wie kTxKeyBottom, aber
+// so weit heruntergezogen, dass sie nicht mit dem Fortschrittsbalken
+// darueber streitet. Eine gefuellte Flaeche an dieser Stelle wurde im
+// Entwurfsblatt vom 2026-10-30 ausprobiert und verworfen: sie las
+// sich wie ein zweiter Balken.
+constexpr auto kMarkeImGlas     = "#2a2520";
+
 // Der SWR-Schutz, wenn er greift. Stand als nacktes „#c2924f" in
 // TxApplet::wireControls.
 constexpr auto kSwrProtActive   = "#c2924f";

@@ -82,24 +82,67 @@ namespace Longpath {
 // Empty string (default) preserves legacy single-profile behavior.
 static QString s_profileOverride;
 
+// ── Nachtrag 2026-10-28: die Kette war zu kurz ───────────────────────
+//
+// Am 2026-10-28 um 20:53 stand der Betreiber vor einem Send-Knopf im
+// FT8-Fenster, der nichts tat, und einem CQ-Knopf, der „set your
+// callsign first" gesagt haette. In seiner Einstellungsdatei stand
+// OE5SOS zu dem Zeitpunkt VIERMAL:
+//
+//   <DxClusterCallsign>OE5SOS
+//   <RbnCallsign>OE5SOS
+//   <PskReporter__s__Callsign>OE5SOS      (+ GridSquare JN67VV)
+//   <FreeDvReporter__s__Callsign>OE5SOS   (+ GridSquare JN67VV)
+//
+// Leer waren genau die zwei, die diese Kette kannte. Sie wurde am
+// 2026-10-16 gegen dieselbe Klasse Fehler gebaut und hat ihn selbst
+// noch einmal gemacht: eine Rueckfallkette, die nur auf die
+// kanonischen Schluessel zurueckfaellt, faengt den Fall nicht, in dem
+// gerade die kanonischen fehlen.
+//
+// Die vier Quellenschluessel kommen deshalb mit ans Ende. Reihenfolge
+// absichtlich so: erst StationCallsign (eine von Hand gesetzte
+// Fassung gilt weiter), dann der kanonische, dann die gewachsenen.
+// RadioModel::resolveCall (RadioModel.cpp:2882) geht fuer die Spot-
+// Dienste den umgekehrten Weg — Quellenschluessel vor kanonischem —
+// und bleibt, wie er ist: dort darf je Dienst ein anderes Rufzeichen
+// stehen, hier wird das der Station gesucht.
 QString AppSettings::stationCallsign()
 {
     auto& s = instance();
-    QString v = s.value(QStringLiteral("StationCallsign")).toString().trimmed();
-    if (v.isEmpty()) {
-        v = s.value(QStringLiteral("User/Callsign")).toString().trimmed();
+    const QStringList kette = {
+        QStringLiteral("StationCallsign"),
+        QStringLiteral("User/Callsign"),
+        QStringLiteral("DxClusterCallsign"),
+        QStringLiteral("RbnCallsign"),
+        QStringLiteral("PskReporter/Callsign"),
+        QStringLiteral("FreeDvReporter/Callsign"),
+    };
+    for (const QString& k : kette) {
+        const QString v = s.value(k).toString().trimmed();
+        if (!v.isEmpty()) {
+            return v;
+        }
     }
-    return v;
+    return QString();
 }
 
 QString AppSettings::stationGridSquare()
 {
     auto& s = instance();
-    QString v = s.value(QStringLiteral("StationGridSquare")).toString().trimmed();
-    if (v.isEmpty()) {
-        v = s.value(QStringLiteral("User/GridSquare")).toString().trimmed();
+    const QStringList kette = {
+        QStringLiteral("StationGridSquare"),
+        QStringLiteral("User/GridSquare"),
+        QStringLiteral("PskReporter/GridSquare"),
+        QStringLiteral("FreeDvReporter/GridSquare"),
+    };
+    for (const QString& k : kette) {
+        const QString v = s.value(k).toString().trimmed();
+        if (!v.isEmpty()) {
+            return v;
+        }
     }
-    return v;
+    return QString();
 }
 
 void AppSettings::setProfileOverride(const QString& profile)

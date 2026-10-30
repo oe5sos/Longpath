@@ -83,8 +83,11 @@ public:
     static QStringList argumentsFor(const Config& cfg);
     /// Ob die Adresse auf diesen Rechner zeigt (nur dann lohnt Starten).
     static bool endpointIsLocal(const QString& endpoint);
-    /// Ob auf Host:Port der Adresse schon jemand Verbindungen annimmt
-    /// (kurzer TCP-Connect, oertlich in Millisekunden entschieden).
+    /// Ob auf Host:Port der Adresse schon jemand Verbindungen annimmt.
+    /// Bei einer oertlichen Adresse entschieden durch einen
+    /// Bindeversuch (kein Paket, keine Wartezeit, keine Falschmeldung —
+    /// siehe .cpp); `timeoutMs` gilt nur noch fuer den Fall, dass die
+    /// Adresse ein Name und damit ein fremder Rechner ist.
     static bool portInUse(const QString& endpoint, int timeoutMs = 300);
 
     void start(const Config& cfg);

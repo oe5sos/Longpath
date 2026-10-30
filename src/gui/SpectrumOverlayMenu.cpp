@@ -193,6 +193,29 @@ void SpectrumOverlayMenu::buildUI()
     connect(m_renderModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &SpectrumOverlayMenu::spectrumRenderModeChanged);
 
+    // Betreiber 2026-10-28, mit Bild: der Traeger stand im Wasserfall auf
+    // 14.0758 MHz und in der 3D-Flaeche auf 14.1066 -- 31 kHz daneben.
+    // Es war kein Fehler in der Verdrahtung, sondern die geerbte
+    // Perspektive: jede aeltere Zeile ist nur 60 % breit, also wandert
+    // alles zur Mitte, waehrend der Wasserfall darunter nie schmaeler
+    // wird. Dieser Haken nimmt die Verengung heraus.
+    m_trueScaleCheck = new QCheckBox(tr("True frequency scale"), this);
+    m_trueScaleCheck->setObjectName(QStringLiteral("overlayMenuTrueScaleCheck"));
+    m_trueScaleCheck->setToolTip(tr("Keeps every row of the 3D surface at full "
+                                    "width, so a signal stands above its own "
+                                    "frequency and matches the waterfall.\n"
+                                    "Off: the perspective narrows older rows "
+                                    "toward the centre."));
+    layout->addWidget(m_trueScaleCheck);
+    m_trueScaleCheck->setEnabled(m_renderModeCombo->currentIndex() == 1);
+
+    connect(m_trueScaleCheck, &QCheckBox::toggled,
+            this, &SpectrumOverlayMenu::dss3dTrueScaleChanged);
+    connect(m_renderModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this](int idx) {
+                if (m_trueScaleCheck) { m_trueScaleCheck->setEnabled(idx == 1); }
+            });
+
     // --- Display Range section ---
     auto* rangeLabel = new QLabel(QStringLiteral("Display Range"), this);
     rangeLabel->setStyleSheet(Style::themed(QStringLiteral("font-weight: bold; color: #4a7ba8; margin-top: 6px;")));
@@ -310,6 +333,14 @@ void SpectrumOverlayMenu::setWfUpdatePeriodMs(int ms)
     m_wfSpeedSlider->blockSignals(false);
 }
 
+void SpectrumOverlayMenu::setDss3dTrueScale(bool on)
+{
+    if (!m_trueScaleCheck) { return; }
+    m_trueScaleCheck->blockSignals(true);
+    m_trueScaleCheck->setChecked(on);
+    m_trueScaleCheck->blockSignals(false);
+}
+
 void SpectrumOverlayMenu::setSpectrumRenderModeIndex(int renderModeIndex)
 {
     if (!m_renderModeCombo) { return; }
@@ -319,6 +350,11 @@ void SpectrumOverlayMenu::setSpectrumRenderModeIndex(int renderModeIndex)
     m_renderModeCombo->blockSignals(true);
     m_renderModeCombo->setCurrentIndex(qBound(0, renderModeIndex, 1));
     m_renderModeCombo->blockSignals(false);
+    // blockSignals haelt auch die Lambda an, die den Haken scharf stellt --
+    // also hier von Hand, sonst steht er beim Oeffnen in 3D grau da.
+    if (m_trueScaleCheck) {
+        m_trueScaleCheck->setEnabled(m_renderModeCombo->currentIndex() == 1);
+    }
 }
 
 void SpectrumOverlayMenu::setValues(int wfColorGain, int wfBlackLevel, bool autoBlack,
