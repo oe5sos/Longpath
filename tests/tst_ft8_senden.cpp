@@ -684,10 +684,23 @@ private slots:
         QCOMPARE(t->timerType(), Qt::PreciseTimer);
 
         // Und die bestellte Wartezeit muss auf einer Fenstergrenze
-        // enden. 15 s teilen die Minute, also liegt jede Grenze auf
-        // :00, :15, :30 oder :45 — der Rest gegen 15 000 ms ist null.
+        // enden -- plus der Dekoderfrist. 15 s teilen die Minute, also
+        // liegt jede Grenze auf :00, :15, :30 oder :45.
+        //
+        // ── Die Frist gehoert dazu (2026-10-30) ──────────────────────
+        //
+        // Bis dahin stand hier „der Rest gegen 15 000 ms ist null".
+        // Seit dem Sendeplan wird 250 ms NACH der Grenze getastet: der
+        // Dekoder ist erst ~40 ms nach dem Fensterende fertig, und
+        // ohne diese Frist kam die Antwort der Gegenstation immer ein
+        // ganzes Fenster zu spaet. Die Frist wird aus der fuehrenden
+        // Stille der Wellenform genommen, nicht hinten angehaengt --
+        // der Ton geht zur selben Zeit hinaus wie vorher. Siehe
+        // `Ft8Tx::sendeplan` und tst_ft8_sendeplan.
+        const Ft8Tx::Sendeplan plan =
+            Ft8Tx::sendeplan(Ft8Decoder::Protocol::Ft8, 250, 500, 300);
         const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
-        const qint64 ziel  = jetzt + t->remainingTime();
+        const qint64 ziel  = jetzt + t->remainingTime() - plan.tastenNachMs;
         const qint64 rest  = ziel % 15000;
         // Zwischen dem Einplanen und dieser Zeile liegt Rechenzeit;
         // 150 ms Spiel sind dafuer, nicht fuer den Taktgeber.
@@ -1144,10 +1157,19 @@ private slots:
         QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::SendeRR73);
         QCOMPARE(gemeldet.count(), 0);
 
-        // Das gesendete RR73 schliesst das QSO ab.
+        // Das gesendete RR73 schliesst das QSO ab -- und weil der Ruf
+        // vom CQ-Knopf kam, geht es ohne Klick weiter.
+        //
+        // Betreiber am 2026-10-30: „Der Durchlauf muss automatisch
+        // ablaufen, so schnell wie moeglich ohne mein klicken bei
+        // einem QSO. Danach automatisch ins Logbuch." Bis dahin blieb
+        // der Ablauf in `Fertig` stehen und es war still, bis jemand
+        // wieder drueckte.
         applet.fensterZuEndeForTest();
-        QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::Fertig);
-        QCOMPARE(gemeldet.count(), 1);
+        QCOMPARE(gemeldet.count(), 1);          // erst ins Logbuch
+        QCOMPARE(applet.ablaufForTest().zustand(),
+                 Ft8Ablauf::Zustand::RufeCq);   // dann weiter rufen
+        QVERIFY(applet.ablaufForTest().partner().isEmpty());
 
         const auto e = gemeldet.first().first().value<LogEntry>();
         QCOMPARE(e.call, QStringLiteral("DL1ABC"));

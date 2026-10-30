@@ -96,6 +96,33 @@ constexpr int kSendeTonMinHz = 200;
 constexpr int kSendeTonMaxHz = 2800;
 constexpr auto kSendeTonSchluessel = "Ft8/SendeTonHz";
 
+// ── Die drei Zeiten einer Sendung ─────────────────────────
+//
+// Begruendung und Rechnung: `Ft8Tx::sendeplan`.
+
+/// Wie lange nach der Fenstergrenze auf den Dekoder gewartet wird,
+/// bevor der Zug festgelegt und getastet wird.
+///
+/// Am Geraet gemessen (2026-10-30): das Fenster endete um :30,000,
+/// der Dekoder meldete um :30,039 — 39 ms mit zwei Runden
+/// Subtraktion. 250 ms lassen Luft fuer mehr Runden und einen
+/// beschaeftigten Rechner, ohne dass etwas davon verlorengeht: die
+/// Frist wird aus der fuehrenden Stille der Wellenform genommen,
+/// nicht hinten angehaengt.
+constexpr qint64 kDekoderFristMs = 250;
+
+/// Wo das Signal nach der Fenstergrenze beginnen soll.
+///
+/// WSJT-X setzt es auf eine halbe Sekunde; das ist der Wert, gegen
+/// den die ganze Betriebsart eingestellt ist. Von vorn abgespielt
+/// laege es bei 1180 ms (ft8_lib zentriert) — dekodierbar, aber
+/// 0,68 s neben der Norm.
+constexpr qint64 kZielVersatzMs = 500;
+
+/// Nachlauf, damit der letzte Ton wirklich draussen ist, bevor der
+/// Sender abschaltet.
+constexpr qint64 kSenderNachlaufMs = 300;
+
 } // namespace
 
 Ft8Applet::Ft8Applet(RadioModel* model, QWidget* parent)
@@ -524,16 +551,8 @@ void Ft8Applet::buildUI()
         // Gesendet wurde nur, wenn zufaellig „Auto" an war -- sonst
         // musste man danach noch „Send" druecken. Das ist nicht, was
         // der Knopf verspricht.
-        m_qsoGemeldet = false;
-        m_ablauf.starteAlsAnrufer(eigenesRufzeichen(), eigenerLocator());
-        m_cqVersucheOffen = m_cqVersucheSpin ? m_cqVersucheSpin->value() : 1;
-
-        // Dieselbe Zahl auch dem Ablauf sagen. Ohne diese Zeile zaehlte
-        // er fuer sich bis fuenf und brach ab, waehrend hier noch elf
-        // Versuche offen standen (gemessen am 2026-10-29, 12:47:12).
-        m_ablauf.setzeCqWiederholungen(m_cqVersucheOffen);
-        ablaufSchritt();
-        zeigeKnopfzustand();
+        m_cqAutomatik = true;
+        starteCqRuf();
     });
     sendRow->addWidget(m_cqRufenBtn);
 
@@ -581,6 +600,8 @@ void Ft8Applet::buildUI()
     // Doppelklick den Ablauf immer startet, ist das der einzige Weg
     // hinaus, und er muss halten.
     connect(m_stopBtn, &QPushButton::clicked, this, [this]() {
+        // Stop heiszt Stop: auch der Wiederanlauf nach einem QSO.
+        m_cqAutomatik = false;
         m_ablauf.abbrechen();
         m_cqVersucheOffen = 0;
         abbrechen();
@@ -693,6 +714,27 @@ void Ft8Applet::fensterZuEnde()
 
 // Den naechsten Zug des Ablaufs senden. Es ist derselbe Weg wie bei
 // einem Druck auf „Send": Bandplan und Tasten inbegriffen.
+// ── Einen CQ-Ruf anfangen ───────────────────────────────
+//
+// Eine Stelle, nicht zwei: der Knopf ruft sie, und nach einem
+// fertigen QSO ruft `zeigeAblauf` sie wieder. Als es zwei Kopien gab,
+// hat eine davon `setzeCqWiederholungen` vergessen -- und der Ruf
+// brach nach fuenf statt nach den eingestellten sechzehn ab
+// (2026-10-29).
+void Ft8Applet::starteCqRuf()
+{
+    m_qsoGemeldet = false;
+    m_ablauf.starteAlsAnrufer(eigenesRufzeichen(), eigenerLocator());
+    m_cqVersucheOffen = m_cqVersucheSpin ? m_cqVersucheSpin->value() : 1;
+
+    // Dieselbe Zahl auch dem Ablauf sagen. Ohne diese Zeile zaehlte
+    // er fuer sich bis fuenf und brach ab, waehrend hier noch elf
+    // Versuche offen standen (gemessen am 2026-10-29, 12:47:12).
+    m_ablauf.setzeCqWiederholungen(m_cqVersucheOffen);
+    ablaufSchritt();
+    zeigeKnopfzustand();
+}
+
 void Ft8Applet::ablaufSchritt()
 {
     const QString was = m_ablauf.naechsteNachricht();
@@ -777,10 +819,30 @@ void Ft8Applet::zeigeAblauf()
     zeigeKnopfzustand();
     if (!m_status) { return; }
     switch (m_ablauf.zustand()) {
-        case Ft8Ablauf::Zustand::Fertig:
-            m_status->setText(tr("QSO with %1 complete").arg(m_ablauf.partner()));
+        case Ft8Ablauf::Zustand::Fertig: {
+            const QString wer = m_ablauf.partner();
+            m_status->setText(tr("QSO with %1 complete").arg(wer));
             meldeFertigesQso();
+
+            // ── Und weiter, ohne Klick ─────────────────────
+            //
+            // Wer den CQ-Knopf gedrueckt hat, will rufen -- nicht ein
+            // QSO fuehren und dann warten. Bis zum 2026-10-30 war hier
+            // Schluss: nach dem RR73 blieb es still, bis der Betreiber
+            // wieder drueckte. Betreiber: „Der Durchlauf muss
+            // automatisch ablaufen, so schnell wie moeglich ohne mein
+            // klicken bei einem QSO."
+            //
+            // Nur wenn der Ruf vom Knopf kam. Ein Doppelklick in die
+            // Liste ist eine Einzelentscheidung: danach wird nicht von
+            // selbst CQ gerufen.
+            if (m_cqAutomatik && !m_sendet) {
+                qCInfo(lcFt8Senden).noquote()
+                    << "QSO mit" << wer << "fertig — rufe weiter CQ";
+                starteCqRuf();
+            }
             break;
+        }
         case Ft8Ablauf::Zustand::Abgebrochen:
             m_status->setText(m_ablauf.partner().isEmpty()
                 ? tr("sequence stopped")
@@ -1046,6 +1108,9 @@ bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
                 const QString sauber = c.selectedText().simplified();
                 const int snr = sauber.section(QLatin1Char(' '), 1, 1).toInt();
                 m_qsoGemeldet = false;
+                // Eine Einzelentscheidung: danach nicht von selbst
+                // weiter CQ rufen.
+                m_cqAutomatik = false;
                 m_ablauf.starteAlsAntworter(senderCallsign(nachricht),
                                             eigenesRufzeichen(),
                                             eigenerLocator(), snr,
@@ -1108,8 +1173,12 @@ void Ft8Applet::sendeNachricht(const QString& text)
     // in der gehoert wird — wer in derselben sendet, hoert sich selbst
     // und niemand sonst.
     const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    const Ft8Tx::Sendeplan plan =
+        Ft8Tx::sendeplan(protocol(), kDekoderFristMs,
+                         kZielVersatzMs, kSenderNachlaufMs);
     const qint64 wartet = Ft8Tx::bisZumNaechsten(jetzt, protocol(),
-                                                 m_periode);
+                                                 m_periode)
+                          + plan.tastenNachMs;
     m_sendet = true;
     if (m_cqBtn)   { m_cqBtn->setEnabled(false); }
     if (m_stopBtn) { m_stopBtn->setEnabled(true); }
@@ -1143,14 +1212,45 @@ void Ft8Applet::sendeNachricht(const QString& text)
         m_sendeTimer->setTimerType(Qt::PreciseTimer);
     }
     m_sendeTimer->disconnect();
-    const QString gesendet = sauber;
-    connect(m_sendeTimer, &QTimer::timeout, this, [this, gesendet]() {
+    QString gesendet = sauber;
+    const bool ausAblauf = m_ablauf.laeuft();
+    connect(m_sendeTimer, &QTimer::timeout, this,
+            [this, gesendet, ausAblauf, plan]() mutable {
         if (!m_sendet || !m_model) { return; }
         Ft8TxSource* q = m_model->ft8TxSource();
         if (!q) {
             qCWarning(lcFt8Senden) << "Tonquelle zwischendurch verschwunden";
             abbrechen();
             return;
+        }
+
+        // ── Den Zug nachsehen, bevor er hinausgeht ─────────────
+        //
+        // Die Nachricht wurde beim Ende der VORIGEN Sendung gepackt,
+        // also knapp 13 s vor diesem Augenblick. In der Zwischenzeit
+        // hat die Gegenstation geantwortet und der Dekoder ist fertig
+        // geworden — nur kam das bisher zu spaet: `ablaufSchritt()`
+        // kehrt bei laufender Sendung um, und der neue Zug musste ein
+        // ganzes Fenster warten. Jeder Zug kostete 30 s statt 15.
+        //
+        // Darum wird hier, nach der Dekoderfrist, nochmal gefragt.
+        // Nur bei einer Sendung aus dem Ablauf: wer Tx1…Tx6 oder
+        // „Send" drueckt, will genau das senden, was dort steht.
+        if (ausAblauf && m_ablauf.laeuft()) {
+            const QString neu = m_ablauf.naechsteNachricht();
+            if (!neu.isEmpty() && neu != gesendet) {
+                if (q->vorbereiten(neu, float(m_sendeTonHz), protocol())) {
+                    qCInfo(lcFt8Senden).noquote()
+                        << "Zug in der Frist gewechselt:" << gesendet
+                        << "->" << neu;
+                    gesendet = neu;
+                    if (m_textFeld) { m_textFeld->setText(neu); }
+                } else {
+                    qCWarning(lcFt8Senden).noquote()
+                        << "Neuer Zug \"" + neu + "\" liess sich nicht "
+                           "packen — es geht der alte hinaus";
+                }
+            }
         }
 
         // Erst den Weg legen, dann tasten: andersherum ginge der
@@ -1161,7 +1261,9 @@ void Ft8Applet::sendeNachricht(const QString& text)
             m_quelleVorher = static_cast<int>(router->activeSource());
             router->setActiveSource(MicSource::Ft8);
         }
-        q->starten();
+        // Ab der uebersprungenen Stille: so bleibt der Zeitpunkt des
+        // ersten Tons derselbe, obwohl wir spaeter tasten.
+        q->starten(plan.probenAbMs);
 
         // ── Wenn der Bandplan nein sagt, nicht weitermachen ──────────
         //
@@ -1224,7 +1326,17 @@ void Ft8Applet::sendeNachricht(const QString& text)
             schluss->deleteLater();
             fensterZuEnde();
         });
-        schluss->start(Ft8Tx::signalMs(protocol()) + 300);
+        // ── So lange, wie das Signal WIRKLICH braucht ─────────
+        //
+        // Hier stand `signalMs + 300`, gerechnet ab der
+        // Fenstergrenze. Das Signal beginnt aber erst nach der
+        // fuehrenden Stille der Wellenform. Am Geraet gemessen
+        // (2026-10-30, 07:09:30,003 getastet, erster Ton 07:09:31,185,
+        // geloest 07:09:42,945): die letzten 880 ms fehlten, also 5,5
+        // von 79 Symbolen. `sendeplan()` rechnet die Dauer jetzt vom
+        // Zielversatz aus — der Nachlauf von 300 ms bleibt, damit der
+        // letzte Ton wirklich draussen ist.
+        schluss->start(static_cast<int>(plan.tastdauerMs));
     });
     m_sendeTimer->start(static_cast<int>(wartet));
 }

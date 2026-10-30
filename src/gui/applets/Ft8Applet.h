@@ -417,6 +417,10 @@ private:
     /// jedem Schritt, und der Zustand bleibt auf Fertig stehen — ohne
     /// diese Wache stuende dasselbe QSO mehrfach im Logbuch.
     bool         m_qsoGemeldet{false};
+    /// Laeuft der Ruf vom CQ-Knopf? Dann geht es nach einem fertigen
+    /// QSO von selbst weiter. Ein Doppelklick in die Fundliste ist
+    /// eine Einzelentscheidung und setzt das zurueck, „Stop“ ebenso.
+    bool         m_cqAutomatik{false};
     /// „CQ": ruft CQ und faengt damit den Ablauf als ANRUFER an — bis zum 2026-10-16 war diese Haelfte
     /// von Ft8Ablauf gebaut und geprueft, aber von nirgends
     /// erreichbar: starteAlsAnrufer() hatte keinen einzigen Aufrufer.
@@ -435,6 +439,9 @@ private:
     /// CQ und Send zeigen, was gerade laeuft — nicht, was zuletzt
     /// geklickt wurde.
     void zeigeKnopfzustand();
+    /// Einen CQ-Ruf anfangen. Eine Stelle fuer den Knopf UND fuer den
+    /// Wiederanlauf nach einem fertigen QSO.
+    void starteCqRuf();
     void meldeFertigesQso();
     void ablaufSchritt();
     void zeigeAblauf();
