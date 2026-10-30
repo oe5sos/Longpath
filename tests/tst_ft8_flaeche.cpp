@@ -651,6 +651,91 @@ private slots:
         QCOMPARE(applet.sendeTonFeldForTest()->value(), 2100);
     }
 
+    // ── Die freie Sendestelle (2026-10-30) ──────────────────────────
+    //
+    // Longpath-eigen: weder WSJT-X noch MSHV suchen eine freie Stelle.
+    // Diese Faelle pruefen den ANSCHLUSS -- die Rechnung selbst liegt
+    // in tst_ft8_tonwahl. Genau dieser Anschluss hat bei Multi
+    // Answering monatelang gefehlt, ohne dass es auffiel.
+
+    void derKnopfFuerDieFreieStelleIstDa()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        QVERIFY2(applet.freieStelleButtonForTest(), "der Knopf fehlt");
+        QVERIFY(!applet.freieStelleButtonForTest()->isCheckable());
+    }
+
+    void gehoerteStationenLandenInDerBelegungsliste()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        QVERIFY(applet.belegteToeneForTest().isEmpty());
+
+        QVector<Longpath::Ft8Decode> funde;
+        for (const int hz : {500, 900, 1800}) {
+            Ft8Decode d;
+            d.text   = QStringLiteral("CQ DL1ABC JO31");
+            d.snrDb  = -10.0;
+            d.freqHz = double(hz);
+            funde.append(d);
+        }
+        QMetaObject::invokeMethod(
+            &applet, "onDecoded", Qt::DirectConnection,
+            Q_ARG(QVector<Longpath::Ft8Decode>, funde),
+            Q_ARG(QDateTime, QDateTime::currentDateTimeUtc()));
+
+        const QVector<int> belegt = applet.belegteToeneForTest();
+        QCOMPARE(belegt.size(), 3);
+        QVERIFY(belegt.contains(900));
+    }
+
+    void aufEinerBelegtenStelleWirdAusgewichen()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        applet.sendeTonFeldForTest()->setValue(1500);
+
+        Ft8Decode d;
+        d.text   = QStringLiteral("CQ DL1ABC JO31");
+        d.snrDb  = -10.0;
+        d.freqHz = 1500.0;
+        applet.fundForTest(d);
+
+        QVERIFY2(applet.sucheFreieStelleForTest(true),
+                 "auf 1500 lag jemand, es haette ausweichen muessen");
+        QVERIFY(applet.sendeTonFeldForTest()->value() != 1500);
+    }
+
+    // GEGENPROBE: auf einer freien Stelle wird NICHT gewechselt. Wer
+    // einen ruft, sucht ihn dort, wo er zuletzt war.
+    void aufEinerFreienStelleBleibtEs()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        applet.sendeTonFeldForTest()->setValue(1500);
+
+        Ft8Decode d;
+        d.text   = QStringLiteral("CQ DL1ABC JO31");
+        d.snrDb  = -10.0;
+        d.freqHz = 700.0;        // weit weg von 1500
+        applet.fundForTest(d);
+
+        QVERIFY(!applet.sucheFreieStelleForTest(true));
+        QCOMPARE(applet.sendeTonFeldForTest()->value(), 1500);
+    }
+
+    // Und ohne einen einzigen Fund wird gar nichts verschoben --
+    // Abwesenheit ist keine Aussage.
+    void ohneFundeWirdNichtsVerschoben()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        applet.sendeTonFeldForTest()->setValue(1500);
+        QVERIFY(!applet.sucheFreieStelleForTest(false));
+        QCOMPARE(applet.sendeTonFeldForTest()->value(), 1500);
+    }
+
     void dieFlaecheLaesstSichAbbilden()
     {
         const QString grabDir = qEnvironmentVariable("LONGPATH_GRAB_DIR");

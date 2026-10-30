@@ -41,6 +41,7 @@
 #include "core/Ft8Ablauf.h"
 #include "models/LogEntry.h"
 #include "core/Ft8Mehrfach.h"
+#include "core/Ft8Tonwahl.h"
 #include "core/Ft8Tx.h"
 
 #include <QDateTime>
@@ -293,6 +294,10 @@ public:
     QSpinBox*       sendeTonFeldForTest() const { return m_tonFeld; }
     QPushButton*    houndButtonForTest() const { return m_houndBtn; }
     QSpinBox*       plaetzeSpinForTest() const { return m_plaetzeSpin; }
+    QPushButton*    freieStelleButtonForTest() const { return m_freieStelleBtn; }
+    QVector<int>    belegteToeneForTest() const { return belegteToene(); }
+    bool            sucheFreieStelleForTest(bool nurWennBelegt)
+                        { return sucheFreieStelle(nurWennBelegt); }
     const Ft8Mehrfach& mehrfachForTest() const { return m_mehrfach; }
     QSpinBox*       rundenFeldForTest() const { return m_rundenFeld; }
     Longpath::Ft8Wasserfall* wasserfallForTest() const { return m_wasserfall; }
@@ -485,6 +490,26 @@ private:
     // zwei Plaetze sind −6 dB je Station, drei −9,5, sechs −15,6
     // (MSHV `gen_ft8.cpp:303`). Bei 5 W und drei Plaetzen bleiben
     // 1,7 W je Station.
+    // ── Wo gerade jemand liegt (2026-10-30) ────────────────
+    //
+    // Die Tonlagen der zuletzt gehoerten Stationen. Daraus sucht
+    // `Ft8Tonwahl::freieTonlage` eine Stelle, auf der man nicht in ein
+    // laufendes QSO hineinruft.
+    //
+    // Nur die letzten Perioden: wer vor fuenf Minuten dort lag, ist
+    // laengst weg, und eine Liste, die nie vergisst, haelt das ganze
+    // Band fuer belegt.
+    QVector<QVector<int>> m_toeneJePeriode;
+    static constexpr int kPeriodenImGedaechtnis = 3;
+    QVector<int> belegteToene() const;
+    /// Die Grenzen, in denen gesendet werden darf -- beim Hound ab
+    /// 1000 Hz (siehe `Ft8Ablauf::kHoundMinTonHz`).
+    int tonUntergrenze() const;
+    QPushButton* m_freieStelleBtn{nullptr};
+    /// Eine freie Sendestelle suchen und setzen. Gibt true, wenn
+    /// gewechselt wurde.
+    bool sucheFreieStelle(bool nurWennBelegt);
+
     Ft8Mehrfach  m_mehrfach;
     QSpinBox*    m_plaetzeSpin{nullptr};
     int          m_plaetze{1};

@@ -5571,6 +5571,7 @@ longpath_add_test(tst_ft8_ablauf)
 
 longpath_add_test(tst_ft8_senden)
 longpath_add_test(tst_ft8_sendeplan)
+longpath_add_test(tst_ft8_tonwahl)
 longpath_add_test(tst_ft8_dxpedition)
 # 2026-10-15: FT8 im PROGRAMM — Abgriff, Flaeche, Eintrag. Dekoder und
 # Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die

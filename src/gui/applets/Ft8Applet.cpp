@@ -774,6 +774,16 @@ void Ft8Applet::buildUI()
         "3 are \u22129.5, 6 are \u221215.6.\n1 means off."));
     m_plaetze = qBound(1, m_plaetzeSpin->value(), Ft8Mehrfach::kMaxPlaetze);
     m_mehrfach.setPlaetze(m_plaetze);
+    m_freieStelleBtn = styledButton(tr("Free"), 46);
+    m_freieStelleBtn->setCheckable(false);
+    m_freieStelleBtn->setToolTip(tr(
+        "Move the transmit tone to a spot where nobody was heard.\n"
+        "Longpath knows this from its own decodes \u2014 WSJT-X and MSHV "
+        "do not."));
+    connect(m_freieStelleBtn, &QPushButton::clicked, this, [this]() {
+        sucheFreieStelle(false);
+    });
+
     connect(m_plaetzeSpin, QOverload<int>::of(&QSpinBox::valueChanged),
             this, [this](int v) {
         m_plaetze = v;
@@ -793,6 +803,8 @@ void Ft8Applet::buildUI()
                                          QString::number(v));
     });
     sendRow->addWidget(m_cqVersucheSpin);
+    sendRow->addWidget(m_plaetzeSpin);
+    sendRow->addWidget(m_freieStelleBtn);
 
     m_cqBtn = blueToggle(tr("Send"), 56);
     m_cqBtn->setToolTip(tr("Send this message once, in the next own "
@@ -927,6 +939,14 @@ void Ft8Applet::fensterZuEnde()
 // (2026-10-29).
 void Ft8Applet::starteCqRuf()
 {
+    // ── Nicht in ein laufendes QSO hineinrufen (2026-10-30) ─────
+    //
+    // Nur beim ANFANG eines Rufs, und nur wenn die Stelle wirklich
+    // belegt ist. Mitten im QSO zu wechseln waere schlimmer als
+    // jede belegte Stelle: wer antwortet, sucht einen dort, wo er
+    // zuletzt war.
+    sucheFreieStelle(true);
+
     m_qsoGemeldet = false;
     m_ablauf.starteAlsAnrufer(eigenesRufzeichen(), eigenerLocator());
     m_cqVersucheOffen = m_cqVersucheSpin ? m_cqVersucheSpin->value() : 1;
@@ -952,6 +972,74 @@ void Ft8Applet::ablaufSchritt()
     if (was.isEmpty() || m_sendet) { return; }
     if (m_textFeld) { m_textFeld->setText(was); }
     sendeNachricht(was);
+}
+
+// ── Wo gerade jemand liegt ───────────────────────────────────────────
+QVector<int> Ft8Applet::belegteToene() const
+{
+    QVector<int> alle;
+    for (const QVector<int>& periode : m_toeneJePeriode) {
+        alle += periode;
+    }
+    return alle;
+}
+
+int Ft8Applet::tonUntergrenze() const
+{
+    // Ein Hound unter 1000 Hz wird nicht beantwortet -- dann darf die
+    // Stellensuche ihn auch nicht dorthin schicken.
+    return m_houndBetrieb ? Ft8Ablauf::kHoundMinTonHz : kSendeTonMinHz;
+}
+
+// ── Eine freie Sendestelle suchen ────────────────────────────────────
+//
+// Weder WSJT-X noch MSHV tun das. Longpath weiss aus den eigenen
+// Funden, WO Stationen senden -- das ist eine bessere Auskunft als
+// Energie im Wasserfall, denn sie sagt „hier sendet jemand" und nicht
+// „hier ist Rauschen".
+bool Ft8Applet::sucheFreieStelle(bool nurWennBelegt)
+{
+    if (!m_tonFeld) { return false; }
+    const QVector<int> belegt = belegteToene();
+    const int von  = tonUntergrenze();
+    const int bis  = kSendeTonMaxHz;
+    const int alt  = m_tonFeld->value();
+
+    if (belegt.isEmpty()) {
+        // Nichts gehoert, nichts zu wissen. Abwesenheit ist keine
+        // Aussage: wer hier verschoebe, zoege eine Station von einer
+        // vielleicht guten Stelle weg, weil der Empfang gerade
+        // schweigt.
+        if (m_status && !nurWennBelegt) {
+            m_status->setText(tr("nothing heard yet — tone unchanged"));
+        }
+        return false;
+    }
+
+    const int abstand = int(Ft8TxSource::kPlatzAbstandHz);
+    if (nurWennBelegt && !stelleBelegt(belegt, alt, abstand)) {
+        return false;
+    }
+
+    const int neu = freieTonlage(belegt, von, bis, abstand, alt);
+    if (neu == alt) {
+        if (m_status) {
+            m_status->setText(stelleBelegt(belegt, alt, abstand)
+                                  ? tr("no free slot — tone unchanged")
+                                  : tr("%1 Hz is clear").arg(alt));
+        }
+        return false;
+    }
+
+    m_tonFeld->setValue(neu);
+    qCInfo(lcFt8Senden).nospace()
+        << "Freie Stelle gesucht: " << alt << " war belegt, jetzt "
+        << neu << " Hz (" << belegt.size() << " Stationen gehoert)";
+    if (m_status) {
+        m_status->setText(tr("tone %1 \u2192 %2 Hz (was busy)")
+                              .arg(alt).arg(neu));
+    }
+    return true;
 }
 
 // ── Ein Fenster, mehrere Stationen ─────────────────────
@@ -1916,6 +2004,17 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
 
     m_list->moveCursor(QTextCursor::End);
     m_list->ensureCursorVisible();
+
+    // Wo in dieser Periode jemand lag -- fuer die Stellensuche.
+    QVector<int> dieserPeriode;
+    dieserPeriode.reserve(funde.size());
+    for (const Ft8Decode& d : funde) {
+        dieserPeriode.append(static_cast<int>(std::lround(d.freqHz)));
+    }
+    m_toeneJePeriode.append(dieserPeriode);
+    while (m_toeneJePeriode.size() > kPeriodenImGedaechtnis) {
+        m_toeneJePeriode.removeFirst();
+    }
 }
 
 

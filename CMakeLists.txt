@@ -558,6 +558,9 @@ set(CORE_SOURCES
     src/core/Ft8Mehrfach.cpp
     src/core/Ft8Stream.cpp
     src/core/Ft8Tx.cpp
+    # Eine freie Sendestelle suchen -- Longpath-eigen, weder WSJT-X
+    # noch MSHV tun das (2026-10-30)
+    src/core/Ft8Tonwahl.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CatProtocol.cpp
