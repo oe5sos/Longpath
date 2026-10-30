@@ -24,7 +24,21 @@
 // spaeteren GPU-Pfad, damit beide nicht driften koennen.
 export const ZEILEN_SICHTBAR   = 96;     // kVisibleRows: Tiefe nach hinten
 export const SPALTEN           = 768;    // kCols
-const BREITE_HINTEN            = 0.60;   // kBackWidthFrac
+
+// ── Frequenztreu: jede Zeile behaelt die volle Breite ─────────────────────
+//
+// Nachgezogen aus PR #344 (`kTrueScaleWidthFrac`). Vorher verjuengten sich
+// die hinteren Zeilen auf 60 % -- und damit stand ein Traeger dort nicht
+// mehr ueber seiner Frequenz. Am Bildschirmfoto des Betreibers gemessen:
+// ein Traeger auf 14.0758 MHz zog seinen Kamm auf 14.1066, also 31 kHz zur
+// Mitte hin. Der Wasserfall darunter verjuengt sich nie, und genau um
+// diesen Betrag widersprachen sich die beiden Bilder.
+//
+// Die Tiefe tragen jetzt der Anstieg nach hinten, der Dunst und die
+// Abdunklung allein. Die KAMMHOEHE schrumpft weiter mit dem alten Wert --
+// sonst saehe das Bild flach aus.
+const BREITE_HINTEN            = 1.00;   // kTrueScaleWidthFrac
+const KAMM_HINTEN              = 0.60;   // kBackWidthFrac, nur noch fuer die Hoehe
 const TIEFE_ANTEIL             = 0.58;   // kDepthSpanFrac
 const KAMM_VORN                = 0.46;   // kFrontMaxRidgeFrac
 const DUNST                    = 0.16;   // kHaze
@@ -163,7 +177,8 @@ export class Raumbild {
       const einzug = W * (1 - breitenAnteil) * 0.5;
       const zeilenB = W - 2 * einzug;
       const grundlinieY = H - tiefe * tiefeSpanne;
-      const kammMax = kammVorn * breitenAnteil;
+      // Die Hoehe folgt dem alten Verjuengungswert, die Breite nicht mehr.
+      const kammMax = kammVorn * (1 - tiefe * (1 - KAMM_HINTEN));
       const dim = MIN_HELLIGKEIT + (1 - MIN_HELLIGKEIT) * (1 - tiefe);
       const zeile = this.zeilen[alter];
 
