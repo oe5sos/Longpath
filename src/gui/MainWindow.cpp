@@ -15606,6 +15606,16 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
                                      : Ft8Decoder::Protocol::Ft8);
     }
 
+    // Und die Lampe in der Leiste sagt, was der Dekoder tut
+    // (2026-10-30). Vorher las sie die Frequenz und schwieg, sobald
+    // man nicht genau auf einer Anrufstelle stand -- siehe
+    // CommandBar::aktualisiereDigiLampe().
+    if (m_commandBar) {
+        // „Laeuft" heiszt: das FT8-Fenster ist da und dekodiert. Nur
+        // dann hat seine Betriebsart Vorrang vor der Frequenz.
+        m_commandBar->setzeDigiDekoder(m_ft8Applet != nullptr, modus);
+    }
+
     // 8. Und das Fenster stellt sich mit um (2026-10-30).
     //
     //    Betreiber: „und wenn bei ft8 klick automatisch ein eigenes

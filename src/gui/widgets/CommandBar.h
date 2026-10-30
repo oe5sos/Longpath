@@ -267,6 +267,17 @@ private:
     void buildModeGroup(QHBoxLayout* row);
     void buildDigiGroup(QHBoxLayout* row);
     void aktualisiereDigiLampe();
+
+public:
+    /// Welche Betriebsart der FT8-Dekoder faehrt, und ob er
+    /// ueberhaupt laeuft. Laeuft er, hat SEINE Betriebsart Vorrang
+    /// vor der Frequenz -- siehe `aktualisiereDigiLampe`.
+    void setzeDigiDekoder(bool laeuft, DigiFrequenzen::Digimodus modus);
+
+private:
+    bool m_digiDekoderLaeuft{false};
+    DigiFrequenzen::Digimodus m_digiBetriebsart{
+        DigiFrequenzen::Digimodus::Ft8};
     void buildStepGroup(QHBoxLayout* row);
 
     // ── Filter und Rauschminderung, 2026-08-21 ───────────────────────

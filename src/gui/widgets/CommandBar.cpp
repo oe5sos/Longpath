@@ -548,19 +548,54 @@ void CommandBar::aktualisiereDigiLampe()
     if (!g) { return; }
     if (!m_slice) { setActive(*g, QString()); return; }
 
+    // ── Die Lampe zeigt den DEKODER, nicht die Frequenz ──────────
+    //
+    // Bis zum 2026-10-30 las sie `stehtSchonDort(frequenz)`. Der
+    // Betreiber stand an dem Abend auf 7.1275 MHz -- keine
+    // Anrufstelle, also beide Pillen grau -- waehrend der Dekoder
+    // durchgehend FT4 fuhr. Er sagte dazu: „war aber auf ft8", und
+    // konnte es nicht besser wissen: die einzige Stelle, an der FT4
+    // stand, war der Knopf IM FT8-Fenster.
+    //
+    // Zwei Anzeigen, die dasselbe meinen und Verschiedenes sagen.
+    // Jetzt sagt die Lampe, was der Dekoder tut -- danach richtet
+    // sich, was ankommt. Wo die Scheibe steht, sagt die Skala.
     const DSPMode m = m_slice->dspMode();
     const bool datenmodus = (m == DSPMode::DIGU || m == DSPMode::DIGL);
     QString label;
     if (datenmodus) {
         using DigiFrequenzen::Digimodus;
-        const auto f = qint64(m_slice->frequency());
-        if (DigiFrequenzen::stehtSchonDort(f, Digimodus::Ft8)) {
-            label = QStringLiteral("FT8");
-        } else if (DigiFrequenzen::stehtSchonDort(f, Digimodus::Ft4)) {
-            label = QStringLiteral("FT4");
+        if (m_digiDekoderLaeuft) {
+            // Der Dekoder hat Vorrang: was er faehrt, bestimmt, was
+            // ankommt. Die Frequenz sagt nur, WO man steht, und das
+            // sagt die Skala schon.
+            label = (m_digiBetriebsart == Digimodus::Ft4)
+                        ? QStringLiteral("FT4") : QStringLiteral("FT8");
+        } else {
+            // Ohne Dekoder bleibt die alte Auskunft: stehe ich auf
+            // einer Anrufstelle? Sie darf NICHT schon bei DIGU
+            // angehen -- in DIGU sitzt man auch auf PSK oder Olivia,
+            // und ein Knopf, der dann leuchtet, luegt.
+            const auto f = qint64(m_slice->frequency());
+            if (DigiFrequenzen::stehtSchonDort(f, Digimodus::Ft8)) {
+                label = QStringLiteral("FT8");
+            } else if (DigiFrequenzen::stehtSchonDort(f, Digimodus::Ft4)) {
+                label = QStringLiteral("FT4");
+            }
         }
     }
     setActive(*g, label);
+}
+
+void CommandBar::setzeDigiDekoder(bool laeuft,
+                                  DigiFrequenzen::Digimodus modus)
+{
+    if (m_digiDekoderLaeuft == laeuft && m_digiBetriebsart == modus) {
+        return;
+    }
+    m_digiDekoderLaeuft = laeuft;
+    m_digiBetriebsart   = modus;
+    aktualisiereDigiLampe();
 }
 
 void CommandBar::buildDigiGroup(QHBoxLayout* row)

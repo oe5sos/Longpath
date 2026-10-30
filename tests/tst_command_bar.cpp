@@ -276,6 +276,56 @@ private slots:
                  QStringLiteral("FT4"));
     }
 
+    // ── Laeuft ein Dekoder, hat ER Vorrang (2026-10-30) ──────────
+    //
+    // Der Betreiber stand am 2026-10-30 auf 7.1275 MHz -- keine
+    // Anrufstelle, also beide Pillen grau -- waehrend der Dekoder
+    // durchgehend FT4 fuhr. Er sagte dazu „war aber auf ft8" und
+    // konnte es nicht besser wissen: die einzige Stelle, an der FT4
+    // stand, war der Knopf IM FT8-Fenster.
+    void derLaufendeDekoderSchlaegtDieFrequenz()
+    {
+        SliceModel slice;
+        CommandBar bar;
+        bar.attach(&slice);
+        slice.setDspMode(DSPMode::DIGU);
+
+        // Genau sein Fall: weit weg von jeder Anrufstelle.
+        slice.setFrequency(7'127'500.0);
+        QVERIFY2(bar.activePill(QStringLiteral("Digi")).isEmpty(),
+                 "ohne Dekoder sagt sie weiterhin nur die Stelle");
+
+        bar.setzeDigiDekoder(true, DigiFrequenzen::Digimodus::Ft4);
+        QCOMPARE(bar.activePill(QStringLiteral("Digi")),
+                 QStringLiteral("FT4"));
+
+        // Und sie folgt ihm beim Umschalten, ohne dass sich die
+        // Frequenz ruehrt.
+        bar.setzeDigiDekoder(true, DigiFrequenzen::Digimodus::Ft8);
+        QCOMPARE(bar.activePill(QStringLiteral("Digi")),
+                 QStringLiteral("FT8"));
+    }
+
+    // Die Gegenprobe zur Gegenprobe: in SSB bleibt sie dunkel, auch
+    // wenn ein Dekoder gemeldet ist. Sonst leuchtete sie waehrend
+    // eines Sprechdurchgangs weiter.
+    void ausserhalbDerDatenmodiBleibtSieDunkel()
+    {
+        SliceModel slice;
+        CommandBar bar;
+        bar.attach(&slice);
+        bar.setzeDigiDekoder(true, DigiFrequenzen::Digimodus::Ft8);
+
+        slice.setDspMode(DSPMode::USB);
+        slice.setFrequency(14'074'000.0);
+        QVERIFY2(bar.activePill(QStringLiteral("Digi")).isEmpty(),
+                 "leuchtet in SSB, obwohl ein Dekoder gemeldet ist");
+
+        slice.setDspMode(DSPMode::DIGU);
+        QCOMPARE(bar.activePill(QStringLiteral("Digi")),
+                 QStringLiteral("FT8"));
+    }
+
     // ── RATE ─────────────────────────────────────────────────────────
     // Am 2026-09-24 lief der QRP-Kanal auf 192 kHz, waehrend 48 kHz
     // ankamen. Die Anzeige zeigt die Kanalrate und wird bernsteinfarben,
