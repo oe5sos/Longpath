@@ -337,7 +337,7 @@ private slots:
         }
         QCOMPARE(strom.verlorenePaketeGesamt(), qint64(0));
         const auto l = strom.luecken();
-        QCOMPARE(l.size(), 1);
+        QCOMPARE(l.size(), qsizetype(1));
         QCOMPARE(l.at(0).pakete, qint64(40));
         QCOMPARE(l.at(0).verloren, qint64(0));
         QCOMPARE(l.at(0).spruenge, qint64(0));
@@ -352,7 +352,7 @@ private slots:
         }
         QCOMPARE(strom.verlorenePaketeGesamt(), qint64(4));
         const auto l = strom.luecken();
-        QCOMPARE(l.size(), 1);
+        QCOMPARE(l.size(), qsizetype(1));
         QCOMPARE(l.at(0).verloren, qint64(4));
         QCOMPARE(l.at(0).spruenge, qint64(2));
     }
@@ -526,9 +526,9 @@ private slots:
             t += 5'000'000LL;          // 5 ms, wie der Tonstrom
         }
         const auto vorher = s.luecken();
-        QCOMPARE(vorher.size(), 1);
-        QCOMPARE(vorher.first().verloren, 0);
-        QCOMPARE(vorher.first().unterbrechungen, 0);
+        QCOMPARE(vorher.size(), qsizetype(1));
+        QCOMPARE(vorher.first().verloren, qint64(0));
+        QCOMPARE(vorher.first().unterbrechungen, qint64(0));
 
         // Jetzt die Sendung: 13,2 s Pause. Der Zaehler ist in der
         // Zeit 165-mal umgelaufen und steht auf irgendeinem Wert.
@@ -536,7 +536,7 @@ private slots:
         s.pruefeZaehlerForTest(klasse, strom, quint8(7), t);
 
         const auto nachher = s.luecken();
-        QCOMPARE(nachher.size(), 1);
+        QCOMPARE(nachher.size(), qsizetype(1));
         QVERIFY2(nachher.first().unterbrechungen == 1,
                  "die lange Pause wurde nicht als Unterbrechung erkannt");
         QVERIFY2(nachher.first().verloren == 0,
@@ -562,7 +562,7 @@ private slots:
         s.pruefeZaehlerForTest(klasse, strom, quint8((80 + 3) & 0xF), t);
 
         const auto l = s.luecken();
-        QCOMPARE(l.size(), 1);
+        QCOMPARE(l.size(), qsizetype(1));
         QCOMPARE(l.first().verloren, qint64(3));
         QCOMPARE(l.first().unterbrechungen, qint64(0));
     }
