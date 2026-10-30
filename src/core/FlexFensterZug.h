@@ -102,6 +102,29 @@ inline bool fensterNimmtBreite(double neueBreiteHz, double alteBreiteHz,
     return std::abs(neueBreiteHz - alteBreiteHz) > 1.0;
 }
 
+/// Wird der Nachzug von dieser Mittenaenderung ueberhaupt angeworfen?
+///
+/// Nein, wenn das Fenster nur dem VFO an den Rand nachgescrollt ist.
+/// Am 2026-10-30 um 16:06 am Geraet gemessen, nach dem Wechsel auf FT8
+/// (Scheibe 7.1948 -> 7.074):
+///
+///     04.041  Panadapter folgt dem Bild — 7.154 MHz (war 7.1948)
+///     04.066  Ausschnitt gesetzt — 7.074 MHz   (die Zentrierung)
+///     04.154  Ausschnitt gesetzt — 7.154 MHz   (der Nachzug gewinnt)
+///
+/// Zwei Zuege liefen gegeneinander: `RadioModel` zentriert den
+/// Panadapter auf die Scheibe, sobald sie aus dem Bild laeuft — und
+/// der Nachzug, den dasselbe Nachscrollen angeworfen hatte, zog ihn
+/// auf die Randstellung zurueck. Die spaetere Quittung gewann, und
+/// das Signal stand wieder 80 kHz neben der Mitte.
+///
+/// Den Nachzug danach zu STOPPEN genuegt nicht: er hatte seinen Befehl
+/// da schon gesendet. Er darf gar nicht erst anlaufen.
+inline bool nachzugWirdAngeworfen(bool mitteFolgtDemVfo)
+{
+    return !mitteFolgtDemVfo;
+}
+
 /// Darf der Nachzug den Panadapter der Maschine auf das Fenster
 /// ziehen?
 ///

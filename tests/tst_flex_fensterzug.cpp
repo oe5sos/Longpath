@@ -56,6 +56,19 @@ private slots:
         QVERIFY(!nachzugZieht(kMaschine, kMaschine, kBreite));
     }
 
+    void derNachzugLaeuftBeiEigenemNachscrollenGarNichtErstAn()
+    {
+        // Gemessen am 2026-10-30, 16:06, nach dem Wechsel auf FT8:
+        //   04.041  Panadapter folgt dem Bild — 7.154 (war 7.1948)
+        //   04.066  Ausschnitt gesetzt — 7.074   (die Zentrierung)
+        //   04.154  Ausschnitt gesetzt — 7.154   (der Nachzug gewinnt)
+        // Der Nachzug hatte seinen Befehl schon gesendet; ihn danach
+        // zu stoppen kommt zu spaet. Er darf nicht anlaufen.
+        QVERIFY(!nachzugWirdAngeworfen(true));
+        // Zieht der Betreiber selbst, laeuft er wie bisher.
+        QVERIFY(nachzugWirdAngeworfen(false));
+    }
+
     void derZoomDesBetreibersUeberlebt()
     {
         // Der Fall vom 2026-10-23: der Betreiber hat hineingezoomt,
