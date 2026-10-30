@@ -1155,6 +1155,7 @@ set(GUI_SOURCES
     src/gui/applets/AppletGrid.h
     src/gui/applets/AppletKeys.cpp
     src/gui/applets/AppletKeys.h
+    src/gui/applets/AppletFensterMasse.cpp
     src/gui/applets/AppletFloatingWindow.cpp
     src/gui/applets/AppletFloatingWindow.h
     src/gui/applets/InstrumentApplet.cpp

@@ -366,6 +366,36 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     QAction* exportToDesktop = menu.addAction(tr("Save to Desktop…"));
     QAction* importFromDesktop = menu.addAction(tr("Load from Desktop…"));
     menu.addSeparator();
+
+    // ── An FT8 oder FT4 binden (2026-10-30) ──────────────────────
+    //
+    // Betreiber: „und wenn bei ft8 klick automatisch ein eigenes
+    // profil erscheint?" — „dies wuerde ich vorher anlegen."
+    //
+    // Direkt ueber `m_profiles` statt ueber ein Signal, anders als
+    // alle Punkte darueber: die brauchen einen Dialog und gehoeren
+    // darum dem Fenster. Hier wird ein Haken gesetzt, mehr nicht.
+    //
+    // `LayoutProfiles::bindDigi` kann das seit heute, `profileFor`
+    // konnte es laengst -- nur rief es niemand, und darum war die
+    // ganze Bindung (auch die an Band und Betriebsart) unerreichbar.
+    QAction* ft8 = menu.addAction(tr("Use for FT8"));
+    QAction* ft4 = menu.addAction(tr("Use for FT4"));
+    for (QAction* a : {ft8, ft4}) { a->setCheckable(true); }
+    if (m_profiles) {
+        ft8->setChecked(m_profiles->isBoundToDigi(
+            name, DigiFrequenzen::Digimodus::Ft8));
+        ft4->setChecked(m_profiles->isBoundToDigi(
+            name, DigiFrequenzen::Digimodus::Ft4));
+    }
+    const QString wink =
+        tr("Switch to this layout when FT8 is selected.\n"
+           "The current layout is saved first.");
+    ft8->setToolTip(wink);
+    ft4->setToolTip(tr("Switch to this layout when FT4 is selected.\n"
+                       "The current layout is saved first."));
+
+    menu.addSeparator();
     QAction* ren = menu.addAction(tr("Rename…"));
     QAction* dup = menu.addAction(tr("Duplicate…"));
     menu.addSeparator();
@@ -393,6 +423,15 @@ void ProfileRail::showMenuFor(const QString& name, const QPoint& globalPos)
     // Weil das Menue am Hauptfenster haengt, kann die Leiste auch allein
     // gestorben sein: dafuer `self`.
     if (!menuOwner || !self) { return; }
+    if (chosen == ft8 || chosen == ft4) {
+        if (m_profiles) {
+            const auto was = (chosen == ft4)
+                                 ? DigiFrequenzen::Digimodus::Ft4
+                                 : DigiFrequenzen::Digimodus::Ft8;
+            m_profiles->bindDigi(name, was, chosen->isChecked());
+        }
+        return;
+    }
     if (chosen == save)      { emit saveRequested(name); }
     else if (chosen == exportToDesktop) { emit exportRequested(name); }
     else if (chosen == importFromDesktop) { emit importRequested(name); }

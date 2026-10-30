@@ -13,6 +13,7 @@
 #include "gui/WindowChrome.h"
 #include "gui/WindowPlacement.h"
 #include "gui/applets/AppletWidget.h"
+#include "gui/applets/AppletFensterMasse.h"
 
 #include <QCloseEvent>
 #include <QDebug>
@@ -170,6 +171,16 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
     m_settleTimer->setSingleShot(true);
     m_settleTimer->setInterval(kSettleMs);
     connect(m_settleTimer, &QTimer::timeout, this, [this]() {
+        // Die Groesse merken, sobald die Geste still steht. Nicht je
+        // Bildpunkt: `kSettleMs` sorgt dafuer, dass ein Zug ueber den
+        // halben Schirm EINE Ablage erzeugt und nicht hundert.
+        //
+        // Nur sichtbar und nur ueber der Untergrenze -- beim Andocken
+        // faellt das Fenster kurz auf fast nichts zusammen, und
+        // `resizeEvent` feuert dabei mit.
+        if (isVisible()) {
+            AppletFensterMasse::merke(m_panelId, size());
+        }
         emit geometrySettled(appletId());
     });
 
@@ -189,6 +200,25 @@ void AppletFloatingWindow::applyDefaultSize()
     // Der Rollbereich hat selbst kaum eine Untergrenze; hier wird nur
     // noch festgelegt, wie klein das Fenster von Hand werden darf.
     setMinimumHeight(m_titleBar ? m_titleBar->height() + 60 : 80);
+
+    // ── Was der Betreiber zuletzt gezogen hat (2026-10-30) ──────
+    //
+    // Vor allem anderen. Eine Groesse, die er selbst gewaehlt hat,
+    // schlaegt jede Rechnung aus `sizeHint()` -- er hat das Fenster
+    // gesehen, die Rechnung nicht.
+    //
+    // Betreiber: „ich wuerde gerne, wenn ich ft8 klicke, dass fenster
+    // groesser haben. besser waere vielleicht die groesse der letzen
+    // veraenderung zu speichern?"
+    //
+    // Das Layoutprofil kann das auch, aber erst ab dem ZWEITEN Mal:
+    // beim ersten Abloesen steht dort noch nichts, und dann rechnet
+    // der Block darunter. Siehe AppletFensterMasse.h.
+    if (const QSize gemerkt = AppletFensterMasse::gemerkt(m_panelId);
+        gemerkt.isValid()) {
+        resize(gemerkt);
+        return;
+    }
 
     // Die Wunschgroesse ist die des Inhalts — aber gedeckelt. Ein
     // abgeloestes Applet ist ein Werkzeug neben der Konsole, kein

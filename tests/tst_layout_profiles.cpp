@@ -422,6 +422,73 @@ private slots:
         lp.load();
         QCOMPARE(lp.names(), QStringList({QStringLiteral("Behalten")}));
     }
+
+    // ── Die Bindung an FT8/FT4 (2026-10-30) ───────────────────────
+    //
+    // `DSPMode` reicht nicht: FT8, FT4 und RTTY sind alle DIGU.
+    // Betreiber: „und wenn bei ft8 klick automatisch ein eigenes
+    // profil erscheint?"
+    void einProfilLaesstSichAnFt8Binden()
+    {
+        LayoutProfiles lp;
+        lp.create(QStringLiteral("FT8"));
+        lp.create(QStringLiteral("SSB"));
+
+        lp.bindDigi(QStringLiteral("FT8"),
+                    DigiFrequenzen::Digimodus::Ft8, true);
+        QVERIFY(lp.isBoundToDigi(QStringLiteral("FT8"),
+                                 DigiFrequenzen::Digimodus::Ft8));
+        QVERIFY(!lp.isBoundToDigi(QStringLiteral("FT8"),
+                                  DigiFrequenzen::Digimodus::Ft4));
+
+        // Mit FT8 gefragt: es passt.
+        QCOMPARE(lp.profileFor(Band::Band40m, DSPMode::DIGU,
+                               DigiFrequenzen::Digimodus::Ft8),
+                 QStringLiteral("FT8"));
+
+        // ── Der Kern: eine Digi-Bindung ist STRENG ────────────
+        //
+        // Ohne Digi-Angabe passt es NICHT. Sonst risse das
+        // FT8-Profil jeden Wechsel nach DIGU an sich -- auch den
+        // nach RTTY, das dieselbe Betriebsart ist und ein ganz
+        // anderes Fenster braucht.
+        QVERIFY2(lp.profileFor(Band::Band40m, DSPMode::DIGU).isEmpty(),
+                 "ohne Digi-Angabe darf ein FT8-Profil nicht greifen");
+        QVERIFY2(lp.profileFor(Band::Band40m, DSPMode::DIGU,
+                               DigiFrequenzen::Digimodus::Ft4).isEmpty(),
+                 "ein FT8-Profil darf nicht bei FT4 greifen");
+    }
+
+    // Die Bindung ueberlebt Speichern und Laden -- sonst waere sie
+    // beim naechsten Start weg, und das faellt erst auf, wenn man
+    // schon umgeschaltet hat.
+    void dieDigiBindungUeberlebtDenNeustart()
+    {
+        {
+            LayoutProfiles lp;
+            lp.create(QStringLiteral("FT4-Fenster"));
+            lp.bindDigi(QStringLiteral("FT4-Fenster"),
+                        DigiFrequenzen::Digimodus::Ft4, true);
+            lp.save();
+        }
+        LayoutProfiles wieder;
+        wieder.load();
+        QVERIFY(wieder.isBoundToDigi(QStringLiteral("FT4-Fenster"),
+                                     DigiFrequenzen::Digimodus::Ft4));
+        QCOMPARE(wieder.profileFor(Band::Band40m, DSPMode::DIGU,
+                                   DigiFrequenzen::Digimodus::Ft4),
+                 QStringLiteral("FT4-Fenster"));
+    }
+
+    // Ein Profil ohne jede Bindung bleibt, was es war: eines, das
+    // nie von selbst greift.
+    void ohneBindungGreiftNichts()
+    {
+        LayoutProfiles lp;
+        lp.create(QStringLiteral("Standard"));
+        QVERIFY(lp.profileFor(Band::Band40m, DSPMode::DIGU,
+                              DigiFrequenzen::Digimodus::Ft8).isEmpty());
+    }
 };
 
 QTEST_GUILESS_MAIN(TestLayoutProfiles)

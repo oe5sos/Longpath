@@ -15553,6 +15553,54 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
                                      ? Ft8Decoder::Protocol::Ft4
                                      : Ft8Decoder::Protocol::Ft8);
     }
+
+    // 8. Und das Fenster stellt sich mit um (2026-10-30).
+    //
+    //    Betreiber: „und wenn bei ft8 klick automatisch ein eigenes
+    //    profil erscheint?" — „dies wuerde ich vorher anlegen."
+    //
+    //    `LayoutProfiles::profileFor()` konnte das seit jeher. Beim
+    //    Nachsehen am 2026-10-30: es ruft NIEMAND. Die ganze Bindung
+    //    (bindBand, bindMode, profileFor) war gebaut, geprueft und von
+    //    keiner Stelle im Programm erreichbar -- derselbe Befund wie
+    //    heute schon bei Multi Answering und bei
+    //    `Ft8Mehrfach::belegung()`.
+    //
+    //    Hier wird nichts entschieden: passt kein Profil, bleibt alles
+    //    stehen. Und das aktive Profil wird vorher gesichert, sonst
+    //    verloere der Betreiber die Anordnung, die er gerade gezogen
+    //    hat.
+    profilNachstellen(modus);
+}
+
+// Das Profil zur Betriebsart holen und aktivieren, falls eines passt.
+//
+// Getrennt von `aufDigiStellen`, weil der Bandwechsel dieselbe Frage
+// stellt und dieselbe Antwort braucht -- zwei Kopien dieser sieben
+// Zeilen waeren genau die Art Dopplung, die auseinanderlaeuft.
+void MainWindow::profilNachstellen(
+    std::optional<DigiFrequenzen::Digimodus> digi)
+{
+    if (!m_layoutProfiles || !m_radioModel) { return; }
+    SliceModel* slice = m_radioModel->activeSlice();
+    if (!slice) { return; }
+
+    const Band band = bandFromFrequency(slice->frequency());
+    const QString passt =
+        m_layoutProfiles->profileFor(band, slice->dspMode(), digi);
+    if (passt.isEmpty() || passt == m_layoutProfiles->current()) {
+        return;
+    }
+
+    // Erst sichern, dann wechseln. Wer eben noch Fenster gezogen hat,
+    // soll sie im alten Profil wiederfinden.
+    m_layoutProfiles->captureIntoCurrent();
+    m_layoutProfiles->save();
+
+    qCInfo(lcContainer).noquote()
+        << "Profil gewechselt:" << m_layoutProfiles->current()
+        << "->" << passt << "(gebunden an diese Betriebsart)";
+    m_layoutProfiles->activate(passt);
 }
 
 void MainWindow::schutzrahmenNachziehen()

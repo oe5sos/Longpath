@@ -338,6 +338,11 @@ public:
     /// kippte am 2026-10-21 alles DAHINTER auf privat und brach sieben
     /// CI-Laeufe (`appletIsRegisteredForTest` war ploetzlich privat).
     void aufDigiStellen(Longpath::DigiFrequenzen::Digimodus modus);
+    /// Das an Band/Modus/Digimodus gebundene Layoutprofil aktivieren,
+    /// falls eines passt. Siehe `LayoutProfiles::profileFor`.
+    void profilNachstellen(
+        std::optional<Longpath::DigiFrequenzen::Digimodus> digi
+            = std::nullopt);
 
     /// Welcher Digimodus zuletzt gemeint war. Der DIGU/DIGL-Knopf in
     /// der Leiste traegt keinen -- er richtet mit diesem her.
