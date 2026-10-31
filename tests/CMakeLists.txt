@@ -5705,6 +5705,14 @@ longpath_add_test(tst_band_flyout_highlight)
 longpath_add_test(tst_band_buttons)
 longpath_add_test(tst_container_title_does_not_shove)
 longpath_add_test(tst_frequency_widget_tunes)
+# Der Lauf `dieOptionenHaengenAmZahnradNichtNurAnDerRechtenMaustaste`
+# liest `FrequencyApplet.cpp` als Datei -- ohne diesen Pfad ueberspraenge
+# er sich still, und ein Waechter, der sich still ueberspringt, waecht
+# nicht. (2026-10-31: genau so lief er beim ersten Mal, SKIP statt PASS.)
+if(TEST tst_frequency_widget_tunes)
+    set_tests_properties(tst_frequency_widget_tunes PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 longpath_add_test(tst_a_second_receiver_can_be_closed)
 longpath_add_test(tst_instrument_brightness_sheet)
 longpath_add_test(tst_zoom_buttons_do_something)
