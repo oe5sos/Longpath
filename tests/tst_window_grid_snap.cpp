@@ -80,9 +80,14 @@ private slots:
         QVERIFY(r.width() >= 20);
         QVERIFY(r.height() >= 20);
         QCOMPARE((r.width() + Style::kFensterLuftPx) % kSnapGridPx, 0);
+        // Nie null -- aber seit dem 2026-10-31 ist das Kleinste eine
+        // Rasterzelle MINUS der Luft: die Zelle ist 16 breit, das
+        // Fenster darin 13, die drei Punkte sind der Abstand zum
+        // Nachbarn.
         const QRect z = snappedFrameRect(QRect(10, 10, 2, 2));
-        QVERIFY(z.width() >= kSnapGridPx);
-        QVERIFY(z.height() >= kSnapGridPx);
+        QVERIFY(z.width()  >= kSnapGridPx - Style::kFensterLuftPx);
+        QVERIFY(z.height() >= kSnapGridPx - Style::kFensterLuftPx);
+        QVERIFY(z.width() > 0);
     }
 
     // Ein echtes Fenster rastet nach dem Loslassen an allen vier Kanten ein.
