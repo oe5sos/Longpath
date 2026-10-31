@@ -117,6 +117,71 @@ private slots:
                      "Das Widget zeigt %1, das Modell steht auf "
                      "14.225.000").arg(shown)));
     }
+    // ── Die Optionen muessen ERREICHBAR sein (2026-10-31) ────────
+    //
+    // Der Betreiber: „frequency widget bitte mit option ausstatten,
+    // was alles genau angezeigt werden soll. entweder nur frequenz,
+    // oder mit swr, oder mit leistung usw."
+    //
+    // Es gab sie alle schon — fuenf einzelne Schalter, seit dem
+    // 2026-08-23 und dem 2026-08-30. Nur: `hasExtendedSettings()`
+    // stand auf dem Vorgabewert false, und `GridCellWidget.cpp:235`
+    // zeichnet das Zahnrad im Panelkopf GENAU DANN, wenn das wahr
+    // ist. Also kein Knopf; die Schalter lagen ausschliesslich hinter
+    // der rechten Maustaste, und wer das nicht weiss, findet nichts.
+    //
+    // Derselbe Fehler wie schon dreimal am 2026-10-30: gebaut, aber
+    // unerreichbar. Dieser Lauf haelt die Erreichbarkeit fest, nicht
+    // das Vorhandensein — `showsSwr()` und die anderen gab es ja die
+    // ganze Zeit.
+    //
+    // KEIN `openExtendedSettings()` hier: `QMenu::exec()` dreht auf
+    // macOS eine Cocoa-Schleife, in der weder Taktgeber noch
+    // gepostete Ereignisse ankommen (2026-10-15 nachgewiesen,
+    // `tst_real_menus_hang_on_the_window`). Geprueft wird der
+    // Schalter, der den Knopf erscheinen laesst, und dasz beide
+    // Zugaenge dasselbe Menue bauen.
+    void dieOptionenHaengenAmZahnradNichtNurAnDerRechtenMaustaste()
+    {
+        RadioModel model;
+        FrequencyApplet applet(&model);
+        QVERIFY2(applet.hasExtendedSettings(),
+                 "ohne dies zeichnet GridCellWidget kein Zahnrad — die "
+                 "Anzeigeschalter waeren nur per rechter Maustaste zu "
+                 "finden");
+
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+        QFile f(QString::fromLocal8Bit(root)
+                + QStringLiteral("/src/gui/applets/FrequencyApplet.cpp"));
+        QVERIFY2(f.open(QIODevice::ReadOnly), qPrintable(f.fileName()));
+        const QString src = QString::fromUtf8(f.readAll());
+
+        // Eine Quelle fuer beide Wege: sonst driften sie auseinander,
+        // und einer der beiden zeigt irgendwann weniger Schalter.
+        for (const QString& kopf : {QStringLiteral("void FrequencyApplet::openExtendedSettings("),
+                                    QStringLiteral("void FrequencyApplet::contextMenuEvent(")}) {
+            const int a = src.indexOf(kopf);
+            QVERIFY2(a >= 0, qPrintable(kopf));
+            const int e = src.indexOf(QStringLiteral("\n}\n"), a);
+            QVERIFY(e > a);
+            QVERIFY2(src.mid(a, e - a).contains(QStringLiteral("baueOptionsMenue")),
+                     qPrintable(kopf + QStringLiteral(" baut sein Menue selbst")));
+        }
+
+        // Und die fuenf Schalter stehen wirklich darin.
+        const int b = src.indexOf(QStringLiteral("QMenu* FrequencyApplet::baueOptionsMenue"));
+        QVERIFY(b > 0);
+        const int be = src.indexOf(QStringLiteral("\n}\n"), b);
+        const QString menue = src.mid(b, be - b);
+        for (const QString& schalter : {QStringLiteral("setShowTiles"),
+                                        QStringLiteral("setShowVfo"),
+                                        QStringLiteral("setShowPower"),
+                                        QStringLiteral("setShowSwr"),
+                                        QStringLiteral("setShowSignal")}) {
+            QVERIFY2(menue.contains(schalter), qPrintable(schalter));
+        }
+    }
 };
 
 QTEST_MAIN(TstFrequencyWidgetTunes)
