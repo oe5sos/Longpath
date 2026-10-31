@@ -10,6 +10,7 @@
 #include <QtTest>
 
 #include "core/AppSettings.h"
+#include "gui/StyleConstants.h"
 #include "gui/LayoutProfiles.h"
 #include "gui/MainWindow.h"
 #include "gui/SideAreaWindow.h"
@@ -286,8 +287,16 @@ private slots:
         QTest::qWait(50);
         const int w0 = win->width();
 
+        // ── Eine Fensterluft weniger (2026-10-31) ──────────────────
+        //
+        // Seit das Raster den Abstand selbst traegt, liegt die FERNE
+        // Kante um `kFensterLuftPx` vor der Rasterlinie. Das Fenster
+        // waechst also in den frei gewordenen Platz, bleibt aber die
+        // Luft von der Seitenflaeche weg -- und genau so ist es
+        // gemeint. Gemessen: 1077 statt 1080, also exakt eine Luft.
         area->setCollapsed(true);
-        QCOMPARE(win->width(), w0 + (kAreaW - SideAreaWindow::kRailW));
+        QCOMPARE(win->width(),
+                 w0 + (kAreaW - SideAreaWindow::kRailW) - Style::kFensterLuftPx);
         area->setCollapsed(false);
         QCOMPARE(win->width(), w0);
 
