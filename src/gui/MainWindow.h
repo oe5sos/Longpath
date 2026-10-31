@@ -102,6 +102,9 @@ namespace Longpath {
 enum class ToastSeverity : int;
 
 class RadioModel;
+/// Defined in core/strip/StripChain.h; der Sendeton-Kanalzug sitzt seit
+/// dem 2026-10-31 auch im Flex-Weg und wird hier nur als Zeiger gehalten.
+class StripChain;
 /// Defined in gui/WindowPlacement.h; nur als Zeiger gehalten
 /// (m_aufbauBewegung), damit dieser Kopf keinen weiteren Kopf zieht.
 class EigeneBewegung;
@@ -261,6 +264,35 @@ public:
                                      qint64 geliefert,
                                      qint64 rateHz,
                                      qint64 maxRahmen);
+
+    /// Was dieser Block noch erlebt, bevor er zur Flex geht.
+    ///
+    /// Drei Schritte in fester Reihenfolge: die Aussteuerung von Hand,
+    /// dann der Kanalzug, dann der Riegel. Herausgezogen aus demselben
+    /// Grund wie `flexFaelligeRahmen` — ein Prueffall kann sie ohne
+    /// Fenster, ohne Geraet und ohne Soundkarte fahren.
+    ///
+    /// Die Reihenfolge ist nicht beliebig: die Schwellen des
+    /// Kompressors und des Tors sind ABSOLUT (dBFS), also muss die
+    /// Aussteuerung vor der Kette liegen, sonst arbeitet sie jedes Mal
+    /// an einem anderen Pegel. Der Riegel liegt hinter der Kette, weil
+    /// er die letzte Sicherung vor dem Wandler ist — auch dann, wenn
+    /// die Kette aus ist.
+    struct FlexMikBlock {
+        /// Spitze NACH der Aussteuerung und VOR der Kette. Das ist die
+        /// Zahl, die etwas ueber die QUELLE sagt — die Warnung „das
+        /// Mikrofon steht zu hoch" haengt an ihr und nicht an dem, was
+        /// ein Kompressor daraus gemacht hat.
+        float quelleSpitze{0.0f};
+        /// Spitze am Ausgang, vor dem Riegel. Das ist, was hinausgeht.
+        float ausgangSpitze{0.0f};
+        /// Ob die Kette wirklich gelaufen ist (an, vorhanden, Stimme).
+        bool  ketteLief{false};
+    };
+    static FlexMikBlock flexMikrofonblock(float* proben, int anzahl,
+                                          float faktor,
+                                          StripChain* kette,
+                                          float grenze);
     /// Die Kommandoleiste, damit ein Lauf ihre Knoepfe wirklich
     /// druecken kann statt die Wirkung nachzubauen.
     class CommandBar* commandBarForTest() const { return m_commandBar; }
@@ -2010,6 +2042,15 @@ private:
     /// Einmal je Sendung melden, wenn das Mikrofon ueber −1 dBFS kam.
     /// Ohne das stuende die Zeile bei jedem Pumpentakt im Protokoll.
     bool   m_flexMikZuLaut{false};
+    /// Dasselbe, aber fuer den Fall, dass erst der KANALZUG ueber den
+    /// Riegel kommt. Eine eigene Flagge, weil es eine andere Ursache
+    /// ist: die Quelle lag dann richtig, und wer die beiden in einer
+    /// Flagge zusammenfasst, verschluckt die zweite Meldung.
+    bool   m_flexKetteZuLaut{false};
+    /// Einmal je Sendung ins Protokoll, dass die Kette mitlief —
+    /// sonst ist am Protokoll nicht zu sehen, ob der Ton bearbeitet
+    /// hinausging oder roh.
+    bool   m_flexKetteGemeldet{false};
 
     // ── Die Pumpe braucht eine Uhr (2026-10-29) ──────────────────────
     //
