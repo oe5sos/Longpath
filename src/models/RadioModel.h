@@ -112,6 +112,7 @@
 #include "core/SkuUiProfile.h"  // issue #257 — setLastBandForTest passes the SKU into refreshAntennasFromAlex
 #include "core/safety/SwrProtectionController.h"
 #include "core/safety/SwrRiegel.h"
+#include "core/safety/FlexAbstimmRegler.h"
 #include "core/safety/TxInhibitMonitor.h"
 #include "core/safety/BandPlanGuard.h"
 
@@ -343,6 +344,10 @@ public:
     /// Zahl aus den Einstellungen ueberhaupt ankommt. Eine Einheit,
     /// die geprueft ist, aber nicht angeschlossen, ist nichts wert --
     /// genau das war heute schon einmal der Fall (Multi Answering).
+    const safety::FlexAbstimmRegler& flexAbstimmRegler() const
+        { return m_flexAbstimmRegler; }
+    safety::FlexAbstimmRegler& flexAbstimmRegler() { return m_flexAbstimmRegler; }
+
     const safety::SwrRiegel& flexSwrRiegel() const { return m_flexSwrRiegel; }
     safety::SwrRiegel&       flexSwrRiegel()       { return m_flexSwrRiegel; }
 
@@ -2771,6 +2776,10 @@ signals:
     /// Betreiber am 2026-10-30: „Sollte SWR ueber 2,5 sein, bitte
     /// nicht senden!" Siehe `safety::SwrRiegel`.
     void flexSwrGesperrt(float swr, float grenze);
+    /// Der Abstimmregler ist am Anschlag und kommt trotzdem nicht auf
+    /// das Ziel — der Hebel reicht nicht. Mit dem, was wirklich
+    /// herauskam, und dem Ziel.
+    void flexAbstimmZielUnerreichbar(double istWatt, double zielWatt);
     /// Die Maschine sendet / sendet nicht mehr — gleich wer getastet hat.
     void flexSendetGeaendert(bool sendet);
 
@@ -3937,6 +3946,18 @@ private:
     /// `flexTasten()`, einer bei jeder Messung — FT8 tastet 13,2 s am
     /// Stueck, da reicht die Pruefung davor nicht.
     safety::SwrRiegel    m_flexSwrRiegel;
+
+    // ── Die Abstimmleistung gegenlesen (2026-10-31) ──────────────────
+    //
+    // Betreiber: „tunen will ich grundsaetzlich mit einem watt." Am
+    // Geraet gemessen ergaben 10 % aber 23 W — `tunepower` ist
+    // Prozent auf einer nicht linearen Kurve. Wer Watt will, musz das
+    // Ergebnis lesen. Siehe `FlexAbstimmRegler`: waehrend des
+    // Traegers geht es nur hinunter.
+    safety::FlexAbstimmRegler m_flexAbstimmRegler;
+    bool                      m_flexAbstimmtGerade{false};
+    int                       m_flexAbstimmProzent{0};
+    QString                   m_flexAbstimmBand;
     bool                 m_flexVerriegelungGezeigt{false};
     bool                 m_flexLeistungGesehen{false};
     /// Welche Zustandsarten die Maschine schon geschickt hat — je Art

@@ -697,6 +697,8 @@ set(CORE_SOURCES
     src/core/safety/RegionSetting.cpp
     src/core/safety/SwrProtectionController.cpp
     src/core/safety/SwrRiegel.cpp
+    src/core/safety/FlexAbstimmRegler.cpp
+    src/core/safety/FlexAbstimmRegler.h
     src/core/safety/TxInhibitMonitor.cpp
     src/core/safety/safety_constants.cpp
     src/core/SpotCollectorClient.cpp

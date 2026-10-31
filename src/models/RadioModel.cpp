@@ -644,6 +644,19 @@ RadioModel::RadioModel(QObject* parent)
             s.value(QStringLiteral("FlexSwrRiegelAn"),
                     QStringLiteral("True")).toString()
             != QLatin1String("False"));
+
+        // ── Der Abstimmregler (2026-10-31) ───────────────────────
+        //
+        // An, weil der Betreiber danach gefragt hat („tunen will ich
+        // grundsaetzlich mit einem watt") und weil die Zahl am Regler
+        // sonst nicht bedeutet, was sie sagt. Abschaltbar bleibt er:
+        // wer die Prozente selbst setzen will, stellt
+        // `FlexAbstimmReglerAn` auf False und bekommt das alte
+        // Verhalten zurueck.
+        m_flexAbstimmRegler.setzeAn(
+            s.value(QStringLiteral("FlexAbstimmReglerAn"),
+                    QStringLiteral("True")).toString()
+            != QLatin1String("False"));
     }
 
     // Sprachspeicher: Ordner neben die Einstellungsdatei legen und
@@ -7628,6 +7641,26 @@ bool RadioModel::flexAbstimmen(bool an)
         m_flexSwrRiegel.zuruecksetzen();
     }
 
+    // ── Die Leistung VOR dem Traeger setzen (2026-10-31) ────────────
+    //
+    // Betreiber: „tunen will ich grundsaetzlich mit einem watt."
+    // Gemessen ergaben 10 % aber 23 W — `tunepower` ist Prozent auf
+    // einer Kurve, die wir nicht kennen. Darum von unten herankommen:
+    // mit dem, was dieses Band gelernt hat, sonst mit dem Kleinsten.
+    // Nachgeregelt wird waehrend des Traegers, und zwar nur hinunter.
+    if (an) {
+        m_flexAbstimmBand    = flexSwrBandKennung();
+        m_flexAbstimmProzent = m_flexAbstimmRegler.startProzent(m_flexAbstimmBand);
+        setzeFlexAbstimmleistung(m_flexAbstimmProzent);
+        m_flexAbstimmtGerade = true;
+        qCInfo(lcConnection).nospace()
+            << "Flex: Abstimmen beginnt mit " << m_flexAbstimmProzent
+            << " % auf " << m_flexAbstimmBand << ", Ziel "
+            << m_flexAbstimmRegler.zielWatt() << " W";
+    } else {
+        m_flexAbstimmtGerade = false;
+    }
+
     m_flexConnection->sendCommand(FlexCommandWire::tuneCommand(an));
     qCInfo(lcConnection) << "Flex: Abstimmtraeger" << (an ? "an" : "aus");
     return true;
@@ -8089,6 +8122,39 @@ void RadioModel::startFlexStreams()
                         flexAbstimmen(false);
                         emit flexSwrGesperrt(float(*swrFuerDenRiegel),
                                              m_flexSwrRiegel.grenze());
+                    }
+                }
+
+                // ── Die Abstimmleistung nachregeln (2026-10-31) ──
+                //
+                // Nur waehrend eines laufenden Abstimmtraegers, und
+                // nur HINUNTER -- der Regler gibt gar nichts anderes
+                // zurueck (siehe `FlexAbstimmRegler`). Der Riegel
+                // oben hat Vorrang: liegt die Stehwelle daneben, ist
+                // der Traeger ohnehin schon geloest.
+                if (fwdW && m_flexAbstimmtGerade) {
+                    const auto neuProzent = m_flexAbstimmRegler.messung(
+                        m_flexAbstimmBand, m_flexAbstimmProzent, *fwdW);
+                    if (neuProzent && *neuProzent != m_flexAbstimmProzent) {
+                        qCInfo(lcConnection).nospace()
+                            << "Flex: Abstimmleistung " << m_flexAbstimmProzent
+                            << " % ergab " << *fwdW << " W — zurueck auf "
+                            << *neuProzent << " % (Ziel "
+                            << m_flexAbstimmRegler.zielWatt() << " W)";
+                        m_flexAbstimmProzent = *neuProzent;
+                        setzeFlexAbstimmleistung(m_flexAbstimmProzent);
+                    }
+                    if (m_flexAbstimmRegler.zielUnerreichbar(m_flexAbstimmBand)) {
+                        // Ein Prozent ist der Anschlag der Maschine.
+                        // Kommt dort schon zu viel heraus, ist das Ziel
+                        // mit diesem Hebel nicht zu erreichen -- und das
+                        // gehoert gesagt, nicht wegreguliert.
+                        qCWarning(lcConnection).nospace()
+                            << "Flex: Ziel " << m_flexAbstimmRegler.zielWatt()
+                            << " W nicht erreichbar — schon bei einem Prozent "
+                            << "kommen " << *fwdW << " W heraus";
+                        emit flexAbstimmZielUnerreichbar(
+                            *fwdW, m_flexAbstimmRegler.zielWatt());
                     }
                 }
 

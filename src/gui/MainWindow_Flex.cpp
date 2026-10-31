@@ -1897,7 +1897,19 @@ void MainWindow::verdrahteFlexSenden()
         if (m_shuttingDown || !m_radioModel || m_flexTargetSliceId < 0) {
             return;
         }
-        m_radioModel->setzeFlexAbstimmleistung(qBound(0, watt, 100));
+        // ── Der Regler, nicht der Regler-Wert (2026-10-31) ──────
+        //
+        // Mit eingeschaltetem Abstimmregler ist die Zahl am Schieber
+        // das ZIEL IN WATT, nicht der Prozentwert fuer die Maschine.
+        // Gemessen: 10 % ergaben 23 W — wer Watt meint, kann die
+        // Prozente nicht einstellen, sondern musz das Ergebnis lesen.
+        // Die Prozente setzt dann `flexAbstimmen()` beim Traegerstart
+        // und regelt sie waehrenddessen nach unten.
+        if (m_radioModel->flexAbstimmRegler().an()) {
+            m_radioModel->flexAbstimmRegler().setzeZielWatt(watt);
+        } else {
+            m_radioModel->setzeFlexAbstimmleistung(qBound(0, watt, 100));
+        }
     });
 
     // ── Einmal nachziehen, statt auf eine Reglerbewegung zu warten ───
@@ -1920,7 +1932,12 @@ void MainWindow::verdrahteFlexSenden()
         const int sendeWatt  = qBound(0, tm.power(), 100);
         const int stimmWatt  = qBound(0, tm.tunePower(), 100);
         m_radioModel->setzeFlexSendeleistung(sendeWatt);
-        m_radioModel->setzeFlexAbstimmleistung(stimmWatt);
+        if (m_radioModel->flexAbstimmRegler().an()) {
+            // Das Ziel in Watt; die Prozente findet der Regler selbst.
+            m_radioModel->flexAbstimmRegler().setzeZielWatt(stimmWatt);
+        } else {
+            m_radioModel->setzeFlexAbstimmleistung(stimmWatt);
+        }
         qCInfo(lcFlexGui).nospace()
             << "Flex: Leistung nachgezogen — senden " << sendeWatt
             << " %, abstimmen " << stimmWatt << " %";

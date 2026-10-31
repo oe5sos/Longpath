@@ -2656,6 +2656,13 @@ longpath_add_test(tst_band_plan_guard_mox_rejection)
 # Ports Thetis console.cs:25933-26120 [v2.10.3.13] (PollPAPWR) and
 # console.cs:29191-29195 [v2.10.3.13] (UIMOXChangedFalse).
 longpath_add_test(tst_swr_protection_controller)
+longpath_add_test(tst_flex_abstimmregler)
+# `derReglerHaengtImAbstimmweg` liest `RadioModel.cpp` als Datei -- ohne
+# diesen Pfad ueberspraenge er sich still (2026-10-31).
+if(TEST tst_flex_abstimmregler)
+    set_tests_properties(tst_flex_abstimmregler PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 longpath_add_test(tst_swr_riegel)
 # `jederSendewegFragtDenRiegel` liest die Quelle: ohne echtes Geraet
 # kommt kein Lauf an das vierte Tor. Ohne diese Zeile ueberspringt er
