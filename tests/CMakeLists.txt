@@ -5570,6 +5570,10 @@ longpath_add_test(tst_scheibenflagge)
 # 2026-10-15: FT8/FT4 nativ — Nachricht hin, Nachricht zurueck, ohne
 # Tondatei und ohne Funkgeraet.
 longpath_add_test(tst_ft8_dekodiert)
+# ── 2026-10-31: die dB-Spalte war der Sync-Score ────────────────────
+# Gegen Signale mit BEKANNTEM Stoerabstand gefahren (0 bis −19 dB),
+# damit eine neue Rechnung nicht wieder bloss plausibel aussieht.
+longpath_add_test(tst_ft8_stoerabstand)
 # 2026-10-21: die Subtraktion aus MSHV -- zieht sie ein Signal heraus,
 # und kommt darunter ein zweites zum Vorschein?
 longpath_add_test(tst_ft8_subtraktion)
