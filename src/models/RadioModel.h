@@ -3788,6 +3788,12 @@ public:
     /// aufhoert zu senden, geht immer hinaus.
     bool flexTasten(bool tasten);
 
+    /// Zu welchem Antennenweg eine Stehwellenmessung gehoert
+    /// (`bandKeyName`, also "20m"). Eine Messung auf einem Band sagt
+    /// ueber ein anderes nichts — siehe `SwrRiegel`, Nachtrag 1 vom
+    /// 2026-10-31.
+    QString flexSwrBandKennung() const;
+
     /// Die Scheibe bestimmen, die senden soll. Ohne das weist die
     /// Maschine `xmit` ab.
     bool setzeFlexSendescheibe(const QString& sliceId);

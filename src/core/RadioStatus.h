@@ -83,6 +83,8 @@
 
 #include "PttSource.h"
 #include <QObject>
+
+#include <optional>
 #include <QVector>
 #include <cmath>
 
@@ -144,6 +146,25 @@ public:
     // ── Setters (called by connection layer) ──────────────────────────────
     void setForwardPower(double watts);
     void setReflectedPower(double watts);   // also recomputes SWR
+
+    // ── Die gemessene Stehwelle, wo das Geraet sie selbst meldet ──────
+    //
+    // 2026-10-31: die Flex schickt `SWR` als eigenen Messwert mit — die
+    // Zahl ihrer eigenen Richtbruecke, zu EINEM Zeitpunkt gemessen. Wir
+    // haben sie bis heute gelesen, skaliert, ins Protokoll geschrieben
+    // und dann weggeworfen, und statt ihrer eine eigene aus FWDPWR und
+    // REFPWR gerechnet. Die beiden kommen aber nicht verlaeszlich im
+    // selben Paket (am 2026-10-27 nachgemessen: die Maschine schickt die
+    // Sendemesswerte NICHT in jeder Zeile), und `setForwardPower`
+    // rechnet bei jedem neuen Vorwaertswert neu — notfalls gegen einen
+    // Ruecklauf aus einem anderen Augenblick. Genau so entstand am
+    // 2026-10-31 eine 7,08, die eine Sendung brach.
+    //
+    // Wo das Geraet selbst misst, gilt das Geraet. Ein leerer Wert
+    // bedeutet „kein eigener Messwert" und laeszt die Rechnung aus
+    // FWD/REF stehen — der OpenHPSDR-Weg hat keine eigene Bruecke.
+    void setMeasuredSwr(std::optional<double> swr);
+    std::optional<double> measuredSwr() const { return m_gemesseneSwr; }
     void setExciterPowerMw(int mw);
     void setPaTemperature(double celsius);
     void setPaCurrent(double amps);
@@ -169,6 +190,7 @@ private:
     double    m_forward{0.0};
     double    m_reflected{0.0};
     double    m_swr{1.0};
+    std::optional<double> m_gemesseneSwr;
     int       m_exciterMw{0};
     double    m_paTemp{0.0};
     double    m_paCurrent{0.0};

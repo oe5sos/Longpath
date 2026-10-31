@@ -21,7 +21,8 @@ void SwrRiegel::setzeGrenze(float g)
     m_grenze = std::clamp(g, 1.0f, 10.0f);
 }
 
-bool SwrRiegel::messung(float swr, float vorwaertsW, qint64 jetztMs)
+bool SwrRiegel::messung(float swr, float vorwaertsW, qint64 jetztMs,
+                        const QString& band)
 {
     if (!m_an) { return false; }
 
@@ -30,8 +31,13 @@ bool SwrRiegel::messung(float swr, float vorwaertsW, qint64 jetztMs)
     // Ausklingens als „letzte Messung" da.
     if (vorwaertsW < kMinLeistungW) { return false; }
 
+    // Ein Bandwechsel seit der letzten Messung macht die alte
+    // hinfaellig: sie beschrieb einen anderen Antennenweg.
+    if (m_hatGemessen && band != m_letztesBand) { m_gebrochen = false; }
+
     m_letzteSwr   = swr;
     m_letzteMs    = jetztMs;
+    m_letztesBand = band;
     m_hatGemessen = true;
 
     if (swr <= m_grenze) { return false; }
@@ -45,17 +51,22 @@ bool SwrRiegel::messung(float swr, float vorwaertsW, qint64 jetztMs)
     return true;
 }
 
-bool SwrRiegel::darfTasten(qint64 jetztMs) const
+bool SwrRiegel::darfTasten(qint64 jetztMs, const QString& band) const
 {
     if (!m_an)          { return true; }
     if (!m_hatGemessen) { return true; }   // Abwesenheit ist keine Aussage
+    // Die Messung gehoert zu EINEM Antennenweg. Fragt jemand fuer ein
+    // anderes Band, liegt fuer dieses Band keine Messung vor — und
+    // Abwesenheit ist keine Aussage. (2026-10-31: EINE Messung auf
+    // 20 m sperrte 15 m mit.)
+    if (band != m_letztesBand) { return true; }
     if ((jetztMs - m_letzteMs) >= kHaltbarkeitMs) { return true; }
     return m_letzteSwr <= m_grenze;
 }
 
-QString SwrRiegel::grund(qint64 jetztMs) const
+QString SwrRiegel::grund(qint64 jetztMs, const QString& band) const
 {
-    if (darfTasten(jetztMs)) { return {}; }
+    if (darfTasten(jetztMs, band)) { return {}; }
     return QStringLiteral("Stehwelle %1 ueber der Grenze %2")
         .arg(m_letzteSwr, 0, 'f', 2)
         .arg(m_grenze, 0, 'f', 2);
@@ -64,6 +75,15 @@ QString SwrRiegel::grund(qint64 jetztMs) const
 void SwrRiegel::zuruecksetzen()
 {
     m_gebrochen = false;
+}
+
+void SwrRiegel::vergessen()
+{
+    m_gebrochen   = false;
+    m_hatGemessen = false;
+    m_letzteSwr   = 0.0f;
+    m_letzteMs    = 0;
+    m_letztesBand.clear();
 }
 
 }  // namespace Longpath::safety
