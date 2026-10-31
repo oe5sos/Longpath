@@ -1086,9 +1086,15 @@ void Ft8Applet::merkeAnrufFallsNoetig(const QString& nachricht, int snr)
     }
 }
 
-bool Ft8Applet::rufeNaechstenWartenden()
+// Den naechsten Wartenden ANFANGEN, ohne zu senden.
+//
+// Getrennt von `rufeNaechstenWartenden`, weil es einen zweiten
+// Aufrufer gibt, der schon mitten in einem Sendefenster steht und den
+// Zug selbst packt (siehe die Dekoderfrist in `sendeNachricht`). Der
+// darf hier nicht `ablaufSchritt()` ausloesen -- das wuerde mitten im
+// laufenden Fenster ein zweites anfangen.
+bool Ft8Applet::beginneNaechstenWartenden()
 {
-    if (m_sendet) { return false; }
     const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
     const Ft8Warteschlange::Wartend w = m_schlange.nimmNaechsten(jetzt);
     if (w.partner.isEmpty()) { return false; }
@@ -1100,6 +1106,13 @@ bool Ft8Applet::rufeNaechstenWartenden()
     qCInfo(lcFt8Senden).noquote()
         << "Aus der Schlange:" << w.partner << "— noch"
         << m_schlange.wartende(jetzt) << "wartend";
+    return true;
+}
+
+bool Ft8Applet::rufeNaechstenWartenden()
+{
+    if (m_sendet) { return false; }
+    if (!beginneNaechstenWartenden()) { return false; }
     ablaufSchritt();
     return true;
 }
@@ -1851,6 +1864,51 @@ void Ft8Applet::sendeNachricht(const QString& text,
         // Darum wird hier, nach der Dekoderfrist, nochmal gefragt.
         // Nur bei einer Sendung aus dem Ablauf: wer Tx1…Tx6 oder
         // „Send" drueckt, will genau das senden, was dort steht.
+        // ── Und wenn das QSO in der Frist ZU ENDE ging (2026-10-31) ─
+        //
+        // Die Nachpruefung darunter fragt seit jeher nur, ob sich der
+        // ZUG geaendert hat. Den Fall „es gibt keinen Zug mehr“ kannte
+        // sie nicht: `laeuft()` ist bei `Fertig` und `Abgebrochen`
+        // falsch, also fiel sie ganz aus -- und die vor 13 s gepackte
+        // Nachricht ging trotzdem hinaus.
+        //
+        // Am Geraet gemessen (2026-10-31, Betreiber-Mitschnitt):
+        //   054100  Tx  R5AV OE5SOS +15
+        //   054115      OE5SOS R5AV RR73     <- er ist fertig
+        //   054130  Tx  R5AV OE5SOS +15      <- trotzdem nochmal
+        //   054200  Tx  UA3IHJ OE5SOS +15    <- der Wartende erst jetzt
+        //
+        // UA3IHJ hatte um 054045 gerufen. Der Zug um 054130 war nicht
+        // nur fuer nichts -- er hat dem Wartenden sein Fenster
+        // weggenommen, und 75 s nach seinem Ruf ist er laengst
+        // woanders. Danach ruft der Ablauf ihn fuenfmal ins Leere.
+        //
+        // Also: nicht senden -- und wenn jemand wartet, bekommt er
+        // GENAU DIESES Fenster. Gepackt wird unten, mit demselben
+        // Weg, der auch den gewechselten Zug packt.
+        //
+        // Nur im einfachen Betrieb: mit mehreren Plaetzen fuehrt
+        // `Ft8Mehrfach` die Ablaeufe, und `m_ablauf` ist dort der
+        // CQ-Ruf, nicht das QSO.
+        if (ausAblauf && !m_ablauf.laeuft() && !mehrfachAn()) {
+            if (m_ablauf.zustand() == Ft8Ablauf::Zustand::Fertig) {
+                // Erst ins Logbuch, dann den Platz raeumen. `zeigeAblauf`
+                // tut das sonst; hier kommt der naechste Ablauf dazwischen.
+                meldeFertigesQso();
+            }
+            if (!beginneNaechstenWartenden()) {
+                qCInfo(lcFt8Senden).noquote()
+                    << "Zug verworfen: das QSO ging in der Dekoderfrist"
+                       " zu Ende, und niemand wartet";
+                abbrechen();
+                zeigeAblauf();
+                return;
+            }
+            qCInfo(lcFt8Senden).noquote()
+                << "QSO in der Frist beendet — der Wartende bekommt"
+                   " dieses Fenster statt des naechsten";
+        }
+
         if (ausAblauf && m_ablauf.laeuft()) {
             const QString neu = m_ablauf.naechsteNachricht();
             if (!neu.isEmpty() && neu != gesendet) {

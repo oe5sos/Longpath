@@ -116,6 +116,8 @@ void SpotModel::applySpotStatus(int index, const QMap<QString, QString>& kvs)
             spot.lifetimeSeconds = val.toInt();
         else if (key == "priority")
             spot.priority = val.toInt();
+        else if (key == "snr")
+            spot.snrDb = val.toInt();
     }
 
     if (isNew)

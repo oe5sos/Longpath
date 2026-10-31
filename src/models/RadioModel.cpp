@@ -2750,7 +2750,26 @@ void RadioModel::meldeEigenenFund(const DxSpot& spot,
 
     if (m_spotModel) {
         const int idx = m_spotModel->dedupIndexFor(spot.dxCall, spot.freqMhz);
-        m_spotModel->applySpotStatus(idx, kvsFromSpot(spot, lifetime, color));
+        // ── Wie stark kommt er an (2026-10-31) ──────────────
+        //
+        // Betreiber: „ich will sehen, wie gut sein signal bei mir
+        // ankommt. so kann ich entscheiden, ob ich es probiere oder ob
+        // es schierig wird."
+        //
+        // Der Dekoder MISST den Stoerabstand und gibt ihn weiter -- auf
+        // dem Weg zum Panadapter ging er bisher verloren: `kvsFromSpot`
+        // traegt Rufzeichen, Frequenz, Quelle und Bemerkung mit, aber
+        // nicht `snr`. Darum stand ueber dem Wasserfall ein Rufzeichen
+        // ohne jede Auskunft darueber, ob sich der Versuch lohnt.
+        //
+        // Nur HIER, nicht in `kvsFromSpot`: ein Cluster-Spot traegt
+        // keinen gemessenen Wert, und `DxSpot::snr` steht dann auf 0 --
+        // das waere eine Zahl, die niemand gemessen hat, und 0 dB ist
+        // bei FT8 ein ganz gewoehnlicher Pegel. Die eigenen Dekoder
+        // (FT8/FT4/RTTY) messen immer.
+        QMap<QString, QString> kvs = kvsFromSpot(spot, lifetime, color);
+        kvs[QStringLiteral("snr")] = QString::number(spot.snr);
+        m_spotModel->applySpotStatus(idx, kvs);
     }
 
     // Und in den Sammler „was mein Geraet gerade gehoert hat".

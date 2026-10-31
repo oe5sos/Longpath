@@ -47,9 +47,17 @@
 namespace Longpath {
 
 // From AetherSDR src/models/SpotModel.h:10-25 [@0cd4559]
+/// „Keine Angabe" — ein Fund aus dem Cluster traegt keinen
+/// Stoerabstand, und 0 dB waere dort eine Zahl, die niemand gemessen
+/// hat. Nur die eigenen Dekoder (FT8/FT4/RTTY) setzen ihn.
+inline constexpr int kSpotKeinSnr = -999;
+
 struct SpotData {
     int index{-1};
     QString callsign;
+    /// Wie stark er bei MIR ankommt, in dB. `kSpotKeinSnr`, wenn ihn
+    /// niemand gemessen hat.
+    int snrDb{kSpotKeinSnr};
     double rxFreqMhz{0.0};
     double txFreqMhz{0.0};
     QString mode;

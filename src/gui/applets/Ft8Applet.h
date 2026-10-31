@@ -572,6 +572,7 @@ private:
 
     Ft8Warteschlange m_schlange;
     /// Den naechsten Wartenden anrufen. Gibt true, wenn einer da war.
+    bool beginneNaechstenWartenden();
     bool rufeNaechstenWartenden();
     /// Einen gehoerten Anruf in die Schlange legen, wenn er gerade
     /// nicht bedient werden kann.

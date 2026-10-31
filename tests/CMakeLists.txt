@@ -942,6 +942,7 @@ longpath_add_test(tst_slice_auto_agc)
 
 # ── Phase 3G-10 Stage 2: WDSP wiring — EMNR (NR2) ────────────────────────
 longpath_add_test(tst_rxchannel_emnr)
+longpath_add_test(tst_emnr_zeta_grenze)
 longpath_add_test(tst_slice_emnr)
 
 # ── Phase 3G-10 Stage 2: WDSP wiring — SNB ───────────────────────────────
@@ -5540,6 +5541,17 @@ longpath_add_test(tst_feldbetrieb)
 # weil es nur Laeufe fuer die Flaeche und fuer die Regeln gab -- den
 # Anschluss zwischen beiden fuhr niemand.
 longpath_add_test(tst_ft8_plaetze_weg)
+
+# ── 2026-10-31: wie stark kommt er an ───────────────────────
+# Zwei der vier Faelle lesen die Quelle (die Verdrahtung vom eigenen
+# Dekoder bis zur Beschriftung laesst sich ohne Geraet nicht fahren).
+# Ohne die ENVIRONMENT-Zeile ueberspringen sie sich STILL und melden
+# trotzdem gruen — am 2026-10-30 zweimal in dieselbe Falle getreten.
+longpath_add_test(tst_spot_signalstaerke)
+if(TEST tst_spot_signalstaerke)
+    set_tests_properties(tst_spot_signalstaerke PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 longpath_add_test(tst_abbau_ueberlebt)
 # 2026-10-15: moos.json nannte zwei Rollen, die es im Programm nicht
 # gibt — still uebergangen, also seit dem ersten Tag wirkungslos.
@@ -5591,6 +5603,16 @@ longpath_add_test(tst_ft8_am_ton)
 longpath_add_test(tst_ft8_ablauf)
 
 longpath_add_test(tst_ft8_senden)
+
+# ── 2026-10-31: das QSO endet in der Dekoderfrist ─────────────
+# Zwei der vier Faelle lesen die Quelle: die Nachpruefung sitzt in
+# einer Lambda im Sendetaktgeber und ist ohne Geraet nicht zu fahren.
+# Ohne die ENVIRONMENT-Zeile ueberspringen sie sich STILL.
+longpath_add_test(tst_ft8_frist_qso_endet)
+if(TEST tst_ft8_frist_qso_endet)
+    set_tests_properties(tst_ft8_frist_qso_endet PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 longpath_add_test(tst_ft8_sendeplan)
 longpath_add_test(tst_ft8_tonwahl)
 longpath_add_test(tst_ft8_warteschlange)
