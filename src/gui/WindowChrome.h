@@ -81,6 +81,27 @@ public:
 signals:
     void closeRequested();
     void dockRequested();
+    /// Das Zahnrad wurde gedrueckt. Siehe `setOptionsVisible`.
+    void optionsRequested();
+
+public:
+    // ── Das Zahnrad im Kopf (2026-10-31) ─────────────────────────────
+    //
+    // Betreiber: „bei der frequenz noch immer keine optionen" -- mit
+    // einem Bildschirmfoto, auf dem das Frequenz-Panel als
+    // SCHWEBENDES Fenster steht.
+    //
+    // Am selben Tag war `FrequencyApplet::hasExtendedSettings()` auf
+    // true gesetzt worden, und in der Applet-SPALTE erscheint das
+    // Zahnrad seither (`GridCellWidget.cpp:235`). Diese Titelleiste
+    // kannte aber gar keinen solchen Knopf: ein Applet, das der
+    // Betreiber aus der Spalte herausgezogen hat, kam damit nicht
+    // mehr an seine eigenen Optionen.
+    //
+    // Vorgabe aus: nur wer `hasExtendedSettings()` meldet, bekommt
+    // ihn. Platz: vor Schloss/Zoom/Andocken/Schliessen, damit das
+    // Kreuz ganz rechts bleibt, wo es hingehoert.
+    void setOptionsVisible(bool on);
 
 public:
     // ── Volle Groesse ────────────────────────────────────────────────
@@ -105,6 +126,8 @@ protected:
 
 private:
     void applyLockVisuals();
+
+    QPushButton* m_optionsBtn{nullptr};
 
     QLabel*      m_label{nullptr};
     QPushButton* m_lockBtn{nullptr};

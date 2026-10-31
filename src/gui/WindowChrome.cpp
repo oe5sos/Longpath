@@ -97,6 +97,27 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
 
     // Volle Groesse / zurueck — Begruendung am toggleZoom() im Header.
     m_zoomBtn = new QPushButton(QStringLiteral("⤢"), this);
+    // ── Das Zahnrad (2026-10-31) ────────────────────────────────────
+    //
+    // Siehe `setOptionsVisible` im Kopf: ein schwebendes Applet kam
+    // bis heute nicht an seine eigenen Optionen. Gleiche Kantenlaenge
+    // und gleiches Stilblatt wie die drei daneben -- auch das
+    // `padding: 0`, aus demselben Grund (vierter Fall derselben
+    // Falle, siehe unten).
+    m_optionsBtn = new QPushButton(QStringLiteral("⚙"), this);
+    m_optionsBtn->setFixedSize(16, 16);
+    m_optionsBtn->setToolTip(tr("Options"));
+    m_optionsBtn->setCursor(Qt::ArrowCursor);
+    m_optionsBtn->setStyleSheet(
+        QStringLiteral("QPushButton { color: %1; background: transparent;"
+                       " border: none; font-size: 11px; padding: 0; }"
+                       "QPushButton:hover { background: %2; }")
+            .arg(Style::kTextPrimary, Style::kButtonHover));
+    m_optionsBtn->setVisible(false);   // nur, wer welche hat
+    connect(m_optionsBtn, &QPushButton::clicked, this,
+            &WindowTitleBar::optionsRequested);
+    lay->addWidget(m_optionsBtn);
+
     m_zoomBtn->setFixedSize(16, 16);
     m_zoomBtn->setToolTip(tr("Full size -- clicking again "
                                          "restores the previous size"));
@@ -144,6 +165,11 @@ WindowTitleBar::WindowTitleBar(const QString& title, QWidget* parent)
     lay->addWidget(close);
 
     applyLockVisuals();   // offenes Schloss, richtiger Zeiger
+}
+
+void WindowTitleBar::setOptionsVisible(bool on)
+{
+    if (m_optionsBtn) { m_optionsBtn->setVisible(on); }
 }
 
 void WindowTitleBar::setTitle(const QString& title)
