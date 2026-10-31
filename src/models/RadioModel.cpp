@@ -7230,6 +7230,12 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                         m_flexHatArtNachzutragen = false;
                         setFlexSliceMode(m_flexArtNachzutragen);
                     }
+                    if (m_flexHatRauschsperreNachzutragen) {
+                        m_flexHatRauschsperreNachzutragen = false;
+                        sendeFlexRauschsperre(
+                            m_flexRauschsperreAnNachzutragen,
+                            m_flexRauschsperreStufeNachzutragen);
+                    }
                     if (m_flexHatFlankenNachzutragen) {
                         m_flexHatFlankenNachzutragen = false;
                         setFlexSliceFilter(m_flexFlankeTiefNachzutragen,
@@ -7416,6 +7422,43 @@ bool RadioModel::setzeFlexSendescheibe(const QString& sliceId)
     qCInfo(lcConnection).nospace()
         << "Flex: Scheibe " << sliceId << " ist jetzt die Sendescheibe";
     return true;
+}
+
+void RadioModel::sendeFlexRauschsperre(bool an, double stufe0bis100)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    // ── Die Scheibennummer kommt spaeter als der Wunsch (2026-10-31) ──
+    //
+    // Beim Anmelden zieht `MainWindow_Flex` Leistung UND Rauschsperre
+    // einmal nach, damit sie nicht auf eine Reglerbewegung warten
+    // muessen. Gemessen an Martins Protokoll lag dieser Griff 143 ms
+    // VOR der ersten Scheibenmeldung der Maschine
+    // (19:54:36.430 gegen 19:54:36.573) -- `m_flexSliceId` war also
+    // noch leer, und die Rauschsperre fiel still hier heraus. Der
+    // Knopf stand auf an, die Maschine behielt, was sie hatte.
+    //
+    // Also merken statt verwerfen, genau wie Art und Flanken es
+    // oben schon tun; nachgereicht wird in der Scheibenmeldung.
+    if (m_flexSliceId.isEmpty()) {
+        m_flexRauschsperreAnNachzutragen    = an;
+        m_flexRauschsperreStufeNachzutragen = stufe0bis100;
+        m_flexHatRauschsperreNachzutragen   = true;
+        qCInfo(lcConnection) << "Flex: Rauschsperre vorgemerkt — "
+                                "die Scheibennummer fehlt noch";
+        return;
+    }
+    m_flexHatRauschsperreNachzutragen = false;
+
+    const QString b1 = FlexCommandWire::setSliceSquelchCommand(m_flexSliceId, an);
+    if (!b1.isEmpty()) { m_flexConnection->sendCommand(b1); }
+
+    const int stufe = std::clamp(static_cast<int>(std::lround(stufe0bis100)), 0, 100);
+    const QString b2 =
+        FlexCommandWire::setSliceSquelchLevelCommand(m_flexSliceId, stufe);
+    if (!b2.isEmpty()) { m_flexConnection->sendCommand(b2); }
+
+    qCInfo(lcConnection).nospace()
+        << "Flex: Rauschsperre " << (an ? "an" : "aus") << ", Stufe " << stufe;
 }
 
 QString RadioModel::flexSwrBandKennung() const
@@ -13827,6 +13870,15 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
         if (rxCh) {
             rxCh->setSsqlEnabled(on);
         }
+        // ── Und bei der Flex die ihre (2026-10-31) ──────────────────
+        //
+        // Betreiber: „der funktioniert nicht", „schieberegler ohne
+        // änderung". Richtig: eine Flex-Scheibe ist eine Scheibe OHNE
+        // `RxChannel` (`MainWindow_Flex.cpp:45`), der Regler hatte also
+        // kein Ziel. Die Maschine hat eine eigene Rauschsperre --
+        // `squelch` / `squelch_level`, beides am selben Tag direkt von
+        // ihr gelesen.
+        sendeFlexRauschsperre(on, slice->ssqlThresh());
         scheduleSettingsSave();
     });
     connect(slice, &SliceModel::ssqlThreshChanged, this, [this, slice](double threshold) {
@@ -13837,6 +13889,9 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
             double normalized = std::clamp(threshold / 100.0, 0.0, 1.0);
             rxCh->setSsqlThresh(normalized);
         }
+        // Siehe oben: die Flex nimmt die Stufe als 0..100, also genau
+        // die Einheit des Schiebers.
+        sendeFlexRauschsperre(slice->ssqlEnabled(), threshold);
         scheduleSettingsSave();
     });
 

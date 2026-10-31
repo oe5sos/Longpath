@@ -315,6 +315,12 @@ QString xmitCommand(bool tasten);
 // ihr das Senden, ohne eine andere zu bestimmen.
 QString setSliceTxCommand(const QString& sliceId, bool sendet);
 
+/// Die Rauschsperre der Maschine. Beide Schluessel sind am 2026-10-31
+/// direkt von der FLEX-8400 gelesen (`squelch`, `squelch_level`), die
+/// Stufe laeuft von 0 bis 100 -- wie unser Schieber.
+QString setSliceSquelchCommand(const QString& sliceId, bool an);
+QString setSliceSquelchLevelCommand(const QString& sliceId, int stufe);
+
 // Sendeleistung und Abstimmleistung in Prozent, wie die Maschine sie
 // im `transmit`-Zustand meldet (`rfpower=`, `tunepower=`).
 //
@@ -535,6 +541,15 @@ private:
     bool    m_mayCreateSlice{true};
     bool    m_guiRegistered{false};
     QMap<quint32, ResponseCallback> m_pending;
+    /// Der Wortlaut jedes abgeschickten Befehls, bis seine Antwort da
+    /// ist. Ohne ihn nennt eine Ablehnung nur ihre laufende Nummer --
+    /// und genau das stand am 2026-10-31 in Martins Protokoll
+    /// („Befehl 1 abgelehnt"), waehrend die Frage war, WELCHER Befehl.
+    /// Begrenzt auf kWortlautDecke Eintraege, damit eine Maschine, die
+    /// nie antwortet, den Speicher nicht fuellt.
+    static constexpr int kWortlautDecke = 512;
+    QMap<quint32, QString> m_wortlaut;
+    QList<quint32>         m_wortlautReihe;
 };
 
 }  // namespace Longpath
