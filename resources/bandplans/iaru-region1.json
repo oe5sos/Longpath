@@ -69,7 +69,8 @@
     {"low": 50.100, "high": 50.500, "label": "SSB/DIGI", "license": "", "color": "#30b030"},
     {"low": 50.500, "high": 51.000, "label": "ALL", "license": "", "color": "#ffd000"},
     {"low": 51.000, "high": 52.000, "label": "FM/RPT", "license": "", "color": "#ffd000"},
-    {"low": 52.000, "high": 54.000, "label": "ALL", "license": "", "color": "#ff8000"}
+    {"low": 52.000, "high": 54.000, "label": "ALL", "license": "", "color": "#ff8000"},
+    {"low": 144.000, "high": 146.000, "label": "2m", "license": "", "color": "#30b030"}
   ],
   "spots": [
     {"freq": 1.836, "label": "CW QRP CoA"},
