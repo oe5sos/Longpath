@@ -51,6 +51,7 @@ private slots:
     void moxController_moxStateChanged_firesOnTxToRxWalk();
     void moxController_manualMoxChanged_firesOnSetTune();
     void transmitModel_tunePowerForBand_storesPerBand();
+    void derAbstimmreglerSchreibtBeideHaelften();
 };
 
 // 1. TransmitModel::setPower / power() round-trip
@@ -202,6 +203,46 @@ void TestTxAppletTuneWiring::transmitModel_tunePowerForBand_storesPerBand()
     QCOMPARE(tx.tunePowerForBand(Band::Band40m),  15);
     QCOMPARE(tx.tunePowerForBand(Band::Band20m),  20);
     QCOMPARE(tx.tunePowerForBand(Band::Band10m),  25);
+}
+
+// ── Der Regler war stumm (2026-10-31) ───────────────────────────────
+//
+// Betreiber: „ich tune mit 1 watt und oben steht kurz ueber 23 watt."
+// Am Regler stand 1, an die Flex ging 10 -- im Protokoll um 14:52:27
+// woertlich: „abstimmen 10 %".
+//
+// Der Leistungsregler schreibt seit jeher ein PAAR: `setPower`
+// (global, MELDET ueber `powerChanged`) und `setPowerForBand`
+// (Speicher). Der Abstimmregler schrieb nur die zweite Haelfte, also
+// feuerte `tunePowerChanged` nie -- und die Flex-Verdrahtung haengt
+// genau daran.
+//
+// Dieser Lauf liest die Quelle, weil ein `TxApplet` ein RadioModel
+// und einen Schirm braucht und `QMenu`/Fensterwege auf macOS im
+// Pruefstand eigene Fallen haben (2026-10-15). Was er festhaelt, ist
+// die PAARIGKEIT: wer die eine Haelfte schreibt, schreibt auch die
+// andere. Faellt er, ist der Regler wieder stumm.
+void TestTxAppletTuneWiring::derAbstimmreglerSchreibtBeideHaelften()
+{
+    const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+    if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+    QFile f(QString::fromLocal8Bit(root)
+            + QStringLiteral("/src/gui/applets/TxApplet.cpp"));
+    QVERIFY2(f.open(QIODevice::ReadOnly), qPrintable(f.fileName()));
+    const QString src = QString::fromUtf8(f.readAll());
+
+    const int a = src.indexOf(QStringLiteral("m_tunePwrSlider, &QSlider::valueChanged"));
+    QVERIFY2(a > 0, "der Abstimmregler haengt an nichts mehr");
+    const int e = src.indexOf(QStringLiteral("\n    });"), a);
+    QVERIFY(e > a);
+    const QString rumpf = src.mid(a, e - a);
+
+    QVERIFY2(rumpf.contains(QStringLiteral("setTunePowerForBand")),
+             "der Bandwert wird nicht mehr geschrieben");
+    QVERIFY2(rumpf.contains(QStringLiteral("tx.setTunePower(")),
+             "der Regler schreibt nur den Bandwert — `tunePowerChanged` "
+             "feuert nicht, und die Flex-Verdrahtung erfaehrt von der "
+             "Einstellung nichts (Befund des Betreibers, 2026-10-31)");
 }
 
 QTEST_MAIN(TestTxAppletTuneWiring)

@@ -2939,6 +2939,13 @@ longpath_add_test(tst_rx_meter_offset)
 # since QWidget requires a display server.
 # Derives from Thetis console.cs:4822 + 12094 + 29978-30157 [v2.10.3.13].
 longpath_add_test(tst_tx_applet_tune_wiring)
+# `derAbstimmreglerSchreibtBeideHaelften` liest `TxApplet.cpp` als Datei.
+# Ohne diesen Pfad ueberspraenge er sich still -- und ein Waechter, der
+# sich still ueberspringt, waecht nicht (2026-10-31).
+if(TEST tst_tx_applet_tune_wiring)
+    set_tests_properties(tst_tx_applet_tune_wiring PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 
 # ── RF Power per-band persistence wiring (regression) ────────────────────────
 # Drives a real TxApplet QWidget so QApplication is required.  Covers:
