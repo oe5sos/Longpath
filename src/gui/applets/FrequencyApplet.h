@@ -20,12 +20,15 @@
 // Modification history (Longpath):
 //   2026-08-17 — Created in C++20/Qt6 for NereusSDR by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Cowork).
+//   2026-10-31 — Die Anzeigeschalter auch ins Zahnrad des Panelkopfs.
 // =================================================================
 
 #include "gui/applets/AppletWidget.h"
 #include "gui/instruments/BarInstrument.h"
 #include "gui/instruments/FrequencyInstrument.h"
 #include "gui/widgets/VfoTileRow.h"
+
+class QMenu;
 
 namespace Longpath {
 
@@ -97,6 +100,28 @@ public:
     void saveState() const;
     void restoreState();
 
+    // ── Die Optionen gehoeren ins Zahnrad (2026-10-31) ───────────────
+    //
+    // Betreiber: „frequency widget bitte mit option ausstatten, was
+    // alles genau angezeigt werden soll. entweder nur frequenz, oder
+    // mit swr, oder mit leistung usw."
+    //
+    // Fuenf Schalter gab es dafuer schon (Kacheln, A/B-Zeile,
+    // Leistung, SWR, S-Meter), seit dem 2026-08-23 und dem
+    // 2026-08-30 — aber NUR hinter der rechten Maustaste. Martins
+    // Regel vom 2026-09-20 lautet: Optionen stehen rechts oben im
+    // Panelkopf, hinter dem Zahnrad. `GridCellWidget` zeigt dieses
+    // Zahnrad genau dann, wenn `hasExtendedSettings()` wahr ist
+    // (`GridCellWidget.cpp:235`) — hier stand der Vorgabewert false,
+    // und damit war der Knopf nie da. Wer nicht weiss, dass man
+    // rechts klicken muss, findet nichts; er hat es nicht gefunden.
+    //
+    // Darum dasselbe Menue an BEIDEN Stellen, aus einer Quelle:
+    // `baueOptionsMenue()`. Die rechte Maustaste bleibt, sie stoert
+    // niemanden.
+    bool hasExtendedSettings() const override { return true; }
+    void openExtendedSettings() override;
+
 protected:
     void contextMenuEvent(QContextMenuEvent* ev) override;
 
@@ -113,6 +138,9 @@ private slots:
 
 private:
     void applyRowVisibility();
+    /// Das Menue der Anzeigeschalter. Eine Quelle fuer das Zahnrad im
+    /// Panelkopf und fuer die rechte Maustaste.
+    QMenu* baueOptionsMenue(QWidget* parent);
 
     VfoTileRow*          m_tiles{nullptr};
     FrequencyInstrument* m_instrument{nullptr};
