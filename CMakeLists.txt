@@ -568,6 +568,10 @@ set(CORE_SOURCES
     src/core/CatProtocol.cpp
     src/core/RigctldServer.cpp
     src/core/ThetisProfilImport.cpp
+    src/core/ProfilHerkunft.cpp
+    src/core/strip/ZeusKanalzug.cpp
+    src/core/ZeusProfilImport.cpp
+    src/core/ZeusAbfrage.cpp
     src/core/CatPuffer.cpp
     src/core/CatPtyServer.cpp
     src/core/CatServer.cpp

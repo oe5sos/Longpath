@@ -68,6 +68,7 @@ class QTabWidget;
 class QVBoxLayout;
 class QTimer;
 class QWidget;
+class QJsonObject;
 
 namespace Longpath {
 
@@ -210,6 +211,11 @@ private:
     // Ein Kanalzugprofil aus AetherSDR. Unsere Grafik, seine
     // Einstellungen -- siehe core/strip/AetherPreset.h.
     void importAetherPreset();
+    /// Die Kette bei einer laufenden Zeus-Maschine abholen.
+    void holeVonZeus();
+    /// Ein gelesenes Zeus-Profil anwenden und berichten. Getrennt vom
+    /// Holen, damit ein Prueffall den Weg ohne Netz fahren kann.
+    void wendeZeusProfilAn(const QJsonObject& profil);
     void rebuildPresetBox(const QString& select = QString());
     void saveUserPreset();
     void deleteUserPreset();
@@ -390,6 +396,10 @@ private:
     QPushButton*    m_presetSave{nullptr};
     QPushButton*    m_presetDelete{nullptr};
     QPushButton*    m_aetherImport{nullptr};
+    /// „Von Zeus…" (2026-10-31). Eigener Knopf und nicht derselbe
+    /// Dateidialog, weil Zeus keine Profildatei hat: seine Kette steht
+    /// nur bei der laufenden Maschine. Siehe ZeusKanalzug.h.
+    QPushButton*    m_zeusHolen{nullptr};
     // Welche eigene Kette beim nächsten Druck auf „Löschen" wirklich
     // gelöscht wird. Leer heißt: der nächste Druck fragt erst.
     QString         m_presetDeleteArmed;

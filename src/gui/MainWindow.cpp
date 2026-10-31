@@ -2318,6 +2318,29 @@ void MainWindow::bringAppletToFront(const QString& id)
             m_sideArea->activateWindow();
             return;
         }
+        // ── Fenster, die kein Applet sind (2026-10-31) ───────────────
+        //
+        // Der Kanalzug ist ein eigener Dialog (`m_stripWindow`, ueber
+        // openChannelStrip), kein Applet in einer Spalte. Er steht
+        // darum weder in `m_floatingApplets` noch in `m_appletsById`
+        // und fiel unten durch „no applet/column" — ohne Wirkung und
+        // ohne dass dem Betreiber etwas gesagt wurde.
+        //
+        // Am Geraet gesehen: das Fenster war offen (ein Profilwechsel
+        // hatte es geoeffnet), lag aber hinter dem Hauptfenster. Der
+        // Menueintrag war damit angehakt, also schaltete ein Klick ihn
+        // AUS statt das Fenster zu holen, und ein zweiter baute es neu
+        // auf — wieder dahinter. Es gab keinen Weg mehr heran.
+        if (id == QLatin1String("WinChannelStrip") && m_stripWindow) {
+            m_stripWindow->show();
+            fitIntoAvailableScreen(m_stripWindow);
+            m_stripWindow->raise();
+            m_stripWindow->activateWindow();
+            qCInfo(lcContainer).nospace()
+                << "bringAppletToFront(" << id << "): own dialog";
+            return;
+        }
+
         QWidget* front = m_floatingApplets.value(id, nullptr);
         QString weg = QStringLiteral("floating");
         if (!front) {

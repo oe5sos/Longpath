@@ -1939,6 +1939,22 @@ longpath_add_test(tst_neues_feld_schaltet_sich_nicht_ein)
 longpath_add_test(tst_schwarzer_hintergrund)
 longpath_add_test(tst_multi_rx_pegel)
 longpath_add_test(tst_thetis_profil_import)
+# 2026-10-31: zwei Profilimporteure an zwei Orten, und keiner konnte
+# die Datei des anderen auch nur benennen. Der Erkenner davor sagt,
+# woher eine Datei kommt und wohin sie gehoert — am INHALT, nie an der
+# Endung.
+longpath_add_test(tst_profil_herkunft)
+# 2026-10-31: Zeus hat kein Austauschformat — seine TX-Audio-Profile
+# stehen nur bei der laufenden Maschine, hinter
+# /api/tx-audio-profiles. Dieser Stand faehrt den ganzen Weg OHNE
+# NETZ: eine Antwort hinein, Profile und Hinweise heraus.
+longpath_add_test(tst_zeus_profil_import)
+# 2026-10-31, nachmittags: Zeus' Audio-Suite IST lesbar — die Schlüssel
+# stehen im Klartext in der Antwort der laufenden Maschine. Dieser
+# Stand fährt sie gegen eine ECHTE Antwort
+# (tests/daten/zeus-tx-audio-profiles.json), und genau die hat sofort
+# gezeigt, dass Zeus jeden Wert als ZEICHENKETTE schickt.
+longpath_add_test(tst_zeus_kanalzug)
 longpath_add_test(tst_cat_verdrahtung)
 # Die drei Knoepfe links oben: zweimal gemeldet, einmal auf einem nie
 # gepushten Zweig verloren, und die Behebung von damals war ausserdem
