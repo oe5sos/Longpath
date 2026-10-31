@@ -35,6 +35,7 @@
 //                 Fischer, AI-assisted via Anthropic Claude.
 // =================================================================
 
+#include "gui/StyleConstants.h"
 #include <functional>
 
 #include <QList>
@@ -82,8 +83,15 @@ QPoint snappedTopLeft(const QPoint& pos, int grid = kSnapGridPx);
 // auseinanderreissen; eine gemeinsame Kante rundet so bei beiden gleich.
 // Nie kleiner als minSize: dann wandert die rechte/untere Kante ein
 // Raster weiter hinaus.
+/// `abstand` ist die Luft, die das Raster selbst mitbringt: die nahe
+/// Kante (links/oben) liegt auf der Rasterlinie, die ferne (rechts/
+/// unten) um so viel davor. Zwei Fenster an derselben Linie haben damit
+/// genau `abstand` Luft, und alle Kanten bleiben auf dem Raster — siehe
+/// die Messung vom 2026-10-31 im Rumpf. `abstand = 0` gibt das alte
+/// Verhalten (buendig).
 QRect snappedFrameRect(const QRect& frame, const QSize& minSize = QSize(),
-                       int grid = kSnapGridPx);
+                       int grid = kSnapGridPx,
+                       int abstand = Style::kFensterLuftPx);
 
 // ── Zwei Punkte Luft (2026-10-15 / 2026-10-21) ───────────────────────
 //
