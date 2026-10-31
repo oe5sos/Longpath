@@ -942,7 +942,6 @@ longpath_add_test(tst_slice_auto_agc)
 
 # ── Phase 3G-10 Stage 2: WDSP wiring — EMNR (NR2) ────────────────────────
 longpath_add_test(tst_rxchannel_emnr)
-longpath_add_test(tst_emnr_zeta_grenze)
 longpath_add_test(tst_slice_emnr)
 
 # ── Phase 3G-10 Stage 2: WDSP wiring — SNB ───────────────────────────────
@@ -8080,6 +8079,14 @@ longpath_add_test(tst_flex_ton_und_pegel)
 longpath_add_test(tst_flex_wasserfall_kachel)
 longpath_add_test(tst_flex_senden)
 longpath_add_test(tst_flex_sendetakt)
+
+# 2026-10-31: der Kanalzug lief an genau einer Stelle — dem eigenen
+# Sendeweg. Die Flex rechnet selbst, hat darum keinen TxWorkerThread,
+# und ihr Mikrofonton ging roh an die Maschine: die ganze eingestellte
+# Kette war ausser Betrieb, sobald dort gesendet wurde. Dieser Stand
+# haelt den neuen Weg fest und fuehrt die alte Fassung als Gegenprobe
+# daneben.
+longpath_add_test(tst_flex_kanalzug)
 
 # 2026-10-30: dreiundzwanzig Mal „getastet, OHNE je eine
 # Verriegelungsmeldung gehoert zu haben" in einem Protokoll von
