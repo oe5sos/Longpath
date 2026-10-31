@@ -66,6 +66,158 @@ private:
 
 private slots:
 
+    // ── Die Warteschlange ist auch ANGESCHLOSSEN ────────────────────
+    //
+    // Nicht „gibt es", sondern „kommt dort an". Genau diese Pruefung
+    // fehlte bei Multi Answering, und darum lag es Monate fertig und
+    // unerreichbar da (2026-10-30).
+    //
+    // Gefahren wird der gemessene Fall vom 2026-10-30: waehrend des
+    // QSOs mit HB9ZHK rief PD4RJ dreimal und wurde nie beantwortet.
+    void einAnrufWaehrendDesQsosLandetInDerSchlange()
+    {
+        AppSettings::instance().setValue(QStringLiteral("StationCallsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("StationGridSquare"),
+                                         QStringLiteral("JN67"));
+
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        QVERIFY(slice);
+        slice->setFrequency(7074000.0);
+        applet.setSlice(slice);
+
+        // Ein QSO laeuft: HB9ZHK hat auf mein CQ geantwortet.
+        applet.ablaufForTestSchreibend().starteMitAnrufer(
+            QStringLiteral("HB9ZHK"), QStringLiteral("OE5SOS"),
+            QStringLiteral("JN67"), 18, QStringLiteral("JN47"));
+        QCOMPARE(applet.ablaufForTest().partner(),
+                 QStringLiteral("HB9ZHK"));
+
+        const QDateTime fenster =
+            QDateTime::fromMSecsSinceEpoch(999999990000LL, QTimeZone::UTC);
+
+        // Jetzt ruft PD4RJ dazwischen -- dreimal, wie gemessen.
+        for (int i = 0; i < 3; ++i) {
+            QMetaObject::invokeMethod(
+                &applet, "onDecoded", Qt::DirectConnection,
+                Q_ARG(QVector<Longpath::Ft8Decode>,
+                      einFund(QStringLiteral("OE5SOS PD4RJ JO33"), 12.0f)),
+                Q_ARG(QDateTime, fenster));
+        }
+        // Und 9A6T, ohne Locator.
+        QMetaObject::invokeMethod(
+            &applet, "onDecoded", Qt::DirectConnection,
+            Q_ARG(QVector<Longpath::Ft8Decode>,
+                  einFund(QStringLiteral("OE5SOS 9A6T"), 11.0f)),
+            Q_ARG(QDateTime, fenster));
+
+        const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+        QCOMPARE(applet.schlangeForTest().wartende(jetzt), 2);
+
+        // Der Partner des laufenden QSOs steht NICHT in der Schlange.
+        QMetaObject::invokeMethod(
+            &applet, "onDecoded", Qt::DirectConnection,
+            Q_ARG(QVector<Longpath::Ft8Decode>,
+                  einFund(QStringLiteral("OE5SOS HB9ZHK R-14"), 16.0f)),
+            Q_ARG(QDateTime, fenster));
+        QCOMPARE(applet.schlangeForTest().wartende(jetzt), 2);
+
+        // Und ein Abschied legt niemanden an.
+        QMetaObject::invokeMethod(
+            &applet, "onDecoded", Qt::DirectConnection,
+            Q_ARG(QVector<Longpath::Ft8Decode>,
+                  einFund(QStringLiteral("OE5SOS DL9XYZ 73"), 5.0f)),
+            Q_ARG(QDateTime, fenster));
+        QCOMPARE(applet.schlangeForTest().wartende(jetzt), 2);
+
+        // Jetzt der zweite Teil: der naechste Wartende wird gerufen --
+        // und zwar mit dem RAPPORT, nicht mit meinem Locator.
+        QVERIFY(applet.rufeNaechstenWartendenForTest());
+        QCOMPARE(applet.ablaufForTest().partner(), QStringLiteral("PD4RJ"));
+        QCOMPARE(applet.ablaufForTest().zustand(),
+                 Ft8Ablauf::Zustand::SendeReport);
+        QCOMPARE(applet.ablaufForTest().naechsteNachricht(),
+                 QStringLiteral("PD4RJ OE5SOS +12"));
+        QCOMPARE(applet.schlangeForTest().wartende(jetzt), 1);
+    }
+
+    // ── Und man SIEHT, dass jemand wartet ─────────────────────────
+    //
+    // Am 2026-10-30 im Betrieb aufgefallen, eine Minute nachdem die
+    // Schlange zum ersten Mal lief: F5PZT und OE3TVJ warteten, und
+    // beide standen im Protokoll und nirgends sonst. Das
+    // Plaetze-Panel zeigt sie, ist aber ab Werk aus. Eine
+    // Warteschlange, die niemand sieht, ist keine.
+    void dieZahlDerWartendenStehtImKopfDerListe()
+    {
+        AppSettings::instance().setValue(QStringLiteral("StationCallsign"),
+                                         QStringLiteral("OE5SOS"));
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        QVERIFY(slice);
+        slice->setFrequency(7074000.0);
+        applet.setSlice(slice);
+
+        QVERIFY(applet.lastLabelForTest());
+        QVERIFY2(!applet.lastLabelForTest()->text()
+                      .contains(QStringLiteral("waiting")),
+                 "ohne Wartende steht dort nichts von Wartenden");
+
+        applet.ablaufForTestSchreibend().starteMitAnrufer(
+            QStringLiteral("HB9ZHK"), QStringLiteral("OE5SOS"),
+            QStringLiteral("JN67"), 18, QString());
+
+        const QDateTime fenster =
+            QDateTime::fromMSecsSinceEpoch(999999990000LL, QTimeZone::UTC);
+        // Die beiden echten Rufzeichen aus dem Protokoll von 16:09.
+        for (const QString& t : {QStringLiteral("OE5SOS F5PZT JN12"),
+                                 QStringLiteral("OE5SOS OE3TVJ JN78")}) {
+            QMetaObject::invokeMethod(
+                &applet, "onDecoded", Qt::DirectConnection,
+                Q_ARG(QVector<Longpath::Ft8Decode>, einFund(t)),
+                Q_ARG(QDateTime, fenster));
+        }
+
+        const QString kopf = applet.lastLabelForTest()->text();
+        QVERIFY2(kopf.contains(QStringLiteral("2 waiting")),
+                 qPrintable(kopf));
+    }
+
+    // ── Die Spaltenkoepfe (2026-10-30) ───────────────────────────
+    //
+    // Betreiber: „die staerke des signals sollte auch in einer
+    // eigenen spalten sein." Sie IST eine -- es fehlte die
+    // Ueberschrift. Entscheidend ist, dass Kopf und Zeile DIESELBEN
+    // Breiten benutzen: zwei Stellen mit eigenen Zahlen liefen beim
+    // ersten Spaltenwechsel auseinander.
+    void derSpaltenkopfStehtUeberDenSpalten()
+    {
+        const QString kopf = Ft8Applet::spaltenkopf();
+        QVERIFY2(kopf.contains(QStringLiteral("dB")), qPrintable(kopf));
+        QVERIFY(kopf.contains(QStringLiteral("DT")));
+        QVERIFY(kopf.contains(QStringLiteral("Freq")));
+
+        // Die Zahl steht unter ihrer Ueberschrift. Gemessen am ENDE
+        // der Spalte, weil beide rechtsbuendig stehen -- und mit
+        // einem Rauschabstand, der in der Zeile sonst nirgends
+        // vorkommt. Mein erster Versuch suchte „8" und fand die Acht
+        // in „191845".
+        const QString zeile = Ft8Applet::zeilentext(
+            QStringLiteral("191845"), -7, 1.0, 2406,
+            QStringLiteral("LZ1ZF SP4DIS KO13"), QString());
+        QCOMPARE(kopf.indexOf(QStringLiteral("dB")) + 2,
+                 zeile.indexOf(QStringLiteral("-7")) + 2);
+        QCOMPARE(kopf.indexOf(QStringLiteral("Freq")) + 4,
+                 zeile.indexOf(QStringLiteral("2406")) + 4);
+        QCOMPARE(kopf.indexOf(QStringLiteral("DT")) + 2,
+                 zeile.indexOf(QStringLiteral("1.0")) + 3);
+    }
+
     // ── Die Landspalte ───────────────────────────────────────────────
     //
     // Betreiber am 2026-10-21: „vielleicht kann man auch das land
@@ -140,18 +292,32 @@ private slots:
     {
         using Art = Ft8Applet::Zeilenart;
 
-        // an mich + neues Land + CQ -> an mich gewinnt
-        QCOMPARE(Ft8Applet::zeilenart(true, true, true), Art::AnMich);
-        // an mich allein
-        QCOMPARE(Ft8Applet::zeilenart(true, false, false), Art::AnMich);
+        // an mich schlaegt alles
+        QCOMPARE(Ft8Applet::zeilenart(true, true, true, true), Art::AnMich);
+        QCOMPARE(Ft8Applet::zeilenart(true, false, false, false),
+                 Art::AnMich);
         // neues Land OHNE CQ -> trotzdem hervorgehoben
-        QCOMPARE(Ft8Applet::zeilenart(false, true, false), Art::NeuesLand);
+        QCOMPARE(Ft8Applet::zeilenart(false, true, false, false),
+                 Art::NeuesLand);
         // neues Land MIT CQ -> das Land schlaegt das CQ
-        QCOMPARE(Ft8Applet::zeilenart(false, true, true), Art::NeuesLand);
+        QCOMPARE(Ft8Applet::zeilenart(false, true, false, true),
+                 Art::NeuesLand);
+        // ── Das neue Grossfeld (2026-10-30) ───────────────────
+        //
+        // Zwischen Land und CQ. Ein fehlendes LAND ist mehr wert als
+        // ein fehlendes Feld -- wer beides hat, will das Land sehen.
+        QCOMPARE(Ft8Applet::zeilenart(false, true, true, false),
+                 Art::NeuesLand);
+        QCOMPARE(Ft8Applet::zeilenart(false, false, true, false),
+                 Art::NeuesGrid);
+        // ... und es schlaegt das CQ, aus demselben Grund wie das Land.
+        QCOMPARE(Ft8Applet::zeilenart(false, false, true, true),
+                 Art::NeuesGrid);
         // nur CQ
-        QCOMPARE(Ft8Applet::zeilenart(false, false, true), Art::Cq);
+        QCOMPARE(Ft8Applet::zeilenart(false, false, false, true), Art::Cq);
         // ein fremdes QSO
-        QCOMPARE(Ft8Applet::zeilenart(false, false, false), Art::Gewoehnlich);
+        QCOMPARE(Ft8Applet::zeilenart(false, false, false, false),
+                 Art::Gewoehnlich);
     }
 
     // ── Die Sendestelle ist waehlbar und bleibt ─────────────────────

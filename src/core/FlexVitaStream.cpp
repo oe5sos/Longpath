@@ -96,7 +96,8 @@ quint16 FlexVitaStream::start(const QHostAddress& radioAddress)
 
 // Ein Schritt je Paket: Zaehlersprung und Ankunftsabstand. Beides
 // braucht einen Zustand JE STROM — siehe die Begruendung am `Strang`.
-void FlexVitaStream::zaehleLuecke(const FlexVita::Header& h)
+void FlexVitaStream::zaehleLuecke(const FlexVita::Header& h,
+                                  qint64 jetztNsVorgabe)
 {
     const quint64 schluessel =
         (static_cast<quint64>(h.packetClass) << 32) | h.streamId;
@@ -107,7 +108,9 @@ void FlexVitaStream::zaehleLuecke(const FlexVita::Header& h)
     }
     ++st.pakete;
 
-    const qint64 jetztNs = m_uhr.isValid() ? m_uhr.nsecsElapsed() : -1;
+    const qint64 jetztNs = jetztNsVorgabe >= 0
+                               ? jetztNsVorgabe
+                               : (m_uhr.isValid() ? m_uhr.nsecsElapsed() : -1);
     qint64 abstandNs = 0;
     if (st.letzteAnkunftNs >= 0 && jetztNs > st.letzteAnkunftNs) {
         abstandNs = jetztNs - st.letzteAnkunftNs;
@@ -129,6 +132,39 @@ void FlexVitaStream::zaehleLuecke(const FlexVita::Header& h)
     const int fehlend =
         FlexVita::fehlendeNachZaehler(st.letzterZaehler, h.counter);
     st.letzterZaehler = h.counter;
+
+    // ── Den ueblichen Abstand mitfuehren ──────────────────────────
+    //
+    // Gleitend, und NUR ueber Abstaende, die selbst keine Luecke
+    // sind: sonst zoege die erste Unterbrechung den Mittelwert hoch
+    // und die naechste faende keine Schwelle mehr vor.
+    if (abstandNs > 0 && st.pakete > 1) {
+        const bool plausibel = st.mittelAbstandNs == 0
+                               || abstandNs < st.mittelAbstandNs * 4;
+        if (plausibel) {
+            st.mittelAbstandNs = st.mittelAbstandNs == 0
+                                     ? abstandNs
+                                     : (st.mittelAbstandNs * 7 + abstandNs) / 8;
+        }
+    }
+
+    // ── Unterbrechung oder Luecke? ────────────────────────────────
+    //
+    // Ueber einem Zaehlerumlauf ist der Sprung bedeutungslos (siehe
+    // FlexVitaStream.h, kUmlaufFaktor). Solche Pausen zaehlen
+    // getrennt -- die eigene Sendung ist die haeufigste davon.
+    const qint64 schwelleNs = st.mittelAbstandNs * kUmlaufFaktor;
+    const bool unterbrochen = st.pakete >= kMindestPaketeFuerMittel
+                              && schwelleNs > 0
+                              && abstandNs > schwelleNs;
+    if (unterbrochen) {
+        ++st.unterbrechungen;
+        if (abstandNs > st.laengsteUnterbrechungNs) {
+            st.laengsteUnterbrechungNs = abstandNs;
+        }
+        return;
+    }
+
     if (fehlend > 0) {
         st.verloren += fehlend;
         ++st.spruenge;
@@ -192,6 +228,8 @@ QVector<FlexVitaStream::Luecken> FlexVitaStream::luecken() const
         l.spruenge         = st.spruenge;
         l.groessteLueckeMs = st.groessteLueckeNs / 1000000LL;
         l.groessteLueckeUm = st.groessteLueckeUm;
+        l.unterbrechungen  = st.unterbrechungen;
+        l.laengsteUnterbrechungMs = st.laengsteUnterbrechungNs / 1000000LL;
         raus.push_back(l);
     }
     std::sort(raus.begin(), raus.end(), [] (const Luecken& a, const Luecken& b) {
@@ -247,16 +285,28 @@ void FlexVitaStream::berichteKlassen()
     QStringList lueckenTeile;
     for (const Luecken& l : luecken()) {
         if (l.pakete < 2) { continue; }
-        lueckenTeile << QStringLiteral("0x%1/%2: %3 verloren in %4 Spruengen, "
-                                       "groeszte Pause %5 ms um %6")
-                            .arg(l.klasse, 4, 16, QLatin1Char('0'))
-                            .arg(l.strom, 0, 16)
-                            .arg(l.verloren)
-                            .arg(l.spruenge)
-                            .arg(l.groessteLueckeMs)
-                            .arg(l.groessteLueckeUm.isEmpty()
-                                     ? QStringLiteral("\u2014")
-                                     : l.groessteLueckeUm);
+        // Luecken und Unterbrechungen GETRENNT. Bis zum 2026-10-30
+        // stand die eigene Sendung als „groeszte Pause 13422 ms" in
+        // derselben Zeile wie der Netzverlust -- und 13,2 s sind
+        // genau die FT8-Tastung des Betreibers.
+        QString teil = QStringLiteral("0x%1/%2: %3 verloren in %4 Spruengen")
+                           .arg(l.klasse, 4, 16, QLatin1Char('0'))
+                           .arg(l.strom, 0, 16)
+                           .arg(l.verloren)
+                           .arg(l.spruenge);
+        if (l.groessteLueckeMs > 0 && !l.groessteLueckeUm.isEmpty()) {
+            teil += QStringLiteral(", groeszte Luecke %1 ms um %2")
+                        .arg(l.groessteLueckeMs)
+                        .arg(l.groessteLueckeUm);
+        }
+        if (l.unterbrechungen > 0) {
+            teil += QStringLiteral("; %1 Unterbrechung(en), laengste "
+                                   "%2 ms (eigene Sendung o.ae., KEIN "
+                                   "Netzverlust)")
+                        .arg(l.unterbrechungen)
+                        .arg(l.laengsteUnterbrechungMs);
+        }
+        lueckenTeile << teil;
     }
     if (!lueckenTeile.isEmpty()) {
         qCInfo(lcFlexStream).nospace()

@@ -41,6 +41,9 @@
 #include "core/Ft8Ablauf.h"
 #include "models/LogEntry.h"
 #include "core/Ft8Mehrfach.h"
+#include "core/Ft8Warteschlange.h"
+#include "core/GridsGearbeitet.h"
+#include "Ft8PlatzStand.h"
 #include "core/Ft8Tonwahl.h"
 #include "core/Ft8Tx.h"
 
@@ -164,8 +167,17 @@ public:
     ///
     /// Statisch, damit die Reihenfolge ohne Fenster, ohne Logbuch und
     /// ohne cty.dat pruefbar ist.
-    enum class Zeilenart { AnMich, NeuesLand, Cq, Gewoehnlich };
-    static Zeilenart zeilenart(bool anMich, bool neuesLand, bool istCq);
+    /// `NeuesGrid` steht zwischen Land und CQ: ein Land, das fehlt,
+    /// ist mehr wert als ein Feld, das fehlt -- und beides mehr als
+    /// ein beliebiges CQ.
+    enum class Zeilenart { AnMich, NeuesLand, NeuesGrid, Cq, Gewoehnlich };
+    static Zeilenart zeilenart(bool anMich, bool neuesLand, bool neuesGrid,
+                               bool istCq);
+
+    /// Die Spaltenueberschrift ueber der Fundliste. Aus DENSELBEN
+    /// Breiten wie `zeilentext` -- zwei Stellen mit eigenen Zahlen
+    /// liefen beim ersten Spaltenwechsel auseinander.
+    static QString spaltenkopf();
 
     /// Eine Zeile der Liste, zusammengesetzt. Spalten wie in WSJT-X
     /// „Band Activity", dahinter das Land.
@@ -266,6 +278,26 @@ public:
     /// Zeitgeber nach bis zu 15 s — im Prueflauf waere das eine
     /// Viertelminute Warten je Zug.
     void fensterZuEndeForTest() { fensterZuEnde(); }
+    /// Der Stand der Plaetze, wie ihn `Ft8PlaetzeApplet` zeigt.
+    /// Oeffentlich fuer den Prueflauf -- sonst waere nur geprueft,
+    /// DASS gerechnet wird, nicht WAS ankommt.
+    Ft8PlaetzeStand plaetzeStandForTest() const { return baueStand(); }
+
+    // ── Zwei reine Abbildungen ──────────────────────────────
+    //
+    // Zustand -> was auf der Kachel steht. Oeffentlich, weil sie ohne
+    // Fenster, ohne Modell und ohne Geraet pruefbar sind -- und weil
+    // genau diese Uebersetzung sonst im Panel noch einmal entstuende.
+    /// Wie weit das QSO ist: 0..5, einer je Strich im Blatt.
+    static int stufeFuer(Ft8Ablauf::Zustand z);
+    /// Der Zug, wie das Fenster ihn nennt: „Tx2", „RR73", „CQ".
+    static QString zugKurz(Ft8Ablauf::Zustand z);
+    /// Die Warteschlange, damit ein Prueflauf nachsehen kann, ob ein
+    /// Anruf wirklich ankommt. Ohne diesen Zugang waere nur die
+    /// Einheit geprueft, nicht ihr Anschluss -- und genau so lag
+    /// Multi Answering monatelang unerreichbar da (2026-10-30).
+    const Ft8Warteschlange& schlangeForTest() const { return m_schlange; }
+    bool rufeNaechstenWartendenForTest() { return rufeNaechstenWartenden(); }
     QLineEdit*   textFeldForTest()  const { return m_textFeld; }
 
     // Fuer den Pruefstand.
@@ -288,6 +320,13 @@ public:
     /// derselbe Zugang.
     QPushButton*    nurCqButtonForTest() const { return m_sichtCq; }
     QPushButton*    nurNeueLaenderButtonForTest() const { return m_sichtNeuesLand; }
+    /// Der Knopf „New grid" (2026-10-30). Er war als einziger der
+    /// sechs Sichten ohne Pruefzugang -- und damit war der Weg
+    /// Logbuch -> `istNeu` -> Zeilenart -> Anzeige nicht fahrbar.
+    QPushButton*    sichtNeuesGridButtonForTest() const { return m_sichtNeuesGrid; }
+    /// Die gearbeiteten Grossfelder, um im Lauf ein Logbuch zu
+    /// stellen statt eine ADIF-Datei unterzuschieben.
+    GridsGearbeitet& gridsForTest() { return m_grids; }
     QPushButton*    sichtAllesButtonForTest() const { return m_sichtAlles; }
     QPushButton*    sichtAnMichButtonForTest() const { return m_sichtAnMich; }
     QPushButton*    sichtFreqButtonForTest() const { return m_sichtFreq; }
@@ -311,6 +350,12 @@ public:
     static QString senderCallsign(const QString& message);
 
 signals:
+    /// Der Stand der Plaetze hat sich geaendert. `Ft8PlaetzeApplet`
+    /// haengt daran -- das ist der EINZIGE Weg dorthin. Zwei Fenster,
+    /// die beide in `Ft8Mehrfach` hineingreifen, haetten jedes seine
+    /// eigene Meinung darueber, welcher Zug gerade dran ist.
+    void plaetzeGeaendert(const Longpath::Ft8PlaetzeStand& stand);
+
     /// Ein QSO ist vollstaendig. Es geht denselben Weg wie eines aus
     /// WSJT-X (MainWindow -> RotorLogbookPanel::logExternalQso): eine
     /// Datei, eine Doppelt-Regel, ein Hochladen.
@@ -375,6 +420,7 @@ private:
         bool    anMich{false};
         bool    istCq{false};
         bool    neuesLand{false};
+        bool    neuesGrid{false};
         QColor  landFarbe;
         bool    eigeneSendung{false};
     };
@@ -385,7 +431,8 @@ private:
     /// zwei Filter gleichzeitig ergeben Faelle, die niemand im Kopf
     /// behaelt (und „CQ only" + „New DXCC only" zeigte frueher die
     /// Schnittmenge, ohne dass das irgendwo stand).
-    enum class Sicht { Alles, AnMich, Cq, NeuesLand, MeineFrequenz };
+    enum class Sicht { Alles, AnMich, Cq, NeuesLand, NeuesGrid,
+                       MeineFrequenz };
     Sicht m_sicht{Sicht::Alles};
     /// Die Liste aus dem Speicher neu zeichnen.
     void zeichneListe();
@@ -452,6 +499,7 @@ private:
     QPushButton* m_sichtNeuesLand{nullptr};
     QPushButton* m_sichtFreq{nullptr};
     QLabel*      m_fundZahl{nullptr};
+    QLabel*      m_spaltenkopf{nullptr};
 
     // ── Die Arbeitsleiste (Entwurf C, 2026-10-30) ────────────
     //
@@ -510,10 +558,35 @@ private:
     /// gewechselt wurde.
     bool sucheFreieStelle(bool nurWennBelegt);
 
+    /// Wer mich gerufen hat, waehrend ich beschaeftigt war -- und
+    /// wer gerade gearbeitet wurde.
+    ///
+    /// Gilt AUCH mit einem Platz, anders als die Schlange in
+    /// `m_mehrfach`. Betreiber am 2026-10-30: „Antworten muessen
+    /// immer automatisch sofort funktionieren, ohne meine Beihilfe."
+    /// Welche Grossfelder schon im Logbuch stehen. Betreiber am
+    /// 2026-10-30: „interessant waere zu sehen, welche grids ich
+    /// noch nicht habe und diese dann zb blau zu markieren."
+    GridsGearbeitet  m_grids;
+    QPushButton*     m_sichtNeuesGrid{nullptr};
+
+    Ft8Warteschlange m_schlange;
+    /// Den naechsten Wartenden anrufen. Gibt true, wenn einer da war.
+    bool rufeNaechstenWartenden();
+    /// Einen gehoerten Anruf in die Schlange legen, wenn er gerade
+    /// nicht bedient werden kann.
+    void merkeAnrufFallsNoetig(const QString& nachricht, int snr);
+
     Ft8Mehrfach  m_mehrfach;
     QSpinBox*    m_plaetzeSpin{nullptr};
     int          m_plaetze{1};
     bool mehrfachAn() const { return m_plaetze > 1; }
+    /// Den Stand fuer das Plaetze-Panel bauen und melden.
+    Ft8PlaetzeStand baueStand() const;
+    void meldeStand();
+    /// Wie weit ein QSO ist: 0..5, einer je Zug. Fuer die fuenf
+    /// Striche im Blatt.
+
     /// Was in diesem Fenster auf allen Plaetzen hinausginge.
     void sendeMehrfach();
     /// Die Tonlage, die der Betreiber hatte, bevor Hound sie ueber

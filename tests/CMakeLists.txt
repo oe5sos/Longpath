@@ -2640,6 +2640,15 @@ longpath_add_test(tst_band_plan_guard_mox_rejection)
 # Ports Thetis console.cs:25933-26120 [v2.10.3.13] (PollPAPWR) and
 # console.cs:29191-29195 [v2.10.3.13] (UIMOXChangedFalse).
 longpath_add_test(tst_swr_protection_controller)
+longpath_add_test(tst_swr_riegel)
+# `jederSendewegFragtDenRiegel` liest die Quelle: ohne echtes Geraet
+# kommt kein Lauf an das vierte Tor. Ohne diese Zeile ueberspringt er
+# sich STILL -- und ein uebersprungener Lauf ist gruen, ohne etwas zu
+# belegen (am 2026-10-30 zweimal in dieselbe Falle getreten).
+if(TEST tst_swr_riegel)
+    set_tests_properties(tst_swr_riegel PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 
 # ── 2026-10-28: Freigabe bei jedem Unkey + Riegel nach offener Antenne ─────
 # Zwei Luecken gegen Thetis geschlossen. Erstens: onMoxOff() loeschte den
@@ -5526,6 +5535,11 @@ longpath_add_test(tst_skala_enden_lesbar)
 longpath_add_test(tst_feldbetrieb)
 # 2026-10-15: zwei Abstuerze beim Beenden in zwei Stunden, beide
 # „Kind meldet sein Ende, Rumpf greift ins halb abgebaute Fenster".
+# Der WEG zum Plaetze-Fenster, im echten MainWindow gefahren. Sechs
+# Ursachen sind am 2026-10-30 nacheinander durch diese Luecke gefallen,
+# weil es nur Laeufe fuer die Flaeche und fuer die Regeln gab -- den
+# Anschluss zwischen beiden fuhr niemand.
+longpath_add_test(tst_ft8_plaetze_weg)
 longpath_add_test(tst_abbau_ueberlebt)
 # 2026-10-15: moos.json nannte zwei Rollen, die es im Programm nicht
 # gibt — still uebergangen, also seit dem ersten Tag wirkungslos.
@@ -5579,6 +5593,11 @@ longpath_add_test(tst_ft8_ablauf)
 longpath_add_test(tst_ft8_senden)
 longpath_add_test(tst_ft8_sendeplan)
 longpath_add_test(tst_ft8_tonwahl)
+longpath_add_test(tst_ft8_warteschlange)
+longpath_add_test(tst_grids_gearbeitet)
+longpath_add_test(tst_applet_fenstermasse)
+longpath_add_test(tst_ft8_plaetze_panel)
+longpath_add_test(tst_panel_automatik)
 longpath_add_test(tst_ft8_dxpedition)
 # 2026-10-15: FT8 im PROGRAMM — Abgriff, Flaeche, Eintrag. Dekoder und
 # Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die
@@ -5985,6 +6004,7 @@ longpath_add_test(tst_widget_picker)
 #    Umschalten verwirft den Umbau, Loeschen laesst das Fenster
 #    herrenlos, die Bindung raet --
 longpath_add_test(tst_layout_profiles)
+longpath_add_test(tst_profilschiene_bindung)
 
 # -- Der Rundgang durch ein ECHTES MainWindow, nicht durch ein blosses
 #    QVariantMap an Haken (das deckt tst_layout_profiles.cpp bereits ab,

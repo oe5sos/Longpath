@@ -630,6 +630,20 @@ RadioModel::RadioModel(QObject* parent)
         const auto& s = AppSettings::instance();
         m_flexMikGainDb = std::clamp(
             s.value(QStringLiteral("FlexMikGainDb"), 0).toInt(), -20, 30);
+
+        // Die Stehwellengrenze, ueber der nicht mehr gesendet wird.
+        // Vorgabe 2,5 — die Zahl des Betreibers vom 2026-10-30.
+        bool ok = false;
+        const float g = s.value(QStringLiteral("FlexSwrGrenze"),
+                                QString::number(
+                                    safety::SwrRiegel::kVorgabeGrenze))
+                            .toString().toFloat(&ok);
+        m_flexSwrRiegel.setzeGrenze(
+            ok ? g : safety::SwrRiegel::kVorgabeGrenze);
+        m_flexSwrRiegel.setzeAn(
+            s.value(QStringLiteral("FlexSwrRiegelAn"),
+                    QStringLiteral("True")).toString()
+            != QLatin1String("False"));
     }
 
     // Sprachspeicher: Ordner neben die Einstellungsdatei legen und
@@ -7428,6 +7442,30 @@ bool RadioModel::flexTasten(bool tasten)
                 << "Flex: getastet, OHNE je eine Verriegelungsmeldung "
                    "gehoert zu haben — die Maschine entscheidet selbst";
         }
+
+        // ── Das vierte Tor: die Stehwelle (2026-10-30) ───────────
+        //
+        // Betreiber: „Sollte SWR ueber 2,5 sein, bitte nicht senden!"
+        //
+        // Der Wert stammt aus der LETZTEN Sendung — zwischen zwei
+        // Sendungen flieszt nichts und die Bruecke misst 1,0. Genau
+        // so ist es gemeint: war die letzte Sendung in eine
+        // Fehlanpassung, geht die naechste gar nicht erst los.
+        //
+        // Wurde nie gemessen, wird nicht gesperrt. Siehe `SwrRiegel`.
+        {
+            const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+            if (!m_flexSwrRiegel.darfTasten(jetzt)) {
+                qCWarning(lcConnection).noquote()
+                    << "Flex: nicht getastet —"
+                    << m_flexSwrRiegel.grund(jetzt);
+                emit flexSwrGesperrt(m_flexSwrRiegel.letzteSwr(),
+                                     m_flexSwrRiegel.grenze());
+                return false;
+            }
+            // Eine neue Sendung faengt ohne alten Bruch an.
+            m_flexSwrRiegel.zuruecksetzen();
+        }
     }
 
     m_flexConnection->sendCommand(FlexCommandWire::xmitCommand(tasten));
@@ -7506,6 +7544,31 @@ bool RadioModel::flexAbstimmen(bool an)
             << m_flexVerriegelungsLage << m_flexVerriegelungsGrund;
         return false;
     }
+    // ── Auch der Abstimmtraeger ist Senden (2026-10-30) ──────────
+    //
+    // Gefunden bei der Durchsicht desselben Abends, an dem der Riegel
+    // entstand: ich hatte EINEN Sendeweg abgedeckt (`flexTasten`) und
+    // den zweiten nicht gesucht. TUNE schickt einen DAUERTRAEGER --
+    // der Fall, in dem die Stehwelle am meisten zaehlt, denn man
+    // stimmt ab, WEIL die Anpassung nicht stimmt.
+    //
+    // Betreiber: „Sollte SWR ueber 2,5 sein, bitte nicht senden!"
+    // Das gilt hier genauso, und schaerfer: ein FT8-Durchgang endet
+    // nach 13,2 s von selbst, ein Abstimmtraeger laeuft, bis ihn
+    // jemand loest.
+    if (an) {
+        const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+        if (!m_flexSwrRiegel.darfTasten(jetzt)) {
+            qCWarning(lcConnection).noquote()
+                << "Flex: nicht abgestimmt —"
+                << m_flexSwrRiegel.grund(jetzt);
+            emit flexSwrGesperrt(m_flexSwrRiegel.letzteSwr(),
+                                 m_flexSwrRiegel.grenze());
+            return false;
+        }
+        m_flexSwrRiegel.zuruecksetzen();
+    }
+
     m_flexConnection->sendCommand(FlexCommandWire::tuneCommand(an));
     qCInfo(lcConnection) << "Flex: Abstimmtraeger" << (an ? "an" : "aus");
     return true;
@@ -7889,6 +7952,44 @@ void RadioModel::startFlexStreams()
                 // der neue Ruecklauf schon drin.
                 if (refW) { m_radioStatus.setReflectedPower(*refW); }
                 if (fwdW) { m_radioStatus.setForwardPower(*fwdW); }
+
+                // ── Der zweite Riegel: waehrend der Sendung ──────
+                //
+                // Vor dem Tasten zu pruefen reicht nicht. FT8 tastet
+                // 13,2 s am Stueck; eine Antenne, die waehrenddessen
+                // abreiszt, oder ein Relais, das nicht umlegt, wuerde
+                // den Sender eine ganze Sendung lang in die
+                // Fehlanpassung treiben.
+                //
+                // Die Maschine meldet die Stehwelle selbst mit; bis
+                // heute stand sie nur in der Protokollzeile und in
+                // zwei Balken. Niemand griff ein.
+                if (fwdW && m_radioStatus.swrRatio() > 0.0) {
+                    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+                    if (m_flexSwrRiegel.messung(
+                            float(m_radioStatus.swrRatio()),
+                            float(*fwdW), jetzt)) {
+                        qCWarning(lcConnection).nospace()
+                            << "Flex: SENDUNG GEBROCHEN — Stehwelle "
+                            << m_radioStatus.swrRatio() << " ueber der Grenze "
+                            << m_flexSwrRiegel.grenze() << " bei "
+                            << *fwdW << " W";
+                        // BEIDE Wege loesen. `xmit 0` beendet keinen
+                        // Abstimmtraeger -- der braucht
+                        // `transmit tune 0`. Bis zur Durchsicht des
+                        // 2026-10-30 stand hier nur das Tasten, und
+                        // damit lief ein TUNE in eine Fehlanpassung
+                        // unbegrenzt weiter, obwohl der Riegel schon
+                        // gegriffen hatte. An eine Maschine, die nicht
+                        // abstimmt, ist der Befehl ein Nichts; im
+                        // Zweifel gewinnt die Sicherheit
+                        // (CLAUDE.local.md).
+                        flexTasten(false);
+                        flexAbstimmen(false);
+                        emit flexSwrGesperrt(float(m_radioStatus.swrRatio()),
+                                             m_flexSwrRiegel.grenze());
+                    }
+                }
 
                 // Einmal melden, dass ueberhaupt etwas ankommt. Am
                 // 2026-10-27 lagen in der einen Messwertzeile FWDPWR

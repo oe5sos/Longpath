@@ -61,6 +61,7 @@
 // =================================================================
 
 #include "core/WdspTypes.h"
+#include "core/DigiFrequenzen.h"
 #include "models/Band.h"
 
 #include <QObject>
@@ -70,6 +71,7 @@
 #include <QVariantMap>
 
 #include <functional>
+#include <optional>
 #include <optional>
 
 namespace Longpath {
@@ -203,13 +205,31 @@ public:
     bool isBoundToBand(const QString& name, Band b) const;
     bool isBoundToMode(const QString& name, DSPMode m) const;
 
+    // ── Bindung an FT8 oder FT4 (2026-10-30) ─────────────────────
+    //
+    // `DSPMode` reicht dafuer nicht: FT8, FT4 und RTTY sind alle
+    // DIGU. Wer ein Profil fuer FT8 will, meint nicht „alle
+    // Datenmodi".
+    //
+    // Betreiber: „und wenn bei ft8 klick automatisch ein eigenes
+    // profil erscheint?" — „dies wuerde ich vorher anlegen."
+    void bindDigi(const QString& name, DigiFrequenzen::Digimodus d, bool on);
+    bool isBoundToDigi(const QString& name, DigiFrequenzen::Digimodus d) const;
+
     /// Welches Profil zu Band und Modus passt, oder leer. Passt mehr
     /// als eines, gewinnt das zuerst angelegte.
     ///
     /// Ein Profil ohne jede Bindung passt NIE automatisch — sonst
     /// würde das erste, das jemand anlegt, jeden Bandwechsel an sich
     /// reißen.
-    QString profileFor(Band b, DSPMode m) const;
+    ///
+    /// `digi` ist die Betriebsart innerhalb der Datenmodi, soweit
+    /// bekannt. Ein Profil, das an FT8 gebunden ist, passt NUR wenn
+    /// hier FT8 steht -- eine Digi-Bindung ohne Digi-Angabe ist ein
+    /// Nein, kein „egal". Sonst risse ein FT8-Profil jeden Wechsel
+    /// nach DIGU an sich, auch den nach RTTY.
+    QString profileFor(Band b, DSPMode m,
+                       std::optional<DigiFrequenzen::Digimodus> digi = std::nullopt) const;
 
     // ── Platte ───────────────────────────────────────────────────────
     void save() const;
@@ -226,6 +246,7 @@ private:
         QVariantMap state;
         QSet<int> bands;
         QSet<int> modes;
+        QSet<int> digis;
     };
 
     /// Der gemeinsame Weg hinter create() und createWith(). Ohne

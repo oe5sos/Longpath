@@ -421,6 +421,46 @@ private slots:
         QCOMPARE(toene[1] - toene[0], Ft8TxSource::kPlatzAbstandHz);
     }
 
+    // ── Der Einstieg eines Anrufers (2026-10-30) ──────────────────
+    //
+    // Diese Pruefung gab es nicht, und darum lief der Fehler Monate
+    // mit: `nimmAnrufer` nahm `starteAlsAntworter`, und das beginnt
+    // bei Tx1. Wer mich gerufen hat, bekam meinen Locator statt
+    // seines Rapports -- ein Durchgang mehr je QSO.
+    void einAnruferBekommtDenRapportUndNichtMeinenLocator()
+    {
+        Ft8Mehrfach m;
+        m.setEigeneDaten(QStringLiteral("OE5SOS"), QStringLiteral("JN67"));
+        m.setPlaetze(3);
+
+        // Genau die Zeile aus dem Fenster vom 2026-10-30:
+        //   124945  12 1.2 1338  OE5SOS PD4RJ JO33
+        QVERIFY(m.nimmAnrufer(QStringLiteral("PD4RJ"), 12,
+                              QStringLiteral("JO33")));
+
+        const QVector<Ft8TxSource::Platz> zuege = m.naechsteNachrichten();
+        QCOMPARE(zuege.size(), 1);
+        QCOMPARE(zuege.first().text,
+                 QStringLiteral("PD4RJ OE5SOS +12"));
+
+        const QVector<Ft8Mehrfach::Belegung> b = m.belegung();
+        QCOMPARE(b.size(), 1);
+        QCOMPARE(b.first().partner, QStringLiteral("PD4RJ"));
+        QCOMPARE(b.first().zustand, Ft8Ablauf::Zustand::SendeReport);
+    }
+
+    // Die Gegenprobe: ein negativer Rapport wird auch so geschrieben,
+    // und der Locator der Gegenstation geht nicht verloren (er
+    // gehoert ins Logbuch, nicht in die Nachricht).
+    void derRapportTraegtSeinVorzeichen()
+    {
+        Ft8Mehrfach m;
+        m.setEigeneDaten(QStringLiteral("OE5SOS"), QStringLiteral("JN67"));
+        QVERIFY(m.nimmAnrufer(QStringLiteral("9A6T"), -6, QString()));
+        QCOMPARE(m.naechsteNachrichten().first().text,
+                 QStringLiteral("9A6T OE5SOS -06"));
+    }
+
 };
 
 QTEST_MAIN(TstFt8MultiAnswering)

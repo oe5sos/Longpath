@@ -45,12 +45,6 @@ bool istBestaetigterRapport(const QString& feld)
            && rapportAus(feld) != Ft8Ablauf::kKeinReport;
 }
 
-bool istSchluss(const QString& feld)
-{
-    return feld.compare(QStringLiteral("RR73"), Qt::CaseInsensitive) == 0
-           || feld.compare(QStringLiteral("RRR"), Qt::CaseInsensitive) == 0
-           || feld.compare(QStringLiteral("73"), Qt::CaseInsensitive) == 0;
-}
 
 /// Der Rapport, wie er gesendet wird: immer mit Vorzeichen und zwei
 /// Stellen, so wie WSJT-X ihn schreibt (-12, +03).
@@ -62,6 +56,13 @@ QString rapportText(int snr)
 }
 
 } // namespace
+
+bool Ft8Ablauf::istAbschied(const QString& feld)
+{
+    return feld.compare(QStringLiteral("RR73"), Qt::CaseInsensitive) == 0
+           || feld.compare(QStringLiteral("RRR"), Qt::CaseInsensitive) == 0
+           || feld.compare(QStringLiteral("73"), Qt::CaseInsensitive) == 0;
+}
 
 bool Ft8Ablauf::wieLocator(const QString& feld)
 {
@@ -105,6 +106,18 @@ void Ft8Ablauf::starteAlsAntworter(const QString& partner,
     m_wiederholungen  = 0;
     m_zustand = (m_partner.isEmpty() || m_meinRuf.isEmpty())
                     ? Zustand::Ruht : Zustand::RufeAn;
+}
+
+void Ft8Ablauf::starteMitAnrufer(const QString& partner,
+                                 const QString& meinRuf,
+                                 const QString& meinLocator,
+                                 int snr,
+                                 const QString& seinLocator)
+{
+    // Derselbe Einstieg wie `Zustand::RufeCq` ihn baut, wenn jemand
+    // auf mein CQ antwortet — nur ohne das CQ davor.
+    starteAlsAntworter(partner, meinRuf, meinLocator, snr, seinLocator);
+    if (m_zustand != Zustand::Ruht) { m_zustand = Zustand::SendeReport; }
 }
 
 void Ft8Ablauf::starteAlsAnrufer(const QString& meinRuf,
@@ -240,6 +253,54 @@ bool Ft8Ablauf::verarbeite(const QString& nachricht, int snr)
 
     switch (m_zustand) {
         case Zustand::RufeCq: {
+            // ── Ein Abschied ist kein Anruf ───────────────────
+            //
+            // Am 2026-10-30 im Betrieb aufgefallen. HB9ZHK war fertig
+            // gearbeitet und im Logbuch (12:50:43); fuenfzehn Sekunden
+            // spaeter kam sein letztes Wort:
+            //
+            //     125045  16  2138  OE5SOS HB9ZHK 73
+            //
+            // Das ist an mich gerichtet, also nahm dieser Zweig es als
+            // Antwort auf mein CQ und begann dasselbe QSO von vorn:
+            // viermal „HB9ZHK OE5SOS +16" ins Leere, 53 s Sendezeit,
+            // dann Abbruch. Waehrenddessen riefen PD4RJ (dreimal) und
+            // 9A6T (zweimal) vergeblich an.
+            //
+            // Ein „73", „RR73" oder „RRR" beendet ein QSO, es beginnt
+            // keines. Wer sich verabschiedet, wird nicht angerufen.
+            if (Ft8Ablauf::istAbschied(letztes)) { return false; }
+
+            // ── Er ist schon weiter als ich (2026-10-30) ──────
+            //
+            // Am Geraet gemessen, FT4 auf 40 m:
+            //
+            //   19:00:21 … 19:01:20  DL7ACA OE5SOS +13   (fuenfmal)
+            //            -> aufgegeben, CQ laeuft weiter
+            //   19:01:52  OE5SOS DL7ACA R-13
+            //
+            // Seine Antwort kam 32 s nach meiner letzten Sendung --
+            // da hatte der Ablauf laengst aufgegeben und rief wieder
+            // CQ. Das „R" vor der Zahl heiszt aber: er HAT meinen
+            // Rapport, er bestaetigt ihn. Ihm jetzt noch einmal einen
+            // Rapport zu schicken wirft das QSO um einen ganzen Zug
+            // zurueck -- und bei einer Station, die ohnehin schwer
+            // durchkommt, heiszt das meistens: gar kein QSO.
+            //
+            // Ihm fehlt nur noch das RR73. Dieselbe Unterscheidung
+            // trifft `Zustand::RufeAn` seit jeher
+            // (`istBestaetigterRapport`); hier fehlte sie.
+            //
+            // Betreiber dazu: „das muss alles automatisch laufen."
+            if (istBestaetigterRapport(letztes)) {
+                m_partner         = vonWem;
+                m_reportGesendet  = snr;
+                m_reportEmpfangen = rapportAus(letztes);
+                m_wiederholungen  = 0;
+                m_zustand         = Zustand::SendeRR73;
+                return true;
+            }
+
             // Jemand antwortet auf mein CQ — mit Locator oder blank.
             m_partner        = vonWem;
             if (wieLocator(letztes)) { m_partnerLocator = letztes; }
@@ -283,7 +344,7 @@ bool Ft8Ablauf::verarbeite(const QString& nachricht, int snr)
                 m_zustand         = Zustand::SendeRR73;
                 return true;
             }
-            if (istSchluss(letztes)) {
+            if (Ft8Ablauf::istAbschied(letztes)) {
                 m_wiederholungen = 0;
                 m_zustand        = Zustand::Fertig;
                 return true;
@@ -310,7 +371,7 @@ bool Ft8Ablauf::verarbeite(const QString& nachricht, int snr)
                 m_zustand        = Zustand::Fertig;
                 return true;
             }
-            if (istSchluss(letztes)) {
+            if (Ft8Ablauf::istAbschied(letztes)) {
                 m_wiederholungen = 0;
                 m_zustand        = Zustand::Sende73;
                 return true;
@@ -320,7 +381,7 @@ bool Ft8Ablauf::verarbeite(const QString& nachricht, int snr)
         case Zustand::SendeRR73:
         case Zustand::Sende73: {
             // Er bestaetigt den Schluss — mehr ist nicht noetig.
-            if (istSchluss(letztes)) {
+            if (Ft8Ablauf::istAbschied(letztes)) {
                 m_wiederholungen = 0;
                 m_zustand        = Zustand::Fertig;
                 return true;

@@ -16,6 +16,8 @@
 
 #include "gui/LayoutProfiles.h"
 
+#include <algorithm>
+
 #include "core/AppSettings.h"
 #include "gui/WindowPlacement.h"
 
@@ -273,8 +275,11 @@ QByteArray LayoutProfiles::exportToJson(const QString& name) const
     for (int v : p->bands) { bands.append(v); }
     QJsonArray modes;
     for (int v : p->modes) { modes.append(v); }
+    QJsonArray digis;
+    for (int v : p->digis) { digis.append(v); }
     o.insert(QStringLiteral("bands"), bands);
     o.insert(QStringLiteral("modes"), modes);
+    o.insert(QStringLiteral("digis"), digis);
 
     return QJsonDocument(o).toJson(QJsonDocument::Indented);
 }
@@ -309,6 +314,12 @@ bool LayoutProfiles::importFromJson(const QString& targetProfile,
     p->modes.clear();
     for (const QJsonValue& m : o.value(QStringLiteral("modes")).toArray()) {
         p->modes.insert(m.toInt());
+    }
+    // Ein Satz von vor dem 2026-10-30 hat kein „digis" -- dann bleibt
+    // die Menge leer, und das Profil verhaelt sich wie bisher.
+    p->digis.clear();
+    for (const QJsonValue& d : o.value(QStringLiteral("digis")).toArray()) {
+        p->digis.insert(d.toInt());
     }
 
     // Nur beim AKTIVEN Profil sofort sichtbar machen -- fuer ein
@@ -355,7 +366,58 @@ bool LayoutProfiles::isBoundToMode(const QString& name, DSPMode m) const
     return p && p->modes.contains(static_cast<int>(m));
 }
 
-QString LayoutProfiles::profileFor(Band b, DSPMode m) const
+// ── Die Bindung liegt ZWEIMAL (2026-10-30) ───────────────────────────
+//
+// Einmal im Profilsatz, wie Baender und Betriebsarten -- und einmal
+// als eigener Schluessel in AppSettings.
+//
+// Das ist keine Dopplung aus Bequemlichkeit, sondern gegen einen
+// gemessenen Verlust. Der Profilsatz wird als EIN JSON geschrieben:
+// wer ihn speichert, schreibt alle Felder, die er kennt -- und nur
+// die. Eine Fassung ohne `digis` loescht es beim ersten Speichern,
+// stillschweigend.
+//
+// Am 2026-10-30 genau so passiert: der Auto-Install hatte dem
+// Betreiber zwischendurch `main` untergeschoben, main kannte das
+// Feld nicht, und nach dem naechsten Start stand in allen drei
+// Profilen `digis=None`. Er klickte zweimal FT8, nichts geschah,
+// und im Protokoll stand kein Wort -- weil nichts zu melden war:
+// die Bindung existierte nicht mehr.
+//
+// Der eigene Schluessel ist ein eigener XML-Knoten. Eine fremde
+// Fassung schreibt ihn nicht und loescht ihn darum auch nicht.
+// Faellt das Feld im Profilsatz aus, holt `load()` es von dort
+// zurueck.
+namespace {
+QString digiSchluessel(const QString& profil)
+{
+    return QStringLiteral("LayoutProfileDigi/%1").arg(profil);
+}
+}  // namespace
+
+void LayoutProfiles::bindDigi(const QString& name, DigiFrequenzen::Digimodus d, bool on)
+{
+    Profile* p = find(name);
+    if (!p) { return; }
+    if (on) { p->digis.insert(static_cast<int>(d)); }
+    else    { p->digis.remove(static_cast<int>(d)); }
+
+    QStringList zahlen;
+    for (int v : p->digis) { zahlen << QString::number(v); }
+    std::sort(zahlen.begin(), zahlen.end());
+    AppSettings::instance().setValue(digiSchluessel(name),
+                                     zahlen.join(QLatin1Char(',')));
+    save();
+}
+
+bool LayoutProfiles::isBoundToDigi(const QString& name, DigiFrequenzen::Digimodus d) const
+{
+    const Profile* p = find(name);
+    return p && p->digis.contains(static_cast<int>(d));
+}
+
+QString LayoutProfiles::profileFor(Band b, DSPMode m,
+                                   std::optional<DigiFrequenzen::Digimodus> digi) const
 {
     // In Anlegereihenfolge, damit das Ergebnis vorhersagbar ist. Eine
     // Bestenauswahl („das mit den meisten Treffern") waere klueger und
@@ -367,13 +429,26 @@ QString LayoutProfiles::profileFor(Band b, DSPMode m) const
         if (!p) { continue; }
         // Ein Profil ohne jede Bindung passt nie automatisch — sonst
         // risse das erste angelegte jeden Bandwechsel an sich.
-        if (p->bands.isEmpty() && p->modes.isEmpty()) { continue; }
+        if (p->bands.isEmpty() && p->modes.isEmpty()
+            && p->digis.isEmpty()) { continue; }
         // Eine leere Seite heisst „egal", nicht „nie".
         const bool bandOk = p->bands.isEmpty()
                          || p->bands.contains(static_cast<int>(b));
         const bool modeOk = p->modes.isEmpty()
                          || p->modes.contains(static_cast<int>(m));
-        if (bandOk && modeOk) { return p->name; }
+        // ── Die Digi-Bindung ist strenger (2026-10-30) ───────
+        //
+        // Bei Band und Modus heisst „leer" = „egal". Hier NICHT in
+        // die andere Richtung: ein Profil, das an FT8 gebunden ist,
+        // passt nur, wenn auch FT8 gefragt wurde. Sonst risse es
+        // jeden Wechsel nach DIGU an sich -- auch den nach RTTY, der
+        // dieselbe Betriebsart ist und ein ganz anderes Fenster
+        // braucht.
+        const bool digiOk = p->digis.isEmpty()
+                         || (digi.has_value()
+                             && p->digis.contains(
+                                    static_cast<int>(*digi)));
+        if (bandOk && modeOk && digiOk) { return p->name; }
     }
     return {};
 }
@@ -394,8 +469,11 @@ void LayoutProfiles::save() const
         for (int v : p->bands) { bands.append(v); }
         QJsonArray modes;
         for (int v : p->modes) { modes.append(v); }
+        QJsonArray digis;
+        for (int v : p->digis) { digis.append(v); }
         o.insert(QStringLiteral("bands"), bands);
         o.insert(QStringLiteral("modes"), modes);
+        o.insert(QStringLiteral("digis"), digis);
         arr.append(o);
     }
     QJsonObject root;
@@ -481,6 +559,23 @@ void LayoutProfiles::load()
         }
         for (const QJsonValue& m : o.value(QStringLiteral("modes")).toArray()) {
             p.modes.insert(m.toInt());
+        }
+        for (const QJsonValue& d : o.value(QStringLiteral("digis")).toArray()) {
+            p.digis.insert(d.toInt());
+        }
+        // Fehlt das Feld (ein Satz von vor dem 2026-10-30 ODER einer,
+        // den eine Fassung ohne `digis` geschrieben hat), aus dem
+        // eigenen Schluessel zurueckholen. Siehe `bindDigi`.
+        if (p.digis.isEmpty()) {
+            const QString roh =
+                AppSettings::instance()
+                    .value(digiSchluessel(name), QString()).toString();
+            for (const QString& t : roh.split(QLatin1Char(','),
+                                              Qt::SkipEmptyParts)) {
+                bool ok = false;
+                const int v = t.toInt(&ok);
+                if (ok) { p.digis.insert(v); }
+            }
         }
         loaded.append(p);
         order << name;

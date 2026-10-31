@@ -66,12 +66,14 @@ bool Ft8Mehrfach::nimmAnrufer(const QString& partner, int snr,
 
     if (aktive() < m_plaetze) {
         Ft8Ablauf a;
-        // Wir sind hier der ANRUFER (wir haben CQ gerufen, er hat
-        // geantwortet), aber der Ablauf beginnt fuer uns bei Tx2: der
-        // Partner steht schon fest. `starteAlsAntworter` baut genau
-        // diesen Einstieg -- der Name meint die Rolle im Gespraech,
-        // nicht wer zuerst gerufen hat.
-        a.starteAlsAntworter(p, m_meinRuf, m_meinLocator, snr, seinLocator);
+        // Er hat mich gerufen, also beginnt es bei Tx2 -- mit dem
+        // Rapport, nicht mit meinem Locator.
+        //
+        // Hier stand bis zum 2026-10-30 `starteAlsAntworter`, mit der
+        // Begruendung, das sei der Einstieg bei Tx2. War es nicht:
+        // jenes setzt `Zustand::RufeAn` (Tx1). Siehe
+        // `Ft8Ablauf::starteMitAnrufer`.
+        a.starteMitAnrufer(p, m_meinRuf, m_meinLocator, snr, seinLocator);
         m_laufend.push_back(a);
         return true;
     }

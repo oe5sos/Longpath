@@ -79,6 +79,8 @@
 
 #include "core/WdspTypes.h"
 #include "core/DigiFrequenzen.h"
+#include "gui/applets/PanelAutomatik.h"
+
 #include <QElapsedTimer>
 #include <QTimer>
 #include <QHash>
@@ -271,6 +273,30 @@ public:
     /// schon oeffentlich, und ein Paar darum kippte am 2026-10-21
     /// alles dahinter auf privat (sieben rote CI-Laeufe).
     class Ft8Applet* ft8AppletForTest() const { return m_ft8Applet; }
+    class Ft8PlaetzeApplet* ft8PlaetzeAppletForTest() const
+    { return m_ft8PlaetzeApplet; }
+    /// Ein Durchgang der Plaetze-Automatik, ohne das Prueflauf-Tor
+    /// und mit der Zeit von Hand. Der Anschluss (Entscheidung ->
+    /// Fenster -> Rueckschlag) war bis zum 2026-10-30 ueberhaupt nicht
+    /// fahrbar, weil `isTestModeEnabled()` am Anfang stand und die
+    /// ganze Automatik im Lauf abschaltete. SECHS Ursachen sind
+    /// nacheinander durch genau diese Luecke gefallen.
+    void ft8SlotsAutomatikSchrittForTest(bool hatInhalt, qint64 jetztMs)
+    { ft8SlotsAutomatikSchritt(hatInhalt, 0, 0, jetztMs); }
+    /// Ob das Plaetze-Panel ein eigenes Fenster hat -- die Groesse,
+    /// die der Betreiber meint, wenn er „kein Fenster" sagt.
+    bool ft8SlotsHatFensterForTest() const;
+    /// Das Fenster selbst, um seine Hoehe zu messen.
+    class QWidget* ft8SlotsFensterForTest() const;
+    /// Ob die Automatik das Panel fuer Eigentum des Betreibers haelt.
+    bool ft8SlotsGehoertDemBetreiberForTest() const
+    { return m_ft8SlotsAutomatik.gehoertDemBetreiber(); }
+    /// Die Automatik von vorn. Noetig, weil die Prueffaelle EINE
+    /// Einstellungsdatei teilen: nach dem ersten Fall steht
+    /// `AppletFt8SlotsVisible=True`, und `setVisible(id, true)` ist
+    /// dann ein Nichts, das kein Signal aussendet.
+    void ft8SlotsAutomatikZuruecksetzenForTest()
+    { m_ft8SlotsAutomatik.zuruecksetzen(); }
 
 
     // ── Der Schutzrahmen (2026-10-14) ────────────────────────────────
@@ -336,6 +362,11 @@ public:
     /// kippte am 2026-10-21 alles DAHINTER auf privat und brach sieben
     /// CI-Laeufe (`appletIsRegisteredForTest` war ploetzlich privat).
     void aufDigiStellen(Longpath::DigiFrequenzen::Digimodus modus);
+    /// Das an Band/Modus/Digimodus gebundene Layoutprofil aktivieren,
+    /// falls eines passt. Siehe `LayoutProfiles::profileFor`.
+    void profilNachstellen(
+        std::optional<Longpath::DigiFrequenzen::Digimodus> digi
+            = std::nullopt);
 
     /// Welcher Digimodus zuletzt gemeint war. Der DIGU/DIGL-Knopf in
     /// der Leiste traegt keinen -- er richtet mit diesem her.
@@ -1165,6 +1196,15 @@ private:
     void setFreeCanvasMode(bool on);
     bool freeCanvasMode() const { return m_freeCanvasMode; }
 
+    /// Das Plaetze-Panel wirklich sichtbar machen -- notfalls als
+    /// eigenes Fenster, wenn die Appletspalte zu ist. Siehe dort.
+    void zeigeFt8SlotsFenster();
+
+    /// Ein Durchgang der Plaetze-Automatik: entscheiden und ausfuehren.
+    /// Ohne das Prueflauf-Tor -- das sitzt beim Aufrufer.
+    void ft8SlotsAutomatikSchritt(bool hatInhalt, int qsos, int wartende,
+                                  qint64 jetztMs);
+
     void detachApplet(AppletWidget* applet, int dockIndex,
                       const QRect& rect = QRect(),
                       const QString& screenKey = QString());
@@ -1811,6 +1851,21 @@ private:
     class RttyDecoderApplet* m_rttyDecoderApplet{nullptr};
     class CwDecoderApplet*   m_cwDecoderApplet{nullptr};
     class Ft8Applet*         m_ft8Applet{nullptr};
+    class Ft8PlaetzeApplet*  m_ft8PlaetzeApplet{nullptr};
+    /// Das Plaetze-Panel geht von selbst auf, wenn etwas laeuft, und
+    /// nach einer Nachlaufzeit wieder zu. Betreiber am 2026-10-30:
+    /// „schoen waere, wenn hier die fenster eigens aufgehen und
+    /// danach wieder zu gehen." Siehe `PanelAutomatik`.
+    PanelAutomatik           m_ft8SlotsAutomatik;
+    /// Gesetzt, solange die Automatik SELBST schaltet. Ohne diesen
+    /// Merker hielt `visibilityChanged` jedes eigene Aufmachen fuer
+    /// einen Griff des Betreibers und schaltete die Automatik im
+    /// ersten Durchgang ab -- siehe `MainWindow.cpp` am Anschluss.
+    bool                     m_ft8SlotsAutomatikSchaltet{false};
+    /// Gesetzt, solange eine ANORDNUNG hergestellt wird (Profil beim
+    /// Start, Profilwechsel, der Sprung auf FT8). Eine Anordnung ist
+    /// kein Griff des Betreibers -- siehe den Hook in `buildUI`.
+    bool                     m_sichtbarkeitOhneBetreiber{false};
     // Torn down and rebuilt on every rebindRttyRadeAvailability() call --
     // same QMetaObject::Connection-list idiom CommandBar::attach() uses,
     // so the dspModeChanged listener below never accumulates one dangling
@@ -1888,6 +1943,9 @@ private:
     QMetaObject::Connection m_flexLeistungBand;
     QMetaObject::Connection m_flexAbstimmleistungBand;
     QMetaObject::Connection m_flexSendetBand;
+    /// Die SWR-Sperre meldet sich am Schirm. Ohne diesen Band
+    /// griff sie stumm -- siehe MainWindow_Flex.cpp.
+    QMetaObject::Connection m_flexSwrBand;
     /// Der Blick des Betreibers zieht den Panadapter der Maschine nach.
     QMetaObject::Connection m_flexBlickBand;
     QTimer* m_flexPanNachzug{nullptr};

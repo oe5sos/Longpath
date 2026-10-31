@@ -561,6 +561,8 @@ set(CORE_SOURCES
     # Eine freie Sendestelle suchen -- Longpath-eigen, weder WSJT-X
     # noch MSHV tun das (2026-10-30)
     src/core/Ft8Tonwahl.cpp
+    src/core/Ft8Warteschlange.cpp
+    src/core/GridsGearbeitet.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CatProtocol.cpp
@@ -690,6 +692,7 @@ set(CORE_SOURCES
     src/core/safety/BandPlanGuard.cpp
     src/core/safety/RegionSetting.cpp
     src/core/safety/SwrProtectionController.cpp
+    src/core/safety/SwrRiegel.cpp
     src/core/safety/TxInhibitMonitor.cpp
     src/core/safety/safety_constants.cpp
     src/core/SpotCollectorClient.cpp
@@ -1153,6 +1156,8 @@ set(GUI_SOURCES
     src/gui/applets/AppletGrid.h
     src/gui/applets/AppletKeys.cpp
     src/gui/applets/AppletKeys.h
+    src/gui/applets/AppletFensterMasse.cpp
+    src/gui/applets/PanelAutomatik.cpp
     src/gui/applets/AppletFloatingWindow.cpp
     src/gui/applets/AppletFloatingWindow.h
     src/gui/applets/InstrumentApplet.cpp
@@ -1286,6 +1291,7 @@ set(GUI_SOURCES
     src/gui/applets/RttyDecoderApplet.cpp
     src/gui/applets/CwDecoderApplet.cpp
     src/gui/applets/Ft8Applet.cpp
+    src/gui/applets/Ft8PlaetzeApplet.cpp
     src/gui/applets/QsoRecorderApplet.cpp
     src/gui/applets/RecordingApplet.cpp
     src/gui/RecordingScheduleDialog.cpp

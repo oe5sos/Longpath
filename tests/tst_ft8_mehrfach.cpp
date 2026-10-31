@@ -77,11 +77,24 @@ private slots:
 
         // Erstes Fenster: drei Anrufe, auf drei Toenen mit 60 Hz
         // Abstand (MSHV gen_ft8.cpp:262).
+        //
+        // ── Der RAPPORT, nicht mein Locator (2026-10-30) ──────
+        //
+        // Hier stand bis heute „DL1ABC OE5SOS JN67", also Tx1. Das
+        // war falsch, und der Lauf hat es festgehalten statt
+        // gefangen: wer MICH gerufen hat, wartet auf einen Rapport,
+        // nicht auf meinen Locator. `nimmAnrufer` nahm
+        // `starteAlsAntworter` (Zustand RufeAn = Tx1) und begruendete
+        // das im Kommentar damit, es sei „der Einstieg bei Tx2" --
+        // war es nie.
+        //
+        // Jeder Durchgang kostete dadurch einen Zug mehr, also 30 s.
+        // Siehe `Ft8Ablauf::starteMitAnrufer`.
         auto raus = m.naechsteNachrichten();
         QCOMPARE(raus.size(), 3);
-        QCOMPARE(raus[0].text, QStringLiteral("DL1ABC OE5SOS JN67"));
-        QCOMPARE(raus[1].text, QStringLiteral("G0XYZ OE5SOS JN67"));
-        QCOMPARE(raus[2].text, QStringLiteral("F5QRP OE5SOS JN67"));
+        QCOMPARE(raus[0].text, QStringLiteral("DL1ABC OE5SOS -12"));
+        QCOMPARE(raus[1].text, QStringLiteral("G0XYZ OE5SOS -07"));
+        QCOMPARE(raus[2].text, QStringLiteral("F5QRP OE5SOS -18"));
         QCOMPARE(raus[1].toneHz - raus[0].toneHz, 60.0f);
         QCOMPARE(raus[2].toneHz - raus[1].toneHz, 60.0f);
 
@@ -91,17 +104,36 @@ private slots:
         QCOMPARE(m.verarbeite(QStringLiteral("OE5SOS F5QRP -20"), -18), 1);
         QCOMPARE(m.verarbeite(QStringLiteral("OE5SOS DL1ABC -09"), -12), 1);
 
+        // ── Und danach RR73, nicht R-12 (2026-10-30) ─────────
+        //
+        // Folgt aus dem Einstieg bei Tx2. Ich habe IHM meinen
+        // Rapport gegeben und SEINEN bekommen -- der Austausch ist
+        // vollstaendig, es fehlt nur die Bestaetigung. Ein
+        // bestaetigter Rapport (R-12) waere der Zug des ANTWORTERS,
+        // und das bin ich hier nicht: ich habe CQ gerufen.
+        //
+        // Der alte Lauf erwartete R-12, weil `nimmAnrufer` bei Tx1
+        // einstieg und der Ablauf dadurch eine Rolle zu tief lag.
         raus = m.naechsteNachrichten();
         QCOMPARE(raus.size(), 3);
-        QCOMPARE(raus[0].text, QStringLiteral("DL1ABC OE5SOS R-12"));
+        QCOMPARE(raus[0].text, QStringLiteral("DL1ABC OE5SOS RR73"));
 
         // Alle drei schliessen ab.
         QCOMPARE(m.verarbeite(QStringLiteral("OE5SOS DL1ABC RR73"), -12), 1);
         QCOMPARE(m.verarbeite(QStringLiteral("OE5SOS G0XYZ RR73"),   -7), 1);
         QCOMPARE(m.verarbeite(QStringLiteral("OE5SOS F5QRP RR73"),  -18), 1);
 
-        // Mein 73 geht hinaus, danach sind alle drei vollstaendig.
-        QCOMPARE(m.naechsteNachrichten().size(), 3);
+        // ── Danach ist nichts mehr zu senden (2026-10-30) ────
+        //
+        // Auch das folgt aus dem Einstieg bei Tx2. Als ANRUFER
+        // schliesse ich mit RR73 ab; sein RR73 ist die Bestaetigung,
+        // und damit ist der Durchgang vorbei. Ein 73 von mir waere
+        // der Zug des ANTWORTERS (Tx5).
+        //
+        // Der alte Lauf erwartete hier drei Saetze -- und hielt damit
+        // fest, dass jedes QSO einen Durchgang laenger dauert als
+        // noetig.
+        QCOMPARE(m.naechsteNachrichten().size(), 0);
         m.fensterVerstrichen();
 
         const QVector<Ft8Ablauf> fertig = m.nimmFertige();

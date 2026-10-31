@@ -110,6 +110,27 @@ public:
                             int snr,
                             const QString& seinLocator = QString());
 
+    /// Jemand hat MICH gerufen, und ich steige mit dem Rapport ein.
+    ///
+    /// ── Warum das nicht `starteAlsAntworter` ist (2026-10-30) ───────
+    ///
+    /// `Ft8Mehrfach::nimmAnrufer` nahm bis heute `starteAlsAntworter`
+    /// und sagte im Kommentar dazu, das sei „der Einstieg bei Tx2".
+    /// War es nicht: `starteAlsAntworter` setzt `Zustand::RufeAn`,
+    /// also Tx1. Auf „OE5SOS PD4RJ JO33" antwortete Longpath damit
+    /// „PD4RJ OE5SOS JN67" — meinen Locator an einen, der schon
+    /// meinen Rapport erwartet. Das QSO kam trotzdem zustande, kostete
+    /// aber einen Durchgang mehr (30 s) und war nicht das, was die
+    /// Gegenstation las.
+    ///
+    /// `snr` ist, was ICH von IHM gemessen habe — es wird sein
+    /// Rapport, und er geht im naechsten Fenster hinaus.
+    void starteMitAnrufer(const QString& partner,
+                          const QString& meinRuf,
+                          const QString& meinLocator,
+                          int snr,
+                          const QString& seinLocator = QString());
+
     /// Ich rufe CQ. Der Partner ergibt sich aus der ersten Antwort.
     void starteAlsAnrufer(const QString& meinRuf,
                           const QString& meinLocator);
@@ -198,6 +219,13 @@ public:
     /// aus der Antwort auf das CQ. Leer, wenn nie einer kam — dann
     /// bleibt GRIDSQUARE im Logbuch leer, statt zu raten.
     QString partnerLocator() const { return m_partnerLocator; }
+
+    /// Ist dieses Feld ein Schlusswort — „73", „RR73" oder „RRR"?
+    ///
+    /// Oeffentlich, weil das Applet dieselbe Frage stellt, bevor es
+    /// einen Anrufer in die Warteschlange legt: wer sich
+    /// verabschiedet, stellt sich nicht an. Zwei Stellen, eine Regel.
+    static bool istAbschied(const QString& feld);
 
     /// Sieht das Feld aus wie ein Feldkenner (JN67, JN67VV)? Nicht
     /// jedes dritte Feld ist einer: „-12", „R-09", „RR73" und „73"

@@ -58,4 +58,40 @@ qint64 anruffrequenz(Band band, Digimodus modus);
 bool stehtSchonDort(qint64 skalenfrequenzHz, Digimodus modus,
                     qint64 spielraumHz = 500);
 
+/// Der Bildausschnitt, in dem FT8 und FT4 wirklich stattfinden.
+///
+/// Betreiber am 2026-10-30, mit einem auf 7,8 kHz gezoomten
+/// Panadapter vor Augen, waehrend der Empfaenger 32 kHz weiter auf
+/// der Anrufstelle stand: „interessant ist hier nur der reine
+/// ft8 - ft4 bereich" — „dieser soll auch automatisch zu sehen sein
+/// und gespeichert."
+///
+/// ── Warum nicht einfach die Anrufstelle in die Mitte ────────────
+///
+/// Weil dort nichts ist. Die Skalenfrequenz ist der TRAEGER; die
+/// Signale liegen darueber, im Durchlassbereich (bei Longpath
+/// 200…2900 Hz, siehe die Leiste unter dem TX-Fenster). Eine Mitte
+/// auf der Anrufstelle haette die Haelfte des Bildes auf leeres Band
+/// gelegt und die obersten Signale abgeschnitten.
+///
+/// Die Mitte liegt darum in der Mitte des Durchlassbereichs, und die
+/// Breite deckt ihn mit etwas Luft nach beiden Seiten.
+struct Bildausschnitt {
+    double mitteHz{0.0};
+    double breiteHz{0.0};
+};
+
+/// Fuer eine Skalenfrequenz (die Anrufstelle). Gibt einen Ausschnitt
+/// mit `breiteHz == 0`, wenn die Frequenz null ist -- dann weiss der
+/// Aufrufer nichts und soll das Bild stehen lassen.
+Bildausschnitt bildausschnitt(qint64 skalenfrequenzHz);
+
+/// Der Durchlassbereich, in dem die Signale liegen. Dieselben
+/// Zahlen, die das TX-Fenster zeigt.
+inline constexpr double kDurchlassVonHz = 200.0;
+inline constexpr double kDurchlassBisHz = 2900.0;
+/// Luft nach beiden Seiten, damit die Raender nicht an der Kante
+/// kleben.
+inline constexpr double kLuftHz = 400.0;
+
 } // namespace Longpath::DigiFrequenzen

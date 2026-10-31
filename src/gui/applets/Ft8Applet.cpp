@@ -15,6 +15,7 @@
 #include "core/Ft8Stream.h"
 #include "core/Ft8Ablauf.h"
 #include "core/Ft8Tx.h"
+#include "core/LogbookDatei.h"
 #include "gui/widgets/Ft8Fensterbalken.h"
 #include "models/Band.h"
 #include <QDialog>
@@ -530,12 +531,35 @@ void Ft8Applet::buildUI()
     m_sichtAnMich = sichtKnopf(tr("To me"),     Sicht::AnMich, 54);
     m_sichtCq     = sichtKnopf(tr("CQ"),        Sicht::Cq, 38);
     m_sichtNeuesLand = sichtKnopf(tr("New DXCC"), Sicht::NeuesLand, 72);
+    // Betreiber am 2026-10-30: „somit sehe ich dann, was ich noch
+    // benoetige." Derselbe Knopf wie „New DXCC", eine Stufe kleiner.
+    m_sichtNeuesGrid = sichtKnopf(tr("New grid"), Sicht::NeuesGrid, 66);
     m_sichtFreq   = sichtKnopf(tr("My freq"),   Sicht::MeineFrequenz, 62);
     m_sichtAlles->setChecked(true);
     m_sichtAnMich->setToolTip(tr("Only messages addressed to you."));
     m_sichtCq->setToolTip(tr("Only CQ calls."));
     m_sichtNeuesLand->setToolTip(tr("Only countries that are not in the "
                                     "log yet."));
+    m_sichtNeuesGrid->setToolTip(tr("Only grid squares that are not in "
+                                    "the log yet.\nBlue in the list."));
+
+    // ── Das Logbuch einmal lesen (2026-10-30) ────────────────────
+    //
+    // Hier und nicht in `MainWindow`: die Markierung gehoert diesem
+    // Fenster, und ein Fenster, das seine eigene Auskunft von einer
+    // Verdrahtung abhaengig macht, ist genau das, was heute dreimal
+    // stillschweigend ausgefallen ist.
+    //
+    // Einmal beim Bauen. Die Datei waechst um ein QSO je Minute;
+    // sie bei jedem Fund neu zu lesen waere Aufwand ohne Gewinn --
+    // frische QSOs kommen ueber `merke()` dazu (siehe
+    // `meldeFertigesQso`).
+    {
+        const int gelesen = m_grids.liesAus(LogbookDatei::pfad());
+        qCInfo(lcFt8Senden).noquote()
+            << "Grossfelder aus dem Logbuch:" << m_grids.anzahl()
+            << "verschiedene aus" << gelesen << "Eintraegen";
+    }
     m_sichtFreq->setToolTip(tr("Decodes within 50 Hz of your transmit "
                                "tone, plus anything addressed to you — "
                                "what the second column used to show."));
@@ -556,6 +580,20 @@ void Ft8Applet::buildUI()
     });
     sichtReihe->addWidget(m_clearBtn);
     root->addLayout(sichtReihe);
+
+    // ── Die Spaltenkoepfe (2026-10-30) ──────────────────────────
+    //
+    // Betreiber: „die staerke des signals sollte auch in einer
+    // eigenen spalten sein." Sie ist eine -- die zweite. Ohne
+    // Ueberschrift war nur nicht zu sehen, welche der vier Zahlen
+    // welche ist. WSJT-X schreibt sie ueber die Liste, und genau
+    // dort hat er sie gesucht.
+    m_spaltenkopf = new QLabel(spaltenkopf(), this);
+    m_spaltenkopf->setFont(Style::monoFont(font(), Style::kFontSmall));
+    m_spaltenkopf->setStyleSheet(
+        QStringLiteral("QLabel { color: %1; padding: 0 0 2px 6px; }")
+            .arg(QString::fromLatin1(Style::kTextInactive)));
+    root->addWidget(m_spaltenkopf);
 
     root->addWidget(m_list, 1);
 
@@ -1002,6 +1040,70 @@ void Ft8Applet::fensterZuEnde()
 // hat eine davon `setzeCqWiederholungen` vergessen -- und der Ruf
 // brach nach fuenf statt nach den eingestellten sechzehn ab
 // (2026-10-29).
+// ── Wer gerufen hat, kommt dran ──────────────────────────────────────
+//
+// Beide Haelften der Warteschlange haengen hier. Sie gelten AUCH mit
+// einem Platz -- `Ft8Mehrfach` hat eine eigene Schlange, aber die
+// laeuft nur, wenn `mehrfachAn()` an ist.
+
+void Ft8Applet::merkeAnrufFallsNoetig(const QString& nachricht, int snr)
+{
+    const QString meiner = eigenesRufzeichen();
+    if (meiner.isEmpty()) { return; }
+
+    const QStringList f = nachricht.toUpper()
+                              .split(QLatin1Char(' '), Qt::SkipEmptyParts);
+    // An mich gerichtet heisst: mein Rufzeichen steht VORNE. Steht es
+    // weiter hinten, bin ich darin nur erwaehnt (etwa im Schluss eines
+    // Fox: „K1ABC RR73; W9XYZ <KH1DX> -17").
+    if (f.size() < 2 || f.first() != meiner) { return; }
+
+    const QString anrufer = f.at(1);
+    if (anrufer.isEmpty() || anrufer == meiner) { return; }
+
+    // Ein Abschied ist kein Anruf -- dieselbe Regel wie in
+    // `Ft8Ablauf::verarbeite`, und darum auch dieselbe Funktion.
+    if (f.size() >= 3 && Ft8Ablauf::istAbschied(f.at(2))) { return; }
+
+    // Mein aktueller Partner steht nicht in der Schlange: mit ihm
+    // laeuft gerade ein QSO.
+    if (!m_ablauf.partner().isEmpty() && anrufer == m_ablauf.partner()) {
+        return;
+    }
+    if (mehrfachAn() && m_mehrfach.kennt(anrufer)) { return; }
+
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    if (m_schlange.merkeAnruf(anrufer, snr,
+                              locatorAusNachricht(nachricht), jetzt)) {
+        qCInfo(lcFt8Senden).noquote()
+            << "Anruf gemerkt:" << anrufer << "— wartet als Nummer"
+            << m_schlange.wartende(jetzt) << "— aus:" << nachricht;
+        // Sofort sichtbar machen, nicht erst beim naechsten
+        // Zustandswechsel: wer ruft, soll auf der Stelle im Kopf der
+        // Liste stehen.
+        zeigeFundZahl();
+        meldeStand();
+    }
+}
+
+bool Ft8Applet::rufeNaechstenWartenden()
+{
+    if (m_sendet) { return false; }
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    const Ft8Warteschlange::Wartend w = m_schlange.nimmNaechsten(jetzt);
+    if (w.partner.isEmpty()) { return false; }
+
+    m_qsoGemeldet = false;
+    // Er hat MICH gerufen, also beginnt es mit dem Rapport.
+    m_ablauf.starteMitAnrufer(w.partner, eigenesRufzeichen(),
+                              eigenerLocator(), w.snr, w.locator);
+    qCInfo(lcFt8Senden).noquote()
+        << "Aus der Schlange:" << w.partner << "— noch"
+        << m_schlange.wartende(jetzt) << "wartend";
+    ablaufSchritt();
+    return true;
+}
+
 void Ft8Applet::starteCqRuf()
 {
     // ── Nicht in ein laufendes QSO hineinrufen (2026-10-30) ─────
@@ -1239,6 +1341,10 @@ void Ft8Applet::meldeFertigesQso()
 {
     if (m_qsoGemeldet || m_ablauf.partner().isEmpty()) { return; }
     m_qsoGemeldet = true;
+    // Das Feld ist ab jetzt gearbeitet -- ohne auf das naechste
+    // Lesen der Datei zu warten. Sonst bliebe die Station, die eben
+    // im Logbuch landete, bis zum Neustart blau.
+    m_grids.merke(m_ablauf.partnerLocator());
     emit qsoFertig(logEintrag(m_ablauf,
                               m_slice ? m_slice->frequency() : 0.0,
                               m_slice && m_slice->dspMode() == DSPMode::DIGL,
@@ -1269,7 +1375,21 @@ void Ft8Applet::zeigeAblauf()
             // Nur wenn der Ruf vom Knopf kam. Ein Doppelklick in die
             // Liste ist eine Einzelentscheidung: danach wird nicht von
             // selbst CQ gerufen.
+            // In die Karenz, damit er nicht gleich noch einmal
+            // gearbeitet wird -- der zweite Riegel neben
+            // `Ft8Ablauf::istAbschied` (2026-10-30, HB9ZHK).
+            m_schlange.merkeGearbeitet(wer, QDateTime::currentMSecsSinceEpoch());
+
             if (m_cqAutomatik && !m_sendet) {
+                // ── Erst die Wartenden, dann wieder CQ ────────
+                //
+                // Wer mich waehrend des QSOs gerufen hat, steht in
+                // der Schlange. Ihn anzurufen ist immer besser als
+                // ein neues CQ: er hat schon gezeigt, dass er mich
+                // hoert, und er wartet. Am 2026-10-30 riefen PD4RJ
+                // und 9A6T zusammen fuenfmal und bekamen nie eine
+                // Antwort, weil es diese Zeilen nicht gab.
+                if (rufeNaechstenWartenden()) { break; }
                 qCInfo(lcFt8Senden).noquote()
                     << "QSO mit" << wer << "fertig — rufe weiter CQ";
                 starteCqRuf();
@@ -1536,7 +1656,28 @@ bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
             // der Doppelklick legte die Antwort nur ins Feld, gesendet
             // wurde nichts. Derselbe Fehlgriff wie beim CQ-Knopf
             // (#315). Angehalten wird mit „Stop".
-            if (!m_sendet) {
+            //
+            // ── Auch WAEHREND einer Sendung (2026-10-30) ─────
+            //
+            // Hier stand `if (!m_sendet)`, und das verschluckte jeden
+            // Doppelklick, der in eine laufende Sendung fiel.
+            // Betreiber: „doppelklick loest kein automatisches qso
+            // aus."
+            //
+            // Bei FT8 ist das die Haelfte der Zeit: 13,2 s von 15
+            // wird getastet, und wer in der Liste etwas sieht,
+            // klickt genau dann. Der Druck war weg, ohne dass
+            // irgendwo etwas stand.
+            //
+            // Der Ablauf wird jetzt IMMER gesetzt. Geht gerade etwas
+            // hinaus, laeuft es aus -- und der neue Zug uebernimmt
+            // beim naechsten Fenster. Dafuer gibt es die
+            // Zug-in-der-Frist-Pruefung seit dem 2026-10-28: sie
+            // fragt nach der Dekoderfrist noch einmal, was wirklich
+            // zu senden ist. `ablaufSchritt()` kehrt bei laufender
+            // Sendung von selbst um, es geht also nichts doppelt
+            // hinaus.
+            {
                 const QString nachricht = nachrichtAusZeile(c.selectedText());
                 const QString sauber = c.selectedText().simplified();
                 const int snr = sauber.section(QLatin1Char(' '), 1, 1).toInt();
@@ -1907,6 +2048,18 @@ void Ft8Applet::updateStatus()
 // aus `zeigeAblauf()` -- also bei jedem Zustandswechsel des Ablaufs.
 void Ft8Applet::zeigeArbeit()
 {
+    // Den Stand ZUERST melden, nicht am Ende (2026-10-30).
+    //
+    // Der Ausstieg darunter gilt der Arbeitsleiste: gibt es sie
+    // nicht, ist nichts zu beschriften. Das Plaetze-Panel haengt
+    // aber nicht an der Leiste, sondern am Ablauf -- und bekam
+    // dadurch nichts, sobald die Leiste fehlte.
+    //
+    // Gesucht habe ich das an vier Stellen (Merker, Qt-Sichtbarkeit,
+    // Fensterliste, Spaltenzustand), und es lag an einem `return`
+    // zwei Zeilen weiter oben.
+    meldeStand();
+
     if (!m_arbeit) { return; }
 
     using Z = Ft8Ablauf::Zustand;
@@ -1969,6 +2122,110 @@ void Ft8Applet::zeigeArbeit()
                                    : QString();
         m_arbeitZug->setText(zug.isEmpty() ? tr("—") : zug);
     }
+
+}
+
+// ── Der Stand fuer das Plaetze-Panel ─────────────────────────────────
+//
+// Betreiber am 2026-10-30: „ich will sehen, sobald ein qso oder
+// mehrere vielleicht seitlich im eigenen fenster zu sehen sind."
+//
+// Gebaut wird er HIER, nicht dort: `Ft8Mehrfach` und
+// `Ft8Warteschlange` gehoeren diesem Applet, und zwei Fenster, die
+// beide hineingreifen, haetten jedes seine eigene Meinung darueber,
+// welcher Zug gerade dran ist.
+
+// Der Zug, wie das Fenster ihn nennt -- „Tx2", „RR73", „CQ". NICHT
+// `Ft8Ablauf::zustandName()`: das sind die technischen Namen
+// („SendeRReport"), gut fuer Prueflaeufe und falsch auf einer
+// Kachel, die 48 Punkte breit ist.
+QString Ft8Applet::zugKurz(Ft8Ablauf::Zustand z)
+{
+    using Z = Ft8Ablauf::Zustand;
+    switch (z) {
+        case Z::RufeCq:       return QStringLiteral("CQ");
+        case Z::RufeAn:       return QStringLiteral("Tx1");
+        case Z::SendeReport:  return QStringLiteral("Tx2");
+        case Z::SendeRReport: return QStringLiteral("Tx3");
+        case Z::SendeRR73:    return QStringLiteral("RR73");
+        case Z::Sende73:      return QStringLiteral("73");
+        case Z::Fertig:       return tr("done");
+        case Z::Ruht:
+        case Z::Abgebrochen:  return QString();
+    }
+    return QString();
+}
+
+int Ft8Applet::stufeFuer(Ft8Ablauf::Zustand z)
+{
+    using Z = Ft8Ablauf::Zustand;
+    switch (z) {
+        case Z::Ruht:         return 0;
+        case Z::RufeCq:       return 0;
+        case Z::RufeAn:       return 1;
+        case Z::SendeReport:  return 2;
+        case Z::SendeRReport: return 3;
+        case Z::SendeRR73:    return 4;
+        case Z::Sende73:      return 5;
+        case Z::Fertig:       return 5;
+        case Z::Abgebrochen:  return 0;
+    }
+    return 0;
+}
+
+Ft8PlaetzeStand Ft8Applet::baueStand() const
+{
+    Ft8PlaetzeStand st;
+    st.plaetzeGesamt = m_plaetze;
+    st.sendet        = m_sendet;
+
+    auto ausAblauf = [this](const Ft8Ablauf& a, int tonHz) {
+        Ft8PlatzStand z;
+        z.partner   = a.partner();
+        z.land      = z.partner.isEmpty() ? QString() : landFuer(z.partner);
+        z.tonHz     = tonHz;
+        z.zug       = zugKurz(a.zustand());
+        z.gesendet  = a.gesendeterReport();
+        z.empfangen = a.empfangenerReport();
+        z.stufe     = stufeFuer(a.zustand());
+        return z;
+    };
+
+    if (mehrfachAn()) {
+        for (const Ft8Mehrfach::Belegung& b : m_mehrfach.belegung()) {
+            Ft8PlatzStand z;
+            z.partner = b.partner;
+            z.land    = z.partner.isEmpty() ? QString() : landFuer(z.partner);
+            z.tonHz   = int(b.toneHz);
+            z.stufe   = stufeFuer(b.zustand);
+            z.zug     = zugKurz(b.zustand);
+            st.plaetze.append(z);
+        }
+    }
+    // Der CQ-Ruf ist ein Platz, kein zweiter Ablauf -- genau wie beim
+    // Senden (siehe `sendeMehrfach`). Darum steht er in derselben
+    // Liste und nicht daneben.
+    if (m_ablauf.laeuft()) {
+        st.plaetze.append(ausAblauf(m_ablauf, m_sendeTonHz));
+    }
+
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    for (const Ft8Warteschlange::Wartend& w : m_schlange.alle()) {
+        if ((jetzt - w.seitMs) >= Ft8Warteschlange::kHaltbarkeitMs) {
+            continue;
+        }
+        Ft8WartenderStand ws;
+        ws.partner = w.partner;
+        ws.land    = landFuer(w.partner);
+        ws.snr     = w.snr;
+        st.wartende.append(ws);
+    }
+    return st;
+}
+
+void Ft8Applet::meldeStand()
+{
+    emit plaetzeGeaendert(baueStand());
 }
 
 // Der Absender einer FT8-Nachricht.
@@ -2084,6 +2341,10 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
             if (bewegt) { ablaufSchritt(); }
         } else if (m_ablauf.laeuft() && m_ablauf.verarbeite(d.text, snr)) {
             ablaufSchritt();
+        } else {
+            // Er ruft mich, aber gerade geht es nicht: ein QSO laeuft,
+            // oder der Ablauf ruht. Dann merken statt fallen lassen.
+            merkeAnrufFallsNoetig(d.text, snr);
         }
 
         const QString ruf = senderCallsign(d.text);
@@ -2150,10 +2411,13 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
 // faltet mehrfache Leerzeichen zusammen -- die Spalten (Zeit, dB, DT,
 // Hz) stuenden danach nicht mehr untereinander.
 Ft8Applet::Zeilenart Ft8Applet::zeilenart(bool anMich, bool neuesLand,
-                                         bool istCq)
+                                         bool neuesGrid, bool istCq)
 {
     if (anMich)    { return Zeilenart::AnMich; }
     if (neuesLand) { return Zeilenart::NeuesLand; }
+    // Zwischen Land und CQ: ein fehlendes Land ist mehr wert als ein
+    // fehlendes Feld, und beides mehr als ein beliebiges CQ.
+    if (neuesGrid) { return Zeilenart::NeuesGrid; }
     if (istCq)     { return Zeilenart::Cq; }
     return Zeilenart::Gewoehnlich;
 }
@@ -2188,6 +2452,30 @@ QString Ft8Applet::zeilentext(const QString& uhrzeit, int snrDb,
         .arg(dtSekunden, 5, 'f', 1)
         .arg(hz, 5)
         .arg(breit, land);
+}
+
+// ── Die Spaltenkoepfe (2026-10-30) ───────────────────────────────────
+//
+// Betreiber: „die staerke des signals sollte auch in einer eigenen
+// spalten sein." Sie IST eine -- die zweite. Ohne Ueberschrift ist
+// nur nicht zu sehen, welche der vier Zahlen welche ist:
+//
+//     191845    8    1.0   2406   LZ1ZF SP4DIS KO13   Poland
+//
+// WSJT-X schreibt sie ueber die Liste („UTC  dB  DT  Freq  Message"),
+// und genau dort hat er sie gesucht. Gebaut aus DENSELBEN Breiten wie
+// `zeilentext` -- zwei Stellen mit eigenen Zahlen waeren beim ersten
+// Spaltenwechsel auseinandergelaufen.
+QString Ft8Applet::spaltenkopf()
+{
+    // `zeilentext` baut "%1 %2 %3 %4  %5": Uhrzeit, dann vier Stellen
+    // fuer dB, fuenf fuer DT, fuenf fuer Hz.
+    return QStringLiteral("%1 %2 %3 %4  %5")
+        .arg(QStringLiteral("UTC   "))
+        .arg(tr("dB"), 4)
+        .arg(tr("DT"), 5)
+        .arg(tr("Freq"), 5)
+        .arg(tr("Message"));
 }
 
 QString Ft8Applet::landFuer(const QString& rufzeichen) const
@@ -2272,6 +2560,7 @@ bool Ft8Applet::inSicht(const Fundzeile& z) const
     case Sicht::AnMich: return z.anMich;
     case Sicht::Cq:     return z.istCq || z.anMich;
     case Sicht::NeuesLand: return z.neuesLand || z.anMich;
+    case Sicht::NeuesGrid: return z.neuesGrid || z.anMich;
     case Sicht::MeineFrequenz:
         // Dieselbe Regel wie frueher die rechte Spalte: das Fenster
         // ist die Signalbreite von FT8/FT4 (50 Hz), kein gegriffener
@@ -2301,7 +2590,8 @@ void Ft8Applet::haengeAn(const Fundzeile& z)
         f.setForeground(QColor(QString::fromLatin1(Style::kTxKeyBorder)));
         f.setFontWeight(QFont::Bold);
     } else {
-        const Zeilenart art = zeilenart(z.anMich, z.neuesLand, z.istCq);
+        const Zeilenart art = zeilenart(z.anMich, z.neuesLand,
+                                        z.neuesGrid, z.istCq);
         if (art == Zeilenart::AnMich) {
             f.setForeground(QColor(QString::fromLatin1(Style::kGreenText)));
             f.setFontWeight(QFont::Bold);
@@ -2313,6 +2603,23 @@ void Ft8Applet::haengeAn(const Fundzeile& z)
                                 : QColor(QString::fromLatin1(
                                       Style::kAmberText)));
             f.setFontWeight(QFont::Bold);
+        } else if (art == Zeilenart::NeuesGrid) {
+            // ── Blau fuer ein Grossfeld, das fehlt (2026-10-30) ──
+            //
+            // Betreiber: „interessant waere zu sehen, welche grids ich
+            // noch nicht habe und diese dann zb blau zu markieren" --
+            // „somit sehe ich dann, was ich noch benoetige."
+            //
+            // Die Farbe ist seine Wahl. Im Hausstil ist Blau sonst
+            // „anfassbar" und Warm „gemessen"; hier traegt es eine
+            // Auskunft. Das ist eine bewusste Ausnahme und keine
+            // Nachlaessigkeit: er hat sie genannt, und sie trennt die
+            // Felder sauber vom Bernstein der Laender und CQs.
+            //
+            // NICHT fett: ein neues Land ist mehr wert als ein neues
+            // Feld, und wenn beides fett waere, hoben sich die
+            // Stufen gegenseitig auf.
+            f.setForeground(QColor(QString::fromLatin1(Style::kAccent)));
         } else if (art == Zeilenart::Cq) {
             f.setForeground(QColor(QString::fromLatin1(Style::kAmberText)));
         } else {
@@ -2367,11 +2674,49 @@ void Ft8Applet::zeigeFundZahl()
                               ? tr("%1 decodes").arg(m_zeilen.size())
                               : tr("%1 of %2").arg(m_lineCount)
                                     .arg(m_zeilen.size());
-    m_fundZahl->setText(m_lastPeriodCount < 0
-                            ? liste
-                            : QStringLiteral("%1 \u00b7 %2")
-                                  .arg(liste,
-                                       tr("%1 last").arg(m_lastPeriodCount)));
+    QString text = m_lastPeriodCount < 0
+                       ? liste
+                       : QStringLiteral("%1 \u00b7 %2")
+                             .arg(liste,
+                                  tr("%1 last").arg(m_lastPeriodCount));
+
+    // ── Wer wartet, muss sichtbar sein ──────────────────────
+    //
+    // Am 2026-10-30 im Betrieb aufgefallen, eine Minute nachdem die
+    // Warteschlange zum ersten Mal lief:
+    //
+    //   16:09:00  Anruf gemerkt: F5PZT  — wartet als Nummer 1
+    //   16:09:00  Anruf gemerkt: OE3TVJ — wartet als Nummer 2
+    //
+    // Beide standen im Protokoll und nirgends sonst. Das Plaetze-Panel
+    // zeigt sie, aber das ist ab Werk aus -- wer es nicht geoeffnet
+    // hat, sieht nicht, dass zwei Stationen auf ihn warten. Eine
+    // Warteschlange, die niemand sieht, ist keine.
+    // ── Wie viele QSOs laufen (2026-10-30) ──────────────────
+    //
+    // Betreiber: „so sehe ich nicht, ob und wie viele qso gleich
+    // ablaufen und welches wie weit sie sind."
+    //
+    // Das Plaetze-Panel zeigt beides ausfuehrlich, ist aber nicht
+    // immer offen. Die ZAHL gehoert darum auch hierher -- sie
+    // beantwortet „laeuft ueberhaupt was" ohne ein zweites Fenster.
+    // Wie weit jedes ist, bleibt dem Panel: fuenf Striche je QSO
+    // passen in keine Kopfzeile.
+    const int laufend = mehrfachAn()
+                            ? m_mehrfach.aktive()
+                            : (m_ablauf.laeuft()
+                               && !m_ablauf.partner().isEmpty() ? 1 : 0);
+    if (laufend > 0) {
+        text += QStringLiteral(" \u00b7 ")
+                + (laufend == 1 ? tr("1 QSO") : tr("%1 QSOs").arg(laufend));
+    }
+
+    const int warten =
+        m_schlange.wartende(QDateTime::currentMSecsSinceEpoch());
+    if (warten > 0) {
+        text += QStringLiteral(" \u00b7 ") + tr("%1 waiting").arg(warten);
+    }
+    m_fundZahl->setText(text);
 }
 
 void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
@@ -2413,6 +2758,21 @@ void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
                 z.landFarbe = dxcc->colorForSpot(senderRuf, mhz, modus);
             }
         }
+    }
+
+    // ── Fehlt mir dieses Grossfeld? (2026-10-30) ─────────────
+    //
+    // Der Locator steht bei FT8 in der Nachricht selbst
+    // („CQ G4MHJ IO83"); nachschlagen muss ihn niemand. Steht keiner
+    // drin -- bei jedem Rapport und jedem RR73 --, ist die Zeile
+    // nicht neu, sondern stumm: `GridsGearbeitet::istNeu` gibt dann
+    // false, und das ist Absicht.
+    //
+    // `leer()` schuetzt vor der schlimmsten Form: ohne gelesenes
+    // Logbuch waere JEDES Feld neu, und die Markierung sagte nichts
+    // mehr. Dann lieber keine.
+    if (!m_grids.leer()) {
+        z.neuesGrid = m_grids.istNeu(locatorAusNachricht(nachricht));
     }
 
     // Gemerkt wird JEDE Zeile, gezeigt nur die, die in die Sicht

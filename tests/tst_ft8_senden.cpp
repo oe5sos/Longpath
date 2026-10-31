@@ -570,6 +570,135 @@ private slots:
         applet.abbrechen();
     }
 
+    // ── Was mir noch fehlt, steht blau (2026-10-30) ─────────────────
+    //
+    // Betreiber: „interessant waere zu sehen, welche grids ich noch
+    // nicht habe und diese dann zb blau zu markieren ... somit sehe
+    // ich dann, was ich noch benoetige." Danach meldete er: „keine
+    // blauen rufzeichen...."
+    //
+    // Behoben war es; belegt nicht. `tst_ft8_flaeche` prueft die
+    // RANGFOLGE der Zeilenarten (`zeilenart(...)`), `tst_grids_-
+    // gearbeitet` die Einheit -- den WEG dazwischen fuhr niemand:
+    //
+    //   Logbuch -> GridsGearbeitet::istNeu -> z.neuesGrid
+    //   -> Sichtfilter -> was in der Liste steht
+    //
+    // Genau die Form, in der heute acht Fehler steckten.
+    void nurDieFehlendenGrossfelderStehenInDerSicht()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        applet.setProtocol(Ft8Decoder::Protocol::Ft8);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+
+        // Ein Logbuch mit genau einem Grossfeld. Ohne das greift
+        // `leer()` und es wird NICHTS markiert -- auch Absicht, siehe
+        // den naechsten Fall.
+        applet.gridsForTest().merke(QStringLiteral("JO31"));
+        QVERIFY(!applet.gridsForTest().leer());
+
+        auto* knopf = applet.sichtNeuesGridButtonForTest();
+        QVERIFY2(knopf, "die Sicht „New grid“ hat keinen Knopf");
+        knopf->click();
+
+        const auto fund = [&applet](const char* text) {
+            Ft8Decode d;
+            d.text   = QString::fromLatin1(text);
+            d.snrDb  = -10;
+            d.freqHz = 1500.0;
+            applet.fundForTest(d);
+        };
+        fund("CQ DL1ABC JO31");    // habe ich schon
+        fund("CQ SP9XYZ KO02");    // fehlt mir
+        fund("CQ G4MHJ IO83");     // fehlt mir
+
+        const QString sicht = applet.listForTest()->toPlainText();
+        QVERIFY2(!sicht.contains(QStringLiteral("DL1ABC")),
+                 qPrintable(QStringLiteral("JO31 ist gearbeitet und darf "
+                                           "nicht in der Sicht stehen:\n")
+                            + sicht));
+        QVERIFY2(sicht.contains(QStringLiteral("SP9XYZ")),
+                 qPrintable(QStringLiteral("KO02 fehlt und muss stehen:\n")
+                            + sicht));
+        QVERIFY2(sicht.contains(QStringLiteral("G4MHJ")),
+                 qPrintable(QStringLiteral("IO83 fehlt und muss stehen:\n")
+                            + sicht));
+    }
+
+    // Ohne gelesenes Logbuch waere JEDES Feld neu, und die Markierung
+    // sagte nichts mehr. Dann lieber keine -- `leer()` schuetzt davor,
+    // und das ist eine Entscheidung, nicht ein Versehen.
+    void ohneLogbuchWirdNichtsMarkiert()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        applet.setProtocol(Ft8Decoder::Protocol::Ft8);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+
+        applet.gridsForTest().leeren();
+        applet.sichtNeuesGridButtonForTest()->click();
+
+        Ft8Decode d;
+        d.text   = QStringLiteral("CQ SP9XYZ KO02");
+        d.snrDb  = -10;
+        d.freqHz = 1500.0;
+        applet.fundForTest(d);
+
+        QVERIFY2(!applet.listForTest()->toPlainText()
+                     .contains(QStringLiteral("SP9XYZ")),
+                 "ohne Logbuch ist kein Feld „neu“ -- sonst waere alles neu");
+    }
+
+    // ── Auch waehrend einer laufenden Sendung (2026-10-30) ──────────
+    //
+    // Betreiber: „doppelklick loest kein automatisches qso aus."
+    //
+    // Hier stand `if (!m_sendet)`, und das verschluckte jeden
+    // Doppelklick, der in eine laufende Sendung fiel. Bei FT8 ist das
+    // die HAELFTE der Zeit: 13,2 s von 15 wird getastet, und wer in
+    // der Liste etwas sieht, klickt genau dann. Der Druck war weg,
+    // ohne dass irgendwo etwas stand.
+    //
+    // Der Fall darueber endet bereits mit `sendetGerade() == true` --
+    // ein zweiter Doppelklick ist also genau seine Lage, und mit der
+    // alten Fassung tat er nichts.
+    void einDoppelklickWaehrendDerSendungZaehltAuch()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        applet.setProtocol(Ft8Decoder::Protocol::Ft4);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        auto* liste = applet.listForTest();
+        QVERIFY(liste);
+        liste->setPlainText(
+            QStringLiteral("120000   -8   0.2  1500  CQ DL1ABC JO31"));
+        doppelklickInDieListe(applet);
+        QCOMPARE(applet.ablaufForTest().partner(), QStringLiteral("DL1ABC"));
+        QVERIFY2(applet.sendetGerade(), "Voraussetzung: es geht etwas hinaus");
+
+        // Jetzt faellt der Klick MITTEN in die Sendung.
+        liste->setPlainText(
+            QStringLiteral("120015  -14   0.1  1740  CQ SP9XYZ KO02"));
+        doppelklickInDieListe(applet);
+
+        QCOMPARE(applet.textFeldForTest()->text(),
+                 QStringLiteral("SP9XYZ OE5SOS JN67"));
+        QVERIFY2(applet.ablaufForTest().laeuft(),
+                 "der Ablauf muss auch waehrend der Sendung anlaufen");
+        QCOMPARE(applet.ablaufForTest().partner(), QStringLiteral("SP9XYZ"));
+        applet.abbrechen();
+    }
+
     // ── Das eigene Gespraech steht rechts ───────────────────────────
     //
     // Betreiber am 2026-10-22: „sehe ich auch rechts, wenn ein qso zu
