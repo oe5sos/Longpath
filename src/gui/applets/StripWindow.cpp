@@ -19,6 +19,7 @@
 #include "gui/StyleConstants.h"
 #include "core/strip/EqBandLayout.h"
 #include "core/strip/AetherPreset.h"
+#include "core/ProfilHerkunft.h"
 #include "core/strip/StripSettings.h"
 #include "core/strip/BandLimit.h"
 #include "core/strip/StripLiveMonitor.h"
@@ -1085,13 +1086,18 @@ void StripWindow::buildUi()
         // Zeile fuer Zeile dasselbe rechnen. Was NICHT uebernommen
         // werden kann, sagt der Importeur selbst und steht danach im
         // Hinweis unter der Zeile.
+        // Seit dem 2026-10-31 heiszt der Knopf nicht mehr nach einem
+        // Hersteller. Er nimmt jede Profildatei an, erkennt sie am
+        // Inhalt und sagt bei einer, die woanders hingehoert, WOHIN —
+        // statt „kein AetherSDR-Kanalzugprofil" und sonst nichts.
         m_aetherImport = new QPushButton(
-            Sprache::T(QStringLiteral("Aether profile…")), this);
+            Sprache::T(QStringLiteral("Profile…")), this);
         m_aetherImport->setStyleSheet(Style::buttonBaseStyle());
         m_aetherImport->setToolTip(QStringLiteral(
             "Loads a channel-strip profile from AetherSDR (.json) — "
             "with the stage order, every value, and the promise that "
-            "nothing runs along that Aether did not have."));
+            "nothing runs along that Aether did not have. A Thetis "
+            "file is recognised too and told where it belongs."));
         row->addWidget(m_aetherImport);
         row->addStretch(1);
 
@@ -2706,11 +2712,47 @@ void StripWindow::importAetherPreset()
     if (!c) { return; }
 
     const QString pfad = QFileDialog::getOpenFileName(
-        this, Sprache::T(QStringLiteral("Open AetherSDR channel strip profile")),
+        this, Sprache::T(QStringLiteral("Open profile")),
         QStandardPaths::writableLocation(QStandardPaths::DesktopLocation),
-        QStringLiteral("AetherSDR (*.json);;%1 (*)")
-            .arg(Sprache::T(QStringLiteral("All files"))));
+        ProfilHerkunft::dateiFilter());
     if (pfad.isEmpty()) { return; }
+
+    // ── Erst ansehen, was da liegt (2026-10-31) ──────────────────────
+    //
+    // Bis heute ging die Datei ungesehen an AetherPreset, und eine
+    // Thetis-Ausfuhr bekam „Das ist kein AetherSDR-Kanalzugprofil
+    // (Feld „schema" lautet „—")". Richtig, und doch die falsche
+    // Auskunft: Longpath KANN diese Datei lesen, nur an einer anderen
+    // Stelle. Jetzt steht das auch da. Begruendung und Vorbild im Kopf
+    // von ProfilHerkunft.h.
+    QFile f(pfad);
+    if (!f.open(QIODevice::ReadOnly)) {
+        m_presetNote->setText(
+            Sprache::T(QStringLiteral("Cannot open that file.")));
+        return;
+    }
+    const QByteArray inhalt = f.readAll();
+    f.close();
+
+    const ProfilHerkunft::Befund b = ProfilHerkunft::erkenne(inhalt);
+    if (b.art == ProfilHerkunft::Art::ThetisProfilausfuhr
+        || b.art == ProfilHerkunft::Art::ThetisDatenbank) {
+        // Erkannt, lesbar — nur nicht hier. Der Weg dorthin steht
+        // dabei, sonst ist die Auskunft so nutzlos wie vorher.
+        m_presetNote->setText(
+            Sprache::T(QStringLiteral(
+                "That is %1. It belongs in the TX profiles, not in the "
+                "channel strip: Setup → Transmit → TX Profiles, "
+                "“Import Thetis profiles…”. The two are different "
+                "chains — this one runs on the microphone, those set "
+                "the radio's own processing."))
+                .arg(b.was));
+        return;
+    }
+    if (b.art != ProfilHerkunft::Art::AetherKanalzug) {
+        m_presetNote->setText(b.warumNicht);
+        return;
+    }
 
     // Dieselbe Sicherung wie beim Wechsel einer Voreinstellung: ein
     // Import ersetzt die ganze Kette, und auch davor soll der

@@ -17,6 +17,7 @@
 
 #include "core/MicProfileManager.h"
 #include "core/ThetisProfilImport.h"
+#include "core/ProfilHerkunft.h"
 #include "models/RadioModel.h"
 #include "gui/StyleConstants.h"
 #include "gui/ScopedChildWidget.h"
@@ -534,6 +535,25 @@ void TxProfileSetupPage::onImportClicked()
     }
     const QByteArray inhalt = f.readAll();
     f.close();
+
+    // ── Die Gegenrichtung (2026-10-31) ───────────────────────────────
+    //
+    // Dasselbe wie im Kanalzugfenster, nur andersherum: wer sein
+    // AetherSDR-Kanalzugprofil hier hereinzieht, soll hoeren, dass
+    // Longpath es lesen kann — zwei Fenster weiter. Vorher bekam er
+    // „Nothing imported." und keinen Hinweis, dass die Datei in
+    // Ordnung ist. Siehe ProfilHerkunft.h.
+    const ProfilHerkunft::Befund b = ProfilHerkunft::erkenne(inhalt);
+    if (b.art == ProfilHerkunft::Art::AetherKanalzug) {
+        QMessageBox::information(
+            this, tr("Import Thetis profiles"),
+            tr("That is a channel-strip profile from AetherSDR. It "
+               "belongs in the channel strip, not here: open the "
+               "Channel Strip window and use “Profile…” in the profile "
+               "row. The two are different chains — that one runs on "
+               "the microphone, these set the radio's own processing."));
+        return;
+    }
 
     const QString bericht = einleseThetisDateiFuerTest(inhalt);
     // Ein Bericht und kein stilles "fertig": was eingelesen wurde, was
