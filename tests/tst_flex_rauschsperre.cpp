@@ -18,6 +18,8 @@
 
 #include <QtTest/QtTest>
 
+#include <QRegularExpression>
+
 #include "core/FlexRadioConnection.h"
 
 using namespace Longpath;
@@ -89,6 +91,86 @@ private slots:
                          " geht nicht an die Maschine — bei der Flex "
                          "bewirkt der Regler dann wieder nichts")));
         }
+    }
+
+    // ── Der Wunsch kommt vor der Scheibennummer ─────────────────────
+    //
+    // Gemessen an Martins Protokoll vom 2026-10-31:
+    //
+    //   19:54:36.430  Flex: Leistung nachgezogen   (hier will sie hinaus)
+    //   19:54:36.573  Flex: Ton auf Scheibe "0"    (hier erst ist die Nummer da)
+    //
+    // 143 ms. In dieser Luecke fiel die Rauschsperre still heraus --
+    // der Knopf stand auf an, die Maschine behielt ihren alten Stand.
+    // Also vormerken statt verwerfen.
+    void ohneScheibeWirdVorgemerkt()
+    {
+        const QString rumpf = funktionsRumpf(
+            QStringLiteral("void RadioModel::sendeFlexRauschsperre"));
+        // Leerzeichen zwischen Name und Zuweisung sind Ausrichtung,
+        // keine Aussage -- der Waechter darf daran nicht haengen.
+        QVERIFY2(rumpf.contains(QRegularExpression(QStringLiteral(
+                     "m_flexHatRauschsperreNachzutragen\\s*=\\s*true"))),
+                 "ohne Scheibennummer wird der Wunsch verworfen statt vorgemerkt — "
+                 "beim Anmelden geht die Rauschsperre dann nie hinaus");
+    }
+
+    // Und das Vorgemerkte musz auch wirklich nachgereicht werden,
+    // sobald die Maschine ihre Scheibe meldet -- an derselben Stelle,
+    // an der Art und Flanken das schon tun.
+    void dieScheibenmeldungTraegtNach()
+    {
+        const QString src = quelle(QStringLiteral("/src/models/RadioModel.cpp"));
+        const int a = src.indexOf(QStringLiteral("m_flexSliceId       = object.split"));
+        QVERIFY2(a > 0, "die Stelle, an der die Scheibennummer ankommt, ist weg");
+        const int e = src.indexOf(QStringLiteral("m_flexHatFlankenNachzutragen"), a);
+        QVERIFY2(e > a, "der Nachtragsblock ist weg");
+        QVERIFY2(src.mid(a, e - a).contains(QStringLiteral("m_flexHatRauschsperreNachzutragen")),
+                 "die Scheibenmeldung reicht die vorgemerkte Rauschsperre nicht nach");
+    }
+
+    // ── Eine Ablehnung musz sagen, WAS abgelehnt wurde ──────────────
+    //
+    // Im selben Protokoll stand „Befehl 1 abgelehnt, Code 0x10000002"
+    // -- ohne den Wortlaut. Bei „funktioniert nicht" ist genau das
+    // die Frage.
+    void dieAblehnungNenntDenWortlaut()
+    {
+        const QString src = quelle(QStringLiteral("/src/core/FlexRadioConnection.cpp"));
+        const int a = src.indexOf(QStringLiteral("abgelehnt, Code"));
+        QVERIFY2(a > 0, "die Ablehnungsmeldung ist weg");
+        // NUR die Meldung selbst, bis zu ihrem Strichpunkt. Weiter
+        // gefasst haette dieser Waechter nicht gebissen: das
+        // Aufraeumen danach nennt denselben Namen und haette den
+        // Fall gruen gehalten, obwohl die Meldung ihn nicht mehr
+        // ausgibt (am 2026-10-31 genau so passiert).
+        const int e = src.indexOf(QLatin1Char(';'), a);
+        QVERIFY2(e > a, "der Antwortzweig sieht anders aus als erwartet");
+        QVERIFY2(src.mid(a, e - a).contains(QStringLiteral("wortlaut")),
+                 "die Ablehnung nennt weiterhin nur die laufende Nummer, "
+                 "nicht den Befehl");
+    }
+
+private:
+    static QString quelle(const QString& relativ)
+    {
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { return QString(); }
+        QFile f(QString::fromLocal8Bit(root) + relativ);
+        if (!f.open(QIODevice::ReadOnly)) { return QString(); }
+        return QString::fromUtf8(f.readAll());
+    }
+
+    // Vom Kopf bis zur schliessenden Klammer in Spalte eins -- nicht
+    // ein Fenster fester Groesse: siehe die Lehre oben.
+    static QString funktionsRumpf(const QString& kopf)
+    {
+        const QString src = quelle(QStringLiteral("/src/models/RadioModel.cpp"));
+        const int a = src.indexOf(kopf);
+        if (a < 0) { return QString(); }
+        const int e = src.indexOf(QStringLiteral("\n}\n"), a);
+        if (e < a) { return QString(); }
+        return src.mid(a, e - a);
     }
 };
 

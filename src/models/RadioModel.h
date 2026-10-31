@@ -3988,6 +3988,13 @@ private:
     int                  m_flexFlankeTiefNachzutragen{0};
     int                  m_flexFlankeHochNachzutragen{0};
     bool                 m_flexHatFlankenNachzutragen{false};
+    /// Rauschsperre: beim Anmelden will sie hinaus, bevor die Maschine
+    /// ihre erste Scheibenmeldung geschickt hat (gemessen 2026-10-31:
+    /// 143 ms zu frueh). Dann wird sie hier gemerkt und mit der
+    /// Scheibennummer nachgereicht -- wie Art und Flanken darueber.
+    bool                 m_flexRauschsperreAnNachzutragen{false};
+    double               m_flexRauschsperreStufeNachzutragen{0.0};
+    bool                 m_flexHatRauschsperreNachzutragen{false};
     /// Rauschminderung: zuletzt geschickt und, solange die
     /// Scheibennummer fehlt, nachzutragen. Vorgabe aus: eine Maschine,
     /// die beim Verbinden etwas anderes meldet, korrigiert das über

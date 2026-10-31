@@ -7230,6 +7230,12 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                         m_flexHatArtNachzutragen = false;
                         setFlexSliceMode(m_flexArtNachzutragen);
                     }
+                    if (m_flexHatRauschsperreNachzutragen) {
+                        m_flexHatRauschsperreNachzutragen = false;
+                        sendeFlexRauschsperre(
+                            m_flexRauschsperreAnNachzutragen,
+                            m_flexRauschsperreStufeNachzutragen);
+                    }
                     if (m_flexHatFlankenNachzutragen) {
                         m_flexHatFlankenNachzutragen = false;
                         setFlexSliceFilter(m_flexFlankeTiefNachzutragen,
@@ -7421,7 +7427,27 @@ bool RadioModel::setzeFlexSendescheibe(const QString& sliceId)
 void RadioModel::sendeFlexRauschsperre(bool an, double stufe0bis100)
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
-    if (m_flexSliceId.isEmpty()) { return; }
+    // ── Die Scheibennummer kommt spaeter als der Wunsch (2026-10-31) ──
+    //
+    // Beim Anmelden zieht `MainWindow_Flex` Leistung UND Rauschsperre
+    // einmal nach, damit sie nicht auf eine Reglerbewegung warten
+    // muessen. Gemessen an Martins Protokoll lag dieser Griff 143 ms
+    // VOR der ersten Scheibenmeldung der Maschine
+    // (19:54:36.430 gegen 19:54:36.573) -- `m_flexSliceId` war also
+    // noch leer, und die Rauschsperre fiel still hier heraus. Der
+    // Knopf stand auf an, die Maschine behielt, was sie hatte.
+    //
+    // Also merken statt verwerfen, genau wie Art und Flanken es
+    // oben schon tun; nachgereicht wird in der Scheibenmeldung.
+    if (m_flexSliceId.isEmpty()) {
+        m_flexRauschsperreAnNachzutragen    = an;
+        m_flexRauschsperreStufeNachzutragen = stufe0bis100;
+        m_flexHatRauschsperreNachzutragen   = true;
+        qCInfo(lcConnection) << "Flex: Rauschsperre vorgemerkt — "
+                                "die Scheibennummer fehlt noch";
+        return;
+    }
+    m_flexHatRauschsperreNachzutragen = false;
 
     const QString b1 = FlexCommandWire::setSliceSquelchCommand(m_flexSliceId, an);
     if (!b1.isEmpty()) { m_flexConnection->sendCommand(b1); }

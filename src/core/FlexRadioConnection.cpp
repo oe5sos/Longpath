@@ -542,6 +542,13 @@ quint32 FlexRadioConnection::sendCommand(const QString& command)
         qCWarning(lcFlexCmd) << "Schreiben unvollstaendig:" << m_socket.errorString();
     }
     qCDebug(lcFlexCmd) << "TX:" << QStringLiteral("C%1|%2").arg(seq).arg(command);
+    // Wortlaut merken, bis die Antwort da ist: eine Ablehnung soll
+    // sagen koennen, WAS abgelehnt wurde.
+    m_wortlaut.insert(seq, command);
+    m_wortlautReihe.append(seq);
+    while (m_wortlautReihe.size() > kWortlautDecke) {
+        m_wortlaut.remove(m_wortlautReihe.takeFirst());
+    }
     return seq;
 }
 
@@ -700,10 +707,18 @@ void FlexRadioConnection::processLine(const QString& line)
 
     case FlexLineType::Response: {
         emit commandResponse(msg.sequence, msg.resultCode, msg.object);
+        const QString wortlaut = m_wortlaut.value(msg.sequence);
         if (msg.resultCode != 0) {
-            qCWarning(lcFlexCmd) << "Befehl" << msg.sequence << "abgelehnt, Code"
-                                 << QStringLiteral("0x%1").arg(msg.resultCode, 0, 16)
-                                 << msg.object;
+            qCWarning(lcFlexCmd).nospace()
+                << "Befehl " << msg.sequence << " abgelehnt, Code 0x"
+                << QString::number(msg.resultCode, 16) << ": \""
+                << (wortlaut.isEmpty() ? QStringLiteral("(Wortlaut nicht mehr da)")
+                                       : wortlaut)
+                << "\" — " << msg.object;
+        }
+        if (!wortlaut.isEmpty()) {
+            m_wortlaut.remove(msg.sequence);
+            m_wortlautReihe.removeOne(msg.sequence);
         }
         // Der Rueckruf wird VOR dem Aufruf entnommen: laeuft er genau
         // einmal, auch wenn er selbst wieder sendet und antwortet.

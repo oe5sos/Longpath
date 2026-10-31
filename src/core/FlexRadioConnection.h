@@ -541,6 +541,15 @@ private:
     bool    m_mayCreateSlice{true};
     bool    m_guiRegistered{false};
     QMap<quint32, ResponseCallback> m_pending;
+    /// Der Wortlaut jedes abgeschickten Befehls, bis seine Antwort da
+    /// ist. Ohne ihn nennt eine Ablehnung nur ihre laufende Nummer --
+    /// und genau das stand am 2026-10-31 in Martins Protokoll
+    /// („Befehl 1 abgelehnt"), waehrend die Frage war, WELCHER Befehl.
+    /// Begrenzt auf kWortlautDecke Eintraege, damit eine Maschine, die
+    /// nie antwortet, den Speicher nicht fuellt.
+    static constexpr int kWortlautDecke = 512;
+    QMap<quint32, QString> m_wortlaut;
+    QList<quint32>         m_wortlautReihe;
 };
 
 }  // namespace Longpath
