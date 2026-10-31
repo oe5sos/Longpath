@@ -22,6 +22,9 @@
 //
 // Die Marke selbst wird am Widget geprueft (tst_begleitgeraet_marke).
 
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 #include <QtTest>
 
 #include "core/AppSettings.h"
@@ -235,6 +238,73 @@ private slots:
 
         QVERIFY(!TransverterSetup::current().active());
         QCOMPARE(TransverterSetup::displayHz(k28_300), k28_300);
+    }
+    // ── Die Spots muessen mit (2026-10-31) ──────────────────────────
+    //
+    // Betreiber fragte nach dem Stand fuer 2-m-Contest. Nachgesehen:
+    // der Panadapter rechnete Achse, Bandplan und die Marke des
+    // Begleitgeraets durch den Transverter -- die SPOTS aber nicht.
+    // `drawSpotMarkers` nahm `hzToX(spot.freqMhz * 1e6)` roh.
+    //
+    // Folge: ein Spot von 144,300 landet auf einer Achse, die 28 MHz
+    // zeigt, also weit auszerhalb des Bildes; und ein echter
+    // 28-MHz-Spot saesze faelschlich mitten im 2-m-Band. Ein Klick
+    // darauf haette die Scheibe auf 144 MHz gestellt -- eine
+    // Frequenz, die das Geraet gar nicht kann.
+    //
+    // Der Lauf liest die Quelle: ein `SpectrumWidget` braucht einen
+    // Schirm und eine GPU, und die CI hat keine (2026-10-21).
+    void dieSpotsGehenDurchDenTransverter()
+    {
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+        QFile f(QString::fromLocal8Bit(root)
+                + QStringLiteral("/src/gui/SpectrumWidget.cpp"));
+        QVERIFY2(f.open(QIODevice::ReadOnly), qPrintable(f.fileName()));
+        const QString src = QString::fromUtf8(f.readAll());
+
+        const int a = src.indexOf(QStringLiteral("void SpectrumWidget::drawSpotMarkers"));
+        QVERIFY2(a > 0, "drawSpotMarkers nicht gefunden");
+        const int e = src.indexOf(QStringLiteral("\n}\n"), a);
+        QVERIFY(e > a);
+        const QString rumpf = src.mid(a, e - a);
+
+        QVERIFY2(!rumpf.contains(QStringLiteral("hzToX(spot.freqMhz * 1.0e6")),
+                 "der Spot wird roh auf die Achse gelegt — mit Transverter "
+                 "landet er auszerhalb des Bildes");
+        QVERIFY2(rumpf.contains(QStringLiteral("zfFuerAchse(spot.freqMhz")),
+                 "die Spotfrequenz geht nicht durch den Transverter");
+
+        // Und der Klick stimmt die ZF ab, nicht die Antennenfrequenz.
+        const int k = src.indexOf(QStringLiteral("const double freqHz   = "));
+        QVERIFY2(k > 0, "die Klickfrequenz ist nicht mehr zu finden");
+        QVERIFY2(src.mid(k, 120).contains(QStringLiteral("zfFuerAchse")),
+                 "ein Klick auf den Spot stellt die Scheibe auf die "
+                 "Antennenfrequenz — die das Geraet nicht kann");
+    }
+
+    // Der Bandplan reichte nur bis 54 MHz; mit Transverter zeigte der
+    // Panadapter auf 2 m darum gar keine Bandgrenze.
+    void derBandplanKenntJetztZweiMeter()
+    {
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+        QFile f(QString::fromLocal8Bit(root)
+                + QStringLiteral("/resources/bandplans/iaru-region1.json"));
+        QVERIFY2(f.open(QIODevice::ReadOnly), qPrintable(f.fileName()));
+        const QJsonDocument d = QJsonDocument::fromJson(f.readAll());
+        QVERIFY2(!d.isNull(), "der Bandplan ist kein gueltiges JSON");
+        const QJsonArray segs = d.object().value(QStringLiteral("segments")).toArray();
+        bool zweiMeter = false;
+        for (const QJsonValue& v : segs) {
+            const QJsonObject o = v.toObject();
+            if (o.value(QStringLiteral("low")).toDouble() == 144.0
+                && o.value(QStringLiteral("high")).toDouble() == 146.0) {
+                zweiMeter = true;
+            }
+        }
+        QVERIFY2(zweiMeter, "144-146 MHz fehlt — auf 2 m zeigt der "
+                            "Panadapter keine Bandgrenze");
     }
 };
 

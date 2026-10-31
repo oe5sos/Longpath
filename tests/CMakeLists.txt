@@ -1115,6 +1115,12 @@ longpath_add_test(tst_begleitgeraet_regler)
 # Der Versatz dort, wo er vor dem Betreiber landet -- und vor allem:
 # dass OHNE Transverter bitgleich nichts passiert.
 longpath_add_test(tst_transverter_anzeige)
+# Zwei der Faelle lesen `SpectrumWidget.cpp` und den Bandplan als
+# Datei -- ohne diesen Pfad ueberspraengen sie sich still (2026-10-31).
+if(TEST tst_transverter_anzeige)
+    set_tests_properties(tst_transverter_anzeige PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 
 # Die Marke im Panadapter: wo sie sitzt (in der ZF) und was daran
 # steht (auf der Antenne) -- zwei Dinge, die man leicht vertauscht.

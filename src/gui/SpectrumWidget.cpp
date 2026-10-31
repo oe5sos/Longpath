@@ -8636,7 +8636,15 @@ void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
 
         // Longpath coordinate mapping: hzToX(double hz, QRect) takes Hz.
         // AetherSDR upstream uses mhzToX(spot.freqMhz). Multiply by 1e6.
-        const int x = hzToX(spot.freqMhz * 1.0e6, specRect);
+        //
+        // ── Durch den Transverter (2026-10-31) ──────────────────────
+        //
+        // Ein Spot traegt die Frequenz auf der ANTENNE (144,300), die
+        // Achse hier zeigt die ZF (28,300). Ohne `zfFuerAchse` landet
+        // jeder 2-m-Spot weit auszerhalb des Bildes -- und ein
+        // 28-MHz-Spot aus dem Cluster saesze faelschlich mitten im
+        // Band. Ohne Transverter ist die Rechnung die Gleichheit.
+        const int x = hzToX(zfFuerAchse(spot.freqMhz * 1.0e6), specRect);
         if (x < 0 || x > width()) continue;
 
         // Color priority: override → DXCC → spot-provided → default cyan
@@ -8755,7 +8763,7 @@ void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
             // Position badge at average x of the group, at maxBottom
             int avgX = 0;
             for (const auto& s : spots) {
-                avgX += hzToX(s.freqMhz * 1.0e6, specRect);
+                avgX += hzToX(zfFuerAchse(s.freqMhz * 1.0e6), specRect);
             }
             avgX /= spots.size();
 
@@ -10095,7 +10103,11 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
                 const auto& sm = m_spotMarkers[hitMarkerIdx];
                 const int   spotIndex = sm.index;
                 const QString call    = sm.callsign;
-                const double freqHz   = sm.freqMhz * 1.0e6;
+                // Der Spot nennt die Antennenfrequenz; abgestimmt wird
+                // die ZF. Ohne diese Umrechnung spraenge die Scheibe
+                // beim Klick auf 144 MHz -- eine Frequenz, die das
+                // Geraet gar nicht kann (2026-10-31).
+                const double freqHz   = zfFuerAchse(sm.freqMhz * 1.0e6);
                 const QString source  = sm.source;
 
                 // Heap + popup() + WA_DeleteOnClose instead of a
