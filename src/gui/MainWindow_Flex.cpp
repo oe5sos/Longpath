@@ -421,12 +421,44 @@ void MainWindow::wireFlex()
         m_flexAnfBand = connect(ziel, &SliceModel::anfEnabledChanged, this,
                                 [rauschHinaus](bool) { rauschHinaus(); });
 
+        // ── Die Rauschsperre gehoert in dieselbe Reihe (2026-10-31) ──
+        //
+        // Sie lag bisher bei `RadioModel::wireSliceSignals`, zusammen
+        // mit dem ganzen uebrigen DSP-Bedienfeld der Scheibe. Diese
+        // Funktion steigt aber in ihrer zweiten Zeile aus:
+        //
+        //     if (!slice || !m_connection) { return; }
+        //
+        // `m_connection` ist die OpenHPSDR-Verbindung -- am Flex immer
+        // null. Am Geraet gemessen (Martins Protokoll, 2026-10-31):
+        //
+        //     23:03:40.740  SQL-Knopf an (Scheibe 0)
+        //     23:03:41.945  SQL-Regler 17 (Scheibe 0)
+        //     ... und danach keine einzige Zeile "Flex: Rauschsperre"
+        //
+        // Knopf und Regler erreichten das Modell. Das Modell erreichte
+        // die Maschine nie, weil an dieser Scheibe gar nichts haengt.
+        // Darum hier, wo der Flex-Weg alles andere auch selbst
+        // verdrahtet -- Art, Flanken, Rauschminderung.
+        auto sperreHinaus = [this, ziel]() {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            m_radioModel->sendeFlexRauschsperre(ziel->ssqlEnabled(),
+                                                ziel->ssqlThresh());
+        };
+        disconnect(m_flexSqlAnBand);
+        m_flexSqlAnBand = connect(ziel, &SliceModel::ssqlEnabledChanged, this,
+                                  [sperreHinaus](bool) { sperreHinaus(); });
+        disconnect(m_flexSqlStufeBand);
+        m_flexSqlStufeBand = connect(ziel, &SliceModel::ssqlThreshChanged, this,
+                                     [sperreHinaus](double) { sperreHinaus(); });
+
         // Und einmal gleich jetzt, damit die Maschine mit dem
         // uebereinstimmt, was im Fenster steht — sonst gilt der
         // Unterschied bis zum ersten Drehen weiter.
         m_radioModel->setFlexSliceMode(ziel->dspMode());
         m_radioModel->setFlexSliceFilter(ziel->filterLow(), ziel->filterHigh());
         rauschHinaus();
+        sperreHinaus();
 
         // ── Beim VERBINDEN gewinnt die MASCHINE ─────────────────────
         //
@@ -1952,19 +1984,6 @@ void MainWindow::verdrahteFlexSenden()
         } else {
             m_radioModel->setzeFlexAbstimmleistung(stimmWatt);
         }
-        // ── Die Rauschsperre gleich mit (2026-10-31) ────────────
-        //
-        // Aus demselben Grund wie die Leistung: die Baender darueber
-        // feuern nur bei einer Reglerbewegung. Ohne diese Zeile
-        // behielte die Maschine, was ein anderer Client zuletzt
-        // gesetzt hat -- und der Knopf im RX-Applet zeigte etwas
-        // anderes, als wirklich gilt.
-        if (const SliceModel* const sl =
-                m_radioModel->sliceById(m_flexTargetSliceId)) {
-            m_radioModel->sendeFlexRauschsperre(sl->ssqlEnabled(),
-                                                sl->ssqlThresh());
-        }
-
         qCInfo(lcFlexGui).nospace()
             << "Flex: Leistung nachgezogen — senden " << sendeWatt
             << " %, abstimmen " << stimmWatt << " %";

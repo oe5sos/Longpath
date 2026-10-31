@@ -6,6 +6,18 @@
 //   Project Files/Source/ChannelMaster/networkproto1.c, original licence from Thetis source is included below
 //   Project Files/Source/Console/HPSDR/NetworkIO.cs (upstream has no top-of-file header — project-level LICENSE applies)
 //
+
+// Dual-Licensing Statement (applies ONLY to Richard Samphire MW0LGE's
+// contributions — preserved verbatim from Thetis LICENSE-DUAL-LICENSING):
+//
+//   For any code originally written by Richard Samphire MW0LGE, or for
+//   any modifications made by him, the copyright holder for those
+//   portions (Richard Samphire) reserves the right to use, license, and
+//   distribute such code under different terms, including closed-source
+//   and proprietary licences, in addition to the GNU General Public
+//   License granted in LICENCE. Nothing in this statement restricts any
+//   rights granted to recipients under the GNU GPL.
+//
 // =================================================================
 // Modification history (Longpath):
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
