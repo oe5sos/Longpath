@@ -57,10 +57,50 @@
 // Keine Uhr: die Zeit kommt von auszen herein, wie bei
 // `Ft8Warteschlange` und `Ft8Stream`.
 //
+// ── Drei Nachtraege vom 2026-10-31 ──────────────────────────────────
+//
+// Der Betreiber: „tune geht auf 20 und 15 meter nicht, 40 schon" —
+// und gleich darauf: „wird dann auf den anderen baendern
+// wahrscheinlich auch nicht funktionieren". Er hatte recht. Was im
+// Protokoll stand:
+//
+//   13:05:14.735  SENDUNG GEBROCHEN — Stehwelle 7.08 bei 24.1 W
+//   13:05:16.747  nicht abgestimmt — Stehwelle 6.75 ueber 2.50
+//   13:06:06.926  nicht abgestimmt — Stehwelle 6.75 ueber 2.50   (15m)
+//   13:07:27.848  TUNE ... TRANSMITTING                          (40m, 2 min spaeter)
+//
+// EINE Messung auf 20 m sperrte danach 20 m UND 15 m. Dasz 40 m ging,
+// war kein Unterschied im Band, sondern der Ablauf der Haltbarkeit.
+//
+// (1) EINE MESSUNG GEHOERT ZU EINEM BAND. Die Stehwelle beschreibt
+//     einen Antennenweg, nicht das Geraet. Was auf 20 m gemessen
+//     wurde, sagt ueber 15 m nichts — schon gar nicht bei getrennten
+//     Antennen. `messung` und `darfTasten` tragen darum das Band mit;
+//     ein Band ohne eigene Messung ist ein Band ohne Aussage, und
+//     „Abwesenheit ist keine Aussage" gilt dort wie ueberall.
+//
+// (2) ABSTIMMEN IST DIE ABHILFE, NICHT DER VERSTOSZ. Man stimmt ab,
+//     WEIL die Anpassung nicht stimmt — ein Riegel, der den
+//     Abstimmtraeger wegen einer alten schlechten Messung verweigert,
+//     verweigert genau den Handgriff, der sie gut machen wuerde. Der
+//     Satz des Betreibers heiszt „nicht SENDEN", nicht „nicht
+//     abstimmen". `darfAbstimmen` fragt darum nicht die gehaltene
+//     Messung; es bleibt der Riegel WAEHREND der Sendung, und der hat
+//     am 2026-10-31 bewiesen, dasz er traegt: 146 ms nach dem Tasten
+//     brach er den Traeger. Ein Abstimmversuch in eine Fehlanpassung
+//     dauert damit etwa einen Augenblick — das ist ein Abstimmstosz,
+//     kein Betrieb auf einer kaputten Antenne.
+//
+// (3) `vergessen()` fuer den Fall, dasz der Weg sich geaendert hat
+//     (andere Antenne, anderes Band): die Messung wird hinfaellig,
+//     nicht nur der Bruch. `zuruecksetzen()` loescht weiter NUR den
+//     Bruch — die beiden duerfen nicht verwechselt werden.
+//
 // =================================================================
 // Modification history (Longpath):
 //   2026-10-30 — Original fuer Longpath von Martin Fischer (OE5SOS),
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-10-31 — Messung je Band, `darfAbstimmen`, `vergessen`.
 // =================================================================
 
 #include <QString>
@@ -86,29 +126,44 @@ public:
     void setzeAn(bool an) { m_an = an; }
     bool an() const { return m_an; }
 
-    /// Eine Messung einspeisen. Gibt true, wenn JETZT gebrochen werden
+    /// Eine Messung einspeisen. `band` ist der Antennenweg, zu dem sie
+    /// gehoert (`bandKeyName`, also "20m"); leer heiszt „unbekannt" und
+    /// gilt dann fuer sich. Gibt true, wenn JETZT gebrochen werden
     /// muss — der Aufrufer loest dann den Sender.
-    bool messung(float swr, float vorwaertsW, qint64 jetztMs);
+    bool messung(float swr, float vorwaertsW, qint64 jetztMs,
+                 const QString& band = QString());
 
-    /// Darf getastet werden? Ohne Messung immer ja (siehe Kopf).
-    bool darfTasten(qint64 jetztMs) const;
+    /// Darf auf DIESEM Band getastet werden? Ohne Messung fuer dieses
+    /// Band immer ja (siehe Kopf, Nachtrag 1).
+    bool darfTasten(qint64 jetztMs, const QString& band = QString()) const;
+
+    /// Darf ein Abstimmtraeger laufen? Eine gehaltene Messung sperrt
+    /// ihn NICHT — Abstimmen ist die Abhilfe (siehe Kopf, Nachtrag 2).
+    /// Es bleibt der Riegel waehrend der Sendung.
+    bool darfAbstimmen() const { return true; }
 
     /// Warum nicht — fuer die Protokollzeile und das Fenster. Leer,
     /// wenn getastet werden darf.
-    QString grund(qint64 jetztMs) const;
+    QString grund(qint64 jetztMs, const QString& band = QString()) const;
 
     float   letzteSwr()     const { return m_letzteSwr; }
     qint64  letzteMessung() const { return m_letzteMs; }
+    QString letztesBand()   const { return m_letztesBand; }
 
     /// Nach dem Loesen: die Messung bleibt stehen (sie soll ja das
     /// naechste Tasten verhindern), nur die Bruchmeldung faellt.
     void zuruecksetzen();
+
+    /// Der Antennenweg hat sich geaendert: die Messung ist hinfaellig,
+    /// nicht nur der Bruch. NICHT dasselbe wie `zuruecksetzen`.
+    void vergessen();
 
 private:
     bool    m_an{true};
     float   m_grenze{kVorgabeGrenze};
     float   m_letzteSwr{0.0f};
     qint64  m_letzteMs{0};
+    QString m_letztesBand;
     bool    m_hatGemessen{false};
     bool    m_gebrochen{false};
 };

@@ -89,7 +89,18 @@ RadioStatus::RadioStatus(QObject* parent)
 
 double RadioStatus::forwardPowerWatts() const { return m_forward; }
 double RadioStatus::reflectedPowerWatts() const { return m_reflected; }
-double RadioStatus::swrRatio() const { return m_swr; }
+double RadioStatus::swrRatio() const
+{
+    // Wo das Geraet selbst misst, gilt das Geraet (2026-10-31).
+    return m_gemesseneSwr ? *m_gemesseneSwr : m_swr;
+}
+
+void RadioStatus::setMeasuredSwr(std::optional<double> swr)
+{
+    if (m_gemesseneSwr == swr) { return; }
+    m_gemesseneSwr = swr;
+    emit powerChanged(m_forward, m_reflected, swrRatio());
+}
 int    RadioStatus::exciterPowerMw() const { return m_exciterMw; }
 double RadioStatus::paTemperatureCelsius() const { return m_paTemp; }
 double RadioStatus::paCurrentAmps() const { return m_paCurrent; }
