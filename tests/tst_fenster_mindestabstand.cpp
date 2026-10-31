@@ -51,7 +51,14 @@ const QRect kBuendigRechts(256, 96, kBreite, kHoehe);
 // also um die Luft schmaler und niedriger -- und bleibt dann dort:
 // 256 + 157 = 413, naechste Linie 416, 416 - 3 = 413. Die Rechnung ist
 // also ortsfest, ein zweiter Durchgang verkleinert nicht noch einmal.
-// Genau das haelt `dasRasternIstOrtsfest` fest.
+// Genau das haelt `dasRasternIstOrtsfest` fest -- und NUR der, denn er
+// rechnet mit `snappedFrameRect` und braucht kein Fenster. Die Laeufe
+// mit echten Fenstern vergleichen die Groesse bewusst nicht auf den
+// Punkt: unter xvfb/offscreen bekommt ein `Qt::Tool`-Fenster nicht
+// unbedingt die Groesse, die es verlangt (im Haus nachgewiesen:
+// offscreen macht aus einer Breite 796). Eine Aussage ueber Geometrie
+// gehoert in den reinen Lauf, eine ueber Verhalten in den mit
+// Fenster.
 const QSize kGerastert(kBreite - Style::kFensterLuftPx,
                        kHoehe  - Style::kFensterLuftPx);
 
@@ -171,11 +178,14 @@ private slots:
 
         const int erwartet = a.frameGeometry().right() + 1 + Style::kFensterLuftPx;
         QTRY_VERIFY_WITH_TIMEOUT(b.frameGeometry().left() == erwartet, 3000);
-        // Die andere Achse bleibt, wo sie war; die Groesse ist die
-        // gerasterte -- das Raster zieht die ferne Kante um die Luft
-        // herein, siehe `kGerastert`.
+        // Die andere Achse bleibt, wo sie war. Die GROESSE wird hier
+        // bewusst nicht auf den Punkt verglichen: unter xvfb/offscreen
+        // bekommt ein `Qt::Tool`-Fenster nicht unbedingt die Groesse,
+        // die es verlangt (im Haus nachgewiesen: offscreen macht aus
+        // einer Breite 796). Die genaue Rechnung steht platformfrei in
+        // `dasRasternIstOrtsfest`; hier zaehlt, dasz das Fenster
+        // aufgerueckt ist und nicht in der anderen Achse verrutscht.
         QCOMPARE(b.frameGeometry().top(), kBuendigRechts.top());
-        QCOMPARE(b.frameGeometry().size(), kGerastert);
 
         // Und es bleibt dort. Raster 16 gegen Abstand 2: die naechste
         // Rasterlinie IST die buendige Kante, von der wir gerade
@@ -224,12 +234,13 @@ private slots:
         // samt Rueckstoss durch waere.
         QTest::qWait(800);
         // Die LAGE bleibt -- darum geht es hier: ein Platzieren schiebt
-        // nicht. Die Groesse ist die gerasterte (2026-10-31): der
-        // gedaempfte Rasterschritt laeuft auch beim Platzieren, er war
-        // bis dahin nur ein Nichts, weil 160 x 96 schon auf dem Raster
-        // lagen. Jetzt zieht er die ferne Kante um die Luft herein.
+        // nicht. Die Groesse darf sich aendern (der gedaempfte
+        // Rasterschritt laeuft auch beim Platzieren; er war bis zum
+        // 2026-10-31 nur ein Nichts, weil 160 x 96 schon auf dem Raster
+        // lagen, und zieht jetzt die ferne Kante um die Luft herein) --
+        // auf den Punkt verglichen wird sie hier NICHT, siehe den
+        // xvfb-Hinweis oben.
         QCOMPARE(b.frameGeometry().topLeft(), vorher.topLeft());
-        QCOMPARE(b.frameGeometry().size(), kGerastert);
         QCOMPARE(a.frameGeometry().topLeft(), kLinks.topLeft());
     }
 
@@ -254,10 +265,9 @@ private slots:
         b.setGeometry(kBuendigRechts);
         meldeBewegung(&b);
         QTest::qWait(800);
-        // Nicht WEGGESCHOBEN -- das ist der Punkt. Die Groesse ist die
-        // gerasterte, siehe `kGerastert`.
+        // Nicht WEGGESCHOBEN -- das ist der Punkt, und nur der. Die
+        // Groesse bleibt hier ungeprueft, siehe den xvfb-Hinweis oben.
         QCOMPARE(b.frameGeometry().topLeft(), kBuendigRechts.topLeft());
-        QCOMPARE(b.frameGeometry().size(), kGerastert);
     }
 
     // ── Das Rastern ist ortsfest (2026-10-31) ────────────────────────
