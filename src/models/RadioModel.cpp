@@ -10102,6 +10102,9 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                 m_txChannel->setTxPhrotNstages(m_transmitModel.phaseRotatorStages());
 
                 // ── 3M-3a-ii Batch 3 — CFC scalars (4) ──
+                // Die Groesse zuerst: sie baut den FFT-Arbeitsbereich neu,
+                // also sollen Laufschalter und Profil danach kommen.
+                m_txChannel->setTxCfcFftSize(m_transmitModel.cfcFftSize());
                 m_txChannel->setTxCfcRunning(m_transmitModel.cfcEnabled());
                 m_txChannel->setTxCfcPostEqRunning(m_transmitModel.cfcPostEqEnabled());
                 m_txChannel->setTxCfcPrecompDb(
@@ -10266,6 +10269,14 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             connect(&m_transmitModel, &TransmitModel::cfcPrecompDbChanged,
                     m_txChannel, [this](int dB) {
                 m_txChannel->setTxCfcPrecompDb(static_cast<double>(dB));
+            });
+
+            // 20b. cfcFftSizeChanged → setTxCfcFftSize.  Baut den
+            //      FFT-Arbeitsbereich neu; Profil, Kurven und Laufschalter
+            //      bleiben stehen (Zeus cfcomp.c:563, v2.0.61).
+            connect(&m_transmitModel, &TransmitModel::cfcFftSizeChanged,
+                    m_txChannel, [this](int points) {
+                m_txChannel->setTxCfcFftSize(points);
             });
 
             // 21. cfcPostEqGainDbChanged → setTxCfcPrePeqDb.

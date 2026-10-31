@@ -655,6 +655,55 @@ void setSize_cfcomp (CFCOMP a, int size)
 *																										*
 ********************************************************************************************************/
 
+// Ported from Zeus Station Engine (GPL-2.0-or-later, Douglas J. Cerrato
+// KB2UKA / Christian Suarez N9WAR and contributors), native/wdsp/cfcomp.c:563
+// at tag v2.0.61:
+//
+//     PORT
+//     int SetTXACFCOMPFftSize (int channel, int size)
+//     {
+//         if (size != 2048 && size != 4096 && size != 8192 && size != 16384) return 0;
+//         CFCOMP a = txa[channel].cfcomp.p;
+//         EnterCriticalSection (&ch[channel].csDSP);
+//         if (a->fsize != size)
+//         {
+//             // Rebuild only the FFT workspace. Profile, curves, gains and run flags
+//             // belong to the operator and survive the history reset.
+//             decalc_cfcomp (a);
+//             a->fsize = size;
+//             calc_cfcomp (a);
+//             flush_cfcomp (a);
+//         }
+//         LeaveCriticalSection (&ch[channel].csDSP);
+//         return 1;
+//     }
+//
+// Upstream WDSP has no such setter: TXA.c pins the size at
+// max(16384, dsp_size) and never changes it.  Longpath has stood at 2048
+// since the first WDSP integration (2026-04-08), which is the low-delay
+// end of this range and NOT upstream's value -- see
+// docs/attribution/WDSP-PROVENANCE.md.
+PORT
+int SetTXACFCOMPFftSize (int channel, int size)
+{
+	CFCOMP a;
+	if (size != 2048 && size != 4096 && size != 8192 && size != 16384) return 0;
+	a = txa[channel].cfcomp.p;
+	EnterCriticalSection (&ch[channel].csDSP);
+	if (a->fsize != size)
+	{
+		// Rebuild the FFT workspace only.  nfreqs, F/G/E/Qg/Qe, the run
+		// flags and precomp/prepeq are the operator's and stay as they are;
+		// calc_cfcomp recomputes the curves from them at the new size.
+		decalc_cfcomp (a);
+		a->fsize = size;
+		calc_cfcomp (a);
+		flush_cfcomp (a);
+	}
+	LeaveCriticalSection (&ch[channel].csDSP);
+	return 1;
+}
+
 PORT
 void SetTXACFCOMPRun (int channel, int run)
 {
@@ -684,6 +733,15 @@ void SetTXACFCOMPprofile (int channel, int nfreqs, double* F, double* G, double 
 {
 	CFCOMP a = txa[channel].cfcomp.p;
 	EnterCriticalSection (&ch[channel].csDSP);
+	// WDSP 2.11 bounds this setter against a->max_freqs (cfcomp.c:599,
+	// TAPR OpenHPSDR-wdsp @e69de50).  Our setter reallocates every array to
+	// nfreqs, so there is no fixed-size overflow to guard; what remains is
+	// nfreqs < 1, which makes calc_comp read a->G[-1], and a null array.
+	if (nfreqs < 1 || F == 0 || G == 0 || E == 0)
+	{
+		LeaveCriticalSection (&ch[channel].csDSP);
+		return;
+	}
 	a->nfreqs = nfreqs;
 	_aligned_free (a->E);
 	_aligned_free (a->F);

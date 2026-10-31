@@ -64,6 +64,9 @@ struct TxChannelState {
     bool   cfcPostEqOn                  = false;
     double cfcPrecompDb                 = 0.0;
     double cfcPostEqGainDb              = 0.0;
+    // 2048 / 4096 / 8192 / 16384.  Longpath's own default is 2048
+    // (TXA.c:206), not upstream WDSP's max(16384, dsp_size).
+    int    cfcFftSize                   = 2048;
     bool   phaseRotatorOn               = false;
     double phaseRotatorFreqHz           = 338.0;
     int    phaseRotatorStages           = 8;

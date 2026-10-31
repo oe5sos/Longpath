@@ -247,6 +247,7 @@ private:
     QCheckBox* m_cfcPostEqEnableChk{nullptr};
     QSpinBox*  m_cfcPrecompSpin{nullptr};
     QSpinBox*  m_cfcPostEqGainSpin{nullptr};
+    QComboBox* m_cfcFftSizeCombo{nullptr};
     class QPushButton* m_cfcBandsBtn{nullptr};
 
     // ── CESSB group ──────────────────────────────────────────────────────────
