@@ -1535,6 +1535,16 @@ public:
     struct SpotMarker {
         int    index{-1};
         QString callsign;
+        /// Wie stark er bei MIR ankommt, in dB -- `kKeineAngabe`,
+        /// wenn ihn niemand gemessen hat (Cluster, RBN, POTA).
+        ///
+        /// Die Zahl steht hier doppelt zu `Longpath::kSpotKeinSnr`,
+        /// damit dieser Kopf das Modell nicht hereinziehen muss (er
+        /// haengt in sehr vielen Uebersetzungseinheiten). Ein
+        /// `static_assert` in der .cpp haelt beide zusammen -- sie
+        /// koennen nicht auseinanderlaufen.
+        static constexpr int kKeineAngabe = -999;
+        int    snrDb{kKeineAngabe};
         double freqMhz{0.0};
         QString color;       // #AARRGGBB or empty for default
         QString mode;

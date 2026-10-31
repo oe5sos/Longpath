@@ -25,6 +25,7 @@ extern "C" {
 
 #include <cmath>
 #include <cstring>
+#include <algorithm>
 #include <vector>
 
 namespace Longpath {
@@ -65,6 +66,187 @@ struct Abzug {
     double f0Hz{0.0};
     double dtSekunden{0.0};
 };
+
+// ── Der Stoerabstand, und warum er hier selbst gerechnet wird ────
+//
+// Bis zum 2026-10-31 stand in der Spalte `kand->score * 0.5f` — wie
+// im Demoprogramm von ft8_lib. Das ist der SYNC-SCORE
+// (`ft8_sync_score`, decode.c:61): die gemittelte Magnitudendifferenz
+// zwischen den Costas-Toenen und ihren Nachbarn, in halben dB. Ein
+// Kontrastmass, kein Stoerabstand — und weil Kandidaten unter
+// `kMinScore` vorher wegfallen, ist es nie negativ.
+//
+// Der Betreiber hat es am Geraet gesehen: „bei der spalte sehe ich
+// DB. aber nur posivitv, keine negativen DB" — bei einer Zeile mit
+// `19` in der Spalte und `-11` im Text derselben Zeile. Echte
+// FT8-Stoerabstaende liegen etwa zwischen −24 und +15 dB und sind
+// meistens negativ; mit dieser Zahl laesst sich nicht entscheiden, ob
+// ein Anruf lohnt.
+//
+// Gerechnet wird aus demselben Wasserfall, den der Dekoder ohnehin
+// aufbaut (`mag[Block][time_osr][freq_osr][Bin]`, Leistung in dB,
+// `monitor.c:198`: `10*log10(mag2)`). Je Symbolblock stehen die acht
+// Tonbins nebeneinander (vier bei FT4); genau EINES traegt den Ton,
+// die anderen tragen Rauschen. Also:
+//
+//   Signal+Rauschen = das staerkste der N Bins
+//   Rauschen        = Mittel der uebrigen N−1
+//   Signal          = Differenz
+//
+// Das braucht die Tonfolge NICHT — bei einem Fund, der LDPC und CRC
+// bestanden hat, ist das staerkste Bin praktisch immer der Ton. So
+// gilt dieselbe Rechnung fuer FT8 (8 Toene) und FT4 (4 Toene).
+//
+// Der Bezug ist 2500 Hz wie bei WSJT-X. Ein Bin ist hier
+// 12000/3840 = 3,125 Hz breit (`nfft = block_size * freq_osr`,
+// monitor.c:62), mit Hann-Fenster also 1,5 Bins Rauschbandbreite =
+// 4,6875 Hz; das macht 10*log10(4,6875/2500) = −27,3 dB.
+//
+// Die Zahl ist trotzdem GEMESSEN und nicht hergeleitet: die
+// Herleitung gibt −27,3 dB, die Messung −28,2. Die Differenz ist
+// die Luecke zwischen der Lehrbuch-Rauschbandbreite und dem, was
+// Fensterung, Ueberlappung und die Spitzenbildung ueber die Bloecke
+// wirklich tun. `tests/tst_ft8_stoerabstand.cpp` erzeugt ein Signal
+// mit bekanntem Stoerabstand und rechnet nach; steht dort etwas
+// anderes als hier, gilt die Messung.
+//
+// Gemessen am 2026-10-31 mit diesem Bezugswert:
+//
+//     Ziel   0 dB -> gemeldet  −0,3
+//     Ziel  −5 dB -> gemeldet  −5,2
+//     Ziel −10 dB -> gemeldet −10,1
+//     Ziel −15 dB -> gemeldet −15,0
+//     Ziel −18 dB -> gemeldet −17,7
+//     Ziel −19 dB -> gemeldet −18,6
+//
+// Groesster Fehler 0,4 dB ueber 19 dB Spanne.
+//
+// ── Und fuer FT4 ist es eine ANDERE Zahl ────────────────────
+//
+// Das faellt leicht unter den Tisch, weil dieselbe Funktion beide
+// Protokolle bedient. FT4 hat die Symbolperiode 0,048 s statt 0,160 s
+// (`FT4_SYMBOL_PERIOD`), also ist `block_size` 576 statt 1920 und
+// `nfft` 1152 statt 3840 — ein Bin ist 10,42 Hz breit statt 3,125.
+// Die Herleitung gibt damit −22,0 dB statt −27,3, ein Unterschied von
+// 5,2 dB. Mit der FT8-Zahl bekaeme jeder FT4-Fund rund fuenf dB zu
+// wenig.
+//
+// Auch diese Zahl ist gemessen, nicht umgerechnet. Die Herleitung gibt
+// −22,0 dB, die Messung −24,2 — und der Abstand zur Herleitung ist
+// hier 2,2 dB, bei FT8 nur 0,9. Genau darum wird jede der beiden
+// gemessen statt die eine aus der anderen gerechnet.
+//
+//     FT4 Ziel   0 dB -> gemeldet  −0,1
+//     FT4 Ziel  −5 dB -> gemeldet  −5,0
+//     FT4 Ziel −10 dB -> gemeldet −10,0
+//     FT4 Ziel −13 dB -> gemeldet −12,9
+//
+// Dass FT4 ueberhaupt messbar wurde, ist ein eigener Fund: siehe
+// `anDieRichtigeStelle` im Prueflauf. `encodeBlock` mittet das Signal
+// im Fenster, und bei FT4 liegt es damit AUSSERHALB dessen, was
+// ft8_lib an Zeitversatz durchsucht. Am Band ist das kein Problem —
+// `Ft8Tx::sendeplan` setzt den Ton auf 500 ms —, aber ein Rundlauf
+// aus `encodeBlock` heraus war fuer FT4 nie moeglich.
+constexpr float kBezugDbFt8 = -28.2f;
+constexpr float kBezugDbFt4 = -24.2f;
+
+/// Untergrenze. Ein Fund, dessen Rechnung nicht aufgeht (Rauschen
+/// null, Bloecke ausserhalb des Wasserfalls), bekommt sie statt einer
+/// erfundenen Zahl.
+constexpr float kSnrUntergrenze = -30.0f;
+
+float stoerabstandDb(const ftx_waterfall_t* wf,
+                     const ftx_candidate_t* kand,
+                     Ft8Decoder::Protocol protocol)
+{
+    if (!wf || !wf->mag || !kand) { return kSnrUntergrenze; }
+
+    const bool ft4    = (protocol == Ft8Decoder::Protocol::Ft4);
+    const int  toene  = ft4 ? 4 : 8;
+    const int  symbole = ft4 ? FT4_NN : FT8_NN;
+
+    const int seite = kand->time_sub * (wf->freq_osr * wf->num_bins)
+                    + kand->freq_sub * wf->num_bins;
+
+    auto leistung = [&](int block, int bin) {
+        const float db =
+            WF_ELEM_MAG(wf->mag[block * wf->block_stride + seite + bin]);
+        return std::pow(10.0, double(db) / 10.0);
+    };
+
+    // ── Warum das Rauschen NICHT aus den Nachbartoenen kommt ─────
+    //
+    // Der erste Versuch nahm je Block das staerkste der N Tonbins als
+    // Signal und das Mittel der uebrigen als Rauschen. Gegen bekannte
+    // Signale gemessen (2026-10-31) staucht das nach oben hin:
+    //
+    //     Ziel −18 dB -> gemeldet −18,6   (gut)
+    //     Ziel −15 dB -> gemeldet −16,3   (gut)
+    //     Ziel −10 dB -> gemeldet −12,8   (schon daneben)
+    //     Ziel  −5 dB -> gemeldet −10,4   (5,4 dB zu wenig)
+    //
+    // Der Grund ist Leckstrahlung: je staerker der Ton, desto mehr
+    // davon steht in seinen Nachbarbins (Hann-Nebenzipfel, und der Ton
+    // liegt nicht genau auf der Binmitte). Was als Rauschen gemessen
+    // wird, ist dann zum Teil das Signal selbst — und der Quotient
+    // wird zu klein.
+    //
+    // Darum kommt das Rauschen aus einem ABSTANDSBEREICH neben dem
+    // Signal, mit zwei Bins Schutzabstand, und als MEDIAN: liegt dort
+    // eine andere Station, zieht sie den Mittelwert hoch, den Median
+    // nicht.
+    constexpr int kSchutz  = 2;    ///< Bins Abstand zum aeussersten Ton
+    constexpr int kBreite  = 12;   ///< so viele Bins je Seite
+    std::vector<double> rauschproben;
+    rauschproben.reserve(static_cast<size_t>(symbole) * 2 * kBreite);
+
+    double summeSpitze = 0.0;
+    int    bloecke     = 0;
+
+    for (int k = 0; k < symbole; ++k) {
+        const int block = kand->time_offset + k;
+        if (block < 0 || block >= wf->num_blocks) { continue; }
+
+        double spitze = -1.0;
+        bool   gut    = true;
+        for (int t = 0; t < toene; ++t) {
+            const int bin = kand->freq_offset + t;
+            if (bin < 0 || bin >= wf->num_bins) { gut = false; break; }
+            const double p = leistung(block, bin);
+            if (p > spitze) { spitze = p; }
+        }
+        if (!gut) { continue; }
+
+        for (int i = 0; i < kBreite; ++i) {
+            const int links  = kand->freq_offset - kSchutz - 1 - i;
+            const int rechts = kand->freq_offset + toene - 1 + kSchutz + 1 + i;
+            if (links >= 0) {
+                rauschproben.push_back(leistung(block, links));
+            }
+            if (rechts < wf->num_bins) {
+                rauschproben.push_back(leistung(block, rechts));
+            }
+        }
+
+        summeSpitze += spitze;
+        ++bloecke;
+    }
+
+    if (bloecke == 0 || rauschproben.empty()) { return kSnrUntergrenze; }
+
+    const size_t mitte = rauschproben.size() / 2;
+    std::nth_element(rauschproben.begin(), rauschproben.begin() + mitte,
+                     rauschproben.end());
+
+    const double mitSignal = summeSpitze / double(bloecke);
+    const double rauschen  = rauschproben[mitte];
+    const double signal    = mitSignal - rauschen;
+    if (signal <= 0.0 || rauschen <= 0.0) { return kSnrUntergrenze; }
+
+    const double jeBin = 10.0 * std::log10(signal / rauschen);
+    const float  snr   = float(jeBin) + (ft4 ? kBezugDbFt4 : kBezugDbFt8);
+    return snr < kSnrUntergrenze ? kSnrUntergrenze : snr;
+}
 
 /// Eine Runde ueber das Fenster. Das war bis zum 2026-10-21 der ganze
 /// Dekoder; jetzt ist es die innere Runde von decodeBlock().
@@ -140,10 +322,9 @@ QVector<Ft8Decode> eineRunde(const float* samples, int count,
 
         Ft8Decode d;
         d.score     = kand->score;
-        // Dieselbe grobe Schaetzung wie im Vorbild. Eine bessere waere
-        // eine eigene Arbeit; eine ERFUNDENE waere schlimmer als eine
-        // grobe.
-        d.snrDb     = static_cast<float>(kand->score) * 0.5f;
+        // Nicht mehr `score * 0.5f` — das war der Sync-Score, kein
+        // Stoerabstand. Siehe `stoerabstandDb` oben.
+        d.snrDb     = stoerabstandDb(wf, kand, protocol);
         d.freqHz    = (mon.min_bin + kand->freq_offset
                        + static_cast<float>(kand->freq_sub) / wf->freq_osr)
                       / mon.symbol_period;

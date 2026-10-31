@@ -5540,6 +5540,17 @@ longpath_add_test(tst_feldbetrieb)
 # weil es nur Laeufe fuer die Flaeche und fuer die Regeln gab -- den
 # Anschluss zwischen beiden fuhr niemand.
 longpath_add_test(tst_ft8_plaetze_weg)
+
+# ── 2026-10-31: wie stark kommt er an ───────────────────────
+# Zwei der vier Faelle lesen die Quelle (die Verdrahtung vom eigenen
+# Dekoder bis zur Beschriftung laesst sich ohne Geraet nicht fahren).
+# Ohne die ENVIRONMENT-Zeile ueberspringen sie sich STILL und melden
+# trotzdem gruen — am 2026-10-30 zweimal in dieselbe Falle getreten.
+longpath_add_test(tst_spot_signalstaerke)
+if(TEST tst_spot_signalstaerke)
+    set_tests_properties(tst_spot_signalstaerke PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 longpath_add_test(tst_abbau_ueberlebt)
 # 2026-10-15: moos.json nannte zwei Rollen, die es im Programm nicht
 # gibt — still uebergangen, also seit dem ersten Tag wirkungslos.
@@ -5559,6 +5570,10 @@ longpath_add_test(tst_scheibenflagge)
 # 2026-10-15: FT8/FT4 nativ — Nachricht hin, Nachricht zurueck, ohne
 # Tondatei und ohne Funkgeraet.
 longpath_add_test(tst_ft8_dekodiert)
+# ── 2026-10-31: die dB-Spalte war der Sync-Score ────────────────────
+# Gegen Signale mit BEKANNTEM Stoerabstand gefahren (0 bis −19 dB),
+# damit eine neue Rechnung nicht wieder bloss plausibel aussieht.
+longpath_add_test(tst_ft8_stoerabstand)
 # 2026-10-21: die Subtraktion aus MSHV -- zieht sie ein Signal heraus,
 # und kommt darunter ein zweites zum Vorschein?
 longpath_add_test(tst_ft8_subtraktion)
@@ -5591,6 +5606,16 @@ longpath_add_test(tst_ft8_am_ton)
 longpath_add_test(tst_ft8_ablauf)
 
 longpath_add_test(tst_ft8_senden)
+
+# ── 2026-10-31: das QSO endet in der Dekoderfrist ─────────────
+# Zwei der vier Faelle lesen die Quelle: die Nachpruefung sitzt in
+# einer Lambda im Sendetaktgeber und ist ohne Geraet nicht zu fahren.
+# Ohne die ENVIRONMENT-Zeile ueberspringen sie sich STILL.
+longpath_add_test(tst_ft8_frist_qso_endet)
+if(TEST tst_ft8_frist_qso_endet)
+    set_tests_properties(tst_ft8_frist_qso_endet PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 longpath_add_test(tst_ft8_sendeplan)
 longpath_add_test(tst_ft8_tonwahl)
 longpath_add_test(tst_ft8_warteschlange)

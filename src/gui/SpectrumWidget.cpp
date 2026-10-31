@@ -118,6 +118,7 @@
 
 #include "widgets/NotchEditPopup.h"
 #include "core/FFTEngine.h"   // kDefaultFftSize
+#include "models/SpotModel.h"  // kSpotKeinSnr — nur fuer den static_assert
 #include "gui/StyleConstants.h"
 #include "gui/styles/Theme.h"
 #include "gui/styles/ThemeQss.h"
@@ -253,6 +254,23 @@ QColor roleColor(const char* roleName, const char* fallback,
 // (callsign / freqMhz / color / dxccColor / source) — non-visual
 // fields like spotterCallsign / comment / timestampMs intentionally
 // excluded so a comment-only update does not force a repaint.
+// Die beiden „keine Angabe“-Werte muessen dieselbe Zahl sein: der
+// Kopf von SpectrumWidget zieht das Modell nicht herein, darum steht
+// sie dort noch einmal. Hier faellt es beim Uebersetzen auf, falls
+// einer der beiden je geaendert wird.
+static_assert(SpectrumWidget::SpotMarker::kKeineAngabe
+                  == Longpath::kSpotKeinSnr,
+              "SpotMarker::kKeineAngabe und kSpotKeinSnr sind "
+              "auseinandergelaufen");
+
+// Der Stoerabstand, wie ihn WSJT-X schreibt: immer mit Vorzeichen,
+// damit −2 und +2 auf einen Blick zu unterscheiden sind.
+static QString sSnrText(int db)
+{
+    return QStringLiteral("%1%2").arg(db < 0 ? QString() : QStringLiteral("+"))
+                                 .arg(db);
+}
+
 static bool spotMarkersVisuallyEqual(const QVector<SpectrumWidget::SpotMarker>& lhs,
                                      const QVector<SpectrumWidget::SpotMarker>& rhs)
 {
@@ -268,6 +286,7 @@ static bool spotMarkersVisuallyEqual(const QVector<SpectrumWidget::SpotMarker>& 
             || std::abs(a.freqMhz - b.freqMhz) > kFrequencyEpsilonMhz
             || a.color != b.color
             || a.dxccColor != b.dxccColor
+            || a.snrDb != b.snrDb
             || a.source != b.source) {
             return false;
         }
@@ -8631,8 +8650,20 @@ void SpectrumWidget::drawSpotMarkers(QPainter& p, const QRect& specRect)
             if (parsed.isValid()) col = parsed;
         }
 
-        // Draw callsign label
-        const QString label = spot.callsign;
+        // ── Rufzeichen UND wie stark er ankommt (2026-10-31) ─────
+        //
+        // Betreiber: „ich will sehen, wie gut sein signal bei mir
+        // ankommt. so kann ich entscheiden, ob ich es probiere oder ob
+        // es schierig wird."
+        //
+        // Nur wo eine Zahl GEMESSEN wurde: die eigenen Dekoder
+        // (FT8/FT4/RTTY) liefern sie, ein Cluster-Spot nicht. Dort
+        // bleibt es beim blossen Rufzeichen -- eine erfundene Null
+        // waere schlimmer als keine Angabe.
+        const QString label = spot.snrDb == SpotMarker::kKeineAngabe
+            ? spot.callsign
+            : QStringLiteral("%1 %2").arg(spot.callsign,
+                                          sSnrText(spot.snrDb));
         const int tw = fm.horizontalAdvance(label) + 6;
 
         // Start at configured position, nudge down to avoid overlap.

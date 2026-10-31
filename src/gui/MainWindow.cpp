@@ -5066,6 +5066,7 @@ void MainWindow::buildUI()
                 SpectrumWidget::SpotMarker m;
                 m.index            = s.index;
                 m.callsign         = s.callsign;
+                m.snrDb            = s.snrDb;
                 // Prefer the RX (heard-on) frequency so cluster spots
                 // land on the actual TX freq of the DX station.  Fall
                 // back to txFreqMhz when only one is populated (e.g.
