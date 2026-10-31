@@ -16,6 +16,7 @@
 #include <QActionGroup>
 #include <QContextMenuEvent>
 #include <QMenu>
+#include <QPointer>
 #include <QVBoxLayout>
 
 namespace Longpath {
@@ -231,17 +232,21 @@ void FrequencyApplet::toggleKiwiDisplay()
     emit kiwiDisplayToggleRequested(m_slice.data());
 }
 
-void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
+QMenu* FrequencyApplet::baueOptionsMenue(QWidget* parent)
 {
-    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
-    const QPointer<FrequencyApplet> self(this);   // Menue am Fenster: ein nativer Vorfahr gab ihm keinen Fensterbezug; Menuegrau statt des geerbten #08080a (2026-09-30)
-    QMenu& menu = *menuOwner.get();
+    // Eine Quelle fuer beide Zugaenge — das Zahnrad im Panelkopf
+    // (Martins Regel vom 2026-09-20) und die rechte Maustaste. Vorher
+    // stand dieses Menue NUR hinter der rechten Maustaste, und
+    // `hasExtendedSettings()` war der Vorgabewert false: der Knopf im
+    // Kopf wurde also nie gezeichnet (`GridCellWidget.cpp:235`).
+    auto* menu = new QMenu(parent);
+
 
     // Haken, keine Punkte: die beiden Zeilen sind unabhaengig. Ein
     // Auswahlkranz aus "keine / Stehwelle / SWR / beide" waere
     // dieselbe Information in vier Zeilen statt zwei und liesse sich
     // schlechter erweitern.
-    QAction* tiles = menu.addAction(tr("Show receiver tiles"));
+    QAction* tiles = menu->addAction(tr("Show receiver tiles"));
     tiles->setCheckable(true);
     tiles->setChecked(m_showTiles);
     connect(tiles, &QAction::triggered, this,
@@ -250,12 +255,12 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
     // Betreiber 2026-08-30: "A und B sollte man im Frequenzfeld auch
     // anhacken können" -- dieselbe Ein-/Ausblenden-Idee wie die beiden
     // Zusatzzeilen unten, nur fuer die VFO-Zeile ("A ... B ...").
-    QAction* vfo = menu.addAction(tr("Show A/B row"));
+    QAction* vfo = menu->addAction(tr("Show A/B row"));
     vfo->setCheckable(true);
     vfo->setChecked(m_showVfo);
     connect(vfo, &QAction::triggered, this,
             [this](bool on) { setShowVfo(on); });
-    menu.addSeparator();
+    menu->addSeparator();
 
     // War "Stehwelle anzeigen" -- falsch beschriftet, obwohl an
     // setShowPower() haengend. "Stehwelle" und "SWR" sind dasselbe
@@ -266,7 +271,7 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
     // Betreiber 2026-08-30 stiess genau darauf ("brauche die Zeile
     // darunter nicht, soll als Option sein" -- die Option gab es
     // schon, nur unter dem falschen Namen versteckt).
-    QAction* pwr = menu.addAction(tr("Show power"));
+    QAction* pwr = menu->addAction(tr("Show power"));
     pwr->setCheckable(true);
     pwr->setChecked(m_showPower);
     connect(pwr, &QAction::triggered, this,
@@ -276,7 +281,7 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
     // "SWR" und "Stehwelle" sind dasselbe Wort (siehe Begruendung oben
     // bei "Show power"); die Beschriftung traegt seither beide,
     // damit niemand mehr danach sucht, ohne es zu finden.
-    QAction* swr = menu.addAction(tr("Show SWR"));
+    QAction* swr = menu->addAction(tr("Show SWR"));
     swr->setCheckable(true);
     swr->setChecked(m_showSwr);
     connect(swr, &QAction::triggered, this,
@@ -284,7 +289,7 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
 
     // Betreiber 2026-08-30: "S-Meter bitte noch bei Frequenz
     // hinzufügen" -- dieselbe Zusatzzeile wie Leistung/SWR.
-    QAction* sig = menu.addAction(tr("Show S-meter"));
+    QAction* sig = menu->addAction(tr("Show S-meter"));
     sig->setCheckable(true);
     sig->setChecked(m_showSignal);
     connect(sig, &QAction::triggered, this,
@@ -296,10 +301,31 @@ void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
     // Haarlinie ohne Mulde und liest m_segmented/m_tube gar nicht mehr.
     // Ein Menuepunkt fuer etwas, das nichts mehr aendert, ist eine
     // Falle -- weg statt weiter anzubieten.
-    menu.exec(ev->globalPos());
+    return menu;
+}
+
+void FrequencyApplet::openExtendedSettings()
+{
+    // Dieselbe Hand wie InstrumentApplet::openExtendedSettings: am
+    // Fenster haengen (ein nativer Vorfahr gab dem Menue sonst keinen
+    // Fensterbezug, 2026-09-30), und ueberleben, falls das Fenster
+    // waehrend exec() stirbt.
+    QMenu* menu = baueOptionsMenue(window());
+    QPointer<QMenu> lebtNoch(menu);
+    menu->exec(mapToGlobal(rect().center()));
+    if (lebtNoch) { lebtNoch->deleteLater(); }
+}
+
+void FrequencyApplet::contextMenuEvent(QContextMenuEvent* ev)
+{
+    QMenu* menu = baueOptionsMenue(window());   // am Fenster, siehe oben
+    QPointer<QMenu> lebtNoch(menu);
+    const QPointer<FrequencyApplet> self(this);
+    menu->exec(ev->globalPos());
+    if (lebtNoch) { lebtNoch->deleteLater(); }
     // Das Elternteil kann waehrend exec() gestorben sein — dann ist
-    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-    if (!menuOwner || !self) { return; }
+    // `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!self) { return; }
     ev->accept();
 }
 
