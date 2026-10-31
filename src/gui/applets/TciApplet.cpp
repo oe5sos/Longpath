@@ -114,6 +114,16 @@ TciApplet::TciApplet(TciServer* server, QWidget* parent)
                 this, &TciApplet::onClientConnected);
         connect(m_server, &TciServer::clientDisconnected,
                 this, &TciApplet::onClientDisconnected);
+        // Der Grund fuer „port: -". Dieselben drei Kanten wie auf der
+        // Setup-Seite (CatNetworkSetupPages.cpp:971-991): ein geglueckter
+        // Start und ein regulaeres Stoppen loeschen ihn, der wartende Bind
+        // setzt ihn.
+        connect(m_server, &TciServer::bindWartetAufAdresse,
+                this, [this](const QString& adresse, quint16 port,
+                             const QString& grund) {
+            m_bindWartet = tr("%1:%2 — %3").arg(adresse).arg(port).arg(grund);
+            updateStatusWidgets();
+        });
     }
 
     // 200 ms refresh timer for level meter polling.
@@ -198,6 +208,9 @@ void TciApplet::buildHeaderRow(QVBoxLayout* vbox)
     row->addWidget(titleLbl);
 
     m_portLabel = makeSecondaryLabel(QStringLiteral("port: -"), this);
+    // Benannt, damit der Pruefstand die Kopfzeile lesen kann statt den
+    // Getter -- die Naht ist die Anzeige, nicht der Zustand dahinter.
+    m_portLabel->setObjectName(QStringLiteral("tciPortLabel"));
     row->addWidget(m_portLabel);
 
     m_clientCountLabel = makeSecondaryLabel(QStringLiteral("0 clients"), this);
@@ -421,8 +434,17 @@ void TciApplet::updateStatusWidgets()
         if (running) {
             m_portLabel->setText(
                 QStringLiteral("port: %1").arg(m_server->port()));
+            m_portLabel->setToolTip(QString());
+        } else if (!m_bindWartet.isEmpty()) {
+            // Der Port ist nicht „-", sondern besetzt -- und das ist eine
+            // andere Lage als „ausgeschaltet". Der ganze Satz (Adresse,
+            // Port, Grund) steht im Hinweis; in die Kopfzeile passt er
+            // nicht, und sie ist nicht der Ort fuer einen Satz.
+            m_portLabel->setText(QStringLiteral("port: blocked"));
+            m_portLabel->setToolTip(m_bindWartet);
         } else {
             m_portLabel->setText(QStringLiteral("port: -"));
+            m_portLabel->setToolTip(QString());
         }
     }
 
@@ -493,6 +515,7 @@ void TciApplet::refresh()
 void TciApplet::onServerStarted(quint16 port)
 {
     Q_UNUSED(port)
+    m_bindWartet.clear();
     applyEnabledState(true);
     if (m_refreshTimer) {
         m_refreshTimer->start();
@@ -501,6 +524,10 @@ void TciApplet::onServerStarted(quint16 port)
 
 void TciApplet::onServerStopped()
 {
+    // Ein regulaeres Stoppen ist kein Bindefehler: der Grund muss weg,
+    // sonst steht „blocked" noch da, nachdem der Betreiber den Server
+    // selbst ausgeschaltet hat.
+    m_bindWartet.clear();
     if (m_refreshTimer) {
         m_refreshTimer->stop();
     }

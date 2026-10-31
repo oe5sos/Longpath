@@ -1894,10 +1894,21 @@ void TciServer::stop()
     // `m_server` null, der Wiederversuch laeuft aber trotzdem. Stuende das
     // Abbrechen danach, liefe er nach einem stop() munter weiter und holte den
     // Server hinter dem Ruecken des Bedieners wieder hoch.
+    // Hat ein Bind gewartet, muss das Ausschalten nach aussen dringen --
+    // sonst bleibt der Grund stehen, den `bindWartetAufAdresse` gemeldet hat.
+    // Gefunden am 2026-10-31: `m_server` ist nach einem gescheiterten
+    // listen() null, also nahm stop() unten den frueheren Ausstieg und
+    // emittierte NICHTS. Die Setup-Seite zeigte danach weiter „wartet auf
+    // ...", obwohl der Betreiber den Server selbst abgeschaltet hatte, und
+    // dem Applet fehlte dieselbe Kante.
+    const bool bindHatGewartet = (m_bindFehlversuche > 0);
     bindWiederversuchAbbrechen();
     m_bindFehlversuche = 0;
 
-    if (!m_server) { return; }
+    if (!m_server) {
+        if (bindHatGewartet) { emit serverStopped(); }
+        return;
+    }
 
     // Phase 26 review finding #4: explicitly sever DSP-thread signal connections
     // BEFORE stopping timers and clearing client state.  The audio tap from

@@ -4014,6 +4014,26 @@ void TxChannel::setTxCfcProfile(const std::vector<double>& F,
 #endif
 }
 
+void TxChannel::setTxCfcFftSize(int points)
+{
+    if (points != 2048 && points != 4096 && points != 8192 && points != 16384) {
+        qCWarning(lcDsp) << "TxChannel" << m_channelId
+                         << "CFC FFT size" << points
+                         << "is not one of 2048/4096/8192/16384 - ignored";
+        return;
+    }
+    m_cfcFftSize = points;  // carry
+#ifdef HAVE_WDSP
+    if (txa[m_channelId].rsmpin.p == nullptr) return;
+    // Ported from Zeus Station Engine native/wdsp/cfcomp.c:563 (v2.0.61).
+    // csDSP-protected inside WDSP; rebuilds the FFT workspace only.
+    if (SetTXACFCOMPFftSize(m_channelId, points) == 0) {
+        qCWarning(lcDsp) << "TxChannel" << m_channelId
+                         << "WDSP refused CFC FFT size" << points;
+    }
+#endif
+}
+
 void TxChannel::setTxCfcPrecompDb(double dB)
 {
     m_cfcPrecompDb = dB;  // carry
@@ -4301,6 +4321,10 @@ void TxChannel::applyState(const TxChannelState& s)
     m_cfcPostEqOn     = s.cfcPostEqOn;
     m_cfcPrecompDb    = s.cfcPrecompDb;
     m_cfcPostEqGainDb = s.cfcPostEqGainDb;
+    m_cfcFftSize      = s.cfcFftSize;
+    // Size first: it rebuilds the FFT workspace, so the run flags and the
+    // profile below land on the workspace the operator actually chose.
+    setTxCfcFftSize(s.cfcFftSize);
     setTxCfcRunning(s.cfcOn);
     setTxCfcPostEqRunning(s.cfcPostEqOn);
     setTxCfcPrecompDb(s.cfcPrecompDb);

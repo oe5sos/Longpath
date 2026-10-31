@@ -279,3 +279,47 @@ uebersetzen, tun aber nichts und sagen das einmal ins Protokoll. **Die
 zugehoerigen Bedienelemente im PureSignal-Fenster sind damit wirkungslos
 und muessen noch ausgegraut werden — das ist Gestaltung und gehoert dem
 Betreiber.**
+
+## WDSP 2.11 — Grenzpruefungen und Warten, Rosinen (2026-10-31)
+
+Pin: TAPR `OpenHPSDR-wdsp` @ `e69de50d1d702216098019013899ad87534c64e0`
+(`wdsp 2.11/Source`, vier Commits NR0V vom 2026-10-15). Kein Vollabgleich:
+die Dateien bleiben, wo sie waren (v1.29 bzw. der PureSignal-3-Satz vom
+2026-10-21 darueber), und nur die folgenden Einzelaenderungen aus Warrens
+2.10 -> 2.11 sind von Hand uebernommen. Jede Fundstelle traegt eine
+`// From WDSP 2.11 (TAPR OpenHPSDR-wdsp @e69de50) <datei>:<zeile>`-Zeile.
+
+| File | Was uebernommen wurde | Source | Date |
+| --- | --- | --- | --- |
+| `third_party/wdsp/src/emnr.c` | `getZeta`: die zweite Indexgrenze verglich die **dB-Zahl** statt des Index (`xi_dB >= dim_zeta` statt `i_xi >= dim_zeta`) — oberhalb etwa +20,5 dB a-priori-Stoerabstand lass sie an `zeta_true`/`zeta_hat` (60x60) vorbei. Dazu `readZetaHat`: Pfadlaenge ueber `snprintf` begrenzt, und eine `zetaHat.bin`, die nicht 60x60 meldet, wird abgewiesen | `wdsp 2.11/Source/emnr.c:211,1086` | 2026-10-31 |
+| `third_party/wdsp/src/siphon.c` | Sechs Grenzpruefungen: `size > sipsize` in den fuenf Probenabgriffen (`RXAGetaSipF`, `RXAGetaSipF1`, `TXAGetaSipF`, `TXAGetaSipF1`, `GetaSipF1EXT`) und `n_alloc_disps > dMAX_DISPLAYS` in `TXASetSipAllocDisps` | `wdsp 2.11/Source/siphon.c:195..404` | 2026-10-31 |
+| `third_party/wdsp/src/channel.c` | `SetChannelState`: beim **Einschalten** auf ein noch laufendes Ausschalten warten, und ein blockierendes Ausschalten (`dmode`) auch dann warten lassen, wenn der Kanal **schon aus** ist. Damit kann kein `flush` mehr laufen, waehrend der Kanal abgebaut wird | `wdsp 2.11/Source/channel.c:289,308` | 2026-10-31 |
+| `third_party/wdsp/src/nnio.c` | Drei Ueberlaufpruefungen: `data_offset + data_bytes` konnte umlaufen (jetzt getrennt verglichen), `numel` beim Multiplizieren der Dimensionen, und die Blob-Summe `total` | `wdsp 2.11/Source/nnio.c:116,154,172` | 2026-10-31 |
+| `third_party/wdsp/src/impulse_cache.c` | Eintragszahl gegen `MAX_CACHE_ENTRIES` und `N` gegen `INT_MAX / sizeof(complex)` gebunden, Belegung geprueft, und auf **jedem** Fehlerweg `free_impulse_cache()` statt eines halb gebauten Zwischenspeichers | `wdsp 2.11/Source/impulse_cache.c:236..246` | 2026-10-31 |
+| `third_party/wdsp/src/wisdom.c` | `WDSPwisdom`: NULL-Verzeichnis abgewiesen und die Pfadlaenge ueber `snprintf` gebunden (vorher `strcpy` + `strncat`). Unser Dateiname `wdspWisdom00` bleibt -- upstream schreibt `wdspWisdom01` | `wdsp 2.11/Source/wisdom.c:49` | 2026-10-31 |
+| `third_party/wdsp/src/cfcomp.c` | Sinngemaess, nicht wortgleich: upstream bindet `SetTXACFCOMPprofile` gegen `a->max_freqs`, das unser Setzer gar nicht hat (er legt jedes Feld auf `nfreqs` neu an, siehe den Teilabgleich vom 2026-04-30 oben). Geblieben ist, was auch bei uns traegt: `nfreqs < 1` liess `calc_comp` `a->G[-1]` lesen, ein Nullzeiger `memcpy` aus NULL | `wdsp 2.11/Source/cfcomp.c:599,621,639` | 2026-10-31 |
+
+**Bewusst NICHT uebernommen:**
+
+* Die **NNR-Netze fuer CW** (`nnr_model_2.c`, `nnr_model_3.c`, `nnrbypass.{c,h}`,
+  `NNET_NSLOTS` 4, `RXAbp1Set` in den Positionssetzern von `anf.c`/`anr.c`/
+  `emnr.c`/`snb.c`/`amd.c`, `getRun_nnrbypass`). Grund: CW ist beim Betreiber
+  zurueckgestellt, und der Satz haengt zusammen — halb eingezogen bricht die
+  Bandpass-Torsteuerung. Wir fuehren ohnehin nur die zwei Sprachnetze
+  (`wdsp_nnr_0.bin` / `wdsp_nnr_1.bin`).
+* `SetTXAPostGenNoiseMag` (`gen.c`): eine neue Schnittstelle, kein Fehler —
+  bei uns ruft sie nichts.
+* `fmd.c`/`emph.c` `a->pfcimp = build_fcimp(...)`: die Stelle gibt es bei uns
+  nicht (unsere `fmd.c`/`emph.c` stehen auf v1.29 und haben keinen
+  `build_fcimp`-Ruf in den NC-Setzern).
+* Der rein kosmetische `agc_noise_bw`-Umbau in `wcpAGC.c`.
+* `nurbs_fit.c` / `nurbs_spline.c` / `calcc.c` / `wisdom.c`-Grenzen, soweit
+  sie **schon** drinstehen: diese Dateien kamen am 2026-10-21 mit dem
+  PureSignal-3-Satz aus 2.11 herein. Neu dazu kam nur `wisdom.c`
+  (NULL-Verzeichnis + Pfadlaengen-Grenze), weil unsere Fassung dort noch
+  `strcpy`/`strncat` mit dem eigenen Dateinamen `wdspWisdom00` benutzt.
+
+`version.c` meldet weiter **129**. Das ist ehrlich: der Baum ist ein
+Gemisch (v1.29 + Thetis-Teilabgleiche + NNR aus 2.10 + PureSignal 3 aus
+2.11 + diese Rosinen), keine 2.11-Fassung. Die Zahl erst anheben, wenn ein
+Vollabgleich gefahren ist — `UPSTREAM-SYNC-PROTOCOL.md` §6.

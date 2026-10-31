@@ -1169,6 +1169,15 @@ void SetTXAosctrlRun(int channel, int run);
 // From Thetis wdsp/cfcomp.c:632-737 [v2.10.3.13].
 void SetTXACFCOMPRun(int channel, int run);
 
+// CFC FFT size.  Only 2048 / 4096 / 8192 / 16384 are accepted; anything else
+// returns 0 and changes nothing.  A larger frame buys frequency resolution
+// (rate / size per bin) and costs delay.  Rebuilds the FFT workspace only --
+// profile, curves, gains and run flags survive.
+//
+// Ported from Zeus Station Engine native/wdsp/cfcomp.c:563 (v2.0.61);
+// no upstream WDSP equivalent.  See docs/attribution/WDSP-PROVENANCE.md.
+int SetTXACFCOMPFftSize(int channel, int size);
+
 // CFC pre/post position. 0 = pre-EQ, 1 = post-EQ (Thetis usage).
 // From Thetis wdsp/cfcomp.c:643-653 [v2.10.3.13].
 void SetTXACFCOMPPosition(int channel, int pos);

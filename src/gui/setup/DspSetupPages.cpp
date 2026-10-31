@@ -2316,6 +2316,35 @@ CfcSetupPage::CfcSetupPage(RadioModel* model, QWidget* parent)
         "Global Post-EQ make-up gain (-24 .. +24 dB)"));
     addLabeledSpinner(cfcLay, "Post-EQ Gain", m_cfcPostEqGainSpin);
 
+    // CFC FFT size.  Longpath has stood at 2048 points since the first WDSP
+    // integration (TXA.c:206, 2026-04-08) while upstream WDSP and Thetis use
+    // max(16384, dsp_size) -- so this is not a new knob on upstream's value
+    // but the first time ours is visible.  The setter is ported from the Zeus
+    // Station Engine (cfcomp.c:563, v2.0.61); WDSP itself has none.
+    m_cfcFftSizeCombo = new QComboBox;
+    m_cfcFftSizeCombo->setObjectName(QStringLiteral("comboCFCFftSize"));
+    for (const int points : TransmitModel::kCfcFftSizes) {
+        // Bin width and delay at the usual 48 kHz DSP rate.  The delay is
+        // three quarters of a frame because cfcomp runs fourfold overlap
+        // (incr = fsize / ovrlp, cfcomp.c:386).
+        const double binHz   = 48000.0 / points;
+        const double delayMs = 0.75 * points / 48.0;
+        m_cfcFftSizeCombo->addItem(
+            QStringLiteral("%1  ·  %2 Hz/Bin  ·  ~%3 ms")
+                .arg(points)
+                .arg(binHz, 0, 'f', binHz < 10.0 ? 1 : 0)
+                .arg(delayMs, 0, 'f', 0),
+            points);
+    }
+    m_cfcFftSizeCombo->setCurrentIndex(
+        m_cfcFftSizeCombo->findData(tx.cfcFftSize()));
+    m_cfcFftSizeCombo->setToolTip(QStringLiteral(
+        "FFT size of the CFC stage.  A larger frame resolves frequency more "
+        "finely and costs transmit delay; the figures are for a 48 kHz DSP "
+        "rate.  Changing it rebuilds the FFT workspace only — your bands, "
+        "curves and gains stay as they are."));
+    addLabeledCombo(cfcLay, "FFT Size", m_cfcFftSizeCombo);
+
     m_cfcBandsBtn = new QPushButton("Configure CFC bands…");
     m_cfcBandsBtn->setObjectName(QStringLiteral("btnCFCBandsConfigure"));
     m_cfcBandsBtn->setAutoDefault(false);
@@ -2354,6 +2383,19 @@ CfcSetupPage::CfcSetupPage(RadioModel* model, QWidget* parent)
             m_cfcPostEqGainSpin, [this](int dB) {
         QSignalBlocker b(m_cfcPostEqGainSpin);
         m_cfcPostEqGainSpin->setValue(dB);
+    });
+
+    connect(m_cfcFftSizeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            &tx, [this, &tx](int idx) {
+        if (idx < 0) { return; }
+        tx.setCfcFftSize(m_cfcFftSizeCombo->itemData(idx).toInt());
+    });
+    connect(&tx, &TransmitModel::cfcFftSizeChanged,
+            m_cfcFftSizeCombo, [this](int points) {
+        const int idx = m_cfcFftSizeCombo->findData(points);
+        if (idx < 0) { return; }
+        QSignalBlocker b(m_cfcFftSizeCombo);
+        m_cfcFftSizeCombo->setCurrentIndex(idx);
     });
 
     // [Configure CFC bands…] — Batch 6 wires the parent SetupDialog to route

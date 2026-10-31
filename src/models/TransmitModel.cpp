@@ -237,6 +237,7 @@
 
 #include "TransmitModel.h"
 #include "core/AppSettings.h"
+#include "core/LogCategories.h"
 #include "core/PaProfile.h"
 #include "core/PureSignal.h"
 #include "core/StepAttenuatorController.h"
@@ -1625,6 +1626,8 @@ void TransmitModel::loadFromSettings(const QString& mac)
                              QStringLiteral("0")).toInt());
     setCfcPostEqGainDb(s.value(pfx + QLatin1String("CFCPostEqGain"),
                                 QStringLiteral("0")).toInt());
+    setCfcFftSize(s.value(pfx + QLatin1String("CFCFftSize"),
+                           QString::number(kCfcFftSizeDefault)).toInt());
 
     // ── CFC per-band arrays (3M-3a-ii Batch 2) ────────────────────────────
     // Defaults from Thetis database.cs:4735-4766 [v2.10.3.13]:
@@ -1903,6 +1906,7 @@ void TransmitModel::persistToSettings(const QString& mac) const
                m_cfcPostEqEnabled ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(pfx + QLatin1String("CFCPreComp"),    QString::number(m_cfcPrecompDb));
     s.setValue(pfx + QLatin1String("CFCPostEqGain"), QString::number(m_cfcPostEqGainDb));
+    s.setValue(pfx + QLatin1String("CFCFftSize"),    QString::number(m_cfcFftSize));
 
     for (int i = 0; i < 10; ++i) {
         s.setValue(pfx + QStringLiteral("CFCEqFreq%1").arg(i),
@@ -2864,6 +2868,26 @@ void TransmitModel::setCfcPrecompDb(int dB)
     m_cfcPrecompDb = clamped;
     persistOne(QStringLiteral("CFCPreComp"), QString::number(clamped));
     emit cfcPrecompDbChanged(clamped);
+}
+
+void TransmitModel::setCfcFftSize(int points)
+{
+    // Keine Klemmung, sondern Abweisung: zwischen 2048 und 4096 gibt es
+    // keinen gueltigen Wert, und ein stillschweigend gerundeter waere
+    // eine andere Einstellung als die verlangte.
+    bool erlaubt = false;
+    for (const int s : kCfcFftSizes) {
+        if (s == points) { erlaubt = true; break; }
+    }
+    if (!erlaubt) {
+        qCWarning(lcDsp) << "TransmitModel: CFC FFT size" << points
+                         << "ist keiner von 2048/4096/8192/16384 - verworfen";
+        return;
+    }
+    if (points == m_cfcFftSize) { return; }
+    m_cfcFftSize = points;
+    persistOne(QStringLiteral("CFCFftSize"), QString::number(points));
+    emit cfcFftSizeChanged(points);
 }
 
 void TransmitModel::setCfcPostEqGainDb(int dB)

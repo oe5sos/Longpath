@@ -1559,6 +1559,7 @@ public:
     bool cfcEnabled() const noexcept       { return m_cfcEnabled; }
     bool cfcPostEqEnabled() const noexcept { return m_cfcPostEqEnabled; }
     int  cfcPrecompDb() const noexcept     { return m_cfcPrecompDb; }
+    int  cfcFftSize() const noexcept       { return m_cfcFftSize; }
     int  cfcPostEqGainDb() const noexcept  { return m_cfcPostEqGainDb; }
 
     /// Per-band CFC EQ frequency (Hz) at index 0..9.  Returns 0 for out-of-range.
@@ -1622,6 +1623,12 @@ public:
 
     // CFC pre-comp scalar: 0..16 dB
     // From Thetis frmCFCConfig.Designer.cs:408-422 [v2.10.3.13] — nudCFC_precomp.
+    // CFC-FFT-Groesse: die vier Werte, die WDSP annimmt. Longpath stand
+    // seit 2026-04-08 fest auf 2048 (TXA.c:206) -- das untere, schnelle
+    // Ende; upstream WDSP und Thetis nehmen max(16384, dsp_size).
+    static constexpr int kCfcFftSizes[4]  = {2048, 4096, 8192, 16384};
+    static constexpr int kCfcFftSizeDefault = 2048;
+
     static constexpr int kCfcPrecompDbMin = 0;
     static constexpr int kCfcPrecompDbMax = 16;
     // CFC post-EQ gain scalar: -24..+24 dB
@@ -1785,6 +1792,9 @@ public slots:
     void setCfcEnabled(bool on);
     void setCfcPostEqEnabled(bool on);
     void setCfcPrecompDb(int dB);
+    /// CFC-FFT-Groesse in Punkten. Nur 2048/4096/8192/16384; alles andere
+    /// wird verworfen und laesst den alten Wert stehen.
+    void setCfcFftSize(int points);
     void setCfcPostEqGainDb(int dB);
     /// Per-band CFC EQ frequency (Hz) at index 0..9.  No-op if index out of range.
     void setCfcEqFreq(int index, int hz);
@@ -1865,6 +1875,7 @@ signals:
     void cfcEnabledChanged(bool on);
     void cfcPostEqEnabledChanged(bool on);
     void cfcPrecompDbChanged(int dB);
+    void cfcFftSizeChanged(int points);
     void cfcPostEqGainDbChanged(int dB);
     /// Emitted when a per-band CFC EQ freq changes; carries index + new value.
     void cfcEqFreqChanged(int index, int hz);
@@ -2492,6 +2503,7 @@ private:
     bool m_cfcEnabled       = false;  // dr["CFCEnabled"]       = false;
     bool m_cfcPostEqEnabled = false;  // dr["CFCPostEqEnabled"] = false;
     int  m_cfcPrecompDb     = 0;      // dr["CFCPreComp"]       = 0;
+    int  m_cfcFftSize       = kCfcFftSizeDefault;   // Longpath-eigen, TXA.c:206
     int  m_cfcPostEqGainDb  = 0;      // dr["CFCPostEqGain"]    = 0;
 
     // CFC per-band frequencies.  database.cs:4757-4766 [v2.10.3.13]:
