@@ -56,6 +56,11 @@ enum class Art {
     ThetisProfilausfuhr,
     /// Thetis-Sicherung: `<Data>` mit allen Tabellen.
     ThetisDatenbank,
+    /// Zeus' TX-Audio-Profile, wie `/api/tx-audio-profiles` sie
+    /// liefert — abgelegt als Datei oder frisch geholt. Ziel: die
+    /// TX-Profile. Zeus hat KEIN Dateiformat; warum das hier trotzdem
+    /// steht, sagt der Kopf von ZeusProfilImport.h.
+    ZeusTxAudio,
 };
 
 struct Befund {

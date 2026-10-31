@@ -1944,6 +1944,11 @@ longpath_add_test(tst_thetis_profil_import)
 # woher eine Datei kommt und wohin sie gehoert — am INHALT, nie an der
 # Endung.
 longpath_add_test(tst_profil_herkunft)
+# 2026-10-31: Zeus hat kein Austauschformat — seine TX-Audio-Profile
+# stehen nur bei der laufenden Maschine, hinter
+# /api/tx-audio-profiles. Dieser Stand faehrt den ganzen Weg OHNE
+# NETZ: eine Antwort hinein, Profile und Hinweise heraus.
+longpath_add_test(tst_zeus_profil_import)
 longpath_add_test(tst_cat_verdrahtung)
 # Die drei Knoepfe links oben: zweimal gemeldet, einmal auf einem nie
 # gepushten Zweig verloren, und die Behebung von damals war ausserdem

@@ -105,12 +105,21 @@ public:
     /// wie die anderen zwei, damit ein Prueffall sie druecken kann --
     /// ohne das waere nur die Existenz pruefbar, nicht die Wirkung.
     QPushButton* importButton() const { return m_importBtn; }
+    /// Die Taste „Von Zeus holen…" (2026-10-31). Zeus hat keine
+    /// Profildatei; seine Profile stehen nur bei der laufenden
+    /// Maschine. Siehe ZeusAbfrage.h.
+    QPushButton* zeusButton() const { return m_zeusBtn; }
 
     /// Den Dateiinhalt einlesen, ohne Dateidialog. Der Dialog gehoert
     /// der Taste; diese Stelle ist das, was danach geschieht, und sie
     /// ist dadurch pruefbar. Gibt den Bericht zurueck, den der Betreiber
     /// zu sehen bekommt.
     QString einleseThetisDateiFuerTest(const QByteArray& inhalt);
+
+    /// Dasselbe fuer Zeus' Antwort — der ganze Weg vom JSON bis zu den
+    /// angelegten Profilen, ohne Netz und ohne Fenster. Ohne diese
+    /// Naht waere am Zeus-Weg nur pruefbar, dass ein Knopf da ist.
+    QString einleseZeusAntwortFuerTest(const QByteArray& json);
 
     // ── Test seams ──────────────────────────────────────────────────────────
     // (No LONGPATH_BUILD_TESTS guard — same convention as TestTwoTonePage.)
@@ -170,6 +179,7 @@ private slots:
     // the verbatim Thetis string via RejectionMessageHook.
     void onDeleteClicked();
     void onImportClicked();
+    void onZeusClicked();
 
 private:
     void buildUi();
@@ -194,6 +204,7 @@ private:
     QPushButton* m_saveBtn{nullptr};
     QPushButton* m_deleteBtn{nullptr};
     QPushButton* m_importBtn{nullptr};
+    QPushButton* m_zeusBtn{nullptr};
 
     // ── State ───────────────────────────────────────────────────────────────
     // The previous combo selection (used to revert on Cancel).

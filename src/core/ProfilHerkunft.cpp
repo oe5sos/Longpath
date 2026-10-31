@@ -10,6 +10,7 @@
 #include "core/ProfilHerkunft.h"
 
 #include "core/strip/AetherPreset.h"
+#include "core/ZeusProfilImport.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -102,6 +103,15 @@ Befund erkenne(const QByteArray& inhalt)
             b.wohin = QStringLiteral("der Kanalzug");
             return b;
         }
+        // Zeus. Erkannt an Feldern, die nur er so nennt — „name"
+        // allein hat jedes zweite JSON, siehe
+        // ZeusProfilImport::siehtNachZeusAus.
+        if (ZeusProfilImport::siehtNachZeusAus(inhalt)) {
+            b.art   = Art::ZeusTxAudio;
+            b.was   = QStringLiteral("Zeus' TX-Audio-Profile");
+            b.wohin = QStringLiteral("die TX-Profile");
+            return b;
+        }
         // Ein JSON-Objekt, aber keines, das wir kennen. Der Satz nennt
         // das Feld, an dem es haengt — damit der Betreiber an der
         // eigenen Datei nachsehen kann, statt zu raten.
@@ -109,8 +119,19 @@ Befund erkenne(const QByteArray& inhalt)
             "Das ist eine JSON-Datei, aber kein Profil, das Longpath "
             "kennt: das Feld „schema\" lautet „%1\". Gelesen werden "
             "AetherSDRs Kanalzugprofile („AetherSDR ChannelStripPreset "
-            "v1\") und Thetis-TX-Profile (XML).")
+            "v1\"), Thetis-TX-Profile (XML) und Zeus' TX-Audio-Profile "
+            "(die Antwort von /api/tx-audio-profiles).")
             .arg(schema.isEmpty() ? QStringLiteral("—") : schema);
+        return b;
+    }
+    // Eine nackte JSON-LISTE ist kein Objekt und faellt oben durch —
+    // Zeus' Antwort kann aber so aussehen, wenn jemand die Huelle
+    // wegschneidet.
+    if (jf.error == QJsonParseError::NoError && doc.isArray()
+        && ZeusProfilImport::siehtNachZeusAus(inhalt)) {
+        b.art   = Art::ZeusTxAudio;
+        b.was   = QStringLiteral("Zeus' TX-Audio-Profile");
+        b.wohin = QStringLiteral("die TX-Profile");
         return b;
     }
 
@@ -132,8 +153,9 @@ Befund erkenne(const QByteArray& inhalt)
     // die Absage.
     b.warumNicht = QStringLiteral(
         "Diese Datei kennt Longpath nicht. Gelesen werden: "
-        "AetherSDRs Kanalzugprofile (.json) und Thetis-TX-Profile "
-        "(.xml, einzeln oder als ganze Datenbank). Erkannt wird am "
+        "AetherSDRs Kanalzugprofile (.json), Thetis-TX-Profile (.xml, "
+        "einzeln oder als ganze Datenbank) und Zeus' TX-Audio-Profile "
+        "(die Antwort von /api/tx-audio-profiles). Erkannt wird am "
         "Inhalt — eine umbenannte Datei ist kein Hindernis.");
     return b;
 }

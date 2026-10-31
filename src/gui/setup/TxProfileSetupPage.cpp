@@ -18,6 +18,8 @@
 #include "core/MicProfileManager.h"
 #include "core/ThetisProfilImport.h"
 #include "core/ProfilHerkunft.h"
+#include "core/ZeusProfilImport.h"
+#include "core/ZeusAbfrage.h"
 #include "models/RadioModel.h"
 #include "gui/StyleConstants.h"
 #include "gui/ScopedChildWidget.h"
@@ -33,6 +35,7 @@
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSignalBlocker>
@@ -119,9 +122,23 @@ void TxProfileSetupPage::buildUi()
                                            "is applied and nothing is "
                                            "overwritten."));
 
+    // ── Von Zeus holen (2026-10-31) ─────────────────────────────────
+    //
+    // Eine eigene Taste und nicht derselbe Dateidialog, weil es bei
+    // Zeus gar keine Datei gibt: seine Profile stehen nur bei der
+    // laufenden Maschine, abzuholen ueber deren oertliche Schnittstelle.
+    // Die Begruendung in voller Laenge im Kopf von ZeusProfilImport.h.
+    m_zeusBtn = new QPushButton(tr("Fetch from Zeus…"), group);
+    m_zeusBtn->setToolTip(tr("Fetches the TX audio profiles from a Zeus "
+                             "station engine running on this computer. "
+                             "Zeus has no profile file — this asks the "
+                             "running machine. Nothing is applied and "
+                             "nothing is overwritten."));
+
     btnRow->addWidget(m_saveBtn);
     btnRow->addWidget(m_deleteBtn);
     btnRow->addWidget(m_importBtn);
+    btnRow->addWidget(m_zeusBtn);
     btnRow->addStretch(1);
     form->addRow(QString(), btnRow);
 
@@ -137,6 +154,8 @@ void TxProfileSetupPage::buildUi()
             this, &TxProfileSetupPage::onDeleteClicked);
     connect(m_importBtn, &QPushButton::clicked,
             this, &TxProfileSetupPage::onImportClicked);
+    connect(m_zeusBtn, &QPushButton::clicked,
+            this, &TxProfileSetupPage::onZeusClicked);
 
     // ── Plan 4 Cluster C (Task 5 / D6): TX Filter group ──────────────────────
     // Low/High cutoff spinboxes for the TX bandpass filter.  Bidirectional with
@@ -544,6 +563,20 @@ void TxProfileSetupPage::onImportClicked()
     // „Nothing imported." und keinen Hinweis, dass die Datei in
     // Ordnung ist. Siehe ProfilHerkunft.h.
     const ProfilHerkunft::Befund b = ProfilHerkunft::erkenne(inhalt);
+    // Eine abgelegte Zeus-Antwort gehoert hierher — sie fuehrt
+    // dieselben Felder. Dass der uebliche Weg zu Zeus die Taste
+    // daneben ist, aendert nichts daran: wer seine Antwort in eine
+    // Datei gelegt hat, soll sie auch von hier einlesen koennen.
+    if (b.art == ProfilHerkunft::Art::ZeusTxAudio) {
+        const QString bericht = einleseZeusAntwortFuerTest(inhalt);
+        ScopedChildWidget<QMessageBox> zOwner(this);
+        QMessageBox& zk = *zOwner.get();
+        zk.setWindowTitle(tr("Import Thetis profiles"));
+        zk.setIcon(QMessageBox::Information);
+        zk.setText(bericht);
+        zk.exec();
+        return;
+    }
     if (b.art == ProfilHerkunft::Art::AetherKanalzug) {
         QMessageBox::information(
             this, tr("Import Thetis profiles"),
@@ -566,6 +599,117 @@ void TxProfileSetupPage::onImportClicked()
     k.setText(bericht.section(QLatin1Char('\n'), 0, 0));
     k.setDetailedText(bericht);
     k.exec();
+}
+
+// ── Von Zeus holen (2026-10-31) ──────────────────────────────────────
+//
+// Zwei Schritte, und der erste ist eine Frage: WO. Zeus bindet seinen
+// Port dynamisch, es gibt keine feste Nummer zum Raten (siehe
+// ZeusAbfrage.h), also wird der Betreiber gefragt — mit dem, was
+// zuletzt ging, als Vorgabe.
+void TxProfileSetupPage::onZeusClicked()
+{
+    bool ja = false;
+    const QString adresse = QInputDialog::getText(
+        this, tr("Fetch from Zeus"),
+        tr("Address of the Zeus station engine on this computer.\n"
+           "The port is not fixed — read it off the Zeus window."),
+        QLineEdit::Normal, ZeusAbfrage::basis(), &ja);
+    if (!ja || adresse.trimmed().isEmpty()) { return; }
+
+    QString grund;
+    if (!ZeusAbfrage::istOertlich(adresse.trimmed(), &grund)) {
+        QMessageBox::warning(this, tr("Fetch from Zeus"), grund);
+        return;
+    }
+    ZeusAbfrage::setzeBasis(adresse.trimmed());
+
+    // Der Holer haengt am Fenster, nicht am Stapel: die Antwort kommt
+    // spaeter, und ein Holer, der vorher stirbt, meldet nie etwas.
+    auto* holer = new ZeusAbfrage(this);
+    m_zeusBtn->setEnabled(false);
+
+    connect(holer, &ZeusAbfrage::gescheitert, this,
+            [this, holer](const QString& g) {
+                m_zeusBtn->setEnabled(true);
+                holer->deleteLater();
+                QMessageBox::warning(this, tr("Fetch from Zeus"), g);
+            });
+    connect(holer, &ZeusAbfrage::gekommen, this,
+            [this, holer](const QByteArray& json) {
+                m_zeusBtn->setEnabled(true);
+                holer->deleteLater();
+
+                const QString bericht = einleseZeusAntwortFuerTest(json);
+                ScopedChildWidget<QMessageBox> dlgOwner(this);
+                QMessageBox& k = *dlgOwner.get();
+                k.setWindowTitle(tr("Fetch from Zeus"));
+                k.setIcon(QMessageBox::Information);
+                k.setText(bericht);
+                k.exec();
+            });
+    holer->hole();
+}
+
+QString TxProfileSetupPage::einleseZeusAntwortFuerTest(const QByteArray& json)
+{
+    const ZeusProfilImport::Ergebnis gelesen = ZeusProfilImport::lies(json);
+
+    QStringList z;
+    if (!gelesen.fehler.isEmpty()) {
+        z << tr("Nothing imported.");
+        for (const QString& f : gelesen.fehler) {
+            z << QStringLiteral("  ") + f;
+        }
+        return z.join(QLatin1Char('\n'));
+    }
+    if (!m_profileMgr) {
+        z << tr("There is no profile manager here -- nothing created.");
+        return z.join(QLatin1Char('\n'));
+    }
+
+    // DERSELBE Schreiber wie beim Thetis-Weg. Nicht aus Sparsamkeit:
+    // zwei Schreiber laufen beim naechsten Feld auseinander, und dann
+    // legt dieselbe Einstellung aus zwei Quellen zwei verschiedene
+    // Profile an.
+    const MicProfileManager::ThetisEinleseErgebnis erg =
+        m_profileMgr->einleseThetisProfile(gelesen.profile);
+
+    z << tr("%1 profile(s) created from Zeus, nothing applied and "
+            "nothing overwritten.").arg(erg.anzahl());
+    z << QString();
+
+    for (auto it = erg.angelegt.constBegin();
+         it != erg.angelegt.constEnd(); ++it) {
+        if (it.key() == it.value()) {
+            z << tr("  created: %1").arg(it.value());
+        } else {
+            z << tr("  created: %1  (in Zeus: %2)")
+                     .arg(it.value(), it.key());
+        }
+        for (const QString& h : erg.hinweise.value(it.value())) {
+            z << QStringLiteral("      ") + h;
+        }
+    }
+    for (auto it = erg.ausgelassen.constBegin();
+         it != erg.ausgelassen.constEnd(); ++it) {
+        z << tr("  NOT created: %1 -- %2").arg(it.key(), it.value());
+    }
+    if (!gelesen.hinweise.isEmpty()) {
+        z << QString() << tr("About the answer:");
+        for (const QString& h : gelesen.hinweise) {
+            z << QStringLiteral("  ") + h;
+        }
+    }
+
+    // Was Zeus fuehrt und wir nicht — einmal am Ende, nicht je Profil.
+    // Ohne diesen Block sieht der Betreiber „angelegt" und weiss
+    // nicht, dass Zeus' halbe Kette gar nicht dabei sein KANN.
+    z << QString() << tr("Zeus carries these, Longpath does not:");
+    for (const QString& h : ZeusProfilImport::nichtUebernommen()) {
+        z << QStringLiteral("  ") + h;
+    }
+    return z.join(QLatin1Char('\n'));
 }
 
 QString TxProfileSetupPage::einleseThetisDateiFuerTest(const QByteArray& inhalt)
