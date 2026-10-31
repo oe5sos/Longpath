@@ -3333,6 +3333,7 @@ longpath_add_test(tst_tci_sendesperre)
 target_compile_definitions(tst_tci_sendesperre PRIVATE LONGPATH_BUILD_TESTS)
 
 longpath_add_test(tst_tci_bind_wiederversuch)
+longpath_add_test(tst_tci_bindefehler_im_applet)
 target_compile_definitions(tst_tci_bind_wiederversuch PRIVATE LONGPATH_BUILD_TESTS)
 # ── mu-law als Tonformat (2026-09-30) ─────────────────────────────────────
 # Misst den Stoerabstand statt nur durchzulaufen, prueft dass der Fehler dem
