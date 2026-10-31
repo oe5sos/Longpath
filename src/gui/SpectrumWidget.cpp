@@ -4074,6 +4074,35 @@ void SpectrumWidget::resizeEvent(QResizeEvent* event)
 
 static int specHFromHeight(int widgetH, float spectrumFrac, int chromeH);
 
+// ── Das Bild notfalls jetzt anlegen (2026-10-31) ────────────────────
+//
+// Betreiber: „warum der wasserfall dort nichts anzeigt weisz ich auch
+// nicht" -- und gleich darauf der entscheidende Satz: „einmal klick in
+// den panadapter und es funktioniert."
+//
+// Die Ursache: `m_waterfall` entstand AUSSCHLIESZLICH in
+// `applyResizeSettled()`, also erst, wenn eine Groessenaenderung zur
+// Ruhe gekommen ist. Kommt das Fenster in gespeicherter Groesse hoch
+// und wird nie gezogen, bleibt das Bild null -- und beide
+// Zeilenwege verwerfen dann JEDE ankommende Zeile mit
+// `if (m_waterfall.isNull()) return;`. Der Strom lief die ganze Zeit
+// (im Protokoll: 10 285 Wasserfallzeilen), nur schrieb sie niemand.
+//
+// Ein Klick loest irgendwann eine Neuberechnung aus, und ab da geht
+// es. Genau das hat er beobachtet.
+//
+// `applyResizeSettled()` legt nur das Bild in der aktuellen Groesse
+// an, setzt die Schreibzeile zurueck und merkt einen vollen
+// Texturschub vor -- es ist gefahrlos, das beim ersten Bedarf
+// nachzuholen statt auf eine Groessenaenderung zu warten.
+bool SpectrumWidget::stelleWasserfallbildSicher()
+{
+    if (!m_waterfall.isNull()) { return true; }
+    if (width() <= 0 || height() <= 0) { return false; }
+    applyResizeSettled();
+    return !m_waterfall.isNull();
+}
+
 void SpectrumWidget::applyResizeSettled()
 {
     // Recreate waterfall image at new size
@@ -6620,7 +6649,10 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
                                                 double lowHz, double highHz)
 {
     if (intensitaet.isEmpty() || !(highHz > lowHz)) { return; }
-    if (m_waterfall.isNull()) { return; }
+    // Siehe `stelleWasserfallbildSicher`: der Weg der Maschine traf
+    // denselben leeren Speicher -- und bei der Flex ist DAS der Weg,
+    // der das Bild schreibt.
+    if (!stelleWasserfallbildSicher()) { return; }
     if (m_wfStopOnTx && m_activePeakHold.txActive()) { return; }
 
     const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
@@ -7058,9 +7090,10 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
 
 void SpectrumWidget::pushWaterfallRow(const QVector<float>& wfPixelsDbm)
 {
-    if (m_waterfall.isNull() || wfPixelsDbm.isEmpty()) {
-        return;
-    }
+    if (wfPixelsDbm.isEmpty()) { return; }
+    // Siehe `stelleWasserfallbildSicher`: ohne das hier blieb der
+    // Wasserfall leer, bis jemand ins Bild klickte.
+    if (!stelleWasserfallbildSicher()) { return; }
 
     // Task 2.8: Stop-on-TX -- skip if TX active and feature enabled.
     if (m_wfStopOnTx && m_activePeakHold.txActive()) {
