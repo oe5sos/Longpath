@@ -7426,7 +7426,13 @@ bool RadioModel::setzeFlexSendescheibe(const QString& sliceId)
 
 void RadioModel::sendeFlexRauschsperre(bool an, double stufe0bis100)
 {
-    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    // Auch das Schweigen wird gemeldet: ein stiller Ruecksprung hier
+    // sah von auszen genauso aus wie ein Regler, der gar nichts tut.
+    if (!m_flexConnection || !m_flexConnection->isConnected()) {
+        qCInfo(lcConnection) << "Flex: Rauschsperre nicht geschickt — "
+                                "keine Verbindung zur Maschine";
+        return;
+    }
     // ── Die Scheibennummer kommt spaeter als der Wunsch (2026-10-31) ──
     //
     // Beim Anmelden zieht `MainWindow_Flex` Leistung UND Rauschsperre
