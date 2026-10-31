@@ -120,7 +120,35 @@ struct Abzug {
 //     Ziel −19 dB -> gemeldet −18,6
 //
 // Groesster Fehler 0,4 dB ueber 19 dB Spanne.
-constexpr float kBezugDb = -28.2f;
+//
+// ── Und fuer FT4 ist es eine ANDERE Zahl ────────────────────
+//
+// Das faellt leicht unter den Tisch, weil dieselbe Funktion beide
+// Protokolle bedient. FT4 hat die Symbolperiode 0,048 s statt 0,160 s
+// (`FT4_SYMBOL_PERIOD`), also ist `block_size` 576 statt 1920 und
+// `nfft` 1152 statt 3840 — ein Bin ist 10,42 Hz breit statt 3,125.
+// Die Herleitung gibt damit −22,0 dB statt −27,3, ein Unterschied von
+// 5,2 dB. Mit der FT8-Zahl bekaeme jeder FT4-Fund rund fuenf dB zu
+// wenig.
+//
+// Auch diese Zahl ist gemessen, nicht umgerechnet. Die Herleitung gibt
+// −22,0 dB, die Messung −24,2 — und der Abstand zur Herleitung ist
+// hier 2,2 dB, bei FT8 nur 0,9. Genau darum wird jede der beiden
+// gemessen statt die eine aus der anderen gerechnet.
+//
+//     FT4 Ziel   0 dB -> gemeldet  −0,1
+//     FT4 Ziel  −5 dB -> gemeldet  −5,0
+//     FT4 Ziel −10 dB -> gemeldet −10,0
+//     FT4 Ziel −13 dB -> gemeldet −12,9
+//
+// Dass FT4 ueberhaupt messbar wurde, ist ein eigener Fund: siehe
+// `anDieRichtigeStelle` im Prueflauf. `encodeBlock` mittet das Signal
+// im Fenster, und bei FT4 liegt es damit AUSSERHALB dessen, was
+// ft8_lib an Zeitversatz durchsucht. Am Band ist das kein Problem —
+// `Ft8Tx::sendeplan` setzt den Ton auf 500 ms —, aber ein Rundlauf
+// aus `encodeBlock` heraus war fuer FT4 nie moeglich.
+constexpr float kBezugDbFt8 = -28.2f;
+constexpr float kBezugDbFt4 = -24.2f;
 
 /// Untergrenze. Ein Fund, dessen Rechnung nicht aufgeht (Rauschen
 /// null, Bloecke ausserhalb des Wasserfalls), bekommt sie statt einer
@@ -216,7 +244,7 @@ float stoerabstandDb(const ftx_waterfall_t* wf,
     if (signal <= 0.0 || rauschen <= 0.0) { return kSnrUntergrenze; }
 
     const double jeBin = 10.0 * std::log10(signal / rauschen);
-    const float  snr   = float(jeBin) + kBezugDb;
+    const float  snr   = float(jeBin) + (ft4 ? kBezugDbFt4 : kBezugDbFt8);
     return snr < kSnrUntergrenze ? kSnrUntergrenze : snr;
 }
 
