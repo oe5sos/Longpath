@@ -2669,6 +2669,12 @@ if(TEST tst_flex_abstimmregler)
     set_tests_properties(tst_flex_abstimmregler PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
+longpath_add_test(tst_flex_rauschsperre)
+if(TEST tst_flex_rauschsperre)
+    set_tests_properties(tst_flex_rauschsperre PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 longpath_add_test(tst_swr_riegel)
 # `jederSendewegFragtDenRiegel` liest die Quelle: ohne echtes Geraet
 # kommt kein Lauf an das vierte Tor. Ohne diese Zeile ueberspringt er

@@ -315,6 +315,12 @@ QString xmitCommand(bool tasten);
 // ihr das Senden, ohne eine andere zu bestimmen.
 QString setSliceTxCommand(const QString& sliceId, bool sendet);
 
+/// Die Rauschsperre der Maschine. Beide Schluessel sind am 2026-10-31
+/// direkt von der FLEX-8400 gelesen (`squelch`, `squelch_level`), die
+/// Stufe laeuft von 0 bis 100 -- wie unser Schieber.
+QString setSliceSquelchCommand(const QString& sliceId, bool an);
+QString setSliceSquelchLevelCommand(const QString& sliceId, int stufe);
+
 // Sendeleistung und Abstimmleistung in Prozent, wie die Maschine sie
 // im `transmit`-Zustand meldet (`rfpower=`, `tunepower=`).
 //

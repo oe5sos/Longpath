@@ -3803,6 +3803,11 @@ public:
     /// 2026-10-31.
     QString flexSwrBandKennung() const;
 
+    /// Die Rauschsperre an die Maschine schicken. Bei der Flex macht
+    /// SIE die Aufbereitung -- unsere WDSP-Sperre hat dort kein Ziel
+    /// (Befund des Betreibers, 2026-10-31).
+    void sendeFlexRauschsperre(bool an, double stufe0bis100);
+
     /// Die Scheibe bestimmen, die senden soll. Ohne das weist die
     /// Maschine `xmit` ab.
     bool setzeFlexSendescheibe(const QString& sliceId);

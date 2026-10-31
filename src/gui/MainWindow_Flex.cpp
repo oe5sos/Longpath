@@ -1952,6 +1952,19 @@ void MainWindow::verdrahteFlexSenden()
         } else {
             m_radioModel->setzeFlexAbstimmleistung(stimmWatt);
         }
+        // ── Die Rauschsperre gleich mit (2026-10-31) ────────────
+        //
+        // Aus demselben Grund wie die Leistung: die Baender darueber
+        // feuern nur bei einer Reglerbewegung. Ohne diese Zeile
+        // behielte die Maschine, was ein anderer Client zuletzt
+        // gesetzt hat -- und der Knopf im RX-Applet zeigte etwas
+        // anderes, als wirklich gilt.
+        if (const SliceModel* const sl =
+                m_radioModel->sliceById(m_flexTargetSliceId)) {
+            m_radioModel->sendeFlexRauschsperre(sl->ssqlEnabled(),
+                                                sl->ssqlThresh());
+        }
+
         qCInfo(lcFlexGui).nospace()
             << "Flex: Leistung nachgezogen — senden " << sendeWatt
             << " %, abstimmen " << stimmWatt << " %";

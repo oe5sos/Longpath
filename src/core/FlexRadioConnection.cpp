@@ -296,6 +296,35 @@ QString xmitCommand(bool tasten)
     return QStringLiteral("xmit %1").arg(tasten ? 1 : 0);
 }
 
+// ── Die Rauschsperre der Maschine (2026-10-31) ──────────────────────
+//
+// Betreiber: „wo kann ich den squelch einstellen" -- und auf die
+// Antwort („RX-Applet, Knopf SQL"): „der funktioniert nicht",
+// „schieberegler ohne änderung".
+//
+// Richtig. Unsere Rauschsperre schreibt in `RxChannel` (WDSP), und
+// `MainWindow_Flex.cpp:45` sagt es selbst: „Flex-Scheibe ist eine
+// Scheibe OHNE RxChannel". Der Regler hatte also schlicht kein Ziel.
+//
+// Die Maschine hat eine eigene. Am 2026-10-31 direkt von ihr gelesen
+// (`sub slice all`, nur lesend):
+//
+//     squelch=0 squelch_level=20
+//
+// Beide Namen sind damit vom Geraet bestaetigt, nicht geraten. Die
+// Stufe laeuft wie unser Schieber von 0 bis 100.
+QString setSliceSquelchCommand(const QString& sliceId, bool an)
+{
+    if (sliceId.isEmpty()) { return QString(); }
+    return QStringLiteral("slice set %1 squelch=%2").arg(sliceId).arg(an ? 1 : 0);
+}
+
+QString setSliceSquelchLevelCommand(const QString& sliceId, int stufe)
+{
+    if (sliceId.isEmpty() || stufe < 0 || stufe > 100) { return QString(); }
+    return QStringLiteral("slice set %1 squelch_level=%2").arg(sliceId).arg(stufe);
+}
+
 QString setSliceTxCommand(const QString& sliceId, bool sendet)
 {
     if (sliceId.isEmpty()) { return QString(); }

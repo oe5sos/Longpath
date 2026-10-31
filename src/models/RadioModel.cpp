@@ -7418,6 +7418,23 @@ bool RadioModel::setzeFlexSendescheibe(const QString& sliceId)
     return true;
 }
 
+void RadioModel::sendeFlexRauschsperre(bool an, double stufe0bis100)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexSliceId.isEmpty()) { return; }
+
+    const QString b1 = FlexCommandWire::setSliceSquelchCommand(m_flexSliceId, an);
+    if (!b1.isEmpty()) { m_flexConnection->sendCommand(b1); }
+
+    const int stufe = std::clamp(static_cast<int>(std::lround(stufe0bis100)), 0, 100);
+    const QString b2 =
+        FlexCommandWire::setSliceSquelchLevelCommand(m_flexSliceId, stufe);
+    if (!b2.isEmpty()) { m_flexConnection->sendCommand(b2); }
+
+    qCInfo(lcConnection).nospace()
+        << "Flex: Rauschsperre " << (an ? "an" : "aus") << ", Stufe " << stufe;
+}
+
 QString RadioModel::flexSwrBandKennung() const
 {
     // Dieselbe Quelle, aus der auch die Antennenumschaltung ihr Band
@@ -13798,6 +13815,15 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
         if (rxCh) {
             rxCh->setSsqlEnabled(on);
         }
+        // ── Und bei der Flex die ihre (2026-10-31) ──────────────────
+        //
+        // Betreiber: „der funktioniert nicht", „schieberegler ohne
+        // änderung". Richtig: eine Flex-Scheibe ist eine Scheibe OHNE
+        // `RxChannel` (`MainWindow_Flex.cpp:45`), der Regler hatte also
+        // kein Ziel. Die Maschine hat eine eigene Rauschsperre --
+        // `squelch` / `squelch_level`, beides am selben Tag direkt von
+        // ihr gelesen.
+        sendeFlexRauschsperre(on, slice->ssqlThresh());
         scheduleSettingsSave();
     });
     connect(slice, &SliceModel::ssqlThreshChanged, this, [this, slice](double threshold) {
@@ -13808,6 +13834,9 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
             double normalized = std::clamp(threshold / 100.0, 0.0, 1.0);
             rxCh->setSsqlThresh(normalized);
         }
+        // Siehe oben: die Flex nimmt die Stufe als 0..100, also genau
+        // die Einheit des Schiebers.
+        sendeFlexRauschsperre(slice->ssqlEnabled(), threshold);
         scheduleSettingsSave();
     });
 
