@@ -1147,6 +1147,23 @@ void TxApplet::wireControls()
     connect(m_tunePwrSlider, &QSlider::valueChanged, this, [this, &tx](int val) {
         updatePowerSliderLabels();
         if (m_updatingFromModel) { return; }
+        // ── Auch global setzen (2026-10-31) ─────────────────────────
+        //
+        // Betreiber: „ich tune mit 1 watt und oben steht kurz ueber 23
+        // watt" — und: „tunen will ich grundsaetzlich mit einem watt."
+        //
+        // Der Regler schrieb NUR den Bandwert. `tunePowerChanged`
+        // feuerte damit nie, und wer daran haengt, erfuhr von der
+        // Einstellung nichts: die Flex-Verdrahtung
+        // (`MainWindow_Flex.cpp`) schickte weiter den alten globalen
+        // Wert. Im Protokoll vom 2026-10-31, 14:52:27, steht es
+        // woertlich — „abstimmen 10 %", waehrend am Regler 1 stand.
+        //
+        // Der Leistungsregler zehn Zeilen hoeher macht es seit jeher
+        // als PAAR: `setPower` (global, meldet) UND `setPowerForBand`
+        // (Speicher). Hier fehlte die erste Haelfte. Jetzt dieselbe
+        // Hand.
+        tx.setTunePower(val);
         tx.setTunePowerForBand(m_currentBand, val);
         // When the user touches the tune slider, switch the tune drive
         // source so TUNE actually reads from tunePowerForBand instead of
@@ -2050,6 +2067,11 @@ void TxApplet::setCurrentBand(Band band)
     // early-return makes the no-band-change call free.
     if (band == txBand()) {
         tx.setPower(tx.powerForBand(band));
+        // Dieselbe Hand fuer die Abstimmleistung (2026-10-31): ohne
+        // sie trug ein Bandwechsel den neuen Bandwert nicht nach
+        // auszen, und das Geraet stimmte mit dem Wert des vorigen
+        // Bandes ab.
+        tx.setTunePower(tx.tunePowerForBand(band));
     }
 }
 

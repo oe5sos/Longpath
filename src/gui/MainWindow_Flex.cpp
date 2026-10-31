@@ -1918,7 +1918,21 @@ void MainWindow::verdrahteFlexSenden()
     {
         const TransmitModel& tm = m_radioModel->transmitModel();
         const int sendeWatt  = qBound(0, tm.power(), 100);
-        const int stimmWatt  = qBound(0, tm.tunePower(), 100);
+        // ── Die Abstimmleistung aus dem BANDWERT (2026-10-31) ───────
+        //
+        // `tm.tunePower()` ist der globale Wert. Bis heute schrieb der
+        // Regler nur den Bandwert, der globale blieb also auf dem
+        // Stand von irgendwann -- beim Betreiber auf 10, waehrend am
+        // Regler 1 stand. Der Regler ist jetzt gepaart
+        // (`TxApplet.cpp`), aber beim Anmelden ist noch offen, wer
+        // zuerst dran war; darum hier die Quelle lesen, die der
+        // Betreiber auch SIEHT: den Wert des Sendebandes.
+        int stimmWatt = qBound(0, tm.tunePower(), 100);
+        if (const SliceModel* const sl =
+                m_radioModel->sliceById(m_flexTargetSliceId)) {
+            stimmWatt = qBound(
+                0, tm.tunePowerForBand(bandFromFrequency(sl->frequency())), 100);
+        }
         m_radioModel->setzeFlexSendeleistung(sendeWatt);
         m_radioModel->setzeFlexAbstimmleistung(stimmWatt);
         qCInfo(lcFlexGui).nospace()
