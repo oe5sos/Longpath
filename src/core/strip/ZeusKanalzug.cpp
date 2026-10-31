@@ -16,7 +16,15 @@
 #include <QJsonObject>
 #include <QJsonValue>
 
+#include <QLoggingCategory>
+
 #include <cmath>
+
+// Im globalen Namensraum angelegt (ZeusAbfrage.cpp), also hier auch
+// dort deklariert — innerhalb von `namespace Longpath` waere es ein
+// ZWEITES Symbol, und der Linker sagt es erst am Ende eines langen
+// Baus.
+Q_DECLARE_LOGGING_CATEGORY(lcZeus)
 
 namespace Longpath {
 namespace ZeusKanalzug {
@@ -461,9 +469,20 @@ Ergebnis anwenden(const QJsonObject& profil, StripChain& k)
     if (e.stufen == 0) {
         e.fehler = QStringLiteral(
             "In diesem Profil stand keine Stufe, die Longpath kennt.");
+        qCWarning(lcZeus).nospace()
+            << "Zeus-Kanalzug: \"" << e.name << "\" brachte nichts mit";
         return e;
     }
     e.ok = true;
+    // Was gesetzt wurde und was liegenblieb, gehoert ins Protokoll und
+    // nicht nur in eine Zeile unter dem Profilfeld — die ist beim
+    // naechsten Klick weg.
+    qCInfo(lcZeus).nospace()
+        << "Zeus-Kanalzug: \"" << e.name << "\" angewandt, "
+        << e.stufen << " Stufe(n), " << e.hinweise.size() << " Hinweis(e)";
+    for (const QString& h : std::as_const(e.hinweise)) {
+        qCInfo(lcZeus).nospace() << "  " << h;
+    }
     return e;
 }
 

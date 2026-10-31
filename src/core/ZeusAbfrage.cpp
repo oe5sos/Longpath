@@ -10,11 +10,19 @@
 
 #include "core/AppSettings.h"
 
+#include <QLoggingCategory>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QTimer>
 #include <QUrl>
+
+// Ein Weg, der nichts ins Protokoll schreibt, ist nicht
+// nachvollziehbar. Am 2026-10-31 stand nach einem Versuch am Geraet
+// KEINE einzige Zeile zu Zeus im Protokoll — weder dass gefragt
+// wurde, noch mit welchem Ergebnis. Das ist jetzt behoben: jeder
+// Versuch und jeder Ausgang steht da.
+Q_LOGGING_CATEGORY(lcZeus, "longpath.zeus")
 
 namespace Longpath {
 
@@ -95,9 +103,12 @@ void ZeusAbfrage::hole(int fristMs)
     const QString b = basis();
     QString grund;
     if (!istOertlich(b, &grund)) {
+        qCWarning(lcZeus).nospace() << "Zeus: " << grund;
         emit gescheitert(grund);
         return;
     }
+    qCInfo(lcZeus).nospace()
+        << "Zeus: frage " << b << QLatin1String(kPfad) << " ab";
 
     if (m_netz == nullptr) {
         m_netz = new QNetworkAccessManager(this);
@@ -128,6 +139,9 @@ void ZeusAbfrage::hole(int fristMs)
                 || a->error() == QNetworkReply::HostNotFoundError
                 || a->error() == QNetworkReply::TimeoutError
                 || a->error() == QNetworkReply::OperationCanceledError;
+            qCWarning(lcZeus).nospace()
+                << "Zeus: gescheitert — " << a->errorString()
+                << " (Fehler " << int(a->error()) << ")";
             if (keinerDa) {
                 emit gescheitert(QStringLiteral(
                     "Unter %1 antwortet keine Zeus-Maschine (%2). Läuft "
@@ -149,6 +163,8 @@ void ZeusAbfrage::hole(int fristMs)
             // Zeus-Prozesse. Die Station Engine lauscht auch, kennt
             // diesen Endpunkt aber nicht — er gehoert dem Produkt.
             // Gemessen am 2026-10-31, siehe den Kopf.
+            qCWarning(lcZeus).nospace()
+                << "Zeus: antwortete mit " << code;
             if (code == 404) {
                 emit gescheitert(QStringLiteral(
                     "Unter %1 lauscht zwar etwas, aber es kennt "
@@ -167,10 +183,13 @@ void ZeusAbfrage::hole(int fristMs)
 
         const QByteArray json = a->readAll();
         if (json.isEmpty()) {
+            qCWarning(lcZeus) << "Zeus: Antwort war leer";
             emit gescheitert(QStringLiteral(
                 "Zeus antwortete, aber die Antwort war leer."));
             return;
         }
+        qCInfo(lcZeus).nospace()
+            << "Zeus: " << json.size() << " Bytes gekommen";
         emit gekommen(json);
     });
 }
