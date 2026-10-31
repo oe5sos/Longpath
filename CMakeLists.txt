@@ -909,6 +909,8 @@ set(GUI_SOURCES
     # und -ende (Entwurf C, 2026-10-30)
     src/gui/widgets/Ft8Fensterbalken.cpp
     src/gui/widgets/DspParamPopup.cpp
+    src/gui/widgets/RasterOverlay.cpp
+    src/gui/widgets/RasterOverlay.h
     src/gui/widgets/DspQuickPopups.cpp
     src/gui/widgets/DspQuickPopups.h
     src/gui/widgets/BandwidthFilterPane.cpp

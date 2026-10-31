@@ -785,6 +785,22 @@ constexpr int kSplitterHandlePx = 6;
 // bleiben sechs.
 constexpr int kPanelGapPx = 2;
 
+// ── Die Luft ZWISCHEN zwei schwebenden Fenstern (2026-10-31) ─────────
+//
+// Betreiber: „ev groeszerer pixel abstand von min 3 pixel."
+//
+// Eine EIGENE Zahl, nicht `kPanelGapPx`: der sitzt auch in den
+// Innenraendern und Abstaenden INNERHALB der Panels
+// (`MainWindow.cpp`, `AppletPanelWidget.cpp`). Wer dort an der Zahl
+// dreht, verschiebt den Inhalt der Felder mit — gemeint war der
+// Abstand der Fenster zueinander.
+//
+// Das Raster rechnet sie mit ein (`snappedFrameRect`): die nahe Kante
+// auf der Rasterlinie, die ferne so viel davor. Darum ist sie der
+// GARANTIERTE Abstand, nicht nur ein Mindestwert, den etwas spaeter
+// noch aufschlaegt.
+constexpr int kFensterLuftPx = 3;
+
 // ── Der Griff ist UNSICHTBAR, bis man ihn beruehrt (2026-10-14) ──────
 //
 // Der Betreiber, mit einem Bild: „Ich moechte im Hintergrund keine
