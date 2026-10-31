@@ -130,6 +130,22 @@ const QHash<QString, QString>& tabelle()
         // weil er jede Profildatei annimmt und am Inhalt erkennt.
         { QStringLiteral("Profile…"),
           QStringLiteral("Profil…") },
+        // Von Zeus holen (2026-10-31). Zeus hat keine Profildatei —
+        // seine Kette steht nur bei der laufenden Maschine.
+        { QStringLiteral("From Zeus…"),
+          QStringLiteral("Von Zeus…") },
+        { QStringLiteral("From Zeus"),
+          QStringLiteral("Von Zeus") },
+        { QStringLiteral("Address of the Zeus station engine on this computer.\nThe port is not fixed — read it off the Zeus window."),
+          QStringLiteral("Adresse der Zeus-Maschine auf diesem Rechner.\nDer Port steht nicht fest — lies ihn am Zeus-Fenster ab.") },
+        { QStringLiteral("Which profile?"),
+          QStringLiteral("Welches Profil?") },
+        { QStringLiteral("From Zeus: %1 (%2 stages)"),
+          QStringLiteral("Aus Zeus: %1 (%2 Stufen)") },
+        { QStringLiteral("Zeus answered, but none of its profiles carries an audio suite."),
+          QStringLiteral("Zeus hat geantwortet, aber keines seiner Profile trägt eine Audio-Suite.") },
+        { QStringLiteral("That is a Zeus answer, but none of its profiles carries an audio suite."),
+          QStringLiteral("Das ist eine Zeus-Antwort, aber keines ihrer Profile trägt eine Audio-Suite.") },
         { QStringLiteral("Open profile"),
           QStringLiteral("Profil öffnen") },
         { QStringLiteral("Cannot open that file."),

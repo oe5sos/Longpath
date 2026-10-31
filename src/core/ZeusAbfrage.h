@@ -25,10 +25,27 @@
 // ab. Eine geratene Portliste waere ein Scanner auf dem eigenen
 // Rechner, und sie waere bei der naechsten Zeus-Fassung falsch.
 //
-// Die Adresse steht in AppSettings unter `Zeus/Basis`, Vorgabe
-// `http://127.0.0.1:5000` — eine VORGABE, kein Fund: sie steht da,
-// damit das Feld nicht leer ist, und wird beim ersten Versuch
-// berichtigt.
+// Die Adresse steht in AppSettings unter `Zeus/Basis`. Als Vorgabe
+// steht der Port, der am 2026-10-31 an Martins Station gemessen wurde
+// (55111) — er ist je Installation ANDERS und nur deshalb da, damit
+// das Feld nicht leer ist.
+//
+// Nicht 5000, obwohl das die uebliche Hausnummer fuer so etwas waere:
+// auf macOS haelt diesen Port der AirPlay-Empfaenger (`ControlCenter`,
+// am selben Tag nachgesehen), und eine Vorgabe, die zuverlaessig auf
+// das falsche Programm zeigt, ist schlimmer als keine.
+//
+// ── Zwei Prozesse, ein Endpunkt ──────────────────────────────────────
+//
+// Zeus laeuft als ZWEI lauschende Prozesse, und nur einer kann diese
+// Frage beantworten (gemessen am 2026-10-31):
+//
+//     StationEn  127.0.0.1:60787  ->  404 auf /api/tx-audio-profiles
+//     ZeusProdu  127.0.0.1:55111  ->  200, die Profile
+//
+// Der Endpunkt gehoert dem PRODUKT, nicht der offengelegten Maschine.
+// Wer den Port der Station Engine eintraegt, bekommt darum ein 404 und
+// keine Verbindungsverweigerung — die Meldung sagt das.
 //
 // ── Nur der eigene Rechner ───────────────────────────────────────────
 //

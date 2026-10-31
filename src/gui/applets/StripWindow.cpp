@@ -19,7 +19,15 @@
 #include "gui/StyleConstants.h"
 #include "core/strip/EqBandLayout.h"
 #include "core/strip/AetherPreset.h"
+#include "core/strip/ZeusKanalzug.h"
 #include "core/ProfilHerkunft.h"
+#include "core/ZeusAbfrage.h"
+
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QInputDialog>
+#include <QLineEdit>
 #include "core/strip/StripSettings.h"
 #include "core/strip/BandLimit.h"
 #include "core/strip/StripLiveMonitor.h"
@@ -1099,6 +1107,23 @@ void StripWindow::buildUi()
             "nothing runs along that Aether did not have. A Thetis "
             "file is recognised too and told where it belongs."));
         row->addWidget(m_aetherImport);
+
+        // ── Von Zeus (2026-10-31) ───────────────────────────────────
+        //
+        // Ein eigener Knopf, weil Zeus keine Profildatei hat: seine
+        // Kette steht nur bei der laufenden Maschine. Dass der Knopf
+        // daneben auch eine ABGELEGTE Zeus-Antwort annimmt, aendert
+        // das nicht — der uebliche Weg ist dieser hier.
+        m_zeusHolen = new QPushButton(
+            Sprache::T(QStringLiteral("From Zeus…")), this);
+        m_zeusHolen->setStyleSheet(Style::buttonBaseStyle());
+        m_zeusHolen->setToolTip(QStringLiteral(
+            "Fetches the audio suite from a Zeus station engine "
+            "running on this computer — gate, de-esser, EQ, "
+            "compressor, saturation, exciter, reverb and limiter. "
+            "What Zeus has and Longpath does not is reported with its "
+            "values, not bent into a stage that sounds similar."));
+        row->addWidget(m_zeusHolen);
         row->addStretch(1);
 
         // A/B. Held down, not toggled: a comparison you have to keep
@@ -1140,6 +1165,8 @@ void StripWindow::buildUi()
                 this, &StripWindow::deleteUserPreset);
         connect(m_aetherImport, &QPushButton::clicked,
                 this, &StripWindow::importAetherPreset);
+        connect(m_zeusHolen, &QPushButton::clicked,
+                this, &StripWindow::holeVonZeus);
 
         connect(m_compareBtn, &QPushButton::pressed, this, [this]() {
             if (StripChain* c = chain()) {
@@ -2706,6 +2733,124 @@ void StripWindow::applyPreset(const QString& name)
 // was nicht abgebildet werden konnte, steht hinterher im Hinweis --
 // lieber eine Zeile zu viel als eine Stufe, die heimlich anders
 // eingestellt ist als in der Datei.
+// ── Die Kette bei Zeus abholen (2026-10-31) ──────────────────────────
+//
+// Zwei Fragen, bevor etwas geschieht: WO steht die Maschine (ihr Port
+// ist nicht fest, siehe ZeusAbfrage.h), und WELCHES Profil — Zeus
+// liefert alle auf einmal.
+void StripWindow::holeVonZeus()
+{
+    if (!chain()) { return; }
+
+    bool ja = false;
+    const QString adresse = QInputDialog::getText(
+        this, Sprache::T(QStringLiteral("From Zeus")),
+        Sprache::T(QStringLiteral(
+            "Address of the Zeus station engine on this computer.\n"
+            "The port is not fixed — read it off the Zeus window.")),
+        QLineEdit::Normal, ZeusAbfrage::basis(), &ja);
+    if (!ja || adresse.trimmed().isEmpty()) { return; }
+
+    QString grund;
+    if (!ZeusAbfrage::istOertlich(adresse.trimmed(), &grund)) {
+        m_presetNote->setText(grund);
+        return;
+    }
+    ZeusAbfrage::setzeBasis(adresse.trimmed());
+
+    auto* holer = new ZeusAbfrage(this);
+    m_zeusHolen->setEnabled(false);
+
+    connect(holer, &ZeusAbfrage::gescheitert, this,
+            [this, holer](const QString& g) {
+                m_zeusHolen->setEnabled(true);
+                holer->deleteLater();
+                m_presetNote->setText(g);
+            });
+    connect(holer, &ZeusAbfrage::gekommen, this,
+            [this, holer](const QByteArray& json) {
+                m_zeusHolen->setEnabled(true);
+                holer->deleteLater();
+
+                const QJsonDocument d = QJsonDocument::fromJson(json);
+                QJsonArray ps = d.isArray()
+                                    ? d.array()
+                                    : d.object()
+                                          .value(QStringLiteral("profiles"))
+                                          .toArray();
+                // Nur die, die wirklich eine Kette tragen. Ein Profil
+                // ohne Audio-Suite in die Auswahl zu stellen heiszt,
+                // dem Betreiber eine Wahl anzubieten, die nichts tut.
+                QStringList namen;
+                QList<QJsonObject> mitKette;
+                for (const QJsonValue& v : std::as_const(ps)) {
+                    const QJsonObject o = v.toObject();
+                    if (!ZeusKanalzug::traegtKanalzug(o)) { continue; }
+                    QString n = o.value(QStringLiteral("name")).toString();
+                    if (n.isEmpty()) {
+                        n = o.value(QStringLiteral("id")).toString();
+                    }
+                    namen << n;
+                    mitKette << o;
+                }
+                if (mitKette.isEmpty()) {
+                    m_presetNote->setText(Sprache::T(QStringLiteral(
+                        "Zeus answered, but none of its profiles "
+                        "carries an audio suite.")));
+                    return;
+                }
+
+                int welches = 0;
+                if (mitKette.size() > 1) {
+                    bool nimm = false;
+                    const QString gewaehlt = QInputDialog::getItem(
+                        this, Sprache::T(QStringLiteral("From Zeus")),
+                        Sprache::T(QStringLiteral("Which profile?")),
+                        namen, 0, false, &nimm);
+                    if (!nimm) { return; }
+                    welches = std::max(0, int(namen.indexOf(gewaehlt)));
+                }
+                wendeZeusProfilAn(mitKette.at(welches));
+            });
+    holer->hole();
+}
+
+void StripWindow::wendeZeusProfilAn(const QJsonObject& profil)
+{
+    StripChain* c = chain();
+    if (!c) { return; }
+
+    // Dieselbe Sicherung wie beim Aether-Import: ein Profil ersetzt
+    // die ganze Kette, und der bestehende Stand soll abrufbar bleiben.
+    StripSettings::saveUserPreset(kLetzterStand(), *c);
+
+    const ZeusKanalzug::Ergebnis e = ZeusKanalzug::anwenden(profil, *c);
+    if (!e.ok) {
+        m_presetNote->setText(e.fehler);
+        return;
+    }
+    if (!e.name.isEmpty()) {
+        StripSettings::saveUserPreset(e.name, *c);
+        rebuildPresetBox();
+        const int at = m_presetBox->findData(e.name);
+        if (at >= 0) {
+            QSignalBlocker b(m_presetBox);
+            m_presetBox->setCurrentIndex(at);
+        }
+    }
+
+    QString text = Sprache::T(QStringLiteral("From Zeus: %1 (%2 stages)"))
+                       .arg(e.name).arg(e.stufen);
+    if (!e.hinweise.isEmpty()) {
+        text += QStringLiteral(" — ") + e.hinweise.join(QStringLiteral(" "));
+    }
+    m_presetNote->setText(text);
+
+    reloadControls();
+    refreshChainRow();
+    persist();
+}
+
 void StripWindow::importAetherPreset()
 {
     StripChain* c = chain();
@@ -2735,6 +2880,26 @@ void StripWindow::importAetherPreset()
     f.close();
 
     const ProfilHerkunft::Befund b = ProfilHerkunft::erkenne(inhalt);
+    // Eine abgelegte Zeus-Antwort: dieselbe Arbeit wie beim Knopf
+    // daneben, nur ohne Netz. Genommen wird das erste Profil, das
+    // ueberhaupt eine Kette traegt — wer waehlen will, holt sie live.
+    if (b.art == ProfilHerkunft::Art::ZeusTxAudio) {
+        const QJsonDocument d = QJsonDocument::fromJson(inhalt);
+        const QJsonArray ps =
+            d.isArray() ? d.array()
+                        : d.object().value(QStringLiteral("profiles")).toArray();
+        for (const QJsonValue& v : ps) {
+            const QJsonObject o = v.toObject();
+            if (ZeusKanalzug::traegtKanalzug(o)) {
+                wendeZeusProfilAn(o);
+                return;
+            }
+        }
+        m_presetNote->setText(Sprache::T(QStringLiteral(
+            "That is a Zeus answer, but none of its profiles carries "
+            "an audio suite.")));
+        return;
+    }
     if (b.art == ProfilHerkunft::Art::ThetisProfilausfuhr
         || b.art == ProfilHerkunft::Art::ThetisDatenbank) {
         // Erkannt, lesbar — nur nicht hier. Der Weg dorthin steht

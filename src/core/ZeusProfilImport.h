@@ -45,14 +45,23 @@
 // wie bei ThetisProfilImport — und derselbe Grund: eine Schicht, die
 // das Netz braucht, um geprueft zu werden, wird nicht geprueft.
 //
-// ── Was NICHT abgebildet werden kann ─────────────────────────────────
+// ── Was diese Datei NICHT liest ──────────────────────────────────────
 //
-// Zeus' Audio-Suite (Tor, De-Esser, Roehre, Hall, Anreicherer) steckt
-// in `NativePluginStates` und `VstPluginStates` — zeusId auf einen
-// Beutel von Einstellungen, deren SCHLUESSEL nicht offengelegt sind.
-// Das waere unser Kanalzug. Es wird gemeldet und nicht geraten; wer
-// hier raet, verstellt einen Sendeton und die Anzeige sieht dabei
-// richtig aus.
+// Zeus' Audio-Suite — Tor, De-Esser, Entzerrer, Kompressor, Roehre,
+// Anreicherer, Hall, Begrenzer. Sie steckt in `NativePluginStates`,
+// und das ist unser KANALZUG, nicht der WDSP-Sendeweg, den diese
+// Datei fuellt. Gelesen wird sie von `core/strip/ZeusKanalzug.{h,cpp}`.
+//
+// Hier stand bis zum 2026-10-31 mittags, ihre Schluessel seien „nicht
+// offengelegt". Das war falsch, und es ist eine Lehre, die bleiben
+// soll: der Satz stammte aus dem Quelltext der Maschine, wo der Beutel
+// nur als `Dictionary<string, Dictionary<string, string>>` auftaucht.
+// Eine LAUFENDE Maschine zeigt die Schluessel im Klartext, mit der
+// Einheit im Namen (`param:threshold-db`). Zwischen „im Quelltext
+// nicht zu sehen" und „nicht offengelegt" liegt eine Abfrage.
+//
+// Was wirklich nicht lesbar ist: `VstPluginStates`. Das sind
+// base64-Zustaende fremder Plugins.
 //
 // =================================================================
 // Modification history (Longpath):

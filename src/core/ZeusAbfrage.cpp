@@ -21,7 +21,10 @@ namespace Longpath {
 namespace {
 
 constexpr char kSchluessel[] = "Zeus/Basis";
-constexpr char kVorgabe[]    = "http://127.0.0.1:5000";
+// Je Installation anders; der hier gemessene steht nur da, damit das
+// Feld nicht leer ist. Siehe den Kopf — 5000 waere auf macOS der
+// AirPlay-Empfaenger.
+constexpr char kVorgabe[]    = "http://127.0.0.1:55111";
 constexpr char kPfad[]       = "/api/tx-audio-profiles";
 constexpr int  kFristMs      = 4000;
 
@@ -142,10 +145,22 @@ void ZeusAbfrage::hole(int fristMs)
         const int code =
             a->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (code != 200) {
+            // 404 heiszt fast immer: der falsche der beiden
+            // Zeus-Prozesse. Die Station Engine lauscht auch, kennt
+            // diesen Endpunkt aber nicht — er gehoert dem Produkt.
+            // Gemessen am 2026-10-31, siehe den Kopf.
+            if (code == 404) {
+                emit gescheitert(QStringLiteral(
+                    "Unter %1 lauscht zwar etwas, aber es kennt "
+                    "%2 nicht (404). Zeus läuft als ZWEI Prozesse — "
+                    "das ist vermutlich die Station Engine. Die "
+                    "Profile hat der andere, der Produktprozess. "
+                    "Beide Ports stehen in der Prozessliste.")
+                    .arg(b, QLatin1String(kPfad)));
+                return;
+            }
             emit gescheitert(QStringLiteral(
-                "Zeus antwortete mit %1 auf %2%3. Diesen Endpunkt hat "
-                "erst die neuere Zeus-Fassung; in einer älteren heißen "
-                "die Profile anders.")
+                "Zeus antwortete mit %1 auf %2%3.")
                 .arg(code).arg(b, QLatin1String(kPfad)));
             return;
         }

@@ -1949,6 +1949,12 @@ longpath_add_test(tst_profil_herkunft)
 # /api/tx-audio-profiles. Dieser Stand faehrt den ganzen Weg OHNE
 # NETZ: eine Antwort hinein, Profile und Hinweise heraus.
 longpath_add_test(tst_zeus_profil_import)
+# 2026-10-31, nachmittags: Zeus' Audio-Suite IST lesbar — die Schlüssel
+# stehen im Klartext in der Antwort der laufenden Maschine. Dieser
+# Stand fährt sie gegen eine ECHTE Antwort
+# (tests/daten/zeus-tx-audio-profiles.json), und genau die hat sofort
+# gezeigt, dass Zeus jeden Wert als ZEICHENKETTE schickt.
+longpath_add_test(tst_zeus_kanalzug)
 longpath_add_test(tst_cat_verdrahtung)
 # Die drei Knoepfe links oben: zweimal gemeldet, einmal auf einem nie
 # gepushten Zweig verloren, und die Behebung von damals war ausserdem

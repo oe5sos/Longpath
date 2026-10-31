@@ -250,10 +250,9 @@ ThetisProfil einProfil(const QJsonObject& o, bool* ok)
     const QJsonArray kette = o.value(QStringLiteral("chainOrder")).toArray();
     if (!nativ.isEmpty() || !vst.isEmpty() || !kette.isEmpty()) {
         p.hinweise << QStringLiteral(
-            "Zeus' Audio-Suite (%1 Stufe(n)) blieb liegen: ihre "
-            "Einstellungen stecken in nativePluginStates/"
-            "vstPluginStates, deren Schlüssel Zeus nicht offenlegt. Das "
-            "wäre in Longpath der Kanalzug — der bleibt, wie er ist.")
+            "Zeus' Audio-Suite (%1 Stufe(n)) gehört nicht hierher, "
+            "sondern in den Kanalzug — dort gibt es „Von Zeus…\". "
+            "Dieses Profil setzt nur die Sendekette des Funkgeräts.")
             .arg(std::max({nativ.size(), vst.size(), kette.size()}));
     }
     if (o.contains(QStringLiteral("targetSpectralDensity"))) {
@@ -362,9 +361,12 @@ QStringList ZeusProfilImport::nichtUebernommen()
 {
     return {
         QStringLiteral(
-            "Die Audio-Suite (nativePluginStates / vstPluginStates / "
-            "chainOrder) — das wäre Longpaths Kanalzug. Zeus legt die "
-            "Schlüssel seiner Stufen nicht offen; geraten wird nicht."),
+            "Die Audio-Suite (nativePluginStates) — die gehört in "
+            "Longpaths Kanalzug, nicht in ein TX-Profil. Im "
+            "Kanalzugfenster gibt es dafür „Von Zeus…\"."),
+        QStringLiteral(
+            "VST-Einschübe (vstPluginStates): base64-Zustände fremder "
+            "Plugins, nicht lesbar und nicht gemeint."),
         QStringLiteral(
             "Die Dichte-Achse (targetSpectralDensity, 0–100) hat kein "
             "Gegenstück."),
