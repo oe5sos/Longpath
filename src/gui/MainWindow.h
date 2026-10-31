@@ -1660,6 +1660,16 @@ private:
     // ConnectionPanel ctor → startDiscovery, which clears the discovery
     // stop flag and runs a fresh ~5 s NIC walk on the main thread mid-
     // close. Symptom: ⌘Q beach-balls for the full SafeDefault scan time.
+    // ── Das sichtbare Raster (2026-10-31) ────────────────────────────
+    //
+    // Betreiber: „man sollte den raster auch ein und ausblenden
+    // können." Ein Blatt ueber dem Hauptfenster, das die Linien
+    // zeichnet, an denen die schwebenden Fenster einrasten. Siehe
+    // `RasterOverlay`. Wird erst beim ersten Einschalten angelegt.
+    class RasterOverlay* m_rasterOverlay{nullptr};
+    QAction*             m_rasterAction{nullptr};
+    void setRasterVisible(bool on);
+
     bool m_shuttingDown{false};
 
     // Betreiber 2026-09-01: echtes macOS-Vollbild (showFullScreen(), ein

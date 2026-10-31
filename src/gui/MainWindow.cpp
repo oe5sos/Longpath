@@ -337,6 +337,7 @@ warren@wpratt.com
 #include "applets/AppletPanelWidget.h"
 #include "applets/FrequencyApplet.h"
 #include "applets/InstrumentApplet.h"
+#include "gui/widgets/RasterOverlay.h"
 #include "gui/WindowPlacement.h"
 #include "gui/SideAreaWindow.h"
 #include "gui/SettingsBackupDialog.h"
@@ -11109,6 +11110,29 @@ void MainWindow::buildMenuBar()
         });
     }
 
+    // ── Das Raster sichtbar machen (2026-10-31) ─────────────────────
+    //
+    // Betreiber: „man sollte den raster auch ein und ausblenden
+    // können." Die Linien gab es seit dem 2026-09-02 nur als
+    // Rechnung — ob zwei Kanten wirklich auf derselben liegen, war
+    // nur durch Zaehlen von Bildpunkten zu pruefen. Genau das hat am
+    // selben Tag den Befund „funktioniert fuer die ausrichtung auch
+    // nicht perfekt" gebraucht.
+    //
+    // Ein Hilfsmittel beim Einrichten, kein Zustand: darum nicht
+    // gemerkt, es faengt jedes Mal ausgeschaltet an.
+    {
+        m_rasterAction = viewMenu->addAction(tr("Show &grid"));
+        m_rasterAction->setCheckable(true);
+        m_rasterAction->setChecked(false);
+        m_rasterAction->setToolTip(
+            tr("Draw the lines the floating windows snap to. Handy while "
+               "arranging them; it changes nothing but the view."));
+        connect(m_rasterAction, &QAction::toggled, this, [this](bool on) {
+            setRasterVisible(on);
+        });
+    }
+
     // ── Applet-Leiste neben oder unter den Panadapter ────────────────
     //
     // 2026-08-19, auf Ansage des Betreibers: „jedes Fenster sollte man
@@ -15994,6 +16018,11 @@ int MainWindow::schwebendeAusDemSchutzrahmenHolen()
 
 void MainWindow::moveEvent(QMoveEvent* event)
 {
+    // Das Rasterblatt rechnet in Bildschirmkoordinaten: zieht das
+    // Fenster um, zeigen seine Linien sonst auf den alten Platz.
+    if (m_rasterOverlay && m_rasterOverlay->isVisible()) {
+        m_rasterOverlay->update();
+    }
     QMainWindow::moveEvent(event);
     if (!m_shuttingDown) {
         snapToGridAfterSettle(this);
@@ -16001,9 +16030,37 @@ void MainWindow::moveEvent(QMoveEvent* event)
     }
 }
 
+void MainWindow::setRasterVisible(bool on)
+{
+    if (!on) {
+        if (m_rasterOverlay) { m_rasterOverlay->hide(); }
+        return;
+    }
+    QWidget* const feld = centralWidget();
+    if (!feld) { return; }
+    if (!m_rasterOverlay) {
+        // Kind des Mittelfelds, nicht des Fensters: so liegt es nicht
+        // ueber der Menueleiste und der Fusszeile.
+        m_rasterOverlay = new RasterOverlay(feld);
+    }
+    m_rasterOverlay->setGeometry(feld->rect());
+    m_rasterOverlay->raise();
+    m_rasterOverlay->show();
+}
+
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
+    // Das Rasterblatt waechst mit. Es rechnet in
+    // Bildschirmkoordinaten, also muss es nach JEDER Groessen- ODER
+    // Lageaenderung neu zeichnen — sonst zeigt es die Linien des
+    // alten Platzes.
+    if (m_rasterOverlay && m_rasterOverlay->isVisible()) {
+        if (QWidget* const feld = centralWidget()) {
+            m_rasterOverlay->setGeometry(feld->rect());
+        }
+        m_rasterOverlay->update();
+    }
     if (!m_shuttingDown) {
         snapToGridAfterSettle(this);
         // Hier faellt der Vollbildwechsel an: das Fenster wird kuerzer,

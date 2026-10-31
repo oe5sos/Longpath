@@ -183,7 +183,8 @@ QPoint snappedTopLeft(const QPoint& pos, int grid)
 // Letzter Rasterversuch je Fenster, siehe snapToGridAfterSettle().
 static QHash<QWidget*, QRect> s_lastSnapAttempt;
 
-QRect snappedFrameRect(const QRect& frame, const QSize& minSize, int grid)
+QRect snappedFrameRect(const QRect& frame, const QSize& minSize, int grid,
+                       int abstand)
 {
     if (grid <= 1 || !frame.isValid()) { return frame; }
     const auto snapAxis = [grid](int v) {
@@ -193,12 +194,49 @@ QRect snappedFrameRect(const QRect& frame, const QSize& minSize, int grid)
     const int top    = snapAxis(frame.y());
     int right  = snapAxis(frame.x() + frame.width());
     int bottom = snapAxis(frame.y() + frame.height());
-    // Mindestgroesse (und nie null): die ferne Kante rasterweise hinaus.
-    const int minW = qMax(grid, minSize.width());
-    const int minH = qMax(grid, minSize.height());
-    while (right - left < minW)  { right  += grid; }
-    while (bottom - top < minH)  { bottom += grid; }
-    return QRect(left, top, right - left, bottom - top);
+
+    // ── Der Abstand gehoert INS Raster (2026-10-31) ──────────────────
+    //
+    // Betreiber, mit einem Bildschirmfoto: „und der raster funktioniert
+    // fuer dich ausrichtung auch nicht perfekt."
+    //
+    // Nachgemessen an genau diesem Bild (Hauptfenster 1470 Punkte breit,
+    // Bild 2000 Bildpunkte, also Faktor 1,3605):
+    //
+    //   BANDWIDTH FILTER  links  16, rechts  640   (beide auf 16er-Linien)
+    //   FREQUENCY         links  16, rechts  288   (desgleichen)
+    //   TX                links 642            ->  ZWEI daneben
+    //   PANADAPTER        links 290, oben 358  ->  ZWEI daneben
+    //   FREQUENCY         oben  356
+    //
+    // Frequenz und Panadapter stehen also um zwei Punkte versetzt
+    // nebeneinander, obwohl beide „eingerastet" sind. Der Grund steht
+    // in `snapToGridAfterSettle`: dort rastete erst `snappedFrameRect`
+    // alle vier Kanten auf Vielfache von 16 (zwei Nachbarn liegen dann
+    // BUENDIG), und erst DANACH schob `mitMindestabstand` den einen um
+    // den einen um die Panelluft weg. Damit faellt dieses Fenster neben das
+    // Raster — und bleibt dort: jede spaetere Rasterung rundet seine
+    // Kanten wieder auf dieselben 16er-Linien, der Abstand schiebt sie
+    // wieder um 2 heraus. Zwei Regeln, die gegeneinander arbeiten.
+    //
+    // Jetzt traegt das Raster den Abstand selbst: die NAHE Kante
+    // (links/oben) liegt auf der Linie, die FERNE (rechts/unten) um
+    // `abstand` davor. Zwei Fenster an derselben Linie haben damit
+    // automatisch genau `abstand` Luft, und ALLE Kanten stammen weiter
+    // aus demselben Raster. `mitMindestabstand` findet dann nichts mehr
+    // zu korrigieren (sein `zuNah` verlangt `spalt < abstand`, und der
+    // Spalt ist genau `abstand`) — es bleibt fuer die Faelle, fuer die
+    // es gebaut wurde: Fenster, die gar nicht gerastert wurden.
+    //
+    // Preis: jedes Fenster wird um `abstand` schmaler und niedriger als
+    // seine Rasterzelle. 272 Punkte Breite werden zu 270. Das ist die
+    // Luft, die vorher auf einer Seite fehlte.
+    const int luft = qMax(0, abstand);
+    const int minW = qMax(grid - luft, minSize.width());
+    const int minH = qMax(grid - luft, minSize.height());
+    while (right - luft - left < minW)  { right  += grid; }
+    while (bottom - luft - top < minH)  { bottom += grid; }
+    return QRect(left, top, right - luft - left, bottom - luft - top);
 }
 
 QRect mitMindestabstand(const QRect& wunsch, const QList<QRect>& nachbarn,
@@ -532,7 +570,7 @@ void snapToGridAfterSettle(QWidget* w, int grid, int delayMs, bool snapSize)
                     }
                     nachbarn << other->frameGeometry();
                 }
-                target = mitMindestabstand(target, nachbarn, Style::kPanelGapPx);
+                target = mitMindestabstand(target, nachbarn, Style::kFensterLuftPx);
             }
             if (target == frame) {
                 s_lastSnapAttempt.remove(w);   // gelungen
