@@ -2669,6 +2669,13 @@ if(TEST tst_flex_abstimmregler)
     set_tests_properties(tst_flex_abstimmregler PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
+
+longpath_add_test(tst_flex_wasserfall_ohne_klick)
+if(TEST tst_flex_wasserfall_ohne_klick)
+    set_tests_properties(tst_flex_wasserfall_ohne_klick PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 longpath_add_test(tst_flex_rauschsperre)
 if(TEST tst_flex_rauschsperre)
     set_tests_properties(tst_flex_rauschsperre PROPERTIES
