@@ -4306,7 +4306,7 @@ void MainWindow::ensureOverlayPanels()
             if (SliceModel* s = sliceForPan(panId)) {
                 m_radioModel->setActiveSliceById(s->sliceIndex());
             }
-            m_radioModel->onBandButtonClicked(bandFromName(name));
+            bandUmschalten(bandFromName(name));
         });
 
         // ── Die Anzeigeregler gehoeren an DIESEN Pan (2026-10-22) ────────
@@ -5242,12 +5242,11 @@ void MainWindow::buildUI()
     // Leiste.
     connect(m_commandBar, &CommandBar::bandRequested, this,
             [this](Longpath::Band band) {
-        if (m_radioModel) { m_radioModel->onBandButtonClicked(band); }
+        if (m_radioModel) { bandUmschalten(band); }
     });
     connect(m_commandBar, &CommandBar::digiRequested, this,
             [this](DigiFrequenzen::Digimodus modus) {
-        m_letzterDigiModus = modus;      // fuer den DIGU-Knopf daneben
-        aufDigiStellen(modus);
+        aufDigiStellen(modus);           // merkt sich den Modus selbst
     });
 
     // ── DIGU/DIGL richtet genauso her wie FT8/FT4 (2026-10-28) ───────
@@ -5490,7 +5489,7 @@ void MainWindow::buildUI()
     auto wireContainerBandClick = [this](ContainerWidget* c) {
         if (!c) { return; }
         connect(c, &ContainerWidget::bandClicked, this, [this](int idx) {
-            m_radioModel->onBandButtonClicked(bandFromUiIndex(idx));
+            bandUmschalten(bandFromUiIndex(idx));
         });
     };
 
@@ -7815,8 +7814,7 @@ void MainWindow::populateDefaultMeter()
     // mains Name bleibt, der zweite ist entfernt.
     connect(m_ft8Applet, &Ft8Applet::digiGewuenscht, this,
             [this](DigiFrequenzen::Digimodus modus) {
-        m_letzterDigiModus = modus;
-        aufDigiStellen(modus);
+        aufDigiStellen(modus);           // merkt sich den Modus selbst
     });
     connect(m_ft8Applet, &Ft8Applet::qsoFertig, this,
             [this](const LogEntry& e) {
@@ -15680,6 +15678,62 @@ QList<QRect> MainWindow::schutzrahmen() const
 // was fehlt. Das ist keine Bedienung, das ist eine Bastelanleitung.
 //
 // Vier Schritte, und jeder fasst nur an, was noetig ist:
+void MainWindow::bandUmschalten(Band band)
+{
+    if (!m_radioModel) { return; }
+
+    SliceModel* slice = m_radioModel->activeSlice();
+    if (!slice) {
+        // Ohne Scheibe gibt es nichts zu merken; der Aufruf darunter
+        // meldet selbst, dass er ins Leere laeuft.
+        m_radioModel->onBandButtonClicked(band);
+        return;
+    }
+
+    // ── Lief gerade Digi? ────────────────────────────────────────────
+    //
+    // Zwei Belege, und einer genuegt. Die Betriebsart muss in beiden
+    // Faellen stimmen -- ohne DIGU/DIGL ist es kein FT8-Betrieb, egal
+    // was sonst offensteht:
+    //
+    //   * das Dekoderfenster steht offen (der haeufige Fall), ODER
+    //   * die Skala steht auf einer Anrufstelle (der Fall, in dem der
+    //     Betreiber das Fenster zugeklappt hat und trotzdem auf FT8
+    //     arbeitet).
+    //
+    // Nur das Fenster zu fragen waere zu eng, nur die Frequenz zu eng:
+    // wer sich von Hand ein paar hundert Hertz danebenstellt, faellt
+    // aus `stehtSchonDort` heraus, hat das Fenster aber offen.
+    const DSPMode modusVorher = slice->dspMode();
+    const bool imDigi = (modusVorher == DSPMode::DIGU
+                         || modusVorher == DSPMode::DIGL);
+    const bool fensterOffen =
+        m_appletVis
+        && m_appletVis->isEffectivelyVisible(QStringLiteral("Ft8Decoder"));
+    const bool aufAnrufstelle = DigiFrequenzen::stehtSchonDort(
+        qint64(slice->frequency()), m_letzterDigiModus);
+    const bool digiLief = imDigi && (fensterOffen || aufAnrufstelle);
+
+    const Band bandVorher = bandFromFrequency(slice->frequency());
+
+    m_radioModel->onBandButtonClicked(band);
+
+    if (!digiLief) { return; }
+
+    // Hat der Wechsel ueberhaupt stattgefunden? `onBandButtonClicked`
+    // steigt bei gleichem Band aus und auch, wenn die Scheibe gesperrt
+    // ist -- beide Male steht hier noch dasselbe Band, und dann waere
+    // ein Nachstellen ein Eingriff, um den niemand gebeten hat.
+    SliceModel* danach = m_radioModel->activeSlice();
+    if (!danach) { return; }
+    if (bandFromFrequency(danach->frequency()) == bandVorher) { return; }
+
+    qCInfo(lcContainer).noquote()
+        << "Bandwechsel nach" << bandLabel(band)
+        << "— Digi lief, stelle wieder her.";
+    aufDigiStellen(m_letzterDigiModus);
+}
+
 void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
 {
     // ── Diese Stelle MELDET, was sie tut (2026-10-28) ────────────────
@@ -15699,6 +15753,25 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
     const QString wasName = (modus == DigiFrequenzen::Digimodus::Ft4)
                                 ? QStringLiteral("FT4")
                                 : QStringLiteral("FT8");
+
+    // ── Und MERKEN, was gemeint war (2026-10-31) ────────────────────
+    //
+    // Hier, nicht beim Aufrufer. Bis heute setzten die beiden
+    // Verdrahtungen (Leiste und Dekoderfenster) `m_letzterDigiModus`
+    // selbst, gleich vor ihrem Aufruf -- zwei Stellen, die dasselbe
+    // Paar bilden mussten. Der DIGU-Knopf und, seit heute, der
+    // Bandwechsel lesen den Wert; eine dritte Stelle, die ihn nur
+    // liest, haette aus zwei Stellen drei gemacht.
+    //
+    // Gefunden vom Pruefstand: `aufDigiStellen(Ft4)` direkt gerufen
+    // liess den Merker auf FT8, und ein Bandwechsel landete danach
+    // auf 14.074 statt 14.080. Am Geraet faellt das niemandem auf,
+    // weil dort immer ein Knopf dazwischenliegt -- bis einmal keiner
+    // dazwischenliegt.
+    //
+    // VOR dem Ausstieg ohne Scheibe: der Wunsch des Bedieners gilt
+    // auch dann, und der naechste Griff soll ihn kennen.
+    m_letzterDigiModus = modus;
 
     SliceModel* slice = m_radioModel ? m_radioModel->activeSlice() : nullptr;
     if (!slice) {
@@ -17735,8 +17808,8 @@ void MainWindow::openAntennaWindow()
             // the band combo already go through (MainWindow.cpp:2249,
             // :3116), so a band change from the antenna window does
             // everything one from the panel does.
-            backend.setRadioBand = [rm = m_radioModel](Band b) {
-                rm->onBandButtonClicked(b);
+            backend.setRadioBand = [this](Band b) {
+                bandUmschalten(b);
             };
             m_antennaWindow->sweepPanel()->setBackend(backend);
         }

@@ -5611,6 +5611,10 @@ longpath_add_test(tst_digi_frequenzen)
 # herrichtet -- Modus, Anrufstelle, Filter, Fenster. Mit Fenster,
 # darum nicht APPLESS.
 longpath_add_test(tst_digi_in_einem_griff)
+# 2026-10-31: und dass ein BANDWECHSEL den Digi-Betrieb nicht
+# verliert -- das Bandgedaechtnis brachte USB mit, und das
+# Verfuegbarkeitstor nahm daraufhin den Dekoder weg. Mit Fenster.
+longpath_add_test(tst_band_behaelt_digi)
 # 2026-10-15: FT8 am laufenden Ton — die Fenstergrenze ist der Punkt.
 longpath_add_test(tst_ft8_am_ton)
 # 2026-10-15: die Sendeseite, geschlossene Schleife — Text hinein,
