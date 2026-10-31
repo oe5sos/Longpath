@@ -7405,6 +7405,23 @@ bool RadioModel::setzeFlexSendescheibe(const QString& sliceId)
     return true;
 }
 
+QString RadioModel::flexSwrBandKennung() const
+{
+    // Dieselbe Quelle, aus der auch die Antennenumschaltung ihr Band
+    // nimmt (`applyAlexAntennaForBand`, Schritt 1 in
+    // `applyTxRxRouting`): die Frequenz der Sendescheibe. Nur so
+    // beschreiben Messung und Umschaltung denselben Weg.
+    if (const SliceModel* const tx = txBoundSlice()) {
+        return bandKeyName(bandFromFrequency(tx->frequency()));
+    }
+    // Rueckfall fuer den Flex-Weg, solange keine Scheibe gebunden ist:
+    // die letzte Frequenz, die wir selbst gestellt haben.
+    if (m_flexZuletztGestellteHz > 0.0) {
+        return bandKeyName(bandFromFrequency(m_flexZuletztGestellteHz));
+    }
+    return bandKeyName(m_lastBand);
+}
+
 bool RadioModel::flexTasten(bool tasten)
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) {
@@ -7472,12 +7489,18 @@ bool RadioModel::flexTasten(bool tasten)
         // Fehlanpassung, geht die naechste gar nicht erst los.
         //
         // Wurde nie gemessen, wird nicht gesperrt. Siehe `SwrRiegel`.
+        //
+        // Und sie gehoert zu EINEM Band: am 2026-10-31 sperrte eine
+        // Messung auf 20 m auch 15 m, weil der Riegel nur einen
+        // einzigen Wert kannte. Darum die Bandkennung mitgeben.
         {
             const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
-            if (!m_flexSwrRiegel.darfTasten(jetzt)) {
+            const QString band = flexSwrBandKennung();
+            if (!m_flexSwrRiegel.darfTasten(jetzt, band)) {
                 qCWarning(lcConnection).noquote()
                     << "Flex: nicht getastet —"
-                    << m_flexSwrRiegel.grund(jetzt);
+                    << m_flexSwrRiegel.grund(jetzt, band)
+                    << "(Band" << band << ")";
                 emit flexSwrGesperrt(m_flexSwrRiegel.letzteSwr(),
                                      m_flexSwrRiegel.grenze());
                 return false;
@@ -7575,16 +7598,33 @@ bool RadioModel::flexAbstimmen(bool an)
     // Das gilt hier genauso, und schaerfer: ein FT8-Durchgang endet
     // nach 13,2 s von selbst, ein Abstimmtraeger laeuft, bis ihn
     // jemand loest.
+    //
+    // ── Zurueckgenommen am 2026-10-31 ───────────────────────────────
+    //
+    // Hier stand derselbe Riegel wie vor dem Tasten, und er war
+    // falsch — nicht in der Umsetzung, im Gedanken. Der Betreiber:
+    // „tune geht auf 20 und 15 meter nicht, 40 schon." Im Protokoll:
+    // eine Messung von 7,08 brach um 13:05:14 eine Sendung, und die
+    // gehaltenen 6,75 verweigerten danach JEDEN Abstimmversuch — auf
+    // 20 m, auf 15 m, zwei Minuten lang.
+    //
+    // Man stimmt ab, WEIL die Anpassung nicht stimmt. Ein Riegel, der
+    // den Abstimmtraeger wegen einer schlechten Messung verweigert,
+    // verweigert den Handgriff, der sie gut machen wuerde — und der
+    // Satz des Betreibers heiszt „nicht senden", nicht „nicht
+    // abstimmen".
+    //
+    // Ungeschuetzt ist der Traeger damit nicht: der Riegel WAEHREND
+    // der Sendung bleibt, und er traegt. Am selben Tag um 13:05:14.735
+    // brach er 146 ms nach dem Tasten bei 24,1 W. Ein Abstimmversuch
+    // in eine Fehlanpassung dauert also einen Augenblick; das ist ein
+    // Abstimmstosz, kein Betrieb auf einer kaputten Antenne.
+    if (an && !m_flexSwrRiegel.darfAbstimmen()) {
+        qCWarning(lcConnection) << "Flex: nicht abgestimmt — der Riegel sperrt";
+        return false;
+    }
     if (an) {
-        const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
-        if (!m_flexSwrRiegel.darfTasten(jetzt)) {
-            qCWarning(lcConnection).noquote()
-                << "Flex: nicht abgestimmt —"
-                << m_flexSwrRiegel.grund(jetzt);
-            emit flexSwrGesperrt(m_flexSwrRiegel.letzteSwr(),
-                                 m_flexSwrRiegel.grenze());
-            return false;
-        }
+        // Ein neuer Traeger faengt ohne alten Bruch an.
         m_flexSwrRiegel.zuruecksetzen();
     }
 
@@ -7955,9 +7995,24 @@ void RadioModel::startFlexStreams()
             // Einheit: die Maschine meldet dBm, die Balken wollen
             // WATT. W = 10^((dBm-30)/10).
             {
-                std::optional<double> fwdW, refW;
+                std::optional<double> fwdW, refW, swrGeraet;
                 for (const auto& s : w) {
                     const auto def = m_flexMesswertNamen.value(s.index);
+                    // ── Die eigene Bruecke der Maschine (2026-10-31) ──
+                    //
+                    // `SWR` liegt im selben Strom und wurde bis heute
+                    // gelesen, skaliert, ins Protokoll geschrieben — und
+                    // weggeworfen. Stattdessen rechneten wir selbst aus
+                    // FWDPWR und REFPWR, und `setForwardPower` rechnet
+                    // bei JEDEM neuen Vorwaertswert neu, notfalls gegen
+                    // einen Ruecklauf aus einem anderen Augenblick. So
+                    // entstand um 13:05:14 eine 7,08.
+                    if (def.first == QLatin1String("SWR")) {
+                        if (const auto v = FlexVita::meterScaled(s.raw, def.second)) {
+                            swrGeraet = *v;
+                        }
+                        continue;
+                    }
                     if (def.first != QLatin1String("FWDPWR")
                         && def.first != QLatin1String("REFPWR")) { continue; }
                     const auto dbm = FlexVita::meterScaled(s.raw, def.second);
@@ -7971,6 +8026,16 @@ void RadioModel::startFlexStreams()
                 // der neue Ruecklauf schon drin.
                 if (refW) { m_radioStatus.setReflectedPower(*refW); }
                 if (fwdW) { m_radioStatus.setForwardPower(*fwdW); }
+                // Und die gemessene Zahl, wo sie dabei ist: ab hier
+                // zeigen die Balken sie und nicht mehr die Rechnung.
+                //
+                // OHNE `if`: ein Paket ohne eigene Stehwelle muss den
+                // Vorrang wieder abgeben, sonst steht der letzte
+                // gemessene Wert fuer immer im Balken. Leer heiszt
+                // „kein eigener Messwert", und dann gilt wieder die
+                // Rechnung aus Vor- und Ruecklauf — also genau das
+                // Verhalten von vorher, nicht weniger.
+                m_radioStatus.setMeasuredSwr(swrGeraet);
 
                 // ── Der zweite Riegel: waehrend der Sendung ──────
                 //
@@ -7983,16 +8048,33 @@ void RadioModel::startFlexStreams()
                 // Die Maschine meldet die Stehwelle selbst mit; bis
                 // heute stand sie nur in der Protokollzeile und in
                 // zwei Balken. Niemand griff ein.
-                if (fwdW && m_radioStatus.swrRatio() > 0.0) {
+                //
+                // ── Nur ein PAAR aus EINEM Paket (2026-10-31) ────
+                //
+                // Entweder die Maschine hat in diesem Paket ihre
+                // eigene Stehwelle mitgeschickt — dann gilt die —,
+                // oder Vorlauf UND Ruecklauf kamen beide hier an,
+                // dann darf aus beiden gerechnet werden. Ein neuer
+                // Vorlauf gegen einen alten Ruecklauf ergibt eine
+                // Zahl, die es nie gegeben hat; genau die brach die
+                // Sendung.
+                const std::optional<double> swrFuerDenRiegel =
+                    swrGeraet ? swrGeraet
+                              : ((fwdW && refW)
+                                     ? std::optional<double>(m_radioStatus.swrRatio())
+                                     : std::nullopt);
+                if (fwdW && swrFuerDenRiegel && *swrFuerDenRiegel > 0.0) {
                     const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
                     if (m_flexSwrRiegel.messung(
-                            float(m_radioStatus.swrRatio()),
-                            float(*fwdW), jetzt)) {
+                            float(*swrFuerDenRiegel),
+                            float(*fwdW), jetzt, flexSwrBandKennung())) {
                         qCWarning(lcConnection).nospace()
                             << "Flex: SENDUNG GEBROCHEN — Stehwelle "
-                            << m_radioStatus.swrRatio() << " ueber der Grenze "
+                            << *swrFuerDenRiegel << " ueber der Grenze "
                             << m_flexSwrRiegel.grenze() << " bei "
-                            << *fwdW << " W";
+                            << *fwdW << " W auf " << flexSwrBandKennung()
+                            << (swrGeraet ? " (Bruecke der Maschine)"
+                                          : " (aus Vor- und Ruecklauf gerechnet)");
                         // BEIDE Wege loesen. `xmit 0` beendet keinen
                         // Abstimmtraeger -- der braucht
                         // `transmit tune 0`. Bis zur Durchsicht des
@@ -8005,7 +8087,7 @@ void RadioModel::startFlexStreams()
                         // (CLAUDE.local.md).
                         flexTasten(false);
                         flexAbstimmen(false);
-                        emit flexSwrGesperrt(float(m_radioStatus.swrRatio()),
+                        emit flexSwrGesperrt(float(*swrFuerDenRiegel),
                                              m_flexSwrRiegel.grenze());
                     }
                 }

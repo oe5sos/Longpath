@@ -206,16 +206,27 @@ private slots:
         // Und beide fragen vorher den Riegel. Je Funktionsrumpf
         // geprueft, nicht datei-weit: eine Abfrage irgendwo in der
         // Datei sagt nichts darueber, ob SIE auf diesem Weg liegt.
-        const QStringList wege{QStringLiteral("bool RadioModel::flexTasten("),
-                               QStringLiteral("bool RadioModel::flexAbstimmen(")};
-        for (const QString& kopf : wege) {
+        //
+        // 2026-10-31: beide fragen weiter, aber nicht dasselbe. Das
+        // Tasten fragt die gehaltene Messung (`darfTasten`), der
+        // Abstimmtraeger nur noch den Riegel selbst
+        // (`darfAbstimmen`) — abstimmen ist die Abhilfe, nicht der
+        // Verstosz. Was hier zaehlt und weiter zaehlen soll: KEIN Weg
+        // tastet, ohne den Riegel ueberhaupt gefragt zu haben.
+        const QMap<QString, QString> wege{
+            {QStringLiteral("bool RadioModel::flexTasten("),
+             QStringLiteral("m_flexSwrRiegel.darfTasten")},
+            {QStringLiteral("bool RadioModel::flexAbstimmen("),
+             QStringLiteral("m_flexSwrRiegel.darfAbstimmen")}};
+        for (auto it = wege.cbegin(); it != wege.cend(); ++it) {
+            const QString& kopf = it.key();
             const int a = src.indexOf(kopf);
             QVERIFY2(a >= 0, qPrintable(kopf));
             // Bis zur naechsten Funktion auf Spaltenanfang.
             int e = src.indexOf(QStringLiteral("\n}\n"), a);
             QVERIFY(e > a);
             const QString rumpf = src.mid(a, e - a);
-            QVERIFY2(rumpf.contains(QStringLiteral("m_flexSwrRiegel.darfTasten")),
+            QVERIFY2(rumpf.contains(it.value()),
                      qPrintable(kopf + QStringLiteral(
                          " tastet den Sender, ohne die Stehwelle zu fragen")));
         }
@@ -229,6 +240,98 @@ private slots:
                  "der Bruch loest das Tasten nicht");
         QVERIFY2(danach.contains(QStringLiteral("flexAbstimmen(false)")),
                  "der Bruch laesst einen laufenden Abstimmtraeger stehen");
+    }
+
+
+    // ── Eine Messung gehoert zu EINEM Band (2026-10-31) ──────────
+    //
+    // Der Befund des Betreibers: „tune geht auf 20 und 15 meter
+    // nicht, 40 schon." Gemessen worden war auf 20 m (7,08 bei
+    // 24,1 W); gesperrt war danach auch 15 m. Dasz 40 m ging, war
+    // nicht das Band — es war der Ablauf der zwei Minuten.
+    void eineMessungAufEinemBandSperrtNichtDasAndere()
+    {
+        SwrRiegel r;
+        QVERIFY(r.messung(7.08f, 24.1f, 1000, QStringLiteral("20m")));
+
+        QVERIFY2(!r.darfTasten(1100, QStringLiteral("20m")),
+                 "auf dem gemessenen Band muss die Sperre greifen");
+        QVERIFY2(r.darfTasten(1100, QStringLiteral("15m")),
+                 "15m hat keine eigene Messung — Abwesenheit ist keine Aussage");
+        QVERIFY2(r.darfTasten(1100, QStringLiteral("40m")),
+                 "40m hat keine eigene Messung");
+        QCOMPARE(r.letztesBand(), QStringLiteral("20m"));
+
+        // Und eine gute Messung auf 15 m laesst 20 m gesperrt.
+        QVERIFY(!r.messung(1.2f, 20.0f, 1200, QStringLiteral("15m")));
+        QVERIFY(r.darfTasten(1300, QStringLiteral("15m")));
+    }
+
+    // ── Abstimmen ist die Abhilfe, nicht der Verstosz ────────────
+    //
+    // Man stimmt ab, WEIL die Anpassung nicht stimmt. Der Riegel vor
+    // dem Abstimmtraeger verweigerte genau den Handgriff, der die
+    // Stehwelle gut gemacht haette. Was schuetzt, ist der Riegel
+    // WAEHREND der Sendung — am 2026-10-31 um 13:05:14.735 nach
+    // 146 ms bei 24,1 W belegt.
+    void derAbstimmtraegerBleibtErlaubt()
+    {
+        SwrRiegel r;
+        QVERIFY(r.messung(7.08f, 24.1f, 1000, QStringLiteral("20m")));
+        QVERIFY2(!r.darfTasten(1100, QStringLiteral("20m")),
+                 "senden bleibt gesperrt");
+        QVERIFY2(r.darfAbstimmen(),
+                 "abstimmen muss gehen — sonst kommt man aus einer "
+                 "Fehlanpassung nicht heraus");
+    }
+
+    // `vergessen` ist NICHT `zuruecksetzen`: das eine loescht die
+    // Messung, das andere nur den Bruch.
+    void vergessenLoeschtDieMessungZuruecksetzenNicht()
+    {
+        SwrRiegel r;
+        QVERIFY(r.messung(7.0f, 20.0f, 1000, QStringLiteral("20m")));
+        r.zuruecksetzen();
+        QVERIFY2(!r.darfTasten(1100, QStringLiteral("20m")),
+                 "zuruecksetzen darf die Messung nicht loeschen");
+
+        r.vergessen();
+        QVERIFY2(r.darfTasten(1100, QStringLiteral("20m")),
+                 "nach vergessen() liegt keine Messung mehr vor");
+        QCOMPARE(r.letzteSwr(), 0.0f);
+        QVERIFY(r.letztesBand().isEmpty());
+        QVERIFY(r.grund(1100, QStringLiteral("20m")).isEmpty());
+    }
+
+    // ── Die Bruecke der Maschine schlaegt die eigene Rechnung ────
+    //
+    // Die Flex schickt `SWR` als eigenen Messwert mit. Wir lasen ihn,
+    // skalierten ihn, schrieben ihn ins Protokoll — und warfen ihn
+    // weg. Gerechnet wurde aus FWDPWR und REFPWR, und die kommen
+    // nicht verlaeszlich im selben Paket (2026-10-27 nachgemessen).
+    // Ein neuer Vorlauf gegen einen alten Ruecklauf ergibt eine Zahl,
+    // die es nie gegeben hat.
+    void derRiegelNimmtDieBrueckeDerMaschine()
+    {
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+        QFile f(QString::fromLocal8Bit(root)
+                + QStringLiteral("/src/models/RadioModel.cpp"));
+        QVERIFY2(f.open(QIODevice::ReadOnly), qPrintable(f.fileName()));
+        const QString src = QString::fromUtf8(f.readAll());
+
+        const int a = src.indexOf(QStringLiteral("m_flexSwrRiegel.messung("));
+        QVERIFY2(a > 0, "niemand speist den Riegel mehr");
+        const QString umfeld = src.mid(qMax(0, a - 2500), 2900);
+
+        QVERIFY2(umfeld.contains(QStringLiteral("swrGeraet")),
+                 "der Riegel rechnet wieder selbst, statt die Bruecke der "
+                 "Maschine zu lesen");
+        QVERIFY2(umfeld.contains(QStringLiteral("(fwdW && refW)")),
+                 "ohne Paar aus EINEM Paket darf nicht gerechnet werden");
+        QVERIFY2(umfeld.contains(QStringLiteral("flexSwrBandKennung()")),
+                 "die Messung wird ohne Band eingespeist und sperrt dann "
+                 "wieder alle Baender");
     }
 
     // ── Eine stumme Sperre ist ein Defekt (2026-10-30) ───────────
