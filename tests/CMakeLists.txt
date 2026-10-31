@@ -8080,6 +8080,14 @@ longpath_add_test(tst_flex_wasserfall_kachel)
 longpath_add_test(tst_flex_senden)
 longpath_add_test(tst_flex_sendetakt)
 
+# 2026-10-31: der Kanalzug lief an genau einer Stelle — dem eigenen
+# Sendeweg. Die Flex rechnet selbst, hat darum keinen TxWorkerThread,
+# und ihr Mikrofonton ging roh an die Maschine: die ganze eingestellte
+# Kette war ausser Betrieb, sobald dort gesendet wurde. Dieser Stand
+# haelt den neuen Weg fest und fuehrt die alte Fassung als Gegenprobe
+# daneben.
+longpath_add_test(tst_flex_kanalzug)
+
 # 2026-10-30: dreiundzwanzig Mal „getastet, OHNE je eine
 # Verriegelungsmeldung gehoert zu haben" in einem Protokoll von
 # vierzig Minuten. Am Geraet nachgemessen kommt die Lage sehr wohl.

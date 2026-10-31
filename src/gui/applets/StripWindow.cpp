@@ -208,12 +208,34 @@ QString StripWindow::noteText() const
         return Sprache::T(QStringLiteral(
             "No strip available in this window."));
     }
-    if (!m_radio || !m_radio->isConnected()) {
+    // `istIrgendwieVerbunden()` und nicht `isConnected()`: das zweite
+    // kennt nur das eigene Funkgeraet (m_connection). Mit einer
+    // verbundenen FLEX stand hier bis zum 2026-10-31 „Kein Funkgeraet
+    // verbunden" — und das war doppelt falsch, denn der Satz daneben
+    // verspricht „sobald ein Funkgeraet da ist, ist genau das der
+    // Sendeton", und beim Flex ging der Ton damals wirklich roh
+    // hinaus. Der Weg ist seit demselben Tag gebaut
+    // (MainWindow::flexMikrofonblock), also stimmt jetzt beides.
+    if (!m_radio || !m_radio->istIrgendwieVerbunden()) {
         return Sprache::T(QStringLiteral(
             "No radio connected — set the strip up here anyway. Record "
             "and Play above run your voice through it off the sound "
             "card, so every stage can be heard and judged at the desk. "
             "The moment a radio comes up, this is what it transmits."));
+    }
+    // Zwei Geraeteklassen, zwei wahre Saetze. Beim eigenen Funkgeraet
+    // rechnet Longpath selbst, und die Kette sitzt vor WDSP. Die Flex
+    // rechnet selbst: dort geht der Mikrofonton an die Maschine, und
+    // die Kette ist das EINZIGE, was ihn vorher anfasst. „vor WDSP" an
+    // einem Geraet ohne WDSP zu behaupten, waere dieselbe Sorte
+    // Unwahrheit wie das „kein Funkgeraet" darueber.
+    if (m_radio && !m_radio->isConnected() && m_radio->flexConnection()) {
+        return Sprache::T(QStringLiteral(
+            "Runs on the microphone before it goes to the radio, which "
+            "does its own SSB processing from there. Switched off, the "
+            "audio is bit-for-bit what it was before this window "
+            "existed — so switching off is a real comparison, not an "
+            "approximate one."));
     }
     return Sprache::T(QStringLiteral(
         "Sits in front of the radio's own processing, on the "

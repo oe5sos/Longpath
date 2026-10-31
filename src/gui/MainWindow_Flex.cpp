@@ -69,6 +69,7 @@
 #include "core/Ft8Tx.h"
 #include "core/MoxController.h"
 #include "core/FlexVitaStream.h"
+#include "core/strip/StripChain.h"
 // Fuer den Anspruchs-Abgleich: Kiwi fuehrt seine Zuordnung in einer
 // eigenen Tabelle, nicht ueber streamIndex().
 #include "core/KiwiSdrManager.h"
@@ -1293,6 +1294,67 @@ void MainWindow::wireFlex()
 // ein fester Block", sondern „so viel, wie die Uhr sagt". Siehe
 // MainWindow.h bei `m_flexSendeUhr` fuer die Messung, die dahinter
 // steht.
+// ── Der Kanalzug im Flex-Sendeweg (2026-10-31) ───────────────────────
+//
+// Bis heute ging der Mikrofonton hier ROH an die Maschine. Der
+// Kanalzug lief an genau einer Stelle — `TxWorkerThread.cpp`, dem
+// eigenen Sendeweg, auf dem Longpath selbst rechnet. Die Flex rechnet
+// selbst, also hat sie keinen TxWorkerThread, und damit war die ganze
+// Kette ausser Betrieb, sobald am Flex gesendet wurde: Entrauschen,
+// Tor, Entzerrer, De-Esser, Kompressor, Roehre, PUDU, Hall, Clipper,
+// Begrenzer. Alles eingestellt, nichts davon in der Luft.
+//
+// Drei Regeln, alle aus dem Vorbild im TxWorkerThread uebernommen:
+//
+//   Nur Stimmen. `vonFt8` ist dort `datenSignal`: der Kanalzug ist
+//   fuer eine Stimme gebaut, und auf einem fertig modulierten Signal
+//   mit konstanter Huellkurve ist er Zerstoerung. Die Begruendung
+//   steht ausfuehrlich bei TxWorkerThread.cpp:1099.
+//
+//   Hauptschalter zuerst. `isEnabled()` wird HIER gefragt und nicht
+//   der Kette ueberlassen — sie kehrt zwar selbst sofort um, aber dann
+//   stuende in `ketteLief` eine Unwahrheit.
+//
+//   Die Kette bleibt eine. Es ist dieselbe, die das Kanalzugfenster
+//   bedient (`RadioModel::stripChain()`), keine zweite mit
+//   nachgezogenen Werten: was der Betreiber am Regler sieht, ist was
+//   hinausgeht. Zwei Sendewege gleichzeitig gibt es nicht — der
+//   TxWorkerThread entsteht nur mit einem eigenen Funkgeraet
+//   (RadioModel.cpp:10638), die Pumpe hier laeuft nur an der Flex.
+MainWindow::FlexMikBlock MainWindow::flexMikrofonblock(
+    float* proben, int anzahl, float faktor, StripChain* kette,
+    float grenze)
+{
+    FlexMikBlock e{};
+    if (proben == nullptr || anzahl <= 0) { return e; }
+
+    // 1. Die Aussteuerung von Hand. 0 dB heiszt roh, wie bisher.
+    if (faktor != 1.0f) {
+        for (int i = 0; i < anzahl; ++i) { proben[i] *= faktor; }
+    }
+    auto spitze = [](const float* s, int n) {
+        float p = 0.0f;
+        for (int i = 0; i < n; ++i) { p = std::max(p, std::fabs(s[i])); }
+        return p;
+    };
+    e.quelleSpitze = spitze(proben, anzahl);
+
+    // 2. Der Kanalzug.
+    if (kette != nullptr && kette->isEnabled()) {
+        kette->processMono(proben, anzahl);
+        e.ketteLief = true;
+    }
+    e.ausgangSpitze = e.ketteLief ? spitze(proben, anzahl) : e.quelleSpitze;
+
+    // 3. Der Riegel. Steht auch dann, wenn die Kette aus ist.
+    if (grenze > 0.0f) {
+        for (int i = 0; i < anzahl; ++i) {
+            proben[i] = std::clamp(proben[i], -grenze, grenze);
+        }
+    }
+    return e;
+}
+
 qint64 MainWindow::flexFaelligeRahmen(qint64 nsecsVerstrichen,
                                       qint64 geliefert,
                                       qint64 rateHz,
@@ -1308,6 +1370,17 @@ qint64 MainWindow::flexFaelligeRahmen(qint64 nsecsVerstrichen,
 void MainWindow::verdrahteFlexSenden()
 {
     if (!m_radioModel) { return; }
+
+    // Der Kanalzug steht schon (RadioModel legt ihn im Konstruktor an,
+    // samt den Einstellungen des Betreibers). Hier wird er nur auf die
+    // Rate dieses Weges gestellt und sein Zustand geleert — dieselbe
+    // Zeile wie beim eigenen Funkgeraet (RadioModel.cpp:10651), aus
+    // demselben Grund: die Pumpe soll auf einer Kette ohne Geschichte
+    // anfangen. Hinein gehen 48 kHz; die Halbierung auf die 24 kHz der
+    // Maschine kommt erst HINTER der Kette.
+    if (StripChain* kette = m_radioModel->stripChain()) {
+        kette->prepare(48000.0);
+    }
 
     // ── Die Mikrofonpumpe ────────────────────────────────────────────
     //
@@ -1531,21 +1604,50 @@ void MainWindow::verdrahteFlexSenden()
                 const float faktor =
                     (gainDb == 0) ? 1.0f
                                   : std::pow(10.0f, float(gainDb) / 20.0f);
-                float roh = 0.0f;
-                for (int i = 0; i < geholt; ++i) {
-                    const float v = m_flexMikMono[i] * faktor;
-                    roh = std::max(roh, std::abs(v));
-                    m_flexMikMono[i] = std::clamp(v, -kMikGrenze, kMikGrenze);
+                // Aussteuerung, Kanalzug, Riegel — in dieser Reihenfolge
+                // und seit dem 2026-10-31 mit der Kette darin. Warum
+                // ausgelagert und warum diese Reihenfolge: siehe den Kopf
+                // von flexMikrofonblock().
+                const FlexMikBlock e = flexMikrofonblock(
+                    m_flexMikMono.data(), geholt, faktor,
+                    m_radioModel->stripChain(), kMikGrenze);
+                m_flexTxSpitze = std::max(m_flexTxSpitze, e.ausgangSpitze);
+
+                // Einmal je Sendung: lief die Kette mit? Ohne diese
+                // Zeile ist einem Protokoll nicht anzusehen, ob der Ton
+                // bearbeitet hinausging oder roh — und genau das war
+                // der Befund, der diesen Umbau ausgeloest hat.
+                if (e.ketteLief && !m_flexKetteGemeldet) {
+                    m_flexKetteGemeldet = true;
+                    qCInfo(lcFlexGui).nospace()
+                        << "Flex-Senden: der Kanalzug laeuft mit.";
                 }
-                m_flexTxSpitze = std::max(m_flexTxSpitze, roh);
-                if (roh > kMikGrenze && !m_flexMikZuLaut) {
+
+                // Die Quelle. Gemessen VOR der Kette, damit die Zeile
+                // weiter das meint, was sie sagt.
+                if (e.quelleSpitze > kMikGrenze && !m_flexMikZuLaut) {
                     m_flexMikZuLaut = true;
                     qCWarning(lcFlexGui).nospace()
                         << "Flex-Senden: das Mikrofon steht zu hoch — "
-                        << "Spitze " << (20.0 * std::log10(roh))
+                        << "Spitze " << (20.0 * std::log10(e.quelleSpitze))
                         << " dBFS vor der Maschine, begrenzt auf −1 dBFS. "
                         << "Die Aussteuerung gehoert an die Quelle, nicht "
                         << "hierher.";
+                }
+                // Die Kette. Eine andere Ursache und darum eine andere
+                // Zeile: hier lag die Quelle richtig und erst der
+                // Aufbereiter (Makeup, Roehre, PUDU) kam darueber.
+                if (e.ketteLief && e.quelleSpitze <= kMikGrenze
+                    && e.ausgangSpitze > kMikGrenze && !m_flexKetteZuLaut) {
+                    m_flexKetteZuLaut = true;
+                    qCWarning(lcFlexGui).nospace()
+                        << "Flex-Senden: der Kanalzug kommt ueber den "
+                        << "Riegel — Quelle "
+                        << (20.0 * std::log10(std::max(e.quelleSpitze, 1.0e-6f)))
+                        << " dBFS, danach "
+                        << (20.0 * std::log10(e.ausgangSpitze))
+                        << " dBFS, begrenzt auf −1 dBFS. Das ist der "
+                        << "Aufbereiter, nicht das Mikrofon.";
                 }
             }
 
@@ -1642,6 +1744,8 @@ void MainWindow::verdrahteFlexSenden()
             m_flexTxVomMik    = 0;
             m_flexTxSpitze    = 0.0f;
             m_flexMikZuLaut   = false;
+            m_flexKetteZuLaut   = false;
+            m_flexKetteGemeldet = false;
             m_flexSendeGeliefert  = 0;
             m_flexSendeRueckstand = 0;
             m_flexSendeUhr.start();
