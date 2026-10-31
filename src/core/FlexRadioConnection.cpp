@@ -296,6 +296,35 @@ QString xmitCommand(bool tasten)
     return QStringLiteral("xmit %1").arg(tasten ? 1 : 0);
 }
 
+// ── Die Rauschsperre der Maschine (2026-10-31) ──────────────────────
+//
+// Betreiber: „wo kann ich den squelch einstellen" -- und auf die
+// Antwort („RX-Applet, Knopf SQL"): „der funktioniert nicht",
+// „schieberegler ohne änderung".
+//
+// Richtig. Unsere Rauschsperre schreibt in `RxChannel` (WDSP), und
+// `MainWindow_Flex.cpp:45` sagt es selbst: „Flex-Scheibe ist eine
+// Scheibe OHNE RxChannel". Der Regler hatte also schlicht kein Ziel.
+//
+// Die Maschine hat eine eigene. Am 2026-10-31 direkt von ihr gelesen
+// (`sub slice all`, nur lesend):
+//
+//     squelch=0 squelch_level=20
+//
+// Beide Namen sind damit vom Geraet bestaetigt, nicht geraten. Die
+// Stufe laeuft wie unser Schieber von 0 bis 100.
+QString setSliceSquelchCommand(const QString& sliceId, bool an)
+{
+    if (sliceId.isEmpty()) { return QString(); }
+    return QStringLiteral("slice set %1 squelch=%2").arg(sliceId).arg(an ? 1 : 0);
+}
+
+QString setSliceSquelchLevelCommand(const QString& sliceId, int stufe)
+{
+    if (sliceId.isEmpty() || stufe < 0 || stufe > 100) { return QString(); }
+    return QStringLiteral("slice set %1 squelch_level=%2").arg(sliceId).arg(stufe);
+}
+
 QString setSliceTxCommand(const QString& sliceId, bool sendet)
 {
     if (sliceId.isEmpty()) { return QString(); }
@@ -513,6 +542,13 @@ quint32 FlexRadioConnection::sendCommand(const QString& command)
         qCWarning(lcFlexCmd) << "Schreiben unvollstaendig:" << m_socket.errorString();
     }
     qCDebug(lcFlexCmd) << "TX:" << QStringLiteral("C%1|%2").arg(seq).arg(command);
+    // Wortlaut merken, bis die Antwort da ist: eine Ablehnung soll
+    // sagen koennen, WAS abgelehnt wurde.
+    m_wortlaut.insert(seq, command);
+    m_wortlautReihe.append(seq);
+    while (m_wortlautReihe.size() > kWortlautDecke) {
+        m_wortlaut.remove(m_wortlautReihe.takeFirst());
+    }
     return seq;
 }
 
@@ -671,10 +707,18 @@ void FlexRadioConnection::processLine(const QString& line)
 
     case FlexLineType::Response: {
         emit commandResponse(msg.sequence, msg.resultCode, msg.object);
+        const QString wortlaut = m_wortlaut.value(msg.sequence);
         if (msg.resultCode != 0) {
-            qCWarning(lcFlexCmd) << "Befehl" << msg.sequence << "abgelehnt, Code"
-                                 << QStringLiteral("0x%1").arg(msg.resultCode, 0, 16)
-                                 << msg.object;
+            qCWarning(lcFlexCmd).nospace()
+                << "Befehl " << msg.sequence << " abgelehnt, Code 0x"
+                << QString::number(msg.resultCode, 16) << ": \""
+                << (wortlaut.isEmpty() ? QStringLiteral("(Wortlaut nicht mehr da)")
+                                       : wortlaut)
+                << "\" — " << msg.object;
+        }
+        if (!wortlaut.isEmpty()) {
+            m_wortlaut.remove(msg.sequence);
+            m_wortlautReihe.removeOne(msg.sequence);
         }
         // Der Rueckruf wird VOR dem Aufruf entnommen: laeuft er genau
         // einmal, auch wenn er selbst wieder sendet und antwortet.
