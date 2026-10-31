@@ -942,6 +942,7 @@ longpath_add_test(tst_slice_auto_agc)
 
 # ── Phase 3G-10 Stage 2: WDSP wiring — EMNR (NR2) ────────────────────────
 longpath_add_test(tst_rxchannel_emnr)
+longpath_add_test(tst_emnr_zeta_grenze)
 longpath_add_test(tst_slice_emnr)
 
 # ── Phase 3G-10 Stage 2: WDSP wiring — SNB ───────────────────────────────
