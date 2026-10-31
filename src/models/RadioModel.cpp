@@ -7747,6 +7747,18 @@ void RadioModel::verarbeiteFlexVerriegelung(const QMap<QString, QString>& kv)
         const bool sendet = (lage == QLatin1String("TRANSMITTING"));
         if (sendet != m_flexSendetGerade) {
             m_flexSendetGerade = sendet;
+            // ── Hier faellt der Vorrang der Bruecke (2026-10-31) ──
+            //
+            // Die gemessene Stehwelle gilt, solange gesendet wird.
+            // Hoert das Senden auf, gibt sie den Vorrang zurueck an
+            // die Rechnung aus Vor- und Ruecklauf — die im Empfang
+            // ohnehin 1,0 ergibt.
+            //
+            // Frueher geschah das bei JEDEM Paket ohne Messwert, und
+            // weil die Maschine ihn nicht in jedes Paket legt, wechselte
+            // die Anzeige zwanzigmal je Sekunde zwischen zwei Zahlen.
+            // Genau das war der unruhige Zeiger.
+            if (!sendet) { m_radioStatus.setMeasuredSwr(std::nullopt); }
             emit flexSendetGeaendert(sendet);
         }
     }
@@ -8062,13 +8074,30 @@ void RadioModel::startFlexStreams()
                 // Und die gemessene Zahl, wo sie dabei ist: ab hier
                 // zeigen die Balken sie und nicht mehr die Rechnung.
                 //
-                // OHNE `if`: ein Paket ohne eigene Stehwelle muss den
-                // Vorrang wieder abgeben, sonst steht der letzte
-                // gemessene Wert fuer immer im Balken. Leer heiszt
-                // „kein eigener Messwert", und dann gilt wieder die
-                // Rechnung aus Vor- und Ruecklauf — also genau das
-                // Verhalten von vorher, nicht weniger.
-                m_radioStatus.setMeasuredSwr(swrGeraet);
+                // ── Zurueckgenommen am 2026-10-31, Abend ────────
+                //
+                // Hier stand `setMeasuredSwr(swrGeraet)` OHNE `if`,
+                // mit der Begruendung, ein Paket ohne eigene
+                // Stehwelle muesse den Vorrang wieder abgeben. Der
+                // Gedanke war richtig, die Wirkung falsch.
+                //
+                // Betreiber am selben Abend: „zeiger beim tunen
+                // komplett unruhig", „auf allen bändern gleich".
+                //
+                // Die Maschine schickt SWR und FWDPWR nicht in jedem
+                // Paket (am 2026-10-27 nachgemessen). Bei zwanzig
+                // Bildern je Sekunde wechselte die Anzeige damit
+                // staendig zwischen der gemessenen Stehwelle und der
+                // aus Vor- und Ruecklauf gerechneten — zwei
+                // verschiedene Zahlen, abwechselnd. Der Zeiger
+                // zappelte zwischen ihnen hin und her.
+                //
+                // Jetzt gilt: gesetzt wird nur, was wirklich da ist.
+                // Der Vorrang faellt beim Ende des Sendens
+                // (`verarbeiteFlexVerriegelung`), nicht bei jedem
+                // Paket, dem der Messwert fehlt. Solange gesendet
+                // wird, steht eine Zahl aus EINER Quelle.
+                if (swrGeraet) { m_radioStatus.setMeasuredSwr(swrGeraet); }
 
                 // ── Der zweite Riegel: waehrend der Sendung ──────
                 //

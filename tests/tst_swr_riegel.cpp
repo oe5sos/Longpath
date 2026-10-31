@@ -363,6 +363,43 @@ private slots:
         QVERIFY2(rumpf.contains(QStringLiteral("ToastSeverity::Error")),
                  "eine Sicherheitssperre ist kein Hinweis am Rand");
     }
+    // ── Der Zeiger darf nicht zappeln (2026-10-31, Abend) ───────────
+    //
+    // Betreiber: „zeiger beim tunen komplett unruhig", „auf allen
+    // bändern gleich".
+    //
+    // Ursache war meine eigene Aenderung vom Mittag desselben Tages:
+    // `setMeasuredSwr(swrGeraet)` stand dort OHNE `if`. Die Maschine
+    // legt SWR aber nicht in jedes Paket; bei zwanzig Bildern je
+    // Sekunde wechselte die Anzeige damit staendig zwischen der
+    // gemessenen Stehwelle und der aus Vor- und Ruecklauf
+    // gerechneten.
+    //
+    // Der Lauf haelt beides fest: gesetzt wird nur, was da ist, und
+    // der Vorrang faellt am ENDE DES SENDENS, nicht bei jedem Paket.
+    void derVorrangFaelltBeimSendeendeNichtBeiJedemPaket()
+    {
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+        QFile f(QString::fromLocal8Bit(root)
+                + QStringLiteral("/src/models/RadioModel.cpp"));
+        QVERIFY2(f.open(QIODevice::ReadOnly), qPrintable(f.fileName()));
+        const QString src = QString::fromUtf8(f.readAll());
+
+        QVERIFY2(src.contains(QStringLiteral("if (swrGeraet) { m_radioStatus.setMeasuredSwr(swrGeraet); }")),
+                 "der Messwert wird wieder bei jedem Paket gesetzt ODER "
+                 "geloescht — der Zeiger zappelt dann zwischen zwei Zahlen");
+
+        // Und das Loeschen haengt am Sendeende.
+        const int a = src.indexOf(QStringLiteral("void RadioModel::verarbeiteFlexVerriegelung"));
+        QVERIFY(a > 0);
+        const int e = src.indexOf(QStringLiteral("\n}\n"), a);
+        QVERIFY(e > a);
+        QVERIFY2(src.mid(a, e - a).contains(
+                     QStringLiteral("setMeasuredSwr(std::nullopt)")),
+                 "niemand gibt den Vorrang zurueck — die gemessene "
+                 "Stehwelle stuende dann fuer immer im Balken");
+    }
 };
 
 QTEST_MAIN(TstSwrRiegel)
