@@ -394,6 +394,29 @@ public:
     /// kippte am 2026-10-21 alles DAHINTER auf privat und brach sieben
     /// CI-Laeufe (`appletIsRegisteredForTest` war ploetzlich privat).
     void aufDigiStellen(Longpath::DigiFrequenzen::Digimodus modus);
+
+    /// Band umschalten -- und den Digi-Betrieb dabei nicht verlieren.
+    ///
+    /// Betreiber am 2026-10-31: „habe von 40 auf 20 meter gewechselt
+    /// und der decoder ist verschwunden!" Das war kein Fehler im
+    /// Dekoder. `RadioModel::onBandButtonClicked` holt fuer ein schon
+    /// besuchtes Band Frequenz UND Betriebsart aus dem Bandgedaechtnis
+    /// zurueck -- auf 20 m lagen dort 14.294700 MHz in USB, von einem
+    /// Sprechabend. Damit fiel die Betriebsart aus DIGU heraus, und das
+    /// Verfuegbarkeitstor in `rebindRttyRadeAvailability` (DIGU/DIGL,
+    /// sonst nichts) nahm das Dekoderfenster weg. Richtig, nur nicht
+    /// gemeint: wer mitten im FT8-Betrieb das Band wechselt, will FT8
+    /// auf dem neuen Band, nicht den letzten Sprechkanal.
+    ///
+    /// Also: lief Digi, wird nach dem Bandwechsel `aufDigiStellen()`
+    /// nachgezogen -- Anrufstelle des NEUEN Bandes, DIGU, Filter,
+    /// Fenster. Lief es nicht, aendert sich nichts.
+    ///
+    /// Jeder Weg zum Bandwechsel geht hier durch (Leiste, Panel,
+    /// Behaelterknoepfe, Antennenfenster). Die Seitenband-Regel vom
+    /// 2026-10-23 musste an drei Stellen einzeln nachgetragen werden,
+    /// weil es diesen einen Weg noch nicht gab.
+    void bandUmschalten(Longpath::Band band);
     /// Das an Band/Modus/Digimodus gebundene Layoutprofil aktivieren,
     /// falls eines passt. Siehe `LayoutProfiles::profileFor`.
     void profilNachstellen(
