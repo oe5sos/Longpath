@@ -3599,6 +3599,10 @@ private:
     /// settle timer, and directly from resizeEvent for the first
     /// allocation.
     void applyResizeSettled();
+    /// Legt `m_waterfall` an, falls es das noch nicht gibt. Gibt false,
+    /// wenn das Fenster dafuer noch keine Groesse hat. Siehe den
+    /// Kommentar im Rumpf (Befund des Betreibers, 2026-10-31).
+    bool stelleWasserfallbildSicher();
 };
 
 } // namespace Longpath
