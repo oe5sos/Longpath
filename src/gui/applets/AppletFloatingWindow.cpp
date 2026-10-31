@@ -97,6 +97,23 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
         }
         emit dockRequested(appletId());
     });
+    // ── Die Optionen auch im schwebenden Fenster (2026-10-31) ───────
+    //
+    // Betreiber, mit Bildschirmfoto: „bei der frequenz noch immer
+    // keine optionen". Das Zahnrad zeichnete bis heute NUR
+    // `GridCellWidget`, also die Applet-Spalte. Wer ein Panel
+    // herauszieht, verlor damit den Zugang zu seinen eigenen
+    // Einstellungen -- bei ihm stehen Frequenz, SWR und S-Meter alle
+    // als schwebende Fenster.
+    //
+    // Dieselbe Bedingung wie in der Spalte (`GridCellWidget.cpp:235`):
+    // nur wer `hasExtendedSettings()` meldet, bekommt den Knopf.
+    if (applet && applet->hasExtendedSettings()) {
+        m_titleBar->setOptionsVisible(true);
+        connect(m_titleBar, &WindowTitleBar::optionsRequested, this,
+                [applet]() { applet->openExtendedSettings(); });
+    }
+
     m_titleBar->setLockKey(QStringLiteral("Applet_%1").arg(panelId));
     lay->addWidget(m_titleBar);
 

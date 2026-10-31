@@ -182,6 +182,41 @@ private slots:
             QVERIFY2(menue.contains(schalter), qPrintable(schalter));
         }
     }
+    // ── Auch im SCHWEBENDEN Fenster (2026-10-31) ────────────────
+    //
+    // Betreiber, mit Bildschirmfoto: „bei der frequenz noch immer
+    // keine optionen". `hasExtendedSettings()` stand da schon auf
+    // true -- aber das Zahnrad zeichnete nur `GridCellWidget`, also
+    // die Applet-Spalte. Bei ihm steht das Frequenz-Panel als
+    // schwebendes Fenster, und dessen Titelleiste kannte gar keinen
+    // solchen Knopf.
+    //
+    // Die Lehre, zum zweiten Mal am selben Tag: „erreichbar" heiszt
+    // nicht „in EINEM Weg erreichbar". Es gibt zwei Gehaeuse fuer
+    // dasselbe Applet, und beide muessen den Knopf zeichnen.
+    void dasZahnradGibtEsAuchImSchwebendenFenster()
+    {
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+
+        QFile ch(QString::fromLocal8Bit(root)
+                 + QStringLiteral("/src/gui/WindowChrome.h"));
+        QVERIFY2(ch.open(QIODevice::ReadOnly), qPrintable(ch.fileName()));
+        const QString chrome = QString::fromUtf8(ch.readAll());
+        QVERIFY2(chrome.contains(QStringLiteral("setOptionsVisible")),
+                 "die Titelleiste kennt keinen Zahnrad-Knopf");
+        QVERIFY2(chrome.contains(QStringLiteral("optionsRequested")),
+                 "der Knopf meldet nichts");
+
+        QFile fw(QString::fromLocal8Bit(root)
+                 + QStringLiteral("/src/gui/applets/AppletFloatingWindow.cpp"));
+        QVERIFY2(fw.open(QIODevice::ReadOnly), qPrintable(fw.fileName()));
+        const QString win = QString::fromUtf8(fw.readAll());
+        QVERIFY2(win.contains(QStringLiteral("hasExtendedSettings()")),
+                 "das schwebende Fenster fragt nicht, ob es Optionen gibt");
+        QVERIFY2(win.contains(QStringLiteral("openExtendedSettings()")),
+                 "der Knopf im schwebenden Fenster oeffnet nichts");
+    }
 };
 
 QTEST_MAIN(TstFrequencyWidgetTunes)
