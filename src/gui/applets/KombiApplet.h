@@ -60,6 +60,23 @@ class KombiApplet : public AppletWidget {
 
 public:
     explicit KombiApplet(RadioModel* model, QWidget* parent = nullptr);
+    ~KombiApplet() override;
+
+    /// Alle lebenden Kombi-Felder, egal in welchem Gehaeuse.
+    ///
+    /// Am 2026-11-01 vom Betreiber gefunden: „kann das rx panel nicht
+    /// reinziehen". Sein RX sitzt in der SPALTE (im Fenster „RX1 Main
+    /// Panel"), das Kombi-Feld schwebt DANEBEN als eigenes Fenster.
+    /// Beide Ablegewege suchten aber nur in ihrem eigenen Gehaeuse --
+    /// die Spalte in ihren Feldern, das Fenster in der Kennungstabelle
+    /// des Hauptfensters. Ueber die Fenstergrenze hinweg fand keiner
+    /// etwas.
+    ///
+    /// Diese Liste kennt keine Gehaeuse. Wer ein Panel ablegt, fragt
+    /// sie und vergleicht Rechtecke auf dem SCHIRM.
+    static QList<KombiApplet*> alle();
+    /// Das sichtbare Feld unter dieser Stelle, oder nullptr.
+    static KombiApplet* unter(const QPoint& globalPos);
 
     QString appletId() const override    { return QStringLiteral("Kombi"); }
     QString appletTitle() const override;

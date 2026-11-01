@@ -2264,16 +2264,12 @@ void MainWindow::legeAufKombiFeld(const QString& appletId, const QPoint& globalP
     // Ein Kombi-Feld ueber sich selbst: ginge nicht gut aus.
     if (qobject_cast<KombiApplet*>(win->applet())) { return; }
 
-    KombiApplet* ziel = nullptr;
-    for (AppletWidget* a : m_appletsById) {
-        auto* k = qobject_cast<KombiApplet*>(a);
-        if (!k || !k->isVisible()) { continue; }
-        // Das sichtbare Rechteck auf dem Schirm -- egal, ob das Feld
-        // in der Spalte steht oder selbst schwebt. Genau das ist der
-        // Unterschied zum ersten Versuch, der nur die Spalte kannte.
-        const QRect r(k->mapToGlobal(QPoint(0, 0)), k->size());
-        if (r.contains(globalPos)) { ziel = k; break; }
-    }
+    // Dieselbe Liste wie in der Spalte: sie kennt keine Gehaeuse,
+    // sondern vergleicht Rechtecke auf dem Schirm. Die
+    // Kennungstabelle hier taugte nicht -- ein Kombi-Feld, das selbst
+    // schwebt, steht zwar darin, aber zwei Suchen an zwei Stellen
+    // laufen frueher oder spaeter auseinander.
+    KombiApplet* ziel = KombiApplet::unter(globalPos);
     if (!ziel) { return; }
 
     m_floatingApplets.remove(appletId);
@@ -8888,7 +8884,7 @@ void MainWindow::populateDefaultMeter()
     // Vorgabe AUS: ein leeres Feld draengt sich niemandem auf. Wer es
     // will, holt es ueber das + unten rechts.
     m_appletVis->registerApplet(QStringLiteral("Kombi"),
-                                QStringLiteral("RX / TX"),      false);
+                                QStringLiteral("Combined"),     false);
     m_appletVis->registerApplet(QStringLiteral("Rx"),
                                 QStringLiteral("RX"),           true);
     m_appletVis->registerApplet(QStringLiteral("Tx"),
@@ -9132,6 +9128,7 @@ void MainWindow::populateDefaultMeter()
     m_appletVis->describeApplet(QStringLiteral("Kombi"),
         tr("Combined"),
         {QStringLiteral("kombi"), QStringLiteral("combined"),
+         QStringLiteral("rx"), QStringLiteral("tx"),
          QStringLiteral("zusammen"), QStringLiteral("reiter"),
          QStringLiteral("tabs"), QStringLiteral("platz"),
          QStringLiteral("space")});

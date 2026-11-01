@@ -81,13 +81,19 @@ private slots:
         QCOMPARE(k.seiten().size(), 1);
     }
 
-    // Der Titel sagt, was drin ist -- nicht „Kombi".
-    void derTitelNenntDenInhalt()
+    // ── Der Name bleibt, der Inhalt wechselt ────────────────────────
+    //
+    // Betreiber, 2026-11-01: „das RX/TX (combined) panel sollte
+    // generell combined heißen, sofern man hier dann alle widget
+    // reinziehen kann!" Ein Name, der mit dem Inhalt wandert, haette
+    // das Feld jedes Mal zu etwas anderem gemacht.
+    void derNameBleibtCombined()
     {
         KombiApplet k(nullptr);
+        QCOMPARE(k.appletTitle(), QStringLiteral("Combined"));
         k.nimmAuf(new Probepanel(QStringLiteral("Rx"), QStringLiteral("RX")));
         k.nimmAuf(new Probepanel(QStringLiteral("Tx"), QStringLiteral("TX")));
-        QCOMPARE(k.appletTitle(), QStringLiteral("RX / TX"));
+        QCOMPARE(k.appletTitle(), QStringLiteral("Combined"));
     }
 
     // Umschalten zeigt die andere Seite, und die Wahl bleibt in den
@@ -165,6 +171,64 @@ private slots:
         QVERIFY2(tx->abgeglichen == 1,
                  "die unsichtbare Seite wurde nicht abgeglichen — beim "
                  "Umschalten stuende dort ein alter Stand");
+    }
+
+    // ── Ueber die Fenstergrenze hinweg ──────────────────────────────
+    //
+    // Betreiber, 2026-11-01: „kann das rx panel nicht reinziehen".
+    // Sein RX sitzt in der SPALTE (Fenster „RX1 Main Panel"), das
+    // Kombi-Feld schwebt DANEBEN als eigenes Fenster. Beide
+    // Ablegewege suchten vorher nur in ihrem eigenen Gehaeuse und
+    // fanden ueber die Fenstergrenze nichts.
+    //
+    // `unter()` kennt keine Gehaeuse: es vergleicht Rechtecke auf dem
+    // Schirm. Dieser Fall stellt zwei getrennte Fenster auf und
+    // fragt nach Stellen in beiden.
+    void unterFindetUeberFenstergrenzen()
+    {
+        QWidget fensterA;
+        fensterA.setGeometry(40, 40, 200, 120);
+        auto* a = new KombiApplet(nullptr, &fensterA);
+        a->setGeometry(0, 0, 200, 120);
+        fensterA.show();
+
+        QWidget fensterB;
+        fensterB.setGeometry(400, 300, 200, 120);
+        auto* b = new KombiApplet(nullptr, &fensterB);
+        b->setGeometry(0, 0, 200, 120);
+        fensterB.show();
+        QTest::qWait(50);
+
+        QCOMPARE(KombiApplet::unter(a->mapToGlobal(QPoint(10, 10))), a);
+        QCOMPARE(KombiApplet::unter(b->mapToGlobal(QPoint(10, 10))), b);
+        QVERIFY2(KombiApplet::unter(QPoint(-5000, -5000)) == nullptr,
+                 "irgendwo im Nirgendwo darf kein Feld liegen");
+    }
+
+    // Und beide Ablegewege muessen DIESE Liste fragen -- zwei Suchen
+    // an zwei Stellen laufen frueher oder spaeter auseinander.
+    void beideWegeFragenDieselbeListe()
+    {
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+        const auto lies = [&](const QString& rel) {
+            QFile f(QString::fromLocal8Bit(root) + rel);
+            return f.open(QIODevice::ReadOnly)
+                       ? QString::fromUtf8(f.readAll()) : QString();
+        };
+        for (const QString& datei : {QStringLiteral("/src/gui/applets/AppletPanelWidget.cpp"),
+                                     QStringLiteral("/src/gui/MainWindow.cpp")}) {
+            const QString src = lies(datei);
+            // Mit Klammer. Ohne sie fand dieser Waechter am
+            // 2026-11-01 seinen eigenen KOMMENTAR („`KombiApplet::unter`
+            // kennt keine Gehaeuse") und blieb gruen, obwohl der Ruf
+            // entfernt war. Ein Waechter, der nicht faellt, waecht
+            // nicht.
+            QVERIFY2(src.contains(QStringLiteral("KombiApplet::unter(")),
+                     qPrintable(datei + QStringLiteral(
+                         " sucht das Kombi-Feld wieder selbst — dann findet "
+                         "es nichts, was in einem anderen Fenster liegt")));
+        }
     }
 
     // ── Ein Panel hat ZWEI Gehaeuse ─────────────────────────────────

@@ -717,22 +717,22 @@ bool AppletPanelWidget::nimmKombiAuf(AppletWidget* gezogen, const QPoint& global
     if (!gezogen || !m_grid) { return false; }
     if (qobject_cast<KombiApplet*>(gezogen)) { return false; }
 
-    for (GridCellWidget* zelle : m_grid->cells()) {
-        if (!zelle || !zelle->isVisible()) { continue; }
-        const QRect r(zelle->mapToGlobal(QPoint(0, 0)), zelle->size());
-        if (!r.contains(globalPos)) { continue; }
-        for (AppletWidget* a : zelle->applets()) {
-            auto* kombi = qobject_cast<KombiApplet*>(a);
-            if (!kombi) { continue; }
-            // Erst aus dem Panel nehmen, dann hineinlegen: sonst
-            // haette das Panel noch ein Feld fuer ein Widget, das
-            // woanders haengt.
-            removeApplet(gezogen);
-            kombi->nimmAuf(gezogen);
-            return true;
-        }
-    }
-    return false;
+    // ── Ueber die Fenstergrenze hinweg (2026-11-01) ─────────────────
+    //
+    // Betreiber: „kann das rx panel nicht reinziehen". Sein RX sitzt
+    // in DIESER Spalte, das Kombi-Feld schwebt daneben als eigenes
+    // Fenster. Die alte Fassung sah nur die Felder dieser Spalte --
+    // ueber die Fenstergrenze fand sie nichts.
+    //
+    // `KombiApplet::unter` kennt keine Gehaeuse: es vergleicht
+    // Rechtecke auf dem Schirm.
+    KombiApplet* kombi = KombiApplet::unter(globalPos);
+    if (!kombi) { return false; }
+    // Erst aus dem Panel nehmen, dann hineinlegen: sonst haette das
+    // Panel noch ein Feld fuer ein Widget, das woanders haengt.
+    removeApplet(gezogen);
+    kombi->nimmAuf(gezogen);
+    return true;
 }
 
 } // namespace Longpath

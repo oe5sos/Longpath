@@ -26,6 +26,7 @@
 namespace Longpath {
 
 namespace {
+QList<KombiApplet*> g_alle;
 QString standSchluessel() { return QStringLiteral("Kombi/Inhalt"); }
 QString seitenSchluessel() { return QStringLiteral("Kombi/Seite"); }
 }  // namespace
@@ -53,6 +54,29 @@ KombiApplet::KombiApplet(RadioModel* model, QWidget* parent)
     root->addWidget(m_hinweis, 1);
 
     reiterNeu();
+    g_alle.append(this);
+}
+
+KombiApplet::~KombiApplet()
+{
+    g_alle.removeAll(this);
+}
+
+QList<KombiApplet*> KombiApplet::alle()
+{
+    return g_alle;
+}
+
+// Das sichtbare Rechteck auf dem SCHIRM entscheidet -- nicht, in
+// welchem Fenster das Feld haengt.
+KombiApplet* KombiApplet::unter(const QPoint& globalPos)
+{
+    for (KombiApplet* k : g_alle) {
+        if (!k || !k->isVisible()) { continue; }
+        const QRect r(k->mapToGlobal(QPoint(0, 0)), k->size());
+        if (r.contains(globalPos)) { return k; }
+    }
+    return nullptr;
 }
 
 void KombiApplet::baueReiter()
@@ -74,14 +98,15 @@ void KombiApplet::baueReiter()
 
 QString KombiApplet::appletTitle() const
 {
-    // Der Titel sagt, was drin ist -- „RX / TX", nicht „Kombi". Bei
-    // leerem Feld der Name der Sache selbst, damit es im Auswaehler
-    // ueberhaupt zu finden ist.
-    QStringList namen;
-    for (const QPointer<AppletWidget>& w : m_inhalte) {
-        if (w) { namen << w->appletTitle(); }
-    }
-    return namen.isEmpty() ? tr("Combined") : namen.join(QStringLiteral(" / "));
+    // IMMER „Combined", nie der Inhalt.
+    //
+    // Betreiber, 2026-11-01: „das RX/TX (combined) panel sollte
+    // generell combined heißen, sofern man hier dann alle widget
+    // reinziehen kann!" -- und man kann. Ein Name, der sich mit dem
+    // Inhalt aendert, haette das Feld jedes Mal zu etwas anderem
+    // gemacht; dabei ist es immer dasselbe Ding. Was gerade drin ist,
+    // steht ohnehin auf den Reitern.
+    return tr("Combined");
 }
 
 void KombiApplet::nimmAuf(AppletWidget* panel)
