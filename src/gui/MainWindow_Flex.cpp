@@ -452,6 +452,96 @@ void MainWindow::wireFlex()
         m_flexSqlStufeBand = connect(ziel, &SliceModel::ssqlThreshChanged, this,
                                      [sperreHinaus](double) { sperreHinaus(); });
 
+        // ── Und die uebrigen Regler der Scheibe (2026-11-01) ────────
+        //
+        // Dieselbe Reihe, derselbe Grund: `wireSliceSignals` steigt
+        // bei `!m_connection` aus (OpenHPSDR), also haengt am Flex
+        // nichts davon. Jeder Schluessel ist am Geraet gelesen, nicht
+        // geraten -- `FlexRadioConnection.h` sagt, wie.
+        //
+        // Was hier FEHLT und warum:
+        //   AGC-Schwelle  unsere Zahl ist eine Schwelle in dBm, die
+        //                 der Maschine laeuft 0..100. Ohne Quelle
+        //                 fuer die Umrechnung wird nicht geraten.
+        //   APF-Frequenz  die Maschine hat nur `apf_level`, wir nur
+        //                 eine Frequenz. Kein gemeinsamer Nenner.
+        //   SNB           unter allen 101 Schluesseln der Scheibe
+        //                 gibt es keinen dafuer.
+        disconnect(m_flexAgcBand);
+        m_flexAgcBand = connect(ziel, &SliceModel::agcModeChanged, this,
+                                [this](AGCMode m) {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            m_radioModel->sendeFlexAgcModus(m);
+        });
+        disconnect(m_flexTonpegelBand);
+        m_flexTonpegelBand = connect(ziel, &SliceModel::afGainChanged, this,
+                                     [this](int g) {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            m_radioModel->sendeFlexTonpegel(g);
+        });
+        disconnect(m_flexStummBand);
+        m_flexStummBand = connect(ziel, &SliceModel::mutedChanged, this,
+                                  [this](bool v) {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            m_radioModel->sendeFlexStumm(v);
+        });
+        disconnect(m_flexBalanceBand);
+        m_flexBalanceBand = connect(ziel, &SliceModel::audioPanChanged, this,
+                                    [this](double p) {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            m_radioModel->sendeFlexBalance(p);
+        });
+        // RIT und XIT haben je zwei Teile (an/aus und Hertz). Die
+        // Maschine nimmt beide in EINEM Befehl, also schickt jeder
+        // der beiden Regler den vollen Stand -- sonst stuende nach
+        // einem Schalten die alte Zahl daneben.
+        auto ritHinaus = [this, ziel]() {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            m_radioModel->sendeFlexRit(ziel->ritEnabled(), ziel->ritHz());
+        };
+        disconnect(m_flexRitAnBand);
+        m_flexRitAnBand = connect(ziel, &SliceModel::ritEnabledChanged, this,
+                                  [ritHinaus](bool) { ritHinaus(); });
+        disconnect(m_flexRitHzBand);
+        m_flexRitHzBand = connect(ziel, &SliceModel::ritHzChanged, this,
+                                  [ritHinaus](int) { ritHinaus(); });
+        auto xitHinaus = [this, ziel]() {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            m_radioModel->sendeFlexXit(ziel->xitEnabled(), ziel->xitHz());
+        };
+        disconnect(m_flexXitAnBand);
+        m_flexXitAnBand = connect(ziel, &SliceModel::xitEnabledChanged, this,
+                                  [xitHinaus](bool) { xitHinaus(); });
+        disconnect(m_flexXitHzBand);
+        m_flexXitHzBand = connect(ziel, &SliceModel::xitHzChanged, this,
+                                  [xitHinaus](int) { xitHinaus(); });
+        disconnect(m_flexApfBand);
+        m_flexApfBand = connect(ziel, &SliceModel::apfEnabledChanged, this,
+                                [this](bool an) {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            m_radioModel->sendeFlexApf(an);
+        });
+
+        // Und einmal gleich jetzt denselben Weg gehen, damit die
+        // Maschine mit dem uebereinstimmt, was im Fenster steht --
+        // und noch einmal, sobald sie ihre Scheibe gemeldet hat. Der
+        // erste Griff faellt naemlich in die 143-ms-Luecke vom
+        // 2026-10-31, in der es die Scheibennummer noch nicht gibt.
+        auto reglerHinaus = [this, ziel]() {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            m_radioModel->sendeFlexAgcModus(ziel->agcMode());
+            m_radioModel->sendeFlexTonpegel(ziel->afGain());
+            m_radioModel->sendeFlexStumm(ziel->muted());
+            m_radioModel->sendeFlexBalance(ziel->audioPan());
+            m_radioModel->sendeFlexRit(ziel->ritEnabled(), ziel->ritHz());
+            m_radioModel->sendeFlexXit(ziel->xitEnabled(), ziel->xitHz());
+            m_radioModel->sendeFlexApf(ziel->apfEnabled());
+        };
+        disconnect(m_flexReglerNachtrag);
+        m_flexReglerNachtrag = connect(m_radioModel,
+                                       &RadioModel::flexScheibennummerDa, this,
+                                       [reglerHinaus]() { reglerHinaus(); });
+
         // Und einmal gleich jetzt, damit die Maschine mit dem
         // uebereinstimmt, was im Fenster steht — sonst gilt der
         // Unterschied bis zum ersten Drehen weiter.
@@ -459,6 +549,7 @@ void MainWindow::wireFlex()
         m_radioModel->setFlexSliceFilter(ziel->filterLow(), ziel->filterHigh());
         rauschHinaus();
         sperreHinaus();
+        reglerHinaus();
 
         // ── Beim VERBINDEN gewinnt die MASCHINE ─────────────────────
         //

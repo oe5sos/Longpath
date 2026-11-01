@@ -325,6 +325,68 @@ QString setSliceSquelchLevelCommand(const QString& sliceId, int stufe)
     return QStringLiteral("slice set %1 squelch_level=%2").arg(sliceId).arg(stufe);
 }
 
+// ── Die uebrigen Regler der Scheibe (2026-11-01) ───────────────────
+//
+// Alle Schluessel am Geraet gelesen, nicht geraten: eine eigene
+// Scheibe angelegt (`slice create freq=7.1 ant=ANT1 mode=LSB`), ihre
+// 101 Zustandsschluessel mitgeschrieben, Scheibe wieder entfernt.
+// Kein Senden, kein Tasten.
+//
+// Der leere Rueckgabewert heiszt immer dasselbe: diesen Befehl gibt
+// es so nicht, also geht nichts hinaus. Ein Befehl an niemanden
+// waere schlimmer als keiner.
+QString setSliceAgcModeCommand(const QString& sliceId, const QString& modus)
+{
+    if (sliceId.isEmpty() || modus.isEmpty()) { return QString(); }
+    // Die Maschine fuehrt genau diese vier. Unser "Long" ist keiner
+    // davon -- wer es trotzdem schickte, bekaeme eine Ablehnung und
+    // die Scheibe bliebe auf dem alten Modus stehen.
+    static const QStringList kBekannt{QStringLiteral("off"), QStringLiteral("slow"),
+                                      QStringLiteral("med"), QStringLiteral("fast")};
+    if (!kBekannt.contains(modus)) { return QString(); }
+    return QStringLiteral("slice set %1 agc_mode=%2").arg(sliceId, modus);
+}
+
+QString setSliceAudioLevelCommand(const QString& sliceId, int stufe)
+{
+    if (sliceId.isEmpty() || stufe < 0 || stufe > 100) { return QString(); }
+    return QStringLiteral("slice set %1 audio_level=%2").arg(sliceId).arg(stufe);
+}
+
+QString setSliceAudioMuteCommand(const QString& sliceId, bool stumm)
+{
+    if (sliceId.isEmpty()) { return QString(); }
+    return QStringLiteral("slice set %1 audio_mute=%2").arg(sliceId).arg(stumm ? 1 : 0);
+}
+
+QString setSliceAudioPanCommand(const QString& sliceId, int links0bis100)
+{
+    if (sliceId.isEmpty() || links0bis100 < 0 || links0bis100 > 100) {
+        return QString();
+    }
+    return QStringLiteral("slice set %1 audio_pan=%2").arg(sliceId).arg(links0bis100);
+}
+
+QString setSliceRitCommand(const QString& sliceId, bool an, int hz)
+{
+    if (sliceId.isEmpty()) { return QString(); }
+    return QStringLiteral("slice set %1 rit_on=%2 rit_freq=%3")
+        .arg(sliceId).arg(an ? 1 : 0).arg(hz);
+}
+
+QString setSliceXitCommand(const QString& sliceId, bool an, int hz)
+{
+    if (sliceId.isEmpty()) { return QString(); }
+    return QStringLiteral("slice set %1 xit_on=%2 xit_freq=%3")
+        .arg(sliceId).arg(an ? 1 : 0).arg(hz);
+}
+
+QString setSliceApfCommand(const QString& sliceId, bool an)
+{
+    if (sliceId.isEmpty()) { return QString(); }
+    return QStringLiteral("slice set %1 apf=%2").arg(sliceId).arg(an ? 1 : 0);
+}
+
 QString setSliceTxCommand(const QString& sliceId, bool sendet)
 {
     if (sliceId.isEmpty()) { return QString(); }

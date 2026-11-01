@@ -2035,6 +2035,19 @@ private:
     /// nie die Maschine.
     QMetaObject::Connection m_flexSqlAnBand;
     QMetaObject::Connection m_flexSqlStufeBand;
+    /// Die uebrigen Regler der Scheibe -- aus demselben Grund eigene
+    /// Baender: am Flex laeuft `wireSliceSignals` nicht.
+    QMetaObject::Connection m_flexAgcBand;
+    QMetaObject::Connection m_flexTonpegelBand;
+    QMetaObject::Connection m_flexStummBand;
+    QMetaObject::Connection m_flexBalanceBand;
+    QMetaObject::Connection m_flexRitAnBand;
+    QMetaObject::Connection m_flexRitHzBand;
+    QMetaObject::Connection m_flexXitAnBand;
+    QMetaObject::Connection m_flexXitHzBand;
+    QMetaObject::Connection m_flexApfBand;
+    /// Einmal nachziehen, sobald die Maschine ihre Scheibe meldet.
+    QMetaObject::Connection m_flexReglerNachtrag;
     /// Einmal je Verbindung: die Fensterbreite auf den Ausschnitt der
     /// Flex stellen. Danach gehoert der Zoom wieder dem Betreiber.
     bool m_flexAusschnittUebernommen{false};
