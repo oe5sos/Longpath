@@ -27,6 +27,7 @@
 #include "AppletGrid.h"
 #include "AppletWidget.h"
 #include "GridCellWidget.h"
+#include "KombiApplet.h"
 #include "gui/StyleConstants.h"
 // Task 40 (Phase 3P-II): analog S-Meter replaces the composite MeterWidget
 // header.  The right-click context menu (Tasks 38/39) is the only entry
@@ -244,6 +245,15 @@ void AppletPanelWidget::addApplet(AppletWidget* applet)
 
     GridCellWidget* cell = m_grid->appendInOwnCell(applet);
     if (!cell) { m_applets.removeOne(applet); return; }
+
+    // Ein Kombi-Feld gibt Panels auch wieder her (Rechtsklick auf
+    // seinen Reiter). Dann braucht das Panel sofort ein eigenes Feld
+    // -- sonst haette es keinen Platz mehr auf der Welt. Das gehoert
+    // hierher und nicht ins Fenster: die Spalte verwaltet ihre Felder.
+    if (auto* kombi = qobject_cast<KombiApplet*>(applet)) {
+        connect(kombi, &KombiApplet::herausgeloest, this,
+                [this](AppletWidget* frei) { if (frei) { addApplet(frei); } });
+    }
     m_wrappers[applet] = cell;
     // Die Kopfleiste ist der Griff — nur sie, nicht das Applet
     // darunter, sonst zöge jeder Regler das ganze Feld mit.
@@ -594,8 +604,22 @@ bool AppletPanelWidget::eventFilter(QObject* watched, QEvent* event)
     case QEvent::MouseButtonRelease: {
         const bool moved = m_dragging;
         if (m_dragApplet) { bar->setCursor(Qt::OpenHandCursor); }
+        AppletWidget* gezogen = m_dragApplet;
         m_dragApplet = nullptr;
         m_dragging = false;
+        // ── Ueber einem Kombi-Feld losgelassen (2026-11-01) ──────────
+        //
+        // Betreiber: „in dieses leere widget sollte man generell
+        // unterschiedlich widget reinziehen können". Das Ziehen gibt
+        // es hier schon (Umsortieren); fuer das Hineinlegen fehlt nur
+        // die Frage, WORUEBER losgelassen wurde.
+        if (moved && gezogen) {
+            if (auto* mouse = static_cast<QMouseEvent*>(event);
+                nimmKombiAuf(gezogen, mouse->globalPosition().toPoint())) {
+                emit appletsReordered();
+                return true;
+            }
+        }
         if (moved) {
             // Einmal am Ende, nicht bei jedem Pixel.
             emit appletsReordered();
@@ -678,6 +702,37 @@ void AppletPanelWidget::dragTo(int globalY)
             return;
         }
     }
+}
+
+// ── Hineinziehen in ein Kombi-Feld ─────────────────────────────────
+//
+// Gibt true zurueck, wenn das gezogene Panel in einem Kombi-Feld
+// gelandet ist -- dann hat es sein eigenes Feld verlassen und der
+// Aufrufer ist fertig.
+//
+// Ein Kombi-Feld ueber sich selbst: ginge nicht gut aus, also erst
+// gar nicht.
+bool AppletPanelWidget::nimmKombiAuf(AppletWidget* gezogen, const QPoint& globalPos)
+{
+    if (!gezogen || !m_grid) { return false; }
+    if (qobject_cast<KombiApplet*>(gezogen)) { return false; }
+
+    for (GridCellWidget* zelle : m_grid->cells()) {
+        if (!zelle || !zelle->isVisible()) { continue; }
+        const QRect r(zelle->mapToGlobal(QPoint(0, 0)), zelle->size());
+        if (!r.contains(globalPos)) { continue; }
+        for (AppletWidget* a : zelle->applets()) {
+            auto* kombi = qobject_cast<KombiApplet*>(a);
+            if (!kombi) { continue; }
+            // Erst aus dem Panel nehmen, dann hineinlegen: sonst
+            // haette das Panel noch ein Feld fuer ein Widget, das
+            // woanders haengt.
+            removeApplet(gezogen);
+            kombi->nimmAuf(gezogen);
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace Longpath

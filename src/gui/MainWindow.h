@@ -1902,6 +1902,7 @@ private:
     // Applets (Phase 3-UI)
     class AmpApplet*   m_ampApplet{nullptr};
     bool               m_ampAppletWired{false};  // guards one-time AmpApplet signal connects
+    class KombiApplet* m_kombiApplet{nullptr};
     class RxApplet* m_rxApplet{nullptr};
     // Phase 3M-3a-ii Batch 6: cached so SetupDialog instances can route
     // CfcSetupPage's [Configure CFC bands…] button to the same modeless

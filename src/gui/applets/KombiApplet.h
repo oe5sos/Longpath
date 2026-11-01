@@ -1,0 +1,106 @@
+#pragma once
+
+// =================================================================
+// src/gui/applets/KombiApplet.h  (Longpath)
+// =================================================================
+//
+// Longpath-original.
+//
+// ── Ein leeres Feld, in das man Panels zieht ─────────────────────────
+//
+// Betreiber, 2026-11-01, zuerst am Beispiel: „ein widget, RX und TX
+// oben im Panel zum umschalten" -- und dann die eigentliche Sache:
+// „in dieses leere widget sollte man generell unterschiedlich widget
+// reinziehen können".
+//
+// Also kein RX/TX-Applet, sondern ein BEHAELTER. RX und TX zusammen
+// sind dann nur der erste Fall: man zieht beide hinein und hat sie
+// auf einem Platz. Jedes andere Paar geht genauso.
+//
+// Der Gewinn ist Platz: zwei Dinge, die nie gleichzeitig bedient
+// werden, kosten sonst doppelt so viel Flaeche wie noetig.
+//
+// ── Warum es die Panels ADOPTIERT, statt neue zu bauen ───────────────
+//
+// `RxApplet` und `TxApplet` haengen an einem halben Dutzend Dingen,
+// die MainWindow ihnen von auszen reicht: Board-Faehigkeiten, SKU,
+// Mikrofonprofile, Zweiton-Steuerung, der CFC-Dialog, die Bindung an
+// den aktiven Empfaenger. Ein zweites Paar waere ein zweites Paar
+// Verdrahtung -- und die haette genau EINEN Zustand gebraucht, den
+// jemand zu wiederholen vergisst.
+//
+// Hier wechselt ein Panel nur den Elternteil. Jede Verbindung, jedes
+// Profil, jede Bindung bleibt, woran sie haengt. Herausloesen gibt
+// dasselbe Objekt unversehrt zurueck.
+//
+// Dasselbe Muster traegt `InstrumentApplet` schon: „ein Applet mit
+// beiden Formen darin, nicht zwei Applets", damit ein Umschalten
+// nicht etwas abbaut und wieder aufbaut.
+//
+// =================================================================
+// Modification history (Longpath):
+//   2026-11-01 — Created in C++20/Qt6 for Longpath by Martin Fischer,
+//                 AI-assisted via Anthropic Claude (Cowork).
+// =================================================================
+
+#include "gui/applets/AppletWidget.h"
+
+#include <QList>
+#include <QPointer>
+
+class QHBoxLayout;
+class QLabel;
+class QPushButton;
+class QStackedWidget;
+
+namespace Longpath {
+
+class KombiApplet : public AppletWidget {
+    Q_OBJECT
+
+public:
+    explicit KombiApplet(RadioModel* model, QWidget* parent = nullptr);
+
+    QString appletId() const override    { return QStringLiteral("Kombi"); }
+    QString appletTitle() const override;
+    void    syncFromModel() override;
+
+    /// Das Zahnrad gehoert der Seite, die gerade zu sehen ist: wer TX
+    /// sieht und das Zahnrad drueckt, meint die TX-Einstellungen.
+    bool hasExtendedSettings() const override;
+    void openExtendedSettings() override;
+
+    /// Ein Panel aufnehmen (Elternwechsel, kein Neubau). Doppelt
+    /// aufnehmen tut nichts.
+    void nimmAuf(AppletWidget* panel);
+    /// Wieder hergeben -- unversehrt, ohne Elternteil. Wer es bekommt,
+    /// legt es zurueck in ein eigenes Feld.
+    void gibFrei(AppletWidget* panel);
+    /// Alle hergeben; Reihenfolge wie aufgenommen.
+    QList<AppletWidget*> gibAlleFrei();
+
+    QList<AppletWidget*> seiten() const;
+    int  seite() const;
+    void zeigeSeite(int welche);
+    bool istLeer() const;
+
+signals:
+    /// Jemand hat ein Panel wieder herausgeloest -- der Aufrufer legt
+    /// es zurueck in ein eigenes Feld.
+    void herausgeloest(AppletWidget* panel);
+    void seiteGewechselt(int welche);
+
+private:
+    void baueReiter();
+    void reiterNeu();
+    void merkeStand() const;
+
+    QStackedWidget* m_stapel{nullptr};
+    QWidget*        m_reiterleiste{nullptr};
+    QHBoxLayout*    m_reiterReihe{nullptr};
+    QLabel*         m_hinweis{nullptr};
+    QList<QPointer<AppletWidget>> m_inhalte;
+    QList<QPushButton*> m_reiter;
+};
+
+} // namespace Longpath

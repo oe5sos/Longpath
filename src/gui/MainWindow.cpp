@@ -348,6 +348,7 @@ warren@wpratt.com
 #include "applets/Kpa500Applet.h"
 #include "applets/AcomApplet.h"
 #include "applets/AppletVisibilityController.h"
+#include "applets/KombiApplet.h"
 #include "applets/RxApplet.h"
 #include "core/PgxlConnection.h"
 #include "core/TgxlConnection.h"
@@ -7563,6 +7564,24 @@ void MainWindow::populateDefaultMeter()
                 this, &MainWindow::onTxInterlockDenial);
     }
 
+    // ── Das Kombi-Feld (2026-11-01) ───────────────────────────────────
+    //
+    // Betreiber: „in dieses leere widget sollte man generell
+    // unterschiedlich widget reinziehen können". Es kommt LEER und
+    // steht zuerst in der Spalte -- wer etwas hineinzieht, zieht es
+    // nach oben, nicht quer durch die ganze Liste.
+    //
+    // Was es aufnimmt, verlaeszt sein eigenes Feld; was wieder
+    // herausgeloest wird (Rechtsklick auf den Reiter), bekommt hier
+    // sofort wieder eines.
+    {
+        m_kombiApplet = new KombiApplet(m_radioModel, nullptr);
+        panel->addApplet(m_kombiApplet);
+        // Das Zurueckgeben verdrahtet die Spalte selbst
+        // (AppletPanelWidget::addApplet) -- sie verwaltet ihre Felder,
+        // nicht dieses Fenster.
+    }
+
     // RxApplet — Tier 1 wired to SliceModel (slice attached in wireSliceToSpectrum)
     m_rxApplet = new RxApplet(nullptr, m_radioModel, nullptr);
     panel->addApplet(m_rxApplet);
@@ -8750,6 +8769,7 @@ void MainWindow::populateDefaultMeter()
         }
     });
 
+    m_appletsById[QStringLiteral("Kombi")]      = m_kombiApplet;
     m_appletsById[QStringLiteral("Rx")]         = m_rxApplet;
     m_appletsById[QStringLiteral("Tx")]         = m_txApplet;
     m_appletsById[QStringLiteral("PhoneCw")]    = m_phoneCwApplet;
@@ -8810,6 +8830,10 @@ void MainWindow::populateDefaultMeter()
     // menu entry stays available for users who want to force-show or
     // permanently hide it. Defaulting to true here means new G2 users see
     // PS immediately without having to discover the menu toggle.
+    // Vorgabe AUS: ein leeres Feld draengt sich niemandem auf. Wer es
+    // will, holt es ueber das + unten rechts.
+    m_appletVis->registerApplet(QStringLiteral("Kombi"),
+                                QStringLiteral("RX / TX"),      false);
     m_appletVis->registerApplet(QStringLiteral("Rx"),
                                 QStringLiteral("RX"),           true);
     m_appletVis->registerApplet(QStringLiteral("Tx"),
@@ -9050,6 +9074,12 @@ void MainWindow::populateDefaultMeter()
          QStringLiteral("meter"), QStringLiteral("balken"),
          QStringLiteral("bar")});
 
+    m_appletVis->describeApplet(QStringLiteral("Kombi"),
+        tr("Combined"),
+        {QStringLiteral("kombi"), QStringLiteral("combined"),
+         QStringLiteral("zusammen"), QStringLiteral("reiter"),
+         QStringLiteral("tabs"), QStringLiteral("platz"),
+         QStringLiteral("space")});
     m_appletVis->describeApplet(QStringLiteral("Rx"),
         tr("Receive"),
         {QStringLiteral("rx"), QStringLiteral("empfang"),

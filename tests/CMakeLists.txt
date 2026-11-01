@@ -2683,6 +2683,8 @@ if(TEST tst_flex_rauschsperre)
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
+longpath_add_test(tst_kombi_feld)
+
 longpath_add_test(tst_flex_scheibenregler)
 if(TEST tst_flex_scheibenregler)
     set_tests_properties(tst_flex_scheibenregler PROPERTIES
