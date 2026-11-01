@@ -22,6 +22,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QSizePolicy>
+#include <QScrollArea>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
@@ -42,8 +43,28 @@ KombiApplet::KombiApplet(RadioModel* model, QWidget* parent)
 
     baueReiter();
 
-    m_stapel = new QStackedWidget(this);
-    root->addWidget(m_stapel, 1);
+    // ── Schmal gestaltbar (2026-11-01) ──────────────────────────────
+    //
+    // Betreiber: „sollte ggf. eher schmal gestaltbar sein, weil
+    // Spalte schmal und hoch ist." Ohne das bestimmt die BREITESTE
+    // Seite die Breite des ganzen Feldes -- und damit die der Spalte.
+    // Ein Rollbereich nimmt der breitesten Seite dieses Vorrecht: sie
+    // darf breiter sein als das Feld, dann wird eben geschoben.
+    //
+    // Nur waagerecht. Senkrecht rollt die Spalte selbst; zwei
+    // ineinander liegende senkrechte Rollbereiche sind eine Falle,
+    // weil das Rad dann mal den einen und mal den anderen bewegt.
+    m_stapel = new QStackedWidget;
+    m_rollbereich = new QScrollArea(this);
+    m_rollbereich->setWidget(m_stapel);
+    m_rollbereich->setWidgetResizable(true);
+    m_rollbereich->setFrameShape(QFrame::NoFrame);
+    m_rollbereich->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    m_rollbereich->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    root->addWidget(m_rollbereich, 1);
+    // Das Feld selbst darf so schmal werden, wie der Betreiber die
+    // Spalte zieht.
+    setMinimumWidth(0);
 
     m_aufklapp = new QWidget(this);
     auto* senkrecht = new QVBoxLayout(m_aufklapp);
@@ -229,6 +250,7 @@ void KombiApplet::reiterNeu()
     if (m_reiterleiste) { m_reiterleiste->setVisible(!leer); }
     if (m_hinweis)      { m_hinweis->setVisible(leer); }
     if (m_stapel)       { m_stapel->setVisible(!leer); }
+    if (m_rollbereich)  { m_rollbereich->setVisible(!leer && !m_aufgeklappt); }
 
     if (!leer) { zeigeSeite(qBound(0, seite(), m_inhalte.size() - 1)); }
     // Die feste Hoehe haengt an den Seiten -- kommt eine dazu oder
@@ -334,6 +356,7 @@ void KombiApplet::ordneSeitenEin()
             w->show();
         }
         m_stapel->setVisible(false);
+        if (m_rollbereich) { m_rollbereich->setVisible(false); }
         m_aufklapp->setVisible(true);
         setMaximumHeight(QWIDGETSIZE_MAX);
         setMinimumHeight(0);
@@ -345,6 +368,7 @@ void KombiApplet::ordneSeitenEin()
         }
         m_aufklapp->setVisible(false);
         m_stapel->setVisible(!m_inhalte.isEmpty());
+        if (m_rollbereich) { m_rollbereich->setVisible(!m_inhalte.isEmpty()); }
         zeigeSeite(seite());
         // ── KEINE feste Hoehe mehr (2026-11-01) ──────────────────────
         //

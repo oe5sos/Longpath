@@ -51,6 +51,7 @@
 class QHBoxLayout;
 class QLabel;
 class QPushButton;
+class QScrollArea;
 class QStackedWidget;
 
 namespace Longpath {
@@ -153,6 +154,9 @@ private:
     void ordneSeitenEin();
 
     QStackedWidget* m_stapel{nullptr};
+    /// Nimmt der breitesten Seite das Vorrecht auf die Breite -- die
+    /// Spalte ist schmal und hoch (Betreiber, 2026-11-01).
+    QScrollArea* m_rollbereich{nullptr};
     QWidget*        m_reiterleiste{nullptr};
     QHBoxLayout*    m_reiterReihe{nullptr};
     QLabel*         m_hinweis{nullptr};
