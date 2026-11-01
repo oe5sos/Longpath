@@ -436,6 +436,12 @@ QString apdResetCommand()
     return QStringLiteral("apd reset");
 }
 
+QString setTuneModeCommand(bool zweiton)
+{
+    return QStringLiteral("transmit set tune_mode=%1")
+        .arg(zweiton ? QStringLiteral("two_tone") : QStringLiteral("single_tone"));
+}
+
 QString createDaxTxStreamCommand()
 {
     return QStringLiteral("stream create type=dax_tx");
