@@ -396,12 +396,24 @@ private slots:
         // Und die Reihenfolge: erst die Panels dorthin, wo das Profil
         // sie haben will, DANN das Feld. Umgekehrt nimmt Schritt 3 sie
         // ihm wieder weg.
+        const int schritt1 = src.indexOf(QStringLiteral("1/6 Vollbild"));
         const int schritt3 = src.indexOf(QStringLiteral("3/6 Applet-Andocken"));
-        const int kombi    = src.indexOf(QStringLiteral("holeKombiInhaltZurueck(\n"));
+        const int leeren   = src.indexOf(QStringLiteral("gibAlleFrei()"));
+        const int fuellen  = src.indexOf(QStringLiteral("holeKombiInhaltZurueck(\n"));
         const int fertig   = src.indexOf(QStringLiteral("6/6 fertig"));
-        QVERIFY2(schritt3 > 0 && fertig > schritt3,
+        QVERIFY2(schritt1 > 0 && schritt3 > schritt1 && fertig > schritt3,
                  "der Anwenden-Weg sieht anders aus als erwartet");
-        QVERIFY2(kombi > schritt3 && kombi < fertig,
+        // LEEREN vor Schritt 1: sonst landen die Panels des Feldes in
+        // der Spalte, obwohl das Profil sie schwebend haben will --
+        // Schritt 3 entscheidet das, und der ist dann vorbei.
+        // Betreiber, 2026-11-01: „aber das profil sieht nicht so aus,
+        // wie gespeichert".
+        QVERIFY2(leeren > 0 && leeren < schritt1,
+                 "das Kombi-Feld wird zu spaet geleert — seine Panels "
+                 "landen dann in der Spalte statt dort, wo das Profil sie "
+                 "haben will");
+        // FUELLEN nach Schritt 3: vorher naehme es ihm Schritt 3 wieder weg.
+        QVERIFY2(fuellen > schritt3 && fuellen < fertig,
                  "das Kombi-Feld wird vor dem Andocken gefuellt — dann ist "
                  "es gleich wieder leer");
     }

@@ -9959,6 +9959,26 @@ void MainWindow::populateDefaultMeter()
                 // synchroner Aufruf.
                 QElapsedTimer profilUhr;
                 profilUhr.start();
+                // ── Das Kombi-Feld zuerst leeren (2026-11-01) ───────
+                //
+                // Betreiber: "aber das profil sieht nicht so aus, wie
+                // gespeichert". Mein Fehler: ich habe das Feld am ENDE
+                // geleert, und seine Panels landeten dann in der
+                // Spalte -- obwohl das Profil sie vielleicht schwebend
+                // haben will. Schritt 3, der das entscheidet, war da
+                // laengst vorbei.
+                //
+                // Also hier, VOR allem anderen: zurueck in die Spalte,
+                // damit Schritt 3 sie behandeln kann wie jedes andere
+                // Panel. Gefuellt wird am Ende.
+                if (m_kombiApplet && m_appletPanel) {
+                    for (QWidget* w : m_kombiApplet->gibAlleFrei()) {
+                        if (auto* a = qobject_cast<AppletWidget*>(w)) {
+                            m_appletPanel->addApplet(a);
+                        }
+                    }
+                }
+
                 qWarning() << "[ProfileApply:Step] 1/6 Vollbild";
                 // Vollbild MERKEN, bevor irgendein Schritt unten es
                 // kippen kann -- am Ende wird es wieder durchgesetzt
@@ -10549,18 +10569,12 @@ void MainWindow::populateDefaultMeter()
                 // Der Leger ist darum wieder draussen. Der Schluessel
                 // bleibt im Profil -- er kostet nichts und beschreibt
                 // den Zustand beim Aufnehmen.
-                // ── Zuletzt das Kombi-Feld (2026-11-01) ─────────────
+                // ── Zuletzt das Kombi-Feld fuellen (2026-11-01) ─────
                 //
-                // Erst muessen die Panels dort liegen, wo das Profil
-                // sie haben will -- dann holt sich das Feld die
-                // seinen. Umgekehrt wuerde Schritt 3 sie ihm wieder
-                // wegnehmen.
+                // Geleert wurde es schon VOR Schritt 1 (siehe dort).
+                // Gefuellt wird es erst jetzt: vorher wuerde Schritt 3
+                // die Panels wieder herausnehmen.
                 if (m_kombiApplet) {
-                    for (QWidget* w : m_kombiApplet->gibAlleFrei()) {
-                        if (auto* a = qobject_cast<AppletWidget*>(w)) {
-                            if (m_appletPanel) { m_appletPanel->addApplet(a); }
-                        }
-                    }
                     holeKombiInhaltZurueck(
                         s.value(QStringLiteral("kombiInhalt")).toStringList());
                 }
