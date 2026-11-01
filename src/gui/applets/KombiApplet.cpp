@@ -19,6 +19,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QSizePolicy>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
@@ -63,7 +64,11 @@ void KombiApplet::baueReiter()
     m_reiterReihe = new QHBoxLayout(m_reiterleiste);
     m_reiterReihe->setContentsMargins(0, 0, 0, 0);
     m_reiterReihe->setSpacing(Style::kPanelGapPx);
-    m_reiterReihe->addStretch(1);
+    // KEIN Dehnfuge am Ende: die Reiter teilen sich die volle Breite.
+    // Betreiber, 2026-11-01, zu Entwurf 2: „ziel des fenster ist es
+    // ja, eines offen zu lassen und schnell umschalten zu können."
+    // Schnell heiszt: nicht zielen muessen. Zwei halbe Panelbreiten
+    // sind das groesztmoegliche Ziel, das hier zu haben ist.
     layout()->addWidget(m_reiterleiste);
 }
 
@@ -137,14 +142,17 @@ void KombiApplet::reiterNeu()
         b->setCheckable(true);
         b->setCursor(Qt::PointingHandCursor);
         b->setStyleSheet(css);
-        b->setFixedHeight(20);
+        // Hoeher als ein gewoehnlicher Knopf (20) und ueber die ganze
+        // Breite: dieser hier wird oft und im Vorbeigehen getroffen.
+        b->setFixedHeight(24);
+        b->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         b->setToolTip(tr("Show this panel. Right-click to take it out again."));
         b->setContextMenuPolicy(Qt::CustomContextMenu);
         connect(b, &QPushButton::clicked, this,
                 [this, i]() { zeigeSeite(i); });
         connect(b, &QWidget::customContextMenuRequested, this,
                 [this, w](const QPoint&) { gibFrei(w); });
-        m_reiterReihe->insertWidget(i, b);
+        m_reiterReihe->insertWidget(i, b, 1);   // gleiche Breite fuer jeden
         m_reiter.append(b);
     }
 
