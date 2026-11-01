@@ -87,13 +87,20 @@ private slots:
     // generell combined heißen, sofern man hier dann alle widget
     // reinziehen kann!" Ein Name, der mit dem Inhalt wandert, haette
     // das Feld jedes Mal zu etwas anderem gemacht.
-    void derNameBleibtCombined()
+    void derNameStehtNurBeimLeerenFeld()
     {
         KombiApplet k(nullptr);
+        // Leer: der Name musz dastehen, sonst weisz niemand, was das
+        // Feld ist.
         QCOMPARE(k.appletTitle(), QStringLiteral("Combined"));
         k.nimmAuf(new Probepanel(QStringLiteral("Rx"), QStringLiteral("RX")));
         k.nimmAuf(new Probepanel(QStringLiteral("Tx"), QStringLiteral("TX")));
-        QCOMPARE(k.appletTitle(), QStringLiteral("Combined"));
+        // Voll: kein ausgeschriebener Name mehr. Betreiber,
+        // 2026-11-01: „also Combined muss ja nicht ausgeschrieben
+        // sein" -- das Wort sagt nichts, was die Pillen nicht zeigen,
+        // und nimmt ihnen in einer schmalen Spalte den Platz.
+        QVERIFY2(k.appletTitle().isEmpty(),
+                 "der ausgeschriebene Name nimmt den Pillen den Platz");
     }
 
     // Umschalten zeigt die andere Seite, und die Wahl bleibt in den
@@ -292,6 +299,25 @@ private slots:
         QSignalSpy spion(&k, &KombiApplet::listeGewuenscht);
         emit k.customContextMenuRequested(QPoint(10, 10));
         QCOMPARE(spion.count(), 1);
+
+        // ── UEBERALL, nicht nur auf dem Feldkoerper ──────────────────
+        //
+        // Betreiber, 2026-11-01, mit Bild („rechte maustaste
+        // funktioniert nicht") und dann klar: „muss immer und überall
+        // funktionieren in im combined". Rollbereich, Stapel und
+        // Hinweis beantworten einen Rechtsklick sonst mit einem leeren
+        // Menue und schlucken ihn.
+        int gefragt = 0;
+        for (QWidget* teil : k.findChildren<QWidget*>()) {
+            if (teil->contextMenuPolicy() == Qt::CustomContextMenu) {
+                ++gefragt;
+            }
+        }
+        QVERIFY2(gefragt >= 4,
+                 qPrintable(QStringLiteral(
+                     "nur %1 Stuecke im Feld fragen nach der Liste — "
+                     "ein Rechtsklick landet dann irgendwo im Nichts")
+                         .arg(gefragt)));
 
         const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
         if (root.isEmpty()) { return; }

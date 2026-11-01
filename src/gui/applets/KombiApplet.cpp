@@ -86,6 +86,31 @@ KombiApplet::KombiApplet(RadioModel* model, QWidget* parent)
     reiterNeu();
     g_alle.append(this);
 
+    // ── Die Liste MUSZ ueberall im Feld zu holen sein ───────────────
+    //
+    // Betreiber, 2026-11-01: „muss immer und überall funktionieren in
+    // im combined". Ein Rechtsklick geht an das Widget UNTER dem
+    // Zeiger; was ihn nicht selbst beantwortet, reicht ihn nach oben
+    // weiter -- aber Rollbereich, Stapel und Hinweis beantworten ihn
+    // mit einem leeren Menue und schlucken ihn damit.
+    //
+    // Darum haengt die Frage an jedem dieser Stuecke. Eine Seite, die
+    // ein EIGENES Rechtsklickmenue hat (das RX-Applet mit seinen
+    // DSP-Griffen), behaelt ihres -- dort kommt der Klick gar nicht
+    // erst bis hierher, und das ist richtig so.
+    for (QWidget* teil : {static_cast<QWidget*>(m_rollbereich),
+                          static_cast<QWidget*>(m_rollbereich->viewport()),
+                          static_cast<QWidget*>(m_stapel),
+                          static_cast<QWidget*>(m_hinweis),
+                          static_cast<QWidget*>(m_aufklapp)}) {
+        if (!teil) { continue; }
+        teil->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(teil, &QWidget::customContextMenuRequested, this,
+                [this, teil](const QPoint& wo) {
+            emit listeGewuenscht(teil->mapToGlobal(wo));
+        });
+    }
+
     // Rechtsklick auf das Feld fragt nach der Liste. Auf dem Feld,
     // nicht nur auf dem leeren Hinweis: auch mit zwei Seiten darin
     // will man eine dritte dazulegen koennen.
@@ -439,12 +464,22 @@ QWidget* KombiApplet::kopfleistenWidget()
         m_pillenReihe = new QHBoxLayout(m_chip);
         m_pillenReihe->setContentsMargins(0, 0, 0, 0);
         m_pillenReihe->setSpacing(3);
+        // ── Rechtsklick auf die LEISTE zeigt die Liste ──────────────
+        //
+        // Betreiber, 2026-11-01, mit Bild: „rechte maustaste
+        // funktioniert nicht". Er hatte auf die Kopfleiste geklickt --
+        // und dort gehoerte das Menue dem Gehaeuse („Move freely /
+        // Own window / Dock at the edge"). Meine Liste hing nur am
+        // Koerper des Feldes, den man bei vollem Feld gar nicht mehr
+        // trifft.
+        //
+        // Jetzt: Rechtsklick auf die Leiste neben den Pillen zeigt
+        // die Liste; Rechtsklick auf eine PILLE nimmt genau die
+        // heraus (das haengt an der Pille selbst, siehe unten).
         m_chip->setContextMenuPolicy(Qt::CustomContextMenu);
         connect(m_chip, &QWidget::customContextMenuRequested, this,
-                [this](const QPoint&) {
-            const QList<QWidget*> s = seiten();
-            const int i = seite();
-            if (i >= 0 && i < s.size()) { gibFrei(s.at(i)); }
+                [this](const QPoint& wo) {
+            emit listeGewuenscht(m_chip->mapToGlobal(wo));
         });
         m_chip->installEventFilter(this);
         m_chip->setProperty("kombiChip", true);
