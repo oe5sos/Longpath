@@ -2048,6 +2048,7 @@ private:
     /// Die uebrigen Regler der Scheibe -- aus demselben Grund eigene
     /// Baender: am Flex laeuft `wireSliceSignals` nicht.
     QMetaObject::Connection m_flexAgcBand;
+    QMetaObject::Connection m_flexAgcSchwelleBand;
     QMetaObject::Connection m_flexTonpegelBand;
     QMetaObject::Connection m_flexStummBand;
     QMetaObject::Connection m_flexBalanceBand;

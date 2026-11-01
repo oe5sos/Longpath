@@ -339,6 +339,8 @@ QString setSliceSquelchLevelCommand(const QString& sliceId, int stufe);
 /// (sie hat nur `apf_level`, wir nur eine Frequenz) und der SNB —
 /// unter allen 101 Schluesseln gibt es keinen dafuer.
 QString setSliceAgcModeCommand(const QString& sliceId, const QString& modus);
+/// Die AGC-Schwelle der Maschine, 0..100 (gelesen: `agc_threshold=60`).
+QString setSliceAgcThresholdCommand(const QString& sliceId, int stufe);
 QString setSliceAudioLevelCommand(const QString& sliceId, int stufe);
 QString setSliceAudioMuteCommand(const QString& sliceId, bool stumm);
 QString setSliceAudioPanCommand(const QString& sliceId, int links0bis100);

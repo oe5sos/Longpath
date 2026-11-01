@@ -7505,6 +7505,37 @@ void RadioModel::sendeFlexAgcModus(AGCMode modus)
         QStringLiteral("AGC %1").arg(name));
 }
 
+// ── Die AGC-Schwelle (2026-11-01) ──────────────────────────────────
+//
+// Betreiber: "höre hier viel zu viel rauschen so denke ich". Nachgesehen:
+// AGC-T war am Flex gar nicht verdrahtet. Sein Regler stand auf -20,
+// die Maschine auf ihrem eigenen Wert (am Geraet gelesen:
+// `agc_threshold=60`) -- er drehte an etwas, das nichts tat, und eine
+// zu niedrige Schwelle hebt genau das Rauschen an.
+//
+// Warum es bisher fehlte: unser Regler laeuft -160..0 (die
+// dBm-Anmutung aus Thetis), die Maschine 0..100. Eine physikalische
+// Umrechnung gibt es ohne Quelle nicht.
+//
+// Was hier steht, ist deshalb AUSDRUECKLICH eine VERHAELTNISMAESZIGE
+// Abbildung: die Stellung des Reglers in seinem eigenen Bereich wird
+// zur gleichen Stellung im Bereich der Maschine. Ganz links bleibt
+// ganz links, ganz rechts bleibt ganz rechts, die Mitte bleibt die
+// Mitte. Das ist keine Behauptung ueber dB -- es ist der einzige
+// Weg, der ohne Raten auskommt und den Regler trotzdem wirken laeszt.
+void RadioModel::sendeFlexAgcSchwelle(int unsereSchwelle)
+{
+    constexpr int kUnten = -160;   // RxApplet: m_agcTSlider->setRange
+    constexpr int kOben  = 0;
+    const int wert = std::clamp(unsereSchwelle, kUnten, kOben);
+    const int flex = std::clamp(
+        static_cast<int>(std::lround(
+            100.0 * double(wert - kUnten) / double(kOben - kUnten))), 0, 100);
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceAgcThresholdCommand(m_flexSliceId, flex),
+        QStringLiteral("AGC-Schwelle %1 (Regler %2)").arg(flex).arg(wert));
+}
+
 void RadioModel::sendeFlexTonpegel(int stufe0bis100)
 {
     const int stufe = std::clamp(stufe0bis100, 0, 100);

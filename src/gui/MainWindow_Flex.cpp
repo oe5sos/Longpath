@@ -473,6 +473,12 @@ void MainWindow::wireFlex()
             if (m_shuttingDown || !m_radioModel) { return; }
             m_radioModel->sendeFlexAgcModus(m);
         });
+        disconnect(m_flexAgcSchwelleBand);
+        m_flexAgcSchwelleBand = connect(ziel, &SliceModel::agcThresholdChanged,
+                                        this, [this](int s) {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            m_radioModel->sendeFlexAgcSchwelle(s);
+        });
         disconnect(m_flexTonpegelBand);
         m_flexTonpegelBand = connect(ziel, &SliceModel::afGainChanged, this,
                                      [this](int g) {
@@ -554,6 +560,7 @@ void MainWindow::wireFlex()
         auto reglerHinaus = [this, ziel, apfHinaus]() {
             if (m_shuttingDown || !m_radioModel) { return; }
             m_radioModel->sendeFlexAgcModus(ziel->agcMode());
+            m_radioModel->sendeFlexAgcSchwelle(ziel->agcThreshold());
             m_radioModel->sendeFlexTonpegel(ziel->afGain());
             m_radioModel->sendeFlexStumm(ziel->muted());
             m_radioModel->sendeFlexBalance(ziel->audioPan());

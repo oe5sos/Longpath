@@ -95,6 +95,43 @@ private slots:
                     QStringLiteral("0"), 101).isEmpty());
     }
 
+    // ── Die AGC-Schwelle ist VERHAELTNISMAESZIG, nicht physikalisch ─
+    //
+    // Betreiber, 2026-11-01: „höre hier viel zu viel rauschen so denke
+    // ich". AGC-T war am Flex nicht verdrahtet -- sein Regler stand
+    // auf -20, die Maschine auf ihrem eigenen Wert (gelesen: 60).
+    //
+    // Unser Regler laeuft -160..0, die Maschine 0..100. Eine
+    // physikalische Umrechnung gibt es ohne Quelle nicht; was es gibt,
+    // ist dieselbe STELLUNG im jeweiligen Bereich. Dieser Fall haelt
+    // genau das fest -- und die Enden, denn dort faellt ein
+    // Vorzeichenfehler zuerst auf.
+    void dieAgcSchwelleHaeltDieEnden()
+    {
+        const QString rumpf = quelle(QStringLiteral("/src/models/RadioModel.cpp"));
+        const int a = rumpf.indexOf(QStringLiteral("void RadioModel::sendeFlexAgcSchwelle"));
+        QVERIFY2(a > 0, "sendeFlexAgcSchwelle ist weg");
+        const int e = rumpf.indexOf(QStringLiteral("\n}\n"), a);
+        QVERIFY2(e > a, "die Funktion sieht anders aus als erwartet");
+        const QString k = rumpf.mid(a, e - a);
+        QVERIFY2(k.contains(QStringLiteral("kUnten = -160")),
+                 "der Bereich des Reglers stimmt nicht mehr mit RxApplet "
+                 "ueberein (m_agcTSlider->setRange(-160, 0))");
+        QVERIFY2(k.contains(QStringLiteral("wert - kUnten")),
+                 "die Abbildung ist verdreht: ganz links muss ganz links "
+                 "bleiben");
+        // Der Befehlsbauer nimmt nur 0..100.
+        QVERIFY(!FlexCommandWire::setSliceAgcThresholdCommand(
+                     QStringLiteral("0"), 0).isEmpty());
+        QVERIFY(!FlexCommandWire::setSliceAgcThresholdCommand(
+                     QStringLiteral("0"), 100).isEmpty());
+        QVERIFY(FlexCommandWire::setSliceAgcThresholdCommand(
+                    QStringLiteral("0"), 101).isEmpty());
+        QCOMPARE(FlexCommandWire::setSliceAgcThresholdCommand(
+                     QStringLiteral("0"), 60),
+                 QStringLiteral("slice set 0 agc_threshold=60"));
+    }
+
     // ── Die Balance ist die Umkehrung derselben Rechnung ────────────
     //
     // Unser Regler schreibt `(val - 50) / 50.0`, also -1 links,
@@ -125,6 +162,7 @@ private slots:
         QVERIFY2(!src.isEmpty(), "MainWindow_Flex.cpp nicht lesbar");
         const QList<QPair<QString, QString>> paare{
             {QStringLiteral("SliceModel::agcModeChanged"),   QStringLiteral("sendeFlexAgcModus")},
+            {QStringLiteral("SliceModel::agcThresholdChanged"), QStringLiteral("sendeFlexAgcSchwelle")},
             {QStringLiteral("SliceModel::afGainChanged"),    QStringLiteral("sendeFlexTonpegel")},
             {QStringLiteral("SliceModel::mutedChanged"),     QStringLiteral("sendeFlexStumm")},
             {QStringLiteral("SliceModel::audioPanChanged"),  QStringLiteral("sendeFlexBalance")},

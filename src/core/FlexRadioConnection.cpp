@@ -347,6 +347,12 @@ QString setSliceAgcModeCommand(const QString& sliceId, const QString& modus)
     return QStringLiteral("slice set %1 agc_mode=%2").arg(sliceId, modus);
 }
 
+QString setSliceAgcThresholdCommand(const QString& sliceId, int stufe)
+{
+    if (sliceId.isEmpty() || stufe < 0 || stufe > 100) { return QString(); }
+    return QStringLiteral("slice set %1 agc_threshold=%2").arg(sliceId).arg(stufe);
+}
+
 QString setSliceAudioLevelCommand(const QString& sliceId, int stufe)
 {
     if (sliceId.isEmpty() || stufe < 0 || stufe > 100) { return QString(); }

@@ -3830,6 +3830,11 @@ public:
     /// (off/slow/med/fast); alles andere geht nicht hinaus und sagt
     /// das im Protokoll.
     void sendeFlexAgcModus(AGCMode modus);
+    /// Die AGC-Schwelle. Unser Regler laeuft -160..0 (dBm-Anmutung
+    /// aus Thetis), die der Maschine 0..100. Die Umrechnung ist
+    /// VERHAELTNISMAESZIG, keine physikalische -- siehe die
+    /// Begruendung an der Umsetzung.
+    void sendeFlexAgcSchwelle(int unsereSchwelle);
     void sendeFlexTonpegel(int stufe0bis100);
     void sendeFlexStumm(bool stumm);
     void sendeFlexBalance(double unserWert);
