@@ -331,6 +331,45 @@ private slots:
                  "die Liste legt nichts hinein");
     }
 
+    // ── Der Fall, der beim Betreiber schiefging ─────────────────────
+    //
+    // „genau mitten im fenster" -- und es kam das Menue des
+    // Containers. Ein Rechtsklick geht an das Widget UNTER dem
+    // Zeiger; reicht das ihn weiter, laeuft er die Elternkette hoch.
+    //
+    // Dieser Fall schickt den Klick genau dorthin: auf eine SEITE im
+    // Feld, nicht auf das Feld selbst. Er darf nicht nach oben
+    // durchlaufen.
+    //
+    // EHRLICH DAZU: dieser Lauf bleibt auch OHNE das Fangnetz gruen
+    // (Gegenprobe gefahren, 2026-11-01). Er haelt also den normalen
+    // Weg fest -- der schon vorher ging --, nicht den Fehler des
+    // Betreibers. Was bei ihm den Klick nach oben durchlieszt, ist
+    // damit NICHT gefunden; das Netz faengt es nur ab. Wer hier
+    // weitersucht: der Unterschied musz in der wirklichen Seite
+    // liegen (Rotorpanel, Bandbreitenfilter), nicht im Behaelter.
+    void rechtsklickAufEinerSeiteKommtAn()
+    {
+        auto* rahmen = new QWidget;        // steht fuer den Container
+        rahmen->setGeometry(0, 0, 300, 200);
+        auto* k = new KombiApplet(nullptr, rahmen);
+        k->setGeometry(0, 0, 300, 200);
+        auto* seite = new Probepanel(QStringLiteral("Rx"), QStringLiteral("RX"));
+        k->nimmAuf(seite);
+        rahmen->show();
+        QTest::qWait(50);
+
+        QSignalSpy spion(k, &KombiApplet::listeGewuenscht);
+        QContextMenuEvent ev(QContextMenuEvent::Mouse, QPoint(20, 20),
+                             seite->mapToGlobal(QPoint(20, 20)));
+        QVERIFY2(QApplication::sendEvent(seite, &ev),
+                 "der Rechtsklick wurde nicht beantwortet — er laeuft dann "
+                 "die Elternkette hoch bis zum Container, und DESSEN Menue "
+                 "erscheint (Betreiber, 2026-11-01)");
+        QCOMPARE(spion.count(), 1);
+        delete rahmen;
+    }
+
     // ── Jedes Widget, nicht nur ein Applet ──────────────────────────
     //
     // Betreiber, 2026-11-01: „ich will da auch den rotor und andere
