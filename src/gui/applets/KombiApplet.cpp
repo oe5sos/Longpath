@@ -137,6 +137,18 @@ void KombiApplet::baueReiter()
 
 QString KombiApplet::appletTitle() const
 {
+    // ── Kein ausgeschriebener Name, solange Pillen dastehen ─────────
+    //
+    // Betreiber, 2026-11-01: "also Combined muss ja nicht
+    // ausgeschrieben sein" -- "dann könnte RX und TX eine eigene
+    // pille nebeneinander sein" -- "wäre platz, eine dritte".
+    //
+    // Richtig: das Wort sagt nichts, was die Pillen nicht schon
+    // zeigen, und es nimmt ihnen in einer schmalen Spalte den Platz
+    // fuer die dritte. Leer bleibt es nur, solange etwas drin ist --
+    // ein leeres Feld muss sagen, was es ist.
+    if (!m_inhalte.isEmpty()) { return QString(); }
+
     // IMMER „Combined", nie der Inhalt.
     //
     // Betreiber, 2026-11-01: „das RX/TX (combined) panel sollte
@@ -410,64 +422,23 @@ void KombiApplet::ordneSeitenEin()
 QWidget* KombiApplet::kopfleistenWidget()
 {
     if (!m_chip) {
-        // ── Form 4: zwei Pfeile, der Name dazwischen ────────────────
+        // ── Eine Pille je Seite, nebeneinander ──────────────────────
         //
-        // Betreiber, 2026-11-01: "aber die pillen gefallen mir nicht"
-        // -- der erste Bau war ein gefuellter Rundknopf. Von den vier
-        // Blaettern faellt die Wahl auf diese Form, weil sie als
-        // einzige ZEIGT, dasz man wechseln kann: die anderen sagen
-        // nur, was gerade laeuft. Und sobald mehr als zwei Panels
-        // drin liegen, braucht es auch den Weg zurueck.
+        // Betreiber, 2026-11-01, nach dem Durchschalt-Griff: "wenn
+        // 2-3 pillen oben stehen wäre es einfacher."
         //
-        // Keine Fuellung, kein Rahmen -- Text und zwei Zeichen.
+        // Stimmt: mit zwei oder drei Seiten ist der direkte Weg immer
+        // kuerzer als das Durchschalten -- man sieht, was da ist, und
+        // trifft es mit einem Klick. (Sein frueheres "die pillen
+        // gefallen mir nicht" galt dem EINEN gefuellten Rundknopf,
+        // nicht der Reihe.)
+        //
+        // In der KOPFLEISTE, nicht als eigener Streifen: der kostete
+        // Hoehe, und die Spalte ist schmal und hoch.
         m_chip = new QWidget(this);
-        auto* reihe = new QHBoxLayout(m_chip);
-        reihe->setContentsMargins(0, 0, 0, 0);
-        reihe->setSpacing(2);
-
-        const QString flach =
-            QStringLiteral(
-                "QPushButton { background: transparent; border: none;"
-                "  color: %1; font-size: 9px; font-weight: bold;"
-                "  padding: 0px 3px; }"
-                "QPushButton:hover { color: %2; }"
-                "QPushButton:disabled { color: %3; }")
-                .arg(QLatin1String(Style::kTextTertiary),
-                     QLatin1String(Style::kTextPrimary),
-                     QLatin1String(Style::kTextInactive));
-
-        m_zurueck = new QPushButton(QStringLiteral("‹"), m_chip);
-        m_zurueck->setCursor(Qt::PointingHandCursor);
-        m_zurueck->setStyleSheet(flach);
-        m_zurueck->setFixedHeight(16);
-        m_zurueck->setToolTip(tr("Previous panel"));
-        reihe->addWidget(m_zurueck);
-
-        m_name = new QLabel(m_chip);
-        m_name->setStyleSheet(
-            QStringLiteral("color: %1; font-size: 9px; font-weight: bold;")
-                .arg(QLatin1String(Style::kTextPrimary)));
-        m_name->setAlignment(Qt::AlignCenter);
-        reihe->addWidget(m_name);
-
-        m_weiter = new QPushButton(QStringLiteral("›"), m_chip);
-        m_weiter->setCursor(Qt::PointingHandCursor);
-        m_weiter->setStyleSheet(flach);
-        m_weiter->setFixedHeight(16);
-        m_weiter->setToolTip(tr("Next panel"));
-        reihe->addWidget(m_weiter);
-
-        connect(m_weiter, &QPushButton::clicked, this, [this]() {
-            if (m_inhalte.size() < 2) { return; }
-            zeigeSeite((seite() + 1) % m_inhalte.size());
-        });
-        connect(m_zurueck, &QPushButton::clicked, this, [this]() {
-            if (m_inhalte.size() < 2) { return; }
-            zeigeSeite((seite() + m_inhalte.size() - 1) % m_inhalte.size());
-        });
-
-        // Rechtsklick loest die gezeigte Seite heraus, Doppelklick
-        // klappt auf und zu -- wie vorher, nur am ganzen Griff.
+        m_pillenReihe = new QHBoxLayout(m_chip);
+        m_pillenReihe->setContentsMargins(0, 0, 0, 0);
+        m_pillenReihe->setSpacing(3);
         m_chip->setContextMenuPolicy(Qt::CustomContextMenu);
         connect(m_chip, &QWidget::customContextMenuRequested, this,
                 [this](const QPoint&) {
@@ -476,15 +447,74 @@ QWidget* KombiApplet::kopfleistenWidget()
             if (i >= 0 && i < s.size()) { gibFrei(s.at(i)); }
         });
         m_chip->installEventFilter(this);
-        m_name->installEventFilter(this);
         m_chip->setProperty("kombiChip", true);
     }
     chipNachziehen();
     return m_chip;
 }
 
-// Was auf dem Chip steht: die laufende Seite und, wenn es mehr als
-// eine gibt, ein Pfeil als Hinweis, dasz es weitergeht.
+// Die Reihe wird neu gebaut, nicht nachgepflegt: bei zwei bis vier
+// Pillen ist das billiger als jede Buchhaltung.
+void KombiApplet::chipNachziehen()
+{
+    if (!m_chip || !m_pillenReihe) { return; }
+    for (QPushButton* b : m_pillen) { b->deleteLater(); }
+    m_pillen.clear();
+
+    const QList<QWidget*> s = seiten();
+    const int aktiv = seite();
+
+    // Dunkel statt Akzent: "muss schwarz sein" (2026-11-01). Die
+    // aktive Pille liegt tiefer und hat helle Schrift -- dieselbe
+    // Sprache wie ueberall im Haus, Licht von oben.
+    const QString css =
+        QStringLiteral(
+            "QPushButton {"
+            "  background: %1; color: %2;"
+            "  border: 1px solid %3; border-radius: 7px;"
+            "  font-size: 9px; font-weight: bold;"
+            "  padding: 0px 7px;"
+            "}"
+            "QPushButton:hover { color: %4; }"
+            "QPushButton:checked { background: %5; color: %4;"
+            "  border: 1px solid %6; }")
+            .arg(QLatin1String(Style::kButtonBg),
+                 QLatin1String(Style::kTextTertiary),
+                 QLatin1String(Style::kBorder),
+                 QLatin1String(Style::kTextPrimary),
+                 QLatin1String(Style::kPanelBg),
+                 QLatin1String(Style::kBorder));
+
+    for (int i = 0; i < s.size(); ++i) {
+        QWidget* seite = s.at(i);
+        // Lange Namen kuerzen: "Rotor / Log" neben zwei anderen
+        // Pillen sprengt sonst eine schmale Spalte.
+        QString text = nameVon(seite);
+        if (text.size() > 11) { text = text.left(10) + QStringLiteral("…"); }
+        auto* b = new QPushButton(text, m_chip);
+        b->setCheckable(true);
+        b->setChecked(i == aktiv);
+        b->setCursor(Qt::PointingHandCursor);
+        b->setStyleSheet(css);
+        b->setFixedHeight(16);
+        b->setToolTip(tr("%1 — right-click takes it out, "
+                         "double-click unfolds them all.").arg(nameVon(seite)));
+        b->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(b, &QPushButton::clicked, this, [this, i]() { zeigeSeite(i); });
+        connect(b, &QWidget::customContextMenuRequested, this,
+                [this, seite](const QPoint&) { gibFrei(seite); });
+        b->installEventFilter(this);
+        b->setProperty("kombiSeite", i);
+        m_pillenReihe->addWidget(b);
+        m_pillen.append(b);
+    }
+
+    m_chip->setVisible(!s.isEmpty());
+    // Der eigene Streifen ist dann ueberfluessig -- genau das war der
+    // Punkt: er kostete Hoehe.
+    if (m_reiterleiste) { m_reiterleiste->setVisible(false); }
+}
+
 // Der Name einer Seite. Ein Applet kennt seinen Titel selbst; alles
 // andere (Rotor, Logbuch) traegt ihn als Fenstertitel.
 QString KombiApplet::nameVon(const QWidget* w)
@@ -498,29 +528,6 @@ QString KombiApplet::nameVon(const QWidget* w)
                                      : w->objectName();
 }
 
-void KombiApplet::chipNachziehen()
-{
-    if (!m_chip) { return; }
-    const QList<QWidget*> s = seiten();
-    const int i = seite();
-    if (m_name) {
-        m_name->setText((i >= 0 && i < s.size()) ? nameVon(s.at(i))
-                                                 : tr("empty"));
-    }
-    // Die Pfeile sind blind, solange es nur eine Seite gibt -- sie
-    // bleiben trotzdem stehen, damit der Griff nicht springt.
-    const bool mehrere = s.size() > 1;
-    if (m_zurueck) { m_zurueck->setEnabled(mehrere); }
-    if (m_weiter)  { m_weiter->setEnabled(mehrere); }
-    m_chip->setToolTip(mehrere
-        ? tr("Switch panel. Right-click takes this one out, "
-             "double-click unfolds them all.")
-        : tr("Right-click the field to see what can go in here."));
-    m_chip->setVisible(!s.isEmpty());
-    // Der eigene Streifen ist dann ueberfluessig -- genau das war der
-    // Punkt: er kostete Hoehe.
-    if (m_reiterleiste) { m_reiterleiste->setVisible(false); }
-}
 
 QList<QWidget*> KombiApplet::seiten() const
 {

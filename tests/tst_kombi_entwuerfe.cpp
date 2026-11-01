@@ -210,8 +210,15 @@ private slots:
         auto* tx = new TxApplet(&rm, nullptr);
         feld.nimmAuf(rx);
         feld.nimmAuf(tx);
+        // Eine DRITTE Seite dazu und die Zelle schmal: genau der
+        // Fall, nach dem der Betreiber gefragt hat („wäre platz, eine
+        // dritte" / „oder man macht es zweizeilig"). Gemessen statt
+        // geraten.
+        auto* rotor = new QWidget;
+        rotor->setWindowTitle(QStringLiteral("Rotor / Log"));
+        feld.nimmAuf(rotor);
         zelle.addWidget(&feld);
-        zelle.resize(360, 300);
+        zelle.resize(300, 300);
         zelle.show();
 
         for (int i = 0; i < 2; ++i) {
