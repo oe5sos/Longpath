@@ -73,6 +73,14 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
     connect(m_titleBar, &WindowTitleBar::closeRequested, this, [this]() {
         emit dockRequested(appletId());
     });
+    // Bringt das Applet ein Bedienteil fuer die Kopfleiste mit, liegt
+    // es hier genauso wie in der Spalte -- ein Applet hat zwei
+    // Gehaeuse (2026-11-01, zweimal die Falle).
+    if (applet) {
+        if (QWidget* kopf = applet->kopfleistenWidget()) {
+            m_titleBar->setKopfWidget(kopf);
+        }
+    }
     // Wo das Fenster losgelassen wurde -- fuer das Kombi-Feld
     // (2026-11-01). Hier wird nichts entschieden, nur weitergereicht:
     // welche Felder es gibt, weiss das Hauptfenster.

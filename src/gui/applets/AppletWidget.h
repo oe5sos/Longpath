@@ -63,6 +63,21 @@ public:
     // and the title bar hides its ⚙ for them rather than showing a
     // button that opens nothing. An applet with a deeper settings
     // surface (e.g. TxApplet's fine TX-settings popup) overrides both.
+    /// Ein Bedienteil, das in die KOPFLEISTE des Gehaeuses gehoert,
+    /// nicht in den Inhalt.
+    ///
+    /// Betreiber, 2026-11-01: "das TX panel ist oben so gross, das bei
+    /// meinem mac das nicht otimal ist" und "ev. die Leiste, wo jetzt
+    /// RX1 Panel als Menue verwenden" -- ein eigener Streifen kostet
+    /// Hoehe, die Kopfleiste ist ohnehin da. Wer hier etwas
+    /// zurueckgibt, bekommt es vom Gehaeuse in seine Leiste gelegt
+    /// (Zelle in der Spalte UND schwebendes Fenster -- ein Applet hat
+    /// zwei Gehaeuse, und das war heute schon zweimal die Falle).
+    ///
+    /// Das Widget gehoert weiterhin dem Applet; das Gehaeuse setzt nur
+    /// den Elternteil.
+    virtual QWidget* kopfleistenWidget() { return nullptr; }
+
     virtual bool hasExtendedSettings() const { return false; }
     virtual void openExtendedSettings() {}
 

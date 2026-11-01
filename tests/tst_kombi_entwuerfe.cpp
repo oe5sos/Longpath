@@ -148,6 +148,27 @@ private slots:
         malen(dir, 4, QStringLiteral("Unterstrich-Reiter"));
     }
 
+    // Zweite Runde: der Umschalter IN der Kopfleiste.
+    //
+    // Betreiber, 2026-11-01: "das TX panel ist oben so gross, das bei
+    // meinem mac das nicht otimal ist. andere vorschlaege bitte" und
+    // "ev. die Leiste, wo jetzt RX1 Panel als Menue verwenden."
+    //
+    // Also: der eigene Reiterstreifen faellt weg, der Umschalter zieht
+    // in die Kopfleiste, die ohnehin schon da ist.
+    void kopfleiste()
+    {
+        const QByteArray dirRoh = qgetenv("LONGPATH_GRAB_DIR");
+        if (dirRoh.isEmpty() || qgetenv("LONGPATH_ENTWURF") != "1") {
+            QSKIP("Zeichenwerkzeug: LONGPATH_GRAB_DIR + LONGPATH_ENTWURF=1");
+        }
+        const QString dir = QString::fromLocal8Bit(dirRoh);
+        malenKopf(dir, 1, QStringLiteral("Reiter statt Titel"));
+        malenKopf(dir, 2, QStringLiteral("Titel + Reiter"));
+        malenKopf(dir, 3, QStringLiteral("Ein Chip, schaltet weiter"));
+        malenKopf(dir, 4, QStringLiteral("Der Titel ist die Seite"));
+    }
+
     // ── Nach der Wahl: das ECHTE Bauteil ────────────────────────────
     //
     // Freihand gemalte Entwuerfe sehen im eingebauten Zustand anders
@@ -184,6 +205,119 @@ private slots:
     }
 
 private:
+    void malenKopf(const QString& dir, int nummer, const QString& name)
+    {
+        const int blattB = kBreite + 2 * kRand;
+        const int blattH = 2 * kHoehe + 3 * kRand + 34;
+        QImage bild(blattB * 2, blattH * 2, QImage::Format_ARGB32_Premultiplied);
+        bild.setDevicePixelRatio(2.0);
+        bild.setDotsPerMeterX(int(144 / 0.0254));
+        bild.setDotsPerMeterY(int(144 / 0.0254));
+        bild.fill(c("#141418"));
+
+        QPainter p(&bild);
+        p.setRenderHint(QPainter::Antialiasing, true);
+        p.setRenderHint(QPainter::TextAntialiasing, true);
+        QFont kopf = p.font();
+        kopf.setPointSizeF(9.0);
+        kopf.setBold(true);
+        p.setFont(kopf);
+        p.setPen(c(Style::kTextPrimary));
+        p.drawText(QRect(kRand, 6, blattB - 2 * kRand, 18),
+                   Qt::AlignVCenter | Qt::AlignLeft,
+                   QStringLiteral("Kopfleiste %1 — %2").arg(nummer).arg(name));
+        for (int i = 0; i < 2; ++i) {
+            const QRect feld(kRand, 30 + kRand + i * (kHoehe + kRand),
+                             kBreite, kHoehe);
+            maleKopfEntwurf(p, feld, nummer, i == 1);
+        }
+        p.end();
+        const QString pfad = QStringLiteral("%1/kombi-kopf-%2.png")
+                                 .arg(dir).arg(nummer);
+        QVERIFY2(bild.save(pfad), qPrintable(pfad));
+        qInfo() << "Blatt:" << pfad << bild.size();
+    }
+
+    // Alle vier teilen sich denselben Rahmen: EIN Streifen oben, kein
+    // zweiter darunter. Genau das ist der Gewinn.
+    void maleKopfEntwurf(QPainter& p, const QRect& feld, int nummer, bool tx)
+    {
+        p.fillRect(feld, c(Style::kPanelBg));
+        p.setPen(QPen(c(Style::kBorder), 1));
+        p.drawRect(feld.adjusted(0, 0, -1, -1));
+        const QRect kopfR(feld.left(), feld.top(), feld.width(), kKopfH);
+        p.fillRect(kopfR, c(Style::kButtonBg));
+        p.drawLine(kopfR.bottomLeft(), kopfR.bottomRight());
+
+        QFont f = p.font();
+        f.setPointSizeF(8.0);
+        f.setBold(true);
+        p.setFont(f);
+        const QString an  = tx ? QStringLiteral("TX") : QStringLiteral("RX");
+        const QString aus = tx ? QStringLiteral("RX") : QStringLiteral("TX");
+
+        if (nummer == 1) {
+            int x = kopfR.left() + 8;
+            for (int i = 0; i < 2; ++i) {
+                const bool dieser = (i == 1) == tx;
+                const QRect tr(x, kopfR.top(), 28, kopfR.height());
+                if (dieser) { p.fillRect(tr, c(Style::kPanelBg)); }
+                p.setPen(c(dieser ? Style::kTextPrimary : Style::kTextInactive));
+                p.drawText(tr, Qt::AlignCenter,
+                           i == 0 ? QStringLiteral("RX") : QStringLiteral("TX"));
+                x += 30;
+            }
+        } else if (nummer == 2) {
+            p.setPen(c(Style::kTextTertiary));
+            p.drawText(kopfR.adjusted(8, 0, 0, 0),
+                       Qt::AlignVCenter | Qt::AlignLeft,
+                       QStringLiteral("COMBINED"));
+            int x = kopfR.left() + 116;
+            for (int i = 0; i < 2; ++i) {
+                const bool dieser = (i == 1) == tx;
+                const QRect tr(x, kopfR.top() + 2, 28, kopfR.height() - 4);
+                if (dieser) {
+                    p.fillRect(tr, c(Style::kPanelBg));
+                    p.setPen(QPen(c(Style::kBorder), 1));
+                    p.drawRect(tr);
+                }
+                p.setPen(c(dieser ? Style::kTextPrimary : Style::kTextInactive));
+                p.drawText(tr, Qt::AlignCenter,
+                           i == 0 ? QStringLiteral("RX") : QStringLiteral("TX"));
+                x += 30;
+            }
+        } else if (nummer == 3) {
+            p.setPen(c(Style::kTextTertiary));
+            p.drawText(kopfR.adjusted(8, 0, 0, 0),
+                       Qt::AlignVCenter | Qt::AlignLeft,
+                       QStringLiteral("COMBINED"));
+            const QRect chip(kopfR.left() + 116, kopfR.top() + 2, 54,
+                             kopfR.height() - 4);
+            p.fillRect(chip, c(Style::kPanelBg));
+            p.setPen(QPen(c(Style::kBorder), 1));
+            p.drawRect(chip);
+            p.setPen(c(Style::kTextPrimary));
+            p.drawText(chip, Qt::AlignCenter,
+                       QStringLiteral("%1 ›").arg(an));
+        } else {
+            p.setPen(c(Style::kTextPrimary));
+            p.drawText(kopfR.adjusted(8, 0, 0, 0),
+                       Qt::AlignVCenter | Qt::AlignLeft,
+                       QStringLiteral("%1  ▾").arg(an));
+            p.setPen(c(Style::kTextInactive));
+            p.drawText(kopfR.adjusted(0, 0, -44, 0),
+                       Qt::AlignVCenter | Qt::AlignRight, aus);
+        }
+
+        p.setPen(c(Style::kTextTertiary));
+        p.drawText(kopfR.adjusted(0, 0, -22, 0),
+                   Qt::AlignVCenter | Qt::AlignRight, QStringLiteral("⚙"));
+        p.drawText(kopfR.adjusted(0, 0, -8, 0),
+                   Qt::AlignVCenter | Qt::AlignRight, QStringLiteral("✕"));
+        maleInhalt(p, QRect(feld.left(), kopfR.bottom() + 1, feld.width(),
+                            feld.bottom() - kopfR.bottom() - 1), tx);
+    }
+
     // Ein Blatt: derselbe Entwurf zweimal, einmal mit RX vorn und
     // einmal mit TX vorn. Ein Umschalter, den man nur in einem
     // Zustand sieht, sagt nichts.

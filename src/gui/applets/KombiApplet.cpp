@@ -45,6 +45,13 @@ KombiApplet::KombiApplet(RadioModel* model, QWidget* parent)
     m_stapel = new QStackedWidget(this);
     root->addWidget(m_stapel, 1);
 
+    m_aufklapp = new QWidget(this);
+    auto* senkrecht = new QVBoxLayout(m_aufklapp);
+    senkrecht->setContentsMargins(0, 0, 0, 0);
+    senkrecht->setSpacing(Style::kPanelGapPx);
+    m_aufklapp->setVisible(false);
+    root->addWidget(m_aufklapp, 1);
+
     // Der leere Zustand sagt, was zu tun ist. Ein leeres Feld ohne ein
     // Wort sieht aus wie ein Fehler.
     m_hinweis = new QLabel(tr("Drag panels in here by their title bar"), this);
@@ -171,18 +178,29 @@ void KombiApplet::reiterNeu()
     // helleren Schrift und an einem schmalen Strich darunter. Das ist
     // dieselbe Menge Farbe wie in Entwurf 4, nur ueber die ganze
     // Breite.
+    // ── Schwarz. Ohne Blau. (2026-11-01) ────────────────────────────
+    //
+    // Betreiber zweimal zu diesem Reiter: „die farbe ist auch blau
+    // und nicht schwarz" und dann „1. muss schwarz sein". Also kein
+    // Akzent, auch nicht als Strich.
+    //
+    // Erkennbar bleibt der aktive Reiter an zwei Dingen, die keine
+    // Farbe kosten: er liegt TIEFER (dunkel wie das Panel, waehrend
+    // die anderen aufgesetzt sind) und seine Schrift ist hell. Das
+    // ist dieselbe Sprache, die der Hausstil ueberall spricht --
+    // Licht von oben, Vertiefung heiszt gewaehlt.
     const QString css =
         Style::buttonBaseStyle()
         + QStringLiteral(
               "QPushButton:checked {"
               "  background: %1; color: %2;"
               "  border: 1px solid %3;"
-              "  border-bottom: 2px solid %4;"
-              "}")
+              "}"
+              "QPushButton:!checked { color: %4; }")
               .arg(QLatin1String(Style::kPanelBg),
                    QLatin1String(Style::kTextPrimary),
                    QLatin1String(Style::kBorder),
-                   QLatin1String(Style::kAccent));
+                   QLatin1String(Style::kTextTertiary));
     for (int i = 0; i < m_inhalte.size(); ++i) {
         AppletWidget* w = m_inhalte.at(i).data();
         if (!w) { continue; }
@@ -213,6 +231,15 @@ void KombiApplet::reiterNeu()
     if (m_stapel)       { m_stapel->setVisible(!leer); }
 
     if (!leer) { zeigeSeite(qBound(0, seite(), m_inhalte.size() - 1)); }
+    // Die feste Hoehe haengt an den Seiten -- kommt eine dazu oder
+    // geht eine weg, wird sie neu bestimmt.
+    if (leer) {
+        setMinimumHeight(0);
+        setMaximumHeight(QWIDGETSIZE_MAX);
+    } else {
+        ordneSeitenEin();
+    }
+    chipNachziehen();
     merkeStand();
 }
 
@@ -259,6 +286,14 @@ bool KombiApplet::eventFilter(QObject* watched, QEvent* ev)
         emit herausgezogen(raus, jetzt);
         return true;
     }
+    case QEvent::MouseButtonDblClick:
+        // Die Reiter fuellen die ganze Leiste -- eine freie Stelle
+        // zum Doppelklicken gibt es nicht, also zaehlt der Reiter
+        // selbst. Einfach klicken schaltet um, doppelt klappt auf.
+        m_zugPanel = nullptr;
+        m_zugStart = QPoint();
+        setAufgeklappt(!m_aufgeklappt);
+        return true;
     case QEvent::MouseButtonRelease:
         m_zugPanel = nullptr;
         m_zugStart = QPoint();
@@ -267,6 +302,134 @@ bool KombiApplet::eventFilter(QObject* watched, QEvent* ev)
         break;
     }
     return AppletWidget::eventFilter(watched, ev);
+}
+
+// ── Auf- und zuklappen ─────────────────────────────────────────────
+//
+// Zugeklappt ist das Feld ein Stapel mit Reitern und einer FESTEN
+// Hoehe -- es springt beim Umschalten nicht, und das war der halbe
+// Sinn der Sache („eine größe, die fix bleibt").
+//
+// Aufgeklappt stehen alle Seiten untereinander: man sieht die
+// anderen Panels mit, ohne sie herauszuziehen. Beim Zuklappen
+// bekommt das Feld seine feste Hoehe zurueck.
+void KombiApplet::setAufgeklappt(bool an)
+{
+    if (m_aufgeklappt == an) { return; }
+    m_aufgeklappt = an;
+    ordneSeitenEin();
+}
+
+// Die feste Hoehe ist die GROESZTE der Seiten -- nicht die der
+// gerade sichtbaren. Sonst waere die Hoehe wieder eine Funktion des
+// Reiters, und genau das soll sie nicht sein.
+int KombiApplet::festeHoehe() const
+{
+    int h = 0;
+    for (const QPointer<AppletWidget>& w : m_inhalte) {
+        if (w) { h = qMax(h, w->sizeHint().height()); }
+    }
+    return h > 0 ? h : 160;
+}
+
+void KombiApplet::ordneSeitenEin()
+{
+    if (!m_stapel || !m_aufklapp) { return; }
+    auto* senkrecht = qobject_cast<QVBoxLayout*>(m_aufklapp->layout());
+    if (!senkrecht) { return; }
+
+    if (m_aufgeklappt) {
+        for (const QPointer<AppletWidget>& w : m_inhalte) {
+            if (!w) { continue; }
+            if (m_stapel->indexOf(w) >= 0) { m_stapel->removeWidget(w); }
+            senkrecht->addWidget(w.data());
+            w->show();
+        }
+        m_stapel->setVisible(false);
+        m_aufklapp->setVisible(true);
+        setMaximumHeight(QWIDGETSIZE_MAX);
+        setMinimumHeight(0);
+    } else {
+        for (const QPointer<AppletWidget>& w : m_inhalte) {
+            if (!w) { continue; }
+            senkrecht->removeWidget(w.data());
+            if (m_stapel->indexOf(w) < 0) { m_stapel->addWidget(w.data()); }
+        }
+        m_aufklapp->setVisible(false);
+        m_stapel->setVisible(!m_inhalte.isEmpty());
+        zeigeSeite(seite());
+        const int h = festeHoehe() + m_reiterleiste->sizeHint().height()
+                      + 3 * Style::kPanelGapPx;
+        setFixedHeight(h);
+    }
+    updateGeometry();
+}
+
+// Der Umschalter in der Kopfleiste (Entwurf 3).
+//
+// EIN Knopf, kein Streifen: er zeigt, was gerade laeuft, und schaltet
+// beim Klick auf die naechste Seite weiter. Der Gewinn ist Hoehe --
+// Betreiber, 2026-11-01: "das TX panel ist oben so gross, das bei
+// meinem mac das nicht otimal ist".
+//
+// Rechtsklick loest die gezeigte Seite wieder heraus, Doppelklick
+// klappt auf und zu: dieselben Griffe wie vorher am Reiter.
+QWidget* KombiApplet::kopfleistenWidget()
+{
+    if (!m_chip) {
+        m_chip = new QPushButton(this);
+        m_chip->setCursor(Qt::PointingHandCursor);
+        m_chip->setFixedHeight(16);
+        m_chip->setStyleSheet(
+            QStringLiteral(
+                "QPushButton {"
+                "  background: %1; color: %2;"
+                "  border: 1px solid %3; border-radius: 4px;"
+                "  font-size: 10px; font-weight: bold;"
+                "  padding: 0px 8px;"
+                "}"
+                "QPushButton:hover { background: %4; }")
+                .arg(QLatin1String(Style::kPanelBg),
+                     QLatin1String(Style::kTextPrimary),
+                     QLatin1String(Style::kBorder),
+                     QLatin1String(Style::kButtonHover)));
+        m_chip->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(m_chip, &QPushButton::clicked, this, [this]() {
+            if (m_inhalte.size() < 2) { return; }
+            zeigeSeite((seite() + 1) % m_inhalte.size());
+        });
+        connect(m_chip, &QWidget::customContextMenuRequested, this,
+                [this](const QPoint&) {
+            const QList<AppletWidget*> s = seiten();
+            const int i = seite();
+            if (i >= 0 && i < s.size()) { gibFrei(s.at(i)); }
+        });
+        m_chip->installEventFilter(this);
+        m_chip->setProperty("kombiChip", true);
+    }
+    chipNachziehen();
+    return m_chip;
+}
+
+// Was auf dem Chip steht: die laufende Seite und, wenn es mehr als
+// eine gibt, ein Pfeil als Hinweis, dasz es weitergeht.
+void KombiApplet::chipNachziehen()
+{
+    if (!m_chip) { return; }
+    const QList<AppletWidget*> s = seiten();
+    const int i = seite();
+    const QString name = (i >= 0 && i < s.size()) ? s.at(i)->appletTitle()
+                                                  : tr("empty");
+    m_chip->setText(s.size() > 1 ? QStringLiteral("%1 \u203a").arg(name)
+                                 : name);
+    m_chip->setToolTip(s.size() > 1
+        ? tr("Next panel. Right-click takes this one out, "
+             "double-click unfolds them all.")
+        : tr("Drag panels onto this field by their title bar."));
+    m_chip->setVisible(!s.isEmpty());
+    // Der eigene Streifen ist dann ueberfluessig -- genau das war der
+    // Punkt: er kostete Hoehe.
+    if (m_reiterleiste) { m_reiterleiste->setVisible(false); }
 }
 
 QList<AppletWidget*> KombiApplet::seiten() const
@@ -297,6 +460,7 @@ void KombiApplet::zeigeSeite(int welche)
         m_reiter.at(i)->setChecked(i == w);
     }
     AppSettings::instance().setValue(seitenSchluessel(), QString::number(w));
+    chipNachziehen();
     emit seiteGewechselt(w);
 }
 

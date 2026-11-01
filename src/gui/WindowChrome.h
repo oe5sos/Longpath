@@ -66,6 +66,9 @@ public:
     // ein festgestelltes Fenster nach dem Neustart festgestellt bleibt
     // — sonst waere das Feststellen eine Geste, die jeder Neustart
     // zurueckdreht.
+    /// Ein Bedienteil des Applets in diese Leiste legen -- vor die
+    /// Knoepfe. Siehe AppletWidget::kopfleistenWidget().
+    void setKopfWidget(QWidget* w);
     void setLockKey(const QString& key);
     bool isLocked() const { return m_locked; }
     void setLocked(bool on);

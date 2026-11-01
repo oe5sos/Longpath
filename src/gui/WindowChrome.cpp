@@ -238,6 +238,24 @@ void WindowTitleBar::applyLockVisuals()
     if (m_zoomBtn) { m_zoomBtn->setEnabled(!m_locked); }
 }
 
+void WindowTitleBar::setKopfWidget(QWidget* w)
+{
+    if (!w) { return; }
+    auto* lay = qobject_cast<QHBoxLayout*>(layout());
+    if (!lay) { return; }
+    int vorDenKnoepfen = lay->count();
+    for (int i = 0; i < lay->count(); ++i) {
+        QLayoutItem* it = lay->itemAt(i);
+        if (it && qobject_cast<QPushButton*>(it->widget())) {
+            vorDenKnoepfen = i;
+            break;
+        }
+    }
+    w->setParent(this);
+    lay->insertWidget(vorDenKnoepfen, w);
+    w->show();
+}
+
 void WindowTitleBar::mousePressEvent(QMouseEvent* ev)
 {
     // Festgestellt heisst festgestellt.

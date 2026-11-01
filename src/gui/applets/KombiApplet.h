@@ -82,6 +82,12 @@ public:
     QString appletTitle() const override;
     void    syncFromModel() override;
 
+    /// Der Umschalter gehoert in die Kopfleiste des Gehaeuses, nicht
+    /// in einen eigenen Streifen -- Entwurf 3, vom Betreiber gewaehlt
+    /// (2026-11-01): "3 bitte ... aber vielleicht gleich direkt in
+    /// der kopfleiste?"
+    QWidget* kopfleistenWidget() override;
+
     /// Das Zahnrad gehoert der Seite, die gerade zu sehen ist: wer TX
     /// sieht und das Zahnrad drueckt, meint die TX-Einstellungen.
     bool hasExtendedSettings() const override;
@@ -95,6 +101,17 @@ public:
     void gibFrei(AppletWidget* panel);
     /// Alle hergeben; Reihenfolge wie aufgenommen.
     QList<AppletWidget*> gibAlleFrei();
+
+    /// Aufgeklappt: ALLE Seiten stehen untereinander, man sieht die
+    /// anderen Panels mit. Zugeklappt: Reiter, feste Hoehe.
+    ///
+    /// Betreiber, 2026-11-01: „es soll eine größe geben, die fix
+    /// bleibt, mit doppelklick auf die panelleiste soll dann quasi
+    /// das menü aufgeklappt sein, sodass man die anderen widget auch
+    /// sieht. doppelklick wieder auf die leiste oben, wieder
+    /// standardgröße."
+    void setAufgeklappt(bool an);
+    bool aufgeklappt() const { return m_aufgeklappt; }
 
     QList<AppletWidget*> seiten() const;
     int  seite() const;
@@ -124,6 +141,9 @@ private:
     void baueReiter();
     void reiterNeu();
     void merkeStand() const;
+    void chipNachziehen();
+    void ordneSeitenEin();
+    int  festeHoehe() const;
 
     QStackedWidget* m_stapel{nullptr};
     QWidget*        m_reiterleiste{nullptr};
@@ -131,10 +151,13 @@ private:
     QLabel*         m_hinweis{nullptr};
     QList<QPointer<AppletWidget>> m_inhalte;
     QList<QPushButton*> m_reiter;
+    QPushButton* m_chip{nullptr};   ///< der Umschalter in der Kopfleiste
     /// Zugbeginn auf einem Reiter -- erst ab einer Strecke wird daraus
     /// ein Herausziehen statt eines Klicks.
     QPoint m_zugStart;
     QPointer<AppletWidget> m_zugPanel;
+    QWidget* m_aufklapp{nullptr};   ///< traegt die Seiten, wenn offen
+    bool     m_aufgeklappt{false};
 };
 
 } // namespace Longpath
