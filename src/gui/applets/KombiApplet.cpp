@@ -385,7 +385,7 @@ QWidget* KombiApplet::kopfleistenWidget()
                 "QPushButton {"
                 "  background: %1; color: %2;"
                 "  border: 1px solid %3; border-radius: 4px;"
-                "  font-size: 10px; font-weight: bold;"
+                "  font-size: 9px; font-weight: bold;"
                 "  padding: 0px 8px;"
                 "}"
                 "QPushButton:hover { background: %4; }")
