@@ -396,12 +396,12 @@ private slots:
             seite.resize(620, seite.sizeHint().height());
             seite.show();
             QVERIFY(QTest::qWaitForWindowExposed(&seite, 5000));
-            blattSpeichern(dir, "apd-A-wie-gebaut-aus.png", seite.grab().toImage(),
-                QStringLiteral("Entwurf A — wie gebaut (das echte Fenster), aus"),
-                QStringLiteral("Der Stand von heute: Banner, Erklärung, Schalter, "
-                               "Messpunkt je Sendeantenne, Knopf. Gefüttert mit den "
-                               "echten Zeilen der 8400. Ehrlich, aber textlastig — "
-                               "die Erklärung nimmt mehr Platz als die Bedienung."));
+            blattSpeichern(dir, "apd-C-gebaut-aus.png", seite.grab().toImage(),
+                QStringLiteral("Entwurf C — GEBAUT, das echte Fenster, aus"),
+                QStringLiteral("Das ECHTE Widget nach dem Umbau auf Entwurf C, "
+                               "gefüttert mit den gemessenen Zeilen der 8400. "
+                               "Aus heisst: der Bogen ist offen, die Stationen "
+                               "sind grau, der Koppler ist der eingebaute."));
         }
         {
             RadioModel rm;
@@ -410,11 +410,12 @@ private slots:
             seite.resize(620, seite.sizeHint().height());
             seite.show();
             QVERIFY(QTest::qWaitForWindowExposed(&seite, 5000));
-            blattSpeichern(dir, "apd-A-wie-gebaut-ein.png", seite.grab().toImage(),
-                QStringLiteral("Entwurf A — wie gebaut, ein, Messpunkt XVTA"),
-                QStringLiteral("Derselbe Aufbau im laufenden Fall. Dass die Kurve "
-                               "trägt, steht als Satz — man muss ihn lesen, statt "
-                               "ihn zu sehen."));
+            blattSpeichern(dir, "apd-C-gebaut-ein.png", seite.grab().toImage(),
+                QStringLiteral("Entwurf C — GEBAUT, das echte Fenster, ein, Messpunkt XVTA"),
+                QStringLiteral("Derselbe Aufbau im laufenden Fall: der Weg trägt "
+                               "Farbe, die Beschriftung wandert auf „external "
+                               "amp“ und „amp sampler“, und die Messwerte stehen "
+                               "unten in der Messwert-Farbe."));
         }
 
         // ── Entwurf B: eine Karte ────────────────────────────────────
