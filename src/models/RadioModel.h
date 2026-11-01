@@ -2775,6 +2775,9 @@ signals:
     /// Der Zustand der Flex-Vorverzerrung hat sich geaendert — der
     /// Schalter, der Messpunkt oder die gelernte Kurve.
     void flexApdGeaendert();
+    /// Der Zweiton der Maschine laeuft (oder nicht mehr). Oeffnet und
+    /// schliesst das Tor der IMD-Messung am Flex.
+    void flexZweitonGeaendert(bool aktiv);
     /// Der Stehwellenriegel hat zugemacht: entweder wurde gar nicht
     /// erst getastet, oder eine laufende Sendung wurde gebrochen.
     /// Betreiber am 2026-10-30: „Sollte SWR ueber 2,5 sein, bitte
@@ -3895,15 +3898,32 @@ public:
     bool flexApdMesspunktSetzen(const QString& sendeantenne, const QString& messpunkt);
     bool flexApdZuruecksetzen();
 
+    // ── Der Zweiton der Maschine (2026-11-01) ───────────────────────
+    //
+    // Nur der MODUS. Getastet wird nicht von hier: der Abstimmtraeger
+    // geht mit `flexAbstimmen(true)` hinaus, und den drueckt der
+    // Betreiber. Ein Programm, das zum Messen selbst tastet, ist genau
+    // das, was hier nie passieren soll.
+    bool flexZweitonModus(bool an);
+
+    /// Laeuft gerade ein Zweiton auf dem Sender? Beides muss stimmen:
+    /// der Abstimmtraeger ist an UND der Modus ist `two_tone`. Das ist
+    /// das Tor fuer die IMD-Messung am Flex.
+    bool flexZweitonAktiv() const { return m_flexTuneAn && m_flexTuneZweiton; }
+
 #ifdef LONGPATH_BUILD_TESTS
     /// Eine Statuszeile der Maschine einspeisen, ohne Maschine. Geht
-    /// durch DENSELBEN Parser wie der Zustandsschub — ein Prueflauf
-    /// oder ein Entwurfsblatt zeigt damit, was die echten Zeilen
-    /// ergeben, nicht was jemand hineingeschrieben hat.
+    /// durch DENSELBEN Weg wie der Zustandsschub
+    /// (`verarbeiteFlexZustandszeile`) — ein Prueflauf oder ein
+    /// Entwurfsblatt zeigt damit, was die echten Zeilen ergeben, nicht
+    /// was jemand hineingeschrieben hat.
+    ///
+    /// Der Name sagt „Apd", weil er dafuer entstand; er traegt
+    /// inzwischen auch die Sendeebene (`transmit`).
     void flexApdStatusForTest(const QString& object,
                               const QMap<QString, QString>& kvs)
     {
-        if (m_flexApd.apply(object, kvs)) { emit flexApdGeaendert(); }
+        verarbeiteFlexZustandszeile(object, kvs);
     }
 #endif
 
@@ -4008,10 +4028,20 @@ private:
     int                  m_flexMikGainDb{0};
     bool                 m_flexVerriegelungGehoert{false};
 
+    /// Eine Zustandszeile der Flex auswerten — Vorverzerrung und
+    /// Sendeebene. EINE Stelle fuer Verbindung und Prueflauf.
+    void verarbeiteFlexZustandszeile(const QString& object,
+                                     const QMap<QString, QString>& kv);
+
     /// Der Zustand der Flex-eigenen Vorverzerrung, wie die Maschine
     /// ihn meldet. Beim Trennen geleert — ein gemerkter Zustand ohne
     /// Maschine dahinter ist eine Behauptung.
     Longpath::FlexApdState m_flexApd;
+
+    /// `transmit tune=` und `transmit tune_mode=`, wie die Maschine
+    /// sie meldet. Zusammen ergeben sie `flexZweitonAktiv()`.
+    bool m_flexTuneAn{false};
+    bool m_flexTuneZweiton{false};
     /// „Sollte SWR ueber 2,5 sein, bitte nicht senden!" (Betreiber,
     /// 2026-10-30). Zwei Riegel: einer vor dem Tasten in
     /// `flexTasten()`, einer bei jeder Messung — FT8 tastet 13,2 s am

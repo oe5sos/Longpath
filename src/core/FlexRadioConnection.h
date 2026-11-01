@@ -443,6 +443,20 @@ QString apdSamplerCommand(const QString& sendeantenne, const QString& messpunkt)
 // gelernte Kurve weg; die Maschine lernt beim naechsten Senden neu.
 QString apdResetCommand();
 
+// ── Der Zweiton der MASCHINE (2026-11-01) ───────────────────────────
+//
+// Die Flex bringt einen eigenen Zweitongenerator mit. Am Geraet
+// gemessen: `transmit set tune_mode=two_tone` wird mit Code 0
+// quittiert und im Zustand als `tune_mode=two_tone` zurueckgemeldet,
+// `single_tone` ebenso. Das ist die Quelle fuer eine IMD-Messung am
+// Flex — unser eigener Zweiton sitzt in WDSP und hat dort kein Ziel.
+//
+// Der Befehl TASTET NICHT. Er stellt nur ein, WAS der Abstimmtraeger
+// aussendet; losgeschickt wird er mit `tuneCommand(true)`, und das
+// bleibt beim Betreiber.
+QString setTuneModeCommand(bool zweiton);
+
+
 }  // namespace FlexCommandWire
 
 // Der Befehlskanal zu einer FlexRadio-Maschine: TCP 4992, Textsaetze,

@@ -130,6 +130,10 @@ private:
     void wireModelSignals();
     void selectDriveRadioFor(DrivePowerSource source);
 
+    /// Nur mit verbundenem Flex: der Zweiton der MASCHINE. Sonst
+    /// nullptr — die Gruppe entsteht dann gar nicht.
+    QCheckBox* m_flexTwoToneCheck{nullptr};
+
     // Tone frequencies group widgets.
     QSpinBox*    m_freq1Spin{nullptr};
     QSpinBox*    m_freq2Spin{nullptr};

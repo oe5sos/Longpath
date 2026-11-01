@@ -6975,28 +6975,10 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
             // Zustand sonst von keiner anderen Stelle gefuehrt wird.
             // `apply` meldet nur, wenn sich wirklich etwas geaendert
             // hat — die Maschine schiebt denselben Zustand mehrfach.
-            if (m_flexApd.apply(object, kv)) {
-                // Laut, aber nur bei echten Aenderungen: ohne diese
-                // Zeile sieht man am Geraet nicht, OB die Maschine
-                // eine Vorverzerrung hat — und eine fehlende Anzeige
-                // sieht dann aus wie ein Fehler in der Bedienung.
-                const QString ant = m_flexApd.antenne();
-                qCInfo(lcConnection).nospace()
-                    << "Flex-APD: " << (m_flexApd.eingeschaltet() ? "ein" : "aus")
-                    << ", einstellbar " << m_flexApd.einstellbar()
-                    << ", Kurve traegt " << m_flexApd.kurveTraegt()
-                    << ", Antenne " << (ant.isEmpty() ? QStringLiteral("—") : ant)
-                    // „INVALID" ist das Wort der Maschine fuer „keiner
-                    // gewaehlt" — hier steht dafuer derselbe Strich wie
-                    // fuer eine fehlende Angabe, sonst liest man es als
-                    // Fehler.
-                    << ", Messpunkt "
-                    << (m_flexApd.hatMesspunkt(ant)
-                            ? m_flexApd.gewaehlterMesspunkt(ant)
-                            : QStringLiteral("— (eingebauter Koppler)"))
-                    << ", Sendeantennen " << m_flexApd.sendeantennen().join(QLatin1Char(','));
-                emit flexApdGeaendert();
-            }
+            // Beide Zustandsarten gehen durch denselben Weg wie im
+            // Prueflauf: `verarbeiteFlexZustandszeile`. Ein zweiter
+            // Weg hier waere ein zweiter Stand der Wahrheit.
+            verarbeiteFlexZustandszeile(object, kv);
 
             if (m_flexPanId.isEmpty() && object.startsWith(QLatin1String("display pan "))) {
                 m_flexPanId = object.split(QLatin1Char(' ')).value(2);
@@ -7321,6 +7303,13 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
             // Der gemerkte APD-Zustand gehoert der Maschine, nicht uns.
             m_flexApd.clear();
             emit flexApdGeaendert();
+            if (flexZweitonAktiv()) {
+                m_flexTuneAn = false;
+                m_flexTuneZweiton = false;
+                emit flexZweitonGeaendert(false);
+            }
+            m_flexTuneAn = false;
+            m_flexTuneZweiton = false;
             setConnectionState(ConnectionState::Disconnected);
         });
 
@@ -7937,6 +7926,86 @@ bool RadioModel::flexApdMesspunktSetzen(const QString& sendeantenne,
 
     m_flexConnection->sendCommand(befehl);
     qCInfo(lcConnection) << "Flex-APD: Messpunkt" << punkt << "fuer" << ant;
+    return true;
+}
+
+// ── Eine Zustandszeile der Flex, ausgewertet ─────────────────────────
+//
+// Absichtlich EINE Stelle: die Verbindung schickt hier herein, und der
+// Prueflauf (ueber `flexApdStatusForTest`) ebenfalls. Was im Prueflauf
+// gruen ist, ist damit auch der Weg, den das Geraet nimmt — und nicht
+// ein Nachbau davon.
+void RadioModel::verarbeiteFlexZustandszeile(const QString& object,
+                                             const QMap<QString, QString>& kv)
+{
+    // ── Der Zweiton der Maschine (2026-11-01) ────────────────────────
+    //
+    // `transmit tune=0 tune_mode=single_tone` steht in jedem
+    // Zustandsschub der Sendeebene. Beides zusammen ist das Tor fuer
+    // die IMD-Messung: ein Zweiton, der nicht ausgesendet wird, ist
+    // keine Messgelegenheit, und ein Abstimmtraeger mit EINEM Ton auch
+    // nicht.
+    //
+    // Je SCHLUESSEL lesen, nicht je Zeile: die Maschine schickt auch
+    // Teilmeldungen der Sendeebene (nur `dax=`, nur `mic_level=`), und
+    // was nicht dasteht, hat sich nicht geaendert. Dieselbe Falle wie
+    // bei `apd`.
+    if (object == QLatin1String("transmit")) {
+        const bool vorher = flexZweitonAktiv();
+        if (kv.contains(QStringLiteral("tune"))) {
+            m_flexTuneAn = kv.value(QStringLiteral("tune")) == QLatin1String("1");
+        }
+        if (kv.contains(QStringLiteral("tune_mode"))) {
+            m_flexTuneZweiton =
+                kv.value(QStringLiteral("tune_mode")) == QLatin1String("two_tone");
+        }
+        if (flexZweitonAktiv() != vorher) {
+            qCInfo(lcConnection) << "Flex-Zweiton:"
+                                 << (flexZweitonAktiv() ? "laeuft" : "aus")
+                                 << "(tune" << m_flexTuneAn
+                                 << ", two_tone" << m_flexTuneZweiton << ")";
+            emit flexZweitonGeaendert(flexZweitonAktiv());
+        }
+    }
+
+    // ── Die Vorverzerrung ────────────────────────────────────────────
+    //
+    // `apply` meldet nur, wenn sich wirklich etwas geaendert hat — die
+    // Maschine schiebt denselben Zustand mehrfach.
+    if (m_flexApd.apply(object, kv)) {
+        // Laut, aber nur bei echten Aenderungen: ohne diese Zeile
+        // sieht man am Geraet nicht, OB die Maschine eine
+        // Vorverzerrung hat — und eine fehlende Anzeige sieht dann aus
+        // wie ein Fehler in der Bedienung.
+        const QString ant = m_flexApd.antenne();
+        qCInfo(lcConnection).nospace()
+            << "Flex-APD: " << (m_flexApd.eingeschaltet() ? "ein" : "aus")
+            << ", einstellbar " << m_flexApd.einstellbar()
+            << ", Kurve traegt " << m_flexApd.kurveTraegt()
+            << ", Antenne " << (ant.isEmpty() ? QStringLiteral("—") : ant)
+            // „INVALID" ist das Wort der Maschine fuer „keiner
+            // gewaehlt" — hier steht dafuer derselbe Strich wie fuer
+            // eine fehlende Angabe, sonst liest man es als Fehler.
+            << ", Messpunkt "
+            << (m_flexApd.hatMesspunkt(ant)
+                    ? m_flexApd.gewaehlterMesspunkt(ant)
+                    : QStringLiteral("— (eingebauter Koppler)"))
+            << ", Sendeantennen " << m_flexApd.sendeantennen().join(QLatin1Char(','));
+        emit flexApdGeaendert();
+    }
+}
+
+bool RadioModel::flexZweitonModus(bool an)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) {
+        qCWarning(lcConnection) << "Flex-Zweiton: nicht gestellt — keine Verbindung";
+        return false;
+    }
+    m_flexConnection->sendCommand(FlexCommandWire::setTuneModeCommand(an));
+    // Ausdruecklich dazusagen, dass jetzt NOCH NICHTS passiert: der
+    // Modus steht, gesendet wird erst mit dem Abstimmtraeger.
+    qCInfo(lcConnection) << "Flex-Zweiton:" << (an ? "two_tone" : "single_tone")
+                         << "gestellt — TUNE loest ihn aus, nicht dieser Befehl";
     return true;
 }
 

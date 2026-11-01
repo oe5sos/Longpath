@@ -3845,6 +3845,27 @@ void MainWindow::wireImdOverlayForPan(SpectrumWidget* sw)
                 sw, &SpectrumWidget::setTestingIMD,
                 Qt::UniqueConnection);
     }
+    // ── Dasselbe Tor fuer den Flex (2026-11-01) ─────────────────────
+    //
+    // Am Flex kommt beides aus der MASCHINE, nicht aus WDSP: sie hat
+    // ihren eigenen Zweiton (`transmit set tune_mode=two_tone`, am
+    // Geraet gemessen) und meldet ihren Sendezustand selbst.
+    // `TwoToneController` und `MoxController` fahren dort beide leer
+    // mit — ohne diese zwei Verbindungen blieb das Tor also zu, und
+    // die Messung am Flex konnte gar nicht stattfinden. Die Rechnung
+    // dahinter ist dieselbe: das Flex-Bild laeuft ueber
+    // `updateKiwiSpectrumDbm` in `updateSpectrumLinear`, und dort
+    // rechnet `analyseImd()`.
+    connect(m_radioModel, &RadioModel::flexZweitonGeaendert,
+            sw, &SpectrumWidget::setTestingIMD, Qt::UniqueConnection);
+    connect(m_radioModel, &RadioModel::flexSendetGeaendert,
+            sw, &SpectrumWidget::setMoxOverlay, Qt::UniqueConnection);
+    // Den STAND mitnehmen, nicht nur kuenftige Aenderungen — dieselbe
+    // Lehre wie beim Messhaken eine Zeile tiefer (2026-10-21).
+    if (m_radioModel->istFlexVerbunden() && m_radioModel->flexZweitonAktiv()) {
+        sw->setTestingIMD(true);
+    }
+
     if (PureSignal* ps = m_radioModel->pureSignal()) {
         connect(ps, &PureSignal::show2ToneMeasurementsChanged,
                 sw, &SpectrumWidget::setShowIMDMeasurements,
