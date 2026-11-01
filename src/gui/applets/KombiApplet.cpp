@@ -410,27 +410,65 @@ void KombiApplet::ordneSeitenEin()
 QWidget* KombiApplet::kopfleistenWidget()
 {
     if (!m_chip) {
-        m_chip = new QPushButton(this);
-        m_chip->setCursor(Qt::PointingHandCursor);
-        m_chip->setFixedHeight(16);
-        m_chip->setStyleSheet(
+        // ── Form 4: zwei Pfeile, der Name dazwischen ────────────────
+        //
+        // Betreiber, 2026-11-01: "aber die pillen gefallen mir nicht"
+        // -- der erste Bau war ein gefuellter Rundknopf. Von den vier
+        // Blaettern faellt die Wahl auf diese Form, weil sie als
+        // einzige ZEIGT, dasz man wechseln kann: die anderen sagen
+        // nur, was gerade laeuft. Und sobald mehr als zwei Panels
+        // drin liegen, braucht es auch den Weg zurueck.
+        //
+        // Keine Fuellung, kein Rahmen -- Text und zwei Zeichen.
+        m_chip = new QWidget(this);
+        auto* reihe = new QHBoxLayout(m_chip);
+        reihe->setContentsMargins(0, 0, 0, 0);
+        reihe->setSpacing(2);
+
+        const QString flach =
             QStringLiteral(
-                "QPushButton {"
-                "  background: %1; color: %2;"
-                "  border: 1px solid %3; border-radius: 4px;"
-                "  font-size: 9px; font-weight: bold;"
-                "  padding: 0px 8px;"
-                "}"
-                "QPushButton:hover { background: %4; }")
-                .arg(QLatin1String(Style::kPanelBg),
+                "QPushButton { background: transparent; border: none;"
+                "  color: %1; font-size: 9px; font-weight: bold;"
+                "  padding: 0px 3px; }"
+                "QPushButton:hover { color: %2; }"
+                "QPushButton:disabled { color: %3; }")
+                .arg(QLatin1String(Style::kTextTertiary),
                      QLatin1String(Style::kTextPrimary),
-                     QLatin1String(Style::kBorder),
-                     QLatin1String(Style::kButtonHover)));
-        m_chip->setContextMenuPolicy(Qt::CustomContextMenu);
-        connect(m_chip, &QPushButton::clicked, this, [this]() {
+                     QLatin1String(Style::kTextInactive));
+
+        m_zurueck = new QPushButton(QStringLiteral("‹"), m_chip);
+        m_zurueck->setCursor(Qt::PointingHandCursor);
+        m_zurueck->setStyleSheet(flach);
+        m_zurueck->setFixedHeight(16);
+        m_zurueck->setToolTip(tr("Previous panel"));
+        reihe->addWidget(m_zurueck);
+
+        m_name = new QLabel(m_chip);
+        m_name->setStyleSheet(
+            QStringLiteral("color: %1; font-size: 9px; font-weight: bold;")
+                .arg(QLatin1String(Style::kTextPrimary)));
+        m_name->setAlignment(Qt::AlignCenter);
+        reihe->addWidget(m_name);
+
+        m_weiter = new QPushButton(QStringLiteral("›"), m_chip);
+        m_weiter->setCursor(Qt::PointingHandCursor);
+        m_weiter->setStyleSheet(flach);
+        m_weiter->setFixedHeight(16);
+        m_weiter->setToolTip(tr("Next panel"));
+        reihe->addWidget(m_weiter);
+
+        connect(m_weiter, &QPushButton::clicked, this, [this]() {
             if (m_inhalte.size() < 2) { return; }
             zeigeSeite((seite() + 1) % m_inhalte.size());
         });
+        connect(m_zurueck, &QPushButton::clicked, this, [this]() {
+            if (m_inhalte.size() < 2) { return; }
+            zeigeSeite((seite() + m_inhalte.size() - 1) % m_inhalte.size());
+        });
+
+        // Rechtsklick loest die gezeigte Seite heraus, Doppelklick
+        // klappt auf und zu -- wie vorher, nur am ganzen Griff.
+        m_chip->setContextMenuPolicy(Qt::CustomContextMenu);
         connect(m_chip, &QWidget::customContextMenuRequested, this,
                 [this](const QPoint&) {
             const QList<QWidget*> s = seiten();
@@ -438,6 +476,7 @@ QWidget* KombiApplet::kopfleistenWidget()
             if (i >= 0 && i < s.size()) { gibFrei(s.at(i)); }
         });
         m_chip->installEventFilter(this);
+        m_name->installEventFilter(this);
         m_chip->setProperty("kombiChip", true);
     }
     chipNachziehen();
@@ -464,14 +503,19 @@ void KombiApplet::chipNachziehen()
     if (!m_chip) { return; }
     const QList<QWidget*> s = seiten();
     const int i = seite();
-    const QString name = (i >= 0 && i < s.size()) ? nameVon(s.at(i))
-                                                  : tr("empty");
-    m_chip->setText(s.size() > 1 ? QStringLiteral("%1 \u203a").arg(name)
-                                 : name);
-    m_chip->setToolTip(s.size() > 1
-        ? tr("Next panel. Right-click takes this one out, "
+    if (m_name) {
+        m_name->setText((i >= 0 && i < s.size()) ? nameVon(s.at(i))
+                                                 : tr("empty"));
+    }
+    // Die Pfeile sind blind, solange es nur eine Seite gibt -- sie
+    // bleiben trotzdem stehen, damit der Griff nicht springt.
+    const bool mehrere = s.size() > 1;
+    if (m_zurueck) { m_zurueck->setEnabled(mehrere); }
+    if (m_weiter)  { m_weiter->setEnabled(mehrere); }
+    m_chip->setToolTip(mehrere
+        ? tr("Switch panel. Right-click takes this one out, "
              "double-click unfolds them all.")
-        : tr("Drag panels onto this field by their title bar."));
+        : tr("Right-click the field to see what can go in here."));
     m_chip->setVisible(!s.isEmpty());
     // Der eigene Streifen ist dann ueberfluessig -- genau das war der
     // Punkt: er kostete Hoehe.

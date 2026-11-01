@@ -176,7 +176,10 @@ private:
     QLabel*         m_hinweis{nullptr};
     QList<QPointer<QWidget>> m_inhalte;
     QList<QPushButton*> m_reiter;
-    QPushButton* m_chip{nullptr};   ///< der Umschalter in der Kopfleiste
+    QWidget*     m_chip{nullptr};     ///< der Umschalter in der Kopfleiste
+    QPushButton* m_zurueck{nullptr};
+    QPushButton* m_weiter{nullptr};
+    QLabel*      m_name{nullptr};
     /// Zugbeginn auf einem Reiter -- erst ab einer Strecke wird daraus
     /// ein Herausziehen statt eines Klicks.
     QPoint m_zugStart;
