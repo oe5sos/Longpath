@@ -342,6 +342,12 @@ signals:
     void overlayRequested();
     void settingsRequested();
     void dockedMoved();
+    /// Ein Zug am Container ist zu Ende -- mit der Stelle, an der
+    /// losgelassen wurde. Betreiber, 2026-11-01: „rx1 soll sich auch
+    /// in combined reinziehen lassen" -- sein RX sitzt in der Spalte
+    /// DIESES Containers, und gezogen wird der Container, nicht die
+    /// Zelle darin.
+    void zugEndeBei(const QPoint& globalPos);
     void dockModeChanged(DockMode mode);
     void titleBarVisibilityChanged(bool visible);
     void lockedChanged(bool locked);
@@ -464,6 +470,7 @@ private:
     QPushButton* m_btnAxis{nullptr};
     QPushButton* m_btnPin{nullptr};
     QPushButton* m_btnSettings{nullptr};
+    QPushButton* m_btnClose{nullptr};   ///< schliesst den Container (2026-11-01)
 
     // Phase 3P-I-a T17 — cached hasAlex flag so items added via
     // wireInteractiveItem() after setBoardCapabilities() still inherit

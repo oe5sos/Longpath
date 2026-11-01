@@ -7537,6 +7537,115 @@ void RadioModel::sendeFlexAgcModus(AGCMode modus)
         QStringLiteral("AGC %1").arg(name));
 }
 
+// ── Die AGC-Schwelle (2026-11-01) ──────────────────────────────────
+//
+// Betreiber: "höre hier viel zu viel rauschen so denke ich". Nachgesehen:
+// AGC-T war am Flex gar nicht verdrahtet. Sein Regler stand auf -20,
+// die Maschine auf ihrem eigenen Wert (am Geraet gelesen:
+// `agc_threshold=60`) -- er drehte an etwas, das nichts tat, und eine
+// zu niedrige Schwelle hebt genau das Rauschen an.
+//
+// Warum es bisher fehlte: unser Regler laeuft -160..0 (die
+// dBm-Anmutung aus Thetis), die Maschine 0..100. Eine physikalische
+// Umrechnung gibt es ohne Quelle nicht.
+//
+// Was hier steht, ist deshalb AUSDRUECKLICH eine VERHAELTNISMAESZIGE
+// Abbildung: die Stellung des Reglers in seinem eigenen Bereich wird
+// zur gleichen Stellung im Bereich der Maschine. Ganz links bleibt
+// ganz links, ganz rechts bleibt ganz rechts, die Mitte bleibt die
+// Mitte. Das ist keine Behauptung ueber dB -- es ist der einzige
+// Weg, der ohne Raten auskommt und den Regler trotzdem wirken laeszt.
+// ── Unsere Steckplaetze auf die Minderer der Maschine ──────────────
+//
+// Betreiber, 2026-10-28: "aber jeder nr sollte anders funktionieren!"
+// Am Flex taten sie das bis heute NICHT: NR1, NR2 und NR4 schickten
+// alle dasselbe `nr=1`, weil WDSP dort nicht im Weg liegt.
+//
+// Die Maschine fuehrt aber fuenf Verfahren (am 2026-11-01 von ihr
+// gelesen, gegen AetherSDRs `SliceModel.cpp` geprueft). Die Zuordnung
+// geht nach der VERFAHRENSFAMILIE, nicht nach der Nummer:
+//
+//   NR1  WDSP anr.c      LMS-Adaptivfilter   -> lms_nr
+//   NR2  WDSP emnr.c     spektral (Ephraim-Malah) -> nr
+//   NR3  rnnoise         neuronal            -> rnnoise
+//   NR4  WDSP sbnr.c     Spektralsubtraktion -> speex_nr
+//
+// Nicht zugeordnet und darum weiterhin bei uns gerechnet: DFNR, BNR,
+// MNR (nachgelagerte Verfahren auf fertigem Ton). NNR hat kein
+// Gegenstueck -- `nrf` waere geraten, und das ist kein Grund.
+QString RadioModel::flexNrSchluessel(NrSlot steckplatz)
+{
+    switch (steckplatz) {
+    case NrSlot::NR1: return QStringLiteral("lms_nr");
+    case NrSlot::NR2: return QStringLiteral("nr");
+    case NrSlot::NR3: return QStringLiteral("rnnoise");
+    case NrSlot::NR4: return QStringLiteral("speex_nr");
+    default:          return QString();
+    }
+}
+
+void RadioModel::setFlexSliceNoiseNbAnf(bool nb, bool anf)
+{
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceNoiseCommand(m_flexSliceId, false, nb, anf)
+            .replace(QStringLiteral(" nr=0"), QString()),
+        QStringLiteral("NB %1, ANF %2").arg(nb).arg(anf));
+}
+
+void RadioModel::sendeFlexNrVerfahren(NrSlot steckplatz)
+{
+    static const QStringList kAlle{
+        QStringLiteral("nr"), QStringLiteral("lms_nr"),
+        QStringLiteral("speex_nr"), QStringLiteral("nrf"),
+        QStringLiteral("rnnoise")};
+    const QString gewaehlt = flexNrSchluessel(steckplatz);
+
+    // Erst alle anderen aus, dann den gewaehlten an. Zwei Minderungen
+    // hintereinander klingen nach Eimer, und keiner der beiden Regler
+    // taete dann noch das, was auf ihm steht.
+    for (const QString& k : kAlle) {
+        if (k == gewaehlt) { continue; }
+        schickeFlexScheibenbefehl(
+            FlexCommandWire::setSliceNrKindCommand(m_flexSliceId, k, false),
+            QStringLiteral("NR %1 aus").arg(k));
+    }
+    if (gewaehlt.isEmpty()) {
+        qCInfo(lcConnection) << "Flex: dieses Verfahren fuehrt die Maschine "
+                                "nicht — Longpath rechnet es selbst";
+        return;
+    }
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceNrKindCommand(m_flexSliceId, gewaehlt, true),
+        QStringLiteral("NR %1 an").arg(gewaehlt));
+}
+
+// Die Staerke. Die Maschine steht ab Werk auf 50 und wir ruehrten sie
+// nie an -- genau das war Martins "NR2 hört sich sehr dumpf an"
+// (2026-11-01). RNNoise hat keine Stufe; dort geht nichts hinaus und
+// eine Zeile sagt es.
+void RadioModel::sendeFlexNrStufe(NrSlot steckplatz, int stufe)
+{
+    const QString schluessel = flexNrSchluessel(steckplatz);
+    if (schluessel.isEmpty()) { return; }
+    const int s = std::clamp(stufe, 0, 100);
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceNrLevelCommand(m_flexSliceId, schluessel, s),
+        QStringLiteral("NR-Staerke %1 = %2").arg(schluessel).arg(s));
+}
+
+void RadioModel::sendeFlexAgcSchwelle(int unsereSchwelle)
+{
+    constexpr int kUnten = -160;   // RxApplet: m_agcTSlider->setRange
+    constexpr int kOben  = 0;
+    const int wert = std::clamp(unsereSchwelle, kUnten, kOben);
+    const int flex = std::clamp(
+        static_cast<int>(std::lround(
+            100.0 * double(wert - kUnten) / double(kOben - kUnten))), 0, 100);
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceAgcThresholdCommand(m_flexSliceId, flex),
+        QStringLiteral("AGC-Schwelle %1 (Regler %2)").arg(flex).arg(wert));
+}
+
 void RadioModel::sendeFlexTonpegel(int stufe0bis100)
 {
     const int stufe = std::clamp(stufe0bis100, 0, 100);

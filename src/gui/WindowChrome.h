@@ -66,12 +66,19 @@ public:
     // ein festgestelltes Fenster nach dem Neustart festgestellt bleibt
     // — sonst waere das Feststellen eine Geste, die jeder Neustart
     // zurueckdreht.
+    /// Ein Bedienteil des Applets in diese Leiste legen -- vor die
+    /// Knoepfe. Siehe AppletWidget::kopfleistenWidget().
+    void setKopfWidget(QWidget* w);
     void setLockKey(const QString& key);
     bool isLocked() const { return m_locked; }
     void setLocked(bool on);
 
 signals:
     void lockedChanged(bool locked);
+    /// Ein Zug am Fensterkopf ist zu Ende -- mit der Stelle, an der
+    /// losgelassen wurde. Wer wissen will, WORUEBER das Fenster
+    /// abgelegt wurde (Kombi-Feld), haengt sich hier an.
+    void zugEndeBei(const QPoint& globalPos);
 
 public:
 

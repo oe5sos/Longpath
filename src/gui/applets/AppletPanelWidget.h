@@ -229,6 +229,8 @@ private:
     // ── Ziehen ───────────────────────────────────────────────────────
     int  stackIndexOf(QWidget* wrapper) const;
     AppletWidget* appletForWrapper(QWidget* wrapper) const;
+    /// Wurde ueber einem Kombi-Feld losgelassen? Dann dort hinein.
+    bool nimmKombiAuf(AppletWidget* gezogen, const QPoint& globalPos);
     void dragTo(int globalY);
 
     /// Das Kontextmenü einer Titelleiste — der einzige Weg zum Ablösen.

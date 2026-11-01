@@ -85,6 +85,10 @@ signals:
     /// Schliessen HEISST andocken: ein Werkzeug, das man wegklickt und
     /// das danach nirgends mehr auftaucht, ist verloren.
     void dockRequested(const QString& id);
+    /// Das Fenster wurde an dieser Stelle losgelassen -- fuer das
+    /// Kombi-Feld (2026-11-01). Wer zuhoert, entscheidet, ob dort
+    /// eines liegt.
+    void abgelegtBei(const QPoint& globalPos);
 
 protected:
     void closeEvent(QCloseEvent* ev) override;

@@ -115,6 +115,9 @@ signals:
     /// Bildpunkt: wer darauf hin ins Profil schreibt, soll einmal
     /// schreiben und nicht vierzigmal.
     void geometrySettled(const QString& appletId);
+    /// Das Fenster wurde an dieser Stelle losgelassen. MainWindow
+    /// entscheidet, ob dort ein Kombi-Feld liegt.
+    void abgelegtBei(const QPoint& globalPos);
 
 protected:
     void closeEvent(QCloseEvent* ev) override;

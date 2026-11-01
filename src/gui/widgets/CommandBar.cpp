@@ -803,6 +803,11 @@ void CommandBar::buildFilterGroup(QHBoxLayout* row)
     });
 }
 
+void CommandBar::setMaschinenNr(const std::function<QString(NrSlot)>& namen)
+{
+    m_maschinenNr = namen;
+}
+
 void CommandBar::setFilterPresetStore(FilterPresetStore* store)
 {
     m_presetStore = store;
@@ -1042,7 +1047,9 @@ void CommandBar::buildNrGroup(QHBoxLayout* row)
                                    b->mapToGlobal(pos),
                                    [this, slot]() {
                                        emit openNrSetupRequested(slot);
-                                   });
+                                   },
+                                   m_maschinenNr ? m_maschinenNr(slot)
+                                                 : QString());
         });
     }
 

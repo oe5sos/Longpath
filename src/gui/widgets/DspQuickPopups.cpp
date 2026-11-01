@@ -431,11 +431,47 @@ void showMnrPopup(QWidget* parent, SliceModel* m_slice,
 
 } // namespace
 
-void showFor(QWidget* parent, SliceModel* slice, NrSlot slot,
-             const QPoint& globalPos,
-             const std::function<void()>& onMore)
+// ── Am Flex rechnet die MASCHINE (2026-11-01) ──────────────────────
+//
+// Dann stehen hier bis heute WDSP-Werte, die nichts tun: unsere
+// Verfahren liegen dort nicht im Weg. Was wirkt, ist die STAERKE der
+// Minderung der Maschine -- eine Zahl von 0 bis 100, Vorgabe 50, die
+// wir nie angeruehrt haben. Genau das war Martins "NR2 hört sich sehr
+// dumpf an".
+//
+// Darum am Flex EIN Regler statt toter Parameter, und daneben der
+// Name, unter dem die Maschine dieses Verfahren fuehrt -- damit
+// sichtbar ist, dasz NR1 und NR2 dort wirklich verschiedene Dinge
+// sind.
+void showFlexNrPopup(QWidget* parent, SliceModel* slice, NrSlot slot,
+                     const QString& nameDerMaschine,
+                     const QPoint& globalPos,
+                     const std::function<void()>& onMore)
 {
     if (!slice) { return; }
+    auto* p = new DspParamPopup(parent);
+    p->addSlider(QStringLiteral("Strength (%1)").arg(nameDerMaschine),
+                 0, 100, slice->flexNrLevel(),
+                 [](int v) { return QString::number(v); },
+                 [slice](int v) { if (slice) { slice->setFlexNrLevel(v); } },
+                 QStringLiteral("The radio's own noise-reduction strength. "
+                                "0 = off, 100 = hardest."),
+                 50);
+    p->finalize(onMore, nullptr);
+    p->showAt(globalPos);
+}
+
+void showFor(QWidget* parent, SliceModel* slice, NrSlot slot,
+             const QPoint& globalPos,
+             const std::function<void()>& onMore,
+             const QString& nameDerMaschine)
+{
+    if (!slice) { return; }
+    // Am Flex rechnet die Maschine -- siehe showFlexNrPopup.
+    if (!nameDerMaschine.isEmpty()) {
+        showFlexNrPopup(parent, slice, slot, nameDerMaschine, globalPos, onMore);
+        return;
+    }
     switch (slot) {
     case NrSlot::NR1:  showNr1Popup(parent, slice, globalPos, onMore);  break;
     case NrSlot::NR2:  showNr2Popup(parent, slice, globalPos, onMore);  break;

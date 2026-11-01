@@ -348,6 +348,7 @@ warren@wpratt.com
 #include "applets/Kpa500Applet.h"
 #include "applets/AcomApplet.h"
 #include "applets/AppletVisibilityController.h"
+#include "applets/KombiApplet.h"
 #include "applets/RxApplet.h"
 #include "core/PgxlConnection.h"
 #include "core/TgxlConnection.h"
@@ -1293,6 +1294,9 @@ MainWindow::MainWindow(QWidget* parent)
     // blocking work several GUI tests were paying for.  See
     // docs/architecture/2026-09-09-ci-discovery-hang-investigation.md.
     QTimer::singleShot(0, this, &MainWindow::openConnectionPanelOnLaunch);
+    // NACH dem Profil: erst muessen die Panels dort liegen, wo das
+    // Profil sie haben will, dann holt das Kombi-Feld seine zurueck.
+    QTimer::singleShot(0, this, [this]() { holeKombiInhaltZurueck(); });
 
     // Phase 3J-2 + 3R M3: restore each spot client's auto-connect /
     // auto-start state. Sibling to the panel-open call above; deferred via
@@ -2180,6 +2184,19 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     }
     tGeometrie = loeseTeile.elapsed();
 
+    // ── Ueber einem Kombi-Feld abgelegt (2026-11-01) ──────────────────
+    //
+    // Betreiber: „nimmt es nicht auf". Richtig -- das Hineinziehen hing
+    // am Ziehen in der SPALTE, und seine Panels schweben alle. Ein
+    // schwebendes Fenster zieht niemand an der Kopfleiste der Spalte;
+    // es zieht am eigenen Fensterkopf, und der meldet jetzt, wo er
+    // losgelassen wurde.
+    //
+    // Dieselbe Lehre wie am 2026-10-31 beim Zahnrad: ein Applet hat
+    // ZWEI Gehaeuse, und wer nur eines bedient, baut etwas, das der
+    // Betreiber nicht erreicht.
+    connect(win, &AppletFloatingWindow::abgelegtBei, this,
+            [this, id](const QPoint& wo) { legeAufKombiFeld(id, wo); });
     connect(win, &AppletFloatingWindow::dockRequested,
             this, &MainWindow::dockAppletBack);
     connect(win, &AppletFloatingWindow::geometrySettled, this,
@@ -2231,6 +2248,181 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
             << " ms, Vorgabegroesse " << (tGroesse > 0 ? tGroesse - tShow : 0)
             << " ms, zusammen " << loeseTeile.elapsed() << " ms";
     }
+}
+
+// ── Ein schwebendes Panel auf einem Kombi-Feld ablegen ─────────────
+//
+// Betreiber, 2026-11-01: „nimmt es nicht auf". Das Hineinziehen hing
+// am Ziehen in der SPALTE; seine Panels schweben aber alle. Hier ist
+// der zweite Weg: das Fenster meldet, wo es losgelassen wurde, und
+// liegt dort ein Kombi-Feld, wandert das Panel hinein.
+//
+// Das Fenster verschwindet dabei -- es hat keinen Inhalt mehr. Den
+// Rest (Reiter, Titel, Merken) macht das Feld selbst.
+void MainWindow::legeAufKombiFeld(const QString& appletId, const QPoint& globalPos)
+{
+    if (m_shuttingDown) { return; }
+    auto* win = m_floatingApplets.value(appletId, nullptr);
+    if (!win) { return; }
+    // Ein Kombi-Feld ueber sich selbst: ginge nicht gut aus.
+    if (qobject_cast<KombiApplet*>(win->applet())) { return; }
+
+    // Dieselbe Liste wie in der Spalte: sie kennt keine Gehaeuse,
+    // sondern vergleicht Rechtecke auf dem Schirm. Die
+    // Kennungstabelle hier taugte nicht -- ein Kombi-Feld, das selbst
+    // schwebt, steht zwar darin, aber zwei Suchen an zwei Stellen
+    // laufen frueher oder spaeter auseinander.
+    KombiApplet* ziel = KombiApplet::unter(globalPos);
+    if (!ziel) { return; }
+
+    m_floatingApplets.remove(appletId);
+    win->hide();
+    AppletWidget* applet = win->releaseApplet();
+    win->deleteLater();
+    if (!applet) { return; }
+
+    ziel->nimmAuf(applet);
+    if (m_layoutProfiles) {
+        m_layoutProfiles->captureIntoCurrent();
+        m_layoutProfiles->save();
+    }
+}
+
+// ── Ein fremdes Panel aus dem Kombi-Feld zurueckgeben ──────────────
+//
+// Betreiber, 2026-11-01: „ich will da auch den rotor und andere
+// sache reinziehen können" -- und: „wo in der Vergangenheit das
+// Panel ganz rechts von oben bis unten mit Rotor bestueckt war,
+// moechte ich das Combined haben ... somit habe ich kein
+// Hoehenprofil und kein Darstellungsprofil."
+//
+// Was kein Applet ist (Rotor/Logbuch), gehoert nicht in die Spalte,
+// sondern in sein eigenes Werkzeugfenster -- genau dorthin, wo es
+// losgelassen wurde.
+// ── Die Liste zum Hineinlegen (2026-11-01) ─────────────────────────
+//
+// Betreiber: „oder man öffnet das leere combined fenster, rechte
+// moustaste und dann sieht man alles, was in das fenster kommen kann
+// und klickt es an."
+//
+// Ziehen bleibt der eine Weg. Dies ist der andere, und fuer ein eben
+// erst geholtes, leeres Feld der bessere: man muss nicht wissen, was
+// es aufnehmen kann -- es steht da.
+void MainWindow::zeigeKombiListe(KombiApplet* feld, const QPoint& globalPos)
+{
+    if (m_shuttingDown || !feld) { return; }
+
+    QMenu menue(this);
+    menue.setStyleSheet(QString::fromLatin1(kPopupMenu));
+
+    // Was schon drin ist, steht nicht noch einmal zur Wahl.
+    const QList<QWidget*> drin = feld->seiten();
+    const auto schonDrin = [&drin](QWidget* w) { return drin.contains(w); };
+
+    int angeboten = 0;
+    for (auto it = m_appletsById.constBegin(); it != m_appletsById.constEnd();
+         ++it) {
+        AppletWidget* a = it.value();
+        if (!a || a == feld || schonDrin(a)) { continue; }
+        if (qobject_cast<KombiApplet*>(a)) { continue; }
+        const QString id = it.key();
+        QAction* act = menue.addAction(a->appletTitle());
+        connect(act, &QAction::triggered, this, [this, feld, a, id]() {
+            holeInsKombiFeld(feld, a, id);
+        });
+        ++angeboten;
+    }
+
+    // ── Der Rotor, auch wenn er noch in der Spalte sitzt ────────────
+    //
+    // Betreiber, 2026-11-01: „finde rotor nicht mit rechter maustaste".
+    // Er stand nur zur Wahl, solange er ein eigenes FENSTER hatte --
+    // sitzt er angedockt in der Spalte, gab es ihn im Menue nicht.
+    // Das ist aber genau der Zustand nach einem Neustart.
+    //
+    // Jetzt steht er immer da; ist er angedockt, wird er fuer den
+    // Weg hierher kurz zum Fenster (`detachRotorPanel`) und geht von
+    // dort ins Feld.
+    const bool rotorSchonDrin =
+        m_rotorWindow && m_rotorWindow->content()
+        && schonDrin(m_rotorWindow->content());
+    if (!rotorSchonDrin) {
+        QAction* act = menue.addAction(QStringLiteral("Rotor / Log"));
+        connect(act, &QAction::triggered, this, [this, feld]() {
+            if (!m_rotorWindow) { detachRotorPanel(); }
+            if (!m_rotorWindow) { return; }
+            ToolWindow* fenster = m_rotorWindow;
+            m_rotorWindow = nullptr;
+            fenster->hide();
+            const QString name = fenster->windowTitle().isEmpty()
+                                     ? QStringLiteral("Rotor / Log")
+                                     : fenster->windowTitle();
+            QWidget* inhalt = fenster->releaseContent();
+            fenster->deleteLater();
+            if (!inhalt) { return; }
+            inhalt->setWindowTitle(name);
+            inhalt->setObjectName(QStringLiteral("RotorLog"));
+            feld->nimmAuf(inhalt);
+        });
+        ++angeboten;
+    }
+
+    if (angeboten == 0) {
+        // Ein leeres Menue sieht aus wie ein kaputtes. Lieber sagen,
+        // warum nichts darin steht.
+        QAction* leer = menue.addAction(tr("Everything is already in here"));
+        leer->setEnabled(false);
+    }
+    menue.exec(globalPos);
+}
+
+// Ein Applet ins Feld holen, egal wo es gerade steckt: in der
+// Spalte oder in einem eigenen Fenster.
+void MainWindow::holeInsKombiFeld(KombiApplet* feld, AppletWidget* applet,
+                                  const QString& appletId)
+{
+    if (!feld || !applet) { return; }
+    if (auto* fenster = m_floatingApplets.value(appletId, nullptr)) {
+        m_floatingApplets.remove(appletId);
+        fenster->hide();
+        AppletWidget* frei = fenster->releaseApplet();
+        fenster->deleteLater();
+        if (frei) { feld->nimmAuf(frei); }
+        return;
+    }
+    if (m_appletPanel) { m_appletPanel->removeApplet(applet); }
+    feld->nimmAuf(applet);
+
+    // ── Die leere Huelle geht mit (2026-11-01) ───────────────────────
+    //
+    // Betreiber: „wieso kann ich das RX 1 panel nicht schließen" --
+    // der Container hat kein x, und nachdem seine Panels ins Feld
+    // gewandert waren, stand er leer im Bild. Beim ZIEHEN raeumte ich
+    // ihn schon weg; ueber die Liste nicht. Jetzt beide Wege.
+    if (!m_appletPanel) { return; }
+    bool nochWas = false;
+    for (AppletWidget* a : m_appletPanel->applets()) {
+        if (a && a != feld && a->isVisible()) { nochWas = true; break; }
+    }
+    if (nochWas) { return; }
+    if (QWidget* spaltenFenster = m_appletPanel->window()) {
+        if (spaltenFenster != this) {
+            qCInfo(lcConnection) << "Kombi: die Spalte ist leer — "
+                                    "ihr Fenster geht mit";
+            spaltenFenster->hide();
+        }
+    }
+}
+
+void MainWindow::gibFremdesPanelZurueck(QWidget* panel, const QRect& dort)
+{
+    if (m_shuttingDown || !panel) { return; }
+    auto* fenster = new ToolWindow(panel, QStringLiteral("RotorLog"),
+                                   QStringLiteral("Rotor / Log"), this);
+    if (dort.isValid()) { fenster->setGeometry(dort); }
+    fenster->show();
+    fenster->raise();
+    m_rotorWindow = fenster;
 }
 
 void MainWindow::dockAppletBack(const QString& appletId)
@@ -7563,6 +7755,49 @@ void MainWindow::populateDefaultMeter()
                 this, &MainWindow::onTxInterlockDenial);
     }
 
+    // ── Das Kombi-Feld (2026-11-01) ───────────────────────────────────
+    //
+    // Betreiber: „in dieses leere widget sollte man generell
+    // unterschiedlich widget reinziehen können". Es kommt LEER und
+    // steht zuerst in der Spalte -- wer etwas hineinzieht, zieht es
+    // nach oben, nicht quer durch die ganze Liste.
+    //
+    // Was es aufnimmt, verlaeszt sein eigenes Feld; was wieder
+    // herausgeloest wird (Rechtsklick auf den Reiter), bekommt hier
+    // sofort wieder eines.
+    {
+        m_kombiApplet = new KombiApplet(m_radioModel, nullptr);
+        panel->addApplet(m_kombiApplet);
+        connect(m_kombiApplet, &KombiApplet::listeGewuenscht, this,
+                [this](const QPoint& wo) {
+            zeigeKombiListe(m_kombiApplet, wo);
+        });
+        // ── Herausgezogen heiszt: dort stehen (2026-11-01) ───────────
+        //
+        // Betreiber: „frequenz lässt sich reinziehen, soll sich aber
+        // wieder rausziehen lassen!" Das Feld gibt den Reiter frei
+        // (die Spalte faengt ihn auf, siehe addApplet), und hier
+        // bekommt er sofort ein eigenes Fenster an der Stelle, an der
+        // losgelassen wurde -- nicht irgendwo. Ein Fenster, das an
+        // fremder Stelle aufgeht, sieht aus wie ein neues
+        // (Betreiber, 2026-08-20).
+        connect(m_kombiApplet, &KombiApplet::herausgezogen, this,
+                [this](QWidget* w, const QPoint& wo) {
+            if (m_shuttingDown || !w) { return; }
+            const QRect dort(wo.x() - 40, wo.y() - 10, 360, 320);
+            if (auto* a = qobject_cast<AppletWidget*>(w)) {
+                detachApplet(a, -1, dort, QString());
+                return;
+            }
+            // Kein Applet (Rotor/Logbuch): es bekommt sein eigenes
+            // Werkzeugfenster zurueck, dort, wo losgelassen wurde.
+            gibFremdesPanelZurueck(w, dort);
+        });
+        // Das Zurueckgeben verdrahtet die Spalte selbst
+        // (AppletPanelWidget::addApplet) -- sie verwaltet ihre Felder,
+        // nicht dieses Fenster.
+    }
+
     // RxApplet — Tier 1 wired to SliceModel (slice attached in wireSliceToSpectrum)
     m_rxApplet = new RxApplet(nullptr, m_radioModel, nullptr);
     panel->addApplet(m_rxApplet);
@@ -8750,6 +8985,7 @@ void MainWindow::populateDefaultMeter()
         }
     });
 
+    m_appletsById[QStringLiteral("Kombi")]      = m_kombiApplet;
     m_appletsById[QStringLiteral("Rx")]         = m_rxApplet;
     m_appletsById[QStringLiteral("Tx")]         = m_txApplet;
     m_appletsById[QStringLiteral("PhoneCw")]    = m_phoneCwApplet;
@@ -8810,6 +9046,10 @@ void MainWindow::populateDefaultMeter()
     // menu entry stays available for users who want to force-show or
     // permanently hide it. Defaulting to true here means new G2 users see
     // PS immediately without having to discover the menu toggle.
+    // Vorgabe AUS: ein leeres Feld draengt sich niemandem auf. Wer es
+    // will, holt es ueber das + unten rechts.
+    m_appletVis->registerApplet(QStringLiteral("Kombi"),
+                                QStringLiteral("Combined"),     false);
     m_appletVis->registerApplet(QStringLiteral("Rx"),
                                 QStringLiteral("RX"),           true);
     m_appletVis->registerApplet(QStringLiteral("Tx"),
@@ -9050,6 +9290,13 @@ void MainWindow::populateDefaultMeter()
          QStringLiteral("meter"), QStringLiteral("balken"),
          QStringLiteral("bar")});
 
+    m_appletVis->describeApplet(QStringLiteral("Kombi"),
+        tr("Combined"),
+        {QStringLiteral("kombi"), QStringLiteral("combined"),
+         QStringLiteral("rx"), QStringLiteral("tx"),
+         QStringLiteral("zusammen"), QStringLiteral("reiter"),
+         QStringLiteral("tabs"), QStringLiteral("platz"),
+         QStringLiteral("space")});
     m_appletVis->describeApplet(QStringLiteral("Rx"),
         tr("Receive"),
         {QStringLiteral("rx"), QStringLiteral("empfang"),
@@ -9088,6 +9335,17 @@ void MainWindow::populateDefaultMeter()
         {QStringLiteral("ft8"), QStringLiteral("ft4"), QStringLiteral("digital"),
          QStringLiteral("decoder"), QStringLiteral("wsjt"),
          QStringLiteral("digu"), QStringLiteral("digl")});
+    // FT8 Slots stand bisher ohne Stichwortzeile im Auswaehler --
+    // dem Betreiber am 2026-11-01 im Bild aufgefallen: unter jedem
+    // anderen Eintrag steht eine, unter diesem nicht. Folge: er war
+    // nur unter seinem genauen Namen zu finden, nicht ueber "qso",
+    // "platz" oder "fox".
+    m_appletVis->describeApplet(QStringLiteral("Ft8Slots"),
+        QStringLiteral("Digital"),
+        {QStringLiteral("ft8"), QStringLiteral("slots"),
+         QStringLiteral("plaetze"), QStringLiteral("platz"),
+         QStringLiteral("qso"), QStringLiteral("fox"),
+         QStringLiteral("hound"), QStringLiteral("multi")});
     m_appletVis->describeApplet(QStringLiteral("Vax"),
         QStringLiteral("Audio"),
         {QStringLiteral("vax"), QStringLiteral("audio"),
@@ -9487,6 +9745,29 @@ void MainWindow::populateDefaultMeter()
                 }
                 s.insert(QStringLiteral("floatingApplets"), floating);
 
+                // ── Was im Kombi-Feld liegt, gehoert INS PROFIL ──────
+                //
+                // Betreiber, 2026-11-01, mit Bild: "so war mein profil
+                // nicht abgespeichert" -- und dann: "ich habe es
+                // definitiv am desktop unter 01. abgespeichert".
+                //
+                // Er hat recht. Das Feld merkte sich seinen Inhalt in
+                // EINER globalen Einstellung (`Kombi/Inhalt`), nicht
+                // im Profil. Damit war er nach einem Profilwechsel
+                // falsch und nach einem Neustart gar nicht da. Jetzt
+                // liegt er dort, wo die uebrige Anordnung liegt.
+                if (m_kombiApplet) {
+                    QStringList drin;
+                    for (QWidget* w : m_kombiApplet->seiten()) {
+                        if (auto* a = qobject_cast<AppletWidget*>(w)) {
+                            drin << panelIdFor(a);
+                        } else if (w && !w->objectName().isEmpty()) {
+                            drin << w->objectName();
+                        }
+                    }
+                    s.insert(QStringLiteral("kombiInhalt"), drin);
+                }
+
                 // Die freistehenden Meter-Container, nach derselben
                 // Regel. MeterDisplay_<id>_Geometry bleibt bestehen,
                 // wird aber nur noch GELESEN — als Rückfall für den
@@ -9678,6 +9959,26 @@ void MainWindow::populateDefaultMeter()
                 // synchroner Aufruf.
                 QElapsedTimer profilUhr;
                 profilUhr.start();
+                // ── Das Kombi-Feld zuerst leeren (2026-11-01) ───────
+                //
+                // Betreiber: "aber das profil sieht nicht so aus, wie
+                // gespeichert". Mein Fehler: ich habe das Feld am ENDE
+                // geleert, und seine Panels landeten dann in der
+                // Spalte -- obwohl das Profil sie vielleicht schwebend
+                // haben will. Schritt 3, der das entscheidet, war da
+                // laengst vorbei.
+                //
+                // Also hier, VOR allem anderen: zurueck in die Spalte,
+                // damit Schritt 3 sie behandeln kann wie jedes andere
+                // Panel. Gefuellt wird am Ende.
+                if (m_kombiApplet && m_appletPanel) {
+                    for (QWidget* w : m_kombiApplet->gibAlleFrei()) {
+                        if (auto* a = qobject_cast<AppletWidget*>(w)) {
+                            m_appletPanel->addApplet(a);
+                        }
+                    }
+                }
+
                 qWarning() << "[ProfileApply:Step] 1/6 Vollbild";
                 // Vollbild MERKEN, bevor irgendein Schritt unten es
                 // kippen kann -- am Ende wird es wieder durchgesetzt
@@ -10268,6 +10569,16 @@ void MainWindow::populateDefaultMeter()
                 // Der Leger ist darum wieder draussen. Der Schluessel
                 // bleibt im Profil -- er kostet nichts und beschreibt
                 // den Zustand beim Aufnehmen.
+                // ── Zuletzt das Kombi-Feld fuellen (2026-11-01) ─────
+                //
+                // Geleert wurde es schon VOR Schritt 1 (siehe dort).
+                // Gefuellt wird es erst jetzt: vorher wuerde Schritt 3
+                // die Panels wieder herausnehmen.
+                if (m_kombiApplet) {
+                    holeKombiInhaltZurueck(
+                        s.value(QStringLiteral("kombiInhalt")).toStringList());
+                }
+
                 qWarning() << "[ProfileApply:Step] 6/6 fertig";
             });
 
@@ -10631,6 +10942,54 @@ void MainWindow::populateDefaultMeter()
     // starten kann, ist so gut wie nicht gebaut.
 
     c0->setContent(panel);
+
+    // ── Den ganzen Container auf ein Kombi-Feld ziehen (2026-11-01) ───
+    //
+    // Betreiber, dreimal: „rx1 soll sich auch in combined reinziehen
+    // lassen. funktioniert bis dato nicht." Sein RX-Panel ist eine
+    // ZELLE in dieser Spalte, und die Spalte steckt in DIESEM
+    // Container („RX1 Main Panel"). Gezogen wird aber der Container,
+    // nicht die Zelle -- also musz auch er ablegen koennen.
+    //
+    // Was hineingeht: die Panels, die in der Spalte sichtbar sind.
+    // Steht dort nur eines (bei ihm genau so, alles andere schwebt),
+    // ist es eindeutig; stehen mehrere, wandern sie zusammen -- er
+    // hat das ganze Fenster abgelegt, nicht eine Zeile daraus.
+    connect(c0, &ContainerWidget::zugEndeBei, this,
+            [this, panel, c0](const QPoint& wo) {
+        if (m_shuttingDown || !panel) { return; }
+        KombiApplet* ziel = KombiApplet::unter(wo);
+        if (!ziel) { return; }
+        const QList<AppletWidget*> drin = panel->applets();
+        int gewandert = 0;
+        for (AppletWidget* a : drin) {
+            if (!a || a == ziel) { continue; }
+            if (qobject_cast<KombiApplet*>(a)) { continue; }
+            if (!a->isVisible()) { continue; }
+            panel->removeApplet(a);
+            ziel->nimmAuf(a);
+            ++gewandert;
+        }
+        // ── Das leere Fenster bleibt sonst stehen (2026-11-01) ───────
+        //
+        // Betreiber mit Bild: nach dem Ablegen stand „RX1 Main Panel"
+        // als groszes schwarzes Rechteck ueber dem halben Schirm --
+        // ein Fenster ohne Inhalt. Wer seine Panels woanders
+        // hinraeumt, will nicht die leere Huelle behalten.
+        if (gewandert > 0) {
+            bool nochWas = false;
+            for (AppletWidget* a : panel->applets()) {
+                if (a && a->isVisible()) { nochWas = true; break; }
+            }
+            if (!nochWas) {
+                qCInfo(lcConnection) << "Kombi: der Container ist leer — "
+                                        "er geht mit";
+                if (QWidget* fenster = c0->window()) {
+                    if (fenster != this) { fenster->hide(); }
+                }
+            }
+        }
+    });
     qCDebug(lcMeter) << "Installed default meter layout: S-Meter + Power/SWR + ALC";
     qCDebug(lcContainer) << "Container #0: Meters + RxApplet + TxApplet + PhoneCwApplet + VaxApplet + TciApplet + ClientChainApplet";
 }
@@ -17329,6 +17688,38 @@ void MainWindow::detachRotorPanel()
 
     m_rotorWindow = new ToolWindow(panel, QStringLiteral("RotorLog"),
                                    QStringLiteral("Rotor / Log"), this);
+    // Auf ein Kombi-Feld abgelegt: der Inhalt wandert hinein, das
+    // leere Fenster verschwindet. Betreiber, 2026-11-01: „ich will da
+    // auch den rotor und andere sache reinziehen können."
+    connect(m_rotorWindow, &ToolWindow::abgelegtBei, this,
+            [this](const QPoint& wo) {
+        if (m_shuttingDown || !m_rotorWindow) { return; }
+        KombiApplet* ziel = KombiApplet::unter(wo);
+        if (!ziel) { return; }
+        ToolWindow* fenster = m_rotorWindow;
+        m_rotorWindow = nullptr;
+        fenster->hide();
+        const QString name = fenster->windowTitle().isEmpty()
+                                 ? QStringLiteral("Rotor / Log")
+                                 : fenster->windowTitle();
+        QWidget* inhalt = fenster->releaseContent();
+        fenster->deleteLater();
+        if (!inhalt) { return; }
+        // ── Der Name haengt am FENSTER, nicht am Inhalt ──────────────
+        //
+        // Betreiber, 2026-11-01: „schau dir die beschriftung über den
+        // rotor an" -- auf dem Reiter stand „Panel". Das ist der
+        // Rueckfall in `KombiApplet::nameVon`: das Rotorpanel selbst
+        // traegt keinen Fenstertitel, der steht am ToolWindow
+        // darueber. Beim Hineinlegen geht das Fenster weg -- also
+        // nimmt der Inhalt den Namen mit.
+        inhalt->setWindowTitle(name);
+        // Eine Kennung, damit das Feld ihn beim naechsten Start
+        // wiederfindet -- `KombiApplet::merkeStand` schreibt fuer ein
+        // Nicht-Applet den objectName.
+        inhalt->setObjectName(QStringLiteral("RotorLog"));
+        ziel->nimmAuf(inhalt);
+    });
     connect(m_rotorWindow, &ToolWindow::dockRequested, this,
             [this](const QString&) { dockRotorPanel(); });
     m_rotorWindow->show();
@@ -19579,8 +19970,77 @@ void MainWindow::onConnectionStateChanged()
 // What's left is just the cold-launch convenience this always also did:
 // open the Connect-to-Radio panel so the user has a one-click path to a
 // saved radio or Add Manually (design §6.1).
+// ── Was im Kombi-Feld lag, liegt beim naechsten Start wieder darin ─
+//
+// Betreiber, 2026-11-01, mit Bild: "so war mein profil nicht
+// abgespeichert". Meine Luecke: das Feld MERKT sich seinen Inhalt
+// (`Kombi/Inhalt`), aber niemand holte ihn zurueck -- also stand es
+// nach jedem Start leer, und die Panels lagen wieder einzeln herum.
+//
+// Hier, einmal nach dem Aufbau: die gemerkten Kennungen der Reihe
+// nach hineinlegen. Was es nicht mehr gibt, wird uebergangen.
+void MainWindow::holeKombiInhaltZurueck(const QStringList& vorgabe)
+{
+    if (m_shuttingDown || !m_kombiApplet) { return; }
+    // Aus dem Profil, wenn eines etwas sagt; sonst aus der gemerkten
+    // Liste des Feldes selbst (erster Start nach dem Umbau).
+    QStringList ids = vorgabe;
+    if (ids.isEmpty()) {
+        const QString liste =
+            AppSettings::instance().value(QStringLiteral("Kombi/Inhalt"),
+                                          QString()).toString();
+        ids = liste.split(QLatin1Char(','), Qt::SkipEmptyParts);
+    }
+    if (ids.isEmpty()) { return; }
+
+    int geholt = 0;
+    for (const QString& id : ids) {
+        if (id == QStringLiteral("RotorLog")) {
+            if (!m_rotorWindow) { detachRotorPanel(); }
+            if (!m_rotorWindow) { continue; }
+            ToolWindow* fenster = m_rotorWindow;
+            m_rotorWindow = nullptr;
+            fenster->hide();
+            QWidget* inhalt = fenster->releaseContent();
+            fenster->deleteLater();
+            if (!inhalt) { continue; }
+            inhalt->setWindowTitle(QStringLiteral("Rotor / Log"));
+            inhalt->setObjectName(QStringLiteral("RotorLog"));
+            m_kombiApplet->nimmAuf(inhalt);
+            ++geholt;
+            continue;
+        }
+        AppletWidget* a = m_appletsById.value(id, nullptr);
+        if (!a || a == m_kombiApplet) { continue; }
+        holeInsKombiFeld(m_kombiApplet, a, id);
+        ++geholt;
+    }
+    qCInfo(lcConnection) << "Kombi: " << geholt << "von" << ids.size()
+                         << "gemerkten Panels zurueckgeholt";
+}
+
 void MainWindow::openConnectionPanelOnLaunch()
 {
+    // ── Nicht mehr bei jedem Start (2026-11-01) ──────────────────────
+    //
+    // Betreiber, mit Bild: „ist wieder alles in der startmaske! weg
+    // damit." Die Maske ging bei JEDEM Start auf, legte sich ueber
+    // alles und raeumte dabei seine schwebenden Fenster hinter sich
+    // (hideFloatingWindowsBehindConnectMask) -- sechs Stueck, wie sie
+    // selbst meldete. Wer seine Anordnung ueber Tage aufbaut, sieht
+    // beim Start erst einmal nichts davon.
+    //
+    // Sie geht jetzt nur noch auf, wenn es NICHTS zu waehlen gibt:
+    // kein gespeichertes Geraet. Dann ist sie das Erste, was einer
+    // braucht. Sonst steht der Weg dorthin da, wo er immer stand --
+    // in der Leiste unten („Click to connect") und oben im Streifen.
+    if (!AppSettings::instance().savedRadios().isEmpty()) {
+        qCInfo(lcConnection) << "Startmaske uebersprungen —"
+                             << AppSettings::instance().savedRadios().size()
+                             << "gespeicherte Geraete; Verbinden ueber die "
+                                "Leiste unten";
+        return;
+    }
     showConnectionPanel();
 }
 
