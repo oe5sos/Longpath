@@ -22,8 +22,10 @@
 #include <QtTest/QtTest>
 
 #include <QRegularExpression>
+#include <QSet>
 
 #include "core/FlexRadioConnection.h"
+#include "models/RadioModel.h"
 
 using namespace Longpath;
 
@@ -93,6 +95,61 @@ private slots:
                     QStringLiteral("0"), -1).isEmpty());
         QVERIFY(FlexCommandWire::setSliceAudioPanCommand(
                     QStringLiteral("0"), 101).isEmpty());
+    }
+
+    // ── Jeder Steckplatz trifft SEINEN Minderer ─────────────────────
+    //
+    // Betreiber, 2026-10-28: „aber jeder nr sollte anders
+    // funktionieren!" Am Flex taten sie das nicht: NR1, NR2 und NR4
+    // schickten alle dasselbe `nr=1`.
+    //
+    // Die Maschine fuehrt fuenf Verfahren; die Zuordnung geht nach
+    // der FAMILIE, nicht nach der Nummer.
+    void jederSteckplatzTrifftSeinenMinderer()
+    {
+        QCOMPARE(RadioModel::flexNrSchluessel(NrSlot::NR1),
+                 QStringLiteral("lms_nr"));     // WDSP anr.c = LMS
+        QCOMPARE(RadioModel::flexNrSchluessel(NrSlot::NR2),
+                 QStringLiteral("nr"));         // WDSP emnr.c = spektral
+        QCOMPARE(RadioModel::flexNrSchluessel(NrSlot::NR3),
+                 QStringLiteral("rnnoise"));    // beide neuronal
+        QCOMPARE(RadioModel::flexNrSchluessel(NrSlot::NR4),
+                 QStringLiteral("speex_nr"));   // beide Spektralsubtraktion
+        // Keine zwei auf denselben -- sonst klaenge wieder alles gleich.
+        const QStringList alle{
+            RadioModel::flexNrSchluessel(NrSlot::NR1),
+            RadioModel::flexNrSchluessel(NrSlot::NR2),
+            RadioModel::flexNrSchluessel(NrSlot::NR3),
+            RadioModel::flexNrSchluessel(NrSlot::NR4)};
+        QCOMPARE(QSet<QString>(alle.begin(), alle.end()).size(), 4);
+        // Was wir selbst rechnen, hat dort nichts zu suchen.
+        for (NrSlot eigen : {NrSlot::DFNR, NrSlot::BNR, NrSlot::MNR,
+                             NrSlot::NNR, NrSlot::Off}) {
+            QVERIFY2(RadioModel::flexNrSchluessel(eigen).isEmpty(),
+                     "ein Verfahren, das die Maschine nicht fuehrt, darf "
+                     "nicht auf einen fremden Schluessel zeigen");
+        }
+    }
+
+    // Und die Maschine nimmt nur ihre eigenen Namen.
+    void nurDieFuenfNamenDerMaschine()
+    {
+        const QString s = QStringLiteral("0");
+        for (const QString& gut : {QStringLiteral("nr"), QStringLiteral("lms_nr"),
+                                   QStringLiteral("speex_nr"),
+                                   QStringLiteral("nrf"),
+                                   QStringLiteral("rnnoise")}) {
+            QVERIFY2(!FlexCommandWire::setSliceNrKindCommand(s, gut, true).isEmpty(),
+                     qPrintable(gut));
+        }
+        QVERIFY(FlexCommandWire::setSliceNrKindCommand(
+                    s, QStringLiteral("nr2"), true).isEmpty());
+        // RNNoise hat keinen Pegel -- es ist ein Netz, kein Regler.
+        QVERIFY(FlexCommandWire::setSliceNrLevelCommand(
+                    s, QStringLiteral("rnnoise"), 50).isEmpty());
+        QCOMPARE(FlexCommandWire::setSliceNrLevelCommand(
+                     s, QStringLiteral("lms_nr"), 70),
+                 QStringLiteral("slice set 0 lms_nr_level=70"));
     }
 
     // ── Die AGC-Schwelle ist VERHAELTNISMAESZIG, nicht physikalisch ─

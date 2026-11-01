@@ -406,10 +406,19 @@ void MainWindow::wireFlex()
                                        1.0f);
             }
 
-            m_radioModel->setFlexSliceNoise(
-                gewaehlt != NrSlot::Off && !eigenesVerfahren,
-                s->nbMode() != NbMode::Off,
-                s->anfEnabled());
+            // ── Jedes Verfahren an SEINEN Minderer (2026-11-01) ──
+            //
+            // Bis heute ging fuer NR1, NR2 und NR4 dasselbe `nr=1`
+            // hinaus -- dreimal derselbe Klang, obwohl die Maschine
+            // fuenf Verfahren fuehrt. Jetzt trifft jeder Steckplatz
+            // den seinen (`RadioModel::flexNrSchluessel`).
+            //
+            // Rauschsperre fuer Knacken (nb) und Auto-Notch (anf)
+            // bleiben daneben, wie bisher.
+            m_radioModel->sendeFlexNrVerfahren(
+                eigenesVerfahren ? NrSlot::Off : gewaehlt);
+            m_radioModel->setFlexSliceNoiseNbAnf(
+                s->nbMode() != NbMode::Off, s->anfEnabled());
         };
         disconnect(m_flexNrBand);
         m_flexNrBand = connect(ziel, &SliceModel::activeNrChanged, this,

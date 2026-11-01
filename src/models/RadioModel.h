@@ -3835,6 +3835,17 @@ public:
     /// VERHAELTNISMAESZIG, keine physikalische -- siehe die
     /// Begruendung an der Umsetzung.
     void sendeFlexAgcSchwelle(int unsereSchwelle);
+
+    /// Welchen Minderer der Maschine unser Steckplatz bedeutet.
+    ///
+    /// Leer heiszt: diesen gibt es dort nicht (DFNR, BNR, MNR rechnen
+    /// wir selbst; NNR hat kein Gegenstueck).
+    static QString flexNrSchluessel(NrSlot steckplatz);
+    /// Genau EINEN der fuenf einschalten, die anderen aus.
+    void sendeFlexNrVerfahren(NrSlot steckplatz);
+    /// Knackunterdrueckung und Auto-Notch -- die beiden, die neben
+    /// dem gewaehlten Verfahren weiterlaufen duerfen.
+    void setFlexSliceNoiseNbAnf(bool nb, bool anf);
     void sendeFlexTonpegel(int stufe0bis100);
     void sendeFlexStumm(bool stumm);
     void sendeFlexBalance(double unserWert);

@@ -235,6 +235,33 @@ QString setSliceFilterCommand(const QString& sliceId, int lowHz, int highHz)
         .arg(sliceId).arg(lowHz).arg(highHz);
 }
 
+// Die fuenf Minderer der Maschine. Nur diese Namen -- ein
+// erfundener Schluessel waere eine Ablehnung je Klick.
+QString setSliceNrKindCommand(const QString& sliceId, const QString& schluessel,
+                              bool an)
+{
+    static const QStringList kBekannt{
+        QStringLiteral("nr"), QStringLiteral("lms_nr"),
+        QStringLiteral("speex_nr"), QStringLiteral("nrf"),
+        QStringLiteral("rnnoise")};
+    if (sliceId.isEmpty() || !kBekannt.contains(schluessel)) { return QString(); }
+    return QStringLiteral("slice set %1 %2=%3")
+        .arg(sliceId, schluessel).arg(an ? 1 : 0);
+}
+
+QString setSliceNrLevelCommand(const QString& sliceId, const QString& schluessel,
+                               int stufe)
+{
+    // RNNoise hat keinen Pegel -- es ist ein Netz, kein Regler.
+    static const QStringList kMitPegel{
+        QStringLiteral("nr"), QStringLiteral("lms_nr"),
+        QStringLiteral("speex_nr"), QStringLiteral("nrf")};
+    if (sliceId.isEmpty() || !kMitPegel.contains(schluessel)) { return QString(); }
+    if (stufe < 0 || stufe > 100) { return QString(); }
+    return QStringLiteral("slice set %1 %2_level=%3")
+        .arg(sliceId, schluessel).arg(stufe);
+}
+
 QString setSliceNoiseCommand(const QString& sliceId,
                              bool nr, bool nb, bool anf)
 {
