@@ -3895,6 +3895,18 @@ public:
     bool flexApdMesspunktSetzen(const QString& sendeantenne, const QString& messpunkt);
     bool flexApdZuruecksetzen();
 
+#ifdef LONGPATH_BUILD_TESTS
+    /// Eine Statuszeile der Maschine einspeisen, ohne Maschine. Geht
+    /// durch DENSELBEN Parser wie der Zustandsschub — ein Prueflauf
+    /// oder ein Entwurfsblatt zeigt damit, was die echten Zeilen
+    /// ergeben, nicht was jemand hineingeschrieben hat.
+    void flexApdStatusForTest(const QString& object,
+                              const QMap<QString, QString>& kvs)
+    {
+        if (m_flexApd.apply(object, kvs)) { emit flexApdGeaendert(); }
+    }
+#endif
+
     /// Den Sendetonstrom anlegen lassen. Die Antwort traegt die
     /// Kennung, die danach in jedes Tonpaket gehoert.
     void legeFlexSendetonstromAn();

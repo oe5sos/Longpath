@@ -2689,6 +2689,10 @@ if(TEST tst_flex_vorverzerrung)
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
+# Zeichenwerkzeug, kein Prueflauf: ueberspringt sich ohne
+# LONGPATH_GRAB_DIR UND LONGPATH_ENTWURF=1.
+longpath_add_test(tst_flex_apd_entwurfsblaetter)
+
 longpath_add_test(tst_flex_scheibenregler)
 if(TEST tst_flex_scheibenregler)
     set_tests_properties(tst_flex_scheibenregler PROPERTIES
