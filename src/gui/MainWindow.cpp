@@ -10770,17 +10770,38 @@ void MainWindow::populateDefaultMeter()
     // ist es eindeutig; stehen mehrere, wandern sie zusammen -- er
     // hat das ganze Fenster abgelegt, nicht eine Zeile daraus.
     connect(c0, &ContainerWidget::zugEndeBei, this,
-            [this, panel](const QPoint& wo) {
+            [this, panel, c0](const QPoint& wo) {
         if (m_shuttingDown || !panel) { return; }
         KombiApplet* ziel = KombiApplet::unter(wo);
         if (!ziel) { return; }
         const QList<AppletWidget*> drin = panel->applets();
+        int gewandert = 0;
         for (AppletWidget* a : drin) {
             if (!a || a == ziel) { continue; }
             if (qobject_cast<KombiApplet*>(a)) { continue; }
             if (!a->isVisible()) { continue; }
             panel->removeApplet(a);
             ziel->nimmAuf(a);
+            ++gewandert;
+        }
+        // ── Das leere Fenster bleibt sonst stehen (2026-11-01) ───────
+        //
+        // Betreiber mit Bild: nach dem Ablegen stand „RX1 Main Panel"
+        // als groszes schwarzes Rechteck ueber dem halben Schirm --
+        // ein Fenster ohne Inhalt. Wer seine Panels woanders
+        // hinraeumt, will nicht die leere Huelle behalten.
+        if (gewandert > 0) {
+            bool nochWas = false;
+            for (AppletWidget* a : panel->applets()) {
+                if (a && a->isVisible()) { nochWas = true; break; }
+            }
+            if (!nochWas) {
+                qCInfo(lcConnection) << "Kombi: der Container ist leer — "
+                                        "er geht mit";
+                if (QWidget* fenster = c0->window()) {
+                    if (fenster != this) { fenster->hide(); }
+                }
+            }
         }
     });
     qCDebug(lcMeter) << "Installed default meter layout: S-Meter + Power/SWR + ALC";
@@ -19748,6 +19769,26 @@ void MainWindow::onConnectionStateChanged()
 // saved radio or Add Manually (design §6.1).
 void MainWindow::openConnectionPanelOnLaunch()
 {
+    // ── Nicht mehr bei jedem Start (2026-11-01) ──────────────────────
+    //
+    // Betreiber, mit Bild: „ist wieder alles in der startmaske! weg
+    // damit." Die Maske ging bei JEDEM Start auf, legte sich ueber
+    // alles und raeumte dabei seine schwebenden Fenster hinter sich
+    // (hideFloatingWindowsBehindConnectMask) -- sechs Stueck, wie sie
+    // selbst meldete. Wer seine Anordnung ueber Tage aufbaut, sieht
+    // beim Start erst einmal nichts davon.
+    //
+    // Sie geht jetzt nur noch auf, wenn es NICHTS zu waehlen gibt:
+    // kein gespeichertes Geraet. Dann ist sie das Erste, was einer
+    // braucht. Sonst steht der Weg dorthin da, wo er immer stand --
+    // in der Leiste unten („Click to connect") und oben im Streifen.
+    if (!AppSettings::instance().savedRadios().isEmpty()) {
+        qCInfo(lcConnection) << "Startmaske uebersprungen —"
+                             << AppSettings::instance().savedRadios().size()
+                             << "gespeicherte Geraete; Verbinden ueber die "
+                                "Leiste unten";
+        return;
+    }
     showConnectionPanel();
 }
 
