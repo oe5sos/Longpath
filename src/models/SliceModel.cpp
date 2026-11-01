@@ -1484,6 +1484,16 @@ void SliceModel::setFmsqThresh(double dB)
     emit fmsqThreshChanged(dB);
 }
 
+// Die Staerke der Minderung, wenn die MASCHINE sie rechnet. 0..100
+// wie bei ihr; unsere eigenen Verfahren bleiben unberuehrt.
+void SliceModel::setFlexNrLevel(int stufe)
+{
+    const int s = qBound(0, stufe, 100);
+    if (m_flexNrLevel == s) { return; }
+    m_flexNrLevel = s;
+    emit flexNrLevelChanged(s);
+}
+
 void SliceModel::setAgcThreshold(int dBu)
 {
     // RxChannel::setAgcThreshold feeds this straight into WDSP's

@@ -3843,6 +3843,8 @@ public:
     static QString flexNrSchluessel(NrSlot steckplatz);
     /// Genau EINEN der fuenf einschalten, die anderen aus.
     void sendeFlexNrVerfahren(NrSlot steckplatz);
+    /// Die Staerke des gewaehlten Verfahrens (0..100).
+    void sendeFlexNrStufe(NrSlot steckplatz, int stufe);
     /// Knackunterdrueckung und Auto-Notch -- die beiden, die neben
     /// dem gewaehlten Verfahren weiterlaufen duerfen.
     void setFlexSliceNoiseNbAnf(bool nb, bool anf);

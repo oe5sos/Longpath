@@ -152,6 +152,30 @@ private slots:
                  QStringLiteral("slice set 0 lms_nr_level=70"));
     }
 
+    // ── Die Staerke geht an das gewaehlte Verfahren ─────────────────
+    //
+    // Die Maschine steht ab Werk auf 50, und wir ruehrten sie nie an
+    // -- das war „NR2 hört sich sehr dumpf an". Jetzt gibt es dafuer
+    // einen Regler, und er musz an den Schluessel des GEWAEHLTEN
+    // Verfahrens gehen, nicht an einen festen.
+    void dieStaerkeGehtAnDasGewaehlteVerfahren()
+    {
+        const QString rumpf = quelle(QStringLiteral("/src/models/RadioModel.cpp"));
+        const int a = rumpf.indexOf(QStringLiteral("void RadioModel::sendeFlexNrStufe"));
+        QVERIFY2(a > 0, "sendeFlexNrStufe ist weg");
+        const int e = rumpf.indexOf(QStringLiteral("\n}\n"), a);
+        QVERIFY2(e > a, "die Funktion sieht anders aus als erwartet");
+        QVERIFY2(rumpf.mid(a, e - a).contains(QStringLiteral("flexNrSchluessel")),
+                 "die Staerke geht an einen festen Schluessel statt an den "
+                 "des gewaehlten Verfahrens");
+
+        // Und der Schnellgriff musz am Flex die Maschine zeigen.
+        const QString fenster = quelle(QStringLiteral("/src/gui/MainWindow_Flex.cpp"));
+        QVERIFY2(fenster.contains(QStringLiteral("setMaschinenNr")),
+                 "der Schnellgriff zeigt am Flex weiterhin WDSP-Werte, die "
+                 "dort nichts tun");
+    }
+
     // ── Die AGC-Schwelle ist VERHAELTNISMAESZIG, nicht physikalisch ─
     //
     // Betreiber, 2026-11-01: „höre hier viel zu viel rauschen so denke

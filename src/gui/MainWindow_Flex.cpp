@@ -84,6 +84,7 @@
 #include "core/FlexFensterZug.h"
 #include <algorithm>
 #include "gui/SpectrumWidget.h"
+#include "gui/widgets/CommandBar.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "models/BandDefaults.h"
@@ -417,6 +418,9 @@ void MainWindow::wireFlex()
             // bleiben daneben, wie bisher.
             m_radioModel->sendeFlexNrVerfahren(
                 eigenesVerfahren ? NrSlot::Off : gewaehlt);
+            if (!eigenesVerfahren) {
+                m_radioModel->sendeFlexNrStufe(gewaehlt, s->flexNrLevel());
+            }
             m_radioModel->setFlexSliceNoiseNbAnf(
                 s->nbMode() != NbMode::Off, s->anfEnabled());
         };
@@ -426,6 +430,20 @@ void MainWindow::wireFlex()
         disconnect(m_flexNbBand);
         m_flexNbBand = connect(ziel, &SliceModel::nbModeChanged, this,
                                [rauschHinaus](NbMode) { rauschHinaus(); });
+        // ── Der Schnellgriff zeigt am Flex die Maschine ─────────────
+        //
+        // Dort stehen sonst WDSP-Werte, die nichts tun. Der Name
+        // kommt aus derselben Zuordnung, die auch den Befehl baut --
+        // zwei Quellen wuerden frueher oder spaeter auseinanderlaufen.
+        if (m_commandBar) {
+            m_commandBar->setMaschinenNr([](NrSlot slot) {
+                return RadioModel::flexNrSchluessel(slot);
+            });
+        }
+
+        disconnect(m_flexNrStufeBand);
+        m_flexNrStufeBand = connect(ziel, &SliceModel::flexNrLevelChanged, this,
+                                    [rauschHinaus](int) { rauschHinaus(); });
         disconnect(m_flexAnfBand);
         m_flexAnfBand = connect(ziel, &SliceModel::anfEnabledChanged, this,
                                 [rauschHinaus](bool) { rauschHinaus(); });

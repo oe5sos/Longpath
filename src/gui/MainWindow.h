@@ -2036,6 +2036,7 @@ private:
     /// (2026-10-28). Drei Bänder, ein Befehl: siehe
     /// RadioModel::setFlexSliceNoise.
     QMetaObject::Connection m_flexNrBand;
+    QMetaObject::Connection m_flexNrStufeBand;
     QMetaObject::Connection m_flexNbBand;
     QMetaObject::Connection m_flexAnfBand;
     /// Die Rauschsperre. Eigene Baender, weil `wireSliceSignals` am

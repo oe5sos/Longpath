@@ -7587,6 +7587,20 @@ void RadioModel::sendeFlexNrVerfahren(NrSlot steckplatz)
         QStringLiteral("NR %1 an").arg(gewaehlt));
 }
 
+// Die Staerke. Die Maschine steht ab Werk auf 50 und wir ruehrten sie
+// nie an -- genau das war Martins "NR2 hört sich sehr dumpf an"
+// (2026-11-01). RNNoise hat keine Stufe; dort geht nichts hinaus und
+// eine Zeile sagt es.
+void RadioModel::sendeFlexNrStufe(NrSlot steckplatz, int stufe)
+{
+    const QString schluessel = flexNrSchluessel(steckplatz);
+    if (schluessel.isEmpty()) { return; }
+    const int s = std::clamp(stufe, 0, 100);
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceNrLevelCommand(m_flexSliceId, schluessel, s),
+        QStringLiteral("NR-Staerke %1 = %2").arg(schluessel).arg(s));
+}
+
 void RadioModel::sendeFlexAgcSchwelle(int unsereSchwelle)
 {
     constexpr int kUnten = -160;   // RxApplet: m_agcTSlider->setRange

@@ -114,9 +114,13 @@ namespace DspQuickPopup {
 ///
 /// `onMore` wird vom Verweis „More Settings…" gerufen; ein leerer
 /// Aufruf laesst den Verweis weg. Tut nichts ohne Scheibe.
+/// `nameDerMaschine` nicht leer heiszt: die MASCHINE rechnet (Flex).
+/// Dann steht hier EIN Regler -- ihre Staerke 0..100 -- statt der
+/// WDSP-Werte, die dort nichts tun.
 void showFor(QWidget* parent, SliceModel* slice, NrSlot slot,
              const QPoint& globalPos,
-             const std::function<void()>& onMore = {});
+             const std::function<void()>& onMore = {},
+             const QString& nameDerMaschine = QString());
 
 } // namespace DspQuickPopup
 } // namespace Longpath
