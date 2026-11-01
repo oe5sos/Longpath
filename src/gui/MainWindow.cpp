@@ -9331,6 +9331,17 @@ void MainWindow::populateDefaultMeter()
         {QStringLiteral("ft8"), QStringLiteral("ft4"), QStringLiteral("digital"),
          QStringLiteral("decoder"), QStringLiteral("wsjt"),
          QStringLiteral("digu"), QStringLiteral("digl")});
+    // FT8 Slots stand bisher ohne Stichwortzeile im Auswaehler --
+    // dem Betreiber am 2026-11-01 im Bild aufgefallen: unter jedem
+    // anderen Eintrag steht eine, unter diesem nicht. Folge: er war
+    // nur unter seinem genauen Namen zu finden, nicht ueber "qso",
+    // "platz" oder "fox".
+    m_appletVis->describeApplet(QStringLiteral("Ft8Slots"),
+        QStringLiteral("Digital"),
+        {QStringLiteral("ft8"), QStringLiteral("slots"),
+         QStringLiteral("plaetze"), QStringLiteral("platz"),
+         QStringLiteral("qso"), QStringLiteral("fox"),
+         QStringLiteral("hound"), QStringLiteral("multi")});
     m_appletVis->describeApplet(QStringLiteral("Vax"),
         QStringLiteral("Audio"),
         {QStringLiteral("vax"), QStringLiteral("audio"),
