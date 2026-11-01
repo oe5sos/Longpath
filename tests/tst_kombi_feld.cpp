@@ -370,6 +370,26 @@ private slots:
         delete rahmen;
     }
 
+    // ── Eine Pille klappt zu und zeigt ihre Seite ───────────────────
+    //
+    // Betreiber, 2026-11-01, mit Bild: „die pillen funktionieren
+    // nicht, kann nicht umschalten". Das Feld war AUFGEKLAPPT -- dann
+    // ist der Stapel gar nicht zu sehen, und ein Klick auf eine Pille
+    // aendert nur etwas Unsichtbares.
+    void einePilleKlapptZu()
+    {
+        KombiApplet k(nullptr);
+        k.nimmAuf(new Probepanel(QStringLiteral("Rx"), QStringLiteral("RX")));
+        k.nimmAuf(new Probepanel(QStringLiteral("Tx"), QStringLiteral("TX")));
+        k.setAufgeklappt(true);
+        QVERIFY(k.aufgeklappt());
+        k.zeigeSeite(1);
+        QVERIFY2(!k.aufgeklappt(),
+                 "die Pille laeszt das Feld aufgeklappt — dann sieht man "
+                 "die gewaehlte Seite nicht und haelt sie fuer kaputt");
+        QCOMPARE(k.seite(), 1);
+    }
+
     // ── Der Inhalt gehoert ins PROFIL ───────────────────────────────
     //
     // Betreiber, 2026-11-01, mit Bild: „so war mein profil nicht

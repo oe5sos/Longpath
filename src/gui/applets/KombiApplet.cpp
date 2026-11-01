@@ -628,6 +628,17 @@ bool KombiApplet::istLeer() const
 void KombiApplet::zeigeSeite(int welche)
 {
     if (m_inhalte.isEmpty()) { return; }
+    // ── Aufgeklappt faellt beim Umschalten zu (2026-11-01) ──────────
+    //
+    // Betreiber, mit Bild: „die pillen funktionieren nicht, kann
+    // nicht umschalten". Auf dem Bild lagen Rotor UND TX
+    // untereinander -- das Feld war aufgeklappt (Doppelklick). Dann
+    // ist der Stapel gar nicht zu sehen, und ein Klick auf eine Pille
+    // aendert nur etwas Unsichtbares.
+    //
+    // Wer eine Pille waehlt, meint diese EINE Seite. Also zuklappen
+    // und sie zeigen.
+    if (m_aufgeklappt) { setAufgeklappt(false); }
     const int w = qBound(0, welche, m_inhalte.size() - 1);
     if (m_stapel) { m_stapel->setCurrentIndex(w); }
     for (int i = 0; i < m_reiter.size(); ++i) {
