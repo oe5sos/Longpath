@@ -750,6 +750,7 @@ set(CORE_SOURCES
     # Befehlskanal (TCP 4992, Saetze C/R/S/M). Keine Stroeme.
     src/core/FlexRadioDiscovery.cpp
     src/core/FlexRadioConnection.cpp
+    src/core/FlexApdState.cpp
     # Stufe 2: der VITA-49-Leser. Nur Bytes und Rahmen, kein Sockel —
     # gegen den Mitschnitt vom 2026-10-18 pruefbar
     # (docs/protocols/flex-vita49-gemessen.md).
@@ -1148,6 +1149,7 @@ set(GUI_SOURCES
     src/gui/setup/SpePage.cpp
     src/gui/setup/Kpa500Page.cpp
     src/gui/setup/AcomPage.cpp
+    src/gui/setup/FlexApdPage.cpp
     src/gui/setup/TciLogWindow.cpp
     src/gui/setup/KeyboardSetupPages.cpp
     src/gui/setup/DiagnosticsSetupPages.cpp

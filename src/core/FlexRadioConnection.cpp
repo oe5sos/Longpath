@@ -415,6 +415,27 @@ QString setDaxRouteCommand(bool ueberDax)
     return QStringLiteral("transmit set dax=%1").arg(ueberDax ? 1 : 0);
 }
 
+QString apdEnableCommand(bool an)
+{
+    return QStringLiteral("apd enable=%1").arg(an ? 1 : 0);
+}
+
+QString apdSamplerCommand(const QString& sendeantenne, const QString& messpunkt)
+{
+    // Ein halber Befehl ist schlimmer als keiner: die Maschine
+    // beantwortet `apd sampler tx_ant= sample_port=` mit Code 0 und
+    // aendert nichts — das sieht wie Erfolg aus und ist keiner.
+    const QString ant = sendeantenne.trimmed();
+    const QString punkt = messpunkt.trimmed();
+    if (ant.isEmpty() || punkt.isEmpty()) { return QString(); }
+    return QStringLiteral("apd sampler tx_ant=%1 sample_port=%2").arg(ant, punkt);
+}
+
+QString apdResetCommand()
+{
+    return QStringLiteral("apd reset");
+}
+
 QString createDaxTxStreamCommand()
 {
     return QStringLiteral("stream create type=dax_tx");
@@ -928,6 +949,18 @@ void FlexRadioConnection::onGuiClientAccepted(const QString& body)
     // steht dort in derselben Reihe wie `sub slice all` und
     // `sub meter all`.
     sendCommand(QStringLiteral("sub tx all"));
+
+    // ── Die Vorverzerrung der Maschine bestellen (2026-11-01) ───────
+    //
+    // Ohne `sub apd all` kommt keine einzige `apd`-Zeile — am Geraet
+    // gemessen: vor der Bestellung nichts, danach sofort der Schalter,
+    // drei Messpunkt-Zeilen und die Scheibenzeile.
+    //
+    // Eine Maschine ohne Vorverzerrung (6000er-Reihe, aeltere
+    // Firmware) antwortet mit Code 0 und schickt nichts. Das ist in
+    // Ordnung: `FlexApdState::bekannt()` bleibt dann false, und die
+    // Bedienung zeigt sich gar nicht erst.
+    sendCommand(QStringLiteral("sub apd all"));
 
     queryAndRecoverSlices();
 }

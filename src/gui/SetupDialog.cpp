@@ -103,6 +103,7 @@
 #include "setup/SpePage.h"
 #include "setup/Kpa500Page.h"
 #include "setup/AcomPage.h"
+#include "setup/FlexApdPage.h"
 // Keyboard
 #include "setup/KeyboardSetupPages.h"
 // Diagnostics
@@ -727,6 +728,15 @@ void SetupDialog::buildTree()
     // remains a lightweight 4-control disabled stub for back-compat with
     // the Thetis tpDSPVOX tab IA.
     registerPage(transmit, "DEXP/VOX", [this] { return new DexpVoxPage(m_model); });
+
+    // Die Vorverzerrung der FLEX-Maschine (2026-11-01). Sie gehoert
+    // hierher und nicht zu PureSignal: dort rechnet WDSP bei uns, hier
+    // die Maschine. Die Seite steht immer in der Liste und sagt selbst,
+    // wenn die verbundene Maschine keine meldet — eine Seite, die je
+    // nach Geraet verschwindet, ist schwerer zu finden als eine, die
+    // erklaert, warum sie leer ist.
+    registerPage(transmit, "Predistortion (Flex)",
+                 [this] { return new FlexApdPage(m_model); });
 
     // 2026-05-22 menu cleanup: the standalone "PGXL Interlock" entry that
     // previously lived here is removed. The same controls live under
