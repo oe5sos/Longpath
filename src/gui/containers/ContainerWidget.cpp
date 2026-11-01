@@ -81,6 +81,7 @@ mw0lge@grange-lane.co.uk
 #include <QTabBar>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMainWindow>
 #include <QPushButton>
 #include <QContextMenuEvent>
 #include <QMenu>
@@ -255,6 +256,34 @@ void ContainerWidget::buildUI()
     m_btnSettings->setToolTip(QStringLiteral("Container settings"));
     m_btnSettings->setStyleSheet(btnStyle);
     barLayout->addWidget(m_btnSettings);
+
+    // ── Und ein x (2026-11-01) ──────────────────────────────────────
+    //
+    // Betreiber, zweimal: "wieso kann ich das RX 1 panel nicht
+    // schließen" und "kann das panel wieder nicht schließen". Zu
+    // Recht -- diese Leiste hatte Pin, Schloss, Andocken und Zahnrad,
+    // aber kein x. Jedes andere Panel im Programm laeszt sich
+    // schliessen; dieses nicht, und niemand sucht den Weg dazu im
+    // Menue.
+    //
+    // Zurueck kommt es ueber Containers im Menue -- dasselbe, was
+    // auch fuer ein geschlossenes Applet gilt.
+    m_btnClose = new QPushButton(QStringLiteral("\u2715"), m_titleBar);
+    m_btnClose->setFixedSize(22, 22);
+    m_btnClose->setToolTip(QStringLiteral("Hide this container "
+                                          "(Containers menu brings it back)"));
+    m_btnClose->setStyleSheet(btnStyle);
+    barLayout->addWidget(m_btnClose);
+    connect(m_btnClose, &QPushButton::clicked, this, [this]() {
+        if (QWidget* fenster = window()) {
+            if (fenster != this && fenster->isWindow()
+                && !qobject_cast<QMainWindow*>(fenster)) {
+                fenster->hide();
+                return;
+            }
+        }
+        hide();
+    });
 
     // ── Die Titelleiste liegt UEBER dem Inhalt, nicht darin ─────────
     //

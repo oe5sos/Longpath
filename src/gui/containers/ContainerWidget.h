@@ -470,6 +470,7 @@ private:
     QPushButton* m_btnAxis{nullptr};
     QPushButton* m_btnPin{nullptr};
     QPushButton* m_btnSettings{nullptr};
+    QPushButton* m_btnClose{nullptr};   ///< schliesst den Container (2026-11-01)
 
     // Phase 3P-I-a T17 — cached hasAlex flag so items added via
     // wireInteractiveItem() after setBoardCapabilities() still inherit
