@@ -252,7 +252,12 @@ void AppletPanelWidget::addApplet(AppletWidget* applet)
     // hierher und nicht ins Fenster: die Spalte verwaltet ihre Felder.
     if (auto* kombi = qobject_cast<KombiApplet*>(applet)) {
         connect(kombi, &KombiApplet::herausgeloest, this,
-                [this](AppletWidget* frei) { if (frei) { addApplet(frei); } });
+                [this](QWidget* frei) {
+            // Nur Applets gehoeren in die Spalte. Ein Rotorfenster
+            // bekommt sein eigenes Fenster zurueck -- das macht das
+            // Hauptfenster, nicht die Spalte.
+            if (auto* a = qobject_cast<AppletWidget*>(frei)) { addApplet(a); }
+        });
     }
     m_wrappers[applet] = cell;
     // Die Kopfleiste ist der Griff — nur sie, nicht das Applet

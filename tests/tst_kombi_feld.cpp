@@ -65,7 +65,7 @@ private slots:
         auto* rx = new Probepanel(QStringLiteral("Rx"), QStringLiteral("RX"));
         k.nimmAuf(rx);
         QCOMPARE(k.seiten().size(), 1);
-        QCOMPARE(k.seiten().first(), static_cast<AppletWidget*>(rx));
+        QCOMPARE(k.seiten().first(), static_cast<QWidget*>(rx));
         QVERIFY(!k.istLeer());
         // Und es haengt wirklich im Behaelter, nicht irgendwo.
         QVERIFY(rx->parentWidget() != nullptr);
@@ -129,10 +129,10 @@ private slots:
         QSignalSpy spion(&k, &KombiApplet::herausgeloest);
         k.gibFrei(rx);
         QCOMPARE(spion.count(), 1);
-        QCOMPARE(spion.first().first().value<AppletWidget*>(),
-                 static_cast<AppletWidget*>(rx));
+        QCOMPARE(spion.first().first().value<QWidget*>(),
+                 static_cast<QWidget*>(rx));
         QCOMPARE(k.seiten().size(), 1);
-        QCOMPARE(k.seiten().first(), static_cast<AppletWidget*>(tx));
+        QCOMPARE(k.seiten().first(), static_cast<QWidget*>(tx));
         QVERIFY2(rx->parentWidget() == nullptr,
                  "herausgeloest heiszt ohne Elternteil -- sonst haengt es "
                  "noch im Behaelter und bekommt nie ein eigenes Feld");
@@ -147,10 +147,10 @@ private slots:
         auto* tx = new Probepanel(QStringLiteral("Tx"), QStringLiteral("TX"));
         k.nimmAuf(rx);
         k.nimmAuf(tx);
-        const QList<AppletWidget*> raus = k.gibAlleFrei();
+        const QList<QWidget*> raus = k.gibAlleFrei();
         QCOMPARE(raus.size(), 2);
-        QCOMPARE(raus.at(0), static_cast<AppletWidget*>(rx));
-        QCOMPARE(raus.at(1), static_cast<AppletWidget*>(tx));
+        QCOMPARE(raus.at(0), static_cast<QWidget*>(rx));
+        QCOMPARE(raus.at(1), static_cast<QWidget*>(tx));
         QVERIFY(k.istLeer());
         delete rx;
         delete tx;
@@ -264,6 +264,41 @@ private slots:
                  "genau die schweben beim Betreiber alle");
         QVERIFY2(fenster.contains(QStringLiteral("legeAufKombiFeld")),
                  "das Ablegen fuehrt ins Leere");
+    }
+
+    // ── Jedes Widget, nicht nur ein Applet ──────────────────────────
+    //
+    // Betreiber, 2026-11-01: „ich will da auch den rotor und andere
+    // sache reinziehen können" -- und der Rotor ist kein Applet,
+    // sondern der Inhalt eines Werkzeugfensters. Ein Behaelter, der
+    // nach der Art fragt, kann ihn nicht aufnehmen.
+    void auchEinFremdesWidget()
+    {
+        KombiApplet k(nullptr);
+        auto* fremd = new QWidget;
+        fremd->setWindowTitle(QStringLiteral("Rotor / Log"));
+        k.nimmAuf(fremd);
+        QCOMPARE(k.seiten().size(), 1);
+        QCOMPARE(k.seiten().first(), fremd);
+        QVERIFY(!k.istLeer());
+        k.gibFrei(fremd);
+        QVERIFY(k.istLeer());
+        QVERIFY2(fremd->parentWidget() == nullptr,
+                 "auch ein fremdes Widget kommt ohne Elternteil zurueck");
+        delete fremd;
+    }
+
+    // Und der Abgleich darf daran nicht scheitern: ein fremdes
+    // Widget hat kein syncFromModel.
+    void derAbgleichStolpertNichtUeberFremde()
+    {
+        KombiApplet k(nullptr);
+        auto* rx = new Probepanel(QStringLiteral("Rx"), QStringLiteral("RX"));
+        auto* fremd = new QWidget;
+        k.nimmAuf(rx);
+        k.nimmAuf(fremd);
+        k.syncFromModel();          // darf nicht stuerzen
+        QCOMPARE(rx->abgeglichen, 1);
     }
 };
 

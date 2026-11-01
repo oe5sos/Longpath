@@ -95,12 +95,18 @@ public:
 
     /// Ein Panel aufnehmen (Elternwechsel, kein Neubau). Doppelt
     /// aufnehmen tut nichts.
-    void nimmAuf(AppletWidget* panel);
+    ///
+    /// Jedes QWidget, nicht nur ein Applet. Betreiber, 2026-11-01:
+    /// „ich will da auch den rotor und andere sache reinziehen
+    /// können" -- und der Rotor ist kein Applet, sondern der Inhalt
+    /// eines ToolWindow. Der Behaelter darf also nicht nach der Art
+    /// fragen, sondern nur nach dem Widget.
+    void nimmAuf(QWidget* panel);
     /// Wieder hergeben -- unversehrt, ohne Elternteil. Wer es bekommt,
     /// legt es zurueck in ein eigenes Feld.
-    void gibFrei(AppletWidget* panel);
+    void gibFrei(QWidget* panel);
     /// Alle hergeben; Reihenfolge wie aufgenommen.
-    QList<AppletWidget*> gibAlleFrei();
+    QList<QWidget*> gibAlleFrei();
 
     /// Aufgeklappt: ALLE Seiten stehen untereinander, man sieht die
     /// anderen Panels mit. Zugeklappt: Reiter, feste Hoehe.
@@ -113,7 +119,7 @@ public:
     void setAufgeklappt(bool an);
     bool aufgeklappt() const { return m_aufgeklappt; }
 
-    QList<AppletWidget*> seiten() const;
+    QList<QWidget*> seiten() const;
     int  seite() const;
     void zeigeSeite(int welche);
     bool istLeer() const;
@@ -121,7 +127,7 @@ public:
 signals:
     /// Jemand hat ein Panel wieder herausgeloest -- der Aufrufer legt
     /// es zurueck in ein eigenes Feld.
-    void herausgeloest(AppletWidget* panel);
+    void herausgeloest(QWidget* panel);
     /// Ein Reiter wurde HERAUSGEZOGEN: dasselbe wie oben, aber mit der
     /// Stelle, an der losgelassen wurde -- dort soll das Panel als
     /// eigenes Fenster stehen.
@@ -131,7 +137,7 @@ signals:
     /// Ziehen; hinaus ging es nur ueber einen Rechtsklick, den man
     /// kennen musz. Was hineingeht, musz auf demselben Weg wieder
     /// hinaus.
-    void herausgezogen(AppletWidget* panel, const QPoint& globalPos);
+    void herausgezogen(QWidget* panel, const QPoint& globalPos);
     void seiteGewechselt(int welche);
 
 protected:
@@ -142,20 +148,21 @@ private:
     void reiterNeu();
     void merkeStand() const;
     void chipNachziehen();
+    /// Der Name einer Seite: der Applet-Titel, sonst der Fenstertitel.
+    static QString nameVon(const QWidget* w);
     void ordneSeitenEin();
-    int  festeHoehe() const;
 
     QStackedWidget* m_stapel{nullptr};
     QWidget*        m_reiterleiste{nullptr};
     QHBoxLayout*    m_reiterReihe{nullptr};
     QLabel*         m_hinweis{nullptr};
-    QList<QPointer<AppletWidget>> m_inhalte;
+    QList<QPointer<QWidget>> m_inhalte;
     QList<QPushButton*> m_reiter;
     QPushButton* m_chip{nullptr};   ///< der Umschalter in der Kopfleiste
     /// Zugbeginn auf einem Reiter -- erst ab einer Strecke wird daraus
     /// ein Herausziehen statt eines Klicks.
     QPoint m_zugStart;
-    QPointer<AppletWidget> m_zugPanel;
+    QPointer<QWidget> m_zugPanel;
     QWidget* m_aufklapp{nullptr};   ///< traegt die Seiten, wenn offen
     bool     m_aufgeklappt{false};
 };

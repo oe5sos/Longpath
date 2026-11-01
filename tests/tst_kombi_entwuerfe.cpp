@@ -27,6 +27,7 @@
 #include <QStyleFactory>
 
 #include "gui/StyleConstants.h"
+#include "gui/applets/GridCellWidget.h"
 #include "gui/applets/KombiApplet.h"
 #include "gui/applets/RxApplet.h"
 #include "gui/applets/TxApplet.h"
@@ -182,19 +183,24 @@ private slots:
         }
         const QString dir = QString::fromLocal8Bit(dirRoh);
 
+        // Das Feld IN SEINEM GEHAEUSE -- der Umschalter sitzt seit
+        // Entwurf 3 in der Kopfleiste der Zelle, also zeigt ein Bild
+        // des Applets allein ihn gar nicht.
         RadioModel rm;
+        GridCellWidget zelle(QStringLiteral("probe"));
         KombiApplet feld(&rm);
         auto* rx = new RxApplet(nullptr, &rm, nullptr);
         auto* tx = new TxApplet(&rm, nullptr);
         feld.nimmAuf(rx);
         feld.nimmAuf(tx);
-        feld.resize(360, 420);
-        feld.show();
+        zelle.addWidget(&feld);
+        zelle.resize(360, 300);
+        zelle.show();
 
         for (int i = 0; i < 2; ++i) {
             feld.zeigeSeite(i);
             QTest::qWait(300);
-            const QImage bild = feld.grab().toImage();
+            const QImage bild = zelle.grab().toImage();
             const QString pfad = QStringLiteral("%1/kombi-echt-%2.png")
                                      .arg(dir)
                                      .arg(i == 0 ? QStringLiteral("rx")

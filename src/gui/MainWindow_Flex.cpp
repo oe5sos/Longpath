@@ -515,19 +515,43 @@ void MainWindow::wireFlex()
         disconnect(m_flexXitHzBand);
         m_flexXitHzBand = connect(ziel, &SliceModel::xitHzChanged, this,
                                   [xitHinaus](int) { xitHinaus(); });
+        // ── APF nur in CW (2026-11-01, am Geraet gemessen) ──────────
+        //
+        // Im Protokoll des Betreibers:
+        //
+        //   WRN: Befehl 23 abgelehnt, Code 0x50000061:
+        //        "slice set 0 apf=0"
+        //
+        // Die Scheibe war in Betrieb und auf LSB; andere Befehle an
+        // dieselbe Scheibe gingen durch. Die Maschine nimmt `apf`
+        // also nicht in jeder Betriebsart an -- bei ihr ist das
+        // Spitzenfilter eine CW-Hilfe. Statt bei jedem Klick eine
+        // Ablehnung zu ernten, geht es nur dort hinaus, wo sie es
+        // annimmt; sonst sagt eine Zeile, warum nicht.
+        //
+        // (Dasz es GENAU an CW haengt, ist aus der Ablehnung
+        // geschlossen, nicht aus einer Quelle. Am Geraet in CW noch
+        // zu bestaetigen.)
+        auto apfHinaus = [this, ziel]() {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            const DSPMode art = ziel->dspMode();
+            if (art != DSPMode::CWL && art != DSPMode::CWU) {
+                qCInfo(lcFlexGui) << "Flex: APF nur in CW — die Maschine "
+                                     "lehnt es sonst ab";
+                return;
+            }
+            m_radioModel->sendeFlexApf(ziel->apfEnabled());
+        };
         disconnect(m_flexApfBand);
         m_flexApfBand = connect(ziel, &SliceModel::apfEnabledChanged, this,
-                                [this](bool an) {
-            if (m_shuttingDown || !m_radioModel) { return; }
-            m_radioModel->sendeFlexApf(an);
-        });
+                                [apfHinaus](bool) { apfHinaus(); });
 
         // Und einmal gleich jetzt denselben Weg gehen, damit die
         // Maschine mit dem uebereinstimmt, was im Fenster steht --
         // und noch einmal, sobald sie ihre Scheibe gemeldet hat. Der
         // erste Griff faellt naemlich in die 143-ms-Luecke vom
         // 2026-10-31, in der es die Scheibennummer noch nicht gibt.
-        auto reglerHinaus = [this, ziel]() {
+        auto reglerHinaus = [this, ziel, apfHinaus]() {
             if (m_shuttingDown || !m_radioModel) { return; }
             m_radioModel->sendeFlexAgcModus(ziel->agcMode());
             m_radioModel->sendeFlexTonpegel(ziel->afGain());
@@ -535,7 +559,7 @@ void MainWindow::wireFlex()
             m_radioModel->sendeFlexBalance(ziel->audioPan());
             m_radioModel->sendeFlexRit(ziel->ritEnabled(), ziel->ritHz());
             m_radioModel->sendeFlexXit(ziel->xitEnabled(), ziel->xitHz());
-            m_radioModel->sendeFlexApf(ziel->apfEnabled());
+            apfHinaus();
         };
         disconnect(m_flexReglerNachtrag);
         m_flexReglerNachtrag = connect(m_radioModel,

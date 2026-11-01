@@ -2285,6 +2285,28 @@ void MainWindow::legeAufKombiFeld(const QString& appletId, const QPoint& globalP
     }
 }
 
+// ── Ein fremdes Panel aus dem Kombi-Feld zurueckgeben ──────────────
+//
+// Betreiber, 2026-11-01: „ich will da auch den rotor und andere
+// sache reinziehen können" -- und: „wo in der Vergangenheit das
+// Panel ganz rechts von oben bis unten mit Rotor bestueckt war,
+// moechte ich das Combined haben ... somit habe ich kein
+// Hoehenprofil und kein Darstellungsprofil."
+//
+// Was kein Applet ist (Rotor/Logbuch), gehoert nicht in die Spalte,
+// sondern in sein eigenes Werkzeugfenster -- genau dorthin, wo es
+// losgelassen wurde.
+void MainWindow::gibFremdesPanelZurueck(QWidget* panel, const QRect& dort)
+{
+    if (m_shuttingDown || !panel) { return; }
+    auto* fenster = new ToolWindow(panel, QStringLiteral("RotorLog"),
+                                   QStringLiteral("Rotor / Log"), this);
+    if (dort.isValid()) { fenster->setGeometry(dort); }
+    fenster->show();
+    fenster->raise();
+    m_rotorWindow = fenster;
+}
+
 void MainWindow::dockAppletBack(const QString& appletId)
 {
     // ── Beim Beenden: NICHTS mehr andocken ───────────────────────────
@@ -7638,10 +7660,16 @@ void MainWindow::populateDefaultMeter()
         // fremder Stelle aufgeht, sieht aus wie ein neues
         // (Betreiber, 2026-08-20).
         connect(m_kombiApplet, &KombiApplet::herausgezogen, this,
-                [this](AppletWidget* w, const QPoint& wo) {
+                [this](QWidget* w, const QPoint& wo) {
             if (m_shuttingDown || !w) { return; }
             const QRect dort(wo.x() - 40, wo.y() - 10, 360, 320);
-            detachApplet(w, -1, dort, QString());
+            if (auto* a = qobject_cast<AppletWidget*>(w)) {
+                detachApplet(a, -1, dort, QString());
+                return;
+            }
+            // Kein Applet (Rotor/Logbuch): es bekommt sein eigenes
+            // Werkzeugfenster zurueck, dort, wo losgelassen wurde.
+            gibFremdesPanelZurueck(w, dort);
         });
         // Das Zurueckgeben verdrahtet die Spalte selbst
         // (AppletPanelWidget::addApplet) -- sie verwaltet ihre Felder,
@@ -17453,6 +17481,21 @@ void MainWindow::detachRotorPanel()
 
     m_rotorWindow = new ToolWindow(panel, QStringLiteral("RotorLog"),
                                    QStringLiteral("Rotor / Log"), this);
+    // Auf ein Kombi-Feld abgelegt: der Inhalt wandert hinein, das
+    // leere Fenster verschwindet. Betreiber, 2026-11-01: „ich will da
+    // auch den rotor und andere sache reinziehen können."
+    connect(m_rotorWindow, &ToolWindow::abgelegtBei, this,
+            [this](const QPoint& wo) {
+        if (m_shuttingDown || !m_rotorWindow) { return; }
+        KombiApplet* ziel = KombiApplet::unter(wo);
+        if (!ziel) { return; }
+        ToolWindow* fenster = m_rotorWindow;
+        m_rotorWindow = nullptr;
+        fenster->hide();
+        QWidget* inhalt = fenster->releaseContent();
+        fenster->deleteLater();
+        if (inhalt) { ziel->nimmAuf(inhalt); }
+    });
     connect(m_rotorWindow, &ToolWindow::dockRequested, this,
             [this](const QString&) { dockRotorPanel(); });
     m_rotorWindow->show();

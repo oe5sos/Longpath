@@ -118,10 +118,10 @@ QString KombiApplet::appletTitle() const
     return tr("Combined");
 }
 
-void KombiApplet::nimmAuf(AppletWidget* panel)
+void KombiApplet::nimmAuf(QWidget* panel)
 {
     if (!panel || !m_stapel) { return; }
-    for (const QPointer<AppletWidget>& w : m_inhalte) {
+    for (const QPointer<QWidget>& w : m_inhalte) {
         if (w == panel) { return; }
     }
     m_inhalte.append(panel);
@@ -131,7 +131,7 @@ void KombiApplet::nimmAuf(AppletWidget* panel)
     zeigeSeite(m_inhalte.size() - 1);
 }
 
-void KombiApplet::gibFrei(AppletWidget* panel)
+void KombiApplet::gibFrei(QWidget* panel)
 {
     if (!panel || !m_stapel) { return; }
     int weg = -1;
@@ -148,11 +148,11 @@ void KombiApplet::gibFrei(AppletWidget* panel)
     emit herausgeloest(panel);
 }
 
-QList<AppletWidget*> KombiApplet::gibAlleFrei()
+QList<QWidget*> KombiApplet::gibAlleFrei()
 {
-    QList<AppletWidget*> raus;
+    QList<QWidget*> raus;
     while (!m_inhalte.isEmpty()) {
-        AppletWidget* w = m_inhalte.first().data();
+        QWidget* w = m_inhalte.first().data();
         if (!w) { m_inhalte.removeFirst(); continue; }
         raus.append(w);
         gibFrei(w);
@@ -202,9 +202,9 @@ void KombiApplet::reiterNeu()
                    QLatin1String(Style::kBorder),
                    QLatin1String(Style::kTextTertiary));
     for (int i = 0; i < m_inhalte.size(); ++i) {
-        AppletWidget* w = m_inhalte.at(i).data();
+        QWidget* w = m_inhalte.at(i).data();
         if (!w) { continue; }
-        auto* b = new QPushButton(w->appletTitle(), m_reiterleiste);
+        auto* b = new QPushButton(nameVon(w), m_reiterleiste);
         b->setCheckable(true);
         b->setCursor(Qt::PointingHandCursor);
         b->setStyleSheet(css);
@@ -258,7 +258,7 @@ bool KombiApplet::eventFilter(QObject* watched, QEvent* ev)
     if (!knopf) { return AppletWidget::eventFilter(watched, ev); }
 
     const int i = knopf->property("kombiSeite").toInt();
-    const QList<AppletWidget*> alle = seiten();
+    const QList<QWidget*> alle = seiten();
 
     switch (ev->type()) {
     case QEvent::MouseButtonPress: {
@@ -277,7 +277,7 @@ bool KombiApplet::eventFilter(QObject* watched, QEvent* ev)
                 < QApplication::startDragDistance()) {
             break;
         }
-        AppletWidget* raus = m_zugPanel.data();
+        QWidget* raus = m_zugPanel.data();
         m_zugPanel = nullptr;
         m_zugStart = QPoint();
         // Erst aus dem Feld, dann die Stelle melden: wer zuhoert,
@@ -320,18 +320,6 @@ void KombiApplet::setAufgeklappt(bool an)
     ordneSeitenEin();
 }
 
-// Die feste Hoehe ist die GROESZTE der Seiten -- nicht die der
-// gerade sichtbaren. Sonst waere die Hoehe wieder eine Funktion des
-// Reiters, und genau das soll sie nicht sein.
-int KombiApplet::festeHoehe() const
-{
-    int h = 0;
-    for (const QPointer<AppletWidget>& w : m_inhalte) {
-        if (w) { h = qMax(h, w->sizeHint().height()); }
-    }
-    return h > 0 ? h : 160;
-}
-
 void KombiApplet::ordneSeitenEin()
 {
     if (!m_stapel || !m_aufklapp) { return; }
@@ -339,7 +327,7 @@ void KombiApplet::ordneSeitenEin()
     if (!senkrecht) { return; }
 
     if (m_aufgeklappt) {
-        for (const QPointer<AppletWidget>& w : m_inhalte) {
+        for (const QPointer<QWidget>& w : m_inhalte) {
             if (!w) { continue; }
             if (m_stapel->indexOf(w) >= 0) { m_stapel->removeWidget(w); }
             senkrecht->addWidget(w.data());
@@ -350,7 +338,7 @@ void KombiApplet::ordneSeitenEin()
         setMaximumHeight(QWIDGETSIZE_MAX);
         setMinimumHeight(0);
     } else {
-        for (const QPointer<AppletWidget>& w : m_inhalte) {
+        for (const QPointer<QWidget>& w : m_inhalte) {
             if (!w) { continue; }
             senkrecht->removeWidget(w.data());
             if (m_stapel->indexOf(w) < 0) { m_stapel->addWidget(w.data()); }
@@ -358,9 +346,21 @@ void KombiApplet::ordneSeitenEin()
         m_aufklapp->setVisible(false);
         m_stapel->setVisible(!m_inhalte.isEmpty());
         zeigeSeite(seite());
-        const int h = festeHoehe() + m_reiterleiste->sizeHint().height()
-                      + 3 * Style::kPanelGapPx;
-        setFixedHeight(h);
+        // ── KEINE feste Hoehe mehr (2026-11-01) ──────────────────────
+        //
+        // Betreiber: „beim drüber scrollen verschwindet einiges".
+        // Gesehen in der laufenden App: das Feld war viel hoeher als
+        // sein Inhalt, darunter eine groesze schwarze Flaeche, und in
+        // der Spalte schob es die Nachbarn aus dem Bild.
+        //
+        // `setFixedHeight` war der falsche Griff. Die feste Groesze,
+        // um die es ihm ging, macht der Stapel von selbst: ein
+        // QStackedWidget nimmt die Hoehe der GROESZTEN Seite, nicht
+        // die der sichtbaren -- das Feld springt beim Umschalten also
+        // ohnehin nicht. Eine Untergrenze genuegt, damit es nicht
+        // zusammenfaellt; nach oben entscheidet das Gehaeuse.
+        setMaximumHeight(QWIDGETSIZE_MAX);
+        setMinimumHeight(0);
     }
     updateGeometry();
 }
@@ -400,7 +400,7 @@ QWidget* KombiApplet::kopfleistenWidget()
         });
         connect(m_chip, &QWidget::customContextMenuRequested, this,
                 [this](const QPoint&) {
-            const QList<AppletWidget*> s = seiten();
+            const QList<QWidget*> s = seiten();
             const int i = seite();
             if (i >= 0 && i < s.size()) { gibFrei(s.at(i)); }
         });
@@ -413,12 +413,25 @@ QWidget* KombiApplet::kopfleistenWidget()
 
 // Was auf dem Chip steht: die laufende Seite und, wenn es mehr als
 // eine gibt, ein Pfeil als Hinweis, dasz es weitergeht.
+// Der Name einer Seite. Ein Applet kennt seinen Titel selbst; alles
+// andere (Rotor, Logbuch) traegt ihn als Fenstertitel.
+QString KombiApplet::nameVon(const QWidget* w)
+{
+    if (!w) { return QString(); }
+    if (auto* a = qobject_cast<const AppletWidget*>(w)) {
+        return a->appletTitle();
+    }
+    if (!w->windowTitle().isEmpty()) { return w->windowTitle(); }
+    return w->objectName().isEmpty() ? QStringLiteral("Panel")
+                                     : w->objectName();
+}
+
 void KombiApplet::chipNachziehen()
 {
     if (!m_chip) { return; }
-    const QList<AppletWidget*> s = seiten();
+    const QList<QWidget*> s = seiten();
     const int i = seite();
-    const QString name = (i >= 0 && i < s.size()) ? s.at(i)->appletTitle()
+    const QString name = (i >= 0 && i < s.size()) ? nameVon(s.at(i))
                                                   : tr("empty");
     m_chip->setText(s.size() > 1 ? QStringLiteral("%1 \u203a").arg(name)
                                  : name);
@@ -432,10 +445,10 @@ void KombiApplet::chipNachziehen()
     if (m_reiterleiste) { m_reiterleiste->setVisible(false); }
 }
 
-QList<AppletWidget*> KombiApplet::seiten() const
+QList<QWidget*> KombiApplet::seiten() const
 {
-    QList<AppletWidget*> raus;
-    for (const QPointer<AppletWidget>& w : m_inhalte) {
+    QList<QWidget*> raus;
+    for (const QPointer<QWidget>& w : m_inhalte) {
         if (w) { raus.append(w.data()); }
     }
     return raus;
@@ -470,8 +483,12 @@ void KombiApplet::zeigeSeite(int welche)
 void KombiApplet::merkeStand() const
 {
     QStringList ids;
-    for (const QPointer<AppletWidget>& w : m_inhalte) {
-        if (w) { ids << w->appletId(); }
+    for (const QPointer<QWidget>& w : m_inhalte) {
+        if (auto* a = qobject_cast<AppletWidget*>(w.data())) {
+            ids << a->appletId();
+        } else if (w) {
+            ids << w->objectName();
+        }
     }
     AppSettings::instance().setValue(standSchluessel(),
                                      ids.join(QLatin1Char(',')));
@@ -481,23 +498,32 @@ void KombiApplet::syncFromModel()
 {
     // ALLE, nicht nur die sichtbare: wer umschaltet, soll keinen
     // veralteten Stand vorfinden.
-    for (const QPointer<AppletWidget>& w : m_inhalte) {
-        if (w) { w->syncFromModel(); }
+    // Nur die Applets koennen das -- ein Rotorfenster hat keinen
+    // Modellabgleich.
+    for (const QPointer<QWidget>& w : m_inhalte) {
+        if (auto* a = qobject_cast<AppletWidget*>(w.data())) {
+            a->syncFromModel();
+        }
     }
 }
 
 bool KombiApplet::hasExtendedSettings() const
 {
-    const QList<AppletWidget*> s = seiten();
+    const QList<QWidget*> s = seiten();
     const int i = seite();
-    return i >= 0 && i < s.size() && s.at(i)->hasExtendedSettings();
+    if (i < 0 || i >= s.size()) { return false; }
+    auto* a = qobject_cast<AppletWidget*>(s.at(i));
+    return a && a->hasExtendedSettings();
 }
 
 void KombiApplet::openExtendedSettings()
 {
-    const QList<AppletWidget*> s = seiten();
+    const QList<QWidget*> s = seiten();
     const int i = seite();
-    if (i >= 0 && i < s.size()) { s.at(i)->openExtendedSettings(); }
+    if (i < 0 || i >= s.size()) { return; }
+    if (auto* a = qobject_cast<AppletWidget*>(s.at(i))) {
+        a->openExtendedSettings();
+    }
 }
 
 } // namespace Longpath

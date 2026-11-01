@@ -42,6 +42,8 @@ ToolWindow::ToolWindow(QWidget* content, const QString& id,
     m_titleBar = new WindowTitleBar(title, this);
     // × und Pfeil docken beide DIREKT an -- nicht ueber close(), denn
     // ein QCloseEvent dockt seit dem 2026-09-17 nie mehr (closeEvent()).
+    connect(m_titleBar, &WindowTitleBar::zugEndeBei, this,
+            [this](const QPoint& wo) { emit abgelegtBei(wo); });
     connect(m_titleBar, &WindowTitleBar::closeRequested, this, [this]() {
         emit dockRequested(m_id);
     });
