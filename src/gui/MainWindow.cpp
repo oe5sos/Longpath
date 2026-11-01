@@ -2330,12 +2330,23 @@ void MainWindow::zeigeKombiListe(KombiApplet* feld, const QPoint& globalPos)
         ++angeboten;
     }
 
-    // Der Rotor ist kein Applet; er steht trotzdem zur Wahl, solange
-    // er ein eigenes Fenster hat.
-    if (m_rotorWindow && m_rotorWindow->content()
-        && !schonDrin(m_rotorWindow->content())) {
+    // ── Der Rotor, auch wenn er noch in der Spalte sitzt ────────────
+    //
+    // Betreiber, 2026-11-01: „finde rotor nicht mit rechter maustaste".
+    // Er stand nur zur Wahl, solange er ein eigenes FENSTER hatte --
+    // sitzt er angedockt in der Spalte, gab es ihn im Menue nicht.
+    // Das ist aber genau der Zustand nach einem Neustart.
+    //
+    // Jetzt steht er immer da; ist er angedockt, wird er fuer den
+    // Weg hierher kurz zum Fenster (`detachRotorPanel`) und geht von
+    // dort ins Feld.
+    const bool rotorSchonDrin =
+        m_rotorWindow && m_rotorWindow->content()
+        && schonDrin(m_rotorWindow->content());
+    if (!rotorSchonDrin) {
         QAction* act = menue.addAction(QStringLiteral("Rotor / Log"));
         connect(act, &QAction::triggered, this, [this, feld]() {
+            if (!m_rotorWindow) { detachRotorPanel(); }
             if (!m_rotorWindow) { return; }
             ToolWindow* fenster = m_rotorWindow;
             m_rotorWindow = nullptr;
@@ -2377,6 +2388,26 @@ void MainWindow::holeInsKombiFeld(KombiApplet* feld, AppletWidget* applet,
     }
     if (m_appletPanel) { m_appletPanel->removeApplet(applet); }
     feld->nimmAuf(applet);
+
+    // ── Die leere Huelle geht mit (2026-11-01) ───────────────────────
+    //
+    // Betreiber: „wieso kann ich das RX 1 panel nicht schließen" --
+    // der Container hat kein x, und nachdem seine Panels ins Feld
+    // gewandert waren, stand er leer im Bild. Beim ZIEHEN raeumte ich
+    // ihn schon weg; ueber die Liste nicht. Jetzt beide Wege.
+    if (!m_appletPanel) { return; }
+    bool nochWas = false;
+    for (AppletWidget* a : m_appletPanel->applets()) {
+        if (a && a != feld && a->isVisible()) { nochWas = true; break; }
+    }
+    if (nochWas) { return; }
+    if (QWidget* spaltenFenster = m_appletPanel->window()) {
+        if (spaltenFenster != this) {
+            qCInfo(lcConnection) << "Kombi: die Spalte ist leer — "
+                                    "ihr Fenster geht mit";
+            spaltenFenster->hide();
+        }
+    }
 }
 
 void MainWindow::gibFremdesPanelZurueck(QWidget* panel, const QRect& dort)
