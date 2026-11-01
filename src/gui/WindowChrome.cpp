@@ -260,6 +260,8 @@ void WindowTitleBar::mouseReleaseEvent(QMouseEvent* ev)
 {
     if (FramelessMoveHelper::finish(this, ev)) {
         setCursor(Qt::OpenHandCursor);
+        // Erst jetzt steht fest, WO das Fenster gelandet ist.
+        emit zugEndeBei(ev->globalPosition().toPoint());
         return;
     }
     QWidget::mouseReleaseEvent(ev);

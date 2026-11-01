@@ -1298,6 +1298,8 @@ private:
     /// Zurück in die Spalte, an die gemerkte Stelle. Räumt das Fenster
     /// ab. Tut nichts, wenn das Applet nicht abgelöst ist.
     void dockAppletBack(const QString& appletId);
+    /// Ein schwebendes Panel auf einem Kombi-Feld ablegen (2026-11-01).
+    void legeAufKombiFeld(const QString& appletId, const QPoint& globalPos);
 
     /// Sichtbarkeit anwenden — auf die Spalte ODER auf das Fenster, je
     /// nachdem, wo das Applet gerade steht. Ohne diese Weiche liefe ein

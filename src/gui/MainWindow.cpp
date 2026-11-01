@@ -2181,6 +2181,19 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     }
     tGeometrie = loeseTeile.elapsed();
 
+    // ── Ueber einem Kombi-Feld abgelegt (2026-11-01) ──────────────────
+    //
+    // Betreiber: „nimmt es nicht auf". Richtig -- das Hineinziehen hing
+    // am Ziehen in der SPALTE, und seine Panels schweben alle. Ein
+    // schwebendes Fenster zieht niemand an der Kopfleiste der Spalte;
+    // es zieht am eigenen Fensterkopf, und der meldet jetzt, wo er
+    // losgelassen wurde.
+    //
+    // Dieselbe Lehre wie am 2026-10-31 beim Zahnrad: ein Applet hat
+    // ZWEI Gehaeuse, und wer nur eines bedient, baut etwas, das der
+    // Betreiber nicht erreicht.
+    connect(win, &AppletFloatingWindow::abgelegtBei, this,
+            [this, id](const QPoint& wo) { legeAufKombiFeld(id, wo); });
     connect(win, &AppletFloatingWindow::dockRequested,
             this, &MainWindow::dockAppletBack);
     connect(win, &AppletFloatingWindow::geometrySettled, this,
@@ -2231,6 +2244,48 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
             << " ms, show() " << (tShow > 0 ? tShow - tGeometrie : 0)
             << " ms, Vorgabegroesse " << (tGroesse > 0 ? tGroesse - tShow : 0)
             << " ms, zusammen " << loeseTeile.elapsed() << " ms";
+    }
+}
+
+// ── Ein schwebendes Panel auf einem Kombi-Feld ablegen ─────────────
+//
+// Betreiber, 2026-11-01: „nimmt es nicht auf". Das Hineinziehen hing
+// am Ziehen in der SPALTE; seine Panels schweben aber alle. Hier ist
+// der zweite Weg: das Fenster meldet, wo es losgelassen wurde, und
+// liegt dort ein Kombi-Feld, wandert das Panel hinein.
+//
+// Das Fenster verschwindet dabei -- es hat keinen Inhalt mehr. Den
+// Rest (Reiter, Titel, Merken) macht das Feld selbst.
+void MainWindow::legeAufKombiFeld(const QString& appletId, const QPoint& globalPos)
+{
+    if (m_shuttingDown) { return; }
+    auto* win = m_floatingApplets.value(appletId, nullptr);
+    if (!win) { return; }
+    // Ein Kombi-Feld ueber sich selbst: ginge nicht gut aus.
+    if (qobject_cast<KombiApplet*>(win->applet())) { return; }
+
+    KombiApplet* ziel = nullptr;
+    for (AppletWidget* a : m_appletsById) {
+        auto* k = qobject_cast<KombiApplet*>(a);
+        if (!k || !k->isVisible()) { continue; }
+        // Das sichtbare Rechteck auf dem Schirm -- egal, ob das Feld
+        // in der Spalte steht oder selbst schwebt. Genau das ist der
+        // Unterschied zum ersten Versuch, der nur die Spalte kannte.
+        const QRect r(k->mapToGlobal(QPoint(0, 0)), k->size());
+        if (r.contains(globalPos)) { ziel = k; break; }
+    }
+    if (!ziel) { return; }
+
+    m_floatingApplets.remove(appletId);
+    win->hide();
+    AppletWidget* applet = win->releaseApplet();
+    win->deleteLater();
+    if (!applet) { return; }
+
+    ziel->nimmAuf(applet);
+    if (m_layoutProfiles) {
+        m_layoutProfiles->captureIntoCurrent();
+        m_layoutProfiles->save();
     }
 }
 

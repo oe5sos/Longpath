@@ -166,6 +166,41 @@ private slots:
                  "die unsichtbare Seite wurde nicht abgeglichen — beim "
                  "Umschalten stuende dort ein alter Stand");
     }
+
+    // ── Ein Panel hat ZWEI Gehaeuse ─────────────────────────────────
+    //
+    // Betreiber, 2026-11-01: „nimmt es nicht auf". Der erste Versuch
+    // hing nur am Ziehen in der SPALTE -- seine Panels schweben aber
+    // alle. Dieselbe Lehre wie beim Zahnrad am 2026-10-31: wer nur
+    // ein Gehaeuse bedient, baut etwas, das der Betreiber nicht
+    // erreicht.
+    //
+    // Darum beide Wege festhalten: die Spalte fragt beim Loslassen,
+    // worueber gezogen wurde; das schwebende Fenster meldet, wo es
+    // abgelegt wurde.
+    void beideGehaeuseNehmenAuf()
+    {
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+        const auto lies = [&](const QString& rel) {
+            QFile f(QString::fromLocal8Bit(root) + rel);
+            return f.open(QIODevice::ReadOnly)
+                       ? QString::fromUtf8(f.readAll()) : QString();
+        };
+
+        const QString spalte = lies(QStringLiteral(
+            "/src/gui/applets/AppletPanelWidget.cpp"));
+        QVERIFY2(spalte.contains(QStringLiteral("nimmKombiAuf")),
+                 "die Spalte fragt beim Loslassen nicht mehr, ob dort ein "
+                 "Kombi-Feld liegt");
+
+        const QString fenster = lies(QStringLiteral("/src/gui/MainWindow.cpp"));
+        QVERIFY2(fenster.contains(QStringLiteral("AppletFloatingWindow::abgelegtBei")),
+                 "ein SCHWEBENDES Panel kann nicht mehr abgelegt werden — und "
+                 "genau die schweben beim Betreiber alle");
+        QVERIFY2(fenster.contains(QStringLiteral("legeAufKombiFeld")),
+                 "das Ablegen fuehrt ins Leere");
+    }
 };
 
 QTEST_MAIN(TstKombiFeld)

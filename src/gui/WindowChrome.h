@@ -72,6 +72,10 @@ public:
 
 signals:
     void lockedChanged(bool locked);
+    /// Ein Zug am Fensterkopf ist zu Ende -- mit der Stelle, an der
+    /// losgelassen wurde. Wer wissen will, WORUEBER das Fenster
+    /// abgelegt wurde (Kombi-Feld), haengt sich hier an.
+    void zugEndeBei(const QPoint& globalPos);
 
 public:
 
