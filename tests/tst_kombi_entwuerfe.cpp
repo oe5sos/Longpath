@@ -170,6 +170,23 @@ private slots:
         malenKopf(dir, 4, QStringLiteral("Der Titel ist die Seite"));
     }
 
+    // Dritte Runde: die FORM des Umschalters in der Kopfleiste.
+    //
+    // Betreiber, 2026-11-01, zum gebauten Chip: "aber die pillen
+    // gefallen mir nicht". Also dieselbe Stelle, vier Formen.
+    void chipformen()
+    {
+        const QByteArray dirRoh = qgetenv("LONGPATH_GRAB_DIR");
+        if (dirRoh.isEmpty() || qgetenv("LONGPATH_ENTWURF") != "1") {
+            QSKIP("Zeichenwerkzeug: LONGPATH_GRAB_DIR + LONGPATH_ENTWURF=1");
+        }
+        const QString dir = QString::fromLocal8Bit(dirRoh);
+        malenForm(dir, 1, QStringLiteral("Nur Text, kein Rahmen"));
+        malenForm(dir, 2, QStringLiteral("Text mit Strich darunter"));
+        malenForm(dir, 3, QStringLiteral("Eckig statt Pille"));
+        malenForm(dir, 4, QStringLiteral("Zwei Pfeile, Name dazwischen"));
+    }
+
     // ── Nach der Wahl: das ECHTE Bauteil ────────────────────────────
     //
     // Freihand gemalte Entwuerfe sehen im eingebauten Zustand anders
@@ -211,6 +228,108 @@ private slots:
     }
 
 private:
+    // Nur die Kopfleiste, gross genug zum Beurteilen: die Form des
+    // Umschalters ist das Thema, nicht der Inhalt darunter.
+    void malenForm(const QString& dir, int nummer, const QString& name)
+    {
+        const int blattB = kBreite + 2 * kRand;
+        const int blattH = 2 * 54 + 3 * kRand + 34;
+        QImage bild(blattB * 2, blattH * 2, QImage::Format_ARGB32_Premultiplied);
+        bild.setDevicePixelRatio(2.0);
+        bild.setDotsPerMeterX(int(144 / 0.0254));
+        bild.setDotsPerMeterY(int(144 / 0.0254));
+        bild.fill(c("#141418"));
+
+        QPainter p(&bild);
+        p.setRenderHint(QPainter::Antialiasing, true);
+        p.setRenderHint(QPainter::TextAntialiasing, true);
+        QFont kopf = p.font();
+        kopf.setPointSizeF(9.0);
+        kopf.setBold(true);
+        p.setFont(kopf);
+        p.setPen(c(Style::kTextPrimary));
+        p.drawText(QRect(kRand, 6, blattB - 2 * kRand, 18),
+                   Qt::AlignVCenter | Qt::AlignLeft,
+                   QStringLiteral("Form %1 — %2").arg(nummer).arg(name));
+
+        for (int i = 0; i < 2; ++i) {
+            const QRect feld(kRand, 30 + kRand + i * (54 + kRand), kBreite, 54);
+            maleForm(p, feld, nummer, i == 1);
+        }
+        p.end();
+        const QString pfad = QStringLiteral("%1/kombi-form-%2.png")
+                                 .arg(dir).arg(nummer);
+        QVERIFY2(bild.save(pfad), qPrintable(pfad));
+        qInfo() << "Blatt:" << pfad << bild.size();
+    }
+
+    void maleForm(QPainter& p, const QRect& feld, int nummer, bool tx)
+    {
+        p.fillRect(feld, c(Style::kPanelBg));
+        p.setPen(QPen(c(Style::kBorder), 1));
+        p.drawRect(feld.adjusted(0, 0, -1, -1));
+        const QRect kopfR(feld.left(), feld.top(), feld.width(), kKopfH + 4);
+        p.fillRect(kopfR, c(Style::kButtonBg));
+        p.drawLine(kopfR.bottomLeft(), kopfR.bottomRight());
+
+        QFont f = p.font();
+        f.setPointSizeF(8.0);
+        f.setBold(true);
+        p.setFont(f);
+        p.setPen(c(Style::kTextTertiary));
+        p.drawText(kopfR.adjusted(8, 0, 0, 0), Qt::AlignVCenter | Qt::AlignLeft,
+                   QStringLiteral("COMBINED"));
+
+        const QString an = tx ? QStringLiteral("TX") : QStringLiteral("RX");
+        const QRect platz(kopfR.left() + 116, kopfR.top() + 3, 62,
+                          kopfR.height() - 6);
+
+        if (nummer == 1) {
+            p.setPen(c(Style::kTextPrimary));
+            p.drawText(platz, Qt::AlignVCenter | Qt::AlignLeft,
+                       QStringLiteral("%1 ›").arg(an));
+        } else if (nummer == 2) {
+            p.setPen(c(Style::kTextPrimary));
+            p.drawText(platz, Qt::AlignVCenter | Qt::AlignLeft,
+                       QStringLiteral("%1 ›").arg(an));
+            const QRect strich(platz.left(), platz.bottom() - 1, 30, 1);
+            p.fillRect(strich, c(Style::kTextTertiary));
+        } else if (nummer == 3) {
+            p.fillRect(platz, c(Style::kPanelBg));
+            p.setPen(QPen(c(Style::kBorder), 1));
+            p.drawRect(platz);
+            p.setPen(c(Style::kTextPrimary));
+            p.drawText(platz, Qt::AlignCenter,
+                       QStringLiteral("%1 ›").arg(an));
+        } else {
+            p.setPen(c(Style::kTextTertiary));
+            p.drawText(QRect(platz.left(), platz.top(), 12, platz.height()),
+                       Qt::AlignCenter, QStringLiteral("‹"));
+            p.drawText(QRect(platz.right() - 12, platz.top(), 12,
+                             platz.height()),
+                       Qt::AlignCenter, QStringLiteral("›"));
+            p.setPen(c(Style::kTextPrimary));
+            p.drawText(platz, Qt::AlignCenter, an);
+        }
+
+        p.setPen(c(Style::kTextTertiary));
+        p.drawText(kopfR.adjusted(0, 0, -22, 0),
+                   Qt::AlignVCenter | Qt::AlignRight, QStringLiteral("⚙"));
+        p.drawText(kopfR.adjusted(0, 0, -8, 0),
+                   Qt::AlignVCenter | Qt::AlignRight, QStringLiteral("✕"));
+
+        QFont k = p.font();
+        k.setPointSizeF(7.5);
+        k.setBold(false);
+        p.setFont(k);
+        p.setPen(c(Style::kTextInactive));
+        p.drawText(QRect(feld.left() + 10, kopfR.bottom() + 6,
+                         feld.width() - 20, 18),
+                   Qt::AlignVCenter | Qt::AlignLeft,
+                   tx ? QStringLiteral("POWER   TUNE   MIC")
+                      : QStringLiteral("AF   SQL   AGC-T"));
+    }
+
     void malenKopf(const QString& dir, int nummer, const QString& name)
     {
         const int blattB = kBreite + 2 * kRand;
