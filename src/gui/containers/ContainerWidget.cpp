@@ -984,7 +984,13 @@ bool ContainerWidget::eventFilter(QObject* watched, QEvent* event)
             updateDrag(me->globalPosition().toPoint());
             return true;
         } else if (event->type() == QEvent::MouseButtonRelease && m_dragging) {
+            QMouseEvent* me = static_cast<QMouseEvent*>(event);
+            const QPoint wo = me->globalPosition().toPoint();
             endDrag();
+            // Wo der Container gelandet ist -- fuer das Kombi-Feld
+            // (2026-11-01). Hier wird nichts entschieden, nur
+            // gemeldet: was dort liegt, weisz das Hauptfenster.
+            emit zugEndeBei(wo);
             return true;
         }
     }

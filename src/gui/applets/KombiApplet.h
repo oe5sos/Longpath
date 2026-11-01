@@ -105,7 +105,20 @@ signals:
     /// Jemand hat ein Panel wieder herausgeloest -- der Aufrufer legt
     /// es zurueck in ein eigenes Feld.
     void herausgeloest(AppletWidget* panel);
+    /// Ein Reiter wurde HERAUSGEZOGEN: dasselbe wie oben, aber mit der
+    /// Stelle, an der losgelassen wurde -- dort soll das Panel als
+    /// eigenes Fenster stehen.
+    ///
+    /// Betreiber, 2026-11-01: „frequenz lässt sich reinziehen, soll
+    /// sich aber wieder rausziehen lassen!" Hinein geht es durch
+    /// Ziehen; hinaus ging es nur ueber einen Rechtsklick, den man
+    /// kennen musz. Was hineingeht, musz auf demselben Weg wieder
+    /// hinaus.
+    void herausgezogen(AppletWidget* panel, const QPoint& globalPos);
     void seiteGewechselt(int welche);
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* ev) override;
 
 private:
     void baueReiter();
@@ -118,6 +131,10 @@ private:
     QLabel*         m_hinweis{nullptr};
     QList<QPointer<AppletWidget>> m_inhalte;
     QList<QPushButton*> m_reiter;
+    /// Zugbeginn auf einem Reiter -- erst ab einer Strecke wird daraus
+    /// ein Herausziehen statt eines Klicks.
+    QPoint m_zugStart;
+    QPointer<AppletWidget> m_zugPanel;
 };
 
 } // namespace Longpath

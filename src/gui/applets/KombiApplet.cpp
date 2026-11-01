@@ -16,7 +16,9 @@
 #include "core/AppSettings.h"
 #include "gui/StyleConstants.h"
 
+#include <QApplication>
 #include <QHBoxLayout>
+#include <QMouseEvent>
 #include <QLabel>
 #include <QPushButton>
 #include <QSizePolicy>
@@ -159,7 +161,28 @@ void KombiApplet::reiterNeu()
     for (QPushButton* b : m_reiter) { b->deleteLater(); }
     m_reiter.clear();
 
-    const QString css = Style::buttonBaseStyle() + Style::blueCheckedStyle();
+    // ── Schwarz, nicht blau (2026-11-01) ────────────────────────────
+    //
+    // Betreiber zum ersten Bau: „die farbe ist auch blau und nicht
+    // schwarz". Zu Recht -- ein Reiter ueber die volle Panelbreite in
+    // der Akzentfarbe ist eine grosze FLAECHE Farbe, und der Hausstil
+    // sagt: Farbe bedeckt hoechstens zwei Prozent. Der aktive Reiter
+    // bleibt jetzt dunkel wie das Panel; erkennbar ist er an der
+    // helleren Schrift und an einem schmalen Strich darunter. Das ist
+    // dieselbe Menge Farbe wie in Entwurf 4, nur ueber die ganze
+    // Breite.
+    const QString css =
+        Style::buttonBaseStyle()
+        + QStringLiteral(
+              "QPushButton:checked {"
+              "  background: %1; color: %2;"
+              "  border: 1px solid %3;"
+              "  border-bottom: 2px solid %4;"
+              "}")
+              .arg(QLatin1String(Style::kPanelBg),
+                   QLatin1String(Style::kTextPrimary),
+                   QLatin1String(Style::kBorder),
+                   QLatin1String(Style::kAccent));
     for (int i = 0; i < m_inhalte.size(); ++i) {
         AppletWidget* w = m_inhalte.at(i).data();
         if (!w) { continue; }
@@ -177,6 +200,9 @@ void KombiApplet::reiterNeu()
                 [this, i]() { zeigeSeite(i); });
         connect(b, &QWidget::customContextMenuRequested, this,
                 [this, w](const QPoint&) { gibFrei(w); });
+        // Herausziehen: der Reiter selbst ist der Griff.
+        b->installEventFilter(this);
+        b->setProperty("kombiSeite", i);
         m_reiterReihe->insertWidget(i, b, 1);   // gleiche Breite fuer jeden
         m_reiter.append(b);
     }
@@ -188,6 +214,59 @@ void KombiApplet::reiterNeu()
 
     if (!leer) { zeigeSeite(qBound(0, seite(), m_inhalte.size() - 1)); }
     merkeStand();
+}
+
+// ── Ein Reiter als Griff ───────────────────────────────────────────
+//
+// Betreiber, 2026-11-01: „frequenz lässt sich reinziehen, soll sich
+// aber wieder rausziehen lassen!" Hinein geht es durch Ziehen; hinaus
+// ging es nur ueber einen Rechtsklick -- einen Weg, den man kennen
+// musz. Was auf einem Weg hineingeht, musz denselben Weg hinaus.
+//
+// Erst ab einer Strecke wird aus dem Druck ein Zug (Qt's eigene
+// Startstrecke), sonst waere jeder Klick ein halbes Herausziehen.
+bool KombiApplet::eventFilter(QObject* watched, QEvent* ev)
+{
+    auto* knopf = qobject_cast<QPushButton*>(watched);
+    if (!knopf) { return AppletWidget::eventFilter(watched, ev); }
+
+    const int i = knopf->property("kombiSeite").toInt();
+    const QList<AppletWidget*> alle = seiten();
+
+    switch (ev->type()) {
+    case QEvent::MouseButtonPress: {
+        auto* me = static_cast<QMouseEvent*>(ev);
+        if (me->button() == Qt::LeftButton && i >= 0 && i < alle.size()) {
+            m_zugStart = me->globalPosition().toPoint();
+            m_zugPanel = alle.at(i);
+        }
+        break;
+    }
+    case QEvent::MouseMove: {
+        auto* me = static_cast<QMouseEvent*>(ev);
+        if (!m_zugPanel || m_zugStart.isNull()) { break; }
+        const QPoint jetzt = me->globalPosition().toPoint();
+        if ((jetzt - m_zugStart).manhattanLength()
+                < QApplication::startDragDistance()) {
+            break;
+        }
+        AppletWidget* raus = m_zugPanel.data();
+        m_zugPanel = nullptr;
+        m_zugStart = QPoint();
+        // Erst aus dem Feld, dann die Stelle melden: wer zuhoert,
+        // bekommt ein Panel ohne Elternteil und eine Stelle dafuer.
+        gibFrei(raus);
+        emit herausgezogen(raus, jetzt);
+        return true;
+    }
+    case QEvent::MouseButtonRelease:
+        m_zugPanel = nullptr;
+        m_zugStart = QPoint();
+        break;
+    default:
+        break;
+    }
+    return AppletWidget::eventFilter(watched, ev);
 }
 
 QList<AppletWidget*> KombiApplet::seiten() const

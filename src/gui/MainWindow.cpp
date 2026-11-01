@@ -7628,6 +7628,21 @@ void MainWindow::populateDefaultMeter()
     {
         m_kombiApplet = new KombiApplet(m_radioModel, nullptr);
         panel->addApplet(m_kombiApplet);
+        // ── Herausgezogen heiszt: dort stehen (2026-11-01) ───────────
+        //
+        // Betreiber: „frequenz lässt sich reinziehen, soll sich aber
+        // wieder rausziehen lassen!" Das Feld gibt den Reiter frei
+        // (die Spalte faengt ihn auf, siehe addApplet), und hier
+        // bekommt er sofort ein eigenes Fenster an der Stelle, an der
+        // losgelassen wurde -- nicht irgendwo. Ein Fenster, das an
+        // fremder Stelle aufgeht, sieht aus wie ein neues
+        // (Betreiber, 2026-08-20).
+        connect(m_kombiApplet, &KombiApplet::herausgezogen, this,
+                [this](AppletWidget* w, const QPoint& wo) {
+            if (m_shuttingDown || !w) { return; }
+            const QRect dort(wo.x() - 40, wo.y() - 10, 360, 320);
+            detachApplet(w, -1, dort, QString());
+        });
         // Das Zurueckgeben verdrahtet die Spalte selbst
         // (AppletPanelWidget::addApplet) -- sie verwaltet ihre Felder,
         // nicht dieses Fenster.
@@ -10713,6 +10728,33 @@ void MainWindow::populateDefaultMeter()
     // starten kann, ist so gut wie nicht gebaut.
 
     c0->setContent(panel);
+
+    // ── Den ganzen Container auf ein Kombi-Feld ziehen (2026-11-01) ───
+    //
+    // Betreiber, dreimal: „rx1 soll sich auch in combined reinziehen
+    // lassen. funktioniert bis dato nicht." Sein RX-Panel ist eine
+    // ZELLE in dieser Spalte, und die Spalte steckt in DIESEM
+    // Container („RX1 Main Panel"). Gezogen wird aber der Container,
+    // nicht die Zelle -- also musz auch er ablegen koennen.
+    //
+    // Was hineingeht: die Panels, die in der Spalte sichtbar sind.
+    // Steht dort nur eines (bei ihm genau so, alles andere schwebt),
+    // ist es eindeutig; stehen mehrere, wandern sie zusammen -- er
+    // hat das ganze Fenster abgelegt, nicht eine Zeile daraus.
+    connect(c0, &ContainerWidget::zugEndeBei, this,
+            [this, panel](const QPoint& wo) {
+        if (m_shuttingDown || !panel) { return; }
+        KombiApplet* ziel = KombiApplet::unter(wo);
+        if (!ziel) { return; }
+        const QList<AppletWidget*> drin = panel->applets();
+        for (AppletWidget* a : drin) {
+            if (!a || a == ziel) { continue; }
+            if (qobject_cast<KombiApplet*>(a)) { continue; }
+            if (!a->isVisible()) { continue; }
+            panel->removeApplet(a);
+            ziel->nimmAuf(a);
+        }
+    });
     qCDebug(lcMeter) << "Installed default meter layout: S-Meter + Power/SWR + ALC";
     qCDebug(lcContainer) << "Container #0: Meters + RxApplet + TxApplet + PhoneCwApplet + VaxApplet + TciApplet + ClientChainApplet";
 }
