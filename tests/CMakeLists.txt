@@ -2683,6 +2683,12 @@ if(TEST tst_flex_rauschsperre)
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
+longpath_add_test(tst_flex_vorverzerrung)
+if(TEST tst_flex_vorverzerrung)
+    set_tests_properties(tst_flex_vorverzerrung PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 longpath_add_test(tst_flex_scheibenregler)
 if(TEST tst_flex_scheibenregler)
     set_tests_properties(tst_flex_scheibenregler PROPERTIES

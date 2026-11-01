@@ -6969,6 +6969,35 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
         connect(m_flexConnection, &FlexRadioConnection::statusReceived,
                 this, [this](const QString& object,
                              const QMap<QString, QString>& kv) {
+            // ── Die Vorverzerrung der Maschine mitlesen ─────────
+            //
+            // Zuerst, weil es die billigste Pruefung ist und weil der
+            // Zustand sonst von keiner anderen Stelle gefuehrt wird.
+            // `apply` meldet nur, wenn sich wirklich etwas geaendert
+            // hat — die Maschine schiebt denselben Zustand mehrfach.
+            if (m_flexApd.apply(object, kv)) {
+                // Laut, aber nur bei echten Aenderungen: ohne diese
+                // Zeile sieht man am Geraet nicht, OB die Maschine
+                // eine Vorverzerrung hat — und eine fehlende Anzeige
+                // sieht dann aus wie ein Fehler in der Bedienung.
+                const QString ant = m_flexApd.antenne();
+                qCInfo(lcConnection).nospace()
+                    << "Flex-APD: " << (m_flexApd.eingeschaltet() ? "ein" : "aus")
+                    << ", einstellbar " << m_flexApd.einstellbar()
+                    << ", Kurve traegt " << m_flexApd.kurveTraegt()
+                    << ", Antenne " << (ant.isEmpty() ? QStringLiteral("—") : ant)
+                    // „INVALID" ist das Wort der Maschine fuer „keiner
+                    // gewaehlt" — hier steht dafuer derselbe Strich wie
+                    // fuer eine fehlende Angabe, sonst liest man es als
+                    // Fehler.
+                    << ", Messpunkt "
+                    << (m_flexApd.hatMesspunkt(ant)
+                            ? m_flexApd.gewaehlterMesspunkt(ant)
+                            : QStringLiteral("— (eingebauter Koppler)"))
+                    << ", Sendeantennen " << m_flexApd.sendeantennen().join(QLatin1Char(','));
+                emit flexApdGeaendert();
+            }
+
             if (m_flexPanId.isEmpty() && object.startsWith(QLatin1String("display pan "))) {
                 m_flexPanId = object.split(QLatin1Char(' ')).value(2);
                 // Nachholen: beim Anmelden gab es die Kennung noch
@@ -7289,6 +7318,9 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
 
         connect(m_flexConnection, &FlexRadioConnection::disconnected,
                 this, [this] {
+            // Der gemerkte APD-Zustand gehoert der Maschine, nicht uns.
+            m_flexApd.clear();
+            emit flexApdGeaendert();
             setConnectionState(ConnectionState::Disconnected);
         });
 
@@ -7827,6 +7859,95 @@ bool RadioModel::flexAbstimmen(bool an)
 
     m_flexConnection->sendCommand(FlexCommandWire::tuneCommand(an));
     qCInfo(lcConnection) << "Flex: Abstimmtraeger" << (an ? "an" : "aus");
+    return true;
+}
+
+// ── Vorverzerrung (APD) der Maschine ─────────────────────────────────
+//
+// Die drei Befehle sind am 2026-11-01 an der FLEX-8400 des Betreibers
+// gemessen; die Wortlaute und die abgewiesene Schreibweise stehen im
+// Kopf von core/FlexRadioConnection.h bei `apdEnableCommand`.
+//
+// Longpath schaltet hier NICHT von selbst ein. Eine Vorverzerrung, die
+// sich ungefragt einschaltet, lernt beim naechsten Tasten eine Kurve
+// auf einen Messpunkt, von dem niemand weisz, ob etwas daran haengt.
+
+bool RadioModel::flexApdEinschalten(bool an)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) {
+        qCWarning(lcConnection) << "Flex-APD: nicht geschaltet — keine Verbindung";
+        return false;
+    }
+    if (!m_flexApd.bekannt()) {
+        // Die Maschine hat nie eine `apd`-Zeile geschickt. Dann hat sie
+        // keine Vorverzerrung, und ein Befehl dorthin ist ein Schuss
+        // ins Leere, der wie Erfolg aussieht.
+        qCWarning(lcConnection)
+            << "Flex-APD: nicht geschaltet — die Maschine meldet keine Vorverzerrung";
+        return false;
+    }
+
+    // Kein Riegel, nur ein Vermerk: OHNE gewaehlten Messpunkt nimmt die
+    // Maschine ihren eingebauten Richtkoppler, linearisiert also ihre
+    // eigene Endstufe. Das ist ein gueltiger Betriebsfall (der
+    // Betreiber hat keinen Abgriff in der ACOM), aber man soll im
+    // Protokoll sehen, welcher der beiden Faelle lief.
+    const QString sendeantenne = m_flexApd.antenne();
+    if (an && !sendeantenne.isEmpty() && !m_flexApd.hatMesspunkt(sendeantenne)) {
+        qCInfo(lcConnection).nospace()
+            << "Flex-APD: kein externer Messpunkt fuer " << sendeantenne
+            << " — die Maschine nimmt ihren eingebauten Koppler";
+    }
+
+    m_flexConnection->sendCommand(FlexCommandWire::apdEnableCommand(an));
+    qCInfo(lcConnection) << "Flex-APD:" << (an ? "ein" : "aus")
+                         << "angefragt, Antenne" << sendeantenne;
+    return true;
+}
+
+bool RadioModel::flexApdMesspunktSetzen(const QString& sendeantenne,
+                                        const QString& messpunkt)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) {
+        qCWarning(lcConnection) << "Flex-APD: Messpunkt nicht gesetzt — keine Verbindung";
+        return false;
+    }
+
+    const QString ant = sendeantenne.trimmed();
+    const QString punkt = messpunkt.trimmed();
+    const QString befehl = FlexCommandWire::apdSamplerCommand(ant, punkt);
+    if (befehl.isEmpty()) {
+        qCWarning(lcConnection) << "Flex-APD: Messpunkt nicht gesetzt — leere Angabe";
+        return false;
+    }
+
+    // Gegen die Liste der MASCHINE pruefen, nicht gegen eine eigene.
+    // Sie meldet je Sendeantenne, was moeglich ist (an der 8400:
+    // XVTA,RX_A fuer ANT1 und ANT2; nur RX_A, wenn ueber XVTA
+    // gesendet wird). „INVALID" ist immer erlaubt: so nimmt man die
+    // Wahl wieder zurueck.
+    const QStringList moegliche = m_flexApd.moeglicheMesspunkte(ant);
+    if (punkt != QLatin1String("INVALID") && !moegliche.isEmpty()
+        && !moegliche.contains(punkt, Qt::CaseInsensitive)) {
+        qCWarning(lcConnection).nospace()
+            << "Flex-APD: " << punkt << " ist fuer " << ant
+            << " nicht vorgesehen — die Maschine kennt " << moegliche.join(QLatin1Char(','));
+        return false;
+    }
+
+    m_flexConnection->sendCommand(befehl);
+    qCInfo(lcConnection) << "Flex-APD: Messpunkt" << punkt << "fuer" << ant;
+    return true;
+}
+
+bool RadioModel::flexApdZuruecksetzen()
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) {
+        qCWarning(lcConnection) << "Flex-APD: nicht zurueckgesetzt — keine Verbindung";
+        return false;
+    }
+    m_flexConnection->sendCommand(FlexCommandWire::apdResetCommand());
+    qCInfo(lcConnection) << "Flex-APD: gelernte Kurve verworfen";
     return true;
 }
 

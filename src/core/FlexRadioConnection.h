@@ -410,6 +410,39 @@ QList<int> sliceListFromReply(const QString& body);
 // FlexLib selbst faellt an dieser Stelle zu (TryParse + continue).
 std::optional<double> frequencyHzFromSliceKvs(const QMap<QString, QString>& kvs);
 
+// ── Vorverzerrung (APD) ──────────────────────────────────────────────
+//
+// Die Flex rechnet ihre Vorverzerrung SELBST. Longpath schaltet sie
+// nur und sagt ihr, woher sie das Rueckkopplungssignal nimmt. Das ist
+// der Unterschied zu PureSignal auf OpenHPSDR, wo WDSP bei UNS rechnet
+// (src/core/PureSignal.h) — dort traegt Longpath die Korrektur, hier
+// die Maschine.
+//
+// Die Wortlaute sind am 2026-11-01 an der FLEX-8400 des Betreibers
+// gemessen (Firmware SmartSDR-MB 4.2.20.41343), nicht abgeleitet:
+//
+//   apd enable=1                              -> code 0, Zustand meldet enable=1
+//   apd enable=0                              -> code 0, Zustand meldet enable=0
+//   apd reset                                 -> code 0
+//   apd sampler tx_ant=ANT1 sample_port=XVTA  -> code 0
+//   apd equalizer_reset                       -> code 0x50001000 (abgewiesen)
+//
+// `apd equalizer_reset` ist nur ein ZUSTANDSNAME, kein Befehl — die
+// Maschine weist ihn ab. Der Befehl heisst `apd reset`, wie in
+// AetherSDR TransmitModel.cpp:233 [@d58e2b8a].
+QString apdEnableCommand(bool an);
+
+// From AetherSDR TransmitModel.cpp:227 [@d58e2b8a] —
+//   "apd sampler tx_ant=%1 sample_port=%2"
+// Je Sendeantenne ein Messpunkt. Welche Werte zulaessig sind, sagt die
+// Maschine selbst in `valid_samplers`: an der 8400 „XVTA,RX_A" fuer
+// ANT1 und ANT2, und nur „RX_A", wenn ueber XVTA gesendet wird.
+QString apdSamplerCommand(const QString& sendeantenne, const QString& messpunkt);
+
+// From AetherSDR TransmitModel.cpp:233 [@d58e2b8a] — wirft die
+// gelernte Kurve weg; die Maschine lernt beim naechsten Senden neu.
+QString apdResetCommand();
+
 }  // namespace FlexCommandWire
 
 // Der Befehlskanal zu einer FlexRadio-Maschine: TCP 4992, Textsaetze,

@@ -104,6 +104,7 @@
 #include "core/RadioDiscovery.h"
 #include "core/FlexRadioDiscovery.h"
 #include "core/FlexRadioConnection.h"
+#include "core/FlexApdState.h"
 #include "core/FlexVitaStream.h"
 #include "core/RadioConnection.h"
 #include "core/HardwareProfile.h"
@@ -2771,6 +2772,9 @@ signals:
     void flexSendefreigabeGeaendert(bool darf);
     /// Die Aussteuerung des Flex-Mikrofonwegs hat sich geaendert.
     void flexMikGainGeaendert(int db);
+    /// Der Zustand der Flex-Vorverzerrung hat sich geaendert — der
+    /// Schalter, der Messpunkt oder die gelernte Kurve.
+    void flexApdGeaendert();
     /// Der Stehwellenriegel hat zugemacht: entweder wurde gar nicht
     /// erst getastet, oder eine laufende Sendung wurde gebrochen.
     /// Betreiber am 2026-10-30: „Sollte SWR ueber 2,5 sein, bitte
@@ -3879,6 +3883,18 @@ public:
     /// Der Abstimmtraeger. Taktet mit der Abstimmleistung.
     bool flexAbstimmen(bool an);
 
+    // ── Vorverzerrung (APD) der Maschine ────────────────────────────
+    //
+    // Die Flex rechnet sie selbst; Longpath schaltet sie und waehlt
+    // den Messpunkt. Warum das nicht unser PureSignal sein kann,
+    // steht im Kopf von core/FlexApdState.h.
+    //
+    // Alle drei geben false zurueck, wenn nichts hinausging.
+    const Longpath::FlexApdState& flexApd() const { return m_flexApd; }
+    bool flexApdEinschalten(bool an);
+    bool flexApdMesspunktSetzen(const QString& sendeantenne, const QString& messpunkt);
+    bool flexApdZuruecksetzen();
+
     /// Den Sendetonstrom anlegen lassen. Die Antwort traegt die
     /// Kennung, die danach in jedes Tonpaket gehoert.
     void legeFlexSendetonstromAn();
@@ -3979,6 +3995,11 @@ private:
     /// setzeFlexMikGainDb(). 0 heiszt: roh hinaus, wie bisher.
     int                  m_flexMikGainDb{0};
     bool                 m_flexVerriegelungGehoert{false};
+
+    /// Der Zustand der Flex-eigenen Vorverzerrung, wie die Maschine
+    /// ihn meldet. Beim Trennen geleert — ein gemerkter Zustand ohne
+    /// Maschine dahinter ist eine Behauptung.
+    Longpath::FlexApdState m_flexApd;
     /// „Sollte SWR ueber 2,5 sein, bitte nicht senden!" (Betreiber,
     /// 2026-10-30). Zwei Riegel: einer vor dem Tasten in
     /// `flexTasten()`, einer bei jeder Messung — FT8 tastet 13,2 s am
