@@ -18,6 +18,7 @@
 
 #include <QApplication>
 #include <QHBoxLayout>
+#include <QContextMenuEvent>
 #include <QMouseEvent>
 #include <QLabel>
 #include <QPushButton>
@@ -65,6 +66,19 @@ KombiApplet::KombiApplet(RadioModel* model, QWidget* parent)
     // Das Feld selbst darf so schmal werden, wie der Betreiber die
     // Spalte zieht.
     setMinimumWidth(0);
+    // ── Und es nimmt die ganze Hoehe ────────────────────────────────
+    //
+    // Betreiber, 2026-11-01: „ich hatte nicht auf die kopfleiste
+    // geklickt." Stimmt -- auf seinem Bild lag die Stelle UNTER dem
+    // Feld: das Combined endete nach seinem Inhalt, und die schwarze
+    // Flaeche darunter gehoerte dem Container. Dessen Menue kam
+    // folgerichtig.
+    //
+    // Sein Ziel war ohnehin „das Panel ganz rechts von oben bis
+    // unten". Also nimmt das Feld den Platz, den es bekommt; dann
+    // gibt es unter ihm keine fremde Flaeche mehr, auf die man
+    // danebenklicken kann.
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 
     m_aufklapp = new QWidget(this);
     auto* senkrecht = new QVBoxLayout(m_aufklapp);
@@ -110,6 +124,22 @@ KombiApplet::KombiApplet(RadioModel* model, QWidget* parent)
             emit listeGewuenscht(teil->mapToGlobal(wo));
         });
     }
+
+    // ── Und ein Fangnetz darunter ───────────────────────────────────
+    //
+    // „genau mitten im fenster" -- und trotzdem kam das Menue des
+    // Containers. Der Rechtsklick geht an das Widget UNTER dem
+    // Zeiger; reicht das ihn weiter, laeuft er die Elternkette hoch
+    // und landet irgendwann beim Container. WELCHES Stueck ihn
+    // durchgereicht hat, ist von auszen nicht zu sehen -- also wird
+    // nicht geraten, sondern abgefangen: ein Filter auf der
+    // Anwendung sieht JEDEN Rechtsklick und fragt nur, ob er
+    // innerhalb DIESES Feldes liegt.
+    //
+    // Eine Seite mit eigenem Menue (RX-Applet, DSP-Griffe) behaelt
+    // ihres: die beantwortet den Klick selbst, und dann kommt er hier
+    // gar nicht an.
+    qApp->installEventFilter(this);
 
     // Rechtsklick auf das Feld fragt nach der Liste. Auf dem Feld,
     // nicht nur auf dem leeren Hinweis: auch mit zwei Seiten darin
@@ -322,6 +352,18 @@ void KombiApplet::reiterNeu()
 // Startstrecke), sonst waere jeder Klick ein halbes Herausziehen.
 bool KombiApplet::eventFilter(QObject* watched, QEvent* ev)
 {
+    // Das Fangnetz (siehe Konstruktor): ein Rechtsklick irgendwo in
+    // diesem Feld, den kein Stueck beantwortet hat.
+    if (ev->type() == QEvent::ContextMenu) {
+        auto* w = qobject_cast<QWidget*>(watched);
+        if (w && (w == this || isAncestorOf(w))) {
+            auto* ce = static_cast<QContextMenuEvent*>(ev);
+            emit listeGewuenscht(ce->globalPos());
+            return true;        // nicht weiter nach oben
+        }
+        return false;
+    }
+
     auto* knopf = qobject_cast<QPushButton*>(watched);
     if (!knopf) { return AppletWidget::eventFilter(watched, ev); }
 
