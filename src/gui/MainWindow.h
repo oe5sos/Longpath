@@ -1303,6 +1303,10 @@ private:
     /// Was kein Applet ist, bekommt sein eigenes Werkzeugfenster
     /// zurueck -- siehe das Kombi-Feld (2026-11-01).
     void gibFremdesPanelZurueck(QWidget* panel, const QRect& dort);
+    /// Rechtsklick auf ein Kombi-Feld: zeigt, was hineinkann.
+    void zeigeKombiListe(class KombiApplet* feld, const QPoint& globalPos);
+    void holeInsKombiFeld(class KombiApplet* feld, AppletWidget* applet,
+                          const QString& appletId);
 
     /// Sichtbarkeit anwenden — auf die Spalte ODER auf das Fenster, je
     /// nachdem, wo das Applet gerade steht. Ohne diese Weiche liefe ein

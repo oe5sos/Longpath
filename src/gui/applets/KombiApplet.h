@@ -121,11 +121,27 @@ public:
     bool aufgeklappt() const { return m_aufgeklappt; }
 
     QList<QWidget*> seiten() const;
+
+    /// Der Name einer Seite: der Applet-Titel, sonst der Fenstertitel.
+    /// Oeffentlich, damit ein Pruefstand ihn festhalten kann -- auf
+    /// dem Reiter stand am 2026-11-01 „Panel", weil der Rotor seinen
+    /// Namen am Fenster trug und nicht am Inhalt.
+    static QString nameVon(const QWidget* w);
     int  seite() const;
     void zeigeSeite(int welche);
     bool istLeer() const;
 
 signals:
+    /// Rechtsklick auf das Feld: der Aufrufer zeigt eine Liste mit
+    /// allem, was hineinkann, und legt das Gewaehlte mit `nimmAuf`
+    /// hinein.
+    ///
+    /// Betreiber, 2026-11-01: „oder man öffnet das leere combined
+    /// fenster, rechte moustaste und dann sieht man alles, was in das
+    /// fenster kommen kann und klickt es an." Ziehen ist der eine
+    /// Weg; wer das Feld gerade erst geholt hat, will nicht erst
+    /// suchen, was es aufnehmen kann.
+    void listeGewuenscht(const QPoint& globalPos);
     /// Jemand hat ein Panel wieder herausgeloest -- der Aufrufer legt
     /// es zurueck in ein eigenes Feld.
     void herausgeloest(QWidget* panel);
@@ -149,8 +165,6 @@ private:
     void reiterNeu();
     void merkeStand() const;
     void chipNachziehen();
-    /// Der Name einer Seite: der Applet-Titel, sonst der Fenstertitel.
-    static QString nameVon(const QWidget* w);
     void ordneSeitenEin();
 
     QStackedWidget* m_stapel{nullptr};

@@ -85,6 +85,15 @@ KombiApplet::KombiApplet(RadioModel* model, QWidget* parent)
 
     reiterNeu();
     g_alle.append(this);
+
+    // Rechtsklick auf das Feld fragt nach der Liste. Auf dem Feld,
+    // nicht nur auf dem leeren Hinweis: auch mit zwei Seiten darin
+    // will man eine dritte dazulegen koennen.
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(this, &QWidget::customContextMenuRequested, this,
+            [this](const QPoint& wo) {
+        emit listeGewuenscht(mapToGlobal(wo));
+    });
 }
 
 KombiApplet::~KombiApplet()

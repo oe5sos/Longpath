@@ -2296,6 +2296,89 @@ void MainWindow::legeAufKombiFeld(const QString& appletId, const QPoint& globalP
 // Was kein Applet ist (Rotor/Logbuch), gehoert nicht in die Spalte,
 // sondern in sein eigenes Werkzeugfenster -- genau dorthin, wo es
 // losgelassen wurde.
+// ── Die Liste zum Hineinlegen (2026-11-01) ─────────────────────────
+//
+// Betreiber: „oder man öffnet das leere combined fenster, rechte
+// moustaste und dann sieht man alles, was in das fenster kommen kann
+// und klickt es an."
+//
+// Ziehen bleibt der eine Weg. Dies ist der andere, und fuer ein eben
+// erst geholtes, leeres Feld der bessere: man muss nicht wissen, was
+// es aufnehmen kann -- es steht da.
+void MainWindow::zeigeKombiListe(KombiApplet* feld, const QPoint& globalPos)
+{
+    if (m_shuttingDown || !feld) { return; }
+
+    QMenu menue(this);
+    menue.setStyleSheet(QString::fromLatin1(kPopupMenu));
+
+    // Was schon drin ist, steht nicht noch einmal zur Wahl.
+    const QList<QWidget*> drin = feld->seiten();
+    const auto schonDrin = [&drin](QWidget* w) { return drin.contains(w); };
+
+    int angeboten = 0;
+    for (auto it = m_appletsById.constBegin(); it != m_appletsById.constEnd();
+         ++it) {
+        AppletWidget* a = it.value();
+        if (!a || a == feld || schonDrin(a)) { continue; }
+        if (qobject_cast<KombiApplet*>(a)) { continue; }
+        const QString id = it.key();
+        QAction* act = menue.addAction(a->appletTitle());
+        connect(act, &QAction::triggered, this, [this, feld, a, id]() {
+            holeInsKombiFeld(feld, a, id);
+        });
+        ++angeboten;
+    }
+
+    // Der Rotor ist kein Applet; er steht trotzdem zur Wahl, solange
+    // er ein eigenes Fenster hat.
+    if (m_rotorWindow && m_rotorWindow->content()
+        && !schonDrin(m_rotorWindow->content())) {
+        QAction* act = menue.addAction(QStringLiteral("Rotor / Log"));
+        connect(act, &QAction::triggered, this, [this, feld]() {
+            if (!m_rotorWindow) { return; }
+            ToolWindow* fenster = m_rotorWindow;
+            m_rotorWindow = nullptr;
+            fenster->hide();
+            const QString name = fenster->windowTitle().isEmpty()
+                                     ? QStringLiteral("Rotor / Log")
+                                     : fenster->windowTitle();
+            QWidget* inhalt = fenster->releaseContent();
+            fenster->deleteLater();
+            if (!inhalt) { return; }
+            inhalt->setWindowTitle(name);
+            feld->nimmAuf(inhalt);
+        });
+        ++angeboten;
+    }
+
+    if (angeboten == 0) {
+        // Ein leeres Menue sieht aus wie ein kaputtes. Lieber sagen,
+        // warum nichts darin steht.
+        QAction* leer = menue.addAction(tr("Everything is already in here"));
+        leer->setEnabled(false);
+    }
+    menue.exec(globalPos);
+}
+
+// Ein Applet ins Feld holen, egal wo es gerade steckt: in der
+// Spalte oder in einem eigenen Fenster.
+void MainWindow::holeInsKombiFeld(KombiApplet* feld, AppletWidget* applet,
+                                  const QString& appletId)
+{
+    if (!feld || !applet) { return; }
+    if (auto* fenster = m_floatingApplets.value(appletId, nullptr)) {
+        m_floatingApplets.remove(appletId);
+        fenster->hide();
+        AppletWidget* frei = fenster->releaseApplet();
+        fenster->deleteLater();
+        if (frei) { feld->nimmAuf(frei); }
+        return;
+    }
+    if (m_appletPanel) { m_appletPanel->removeApplet(applet); }
+    feld->nimmAuf(applet);
+}
+
 void MainWindow::gibFremdesPanelZurueck(QWidget* panel, const QRect& dort)
 {
     if (m_shuttingDown || !panel) { return; }
@@ -7650,6 +7733,10 @@ void MainWindow::populateDefaultMeter()
     {
         m_kombiApplet = new KombiApplet(m_radioModel, nullptr);
         panel->addApplet(m_kombiApplet);
+        connect(m_kombiApplet, &KombiApplet::listeGewuenscht, this,
+                [this](const QPoint& wo) {
+            zeigeKombiListe(m_kombiApplet, wo);
+        });
         // ── Herausgezogen heiszt: dort stehen (2026-11-01) ───────────
         //
         // Betreiber: „frequenz lässt sich reinziehen, soll sich aber
@@ -17513,9 +17600,22 @@ void MainWindow::detachRotorPanel()
         ToolWindow* fenster = m_rotorWindow;
         m_rotorWindow = nullptr;
         fenster->hide();
+        const QString name = fenster->windowTitle().isEmpty()
+                                 ? QStringLiteral("Rotor / Log")
+                                 : fenster->windowTitle();
         QWidget* inhalt = fenster->releaseContent();
         fenster->deleteLater();
-        if (inhalt) { ziel->nimmAuf(inhalt); }
+        if (!inhalt) { return; }
+        // ── Der Name haengt am FENSTER, nicht am Inhalt ──────────────
+        //
+        // Betreiber, 2026-11-01: „schau dir die beschriftung über den
+        // rotor an" -- auf dem Reiter stand „Panel". Das ist der
+        // Rueckfall in `KombiApplet::nameVon`: das Rotorpanel selbst
+        // traegt keinen Fenstertitel, der steht am ToolWindow
+        // darueber. Beim Hineinlegen geht das Fenster weg -- also
+        // nimmt der Inhalt den Namen mit.
+        inhalt->setWindowTitle(name);
+        ziel->nimmAuf(inhalt);
     });
     connect(m_rotorWindow, &ToolWindow::dockRequested, this,
             [this](const QString&) { dockRotorPanel(); });

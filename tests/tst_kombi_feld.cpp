@@ -264,6 +264,45 @@ private slots:
                  "genau die schweben beim Betreiber alle");
         QVERIFY2(fenster.contains(QStringLiteral("legeAufKombiFeld")),
                  "das Ablegen fuehrt ins Leere");
+
+        // Und der Name eines Werkzeugfensters muss beim Hineinlegen
+        // MITGEHEN: er haengt am Fenster, und das Fenster verschwindet.
+        const int a = fenster.indexOf(QStringLiteral("ToolWindow::abgelegtBei"));
+        QVERIFY2(a > 0, "ein Werkzeugfenster kann nicht abgelegt werden");
+        const int e = fenster.indexOf(QStringLiteral("    });"), a);
+        QVERIFY2(e > a, "der Ablegeweg sieht anders aus als erwartet");
+        QVERIFY2(fenster.mid(a, e - a).contains(QStringLiteral("setWindowTitle")),
+                 "der Name bleibt am verschwindenden Fenster haengen — auf "
+                 "dem Reiter steht dann „Panel“");
+    }
+
+    // ── Rechtsklick fragt nach der Liste ────────────────────────────
+    //
+    // Betreiber, 2026-11-01: „oder man öffnet das leere combined
+    // fenster, rechte moustaste und dann sieht man alles, was in das
+    // fenster kommen kann und klickt es an."
+    //
+    // Das Feld selbst kennt die Liste nicht -- es fragt nur. Wer sie
+    // kennt (das Hauptfenster), zeigt sie.
+    void rechtsklickFragtNachDerListe()
+    {
+        KombiApplet k(nullptr);
+        k.resize(200, 120);
+        k.show();
+        QSignalSpy spion(&k, &KombiApplet::listeGewuenscht);
+        emit k.customContextMenuRequested(QPoint(10, 10));
+        QCOMPARE(spion.count(), 1);
+
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { return; }
+        QFile f(QString::fromLocal8Bit(root)
+                + QStringLiteral("/src/gui/MainWindow.cpp"));
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        const QString src = QString::fromUtf8(f.readAll());
+        QVERIFY2(src.contains(QStringLiteral("KombiApplet::listeGewuenscht")),
+                 "niemand zeigt die Liste — der Rechtsklick fuehrt ins Leere");
+        QVERIFY2(src.contains(QStringLiteral("holeInsKombiFeld")),
+                 "die Liste legt nichts hinein");
     }
 
     // ── Jedes Widget, nicht nur ein Applet ──────────────────────────
@@ -279,6 +318,9 @@ private slots:
         fremd->setWindowTitle(QStringLiteral("Rotor / Log"));
         k.nimmAuf(fremd);
         QCOMPARE(k.seiten().size(), 1);
+        // Der Name kommt vom Fenstertitel -- ohne ihn stand auf dem
+        // Reiter „Panel" (Betreiber, 2026-11-01, mit Bild).
+        QCOMPARE(KombiApplet::nameVon(fremd), QStringLiteral("Rotor / Log"));
         QCOMPARE(k.seiten().first(), fremd);
         QVERIFY(!k.istLeer());
         k.gibFrei(fremd);
