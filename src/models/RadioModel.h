@@ -2783,6 +2783,17 @@ signals:
     /// Die Maschine sendet / sendet nicht mehr — gleich wer getastet hat.
     void flexSendetGeaendert(bool sendet);
 
+    /// Die Maschine hat ihre Scheibe gemeldet -- ab jetzt kann ein
+    /// Befehl an sie ueberhaupt hinausgehen.
+    ///
+    /// Gemessen am 2026-10-31: der Anmeldeschub laeuft 143 ms VOR
+    /// dieser Meldung, und alles, was in dieser Luecke hinaus will,
+    /// faellt still an der fehlenden Scheibennummer aus. Statt
+    /// siebenmal einen Merkposten zu bauen, sagt die Maschine hier
+    /// einmal Bescheid, und wer etwas nachzutragen hat, haengt sich
+    /// daran.
+    void flexScheibennummerDa();
+
     void infoChanged();
     // Phase 3Q-1: parametrized — state passed so UI consumers can act without
     // a secondary RadioModel::connectionState() read under race conditions.
@@ -3807,6 +3818,28 @@ public:
     /// SIE die Aufbereitung -- unsere WDSP-Sperre hat dort kein Ziel
     /// (Befund des Betreibers, 2026-10-31).
     void sendeFlexRauschsperre(bool an, double stufe0bis100);
+
+    /// Die uebrigen Regler der Scheibe, einzeln an die Maschine.
+    ///
+    /// Alle aus demselben Grund wie die Rauschsperre:
+    /// `wireSliceSignals` steigt bei `!m_connection` aus, und das ist
+    /// die OpenHPSDR-Verbindung -- am Flex also nie da. Was dort
+    /// wirken soll, musz der Flex-Weg selbst schicken.
+    ///
+    /// `agcModus` nimmt nur die vier Namen, die die Maschine fuehrt
+    /// (off/slow/med/fast); alles andere geht nicht hinaus und sagt
+    /// das im Protokoll.
+    void sendeFlexAgcModus(AGCMode modus);
+    void sendeFlexTonpegel(int stufe0bis100);
+    void sendeFlexStumm(bool stumm);
+    void sendeFlexBalance(double unserWert);
+    void sendeFlexRit(bool an, int hz);
+    void sendeFlexXit(bool an, int hz);
+    void sendeFlexApf(bool an);
+    /// Die gemeinsame Mitte der sieben: Verbindung, Scheibennummer,
+    /// Befehl -- und jedes dieser drei Tore meldet sich, wenn es
+    /// schlieszt. `was` ist der Name fuer das Protokoll.
+    void schickeFlexScheibenbefehl(const QString& befehl, const QString& was);
 
     /// Die Scheibe bestimmen, die senden soll. Ohne das weist die
     /// Maschine `xmit` ab.

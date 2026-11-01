@@ -7226,6 +7226,10 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                 // Was ohne Scheibennummer nicht hinausgehen konnte,
                 // geht jetzt hinaus — siehe setFlexSliceMode().
                 if (!m_flexSliceId.isEmpty()) {
+                    // Zuerst sagen, DASZ sie da ist: daran haengt, wer
+                    // keinen eigenen Merkposten hat (die uebrigen
+                    // Regler der Scheibe, MainWindow_Flex).
+                    emit flexScheibennummerDa();
                     if (m_flexHatArtNachzutragen) {
                         m_flexHatArtNachzutragen = false;
                         setFlexSliceMode(m_flexArtNachzutragen);
@@ -7426,7 +7430,13 @@ bool RadioModel::setzeFlexSendescheibe(const QString& sliceId)
 
 void RadioModel::sendeFlexRauschsperre(bool an, double stufe0bis100)
 {
-    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    // Auch das Schweigen wird gemeldet: ein stiller Ruecksprung hier
+    // sah von auszen genauso aus wie ein Regler, der gar nichts tut.
+    if (!m_flexConnection || !m_flexConnection->isConnected()) {
+        qCInfo(lcConnection) << "Flex: Rauschsperre nicht geschickt — "
+                                "keine Verbindung zur Maschine";
+        return;
+    }
     // ── Die Scheibennummer kommt spaeter als der Wunsch (2026-10-31) ──
     //
     // Beim Anmelden zieht `MainWindow_Flex` Leistung UND Rauschsperre
@@ -7459,6 +7469,117 @@ void RadioModel::sendeFlexRauschsperre(bool an, double stufe0bis100)
 
     qCInfo(lcConnection).nospace()
         << "Flex: Rauschsperre " << (an ? "an" : "aus") << ", Stufe " << stufe;
+}
+
+// ── Die uebrigen Regler der Scheibe (2026-11-01) ───────────────────
+//
+// Derselbe Grund wie bei der Rauschsperre, nur breiter:
+// `wireSliceSignals` steigt bei `!m_connection` aus -- das ist die
+// OpenHPSDR-Verbindung, am Flex nie vorhanden. Alles, was dort
+// haengt, ist am Flex tot; was wirken soll, schickt der Flex-Weg
+// selbst.
+//
+// Jeder Sender hier ist eine Uebersetzung, keine Entscheidung: er
+// nimmt, was Longpath fuehrt, und sagt es in den Worten der
+// Maschine. Die Worte sind am 2026-11-01 von ihr gelesen.
+void RadioModel::sendeFlexAgcModus(AGCMode modus)
+{
+    // Die Maschine kennt vier. Unser "Long" und "Custom" sind keine
+    // davon -- lieber nichts schicken und es sagen, als eine
+    // Ablehnung zu ernten und die Scheibe stillschweigend auf dem
+    // alten Modus zu lassen.
+    QString name;
+    switch (modus) {
+    case AGCMode::Off:  name = QStringLiteral("off");  break;
+    case AGCMode::Slow: name = QStringLiteral("slow"); break;
+    case AGCMode::Med:  name = QStringLiteral("med");  break;
+    case AGCMode::Fast: name = QStringLiteral("fast"); break;
+    case AGCMode::Long:
+    case AGCMode::Custom:
+        qCInfo(lcConnection) << "Flex: diesen AGC-Modus fuehrt die Maschine "
+                                "nicht — sie kennt off, slow, med, fast";
+        return;
+    }
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceAgcModeCommand(m_flexSliceId, name),
+        QStringLiteral("AGC %1").arg(name));
+}
+
+void RadioModel::sendeFlexTonpegel(int stufe0bis100)
+{
+    const int stufe = std::clamp(stufe0bis100, 0, 100);
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceAudioLevelCommand(m_flexSliceId, stufe),
+        QStringLiteral("Tonpegel %1").arg(stufe));
+}
+
+void RadioModel::sendeFlexStumm(bool stumm)
+{
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceAudioMuteCommand(m_flexSliceId, stumm),
+        stumm ? QStringLiteral("stumm") : QStringLiteral("nicht stumm"));
+}
+
+void RadioModel::sendeFlexBalance(double unserWert)
+{
+    // Unser Wert laeuft von -1 (links) ueber 0 (Mitte) bis +1
+    // (rechts) -- so schreibt ihn der Regler im RX-Applet
+    // (`(val - 50) / 50.0`). Die Maschine zaehlt 0..100 mit 50 als
+    // Mitte. Das ist genau die Umkehrung derselben Rechnung.
+    const int flex = std::clamp(
+        static_cast<int>(std::lround((unserWert + 1.0) * 50.0)), 0, 100);
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceAudioPanCommand(m_flexSliceId, flex),
+        QStringLiteral("Balance %1").arg(flex));
+}
+
+void RadioModel::sendeFlexRit(bool an, int hz)
+{
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceRitCommand(m_flexSliceId, an, hz),
+        QStringLiteral("RIT %1 %2 Hz").arg(an ? QStringLiteral("an")
+                                              : QStringLiteral("aus")).arg(hz));
+}
+
+void RadioModel::sendeFlexXit(bool an, int hz)
+{
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceXitCommand(m_flexSliceId, an, hz),
+        QStringLiteral("XIT %1 %2 Hz").arg(an ? QStringLiteral("an")
+                                              : QStringLiteral("aus")).arg(hz));
+}
+
+void RadioModel::sendeFlexApf(bool an)
+{
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceApfCommand(m_flexSliceId, an),
+        an ? QStringLiteral("APF an") : QStringLiteral("APF aus"));
+}
+
+// Die gemeinsame Mitte der sieben: dieselben drei Tore, dieselbe
+// Meldung. Jedes Tor hat heute Abend schon einmal einen Regler
+// verschluckt, ohne ein Wort zu sagen -- darum meldet sich auch das
+// Schweigen.
+void RadioModel::schickeFlexScheibenbefehl(const QString& befehl,
+                                           const QString& was)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) {
+        qCInfo(lcConnection) << "Flex:" << was
+                             << "nicht geschickt — keine Verbindung";
+        return;
+    }
+    if (m_flexSliceId.isEmpty()) {
+        qCInfo(lcConnection) << "Flex:" << was
+                             << "nicht geschickt — die Scheibennummer fehlt";
+        return;
+    }
+    if (befehl.isEmpty()) {
+        qCInfo(lcConnection) << "Flex:" << was
+                             << "fuehrt die Maschine nicht";
+        return;
+    }
+    m_flexConnection->sendCommand(befehl);
+    qCInfo(lcConnection) << "Flex:" << was;
 }
 
 QString RadioModel::flexSwrBandKennung() const

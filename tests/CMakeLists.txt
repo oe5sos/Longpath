@@ -2683,6 +2683,12 @@ if(TEST tst_flex_rauschsperre)
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
+longpath_add_test(tst_flex_scheibenregler)
+if(TEST tst_flex_scheibenregler)
+    set_tests_properties(tst_flex_scheibenregler PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 longpath_add_test(tst_swr_riegel)
 # `jederSendewegFragtDenRiegel` liest die Quelle: ohne echtes Geraet
 # kommt kein Lauf an das vierte Tor. Ohne diese Zeile ueberspringt er

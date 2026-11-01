@@ -128,6 +128,7 @@
 
 #include <QGuiApplication>
 
+#include "core/LogCategories.h"
 #include "core/BoardCapabilities.h"
 #include "core/HpsdrModel.h"
 #include "core/SkuUiProfile.h"
@@ -656,6 +657,20 @@ void RxApplet::buildUi()
 
         m_sqlBtn = greenToggle(QStringLiteral("SQL"), 52, 20);
         connect(m_sqlBtn, &QPushButton::toggled, this, [this](bool on) {
+            // ── Warum das ins Protokoll geht (2026-10-31) ───────────
+            //
+            // Betreiber dreimal „squelch funktioniert nicht". Der Weg
+            // hat zwei Haelften -- Knopf -> Modell und Modell ->
+            // Maschine -- und ohne diese Zeile war von auszen nicht zu
+            // sehen, welche der beiden schweigt. Die zweite meldet
+            // sich schon („Flex: Rauschsperre ...").
+            // Scheibe -1 heiszt: keine. Alles in einer Kette aus
+            // `<<`, weil der Englisch-Pruefstand Zeilen, die mit
+            // etwas anderem beginnen, als Beschriftung im Fenster
+            // liest -- meine erste Fassung lief genau darauf auf.
+            qCInfo(lcDsp).nospace()
+                << "SQL-Knopf " << (on ? "an" : "aus")
+                << " (Scheibe " << (m_slice ? m_slice->sliceIndex() : -1) << ")";
             if (m_updatingFromModel || !m_slice) { return; }
             // In FM die FM-Rauschsperre (2026-09-27) -- sonst war sie
             // nirgends zu erreichen. Thetis steuert je Betriebsart: im
@@ -674,6 +689,9 @@ void RxApplet::buildUi()
         m_sqlSlider->setFixedHeight(18);
         m_sqlSlider->setStyleSheet(Style::sliderHStyle());
         connect(m_sqlSlider, &QSlider::valueChanged, this, [this](int val) {
+            qCInfo(lcDsp).nospace()
+                << "SQL-Regler " << val
+                << " (Scheibe " << (m_slice ? m_slice->sliceIndex() : -1) << ")";
             if (m_updatingFromModel || !m_slice) { return; }
             if (m_slice->dspMode() == DSPMode::FM) {
                 m_slice->setFmsqThresh(fmSquelchDbFromSlider(val));

@@ -151,6 +151,48 @@ private slots:
                  "nicht den Befehl");
     }
 
+    // ── Und der Flex-Weg musz sie selbst verdrahten ────────────────
+    //
+    // `RadioModel::wireSliceSignals` steigt in seiner zweiten Zeile
+    // aus, wenn `m_connection` fehlt -- das ist die
+    // OpenHPSDR-Verbindung, am Flex immer null. Das ganze
+    // DSP-Bedienfeld der Scheibe haengt dort also an nichts. Gemessen
+    // am 2026-10-31: „SQL-Knopf an (Scheibe 0)" im Protokoll, und
+    // danach keine einzige Zeile „Flex: Rauschsperre".
+    //
+    // Darum verdrahtet der Flex-Weg Art, Flanken und Rauschminderung
+    // selbst -- und ab jetzt auch die Rauschsperre.
+    void derFlexWegVerdrahtetSieSelbst()
+    {
+        const QString src = quelle(QStringLiteral("/src/gui/MainWindow_Flex.cpp"));
+        QVERIFY2(!src.isEmpty(), "MainWindow_Flex.cpp nicht lesbar");
+        for (const QString& signal : {QStringLiteral("SliceModel::ssqlEnabledChanged"),
+                                      QStringLiteral("SliceModel::ssqlThreshChanged")}) {
+            QVERIFY2(src.contains(signal),
+                     qPrintable(signal + QStringLiteral(
+                         " haengt am Flex an nichts — wireSliceSignals "
+                         "laeuft dort nicht (sie braucht m_connection)")));
+        }
+        QVERIFY2(src.contains(QStringLiteral("sendeFlexRauschsperre")),
+                 "der Flex-Weg schickt die Rauschsperre nicht hinaus");
+    }
+
+    // Die Gegenseite des Riegels oben: dasz `wireSliceSignals` wirklich
+    // an `m_connection` haengt, ist kein Verdacht, sondern steht da.
+    // Faellt diese Zeile einmal weg, ist der Grund fuer die eigene
+    // Verdrahtung weg -- und dieser Fall sagt es.
+    void wireSliceSignalsBrauchtDieAndereVerbindung()
+    {
+        const QString src = quelle(QStringLiteral("/src/models/RadioModel.cpp"));
+        const int a = src.indexOf(QStringLiteral("void RadioModel::wireSliceSignals"));
+        QVERIFY2(a > 0, "wireSliceSignals ist weg");
+        const int e = src.indexOf(QStringLiteral("connect("), a);
+        QVERIFY2(e > a, "wireSliceSignals sieht anders aus als erwartet");
+        QVERIFY2(src.mid(a, e - a).contains(QStringLiteral("!m_connection")),
+                 "wireSliceSignals haengt nicht mehr an m_connection — dann "
+                 "gehoert die eigene Flex-Verdrahtung auf den Pruefstand");
+    }
+
 private:
     static QString quelle(const QString& relativ)
     {

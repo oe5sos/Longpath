@@ -2028,6 +2028,26 @@ private:
     QMetaObject::Connection m_flexNrBand;
     QMetaObject::Connection m_flexNbBand;
     QMetaObject::Connection m_flexAnfBand;
+    /// Die Rauschsperre. Eigene Baender, weil `wireSliceSignals` am
+    /// Flex ueberhaupt nicht laeuft (sie steigt bei `!m_connection`
+    /// aus, und das ist die OpenHPSDR-Verbindung) -- gemessen am
+    /// 2026-10-31: Knopf und Regler erreichten das Modell, das Modell
+    /// nie die Maschine.
+    QMetaObject::Connection m_flexSqlAnBand;
+    QMetaObject::Connection m_flexSqlStufeBand;
+    /// Die uebrigen Regler der Scheibe -- aus demselben Grund eigene
+    /// Baender: am Flex laeuft `wireSliceSignals` nicht.
+    QMetaObject::Connection m_flexAgcBand;
+    QMetaObject::Connection m_flexTonpegelBand;
+    QMetaObject::Connection m_flexStummBand;
+    QMetaObject::Connection m_flexBalanceBand;
+    QMetaObject::Connection m_flexRitAnBand;
+    QMetaObject::Connection m_flexRitHzBand;
+    QMetaObject::Connection m_flexXitAnBand;
+    QMetaObject::Connection m_flexXitHzBand;
+    QMetaObject::Connection m_flexApfBand;
+    /// Einmal nachziehen, sobald die Maschine ihre Scheibe meldet.
+    QMetaObject::Connection m_flexReglerNachtrag;
     /// Einmal je Verbindung: die Fensterbreite auf den Ausschnitt der
     /// Flex stellen. Danach gehoert der Zoom wieder dem Betreiber.
     bool m_flexAusschnittUebernommen{false};

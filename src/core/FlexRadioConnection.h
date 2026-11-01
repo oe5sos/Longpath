@@ -321,6 +321,31 @@ QString setSliceTxCommand(const QString& sliceId, bool sendet);
 QString setSliceSquelchCommand(const QString& sliceId, bool an);
 QString setSliceSquelchLevelCommand(const QString& sliceId, int stufe);
 
+/// Die uebrigen Regler der Scheibe. Alle Schluessel am 2026-11-01
+/// direkt von der FLEX-8400 gelesen: eine eigene Scheibe angelegt,
+/// die 101 Schluessel ihres Zustands mitgeschrieben, Scheibe wieder
+/// entfernt. Nichts davon ist geraten.
+///
+///   agc_mode=med        off | slow | med | fast
+///   audio_level=50      0..100
+///   audio_mute=0        0 | 1
+///   audio_pan=50        0..100, 50 ist Mitte
+///   rit_on=0 rit_freq=0 Hz
+///   xit_on=0 xit_freq=0 Hz
+///   apf=0               0 | 1
+///
+/// Was die Maschine NICHT fuehrt und deshalb hier fehlt: unser
+/// AGC "Long" (sie kennt nur die vier oben), eine APF-Frequenz
+/// (sie hat nur `apf_level`, wir nur eine Frequenz) und der SNB —
+/// unter allen 101 Schluesseln gibt es keinen dafuer.
+QString setSliceAgcModeCommand(const QString& sliceId, const QString& modus);
+QString setSliceAudioLevelCommand(const QString& sliceId, int stufe);
+QString setSliceAudioMuteCommand(const QString& sliceId, bool stumm);
+QString setSliceAudioPanCommand(const QString& sliceId, int links0bis100);
+QString setSliceRitCommand(const QString& sliceId, bool an, int hz);
+QString setSliceXitCommand(const QString& sliceId, bool an, int hz);
+QString setSliceApfCommand(const QString& sliceId, bool an);
+
 // Sendeleistung und Abstimmleistung in Prozent, wie die Maschine sie
 // im `transmit`-Zustand meldet (`rfpower=`, `tunepower=`).
 //
