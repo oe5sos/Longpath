@@ -370,6 +370,42 @@ private slots:
         delete rahmen;
     }
 
+    // ── Der Inhalt gehoert ins PROFIL ───────────────────────────────
+    //
+    // Betreiber, 2026-11-01, mit Bild: „so war mein profil nicht
+    // abgespeichert" -- und auf Nachfrage: „ich habe es definitiv am
+    // desktop unter 01. abgespeichert".
+    //
+    // Er hatte recht. Das Feld merkte sich seinen Inhalt in EINER
+    // globalen Einstellung, nicht im Profil: nach einem
+    // Profilwechsel war er falsch, nach einem Neustart gar nicht da.
+    void derInhaltStehtImProfil()
+    {
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+        QFile f(QString::fromLocal8Bit(root)
+                + QStringLiteral("/src/gui/MainWindow.cpp"));
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        const QString src = QString::fromUtf8(f.readAll());
+
+        QVERIFY2(src.contains(QStringLiteral("insert(QStringLiteral(\"kombiInhalt\")")),
+                 "das Profil sichert den Inhalt des Feldes nicht — dann ist "
+                 "er nach jedem Wechsel falsch");
+        QVERIFY2(src.contains(QStringLiteral("value(QStringLiteral(\"kombiInhalt\")")),
+                 "das Profil stellt den Inhalt nicht wieder her");
+        // Und die Reihenfolge: erst die Panels dorthin, wo das Profil
+        // sie haben will, DANN das Feld. Umgekehrt nimmt Schritt 3 sie
+        // ihm wieder weg.
+        const int schritt3 = src.indexOf(QStringLiteral("3/6 Applet-Andocken"));
+        const int kombi    = src.indexOf(QStringLiteral("holeKombiInhaltZurueck(\n"));
+        const int fertig   = src.indexOf(QStringLiteral("6/6 fertig"));
+        QVERIFY2(schritt3 > 0 && fertig > schritt3,
+                 "der Anwenden-Weg sieht anders aus als erwartet");
+        QVERIFY2(kombi > schritt3 && kombi < fertig,
+                 "das Kombi-Feld wird vor dem Andocken gefuellt — dann ist "
+                 "es gleich wieder leer");
+    }
+
     // ── Jedes Widget, nicht nur ein Applet ──────────────────────────
     //
     // Betreiber, 2026-11-01: „ich will da auch den rotor und andere

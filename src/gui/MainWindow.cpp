@@ -1294,6 +1294,9 @@ MainWindow::MainWindow(QWidget* parent)
     // blocking work several GUI tests were paying for.  See
     // docs/architecture/2026-09-09-ci-discovery-hang-investigation.md.
     QTimer::singleShot(0, this, &MainWindow::openConnectionPanelOnLaunch);
+    // NACH dem Profil: erst muessen die Panels dort liegen, wo das
+    // Profil sie haben will, dann holt das Kombi-Feld seine zurueck.
+    QTimer::singleShot(0, this, [this]() { holeKombiInhaltZurueck(); });
 
     // Phase 3J-2 + 3R M3: restore each spot client's auto-connect /
     // auto-start state. Sibling to the panel-open call above; deferred via
@@ -2358,6 +2361,7 @@ void MainWindow::zeigeKombiListe(KombiApplet* feld, const QPoint& globalPos)
             fenster->deleteLater();
             if (!inhalt) { return; }
             inhalt->setWindowTitle(name);
+            inhalt->setObjectName(QStringLiteral("RotorLog"));
             feld->nimmAuf(inhalt);
         });
         ++angeboten;
@@ -9741,6 +9745,29 @@ void MainWindow::populateDefaultMeter()
                 }
                 s.insert(QStringLiteral("floatingApplets"), floating);
 
+                // ── Was im Kombi-Feld liegt, gehoert INS PROFIL ──────
+                //
+                // Betreiber, 2026-11-01, mit Bild: "so war mein profil
+                // nicht abgespeichert" -- und dann: "ich habe es
+                // definitiv am desktop unter 01. abgespeichert".
+                //
+                // Er hat recht. Das Feld merkte sich seinen Inhalt in
+                // EINER globalen Einstellung (`Kombi/Inhalt`), nicht
+                // im Profil. Damit war er nach einem Profilwechsel
+                // falsch und nach einem Neustart gar nicht da. Jetzt
+                // liegt er dort, wo die uebrige Anordnung liegt.
+                if (m_kombiApplet) {
+                    QStringList drin;
+                    for (QWidget* w : m_kombiApplet->seiten()) {
+                        if (auto* a = qobject_cast<AppletWidget*>(w)) {
+                            drin << panelIdFor(a);
+                        } else if (w && !w->objectName().isEmpty()) {
+                            drin << w->objectName();
+                        }
+                    }
+                    s.insert(QStringLiteral("kombiInhalt"), drin);
+                }
+
                 // Die freistehenden Meter-Container, nach derselben
                 // Regel. MeterDisplay_<id>_Geometry bleibt bestehen,
                 // wird aber nur noch GELESEN — als Rückfall für den
@@ -10522,6 +10549,22 @@ void MainWindow::populateDefaultMeter()
                 // Der Leger ist darum wieder draussen. Der Schluessel
                 // bleibt im Profil -- er kostet nichts und beschreibt
                 // den Zustand beim Aufnehmen.
+                // ── Zuletzt das Kombi-Feld (2026-11-01) ─────────────
+                //
+                // Erst muessen die Panels dort liegen, wo das Profil
+                // sie haben will -- dann holt sich das Feld die
+                // seinen. Umgekehrt wuerde Schritt 3 sie ihm wieder
+                // wegnehmen.
+                if (m_kombiApplet) {
+                    for (QWidget* w : m_kombiApplet->gibAlleFrei()) {
+                        if (auto* a = qobject_cast<AppletWidget*>(w)) {
+                            if (m_appletPanel) { m_appletPanel->addApplet(a); }
+                        }
+                    }
+                    holeKombiInhaltZurueck(
+                        s.value(QStringLiteral("kombiInhalt")).toStringList());
+                }
+
                 qWarning() << "[ProfileApply:Step] 6/6 fertig";
             });
 
@@ -17657,6 +17700,10 @@ void MainWindow::detachRotorPanel()
         // darueber. Beim Hineinlegen geht das Fenster weg -- also
         // nimmt der Inhalt den Namen mit.
         inhalt->setWindowTitle(name);
+        // Eine Kennung, damit das Feld ihn beim naechsten Start
+        // wiederfindet -- `KombiApplet::merkeStand` schreibt fuer ein
+        // Nicht-Applet den objectName.
+        inhalt->setObjectName(QStringLiteral("RotorLog"));
         ziel->nimmAuf(inhalt);
     });
     connect(m_rotorWindow, &ToolWindow::dockRequested, this,
@@ -19909,6 +19956,55 @@ void MainWindow::onConnectionStateChanged()
 // What's left is just the cold-launch convenience this always also did:
 // open the Connect-to-Radio panel so the user has a one-click path to a
 // saved radio or Add Manually (design §6.1).
+// ── Was im Kombi-Feld lag, liegt beim naechsten Start wieder darin ─
+//
+// Betreiber, 2026-11-01, mit Bild: "so war mein profil nicht
+// abgespeichert". Meine Luecke: das Feld MERKT sich seinen Inhalt
+// (`Kombi/Inhalt`), aber niemand holte ihn zurueck -- also stand es
+// nach jedem Start leer, und die Panels lagen wieder einzeln herum.
+//
+// Hier, einmal nach dem Aufbau: die gemerkten Kennungen der Reihe
+// nach hineinlegen. Was es nicht mehr gibt, wird uebergangen.
+void MainWindow::holeKombiInhaltZurueck(const QStringList& vorgabe)
+{
+    if (m_shuttingDown || !m_kombiApplet) { return; }
+    // Aus dem Profil, wenn eines etwas sagt; sonst aus der gemerkten
+    // Liste des Feldes selbst (erster Start nach dem Umbau).
+    QStringList ids = vorgabe;
+    if (ids.isEmpty()) {
+        const QString liste =
+            AppSettings::instance().value(QStringLiteral("Kombi/Inhalt"),
+                                          QString()).toString();
+        ids = liste.split(QLatin1Char(','), Qt::SkipEmptyParts);
+    }
+    if (ids.isEmpty()) { return; }
+
+    int geholt = 0;
+    for (const QString& id : ids) {
+        if (id == QStringLiteral("RotorLog")) {
+            if (!m_rotorWindow) { detachRotorPanel(); }
+            if (!m_rotorWindow) { continue; }
+            ToolWindow* fenster = m_rotorWindow;
+            m_rotorWindow = nullptr;
+            fenster->hide();
+            QWidget* inhalt = fenster->releaseContent();
+            fenster->deleteLater();
+            if (!inhalt) { continue; }
+            inhalt->setWindowTitle(QStringLiteral("Rotor / Log"));
+            inhalt->setObjectName(QStringLiteral("RotorLog"));
+            m_kombiApplet->nimmAuf(inhalt);
+            ++geholt;
+            continue;
+        }
+        AppletWidget* a = m_appletsById.value(id, nullptr);
+        if (!a || a == m_kombiApplet) { continue; }
+        holeInsKombiFeld(m_kombiApplet, a, id);
+        ++geholt;
+    }
+    qCInfo(lcConnection) << "Kombi: " << geholt << "von" << ids.size()
+                         << "gemerkten Panels zurueckgeholt";
+}
+
 void MainWindow::openConnectionPanelOnLaunch()
 {
     // ── Nicht mehr bei jedem Start (2026-11-01) ──────────────────────

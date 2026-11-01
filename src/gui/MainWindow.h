@@ -1047,6 +1047,8 @@ private:
     void buildStatusBar();
     void applyDarkTheme();
     void openConnectionPanelOnLaunch();
+    /// Was im Kombi-Feld lag, beim Start wieder hineinlegen.
+    void holeKombiInhaltZurueck(const QStringList& vorgabe = {});
     void wireSliceToSpectrum();
 
     /// Re-bind RttyDecoderApplet and the RADE/RttyDecoder availability gate
