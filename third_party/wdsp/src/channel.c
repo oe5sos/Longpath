@@ -286,11 +286,40 @@ int SetChannelState (int channel, int state, int dmode)
 			}
 			break;
 		case 1:
+			// From WDSP 2.11 (TAPR OpenHPSDR-wdsp @e69de50) channel.c:289 —
+			// if a turn-off is still in progress, wait for it to complete before beginning the turn-on
+			while (_InterlockedAnd (&ch[channel].flushflag, 1) && count < timeout)
+			{
+				Sleep(1);
+				count++;
+			}
+			if (count >= timeout)
+			{
+				InterlockedBitTestAndReset (&ch[channel].exchange, 0);
+				InterlockedBitTestAndReset (&ch[channel].flushflag, 0);
+				InterlockedBitTestAndReset (&a->slew.downflag, 0);
+			}
 			InterlockedBitTestAndSet (&a->slew.upflag, 0);
 			InterlockedBitTestAndSet (&ch[channel].iob.ch_upslew, 0);
 			InterlockedBitTestAndReset (&ch[channel].iob.pc->exec_bypass, 0);
 			InterlockedBitTestAndSet (&ch[channel].exchange, 0);
 			break;
+		}
+	}
+	// From WDSP 2.11 (TAPR OpenHPSDR-wdsp @e69de50) channel.c:308 — a
+	// blocking turn-off must also wait when the channel is already off.
+	else if (state == 0 && dmode)
+	{	// already OFF; if a turn-off begun with dmode == 0 is still in progress, wait for it to complete
+		while (_InterlockedAnd (&ch[channel].flushflag, 1) && count < timeout)
+		{
+			Sleep(1);
+			count++;
+		}
+		if (count >= timeout)
+		{
+			InterlockedBitTestAndReset (&ch[channel].exchange, 0);
+			InterlockedBitTestAndReset (&ch[channel].flushflag, 0);
+			InterlockedBitTestAndReset (&a->slew.downflag, 0);
 		}
 	}
 	return prior_state;

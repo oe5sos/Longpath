@@ -1906,6 +1906,16 @@ public:
     /// From Thetis wdsp/cfcomp.c:700-715 [v2.10.3.13].
     void setTxCfcPrecompDb(double dB);
 
+    /// CFC FFT size in points: 2048, 4096, 8192 or 16384.  Anything else is
+    /// refused by WDSP and this carries the old value on.  A larger frame
+    /// gives finer frequency resolution (dsp_rate / size per bin) at the
+    /// price of delay -- about three quarters of a frame, because cfcomp
+    /// runs fourfold overlap (incr = fsize / ovrlp, cfcomp.c:386).
+    ///
+    /// Longpath's own value is 2048 (TXA.c:206), not upstream's
+    /// max(16384, dsp_size).
+    void setTxCfcFftSize(int points);
+
     /// CFC post-EQ run gate.  Wraps SetTXACFCOMPPeqRun(channel, on ? 1 : 0).
     /// Independent from setTxCfcRunning — when on, WDSP applies the peq
     /// filter after the comp curve.
@@ -3183,6 +3193,7 @@ private:
     bool    m_cfcOn            {false};
     bool    m_cfcPostEqOn      {false};
     double  m_cfcPrecompDb     {0.0};
+    int     m_cfcFftSize       {2048};   // TXA.c:206 create_cfcomp fft size
     double  m_cfcPostEqGainDb  {0.0};
 
     // Phase rotator carry (mirrors WDSP-wired setTxPhrotCornerHz/Nstages/Reverse)

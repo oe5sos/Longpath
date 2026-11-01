@@ -210,10 +210,11 @@ int readZetaHat(const char* zeta_file, int* rows, int* cols,
 {
 	char zetaBinary[256];
 	char bin[50] = ".bin";
-	sprintf (zetaBinary, "%s%s", zeta_file, bin);
+	// From WDSP 2.11 (TAPR OpenHPSDR-wdsp @e69de50) emnr.c:211 — bound the path, reject a zetaHat.bin that is not 60x60
+	int pathlen = zeta_file ? snprintf (zetaBinary, sizeof (zetaBinary), "%s%s", zeta_file, bin) : -1;
 	FILE* pzetaBinary;
 	int e = 0;
-	if (pzetaBinary = fopen(zetaBinary, "rb"))
+	if (pathlen > 0 && pathlen < (int)sizeof (zetaBinary) && (pzetaBinary = fopen(zetaBinary, "rb")))
 	{
 		int nvals = 0;
 		// 'fread's executed only through first error
@@ -223,6 +224,7 @@ int readZetaHat(const char* zeta_file, int* rows, int* cols,
 		if (e == 0 && fread(gmax,      sizeof(double), 1,     pzetaBinary) != 1) e = 1;
 		if (e == 0 && fread(ximin,     sizeof(double), 1,     pzetaBinary) != 1) e = 1;
 		if (e == 0 && fread(ximax,     sizeof(double), 1,     pzetaBinary) != 1) e = 1;
+		if (e == 0 && (*rows != 60 || *cols != 60)) e = 1;
 		if (e == 0)   nvals = (*rows) * (*cols);
 		if (e == 0 && fread(zetaHat,   sizeof(double), nvals, pzetaBinary) != nvals) e = 1;
 		if (e == 0 && fread(zetaValid, sizeof(int),    nvals, pzetaBinary) != nvals) e = 1;
@@ -1056,7 +1058,11 @@ int getZeta( EMNR a, double gamma, double eps, double* zeta)
 	i_gamma = (int)floor((gamma_dB - a->g.z_gamma_min) / gamma_per_cell);
 	i_xi    = (int)floor((xi_dB    - a->g.z_xihat_min) / xi_per_cell);
 	if (i_gamma < 0 || i_gamma >= a->g.dim_zeta ||
-		i_xi < 0 || xi_dB  >= a->g.dim_zeta)
+		// From WDSP 2.11 (TAPR OpenHPSDR-wdsp @e69de50) emnr.c:1086 — the
+		// second bound compared the dB value, not the index: for an
+		// a-priori SNR above about +20.5 dB this read past zeta_true /
+		// zeta_hat (60 x 60 = 3600 entries).
+		i_xi < 0 || i_xi >= a->g.dim_zeta)
 		return -1;
 	index = i_gamma * a->g.dim_zeta + i_xi;
 	int ztvalue = a->g.zeta_true[index];

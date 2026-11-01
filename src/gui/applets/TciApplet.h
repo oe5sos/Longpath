@@ -110,6 +110,15 @@ private:
     TciServer*   m_server{nullptr};
     QTimer*      m_refreshTimer{nullptr};
 
+    // Der Grund, warum der Server NICHT horcht -- leer, solange er laeuft.
+    //
+    // Es gab ihn schon: `TciServer::bindWartetAufAdresse` traegt Adresse,
+    // Port und Grund, und die Setup-Seite zeigt ihn (CatNetworkSetupPages
+    // am 2026-10-02 verdrahtet). Nur stand er dort, wo man ihn erst sieht,
+    // wenn man schon weiss, dass etwas fehlt: im Einstellungsfenster. Das
+    // Applet, das der Betreiber offen hat, sagte nur „port: -".
+    QString      m_bindWartet;
+
     // ── Main content widgets (hidden when server is stopped) ─────────────────
     QWidget*     m_mainContent{nullptr};
 

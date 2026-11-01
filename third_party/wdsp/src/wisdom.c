@@ -46,8 +46,10 @@ int WDSPwisdom (char* directory)
 	double* fftout;
 	char wisdom_file[1024];
 	const int maxsize = max (MAX_WISDOM_SIZE_DISPLAY, MAX_WISDOM_SIZE_FILTER + 1);
-	strcpy (wisdom_file, directory);
-	strncat (wisdom_file, "wdspWisdom00", 16);
+	// From WDSP 2.11 (TAPR OpenHPSDR-wdsp @e69de50) wisdom.c:49 — NULL directory and path-length bound
+	if (directory == NULL) return -1;
+	int pathlen = snprintf (wisdom_file, sizeof (wisdom_file), "%s%s", directory, "wdspWisdom00");
+	if (pathlen < 0 || (size_t)pathlen >= sizeof (wisdom_file)) return -1;
 	if(!fftw_import_wisdom_from_filename(wisdom_file))
 	{
 		fftin =  (double *) malloc0 (maxsize * sizeof (complex));
