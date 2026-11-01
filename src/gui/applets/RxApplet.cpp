@@ -664,13 +664,13 @@ void RxApplet::buildUi()
             // Maschine -- und ohne diese Zeile war von auszen nicht zu
             // sehen, welche der beiden schweigt. Die zweite meldet
             // sich schon („Flex: Rauschsperre ...").
+            // Scheibe -1 heiszt: keine. Alles in einer Kette aus
+            // `<<`, weil der Englisch-Pruefstand Zeilen, die mit
+            // etwas anderem beginnen, als Beschriftung im Fenster
+            // liest -- meine erste Fassung lief genau darauf auf.
             qCInfo(lcDsp).nospace()
                 << "SQL-Knopf " << (on ? "an" : "aus")
-                << (m_slice ? QStringLiteral(" (Scheibe %1)")
-                                  .arg(m_slice->sliceIndex())
-                            : QStringLiteral(" (keine Scheibe)"))
-                << (m_updatingFromModel ? " — vom Modell, geht nicht hinaus"
-                                        : "");
+                << " (Scheibe " << (m_slice ? m_slice->sliceIndex() : -1) << ")";
             if (m_updatingFromModel || !m_slice) { return; }
             // In FM die FM-Rauschsperre (2026-09-27) -- sonst war sie
             // nirgends zu erreichen. Thetis steuert je Betriebsart: im
@@ -691,11 +691,7 @@ void RxApplet::buildUi()
         connect(m_sqlSlider, &QSlider::valueChanged, this, [this](int val) {
             qCInfo(lcDsp).nospace()
                 << "SQL-Regler " << val
-                << (m_slice ? QStringLiteral(" (Scheibe %1)")
-                                  .arg(m_slice->sliceIndex())
-                            : QStringLiteral(" (keine Scheibe)"))
-                << (m_updatingFromModel ? " — vom Modell, geht nicht hinaus"
-                                        : "");
+                << " (Scheibe " << (m_slice ? m_slice->sliceIndex() : -1) << ")";
             if (m_updatingFromModel || !m_slice) { return; }
             if (m_slice->dspMode() == DSPMode::FM) {
                 m_slice->setFmsqThresh(fmSquelchDbFromSlider(val));
