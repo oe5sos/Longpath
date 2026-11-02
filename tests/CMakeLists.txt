@@ -8213,6 +8213,12 @@ longpath_add_test(tst_flex_fensterzug)
 # Urteil fest (core/FensterRandScroll.h).
 longpath_add_test(tst_fenster_randscroll)
 
+# Die Schwesterfrage fuer CTUN: dort bewegt eine Mitte nicht den VFO,
+# sondern die DDC. Drei Stellen stellen das Fenster von selbst auf den
+# VFO (Zoomziehen, Strg+Rad, recenterOnVfo) und wurden dort fuer Zuege
+# gehalten. Longpath-original: kein Port.
+longpath_add_test(tst_zoom_in_ctun_ist_kein_zug)
+
 # -- Flex: der Fehlerweg sagt jetzt etwas ---------------------------------
 # „Disconnected — Unknown error" im Verbindungsfenster, 2026-10-28 20:41,
 # dreimal in Folge; eine Millisekunde zwischen Wahl und Fehler, und als

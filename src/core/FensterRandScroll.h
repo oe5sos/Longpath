@@ -53,6 +53,8 @@
 // Modification history (Longpath):
 //   2026-10-30 — Original fuer Longpath von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-11-02 — mitteIstDdcBefehl: dieselbe Unterscheidung fuer den
+//                 CTUN-Zweig, wo die Mitte die DDC bewegt.
 // =================================================================
 
 namespace Longpath {
@@ -90,6 +92,34 @@ inline bool mitteIstAbstimmbefehl(bool ctun, bool folgtDemVfo)
     if (ctun)        { return false; }
     if (folgtDemVfo) { return false; }
     return true;
+}
+
+/// Darf eine Mittenaenderung des Fensters die DDC verstellen?
+///
+/// Die Schwesterfrage zu der darueber, fuer den CTUN-Betrieb. Dort ist
+/// die Mitte nie ein Abstimmbefehl (siehe oben), aber ein ZUG am
+/// Panadapter ist sehr wohl die Bitte, die DDC zu verschieben -- das
+/// ist, was CTUN ausmacht.
+///
+/// \param folgtDemVfo true, wenn das Fenster sich SELBST auf den VFO
+///                    gestellt hat (Zoomen, recenterOnVfo, Randscroll)
+///
+/// Gefunden am 2026-11-02: drei Stellen stellen das Fenster von selbst
+/// auf den VFO und melden eine neue Mitte -- Zoomziehen am
+/// Frequenzmassstab, Zoomen mit Strg/Cmd+Rad und `recenterOnVfo()`
+/// (SpectrumWidget; die Aufzaehlung steht seit dem 2026-10-27 in
+/// PanadapterApplet.cpp). In CTUN nahm MainWindow jede davon fuer
+/// einen Zug und verstellte die DDC auf den VFO -- das Gegenteil
+/// dessen, was CTUN verspricht: die DDC steht fest, der VFO wandert
+/// darin. Ein zweiter Slice im selben Fenster wurde mitgezogen.
+///
+/// Die vierte Stelle, das Randscrollen, laeuft in CTUN gar nicht
+/// (setVfoFrequency prueft `!m_ctunEnabled`) -- und gerade deshalb fiel
+/// es nicht auf: die eine Stelle, die seit dem 2026-10-30 eine Fahne
+/// traegt, ist die eine, die in CTUN nie feuert.
+inline bool mitteIstDdcBefehl(bool folgtDemVfo)
+{
+    return !folgtDemVfo;
 }
 
 } // namespace FensterRandScroll

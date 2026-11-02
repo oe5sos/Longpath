@@ -10792,7 +10792,16 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
         // Only emit centerChanged if center actually moved — avoids DDC retune per drag frame
         if (!qFuzzyCompare(m_centerHz, m_vfoHz)) {
             m_centerHz = m_vfoHz;
+        // ── Auch das ist KEIN Zug (2026-11-02) ──────────────────
+        //
+        // Dieselbe Fahne wie beim Randscrollen, aus demselben Grund:
+        // das Fenster stellt sich SELBST auf den VFO. In CTUN nahm
+        // MainWindow das fuer einen Zug und verstellte die DDC --
+        // genau das Gegenteil dessen, was CTUN verspricht. Siehe
+        // core/FensterRandScroll.h, mitteIstDdcBefehl.
+            m_mitteFolgtDemVfo = true;
             emit centerChanged(m_centerHz);
+            m_mitteFolgtDemVfo = false;
         }
         updateVfoPositions();
 #ifdef LONGPATH_GPU_SPECTRUM
@@ -11469,7 +11478,16 @@ void SpectrumWidget::wheelEvent(QWheelEvent* event)
         const double oldCenter = m_centerHz;
         setFrequencyRange(m_vfoHz, newBw);
         if (!qFuzzyCompare(oldCenter, m_centerHz)) {
+        // ── Auch das ist KEIN Zug (2026-11-02) ──────────────────
+        //
+        // Dieselbe Fahne wie beim Randscrollen, aus demselben Grund:
+        // das Fenster stellt sich SELBST auf den VFO. In CTUN nahm
+        // MainWindow das fuer einen Zug und verstellte die DDC --
+        // genau das Gegenteil dessen, was CTUN verspricht. Siehe
+        // core/FensterRandScroll.h, mitteIstDdcBefehl.
+            m_mitteFolgtDemVfo = true;
             emit centerChanged(m_centerHz);
+            m_mitteFolgtDemVfo = false;
         }
         emit bandwidthChangeRequested(newBw);
     } else if (event->modifiers() & Qt::ShiftModifier) {
@@ -13498,7 +13516,11 @@ void SpectrumWidget::recenterOnVfo()
 {
     m_centerHz = m_vfoHz;
     m_vfoOffScreen = VfoOffScreen::None;
+    // Der Name sagt es schon: das Fenster stellt sich auf den VFO. Kein
+    // Zug. Siehe core/FensterRandScroll.h, mitteIstDdcBefehl (2026-11-02).
+    m_mitteFolgtDemVfo = true;
     emit centerChanged(m_centerHz);
+    m_mitteFolgtDemVfo = false;
     updateVfoPositions();
 #ifdef LONGPATH_GPU_SPECTRUM
     markOverlayDirty();
