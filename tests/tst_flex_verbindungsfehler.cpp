@@ -92,10 +92,16 @@ void TstFlexVerbindungsfehler::jedeNummerHatKlartext()
 
     // Der Fall aus dem Protokoll: Qt kennt den errno nicht. Auch dann
     // muss die Meldung sagen, DASS die Zuordnung fehlt, statt zu
-    // schweigen.
+    // schweigen — und seit dem 2026-11-01 auch, was zu tun ist. Der
+    // Wortlaut stand bis dahin auf Deutsch („errno unbekannt"); die
+    // Meldung geht aber in die Verbindungsmaske und wird gelesen,
+    // also ist sie englisch wie der Rest der Oberflaeche.
     const QString unbekannt =
         FlexRadioConnection::socketErrorText(QAbstractSocket::UnknownSocketError);
-    QVERIFY(unbekannt.contains(QStringLiteral("errno"), Qt::CaseInsensitive));
+    QVERIFY2(unbekannt.contains(QStringLiteral("no reason"), Qt::CaseInsensitive),
+             qPrintable(unbekannt));
+    QVERIFY2(unbekannt.contains(QStringLiteral("try again"), Qt::CaseInsensitive),
+             qPrintable(unbekannt));
 }
 
 void TstFlexVerbindungsfehler::abgewieseneVerbindungNenntZielUndNummer()
@@ -123,8 +129,9 @@ void TstFlexVerbindungsfehler::abgewieseneVerbindungNenntZielUndNummer()
     QVERIFY2(msg.contains(QStringLiteral("127.0.0.1")), qPrintable(msg));
     QVERIFY2(msg.contains(QString::number(freierPort)), qPrintable(msg));
     // Die Nummer steht drin, damit ein Protokoll ohne diese Tabelle
-    // auswertbar bleibt.
-    QVERIFY2(msg.contains(QStringLiteral("Nr.")), qPrintable(msg));
+    // auswertbar bleibt. Seit dem 2026-11-01 heisst der Rahmen „no."
+    // statt „Nr." — dieselbe Umstellung wie bei den Fehlertexten.
+    QVERIFY2(msg.contains(QStringLiteral("no.")), qPrintable(msg));
     QCOMPARE(verbindung.state(), FlexRadioConnection::State::Error);
 }
 
