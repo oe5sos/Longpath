@@ -881,8 +881,14 @@ qint64 WdspEngine::rebuildRxChannel(int channelId, const ChannelConfig& cfg)
 //
 // Longpath scope here:
 //   * SetInputSamplerate / SetInputBuffsize on the channel — full port.
-//   * ANB / NOB rate-and-size — deferred (NbFamily currently re-seeds these
-//     at construction; live propagation requires per-instance setters).
+//   * ANB / NOB rate-and-size — ported. Hier stand bis zum 2026-11-02
+//     "deferred (NbFamily currently re-seeds these at construction; live
+//     propagation requires per-instance setters)". Das stimmt nicht mehr:
+//     setRxChannelRate unten ruft RxChannel::setSampleRate, und die reicht
+//     an NbFamily::setSampleRate weiter (RxChannel.cpp:381), die die vier
+//     EXT-Setter in der Reihenfolge von cmaster.c:464-470 schreibt
+//     (Buffsize vor Samplerate). Der Kommentar hat den Stand ueberlebt,
+//     den er beschrieb.
 //   * Siphon / IVAC — Longpath uses different display + VAC paths.
 // ---------------------------------------------------------------------------
 

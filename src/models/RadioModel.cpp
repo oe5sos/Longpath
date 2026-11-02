@@ -4597,6 +4597,40 @@ void RadioModel::reshiftSlicesOnStream(int streamIndex, double newCentreHz)
     if (streamIndex < 0) {
         return;
     }
+
+    // ── Den Zuteiler mitnehmen ───────────────────────────────────────────
+    //
+    // Beide Aufrufer (MainWindow: der CTUN-Zug am Panadapter und das
+    // Loesen des CTUN-Riegels) uebergeben die Stelle, an der die DDC
+    // WIRKLICH steht -- der Zug schreibt sie ueber forceHardwareFrequency
+    // ins Geraet und ueber setDdcCenterFrequency ins Widget. Nur der
+    // Zuteiler blieb aussen vor, und das war mit Absicht so: er sollte
+    // nicht als zweiter Schreiber in den Zug hineinreden.
+    //
+    // Die Absicht hatte einen Preis, den erst
+    // tests/tst_ctun_zug_macht_zuteiler_schal.cpp sichtbar gemacht hat.
+    // bindSliceToStream rechnet den naechsten VFO-Schritt wieder gegen den
+    // Zuteiler ("the allocator is authoritative", siehe dort) -- und der
+    // stand noch auf der Mitte von vor dem Zug. Gemessen am 2026-11-02:
+    // nach einem Zug um 60 kHz gab der Zuteiler `JoinedExisting shift=5000`
+    // statt -55000. Der Ton sass um den ganzen Zug daneben, waehrend das
+    // Fahnenschild die richtige Frequenz zeigte.
+    //
+    // Ein Zuteiler, der eine Stelle nennt, an der das Geraet nicht steht,
+    // ist schlechter als einer, der mitgeht: er ist die Quelle, aus der
+    // JEDE spaetere Platzierung schoepft. Also geht er mit.
+    //
+    // NereusSDR hat denselben Fall am 2026-10-25 behoben (f183631b9, ihre
+    // #648, "move a CTUN DDC the allocator thinks is already there"). Ihre
+    // Stelle ist eine andere (requestStreamCentre kehrte frueh zurueck,
+    // weil die Mitte des Zuteilers passte) -- die Ursache ist dieselbe.
+    if (m_streamAllocator.isStreamActive(streamIndex)
+        && m_streamAllocator.streamCentreHz(streamIndex) != newCentreHz) {
+        m_streamAllocator.activateStream(
+            streamIndex, newCentreHz,
+            m_streamAllocator.streamSampleRateHz(streamIndex));
+    }
+
     const QVector<int> members = slicesOnStream(streamIndex);
     for (int sliceIdx : members) {
         SliceModel* s = sliceById(sliceIdx);
