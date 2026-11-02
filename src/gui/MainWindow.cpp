@@ -4091,6 +4091,27 @@ void MainWindow::wireSpectrumSliceControls(SpectrumWidget* sw,
             }
             return;
         }
+        // ── Auch hier: nur ein Zug ist ein Befehl (2026-11-02) ──
+        //
+        // Der Zweig darunter verstellt die DDC. Fuer einen Zug am
+        // Panadapter ist das genau richtig -- der Zug IST die Bitte,
+        // das Fenster zu verschieben. Nur ist der Zug nicht der
+        // einzige Weg, auf dem eine neue Mitte hier ankommt: das
+        // Fenster stellt sich auch selbst auf den VFO (Zoomziehen,
+        // Strg+Rad, recenterOnVfo -- die Aufzaehlung steht in
+        // PanadapterApplet.cpp seit dem 2026-10-27).
+        //
+        // Jede dieser drei verstellte bis heute die DDC auf den VFO:
+        // das Gegenteil dessen, was CTUN verspricht. Ein zweiter
+        // Slice im selben Fenster wurde mitgezogen, und seit PR #375
+        // ging die Mitte auch in den Zuteiler.
+        //
+        // Der herkoemmliche Zweig oben stellt dieselbe Frage seit dem
+        // 2026-10-30 (mitteIstAbstimmbefehl), nur fuer ein anderes
+        // Ziel. Hier ist es die DDC.
+        if (!FensterRandScroll::mitteIstDdcBefehl(sw->mitteFolgtDemVfo())) {
+            return;
+        }
         const int stream = s->streamIndex();
         if (stream >= 0 && m_radioModel->receiverManager()) {
             m_radioModel->receiverManager()->forceHardwareFrequency(

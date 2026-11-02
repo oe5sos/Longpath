@@ -2954,7 +2954,10 @@ private:
     bool   m_ctunEnabled{true};  // true = SmartSDR-style (pan independent of VFO)
     enum class VfoOffScreen { None, Left, Right };
     VfoOffScreen m_vfoOffScreen{VfoOffScreen::None};
-    /// Siehe mitteFolgtDemVfo(): nur waehrend des Nachscrollens gesetzt.
+    /// Siehe mitteFolgtDemVfo(): nur waehrend einer EIGENEN Bewegung
+    /// des Fensters gesetzt -- Randscrollen (2026-10-30) sowie Zoomen
+    /// und recenterOnVfo (2026-11-02). Ausserhalb dieser Meldungen
+    /// steht sie auf false, damit ein echter Zug ein Zug bleibt.
     bool         m_mitteFolgtDemVfo{false};
     void drawOffScreenIndicator(QPainter& p, const QRect& specRect, const QRect& wfRect);
 
