@@ -24,11 +24,13 @@
 #include <QImage>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPushButton>
 #include <QStyleFactory>
 
 #include "gui/StyleConstants.h"
 #include "gui/applets/GridCellWidget.h"
 #include "gui/applets/KombiApplet.h"
+#include "gui/widgets/CommandBar.h"
 #include "gui/applets/RxApplet.h"
 #include "gui/applets/TxApplet.h"
 #include "gui/styles/AppTheme.h"
@@ -185,6 +187,41 @@ private slots:
         malenForm(dir, 2, QStringLiteral("Text mit Strich darunter"));
         malenForm(dir, 3, QStringLiteral("Eckig statt Pille"));
         malenForm(dir, 4, QStringLiteral("Zwei Pfeile, Name dazwischen"));
+    }
+
+    // ── Die Auswahl ohne Blau (2026-11-02) ──────────────────────────
+    //
+    // Betreiber: „ich will diesen blauen hintergrund überall weg".
+    // Geaendert wurde EINE Stelle (kGlassSel* in StyleConstants.h);
+    // dieses Blatt zeigt, was daraus in der echten Befehlsleiste
+    // wird -- gewaehlte Knoepfe neben ungewaehlten.
+    void dieAuswahlOhneBlau()
+    {
+        const QByteArray dirRoh = qgetenv("LONGPATH_GRAB_DIR");
+        if (dirRoh.isEmpty() || qgetenv("LONGPATH_ENTWURF") != "1") {
+            QSKIP("Zeichenwerkzeug: LONGPATH_GRAB_DIR + LONGPATH_ENTWURF=1");
+        }
+        CommandBar leiste;
+        leiste.resize(1200, 90);
+        leiste.show();
+        QTest::qWait(300);
+        // Ohne Funkgeraet ist nichts gewaehlt -- und gerade der
+        // gewaehlte Zustand ist hier die Frage. Also je Gruppe einen
+        // von Hand druecken.
+        const QStringList gewaehlt{QStringLiteral("40m"), QStringLiteral("LSB"),
+                                   QStringLiteral("FT8"), QStringLiteral("100 Hz"),
+                                   QStringLiteral("NR2")};
+        for (QPushButton* b : leiste.findChildren<QPushButton*>()) {
+            if (b->isCheckable() && gewaehlt.contains(b->text())) {
+                b->setChecked(true);
+            }
+        }
+        QTest::qWait(150);
+        const QImage bild = leiste.grab().toImage();
+        const QString pfad = QString::fromLocal8Bit(dirRoh)
+                             + QStringLiteral("/auswahl-ohne-blau.png");
+        QVERIFY2(bild.save(pfad), qPrintable(pfad));
+        qInfo() << "Blatt:" << pfad << bild.size();
     }
 
     // ── Nach der Wahl: das ECHTE Bauteil ────────────────────────────
