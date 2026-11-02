@@ -655,43 +655,64 @@ void FlexRadioConnection::onSocketDisconnected()
     emit disconnected();
 }
 
+// ── Diese Texte SIEHT der Betreiber (2026-11-01) ────────────────────
+//
+// Sie standen auf Deutsch, weil Fehlertexte unter src/core als
+// Protokolltexte galten — `tst_oberflaeche_englisch` nimmt sie aus
+// genau diesem Grund ausdruecklich aus („die liest der Betreiber,
+// nicht der Benutzer").
+//
+// Das stimmt fuer diese hier nicht: `onSocketErrorOccurred` schickt
+// den Text als `errorOccurred` weiter, und die Verbindungsmaske
+// stellt ihn in ihre Zustandszeile. Am 2026-11-01 stand dort
+// „Disconnected — Socketfehler ohne Zuordnung (errno unbekannt)
+// (Unknown error, Nr. -1, Ziel 172.30.30.12:4992)" — deutscher Satz,
+// englische Oberflaeche, und inhaltlich ein Schulterzucken.
+//
+// Also englisch wie der Rest der Oberflaeche, und der unbekannte Fall
+// sagt, was man TUN kann.
 QString FlexRadioConnection::socketErrorText(QAbstractSocket::SocketError error)
 {
     switch (error) {
     case QAbstractSocket::ConnectionRefusedError:
-        return QObject::tr("Verbindung abgewiesen — auf dem Port hoert nichts");
+        return QObject::tr("Connection refused — nothing is listening on that port");
     case QAbstractSocket::RemoteHostClosedError:
-        return QObject::tr("Die Maschine hat aufgelegt");
+        return QObject::tr("The radio hung up");
     case QAbstractSocket::HostNotFoundError:
-        return QObject::tr("Adresse nicht gefunden");
+        return QObject::tr("Address not found");
     case QAbstractSocket::SocketTimeoutError:
-        return QObject::tr("Keine Antwort — Frist abgelaufen");
+        return QObject::tr("No answer — timed out");
     case QAbstractSocket::NetworkError:
-        return QObject::tr("Netz nicht erreichbar — Kabel, WLAN oder Route");
+        return QObject::tr("Network unreachable — cable, Wi-Fi or route");
     case QAbstractSocket::SocketAccessError:
-        return QObject::tr("Betriebssystem verweigert den Socket");
+        return QObject::tr("The operating system refused the socket");
     case QAbstractSocket::SocketResourceError:
-        return QObject::tr("Keine Socketmittel frei");
+        return QObject::tr("No socket resources left");
     case QAbstractSocket::AddressInUseError:
-        return QObject::tr("Adresse schon belegt");
+        return QObject::tr("Address already in use");
     case QAbstractSocket::SocketAddressNotAvailableError:
-        return QObject::tr("Adresse auf dieser Maschine nicht verfuegbar");
+        return QObject::tr("That address does not exist on this machine");
     case QAbstractSocket::UnsupportedSocketOperationError:
-        return QObject::tr("Diese Socketoperation traegt das System nicht");
+        return QObject::tr("The system does not support this socket operation");
     case QAbstractSocket::UnfinishedSocketOperationError:
-        return QObject::tr("Vorige Socketoperation laeuft noch");
+        return QObject::tr("A previous socket operation is still running");
     case QAbstractSocket::DatagramTooLargeError:
-        return QObject::tr("Datagramm zu gross");
+        return QObject::tr("Datagram too large");
     case QAbstractSocket::UnknownSocketError:
         // Qt kennt den errno nicht und schreibt „Unknown error". Mehr
-        // als die Nummer gibt es hier nicht — aber das Ziel und der
-        // Zustand stehen in der Meldung, und das ist der Unterschied
-        // zwischen einer Spur und einem Schulterzucken.
-        return QObject::tr("Socketfehler ohne Zuordnung (errno unbekannt)");
+        // ueber die URSACHE gibt es hier nicht — aber ueber den
+        // Umgang damit schon: am 2026-11-01 war das Geraet in der
+        // Erkennung sichtbar („just now"), und derselbe Anruf ging
+        // Minuten spaeter durch. Bei einem Geraet am WLAN heisst
+        // dieser Fehler fast immer: ein Paket ist unterwegs verloren
+        // gegangen. Das gehoert in den Satz, sonst sucht der Betreiber
+        // an der falschen Stelle.
+        return QObject::tr("The connection attempt was lost and the system "
+                           "gave no reason — try again");
     default:
         break;
     }
-    return QObject::tr("Socketfehler %1").arg(static_cast<int>(error));
+    return QObject::tr("Socket error %1").arg(static_cast<int>(error));
 }
 
 void FlexRadioConnection::onSocketErrorOccurred(QAbstractSocket::SocketError error)
@@ -704,7 +725,7 @@ void FlexRadioConnection::onSocketErrorOccurred(QAbstractSocket::SocketError err
     const QString ziel = m_targetPort != 0
         ? QStringLiteral("%1:%2").arg(m_targetAddress.toString()).arg(m_targetPort)
         : QStringLiteral("—");
-    const QString msg = QStringLiteral("%1 (%2, Nr. %3, Ziel %4)")
+    const QString msg = QStringLiteral("%1 (%2, no. %3, target %4)")
                             .arg(socketErrorText(error),
                                  m_socket.errorString(),
                                  QString::number(static_cast<int>(error)),
