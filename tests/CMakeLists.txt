@@ -1921,6 +1921,14 @@ longpath_add_test(tst_radio_model_band_save_uses_slice_frequency)
 # low-pass on the previous band. Longpath-original: no Thetis port.
 longpath_add_test(tst_band_change_retunes_ddc_in_ctun)
 
+# ── Und die Gegenrichtung: ein CTUN-Zug macht den Zuteiler schal ──────────
+# Der Zug schreibt Geraet, Widget und Versaetze -- aber nicht
+# m_streamAllocator. Der naechste VFO-Schritt rechnet dann wieder gegen die
+# alte Mitte, und der Ton sitzt um den gezogenen Betrag daneben, waehrend das
+# Fahnenschild die richtige Frequenz zeigt. NereusSDR hat denselben Fall am
+# 2026-10-25 behoben (f183631b9, ihre #648). Longpath-original: kein Port.
+longpath_add_test(tst_ctun_zug_macht_zuteiler_schal)
+
 # ── RF-safety companion: the transmit frequency comes from the TX-bound slice ─
 # Splitting the LPF masks only holds if the transmit frequency itself is taken
 # from the slice bound to the transmitter, not from whichever slice happens to

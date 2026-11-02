@@ -361,9 +361,16 @@ private slots:
     // push, tunefreq + shift lands short by the whole drag distance for every
     // slice on the pan, which is the exact failure 4.1 exists to prevent.
     //
-    // The authoritative centre here is the newCentreHz argument, NOT
-    // m_streamAllocator.streamCentreHz: the drag does not move the allocator
-    // (MainWindow.cpp:1794-1796 writes the hardware directly).
+    // The authoritative centre here is the newCentreHz argument. The drag
+    // writes the hardware directly (MainWindow, in the centerChanged
+    // handler), so that argument is where the DDC really is.
+    //
+    // 2026-11-02: it is now ALSO where the allocator is.
+    // reshiftSlicesOnStream carries the new centre into m_streamAllocator,
+    // because leaving it behind broke the NEXT placement -- see
+    // tests/tst_ctun_zug_macht_zuteiler_schal.cpp. This test is unchanged
+    // and still passes: asserting against the argument asserts against the
+    // one centre there now is.
 
     void a_ctun_pan_drag_carries_the_tune_frequency_for_every_stream_member()
     {
@@ -453,12 +460,17 @@ private slots:
     //
     // WDSP maps a notch with offset = tunefreq + shift (nbp.c:192). Those two
     // terms had two owners with two different notions of the stream centre:
-    // reshiftSlicesOnStream pushes the real DDC position (a CTUN drag writes
-    // hardware directly and deliberately leaves the allocator where it was),
-    // while bindSliceToStream pushes the allocator's centre, and the shift was
-    // read from a stored offset computed against the allocator. After a CTUN
-    // drag the pair described different origins and the sum was wrong by the
-    // drag distance.
+    // reshiftSlicesOnStream pushes the real DDC position, while
+    // bindSliceToStream pushes the allocator's centre, and the shift was read
+    // from a stored offset computed against the allocator. After a CTUN drag
+    // the pair described different origins and the sum was wrong by the drag
+    // distance.
+    //
+    // 2026-11-02: the two notions have since been made one --
+    // reshiftSlicesOnStream carries the dragged centre into the allocator.
+    // This test keeps its value as the guard on the OTHER half: that the
+    // tune frequency is pushed at all on a retune, and for every member of
+    // the stream, not only the dragged slice.
     //
     // The old test asserted the invariant at a single bind call, so it passed
     // while this hole was open. This one drives the real sequence: CTUN drag,
