@@ -4643,7 +4643,7 @@ void TciServer::onRawIqDataReceived(const QVector<float>& interleavedIQ)
 // Quelle ist RadioModel::spektrumBereit (2026-11-03), nicht mehr die FFTEngine
 // von Strom 0 — Begründung in start() und an RadioModel::meldeSpektrum.
 void TciServer::onSpektrumBereit(int receiverId, const QVector<float>& binsDbm,
-                                 int spanneHz)
+                                 int spanneHz, double mitteHz)
 {
     if (binsDbm.isEmpty() || receiverId < 0 || receiverId > 1) { return; }
     if (m_clients.isEmpty()) { return; }
@@ -4728,6 +4728,23 @@ void TciServer::onSpektrumBereit(int receiverId, const QVector<float>& binsDbm,
                     .arg(receiverId).arg(spanneEffektivHz));
         }
 
+        // ── Die Bildmitte melden, sobald sie sich aendert (2026-11-03) ──────
+        //
+        // Begruendung an TciClientSession::spectrumMitteGemeldetHz. Die Quelle
+        // sagt sie mit (Flex: Panadapter-Ausschnitt); sagt sie nichts, gilt
+        // der Strom-Mittelpunkt des Zuteilers. Bleibt beides aus, wird nichts
+        // gemeldet — lieber keine Skala als eine falsche.
+        const double mitte = (mitteHz > 0.0)
+            ? mitteHz
+            : (m_model.isNull() ? 0.0 : m_model->streamCentreHz(receiverId));
+        const qint64 mitteGerundet = (mitte > 0.0) ? qint64(std::llround(mitte)) : 0;
+        if (mitteGerundet > 0 && mitteGerundet != session->spectrumMitteGemeldetHz) {
+            session->spectrumMitteGemeldetHz = mitteGerundet;
+            session->sendQueue.push(TciSendQueue::Priority::Control,
+                QStringLiteral("spectrum_centre:%1,%2;")
+                    .arg(receiverId).arg(mitteGerundet));
+        }
+
         QVector<float> bild(punkte);
         for (int i = 0; i < punkte; ++i) {
             // Bereichsgrenzen in 64 Bit rechnen: 16384 Bins mal 1024 Punkte
@@ -4755,6 +4772,7 @@ void TciServer::onSpektrumBereit(int receiverId, const QVector<float>& binsDbm,
             qCInfo(lcTci) << "TciServer: erstes Spektrumbild gesendet, rx"
                           << receiverId << n << "Bins ->" << punkte
                           << "Punkte, Spanne" << spanneEffektivHz
+                          << "Hz, Mitte" << mitteGerundet
                           << "Hz, peer" << session->peer;
         }
     }

@@ -1010,9 +1010,22 @@ public:
     // Faden: darf von JEDEM Faden gerufen werden (die FFTEngine ruft vom
     // FFT-Faden). Das Signal wird dann von dort gesendet; wer anhaengt,
     // bekommt es ueber Qt::AutoConnection in seinem eigenen Faden.
-    void meldeSpektrum(int rx, const QVector<float>& dbm, int spanneHz)
+    //
+    // `mitteHz` (seit 2026-11-03, zweiter Schritt): die Frequenz in der
+    // Bildmitte. 0 heisst unbekannt; der TCI-Server nimmt dann den
+    // Strom-Mittelpunkt des Zuteilers (streamCentreHz). Die Flex sagt sie
+    // selbst — dort ist `dds:` nur das VFO, nicht die Bildmitte.
+    void meldeSpektrum(int rx, const QVector<float>& dbm, int spanneHz,
+                       double mitteHz = 0.0)
     {
-        emit spektrumBereit(rx, dbm, spanneHz);
+        emit spektrumBereit(rx, dbm, spanneHz, mitteHz);
+    }
+
+    // Mittelfrequenz des Stroms (DDC-Mitte), wie der Zuteiler sie fuehrt;
+    // 0, wenn der Strom nicht vergeben ist. Fuer den TCI-Spektrumstrom.
+    double streamCentreHz(int streamIndex) const
+    {
+        return m_streamAllocator.streamCentreHz(streamIndex);
     }
 
     // Der Flex-Einstieg: ein fertiger FFT-Rahmen der Maschine. Sendet
@@ -3034,7 +3047,8 @@ signals:
     void flexSpectrumReady(quint32 streamId, const QVector<float>& dbm);
     // Fertiges Spektrum in dBm von IRGENDEINEM Geraet, siehe
     // meldeSpektrum(). Kann aus einem fremden Faden kommen.
-    void spektrumBereit(int rx, const QVector<float>& dbm, int spanneHz);
+    void spektrumBereit(int rx, const QVector<float>& dbm, int spanneHz,
+                        double mitteHz);
     void flexWaterfallRowReady(quint32 streamId, const QVector<quint16>& values,
                                double lowFreqMhz, double highFreqMhz,
                                quint32 autoBlackLevel);

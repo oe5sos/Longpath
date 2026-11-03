@@ -200,6 +200,18 @@ private slots:
         }
         QVERIFY2(gemeldet, "Die Flex-Spanne (Panadapter-Ausschnitt) muss gemeldet werden");
 
+        // Und die Bildmitte (2026-11-03, zweiter Schritt): an der Flex ist
+        // `dds:` das VFO, nicht die Mitte — der Client braucht sie fuer die
+        // Skala. (6 985 340 + 7 185 340) / 2 = 7 085 340 Hz.
+        bool mitteGemeldet = false;
+        for (int i = 0; i < textSpy.count(); ++i) {
+            if (textSpy.at(i).at(0).toString().contains(
+                    QStringLiteral("spectrum_centre:0,7085340;"))) {
+                mitteGemeldet = true;
+            }
+        }
+        QVERIFY2(mitteGemeldet, "Die Bildmitte muss als spectrum_centre gemeldet werden");
+
         client.close();
         server.stop();
     }

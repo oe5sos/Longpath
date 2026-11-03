@@ -346,7 +346,11 @@ private slots:
     //
     // `spanneHz`: die Breite, die die Bins zusammen abdecken; 0 = unbekannt,
     // dann gilt die zuletzt vom Gerät gemeldete I/Q-Abtastrate.
-    void onSpektrumBereit(int rx, const QVector<float>& binsDbm, int spanneHz);
+    // `mitteHz`: Frequenz der Bildmitte, 0 = unbekannt (dann der
+    // Strom-Mittelpunkt des Zuteilers). Wird als `spectrum_centre:` gemeldet,
+    // weil `dds:` bei Longpath das VFO ist und an der Flex nie die Mitte.
+    void onSpektrumBereit(int rx, const QVector<float>& binsDbm, int spanneHz,
+                          double mitteHz);
 
     // Destroys all RESAMPLEF instances for the given session and clears the map.
     // Called from onClientDisconnected and stop().

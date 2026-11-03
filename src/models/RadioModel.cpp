@@ -8307,7 +8307,9 @@ void RadioModel::meldeFlexSpektrum(quint32 id, const QVector<float>& dbm)
     // Wasserfallkachel (die hat ihren eigenen Rand).
     const double breite = m_flexAusschnittHochHz - m_flexAusschnittTiefHz;
     meldeSpektrum(0, dbm,
-                  (breite > 0.0) ? static_cast<int>(std::lround(breite)) : 0);
+                  (breite > 0.0) ? static_cast<int>(std::lround(breite)) : 0,
+                  (breite > 0.0) ? 0.5 * (m_flexAusschnittTiefHz + m_flexAusschnittHochHz)
+                                 : 0.0);
 }
 
 void RadioModel::startFlexStreams()

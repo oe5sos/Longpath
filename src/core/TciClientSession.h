@@ -155,6 +155,13 @@ struct TciClientSession {
     // 0 heisst "volle Breite, Spanne unbekannt".
     int spectrumSpanGemeldetHz{-1};   // -1 = noch nie gemeldet
 
+    // Die Frequenz der Bildmitte, zuletzt als `spectrum_centre:<rx>,<hz>;`
+    // gemeldet (2026-11-03). Der Client braucht sie fuer eine Skala: `dds:`
+    // ist bei Longpath das VFO (TciProtocol::enqueueLocalBroadcastVfo), und
+    // an der Flex liegt die Bildmitte woanders, sobald die Scheibe im Bild
+    // wandert. Nur bei Aenderung, wie die Spanne.
+    qint64 spectrumMitteGemeldetHz{-1};
+
     // Bilder je Sekunde. Vorgabe 10 — darunter ruckelt der Wasserfall
     // sichtbar, darüber sieht das Auge am Telefon nichts mehr dazu.
     int spectrumFps{10};
