@@ -120,12 +120,34 @@ denen ein Bild zugestellt werden soll, fallen mit **0 Rahmen** um
 (`Totals: 4 passed, 3 failed`, 13,8 s) — derselbe Befund wie am Gerät,
 auf allen drei Wegen. Mit der Behebung: 7/7 grün in 3,6 s.
 
-## Am Gerät
+## Am Gerät, 2026-11-03 17:26
 
-Siehe Nachtrag unten, sobald gefahren. Prüfling:
-`python3 -I tci_probe.py 50001 256 8` gegen das laufende Longpath an der
-Flex; erwartet werden rund 80 Rahmen in 8 s und die Ankunftszeile im
-Protokoll.
+Longpath 0.8.2 aus diesem Zweig (`3ad62e9ba`), vom Betreiber gestartet,
+an der Flex auf 20 m. Derselbe Prüfling wie am Vortag:
+
+```
+python3 -I tci_probe.py 50001 256 8
+Handschlag: HTTP/1.1 101 Switching Protocols | Accept stimmt: True
+>> spectrum_start:0,256,10;
+   erster Rahmen: 320 Byte, Stromtyp=100, Abtastart=100, Punkte=256
+<< Binaerrahmen in 8s: 65
+```
+
+| | 2026-11-02 (alt) | 2026-11-03 (neu) |
+| --- | --- | --- |
+| Binärrahmen in 8 s | 0 | **65** |
+
+Und im Protokoll die Zeile, die es vorher nicht gab:
+
+```
+[17:26:38.386] INF: TciServer: Spektrum abonniert rx 0 256 Punkte, 10 B/s, peer …
+[17:26:38.429] INF: TciServer: erstes Spektrumbild gesendet, rx 0 4096 Bins -> 256 Punkte, Spanne 200000 Hz, peer …
+```
+
+43 ms vom Abonnement bis zum ersten Bild; die Spanne ist der
+200-kHz-Ausschnitt der Maschine. 65 statt der rechnerischen 80 Rahmen:
+die Drossel misst gegen die Ankunft der Flex-Bilder, nicht gegen eine
+Uhr, und der Rückstau-Schutz lässt kein Bild warten — das ist gewollt.
 
 ## Was sich daraus merken lässt
 
