@@ -105,17 +105,20 @@ Fehlt sie bei stehendem Abonnement, ist die Quelle tot — nicht der Client.
 `tests/tst_tci_spektrum_quelle.cpp` fährt den Weg Modell → Server →
 echter `QWebSocket`-Client:
 
-| Fall | hält fest |
-| --- | --- |
-| `modell_meldung_erreicht_den_client` | Abonnement, ≥ 5 Rahmen, Stromtyp 100, 256 Punkte, Träger von Bin 2048/4096 auf Punkt 128 (Byte 140), Rauschen Byte 80, `spectrum_span:0,48000;` aus der Meldung |
-| `spanne_der_quelle_bestimmt_den_ausschnitt` | 200 kHz gemeldet, 50 kHz verlangt → mittig geviertelt, `spectrum_span:0,50000;`, Träger bleibt in der Mitte |
-| `fremde_empfaengernummer_wird_verworfen` | rx 100000 liefert nichts — darum muss die SunSDR-Engine als 0 angehängt werden |
-| `ohne_abonnement_kein_rahmen` | — |
+| Fall | hält fest | alte Fassung |
+| --- | --- | --- |
+| `modell_meldung_erreicht_den_client` | Abonnement, ≥ 5 Rahmen, Stromtyp 100, 256 Punkte, Träger von Bin 2048/4096 auf Punkt 128 (Byte 140), Rauschen Byte 80, `spectrum_span:0,48000;` aus der Meldung | **rot, 0 Rahmen** |
+| `flex_meldung_erreicht_den_client` | der Flex-Einstieg `meldeFlexSpektrum` selbst, Ausschnitt 6,985–7,185 MHz wie im Gerätelog, 718 Punkte wie das Logprogramm: Fenster bekommt `flexSpectrumReady` weiterhin, Client ≥ 5 Rahmen, Abtastart 100, Träger auf Punkt 359, `spectrum_span:0,200000;` | **rot, 0 Rahmen** |
+| `spanne_der_quelle_bestimmt_den_ausschnitt` | 200 kHz gemeldet, 50 kHz verlangt → mittig geviertelt, `spectrum_span:0,50000;`, Träger bleibt in der Mitte | **rot, 0 Rahmen** |
+| `fremde_empfaengernummer_wird_verworfen` | rx 100000 liefert nichts — darum muss die SunSDR-Engine als 0 angehängt werden | grün (verwirft auch alt) |
+| `ohne_abonnement_kein_rahmen` | — | grün |
 
-**Gegenprobe gegen die alte Fassung** (TciServer.{h,cpp} und
-TciClientSession.h von `origin/main` zurückgespielt, sonst alles neu):
-`modell_meldung_erreicht_den_client` fällt mit **0 Rahmen** um — genau
-der Befund vom Gerät. Mit der Behebung grün. Zahlen siehe PR.
+**Gegenprobe gegen die alte Fassung**, gefahren am 2026-11-03:
+`TciServer.{h,cpp}` und `TciClientSession.h` von `origin/main`
+zurückgespielt, Modell und Prüfstand neu. Ergebnis: die drei Fälle, in
+denen ein Bild zugestellt werden soll, fallen mit **0 Rahmen** um
+(`Totals: 4 passed, 3 failed`, 13,8 s) — derselbe Befund wie am Gerät,
+auf allen drei Wegen. Mit der Behebung: 7/7 grün in 3,6 s.
 
 ## Am Gerät
 
