@@ -1098,6 +1098,12 @@ private:
     /// unsized until RadioModel::configureStreamPool runs at connect.
     FFTEngine* createFftEngineForStream(int streamIndex);
 
+    /// Haengt die dBm-Bins dieser Engine als TCI-Empfaenger `rx` an
+    /// RadioModel::meldeSpektrum — den geraeteunabhaengigen Weg, an dem der
+    /// TCI-Spektrumstrom seit 2026-11-03 haengt (vorher an Engine 0 allein,
+    /// und die rechnet bei Flex und SunSDR nichts).
+    void verbindeSpektrumMeldung(FFTEngine* engine, int rx);
+
     /// Push the stream's cached DDC centre + sample rate onto one pan's
     /// SpectrumWidget so visibleBinRange maps its bins against the right
     /// window. No-op for a stream we have never seen a centre for.

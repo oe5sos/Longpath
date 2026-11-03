@@ -43,7 +43,6 @@
 #include "models/SliceModel.h"  // Phase 3J-1 closeout: SliceModel signal wireup for local broadcast.
 #include "models/NotchModel.h"  // TNF section 6.4: master notch enable broadcast.
 #include "models/TransmitModel.h"  // Phase 3J-1 closeout (review P2): MON / TUN broadcast wireup.
-#include "FFTEngine.h"                // Spektrum-Abgriff: fftReady liefert fertige dBm-Bins
 #include "MoxController.h"         // Phase 3J-1 closeout (review P2): MOX broadcast wireup.
 #include "TxSliceArbiter.h"        // Codex review round 6: tx_frequency follows the TX-bound slice.
 #include "AudioEngine.h"           // Phase 3J-1 closeout (review P1 #1): volume change broadcast.
@@ -893,21 +892,26 @@ void TciServer::hookAudioAndIqTaps()
         // Client weiterzugeben kostet nichts — verglichen damit, ihn den
         // rohen I/Q-Strom ziehen und selbst eine FFT rechnen zu lassen.
         //
-        // Ebenfalls QueuedConnection: fftReady kommt vom FFT-Faden, m_clients
-        // und QWebSocket gehören dem Hauptfaden. Der QVector ist implizit
-        // geteilt, die Kopie also billig.
-        // Der Abgriff wird hier NICHT fest verdrahtet: beim Serverstart gibt es
-        // die FFTEngine noch gar nicht. MainWindow startet den TCI-Server
-        // (MainWindow.cpp:987) lange bevor es dem RadioModel seine Engine gibt
-        // (MainWindow.cpp:5054). Ein Versuch an dieser Stelle findet immer
-        // nullptr — beim ersten Livetest an einem echten Gerät stand genau das
-        // im Log ("keine FFTEngine — Spektrumstrom steht nicht bereit"), und
-        // der Spektrumstrom wäre tot geblieben.
+        // Der Abgriff hängt am MODELL, nicht an einer FFTEngine (2026-11-03).
+        // Bis dahin holte ensureFftTap() beim ersten spectrum_start die
+        // Engine von Strom 0 nach — und die rechnet nur für OpenHPSDR-Geräte.
+        // An der Flex (Bild kommt fertig von der Maschine) und an der SunSDR
+        // (eigene Engine mit Pseudo-Stromnummer) feuerte deren fftReady nie:
+        // "Spektrum-Abgriff an FFTEngine::fftReady" stand im Protokoll, und
+        // es kamen 0 Rahmen in 8 s (gemessen 2026-11-02, während Longpath
+        // selbst ein lebendes 40-m-Bild zeigte). Verbunden ist nicht erreicht.
         //
-        // Stattdessen holt ensureFftTap() das nach, sobald ein Client wirklich
-        // ein Spektrum bestellt. Dann steht die Engine längst, und der Fall
-        // "Server läuft, Radio kommt später" ist damit gleich mit erschlagen.
-        ensureFftTap();
+        // RadioModel::spektrumBereit wird von jeder Quelle gefüttert
+        // (MainWindow::verbindeSpektrumMeldung, RadioModel::startFlexStreams).
+        // AutoConnection: die FFTEngine sendet vom FFT-Faden, die Flex vom
+        // Hauptfaden; m_clients und QWebSocket gehören dem Hauptfaden, also
+        // landet der Aufruf in beiden Fällen dort. Der QVector ist implizit
+        // geteilt, die Kopie also billig. Das Modell gibt es beim Serverstart
+        // — anders als die Engine — längst, und stop() trennt es mit allen
+        // anderen Modellverbindungen, so dass start() hier neu anhängt.
+        connect(m_model, &RadioModel::spektrumBereit,
+                this, &TciServer::onSpektrumBereit);
+        qCInfo(lcTci) << "TciServer: Spektrum-Abgriff an RadioModel::spektrumBereit";
     }
 }
 
@@ -3645,9 +3649,6 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                             (hz <= 0) ? 0 : std::clamp(hz, 2000, 1000000);
                     }
                 }
-                // Jetzt ist die FFTEngine da, auch wenn sie es beim Serverstart
-                // noch nicht war.
-                ensureFftTap();
                 if (!session->spectrumEnabled.contains(rx)) {
                     session->spectrumEnabled.insert(rx);
                     qCInfo(lcTci) << "TciServer: Spektrum abonniert rx" << rx
@@ -4638,27 +4639,11 @@ void TciServer::onRawIqDataReceived(const QVector<float>& interleavedIQ)
 // SpectrumWidget::dbmOverRange es am Pult macht. Ein Mittelwert über 64 Bins
 // lässt einen schmalen Träger im Rauschen verschwinden, und genau der ist
 // das, was man sucht.
-// Verdrahtet den Spektrum-Abgriff, sobald die FFTEngine da ist — und nur
-// einmal. Wird beim Serverstart versucht (da meist vergeblich, siehe dort) und
-// bei jedem spectrum_start nachgeholt.
-void TciServer::ensureFftTap()
-{
-    if (m_fftTapConnected) { return; }
-    if (m_model.isNull()) { return; }
-    auto* fft = m_model->fftEngine();
-    if (!fft) { return; }
-
-    // QueuedConnection: fftReady kommt vom FFT-Faden, m_clients und
-    // QWebSocket gehören dem Hauptfaden. Der QVector ist implizit geteilt,
-    // die Kopie also billig.
-    connect(fft, &FFTEngine::fftReady,
-            this, &TciServer::onFftBinsReady,
-            Qt::QueuedConnection);
-    m_fftTapConnected = true;
-    qCInfo(lcTci) << "TciServer: Spektrum-Abgriff an FFTEngine::fftReady";
-}
-
-void TciServer::onFftBinsReady(int receiverId, const QVector<float>& binsDbm)
+//
+// Quelle ist RadioModel::spektrumBereit (2026-11-03), nicht mehr die FFTEngine
+// von Strom 0 — Begründung in start() und an RadioModel::meldeSpektrum.
+void TciServer::onSpektrumBereit(int receiverId, const QVector<float>& binsDbm,
+                                 int spanneHz)
 {
     if (binsDbm.isEmpty() || receiverId < 0 || receiverId > 1) { return; }
     if (m_clients.isEmpty()) { return; }
@@ -4697,12 +4682,15 @@ void TciServer::onFftBinsReady(int receiverId, const QVector<float>& binsDbm)
         // zwischen "feiner" und "groesser gemalt": die Punkte decken dann
         // weniger Hertz ab, statt dieselben Hertz breiter zu zeigen.
         //
-        // Die Bins decken die volle Abtastrate ab (m_fftSampleRate, vom
-        // Panadapter gesetzt). Ist sie unbekannt, bleibt es bei allem —
+        // Die Bins decken `spanneHz` ab — die Quelle sagt es mit (Abtastrate
+        // der FFTEngine, Panadapter-Ausschnitt der Flex). Sagt sie nichts,
+        // gilt die zuletzt vom Geraet gemeldete I/Q-Abtastrate
+        // (m_fftSampleRate). Ist auch die unbekannt, bleibt es bei allem —
         // lieber die ganze Breite als ein falsch beschnittener Ausschnitt.
         int erstesBin = 0;
         int letztesBin = n;   // ausschliesslich
-        const int abtastrate = m_fftSampleRate.load(std::memory_order_acquire);
+        const int abtastrate = (spanneHz > 0)
+            ? spanneHz : m_fftSampleRate.load(std::memory_order_acquire);
         if (session->spectrumSpanHz > 0 && abtastrate > 0
             && session->spectrumSpanHz < abtastrate) {
             const double anteil = double(session->spectrumSpanHz) / double(abtastrate);
@@ -4760,6 +4748,15 @@ void TciServer::onFftBinsReady(int receiverId, const QVector<float>& binsDbm)
         if (!rueckstauFrei(ws)) { continue; }
         ws->sendBinaryMessage(TciBinaryFrame::buildSpectrumPayload(
             receiverId, session->spectrumFps, punkte, bild.constData()));
+        // Ankunft melden, nicht Absicht: "abonniert" stand am 2026-11-02 im
+        // Protokoll, waehrend 0 Rahmen gingen. Einmal je Sitzung.
+        if (!session->spectrumErstesBildGemeldet) {
+            session->spectrumErstesBildGemeldet = true;
+            qCInfo(lcTci) << "TciServer: erstes Spektrumbild gesendet, rx"
+                          << receiverId << n << "Bins ->" << punkte
+                          << "Punkte, Spanne" << spanneEffektivHz
+                          << "Hz, peer" << session->peer;
+        }
     }
 }
 

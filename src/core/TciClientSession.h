@@ -164,6 +164,15 @@ struct TciClientSession {
     // also das Dreifache des Verlangten.
     qint64 lastSpectrumMs{0};
 
+    // Ob das ERSTE Bild dieser Sitzung schon protokolliert wurde.
+    //
+    // Am 2026-11-02 standen "Spektrum-Abgriff an FFTEngine::fftReady" und
+    // "Spektrum abonniert" im Protokoll, und trotzdem kam kein einziger
+    // Rahmen an (gemessen: 0 in 8 s). Beide Zeilen melden Absicht, keine
+    // davon Ankunft. Diese Zeile meldet Ankunft — einmal je Sitzung, damit
+    // sie nicht zehnmal je Sekunde kommt.
+    bool spectrumErstesBildGemeldet{false};
+
     // Phase 16 Task 16.3 (sub-commit b): per-slice WDSP RESAMPLEF instance.
     // Created lazily on audio_start, destroyed on audio_stop + disconnect.
     // Key = rx index (slice).  void* avoids pulling WDSP resample.h into

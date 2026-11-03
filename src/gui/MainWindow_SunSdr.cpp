@@ -734,6 +734,11 @@ void MainWindow::wireSunSdr()
                 engine->feedIQ(iq);
             });
 
+            // TCI-Spektrumstrom (2026-11-03): diese Engine traegt die
+            // Pseudo-Stromnummer, createFftEngineForStream haengt sie darum
+            // nicht an. Nach aussen ist die SunSDR der Empfaenger 0.
+            verbindeSpektrumMeldung(engine, 0);
+
             // Rate propagieren, aber nur bei einer echten Umstellung --
             // TCI erlaubt iq_samplerate jederzeit zu aendern (siehe
             // TciClient.h), doch das kommt selten vor, nicht auf jedem

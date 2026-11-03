@@ -3373,8 +3373,35 @@ FFTEngine* MainWindow::createFftEngineForStream(int streamIndex)
         nf->feed(binsDbm, kFrameIntervalMs);
     });
 
+    // TCI-Spektrumstrom: Strom 0 und 1 sind die TCI-Empfaenger 0 und 1.
+    // Die SunSDR-Engine (Pseudo-Strom 100000) haengt sich in
+    // MainWindow_SunSdr.cpp selbst als Empfaenger 0 an, die Flex meldet
+    // ohne Engine direkt aus RadioModel::startFlexStreams.
+    if (streamIndex <= 1) {
+        verbindeSpektrumMeldung(engine, streamIndex);
+    }
+
     m_fftEngines.insert(streamIndex, engine);
     return engine;
+}
+
+void MainWindow::verbindeSpektrumMeldung(FFTEngine* engine, int rx)
+{
+    if (!engine || !m_radioModel) { return; }
+    // Kontext ist die ENGINE, nicht MainWindow: fftReady kommt vom
+    // FFT-Faden, und so bleibt der Aufruf dort — ohne einen Umweg ueber
+    // die Ereignisschleife des Hauptfadens fuer jedes Bild. meldeSpektrum
+    // sendet das Signal vom rufenden Faden; der TCI-Server bekommt es
+    // ueber AutoConnection in seinem Faden. Dass `engine` hier noch lebt,
+    // ist sicher: eine direkte Verbindung laeuft nur, solange der Sender
+    // existiert, und QPointer faengt den Fall, dass das Modell beim Abbau
+    // vor der Engine geht.
+    connect(engine, &FFTEngine::fftReady, engine,
+            [model = QPointer<RadioModel>(m_radioModel), engine, rx]
+            (int, const QVector<float>& binsDbm) {
+        if (model.isNull()) { return; }
+        model->meldeSpektrum(rx, binsDbm, static_cast<int>(engine->sampleRate()));
+    });
 }
 
 void MainWindow::applyStreamWindowToPan(const QString& panId, int streamIndex)

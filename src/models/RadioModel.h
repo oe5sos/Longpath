@@ -990,6 +990,45 @@ public:
     void setSpectrumWidget(class SpectrumWidget* w) { m_spectrumWidget = w; }
     class FFTEngine* fftEngine() const { return m_fftEngine; }
     void setFftEngine(class FFTEngine* e) { m_fftEngine = e; }
+
+    // ── Fertiges Spektrum, gleich welches Geraet es gerechnet hat ────────
+    //
+    // Wer ein fertiges Bild hat, meldet es hier; wer eines braucht (der
+    // TCI-Spektrumstrom), haengt an `spektrumBereit`. Bis 2026-11-02 hing
+    // der TCI-Server stattdessen an `fftEngine()`, also an der FFTEngine von
+    // Strom 0 — und die rechnet nur fuer OpenHPSDR-Geraete. Die Flex liefert
+    // ihr Spektrum selbst (`flexSpectrumReady`), die SunSDR rechnet in einer
+    // Engine mit Pseudo-Stromnummer: bei beiden feuerte `fftReady` von
+    // Engine 0 nie, und der Strom blieb leer, obwohl das Protokoll Erfolg
+    // meldete (0 Rahmen in 8 s gemessen, waehrend Longpath selbst ein
+    // lebendes 40-m-Bild zeigte).
+    //
+    // `rx` ist die TCI-Empfaengernummer (0 oder 1), `spanneHz` die Breite,
+    // die die Bins zusammen abdecken — die Abtastrate bei einer FFTEngine,
+    // der Panadapter-Ausschnitt bei der Flex. 0 heisst unbekannt.
+    //
+    // Faden: darf von JEDEM Faden gerufen werden (die FFTEngine ruft vom
+    // FFT-Faden). Das Signal wird dann von dort gesendet; wer anhaengt,
+    // bekommt es ueber Qt::AutoConnection in seinem eigenen Faden.
+    void meldeSpektrum(int rx, const QVector<float>& dbm, int spanneHz)
+    {
+        emit spektrumBereit(rx, dbm, spanneHz);
+    }
+
+    // Der Flex-Einstieg: ein fertiger FFT-Rahmen der Maschine. Sendet
+    // `flexSpectrumReady` (fuer das Fenster) UND meldet ueber
+    // meldeSpektrum() als Empfaenger 0 mit dem Panadapter-Ausschnitt als
+    // Spanne. Oeffentlich und benannt, damit ein Pruefstand genau diesen
+    // Weg fahren kann — es war der Weg, auf dem am 2026-11-02 nichts ankam.
+    void meldeFlexSpektrum(quint32 streamId, const QVector<float>& dbm);
+
+    // Pruefstand: den Panadapter-Ausschnitt der Maschine setzen, ohne eine
+    // Flex-Statuszeile zu zerlegen.
+    void setFlexAusschnittForTest(double tiefHz, double hochHz)
+    {
+        m_flexAusschnittTiefHz = tiefHz;
+        m_flexAusschnittHochHz = hochHz;
+    }
     class ClarityController* clarityController() const { return m_clarityController; }
     void setClarityController(class ClarityController* c) { m_clarityController = c; }
     class StepAttenuatorController* stepAttController() const { return m_stepAttController; }
@@ -2993,6 +3032,9 @@ signals:
     // Fertiger FFT-Rahmen in dBm, und die Wasserfallzeile (roh, ein
     // Farbmaszstab — keine dBm, siehe core/FlexVitaReader.h).
     void flexSpectrumReady(quint32 streamId, const QVector<float>& dbm);
+    // Fertiges Spektrum in dBm von IRGENDEINEM Geraet, siehe
+    // meldeSpektrum(). Kann aus einem fremden Faden kommen.
+    void spektrumBereit(int rx, const QVector<float>& dbm, int spanneHz);
     void flexWaterfallRowReady(quint32 streamId, const QVector<quint16>& values,
                                double lowFreqMhz, double highFreqMhz,
                                quint32 autoBlackLevel);
