@@ -1237,9 +1237,9 @@ constexpr auto kComboStyle =
     // selection-background-color den Eintrag unsichtbar macht.
     "QComboBox QAbstractItemView {"
     "  background: #0e0e10; color: #dcdce1; border: 1px solid #2c2c31;"
-    "  selection-background-color: #26262c; selection-color: #f0f0f4; outline: none; }"
+    "  selection-background-color: #1a1a1e; selection-color: #f0f0f4; outline: none; }"
     "QComboBox QAbstractItemView::item { padding: 3px 6px; min-height: 18px; }"
-    "QComboBox QAbstractItemView::item:selected { background: #26262c; color: #f0f0f4; }";
+    "QComboBox QAbstractItemView::item:selected { background: #1a1a1e; color: #f0f0f4; }";
 
 constexpr auto kCheckBoxStyle =
     "QCheckBox { color: #dcdce1; spacing: 6px; min-height: 20px; }"   // min-height: drei Haekchen untereinander kollidierten
@@ -1251,7 +1251,7 @@ constexpr auto kCheckBoxStyle =
     "QCheckBox::indicator:hover { border-color: #4a7ba8; }"
     "QCheckBox::indicator:checked {"
     "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #131317, stop:1 #0d0d10);"
-    "  border: 1px solid #55555e; border-top-color: #6a6a74; }"
+    "  border: 1px solid #55555e; border-top-color: #55555e; }"
     "QCheckBox::indicator:checked:disabled { background: #232327; border-color: #232327; }";
 
 constexpr auto kRadioButtonStyle =
@@ -1264,7 +1264,7 @@ constexpr auto kRadioButtonStyle =
     "QRadioButton::indicator:hover { border-color: #4a7ba8; }"
     "QRadioButton::indicator:checked {"
     "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #131317, stop:1 #0d0d10);"
-    "  border: 1px solid #55555e; border-top-color: #6a6a74; }";
+    "  border: 1px solid #55555e; border-top-color: #55555e; }";
 
 // ── Eingabefelder sind Mulden, keine Flaechen ────────────────────────
 //

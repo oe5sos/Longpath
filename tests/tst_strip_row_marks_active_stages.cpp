@@ -69,7 +69,7 @@ class TstStripRowMarksActiveStages : public QObject {
 private slots:
     // Eine eingeschaltete Stufe traegt die Auswahlfarbe des Hauses --
     // auf der ganzen Flaeche, nicht nur am Rand.
-    void activeTileIsFilledBlue()
+    void activeTileIsAFilledField()
     {
         StripChain c;
         c.prepare(48000.0);
@@ -100,8 +100,14 @@ private slots:
             const QColor a = img.pixelColor(on.left() + 6, on.top() + dy);
             const QColor b = img.pixelColor(off.left() + 6, off.top() + dy);
 
-            QVERIFY2(blueLead(a) > 40,
-                     qPrintable(QStringLiteral("eingeschaltet, dy=%1: %2")
+            // Kein Blau mehr (2026-11-02). Betreiber: „ich will
+            // diesen blauen hintergrund überall weg." Die Markierung
+            // ist jetzt eine HELLERE Flaeche -- hier herum, weil die
+            // Kacheln alle in einer Mulde liegen und eine weitere
+            // Mulde unsichtbar waere. Geprueft wird deshalb die
+            // Helligkeit, nicht die Farbe.
+            QVERIFY2(blueLead(a) < 25,
+                     qPrintable(QStringLiteral("wieder blau, dy=%1: %2")
                                     .arg(dy).arg(a.name())));
             QVERIFY2(brightness(a) > brightness(b) + 30,
                      qPrintable(QStringLiteral("zu nah an aus, dy=%1: %2 vs %3")
@@ -137,20 +143,24 @@ private slots:
         const QColor running = sample(true);
         const QColor parked  = sample(false);
 
-        QVERIFY2(brightness(parked) < brightness(running) - 20,
+        // Die Abstaende sind kleiner als mit der Farbfuellung von
+        // frueher (2026-11-02) -- geprueft wird jetzt eine Ordnung in
+        // DREI Stufen auf derselben Leiter: aus < geparkt < laeuft.
+        QVERIFY2(brightness(parked) < brightness(running) - 12,
                  qPrintable(QStringLiteral("geparkt wie laufend: %1 vs %2")
                                 .arg(parked.name(), running.name())));
         // Die Schwelle kommt von einem Befund am Geraet: mit der
         // ersten Mischung (0,30) war die geparkte Kachel fast Schwarz
         // -- und genau so steht das Fenster da, solange kein Funkgeraet
         // haengt. „funktioniert grafisch leider nicht, nur die font
-        // wird dicker oder andersfaerbig." Sie muss ein blaues Feld
-        // sein, nicht eine Ahnung davon.
-        QVERIFY2(brightness(parked) > 30,
+        // wird dicker oder andersfaerbig." Sie muss ein FELD sein,
+        // nicht eine Ahnung davon -- seit dem 2026-11-02 ein helleres
+        // statt eines blauen.
+        QVERIFY2(brightness(parked) > 20,
                  qPrintable(QStringLiteral("geparkt wie aus: %1")
                                 .arg(parked.name())));
-        QVERIFY2(blueLead(parked) > 30,
-                 qPrintable(QStringLiteral("geparkt ohne Blau: %1")
+        QVERIFY2(blueLead(parked) < 25,
+                 qPrintable(QStringLiteral("geparkt wieder blau: %1")
                                 .arg(parked.name())));
     }
 

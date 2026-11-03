@@ -397,13 +397,26 @@ void StripChainView::paintEvent(QPaintEvent*)
         // Hauses: Blau heisst hier ueberall „angefasst, eingeschaltet",
         // Warm heisst „gemessen" (HAUSSTIL.md). Deshalb bleibt der
         // Arbeitsbalken bernstein -- er sagt etwas anderes als die
-        // Flaeche, und auf Blau sagt er es deutlicher als vorher.
+        // Flaeche, und herausgehoben sagt er es deutlicher als vorher.
         const QRect box = r.adjusted(0, 0, -1, -1);
         QColor text;
         if (on && master) {
+            // ── Hier markiert HELL, nicht dunkel (2026-11-02) ────────
+            //
+            // Sonst ist die Auswahl im Haus eine Mulde: die Knoepfe
+            // ringsum sind aufgesetzt, also faellt das Vertiefte auf.
+            // Diese Kacheln sind aber ALLE vertieft (kInsetBg) -- eine
+            // weitere Mulde waere unsichtbar. Dieselbe Sprache, andere
+            // Richtung: was arbeitet, steht HERAUS.
+            // kButtonAltHover, nicht der gewoehnliche Knopfverlauf:
+            // die Kacheln liegen in einer dunklen Mulde, und eine
+            // Markierung, die man suchen muss, ist keine. Der
+            // Betreiber am 2026-09-17 genau dazu: „funktioniert
+            // grafisch leider nicht, nur die font wird dicker oder
+            // andersfaerbig."
             QLinearGradient g(box.topLeft(), box.bottomLeft());
-            g.setColorAt(0.0, c(Style::kGlassSelTop));
-            g.setColorAt(1.0, c(Style::kGlassSelBot));
+            g.setColorAt(0.0, c(Style::kButtonAltHover));
+            g.setColorAt(1.0, c(Style::kButtonHover));
             p.setBrush(g);
             p.setPen(QPen(c(Style::kGlassSelBorder), 1));
             text = c(Style::kGlassSelText);
@@ -412,11 +425,11 @@ void StripChainView::paintEvent(QPaintEvent*)
             // Kette laeuft nicht. Zuerst mit 0,30 gemischt -- das war
             // fast Schwarz und hat die Markierung in genau dem Zustand
             // verschluckt, in dem das Fenster ohne Funkgeraet steht.
-            // Sie muss auch hier als blaues Feld zu sehen sein, nur
-            // schwaecher als „arbeitet".
+            // Sie muss auch hier zu sehen sein, nur schwaecher als
+            // „arbeitet": halb herausgehoben statt ganz.
             QLinearGradient g(box.topLeft(), box.bottomLeft());
-            g.setColorAt(0.0, mix(c(Style::kInsetBg), c(Style::kGlassSelTop), 0.55));
-            g.setColorAt(1.0, mix(c(Style::kInsetBg), c(Style::kGlassSelBot), 0.55));
+            g.setColorAt(0.0, mix(c(Style::kInsetBg), c(Style::kButtonAltHover), 0.55));
+            g.setColorAt(1.0, mix(c(Style::kInsetBg), c(Style::kButtonHover), 0.55));
             p.setBrush(g);
             p.setPen(QPen(mix(c(Style::kInsetBorder),
                               c(Style::kGlassSelBorder), 0.55), 1));
