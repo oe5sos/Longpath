@@ -149,6 +149,22 @@ Und im Protokoll die Zeile, die es vorher nicht gab:
 die Drossel misst gegen die Ankunft der Flex-Bilder, nicht gegen eine
 Uhr, und der Rückstau-Schutz lässt kein Bild warten — das ist gewollt.
 
+**Contestprogramm, 17:33:** aus /Applications gestartet (v0.1.7, Host
+127.0.0.1, Port 50001). Es abonniert 718 Punkte, das erste Bild geht
+7 ms später:
+
+```
+[17:33:05.110] INF: TciServer: Spektrum abonniert rx 0 718 Punkte, 10 B/s, peer …:60464
+[17:33:05.117] INF: TciServer: erstes Spektrumbild gesendet, rx 0 4096 Bins -> 718 Punkte, Spanne 200000 Hz, peer …:60464
+```
+
+Das Wasserfall-Panel im Seitenbereich zeigt das Band: die Spektrumlinie
+mit den Trägern, darunter laufende Zeilen mit senkrechten Spuren — nicht
+mehr leer. Ein zweiter Prüfling nebenher bekam 64 Rahmen in 8 s; der
+Server bediente beide. Nicht geprüft: ob die Breite im Panel genau den
+200 kHz entspricht (das Panel hat keine Frequenzskala), und ob die
+Leitung über Stunden hält.
+
 ## Was sich daraus merken lässt
 
 1. **Ein Abgriff an „der" Engine ist ein Abgriff an Strom 0.** Longpath
