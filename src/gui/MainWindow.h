@@ -459,6 +459,8 @@ public:
     }
     int floatingWindowsWaitingForConnectMaskForTest() const
     { return int(m_floatingContainersHiddenPreConnect.size()); }
+    int schwebendeFensterImDockForTest() const
+    { return int(m_schwebendeFensterImDock.size()); }
     void restoreFloatingWindowsForTest()
     { restoreFloatingWindowsHiddenBehindConnectMask(); }
 
@@ -590,6 +592,9 @@ public slots:
 
 protected:
     void closeEvent(QCloseEvent* event) override;
+    /// Ablage ins Dock (Minimieren) nimmt die schwebenden Fenster mit,
+    /// das Zurueckholen bringt sie wieder -- siehe die Definition.
+    void changeEvent(QEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
     void moveEvent(QMoveEvent* event) override;
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -1313,6 +1318,13 @@ private:
     /// alles beim naechsten Connected ODER beim Schliessen der Maske
     /// ohne Verbindung.
     void hideFloatingWindowsBehindConnectMask();
+
+    /// Die gemeinsame Aufzaehlung dahinter: versteckt alles, was gerade
+    /// sichtbar schwebt, und merkt es in `liste` vor. Zweiter Abnehmer
+    /// neben der Maske ist die Ablage ins Dock (2026-11-03).
+    void versteckeSchwebendeFenster(QList<QPointer<QWidget>>& liste);
+    void legeSchwebendeFensterInsDock();
+    void holeSchwebendeFensterAusDemDock();
 
     /// Die Gegenseite: zeigt wieder, was fuer die Maske weggeraeumt wurde
     /// -- aber erst, wenn die Maske wirklich weg ist. Solange sie steht,
@@ -2370,6 +2382,9 @@ private:
     // deswegen tatsaechlich versteckt wurden, damit die erste Verbindung
     // genau die wieder zeigt und nichts, was ohnehin schon zu war.
     QList<QPointer<QWidget>> m_floatingContainersHiddenPreConnect;
+    /// Was beim Minimieren des Hauptfensters mit ins Dock ging und beim
+    /// Zurueckholen wieder gezeigt wird (2026-11-03).
+    QList<QPointer<QWidget>> m_schwebendeFensterImDock;
     /// Der Rotor/Log-Einmalhaken (Konstruktor) hat bei der ersten
     /// Verbindung dieser Sitzung zugeschlagen und moechte m_rotorWindow
     /// zeigen -- ausgefuehrt wird der Wunsch in
