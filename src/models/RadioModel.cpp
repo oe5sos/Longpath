@@ -8406,6 +8406,21 @@ void RadioModel::applyFlexPanSetup()
                                  : "(Hoehe erbeten, noch unbestaetigt)");
 }
 
+void RadioModel::meldeFlexSpektrum(quint32 id, const QVector<float>& dbm)
+{
+    emit flexSpectrumReady(id, dbm);
+    // Auch auf den geraeteunabhaengigen Weg (2026-11-03): der
+    // TCI-Spektrumstrom hing an der FFTEngine, und die rechnet bei der
+    // Flex nichts — die Maschine liefert das Bild fertig. Die Spanne ist
+    // der Panadapter-Ausschnitt der Maschine, nicht die Breite der
+    // Wasserfallkachel (die hat ihren eigenen Rand).
+    const double breite = m_flexAusschnittHochHz - m_flexAusschnittTiefHz;
+    meldeSpektrum(0, dbm,
+                  (breite > 0.0) ? static_cast<int>(std::lround(breite)) : 0,
+                  (breite > 0.0) ? 0.5 * (m_flexAusschnittTiefHz + m_flexAusschnittHochHz)
+                                 : 0.0);
+}
+
 void RadioModel::startFlexStreams()
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) {
@@ -8413,10 +8428,11 @@ void RadioModel::startFlexStreams()
     }
     if (!m_flexStream) {
         m_flexStream = new FlexVitaStream(this);
+        // Benannter Einstieg statt Lambda (2026-11-03), damit der Pruefstand
+        // tst_tci_spektrum_quelle den Flex-Weg selbst fahren kann: am Geraet
+        // war genau dieser Weg der, auf dem nichts beim TCI-Client ankam.
         connect(m_flexStream, &FlexVitaStream::spectrumReady,
-                this, [this](quint32 id, const QVector<float>& dbm) {
-            emit flexSpectrumReady(id, dbm);
-        });
+                this, &RadioModel::meldeFlexSpektrum);
         connect(m_flexStream, &FlexVitaStream::waterfallRowReady,
                 this, [this](quint32 id, const QVector<quint16>& v,
                              double lo, double hi, quint32 ab) {

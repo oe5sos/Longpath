@@ -338,11 +338,19 @@ private slots:
     void onRawIqDataReceived(const QVector<float>& interleavedIQ);
 
     // Fertig gerechnetes Spektrum an die Clients, die eines abonniert haben.
-    // Hängt an FFTEngine::fftReady — der Server rechnet also nichts zusätzlich,
-    // er gibt weiter, was der Panadapter ohnehin bekommt. Verdichtung auf die
-    // Bildpunktzahl des Clients und Drosselung auf dessen Bildrate passieren
-    // dort; Begründung an der Implementierung.
-    void onFftBinsReady(int receiverId, const QVector<float>& binsDbm);
+    // Hängt an RadioModel::spektrumBereit — der Server rechnet also nichts
+    // zusätzlich, er gibt weiter, was der Panadapter ohnehin bekommt, gleich
+    // welches Gerät es gerechnet hat (FFTEngine, Flex, SunSDR). Verdichtung
+    // auf die Bildpunktzahl des Clients und Drosselung auf dessen Bildrate
+    // passieren dort; Begründung an der Implementierung.
+    //
+    // `spanneHz`: die Breite, die die Bins zusammen abdecken; 0 = unbekannt,
+    // dann gilt die zuletzt vom Gerät gemeldete I/Q-Abtastrate.
+    // `mitteHz`: Frequenz der Bildmitte, 0 = unbekannt (dann der
+    // Strom-Mittelpunkt des Zuteilers). Wird als `spectrum_centre:` gemeldet,
+    // weil `dds:` bei Longpath das VFO ist und an der Flex nie die Mitte.
+    void onSpektrumBereit(int rx, const QVector<float>& binsDbm, int spanneHz,
+                          double mitteHz);
 
     // Destroys all RESAMPLEF instances for the given session and clears the map.
     // Called from onClientDisconnected and stop().
@@ -353,14 +361,11 @@ private:
     // `private slots:`, und eine Membervariable darin lässt moc scheitern
     // ("Not a signal or slot declaration").
 
-    // Verdrahtet den Spektrum-Abgriff, sobald die FFTEngine existiert — und nur
-    // einmal. Beim Serverstart gibt es sie noch nicht: MainWindow startet den
-    // TCI-Server (MainWindow.cpp:987) lange bevor es dem RadioModel seine
-    // Engine gibt (MainWindow.cpp:5054). Beim ersten Livetest an einem echten
-    // Gerät stand deshalb "keine FFTEngine" im Log und der Spektrumstrom wäre
-    // tot geblieben. Wird darum bei jedem spectrum_start nachgeholt.
-    void ensureFftTap();
-    bool m_fftTapConnected{false};
+    // Bis 2026-11-03 stand hier ensureFftTap(): ein nachgeholter Abgriff an
+    // `m_model->fftEngine()`, also an der FFTEngine von Strom 0. Der war an
+    // der Flex und an der SunSDR tot (siehe RadioModel::meldeSpektrum) und
+    // meldete trotzdem Erfolg. Jetzt hängt der Server beim Start am Modell,
+    // das es beim Serverstart — anders als die Engine — längst gibt.
 
     // Phase 3J-1 review P2.3: connect RX audio tap (RxChannel::audioFrameReady
     // → onAudioFrameReady) and IQ tap (RadioModel::rawIqData →

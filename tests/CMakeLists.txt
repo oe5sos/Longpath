@@ -3399,6 +3399,17 @@ longpath_add_test(tst_tci_origin_and_tx_time_cap)
 # (dBm+200 auf ein Byte), die Randfälle und die Spitzenwert-Verdichtung.
 longpath_add_test(tst_tci_spectrum_stream)
 
+# ── Spektrumstrom: die Quelle (2026-11-03) ─────────────────────────────────
+# Am Gerät gemessen (Flex, 2026-11-02): Abonnement bestätigt, Abgriff
+# gemeldet, 0 Rahmen in 8 s. Der Abgriff hing an der FFTEngine von Strom 0,
+# die bei Flex und SunSDR nie rechnet. Jetzt hängt der Server an
+# RadioModel::spektrumBereit; dieser Prüfstand fährt den Weg Modell -> Server
+# -> echter WebSocket-Client, mit Gegenprobe gegen die alte Fassung.
+if(Qt6WebSockets_FOUND)
+    longpath_add_test(tst_tci_spektrum_quelle)
+    target_link_libraries(tst_tci_spektrum_quelle PRIVATE Qt6::WebSockets)
+endif()
+
 # ── Tonumtaster je Kanal (2026-09-30) ──────────────────────────────────────
 # WDSPs RESAMPLEF rechnet einkanalig und reell. Der verschraenkte
 # Stereopuffer lief bis 2026-09-30 als EIN Strom hindurch: L und R
