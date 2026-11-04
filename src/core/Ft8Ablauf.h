@@ -175,6 +175,49 @@ public:
     /// wird. Siehe oben; die Zahl steht in WSJT-X' eigener Vorschrift.
     static constexpr int kHoundMinTonHz = 1000;
 
+    // ═══ Contestbetrieb (2026-11-04) ════════════════════════════════
+    //
+    // Im EU-VHF-Contest tritt an die Stelle des Rapports ein
+    // AUSTAUSCH: Rapport, laufende Nummer und sechsstelliger
+    // Feldkenner in einem. Das ist Nachrichtentyp 5, und er sieht so
+    // aus:
+    //
+    //     <DL1ABC> <OE5SOS> 590001 JN78CT
+    //     <DL1ABC> <OE5SOS> R 590001 JN78CT
+    //
+    // Betroffen sind NUR die beiden Austauschzuege (Tx2/Tx3). Anruf,
+    // RR73, 73 und CQ bleiben gewoehnliche Saetze -- sie passen nicht
+    // in Typ 5, und WSJT-X haelt es genauso.
+    struct Contest {
+        bool    an{false};        ///< Contestbetrieb eingeschaltet
+        int     nummer{1};        ///< die laufende Nummer, die ICH gebe
+        QString meinLocator6;     ///< mein Feldkenner, SECHSstellig
+
+        /// Taugt das fuer eine Aussendung? Der Feldkenner muss sechs
+        /// Stellen haben -- vier gehen in Typ 5 nicht hinein, und
+        /// etwas anderes zu senden waere schlimmer als abzulehnen.
+        bool brauchbar() const;
+    };
+
+    /// Der Rapport im Contest. Drei Bit tragen 52..59; gegeben wird
+    /// im Contest durchweg 59, weil der wirkliche Stoerabstand
+    /// ohnehin in seiner eigenen Spalte steht und niemand im
+    /// FT8-Contest einen abweichenden Rapport erwartet.
+    static constexpr int kContestRapport = 59;
+
+    void setzeContest(const Contest& c);
+    const Contest& contest() const { return m_contest; }
+
+    /// Seine laufende Nummer, soweit sie in einem Austausch stand.
+    /// 0, wenn nie eine kam -- dann bleibt sie im Logbuch leer,
+    /// statt geraten zu werden.
+    int empfangeneNummer() const { return m_nummerEmpfangen; }
+
+    /// Sein sechsstelliger Feldkenner aus dem Austausch. Leer, wenn
+    /// keiner kam. NICHT dasselbe wie `partnerLocator()`: der kommt
+    /// aus dem gewoehnlichen Betrieb und hat oft nur vier Stellen.
+    QString partnerLocator6() const { return m_partnerLocator6; }
+
     /// Was im naechsten Fenster zu senden waere, oder leer.
     QString naechsteNachricht() const;
 
@@ -190,6 +233,17 @@ public:
                                  const QString& meinRuf,
                                  const QString& meinLocator,
                                  int reportDb);
+
+    /// Dieselbe Frage im Contestbetrieb. Ist `c.an` falsch oder
+    /// `c.brauchbar()` nein, faellt sie auf die Fassung darueber
+    /// zurueck -- ein unbrauchbarer Austausch darf den gewoehnlichen
+    /// Betrieb nicht lahmlegen.
+    static QString nachrichtFuer(Zustand z,
+                                 const QString& partner,
+                                 const QString& meinRuf,
+                                 const QString& meinLocator,
+                                 int reportDb,
+                                 const Contest& c);
 
     /// Eine gehoerte Nachricht einspeisen. Gibt true, wenn sie den
     /// Ablauf weitergebracht hat (dann ist der Zaehler zurueckgesetzt).
@@ -250,6 +304,9 @@ private:
     int     m_reportEmpfangen{kKeinReport};
     int     m_wiederholungen{0};
     int     m_cqWiederholungen{kMaxWiederholungen};
+    Contest m_contest;
+    int     m_nummerEmpfangen{0};
+    QString m_partnerLocator6;
 };
 
 } // namespace Longpath

@@ -168,8 +168,77 @@ bool Ft8Ablauf::laeuft() const
 
 QString Ft8Ablauf::naechsteNachricht() const
 {
+    // Die Contest-Fassung entscheidet selbst, ob sie greift: ohne
+    // brauchbaren Austausch faellt sie auf den gewoehnlichen Weg
+    // zurueck (siehe `Contest::brauchbar`).
     return nachrichtFuer(m_zustand, m_partner, m_meinRuf, m_meinLocator,
-                         m_reportGesendet);
+                         m_reportGesendet, m_contest);
+}
+
+bool Ft8Ablauf::Contest::brauchbar() const
+{
+    if (!an) { return false; }
+    if (nummer < 1 || nummer > 4095) { return false; }
+    // SECHS Stellen, und zwar im Raster: AA00AA bis RR99XX. Vier
+    // Stellen gehen in Typ 5 nicht hinein -- die 25 Bit sind fuer
+    // sechs gerechnet. Wer nur „JN78" eingestellt hat, kann am
+    // EU-VHF-Contest nicht teilnehmen; das muss das Programm SAGEN,
+    // nicht stillschweigend etwas anderes senden.
+    if (meinLocator6.size() != 6) { return false; }
+    const QString g = meinLocator6.toUpper();
+    if (g.at(0) < QLatin1Char('A') || g.at(0) > QLatin1Char('R')) { return false; }
+    if (g.at(1) < QLatin1Char('A') || g.at(1) > QLatin1Char('R')) { return false; }
+    if (!g.at(2).isDigit() || !g.at(3).isDigit()) { return false; }
+    if (g.at(4) < QLatin1Char('A') || g.at(4) > QLatin1Char('X')) { return false; }
+    if (g.at(5) < QLatin1Char('A') || g.at(5) > QLatin1Char('X')) { return false; }
+    return true;
+}
+
+void Ft8Ablauf::setzeContest(const Contest& c)
+{
+    m_contest = c;
+    m_contest.meinLocator6 = m_contest.meinLocator6.toUpper();
+}
+
+QString Ft8Ablauf::nachrichtFuer(Zustand z,
+                                 const QString& partner,
+                                 const QString& meinRuf,
+                                 const QString& meinLocator,
+                                 int reportDb,
+                                 const Contest& c)
+{
+    // Ohne brauchbaren Austausch der gewoehnliche Weg. Ein
+    // halbfertiger Contestbetrieb darf den normalen nicht lahmlegen --
+    // wer den Feldkenner noch nicht sechsstellig eingetragen hat,
+    // funkt eben gewoehnlich weiter.
+    if (!c.brauchbar()) {
+        return nachrichtFuer(z, partner, meinRuf, meinLocator, reportDb);
+    }
+
+    // NUR die beiden Austauschzuege. Anruf, RR73, 73 und CQ sind
+    // gewoehnliche Saetze: sie passen nicht in Typ 5 (der traegt
+    // keinen Anruf und kein Schlusswort), und WSJT-X haelt es
+    // ebenso.
+    //
+    // Die spitzen Klammern sind Pflicht, nicht Schmuck: Typ 5
+    // uebertraegt beide Rufzeichen nur als Hash, und
+    // `encode_eu_vhf_text()` erkennt den Satz an ihnen.
+    switch (z) {
+        case Zustand::SendeReport:
+            return QStringLiteral("<%1> <%2> %3%4 %5")
+                .arg(partner, meinRuf)
+                .arg(kContestRapport)
+                .arg(c.nummer, 4, 10, QLatin1Char('0'))
+                .arg(c.meinLocator6);
+        case Zustand::SendeRReport:
+            return QStringLiteral("<%1> <%2> R %3%4 %5")
+                .arg(partner, meinRuf)
+                .arg(kContestRapport)
+                .arg(c.nummer, 4, 10, QLatin1Char('0'))
+                .arg(c.meinLocator6);
+        default:
+            return nachrichtFuer(z, partner, meinRuf, meinLocator, reportDb);
+    }
 }
 
 QString Ft8Ablauf::nachrichtFuer(Zustand z,
@@ -209,7 +278,20 @@ bool Ft8Ablauf::anMich(const QString& nachricht, QString* vonWem) const
         nachricht.simplified().toUpper().split(QLatin1Char(' '),
                                                Qt::SkipEmptyParts);
     if (f.size() < 2) { return false; }
-    if (f.at(0) != m_meinRuf) { return false; }
+    // ── Auch der ANGERUFENE kann geklammert sein (2026-11-04) ───
+    //
+    // Bis heute wurde nur der Absender geschaelt (gleich darunter,
+    // fuer den Fox). Im EU-VHF-Contest stehen aber BEIDE Rufzeichen
+    // nur als Hash im Paket, also auch meines:
+    //
+    //     <OE5SOS> <DL1ABC> 590001 JN78CT
+    //
+    // `f.at(0) != m_meinRuf` warf das weg -- ein Contest-Anruf an
+    // mich erreichte den Ablauf nie, und das QSO kam nicht zustande.
+    // Von aussen sieht das aus wie „er ruft mich nicht".
+    QString anWen = f.at(0);
+    anWen.remove(QLatin1Char('<')).remove(QLatin1Char('>'));
+    if (anWen != m_meinRuf) { return false; }
     // Der Absender kann in spitzen Klammern stehen: dann kam sein
     // Rufzeichen als Hash im Paket, nicht als Text (0.1-Format, und
     // auch der Standardsatz kennt gehashte Rufzeichen). „<KH1DX>" und
@@ -249,7 +331,53 @@ bool Ft8Ablauf::verarbeite(const QString& nachricht, int snr)
     if (!foxSchluss && !m_partner.isEmpty() && vonWem != m_partner) {
         return false;
     }
-    const QString letztes = f.size() >= 3 ? f.at(2) : QString();
+    QString letztes = f.size() >= 3 ? f.at(2) : QString();
+
+    // ── Ein Contest-Austausch sieht anders aus (2026-11-04) ─────────
+    //
+    //     <OE5SOS> <DL1ABC> 590001 JN78CT
+    //     <OE5SOS> <DL1ABC> R 590001 JN78CT
+    //
+    // An der Stelle, an der sonst der Rapport steht, steht hier die
+    // Austauschzahl oder ein einzelnes „R". Der Zustandsautomat
+    // darunter kennt nur Rapporte -- statt ihn an sechs Stellen
+    // umzubauen, wird der Austausch HIER gelesen und in etwas
+    // uebersetzt, das er versteht:
+    //
+    //   `590001`     -> wie ein Rapport  (er gibt mir seinen)
+    //   `R 590001`   -> wie `R+00`       (er bestaetigt meinen)
+    //
+    // Die Zahlen selbst gehen nicht verloren: Nummer und
+    // sechsstelliger Feldkenner landen in eigenen Feldern und von
+    // dort ins Logbuch. Der Rapport aus dem Austausch wird BEWUSST
+    // nicht nach `m_reportEmpfangen` geschrieben -- er ist im Contest
+    // immer 59 und sagt nichts; der wirkliche Stoerabstand steht in
+    // seiner eigenen Spalte.
+    {
+        const int iAust = (f.size() >= 4 && f.at(2) == QStringLiteral("R"))
+                              ? 3 : 2;
+        const bool mitR = (iAust == 3);
+        if (f.size() >= iAust + 2) {
+            const QString zahl = f.at(iAust);
+            const QString grid = f.at(iAust + 1);
+            // Sechs Ziffern, und dahinter ein sechsstelliger
+            // Feldkenner -- beides zusammen, sonst ist es kein
+            // Austausch.
+            bool nurZiffern = (zahl.size() == 6);
+            for (const QChar c : zahl) {
+                if (!c.isDigit()) { nurZiffern = false; break; }
+            }
+            if (nurZiffern && grid.size() == 6 && wieLocator(grid)) {
+                m_nummerEmpfangen = zahl.right(4).toInt();
+                m_partnerLocator6 = grid;
+                // Auch in das gewoehnliche Feld, damit Logbuch und
+                // Anzeige ihn finden, wo sie ihn immer suchen.
+                m_partnerLocator  = grid;
+                letztes = mitR ? QStringLiteral("R+00")
+                               : QStringLiteral("+00");
+            }
+        }
+    }
 
     switch (m_zustand) {
         case Zustand::RufeCq: {

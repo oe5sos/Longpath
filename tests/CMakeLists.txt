@@ -5744,6 +5744,10 @@ longpath_add_test(tst_ft8_dxpedition)
 # tst_ft8_dxpedition: upstream laesst den Typ in den default-Zweig
 # laufen, und JEDE Contest-Station fiel still durch.
 longpath_add_test(tst_ft8_eu_vhf)
+# 2026-11-04: der ZUGABLAUF im Contest. Das Format kann Longpath in
+# beide Richtungen; hier geht es darum, ob der Ablauf die richtigen
+# Saetze erzeugt und die zurueckkommenden versteht.
+longpath_add_test(tst_ft8_contest_ablauf)
 # 2026-10-15: FT8 im PROGRAMM — Abgriff, Flaeche, Eintrag. Dekoder und
 # Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die
 # Verdrahtung, nicht die Rechnung.
