@@ -19,6 +19,7 @@
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>
+#include <QFile>
 #include <QLabel>
 #include <QProcess>
 #include <QPushButton>
@@ -26,6 +27,7 @@
 
 #include "core/UpdateChecker.h"
 #include "core/UpdateInstaller.h"
+#include "gui/TitleBar.h"
 #include "gui/UpdateDialog.h"
 
 using namespace Longpath;
@@ -54,6 +56,72 @@ class TstUpdateChecker : public QObject {
     Q_OBJECT
 
 private slots:
+    // ── Ein Fehlschlag darf nicht aussehen wie „noch nichts gehoert" ──
+    //
+    // Betreiber, 2026-11-03 nachts: „grundsaetzlich sollten alle
+    // versionen einen automatischen updater haben!" -- und ein
+    // Updater, der stillschweigend scheitert, ist keiner.
+    //
+    // Bis 2026-11-04 hing am Signal checkFailed nur ein qWarning und
+    // ein deleteLater. Im Kopf blieb damit stehen, was vor der
+    // Abfrage dort stand, und „nichts gesehen" hiess wieder
+    // zweierlei: alles aktuell ODER gar nicht nachgesehen. Genau das
+    // hat am 2026-10-14 auf dem Mac mini eine Stunde gekostet, als
+    // die Pruefung bei jedem Start in einen haengenden
+    // TLS-Handshake lief.
+    void aFailedCheckSaysSoInTheTitleBar()
+    {
+        TitleBar leiste(nullptr);
+        auto* anzeige = leiste.findChild<QLabel*>(QStringLiteral("titleBarUpdateState"));
+        QVERIFY2(anzeige, "keine Aktualisierungsanzeige im Kopf");
+        const QString vorher = anzeige->text();
+
+        leiste.setUpdateState(QStringLiteral("· not checked"),
+                              TitleBar::AktualisierungsStand::Unbekannt,
+                              QStringLiteral("Host api.github.com not found"));
+        QVERIFY2(anzeige->text() != vorher,
+                 "die Anzeige steht nach einem Fehlschlag noch auf dem alten Text");
+        QCOMPARE(anzeige->text(), QStringLiteral("· not checked"));
+        // Der Grund gehoert in den Tooltip -- auf der Leiste waere er
+        // zu lang, beim Melden eines Fehlers ist er aber genau das,
+        // was zaehlt.
+        QVERIFY2(anzeige->toolTip().contains(QStringLiteral("api.github.com")),
+                 qPrintable(QStringLiteral("Tooltip ohne Grund: \"%1\"").arg(anzeige->toolTip())));
+
+        // Und ohne Grund steht wieder die allgemeine Erklaerung da,
+        // nicht ein leerer Tooltip.
+        leiste.setUpdateState(QStringLiteral("· up to date"),
+                              TitleBar::AktualisierungsStand::Aktuell);
+        QVERIFY2(!anzeige->toolTip().isEmpty(), "Tooltip nach up-to-date ist leer");
+        QVERIFY2(!anzeige->toolTip().contains(QStringLiteral("api.github.com")),
+                 "der alte Fehlergrund klebt im Tooltip fest");
+    }
+
+    // Die Verdrahtung selbst: im Fehlzweig der Startpruefung MUSS
+    // setUpdateState stehen. Geprueft wird genau der eine Lambda-Rumpf
+    // -- nicht ein Fenster von n Zeichen um die Fundstelle, das beim
+    // letzten Mal den Nachbarn mitgenommen hat (Lehre 2026-10-30).
+    void theFailureBranchIsWiredToTheTitleBar()
+    {
+        const QString wurzel = qEnvironmentVariable("LONGPATH_SOURCE_DIR");
+        QVERIFY2(!wurzel.isEmpty(), "LONGPATH_SOURCE_DIR fehlt -- ueber ctest laufen lassen");
+        QFile datei(wurzel + QStringLiteral("/src/gui/MainWindow.cpp"));
+        QVERIFY2(datei.open(QIODevice::ReadOnly | QIODevice::Text), qPrintable(datei.fileName()));
+        const QString quelle = QString::fromUtf8(datei.readAll());
+
+        const int anfang = quelle.indexOf(QStringLiteral("UpdateChecker::checkFailed"));
+        QVERIFY2(anfang > 0, "der Fehlzweig der Startpruefung ist verschwunden");
+        const int ende = quelle.indexOf(QStringLiteral("});"), anfang);
+        QVERIFY2(ende > anfang, "kein Ende des Lambda gefunden");
+        const QString rumpf = quelle.mid(anfang, ende - anfang);
+        // Kurz genug, dass hier wirklich nur dieser eine Zweig steht.
+        QVERIFY2(rumpf.length() < 1100,
+                 qPrintable(QStringLiteral("Der abgegriffene Rumpf ist %1 Zeichen lang -- "
+                                           "da steht mehr als der Fehlzweig drin").arg(rumpf.length())));
+        QVERIFY2(rumpf.contains(QStringLiteral("setUpdateState")),
+                 "der Fehlzweig sagt dem Kopf nichts -- der Bediener sieht einen leeren Platz");
+    }
+
     void parsesAGitHubRelease()
     {
         QString err;

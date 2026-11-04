@@ -5579,6 +5579,11 @@ longpath_add_test(tst_color_picker_not_native)
 # 2026-09-21: Help > Check for Updates... -- Release-JSON, Version, Paket,
 # SHA256SUMS, Startpruefung, Zielpfad, Neustart-Helfer, DMG-Einspielen (macOS).
 longpath_add_test(tst_update_checker)
+# Der Fehlzweig-Pruefstand liest src/gui/MainWindow.cpp.
+if(TEST tst_update_checker)
+    set_tests_properties(tst_update_checker PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 # 2026-10-14: sieben Absturzberichte lagen herum, keiner stand im
 # Protokoll. CrashReportDigest holt sie beim naechsten Start nach.
 longpath_add_test(tst_absturzberichte)
