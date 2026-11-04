@@ -50,14 +50,25 @@ public:
     // eigenstaendig laeuft (dessen Fenster wird dann nach vorn geholt)
     // oder die Datenbank nicht aufgeht. Ein zweiter Aufruf holt das
     // offene Fenster nach vorn.
-    bool oeffne(QString* grund = nullptr);
+    //
+    // `elternFenster` (2026-11-04): Longpaths Hauptfenster. Damit wird das
+    // Logbuch ein Fenster DERSELBEN Ebene wie Longpaths schwebende Panels
+    // (Qt::Tool, auf macOS ein NSPanel auf der schwebenden Ebene). Ohne das
+    // lag es als gewoehnliches Fenster immer UNTER den Panels -- Betreiber
+    // 2026-11-04: "wenn ich contestprogramm oeffne, soll das nach anklicken
+    // im vordergrund bleiben!" Auf einer Ebene gilt die Klickreihenfolge.
+    // Ohne Elternfenster (Pruefstand) bleibt es ein gewoehnliches Fenster.
+    bool oeffne(QString* grund = nullptr, QWidget* elternFenster = nullptr);
 
     // Schliesst das Fenster und raeumt Controller und Datenbank ab.
     void schliesse();
 
     bool istOffen() const;
 
-    QWidget* fensterForTest() const;
+    // Das offene Logbuch-Fenster oder nullptr -- fuer den Wirt, der es beim
+    // Minimieren mit ins Dock nimmt (MainWindow::legeSchwebendeFensterInsDock).
+    QWidget* fenster() const;
+    QWidget* fensterForTest() const { return fenster(); }
 
 signals:
     void geoeffnet();

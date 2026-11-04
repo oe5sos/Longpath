@@ -17099,6 +17099,19 @@ void MainWindow::legeSchwebendeFensterInsDock()
     // das Dock das Fenster zweimal meldet) darf die Liste nicht leeren.
     QList<QPointer<QWidget>> jetzt;
     versteckeSchwebendeFenster(jetzt);
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // Das Contest-Logbuch ist seit 2026-11-04 ein Fenster derselben Ebene
+    // (Qt::Tool) und bliebe beim Minimieren genauso stehen wie die Panels.
+    // NICHT in versteckeSchwebendeFenster(): hinter die Connect-Maske soll
+    // es nicht -- ein Funkgeraetewechsel mitten im Contest darf das Log
+    // nicht wegraeumen.
+    if (m_contestFenster) {
+        if (QWidget* log = m_contestFenster->fenster(); log && log->isVisible()) {
+            log->hide();
+            jetzt.append(log);
+        }
+    }
+#endif
     m_schwebendeFensterImDock.append(jetzt);
     qInfo() << "[Dock] abgelegt:" << jetzt.size() << "schwebende Fenster";
 }
@@ -18912,7 +18925,7 @@ void MainWindow::openContestFenster()
     }
 
     QString grund;
-    if (!m_contestFenster->oeffne(&grund)) {
+    if (!m_contestFenster->oeffne(&grund, this)) {
         ScopedChildWidget<QMessageBox> dlgOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
         QMessageBox& box = *dlgOwner.get();
         box.setWindowTitle(tr("Contest Logbook"));

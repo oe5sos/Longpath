@@ -111,6 +111,45 @@ private slots:
         bruecke.schliesse();
     }
 
+    // ── Mit Elternfenster: dieselbe Ebene wie die Panels ─────────────
+    //
+    // Betreiber 2026-11-04: "wenn ich contestprogramm oeffne, soll das nach
+    // anklicken im vordergrund bleiben!" Longpaths Panels sind Qt::Tool mit
+    // dem Hauptfenster als Eltern; ein gewoehnliches Fenster liegt auf macOS
+    // immer darunter. Mit Elternfenster wird das Logbuch ein Qt::Tool und
+    // bleibt sichtbar, wenn das Programm nicht vorn ist.
+    void mitElternfensterLiegtEsAufDerEbeneDerPanels()
+    {
+        QTemporaryDir ordner;
+        QVERIFY(ordner.isValid());
+        qputenv("CONTESTPROGRAMM_DATA_DIR", ordner.path().toUtf8());
+        QVERIFY(belegeLogVor(ordner.path()));
+
+        QWidget eltern;
+        eltern.resize(800, 600);
+        eltern.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&eltern, kFensterFrist));
+
+        ContestFenster bruecke;
+        QString grund;
+        QVERIFY2(bruecke.oeffne(&grund, &eltern), qPrintable(grund));
+        QWidget* fenster = bruecke.fenster();
+        QVERIFY(fenster);
+        QCOMPARE(fenster->parentWidget(), &eltern);
+        QCOMPARE(fenster->windowFlags() & Qt::WindowType_Mask, Qt::Tool);
+        QVERIFY2(fenster->testAttribute(Qt::WA_MacAlwaysShowToolWindow),
+                 "Das Logbuch muss stehen bleiben, wenn Longpath nicht vorn ist");
+        QVERIFY(fenster->isWindow());
+        QVERIFY(QTest::qWaitForWindowExposed(fenster, kFensterFrist));
+        bruecke.schliesse();
+
+        // Ohne Elternfenster bleibt es ein gewoehnliches Fenster.
+        QVERIFY2(bruecke.oeffne(&grund), qPrintable(grund));
+        QCOMPARE(bruecke.fenster()->parentWidget(), nullptr);
+        QVERIFY((bruecke.fenster()->windowFlags() & Qt::WindowType_Mask) != Qt::Tool);
+        bruecke.schliesse();
+    }
+
     void einZweiterSchreiberWirdAbgewiesen()
     {
         QTemporaryDir ordner;

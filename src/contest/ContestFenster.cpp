@@ -43,7 +43,7 @@ QString ContestFenster::datenverzeichnis()
     return Contestprogramm::standardDatenverzeichnis();
 }
 
-bool ContestFenster::oeffne(QString* grund)
+bool ContestFenster::oeffne(QString* grund, QWidget* elternFenster)
 {
     if (m_innen->fenster) {
         m_innen->fenster->setWindowState(
@@ -92,9 +92,23 @@ bool ContestFenster::oeffne(QString* grund)
     // Stylesheet kommt an das Fenster, nicht an die Anwendung -- Longpath
     // hat sein eigenes.
     Contestprogramm::Style::setActiveTheme(steuerung->settings().colorTheme);
-    auto* fenster = new Contestprogramm::MainWindow(*steuerung);
+    auto* fenster = new Contestprogramm::MainWindow(*steuerung, elternFenster);
     fenster->setAttribute(Qt::WA_DeleteOnClose);
     fenster->setStyleSheet(Contestprogramm::Style::appStyleSheet());
+    if (elternFenster) {
+        // Dieselbe Ebene wie Longpaths schwebende Panels (PanFloatingWindow,
+        // AppletFloatingWindow: Qt::Tool mit dem Hauptfenster als Eltern).
+        // Nur so steht das Logbuch nach einem Klick ueber ihnen -- ein
+        // gewoehnliches Fenster liegt auf macOS IMMER unter einem NSPanel
+        // der schwebenden Ebene, egal wer zuletzt geklickt wurde.
+        // Die Knoepfe des Rahmens bleiben: nur der Fenstertyp wechselt.
+        fenster->setWindowFlags((fenster->windowFlags() & ~Qt::WindowType_Mask)
+                                | Qt::Tool);
+        // Ein Werkzeugfenster verschwindet auf macOS, sobald das Programm
+        // nicht mehr vorn ist. Fuer ein Logbuch waere das falsch: es soll
+        // stehen bleiben, auch wenn der Betreiber kurz im Browser ist.
+        fenster->setAttribute(Qt::WA_MacAlwaysShowToolWindow);
+    }
 
     m_innen->wache     = std::move(wache);
     m_innen->steuerung = std::move(steuerung);
@@ -148,7 +162,7 @@ bool ContestFenster::istOffen() const
     return !m_innen->fenster.isNull();
 }
 
-QWidget* ContestFenster::fensterForTest() const
+QWidget* ContestFenster::fenster() const
 {
     return m_innen->fenster;
 }
