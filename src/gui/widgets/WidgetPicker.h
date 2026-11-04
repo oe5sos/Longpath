@@ -96,6 +96,24 @@ public:
 
     /// Die gerade sichtbaren Karten, in Anmeldereihenfolge.
     QStringList entries() const;
+
+    // ── Eintraege, die kein Applet sind (2026-11-04) ───────────────
+    //
+    // Betreiber: "am besten waere auch, wenn ich durch das + alles
+    // hinzufuegen kann." Die Panels des Contestprogramms sind keine
+    // Applets von AppletVisibilityController -- sie leben im Logbuch --
+    // sollen aber hier wie alle anderen stehen: eigene Kategorie, Titel,
+    // Schlagworte, Haken. Wer sie anmeldet, sagt mit zwei Funktionen,
+    // ob eines an ist und wie man es schaltet.
+    struct ZusatzEintrag {
+        QString id;
+        QString titel;
+        QString kategorie;
+        QStringList schlagworte;
+        std::function<bool()> istAn;
+        std::function<void(bool)> schalte;
+    };
+    void setZusatzEintraege(const QList<ZusatzEintrag>& liste);
     bool isChecked(const QString& id) const;
     bool isEnabled(const QString& id) const;
     /// Eine Karte auslösen, als hätte jemand geklickt. false, wenn sie
@@ -130,6 +148,7 @@ private:
     QVBoxLayout* m_cards{nullptr};
     QHash<QString, Card> m_byId;
     QStringList m_order;
+    QList<ZusatzEintrag> m_zusatz;
     QString m_category;
     QString m_needle;
 };
@@ -144,6 +163,9 @@ public:
 
     void openPicker();
     WidgetPicker* picker() const { return m_picker; }
+    // Siehe WidgetPicker::setZusatzEintraege; der Auswaehler entsteht
+    // erst beim ersten Oeffnen, darum hier gemerkt.
+    void setZusatzEintraege(const QList<WidgetPicker::ZusatzEintrag>& liste);
 
     /// Wo der Auswähler aufgehen soll: unter dem Plus, rechtsbündig,
     /// und in den sichtbaren Bildschirm geschoben. Öffentlich, damit
@@ -173,6 +195,7 @@ private:
     QPointer<AppletVisibilityController> m_vis;
     WidgetPicker* m_picker{nullptr};
     QWidget* m_glyph{nullptr};
+    QList<WidgetPicker::ZusatzEintrag> m_zusatz;
 };
 
 } // namespace Longpath

@@ -154,10 +154,12 @@ WidgetPicker::WidgetPicker(AppletVisibilityController* vis, QWidget* parent)
         "  outline: none; padding: 4px 12px; }"
         "QListWidget::item { color: %1; padding: 9px 12px;"
         "  border-radius: 6px; }"
-        "QListWidget::item:selected { background: %2; color: %3; }")
+        "QListWidget::item:selected { background: %2; color: %3;"
+        "  border: 1px solid %4; }")   // Mulde statt Blau, siehe refresh()
         .arg(QString::fromLatin1(Style::kTextSecondary),
-             QString::fromLatin1(Style::kBlueBg),
-             QString::fromLatin1(Style::kBlueText)));
+             QString::fromLatin1(Style::kGlassSelTop),
+             QString::fromLatin1(Style::kGlassSelText),
+             QString::fromLatin1(Style::kGlassSelBorder)));
     body->addWidget(m_categories);
     connect(m_categories, &QListWidget::currentTextChanged,
             this, [this](const QString& t) { setCategory(t); });
@@ -217,6 +219,11 @@ void WidgetPicker::rebuild()
 
     m_categories->addItem(allCategory());
     for (const QString& c : m_vis->categories()) { m_categories->addItem(c); }
+    for (const ZusatzEintrag& z : m_zusatz) {
+        if (m_categories->findItems(z.kategorie, Qt::MatchExactly).isEmpty()) {
+            m_categories->addItem(z.kategorie);
+        }
+    }
     m_categories->setCurrentRow(0);
 
     for (const QString& id : m_vis->registeredIds()) {
@@ -285,7 +292,57 @@ void WidgetPicker::rebuild()
         m_byId.insert(id, Card{frame, id, avail, m_vis->isVisible(id), click});
         m_order << id;
     }
+
+    // Die Zusatzeintraege (Panels des Contestprogramms): dieselbe Karte,
+    // nur Zustand und Schalter kommen vom Anmelder, nicht vom Controller.
+    for (const ZusatzEintrag& z : m_zusatz) {
+        auto* frame = new CardFrame(this);
+        frame->setAttribute(Qt::WA_StyledBackground, true);
+        frame->setCursor(Qt::PointingHandCursor);
+        auto* col = new QVBoxLayout(frame);
+        col->setContentsMargins(15, 11, 15, 12);
+        col->setSpacing(4);
+        auto* name = new QLabel(z.titel, frame);
+        {
+            QFont f = name->font();
+            f.setPixelSize(13);
+            f.setBold(true);
+            name->setFont(f);
+        }
+        col->addWidget(name);
+        auto* keys = new QLabel(z.schlagworte.join(QStringLiteral(" · ")), frame);
+        {
+            QFont f = keys->font();
+            f.setPixelSize(11);
+            keys->setFont(f);
+        }
+        keys->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+            .arg(QString::fromLatin1(Style::kTextScale)));
+        col->addWidget(keys);
+        const QString id = z.id;
+        auto click = [this, id]() {
+            for (const ZusatzEintrag& e : m_zusatz) {
+                if (e.id != id || !e.istAn || !e.schalte) { continue; }
+                const bool next = !e.istAn();
+                e.schalte(next);
+                refresh();
+                emit toggled(id, next);
+                return;
+            }
+        };
+        frame->onClick = click;
+        frame->dragId = id;
+        m_cards->insertWidget(m_cards->count() - 1, frame);
+        m_byId.insert(id, Card{frame, id, true, z.istAn ? z.istAn() : false, click});
+        m_order << id;
+    }
     refresh();
+}
+
+void WidgetPicker::setZusatzEintraege(const QList<ZusatzEintrag>& liste)
+{
+    m_zusatz = liste;
+    rebuild();
 }
 
 void WidgetPicker::refresh()
@@ -293,19 +350,36 @@ void WidgetPicker::refresh()
     if (!m_vis) { return; }
     for (const QString& id : m_order) {
         Card& c = m_byId[id];
-        c.checked = m_vis->isVisible(id);
-        c.enabled = m_vis->isAvailable(id);
+        const ZusatzEintrag* z = nullptr;
+        for (const ZusatzEintrag& e : m_zusatz) { if (e.id == id) { z = &e; break; } }
+        if (z) {
+            c.checked = z->istAn ? z->istAn() : false;
+            c.enabled = true;
+        } else {
+            c.checked = m_vis->isVisible(id);
+            c.enabled = m_vis->isAvailable(id);
+        }
         if (!c.frame) { continue; }
         c.frame->setEnabled(c.enabled);
         // Eine gewählte Karte trägt den Auswahlrahmen — genau eine
-        // Eigenschaft, zwei Zustände, kein Haken nötig.
-        c.frame->setStyleSheet(QStringLiteral(
-            "CardFrame { background: %1; border: 1px solid %2;"
-            "            border-radius: 6px; }")
-            .arg(QString::fromLatin1(c.checked ? Style::kBlueBg
-                                               : Style::kInsetBg),
-                 QString::fromLatin1(c.checked ? Style::kBlueBorder
-                                               : Style::kBorderSubtle)));
+        // Eigenschaft, zwei Zustände, kein Haken nötig. Angehakt = eine
+        // Mulde (kGlassSel*), kein Blau: Betreiber 2026-11-02 "kein
+        // Auswahl-Blau", und am 2026-11-04 am Auswaehler selbst: "blauer
+        // hintergrund ganz rechts". Dieselbe Mulde wie an den
+        // Kopfleisten-Pillen.
+        c.frame->setStyleSheet(c.checked
+            ? QStringLiteral(
+                "CardFrame { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+                "            stop:0 %1, stop:1 %2); border: 1px solid %3;"
+                "            border-radius: 6px; }")
+                .arg(QString::fromLatin1(Style::kGlassSelTop),
+                     QString::fromLatin1(Style::kGlassSelBot),
+                     QString::fromLatin1(Style::kGlassSelBorder))
+            : QStringLiteral(
+                "CardFrame { background: %1; border: 1px solid %2;"
+                "            border-radius: 6px; }")
+                .arg(QString::fromLatin1(Style::kInsetBg),
+                     QString::fromLatin1(Style::kBorderSubtle)));
     }
     applyFilter();
 }
@@ -316,9 +390,24 @@ void WidgetPicker::applyFilter()
     for (const QString& id : m_order) {
         Card& c = m_byId[id];
         if (!c.frame) { continue; }
-        const bool byCat = m_category == allCategory()
-                        || m_vis->category(id) == m_category;
-        const bool byText = m_vis->matches(id, m_needle);
+        const ZusatzEintrag* z = nullptr;
+        for (const ZusatzEintrag& e : m_zusatz) { if (e.id == id) { z = &e; break; } }
+        bool byCat = false;
+        bool byText = false;
+        if (z) {
+            byCat = m_category == allCategory() || z->kategorie == m_category;
+            const QString n = m_needle.trimmed().toLower();
+            byText = n.isEmpty() || z->titel.toLower().contains(n)
+                     || z->id.toLower().contains(n);
+            for (const QString& k : z->schlagworte) {
+                if (byText) { break; }
+                byText = k.toLower().contains(n);
+            }
+        } else {
+            byCat = m_category == allCategory()
+                    || m_vis->category(id) == m_category;
+            byText = m_vis->matches(id, m_needle);
+        }
         c.frame->setVisible(byCat && byText);
     }
 }
@@ -716,6 +805,12 @@ bool AddWidgetButton::eventFilter(QObject* watched, QEvent* e)
     return QWidget::eventFilter(watched, e);
 }
 
+void AddWidgetButton::setZusatzEintraege(const QList<WidgetPicker::ZusatzEintrag>& liste)
+{
+    m_zusatz = liste;
+    if (m_picker) { m_picker->setZusatzEintraege(liste); }
+}
+
 void AddWidgetButton::openPicker()
 {
     if (!m_picker) {
@@ -733,6 +828,7 @@ void AddWidgetButton::openPicker()
         // Qt::Tool: eigenes Fenster mit Titelleiste, verschiebbar,
         // bleibt offen, bleibt über dem Hauptfenster.
         m_picker = new WidgetPicker(m_vis, this);
+        if (!m_zusatz.isEmpty()) { m_picker->setZusatzEintraege(m_zusatz); }
         m_picker->setWindowFlags(Qt::Tool);
         m_picker->setWindowTitle(tr("Add a widget"));
         connect(m_picker, &WidgetPicker::toggled,

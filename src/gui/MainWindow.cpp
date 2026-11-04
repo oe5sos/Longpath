@@ -9597,6 +9597,36 @@ void MainWindow::populateDefaultMeter()
         if (visible) { bringAppletToFront(id); }
     });
     m_addWidgetBtn->setToolTip(tr("Add or remove windows"));
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // Die Panels des Contestprogramms auch hinter dem "+" (Betreiber
+    // 2026-11-04: "am besten waere auch, wenn ich durch das + alles
+    // hinzufuegen kann"). Keine Applets, darum als Zusatzeintraege mit
+    // Zustand und Schalter aus der Bruecke; derselbe Weg wie Tools >
+    // Contest logbook panels und das Containers-Menue.
+    {
+        QList<WidgetPicker::ZusatzEintrag> liste;
+        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+            WidgetPicker::ZusatzEintrag z;
+            z.id = QStringLiteral("Contest:%1").arg(e.id);
+            z.titel = QStringLiteral("Contest · %1").arg(e.titel);
+            z.kategorie = tr("Contest logbook");
+            z.schlagworte = e.schlagworte;
+            const QString id = e.id;
+            z.istAn = [this, id]() {
+                return m_contestFenster && m_contestFenster->istPanelSchwebend(id);
+            };
+            z.schalte = [this, id](bool an) {
+                if (an) {
+                    contestPanelAlsFenster(id);
+                } else if (m_contestFenster) {
+                    m_contestFenster->dockePanel(id);
+                }
+            };
+            liste.append(z);
+        }
+        m_addWidgetBtn->setZusatzEintraege(liste);
+    }
+#endif
     m_addWidgetBtn->raise();
     m_addWidgetBtn->show();
     positionAddWidgetButton();
@@ -12583,9 +12613,12 @@ void MainWindow::buildMenuBar()
         // dockePanel), der Haken = "steht als eigenes Fenster". Der Stand
         // aendert sich im Logbuch selbst (↙ am Panel), darum beim
         // Aufklappen nachgezogen.
+        // addSection() zeigt macOS nicht (natives Menue: nur ein Strich),
+        // darum tragen die Eintraege den Vorsatz "Contest ·" -- Betreiber
+        // 2026-11-04, mit der Liste vor sich: "da ist wieder nichts".
         containersMenu->addSection(tr("Contest logbook"));
         for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
-            QAction* a = containersMenu->addAction(e.titel);
+            QAction* a = containersMenu->addAction(QStringLiteral("Contest · %1").arg(e.titel));
             a->setObjectName(QStringLiteral("actContainersContestPanel_%1").arg(e.id));
             a->setCheckable(true);
             a->setToolTip(tr("Show this Contestprogramm panel as its own window in Longpath"));

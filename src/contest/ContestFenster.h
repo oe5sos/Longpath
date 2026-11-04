@@ -74,7 +74,11 @@ public:
     // dann ein Qt::Tool-Kind des (verborgenen) Logbuch-Fensters, das
     // seinerseits am Longpath-Hauptfenster haengt -- also auf der Ebene
     // von Longpaths eigenen Panels. Das ✕ am Panel dockt es zurueck.
-    struct PanelEintrag { QString id; QString titel; };
+    // `schlagworte`: Suchworte fuer den Auswaehler hinter dem "+"
+    // (deutsch wie das Logbuch selbst; sie liegen HIER und nicht in
+    // src/gui, weil die Oberflaeche von Longpath englisch bleibt und
+    // tst_oberflaeche_englisch dort deutsche Texte zaehlt).
+    struct PanelEintrag { QString id; QString titel; QStringList schlagworte; };
     // Alle Panels in der Reihenfolge des Contestprogramms -- auch, wenn
     // das Logbuch noch nicht geladen ist.
     static QList<PanelEintrag> panels();

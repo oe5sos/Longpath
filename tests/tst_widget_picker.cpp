@@ -360,6 +360,75 @@ private slots:
         QVERIFY2(!b.picker()->isVisible(),
                  "der zweite Druck schloss nicht -- das Kreuz luegt");
     }
+
+    // ── Eintraege, die kein Applet sind (2026-11-04) ──────────────────
+    //
+    // Betreiber: "am besten waere auch, wenn ich durch das + alles
+    // hinzufuegen kann." Die Panels des Contestprogramms kommen als
+    // Zusatzeintraege: eigene Kategorie, Suche ueber Titel und
+    // Schlagworte, Haken aus istAn(), Klick ueber schalte(). Alte Fassung:
+    // die Methode gibt es nicht.
+    void einZusatzeintragStehtMitKategorieHakenUndSuche()
+    {
+        AppletVisibilityController vis;
+        registerThree(vis);
+        WidgetPicker p(&vis);
+
+        bool an = false;
+        int geschaltet = 0;
+        WidgetPicker::ZusatzEintrag z;
+        z.id = QStringLiteral("Contest:chat");
+        z.titel = QStringLiteral("Contest · Chat");
+        z.kategorie = QStringLiteral("Contest logbook");
+        z.schlagworte = {QStringLiteral("chat"), QStringLiteral("on4kst")};
+        z.istAn = [&an]() { return an; };
+        z.schalte = [&an, &geschaltet](bool neu) { an = neu; ++geschaltet; };
+        p.setZusatzEintraege({z});
+
+        QVERIFY2(p.entries().contains(QStringLiteral("Contest:chat")),
+                 "der Zusatzeintrag muss in der Liste stehen");
+        QCOMPARE(p.entries().size(), 4);
+        QVERIFY(p.categoryColumn().contains(QStringLiteral("Contest logbook")));
+        QVERIFY(!p.isChecked(QStringLiteral("Contest:chat")));
+
+        // Klick schaltet ueber den Anmelder, und der Haken folgt.
+        QVERIFY(p.toggle(QStringLiteral("Contest:chat")));
+        QCOMPARE(geschaltet, 1);
+        QVERIFY(an);
+        QVERIFY(p.isChecked(QStringLiteral("Contest:chat")));
+        // Ein Zustandswechsel von aussen (↙ am Panel) kommt mit refresh().
+        an = false;
+        p.refresh();
+        QVERIFY(!p.isChecked(QStringLiteral("Contest:chat")));
+
+        // Kategorie und Suche filtern wie bei den Applets.
+        p.setCategory(QStringLiteral("Contest logbook"));
+        QCOMPARE(p.entries(), QStringList{QStringLiteral("Contest:chat")});
+        p.setCategory(WidgetPicker::allCategory());
+        p.setSearch(QStringLiteral("on4kst"));
+        QCOMPARE(p.entries(), QStringList{QStringLiteral("Contest:chat")});
+        p.setSearch(QStringLiteral("rx"));
+        QVERIFY(!p.entries().contains(QStringLiteral("Contest:chat")));
+    }
+
+    // Der Knopf merkt sich die Eintraege, auch wenn der Auswaehler erst
+    // beim ersten Oeffnen entsteht.
+    void derKnopfReichtDieZusatzeintraegeWeiter()
+    {
+        AppletVisibilityController vis;
+        registerThree(vis);
+        AddWidgetButton b(&vis);
+        WidgetPicker::ZusatzEintrag z;
+        z.id = QStringLiteral("Contest:log");
+        z.titel = QStringLiteral("Contest · Log");
+        z.kategorie = QStringLiteral("Contest logbook");
+        z.istAn = []() { return false; };
+        z.schalte = [](bool) {};
+        b.setZusatzEintraege({z});
+        b.openPicker();
+        QVERIFY(b.picker());
+        QVERIFY(b.picker()->entries().contains(QStringLiteral("Contest:log")));
+    }
 };
 
 QTEST_MAIN(TestWidgetPicker)
