@@ -206,6 +206,13 @@ void GridCellWidget::addWidget(QWidget* w)
     w->setParent(this);
     w->show();
     m_contentLayout->addWidget(w);
+    // Bringt das Applet ein Bedienteil fuer die Kopfleiste mit, legt
+    // das Feld es dorthin -- siehe AppletWidget::kopfleistenWidget().
+    if (auto* applet = qobject_cast<AppletWidget*>(w)) {
+        if (QWidget* kopf = applet->kopfleistenWidget()) {
+            setTrailingWidget(kopf);
+        }
+    }
     refreshTitleText();
     updateOptionsButtonVisibility();
 }
@@ -255,7 +262,21 @@ void GridCellWidget::setTrailingWidget(QWidget* w)
     if (m_trailing == w) { return; }
     if (m_trailing) { m_titleLayout->removeWidget(m_trailing); }
     m_trailing = w;
-    if (m_trailing) { m_titleLayout->addWidget(m_trailing); }
+    if (m_trailing) {
+        // VOR die Knoepfe, nicht dahinter: rechts auszen gehoert dem
+        // Zahnrad und dem x (Martins Regel vom 2026-09-20).
+        int vorDenKnoepfen = m_titleLayout->count();
+        for (int i = 0; i < m_titleLayout->count(); ++i) {
+            QLayoutItem* it = m_titleLayout->itemAt(i);
+            if (it && qobject_cast<QPushButton*>(it->widget())) {
+                vorDenKnoepfen = i;
+                break;
+            }
+        }
+        m_titleLayout->insertWidget(vorDenKnoepfen, m_trailing);
+        m_trailing->setParent(m_titleBar);
+        m_trailing->show();
+    }
     updateTitleBarHeight();
 }
 

@@ -1052,6 +1052,8 @@ private:
     void buildStatusBar();
     void applyDarkTheme();
     void openConnectionPanelOnLaunch();
+    /// Was im Kombi-Feld lag, beim Start wieder hineinlegen.
+    void holeKombiInhaltZurueck(const QStringList& vorgabe = {});
     void wireSliceToSpectrum();
 
     /// Re-bind RttyDecoderApplet and the RADE/RttyDecoder availability gate
@@ -1303,6 +1305,15 @@ private:
     /// Zurück in die Spalte, an die gemerkte Stelle. Räumt das Fenster
     /// ab. Tut nichts, wenn das Applet nicht abgelöst ist.
     void dockAppletBack(const QString& appletId);
+    /// Ein schwebendes Panel auf einem Kombi-Feld ablegen (2026-11-01).
+    void legeAufKombiFeld(const QString& appletId, const QPoint& globalPos);
+    /// Was kein Applet ist, bekommt sein eigenes Werkzeugfenster
+    /// zurueck -- siehe das Kombi-Feld (2026-11-01).
+    void gibFremdesPanelZurueck(QWidget* panel, const QRect& dort);
+    /// Rechtsklick auf ein Kombi-Feld: zeigt, was hineinkann.
+    void zeigeKombiListe(class KombiApplet* feld, const QPoint& globalPos);
+    void holeInsKombiFeld(class KombiApplet* feld, AppletWidget* applet,
+                          const QString& appletId);
 
     /// Sichtbarkeit anwenden — auf die Spalte ODER auf das Fenster, je
     /// nachdem, wo das Applet gerade steht. Ohne diese Weiche liefe ein
@@ -1914,6 +1925,7 @@ private:
     // Applets (Phase 3-UI)
     class AmpApplet*   m_ampApplet{nullptr};
     bool               m_ampAppletWired{false};  // guards one-time AmpApplet signal connects
+    class KombiApplet* m_kombiApplet{nullptr};
     class RxApplet* m_rxApplet{nullptr};
     // Phase 3M-3a-ii Batch 6: cached so SetupDialog instances can route
     // CfcSetupPage's [Configure CFC bands…] button to the same modeless
@@ -2038,6 +2050,7 @@ private:
     /// (2026-10-28). Drei Bänder, ein Befehl: siehe
     /// RadioModel::setFlexSliceNoise.
     QMetaObject::Connection m_flexNrBand;
+    QMetaObject::Connection m_flexNrStufeBand;
     QMetaObject::Connection m_flexNbBand;
     QMetaObject::Connection m_flexAnfBand;
     /// Die Rauschsperre. Eigene Baender, weil `wireSliceSignals` am
@@ -2050,6 +2063,7 @@ private:
     /// Die uebrigen Regler der Scheibe -- aus demselben Grund eigene
     /// Baender: am Flex laeuft `wireSliceSignals` nicht.
     QMetaObject::Connection m_flexAgcBand;
+    QMetaObject::Connection m_flexAgcSchwelleBand;
     QMetaObject::Connection m_flexTonpegelBand;
     QMetaObject::Connection m_flexStummBand;
     QMetaObject::Connection m_flexBalanceBand;

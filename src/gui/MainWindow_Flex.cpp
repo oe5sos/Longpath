@@ -84,6 +84,7 @@
 #include "core/FlexFensterZug.h"
 #include <algorithm>
 #include "gui/SpectrumWidget.h"
+#include "gui/widgets/CommandBar.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "models/BandDefaults.h"
@@ -406,10 +407,22 @@ void MainWindow::wireFlex()
                                        1.0f);
             }
 
-            m_radioModel->setFlexSliceNoise(
-                gewaehlt != NrSlot::Off && !eigenesVerfahren,
-                s->nbMode() != NbMode::Off,
-                s->anfEnabled());
+            // ── Jedes Verfahren an SEINEN Minderer (2026-11-01) ──
+            //
+            // Bis heute ging fuer NR1, NR2 und NR4 dasselbe `nr=1`
+            // hinaus -- dreimal derselbe Klang, obwohl die Maschine
+            // fuenf Verfahren fuehrt. Jetzt trifft jeder Steckplatz
+            // den seinen (`RadioModel::flexNrSchluessel`).
+            //
+            // Rauschsperre fuer Knacken (nb) und Auto-Notch (anf)
+            // bleiben daneben, wie bisher.
+            m_radioModel->sendeFlexNrVerfahren(
+                eigenesVerfahren ? NrSlot::Off : gewaehlt);
+            if (!eigenesVerfahren) {
+                m_radioModel->sendeFlexNrStufe(gewaehlt, s->flexNrLevel());
+            }
+            m_radioModel->setFlexSliceNoiseNbAnf(
+                s->nbMode() != NbMode::Off, s->anfEnabled());
         };
         disconnect(m_flexNrBand);
         m_flexNrBand = connect(ziel, &SliceModel::activeNrChanged, this,
@@ -417,6 +430,20 @@ void MainWindow::wireFlex()
         disconnect(m_flexNbBand);
         m_flexNbBand = connect(ziel, &SliceModel::nbModeChanged, this,
                                [rauschHinaus](NbMode) { rauschHinaus(); });
+        // ── Der Schnellgriff zeigt am Flex die Maschine ─────────────
+        //
+        // Dort stehen sonst WDSP-Werte, die nichts tun. Der Name
+        // kommt aus derselben Zuordnung, die auch den Befehl baut --
+        // zwei Quellen wuerden frueher oder spaeter auseinanderlaufen.
+        if (m_commandBar) {
+            m_commandBar->setMaschinenNr([](NrSlot slot) {
+                return RadioModel::flexNrSchluessel(slot);
+            });
+        }
+
+        disconnect(m_flexNrStufeBand);
+        m_flexNrStufeBand = connect(ziel, &SliceModel::flexNrLevelChanged, this,
+                                    [rauschHinaus](int) { rauschHinaus(); });
         disconnect(m_flexAnfBand);
         m_flexAnfBand = connect(ziel, &SliceModel::anfEnabledChanged, this,
                                 [rauschHinaus](bool) { rauschHinaus(); });
@@ -473,6 +500,12 @@ void MainWindow::wireFlex()
             if (m_shuttingDown || !m_radioModel) { return; }
             m_radioModel->sendeFlexAgcModus(m);
         });
+        disconnect(m_flexAgcSchwelleBand);
+        m_flexAgcSchwelleBand = connect(ziel, &SliceModel::agcThresholdChanged,
+                                        this, [this](int s) {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            m_radioModel->sendeFlexAgcSchwelle(s);
+        });
         disconnect(m_flexTonpegelBand);
         m_flexTonpegelBand = connect(ziel, &SliceModel::afGainChanged, this,
                                      [this](int g) {
@@ -515,27 +548,52 @@ void MainWindow::wireFlex()
         disconnect(m_flexXitHzBand);
         m_flexXitHzBand = connect(ziel, &SliceModel::xitHzChanged, this,
                                   [xitHinaus](int) { xitHinaus(); });
+        // ── APF nur in CW (2026-11-01, am Geraet gemessen) ──────────
+        //
+        // Im Protokoll des Betreibers:
+        //
+        //   WRN: Befehl 23 abgelehnt, Code 0x50000061:
+        //        "slice set 0 apf=0"
+        //
+        // Die Scheibe war in Betrieb und auf LSB; andere Befehle an
+        // dieselbe Scheibe gingen durch. Die Maschine nimmt `apf`
+        // also nicht in jeder Betriebsart an -- bei ihr ist das
+        // Spitzenfilter eine CW-Hilfe. Statt bei jedem Klick eine
+        // Ablehnung zu ernten, geht es nur dort hinaus, wo sie es
+        // annimmt; sonst sagt eine Zeile, warum nicht.
+        //
+        // (Dasz es GENAU an CW haengt, ist aus der Ablehnung
+        // geschlossen, nicht aus einer Quelle. Am Geraet in CW noch
+        // zu bestaetigen.)
+        auto apfHinaus = [this, ziel]() {
+            if (m_shuttingDown || !m_radioModel) { return; }
+            const DSPMode art = ziel->dspMode();
+            if (art != DSPMode::CWL && art != DSPMode::CWU) {
+                qCInfo(lcFlexGui) << "Flex: APF nur in CW — die Maschine "
+                                     "lehnt es sonst ab";
+                return;
+            }
+            m_radioModel->sendeFlexApf(ziel->apfEnabled());
+        };
         disconnect(m_flexApfBand);
         m_flexApfBand = connect(ziel, &SliceModel::apfEnabledChanged, this,
-                                [this](bool an) {
-            if (m_shuttingDown || !m_radioModel) { return; }
-            m_radioModel->sendeFlexApf(an);
-        });
+                                [apfHinaus](bool) { apfHinaus(); });
 
         // Und einmal gleich jetzt denselben Weg gehen, damit die
         // Maschine mit dem uebereinstimmt, was im Fenster steht --
         // und noch einmal, sobald sie ihre Scheibe gemeldet hat. Der
         // erste Griff faellt naemlich in die 143-ms-Luecke vom
         // 2026-10-31, in der es die Scheibennummer noch nicht gibt.
-        auto reglerHinaus = [this, ziel]() {
+        auto reglerHinaus = [this, ziel, apfHinaus]() {
             if (m_shuttingDown || !m_radioModel) { return; }
             m_radioModel->sendeFlexAgcModus(ziel->agcMode());
+            m_radioModel->sendeFlexAgcSchwelle(ziel->agcThreshold());
             m_radioModel->sendeFlexTonpegel(ziel->afGain());
             m_radioModel->sendeFlexStumm(ziel->muted());
             m_radioModel->sendeFlexBalance(ziel->audioPan());
             m_radioModel->sendeFlexRit(ziel->ritEnabled(), ziel->ritHz());
             m_radioModel->sendeFlexXit(ziel->xitEnabled(), ziel->xitHz());
-            m_radioModel->sendeFlexApf(ziel->apfEnabled());
+            apfHinaus();
         };
         disconnect(m_flexReglerNachtrag);
         m_flexReglerNachtrag = connect(m_radioModel,

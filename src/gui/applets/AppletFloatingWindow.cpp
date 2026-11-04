@@ -27,6 +27,45 @@
 
 namespace Longpath {
 
+// ── Klick holt nach vorne (2026-11-01) ─────────────────────────────
+//
+// Betreiber: „und wenn ich auf ein panel klicke soll es schon in der
+// vordergrund gelange". Unsere Fenster sind rahmenlos; das System
+// hebt sie darum nicht von selbst, wenn man irgendwo hineinklickt --
+// nur die Kopfleiste tat es beim Ziehen.
+//
+// Ein Filter auf dem Fenster selbst: jeder Druck darin hebt es, und
+// das Ereignis laeuft unveraendert weiter zu dem, was darunter liegt.
+namespace {
+class NachVorneBeiKlick : public QObject {
+public:
+    explicit NachVorneBeiKlick(QWidget* fenster)
+        : QObject(fenster), m_fenster(fenster)
+    {
+        if (qApp) { qApp->installEventFilter(this); }
+    }
+protected:
+    bool eventFilter(QObject* ziel, QEvent* ev) override
+    {
+        // AUF DER ANWENDUNG, nicht auf dem Fenster: ein Mausdruck
+        // geht an das Kind, das darunter liegt, und ein Filter am
+        // Fenster saehe ihn nie. Darum hier jeden Druck sehen und
+        // fragen, ob er zu uns gehoert.
+        if (ev->type() != QEvent::MouseButtonPress || !m_fenster) {
+            return false;
+        }
+        auto* w = qobject_cast<QWidget*>(ziel);
+        if (w && (w == m_fenster || m_fenster->isAncestorOf(w))) {
+            m_fenster->raise();
+        }
+        return false;   // nie schlucken
+    }
+private:
+    QPointer<QWidget> m_fenster;
+};
+}  // namespace
+
+
 AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
                                            const QString& panelId,
                                            int dockIndex, QWidget* parent)
@@ -73,6 +112,21 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
     connect(m_titleBar, &WindowTitleBar::closeRequested, this, [this]() {
         emit dockRequested(appletId());
     });
+    // Bringt das Applet ein Bedienteil fuer die Kopfleiste mit, liegt
+    // es hier genauso wie in der Spalte -- ein Applet hat zwei
+    // Gehaeuse (2026-11-01, zweimal die Falle).
+    if (applet) {
+        if (QWidget* kopf = applet->kopfleistenWidget()) {
+            m_titleBar->setKopfWidget(kopf);
+        }
+    }
+    // Wo das Fenster losgelassen wurde -- fuer das Kombi-Feld
+    // (2026-11-01). Hier wird nichts entschieden, nur weitergereicht:
+    // welche Felder es gibt, weiss das Hauptfenster.
+    // Haengt sich selbst an die Anwendung (siehe oben).
+    new NachVorneBeiKlick(this);
+    connect(m_titleBar, &WindowTitleBar::zugEndeBei, this,
+            [this](const QPoint& wo) { emit abgelegtBei(wo); });
     connect(m_titleBar, &WindowTitleBar::dockRequested, this, [this]() {
         // ── Der Knopf, der zufaellig genau dort landet ────────────────
         //

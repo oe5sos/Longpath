@@ -2691,6 +2691,19 @@ if(TEST tst_flex_rauschsperre)
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
+longpath_add_test(tst_kombi_entwuerfe)
+longpath_add_test(tst_startmaske)
+if(TEST tst_startmaske)
+    set_tests_properties(tst_startmaske PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
+longpath_add_test(tst_kombi_feld)
+if(TEST tst_kombi_feld)
+    set_tests_properties(tst_kombi_feld PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 longpath_add_test(tst_flex_socketmeldung)
 
 longpath_add_test(tst_flex_vorverzerrung)

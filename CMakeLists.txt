@@ -1270,6 +1270,7 @@ set(GUI_SOURCES
     src/core/QsoConfirmation.cpp
     src/core/QsoUploader.h
     src/models/LogEntry.cpp
+    src/gui/applets/KombiApplet.cpp
     src/gui/applets/RxApplet.cpp
     src/gui/applets/TxApplet.cpp
     src/gui/applets/TxEqDialog.cpp
