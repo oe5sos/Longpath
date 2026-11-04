@@ -210,6 +210,21 @@ bool ContestFenster::zeigePanelAlsFenster(const QString& id, QString* grund,
     return true;
 }
 
+int ContestFenster::sperreAllePanels(bool an)
+{
+    if (!m_innen->fenster) { return 0; }
+    int n = 0;
+    for (const PanelEintrag& e : panels()) {
+        auto* panel = qobject_cast<Contestprogramm::PanelContainerWidget*>(
+            m_innen->fenster->panelFenster(e.id));
+        if (panel && panel->isLocked() != an) {
+            panel->setLocked(an);
+            ++n;
+        }
+    }
+    return n;
+}
+
 void ContestFenster::dockePanel(const QString& id)
 {
     if (m_innen->fenster) { m_innen->fenster->setzePanelSchwebend(id, false); }

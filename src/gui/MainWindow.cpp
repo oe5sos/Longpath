@@ -7473,6 +7473,27 @@ void MainWindow::rebuildEditContainerSubmenu()
     }
 }
 
+int MainWindow::sperreAlleFenster(bool an)
+{
+    int n = 0;
+    // Die schwebenden Fenster (Applets, Panadapter, Werkzeugfenster):
+    // ihr Schloss sitzt in der Kopfleiste und schreibt sich selbst in
+    // die Einstellungen (WindowTitleBar::setLocked, lockKey).
+    for (WindowTitleBar* tb : findChildren<WindowTitleBar*>()) {
+        if (tb->isLocked() != an) { tb->setLocked(an); ++n; }
+    }
+    // Die Instrumenten-Container (Meter) haben ihr eigenes Schloss.
+    if (m_containerManager) {
+        for (ContainerWidget* c : m_containerManager->allContainers()) {
+            if (c && c->isLocked() != an) { c->setLocked(an); ++n; }
+        }
+    }
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    if (m_contestFenster) { n += m_contestFenster->sperreAllePanels(an); }
+#endif
+    return n;
+}
+
 void MainWindow::resetDefaultLayout()
 {
     if (!m_containerManager) { return; }
@@ -12491,6 +12512,32 @@ void MainWindow::buildMenuBar()
                 // Flaeche blieb voll, und niemand sah warum.
                 m_appletVis->setVisible(id, false);
             }
+        });
+    }
+
+    // ── Alles sperren / alles freigeben (2026-11-04) ─────────────────
+    //
+    // Jedes schwebende Fenster, jeder Instrumenten-Container und jedes
+    // Panel des Contestprogramms hat sein eigenes Schloss. Im Betrieb
+    // will man nicht zwanzig Schloesser bedienen, sondern eines:
+    // Vorschlag 6 der Vereinfachungen vom 2026-11-04, Betreiber
+    // "entscheide selbst". Die Einzelschloesser bleiben; das hier setzt
+    // sie nur alle auf einmal (siehe sperreAlleFenster()).
+    {
+        QAction* sperren = containersMenu->addAction(tr("Lock every window in place"));
+        sperren->setObjectName(QStringLiteral("actLockEveryWindow"));
+        sperren->setToolTip(tr(
+            "Every floating window, meter container and contest panel keeps "
+            "its place and size until it is unlocked again."));
+        connect(sperren, &QAction::triggered, this, [this]() {
+            const int n = sperreAlleFenster(true);
+            qInfo() << "[Schloss] alles gesperrt:" << n << "Fenster/Panels";
+        });
+        QAction* frei = containersMenu->addAction(tr("Unlock every window"));
+        frei->setObjectName(QStringLiteral("actUnlockEveryWindow"));
+        connect(frei, &QAction::triggered, this, [this]() {
+            const int n = sperreAlleFenster(false);
+            qInfo() << "[Schloss] alles freigegeben:" << n << "Fenster/Panels";
         });
     }
 
