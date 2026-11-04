@@ -234,6 +234,24 @@ QString setSliceFilterCommand(const QString& sliceId, int lowHz, int highHz);
 // Longpath. Wer sie verstellen will, tut das an der Maschine — hier
 // würde ein mitgeschickter Wert die Einstellung des Betreibers bei
 // jedem Knopfdruck überschreiben.
+/// Die fuenf Rauschminderer der Maschine, einzeln.
+///
+/// Schluessel am 2026-11-01 vom Geraet gelesen und gegen AetherSDRs
+/// `SliceModel.cpp` geprueft, das alle fuenf bedient:
+///
+///   nr          klassische, spektrale Minderung   (nr_level)
+///   lms_nr      LMS                               (lms_nr_level)
+///   speex_nr    Speex                             (speex_nr_level)
+///   nrf         NRF                               (nrf_level)
+///   rnnoise     RNNoise, neuronal                 (kein Pegel)
+///
+/// Der leere Rueckgabewert heiszt wie ueberall: diesen Befehl gibt es
+/// so nicht, also geht nichts hinaus.
+QString setSliceNrKindCommand(const QString& sliceId, const QString& schluessel,
+                              bool an);
+QString setSliceNrLevelCommand(const QString& sliceId, const QString& schluessel,
+                               int stufe);
+
 QString setSliceNoiseCommand(const QString& sliceId,
                              bool nr, bool nb, bool anf);
 
@@ -339,6 +357,8 @@ QString setSliceSquelchLevelCommand(const QString& sliceId, int stufe);
 /// (sie hat nur `apf_level`, wir nur eine Frequenz) und der SNB —
 /// unter allen 101 Schluesseln gibt es keinen dafuer.
 QString setSliceAgcModeCommand(const QString& sliceId, const QString& modus);
+/// Die AGC-Schwelle der Maschine, 0..100 (gelesen: `agc_threshold=60`).
+QString setSliceAgcThresholdCommand(const QString& sliceId, int stufe);
 QString setSliceAudioLevelCommand(const QString& sliceId, int stufe);
 QString setSliceAudioMuteCommand(const QString& sliceId, bool stumm);
 QString setSliceAudioPanCommand(const QString& sliceId, int links0bis100);

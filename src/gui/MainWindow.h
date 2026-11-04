@@ -459,6 +459,8 @@ public:
     }
     int floatingWindowsWaitingForConnectMaskForTest() const
     { return int(m_floatingContainersHiddenPreConnect.size()); }
+    int schwebendeFensterImDockForTest() const
+    { return int(m_schwebendeFensterImDock.size()); }
     void restoreFloatingWindowsForTest()
     { restoreFloatingWindowsHiddenBehindConnectMask(); }
 
@@ -590,6 +592,9 @@ public slots:
 
 protected:
     void closeEvent(QCloseEvent* event) override;
+    /// Ablage ins Dock (Minimieren) nimmt die schwebenden Fenster mit,
+    /// das Zurueckholen bringt sie wieder -- siehe die Definition.
+    void changeEvent(QEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
     void moveEvent(QMoveEvent* event) override;
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -1047,6 +1052,8 @@ private:
     void buildStatusBar();
     void applyDarkTheme();
     void openConnectionPanelOnLaunch();
+    /// Was im Kombi-Feld lag, beim Start wieder hineinlegen.
+    void holeKombiInhaltZurueck(const QStringList& vorgabe = {});
     void wireSliceToSpectrum();
 
     /// Re-bind RttyDecoderApplet and the RADE/RttyDecoder availability gate
@@ -1304,6 +1311,15 @@ private:
     /// Zurück in die Spalte, an die gemerkte Stelle. Räumt das Fenster
     /// ab. Tut nichts, wenn das Applet nicht abgelöst ist.
     void dockAppletBack(const QString& appletId);
+    /// Ein schwebendes Panel auf einem Kombi-Feld ablegen (2026-11-01).
+    void legeAufKombiFeld(const QString& appletId, const QPoint& globalPos);
+    /// Was kein Applet ist, bekommt sein eigenes Werkzeugfenster
+    /// zurueck -- siehe das Kombi-Feld (2026-11-01).
+    void gibFremdesPanelZurueck(QWidget* panel, const QRect& dort);
+    /// Rechtsklick auf ein Kombi-Feld: zeigt, was hineinkann.
+    void zeigeKombiListe(class KombiApplet* feld, const QPoint& globalPos);
+    void holeInsKombiFeld(class KombiApplet* feld, AppletWidget* applet,
+                          const QString& appletId);
 
     /// Sichtbarkeit anwenden — auf die Spalte ODER auf das Fenster, je
     /// nachdem, wo das Applet gerade steht. Ohne diese Weiche liefe ein
@@ -1319,6 +1335,13 @@ private:
     /// alles beim naechsten Connected ODER beim Schliessen der Maske
     /// ohne Verbindung.
     void hideFloatingWindowsBehindConnectMask();
+
+    /// Die gemeinsame Aufzaehlung dahinter: versteckt alles, was gerade
+    /// sichtbar schwebt, und merkt es in `liste` vor. Zweiter Abnehmer
+    /// neben der Maske ist die Ablage ins Dock (2026-11-03).
+    void versteckeSchwebendeFenster(QList<QPointer<QWidget>>& liste);
+    void legeSchwebendeFensterInsDock();
+    void holeSchwebendeFensterAusDemDock();
 
     /// Die Gegenseite: zeigt wieder, was fuer die Maske weggeraeumt wurde
     /// -- aber erst, wenn die Maske wirklich weg ist. Solange sie steht,
@@ -1908,6 +1931,7 @@ private:
     // Applets (Phase 3-UI)
     class AmpApplet*   m_ampApplet{nullptr};
     bool               m_ampAppletWired{false};  // guards one-time AmpApplet signal connects
+    class KombiApplet* m_kombiApplet{nullptr};
     class RxApplet* m_rxApplet{nullptr};
     // Phase 3M-3a-ii Batch 6: cached so SetupDialog instances can route
     // CfcSetupPage's [Configure CFC bands…] button to the same modeless
@@ -2032,6 +2056,7 @@ private:
     /// (2026-10-28). Drei Bänder, ein Befehl: siehe
     /// RadioModel::setFlexSliceNoise.
     QMetaObject::Connection m_flexNrBand;
+    QMetaObject::Connection m_flexNrStufeBand;
     QMetaObject::Connection m_flexNbBand;
     QMetaObject::Connection m_flexAnfBand;
     /// Die Rauschsperre. Eigene Baender, weil `wireSliceSignals` am
@@ -2044,6 +2069,7 @@ private:
     /// Die uebrigen Regler der Scheibe -- aus demselben Grund eigene
     /// Baender: am Flex laeuft `wireSliceSignals` nicht.
     QMetaObject::Connection m_flexAgcBand;
+    QMetaObject::Connection m_flexAgcSchwelleBand;
     QMetaObject::Connection m_flexTonpegelBand;
     QMetaObject::Connection m_flexStummBand;
     QMetaObject::Connection m_flexBalanceBand;
@@ -2376,6 +2402,9 @@ private:
     // deswegen tatsaechlich versteckt wurden, damit die erste Verbindung
     // genau die wieder zeigt und nichts, was ohnehin schon zu war.
     QList<QPointer<QWidget>> m_floatingContainersHiddenPreConnect;
+    /// Was beim Minimieren des Hauptfensters mit ins Dock ging und beim
+    /// Zurueckholen wieder gezeigt wird (2026-11-03).
+    QList<QPointer<QWidget>> m_schwebendeFensterImDock;
     /// Der Rotor/Log-Einmalhaken (Konstruktor) hat bei der ersten
     /// Verbindung dieser Sitzung zugeschlagen und moechte m_rotorWindow
     /// zeigen -- ausgefuehrt wird der Wunsch in

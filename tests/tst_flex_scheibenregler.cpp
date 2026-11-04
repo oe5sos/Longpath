@@ -22,8 +22,10 @@
 #include <QtTest/QtTest>
 
 #include <QRegularExpression>
+#include <QSet>
 
 #include "core/FlexRadioConnection.h"
+#include "models/RadioModel.h"
 
 using namespace Longpath;
 
@@ -95,6 +97,122 @@ private slots:
                     QStringLiteral("0"), 101).isEmpty());
     }
 
+    // ── Jeder Steckplatz trifft SEINEN Minderer ─────────────────────
+    //
+    // Betreiber, 2026-10-28: „aber jeder nr sollte anders
+    // funktionieren!" Am Flex taten sie das nicht: NR1, NR2 und NR4
+    // schickten alle dasselbe `nr=1`.
+    //
+    // Die Maschine fuehrt fuenf Verfahren; die Zuordnung geht nach
+    // der FAMILIE, nicht nach der Nummer.
+    void jederSteckplatzTrifftSeinenMinderer()
+    {
+        QCOMPARE(RadioModel::flexNrSchluessel(NrSlot::NR1),
+                 QStringLiteral("lms_nr"));     // WDSP anr.c = LMS
+        QCOMPARE(RadioModel::flexNrSchluessel(NrSlot::NR2),
+                 QStringLiteral("nr"));         // WDSP emnr.c = spektral
+        QCOMPARE(RadioModel::flexNrSchluessel(NrSlot::NR3),
+                 QStringLiteral("rnnoise"));    // beide neuronal
+        QCOMPARE(RadioModel::flexNrSchluessel(NrSlot::NR4),
+                 QStringLiteral("speex_nr"));   // beide Spektralsubtraktion
+        // Keine zwei auf denselben -- sonst klaenge wieder alles gleich.
+        const QStringList alle{
+            RadioModel::flexNrSchluessel(NrSlot::NR1),
+            RadioModel::flexNrSchluessel(NrSlot::NR2),
+            RadioModel::flexNrSchluessel(NrSlot::NR3),
+            RadioModel::flexNrSchluessel(NrSlot::NR4)};
+        QCOMPARE(QSet<QString>(alle.begin(), alle.end()).size(), 4);
+        // Was wir selbst rechnen, hat dort nichts zu suchen.
+        for (NrSlot eigen : {NrSlot::DFNR, NrSlot::BNR, NrSlot::MNR,
+                             NrSlot::NNR, NrSlot::Off}) {
+            QVERIFY2(RadioModel::flexNrSchluessel(eigen).isEmpty(),
+                     "ein Verfahren, das die Maschine nicht fuehrt, darf "
+                     "nicht auf einen fremden Schluessel zeigen");
+        }
+    }
+
+    // Und die Maschine nimmt nur ihre eigenen Namen.
+    void nurDieFuenfNamenDerMaschine()
+    {
+        const QString s = QStringLiteral("0");
+        for (const QString& gut : {QStringLiteral("nr"), QStringLiteral("lms_nr"),
+                                   QStringLiteral("speex_nr"),
+                                   QStringLiteral("nrf"),
+                                   QStringLiteral("rnnoise")}) {
+            QVERIFY2(!FlexCommandWire::setSliceNrKindCommand(s, gut, true).isEmpty(),
+                     qPrintable(gut));
+        }
+        QVERIFY(FlexCommandWire::setSliceNrKindCommand(
+                    s, QStringLiteral("nr2"), true).isEmpty());
+        // RNNoise hat keinen Pegel -- es ist ein Netz, kein Regler.
+        QVERIFY(FlexCommandWire::setSliceNrLevelCommand(
+                    s, QStringLiteral("rnnoise"), 50).isEmpty());
+        QCOMPARE(FlexCommandWire::setSliceNrLevelCommand(
+                     s, QStringLiteral("lms_nr"), 70),
+                 QStringLiteral("slice set 0 lms_nr_level=70"));
+    }
+
+    // ── Die Staerke geht an das gewaehlte Verfahren ─────────────────
+    //
+    // Die Maschine steht ab Werk auf 50, und wir ruehrten sie nie an
+    // -- das war „NR2 hört sich sehr dumpf an". Jetzt gibt es dafuer
+    // einen Regler, und er musz an den Schluessel des GEWAEHLTEN
+    // Verfahrens gehen, nicht an einen festen.
+    void dieStaerkeGehtAnDasGewaehlteVerfahren()
+    {
+        const QString rumpf = quelle(QStringLiteral("/src/models/RadioModel.cpp"));
+        const int a = rumpf.indexOf(QStringLiteral("void RadioModel::sendeFlexNrStufe"));
+        QVERIFY2(a > 0, "sendeFlexNrStufe ist weg");
+        const int e = rumpf.indexOf(QStringLiteral("\n}\n"), a);
+        QVERIFY2(e > a, "die Funktion sieht anders aus als erwartet");
+        QVERIFY2(rumpf.mid(a, e - a).contains(QStringLiteral("flexNrSchluessel")),
+                 "die Staerke geht an einen festen Schluessel statt an den "
+                 "des gewaehlten Verfahrens");
+
+        // Und der Schnellgriff musz am Flex die Maschine zeigen.
+        const QString fenster = quelle(QStringLiteral("/src/gui/MainWindow_Flex.cpp"));
+        QVERIFY2(fenster.contains(QStringLiteral("setMaschinenNr")),
+                 "der Schnellgriff zeigt am Flex weiterhin WDSP-Werte, die "
+                 "dort nichts tun");
+    }
+
+    // ── Die AGC-Schwelle ist VERHAELTNISMAESZIG, nicht physikalisch ─
+    //
+    // Betreiber, 2026-11-01: „höre hier viel zu viel rauschen so denke
+    // ich". AGC-T war am Flex nicht verdrahtet -- sein Regler stand
+    // auf -20, die Maschine auf ihrem eigenen Wert (gelesen: 60).
+    //
+    // Unser Regler laeuft -160..0, die Maschine 0..100. Eine
+    // physikalische Umrechnung gibt es ohne Quelle nicht; was es gibt,
+    // ist dieselbe STELLUNG im jeweiligen Bereich. Dieser Fall haelt
+    // genau das fest -- und die Enden, denn dort faellt ein
+    // Vorzeichenfehler zuerst auf.
+    void dieAgcSchwelleHaeltDieEnden()
+    {
+        const QString rumpf = quelle(QStringLiteral("/src/models/RadioModel.cpp"));
+        const int a = rumpf.indexOf(QStringLiteral("void RadioModel::sendeFlexAgcSchwelle"));
+        QVERIFY2(a > 0, "sendeFlexAgcSchwelle ist weg");
+        const int e = rumpf.indexOf(QStringLiteral("\n}\n"), a);
+        QVERIFY2(e > a, "die Funktion sieht anders aus als erwartet");
+        const QString k = rumpf.mid(a, e - a);
+        QVERIFY2(k.contains(QStringLiteral("kUnten = -160")),
+                 "der Bereich des Reglers stimmt nicht mehr mit RxApplet "
+                 "ueberein (m_agcTSlider->setRange(-160, 0))");
+        QVERIFY2(k.contains(QStringLiteral("wert - kUnten")),
+                 "die Abbildung ist verdreht: ganz links muss ganz links "
+                 "bleiben");
+        // Der Befehlsbauer nimmt nur 0..100.
+        QVERIFY(!FlexCommandWire::setSliceAgcThresholdCommand(
+                     QStringLiteral("0"), 0).isEmpty());
+        QVERIFY(!FlexCommandWire::setSliceAgcThresholdCommand(
+                     QStringLiteral("0"), 100).isEmpty());
+        QVERIFY(FlexCommandWire::setSliceAgcThresholdCommand(
+                    QStringLiteral("0"), 101).isEmpty());
+        QCOMPARE(FlexCommandWire::setSliceAgcThresholdCommand(
+                     QStringLiteral("0"), 60),
+                 QStringLiteral("slice set 0 agc_threshold=60"));
+    }
+
     // ── Die Balance ist die Umkehrung derselben Rechnung ────────────
     //
     // Unser Regler schreibt `(val - 50) / 50.0`, also -1 links,
@@ -125,6 +243,7 @@ private slots:
         QVERIFY2(!src.isEmpty(), "MainWindow_Flex.cpp nicht lesbar");
         const QList<QPair<QString, QString>> paare{
             {QStringLiteral("SliceModel::agcModeChanged"),   QStringLiteral("sendeFlexAgcModus")},
+            {QStringLiteral("SliceModel::agcThresholdChanged"), QStringLiteral("sendeFlexAgcSchwelle")},
             {QStringLiteral("SliceModel::afGainChanged"),    QStringLiteral("sendeFlexTonpegel")},
             {QStringLiteral("SliceModel::mutedChanged"),     QStringLiteral("sendeFlexStumm")},
             {QStringLiteral("SliceModel::audioPanChanged"),  QStringLiteral("sendeFlexBalance")},

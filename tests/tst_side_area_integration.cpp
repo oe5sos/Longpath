@@ -8,6 +8,9 @@
 // wohnt.
 
 #include <QtTest>
+#include <QScopeGuard>
+#include <QGuiApplication>
+#include <QScreen>
 
 #include "core/AppSettings.h"
 #include "gui/StyleConstants.h"
@@ -18,11 +21,17 @@
 #include "gui/PanFloatingWindow.h"
 #include "gui/PanadapterStack.h"
 #include "gui/PanadapterApplet.h"
+#include "gui/WindowPlacement.h"   // kSnapGridPx — der Fall rastet
 #include "gui/applets/AppletFloatingWindow.h"
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/AppletVisibilityController.h"
 #include "gui/applets/AppletWidget.h"
 #include "FensterFrist.h"
+
+// Spiegelt kNeighbourSlackPx aus src/gui/MainWindow_SideArea.cpp:58
+// („grenzt an" — Luecke bis hierhin). Dort dateilokal; hier noch einmal,
+// damit der ferne Fall nachrechnen kann, dass er WIRKLICH fern ist.
+namespace { constexpr int kNeighbourSlackPxFuerTest = 16; }
 
 using namespace Longpath;
 
@@ -48,6 +57,10 @@ bool hasAncestor(const QWidget* w, const QWidget* ancestor)
 }
 
 } // namespace
+
+// Laenger als die 180 ms von snapToGridAfterSettle (WindowPlacement.h),
+// mit Luft fuer einen langsamen Laeufer.
+static constexpr int kRastFristMs = 400;
 
 class TestSideAreaIntegration : public QObject
 {
@@ -260,20 +273,39 @@ private slots:
         m_mw->setSideAreaEnabledForTest(true);
         SideAreaWindow* area = m_mw->sideAreaForTest();
         QVERIFY(area);
-        // Rasterfeste Werte (2026-09-26, auf 16 umgerechnet am
-        // 2026-10-20): Fenster rasten an allen vier Kanten ein, krumme
-        // Werte zieht das Raster nach dem Setzen zurecht. Alle vier
-        // Kanten hier sind durch kSnapGridPx teilbar (896 = 56·16,
-        // 96 = 6·16, rechts 1232 = 77·16, unten 608 = 38·16), damit
-        // nichts nachwandert und die Rechnung unten aufgeht.
+        // ── Der Fall muss AUF DEN SCHIRM passen (2026-11-02) ───────
         //
-        // Mit der alten Weite 8 standen hier 904/104/328/496. Dieselben
-        // Zahlen ergaben mit 16 ein Nachrasten von 904 auf 912 und
-        // damit eine um 8 schmalere Flaeche -- der Lauf meldete 1080
-        // statt 1088. Nicht die Erwartung ist falsch gewesen, sondern
-        // die Eingangswerte.
-        constexpr int kAreaW = 336;
-        area->setGeometry(896, 96, kAreaW, 512);
+        // Hier standen feste Zahlen: die Seitenflaeche auf x=896 mit
+        // Breite 336, also bis 1232. Auf einem Mac stimmt das. Unter
+        // `xvfb-run` ist der virtuelle Schirm aber nur rund 796 Punkte
+        // breit (gemessen am 2026-10-20, #279) -- die Flaeche lag dort
+        // KOMPLETT ausserhalb, der beim Einklappen frei werdende Platz
+        // damit auch, und der Nachbar konnte nicht hineinwachsen.
+        //
+        // Der Lauf meldete `win->width()` 781 statt 1074 und fiel
+        // danach mit SIGSEGV um. Zwei Mal an einem Vormittag gekostet:
+        // einmal gesucht, einmal durch einen Neulauf widerlegt. Siehe
+        // [[longpath-pruefstand-fensterbreite-xvfb]].
+        //
+        // Jetzt haengen alle vier Kanten am WIRKLICH verfuegbaren
+        // Bereich: die Flaeche klebt an dessen rechter Kante, das
+        // Fenster links daneben. Damit ist der frei werdende Platz auf
+        // jedem Schirm wirklich da, und die Rechnung unten gilt
+        // ueberall -- auf dem Mac wie unter xvfb.
+        //
+        // Rasterfest bleibt es auch: `kSnapGridPx` teilt jede Kante,
+        // sonst zieht das Raster nach dem Setzen nach und die Rechnung
+        // geht um ein paar Punkte daneben (so geschehen am 2026-10-20,
+        // 904 rastete auf 912).
+        const QRect avail = QGuiApplication::primaryScreen()->availableGeometry();
+        constexpr int kGrid  = Longpath::kSnapGridPx;
+        constexpr int kAreaW = 336;          // wie bisher: 21 Rasterfelder
+        auto abRunden = [](int v) { return (v / kGrid) * kGrid; };
+
+        // Die Flaeche an die rechte Kante, rasterfest nach links gerueckt.
+        const int areaX = abRunden(avail.right() + 1 - kAreaW);
+        const int areaY = abRunden(avail.top() + 96);
+        area->setGeometry(areaX, areaY, kAreaW, 512);
 
         auto* stack = m_mw->findChild<PanadapterStack*>();
         auto* pan = m_mw->findChild<PanadapterApplet*>();
@@ -283,28 +315,103 @@ private slots:
         QTest::qWait(300);
         PanFloatingWindow* win = stack->floatingWindowForTest(pan->panId());
         QVERIFY(win);
-        win->setGeometry(96, 144, 784, 304);   // rechter Rand 880: 16 px Luft
-        QTest::qWait(50);
-        const int w0 = win->width();
+        // Andocken auf jedem Weg hinaus -- auch wenn ein QCOMPARE unten
+        // abbricht. Ein beim Abbau noch schwebender Panadapter stuerzt
+        // unter "offscreen" in QOffscreenBackingStore::clearHash() ab
+        // (Linux-CI 2026-11-03: erst QCOMPARE rot, dann SIGSEGV), und aus
+        // einem Fehlschlag wurde ein Absturz ohne Zahl.
+        auto andocken = qScopeGuard([stack, pan]() {
+            stack->dockPanadapter(pan->panId());
+            QTest::qWait(100);
+        });
 
-        // ── Eine Fensterluft weniger (2026-10-31) ──────────────────
+        // Das Fenster links daneben, seine rechte Kante eine Luft vor
+        // der linken Kante der Flaeche -- das ist „grenzt an"
+        // (kNeighbourSlackPx = 16 in MainWindow_SideArea.cpp).
         //
-        // Seit das Raster den Abstand selbst traegt, liegt die FERNE
-        // Kante um `kFensterLuftPx` vor der Rasterlinie. Das Fenster
-        // waechst also in den frei gewordenen Platz, bleibt aber die
-        // Luft von der Seitenflaeche weg -- und genau so ist es
-        // gemeint. Gemessen: 1077 statt 1080, also exakt eine Luft.
+        // ── Erst setzen, dann ABLESEN, dann ruecken ────────────────
+        //
+        // Die Breite kann man sich nicht ausrechnen: das Fenster hat
+        // eine Mindestbreite (gemessen 420 unter offscreen), und
+        // `resize` klemmt stillschweigend darauf hoch. Ein aus der
+        // Flaechenkante gerechnetes, schmaleres Mass landete deshalb
+        // 52 Punkte IN der Flaeche statt daneben -- und `touches`
+        // (Grenze 16) schlug nicht an, der Nachbar wuchs nicht, der
+        // Lauf fiel um. Darum: Groesse setzen, die WIRKLICHE Breite
+        // ablesen, und das Fenster danach so ruecken, dass seine
+        // rechte Kante eine Luft vor der Flaeche sitzt.
+        const int winY = abRunden(avail.top() + 144);
+        // Nach jedem Setzen und Ruecken WARTEN, bis die Lage steht:
+        // snapToGridAfterSettle (WindowPlacement.h) rastet den Rahmen erst
+        // 180 ms nach dem Loslassen ein. Wer nach 50 ms misst, misst die
+        // Breite VOR dem Rasten und vergleicht spaeter mit der danach --
+        // auf dem langsamen Linux-Laeufer fiel genau das in die Messung
+        // (429 statt 420, 2026-11-03). Breiten erst nach dem Rasten lesen.
+        win->setGeometry(abRunden(avail.left() + 96), winY, 2 * kGrid, 304);
+        QTest::qWait(kRastFristMs);
+        const int w0 = win->width();
+        const int winX = areaX - w0 - Style::kFensterLuftPx;
+        win->move(winX, winY);
+        QTest::qWait(kRastFristMs);
+        QCOMPARE(win->width(), w0);
+
+        // Die Voraussetzung ausdruecklich pruefen, statt sie zu hoffen:
+        // ohne Platz links von der Flaeche misst der Rest nichts.
+        // Nicht ueberspringen -- ein uebersprungener Lauf sieht wie ein
+        // Erfolg aus.
+        QVERIFY2(winX >= avail.left(),
+                 qPrintable(QStringLiteral(
+                     "kein Platz neben der Seitenflaeche: Schirm %1 breit, "
+                     "Flaeche ab %2, Fenster mindestens %3 breit -- es "
+                     "begaenne bei %4")
+                     .arg(avail.width()).arg(areaX).arg(w0).arg(winX)));
+
+        // ── Es waechst um GENAU den frei gewordenen Platz ──────────
+        //
+        // Hier stand bis zum 2026-11-02 ein `- kFensterLuftPx`, mit der
+        // Begruendung „gemessen: 1077 statt 1080, also exakt eine
+        // Luft". Die Luft war aber nie ein Abzug beim Wachsen -- sie
+        // steckte darin, dass die Erwartung mit der GESETZTEN Breite
+        // der Flaeche rechnete (336) statt mit der, die nach dem
+        // Rastern wirklich dasteht (gemessen 333). Drei Punkte
+        // Unterschied, und genau drei wurden abgezogen.
+        //
+        // Jetzt mit der wirklichen Breite -- und dann stimmt die Regel
+        // ohne Korrektur: `resizeNeighbourPans` legt `delta` drauf,
+        // und `delta` ist die Aenderung der Flaechengeometrie.
+        // Nachgerechnet unter offscreen: Flaeche 333 breit, Leiste 40,
+        // frei also 293; Fenster 420 → 713. Exakt 293.
+        // Auch die Breite der Flaeche selbst wird gerastert (gemessen:
+        // 333 statt der gesetzten 336). Die Erwartung rechnet deshalb
+        // mit dem, was wirklich dasteht.
+        const int areaWist = area->geometry().width();
         area->setCollapsed(true);
         QCOMPARE(win->width(),
-                 w0 + (kAreaW - SideAreaWindow::kRailW) - Style::kFensterLuftPx);
+                 w0 + (areaWist - SideAreaWindow::kRailW));
         area->setCollapsed(false);
         QCOMPARE(win->width(), w0);
 
         // Ein Panadapter, der NICHT angrenzt, bleibt, wie er ist.
-        win->setGeometry(96, 144, 592, 304);   // rechter Rand 688: weit weg
-        QTest::qWait(50);
+        //
+        // „Weit weg" heisst: mehr als kNeighbourSlackPx (16) von der
+        // linken Kante der Flaeche entfernt. Erreicht wird das durch
+        // RUECKEN, nicht durch Verkleinern -- die Mindestbreite des
+        // Fensters laesst sich nicht unterschreiten, ein schmaleres
+        // Mass wird stillschweigend hochgeklemmt und der Fall misst
+        // dann wieder etwas anderes als gemeint (2026-11-02).
+        // Erst ruecken, dann rasten lassen, DANN die Breite lesen, mit der
+        // weiter gerechnet wird -- bei x = 0 rastet die rechte Kante neu.
+        const int fernX = avail.left();
+        win->move(fernX, winY);
+        QTest::qWait(kRastFristMs);
+        const int fernW = win->width();
+        QVERIFY2(areaX - (fernX + fernW) > kNeighbourSlackPxFuerTest,
+                 qPrintable(QStringLiteral(
+                     "das Fenster grenzt immer noch an: rechte Kante %1, "
+                     "Flaeche ab %2")
+                     .arg(fernX + fernW).arg(areaX)));
         area->setCollapsed(true);
-        QCOMPARE(win->width(), 592);
+        QCOMPARE(win->width(), fernW);
         area->setCollapsed(false);
 
         // Wieder andocken: ein beim Abbau noch schwebender Panadapter
@@ -312,9 +419,8 @@ private slots:
         // QOffscreenBackingStore::clearHash() aus (docs/architecture/
         // 2026-09-08-container-move-test-offscreen-teardown-segfault.md,
         // tst_closing_takes_the_float_along ueberspringt deshalb) -- mit
-        // dem Seitenbereich hat das nichts zu tun.
-        stack->dockPanadapter(pan->panId());
-        QTest::qWait(100);
+        // dem Seitenbereich hat das nichts zu tun. Angedockt wird vom
+        // qScopeGuard oben, auf jedem Weg hinaus.
     }
 
     // Beenden mit gefülltem Bereich: kein Absturz beim Abräumen.

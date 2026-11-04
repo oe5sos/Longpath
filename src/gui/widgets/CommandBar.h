@@ -65,6 +65,7 @@
 #include <QPointer>
 #include <QString>
 #include <QVector>
+#include <functional>
 #include <QWidget>
 
 class QHBoxLayout;
@@ -159,6 +160,11 @@ public:
     /// aufs RadioModel — die Leiste kennt sonst nur die Scheibe.
     void setFilterPresetStore(FilterPresetStore* store);
 
+    /// Rechnet die MASCHINE die Rauschminderung (Flex)? Dann zeigt
+    /// der Schnellgriff ihre Staerke statt der WDSP-Werte, die dort
+    /// nichts tun. Leer = wir rechnen selbst.
+    void setMaschinenNr(const std::function<QString(NrSlot)>& namen);
+
     /// Was das „…" der Filtergruppe gerade anbietet, in Reihenfolge:
     /// Name und Kanten. Ohne Scheibe leer.
     struct FilterMenuEntry {
@@ -212,6 +218,7 @@ protected:
     void paintEvent(QPaintEvent* e) override;
 
 private:
+    std::function<QString(NrSlot)> m_maschinenNr;
     /// Wo die Dehnung steht -- gesucht, nicht geraten (siehe .cpp).
     int dehnungsPlatz() const;
     /// Bauteil -> die Gruppe, in der es steckt (fuer removeGroupWidget).

@@ -537,10 +537,29 @@ constexpr auto kGlassPanelTop   = "#17171b";   // Panelverlauf oben
 constexpr auto kGlassPanelBot   = "#0e0e10";   // Panelverlauf unten
 constexpr auto kGlassBtnTop     = "#222227";   // erhabener Knopf, oben
 constexpr auto kGlassBtnBot     = "#141417";   // erhabener Knopf, unten
-constexpr auto kGlassSelTop     = "#2f5f92";   // Auswahl, oben
-constexpr auto kGlassSelBot     = "#1e3d5f";   // Auswahl, unten
-constexpr auto kGlassSelBorder  = "#3d78b0";
-constexpr auto kGlassSelText    = "#dbe9f8";
+// Eine Auswahl ist eine MULDE, keine Farbflaeche (2026-11-02).
+//
+// Betreiber, zum wiederholten Mal und zuletzt deutlich: "ich will
+// diesen blauen hintergrund ueberall weg, er kommt immer wieder und
+// es ist aergerlich, dass ich das immer wieder sagen muss."
+//
+// Er hat recht, und es war nie Geschmack: der Hausstil sagt, Farbe
+// bedeckt hoechstens zwei Prozent. Ein gefuellter blauer Knopf ist
+// eine FLAECHE -- und bei zwanzig Bandtasten, Betriebsarten und
+// Filtern sind es zwanzig davon.
+//
+// Erkennbar bleibt die Auswahl ohne einen Tropfen Farbe, in
+// derselben Sprache, die das Haus ueberall spricht: Licht kommt von
+// oben, also liegt das Gewaehlte TIEFER als die ungewaehlten
+// (aufgesetzten), seine Schrift ist heller und sein Rahmen auch.
+//
+// Diese vier Werte sind die EINE Stelle. Wer sie aendert, aendert
+// jeden gewaehlten Knopf im Programm -- darum kam das Blau nach
+// jeder Einzelbehebung zurueck.
+constexpr auto kGlassSelTop     = "#131317";   // Auswahl, oben (Mulde)
+constexpr auto kGlassSelBot     = "#0d0d10";   // Auswahl, unten
+constexpr auto kGlassSelBorder  = "#55555e";   // heller als kBorder
+constexpr auto kGlassSelText    = "#f0f0f4";   // heller als kTextPrimary
 constexpr int  kGlassLightAlpha  = 18;   // Lichtkante: Weiss mit diesem Alpha
 constexpr int  kGlassShadeAlpha  = 110;  // Innenschatten: Schwarz, erste Zeile
 constexpr auto kGlassLight       = "rgba(255, 255, 255, 18)";   // dieselbe Kante fuer Stylesheets
@@ -1218,9 +1237,9 @@ constexpr auto kComboStyle =
     // selection-background-color den Eintrag unsichtbar macht.
     "QComboBox QAbstractItemView {"
     "  background: #0e0e10; color: #dcdce1; border: 1px solid #2c2c31;"
-    "  selection-background-color: #1e3d5f; selection-color: #dbe9f8; outline: none; }"
+    "  selection-background-color: #1a1a1e; selection-color: #f0f0f4; outline: none; }"
     "QComboBox QAbstractItemView::item { padding: 3px 6px; min-height: 18px; }"
-    "QComboBox QAbstractItemView::item:selected { background: #1e3d5f; color: #dbe9f8; }";
+    "QComboBox QAbstractItemView::item:selected { background: #1a1a1e; color: #f0f0f4; }";
 
 constexpr auto kCheckBoxStyle =
     "QCheckBox { color: #dcdce1; spacing: 6px; min-height: 20px; }"   // min-height: drei Haekchen untereinander kollidierten
@@ -1231,8 +1250,8 @@ constexpr auto kCheckBoxStyle =
     "  border-bottom-color: rgba(255, 255, 255, 18); border-radius: 4px; }"
     "QCheckBox::indicator:hover { border-color: #4a7ba8; }"
     "QCheckBox::indicator:checked {"
-    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2f5f92, stop:1 #1e3d5f);"
-    "  border: 1px solid #3d78b0; border-top-color: #4b88c1; }"
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #131317, stop:1 #0d0d10);"
+    "  border: 1px solid #55555e; border-top-color: #55555e; }"
     "QCheckBox::indicator:checked:disabled { background: #232327; border-color: #232327; }";
 
 constexpr auto kRadioButtonStyle =
@@ -1244,8 +1263,8 @@ constexpr auto kRadioButtonStyle =
     "  border-bottom-color: rgba(255, 255, 255, 18); border-radius: 7px; }"
     "QRadioButton::indicator:hover { border-color: #4a7ba8; }"
     "QRadioButton::indicator:checked {"
-    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2f5f92, stop:1 #1e3d5f);"
-    "  border: 1px solid #3d78b0; border-top-color: #4b88c1; }";
+    "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #131317, stop:1 #0d0d10);"
+    "  border: 1px solid #55555e; border-top-color: #55555e; }";
 
 // ── Eingabefelder sind Mulden, keine Flaechen ────────────────────────
 //

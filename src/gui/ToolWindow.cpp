@@ -24,6 +24,45 @@
 
 namespace Longpath {
 
+// ── Klick holt nach vorne (2026-11-01) ─────────────────────────────
+//
+// Betreiber: „und wenn ich auf ein panel klicke soll es schon in der
+// vordergrund gelange". Unsere Fenster sind rahmenlos; das System
+// hebt sie darum nicht von selbst, wenn man irgendwo hineinklickt --
+// nur die Kopfleiste tat es beim Ziehen.
+//
+// Ein Filter auf dem Fenster selbst: jeder Druck darin hebt es, und
+// das Ereignis laeuft unveraendert weiter zu dem, was darunter liegt.
+namespace {
+class NachVorneBeiKlick : public QObject {
+public:
+    explicit NachVorneBeiKlick(QWidget* fenster)
+        : QObject(fenster), m_fenster(fenster)
+    {
+        if (qApp) { qApp->installEventFilter(this); }
+    }
+protected:
+    bool eventFilter(QObject* ziel, QEvent* ev) override
+    {
+        // AUF DER ANWENDUNG, nicht auf dem Fenster: ein Mausdruck
+        // geht an das Kind, das darunter liegt, und ein Filter am
+        // Fenster saehe ihn nie. Darum hier jeden Druck sehen und
+        // fragen, ob er zu uns gehoert.
+        if (ev->type() != QEvent::MouseButtonPress || !m_fenster) {
+            return false;
+        }
+        auto* w = qobject_cast<QWidget*>(ziel);
+        if (w && (w == m_fenster || m_fenster->isAncestorOf(w))) {
+            m_fenster->raise();
+        }
+        return false;   // nie schlucken
+    }
+private:
+    QPointer<QWidget> m_fenster;
+};
+}  // namespace
+
+
 ToolWindow::ToolWindow(QWidget* content, const QString& id,
                        const QString& title, QWidget* parent)
     : QWidget(parent, Qt::Tool | Qt::FramelessWindowHint)
@@ -42,6 +81,10 @@ ToolWindow::ToolWindow(QWidget* content, const QString& id,
     m_titleBar = new WindowTitleBar(title, this);
     // × und Pfeil docken beide DIREKT an -- nicht ueber close(), denn
     // ein QCloseEvent dockt seit dem 2026-09-17 nie mehr (closeEvent()).
+    // Haengt sich selbst an die Anwendung (siehe oben).
+    new NachVorneBeiKlick(this);
+    connect(m_titleBar, &WindowTitleBar::zugEndeBei, this,
+            [this](const QPoint& wo) { emit abgelegtBei(wo); });
     connect(m_titleBar, &WindowTitleBar::closeRequested, this, [this]() {
         emit dockRequested(m_id);
     });
