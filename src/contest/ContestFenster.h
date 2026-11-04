@@ -89,6 +89,10 @@ public:
     bool zeigePanelAlsFenster(const QString& id, QString* grund = nullptr,
                               QWidget* elternFenster = nullptr);
     void dockePanel(const QString& id);
+    // Alle Panels sperren oder freigeben (ihr eigenes Schloss in der
+    // Kopfzeile); liefert, wie viele umgestellt wurden. Fuer "Lock every
+    // window in place" in Longpath.
+    int sperreAllePanels(bool an);
     QWidget* panelFenster(const QString& id) const;
 
     // Schliesst das Fenster und raeumt Controller und Datenbank ab.

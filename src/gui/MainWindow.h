@@ -253,6 +253,7 @@ public:
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
     class ContestFenster* contestFensterForTest() const { return m_contestFenster; }
+    int sperreAlleFensterForTest(bool an) { return sperreAlleFenster(an); }
 
     /// Wie viele Rahmen des Sendetons jetzt faellig sind.
     ///
@@ -897,6 +898,10 @@ private slots:
     /// Betreiber: "jedes panel ... eigens hinzuzufuegen"). Laedt das
     /// Logbuch bei Bedarf verborgen. Siehe ContestFenster.h.
     void contestPanelAlsFenster(const QString& id);
+    /// Alle Schloesser auf einmal (2026-11-04): schwebende Fenster,
+    /// Instrumenten-Container, Panels des Contestprogramms. Liefert, wie
+    /// viele umgestellt wurden. Containers > Lock every window in place.
+    int sperreAlleFenster(bool an);
     // Frequency memories (Thetis MemoryForm + the front-panel quick memory):
     // Tools > Memories..., Tools > Memory Quick Save / Quick Restore.
     void openMemories();
