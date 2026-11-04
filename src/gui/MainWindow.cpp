@@ -18396,9 +18396,17 @@ void MainWindow::openMemories()
     m_memoryDialog->activateWindow();
 }
 
-#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+// Immer definiert, auch ohne Submodul: der Slot steht in der Metatabelle
+// (moc), und ein fehlender Rumpf liess den Bau ohne LONGPATH_CONTESTPROGRAMM
+// am Linker stehen (gemessen 2026-11-04). Ohne Submodul gibt es keinen
+// Menueeintrag, der ihn rufen koennte; er sagt es trotzdem ins Protokoll.
 void MainWindow::openContestFenster()
 {
+#ifndef LONGPATH_HAVE_CONTESTPROGRAMM
+    qWarning() << "Contest logbook: this build has no Contestprogramm "
+                  "(LONGPATH_CONTESTPROGRAMM off)";
+    return;
+#else
     if (!m_contestFenster) {
         m_contestFenster = new ContestFenster(this);
     }
@@ -18440,8 +18448,8 @@ void MainWindow::openContestFenster()
         return;
     }
     qInfo() << "Contest logbook opened, data directory" << ContestFenster::datenverzeichnis();
-}
 #endif
+}
 
 void MainWindow::openSpotHub()
 {
