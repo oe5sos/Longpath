@@ -57,6 +57,29 @@ bool AppletVisibilityController::isAvailable(const QString& id) const
     return it != m_entries.end() ? it->available : false;
 }
 
+void AppletVisibilityController::setHideWhenUnavailable(const QString& id, bool hide)
+{
+    auto it = m_entries.find(id);
+    if (it == m_entries.end() || it->hideWhenUnavailable == hide) { return; }
+    it->hideWhenUnavailable = hide;
+    // Wer die Liste fuehrt, hoert auf availabilityChanged -- dasselbe
+    // Signal mit dem unveraenderten Stand reicht zum Nachziehen.
+    emit availabilityChanged(id, it->available);
+}
+
+bool AppletVisibilityController::hideWhenUnavailable(const QString& id) const
+{
+    auto it = m_entries.find(id);
+    return it != m_entries.end() && it->hideWhenUnavailable;
+}
+
+bool AppletVisibilityController::isListed(const QString& id) const
+{
+    auto it = m_entries.find(id);
+    if (it == m_entries.end()) { return false; }
+    return it->available || !it->hideWhenUnavailable;
+}
+
 bool AppletVisibilityController::isEffectivelyVisible(const QString& id) const
 {
     auto it = m_entries.find(id);

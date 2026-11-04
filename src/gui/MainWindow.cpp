@@ -9597,6 +9597,36 @@ void MainWindow::populateDefaultMeter()
         if (visible) { bringAppletToFront(id); }
     });
     m_addWidgetBtn->setToolTip(tr("Add or remove windows"));
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // Die Panels des Contestprogramms auch hinter dem "+" (Betreiber
+    // 2026-11-04: "am besten waere auch, wenn ich durch das + alles
+    // hinzufuegen kann"). Keine Applets, darum als Zusatzeintraege mit
+    // Zustand und Schalter aus der Bruecke; derselbe Weg wie Tools >
+    // Contest logbook panels und das Containers-Menue.
+    {
+        QList<WidgetPicker::ZusatzEintrag> liste;
+        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+            WidgetPicker::ZusatzEintrag z;
+            z.id = QStringLiteral("Contest:%1").arg(e.id);
+            z.titel = QStringLiteral("Contest · %1").arg(e.titel);
+            z.kategorie = tr("Contest logbook");
+            z.schlagworte = e.schlagworte;
+            const QString id = e.id;
+            z.istAn = [this, id]() {
+                return m_contestFenster && m_contestFenster->istPanelSchwebend(id);
+            };
+            z.schalte = [this, id](bool an) {
+                if (an) {
+                    contestPanelAlsFenster(id);
+                } else if (m_contestFenster) {
+                    m_contestFenster->dockePanel(id);
+                }
+            };
+            liste.append(z);
+        }
+        m_addWidgetBtn->setZusatzEintraege(liste);
+    }
+#endif
     m_addWidgetBtn->raise();
     m_addWidgetBtn->show();
     positionAddWidgetButton();
@@ -9610,6 +9640,13 @@ void MainWindow::populateDefaultMeter()
     const bool fourO3AOn = m_radioModel && m_radioModel->fourO3AEnabled();
     m_appletVis->setAvailable(QStringLiteral("Amp"),   fourO3AOn);
     m_appletVis->setAvailable(QStringLiteral("Tuner"), fourO3AOn);
+    // Hardware, die es hier nicht gibt, steht nicht in den Listen
+    // (Betreiber 2026-11-04: "was wir noch nicht haben, benoetigen wir
+    // nicht, du kannst dies loeschen"). Die Decoder darunter bleiben
+    // aufgefuehrt: sie kommen mit der Betriebsart.
+    for (const char* hw : {"Amp", "Tuner", "RfKit", "Spe", "Kpa500", "Acom"}) {
+        m_appletVis->setHideWhenUnavailable(QString::fromLatin1(hw), true);
+    }
     // RADE / RTTY: available only in RADE_U/_L / DIGL respectively.
     // Safe pre-slice default -- no slice exists yet at this point in
     // startup, so there is no real mode to read. rebindRttyRadeAvailability()
@@ -12516,6 +12553,10 @@ void MainWindow::buildMenuBar()
             // Amp/Tuner when 4O3A is disabled). Check state still
             // reflects the user preference.
             act->setEnabled(m_appletVis->isAvailable(id));
+            // Hinter einem ausgeschalteten Hauptschalter gar nicht
+            // aufgefuehrt (2026-11-04, "was wir noch nicht haben,
+            // benoetigen wir nicht") -- siehe setHideWhenUnavailable.
+            act->setVisible(m_appletVis->isListed(id));
             // User-visible tooltip — plain English, no source cites.
             act->setToolTip(QStringLiteral("Show or hide the %1 applet")
                             .arg(m_appletVis->displayName(id)));
@@ -12569,6 +12610,7 @@ void MainWindow::buildMenuBar()
                 this, [this](const QString& id, bool available) {
             if (auto* act = m_topMenuAppletActions.value(id, nullptr)) {
                 act->setEnabled(available);
+                act->setVisible(m_appletVis && m_appletVis->isListed(id));
             }
         });
 
@@ -12583,9 +12625,12 @@ void MainWindow::buildMenuBar()
         // dockePanel), der Haken = "steht als eigenes Fenster". Der Stand
         // aendert sich im Logbuch selbst (↙ am Panel), darum beim
         // Aufklappen nachgezogen.
+        // addSection() zeigt macOS nicht (natives Menue: nur ein Strich),
+        // darum tragen die Eintraege den Vorsatz "Contest ·" -- Betreiber
+        // 2026-11-04, mit der Liste vor sich: "da ist wieder nichts".
         containersMenu->addSection(tr("Contest logbook"));
         for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
-            QAction* a = containersMenu->addAction(e.titel);
+            QAction* a = containersMenu->addAction(QStringLiteral("Contest · %1").arg(e.titel));
             a->setObjectName(QStringLiteral("actContainersContestPanel_%1").arg(e.id));
             a->setCheckable(true);
             a->setToolTip(tr("Show this Contestprogramm panel as its own window in Longpath"));

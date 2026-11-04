@@ -110,7 +110,7 @@ private slots:
                 QStringLiteral("actContainersContestPanel_%1").arg(e.id));
             QVERIFY2(a, qPrintable(QStringLiteral("Eintrag fuer '%1' fehlt im Containers-Menue").arg(e.id)));
             QVERIFY(a->isCheckable());
-            QCOMPARE(a->text(), e.titel);
+            QCOMPARE(a->text(), QStringLiteral("Contest · %1").arg(e.titel));
             QVERIFY2(menu->actions().contains(a), "der Eintrag muss IM Containers-Menue haengen");
         }
     }

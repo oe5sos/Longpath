@@ -156,10 +156,22 @@ bool ContestFenster::lade(QString* grund, QWidget* elternFenster)
 
 QList<ContestFenster::PanelEintrag> ContestFenster::panels()
 {
+    static const QHash<QString, QStringList> schlagworte = {
+        {QStringLiteral("unifiedlog"),   {QStringLiteral("log"), QStringLiteral("qso"), QStringLiteral("callsign"), QStringLiteral("rufzeichen")}},
+        {QStringLiteral("rotorrow"),     {QStringLiteral("rotor"), QStringLiteral("antenne"), QStringLiteral("richtung"), QStringLiteral("azimut")}},
+        {QStringLiteral("map"),          {QStringLiteral("karte"), QStringLiteral("map"), QStringLiteral("verbindungen"), QStringLiteral("qsos")}},
+        {QStringLiteral("suggestion"),   {QStringLiteral("ziel"), QStringLiteral("naechstes"), QStringLiteral("vorschlag")}},
+        {QStringLiteral("ratemeter"),    {QStringLiteral("rate"), QStringLiteral("tempo"), QStringLiteral("qso/h")}},
+        {QStringLiteral("checkpartial"), {QStringLiteral("check"), QStringLiteral("partial"), QStringLiteral("dupe")}},
+        {QStringLiteral("bandmap"),      {QStringLiteral("bandmap"), QStringLiteral("spots"), QStringLiteral("cluster")}},
+        {QStringLiteral("skeds"),        {QStringLiteral("skeds"), QStringLiteral("termine"), QStringLiteral("verabredung")}},
+        {QStringLiteral("chat"),         {QStringLiteral("chat"), QStringLiteral("on4kst"), QStringLiteral("kst")}},
+        {QStringLiteral("wasserfall"),   {QStringLiteral("wasserfall"), QStringLiteral("waterfall"), QStringLiteral("spektrum")}},
+    };
     QList<PanelEintrag> liste;
     for (const Contestprogramm::MainWindow::PanelEintrag& e
          : Contestprogramm::MainWindow::panelEintraege()) {
-        liste.append({e.id, e.titel});
+        liste.append({e.id, e.titel, schlagworte.value(e.id, {e.id})});
     }
     return liste;
 }
