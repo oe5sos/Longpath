@@ -3905,6 +3905,8 @@ public:
     void sendeFlexNrVerfahren(NrSlot steckplatz);
     /// Die Staerke des gewaehlten Verfahrens (0..100).
     void sendeFlexNrStufe(NrSlot steckplatz, int stufe);
+    /// Staerke der automatischen Kerbe an der Maschine (anf_level, 0..100).
+    void sendeFlexAnfStufe(int stufe);
     /// Knackunterdrueckung und Auto-Notch -- die beiden, die neben
     /// dem gewaehlten Verfahren weiterlaufen duerfen.
     void setFlexSliceNoiseNbAnf(bool nb, bool anf);

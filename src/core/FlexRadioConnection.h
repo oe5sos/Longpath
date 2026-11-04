@@ -255,6 +255,14 @@ QString setSliceNrLevelCommand(const QString& sliceId, const QString& schluessel
 QString setSliceNoiseCommand(const QString& sliceId,
                              bool nr, bool nb, bool anf);
 
+// Die Staerke der automatischen Kerbe: `slice set <id> anf_level=<0..100>`.
+// Der Schalter dazu steckt in setSliceNoiseCommand (anf=0/1) -- hier
+// geht es nur um das Wieviel. Leer bei leerer Scheibennummer oder
+// einer Stufe ausserhalb 0..100; die Maschine wuerde den Befehl sonst
+// mit 0x50000061 zurueckweisen, und wir haetten eine Zeile im
+// Protokoll statt einer Wirkung.
+QString setSliceAnfLevelCommand(const QString& sliceId, int stufe);
+
 // ── Den Panadapter der Maschine mitnehmen (2026-10-22) ───────────────
 //
 // `slice tune` traegt `autopan=0`, damit die Maschine das Bild bei

@@ -122,5 +122,13 @@ void showFor(QWidget* parent, SliceModel* slice, NrSlot slot,
              const std::function<void()>& onMore = {},
              const QString& nameDerMaschine = QString());
 
+/// Dasselbe fuer die automatische Kerbe am Flex: EIN Regler, die
+/// Staerke der Maschine (anf_level, 0..100). Unsere vier WDSP-Werte
+/// fuer ANF liegen dort nicht im Weg und werden darum nicht gezeigt.
+/// Tut nichts ohne Scheibe.
+void showFlexAnfPopup(QWidget* parent, SliceModel* slice,
+                      const QPoint& globalPos,
+                      const std::function<void()>& onMore = {});
+
 } // namespace DspQuickPopup
 } // namespace Longpath

@@ -24,7 +24,10 @@
 #include <QRegularExpression>
 #include <QSet>
 
+#include <QSignalSpy>
+
 #include "core/FlexRadioConnection.h"
+#include "models/SliceModel.h"
 #include "models/RadioModel.h"
 
 using namespace Longpath;
@@ -150,6 +153,68 @@ private slots:
         QCOMPARE(FlexCommandWire::setSliceNrLevelCommand(
                      s, QStringLiteral("lms_nr"), 70),
                  QStringLiteral("slice set 0 lms_nr_level=70"));
+    }
+
+    // ── Die Kerbe hat auch eine Staerke ────────────────────────────
+    //
+    // Der Schalter (anf) ging seit jeher mit nr und nb in EINEM
+    // Befehl hinaus. Die Staerke dazu fuehrt die Maschine unter einem
+    // eigenen Schluessel, `anf_level` -- und die hat bis 2026-11-04
+    // nie jemand gesetzt: sie stand immer auf ihren 50, waehrend
+    // unsere vier WDSP-Werte (Abgriffe, Verzoegerung, Verstaerkung,
+    // Leckrate) am Flex gar nicht im Weg liegen.
+    void dieKerbeHatAuchEineStaerke()
+    {
+        const QString s = QStringLiteral("0");
+        QCOMPARE(FlexCommandWire::setSliceAnfLevelCommand(s, 70),
+                 QStringLiteral("slice set 0 anf_level=70"));
+        QCOMPARE(FlexCommandWire::setSliceAnfLevelCommand(s, 0),
+                 QStringLiteral("slice set 0 anf_level=0"));
+        QCOMPARE(FlexCommandWire::setSliceAnfLevelCommand(s, 100),
+                 QStringLiteral("slice set 0 anf_level=100"));
+        // Ohne Scheibennummer und ausserhalb von 0..100 gar nichts:
+        // die Maschine wiese es mit 0x50000061 zurueck, und wir
+        // haetten eine Zeile im Protokoll statt einer Wirkung.
+        QVERIFY(FlexCommandWire::setSliceAnfLevelCommand(QString(), 50).isEmpty());
+        QVERIFY(FlexCommandWire::setSliceAnfLevelCommand(s, -1).isEmpty());
+        QVERIFY(FlexCommandWire::setSliceAnfLevelCommand(s, 101).isEmpty());
+    }
+
+    // Und das Modell haelt sie: 0..100, Vorgabe 50 wie an der
+    // Maschine, und ausserhalb wird gekappt statt durchgereicht.
+    void dasModellHaeltDieKerbenstaerke()
+    {
+        SliceModel m;
+        QCOMPARE(m.flexAnfLevel(), 50);
+        QSignalSpy spion(&m, &SliceModel::flexAnfLevelChanged);
+        m.setFlexAnfLevel(70);
+        QCOMPARE(m.flexAnfLevel(), 70);
+        QCOMPARE(spion.count(), 1);
+        m.setFlexAnfLevel(70);              // derselbe Wert: kein Signal
+        QCOMPARE(spion.count(), 1);
+        m.setFlexAnfLevel(999);
+        QCOMPARE(m.flexAnfLevel(), 100);
+        m.setFlexAnfLevel(-5);
+        QCOMPARE(m.flexAnfLevel(), 0);
+    }
+
+    // Der Rechtsklick auf ANF fuehrte ins Leere: der Knopf trug
+    // `Qt::CustomContextMenu`, aber nichts haengte daran. Geprueft
+    // wird genau der eine Lambda-Rumpf am Knopf, mit einer
+    // Laengengrenze -- ein Fenster von n Zeichen um die Fundstelle
+    // hat beim letzten Mal den Nachbarn mitgenommen.
+    void derRechtsklickAufAnfFuehrtIrgendwohin()
+    {
+        const QString quelltext = quelle(QStringLiteral("/src/gui/applets/RxApplet.cpp"));
+        const int a = quelltext.indexOf(
+            QStringLiteral("connect(m_anfBtn, &QWidget::customContextMenuRequested"));
+        QVERIFY2(a > 0, "der Rechtsklick auf ANF haengt an nichts -- er tut wieder gar nichts");
+        const int e = quelltext.indexOf(QStringLiteral("});"), a);
+        QVERIFY(e > a);
+        const QString rumpf = quelltext.mid(a, e - a);
+        QVERIFY2(rumpf.length() < 400, qPrintable(QString::number(rumpf.length())));
+        QVERIFY2(rumpf.contains(QStringLiteral("anfQuickRequested")),
+                 qPrintable(rumpf));
     }
 
     // ── Die Staerke geht an das gewaehlte Verfahren ─────────────────

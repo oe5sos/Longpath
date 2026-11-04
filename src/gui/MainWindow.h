@@ -2066,6 +2066,7 @@ private:
     QMetaObject::Connection m_flexNrStufeBand;
     QMetaObject::Connection m_flexNbBand;
     QMetaObject::Connection m_flexAnfBand;
+    QMetaObject::Connection m_flexAnfStufeBand;   ///< anf_level (Flex)
     /// Die Rauschsperre. Eigene Baender, weil `wireSliceSignals` am
     /// Flex ueberhaupt nicht laeuft (sie steigt bei `!m_connection`
     /// aus, und das ist die OpenHPSDR-Verbindung) -- gemessen am

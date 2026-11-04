@@ -7667,6 +7667,20 @@ void RadioModel::sendeFlexNrStufe(NrSlot steckplatz, int stufe)
         QStringLiteral("NR-Staerke %1 = %2").arg(schluessel).arg(s));
 }
 
+// Die Kerbe selbst (an/aus) steckt in setFlexSliceNoiseNbAnf, zusammen
+// mit nr und nb -- ein Befehl fuer alle drei Schalter. Die STAERKE
+// braucht einen eigenen, weil die Maschine sie unter einem eigenen
+// Schluessel fuehrt (anf_level). Unsere vier WDSP-Werte fuer ANF
+// (Abgriffe, Verzoegerung, Verstaerkung, Leckrate) liegen am Flex
+// nicht im Weg und bleiben darum unberuehrt.
+void RadioModel::sendeFlexAnfStufe(int stufe)
+{
+    const int s = std::clamp(stufe, 0, 100);
+    schickeFlexScheibenbefehl(
+        FlexCommandWire::setSliceAnfLevelCommand(m_flexSliceId, s),
+        QStringLiteral("ANF-Staerke %1").arg(s));
+}
+
 void RadioModel::sendeFlexAgcSchwelle(int unsereSchwelle)
 {
     constexpr int kUnten = -160;   // RxApplet: m_agcTSlider->setRange
