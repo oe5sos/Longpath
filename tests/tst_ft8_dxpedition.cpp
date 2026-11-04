@@ -237,6 +237,15 @@ private slots:
     //
     // Dieser Lauf nagelt das fest, damit die Aussage geprueft ist und
     // nicht behauptet.
+    // ACHTUNG beim Lesen: dieser Fall prueft die „/P"-FORM (i3 = 2),
+    // also `PA3XYZ/P GM4ABC/P JO22` — NICHT den Contest-Austausch mit
+    // Rapport und laufender Nummer. Der ist Typ 5 und steht in
+    // `tests/tst_ft8_eu_vhf.cpp`. Der Name hier stammt aus der Zeit,
+    // als Typ 5 noch gar nicht gelesen wurde, und hat beim Nachsehen
+    // am 2026-11-04 fast zu dem Schluss verfuehrt, der Contest werde
+    // bereits gelesen. Er bleibt stehen, weil die „/P"-Form wirklich
+    // zum EU-VHF-Betrieb gehoert — nur eben als Anruf, nicht als
+    // Austausch.
     void derEuVhfAustauschWirdGelesen()
     {
         ftx_message_t m;
@@ -286,14 +295,18 @@ private slots:
     // europaeischen VHF-Betrieb spielt keiner eine Rolle. Faellt einer
     // davon irgendwann durch, soll dieser Lauf umkippen und sagen,
     // dass die Lage sich geaendert hat.
-    void dieDreiUsContestformateFehlenWeiterhin()
+    // 2026-11-04: aus DREI sind ZWEI geworden. `i3 = 5` heisst in der
+    // Aufzaehlung „WWROF", ist aber der EU-VHF-Contest (der Name von
+    // upstream taeuscht, siehe message.h) — und der wird seit heute
+    // gelesen, `tests/tst_ft8_eu_vhf.cpp`. Die beiden
+    // US-Contestformate bleiben offen; dieser Fall haelt fest, WAS
+    // genau noch fehlt, damit es nicht in Vergessenheit geraet.
+    void diezweiUsContestformateFehlenWeiterhin()
     {
-        // ARRL Field Day (0.3/0.4), ARRL RTTY Roundup (i3=3),
-        // WWROF (i3=5).
+        // ARRL Field Day (0.3/0.4), ARRL RTTY Roundup (i3=3).
         struct { quint8 p8; quint8 p9; const char* name; } faelle[] = {
             { 0x00, 0xC0, "ARRL Field Day (0.3)" },   // n3 = 3
             { 0x00, 0x18, "ARRL RTTY Roundup" },      // i3 = 3
-            { 0x00, 0x28, "WWROF" },                  // i3 = 5
         };
         for (const auto& f : faelle) {
             ftx_message_t m;

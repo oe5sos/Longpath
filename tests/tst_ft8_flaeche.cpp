@@ -663,6 +663,36 @@ private slots:
         QCOMPARE(Ft8Applet::senderCallsign(QStringLiteral("TU 73")), QString());
     }
 
+    // ── Der Contest schreibt die Rufzeichen in spitzen Klammern ─────
+    //
+    // Im EU-VHF-Contest (Typ 5) stehen BEIDE Rufzeichen nur als Hash
+    // im Paket; ft8_lib schreibt sie aufgeloest in spitzen Klammern
+    // heraus, wie WSJT-X. Ohne Abstreifen nahm diese Funktion
+    // stattdessen den LOCATOR fuer das Rufzeichen -- `IO91NP` hat
+    // Buchstaben, Ziffern und endet auf einen Buchstaben, die Pruefung
+    // passt leider. Die DXCC-Einfaerbung schlug dann auf ein Land, das
+    // niemand gerufen hatte.
+    //
+    // Gegenprobe: ohne `ohneSpitzeKlammern` in Ft8Applet.cpp liefert
+    // der erste Fall hier „IO91NP".
+    void derAbsenderWirdAuchInSpitzenKlammernErkannt()
+    {
+        QCOMPARE(Ft8Applet::senderCallsign(
+                     QStringLiteral("<OE1ABC> <OE5SOS> 590003 IO91NP")),
+                 QStringLiteral("OE5SOS"));
+        QCOMPARE(Ft8Applet::senderCallsign(
+                     QStringLiteral("<OE1ABC> <OE5SOS> R 590003 IO91NP")),
+                 QStringLiteral("OE5SOS"));
+        // Unaufgeloest bleibt unaufgeloest: „<...>" ist kein
+        // Rufzeichen, und etwas zu erfinden waere schlimmer als nichts.
+        QCOMPARE(Ft8Applet::senderCallsign(
+                     QStringLiteral("<...> <...> 590003 IO91NP")),
+                 QString());
+        // Und der gewoehnliche Weg bleibt, wie er war.
+        QCOMPARE(Ft8Applet::senderCallsign(QStringLiteral("CQ OE5SOS JN78")),
+                 QStringLiteral("OE5SOS"));
+    }
+
     // ── Der Abgriff ─────────────────────────────────────────────────
 
     void derSechsteAbgriffTraegtProben()
@@ -900,6 +930,59 @@ private slots:
         applet.sendeTonFeldForTest()->setValue(1500);
         QVERIFY(!applet.sucheFreieStelleForTest(false));
         QCOMPARE(applet.sendeTonFeldForTest()->value(), 1500);
+    }
+
+    // ── Der Contest ruft mich — und ich sehe es (2026-11-04) ───────
+    //
+    // Im EU-VHF-Contest stehen die Rufzeichen in spitzen Klammern.
+    // `zeigeZeile` verglich bis heute `<OE5SOS>` mit `OE5SOS` und sagte
+    // nie ja: die Zeile stand vor dem Betreiber, aber die Sicht
+    // „An mich" blieb leer, und die Zeile war nicht hervorgehoben.
+    // Im Contest heisst das: man wird gerufen und merkt es nicht.
+    //
+    // Gegenprobe: ohne `ohneSpitzeKlammern` in `zeigeZeile` bleibt die
+    // Sicht „An mich" hier leer.
+    void einContestrufAnMichWirdErkannt()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+
+        Ft8Decode d;
+        d.text   = QStringLiteral("<OE5SOS> <DL1ABC> 590003 JO31AB");
+        d.snrDb  = -10.0;
+        d.freqHz = 1200.0;
+        applet.fundForTest(d);
+
+        // Auf „An mich" schalten: dort darf nur stehen, was mich meint.
+        applet.sichtAnMichButtonForTest()->click();
+        const QString sichtbar = applet.listForTest()->toPlainText();
+        QVERIFY2(sichtbar.contains(QStringLiteral("590003")),
+                 qPrintable(QStringLiteral("Sicht „An mich\" ist leer: [%1]")
+                                .arg(sichtbar)));
+    }
+
+    // GEGENPROBE: ein Contestruf an JEMAND ANDEREN darf dort NICHT
+    // stehen. Ein Abstreifen, das jede Zeile durchlaesst, waere
+    // schlimmer als keines.
+    void einContestrufAnEinenAnderenStehtNichtDort()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+
+        Ft8Decode d;
+        d.text   = QStringLiteral("<DL9XYZ> <DL1ABC> 590007 JO31AB");
+        d.snrDb  = -10.0;
+        d.freqHz = 1300.0;
+        applet.fundForTest(d);
+
+        applet.sichtAnMichButtonForTest()->click();
+        QVERIFY2(!applet.listForTest()->toPlainText()
+                     .contains(QStringLiteral("590007")),
+                 qPrintable(applet.listForTest()->toPlainText()));
     }
 
     void dieFlaecheLaesstSichAbbilden()

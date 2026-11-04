@@ -2296,6 +2296,37 @@ void Ft8Applet::meldeStand()
 // In beiden Faellen ist der Absender das ERSTE Feld, das wie ein
 // Rufzeichen aussieht und nicht an erster Stelle steht — ausser bei
 // CQ, wo das erste Feld der Anruf selbst ist.
+// Ein Rufzeichen aus spitzen Klammern schaelen.
+//
+// ── Warum es die braucht (2026-11-04) ───────────────────────────────
+//
+// Im EU-VHF-Contest (Nachrichtentyp 5) stehen BEIDE Rufzeichen nur als
+// Hash im Paket, und ft8_lib schreibt sie — wie WSJT-X — in spitzen
+// Klammern heraus: `<OE1ABC> <OE5SOS> 590003 IO91NP`. Ohne das
+// Abstreifen kostete das an zwei Stellen gleichzeitig:
+//
+//   * `anMich` verglich `<OE5SOS>` mit `OE5SOS` und sagte nie ja —
+//     im Contest haette der Betreiber nicht gesehen, dass er gerufen
+//     wird, obwohl die Zeile vor ihm stand.
+//   * `senderCallsign` lehnte die geklammerten Felder ab und nahm
+//     stattdessen `IO91NP` (Buchstaben, Ziffern, endet auf Buchstabe
+//     — die Pruefung passt leider). Der Locator wurde damit fuer das
+//     Rufzeichen gehalten, und die DXCC-Einfaerbung schlug auf ein
+//     Land, das niemand gerufen hatte.
+//
+// Die Klammern selbst sind kein Fehler: sie SAGEN etwas, naemlich
+// „gehasht, aus der Tabelle aufgeloest". Darum werden sie nur fuer
+// den Vergleich abgestreift, nicht aus der angezeigten Zeile.
+static QString ohneSpitzeKlammern(const QString& feld)
+{
+    if (feld.size() >= 3
+        && feld.startsWith(QLatin1Char('<'))
+        && feld.endsWith(QLatin1Char('>'))) {
+        return feld.mid(1, feld.size() - 2);
+    }
+    return feld;
+}
+
 QString Ft8Applet::senderCallsign(const QString& message)
 {
     const QStringList felder =
@@ -2318,13 +2349,41 @@ QString Ft8Applet::senderCallsign(const QString& message)
             else if (c != QLatin1Char('/')) { return false; }
         }
         if (!ziffer || !buchstabe) { return false; }
-        return !f.back().isDigit();
+        if (f.back().isDigit()) { return false; }
+
+        // ── Und der SECHSstellige Feldkenner auch nicht (2026-11-04)
+        //
+        // Die Regel „letzte Stelle keine Ziffer" faengt JN78, aber
+        // nicht IO91NP: Buchstaben, Ziffern, endet auf einen
+        // Buchstaben — die Pruefung darueber passt. Aufgefallen am
+        // EU-VHF-Contest, wo `<...> <...> 590003 IO91NP` als
+        // Rufzeichen „IO91NP" lieferte und die DXCC-Einfaerbung auf
+        // ein Land schlug, das niemand gerufen hatte. Der Fehler war
+        // aber schon vorher da — jede Nachricht mit sechsstelligem
+        // Locator und ohne lesbares Rufzeichen traf ihn.
+        //
+        // Das Muster ist Buchstabe Buchstabe Ziffer Ziffer Buchstabe
+        // Buchstabe. Ehrlich gesagt: ein Sonderrufzeichen wie
+        // „OE25AB" sieht genauso aus und faellt hier mit heraus. Das
+        // ist der kleinere Schaden — es kommt selten vor, und wer es
+        // fuehrt, steht in derselben Nachricht meist noch an einer
+        // zweiten Stelle.
+        if (f.size() == 6
+            && f.at(0).isLetter() && f.at(1).isLetter()
+            && f.at(2).isDigit()  && f.at(3).isDigit()
+            && f.at(4).isLetter() && f.at(5).isLetter()) {
+            return false;
+        }
+        return true;
     };
 
     // Erst ab Feld 1: an Stelle 0 steht der Anruf („CQ") oder der
     // ANGERUFENE, nie der Absender.
     for (int i = 1; i < felder.size(); ++i) {
-        if (wieRufzeichen(felder.at(i))) { return felder.at(i); }
+        // Erst schaelen: `<OE5SOS>` ist ein Rufzeichen, nur gehasht
+        // uebertragen. Siehe `ohneSpitzeKlammern` oben.
+        const QString kern = ohneSpitzeKlammern(felder.at(i));
+        if (wieRufzeichen(kern)) { return kern; }
     }
     return {};
 }
@@ -2788,10 +2847,16 @@ void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
     const QString ruf = eigenesRufzeichen();
     // Wortgrenzen, nicht contains(): „OE5SOS" steckt auch in
     // „OE5SOSX", und das ist eine andere Station.
-    z.anMich =
-        !ruf.isEmpty()
-        && nachricht.toUpper().split(QLatin1Char(' '),
-                                     Qt::SkipEmptyParts).contains(ruf);
+    // Geschaelt vergleichen: im Contest steht das eigene Rufzeichen
+    // als `<OE5SOS>` da (siehe `ohneSpitzeKlammern`).
+    z.anMich = false;
+    if (!ruf.isEmpty()) {
+        const QStringList felder = nachricht.toUpper().split(
+            QLatin1Char(' '), Qt::SkipEmptyParts);
+        for (const QString& f : felder) {
+            if (ohneSpitzeKlammern(f) == ruf) { z.anMich = true; break; }
+        }
+    }
     z.istCq = nachricht.trimmed().toUpper().startsWith(
         QStringLiteral("CQ"));
 
