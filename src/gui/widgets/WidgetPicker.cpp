@@ -406,7 +406,10 @@ void WidgetPicker::applyFilter()
         } else {
             byCat = m_category == allCategory()
                     || m_vis->category(id) == m_category;
-            byText = m_vis->matches(id, m_needle);
+            // "Was wir noch nicht haben, benoetigen wir nicht": ein
+            // Applet hinter einem ausgeschalteten Hauptschalter steht
+            // gar nicht in der Liste (AppletVisibilityController::isListed).
+            byText = m_vis->matches(id, m_needle) && m_vis->isListed(id);
         }
         c.frame->setVisible(byCat && byText);
     }

@@ -9640,6 +9640,13 @@ void MainWindow::populateDefaultMeter()
     const bool fourO3AOn = m_radioModel && m_radioModel->fourO3AEnabled();
     m_appletVis->setAvailable(QStringLiteral("Amp"),   fourO3AOn);
     m_appletVis->setAvailable(QStringLiteral("Tuner"), fourO3AOn);
+    // Hardware, die es hier nicht gibt, steht nicht in den Listen
+    // (Betreiber 2026-11-04: "was wir noch nicht haben, benoetigen wir
+    // nicht, du kannst dies loeschen"). Die Decoder darunter bleiben
+    // aufgefuehrt: sie kommen mit der Betriebsart.
+    for (const char* hw : {"Amp", "Tuner", "RfKit", "Spe", "Kpa500", "Acom"}) {
+        m_appletVis->setHideWhenUnavailable(QString::fromLatin1(hw), true);
+    }
     // RADE / RTTY: available only in RADE_U/_L / DIGL respectively.
     // Safe pre-slice default -- no slice exists yet at this point in
     // startup, so there is no real mode to read. rebindRttyRadeAvailability()
@@ -12546,6 +12553,10 @@ void MainWindow::buildMenuBar()
             // Amp/Tuner when 4O3A is disabled). Check state still
             // reflects the user preference.
             act->setEnabled(m_appletVis->isAvailable(id));
+            // Hinter einem ausgeschalteten Hauptschalter gar nicht
+            // aufgefuehrt (2026-11-04, "was wir noch nicht haben,
+            // benoetigen wir nicht") -- siehe setHideWhenUnavailable.
+            act->setVisible(m_appletVis->isListed(id));
             // User-visible tooltip — plain English, no source cites.
             act->setToolTip(QStringLiteral("Show or hide the %1 applet")
                             .arg(m_appletVis->displayName(id)));
@@ -12599,6 +12610,7 @@ void MainWindow::buildMenuBar()
                 this, [this](const QString& id, bool available) {
             if (auto* act = m_topMenuAppletActions.value(id, nullptr)) {
                 act->setEnabled(available);
+                act->setVisible(m_appletVis && m_appletVis->isListed(id));
             }
         });
 

@@ -411,6 +411,36 @@ private slots:
         QVERIFY(!p.entries().contains(QStringLiteral("Contest:chat")));
     }
 
+    // ── Was wir nicht haben, steht nicht in der Liste (2026-11-04) ───
+    //
+    // Betreiber: "was wir noch nicht haben, benoetigen wir nicht, du
+    // kannst dies loeschen." Ein Applet hinter einem ausgeschalteten
+    // Hauptschalter faellt aus dem Auswaehler; ohne die Fahne bleibt es
+    // grau mit OFF, wie bisher (Decoder nach Betriebsart).
+    void einAppletOhneHardwareStehtNichtInDerListe()
+    {
+        AppletVisibilityController vis;
+        registerThree(vis);
+        vis.registerApplet(QStringLiteral("Amp"), QStringLiteral("Power Genius"), true);
+        vis.registerApplet(QStringLiteral("Ft8Decoder"), QStringLiteral("FT8 Decoder"), true);
+        vis.setAvailable(QStringLiteral("Amp"), false);
+        vis.setAvailable(QStringLiteral("Ft8Decoder"), false);
+        vis.setHideWhenUnavailable(QStringLiteral("Amp"), true);
+
+        WidgetPicker p(&vis);
+        QVERIFY2(!p.entries().contains(QStringLiteral("Amp")),
+                 "die fehlende Endstufe darf nicht aufgefuehrt sein");
+        QVERIFY2(p.entries().contains(QStringLiteral("Ft8Decoder")),
+                 "der Decoder bleibt grau aufgefuehrt");
+        QVERIFY(!p.isEnabled(QStringLiteral("Ft8Decoder")));
+
+        // Schalter an: sie erscheint, ohne Neuaufbau.
+        vis.setAvailable(QStringLiteral("Amp"), true);
+        QVERIFY(p.entries().contains(QStringLiteral("Amp")));
+        vis.setAvailable(QStringLiteral("Amp"), false);
+        QVERIFY(!p.entries().contains(QStringLiteral("Amp")));
+    }
+
     // Der Knopf merkt sich die Eintraege, auch wenn der Auswaehler erst
     // beim ersten Oeffnen entsteht.
     void derKnopfReichtDieZusatzeintraegeWeiter()

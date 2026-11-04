@@ -104,6 +104,20 @@ public slots:
     // the applet back if the user wanted it visible.
     void setAvailable(const QString& id, bool available);
 
+    // ── Was wir nicht haben, steht nicht in der Liste (2026-11-04) ──
+    //
+    // Betreiber, zum ausgegrauten Rest im Containers-Menue und hinter
+    // dem "+": "was wir noch nicht haben, benoetigen wir nicht, du
+    // kannst dies loeschen." Ein Applet, das an einem Hauptschalter
+    // haengt (Endstufen, Tuner, 4O3A), wird mit dieser Fahne gar nicht
+    // erst aufgefuehrt, solange der Schalter aus ist -- statt grau mit
+    // "OFF". Die Betriebsart-Decoder (RTTY, CW, FT8, RADE) bleiben
+    // sichtbar: die kommen mit der Betriebsart, nicht mit Hardware.
+    void setHideWhenUnavailable(const QString& id, bool hide);
+    bool hideWhenUnavailable(const QString& id) const;
+    // In Menue und Auswaehler aufgefuehrt? available || !hideWhenUnavailable.
+    bool isListed(const QString& id) const;
+
 signals:
     // User preference changed (e.g., user clicked the menu).
     void visibilityChanged(const QString& id, bool visible);
@@ -125,6 +139,7 @@ private:
         bool available{true};     // capability gate (runtime)
         QString category;         // leer -> uncategorised()
         QStringList keywords;
+        bool hideWhenUnavailable{false};
     };
     QHash<QString, Entry> m_entries;   // id -> entry
     QStringList m_order;               // registration order
