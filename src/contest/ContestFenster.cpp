@@ -13,6 +13,7 @@
 #include "app/Datenverzeichnis.h"
 #include "app/SingleInstanceGuard.h"
 #include "ui/MainWindow.h"
+#include "ui/PanelContainerWidget.h"
 #include "ui/StyleKit.h"
 
 #include <QDir>
@@ -43,16 +44,24 @@ QString ContestFenster::datenverzeichnis()
     return Contestprogramm::standardDatenverzeichnis();
 }
 
-bool ContestFenster::oeffne(QString* grund)
+bool ContestFenster::oeffne(QString* grund, QWidget* elternFenster)
 {
-    if (m_innen->fenster) {
+    const bool schonDa = m_innen->fenster != nullptr;
+    if (!lade(grund, elternFenster)) { return false; }
+    if (schonDa) {
         m_innen->fenster->setWindowState(
             (m_innen->fenster->windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
-        m_innen->fenster->show();
-        m_innen->fenster->raise();
-        m_innen->fenster->activateWindow();
-        return true;
     }
+    m_innen->fenster->show();
+    m_innen->fenster->raise();
+    m_innen->fenster->activateWindow();
+    if (!schonDa) { emit geoeffnet(); }
+    return true;
+}
+
+bool ContestFenster::lade(QString* grund, QWidget* elternFenster)
+{
+    if (m_innen->fenster) { return true; }
 
     const QString ordner = datenverzeichnis();
     if (!QDir().mkpath(ordner)) {
@@ -92,9 +101,28 @@ bool ContestFenster::oeffne(QString* grund)
     // Stylesheet kommt an das Fenster, nicht an die Anwendung -- Longpath
     // hat sein eigenes.
     Contestprogramm::Style::setActiveTheme(steuerung->settings().colorTheme);
-    auto* fenster = new Contestprogramm::MainWindow(*steuerung);
+    // Panels als eigene Fenster ohne Systemrahmen, eckig, mit ↙ zurueck
+    // -- wie Longpaths eigene Fenster (Betreiber 2026-11-04: "alle panels
+    // haben hier noch runde kanten, dies bitte auf eckig umstellen").
+    // Eigenstaendig behaelt das Contestprogramm den Systemrahmen.
+    Contestprogramm::PanelContainerWidget::setzeRahmenlosSchwebend(elternFenster != nullptr);
+    auto* fenster = new Contestprogramm::MainWindow(*steuerung, elternFenster);
     fenster->setAttribute(Qt::WA_DeleteOnClose);
     fenster->setStyleSheet(Contestprogramm::Style::appStyleSheet());
+    if (elternFenster) {
+        // Dieselbe Ebene wie Longpaths schwebende Panels (PanFloatingWindow,
+        // AppletFloatingWindow: Qt::Tool mit dem Hauptfenster als Eltern).
+        // Nur so steht das Logbuch nach einem Klick ueber ihnen -- ein
+        // gewoehnliches Fenster liegt auf macOS IMMER unter einem NSPanel
+        // der schwebenden Ebene, egal wer zuletzt geklickt wurde.
+        // Die Knoepfe des Rahmens bleiben: nur der Fenstertyp wechselt.
+        fenster->setWindowFlags((fenster->windowFlags() & ~Qt::WindowType_Mask)
+                                | Qt::Tool);
+        // Ein Werkzeugfenster verschwindet auf macOS, sobald das Programm
+        // nicht mehr vorn ist. Fuer ein Logbuch waere das falsch: es soll
+        // stehen bleiben, auch wenn der Betreiber kurz im Browser ist.
+        fenster->setAttribute(Qt::WA_MacAlwaysShowToolWindow);
+    }
 
     m_innen->wache     = std::move(wache);
     m_innen->steuerung = std::move(steuerung);
@@ -121,10 +149,63 @@ bool ContestFenster::oeffne(QString* grund)
     });
     connect(m_innen->wache.get(), &Contestprogramm::SingleInstanceGuard::activateRequested,
             this, [this]() { oeffne(nullptr); });
-
-    fenster->show();
-    emit geoeffnet();
     return true;
+}
+
+// ── Die Panels einzeln ──────────────────────────────────────────────
+
+QList<ContestFenster::PanelEintrag> ContestFenster::panels()
+{
+    QList<PanelEintrag> liste;
+    for (const Contestprogramm::MainWindow::PanelEintrag& e
+         : Contestprogramm::MainWindow::panelEintraege()) {
+        liste.append({e.id, e.titel});
+    }
+    return liste;
+}
+
+bool ContestFenster::istPanelSchwebend(const QString& id) const
+{
+    return m_innen->fenster && m_innen->fenster->istPanelSchwebend(id);
+}
+
+bool ContestFenster::zeigePanelAlsFenster(const QString& id, QString* grund,
+                                          QWidget* elternFenster)
+{
+    if (!lade(grund, elternFenster)) { return false; }
+    Contestprogramm::MainWindow* log = m_innen->fenster;
+    QWidget* panel = log->panelFenster(id);
+    if (!panel) {
+        if (grund) { *grund = QStringLiteral("Unknown logbook panel: %1").arg(id); }
+        return false;
+    }
+    const bool warSchonFenster = log->istPanelSchwebend(id);
+    log->setzePanelSchwebend(id, true);
+    if (!warSchonFenster && !log->isVisible() && elternFenster) {
+        // Aus einem nie gezeigten Logbuch kommt das Panel ohne Platz:
+        // neben das Elternfenster, gestaffelt nach der Zahl der schon
+        // schwebenden Panels, damit zwei nicht uebereinander liegen.
+        int schwebend = 0;
+        for (const PanelEintrag& e : panels()) {
+            if (e.id != id && log->istPanelSchwebend(e.id)) { ++schwebend; }
+        }
+        const QPoint ecke = elternFenster->frameGeometry().topLeft()
+                            + QPoint(96 + 40 * schwebend, 120 + 40 * schwebend);
+        panel->move(ecke);
+    }
+    panel->raise();
+    panel->activateWindow();
+    return true;
+}
+
+void ContestFenster::dockePanel(const QString& id)
+{
+    if (m_innen->fenster) { m_innen->fenster->setzePanelSchwebend(id, false); }
+}
+
+QWidget* ContestFenster::panelFenster(const QString& id) const
+{
+    return m_innen->fenster ? m_innen->fenster->panelFenster(id) : nullptr;
 }
 
 void ContestFenster::schliesse()
@@ -148,7 +229,7 @@ bool ContestFenster::istOffen() const
     return !m_innen->fenster.isNull();
 }
 
-QWidget* ContestFenster::fensterForTest() const
+QWidget* ContestFenster::fenster() const
 {
     return m_innen->fenster;
 }

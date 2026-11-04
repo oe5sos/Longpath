@@ -64,6 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           fetch-depth: 0
           ref: ${{ github.event.inputs.tag || github.ref }}
 
@@ -161,6 +162,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Install system dependencies
@@ -410,6 +412,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           ref: ${{ needs.prepare.outputs.tag }}
 
       # Qt 6.8 linkt am Mac noch AGL.framework mit; das macOS-26-SDK
@@ -750,6 +753,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Set up MSVC
@@ -798,6 +802,17 @@ jobs:
           cd ..
           Copy-Item fftw-tmp/fftw3.lib "$fftw_dir/lib/"
 
+      # zlib fuer das Contestprogramm (Submodul): ohne das steht der
+      # Windows-Lauf bei "Could NOT find ZLIB" -- und die Fassung haette
+      # kein Contest-Logbuch. DIESER Lauf baut mit MSVC (lib /def oben,
+      # Qt win64_msvc), darum vcpkg x64-windows-static-md wie in der CI
+      # des Contestprogramms; ci.yml baut mit MinGW und holt zlib dort
+      # aus der Quelle (siehe "zlib aus der Quelle (Windows, MinGW)").
+      - name: zlib via vcpkg
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install zlib:x64-windows-static-md
+
       - name: Configure
         shell: bash
         run: |
@@ -808,7 +823,8 @@ jobs:
           # again.
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DLONGPATH_GPU_SPECTRUM=ON
+            -DLONGPATH_GPU_SPECTRUM=ON \
+            -DZLIB_ROOT="$VCPKG_INSTALLATION_ROOT/installed/x64-windows-static-md"
 
       - name: Build
         shell: bash
@@ -935,6 +951,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.tag }}
 

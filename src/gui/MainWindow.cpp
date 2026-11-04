@@ -12648,6 +12648,19 @@ void MainWindow::buildMenuBar()
             // sich beim Aufgehen gleich CAT und Wasserfall.
             QTimer::singleShot(0, this, &MainWindow::openContestFenster);
         }
+
+        // Jedes Panel des Contestprogramms einzeln (2026-11-04). Betreiber:
+        // "jedes panel vom contestprogramm sollte in longpath eigens
+        // hinzuzufuegen sein, das waere die beste version." Und davor:
+        // ist das Logbuch das aktive Fenster, zeigt die Menueleiste weder
+        // Longpaths Menues noch das Fenster-Menue des Contestprogramms --
+        // darum liegt die Liste HIER. Gefuellt beim Aufklappen, weil der
+        // Stand (schwebend oder nicht) sich im Logbuch selbst aendert.
+        QMenu* panelMenu = toolsMenu->addMenu(tr("Contest logbook &panels"));
+        panelMenu->setObjectName(QStringLiteral("menuContestPanels"));
+        connect(panelMenu, &QMenu::aboutToShow, this,
+                [this, panelMenu]() { fuelleContestPanelMenu(panelMenu); });
+        fuelleContestPanelMenu(panelMenu);
     }
 #endif
 
@@ -16483,6 +16496,23 @@ void MainWindow::profilNachstellen(
     m_layoutProfiles->activate(passt);
 }
 
+// Haengt `w` -- ueber beliebig viele Fensterstufen -- am Hauptfenster
+// `haupt`? Longpaths eigene Panels sind direkte Fensterkinder; die
+// Panels des Contestprogramms (2026-11-04) sind Fensterkinder des
+// Logbuch-Fensters, das seinerseits am Hauptfenster haengt. Beide sollen
+// mitziehen, ins Dock gehen und von den Bedienleisten herunter.
+static bool schwebtUnter(const QWidget* w, const QWidget* haupt)
+{
+    if (!w || !haupt || w == haupt) { return false; }
+    // Von Fenster zu Fenster nach oben: window() ist das umschliessende
+    // Fenster, dessen parentWidget() das naechste darueber.
+    for (const QWidget* fenster = w->parentWidget() ? w->parentWidget()->window() : nullptr;
+         fenster; fenster = fenster->parentWidget() ? fenster->parentWidget()->window() : nullptr) {
+        if (fenster == haupt) { return true; }
+    }
+    return false;
+}
+
 void MainWindow::schutzrahmenNachziehen()
 {
     if (m_shuttingDown) { return; }
@@ -16491,10 +16521,108 @@ void MainWindow::schutzrahmenNachziehen()
         m_schutzrahmenTimer->setSingleShot(true);
         m_schutzrahmenTimer->setInterval(250);
         connect(m_schutzrahmenTimer, &QTimer::timeout, this, [this]() {
+            // Erst mitziehen, dann aus den Sperrstreifen holen: wer
+            // mitgezogen auf einer Bedienleiste landet, wird gleich
+            // noch heruntergeschoben. Gezogen wird NUR, wenn in diesem
+            // Nachlauf eine fremde Bewegung war; sonst wird die Basis
+            // nur nachgefuehrt.
+            if (m_fremdeBewegungAnhaengig) {
+                schwebendeMitziehen();
+            } else {
+                m_hauptrahmenBasis = frameGeometry();
+            }
+            m_fremdeBewegungAnhaengig = false;
             schwebendeAusDemSchutzrahmenHolen();
         });
     }
+    // Eine eigene Bewegung des Hauptfensters (Profil, Aufbau,
+    // showMaximized) ist kein Anlass zum Mitziehen -- das Profil stellt
+    // die schwebenden Fenster selbst. Die Basis folgt, der Nachlauf
+    // sieht dann "alt == neu" und tut nichts.
+    //
+    // AUSSER dem Raster: nach einer FREMDEN Bewegung rueckt
+    // snapToGridAfterSettle() das Hauptfenster nach 180 ms um weniger
+    // als eine Rasterweite nach, als eigene Bewegung. Das ist der
+    // Nachhall der fremden Bewegung, nicht eine eigene -- setzte er die
+    // Basis neu, saehe der Nachlauf "alt == neu" und die schwebenden
+    // Fenster blieben stehen (gemessen 2026-11-04: Groessenzug +480 px
+    // -> Raster rueckt um 3 px -> nichts mitgezogen). Erkennbar daran,
+    // dass eine FREMDE Bewegung im Nachlauf haengt und der Sprung klein
+    // ist.
+    //
+    // Nicht "der Nachlauf laeuft noch" allein: beim Aufbau rueckt das
+    // Raster das frisch maximierte Hauptfenster genauso nach (Geraetelog
+    // 2026-11-04 12:09:43: QRect(0,48 ...) -> QRect(0,33 ...), 5
+    // schwebende Fenster mitgezogen, Betreiber: "wieder irgendeine
+    // zusammensetzung der panels"), und da war KEINE fremde Bewegung,
+    // nur der Aufbau selbst. Darum zaehlt der Nachlauf, was ihn
+    // angestossen hat.
+    const QRect jetzt = frameGeometry();
+    if (eigeneBewegungLebt() || m_aufbauBewegung || !isVisible()) {
+        const bool rasterNachhall =
+            m_fremdeBewegungAnhaengig
+            && m_schutzrahmenTimer->isActive() && m_letzterHauptrahmen.isValid()
+            && qAbs(jetzt.x() - m_letzterHauptrahmen.x()) < kSnapGridPx
+            && qAbs(jetzt.y() - m_letzterHauptrahmen.y()) < kSnapGridPx
+            && qAbs(jetzt.width() - m_letzterHauptrahmen.width()) < kSnapGridPx
+            && qAbs(jetzt.height() - m_letzterHauptrahmen.height()) < kSnapGridPx;
+        if (!rasterNachhall) {
+            m_hauptrahmenBasis = jetzt;
+            m_fremdeBewegungAnhaengig = false;
+        }
+    } else {
+        m_fremdeBewegungAnhaengig = true;
+    }
+    m_letzterHauptrahmen = jetzt;
     m_schutzrahmenTimer->start();
+}
+
+int MainWindow::schwebendeMitziehen()
+{
+    if (m_shuttingDown) { return 0; }
+    const QRect neu = frameGeometry();
+    const QRect alt = m_hauptrahmenBasis;
+    m_hauptrahmenBasis = neu;
+    if (!alt.isValid() || alt == neu || alt.width() <= 0 || alt.height() <= 0) {
+        return 0;
+    }
+    if (isMinimized()) { return 0; }
+
+    const double fx = double(neu.width()) / double(alt.width());
+    const double fy = double(neu.height()) / double(alt.height());
+
+    int bewegt = 0;
+    const EigeneBewegung wirSelbst;
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (!w || w == this || !w->isVisible()) { continue; }
+        if (w->isModal() || qobject_cast<QDialog*>(w)) { continue; }
+        if (!schwebtUnter(w, this)) { continue; }
+        if (w->isMaximized() || w->isFullScreen()) { continue; }
+
+        const QRect r = w->frameGeometry();
+        QPoint ziel(neu.x() + qRound(double(r.x() - alt.x()) * fx),
+                    neu.y() + qRound(double(r.y() - alt.y()) * fy));
+        // Auf dem Schirm bleiben: ein Fenster, dessen Titelleiste
+        // draussen liegt, laesst sich nicht mehr fassen.
+        if (QScreen* scr = w->screen()) {
+            const QRect platz = scr->availableGeometry();
+            ziel.setX(qBound(platz.left(), ziel.x(),
+                             qMax(platz.left(), platz.right() - r.width() + 1)));
+            ziel.setY(qBound(platz.top(), ziel.y(),
+                             qMax(platz.top(), platz.bottom() - r.height() + 1)));
+        }
+        if (ziel != r.topLeft()) {
+            // move(), nicht setGeometry(): die GROESSE gehoert dem
+            // Betreiber (siehe schwebendeAusDemSchutzrahmenHolen).
+            w->move(ziel);
+            ++bewegt;
+        }
+    }
+    if (bewegt > 0) {
+        qCInfo(lcContainer) << "Hauptfenster" << alt << "->" << neu << ":"
+                            << bewegt << "schwebende Fenster mitgezogen";
+    }
+    return bewegt;
 }
 
 int MainWindow::schwebendeAusDemSchutzrahmenHolen()
@@ -16511,8 +16639,7 @@ int MainWindow::schwebendeAusDemSchutzrahmenHolen()
         // Einstellungsfenster ueber der Statuszeile ist kein Problem --
         // es geht wieder zu.
         if (w->isModal() || qobject_cast<QDialog*>(w)) { continue; }
-        const QWidget* eltern = w->parentWidget();
-        if (!eltern || eltern->window() != this) { continue; }
+        if (!schwebtUnter(w, this)) { continue; }
 
         const QRect alt = w->frameGeometry();
         QRect platz;
@@ -17126,6 +17253,21 @@ void MainWindow::legeSchwebendeFensterInsDock()
     // das Dock das Fenster zweimal meldet) darf die Liste nicht leeren.
     QList<QPointer<QWidget>> jetzt;
     versteckeSchwebendeFenster(jetzt);
+    // Das Contest-Logbuch (seit 2026-11-04 ein Fenster derselben Ebene,
+    // Qt::Tool) und seine einzeln geholten Panels bleiben beim Minimieren
+    // genauso stehen wie Longpaths Panels. NICHT in
+    // versteckeSchwebendeFenster(): hinter die Connect-Maske soll das Log
+    // nicht -- ein Funkgeraetewechsel mitten im Contest darf es nicht
+    // wegraeumen. Aufzaehlung ueber die Fensterkette (schwebtUnter), weil
+    // die Panels des Contestprogramms am Logbuch haengen, nicht an uns.
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (!w || w == this || !w->isVisible()) { continue; }
+        if (w->isModal() || qobject_cast<QDialog*>(w)) { continue; }
+        if (!schwebtUnter(w, this)) { continue; }
+        if (jetzt.contains(QPointer<QWidget>(w))) { continue; }
+        w->hide();
+        jetzt.append(w);
+    }
     m_schwebendeFensterImDock.append(jetzt);
     qInfo() << "[Dock] abgelegt:" << jetzt.size() << "schwebende Fenster";
 }
@@ -18901,13 +19043,9 @@ void MainWindow::openMemories()
 // (moc), und ein fehlender Rumpf liess den Bau ohne LONGPATH_CONTESTPROGRAMM
 // am Linker stehen (gemessen 2026-11-04). Ohne Submodul gibt es keinen
 // Menueeintrag, der ihn rufen koennte; er sagt es trotzdem ins Protokoll.
-void MainWindow::openContestFenster()
+void MainWindow::bereiteContestFensterVor()
 {
-#ifndef LONGPATH_HAVE_CONTESTPROGRAMM
-    qWarning() << "Contest logbook: this build has no Contestprogramm "
-                  "(LONGPATH_CONTESTPROGRAMM off)";
-    return;
-#else
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
     if (!m_contestFenster) {
         m_contestFenster = new ContestFenster(this);
     }
@@ -18937,9 +19075,82 @@ void MainWindow::openContestFenster()
                        << "-- the logbook will show CAT as disconnected";
         }
     }
+#endif
+}
 
+void MainWindow::fuelleContestPanelMenu(QMenu* menu)
+{
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    if (!menu) { return; }
+    menu->clear();
+    for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+        // Der Titel ist der des Contestprogramms (deutsch): es IST das
+        // Contestprogramm, siehe das Blatt vom 2026-11-04.
+        QAction* a = menu->addAction(e.titel);
+        a->setObjectName(QStringLiteral("actContestPanel_%1").arg(e.id));
+        a->setCheckable(true);
+        a->setChecked(m_contestFenster && m_contestFenster->istPanelSchwebend(e.id));
+        a->setToolTip(tr("Show this Contestprogramm panel as its own window in Longpath"));
+        connect(a, &QAction::toggled, this, [this, id = e.id](bool an) {
+            if (an) {
+                contestPanelAlsFenster(id);
+            } else if (m_contestFenster) {
+                m_contestFenster->dockePanel(id);
+            }
+        });
+    }
+    menu->addSeparator();
+    QAction* alle = menu->addAction(tr("All panels as own windows"));
+    alle->setObjectName(QStringLiteral("actContestPanelsAlle"));
+    connect(alle, &QAction::triggered, this, [this]() {
+        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+            contestPanelAlsFenster(e.id);
+        }
+    });
+    QAction* zurueck = menu->addAction(tr("All panels back into the logbook"));
+    zurueck->setObjectName(QStringLiteral("actContestPanelsZurueck"));
+    zurueck->setEnabled(m_contestFenster && m_contestFenster->istOffen());
+    connect(zurueck, &QAction::triggered, this, [this]() {
+        if (!m_contestFenster) { return; }
+        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+            m_contestFenster->dockePanel(e.id);
+        }
+    });
+#else
+    Q_UNUSED(menu);
+#endif
+}
+
+void MainWindow::contestPanelAlsFenster(const QString& id)
+{
+#ifndef LONGPATH_HAVE_CONTESTPROGRAMM
+    Q_UNUSED(id);
+#else
+    bereiteContestFensterVor();
     QString grund;
-    if (!m_contestFenster->oeffne(&grund)) {
+    if (!m_contestFenster->zeigePanelAlsFenster(id, &grund, this)) {
+        ScopedChildWidget<QMessageBox> dlgOwner(this);
+        QMessageBox& box = *dlgOwner.get();
+        box.setWindowTitle(tr("Contest Logbook"));
+        box.setIcon(QMessageBox::Information);
+        box.setText(grund);
+        box.exec();
+        return;
+    }
+    qInfo() << "Contest logbook panel as own window:" << id;
+#endif
+}
+
+void MainWindow::openContestFenster()
+{
+#ifndef LONGPATH_HAVE_CONTESTPROGRAMM
+    qWarning() << "Contest logbook: this build has no Contestprogramm "
+                  "(LONGPATH_CONTESTPROGRAMM off)";
+    return;
+#else
+    bereiteContestFensterVor();
+    QString grund;
+    if (!m_contestFenster->oeffne(&grund, this)) {
         ScopedChildWidget<QMessageBox> dlgOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
         QMessageBox& box = *dlgOwner.get();
         box.setWindowTitle(tr("Contest Logbook"));

@@ -27,6 +27,8 @@ jobs:
     name: Compliance & Provenance
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Verify Thetis license headers
         run: python3 scripts/verify-thetis-headers.py
@@ -488,6 +490,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       # ------------------------------------------------------------------
       # Linux dependencies
@@ -761,6 +765,30 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
+      # Das Contestprogramm (Submodul, seit 2026-11-04 in der CI mitgebaut)
+      # braucht zlib fuer die gzip-Kacheln des SRTM-Gelaendes
+      # (third_party/contestprogramm/CMakeLists.txt, find_package(ZLIB
+      # REQUIRED)). Linux und macOS haben es im Werkzeugkasten, der
+      # Windows-Laeufer nicht -- erster Lauf mit Submodul: "Could NOT find
+      # ZLIB". Erster Versuch (3cec5a18e) war vcpkg wie in der CI des
+      # Contestprogramms -- aber die baut mit MSVC, dieser Lauf mit MinGW
+      # (Qt mingw_64): CMake fand die Kopfdatei und nicht die Bibliothek
+      # (ein MSVC-Archiv). Darum zlib aus der Quelle, mit DEMSELBEN
+      # MinGW, statisch (ZLIB_USE_STATIC_LIBS: libzlibstatic.a, kein
+      # zlib1.dll, das beizulegen waere).
+      - name: zlib aus der Quelle (Windows, MinGW)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          curl -L -o /tmp/zlib.tar.gz "https://github.com/madler/zlib/archive/refs/tags/v1.3.1.tar.gz"
+          mkdir -p /tmp/zlib-src && tar -xzf /tmp/zlib.tar.gz -C /tmp/zlib-src --strip-components=1
+          cmake -S /tmp/zlib-src -B /tmp/zlib-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DZLIB_BUILD_EXAMPLES=OFF \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/third_party/zlib-mingw"
+          cmake --build /tmp/zlib-build
+          cmake --install /tmp/zlib-build
+          ls "$GITHUB_WORKSPACE/third_party/zlib-mingw/lib"
+
       - name: Configure (Windows)
         if: runner.os == 'Windows'
         shell: bash
@@ -791,7 +819,9 @@ jobs:
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DLONGPATH_GPU_SPECTRUM=ON \
             -DLONGPATH_BUILD_TESTS=ON \
-            -DLONGPATH_TEST_TIMEOUT=30
+            -DLONGPATH_TEST_TIMEOUT=30 \
+            -DZLIB_ROOT="$GITHUB_WORKSPACE/third_party/zlib-mingw" \
+            -DZLIB_USE_STATIC_LIBS=ON
 
       # ------------------------------------------------------------------
       # Build
@@ -1203,6 +1233,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install system dependencies
         run: |
@@ -1334,6 +1366,8 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install system dependencies
         run: |

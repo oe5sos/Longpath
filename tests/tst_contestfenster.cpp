@@ -111,6 +111,120 @@ private slots:
         bruecke.schliesse();
     }
 
+    // ── Mit Elternfenster: dieselbe Ebene wie die Panels ─────────────
+    //
+    // Betreiber 2026-11-04: "wenn ich contestprogramm oeffne, soll das nach
+    // anklicken im vordergrund bleiben!" Longpaths Panels sind Qt::Tool mit
+    // dem Hauptfenster als Eltern; ein gewoehnliches Fenster liegt auf macOS
+    // immer darunter. Mit Elternfenster wird das Logbuch ein Qt::Tool und
+    // bleibt sichtbar, wenn das Programm nicht vorn ist.
+    void mitElternfensterLiegtEsAufDerEbeneDerPanels()
+    {
+        QTemporaryDir ordner;
+        QVERIFY(ordner.isValid());
+        qputenv("CONTESTPROGRAMM_DATA_DIR", ordner.path().toUtf8());
+        QVERIFY(belegeLogVor(ordner.path()));
+
+        QWidget eltern;
+        eltern.resize(800, 600);
+        eltern.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&eltern, kFensterFrist));
+
+        ContestFenster bruecke;
+        QString grund;
+        QVERIFY2(bruecke.oeffne(&grund, &eltern), qPrintable(grund));
+        QWidget* fenster = bruecke.fenster();
+        QVERIFY(fenster);
+        QCOMPARE(fenster->parentWidget(), &eltern);
+        QCOMPARE(fenster->windowFlags() & Qt::WindowType_Mask, Qt::Tool);
+        QVERIFY2(fenster->testAttribute(Qt::WA_MacAlwaysShowToolWindow),
+                 "Das Logbuch muss stehen bleiben, wenn Longpath nicht vorn ist");
+        QVERIFY(fenster->isWindow());
+        QVERIFY(QTest::qWaitForWindowExposed(fenster, kFensterFrist));
+        bruecke.schliesse();
+
+        // Ohne Elternfenster bleibt es ein gewoehnliches Fenster.
+        QVERIFY2(bruecke.oeffne(&grund), qPrintable(grund));
+        QCOMPARE(bruecke.fenster()->parentWidget(), nullptr);
+        QVERIFY((bruecke.fenster()->windowFlags() & Qt::WindowType_Mask) != Qt::Tool);
+        bruecke.schliesse();
+    }
+
+    // ── Panels einzeln, ohne das Logbuch-Fenster ──────────────────────
+    //
+    // Betreiber 2026-11-04: "jedes panel vom contestprogramm sollte in
+    // longpath eigens hinzuzufuegen sein, das waere die beste version."
+    // Das Panel kommt als eigenes Fenster, haengt ueber das (verborgene)
+    // Logbuch am Elternfenster, hat eine greifbare Groesse und steht
+    // neben dem Elternfenster; das Logbuch selbst bleibt zu.
+    void einPanelOhneLogbuchFenster()
+    {
+        QTemporaryDir ordner;
+        QVERIFY(ordner.isValid());
+        qputenv("CONTESTPROGRAMM_DATA_DIR", ordner.path().toUtf8());
+        QVERIFY(belegeLogVor(ordner.path()));
+
+        QWidget eltern;
+        eltern.resize(800, 600);
+        eltern.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&eltern, kFensterFrist));
+
+        const QList<ContestFenster::PanelEintrag> panels = ContestFenster::panels();
+        QVERIFY(panels.size() >= 8);
+        bool chatDabei = false;
+        for (const ContestFenster::PanelEintrag& e : panels) {
+            QVERIFY(!e.id.isEmpty() && !e.titel.isEmpty());
+            chatDabei = chatDabei || e.id == QStringLiteral("chat");
+        }
+        QVERIFY(chatDabei);
+
+        ContestFenster bruecke;
+        QString grund;
+        QVERIFY(!bruecke.istPanelSchwebend(QStringLiteral("chat")));
+        QVERIFY2(bruecke.zeigePanelAlsFenster(QStringLiteral("chat"), &grund, &eltern),
+                 qPrintable(grund));
+        QWidget* chat = bruecke.panelFenster(QStringLiteral("chat"));
+        QVERIFY(chat);
+        QVERIFY(bruecke.istPanelSchwebend(QStringLiteral("chat")));
+        QVERIFY(chat->isWindow());
+        QCOMPARE(chat->windowFlags() & Qt::WindowType_Mask, Qt::Tool);
+        QVERIFY(QTest::qWaitForWindowExposed(chat, kFensterFrist));
+        QVERIFY2(chat->width() >= 160 && chat->height() >= 120,
+                 qPrintable(QStringLiteral("Panel kam %1x%2 daher")
+                                .arg(chat->width()).arg(chat->height())));
+        // Haengt ueber das Logbuch am Elternfenster.
+        QWidget* log = bruecke.fenster();
+        QVERIFY(log);
+        QCOMPARE(chat->parentWidget(), log);
+        QCOMPARE(log->parentWidget(), &eltern);
+        QVERIFY2(!log->isVisible(), "das Logbuch-Fenster bleibt zu");
+        // Neben dem Elternfenster, nicht bei (0,0).
+        const QPoint ecke = chat->frameGeometry().topLeft();
+        QVERIFY2(ecke.x() >= eltern.frameGeometry().x() + 32
+                     && ecke.y() >= eltern.frameGeometry().y() + 32,
+                 qPrintable(QStringLiteral("Panel steht bei (%1,%2), Eltern bei (%3,%4)")
+                                .arg(ecke.x()).arg(ecke.y())
+                                .arg(eltern.frameGeometry().x()).arg(eltern.frameGeometry().y())));
+
+        // Ein zweites Panel staffelt sich dahinter.
+        QVERIFY2(bruecke.zeigePanelAlsFenster(QStringLiteral("bandmap"), &grund, &eltern),
+                 qPrintable(grund));
+        QWidget* bandmap = bruecke.panelFenster(QStringLiteral("bandmap"));
+        QVERIFY(bandmap && bandmap->isWindow());
+        QVERIFY(bandmap->frameGeometry().topLeft() != chat->frameGeometry().topLeft());
+
+        // Zurueck ins Logbuch: kein Fenster mehr.
+        bruecke.dockePanel(QStringLiteral("chat"));
+        QVERIFY(!bruecke.istPanelSchwebend(QStringLiteral("chat")));
+        QVERIFY(!chat->isWindow());
+
+        // Jetzt das Logbuch zeigen: dasselbe Fenster, kein zweites.
+        QVERIFY2(bruecke.oeffne(&grund, &eltern), qPrintable(grund));
+        QCOMPARE(bruecke.fenster(), log);
+        QVERIFY(log->isVisible());
+        bruecke.schliesse();
+    }
+
     void einZweiterSchreiberWirdAbgewiesen()
     {
         QTemporaryDir ordner;
