@@ -18792,9 +18792,21 @@ void MainWindow::scheduleStartupUpdateCheck()
         // Protokoll sagte darueber nichts, weil hier nur deleteLater
         // hing. Der Bediener bekommt weiter keinen Dialog zu sehen.
         connect(checker, &UpdateChecker::checkFailed, this,
-                [checker](const QString& why) {
+                [this, checker](const QString& why) {
             qWarning() << "Startup update check failed:" << why;
             checker->deleteLater();
+            // ... und seit 2026-11-04 steht es auch im Kopf. Bis dahin
+            // blieb der Platz neben der Version LEER, wenn die Abfrage
+            // nicht durchkam -- also genau so leer wie vor der
+            // Antwort. Damit hiess „nichts gesehen" wieder zweierlei,
+            // und das war der eine Fall, den die Umstellung vom
+            // 2026-10-14 ausdruecklich beseitigen sollte. Der Grund
+            // steht im Tooltip; ein Dialog kommt weiterhin nicht.
+            if (m_titleBar) {
+                m_titleBar->setUpdateState(tr("· not checked"),
+                                           TitleBar::AktualisierungsStand::Unbekannt,
+                                           why);
+            }
         });
         checker->checkLatest();
     });

@@ -95,6 +95,18 @@ constexpr int kSpacing      = 6;
 // Fixed strip height. From AetherSDR TitleBar.cpp:30.
 constexpr int kStripHeight = 32;
 
+
+// Steht im Tooltip der Aktualisierungsanzeige, solange es keinen
+// besonderen Grund gibt. An EINER Stelle, weil sie zweimal gebraucht
+// wird: beim Anlegen und bei jedem Zustandswechsel ohne Grund.
+QString kAktualisierungHinweis()
+{
+    return TitleBar::tr(
+        "How this build compares with the latest published release. "
+        "Checked at every start; Help → Check for Updates… checks "
+        "right away.");
+}
+
 } // namespace
 
 // =========================================================================
@@ -591,10 +603,7 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
         "QLabel { color: %1; font-size: 11px; }")
         .arg(QLatin1String(Style::kTextInactive)));
     m_updateState->setText(tr("· checking …"));
-    m_updateState->setToolTip(tr(
-        "How this build compares with the latest published release. "
-        "Checked at every start; Help → Check for Updates… checks "
-        "right away."));
+    m_updateState->setToolTip(kAktualisierungHinweis());
     m_hbox->addSpacing(6);
     m_hbox->addWidget(m_updateState);
 
@@ -712,7 +721,8 @@ void TitleBar::setLinkerRand(int punkte)
 }
 
 void TitleBar::setUpdateState(const QString& text,
-                              AktualisierungsStand art)
+                              AktualisierungsStand art,
+                              const QString& grund)
 {
     if (m_updateState == nullptr) { return; }
     const char* farbe = Style::kTextInactive;
@@ -725,6 +735,10 @@ void TitleBar::setUpdateState(const QString& text,
     m_updateState->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 11px; }")
         .arg(QLatin1String(farbe)));
+    // Der Grund tritt an die Stelle der allgemeinen Erklaerung, aber
+    // nur wenn es einen gibt -- sonst stuende nach einem „up to date"
+    // gar nichts mehr im Tooltip.
+    m_updateState->setToolTip(grund.isEmpty() ? kAktualisierungHinweis() : grund);
 }
 
 void TitleBar::setMenuBar(QMenuBar* mb)
