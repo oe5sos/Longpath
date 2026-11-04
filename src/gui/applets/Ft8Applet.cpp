@@ -322,6 +322,52 @@ void Ft8Applet::buildUI()
     m_houndBtn->setChecked(m_houndBetrieb);
     head->addWidget(m_houndBtn);
 
+    // ── Contestbetrieb (2026-11-04) ─────────────────────────────────
+    //
+    // Im EU-VHF-Contest tritt an die Stelle des Rapports ein
+    // Austausch: 59, laufende Nummer, sechsstelliger Feldkenner. Das
+    // ist Nachrichtentyp 5 (siehe `Ft8Ablauf::Contest`).
+    //
+    // Ein Schalter, keine Erkennung -- genau wie beim Hound daneben:
+    // ob gerade Contest ist, weiss der Betreiber, nicht die Maschine.
+    //
+    // Der Feldkenner kommt aus den STATIONSDATEN, nicht aus einem
+    // zweiten Feld hier. Eine Angabe, eine Stelle; wer sie aendert,
+    // aendert sie fuer alles. Hat sie nur vier Stellen, sagt der
+    // Schalter das beim Einschalten und bleibt aus -- lieber
+    // ablehnen als stillschweigend etwas anderes senden.
+    m_contestBtn = blueToggle(tr("Contest"), 68);
+    m_contestBtn->setToolTip(
+        tr("EU VHF contest exchange: 59, running serial and your "
+           "six-character locator instead of the signal report. Needs "
+           "a six-character locator in the station data."));
+    connect(m_contestBtn, &QPushButton::clicked, this, [this](bool an) {
+        if (an && eigenerLocator().size() < 6) {
+            m_contestBtn->setChecked(false);
+            if (m_status) {
+                m_status->setText(
+                    tr("contest needs a six-character locator — "
+                       "yours is \"%1\"").arg(eigenerLocator()));
+            }
+            return;
+        }
+        m_contestAn = an;
+        AppSettings::instance().setValue(
+            QStringLiteral("Ft8/Contest"),
+            an ? QStringLiteral("True") : QStringLiteral("False"));
+        uebernimmContest();
+        zeigeContestStand();
+    });
+    m_contestAn = AppSettings::instance()
+                      .value(QStringLiteral("Ft8/Contest"),
+                             QStringLiteral("False")).toString()
+                  == QStringLiteral("True");
+    // Beim Hochfahren still abschalten, wenn der Feldkenner nicht
+    // taugt: sonst stuende der Schalter an und saendte doch nichts.
+    if (m_contestAn && eigenerLocator().size() < 6) { m_contestAn = false; }
+    m_contestBtn->setChecked(m_contestAn);
+    head->addWidget(m_contestBtn);
+
     head->addSpacing(8);
 
     // ── „CQ only" ───────────────────────────────────────────────────
@@ -1101,6 +1147,15 @@ bool Ft8Applet::beginneNaechstenWartenden()
 
     m_qsoGemeldet = false;
     // Er hat MICH gerufen, also beginnt es mit dem Rapport.
+    // ── Vor JEDEM QSO-Start den Contest-Stand nachziehen ────────
+    //
+    // Sonst traegt der Ablauf die Nummer, die beim Einschalten des
+    // Schalters galt -- und nach dem ersten QSO, nach einem
+    // Bandwechsel oder nach einem Neustart waere sie falsch. Die
+    // vier Startstellen tun es alle; eine davon zu vergessen hiesse,
+    // dass genau DIESER Weg eine alte Nummer sendet, und das faellt
+    // erst beim Logabgleich auf.
+    uebernimmContest();
     m_ablauf.starteMitAnrufer(w.partner, eigenesRufzeichen(),
                               eigenerLocator(), w.snr, w.locator);
     qCInfo(lcFt8Senden).noquote()
@@ -1128,6 +1183,7 @@ void Ft8Applet::starteCqRuf()
     sucheFreieStelle(true);
 
     m_qsoGemeldet = false;
+    uebernimmContest();   // siehe `starteMitAnrufer` oben
     m_ablauf.starteAlsAnrufer(eigenesRufzeichen(), eigenerLocator());
     m_cqVersucheOffen = m_cqVersucheSpin ? m_cqVersucheSpin->value() : 1;
 
@@ -1363,6 +1419,25 @@ void Ft8Applet::meldeFertigesQso()
                               m_slice && m_slice->dspMode() == DSPMode::DIGL,
                               protocol(), eigenerLocator(),
                               m_sendeTonHz));
+
+    // ── Die laufende Nummer hochzaehlen (2026-11-04) ────────────────
+    //
+    // NACH dem Logeintrag, nicht davor: der Eintrag traegt die
+    // Nummer, die GEGEBEN wurde. Wer vorher hochzaehlt, schreibt jede
+    // Nummer um eins zu hoch ins Log, und beim Abgleich stimmt kein
+    // einziges QSO.
+    //
+    // Und nur im Contestbetrieb -- sonst liefe die Folge auch an
+    // einem gewoehnlichen Abend weiter und faenge beim naechsten
+    // Contest irgendwo an.
+    if (m_contestAn) {
+        const int naechste = naechsteContestNummer() + 1;
+        AppSettings::instance().setValue(
+            contestNummerSchluessel(),
+            QString::number(naechste > 4095 ? 4095 : naechste));
+        uebernimmContest();
+        zeigeContestStand();
+    }
 }
 
 void Ft8Applet::zeigeAblauf()
@@ -1637,6 +1712,52 @@ QString Ft8Applet::eigenesRufzeichen()
     return AppSettings::stationCallsign().toUpper();
 }
 
+QString Ft8Applet::contestNummerSchluessel() const
+{
+    // Je Band eine eigene Folge -- IARU R1: „a serial number
+    // commencing with 001 for the first contact on each band".
+    // Dieselbe Vorgabe fuehrt das Contestprogramm
+    // (`ContestDefinition::serialScope()` = „band").
+    const double hz = m_slice ? m_slice->frequency() : 0.0;
+    return QStringLiteral("Ft8/ContestNummer/%1")
+        .arg(Longpath::bandKeyName(Longpath::bandFromFrequency(hz)));
+}
+
+int Ft8Applet::naechsteContestNummer() const
+{
+    const int n = AppSettings::instance()
+                      .value(contestNummerSchluessel(),
+                             QStringLiteral("1")).toInt();
+    // Wertebereich wie in `Ft8Ablauf::Contest::brauchbar()`: unter 1
+    // oder ueber 4095 ist keine gueltige Nummer, und eine kaputte
+    // Einstellung darf den Betrieb nicht anhalten.
+    return (n < 1 || n > 4095) ? 1 : n;
+}
+
+void Ft8Applet::uebernimmContest()
+{
+    Ft8Ablauf::Contest c;
+    c.an           = m_contestAn;
+    c.nummer       = naechsteContestNummer();
+    c.meinLocator6 = eigenerLocator();
+    m_ablauf.setzeContest(c);
+}
+
+void Ft8Applet::zeigeContestStand()
+{
+    if (!m_status) { return; }
+    if (!m_contestAn) {
+        m_status->setText(tr("contest off"));
+        return;
+    }
+    m_status->setText(tr("contest: next serial %1 on %2")
+                          .arg(naechsteContestNummer(), 3, 10,
+                               QLatin1Char('0'))
+                          .arg(Longpath::bandLabel(
+                              Longpath::bandFromFrequency(
+                                  m_slice ? m_slice->frequency() : 0.0))));
+}
+
 QString Ft8Applet::eigenerLocator()
 {
     return AppSettings::stationGridSquare().toUpper();
@@ -1701,12 +1822,14 @@ bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
                 if (m_houndBetrieb) {
                     // Im Fox-Betrieb ruft man die Expedition; den
                     // Schluss macht sie. Siehe `starteAlsHound`.
+                    uebernimmContest();   // siehe oben
                     m_ablauf.starteAlsHound(senderCallsign(nachricht),
                                             eigenesRufzeichen(),
                                             eigenerLocator());
                     ablaufSchritt();
                     return true;
                 }
+                uebernimmContest();   // siehe oben
                 m_ablauf.starteAlsAntworter(senderCallsign(nachricht),
                                             eigenesRufzeichen(),
                                             eigenerLocator(), snr,
