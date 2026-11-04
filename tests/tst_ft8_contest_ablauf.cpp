@@ -29,7 +29,13 @@
 
 #include <QtTest/QtTest>
 
+#include "core/AppSettings.h"
 #include "core/Ft8Ablauf.h"
+#include "gui/applets/Ft8Applet.h"
+#include "models/RadioModel.h"
+#include "models/SliceModel.h"
+
+#include <QPushButton>
 
 using namespace Longpath;
 using Contest = Ft8Ablauf::Contest;
@@ -53,6 +59,38 @@ class TstFt8ContestAblauf : public QObject
     Q_OBJECT
 
 private slots:
+
+    void initTestCase()
+    {
+        QStandardPaths::setTestModeEnabled(true);
+    }
+
+    // ── Jeder Bedienfall faengt bei NULL an ─────────────────────────
+    //
+    // Der Testmodus gibt ein eigenes Verzeichnis, aber es ueberlebt
+    // zwischen den Laeufen. Beim ersten Entwurf hingen die beiden
+    // Schalterfaelle darum an einem Zustand, den sie nicht selbst
+    // gesetzt hatten: `Ft8/Contest` stand von einem frueheren Lauf
+    // auf „True", der Knopf war schon an, und `clicked(bool)` lieferte
+    // das GEGENTEIL dessen, was der Fall erwartete -- beide Faelle
+    // schlugen genau vertauscht fehl. Direkt gestartet waren sie
+    // gruen, weil dort die echten Einstellungen des Betreibers mit
+    // einem sechsstelligen Feldkenner darin lagen.
+    //
+    // Siehe `longpath-offscreen-sonde-ueberschreibt-einstellungen`.
+    void init()
+    {
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Contest"),
+                                         QStringLiteral("False"));
+        AppSettings::instance().setValue(QStringLiteral("StationGridSquare"),
+                                         QString());
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QString());
+        AppSettings::instance().setValue(
+            QStringLiteral("PskReporter/GridSquare"), QString());
+        AppSettings::instance().setValue(
+            QStringLiteral("FreeDvReporter/GridSquare"), QString());
+    }
 
     // ── Was „brauchbar" heisst ──────────────────────────────────────
     //
@@ -216,6 +254,47 @@ private slots:
     // ── Und was KEIN Austausch ist ──────────────────────────────────
     //
     // Der Erkenner darf gewoehnliche Saetze nicht an sich ziehen.
+    // ═══ DIE BEDIENUNG ══════════════════════════════════════════════
+    //
+    // Der Kern kann es — aber erreichbar heisst: im Fenster, mit dem
+    // Schalter, den der Betreiber drueckt. Dieselbe Lehre wie bei
+    // „gebaut ≠ erreichbar": Multi Answering lag Monate fertig da
+    // und kam an keinen Knopf.
+
+    // ── Ohne sechsstelligen Feldkenner geht der Schalter nicht an ──
+    //
+    // Lieber ablehnen und es SAGEN als stillschweigend etwas anderes
+    // senden. Der Betreiber sieht sonst einen Schalter, der an steht,
+    // und einen Austausch, der nicht kommt.
+    void derSchalterLehntEinenKurzenFeldkennerAb()
+    {
+        AppSettings::instance().setValue(QStringLiteral("StationGridSquare"),
+                                         QStringLiteral("JN78"));
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        QPushButton* b = applet.contestButtonForTest();
+        QVERIFY2(b != nullptr, "kein Contest-Schalter im Fenster");
+
+        b->click();
+        QVERIFY2(!b->isChecked(),
+                 "der Schalter ging an, obwohl der Feldkenner vier "
+                 "Stellen hat");
+    }
+
+    // Und mit sechs Stellen geht er an.
+    void mitSechsStellenGehtDerSchalterAn()
+    {
+        AppSettings::instance().setValue(QStringLiteral("StationGridSquare"),
+                                         QStringLiteral("JN78CT"));
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        QPushButton* b = applet.contestButtonForTest();
+        QVERIFY(b != nullptr);
+
+        b->click();
+        QVERIFY2(b->isChecked(), "der Schalter blieb aus");
+    }
+
     void gewoehnlicheSaetzeWerdenNichtAlsAustauschGelesen()
     {
         Ft8Ablauf a;

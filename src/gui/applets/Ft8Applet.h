@@ -332,6 +332,7 @@ public:
     QPushButton*    sichtFreqButtonForTest() const { return m_sichtFreq; }
     QSpinBox*       sendeTonFeldForTest() const { return m_tonFeld; }
     QPushButton*    houndButtonForTest() const { return m_houndBtn; }
+    QPushButton*    contestButtonForTest() const { return m_contestBtn; }
     QSpinBox*       plaetzeSpinForTest() const { return m_plaetzeSpin; }
     QPushButton*    freieStelleButtonForTest() const { return m_freieStelleBtn; }
     QVector<int>    belegteToeneForTest() const { return belegteToene(); }
@@ -522,6 +523,25 @@ private:
     /// man erst, wenn sie jemanden aufruft.
     QPushButton* m_houndBtn{nullptr};
     bool         m_houndBetrieb{false};
+
+    /// Contestbetrieb: Schalter, Stand und die laufende Nummer.
+    ///
+    /// Die Nummer wird JE BAND gefuehrt und faengt dort wieder bei 1
+    /// an -- IARU-Region-1-Regel („a serial number commencing with
+    /// 001 for the first contact on each band"), und so haelt es auch
+    /// das Contestprogramm (`ContestDefinition::serialScope()`,
+    /// Vorgabe „band").
+    QPushButton* m_contestBtn{nullptr};
+    bool         m_contestAn{false};
+
+    /// Den Contest-Stand aus den Einstellungen in den Ablauf tragen.
+    void uebernimmContest();
+    /// Die naechste Nummer in die Statuszeile.
+    void zeigeContestStand();
+    /// Der Schluessel, unter dem die Nummer dieses Bandes liegt.
+    QString contestNummerSchluessel() const;
+    /// Die naechste Nummer fuer das Band, auf dem die Scheibe steht.
+    int naechsteContestNummer() const;
 
     // ── Multi Answering (2026-10-30 angeschlossen) ───────────
     //
