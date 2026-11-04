@@ -617,7 +617,16 @@ QList<QWidget*> KombiApplet::seiten() const
 
 int KombiApplet::seite() const
 {
-    return m_stapel ? qMax(0, m_stapel->currentIndex()) : 0;
+    // Die Nummer der Seite in seiten(), nicht der Stapelindex -- siehe
+    // zeigeSeite(): die beiden Reihenfolgen muessen nicht gleich sein.
+    if (!m_stapel) { return 0; }
+    const int i = seiten().indexOf(m_stapel->currentWidget());
+    return qMax(0, i);
+}
+
+QWidget* KombiApplet::aktuelleSeiteForTest() const
+{
+    return m_stapel ? m_stapel->currentWidget() : nullptr;
 }
 
 bool KombiApplet::istLeer() const
@@ -639,8 +648,23 @@ void KombiApplet::zeigeSeite(int welche)
     // Wer eine Pille waehlt, meint diese EINE Seite. Also zuklappen
     // und sie zeigen.
     if (m_aufgeklappt) { setAufgeklappt(false); }
-    const int w = qBound(0, welche, m_inhalte.size() - 1);
-    if (m_stapel) { m_stapel->setCurrentIndex(w); }
+    // Betreiber 2026-11-04: "RX/TX -- entweder RX oder TX (Pille
+    // schaltet nicht um)". Pille RX hell, Inhalt TX: die Pille zaehlt
+    // ueber seiten() (die Reihenfolge von m_inhalte), der Stapel hatte
+    // eine ANDERE Reihenfolge -- ein Panel, das im aufgeklappten
+    // Zustand hereinkam, steht im Stapel vorn (nimmAuf: addWidget) und
+    // in m_inhalte hinten; setAufgeklappt(false) haengt den Rest
+    // dahinter. Index gegen Index ging dann daneben. Darum ueber das
+    // Widget: die Seite, die die Pille meint, wird gezeigt -- und wer
+    // nicht im Stapel ist, kommt hinein.
+    const QList<QWidget*> s = seiten();
+    if (s.isEmpty()) { return; }
+    const int w = qBound(0, welche, s.size() - 1);
+    if (m_stapel) {
+        QWidget* ziel = s.at(w);
+        if (m_stapel->indexOf(ziel) < 0) { m_stapel->addWidget(ziel); }
+        m_stapel->setCurrentWidget(ziel);
+    }
     for (int i = 0; i < m_reiter.size(); ++i) {
         m_reiter.at(i)->setChecked(i == w);
     }
