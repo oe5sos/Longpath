@@ -49,6 +49,10 @@ static void add_brackets(char* result, const char* original, int length);
 /// @param[out] n10_out Pointer to store 10-bit hash value (can be NULL)
 /// @return True on success
 static bool save_callsign(const ftx_callsign_hash_interface_t* hash_if, const char* callsign, uint32_t* n22_out, uint16_t* n12_out, uint16_t* n10_out);
+// Longpath 2026-11-04: steht weiter unten, wird aber von
+// ftx_message_encode() schon vorher gebraucht.
+static ftx_message_rc_t encode_eu_vhf_text(ftx_message_t* msg,
+    ftx_callsign_hash_interface_t* hash_if, const char* message_text);
 static bool lookup_callsign(const ftx_callsign_hash_interface_t* hash_if, ftx_callsign_hash_type_t hash_type, uint32_t hash, char* callsign);
 
 /// returns the numeric value if it matches "CQ nnn" or "CQ a[bcd]", otherwise -1
@@ -207,6 +211,18 @@ ftx_message_rc_t ftx_message_encode(ftx_message_t* msg, ftx_callsign_hash_interf
             return rc;
         LOG(LOG_DEBUG, "   ftx_message_encode_nonstd failed: %d\n", rc);
     }
+    // Longpath 2026-11-04: der EU-VHF-Contest VOR dem Freitext.
+    //
+    // Die Reihenfolge ist die von WSJT-X: `pack77` prueft Typ 5 als
+    // letzten Sonderfall und faellt erst DANN auf Freitext zurueck
+    // (`packjt77.f90:186-190`). Andersherum landete jeder
+    // Contest-Austausch als Freitext auf dem Band -- lesbar nur fuer
+    // den, der dasselbe falsch macht.
+    rc = encode_eu_vhf_text(msg, hash_if, message_text);
+    if (rc == FTX_MESSAGE_RC_OK)
+        return rc;
+    LOG(LOG_DEBUG, "   encode_eu_vhf_text failed: %d\n", rc);
+
     rc = ftx_message_encode_free(msg, message_text);
     if (rc == FTX_MESSAGE_RC_OK)
         return rc;
@@ -579,6 +595,194 @@ ftx_message_rc_t ftx_message_decode_std(const ftx_message_t* msg, ftx_callsign_h
 // ftx_message_decode() sonst benutzt (ein 13-stelliges Rufzeichen plus
 // " RR73;" sind 19 Zeichen). Darum schreibt dieser Dekoder den fertigen
 // Text direkt, und der Aufrufer setzt field1 = NULL.
+// Der sechsstellige Locator ALS 25 Bit -- die Gegenrichtung zu
+// `to_grid6()` weiter unten.
+//
+// From WSJT-X `lib/77bit/packjt77.f90:1421-1428` [v2.7.0] --
+//   `j1=(ichar(grid6(1:1))-ichar('A'))*18*10*10*24*24` ...
+//   `igrid6=j1+j2+j3+j4+j5+j6`
+//
+// Gibt false, wenn eine Stelle ausserhalb ihres Bereichs liegt --
+// dieselbe Pruefung, die WSJT-X als `is_grid6` vorschaltet.
+static bool from_grid6(const char* g, uint32_t* out)
+{
+    if (g[0] < 'A' || g[0] > 'R') { return false; }
+    if (g[1] < 'A' || g[1] > 'R') { return false; }
+    if (g[2] < '0' || g[2] > '9') { return false; }
+    if (g[3] < '0' || g[3] > '9') { return false; }
+    if (g[4] < 'A' || g[4] > 'X') { return false; }
+    if (g[5] < 'A' || g[5] > 'X') { return false; }
+    *out = (uint32_t)(g[0] - 'A') * (18u * 10u * 10u * 24u * 24u)
+         + (uint32_t)(g[1] - 'A') * (10u * 10u * 24u * 24u)
+         + (uint32_t)(g[2] - '0') * (10u * 24u * 24u)
+         + (uint32_t)(g[3] - '0') * (24u * 24u)
+         + (uint32_t)(g[4] - 'A') * 24u
+         + (uint32_t)(g[5] - 'A');
+    return true;
+}
+
+// Ein Feld gross-endig ab Bit 0 in die Nutzlast legen.
+static void put_bits(ftx_message_t* msg, int from_bit, int width, uint32_t value)
+{
+    for (int i = 0; i < width; ++i)
+    {
+        const int bit  = from_bit + i;
+        const uint32_t v = (value >> (width - 1 - i)) & 1u;
+        const int byte = bit / 8;
+        const int rest = 7 - (bit % 8);
+        if (v) { msg->payload[byte] |=  (uint8_t)(1u << rest); }
+        else   { msg->payload[byte] &= (uint8_t)~(1u << rest); }
+    }
+}
+
+// Den Contest-Austausch aus dem FERTIGEN Satz packen.
+//
+// Die Form, die WSJT-X erwartet und die `ftx_message_decode_eu_vhf()`
+// auch wieder herausschreibt:
+//
+//     <OE1ABC> <OE5SOS> R 590003 IO91NP
+//     <OE1ABC> <OE5SOS> 590003 IO91NP
+//
+// From WSJT-X `lib/77bit/packjt77.f90:1398-1404` [v2.7.0] --
+//   `if(nwords.lt.4 .or. nwords.gt.5) return        !nwords must be 4 or 5`
+//   `if(w(1)(1:1).ne.'<' .or. w(2)(1:1).ne.'<') return !Both calls must be hashed`
+//   `if(nx.lt.520001 .or. nx.gt.594095) return   !Exchange between 520001 - 594095`
+//   `if(.not.is_grid6(w(nwords)(1:6))) return    !Last word must be a valid grid6`
+//
+// Die spitzen Klammern sind Pflicht, nicht Schmuck: sie sagen, dass
+// beide Rufzeichen gehasht uebertragen werden. Ein Satz ohne sie ist
+// keine Typ-5-Nachricht, und ihn trotzdem so zu packen hiesse, zwei
+// Rufzeichen wegzuwerfen, die der Absender im Klartext meinte.
+static ftx_message_rc_t encode_eu_vhf_text(ftx_message_t* msg,
+    ftx_callsign_hash_interface_t* hash_if, const char* message_text)
+{
+    char w[5][16];
+    int nwords = 0;
+    const char* p = message_text;
+    while (*p != '\0' && nwords < 5)
+    {
+        while (*p == ' ') { ++p; }
+        if (*p == '\0') { break; }
+        int k = 0;
+        while (*p != '\0' && *p != ' ' && k < 15) { w[nwords][k++] = *p++; }
+        if (*p != '\0' && *p != ' ') { return FTX_MESSAGE_RC_ERROR_TYPE; }
+        w[nwords][k] = '\0';
+        ++nwords;
+    }
+    while (*p == ' ') { ++p; }
+    if (*p != '\0') { return FTX_MESSAGE_RC_ERROR_TYPE; }  // mehr als 5
+    if (nwords < 4) { return FTX_MESSAGE_RC_ERROR_TYPE; }
+
+    // Beide Rufzeichen gehasht, sonst ist es ein anderer Typ.
+    if (w[0][0] != '<' || w[1][0] != '<') { return FTX_MESSAGE_RC_ERROR_TYPE; }
+
+    // Das „R" steht, wenn es da ist, als drittes Wort allein.
+    bool is_r = false;
+    if (nwords == 5)
+    {
+        if (w[2][0] != 'R' || w[2][1] != '\0') { return FTX_MESSAGE_RC_ERROR_TYPE; }
+        is_r = true;
+    }
+
+    // Der Austausch ist EINE sechsstellige Zahl.
+    const char* exch = w[nwords - 2];
+    long nx = 0;
+    for (int i = 0; exch[i] != '\0'; ++i)
+    {
+        if (exch[i] < '0' || exch[i] > '9') { return FTX_MESSAGE_RC_ERROR_TYPE; }
+        nx = nx * 10 + (exch[i] - '0');
+        if (nx > 999999L) { return FTX_MESSAGE_RC_ERROR_TYPE; }
+    }
+    if (nx < 520001L || nx > 594095L) { return FTX_MESSAGE_RC_ERROR_TYPE; }
+
+    // Die Klammern abstreifen -- gehasht wird das Rufzeichen selbst.
+    char call_to[14], call_de[14];
+    int n = 0;
+    for (int i = 1; w[0][i] != '\0' && w[0][i] != '>' && n < 13; ++i) { call_to[n++] = w[0][i]; }
+    call_to[n] = '\0';
+    n = 0;
+    for (int i = 1; w[1][i] != '\0' && w[1][i] != '>' && n < 13; ++i) { call_de[n++] = w[1][i]; }
+    call_de[n] = '\0';
+    if (call_to[0] == '\0' || call_de[0] == '\0') { return FTX_MESSAGE_RC_ERROR_TYPE; }
+
+    return ftx_message_encode_eu_vhf(msg, hash_if, call_to, call_de, is_r,
+                                     (int)(nx / 10000L), (int)(nx % 10000L),
+                                     w[nwords - 1]);
+}
+
+ftx_message_rc_t ftx_message_encode_eu_vhf(ftx_message_t* msg,
+    ftx_callsign_hash_interface_t* hash_if, const char* call_to,
+    const char* call_de, bool is_r, int rst, int serial, const char* grid6)
+{
+    if (msg == NULL || call_to == NULL || call_de == NULL || grid6 == NULL)
+    {
+        return FTX_MESSAGE_RC_ERROR_TYPE;
+    }
+
+    // From WSJT-X `lib/77bit/packjt77.f90:1402` [v2.7.0] --
+    //   `if(nx.lt.520001 .or. nx.gt.594095) return`
+    // Der Austausch ist EINE Zahl: Rapport mal 10000 plus Nummer.
+    // Daraus folgen beide Grenzen.
+    if (rst < 52 || rst > 59) { return FTX_MESSAGE_RC_ERROR_TYPE; }
+    if (serial < 1 || serial > 4095) { return FTX_MESSAGE_RC_ERROR_TYPE; }
+
+    uint32_t igrid6 = 0;
+    if (!from_grid6(grid6, &igrid6))
+    {
+        return FTX_MESSAGE_RC_ERROR_GRID;
+    }
+
+    // Beide Rufzeichen werden gehasht UND gemerkt -- `save_callsign`
+    // tut beides. Das Merken ist kein Nebeneffekt, sondern noetig:
+    // die Gegenstation bekommt nur den Hash, und wer das eigene
+    // Rufzeichen nicht in der Tabelle hat, liest die eigene Aussendung
+    // im Rundlauf als `<...>`.
+    uint32_t n22_de = 0;
+    uint16_t n12_to = 0;
+    if (!save_callsign(hash_if, call_to, NULL, &n12_to, NULL))
+    {
+        return FTX_MESSAGE_RC_ERROR_CALLSIGN1;
+    }
+    if (!save_callsign(hash_if, call_de, &n22_de, NULL, NULL))
+    {
+        return FTX_MESSAGE_RC_ERROR_CALLSIGN2;
+    }
+
+    // ── Die Falle an dieser Stelle (2026-11-04) ──────────────────────
+    //
+    // WSJT-X laesst den Austausch bis 594095 zu, das Feld traegt aber
+    // nur elf Bit:
+    //
+    //   From WSJT-X `lib/77bit/packjt77.f90:1419-1420` [v2.7.0] --
+    //     `iserial=mod(nx,10000)`
+    //     `if(iserial.gt.2047) iserial=2047`
+    //
+    // Eine Nummer ueber 2047 wird also STILL auf 2047 gekappt, und die
+    // Gegenstation traegt eine falsche Nummer ins Log. Das ist kein
+    // Fehler dieses Ports, sondern die Grenze des Formats -- hier
+    // steht sie wenigstens aufgeschrieben. Bei FT8 im UKW-Contest ist
+    // sie praktisch unerreichbar (2047 QSOs in einer Betriebsart),
+    // aber „praktisch unerreichbar" ist kein Grund, es zu verschweigen.
+    uint32_t iserial = (uint32_t)serial;
+    if (iserial > 2047u) { iserial = 2047u; }
+
+    const uint32_t irpt = (uint32_t)(rst - 52);
+
+    ftx_message_init(msg);
+    int p = 0;
+    put_bits(msg, p, 12, n12_to);               p += 12;
+    put_bits(msg, p, 22, n22_de);               p += 22;
+    put_bits(msg, p,  1, is_r ? 1u : 0u);       p +=  1;
+    put_bits(msg, p,  3, irpt);                 p +=  3;
+    put_bits(msg, p, 11, iserial);              p += 11;
+    put_bits(msg, p, 25, igrid6);               p += 25;
+    put_bits(msg, 74, 3, 5);                    // i3 = 5
+
+    LOG(LOG_INFO, "Encoded EU VHF contest message [%s %s %s%d%04d %s]\n",
+        call_to, call_de, is_r ? "R " : "", rst, (int)iserial, grid6);
+    return FTX_MESSAGE_RC_OK;
+}
+
 // Der sechsstellige Locator aus 25 Bit.
 //
 // From WSJT-X `lib/77bit/packjt77.f90:1577-1607` [v2.7.0] --

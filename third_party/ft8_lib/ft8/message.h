@@ -143,6 +143,22 @@ ftx_message_rc_t ftx_message_decode_eu_vhf(const ftx_message_t* msg,
     ftx_callsign_hash_interface_t* hash_if, char* message,
     ftx_field_t field_types[FTX_MAX_MESSAGE_FIELDS]);
 
+/// Typ 5 packen. Longpath-Erweiterung 2026-11-04: upstreams
+/// `ftx_message_encode()` kennt nur Standard, Nicht-Standard und
+/// Freitext — einen Contest-Austausch kann es nicht erzeugen.
+///
+/// `rst` ist 52..59 (NICHT dB), `serial` 1..4095. Beide Rufzeichen
+/// werden gehasht und dabei in der Tabelle gemerkt; die Gegenstation
+/// bekommt nur die Hashes zu sehen.
+///
+/// ACHTUNG: eine `serial` ueber 2047 wird auf 2047 GEKAPPT — das Feld
+/// hat elf Bit. Das ist die Grenze des Formats, nicht dieses Ports;
+/// siehe die Begruendung an der Funktion.
+ftx_message_rc_t ftx_message_encode_eu_vhf(ftx_message_t* msg,
+    ftx_callsign_hash_interface_t* hash_if, const char* call_to,
+    const char* call_de, bool is_r, int rst, int serial,
+    const char* grid6);
+
 uint8_t ftx_message_get_i3(const ftx_message_t* msg);
 uint8_t ftx_message_get_n3(const ftx_message_t* msg);
 ftx_message_type_t ftx_message_get_type(const ftx_message_t* msg);

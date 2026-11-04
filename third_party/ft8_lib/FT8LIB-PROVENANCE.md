@@ -131,6 +131,62 @@ Locator-Schranken-Fall wurde dabei geschärft — er prüft jetzt auf
 ebenfalls einen Fehler lieferte (nur einen anderen) und ein „irgendein
 Fehler" nichts belegt hätte.
 
+### Erweiterung: Typ 5 SENDEN — 2026-11-04
+
+| Datei | Was |
+| --- | --- |
+| `ft8/message.c` | `from_grid6()` + `put_bits()` (statisch), `ftx_message_encode_eu_vhf()`, `encode_eu_vhf_text()` (statisch) + Aufruf in `ftx_message_encode()` vor dem Freitext-Rückfall |
+| `ft8/message.h` | Deklaration von `ftx_message_encode_eu_vhf()` |
+
+Die Leseseite darüber half beim Empfangen; senden konnte Longpath den
+Austausch weiterhin nicht. `ftx_message_encode()` kennt nur drei Wege
+— `encode_std`, `encode_nonstd`, `encode_free`. Ein Contest-Austausch
+wäre dort als **Freitext** auf dem Band gelandet: lesbar nur für den,
+der denselben Fehler macht.
+
+Die Bitlage und die Schranken sind übernommen, nicht gerechnet:
+
+> From WSJT-X `lib/77bit/packjt77.f90:1398-1431` [v2.7.0] —
+> `if(nwords.lt.4 .or. nwords.gt.5) return` /
+> `if(w(1)(1:1).ne.'<' .or. w(2)(1:1).ne.'<') return` /
+> `if(nx.lt.520001 .or. nx.gt.594095) return` /
+> `irpt=nx/10000 - 52` / `iserial=mod(nx,10000)` /
+> `if(iserial.gt.2047) iserial=2047` /
+> `1010 format(b12.12,b22.22,b1,b3.3,b11.11,b25.25,b3.3)`
+
+Die Reihenfolge in `ftx_message_encode()` ist ebenfalls die von
+WSJT-X: Typ 5 als letzter Sonderfall, **vor** dem Freitext-Rückfall
+(`packjt77.f90:186-190`).
+
+#### Die Grenze, die das Format setzt
+
+**Eine laufende Nummer über 2047 wird still auf 2047 gekappt.** Das
+Feld hat elf Bit, WSJT-X lässt den Austausch aber bis 594095 zu — die
+Prüfung erlaubt also 4095, das Feld trägt 2047. Die Gegenstation
+trägt dann eine falsche Nummer ins Log. Das ist kein Fehler dieses
+Ports, sondern die Grenze des Formats; im UKW-Contest mit FT8 ist sie
+praktisch unerreichbar, aber „praktisch unerreichbar" ist kein Grund,
+es zu verschweigen. `tests/tst_ft8_eu_vhf.cpp` hält es fest.
+
+#### Belege
+
+`tests/tst_ft8_eu_vhf.cpp` wächst auf 20 Fälle. Der entscheidende ist
+**nicht** der Rundlauf — der wäre grün, auch wenn Packer und
+Auspacker dieselbe falsche Bitreihenfolge hätten. Er ist
+`derPackerLegtDieFelderDorthinWoWsjtxSieErwartet`: die gepackte
+Nutzlast wird mit demselben unabhängigen Bit-für-Bit-Leser zerlegt,
+mit dem auch die Lesefälle gegen WSJT-X gebaut sind, und Feld für
+Feld gegen die Erwartung geprüft.
+
+Dazu, was der Packer **abweisen** muss: Rapport außerhalb 52…59,
+Nummer 0 oder über 4095, vierstelliger Locator, Locator außerhalb des
+Rasters. Und was der Texterkenner **nicht** an sich ziehen darf:
+Sätze ohne spitze Klammern (die Klammern sagen „gehasht"), mit nur
+einem gehashten Rufzeichen, mit Austausch außerhalb der Schranken.
+
+Gegenprobe ohne `encode_eu_vhf_text` im Weg: die beiden Textweg-Fälle
+rot.
+
 ### Erweiterung: Nachrichtentyp 0.1 (DXpedition Mode) — 2026-10-30
 
 | Datei | Was |
