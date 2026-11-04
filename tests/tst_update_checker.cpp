@@ -27,6 +27,7 @@
 #include <QPushButton>
 #include <QTemporaryDir>
 
+#include "core/AppSettings.h"
 #include "core/UpdateChecker.h"
 #include "core/UpdateInstaller.h"
 #include "gui/TitleBar.h"
@@ -493,6 +494,83 @@ private slots:
         QVERIFY2(why.contains(QStringLiteral("github.com")), qPrintable(why));
         QVERIFY2(why.contains(QStringLiteral("raw.githubusercontent.com"))
                      || why.contains(QStringLiteral("CHANGELOG.md")), qPrintable(why));
+        qunsetenv("LONGPATH_UPDATE_API_URL");
+        qunsetenv("LONGPATH_UPDATE_WEB_URL");
+        qunsetenv("LONGPATH_UPDATE_CHANGELOG_URL");
+    }
+
+    // ── „da sieht es aus, als er nichts täte" ─────────────────────────
+    //
+    // Betreiber am 2026-11-04, waehrend er dem Dialog zusah. Gemessen
+    // an seinem Geraet: 15 s api.github.com, 15 s github.com, dann erst
+    // eine Antwort -- und der Text stand die ganze Zeit still. Jeder
+    // Schritt muss sich melden.
+    void saysWhichWayItIsTrying()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString datei = dir.filePath(QStringLiteral("CHANGELOG.md"));
+        QFile f(datei);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write(kChangelog);
+        f.close();
+
+        qputenv("LONGPATH_UPDATE_API_URL", "https://127.0.0.1:9/dead");
+        qputenv("LONGPATH_UPDATE_WEB_URL", "https://127.0.0.1:9/dead");
+        qputenv("LONGPATH_UPDATE_CHANGELOG_URL",
+                QUrl::fromLocalFile(datei).toString().toUtf8());
+
+        UpdateChecker checker(QStringLiteral("0.8.1"));
+        QSignalSpy sagt(&checker, &UpdateChecker::trying);
+        QSignalSpy known(&checker, &UpdateChecker::latestKnown);
+        checker.checkLatest();
+        QVERIFY(known.wait(90000));
+
+        // Drei Schritte mindestens: API, github.com, CHANGELOG. Jeder
+        // nennt den Host, damit der Bediener sieht, worauf gewartet wird.
+        QVERIFY2(sagt.count() >= 3, qPrintable(QStringLiteral("nur %1 Ansagen").arg(sagt.count())));
+        QStringList alle;
+        for (int i = 0; i < sagt.count(); ++i) { alle << sagt.at(i).at(0).toString(); }
+        const QString text = alle.join(QLatin1Char('|'));
+        QVERIFY2(text.contains(QStringLiteral("api.github.com")), qPrintable(text));
+        QVERIFY2(text.contains(QStringLiteral("github.com")), qPrintable(text));
+        QVERIFY2(text.contains(QStringLiteral("raw.githubusercontent.com")), qPrintable(text));
+
+        qunsetenv("LONGPATH_UPDATE_API_URL");
+        qunsetenv("LONGPATH_UPDATE_WEB_URL");
+        qunsetenv("LONGPATH_UPDATE_CHANGELOG_URL");
+    }
+
+    // Und der Weg, der getragen hat, wird gemerkt -- damit die beiden
+    // Azure-Schritte beim naechsten Mal nur eine kurze Frist bekommen
+    // statt wieder 30 s zu verschenken.
+    void remembersTheWayThatWorked()
+    {
+        auto& s = AppSettings::instance();
+        s.setValue(UpdateChecker::lastSourceKey(), QStringLiteral("api"));
+
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString datei = dir.filePath(QStringLiteral("CHANGELOG.md"));
+        QFile f(datei);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write(kChangelog);
+        f.close();
+
+        qputenv("LONGPATH_UPDATE_API_URL", "https://127.0.0.1:9/dead");
+        qputenv("LONGPATH_UPDATE_WEB_URL", "https://127.0.0.1:9/dead");
+        qputenv("LONGPATH_UPDATE_CHANGELOG_URL",
+                QUrl::fromLocalFile(datei).toString().toUtf8());
+
+        UpdateChecker checker(QStringLiteral("0.8.1"));
+        QSignalSpy known(&checker, &UpdateChecker::latestKnown);
+        checker.checkLatest();
+        QVERIFY(known.wait(90000));
+        QCOMPARE(s.value(UpdateChecker::lastSourceKey()).toString(),
+                 QStringLiteral("changelog"));
+
+        // Zurueck auf Anfang, damit kein anderer Fall darauf stolpert.
+        s.setValue(UpdateChecker::lastSourceKey(), QStringLiteral("api"));
         qunsetenv("LONGPATH_UPDATE_API_URL");
         qunsetenv("LONGPATH_UPDATE_WEB_URL");
         qunsetenv("LONGPATH_UPDATE_CHANGELOG_URL");

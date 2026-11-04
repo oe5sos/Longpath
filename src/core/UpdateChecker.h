@@ -71,6 +71,9 @@
 //   2026-10-14 -- Zweiter Weg ueber github.com, wenn api.github.com
 //                 nicht antwortet, by Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude.
+//   2026-11-04 -- Fortschritt melden und den letzten erfolgreichen Weg
+//                 merken, by Martin Fischer (OE5SOS),
+//                 AI-assisted via Anthropic Claude.
 //   2026-11-04 -- Dritter Weg ueber raw.githubusercontent.com +
 //                 CHANGELOG.md, weil github.com dieselbe Azure-Route
 //                 nimmt wie api.github.com; ReleaseInfo::Source statt
@@ -193,9 +196,27 @@ public:
     // Im Betrieb api.github.com; mit LONGPATH_UPDATE_API_URL gesetzt die
     // dort genannte Adresse (nur fuer Pruefstaende, siehe .cpp).
     static QUrl latestReleaseApiUrl();
+
+    // -- Nicht wieder 30 Sekunden stumm warten (2026-11-04) --------------
+    //
+    // Betreiber, waehrend er dem Dialog zusah: "da sieht es aus, als er
+    // nichts taete". Gemessen an seinem Geraet: 15 s api.github.com,
+    // 15 s github.com, dann erst eine Antwort -- und der Text stand die
+    // ganze Zeit auf "Checking for the latest release...".
+    //
+    // Darum zweierlei. Erstens sagt trying() jeden Schritt an. Zweitens
+    // wird der Weg gemerkt, der zuletzt getragen hat: fiel die letzte
+    // Pruefung durch bis zum CHANGELOG, bekommen die beiden
+    // Azure-Schritte nur noch eine kurze Frist statt der vollen. Die
+    // Reihenfolge bleibt, damit die API weiter gewinnt, sobald sie
+    // wieder antwortet -- nur das Warten darauf wird kurz.
+    static QString lastSourceKey() { return QStringLiteral("UpdateLastSource"); }
+    static QString sourceName(ReleaseInfo::Source s);
     static QByteArray userAgent();
 
 signals:
+    // Was gerade versucht wird, in einem Satz fuer die Oberflaeche.
+    void trying(const QString& what);
     void latestKnown(const Longpath::ReleaseInfo& release, bool newerThanRunning);
     void checkFailed(const QString& why);
     void downloadProgress(qint64 received, qint64 total);
@@ -208,6 +229,11 @@ private:
     void checkLatestViaWebsite(const QString& apiError);
     void checkLatestViaChangelog(const QString& earlierErrors);
     void probeAssetAndFinish(const ReleaseInfo& release, const QString& apiError);
+
+    // Frist fuer die beiden Schritte ueber GitHubs Azure-Frontends.
+    // Voll, solange die API zuletzt getragen hat; kurz, wenn die letzte
+    // Pruefung bis zum CHANGELOG durchfiel.
+    int m_azureTimeoutMs{0};
 
     QString m_runningVersion;
     QNetworkAccessManager* m_net{nullptr};
