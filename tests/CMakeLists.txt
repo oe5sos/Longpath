@@ -5609,6 +5609,11 @@ longpath_add_test(tst_color_picker_not_native)
 # 2026-09-21: Help > Check for Updates... -- Release-JSON, Version, Paket,
 # SHA256SUMS, Startpruefung, Zielpfad, Neustart-Helfer, DMG-Einspielen (macOS).
 longpath_add_test(tst_update_checker)
+# Der Fehlzweig-Pruefstand liest src/gui/MainWindow.cpp.
+if(TEST tst_update_checker)
+    set_tests_properties(tst_update_checker PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 # 2026-10-14: sieben Absturzberichte lagen herum, keiner stand im
 # Protokoll. CrashReportDigest holt sie beim naechsten Start nach.
 longpath_add_test(tst_absturzberichte)
@@ -6758,6 +6763,17 @@ endif()
 if(Qt6WebSockets_FOUND)
     longpath_add_test(tst_tci_iq_roundtrip)
     target_link_libraries(tst_tci_iq_roundtrip PRIVATE Qt6::WebSockets)
+endif()
+
+# ── Das Contestprogramm als Fenster (2026-11-04) ──────────────────────────
+# Nur mit dem Submodul: oeffnet das Logbuch-Fenster in einem eigenen
+# Datenordner, schliesst es, oeffnet es wieder, und haelt fest, dass ein
+# zweiter Schreiber auf demselben Log abgewiesen wird.
+if(LONGPATH_CONTESTPROGRAMM)
+    longpath_add_test(tst_contestfenster)
+    # Qt6::Sql kommt ueber das Submodul (find_package dort); der Pruefstand
+    # belegt das Log vorab ueber SQLite, ohne Koepfe des Contestprogramms.
+    target_link_libraries(tst_contestfenster PRIVATE Qt6::Sql)
 endif()
 
 # ── Phase 3J-1 Task 17.1: TX audio binary pipeline + single-client mutex ──────

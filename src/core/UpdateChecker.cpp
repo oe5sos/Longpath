@@ -11,11 +11,15 @@
 //   2026-10-14 -- Zweiter Weg ueber github.com, wenn api.github.com
 //                 nicht antwortet, by Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude.
+//   2026-11-04 -- Dritter Weg ueber raw.githubusercontent.com +
+//                 CHANGELOG.md, by Martin Fischer (OE5SOS),
+//                 AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "UpdateChecker.h"
 
 #include <QCryptographicHash>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -28,6 +32,7 @@
 #include <QRegularExpression>
 #include <QLoggingCategory>
 #include <QSysInfo>
+#include <QTimeZone>
 
 namespace Longpath {
 
@@ -88,6 +93,12 @@ QUrl UpdateChecker::latestReleaseApiUrl()
 
 QUrl UpdateChecker::latestReleaseWebUrl()
 {
+    // LONGPATH_UPDATE_WEB_URL: nur fuer Pruefstaende, wie
+    // LONGPATH_UPDATE_API_URL. Ohne das waere der dritte Weg auf einem
+    // Rechner MIT funktionierendem GitHub nicht pruefbar -- die Kette
+    // stiege schon hier aus, und der Prueflauf waere falsch gruen.
+    const QString override = qEnvironmentVariable("LONGPATH_UPDATE_WEB_URL");
+    if (!override.isEmpty()) { return QUrl(override); }
     return QUrl(QStringLiteral("https://github.com/oe5sos/Longpath/releases/latest"));
 }
 
@@ -114,7 +125,7 @@ ReleaseInfo UpdateChecker::releaseFromTag(const QString& tag)
 {
     ReleaseInfo r;
     r.tag = tag;
-    r.viaWebsiteFallback = true;
+    r.source = ReleaseInfo::Source::Website;
     r.version = numericVersion(tag);
     r.name = QStringLiteral("Longpath %1").arg(r.version);
     // Die Notizen stehen nur in der API. Statt eines leeren Feldes die
@@ -270,6 +281,80 @@ QString UpdateChecker::sha256Of(const QString& filePath)
 
 // ── Netz ──────────────────────────────────────────────────────────────
 
+QUrl UpdateChecker::changelogRawUrl()
+{
+    // Wie latestReleaseApiUrl(): nur fuer Pruefstaende umlenkbar, damit
+    // der Weg ohne Netz gefahren werden kann.
+    const QString override = qEnvironmentVariable("LONGPATH_UPDATE_CHANGELOG_URL");
+    if (!override.isEmpty()) { return QUrl(override); }
+    return QUrl(QStringLiteral(
+        "https://raw.githubusercontent.com/oe5sos/Longpath/main/CHANGELOG.md"));
+}
+
+std::optional<ReleaseInfo> UpdateChecker::parseChangelogLatest(const QByteArray& markdown,
+                                                               QString* error)
+{
+    const auto fehler = [error](const QString& why) -> std::optional<ReleaseInfo> {
+        if (error) { *error = why; }
+        return std::nullopt;
+    };
+    if (markdown.isEmpty()) { return fehler(QStringLiteral("CHANGELOG.md is empty")); }
+
+    // "## [0.8.2] - 2026-10-22" -- die Version darf einen Anhang tragen
+    // ("0.6.3-rc1"), das Datum ist freiwillig. Die oberste Ueberschrift
+    // dieser Form gewinnt; "# Changelog" darueber wird uebergangen.
+    static const QRegularExpression ueberschrift(
+        QStringLiteral(R"(^##\s+\[(\d[^\]]*)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?\s*$)"));
+    // Jede weitere "## "-Zeile beendet den Abschnitt. "### " nicht --
+    // die gehoeren zum Text.
+    static const QRegularExpression naechste(QStringLiteral(R"(^##\s+\S)"));
+
+    const QStringList zeilen = QString::fromUtf8(markdown).split(QLatin1Char('\n'));
+    int kopf = -1;
+    QRegularExpressionMatch treffer;
+    for (int i = 0; i < zeilen.size(); ++i) {
+        const auto m = ueberschrift.match(zeilen.at(i));
+        if (m.hasMatch()) { kopf = i; treffer = m; break; }
+    }
+    if (kopf < 0) {
+        return fehler(QStringLiteral("no \"## [version]\" heading in CHANGELOG.md"));
+    }
+
+    ReleaseInfo r;
+    r.source  = ReleaseInfo::Source::Changelog;
+    r.version = treffer.captured(1).trimmed();
+    r.tag     = QStringLiteral("v%1").arg(r.version);
+    r.name    = QStringLiteral("Longpath %1").arg(r.version);
+    r.htmlUrl = QUrl(QStringLiteral("https://github.com/oe5sos/Longpath/releases/tag/%1")
+                         .arg(r.tag));
+    if (!treffer.captured(2).isEmpty()) {
+        // Mittag UTC: der Abschnitt nennt nur den Tag, und 00:00 liesse
+        // die Ortszeit westlich von Greenwich einen Tag zurueckfallen.
+        r.publishedAt = QDateTime(QDate::fromString(treffer.captured(2), Qt::ISODate),
+                                  QTime(12, 0), QTimeZone::utc());
+    }
+
+    QStringList text;
+    for (int i = kopf + 1; i < zeilen.size(); ++i) {
+        if (naechste.match(zeilen.at(i)).hasMatch()) { break; }
+        text.append(zeilen.at(i));
+    }
+    while (!text.isEmpty() && text.constLast().trimmed().isEmpty()) { text.removeLast(); }
+    while (!text.isEmpty() && text.constFirst().trimmed().isEmpty()) { text.removeFirst(); }
+    r.notes = text.join(QLatin1Char('\n'));
+
+    // SHA256SUMS.txt liegt bei jeder Veroeffentlichung an derselben
+    // Stelle -- wie in releaseFromTag(). Erreichbar ist sie auf diesem
+    // Weg allerdings nicht (github.com ist ja gerade tot); der Eintrag
+    // steht da, damit downloadAndVerify() nichts fehlt, falls die Route
+    // zwischendurch wieder aufgeht.
+    ReleaseAsset sums;
+    sums.name = QString::fromLatin1(kSumsAssetName);
+    sums.url  = assetDownloadUrl(r.tag, sums.name);
+    r.assets.append(sums);
+    return r;
+}
+
 void UpdateChecker::checkLatest()
 {
     cancel();
@@ -318,8 +403,13 @@ void UpdateChecker::checkLatestViaWebsite(const QString& apiError)
         if (m_active == reply) { m_active = nullptr; }
         if (m_cancelled) { return; }
         if (reply->error() != QNetworkReply::NoError) {
-            emit checkFailed(QStringLiteral("%1 (github.com: %2)")
-                                 .arg(apiError, reply->errorString()));
+            // github.com loest in DENSELBEN Azure-Bereich auf wie
+            // api.github.com (gemessen 2026-11-04, siehe Kopf) -- dieser
+            // Weg scheitert dort also immer mit. Darum der dritte.
+            qCWarning(lcUpdate) << "github.com failed too:" << reply->errorString()
+                                << "-- trying raw.githubusercontent.com instead";
+            checkLatestViaChangelog(QStringLiteral("%1 (github.com: %2)")
+                                        .arg(apiError, reply->errorString()));
             return;
         }
         // Relativ zulaessig, darum ueber die Anfrage-URL aufloesen.
@@ -327,12 +417,43 @@ void UpdateChecker::checkLatestViaWebsite(const QString& apiError)
         target = target.isEmpty() ? reply->url() : reply->url().resolved(target);
         const QString tag = tagFromReleaseUrl(target);
         if (tag.isEmpty()) {
-            emit checkFailed(QStringLiteral("%1 (github.com did not point at a release: %2)")
-                                 .arg(apiError, target.toString()));
+            qCWarning(lcUpdate) << "github.com answered but pointed nowhere:" << target
+                                << "-- trying raw.githubusercontent.com instead";
+            checkLatestViaChangelog(
+                QStringLiteral("%1 (github.com did not point at a release: %2)")
+                    .arg(apiError, target.toString()));
             return;
         }
         qCInfo(lcUpdate) << "github.com points at release" << tag;
         probeAssetAndFinish(releaseFromTag(tag), apiError);
+    });
+}
+
+void UpdateChecker::checkLatestViaChangelog(const QString& earlierErrors)
+{
+    // Letzter Weg: eine gewoehnliche Datei bei Fastly, kein Azure-Host,
+    // keine API. Scheitert auch der, hat der Bediener alle drei Gruende
+    // in einer Zeile.
+    QNetworkReply* reply = m_net->get(request(changelogRawUrl(), kApiTimeoutMs));
+    m_active = reply;
+    connect(reply, &QNetworkReply::finished, this, [this, reply, earlierErrors]() {
+        reply->deleteLater();
+        if (m_active == reply) { m_active = nullptr; }
+        if (m_cancelled) { return; }
+        if (reply->error() != QNetworkReply::NoError) {
+            emit checkFailed(QStringLiteral("%1 (raw.githubusercontent.com: %2)")
+                                 .arg(earlierErrors, reply->errorString()));
+            return;
+        }
+        QString err;
+        const auto release = parseChangelogLatest(reply->readAll(), &err);
+        if (!release) {
+            emit checkFailed(QStringLiteral("%1 (CHANGELOG.md: %2)")
+                                 .arg(earlierErrors, err));
+            return;
+        }
+        qCInfo(lcUpdate) << "CHANGELOG.md names release" << release->tag;
+        probeAssetAndFinish(*release, earlierErrors);
     });
 }
 
@@ -361,11 +482,18 @@ void UpdateChecker::probeAssetAndFinish(const ReleaseInfo& release, const QStrin
             a.url = assetDownloadUrl(release.tag, wanted);
             a.size = reply->header(QNetworkRequest::ContentLengthHeader).toLongLong();
             r.assets.append(a);
-        } else {
+        } else if (reply->error() == QNetworkReply::NoError) {
             // Kein Paket fuer diese Maschine (etwa Windows seit 0.6.7).
             // Der Dialog sagt das von sich aus und bietet die Seite an.
             qCWarning(lcUpdate) << "no package" << wanted << "in" << release.tag
-                                << "-- HTTP" << status << reply->errorString();
+                                << "-- HTTP" << status;
+        } else {
+            // Die Frage kam nicht an. Das ist NICHT dasselbe wie "es gibt
+            // das Paket nicht" -- ueber den dritten Weg ist github.com
+            // ohnehin tot, und ein Zeitablauf darf nicht als Befund
+            // gelesen werden (Abwesenheit ist keine Aussage).
+            qCWarning(lcUpdate) << "could not ask about" << wanted << "in" << release.tag
+                                << "--" << reply->errorString();
         }
         Q_UNUSED(apiError);
         emit latestKnown(r, compareVersions(r.version, m_runningVersion) > 0);

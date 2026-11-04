@@ -240,7 +240,10 @@ public:
     // ConnectionSegment::UpdateState -- zwei gleichnamige
     // Aufzaehlungen in einer Datei sind eine Falle.
     enum class AktualisierungsStand { Unbekannt, Aktuell, Neuer };
-    void setUpdateState(const QString& text, AktualisierungsStand art);
+    // `grund` landet im Tooltip -- bei „not checked" steht dort,
+    // warum die Abfrage nicht durchkam. Leer laesst den Tooltip weg.
+    void setUpdateState(const QString& text, AktualisierungsStand art,
+                        const QString& grund = QString());
 
     // Platz links, damit die drei Fensterknoepfe von macOS nicht auf
     // der Menuezeile liegen. Siehe gui/MacVollflaeche.h.
