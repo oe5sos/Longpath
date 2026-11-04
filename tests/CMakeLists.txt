@@ -5648,6 +5648,12 @@ longpath_add_test(tst_panadapter_schalter)
 # 2026-10-15: „englisch durchgehend" — ich habe zweimal „0 deutsche
 # Quelltexte" gemeldet und lag zweimal falsch. Jetzt zaehlt es ein Lauf.
 longpath_add_test(tst_oberflaeche_englisch)
+# 2026-11-04: "zum hundertsten mal der hintergrund blau" -- das alte
+# #0f0f1a stand roh in zwoelf Stylesheets und galt, sobald kein Thema
+# aktiv war. Verboten in jedem String und jeder QColor, siehe Datei.
+longpath_add_test(tst_kein_blauer_grund)
+target_compile_definitions(tst_kein_blauer_grund PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 # 2026-10-15: das breite rosa Band im Bildschirmfoto — ein umgedrehter
 # HGauge war IMMER in der Gefahrenfarbe, ohne jede Schwelle.
 longpath_add_test(tst_kompressionsbalken_nicht_rot)

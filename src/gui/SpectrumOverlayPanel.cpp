@@ -1756,7 +1756,7 @@ void SpectrumOverlayPanel::setClarityStatus(bool active, bool paused)
         ? QStringLiteral("#c2924f")   // amber
         : QString::fromLatin1(Style::kDspToggleBorder);  // green
     m_clarityBadge->setStyleSheet(Style::themed(
-        QStringLiteral("QLabel { background: %1; color: #0f0f1a; "
+        QStringLiteral("QLabel { background: %1; color: #08080a; "
                         "border-radius: 6px; font-size: 11px; "
                         "font-weight: bold; }").arg(color)));
     m_clarityBadge->show();

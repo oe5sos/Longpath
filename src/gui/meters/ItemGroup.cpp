@@ -388,7 +388,7 @@ ItemGroup* ItemGroup::createHBarPreset(int bindingId, double minVal, double maxV
     // Background fill
     SolidColourItem* bg = new SolidColourItem();
     bg->setRect(0.0f, 0.0f, 1.0f, 1.0f);
-    bg->setColour(QColor(QStringLiteral("#0f0f1a")));
+    bg->setColour(QColor(QStringLiteral("#08080a")));
     bg->setZOrder(0);
     group->addItem(bg);
 
@@ -458,7 +458,7 @@ ItemGroup* ItemGroup::createCompactHBarPreset(int bindingId, double minVal, doub
     // Background fill
     SolidColourItem* bg = new SolidColourItem();
     bg->setRect(0.0f, 0.0f, 1.0f, 1.0f);
-    bg->setColour(QColor(QStringLiteral("#0f0f1a")));
+    bg->setColour(QColor(QStringLiteral("#08080a")));
     bg->setZOrder(0);
     group->addItem(bg);
 
@@ -639,7 +639,7 @@ ItemGroup* ItemGroup::createPowerSwrPreset(const QString& name, QObject* parent)
     // Background
     SolidColourItem* bg = new SolidColourItem();
     bg->setRect(0.0f, 0.0f, 1.0f, 1.0f);
-    bg->setColour(QColor(0x0f, 0x0f, 0x1a));
+    bg->setColour(QColor(0x08, 0x08, 0x0a) /* kAppBg, nicht das alte Blau (2026-11-04) */);
     bg->setZOrder(0);
     group->addItem(bg);
 
@@ -1476,7 +1476,7 @@ ItemGroup* ItemGroup::createSignalTextPreset(int bindingId, QObject* parent)
     // Background
     SolidColourItem* bg = new SolidColourItem();
     bg->setRect(0.0f, 0.0f, 1.0f, 1.0f);
-    bg->setColour(QColor(0x0f, 0x0f, 0x1a));
+    bg->setColour(QColor(0x08, 0x08, 0x0a) /* kAppBg, nicht das alte Blau (2026-11-04) */);
     bg->setZOrder(0);
     group->addItem(bg);
 
@@ -1552,7 +1552,7 @@ ItemGroup* ItemGroup::createVfoDisplayPreset(QObject* parent)
     auto* group = new ItemGroup(QStringLiteral("VFO Display"), parent);
     auto* bg = new SolidColourItem(group);
     bg->setRect(0.0f, 0.0f, 1.0f, 1.0f);
-    bg->setColour(QColor(0x0f, 0x0f, 0x1a));
+    bg->setColour(QColor(0x08, 0x08, 0x0a) /* kAppBg, nicht das alte Blau (2026-11-04) */);
     bg->setZOrder(0);
     group->addItem(bg);
     auto* vfo = new VfoDisplayItem(group);
@@ -1574,7 +1574,7 @@ ItemGroup* ItemGroup::createClockPreset(QObject* parent)
     auto* group = new ItemGroup(QStringLiteral("Clock"), parent);
     auto* bg = new SolidColourItem(group);
     bg->setRect(0.0f, 0.0f, 1.0f, 0.15f);
-    bg->setColour(QColor(0x0f, 0x0f, 0x1a));
+    bg->setColour(QColor(0x08, 0x08, 0x0a) /* kAppBg, nicht das alte Blau (2026-11-04) */);
     bg->setZOrder(0);
     group->addItem(bg);
     auto* clock = new ClockItem(group);
@@ -1589,7 +1589,7 @@ ItemGroup* ItemGroup::createContestPreset(QObject* parent)
     auto* group = new ItemGroup(QStringLiteral("Contest"), parent);
     auto* bg = new SolidColourItem(group);
     bg->setRect(0.0f, 0.0f, 1.0f, 1.0f);
-    bg->setColour(QColor(0x0f, 0x0f, 0x1a));
+    bg->setColour(QColor(0x08, 0x08, 0x0a) /* kAppBg, nicht das alte Blau (2026-11-04) */);
     bg->setZOrder(0);
     group->addItem(bg);
     auto* vfo = new VfoDisplayItem(group);

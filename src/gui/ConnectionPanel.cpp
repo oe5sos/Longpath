@@ -739,7 +739,7 @@ void ConnectionPanel::buildUI()
 
     // Apply dark theme to dialog
     setStyleSheet(Style::themed(QStringLiteral(
-        "QDialog { background: #0f0f1a; }"
+        "QDialog { background: #08080a; }"
         "QGroupBox {"
         "  color: #8090a0;"
         "  border: 1px solid #203040;"

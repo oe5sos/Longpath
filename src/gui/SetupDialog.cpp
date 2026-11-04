@@ -163,7 +163,7 @@ SetupDialog::SetupDialog(RadioModel* model, QWidget* parent)
     setWindowTitle("Longpath Settings");
     setMinimumSize(820, 600);
     resize(900, 650);
-    setStyleSheet(Style::themed("QDialog { background: #0f0f1a; }"));
+    setStyleSheet(Style::themed("QDialog { background: #08080a; }"));
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -196,7 +196,7 @@ SetupDialog::SetupDialog(RadioModel* model, QWidget* parent)
 
     // Stacked widget for page content
     m_stack = new QStackedWidget;
-    m_stack->setStyleSheet(Style::themed("QStackedWidget { background: #0f0f1a; }"));
+    m_stack->setStyleSheet(Style::themed("QStackedWidget { background: #08080a; }"));
 
     splitter->addWidget(m_tree);
     splitter->addWidget(m_stack);

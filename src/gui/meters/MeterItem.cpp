@@ -1510,7 +1510,7 @@ void NeedleItem::paintBackground(QPainter& p, int widgetW, int widgetH)
     const float ph = static_cast<float>(rect.height());
 
     // Background fill — from AetherSDR SMeterWidget.cpp line 197
-    p.fillRect(rect, QColor(0x0f, 0x0f, 0x1a));
+    p.fillRect(rect, QColor(0x08, 0x08, 0x0a) /* kAppBg, nicht das alte Blau (2026-11-04) */);
 
     // From AetherSDR: cx = width*0.5, radius = width*0.85
     // cy = height + radius - height*0.65

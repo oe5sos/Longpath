@@ -1158,7 +1158,7 @@ inline QString titleBarStyle()
 // layouts directly (CatNetwork, Keyboard, Diagnostics pages).
 
 constexpr auto kPageStyle =
-    "QWidget { background: #0f0f1a; color: #c8d8e8; }";
+    "QWidget { background: #08080a; color: #c8d8e8; }";   // kAppBg -- das alte Blau #0f0f1a ist seit 2026-11-04 verboten (tst_kein_blauer_grund)
 
 constexpr auto kGroupBoxStyle =
     // Eine Gruppe ist eine Platte im Panel: feiner Rahmen mit Licht-

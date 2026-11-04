@@ -76,10 +76,10 @@ void SetupPage::init(const QString& title)
     auto* scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setStyleSheet(Style::themed("QScrollArea { background: #0f0f1a; border: none; }"));
+    scroll->setStyleSheet(Style::themed("QScrollArea { background: #08080a; border: none; }"));
 
     auto* contentWidget = new QWidget;
-    contentWidget->setStyleSheet(Style::themed("QWidget { background: #0f0f1a; }"));
+    contentWidget->setStyleSheet(Style::themed("QWidget { background: #08080a; }"));
 
     m_contentLayout = new QVBoxLayout(contentWidget);
     m_contentLayout->setContentsMargins(0, 4, 0, 4);

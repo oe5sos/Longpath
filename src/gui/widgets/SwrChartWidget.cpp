@@ -230,7 +230,7 @@ void SwrChartWidget::paintEvent(QPaintEvent* /*ev*/)
                      height() - kMarginT - kMarginB);
 
     // Background.
-    p.fillRect(rect(), QColor(0x0f, 0x0f, 0x1a));
+    p.fillRect(rect(), QColor(0x08, 0x08, 0x0a) /* kAppBg, nicht das alte Blau (2026-11-04) */);
     p.fillRect(plot, QColor(Style::hexRole(Style::kBadgeInfoBg)));
 
     const double yMin = 1.0;

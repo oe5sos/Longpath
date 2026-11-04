@@ -36,7 +36,7 @@ ParkInfoDialog::ParkInfoDialog(QWidget* parent)
     setWindowTitle("Park Info");
     setModal(false);
     setMinimumWidth(420);
-    setStyleSheet("QDialog { background: #0f0f1a; }");
+    setStyleSheet("QDialog { background: #08080a; }");   // kAppBg
 
     auto* layout = new QVBoxLayout(this);
 

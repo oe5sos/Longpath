@@ -100,7 +100,7 @@ QVariant SpotTableModel::data(const QModelIndex& index, int role) const
             // of inventing a new color; the highlight color itself
             // stays the operator's choice via the swatch button.
             if (m_watchColor.isValid() && matchesWatchTerms(spot))
-                return QColor(0x0f, 0x0f, 0x1a);
+                return QColor(0x08, 0x08, 0x0a);   // kAppBg als dunkle Schrift auf der Beobachtungsfarbe
             return QColor(0x00, 0xb4, 0xd8);  // accent
         }
         if (index.column() == ColFreq)

@@ -191,7 +191,7 @@ constexpr const char* kAutoToggleStyle =
     "QPushButton:!checked { background: #33280f; }";
 
 const QString kStartBtnStyle = QStringLiteral(
-    "QPushButton { background: #4a7ba8; color: #0f0f1a; font-weight: bold; "
+    "QPushButton { background: #4a7ba8; color: #08080a; font-weight: bold; "
     "border: 1px solid #4a7ba8; padding: 4px; border-radius: 6px; }"
     "QPushButton:hover { background: #4a7ba8; }"
     "QPushButton:disabled { background: %1; color: #4e4e53; }")
@@ -232,7 +232,7 @@ constexpr const char* kFilterPillStyle =
     "}"
     "QPushButton:checked {"
     "  background: #4a7ba8;"
-    "  color: #0f0f1a;"
+    "  color: #08080a;"
     "  border-color: #4a7ba8;"
     "}"
     "QPushButton:hover { border-color: #c8d8e8; }";

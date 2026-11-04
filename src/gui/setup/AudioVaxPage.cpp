@@ -688,7 +688,7 @@ void VaxChannelCard::onAutoDetectClicked()
     ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
     QMenu& menu = *menuOwner.get();
     menu.setStyleSheet(Style::themed(
-        "QMenu { background: #0f0f1a; color: #c8d8e8; border: 1px solid #203040; }"
+        "QMenu { background: #08080a; color: #c8d8e8; border: 1px solid #203040; }"
         "QMenu::item:selected { background: #203040; }"
         "QMenu::item:disabled { color: #556070; }"));
 
