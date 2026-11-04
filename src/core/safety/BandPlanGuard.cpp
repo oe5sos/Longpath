@@ -189,7 +189,7 @@ constexpr std::array<ChannelEntry, 1> kJapanChannels60m{{
 
 // US (clsBandStackManager.cs AddRegion2BandStack, Region2 = Region.US)
 // clsBandStackManager.cs:1088-1098 [v2.10.3.13].
-constexpr std::array<BandRange, 11> kUsBandRanges{{
+constexpr std::array<BandRange, 12> kUsBandRanges{{
     { Band::Band160m, 1'800'000,  2'000'000 },
     { Band::Band80m,  3'500'000,  4'000'000 },
     { Band::Band40m,  7'000'000,  7'300'000 },
@@ -201,11 +201,23 @@ constexpr std::array<BandRange, 11> kUsBandRanges{{
     { Band::Band10m, 28'000'000, 29'700'000 },
     { Band::Band6m,  50'000'000, 54'000'000 },
     { Band::Band60m,  5'100'000,  5'500'000 },  // overlaid by kUsChannels60m
+    // ── 2 m, fuer den Transverter (2026-11-04) ───────────────────────
+    //
+    // Mit einem Transverter sendet das Geraet auf der ZF (beim MV-2
+    // auf 28 MHz), auf der Antenne liegen aber 144 MHz. Bis heute
+    // kannte diese Tabelle kein 2 m, und der Waechter urteilte darum
+    // immer ueber die ZF: die 10-m-Kante bei 29,700 MHz entspricht
+    // 145,700 MHz, und die oberen 300 kHz von 2 m waren damit
+    // gesperrt, obwohl erlaubt. Die Kante kommt aus der hauseigenen
+    // Tabelle (core/antenna/AmateurBands.cpp), nicht aus Thetis --
+    // Thetis endet bei 6 m.
+    // Region 2: 144-148 (FCC 47 CFR 97.301)
+    { Band::Band2m, 144'000'000, 148'000'000 },
 }};
 
 // Europe / Region 1 (clsBandStackManager.cs AddRegion1BandStack)
 // clsBandStackManager.cs:1104-1116 [v2.10.3.13].
-constexpr std::array<BandRange, 11> kEuropeBandRanges{{
+constexpr std::array<BandRange, 12> kEuropeBandRanges{{
     { Band::Band160m, 1'810'000,  2'000'000 },
     { Band::Band80m,  3'500'000,  3'800'000 },
     { Band::Band40m,  7'000'000,  7'200'000 },
@@ -237,11 +249,14 @@ constexpr std::array<BandRange, 11> kEuropeBandRanges{{
     // same WRC-15 fifteen kilohertz. The UK and Japan have their own
     // channel tables and are untouched.
     { Band::Band60m,  5'351'500,  5'366'500 },
+    // 2 m fuer den Transverter -- siehe kUsBandRanges.
+    // Region 1: 144-146
+    { Band::Band2m, 144'000'000, 146'000'000 },
 }};
 
 // United Kingdom (clsBandStackManager.cs AddRegion1BandStack with UK edits)
 // clsBandStackManager.cs:1409-1435 [v2.10.3.13].
-constexpr std::array<BandRange, 11> kUkBandRanges{{
+constexpr std::array<BandRange, 12> kUkBandRanges{{
     { Band::Band160m, 1'810'000,  2'000'000 },
     { Band::Band80m,  3'500'000,  3'800'000 },
     { Band::Band40m,  7'000'000,  7'200'000 },
@@ -253,10 +268,13 @@ constexpr std::array<BandRange, 11> kUkBandRanges{{
     { Band::Band10m, 28'000'000, 29'700'000 },
     { Band::Band6m,  50'030'000, 52'000'000 },
     { Band::Band60m,  5'250'000,  5'410'000 },  // overlaid by kUkChannels60m
+    // 2 m fuer den Transverter -- siehe kUsBandRanges.
+    // Region 1: 144-146
+    { Band::Band2m, 144'000'000, 146'000'000 },
 }};
 
 // Japan (clsBandStackManager.cs:1467-1480 [v2.10.3.13]).
-constexpr std::array<BandRange, 11> kJapanBandRanges{{
+constexpr std::array<BandRange, 12> kJapanBandRanges{{
     { Band::Band160m, 1'830'000,  1'912'500 },
     { Band::Band80m,  3'500'000,  3'805'000 },
     { Band::Band60m,  4'629'995,  4'630'005 },  // overlaid by kJapanChannels60m
@@ -268,10 +286,13 @@ constexpr std::array<BandRange, 11> kJapanBandRanges{{
     { Band::Band12m, 24'890'000, 24'990'000 },
     { Band::Band10m, 28'000'000, 29'700'000 },
     { Band::Band6m,  50'000'000, 52'000'000 },
+    // 2 m fuer den Transverter -- siehe kUsBandRanges.
+    // Japan: 144-146, enger als der R3-Plan -- enger ist die sichere Richtung
+    { Band::Band2m, 144'000'000, 146'000'000 },
 }};
 
 // Australia (clsBandStackManager.cs:1483-1499 [v2.10.3.13]).
-constexpr std::array<BandRange, 11> kAustraliaBandRanges{{
+constexpr std::array<BandRange, 12> kAustraliaBandRanges{{
     { Band::Band160m, 1'810'000,  1'875'000 },
     { Band::Band80m,  3'500'000,  3'800'000 },
     { Band::Band60m,  5'000'000,  7'000'000 },  // wide allocation
@@ -283,10 +304,13 @@ constexpr std::array<BandRange, 11> kAustraliaBandRanges{{
     { Band::Band12m, 24'890'000, 24'990'000 },
     { Band::Band10m, 28'000'000, 29'700'000 },
     { Band::Band6m,  50'000'000, 54'000'000 },
+    // 2 m fuer den Transverter -- siehe kUsBandRanges.
+    // Australien: 144-148 (ACMA)
+    { Band::Band2m, 144'000'000, 148'000'000 },
 }};
 
 // Spain (clsBandStackManager.cs:1440-1465 [v2.10.3.13]).
-constexpr std::array<BandRange, 11> kSpainBandRanges{{
+constexpr std::array<BandRange, 12> kSpainBandRanges{{
     { Band::Band160m, 1'810'000,  2'000'000 },
     { Band::Band80m,  3'500'000,  3'800'000 },
     { Band::Band60m,  5'100'000,  5'500'000 },
@@ -298,6 +322,9 @@ constexpr std::array<BandRange, 11> kSpainBandRanges{{
     { Band::Band12m, 24'890'000, 24'990'000 },
     { Band::Band10m, 28'000'000, 29'700'000 },
     { Band::Band6m,  50'000'000, 52'000'000 },
+    // 2 m fuer den Transverter -- siehe kUsBandRanges.
+    // Region 1: 144-146
+    { Band::Band2m, 144'000'000, 146'000'000 },
 }};
 
 // ---------------------------------------------------------------------------

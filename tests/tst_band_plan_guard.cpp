@@ -35,6 +35,13 @@ private slots:
     void australia6m_outOfBand_returnsFalse();
     void spain20m_inBand_returnsTrue();
     void spain6m_outOfBand_returnsFalse();
+
+    // ── 2 m, fuer den Transverter (2026-11-04) ──────────────────────
+    void zweiMeter_untereKante_erlaubt();
+    void zweiMeter_obereKanteRegion1_erlaubt();
+    void zweiMeter_ueberRegion1_abgelehnt();
+    void zweiMeter_usReichtBis148();
+    void zweiMeter_unterhalbDerKante_abgelehnt();
 };
 
 void TestBandPlanGuard::us60m_validChannelCenter_returnsTrue()
@@ -265,6 +272,58 @@ void TestBandPlanGuard::spain6m_outOfBand_returnsFalse()
     // (clsBandStackManager.cs:1464 [v2.10.3.13])
     BandPlanGuard guard;
     QVERIFY(!guard.isValidTxFreq(Region::Spain, 52'500'000, DSPMode::USB, false));
+}
+
+// ── 2 m, fuer den Transverter ──────────────────────────────────────
+//
+// Mit einem Transverter sendet das Geraet auf der ZF (beim MV-2 auf
+// 28 MHz), auf der Antenne liegen aber 144 MHz. Bis 2026-11-04 kannte
+// dieser Waechter kein 2 m: die 10-m-Kante bei 29,700 MHz entspricht
+// 145,700, und die oberen 300 kHz des Bandes waren damit gesperrt,
+// obwohl erlaubt. Die Kanten kommen aus der hauseigenen Tabelle
+// (core/antenna/AmateurBands.cpp), nicht aus Thetis -- das endet
+// bei 6 m.
+
+void TestBandPlanGuard::zweiMeter_untereKante_erlaubt()
+{
+    BandPlanGuard guard;
+    // Die SSB-Anruffrequenz der Region 1, und damit die Stelle, an der
+    // ein Contest auf 2 m beginnt.
+    QVERIFY(guard.isValidTxFreq(Region::Europe, 144'300'000, DSPMode::USB, false));
+    QVERIFY(guard.isValidTxFreq(Region::Europe, 144'000'000, DSPMode::USB, false));
+}
+
+void TestBandPlanGuard::zweiMeter_obereKanteRegion1_erlaubt()
+{
+    BandPlanGuard guard;
+    // 145,800 liegt ueber der alten 10-m-Kante (29,700 + 116 = 145,700)
+    // -- genau der Bereich, den der Waechter vorher abgelehnt hat.
+    QVERIFY(guard.isValidTxFreq(Region::Europe, 145'800'000, DSPMode::USB, false));
+    QVERIFY(guard.isValidTxFreq(Region::Europe, 146'000'000, DSPMode::USB, false));
+}
+
+void TestBandPlanGuard::zweiMeter_ueberRegion1_abgelehnt()
+{
+    BandPlanGuard guard;
+    // 146,500 ist in Region 1 kein Amateurband. Der Waechter wurde
+    // erweitert, nicht geoeffnet.
+    QVERIFY(!guard.isValidTxFreq(Region::Europe, 146'500'000, DSPMode::USB, false));
+    QVERIFY(!guard.isValidTxFreq(Region::UnitedKingdom, 146'500'000, DSPMode::USB, false));
+}
+
+void TestBandPlanGuard::zweiMeter_usReichtBis148()
+{
+    BandPlanGuard guard;
+    QVERIFY(guard.isValidTxFreq(Region::UnitedStates, 147'000'000, DSPMode::USB, false));
+    QVERIFY(!guard.isValidTxFreq(Region::UnitedStates, 148'500'000, DSPMode::USB, false));
+}
+
+void TestBandPlanGuard::zweiMeter_unterhalbDerKante_abgelehnt()
+{
+    BandPlanGuard guard;
+    // Knapp darunter liegt nichts -- zwischen 6 m und 2 m ist Luft.
+    QVERIFY(!guard.isValidTxFreq(Region::Europe, 143'900'000, DSPMode::USB, false));
+    QVERIFY(!guard.isValidTxFreq(Region::Europe, 100'000'000, DSPMode::USB, false));
 }
 
 QTEST_GUILESS_MAIN(TestBandPlanGuard)

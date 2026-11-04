@@ -126,7 +126,22 @@ enum class Band : int {
     Band14m,
     Band13m,
     Band11m,
-    Count = 27,
+
+    // ── 2 m, HINTEN angehaengt (2026-11-04) ──────────────────────────
+    //
+    // Nicht hinter Band6m eingefuegt, wo es der Ordnung nach hingehoert:
+    // die Zahlwerte dieser Aufzaehlung stehen in den Einstellungen des
+    // Bedieners (je Band ein Eintrag). Ein Einschub haette jedes Band
+    // dahinter um eins verschoben und damit die gespeicherten Werte
+    // aller Bediener auf das jeweils falsche Band gelegt. Angehaengt
+    // bleibt jeder vorhandene Zahlwert, der er war.
+    //
+    // Gebraucht wird es fuer den Bandplan: mit Transverter sendet das
+    // Geraet zwar auf der ZF, auf der Antenne liegen aber 2 m, und der
+    // Waechter muss das Band kennen, um es erlauben zu koennen (siehe
+    // core/safety/BandPlanGuard.cpp).
+    Band2m,
+    Count = 28,
 
     // Iteration aliases for SWL-only loops (e.g. OcOutputsSwlTab matrix
     // build, HERCULES SWL pin-7 auto-fill).

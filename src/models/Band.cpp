@@ -121,6 +121,10 @@ QString bandLabel(Band b)
         case Band::Band12m:  return QStringLiteral("12m");
         case Band::Band10m:  return QStringLiteral("10m");
         case Band::Band6m:   return QStringLiteral("6m");
+        // 2 m kommt nur mit Transverter vor (siehe Band.h); die
+        // Beschriftung gehoert trotzdem hierher, sonst steht im
+        // Logbuch und in jeder Anzeige ein leerer Name.
+        case Band::Band2m:   return QStringLiteral("2m");
         case Band::GEN:      return QStringLiteral("GEN");
         case Band::WWV:      return QStringLiteral("WWV");
         case Band::XVTR:     return QStringLiteral("XVTR");
