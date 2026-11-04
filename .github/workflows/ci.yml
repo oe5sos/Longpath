@@ -27,6 +27,8 @@ jobs:
     name: Compliance & Provenance
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Verify Thetis license headers
         run: python3 scripts/verify-thetis-headers.py
@@ -488,6 +490,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       # ------------------------------------------------------------------
       # Linux dependencies
@@ -1203,6 +1207,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install system dependencies
         run: |
@@ -1334,6 +1340,8 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install system dependencies
         run: |

@@ -64,6 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           fetch-depth: 0
           ref: ${{ github.event.inputs.tag || github.ref }}
 
@@ -161,6 +162,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Install system dependencies
@@ -410,6 +412,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           ref: ${{ needs.prepare.outputs.tag }}
 
       # Qt 6.8 linkt am Mac noch AGL.framework mit; das macOS-26-SDK
@@ -750,6 +753,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Set up MSVC
@@ -935,6 +939,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          submodules: recursive
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.tag }}
 

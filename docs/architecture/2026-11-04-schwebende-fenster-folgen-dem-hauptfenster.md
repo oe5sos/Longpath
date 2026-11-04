@@ -150,6 +150,17 @@ Wertschrift), und am Mindestmaß ist es da, klein, statt weg. Und „bei
 karte und verbindungen sollten die rotoren eher mittig sein": die
 Rotorscheiben in der Kartenspalte stehen in der Spaltenmitte.
 
+## 5. Die Fassung 0.9.0 hatte das alles nicht
+
+Gefunden am Gerät, 13:57: der Updater holte 0.9.0 (Release-Lauf von
+main), und dort fehlte Tools › Contest Logbook — „hier ist nun nichts
+mehr zu finden". Die Release- und CI-Läufe checkten ohne Submodule aus;
+`LONGPATH_CONTESTPROGRAMM` ist „AUS, wenn das Submodul fehlt", also kam
+das seit #381 gemergte Fenster in keine Fassung. Jeder `actions/checkout`
+in `ci.yml` und `release.yml` hat jetzt `submodules: recursive`; CI und
+Release bauen das Contestprogramm mit, und `tst_contestfenster` läuft
+in der CI.
+
 ## Was bewusst NICHT passiert
 
 * Kein Mitziehen bei jedem Pixel eines Größenzugs — Nachlauf, wie beim
