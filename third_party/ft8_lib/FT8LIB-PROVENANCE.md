@@ -158,6 +158,31 @@ Die Reihenfolge in `ftx_message_encode()` ist ebenfalls die von
 WSJT-X: Typ 5 als letzter Sonderfall, **vor** dem Freitext-Rückfall
 (`packjt77.f90:186-190`).
 
+#### Unabhängig bestätigt: MSHV kommt auf dieselben Bitgrenzen
+
+Die Bitlage stammt aus WSJT-X. Eine zweite, unabhängig geschriebene
+Umsetzung derselben Spezifikation bestätigt sie Feld für Feld —
+MSHV (LZ2HV, GPLv3), `src/HvMsPlayer/libsound/HvPackUnpackMsg/pack_unpack_msg77.cpp:883-901`:
+
+```cpp
+else if (i3==5)//2.39 new EU VHF contest
+    int n12     = BinToInt32(c77,0,12);
+    int n22     = BinToInt32(c77,12,34);
+    int ir      = BinToInt32(c77,34,35);
+    int irpt    = BinToInt32(c77,35,38);
+    int iserial = BinToInt32(c77,38,49);
+    int igrid6  = BinToInt32(c77,49,74);
+    if (igrid6<0 || igrid6>18662399) { unpk77_success=false; return ""; }
+```
+
+Dieselben sechs Grenzen, dieselbe Locator-Schranke, dasselbe
+Zusammensetzen von `cexch` aus `52+irpt` und vier Stellen Nummer. Das
+ist mehr wert als ein weiterer eigener Prüffall: zwei Umsetzungen, die
+sich nicht kennen, sind an derselben Stelle gleich.
+
+(Fact-only-Zitat, kein Port — MSHV-PROVENANCE.md führt die Bibliothek
+bereits.)
+
 #### Die Grenze, die das Format setzt
 
 **Eine laufende Nummer über 2047 wird still auf 2047 gekappt.** Das
