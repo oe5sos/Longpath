@@ -59,7 +59,7 @@ void FilterPresetEditDialog::buildUi(const FilterPreset& current)
     setMinimumWidth(300);
 
     static const QString kDialogStyle = QStringLiteral(
-        "QDialog { background: #0f0f1a; color: #c8d8e8; }"
+        "QDialog { background: #08080a; color: #c8d8e8; }"
         "QLabel  { color: #c8d8e8; }"
         "QLineEdit, QSpinBox { background: #1a1a2a; color: #c8d8e8; border: 1px solid #304050; "
         "  border-radius: 6px; padding: 2px 4px; }"

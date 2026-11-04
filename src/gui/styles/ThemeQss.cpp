@@ -38,7 +38,7 @@ const QVector<ThemeEntry>& table()
 {
     static const QVector<ThemeEntry> t = {
         // Flächen
-        { "app-bg",            "#0f0f1a", Style::kAppBg },
+        { "app-bg",            "#08080a", Style::kAppBg },
         { "panel",             "#0a0a18", Style::kPanelBg },
         { "statusbar-bg",      "#0a0a14", Style::kStatusBarBg },
         { "disabled-bg",       "#1a1a2a", Style::kDisabledBg },

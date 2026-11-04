@@ -454,8 +454,8 @@ NrAnfSetupPage::NrAnfSetupPage(RadioModel* model, QWidget* parent)
         auto* scroll = new QScrollArea;
         scroll->setWidgetResizable(true);
         scroll->setFrameShape(QFrame::NoFrame);
-        scroll->setStyleSheet(Style::themed("QScrollArea { background: #0f0f1a; border: none; }"));
-        page->setStyleSheet(Style::themed("QWidget { background: #0f0f1a; }"));
+        scroll->setStyleSheet(Style::themed("QScrollArea { background: #08080a; border: none; }"));
+        page->setStyleSheet(Style::themed("QWidget { background: #08080a; }"));
         auto* vlay = new QVBoxLayout(page);
         vlay->setContentsMargins(8, 8, 8, 8);
         vlay->setSpacing(6);

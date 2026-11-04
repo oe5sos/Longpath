@@ -218,7 +218,7 @@ constexpr const char* kBtnStyle =
 const QString kOkBtnStyle = QStringLiteral(
     "QPushButton {"
     "  background: #4a7ba8;"
-    "  color: #0f0f1a;"
+    "  color: #08080a;"
     "  border: 1px solid %1;"
     "  border-radius: 6px;"
     "  padding: 4px 8px;"
@@ -237,7 +237,7 @@ constexpr const char* kListStyle =
     "}"
     "QListWidget::item:selected {"
     "  background: #4a7ba8;"
-    "  color: #0f0f1a;"
+    "  color: #08080a;"
     "}";
 
 constexpr const char* kLabelStyle =
@@ -305,7 +305,7 @@ void ContainerSettingsDialog::buildLayout()
     root->setSpacing(6);
 
     // Dark dialog background
-    setStyleSheet(Style::themed("QDialog { background: #0f0f1a; color: #c8d8e8; }"));
+    setStyleSheet(Style::themed("QDialog { background: #08080a; color: #c8d8e8; }"));
 
     // --- Container-level properties bar (top) ---
     buildContainerPropertiesSection(root);
@@ -810,14 +810,14 @@ void ContainerSettingsDialog::buildContainerPropertiesSection(QVBoxLayout* paren
     bgLabel->setStyleSheet(kLabelStyle);
     m_bgColorBtn = new QPushButton(QStringLiteral("  "), bar);
     m_bgColorBtn->setStyleSheet(Style::themed(
-        "QPushButton { background: #0f0f1a; border: 1px solid #205070;"
+        "QPushButton { background: #08080a; border: 1px solid #205070;"
         "  border-radius: 6px; min-width: 32px; min-height: 18px; }"
         "QPushButton:hover { border-color: #4a7ba8; }"));
     m_bgColorBtn->setAutoDefault(false);
     m_bgColorBtn->setDefault(false);
     m_bgColorBtn->setToolTip(QStringLiteral("Choose background color"));
     connect(m_bgColorBtn, &QPushButton::clicked, this, [this]() {
-        QColor initial(QStringLiteral("#0f0f1a"));
+        QColor initial(QStringLiteral("#08080a"));
         QColor chosen = QColorDialog::getColor(initial, this,
                                                QStringLiteral("Background Color"), QColorDialog::DontUseNativeDialog);
         if (chosen.isValid()) {
@@ -1077,7 +1077,7 @@ void ContainerSettingsDialog::onItemSelectionChanged()
         "QScrollArea { background: #0a0a18; border: 1px solid #203040; }"
         "QScrollArea > QWidget > QWidget { background: #0a0a18; }"
         "QScrollBar:vertical {"
-        "  background: #0f0f1a; width: 10px; margin: 0;"
+        "  background: #08080a; width: 10px; margin: 0;"
         "}"
         "QScrollBar::handle:vertical {"
         "  background: #205070; border-radius: 2px; min-height: 24px;"
@@ -1118,7 +1118,7 @@ void ContainerSettingsDialog::onAddItem()
                        "}"
                        "QMenu::item:selected {"
                        "  background: #4a7ba8;"
-                       "  color: #0f0f1a;"
+                       "  color: #08080a;"
                        "}"
                        "QMenu::separator {"
                        "  background: #203040;"
@@ -1986,7 +1986,7 @@ void ContainerSettingsDialog::onLoadPreset()
 {
     constexpr const char* kMenuStyle =
         "QMenu { background: #1a2a3a; color: #c8d8e8; border: 1px solid #205070; }"
-        "QMenu::item:selected { background: #4a7ba8; color: #0f0f1a; }"
+        "QMenu::item:selected { background: #4a7ba8; color: #08080a; }"
         "QMenu::separator { background: #203040; height: 1px; }";
 
     ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h

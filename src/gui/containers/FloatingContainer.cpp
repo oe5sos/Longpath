@@ -80,7 +80,7 @@ FloatingContainer::FloatingContainer(int rxSource, QWidget* parent)
 {
     setMinimumSize(ContainerWidget::kMinContainerWidth,
                    ContainerWidget::kMinContainerHeight);
-    setStyleSheet(Style::themed(QStringLiteral("background: #0f0f1a;")));
+    setStyleSheet(Style::themed(QStringLiteral("background: #08080a;")));
     updateTitle();
 
     // Ein sichtbarer Anfasser unten rechts. ContainerWidget kann zwar

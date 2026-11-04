@@ -72,7 +72,7 @@ namespace Longpath {
 namespace {
 
 constexpr const char* kPickerStyle =
-    "QDialog { background: #0f0f1a; color: #c8d8e8; }"
+    "QDialog { background: #08080a; color: #c8d8e8; }"
     "QLabel { color: #c8d8e8; font-size: 11px; }"
     "QTreeWidget {"
     "  background: #0a0a18; color: #c8d8e8;"
@@ -85,7 +85,7 @@ constexpr const char* kPickerStyle =
     "  padding: 3px 10px; min-height: 20px;"
     "}"
     "QPushButton:hover { background: #203040; }"
-    "QPushButton:pressed { background: #4a7ba8; color: #0f0f1a; }";
+    "QPushButton:pressed { background: #4a7ba8; color: #08080a; }";
 
 } // namespace
 

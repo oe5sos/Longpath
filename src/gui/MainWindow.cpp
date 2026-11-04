@@ -1242,7 +1242,7 @@ MainWindow::MainWindow(QWidget* parent)
             m_wisdomDialog->setMinimumDuration(0);
             m_wisdomDialog->setWindowModality(Qt::ApplicationModal);
             m_wisdomDialog->setStyleSheet(Style::themed(QStringLiteral(
-                "QProgressDialog { background: #0f0f1a; }"
+                "QProgressDialog { background: #08080a; }"
                 "QLabel { color: #c8d8e8; font-size: 13px; }"
                 "QProgressBar {"
                 "  text-align: center; font-size: 13px;"
@@ -17144,7 +17144,7 @@ void MainWindow::applyDarkTheme()
             .arg(Style::hexRole(Style::kAccent));
 
     setStyleSheet(Style::themed(separatorStyle + QStringLiteral(
-        "QMainWindow { background: #0f0f1a; }"
+        "QMainWindow { background: #08080a; }"   // kAppBg, nicht das alte Blau (2026-11-04)
         "QMenuBar {"
         "  background: #1a2a3a;"
         "  color: #c8d8e8;"
@@ -21149,7 +21149,7 @@ void MainWindow::showFeatureRequestDialogImpl()
     sDlg = dlg;
     dlg->setWindowTitle(QStringLiteral("AI-Assisted Issue Reporter"));
     dlg->setAttribute(Qt::WA_DeleteOnClose);
-    dlg->setStyleSheet(Style::themed(QStringLiteral("QDialog { background: #0f0f1a; }")));
+    dlg->setStyleSheet(Style::themed(QStringLiteral("QDialog { background: #08080a; }")));
     dlg->setMinimumWidth(620);
 
     auto* vbox = new QVBoxLayout(dlg);
@@ -21217,7 +21217,7 @@ void MainWindow::showFeatureRequestDialogImpl()
     auto* submitBtn = new QPushButton(QStringLiteral("Submit Your Idea"), dlg);
     submitBtn->setAutoDefault(false);
     submitBtn->setStyleSheet(Style::themed(QStringLiteral(
-        "QPushButton { background: #4a7ba8; color: #0f0f1a; font-weight: bold; "
+        "QPushButton { background: #4a7ba8; color: #08080a; font-weight: bold; "
         "border-radius: 6px; padding: 8px 20px; font-size: 13px; }"
         "QPushButton:hover { background: #4a7ba8; }")));
     connect(submitBtn, &QPushButton::clicked, dlg, [dlg] {
