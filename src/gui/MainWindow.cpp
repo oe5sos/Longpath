@@ -12621,6 +12621,19 @@ void MainWindow::buildMenuBar()
             // sich beim Aufgehen gleich CAT und Wasserfall.
             QTimer::singleShot(0, this, &MainWindow::openContestFenster);
         }
+
+        // Jedes Panel des Contestprogramms einzeln (2026-11-04). Betreiber:
+        // "jedes panel vom contestprogramm sollte in longpath eigens
+        // hinzuzufuegen sein, das waere die beste version." Und davor:
+        // ist das Logbuch das aktive Fenster, zeigt die Menueleiste weder
+        // Longpaths Menues noch das Fenster-Menue des Contestprogramms --
+        // darum liegt die Liste HIER. Gefuellt beim Aufklappen, weil der
+        // Stand (schwebend oder nicht) sich im Logbuch selbst aendert.
+        QMenu* panelMenu = toolsMenu->addMenu(tr("Contest logbook &panels"));
+        panelMenu->setObjectName(QStringLiteral("menuContestPanels"));
+        connect(panelMenu, &QMenu::aboutToShow, this,
+                [this, panelMenu]() { fuelleContestPanelMenu(panelMenu); });
+        fuelleContestPanelMenu(panelMenu);
     }
 #endif
 
@@ -16456,6 +16469,23 @@ void MainWindow::profilNachstellen(
     m_layoutProfiles->activate(passt);
 }
 
+// Haengt `w` -- ueber beliebig viele Fensterstufen -- am Hauptfenster
+// `haupt`? Longpaths eigene Panels sind direkte Fensterkinder; die
+// Panels des Contestprogramms (2026-11-04) sind Fensterkinder des
+// Logbuch-Fensters, das seinerseits am Hauptfenster haengt. Beide sollen
+// mitziehen, ins Dock gehen und von den Bedienleisten herunter.
+static bool schwebtUnter(const QWidget* w, const QWidget* haupt)
+{
+    if (!w || !haupt || w == haupt) { return false; }
+    // Von Fenster zu Fenster nach oben: window() ist das umschliessende
+    // Fenster, dessen parentWidget() das naechste darueber.
+    for (const QWidget* fenster = w->parentWidget() ? w->parentWidget()->window() : nullptr;
+         fenster; fenster = fenster->parentWidget() ? fenster->parentWidget()->window() : nullptr) {
+        if (fenster == haupt) { return true; }
+    }
+    return false;
+}
+
 void MainWindow::schutzrahmenNachziehen()
 {
     if (m_shuttingDown) { return; }
@@ -16539,8 +16569,7 @@ int MainWindow::schwebendeMitziehen()
     for (QWidget* w : QApplication::topLevelWidgets()) {
         if (!w || w == this || !w->isVisible()) { continue; }
         if (w->isModal() || qobject_cast<QDialog*>(w)) { continue; }
-        const QWidget* eltern = w->parentWidget();
-        if (!eltern || eltern->window() != this) { continue; }
+        if (!schwebtUnter(w, this)) { continue; }
         if (w->isMaximized() || w->isFullScreen()) { continue; }
 
         const QRect r = w->frameGeometry();
@@ -16583,8 +16612,7 @@ int MainWindow::schwebendeAusDemSchutzrahmenHolen()
         // Einstellungsfenster ueber der Statuszeile ist kein Problem --
         // es geht wieder zu.
         if (w->isModal() || qobject_cast<QDialog*>(w)) { continue; }
-        const QWidget* eltern = w->parentWidget();
-        if (!eltern || eltern->window() != this) { continue; }
+        if (!schwebtUnter(w, this)) { continue; }
 
         const QRect alt = w->frameGeometry();
         QRect platz;
@@ -17198,19 +17226,21 @@ void MainWindow::legeSchwebendeFensterInsDock()
     // das Dock das Fenster zweimal meldet) darf die Liste nicht leeren.
     QList<QPointer<QWidget>> jetzt;
     versteckeSchwebendeFenster(jetzt);
-#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
-    // Das Contest-Logbuch ist seit 2026-11-04 ein Fenster derselben Ebene
-    // (Qt::Tool) und bliebe beim Minimieren genauso stehen wie die Panels.
-    // NICHT in versteckeSchwebendeFenster(): hinter die Connect-Maske soll
-    // es nicht -- ein Funkgeraetewechsel mitten im Contest darf das Log
-    // nicht wegraeumen.
-    if (m_contestFenster) {
-        if (QWidget* log = m_contestFenster->fenster(); log && log->isVisible()) {
-            log->hide();
-            jetzt.append(log);
-        }
+    // Das Contest-Logbuch (seit 2026-11-04 ein Fenster derselben Ebene,
+    // Qt::Tool) und seine einzeln geholten Panels bleiben beim Minimieren
+    // genauso stehen wie Longpaths Panels. NICHT in
+    // versteckeSchwebendeFenster(): hinter die Connect-Maske soll das Log
+    // nicht -- ein Funkgeraetewechsel mitten im Contest darf es nicht
+    // wegraeumen. Aufzaehlung ueber die Fensterkette (schwebtUnter), weil
+    // die Panels des Contestprogramms am Logbuch haengen, nicht an uns.
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (!w || w == this || !w->isVisible()) { continue; }
+        if (w->isModal() || qobject_cast<QDialog*>(w)) { continue; }
+        if (!schwebtUnter(w, this)) { continue; }
+        if (jetzt.contains(QPointer<QWidget>(w))) { continue; }
+        w->hide();
+        jetzt.append(w);
     }
-#endif
     m_schwebendeFensterImDock.append(jetzt);
     qInfo() << "[Dock] abgelegt:" << jetzt.size() << "schwebende Fenster";
 }
@@ -18986,13 +19016,9 @@ void MainWindow::openMemories()
 // (moc), und ein fehlender Rumpf liess den Bau ohne LONGPATH_CONTESTPROGRAMM
 // am Linker stehen (gemessen 2026-11-04). Ohne Submodul gibt es keinen
 // Menueeintrag, der ihn rufen koennte; er sagt es trotzdem ins Protokoll.
-void MainWindow::openContestFenster()
+void MainWindow::bereiteContestFensterVor()
 {
-#ifndef LONGPATH_HAVE_CONTESTPROGRAMM
-    qWarning() << "Contest logbook: this build has no Contestprogramm "
-                  "(LONGPATH_CONTESTPROGRAMM off)";
-    return;
-#else
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
     if (!m_contestFenster) {
         m_contestFenster = new ContestFenster(this);
     }
@@ -19022,7 +19048,80 @@ void MainWindow::openContestFenster()
                        << "-- the logbook will show CAT as disconnected";
         }
     }
+#endif
+}
 
+void MainWindow::fuelleContestPanelMenu(QMenu* menu)
+{
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    if (!menu) { return; }
+    menu->clear();
+    for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+        // Der Titel ist der des Contestprogramms (deutsch): es IST das
+        // Contestprogramm, siehe das Blatt vom 2026-11-04.
+        QAction* a = menu->addAction(e.titel);
+        a->setObjectName(QStringLiteral("actContestPanel_%1").arg(e.id));
+        a->setCheckable(true);
+        a->setChecked(m_contestFenster && m_contestFenster->istPanelSchwebend(e.id));
+        a->setToolTip(tr("Show this Contestprogramm panel as its own window in Longpath"));
+        connect(a, &QAction::toggled, this, [this, id = e.id](bool an) {
+            if (an) {
+                contestPanelAlsFenster(id);
+            } else if (m_contestFenster) {
+                m_contestFenster->dockePanel(id);
+            }
+        });
+    }
+    menu->addSeparator();
+    QAction* alle = menu->addAction(tr("All panels as own windows"));
+    alle->setObjectName(QStringLiteral("actContestPanelsAlle"));
+    connect(alle, &QAction::triggered, this, [this]() {
+        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+            contestPanelAlsFenster(e.id);
+        }
+    });
+    QAction* zurueck = menu->addAction(tr("All panels back into the logbook"));
+    zurueck->setObjectName(QStringLiteral("actContestPanelsZurueck"));
+    zurueck->setEnabled(m_contestFenster && m_contestFenster->istOffen());
+    connect(zurueck, &QAction::triggered, this, [this]() {
+        if (!m_contestFenster) { return; }
+        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+            m_contestFenster->dockePanel(e.id);
+        }
+    });
+#else
+    Q_UNUSED(menu);
+#endif
+}
+
+void MainWindow::contestPanelAlsFenster(const QString& id)
+{
+#ifndef LONGPATH_HAVE_CONTESTPROGRAMM
+    Q_UNUSED(id);
+#else
+    bereiteContestFensterVor();
+    QString grund;
+    if (!m_contestFenster->zeigePanelAlsFenster(id, &grund, this)) {
+        ScopedChildWidget<QMessageBox> dlgOwner(this);
+        QMessageBox& box = *dlgOwner.get();
+        box.setWindowTitle(tr("Contest Logbook"));
+        box.setIcon(QMessageBox::Information);
+        box.setText(grund);
+        box.exec();
+        return;
+    }
+    qInfo() << "Contest logbook panel as own window:" << id;
+#endif
+}
+
+void MainWindow::openContestFenster()
+{
+#ifndef LONGPATH_HAVE_CONTESTPROGRAMM
+    qWarning() << "Contest logbook: this build has no Contestprogramm "
+                  "(LONGPATH_CONTESTPROGRAMM off)";
+    return;
+#else
+    bereiteContestFensterVor();
     QString grund;
     if (!m_contestFenster->oeffne(&grund, this)) {
         ScopedChildWidget<QMessageBox> dlgOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h

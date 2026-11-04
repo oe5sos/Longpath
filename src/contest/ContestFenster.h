@@ -26,6 +26,7 @@
 // =================================================================
 #pragma once
 
+#include <QList>
 #include <QObject>
 #include <QString>
 
@@ -59,6 +60,32 @@ public:
     // im vordergrund bleiben!" Auf einer Ebene gilt die Klickreihenfolge.
     // Ohne Elternfenster (Pruefstand) bleibt es ein gewoehnliches Fenster.
     bool oeffne(QString* grund = nullptr, QWidget* elternFenster = nullptr);
+    // Wie oeffne(), aber OHNE das Logbuch-Fenster zu zeigen: Controller,
+    // Datenbank und Fenster entstehen, das Fenster bleibt verborgen. Fuer
+    // die Panels einzeln (unten). Ein zweiter Aufruf tut nichts.
+    bool lade(QString* grund = nullptr, QWidget* elternFenster = nullptr);
+
+    // ── Die Panels des Contestprogramms einzeln (2026-11-04) ─────────
+    //
+    // Betreiber: "jedes panel vom contestprogramm sollte in longpath
+    // eigens hinzuzufuegen sein, das waere die beste version." Jedes
+    // Panel (Log, Chat, Karte, Bandmap, ...) laesst sich als eigenes
+    // Fenster holen, ohne das Logbuch-Hauptfenster zu zeigen. Es ist
+    // dann ein Qt::Tool-Kind des (verborgenen) Logbuch-Fensters, das
+    // seinerseits am Longpath-Hauptfenster haengt -- also auf der Ebene
+    // von Longpaths eigenen Panels. Das ✕ am Panel dockt es zurueck.
+    struct PanelEintrag { QString id; QString titel; };
+    // Alle Panels in der Reihenfolge des Contestprogramms -- auch, wenn
+    // das Logbuch noch nicht geladen ist.
+    static QList<PanelEintrag> panels();
+    bool istPanelSchwebend(const QString& id) const;
+    // Holt das Panel als eigenes Fenster; laedt das Logbuch bei Bedarf
+    // (verborgen). Ein Panel aus einem nie gezeigten Logbuch wird neben
+    // das Elternfenster gestellt, gestaffelt.
+    bool zeigePanelAlsFenster(const QString& id, QString* grund = nullptr,
+                              QWidget* elternFenster = nullptr);
+    void dockePanel(const QString& id);
+    QWidget* panelFenster(const QString& id) const;
 
     // Schliesst das Fenster und raeumt Controller und Datenbank ab.
     void schliesse();

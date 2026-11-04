@@ -45,14 +45,22 @@ QString ContestFenster::datenverzeichnis()
 
 bool ContestFenster::oeffne(QString* grund, QWidget* elternFenster)
 {
-    if (m_innen->fenster) {
+    const bool schonDa = m_innen->fenster != nullptr;
+    if (!lade(grund, elternFenster)) { return false; }
+    if (schonDa) {
         m_innen->fenster->setWindowState(
             (m_innen->fenster->windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
-        m_innen->fenster->show();
-        m_innen->fenster->raise();
-        m_innen->fenster->activateWindow();
-        return true;
     }
+    m_innen->fenster->show();
+    m_innen->fenster->raise();
+    m_innen->fenster->activateWindow();
+    if (!schonDa) { emit geoeffnet(); }
+    return true;
+}
+
+bool ContestFenster::lade(QString* grund, QWidget* elternFenster)
+{
+    if (m_innen->fenster) { return true; }
 
     const QString ordner = datenverzeichnis();
     if (!QDir().mkpath(ordner)) {
@@ -135,10 +143,63 @@ bool ContestFenster::oeffne(QString* grund, QWidget* elternFenster)
     });
     connect(m_innen->wache.get(), &Contestprogramm::SingleInstanceGuard::activateRequested,
             this, [this]() { oeffne(nullptr); });
-
-    fenster->show();
-    emit geoeffnet();
     return true;
+}
+
+// ── Die Panels einzeln ──────────────────────────────────────────────
+
+QList<ContestFenster::PanelEintrag> ContestFenster::panels()
+{
+    QList<PanelEintrag> liste;
+    for (const Contestprogramm::MainWindow::PanelEintrag& e
+         : Contestprogramm::MainWindow::panelEintraege()) {
+        liste.append({e.id, e.titel});
+    }
+    return liste;
+}
+
+bool ContestFenster::istPanelSchwebend(const QString& id) const
+{
+    return m_innen->fenster && m_innen->fenster->istPanelSchwebend(id);
+}
+
+bool ContestFenster::zeigePanelAlsFenster(const QString& id, QString* grund,
+                                          QWidget* elternFenster)
+{
+    if (!lade(grund, elternFenster)) { return false; }
+    Contestprogramm::MainWindow* log = m_innen->fenster;
+    QWidget* panel = log->panelFenster(id);
+    if (!panel) {
+        if (grund) { *grund = QStringLiteral("Unknown logbook panel: %1").arg(id); }
+        return false;
+    }
+    const bool warSchonFenster = log->istPanelSchwebend(id);
+    log->setzePanelSchwebend(id, true);
+    if (!warSchonFenster && !log->isVisible() && elternFenster) {
+        // Aus einem nie gezeigten Logbuch kommt das Panel ohne Platz:
+        // neben das Elternfenster, gestaffelt nach der Zahl der schon
+        // schwebenden Panels, damit zwei nicht uebereinander liegen.
+        int schwebend = 0;
+        for (const PanelEintrag& e : panels()) {
+            if (e.id != id && log->istPanelSchwebend(e.id)) { ++schwebend; }
+        }
+        const QPoint ecke = elternFenster->frameGeometry().topLeft()
+                            + QPoint(96 + 40 * schwebend, 120 + 40 * schwebend);
+        panel->move(ecke);
+    }
+    panel->raise();
+    panel->activateWindow();
+    return true;
+}
+
+void ContestFenster::dockePanel(const QString& id)
+{
+    if (m_innen->fenster) { m_innen->fenster->setzePanelSchwebend(id, false); }
+}
+
+QWidget* ContestFenster::panelFenster(const QString& id) const
+{
+    return m_innen->fenster ? m_innen->fenster->panelFenster(id) : nullptr;
 }
 
 void ContestFenster::schliesse()

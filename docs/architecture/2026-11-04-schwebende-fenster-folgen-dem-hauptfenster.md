@@ -76,6 +76,48 @@ Versatz; Wachsen → Verhältnis gehalten, Größe unverändert; eigene
 Bewegung NEBEN dem Raster (−93,−41; das Raster rückt danach nach) →
 nichts. Alte Fassung: die ersten beiden Fälle fallen um.
 
+## 3. „jedes panel vom contestprogramm sollte in longpath eigens hinzuzufügen sein"
+
+Betreiber, später am selben Tag, mit dem Tools-Menü auf dem Bild: „am
+besten wäre, wenn hier alle auch vom logprogramm contestprogramm
+stehen" — und: „wir haben dann auf der einen seite das eigene contest
+programm, wenn es probleme gibt und wenn ich will, kann ich dies eigens
+mit longpath nutzen."
+
+Beobachtet am Gerät: ist das Logbuch das aktive Fenster, zeigt die
+Menüleiste nur „Apple" und „Longpath" — weder Longpaths Menüs noch das
+Fenster-Menü des Contestprogramms (dort sitzt „Als eigenes Fenster").
+Darum liegt die Liste in Longpaths Tools-Menü: **Tools › Contest
+logbook panels**, je Panel ein Haken „als eigenes Fenster", dazu „alle"
+und „alle zurück". Gefüllt beim Aufklappen, weil sich der Stand im
+Logbuch selbst ändert (✕ am Panel dockt es zurück).
+
+* Contestprogramm (oe5sos/Contestprogramm#72): `MainWindow::panelEintraege()`
+  (die Tabelle von Fenster › Panels, jetzt an EINER Stelle),
+  `istPanelSchwebend`, `setzePanelSchwebend` (holt ein Panel vorher aus
+  dem Seitenbereich; ein nie gezeigtes Hauptfenster hat keine ausgelegte
+  Fläche, dann bekommt das Panel die Größe des Entwurfs), `panelFenster`.
+  Eigenständig ändert sich nichts.
+* Longpath: `ContestFenster::lade()` — Controller, Datenbank, Fenster
+  OHNE es zu zeigen; `panels()`, `zeigePanelAlsFenster()` (lädt bei
+  Bedarf verborgen; ein Panel aus einem nie gezeigten Logbuch wird neben
+  das Hauptfenster gestellt, gestaffelt), `dockePanel()`, `panelFenster()`.
+  Das Panel ist ein `Qt::Tool`-Kind des (verborgenen) Logbuch-Fensters,
+  das am Longpath-Hauptfenster hängt — also auf der Ebene von Longpaths
+  eigenen Panels.
+* Die Aufzählung der schwebenden Fenster (Mitziehen, Schutzrahmen,
+  Dock-Ablage) geht jetzt über die Fensterkette (`schwebtUnter`): ein
+  Fenster gehört dazu, wenn es über beliebig viele Fensterstufen am
+  Hauptfenster hängt. Vorher nur direkte Kinder.
+
+Prüfstand: `tst_contestfenster::einPanelOhneLogbuchFenster` (Panel kommt
+als Tool-Fenster mit Größe neben das Elternfenster, zweites gestaffelt,
+Logbuch bleibt zu, zurück, dann Logbuch zeigen = dasselbe Fenster);
+Contestprogramm `test_einbettung::panelsLassenSichVonAussenAbloesen`.
+
+Offen: macOS zeigt ein Werkzeugfenster, dessen Elternfenster verborgen
+ist — das ist am Gerät zu sehen, nicht im offscreen-Prüfstand.
+
 ## Was bewusst NICHT passiert
 
 * Kein Mitziehen bei jedem Pixel eines Größenzugs — Nachlauf, wie beim
