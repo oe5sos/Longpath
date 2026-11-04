@@ -6730,6 +6730,17 @@ if(Qt6WebSockets_FOUND)
     target_link_libraries(tst_tci_iq_roundtrip PRIVATE Qt6::WebSockets)
 endif()
 
+# ── Das Contestprogramm als Fenster (2026-11-04) ──────────────────────────
+# Nur mit dem Submodul: oeffnet das Logbuch-Fenster in einem eigenen
+# Datenordner, schliesst es, oeffnet es wieder, und haelt fest, dass ein
+# zweiter Schreiber auf demselben Log abgewiesen wird.
+if(LONGPATH_CONTESTPROGRAMM)
+    longpath_add_test(tst_contestfenster)
+    # Qt6::Sql kommt ueber das Submodul (find_package dort); der Pruefstand
+    # belegt das Log vorab ueber SQLite, ohne Koepfe des Contestprogramms.
+    target_link_libraries(tst_contestfenster PRIVATE Qt6::Sql)
+endif()
+
 # ── Phase 3J-1 Task 17.1: TX audio binary pipeline + single-client mutex ──────
 # Tests: TX mutex acquire/release, active-client-frame-lands, non-active-client-
 # frame-dropped (ring invariant).

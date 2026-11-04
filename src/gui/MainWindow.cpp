@@ -357,6 +357,11 @@ warren@wpratt.com
 #include "applets/TxEqDialog.h"
 // Phase 3J-2 H1: Tools menu modeless singletons (Spot Hub + FreeDV Reporter).
 #include "SpotHubDialog.h"
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+// Das Contestprogramm als Fenster (2026-11-04). Nur die Bruecke -- deren
+// Kopf zieht nichts aus dem fremden Baum herein.
+#include "ContestFenster.h"
+#endif
 #include "MemoryDialog.h"
 #include "FreeDVReporterDialog.h"
 // Phase 3F Sub-Epic G T4: bench-minimum Diversity dialog (Tools menu).
@@ -12225,6 +12230,41 @@ void MainWindow::buildMenuBar()
         connect(spotHubAction, &QAction::triggered, this, &MainWindow::openSpotHub);
     }
 
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // ── Das Contestprogramm als Fenster (2026-11-04) ─────────────────
+    //
+    // Betreiber: "sodass man nicht primaer beide programme offen haben
+    // muss ... es soll aber trotzdem alles auch einzeln funktionieren."
+    // Dasselbe Log, dieselbe Oberflaeche wie eigenstaendig, im Prozess
+    // von Longpath. CAT kommt ueber Longpaths eigenen rigctld-Server
+    // (4532), der Wasserfall ueber TCI (50001) -- beides localhost, wie
+    // bei zwei Programmen. Siehe src/contest/ContestFenster.h.
+    {
+        QAction* contestAction = toolsMenu->addAction(tr("Contest &Logbook (Contestprogramm)..."));
+        contestAction->setObjectName(QStringLiteral("actContestFenster"));
+        contestAction->setToolTip(tr(
+            "Open the Contestprogramm logbook as a window inside Longpath. "
+            "CAT and waterfall come from this Longpath over localhost."));
+        connect(contestAction, &QAction::triggered, this, &MainWindow::openContestFenster);
+
+        QAction* beimStart = toolsMenu->addAction(tr("Open contest logbook at launch"));
+        beimStart->setObjectName(QStringLiteral("actContestFensterBeimStart"));
+        beimStart->setCheckable(true);
+        beimStart->setChecked(AppSettings::instance().value(
+            QStringLiteral("ContestprogrammBeimStart"),
+            QStringLiteral("False")).toString() == QStringLiteral("True"));
+        connect(beimStart, &QAction::toggled, this, [](bool an) {
+            AppSettings::instance().setValue(QStringLiteral("ContestprogrammBeimStart"),
+                                             an ? QStringLiteral("True") : QStringLiteral("False"));
+        });
+        if (beimStart->isChecked() && AppSettings::darfVonSelbstVerbinden()) {
+            // Erst wenn das Hauptfenster steht -- das Contestprogramm holt
+            // sich beim Aufgehen gleich CAT und Wasserfall.
+            QTimer::singleShot(0, this, &MainWindow::openContestFenster);
+        }
+    }
+#endif
+
     // Frequency memories -- Thetis's Memory window (console.cs:40519-40524
     // [@852bf0e] mnuMemory_Click) and the front-panel quick memory pair
     // (btnMemoryQuickSave / btnMemoryQuickRestore, console.cs:36442-36455
@@ -18355,6 +18395,53 @@ void MainWindow::openMemories()
     m_memoryDialog->raise();
     m_memoryDialog->activateWindow();
 }
+
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+void MainWindow::openContestFenster()
+{
+    if (!m_contestFenster) {
+        m_contestFenster = new ContestFenster(this);
+    }
+
+    // Das Contestprogramm liest die Frequenz ueber rigctld (4532). Laeuft
+    // Longpaths Server nicht (Vorgabe RigctldEnabled=False), wird er fuer
+    // diese Sitzung gestartet -- NUR lesend, PTT bleibt beim Schalter
+    // RigctldAllowPtt (Vorgabe aus; Betreiber 2026-11-01: "Nein, nur
+    // lesen"). Die Einstellung selbst bleibt unangetastet.
+    if (m_rigctldServer && !m_rigctldServer->isListening()
+        && AppSettings::darfVonSelbstVerbinden()) {
+        auto& s = AppSettings::instance();
+        const quint16 port = static_cast<quint16>(
+            s.value(QStringLiteral("RigctldPort"), QStringLiteral("4532")).toString().toUShort());
+        QHostAddress bindAddr;
+        if (!bindAddr.setAddress(s.value(QStringLiteral("RigctldBindAddress"),
+                                         QStringLiteral("127.0.0.1")).toString())) {
+            bindAddr = QHostAddress(QHostAddress::LocalHost);
+        }
+        if (m_rigctldServer->start(bindAddr, port)) {
+            m_rigctldServer->setPttAllowed(
+                s.value(QStringLiteral("RigctldAllowPtt"), QStringLiteral("False")).toString()
+                == QStringLiteral("True"));
+            qInfo() << "Contest logbook: rigctld server started for this session on port" << port;
+        } else {
+            qWarning() << "Contest logbook: rigctld server could not start on port" << port
+                       << "-- the logbook will show CAT as disconnected";
+        }
+    }
+
+    QString grund;
+    if (!m_contestFenster->oeffne(&grund)) {
+        ScopedChildWidget<QMessageBox> dlgOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+        QMessageBox& box = *dlgOwner.get();
+        box.setWindowTitle(tr("Contest Logbook"));
+        box.setIcon(QMessageBox::Information);
+        box.setText(grund);
+        box.exec();
+        return;
+    }
+    qInfo() << "Contest logbook opened, data directory" << ContestFenster::datenverzeichnis();
+}
+#endif
 
 void MainWindow::openSpotHub()
 {

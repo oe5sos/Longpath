@@ -252,6 +252,7 @@ public:
     class KiwiSdrManager* kiwiSdrManagerForTest() const
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
+    class ContestFenster* contestFensterForTest() const { return m_contestFenster; }
 
     /// Wie viele Rahmen des Sendetons jetzt faellig sind.
     ///
@@ -857,6 +858,9 @@ private slots:
     // (Tools menu). Same lazy-construction pattern as openPureSignalDialog;
     // both dialogs are single-instance for the lifetime of MainWindow.
     void openSpotHub();
+    /// Tools > Contest Logbook: das Contestprogramm im eigenen Fenster,
+    /// mit Longpaths rigctld-Server als CAT-Quelle.
+    void openContestFenster();
     // Frequency memories (Thetis MemoryForm + the front-panel quick memory):
     // Tools > Memories..., Tools > Memory Quick Save / Quick Restore.
     void openMemories();
@@ -1938,6 +1942,9 @@ private:
     QList<QMetaObject::Connection> m_rttyRadeLinks;
     /// Der CAT-Server (2026-10-11). Vier Kanaele, nur auf 127.0.0.1.
     class RigctldServer* m_rigctldServer{nullptr};  // Phase 3K: Hamlib-Bruecke
+    /// Das Contestprogramm als Fenster in Longpath (2026-11-04), nur mit
+    /// LONGPATH_CONTESTPROGRAMM gebaut; sonst bleibt der Zeiger leer.
+    class ContestFenster* m_contestFenster{nullptr};
     class CatServer*    m_catServer{nullptr};
     class CatPtyServer* m_catPtyServer{nullptr};
     class EqApplet* m_eqApplet{nullptr};
