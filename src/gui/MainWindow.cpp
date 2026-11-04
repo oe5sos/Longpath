@@ -2332,6 +2332,11 @@ void MainWindow::zeigeKombiListe(KombiApplet* feld, const QPoint& globalPos)
         if (!a || a == feld || schonDrin(a)) { continue; }
         if (qobject_cast<KombiApplet*>(a)) { continue; }
         const QString id = it.key();
+        // "Was wir noch nicht haben, benoetigen wir nicht" (2026-11-04,
+        // zur Combined-Liste: "die alten wie zb ACOM raus"): Hardware
+        // hinter einem ausgeschalteten Hauptschalter steht auch hier
+        // nicht -- dieselbe Regel wie im Containers-Menue und hinter dem +.
+        if (m_appletVis && !m_appletVis->isListed(id)) { continue; }
         QAction* act = menue.addAction(a->appletTitle());
         connect(act, &QAction::triggered, this, [this, feld, a, id]() {
             holeInsKombiFeld(feld, a, id);

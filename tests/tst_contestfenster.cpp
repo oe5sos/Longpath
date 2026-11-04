@@ -9,6 +9,8 @@
 // ist (dieselbe Einzelplatz-Wache, dasselbe Verzeichnis).
 
 #include <QtTest>
+#include <QPushButton>
+#include <QPointer>
 #include <QFile>
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -192,10 +194,13 @@ private slots:
         QVERIFY2(chat->width() >= 160 && chat->height() >= 120,
                  qPrintable(QStringLiteral("Panel kam %1x%2 daher")
                                 .arg(chat->width()).arg(chat->height())));
-        // Haengt ueber das Logbuch am Elternfenster.
+        // Haengt DIREKT am Elternfenster, als Geschwister von Longpaths
+        // eigenen Panels (2026-11-04: "nicht alle offenen fenster lassen
+        // sich durch anklicken in den vordergrund schieben" -- zwei
+        // Geschwisterkreise, jetzt einer). Das Logbuch haengt ebenfalls dort.
         QWidget* log = bruecke.fenster();
         QVERIFY(log);
-        QCOMPARE(chat->parentWidget(), log);
+        QCOMPARE(chat->parentWidget(), &eltern);
         QCOMPARE(log->parentWidget(), &eltern);
         QVERIFY2(!log->isVisible(), "das Logbuch-Fenster bleibt zu");
         // Neben dem Elternfenster, nicht bei (0,0).
@@ -223,6 +228,51 @@ private slots:
         QCOMPARE(bruecke.fenster(), log);
         QVERIFY(log->isVisible());
         bruecke.schliesse();
+    }
+
+    // ── ✕ am Panel: zurueck ins Logbuch und ausgeblendet ─────────────
+    //
+    // Betreiber 2026-11-04: "alle fenster muessen sich mit X schliessen
+    // lassen!" Das ✕ (rahmenlos, in Longpath) dockt das Panel zurueck UND
+    // blendet es aus; der Haken holt es wieder. Und schliesse() mit
+    // schwebenden Panels darf nichts Totes zuruecklassen.
+    void dasKreuzBlendetAusUndDerHakenHoltEsWieder()
+    {
+        QTemporaryDir ordner;
+        QVERIFY(ordner.isValid());
+        qputenv("CONTESTPROGRAMM_DATA_DIR", ordner.path().toUtf8());
+        QVERIFY(belegeLogVor(ordner.path()));
+        QWidget eltern;
+        eltern.resize(800, 600);
+        eltern.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&eltern, kFensterFrist));
+
+        ContestFenster bruecke;
+        QString grund;
+        QVERIFY2(bruecke.zeigePanelAlsFenster(QStringLiteral("chat"), &grund, &eltern),
+                 qPrintable(grund));
+        QWidget* chat = bruecke.panelFenster(QStringLiteral("chat"));
+        QVERIFY(chat && chat->isWindow());
+        QPushButton* kreuz = nullptr;
+        for (QPushButton* b : chat->findChildren<QPushButton*>()) {
+            if (b->objectName() == QStringLiteral("panelHeaderCloseButton")) { kreuz = b; }
+        }
+        QVERIFY2(kreuz && kreuz->isVisible(), "das ✕ muss in der Kopfzeile stehen");
+        kreuz->click();
+        QVERIFY(!bruecke.istPanelSchwebend(QStringLiteral("chat")));
+        QVERIFY2(!chat->isVisible(), "nach ✕ ist das Panel weg");
+
+        // Der Haken (zeigePanelAlsFenster) holt es wieder.
+        QVERIFY2(bruecke.zeigePanelAlsFenster(QStringLiteral("chat"), &grund, &eltern),
+                 qPrintable(grund));
+        QVERIFY(chat->isWindow());
+        QTRY_VERIFY_WITH_TIMEOUT(chat->isVisible(), 3000);
+
+        // Abbau mit schwebendem Panel: kein Absturz, nichts bleibt stehen.
+        QPointer<QWidget> chatZeiger(chat);
+        bruecke.schliesse();
+        QVERIFY2(chatZeiger.isNull(), "das Panel muss mit dem Logbuch gehen");
+        QVERIFY(!bruecke.istOffen());
     }
 
     void einZweiterSchreiberWirdAbgewiesen()

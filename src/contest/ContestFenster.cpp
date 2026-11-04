@@ -239,6 +239,13 @@ void ContestFenster::schliesse()
 {
     if (m_innen->fenster) {
         Contestprogramm::MainWindow* f = m_innen->fenster;
+        // Die schwebenden Panels haengen als Geschwister am Longpath-
+        // Hauptfenster (2026-11-04), nicht mehr am Logbuch: vor dem
+        // Loeschen zurueck in die Flaeche, sonst ueberlebten sie es mit
+        // totem Controller.
+        for (const PanelEintrag& e : panels()) {
+            if (f->istPanelSchwebend(e.id)) { f->setzePanelSchwebend(e.id, false); }
+        }
         m_innen->fenster = nullptr;
         // Synchron abbauen, nicht deleteLater: der Controller geht gleich
         // hinterher, und das Fenster darf dann nicht mehr leben.
