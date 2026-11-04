@@ -60,9 +60,21 @@ schwebenden Fenster ohnehin selbst. Dafür neu: `eigeneBewegungLebt()`
 in WindowPlacement. Das Logbuch ist seit Teil 1 Teil dieser Aufzählung
 und zieht mit.
 
+Gezogen wird nur, wenn im laufenden Nachlauf eine FREMDE Bewegung war
+(`m_fremdeBewegungAnhaengig`). Gefunden am Gerät, 12:09:43, erster Start
+mit dieser Fassung: „Hauptfenster QRect(0,48 …) → QRect(0,33 …): 5
+schwebende Fenster mitgezogen" — Betreiber: „wieder irgendeine
+zusammensetzung der panels". Das Raster hatte das frisch maximierte
+Hauptfenster um 15 px nachgerückt; der Sprung war klein und der
+Nachlauf lief, also galt er als Nachhall einer fremden Bewegung, die es
+nie gab. Beim Aufbau ist jede Bewegung eigen. Das wiegt doppelt, weil
+`captureIntoCurrent()` beim Beenden die aktuelle Anordnung ins Profil
+schreibt: ein Versatz bei jedem Start wandert so ins Profil.
+
 Prüfstand `tst_schwebende_folgen_dem_hauptfenster`: Zug → gleicher
 Versatz; Wachsen → Verhältnis gehalten, Größe unverändert; eigene
-Bewegung → nichts. Alte Fassung: die ersten beiden Fälle fallen um.
+Bewegung NEBEN dem Raster (−93,−41; das Raster rückt danach nach) →
+nichts. Alte Fassung: die ersten beiden Fälle fallen um.
 
 ## Was bewusst NICHT passiert
 

@@ -16466,8 +16466,15 @@ void MainWindow::schutzrahmenNachziehen()
         connect(m_schutzrahmenTimer, &QTimer::timeout, this, [this]() {
             // Erst mitziehen, dann aus den Sperrstreifen holen: wer
             // mitgezogen auf einer Bedienleiste landet, wird gleich
-            // noch heruntergeschoben.
-            schwebendeMitziehen();
+            // noch heruntergeschoben. Gezogen wird NUR, wenn in diesem
+            // Nachlauf eine fremde Bewegung war; sonst wird die Basis
+            // nur nachgefuehrt.
+            if (m_fremdeBewegungAnhaengig) {
+                schwebendeMitziehen();
+            } else {
+                m_hauptrahmenBasis = frameGeometry();
+            }
+            m_fremdeBewegungAnhaengig = false;
             schwebendeAusDemSchutzrahmenHolen();
         });
     }
@@ -16483,18 +16490,31 @@ void MainWindow::schutzrahmenNachziehen()
     // Basis neu, saehe der Nachlauf "alt == neu" und die schwebenden
     // Fenster blieben stehen (gemessen 2026-11-04: Groessenzug +480 px
     // -> Raster rueckt um 3 px -> nichts mitgezogen). Erkennbar daran,
-    // dass der Nachlauf noch laeuft und der Sprung klein ist.
+    // dass eine FREMDE Bewegung im Nachlauf haengt und der Sprung klein
+    // ist.
+    //
+    // Nicht "der Nachlauf laeuft noch" allein: beim Aufbau rueckt das
+    // Raster das frisch maximierte Hauptfenster genauso nach (Geraetelog
+    // 2026-11-04 12:09:43: QRect(0,48 ...) -> QRect(0,33 ...), 5
+    // schwebende Fenster mitgezogen, Betreiber: "wieder irgendeine
+    // zusammensetzung der panels"), und da war KEINE fremde Bewegung,
+    // nur der Aufbau selbst. Darum zaehlt der Nachlauf, was ihn
+    // angestossen hat.
     const QRect jetzt = frameGeometry();
     if (eigeneBewegungLebt() || m_aufbauBewegung || !isVisible()) {
         const bool rasterNachhall =
-            m_schutzrahmenTimer->isActive() && m_letzterHauptrahmen.isValid()
+            m_fremdeBewegungAnhaengig
+            && m_schutzrahmenTimer->isActive() && m_letzterHauptrahmen.isValid()
             && qAbs(jetzt.x() - m_letzterHauptrahmen.x()) < kSnapGridPx
             && qAbs(jetzt.y() - m_letzterHauptrahmen.y()) < kSnapGridPx
             && qAbs(jetzt.width() - m_letzterHauptrahmen.width()) < kSnapGridPx
             && qAbs(jetzt.height() - m_letzterHauptrahmen.height()) < kSnapGridPx;
         if (!rasterNachhall) {
             m_hauptrahmenBasis = jetzt;
+            m_fremdeBewegungAnhaengig = false;
         }
+    } else {
+        m_fremdeBewegungAnhaengig = true;
     }
     m_letzterHauptrahmen = jetzt;
     m_schutzrahmenTimer->start();

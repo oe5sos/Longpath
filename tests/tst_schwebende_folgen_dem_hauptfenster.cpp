@@ -184,17 +184,24 @@ private slots:
     }
 
     // ── Fall 3: eine Profilanwendung (eigene Bewegung) zieht NICHT ───────
+    //
+    // Mit einem Versatz NEBEN dem Raster (-93,-41): das Raster rueckt das
+    // Hauptfenster danach um wenige Pixel nach, als eigene Bewegung im
+    // laufenden Nachlauf -- genau der Weg, auf dem beim Aufbau am
+    // 2026-11-04 fuenf Fenster gezogen wurden (Geraetelog 12:09:43,
+    // "wieder irgendeine zusammensetzung der panels"). Ohne fremde
+    // Bewegung davor darf das nichts ziehen.
     void eigeneBewegungZiehtNicht()
     {
         const QPoint vorher = m_abgeloest->frameGeometry().topLeft();
         {
             const EigeneBewegung wirSelbst;
-            m_mw->move(m_mw->pos() + QPoint(-96, -48));
+            m_mw->move(m_mw->pos() + QPoint(-93, -41));
             QCoreApplication::processEvents();
         }
         QTest::qWait(kNachlaufMs);
         // Das Raster darf es um weniger als eine Rasterweite ruecken,
-        // das Mitziehen haette es um (96,48) bewegt.
+        // das Mitziehen haette es um rund (93,41) bewegt.
         const QPoint delta = m_abgeloest->frameGeometry().topLeft() - vorher;
         QVERIFY2(qAbs(delta.x()) < kSnapGridPx && qAbs(delta.y()) < kSnapGridPx,
                  qPrintable(QStringLiteral("eigene Bewegung zog mit: (%1,%2)")

@@ -456,6 +456,10 @@ public:
     /// Der Rahmen beim letzten Lage-/Groessenereignis -- um den kleinen
     /// Nachhall des Rasters von einer echten eigenen Bewegung zu trennen.
     QRect m_letzterHauptrahmen;
+    /// Im laufenden Nachlauf war eine FREMDE Bewegung (Zug, "+",
+    /// Vollbild). Nur dann wird gezogen; und nur dann ist ein kleiner
+    /// eigener Sprung danach der Nachhall des Rasters.
+    bool m_fremdeBewegungAnhaengig{false};
 
 
     /// Den Schutzrahmen sichtbar machen, solange ein schwebendes
