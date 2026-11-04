@@ -399,6 +399,36 @@ private slots:
     // Er hatte recht. Das Feld merkte sich seinen Inhalt in EINER
     // globalen Einstellung, nicht im Profil: nach einem
     // Profilwechsel war er falsch, nach einem Neustart gar nicht da.
+    // ── Pille und Seite bleiben zusammen, auch nach Umsortierung ────
+    //
+    // Betreiber 2026-11-04: "RX/TX -- entweder RX oder TX (Pille
+    // schaltet nicht um)": Pille RX hell, Inhalt TX. Nachgestellt: ein
+    // drittes Panel kommt im AUFGEKLAPPTEN Zustand herein -- dann steht
+    // es im Stapel vorn, in der Liste hinten. Alte Fassung: zeigeSeite(0)
+    // zeigt das dritte statt RX, die Pille sagt RX.
+    void pilleUndSeiteBleibenZusammen()
+    {
+        KombiApplet k(nullptr);
+        auto* rx = new Probepanel(QStringLiteral("Rx"), QStringLiteral("RX"));
+        auto* tx = new Probepanel(QStringLiteral("Tx"), QStringLiteral("TX"));
+        k.nimmAuf(rx);
+        k.nimmAuf(tx);
+        k.setAufgeklappt(true);
+        auto* dritte = new Probepanel(QStringLiteral("Log"), QStringLiteral("LOG"));
+        k.nimmAuf(dritte);
+        k.setAufgeklappt(false);
+
+        k.zeigeSeite(0);
+        QCOMPARE(k.seite(), 0);
+        QCOMPARE(k.aktuelleSeiteForTest(), static_cast<QWidget*>(rx));
+        k.zeigeSeite(1);
+        QCOMPARE(k.seite(), 1);
+        QCOMPARE(k.aktuelleSeiteForTest(), static_cast<QWidget*>(tx));
+        k.zeigeSeite(2);
+        QCOMPARE(k.seite(), 2);
+        QCOMPARE(k.aktuelleSeiteForTest(), static_cast<QWidget*>(dritte));
+    }
+
     void derInhaltStehtImProfil()
     {
         const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");

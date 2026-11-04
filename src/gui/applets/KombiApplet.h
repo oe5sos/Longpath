@@ -128,6 +128,8 @@ public:
     /// Namen am Fenster trug und nicht am Inhalt.
     static QString nameVon(const QWidget* w);
     int  seite() const;
+    /// Das Widget, das der Stapel gerade zeigt (Pruefstand).
+    QWidget* aktuelleSeiteForTest() const;
     void zeigeSeite(int welche);
     bool istLeer() const;
 
