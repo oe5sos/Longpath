@@ -262,6 +262,13 @@ QString setSliceNrLevelCommand(const QString& sliceId, const QString& schluessel
         .arg(sliceId, schluessel).arg(stufe);
 }
 
+QString setSliceAnfLevelCommand(const QString& sliceId, int stufe)
+{
+    if (sliceId.isEmpty()) { return QString(); }
+    if (stufe < 0 || stufe > 100) { return QString(); }
+    return QStringLiteral("slice set %1 anf_level=%2").arg(sliceId).arg(stufe);
+}
+
 QString setSliceNoiseCommand(const QString& sliceId,
                              bool nr, bool nb, bool anf)
 {

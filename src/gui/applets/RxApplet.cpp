@@ -162,6 +162,7 @@
 #include <QLabel>
 #include <QMenu>
 #include <QPainter>
+#include <QCursor>
 #include <QPushButton>
 #include <QSlider>
 #include <QSpinBox>
@@ -2129,6 +2130,13 @@ void RxApplet::wireInheritedRows()
     connect(m_anfBtn, &QPushButton::toggled, this, [this](bool on) {
         if (m_updatingFromModel || !m_slice) { return; }
         m_slice->setAnfEnabled(on);
+    });
+    // Der Knopf trug seit jeher `Qt::CustomContextMenu` (siehe oben),
+    // aber nichts haengte daran -- ein Rechtsklick tat nichts.
+    connect(m_anfBtn, &QWidget::customContextMenuRequested, this,
+            [this](const QPoint& p) {
+        emit anfQuickRequested(m_anfBtn ? m_anfBtn->mapToGlobal(p)
+                                        : QCursor::pos());
     });
 
     // NB dreistufig

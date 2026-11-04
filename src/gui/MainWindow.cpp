@@ -271,6 +271,7 @@ warren@wpratt.com
 #include "widgets/ProfileRail.h"
 #include "widgets/WidgetPicker.h"
 #include "gui/LayoutProfiles.h"
+#include "gui/widgets/DspQuickPopups.h"
 #include "gui/widgets/WorldTexture.h"
 #include "applets/StripWindow.h"
 #include "core/strip/BandLimit.h"
@@ -15658,6 +15659,37 @@ void MainWindow::wireSliceToSpectrum()
         });
         connect(m_rxApplet, &RxApplet::openNrSetupRequested,
                 this, &MainWindow::openNrSetupPage);
+
+        // ── Rechtsklick auf ANF (2026-11-04) ────────────────────────
+        //
+        // Am Flex rechnet die MASCHINE die Kerbe, und sie fuehrt
+        // dafuer eine eigene Staerke (`anf_level`, 0..100). Unsere
+        // vier WDSP-Werte -- Abgriffe, Verzoegerung, Verstaerkung,
+        // Leckrate -- liegen dort nicht im Weg; die Einrichtungsseite
+        // zeigte also vier Regler, von denen keiner etwas tat.
+        //
+        // Dieselbe Trennung wie bei der Rauschminderung: das Applet
+        // meldet nur den Klick, HIER faellt die Entscheidung, weil
+        // nur das Hauptfenster weiss, welches Geraet haengt.
+        connect(m_rxApplet, &RxApplet::anfQuickRequested, this,
+                [this](const QPoint& globalPos) {
+            // EINE Stelle fuer die Seite, zwei Wege hinein: der
+            // Schnellregler bietet sie als „More Settings…" an, ohne
+            // Flex fuehrt der Rechtsklick direkt dorthin.
+            auto seiteZeigen = [this]() {
+                auto* dialog = new SetupDialog(m_radioModel, this);
+                dialog->setAttribute(Qt::WA_DeleteOnClose);
+                wireSetupDialog(dialog);
+                dialog->selectPage(QStringLiteral("NB/SNB"));
+                dialog->show();
+            };
+            if (m_radioModel && m_radioModel->istFlexVerbunden()) {
+                DspQuickPopup::showFlexAnfPopup(this, m_radioModel->activeSlice(),
+                                                globalPos, seiteZeigen);
+                return;
+            }
+            seiteZeigen();
+        });
     }
 
     // Dieselbe Stelle aus der oberen Leiste: der Rechtsklick auf eine

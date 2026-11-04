@@ -277,6 +277,11 @@ signals:
     // Flagge, damit die Verdrahtung dort eine Zeile bleibt.
     void openNrSetupRequested(Longpath::NrSlot slot);
     void openNbSetupRequested();
+    /// Rechtsklick auf ANF. Der Empfaenger entscheidet, was er zeigt:
+    /// am Flex den Schnellregler fuer die Staerke der Maschine, sonst
+    /// die Einrichtungsseite. Die Flex-Kenntnis gehoert zum Aufrufer,
+    /// nicht in dieses Applet.
+    void anfQuickRequested(const QPoint& globalPos);
 
 protected:
     void resizeEvent(QResizeEvent* e) override;

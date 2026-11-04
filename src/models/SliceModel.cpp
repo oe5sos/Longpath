@@ -1494,6 +1494,18 @@ void SliceModel::setFlexNrLevel(int stufe)
     emit flexNrLevelChanged(s);
 }
 
+// Und dasselbe fuer die automatische Kerbe: am Flex heisst sie
+// `anf_level` und ist wie die Minderung eine Zahl von 0 bis 100.
+// Unsere eigenen ANF-Werte (Abgriffe, Verzoegerung, Verstaerkung,
+// Leckrate) liegen am Flex nicht im Weg -- dort rechnet die Maschine.
+void SliceModel::setFlexAnfLevel(int stufe)
+{
+    const int s = qBound(0, stufe, 100);
+    if (m_flexAnfLevel == s) { return; }
+    m_flexAnfLevel = s;
+    emit flexAnfLevelChanged(s);
+}
+
 void SliceModel::setAgcThreshold(int dBu)
 {
     // RxChannel::setAgcThreshold feeds this straight into WDSP's

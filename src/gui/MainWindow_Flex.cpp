@@ -423,6 +423,13 @@ void MainWindow::wireFlex()
             }
             m_radioModel->setFlexSliceNoiseNbAnf(
                 s->nbMode() != NbMode::Off, s->anfEnabled());
+            // Und die Staerke der Kerbe gleich mit: sie steht unter
+            // einem eigenen Schluessel (anf_level) und war bis
+            // 2026-11-04 nie gesetzt -- die Maschine blieb auf ihren
+            // 50, egal was der Schnellgriff zeigte.
+            if (s->anfEnabled()) {
+                m_radioModel->sendeFlexAnfStufe(s->flexAnfLevel());
+            }
         };
         disconnect(m_flexNrBand);
         m_flexNrBand = connect(ziel, &SliceModel::activeNrChanged, this,
@@ -447,6 +454,9 @@ void MainWindow::wireFlex()
         disconnect(m_flexAnfBand);
         m_flexAnfBand = connect(ziel, &SliceModel::anfEnabledChanged, this,
                                 [rauschHinaus](bool) { rauschHinaus(); });
+        disconnect(m_flexAnfStufeBand);
+        m_flexAnfStufeBand = connect(ziel, &SliceModel::flexAnfLevelChanged, this,
+                                     [rauschHinaus](int) { rauschHinaus(); });
 
         // ── Die Rauschsperre gehoert in dieselbe Reihe (2026-10-31) ──
         //

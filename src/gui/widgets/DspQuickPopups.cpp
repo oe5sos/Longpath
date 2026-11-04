@@ -461,6 +461,28 @@ void showFlexNrPopup(QWidget* parent, SliceModel* slice, NrSlot slot,
     p->showAt(globalPos);
 }
 
+// Dieselbe Ueberlegung fuer die automatische Kerbe. Bis 2026-11-04
+// hatte der ANF-Knopf zwar `Qt::CustomContextMenu` gesetzt, aber
+// nichts daran haengen -- ein Rechtsklick tat gar nichts. Und die
+// Staerke, die die Maschine dafuer fuehrt, hat nie jemand gesetzt:
+// sie stand immer auf ihren 50.
+void showFlexAnfPopup(QWidget* parent, SliceModel* slice,
+                      const QPoint& globalPos,
+                      const std::function<void()>& onMore)
+{
+    if (!slice) { return; }
+    auto* p = new DspParamPopup(parent);
+    p->addSlider(QStringLiteral("Strength (anf)"),
+                 0, 100, slice->flexAnfLevel(),
+                 [](int v) { return QString::number(v); },
+                 [slice](int v) { if (slice) { slice->setFlexAnfLevel(v); } },
+                 QStringLiteral("The radio's own auto-notch depth. "
+                                "0 = off, 100 = deepest."),
+                 50);
+    p->finalize(onMore, nullptr);
+    p->showAt(globalPos);
+}
+
 void showFor(QWidget* parent, SliceModel* slice, NrSlot slot,
              const QPoint& globalPos,
              const std::function<void()>& onMore,
