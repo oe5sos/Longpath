@@ -17,6 +17,7 @@
 // =================================================================
 
 #include "UpdateChecker.h"
+#include "AppSettings.h"
 
 #include <QCryptographicHash>
 #include <QDateTime>
@@ -44,6 +45,11 @@ Q_LOGGING_CATEGORY(lcUpdate, "longpath.update", QtInfoMsg)
 
 namespace {
 constexpr int kApiTimeoutMs = 15000;
+// Kurze Frist fuer die zwei Schritte ueber GitHubs Azure-Frontends,
+// wenn die letzte Pruefung dort ohnehin durchfiel. Vier Sekunden
+// reichen fuer eine Antwort, die kommt (gemessen: die alte GitHub-IP
+// antwortet in 0,22 s), und ersparen 22 s Warten, wenn keine kommt.
+constexpr int kAzureKurzMs = 4000;
 // Ein 100-MB-Paket ueber eine langsame Leitung: grosszuegig, aber nicht
 // unendlich -- ein haengender Download soll irgendwann "fehlgeschlagen"
 // heissen statt ewig "laeuft".
@@ -76,6 +82,20 @@ UpdateChecker::UpdateChecker(const QString& runningVersion, QObject* parent)
     , m_net(new QNetworkAccessManager(this))
 {
     qRegisterMetaType<ReleaseInfo>("Longpath::ReleaseInfo");
+    const QString zuletzt = AppSettings::instance()
+                                .value(lastSourceKey(), QStringLiteral("api"))
+                                .toString();
+    m_azureTimeoutMs = (zuletzt == QStringLiteral("api")) ? kApiTimeoutMs : kAzureKurzMs;
+}
+
+QString UpdateChecker::sourceName(ReleaseInfo::Source s)
+{
+    switch (s) {
+    case ReleaseInfo::Source::Api:       return QStringLiteral("api");
+    case ReleaseInfo::Source::Website:   return QStringLiteral("website");
+    case ReleaseInfo::Source::Changelog: return QStringLiteral("changelog");
+    }
+    return QStringLiteral("api");
 }
 
 // ── reine Funktionen ──────────────────────────────────────────────────
@@ -359,7 +379,8 @@ void UpdateChecker::checkLatest()
 {
     cancel();
     m_cancelled = false;
-    QNetworkReply* reply = m_net->get(request(latestReleaseApiUrl(), kApiTimeoutMs,
+    emit trying(QStringLiteral("Asking api.github.com for the latest release…"));
+    QNetworkReply* reply = m_net->get(request(latestReleaseApiUrl(), m_azureTimeoutMs,
                                               QByteArrayLiteral("application/vnd.github+json")));
     m_active = reply;
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
@@ -383,6 +404,7 @@ void UpdateChecker::checkLatest()
             checkLatestViaWebsite(err);
             return;
         }
+        AppSettings::instance().setValue(lastSourceKey(), sourceName(release->source));
         emit latestKnown(*release, compareVersions(release->version, m_runningVersion) > 0);
     });
 }
@@ -391,11 +413,12 @@ void UpdateChecker::checkLatestViaWebsite(const QString& apiError)
 {
     // Die Weiterleitung ist die ganze Auskunft -- ihr folgen muss man
     // nicht, die HTML-Seite dahinter interessiert nicht.
+    emit trying(QStringLiteral("api.github.com did not answer — trying github.com…"));
     QNetworkRequest req(latestReleaseWebUrl());
     req.setHeader(QNetworkRequest::UserAgentHeader, userAgent());
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                      QNetworkRequest::ManualRedirectPolicy);
-    req.setTransferTimeout(kApiTimeoutMs);
+    req.setTransferTimeout(m_azureTimeoutMs);
     QNetworkReply* reply = m_net->get(req);
     m_active = reply;
     connect(reply, &QNetworkReply::finished, this, [this, reply, apiError]() {
@@ -434,6 +457,8 @@ void UpdateChecker::checkLatestViaChangelog(const QString& earlierErrors)
     // Letzter Weg: eine gewoehnliche Datei bei Fastly, kein Azure-Host,
     // keine API. Scheitert auch der, hat der Bediener alle drei Gruende
     // in einer Zeile.
+    emit trying(QStringLiteral("github.com did not answer either — reading CHANGELOG.md "
+                               "from raw.githubusercontent.com…"));
     QNetworkReply* reply = m_net->get(request(changelogRawUrl(), kApiTimeoutMs));
     m_active = reply;
     connect(reply, &QNetworkReply::finished, this, [this, reply, earlierErrors]() {
@@ -464,10 +489,12 @@ void UpdateChecker::probeAssetAndFinish(const ReleaseInfo& release, const QStrin
     // ob es sie gibt und wie gross sie ist (der Dialog zeigt die Groesse).
     const QString wanted = assetNameForThisMachine(release.version);
     if (wanted.isEmpty()) {
+        AppSettings::instance().setValue(lastSourceKey(), sourceName(release.source));
         emit latestKnown(release, compareVersions(release.version, m_runningVersion) > 0);
         return;
     }
-    QNetworkRequest req = request(assetDownloadUrl(release.tag, wanted), kApiTimeoutMs);
+    emit trying(QStringLiteral("Found %1 — looking for %2…").arg(release.version, wanted));
+    QNetworkRequest req = request(assetDownloadUrl(release.tag, wanted), m_azureTimeoutMs);
     QNetworkReply* reply = m_net->head(req);
     m_active = reply;
     connect(reply, &QNetworkReply::finished, this, [this, reply, release, wanted, apiError]() {
@@ -496,6 +523,7 @@ void UpdateChecker::probeAssetAndFinish(const ReleaseInfo& release, const QStrin
                                 << "--" << reply->errorString();
         }
         Q_UNUSED(apiError);
+        AppSettings::instance().setValue(lastSourceKey(), sourceName(r.source));
         emit latestKnown(r, compareVersions(r.version, m_runningVersion) > 0);
     });
 }

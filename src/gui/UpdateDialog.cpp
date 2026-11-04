@@ -61,6 +61,12 @@ UpdateDialog::UpdateDialog(const QString& runningVersion, QWidget* parent)
     setModal(false);
     buildUi();
 
+    // Jeden Schritt ansagen. Ohne das steht 30 s lang "Checking for the
+    // latest release..." da, waehrend zwei Fristen ablaufen -- Betreiber
+    // am 2026-11-04: "da sieht es aus, als er nichts taete".
+    connect(m_checker, &UpdateChecker::trying, this, [this](const QString& was) {
+        m_status->setText(was);
+    });
     connect(m_checker, &UpdateChecker::latestKnown, this, &UpdateDialog::onLatestKnown);
     connect(m_checker, &UpdateChecker::checkFailed, this, &UpdateDialog::onCheckFailed);
     connect(m_checker, &UpdateChecker::downloadProgress, this, [this](qint64 got, qint64 total) {
