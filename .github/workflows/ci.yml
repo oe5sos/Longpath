@@ -770,15 +770,24 @@ jobs:
       # (third_party/contestprogramm/CMakeLists.txt, find_package(ZLIB
       # REQUIRED)). Linux und macOS haben es im Werkzeugkasten, der
       # Windows-Laeufer nicht -- erster Lauf mit Submodul: "Could NOT find
-      # ZLIB". Derselbe Weg wie in der eigenen CI des Contestprogramms:
-      # vcpkg, statisch, dynamische CRT (passt zu MSVCs /MD). Nur
-      # ZLIB_ROOT, nicht die vcpkg-Toolchain: die wuerde jedes andere
-      # find_package in Longpath mit umlenken.
-      - name: zlib via vcpkg (Windows)
+      # ZLIB". Erster Versuch (3cec5a18e) war vcpkg wie in der CI des
+      # Contestprogramms -- aber die baut mit MSVC, dieser Lauf mit MinGW
+      # (Qt mingw_64): CMake fand die Kopfdatei und nicht die Bibliothek
+      # (ein MSVC-Archiv). Darum zlib aus der Quelle, mit DEMSELBEN
+      # MinGW, statisch (ZLIB_USE_STATIC_LIBS: libzlibstatic.a, kein
+      # zlib1.dll, das beizulegen waere).
+      - name: zlib aus der Quelle (Windows, MinGW)
         if: runner.os == 'Windows'
-        shell: pwsh
+        shell: bash
         run: |
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install zlib:x64-windows-static-md
+          curl -L -o /tmp/zlib.tar.gz "https://github.com/madler/zlib/archive/refs/tags/v1.3.1.tar.gz"
+          mkdir -p /tmp/zlib-src && tar -xzf /tmp/zlib.tar.gz -C /tmp/zlib-src --strip-components=1
+          cmake -S /tmp/zlib-src -B /tmp/zlib-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DZLIB_BUILD_EXAMPLES=OFF \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/third_party/zlib-mingw"
+          cmake --build /tmp/zlib-build
+          cmake --install /tmp/zlib-build
+          ls "$GITHUB_WORKSPACE/third_party/zlib-mingw/lib"
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
@@ -811,7 +820,8 @@ jobs:
             -DLONGPATH_GPU_SPECTRUM=ON \
             -DLONGPATH_BUILD_TESTS=ON \
             -DLONGPATH_TEST_TIMEOUT=30 \
-            -DZLIB_ROOT="$VCPKG_INSTALLATION_ROOT/installed/x64-windows-static-md"
+            -DZLIB_ROOT="$GITHUB_WORKSPACE/third_party/zlib-mingw" \
+            -DZLIB_USE_STATIC_LIBS=ON
 
       # ------------------------------------------------------------------
       # Build

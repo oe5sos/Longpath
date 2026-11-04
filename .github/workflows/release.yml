@@ -802,9 +802,12 @@ jobs:
           cd ..
           Copy-Item fftw-tmp/fftw3.lib "$fftw_dir/lib/"
 
-      # zlib fuer das Contestprogramm (Submodul), siehe ci.yml
-      # "zlib via vcpkg (Windows)": ohne das steht der Windows-Lauf bei
-      # "Could NOT find ZLIB" -- und die Fassung haette kein Contest-Logbuch.
+      # zlib fuer das Contestprogramm (Submodul): ohne das steht der
+      # Windows-Lauf bei "Could NOT find ZLIB" -- und die Fassung haette
+      # kein Contest-Logbuch. DIESER Lauf baut mit MSVC (lib /def oben,
+      # Qt win64_msvc), darum vcpkg x64-windows-static-md wie in der CI
+      # des Contestprogramms; ci.yml baut mit MinGW und holt zlib dort
+      # aus der Quelle (siehe "zlib aus der Quelle (Windows, MinGW)").
       - name: zlib via vcpkg
         shell: pwsh
         run: |
