@@ -1467,6 +1467,64 @@ else()
     target_link_libraries(Longpath PRIVATE LongpathObjs)
 endif()
 
+# ── Das Contestprogramm als Fenster in Longpath (2026-11-04) ──────────────
+#
+# Betreiber: "vielleicht sollte man das alles in longpath automatisch als
+# option zusaetzlich einbauen ... es soll aber trotzdem alles auch einzeln
+# funktionieren." Das Contestprogramm (oe5sos/Contestprogramm, eigenes
+# Repo, GPLv3) liegt als Submodul unter third_party/contestprogramm und
+# wird als Bibliothek ContestprogrammCore gelinkt; Longpath oeffnet sein
+# Hauptfenster aus dem Tools-Menue (src/contest/ContestFenster.*).
+#
+# Vorgabe: AN, wenn das Submodul ausgecheckt ist, sonst AUS -- die CI
+# checkt ohne Submodule aus und baut Longpath wie bisher. Lokal:
+#     git submodule update --init third_party/contestprogramm
+#
+# Die Bruecke ist eine EIGENE kleine Bibliothek, weil beide Baeume ein
+# src/core mit gleichnamigen Kopfdateien haben (Maidenhead.h,
+# RigctldClient.h, ...): nur ContestFenster.cpp sieht die Include-Pfade
+# des Contestprogramms, und ContestFenster.h zieht keine davon herein.
+set(LONGPATH_CONTESTPROGRAMM_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/contestprogramm"
+    CACHE PATH "Quellbaum des Contestprogramms (Submodul)")
+if(EXISTS "${LONGPATH_CONTESTPROGRAMM_DIR}/CMakeLists.txt")
+    set(_longpath_contest_default ON)
+else()
+    set(_longpath_contest_default OFF)
+endif()
+option(LONGPATH_CONTESTPROGRAMM
+    "Contestprogramm als Fenster in Longpath (braucht das Submodul third_party/contestprogramm)"
+    ${_longpath_contest_default})
+if(LONGPATH_CONTESTPROGRAMM)
+    if(NOT EXISTS "${LONGPATH_CONTESTPROGRAMM_DIR}/CMakeLists.txt")
+        message(FATAL_ERROR "LONGPATH_CONTESTPROGRAMM ist an, aber ${LONGPATH_CONTESTPROGRAMM_DIR} "
+                "ist leer. git submodule update --init third_party/contestprogramm")
+    endif()
+    # Qt6::Sql und Qt6::Multimedia braucht das Contestprogramm; sein
+    # find_package im Unterverzeichnis legt die Ziele nur DORT an. Hier
+    # noch einmal, damit auch der Pruefstand tst_contestfenster sie sieht.
+    find_package(Qt6 REQUIRED COMPONENTS Sql Multimedia)
+    add_subdirectory("${LONGPATH_CONTESTPROGRAMM_DIR}" contestprogramm EXCLUDE_FROM_ALL)
+    add_library(LongpathContestBruecke STATIC
+        src/contest/ContestFenster.h
+        src/contest/ContestFenster.cpp)
+    target_include_directories(LongpathContestBruecke PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/contest")
+    target_link_libraries(LongpathContestBruecke
+        PUBLIC  Qt6::Core Qt6::Widgets
+        PRIVATE ContestprogrammCore)
+    # LongpathObjs (MainWindow) ruft die Bruecke; ueber PUBLIC bekommen
+    # Longpath UND jeder Pruefstand, der LongpathObjs linkt, die Bibliothek
+    # und den Include-Pfad src/contest -- sonst fehlten ihnen die Symbole.
+    target_compile_definitions(LongpathObjs PUBLIC LONGPATH_HAVE_CONTESTPROGRAMM=1)
+    target_link_libraries(LongpathObjs PUBLIC LongpathContestBruecke)
+    if(TARGET LongpathObjs_LTO)
+        target_compile_definitions(LongpathObjs_LTO PUBLIC LONGPATH_HAVE_CONTESTPROGRAMM=1)
+        target_link_libraries(LongpathObjs_LTO PUBLIC LongpathContestBruecke)
+    endif()
+    message(STATUS "Contestprogramm als Fenster: AN (${LONGPATH_CONTESTPROGRAMM_DIR})")
+else()
+    message(STATUS "Contestprogramm als Fenster: aus")
+endif()
+
 # ── Sprachen (2026-10-14) ────────────────────────────────────────────
 #
 # Betreiber: "englisch durchgehend, aber deutsch als option". Englisch
