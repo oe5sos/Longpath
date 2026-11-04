@@ -56,6 +56,10 @@ public:
     // Paket, sonst /Applications/Longpath.app.
     static QString installTargetPath(const QString& applicationDirPath,
                                      const QString& envOverride);
+    // Liegt das Buendel in einem Bauordner (build/, build-*/,
+    // cmake-build-*/)? Dann ist es ein Entwicklerbau und kein Ziel
+    // fuer eine Fassung -- siehe die Herleitung in der .cpp.
+    static bool isDeveloperBundle(const QString& bundlePath);
     // Der abgekoppelte Neustart-Helfer: wartet, bis <pid> weg ist, und
     // oeffnet <target> -- auf macOS per `open` (LaunchServices), sonst
     // direkt -- mit denselben Argumenten wie dieser Lauf (--profile!).

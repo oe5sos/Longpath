@@ -234,6 +234,18 @@ private slots:
                  QStringLiteral("/Applications/Longpath.app"));
         QCOMPARE(UpdateInstaller::installTargetPath(QStringLiteral("/Users/x/Apps/Longpath.app/Contents/MacOS"), QString()),
                  QStringLiteral("/Users/x/Apps/Longpath.app"));
+        // Ein Entwicklerbau (2026-11-04, Worktree-Bau vom Updater
+        // ueberschrieben, danach SIGABRT beim Start) ist kein Ziel:
+        // dann /Applications, nicht das laufende Buendel.
+        QVERIFY(UpdateInstaller::isDeveloperBundle(
+            QStringLiteral("/Users/x/Longpath/worktrees/foo/build/Longpath.app")));
+        QVERIFY(UpdateInstaller::isDeveloperBundle(QStringLiteral("/Users/x/L/build-debug/Longpath.app")));
+        QVERIFY(UpdateInstaller::isDeveloperBundle(QStringLiteral("/Users/x/L/cmake-build-release/Longpath.app")));
+        QVERIFY(!UpdateInstaller::isDeveloperBundle(QStringLiteral("/Applications/Longpath.app")));
+        QVERIFY(!UpdateInstaller::isDeveloperBundle(QStringLiteral("/Users/x/Apps/Longpath.app")));
+        QCOMPARE(UpdateInstaller::installTargetPath(
+                     QStringLiteral("/Users/x/Longpath/worktrees/foo/build/Longpath.app/Contents/MacOS"), QString()),
+                 QStringLiteral("/Applications/Longpath.app"));
         QCOMPARE(UpdateInstaller::installTargetPath(QStringLiteral("/Applications/Longpath.app/Contents/MacOS"),
                                                     QStringLiteral("/tmp/t/Longpath.app")),
                  QStringLiteral("/tmp/t/Longpath.app"));

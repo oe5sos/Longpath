@@ -47,8 +47,30 @@ QString UpdateInstaller::installTargetPath(const QString& applicationDirPath,
 {
     if (!envOverride.isEmpty()) { return envOverride; }
     const QString running = runningBundlePath(applicationDirPath);
-    if (!running.isEmpty()) { return running; }
+    if (!running.isEmpty() && !isDeveloperBundle(running)) { return running; }
     return QStringLiteral("/Applications/Longpath.app");
+}
+
+bool UpdateInstaller::isDeveloperBundle(const QString& bundlePath)
+{
+    // Gefunden am 2026-11-04: der Betreiber fuhr den Bau aus
+    // ~/Longpath/worktrees/<zweig>/build/Longpath.app und drueckte im
+    // Update-Dialog "Download and install". Die Fassung 0.9.0 (mit ihren
+    // Qt-6.8.3-Frameworks, PlugIns und qt.conf) landete IN diesem
+    // Buendel. Jeder spaetere Bau tauschte nur das Programm (Homebrew-Qt
+    // 6.11.1) und liess die fremden Teile liegen -- "Could not find the
+    // Qt platform plugin cocoa", SIGABRT beim Start, drei Absturzberichte.
+    // Ein Entwicklerbau ist kein Ziel fuer eine Fassung: der naechste
+    // cmake-Lauf ueberschreibt sie ohnehin. Erkannt am Bauordner im
+    // Pfad (build, build-xyz, cmake-build-...).
+    const QStringList parts = QDir::cleanPath(bundlePath).split(QLatin1Char('/'), Qt::SkipEmptyParts);
+    for (const QString& p : parts) {
+        if (p == QStringLiteral("build") || p.startsWith(QStringLiteral("build-"))
+            || p.startsWith(QStringLiteral("cmake-build"))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 QStringList UpdateInstaller::relaunchScript(qint64 pid, const QString& target, bool viaOpen,
