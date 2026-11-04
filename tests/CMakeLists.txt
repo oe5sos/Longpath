@@ -5422,6 +5422,17 @@ longpath_add_test(tst_real_mainwindow_detach)
 #    Minimieren des Elternfensters stehen; MainWindow::changeEvent
 #    versteckt sie und holt sie zurueck.
 longpath_add_test(tst_dock_ablage_nimmt_fenster_mit)
+longpath_add_test(tst_schwebende_folgen_dem_hauptfenster)
+# Dieser Pruefstand misst Lagen von Fenstern GEGEN das Hauptfenster, und
+# das Hauptfenster ist mindestens 800x600 -- auf dem 800x800-Schirm, den
+# das offscreen-Plugin von sich aus hat, stoesst jedes schwebende Fenster
+# an den Rand oder an die Bedienleisten (gemessen 2026-11-04: Versatz
+# (96,48) statt (96,64)). Das offscreen-Plugin nimmt einen Schirm aus
+# einer Konfigurationsdatei (`offscreen:configfile=...`, Qt 6.11 hier
+# geprueft: 1920x1200 statt 800x800). Gesetzt wird das NACH der
+# Schleife am Ende dieser Datei, die QT_QPA_PLATFORM fuer alle Tests
+# setzt -- siehe dort (`_longpath_grosser_schirm`).
+set(_longpath_grosser_schirm tst_schwebende_folgen_dem_hauptfenster)
 longpath_add_test(tst_real_pan_float)
 longpath_add_test(tst_real_rotor_window)
 
@@ -8724,7 +8735,14 @@ if(LONGPATH_TEST_PLATFORM)
         if(NOT _longpath_env)
             set(_longpath_env "")
         endif()
-        list(APPEND _longpath_env "QT_QPA_PLATFORM=${LONGPATH_TEST_PLATFORM}")
+        if(LONGPATH_TEST_PLATFORM STREQUAL "offscreen"
+           AND _longpath_test IN_LIST _longpath_grosser_schirm)
+            # Siehe die Erklaerung bei longpath_add_test(${_longpath_grosser_schirm}).
+            list(APPEND _longpath_env
+                "QT_QPA_PLATFORM=offscreen:configfile=${CMAKE_CURRENT_SOURCE_DIR}/offscreen-grosser-schirm.json")
+        else()
+            list(APPEND _longpath_env "QT_QPA_PLATFORM=${LONGPATH_TEST_PLATFORM}")
+        endif()
         set_tests_properties(${_longpath_test} PROPERTIES
             ENVIRONMENT "${_longpath_env}")
     endforeach()

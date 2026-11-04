@@ -315,6 +315,8 @@ void setzeZugmelder(std::function<void(QWidget*)> melder)
 EigeneBewegung::EigeneBewegung()  { ++s_eigeneBewegungen; }
 EigeneBewegung::~EigeneBewegung() { --s_eigeneBewegungen; }
 
+bool eigeneBewegungLebt() { return s_eigeneBewegungen > 0; }
+
 void meldeZug(QWidget* bewegtes)
 {
     if (!bewegtes) { return; }

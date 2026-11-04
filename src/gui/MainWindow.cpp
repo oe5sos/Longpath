@@ -16464,10 +16464,89 @@ void MainWindow::schutzrahmenNachziehen()
         m_schutzrahmenTimer->setSingleShot(true);
         m_schutzrahmenTimer->setInterval(250);
         connect(m_schutzrahmenTimer, &QTimer::timeout, this, [this]() {
+            // Erst mitziehen, dann aus den Sperrstreifen holen: wer
+            // mitgezogen auf einer Bedienleiste landet, wird gleich
+            // noch heruntergeschoben.
+            schwebendeMitziehen();
             schwebendeAusDemSchutzrahmenHolen();
         });
     }
+    // Eine eigene Bewegung des Hauptfensters (Profil, Aufbau,
+    // showMaximized) ist kein Anlass zum Mitziehen -- das Profil stellt
+    // die schwebenden Fenster selbst. Die Basis folgt, der Nachlauf
+    // sieht dann "alt == neu" und tut nichts.
+    //
+    // AUSSER dem Raster: nach einer FREMDEN Bewegung rueckt
+    // snapToGridAfterSettle() das Hauptfenster nach 180 ms um weniger
+    // als eine Rasterweite nach, als eigene Bewegung. Das ist der
+    // Nachhall der fremden Bewegung, nicht eine eigene -- setzte er die
+    // Basis neu, saehe der Nachlauf "alt == neu" und die schwebenden
+    // Fenster blieben stehen (gemessen 2026-11-04: Groessenzug +480 px
+    // -> Raster rueckt um 3 px -> nichts mitgezogen). Erkennbar daran,
+    // dass der Nachlauf noch laeuft und der Sprung klein ist.
+    const QRect jetzt = frameGeometry();
+    if (eigeneBewegungLebt() || m_aufbauBewegung || !isVisible()) {
+        const bool rasterNachhall =
+            m_schutzrahmenTimer->isActive() && m_letzterHauptrahmen.isValid()
+            && qAbs(jetzt.x() - m_letzterHauptrahmen.x()) < kSnapGridPx
+            && qAbs(jetzt.y() - m_letzterHauptrahmen.y()) < kSnapGridPx
+            && qAbs(jetzt.width() - m_letzterHauptrahmen.width()) < kSnapGridPx
+            && qAbs(jetzt.height() - m_letzterHauptrahmen.height()) < kSnapGridPx;
+        if (!rasterNachhall) {
+            m_hauptrahmenBasis = jetzt;
+        }
+    }
+    m_letzterHauptrahmen = jetzt;
     m_schutzrahmenTimer->start();
+}
+
+int MainWindow::schwebendeMitziehen()
+{
+    if (m_shuttingDown) { return 0; }
+    const QRect neu = frameGeometry();
+    const QRect alt = m_hauptrahmenBasis;
+    m_hauptrahmenBasis = neu;
+    if (!alt.isValid() || alt == neu || alt.width() <= 0 || alt.height() <= 0) {
+        return 0;
+    }
+    if (isMinimized()) { return 0; }
+
+    const double fx = double(neu.width()) / double(alt.width());
+    const double fy = double(neu.height()) / double(alt.height());
+
+    int bewegt = 0;
+    const EigeneBewegung wirSelbst;
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (!w || w == this || !w->isVisible()) { continue; }
+        if (w->isModal() || qobject_cast<QDialog*>(w)) { continue; }
+        const QWidget* eltern = w->parentWidget();
+        if (!eltern || eltern->window() != this) { continue; }
+        if (w->isMaximized() || w->isFullScreen()) { continue; }
+
+        const QRect r = w->frameGeometry();
+        QPoint ziel(neu.x() + qRound(double(r.x() - alt.x()) * fx),
+                    neu.y() + qRound(double(r.y() - alt.y()) * fy));
+        // Auf dem Schirm bleiben: ein Fenster, dessen Titelleiste
+        // draussen liegt, laesst sich nicht mehr fassen.
+        if (QScreen* scr = w->screen()) {
+            const QRect platz = scr->availableGeometry();
+            ziel.setX(qBound(platz.left(), ziel.x(),
+                             qMax(platz.left(), platz.right() - r.width() + 1)));
+            ziel.setY(qBound(platz.top(), ziel.y(),
+                             qMax(platz.top(), platz.bottom() - r.height() + 1)));
+        }
+        if (ziel != r.topLeft()) {
+            // move(), nicht setGeometry(): die GROESSE gehoert dem
+            // Betreiber (siehe schwebendeAusDemSchutzrahmenHolen).
+            w->move(ziel);
+            ++bewegt;
+        }
+    }
+    if (bewegt > 0) {
+        qCInfo(lcContainer) << "Hauptfenster" << alt << "->" << neu << ":"
+                            << bewegt << "schwebende Fenster mitgezogen";
+    }
+    return bewegt;
 }
 
 int MainWindow::schwebendeAusDemSchutzrahmenHolen()

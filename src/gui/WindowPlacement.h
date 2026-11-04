@@ -332,4 +332,10 @@ public:
     EigeneBewegung& operator=(const EigeneBewegung&) = delete;
 };
 
+/// Lebt gerade eine `EigeneBewegung`? Fuer Stellen, die auf eine
+/// Bewegung des HAUPTFENSTERS reagieren (die schwebenden Fenster ziehen
+/// mit, MainWindow::schwebendeMitziehen) und dabei das Platzieren durch
+/// ein Profil vom Zug des Betreibers unterscheiden muessen.
+bool eigeneBewegungLebt();
+
 } // namespace Longpath

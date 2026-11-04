@@ -435,6 +435,28 @@ public:
     /// einmal.
     void schutzrahmenNachziehen();
 
+    /// Die schwebenden Fenster folgen dem Hauptfenster (2026-11-04).
+    ///
+    /// Betreiber: "sobald ich das _ oder das + usw. links oben verwenden
+    /// muss sich das ganze!!!! Fenster bewegen! auch die freischwebenden
+    /// im verhältnis!" Ein Zug am Titelbalken, das "+" (Zoom), Vollbild:
+    /// das Hauptfenster bekommt einen neuen Rahmen, und jedes schwebende
+    /// Fenster (dieselbe Aufzaehlung wie beim Schutzrahmen: Qt::Tool-
+    /// Kinder des Hauptfensters, keine Dialoge) wird von der alten Lage
+    /// IM VERHAELTNIS zum alten Rahmen auf den neuen abgebildet. Die
+    /// Groesse bleibt dem Betreiber. Laeuft im Nachlauf des Schutzrahmens
+    /// (250 ms), VOR dem Herausholen aus den Sperrstreifen.
+    ///
+    /// `m_hauptrahmenBasis` ist der Rahmen, zu dem die Lagen zuletzt
+    /// passten. Eine EIGENE Bewegung (Profil anwenden, Aufbau, Raster)
+    /// setzt nur die Basis neu und zieht nichts: dort setzt das Profil
+    /// die schwebenden Fenster ohnehin selbst.
+    int schwebendeMitziehen();
+    QRect m_hauptrahmenBasis;
+    /// Der Rahmen beim letzten Lage-/Groessenereignis -- um den kleinen
+    /// Nachhall des Rasters von einer echten eigenen Bewegung zu trennen.
+    QRect m_letzterHauptrahmen;
+
 
     /// Den Schutzrahmen sichtbar machen, solange ein schwebendes
     /// Fenster gezogen wird (2026-10-14). Blendet sich 600 ms nach der
@@ -452,6 +474,7 @@ public:
     // echtes Rotor/Log-Fenster ins Layout stellen, ohne ein Profil
     // anzufassen. Also ein Stellvertreter: irgendein Fenster in die
     // Liste legen und danach fragen, ob es schon zurueck ist.
+    int schwebendeMitziehenForTest() { return schwebendeMitziehen(); }
     void rememberFloatingWindowBehindConnectMaskForTest(QWidget* w)
     {
         if (!w) { return; }
