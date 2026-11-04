@@ -142,6 +142,14 @@ und am Mindestmaß fielen die Gradzahlen weg (r ≤ 84). Jetzt
 Breite reicht, sonst untereinander) und Gradzahlen bis r = 54 eine Stufe
 kleiner statt weg.
 
+Nachtrag (oe5sos/Contestprogramm#72, 8f0ac07): „die kästchen für die
+gradanzahl bei rotoren können kleiner sein, so wäre dann alles auch
+gemeinsam kleiner" — das Ablesefeld unter dem Zifferblatt (Aktuell /
+Ziel / Entfernung) hat jetzt drei Stufen nach der Breite (38 / 28 / 16 px
+Wertschrift), und am Mindestmaß ist es da, klein, statt weg. Und „bei
+karte und verbindungen sollten die rotoren eher mittig sein": die
+Rotorscheiben in der Kartenspalte stehen in der Spaltenmitte.
+
 ## Was bewusst NICHT passiert
 
 * Kein Mitziehen bei jedem Pixel eines Größenzugs — Nachlauf, wie beim
