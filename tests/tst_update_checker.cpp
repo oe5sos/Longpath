@@ -15,6 +15,8 @@
 //   2026-10-14 -- Zweiter Weg ueber github.com, wenn api.github.com
 //                 nicht antwortet, by Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude.
+//   2026-11-04 -- Dritter Weg ueber CHANGELOG.md, by Martin Fischer
+//                 (OE5SOS), AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include <QtTest/QtTest>
@@ -49,6 +51,24 @@ const QByteArray kReleaseJson = QByteArrayLiteral(
     "    {\"name\": \"SHA256SUMS.txt\", \"browser_download_url\": \"https://github.com/oe5sos/Longpath/releases/download/v0.6.4/SHA256SUMS.txt\", \"size\": 1200}\n"
     "  ]\n"
     "}\n"
+);
+
+// CHANGELOG.md wie im Baum: ein Titel, dann Abschnitte je Version, mit
+// "### " darin (die duerfen den Abschnitt NICHT beenden).
+const QByteArray kChangelog = QByteArrayLiteral(
+    "# Changelog\n"
+    "\n"
+    "## [0.8.2] - 2026-10-22\n"
+    "\n"
+    "Ein Punkt, und er betrifft Windows.\n"
+    "\n"
+    "### Tondiagnose auf jeder Plattform (#326)\n"
+    "\n"
+    "Der Eintrag stand hinter einem Plattform-Tor.\n"
+    "\n"
+    "## [0.8.1] - 2026-10-22\n"
+    "\n"
+    "Aelter, darf nicht gewinnen.\n"
 );
 } // namespace
 
@@ -293,7 +313,7 @@ private slots:
                  QStringLiteral("https://github.com/oe5sos/Longpath/releases/download/v0.6.8/SHA256SUMS.txt"));
         // Die fehlenden Notizen werden benannt, nicht verschwiegen.
         QVERIFY(r.notes.contains(QStringLiteral("api.github.com")));
-        QVERIFY(r.viaWebsiteFallback);
+        QCOMPARE(r.source, ReleaseInfo::Source::Website);
     }
 
     void buildsDownloadUrlsLikeReleaseYml()
@@ -341,7 +361,7 @@ private slots:
         QCOMPARE(failed.count(), 0);
 
         const auto release = known.at(0).at(0).value<ReleaseInfo>();
-        QVERIFY(release.viaWebsiteFallback);
+        QCOMPARE(release.source, ReleaseInfo::Source::Website);
         QVERIFY(!release.version.isEmpty());
         QCOMPARE(known.at(0).at(1).toBool(), true);   // 0.0.1 ist aelter
         // Das Paket fuer diese Maschine muss per HEAD gefunden und mit
@@ -350,6 +370,132 @@ private slots:
         QVERIFY2(mine.has_value(), "no package for this machine in the fallback release");
         QVERIFY(mine->size > 1000000);
         qunsetenv("LONGPATH_UPDATE_API_URL");
+    }
+
+    // ── Dritter Weg: CHANGELOG.md ────────────────────────────────────
+    //
+    // Der zweite Weg (github.com) hat am Mac mini nie geholfen, weil
+    // github.com in denselben Azure-Bereich aufloest wie
+    // api.github.com. raw.githubusercontent.com liegt bei Fastly und
+    // antwortet dort (gemessen 2026-11-04: 104 045 B in unter 1 s).
+
+    void parsesTheTopmostChangelogSection()
+    {
+        QString err;
+        const auto r = UpdateChecker::parseChangelogLatest(kChangelog, &err);
+        QVERIFY2(r.has_value(), qPrintable(err));
+        QCOMPARE(r->version, QStringLiteral("0.8.2"));
+        QCOMPARE(r->tag, QStringLiteral("v0.8.2"));
+        QCOMPARE(r->name, QStringLiteral("Longpath 0.8.2"));
+        QCOMPARE(r->source, ReleaseInfo::Source::Changelog);
+        QCOMPARE(r->publishedAt.date(), QDate(2026, 10, 22));
+        QCOMPARE(r->htmlUrl.toString(),
+                 QStringLiteral("https://github.com/oe5sos/Longpath/releases/tag/v0.8.2"));
+        // Die Notizen sind der Abschnitt -- mehr, als der zweite Weg
+        // liefern kann (dort stehen sie nur in der API).
+        QVERIFY(r->notes.contains(QStringLiteral("betrifft Windows")));
+        QVERIFY(r->notes.contains(QStringLiteral("### Tondiagnose")));
+        // Und er endet an der naechsten Version, nicht erst am Dateiende.
+        QVERIFY(!r->notes.contains(QStringLiteral("darf nicht gewinnen")));
+        QVERIFY(!r->notes.startsWith(QLatin1Char('\n')));
+        QVERIFY(!r->notes.endsWith(QLatin1Char('\n')));
+        // SHA256SUMS.txt liegt bei, damit downloadAndVerify() nichts fehlt.
+        QVERIFY(r->asset(QStringLiteral("SHA256SUMS.txt")).has_value());
+    }
+
+    void changelogWithASuffixVersionAndNoDate()
+    {
+        const auto r = UpdateChecker::parseChangelogLatest(
+            QByteArrayLiteral("# Changelog\n\n## [0.6.3-rc1]\n\nKandidat.\n"));
+        QVERIFY(r.has_value());
+        QCOMPARE(r->version, QStringLiteral("0.6.3-rc1"));
+        QCOMPARE(r->tag, QStringLiteral("v0.6.3-rc1"));
+        QVERIFY(!r->publishedAt.isValid());   // kein Datum -> keine Erfindung
+        QCOMPARE(r->notes, QStringLiteral("Kandidat."));
+    }
+
+    void changelogWithoutASectionIsAnError()
+    {
+        QString err;
+        QVERIFY(!UpdateChecker::parseChangelogLatest(QByteArrayLiteral("# Changelog\n"), &err));
+        QVERIFY(!err.isEmpty());
+        err.clear();
+        QVERIFY(!UpdateChecker::parseChangelogLatest(QByteArray(), &err));
+        QVERIFY(!err.isEmpty());
+        // Eine HTML-Fehlerseite statt der Datei darf nicht als
+        // Veroeffentlichung durchgehen.
+        QVERIFY(!UpdateChecker::parseChangelogLatest(
+            QByteArrayLiteral("<html><body>404: Not Found</body></html>")));
+    }
+
+    void changelogUrlIsOverridableForTestsOnly()
+    {
+        QCOMPARE(UpdateChecker::changelogRawUrl().host(),
+                 QStringLiteral("raw.githubusercontent.com"));
+        qputenv("LONGPATH_UPDATE_CHANGELOG_URL", "https://127.0.0.1:9/nope");
+        QCOMPARE(UpdateChecker::changelogRawUrl().host(), QStringLiteral("127.0.0.1"));
+        qunsetenv("LONGPATH_UPDATE_CHANGELOG_URL");
+        QCOMPARE(UpdateChecker::changelogRawUrl().host(),
+                 QStringLiteral("raw.githubusercontent.com"));
+    }
+
+    // Der ganze Weg, OHNE Netz: beide GitHub-Hosts zeigen auf einen
+    // geschlossenen Port -- genau die Lage am Mac mini --, und
+    // CHANGELOG.md kommt aus einer Datei. Damit laeuft die Pruefung auch
+    // auf einem CI-Laeufer ohne Internet.
+    void fallsBackToTheChangelogWhenBothGithubHostsAreDead()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString datei = dir.filePath(QStringLiteral("CHANGELOG.md"));
+        QFile f(datei);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        QVERIFY(f.write(kChangelog) == kChangelog.size());
+        f.close();
+
+        qputenv("LONGPATH_UPDATE_API_URL", "https://127.0.0.1:9/dead");
+        qputenv("LONGPATH_UPDATE_WEB_URL", "https://127.0.0.1:9/dead");
+        qputenv("LONGPATH_UPDATE_CHANGELOG_URL",
+                QUrl::fromLocalFile(datei).toString().toUtf8());
+
+        UpdateChecker checker(QStringLiteral("0.8.1"));
+        QSignalSpy known(&checker, &UpdateChecker::latestKnown);
+        QSignalSpy failed(&checker, &UpdateChecker::checkFailed);
+        checker.checkLatest();
+        QVERIFY2(known.wait(90000), "the changelog fallback produced no release");
+        QCOMPARE(failed.count(), 0);
+
+        const auto release = known.at(0).at(0).value<ReleaseInfo>();
+        QCOMPARE(release.source, ReleaseInfo::Source::Changelog);
+        QCOMPARE(release.version, QStringLiteral("0.8.2"));
+        QCOMPARE(known.at(0).at(1).toBool(), true);   // 0.8.1 ist aelter
+        QVERIFY(release.notes.contains(QStringLiteral("betrifft Windows")));
+
+        qunsetenv("LONGPATH_UPDATE_API_URL");
+        qunsetenv("LONGPATH_UPDATE_WEB_URL");
+        qunsetenv("LONGPATH_UPDATE_CHANGELOG_URL");
+    }
+
+    // Und die Gegenprobe: ist auch CHANGELOG.md nicht zu holen, gibt es
+    // einen Fehler, der ALLE DREI Gruende nennt -- nicht einen davon.
+    void allThreeWaysDeadNamesAllThreeReasons()
+    {
+        qputenv("LONGPATH_UPDATE_API_URL", "https://127.0.0.1:9/dead");
+        qputenv("LONGPATH_UPDATE_WEB_URL", "https://127.0.0.1:9/dead");
+        qputenv("LONGPATH_UPDATE_CHANGELOG_URL", "file:///nonexistent/CHANGELOG.md");
+        UpdateChecker checker(QStringLiteral("0.0.1"));
+        QSignalSpy known(&checker, &UpdateChecker::latestKnown);
+        QSignalSpy failed(&checker, &UpdateChecker::checkFailed);
+        checker.checkLatest();
+        QVERIFY2(failed.wait(90000), "no failure reported although every way was dead");
+        QCOMPARE(known.count(), 0);
+        const QString why = failed.at(0).at(0).toString();
+        QVERIFY2(why.contains(QStringLiteral("github.com")), qPrintable(why));
+        QVERIFY2(why.contains(QStringLiteral("raw.githubusercontent.com"))
+                     || why.contains(QStringLiteral("CHANGELOG.md")), qPrintable(why));
+        qunsetenv("LONGPATH_UPDATE_API_URL");
+        qunsetenv("LONGPATH_UPDATE_WEB_URL");
+        qunsetenv("LONGPATH_UPDATE_CHANGELOG_URL");
     }
 
     void installsFromADiskImageOnMac()

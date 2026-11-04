@@ -204,9 +204,18 @@ void UpdateDialog::onLatestKnown(const ReleaseInfo& release, bool newer)
         return;
     }
     if (!m_asset) {
-        m_status->setText(QStringLiteral("Version %1 is available, but it carries no package for this machine (%2). "
-                                         "Open the release page to pick one by hand.")
-                              .arg(release.version, wanted));
+        // Zwei verschiedene Lagen, die gleich aussehen. Ueber den dritten
+        // Weg war github.com ueberhaupt nicht erreichbar, das Paket also
+        // nicht nachsehbar -- "es gibt keins" waere dann eine Behauptung
+        // ueber etwas, das niemand gefragt hat.
+        m_status->setText(release.source == ReleaseInfo::Source::Changelog
+            ? QStringLiteral("Version %1 is available, but github.com could not be reached from "
+                             "this machine, so the package (%2) could not be fetched here. "
+                             "Open the release page on a machine that reaches GitHub.")
+                  .arg(release.version, wanted)
+            : QStringLiteral("Version %1 is available, but it carries no package for this machine (%2). "
+                             "Open the release page to pick one by hand.")
+                  .arg(release.version, wanted));
         m_action->setText(QStringLiteral("Open release page"));
         m_mode = Action::OpenPage;
         m_action->setEnabled(true);
@@ -217,9 +226,18 @@ void UpdateDialog::onLatestKnown(const ReleaseInfo& release, bool newer)
     const QString what = m_asset->size > 0
         ? QStringLiteral("%1, %2").arg(m_asset->name, megabytes(m_asset->size))
         : m_asset->name;
-    const QString how = release.viaWebsiteFallback
-        ? QStringLiteral(" (read from github.com -- api.github.com did not answer)")
-        : QString();
+    QString how;
+    switch (release.source) {
+    case ReleaseInfo::Source::Api:
+        break;
+    case ReleaseInfo::Source::Website:
+        how = QStringLiteral(" (read from github.com -- api.github.com did not answer)");
+        break;
+    case ReleaseInfo::Source::Changelog:
+        how = QStringLiteral(" (read from CHANGELOG.md via raw.githubusercontent.com -- "
+                             "neither api.github.com nor github.com answered)");
+        break;
+    }
     m_status->setText(QStringLiteral("Version %1 is available (%2).%3 One click downloads, verifies and installs it, then restarts Longpath.")
                           .arg(release.version, what, how));
     m_action->setText(QStringLiteral("Download and install"));
