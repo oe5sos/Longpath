@@ -12571,6 +12571,42 @@ void MainWindow::buildMenuBar()
             }
         });
 
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+        // ── Containers > Contest logbook section (2026-11-04) ───────────
+        //
+        // Betreiber, mit dem Containers-Menue auf dem Bild: "finde bei
+        // longpath jetzt nichts vom contestprogramm". Die Panels des
+        // Contestprogramms standen nur unter Tools > Contest logbook
+        // panels; hier, wo ALLE Panels mit Haken stehen, hat er sie
+        // gesucht. Also auch hier, derselbe Weg (contestPanelAlsFenster /
+        // dockePanel), der Haken = "steht als eigenes Fenster". Der Stand
+        // aendert sich im Logbuch selbst (↙ am Panel), darum beim
+        // Aufklappen nachgezogen.
+        containersMenu->addSection(tr("Contest logbook"));
+        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+            QAction* a = containersMenu->addAction(e.titel);
+            a->setObjectName(QStringLiteral("actContainersContestPanel_%1").arg(e.id));
+            a->setCheckable(true);
+            a->setToolTip(tr("Show this Contestprogramm panel as its own window in Longpath"));
+            connect(a, &QAction::toggled, this, [this, id = e.id](bool an) {
+                if (an) {
+                    contestPanelAlsFenster(id);
+                } else if (m_contestFenster) {
+                    m_contestFenster->dockePanel(id);
+                }
+            });
+            m_containersContestActions.insert(e.id, a);
+        }
+        connect(containersMenu, &QMenu::aboutToShow, this, [this]() {
+            for (auto it = m_containersContestActions.cbegin();
+                 it != m_containersContestActions.cend(); ++it) {
+                QSignalBlocker block(it.value());
+                it.value()->setChecked(m_contestFenster
+                                       && m_contestFenster->istPanelSchwebend(it.key()));
+            }
+        });
+#endif
+
         // "WinAntenna" bewusst NICHT ueber m_appletVis->setAvailable(): das
         // wuerde auch effectiveVisibilityChanged ausloesen und damit in
         // applyWindowVisibility()'s eigene, bereits am 2026-09-01

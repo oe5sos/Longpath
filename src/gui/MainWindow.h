@@ -2557,6 +2557,9 @@ private:
     /// mitgehen.
     QHash<QString, class AppletFloatingWindow*> m_floatingApplets;
     QHash<QString, QAction*> m_topMenuAppletActions;
+    /// Containers > Contest logbook: je Panel des Contestprogramms ein
+    /// Haken "als eigenes Fenster" (2026-11-04), siehe MainWindow.cpp.
+    QHash<QString, QAction*> m_containersContestActions;
 
     // Phase 3O Sub-Phase 10 Task 10c: host strip for the menu bar +
     // MasterOutputWidget. Owned by QMainWindow via setMenuWidget().

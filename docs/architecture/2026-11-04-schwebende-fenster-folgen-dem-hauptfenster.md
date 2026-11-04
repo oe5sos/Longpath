@@ -150,6 +150,13 @@ Wertschrift), und am Mindestmaß ist es da, klein, statt weg. Und „bei
 karte und verbindungen sollten die rotoren eher mittig sein": die
 Rotorscheiben in der Kartenspalte stehen in der Spaltenmitte.
 
+Nachtrag: „finde bei longpath jetzt nichts vom contestprogramm" — mit
+dem Containers-Menü auf dem Bild. Dort stehen alle Panels mit Haken,
+dort hat er gesucht. Jetzt steht dort ein Abschnitt „Contest logbook"
+mit denselben Einträgen wie unter Tools; Haken = steht als eigenes
+Fenster, beim Aufklappen nachgezogen. Prüfstand
+`tst_contest_panels_im_containers_menu` am echten Hauptfenster.
+
 ## 5. Die Fassung 0.9.0 hatte das alles nicht
 
 Gefunden am Gerät, 13:57: der Updater holte 0.9.0 (Release-Lauf von
