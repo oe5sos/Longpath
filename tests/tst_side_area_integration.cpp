@@ -8,6 +8,7 @@
 // wohnt.
 
 #include <QtTest>
+#include <QScopeGuard>
 #include <QGuiApplication>
 #include <QScreen>
 
@@ -56,6 +57,10 @@ bool hasAncestor(const QWidget* w, const QWidget* ancestor)
 }
 
 } // namespace
+
+// Laenger als die 180 ms von snapToGridAfterSettle (WindowPlacement.h),
+// mit Luft fuer einen langsamen Laeufer.
+static constexpr int kRastFristMs = 400;
 
 class TestSideAreaIntegration : public QObject
 {
@@ -310,6 +315,15 @@ private slots:
         QTest::qWait(300);
         PanFloatingWindow* win = stack->floatingWindowForTest(pan->panId());
         QVERIFY(win);
+        // Andocken auf jedem Weg hinaus -- auch wenn ein QCOMPARE unten
+        // abbricht. Ein beim Abbau noch schwebender Panadapter stuerzt
+        // unter "offscreen" in QOffscreenBackingStore::clearHash() ab
+        // (Linux-CI 2026-11-03: erst QCOMPARE rot, dann SIGSEGV), und aus
+        // einem Fehlschlag wurde ein Absturz ohne Zahl.
+        auto andocken = qScopeGuard([stack, pan]() {
+            stack->dockPanadapter(pan->panId());
+            QTest::qWait(100);
+        });
 
         // Das Fenster links daneben, seine rechte Kante eine Luft vor
         // der linken Kante der Flaeche -- das ist „grenzt an"
@@ -327,12 +341,18 @@ private slots:
         // ablesen, und das Fenster danach so ruecken, dass seine
         // rechte Kante eine Luft vor der Flaeche sitzt.
         const int winY = abRunden(avail.top() + 144);
+        // Nach jedem Setzen und Ruecken WARTEN, bis die Lage steht:
+        // snapToGridAfterSettle (WindowPlacement.h) rastet den Rahmen erst
+        // 180 ms nach dem Loslassen ein. Wer nach 50 ms misst, misst die
+        // Breite VOR dem Rasten und vergleicht spaeter mit der danach --
+        // auf dem langsamen Linux-Laeufer fiel genau das in die Messung
+        // (429 statt 420, 2026-11-03). Breiten erst nach dem Rasten lesen.
         win->setGeometry(abRunden(avail.left() + 96), winY, 2 * kGrid, 304);
-        QTest::qWait(50);
+        QTest::qWait(kRastFristMs);
         const int w0 = win->width();
         const int winX = areaX - w0 - Style::kFensterLuftPx;
         win->move(winX, winY);
-        QTest::qWait(50);
+        QTest::qWait(kRastFristMs);
         QCOMPARE(win->width(), w0);
 
         // Die Voraussetzung ausdruecklich pruefen, statt sie zu hoffen:
@@ -379,15 +399,17 @@ private slots:
         // Fensters laesst sich nicht unterschreiten, ein schmaleres
         // Mass wird stillschweigend hochgeklemmt und der Fall misst
         // dann wieder etwas anderes als gemeint (2026-11-02).
+        // Erst ruecken, dann rasten lassen, DANN die Breite lesen, mit der
+        // weiter gerechnet wird -- bei x = 0 rastet die rechte Kante neu.
         const int fernX = avail.left();
+        win->move(fernX, winY);
+        QTest::qWait(kRastFristMs);
         const int fernW = win->width();
         QVERIFY2(areaX - (fernX + fernW) > kNeighbourSlackPxFuerTest,
                  qPrintable(QStringLiteral(
                      "das Fenster grenzt immer noch an: rechte Kante %1, "
                      "Flaeche ab %2")
                      .arg(fernX + fernW).arg(areaX)));
-        win->move(fernX, winY);
-        QTest::qWait(50);
         area->setCollapsed(true);
         QCOMPARE(win->width(), fernW);
         area->setCollapsed(false);
@@ -397,9 +419,8 @@ private slots:
         // QOffscreenBackingStore::clearHash() aus (docs/architecture/
         // 2026-09-08-container-move-test-offscreen-teardown-segfault.md,
         // tst_closing_takes_the_float_along ueberspringt deshalb) -- mit
-        // dem Seitenbereich hat das nichts zu tun.
-        stack->dockPanadapter(pan->panId());
-        QTest::qWait(100);
+        // dem Seitenbereich hat das nichts zu tun. Angedockt wird vom
+        // qScopeGuard oben, auf jedem Weg hinaus.
     }
 
     // Beenden mit gefülltem Bereich: kein Absturz beim Abräumen.
