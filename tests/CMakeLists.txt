@@ -5729,6 +5729,10 @@ longpath_add_test(tst_applet_fenstermasse)
 longpath_add_test(tst_ft8_plaetze_panel)
 longpath_add_test(tst_panel_automatik)
 longpath_add_test(tst_ft8_dxpedition)
+# 2026-11-04: Typ 5, der EU-VHF-Contest. Dieselbe Klasse wie
+# tst_ft8_dxpedition: upstream laesst den Typ in den default-Zweig
+# laufen, und JEDE Contest-Station fiel still durch.
+longpath_add_test(tst_ft8_eu_vhf)
 # 2026-10-15: FT8 im PROGRAMM — Abgriff, Flaeche, Eintrag. Dekoder und
 # Uhr waren gruen und trotzdem unerreichbar; dieser Lauf prueft die
 # Verdrahtung, nicht die Rechnung.

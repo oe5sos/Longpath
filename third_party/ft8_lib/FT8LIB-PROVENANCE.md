@@ -55,6 +55,82 @@ gleich.
 | `common/gfsk.c:60,68` | `dphi[n_wave + 2*n_spsym]`, `pulse[3*n_spsym]` | `malloc`/`free`, einmal je Aussendung |
 | `ft8/message.c` | `stpcpy()` (POSIX, fehlt in MSVCs Bibliothek) | Ersatz unter `#ifdef _MSC_VER` |
 
+### Erweiterung: Nachrichtentyp 5 (EU VHF Contest) — 2026-11-04
+
+| Datei | Was |
+| --- | --- |
+| `ft8/message.c` | neue Funktionen `to_grid6()` (statisch) + `ftx_message_decode_eu_vhf()`, ein `case` im `switch` von `ftx_message_decode()` |
+| `ft8/message.h` | Deklaration dazu; **und ein berichtigter Kommentar** an `FTX_MESSAGE_TYPE_WWROF` |
+
+Dieselbe Klasse wie beim DXpedition-Typ darunter: upstream erkennt den
+Typ (`ftx_message_get_type()` liefert ihn), **dekodiert ihn aber
+nicht** — der `switch` lässt ihn in den `default`-Zweig laufen und
+gibt `FTX_MESSAGE_RC_ERROR_TYPE` zurück. `Ft8Decoder.cpp` wirft die
+Zeile daraufhin weg. In einem EU-VHF-Contest fiel damit **jede**
+Contest-Station still durch, von „niemand da" nicht zu unterscheiden.
+
+#### Zwei falsche Fährten, die hier geschlossen sind
+
+**1. Typ 0.2 ist tot.** Upstream führt ihn als „EU VHF contest", und
+das war er einmal. WSJT-X 2.7.0 dekodiert ihn selbst nicht mehr:
+
+> From WSJT-X `lib/77bit/packjt77.f90:330-331` [v2.7.0] —
+> `else if(i3.eq.0 .and. n3.eq.2) then` / `unpk77_success=.false.`
+
+Wer dort baut, baut an einem Format, das niemand mehr sendet.
+
+**2. Der Name `FTX_MESSAGE_TYPE_WWROF` täuscht**, und der Kommentar
+daneben beschrieb die Felder falsch (`1 28 28 1 7 9`) — mit einem
+Fragezeichen von upstream selbst. Maßgeblich ist:
+
+> From WSJT-X `lib/77bit/packjt77.f90:593-610` [v2.7.0] —
+> `! Type 5  <PA3XYZ> <G4ABC/P> R 590003 IO91NP      h12 h22 r1 s3 S11 g25`
+> `read(c77,1060) n12,n22,ir,irpt,iserial,igrid6` /
+> `1060 format(b12,b22,b1,b3,b11,b25)` / `nrs=52+irpt` /
+> `write(cexch,1022) nrs,iserial` / `1022 format(i2,i4.4)`
+
+Der Enum-Name bleibt unverändert, damit fremder Quelltext sich nicht
+ändert; der Kommentar ist berichtigt und verweist auf die Quelle.
+
+Die Locator-Umrechnung ist ebenfalls übernommen, nicht gerechnet:
+
+> From WSJT-X `lib/77bit/packjt77.f90:1577-1607` [v2.7.0] —
+> `subroutine to_grid6(n,grid6,ok)` / `j1=n/(18*10*10*24*24)` …
+
+#### Vier Stellen, an denen man sich vertut — je ein Prüffall
+
+`tests/tst_ft8_eu_vhf.cpp`, 12 Fälle:
+
+* **Der Rapport ist kein dB-Wert**, sondern `52 + irpt` (drei Bit,
+  also 52…59). Im Contest ist es faktisch immer 59, aber die Bits
+  können auch weniger tragen.
+* **Die laufende Nummer hat immer vier Stellen** (`format(i4.4)`).
+  „5901" statt „590001" wäre ein anderer Austausch.
+* **Der Locator ist sechsstellig**, 25 Bit. Im UKW-Contest zählt genau
+  die sechste Stelle für die Entfernungspunkte; vier Stellen wären bis
+  zu 100 km daneben.
+* **Beide Rufzeichen stehen nur als Hash** (12 und 22 Bit). Ohne
+  Eintrag in der Tabelle steht `<...>` — kein Fehler, sondern alles,
+  was gesendet wurde.
+
+#### Warum die Prüfnutzlast anders entsteht als beim DXpedition-Lauf
+
+Dort kamen die Rufzeichenfelder aus ft8_libs **eigenem** Packer, damit
+ein Fehler in der Bitreihenfolge sich nicht in beide Richtungen
+aufhebt. Diesen Weg gibt es hier nicht: für Typ 5 hat ft8_lib **keinen**
+Packer. Der Ersatz ist ein generischer Bit-Setzer (Bitposition hinein,
+Wert hinein), der mit der Auspackrechnung in `message.c` keine Zeile
+teilt — dort Schiebeweiten und Masken je Feld, hier Bit für Bit. Dazu
+`ftx_message_get_type()` als unabhängige Probe, dass `i3` wirklich dort
+sitzt, wo der Setzer es hinlegt.
+
+Gegenprobe gegen die Fassung ohne den `case` gefahren: **8 von 12
+Fällen rot**, alle mit `RC=5` (`FTX_MESSAGE_RC_ERROR_TYPE`). Der
+Locator-Schranken-Fall wurde dabei geschärft — er prüft jetzt auf
+`FTX_MESSAGE_RC_ERROR_GRID` genau, weil die alte Fassung dort
+ebenfalls einen Fehler lieferte (nur einen anderen) und ein „irgendein
+Fehler" nichts belegt hätte.
+
 ### Erweiterung: Nachrichtentyp 0.1 (DXpedition Mode) — 2026-10-30
 
 | Datei | Was |

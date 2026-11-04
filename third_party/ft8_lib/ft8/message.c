@@ -459,6 +459,17 @@ ftx_message_rc_t ftx_message_decode(const ftx_message_t* msg, ftx_callsign_hash_
         field2 = NULL;
         field3 = NULL;
         break;
+    case FTX_MESSAGE_TYPE_WWROF:
+        // Der Name taeuscht: das ist der EU-VHF-Contest (siehe die
+        // Anmerkung an der Aufzaehlung in message.h). Schreibt den
+        // fertigen Satz direkt, weil der Austausch kein eigenes Feld
+        // der drei 14-Byte-Felder ist.
+        rc = ftx_message_decode_eu_vhf(msg, hash_if, message,
+                                       offsets->types);
+        field1 = NULL;
+        field2 = NULL;
+        field3 = NULL;
+        break;
     default:
         // not handled yet
         field1 = NULL;
@@ -568,6 +579,136 @@ ftx_message_rc_t ftx_message_decode_std(const ftx_message_t* msg, ftx_callsign_h
 // ftx_message_decode() sonst benutzt (ein 13-stelliges Rufzeichen plus
 // " RR73;" sind 19 Zeichen). Darum schreibt dieser Dekoder den fertigen
 // Text direkt, und der Aufrufer setzt field1 = NULL.
+// Der sechsstellige Locator aus 25 Bit.
+//
+// From WSJT-X `lib/77bit/packjt77.f90:1577-1607` [v2.7.0] --
+//   `subroutine to_grid6(n,grid6,ok)`
+//   `j1=n/(18*10*10*24*24)` ... `j6=n-j5*24`
+//   `grid6(1:1)=char(j1+ichar('A'))` ... `grid6(6:6)=char(j6+ichar('A'))`
+//
+// Die Stellenwerte stehen rueckwaerts: Feld (18) x Feld (18) x Quadrat
+// (10) x Quadrat (10) x Unterquadrat (24) x Unterquadrat (24). Der
+// groesste gueltige Wert ist damit 18*18*10*10*24*24 - 1 = 18662399 --
+// dieselbe Schranke, die WSJT-X in `unpack77` prueft.
+//
+// Gibt false, wenn eine Stelle ausserhalb ihres Bereichs liegt. Das
+// kann nur bei einem verfaelschten Paket vorkommen; dann ist
+// stehenbleiben richtig, nicht raten.
+static bool to_grid6(uint32_t n, char* grid6)
+{
+    const uint32_t j1 = n / (18u * 10u * 10u * 24u * 24u);
+    if (j1 > 17u) { return false; }
+    n -= j1 * (18u * 10u * 10u * 24u * 24u);
+    const uint32_t j2 = n / (10u * 10u * 24u * 24u);
+    if (j2 > 17u) { return false; }
+    n -= j2 * (10u * 10u * 24u * 24u);
+    const uint32_t j3 = n / (10u * 24u * 24u);
+    if (j3 > 9u) { return false; }
+    n -= j3 * (10u * 24u * 24u);
+    const uint32_t j4 = n / (24u * 24u);
+    if (j4 > 9u) { return false; }
+    n -= j4 * (24u * 24u);
+    const uint32_t j5 = n / 24u;
+    if (j5 > 23u) { return false; }
+    const uint32_t j6 = n - j5 * 24u;
+    if (j6 > 23u) { return false; }
+    grid6[0] = (char)('A' + j1);
+    grid6[1] = (char)('A' + j2);
+    grid6[2] = (char)('0' + j3);
+    grid6[3] = (char)('0' + j4);
+    grid6[4] = (char)('A' + j5);
+    grid6[5] = (char)('A' + j6);
+    grid6[6] = '\0';
+    return true;
+}
+
+ftx_message_rc_t ftx_message_decode_eu_vhf(const ftx_message_t* msg,
+    ftx_callsign_hash_interface_t* hash_if, char* message,
+    ftx_field_t field_types[FTX_MAX_MESSAGE_FIELDS])
+{
+    char call_1[14], call_2[14], grid6[7];
+
+    // 12 + 22 + 1 + 3 + 11 + 25 Bit, gross-endig ab Bit 0 der Nutzlast.
+    //
+    // From WSJT-X `lib/77bit/packjt77.f90:597-598` [v2.7.0] --
+    //   `read(c77,1060) n12,n22,ir,irpt,iserial,igrid6`
+    //   `1060 format(b12,b22,b1,b3,b11,b25)`
+    uint16_t n12 = ((uint16_t)msg->payload[0] << 4);
+    n12 |= ((uint16_t)msg->payload[1] >> 4);
+
+    uint32_t n22 = ((uint32_t)(msg->payload[1] & 0x0Fu) << 18);
+    n22 |= ((uint32_t)msg->payload[2] << 10);
+    n22 |= ((uint32_t)msg->payload[3] << 2);
+    n22 |= ((uint32_t)msg->payload[4] >> 6);
+
+    uint8_t ir = (msg->payload[4] >> 5) & 0x01u;
+
+    uint8_t irpt = (msg->payload[4] >> 2) & 0x07u;
+
+    uint16_t iserial = ((uint16_t)(msg->payload[4] & 0x03u) << 9);
+    iserial |= ((uint16_t)msg->payload[5] << 1);
+    iserial |= ((uint16_t)msg->payload[6] >> 7);
+
+    uint32_t igrid6 = ((uint32_t)(msg->payload[6] & 0x7Fu) << 18);
+    igrid6 |= ((uint32_t)msg->payload[7] << 10);
+    igrid6 |= ((uint32_t)msg->payload[8] << 2);
+    igrid6 |= ((uint32_t)msg->payload[9] >> 6);
+
+    LOG(LOG_DEBUG, "decode_eu_vhf() n12=%d n22=%d ir=%d irpt=%d iserial=%d igrid6=%d\n",
+        n12, n22, ir, irpt, iserial, igrid6);
+
+    // WSJT-X prueft die Schranke VOR allem anderen und steigt aus
+    // (`unpk77_success=.false.; return`). Ein Paket mit unmoeglichem
+    // Locator ist verfaelscht; eine halbe Zeile daraus waere schlimmer
+    // als keine.
+    if (!to_grid6(igrid6, grid6))
+    {
+        return FTX_MESSAGE_RC_ERROR_GRID;
+    }
+
+    // BEIDE Rufzeichen stehen nur als Hash im Paket -- 12 Bit und 22
+    // Bit. Ohne Eintrag in der Tabelle setzt lookup_callsign "<...>",
+    // genau wie WSJT-X. Das ist kein Fehler, sondern alles, was
+    // gesendet wurde.
+    lookup_callsign(hash_if, FTX_CALLSIGN_HASH_12_BITS, n12, call_1);
+    field_types[0] = FTX_FIELD_CALL;
+    lookup_callsign(hash_if, FTX_CALLSIGN_HASH_22_BITS, n22, call_2);
+    field_types[1] = FTX_FIELD_CALL;
+
+    // Der Rapport ist KEIN dB-Wert: 52 + irpt, also 52..59. Im Contest
+    // wird faktisch immer 59 gegeben, aber die drei Bit koennen auch
+    // weniger tragen.
+    //
+    // From WSJT-X `lib/77bit/packjt77.f90:605-607` [v2.7.0] --
+    //   `nrs=52+irpt`
+    //   `write(cexch,1022) nrs,iserial`
+    //   `1022 format(i2,i4.4)`
+    const uint32_t nrs = 52u + (uint32_t)irpt;
+
+    char* p = message;
+    p = append_string(p, call_1);
+    p = append_string(p, " ");
+    p = append_string(p, call_2);
+    p = append_string(p, ir ? " R " : " ");
+    // Zwei Stellen Rapport (52..59 ist immer zweistellig), dann vier
+    // Stellen laufende Nummer mit fuehrenden Nullen -- zusammen die
+    // sechs Ziffern, die im Contest als ein Block gelesen werden
+    // ("590003").
+    *p++ = (char)('0' + ((nrs / 10u) % 10u));
+    *p++ = (char)('0' + (nrs % 10u));
+    *p++ = (char)('0' + ((iserial / 1000u) % 10u));
+    *p++ = (char)('0' + ((iserial / 100u) % 10u));
+    *p++ = (char)('0' + ((iserial / 10u) % 10u));
+    *p++ = (char)('0' + (iserial % 10u));
+    *p++ = ' ';
+    *p = '\0';
+    p = append_string(p, grid6);
+    field_types[2] = FTX_FIELD_GRID;
+
+    LOG(LOG_INFO, "Decoded EU VHF contest message [%s]\n", message);
+    return FTX_MESSAGE_RC_OK;
+}
+
 ftx_message_rc_t ftx_message_decode_dxpedition(const ftx_message_t* msg,
     ftx_callsign_hash_interface_t* hash_if, char* message,
     ftx_field_t field_types[FTX_MAX_MESSAGE_FIELDS])

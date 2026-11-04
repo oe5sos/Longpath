@@ -50,7 +50,17 @@ typedef enum
                                   // 2     PA3XYZ/P GM4ABC/P R JO22           28 1 28 1 1 15   74   EU VHF contest
     FTX_MESSAGE_TYPE_ARRL_RTTY,   // 3     TU; W9XYZ K1ABC R 579 MA           1 28 28 1 3 13   74   ARRL RTTY Roundup
     FTX_MESSAGE_TYPE_NONSTD_CALL, // 4     <WA9XYZ> PJ4/KA1ABC RR73           12 58 1 2 1      74   Nonstandard calls
-    FTX_MESSAGE_TYPE_WWROF,       // 5     TU; W9XYZ K1ABC R-07 FN            1 28 28 1 7 9    74   WWROF contest ?
+    // Der Name und die Zeile danach stammen von upstream und sind BEIDE
+    // falsch -- das Fragezeichen war berechtigt. Typ 5 ist der
+    // EU-VHF-Contest, nicht WWROF, und seine Felder sind h12 h22 r1 s3
+    // s11 g25, nicht 1 28 28 1 7 9. Massgeblich: WSJT-X
+    // `lib/77bit/packjt77.f90:593-610` [v2.7.0] --
+    //   `! Type 5  <PA3XYZ> <G4ABC/P> R 590003 IO91NP      h12 h22 r1 s3 S11 g25`
+    //   `read(c77,1060) n12,n22,ir,irpt,iserial,igrid6`
+    //   `1060 format(b12,b22,b1,b3,b11,b25)`
+    // Der Name bleibt, damit fremder Quelltext sich nicht aendert;
+    // `ftx_message_decode_eu_vhf()` weiter unten liest ihn richtig.
+    FTX_MESSAGE_TYPE_WWROF,       // 5     <PA3XYZ> <G4ABC/P> R 590003 IO91NP  h12 h22 r1 s3 s11 g25  74  EU VHF contest
     FTX_MESSAGE_TYPE_UNKNOWN      // Unknown or invalid type
 } ftx_message_type_t;
 
@@ -115,6 +125,21 @@ void ftx_message_init(ftx_message_t* msg);
 /// Hound sieht nie, dass er aufgerufen wurde. Schreibt den fertigen
 /// Satz nach `message` -- er passt nicht in die drei 14-Byte-Felder.
 ftx_message_rc_t ftx_message_decode_dxpedition(const ftx_message_t* msg,
+    ftx_callsign_hash_interface_t* hash_if, char* message,
+    ftx_field_t field_types[FTX_MAX_MESSAGE_FIELDS]);
+
+/// Typ 5, EU VHF Contest. Longpath-Erweiterung 2026-11-04: upstream
+/// laesst auch diesen Typ in den default-Zweig laufen, und jede
+/// Contest-Station faellt still durch -- von „niemand da" nicht zu
+/// unterscheiden. Schreibt den fertigen Satz nach `message`, weil der
+/// Austausch (Rapport + laufende Nummer) kein eigenes Feld der drei
+/// 14-Byte-Felder ist.
+///
+/// ACHTUNG: `FTX_MESSAGE_TYPE_WWROF` heisst der Typ in der Aufzaehlung
+/// oben, und der Kommentar dort beschreibt ihn falsch (siehe die
+/// Anmerkung an der Aufzaehlung). Massgeblich ist WSJT-X
+/// `lib/77bit/packjt77.f90:593-610` [v2.7.0].
+ftx_message_rc_t ftx_message_decode_eu_vhf(const ftx_message_t* msg,
     ftx_callsign_hash_interface_t* hash_if, char* message,
     ftx_field_t field_types[FTX_MAX_MESSAGE_FIELDS]);
 
