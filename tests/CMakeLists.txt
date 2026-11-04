@@ -5422,6 +5422,7 @@ longpath_add_test(tst_real_mainwindow_detach)
 #    Minimieren des Elternfensters stehen; MainWindow::changeEvent
 #    versteckt sie und holt sie zurueck.
 longpath_add_test(tst_dock_ablage_nimmt_fenster_mit)
+longpath_add_test(tst_haekchen_sichtbar)
 longpath_add_test(tst_schwebende_folgen_dem_hauptfenster)
 # Dieser Pruefstand misst Lagen von Fenstern GEGEN das Hauptfenster, und
 # das Hauptfenster ist mindestens 800x600 -- auf dem 800x800-Schirm, den

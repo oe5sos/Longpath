@@ -1241,6 +1241,19 @@ constexpr auto kComboStyle =
     "QComboBox QAbstractItemView::item { padding: 3px 6px; min-height: 18px; }"
     "QComboBox QAbstractItemView::item:selected { background: #1a1a1e; color: #f0f0f4; }";
 
+// ── Ein Haken ist ein Haken (2026-11-04) ────────────────────────────
+//
+// Betreiber, am Update-Dialog: "man sieht nicht, ob das Haekchen an ist
+// oder nicht. das sollte ueberall kontrolliert werden." Stimmt: "an"
+// war bis dahin nur ein etwas hellerer Rand (#55555e statt #2c2c31) auf
+// fast demselben schwarzen Grund -- gemessen im Indikator: Helligkeit
+// 17 aus, 26 an. Jetzt traegt der angehakte Zustand ein Haekchen
+// (resources/icons/check.svg, Textfarbe) und der Rundknopf einen Punkt;
+// abgeschaltet dasselbe in der gedaempften Schrift. Die Mulde selbst
+// bleibt. Alle Stellen, die nur Breite/Hoehe des Indikators setzen
+// (SpotHub, RX-Applet, ClientChain, Overlay-Menue), erben das von hier;
+// AddCustomRadioDialog fuellt "an" mit kAccent und war schon sichtbar.
+// Pruefstand: tests/tst_haekchen_sichtbar.cpp.
 constexpr auto kCheckBoxStyle =
     "QCheckBox { color: #dcdce1; spacing: 6px; min-height: 20px; }"   // min-height: drei Haekchen untereinander kollidierten
     "QCheckBox:disabled { color: #6a6a70; }"
@@ -1250,9 +1263,11 @@ constexpr auto kCheckBoxStyle =
     "  border-bottom-color: rgba(255, 255, 255, 18); border-radius: 4px; }"
     "QCheckBox::indicator:hover { border-color: #4a7ba8; }"
     "QCheckBox::indicator:checked {"
+    "  image: url(:/icons/check.svg);"
     "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #131317, stop:1 #0d0d10);"
     "  border: 1px solid #55555e; border-top-color: #55555e; }"
-    "QCheckBox::indicator:checked:disabled { background: #232327; border-color: #232327; }";
+    "QCheckBox::indicator:checked:disabled { image: url(:/icons/check-dim.svg);"
+    "  background: #232327; border-color: #232327; }";
 
 constexpr auto kRadioButtonStyle =
     "QRadioButton { color: #dcdce1; spacing: 6px; min-height: 20px; }"
@@ -1263,8 +1278,11 @@ constexpr auto kRadioButtonStyle =
     "  border-bottom-color: rgba(255, 255, 255, 18); border-radius: 7px; }"
     "QRadioButton::indicator:hover { border-color: #4a7ba8; }"
     "QRadioButton::indicator:checked {"
+    "  image: url(:/icons/radio-dot.svg);"   // ein Punkt, siehe kCheckBoxStyle
     "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #131317, stop:1 #0d0d10);"
-    "  border: 1px solid #55555e; border-top-color: #55555e; }";
+    "  border: 1px solid #55555e; border-top-color: #55555e; }"
+    "QRadioButton::indicator:checked:disabled { image: url(:/icons/radio-dot-dim.svg);"
+    "  background: #232327; border-color: #232327; }";
 
 // ── Eingabefelder sind Mulden, keine Flaechen ────────────────────────
 //

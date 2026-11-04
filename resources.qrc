@@ -25,6 +25,10 @@
         <file alias="spin-up.svg">resources/icons/spin-up.svg</file>
         <file alias="spin-down.svg">resources/icons/spin-down.svg</file>
         <file alias="badge-check.svg">resources/icons/badge-check.svg</file>
+        <file alias="check.svg">resources/icons/check.svg</file>
+        <file alias="check-dim.svg">resources/icons/check-dim.svg</file>
+        <file alias="radio-dot.svg">resources/icons/radio-dot.svg</file>
+        <file alias="radio-dot-dim.svg">resources/icons/radio-dot-dim.svg</file>
         <file alias="badge-dot.svg">resources/icons/badge-dot.svg</file>
         <file alias="badge-prohibited.svg">resources/icons/badge-prohibited.svg</file>
         <file alias="badge-mode.svg">resources/icons/badge-mode.svg</file>
