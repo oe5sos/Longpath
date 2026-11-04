@@ -16676,7 +16676,7 @@ void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
 // eingesammelt, und umgekehrt.
 void MainWindow::changeEvent(QEvent* event)
 {
-    if (event && event->type() == QEvent::WindowStateChange) {
+    if (event && event->type() == QEvent::WindowStateChange && !m_shuttingDown) {
         const auto* ev = static_cast<QWindowStateChangeEvent*>(event);
         const bool war = (ev->oldState() & Qt::WindowMinimized) != 0;
         const bool ist = (windowState() & Qt::WindowMinimized) != 0;
@@ -16691,7 +16691,11 @@ void MainWindow::changeEvent(QEvent* event)
 
 void MainWindow::legeSchwebendeFensterInsDock()
 {
-    if (m_shuttingDown) { return; }
+    // Beim Abbau und vor dem Aufbau gibt es nichts zu verstecken -- und
+    // m_containerManager, an dem die Aufzaehlung haengt, womoeglich nicht
+    // mehr. Linux-CI am 2026-11-03: Segfault in tst_side_area_integration
+    // auf diesem Zweig, lokal nicht nachstellbar; diese Wache kostet nichts.
+    if (m_shuttingDown || !m_containerManager || !m_panStack) { return; }
     // Ein zweites Minimieren ohne Zurueckholen (kommt bei macOS vor, wenn
     // das Dock das Fenster zweimal meldet) darf die Liste nicht leeren.
     QList<QPointer<QWidget>> jetzt;
