@@ -13,6 +13,7 @@
 #include "app/Datenverzeichnis.h"
 #include "app/SingleInstanceGuard.h"
 #include "ui/MainWindow.h"
+#include "ui/PanelContainerWidget.h"
 #include "ui/StyleKit.h"
 
 #include <QDir>
@@ -100,6 +101,11 @@ bool ContestFenster::lade(QString* grund, QWidget* elternFenster)
     // Stylesheet kommt an das Fenster, nicht an die Anwendung -- Longpath
     // hat sein eigenes.
     Contestprogramm::Style::setActiveTheme(steuerung->settings().colorTheme);
+    // Panels als eigene Fenster ohne Systemrahmen, eckig, mit ↙ zurueck
+    // -- wie Longpaths eigene Fenster (Betreiber 2026-11-04: "alle panels
+    // haben hier noch runde kanten, dies bitte auf eckig umstellen").
+    // Eigenstaendig behaelt das Contestprogramm den Systemrahmen.
+    Contestprogramm::PanelContainerWidget::setzeRahmenlosSchwebend(elternFenster != nullptr);
     auto* fenster = new Contestprogramm::MainWindow(*steuerung, elternFenster);
     fenster->setAttribute(Qt::WA_DeleteOnClose);
     fenster->setStyleSheet(Contestprogramm::Style::appStyleSheet());

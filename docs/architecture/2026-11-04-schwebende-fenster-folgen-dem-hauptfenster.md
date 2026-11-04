@@ -118,6 +118,30 @@ Contestprogramm `test_einbettung::panelsLassenSichVonAussenAbloesen`.
 Offen: macOS zeigt ein Werkzeugfenster, dessen Elternfenster verborgen
 ist — das ist am Gerät zu sehen, nicht im offscreen-Prüfstand.
 
+## 4. „alle panels haben hier noch runde kanten, dies bitte auf eckig umstellen" — und die Rotoren klein
+
+Die Panels des Contestprogramms kamen als `Qt::Tool`-Fenster mit dem
+Rahmen des Systems: Titelleiste, Ampelknöpfe, runde Ecken. Longpaths
+eigene Fenster (`ToolWindow`, `AppletFloatingWindow`, `PanFloatingWindow`)
+sind `Qt::Tool | FramelessWindowHint` mit eigener Kopfzeile — eckig.
+Also (oe5sos/Contestprogramm#72, f432e0a):
+`PanelContainerWidget::setzeRahmenlosSchwebend(true)`, von
+`ContestFenster::lade()` gesetzt, wenn ein Elternfenster da ist: ein
+schwebendes Panel wird rahmenlos, der Panelrahmen eckig (Radius 0), die
+Kopfzeile bekommt den Rückweg ↙ (das ✕ des Systems fällt weg; chromlose
+Panels wie die Karte einen Knopf neben dem Schloss), Zug an der
+Kopfzeile und Anfasser rechts unten arbeiten wie in der Fläche, geklemmt
+an den Schirm statt ans Elternfenster. Eigenständig bleibt alles beim
+Systemrahmen.
+
+„das fenster rotoren muss sehr groß gezogen werden, um grad eigens zu
+sehen. bitte um lösungen, um fenster klein ziehen zu können": die
+Rotorzeile war ein QHBoxLayout, Mindestbreite = Summe beider Rotoren,
+und am Mindestmaß fielen die Gradzahlen weg (r ≤ 84). Jetzt
+`RotorRowWidget` (Mindestbreite = EIN Rotor; nebeneinander, wenn die
+Breite reicht, sonst untereinander) und Gradzahlen bis r = 54 eine Stufe
+kleiner statt weg.
+
 ## Was bewusst NICHT passiert
 
 * Kein Mitziehen bei jedem Pixel eines Größenzugs — Nachlauf, wie beim
