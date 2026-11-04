@@ -6787,9 +6787,11 @@ endif()
 # zweiter Schreiber auf demselben Log abgewiesen wird.
 if(LONGPATH_CONTESTPROGRAMM)
     longpath_add_test(tst_contestfenster)
+    longpath_add_test(tst_contest_panels_im_containers_menu)
     # Qt6::Sql kommt ueber das Submodul (find_package dort); der Pruefstand
     # belegt das Log vorab ueber SQLite, ohne Koepfe des Contestprogramms.
     target_link_libraries(tst_contestfenster PRIVATE Qt6::Sql)
+    target_link_libraries(tst_contest_panels_im_containers_menu PRIVATE Qt6::Sql)
 endif()
 
 # ── Phase 3J-1 Task 17.1: TX audio binary pipeline + single-client mutex ──────
