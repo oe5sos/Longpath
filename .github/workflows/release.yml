@@ -802,6 +802,14 @@ jobs:
           cd ..
           Copy-Item fftw-tmp/fftw3.lib "$fftw_dir/lib/"
 
+      # zlib fuer das Contestprogramm (Submodul), siehe ci.yml
+      # "zlib via vcpkg (Windows)": ohne das steht der Windows-Lauf bei
+      # "Could NOT find ZLIB" -- und die Fassung haette kein Contest-Logbuch.
+      - name: zlib via vcpkg
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install zlib:x64-windows-static-md
+
       - name: Configure
         shell: bash
         run: |
@@ -812,7 +820,8 @@ jobs:
           # again.
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DLONGPATH_GPU_SPECTRUM=ON
+            -DLONGPATH_GPU_SPECTRUM=ON \
+            -DZLIB_ROOT="$VCPKG_INSTALLATION_ROOT/installed/x64-windows-static-md"
 
       - name: Build
         shell: bash

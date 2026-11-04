@@ -765,6 +765,21 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
+      # Das Contestprogramm (Submodul, seit 2026-11-04 in der CI mitgebaut)
+      # braucht zlib fuer die gzip-Kacheln des SRTM-Gelaendes
+      # (third_party/contestprogramm/CMakeLists.txt, find_package(ZLIB
+      # REQUIRED)). Linux und macOS haben es im Werkzeugkasten, der
+      # Windows-Laeufer nicht -- erster Lauf mit Submodul: "Could NOT find
+      # ZLIB". Derselbe Weg wie in der eigenen CI des Contestprogramms:
+      # vcpkg, statisch, dynamische CRT (passt zu MSVCs /MD). Nur
+      # ZLIB_ROOT, nicht die vcpkg-Toolchain: die wuerde jedes andere
+      # find_package in Longpath mit umlenken.
+      - name: zlib via vcpkg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install zlib:x64-windows-static-md
+
       - name: Configure (Windows)
         if: runner.os == 'Windows'
         shell: bash
@@ -795,7 +810,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DLONGPATH_GPU_SPECTRUM=ON \
             -DLONGPATH_BUILD_TESTS=ON \
-            -DLONGPATH_TEST_TIMEOUT=30
+            -DLONGPATH_TEST_TIMEOUT=30 \
+            -DZLIB_ROOT="$VCPKG_INSTALLATION_ROOT/installed/x64-windows-static-md"
 
       # ------------------------------------------------------------------
       # Build
