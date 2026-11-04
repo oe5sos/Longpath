@@ -256,6 +256,7 @@ warren@wpratt.com
 #include "MemoryRecord.h"
 #include "BandDefaults.h"
 #include "RxDspWorker.h"
+#include "core/TransverterSetup.h"
 #include "core/FFTEngine.h"
 // 3M-1a G.1: TX-side integration — MoxController + TxChannel view.
 // TxMicRouter is already included via RadioModel.h (for std::unique_ptr destructor).
@@ -12967,9 +12968,26 @@ void RadioModel::installBandPlanMoxCheck()
             return {false, QStringLiteral("No TX-bound slice")};
         }
 
-        const auto freqHz = static_cast<std::int64_t>(slice->frequency());
+        // ── Mit Transverter zaehlt, was auf der ANTENNE liegt ────────
+        //
+        // Das Geraet sendet auf der ZF -- beim MV-2 auf 28 MHz --, und
+        // genau die stand hier bis 2026-11-04. Auf der Antenne liegen
+        // aber 2 m, und die 10-m-Kante bei 29,700 MHz entspricht
+        // 145,700: die oberen 300 kHz des Bandes lehnte der Waechter
+        // ab, obwohl sie erlaubt sind.
+        //
+        // Das ist KEINE Umgehung. Geprueft wird weiterhin eine echte
+        // Bandkante, nur die richtige: die des Bandes, auf dem die
+        // Energie wirklich hinausgeht. Umgerechnet wird ausschliesslich
+        // dann, wenn der Transverter eingeschaltet, brauchbar
+        // eingestellt UND die ZF in seinem Fenster ist
+        // (TransverterSetup::rfFrequencyHz gibt sonst unveraendert
+        // zurueck) -- ohne Transverter bleibt alles, wie es war.
+        const TransverterSetup& trv = TransverterSetup::current();
+        const auto zfHz = static_cast<std::int64_t>(slice->frequency());
+        const auto freqHz = static_cast<std::int64_t>(trv.rfFrequencyHz(zfHz));
         const DSPMode mode = slice->dspMode();
-        const Band txBand = bandFromFrequency(slice->frequency());
+        const Band txBand = bandFromFrequency(static_cast<double>(freqHz));
 
         if (choice.configured) {
             return m_bandPlan.checkMoxAllowed(choice.region, freqHz, mode,

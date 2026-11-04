@@ -273,6 +273,11 @@ constexpr float lookupHfBand(const HfRow& row, Band band) noexcept {
         case Band::Band12m:  return row.band12m;
         case Band::Band10m:  return row.band10m;
         case Band::Band6m:   return row.band6m;
+        // 2 m steht in keiner Verstaerkungstabelle des Hauses: dort
+        // haengt ein Transverter, und dessen Verstaerkung ist seine
+        // eigene, nicht die der Endstufe. Darum derselbe Platzhalter
+        // wie fuer GEN/WWV/XVTR weiter unten.
+        case Band::Band2m:   return kPaGainSentinel;
         // Longpath-specific slots — no Thetis equivalent.
         case Band::GEN:
         case Band::WWV:

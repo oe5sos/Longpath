@@ -98,6 +98,10 @@ BandSeed seedFor(Band b)
         case Band::Band10m:  return { Band::Band10m,  28305000.0,  DSPMode::USB, true };
         // From Thetis clsBandStackManager.cs:2155 [v2.10.3.13]
         case Band::Band6m:   return { Band::Band6m,   50125000.0,  DSPMode::USB, true };
+        // 2 m: die SSB-Anruffrequenz der Region 1 (144,300). Das
+        // Geraet steht dabei auf der ZF -- diese Vorgabe gilt fuer
+        // die Antenne, der Transverter rechnet zurueck.
+        case Band::Band2m:   return { Band::Band2m,  144300000.0,  DSPMode::USB, true };
         // From Thetis clsBandStackManager.cs:2165 [v2.10.3.13] —
         // 10 MHz is mid-list of 5 WWV entries and most commonly usable.
         // Thetis uses synchronous AM (SAM), not plain AM.
