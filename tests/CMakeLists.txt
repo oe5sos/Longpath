@@ -5403,6 +5403,12 @@ longpath_add_test(tst_applet_panel_min_width)
 longpath_add_test(tst_applet_detach_reachable)
 longpath_add_test(tst_applet_window_size)
 longpath_add_test(tst_real_mainwindow_detach)
+# -- 2026-11-03: Ablage ins Dock nimmt die schwebenden Fenster mit --
+#    Betreiber: "wenn ich longpath in die taskleiste legen will, bleiben
+#    die fenster offen." Qt::Tool-Kinder bleiben bei macOS beim
+#    Minimieren des Elternfensters stehen; MainWindow::changeEvent
+#    versteckt sie und holt sie zurueck.
+longpath_add_test(tst_dock_ablage_nimmt_fenster_mit)
 longpath_add_test(tst_real_pan_float)
 longpath_add_test(tst_real_rotor_window)
 

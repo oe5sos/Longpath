@@ -16470,7 +16470,16 @@ void MainWindow::applyDarkTheme()
 // Betreiber 2026-09-01: "panadapter kann ich nicht finden / profil 01
 // ist leer": nach dem Wegklicken der Maske blieb sonst eine leere
 // Flaeche, das Layout des Betreibers unauffindbar versteckt.
-void MainWindow::hideFloatingWindowsBehindConnectMask()
+// Alle Schwebe-Mechanismen verstecken und in `liste` vormerken. Zwei
+// Abnehmer: die Connect-Maske (seit je) und seit 2026-11-03 die Ablage ins
+// Dock -- der Betreiber: "wenn ich longpath in die taskleiste legen will,
+// bleiben die fenster offen. das ist falsch." Die schwebenden Fenster sind
+// Qt::Tool mit dem Hauptfenster als Elternteil; macOS nimmt sie beim
+// Minimieren des Elternfensters NICHT mit, sie stehen weiter am
+// Schreibtisch. Also machen wir es selbst, mit derselben Aufzaehlung wie
+// fuer die Maske, damit kein Mechanismus vergessen wird (der Panadapter
+// war am 2026-09-01 genau so einer).
+void MainWindow::versteckeSchwebendeFenster(QList<QPointer<QWidget>>& liste)
 {
     for (ContainerWidget* c : m_containerManager->allContainers()) {
         if (!c) { continue; }
@@ -16478,12 +16487,12 @@ void MainWindow::hideFloatingWindowsBehindConnectMask()
             QWidget* win = c->window();
             if (win && win != this && win->isVisible()) {
                 win->hide();
-                m_floatingContainersHiddenPreConnect.append(win);
+                liste.append(win);
             }
         } else if (c->isOverlayDocked()) {
             if (c->isVisible()) {
                 c->hide();
-                m_floatingContainersHiddenPreConnect.append(c);
+                liste.append(c);
             }
         }
     }
@@ -16504,12 +16513,12 @@ void MainWindow::hideFloatingWindowsBehindConnectMask()
     for (AppletFloatingWindow* w : std::as_const(m_floatingApplets)) {
         if (w && w->isVisible()) {
             w->hide();
-            m_floatingContainersHiddenPreConnect.append(w);
+            liste.append(w);
         }
     }
     if (m_antennaWindow && m_antennaWindow->isVisible()) {
         m_antennaWindow->hide();
-        m_floatingContainersHiddenPreConnect.append(m_antennaWindow);
+        liste.append(m_antennaWindow);
     }
     if (m_panStack) {
         for (const QString& panId : m_panStack->panIdsForTesting()) {
@@ -16517,7 +16526,7 @@ void MainWindow::hideFloatingWindowsBehindConnectMask()
                 if (auto* pf = m_panStack->floatingWindowForTest(panId)) {
                     if (pf->isVisible()) {
                         pf->hide();
-                        m_floatingContainersHiddenPreConnect.append(pf);
+                        liste.append(pf);
                     }
                 }
             }
@@ -16525,13 +16534,13 @@ void MainWindow::hideFloatingWindowsBehindConnectMask()
     }
     if (m_rotorWindow && m_rotorWindow->isVisible()) {
         m_rotorWindow->hide();
-        m_floatingContainersHiddenPreConnect.append(m_rotorWindow);
+        liste.append(m_rotorWindow);
     }
     // Der Seitenbereich ist ein schwebendes Fenster wie die anderen: hinter
     // die Verbindungsmaske, und mit derselben Liste wieder hervor.
     if (m_sideArea && m_sideArea->isVisible()) {
         m_sideArea->hide();
-        m_floatingContainersHiddenPreConnect.append(m_sideArea.data());
+        liste.append(m_sideArea.data());
     }
 
     // Und es dem Dialog sagen. Die Regel „alles hinter die Maske" ist
@@ -16539,6 +16548,11 @@ void MainWindow::hideFloatingWindowsBehindConnectMask()
     // Betreiber sah am 2026-10-21 eine schwarze Flaeche und suchte eine
     // Stunde lang im Funkgeraet, waehrend sein Panadapter als
     // verstecktes Schwebefenster hinter genau diesem Dialog stand.
+}
+
+void MainWindow::hideFloatingWindowsBehindConnectMask()
+{
+    versteckeSchwebendeFenster(m_floatingContainersHiddenPreConnect);
     qWarning() << "[ConnectMaske] versteckt:"
                << m_floatingContainersHiddenPreConnect.size() << "Fenster";
     for (const QPointer<QWidget>& w
@@ -16644,6 +16658,63 @@ void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
         m_raiseLogbookAfterConnectMask = false;
         QTimer::singleShot(0, this, [this]() { raiseLogbookIfOpen(); });
     }
+}
+
+// ── Ablage ins Dock nimmt die schwebenden Fenster mit (2026-11-03) ────────
+//
+// Betreiber: "wenn ich longpath in die taskleiste legen will, bleiben die
+// fenster offen. das ist falsch." Die abgeloesten Applets, der schwebende
+// Panadapter, Rotor/Log und die Seitenflaeche sind eigene Qt::Tool-Fenster
+// mit dem Hauptfenster als Elternteil. Minimiert der Betreiber das
+// Hauptfenster (gelber Knopf, Dock-Klick, Cmd-M), bleibt bei macOS jedes
+// dieser Fenster stehen -- nur das Hauptfenster geht ins Dock.
+//
+// Darum hier: beim Uebergang NACH minimiert alles verstecken, was gerade
+// sichtbar schwebt, und beim Uebergang ZURUECK genau das wieder zeigen.
+// Dieselbe Aufzaehlung wie fuer die Connect-Maske, eigene Liste: was hinter
+// der Maske liegt, ist nicht sichtbar und wird hier gar nicht erst
+// eingesammelt, und umgekehrt.
+void MainWindow::changeEvent(QEvent* event)
+{
+    if (event && event->type() == QEvent::WindowStateChange && !m_shuttingDown) {
+        const auto* ev = static_cast<QWindowStateChangeEvent*>(event);
+        const bool war = (ev->oldState() & Qt::WindowMinimized) != 0;
+        const bool ist = (windowState() & Qt::WindowMinimized) != 0;
+        if (ist && !war) {
+            legeSchwebendeFensterInsDock();
+        } else if (!ist && war) {
+            holeSchwebendeFensterAusDemDock();
+        }
+    }
+    QMainWindow::changeEvent(event);
+}
+
+void MainWindow::legeSchwebendeFensterInsDock()
+{
+    // Beim Abbau und vor dem Aufbau gibt es nichts zu verstecken -- und
+    // m_containerManager, an dem die Aufzaehlung haengt, womoeglich nicht
+    // mehr. Linux-CI am 2026-11-03: Segfault in tst_side_area_integration
+    // auf diesem Zweig, lokal nicht nachstellbar; diese Wache kostet nichts.
+    if (m_shuttingDown || !m_containerManager || !m_panStack) { return; }
+    // Ein zweites Minimieren ohne Zurueckholen (kommt bei macOS vor, wenn
+    // das Dock das Fenster zweimal meldet) darf die Liste nicht leeren.
+    QList<QPointer<QWidget>> jetzt;
+    versteckeSchwebendeFenster(jetzt);
+    m_schwebendeFensterImDock.append(jetzt);
+    qInfo() << "[Dock] abgelegt:" << jetzt.size() << "schwebende Fenster";
+}
+
+void MainWindow::holeSchwebendeFensterAusDemDock()
+{
+    if (m_shuttingDown) { m_schwebendeFensterImDock.clear(); return; }
+    int geholt = 0;
+    for (const QPointer<QWidget>& w : std::as_const(m_schwebendeFensterImDock)) {
+        if (w) { w->show(); w->raise(); ++geholt; }
+    }
+    if (!m_schwebendeFensterImDock.isEmpty()) {
+        qInfo() << "[Dock] zurueck:" << geholt << "schwebende Fenster";
+    }
+    m_schwebendeFensterImDock.clear();
 }
 
 void MainWindow::showConnectionPanel()
