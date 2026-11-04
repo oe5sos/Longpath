@@ -1,5 +1,133 @@
 # Changelog
 
+## [0.9.0] - 2026-11-04
+
+52 Stände seit 0.8.2, und die meisten davon sind am Gerät entstanden:
+die **FLEX-8400** steht seit dem 22.10. in der Leitung und hat fast
+jeden Befund dieser Fassung selbst gemeldet. Deshalb 0.9.0 und nicht
+0.8.3 — am Flex kann Longpath jetzt senden, und die Regler der Scheibe
+erreichen wirklich die Maschine.
+
+### Die FLEX-8400
+
+Bis 0.8.2 war der Flex ein Empfänger mit einem Bild. Jetzt ist er eine
+Station.
+
+- **Senden über die FLEX-8400, Stufe 2** (#332) — Tastung, Zug und
+  Rückweg.
+- **Die Regler der Scheibe erreichen die Maschine** (#370). Das war der
+  größte einzelne Befund: `wireSliceSignals()` beginnt mit
+  `if (!slice || !m_connection) { return; }`, und `m_connection` ist am
+  Flex **immer** leer — es ist die OpenHPSDR-Verbindung. Damit lagen
+  rund 65 Handhaben tot. AGC, Tonpegel, Stumm, Balance, RIT/XIT,
+  Rauschminderung samt Stufe und APF gehen jetzt den eigenen Weg.
+- **Die Rauschsperre hatte kein Ziel** (#369) — der Befehl ging
+  hinaus, bevor die Scheibennummer da war, und verschwand still. Jetzt
+  wird er vorgemerkt und nachgereicht.
+- **Der Kanalzug war am falschen Gerät** (#357).
+- **Die Verriegelung gehört vor das Tontor** (#355), und **das Tor
+  liest die Lage statt `tx_allowed`** (#349) — das Mikrofon heißt
+  seitdem auch Mikrofon.
+- **Der Stehwellenriegel sperrte jedes Band und auch das Abstimmen**
+  (#361); **der SWR-Zeiger zappelte zwischen zwei Zahlen** (#368).
+- **Die eingestellte Abstimmleistung ging nie hinaus** (#364), und sie
+  lässt sich jetzt **nachregeln** (#365) — der Transverter nimmt die
+  Spots mit.
+- **Die Vorverzerrung der Maschine ist bedienbar** (#372).
+- **Lücken im VITA-Strom werden gemessen, nicht erraten** (#348); **die
+  gemeldete Bildhöhe lügt** (#329), und **die 80 kHz sind gerechnet** —
+  Breite/2 minus Rand, zweimal zurückgeschrieben (#352).
+- **Der Nachzug läuft beim eigenen Nachscrollen gar nicht erst an**
+  (#354), **eine Spur nennt den Schreiber der Frequenz** (#351), und
+  **die Socketmeldung sagt jetzt etwas** (#373).
+
+### FT8, FT4 und MSHV
+
+- **FT8 sendet über die Flex — und hört danach wieder** (#345), **der
+  Ruf hört nicht nach fünf auf, und der Ton geht in Echtzeit hinaus**
+  (#347), **getastet wird auf die Sekunde**, und je Sendung steht im
+  Protokoll, was hinausging (#346).
+- **Wer mich ruft, kommt dran** — drei Befunde aus dem Betrieb (#353) —
+  und **wie stark er ankommt**, samt keinem Zug ins Leere (#356).
+- **MSHV Multi Answering**, Stufe 1 und 2 (#323, #333): mehrere
+  Stationen in einem Fenster, und die Buchhaltung steht vor der
+  Sendeseite.
+- **„New DXCC" zeigt nur Länder, die noch fehlen** (#336).
+- **Ein Druck auf DIGU richtet genauso her wie FT8** — und die Stelle
+  meldet, was sie tut (#343).
+- **Die Zahl der Dekoderrunden ist einstellbar** (#318), für die
+  Gegenprobe am Band.
+- **Ein Bandwechsel behält den Digi-Betrieb** (#360).
+
+### Bedienung
+
+- **Combined: ein Feld, in das jedes Panel wandert** (#371). Wo früher
+  die rechte Spalte von oben bis unten mit dem Rotor besetzt war, liegt
+  jetzt ein Feld, in das sich Rotor, RX, TX und jedes andere Panel
+  ziehen lassen; oben in der Kopfleiste stehen bis zu drei Reiter zum
+  Umschalten. Damit braucht es dafür weder ein Höhen- noch ein
+  Darstellungsprofil.
+- **Die Ablage ins Dock nimmt die schwebenden Fenster mit** (#379).
+- **Das Zahnrad gibt es jetzt auch im schwebenden Fenster** (#366), und
+  die **Panadapter-Kopfleiste** hat ein sichtbares Zahnrad und 2D/3D
+  mit einem Griff (#350).
+- **Der Wasserfall braucht keinen Klick mehr** (#367).
+- **Ein Zoom in CTUN ist kein Zug am Fenster** (#376); **der Zuteiler
+  ging beim CTUN-Zug nicht mit** (#375).
+- **Die 3D-Fläche ist frequenztreu** — die Spitze steht wieder über
+  ihrer Frequenz (#344).
+- **Profile: Aether, Thetis und Zeus** — samt Zeus' Kanalzug (#358).
+- **Frequenz-Widget**: die Anzeigeschalter liegen jetzt auch im
+  Zahnrad (#363). **Raster**: der Abstand gehört hinein, nicht danach
+  aufgeschlagen (#362).
+
+### Fernzugriff
+
+- **Die App ohne das eigene Netz** (#342) — Longpath erreicht die
+  Station auch von außerhalb.
+- **Longpath folgt einem fremden Funkgerät** (#337), Begleitgerät und
+  Transverter, Stufe 1 und 2.
+
+### Aktualisierung
+
+Zwei Löcher, die beide dasselbe Muster hatten: man sah nicht, was das
+Programm gerade weiß.
+
+- **Eine fehlgeschlagene Startprüfung steht jetzt auch im Kopf**
+  (#382). Am Signal `checkFailed` hingen nur ein `qWarning` und ein
+  `deleteLater` — kam die Abfrage nicht durch, blieb der Platz neben
+  der Version so leer wie vor der Abfrage. Jetzt `· not checked`, der
+  Grund im Tooltip.
+- **Dritter Weg: `CHANGELOG.md` über Fastly** (#383). Am Mac mini hat
+  der zweite Weg (`github.com` statt `api.github.com`) **nie**
+  geholfen, weil beide Namen in denselben Azure-Bereich auflösen. Am
+  Gerät gemessen: über die alte Adresse kommen 51 KB in unter einer
+  Sekunde, über Azure nach 21 Sekunden nichts. `raw.githubusercontent.com`
+  liegt bei Fastly und ist davon nicht betroffen. Die Kette heißt jetzt
+  API → github.com → CHANGELOG, und scheitert alles, nennt **eine**
+  Fehlerzeile alle drei Gründe.
+
+### Schutz
+
+- **SWR-Schutz: Freigabe bei jedem Unkey, Riegel nach offener Antenne**
+  (#341).
+- **Die Lückenregel bekommt ihre zwei Schranken** (#338).
+
+### Prüfstände
+
+- **Windows fährt jetzt Prüfstände** (#328): 189 statt 0 — und die
+  Begründung dagegen war falsch. Dazu ein **Tor auf die belegte Liste**
+  (#331): sechs statt 189, mit einem Zeitlimit, das endet.
+- **Die Prüfstände werden netzdicht** (#339).
+- **Der Seitenflächen-Prüfstand rechnet vom wirklichen Schirm** (#377)
+  und **wartet das Rasten ab** (#380).
+- **Kinder auf dem Stapel: jetzt auch die Dialoge** (#340).
+
+### Abgleich
+
+- **Zeus 2.0.61** (#359): ein Grenzfehler in `emnr.c`, und die CFC-FFT
+  war nie entschieden.
+
 ## [0.8.2] - 2026-10-22
 
 Ein Punkt, und er betrifft Windows.
