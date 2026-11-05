@@ -17374,6 +17374,25 @@ void MainWindow::versteckeSchwebendeFenster(QList<QPointer<QWidget>>& liste)
         m_sideArea->hide();
         liste.append(m_sideArea.data());
     }
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // Die Contest-Panels und das Logbuch-Fenster (2026-11-05): der
+    // sechste Mechanismus -- und prompt vergessen wie die vier davor.
+    // Betreiber, mit Bild von Log und Chat hinter der Maske: "ich will
+    // bei dieser connect maske nichts im hintergrund haben".
+    if (m_contestFenster && m_contestFenster->istOffen()) {
+        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+            QWidget* p = m_contestFenster->panelFenster(e.id);
+            if (p && p->isWindow() && p->isVisible()) {
+                p->hide();
+                liste.append(p);
+            }
+        }
+        if (QWidget* log = m_contestFenster->fenster(); log && log->isVisible()) {
+            log->hide();
+            liste.append(log);
+        }
+    }
+#endif
 
     // Und es dem Dialog sagen. Die Regel „alles hinter die Maske" ist
     // richtig; dass sie darueber schwieg, war der Fehler — der
@@ -19436,6 +19455,12 @@ void MainWindow::stelleContestAnordnungHer(const QVariantMap& s)
         return;
     }
     qInfo() << "Contest panels from the profile:" << panels.keys() << "logbook window" << logbuch;
+    // Steht gerade die Verbindungsmaske, gehoeren auch diese Fenster
+    // dahinter -- und kommen mit den anderen wieder hervor.
+    if (m_connectionPanel && m_connectionPanel->isVisible()) {
+        hideFloatingWindowsBehindConnectMask();
+        return;
+    }
     // Das Hauptfenster bleibt das aktive: nur es hat die Menueleiste.
     // Live 2026-11-05: nach dem Start war ein Panel aktiv, und der Mac
     // zeigte "Apple · Longpath" und sonst nichts.
