@@ -30,6 +30,7 @@
 #include "gui/MainWindow.h"
 #include "ContestFenster.h"
 #include "gui/LayoutProfiles.h"
+#include "gui/applets/KombiApplet.h"
 #include "FensterFrist.h"
 
 using namespace Longpath;
@@ -189,6 +190,69 @@ private slots:
         QVERIFY(profile->activate(vorher));
         QTest::qWait(800);
         QVERIFY(!bruecke->istPanelSchwebend(QStringLiteral("chat")));
+    }
+
+    // ── Fall 4: das Combined-Feld nimmt ein Contest-Panel (2026-11-05) ──
+    //
+    // Betreiber: "im combined sollten auch alle contest optionen moeglich
+    // sein". Ins Feld, im Profil als "Contest:chat", nicht als Fenster;
+    // herausgezogen wird es wieder ein Fenster; ein Profil mit dem Feld-
+    // Inhalt holt es zurueck, eines ohne raeumt es weg.
+    void dasCombinedFeldNimmtEinContestPanel()
+    {
+        auto* kombi = m_mw->findChild<KombiApplet*>();
+        QVERIFY2(kombi, "das Combined-Feld muss da sein");
+        auto* profile = m_mw->findChild<LayoutProfiles*>();
+        QVERIFY(profile);
+        const QString vorher = profile->current();
+
+        m_mw->holeContestInsKombiFeldForTest(QStringLiteral("chat"));
+        QTest::qWait(300);
+        ContestFenster* bruecke = m_mw->contestFensterForTest();
+        QVERIFY(bruecke);
+        QWidget* chat = bruecke->panelFenster(QStringLiteral("chat"));
+        QVERIFY(chat && !chat->isWindow());
+        QVERIFY2(kombi->seiten().contains(chat), "chat muss eine Seite des Feldes sein");
+        QVERIFY(bruecke->panelInFremdemGehaeuse(QStringLiteral("chat")));
+
+        profile->captureIntoCurrent();
+        const QVariantMap erfasst = profile->snapshot(vorher);
+        QVERIFY2(erfasst.value(QStringLiteral("kombiInhalt")).toStringList()
+                     .contains(QStringLiteral("Contest:chat")),
+                 "im Profil steht das Feld mit Contest:chat");
+        QVERIFY2(!erfasst.value(QStringLiteral("contestPanels")).toMap().contains(QStringLiteral("chat")),
+                 "und nicht als Fenster");
+
+        // Herausgezogen: ein Fenster dort, wo losgelassen wurde.
+        kombi->gibFrei(chat);
+        emit kombi->herausgezogen(chat, QPoint(300, 300));
+        QTest::qWait(300);
+        QVERIFY2(chat->isWindow(), "nach dem Herausziehen ein Fenster");
+        QVERIFY(!bruecke->panelInFremdemGehaeuse(QStringLiteral("chat")));
+        QVERIFY(bruecke->istPanelSchwebend(QStringLiteral("chat")));
+
+        // Ein Profil, das das Feld mit Contest:chat will.
+        QVariantMap zustand = profile->snapshot(vorher);
+        zustand.insert(QStringLiteral("kombiInhalt"), QStringList{QStringLiteral("Contest:chat")});
+        zustand.insert(QStringLiteral("contestPanels"), QVariantMap());
+        zustand.insert(QStringLiteral("contestLogbook"), false);
+        QVERIFY(profile->createWith(QStringLiteral("Kombi"), zustand));
+        QVERIFY(profile->activate(QStringLiteral("Kombi")));
+        QTest::qWait(800);
+        QVERIFY2(kombi->seiten().contains(chat), "das Profil holt chat ins Feld");
+        QVERIFY(!chat->isWindow());
+
+        // Und eines ohne: zurueck in die Flaeche des Logbuchs.
+        QVariantMap leer = profile->snapshot(vorher);
+        leer.insert(QStringLiteral("kombiInhalt"), QStringList());
+        leer.insert(QStringLiteral("contestPanels"), QVariantMap());
+        leer.insert(QStringLiteral("contestLogbook"), false);
+        QVERIFY(profile->createWith(QStringLiteral("Leer"), leer));
+        QVERIFY(profile->activate(QStringLiteral("Leer")));
+        QTest::qWait(800);
+        QVERIFY(!kombi->seiten().contains(chat));
+        QVERIFY(!bruecke->istPanelSchwebend(QStringLiteral("chat")));
+        QVERIFY(!chat->isWindow());
     }
 };
 

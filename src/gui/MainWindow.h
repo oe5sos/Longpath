@@ -253,6 +253,7 @@ public:
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
     class ContestFenster* contestFensterForTest() const { return m_contestFenster; }
+    void holeContestInsKombiFeldForTest(const QString& id) { holeContestInsKombiFeld(m_kombiApplet, id); }
     int sperreAlleFensterForTest(bool an) { return sperreAlleFenster(an); }
 
     /// Wie viele Rahmen des Sendetons jetzt faellig sind.
@@ -1358,6 +1359,7 @@ private:
     void gibFremdesPanelZurueck(QWidget* panel, const QRect& dort);
     /// Rechtsklick auf ein Kombi-Feld: zeigt, was hineinkann.
     void zeigeKombiListe(class KombiApplet* feld, const QPoint& globalPos);
+    void holeContestInsKombiFeld(class KombiApplet* feld, const QString& id);
     void holeInsKombiFeld(class KombiApplet* feld, AppletWidget* applet,
                           const QString& appletId);
 
