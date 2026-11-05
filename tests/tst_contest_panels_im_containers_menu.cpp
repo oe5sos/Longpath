@@ -177,6 +177,9 @@ private slots:
         QWidget* chat = bruecke->panelFenster(QStringLiteral("chat"));
         QVERIFY(chat && chat->isWindow());
         QTRY_COMPARE_WITH_TIMEOUT(chat->frameGeometry(), chatSoll, 3000);
+        // Das Hauptfenster ist das aktive Fenster -- nur es hat die
+        // Menueleiste (live 2026-11-05: "Apple · Longpath", sonst nichts).
+        QTRY_VERIFY2_WITH_TIMEOUT(QApplication::activeWindow() == m_mw, "das Hauptfenster muss aktiv bleiben", 3000);
         QVERIFY2(!bruecke->fenster()->isVisible(), "das Logbuch-Fenster bleibt zu");
 
         // Die Erfassung schreibt die Anordnung zurueck.

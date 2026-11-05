@@ -19436,6 +19436,10 @@ void MainWindow::stelleContestAnordnungHer(const QVariantMap& s)
         return;
     }
     qInfo() << "Contest panels from the profile:" << panels.keys() << "logbook window" << logbuch;
+    // Das Hauptfenster bleibt das aktive: nur es hat die Menueleiste.
+    // Live 2026-11-05: nach dem Start war ein Panel aktiv, und der Mac
+    // zeigte "Apple · Longpath" und sonst nichts.
+    if (!m_shuttingDown && isVisible()) { activateWindow(); }
 #endif
 }
 

@@ -17,6 +17,7 @@
 #include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QWidget>
+#include <QScreen>
 #include <QVBoxLayout>
 
 #include "ContestFenster.h"
@@ -298,7 +299,7 @@ private slots:
         QVERIFY(QTest::qWaitForWindowExposed(&eltern, kFensterFrist));
 
         const QRect chatSoll(128, 144, 397, 301);
-        const QRect bandmapSoll(560, 144, 301, 237);
+        const QRect bandmapSoll(400, 464, 301, 237);   // im 800x800-Schirm des Pruefstands
         QVariantMap gesichert;
         {
             ContestFenster bruecke;
@@ -329,6 +330,23 @@ private slots:
         QCOMPARE(neu.panelFenster(QStringLiteral("chat"))->frameGeometry(), chatSoll);
         QCOMPARE(neu.panelFenster(QStringLiteral("bandmap"))->frameGeometry(), bandmapSoll);
         QVERIFY2(!neu.logbuchSichtbar(), "das Logbuch-Fenster bleibt zu");
+
+        // Ein Rahmen, der rechts/unten ueber den Schirm hinausragt, rueckt
+        // hinein (Groesse bleibt) -- live ragte der Chat rechts hinaus.
+        {
+            const QRect frei = eltern.screen()->availableGeometry();
+            QVariantMap weit;
+            weit.insert(QStringLiteral("map"),
+                        QVariantMap{{QStringLiteral("x"), frei.right() - 100},
+                                    {QStringLiteral("y"), frei.bottom() - 100},
+                                    {QStringLiteral("w"), 397}, {QStringLiteral("h"), 301}});
+            QVERIFY2(neu.stelleAnordnungHer(weit, false, &grund, &eltern), qPrintable(grund));
+            const QRect r = neu.panelFenster(QStringLiteral("map"))->frameGeometry();
+            QVERIFY2(frei.contains(r), qPrintable(QStringLiteral("Karte steht bei %1,%2 %3x%4, Schirm %5x%6")
+                                                      .arg(r.x()).arg(r.y()).arg(r.width()).arg(r.height())
+                                                      .arg(frei.width()).arg(frei.height())));
+            QCOMPARE(r.size(), QSize(397, 301));
+        }
 
         // Ein Profil ohne Contest raeumt auf, laesst aber das Logbuch leben.
         neu.raeumeAnordnung();
