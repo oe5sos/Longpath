@@ -87,8 +87,12 @@ public:
     // Holt das Panel als eigenes Fenster; laedt das Logbuch bei Bedarf
     // (verborgen). Ein Panel aus einem nie gezeigten Logbuch wird neben
     // das Elternfenster gestellt, gestaffelt.
+    // `aktivieren`: das Panel nach vorn und aktiv -- beim Herstellen aus
+    // dem Profil NICHT (2026-11-05): dann war beim Start ein Panel vor
+    // dem Hauptfenster aktiv, und der Mac zeigte eine leere Menueleiste
+    // ("Apple · Longpath"), weil ein Werkzeugfenster keine hat.
     bool zeigePanelAlsFenster(const QString& id, QString* grund = nullptr,
-                              QWidget* elternFenster = nullptr);
+                              QWidget* elternFenster = nullptr, bool aktivieren = true);
     void dockePanel(const QString& id);
     // Alle Panels sperren oder freigeben (ihr eigenes Schloss in der
     // Kopfzeile); liefert, wie viele umgestellt wurden. Fuer "Lock every

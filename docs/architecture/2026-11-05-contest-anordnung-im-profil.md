@@ -91,3 +91,41 @@ Prüfstände: `tst_contestfenster::einPanelGehtInEinFremdesGehaeuseUndZurueck`,
 `tst_contest_panels_im_containers_menu::dasCombinedFeldNimmtEinContestPanel`
 (gegen die Fassung ohne die vier Zweige rot), Contestprogramm
 `test_einbettung::imFremdenGehaeuseIstDasPanelNackt`.
+
+## Live am Stand 850844a70 (2026-11-05, 11:44)
+
+- Blauer Grund rechts: weg, gemessen `#08080a` (vorher `#0e0e1b`).
+- Profil „Neu": Log und Chat als Fenster zurück, Logbuch zu
+  (Protokoll: „Contest panels from the profile: chat, unifiedlog,
+  logbook window false").
+- Raster: Log auf 16er-Linien mit 3 Luft; der Chat ragte rechts über
+  den Schirm (gespeicherter Rahmen) und war dort nicht einzufangen.
+- **Menüleiste: nur „Apple · Longpath"** — die Panels wurden beim
+  Herstellen aktiviert, bevor das Hauptfenster je aktiv war; ein
+  Werkzeugfenster hat keine Leiste, und der Mac zeigte die leere.
+- Contestprogramm: „unique connections require a pointer to member
+  function" — die ✕-Verbindung (versteckt → Profil sichern) war Lambda
+  + UniqueConnection, von Qt abgelehnt; das ✕ sicherte seit #74 nie.
+
+Behoben: beim Herstellen kein `activateWindow()` auf die Panels, das
+Hauptfenster wird danach aktiviert (nur es hat die Leiste); Rahmen aus
+dem Profil rücken in den Schirm (Größe bleibt); Contestprogramm #77
+ersetzt das Lambda durch einen Slot. Der Menüleisten-Fall ist offscreen
+trivial grün (dort wechselt das aktive Fenster nicht) — der Beleg ist
+das Gerät.
+
+## Nachtrag: hinter der Verbindungsmaske ist nichts (2026-11-05, 12:53)
+
+**Betreiber, mit Bild von Log und Chat hinter der Maske:** „ich will bei
+dieser connect maske nichts im hintergrund haben — hatte ich dir auch
+schon hunderte mal gesagt." Die Regel vom 2026-09-01 („ALLE fliegenden
+Fenster gehören hinter die ConnectMaske") kannte fünf Mechanismen; die
+Contest-Fenster waren der sechste und fehlten — genau die Lehre, die
+im Code über dieser Liste steht: jede neue Fensterart wird dort
+vergessen.
+
+Jetzt: `versteckeSchwebendeFenster()` nimmt die Contest-Panels
+(Fenster) und das Logbuch-Fenster mit in dieselbe Liste; stellt das
+Profil Panels her, während die Maske steht, gehen sie sofort dahinter.
+Prüfstand `tst_contest_panels_im_containers_menu::hinterDerMaskeIstNichts`
+(ohne den Block rot).

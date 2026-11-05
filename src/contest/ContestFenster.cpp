@@ -19,6 +19,7 @@
 
 #include <QDir>
 #include <QEvent>
+#include <QScreen>
 #include <QPointer>
 #include <QTimer>
 
@@ -298,7 +299,7 @@ bool ContestFenster::istPanelSchwebend(const QString& id) const
 }
 
 bool ContestFenster::zeigePanelAlsFenster(const QString& id, QString* grund,
-                                          QWidget* elternFenster)
+                                          QWidget* elternFenster, bool aktivieren)
 {
     if (!lade(grund, elternFenster)) { return false; }
     Contestprogramm::MainWindow* log = m_innen->fenster;
@@ -322,7 +323,7 @@ bool ContestFenster::zeigePanelAlsFenster(const QString& id, QString* grund,
         panel->move(ecke);
     }
     panel->raise();
-    panel->activateWindow();
+    if (aktivieren) { panel->activateWindow(); }
     return true;
 }
 
@@ -388,13 +389,23 @@ bool ContestFenster::stelleAnordnungHer(const QVariantMap& panelsSoll, bool logb
             if (log->istPanelSchwebend(e.id)) { log->setzePanelSchwebend(e.id, false); }
             continue;
         }
-        if (!zeigePanelAlsFenster(e.id, grund, elternFenster)) { return false; }
+        if (!zeigePanelAlsFenster(e.id, grund, elternFenster, /*aktivieren=*/false)) { return false; }
         const QVariantMap r = panelsSoll.value(e.id).toMap();
-        const QRect rahmen(r.value(QStringLiteral("x")).toInt(),
-                           r.value(QStringLiteral("y")).toInt(),
-                           r.value(QStringLiteral("w")).toInt(),
-                           r.value(QStringLiteral("h")).toInt());
+        QRect rahmen(r.value(QStringLiteral("x")).toInt(),
+                     r.value(QStringLiteral("y")).toInt(),
+                     r.value(QStringLiteral("w")).toInt(),
+                     r.value(QStringLiteral("h")).toInt());
         QWidget* panel = log->panelFenster(e.id);
+        // Innerhalb des Schirms (2026-11-05, live: der Chat ragte rechts
+        // hinaus, und das Raster konnte ihn dort nicht einfangen). Die
+        // Groesse bleibt, die Lage rueckt hinein.
+        if (panel && panel->screen()) {
+            const QRect frei = panel->screen()->availableGeometry();
+            if (rahmen.right() > frei.right())   { rahmen.moveRight(frei.right()); }
+            if (rahmen.bottom() > frei.bottom()) { rahmen.moveBottom(frei.bottom()); }
+            if (rahmen.left() < frei.left())     { rahmen.moveLeft(frei.left()); }
+            if (rahmen.top() < frei.top())       { rahmen.moveTop(frei.top()); }
+        }
         if (panel && rahmen.isValid() && rahmen.width() >= 16 && rahmen.height() >= 16) {
             // Eigene Bewegung: kein Zug des Bedieners, kein Schutzrahmen.
             // Rahmenlos: Rahmen == Geometrie.

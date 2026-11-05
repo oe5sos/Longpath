@@ -29,6 +29,7 @@
 
 #include "gui/MainWindow.h"
 #include "ContestFenster.h"
+#include "gui/ConnectionPanel.h"
 #include "gui/LayoutProfiles.h"
 #include "gui/applets/KombiApplet.h"
 #include "FensterFrist.h"
@@ -177,6 +178,9 @@ private slots:
         QWidget* chat = bruecke->panelFenster(QStringLiteral("chat"));
         QVERIFY(chat && chat->isWindow());
         QTRY_COMPARE_WITH_TIMEOUT(chat->frameGeometry(), chatSoll, 3000);
+        // Das Hauptfenster ist das aktive Fenster -- nur es hat die
+        // Menueleiste (live 2026-11-05: "Apple · Longpath", sonst nichts).
+        QTRY_VERIFY2_WITH_TIMEOUT(QApplication::activeWindow() == m_mw, "das Hauptfenster muss aktiv bleiben", 3000);
         QVERIFY2(!bruecke->fenster()->isVisible(), "das Logbuch-Fenster bleibt zu");
 
         // Die Erfassung schreibt die Anordnung zurueck.
@@ -253,6 +257,48 @@ private slots:
         QVERIFY(!kombi->seiten().contains(chat));
         QVERIFY(!bruecke->istPanelSchwebend(QStringLiteral("chat")));
         QVERIFY(!chat->isWindow());
+    }
+
+    // ── Fall 5: hinter der Verbindungsmaske ist nichts (2026-11-05) ─────
+    //
+    // Betreiber, mit Bild von Log und Chat hinter der Maske: "ich will bei
+    // dieser connect maske nichts im hintergrund haben" -- "hatte ich dir
+    // auch schon hunderte mal gesagt". Die Contest-Fenster (Panels und
+    // Logbuch) gehen mit den anderen hinter die Maske und kommen mit ihr
+    // wieder hervor.
+    void hinterDerMaskeIstNichts()
+    {
+        if (auto* alt = m_mw->findChild<ConnectionPanel*>()) { alt->close(); QTest::qWait(300); }
+        QAction* chatAction = m_mw->findChild<QAction*>(
+            QStringLiteral("actContainersContestPanel_chat"));
+        QVERIFY(chatAction);
+        chatAction->setChecked(true);
+        QTest::qWait(300);
+        ContestFenster* bruecke = m_mw->contestFensterForTest();
+        QVERIFY(bruecke);
+        QWidget* chat = bruecke->panelFenster(QStringLiteral("chat"));
+        QVERIFY(chat && chat->isWindow());
+        QTRY_VERIFY_WITH_TIMEOUT(chat->isVisible(), 3000);
+        QString grund;
+        QVERIFY2(bruecke->oeffne(&grund, m_mw), qPrintable(grund));
+        QWidget* log = bruecke->fenster();
+        QVERIFY(log && log->isVisible());
+
+        const int vorher = m_mw->floatingWindowsWaitingForConnectMaskForTest();
+        QVERIFY(QMetaObject::invokeMethod(m_mw, "showConnectionPanel"));
+        QTRY_VERIFY_WITH_TIMEOUT(m_mw->findChild<ConnectionPanel*>() != nullptr, 20000);
+        ConnectionPanel* maske = m_mw->findChild<ConnectionPanel*>();
+        QTRY_VERIFY_WITH_TIMEOUT(maske->isVisible(), 5000);
+        QVERIFY2(!chat->isVisible(), "das Chat-Fenster steht hinter der Maske");
+        QVERIFY2(!log->isVisible(), "das Logbuch-Fenster steht hinter der Maske");
+        QVERIFY(m_mw->floatingWindowsWaitingForConnectMaskForTest() >= vorher + 2);
+
+        maske->close();
+        QTRY_VERIFY_WITH_TIMEOUT(m_mw->findChild<ConnectionPanel*>() == nullptr, 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(chat->isVisible(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(log->isVisible(), 5000);
+        bruecke->dockePanel(QStringLiteral("chat"));
+        log->close();   // versteckt nur
     }
 };
 
