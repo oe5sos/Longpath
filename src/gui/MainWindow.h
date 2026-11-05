@@ -2011,6 +2011,12 @@ private:
     /// Das Contestprogramm als Fenster in Longpath (2026-11-04), nur mit
     /// LONGPATH_CONTESTPROGRAMM gebaut; sonst bleibt der Zeiger leer.
     class ContestFenster* m_contestFenster{nullptr};
+    // Die Contest-Anordnung aus dem Profil, solange sie nicht hergestellt
+    // werden konnte (Logbuch laeuft eigenstaendig o. ae.): die Erfassung
+    // schreibt sie dann unveraendert zurueck, statt sie zu verlieren.
+    QVariantMap m_contestAnordnungGemerkt;
+    QTimer*     m_contestAnordnungTimer{nullptr};
+    void stelleContestAnordnungHer(const QVariantMap& s);
     /// Bruecke anlegen und Longpaths rigctld fuer die Sitzung starten
     /// (nur lesend). Gemeinsam fuer das Logbuch und die Panels einzeln.
     void bereiteContestFensterVor();

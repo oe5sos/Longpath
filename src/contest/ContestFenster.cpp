@@ -74,10 +74,53 @@ private:
 };
 } // namespace
 
+namespace {
+// ── Das ✕ am eingebetteten Logbuch versteckt nur (2026-11-05) ────────
+//
+// Bis heute schloss es das Fenster (WA_DeleteOnClose): Controller und
+// Datenbank gingen hinterher, und die schwebenden Panels -- seit #74
+// Geschwister am Longpath-Hauptfenster, nicht mehr Kinder des Logbuchs
+// -- ueberlebten das mit totem Controller. Ihre Anordnung war damit auch
+// fort: niemand sicherte sie mehr. Eingebettet ist das Logbuch-Fenster
+// nur eine Ansicht auf das laufende Contestprogramm; das ✕ nimmt die
+// Ansicht weg, Tools > Contest Logbook holt sie wieder. Abgebaut wird
+// nur noch ueber schliesse() -- beim Beenden von Longpath.
+class LogbuchKreuz : public QObject {
+public:
+    LogbuchKreuz(QWidget* fenster, ContestFenster* bruecke)
+        : QObject(fenster), m_fenster(fenster), m_bruecke(bruecke)
+    {
+        fenster->installEventFilter(this);
+    }
+
+protected:
+    bool eventFilter(QObject* obj, QEvent* ev) override
+    {
+        if (obj == m_fenster) {
+            if (ev->type() == QEvent::Close) {
+                m_fenster->hide();
+                ev->ignore();
+                emit m_bruecke->anordnungGeaendert();
+                return true;
+            }
+            if (ev->type() == QEvent::Show || ev->type() == QEvent::Hide) {
+                emit m_bruecke->anordnungGeaendert();
+            }
+        }
+        return QObject::eventFilter(obj, ev);
+    }
+
+private:
+    QWidget*        m_fenster;
+    ContestFenster* m_bruecke;
+};
+} // namespace
+
 struct ContestFenster::Innen {
     std::unique_ptr<Contestprogramm::SingleInstanceGuard> wache;
     std::unique_ptr<Contestprogramm::AppController>       steuerung;
     QPointer<Contestprogramm::MainWindow>                 fenster;
+    QPointer<LogbuchKreuz>                                kreuz;
 };
 
 ContestFenster::ContestFenster(QObject* parent)
@@ -180,12 +223,23 @@ bool ContestFenster::lade(QString* grund, QWidget* elternFenster)
     m_innen->steuerung = std::move(steuerung);
     m_innen->fenster   = fenster;
     if (elternFenster) {
+        m_innen->kreuz = new LogbuchKreuz(fenster, this);
         for (const PanelEintrag& e : panels()) {
             auto* panel = qobject_cast<Contestprogramm::PanelContainerWidget*>(
                 fenster->panelFenster(e.id));
             if (panel && !panel->property("longpathRaster").toBool()) {
                 new PanelRaster(panel);
                 panel->setProperty("longpathRaster", true);
+                // Jede Aenderung der Anordnung meldet sich -- der Wirt
+                // schreibt sie ins Profil (gedaempft).
+                connect(panel, &Contestprogramm::PanelContainerWidget::floatingChanged,
+                        this, [this](bool) { emit anordnungGeaendert(); });
+                connect(panel, &Contestprogramm::PanelContainerWidget::versteckt,
+                        this, [this](const QString&) { emit anordnungGeaendert(); });
+                connect(panel, &Contestprogramm::PanelContainerWidget::geometryEdited,
+                        this, &ContestFenster::anordnungGeaendert);
+                connect(panel, &Contestprogramm::PanelContainerWidget::geometryApplied,
+                        this, [this](const QRect&) { emit anordnungGeaendert(); });
             }
         }
     }
@@ -297,6 +351,74 @@ QWidget* ContestFenster::panelFenster(const QString& id) const
     return m_innen->fenster ? m_innen->fenster->panelFenster(id) : nullptr;
 }
 
+// ── Die Anordnung fuer das Profil ───────────────────────────────────
+
+QVariantMap ContestFenster::anordnungDerPanels() const
+{
+    QVariantMap aus;
+    if (!m_innen->fenster) { return aus; }
+    for (const PanelEintrag& e : panels()) {
+        if (!m_innen->fenster->istPanelSchwebend(e.id)) { continue; }
+        QWidget* panel = m_innen->fenster->panelFenster(e.id);
+        if (!panel || !panel->isWindow()) { continue; }
+        const QRect r = panel->frameGeometry();
+        aus.insert(e.id, QVariantMap{{QStringLiteral("x"), r.x()},
+                                     {QStringLiteral("y"), r.y()},
+                                     {QStringLiteral("w"), r.width()},
+                                     {QStringLiteral("h"), r.height()}});
+    }
+    return aus;
+}
+
+bool ContestFenster::logbuchSichtbar() const
+{
+    return m_innen->fenster && m_innen->fenster->isVisible();
+}
+
+bool ContestFenster::stelleAnordnungHer(const QVariantMap& panelsSoll, bool logbuch,
+                                        QString* grund, QWidget* elternFenster)
+{
+    if (!lade(grund, elternFenster)) { return false; }
+    Contestprogramm::MainWindow* log = m_innen->fenster;
+    for (const PanelEintrag& e : panels()) {
+        const bool soll = panelsSoll.contains(e.id);
+        if (!soll) {
+            if (log->istPanelSchwebend(e.id)) { log->setzePanelSchwebend(e.id, false); }
+            continue;
+        }
+        if (!zeigePanelAlsFenster(e.id, grund, elternFenster)) { return false; }
+        const QVariantMap r = panelsSoll.value(e.id).toMap();
+        const QRect rahmen(r.value(QStringLiteral("x")).toInt(),
+                           r.value(QStringLiteral("y")).toInt(),
+                           r.value(QStringLiteral("w")).toInt(),
+                           r.value(QStringLiteral("h")).toInt());
+        QWidget* panel = log->panelFenster(e.id);
+        if (panel && rahmen.isValid() && rahmen.width() >= 16 && rahmen.height() >= 16) {
+            // Eigene Bewegung: kein Zug des Bedieners, kein Schutzrahmen.
+            // Rahmenlos: Rahmen == Geometrie.
+            const Longpath::EigeneBewegungBruecke eigen;
+            panel->setGeometry(rahmen);
+        }
+    }
+    if (logbuch) {
+        if (!oeffne(grund, elternFenster)) { return false; }
+    } else if (log->isVisible()) {
+        log->hide();
+    }
+    return true;
+}
+
+void ContestFenster::raeumeAnordnung()
+{
+    if (!m_innen->fenster) { return; }
+    for (const PanelEintrag& e : panels()) {
+        if (m_innen->fenster->istPanelSchwebend(e.id)) {
+            m_innen->fenster->setzePanelSchwebend(e.id, false);
+        }
+    }
+    if (m_innen->fenster->isVisible()) { m_innen->fenster->hide(); }
+}
+
 void ContestFenster::schliesse()
 {
     if (m_innen->fenster) {
@@ -309,6 +431,8 @@ void ContestFenster::schliesse()
             if (f->istPanelSchwebend(e.id)) { f->setzePanelSchwebend(e.id, false); }
         }
         m_innen->fenster = nullptr;
+        // Das ✕-Filter wuerde dieses close() in ein hide() verwandeln.
+        if (m_innen->kreuz) { f->removeEventFilter(m_innen->kreuz); delete m_innen->kreuz; }
         // Synchron abbauen, nicht deleteLater: der Controller geht gleich
         // hinterher, und das Fenster darf dann nicht mehr leben.
         f->setAttribute(Qt::WA_DeleteOnClose, false);
