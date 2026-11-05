@@ -317,6 +317,14 @@ EigeneBewegung::~EigeneBewegung() { --s_eigeneBewegungen; }
 
 bool eigeneBewegungLebt() { return s_eigeneBewegungen > 0; }
 
+// Siehe WindowPlacementBruecke.h: dieselben zwei Zeilen wie in
+// PanFloatingWindow::moveEvent, fuer Fenster, die nicht von uns sind.
+void rasterWieSchwebendesFenster(QWidget* w)
+{
+    snapToGridAfterSettle(w);
+    meldeZug(w);
+}
+
 void meldeZug(QWidget* bewegtes)
 {
     if (!bewegtes) { return; }
@@ -597,6 +605,16 @@ void snapToGridAfterSettle(QWidget* w, int grid, int delayMs, bool snapSize)
             const QPoint inset = w->geometry().topLeft() - frame.topLeft();
             const EigeneBewegung wirSelbst;
             w->setGeometry(QRect(target.topLeft() + inset, target.size() - deco));
+            // Sitzt es, ist der Versuch JETZT abgeschlossen -- nicht erst
+            // im Nachlauf 180 ms spaeter. Der Nachlauf faellt aus, sobald
+            // der Bediener vorher wieder zieht (jeder Zug startet den
+            // Timer neu), und dann galt der naechste Zug auf dieselben
+            // Rasterlinien als "das System haelt das Fenster fest" und
+            // wurde verworfen (gefunden 2026-11-05 am Contest-Panel, das
+            // nach einem kurzen Zug einfach neben dem Raster stehen blieb).
+            if (w->frameGeometry() == target) {
+                s_lastSnapAttempt.remove(w);
+            }
         });
         QObject::connect(w, &QObject::destroyed, w, [w]() {
             timers.remove(w);

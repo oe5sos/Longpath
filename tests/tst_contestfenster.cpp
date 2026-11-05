@@ -230,6 +230,51 @@ private slots:
         bruecke.schliesse();
     }
 
+    // ── Aufs Raster wie Longpaths eigene Fenster ─────────────────────
+    //
+    // Betreiber 2026-11-05, mit Bild: "hier funktioniert der raster nicht
+    // mit der anordnung der fenster". Ein abgeloestes Panel, das der
+    // Bediener zieht (drei Lagen nacheinander, wie beim Ziehen), muss nach
+    // dem Loslassen auf dem 16er-Raster stehen -- wie PanFloatingWindow.
+    void einPanelRastetNachDemZugEin()
+    {
+        QTemporaryDir ordner;
+        QVERIFY(ordner.isValid());
+        qputenv("CONTESTPROGRAMM_DATA_DIR", ordner.path().toUtf8());
+        QVERIFY(belegeLogVor(ordner.path()));
+
+        QWidget eltern;
+        eltern.resize(800, 600);
+        eltern.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&eltern, kFensterFrist));
+
+        ContestFenster bruecke;
+        QString grund;
+        QVERIFY2(bruecke.zeigePanelAlsFenster(QStringLiteral("chat"), &grund, &eltern),
+                 qPrintable(grund));
+        QWidget* chat = bruecke.panelFenster(QStringLiteral("chat"));
+        QVERIFY(chat && chat->isWindow());
+        QVERIFY(QTest::qWaitForWindowExposed(chat, kFensterFrist));
+        QTest::qWait(400);   // ein etwaiger Rasterlauf des Aufbaus ist vorbei
+
+        // Ziehen: drei Lagen, alle neben dem Raster.
+        const QPoint ziel(chat->x() + 5, chat->y() + 7);
+        chat->move(ziel - QPoint(4, 4));
+        chat->move(ziel - QPoint(2, 2));
+        chat->move(ziel);
+        QCOMPARE(chat->frameGeometry().topLeft(), ziel);
+        QVERIFY(ziel.x() % 16 != 0 || ziel.y() % 16 != 0);
+
+        // Nach der Ruhe (180 ms Daempfung) liegt der Rahmen auf dem Raster.
+        QTRY_VERIFY2_WITH_TIMEOUT(chat->frameGeometry().x() % 16 == 0
+                                      && chat->frameGeometry().y() % 16 == 0,
+                                  qPrintable(QStringLiteral("steht bei (%1,%2)")
+                                                 .arg(chat->frameGeometry().x())
+                                                 .arg(chat->frameGeometry().y())),
+                                  3000);
+        bruecke.schliesse();
+    }
+
     // ── ✕ am Panel: zurueck ins Logbuch und ausgeblendet ─────────────
     //
     // Betreiber 2026-11-04: "alle fenster muessen sich mit X schliessen
