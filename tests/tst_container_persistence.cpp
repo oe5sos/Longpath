@@ -40,6 +40,48 @@ private:
     }
 
 private slots:
+    // 2026-11-05: "zum 102. Mal der blaue Streifen" -- die Vorgabe
+    // m_backgroundColor war das alte Blau, serialize() schrieb es ins
+    // Profil, deserialize() legte es als Stylesheet auf den Inhalt.
+    void einFrischerContainerSchreibtKeinAltesBlau()
+    {
+        ContainerWidget c;
+        const QStringList p = c.serialize().split(QLatin1Char('|'));
+        QVERIFY(p.size() > 12);
+        QCOMPARE(p[12].toLower(), QStringLiteral("#ff08080a"));
+    }
+
+    void einAltesProfilMitBlauHeiltBeimLaden()
+    {
+        ContainerWidget c;
+        const QString alt = QStringLiteral(
+            "237f2488|1|0|0|640|480|false|0|0|TOP|false|true|#ff0f0f1a|false|true|Main Panel");
+        QVERIFY(c.deserialize(alt));
+        const QStringList p = c.serialize().split(QLatin1Char('|'));
+        QCOMPARE(p[12].toLower(), QStringLiteral("#ff08080a"));
+        for (QWidget* w : c.findChildren<QWidget*>()) {
+            QVERIFY2(!w->styleSheet().contains(QStringLiteral("0f0f1a"), Qt::CaseInsensitive),
+                     qPrintable(w->styleSheet()));
+        }
+    }
+
+    void einFarbblockImMeterHeiltEbenso()
+    {
+        SolidColourItem frisch;
+        QCOMPARE(frisch.colour().name(QColor::HexRgb), QStringLiteral("#08080a"));
+        SolidColourItem alt;
+        QVERIFY(alt.deserialize(QStringLiteral("SOLID|0|0|100|20|0|1|#ff0f0f1a")));
+        QCOMPARE(alt.colour().name(QColor::HexRgb), QStringLiteral("#08080a"));
+    }
+
+    void eineEchteBetreiberfarbeBleibt()
+    {
+        ContainerWidget c;
+        QVERIFY(c.deserialize(QStringLiteral(
+            "x|1|0|0|640|480|false|0|0|TOP|false|true|#ff203040|false|true|")));
+        QCOMPARE(c.serialize().split(QLatin1Char('|'))[12].toLower(), QStringLiteral("#ff203040"));
+    }
+
     void init() { clearContainerKeys(); }
     void cleanup() { clearContainerKeys(); }
 

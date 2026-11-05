@@ -440,7 +440,11 @@ private:
     bool m_titleBarVisible{true};
     bool m_minimised{false};          // runtime only, not persisted
     bool m_highlighted{false};        // runtime only, not persisted
-    QColor m_backgroundColor{0x0f, 0x0f, 0x1a};
+    // Vorgabe = Style::kAppBg (#08080a). Hier stand bis 2026-11-05 das
+    // alte Blau 0x0f,0x0f,0x1a -- und serialize() schrieb es in JEDES
+    // Profil, deserialize() legte es als Stylesheet auf den Inhalt: so
+    // ueberlebte der blaue Streifen rechts jede Farbkorrektur.
+    QColor m_backgroundColor{0x08, 0x08, 0x0a};
 
     // --- Drag/Resize state ---
     QPoint m_dragStartPos;

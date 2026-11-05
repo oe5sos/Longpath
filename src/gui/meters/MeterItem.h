@@ -350,7 +350,7 @@ public:
     bool deserialize(const QString& data) override;
 
 private:
-    QColor m_colour{0x0f, 0x0f, 0x1a};
+    QColor m_colour{0x08, 0x08, 0x0a};   // Style::kAppBg; bis 2026-11-05 das alte Blau
 };
 
 // ---------------------------------------------------------------------------
