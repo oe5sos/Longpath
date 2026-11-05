@@ -15,12 +15,64 @@
 #include "ui/MainWindow.h"
 #include "ui/PanelContainerWidget.h"
 #include "ui/StyleKit.h"
+#include "../gui/WindowPlacementBruecke.h"
 
 #include <QDir>
+#include <QEvent>
 #include <QPointer>
 #include <QTimer>
 
 namespace Longpath {
+
+namespace {
+// ── Die Contest-Panels aufs Raster (2026-11-05) ─────────────────────
+//
+// Betreiber, mit Bild: "hier funktioniert der raster nicht mit der
+// anordnung der fenster" -- Karte, Log und Chat standen schief zum
+// Panadapter. Longpaths vier schwebende Fensterklassen rufen aus ihrem
+// moveEvent/resizeEvent `snapToGridAfterSettle()` und `meldeZug()`
+// (hier gebuendelt als rasterWieSchwebendesFenster());
+// ein Panel des Contestprogramms zieht sich mit EIGENEM Mauscode
+// (PanelContainerWidget::updateDrag -> move()) und wusste von beidem
+// nichts. Derselbe Aufruf, nur von aussen: ein Ereignisfilter je Panel,
+// wirksam, solange das Panel ein Fenster ist (abgeloest); in der
+// Flaeche des Logbuchs rastert das Contestprogramm selbst.
+//
+// Schiebt das Raster (oder Longpath sonst: Profil, Mitziehen), meldet
+// sich das ueber `eigeneBewegungLebt()`. Dann zusaetzlich
+// trySetGeometry() mit der neuen Lage: das loest
+// `geometryApplied` aus, und der PanelLayoutManager des
+// Contestprogramms merkt sich die gerasterte Lage -- sonst stuende im
+// gespeicherten Layout die Lage von VOR dem Einrasten.
+class PanelRaster : public QObject {
+public:
+    explicit PanelRaster(Contestprogramm::PanelContainerWidget* panel)
+        : QObject(panel), m_panel(panel)
+    {
+        panel->installEventFilter(this);
+    }
+
+protected:
+    bool eventFilter(QObject* obj, QEvent* ev) override
+    {
+        if (obj == m_panel && m_panel->isWindow()
+            && (ev->type() == QEvent::Move || ev->type() == QEvent::Resize)) {
+            // IMMER melden, auch beim eigenen Schub: erst der Lauf danach
+            // sieht "Rahmen == Ziel" und schliesst den Versuch ab -- sonst
+            // gilt der naechste Zug auf dieselbe Rasterlinie als "das
+            // System haelt das Fenster fest" und wird verworfen.
+            Longpath::rasterWieSchwebendesFenster(m_panel);
+            if (Longpath::eigeneBewegungLebt()) {
+                m_panel->trySetGeometry(m_panel->geometry());
+            }
+        }
+        return QObject::eventFilter(obj, ev);
+    }
+
+private:
+    Contestprogramm::PanelContainerWidget* m_panel;
+};
+} // namespace
 
 struct ContestFenster::Innen {
     std::unique_ptr<Contestprogramm::SingleInstanceGuard> wache;
@@ -127,6 +179,16 @@ bool ContestFenster::lade(QString* grund, QWidget* elternFenster)
     m_innen->wache     = std::move(wache);
     m_innen->steuerung = std::move(steuerung);
     m_innen->fenster   = fenster;
+    if (elternFenster) {
+        for (const PanelEintrag& e : panels()) {
+            auto* panel = qobject_cast<Contestprogramm::PanelContainerWidget*>(
+                fenster->panelFenster(e.id));
+            if (panel && !panel->property("longpathRaster").toBool()) {
+                new PanelRaster(panel);
+                panel->setProperty("longpathRaster", true);
+            }
+        }
+    }
 
     // Geht das Fenster zu (Schliessknopf, closeEvent sichert das Layout),
     // kommen Controller und Wache hinterher -- aber erst, wenn das Fenster
