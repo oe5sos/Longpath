@@ -378,6 +378,11 @@ bool SolidColourItem::deserialize(const QString& data)
         return false;
     }
     m_colour = QColor(parts[7]);
+    // Das alte Blau (#0f0f1a, bis 2026-11-04 die Vorgabe) in gespeicherten
+    // Profilen ist keine Betreiberwahl: es wird zur heutigen Vorgabe.
+    if (m_colour.isValid() && m_colour.rgb() == qRgb(0x0f, 0x0f, 0x1a)) {
+        m_colour = QColor(QLatin1String(Style::kAppBg));
+    }
     return m_colour.isValid();
 }
 

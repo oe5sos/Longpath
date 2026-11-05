@@ -33,3 +33,18 @@ bleibt. Alte Fassung: 27 + 7 Stellen rot.
 Nicht angefasst: die Konstanten `kGlassSel*` (die Mulde für Auswahl, seit
 2026-11-02) und `kBlueBg`/`kBlueBorder` für das, was wirklich blau sein
 darf (anfassbare Flächen nach HAUSSTIL „Blau = anfassbar").
+
+## Nachtrag 2026-11-05: die zweite Quelle
+
+Am Stand 71c76e2d2 war der Streifen rechts im Hauptfenster noch da
+(gemessen #0e0e1b). Quelle: `ContainerWidget.h` hielt die Vorgabe als
+Klammer-Initialisierung `{0x0f, 0x0f, 0x1a}`, die der Prüfstand nicht
+suchte, und `serialize()` schrieb sie in jedes Profil (Feld 12,
+`#ff0f0f1a`), `deserialize()` legte sie als Stylesheet auf den Inhalt.
+Gleiches Muster in `MeterItem.h` (`SolidColourItem`).
+
+Behoben: Vorgabe = `kAppBg`; beim Laden wird das alte Blau als
+damalige Vorgabe erkannt und zu `kAppBg` (eine echte Betreiberfarbe
+bleibt); der Prüfstand `tst_kein_blauer_grund` fängt auch die
+Klammerform. Lehre: eine Farbe kann als Text, als Aufruf und als
+Klammer-Initialisierung stehen; ein Scanner braucht alle drei.

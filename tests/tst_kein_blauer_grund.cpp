@@ -40,12 +40,14 @@ private slots:
         const QString wurzel = QStringLiteral(LONGPATH_SRC_DIR "/src");
         QVERIFY2(QDir(wurzel).exists(), qPrintable(wurzel));
 
-        // Das Literal in einem String ("...#0f0f1a...") oder als QColor.
+        // Das Literal in einem String ("...#0f0f1a...") oder als QColor --
+        // auch als Klammer-Initialisierung {0x0f, 0x0f, 0x1a} (so stand es
+        // bis 2026-11-05 in ContainerWidget.h, vom Pruefstand uebersehen).
         static const QRegularExpression imString(
             QStringLiteral("\"[^\"\\n]*#0f0f1a[^\"\\n]*\""),
             QRegularExpression::CaseInsensitiveOption);
         static const QRegularExpression alsFarbe(
-            QStringLiteral("QColor\\(\\s*0x0f\\s*,\\s*0x0f\\s*,\\s*0x1a\\s*\\)"),
+            QStringLiteral("(QColor\\(|\\{)\\s*0x0f\\s*,\\s*0x0f\\s*,\\s*0x1a\\s*[)}]"),
             QRegularExpression::CaseInsensitiveOption);
 
         QStringList funde;

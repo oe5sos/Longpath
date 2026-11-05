@@ -1372,6 +1372,12 @@ bool ContainerWidget::deserialize(const QString& data)
     setBorder(p[11].toLower() == QStringLiteral("true"));
 
     QColor bgColor(p[12]);
+    // Das alte Blau (#0f0f1a, bis 2026-11-04 die Vorgabe) steht in jedem
+    // gespeicherten Profil; es ist keine Wahl des Betreibers, sondern
+    // die damalige Vorgabe -- und wird zur heutigen.
+    if (bgColor.isValid() && bgColor.rgb() == qRgb(0x0f, 0x0f, 0x1a)) {
+        bgColor = QColor(QLatin1String(Style::kAppBg));
+    }
     if (bgColor.isValid()) {
         m_backgroundColor = bgColor;
         m_contentHolder->setStyleSheet(
