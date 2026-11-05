@@ -21,6 +21,8 @@
 // no-port-check: Longpath-original test file.
 
 #include <QtTest>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QAction>
 #include <QMenu>
 #include <QSqlDatabase>
@@ -299,6 +301,35 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(log->isVisible(), 5000);
         bruecke->dockePanel(QStringLiteral("chat"));
         log->close();   // versteckt nur
+    }
+
+    // ── Fall 6: Datei > Save Current Layout sichert, was man sieht ──────
+    //
+    // Betreiber 2026-11-05: "habe es total anders gespeichert als
+    // contest" -- der Export auf der Schiene nahm das Profil des
+    // angeklickten Buchstabens (C, gespeicherter Stand) statt der
+    // Live-Anordnung (N). Der Menuepunkt nimmt immer das aktive Profil,
+    // live erfasst: mit den Contest-Panels.
+    void dasDateiMenueSichertDieLiveAnordnung()
+    {
+        QAction* sichern = m_mw->findChild<QAction*>(QStringLiteral("actSaveCurrentLayout"));
+        QVERIFY2(sichern && sichern->isEnabled(), "Datei > Save Current Layout fehlt");
+
+        QString grund;
+        QVERIFY2(m_mw->contestFensterForTest()->zeigePanelAlsFenster(QStringLiteral("chat"), &grund, m_mw),
+                 qPrintable(grund));
+        QTest::qWait(300);
+        auto* profile = m_mw->findChild<LayoutProfiles*>();
+        QVERIFY(profile);
+
+        const QByteArray json = m_mw->layoutprofilAlsJsonForTest(profile->current());
+        QVERIFY(!json.isEmpty());
+        const QJsonObject o = QJsonDocument::fromJson(json).object();
+        QCOMPARE(o.value(QStringLiteral("name")).toString(), profile->current());
+        const QJsonObject state = o.value(QStringLiteral("state")).toObject();
+        QVERIFY2(state.value(QStringLiteral("contestPanels")).toObject().contains(QStringLiteral("chat")),
+                 "die Live-Anordnung mit dem Chat-Fenster muss in der Datei stehen");
+        m_mw->contestFensterForTest()->dockePanel(QStringLiteral("chat"));
     }
 };
 

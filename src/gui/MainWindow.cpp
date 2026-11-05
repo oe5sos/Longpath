@@ -3157,6 +3157,57 @@ void MainWindow::setzeProfilschiene(Qt::Orientation richtung)
     wireProfileRail();
 }
 
+// ── Ein Layoutprofil als JSON (2026-08-30 / 2026-11-05) ─────────────
+//
+// Beim aktiven Profil erst captureIntoCurrent(), sonst wuerde eine
+// gerade eben umgebaute, aber noch nicht gesicherte Ansicht als der
+// VORHERIGE Stand exportiert -- bei einem anderen Profil ist dessen
+// zuletzt gesicherter Zustand schon das Richtige, da nie aktiv seit dem
+// letzten Umbau.
+QByteArray MainWindow::layoutprofilAlsJson(const QString& name)
+{
+    if (!m_layoutProfiles) { return {}; }
+    if (m_layoutProfiles->current() == name) {
+        m_layoutProfiles->captureIntoCurrent();
+    }
+    return m_layoutProfiles->exportToJson(name);
+}
+
+// Betreiber 2026-08-30: "Das Layout Profil ... sollten auf dem Desktop
+// zur Sicherheit abspeicherbar zu sein" -- eine Kopie neben AppSettings'
+// XML, unabhaengig lesbar und fuer ein Backup geeignet. Von der Schiene
+// (Rechtsklick auf einen Buchstaben) und seit 2026-11-05 aus dem
+// Datei-Menue fuer das AKTIVE Profil: Betreiber hatte auf "C"
+// exportiert und bekam das gespeicherte Profil C statt seiner
+// Live-Anordnung aus "N" ("habe es total anders gespeichert als
+// contest").
+void MainWindow::exportiereLayoutprofil(const QString& name)
+{
+    const QByteArray json = layoutprofilAlsJson(name);
+    if (json.isEmpty()) { return; }
+
+    const QString suggested =
+        QStandardPaths::writableLocation(QStandardPaths::DesktopLocation)
+        + QStringLiteral("/Longpath-Layout-%1-%2.json")
+            .arg(name,
+                 QDateTime::currentDateTime()
+                     .toString(QStringLiteral("yyyy-MM-dd_HHmm")));
+    const QString path = QFileDialog::getSaveFileName(
+        this, tr("Save layout profile to the Desktop"),
+        suggested, QStringLiteral("JSON (*.json)"));
+    if (path.isEmpty()) { return; }
+
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        QMessageBox::warning(
+            this, tr("Profile"),
+            tr("“%1” could not be written.").arg(path));
+        return;
+    }
+    f.write(json);
+    qInfo() << "Layout profile exported:" << name << "->" << path;
+}
+
 void MainWindow::wireProfileRail()
 {
     if (!m_profileRail || !m_layoutProfiles) { return; }
@@ -3226,34 +3277,7 @@ void MainWindow::wireProfileRail()
     // bei einem anderen Profil ist dessen zuletzt gesicherter Zustand
     // schon das Richtige, da nie aktiv seit dem letzten Umbau.
     connect(m_profileRail, &ProfileRail::exportRequested, this,
-            [this](const QString& name) {
-        if (!m_layoutProfiles) { return; }
-        if (m_layoutProfiles->current() == name) {
-            m_layoutProfiles->captureIntoCurrent();
-        }
-        const QByteArray json = m_layoutProfiles->exportToJson(name);
-        if (json.isEmpty()) { return; }
-
-        const QString suggested =
-            QStandardPaths::writableLocation(QStandardPaths::DesktopLocation)
-            + QStringLiteral("/Longpath-Layout-%1-%2.json")
-                .arg(name,
-                     QDateTime::currentDateTime()
-                         .toString(QStringLiteral("yyyy-MM-dd_HHmm")));
-        const QString path = QFileDialog::getSaveFileName(
-            this, tr("Save layout profile to the Desktop"),
-            suggested, QStringLiteral("JSON (*.json)"));
-        if (path.isEmpty()) { return; }
-
-        QFile f(path);
-        if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            QMessageBox::warning(
-                this, tr("Profile"),
-                tr("“%1” could not be written.").arg(path));
-            return;
-        }
-        f.write(json);
-    });
+            &MainWindow::exportiereLayoutprofil);
 
     // Betreiber 2026-08-30: "DIE gespeicherten profile sollte man auch
     // mit rechter moustaste importiren können" -- das Gegenstueck zum
@@ -11245,6 +11269,22 @@ void MainWindow::buildMenuBar()
         backupsAction->setMenuRole(QAction::NoRole);
         backupsAction->setToolTip(QStringLiteral(
             "Back up, restore and prune copies of the settings file"));
+    }
+
+    // Die AKTIVE Anordnung als Datei (2026-11-05). Auf der Schiene gilt
+    // der Buchstabe, auf den man klickt -- und der Betreiber klickte "C",
+    // bekam das gespeicherte Profil C und nicht, was er sah. Hier gibt
+    // es keine Wahl: was gerade zu sehen ist, so wie es ist.
+    {
+        QAction* layoutAction = fileMenu->addAction(
+            QStringLiteral("Save Current &Layout to the Desktop..."), this, [this]() {
+                if (m_layoutProfiles) { exportiereLayoutprofil(m_layoutProfiles->current()); }
+            });
+        layoutAction->setObjectName(QStringLiteral("actSaveCurrentLayout"));
+        layoutAction->setMenuRole(QAction::NoRole);
+        layoutAction->setToolTip(QStringLiteral(
+            "Write the layout you see right now (the active profile, captured live) "
+            "to a JSON file -- same file as the profile rail's Export"));
     }
 
     {

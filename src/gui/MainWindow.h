@@ -253,6 +253,7 @@ public:
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
     class ContestFenster* contestFensterForTest() const { return m_contestFenster; }
+    QByteArray layoutprofilAlsJsonForTest(const QString& name) { return layoutprofilAlsJson(name); }
     void holeContestInsKombiFeldForTest(const QString& id) { holeContestInsKombiFeld(m_kombiApplet, id); }
     int sperreAlleFensterForTest(bool an) { return sperreAlleFenster(an); }
 
@@ -1360,6 +1361,8 @@ private:
     /// Rechtsklick auf ein Kombi-Feld: zeigt, was hineinkann.
     void zeigeKombiListe(class KombiApplet* feld, const QPoint& globalPos);
     void holeContestInsKombiFeld(class KombiApplet* feld, const QString& id);
+    QByteArray layoutprofilAlsJson(const QString& name);
+    void exportiereLayoutprofil(const QString& name);
     void holeInsKombiFeld(class KombiApplet* feld, AppletWidget* applet,
                           const QString& appletId);
 
