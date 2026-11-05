@@ -28,6 +28,7 @@
 
 #include <QList>
 #include <QObject>
+#include <QVariantMap>
 #include <QString>
 
 #include <memory>
@@ -95,6 +96,30 @@ public:
     int sperreAllePanels(bool an);
     QWidget* panelFenster(const QString& id) const;
 
+    // ── Die Anordnung gehoert ins Layoutprofil (2026-11-05) ──────────
+    //
+    // Betreiber, nach einem Neustart: "so war mein letzter zustand
+    // nicht!!!!" -- Logbuch-Fenster offen, Rotoren darin, Chat und Log
+    // woanders. Seine Anordnung (Karte, Log, Chat als Fenster, Logbuch
+    // zu) stand NIRGENDS: das Contestprogramm sichert Fensterlagen nur
+    // bei eigenem Zug, Longpaths Profil kannte die Panels nicht, und ein
+    // Desktop-Export des Profils (CONTEST.json) enthielt sie deshalb
+    // auch nicht. Jetzt liefert die Bruecke die Anordnung als Werte fuer
+    // das Profil und stellt sie daraus wieder her.
+    //
+    // anordnungDerPanels(): id -> {x, y, w, h} (Rahmen auf dem Schirm)
+    // fuer jedes Panel, das gerade ein Fenster ist.
+    QVariantMap anordnungDerPanels() const;
+    bool logbuchSichtbar() const;
+    // Laedt das Logbuch bei Bedarf (verborgen), holt genau die genannten
+    // Panels als Fenster an ihre Stelle, dockt alle anderen zurueck und
+    // zeigt das Logbuch-Fenster nur, wenn `logbuch` es sagt.
+    bool stelleAnordnungHer(const QVariantMap& panels, bool logbuch,
+                            QString* grund = nullptr, QWidget* elternFenster = nullptr);
+    // Ein Profil ohne Contest: alle Panels zurueck, Logbuch verborgen.
+    // Controller und Datenbank bleiben (CAT, Cluster laufen weiter).
+    void raeumeAnordnung();
+
     // Schliesst das Fenster und raeumt Controller und Datenbank ab.
     void schliesse();
 
@@ -108,6 +133,10 @@ public:
 signals:
     void geoeffnet();
     void geschlossen();
+    // Ein Panel wurde Fenster oder dockte zurueck, bewegte sich, wurde
+    // ausgeblendet, oder das Logbuch-Fenster ging auf oder zu -- der
+    // Wirt schreibt die Anordnung dann ins Profil.
+    void anordnungGeaendert();
 
 private:
     struct Innen;

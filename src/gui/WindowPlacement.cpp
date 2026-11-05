@@ -6,6 +6,7 @@
 // =================================================================
 
 #include "gui/WindowPlacement.h"
+#include "gui/WindowPlacementBruecke.h"
 
 #include <QSet>
 #include "gui/MacFloatingWindowBehavior.h"
@@ -316,6 +317,8 @@ EigeneBewegung::EigeneBewegung()  { ++s_eigeneBewegungen; }
 EigeneBewegung::~EigeneBewegung() { --s_eigeneBewegungen; }
 
 bool eigeneBewegungLebt() { return s_eigeneBewegungen > 0; }
+EigeneBewegungBruecke::EigeneBewegungBruecke()  { ++s_eigeneBewegungen; }
+EigeneBewegungBruecke::~EigeneBewegungBruecke() { --s_eigeneBewegungen; }
 
 // Siehe WindowPlacementBruecke.h: dieselben zwei Zeilen wie in
 // PanFloatingWindow::moveEvent, fuer Fenster, die nicht von uns sind.

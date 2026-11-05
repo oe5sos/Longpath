@@ -9912,6 +9912,30 @@ void MainWindow::populateDefaultMeter()
                              m_rotorDock->isVisible());
                 }
 
+                // ── Contest-Panels und Logbuch (2026-11-05) ─────────
+                //
+                // Betreiber nach einem Neustart: "so war mein letzter
+                // zustand nicht!!!!" -- seine Anordnung der Contest-
+                // Panels stand in keinem Profil (sein Desktop-Export
+                // CONTEST.json hatte nur den Panadapter). Jetzt: welche
+                // Panels Fenster sind und wo, und ob das Logbuch-Fenster
+                // zu sehen ist. Ohne geladenes Logbuch bleibt das zuletzt
+                // Gelesene stehen, sonst verloere ein Start ohne Contest
+                // die Anordnung.
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+                if (m_contestFenster && m_contestFenster->istOffen()) {
+                    s.insert(QStringLiteral("contestPanels"),
+                             m_contestFenster->anordnungDerPanels());
+                    s.insert(QStringLiteral("contestLogbook"),
+                             m_contestFenster->logbuchSichtbar());
+                } else if (!m_contestAnordnungGemerkt.isEmpty()) {
+                    s.insert(QStringLiteral("contestPanels"),
+                             m_contestAnordnungGemerkt.value(QStringLiteral("contestPanels")));
+                    s.insert(QStringLiteral("contestLogbook"),
+                             m_contestAnordnungGemerkt.value(QStringLiteral("contestLogbook")));
+                }
+#endif
+
                 // ── Panadapter-Schwebefenster ───────────────────────
                 //
                 // Betreiber 2026-09-01: "Besonders Panadapter und Rotor
@@ -10695,6 +10719,16 @@ void MainWindow::populateDefaultMeter()
                     holeKombiInhaltZurueck(
                         s.value(QStringLiteral("kombiInhalt")).toStringList());
                 }
+
+                // Die Contest-Panels zuletzt, und erst im naechsten
+                // Durchlauf der Schleife: beim Start steht das Hauptfenster
+                // noch nicht, und das Logbuch holt sich beim Laden CAT
+                // und Wasserfall (wie "Open contest logbook at launch").
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+                QTimer::singleShot(0, this, [this, s]() {
+                    if (!m_shuttingDown) { stelleContestAnordnungHer(s); }
+                });
+#endif
 
                 qWarning() << "[ProfileApply:Step] 6/6 fertig";
             });
@@ -12779,8 +12813,17 @@ void MainWindow::buildMenuBar()
         });
         if (beimStart->isChecked() && AppSettings::darfVonSelbstVerbinden()) {
             // Erst wenn das Hauptfenster steht -- das Contestprogramm holt
-            // sich beim Aufgehen gleich CAT und Wasserfall.
-            QTimer::singleShot(0, this, &MainWindow::openContestFenster);
+            // sich beim Aufgehen gleich CAT und Wasserfall. Sagt das
+            // Profil selbst etwas zum Contest (2026-11-05), gilt das:
+            // es weiss auch, ob das Logbuch-Fenster zu bleiben soll.
+            QTimer::singleShot(0, this, [this]() {
+                if (m_layoutProfiles
+                    && m_layoutProfiles->snapshot(m_layoutProfiles->current())
+                           .contains(QStringLiteral("contestPanels"))) {
+                    return;
+                }
+                openContestFenster();
+            });
         }
 
         // Jedes Panel des Contestprogramms einzeln (2026-11-04). Betreiber:
@@ -19213,6 +19256,16 @@ void MainWindow::bereiteContestFensterVor()
 #ifdef LONGPATH_HAVE_CONTESTPROGRAMM
     if (!m_contestFenster) {
         m_contestFenster = new ContestFenster(this);
+        // Jede Aenderung der Anordnung ins Profil -- gedaempft, denn beim
+        // Ziehen kommt sie mit jedem Bildpunkt.
+        m_contestAnordnungTimer = new QTimer(this);
+        m_contestAnordnungTimer->setSingleShot(true);
+        m_contestAnordnungTimer->setInterval(500);
+        connect(m_contestAnordnungTimer, &QTimer::timeout, this, [this]() {
+            if (m_layoutProfiles && !m_shuttingDown) { m_layoutProfiles->captureIntoCurrent(); }
+        });
+        connect(m_contestFenster, &ContestFenster::anordnungGeaendert,
+                m_contestAnordnungTimer, qOverload<>(&QTimer::start));
     }
 
     // Das Contestprogramm liest die Frequenz ueber rigctld (4532). Laeuft
@@ -19283,6 +19336,35 @@ void MainWindow::fuelleContestPanelMenu(QMenu* menu)
     });
 #else
     Q_UNUSED(menu);
+#endif
+}
+
+void MainWindow::stelleContestAnordnungHer(const QVariantMap& s)
+{
+#ifndef LONGPATH_HAVE_CONTESTPROGRAMM
+    Q_UNUSED(s);
+#else
+    const QVariantMap panels = s.value(QStringLiteral("contestPanels")).toMap();
+    const bool logbuch = s.value(QStringLiteral("contestLogbook")).toBool();
+    m_contestAnordnungGemerkt.clear();
+    if (panels.isEmpty() && !logbuch) {
+        // Ein Profil ohne Contest -- oder eines von vor dem 2026-11-05.
+        // Nur, was schon laeuft, wird weggeraeumt; geladen wird nichts.
+        if (m_contestFenster && m_contestFenster->istOffen()
+            && s.contains(QStringLiteral("contestPanels"))) {
+            m_contestFenster->raeumeAnordnung();
+        }
+        return;
+    }
+    bereiteContestFensterVor();
+    QString grund;
+    if (!m_contestFenster->stelleAnordnungHer(panels, logbuch, &grund, this)) {
+        qWarning() << "Contest panels from the profile could not be restored:" << grund;
+        m_contestAnordnungGemerkt.insert(QStringLiteral("contestPanels"), panels);
+        m_contestAnordnungGemerkt.insert(QStringLiteral("contestLogbook"), logbuch);
+        return;
+    }
+    qInfo() << "Contest panels from the profile:" << panels.keys() << "logbook window" << logbuch;
 #endif
 }
 

@@ -22,4 +22,15 @@ void rasterWieSchwebendesFenster(QWidget* w);
 /// Profil, Mitziehen), ist eine Lageaenderung kein Zug des Bedieners.
 bool eigeneBewegungLebt();
 
+/// Wie EigeneBewegung in WindowPlacement.h: solange ein Objekt lebt,
+/// zaehlt eine Fensterbewegung nicht als Zug des Bedieners (kein
+/// Schutzrahmen-Hinweis, kein Zugzaehler).
+class EigeneBewegungBruecke {
+public:
+    EigeneBewegungBruecke();
+    ~EigeneBewegungBruecke();
+    EigeneBewegungBruecke(const EigeneBewegungBruecke&) = delete;
+    EigeneBewegungBruecke& operator=(const EigeneBewegungBruecke&) = delete;
+};
+
 } // namespace Longpath

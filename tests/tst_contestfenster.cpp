@@ -11,6 +11,7 @@
 #include <QtTest>
 #include <QPushButton>
 #include <QPointer>
+#include <QSignalSpy>
 #include <QFile>
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -273,6 +274,114 @@ private slots:
                                                  .arg(chat->frameGeometry().y())),
                                   3000);
         bruecke.schliesse();
+    }
+
+    // ── Die Anordnung kommt aus dem Profil zurueck (2026-11-05) ─────
+    //
+    // Betreiber nach einem Neustart: "so war mein letzter zustand
+    // nicht!!!!" Zwei Panels als Fenster an bekannten Stellen, Logbuch
+    // zu -> Werte fuer das Profil -> alles abbauen -> aus den Werten
+    // wiederherstellen: dieselben Fenster an denselben Stellen, Logbuch
+    // weiter zu. Die Rahmen liegen auf dem Raster (16er-Linien, 3 Luft),
+    // damit der Rasterlauf nach dem Herstellen nichts verschiebt.
+    void dieAnordnungKommtAusDemProfilZurueck()
+    {
+        QTemporaryDir ordner;
+        QVERIFY(ordner.isValid());
+        qputenv("CONTESTPROGRAMM_DATA_DIR", ordner.path().toUtf8());
+        QVERIFY(belegeLogVor(ordner.path()));
+
+        QWidget eltern;
+        eltern.resize(800, 600);
+        eltern.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&eltern, kFensterFrist));
+
+        const QRect chatSoll(128, 144, 397, 301);
+        const QRect bandmapSoll(560, 144, 301, 237);
+        QVariantMap gesichert;
+        {
+            ContestFenster bruecke;
+            QString grund;
+            QVERIFY2(bruecke.zeigePanelAlsFenster(QStringLiteral("chat"), &grund, &eltern),
+                     qPrintable(grund));
+            QVERIFY2(bruecke.zeigePanelAlsFenster(QStringLiteral("bandmap"), &grund, &eltern),
+                     qPrintable(grund));
+            bruecke.panelFenster(QStringLiteral("chat"))->setGeometry(chatSoll);
+            bruecke.panelFenster(QStringLiteral("bandmap"))->setGeometry(bandmapSoll);
+            QTest::qWait(500);
+            QVERIFY(!bruecke.logbuchSichtbar());
+            gesichert = bruecke.anordnungDerPanels();
+            QCOMPARE(gesichert.size(), 2);
+            const QVariantMap c = gesichert.value(QStringLiteral("chat")).toMap();
+            QCOMPARE(QRect(c.value("x").toInt(), c.value("y").toInt(),
+                           c.value("w").toInt(), c.value("h").toInt()), chatSoll);
+            bruecke.schliesse();
+        }
+
+        ContestFenster neu;
+        QString grund;
+        QVERIFY2(neu.stelleAnordnungHer(gesichert, false, &grund, &eltern), qPrintable(grund));
+        QTest::qWait(500);
+        QVERIFY(neu.istPanelSchwebend(QStringLiteral("chat")));
+        QVERIFY(neu.istPanelSchwebend(QStringLiteral("bandmap")));
+        QVERIFY(!neu.istPanelSchwebend(QStringLiteral("map")));
+        QCOMPARE(neu.panelFenster(QStringLiteral("chat"))->frameGeometry(), chatSoll);
+        QCOMPARE(neu.panelFenster(QStringLiteral("bandmap"))->frameGeometry(), bandmapSoll);
+        QVERIFY2(!neu.logbuchSichtbar(), "das Logbuch-Fenster bleibt zu");
+
+        // Ein Profil ohne Contest raeumt auf, laesst aber das Logbuch leben.
+        neu.raeumeAnordnung();
+        QVERIFY(!neu.istPanelSchwebend(QStringLiteral("chat")));
+        QVERIFY(neu.istOffen());
+
+        // Und mit sichtbarem Logbuch kommt es sichtbar zurueck.
+        QVERIFY2(neu.stelleAnordnungHer(QVariantMap(), true, &grund, &eltern), qPrintable(grund));
+        QVERIFY(neu.logbuchSichtbar());
+        neu.schliesse();
+    }
+
+    // ── Das ✕ am eingebetteten Logbuch versteckt nur ────────────────
+    //
+    // Vorher: WA_DeleteOnClose -> Controller fort, die schwebenden Panels
+    // (Geschwister am Hauptfenster) blieben mit totem Controller stehen,
+    // und ihre Anordnung sicherte niemand mehr.
+    void dasKreuzAmLogbuchVerstecktNur()
+    {
+        QTemporaryDir ordner;
+        QVERIFY(ordner.isValid());
+        qputenv("CONTESTPROGRAMM_DATA_DIR", ordner.path().toUtf8());
+        QVERIFY(belegeLogVor(ordner.path()));
+
+        QWidget eltern;
+        eltern.resize(800, 600);
+        eltern.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&eltern, kFensterFrist));
+
+        ContestFenster bruecke;
+        QString grund;
+        QVERIFY2(bruecke.oeffne(&grund, &eltern), qPrintable(grund));
+        QWidget* log = bruecke.fenster();
+        QVERIFY(log && log->isVisible());
+        QVERIFY2(bruecke.zeigePanelAlsFenster(QStringLiteral("chat"), &grund, &eltern),
+                 qPrintable(grund));
+        QSignalSpy geaendert(&bruecke, &ContestFenster::anordnungGeaendert);
+
+        QVERIFY(!log->close());          // abgefangen: nur verstecken
+        QVERIFY(bruecke.istOffen());
+        QCOMPARE(bruecke.fenster(), log);
+        QVERIFY(!log->isVisible());
+        QVERIFY(geaendert.count() >= 1);
+        // Die Panels leben weiter und lassen sich bedienen.
+        QVERIFY(bruecke.istPanelSchwebend(QStringLiteral("chat")));
+        bruecke.dockePanel(QStringLiteral("chat"));
+        QVERIFY(!bruecke.istPanelSchwebend(QStringLiteral("chat")));
+        // Tools > Contest Logbook: dieselbe Ansicht wieder.
+        QVERIFY2(bruecke.oeffne(&grund, &eltern), qPrintable(grund));
+        QCOMPARE(bruecke.fenster(), log);
+        QVERIFY(log->isVisible());
+        // schliesse() baut trotz Filter wirklich ab.
+        bruecke.schliesse();
+        QVERIFY(!bruecke.istOffen());
     }
 
     // ── ✕ am Panel: zurueck ins Logbuch und ausgeblendet ─────────────

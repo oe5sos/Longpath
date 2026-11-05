@@ -29,6 +29,7 @@
 
 #include "gui/MainWindow.h"
 #include "ContestFenster.h"
+#include "gui/LayoutProfiles.h"
 #include "FensterFrist.h"
 
 using namespace Longpath;
@@ -140,6 +141,53 @@ private slots:
 
         chat->setChecked(false);
         QTest::qWait(200);
+        QVERIFY(!bruecke->istPanelSchwebend(QStringLiteral("chat")));
+    }
+
+    // ── Fall 3: das Profil bringt die Panels zurueck (2026-11-05) ───────
+    //
+    // Betreiber nach einem Neustart: "so war mein letzter zustand
+    // nicht!!!!" Ein Profil mit contestPanels/contestLogbook holt die
+    // Panels als Fenster an ihre Stelle, die Erfassung schreibt sie
+    // zurueck, und ein Profil ohne Contest raeumt sie weg.
+    void dasProfilBringtDiePanelsZurueck()
+    {
+        auto* profile = m_mw->findChild<LayoutProfiles*>();
+        QVERIFY(profile);
+        const QString vorher = profile->current();
+        QVERIFY(!vorher.isEmpty());
+
+        const QRect chatSoll(128, 144, 397, 301);
+        QVariantMap zustand = profile->snapshot(vorher);
+        zustand.insert(QStringLiteral("contestPanels"),
+                       QVariantMap{{QStringLiteral("chat"),
+                                    QVariantMap{{QStringLiteral("x"), chatSoll.x()},
+                                                {QStringLiteral("y"), chatSoll.y()},
+                                                {QStringLiteral("w"), chatSoll.width()},
+                                                {QStringLiteral("h"), chatSoll.height()}}}});
+        zustand.insert(QStringLiteral("contestLogbook"), false);
+        QVERIFY(profile->createWith(QStringLiteral("Contest"), zustand));
+        QVERIFY(profile->activate(QStringLiteral("Contest")));
+        QTest::qWait(800);   // das Herstellen laeuft im naechsten Durchlauf
+
+        ContestFenster* bruecke = m_mw->contestFensterForTest();
+        QVERIFY(bruecke && bruecke->istOffen());
+        QVERIFY2(bruecke->istPanelSchwebend(QStringLiteral("chat")), "chat muss ein Fenster sein");
+        QWidget* chat = bruecke->panelFenster(QStringLiteral("chat"));
+        QVERIFY(chat && chat->isWindow());
+        QTRY_COMPARE_WITH_TIMEOUT(chat->frameGeometry(), chatSoll, 3000);
+        QVERIFY2(!bruecke->fenster()->isVisible(), "das Logbuch-Fenster bleibt zu");
+
+        // Die Erfassung schreibt die Anordnung zurueck.
+        profile->captureIntoCurrent();
+        const QVariantMap erfasst = profile->snapshot(QStringLiteral("Contest"));
+        const QVariantMap panels = erfasst.value(QStringLiteral("contestPanels")).toMap();
+        QVERIFY2(panels.contains(QStringLiteral("chat")), "chat fehlt in der Erfassung");
+        QCOMPARE(erfasst.value(QStringLiteral("contestLogbook")).toBool(), false);
+
+        // Zurueck zum Profil ohne Contest: das Panel dockt zurueck.
+        QVERIFY(profile->activate(vorher));
+        QTest::qWait(800);
         QVERIFY(!bruecke->istPanelSchwebend(QStringLiteral("chat")));
     }
 };
