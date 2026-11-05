@@ -129,3 +129,18 @@ Jetzt: `versteckeSchwebendeFenster()` nimmt die Contest-Panels
 Profil Panels her, während die Maske steht, gehen sie sofort dahinter.
 Prüfstand `tst_contest_panels_im_containers_menu::hinterDerMaskeIstNichts`
 (ohne den Block rot).
+
+## Nachtrag: „Save Current Layout to the Desktop…" (2026-11-05, 20:50)
+
+**Betreiber:** „habe es total anders gespeichert als contest." Sein
+Export CONTEST.json von 20:37 enthielt das Profil „C" (gespeicherter
+Stand vom Morgen), nicht seine Live-Anordnung aus „N": der Export auf
+der Profilschiene nimmt das Profil des angeklickten Buchstabens, und
+bei einem nicht aktiven Profil dessen gespeicherten Stand (so gewollt,
+siehe `exportiereLayoutprofil`). Das JSON verrät es in `"name"`.
+
+Jetzt gibt es im Datei-Menü **Save Current Layout to the Desktop…**:
+immer das aktive Profil, live erfasst — keine Buchstabenwahl. Der
+Schienen-Export bleibt, beide gehen über `layoutprofilAlsJson()`.
+Prüfstand `tst_contest_panels_im_containers_menu::dasDateiMenueSichertDieLiveAnordnung`
+(ohne die Live-Erfassung rot).
