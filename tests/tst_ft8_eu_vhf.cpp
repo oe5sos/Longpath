@@ -79,6 +79,22 @@ void setzeBits(ftx_message_t* m, int abBit, int breite, quint32 wert)
     }
 }
 
+/// Ein Feld aus der Nutzlast lesen — Gegenstueck zu `setzeBits`.
+///
+/// Teilt mit `message.c` wieder keine Zeile: dort Schiebeweiten und
+/// Masken je Feld, hier Bit fuer Bit.
+quint32 liesBits(const ftx_message_t& m, int abBit, int breite)
+{
+    quint32 wert = 0;
+    for (int i = 0; i < breite; ++i) {
+        const int bit  = abBit + i;
+        const int byte = bit / 8;
+        const int rest = 7 - (bit % 8);
+        wert = (wert << 1) | ((m.payload[byte] >> rest) & 1u);
+    }
+    return wert;
+}
+
 /// Eine Typ-5-Nachricht bauen.
 ///
 /// From WSJT-X `lib/77bit/packjt77.f90:597-598` [v2.7.0] --
@@ -265,6 +281,238 @@ private slots:
                                          gridZahl("IO91NP"));
         const QString s = entpacke(m);
         QVERIFY2(s.count(QStringLiteral("<...>")) == 2, qPrintable(s));
+    }
+
+    // ═══ SENDEN (2026-11-04) ════════════════════════════════════════
+    //
+    // upstreams `ftx_message_encode()` kennt nur Standard,
+    // Nicht-Standard und Freitext. Einen Contest-Austausch kann es
+    // nicht erzeugen — `ftx_message_encode_eu_vhf()` ist dafuer da.
+
+    // ── Der Beleg, der zaehlt: gegen den UNABHAENGIGEN Bit-Setzer ───
+    //
+    // Ein reiner Rundlauf (selbst packen, selbst auspacken) waere
+    // gruen, auch wenn beide Seiten dieselbe falsche Bitreihenfolge
+    // haetten. Darum wird die gepackte Nutzlast hier Feld fuer Feld
+    // mit `liesBits` zerlegt — derselbe Bit-fuer-Bit-Weg, mit dem
+    // oben schon die Lesefaelle gegen WSJT-X gebaut sind.
+    void derPackerLegtDieFelderDorthinWoWsjtxSieErwartet()
+    {
+        ftx_message_t m{};
+        QCOMPARE(ftx_message_encode_eu_vhf(
+                     &m,
+                     static_cast<ftx_callsign_hash_interface_t*>(
+                         Longpath::ft8RufzeichenSchnittstelle()),
+                     "OE1ABC", "OE5SOS", true, 59, 3, "IO91NP"),
+                 FTX_MESSAGE_RC_OK);
+
+        // Die Hashes stehen in den ersten 34 Bit; sie werden weiter
+        // unten ueber den Rundlauf durch die Tabelle geprueft. Hier
+        // geht es um die Lage ALLER UEBRIGEN Felder.
+        QCOMPARE(liesBits(m, 34,  1), 1u);                      // ir
+        QCOMPARE(liesBits(m, 35,  3), 7u);                      // 59 - 52
+        QCOMPARE(liesBits(m, 38, 11), 3u);                      // Nummer
+        QCOMPARE(liesBits(m, 49, 25), gridZahl("IO91NP"));      // Locator
+        QCOMPARE(liesBits(m, 74,  3), 5u);                      // i3
+        // Und ft8_libs eigener Leser muss denselben Typ sehen.
+        QCOMPARE(ftx_message_get_type(&m), FTX_MESSAGE_TYPE_WWROF);
+    }
+
+    // ── Der Rundlauf: eigener Sender gegen eigenen Empfaenger ──────
+    //
+    // Er belegt die Bitreihenfolge NICHT (derselbe Fehler in beide
+    // Richtungen hoebe sich auf) — aber er faengt die Tabelle, die
+    // Hashes und das Zusammensetzen der Zeichenkette, und das ist
+    // genau das, was der Fall darueber nicht abdeckt.
+    void waIchSendeLeseIchAuchWiederEin()
+    {
+        auto* hif = static_cast<ftx_callsign_hash_interface_t*>(
+            Longpath::ft8RufzeichenSchnittstelle());
+        Longpath::Ft8Rufzeichenspeicher::instanz().leeren();
+
+        ftx_message_t m{};
+        QCOMPARE(ftx_message_encode_eu_vhf(&m, hif, "OE1ABC", "OE5SOS",
+                                           false, 59, 42, "JN78CT"),
+                 FTX_MESSAGE_RC_OK);
+
+        char text[64] = {};
+        ftx_message_offsets_t off;
+        QCOMPARE(ftx_message_decode(&m, hif, text, &off),
+                 FTX_MESSAGE_RC_OK);
+        // Beide Rufzeichen kommen zurueck, weil der Packer sie beim
+        // Hashen gemerkt hat — in spitzen Klammern, wie WSJT-X.
+        QCOMPARE(QString::fromLatin1(text),
+                 QStringLiteral("<OE1ABC> <OE5SOS> 590042 JN78CT"));
+    }
+
+    void dasRFlagUeberlebtDenRundlauf()
+    {
+        auto* hif = static_cast<ftx_callsign_hash_interface_t*>(
+            Longpath::ft8RufzeichenSchnittstelle());
+        ftx_message_t m{};
+        QCOMPARE(ftx_message_encode_eu_vhf(&m, hif, "OE1ABC", "OE5SOS",
+                                           true, 59, 42, "JN78CT"),
+                 FTX_MESSAGE_RC_OK);
+        char text[64] = {};
+        ftx_message_offsets_t off;
+        ftx_message_decode(&m, hif, text, &off);
+        QCOMPARE(QString::fromLatin1(text),
+                 QStringLiteral("<OE1ABC> <OE5SOS> R 590042 JN78CT"));
+    }
+
+    // ── Die Grenze, die das FORMAT setzt (nicht dieser Port) ────────
+    //
+    // Elf Bit tragen 2047. WSJT-X laesst den Austausch aber bis
+    // 594095 zu und KAPPT dann still:
+    //   `if(iserial.gt.2047) iserial=2047` (packjt77.f90:1420)
+    //
+    // Die Gegenstation traegt in diesem Fall eine falsche Nummer ins
+    // Log. Der Fall haelt fest, DASS es so ist — damit niemand spaeter
+    // einen Fehler sucht, wo das Format aufhoert.
+    void eineNummerUeber2047WirdGekappt()
+    {
+        auto* hif = static_cast<ftx_callsign_hash_interface_t*>(
+            Longpath::ft8RufzeichenSchnittstelle());
+        ftx_message_t m{};
+        QCOMPARE(ftx_message_encode_eu_vhf(&m, hif, "OE1ABC", "OE5SOS",
+                                           false, 59, 3000, "JN78CT"),
+                 FTX_MESSAGE_RC_OK);
+        char text[64] = {};
+        ftx_message_offsets_t off;
+        ftx_message_decode(&m, hif, text, &off);
+        QVERIFY2(QString::fromLatin1(text).contains(QStringLiteral("592047")),
+                 text);
+        // Und 2047 selbst geht noch sauber durch.
+        ftx_message_t m2{};
+        ftx_message_encode_eu_vhf(&m2, hif, "OE1ABC", "OE5SOS",
+                                  false, 59, 2047, "JN78CT");
+        char t2[64] = {};
+        ftx_message_decode(&m2, hif, t2, &off);
+        QVERIFY2(QString::fromLatin1(t2).contains(QStringLiteral("592047")), t2);
+    }
+
+    // ── Was der Packer ABWEISEN muss ────────────────────────────────
+    //
+    // Ein Packer, der alles annimmt, sendet Unsinn auf das Band.
+    void unmoeglicheWerteWerdenAbgewiesen()
+    {
+        auto* hif = static_cast<ftx_callsign_hash_interface_t*>(
+            Longpath::ft8RufzeichenSchnittstelle());
+        ftx_message_t m{};
+        // Rapport ausserhalb 52..59 — drei Bit koennen nicht mehr.
+        QVERIFY(ftx_message_encode_eu_vhf(&m, hif, "A", "B", false, 51, 1,
+                                          "JN78CT") != FTX_MESSAGE_RC_OK);
+        QVERIFY(ftx_message_encode_eu_vhf(&m, hif, "A", "B", false, 60, 1,
+                                          "JN78CT") != FTX_MESSAGE_RC_OK);
+        // Nummer 0 oder ueber 4095 — WSJT-Xs eigene Schranke.
+        QVERIFY(ftx_message_encode_eu_vhf(&m, hif, "A", "B", false, 59, 0,
+                                          "JN78CT") != FTX_MESSAGE_RC_OK);
+        QVERIFY(ftx_message_encode_eu_vhf(&m, hif, "A", "B", false, 59, 4096,
+                                          "JN78CT") != FTX_MESSAGE_RC_OK);
+        // Ein VIERstelliger Locator ist kein sechsstelliger.
+        QCOMPARE(ftx_message_encode_eu_vhf(&m, hif, "A", "B", false, 59, 1,
+                                           "JN78"),
+                 FTX_MESSAGE_RC_ERROR_GRID);
+        // Und ein Locator ausserhalb des Rasters.
+        QCOMPARE(ftx_message_encode_eu_vhf(&m, hif, "A", "B", false, 59, 1,
+                                           "SS99XX"),
+                 FTX_MESSAGE_RC_ERROR_GRID);
+    }
+
+    // ── Der Textweg: so sendet das PROGRAMM ────────────────────────
+    //
+    // `Ft8Decoder::encodeBlock()` nimmt Text und reicht ihn an
+    // `ftx_message_encode()` — der kannte Typ 5 nicht und haette
+    // jeden Contest-Austausch als FREITEXT auf das Band gelegt.
+    // Lesbar nur fuer den, der denselben Fehler macht.
+    //
+    // Gegenprobe: ohne `encode_eu_vhf_text` im Weg kommt hier
+    // Freitext heraus, und `get_type` meldet FREE_TEXT statt WWROF.
+    void derTextwegPacktDenContestUndNichtFreitext()
+    {
+        auto* hif = static_cast<ftx_callsign_hash_interface_t*>(
+            Longpath::ft8RufzeichenSchnittstelle());
+        ftx_message_t m{};
+        ftx_message_init(&m);
+        QCOMPARE(ftx_message_encode(
+                     &m, hif, "<OE1ABC> <OE5SOS> R 590003 IO91NP"),
+                 FTX_MESSAGE_RC_OK);
+        QCOMPARE(ftx_message_get_type(&m), FTX_MESSAGE_TYPE_WWROF);
+
+        char text[64] = {};
+        ftx_message_offsets_t off;
+        QCOMPARE(ftx_message_decode(&m, hif, text, &off),
+                 FTX_MESSAGE_RC_OK);
+        QCOMPARE(QString::fromLatin1(text),
+                 QStringLiteral("<OE1ABC> <OE5SOS> R 590003 IO91NP"));
+    }
+
+    void derTextwegKommtAuchOhneRAus()
+    {
+        auto* hif = static_cast<ftx_callsign_hash_interface_t*>(
+            Longpath::ft8RufzeichenSchnittstelle());
+        ftx_message_t m{};
+        ftx_message_init(&m);
+        QCOMPARE(ftx_message_encode(
+                     &m, hif, "<OE1ABC> <OE5SOS> 590003 IO91NP"),
+                 FTX_MESSAGE_RC_OK);
+        QCOMPARE(ftx_message_get_type(&m), FTX_MESSAGE_TYPE_WWROF);
+    }
+
+    // ── Und was NICHT als Contest gepackt werden darf ───────────────
+    //
+    // Der wichtigere Teil. Ein Erkenner, der zu viel schluckt, legt
+    // gewoehnliche Saetze in ein Format, das kein anderes Programm
+    // dort erwartet.
+    void gewoehnlicheSaetzeBleibenWasSieSind()
+    {
+        auto* hif = static_cast<ftx_callsign_hash_interface_t*>(
+            Longpath::ft8RufzeichenSchnittstelle());
+        // Die gewoehnlichen Saetze bleiben Standard -- der neue
+        // Erkenner darf sie nicht an sich ziehen.
+        struct { const char* text; ftx_message_type_t typ; } standard[] = {
+            { "CQ OE5SOS JN78",     FTX_MESSAGE_TYPE_STANDARD },
+            { "OE1ABC OE5SOS -12",  FTX_MESSAGE_TYPE_STANDARD },
+            { "OE1ABC OE5SOS RR73", FTX_MESSAGE_TYPE_STANDARD },
+        };
+        for (const auto& f : standard) {
+            ftx_message_t m{};
+            ftx_message_init(&m);
+            QCOMPARE(ftx_message_encode(&m, hif, f.text), FTX_MESSAGE_RC_OK);
+            QVERIFY2(ftx_message_get_type(&m) == f.typ,
+                     qPrintable(QStringLiteral("[%1] wurde Typ %2")
+                                    .arg(QLatin1String(f.text))
+                                    .arg(int(ftx_message_get_type(&m)))));
+        }
+
+        // Und diese hier duerfen NICHT als Typ 5 herauskommen. Ob sie
+        // stattdessen als Freitext durchgehen oder ganz abgewiesen
+        // werden, ist zweitrangig -- ein Satz dieser Laenge passt
+        // ohnehin nicht in die dreizehn Zeichen des Freitexts. Der
+        // Punkt ist: NICHT Typ 5.
+        for (const char* t : {
+                 // Ohne spitze Klammern ist es kein Typ 5, auch wenn
+                 // der Rest passt -- die Klammern sagen „gehasht",
+                 // und ohne sie wollte der Absender zwei Rufzeichen
+                 // im Klartext senden.
+                 "OE1ABC OE5SOS R 590003 IO91NP",
+                 // Nur EIN Rufzeichen gehasht: auch nicht.
+                 "<OE1ABC> OE5SOS 590003 IO91NP",
+                 // Austausch ausserhalb 520001..594095.
+                 "<OE1ABC> <OE5SOS> 510003 IO91NP",
+                 "<OE1ABC> <OE5SOS> 599999 IO91NP",
+                 // Vierstelliger Locator.
+                 "<OE1ABC> <OE5SOS> 590003 IO91",
+             }) {
+            ftx_message_t m{};
+            ftx_message_init(&m);
+            const ftx_message_rc_t rc = ftx_message_encode(&m, hif, t);
+            if (rc == FTX_MESSAGE_RC_OK) {
+                QVERIFY2(ftx_message_get_type(&m) != FTX_MESSAGE_TYPE_WWROF,
+                         qPrintable(QStringLiteral("[%1] wurde faelschlich Typ 5")
+                                        .arg(QLatin1String(t))));
+            }
+        }
     }
 
     // Und mit Tabelle kommen sie heraus. Das ist der Fall, den der
