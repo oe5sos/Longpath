@@ -360,7 +360,7 @@ QVariantMap ContestFenster::anordnungDerPanels() const
     for (const PanelEintrag& e : panels()) {
         if (!m_innen->fenster->istPanelSchwebend(e.id)) { continue; }
         QWidget* panel = m_innen->fenster->panelFenster(e.id);
-        if (!panel || !panel->isWindow()) { continue; }
+        if (!panel || !panel->isWindow() || panelInFremdemGehaeuse(e.id)) { continue; }
         const QRect r = panel->frameGeometry();
         aus.insert(e.id, QVariantMap{{QStringLiteral("x"), r.x()},
                                      {QStringLiteral("y"), r.y()},
@@ -381,6 +381,8 @@ bool ContestFenster::stelleAnordnungHer(const QVariantMap& panelsSoll, bool logb
     if (!lade(grund, elternFenster)) { return false; }
     Contestprogramm::MainWindow* log = m_innen->fenster;
     for (const PanelEintrag& e : panels()) {
+        // Im Combined-Feld: das Feld fuehrt es (kombiInhalt im Profil).
+        if (panelInFremdemGehaeuse(e.id)) { continue; }
         const bool soll = panelsSoll.contains(e.id);
         if (!soll) {
             if (log->istPanelSchwebend(e.id)) { log->setzePanelSchwebend(e.id, false); }
@@ -408,10 +410,67 @@ bool ContestFenster::stelleAnordnungHer(const QVariantMap& panelsSoll, bool logb
     return true;
 }
 
+// ── Ein Panel in einem fremden Gehaeuse ─────────────────────────────
+
+QWidget* ContestFenster::panelFuerFremdesGehaeuse(const QString& id, QString* grund,
+                                                  QWidget* elternFenster)
+{
+    if (!lade(grund, elternFenster)) { return nullptr; }
+    Contestprogramm::MainWindow* log = m_innen->fenster;
+    auto* panel = qobject_cast<Contestprogramm::PanelContainerWidget*>(log->panelFenster(id));
+    if (!panel) {
+        if (grund) { *grund = QStringLiteral("Unknown logbook panel: %1").arg(id); }
+        return nullptr;
+    }
+    if (panel->fremdesGehaeuse()) { return panel; }
+    if (!log->istPanelSichtbar(id)) { log->setzePanelSichtbar(id, true); }
+    if (!log->istPanelSchwebend(id)) { log->setzePanelSchwebend(id, true); }
+    panel->setzeFremdesGehaeuse(true);
+    panel->hide();
+    emit anordnungGeaendert();
+    return panel;
+}
+
+void ContestFenster::nimmPanelZurueck(const QString& id, const QRect& dort)
+{
+    if (!m_innen->fenster) { return; }
+    Contestprogramm::MainWindow* log = m_innen->fenster;
+    auto* panel = qobject_cast<Contestprogramm::PanelContainerWidget*>(log->panelFenster(id));
+    if (!panel || !panel->fremdesGehaeuse()) { return; }
+    panel->setzeFremdesGehaeuse(false);
+    // Erst in die Flaeche -- dort hat es seinen Elternteil wieder --
+    // und von da, wenn gewuenscht, als Werkzeugfenster am Hauptfenster
+    // dorthin, wo es losgelassen wurde.
+    log->setzePanelSchwebend(id, false);
+    if (dort.isValid()) {
+        log->setzePanelSchwebend(id, true);
+        if (panel->isWindow()) {
+            const Longpath::EigeneBewegungBruecke eigen;
+            panel->setGeometry(dort);
+        }
+    }
+    emit anordnungGeaendert();
+}
+
+bool ContestFenster::panelInFremdemGehaeuse(const QString& id) const
+{
+    if (!m_innen->fenster) { return false; }
+    auto* panel = qobject_cast<Contestprogramm::PanelContainerWidget*>(
+        m_innen->fenster->panelFenster(id));
+    return panel && panel->fremdesGehaeuse();
+}
+
+QString ContestFenster::panelIdVon(const QWidget* w)
+{
+    auto* panel = qobject_cast<const Contestprogramm::PanelContainerWidget*>(w);
+    return panel ? panel->id() : QString();
+}
+
 void ContestFenster::raeumeAnordnung()
 {
     if (!m_innen->fenster) { return; }
     for (const PanelEintrag& e : panels()) {
+        if (panelInFremdemGehaeuse(e.id)) { continue; }   // das Gehaeuse fuehrt es
         if (m_innen->fenster->istPanelSchwebend(e.id)) {
             m_innen->fenster->setzePanelSchwebend(e.id, false);
         }

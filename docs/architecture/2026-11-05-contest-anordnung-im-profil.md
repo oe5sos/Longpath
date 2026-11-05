@@ -57,3 +57,37 @@ Seine Anordnung stand nirgends.
 
 Nicht gesichert: die Anordnung von 06:18 selbst — sie war nie
 gespeichert und muss einmal neu gelegt werden; ab dann bleibt sie.
+
+## Nachtrag: die Contest-Panels im Combined-Feld (2026-11-05, nachmittags)
+
+**Betreiber, mit Bild:** „im combined sollten auch alle contest
+optionen möglich sein" — die Liste hinter dem „+" des Combined-Felds
+kannte nur Longpaths Applets und Rotor/Log.
+
+Jetzt stehen dort alle Panels des Logbuchs („Contest · Karte /
+Verbindungen", …). Der Weg ist derselbe wie bei Rotor/Log: das Feld
+nimmt das Widget selbst auf (`KombiApplet::nimmAuf`), ohne Hülle.
+
+- **Contestprogramm (#76):** `PanelContainerWidget::setzeFremdesGehaeuse`
+  — im Feld ohne eigene Knöpfe (Schloss, ↙, ✕) und Anfasser, und
+  `setFloating(false)` tut nichts: ein Andocken aus dem Logbuch heraus
+  risse das Widget aus dem Feld. Für den PanelLayoutManager bleibt es
+  „abgelöst".
+- **Brücke:** `panelFuerFremdesGehaeuse()` macht das Panel bereit
+  (geladen, sichtbar, abgelöst, nackt) und gibt es verborgen; das Feld
+  zeigt es. `nimmPanelZurueck()` holt es nach dem Freigeben in die
+  Fläche und, mit Ziel, als Fenster dorthin. Die Profilwerte
+  (`contestPanels`) führen ein Panel im Feld nicht als Fenster;
+  `stelleAnordnungHer`/`raeumeAnordnung` lassen es im Feld.
+- **Profil:** im `kombiInhalt` steht es als `Contest:<id>` (Vorsatz,
+  damit „chat" nicht wie ein Applet aussieht); das Zurückholen kennt
+  den Vorsatz; das Leeren vor Schritt 1 gibt ein Contest-Panel an das
+  Logbuch zurück, und das neue Profil sagt dann selbst, was es will.
+- **Herausziehen** aus dem Feld: `gibFremdesPanelZurueck` erkennt ein
+  Contest-Panel und macht daraus ein Fenster am Logbuch, dort, wo
+  losgelassen wurde — keine Longpath-Hülle.
+
+Prüfstände: `tst_contestfenster::einPanelGehtInEinFremdesGehaeuseUndZurueck`,
+`tst_contest_panels_im_containers_menu::dasCombinedFeldNimmtEinContestPanel`
+(gegen die Fassung ohne die vier Zweige rot), Contestprogramm
+`test_einbettung::imFremdenGehaeuseIstDasPanelNackt`.

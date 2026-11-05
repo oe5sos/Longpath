@@ -17,6 +17,7 @@
 #include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QWidget>
+#include <QVBoxLayout>
 
 #include "ContestFenster.h"
 #include "FensterFrist.h"
@@ -338,6 +339,64 @@ private slots:
         QVERIFY2(neu.stelleAnordnungHer(QVariantMap(), true, &grund, &eltern), qPrintable(grund));
         QVERIFY(neu.logbuchSichtbar());
         neu.schliesse();
+    }
+
+    // ── Ein Panel in einem fremden Gehaeuse (2026-11-05) ────────────
+    //
+    // Betreiber: "im combined sollten auch alle contest optionen
+    // moeglich sein". Das Gehaeuse ist hier ein Widget mit Layout.
+    void einPanelGehtInEinFremdesGehaeuseUndZurueck()
+    {
+        QTemporaryDir ordner;
+        QVERIFY(ordner.isValid());
+        qputenv("CONTESTPROGRAMM_DATA_DIR", ordner.path().toUtf8());
+        QVERIFY(belegeLogVor(ordner.path()));
+
+        QWidget eltern;
+        eltern.resize(800, 600);
+        eltern.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&eltern, kFensterFrist));
+
+        ContestFenster bruecke;
+        QString grund;
+        QWidget* chat = bruecke.panelFuerFremdesGehaeuse(QStringLiteral("chat"), &grund, &eltern);
+        QVERIFY2(chat, qPrintable(grund));
+        QCOMPARE(ContestFenster::panelIdVon(chat), QStringLiteral("chat"));
+        QVERIFY(ContestFenster::panelIdVon(&eltern).isEmpty());
+        QVERIFY(bruecke.panelInFremdemGehaeuse(QStringLiteral("chat")));
+        QVERIFY2(!chat->isVisible(), "verborgen uebergeben -- das Gehaeuse zeigt es");
+
+        QWidget gehaeuse(&eltern, Qt::Window);
+        auto* lay = new QVBoxLayout(&gehaeuse);
+        lay->addWidget(chat);
+        gehaeuse.show();
+        QVERIFY(!chat->isWindow());
+        QVERIFY(bruecke.istPanelSchwebend(QStringLiteral("chat")));
+        // Das Profil fuehrt es nicht als Fenster, und das Herstellen einer
+        // Anordnung ohne chat laesst es im Gehaeuse.
+        QVERIFY(!bruecke.anordnungDerPanels().contains(QStringLiteral("chat")));
+        QVERIFY2(bruecke.stelleAnordnungHer(QVariantMap(), false, &grund, &eltern), qPrintable(grund));
+        QCOMPARE(chat->parentWidget(), &gehaeuse);
+        bruecke.raeumeAnordnung();
+        QCOMPARE(chat->parentWidget(), &gehaeuse);
+
+        // Zurueck: das Gehaeuse gibt frei, die Bruecke macht ein Fenster daraus.
+        lay->removeWidget(chat);
+        chat->setParent(nullptr);
+        const QRect dort(128, 144, 397, 301);
+        bruecke.nimmPanelZurueck(QStringLiteral("chat"), dort);
+        QVERIFY(!bruecke.panelInFremdemGehaeuse(QStringLiteral("chat")));
+        QVERIFY(chat->isWindow() && bruecke.istPanelSchwebend(QStringLiteral("chat")));
+        QCOMPARE(chat->frameGeometry(), dort);
+        QVERIFY(bruecke.anordnungDerPanels().contains(QStringLiteral("chat")));
+
+        // Ohne Ziel: zurueck in die Flaeche.
+        QWidget* karte = bruecke.panelFuerFremdesGehaeuse(QStringLiteral("map"), &grund, &eltern);
+        QVERIFY2(karte, qPrintable(grund));
+        karte->setParent(nullptr);
+        bruecke.nimmPanelZurueck(QStringLiteral("map"), QRect());
+        QVERIFY(!bruecke.istPanelSchwebend(QStringLiteral("map")));
+        bruecke.schliesse();
     }
 
     // ── Das ✕ am eingebetteten Logbuch versteckt nur ────────────────

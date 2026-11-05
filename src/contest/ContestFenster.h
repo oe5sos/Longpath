@@ -116,6 +116,23 @@ public:
     // zeigt das Logbuch-Fenster nur, wenn `logbuch` es sagt.
     bool stelleAnordnungHer(const QVariantMap& panels, bool logbuch,
                             QString* grund = nullptr, QWidget* elternFenster = nullptr);
+    // ── Ein Panel in einem fremden Gehaeuse (2026-11-05) ─────────────
+    //
+    // Betreiber: "im combined sollten auch alle contest optionen moeglich
+    // sein". Longpaths Combined-Feld nimmt das Panel-Widget selbst auf
+    // (Elternwechsel, eigene Kopfzeile). panelFuerFremdesGehaeuse() macht
+    // das Panel dafuer bereit (geladen, sichtbar, abgeloest, ohne eigene
+    // Knoepfe) und gibt es verborgen zurueck -- das Gehaeuse zeigt es.
+    // nimmPanelZurueck() holt es aus dem Gehaeuse (das es vorher
+    // freigegeben hat, Elternteil null) in die Flaeche des Logbuchs
+    // zurueck und, wenn `dort` gilt, als eigenes Fenster dorthin.
+    QWidget* panelFuerFremdesGehaeuse(const QString& id, QString* grund = nullptr,
+                                      QWidget* elternFenster = nullptr);
+    void nimmPanelZurueck(const QString& id, const QRect& dort);
+    bool panelInFremdemGehaeuse(const QString& id) const;
+    // Die Panel-Kennung eines beliebigen Widgets, leer fuer alles andere.
+    static QString panelIdVon(const QWidget* w);
+
     // Ein Profil ohne Contest: alle Panels zurueck, Logbuch verborgen.
     // Controller und Datenbank bleiben (CAT, Cluster laufen weiter).
     void raeumeAnordnung();

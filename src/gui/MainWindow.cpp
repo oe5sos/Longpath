@@ -2378,6 +2378,23 @@ void MainWindow::zeigeKombiListe(KombiApplet* feld, const QPoint& globalPos)
         ++angeboten;
     }
 
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // ── Die Contest-Panels (2026-11-05) ──────────────────────────────
+    //
+    // Betreiber: "im combined sollten auch alle contest optionen
+    // moeglich sein". Jedes Panel des Logbuchs, das noch nicht im Feld
+    // ist -- das Logbuch wird bei Bedarf geladen (verborgen).
+    for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+        if (m_contestFenster && schonDrin(m_contestFenster->panelFenster(e.id))) { continue; }
+        QAction* act = menue.addAction(QStringLiteral("Contest · %1").arg(e.titel));
+        const QString id = e.id;
+        connect(act, &QAction::triggered, this, [this, feld, id]() {
+            holeContestInsKombiFeld(feld, id);
+        });
+        ++angeboten;
+    }
+#endif
+
     if (angeboten == 0) {
         // Ein leeres Menue sieht aus wie ein kaputtes. Lieber sagen,
         // warum nichts darin steht.
@@ -2385,6 +2402,26 @@ void MainWindow::zeigeKombiListe(KombiApplet* feld, const QPoint& globalPos)
         leer->setEnabled(false);
     }
     menue.exec(globalPos);
+}
+
+// Ein Contest-Panel ins Feld holen (2026-11-05): die Bruecke macht es
+// bereit (geladen, abgeloest, ohne eigene Knoepfe), das Feld nimmt es.
+void MainWindow::holeContestInsKombiFeld(KombiApplet* feld, const QString& id)
+{
+#ifndef LONGPATH_HAVE_CONTESTPROGRAMM
+    Q_UNUSED(feld); Q_UNUSED(id);
+#else
+    if (!feld || m_shuttingDown) { return; }
+    bereiteContestFensterVor();
+    QString grund;
+    QWidget* panel = m_contestFenster->panelFuerFremdesGehaeuse(id, &grund, this);
+    if (!panel) {
+        qWarning() << "Contest panel into the combined field failed:" << id << grund;
+        return;
+    }
+    feld->nimmAuf(panel);
+    qInfo() << "Contest panel into the combined field:" << id;
+#endif
 }
 
 // Ein Applet ins Feld holen, egal wo es gerade steckt: in der
@@ -2428,6 +2465,17 @@ void MainWindow::holeInsKombiFeld(KombiApplet* feld, AppletWidget* applet,
 void MainWindow::gibFremdesPanelZurueck(QWidget* panel, const QRect& dort)
 {
     if (m_shuttingDown || !panel) { return; }
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // Ein Contest-Panel geht zurueck an das Logbuch: als eigenes
+    // Fenster dort, wo es losgelassen wurde (2026-11-05).
+    if (m_contestFenster) {
+        const QString contestId = ContestFenster::panelIdVon(panel);
+        if (!contestId.isEmpty()) {
+            m_contestFenster->nimmPanelZurueck(contestId, dort);
+            return;
+        }
+    }
+#endif
     auto* fenster = new ToolWindow(panel, QStringLiteral("RotorLog"),
                                    QStringLiteral("Rotor / Log"), this);
     if (dort.isValid()) { fenster->setGeometry(dort); }
@@ -9878,7 +9926,18 @@ void MainWindow::populateDefaultMeter()
                     for (QWidget* w : m_kombiApplet->seiten()) {
                         if (auto* a = qobject_cast<AppletWidget*>(w)) {
                             drin << panelIdFor(a);
-                        } else if (w && !w->objectName().isEmpty()) {
+                            continue;
+                        }
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+                        // Ein Contest-Panel: mit Vorsatz, damit "chat"
+                        // nicht wie ein Applet aussieht (2026-11-05).
+                        if (const QString contestId = ContestFenster::panelIdVon(w);
+                            !contestId.isEmpty()) {
+                            drin << QStringLiteral("Contest:") + contestId;
+                            continue;
+                        }
+#endif
+                        if (w && !w->objectName().isEmpty()) {
                             drin << w->objectName();
                         }
                     }
@@ -10116,7 +10175,19 @@ void MainWindow::populateDefaultMeter()
                     for (QWidget* w : m_kombiApplet->gibAlleFrei()) {
                         if (auto* a = qobject_cast<AppletWidget*>(w)) {
                             m_appletPanel->addApplet(a);
+                            continue;
                         }
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+                        // Ein Contest-Panel zurueck in die Flaeche des
+                        // Logbuchs; was das neue Profil davon will, sagt
+                        // es gleich selbst (kombiInhalt, contestPanels).
+                        if (m_contestFenster) {
+                            const QString contestId = ContestFenster::panelIdVon(w);
+                            if (!contestId.isEmpty()) {
+                                m_contestFenster->nimmPanelZurueck(contestId, QRect());
+                            }
+                        }
+#endif
                     }
                 }
 
@@ -20694,6 +20765,13 @@ void MainWindow::holeKombiInhaltZurueck(const QStringList& vorgabe)
             ++geholt;
             continue;
         }
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+        if (id.startsWith(QStringLiteral("Contest:"))) {
+            holeContestInsKombiFeld(m_kombiApplet, id.mid(8));
+            ++geholt;
+            continue;
+        }
+#endif
         AppletWidget* a = m_appletsById.value(id, nullptr);
         if (!a || a == m_kombiApplet) { continue; }
         holeInsKombiFeld(m_kombiApplet, a, id);
