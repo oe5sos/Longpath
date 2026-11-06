@@ -15,6 +15,7 @@
 
 #include <QtTest/QtTest>
 
+#include "core/AppSettings.h"
 #include "gui/applets/KombiApplet.h"
 
 using namespace Longpath;
@@ -474,6 +475,25 @@ private slots:
     // sache reinziehen können" -- und der Rotor ist kein Applet,
     // sondern der Inhalt eines Werkzeugfensters. Ein Behaelter, der
     // nach der Art fragt, kann ihn nicht aufnehmen.
+    // 2026-11-06: zwei Felder duerfen sich ihren Stand nicht teilen -- sonst
+    // las das zweite beim Start, was das erste zuletzt enthielt.
+    void jedesFeldMerktSichSeinenStandSelbst()
+    {
+        KombiApplet a(nullptr);
+        KombiApplet b(nullptr, nullptr, QStringLiteral("Kombi2"));
+        QCOMPARE(a.appletId(), QStringLiteral("Kombi"));
+        QCOMPARE(b.appletId(), QStringLiteral("Kombi2"));
+        auto* w = new QWidget;
+        w->setObjectName(QStringLiteral("NurImZweiten"));
+        b.nimmAuf(w);
+        const QString erstes = AppSettings::instance().value(QStringLiteral("Kombi/Inhalt"), QString()).toString();
+        const QString zweites = AppSettings::instance().value(QStringLiteral("Kombi2/Inhalt"), QString()).toString();
+        QVERIFY2(zweites.contains(QStringLiteral("NurImZweiten")), qPrintable(zweites));
+        QVERIFY2(!erstes.contains(QStringLiteral("NurImZweiten")), qPrintable(erstes));
+        b.gibFrei(w);
+        delete w;
+    }
+
     void auchEinFremdesWidget()
     {
         KombiApplet k(nullptr);

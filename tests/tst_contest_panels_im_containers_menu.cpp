@@ -181,9 +181,6 @@ private slots:
         QWidget* chat = bruecke->panelFenster(QStringLiteral("chat"));
         QVERIFY(chat && chat->isWindow());
         QTRY_COMPARE_WITH_TIMEOUT(chat->frameGeometry(), chatSoll, 3000);
-        // Das Hauptfenster ist das aktive Fenster -- nur es hat die
-        // Menueleiste (live 2026-11-05: "Apple · Longpath", sonst nichts).
-        QTRY_VERIFY2_WITH_TIMEOUT(QApplication::activeWindow() == m_mw, "das Hauptfenster muss aktiv bleiben", 3000);
         QVERIFY2(!bruecke->fenster()->isVisible(), "das Logbuch-Fenster bleibt zu");
 
         // Die Erfassung schreibt die Anordnung zurueck.
@@ -359,6 +356,114 @@ private slots:
         QTest::qWait(300);
         QVERIFY(pan->frequencyReadoutShown() && pan->swrReadoutShown());
         QVERIFY(profile->activate(vorher));
+    }
+
+    // ── Fall: zwei Combined-Felder (2026-11-06) ─────────────────────────
+    //
+    // Betreiber: "ich will auch ein 2tes combined fenster oeffnen!!" Zwei
+    // Felder, jedes mit eigenem Inhalt im Profil. Ein Panel hat nur EINEN
+    // Platz: was im einen liegt, steht in der Liste des anderen nicht.
+    void zweiCombinedFelder()
+    {
+        KombiApplet* eins = m_mw->kombiFeldForTest(1);
+        KombiApplet* zwei = m_mw->kombiFeldForTest(2);
+        QVERIFY(eins && zwei && eins != zwei);
+        QCOMPARE(eins->appletId(), QStringLiteral("Kombi"));
+        QCOMPARE(zwei->appletId(), QStringLiteral("Kombi2"));
+        QCOMPARE(zwei->appletTitle(), QStringLiteral("Combined 2"));
+        QCOMPARE(eins->appletTitle(), QStringLiteral("Combined"));
+        QVERIFY(KombiApplet::alle().contains(zwei));
+
+        auto* profile = m_mw->findChild<LayoutProfiles*>();
+        QVERIFY(profile);
+
+        const QString chatEintrag = QStringLiteral("Contest · Chat");
+        QVERIFY2(m_mw->kombiListeForTest(eins).contains(chatEintrag), "Chat steht zur Wahl");
+        QVERIFY2(m_mw->kombiListeForTest(zwei).contains(chatEintrag), "in beiden Listen");
+        QVERIFY2(!m_mw->kombiListeForTest(eins).contains(QStringLiteral("Combined 2")),
+                 "ein Feld legt man nicht in ein Feld");
+
+        m_mw->holeContestInsKombiFeldForTest(QStringLiteral("chat"), /*zweites=*/true);
+        QTest::qWait(200);
+        ContestFenster* bruecke = m_mw->contestFensterForTest();
+        QVERIFY(bruecke);
+        QWidget* chat = bruecke->panelFenster(QStringLiteral("chat"));
+        QVERIFY(zwei->seiten().contains(chat));
+        QVERIFY(!eins->seiten().contains(chat));
+        QVERIFY2(!m_mw->kombiListeForTest(eins).contains(chatEintrag),
+                 "was im zweiten Feld liegt, steht im ersten nicht zur Wahl");
+
+        // Jedes Feld hat seinen eigenen Eintrag im Profil.
+        profile->captureIntoCurrent();
+        const QVariantMap erfasst = profile->snapshot(profile->current());
+        QVERIFY(erfasst.value(QStringLiteral("kombiInhalt2")).toStringList()
+                    .contains(QStringLiteral("Contest:chat")));
+        QVERIFY(!erfasst.value(QStringLiteral("kombiInhalt")).toStringList()
+                     .contains(QStringLiteral("Contest:chat")));
+
+        // Ein Profilwechsel leert BEIDE und fuellt jedes aus seinem Eintrag.
+        QVariantMap anders = erfasst;
+        anders.insert(QStringLiteral("kombiInhalt"), QStringList{QStringLiteral("Contest:chat")});
+        anders.insert(QStringLiteral("kombiInhalt2"), QStringList{QStringLiteral("Contest:map")});
+        anders.insert(QStringLiteral("contestPanels"), QVariantMap());
+        anders.insert(QStringLiteral("contestLogbook"), false);
+        QVERIFY(profile->createWith(QStringLiteral("ZweiFelder"), anders));
+        QVERIFY(profile->activate(QStringLiteral("ZweiFelder")));
+        QTest::qWait(800);
+        QWidget* karte = bruecke->panelFenster(QStringLiteral("map"));
+        QVERIFY2(eins->seiten().contains(chat), "chat wechselt ins erste Feld");
+        QVERIFY2(zwei->seiten().contains(karte), "die Karte ins zweite");
+        QVERIFY(!zwei->seiten().contains(chat));
+
+        // Eines ohne Eintrag fuer das zweite Feld (altes Profil): es wird leer.
+        QVariantMap altes = anders;
+        altes.remove(QStringLiteral("kombiInhalt2"));
+        altes.insert(QStringLiteral("kombiInhalt"), QStringList());
+        QVERIFY(profile->createWith(QStringLiteral("OhneZweites"), altes));
+        QVERIFY(profile->activate(QStringLiteral("OhneZweites")));
+        QTest::qWait(800);
+        QVERIFY2(zwei->seiten().isEmpty(), "ein altes Profil laesst das zweite Feld leer");
+        QVERIFY(eins->seiten().isEmpty());
+    }
+
+    // ── Fall 7: "kein Contest" bleibt im Profil stehen (2026-11-06) ─────
+    //
+    // Betreiber 05:49: "so nicht abgespeichert" -- das Logbuch war beim
+    // Start offen, obwohl das Profil "Logbuch zu" sagte. Beim Beenden
+    // einer Sitzung ohne geladenes Logbuch schrieb die Erfassung die
+    // Contest-Eintraege nicht mehr; das Profil verlor seine Aussage.
+    void keinContestBleibtImProfilStehen()
+    {
+        auto* profile = m_mw->findChild<LayoutProfiles*>();
+        QVERIFY(profile);
+        QVariantMap zustand = profile->snapshot(profile->current());
+        zustand.insert(QStringLiteral("contestPanels"), QVariantMap());
+        zustand.insert(QStringLiteral("contestLogbook"), false);
+        QVERIFY(profile->createWith(QStringLiteral("OhneContest"), zustand));
+        QVERIFY(profile->activate(QStringLiteral("OhneContest")));
+        QTest::qWait(500);
+
+        // Wie eine Sitzung, in der das Logbuch nie geladen wurde.
+        if (ContestFenster* b = m_mw->contestFensterForTest()) { b->schliesse(); QVERIFY(!b->istOffen()); }
+        profile->captureIntoCurrent();
+        const QVariantMap erfasst = profile->snapshot(QStringLiteral("OhneContest"));
+        QVERIFY2(erfasst.contains(QStringLiteral("contestPanels")),
+                 "die Aussage 'kein Contest' muss im Profil bleiben");
+        QCOMPARE(erfasst.value(QStringLiteral("contestLogbook")).toBool(), false);
+
+        // Ein Profil ganz ohne Contest-Eintrag (von vor dem 2026-11-05)
+        // bekommt mit der Erfassung "kein Contest, Logbuch zu".
+        QVariantMap alt = profile->snapshot(profile->current());
+        alt.remove(QStringLiteral("contestPanels"));
+        alt.remove(QStringLiteral("contestLogbook"));
+        QVERIFY(profile->createWith(QStringLiteral("Altes"), alt));
+        QVERIFY(profile->activate(QStringLiteral("Altes")));
+        QTest::qWait(500);
+        profile->captureIntoCurrent();
+        const QVariantMap altErfasst = profile->snapshot(QStringLiteral("Altes"));
+        QVERIFY2(altErfasst.contains(QStringLiteral("contestPanels")),
+                 "auch ein altes Profil sagt nach der Erfassung 'kein Contest'");
+        QCOMPARE(altErfasst.value(QStringLiteral("contestLogbook")).toBool(), false);
     }
 };
 

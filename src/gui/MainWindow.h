@@ -254,7 +254,10 @@ public:
     RadioModel* radioModelForTest() const { return m_radioModel; }
     class ContestFenster* contestFensterForTest() const { return m_contestFenster; }
     QByteArray layoutprofilAlsJsonForTest(const QString& name) { return layoutprofilAlsJson(name); }
-    void holeContestInsKombiFeldForTest(const QString& id) { holeContestInsKombiFeld(m_kombiApplet, id); }
+    void holeContestInsKombiFeldForTest(const QString& id, bool zweites = false)
+    { holeContestInsKombiFeld(zweites ? m_kombiApplet2 : m_kombiApplet, id); }
+    class KombiApplet* kombiFeldForTest(int nr) const { return nr == 2 ? m_kombiApplet2 : m_kombiApplet; }
+    QStringList kombiListeForTest(class KombiApplet* feld);
     int sperreAlleFensterForTest(bool an) { return sperreAlleFenster(an); }
 
     /// Wie viele Rahmen des Sendetons jetzt faellig sind.
@@ -1095,7 +1098,7 @@ private:
     void applyDarkTheme();
     void openConnectionPanelOnLaunch();
     /// Was im Kombi-Feld lag, beim Start wieder hineinlegen.
-    void holeKombiInhaltZurueck(const QStringList& vorgabe = {});
+    void holeKombiInhaltZurueck(class KombiApplet* feld, const QStringList& vorgabe = {});
     void wireSliceToSpectrum();
 
     /// Re-bind RttyDecoderApplet and the RADE/RttyDecoder availability gate
@@ -1360,6 +1363,7 @@ private:
     void gibFremdesPanelZurueck(QWidget* panel, const QRect& dort);
     /// Rechtsklick auf ein Kombi-Feld: zeigt, was hineinkann.
     void zeigeKombiListe(class KombiApplet* feld, const QPoint& globalPos);
+    void fuelleKombiListe(class QMenu& menue, class KombiApplet* feld);
     void holeContestInsKombiFeld(class KombiApplet* feld, const QString& id);
     QByteArray layoutprofilAlsJson(const QString& name);
     void exportiereLayoutprofil(const QString& name);
@@ -1977,6 +1981,11 @@ private:
     class AmpApplet*   m_ampApplet{nullptr};
     bool               m_ampAppletWired{false};  // guards one-time AmpApplet signal connects
     class KombiApplet* m_kombiApplet{nullptr};
+    // Das zweite Feld (2026-11-06). Alle Stellen, die "das Feld" meinen,
+    // gehen ueber kombiFelder() -- eine Kopie der Liste vergaesse eines.
+    class KombiApplet* m_kombiApplet2{nullptr};
+    QList<class KombiApplet*> kombiFelder() const;
+    void verdrahteKombiFeld(class KombiApplet* feld);
     class RxApplet* m_rxApplet{nullptr};
     // Phase 3M-3a-ii Batch 6: cached so SetupDialog instances can route
     // CfcSetupPage's [Configure CFC bands…] button to the same modeless

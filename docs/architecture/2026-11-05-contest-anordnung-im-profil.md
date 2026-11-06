@@ -165,3 +165,30 @@ zum einblenden im panadapter". Blätter:
   die Schwelle 2,5 gibt.
 - Der Streifen CH 0/TX/KIWI rückt mit der Zeile von y = 8 auf y = 0, sonst
   hinge er in die SWR-Anzeige.
+
+## Nachtrag 2026-11-06: „kein Contest" muss im Profil stehen bleiben
+
+**Betreiber, 05:49:** „so nicht abgespeichert" — nach dem Start stand
+das Logbuch-Fenster offen, Karte und Wasserfall darin, „welches ich
+nie dort hatte".
+
+Hergang: Profil „N" sagte „kein Contest, Logbuch zu" (`contestPanels`
+leer, `contestLogbook` false). In der Sitzung von 05:45 wurde das
+Logbuch nie geladen; beim Beenden schrieb die Erfassung die
+Contest-Einträge nicht mehr, weil `m_contestAnordnungGemerkt` beim
+Anwenden geleert und bei „nichts herzustellen" nicht gefüllt wurde. Das
+Profil verlor seine Aussage, und „Open contest logbook at launch"
+(eingeschaltet) fand beim nächsten Start keinen Widerspruch mehr.
+
+Jetzt merkt sich das Anwenden die Aussage des Profils immer — auch
+„nichts" —, und ein Profil ohne jeden Contest-Eintrag (von vor dem
+2026-11-05, wie „C") bekommt mit der nächsten Erfassung „kein Contest,
+Logbuch zu": was auf dem Schirm ist, ist die Wahrheit. „at launch"
+greift damit nur noch beim allerersten Start eines alten Profils.
+Prüfstand `keinContestBleibtImProfilStehen` (gegen die alte Fassung
+rot).
+
+Am selben Tag erledigt: Longpath startet nicht mehr immer mit Profil 1,
+sondern mit dem zuletzt aktiven (`LayoutProfiles::startWithLastActive`,
+Betreiber „Zuletzt aktives"). Das Logbuch kommt mit dem Profil, mit dem
+Longpath startet.

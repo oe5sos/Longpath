@@ -60,7 +60,11 @@ class KombiApplet : public AppletWidget {
     Q_OBJECT
 
 public:
-    explicit KombiApplet(RadioModel* model, QWidget* parent = nullptr);
+    /// `kennung`: "Kombi" oder "Kombi2" (2026-11-06, Betreiber: "ich will
+    /// auch ein 2tes combined fenster oeffnen!!"). Sie ist die appletId und
+    /// der Praefix der eigenen Einstellungen.
+    explicit KombiApplet(RadioModel* model, QWidget* parent = nullptr,
+                         const QString& kennung = QStringLiteral("Kombi"));
     ~KombiApplet() override;
 
     /// Alle lebenden Kombi-Felder, egal in welchem Gehaeuse.
@@ -79,7 +83,7 @@ public:
     /// Das sichtbare Feld unter dieser Stelle, oder nullptr.
     static KombiApplet* unter(const QPoint& globalPos);
 
-    QString appletId() const override    { return QStringLiteral("Kombi"); }
+    QString appletId() const override    { return m_kennung; }
     QString appletTitle() const override;
     void    syncFromModel() override;
 
@@ -163,6 +167,7 @@ protected:
     bool eventFilter(QObject* watched, QEvent* ev) override;
 
 private:
+    QString m_kennung;
     void baueReiter();
     void reiterNeu();
     void merkeStand() const;
