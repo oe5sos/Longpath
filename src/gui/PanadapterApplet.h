@@ -50,6 +50,7 @@ class QMenu;
 // Longpath::QLabel und der Uebersetzer meldet einen unvollstaendigen
 // Typ, obwohl <QLabel> eingebunden ist.
 class QLabel;
+class QProgressBar;
 
 class QPushButton;
 
@@ -164,6 +165,25 @@ public:
     /// Longpath-native test seam.
     QMenu* buildContextMenuForTesting() { return buildContextMenu(this); }
 
+    // ── Die Anzeigezeile (2026-11-06) ────────────────────────────────
+    //
+    // Betreiber: "als option, dass die frequenz in panadapter zu lesen
+    // ist" und "swr und frequenz optional einzublenden" -- Vorschlag 1
+    // der Entwurfsblaetter, "aber bitte als option". Eine Zeile unter dem
+    // Kopf, nur vorhanden, solange mindestens ein Haken gesetzt ist;
+    // beide im Zahnrad, beide ab Werk aus. Der Stand liegt im Layoutprofil.
+    void setFrequencyReadoutShown(bool on);
+    bool frequencyReadoutShown() const { return m_zeigeFrequenz; }
+    void setSwrReadoutShown(bool on);
+    bool swrReadoutShown() const { return m_zeigeSwr; }
+    /// Aus der einen Verteilung der Messwerte (MainWindow), wie
+    /// FrequencyApplet::onReading -- dieselbe Quelle, dieselbe Zahl.
+    void onReading(int bindingId, double value);
+    /// Die Zeile, wie sie gerade zu sehen ist; leer, wenn keine Frequenz da.
+    QString frequencyReadoutTextForTest() const;
+    QString swrReadoutTextForTest() const;
+    QWidget* readoutRowForTest() const { return m_anzeigeZeile; }
+
     /// Dasselbe fuer das Zahnrad-Menue: eine Pruefung soll die
     /// Eintraege ueber ihren Text ausloesen koennen, ohne eine
     /// verschachtelte Ereignisschleife zu starten.
@@ -248,8 +268,25 @@ private:
     /// Deckkraft, Grundfarbe, und der Weg in den Setup-Dialog.
     QMenu* buildDisplayMenu(QObject* parent);
 
+    void aktualisiereAnzeigeZeile();
+    void zeigeAnzeigeFrequenz(double hz);
+    void aktualisiereAnzeigeSwr();
+
     QString                 m_panId;
     SpectrumWidget*         m_spectrum {nullptr};
+    // Die Anzeigezeile, siehe setFrequencyReadoutShown().
+    bool                    m_zeigeFrequenz {false};
+    bool                    m_zeigeSwr {false};
+    QWidget*                m_anzeigeZeile {nullptr};
+    QLabel*                 m_anzeigeFrequenz {nullptr};
+    QLabel*                 m_anzeigeEinheit {nullptr};
+    QWidget*                m_anzeigeSwr {nullptr};
+    QLabel*                 m_anzeigeSwrWert {nullptr};
+    QLabel*                 m_anzeigeSwrWarnung {nullptr};
+    QProgressBar*           m_anzeigeSwrBalken {nullptr};
+    double                  m_vorlaufW {0.0};
+    double                  m_swrWert {1.0};
+    QMetaObject::Connection m_anzeigeVerbindung;
     QLabel*                 m_titleLabel {nullptr};
     QLabel*                 m_grip {nullptr};
     QPushButton*            m_btnFloat {nullptr};

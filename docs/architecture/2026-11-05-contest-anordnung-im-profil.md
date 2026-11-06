@@ -144,3 +144,24 @@ immer das aktive Profil, live erfasst — keine Buchstabenwahl. Der
 Schienen-Export bleibt, beide gehen über `layoutprofilAlsJson()`.
 Prüfstand `tst_contest_panels_im_containers_menu::dasDateiMenueSichertDieLiveAnordnung`
 (ohne die Live-Erfassung rot).
+
+## Nachtrag 2026-11-06: die Anzeigezeile im Panadapter
+
+Betreiber: „als option, dass die frequenz in panadapter zu lesen ist",
+„swr und frequenz optional einzublenden", dann „1. aber bitte als option
+zum einblenden im panadapter". Blätter:
+`~/Longpath/werkzeug/frequenz-im-panadapter-2026-11-06/`.
+
+- Zwei Haken im Zahnrad, „Frequency readout" und „SWR readout", ab Werk
+  aus. Ohne Haken gibt es die Zeile nicht, das Spektrum behält die Höhe.
+- Der Stand liegt je Panadapter im Layoutprofil (`panReadouts`); was das
+  Profil nicht nennt, ist aus.
+- Frequenz: die Scheibe DIESES Panadapters (`updateStatusOverlay`), nicht
+  die global aktive und nicht die Bildmitte aus dem Kopf.
+- SWR: aus der einen Verteilung `MeterPoller::readingUpdated`, Skala und
+  Schwelle aus `readingFor(TxSwr)`. Ohne Vorlaufleistung ein Strich: alle
+  Radios melden im Empfang 0 W, auch die Flex.
+- Abweichung vom Blatt: nur zwei Stufen statt drei, weil es im Baum nur
+  die Schwelle 2,5 gibt.
+- Der Streifen CH 0/TX/KIWI rückt mit der Zeile von y = 8 auf y = 0, sonst
+  hinge er in die SWR-Anzeige.

@@ -23,6 +23,8 @@
 #include <QImage>
 #include <QMessageBox>
 #include "gui/SpectrumWidget.h"
+#include "gui/instruments/ReadingSource.h"
+#include "gui/meters/MeterPoller.h"
 #include "gui/widgets/SpectrumStatusOverlay.h"
 #include "models/SliceModel.h"
 #include "core/AppSettings.h"
@@ -31,6 +33,7 @@
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QPointer>
+#include <QProgressBar>
 #include <QResizeEvent>
 #include <QVBoxLayout>
 #include "gui/styles/ThemeQss.h"
@@ -274,6 +277,68 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
                             .arg(Style::titleBarStyle()));
     layout->addWidget(head, 0);
 
+    // ── Die Anzeigezeile (2026-11-06) ────────────────────────────────
+    //
+    // Unter dem Kopf, ueber dem Spektrum: Abstimmfrequenz links in Messing,
+    // SWR rechts, gross wie auf dem gewaehlten Blatt. Skala und Schwelle
+    // kommen aus ReadingSource (readingFor), nicht von hier: keine zweite
+    // Skala. Verborgen, solange kein Haken gesetzt ist: dann bekommt das
+    // Spektrum die ganze Hoehe, wie bisher.
+    m_anzeigeZeile = new QWidget(this);
+    m_anzeigeZeile->setObjectName(QStringLiteral("panReadoutRow"));
+    m_anzeigeZeile->setAttribute(Qt::WA_StyledBackground, true);
+    m_anzeigeZeile->setStyleSheet(QStringLiteral(
+        "QWidget#panReadoutRow { background: %1; border-bottom: 1px solid %2; }")
+        .arg(QLatin1String(Style::kPanelBg), QLatin1String(Style::kBorder)));
+    m_anzeigeZeile->setFixedHeight(34);
+    auto* zeile = new QHBoxLayout(m_anzeigeZeile);
+    zeile->setContentsMargins(12, 0, 12, 0);
+    zeile->setSpacing(8);
+    m_anzeigeFrequenz = new QLabel(QString::fromUtf8("\xe2\x80\x94"), m_anzeigeZeile);
+    m_anzeigeFrequenz->setObjectName(QStringLiteral("panReadoutFrequency"));
+    m_anzeigeFrequenz->setFont(Style::monoFont(m_anzeigeFrequenz->font(), Style::kFontReading));
+    m_anzeigeFrequenz->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; background: transparent; }")
+        .arg(QLatin1String(Style::kAmberText)));
+    zeile->addWidget(m_anzeigeFrequenz);
+    m_anzeigeEinheit = new QLabel(QStringLiteral("MHz"), m_anzeigeZeile);
+    m_anzeigeEinheit->setFont(Style::capsFont(m_anzeigeEinheit->font(), Style::kFontCaption));
+    m_anzeigeEinheit->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; background: transparent; }")
+        .arg(QLatin1String(Style::kAmberDim)));
+    zeile->addWidget(m_anzeigeEinheit);
+    zeile->addStretch(1);
+    m_anzeigeSwr = new QWidget(m_anzeigeZeile);
+    auto* swrZeile = new QHBoxLayout(m_anzeigeSwr);
+    swrZeile->setContentsMargins(0, 0, 0, 0);
+    swrZeile->setSpacing(8);
+    auto* swrName = new QLabel(QStringLiteral("SWR"), m_anzeigeSwr);
+    swrName->setFont(Style::capsFont(swrName->font(), Style::kFontCaption));
+    swrName->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; background: transparent; }")
+        .arg(QLatin1String(Style::kAmberDim)));
+    swrZeile->addWidget(swrName);
+    m_anzeigeSwrWert = new QLabel(m_anzeigeSwr);
+    m_anzeigeSwrWert->setObjectName(QStringLiteral("panReadoutSwr"));
+    m_anzeigeSwrWert->setFont(Style::monoFont(m_anzeigeSwrWert->font(), Style::kFontReading));
+    m_anzeigeSwrWert->setMinimumWidth(62);   // Zahl und Strich: gleich breit, nichts zappelt
+    swrZeile->addWidget(m_anzeigeSwrWert);
+    m_anzeigeSwrBalken = new QProgressBar(m_anzeigeSwr);
+    m_anzeigeSwrBalken->setRange(0, 1000);
+    m_anzeigeSwrBalken->setTextVisible(false);
+    m_anzeigeSwrBalken->setFixedSize(120, 8);
+    swrZeile->addWidget(m_anzeigeSwrBalken);
+    m_anzeigeSwrWarnung = new QLabel(QStringLiteral("!"), m_anzeigeSwr);
+    m_anzeigeSwrWarnung->setFixedWidth(10);
+    m_anzeigeSwrWarnung->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; background: transparent; font-weight: bold; }")
+        .arg(QLatin1String(Style::kAmberText)));
+    swrZeile->addWidget(m_anzeigeSwrWarnung);
+    zeile->addWidget(m_anzeigeSwr);
+    aktualisiereAnzeigeSwr();
+    m_anzeigeZeile->hide();
+    layout->addWidget(m_anzeigeZeile, 0);
+
     layout->addWidget(m_spectrum, 1);
 
     // Die Mitte laeuft mit. Ohne Verbindung steht nur der Name da —
@@ -466,9 +531,103 @@ QByteArrayList PanadapterApplet::statusOverlaySliceProperties()
     };
 }
 
+void PanadapterApplet::setFrequencyReadoutShown(bool on)
+{
+    if (m_zeigeFrequenz == on) { return; }
+    m_zeigeFrequenz = on;
+    aktualisiereAnzeigeZeile();
+}
+
+void PanadapterApplet::setSwrReadoutShown(bool on)
+{
+    if (m_zeigeSwr == on) { return; }
+    m_zeigeSwr = on;
+    aktualisiereAnzeigeZeile();
+}
+
+void PanadapterApplet::aktualisiereAnzeigeZeile()
+{
+    if (!m_anzeigeZeile) { return; }
+    m_anzeigeFrequenz->setVisible(m_zeigeFrequenz);
+    m_anzeigeEinheit->setVisible(m_zeigeFrequenz);
+    m_anzeigeSwr->setVisible(m_zeigeSwr);
+    m_anzeigeZeile->setVisible(m_zeigeFrequenz || m_zeigeSwr);
+    // Der Streifen haengt sonst in die Flaeche unter dem Kopf -- das waere
+    // jetzt die Zeile. Siehe repositionStatusOverlay().
+    repositionStatusOverlay();
+}
+
+void PanadapterApplet::onReading(int bindingId, double value)
+{
+    // Auch verborgen fuettern: sonst stuende beim Einschalten erst einmal
+    // nichts da (dieselbe Ueberlegung wie in FrequencyApplet::onReading).
+    if (bindingId == MeterBinding::TxPower) {
+        m_vorlaufW = value;
+    } else if (bindingId == MeterBinding::TxSwr) {
+        m_swrWert = value;
+    } else {
+        return;
+    }
+    aktualisiereAnzeigeSwr();
+}
+
+// Ohne Leistung gibt es kein SWR: im Empfang steht ein Strich statt einer
+// Zahl, die wie eine Messung aussaehe. Alle Radios melden im Empfang 0 W
+// Vorlauf (RadioStatus::setForwardPower), die Flex ebenso -- darum haengt das
+// an der Leistung und nicht an einer eigenen MOX-Verdrahtung.
+void PanadapterApplet::aktualisiereAnzeigeSwr()
+{
+    if (!m_anzeigeSwrWert) { return; }
+    const ReadingDescriptor* skala = readingFor(MeterBinding::TxSwr);
+    const bool gemessen = m_vorlaufW > 0.05 && skala != nullptr;
+    const bool warnung = gemessen && skala->threshold && m_swrWert >= *skala->threshold;
+    const QString farbe = QLatin1String(!gemessen ? Style::kAmberDim
+                                        : warnung ? Style::kAmberText
+                                                  : Style::kGreenText);
+    m_anzeigeSwrWert->setText(gemessen ? QString::number(m_swrWert, 'f', skala->decimals)
+                                       : QString::fromUtf8("\xe2\x80\x94"));
+    m_anzeigeSwrWert->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; background: transparent; }").arg(farbe));
+    m_anzeigeSwrBalken->setValue(gemessen ? qRound(skala->fraction(m_swrWert) * 1000.0) : 0);
+    m_anzeigeSwrBalken->setStyleSheet(QStringLiteral(
+        "QProgressBar { background: %1; border: 1px solid %2; border-radius: 4px; }"
+        "QProgressBar::chunk { background: %3; border-radius: 3px; }")
+        .arg(QLatin1String(Style::kButtonBg), QLatin1String(Style::kBorder), farbe));
+    m_anzeigeSwrWarnung->setText(warnung ? QStringLiteral("!") : QString());
+}
+
+void PanadapterApplet::zeigeAnzeigeFrequenz(double hz)
+{
+    if (!m_anzeigeFrequenz) { return; }
+    // MHz.kHz.Hz, wie auf dem Blatt: 7.113.065
+    const qint64 h = qRound64(hz);
+    m_anzeigeFrequenz->setText(QStringLiteral("%1.%2.%3")
+        .arg(h / 1000000)
+        .arg((h / 1000) % 1000, 3, 10, QLatin1Char('0'))
+        .arg(h % 1000, 3, 10, QLatin1Char('0')));
+}
+
+QString PanadapterApplet::swrReadoutTextForTest() const
+{
+    return m_anzeigeSwrWert ? m_anzeigeSwrWert->text() : QString();
+}
+
+QString PanadapterApplet::frequencyReadoutTextForTest() const
+{
+    return m_anzeigeFrequenz ? m_anzeigeFrequenz->text() : QString();
+}
+
 void PanadapterApplet::updateStatusOverlay(SliceModel* slice, int chainIndex)
 {
     if (!m_statusOverlay || !slice) { return; }
+
+    // Die Anzeigezeile haengt an DIESER Scheibe (der des Panadapters),
+    // nicht an der global aktiven; dieselbe Regel wie der Streifen hier.
+    QObject::disconnect(m_anzeigeVerbindung);
+    m_anzeigeVerbindung = connect(slice, &SliceModel::frequencyChanged, this,
+                                  [this](double hz) { zeigeAnzeigeFrequenz(hz); });
+    zeigeAnzeigeFrequenz(slice->frequency());
+
     // SliceModel::sliceLetter() now derives from the stable slice id, so the
     // local workaround this used to carry is gone. (It reported 'A' for every
     // slice while the letter was a stored member no one ever set.)
@@ -551,7 +710,10 @@ void PanadapterApplet::repositionStatusOverlay()
         reserved = std::max(reserved, std::max(0, width() - links + 6));
     }
 
-    m_statusOverlay->setGeometry(width() - hint.width() - 8 - reserved, 8,
+    // Mit der Anzeigezeile bleibt der Streifen IM Kopf: bei y = 8 hinge er
+    // sonst ueber die Zeile, genau in die SWR-Anzeige.
+    const bool zeile = m_anzeigeZeile && !m_anzeigeZeile->isHidden();
+    m_statusOverlay->setGeometry(width() - hint.width() - 8 - reserved, zeile ? 0 : 8,
                                  hint.width(), hint.height());
 }
 
@@ -684,6 +846,19 @@ QMenu* PanadapterApplet::buildContextMenu(QObject* parent)
 QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
 {
     auto* menu = new QMenu(qobject_cast<QWidget*>(parent));
+
+    // Die Anzeigezeile, zuoberst: das ist, was man hier am ehesten sucht.
+    QAction* zeileFrequenz = menu->addAction(tr("Frequency readout"));
+    zeileFrequenz->setCheckable(true);
+    zeileFrequenz->setChecked(m_zeigeFrequenz);
+    connect(zeileFrequenz, &QAction::toggled, this,
+            [this](bool an) { setFrequencyReadoutShown(an); });
+    QAction* zeileSwr = menu->addAction(tr("SWR readout"));
+    zeileSwr->setCheckable(true);
+    zeileSwr->setChecked(m_zeigeSwr);
+    connect(zeileSwr, &QAction::toggled, this,
+            [this](bool an) { setSwrReadoutShown(an); });
+    menu->addSeparator();
 
     menu->addAction(tr("Choose background image…"), this, [this]() {
         // ── Der Dialog gehoert dem FENSTER, nicht dem Applet ─────
