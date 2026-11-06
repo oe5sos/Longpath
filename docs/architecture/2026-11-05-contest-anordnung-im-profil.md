@@ -144,3 +144,29 @@ immer das aktive Profil, live erfasst — keine Buchstabenwahl. Der
 Schienen-Export bleibt, beide gehen über `layoutprofilAlsJson()`.
 Prüfstand `tst_contest_panels_im_containers_menu::dasDateiMenueSichertDieLiveAnordnung`
 (ohne die Live-Erfassung rot).
+
+## Nachtrag 2026-11-06: „kein Contest" muss im Profil stehen bleiben
+
+**Betreiber, 05:49:** „so nicht abgespeichert" — nach dem Start stand
+das Logbuch-Fenster offen, Karte und Wasserfall darin, „welches ich
+nie dort hatte".
+
+Hergang: Profil „N" sagte „kein Contest, Logbuch zu" (`contestPanels`
+leer, `contestLogbook` false). In der Sitzung von 05:45 wurde das
+Logbuch nie geladen; beim Beenden schrieb die Erfassung die
+Contest-Einträge nicht mehr, weil `m_contestAnordnungGemerkt` beim
+Anwenden geleert und bei „nichts herzustellen" nicht gefüllt wurde. Das
+Profil verlor seine Aussage, und „Open contest logbook at launch"
+(eingeschaltet) fand beim nächsten Start keinen Widerspruch mehr.
+
+Jetzt merkt sich das Anwenden die Aussage des Profils immer — auch
+„nichts" —, und ein Profil ohne jeden Contest-Eintrag (von vor dem
+2026-11-05, wie „C") bekommt mit der nächsten Erfassung „kein Contest,
+Logbuch zu": was auf dem Schirm ist, ist die Wahrheit. „at launch"
+greift damit nur noch beim allerersten Start eines alten Profils.
+Prüfstand `keinContestBleibtImProfilStehen` (gegen die alte Fassung
+rot).
+
+Offen: Longpath startet immer mit Profil 1 („N", Betreiber-Regel vom
+2026-09-27); sein Contest-Profil ist „C". Das Logbuch kommt mit dem
+Profil, mit dem Longpath startet.
