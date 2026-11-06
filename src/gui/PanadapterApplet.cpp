@@ -591,7 +591,7 @@ void PanadapterApplet::aktualisiereAnzeigeSwr()
     m_anzeigeSwrBalken->setValue(gemessen ? qRound(skala->fraction(m_swrWert) * 1000.0) : 0);
     m_anzeigeSwrBalken->setStyleSheet(QStringLiteral(
         "QProgressBar { background: %1; border: 1px solid %2; border-radius: 4px; }"
-        "QProgressBar::chunk { background: %3; border-radius: 3px; }")
+        "QProgressBar::chunk { background: %3; border-radius: 2px; }")
         .arg(QLatin1String(Style::kButtonBg), QLatin1String(Style::kBorder), farbe));
     m_anzeigeSwrWarnung->setText(warnung ? QStringLiteral("!") : QString());
 }
