@@ -27,6 +27,7 @@
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPushButton>
+#include <QSignalSpy>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QTemporaryDir>
@@ -493,9 +494,13 @@ private slots:
         };
 
         // Es zaehlt, was unter dem Zeiger oben liegt. Fenster aus den
-        // Faellen davor duerfen die Felder nicht verdecken.
+        // Faellen davor duerfen die Felder nicht verdecken. Wegruecken,
+        // nicht verstecken: ein verstecktes Fenster stuerzt beim Abbau
+        // unter "offscreen" in QOffscreenBackingStore::clearHash() ab.
         for (QWidget* t : QApplication::topLevelWidgets()) {
-            if (t != eins->window() && t != zwei->window() && t->isVisible()) { t->hide(); }
+            if (t != eins->window() && t != zwei->window() && t->isVisible()) {
+                t->move(5000, 5000);
+            }
         }
         QTest::qWait(100);
 
@@ -584,6 +589,52 @@ private slots:
         QVERIFY2(altErfasst.contains(QStringLiteral("contestPanels")),
                  "auch ein altes Profil sagt nach der Erfassung 'kein Contest'");
         QCOMPARE(altErfasst.value(QStringLiteral("contestLogbook")).toBool(), false);
+    }
+
+    // ── Schliessen und sofort wieder oeffnen (2026-11-06) ────────────────
+    //
+    // Das Schliessen hinterlaesst einen Aufraeum-Auftrag fuer die naechste
+    // Runde. Oeffnet das Logbuch vorher wieder, durfte er ihm nicht die
+    // Datenbank wegnehmen. Das Signal macht den Fall scharf: der Zugriff
+    // auf die tote Datenbank stuerzte nur in jedem zwoelften Lauf ab.
+    void gleichWiederOeffnenBehaeltDieDatenbank()
+    {
+        ContestFenster* bruecke = m_mw->contestFensterForTest();
+        QVERIFY(bruecke);
+        m_mw->holeContestInsKombiFeldForTest(QStringLiteral("map"), /*zweites=*/false);
+        QTest::qWait(100);
+        QSignalSpy geschlossen(bruecke, &ContestFenster::geschlossen);
+        bruecke->schliesse();
+        QString grund;
+        QVERIFY2(bruecke->stelleAnordnungHer({}, false, &grund, m_mw), qPrintable(grund));
+        QVERIFY(bruecke->istOffen());
+        QTest::qWait(100);
+        QCOMPARE(geschlossen.size(), 0);
+        QVERIFY2(bruecke->istOffen(), "das neue Logbuch muss offen bleiben");
+    }
+
+    // ── Letzter Fall: Beenden mit dem Log im Combined (2026-11-06) ───────
+    //
+    // Am 2026-11-05 stuerzte Longpath drei Mal im Abbau des Logbuchs ab.
+    // Liegt das Log in einem fremden Gehaeuse, darf der Abbau es nicht
+    // doppelt treffen. Muss der letzte Fall bleiben: er schliesst das
+    // Fenster, das alle anderen brauchen, und raeumt damit zugleich ab,
+    // was sonst den Qt-eigenen Offscreen-Absturz im Abbau ausloest.
+    void beendenMitDemLogImCombined()
+    {
+        KombiApplet* eins = m_mw->kombiFeldForTest(1);
+        QVERIFY(eins);
+        m_mw->holeContestInsKombiFeldForTest(QStringLiteral("unifiedlog"), /*zweites=*/false);
+        QTest::qWait(300);
+        ContestFenster* bruecke = m_mw->contestFensterForTest();
+        QVERIFY(bruecke);
+        QVERIFY(eins->seiten().contains(bruecke->panelFenster(QStringLiteral("unifiedlog"))));
+
+        QVERIFY(m_mw->close());
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        QApplication::closeAllWindows();
+        QTest::qWait(300);
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
     }
 };
 

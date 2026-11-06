@@ -251,6 +251,11 @@ bool ContestFenster::lade(QString* grund, QWidget* elternFenster)
     connect(fenster, &QObject::destroyed, this, [this]() {
         m_innen->fenster = nullptr;
         QTimer::singleShot(0, this, [this]() {
+            // Ist inzwischen ein neues Logbuch offen, gehoeren Controller
+            // und Datenbank IHM. Dieser Auftrag raeumte sie ihm weg, und
+            // das Fenster griff danach ins Leere (Absturz in
+            // ContestDatabase::setSettingValue, gefunden 2026-11-06).
+            if (m_innen->fenster) { return; }
             m_innen->steuerung.reset();
             if (m_innen->wache) { m_innen->wache->release(); }
             m_innen->wache.reset();
