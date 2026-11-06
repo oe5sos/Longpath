@@ -33,6 +33,7 @@
 #include "ContestFenster.h"
 #include "gui/ConnectionPanel.h"
 #include "gui/LayoutProfiles.h"
+#include "gui/PanadapterApplet.h"
 #include "gui/applets/KombiApplet.h"
 #include "FensterFrist.h"
 
@@ -327,6 +328,34 @@ private slots:
         QVERIFY2(state.value(QStringLiteral("contestPanels")).toObject().contains(QStringLiteral("chat")),
                  "die Live-Anordnung mit dem Chat-Fenster muss in der Datei stehen");
         m_mw->contestFensterForTest()->dockePanel(QStringLiteral("chat"));
+    }
+
+    // ── Fall: die Anzeigezeile gehoert dem Profil (2026-11-06) ──────────
+    void dieAnzeigeZeileGehoertDemProfil()
+    {
+        auto* profile = m_mw->findChild<LayoutProfiles*>();
+        QVERIFY(profile);
+        PanadapterApplet* pan = m_mw->findChild<PanadapterApplet*>();
+        QVERIFY(pan);
+        const QString vorher = profile->current();
+        QVERIFY(profile->create(QStringLiteral("MitZeile")));
+        pan->setFrequencyReadoutShown(true);
+        pan->setSwrReadoutShown(true);
+        profile->captureIntoCurrent();
+        const QVariantMap z = profile->snapshot(QStringLiteral("MitZeile"))
+                                  .value(QStringLiteral("panReadouts")).toMap()
+                                  .value(pan->panId()).toMap();
+        QVERIFY2(z.value(QStringLiteral("frequency")).toBool() && z.value(QStringLiteral("swr")).toBool(),
+                 "beide Haken stehen im Profil");
+
+        // Ein Profil, das sie nicht nennt, zeigt sie nicht.
+        QVERIFY(profile->activate(vorher));
+        QTest::qWait(300);
+        QVERIFY(!pan->frequencyReadoutShown() && !pan->swrReadoutShown());
+        QVERIFY(profile->activate(QStringLiteral("MitZeile")));
+        QTest::qWait(300);
+        QVERIFY(pan->frequencyReadoutShown() && pan->swrReadoutShown());
+        QVERIFY(profile->activate(vorher));
     }
 
     // ── Fall: zwei Combined-Felder (2026-11-06) ─────────────────────────

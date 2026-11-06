@@ -5911,6 +5911,12 @@ void MainWindow::buildUI()
         // nicht alle" -- das Frequenz-Widget ist seither die EINZIGE
         // Stelle dafuer.
         if (m_frequencyApplet)  { m_frequencyApplet->onReading(bindingId, value); }
+        // Die Anzeigezeile im Panadapter: dieselbe Verteilung, dieselbe Zahl.
+        if (m_panStack) {
+            for (PanadapterApplet* pan : m_panStack->allApplets()) {
+                if (pan) { pan->onReading(bindingId, value); }
+            }
+        }
     });
 
     // Task 3.1: expose MeterPoller via RadioModel so MultimeterPage can
@@ -10047,6 +10053,21 @@ void MainWindow::populateDefaultMeter()
                              m_rotorDock->isVisible());
                 }
 
+                // ── Die Anzeigezeile im Panadapter (2026-11-06) ─────
+                //
+                // Je Panadapter und je Profil: "C" kann sie zeigen und
+                // "N" nicht.
+                if (m_panStack) {
+                    QVariantMap zeilen;
+                    for (PanadapterApplet* pan : m_panStack->allApplets()) {
+                        if (!pan) { continue; }
+                        zeilen.insert(pan->panId(),
+                                      QVariantMap{{QStringLiteral("frequency"), pan->frequencyReadoutShown()},
+                                                  {QStringLiteral("swr"), pan->swrReadoutShown()}});
+                    }
+                    s.insert(QStringLiteral("panReadouts"), zeilen);
+                }
+
                 // ── Contest-Panels und Logbuch (2026-11-05) ─────────
                 //
                 // Betreiber nach einem Neustart: "so war mein letzter
@@ -10881,6 +10902,17 @@ void MainWindow::populateDefaultMeter()
                     if (!m_shuttingDown) { stelleContestAnordnungHer(s); }
                 });
 #endif
+
+                // Die Anzeigezeile: was das Profil nicht nennt, ist aus.
+                if (m_panStack) {
+                    const QVariantMap zeilen = s.value(QStringLiteral("panReadouts")).toMap();
+                    for (PanadapterApplet* pan : m_panStack->allApplets()) {
+                        if (!pan) { continue; }
+                        const QVariantMap z = zeilen.value(pan->panId()).toMap();
+                        pan->setFrequencyReadoutShown(z.value(QStringLiteral("frequency")).toBool());
+                        pan->setSwrReadoutShown(z.value(QStringLiteral("swr")).toBool());
+                    }
+                }
 
                 qWarning() << "[ProfileApply:Step] 6/6 fertig";
             });

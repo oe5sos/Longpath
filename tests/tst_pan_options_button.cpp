@@ -24,6 +24,8 @@
 #include <QSignalSpy>
 
 #include "gui/PanadapterApplet.h"
+#include "gui/meters/MeterPoller.h"
+#include "models/SliceModel.h"
 #include "FensterFrist.h"
 
 using namespace Longpath;
@@ -51,6 +53,78 @@ private slots:
     }
 
     // Die Eintraege muessen wirklich etwas ausloesen.
+    // 2026-11-06, Betreiber: "1. aber bitte als option zum einblenden im
+    // panadapter." Ab Werk aus, keine Zeile; jeder Haken einzeln.
+    void dieAnzeigeZeileIstEineOption()
+    {
+        PanadapterApplet applet(QStringLiteral("A"));
+        applet.resize(800, 400);
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
+
+        QWidget* zeile = applet.readoutRowForTest();
+        QVERIFY(zeile);
+        QVERIFY2(!zeile->isVisible(), "ohne Haken gibt es keine Zeile");
+        QVERIFY(!applet.frequencyReadoutShown() && !applet.swrReadoutShown());
+
+        QMenu* m = applet.buildDisplayMenuForTesting();
+        QVERIFY(m);
+        QAction* frequenz = nullptr;
+        QAction* swr = nullptr;
+        for (QAction* a : m->actions()) {
+            if (a->text() == QStringLiteral("Frequency readout")) { frequenz = a; }
+            if (a->text() == QStringLiteral("SWR readout")) { swr = a; }
+        }
+        QVERIFY2(frequenz && swr, "beide Haken stehen im Zahnrad");
+        QVERIFY(frequenz->isCheckable() && !frequenz->isChecked());
+
+        frequenz->trigger();
+        QVERIFY(applet.frequencyReadoutShown());
+        QVERIFY2(zeile->isVisible(), "ein Haken genuegt fuer die Zeile");
+        swr->trigger();
+        QVERIFY(applet.swrReadoutShown());
+        frequenz->trigger();
+        QVERIFY2(zeile->isVisible(), "SWR allein traegt die Zeile auch");
+        swr->trigger();
+        QVERIFY2(!zeile->isVisible(), "beide aus: Zeile weg");
+        delete m;
+    }
+
+    // Die Zeile zeigt die Abstimmfrequenz der Scheibe und laeuft mit.
+    void dieAnzeigeZeileLaeuftMitDerScheibe()
+    {
+        PanadapterApplet applet(QStringLiteral("A"));
+        SliceModel slice;
+        slice.setFrequency(7113065.0);
+        applet.updateStatusOverlay(&slice, 0);
+        QCOMPARE(applet.frequencyReadoutTextForTest(), QStringLiteral("7.113.065"));
+        slice.setFrequency(14225000.0);
+        QCOMPARE(applet.frequencyReadoutTextForTest(), QStringLiteral("14.225.000"));
+
+        // Eine andere Scheibe loest die erste ab.
+        SliceModel zweite;
+        zweite.setFrequency(3650500.0);
+        applet.updateStatusOverlay(&zweite, 0);
+        QCOMPARE(applet.frequencyReadoutTextForTest(), QStringLiteral("3.650.500"));
+        slice.setFrequency(21000000.0);
+        QCOMPARE(applet.frequencyReadoutTextForTest(), QStringLiteral("3.650.500"));
+    }
+
+    // Ohne Leistung kein SWR: im Empfang steht ein Strich. Beim Senden die
+    // Zahl aus derselben Quelle wie das Frequenz-Widget.
+    void imEmpfangSteht_einStrich()
+    {
+        PanadapterApplet applet(QStringLiteral("A"));
+        const QString strich = QString::fromUtf8("\xe2\x80\x94");
+        QCOMPARE(applet.swrReadoutTextForTest(), strich);
+        applet.onReading(MeterBinding::TxSwr, 1.4);
+        QCOMPARE(applet.swrReadoutTextForTest(), strich);     // noch keine Leistung
+        applet.onReading(MeterBinding::TxPower, 25.0);
+        QCOMPARE(applet.swrReadoutTextForTest(), QStringLiteral("1.40"));
+        applet.onReading(MeterBinding::TxPower, 0.0);
+        QCOMPARE(applet.swrReadoutTextForTest(), strich);     // zurueck im Empfang
+    }
+
     void itsEntriesActuallyFire()
     {
         PanadapterApplet applet(QStringLiteral("A"));

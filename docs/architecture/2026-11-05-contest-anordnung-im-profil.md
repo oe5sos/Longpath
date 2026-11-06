@@ -145,6 +145,27 @@ Schienen-Export bleibt, beide gehen über `layoutprofilAlsJson()`.
 Prüfstand `tst_contest_panels_im_containers_menu::dasDateiMenueSichertDieLiveAnordnung`
 (ohne die Live-Erfassung rot).
 
+## Nachtrag 2026-11-06: die Anzeigezeile im Panadapter
+
+Betreiber: „als option, dass die frequenz in panadapter zu lesen ist",
+„swr und frequenz optional einzublenden", dann „1. aber bitte als option
+zum einblenden im panadapter". Blätter:
+`~/Longpath/werkzeug/frequenz-im-panadapter-2026-11-06/`.
+
+- Zwei Haken im Zahnrad, „Frequency readout" und „SWR readout", ab Werk
+  aus. Ohne Haken gibt es die Zeile nicht, das Spektrum behält die Höhe.
+- Der Stand liegt je Panadapter im Layoutprofil (`panReadouts`); was das
+  Profil nicht nennt, ist aus.
+- Frequenz: die Scheibe DIESES Panadapters (`updateStatusOverlay`), nicht
+  die global aktive und nicht die Bildmitte aus dem Kopf.
+- SWR: aus der einen Verteilung `MeterPoller::readingUpdated`, Skala und
+  Schwelle aus `readingFor(TxSwr)`. Ohne Vorlaufleistung ein Strich: alle
+  Radios melden im Empfang 0 W, auch die Flex.
+- Abweichung vom Blatt: nur zwei Stufen statt drei, weil es im Baum nur
+  die Schwelle 2,5 gibt.
+- Der Streifen CH 0/TX/KIWI rückt mit der Zeile von y = 8 auf y = 0, sonst
+  hinge er in die SWR-Anzeige.
+
 ## Nachtrag 2026-11-06: „kein Contest" muss im Profil stehen bleiben
 
 **Betreiber, 05:49:** „so nicht abgespeichert" — nach dem Start stand
@@ -167,6 +188,7 @@ greift damit nur noch beim allerersten Start eines alten Profils.
 Prüfstand `keinContestBleibtImProfilStehen` (gegen die alte Fassung
 rot).
 
-Offen: Longpath startet immer mit Profil 1 („N", Betreiber-Regel vom
-2026-09-27); sein Contest-Profil ist „C". Das Logbuch kommt mit dem
-Profil, mit dem Longpath startet.
+Am selben Tag erledigt: Longpath startet nicht mehr immer mit Profil 1,
+sondern mit dem zuletzt aktiven (`LayoutProfiles::startWithLastActive`,
+Betreiber „Zuletzt aktives"). Das Logbuch kommt mit dem Profil, mit dem
+Longpath startet.
