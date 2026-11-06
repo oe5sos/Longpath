@@ -1302,7 +1302,9 @@ MainWindow::MainWindow(QWidget* parent)
     QTimer::singleShot(0, this, &MainWindow::openConnectionPanelOnLaunch);
     // NACH dem Profil: erst muessen die Panels dort liegen, wo das
     // Profil sie haben will, dann holt das Kombi-Feld seine zurueck.
-    QTimer::singleShot(0, this, [this]() { holeKombiInhaltZurueck(); });
+    QTimer::singleShot(0, this, [this]() {
+        for (KombiApplet* feld : kombiFelder()) { holeKombiInhaltZurueck(feld); }
+    });
 
     // Phase 3J-2 + 3R M3: restore each spot client's auto-connect /
     // auto-start state. Sibling to the panel-open call above; deferred via
@@ -2314,15 +2316,66 @@ void MainWindow::legeAufKombiFeld(const QString& appletId, const QPoint& globalP
 // Ziehen bleibt der eine Weg. Dies ist der andere, und fuer ein eben
 // erst geholtes, leeres Feld der bessere: man muss nicht wissen, was
 // es aufnehmen kann -- es steht da.
+QList<KombiApplet*> MainWindow::kombiFelder() const
+{
+    QList<KombiApplet*> felder;
+    if (m_kombiApplet)  { felder << m_kombiApplet; }
+    if (m_kombiApplet2) { felder << m_kombiApplet2; }
+    return felder;
+}
+
+void MainWindow::verdrahteKombiFeld(KombiApplet* feld)
+{
+    connect(feld, &KombiApplet::listeGewuenscht, this,
+            [this, feld](const QPoint& wo) { zeigeKombiListe(feld, wo); });
+    // ── Herausgezogen heiszt: dort stehen (2026-11-01) ───────────────
+    //
+    // Betreiber: „frequenz lässt sich reinziehen, soll sich aber
+    // wieder rausziehen lassen!" Das Feld gibt den Reiter frei
+    // (die Spalte faengt ihn auf, siehe addApplet), und hier
+    // bekommt er sofort ein eigenes Fenster an der Stelle, an der
+    // losgelassen wurde -- nicht irgendwo. Ein Fenster, das an
+    // fremder Stelle aufgeht, sieht aus wie ein neues
+    // (Betreiber, 2026-08-20).
+    connect(feld, &KombiApplet::herausgezogen, this,
+            [this](QWidget* w, const QPoint& wo) {
+        if (m_shuttingDown || !w) { return; }
+        const QRect dort(wo.x() - 40, wo.y() - 10, 360, 320);
+        if (auto* a = qobject_cast<AppletWidget*>(w)) {
+            detachApplet(a, -1, dort, QString());
+            return;
+        }
+        // Kein Applet (Rotor/Logbuch): es bekommt sein eigenes
+        // Werkzeugfenster zurueck, dort, wo losgelassen wurde.
+        gibFremdesPanelZurueck(w, dort);
+    });
+}
+
+QStringList MainWindow::kombiListeForTest(KombiApplet* feld)
+{
+    QMenu menue(this);
+    fuelleKombiListe(menue, feld);
+    QStringList texte;
+    for (QAction* a : menue.actions()) { texte << a->text(); }
+    return texte;
+}
+
 void MainWindow::zeigeKombiListe(KombiApplet* feld, const QPoint& globalPos)
 {
     if (m_shuttingDown || !feld) { return; }
 
     QMenu menue(this);
     menue.setStyleSheet(QString::fromLatin1(kPopupMenu));
+    fuelleKombiListe(menue, feld);
+    menue.exec(globalPos);
+}
 
-    // Was schon drin ist, steht nicht noch einmal zur Wahl.
-    const QList<QWidget*> drin = feld->seiten();
+void MainWindow::fuelleKombiListe(QMenu& menue, KombiApplet* feld)
+{
+    // Was schon drin ist, steht nicht noch einmal zur Wahl -- auch nicht,
+    // wenn es im ANDEREN Feld liegt: ein Panel hat nur einen Platz.
+    QList<QWidget*> drin;
+    for (KombiApplet* f : kombiFelder()) { drin += f->seiten(); }
     const auto schonDrin = [&drin](QWidget* w) { return drin.contains(w); };
 
     int angeboten = 0;
@@ -2401,7 +2454,6 @@ void MainWindow::zeigeKombiListe(KombiApplet* feld, const QPoint& globalPos)
         QAction* leer = menue.addAction(tr("Everything is already in here"));
         leer->setEnabled(false);
     }
-    menue.exec(globalPos);
 }
 
 // Ein Contest-Panel ins Feld holen (2026-11-05): die Bruecke macht es
@@ -7920,31 +7972,13 @@ void MainWindow::populateDefaultMeter()
     {
         m_kombiApplet = new KombiApplet(m_radioModel, nullptr);
         panel->addApplet(m_kombiApplet);
-        connect(m_kombiApplet, &KombiApplet::listeGewuenscht, this,
-                [this](const QPoint& wo) {
-            zeigeKombiListe(m_kombiApplet, wo);
-        });
-        // ── Herausgezogen heiszt: dort stehen (2026-11-01) ───────────
-        //
-        // Betreiber: „frequenz lässt sich reinziehen, soll sich aber
-        // wieder rausziehen lassen!" Das Feld gibt den Reiter frei
-        // (die Spalte faengt ihn auf, siehe addApplet), und hier
-        // bekommt er sofort ein eigenes Fenster an der Stelle, an der
-        // losgelassen wurde -- nicht irgendwo. Ein Fenster, das an
-        // fremder Stelle aufgeht, sieht aus wie ein neues
-        // (Betreiber, 2026-08-20).
-        connect(m_kombiApplet, &KombiApplet::herausgezogen, this,
-                [this](QWidget* w, const QPoint& wo) {
-            if (m_shuttingDown || !w) { return; }
-            const QRect dort(wo.x() - 40, wo.y() - 10, 360, 320);
-            if (auto* a = qobject_cast<AppletWidget*>(w)) {
-                detachApplet(a, -1, dort, QString());
-                return;
-            }
-            // Kein Applet (Rotor/Logbuch): es bekommt sein eigenes
-            // Werkzeugfenster zurueck, dort, wo losgelassen wurde.
-            gibFremdesPanelZurueck(w, dort);
-        });
+        verdrahteKombiFeld(m_kombiApplet);
+        // Das zweite Feld (2026-11-06). Betreiber: "ich will auch ein
+        // 2tes combined fenster oeffnen!!" Dasselbe Bauteil mit eigener
+        // Kennung, eigener Liste, eigenem Eintrag im Profil.
+        m_kombiApplet2 = new KombiApplet(m_radioModel, nullptr, QStringLiteral("Kombi2"));
+        panel->addApplet(m_kombiApplet2);
+        verdrahteKombiFeld(m_kombiApplet2);
         // Das Zurueckgeben verdrahtet die Spalte selbst
         // (AppletPanelWidget::addApplet) -- sie verwaltet ihre Felder,
         // nicht dieses Fenster.
@@ -9138,6 +9172,7 @@ void MainWindow::populateDefaultMeter()
     });
 
     m_appletsById[QStringLiteral("Kombi")]      = m_kombiApplet;
+    m_appletsById[QStringLiteral("Kombi2")]     = m_kombiApplet2;
     m_appletsById[QStringLiteral("Rx")]         = m_rxApplet;
     m_appletsById[QStringLiteral("Tx")]         = m_txApplet;
     m_appletsById[QStringLiteral("PhoneCw")]    = m_phoneCwApplet;
@@ -9202,6 +9237,8 @@ void MainWindow::populateDefaultMeter()
     // will, holt es ueber das + unten rechts.
     m_appletVis->registerApplet(QStringLiteral("Kombi"),
                                 QStringLiteral("Combined"),     false);
+    m_appletVis->registerApplet(QStringLiteral("Kombi2"),
+                                QStringLiteral("Combined 2"),   false);
     m_appletVis->registerApplet(QStringLiteral("Rx"),
                                 QStringLiteral("RX"),           true);
     m_appletVis->registerApplet(QStringLiteral("Tx"),
@@ -9446,6 +9483,13 @@ void MainWindow::populateDefaultMeter()
         tr("Combined"),
         {QStringLiteral("kombi"), QStringLiteral("combined"),
          QStringLiteral("rx"), QStringLiteral("tx"),
+         QStringLiteral("zusammen"), QStringLiteral("reiter"),
+         QStringLiteral("tabs"), QStringLiteral("platz"),
+         QStringLiteral("space")});
+    m_appletVis->describeApplet(QStringLiteral("Kombi2"),
+        tr("Combined 2"),
+        {QStringLiteral("kombi"), QStringLiteral("combined"),
+         QStringLiteral("zwei"), QStringLiteral("second"),
          QStringLiteral("zusammen"), QStringLiteral("reiter"),
          QStringLiteral("tabs"), QStringLiteral("platz"),
          QStringLiteral("space")});
@@ -9945,27 +9989,35 @@ void MainWindow::populateDefaultMeter()
                 // im Profil. Damit war er nach einem Profilwechsel
                 // falsch und nach einem Neustart gar nicht da. Jetzt
                 // liegt er dort, wo die uebrige Anordnung liegt.
-                if (m_kombiApplet) {
-                    QStringList drin;
-                    for (QWidget* w : m_kombiApplet->seiten()) {
-                        if (auto* a = qobject_cast<AppletWidget*>(w)) {
-                            drin << panelIdFor(a);
-                            continue;
-                        }
+                {
+                    const auto inhaltVon = [this](KombiApplet* feld) {
+                        QStringList drin;
+                        for (QWidget* w : feld->seiten()) {
+                            if (auto* a = qobject_cast<AppletWidget*>(w)) {
+                                drin << panelIdFor(a);
+                                continue;
+                            }
 #ifdef LONGPATH_HAVE_CONTESTPROGRAMM
-                        // Ein Contest-Panel: mit Vorsatz, damit "chat"
-                        // nicht wie ein Applet aussieht (2026-11-05).
-                        if (const QString contestId = ContestFenster::panelIdVon(w);
-                            !contestId.isEmpty()) {
-                            drin << QStringLiteral("Contest:") + contestId;
-                            continue;
-                        }
+                            // Ein Contest-Panel: mit Vorsatz, damit "chat"
+                            // nicht wie ein Applet aussieht (2026-11-05).
+                            if (const QString contestId = ContestFenster::panelIdVon(w);
+                                !contestId.isEmpty()) {
+                                drin << QStringLiteral("Contest:") + contestId;
+                                continue;
+                            }
 #endif
-                        if (w && !w->objectName().isEmpty()) {
-                            drin << w->objectName();
+                            if (w && !w->objectName().isEmpty()) {
+                                drin << w->objectName();
+                            }
                         }
+                        return drin;
+                    };
+                    if (m_kombiApplet) {
+                        s.insert(QStringLiteral("kombiInhalt"), inhaltVon(m_kombiApplet));
                     }
-                    s.insert(QStringLiteral("kombiInhalt"), drin);
+                    if (m_kombiApplet2) {
+                        s.insert(QStringLiteral("kombiInhalt2"), inhaltVon(m_kombiApplet2));
+                    }
                 }
 
                 // Die freistehenden Meter-Container, nach derselben
@@ -10195,8 +10247,9 @@ void MainWindow::populateDefaultMeter()
                 // Also hier, VOR allem anderen: zurueck in die Spalte,
                 // damit Schritt 3 sie behandeln kann wie jedes andere
                 // Panel. Gefuellt wird am Ende.
-                if (m_kombiApplet && m_appletPanel) {
-                    for (QWidget* w : m_kombiApplet->gibAlleFrei()) {
+                for (KombiApplet* feld : kombiFelder()) {
+                    if (!m_appletPanel) { break; }
+                    for (QWidget* w : feld->gibAlleFrei()) {
                         if (auto* a = qobject_cast<AppletWidget*>(w)) {
                             m_appletPanel->addApplet(a);
                             continue;
@@ -10812,7 +10865,11 @@ void MainWindow::populateDefaultMeter()
                 // die Panels wieder herausnehmen.
                 if (m_kombiApplet) {
                     holeKombiInhaltZurueck(
-                        s.value(QStringLiteral("kombiInhalt")).toStringList());
+                        m_kombiApplet, s.value(QStringLiteral("kombiInhalt")).toStringList());
+                }
+                if (m_kombiApplet2) {
+                    holeKombiInhaltZurueck(
+                        m_kombiApplet2, s.value(QStringLiteral("kombiInhalt2")).toStringList());
                 }
 
                 // Die Contest-Panels zuletzt, und erst im naechsten
@@ -20803,15 +20860,15 @@ void MainWindow::onConnectionStateChanged()
 //
 // Hier, einmal nach dem Aufbau: die gemerkten Kennungen der Reihe
 // nach hineinlegen. Was es nicht mehr gibt, wird uebergangen.
-void MainWindow::holeKombiInhaltZurueck(const QStringList& vorgabe)
+void MainWindow::holeKombiInhaltZurueck(KombiApplet* feld, const QStringList& vorgabe)
 {
-    if (m_shuttingDown || !m_kombiApplet) { return; }
+    if (m_shuttingDown || !feld) { return; }
     // Aus dem Profil, wenn eines etwas sagt; sonst aus der gemerkten
     // Liste des Feldes selbst (erster Start nach dem Umbau).
     QStringList ids = vorgabe;
     if (ids.isEmpty()) {
         const QString liste =
-            AppSettings::instance().value(QStringLiteral("Kombi/Inhalt"),
+            AppSettings::instance().value(feld->appletId() + QStringLiteral("/Inhalt"),
                                           QString()).toString();
         ids = liste.split(QLatin1Char(','), Qt::SkipEmptyParts);
     }
@@ -20830,20 +20887,20 @@ void MainWindow::holeKombiInhaltZurueck(const QStringList& vorgabe)
             if (!inhalt) { continue; }
             inhalt->setWindowTitle(QStringLiteral("Rotor / Log"));
             inhalt->setObjectName(QStringLiteral("RotorLog"));
-            m_kombiApplet->nimmAuf(inhalt);
+            feld->nimmAuf(inhalt);
             ++geholt;
             continue;
         }
 #ifdef LONGPATH_HAVE_CONTESTPROGRAMM
         if (id.startsWith(QStringLiteral("Contest:"))) {
-            holeContestInsKombiFeld(m_kombiApplet, id.mid(8));
+            holeContestInsKombiFeld(feld, id.mid(8));
             ++geholt;
             continue;
         }
 #endif
         AppletWidget* a = m_appletsById.value(id, nullptr);
-        if (!a || a == m_kombiApplet) { continue; }
-        holeInsKombiFeld(m_kombiApplet, a, id);
+        if (!a || qobject_cast<KombiApplet*>(a)) { continue; }
+        holeInsKombiFeld(feld, a, id);
         ++geholt;
     }
     qCInfo(lcConnection) << "Kombi: " << geholt << "von" << ids.size()

@@ -31,12 +31,13 @@ namespace Longpath {
 
 namespace {
 QList<KombiApplet*> g_alle;
-QString standSchluessel() { return QStringLiteral("Kombi/Inhalt"); }
-QString seitenSchluessel() { return QStringLiteral("Kombi/Seite"); }
+QString standSchluessel(const QString& kennung) { return kennung + QStringLiteral("/Inhalt"); }
+QString seitenSchluessel(const QString& kennung) { return kennung + QStringLiteral("/Seite"); }
 }  // namespace
 
-KombiApplet::KombiApplet(RadioModel* model, QWidget* parent)
+KombiApplet::KombiApplet(RadioModel* model, QWidget* parent, const QString& kennung)
     : AppletWidget(model, parent)
+    , m_kennung(kennung)
 {
     auto* root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
@@ -212,7 +213,7 @@ QString KombiApplet::appletTitle() const
     // Inhalt aendert, haette das Feld jedes Mal zu etwas anderem
     // gemacht; dabei ist es immer dasselbe Ding. Was gerade drin ist,
     // steht ohnehin auf den Reitern.
-    return tr("Combined");
+    return m_kennung == QStringLiteral("Kombi2") ? tr("Combined 2") : tr("Combined");
 }
 
 void KombiApplet::nimmAuf(QWidget* panel)
@@ -668,7 +669,7 @@ void KombiApplet::zeigeSeite(int welche)
     for (int i = 0; i < m_reiter.size(); ++i) {
         m_reiter.at(i)->setChecked(i == w);
     }
-    AppSettings::instance().setValue(seitenSchluessel(), QString::number(w));
+    AppSettings::instance().setValue(seitenSchluessel(m_kennung), QString::number(w));
     chipNachziehen();
     emit seiteGewechselt(w);
 }
@@ -686,7 +687,7 @@ void KombiApplet::merkeStand() const
             ids << w->objectName();
         }
     }
-    AppSettings::instance().setValue(standSchluessel(),
+    AppSettings::instance().setValue(standSchluessel(m_kennung),
                                      ids.join(QLatin1Char(',')));
 }
 
