@@ -521,6 +521,14 @@ void LayoutProfiles::save() const
     }
 }
 
+void LayoutProfiles::startWithLastActive()
+{
+    if (m_order.isEmpty()) { return; }
+    if (!m_current.isEmpty() && m_order.contains(m_current)) { return; }
+    m_current = m_order.first();
+    emit currentChanged(m_current);
+}
+
 void LayoutProfiles::startWithFirst()
 {
     if (m_order.isEmpty() || m_current == m_order.first()) { return; }

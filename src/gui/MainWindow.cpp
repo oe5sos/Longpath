@@ -10829,9 +10829,11 @@ void MainWindow::populateDefaultMeter()
             });
 
         m_layoutProfiles->load();
-        // Immer Profil 1, nicht das zuletzt aktive (Betreiber 2026-09-27,
-        // siehe LayoutProfiles::startWithFirst()).
-        m_layoutProfiles->startWithFirst();
+        // Das zuletzt aktive Profil (Betreiber 2026-11-06, "Zuletzt
+        // aktives": sein Contest-Profil ist "C", und Longpath kam jeden
+        // Morgen mit "N" herauf). Vom 2026-09-27 bis heute galt "immer
+        // Profil 1" (startWithFirst); siehe LayoutProfiles.h.
+        m_layoutProfiles->startWithLastActive();
         // Betreiber 2026-09-01: "letzter Zustand nie beim Öffnen
         // sichtbar" -- zeigt, was TATSAECHLICH von der Platte kam,
         // bevor applyCurrent() irgendetwas damit tut. Vergleich mit

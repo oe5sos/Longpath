@@ -134,7 +134,18 @@ private slots:
 
         auto* profile = mw->findChild<LayoutProfiles*>();
         QVERIFY(profile);
-        const QString vorher = profile->current();
+
+        // Die Ausgangslage stellt der Fall selbst her. Seit 2026-11-06
+        // startet Longpath im zuletzt aktiven Profil, und der Fall davor
+        // hinterlaesst "Field". Ohne diese Zeilen stuende vorher schon
+        // auf "Field", und es gaebe keinen Wechsel zu pruefen.
+        const QString vorher = QStringLiteral("Einrichtung");
+        if (profile->exists(vorher)) {
+            profile->activate(vorher);
+        } else {
+            profile->create(vorher);
+        }
+        QCOMPARE(profile->current(), vorher);
 
         QAction* a = eintrag(mw);
         QVERIFY(a);
