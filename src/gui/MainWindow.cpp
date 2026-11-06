@@ -19478,7 +19478,21 @@ void MainWindow::stelleContestAnordnungHer(const QVariantMap& s)
 #else
     const QVariantMap panels = s.value(QStringLiteral("contestPanels")).toMap();
     const bool logbuch = s.value(QStringLiteral("contestLogbook")).toBool();
+    // Was das Profil sagt, bleibt gemerkt -- AUCH "kein Contest, Logbuch
+    // zu". Bis 2026-11-06 ging das verloren: ohne geladenes Logbuch
+    // schrieb die Erfassung beim Beenden keine Contest-Eintraege mehr,
+    // das Profil verlor die Aussage, und "Open contest logbook at
+    // launch" fand beim naechsten Start keinen Widerspruch -- das
+    // Logbuch ging auf, obwohl das Profil es zu haben wollte
+    // (Betreiber 2026-11-06, 05:49: "so nicht abgespeichert"). Und ein
+    // Profil OHNE jeden Contest-Eintrag (von vor dem 2026-11-05, wie sein
+    // "C") bekommt mit der naechsten Erfassung "kein Contest, Logbuch zu"
+    // -- was auf dem Schirm ist, ist die Wahrheit, und "at launch" hat
+    // dann nirgends mehr ein Loch, in das es hineinoeffnen koennte
+    // ("das Contestprogrammfenster, welches ich nie dort hatte").
     m_contestAnordnungGemerkt.clear();
+    m_contestAnordnungGemerkt.insert(QStringLiteral("contestPanels"), panels);
+    m_contestAnordnungGemerkt.insert(QStringLiteral("contestLogbook"), logbuch);
     if (panels.isEmpty() && !logbuch) {
         // Ein Profil ohne Contest -- oder eines von vor dem 2026-11-05.
         // Nur, was schon laeuft, wird weggeraeumt; geladen wird nichts.
