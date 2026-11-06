@@ -25,6 +25,8 @@
 #include <QJsonObject>
 #include <QAction>
 #include <QMenu>
+#include <QMouseEvent>
+#include <QPushButton>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QTemporaryDir>
@@ -34,6 +36,7 @@
 #include "gui/ConnectionPanel.h"
 #include "gui/LayoutProfiles.h"
 #include "gui/PanadapterApplet.h"
+#include "gui/applets/AppletVisibilityController.h"
 #include "gui/applets/KombiApplet.h"
 #include "FensterFrist.h"
 
@@ -393,6 +396,22 @@ private slots:
         QVERIFY2(!m_mw->kombiListeForTest(eins).contains(chatEintrag),
                  "was im zweiten Feld liegt, steht im ersten nicht zur Wahl");
 
+        // Es steht dort mit seinem Ort, und ein Klick holt es herueber
+        // (Betreiber 2026-11-06, "sehe hier nicht den chat").
+        const QString ausZwei = QStringLiteral("Chat (in Combined 2)");
+        QVERIFY2(m_mw->kombiListeForTest(eins).contains(ausZwei),
+                 "das Panel aus dem anderen Feld steht zur Wahl");
+        QVERIFY(m_mw->waehleKombiEintragForTest(eins, ausZwei));
+        QTest::qWait(100);
+        QVERIFY2(eins->seiten().contains(chat), "der Klick holt es ins erste Feld");
+        QVERIFY2(!zwei->seiten().contains(chat), "ein Panel hat nur einen Platz");
+        QVERIFY2(chat->isVisibleTo(eins), "und es ist dort zu sehen");
+        QVERIFY(m_mw->kombiListeForTest(zwei).contains(QStringLiteral("Chat (in Combined)")));
+        QVERIFY(m_mw->waehleKombiEintragForTest(zwei, QStringLiteral("Chat (in Combined)")));
+        QTest::qWait(100);
+        QVERIFY2(zwei->seiten().contains(chat), "und wieder zurueck");
+        QVERIFY(!eins->seiten().contains(chat));
+
         // Jedes Feld hat seinen eigenen Eintrag im Profil.
         profile->captureIntoCurrent();
         const QVariantMap erfasst = profile->snapshot(profile->current());
@@ -424,6 +443,107 @@ private slots:
         QTest::qWait(800);
         QVERIFY2(zwei->seiten().isEmpty(), "ein altes Profil laesst das zweite Feld leer");
         QVERIFY(eins->seiten().isEmpty());
+    }
+
+    // ── Fall: rueberziehen und entfernen (2026-11-06) ───────────────────
+    //
+    // Betreiber: "man sollte das auch wieder loeschen koennen", "oder
+    // rueberziehen". Der Zug laeuft durch die echten Mausereignisse des
+    // Reiters; entschieden wird beim Loslassen.
+    void reiterZiehenUndEntfernen()
+    {
+        KombiApplet* eins = m_mw->kombiFeldForTest(1);
+        KombiApplet* zwei = m_mw->kombiFeldForTest(2);
+        QVERIFY(eins && zwei);
+        auto* vis = m_mw->findChild<AppletVisibilityController*>();
+        QVERIFY(vis);
+        for (KombiApplet* f : {eins, zwei}) {
+            vis->setVisible(f->appletId(), true);
+            f->window()->show();
+            f->show();
+        }
+        QTest::qWait(300);
+        QVERIFY2(eins->isVisible() && zwei->isVisible(), "die Ziele muessen zu sehen sein");
+
+        m_mw->holeContestInsKombiFeldForTest(QStringLiteral("chat"), /*zweites=*/false);
+        QTest::qWait(200);
+        ContestFenster* bruecke = m_mw->contestFensterForTest();
+        QVERIFY(bruecke);
+        QWidget* chat = bruecke->panelFenster(QStringLiteral("chat"));
+        QVERIFY(eins->seiten().contains(chat));
+
+        const auto reiterVon = [](KombiApplet* f, const QString& text) -> QPushButton* {
+            for (QPushButton* b : f->findChildren<QPushButton*>()) {
+                if (b->text() == text && b->property("kombiSeite").isValid()) { return b; }
+            }
+            return nullptr;
+        };
+        const auto zieheNach = [](QPushButton* reiter, const QPoint& ziel) {
+            const QPoint start = reiter->rect().center();
+            const QPoint gStart = reiter->mapToGlobal(start);
+            QMouseEvent druck(QEvent::MouseButtonPress, QPointF(start), QPointF(gStart),
+                              Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+            QApplication::sendEvent(reiter, &druck);
+            QMouseEvent zug(QEvent::MouseMove, QPointF(start), QPointF(ziel),
+                            Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+            QApplication::sendEvent(reiter, &zug);
+            QMouseEvent los(QEvent::MouseButtonRelease, QPointF(start), QPointF(ziel),
+                            Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+            QApplication::sendEvent(reiter, &los);
+        };
+
+        // Es zaehlt, was unter dem Zeiger oben liegt. Fenster aus den
+        // Faellen davor duerfen die Felder nicht verdecken.
+        for (QWidget* t : QApplication::topLevelWidgets()) {
+            if (t != eins->window() && t != zwei->window() && t->isVisible()) { t->hide(); }
+        }
+        QTest::qWait(100);
+
+        // Im eigenen Feld losgelassen: nichts geschieht.
+        QPushButton* reiter = reiterVon(eins, QStringLiteral("Chat"));
+        QVERIFY(reiter);
+        zieheNach(reiter, eins->mapToGlobal(QPoint(eins->width() / 2, eins->height() / 2)));
+        QTest::qWait(100);
+        QVERIFY2(eins->seiten().contains(chat), "im eigenen Feld bleibt es");
+
+        // Ueber dem anderen Feld losgelassen: es wechselt.
+        reiter = reiterVon(eins, QStringLiteral("Chat"));
+        QVERIFY(reiter);
+        zieheNach(reiter, zwei->mapToGlobal(QPoint(zwei->width() / 2, zwei->height() / 2)));
+        QTest::qWait(100);
+        QVERIFY2(zwei->seiten().contains(chat), "rueberziehen legt es ins andere Feld");
+        QVERIFY(!eins->seiten().contains(chat));
+
+        // Auch aus dem Menue des Reiters.
+        QVERIFY(m_mw->waehleReiterEintragForTest(zwei, chat, QStringLiteral("Move to Combined")));
+        QVERIFY(eins->seiten().contains(chat));
+
+        // Remove: raus aus dem Feld, kein Fenster, wieder waehlbar.
+        QVERIFY(m_mw->waehleReiterEintragForTest(eins, chat, QStringLiteral("Remove")));
+        QTest::qWait(100);
+        QVERIFY(!eins->seiten().contains(chat));
+        QVERIFY(!bruecke->panelInFremdemGehaeuse(QStringLiteral("chat")));
+        QVERIFY2(!chat->isWindow(), "es bleibt kein Fenster zurueck");
+        QVERIFY2(m_mw->kombiListeForTest(eins).contains(QStringLiteral("Contest · Chat")),
+                 "es steht wieder zur Wahl");
+
+        // Ein Applet wechselt das Feld und geht auf demselben Weg.
+        const QString id = QStringLiteral("Frequency");
+        vis->setVisible(id, true);
+        QVERIFY(m_mw->waehleKombiEintragForTest(eins, QStringLiteral("Frequency")));
+        QTest::qWait(100);
+        QCOMPARE(eins->seiten().size(), 1);
+        QWidget* applet = eins->seiten().first();
+        QVERIFY(m_mw->waehleKombiEintragForTest(zwei, QStringLiteral("Frequency (in Combined)")));
+        QTest::qWait(100);
+        QVERIFY2(zwei->seiten().contains(applet), "das Applet wechselt das Feld");
+        QVERIFY2(applet->parentWidget() && zwei->isAncestorOf(applet),
+                 "und die Spalte haelt es nicht fest");
+        QVERIFY(m_mw->waehleReiterEintragForTest(zwei, applet, QStringLiteral("Remove")));
+        QTest::qWait(100);
+        QVERIFY(!zwei->seiten().contains(applet));
+        QVERIFY2(!vis->isVisible(id), "ein entferntes Applet ist aus");
+        vis->setVisible(id, true);
     }
 
     // ── Fall 7: "kein Contest" bleibt im Profil stehen (2026-11-06) ─────

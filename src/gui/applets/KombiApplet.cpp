@@ -310,12 +310,10 @@ void KombiApplet::reiterNeu()
         // Breite: dieser hier wird oft und im Vorbeigehen getroffen.
         b->setFixedHeight(24);
         b->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        b->setToolTip(tr("Show this panel. Right-click to take it out again."));
-        b->setContextMenuPolicy(Qt::CustomContextMenu);
+        b->setToolTip(tr("Show this panel. Drag it out, or onto another "
+                         "Combined. Right-click for more."));
         connect(b, &QPushButton::clicked, this,
                 [this, i]() { zeigeSeite(i); });
-        connect(b, &QWidget::customContextMenuRequested, this,
-                [this, w](const QPoint&) { gibFrei(w); });
         // Herausziehen: der Reiter selbst ist der Griff.
         b->installEventFilter(this);
         b->setProperty("kombiSeite", i);
@@ -359,14 +357,31 @@ bool KombiApplet::eventFilter(QObject* watched, QEvent* ev)
         auto* w = qobject_cast<QWidget*>(watched);
         if (w && (w == this || isAncestorOf(w))) {
             auto* ce = static_cast<QContextMenuEvent*>(ev);
+            // Ein Reiter hat sein eigenes Menue. Dieses Netz fing den
+            // Klick bisher vor ihm ab; das "Rechtsklick nimmt es heraus"
+            // des Tooltips lief deshalb nie (2026-11-06).
+            if (auto* reiter = qobject_cast<QPushButton*>(w);
+                reiter && m_reiter.contains(reiter)) {
+                const int i = reiter->property("kombiSeite").toInt();
+                const QList<QWidget*> alle = seiten();
+                if (i >= 0 && i < alle.size()) {
+                    emit reiterMenueGewuenscht(alle.at(i), ce->globalPos());
+                }
+                return true;
+            }
             emit listeGewuenscht(ce->globalPos());
             return true;        // nicht weiter nach oben
         }
         return false;
     }
 
+    // Der Filter haengt an der Anwendung: nur die EIGENEN Reiter zaehlen.
+    // Ohne diese Frage griff ein Druck auf irgendeinen Knopf die erste
+    // Seite, und schon ein kleiner Mausweg riss sie aus dem Feld.
     auto* knopf = qobject_cast<QPushButton*>(watched);
-    if (!knopf) { return AppletWidget::eventFilter(watched, ev); }
+    if (!knopf || !m_reiter.contains(knopf)) {
+        return AppletWidget::eventFilter(watched, ev);
+    }
 
     const int i = knopf->property("kombiSeite").toInt();
     const QList<QWidget*> alle = seiten();
@@ -383,18 +398,15 @@ bool KombiApplet::eventFilter(QObject* watched, QEvent* ev)
     case QEvent::MouseMove: {
         auto* me = static_cast<QMouseEvent*>(ev);
         if (!m_zugPanel || m_zugStart.isNull()) { break; }
-        const QPoint jetzt = me->globalPosition().toPoint();
-        if ((jetzt - m_zugStart).manhattanLength()
-                < QApplication::startDragDistance()) {
-            break;
+        if (!m_zugLaeuft) {
+            const QPoint jetzt = me->globalPosition().toPoint();
+            if ((jetzt - m_zugStart).manhattanLength()
+                    < QApplication::startDragDistance()) {
+                break;
+            }
+            m_zugLaeuft = true;
+            knopf->setCursor(Qt::ClosedHandCursor);
         }
-        QWidget* raus = m_zugPanel.data();
-        m_zugPanel = nullptr;
-        m_zugStart = QPoint();
-        // Erst aus dem Feld, dann die Stelle melden: wer zuhoert,
-        // bekommt ein Panel ohne Elternteil und eine Stelle dafuer.
-        gibFrei(raus);
-        emit herausgezogen(raus, jetzt);
         return true;
     }
     case QEvent::MouseButtonDblClick:
@@ -403,12 +415,48 @@ bool KombiApplet::eventFilter(QObject* watched, QEvent* ev)
         // selbst. Einfach klicken schaltet um, doppelt klappt auf.
         m_zugPanel = nullptr;
         m_zugStart = QPoint();
+        m_zugLaeuft = false;
         setAufgeklappt(!m_aufgeklappt);
         return true;
-    case QEvent::MouseButtonRelease:
+    case QEvent::MouseButtonRelease: {
+        // ── Entschieden wird beim Loslassen (2026-11-06) ─────────────
+        //
+        // Betreiber: "oder rueberziehen". Bis hierher loeste schon der
+        // erste Mausweg das Panel; ein Ziel konnte es so nie geben.
+        const bool zug = m_zugLaeuft;
+        QWidget* raus = m_zugPanel.data();
         m_zugPanel = nullptr;
         m_zugStart = QPoint();
-        break;
+        m_zugLaeuft = false;
+        if (!zug) { break; }
+        knopf->setCursor(Qt::PointingHandCursor);
+        knopf->setDown(false);
+        const QPoint jetzt =
+            static_cast<QMouseEvent*>(ev)->globalPosition().toPoint();
+        // Es zaehlt, was oben liegt. Das Ziel steht VOR dem Freigeben
+        // fest: danach schrumpft dieses Feld, und ein Nachbar in derselben
+        // Spalte rutscht unter dem Zeiger weg.
+        QWidget* oben = QApplication::widgetAt(jetzt);
+        KombiApplet* ziel = nullptr;
+        for (QWidget* w = oben; w && !ziel; w = w->parentWidget()) {
+            ziel = qobject_cast<KombiApplet*>(w);
+        }
+        if (!oben && QRect(mapToGlobal(QPoint(0, 0)), size()).contains(jetzt)) {
+            ziel = this;
+        }
+        // Im eigenen Feld losgelassen: es bleibt, wo es ist.
+        if (raus && ziel != this) {
+            // Erst aus dem Feld, dann melden: wer zuhoert, bekommt ein
+            // Panel ohne Elternteil.
+            gibFrei(raus);
+            if (ziel) {
+                emit herueberGezogen(raus, ziel);
+            } else {
+                emit herausgezogen(raus, jetzt);
+            }
+        }
+        return true;
+    }
     default:
         break;
     }

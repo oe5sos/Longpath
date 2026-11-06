@@ -161,6 +161,12 @@ signals:
     /// kennen musz. Was hineingeht, musz auf demselben Weg wieder
     /// hinaus.
     void herausgezogen(QWidget* panel, const QPoint& globalPos);
+    /// Ein Reiter wurde ueber einem ANDEREN Feld losgelassen (Betreiber
+    /// 2026-11-06: "oder rueberziehen"). Das Panel ist schon freigegeben.
+    void herueberGezogen(QWidget* panel, KombiApplet* ziel);
+    /// Rechtsklick auf einen Reiter: der Aufrufer zeigt, was mit dieser
+    /// Seite geschehen kann (anderes Feld, eigenes Fenster, entfernen).
+    void reiterMenueGewuenscht(QWidget* panel, const QPoint& globalPos);
     void seiteGewechselt(int welche);
 
 protected:
@@ -190,6 +196,7 @@ private:
     /// ein Herausziehen statt eines Klicks.
     QPoint m_zugStart;
     QPointer<QWidget> m_zugPanel;
+    bool m_zugLaeuft{false};
     QWidget* m_aufklapp{nullptr};   ///< traegt die Seiten, wenn offen
     bool     m_aufgeklappt{false};
 };
