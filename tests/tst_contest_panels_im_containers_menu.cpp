@@ -331,6 +331,46 @@ private slots:
                  "die Live-Anordnung mit dem Chat-Fenster muss in der Datei stehen");
         m_mw->contestFensterForTest()->dockePanel(QStringLiteral("chat"));
     }
+
+    // ── Fall 7: "kein Contest" bleibt im Profil stehen (2026-11-06) ─────
+    //
+    // Betreiber 05:49: "so nicht abgespeichert" -- das Logbuch war beim
+    // Start offen, obwohl das Profil "Logbuch zu" sagte. Beim Beenden
+    // einer Sitzung ohne geladenes Logbuch schrieb die Erfassung die
+    // Contest-Eintraege nicht mehr; das Profil verlor seine Aussage.
+    void keinContestBleibtImProfilStehen()
+    {
+        auto* profile = m_mw->findChild<LayoutProfiles*>();
+        QVERIFY(profile);
+        QVariantMap zustand = profile->snapshot(profile->current());
+        zustand.insert(QStringLiteral("contestPanels"), QVariantMap());
+        zustand.insert(QStringLiteral("contestLogbook"), false);
+        QVERIFY(profile->createWith(QStringLiteral("OhneContest"), zustand));
+        QVERIFY(profile->activate(QStringLiteral("OhneContest")));
+        QTest::qWait(500);
+
+        // Wie eine Sitzung, in der das Logbuch nie geladen wurde.
+        if (ContestFenster* b = m_mw->contestFensterForTest()) { b->schliesse(); QVERIFY(!b->istOffen()); }
+        profile->captureIntoCurrent();
+        const QVariantMap erfasst = profile->snapshot(QStringLiteral("OhneContest"));
+        QVERIFY2(erfasst.contains(QStringLiteral("contestPanels")),
+                 "die Aussage 'kein Contest' muss im Profil bleiben");
+        QCOMPARE(erfasst.value(QStringLiteral("contestLogbook")).toBool(), false);
+
+        // Ein Profil ganz ohne Contest-Eintrag (von vor dem 2026-11-05)
+        // bekommt mit der Erfassung "kein Contest, Logbuch zu".
+        QVariantMap alt = profile->snapshot(profile->current());
+        alt.remove(QStringLiteral("contestPanels"));
+        alt.remove(QStringLiteral("contestLogbook"));
+        QVERIFY(profile->createWith(QStringLiteral("Altes"), alt));
+        QVERIFY(profile->activate(QStringLiteral("Altes")));
+        QTest::qWait(500);
+        profile->captureIntoCurrent();
+        const QVariantMap altErfasst = profile->snapshot(QStringLiteral("Altes"));
+        QVERIFY2(altErfasst.contains(QStringLiteral("contestPanels")),
+                 "auch ein altes Profil sagt nach der Erfassung 'kein Contest'");
+        QCOMPARE(altErfasst.value(QStringLiteral("contestLogbook")).toBool(), false);
+    }
 };
 
 QTEST_MAIN(TestContestPanelsImContainersMenu)
