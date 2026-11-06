@@ -409,6 +409,39 @@ private slots:
         QCOMPARE(changed.count(), before);
     }
 
+    // 2026-11-06, Betreiber: "Zuletzt aktives". Was beim Beenden aktiv
+    // war, ist beim Start aktiv; fehlt es, gilt Profil 1.
+    void theStartIsTheLastActiveOne()
+    {
+        {
+            LayoutProfiles lp;
+            hook(lp);
+            m_live.insert(QStringLiteral("v"), QStringLiteral("standard"));
+            QVERIFY(lp.create(QStringLiteral("Neu")));
+            QVERIFY(lp.create(QStringLiteral("C")));
+            m_live.insert(QStringLiteral("v"), QStringLiteral("contest"));
+            lp.captureIntoCurrent();
+            lp.save();
+        }
+
+        LayoutProfiles again;
+        hook(again);
+        again.load();
+        QSignalSpy changed(&again, &LayoutProfiles::currentChanged);
+        again.startWithLastActive();
+        QCOMPARE(again.current(), QStringLiteral("C"));
+        QCOMPARE(changed.count(), 0);
+        again.applyCurrent();
+        QCOMPARE(m_live.value(QStringLiteral("v")).toString(), QStringLiteral("contest"));
+
+        // Das zuletzt aktive gibt es nicht mehr: Profil 1.
+        QVERIFY(again.remove(QStringLiteral("C")));
+        LayoutProfiles leer;
+        hook(leer);
+        leer.startWithLastActive();
+        QVERIFY(leer.current().isEmpty());   // ohne Profile nichts
+    }
+
     void abrokenFileLeavesTheProfilesAlone()
     {
         // Dieselbe Regel wie bei der Theme-Datei: eine beschaedigte

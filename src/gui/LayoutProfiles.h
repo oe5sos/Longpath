@@ -165,6 +165,12 @@ public:
     /// Fensters ueberschriebe das zuletzt aktive Profil mit der Vorgabe.
     /// Danach wie immer applyCurrent().
     void startWithFirst();
+    /// Beim Start gilt das zuletzt aktive Profil (Betreiber 2026-11-06,
+    /// "Zuletzt aktives" -- sein Contest-Profil ist "C", und Longpath kam
+    /// jeden Morgen mit "N" herauf). Kennt die Liste das zuletzt aktive
+    /// nicht mehr (geloescht, leere Datei), gilt wie bisher Profil 1.
+    /// Setzt nur m_current, ohne captureIntoCurrent(); danach applyCurrent().
+    void startWithLastActive();
 
     QVariantMap snapshot(const QString& name) const;
 
