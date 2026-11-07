@@ -107,7 +107,14 @@ public:
     /// CatRig). Verbindet und startet rigctld, auch wenn das Folgen auf
     /// der Einstellseite aus ist. Beim Abschalten bleibt die Verbindung
     /// nur stehen, wenn das Folgen dort an ist.
+    ///
+    /// In dieser Rolle ist das Geraet die Anzeige: gefragt wird im
+    /// kKatAbfrageMs-Takt statt im gemuetlichen Takt fuer die Marke. Jede
+    /// zweite Abfrage gilt der Frequenz, der VFO laeuft also mit rund 8
+    /// Schritten je Sekunde mit (Betreiber, 2026-11-07: "relativ
+    /// zeitverzoegert").
     void setCatBetrieb(bool an);
+    static constexpr int kKatAbfrageMs = 60;
     bool catBetrieb() const { return m_catBetrieb; }
 
     // ── Was das Geraet sagt ─────────────────────────────────────────

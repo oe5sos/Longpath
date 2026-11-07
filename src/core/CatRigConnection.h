@@ -117,12 +117,15 @@ private:
     void stoppeTon();
     void lieferBloecke();
     void schiebeAnDenTraeger(QVector<float>& iq);
+    void fuelleLeereSeite(QVector<float>& iq, const float* ton, int n);
 
     QString m_tonEingang;
     QAudioSource* m_quelle{nullptr};
     QIODevice*    m_tonGeraet{nullptr};
     int           m_kanaele{2};
     AudioZuIq     m_wandler;
+    AudioZuIq     m_fueller;
+    quint32       m_rauschZustand{0x2F6E2B1u};
     QVector<float> m_vorrat;
     std::atomic<bool> m_gespiegelt{false};
     std::atomic<double> m_traegerHz{0.0};

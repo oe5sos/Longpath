@@ -159,6 +159,36 @@ void CatRigConnection::schiebeAnDenTraeger(QVector<float>& iq)
     m_phase = std::remainder(m_phase, 2.0 * M_PI);
 }
 
+// ── Die leere Seite des Spektrums ───────────────────────────────
+//
+// Der Ton liegt nur auf einer Seite des Traegers, die andere ist bis auf
+// -185 dBm leer. Gemessen am 2026-11-07 am TS-590: Daten bei -120 dBm,
+// aber Skala und Wasserfall stellten sich auf -150 bis -190. Beide suchen
+// den Rauschflur ueber Perzentile aller Punkte und fanden ihn in der leeren
+// Haelfte, und das echte Bild fiel oben aus der Anzeige.
+//
+// Darum bekommt die leere Seite Rauschen in Hoehe des Tonpegels. Das ist
+// keine Korrektur an drei Automatiken, die fuer jedes SDR richtig liegen,
+// und hoeren kann man es nicht: das Filter des Demodulators laesst diese
+// Seite nicht durch (Spiegeldaempfung rund 65 dB, gemessen im Kettentest).
+void CatRigConnection::fuelleLeereSeite(QVector<float>& iq, const float* ton, int n)
+{
+    double summe = 0.0;
+    for (int i = 0; i < n; ++i) { summe += double(ton[i]) * ton[i]; }
+    const float pegel = static_cast<float>(std::sqrt(summe / n));
+
+    QVector<float> rauschen(n);
+    for (int i = 0; i < n; ++i) {
+        // Gleichverteilt in -1..1 hat den Effektivwert 1/sqrt(3).
+        m_rauschZustand = m_rauschZustand * 1664525u + 1013904223u;
+        const float zufall = static_cast<float>(m_rauschZustand >> 8) / 8388608.0f - 1.0f;
+        rauschen[i] = zufall * pegel * 1.732f;
+    }
+    m_fueller.setGespiegelt(!m_wandler.gespiegelt());
+    const QVector<float> gegenseite = m_fueller.verarbeite(rauschen.constData(), n);
+    for (qsizetype i = 0; i < iq.size(); ++i) { iq[i] += gegenseite[i]; }
+}
+
 void CatRigConnection::lieferBloecke()
 {
     m_wandler.setGespiegelt(m_gespiegelt.load());
@@ -167,6 +197,7 @@ void CatRigConnection::lieferBloecke()
     while (vorhanden - fertig >= kBlockProben) {
         QVector<float> block =
             m_wandler.verarbeite(m_vorrat.constData() + fertig, kBlockProben);
+        fuelleLeereSeite(block, m_vorrat.constData() + fertig, kBlockProben);
         fertig += kBlockProben;
         schiebeAnDenTraeger(block);
         emit iqDataReceived(/*hwReceiverIndex=*/0, block);

@@ -94,6 +94,7 @@ public:
     /// soll der Hand am Knopf folgen, nicht hinterherkriechen; ein
     /// Viertelsekundentakt auf der Rueckschleife kostet nichts.
     void setPollIntervalMs(int ms);
+    static constexpr int kStandardAbfrageMs = 250;
     int  pollIntervalMs() const { return m_pollMs; }
 
     /// Aelter als das, und die Frequenz wird nicht mehr angezeigt.
@@ -230,7 +231,7 @@ private:
     QTimer* m_poll{nullptr};
     QTimer* m_retry{nullptr};
     QTimer* m_deadline{nullptr};
-    int     m_pollMs{250};
+    int     m_pollMs{kStandardAbfrageMs};
     quint64 m_tick{0};
 
     State     m_state{State::Disconnected};

@@ -279,6 +279,43 @@ private slots:
         QVERIFY(bloecke.size() > 200);
     }
 
+    // Die leere Seite liess Skala und Wasserfall am 2026-11-07 auf -190 dB
+    // fallen, waehrend die Daten bei -120 lagen.
+    void dieGegenseiteDesTonsIstNichtLeer()
+    {
+        CatRigConnection verbindung;
+        QVector<float> gesammelt;
+        connect(&verbindung, &RadioConnection::iqDataReceived, this,
+                [&gesammelt](int, const QVector<float>& block) { gesammelt += block; });
+
+        // Weisses Rauschen als Ton: auf der Tonseite breitbandig.
+        constexpr int kProben = 48000;
+        QByteArray pcm(kProben * 2, Qt::Uninitialized);
+        auto* roh = reinterpret_cast<qint16*>(pcm.data());
+        quint32 z = 12345u;
+        for (int i = 0; i < kProben; ++i) {
+            z = z * 1664525u + 1013904223u;
+            roh[i] = static_cast<qint16>(int(z >> 16) - 32768) / 8;
+        }
+        verbindung.verarbeiteTon(pcm, 1);
+        QVERIFY(gesammelt.size() > 80000);
+
+        const auto band = [&gesammelt](double vonHz, double bisHz) {
+            double summe = 0.0;
+            int punkte = 0;
+            for (double hz = vonHz; hz < bisHz; hz += 137.0) {
+                const double e = energieBei(gesammelt, hz, 1000);
+                summe += e * e;
+                ++punkte;
+            }
+            return summe / punkte;
+        };
+        const double tonseite = band(1000.0, 8000.0);
+        const double gegenseite = band(-8000.0, -1000.0);
+        const double verhaeltnisDb = 10.0 * std::log10(gegenseite / tonseite);
+        QVERIFY2(std::abs(verhaeltnisDb) < 3.0, qPrintable(QString::number(verhaeltnisDb)));
+    }
+
     void ohneTonEingangSteigtDieVerbindungNichtAus()
     {
         CatRigConnection verbindung;
@@ -348,6 +385,7 @@ private slots:
         CompanionRigController rig;
         rig.setCatBetrieb(true);
         QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 3000);
+        QCOMPARE(rig.client()->pollIntervalMs(), CompanionRigController::kKatAbfrageMs);
         rig.client()->setPollIntervalMs(20);
 
         SliceModel scheibe;
@@ -474,7 +512,9 @@ private slots:
         qInfo() << "verschoben: Spitze" << spitzeHz() << "S" << sVerschoben;
         QVERIFY2(rahmen > 0, "kein Spektrum aus der Kette");
         QVERIFY2(std::abs(spitzeUsb - 1000.0) < 200.0, qPrintable(QString::number(spitzeUsb)));
-        QVERIFY2(sMeter > sMeterFalsch + 20.0,
+        // Nicht mehr: die Gegenseite traegt jetzt das Fuellrauschen, und das
+        // liegt hier im Durchlassbereich, weil der Ton falsch herum steht.
+        QVERIFY2(sMeter > sMeterFalsch + 6.0,
                  qPrintable(QStringLiteral("%1 gegen %2").arg(sMeter).arg(sMeterFalsch)));
         QVERIFY2(sVerschoben > sMeter - 6.0, qPrintable(QString::number(sVerschoben)));
 

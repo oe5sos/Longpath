@@ -320,9 +320,11 @@ void CompanionRigController::setCatBetrieb(bool an)
             AppSettings::instance().value(QStringLiteral("CompanionRigStartDaemon")),
             true);
         if (!verbunden()) { verbinde(); }
+        if (m_client) { m_client->setPollIntervalMs(kKatAbfrageMs); }
         return;
     }
 
+    if (m_client) { m_client->setPollIntervalMs(RigctldClient::kStandardAbfrageMs); }
     ladeEinstellungen();
     if (!m_eingeschaltet) { trenne(); }
 }

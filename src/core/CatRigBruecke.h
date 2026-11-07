@@ -47,10 +47,9 @@ class CatRigBruecke : public QObject {
     Q_OBJECT
 public:
     /// So lange zaehlen Meldungen vom Geraet nach einem Befehl nicht.
-    /// rigctld wird im Sekundentakt abgefragt, und ein Befehl braucht
-    /// einen Umlauf: eine Frist unter einem Takt liesse die alte
-    /// Frequenz durch.
-    static constexpr int kFristNachBefehlMs = 1500;
+    /// Ein Befehl braucht einen Umlauf durch rigctld und die naechste
+    /// Abfrage. Eine kuerzere Frist liesse die alte Frequenz durch.
+    static constexpr int kFristNachBefehlMs = 400;
 
     CatRigBruecke(CompanionRigController* rig, SliceModel* scheibe,
                   QObject* parent = nullptr);
