@@ -6595,7 +6595,15 @@ void MainWindow::buildUI()
         for (PanadapterApplet* applet : m_panStack->allApplets()) {
             if (applet) { applet->zeigeDasGeraet(); }
         }
-        if (m_appletVis) { m_appletVis->setVisible(QStringLiteral("CatRig"), true); }
+        // Nicht setVisible(): das steigt aus, wenn der gemerkte Zustand
+        // schon „sichtbar" sagt. Und sichtbar in einer Spalte, die das
+        // Profil gar nicht zeigt, ist unsichtbar -- im Profil CONTEST war
+        // das Feld so nicht zu erreichen (am Geraet gesehen, 2026-11-07).
+        // bringAppletToFront loest es dann als eigenes Fenster ab.
+        if (m_appletVis) {
+            m_appletVis->ensureVisible(QStringLiteral("CatRig"));
+            bringAppletToFront(QStringLiteral("CatRig"));
+        }
     });
 
     // Das Geraet meldet, Longpath zeigt: S-Meter und ON AIR kommen im

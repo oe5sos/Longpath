@@ -46,6 +46,8 @@
 #include "models/SliceModel.h"
 #include "core/FFTRouter.h"
 #include "gui/MainWindow.h"
+#include "gui/applets/AppletPanelWidget.h"
+#include "gui/applets/CatRigApplet.h"
 #include "gui/SpectrumWidget.h"
 
 using namespace Longpath;
@@ -121,6 +123,17 @@ private:
     }
 
     QTcpServer m_server;
+};
+
+// Eine verbundene CAT-Verbindung ohne Ton und ohne Hochlauf.
+class VerbundeneCatRig : public CatRigConnection
+{
+public:
+    explicit VerbundeneCatRig(const RadioInfo& info)
+    {
+        m_radioInfo = info;
+        setState(ConnectionState::Connected);
+    }
 };
 
 // Energie des Signals `hz` ueber dem Traeger, negativ darunter. Im
@@ -699,6 +712,39 @@ private slots:
         radio.disconnectFromRadio();
         QTRY_VERIFY_WITH_TIMEOUT(!radio.isConnected(), 10000);
         QVERIFY(!radio.companionRig()->catBetrieb());
+    }
+
+    // Im Profil CONTEST ist die Appletspalte nicht zu sehen. Das Feld stand
+    // dort „sichtbar" und war nicht zu erreichen; gesehen am Geraet.
+    void verbunden_geht_das_feld_auch_ohne_spalte_auf()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+        // Der gemerkte Zustand sagt schon „sichtbar", wie beim Betreiber.
+        stelleEin(QStringLiteral("AppletCatRigVisible"), QStringLiteral("True"));
+
+        auto* fenster = new MainWindow();   // bewusst nicht abgeraeumt
+        fenster->resize(1280, 800);
+        fenster->show();
+        QVERIFY(QTest::qWaitForWindowExposed(fenster, 20000));
+
+        auto* feld = fenster->findChild<CatRigApplet*>();
+        auto* spalte = fenster->findChild<AppletPanelWidget*>();
+        QVERIFY(feld);
+        QVERIFY(spalte);
+        spalte->hide();
+        QVERIFY(!feld->isVisible());
+
+        VerbundeneCatRig verbindung(*info);
+        RadioModel& radio = *fenster->radioModelForTest();
+        radio.injectConnectionForTest(&verbindung);
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+
+        QTRY_VERIFY_WITH_TIMEOUT(feld->isVisible(), 5000);
+        QVERIFY2(feld->window() != fenster, "das Feld blieb in der verdeckten Spalte");
+        radio.injectConnectionForTest(nullptr);
     }
 
     // Ueber die Pruef-Zugaenge und nicht ueber connectToRadio(): der volle
