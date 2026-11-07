@@ -47,7 +47,9 @@
 #include <QObject>
 #include <QString>
 #include <memory>
+#include <optional>
 
+#include "core/RadioDiscovery.h"
 #include "core/RigctldClient.h"
 
 namespace Longpath {
@@ -95,6 +97,19 @@ public:
     void verbinde();
     void trenne();
 
+    // ── Betrieb ohne SDR ───────────────────────────────────
+
+    /// Das eingestellte Geraet als Eintrag fuer das Verbinden-Fenster,
+    /// oder nichts, wenn kein Geraet mit Anschluss eingestellt ist.
+    static std::optional<RadioInfo> radioInfoAusEinstellungen();
+
+    /// Das Geraet wird als eigenes Funkgeraet gefuehrt (ProtocolVersion::
+    /// CatRig). Verbindet und startet rigctld, auch wenn das Folgen auf
+    /// der Einstellseite aus ist. Beim Abschalten bleibt die Verbindung
+    /// nur stehen, wenn das Folgen dort an ist.
+    void setCatBetrieb(bool an);
+    bool catBetrieb() const { return m_catBetrieb; }
+
     // ── Was das Geraet sagt ─────────────────────────────────────────
 
     RigctldClient* client() const { return m_client.get(); }
@@ -131,6 +146,10 @@ public:
     /// Darf ein Klick im Panadapter das fremde Geraet bewegen?
     bool darfAbstimmen() const;
 
+    /// Stellt die Betriebsart des fremden Geraets ("USB", "LSB", ...).
+    /// Gleiche Bedingungen wie stimmeAbZf().
+    void stelleModus(const QString& modus);
+
     /// Zeigt die eingestellte Adresse auf Longpaths EIGENEN
     /// rigctld-Server? Dann fragt Longpath sich selbst -- siehe den
     /// langen Kommentar in der Umsetzung.
@@ -144,6 +163,9 @@ public:
 signals:
     /// Das Geraet meldet eine andere ZF-Frequenz. Die Marke haengt hier.
     void zfFrequenzGeaendert(qint64 ifHz);
+
+    /// Das Geraet meldet eine andere Betriebsart.
+    void modusGeaendert(const QString& modus);
 
     /// Verbindung auf oder zu. Wer die Marke malt, blendet sie hier aus.
     void verbindungGeaendert(bool verbunden);
@@ -164,6 +186,7 @@ private:
     std::unique_ptr<RigctldClient>  m_client;
 
     bool    m_eingeschaltet{false};
+    bool    m_catBetrieb{false};
     bool    m_daemonSelbstStarten{false};
     int     m_modell{0};
     QString m_anschluss;

@@ -177,6 +177,24 @@ void RigctldClient::setFrequencyHz(qint64 hz)
     send(setFrequencyCommand(hz), Pending::Report);
 }
 
+QByteArray RigctldClient::setModeCommand(const QString& mode)
+{
+    const QString m = mode.trimmed().toUpper();
+    if (m.isEmpty()) { return {}; }
+    for (const QChar c : m) {
+        if (!c.isLetterOrNumber()) { return {}; }
+    }
+    return QStringLiteral("M %1 0\n").arg(m).toLatin1();
+}
+
+void RigctldClient::setMode(const QString& mode)
+{
+    if (!isConnected()) { return; }
+    const QByteArray befehl = setModeCommand(mode);
+    if (befehl.isEmpty()) { return; }
+    send(befehl, Pending::Report);
+}
+
 void RigctldClient::poll()
 {
     // Ein ausstehender Befehl auf einmal. Steht die letzte Antwort noch

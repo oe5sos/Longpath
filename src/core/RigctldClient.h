@@ -135,6 +135,10 @@ public:
     /// keine Verbindung steht.
     void setFrequencyHz(qint64 hz);
 
+    /// Das Geraet auf diese Betriebsart stellen ("USB", "LSB", ...).
+    /// Tut nichts, wenn keine Verbindung steht.
+    void setMode(const QString& mode);
+
     // ── Protokoll, als reine Funktionen ─────────────────────────────
 
     /// "145000000\n" -> 145000000. Liefert false fuer alles, was keine
@@ -162,6 +166,11 @@ public:
     /// und ein Gebietsschema mit Tausenderpunkten waere eine
     /// Ablehnung.
     static QByteArray setFrequencyCommand(qint64 hz);
+
+    /// Der Befehl fuer die Betriebsart. Die 0 laesst die Durchlassbreite
+    /// beim Geraet. Nur Buchstaben und Ziffern gehen durch, damit ein
+    /// Text nie zu einem zweiten Befehl wird; alles andere ergibt leer.
+    static QByteArray setModeCommand(const QString& mode);
 
 signals:
     void stateChanged(State s);

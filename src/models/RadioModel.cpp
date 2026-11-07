@@ -12952,6 +12952,15 @@ void RadioModel::installBandPlanMoxCheck()
     }
 
     m_moxController->setMoxCheck([this]() -> safety::BandPlanGuard::MoxCheckResult {
+        // Ein Geraet hinter CAT sendet an seiner eigenen Taste. Die
+        // Verbindung koennte ohnehin nicht tasten (CatRigConnection::
+        // setMox ist leer); hier bekommt der Betreiber den Grund zu sehen,
+        // statt einer MOX-Taste, die aufleuchtet und nichts tut.
+        if (m_lastRadioInfo.protocol == ProtocolVersion::CatRig) {
+            return {false, QStringLiteral("%1 transmits at the rig, not from Longpath")
+                               .arg(m_lastRadioInfo.name)};
+        }
+
         // ── The guard was reading a key nobody wrote ──────────────────
         //
         // 2026-08-14. This read "BandPlanRegion" and defaulted to
@@ -15563,8 +15572,33 @@ void RadioModel::saveSliceState(SliceModel* slice)
     m_transmitModel.save();
 }
 
+void RadioModel::starteCatBetriebWennNoetig()
+{
+    if (m_lastRadioInfo.protocol != ProtocolVersion::CatRig || !m_companionRig) {
+        return;
+    }
+    if (m_catRigBruecke) { return; }
+
+    m_companionRig->setCatBetrieb(true);
+    SliceModel* scheibe = m_activeSlice ? m_activeSlice
+                                        : (m_slices.isEmpty() ? nullptr : m_slices.first());
+    if (!scheibe) {
+        qCWarning(lcConnection) << "CAT rig connected without a slice";
+        return;
+    }
+    m_catRigBruecke = std::make_unique<CatRigBruecke>(m_companionRig.get(), scheibe);
+}
+
+void RadioModel::beendeCatBetrieb()
+{
+    m_catRigBruecke.reset();
+    if (m_companionRig) { m_companionRig->setCatBetrieb(false); }
+}
+
 void RadioModel::teardownConnection()
 {
+    beendeCatBetrieb();
+
     if (!m_connection) {
         return;
     }
@@ -16121,6 +16155,7 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
     switch (state) {
     case ConnectionState::Connected:
         qCDebug(lcConnection) << "Connected to" << m_name;
+        starteCatBetriebWennNoetig();
         // ── 3M-1c Phase L.2: TwoToneController power-on gate ─────────────────
         // The controller's setActive(true) refuses to engage unless powerOn
         // is true (mirrors !console.PowerOn at setup.cs:11063 [v2.10.3.13]).

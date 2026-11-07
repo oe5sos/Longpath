@@ -1426,11 +1426,23 @@ const BoardCapabilities kUnknown = {
 // Size bumped from 10 → 12 in Phase 3M-0 Task 1 (added kHermesLiteRxOnly,
 // kAndromeda). Bumped 12 → 13 in ANAN-G2E port (added kHermesC10). //N1GP G2E added
 // Bumped 13 → 14 for the SunSDR native driver (added kSunSdr2Qrp), 2026-08-26.
+// Ein Funkgeraet hinter CAT: kein I/Q, keine OpenHPSDR-Hardware, und
+// gesendet wird am Geraet. Darum die sicheren Vorgaben von kUnknown, nur
+// mit eigener Kennung und isRxOnlySku. Siehe core/CatRigConnection.h.
+const BoardCapabilities kCatRig = [] {
+    BoardCapabilities c = kUnknown;
+    c.board       = HPSDRHW::CatRig;
+    c.protocol    = ProtocolVersion::CatRig;
+    c.isRxOnlySku = true;
+    c.displayName = "CAT rig";
+    return c;
+}();
+
 // kUnknown remains last as the forBoard() fallback.
-const std::array<BoardCapabilities, 14> kTable = {
+const std::array<BoardCapabilities, 15> kTable = {
     kAtlas, kHermes, kHermesII, kAngelia, kOrion,
     kOrionMKII, kHermesC10, kHermesLite, kHermesLiteRxOnly,
-    kSaturn, kSaturnMKII, kAndromeda, kSunSdr2Qrp, kUnknown
+    kSaturn, kSaturnMKII, kAndromeda, kSunSdr2Qrp, kCatRig, kUnknown
 };
 
 } // anonymous namespace

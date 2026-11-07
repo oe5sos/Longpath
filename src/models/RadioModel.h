@@ -123,6 +123,7 @@
 // Vollstaendig noetig: QPointer<T> kann T nicht vorwaerts deklariert
 // benutzen (static_cast auf QObject*). Der Kopf ist winzig.
 #include "core/RotorController.h"
+#include "core/CatRigBruecke.h"
 #include "core/CompanionRigController.h"
 #include <QHash>
 #include <QObject>
@@ -4832,6 +4833,11 @@ private:
     QPointer<RotorController>             m_rotor;
     // Besessen -- siehe companionRig().
     std::unique_ptr<CompanionRigController> m_companionRig;
+    // Nur im Betrieb ohne SDR, siehe core/CatRigConnection.h. Steht hinter
+    // m_companionRig: die Bruecke geht beim Abbau zuerst.
+    std::unique_ptr<CatRigBruecke>          m_catRigBruecke;
+    void starteCatBetriebWennNoetig();
+    void beendeCatBetrieb();
     std::unique_ptr<SpotTableModel>       m_spotTableModel;
     std::unique_ptr<FreeDVStationModel>   m_freeDvStationModel;
     std::unique_ptr<RxDecodeModel>        m_rxDecodeModel;

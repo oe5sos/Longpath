@@ -186,7 +186,8 @@ private slots:
     void onTableDoubleClicked(int row, int column);
     void onContextMenuRequested(const QPoint& pos);
     void updateStatusStrip();       // Phase 3Q Task 5 — status strip update
-    void refreshLastSeenColumn();   // Phase 3Q Task 5 — periodic relative-time refresh
+    void refreshLastSeenColumn();
+    void aktualisiereCatZeile();   // Phase 3Q Task 5 — periodic relative-time refresh
 
 private:
     void buildUI();

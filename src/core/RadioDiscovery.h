@@ -104,7 +104,11 @@ enum class ProtocolVersion : int {
     // Weg, den ein echtes Geraet speist (Phase 3M, Variante A des
     // Plans). Nichts davon wird erkannt — eine solche RadioInfo
     // entsteht nur, wenn der Betreiber eine Datei oeffnet.
-    Playback  = 5
+    Playback  = 5,
+    // Ein klassisches Funkgeraet, nur per CAT gefuehrt: kein I/Q, kein
+    // Senden aus Longpath. Wird nicht im Netz erkannt, sondern aus den
+    // CompanionRig*-Einstellungen gebaut. Siehe core/CatRigConnection.h.
+    CatRig    = 6
 };
 
 // Information about a discovered OpenHPSDR radio.
