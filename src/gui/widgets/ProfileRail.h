@@ -43,6 +43,7 @@
 //                 AI-assisted via Anthropic Claude (Cowork).
 // =================================================================
 
+#include <QElapsedTimer>
 #include <QHash>
 #include <QPointer>
 #include <QString>
@@ -206,6 +207,7 @@ public:
     bool waehleImMenueForTest(const QString& profil, Eintrag eintrag);
     /// Das Menue bauen, ohne es zu zeigen -- fuer den Prueflauf, der
     /// nachsieht, ob ein Haken richtig dasteht.
+    QString letzterAusloeserForTest() const { return m_letzterAusloeser; }
     Menueteile baueMenueForTest(const QString& name, class QMenu& menu)
     { return baueMenue(name, menu); }
 
@@ -215,6 +217,11 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
+    void meldeAusloeser(const QString& name);
+    QElapsedTimer m_druckUhr;
+    QString m_letzteEingabe;      ///< wovon der naechste Klick kommt
+    QString m_letzterAusloeser;   ///< was zuletzt im Log stand
+
     // Je Abzeichen ein Loeschkreuz, sichtbar beim Ueberfahren.
     QHash<QString, QPushButton*> m_closers;
 

@@ -23,6 +23,9 @@
 // =================================================================
 
 #include <QtTest>
+#include <QKeyEvent>
+#include <QMouseEvent>
+#include <QPushButton>
 
 #include "gui/LayoutProfiles.h"
 #include "gui/styles/AppTheme.h"
@@ -424,6 +427,62 @@ private slots:
                      "die Schiene muss die andere Richtung melden, sonst "
                      "passiert beim Umschalten nichts");
         }
+    }
+
+    // ── Jeder Wechsel nennt seinen Ausloeser (2026-11-07) ────────────────
+    //
+    // Betreiber: "ich habe so definitiv longpath nicht verlassen!!!!" Das
+    // Log sagte, die Schiene habe gewechselt, und nicht, wodurch.
+    void einKlickNenntSeinenAusloeser()
+    {
+        LayoutProfiles profile;
+        QVERIFY(profile.create(QStringLiteral("Alpha")));
+        QVERIFY(profile.create(QStringLiteral("Beta")));
+        QVERIFY(profile.create(QStringLiteral("Gamma")));
+        ProfileRail rail(&profile, Qt::Horizontal);
+        rail.show();
+        const auto abzeichen = [&rail](const QString& text) -> QPushButton* {
+            for (QPushButton* b : rail.findChildren<QPushButton*>()) {
+                if (b->text() == text) { return b; }
+            }
+            return nullptr;
+        };
+
+        QPushButton* a = abzeichen(QStringLiteral("A"));
+        QVERIFY(a);
+        const QPoint mitte = a->rect().center();
+        const QPoint global = a->mapToGlobal(mitte);
+        QMouseEvent druck(QEvent::MouseButtonPress, QPointF(mitte), QPointF(global),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(a, &druck);
+        QMouseEvent los(QEvent::MouseButtonRelease, QPointF(mitte), QPointF(global),
+                        Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("^\\[ProfileClick\\]")));
+        QApplication::sendEvent(a, &los);
+        QCOMPARE(profile.current(), QStringLiteral("Alpha"));
+        QVERIFY2(rail.letzterAusloeserForTest().contains(QStringLiteral("Maus bei")),
+                 qPrintable(rail.letzterAusloeserForTest()));
+        QTest::qWait(10);
+
+        QPushButton* b = abzeichen(QStringLiteral("B"));
+        QVERIFY(b);
+        QKeyEvent runter(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier, QStringLiteral(" "));
+        QKeyEvent hoch(QEvent::KeyRelease, Qt::Key_Space, Qt::NoModifier, QStringLiteral(" "));
+        QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("^\\[ProfileClick\\]")));
+        QApplication::sendEvent(b, &runter);
+        QApplication::sendEvent(b, &hoch);
+        QCOMPARE(profile.current(), QStringLiteral("Beta"));
+        QVERIFY2(rail.letzterAusloeserForTest().contains(QStringLiteral("Taste")),
+                 qPrintable(rail.letzterAusloeserForTest()));
+        QTest::qWait(10);
+
+        QPushButton* g = abzeichen(QStringLiteral("G"));
+        QVERIFY(g);
+        QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("^\\[ProfileClick\\]")));
+        g->click();
+        QCOMPARE(profile.current(), QStringLiteral("Gamma"));
+        QVERIFY2(rail.letzterAusloeserForTest().contains(QStringLiteral("keine Eingabe")),
+                 qPrintable(rail.letzterAusloeserForTest()));
     }
 };
 
