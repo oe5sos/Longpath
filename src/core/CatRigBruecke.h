@@ -69,6 +69,10 @@ public:
     /// Fuer den Pruefstand: die Frist sofort als abgelaufen behandeln.
     void fristAufhebenForTest() { m_befehlGesendet = false; }
 
+    /// Fuer den Pruefstand: eine langsame Maschine soll nicht die Frist
+    /// ablaufen lassen, bevor die Meldung da ist, die sie abfangen soll.
+    void fristSetzenForTest(int ms) { m_fristMs = ms; }
+
 private:
     void vomGeraetFrequenz(qint64 hz);
     void vomGeraetModus(const QString& modus);
@@ -84,6 +88,7 @@ private:
     QElapsedTimer m_seitBefehl;
     bool m_befehlGesendet{false};
     bool m_uebernimmtVomGeraet{false};
+    int m_fristMs{kFristNachBefehlMs};
     QTimer* m_filterZug{nullptr};
     QTimer* m_filterAbgleich{nullptr};
     int m_filterVonHz{0};

@@ -98,7 +98,7 @@ QString CatRigBruecke::modusFuerGeraet(DSPMode modus)
 
 bool CatRigBruecke::fristLaeuft() const
 {
-    return m_befehlGesendet && m_seitBefehl.elapsed() < kFristNachBefehlMs;
+    return m_befehlGesendet && m_seitBefehl.elapsed() < m_fristMs;
 }
 
 void CatRigBruecke::vomGeraetFrequenz(qint64 hz)

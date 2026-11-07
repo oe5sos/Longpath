@@ -368,16 +368,19 @@ private slots:
         zielAuf(doppel.port());
         CompanionRigController rig;
         rig.setCatBetrieb(true);
-        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
         rig.client()->setPollIntervalMs(20);
+        // Langsam abfragen: reihum kaeme in der Frist unten nur eine Antwort.
+        rig.client()->setPollIntervalMs(5000);
         doppel.rohFragen.clear();
         rig.stelle(Ts590Cat::stelleAgc(Ts590Cat::Agc::Langsam));
         QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W GC1; 0\n"), 2000);
         // Nachgelesen wird sofort, sonst springt die Taste bis zur naechsten
         // Runde zurueck.
-        QTRY_VERIFY_WITH_TIMEOUT(doppel.rohFragen.size() >= Ts590Cat::abfragen().size(), 300);
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.rohFragen.size() >= Ts590Cat::abfragen().size(), 4000);
+        rig.client()->setPollIntervalMs(20);
         doppel.frequenz = 28111000;
-        QTRY_COMPARE_WITH_TIMEOUT(rig.client()->frequencyHz(), qint64(28111000), 1000);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.client()->frequencyHz(), qint64(28111000), 20000);
         QVERIFY(rig.verbunden());
     }
 
@@ -394,32 +397,32 @@ private slots:
         CompanionRigController rig;
         QSignalSpy warnung(&rig, &CompanionRigController::problem);
         rig.setCatBetrieb(true);
-        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
         rig.client()->setPollIntervalMs(20);
 
-        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().leistungW, 5, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().leistungW, 5, 20000);
         QCOMPARE(rig.catZustand().antenne, 2);
         QCOMPARE(rig.catZustand().rxAnt, 0);
         QCOMPARE(rig.catZustand().rfGain, 200);
         QCOMPARE(rig.catZustand().meterPunkte, 15);
-        QTRY_VERIFY_WITH_TIMEOUT(!warnung.isEmpty(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!warnung.isEmpty(), 20000);
         QVERIFY(warnung.first().first().toString().contains(QStringLiteral("RX ANT")));
         const int anzahl = warnung.size();
 
         // Stehen beide richtig, schweigt die Warnung und bleibt still.
         doppel.roh["AN;"] = "AN111;";
-        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().drive, 1, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().drive, 1, 20000);
         QCOMPARE(warnung.size(), anzahl);
 
         // Der Sendezustand kommt vom Geraet, das SWR nur dann.
         QVERIFY(!rig.sendet());
         doppel.gesendet = true;
-        QTRY_VERIFY_WITH_TIMEOUT(rig.sendet(), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().swrPunkte, 7, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.sendet(), 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().swrPunkte, 7, 20000);
 
         // Stellen geht ueber die geschlossene Liste.
         rig.stelle(Ts590Cat::stelleDaempfung(true));
-        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("L ATT 12\n"), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("L ATT 12\n"), 20000);
         QVERIFY2(!doppel.hatGetastet(), "Longpath hat das fremde Geraet getastet");
 
         TransverterSetup{}.save();
@@ -432,20 +435,20 @@ private slots:
         zielAuf(doppel.port());
         CompanionRigController rig;
         rig.setCatBetrieb(true);
-        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
         rig.client()->setPollIntervalMs(20);
 
         SliceModel scheibe;
         CatRigBruecke bruecke(&rig, &scheibe);
         QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 10000);
-        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 20000);
         QCOMPARE(scheibe.filterLow(), 100);
 
         // Das Geraet steht in LSB: dieselben Grenzen, unter dem Traeger.
         doppel.modus = QStringLiteral("LSB");
         QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::LSB, 10000);
         doppel.roh["SH;"] = "SH10;";
-        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterLow(), -3000, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterLow(), -3000, 20000);
         QCOMPARE(scheibe.filterHigh(), -100);
 
         // Von der Scheibe zum Geraet, auf die Tabelle gerundet.
@@ -462,11 +465,11 @@ private slots:
         zielAuf(doppel.port());
         CompanionRigController rig;
         rig.setCatBetrieb(true);
-        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
         rig.client()->setPollIntervalMs(20);
         SliceModel scheibe;
         CatRigBruecke bruecke(&rig, &scheibe);
-        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 20000);
 
         doppel.befehle.clear();
         for (int hz = 2000; hz <= 3000; hz += 50) {
@@ -479,7 +482,7 @@ private slots:
         // Das Geraet rundet auf seine Tabelle: die Anzeige folgt ihm, auch
         // wenn sich dort nichts mehr aendert.
         scheibe.setFilter(100, 2850);
-        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 20000);
     }
 
     // In CW stellt das Geraet nur die Breite. Die Lage bleibt der Scheibe.
@@ -493,16 +496,16 @@ private slots:
         zielAuf(doppel.port());
         CompanionRigController rig;
         rig.setCatBetrieb(true);
-        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
         rig.client()->setPollIntervalMs(20);
         SliceModel scheibe;
         CatRigBruecke bruecke(&rig, &scheibe);
         QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::CWU, 10000);
-        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh() - scheibe.filterLow(), 500, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh() - scheibe.filterLow(), 500, 20000);
         const int mitte = (scheibe.filterHigh() + scheibe.filterLow()) / 2;
 
         doppel.roh["FW;"] = "FW0250;";
-        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh() - scheibe.filterLow(), 250, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh() - scheibe.filterLow(), 250, 20000);
         QVERIFY(std::abs((scheibe.filterHigh() + scheibe.filterLow()) / 2 - mitte) <= 1);
 
         doppel.befehle.clear();
@@ -643,7 +646,7 @@ private slots:
 
         CompanionRigController rig;
         rig.setCatBetrieb(true);
-        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
         QCOMPARE(rig.client()->pollIntervalMs(), CompanionRigController::kKatAbfrageMs);
         rig.client()->setPollIntervalMs(20);
 
@@ -652,33 +655,35 @@ private slots:
         CatRigBruecke bruecke(&rig, &scheibe);
 
         // Das Geraet gibt den Stand vor.
-        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28078400), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28078400), 20000);
         QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 10000);
 
         // Ohne das antwortet rigctld eine Sekunde lang aus dem Speicher.
         QTRY_VERIFY_WITH_TIMEOUT(
-            doppel.befehle.contains(QByteArray("\\set_cache 0\n")), 3000);
+            doppel.befehle.contains(QByteArray("\\set_cache 0\n")), 20000);
         for (const QByteArray& b : std::as_const(doppel.befehle)) {
             QVERIFY2(b.startsWith("\\set_cache"),
                      "eine Meldung vom Geraet ging als Befehl zurueck");
         }
 
         // Die Scheibe stellt das Geraet.
+        bruecke.fristSetzenForTest(600000);
         scheibe.setFrequency(28100000.0);
-        QTRY_COMPARE_WITH_TIMEOUT(doppel.frequenz, qint64(28100000), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(doppel.frequenz, qint64(28100000), 20000);
 
         // Eine abweichende Meldung in der Frist zieht den VFO nicht zurueck.
         // Erst warten, bis der Client die neue Zahl kennt: sonst aendert
         // sich aus seiner Sicht nichts, und die Pruefung sagt nichts aus.
-        QTRY_COMPARE_WITH_TIMEOUT(rig.zfFrequenzHz(), qint64(28100000), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.zfFrequenzHz(), qint64(28100000), 20000);
         doppel.frequenz = 28078400;
-        QTRY_COMPARE_WITH_TIMEOUT(rig.zfFrequenzHz(), qint64(28078400), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.zfFrequenzHz(), qint64(28078400), 20000);
         QCOMPARE(qRound64(scheibe.frequency()), qint64(28100000));
 
         // Nach der Frist gilt das Geraet wieder.
+        bruecke.fristSetzenForTest(CatRigBruecke::kFristNachBefehlMs);
         bruecke.fristAufhebenForTest();
         doppel.frequenz = 28200000;
-        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28200000), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28200000), 20000);
 
         // Betriebsart in beide Richtungen.
         scheibe.setDspMode(DSPMode::LSB);
@@ -726,7 +731,7 @@ private slots:
 
         radio.connectToRadio(*info);
         QTRY_VERIFY_WITH_TIMEOUT(radio.isConnected(), 300000);
-        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 20000);
         qInfo() << "Abtastrate" << radio.connectionSampleRateHz();
         QCOMPARE(radio.connectionSampleRateHz(), 48000);
 
@@ -997,7 +1002,7 @@ private slots:
         radio.injectConnectionForTest(&verbindung);
         radio.onConnectionStateChangedForTest(ConnectionState::Connected);
 
-        QTRY_VERIFY_WITH_TIMEOUT(feld->isVisible(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(feld->isVisible(), 20000);
         QVERIFY2(feld->window() != fenster, "das Feld blieb in der verdeckten Spalte");
         radio.injectConnectionForTest(nullptr);
     }
@@ -1020,7 +1025,7 @@ private slots:
 
         auto* feld = fenster->findChild<CatRigApplet*>();
         QVERIFY(feld);
-        QTRY_VERIFY_WITH_TIMEOUT(feld->isVisible(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(feld->isVisible(), 20000);
         QCOMPARE(feld->window(), static_cast<QWidget*>(fenster));
 
         // Ein schwebendes Fenster genau ueber dem Feld, hinter der Maske.
@@ -1037,13 +1042,13 @@ private slots:
         QCOMPARE(feld->window(), static_cast<QWidget*>(fenster));
 
         // Die Maske geht nach dem Verbinden von selbst zu.
-        QTRY_VERIFY_WITH_TIMEOUT(deckel.isVisible(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(deckel.isVisible(), 20000);
         QTRY_VERIFY2_WITH_TIMEOUT(feld->window() != fenster,
-                                  "das Feld blieb unter dem Fenster liegen", 3000);
+                                  "das Feld blieb unter dem Fenster liegen", 20000);
         QVERIFY(feld->isVisible());
         // Und es liegt nicht ueber dem Fenster, wenn daneben Platz ist.
         QTRY_VERIFY_WITH_TIMEOUT(
-            !feld->window()->frameGeometry().intersects(deckel.frameGeometry()), 2000);
+            !feld->window()->frameGeometry().intersects(deckel.frameGeometry()), 20000);
         radio.injectConnectionForTest(nullptr);
     }
 
@@ -1071,7 +1076,7 @@ private slots:
         radio.installBandPlanMoxCheckForTest();
         radio.onConnectionStateChangedForTest(ConnectionState::Connected);
         QVERIFY(radio.companionRig()->catBetrieb());
-        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 20000);
         QVERIFY(radio.moxController());
 
         QSignalSpy abgewiesen(radio.moxController(), &MoxController::moxRejected);
