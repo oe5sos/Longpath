@@ -164,8 +164,17 @@ void CatRigBruecke::vonScheibeFilter(int low, int high)
         return;
     }
     m_filterBreiteHz = std::abs(high - low);
-    m_filterVonHz = std::min(std::abs(low), std::abs(high));
-    m_filterBisHz = std::max(std::abs(low), std::abs(high));
+    const bool unten = modus == DSPMode::LSB || modus == DSPMode::CWL;
+    m_filterVonHz = unten ? -high : low;
+    m_filterBisHz = unten ? -low : high;
+    // Die Filtertasten halten die Mitte fest. Bei einem schmaleren Filter
+    // liegt eine Kante dann jenseits des Traegers, das kennt das Geraet
+    // nicht. Es zaehlt die Breite: am Geraet gesehen wurde aus 2.9k sonst
+    // 2400 Hz.
+    if (m_filterVonHz < 0 && m_rig) {
+        m_filterVonHz = std::max(0, m_rig->catZustand().lowCutHz);
+        m_filterBisHz = m_filterVonHz + m_filterBreiteHz;
+    }
     m_befehlGesendet = true;
     m_seitBefehl.start();
     m_filterZug->start();

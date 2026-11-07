@@ -485,6 +485,39 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 20000);
     }
 
+    // Die Filtertasten halten die Mitte fest; eine Kante landet dabei jenseits
+    // des Traegers. Am 590 wurde aus 2.9k so 2400 Hz.
+    void filtertaste_ueber_den_traeger_behaelt_die_breite()
+    {
+        RigctldDoppel doppel;
+        doppel.modus = QStringLiteral("LSB");
+        doppel.roh["SL;"] = "SL01;";
+        doppel.roh["SH;"] = "SH07;";
+        zielAuf(doppel.port());
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::LSB, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterLow(), -2400, 20000);
+
+        doppel.befehle.clear();
+        scheibe.setFilter(-2675, 225);   // Mitte -1225, 2900 Hz breit
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W SH10; 0\n"), 20000);
+        QCOMPARE(doppel.befehle.size(), 1);   // die untere Kante bleibt 50 Hz
+
+        // Dasselbe in USB, auf der anderen Seite des Traegers.
+        doppel.roh["SH;"] = "SH10;";
+        doppel.modus = QStringLiteral("USB");
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 3000, 20000);
+        doppel.befehle.clear();
+        scheibe.setFilter(-175, 2225);   // 2400 Hz breit
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W SH07; 0\n"), 20000);
+    }
+
     // In CW stellt das Geraet nur die Breite. Die Lage bleibt der Scheibe.
     void in_cw_wird_die_breite_gestellt()
     {
