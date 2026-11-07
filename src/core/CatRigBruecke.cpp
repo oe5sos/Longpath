@@ -13,6 +13,7 @@
 #include "CatRigBruecke.h"
 
 #include "core/CompanionRigController.h"
+#include "core/TransverterSetup.h"
 #include "core/Ts590Cat.h"
 #include "models/SliceModel.h"
 
@@ -206,8 +207,20 @@ void CatRigBruecke::vonScheibeFrequenz(double hz)
 {
     if (!m_rig || m_uebernimmtVomGeraet) { return; }
     const qint64 ganz = std::llround(hz);
-    if (ganz == m_rig->zfFrequenzHz()) { return; }
-    m_rig->stimmeAbZf(ganz);
+    // Bandtaste oder Eingabe auf 2 m: das Geraet kennt nur die ZF, und die
+    // Scheibe gehoert auf dieselbe Frequenz wie das Geraet. Am 590 ohne
+    // Konverter gefunden: 144,300 MHz kam dort nie an.
+    const qint64 zf = TransverterSetup::current().ifFrequencyHz(ganz);
+    if (zf != ganz) {
+        QTimer::singleShot(0, this, [this, zf]() {
+            if (!m_scheibe) { return; }
+            m_uebernimmtVomGeraet = true;
+            m_scheibe->setFrequency(static_cast<double>(zf));
+            m_uebernimmtVomGeraet = false;
+        });
+    }
+    if (zf == m_rig->zfFrequenzHz()) { return; }
+    m_rig->stimmeAbZf(zf);
     m_befehlGesendet = true;
     m_seitBefehl.start();
 }

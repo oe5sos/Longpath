@@ -23,6 +23,7 @@
 
 #include <QtTest>
 #include <QComboBox>
+#include <QLabel>
 #include <QPushButton>
 #include <QSignalSpy>
 #include <QSlider>
@@ -41,6 +42,7 @@
 #include "core/MoxController.h"
 #include "core/RadioConnection.h"
 #include "core/RigctldClient.h"
+#include "core/RigctldServer.h"
 #include "core/RxChannel.h"
 #include "core/Ts590Cat.h"
 #include "core/TransverterSetup.h"
@@ -516,6 +518,33 @@ private slots:
         doppel.befehle.clear();
         scheibe.setFilter(-175, 2225);   // 2400 Hz breit
         QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W SH07; 0\n"), 20000);
+    }
+
+    // Bandtaste oder Eingabe auf 2 m: am Geraet muss die ZF ankommen.
+    void eine_eingabe_auf_2m_landet_auf_der_zf()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        TransverterSetup t;
+        t.enabled = true;
+        t.offsetHz = 116000000;
+        t.save();
+        TransverterSetup::setCurrent(t);
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28078400), 20000);
+
+        scheibe.setFrequency(144300000.0);
+        QTRY_COMPARE_WITH_TIMEOUT(doppel.frequenz, qint64(28300000), 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28300000), 20000);
+
+        t.enabled = false;
+        t.save();
+        TransverterSetup::setCurrent(t);
     }
 
     // In CW stellt das Geraet nur die Breite. Die Lage bleibt der Scheibe.
@@ -1005,6 +1034,93 @@ private slots:
 
         QCOMPARE(frage("f"), frequenzVorher);
         QCOMPARE(frage("t"), QByteArray("0"));
+    }
+
+    // Nur von Hand, am echten Geraet und ohne Konverter: der 590 steht auf der
+    // ZF, Longpath rechnet auf 2 m. Es wird nichts gesendet.
+    void trockenlauf_mit_transverter()
+    {
+        const int port = qEnvironmentVariableIntValue("LONGPATH_CAT_TROCKEN");
+        if (port <= 0) { QSKIP("Nur von Hand: LONGPATH_CAT_TROCKEN=<rigctld>"); }
+        zielAuf(static_cast<quint16>(port));
+        TransverterSetup t;
+        t.enabled = true;
+        t.offsetHz = 116000000;
+        t.save();
+        TransverterSetup::setCurrent(t);
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+
+        QTcpSocket leser;
+        leser.connectToHost(QHostAddress::LocalHost, static_cast<quint16>(port));
+        QVERIFY(leser.waitForConnected(3000));
+        const auto frage = [&leser](const QByteArray& zeile) {
+            leser.readAll();
+            leser.write(zeile + '\n');
+            QByteArray antwort;
+            for (int i = 0; i < 40 && !antwort.contains(';') && !antwort.contains('\n'); ++i) {
+                leser.waitForReadyRead(50);
+                antwort += leser.readAll();
+            }
+            return QByteArray(antwort).replace('\0', "").trimmed();
+        };
+        frage("\\set_cache 0");
+        leser.write("W MD2; 0\n");
+        leser.waitForReadyRead(500);
+        QCOMPARE(frage("F 28144000"), QByteArray("RPRT 0"));
+
+        auto* fenster = new MainWindow();   // bewusst nicht abgeraeumt
+        fenster->resize(1280, 800);
+        fenster->show();
+        QVERIFY(QTest::qWaitForWindowExposed(fenster, 20000));
+        VerbundeneCatRig verbindung(*info);
+        RadioModel& radio = *fenster->radioModelForTest();
+        radio.setLastRadioInfoForTest(*info);
+        radio.injectConnectionForTest(&verbindung);
+        if (radio.activeSlice() == nullptr) { radio.addSlice(); }
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        CompanionRigController* rig = radio.companionRig();
+        QTRY_VERIFY_WITH_TIMEOUT(rig->verbunden(), 10000);
+
+        // Das Geraet gibt den Stand vor: Scheibe auf der ZF, Anzeige auf 2 m.
+        QTRY_COMPARE_WITH_TIMEOUT(radio.vfoHz(0, 0), qint64(28144000), 10000);
+        QCOMPARE(rig->rfFrequenzHz(), qint64(144144000));
+        auto* flaeche = fenster->findChild<SpectrumWidget*>();
+        QVERIFY(flaeche);
+        QCOMPARE(qint64(flaeche->rfFuerAnzeigeForTest(28144000.0)), qint64(144144000));
+        qInfo().noquote() << "TROCKEN Anzeige" << rig->beschreibung();
+
+        // RX ANT und DRV sind aus: das Feld muss es rot sagen.
+        auto* feld = fenster->findChild<CatRigApplet*>();
+        QVERIFY(feld);
+        auto* wege = feld->findChild<QLabel*>(QStringLiteral("catRigWege"));
+        QVERIFY(wege);
+        QTRY_VERIFY_WITH_TIMEOUT(wege->text().contains(QStringLiteral("off")), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(!wege->styleSheet().isEmpty(), 10000);
+        qInfo().noquote() << "TROCKEN Warnung" << wege->text() << wege->styleSheet();
+
+        // Ein Klick im Logbuch: es rechnet 144,250 auf die ZF und schickt 28,250.
+        RigctldServer server(&radio);
+        QVERIFY(server.start(QHostAddress::LocalHost, 45321));
+        QTcpSocket logbuch;
+        logbuch.connectToHost(QHostAddress::LocalHost, 45321);
+        QVERIFY(logbuch.waitForConnected(3000));
+        logbuch.write("F 28250000\n");
+        QTRY_COMPARE_WITH_TIMEOUT(frage("f"), QByteArray("28250000"), 5000);
+        qInfo().noquote() << "TROCKEN Logbuch 144.250 -> Geraet" << frage("f");
+
+        // Eine Eingabe auf 2 m, etwa die Bandtaste: am Geraet muss die ZF landen.
+        radio.setVfoHz(0, 0, 144300000);
+        QTRY_COMPARE_WITH_TIMEOUT(frage("f"), QByteArray("28300000"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(radio.vfoHz(0, 0), qint64(28300000), 5000);
+        qInfo().noquote() << "TROCKEN Eingabe 144.300 -> Geraet" << frage("f");
+
+        QCOMPARE(frage("t"), QByteArray("0"));
+        radio.onConnectionStateChangedForTest(ConnectionState::Disconnected);
+        radio.injectConnectionForTest(nullptr);
+        t.enabled = false;
+        t.save();
+        TransverterSetup::setCurrent(t);
     }
 
     // Im Profil CONTEST ist die Appletspalte nicht zu sehen. Das Feld stand
