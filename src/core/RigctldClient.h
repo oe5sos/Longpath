@@ -260,6 +260,7 @@ private:
     QByteArray m_rohHaeufig;
     QByteArray m_rohBeimSenden;
     int     m_rohIndex{0};
+    int     m_rohRunde{0};
     int     m_geraderTakt{0};
 
     State     m_state{State::Disconnected};

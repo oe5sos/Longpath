@@ -237,11 +237,13 @@ void RigctldClient::poll()
             send(QByteArrayLiteral("t\n"), Pending::Ptt);
         } else if (schritt == 1 || schritt == 3) {
             if (schritt == 3 && !m_ptt) {
-                if (m_rohIndex >= m_rohListe.size()) {
-                    m_rohIndex = 0;
+                // Die Betriebsart jedes dritte Mal: sie soll dem Knopf am
+                // Geraet folgen und nicht auf die ganze Liste warten.
+                if (++m_rohRunde % 3 == 0) {
                     send(QByteArrayLiteral("m\n"), Pending::Mode);
                     return;
                 }
+                if (m_rohIndex >= m_rohListe.size()) { m_rohIndex = 0; }
                 send(QByteArrayLiteral("w ") + m_rohListe.at(m_rohIndex++) + '\n',
                      Pending::Roh);
             } else if (schritt == 3) {

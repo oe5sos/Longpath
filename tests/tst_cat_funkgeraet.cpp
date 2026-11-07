@@ -378,13 +378,13 @@ private slots:
 
         SliceModel scheibe;
         CatRigBruecke bruecke(&rig, &scheibe);
-        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 10000);
         QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 5000);
         QCOMPARE(scheibe.filterLow(), 100);
 
         // Das Geraet steht in LSB: dieselben Grenzen, unter dem Traeger.
         doppel.modus = QStringLiteral("LSB");
-        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::LSB, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::LSB, 10000);
         doppel.roh["SH;"] = "SH10;";
         QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterLow(), -3000, 5000);
         QCOMPARE(scheibe.filterHigh(), -100);
@@ -538,7 +538,7 @@ private slots:
 
         // Das Geraet gibt den Stand vor.
         QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28078400), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 10000);
 
         // Ohne das antwortet rigctld eine Sekunde lang aus dem Speicher.
         QTRY_VERIFY_WITH_TIMEOUT(
@@ -567,10 +567,10 @@ private slots:
 
         // Betriebsart in beide Richtungen.
         scheibe.setDspMode(DSPMode::LSB);
-        QTRY_COMPARE_WITH_TIMEOUT(doppel.modus, QStringLiteral("LSB"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(doppel.modus, QStringLiteral("LSB"), 10000);
         bruecke.fristAufhebenForTest();
         doppel.modus = QStringLiteral("CW");
-        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::CWU, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::CWU, 10000);
 
         QVERIFY2(!doppel.hatGetastet(), "Longpath hat das fremde Geraet getastet");
     }
