@@ -1052,6 +1052,38 @@ private slots:
         radio.injectConnectionForTest(nullptr);
     }
 
+    // Ein Klick im Contest-Teil geht ueber den Rig-Server auf die Scheibe.
+    // Von dort muss er beim Geraet ankommen.
+    void abstimmen_ueber_die_scheibe_erreicht_das_geraet()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+
+        auto* fenster = new MainWindow();   // bewusst nicht abgeraeumt
+        fenster->resize(1280, 800);
+        fenster->show();
+        QVERIFY(QTest::qWaitForWindowExposed(fenster, 20000));
+
+        VerbundeneCatRig verbindung(*info);
+        RadioModel& radio = *fenster->radioModelForTest();
+        radio.setLastRadioInfoForTest(*info);
+        radio.injectConnectionForTest(&verbindung);
+        if (radio.activeSlice() == nullptr) { radio.addSlice(); }
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 20000);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.vfoHz(0, 0) == doppel.frequenz, 20000);
+
+        doppel.befehle.clear();
+        radio.setVfoHz(0, 0, 28144000);
+        QTRY_COMPARE_WITH_TIMEOUT(doppel.frequenz, qint64(28144000), 20000);
+        QVERIFY(!doppel.hatGetastet());
+
+        radio.onConnectionStateChangedForTest(ConnectionState::Disconnected);
+        radio.injectConnectionForTest(nullptr);
+    }
+
     void freierPlatz_meidet_was_belegt_ist()
     {
         const QRect flaeche(0, 0, 400, 300);
