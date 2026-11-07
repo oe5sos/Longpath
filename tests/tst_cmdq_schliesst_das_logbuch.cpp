@@ -27,6 +27,7 @@
 #include <QTemporaryDir>
 
 #include "gui/MainWindow.h"
+#include "gui/applets/KombiApplet.h"
 #include "ContestFenster.h"
 #include "FensterFrist.h"
 
@@ -94,6 +95,15 @@ private slots:
         ContestFenster* bruecke = fenster->contestFensterForTest();
         QVERIFY2(bruecke, "der Haken muss das Logbuch laden");
         QVERIFY2(bruecke->istOffen(), "ohne offenes Logbuch sagte die Pruefung nichts");
+
+        // Das Protokollfeld in Combined, das schwebt: so stand es, wenn
+        // Longpath beim Beenden abstuerzte. Das Gehaeuse wurde geloescht,
+        // und ~MainWindow des Logbuchs griff in das tote Feld.
+        fenster->holeContestInsKombiFeldForTest(QStringLiteral("unifiedlog"));
+        QTest::qWait(100);
+        QVERIFY(bruecke->panelInFremdemGehaeuse(QStringLiteral("unifiedlog")));
+        fenster->detachAppletForTest(fenster->kombiFeldForTest(1));
+        QTest::qWait(100);
 
         fenster->close();
 

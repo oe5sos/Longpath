@@ -13,9 +13,14 @@
 #include "CatRigBruecke.h"
 
 #include "core/CompanionRigController.h"
+#include "core/Ts590Cat.h"
 #include "models/SliceModel.h"
 
+#include <QTimer>
+
+#include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace Longpath {
 
@@ -25,6 +30,19 @@ CatRigBruecke::CatRigBruecke(CompanionRigController* rig, SliceModel* scheibe,
     , m_rig(rig)
     , m_scheibe(scheibe)
 {
+    m_filterZug = new QTimer(this);
+    m_filterZug->setSingleShot(true);
+    m_filterZug->setInterval(kFilterZugMs);
+    connect(m_filterZug, &QTimer::timeout, this, &CatRigBruecke::schickeFilter);
+
+    // Die Antwort auf das Nachlesen kommt noch in der Frist und zaehlt dort
+    // nicht. Ohne diesen Abgleich bliebe die Anzeige auf dem verlangten Wert
+    // stehen, obwohl das Geraet auf seine Tabelle gerundet hat.
+    m_filterAbgleich = new QTimer(this);
+    m_filterAbgleich->setSingleShot(true);
+    m_filterAbgleich->setInterval(kFristNachBefehlMs + 50);
+    connect(m_filterAbgleich, &QTimer::timeout, this, &CatRigBruecke::vomGeraetFilter);
+
     if (!rig || !scheibe) { return; }
 
     connect(rig, &CompanionRigController::zfFrequenzGeaendert,
@@ -35,6 +53,10 @@ CatRigBruecke::CatRigBruecke(CompanionRigController* rig, SliceModel* scheibe,
             this, &CatRigBruecke::vonScheibeFrequenz);
     connect(scheibe, &SliceModel::dspModeChanged,
             this, &CatRigBruecke::vonScheibeModus);
+    connect(rig, &CompanionRigController::catZustandGeaendert,
+            this, &CatRigBruecke::vomGeraetFilter);
+    connect(scheibe, &SliceModel::filterChanged,
+            this, &CatRigBruecke::vonScheibeFilter);
 
     // Beim Verbinden gibt das Geraet den Stand vor, nicht die Scheibe.
     if (const qint64 hz = rig->zfFrequenzHz(); hz > 0) {
@@ -76,7 +98,7 @@ QString CatRigBruecke::modusFuerGeraet(DSPMode modus)
 
 bool CatRigBruecke::fristLaeuft() const
 {
-    return m_befehlGesendet && m_seitBefehl.elapsed() < kFristNachBefehlMs;
+    return m_befehlGesendet && m_seitBefehl.elapsed() < m_fristMs;
 }
 
 void CatRigBruecke::vomGeraetFrequenz(qint64 hz)
@@ -96,6 +118,88 @@ void CatRigBruecke::vomGeraetModus(const QString& modus)
     m_uebernimmtVomGeraet = true;
     m_scheibe->setDspMode(m);
     m_uebernimmtVomGeraet = false;
+}
+
+// Filtergrenzen gibt es am Geraet als Abstand vom Traeger. Die Scheibe rechnet
+// vorzeichenbehaftet: in LSB liegt das Filter unter dem Traeger.
+void CatRigBruecke::vomGeraetFilter()
+{
+    if (!m_rig || !m_scheibe || fristLaeuft()) { return; }
+    const Ts590Cat::Zustand& z = m_rig->catZustand();
+
+    const DSPMode modus = m_scheibe->dspMode();
+    if (modus == DSPMode::CWU || modus == DSPMode::CWL) {
+        // In CW kennt das Geraet nur die Breite. Die Lage bleibt der Scheibe.
+        if (z.cwBreiteHz <= 0) { return; }
+        const int mitte = (m_scheibe->filterLow() + m_scheibe->filterHigh()) / 2;
+        const int unten = mitte - z.cwBreiteHz / 2;
+        const int oben = unten + z.cwBreiteHz;
+        if (m_scheibe->filterLow() == unten && m_scheibe->filterHigh() == oben) { return; }
+        m_uebernimmtVomGeraet = true;
+        m_scheibe->setFilter(unten, oben);
+        m_uebernimmtVomGeraet = false;
+        return;
+    }
+    if (z.lowCutHz < 0 || z.highCutHz < 0) { return; }
+    int low = z.lowCutHz;
+    int high = z.highCutHz;
+    if (modus == DSPMode::LSB) {
+        low = -z.highCutHz;
+        high = -z.lowCutHz;
+    } else if (modus != DSPMode::USB) {
+        return;   // nur SSB: die Tabellen der anderen Betriebsarten weichen ab
+    }
+    if (m_scheibe->filterLow() == low && m_scheibe->filterHigh() == high) { return; }
+    m_uebernimmtVomGeraet = true;
+    m_scheibe->setFilter(low, high);
+    m_uebernimmtVomGeraet = false;
+}
+
+void CatRigBruecke::vonScheibeFilter(int low, int high)
+{
+    if (!m_rig || !m_scheibe || m_uebernimmtVomGeraet) { return; }
+    const DSPMode modus = m_scheibe->dspMode();
+    if (modus != DSPMode::USB && modus != DSPMode::LSB
+        && modus != DSPMode::CWU && modus != DSPMode::CWL) {
+        return;
+    }
+    m_filterBreiteHz = std::abs(high - low);
+    const bool unten = modus == DSPMode::LSB || modus == DSPMode::CWL;
+    m_filterVonHz = unten ? -high : low;
+    m_filterBisHz = unten ? -low : high;
+    // Die Filtertasten halten die Mitte fest. Bei einem schmaleren Filter
+    // liegt eine Kante dann jenseits des Traegers, das kennt das Geraet
+    // nicht. Es zaehlt die Breite: am Geraet gesehen wurde aus 2.9k sonst
+    // 2400 Hz.
+    if (m_filterVonHz < 0 && m_rig) {
+        m_filterVonHz = std::max(0, m_rig->catZustand().lowCutHz);
+        m_filterBisHz = m_filterVonHz + m_filterBreiteHz;
+    }
+    m_befehlGesendet = true;
+    m_seitBefehl.start();
+    m_filterZug->start();
+}
+
+void CatRigBruecke::schickeFilter()
+{
+    if (!m_rig) { return; }
+    const Ts590Cat::Zustand& z = m_rig->catZustand();
+    const DSPMode modus = m_scheibe ? m_scheibe->dspMode() : DSPMode::USB;
+    if (modus == DSPMode::CWU || modus == DSPMode::CWL) {
+        if (Ts590Cat::naechsteCwBreite(m_filterBreiteHz) != z.cwBreiteHz) {
+            m_rig->stelle(Ts590Cat::stelleCwBreite(m_filterBreiteHz));
+        }
+    } else {
+        if (Ts590Cat::naechsterLowCut(m_filterVonHz) != z.lowCutHz) {
+            m_rig->stelle(Ts590Cat::stelleLowCut(m_filterVonHz));
+        }
+        if (Ts590Cat::naechsterHighCut(m_filterBisHz) != z.highCutHz) {
+            m_rig->stelle(Ts590Cat::stelleHighCut(m_filterBisHz));
+        }
+    }
+    m_befehlGesendet = true;
+    m_seitBefehl.start();
+    m_filterAbgleich->start();
 }
 
 void CatRigBruecke::vonScheibeFrequenz(double hz)

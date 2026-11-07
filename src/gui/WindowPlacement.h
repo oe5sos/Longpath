@@ -39,6 +39,7 @@
 #include <functional>
 
 #include <QList>
+#include <QObject>
 #include <QPoint>
 #include <QRect>
 #include <QSize>
@@ -304,6 +305,32 @@ void fitIntoAvailableScreen(QWidget* w);
 QRect ausSperrstreifenSchieben(const QRect& wunsch,
                                const QList<QRect>& sperren,
                                const QRect& platz);
+
+// ── Jeder Mausdruck im Programm (2026-11-07) ─────────────────────────
+//
+// Auf der Anwendung, weil ein Druck an das Kind geht, das darunter liegt.
+// Teuer ist das nicht: alles ausser dem Druck faellt in der ersten Zeile
+// durch. Liefert `melder` wahr, wird der Druck geschluckt.
+class KlickHoltNachVorne : public QObject {
+public:
+    KlickHoltNachVorne(std::function<bool(QWidget*)> melder, QObject* eltern);
+protected:
+    bool eventFilter(QObject* ziel, QEvent* ereignis) override;
+private:
+    std::function<bool(QWidget*)> m_melder;
+};
+
+// ── Ein freier Platz (2026-11-07) ────────────────────────────────────
+//
+// Betreiber zum CAT-Feld: „wieder ein window, welches ich nicht oeffnen
+// kann." Ein Fenster, das von selbst aufgeht, legt sich nicht ueber die
+// Anordnung, wenn daneben Platz ist.
+//
+// Die erste Lage von `groesse` in `flaeche`, die keines der Rechtecke in
+// `belegt` schneidet, zeilenweise von links oben auf dem Raster `schritt`.
+// Gibt es keine, kommt ein leeres Rechteck zurueck.
+QRect freierPlatz(const QSize& groesse, const QRect& flaeche,
+                  const QList<QRect>& belegt, int schritt = 16);
 
 // ── „Ich werde gerade gezogen" (2026-10-14) ──────────────────────────
 //

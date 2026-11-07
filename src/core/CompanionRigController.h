@@ -51,6 +51,7 @@
 
 #include "core/RadioDiscovery.h"
 #include "core/RigctldClient.h"
+#include "core/Ts590Cat.h"
 
 namespace Longpath {
 
@@ -153,6 +154,16 @@ public:
     /// Darf ein Klick im Panadapter das fremde Geraet bewegen?
     bool darfAbstimmen() const;
 
+    /// Was das Geraet zuletzt gemeldet hat. Leer, solange es kein TS-590S
+    /// im Betrieb ohne SDR ist.
+    const Ts590Cat::Zustand& catZustand() const { return m_catZustand; }
+
+    /// Sendet das Geraet gerade? Es meldet das, Longpath loest es nie aus.
+    bool sendet() const { return m_sendet; }
+
+    /// Schickt eine Zeile aus core/Ts590Cat.h ans Geraet.
+    void stelle(const QByteArray& zeile);
+
     /// Stellt die Betriebsart des fremden Geraets ("USB", "LSB", ...).
     /// Gleiche Bedingungen wie stimmeAbZf().
     void stelleModus(const QString& modus);
@@ -171,6 +182,12 @@ signals:
     /// Das Geraet meldet eine andere ZF-Frequenz. Die Marke haengt hier.
     void zfFrequenzGeaendert(qint64 ifHz);
 
+    /// catZustand() hat sich geaendert.
+    void catZustandGeaendert();
+
+    /// Das Geraet sendet, oder es hat aufgehoert.
+    void sendetGeaendert(bool sendet);
+
     /// Das Geraet meldet eine andere Betriebsart.
     void modusGeaendert(const QString& modus);
 
@@ -188,12 +205,17 @@ signals:
 private:
     void baueClient();
     void starteDaemonWennGewuenscht();
+    void rohAntwortLesen(const QByteArray& antwort);
+    void pruefeTransverterWege();
 
     std::unique_ptr<RigctldProcess> m_proc;
     std::unique_ptr<RigctldClient>  m_client;
 
     bool    m_eingeschaltet{false};
     bool    m_catBetrieb{false};
+    bool    m_sendet{false};
+    bool    m_wegeWarnung{false};
+    Ts590Cat::Zustand m_catZustand;
     bool    m_daemonSelbstStarten{false};
     int     m_modell{0};
     QString m_anschluss;

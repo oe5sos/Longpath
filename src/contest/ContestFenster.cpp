@@ -183,6 +183,9 @@ bool ContestFenster::lade(QString* grund, QWidget* elternFenster)
     }
 
     auto steuerung = std::make_unique<Contestprogramm::AppController>();
+    // CAT kommt hier von Longpath selbst; ein zweiter rigctld wuerde ihm
+    // den Anschluss wegnehmen.
+    steuerung->setRigctldSelbstStarten(false);
     QString fehler;
     if (!steuerung->openDatabase(Contestprogramm::datenbankPfad(ordner), &fehler)) {
         if (grund) {
@@ -502,7 +505,14 @@ void ContestFenster::schliesse()
         // Hauptfenster (2026-11-04), nicht mehr am Logbuch: vor dem
         // Loeschen zurueck in die Flaeche, sonst ueberlebten sie es mit
         // totem Controller.
+        //
+        // Dasselbe fuer ein Panel in einem fremden Gehaeuse (Combined): geht
+        // das Gehaeuse zuerst, stirbt das Panel mit ihm, und ~MainWindow des
+        // Logbuchs greift in einen toten Zeiger. So endeten seit dem
+        // 2026-11-04 acht Beenden in einem Absturz, jedesmal VOR der letzten
+        // Sicherung.
         for (const PanelEintrag& e : panels()) {
+            if (panelInFremdemGehaeuse(e.id)) { nimmPanelZurueck(e.id, QRect()); }
             if (f->istPanelSchwebend(e.id)) { f->setzePanelSchwebend(e.id, false); }
         }
         m_innen->fenster = nullptr;

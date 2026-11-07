@@ -394,6 +394,9 @@ void MeterPoller::poll()
     for (int bindingId = MeterBinding::SignalPeak;
          bindingId <= MeterBinding::AgcAvg; ++bindingId) {
         double value = m_rxChannel->getMeter(static_cast<RxMeterType>(bindingId));
+        const bool istS = bindingId == MeterBinding::SignalPeak
+                       || bindingId == MeterBinding::SignalAvg;
+        if (istS && m_externesS) { value = *m_externesS - rxOffsetDb; }
         // Apply RXOffset to SignalPeak / SignalAvg only (matches Thetis
         // console.cs:46824 + :46828, NOT :46831-:46835).
         if (bindingId == MeterBinding::SignalPeak
@@ -461,9 +464,13 @@ void MeterPoller::pollSliceSMeters()
         RxChannel* ch = m_wdspEngine->rxChannel(sliceId);
         if (!ch) { continue; }
         emit sliceSmeterUpdated(
-            sliceId, ch->getMeter(RxMeterType::SignalAvg) + rxOffsetDb);
+            sliceId, m_externesS ? *m_externesS
+                                 : ch->getMeter(RxMeterType::SignalAvg) + rxOffsetDb);
     }
 }
+
+void MeterPoller::setExternesSMeter(double dbm) { m_externesS = dbm; }
+void MeterPoller::loescheExternesSMeter() { m_externesS.reset(); }
 
 void MeterPoller::pollSMeter()
 {
@@ -485,8 +492,9 @@ void MeterPoller::pollSMeter()
     // S-Meter-Wert" braucht, und haengt an keiner Anzeige.
     if (!m_rxChannel) { return; }
     const double rxOffsetDb = m_rxOffsetSource ? m_rxOffsetSource() : 0.0;
-    emit smeterUpdated(m_rxChannel->getMeter(RxMeterType::SignalAvg)
-                       + rxOffsetDb);
+    emit smeterUpdated(m_externesS ? *m_externesS
+                                   : m_rxChannel->getMeter(RxMeterType::SignalAvg)
+                                         + rxOffsetDb);
 }
 
 // Poll the four WDSP TX meters active in 3M-1a and push to meter widget targets.
