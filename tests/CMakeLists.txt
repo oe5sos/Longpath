@@ -5986,6 +5986,7 @@ longpath_add_test(tst_anf_tuning)
 # -- rotctld command line and the curated controller list: loopback
 #    only, no stray -r, and ARCO/ERC reachable from the picker --
 longpath_add_test(tst_rotctld_process)
+longpath_add_test(tst_daemon_ueberlebt_beenden_nicht)
 
 # -- Installing Hamlib for the operator: reading `rotctl --list` and
 #    `--version` by shape rather than by column, and the rule that the
@@ -6799,10 +6800,12 @@ endif()
 if(LONGPATH_CONTESTPROGRAMM)
     longpath_add_test(tst_contestfenster)
     longpath_add_test(tst_contest_panels_im_containers_menu)
+    longpath_add_test(tst_cmdq_schliesst_das_logbuch)
     # Qt6::Sql kommt ueber das Submodul (find_package dort); der Pruefstand
     # belegt das Log vorab ueber SQLite, ohne Koepfe des Contestprogramms.
     target_link_libraries(tst_contestfenster PRIVATE Qt6::Sql)
     target_link_libraries(tst_contest_panels_im_containers_menu PRIVATE Qt6::Sql)
+    target_link_libraries(tst_cmdq_schliesst_das_logbuch PRIVATE Qt6::Sql)
 endif()
 
 # ── Phase 3J-1 Task 17.1: TX audio binary pipeline + single-client mutex ──────

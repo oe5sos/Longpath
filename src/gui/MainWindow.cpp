@@ -21494,6 +21494,16 @@ void MainWindow::closeEvent(QCloseEvent* event)
     }
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
 
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // Das Logbuch JETZT zumachen und nicht erst im Destruktor: bei Cmd+Q
+    // und quit() laeuft ~ContestFenster nie (exit() kommt noch in diesem
+    // closeEvent, gemessen 2026-11-07). Die letzte Log-Sicherung haengt
+    // am Abbau des Controllers und fiele sonst aus. Die Stelle steht
+    // bewusst hier hinten: so ist alles andere im selben Zustand wie beim
+    // roten Punkt, nur der Zeitpunkt ist frueher.
+    if (m_contestFenster) { m_contestFenster->schliesse(); }
+#endif
+
     event->accept();
 
     // Ask Qt for an orderly exit from the event loop. Previously called

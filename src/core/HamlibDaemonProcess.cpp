@@ -11,6 +11,9 @@
 //                gemacht. Der Rumpf ist unveraendert; nur dort, wo
 //                vorher "rotctld" stand, steht jetzt m_binaryName.
 //                KI-gestuetzt ueber Anthropic Claude Code.
+//   2026-11-07 — Der Daemon stirbt mit dem Programm, auch auf dem Weg
+//                ueber exit(), auf dem kein Destruktor laeuft. Martin
+//                Fischer, KI-gestuetzt ueber Anthropic Claude Code.
 // =================================================================
 
 #include "HamlibDaemonProcess.h"
@@ -20,6 +23,12 @@
 #include <QLoggingCategory>
 #include <QStandardPaths>
 #include <QTcpServer>
+
+#if defined(Q_OS_UNIX)
+#include <csignal>
+#include <cstdlib>
+#include <sys/types.h>
+#endif
 
 namespace Longpath {
 
@@ -44,6 +53,55 @@ quint16 anyFreeLoopbackPort()
     return probe.serverPort();
 }
 
+// ── Der Daemon stirbt mit dem Programm ──────────────────────────────
+//
+// Gemessen am 2026-11-07 (Qt 6.11, macOS): Cmd+Q und
+// QCoreApplication::quit() enden in [NSApp terminate:], und das ruft
+// exit() noch innerhalb von closeEvent(). aboutToQuit feuert nicht,
+// app.exec() kehrt nicht zurueck, das MainWindow auf dem Stapel von
+// main() wird nie zerstoert. Nur atexit laeuft; einzig der rote Punkt
+// geht den ordentlichen Weg.
+//
+// Auf diesen beiden Wegen erreicht ~HamlibDaemonProcess() den Daemon
+// also nie. Er bleibt als Waise zurueck und haelt den seriellen
+// Anschluss -- der naechste Start scheitert dann an etwas, das mit dem
+// Geraet nichts zu tun hat.
+//
+// Darum diese Liste, an atexit gehaengt. Absichtlich kein Warten: der
+// Daemon schliesst den Anschluss bei SIGTERM selbst, und im exit() gibt
+// es niemanden mehr, der auf ihn warten sollte. Die Liste wird nie
+// freigegeben, weil sie sonst vor dem atexit-Haken sterben koennte. Sie
+// wird nur aus dem Hauptfaden angefasst, wie QProcess hier auch.
+#if defined(Q_OS_UNIX)
+QList<qint64>& laufendeDaemons()
+{
+    static auto* liste = new QList<qint64>;
+    return *liste;
+}
+
+void beendeUebrigeDaemons()
+{
+    for (const qint64 pid : laufendeDaemons()) {
+        ::kill(static_cast<pid_t>(pid), SIGTERM);
+    }
+}
+
+void merkeDaemon(qint64 pid)
+{
+    static const int einmal = std::atexit(beendeUebrigeDaemons);
+    Q_UNUSED(einmal);
+    laufendeDaemons().append(pid);
+}
+
+void vergissDaemon(qint64 pid)
+{
+    laufendeDaemons().removeOne(pid);
+}
+#else
+void merkeDaemon(qint64) {}
+void vergissDaemon(qint64) {}
+#endif
+
 } // namespace
 
 HamlibDaemonProcess::HamlibDaemonProcess(QString binaryName,
@@ -55,6 +113,9 @@ HamlibDaemonProcess::HamlibDaemonProcess(QString binaryName,
 {
     connect(&m_proc, &QProcess::finished, this,
             [this](int code, QProcess::ExitStatus) {
+        vergissDaemon(m_gemerktePid);
+        m_gemerktePid = 0;
+
         const QString err =
             QString::fromLocal8Bit(m_proc.readAllStandardError()).trimmed();
         if (m_stopRequested) {
@@ -232,6 +293,8 @@ bool HamlibDaemonProcess::start(int hamlibModel, const QString& device,
         }
         return false;
     }
+    m_gemerktePid = m_proc.processId();
+    merkeDaemon(m_gemerktePid);
     qCInfo(lcHamlibDaemon) << "started" << binary << m_proc.arguments();
     return true;
 }
