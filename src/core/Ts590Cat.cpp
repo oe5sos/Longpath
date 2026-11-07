@@ -129,11 +129,13 @@ QByteArray stelleRfGain(int wert)
 
 QByteArray stelleAgc(Agc agc)
 {
-    // Hamlibs Zahlen, nicht die des Geraets: 0 aus, 2 schnell, 3 langsam.
+    // Nicht `L AGC`: Hamlib 4.7.2 meldet dort RPRT 0, und das Geraet bleibt
+    // stehen; am TS-590S gemessen. `W ... 0` schickt roh und wartet auf
+    // nichts, `w` dagegen liefe 400 ms in die Zeitgrenze von rigctld.
     switch (agc) {
-    case Agc::Aus:     return QByteArrayLiteral("L AGC 0\n");
-    case Agc::Langsam: return QByteArrayLiteral("L AGC 3\n");
-    case Agc::Schnell: return QByteArrayLiteral("L AGC 2\n");
+    case Agc::Aus:     return QByteArrayLiteral("W GC0; 0\n");
+    case Agc::Langsam: return QByteArrayLiteral("W GC1; 0\n");
+    case Agc::Schnell: return QByteArrayLiteral("W GC2; 0\n");
     }
     return {};
 }

@@ -22,7 +22,10 @@
 // =================================================================
 
 #include <QtTest>
+#include <QComboBox>
+#include <QPushButton>
 #include <QSignalSpy>
+#include <QSlider>
 #include <QTcpServer>
 #include <QTcpSocket>
 
@@ -88,6 +91,7 @@ public:
             if (t.startsWith("T ") || t.startsWith("\\set_ptt") || t.startsWith("b ")) {
                 return true;
             }
+            if (t.startsWith("W ") && !t.startsWith("W GC")) { return true; }
             for (const char* verboten : {"w TX", "w KY", "w PB", "w PS", "w EX", "w PC1", "l RFPOWER"}) {
                 if (t.startsWith(verboten)) { return true; }
             }
@@ -113,6 +117,10 @@ private:
                 if (roh.contains(frage)) { s->write(roh.value(frage) + '\0'); }
                 else { s->write("RPRT -1\n"); }
                 rohFragen.append(frage);
+            } else if (t.startsWith("W ")) {
+                // Wie rigctld: kein RPRT, nur ein Nullbyte.
+                befehle.append(zeile);
+                s->write(QByteArray(1, '\0'));
             } else {
                 befehle.append(zeile);
                 if (t.startsWith("F ")) { frequenz = t.mid(2).toLongLong(); }
@@ -323,7 +331,7 @@ private slots:
         }
         const QByteArrayList zeilen = {
             Ts590Cat::stelleVorverstaerker(true), Ts590Cat::stelleDaempfung(true),
-            Ts590Cat::stelleRfGain(128), Ts590Cat::stelleAgc(Ts590Cat::Agc::Schnell),
+            Ts590Cat::stelleRfGain(128),
             Ts590Cat::stelleNb(true), Ts590Cat::stelleNr(true),
             Ts590Cat::stelleLowCut(100), Ts590Cat::stelleHighCut(2800)};
         for (const QByteArray& z : zeilen) {
@@ -331,8 +339,32 @@ private slots:
             QVERIFY2(!z.contains("RFPOWER") && !z.contains("PTT"), z.constData());
         }
         QCOMPARE(Ts590Cat::stelleRfGain(255), QByteArray("L RF 1.000\n"));
+        QCOMPARE(Ts590Cat::stelleAgc(Ts590Cat::Agc::Aus), QByteArray("W GC0; 0\n"));
+        QCOMPARE(Ts590Cat::stelleAgc(Ts590Cat::Agc::Langsam), QByteArray("W GC1; 0\n"));
+        QCOMPARE(Ts590Cat::stelleAgc(Ts590Cat::Agc::Schnell), QByteArray("W GC2; 0\n"));
         QCOMPARE(Ts590Cat::punkteZuDbm(15), -73.0);
         QCOMPARE(Ts590Cat::naechsterHighCut(2850), 2800);
+    }
+
+    // Die Antwort auf `W` ist ein Nullbyte. Bleibt das liegen, steht die
+    // ganze Abfrage bis zur Antwortwache still.
+    void agc_haelt_die_abfrage_nicht_auf()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 3000);
+        rig.client()->setPollIntervalMs(20);
+        doppel.rohFragen.clear();
+        rig.stelle(Ts590Cat::stelleAgc(Ts590Cat::Agc::Langsam));
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W GC1; 0\n"), 2000);
+        // Nachgelesen wird sofort, sonst springt die Taste bis zur naechsten
+        // Runde zurueck.
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.rohFragen.size() >= Ts590Cat::abfragen().size(), 300);
+        doppel.frequenz = 28111000;
+        QTRY_COMPARE_WITH_TIMEOUT(rig.client()->frequencyHz(), qint64(28111000), 1000);
+        QVERIFY(rig.verbunden());
     }
 
     void derZustandKommtVomGeraetUndWarntAmTransverter()
@@ -712,6 +744,94 @@ private slots:
         radio.disconnectFromRadio();
         QTRY_VERIFY_WITH_TIMEOUT(!radio.isConnected(), 10000);
         QVERIFY(!radio.companionRig()->catBetrieb());
+    }
+
+    // Nur von Hand, am echten Geraet: die Tasten des Feldes druecken und am
+    // Geraet nachlesen. Ohne Fenster; rigctld laeuft auf dem Port aus der
+    // Umgebung. Am Ende steht alles wie vorher, nur RF Gain ist offen.
+    void feld_am_echten_geraet()
+    {
+        const int port = qEnvironmentVariableIntValue("LONGPATH_CAT_FELD_PORT");
+        if (port <= 0) { QSKIP("Nur von Hand: LONGPATH_CAT_FELD_PORT=<rigctld>"); }
+        zielAuf(static_cast<quint16>(port));
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+
+        QTcpSocket leser;
+        leser.connectToHost(QHostAddress::LocalHost, static_cast<quint16>(port));
+        QVERIFY(leser.waitForConnected(3000));
+        const auto frage = [&leser](const QByteArray& zeile) {
+            leser.readAll();
+            leser.write(zeile + '\n');
+            QByteArray antwort;
+            for (int i = 0; i < 40 && !antwort.contains(';') && !antwort.contains('\n'); ++i) {
+                leser.waitForReadyRead(50);
+                antwort += leser.readAll();
+            }
+            return QByteArray(antwort).replace('\0', "").trimmed();
+        };
+        leser.write("\\set_cache 0\n");
+        leser.waitForReadyRead(500);
+        const QByteArray frequenzVorher = frage("f");
+
+        RadioModel radio;
+        radio.setLastRadioInfoForTest(*info);
+        radio.installBandPlanMoxCheckForTest();
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 5000);
+
+        CatRigApplet feld(&radio);
+        // Eine ganze Runde der Abfrageliste, damit das Feld den Stand kennt.
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->catZustand().rfGain >= 0, 5000);
+        QTest::qWait(800);
+
+        const auto taste = [&](const char* name, const QByteArray& abfrage) {
+            auto* knopf = feld.findChild<QPushButton*>(QLatin1String(name));
+            QVERIFY(knopf);
+            const QByteArray vorher = frage(abfrage);
+            const bool stand = knopf->isChecked();
+            knopf->click();
+            QTRY_VERIFY2_WITH_TIMEOUT(frage(abfrage) != vorher, name, 3000);
+            const QByteArray geschaltet = frage(abfrage);
+            QTRY_COMPARE_WITH_TIMEOUT(knopf->isChecked(), !stand, 3000);
+            knopf->click();
+            QTRY_VERIFY2_WITH_TIMEOUT(frage(abfrage) == vorher, name, 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(knopf->isChecked(), stand, 3000);
+            qInfo().noquote() << "FELD" << name << vorher << "->" << geschaltet << "->" << vorher;
+        };
+        taste("catRigAtt", "w RA;");
+        taste("catRigNb", "w NB;");
+        taste("catRigNr", "w NR;");
+        taste("catRigPreamp", "w PA;");
+
+        auto* agc = feld.findChild<QComboBox*>(QStringLiteral("catRigAgc"));
+        QVERIFY(agc);
+        const QByteArray agcVorher = frage("w GC;");
+        const int agcStand = agc->currentIndex();
+        const int agcAnders = agcStand == 1 ? 2 : 1;
+        agc->setCurrentIndex(agcAnders);
+        emit agc->activated(agcAnders);
+        QTRY_VERIFY_WITH_TIMEOUT(frage("w GC;") != agcVorher, 3000);
+        const QByteArray agcGeschaltet = frage("w GC;");
+        agc->setCurrentIndex(agcStand);
+        emit agc->activated(agcStand);
+        QTRY_COMPARE_WITH_TIMEOUT(frage("w GC;"), agcVorher, 3000);
+        qInfo().noquote() << "FELD AGC" << agcVorher << "->" << agcGeschaltet << "->" << agcVorher;
+
+        auto* rf = feld.findChild<QSlider*>(QStringLiteral("catRigRfGain"));
+        QVERIFY(rf);
+        const QByteArray meterVorher = frage("w SM0;");
+        const QByteArray rfVorher = frage("w RG;");
+        rf->setValue(255);
+        emit rf->sliderReleased();
+        QTRY_COMPARE_WITH_TIMEOUT(frage("w RG;"), QByteArray("RG255;"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(radio.companionRig()->catZustand().rfGain, 255, 500);
+        QCOMPARE(rf->value(), 255);
+        qInfo().noquote() << "FELD RF" << rfVorher << "->" << frage("w RG;")
+                          << "S-Meter" << meterVorher << "->" << frage("w SM0;");
+
+        QCOMPARE(frage("f"), frequenzVorher);
+        QCOMPARE(frage("t"), QByteArray("0"));
     }
 
     // Im Profil CONTEST ist die Appletspalte nicht zu sehen. Das Feld stand

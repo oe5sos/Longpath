@@ -147,6 +147,9 @@ public:
     /// Eine fertige Zeile fuer rigctld schicken. Nur fuer Zeilen aus
     /// core/Ts590Cat.h: dort steht die geschlossene Liste.
     void schickeZeile(const QByteArray& zeile);
+    /// Die Rohabfragen sofort, nicht reihum: eine Runde dauert fast zwei
+    /// Sekunden, und solange spraengen Tasten auf den alten Stand zurueck.
+    void frageRohListeNach();
 
     /// Schaltet den Zwischenspeicher von rigctld ab. Ab Werk beantwortet
     /// Hamlib eine Frequenzfrage eine Sekunde lang aus dem Speicher
@@ -220,7 +223,7 @@ signals:
     void replyTimedOut();
 
 private:
-    enum class Pending { None, Frequency, Mode, Ptt, Report, Roh };
+    enum class Pending { None, Frequency, Mode, Ptt, Report, Roh, Nullbyte };
 
     void send(const QByteArray& command, Pending expect);
     void pump();

@@ -201,7 +201,16 @@ void RigctldClient::setRohAbfragen(const QList<QByteArray>& liste,
 void RigctldClient::schickeZeile(const QByteArray& zeile)
 {
     if (!isConnected() || zeile.isEmpty()) { return; }
-    send(zeile, Pending::Report);
+    // `W` meldet kein RPRT: es kommt nur ein Nullbyte zurueck.
+    send(zeile, zeile.startsWith("W ") ? Pending::Nullbyte : Pending::Report);
+}
+
+void RigctldClient::frageRohListeNach()
+{
+    if (!isConnected()) { return; }
+    for (const QByteArray& frage : std::as_const(m_rohListe)) {
+        send(QByteArrayLiteral("w ") + frage + '\n', Pending::Roh);
+    }
 }
 
 void RigctldClient::schalteZwischenspeicherAus()
@@ -297,6 +306,18 @@ void RigctldClient::onReadyRead()
     m_buffer += m_socket.readAll();
 
     while (m_awaiting != Pending::None) {
+        if (m_awaiting == Pending::Nullbyte) {
+            const qsizetype null = m_buffer.indexOf('\0');
+            const qsizetype zeile = m_buffer.indexOf('\n');
+            if (null < 0 && zeile < 0) { return; }
+            const qsizetype ende = (null >= 0 && (zeile < 0 || null < zeile)) ? null : zeile;
+            m_buffer.remove(0, ende + 1);
+            m_awaiting = Pending::None;
+            m_deadline->stop();
+            pump();
+            continue;
+        }
+
         // Eine Rohantwort endet nicht mit einem Zeilenumbruch: rigctld gibt
         // weiter, was das Geraet schickt, "PA10;" und eine Null dahinter.
         if (m_awaiting == Pending::Roh) {
@@ -399,6 +420,7 @@ void RigctldClient::onReadyRead()
             break;
         }
         case Pending::Roh:     // oben erledigt, kommt hier nie an
+        case Pending::Nullbyte:
         case Pending::None:
             break;
         }

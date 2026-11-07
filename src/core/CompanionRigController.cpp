@@ -296,6 +296,7 @@ void CompanionRigController::stelle(const QByteArray& zeile)
 {
     if (!darfAbstimmen()) { return; }
     m_client->schickeZeile(zeile);
+    m_client->frageRohListeNach();
 }
 
 void CompanionRigController::rohAntwortLesen(const QByteArray& antwort)
