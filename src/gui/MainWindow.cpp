@@ -6582,6 +6582,20 @@ void MainWindow::buildUI()
         }
     });
 
+    // Ein Geraet hinter CAT hat keinen KiwiSDR neben sich. Stand der
+    // Panadapter noch aus einer anderen Sitzung auf KIWI, verwarf er jeden
+    // Rahmen des Geraets, und das Bild blieb leer (gemessen 2026-11-07).
+    connect(m_radioModel, &RadioModel::connectionStateChanged, this, [this]() {
+        const RadioConnection* verbindung = m_radioModel->connection();
+        if (!m_panStack || !m_radioModel->isConnected() || !verbindung
+            || verbindung->radioInfo().protocol != ProtocolVersion::CatRig) {
+            return;
+        }
+        for (PanadapterApplet* applet : m_panStack->allApplets()) {
+            if (applet) { applet->zeigeDasGeraet(); }
+        }
+    });
+
     // Phase 3Q-8: clicking the spectrum while disconnected opens ConnectionPanel.
     connect(activeSpectrumWidget(), &SpectrumWidget::disconnectedClickRequest,
             this, &MainWindow::showConnectionPanel);

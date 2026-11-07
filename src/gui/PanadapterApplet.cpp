@@ -431,10 +431,7 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     // lassen" (Betreiber, 2026-08-27). Turning it back on stays a
     // deliberate right-click menu action, not a click on an absent pill.
     connect(m_statusOverlay, &SpectrumStatusOverlay::kiwiBadgeClicked, this,
-            [this]() {
-        m_spectrum->setKiwiDisplaySource(false);
-        m_statusOverlay->setKiwiActive(false);
-    });
+            &PanadapterApplet::zeigeDasGeraet);
 
     // Phase 3F Sub-Epic F Task 13: restore persisted extended-view
     // toggle (default true) and apply it to the embedded spectrum immediately.
@@ -445,6 +442,12 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
 }
 
 PanadapterApplet::~PanadapterApplet() = default;
+
+void PanadapterApplet::zeigeDasGeraet()
+{
+    m_spectrum->setKiwiDisplaySource(false);
+    m_statusOverlay->setKiwiActive(false);
+}
 
 void PanadapterApplet::addSlice(int sliceIndex)
 {

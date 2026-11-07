@@ -444,6 +444,10 @@ private slots:
         const auto info = CompanionRigController::radioInfoAusEinstellungen();
         QVERIFY(info.has_value());
 
+        // So stand der Panadapter des Betreibers: eine gemerkte KIWI-Quelle
+        // verwarf jeden Rahmen des Geraets.
+        stelleEin(QStringLiteral("Pan_pan-0_KiwiDisplay"), QStringLiteral("True"));
+
         // Das echte Hauptfenster: die FFT haengt an ihm, nicht am Modell.
         auto* fenster = new MainWindow();   // bewusst nicht abgeraeumt
         fenster->resize(1280, 800);
@@ -514,6 +518,10 @@ private slots:
         QVERIFY2(radio.activeSlice() && radio.activeSlice()->streamIndex() == 0,
                  "die Scheibe haengt an keinem Strom, der Panadapter bleibt leer");
         QVERIFY(!radio.fftRouter()->pansForReceiver(0).isEmpty());
+        for (SpectrumWidget* sw : fenster->findChildren<SpectrumWidget*>()) {
+            QVERIFY2(!sw->kiwiDisplaySource(), "der Panadapter steht noch auf KIWI");
+            QVERIFY2(sw->renderedPixelCountForTest() > 0, "der Panadapter hat nichts gezeichnet");
+        }
         const double spitzeUsb = spitzeHz();
         // Gegenrichtung: derselbe Ton im falschen Seitenband ist im
         // Durchlassbereich nicht zu hoeren.

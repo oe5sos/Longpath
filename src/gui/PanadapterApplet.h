@@ -156,6 +156,10 @@ public:
     /// is held at extendedMode == false regardless of zoom (forced off);
     /// when true, the zoom auto-derive decides extendedMode dynamically.
     bool extendedViewEnabled() const { return m_extendedViewEnabled; }
+    /// Zeigt wieder das Geraet statt des KiwiSDR, wie der Klick auf die
+    /// KIWI-Plakette.
+    void zeigeDasGeraet();
+
     void setExtendedViewEnabled(bool on);
 
     /// Test-only: build and return the right-click context menu without
