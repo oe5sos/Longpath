@@ -79,6 +79,7 @@ quint16 FlexVitaStream::start(const QHostAddress& radioAddress)
     m_proKlasse.clear();
     m_straenge.clear();
     m_tonLuecken.clear();
+    m_tonHalt.clear();
     m_gefuellteRahmen = 0;
     m_lueckenfuellung =
         AppSettings::instance()
@@ -87,6 +88,7 @@ quint16 FlexVitaStream::start(const QHostAddress& radioAddress)
         == QStringLiteral("True");
     m_verlorenGesamt = 0;
     m_verlorenGemeldet = 0;
+    m_spaetGesamt = 0;
     m_uhr.start();
     m_bericht.setInterval(5000);
     m_bericht.callOnTimeout(this, [this] { berichteKlassen(); });
@@ -96,8 +98,8 @@ quint16 FlexVitaStream::start(const QHostAddress& radioAddress)
 
 // Ein Schritt je Paket: Zaehlersprung und Ankunftsabstand. Beides
 // braucht einen Zustand JE STROM — siehe die Begruendung am `Strang`.
-void FlexVitaStream::zaehleLuecke(const FlexVita::Header& h,
-                                  qint64 jetztNsVorgabe)
+FlexVitaStream::Schritt FlexVitaStream::zaehleLuecke(const FlexVita::Header& h,
+                                                     qint64 jetztNsVorgabe)
 {
     const quint64 schluessel =
         (static_cast<quint64>(h.packetClass) << 32) | h.streamId;
@@ -127,11 +129,10 @@ void FlexVitaStream::zaehleLuecke(const FlexVita::Header& h,
     if (!st.gesehen) {
         st.gesehen = true;
         st.letzterZaehler = h.counter;
-        return;
+        return {};
     }
     const int fehlend =
         FlexVita::fehlendeNachZaehler(st.letzterZaehler, h.counter);
-    st.letzterZaehler = h.counter;
 
     // ── Den ueblichen Abstand mitfuehren ──────────────────────────
     //
@@ -153,7 +154,8 @@ void FlexVitaStream::zaehleLuecke(const FlexVita::Header& h,
     // Ueber einem Zaehlerumlauf ist der Sprung bedeutungslos (siehe
     // FlexVitaStream.h, kUmlaufFaktor). Solche Pausen zaehlen
     // getrennt -- die eigene Sendung ist die haeufigste davon.
-    const qint64 schwelleNs = st.mittelAbstandNs * kUmlaufFaktor;
+    const qint64 schwelleNs =
+        std::max(st.mittelAbstandNs * kUmlaufFaktor, kUnterbrechungBodenNs);
     const bool unterbrochen = st.pakete >= kMindestPaketeFuerMittel
                               && schwelleNs > 0
                               && abstandNs > schwelleNs;
@@ -162,8 +164,32 @@ void FlexVitaStream::zaehleLuecke(const FlexVita::Header& h,
         if (abstandNs > st.laengsteUnterbrechungNs) {
             st.laengsteUnterbrechungNs = abstandNs;
         }
-        return;
+        st.letzterZaehler = h.counter;
+        st.offeneLuecke = 0;
+        return {};
     }
+
+    // ── Ein Schritt zurueck ist kein Verlust (2026-11-07) ────────────
+    //
+    // Ein 4-Bit-Zaehler kennt kein Zurueck: n+1 und dann n rechnet sich
+    // zu 14 fehlenden, ein doppeltes Paket zu 15. Ueber WLAN geschah das
+    // alle paar Sekunden, die Fuellung schob dafuer 104,9 s Stille in
+    // 8,8 h ein, und angekommen war jedes Paket. Der Zaehler bleibt auf
+    // dem hoechsten Stand; holt das spaete Paket den juengsten Sprung
+    // ein, fehlte dort auch nichts.
+    if (fehlend >= kSpaetAbFehlend) {
+        ++st.spaet;
+        ++m_spaetGesamt;
+        if (st.offeneLuecke > 0) {
+            --st.offeneLuecke;
+            --st.verloren;
+            --m_verlorenGesamt;
+            if (st.offeneLuecke == 0) { --st.spruenge; }
+        }
+        return {true, 0};
+    }
+    st.letzterZaehler = h.counter;
+    st.offeneLuecke = fehlend;
 
     if (fehlend > 0) {
         st.verloren += fehlend;
@@ -212,6 +238,7 @@ void FlexVitaStream::zaehleLuecke(const FlexVita::Header& h,
                                         FlexVita::kMaxGefuellteLuecken);
         }
     }
+    return {false, fehlend};
 }
 
 QVector<FlexVitaStream::Luecken> FlexVitaStream::luecken() const
@@ -230,6 +257,7 @@ QVector<FlexVitaStream::Luecken> FlexVitaStream::luecken() const
         l.groessteLueckeUm = st.groessteLueckeUm;
         l.unterbrechungen  = st.unterbrechungen;
         l.laengsteUnterbrechungMs = st.laengsteUnterbrechungNs / 1000000LL;
+        l.spaet            = st.spaet;
         raus.push_back(l);
     }
     std::sort(raus.begin(), raus.end(), [] (const Luecken& a, const Luecken& b) {
@@ -306,6 +334,10 @@ void FlexVitaStream::berichteKlassen()
                         .arg(l.unterbrechungen)
                         .arg(l.laengsteUnterbrechungMs);
         }
+        if (l.spaet > 0) {
+            teil += QStringLiteral("; %1 zu spaet oder doppelt (KEIN "
+                                   "Verlust)").arg(l.spaet);
+        }
         lueckenTeile << teil;
     }
     if (!lueckenTeile.isEmpty()) {
@@ -358,6 +390,7 @@ void FlexVitaStream::stop()
         m_socket.close();
     }
     m_localPort = 0;
+    m_tonHalt.clear();
 }
 
 bool FlexVitaStream::isRunning() const
@@ -401,6 +434,22 @@ void FlexVitaStream::onReadyRead()
 
 // From AetherSDR PanadapterStream::processDatagram [@d58e2b8a] — an der
 // Paketklasse verteilen, alles Unbekannte still fallen lassen.
+// Fehlende Pakete als ausgeblendete Stille wieder einschieben. Ohne das
+// springt die Welle (Knacken) UND der Ton laeuft um die fehlende Zeit zu
+// kurz — bei den am 2026-10-29 gemessenen 1,2 % sind das 0,7 s auf die
+// Minute.
+void FlexVitaStream::gibTonAus(quint32 strom, const QVector<float>& werte)
+{
+    FlexVita::Lueckenzustand& lz = m_tonLuecken[strom];
+    const int vorher = werte.size();
+    const QVector<float> gefuellt =
+        FlexVita::fuelleLuecke(werte, lz, m_lueckenfuellung);
+    if (gefuellt.size() > vorher) {
+        m_gefuellteRahmen += (gefuellt.size() - vorher) / 2;
+    }
+    emit audioSamplesReady(strom, gefuellt);
+}
+
 void FlexVitaStream::handleDatagram(const QByteArray& datagram)
 {
     ++m_datagrams;
@@ -412,7 +461,7 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
         return;
     }
     ++m_proKlasse[static_cast<quint16>(h.packetClass)];
-    zaehleLuecke(h);
+    const Schritt schritt = zaehleLuecke(h);
 
     switch (static_cast<FlexVitaClass>(h.packetClass)) {
     case FlexVitaClass::PanadapterFft: {
@@ -484,18 +533,38 @@ void FlexVitaStream::handleDatagram(const QByteArray& datagram)
         if (werte.isEmpty()) {
             return;
         }
-        // Fehlende Pakete als ausgeblendete Stille wieder einschieben.
-        // Ohne das springt die Welle (Knacken) UND der Ton laeuft um
-        // die fehlende Zeit zu kurz — bei den am 2026-10-29 gemessenen
-        // 1,2 % sind das 0,7 s auf die Minute.
+        // Der Nachzuegler gehoert VOR das wartende Paket: so bleibt die
+        // Folge lueckenlos, und es wird nichts gefuellt. Ein spaetes
+        // Paket ohne wartendes ist doppelt, oder seine Zeit ist vorbei.
         FlexVita::Lueckenzustand& lz = m_tonLuecken[h.streamId];
-        const int vorher = werte.size();
-        const QVector<float> gefuellt =
-            FlexVita::fuelleLuecke(werte, lz, m_lueckenfuellung);
-        if (gefuellt.size() > vorher) {
-            m_gefuellteRahmen += (gefuellt.size() - vorher) / 2;
+        TonHalt& halt = m_tonHalt[h.streamId];
+        if (schritt.spaet) {
+            if (!halt.belegt) { return; }
+            const int rest = std::max(0, lz.offeneLuecken - 1);
+            lz.offeneLuecken = 0;
+            gibTonAus(h.streamId, werte);
+            lz.offeneLuecken = rest;
+            if (rest == 0) {
+                const QVector<float> gewartet = halt.werte;
+                halt = TonHalt{};
+                gibTonAus(h.streamId, gewartet);
+            }
+            return;
         }
-        emit audioSamplesReady(h.streamId, gefuellt);
+        if (halt.belegt) {
+            const QVector<float> gewartet = halt.werte;
+            halt = TonHalt{};
+            gibTonAus(h.streamId, gewartet);
+        }
+        // Eine kleine Lücke kann eine Vertauschung sein: das Paket wartet
+        // einen Schritt. Das kostet 5,3 ms, nur wenn wirklich etwas fehlt.
+        if (schritt.luecke > 0 && schritt.luecke <= kHalteBisFehlend
+            && lz.offeneLuecken > 0 && m_lueckenfuellung) {
+            halt.werte = werte;
+            halt.belegt = true;
+            return;
+        }
+        gibTonAus(h.streamId, werte);
         break;
     }
 

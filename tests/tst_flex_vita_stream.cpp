@@ -83,6 +83,14 @@ QByteArray tonMit(quint8 zaehler, quint32 strom)
     return mitZaehler(mitStrom(p, strom), zaehler);
 }
 
+// Ein Tonpaket, das sich am Ausgang wiedererkennen laesst.
+QByteArray tonMitMarke(quint8 zaehler, quint32 strom)
+{
+    QByteArray p = roh(LongpathTest::FlexVitaGolden::kTonKopf);
+    p.append(QByteArray(1024, char(zaehler + 1)));
+    return mitZaehler(mitStrom(p, strom), zaehler);
+}
+
 QByteArray kachelPaket(const char* kopfHex, int breite, quint16 wert)
 {
     QByteArray p = roh(kopfHex);
@@ -438,6 +446,108 @@ private slots:
         // ist aber das erste nach der Unterbrechung.
         strom.ingestDatagramForTesting(tonMit(12, 0x04000008u));
         QCOMPARE(strom.gefuellteRahmen(), vorher);
+    }
+
+    // ── Ein Schritt zurueck ist kein Verlust (2026-11-07) ───────────────
+    //
+    // Ueber 8,8 h WLAN meldete der Rollzaehler 141 000 verlorene Pakete,
+    // angekommen waren alle: 937,5 Tonpakete je 5 s mit und ohne Meldung.
+    // Die Fuellung schob dafuer 104,9 s Stille in den Ton.
+    void vertauschteTonpaketeKommenInDerRichtigenFolgeHeraus()
+    {
+        FlexVitaStream strom;
+        QSignalSpy ton(&strom, &FlexVitaStream::audioSamplesReady);
+        const quint8 folge[] = {0, 1, 2, 3, 5, 4, 6, 7};
+        for (const quint8 z : folge) {
+            strom.ingestDatagramForTesting(tonMitMarke(z, 0x04000008u));
+        }
+        QCOMPARE(strom.verlorenePaketeGesamt(), qint64(0));
+        QCOMPARE(strom.spaetePaketeGesamt(), qint64(1));
+        QCOMPARE(strom.gefuellteRahmen(), qint64(0));
+        QCOMPARE(strom.luecken().at(0).spruenge, qint64(0));
+        QCOMPARE(ton.count(), 8);
+        QByteArray marken;
+        for (const QList<QVariant>& paket : ton) {
+            const QVector<float> w = paket.at(1).value<QVector<float>>();
+            QCOMPARE(w.size(), 256);
+            marken.append(QByteArray::number(w.last()));
+            marken.append(' ');
+        }
+        // Dieselbe Folge wie ein ungestoerter Strom sie liefert.
+        FlexVitaStream sauber;
+        QSignalSpy soll(&sauber, &FlexVitaStream::audioSamplesReady);
+        for (quint8 z = 0; z < 8; ++z) {
+            sauber.ingestDatagramForTesting(tonMitMarke(z, 0x04000008u));
+        }
+        QByteArray sollMarken;
+        for (const QList<QVariant>& paket : soll) {
+            sollMarken.append(QByteArray::number(paket.at(1).value<QVector<float>>().last()));
+            sollMarken.append(' ');
+        }
+        QCOMPARE(marken, sollMarken);
+    }
+
+    void einDoppeltesPaketIstKeinVerlustUndKlingtNichtZweimal()
+    {
+        FlexVitaStream strom;
+        QSignalSpy ton(&strom, &FlexVitaStream::audioSamplesReady);
+        const quint8 folge[] = {0, 1, 2, 3, 3, 4, 5};
+        for (const quint8 z : folge) {
+            strom.ingestDatagramForTesting(tonMitMarke(z, 0x04000008u));
+        }
+        QCOMPARE(strom.verlorenePaketeGesamt(), qint64(0));
+        QCOMPARE(strom.spaetePaketeGesamt(), qint64(1));
+        QCOMPARE(strom.gefuellteRahmen(), qint64(0));
+        QCOMPARE(ton.count(), 6);
+    }
+
+    // GEGENPROBE: was WIRKLICH fehlt, bleibt ein Verlust und wird gefuellt,
+    // einen Schritt spaeter als frueher.
+    void einWirklichFehlendesPaketWirdWeiterGefuellt()
+    {
+        FlexVitaStream strom;
+        QSignalSpy ton(&strom, &FlexVitaStream::audioSamplesReady);
+        const quint8 folge[] = {0, 1, 2, 3, 5, 6, 7};
+        for (const quint8 z : folge) {
+            strom.ingestDatagramForTesting(tonMitMarke(z, 0x04000008u));
+        }
+        QCOMPARE(strom.verlorenePaketeGesamt(), qint64(1));
+        QCOMPARE(strom.spaetePaketeGesamt(), qint64(0));
+        QVERIFY2(strom.gefuellteRahmen() > 0, "die fehlende Zeit muss eingeschoben sein");
+        QCOMPARE(ton.count(), 7);
+    }
+
+    // Ein Strom, der schweigend zurueckspringt, darf nicht haengen bleiben:
+    // nach zwei spaeten Paketen geht es normal weiter.
+    void nachSpaetenPaketenLaeuftDerZaehlerWeiter()
+    {
+        FlexVitaStream strom;
+        const quint8 folge[] = {4, 5, 6, 7, 5, 6, 8, 9, 10};
+        for (const quint8 z : folge) {
+            strom.ingestDatagramForTesting(tonMit(z, 0x04000008u));
+        }
+        QCOMPARE(strom.verlorenePaketeGesamt(), qint64(0));
+        QCOMPARE(strom.spaetePaketeGesamt(), qint64(2));
+    }
+
+    // WLAN liefert in Buendeln. Der gemittelte Abstand wird dadurch winzig,
+    // und ein gewoehnlicher Abstand galt als Unterbrechung: sein Sprung
+    // fiel unter den Tisch. Gemessen: 2,6 Mio. "Unterbrechungen" bei
+    // 5,9 Mio. Tonpaketen.
+    void einBuendelMachtKeineUnterbrechung()
+    {
+        FlexVitaStream strom;
+        const quint16 ton = static_cast<quint16>(FlexVitaClass::NarrowAudio);
+        qint64 t = 1000000;
+        quint8 z = 0;
+        for (int i = 0; i < 80; ++i) {
+            strom.pruefeZaehlerForTest(ton, 0x04000008u, z, t);
+            z = (z + 1) & 0x0F;
+            t += (i % 2 == 0) ? 10000 : 10600000;   // 10 us, dann 10,6 ms
+        }
+        QCOMPARE(strom.luecken().at(0).unterbrechungen, qint64(0));
+        strom.pruefeZaehlerForTest(ton, 0x04000008u, (z + 1) & 0x0F, t);
+        QCOMPARE(strom.verlorenePaketeGesamt(), qint64(1));
     }
 
     // GEGENPROBE: derselbe Sprung OHNE Pause wird sehr wohl gefuellt.

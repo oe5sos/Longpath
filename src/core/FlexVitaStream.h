@@ -165,6 +165,8 @@ public:
         /// Die eigene Sendung ist die haeufigste davon.
         qint64  unterbrechungen{0};
         qint64  laengsteUnterbrechungMs{0};
+        /// Pakete, die zu spaet oder doppelt kamen -- KEIN Verlust.
+        qint64  spaet{0};
     };
     /// Je Stromkennung ein Eintrag, nach Klasse sortiert.
     QVector<Luecken> luecken() const;
@@ -197,6 +199,22 @@ public:
     /// Bis der mittlere Abstand steht, wird nichts als Unterbrechung
     /// gewertet: eine Schwelle aus zwei Messwerten ist geraten.
     static constexpr int kMindestPaketeFuerMittel = 32;
+    /// Ab hier ist ein Zaehlersprung ein Schritt ZURUECK: spaet oder
+    /// doppelt, kein Verlust. Gemessen am 2026-11-07 ueber 8,8 h WLAN:
+    /// Meldungen von 14 bis 16 bei unveraendert 937,5 Tonpaketen je 5 s.
+    /// Der Preis: fehlen wirklich 12 bis 15 Pakete, liest er sie als
+    /// spaet, und ein bis drei Pakete fallen weg, bis der Zaehler wieder
+    /// passt. Vier Bit geben nicht mehr her.
+    static constexpr int kSpaetAbFehlend = 12;
+    /// Bis zu so vielen fehlenden wartet ein Tonpaket einen Schritt auf
+    /// den Nachzuegler. Mehr ist keine Vertauschung, sondern Verlust.
+    static constexpr int kHalteBisFehlend = 3;
+    /// Darunter ist keine Pause eine Unterbrechung: ein Zaehlerumlauf
+    /// beim schnellsten Strom (16 Tonpakete zu 5,33 ms). Der gemittelte
+    /// Abstand allein taugt nicht: WLAN liefert in Buendeln, das Mittel
+    /// wird winzig, und fast die Haelfte aller Tonpakete galt als
+    /// Unterbrechung -- ihre Spruenge fielen unter den Tisch.
+    static constexpr qint64 kUnterbrechungBodenNs = 85LL * 1000000LL;
 
     // ── Lueckenfuellung im Tonweg (2026-10-30) ───────────────────
     //
@@ -211,6 +229,8 @@ public:
     // Pruefstand — bleibt es bei der Vorgabe.
     void setzeLueckenfuellung(bool an) { m_lueckenfuellung = an; }
     bool lueckenfuellung() const { return m_lueckenfuellung; }
+    /// Pakete, die zu spaet oder doppelt kamen, ueber alle Stroeme.
+    qint64 spaetePaketeGesamt() const { return m_spaetGesamt; }
     /// Wieviele Rahmen die Fuellung bisher eingeschoben hat.
     qint64 gefuellteRahmen() const { return m_gefuellteRahmen; }
 
@@ -288,7 +308,12 @@ private:
     struct Strang {
         quint16 klasse{0};
         quint32 strom{0};
+        /// Der HOECHSTE Stand; ein spaetes Paket setzt ihn nicht zurueck.
         quint8  letzterZaehler{0};
+        /// Was der juengste Sprung als fehlend zaehlte und noch nachkommen
+        /// koennte. Das naechste Paket in Folge schliesst die Frage.
+        int     offeneLuecke{0};
+        qint64  spaet{0};
         bool    gesehen{false};
         qint64  pakete{0};
         qint64  verloren{0};
@@ -316,14 +341,27 @@ private:
     /// Ein Prueflauf gibt sie vor -- eine Klasse mit eigener Uhr
     /// laesst sich nur in Echtzeit pruefen, und eine Pause von
     /// 13 Sekunden waere dann ein Prueflauf von 13 Sekunden.
-    void zaehleLuecke(const FlexVita::Header& h,
+    /// Was ein Paket fuer die Reihenfolge bedeutet.
+    struct Schritt {
+        bool spaet{false};   ///< zu spaet oder doppelt
+        int  luecke{0};      ///< so viele fehlen vor diesem Paket
+    };
+    /// Ein Tonpaket, das auf einen Nachzuegler wartet.
+    struct TonHalt {
+        QVector<float> werte;
+        bool belegt{false};
+    };
+    void gibTonAus(quint32 strom, const QVector<float>& werte);
+    Schritt zaehleLuecke(const FlexVita::Header& h,
                       qint64 jetztNsVorgabe = -1);
     bool m_lueckenfuellung{true};
     QMap<quint32, FlexVita::Lueckenzustand> m_tonLuecken;  ///< je Tonstrom
+    QMap<quint32, TonHalt> m_tonHalt;                      ///< je Tonstrom
     qint64 m_gefuellteRahmen{0};
     QMap<quint64, Strang> m_straenge;   ///< Schluessel: Klasse<<32 | Strom
     QElapsedTimer m_uhr;
     qint64 m_verlorenGesamt{0};
+    qint64 m_spaetGesamt{0};
     qint64 m_verlorenGemeldet{0};
 
     QTimer m_bericht;
