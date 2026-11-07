@@ -256,6 +256,7 @@ public:
     QByteArray layoutprofilAlsJsonForTest(const QString& name) { return layoutprofilAlsJson(name); }
     void holeContestInsKombiFeldForTest(const QString& id, bool zweites = false)
     { holeContestInsKombiFeld(zweites ? m_kombiApplet2 : m_kombiApplet, id); }
+    void detachAppletForTest(class AppletWidget* applet);
     class KombiApplet* kombiFeldForTest(int nr) const { return nr == 2 ? m_kombiApplet2 : m_kombiApplet; }
     QStringList kombiListeForTest(class KombiApplet* feld);
     bool waehleKombiEintragForTest(class KombiApplet* feld, const QString& text);

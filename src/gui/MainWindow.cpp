@@ -19726,6 +19726,11 @@ void MainWindow::bereiteContestFensterVor()
 #endif
 }
 
+void MainWindow::detachAppletForTest(AppletWidget* applet)
+{
+    detachApplet(applet, 0);
+}
+
 void MainWindow::fuelleContestPanelMenu(QMenu* menu)
 {
 #ifdef LONGPATH_HAVE_CONTESTPROGRAMM
@@ -21498,6 +21503,16 @@ void MainWindow::closeEvent(QCloseEvent* event)
     // ersten Anlauf (c8d8161a) uebersehen wurde. Eine Probe im echten
     // Hauptfenster hat den Absturz dann geliefert: abloesen, schliessen,
     // SIGSEGV.
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // Das Logbuch JETZT zumachen, nicht erst im Destruktor, und VOR den
+    // schwebenden Fenstern: bei Cmd+Q laeuft ~ContestFenster nie (exit()
+    // kommt noch in diesem closeEvent, gemessen 2026-11-07), und ein
+    // Panel in Combined stirbt sonst mit seinem Gehaeuse. Die letzte
+    // Log-Sicherung haengt am Abbau des Controllers. Das Profil ist ganz
+    // oben in diesem closeEvent schon aufgenommen.
+    if (m_contestFenster) { m_contestFenster->schliesse(); }
+#endif
+
     if (m_panStack) { m_panStack->shutDownFloating(); }
 
     for (AppletFloatingWindow* w : m_floatingApplets) { delete w; }
@@ -21583,16 +21598,6 @@ void MainWindow::closeEvent(QCloseEvent* event)
         w->deleteLater();
     }
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-
-#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
-    // Das Logbuch JETZT zumachen und nicht erst im Destruktor: bei Cmd+Q
-    // und quit() laeuft ~ContestFenster nie (exit() kommt noch in diesem
-    // closeEvent, gemessen 2026-11-07). Die letzte Log-Sicherung haengt
-    // am Abbau des Controllers und fiele sonst aus. Die Stelle steht
-    // bewusst hier hinten: so ist alles andere im selben Zustand wie beim
-    // roten Punkt, nur der Zeitpunkt ist frueher.
-    if (m_contestFenster) { m_contestFenster->schliesse(); }
-#endif
 
     event->accept();
 
