@@ -16,6 +16,7 @@
 #include <cmath>
 
 #include <QApplication>
+#include <QEvent>
 #include <QGuiApplication>
 #include <QHash>
 #include <QLoggingCategory>
@@ -362,6 +363,19 @@ void meldeZug(QWidget* bewegtes)
     // Fensters in ein Bild (Vorschaubilder der Fensteranordnung).
     if (!bewegtes->isVisible()) { return; }
     if (s_zugmelder) { s_zugmelder(bewegtes); }
+}
+
+KlickHoltNachVorne::KlickHoltNachVorne(std::function<bool(QWidget*)> melder, QObject* eltern)
+    : QObject(eltern), m_melder(std::move(melder))
+{
+    if (qApp) { qApp->installEventFilter(this); }
+}
+
+bool KlickHoltNachVorne::eventFilter(QObject* ziel, QEvent* ereignis)
+{
+    if (ereignis->type() != QEvent::MouseButtonPress) { return false; }
+    auto* widget = qobject_cast<QWidget*>(ziel);
+    return widget && m_melder(widget);
 }
 
 QRect freierPlatz(const QSize& groesse, const QRect& flaeche,

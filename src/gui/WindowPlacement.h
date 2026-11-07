@@ -39,6 +39,7 @@
 #include <functional>
 
 #include <QList>
+#include <QObject>
 #include <QPoint>
 #include <QRect>
 #include <QSize>
@@ -304,6 +305,20 @@ void fitIntoAvailableScreen(QWidget* w);
 QRect ausSperrstreifenSchieben(const QRect& wunsch,
                                const QList<QRect>& sperren,
                                const QRect& platz);
+
+// ── Jeder Mausdruck im Programm (2026-11-07) ─────────────────────────
+//
+// Auf der Anwendung, weil ein Druck an das Kind geht, das darunter liegt.
+// Teuer ist das nicht: alles ausser dem Druck faellt in der ersten Zeile
+// durch. Liefert `melder` wahr, wird der Druck geschluckt.
+class KlickHoltNachVorne : public QObject {
+public:
+    KlickHoltNachVorne(std::function<bool(QWidget*)> melder, QObject* eltern);
+protected:
+    bool eventFilter(QObject* ziel, QEvent* ereignis) override;
+private:
+    std::function<bool(QWidget*)> m_melder;
+};
 
 // ── Ein freier Platz (2026-11-07) ────────────────────────────────────
 //

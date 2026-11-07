@@ -2806,6 +2806,40 @@ void MainWindow::bringAppletToFront(const QString& id)
     });
 }
 
+// ── Jeder Klick holt das Fenster nach vorne (2026-11-07) ─────────────
+//
+// Betreiber: „wir hatten vereinbart, dass jeder klick auf ein fenster
+// diese in den vordergrund rueckt". Der Filter vom 2026-11-01 sitzt nur in
+// zwei Fensterarten. Hier gilt es fuer alle schwebenden, und fuer das, was
+// kein eigenes Fenster hat: ein Applet in der Spalte liegt im Hauptfenster,
+// und das kommt nie ueber die Werkzeugfenster (siehe bringAppletToFront).
+// Verdeckt loest es darum der Klick ab. Der Druck wird dann geschluckt:
+// er soll das Feld holen und keine halb verdeckte Taste ausloesen.
+bool MainWindow::klickHoltNachVorne(QWidget* ziel)
+{
+    if (!ziel || m_shuttingDown) { return false; }
+    QWidget* fenster = ziel->window();
+    if (fenster != this) {
+        if (fenster->windowType() == Qt::Tool) { fenster->raise(); }
+        return false;
+    }
+    if (!m_appletPanel || !m_appletPanel->isAncestorOf(ziel)) { return false; }
+    if (QApplication::activeModalWidget()
+        || (m_connectionPanel && m_connectionPanel->isVisible())) {
+        return false;   // Die Maske deckt alles ab; das ist kein Verdecken.
+    }
+    for (QWidget* w = ziel; w; w = w->parentWidget()) {
+        auto* applet = qobject_cast<AppletWidget*>(w);
+        if (!applet) { continue; }
+        if (!appletHiddenInColumn(applet, false)) { return false; }
+        const QString id = panelIdFor(applet);
+        if (id.isEmpty()) { return false; }
+        bringAppletToFront(id);
+        return true;
+    }
+    return false;
+}
+
 bool MainWindow::appletHiddenInColumn(QWidget* applet, bool countScrolledAway) const
 {
     if (!applet || !isVisible() || isMinimized() || !applet->isVisible()) {
@@ -6611,6 +6645,8 @@ void MainWindow::buildUI()
             activeSpectrumWidget()->clearWaterfallHistory();
         }
     });
+
+    new KlickHoltNachVorne([this](QWidget* w) { return klickHoltNachVorne(w); }, this);
 
     // Ein Geraet hinter CAT hat keinen KiwiSDR neben sich. Stand der
     // Panadapter noch aus einer anderen Sitzung auf KIWI, verwarf er jeden

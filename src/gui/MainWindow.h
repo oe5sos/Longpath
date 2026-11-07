@@ -1335,6 +1335,8 @@ private:
     /// Fenster obenauf ablösen. Nur für Einschalten per Menü/Plus —
     /// nicht beim Start oder Profilwechsel, die Lagen gehören dem Profil.
     void bringAppletToFront(const QString& id);
+    /// Ein Mausdruck irgendwo im Programm. Wahr heisst: geschluckt.
+    bool klickHoltNachVorne(QWidget* ziel);
     /// Das CAT-Feld nach dem Verbinden zeigen. Geht es dabei neu als eigenes
     /// Fenster auf, kommt es auf einen freien Platz, wenn es einen gibt.
     void zeigeCatRigFeld();

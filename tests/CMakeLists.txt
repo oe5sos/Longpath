@@ -1113,6 +1113,8 @@ longpath_add_test(tst_begleitgeraet_seite)
 # befragen, und der Versatz beim Laden.
 longpath_add_test(tst_begleitgeraet_regler)
 longpath_add_test(tst_cat_funkgeraet)
+# Jeder Klick holt das Fenster nach vorne, auch aus der Spalte.
+longpath_add_test(tst_klick_holt_nach_vorne)
 
 # Der Versatz dort, wo er vor dem Betreiber landet -- und vor allem:
 # dass OHNE Transverter bitgleich nichts passiert.
