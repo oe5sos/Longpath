@@ -18,8 +18,13 @@
 #include "gui/widgets/CommandBar.h"
 
 #include <QDebug>
+#include <QApplication>
+#include <QCursor>
 #include <QEvent>
+#include <QKeyEvent>
 #include <QMenu>
+#include <QMouseEvent>
+#include <QPointingDevice>
 #include <QPointer>
 #include <QPushButton>
 #include <QBoxLayout>
@@ -266,8 +271,11 @@ void ProfileRail::rebuild()
         }
         b->setContextMenuPolicy(Qt::CustomContextMenu);
         connect(b, &QPushButton::clicked, this, [this, name]() {
+            meldeAusloeser(name);
             if (m_profiles) { m_profiles->activate(name); }
         });
+        // Fuer die Frage, WER geklickt hat (siehe meldeAusloeser).
+        b->installEventFilter(this);
         connect(b, &QWidget::customContextMenuRequested,
                 this, [this, b, name](const QPoint& p) {
             showMenuFor(name, b->mapToGlobal(p));
@@ -306,7 +314,6 @@ void ProfileRail::rebuild()
                          QString::fromLatin1(Style::kTextSecondary),
                          QString::fromLatin1(Style::kRedBg)));
             x->hide();
-            b->installEventFilter(this);
             m_closers.insert(name, x);
 
             connect(x, &QPushButton::clicked, this, [this, name]() {
@@ -326,9 +333,64 @@ void ProfileRail::rebuild()
     if (m_richtung == Qt::Vertical) { m_column->addStretch(1); }
 }
 
+// ── Wer hat umgeschaltet? (2026-11-07) ──────────────────────────────
+//
+// Betreiber, Longpath im Profil CONTEST beendet und neu gestartet: "ich
+// habe so definitiv longpath nicht verlassen!!!!" Sieben Sekunden nach dem
+// Start stand es auf "Neu", und das Log wusste nur: ueber die Schiene.
+// Automatik und Feldbetrieb schieden aus, ob Maus, Taste oder Programm,
+// sagte nichts. Am Vorabend geschah dasselbe zehn Sekunden nach dem Start.
+// Darum schreibt jeder Klick auf ein Abzeichen seinen Ausloeser auf.
+void ProfileRail::meldeAusloeser(const QString& name)
+{
+    const QString eingabe =
+        m_letzteEingabe.isEmpty()
+            ? QStringLiteral("keine Eingabe, vom Programm ausgeloest")
+            : m_letzteEingabe;
+    m_letzteEingabe.clear();
+    const QPoint zeiger = QCursor::pos();
+    m_letzterAusloeser =
+        QStringLiteral("%1 -> %2: %3; Zeiger (%4,%5); Anwendung %6; Fenster \"%7\"")
+            .arg(m_profiles ? m_profiles->current() : QString(), name, eingabe)
+            .arg(zeiger.x())
+            .arg(zeiger.y())
+            .arg(QGuiApplication::applicationState() == Qt::ApplicationActive
+                     ? QStringLiteral("vorn")
+                     : QStringLiteral("im Hintergrund"))
+            .arg(QApplication::activeWindow()
+                     ? QApplication::activeWindow()->metaObject()->className()
+                     : "keines");
+    qWarning().noquote() << "[ProfileClick]" << m_letzterAusloeser;
+}
+
 // Das X erscheint, solange der Zeiger auf dem Abzeichen steht.
 bool ProfileRail::eventFilter(QObject* watched, QEvent* event)
 {
+    switch (event->type()) {
+    case QEvent::MouseButtonPress:
+        m_druckUhr.start();
+        break;
+    case QEvent::MouseButtonRelease: {
+        const auto* me = static_cast<QMouseEvent*>(event);
+        const QPoint wo = me->globalPosition().toPoint();
+        m_letzteEingabe =
+            QStringLiteral("Maus bei (%1,%2), gehalten %3 ms, Geraet \"%4\"")
+                .arg(wo.x())
+                .arg(wo.y())
+                .arg(m_druckUhr.isValid() ? m_druckUhr.elapsed() : -1)
+                .arg(me->pointingDevice() ? me->pointingDevice()->name() : QString());
+        break;
+    }
+    case QEvent::KeyPress:
+    case QEvent::KeyRelease: {
+        const auto* ke = static_cast<QKeyEvent*>(event);
+        m_letzteEingabe = QStringLiteral("Taste %1").arg(
+            QKeySequence(ke->key()).toString());
+        break;
+    }
+    default:
+        break;
+    }
     if (event->type() == QEvent::Enter || event->type() == QEvent::Leave) {
         const bool show = (event->type() == QEvent::Enter);
         for (auto it = m_badges.cbegin(); it != m_badges.cend(); ++it) {
