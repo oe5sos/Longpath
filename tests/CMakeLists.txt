@@ -5986,6 +5986,7 @@ longpath_add_test(tst_anf_tuning)
 # -- rotctld command line and the curated controller list: loopback
 #    only, no stray -r, and ARCO/ERC reachable from the picker --
 longpath_add_test(tst_rotctld_process)
+longpath_add_test(tst_daemon_ueberlebt_beenden_nicht)
 
 # -- Installing Hamlib for the operator: reading `rotctl --list` and
 #    `--version` by shape rather than by column, and the rule that the
