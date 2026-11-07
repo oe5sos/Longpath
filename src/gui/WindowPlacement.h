@@ -305,6 +305,18 @@ QRect ausSperrstreifenSchieben(const QRect& wunsch,
                                const QList<QRect>& sperren,
                                const QRect& platz);
 
+// ── Ein freier Platz (2026-11-07) ────────────────────────────────────
+//
+// Betreiber zum CAT-Feld: „wieder ein window, welches ich nicht oeffnen
+// kann." Ein Fenster, das von selbst aufgeht, legt sich nicht ueber die
+// Anordnung, wenn daneben Platz ist.
+//
+// Die erste Lage von `groesse` in `flaeche`, die keines der Rechtecke in
+// `belegt` schneidet, zeilenweise von links oben auf dem Raster `schritt`.
+// Gibt es keine, kommt ein leeres Rechteck zurueck.
+QRect freierPlatz(const QSize& groesse, const QRect& flaeche,
+                  const QList<QRect>& belegt, int schritt = 16);
+
 // ── „Ich werde gerade gezogen" (2026-10-14) ──────────────────────────
 //
 // Der Betreiber zum Schutzrahmen: „es sollte vielleicht einen grossen

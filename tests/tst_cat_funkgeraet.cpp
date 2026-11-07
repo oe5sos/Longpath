@@ -52,6 +52,7 @@
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/CatRigApplet.h"
 #include "gui/SpectrumWidget.h"
+#include "gui/WindowPlacement.h"
 
 using namespace Longpath;
 
@@ -865,6 +866,61 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(feld->isVisible(), 5000);
         QVERIFY2(feld->window() != fenster, "das Feld blieb in der verdeckten Spalte");
         radio.injectConnectionForTest(nullptr);
+    }
+
+    // Waehrend die Maske steht, sind die Fenster versteckt und die Spalte
+    // gilt als frei. Danach lagen sie wieder ueber dem Feld; gesehen am
+    // Geraet im Profil N.
+    void das_feld_wartet_auf_die_fenster_hinter_der_maske()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+        stelleEin(QStringLiteral("AppletCatRigVisible"), QStringLiteral("True"));
+
+        auto* fenster = new MainWindow();   // bewusst nicht abgeraeumt
+        fenster->resize(1280, 800);
+        fenster->show();
+        QVERIFY(QTest::qWaitForWindowExposed(fenster, 20000));
+
+        auto* feld = fenster->findChild<CatRigApplet*>();
+        QVERIFY(feld);
+        QTRY_VERIFY_WITH_TIMEOUT(feld->isVisible(), 5000);
+        QCOMPARE(feld->window(), static_cast<QWidget*>(fenster));
+
+        // Ein schwebendes Fenster genau ueber dem Feld, hinter der Maske.
+        QWidget deckel;
+        deckel.setGeometry(QRect(feld->mapToGlobal(QPoint(0, 0)), feld->size()));
+        deckel.show();
+        fenster->rememberFloatingWindowBehindConnectMaskForTest(&deckel);
+
+        VerbundeneCatRig verbindung(*info);
+        RadioModel& radio = *fenster->radioModelForTest();
+        radio.injectConnectionForTest(&verbindung);
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        QTest::qWait(100);
+        QCOMPARE(feld->window(), static_cast<QWidget*>(fenster));
+
+        // Die Maske geht nach dem Verbinden von selbst zu.
+        QTRY_VERIFY_WITH_TIMEOUT(deckel.isVisible(), 5000);
+        QTRY_VERIFY2_WITH_TIMEOUT(feld->window() != fenster,
+                                  "das Feld blieb unter dem Fenster liegen", 3000);
+        QVERIFY(feld->isVisible());
+        // Und es liegt nicht ueber dem Fenster, wenn daneben Platz ist.
+        QTRY_VERIFY_WITH_TIMEOUT(
+            !feld->window()->frameGeometry().intersects(deckel.frameGeometry()), 2000);
+        radio.injectConnectionForTest(nullptr);
+    }
+
+    void freierPlatz_meidet_was_belegt_ist()
+    {
+        const QRect flaeche(0, 0, 400, 300);
+        QCOMPARE(freierPlatz(QSize(100, 100), flaeche, {}), QRect(0, 0, 100, 100));
+        QCOMPARE(freierPlatz(QSize(100, 100), flaeche, {QRect(0, 0, 200, 300)}),
+                 QRect(208, 0, 100, 100));
+        QVERIFY(freierPlatz(QSize(100, 100), flaeche, {flaeche}).isEmpty());
+        QVERIFY(freierPlatz(QSize(500, 100), flaeche, {}).isEmpty());
     }
 
     // Ueber die Pruef-Zugaenge und nicht ueber connectToRadio(): der volle

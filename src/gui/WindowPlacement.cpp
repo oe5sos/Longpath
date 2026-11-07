@@ -364,6 +364,26 @@ void meldeZug(QWidget* bewegtes)
     if (s_zugmelder) { s_zugmelder(bewegtes); }
 }
 
+QRect freierPlatz(const QSize& groesse, const QRect& flaeche,
+                  const QList<QRect>& belegt, int schritt)
+{
+    const auto aufRaster = [schritt](int wert) {
+        const int rest = ((wert % schritt) + schritt) % schritt;
+        return rest == 0 ? wert : wert + schritt - rest;
+    };
+    for (int y = aufRaster(flaeche.top()); y + groesse.height() - 1 <= flaeche.bottom();
+         y += schritt) {
+        for (int x = aufRaster(flaeche.left()); x + groesse.width() - 1 <= flaeche.right();
+             x += schritt) {
+            const QRect lage(QPoint(x, y), groesse);
+            const bool frei = std::none_of(belegt.cbegin(), belegt.cend(),
+                [&lage](const QRect& r) { return r.intersects(lage); });
+            if (frei) { return lage; }
+        }
+    }
+    return {};
+}
+
 QRect ausSperrstreifenSchieben(const QRect& wunsch,
                                const QList<QRect>& sperren,
                                const QRect& platz)

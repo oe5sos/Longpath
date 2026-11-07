@@ -2848,6 +2848,35 @@ bool MainWindow::appletHiddenInColumn(QWidget* applet, bool countScrolledAway) c
     return coveredFraction(onScreen, covers) >= 0.25;
 }
 
+void MainWindow::zeigeCatRigFeld()
+{
+    const QString id = QStringLiteral("CatRig");
+    const bool hatteFenster = m_floatingApplets.contains(id);
+    bringAppletToFront(id);
+    if (hatteFenster) { return; }   // Die Lage gehoert dem Profil.
+
+    // Einen Umlauf spaeter: dann hat bringAppletToFront abgeloest.
+    QTimer::singleShot(0, this, [this, id]() {
+        QWidget* fenster = m_floatingApplets.value(id, nullptr);
+        if (m_shuttingDown || !fenster) { return; }
+        QList<QRect> belegt = schutzrahmen();
+        const auto tops = QApplication::topLevelWidgets();
+        for (QWidget* w : tops) {
+            if (!w || w == this || w == fenster || !w->isVisible() || w->isMinimized()) {
+                continue;
+            }
+            const Qt::WindowType art = w->windowType();
+            if (art == Qt::Popup || art == Qt::ToolTip) { continue; }
+            belegt.append(w->frameGeometry());
+        }
+        const QRect platz = freierPlatz(fenster->frameGeometry().size(), frameGeometry(), belegt);
+        if (platz.isEmpty()) { return; }
+        const EigeneBewegung eigene;
+        fenster->move(platz.topLeft());
+        fenster->raise();
+    });
+}
+
 // ── Das Plaetze-Panel wirklich SICHTBAR machen (2026-10-30) ──────────
 //
 // `ensureVisible()` allein reicht nicht, und der Betreiber hat genau
@@ -6600,9 +6629,20 @@ void MainWindow::buildUI()
         // Profil gar nicht zeigt, ist unsichtbar -- im Profil CONTEST war
         // das Feld so nicht zu erreichen (am Geraet gesehen, 2026-11-07).
         // bringAppletToFront loest es dann als eigenes Fenster ab.
+        //
+        // Aber nicht, solange die Maske steht: dann sind die schwebenden
+        // Fenster versteckt, die Spalte gilt als frei, und danach liegen
+        // sie wieder darueber (am Geraet gesehen, Profil N: das Feld
+        // schaute nur im Spalt zwischen zwei Fenstern hervor).
         if (m_appletVis) {
             m_appletVis->ensureVisible(QStringLiteral("CatRig"));
-            bringAppletToFront(QStringLiteral("CatRig"));
+            const bool maskeSteht = !m_floatingContainersHiddenPreConnect.isEmpty()
+                                    || (m_connectionPanel && m_connectionPanel->isVisible());
+            if (maskeSteht) {
+                m_catRigFeldNachDerMaske = true;
+            } else {
+                zeigeCatRigFeld();
+            }
         }
     });
 
@@ -17856,6 +17896,11 @@ void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
     if (restoredAny || m_raiseLogbookAfterConnectMask) {
         m_raiseLogbookAfterConnectMask = false;
         QTimer::singleShot(0, this, [this]() { raiseLogbookIfOpen(); });
+    }
+
+    if (m_catRigFeldNachDerMaske) {
+        m_catRigFeldNachDerMaske = false;
+        if (m_radioModel && m_radioModel->isConnected()) { zeigeCatRigFeld(); }
     }
 }
 

@@ -1020,6 +1020,9 @@ private:
     bool m_startedSafely{false};
     int  m_failedStartCount{0};
     bool m_raiseLogbookAfterConnectMask{false};
+    /// Verbunden, solange die Maske stand: ob das CAT-Feld verdeckt ist,
+    /// laesst sich erst sagen, wenn die Fenster wieder da sind.
+    bool m_catRigFeldNachDerMaske{false};
     void openRotorSetup();
     void openVoiceCheck();
     void wirePuduMonitor();
@@ -1332,6 +1335,9 @@ private:
     /// Fenster obenauf ablösen. Nur für Einschalten per Menü/Plus —
     /// nicht beim Start oder Profilwechsel, die Lagen gehören dem Profil.
     void bringAppletToFront(const QString& id);
+    /// Das CAT-Feld nach dem Verbinden zeigen. Geht es dabei neu als eigenes
+    /// Fenster auf, kommt es auf einen freien Platz, wenn es einen gibt.
+    void zeigeCatRigFeld();
     /// Ist das Applet in der Spalte des Hauptfensters für den Bediener
     /// verdeckt (von schwebenden Fenstern, weggerollt, Fenster zu)?
     /// `countScrolledAway`: auch weggerollt zaehlt als verdeckt.
