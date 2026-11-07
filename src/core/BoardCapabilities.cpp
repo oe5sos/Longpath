@@ -1435,6 +1435,11 @@ const BoardCapabilities kCatRig = [] {
     c.protocol    = ProtocolVersion::CatRig;
     c.isRxOnlySku = true;
     c.displayName = "CAT rig";
+    // Ein Strom fuer den Ton. kUnknown hat keinen: ohne ihn bindet sich die
+    // Scheibe an nichts, und der Panadapter bleibt leer, obwohl die
+    // FFT rechnet und der Ton zu hoeren ist (gemessen 2026-11-07).
+    c.userDdcCount = 1;
+    c.maxSlices    = 1;
     return c;
 }();
 

@@ -42,7 +42,9 @@
 #include "core/WdspEngine.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "core/FFTRouter.h"
 #include "gui/MainWindow.h"
+#include "gui/SpectrumWidget.h"
 
 using namespace Longpath;
 
@@ -165,6 +167,9 @@ private slots:
         const BoardCapabilities& caps = BoardCapsTable::forBoard(HPSDRHW::CatRig);
         QCOMPARE(caps.board, HPSDRHW::CatRig);
         QVERIFY(caps.isRxOnlySku);
+        // Ohne Strom bindet sich die Scheibe an nichts: Ton ja, Bild nein.
+        QCOMPARE(caps.userDdcCount, 1);
+        QVERIFY(caps.maxSlices >= 1);
     }
 
     // Der Ton muss dort liegen, wo ein SDR ihn zeigen wuerde: in USB ueber
@@ -493,6 +498,22 @@ private slots:
         speise();
         const double sMeter = kanal->getMeter(RxMeterType::SignalAvg);
         qInfo() << "USB: Spitze" << spitzeHz() << "S" << sMeter << "Rahmen" << rahmen;
+        for (SpectrumWidget* sw : fenster->findChildren<SpectrumWidget*>()) {
+            const auto& pix = sw->undentedPixelsForTest();
+            float lo = 999.f, hi = -999.f;
+            for (float v : pix) { lo = std::min(lo, v); hi = std::max(hi, v); }
+            qInfo() << "Flaeche" << sw->objectName() << "ddc" << sw->ddcCenterFrequency()
+                    << "rate" << sw->sampleRate() << "mitte" << sw->centerFrequency()
+                    << "bw" << sw->bandwidth() << "pix" << sw->renderedPixelCountForTest()
+                    << "bins" << sw->visibleBinCountForTest() << "nf" << sw->nfFftBinAverageForTest()
+                    << "lo" << lo << "hi" << hi << "sichtbar" << sw->isVisible();
+        }
+        qInfo() << "Scheibenstrom" << (radio.activeSlice() ? radio.activeSlice()->streamIndex() : -9)
+                << "Pans" << radio.fftRouter()->pansForReceiver(0)
+                << "Frequenz" << (radio.activeSlice() ? radio.activeSlice()->frequency() : 0.0);
+        QVERIFY2(radio.activeSlice() && radio.activeSlice()->streamIndex() == 0,
+                 "die Scheibe haengt an keinem Strom, der Panadapter bleibt leer");
+        QVERIFY(!radio.fftRouter()->pansForReceiver(0).isEmpty());
         const double spitzeUsb = spitzeHz();
         // Gegenrichtung: derselbe Ton im falschen Seitenband ist im
         // Durchlassbereich nicht zu hoeren.
