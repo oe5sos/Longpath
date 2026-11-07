@@ -27,6 +27,9 @@ constexpr std::array<int, 14> kHighCut = {1000, 1200, 1400, 1600, 1800, 2000, 22
                                           2400, 2600, 2800, 3000, 3400, 4000, 5000};
 constexpr std::array<int, 12> kLowCut  = {0, 50, 100, 200, 300, 400, 500, 600,
                                           700, 800, 900, 1000};
+// Am TS-590S nachgelesen (2026-11-07): FW nimmt jeden dieser Werte in CW an.
+constexpr std::array<int, 14> kCwBreite = {50, 80, 100, 150, 200, 250, 300,
+                                           400, 500, 600, 1000, 1500, 2000, 2500};
 
 template <std::size_t N>
 int naechster(const std::array<int, N>& tabelle, int hz)
@@ -52,7 +55,7 @@ QList<QByteArray> abfragen()
     return {QByteArrayLiteral("AN;"), QByteArrayLiteral("PA;"), QByteArrayLiteral("RA;"),
             QByteArrayLiteral("RG;"), QByteArrayLiteral("GC;"), QByteArrayLiteral("NB;"),
             QByteArrayLiteral("NR;"), QByteArrayLiteral("SL;"), QByteArrayLiteral("SH;"),
-            QByteArrayLiteral("PC;")};
+            QByteArrayLiteral("PC;"), QByteArrayLiteral("FW;"), QByteArrayLiteral("FL;")};
 }
 
 QByteArray abfrageMeter() { return QByteArrayLiteral("SM0;"); }
@@ -98,6 +101,18 @@ bool leseAntwort(QByteArray a, Zustand& z)
         z.highCutHz = kHighCut[std::size_t(i)];
         return true;
     }
+    if (k == "FW") {
+        const int hz = zahl(a, 2, 4);
+        if (hz <= 0) { return false; }
+        z.cwBreiteHz = hz;
+        return true;
+    }
+    if (k == "FL") {
+        const int nummer = zahl(a, 2, 1);
+        if (nummer != 1 && nummer != 2) { return false; }
+        z.filter = nummer;
+        return true;
+    }
     return false;
 }
 
@@ -110,6 +125,7 @@ double punkteZuDbm(int punkte)
 
 int naechsterLowCut(int hz)  { return naechster(kLowCut, hz); }
 int naechsterHighCut(int hz) { return naechster(kHighCut, hz); }
+int naechsteCwBreite(int hz) { return naechster(kCwBreite, hz); }
 
 QByteArray stelleVorverstaerker(bool an)
 {
@@ -150,14 +166,31 @@ QByteArray stelleNr(bool an)
     return an ? QByteArrayLiteral("U NR 1\n") : QByteArrayLiteral("U NR 0\n");
 }
 
+// Nicht `L SLOPE_...`: das lehnt Hamlib 4.7.2 in LSB mit RPRT -1 ab, am
+// TS-590S gemessen. Die Geraetebefehle wirken in beiden Seitenbaendern.
 QByteArray stelleLowCut(int hz)
 {
-    return QStringLiteral("L SLOPE_LOW %1\n").arg(naechsterLowCut(hz)).toLatin1();
+    const int wert = naechsterLowCut(hz);
+    const auto i = std::distance(kLowCut.begin(), std::find(kLowCut.begin(), kLowCut.end(), wert));
+    return QStringLiteral("W SL%1; 0\n").arg(i, 2, 10, QLatin1Char('0')).toLatin1();
 }
 
 QByteArray stelleHighCut(int hz)
 {
-    return QStringLiteral("L SLOPE_HIGH %1\n").arg(naechsterHighCut(hz)).toLatin1();
+    const int wert = naechsterHighCut(hz);
+    const auto i = std::distance(kHighCut.begin(), std::find(kHighCut.begin(), kHighCut.end(), wert));
+    return QStringLiteral("W SH%1; 0\n").arg(i, 2, 10, QLatin1Char('0')).toLatin1();
+}
+
+QByteArray stelleCwBreite(int hz)
+{
+    return QStringLiteral("W FW%1; 0\n")
+        .arg(naechsteCwBreite(hz), 4, 10, QLatin1Char('0')).toLatin1();
+}
+
+QByteArray stelleFilter(int filter)
+{
+    return filter == 1 ? QByteArrayLiteral("W FL1; 0\n") : QByteArrayLiteral("W FL2; 0\n");
 }
 
 } // namespace Longpath::Ts590Cat

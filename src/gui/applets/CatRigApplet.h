@@ -43,6 +43,7 @@ private:
     QPushButton* m_nb{nullptr};
     QPushButton* m_nr{nullptr};
     QComboBox*   m_agc{nullptr};
+    QPushButton* m_filter{nullptr};
     QSlider*     m_rfGain{nullptr};
     QLabel*      m_rfWert{nullptr};
     QLabel*      m_messwerte{nullptr};

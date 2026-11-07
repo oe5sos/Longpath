@@ -126,9 +126,21 @@ void CatRigBruecke::vomGeraetFilter()
 {
     if (!m_rig || !m_scheibe || fristLaeuft()) { return; }
     const Ts590Cat::Zustand& z = m_rig->catZustand();
-    if (z.lowCutHz < 0 || z.highCutHz < 0) { return; }
 
     const DSPMode modus = m_scheibe->dspMode();
+    if (modus == DSPMode::CWU || modus == DSPMode::CWL) {
+        // In CW kennt das Geraet nur die Breite. Die Lage bleibt der Scheibe.
+        if (z.cwBreiteHz <= 0) { return; }
+        const int mitte = (m_scheibe->filterLow() + m_scheibe->filterHigh()) / 2;
+        const int unten = mitte - z.cwBreiteHz / 2;
+        const int oben = unten + z.cwBreiteHz;
+        if (m_scheibe->filterLow() == unten && m_scheibe->filterHigh() == oben) { return; }
+        m_uebernimmtVomGeraet = true;
+        m_scheibe->setFilter(unten, oben);
+        m_uebernimmtVomGeraet = false;
+        return;
+    }
+    if (z.lowCutHz < 0 || z.highCutHz < 0) { return; }
     int low = z.lowCutHz;
     int high = z.highCutHz;
     if (modus == DSPMode::LSB) {
@@ -147,7 +159,11 @@ void CatRigBruecke::vonScheibeFilter(int low, int high)
 {
     if (!m_rig || !m_scheibe || m_uebernimmtVomGeraet) { return; }
     const DSPMode modus = m_scheibe->dspMode();
-    if (modus != DSPMode::USB && modus != DSPMode::LSB) { return; }
+    if (modus != DSPMode::USB && modus != DSPMode::LSB
+        && modus != DSPMode::CWU && modus != DSPMode::CWL) {
+        return;
+    }
+    m_filterBreiteHz = std::abs(high - low);
     m_filterVonHz = std::min(std::abs(low), std::abs(high));
     m_filterBisHz = std::max(std::abs(low), std::abs(high));
     m_befehlGesendet = true;
@@ -159,11 +175,18 @@ void CatRigBruecke::schickeFilter()
 {
     if (!m_rig) { return; }
     const Ts590Cat::Zustand& z = m_rig->catZustand();
-    if (Ts590Cat::naechsterLowCut(m_filterVonHz) != z.lowCutHz) {
-        m_rig->stelle(Ts590Cat::stelleLowCut(m_filterVonHz));
-    }
-    if (Ts590Cat::naechsterHighCut(m_filterBisHz) != z.highCutHz) {
-        m_rig->stelle(Ts590Cat::stelleHighCut(m_filterBisHz));
+    const DSPMode modus = m_scheibe ? m_scheibe->dspMode() : DSPMode::USB;
+    if (modus == DSPMode::CWU || modus == DSPMode::CWL) {
+        if (Ts590Cat::naechsteCwBreite(m_filterBreiteHz) != z.cwBreiteHz) {
+            m_rig->stelle(Ts590Cat::stelleCwBreite(m_filterBreiteHz));
+        }
+    } else {
+        if (Ts590Cat::naechsterLowCut(m_filterVonHz) != z.lowCutHz) {
+            m_rig->stelle(Ts590Cat::stelleLowCut(m_filterVonHz));
+        }
+        if (Ts590Cat::naechsterHighCut(m_filterBisHz) != z.highCutHz) {
+            m_rig->stelle(Ts590Cat::stelleHighCut(m_filterBisHz));
+        }
     }
     m_befehlGesendet = true;
     m_seitBefehl.start();

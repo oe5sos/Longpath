@@ -53,6 +53,9 @@ CatRigApplet::CatRigApplet(RadioModel* model, QWidget* parent)
         connect(m_agc, &QComboBox::activated, this, [schicke](int i) {
             schicke(Ts590Cat::stelleAgc(static_cast<Ts590Cat::Agc>(i)));
         });
+        connect(m_filter, &QPushButton::clicked, this, [rig, schicke]() {
+            schicke(Ts590Cat::stelleFilter(rig->catZustand().filter == 1 ? 2 : 1));
+        });
         connect(m_rfGain, &QSlider::sliderReleased, this, [this, schicke]() {
             schicke(Ts590Cat::stelleRfGain(m_rfGain->value()));
         });
@@ -100,6 +103,9 @@ void CatRigApplet::buildUI()
     m_agc->addItems({QStringLiteral("Off"), QStringLiteral("Slow"), QStringLiteral("Fast")});
     agcZeile->addWidget(agcText);
     agcZeile->addWidget(m_agc, 1);
+    m_filter = new QPushButton(QStringLiteral("FIL"), this);
+    m_filter->setObjectName(QStringLiteral("catRigFilter"));
+    agcZeile->addWidget(m_filter);
     root->addLayout(agcZeile);
 
     m_rfGain = new QSlider(Qt::Horizontal, this);
@@ -154,6 +160,9 @@ void CatRigApplet::syncFromModel()
     if (z.agc >= 0 && z.agc < m_agc->count()) {
         const QSignalBlocker sperre(m_agc);
         m_agc->setCurrentIndex(z.agc);
+    }
+    if (z.filter > 0) {
+        m_filter->setText(z.filter == 1 ? QStringLiteral("FIL A") : QStringLiteral("FIL B"));
     }
     if (z.rfGain >= 0 && !m_rfGain->isSliderDown()) {
         const QSignalBlocker sperre(m_rfGain);

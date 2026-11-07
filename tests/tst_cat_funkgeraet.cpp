@@ -92,7 +92,10 @@ public:
             if (t.startsWith("T ") || t.startsWith("\\set_ptt") || t.startsWith("b ")) {
                 return true;
             }
-            if (t.startsWith("W ") && !t.startsWith("W GC")) { return true; }
+            if (t.startsWith("W ") && !t.startsWith("W GC") && !t.startsWith("W SH")
+                && !t.startsWith("W SL") && !t.startsWith("W FW") && !t.startsWith("W FL")) {
+                return true;
+            }
             for (const char* verboten : {"w TX", "w KY", "w PB", "w PS", "w EX", "w PC1", "l RFPOWER"}) {
                 if (t.startsWith(verboten)) { return true; }
             }
@@ -316,6 +319,11 @@ private slots:
         QCOMPARE(z.lowCutHz, 100);
         QVERIFY(Ts590Cat::leseAntwort("SH09;", z));
         QCOMPARE(z.highCutHz, 2800);
+        QVERIFY(Ts590Cat::leseAntwort("FW0250;", z));
+        QCOMPARE(z.cwBreiteHz, 250);
+        QVERIFY(Ts590Cat::leseAntwort("FL2;", z));
+        QCOMPARE(z.filter, 2);
+        QVERIFY(!Ts590Cat::leseAntwort("?;", z));
         QVERIFY(Ts590Cat::leseAntwort("PC005;", z));
         QCOMPARE(z.leistungW, 5);
         QVERIFY(!Ts590Cat::leseAntwort("XX1;", z));
@@ -333,13 +341,18 @@ private slots:
         const QByteArrayList zeilen = {
             Ts590Cat::stelleVorverstaerker(true), Ts590Cat::stelleDaempfung(true),
             Ts590Cat::stelleRfGain(128),
-            Ts590Cat::stelleNb(true), Ts590Cat::stelleNr(true),
-            Ts590Cat::stelleLowCut(100), Ts590Cat::stelleHighCut(2800)};
+            Ts590Cat::stelleNb(true), Ts590Cat::stelleNr(true)};
         for (const QByteArray& z : zeilen) {
             QVERIFY2(z.startsWith("L ") || z.startsWith("U "), z.constData());
             QVERIFY2(!z.contains("RFPOWER") && !z.contains("PTT"), z.constData());
         }
         QCOMPARE(Ts590Cat::stelleRfGain(255), QByteArray("L RF 1.000\n"));
+        QCOMPARE(Ts590Cat::stelleLowCut(100), QByteArray("W SL02; 0\n"));
+        QCOMPARE(Ts590Cat::stelleHighCut(2800), QByteArray("W SH09; 0\n"));
+        QCOMPARE(Ts590Cat::stelleHighCut(2850), QByteArray("W SH09; 0\n"));
+        QCOMPARE(Ts590Cat::stelleCwBreite(480), QByteArray("W FW0500; 0\n"));
+        QCOMPARE(Ts590Cat::stelleFilter(1), QByteArray("W FL1; 0\n"));
+        QCOMPARE(Ts590Cat::stelleFilter(2), QByteArray("W FL2; 0\n"));
         QCOMPARE(Ts590Cat::stelleAgc(Ts590Cat::Agc::Aus), QByteArray("W GC0; 0\n"));
         QCOMPARE(Ts590Cat::stelleAgc(Ts590Cat::Agc::Langsam), QByteArray("W GC1; 0\n"));
         QCOMPARE(Ts590Cat::stelleAgc(Ts590Cat::Agc::Schnell), QByteArray("W GC2; 0\n"));
@@ -437,8 +450,8 @@ private slots:
 
         // Von der Scheibe zum Geraet, auf die Tabelle gerundet.
         scheibe.setFilter(-2600, -200);
-        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("L SLOPE_HIGH 2600\n"), 3000);
-        QVERIFY(doppel.befehle.contains("L SLOPE_LOW 200\n"));
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W SH08; 0\n"), 3000);
+        QVERIFY(doppel.befehle.contains("W SL03; 0\n"));
     }
 
     // Beim Ziehen kommt jede Bewegung einzeln. Zum Geraet geht nur die letzte,
@@ -460,13 +473,41 @@ private slots:
             scheibe.setFilter(100, hz);
             QTest::qWait(2);
         }
-        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("L SLOPE_HIGH 3000\n"), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W SH10; 0\n"), 2000);
         QCOMPARE(doppel.befehle.size(), 1);
 
         // Das Geraet rundet auf seine Tabelle: die Anzeige folgt ihm, auch
         // wenn sich dort nichts mehr aendert.
         scheibe.setFilter(100, 2850);
         QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 2000);
+    }
+
+    // In CW stellt das Geraet nur die Breite. Die Lage bleibt der Scheibe.
+    void in_cw_wird_die_breite_gestellt()
+    {
+        RigctldDoppel doppel;
+        doppel.modus = QStringLiteral("CW");
+        doppel.roh["FW;"] = "FW0500;";
+        doppel.roh.remove("SL;");
+        doppel.roh.remove("SH;");
+        zielAuf(doppel.port());
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 3000);
+        rig.client()->setPollIntervalMs(20);
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::CWU, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh() - scheibe.filterLow(), 500, 5000);
+        const int mitte = (scheibe.filterHigh() + scheibe.filterLow()) / 2;
+
+        doppel.roh["FW;"] = "FW0250;";
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh() - scheibe.filterLow(), 250, 5000);
+        QVERIFY(std::abs((scheibe.filterHigh() + scheibe.filterLow()) / 2 - mitte) <= 1);
+
+        doppel.befehle.clear();
+        scheibe.setFilter(mitte - 300, mitte + 300);
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W FW0600; 0\n"), 2000);
     }
 
     // Nur von Hand, mit dem Geraet am USB-Kabel. Liest nur den Ton.
@@ -812,7 +853,7 @@ private slots:
         CatRigApplet feld(&radio);
         // Eine ganze Runde der Abfrageliste, damit das Feld den Stand kennt.
         QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->catZustand().rfGain >= 0, 5000);
-        QTest::qWait(800);
+        QTest::qWait(3000);
 
         const auto taste = [&](const char* name, const QByteArray& abfrage) {
             auto* knopf = feld.findChild<QPushButton*>(QLatin1String(name));
@@ -836,16 +877,20 @@ private slots:
         auto* agc = feld.findChild<QComboBox*>(QStringLiteral("catRigAgc"));
         QVERIFY(agc);
         const QByteArray agcVorher = frage("w GC;");
-        const int agcStand = agc->currentIndex();
-        const int agcAnders = agcStand == 1 ? 2 : 1;
-        agc->setCurrentIndex(agcAnders);
-        emit agc->activated(agcAnders);
-        QTRY_VERIFY_WITH_TIMEOUT(frage("w GC;") != agcVorher, 3000);
-        const QByteArray agcGeschaltet = frage("w GC;");
-        agc->setCurrentIndex(agcStand);
-        emit agc->activated(agcStand);
-        QTRY_COMPARE_WITH_TIMEOUT(frage("w GC;"), agcVorher, 3000);
-        qInfo().noquote() << "FELD AGC" << agcVorher << "->" << agcGeschaltet << "->" << agcVorher;
+        // Steht das Geraet auf AGC aus (bei uns in CW), nimmt es weder GC1
+        // noch GC2 an; gemessen 2026-11-07.
+        if (agcVorher != "GC0;") {
+            const int agcStand = agc->currentIndex();
+            const int agcAnders = agcStand == 1 ? 2 : 1;
+            agc->setCurrentIndex(agcAnders);
+            emit agc->activated(agcAnders);
+            QTRY_VERIFY_WITH_TIMEOUT(frage("w GC;") != agcVorher, 3000);
+            const QByteArray agcGeschaltet = frage("w GC;");
+            agc->setCurrentIndex(agcStand);
+            emit agc->activated(agcStand);
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w GC;"), agcVorher, 3000);
+            qInfo().noquote() << "FELD AGC" << agcVorher << "->" << agcGeschaltet << "->" << agcVorher;
+        }
 
         auto* rf = feld.findChild<QSlider*>(QStringLiteral("catRigRfGain"));
         QVERIFY(rf);
@@ -858,6 +903,67 @@ private slots:
         QCOMPARE(rf->value(), 255);
         qInfo().noquote() << "FELD RF" << rfVorher << "->" << frage("w RG;")
                           << "S-Meter" << meterVorher << "->" << frage("w SM0;");
+
+        // Die Filtertaste und die Bandbreite, in dem Seitenband, in dem das
+        // Geraet gerade steht. Am Ende steht beides wie vorher.
+        auto* filter = feld.findChild<QPushButton*>(QStringLiteral("catRigFilter"));
+        QVERIFY(filter);
+        const QByteArray filterVorher = frage("w FL;");
+        filter->click();
+        QTRY_VERIFY_WITH_TIMEOUT(frage("w FL;") != filterVorher, 3000);
+        const QByteArray filterGeschaltet = frage("w FL;");
+        QTRY_VERIFY_WITH_TIMEOUT(filter->text() == (filterGeschaltet == "FL1;"
+                                     ? QStringLiteral("FIL A") : QStringLiteral("FIL B")), 3000);
+        filter->click();
+        QTRY_COMPARE_WITH_TIMEOUT(frage("w FL;"), filterVorher, 3000);
+        qInfo().noquote() << "FELD FIL" << filterVorher << "->" << filterGeschaltet << "->" << filterVorher;
+
+        const QByteArray modus = frage("w MD;");
+        if (modus == "MD1;" || modus == "MD2;") {
+            SliceModel scheibe;
+            CatRigBruecke bruecke(radio.companionRig(), &scheibe);
+            const DSPMode band = modus == "MD1;" ? DSPMode::LSB : DSPMode::USB;
+            QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), band, 5000);
+            QTRY_VERIFY_WITH_TIMEOUT(scheibe.filterHigh() != scheibe.filterLow()
+                                     && std::abs(scheibe.filterHigh()) + std::abs(scheibe.filterLow()) > 0, 5000);
+            QTest::qWait(1000);
+            const int vz = band == DSPMode::LSB ? -1 : 1;
+            const auto setze = [&](int von, int bis) {
+                band == DSPMode::LSB ? scheibe.setFilter(-bis, -von) : scheibe.setFilter(von, bis);
+            };
+            const QByteArray slVorher = frage("w SL;"), shVorher = frage("w SH;");
+            const int hochVorher = std::max(std::abs(scheibe.filterLow()), std::abs(scheibe.filterHigh()));
+            const int tiefVorher = std::min(std::abs(scheibe.filterLow()), std::abs(scheibe.filterHigh()));
+            setze(300, 2000);
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w SL;"), QByteArray("SL04;"), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w SH;"), QByteArray("SH05;"), 3000);
+            setze(300, 2850);      // zwischen zwei Stufen: das Geraet rundet
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w SH;"), QByteArray("SH09;"), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(band == DSPMode::LSB ? scheibe.filterLow() : scheibe.filterHigh(),
+                                      vz * 2800, 3000);
+            setze(tiefVorher, hochVorher);
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w SL;"), slVorher, 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w SH;"), shVorher, 3000);
+            qInfo().noquote() << "FELD Bandbreite" << modus << slVorher << shVorher
+                              << "-> SL04; SH05; -> SH09; -> zurueck";
+        }
+
+        if (modus == "MD3;") {
+            SliceModel scheibe;
+            CatRigBruecke bruecke(radio.companionRig(), &scheibe);
+            QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::CWU, 5000);
+            const QByteArray breiteVorher = frage("w FW;");
+            QTest::qWait(1500);
+            const int mitte = (scheibe.filterLow() + scheibe.filterHigh()) / 2;
+            scheibe.setFilter(mitte - 300, mitte + 300);
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w FW;"), QByteArray("FW0600;"), 3000);
+            scheibe.setFilter(mitte - 240, mitte + 240);   // rundet auf 500
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w FW;"), QByteArray("FW0500;"), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh() - scheibe.filterLow(), 500, 3000);
+            leser.write("W " + breiteVorher + " 0\n");
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w FW;"), breiteVorher, 3000);
+            qInfo().noquote() << "FELD CW" << breiteVorher << "-> FW0600; -> FW0500; -> zurueck";
+        }
 
         QCOMPARE(frage("f"), frequenzVorher);
         QCOMPARE(frage("t"), QByteArray("0"));

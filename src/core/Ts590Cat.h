@@ -53,6 +53,8 @@ struct Zustand {
     int  swrPunkte{-1};        // 0..30
     int  lowCutHz{-1};
     int  highCutHz{-1};
+    int  cwBreiteHz{-1};       // nur in CW, sonst bleibt der letzte Wert
+    int  filter{-1};           // 1 = Filter A, 2 = Filter B
 
     bool operator==(const Zustand&) const = default;
 };
@@ -78,6 +80,7 @@ double punkteZuDbm(int punkte);
 /// Menge ist fest, ein Wunsch dazwischen faellt auf den naechsten Wert.
 int naechsterLowCut(int hz);
 int naechsterHighCut(int hz);
+int naechsteCwBreite(int hz);
 
 // ── Die Zeilen fuer rigctld ─────────────────────────────────────
 QByteArray stelleVorverstaerker(bool an);
@@ -88,5 +91,7 @@ QByteArray stelleNb(bool an);
 QByteArray stelleNr(bool an);
 QByteArray stelleLowCut(int hz);
 QByteArray stelleHighCut(int hz);
+QByteArray stelleCwBreite(int hz);
+QByteArray stelleFilter(int filter);      // 1 = A, 2 = B
 
 } // namespace Longpath::Ts590Cat
