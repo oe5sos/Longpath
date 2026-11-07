@@ -38,6 +38,8 @@
 
 #include "core/WdspTypes.h"
 
+class QTimer;
+
 namespace Longpath {
 
 class CompanionRigController;
@@ -50,6 +52,10 @@ public:
     /// Ein Befehl braucht einen Umlauf durch rigctld und die naechste
     /// Abfrage. Eine kuerzere Frist liesse die alte Frequenz durch.
     static constexpr int kFristNachBefehlMs = 400;
+
+    /// Beim Ziehen an der Bandbreite kommt jede Bewegung einzeln. Geschickt
+    /// wird erst, wenn so lange nichts Neues kam.
+    static constexpr int kFilterZugMs = 120;
 
     CatRigBruecke(CompanionRigController* rig, SliceModel* scheibe,
                   QObject* parent = nullptr);
@@ -70,6 +76,7 @@ private:
     void vonScheibeModus(DSPMode modus);
     void vomGeraetFilter();
     void vonScheibeFilter(int low, int high);
+    void schickeFilter();
     bool fristLaeuft() const;
 
     QPointer<CompanionRigController> m_rig;
@@ -77,6 +84,10 @@ private:
     QElapsedTimer m_seitBefehl;
     bool m_befehlGesendet{false};
     bool m_uebernimmtVomGeraet{false};
+    QTimer* m_filterZug{nullptr};
+    QTimer* m_filterAbgleich{nullptr};
+    int m_filterVonHz{0};
+    int m_filterBisHz{0};
 };
 
 } // namespace Longpath

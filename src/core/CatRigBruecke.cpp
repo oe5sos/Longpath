@@ -13,7 +13,10 @@
 #include "CatRigBruecke.h"
 
 #include "core/CompanionRigController.h"
+#include "core/Ts590Cat.h"
 #include "models/SliceModel.h"
+
+#include <QTimer>
 
 #include <algorithm>
 #include <cmath>
@@ -27,6 +30,19 @@ CatRigBruecke::CatRigBruecke(CompanionRigController* rig, SliceModel* scheibe,
     , m_rig(rig)
     , m_scheibe(scheibe)
 {
+    m_filterZug = new QTimer(this);
+    m_filterZug->setSingleShot(true);
+    m_filterZug->setInterval(kFilterZugMs);
+    connect(m_filterZug, &QTimer::timeout, this, &CatRigBruecke::schickeFilter);
+
+    // Die Antwort auf das Nachlesen kommt noch in der Frist und zaehlt dort
+    // nicht. Ohne diesen Abgleich bliebe die Anzeige auf dem verlangten Wert
+    // stehen, obwohl das Geraet auf seine Tabelle gerundet hat.
+    m_filterAbgleich = new QTimer(this);
+    m_filterAbgleich->setSingleShot(true);
+    m_filterAbgleich->setInterval(kFristNachBefehlMs + 50);
+    connect(m_filterAbgleich, &QTimer::timeout, this, &CatRigBruecke::vomGeraetFilter);
+
     if (!rig || !scheibe) { return; }
 
     connect(rig, &CompanionRigController::zfFrequenzGeaendert,
@@ -132,12 +148,26 @@ void CatRigBruecke::vonScheibeFilter(int low, int high)
     if (!m_rig || !m_scheibe || m_uebernimmtVomGeraet) { return; }
     const DSPMode modus = m_scheibe->dspMode();
     if (modus != DSPMode::USB && modus != DSPMode::LSB) { return; }
-    const int vonHz = std::min(std::abs(low), std::abs(high));
-    const int bisHz = std::max(std::abs(low), std::abs(high));
-    m_rig->stelle(Ts590Cat::stelleLowCut(vonHz));
-    m_rig->stelle(Ts590Cat::stelleHighCut(bisHz));
+    m_filterVonHz = std::min(std::abs(low), std::abs(high));
+    m_filterBisHz = std::max(std::abs(low), std::abs(high));
     m_befehlGesendet = true;
     m_seitBefehl.start();
+    m_filterZug->start();
+}
+
+void CatRigBruecke::schickeFilter()
+{
+    if (!m_rig) { return; }
+    const Ts590Cat::Zustand& z = m_rig->catZustand();
+    if (Ts590Cat::naechsterLowCut(m_filterVonHz) != z.lowCutHz) {
+        m_rig->stelle(Ts590Cat::stelleLowCut(m_filterVonHz));
+    }
+    if (Ts590Cat::naechsterHighCut(m_filterBisHz) != z.highCutHz) {
+        m_rig->stelle(Ts590Cat::stelleHighCut(m_filterBisHz));
+    }
+    m_befehlGesendet = true;
+    m_seitBefehl.start();
+    m_filterAbgleich->start();
 }
 
 void CatRigBruecke::vonScheibeFrequenz(double hz)

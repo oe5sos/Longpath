@@ -149,6 +149,7 @@ public:
     void schickeZeile(const QByteArray& zeile);
     /// Die Rohabfragen sofort, nicht reihum: eine Runde dauert fast zwei
     /// Sekunden, und solange spraengen Tasten auf den alten Stand zurueck.
+    /// Mehrere Aufrufe kurz hintereinander lesen nur einmal nach.
     void frageRohListeNach();
 
     /// Schaltet den Zwischenspeicher von rigctld ab. Ab Werk beantwortet
@@ -257,6 +258,7 @@ private:
     QTimer* m_poll{nullptr};
     QTimer* m_retry{nullptr};
     QTimer* m_deadline{nullptr};
+    QTimer* m_nachlesen{nullptr};
     int     m_pollMs{kStandardAbfrageMs};
     quint64 m_tick{0};
     QList<QByteArray> m_rohListe;

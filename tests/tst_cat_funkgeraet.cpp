@@ -441,6 +441,34 @@ private slots:
         QVERIFY(doppel.befehle.contains("L SLOPE_LOW 200\n"));
     }
 
+    // Beim Ziehen kommt jede Bewegung einzeln. Zum Geraet geht nur die letzte,
+    // sonst stapeln sich die Befehle hinter dem Mauszeiger.
+    void ziehen_an_der_bandbreite_schickt_nur_das_letzte()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 3000);
+        rig.client()->setPollIntervalMs(20);
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 5000);
+
+        doppel.befehle.clear();
+        for (int hz = 2000; hz <= 3000; hz += 50) {
+            scheibe.setFilter(100, hz);
+            QTest::qWait(2);
+        }
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("L SLOPE_HIGH 3000\n"), 2000);
+        QCOMPARE(doppel.befehle.size(), 1);
+
+        // Das Geraet rundet auf seine Tabelle: die Anzeige folgt ihm, auch
+        // wenn sich dort nichts mehr aendert.
+        scheibe.setFilter(100, 2850);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 2000);
+    }
+
     // Nur von Hand, mit dem Geraet am USB-Kabel. Liest nur den Ton.
     void derEchteTonEingangLiefertBloecke()
     {

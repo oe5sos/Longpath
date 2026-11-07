@@ -57,6 +57,16 @@ RigctldClient::RigctldClient(QObject* parent) : QObject(parent)
     // durch, und der Client ist stumm tot, bis jemand von Hand neu
     // verbindet. Die Verbindung zu kappen schickt die Erholung ueber
     // den Trennungsweg, der den Wiederanlauf schon kennt.
+    m_nachlesen = new QTimer(this);
+    m_nachlesen->setSingleShot(true);
+    m_nachlesen->setInterval(50);
+    connect(m_nachlesen, &QTimer::timeout, this, [this]() {
+        if (!isConnected()) { return; }
+        for (const QByteArray& frage : std::as_const(m_rohListe)) {
+            send(QByteArrayLiteral("w ") + frage + '\n', Pending::Roh);
+        }
+    });
+
     m_deadline = new QTimer(this);
     m_deadline->setSingleShot(true);
     m_deadline->setInterval(kReplyTimeoutMs);
@@ -164,6 +174,7 @@ void RigctldClient::disconnectFromRig()
     m_retry->stop();
     m_poll->stop();
     m_deadline->stop();
+    m_nachlesen->stop();
     m_queue.clear();
     m_buffer.clear();
     m_awaiting = Pending::None;
@@ -207,10 +218,7 @@ void RigctldClient::schickeZeile(const QByteArray& zeile)
 
 void RigctldClient::frageRohListeNach()
 {
-    if (!isConnected()) { return; }
-    for (const QByteArray& frage : std::as_const(m_rohListe)) {
-        send(QByteArrayLiteral("w ") + frage + '\n', Pending::Roh);
-    }
+    if (isConnected()) { m_nachlesen->start(); }
 }
 
 void RigctldClient::schalteZwischenspeicherAus()
