@@ -50,6 +50,50 @@ private:
     static QList<QRect> rahmen() { return {obenStreifen(), untenStreifen()}; }
 
 private slots:
+    // Gemessen am 2026-11-07: Bandbreitenfilter 160, 176, 192, von Lauf
+    // zu Lauf. Das Hauptfenster steht beim Aufbau noch auf y=48, die
+    // verfuegbare Flaeche beginnt bei 33. Ein Rundlauf Speichern und
+    // Laden muss dieselbe Lage ergeben.
+    void einMaximiertesFensterWandertNichtVonLaufZuLauf()
+    {
+        const QRect verfuegbar(0, 33, 1470, 923);
+        const QRect fertig(0, 33, 1470, 865);
+        const QRect unterwegs(0, 48, 1470, 865);
+
+        int y = 176;
+        for (int lauf = 0; lauf < 5; ++lauf) {
+            const int dy = y - fertig.y();
+            const QPoint ecke = bezugspunktFuerProfil(Qt::WindowMaximized,
+                                                      unterwegs, verfuegbar);
+            y = snappedTopLeft(QPoint(0, ecke.y() + dy), kSnapGridPx).y();
+        }
+        QCOMPARE(y, 176);
+    }
+
+    void einNormalesFensterBleibtAnSeinemRahmen()
+    {
+        const QRect rahmen(100, 48, 900, 600);
+        QCOMPARE(bezugspunktFuerProfil(Qt::WindowNoState, rahmen,
+                                       QRect(0, 33, 1470, 923)),
+                 rahmen.topLeft());
+        QCOMPARE(bezugspunktFuerProfil(Qt::WindowFullScreen, rahmen,
+                                       QRect(0, 33, 1470, 923)),
+                 rahmen.topLeft());
+    }
+
+    // Solange das Hauptfenster unterwegs ist, liegen seine Leisten zu
+    // tief, und der Schutzrahmen darf nichts schieben.
+    void derRahmenWartetAufDasHauptfenster()
+    {
+        const QRect verfuegbar(0, 33, 1470, 923);
+        QVERIFY(!hauptrahmenSteht(Qt::WindowMaximized,
+                                  QRect(0, 48, 1470, 865), verfuegbar));
+        QVERIFY(hauptrahmenSteht(Qt::WindowMaximized,
+                                 QRect(0, 33, 1470, 865), verfuegbar));
+        QVERIFY(hauptrahmenSteht(Qt::WindowNoState,
+                                 QRect(0, 48, 1470, 865), verfuegbar));
+    }
+
     void einFensterAufDerKommandoleisteWirdHERUNTERGESCHOBEN()
     {
         // Genau Martins Fall: der Bandbreitenfilter stand im Vollbild bei

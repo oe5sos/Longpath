@@ -474,6 +474,10 @@ private slots:
             // switch, so the field initializer holds") — not an
             // oversight to fix, a board this switch was never for.
             int(HPSDRHW::SunSdr2Qrp),
+            // Ein Funkgeraet hinter CAT (TS-590): dieselbe Lage wie die
+            // SunSDR. Keine Alex-Platine, nie auf diesem Weg, eigene
+            // CatRigConnection. Der Vorgabewert ist hier richtig.
+            int(HPSDRHW::CatRig),
         };
         for (const BoardCapabilities& caps : BoardCapsTable::all()) {
             QVERIFY2(covered.contains(int(caps.board)),

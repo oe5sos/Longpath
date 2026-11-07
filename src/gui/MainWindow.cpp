@@ -6582,6 +6582,20 @@ void MainWindow::buildUI()
         }
     });
 
+    // Ein Geraet hinter CAT hat keinen KiwiSDR neben sich. Stand der
+    // Panadapter noch aus einer anderen Sitzung auf KIWI, verwarf er jeden
+    // Rahmen des Geraets, und das Bild blieb leer (gemessen 2026-11-07).
+    connect(m_radioModel, &RadioModel::connectionStateChanged, this, [this]() {
+        const RadioConnection* verbindung = m_radioModel->connection();
+        if (!m_panStack || !m_radioModel->isConnected() || !verbindung
+            || verbindung->radioInfo().protocol != ProtocolVersion::CatRig) {
+            return;
+        }
+        for (PanadapterApplet* applet : m_panStack->allApplets()) {
+            if (applet) { applet->zeigeDasGeraet(); }
+        }
+    });
+
     // Phase 3Q-8: clicking the spectrum while disconnected opens ConnectionPanel.
     connect(activeSpectrumWidget(), &SpectrumWidget::disconnectedClickRequest,
             this, &MainWindow::showConnectionPanel);
@@ -16633,7 +16647,10 @@ QRect MainWindow::lageAusProfil(const QVariantMap& quelle) const
     const int h = quelle.value(QStringLiteral("h")).toInt();
     if (quelle.contains(QStringLiteral("dx"))
         && quelle.contains(QStringLiteral("dy"))) {
-        const QPoint ecke = frameGeometry().topLeft();
+        const QScreen* schirm = screen();
+        const QPoint ecke = bezugspunktFuerProfil(
+            windowState(), frameGeometry(),
+            schirm ? schirm->availableGeometry() : QRect());
         return QRect(ecke.x() + quelle.value(QStringLiteral("dx")).toInt(),
                      ecke.y() + quelle.value(QStringLiteral("dy")).toInt(),
                      w, h);
@@ -17157,6 +17174,13 @@ int MainWindow::schwebendeMitziehen()
 int MainWindow::schwebendeAusDemSchutzrahmenHolen()
 {
     if (m_shuttingDown) { return 0; }
+    // Das Hauptfenster ist noch unterwegs: seine Leisten liegen zu tief.
+    // Die Bewegung meldet sich selbst, moveEvent() ruft hier noch einmal.
+    if (const QScreen* schirm = screen();
+        schirm && !hauptrahmenSteht(windowState(), frameGeometry(),
+                                    schirm->availableGeometry())) {
+        return 0;
+    }
     const QList<QRect> sperren = schutzrahmen();
     if (sperren.isEmpty()) { return 0; }
 

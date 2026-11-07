@@ -611,6 +611,9 @@ set(CORE_SOURCES
     src/core/P1RadioConnection.cpp
     src/core/P2RadioConnection.cpp
     src/core/PlaybackRadioConnection.cpp
+    src/core/AudioZuIq.cpp
+    src/core/CatRigConnection.cpp
+    src/core/CatRigBruecke.cpp
     src/core/SunSdrRadioConnection.cpp
     src/core/ReceiverManager.cpp
     src/core/AudioEngine.cpp

@@ -149,7 +149,11 @@ enum class HPSDRHW : int {
     // `max_panadapters`), nicht in einer Platinentabelle. Siehe
     // FlexRadioDiscovery.h.
     Flex8400         = 14, // FlexRadio FLEX-8400, Stufe 1 (Erkennung + Befehlskanal)
-    // 15..19 available for future Longpath-original SKU slots.
+    // Keine Platine, sondern ein Funkgeraet hinter CAT (TS-590S). Eigener
+    // Wert, damit die Sendesperre an der Faehigkeitstabelle haengt und
+    // nicht an einem Sonderfall. Siehe core/CatRigConnection.h.
+    CatRig           = 15,
+    // 16..19 available for future Longpath-original SKU slots.
     // From Thetis network.h:425 [v2.10.3.15] //N1GP G2E added (HermesC10)
     // -- same tagged enum block also carries //MI0BOT at :422 (HermesLite,
     // see above) and G8NJJ at :423 (Saturn, see above)
@@ -449,6 +453,7 @@ constexpr const char* boardCodeName(HPSDRHW hw) noexcept {
         case HPSDRHW::Andromeda:        return "Andromeda";
         case HPSDRHW::SunSdr2Qrp:       return "SunSDR2 QRP";
         case HPSDRHW::Flex8400:         return "FLEX-8400";
+        case HPSDRHW::CatRig:           return "CAT rig";
         case HPSDRHW::Unknown:          return "Unknown";
     }
     return "Unknown";

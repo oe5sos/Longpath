@@ -103,6 +103,7 @@ mw0lge@grange-lane.co.uk
 #include "core/AppSettings.h"
 #include "core/LogCategories.h"
 #include "core/BoardCapabilities.h"
+#include "core/CompanionRigController.h"
 #include "core/HpsdrModel.h"
 
 #include <QCheckBox>
@@ -114,6 +115,8 @@ mw0lge@grange-lane.co.uk
 #include <QApplication>
 #include <QClipboard>
 #include <QDateTime>
+#include <QFile>
+#include <QFileInfo>
 #include <QFont>
 #include <QColor>
 #include <QPainter>
@@ -296,6 +299,10 @@ ConnectionPanel::ConnectionPanel(RadioModel* model, QWidget* parent)
         disc->setSavedMacs(savedMacs);
     }
 
+    // Das Geraet hinter CAT wird nicht im Netz erkannt: es steht hier, wenn
+    // es eingestellt ist, und sein Anschluss entscheidet ueber den Punkt.
+    aktualisiereCatZeile();
+
     // Populate with any radios already discovered before the panel opened
     const QList<RadioInfo> existing = disc->discoveredRadios();
     for (const RadioInfo& info : existing) {
@@ -388,9 +395,21 @@ QString platinenName(HPSDRHW board)
         case HPSDRHW::Andromeda:         return QStringLiteral("Andromeda");
         case HPSDRHW::SunSdr2Qrp:        return QStringLiteral("SunSDR2 QRP");
         case HPSDRHW::Flex8400:          return QStringLiteral("FLEX-8400");
+        case HPSDRHW::CatRig:            return QStringLiteral("CAT rig");
         default:                         break;
     }
     return QStringLiteral("Unknown");
+}
+
+// Ein Geraet hinter CAT hat keine IP, sondern einen Anschluss.
+QString adresseFuerAnzeige(const RadioInfo& info)
+{
+    if (info.protocol == ProtocolVersion::CatRig) {
+        return QFileInfo(AppSettings::instance()
+                             .value(QStringLiteral("CompanionRigDevice"))
+                             .toString()).fileName();
+    }
+    return info.address.toString();
 }
 
 // Die Fassung, wie sie die Maschine meldet.
@@ -946,8 +965,24 @@ void ConnectionPanel::updateStatusStrip()
 // Rewrites every cell in the Last Seen column using current relative times.
 // ---------------------------------------------------------------------------
 
+void ConnectionPanel::aktualisiereCatZeile()
+{
+    const std::optional<RadioInfo> info =
+        CompanionRigController::radioInfoAusEinstellungen();
+    if (!info) { return; }
+    const bool steckt = QFile::exists(AppSettings::instance()
+        .value(QStringLiteral("CompanionRigDevice")).toString().trimmed());
+    if (steckt) {
+        m_lastSeenMs.insert(info->macAddress, QDateTime::currentMSecsSinceEpoch());
+    }
+    upsertRowForInfo(*info, steckt);
+    setPillIconForRow(rowForMac(info->macAddress), info->macAddress);
+}
+
 void ConnectionPanel::refreshLastSeenColumn()
 {
+    aktualisiereCatZeile();
+
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
     const int rowCount = m_radioTable->rowCount();
 
@@ -1120,6 +1155,7 @@ void ConnectionPanel::populateRow(int row, const RadioInfo& info)
         case ProtocolVersion::Protocol2: protoStr = QStringLiteral("P2"); break;
         case ProtocolVersion::SunSdr:    protoStr = QStringLiteral("SunSDR"); break;
         case ProtocolVersion::Flex:      protoStr = QStringLiteral("Flex"); break;
+        case ProtocolVersion::CatRig:    protoStr = QStringLiteral("CAT"); break;
         case ProtocolVersion::Protocol1:
         default:                         protoStr = QStringLiteral("P1"); break;
     }
@@ -1147,7 +1183,7 @@ void ConnectionPanel::populateRow(int row, const RadioInfo& info)
     m_radioTable->setItem(row, ColName,     makeItem(name));
     m_radioTable->setItem(row, ColBoard,    makeItem(boardStr));
     m_radioTable->setItem(row, ColProtocol, makeItem(protoStr));
-    m_radioTable->setItem(row, ColIp,       makeItem(info.address.toString()));
+    m_radioTable->setItem(row, ColIp,       makeItem(adresseFuerAnzeige(info)));
     m_radioTable->setItem(row, ColLastSeen, makeItem(lastSeenStr));
     m_radioTable->setItem(row, ColFirmware, makeItem(fassungsText(info)));
     m_radioTable->setItem(row, ColInUse,    makeItem(inUseStr));
@@ -1416,12 +1452,16 @@ void ConnectionPanel::onConnectClicked()
         ? QStringLiteral("manual-%1-%2").arg(info.address.toString()).arg(info.port)
         : info.macAddress;
     AppSettings& s = AppSettings::instance();
-    // Preserve existing pinToMac flag if the radio is already saved; default false.
-    bool pinToMac = false;
-    if (auto existing = s.savedRadio(macKey)) {
-        pinToMac = existing->pinToMac;
+    // Der CAT-Eintrag entsteht jedes Mal aus den Einstellungen und kommt
+    // nicht in die Liste der Radios: das Letzte-Radio-Merken genuegt.
+    if (info.protocol != ProtocolVersion::CatRig) {
+        // Preserve existing pinToMac flag if the radio is already saved; default false.
+        bool pinToMac = false;
+        if (auto existing = s.savedRadio(macKey)) {
+            pinToMac = existing->pinToMac;
+        }
+        s.saveRadio(info, pinToMac);
     }
-    s.saveRadio(info, pinToMac);
     s.setLastConnected(macKey);
     s.save();
 
@@ -1693,10 +1733,14 @@ void ConnectionPanel::updateButtonStates()
     // Phase 3Q Task 5: m_disconnectBtn removed from bottom strip.
     // Disconnect lives in the status strip (m_stripDisconnectBtn).
     // Forget + Edit: enabled when a row with a MAC is selected.
-    const bool rowHasMac = hasSelection && !selectedRadio().macAddress.isEmpty();
-    m_forgetBtn->setEnabled(rowHasMac);
+    const RadioInfo auswahl = hasSelection ? selectedRadio() : RadioInfo{};
+    const bool rowHasMac = hasSelection && !auswahl.macAddress.isEmpty();
+    // Der CAT-Eintrag kommt aus den Einstellungen, nicht aus der Liste
+    // gespeicherter Radios: Bearbeiten und Vergessen gehen dort ins Leere.
+    const bool gespeichert = rowHasMac && auswahl.protocol != ProtocolVersion::CatRig;
+    m_forgetBtn->setEnabled(gespeichert);
     if (m_editBtn) {
-        m_editBtn->setEnabled(rowHasMac);
+        m_editBtn->setEnabled(gespeichert);
     }
 }
 
@@ -1749,12 +1793,15 @@ void ConnectionPanel::updateDetailPanel()
         case ProtocolVersion::Protocol2: detailProtoStr = QStringLiteral("P2");     break;
         case ProtocolVersion::SunSdr:    detailProtoStr = QStringLiteral("SunSDR"); break;
         case ProtocolVersion::Flex:      detailProtoStr = QStringLiteral("Flex");   break;
+        case ProtocolVersion::CatRig:    detailProtoStr = QStringLiteral("CAT");    break;
         case ProtocolVersion::Protocol1:
         default:                         detailProtoStr = QStringLiteral("P1");    break;
     }
     m_detailProtoLabel->setText(QStringLiteral("Protocol: %1").arg(detailProtoStr));
     m_detailFwLabel->setText(QStringLiteral("Firmware: %1").arg(fassungsText(info)));
-    m_detailIpLabel->setText(QStringLiteral("IP: %1").arg(info.address.toString()));
+    m_detailIpLabel->setText(info.protocol == ProtocolVersion::CatRig
+        ? QStringLiteral("Port: %1").arg(adresseFuerAnzeige(info))
+        : QStringLiteral("IP: %1").arg(info.address.toString()));
     m_detailMacLabel->setText(QStringLiteral("MAC: %1").arg(info.macAddress));
 
     // Populate model combo

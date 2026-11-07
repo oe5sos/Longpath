@@ -306,6 +306,7 @@ warren@wpratt.com
 #include "core/WdspEngine.h"
 #include "core/RxChannel.h"
 #include "core/AppSettings.h"
+#include "core/CatRigConnection.h"
 #include "core/SampleRateCatalog.h"
 #include "core/LogCategories.h"
 #include "core/NoiseFloorTracker.h"
@@ -9779,6 +9780,14 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     }
     m_connection = conn.release();
 
+    // Der Ton des Geraets: Faustwert ist der Name, unter dem der TS-590
+    // sich als USB-Tongeraet meldet.
+    if (auto* cat = qobject_cast<CatRigConnection*>(m_connection)) {
+        cat->setTonEingang(AppSettings::instance()
+            .value(QStringLiteral("CompanionRigAudioInput"),
+                   QStringLiteral("USB Audio CODEC")).toString());
+    }
+
     // Phase 3M: eine Wiedergabe braucht ihre Datei, bevor sie laeuft.
     // RadioConnection::create() kennt nur die RadioInfo, und die traegt
     // keinen Dateinamen -- darum hier, an der einen Stelle, an der die
@@ -12952,6 +12961,15 @@ void RadioModel::installBandPlanMoxCheck()
     }
 
     m_moxController->setMoxCheck([this]() -> safety::BandPlanGuard::MoxCheckResult {
+        // Ein Geraet hinter CAT sendet an seiner eigenen Taste. Die
+        // Verbindung koennte ohnehin nicht tasten (CatRigConnection::
+        // setMox ist leer); hier bekommt der Betreiber den Grund zu sehen,
+        // statt einer MOX-Taste, die aufleuchtet und nichts tut.
+        if (m_lastRadioInfo.protocol == ProtocolVersion::CatRig) {
+            return {false, QStringLiteral("%1 transmits at the rig, not from Longpath")
+                               .arg(m_lastRadioInfo.name)};
+        }
+
         // ── The guard was reading a key nobody wrote ──────────────────
         //
         // 2026-08-14. This read "BandPlanRegion" and defaulted to
@@ -15563,8 +15581,52 @@ void RadioModel::saveSliceState(SliceModel* slice)
     m_transmitModel.save();
 }
 
+void RadioModel::starteCatBetriebWennNoetig()
+{
+    if (m_lastRadioInfo.protocol != ProtocolVersion::CatRig || !m_companionRig) {
+        return;
+    }
+    if (m_catRigBruecke) { return; }
+
+    m_companionRig->setCatBetrieb(true);
+    SliceModel* scheibe = m_activeSlice ? m_activeSlice
+                                        : (m_slices.isEmpty() ? nullptr : m_slices.first());
+    if (!scheibe) {
+        qCWarning(lcConnection) << "CAT rig connected without a slice";
+        return;
+    }
+    m_catRigBruecke = std::make_unique<CatRigBruecke>(m_companionRig.get(), scheibe);
+
+    auto traegerFuer = [this](double hz) {
+        if (auto* cat = qobject_cast<CatRigConnection*>(m_connection)) {
+            cat->setTraegerHz(hz);
+        }
+    };
+    traegerFuer(scheibe->frequency());
+    m_catTraeger = connect(scheibe, &SliceModel::frequencyChanged, this, traegerFuer);
+
+    auto spiegelFuer = [this](DSPMode modus) {
+        auto* cat = qobject_cast<CatRigConnection*>(m_connection);
+        if (!cat) { return; }
+        cat->setGespiegelt(modus == DSPMode::LSB || modus == DSPMode::DIGL
+                           || modus == DSPMode::CWL);
+    };
+    spiegelFuer(scheibe->dspMode());
+    m_catSpiegel = connect(scheibe, &SliceModel::dspModeChanged, this, spiegelFuer);
+}
+
+void RadioModel::beendeCatBetrieb()
+{
+    QObject::disconnect(m_catSpiegel);
+    QObject::disconnect(m_catTraeger);
+    m_catRigBruecke.reset();
+    if (m_companionRig) { m_companionRig->setCatBetrieb(false); }
+}
+
 void RadioModel::teardownConnection()
 {
+    beendeCatBetrieb();
+
     if (!m_connection) {
         return;
     }
@@ -16073,7 +16135,8 @@ void RadioModel::applyHardwareProfileFor(const RadioInfo& info)
     // PureSignal -- lauter OpenHPSDR-Dinge, die dieses Geraet nicht hat;
     // der Atlas-Rueckfall ist dort der harmloseste Stand. Korrigiert wird
     // nur, WELCHE Kenndaten gelten: die des gemeldeten Boards.
-    if (info.protocol == ProtocolVersion::SunSdr) {
+    if (info.protocol == ProtocolVersion::SunSdr
+        || info.protocol == ProtocolVersion::CatRig) {
         m_hardwareProfile.effectiveBoard = info.boardType;
         m_hardwareProfile.caps           = &BoardCapsTable::forBoard(info.boardType);
         m_hardwareProfile.adcCount       = m_hardwareProfile.caps->adcCount;
@@ -16121,6 +16184,7 @@ void RadioModel::onConnectionStateChanged(ConnectionState state)
     switch (state) {
     case ConnectionState::Connected:
         qCDebug(lcConnection) << "Connected to" << m_name;
+        starteCatBetriebWennNoetig();
         // ── 3M-1c Phase L.2: TwoToneController power-on gate ─────────────────
         // The controller's setActive(true) refuses to engage unless powerOn
         // is true (mirrors !console.PowerOn at setup.cs:11063 [v2.10.3.13]).

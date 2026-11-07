@@ -240,6 +240,22 @@ QRect snappedFrameRect(const QRect& frame, const QSize& minSize, int grid,
     return QRect(left, top, right - luft - left, bottom - luft - top);
 }
 
+QPoint bezugspunktFuerProfil(Qt::WindowStates zustand, const QRect& rahmen,
+                             const QRect& verfuegbar)
+{
+    if ((zustand & Qt::WindowMaximized) && !(zustand & Qt::WindowFullScreen)
+        && verfuegbar.isValid()) {
+        return verfuegbar.topLeft();
+    }
+    return rahmen.topLeft();
+}
+
+bool hauptrahmenSteht(Qt::WindowStates zustand, const QRect& rahmen,
+                      const QRect& verfuegbar)
+{
+    return rahmen.topLeft() == bezugspunktFuerProfil(zustand, rahmen, verfuegbar);
+}
+
 QRect mitMindestabstand(const QRect& wunsch, const QList<QRect>& nachbarn,
                         int abstand, int maxUeberlappung)
 {

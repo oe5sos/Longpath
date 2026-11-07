@@ -135,8 +135,14 @@ void CompanionRigController::baueClient()
     connect(m_client.get(), &RigctldClient::frequencyChanged, this,
             [this](qint64 hz) { emit zfFrequenzGeaendert(hz); });
 
+    connect(m_client.get(), &RigctldClient::modeChanged, this,
+            [this](const QString& modus, int) { emit modusGeaendert(modus); });
+
     connect(m_client.get(), &RigctldClient::stateChanged, this,
             [this](RigctldClient::State s) {
+        if (s == RigctldClient::State::Connected && m_catBetrieb && m_client) {
+            m_client->schalteZwischenspeicherAus();
+        }
         emit verbindungGeaendert(s == RigctldClient::State::Connected);
     });
 
@@ -271,7 +277,62 @@ qint64 CompanionRigController::rfFrequenzHz() const
 
 bool CompanionRigController::darfAbstimmen() const
 {
-    return m_eingeschaltet && verbunden();
+    return (m_eingeschaltet || m_catBetrieb) && verbunden();
+}
+
+void CompanionRigController::stelleModus(const QString& modus)
+{
+    if (!darfAbstimmen()) { return; }
+    m_client->setMode(modus);
+}
+
+std::optional<RadioInfo> CompanionRigController::radioInfoAusEinstellungen()
+{
+    auto& s = AppSettings::instance();
+    const QString anschluss =
+        s.value(QStringLiteral("CompanionRigDevice")).toString().trimmed();
+    const int modell = s.value(QStringLiteral("CompanionRigModel"), 0).toInt();
+    if (anschluss.isEmpty() || modell <= 0) { return std::nullopt; }
+
+    RadioInfo info;
+    const QString name = s.value(QStringLiteral("CompanionRigName")).toString().trimmed();
+    info.name         = name.isEmpty() ? QStringLiteral("CAT rig") : name;
+    // Lokal verwaltete Adresse: kein echtes Geraet traegt sie. Der
+    // Schluessel bleibt so ueber Anschlusswechsel gleich, und dieses
+    // Funkgeraet bekommt eigene Einstellungen je Band.
+    info.macAddress   = QStringLiteral("02:00:00:00:05:90");
+    info.protocol     = ProtocolVersion::CatRig;
+    info.boardType    = HPSDRHW::CatRig;
+    info.adcCount     = 1;
+    info.maxReceivers = 1;
+    info.maxSampleRate = 48000;
+    info.firmwareText = QStringLiteral("CAT");
+    return info;
+}
+
+void CompanionRigController::setCatBetrieb(bool an)
+{
+    if (m_catBetrieb == an) { return; }
+    m_catBetrieb = an;
+
+    if (an) {
+        ladeEinstellungen();
+        // Die Vorgabe der Einstellseite, nicht die des Folgens: wer dort
+        // nie etwas gespeichert hat, soll trotzdem verbinden koennen.
+        m_daemonSelbstStarten = alsBool(
+            AppSettings::instance().value(QStringLiteral("CompanionRigStartDaemon")),
+            true);
+        if (!verbunden()) { verbinde(); }
+        if (m_client) {
+            m_client->setPollIntervalMs(kKatAbfrageMs);
+            m_client->schalteZwischenspeicherAus();   // falls schon verbunden
+        }
+        return;
+    }
+
+    if (m_client) { m_client->setPollIntervalMs(RigctldClient::kStandardAbfrageMs); }
+    ladeEinstellungen();
+    if (!m_eingeschaltet) { trenne(); }
 }
 
 void CompanionRigController::stimmeAbZf(qint64 ifHz)
@@ -282,7 +343,7 @@ void CompanionRigController::stimmeAbZf(qint64 ifHz)
 
 QString CompanionRigController::beschreibung() const
 {
-    if (!m_eingeschaltet) { return tr("Companion rig off."); }
+    if (!m_eingeschaltet && !m_catBetrieb) { return tr("Companion rig off."); }
     if (!m_client) { return tr("Not connected."); }
 
     switch (m_client->state()) {

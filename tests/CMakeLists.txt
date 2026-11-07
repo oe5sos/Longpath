@@ -1112,6 +1112,7 @@ longpath_add_test(tst_begleitgeraet_seite)
 # Die Dauerverbindung: nicht von selbst verbinden, nicht sich selbst
 # befragen, und der Versatz beim Laden.
 longpath_add_test(tst_begleitgeraet_regler)
+longpath_add_test(tst_cat_funkgeraet)
 
 # Der Versatz dort, wo er vor dem Betreiber landet -- und vor allem:
 # dass OHNE Transverter bitgleich nichts passiert.
