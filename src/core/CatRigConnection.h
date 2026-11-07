@@ -10,12 +10,13 @@
 // Ein klassisches Funkgeraet, das Longpath nur per CAT fuehrt, zuerst
 // der Kenwood TS-590S.
 //
-// Es liefert kein I/Q. Diese Verbindung schiebt darum keine einzige
-// Probe: Panadapter und Wasserfall bleiben leer, und Longpaths Filter
-// und NR haben nichts zu rechnen. Sie sorgt nur dafuer, dass das Geraet
-// im Verbinden-Fenster steht wie jedes andere und dass VFO, Band- und
-// Modus-Knoepfe den ueblichen Weg gehen. Die Frequenz wandert ueber
-// core/CatRigBruecke.h, nicht ueber diese Klasse.
+// Es liefert kein I/Q, aber seinen Ton ueber USB. Diese Verbindung liest
+// den Ton und schickt ihn, in I/Q gewandelt (core/AudioZuIq.h), in
+// denselben Weg wie ein SDR: Ton in Longpath, ein schmaler Wasserfall ueber
+// die Filterbreite des Geraets, Filter und NR. Ein Bandbild ist das nicht.
+// Die Frequenz wandert ueber core/CatRigBruecke.h, nicht ueber diese
+// Klasse. Fehlt der Tonanschluss, bleibt die Verbindung stehen, nur ohne
+// Ton: CAT allein ist auch ein Betrieb.
 //
 // ── Senden ──────────────────────────────────────────────────────
 //
@@ -34,6 +35,17 @@
 
 #include "RadioConnection.h"
 
+#include "core/AudioZuIq.h"
+
+#include <QByteArray>
+#include <QString>
+#include <QVector>
+
+#include <atomic>
+
+class QAudioSource;
+class QIODevice;
+
 namespace Longpath {
 
 class CatRigConnection : public RadioConnection {
@@ -45,6 +57,31 @@ public:
 
     // ProtocolVersion::CatRig
     int protocolVersion() const override { return 6; }
+
+    /// Name des Toneingangs, oder ein Teil davon. Vor connectToRadio().
+    void setTonEingang(const QString& name) { m_tonEingang = name; }
+
+    /// LSB liegt unter dem Traeger. Aus jedem Faden aufrufbar.
+    void setGespiegelt(bool gespiegelt) { m_gespiegelt.store(gespiegelt); }
+
+    /// Wo der Traeger des Geraets steht. Aus jedem Faden aufrufbar.
+    ///
+    /// Der Empfangsweg rechnet wie bei einem SDR: die Mitte des Stroms
+    /// kommt ueber setReceiverFrequency(), und WDSP stimmt um den Abstand
+    /// VFO minus Mitte ab (CTUN). Der Ton sitzt aber immer am Traeger.
+    /// Darum wird er genau um diesen Abstand verschoben, und er liegt in
+    /// Panadapter und Demodulator dort, wo er auf dem Band liegt.
+    void setTraegerHz(double hz) { m_traegerHz.store(hz); }
+
+    /// So viele Tonproben ergeben einen Block: 10 ms bei 48 kHz.
+    static constexpr int kBlockProben = 480;
+
+    /// Liefert der Eingang gerade Ton?
+    bool tonLaeuft() const { return m_quelle != nullptr; }
+
+    /// 16-Bit-Ton hinein, mit `kanaele` Kanaelen. Oeffentlich fuer den
+    /// Pruefstand: so geht der Weg ohne Tongeraet.
+    void verarbeiteTon(const QByteArray& pcm, int kanaele);
 
 public slots:
     void init() override;
@@ -74,6 +111,23 @@ public slots:
     void setMicPTTDisabled(bool disabled) override;
     void setMicXlr(bool xlrJack) override;
     void setWatchdogEnabled(bool enabled) override;
+
+private:
+    void starteTon();
+    void stoppeTon();
+    void lieferBloecke();
+    void schiebeAnDenTraeger(QVector<float>& iq);
+
+    QString m_tonEingang;
+    QAudioSource* m_quelle{nullptr};
+    QIODevice*    m_tonGeraet{nullptr};
+    int           m_kanaele{2};
+    AudioZuIq     m_wandler;
+    QVector<float> m_vorrat;
+    std::atomic<bool> m_gespiegelt{false};
+    std::atomic<double> m_traegerHz{0.0};
+    std::atomic<double> m_mitteHz{0.0};
+    double m_phase{0.0};
 };
 
 } // namespace Longpath

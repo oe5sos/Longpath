@@ -4836,6 +4836,8 @@ private:
     // Nur im Betrieb ohne SDR, siehe core/CatRigConnection.h. Steht hinter
     // m_companionRig: die Bruecke geht beim Abbau zuerst.
     std::unique_ptr<CatRigBruecke>          m_catRigBruecke;
+    QMetaObject::Connection                 m_catSpiegel;
+    QMetaObject::Connection                 m_catTraeger;
     void starteCatBetriebWennNoetig();
     void beendeCatBetrieb();
     std::unique_ptr<SpotTableModel>       m_spotTableModel;
