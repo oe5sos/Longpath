@@ -405,6 +405,7 @@ warren@wpratt.com
 #include "applets/KiwiSdrApplet.h"
 #include "KiwiWaterfallPanel.h"
 #include "applets/AsrApplet.h"
+#include "applets/CatRigApplet.h"
 #include "asr/AsrService.h"
 #include "asr/RemoteAsrBackend.h"
 #include "core/audio/AudioTapRing.h"
@@ -6594,7 +6595,32 @@ void MainWindow::buildUI()
         for (PanadapterApplet* applet : m_panStack->allApplets()) {
             if (applet) { applet->zeigeDasGeraet(); }
         }
+        if (m_appletVis) { m_appletVis->setVisible(QStringLiteral("CatRig"), true); }
     });
+
+    // Das Geraet meldet, Longpath zeigt: S-Meter und ON AIR kommen im
+    // Betrieb ohne SDR von dort.
+    if (auto* rig = m_radioModel->companionRig()) {
+        connect(rig, &CompanionRigController::catZustandGeaendert, this, [this, rig]() {
+            if (!m_meterPoller || !rig->catBetrieb()) { return; }
+            const int punkte = rig->catZustand().meterPunkte;
+            if (punkte >= 0 && !rig->sendet()) {
+                m_meterPoller->setExternesSMeter(Ts590Cat::punkteZuDbm(punkte));
+            }
+        });
+        connect(rig, &CompanionRigController::sendetGeaendert, this, [this, rig](bool tx) {
+            if (!m_txStatusBadge || m_txInhibited || !rig->catBetrieb()) { return; }
+            m_txStatusBadge->setVariant(tx ? StatusBadge::Variant::Tx
+                                           : StatusBadge::Variant::Off);
+            m_txStatusBadge->setToolTip(tx ? tr("Transmitting at the rig")
+                                           : tr("Receive"));
+        });
+        connect(m_radioModel, &RadioModel::connectionStateChanged, this, [this, rig]() {
+            if (m_meterPoller && !rig->catBetrieb()) {
+                m_meterPoller->loescheExternesSMeter();
+            }
+        });
+    }
 
     // Phase 3Q-8: clicking the spectrum while disconnected opens ConnectionPanel.
     connect(activeSpectrumWidget(), &SpectrumWidget::disconnectedClickRequest,
@@ -8771,6 +8797,8 @@ void MainWindow::populateDefaultMeter()
     // Genau darum ist die Rueckmeldung im Applet so ausfuehrlich.
     m_asrApplet = new AsrApplet(m_radioModel, nullptr);
     panel->addApplet(m_asrApplet);
+    m_catRigApplet = new CatRigApplet(m_radioModel, nullptr);
+    panel->addApplet(m_catRigApplet);
     connect(m_asrApplet, &AsrApplet::enableRequested,
             this, &MainWindow::setAsrEnabled);
 
@@ -9354,6 +9382,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("KiwiSdr")] = m_kiwiSdrApplet;
     m_appletsById[QStringLiteral("KiwiWaterfalls")] = m_kiwiWaterfallPanel;
     m_appletsById[QStringLiteral("Asr")]     = m_asrApplet;
+    m_appletsById[QStringLiteral("CatRig")]  = m_catRigApplet;
 #ifdef HAVE_WEBSOCKETS
     if (m_tciApplet) {
         m_appletsById[QStringLiteral("Tci")]        = m_tciApplet;
@@ -9539,6 +9568,8 @@ void MainWindow::populateDefaultMeter()
                                 tr("KIWI WATERFALLS"), false);
     m_appletVis->registerApplet(QStringLiteral("Asr"),
                                 tr("Transcript"),               true);
+    m_appletVis->registerApplet(QStringLiteral("CatRig"),
+                                tr("CAT RIG"),                  false);
 
     // ── Kategorie und Schlagwoerter ──────────────────────────────────
     //

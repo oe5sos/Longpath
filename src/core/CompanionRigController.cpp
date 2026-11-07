@@ -24,6 +24,9 @@ Q_LOGGING_CATEGORY(lcCompanionRig, "longpath.companionrig")
 
 namespace {
 
+// Hamlibs Nummer. Filtertabellen und Menues des SG weichen ab.
+constexpr int kModellTs590S = 2031;
+
 /// AppSettings schreibt Wahrheitswerte als "True"/"False" (so wie
 /// Thetis es tat), nicht als 0/1. Wer hier toBool() nimmt, bekommt bei
 /// "False" ein true -- ein nicht leerer String ist wahr.
@@ -134,6 +137,15 @@ void CompanionRigController::baueClient()
 
     connect(m_client.get(), &RigctldClient::frequencyChanged, this,
             [this](qint64 hz) { emit zfFrequenzGeaendert(hz); });
+
+    connect(m_client.get(), &RigctldClient::rohAntwort,
+            this, &CompanionRigController::rohAntwortLesen);
+
+    connect(m_client.get(), &RigctldClient::pttChanged, this, [this](bool keyed) {
+        if (m_sendet == keyed) { return; }
+        m_sendet = keyed;
+        emit sendetGeaendert(keyed);
+    });
 
     connect(m_client.get(), &RigctldClient::modeChanged, this,
             [this](const QString& modus, int) { emit modusGeaendert(modus); });
@@ -280,6 +292,37 @@ bool CompanionRigController::darfAbstimmen() const
     return (m_eingeschaltet || m_catBetrieb) && verbunden();
 }
 
+void CompanionRigController::stelle(const QByteArray& zeile)
+{
+    if (!darfAbstimmen()) { return; }
+    m_client->schickeZeile(zeile);
+}
+
+void CompanionRigController::rohAntwortLesen(const QByteArray& antwort)
+{
+    Ts590Cat::Zustand neu = m_catZustand;
+    if (!Ts590Cat::leseAntwort(antwort, neu) || neu == m_catZustand) { return; }
+    m_catZustand = neu;
+    pruefeTransverterWege();
+    emit catZustandGeaendert();
+}
+
+// Am Transverter muss das Geraet ueber RX ANT empfangen und auf DRV senden.
+// Steht beides anders, geht die volle Leistung an die Antennenbuchse. Gesagt
+// wird das, geaendert nichts: die Buchsen gehoeren dem Betreiber, und auf
+// Kurzwelle ist genau dieser Stand richtig.
+void CompanionRigController::pruefeTransverterWege()
+{
+    const bool falsch = TransverterSetup::current().enabled
+                        && (m_catZustand.rxAnt == 0 || m_catZustand.drive == 0);
+    if (falsch == m_wegeWarnung) { return; }
+    m_wegeWarnung = falsch;
+    if (falsch) {
+        emit problem(tr("Transverter active, but RX ANT or DRV is off at the rig. "
+                        "Check both before you transmit."));
+    }
+}
+
 void CompanionRigController::stelleModus(const QString& modus)
 {
     if (!darfAbstimmen()) { return; }
@@ -326,11 +369,20 @@ void CompanionRigController::setCatBetrieb(bool an)
         if (m_client) {
             m_client->setPollIntervalMs(kKatAbfrageMs);
             m_client->schalteZwischenspeicherAus();   // falls schon verbunden
+            if (m_modell == kModellTs590S) {
+                m_client->setRohAbfragen(Ts590Cat::abfragen(), Ts590Cat::abfrageMeter(),
+                                         Ts590Cat::abfrageSwr());
+            }
         }
         return;
     }
 
-    if (m_client) { m_client->setPollIntervalMs(RigctldClient::kStandardAbfrageMs); }
+    if (m_client) {
+        m_client->setPollIntervalMs(RigctldClient::kStandardAbfrageMs);
+        m_client->setRohAbfragen({}, {}, {});
+    }
+    m_catZustand = Ts590Cat::Zustand{};
+    m_wegeWarnung = false;
     ladeEinstellungen();
     if (!m_eingeschaltet) { trenne(); }
 }

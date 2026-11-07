@@ -2351,6 +2351,7 @@ private:
     std::unique_ptr<class AudioTapRing> m_asrTapRing;
     class AsrService*     m_asrService{nullptr};
     class AsrApplet*      m_asrApplet{nullptr};
+    class CatRigApplet*   m_catRigApplet{nullptr};
     int                   m_asrTapSlice{-1};
     class BandwidthFilterApplet* m_bwFilterApplet{nullptr};
     class CatApplet*        m_catApplet{nullptr};

@@ -68,6 +68,8 @@ private:
     void vomGeraetModus(const QString& modus);
     void vonScheibeFrequenz(double hz);
     void vonScheibeModus(DSPMode modus);
+    void vomGeraetFilter();
+    void vonScheibeFilter(int low, int high);
     bool fristLaeuft() const;
 
     QPointer<CompanionRigController> m_rig;

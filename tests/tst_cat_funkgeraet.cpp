@@ -39,6 +39,8 @@
 #include "core/RadioConnection.h"
 #include "core/RigctldClient.h"
 #include "core/RxChannel.h"
+#include "core/Ts590Cat.h"
+#include "core/TransverterSetup.h"
 #include "core/WdspEngine.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -70,6 +72,12 @@ public:
     qint64     frequenz{28078400};
     QString    modus{QStringLiteral("USB")};
     QByteArrayList befehle;
+    QByteArrayList rohFragen;
+    bool gesendet{false};
+    QHash<QByteArray, QByteArray> roh{
+        {"SM0;", "SM00015;"}, {"RM;", "RM10007;"}, {"AN;", "AN100;"}, {"PA;", "PA10;"},
+        {"RA;", "RA0000;"}, {"RG;", "RG200;"}, {"GC;", "GC2;"}, {"NB;", "NB0;"},
+        {"NR;", "NR1;"}, {"SL;", "SL02;"}, {"SH;", "SH09;"}, {"PC;", "PC005;"}};
 
     bool hatGetastet() const
     {
@@ -77,6 +85,9 @@ public:
             const QByteArray t = b.trimmed();
             if (t.startsWith("T ") || t.startsWith("\\set_ptt") || t.startsWith("b ")) {
                 return true;
+            }
+            for (const char* verboten : {"w TX", "w KY", "w PB", "w PS", "w EX", "w PC1", "l RFPOWER"}) {
+                if (t.startsWith(verboten)) { return true; }
             }
         }
         return false;
@@ -93,7 +104,13 @@ private:
             } else if (t == "m") {
                 s->write(modus.toLatin1() + "\n2200\n");
             } else if (t == "t") {
-                s->write("0\n");
+                s->write(gesendet ? "1\n" : "0\n");
+            } else if (t.startsWith("w ")) {
+                // Wie rigctld: die Antwort des Geraets, kein Zeilenumbruch.
+                const QByteArray frage = t.mid(2);
+                if (roh.contains(frage)) { s->write(roh.value(frage) + '\0'); }
+                else { s->write("RPRT -1\n"); }
+                rohFragen.append(frage);
             } else {
                 befehle.append(zeile);
                 if (t.startsWith("F ")) { frequenz = t.mid(2).toLongLong(); }
@@ -254,6 +271,128 @@ private slots:
         const double amTraeger = energieBei(gesammelt, 1000.0, 1000);
         QVERIFY2(dort > 0.2, qPrintable(QString::number(dort)));
         QVERIFY2(amTraeger < dort * 0.01, qPrintable(QString::number(amTraeger)));
+    }
+
+    void dieAntwortenDesGeraetsWerdenGelesen()
+    {
+        Ts590Cat::Zustand z;
+        QVERIFY(Ts590Cat::leseAntwort(QByteArray("AN101;\0", 7), z));
+        QCOMPARE(z.antenne, 2);
+        QCOMPARE(z.rxAnt, 0);
+        QCOMPARE(z.drive, 1);
+        QVERIFY(Ts590Cat::leseAntwort("PA10;", z));
+        QCOMPARE(z.vorverstaerker, 1);
+        QVERIFY(Ts590Cat::leseAntwort("RA0100;", z));
+        QCOMPARE(z.daempfung, 1);
+        QVERIFY(Ts590Cat::leseAntwort("RG128;", z));
+        QCOMPARE(z.rfGain, 128);
+        QVERIFY(Ts590Cat::leseAntwort("SM00030;", z));
+        QCOMPARE(z.meterPunkte, 30);
+        QVERIFY(Ts590Cat::leseAntwort("RM10012;", z));
+        QCOMPARE(z.swrPunkte, 12);
+        QVERIFY(Ts590Cat::leseAntwort("SL02;", z));
+        QCOMPARE(z.lowCutHz, 100);
+        QVERIFY(Ts590Cat::leseAntwort("SH09;", z));
+        QCOMPARE(z.highCutHz, 2800);
+        QVERIFY(Ts590Cat::leseAntwort("PC005;", z));
+        QCOMPARE(z.leistungW, 5);
+        QVERIFY(!Ts590Cat::leseAntwort("XX1;", z));
+        QVERIFY(!Ts590Cat::leseAntwort("RPRT -1", z));
+    }
+
+    void dieBefehlslisteKannNichtSenden()
+    {
+        for (const QByteArray& f : Ts590Cat::abfragen()) {
+            QVERIFY2(f.endsWith(';') && f.size() == 3, f.constData());
+            for (const char* v : {"TX", "RX", "KY", "PB", "PS", "EX"}) {
+                QVERIFY2(!f.startsWith(v), f.constData());
+            }
+        }
+        const QByteArrayList zeilen = {
+            Ts590Cat::stelleVorverstaerker(true), Ts590Cat::stelleDaempfung(true),
+            Ts590Cat::stelleRfGain(128), Ts590Cat::stelleAgc(Ts590Cat::Agc::Schnell),
+            Ts590Cat::stelleNb(true), Ts590Cat::stelleNr(true),
+            Ts590Cat::stelleLowCut(100), Ts590Cat::stelleHighCut(2800)};
+        for (const QByteArray& z : zeilen) {
+            QVERIFY2(z.startsWith("L ") || z.startsWith("U "), z.constData());
+            QVERIFY2(!z.contains("RFPOWER") && !z.contains("PTT"), z.constData());
+        }
+        QCOMPARE(Ts590Cat::stelleRfGain(255), QByteArray("L RF 1.000\n"));
+        QCOMPARE(Ts590Cat::punkteZuDbm(15), -73.0);
+        QCOMPARE(Ts590Cat::naechsterHighCut(2850), 2800);
+    }
+
+    void derZustandKommtVomGeraetUndWarntAmTransverter()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+
+        TransverterSetup t;
+        t.enabled = true;
+        t.offsetHz = 116000000;
+        t.save();
+
+        CompanionRigController rig;
+        QSignalSpy warnung(&rig, &CompanionRigController::problem);
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 3000);
+        rig.client()->setPollIntervalMs(20);
+
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().leistungW, 5, 5000);
+        QCOMPARE(rig.catZustand().antenne, 2);
+        QCOMPARE(rig.catZustand().rxAnt, 0);
+        QCOMPARE(rig.catZustand().rfGain, 200);
+        QCOMPARE(rig.catZustand().meterPunkte, 15);
+        QTRY_VERIFY_WITH_TIMEOUT(!warnung.isEmpty(), 3000);
+        QVERIFY(warnung.first().first().toString().contains(QStringLiteral("RX ANT")));
+        const int anzahl = warnung.size();
+
+        // Stehen beide richtig, schweigt die Warnung und bleibt still.
+        doppel.roh["AN;"] = "AN111;";
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().drive, 1, 5000);
+        QCOMPARE(warnung.size(), anzahl);
+
+        // Der Sendezustand kommt vom Geraet, das SWR nur dann.
+        QVERIFY(!rig.sendet());
+        doppel.gesendet = true;
+        QTRY_VERIFY_WITH_TIMEOUT(rig.sendet(), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().swrPunkte, 7, 3000);
+
+        // Stellen geht ueber die geschlossene Liste.
+        rig.stelle(Ts590Cat::stelleDaempfung(true));
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("L ATT 12\n"), 3000);
+        QVERIFY2(!doppel.hatGetastet(), "Longpath hat das fremde Geraet getastet");
+
+        TransverterSetup{}.save();
+        TransverterSetup::setCurrent(TransverterSetup{});
+    }
+
+    void dasFilterFolgtDemGeraetInBeidenSeitenbaendern()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 3000);
+        rig.client()->setPollIntervalMs(20);
+
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 5000);
+        QCOMPARE(scheibe.filterLow(), 100);
+
+        // Das Geraet steht in LSB: dieselben Grenzen, unter dem Traeger.
+        doppel.modus = QStringLiteral("LSB");
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::LSB, 3000);
+        doppel.roh["SH;"] = "SH10;";
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterLow(), -3000, 5000);
+        QCOMPARE(scheibe.filterHigh(), -100);
+
+        // Von der Scheibe zum Geraet, auf die Tabelle gerundet.
+        scheibe.setFilter(-2600, -200);
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("L SLOPE_HIGH 2600\n"), 3000);
+        QVERIFY(doppel.befehle.contains("L SLOPE_LOW 200\n"));
     }
 
     // Nur von Hand, mit dem Geraet am USB-Kabel. Liest nur den Ton.

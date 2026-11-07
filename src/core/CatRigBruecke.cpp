@@ -15,7 +15,9 @@
 #include "core/CompanionRigController.h"
 #include "models/SliceModel.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace Longpath {
 
@@ -35,6 +37,10 @@ CatRigBruecke::CatRigBruecke(CompanionRigController* rig, SliceModel* scheibe,
             this, &CatRigBruecke::vonScheibeFrequenz);
     connect(scheibe, &SliceModel::dspModeChanged,
             this, &CatRigBruecke::vonScheibeModus);
+    connect(rig, &CompanionRigController::catZustandGeaendert,
+            this, &CatRigBruecke::vomGeraetFilter);
+    connect(scheibe, &SliceModel::filterChanged,
+            this, &CatRigBruecke::vonScheibeFilter);
 
     // Beim Verbinden gibt das Geraet den Stand vor, nicht die Scheibe.
     if (const qint64 hz = rig->zfFrequenzHz(); hz > 0) {
@@ -96,6 +102,42 @@ void CatRigBruecke::vomGeraetModus(const QString& modus)
     m_uebernimmtVomGeraet = true;
     m_scheibe->setDspMode(m);
     m_uebernimmtVomGeraet = false;
+}
+
+// Filtergrenzen gibt es am Geraet als Abstand vom Traeger. Die Scheibe rechnet
+// vorzeichenbehaftet: in LSB liegt das Filter unter dem Traeger.
+void CatRigBruecke::vomGeraetFilter()
+{
+    if (!m_rig || !m_scheibe || fristLaeuft()) { return; }
+    const Ts590Cat::Zustand& z = m_rig->catZustand();
+    if (z.lowCutHz < 0 || z.highCutHz < 0) { return; }
+
+    const DSPMode modus = m_scheibe->dspMode();
+    int low = z.lowCutHz;
+    int high = z.highCutHz;
+    if (modus == DSPMode::LSB) {
+        low = -z.highCutHz;
+        high = -z.lowCutHz;
+    } else if (modus != DSPMode::USB) {
+        return;   // nur SSB: die Tabellen der anderen Betriebsarten weichen ab
+    }
+    if (m_scheibe->filterLow() == low && m_scheibe->filterHigh() == high) { return; }
+    m_uebernimmtVomGeraet = true;
+    m_scheibe->setFilter(low, high);
+    m_uebernimmtVomGeraet = false;
+}
+
+void CatRigBruecke::vonScheibeFilter(int low, int high)
+{
+    if (!m_rig || !m_scheibe || m_uebernimmtVomGeraet) { return; }
+    const DSPMode modus = m_scheibe->dspMode();
+    if (modus != DSPMode::USB && modus != DSPMode::LSB) { return; }
+    const int vonHz = std::min(std::abs(low), std::abs(high));
+    const int bisHz = std::max(std::abs(low), std::abs(high));
+    m_rig->stelle(Ts590Cat::stelleLowCut(vonHz));
+    m_rig->stelle(Ts590Cat::stelleHighCut(bisHz));
+    m_befehlGesendet = true;
+    m_seitBefehl.start();
 }
 
 void CatRigBruecke::vonScheibeFrequenz(double hz)

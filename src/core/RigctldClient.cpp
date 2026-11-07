@@ -187,6 +187,23 @@ QByteArray RigctldClient::setModeCommand(const QString& mode)
     return QStringLiteral("M %1 0\n").arg(m).toLatin1();
 }
 
+void RigctldClient::setRohAbfragen(const QList<QByteArray>& liste,
+                                   const QByteArray& haeufig,
+                                   const QByteArray& beimSenden)
+{
+    m_rohListe      = liste;
+    m_rohHaeufig    = haeufig;
+    m_rohBeimSenden = beimSenden;
+    m_rohIndex      = 0;
+    m_geraderTakt   = 0;
+}
+
+void RigctldClient::schickeZeile(const QByteArray& zeile)
+{
+    if (!isConnected() || zeile.isEmpty()) { return; }
+    send(zeile, Pending::Report);
+}
+
 void RigctldClient::schalteZwischenspeicherAus()
 {
     if (!isConnected()) { return; }
@@ -210,6 +227,34 @@ void RigctldClient::poll()
     if (m_awaiting != Pending::None || !m_queue.isEmpty()) { return; }
 
     ++m_tick;
+
+    // Mit Rohabfragen: die Frequenz behaelt jeden zweiten Takt, PTT jeden
+    // vierten, und dazwischen wechseln sich die haeufige Abfrage und die
+    // Liste ab.
+    if (!m_rohListe.isEmpty() && m_tick % 2 == 0) {
+        const int schritt = m_geraderTakt++ % 4;
+        if (schritt == 0) {
+            send(QByteArrayLiteral("t\n"), Pending::Ptt);
+        } else if (schritt == 1 || schritt == 3) {
+            if (schritt == 3 && !m_ptt) {
+                if (m_rohIndex >= m_rohListe.size()) {
+                    m_rohIndex = 0;
+                    send(QByteArrayLiteral("m\n"), Pending::Mode);
+                    return;
+                }
+                send(QByteArrayLiteral("w ") + m_rohListe.at(m_rohIndex++) + '\n',
+                     Pending::Roh);
+            } else if (schritt == 3) {
+                send(QByteArrayLiteral("w ") + m_rohBeimSenden + '\n', Pending::Roh);
+            } else {
+                send(QByteArrayLiteral("w ") + m_rohHaeufig + '\n', Pending::Roh);
+            }
+        } else {
+            send(QByteArrayLiteral("f\n"), Pending::Frequency);
+        }
+        return;
+    }
+
     if (m_tick % kModeEveryNthTick == 0) {
         send(QByteArrayLiteral("m\n"), Pending::Mode);
         return;
@@ -250,6 +295,26 @@ void RigctldClient::onReadyRead()
     m_buffer += m_socket.readAll();
 
     while (m_awaiting != Pending::None) {
+        // Eine Rohantwort endet nicht mit einem Zeilenumbruch: rigctld gibt
+        // weiter, was das Geraet schickt, "PA10;" und eine Null dahinter.
+        if (m_awaiting == Pending::Roh) {
+            const qsizetype ende = m_buffer.indexOf(';');
+            const qsizetype zeile = m_buffer.indexOf('\n');
+            if (ende < 0 && zeile < 0) { return; }
+            qsizetype bis = (ende >= 0 && (zeile < 0 || ende < zeile)) ? ende + 1 : zeile + 1;
+            while (bis < m_buffer.size()
+                   && (m_buffer.at(bis) == '\0' || m_buffer.at(bis) == '\n')) {
+                ++bis;
+            }
+            const QByteArray antwort = m_buffer.left(bis);
+            m_buffer.remove(0, bis);
+            m_awaiting = Pending::None;
+            m_deadline->stop();
+            if (ende >= 0) { emit rohAntwort(antwort); }
+            pump();
+            continue;
+        }
+
         const int noetig = expectedLines(m_awaiting);
 
         // Eine RPRT-Zeile beendet das Warten SOFORT, auch wenn zwei
@@ -331,6 +396,7 @@ void RigctldClient::onReadyRead()
             }
             break;
         }
+        case Pending::Roh:     // oben erledigt, kommt hier nie an
         case Pending::None:
             break;
         }
