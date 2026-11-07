@@ -2328,6 +2328,17 @@ void MainWindow::verdrahteKombiFeld(KombiApplet* feld)
 {
     connect(feld, &KombiApplet::listeGewuenscht, this,
             [this, feld](const QPoint& wo) { zeigeKombiListe(feld, wo); });
+    connect(feld, &KombiApplet::herueberGezogen, this,
+            [this](QWidget* w, KombiApplet* ziel) {
+        if (!m_shuttingDown) { uebergibKombiPanel(ziel, w); }
+    });
+    connect(feld, &KombiApplet::reiterMenueGewuenscht, this,
+            [this, feld](QWidget* w, const QPoint& wo) {
+        QMenu menue(this);
+        menue.setStyleSheet(QString::fromLatin1(kPopupMenu));
+        fuelleReiterMenue(menue, feld, w);
+        menue.exec(wo);
+    });
     // ── Herausgezogen heiszt: dort stehen (2026-11-01) ───────────────
     //
     // Betreiber: „frequenz lässt sich reinziehen, soll sich aber
@@ -2349,6 +2360,27 @@ void MainWindow::verdrahteKombiFeld(KombiApplet* feld)
         // Werkzeugfenster zurueck, dort, wo losgelassen wurde.
         gibFremdesPanelZurueck(w, dort);
     });
+}
+
+bool MainWindow::waehleReiterEintragForTest(KombiApplet* feld, QWidget* panel,
+                                            const QString& text)
+{
+    QMenu menue(this);
+    fuelleReiterMenue(menue, feld, panel);
+    for (QAction* a : menue.actions()) {
+        if (a->text() == text) { a->trigger(); return true; }
+    }
+    return false;
+}
+
+bool MainWindow::waehleKombiEintragForTest(KombiApplet* feld, const QString& text)
+{
+    QMenu menue(this);
+    fuelleKombiListe(menue, feld);
+    for (QAction* a : menue.actions()) {
+        if (a->text() == text) { a->trigger(); return true; }
+    }
+    return false;
 }
 
 QStringList MainWindow::kombiListeForTest(KombiApplet* feld)
@@ -2379,6 +2411,33 @@ void MainWindow::fuelleKombiListe(QMenu& menue, KombiApplet* feld)
     const auto schonDrin = [&drin](QWidget* w) { return drin.contains(w); };
 
     int angeboten = 0;
+
+    // ── Was im ANDEREN Feld liegt, kommt per Klick heruber (2026-11-06) ──
+    //
+    // Betreiber, mit Bild der Liste von Combined 2: "sehe hier nicht den
+    // chat". Er lag im ersten Feld, und die Liste bot nur Freies an; der
+    // Weg ging ueber Herausziehen und erneutes Waehlen. Ganz oben, weil
+    // die Liste schon jetzt die Schirmhoehe fuellt. Das Panel wechselt
+    // das Feld, es bleibt bei einem Platz.
+    for (KombiApplet* anderes : kombiFelder()) {
+        if (!anderes || anderes == feld) { continue; }
+        const QString feldName = anderes->appletId() == QStringLiteral("Kombi2")
+                                     ? QStringLiteral("Combined 2")
+                                     : QStringLiteral("Combined");
+        for (QWidget* w : anderes->seiten()) {
+            QAction* act = menue.addAction(QStringLiteral("%1 (in %2)")
+                                               .arg(KombiApplet::nameVon(w), feldName));
+            connect(act, &QAction::triggered, this,
+                    [this, feld, anderes, w = QPointer<QWidget>(w)]() {
+                if (!w) { return; }
+                anderes->gibFrei(w);
+                uebergibKombiPanel(feld, w);
+            });
+            ++angeboten;
+        }
+    }
+    if (angeboten > 0) { menue.addSeparator(); }
+
     for (auto it = m_appletsById.constBegin(); it != m_appletsById.constEnd();
          ++it) {
         AppletWidget* a = it.value();
@@ -2407,9 +2466,12 @@ void MainWindow::fuelleKombiListe(QMenu& menue, KombiApplet* feld)
     // Jetzt steht er immer da; ist er angedockt, wird er fuer den
     // Weg hierher kurz zum Fenster (`detachRotorPanel`) und geht von
     // dort ins Feld.
-    const bool rotorSchonDrin =
-        m_rotorWindow && m_rotorWindow->content()
-        && schonDrin(m_rotorWindow->content());
+    //
+    // Im Feld hat er kein Fenster mehr, m_rotorWindow ist dann leer; darum
+    // zaehlt der Name der Seite, sonst stuende er hier ein zweites Mal.
+    const bool rotorSchonDrin = std::any_of(drin.cbegin(), drin.cend(), [](QWidget* w) {
+        return w && w->objectName() == QStringLiteral("RotorLog");
+    });
     if (!rotorSchonDrin) {
         QAction* act = menue.addAction(QStringLiteral("Rotor / Log"));
         connect(act, &QAction::triggered, this, [this, feld]() {
@@ -2458,6 +2520,63 @@ void MainWindow::fuelleKombiListe(QMenu& menue, KombiApplet* feld)
 
 // Ein Contest-Panel ins Feld holen (2026-11-05): die Bruecke macht es
 // bereit (geladen, abgeloest, ohne eigene Knoepfe), das Feld nimmt es.
+// Ein freigegebenes Panel in ein anderes Feld legen. Ein Applet hat die
+// Spalte aufgefangen (siehe addApplet); das erledigt holeInsKombiFeld.
+void MainWindow::uebergibKombiPanel(KombiApplet* ziel, QWidget* panel)
+{
+    if (!ziel || !panel) { return; }
+    if (auto* a = qobject_cast<AppletWidget*>(panel)) {
+        holeInsKombiFeld(ziel, a, panelIdFor(a));
+        return;
+    }
+    ziel->nimmAuf(panel);
+}
+
+// Rechtsklick auf einen Reiter (Betreiber 2026-11-06: "man sollte das auch
+// wieder loeschen koennen"). Remove nimmt das Panel aus dem Bild, ohne ein
+// Fenster zu hinterlassen; ueber Liste und Containers-Menue kommt es wieder.
+void MainWindow::fuelleReiterMenue(QMenu& menue, KombiApplet* feld, QWidget* panel)
+{
+    for (KombiApplet* ziel : kombiFelder()) {
+        if (!ziel || ziel == feld || !ziel->isVisible()) { continue; }
+        const QString name = ziel->appletId() == QStringLiteral("Kombi2")
+                                 ? QStringLiteral("Combined 2")
+                                 : QStringLiteral("Combined");
+        QAction* act = menue.addAction(tr("Move to %1").arg(name));
+        connect(act, &QAction::triggered, this,
+                [this, feld, ziel, w = QPointer<QWidget>(panel)]() {
+            if (!w) { return; }
+            feld->gibFrei(w);
+            uebergibKombiPanel(ziel, w);
+        });
+    }
+    QAction* fenster = menue.addAction(tr("Open as window"));
+    connect(fenster, &QAction::triggered, this,
+            [feld, w = QPointer<QWidget>(panel)]() {
+        if (!w) { return; }
+        feld->gibFrei(w);
+        emit feld->herausgezogen(w, QCursor::pos());
+    });
+    QAction* weg = menue.addAction(tr("Remove"));
+    connect(weg, &QAction::triggered, this,
+            [this, feld, w = QPointer<QWidget>(panel)]() {
+        if (w) { entferneAusKombiFeld(feld, w); }
+    });
+}
+
+void MainWindow::entferneAusKombiFeld(KombiApplet* feld, QWidget* panel)
+{
+    if (m_shuttingDown || !feld || !panel) { return; }
+    feld->gibFrei(panel);
+    if (auto* a = qobject_cast<AppletWidget*>(panel)) {
+        if (m_appletVis) { m_appletVis->setVisible(panelIdFor(a), false); }
+        return;
+    }
+    gibFremdesPanelZurueck(panel, QRect());
+    // Der Rotor bekam dabei sein Fenster zurueck; es bleibt verborgen.
+    if (m_rotorWindow && m_rotorWindow->content() == panel) { m_rotorWindow->hide(); }
+}
+
 void MainWindow::holeContestInsKombiFeld(KombiApplet* feld, const QString& id)
 {
 #ifndef LONGPATH_HAVE_CONTESTPROGRAMM

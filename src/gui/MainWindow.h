@@ -258,6 +258,9 @@ public:
     { holeContestInsKombiFeld(zweites ? m_kombiApplet2 : m_kombiApplet, id); }
     class KombiApplet* kombiFeldForTest(int nr) const { return nr == 2 ? m_kombiApplet2 : m_kombiApplet; }
     QStringList kombiListeForTest(class KombiApplet* feld);
+    bool waehleKombiEintragForTest(class KombiApplet* feld, const QString& text);
+    bool waehleReiterEintragForTest(class KombiApplet* feld, QWidget* panel,
+                                    const QString& text);
     int sperreAlleFensterForTest(bool an) { return sperreAlleFenster(an); }
 
     /// Wie viele Rahmen des Sendetons jetzt faellig sind.
@@ -1364,6 +1367,9 @@ private:
     /// Rechtsklick auf ein Kombi-Feld: zeigt, was hineinkann.
     void zeigeKombiListe(class KombiApplet* feld, const QPoint& globalPos);
     void fuelleKombiListe(class QMenu& menue, class KombiApplet* feld);
+    void fuelleReiterMenue(class QMenu& menue, class KombiApplet* feld, QWidget* panel);
+    void uebergibKombiPanel(class KombiApplet* ziel, QWidget* panel);
+    void entferneAusKombiFeld(class KombiApplet* feld, QWidget* panel);
     void holeContestInsKombiFeld(class KombiApplet* feld, const QString& id);
     QByteArray layoutprofilAlsJson(const QString& name);
     void exportiereLayoutprofil(const QString& name);

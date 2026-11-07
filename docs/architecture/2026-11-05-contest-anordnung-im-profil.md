@@ -192,3 +192,19 @@ Am selben Tag erledigt: Longpath startet nicht mehr immer mit Profil 1,
 sondern mit dem zuletzt aktiven (`LayoutProfiles::startWithLastActive`,
 Betreiber „Zuletzt aktives"). Das Logbuch kommt mit dem Profil, mit dem
 Longpath startet.
+
+## Nachtrag 2026-11-06: Panels zwischen den Combined-Feldern
+
+Betreiber: „sehe hier nicht den chat", „man sollte das auch wieder löschen
+können", „oder rüberziehen".
+
+- Die Liste nennt oben, was im anderen Feld liegt („Chat (in Combined)"),
+  ein Klick holt es herüber. Ein Panel hat weiter nur einen Platz.
+- Ein Reiter zieht sich ins andere Feld. Entschieden wird beim Loslassen,
+  und das Ziel steht vor dem Freigeben fest: danach schrumpft das Quellfeld,
+  und ein Nachbar in derselben Spalte rutscht unter dem Zeiger weg.
+- Rechtsklick auf den Reiter: „Move to …", „Open as window", „Remove".
+  Remove lässt kein Fenster zurück; Liste und Containers-Menü holen das Panel
+  wieder. Das Netz auf der Anwendung fing diesen Rechtsklick vorher ab.
+- Der Griff reagiert nur noch auf die eigenen Reiter. Zuvor griff ein Druck
+  auf irgendeinen Knopf der Anwendung die erste Seite.

@@ -14,6 +14,10 @@
 // =================================================================
 
 #include <QtTest/QtTest>
+#include <QContextMenuEvent>
+#include <QMouseEvent>
+#include <QPushButton>
+#include <QSignalSpy>
 
 #include "core/AppSettings.h"
 #include "gui/applets/KombiApplet.h"
@@ -492,6 +496,78 @@ private slots:
         QVERIFY2(!erstes.contains(QStringLiteral("NurImZweiten")), qPrintable(erstes));
         b.gibFrei(w);
         delete w;
+    }
+
+    // ── Der Griff gehoert den eigenen Reitern (2026-11-06) ──────────────
+    //
+    // Der Filter haengt an der Anwendung. Ohne die Frage nach dem eigenen
+    // Reiter griff ein Druck auf IRGENDEINEN Knopf die erste Seite.
+    void einFremderKnopfGreiftNichts()
+    {
+        KombiApplet k(nullptr);
+        auto* seite = new QWidget;
+        seite->setWindowTitle(QStringLiteral("Seite"));
+        k.nimmAuf(seite);
+        QPushButton fremd(QStringLiteral("fremd"));
+        const QPoint start(5, 5);
+        const QPoint gStart = fremd.mapToGlobal(start);
+        const QPoint weit = gStart + QPoint(300, 300);
+        QMouseEvent druck(QEvent::MouseButtonPress, QPointF(start), QPointF(gStart),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(&fremd, &druck);
+        QMouseEvent zug(QEvent::MouseMove, QPointF(start), QPointF(weit),
+                        Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(&fremd, &zug);
+        QMouseEvent los(QEvent::MouseButtonRelease, QPointF(start), QPointF(weit),
+                        Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(&fremd, &los);
+        QVERIFY2(k.seiten().contains(seite), "ein fremder Knopf riss die Seite heraus");
+    }
+
+    // Der Rechtsklick erreicht den Reiter; das Netz des Feldes fing ihn ab.
+    // Und aus dem Feld gezogen wird beim Loslassen, nicht beim ersten Weg.
+    void derReiterHatSeinMenueUndDerZugEndetBeimLoslassen()
+    {
+        KombiApplet k(nullptr);
+        k.resize(300, 200);
+        k.show();
+        auto* seite = new QWidget;
+        seite->setWindowTitle(QStringLiteral("Seite"));
+        k.nimmAuf(seite);
+        QPushButton* reiter = nullptr;
+        for (QPushButton* b : k.findChildren<QPushButton*>()) {
+            if (b->text() == QStringLiteral("Seite")) { reiter = b; }
+        }
+        QVERIFY(reiter);
+
+        QSignalSpy menue(&k, &KombiApplet::reiterMenueGewuenscht);
+        QSignalSpy liste(&k, &KombiApplet::listeGewuenscht);
+        QContextMenuEvent rechts(QContextMenuEvent::Mouse, QPoint(3, 3),
+                                 reiter->mapToGlobal(QPoint(3, 3)));
+        QApplication::sendEvent(reiter, &rechts);
+        QCOMPARE(menue.size(), 1);
+        QCOMPARE(liste.size(), 0);
+        QCOMPARE(menue.first().at(0).value<QWidget*>(), seite);
+
+        QSignalSpy raus(&k, &KombiApplet::herausgezogen);
+        const QPoint start(3, 3);
+        const QPoint gStart = reiter->mapToGlobal(start);
+        const QPoint draussen = k.mapToGlobal(QPoint(k.width() + 200, 0));
+        QMouseEvent druck(QEvent::MouseButtonPress, QPointF(start), QPointF(gStart),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(reiter, &druck);
+        QMouseEvent zug(QEvent::MouseMove, QPointF(start), QPointF(draussen),
+                        Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(reiter, &zug);
+        QCOMPARE(raus.size(), 0);
+        QVERIFY2(k.seiten().contains(seite), "waehrend des Zuges bleibt es im Feld");
+        QMouseEvent los(QEvent::MouseButtonRelease, QPointF(start), QPointF(draussen),
+                        Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(reiter, &los);
+        QCOMPARE(raus.size(), 1);
+        QCOMPARE(raus.first().at(1).toPoint(), draussen);
+        QVERIFY(!k.seiten().contains(seite));
+        delete seite;
     }
 
     void auchEinFremdesWidget()
