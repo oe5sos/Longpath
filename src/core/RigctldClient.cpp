@@ -127,7 +127,7 @@ void RigctldClient::setTarget(const QString& host, quint16 port)
 
 void RigctldClient::setPollIntervalMs(int ms)
 {
-    m_pollMs = qBound(50, ms, 5000);
+    m_pollMs = qBound(20, ms, 5000);
     m_poll->setInterval(m_pollMs);
 }
 
