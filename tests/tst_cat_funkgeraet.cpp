@@ -38,8 +38,11 @@
 #include "core/MoxController.h"
 #include "core/RadioConnection.h"
 #include "core/RigctldClient.h"
+#include "core/RxChannel.h"
+#include "core/WdspEngine.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "gui/MainWindow.h"
 
 using namespace Longpath;
 
@@ -101,9 +104,11 @@ private:
     QTcpServer m_server;
 };
 
-// Energie des komplexen Signals bei `hz`; negativ heisst unter dem Traeger.
+// Energie des Signals `hz` ueber dem Traeger, negativ darunter. Im
+// Empfangsweg liegt das bei der umgekehrten Frequenz, siehe AudioZuIq.h.
 double energieBei(const QVector<float>& iq, double hz, int ab)
 {
+    hz = -hz;
     std::complex<double> summe(0.0, 0.0);
     const int n = static_cast<int>(iq.size()) / 2;
     for (int i = ab; i < n; ++i) {
@@ -246,6 +251,34 @@ private slots:
         QVERIFY2(amTraeger < dort * 0.01, qPrintable(QString::number(amTraeger)));
     }
 
+    // Nur von Hand, mit dem Geraet am USB-Kabel. Liest nur den Ton.
+    void derEchteTonEingangLiefertBloecke()
+    {
+        const QByteArray name = qgetenv("LONGPATH_CAT_TON");
+        if (name.isEmpty()) { QSKIP("Nur von Hand: LONGPATH_CAT_TON=<Geraetename>"); }
+
+        CatRigConnection verbindung;
+        verbindung.setTonEingang(QString::fromUtf8(name));
+        QSignalSpy bloecke(&verbindung, &RadioConnection::iqDataReceived);
+        RadioInfo info;
+        info.protocol = ProtocolVersion::CatRig;
+        verbindung.connectToRadio(info);
+        QVERIFY2(verbindung.tonLaeuft(), "der Toneingang ist nicht aufgegangen");
+        QTest::qWait(3000);
+        verbindung.disconnect();
+
+        double summe = 0.0;
+        qint64 proben = 0;
+        for (const QList<QVariant>& b : std::as_const(bloecke)) {
+            const auto iq = b.at(1).value<QVector<float>>();
+            for (float v : iq) { summe += double(v) * v; ++proben; }
+        }
+        const double rms = proben ? std::sqrt(summe / proben) : 0.0;
+        qInfo() << "Bloecke" << bloecke.size() << "in 3 s, Pegel"
+                << 20.0 * std::log10(rms + 1e-12) << "dBFS";
+        QVERIFY(bloecke.size() > 200);
+    }
+
     void ohneTonEingangSteigtDieVerbindungNichtAus()
     {
         CatRigConnection verbindung;
@@ -351,6 +384,106 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::CWU, 3000);
 
         QVERIFY2(!doppel.hatGetastet(), "Longpath hat das fremde Geraet getastet");
+    }
+
+    // Die ganze Kette durch den echten Hochlauf, von Hand zu starten: in
+    // einem frischen Konfigurationsordner rechnet WDSP erst seine Wisdom,
+    // das sprengt die Zeitgrenze eines normalen Laufs.
+    void dieGanzeKetteLiefertEinSpektrum()
+    {
+        if (!qEnvironmentVariableIsSet("LONGPATH_CAT_KETTE")) {
+            QSKIP("Nur von Hand: LONGPATH_CAT_KETTE=1");
+        }
+        RigctldDoppel doppel;
+        doppel.frequenz = 28078000;
+        zielAuf(doppel.port());
+        stelleEin(QStringLiteral("CompanionRigAudioInput"), QStringLiteral("gibt es nicht"));
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+
+        // Das echte Hauptfenster: die FFT haengt an ihm, nicht am Modell.
+        auto* fenster = new MainWindow();   // bewusst nicht abgeraeumt
+        fenster->resize(1280, 800);
+        fenster->show();
+        QVERIFY(QTest::qWaitForWindowExposed(fenster, 20000));
+        RadioModel& radio = *fenster->radioModelForTest();
+        QVector<float> letztes;
+        int spanne = 0;
+        qint64 mitte = 0;
+        int rahmen = 0;
+        connect(&radio, &RadioModel::spektrumBereit, this,
+                [&](int, const QVector<float>& dbm, int s, qint64 m) {
+                    letztes = dbm; spanne = s; mitte = m; ++rahmen;
+                });
+
+        radio.connectToRadio(*info);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.isConnected(), 300000);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 5000);
+        qInfo() << "Abtastrate" << radio.connectionSampleRateHz();
+        QCOMPARE(radio.connectionSampleRateHz(), 48000);
+
+        auto* cat = qobject_cast<CatRigConnection*>(
+            const_cast<RadioConnection*>(radio.connection()));
+        QVERIFY(cat);
+
+        auto speise = [&]() {
+            const QVector<float> ton = sinus(1000.0, 48000 * 2);
+            constexpr int kStueck = 960;
+            for (int ab = 0; ab + kStueck <= ton.size(); ab += kStueck) {
+                QByteArray pcm(kStueck * 2, Qt::Uninitialized);
+                auto* roh = reinterpret_cast<qint16*>(pcm.data());
+                for (int i = 0; i < kStueck; ++i) {
+                    roh[i] = static_cast<qint16>(ton[ab + i] * 32767.0f);
+                }
+                QMetaObject::invokeMethod(cat, [cat, pcm]() { cat->verarbeiteTon(pcm, 1); });
+                QTest::qWait(20);
+            }
+        };
+        auto spitzeHz = [&]() {
+            int spitze = 0;
+            for (int i = 1; i < letztes.size(); ++i) {
+                if (letztes[i] > letztes[spitze]) { spitze = i; }
+            }
+            return -spanne / 2.0 + spitze * double(spanne) / letztes.size();
+        };
+        auto* kanal = radio.wdspEngine()->rxChannel(0);
+        QVERIFY(kanal);
+
+        // Die Scheibe steht in USB: der Ton gehoert ueber den Traeger, im
+        // Wasserfall wie im Demodulator.
+        cat->setGespiegelt(false);
+        speise();
+        const double sMeter = kanal->getMeter(RxMeterType::SignalAvg);
+        qInfo() << "USB: Spitze" << spitzeHz() << "S" << sMeter << "Rahmen" << rahmen;
+        const double spitzeUsb = spitzeHz();
+        // Gegenrichtung: derselbe Ton im falschen Seitenband ist im
+        // Durchlassbereich nicht zu hoeren.
+        cat->setGespiegelt(true);
+        speise();
+        const double sMeterFalsch = kanal->getMeter(RxMeterType::SignalAvg);
+        qInfo() << "falsch: Spitze" << spitzeHz() << "S" << sMeterFalsch;
+        cat->setGespiegelt(false);
+
+        // Der Traeger wandert im Fenster: Ton und Demodulator muessen
+        // mitgehen, sonst waere ein Signal in CTUN nicht zu hoeren.
+        doppel.frequenz = 28078000 + 1500;
+        QTRY_COMPARE_WITH_TIMEOUT(radio.companionRig()->zfFrequenzHz(), doppel.frequenz, 4000);
+        QTest::qWait(200);
+        speise();
+        const double sVerschoben = kanal->getMeter(RxMeterType::SignalAvg);
+        qInfo() << "verschoben: Spitze" << spitzeHz() << "S" << sVerschoben;
+        QVERIFY2(rahmen > 0, "kein Spektrum aus der Kette");
+        QVERIFY2(std::abs(spitzeUsb - 1000.0) < 200.0, qPrintable(QString::number(spitzeUsb)));
+        QVERIFY2(sMeter > sMeterFalsch + 20.0,
+                 qPrintable(QStringLiteral("%1 gegen %2").arg(sMeter).arg(sMeterFalsch)));
+        QVERIFY2(sVerschoben > sMeter - 6.0, qPrintable(QString::number(sVerschoben)));
+
+        radio.setMox(true);
+        QVERIFY(!radio.mox());
+        QVERIFY(!doppel.hatGetastet());
+        radio.disconnectFromRadio();
+        QTRY_VERIFY_WITH_TIMEOUT(!radio.isConnected(), 10000);
+        QVERIFY(!radio.companionRig()->catBetrieb());
     }
 
     // Ueber die Pruef-Zugaenge und nicht ueber connectToRadio(): der volle

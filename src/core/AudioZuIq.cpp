@@ -40,7 +40,8 @@ QVector<float> AudioZuIq::verarbeite(const float* ton, int n)
     QVector<float> aus(n * 2);
     const int laenge = static_cast<int>(m_koeffizienten.size());
     const int mitte = laenge / 2;
-    const float vorzeichen = m_gespiegelt ? -1.0f : 1.0f;
+    // Siehe Kopf von AudioZuIq.h: USB ist hier die negative Frequenz.
+    const float vorzeichen = m_gespiegelt ? 1.0f : -1.0f;
 
     for (int i = 0; i < n; ++i) {
         m_verlauf[m_kopf] = ton[i];

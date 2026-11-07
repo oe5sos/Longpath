@@ -143,7 +143,9 @@ void CatRigConnection::schiebeAnDenTraeger(QVector<float>& iq)
         return;
     }
 
-    const double schritt = 2.0 * M_PI * abstand / kAbtastrate;
+    // Minus: im Empfangsweg liegt "ueber dem Traeger" bei negativer
+    // Frequenz, siehe AudioZuIq.h.
+    const double schritt = -2.0 * M_PI * abstand / kAbtastrate;
     const int proben = static_cast<int>(iq.size()) / 2;
     for (int i = 0; i < proben; ++i) {
         const float c = static_cast<float>(std::cos(m_phase));

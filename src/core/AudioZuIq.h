@@ -22,6 +22,12 @@
 // gedrehte Ton, I derselbe Ton um die Gruppenlaufzeit verzoegert. In LSB
 // liegt das Signal unter dem Traeger, also wird Q gespiegelt.
 //
+// Das Vorzeichen folgt Longpaths Empfangsweg, nicht der Lehrbuchformel:
+// dort liegt ein Signal UEBER dem Traeger bei negativer Frequenz
+// (FFTEngine vertauscht I und Q, WDSP rechnet entsprechend). Gemessen am
+// 2026-11-07 durch die ganze Kette: mit dem Lehrbuch-Vorzeichen stand der
+// 1-kHz-Ton in USB bei -1 kHz, und das S-Meter zeigte -70 statt -6 dBm.
+//
 // Der Filter kennt keinen Faden. Wer ihn benutzt, ruft ihn aus einem.
 //
 // =================================================================
