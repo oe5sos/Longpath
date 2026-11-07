@@ -140,6 +140,9 @@ void CompanionRigController::baueClient()
 
     connect(m_client.get(), &RigctldClient::stateChanged, this,
             [this](RigctldClient::State s) {
+        if (s == RigctldClient::State::Connected && m_catBetrieb && m_client) {
+            m_client->schalteZwischenspeicherAus();
+        }
         emit verbindungGeaendert(s == RigctldClient::State::Connected);
     });
 
@@ -320,7 +323,10 @@ void CompanionRigController::setCatBetrieb(bool an)
             AppSettings::instance().value(QStringLiteral("CompanionRigStartDaemon")),
             true);
         if (!verbunden()) { verbinde(); }
-        if (m_client) { m_client->setPollIntervalMs(kKatAbfrageMs); }
+        if (m_client) {
+            m_client->setPollIntervalMs(kKatAbfrageMs);
+            m_client->schalteZwischenspeicherAus();   // falls schon verbunden
+        }
         return;
     }
 

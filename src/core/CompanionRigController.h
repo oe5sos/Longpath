@@ -109,12 +109,12 @@ public:
     /// nur stehen, wenn das Folgen dort an ist.
     ///
     /// In dieser Rolle ist das Geraet die Anzeige: gefragt wird im
-    /// kKatAbfrageMs-Takt statt im gemuetlichen Takt fuer die Marke. Jede
-    /// zweite Abfrage gilt der Frequenz, der VFO laeuft also mit rund 8
-    /// Schritten je Sekunde mit (Betreiber, 2026-11-07: "relativ
-    /// zeitverzoegert").
+    /// kKatAbfrageMs-Takt statt im gemuetlichen Takt fuer die Marke, und
+    /// am Zwischenspeicher von rigctld vorbei. Jede zweite Abfrage gilt
+    /// der Frequenz, der VFO laeuft also mit rund 16 Schritten je Sekunde
+    /// mit (Betreiber, 2026-11-07: "relativ zeitverzoegert").
     void setCatBetrieb(bool an);
-    static constexpr int kKatAbfrageMs = 60;
+    static constexpr int kKatAbfrageMs = 30;
     bool catBetrieb() const { return m_catBetrieb; }
 
     // ── Was das Geraet sagt ─────────────────────────────────────────

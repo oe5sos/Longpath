@@ -136,6 +136,14 @@ public:
     /// keine Verbindung steht.
     void setFrequencyHz(qint64 hz);
 
+    /// Schaltet den Zwischenspeicher von rigctld ab. Ab Werk beantwortet
+    /// Hamlib eine Frequenzfrage eine Sekunde lang aus dem Speicher
+    /// (gemessen: `get_cache` meldet 1000 ms, eine Antwort dauert 0,1 ms).
+    /// Fuer die Marke ist das gleichgueltig, fuer einen VFO, der dem Knopf
+    /// folgen soll, ist es ein Sekundentakt. Ohne Speicher fragt rigctld
+    /// wirklich das Geraet, in rund 3 ms.
+    void schalteZwischenspeicherAus();
+
     /// Das Geraet auf diese Betriebsart stellen ("USB", "LSB", ...).
     /// Tut nichts, wenn keine Verbindung steht.
     void setMode(const QString& mode);

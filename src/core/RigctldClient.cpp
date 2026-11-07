@@ -187,6 +187,12 @@ QByteArray RigctldClient::setModeCommand(const QString& mode)
     return QStringLiteral("M %1 0\n").arg(m).toLatin1();
 }
 
+void RigctldClient::schalteZwischenspeicherAus()
+{
+    if (!isConnected()) { return; }
+    send(QByteArrayLiteral("\\set_cache 0\n"), Pending::Report);
+}
+
 void RigctldClient::setMode(const QString& mode)
 {
     if (!isConnected()) { return; }

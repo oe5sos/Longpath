@@ -400,7 +400,14 @@ private slots:
         // Das Geraet gibt den Stand vor.
         QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28078400), 3000);
         QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 3000);
-        QVERIFY2(doppel.befehle.isEmpty(), "eine Meldung vom Geraet ging als Befehl zurueck");
+
+        // Ohne das antwortet rigctld eine Sekunde lang aus dem Speicher.
+        QTRY_VERIFY_WITH_TIMEOUT(
+            doppel.befehle.contains(QByteArray("\\set_cache 0\n")), 3000);
+        for (const QByteArray& b : std::as_const(doppel.befehle)) {
+            QVERIFY2(b.startsWith("\\set_cache"),
+                     "eine Meldung vom Geraet ging als Befehl zurueck");
+        }
 
         // Die Scheibe stellt das Geraet.
         scheibe.setFrequency(28100000.0);
