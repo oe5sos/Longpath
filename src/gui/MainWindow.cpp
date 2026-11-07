@@ -11078,6 +11078,41 @@ void MainWindow::populateDefaultMeter()
                     }
                 }
 
+                // ── Nach dem Inhalt noch einmal die Plaetze ──────────────
+                //
+                // Betreiber 2026-11-07: "alleine nur das aendern des profils
+                // macht probleme", mit Bild: Combined auf drei Zeilen
+                // zusammengefallen, und "Frequency" lag ueber dem Panadapter,
+                // wo er es nie gesehen hatte.
+                //
+                // Beides kommt aus der Reihenfolge. Die Fenster bekommen ihre
+                // Groesse, BEVOR holeKombiInhaltZurueck ihnen den Inhalt
+                // zurueckgibt, und ein leeres Feld faellt zusammen. Beim Start
+                // kommt der Panadapter nach den Applets und liegt damit oben,
+                // beim Wechsel hebt show() die Applets ueber ihn.
+                //
+                // Also einmal nachziehen, wenn die Fenster sich gesetzt
+                // haben: dieselbe Lage und dieselbe Stapelung wie beim Start.
+                QTimer::singleShot(0, this, [this, s]() {
+                    if (m_shuttingDown) { return; }
+                    const EigeneBewegung wirSelbst;
+                    const QVariantMap geloest =
+                        s.value(QStringLiteral("floatingApplets")).toMap();
+                    for (auto it = geloest.constBegin(); it != geloest.constEnd(); ++it) {
+                        AppletFloatingWindow* w = m_floatingApplets.value(it.key(), nullptr);
+                        if (!w) { continue; }
+                        const QRect soll = lageAusProfil(it.value().toMap());
+                        if (soll.isValid() && w->geometry() != soll) { w->setGeometry(soll); }
+                    }
+                    if (!m_panStack) { return; }
+                    for (PanadapterApplet* pan : m_panStack->allApplets()) {
+                        if (!pan) { continue; }
+                        if (auto* fenster = m_panStack->floatingWindowForTest(pan->panId())) {
+                            fenster->raise();
+                        }
+                    }
+                });
+
                 qWarning() << "[ProfileApply:Step] 6/6 fertig";
             });
 
