@@ -16633,7 +16633,10 @@ QRect MainWindow::lageAusProfil(const QVariantMap& quelle) const
     const int h = quelle.value(QStringLiteral("h")).toInt();
     if (quelle.contains(QStringLiteral("dx"))
         && quelle.contains(QStringLiteral("dy"))) {
-        const QPoint ecke = frameGeometry().topLeft();
+        const QScreen* schirm = screen();
+        const QPoint ecke = bezugspunktFuerProfil(
+            windowState(), frameGeometry(),
+            schirm ? schirm->availableGeometry() : QRect());
         return QRect(ecke.x() + quelle.value(QStringLiteral("dx")).toInt(),
                      ecke.y() + quelle.value(QStringLiteral("dy")).toInt(),
                      w, h);
@@ -17157,6 +17160,13 @@ int MainWindow::schwebendeMitziehen()
 int MainWindow::schwebendeAusDemSchutzrahmenHolen()
 {
     if (m_shuttingDown) { return 0; }
+    // Das Hauptfenster ist noch unterwegs: seine Leisten liegen zu tief.
+    // Die Bewegung meldet sich selbst, moveEvent() ruft hier noch einmal.
+    if (const QScreen* schirm = screen();
+        schirm && !hauptrahmenSteht(windowState(), frameGeometry(),
+                                    schirm->availableGeometry())) {
+        return 0;
+    }
     const QList<QRect> sperren = schutzrahmen();
     if (sperren.isEmpty()) { return 0; }
 

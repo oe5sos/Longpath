@@ -140,6 +140,27 @@ QRect mitMindestabstand(const QRect& wunsch, const QList<QRect>& nachbarn,
                         int abstand,
                         int maxUeberlappung = kSnapGridPx / 2);
 
+// Der Bezugspunkt fuer die Lage eines schwebenden Fensters im Profil.
+//
+// Gemessen 2026-11-07: die Fenster wanderten von Lauf zu Lauf um genau
+// 16 Punkte nach unten (Bandbreitenfilter 160, 176, 192). Auf macOS steht
+// ein frisch maximiertes Hauptfenster noch kurz an seinem alten Platz
+// (Geraetelog: y=48 statt 33), waehrend die Fenster schon gesetzt werden.
+// Alle landen damit 15 Punkte zu tief, das Raster macht 16 daraus, und
+// beim Beenden wird das als neue Lage gespeichert.
+//
+// Ein maximiertes Fenster steht aber fest in der linken oberen Ecke der
+// verfuegbaren Flaeche, auch solange es noch unterwegs ist. Das ist der
+// Bezugspunkt, nicht der noch veraltete Rahmen.
+QPoint bezugspunktFuerProfil(Qt::WindowStates zustand, const QRect& rahmen,
+                             const QRect& verfuegbar);
+
+// Steht das Hauptfenster schon dort, wo es hingehoert? Solange nicht,
+// liegen auch die Bedienleisten noch am falschen Platz, und der
+// Schutzrahmen schoebe Fenster, die gar nicht im Weg sind.
+bool hauptrahmenSteht(Qt::WindowStates zustand, const QRect& rahmen,
+                      const QRect& verfuegbar);
+
 // Von moveEvent() jeder schwebenden Fensterklasse mit einer Zeile
 // aufzurufen. Legt bei Bedarf einen einmaligen, an `w` gebundenen
 // Debounce-Timer an (kein Member in der aufrufenden Klasse noetig) und
