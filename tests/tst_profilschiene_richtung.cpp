@@ -460,7 +460,7 @@ private slots:
         QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("^\\[ProfileClick\\]")));
         QApplication::sendEvent(a, &los);
         QCOMPARE(profile.current(), QStringLiteral("Alpha"));
-        QVERIFY2(rail.letzterAusloeserForTest().contains(QStringLiteral("Maus bei")),
+        QVERIFY2(rail.letzterAusloeserForTest().contains(QStringLiteral("mouse at")),
                  qPrintable(rail.letzterAusloeserForTest()));
         QTest::qWait(10);
 
@@ -472,7 +472,7 @@ private slots:
         QApplication::sendEvent(b, &runter);
         QApplication::sendEvent(b, &hoch);
         QCOMPARE(profile.current(), QStringLiteral("Beta"));
-        QVERIFY2(rail.letzterAusloeserForTest().contains(QStringLiteral("Taste")),
+        QVERIFY2(rail.letzterAusloeserForTest().contains(QStringLiteral("key ")),
                  qPrintable(rail.letzterAusloeserForTest()));
         QTest::qWait(10);
 
@@ -481,7 +481,7 @@ private slots:
         QTest::ignoreMessage(QtWarningMsg, QRegularExpression(QStringLiteral("^\\[ProfileClick\\]")));
         g->click();
         QCOMPARE(profile.current(), QStringLiteral("Gamma"));
-        QVERIFY2(rail.letzterAusloeserForTest().contains(QStringLiteral("keine Eingabe")),
+        QVERIFY2(rail.letzterAusloeserForTest().contains(QStringLiteral("no input event")),
                  qPrintable(rail.letzterAusloeserForTest()));
     }
 };

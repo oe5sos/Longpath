@@ -345,21 +345,21 @@ void ProfileRail::meldeAusloeser(const QString& name)
 {
     const QString eingabe =
         m_letzteEingabe.isEmpty()
-            ? QStringLiteral("keine Eingabe, vom Programm ausgeloest")
+            ? QStringLiteral("no input event, triggered by the program")
             : m_letzteEingabe;
     m_letzteEingabe.clear();
     const QPoint zeiger = QCursor::pos();
     m_letzterAusloeser =
-        QStringLiteral("%1 -> %2: %3; Zeiger (%4,%5); Anwendung %6; Fenster \"%7\"")
+        QStringLiteral("%1 -> %2: %3; pointer (%4,%5); application %6; window \"%7\"")
             .arg(m_profiles ? m_profiles->current() : QString(), name, eingabe)
             .arg(zeiger.x())
             .arg(zeiger.y())
             .arg(QGuiApplication::applicationState() == Qt::ApplicationActive
-                     ? QStringLiteral("vorn")
-                     : QStringLiteral("im Hintergrund"))
+                     ? QStringLiteral("in front")
+                     : QStringLiteral("in the background"))
             .arg(QApplication::activeWindow()
                      ? QApplication::activeWindow()->metaObject()->className()
-                     : "keines");
+                     : "none");
     qWarning().noquote() << "[ProfileClick]" << m_letzterAusloeser;
 }
 
@@ -374,7 +374,7 @@ bool ProfileRail::eventFilter(QObject* watched, QEvent* event)
         const auto* me = static_cast<QMouseEvent*>(event);
         const QPoint wo = me->globalPosition().toPoint();
         m_letzteEingabe =
-            QStringLiteral("Maus bei (%1,%2), gehalten %3 ms, Geraet \"%4\"")
+            QStringLiteral("mouse at (%1,%2), held %3 ms, device \"%4\"")
                 .arg(wo.x())
                 .arg(wo.y())
                 .arg(m_druckUhr.isValid() ? m_druckUhr.elapsed() : -1)
@@ -384,7 +384,7 @@ bool ProfileRail::eventFilter(QObject* watched, QEvent* event)
     case QEvent::KeyPress:
     case QEvent::KeyRelease: {
         const auto* ke = static_cast<QKeyEvent*>(event);
-        m_letzteEingabe = QStringLiteral("Taste %1").arg(
+        m_letzteEingabe = QStringLiteral("key %1").arg(
             QKeySequence(ke->key()).toString());
         break;
     }
