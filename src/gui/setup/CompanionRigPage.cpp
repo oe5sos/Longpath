@@ -460,6 +460,29 @@ void CompanionRigPage::baueTransverterGruppe()
         "Applies only while the VFO is inside the IF window. 0 = no change."));
     grid->addWidget(m_tvRxGain, row++, 1);
 
+    // LO-Fehler (2026-11-08) -- Thetis "LO Error (kHz)" im Transverter-
+    // Fenster, drei Stellen, +/-1000 kHz (siehe TransverterSetup::loErrorKhz).
+    // Schritt 10 Hz statt Thetis' 1 kHz: der Fehler eines Quarzoszillators
+    // liegt bei einigen hundert Hz, und ein kHz-Schritt traefe ihn nie.
+    auto* loLabel = new QLabel(QStringLiteral("LO error:"), group);
+    loLabel->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
+    grid->addWidget(loLabel, row, 0);
+    m_tvLoFehler = new QDoubleSpinBox(group);
+    m_tvLoFehler->setObjectName(QStringLiteral("transverterLoError"));
+    m_tvLoFehler->setStyleSheet(Style::doubleSpinBoxStyle());
+    m_tvLoFehler->setLocale(QLocale::c());
+    m_tvLoFehler->setDecimals(3);
+    m_tvLoFehler->setRange(-TransverterSetup::kLoErrorGrenzeKhz,
+                           TransverterSetup::kLoErrorGrenzeKhz);
+    m_tvLoFehler->setSingleStep(0.010);
+    m_tvLoFehler->setSuffix(QStringLiteral(" kHz"));
+    m_tvLoFehler->setToolTip(QStringLiteral(
+        "How far the transverter's local oscillator is off, in kHz "
+        "(0.250 = 250 Hz). Corrects the displayed antenna frequency and "
+        "what is sent to the radio. Easiest to set with a right-click on "
+        "a beacon in the panadapter: \"Calibrate on this carrier\"."));
+    grid->addWidget(m_tvLoFehler, row++, 1);
+
     m_tvText = new QLabel(QString(), group);
     m_tvText->setObjectName(QStringLiteral("transverterSummary"));
     m_tvText->setStyleSheet(
@@ -512,6 +535,12 @@ void CompanionRigPage::baueTransverterGruppe()
         m_tv.rxGainDb = m_tvRxGain->value();
         speichereTransverter();
     });
+    connect(m_tvLoFehler, &QDoubleSpinBox::editingFinished, this, [this]() {
+        if (m_fuellt) { return; }
+        m_tv.loErrorKhz = m_tvLoFehler->value();
+        m_tvText->setText(m_tv.describe());
+        speichereTransverter();
+    });
     connect(m_tvVon, &QDoubleSpinBox::editingFinished, this, ausDenFeldern);
     connect(m_tvBis, &QDoubleSpinBox::editingFinished, this, ausDenFeldern);
     connect(m_tvVersatz, &QDoubleSpinBox::editingFinished,
@@ -527,6 +556,7 @@ void CompanionRigPage::zeigeTransverter()
     m_tvBis->setValue(static_cast<double>(m_tv.ifHighHz) / 1e6);
     m_tvVersatz->setValue(static_cast<double>(m_tv.offsetHz) / 1e6);
     m_tvRxGain->setValue(m_tv.rxGainDb);
+    m_tvLoFehler->setValue(m_tv.loErrorKhz);
 
     // Trifft die Einstellung eine Vorgabe, soll die Auswahl das zeigen.
     int treffer = 0;

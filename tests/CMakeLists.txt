@@ -1137,6 +1137,10 @@ longpath_add_test(tst_tune_abgewiesen)
 #   (S9 = -93 dBm ueber 30 MHz), die RX-Verstaerkung des Transverters im
 #   Pegelversatz (Thetis RXCalibrationOffset) und die S-Striche am Panadapter.
 longpath_add_test(tst_s_stufen)
+# tst_frequenz_eichung (2026-11-08): LO-Fehler des Transverters (Thetis
+#   xvtr.cs), Einmessen an einem Traeger (Thetis CalibrateFreq) auf KW und
+#   UKW, und der Korrekturfaktor auch bei P1 (Thetis NetworkIO.cs VFOfreq).
+longpath_add_test(tst_frequenz_eichung)
 if(TEST tst_transverter_nur_empfang)
     set_tests_properties(tst_transverter_nur_empfang PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")

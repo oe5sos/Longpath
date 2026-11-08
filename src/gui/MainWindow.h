@@ -753,6 +753,10 @@ private slots:
     /// on a functor target, it refuses the connect outright and returns an
     /// invalid Connection. As a lambda this signal was not connected at all.
     void onNotchCreateFromPan(double freqHz, bool narrow);
+    // Einmessen an einem Traeger (2026-11-08): Ergebnis der Messung eines
+    // Panadapters -> Dialog (TraegerEichDialog).
+    void zeigeTraegerEichung(bool gefunden, double geraetHz, double anzeigeHz,
+                             float snrDb);
     void onNotchCreateRequested(const QString& panId, double freqHz, bool narrow);
     void onNotchMoveRequested(int id, double newFreqHz);
     void onNotchWidthRequested(int id, double widthHz);

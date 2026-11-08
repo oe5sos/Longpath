@@ -256,6 +256,7 @@ warren@wpratt.com
 #include "MemoryRecord.h"
 #include "BandDefaults.h"
 #include "RxDspWorker.h"
+#include "core/FrequenzEichung.h"
 #include "core/SMeterSkala.h"
 #include "core/TransverterSetup.h"
 #include "core/FFTEngine.h"
@@ -4011,6 +4012,49 @@ double RadioModel::rxMeterOffsetDb() const
     const double transverter = TransverterSetup::current().pegelVersatzDb(zf);
 
     return static_cast<double>(preampOffset + meterCalOffset) + transverter;
+}
+
+RadioModel::EichZiel RadioModel::eichZielFuer(double geraetHz) const
+{
+    const TransverterSetup t = TransverterSetup::current();
+    if (t.active() && t.coversIf(qRound64(geraetHz))) {
+        return EichZiel::Transverter;
+    }
+    if (qobject_cast<const P1RadioConnection*>(m_connection)
+        || qobject_cast<const P2RadioConnection*>(m_connection)) {
+        return EichZiel::Geraet;
+    }
+    return EichZiel::NurAnzeige;
+}
+
+bool RadioModel::uebernimmEichung(double geraetHz, double anzeigeHz, double wahrHz)
+{
+    switch (eichZielFuer(geraetHz)) {
+    case EichZiel::Transverter: {
+        TransverterSetup t = TransverterSetup::load();
+        t.loErrorKhz = std::clamp(t.loErrorFuer(qRound64(anzeigeHz), qRound64(wahrHz)),
+                                  -TransverterSetup::kLoErrorGrenzeKhz,
+                                  TransverterSetup::kLoErrorGrenzeKhz);
+        t.save();
+        // Laedt neu, legt es prozessweit ab und meldet versatzGeaendert:
+        // VFO-Zahl, Achse, Bandplan und Spots ziehen nach.
+        companionRig()->einstellungenGeaendert();
+        return true;
+    }
+    case EichZiel::Geraet: {
+        // Mit externem 10-MHz-Bezug nimmt Thetis den 10-MHz-Faktor, und
+        // eine Eichung am Traeger aendert nichts (setup.cs:14036-14050);
+        // dann wird nicht so getan, als ob.
+        if (m_calController.using10MHzRef()) { return false; }
+        m_calController.setFreqCorrectionFactor(FrequenzEichung::neuerFaktor(
+            m_calController.freqCorrectionFactor(), geraetHz, wahrHz));
+        m_calController.save();
+        return true;
+    }
+    case EichZiel::NurAnzeige:
+        break;
+    }
+    return false;
 }
 
 void RadioModel::pruefeRxMeterOffset()
@@ -11755,10 +11799,14 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     }
 
     // Wire CalibrationController to P2RadioConnection so hzToPhaseWord()
-    // applies effectiveFreqCorrectionFactor(). P1 uses raw Hz (not phase words),
-    // so P1 doesn't need this. Phase 3P-G.
+    // applies effectiveFreqCorrectionFactor(). Phase 3P-G.
+    // P1 ebenso (2026-11-08): hier stand "P1 uses raw Hz, so P1 doesn't need
+    // this" -- falsch, Thetis korrigiert die Hz genauso (NetworkIO.cs
+    // VFOfreq), sonst wirkt die Frequenzeichung an P1-Geraeten nicht.
     if (auto* p2 = qobject_cast<class P2RadioConnection*>(m_connection)) {
         p2->setCalibrationController(&m_calController);
+    } else if (auto* p1 = qobject_cast<class P1RadioConnection*>(m_connection)) {
+        p1->setCalibrationController(&m_calController);
     }
 
     // Wire IoBoardHl2 so P1CodecHl2 can dequeue I2C transactions into C&C

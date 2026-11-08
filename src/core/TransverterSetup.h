@@ -1,10 +1,72 @@
-#pragma once
-
 // =================================================================
 // src/core/TransverterSetup.h  (Longpath)
 // =================================================================
 //
-// Longpath-original.
+// Longpath-original (window + offset, 2026-10-27), with ONE ported
+// piece: the LO error (2026-11-08).
+//
+// Ported from Thetis source:
+//   Project Files/Source/Console/xvtr.cs, original licence from Thetis source is included below
+//
+// =================================================================
+// Modification history (Longpath):
+//   2026-10-27 — Transverter window and offset, Longpath-original,
+//                 Martin Fischer (OE5SOS), AI-assisted via Anthropic
+//                 Claude Code.
+//   2026-11-08 — LO error ported from Thetis xvtr.cs TranslateFreq /
+//                 udLOError, Martin Fischer (OE5SOS), with AI-assisted
+//                 transformation via Anthropic Claude Code.
+//                 Thetis v2.10.3.15-5 [@852bf0e].
+// =================================================================
+
+// --- From xvtr.cs ---
+//=================================================================
+// xvtr.cs
+//=================================================================
+// PowerSDR is a C# implementation of a Software Defined Radio.
+// Copyright (C) 2004-2009  FlexRadio Systems
+// Copyright (C) 2010-2013  Doug Wigley
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+//
+// You may contact us via email at: sales@flex-radio.com.
+// Paper mail may be sent to: 
+//    FlexRadio Systems
+//    8900 Marybank Dr.
+//    Austin, TX 78750
+//    USA
+//=================================================================
+//
+//============================================================================================//
+// Dual-Licensing Statement (Applies Only to Author's Contributions, Richard Samphire MW0LGE) //
+// ------------------------------------------------------------------------------------------ //
+// For any code originally written by Richard Samphire MW0LGE, or for any modifications       //
+// made by him, the copyright holder for those portions (Richard Samphire) reserves the       //
+// right to use, license, and distribute such code under different terms, including           //
+// closed-source and proprietary licences, in addition to the GNU General Public License      //
+// granted above. Nothing in this statement restricts any rights granted to recipients under  //
+// the GNU GPL. Code contributed by others (not Richard Samphire) remains licensed under      //
+// its original terms and is not affected by this dual-licensing statement in any way.        //
+// Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
+//============================================================================================//
+
+#pragma once
+
+//
+// ── Herkunft ────────────────────────────────────────────────────────
+//
+// Longpath-original bis auf den LO-Fehler (unten, bei loErrorKhz).
 //
 // ── Was auf der Antenne liegt, ist nicht, was das Geraet zeigt ──────
 //
@@ -65,6 +127,29 @@ struct TransverterSetup {
     qint64 ifHighHz {32000000};    ///< MV-2: 28-32 -> 144-148 (2026-11-08)
     qint64 offsetHz {116000000};   ///< RF = ZF + offsetHz
 
+    // ── LO-Fehler (2026-11-08, Port aus Thetis) ─────────────────────
+    //
+    // Der Quarzoszillator eines Transverters liegt nie genau auf dem
+    // Nennwert; beim MV-2 auf 116 MHz typisch einige hundert Hz daneben.
+    // Thetis fuehrt dafuer je Transverter ein eigenes Feld, in kHz mit
+    // drei Stellen (also auf 1 Hz), +/-1000 kHz:
+    //   From Thetis xvtr.cs:2794-2811 [@852bf0e] (udLOError0):
+    //     DecimalPlaces = 3; Maximum = 1000; Minimum = -1000;
+    // und rechnet ihn beim Umsetzen Antenne -> Geraet dazu (MHz):
+    //   From Thetis xvtr.cs:5343-5345 [@852bf0e] (TranslateFreq):
+    //     return (double)(freq -
+    //         (double)lo_offset[i].Value +
+    //         ((double)lo_error[i].Value / 1000.0));
+    // Also ZF = RF - Versatz + Fehler, und umgekehrt RF = ZF + Versatz
+    // - Fehler. Ab Werk 0: ohne Eintrag aendert sich keine Frequenz.
+    double loErrorKhz {0.0};
+
+    /// Grenze des Feldes, wie Thetis (+/-1000 kHz).
+    static constexpr double kLoErrorGrenzeKhz = 1000.0;
+
+    /// Der LO-Fehler in Hz (gerundet; Thetis zeigt 1 Hz Aufloesung).
+    qint64 loErrorHz() const { return qRound64(loErrorKhz * 1000.0); }
+
     // ── Nur Empfang (2026-11-08) ────────────────────────────────────
     //
     // Die Station: der TS-590 sendet ueber DRV in den MV-2 (IFi) und
@@ -117,26 +202,40 @@ struct TransverterSetup {
         return ifHz >= ifLowHz && ifHz <= ifHighHz;
     }
 
-    /// Liegt diese Antennenfrequenz im umgerechneten Fenster?
+    /// Liegt diese Antennenfrequenz im umgerechneten Fenster? Das
+    /// ZF-Fenster mit Versatz und LO-Fehler auf die Antenne umgerechnet
+    /// -- dieselbe Rechnung wie rfFrequencyHz.
     bool coversRf(qint64 rfHz) const
     {
-        return rfHz >= ifLowHz + offsetHz && rfHz <= ifHighHz + offsetHz;
+        const qint64 d = offsetHz - loErrorHz();
+        return rfHz >= ifLowHz + d && rfHz <= ifHighHz + d;
     }
 
     /// Was das Geraet zeigt -> was auf der Antenne liegt.
     /// Unveraendert, wenn nicht aktiv oder ausserhalb des Fensters.
+    /// RF = ZF + Versatz - LO-Fehler (Umkehrung von TranslateFreq).
     qint64 rfFrequencyHz(qint64 ifHz) const
     {
         if (!active() || !coversIf(ifHz)) { return ifHz; }
-        return ifHz + offsetHz;
+        return ifHz + offsetHz - loErrorHz();
     }
 
     /// Was auf der Antenne liegt -> was dem Geraet zu sagen ist.
     /// Unveraendert, wenn nicht aktiv oder ausserhalb des Fensters.
+    /// ZF = RF - Versatz + LO-Fehler (TranslateFreq, siehe loErrorKhz).
     qint64 ifFrequencyHz(qint64 rfHz) const
     {
         if (!active() || !coversRf(rfHz)) { return rfHz; }
-        return rfHz - offsetHz;
+        return rfHz - offsetHz + loErrorHz();
+    }
+
+    /// Einmessen (Longpath-eigen): ein Signal mit bekannter Frequenz
+    /// (eine Bake) erscheint bei `angezeigtHz`. Liefert den LO-Fehler
+    /// in kHz, der die Anzeige auf `wahrHz` bringt; der bisherige Fehler
+    /// steckt in `angezeigtHz` schon drin.
+    double loErrorFuer(qint64 angezeigtHz, qint64 wahrHz) const
+    {
+        return loErrorKhz + static_cast<double>(angezeigtHz - wahrHz) / 1000.0;
     }
 
     /// "28.000-30.000 -> 144.000-146.000 MHz (+116 MHz)", oder leer,

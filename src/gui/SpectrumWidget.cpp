@@ -169,6 +169,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QFontMetricsF>
+#include "core/FrequenzEichung.h"
 #include "core/SMeterSkala.h"
 #include <QLinearGradient>
 #include <QResizeEvent>
@@ -3987,6 +3988,7 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     // CPU-Bau fand das am 2026-11-08: dort lief beides nie).
     werteDurchlassAus();
     fuehreLupeNach();
+    fuehreEichungNach();
 
 #ifdef LONGPATH_GPU_SPECTRUM
     // Mode3D: die Bandbreite liegt dort in dieser Schicht
@@ -8165,6 +8167,55 @@ void SpectrumWidget::fuehreLupeNach()
     const Durchlass::Hoehe ziel = Durchlass::lupenHoehe(m_lupeGlatt);
     m_lupeHoehe = (neu || !m_lupeHoeheDa) ? ziel : Durchlass::fuehreNach(m_lupeHoehe, ziel);
     m_lupeHoeheDa = true;
+}
+
+bool SpectrumWidget::starteTraegerMessungBei(const QPoint& widgetPos)
+{
+    const QRect r = notchSpecRect();
+    if (!r.contains(widgetPos)) {
+        return false;
+    }
+    return starteTraegerMessung(xToHz(widgetPos.x(), r));
+}
+
+bool SpectrumWidget::starteTraegerMessung(double geraetHz)
+{
+    if (geraetHz <= 0.0 || m_fullLinearBins.isEmpty() || m_sampleRateHz <= 0.0) {
+        return false;
+    }
+    m_eichZielHz = geraetHz;
+    m_eichSumme.fill(0.0, m_fullLinearBins.size());
+    m_eichBilder = 0;
+    return true;
+}
+
+// Im Datenweg, wie die Lupe: jedes Spektrum zaehlt, nicht nur jedes
+// gemalte. Zehn Bilder (Thetis console.cs:9745), dann suchen und melden.
+void SpectrumWidget::fuehreEichungNach()
+{
+    if (m_eichZielHz <= 0.0) {
+        return;
+    }
+    const int n = m_fullLinearBins.size();
+    if (n != m_eichSumme.size()) {          // FFT umgestellt: neu anfangen
+        m_eichSumme.fill(0.0, n);
+        m_eichBilder = 0;
+    }
+    for (int k = 0; k < n; ++k) {
+        m_eichSumme[k] += static_cast<double>(m_fullLinearBins[k]);
+    }
+    if (++m_eichBilder < FrequenzEichung::kMittelBilder) {
+        return;
+    }
+    const double binHz = m_sampleRateHz / n;
+    const double fftUnten = m_ddcCenterHz - m_sampleRateHz / 2.0;
+    const FrequenzEichung::Treffer t = FrequenzEichung::sucheTraeger(
+        m_eichSumme, binHz, fftUnten, m_eichZielHz);
+    m_eichZielHz = 0.0;
+    m_eichSumme.clear();
+    m_eichBilder = 0;
+    emit traegerGemessen(t.gefunden, t.hz, t.gefunden ? rfFuerAnzeige(t.hz) : 0.0,
+                         t.snrDb);
 }
 
 bool SpectrumWidget::lupeSichtbar() const

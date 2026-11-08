@@ -717,6 +717,16 @@ public:
     void setGapFinderShown(bool on);
     bool gapFinderShown() const { return m_zeigeLuecken; }
     void setPassbandMagnifier(int modus);
+
+    // ── Einmessen an einem Traeger (2026-11-08) ────────────────────────
+    /// Mittelt die naechsten zehn Spektren und sucht +/-2,5 kHz um die
+    /// Stelle `widgetPos` (oder `geraetHz`) den staerksten Traeger;
+    /// meldet sich mit traegerGemessen. Wie Thetis' Freq Cal, aber an
+    /// der angeklickten Stelle. false, wenn die Stelle nicht im Spektrum
+    /// liegt oder noch keine Daten da sind.
+    bool starteTraegerMessungBei(const QPoint& widgetPos);
+    bool starteTraegerMessung(double geraetHz);
+    bool traegerMessungLaeuft() const { return m_eichZielHz > 0.0; }
     int  passbandMagnifier() const { return m_lupenModus; }
 
     // ── S-Stufen an der dBm-Skala (2026-11-08) ──────────────────────────
@@ -2110,6 +2120,12 @@ signals:
     // in MainWindow::refreshPanNotchMarkers.  Emitters land with the
     // interaction layer (design sections 7.1 through 7.4).
     void notchCreateRequested(double freqHz, bool narrow);
+
+    /// Einmessen (2026-11-08): die Messung nach starteTraegerMessung ist
+    /// fertig. geraetHz = Traeger am Geraet, anzeigeHz = auf der Antenne
+    /// (mit Transverter umgerechnet). Siehe core/FrequenzEichung.h.
+    void traegerGemessen(bool gefunden, double geraetHz, double anzeigeHz,
+                         float snrDb);
     void notchMoveRequested(int id, double newFreqHz);
     void notchWidthRequested(int id, double widthHz);
     /// Emitted when a notch drag ends, so the coalesced DSP push can flush
@@ -2859,6 +2875,10 @@ private:
     QVector<float>             m_lupeGlatt;
     int                        m_lupeErster{-1};
     Durchlass::Hoehe           m_lupeHoehe;     // eigener Hoehenmassstab
+    double                     m_eichZielHz{0.0};   // Einmessen: Suchmitte (Geraet)
+    QVector<double>            m_eichSumme;         // gemittelte Leistung je Bin
+    int                        m_eichBilder{0};
+    void fuehreEichungNach();
     bool                       m_lupeHoeheDa{false};
     bool                       m_sStufenSkala{false};   // S-Stufen statt dBm
     // Schaerfe (2026-11-08), siehe setWaterfallDevicePixels. AN ab Werk.

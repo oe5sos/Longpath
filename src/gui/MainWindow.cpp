@@ -338,6 +338,7 @@ warren@wpratt.com
 #include "applets/AppletPanelWidget.h"
 #include "applets/FrequencyApplet.h"
 #include "applets/InstrumentApplet.h"
+#include "TraegerEichDialog.h"
 #include "gui/widgets/RasterOverlay.h"
 #include "gui/WindowPlacement.h"
 #include "gui/SideAreaWindow.h"
@@ -4071,6 +4072,9 @@ void MainWindow::wirePanNotchHandlers()
         // pan from sender() instead.
         connect(sw, &SpectrumWidget::notchCreateRequested,
                 this, &MainWindow::onNotchCreateFromPan,
+                Qt::UniqueConnection);
+        connect(sw, &SpectrumWidget::traegerGemessen,
+                this, &MainWindow::zeigeTraegerEichung,
                 Qt::UniqueConnection);
         connect(sw, &SpectrumWidget::notchMoveRequested,
                 this, &MainWindow::onNotchMoveRequested,
@@ -21282,6 +21286,16 @@ void MainWindow::checkVaxFirstRun()
     });
 
     dlg->show();
+}
+
+void MainWindow::zeigeTraegerEichung(bool gefunden, double geraetHz, double anzeigeHz,
+                                     float snrDb)
+{
+    // open(), nicht exec(): keine verschachtelte Schleife, und das
+    // Fenster raeumt sich selbst weg (WA_DeleteOnClose).
+    auto* d = new TraegerEichDialog(m_radioModel, gefunden, geraetHz, anzeigeHz,
+                                    snrDb, this);
+    d->open();
 }
 
 InstrumentApplet* MainWindow::signalInstrumentForTest() const

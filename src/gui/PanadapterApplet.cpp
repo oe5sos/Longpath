@@ -764,6 +764,11 @@ void PanadapterApplet::contextMenuEvent(QContextMenuEvent* event)
     // Am Fenster, nicht am Applet (2026-09-30): das Applet ist nativ (es
     // traegt den Panadapter), und ein Menue daran bekam von Qt keinen
     // Fensterbezug („... must be a top level window.").
+    m_menuSpektrumPos = QPoint(-1, -1);
+    if (SpectrumWidget* sw = spectrumWidget()) {
+        const QPoint p = sw->mapFrom(this, event->pos());
+        if (sw->rect().contains(p)) { m_menuSpektrumPos = p; }
+    }
     QMenu* menu = buildContextMenu(window());
     // Das Fenster kann waehrend exec() sterben; dann hat Qt das Menue als
     // sein Kind schon geholt und der Zeiger hier ist tot.
@@ -800,6 +805,26 @@ QMenu* PanadapterApplet::buildContextMenu(QObject* parent)
         emit floatRequested(panId());
     });
     menu->addSeparator();
+
+    // ── Einmessen an einem Traeger (2026-11-08) ─────────────────────
+    //
+    // Auf 2 m stellt es den LO-Fehler des Transverters, auf KW an einem
+    // OpenHPSDR-Geraet den Korrekturfaktor (Thetis Freq Cal) -- an der
+    // Stelle des Rechtsklicks, nicht an einer festen Eichfrequenz. Das
+    // Ergebnis kommt ueber SpectrumWidget::traegerGemessen ins
+    // Hauptfenster, das den Dialog zeigt.
+    if (spectrumWidget()) {
+        QAction* eich = menu->addAction(tr("Calibrate frequency on this carrier…"));
+        eich->setToolTip(tr("Measures the strongest carrier within ±2.5 kHz of "
+                            "this point (ten spectra averaged) and corrects the "
+                            "transverter LO error or the radio's reference."));
+        const QPoint p = m_menuSpektrumPos;
+        eich->setEnabled(p.x() >= 0);
+        connect(eich, &QAction::triggered, this, [this, p]() {
+            if (SpectrumWidget* w = spectrumWidget()) { w->starteTraegerMessungBei(p); }
+        });
+        menu->addSeparator();
+    }
 
     // ── Anzeigequelle: Geraet oder KiwiSDR (Stufe 6, 2026-08-23) ────
     //

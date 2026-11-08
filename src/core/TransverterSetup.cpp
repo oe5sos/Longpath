@@ -1,3 +1,6 @@
+// Independently implemented from TransverterSetup.h interface.
+// (Laden, Speichern und Vorgaben sind Longpath-eigen; der portierte
+// LO-Fehler steht im Header und ist dort belegt.)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Longpath-original. Siehe TransverterSetup.h fuer den Anlass.
@@ -9,6 +12,8 @@
 #include "core/TransverterSetup.h"
 
 #include "core/AppSettings.h"
+
+#include <algorithm>
 
 namespace Longpath {
 
@@ -32,13 +37,17 @@ QString TransverterSetup::describe() const
     const QString sign = offsetHz >= 0 ? QStringLiteral("+") : QStringLiteral("-");
     const qint64  mag  = offsetHz >= 0 ? offsetHz : -offsetHz;
 
-    return QStringLiteral("%1-%2 MHz → %3-%4 MHz (%5%6 MHz)")
+    QString t = QStringLiteral("%1-%2 MHz → %3-%4 MHz (%5%6 MHz)")
         .arg(mhz(ifLowHz),
              mhz(ifHighHz),
              mhz(ifLowHz + offsetHz),
              mhz(ifHighHz + offsetHz),
              sign,
              mhz(mag));
+    if (loErrorHz() != 0) {
+        t += QStringLiteral(", LO error %1 Hz").arg(loErrorHz());
+    }
+    return t;
 }
 
 QVector<TransverterSetup::Preset> TransverterSetup::presets()
@@ -87,6 +96,9 @@ TransverterSetup TransverterSetup::load()
                            QStringLiteral("True")).toString()
                    == QStringLiteral("True");
     t.rxGainDb = s.value(QStringLiteral("Transverter/RxGainDb"), 0.0).toDouble();
+    t.loErrorKhz = std::clamp(
+        s.value(QStringLiteral("Transverter/LoErrorKhz"), 0.0).toDouble(),
+        -TransverterSetup::kLoErrorGrenzeKhz, TransverterSetup::kLoErrorGrenzeKhz);
     return t;
 }
 
@@ -101,6 +113,7 @@ void TransverterSetup::save() const
     s.setValue(QStringLiteral("Transverter/RxOnly"),
                nurEmpfang ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(QStringLiteral("Transverter/RxGainDb"), rxGainDb);
+    s.setValue(QStringLiteral("Transverter/LoErrorKhz"), loErrorKhz);
 }
 
 // ── Die prozessweite Fassung ────────────────────────────────────────

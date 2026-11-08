@@ -130,6 +130,7 @@ private:
     QDoubleSpinBox* m_tvBis{nullptr};
     QDoubleSpinBox* m_tvVersatz{nullptr};
     QDoubleSpinBox* m_tvRxGain{nullptr};    // RX-Verstaerkung (2026-11-08)
+    QDoubleSpinBox* m_tvLoFehler{nullptr};  // LO-Fehler, kHz (2026-11-08)
     QLabel*         m_tvText{nullptr};
 
     RadioModel* m_model{nullptr};

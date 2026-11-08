@@ -1706,6 +1706,21 @@ public:
 
     bool isConnected() const;
 
+    // ── Einmessen an einem Traeger (2026-11-08) ────────────────────────
+    //
+    // Wohin wirkt eine Traegermessung? Liegt der Traeger im ZF-Fenster
+    // eines aktiven Transverters, ist es dessen LO-Fehler (2 m); haengt
+    // ein OpenHPSDR-Geraet (P1/P2) dran, dessen Korrekturfaktor (KW,
+    // Thetis Freq Cal); sonst wird nur angezeigt -- fuer die Flex u. a.
+    // gibt es keine belegte Quelle, wie deren Bezug zu stellen waere.
+    enum class EichZiel { Transverter, Geraet, NurAnzeige };
+    EichZiel eichZielFuer(double geraetHz) const;
+
+    /// Uebernimmt eine Messung: der Traeger erschien bei geraetHz (am
+    /// Geraet) bzw. anzeigeHz (auf der Antenne), wahr ist wahrHz (auf
+    /// der Antenne). false bei NurAnzeige oder externem 10-MHz-Bezug.
+    bool uebernimmEichung(double geraetHz, double anzeigeHz, double wahrHz);
+
     /// Steht IRGENDEINE Funkverbindung — eigenes Geraet ODER Flex.
     ///
     /// `isConnected()` kennt nur `m_connection`, also OpenHPSDR. Bei
