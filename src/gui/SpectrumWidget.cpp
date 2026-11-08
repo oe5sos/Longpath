@@ -5892,6 +5892,24 @@ void SpectrumWidget::drawBandPlan(QPainter& p, const QRect& specRect)
     const int    bandH    = m_bandPlanFontSize + 4;
     const int    bandY    = specRect.bottom() - bandH + 1;
 
+    // Erst die Merkpunkte, dann die Beschriftungen (2026-11-08): eine
+    // Beschriftung weicht einem Punkt aus, wo sie kann; wo nicht, gewinnt
+    // die Schrift. Bei 4 MHz Breite lagen die Punkte sonst auf "CW", "FM".
+    const auto& spots = m_bandPlanMgr->spots();
+    QVector<int> punktX;
+    for (const auto& spot : spots) {
+        if (spot.freqMhz < startMhz || spot.freqMhz > endMhz) {
+            continue;
+        }
+        // Wie die Abschnitte: der Merkpunkt ist eine Antennenfrequenz, die
+        // Achse eine ZF. Bis 2026-11-08 stand hier die Antennenfrequenz roh
+        // -- mit Transverter lag ein 144,300-Punkt weit rechts ausserhalb
+        // eines 28-MHz-Bildes. Es fiel nicht auf, weil der Plan auf 2 m bis
+        // dahin keine Merkpunkte hatte.
+        punktX << hzToX(zfFuerAchse(spot.freqMhz * 1.0e6), specRect);
+    }
+    QVector<bool> punktVerdeckt(punktX.size(), false);
+
     const auto& segments = m_bandPlanMgr->segments();
     for (const auto& seg : segments) {
         if (seg.highMhz <= startMhz || seg.lowMhz >= endMhz) {
@@ -5955,27 +5973,37 @@ void SpectrumWidget::drawBandPlan(QPainter& p, const QRect& specRect)
             }
 
             p.setPen(Qt::white);
-            p.drawText(QRect(x1, bandY, x2 - x1, bandH), Qt::AlignCenter, label);
+            const int tw = QFontMetrics(f).horizontalAdvance(label);
+            const int lx = Durchlass::bandplanTextX(x1, x2, tw, punktX);
+            if (lx >= 0) {
+                p.drawText(QRect(lx, bandY, tw, bandH), Qt::AlignCenter, label);
+            } else {
+                p.drawText(QRect(x1, bandY, x2 - x1, bandH), Qt::AlignCenter, label);
+                const int tl = (x1 + x2 - tw) / 2;
+                for (int i = 0; i < punktX.size(); ++i) {
+                    if (punktX[i] + 6 > tl && punktX[i] - 6 < tl + tw) {
+                        punktVerdeckt[i] = true;
+                    }
+                }
+            }
         }
     }
 
     // Spot markers (white dots for digital calling frequencies, etc.).
     // From AetherSDR SpectrumWidget.cpp:4282-4292 [@0cd4559].
-    const auto& spots = m_bandPlanMgr->spots();
+    // Nicht unter einer Beschriftung (siehe oben), und Punkte, die sich
+    // gegenseitig verdecken (naeher als ein Durchmesser), nur einmal.
     p.setRenderHint(QPainter::Antialiasing, true);
     p.setPen(Qt::NoPen);
     p.setBrush(Qt::white);
-    for (const auto& spot : spots) {
-        if (spot.freqMhz < startMhz || spot.freqMhz > endMhz) {
+    int letzterX = -1000;
+    for (int i = 0; i < punktX.size(); ++i) {
+        const int sx = punktX[i];
+        if (punktVerdeckt[i] || std::abs(sx - letzterX) < 9) {
             continue;
         }
-        // Wie die Abschnitte oben: der Merkpunkt ist eine Antennen-
-        // frequenz, die Achse eine ZF. Bis 2026-11-08 stand hier die
-        // Antennenfrequenz roh -- mit Transverter lag ein 144,300-Punkt
-        // weit rechts ausserhalb eines 28-MHz-Bildes. Es fiel nicht auf,
-        // weil der Plan auf 2 m bis dahin keine Merkpunkte hatte.
-        const int sx = hzToX(zfFuerAchse(spot.freqMhz * 1.0e6), specRect);
         p.drawEllipse(QPoint(sx, bandY + bandH / 2), 4, 4);
+        letzterX = sx;
     }
     p.setRenderHint(QPainter::Antialiasing, false);
 }

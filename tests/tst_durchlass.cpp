@@ -106,6 +106,17 @@ private slots:
         QCOMPARE(h.einspielen({s}).size(), 1);
     }
 
+    // Bandplan-Beschriftung weicht den Merkpunkten aus: Mitte, links,
+    // rechts -- und wenn nichts frei ist, -1 (dann gewinnt die Schrift).
+    void dieBeschriftungWeichtDenPunktenAus()
+    {
+        QCOMPARE(bandplanTextX(0, 100, 40, {}), 30);
+        QCOMPARE(bandplanTextX(0, 100, 40, {50}), 4);
+        QCOMPARE(bandplanTextX(0, 100, 40, {20, 50}), 56);
+        QCOMPARE(bandplanTextX(0, 100, 40, {20, 50, 80}), -1);
+        QCOMPARE(bandplanTextX(0, 30, 40, {}), -1);     // passt gar nicht
+    }
+
     void dieLupeNimmtDieRichtigenBins()
     {
         const BinBereich b = lupenBins(4096, 10.0, 0.0, 1000.0, 2000.0);

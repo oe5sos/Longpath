@@ -142,4 +142,14 @@ struct BinBereich {
 BinBereich lupenBins(int binZahl, double binHz, double fftUntenHz,
                      double vonHz, double bisHz);
 
+// ── Bandplan-Streifen: Beschriftung und Merkpunkte (2026-11-08) ──────
+
+/// Linke Kante einer Abschnittsbeschriftung der Breite `textW` im
+/// Abschnitt [x1, x2], so dass kein Merkpunkt (Mitte in `punkte`, mit
+/// `frei` Punkten Luft) sie beruehrt: zuerst die Mitte, dann links, dann
+/// rechts. -1, wenn keine Stelle frei ist -- dann gewinnt die Schrift,
+/// und die Punkte darunter entfallen (bei 4 MHz Breite lagen sie sonst
+/// auf "CW" und "FM").
+int bandplanTextX(int x1, int x2, int textW, const QVector<int>& punkte, int frei = 6);
+
 } // namespace Longpath::Durchlass

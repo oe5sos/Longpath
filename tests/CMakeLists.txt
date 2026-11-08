@@ -1129,6 +1129,10 @@ endif()
 # ist erlaubt). MOX/TUNE ueber die echte MOX-Pruefung, die Flex-Wege und
 # das Kaestchen auf der Seite. Ein Fall liest RadioModel.cpp.
 longpath_add_test(tst_transverter_nur_empfang)
+# tst_tune_abgewiesen (2026-11-08): ein abgewiesenes TUNE setzt weder
+#   Handbetrieb noch PTT-Modus (Thetis console.cs:30061-30069) -- vorher
+#   meldete es "transmit tune=1" an TGXL/PGXL, ohne Traeger.
+longpath_add_test(tst_tune_abgewiesen)
 if(TEST tst_transverter_nur_empfang)
     set_tests_properties(tst_transverter_nur_empfang PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")

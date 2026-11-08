@@ -189,4 +189,18 @@ BinBereich lupenBins(int binZahl, double binHz, double fftUntenHz,
     return b;
 }
 
+int bandplanTextX(int x1, int x2, int textW, const QVector<int>& punkte, int frei)
+{
+    const int kandidaten[3] = {(x1 + x2 - textW) / 2, x1 + 4, x2 - 4 - textW};
+    for (int k : kandidaten) {
+        if (k < x1 + 2 || k + textW > x2 - 2) { continue; }
+        bool trifft = false;
+        for (int px : punkte) {
+            if (px + frei > k && px - frei < k + textW) { trifft = true; break; }
+        }
+        if (!trifft) { return k; }
+    }
+    return -1;
+}
+
 } // namespace Longpath::Durchlass
