@@ -1148,6 +1148,10 @@ longpath_add_test(tst_rundum_lauf)
 #   zaehlt, nicht nur das Ziel (Anschlag Nord/Sued/frei), und der
 #   Rundum-Lauf bleibt darin.
 longpath_add_test(tst_rotor_bereich)
+# tst_logbuch_blaetter (2026-11-08): Entwurfswerkzeug, rendert drei
+#   Logbuch-Ideen aus einer Logbuch-Kopie (LONGPATH_LOGBOOK_FIXTURE +
+#   LONGPATH_GRAB_DIR); ohne beide uebersprungen.
+longpath_add_test(tst_logbuch_blaetter)
 if(TEST tst_transverter_nur_empfang)
     set_tests_properties(tst_transverter_nur_empfang PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
