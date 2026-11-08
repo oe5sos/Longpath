@@ -101,7 +101,18 @@ mw0lge@grange-lane.co.uk
 
 #include "SMeterSkala.h"
 
+#include <atomic>
+
 namespace Longpath::SMeter {
+
+namespace {
+// From Thetis MeterManager.cs:359 [@852bf0e]: _rx1VHForAbove = false;
+std::atomic<bool> g_ueberGrenze{false};
+} // namespace
+
+void setzeUeberGrenze(bool ueber) { g_ueberGrenze.store(ueber, std::memory_order_relaxed); }
+bool istUeberGrenze() { return g_ueberGrenze.load(std::memory_order_relaxed); }
+float versatzUeberGrenze() { return istUeberGrenze() ? kVersatzUeberGrenzeDb : 0.0f; }
 
 // From Thetis common.cs:881-887 [@852bf0e]:
 //   public static double GetSMeterUnits(double dbm, bool bAboveS9Frequency)

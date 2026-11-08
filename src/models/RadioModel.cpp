@@ -256,6 +256,7 @@ warren@wpratt.com
 #include "MemoryRecord.h"
 #include "BandDefaults.h"
 #include "RxDspWorker.h"
+#include "core/SMeterSkala.h"
 #include "core/TransverterSetup.h"
 #include "core/FFTEngine.h"
 // 3M-1a G.1: TX-side integration — MoxController + TxChannel view.
@@ -4014,6 +4015,15 @@ double RadioModel::rxMeterOffsetDb() const
 
 void RadioModel::pruefeRxMeterOffset()
 {
+    // Dieselben Anlaesse (Abstimmen, andere Scheibe, Transverter)
+    // fuehren auch die S9-Grenze nach -- an der ANTENNENfrequenz.
+    // From Thetis MeterManager.cs:4508 [@852bf0e]:
+    //   _rx1VHForAbove = newFreq >= _s9Frequency;
+    if (m_activeSlice) {
+        const qint64 antenne = TransverterSetup::current().rfFrequencyHz(
+            static_cast<qint64>(m_activeSlice->frequency()));
+        SMeter::setzeUeberGrenze(SMeter::ueberGrenze(antenne / 1.0e6));
+    }
     const double v = rxMeterOffsetDb();
     if (!qFuzzyCompare(1.0 + v, 1.0 + m_lastEmittedRxMeterOffsetDb)) {
         m_lastEmittedRxMeterOffsetDb = v;

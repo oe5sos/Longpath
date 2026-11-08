@@ -14,6 +14,8 @@
 
 #include "gui/instruments/ReadingSource.h"
 
+#include "core/SMeterSkala.h"
+
 #include "gui/meters/MeterItem.h"     // readingName()
 #include "gui/meters/MeterPoller.h"   // MeterBinding
 
@@ -89,6 +91,7 @@ QList<ReadingDescriptor> buildTable()
         d.decimals   = 0;
         d.fractionOf = &sigFractionFromDbm;
         d.format     = &sigFormat;
+        d.versatz    = &SMeter::versatzUeberGrenze;
         // Beschriftet jede zweite S-Stufe, feine Striche bei jeder —
         // aus dem Entwurf (zeiger-verfeinert.html, sigCfg).
         d.ticks = {
@@ -332,6 +335,11 @@ double signalFraction(double dbm)
 
 // ── ReadingDescriptor ────────────────────────────────────────────────
 
+double ReadingDescriptor::valueFraction(double value) const
+{
+    return fraction(value + (versatz ? static_cast<double>(versatz()) : 0.0));
+}
+
 double ReadingDescriptor::fraction(double value) const
 {
     if (fractionOf) {
@@ -343,7 +351,9 @@ double ReadingDescriptor::fraction(double value) const
 
 QString ReadingDescriptor::text(double value) const
 {
-    if (format) { return format(value); }
+    if (format) {
+        return format(value + (versatz ? static_cast<double>(versatz()) : 0.0));
+    }
     return QString::number(value, 'f', decimals);
 }
 

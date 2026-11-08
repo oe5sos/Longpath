@@ -85,7 +85,8 @@ void MagicEyeItem::setValue(double v)
 {
     MeterItem::setValue(v);
     m_smoothedDbm += kSmoothAlpha * (static_cast<float>(v) - m_smoothedDbm);
-    m_smoothedDbm = std::clamp(m_smoothedDbm, kS0Dbm, kMaxDbm);
+    // Grenzen der Anzeige: ueber der S9-Grenze 20 dB tiefer (sVersatz).
+    m_smoothedDbm = std::clamp(m_smoothedDbm, kS0Dbm - sVersatz(), kMaxDbm - sVersatz());
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +133,7 @@ void MagicEyeItem::paint(QPainter& p, int widgetW, int widgetH)
     // Step 5: shadow wedge — dark pie slice, symmetric about 12 o'clock
     // Shadow narrows as signal strength increases (fraction → 1.0)
     // From Thetis clsMagicEyeItem (MeterManager.cs:15855+)
-    float fraction  = dbmToFraction(m_smoothedDbm);
+    float fraction  = dbmToFraction(m_smoothedDbm + sVersatz());
     float shadowDeg = kMaxShadowDeg - fraction * (kMaxShadowDeg - kMinShadowDeg);
     float halfShadow = shadowDeg / 2.0f;
 

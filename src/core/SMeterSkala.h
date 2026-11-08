@@ -125,6 +125,33 @@ inline bool ueberGrenze(double antenneMhz, double grenzeMhz = kS9GrenzeMhzVorgab
     return antenneMhz >= grenzeMhz;
 }
 
+// ── Die Kennung des gemessenen Empfaengers ──────────────────────────
+//
+// Thetis haelt je Empfaenger eine statische Kennung, die beim Abstimmen
+// nachgefuehrt wird, und schiebt damit Zeiger, Balken und S-Text:
+//   From Thetis MeterManager.cs:273 [@852bf0e]:
+//     private static bool _rx1VHForAbove;
+//   From Thetis MeterManager.cs:4508 [@852bf0e] (OnVFOA):
+//     _rx1VHForAbove = newFreq >= _s9Frequency;
+//   From Thetis MeterManager.cs:5419-5425 [@852bf0e]:
+//     private static float dbmOffsetForAboveS9Frequency(int rx)
+//     { if (IsAboveS9Frequency(rx)) return 20f; else return 0f; }
+// Longpath misst EINEN Empfaenger (MeterPoller haengt an der aktiven
+// Scheibe), daher eine Kennung. RadioModel setzt sie aus der
+// Antennenfrequenz der aktiven Scheibe (beim Transverter 144,300,
+// nicht 28,300 -- Thetis' VFOAFreq ist ebenfalls die angezeigte).
+
+/// Setzen (RadioModel) und lesen (Instrumente, Meter).
+void setzeUeberGrenze(bool ueber);
+bool istUeberGrenze();
+
+/// Der Versatz, den Thetis' getPerc auf Signal-Lesungen anrechnet,
+/// bevor es die Stelle auf der Skala sucht (MeterManager.cs:41049-41052
+/// [@852bf0e]). Die Skala bleibt in KW-dBm beschriftet; der Wert
+/// rueckt um 20 dB, damit -93 dBm auf dem S9-Strich steht.
+inline constexpr float kVersatzUeberGrenzeDb = 20.0f;
+float versatzUeberGrenze();
+
 /// Stetige S-Stufe (9 = S9).
 /// From Thetis common.cs:881-887 [@852bf0e] GetSMeterUnits.
 double einheiten(double dbm, bool ueberS9Frequenz);

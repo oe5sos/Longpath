@@ -99,8 +99,19 @@ struct ReadingDescriptor {
     /// Wert → Anzeigetext. Nullzeiger heißt „mit `decimals` Stellen".
     QString (*format)(double) {nullptr};
 
-    /// Anteil für einen Wert, mit Klemmung auf 0..1.
+    /// Versatz, um den eine LESUNG rueckt, bevor sie eingeordnet und
+    /// beschriftet wird -- nicht die Striche der Skala. Fuer die drei
+    /// Empfangsgroessen: +20 dB ueber der S9-Grenze (2 m), wie Thetis'
+    /// getPerc (MeterManager.cs:41049-41052 [@852bf0e]). Nullzeiger
+    /// heisst kein Versatz.
+    float (*versatz)() {nullptr};
+
+    /// Anteil für einen Wert, mit Klemmung auf 0..1. Fuer STRICHE und
+    /// Schwellen: ohne Versatz.
     double fraction(double value) const;
+
+    /// Anteil fuer eine LESUNG (Zeiger, Balken, Spitze): mit Versatz.
+    double valueFraction(double value) const;
 
     /// Anzeigetext für einen Wert.
     QString text(double value) const;
@@ -159,12 +170,16 @@ QList<const ReadingDescriptor*> readingsWithScale();
 //    Portierungsfehler. Wer sie „berichtigt", macht ein anderes
 //    Instrument daraus.
 //
-// 2. Thetis verschiebt die Skala oberhalb einer Grenzfrequenz um 20 dB
-//    (MeterManager.cs:22874, `if (IsAboveS9Frequency(_rx)) cb.Value -= 20;`
-//    mit _s9Frequency = 30.0 MHz aus :358) — auf UKW ist S9 nach IARU
-//    -93 dBm statt -73 dBm. Diese Umschaltung haben WIR NICHT, und die
-//    geloeschte analoge Anzeige hatte sie auch nicht. Bekannte Luecke,
-//    hier vermerkt, damit sie nicht ein drittes Mal gesucht wird.
+// 2. (Seit 2026-11-08 keine Abweichung mehr.) Thetis rueckt die
+//    Lesung oberhalb einer Grenzfrequenz um 20 dB (MeterManager.cs:5419
+//    dbmOffsetForAboveS9Frequency, angewandt in getPerc :41049-41052,
+//    _s9Frequency = 30.0 MHz aus :358) — auf UKW ist S9 nach IARU
+//    -93 dBm statt -73 dBm. Longpath macht es ebenso: die Striche
+//    bleiben, die Lesung rueckt (ReadingDescriptor::versatz, Kennung
+//    in core/SMeterSkala). Max Bin rueckt mit, obwohl getPerc nur die
+//    beiden anderen nennt: Thetis' ZeroReading (:2023) und der S-Text
+//    behandeln es als dieselbe Groesse, und auf einer S-Skala waere
+//    ein Zeiger 20 dB daneben.
 constexpr double kS0Dbm   = -127.0;   ///< MeterManager.cs:22870 (Kommentar)
 constexpr double kS9Dbm   =  -73.0;   ///< MeterManager.cs:22871
 constexpr double kSMaxDbm =  -13.0;   ///< MeterManager.cs:22872

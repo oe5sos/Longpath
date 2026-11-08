@@ -179,7 +179,7 @@ void BarInstrument::paintOne(QPainter& p, const QRectF& area,
                              const ReadingDescriptor& d, double value,
                              bool withGlow, bool hasValue)
 {
-    const double f = d.fraction(value);
+    const double f = d.valueFraction(value);
     const QColor col = Instrument::valueColour(d, value);
 
     // ── Die knappe Form: Haarlinie statt Mulde ────────────────────────
@@ -269,7 +269,7 @@ void BarInstrument::paintOne(QPainter& p, const QRectF& area,
         // bleibt und langsam zurueckfaellt. Nur wenn sie ueberhaupt
         // vor dem Wert liegt — sonst zeichnete sie eine zweite Kante
         // auf die erste.
-        const double pf = d.fraction(m_peak.value());
+        const double pf = d.valueFraction(m_peak.value());
         if (pf > f + 0.005) { Instrument::paintPeakMark(p, spine, pf); }
     }
 

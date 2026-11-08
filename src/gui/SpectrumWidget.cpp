@@ -9233,10 +9233,15 @@ void SpectrumWidget::updateSignalHistory(float noiseFloorDbm)
     const QString voiceHex = roleColor("warn", Style::kAmberWarn).name();
     const QString qrmHex   = roleColor("danger", Style::kRedBorder).name();
 
+    // Ueber der S9-Grenze (2 m) ist S9 -93 dBm: die Lesung rueckt um
+    // 20 dB wie an den Instrumenten (SMeter::kVersatzUeberGrenzeDb).
+    const float sVersatz =
+        SMeter::ueberGrenze(rfFuerAnzeige(m_vfoHz) / 1.0e6)
+            ? SMeter::kVersatzUeberGrenzeDb : 0.0f;
     QVector<SpotMarker> markers;
     for (const auto& e : m_signalHistory.visibleEntries()) {
         SpotMarker m;
-        m.callsign    = Longpath::sLabel(e.peakDbm);
+        m.callsign    = Longpath::sLabel(e.peakDbm + sVersatz);
         m.freqMhz     = e.freqMhz;
         m.mode        = e.mode;
         m.source      = e.suspectQrm ? QStringLiteral("QRM")
