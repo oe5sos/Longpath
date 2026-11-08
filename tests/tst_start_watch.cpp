@@ -44,6 +44,7 @@ private slots:
     void dieMarkeLiegtNichtInDenEinstellungen();
     void derHinweisSagtWasPassiertIst();
     void dasHauptfensterFaehrtWirklichSicherHoch();
+    void einOrdentlichesBeendenZaehltAlsDurchgekommen();
 
 private:
     /// Der Wert, mit dem der Pruefbetrieb gestartet ist.
@@ -265,6 +266,25 @@ void TstStartWatch::dasHauptfensterFaehrtWirklichSicherHoch()
     }
 
     qunsetenv("LONGPATH_NO_DIALOGS");
+    StartWatch::reset();
+}
+
+// Betreiber-Protokoll 2026-11-08: Lauf 13:37 nach 18 s sauber beendet,
+// Start 15:03 meldete „1 Start(s) in Folge kamen nicht durch". Ein
+// geordnetes Schliessen des Hauptfensters muss die Marke loeschen.
+void TstStartWatch::einOrdentlichesBeendenZaehltAlsDurchgekommen()
+{
+    qputenv("LONGPATH_NO_DIALOGS", "1");
+    StartWatch::reset();
+    QCOMPARE(StartWatch::beginStart(), 0);          // wie main(): Marke setzen
+    auto* mw = new MainWindow();
+    mw->resize(1024, 700);
+    mw->show();
+    QVERIFY(QTest::qWaitForWindowExposed(mw));
+    QTest::qWait(150);
+    mw->close();                                     // lange vor 20 s
+    for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+    QCOMPARE(StartWatch::beginStart(), 0);
     StartWatch::reset();
 }
 

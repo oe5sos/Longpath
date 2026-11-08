@@ -21344,6 +21344,15 @@ void MainWindow::closeEvent(QCloseEvent* event)
     // discovery via ConnectionPanel's ctor while teardown runs.
     m_shuttingDown = true;
 
+    // Wer ordentlich beendet, ist durchgekommen (2026-11-08). Der
+    // Startwaechter zaehlte jeden Lauf unter 20 s als steckengeblieben --
+    // auch einen, den der Betreiber nach 18 s sauber geschlossen hat
+    // (Protokoll 13:37 -> „1 Start(s) in Folge kamen nicht durch" um
+    // 15:03). Zweimal so, und der dritte Start kaeme ohne seine Anordnung
+    // hoch. Ein haengender Start erreicht dieses closeEvent nicht, ein
+    // Absturz auch nicht -- die bleiben gezaehlt.
+    StartWatch::markRunning();
+
     // ── Profil-Stand sichern, SOFORT, nicht ueber aboutToQuit ────────
     //
     // Absturzbericht 2026-08-27 23:10 (Segfault beim Beenden, nach
