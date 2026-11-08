@@ -2149,6 +2149,7 @@ private:
     /// nie die Maschine.
     QMetaObject::Connection m_flexSqlAnBand;
     QMetaObject::Connection m_flexSqlStufeBand;
+    QMetaObject::Connection m_flexSqlAutoBand;
     /// Die uebrigen Regler der Scheibe -- aus demselben Grund eigene
     /// Baender: am Flex laeuft `wireSliceSignals` nicht.
     QMetaObject::Connection m_flexAgcBand;

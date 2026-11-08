@@ -599,6 +599,10 @@ RadioModel::RadioModel(QObject* parent)
     // -> Name/Checked).
     m_fmDeviationHz = SliceModel::fmDeviationHz();
 
+    // Auto-SQL der Flex: der Abstand ueber dem Rauschen ist eine Zahl
+    // fuer alle Baender (FlexAutoRauschsperre.h).
+    m_flexAutoSql.setMarge(FlexAutoRauschsperre::ladeMarge());
+
     // Frequency memories. From Thetis console.cs:2006-2007 [@852bf0e]:
     //   MemoryList = MemoryList.Restore();
     //   MemoryList.CheckVersion();
@@ -7618,6 +7622,66 @@ void RadioModel::sendeFlexRauschsperre(bool an, double stufe0bis100)
         << "Flex: Rauschsperre " << (an ? "an" : "aus") << ", Stufe " << stufe;
 }
 
+// ── Auto-SQL (2026-11-08) ───────────────────────────────────────────
+//
+// Warum und wie: FlexAutoRauschsperre.h. Hier nur der Anschluss --
+// der Pegel der Scheibe kommt aus dem Messwertstrom (zehnmal je
+// Sekunde), die Stufe geht ueber denselben Befehl hinaus wie der
+// Regler von Hand.
+void RadioModel::fuehreFlexAutoSqlNach(double dbm, qint64 jetztMs)
+{
+    // Beim Senden misst die Scheibe nicht das Band. AetherSDR prueft
+    // dafuer m_transmitting (SpectrumWidget.cpp:4600 [@d58e2b8a]).
+    if (m_flexSendetGerade) { return; }
+    m_flexAutoSql.messung(dbm, jetztMs);
+    if (m_flexAutoSqlAn) { sendeFlexAutoStufe(jetztMs); }
+}
+
+void RadioModel::sendeFlexAutoStufe(qint64 jetztMs)
+{
+    const auto stufe = m_flexAutoSql.faellig(jetztMs);
+    if (!stufe) { return; }
+    const double rausch = m_flexAutoSql.rauschDbm().value_or(0.0);
+    qCInfo(lcConnection).nospace()
+        << "Flex: Auto-SQL — Rauschen " << rausch << " dBm + "
+        << m_flexAutoSql.marge() << " dB → Stufe " << *stufe
+        << " (" << FlexAutoRauschsperre::dbmFuerStufe(*stufe) << " dBm)";
+    emit flexAutoRauschsperreGestellt(rausch, *stufe);
+    sendeFlexRauschsperre(true, *stufe);
+}
+
+void RadioModel::setFlexAutoRauschsperre(bool an)
+{
+    if (an == m_flexAutoSqlAn) { return; }
+    m_flexAutoSqlAn = an;
+    qCInfo(lcConnection) << "Flex: Auto-SQL" << (an ? "an" : "aus");
+    if (!an) { return; }
+    // Sofort die erste Stufe, wenn schon gemessen ist -- gemessen wird
+    // auch bei ausgeschalteter Automatik, also meist ja. Sonst kommt
+    // sie mit der zehnten Probe, eine Sekunde spaeter.
+    m_flexAutoSql.neuSenden();
+    sendeFlexAutoStufe(QDateTime::currentMSecsSinceEpoch());
+}
+
+void RadioModel::setFlexAutoMarge(int db)
+{
+    const int vorher = m_flexAutoSql.marge();
+    m_flexAutoSql.setMarge(db);
+    if (m_flexAutoSql.marge() == vorher) { return; }
+    FlexAutoRauschsperre::speichereMarge(m_flexAutoSql.marge());
+    // Nicht auf die naechste Probe warten: wer am Regler zieht, soll
+    // die Wirkung sofort hoeren (setMarge hat neuSenden gesetzt).
+    if (m_flexAutoSqlAn) { sendeFlexAutoStufe(QDateTime::currentMSecsSinceEpoch()); }
+}
+
+void RadioModel::flexAutoSqlNeuMessen(const char* grund)
+{
+    m_flexAutoSql.zuruecksetzen();
+    if (m_flexAutoSqlAn) {
+        qCInfo(lcConnection) << "Flex: Auto-SQL misst neu —" << grund;
+    }
+}
+
 // ── Die uebrigen Regler der Scheibe (2026-11-01) ───────────────────
 //
 // Derselbe Grund wie bei der Rauschsperre, nur breiter:
@@ -8656,6 +8720,7 @@ void RadioModel::startFlexStreams()
                 if (const auto wert = FlexVita::meterScaled(s.raw, def.second)) {
                     m_flexPegelDbm     = *wert;
                     m_flexPegelStempel = jetzt;
+                    fuehreFlexAutoSqlNach(*wert, jetzt);
                 }
                 break;
             }
@@ -9029,6 +9094,14 @@ void RadioModel::tuneFlexSlice(double hz)
     if (befehl.isEmpty()) { return; }
     m_flexConnection->sendCommand(befehl);
 
+    // Auto-SQL: an einer anderen Stelle des Bandes (oder auf einem
+    // anderen Band) rauscht es anders. Wer nur ein Stueck weiterdreht,
+    // behaelt seine Messung; erst ein Sprung misst neu.
+    if (std::abs(hz - m_flexAutoSqlBezugHz) > 20000.0) {
+        m_flexAutoSqlBezugHz = hz;
+        flexAutoSqlNeuMessen("Sprung der Frequenz");
+    }
+
     // ── Und das Bild mitnehmen, wenn die Scheibe hinauslaeuft ───────
     //
     // `autopan=0` oben haelt das Bild beim Drehen ruhig — unser
@@ -9116,6 +9189,7 @@ void RadioModel::setFlexSliceMode(DSPMode mode)
         FlexCommandWire::setSliceModeCommand(m_flexSliceId, name);
     if (befehl.isEmpty()) { return; }
     m_flexConnection->sendCommand(befehl);
+    flexAutoSqlNeuMessen("andere Betriebsart");
 }
 
 void RadioModel::setFlexSliceFilter(int lowHz, int highHz)
@@ -9137,6 +9211,9 @@ void RadioModel::setFlexSliceFilter(int lowHz, int highHz)
         FlexCommandWire::setSliceFilterCommand(m_flexSliceId, lowHz, highHz);
     if (befehl.isEmpty()) { return; }
     m_flexConnection->sendCommand(befehl);
+    // Ein breiterer Durchlass rauscht lauter (6 kHz gegen 2,7 kHz sind
+    // 3,5 dB) -- mit der alten Messung laege die Schwelle zu tief.
+    flexAutoSqlNeuMessen("andere Flanken");
 }
 
 void RadioModel::setFlexSliceNoise(bool nr, bool nb, bool anf)

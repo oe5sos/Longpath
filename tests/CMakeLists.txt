@@ -2735,6 +2735,13 @@ if(TEST tst_flex_rauschsperre)
     set_tests_properties(tst_flex_rauschsperre PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
+# tst_flex_auto_sql (2026-11-08): Auto-SQL an der Flex -- Stufe = Rauschen
+#   der Scheibe (unteres Zehntel, 20 s) + Abstand; Knopf Aus/SQL/AUTO.
+longpath_add_test(tst_flex_auto_sql)
+if(TEST tst_flex_auto_sql)
+    set_tests_properties(tst_flex_auto_sql PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 
 longpath_add_test(tst_kombi_entwuerfe)
 longpath_add_test(tst_startmaske)

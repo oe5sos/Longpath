@@ -71,6 +71,7 @@
 
 #include "core/ConnectionState.h"
 #include "core/CouplerZero.h"
+#include "core/FlexAutoRauschsperre.h"
 #include "core/audio/VoiceKeyer.h"
 #include "core/audio/QsoRecorderController.h"
 #include "RecordingModel.h"
@@ -2860,6 +2861,9 @@ signals:
     void flexAbstimmZielUnerreichbar(double istWatt, double zielWatt);
     /// Die Maschine sendet / sendet nicht mehr — gleich wer getastet hat.
     void flexSendetGeaendert(bool sendet);
+    /// Auto-SQL hat eine Stufe gestellt (rauschDbm = gemessenes Rauschen
+    /// der Scheibe, stufe = was an die Maschine ging).
+    void flexAutoRauschsperreGestellt(double rauschDbm, int stufe);
 
     /// Die Maschine hat ihre Scheibe gemeldet -- ab jetzt kann ein
     /// Befehl an sie ueberhaupt hinausgehen.
@@ -3901,6 +3905,18 @@ public:
     /// (Befund des Betreibers, 2026-10-31).
     void sendeFlexRauschsperre(bool an, double stufe0bis100);
 
+    /// Auto-SQL an der Flex (2026-11-08, siehe FlexAutoRauschsperre.h):
+    /// die Stufe folgt dem Pegel der Scheibe plus Abstand. Gemessen
+    /// wird immer (ausser beim Senden), gesendet nur, solange an.
+    void setFlexAutoRauschsperre(bool an);
+    bool flexAutoRauschsperre() const { return m_flexAutoSqlAn; }
+    void setFlexAutoMarge(int db);
+    int  flexAutoMarge() const { return m_flexAutoSql.marge(); }
+    const FlexAutoRauschsperre& flexAutoSchaetzer() const { return m_flexAutoSql; }
+    /// Fuer den Pruefstand: ein Pegel der Scheibe, als kaeme er aus dem
+    /// Messwertstrom -- derselbe Weg wie dort.
+    void flexPegelFuerTest(double dbm, qint64 jetztMs) { fuehreFlexAutoSqlNach(dbm, jetztMs); }
+
     /// Die uebrigen Regler der Scheibe, einzeln an die Maschine.
     ///
     /// Alle aus demselben Grund wie die Rauschsperre:
@@ -4212,6 +4228,12 @@ private:
     /// Der S-Meter-Umlauf liest WDSP, und beim Flex rechnet das Radio —
     /// dort steht nichts. Darum kommt die Zahl von der Maschine.
     double               m_flexPegelDbm{0.0};
+    void                 fuehreFlexAutoSqlNach(double dbm, qint64 jetztMs);
+    void                 sendeFlexAutoStufe(qint64 jetztMs);
+    void                 flexAutoSqlNeuMessen(const char* grund);
+    FlexAutoRauschsperre m_flexAutoSql;
+    bool                 m_flexAutoSqlAn{false};
+    double               m_flexAutoSqlBezugHz{0.0};
     qint64               m_flexPegelStempel{0};
     ReceiverManager* m_receiverManager{nullptr};
     AudioEngine*     m_audioEngine{nullptr};

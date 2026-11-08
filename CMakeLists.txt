@@ -899,6 +899,7 @@ set(GUI_SOURCES
     src/core/FrequenzEichung.cpp
     src/core/RundumLauf.cpp
     src/core/RotorBereich.cpp
+    src/core/FlexAutoRauschsperre.cpp
     src/core/LogbuchBilder.cpp
     src/core/SingleInstanceGuard.cpp
     src/gui/spectrum/SpectrumAvenger.cpp

@@ -122,6 +122,7 @@
 
 #include "AppletWidget.h"
 #include "core/BoardCapabilities.h"
+#include "core/FlexAutoRauschsperre.h"
 #include "core/SkuUiProfile.h"
 #include "core/WdspTypes.h"
 #include "gui/widgets/TriBtn.h"
@@ -134,6 +135,7 @@
 #include <QStringList>
 #include <QVector>
 
+#include <functional>
 #include <optional>
 #include <utility>
 
@@ -214,6 +216,18 @@ public:
     // Set the antenna list shown in the RX/TX antenna menus.
     void setAntennaList(const QStringList& ants);
 
+    // ── Auto-SQL (2026-11-08) ────────────────────────────────────────
+    //
+    // Nur an der Flex: der SQL-Knopf hat dann drei Stellungen,
+    // Aus -> SQL -> AUTO (AetherSDR RxApplet.cpp:962-1002 [@d58e2b8a]),
+    // und in AUTO stellt der Regler den Abstand in dB ueber dem
+    // gemessenen Rauschen (FlexAutoRauschsperre.h). Ob AUTO angeboten
+    // wird, entscheidet der Aufrufer -- die Flex-Kenntnis gehoert nicht
+    // in dieses Applet (wie bei anfQuickRequested).
+    void setAutoSqlVerfuegbar(std::function<bool()> verfuegbar);
+    void setAutoSqlMarge(int db);
+    void setAutoSqlStand(double rauschDbm, int stufe);
+
 public slots:
     // Phase 3P-I-a T16 — gate ANT buttons on caps.hasAlex + antenna count.
     // Hidden on HL2/Atlas and any board without an Alex front-end.
@@ -261,9 +275,19 @@ private:
     // SQL-Knopf und -Regler aus dem Modell: in FM die FM-Rauschsperre,
     // sonst die Sprach-Sperre.
     void syncSquelchFromModel();
+    // Beschriftung, Bereich und Wert des Reglers nach der Stellung.
+    void applySqlModeVisuals();
+    bool autoSqlAngeboten() const;
+    bool autoSqlAktiv() const;
+    std::function<bool()> m_autoSqlVerfuegbar;
+    int    m_autoSqlMarge{FlexAutoRauschsperre::kMargeVorgabeDb};
+    double m_autoSqlRauschDbm{0.0};
+    int    m_autoSqlStufe{-1};
 
 signals:
     void autoAgcToggled(bool on);
+    // In AUTO: der Abstand ueber dem Rauschen wurde verstellt.
+    void autoSqlMargeGeaendert(int db);
     void openSetupRequested();
     // Phase 3F (Bug 3): a slice tab was clicked; MainWindow routes this to
     // RadioModel::setActiveSlice. Mirrors AetherSDR

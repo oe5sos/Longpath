@@ -64,6 +64,7 @@
 
 #include "gui/MainWindow.h"
 #include "gui/widgets/StatusToast.h"
+#include "gui/applets/RxApplet.h"
 
 #include "core/AudioEngine.h"
 #include "core/Ft8Tx.h"
@@ -479,6 +480,14 @@ void MainWindow::wireFlex()
         // verdrahtet -- Art, Flanken, Rauschminderung.
         auto sperreHinaus = [this, ziel]() {
             if (m_shuttingDown || !m_radioModel) { return; }
+            // ── Auto-SQL (2026-11-08) ───────────────────────────────
+            //
+            // In AUTO stellt der Pegel der Scheibe die Stufe, nicht der
+            // Regler (FlexAutoRauschsperre.h) -- dann geht hier nichts
+            // hinaus, sonst ueberschriebe die Hand-Stufe die Automatik.
+            const bool automatik = ziel->ssqlEnabled() && ziel->ssqlAuto();
+            m_radioModel->setFlexAutoRauschsperre(automatik);
+            if (automatik) { return; }
             m_radioModel->sendeFlexRauschsperre(ziel->ssqlEnabled(),
                                                 ziel->ssqlThresh());
         };
@@ -488,6 +497,24 @@ void MainWindow::wireFlex()
         disconnect(m_flexSqlStufeBand);
         m_flexSqlStufeBand = connect(ziel, &SliceModel::ssqlThreshChanged, this,
                                      [sperreHinaus](double) { sperreHinaus(); });
+        disconnect(m_flexSqlAutoBand);
+        m_flexSqlAutoBand = connect(ziel, &SliceModel::ssqlAutoChanged, this,
+                                    [sperreHinaus](bool) { sperreHinaus(); });
+        // Der Knopf bietet AUTO an, solange eine Flex steht; der Regler
+        // zeigt dann den gespeicherten Abstand.
+        if (m_rxApplet) {
+            m_rxApplet->setAutoSqlMarge(m_radioModel->flexAutoMarge());
+            m_rxApplet->setAutoSqlVerfuegbar([this]() {
+                return !m_shuttingDown && m_radioModel
+                    && m_radioModel->istFlexVerbunden();
+            });
+            connect(m_rxApplet, &RxApplet::autoSqlMargeGeaendert,
+                    m_radioModel, &RadioModel::setFlexAutoMarge,
+                    Qt::UniqueConnection);
+            connect(m_radioModel, &RadioModel::flexAutoRauschsperreGestellt,
+                    m_rxApplet, &RxApplet::setAutoSqlStand,
+                    Qt::UniqueConnection);
+        }
 
         // ── Und die uebrigen Regler der Scheibe (2026-11-01) ────────
         //
