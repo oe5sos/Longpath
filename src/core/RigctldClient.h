@@ -152,6 +152,11 @@ public:
     /// Mehrere Aufrufe kurz hintereinander lesen nur einmal nach.
     void frageRohListeNach();
 
+    /// Die naechste Antwort auf f und m meldet sich auch dann, wenn sie
+    /// gleich geblieben ist. Fuer die CAT-Bruecke: eine Meldung, die in
+    /// ihre Frist fiel, kaeme sonst nie wieder.
+    void erzwingeNaechsteMeldung() { m_meldeFrequenz = true; m_meldeModus = true; }
+
     /// Schaltet den Zwischenspeicher von rigctld ab. Ab Werk beantwortet
     /// Hamlib eine Frequenzfrage eine Sekunde lang aus dem Speicher
     /// (gemessen: `get_cache` meldet 1000 ms, eine Antwort dauert 0,1 ms).
@@ -259,6 +264,8 @@ private:
     QTimer* m_retry{nullptr};
     QTimer* m_deadline{nullptr};
     QTimer* m_nachlesen{nullptr};
+    bool m_meldeFrequenz{false};
+    bool m_meldeModus{false};
     int     m_pollMs{kStandardAbfrageMs};
     quint64 m_tick{0};
     QList<QByteArray> m_rohListe;

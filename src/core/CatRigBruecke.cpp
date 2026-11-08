@@ -13,6 +13,7 @@
 #include "CatRigBruecke.h"
 
 #include "core/CompanionRigController.h"
+#include "core/RigctldClient.h"
 #include "core/TransverterSetup.h"
 #include "core/Ts590Cat.h"
 #include "models/SliceModel.h"
@@ -36,13 +37,14 @@ CatRigBruecke::CatRigBruecke(CompanionRigController* rig, SliceModel* scheibe,
     m_filterZug->setInterval(kFilterZugMs);
     connect(m_filterZug, &QTimer::timeout, this, &CatRigBruecke::schickeFilter);
 
-    // Die Antwort auf das Nachlesen kommt noch in der Frist und zaehlt dort
-    // nicht. Ohne diesen Abgleich bliebe die Anzeige auf dem verlangten Wert
-    // stehen, obwohl das Geraet auf seine Tabelle gerundet hat.
-    m_filterAbgleich = new QTimer(this);
-    m_filterAbgleich->setSingleShot(true);
-    m_filterAbgleich->setInterval(kFristNachBefehlMs + 50);
-    connect(m_filterAbgleich, &QTimer::timeout, this, &CatRigBruecke::vomGeraetFilter);
+    // Was das Geraet in der Frist meldet, zaehlt dort nicht -- und kaeme nie
+    // wieder, weil Client und Zustand nur Aenderungen melden. Ohne diesen
+    // Abgleich blieb die Anzeige auf dem verlangten Filter stehen, obwohl das
+    // Geraet gerundet hatte, und auf der alten Betriebsart, wenn am Geraet
+    // kurz nach einem Befehl umgeschaltet wurde (CI, langsamer Laeufer).
+    m_fristEnde = new QTimer(this);
+    m_fristEnde->setSingleShot(true);
+    connect(m_fristEnde, &QTimer::timeout, this, &CatRigBruecke::nachDerFrist);
 
     if (!rig || !scheibe) { return; }
 
@@ -176,8 +178,7 @@ void CatRigBruecke::vonScheibeFilter(int low, int high)
         m_filterVonHz = std::max(0, m_rig->catZustand().lowCutHz);
         m_filterBisHz = m_filterVonHz + m_filterBreiteHz;
     }
-    m_befehlGesendet = true;
-    m_seitBefehl.start();
+    starteFrist();
     m_filterZug->start();
 }
 
@@ -198,9 +199,7 @@ void CatRigBruecke::schickeFilter()
             m_rig->stelle(Ts590Cat::stelleHighCut(m_filterBisHz));
         }
     }
-    m_befehlGesendet = true;
-    m_seitBefehl.start();
-    m_filterAbgleich->start();
+    starteFrist();
 }
 
 void CatRigBruecke::vonScheibeFrequenz(double hz)
@@ -221,8 +220,7 @@ void CatRigBruecke::vonScheibeFrequenz(double hz)
     }
     if (zf == m_rig->zfFrequenzHz()) { return; }
     m_rig->stimmeAbZf(zf);
-    m_befehlGesendet = true;
-    m_seitBefehl.start();
+    starteFrist();
 }
 
 void CatRigBruecke::vonScheibeModus(DSPMode modus)
@@ -231,8 +229,21 @@ void CatRigBruecke::vonScheibeModus(DSPMode modus)
     const QString rigModus = modusFuerGeraet(modus);
     if (rigModus.isEmpty()) { return; }
     m_rig->stelleModus(rigModus);
+    starteFrist();
+}
+
+void CatRigBruecke::starteFrist()
+{
     m_befehlGesendet = true;
     m_seitBefehl.start();
+    m_fristEnde->start(m_fristMs + 50);
+}
+
+void CatRigBruecke::nachDerFrist()
+{
+    if (!m_rig) { return; }
+    if (auto* client = m_rig->client()) { client->erzwingeNaechsteMeldung(); }
+    vomGeraetFilter();
 }
 
 } // namespace Longpath

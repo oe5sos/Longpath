@@ -81,6 +81,8 @@ private:
     void vomGeraetFilter();
     void vonScheibeFilter(int low, int high);
     void schickeFilter();
+    void starteFrist();
+    void nachDerFrist();
     bool fristLaeuft() const;
 
     QPointer<CompanionRigController> m_rig;
@@ -90,7 +92,7 @@ private:
     bool m_uebernimmtVomGeraet{false};
     int m_fristMs{kFristNachBefehlMs};
     QTimer* m_filterZug{nullptr};
-    QTimer* m_filterAbgleich{nullptr};
+    QTimer* m_fristEnde{nullptr};
     int m_filterVonHz{0};
     int m_filterBisHz{0};
     int m_filterBreiteHz{0};

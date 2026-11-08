@@ -520,6 +520,34 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W SH07; 0\n"), 20000);
     }
 
+    // Am Geraet gedreht, kurz nachdem Longpath etwas geschickt hat: die
+    // Meldung faellt in die Frist und darf trotzdem nicht verloren gehen.
+    // Gefunden auf dem langsamen CI-Laeufer, der genau dieses Fenster traf.
+    void eine_meldung_in_der_frist_geht_nicht_verloren()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28078400), 20000);
+
+        bruecke.fristSetzenForTest(1500);
+        scheibe.setFrequency(28100000.0);
+        QTRY_COMPARE_WITH_TIMEOUT(doppel.frequenz, qint64(28100000), 20000);
+        doppel.modus = QStringLiteral("LSB");
+        doppel.frequenz = 28120000;
+        QTRY_COMPARE_WITH_TIMEOUT(rig.client()->mode(), QStringLiteral("LSB"), 20000);
+
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::LSB, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28120000), 20000);
+        bruecke.fristSetzenForTest(CatRigBruecke::kFristNachBefehlMs);
+    }
+
     // Bandtaste oder Eingabe auf 2 m: am Geraet muss die ZF ankommen.
     void eine_eingabe_auf_2m_landet_auf_der_zf()
     {

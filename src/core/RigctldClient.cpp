@@ -380,7 +380,8 @@ void RigctldClient::onReadyRead()
             qint64 hz = 0;
             if (parseFrequency(antwort, hz)) {
                 m_lastFrequency = QDateTime::currentDateTimeUtc();
-                if (hz != m_frequencyHz) {
+                if (hz != m_frequencyHz || m_meldeFrequenz) {
+                    m_meldeFrequenz = false;
                     m_frequencyHz = hz;
                     emit frequencyChanged(hz);
                 }
@@ -398,7 +399,8 @@ void RigctldClient::onReadyRead()
             QString modus;
             int durchlass = 0;
             if (parseMode(antwort, modus, durchlass)) {
-                if (modus != m_mode || durchlass != m_passbandHz) {
+                if (modus != m_mode || durchlass != m_passbandHz || m_meldeModus) {
+                    m_meldeModus = false;
                     m_mode = modus;
                     m_passbandHz = durchlass;
                     emit modeChanged(m_mode, m_passbandHz);
