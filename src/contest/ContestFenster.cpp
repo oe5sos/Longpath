@@ -12,6 +12,7 @@
 #include "app/AppController.h"
 #include "app/Datenverzeichnis.h"
 #include "app/SingleInstanceGuard.h"
+#include "data/LogBackup.h"
 #include "ui/MainWindow.h"
 #include "ui/PanelContainerWidget.h"
 #include "ui/StyleKit.h"
@@ -19,6 +20,7 @@
 
 #include <QDir>
 #include <QEvent>
+#include <QFileInfo>
 #include <QScreen>
 #include <QPointer>
 #include <QTimer>
@@ -226,6 +228,29 @@ bool ContestFenster::lade(QString* grund, QWidget* elternFenster)
     m_innen->wache     = std::move(wache);
     m_innen->steuerung = std::move(steuerung);
     m_innen->fenster   = fenster;
+
+    // ── Der Stick (2026-11-08) ────────────────────────────────────────
+    //
+    // Am 07.11. stand den ganzen Nachmittag „Zweiter Sicherungsordner nicht
+    // erreichbar" im Protokoll, und niemand sah es: eigenstaendig zeigt das
+    // Logbuch das in seiner Statuszeile, und die gibt es in Longpath nicht.
+    // Gemeldet wird beim Oeffnen, nicht erst beim ersten QSO, damit es vor
+    // dem Contest auffaellt. Dieselbe Pruefung wie im Startcheck.
+    if (Contestprogramm::LogBackup* sicherung = m_innen->steuerung->logBackup()) {
+        connect(sicherung, &Contestprogramm::LogBackup::mirrorFailed,
+                this, &ContestFenster::sicherungsWarnung);
+        const QString zweit = sicherung->mirrorDirectory();
+        const bool erreichbar = zweit.isEmpty()
+            || QFileInfo(zweit).isWritable()
+            || (!QFileInfo::exists(zweit) && QFileInfo(QFileInfo(zweit).path()).isWritable());
+        if (!erreichbar) {
+            QTimer::singleShot(0, this, [this, zweit]() {
+                emit sicherungsWarnung(
+                    QStringLiteral("Zweiter Sicherungsordner nicht erreichbar: %1 — Stick eingesteckt?")
+                        .arg(zweit));
+            });
+        }
+    }
     if (elternFenster) {
         m_innen->kreuz = new LogbuchKreuz(fenster, this);
         for (const PanelEintrag& e : panels()) {

@@ -19785,6 +19785,11 @@ void MainWindow::bereiteContestFensterVor()
         });
         connect(m_contestFenster, &ContestFenster::anordnungGeaendert,
                 m_contestAnordnungTimer, qOverload<>(&QTimer::start));
+        // Ohne zweite Sicherung soll es auffallen, nicht nur im Protokoll stehen.
+        connect(m_contestFenster, &ContestFenster::sicherungsWarnung,
+                this, [this](const QString& text) {
+            showToast(text, ToastSeverity::Warning, 15000);
+        });
     }
 
     // Das Contestprogramm liest die Frequenz ueber rigctld (4532). Laeuft

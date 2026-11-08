@@ -6809,6 +6809,9 @@ if(LONGPATH_CONTESTPROGRAMM)
     target_link_libraries(tst_contestfenster PRIVATE Qt6::Sql)
     target_link_libraries(tst_contest_panels_im_containers_menu PRIVATE Qt6::Sql)
     target_link_libraries(tst_cmdq_schliesst_das_logbuch PRIVATE Qt6::Sql)
+    # Ohne Stick soll es in Longpath auffallen, nicht nur im Protokoll stehen.
+    longpath_add_test(tst_logbuch_meldet_den_stick)
+    target_link_libraries(tst_logbuch_meldet_den_stick PRIVATE Qt6::Sql)
 endif()
 
 # ── Phase 3J-1 Task 17.1: TX audio binary pipeline + single-client mutex ──────

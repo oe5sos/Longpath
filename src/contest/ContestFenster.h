@@ -158,6 +158,10 @@ signals:
     // ausgeblendet, oder das Logbuch-Fenster ging auf oder zu -- der
     // Wirt schreibt die Anordnung dann ins Profil.
     void anordnungGeaendert();
+    // Der zweite Sicherungsordner (der Stick) ist nicht erreichbar. Die
+    // Statuszeile des Logbuchs, die das eigenstaendig zeigt, ist in
+    // Longpath nicht zu sehen; der Wirt zeigt es selbst.
+    void sicherungsWarnung(const QString& text);
 
 private:
     struct Innen;
