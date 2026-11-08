@@ -147,8 +147,10 @@ private slots:
         writer.setXitHz(-100);
         writer.setAfGain(70);
         writer.setRfGain(60);
-        writer.setRxAntenna(QStringLiteral("ANT2"));
-        writer.setTxAntenna(QStringLiteral("ANT2"));
+        // Die Antenne gehoert seit dem 2026-11-08 NICHT mehr zum
+        // Rundlauf der Scheibe: sie steht je Band in der Alex-Tabelle
+        // (siehe tst_antenne_je_band_zweite_ablage). Zwei Ablagen fuer
+        // dieselbe Sache waren der Fehler, nicht das Fehlen einer.
 
         writer.saveToSettings(Band::Band20m);
 
@@ -178,8 +180,14 @@ private slots:
         QCOMPARE(reader.xitHz(),        -100);
         QCOMPARE(reader.afGain(),       70);
         QCOMPARE(reader.rfGain(),       60);
-        QCOMPARE(reader.rxAntenna(),    QStringLiteral("ANT2"));
-        QCOMPARE(reader.txAntenna(),    QStringLiteral("ANT2"));
+        // Gegenprobe zur geloeschten Ablage: die Scheibe traegt nach
+        // dem Wiederherstellen NICHT die gespeicherte Antenne, weil es
+        // keine gespeicherte Antenne mehr gibt. Die Beschriftung setzt
+        // `RadioModel::loadSliceState` aus der Alex-Tabelle.
+        auto& st = AppSettings::instance();
+        const QString sp0 = QStringLiteral("Slice0/");
+        QVERIFY(!st.contains(sp0 + QStringLiteral("RxAntenna")));
+        QVERIFY(!st.contains(sp0 + QStringLiteral("TxAntenna")));
     }
 
     // ── Test 2: per-band isolation ────────────────────────────────────────────
@@ -283,9 +291,11 @@ private slots:
         QCOMPARE(s.value(sp + QStringLiteral("AfGain")).toInt(), 65);
         QVERIFY(s.contains(sp + QStringLiteral("RfGain")));
         QCOMPARE(s.value(sp + QStringLiteral("RfGain")).toInt(), 75);
-        QVERIFY(s.contains(sp + QStringLiteral("RxAntenna")));
-        QCOMPARE(s.value(sp + QStringLiteral("RxAntenna")).toString(),
-                 QStringLiteral("ANT2"));
+        // `VfoRxAntenna` wird NICHT mehr umgezogen: sein Ziel wird seit
+        // dem 2026-11-08 nicht mehr gelesen. Es wird nur noch entfernt
+        // (siehe oben), und im Ziel steht nichts.
+        QVERIFY(!s.contains(sp + QStringLiteral("RxAntenna")));
+        QVERIFY(!s.contains(sp + QStringLiteral("TxAntenna")));
 
         // Second call to migrateLegacyKeys() must be a no-op (no crash,
         // no double-migration, keys should still be present / absent).
