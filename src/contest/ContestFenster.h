@@ -167,6 +167,15 @@ signals:
     // Statuszeile des Logbuchs, die das eigenstaendig zeigt, ist in
     // Longpath nicht zu sehen; der Wirt zeigt es selbst.
     void sicherungsWarnung(const QString& text);
+    // Was das Logbuch in seine Statuszeile schreibt -- ohne das, was dort
+    // nur dauernd mitlaeuft (QSO-Zaehler, Frequenzecho, Band, Betriebsart).
+    // Eingebettet ist diese Zeile nicht zu sehen; der Wirt zeigt es selbst.
+    void logbuchMeldung(const QString& text, bool warnung);
+
+public:
+    /// Ob eine Zeile aus der Statuszeile des Logbuchs nach Longpath gehoert,
+    /// und ob sie eine Warnung ist. Ohne Fenster pruefbar.
+    static bool meldungGehoertNachAussen(const QString& text, bool* warnung = nullptr);
 
 private:
     struct Innen;

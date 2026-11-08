@@ -19790,6 +19790,12 @@ void MainWindow::bereiteContestFensterVor()
                 this, [this](const QString& text) {
             showToast(text, ToastSeverity::Warning, 15000);
         });
+        // Die Statuszeile des Logbuchs ist eingebettet nicht zu sehen.
+        connect(m_contestFenster, &ContestFenster::logbuchMeldung,
+                this, [this](const QString& text, bool warnung) {
+            showToast(text, warnung ? ToastSeverity::Warning : ToastSeverity::Info,
+                      warnung ? 10000 : 6000);
+        });
     }
 
     // Das Contestprogramm liest die Frequenz ueber rigctld (4532). Laeuft
