@@ -29,6 +29,7 @@
 #include <QDir>
 #include <QImage>
 
+#include <array>
 #include <cmath>
 #include <random>
 
@@ -38,6 +39,9 @@
 #include "models/BandPlanManager.h"
 
 #include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QXmlStreamReader>
 #include "FensterFrist.h"
 
@@ -129,8 +133,28 @@ private:
 // 144,400, FM-Anruf 145,500, Relais-Ausgaenge ab 145,600.
 class ZweiMeterSzene {
 public:
-    ZweiMeterSzene(double mitteRfHz, double rateHz, int bins, quint32 seed)
-        : m_mitte(mitteRfHz), m_rate(rateHz), m_bins(bins), m_rng(seed) {}
+    ZweiMeterSzene(double mitteRfHz, double rateHz, int bins, quint32 seed,
+                   bool gedraenge = false)
+        : m_mitte(mitteRfHz), m_rate(rateHz), m_bins(bins), m_rng(seed),
+          m_gedraenge(gedraenge)
+    {
+        // Contest-Gedraenge (Entwurf Lueckenfinder, 2026-11-08): SSB alle
+        // 3-6 kHz, unregelmaessig, mit drei echten Luecken -- so sieht ein
+        // 2-m-Contestsamstag aus, nicht wie ein Raster alle 15 kHz.
+        if (m_gedraenge) {
+            std::mt19937 r(4711);
+            std::uniform_real_distribution<double> schritt(2900.0, 6000.0);
+            std::uniform_real_distribution<double> pegel(-118.0, -88.0);
+            const double frei[][2] = {{144212000, 144221000}, {144262000, 144268500},
+                                      {144334000, 144346000}};
+            for (double f = 144162000.0; f < 144396000.0; f += schritt(r)) {
+                bool inLuecke = false;
+                for (const auto& l : frei) { if (f + 2700.0 > l[0] && f < l[1]) { inLuecke = true; } }
+                if (inLuecke) { continue; }
+                m_stationen.push_back({f, pegel(r)});
+            }
+        }
+    }
 
     QVector<float> frame(int n)
     {
@@ -161,10 +185,20 @@ public:
             {144318000, -99},  {144333000, -111}, {144349000, -94}, {144366000, -107},
             {144381000, -115},
         };
+        if (m_gedraenge) {
+            int s = 0;
+            for (const auto& st : m_stationen) {
+                if (std::sin(n * (0.17 + 0.029 * s) + s) > -0.6) { sprache(b, st[0], st[1], n, s); }
+                ++s;
+            }
+            for (const auto& bk : {144408000.0, 144418000.0, 144437000.0, 144462000.0}) { ton(b, bk, -114.0); }
+            ton(b, 144050000.0, -100.0);
+            return b;
+        }
         int k = 0;
         for (const auto& st : ssb) {
             const bool spricht = std::sin(n * (0.21 + 0.037 * k) + k) > -0.3;
-            if (spricht) { band(b, st[0], 2400.0, st[1]); }
+            if (spricht) { sprache(b, st[0], st[1], n, k); }
             ++k;
         }
         // Baken
@@ -200,6 +234,26 @@ private:
             if (x >= 0 && x < m_bins) { b[x] += static_cast<float>(db2p(dbm) * w[i + 2]); }
         }
     }
+    // SSB wie die 20-m-Szene oben: Formanten 500/1500 Hz, 300-2700 Hz,
+    // Silbenhuellkurve -- ein flacher Block sieht in der Lupe nach nichts aus.
+    void sprache(QVector<float>& b, double traeger, double dbm, int n, int k)
+    {
+        std::exponential_distribution<double> expo(1.0);
+        const double env = 0.55 + 0.45 * std::sin(n * (0.9 + 0.13 * k) + 2.0 * k);
+        const int b0 = binFuer(traeger + 300.0), b1 = std::max(b0 + 1, binFuer(traeger + 2700.0));
+        const double hzJeBin = m_rate / m_bins;
+        for (int x = b0; x < b1; ++x) {
+            if (x < 0 || x >= m_bins) { continue; }
+            const double f = (x - b0) * hzJeBin;
+            // Sprache faellt zu den Hoehen hin ab (etwa -12 dB von 300 auf
+            // 2500 Hz), mit einem zweiten Formanten um 1400 Hz.
+            const double fa = f + 300.0;
+            const double form = (1.0 / (1.0 + (fa / 700.0) * (fa / 700.0)))
+                              * (1.0 + 0.8 * std::exp(-std::pow((fa - 1400.0) / 300.0, 2)))
+                              + 0.02;
+            b[x] += static_cast<float>(db2p(dbm) * env * form * expo(m_rng));
+        }
+    }
     void band(QVector<float>& b, double unten, double breite, double dbm)
     {
         std::exponential_distribution<double> expo(1.0);
@@ -213,6 +267,8 @@ private:
     double m_mitte, m_rate;
     int m_bins;
     std::mt19937 m_rng;
+    bool m_gedraenge{false};
+    QVector<std::array<double, 2>> m_stationen;
 };
 
 // Die Anzeige-Einstellungen eines echten Longpath.settings uebernehmen
@@ -507,15 +563,20 @@ private slots:
         plaene.loadPlans();
         plaene.setActivePlan(QStringLiteral("IARU Region 1"));
 
-        struct Fall { QString id; double mitteRf; double rate; int bins; };
+        struct Fall { QString id; double mitteRf; double rate; int bins; QSize groesse;
+                      bool gedraenge = false; };
         const QList<Fall> faelle = {
-            {QStringLiteral("z1_contest_144_0_bis_144_5"), 144250000.0, 500000.0, 16384},
-            {QStringLiteral("z2_voll_144_bis_148"),        146000000.0, 4000000.0, 65536},
+            {QStringLiteral("z1_contest_144_0_bis_144_5"), 144250000.0, 500000.0, 16384, {1170, 620}},
+            {QStringLiteral("z2_voll_144_bis_148"),        146000000.0, 4000000.0, 65536, {1170, 620}},
+            // Grund fuer den Lupen-Entwurf (2026-11-08): +/-10 kHz um den
+            // VFO, fein aufgeloest, als schmaler Streifen.
+            {QStringLiteral("z3_lupe_144300_20k"),         144300000.0, 20000.0, 4096, {560, 300}},
+            {QStringLiteral("z4_contest_gedraenge"),       144250000.0, 500000.0, 16384, {1170, 620}, true},
         };
         for (const Fall& fall : faelle) {
             if (!wanted.isEmpty() && !wanted.contains(fall.id)) { continue; }
             SpectrumWidget w;
-            w.resize(1170, 620);
+            w.resize(fall.groesse);
             w.loadSettings();
             w.setBandPlanManager(&plaene);
             w.setBandPlanFontSize(qMax(6, AppSettings::instance()
@@ -532,12 +593,14 @@ private slots:
             w.setDdcCenterFrequency(mitteZf);
             w.setFrequencyRange(mitteZf, fall.rate);
             w.setFilterOffset(150, 2850);
-            w.setCompanionMarker(true, 144300000 - tv.offsetHz, QStringLiteral("TS-590"));
+            const bool lupe = fall.id.startsWith(QLatin1String("z3_"));
+            w.setCompanionMarker(!lupe, 144300000 - tv.offsetHz, QStringLiteral("TS-590"));
+            if (lupe) { w.setShowPeakValueOverlay(false); }
             w.setDbmRange(-150.0f, -60.0f);
             w.setClarityActive(true);
             w.setClarityWaterfallThresholds(-140.0f, -80.0f, -135.0f);
 
-            ZweiMeterSzene szene(fall.mitteRf, fall.rate, fall.bins, 20261108);
+            ZweiMeterSzene szene(fall.mitteRf, fall.rate, fall.bins, 20261108, fall.gedraenge);
             const int frames = qMax(1, qEnvironmentVariableIntValue("LONGPATH_RENDER_FRAMES") > 0
                                            ? qEnvironmentVariableIntValue("LONGPATH_RENDER_FRAMES")
                                            : 360);
@@ -554,6 +617,27 @@ private slots:
             const QString path = dir + QLatin1Char('/') + fall.id + QStringLiteral(".png");
             QVERIFY(img.save(path));
             qInfo().noquote() << "geschrieben:" << path << img.size();
+            // Fuer Entwurfsblaetter: was die Kurve WIRKLICH zeigt (dBm je
+            // Anzeigepunkt) und die Geometrie -- damit ein Entwurf nach den
+            // angezeigten Werten zeichnet, nicht nach Augenmass.
+            {
+                QJsonObject o;
+                QJsonArray px;
+                for (float v : w.renderedPixels()) { px.append(std::round(v * 10.0f) / 10.0); }
+                const QRect r = w.spectrumRect();
+                o[QStringLiteral("pixels")]     = px;
+                o[QStringLiteral("specRect")]   = QJsonArray{r.x(), r.y(), r.width(), r.height()};
+                o[QStringLiteral("dpr")]        = img.width() / static_cast<double>(w.width());
+                o[QStringLiteral("centerHz")]   = w.centerFrequency();
+                o[QStringLiteral("bandwidthHz")] = w.bandwidth();
+                o[QStringLiteral("offsetHz")]   = static_cast<double>(tv.offsetHz);
+                o[QStringLiteral("vfoRfHz")]    = 144300000.0;
+                o[QStringLiteral("filterLoHz")] = 150;
+                o[QStringLiteral("filterHiHz")] = 2850;
+                QFile jf(dir + QLatin1Char('/') + fall.id + QStringLiteral(".json"));
+                QVERIFY(jf.open(QIODevice::WriteOnly));
+                jf.write(QJsonDocument(o).toJson(QJsonDocument::Compact));
+            }
             w.setBandPlanManager(nullptr);
         }
         TransverterSetup::setCurrent(TransverterSetup{});
