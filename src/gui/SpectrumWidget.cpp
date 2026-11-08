@@ -1108,7 +1108,8 @@ void SpectrumWidget::loadSettings()
     m_zeigeBandbreite = readBool(QStringLiteral("DisplayPassbandLabel"), true);
     m_zeigeKlammern   = readBool(QStringLiteral("DisplaySignalBrackets"), true);
     m_zeigeLuecken    = readBool(QStringLiteral("DisplayGapFinder"), true);
-    m_lupenModus      = qBound(0, readInt(QStringLiteral("DisplayPassbandMagnifier"), 1), 2);
+    // 0 aus, 1 an; eine alte 2 ("immer") gilt als an.
+    m_lupenModus      = (readInt(QStringLiteral("DisplayPassbandMagnifier"), 1) != 0) ? 1 : 0;
     m_sStufenSkala    = readBool(QStringLiteral("DisplaySUnitsScale"), false);
     {
         const bool wfDev = readBool(QStringLiteral("DisplayWaterfallDevicePixels"), true);
@@ -2430,7 +2431,7 @@ QVector<QPair<QString, float>> SpectrumWidget::sStufenStriche() const
 
 void SpectrumWidget::setPassbandMagnifier(int modus)
 {
-    modus = qBound(0, modus, 2);
+    modus = (modus != 0) ? 1 : 0;
     if (m_lupenModus == modus) { return; }
     m_lupenModus = modus;
     m_lupeGlatt.clear();
@@ -8168,15 +8169,8 @@ bool SpectrumWidget::lupeSichtbar() const
         || m_sampleRateHz <= 0.0 || m_bandwidthHz <= 0.0) {
         return false;
     }
-    if (m_lupenModus == 2) {
-        return true;
-    }
-    const int w = width() - effectiveStripW();
-    if (w <= 0) {
-        return false;
-    }
-    const double px = std::abs(m_filterHighHz - m_filterLowHz) / m_bandwidthHz * w;
-    return px < Durchlass::kLupeAbPunkten;
+    // An heisst sichtbar, bei jeder Spanne (siehe Durchlass.h, Lupe).
+    return true;
 }
 
 void SpectrumWidget::paintSignalKlammern(QPainter& p, const QRect& specRect)
@@ -8365,12 +8359,20 @@ void SpectrumWidget::paintDurchlassLupe(QPainter& p, const QRect& specRect)
     p.setFont(kopf);
     p.setPen(QColor(Style::kTextSecondary));
     const QRectF kopfZeile(rahmen.left() + 10.0, rahmen.top() + 3.0, rahmen.width() - 20.0, 16.0);
-    p.drawText(kopfZeile, Qt::AlignLeft | Qt::AlignVCenter,
-               tr("MAGNIFIER ±%1 kHz · %2")
-                   .arg(qRound(Durchlass::kLupeHalbHz / 1000.0))
-                   .arg(rfFuerAnzeige(m_vfoHz) / 1.0e6, 0, 'f', 3));
-    p.drawText(kopfZeile, Qt::AlignRight | Qt::AlignVCenter,
-               tr("%1 Hz/bin").arg(binHz, 0, 'f', binHz < 10.0 ? 1 : 0));
+    const QString rechts = tr("%1 Hz/bin").arg(binHz, 0, 'f', binHz < 10.0 ? 1 : 0);
+    QString links = tr("MAGNIFIER ±%1 kHz · %2")
+                        .arg(qRound(Durchlass::kLupeHalbHz / 1000.0))
+                        .arg(rfFuerAnzeige(m_vfoHz) / 1.0e6, 0, 'f', 3);
+    // Auf 2 m ist die Frequenz eine Stelle laenger, und die Zeile lief
+    // in "409 Hz/bin" hinein (Werkbank z3, 2026-11-08). Dann ohne sie --
+    // die Frequenz steht ohnehin am VFO.
+    const QFontMetricsF kopfMass(kopf);
+    if (kopfMass.horizontalAdvance(links) + kopfMass.horizontalAdvance(rechts) + 12.0
+        > kopfZeile.width()) {
+        links = tr("MAGNIFIER ±%1 kHz").arg(qRound(Durchlass::kLupeHalbHz / 1000.0));
+    }
+    p.drawText(kopfZeile, Qt::AlignLeft | Qt::AlignVCenter, links);
+    p.drawText(kopfZeile, Qt::AlignRight | Qt::AlignVCenter, rechts);
 
     p.setClipRect(flaeche);
     auto xVon = [&](double hz) {

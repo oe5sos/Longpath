@@ -2846,7 +2846,7 @@ private:
     bool        m_zeigeBandbreite{true};
     bool        m_zeigeKlammern{true};
     bool        m_zeigeLuecken{true};
-    int         m_lupenModus{1};            // 0 aus, 1 auto, 2 immer
+    int         m_lupenModus{1};            // 0 aus, 1 an (immer sichtbar)
     bool        m_kanteFein{false};         // Shift beim Ziehen: ohne Rast
     Durchlass::Haltung         m_klammerHaltung;
     float                      m_klammerBoden{0.0f};

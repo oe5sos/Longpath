@@ -892,8 +892,8 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
         QAction* lupe = menu->addAction(tr("Passband magnifier"));
         lupe->setCheckable(true);
         lupe->setChecked(m_spectrum->passbandMagnifier() != 0);
-        lupe->setToolTip(tr("Shows ±10 kHz around the VFO when the passband "
-                            "is too narrow to read in the main view."));
+        lupe->setToolTip(tr("Shows ±10 kHz around the VFO with the passband, "
+                            "at every zoom level."));
         connect(lupe, &QAction::toggled, m_spectrum,
                 [this](bool an) { m_spectrum->setPassbandMagnifier(an ? 1 : 0); });
         menu->addSeparator();

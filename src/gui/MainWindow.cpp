@@ -21284,6 +21284,11 @@ void MainWindow::checkVaxFirstRun()
     dlg->show();
 }
 
+InstrumentApplet* MainWindow::signalInstrumentForTest() const
+{
+    return m_signalInstrument;
+}
+
 void MainWindow::closeEvent(QCloseEvent* event)
 {
     // Mark shutting-down BEFORE anything else so the "auto-open

@@ -227,16 +227,20 @@ private slots:
         }
     }
 
-    void dieLupeNurBeiSchmalemDurchlass()
+    // An heisst sichtbar, bei jeder Spanne (Betreiber 2026-11-08: beim
+    // Hineinzoomen von 200 auf 134 kHz war sie weg).
+    void dieLupeIstAnOderAus()
     {
         SpectrumWidget w;
-        einstellen(w, 48000.0);
-        fuettern(w, szene(48000.0, kMitte, {{14110000.0, -100.0}}), 3);
-        QVERIFY2(!w.magnifierVisibleForTest(), "bei 48 kHz ist der Durchlass breit genug");
-
+        for (double spanne : {768000.0, 192000.0, 134000.0, 48000.0, 12000.0}) {
+            einstellen(w, 192000.0);
+            fuettern(w, szene(192000.0, kMitte, {{14110000.0, -100.0}}), 3);
+            w.setFrequencyRange(kMitte, spanne);
+            QVERIFY2(w.magnifierVisibleForTest(),
+                     qPrintable(QStringLiteral("bei %1 Hz Spanne ist die Lupe weg").arg(spanne)));
+        }
         einstellen(w, 768000.0);
         fuettern(w, szene(768000.0, kMitte, {{14110000.0, -100.0}}), 3);
-        QVERIFY2(w.magnifierVisibleForTest(), "bei 768 kHz sind 2,7 kHz wenige Punkte");
         w.paintPassbandOverlaysForTest();
         const int erwartet = static_cast<int>(2.0 * Durchlass::kLupeHalbHz / (768000.0 / kBins));
         QVERIFY2(std::abs(w.magnifierBinsForTest().size() - erwartet) <= 2,
@@ -244,9 +248,10 @@ private slots:
 
         w.setPassbandMagnifier(0);
         QVERIFY(!w.magnifierVisibleForTest());
+        // Eine alte "2" (immer) aus der Einstellungsdatei gilt als an.
         w.setPassbandMagnifier(2);
-        einstellen(w, 48000.0);
-        QVERIFY2(w.magnifierVisibleForTest(), "\"immer\" heisst immer");
+        QCOMPARE(w.passbandMagnifier(), 1);
+        QVERIFY(w.magnifierVisibleForTest());
     }
 
     void dieVierHakenImZahnrad()

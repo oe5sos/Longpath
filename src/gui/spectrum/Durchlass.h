@@ -118,17 +118,15 @@ private:
 
 // ── 8  Lupe ─────────────────────────────────────────────────────────
 
-/// Unter dieser Breite (logische Punkte) ist der Durchlass im Hauptbild
-/// zu schmal, um darin etwas zu erkennen -- die Lupe erscheint (Modus
-/// "auto"). 12, nicht 40: bei 40 stand sie schon in jeder gewoehnlichen
-/// KW-Ansicht (192 kHz, 2,8 kHz Filter = 14 Punkte) und deckte ein
-/// Viertel des Spektrums zu (tst_spectrum_trace_on_grid, 2026-11-08).
-/// Gedacht ist sie fuer breite Bilder: 2 m mit 500 kHz (6 Punkte) oder
-/// 4 MHz (1 Punkt).
-inline constexpr int kLupeAbPunkten = 12;
-
 /// Halbe Breite der Lupe.
 inline constexpr double kLupeHalbHz = 10000.0;
+
+/// Die Lupe kennt seit 2026-11-08 abends nur noch AN und AUS. Vorher
+/// gab es "auto" (nur bei schmalem Durchlass, zuerst unter 12 Punkten):
+/// beim Hineinzoomen verschwand sie (Betreiber, 200 -> 134 kHz: "beim
+/// vergroessern ist das fenster weg"). Seine Regel: "ein- oder
+/// ausblenden koennen, aber sie sollte immer ersichtlich sein" -- dann
+/// kann das Bandbreitenfenster wegbleiben.
 
 /// Erster und letzter Bin (einschliesslich), die [vonHz, bisHz] eines
 /// FFT abdecken, dessen erster Bin bei `fftUntenHz` beginnt. Auf den

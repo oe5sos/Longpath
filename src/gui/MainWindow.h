@@ -252,6 +252,7 @@ public:
     class KiwiSdrManager* kiwiSdrManagerForTest() const
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
+    class InstrumentApplet* signalInstrumentForTest() const;
     class ContestFenster* contestFensterForTest() const { return m_contestFenster; }
     QByteArray layoutprofilAlsJsonForTest(const QString& name) { return layoutprofilAlsJson(name); }
     void holeContestInsKombiFeldForTest(const QString& id, bool zweites = false)
@@ -2554,9 +2555,15 @@ private:
     /// Die beiden Zeiger-/Balkeninstrumente (2026-08-17). Sie hängen an
     /// MeterPoller::readingUpdated, also am selben Umlauf wie die
     /// Meter-Items.
-    class FrequencyApplet*  m_frequencyApplet{nullptr};
-    class InstrumentApplet* m_swrInstrument{nullptr};
-    class InstrumentApplet* m_signalInstrument{nullptr};
+    ///
+    /// QPointer, nicht roh (2026-11-08): closeEvent loescht die
+    /// schwebenden Applet-Fenster samt Applet, und bis quit() laeuft die
+    /// Ereignisschleife weiter -- ein Meter-Takt danach traf das
+    /// geloeschte S-Meter (Absturzbericht 12:35, NeedleInstrument::
+    /// onReading mit this = 0, 57 ms nach closeEvent).
+    QPointer<class FrequencyApplet>  m_frequencyApplet;
+    QPointer<class InstrumentApplet> m_swrInstrument;
+    QPointer<class InstrumentApplet> m_signalInstrument;
     // Betreiber 2026-09-03: "leider funktioniert die Frequenzanzeige
     // nicht im S-Meter" -- die urspruengliche Verdrahtung (buildUI())
     // lief EINMAL gegen die beim Start aktive Scheibe; ein frisches
