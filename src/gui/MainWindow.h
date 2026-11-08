@@ -757,6 +757,8 @@ private slots:
     // Panadapters -> Dialog (TraegerEichDialog).
     void zeigeTraegerEichung(bool gefunden, double geraetHz, double anzeigeHz,
                              float snrDb);
+    // Rundum-Lauf (2026-11-08): Tools -> Rotor sweep.
+    void oeffneRundumLauf();
     void onNotchCreateRequested(const QString& panId, double freqHz, bool narrow);
     void onNotchMoveRequested(int id, double newFreqHz);
     void onNotchWidthRequested(int id, double widthHz);
@@ -2568,6 +2570,7 @@ private:
     QPointer<class FrequencyApplet>  m_frequencyApplet;
     QPointer<class InstrumentApplet> m_swrInstrument;
     QPointer<class InstrumentApplet> m_signalInstrument;
+    QPointer<class RundumDialog>     m_rundumDialog;   // Rundum-Lauf (2026-11-08)
     // Betreiber 2026-09-03: "leider funktioniert die Frequenzanzeige
     // nicht im S-Meter" -- die urspruengliche Verdrahtung (buildUI())
     // lief EINMAL gegen die beim Start aktive Scheibe; ein frisches

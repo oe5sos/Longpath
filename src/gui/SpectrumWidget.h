@@ -727,6 +727,12 @@ public:
     bool starteTraegerMessungBei(const QPoint& widgetPos);
     bool starteTraegerMessung(double geraetHz);
     bool traegerMessungLaeuft() const { return m_eichZielHz > 0.0; }
+
+    // ── Bandlage fuer den Rundum-Lauf (2026-11-08) ─────────────────────
+    /// Meldet hoechstens alle 100 ms bandLage(): Rauschboden (Median des
+    /// sichtbaren Ausschnitts), Belegung (mittlerer dB-Ueberschuss ueber
+    /// Boden + 6 dB je Bildpunkt) und die Zahl erkannter Signale.
+    void setBandLageMelden(bool an) { m_bandLageMelden = an; }
     int  passbandMagnifier() const { return m_lupenModus; }
 
     // ── S-Stufen an der dBm-Skala (2026-11-08) ──────────────────────────
@@ -2126,6 +2132,7 @@ signals:
     /// (mit Transverter umgerechnet). Siehe core/FrequenzEichung.h.
     void traegerGemessen(bool gefunden, double geraetHz, double anzeigeHz,
                          float snrDb);
+    void bandLage(float bodenDbm, float belegung, int signale);
     void notchMoveRequested(int id, double newFreqHz);
     void notchWidthRequested(int id, double widthHz);
     /// Emitted when a notch drag ends, so the coalesced DSP push can flush
@@ -2876,6 +2883,9 @@ private:
     int                        m_lupeErster{-1};
     Durchlass::Hoehe           m_lupeHoehe;     // eigener Hoehenmassstab
     double                     m_eichZielHz{0.0};   // Einmessen: Suchmitte (Geraet)
+    bool                       m_bandLageMelden{false};
+    qint64                     m_bandLageZuletztMs{0};
+    void meldeBandLage();
     QVector<double>            m_eichSumme;         // gemittelte Leistung je Bin
     int                        m_eichBilder{0};
     void fuehreEichungNach();

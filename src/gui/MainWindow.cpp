@@ -339,6 +339,7 @@ warren@wpratt.com
 #include "applets/FrequencyApplet.h"
 #include "applets/InstrumentApplet.h"
 #include "TraegerEichDialog.h"
+#include "RundumDialog.h"
 #include "gui/widgets/RasterOverlay.h"
 #include "gui/WindowPlacement.h"
 #include "gui/SideAreaWindow.h"
@@ -13240,6 +13241,16 @@ void MainWindow::buildMenuBar()
             "Open the antenna rotator dial."));
         connect(rotorAction, &QAction::triggered,
                 this, &MainWindow::openRotorDial);
+
+        // Rundum-Lauf (2026-11-08): der Rotor dreht einmal herum, der
+        // Panadapter misst je Richtung Belegung und Rauschboden.
+        QAction* sweepAction = toolsMenu->addAction(QStringLiteral("Rotor &sweep..."));
+        sweepAction->setObjectName(QStringLiteral("actRotorSweep"));
+        sweepAction->setToolTip(QStringLiteral(
+            "Turn the antenna once around and see, per direction, how busy the "
+            "band is and where the noise comes from."));
+        connect(sweepAction, &QAction::triggered,
+                this, &MainWindow::oeffneRundumLauf);
     }
 
     // The channel strip. Next to the voice check because they are two
@@ -21286,6 +21297,29 @@ void MainWindow::checkVaxFirstRun()
     });
 
     dlg->show();
+}
+
+void MainWindow::oeffneRundumLauf()
+{
+    if (m_rundumDialog) {
+        m_rundumDialog->raise();
+        m_rundumDialog->activateWindow();
+        return;
+    }
+    // Gemessen wird am aktiven Panadapter -- dem, den der Betreiber sieht.
+    SpectrumWidget* sw = nullptr;
+    if (m_panStack) {
+        const QString aktiv = m_panStack->activePanId();
+        for (PanadapterApplet* a : m_panStack->allApplets()) {
+            if (!a) { continue; }
+            if (!sw || a->panId() == aktiv) { sw = a->spectrumWidget(); }
+            if (a->panId() == aktiv) { break; }
+        }
+    }
+    auto* d = new RundumDialog(m_radioModel, sw, this);
+    d->setAttribute(Qt::WA_DeleteOnClose);
+    m_rundumDialog = d;
+    d->show();
 }
 
 void MainWindow::zeigeTraegerEichung(bool gefunden, double geraetHz, double anzeigeHz,

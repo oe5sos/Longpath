@@ -3989,6 +3989,7 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     werteDurchlassAus();
     fuehreLupeNach();
     fuehreEichungNach();
+    meldeBandLage();
 
 #ifdef LONGPATH_GPU_SPECTRUM
     // Mode3D: die Bandbreite liegt dort in dieser Schicht
@@ -8216,6 +8217,30 @@ void SpectrumWidget::fuehreEichungNach()
     m_eichBilder = 0;
     emit traegerGemessen(t.gefunden, t.hz, t.gefunden ? rfFuerAnzeige(t.hz) : 0.0,
                          t.snrDb);
+}
+
+void SpectrumWidget::meldeBandLage()
+{
+    if (!m_bandLageMelden) {
+        return;
+    }
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    if (jetzt - m_bandLageZuletztMs < 100) {
+        return;
+    }
+    const int n = m_renderedPixels.size();
+    if (n < 16 || m_bandwidthHz <= 0.0) {
+        return;
+    }
+    m_bandLageZuletztMs = jetzt;
+    const float boden = Durchlass::rauschboden(m_renderedPixels);
+    double ueber = 0.0;
+    for (float v : m_renderedPixels) {
+        ueber += std::max(0.0f, v - (boden + 6.0f));
+    }
+    const int signale = Durchlass::erkenneSignale(
+        m_renderedPixels, m_bandwidthHz / (n - 1), boden).size();
+    emit bandLage(boden, static_cast<float>(ueber / n), signale);
 }
 
 bool SpectrumWidget::lupeSichtbar() const

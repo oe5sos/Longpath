@@ -1141,6 +1141,9 @@ longpath_add_test(tst_s_stufen)
 #   xvtr.cs), Einmessen an einem Traeger (Thetis CalibrateFreq) auf KW und
 #   UKW, und der Korrekturfaktor auch bei P1 (Thetis NetworkIO.cs VFOfreq).
 longpath_add_test(tst_frequenz_eichung)
+# tst_rundum_lauf (2026-11-08): Rotor einmal herum in 30-Grad-Schritten,
+#   Belegung und Rauschboden je 5-Grad-Sektor, Rueckkehr, Abbruch.
+longpath_add_test(tst_rundum_lauf)
 if(TEST tst_transverter_nur_empfang)
     set_tests_properties(tst_transverter_nur_empfang PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")

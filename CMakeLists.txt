@@ -897,6 +897,7 @@ set(GUI_SOURCES
     src/gui/spectrum/Durchlass.cpp
     src/core/SMeterSkala.cpp
     src/core/FrequenzEichung.cpp
+    src/core/RundumLauf.cpp
     src/gui/spectrum/SpectrumAvenger.cpp
     src/gui/DssRenderer.cpp
     src/gui/SpectrumWidget.cpp
@@ -1313,6 +1314,7 @@ set(GUI_SOURCES
     src/gui/applets/RecordingApplet.cpp
     src/gui/RecordingScheduleDialog.cpp
     src/gui/TraegerEichDialog.cpp
+    src/gui/RundumDialog.cpp
     src/gui/applets/BandwidthFilterApplet.cpp
     src/gui/applets/CatApplet.cpp
     src/gui/applets/TunerApplet.cpp
