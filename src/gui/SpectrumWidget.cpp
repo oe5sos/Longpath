@@ -2273,6 +2273,45 @@ void SpectrumWidget::setTraceHalo(bool on)
     update();
 }
 
+// ── Schaerfe-Entwuerfe (2026-11-08) ──────────────────────────────────
+// Alle drei werden (noch) nicht gespeichert: Entwurfsschalter fuer die
+// Blaetter, siehe den Kommentar im Header. Erst wenn der Betreiber eine
+// Fassung waehlt, bekommt sie einen Schluessel und wird zur Vorgabe.
+
+void SpectrumWidget::setWaterfallDevicePixels(bool on)
+{
+    if (m_wfDevicePixels == on) {
+        return;
+    }
+    m_wfDevicePixels = on;
+    // Neue Bildbreite: das Bild verwerfen und beim naechsten Bedarf in
+    // der richtigen Groesse anlegen (stelleWasserfallbildSicher). Der
+    // Verlauf geht dabei verloren, genau wie bei einer Groessenaenderung.
+    m_waterfall = QImage();
+    stelleWasserfallbildSicher();
+    update();
+}
+
+void SpectrumWidget::setGridHairline(bool on)
+{
+    if (m_gridHairline == on) {
+        return;
+    }
+    m_gridHairline = on;
+    markOverlayDirty();
+    update();
+}
+
+void SpectrumWidget::setTraceEdgePx(float px)
+{
+    px = qBound(0.25f, px, 2.0f);
+    if (qFuzzyCompare(m_traceEdgePx, px)) {
+        return;
+    }
+    m_traceEdgePx = px;
+    update();
+}
+
 void SpectrumWidget::setHeatmapEnabled(bool on)
 {
     if (m_heatmapEnabled == on) {
@@ -4114,6 +4153,13 @@ void SpectrumWidget::applyResizeSettled()
 #else
     int wfW = w - effectiveStripW();
 #endif
+    // Schaerfe-Entwurf (2026-11-08): auf Wunsch so viele Spalten, wie der
+    // Schirm Punkte hat -- dieselbe Breite, die updateSpectrumLinear als
+    // displayWidth rechnet. Dann faellt im Wasserfall keine Spalte mehr
+    // zusammen, und die GPU streckt nichts. Die Hoehe bleibt logisch.
+    if (m_wfDevicePixels) {
+        wfW = static_cast<int>(std::lround(wfW * devicePixelRatioF()));
+    }
     // Dieselbe Hoehe, die der Zeichenweg dem Wasserfall gibt (GPU:
     // renderGpuFrame, CPU: paintEvent) -- ueber specHFromHeight, wie dort.
     // Hier stand int(h*(1-frac)) - chrome: auf dem GPU-Weg teilt der die
@@ -4336,8 +4382,32 @@ void SpectrumWidget::drawGrid(QPainter& p, const QRect& specRect)
         return;
     }
 
+    // Schaerfe-Entwurf (2026-11-08), setGridHairline: ein Geraete-Pixel
+    // breit statt eines logischen, und die Lage stetig gerechnet wie die
+    // Kurve (dbmToYf, Frequenz ohne Abschneiden), dann auf die MITTE eines
+    // Geraete-Pixels gelegt -- mit abgeschaltetem Antialiasing faellt die
+    // Linie so genau auf eine Punktreihe. Aus: Wert fuer Wert wie bisher.
+    const qreal gridDpr = devicePixelRatioF();
+    const qreal gridPenW = m_gridHairline ? 1.0 / gridDpr : 1.0;
+    auto aufGeraetepixel = [gridDpr](double logisch) {
+        return (std::floor(logisch * gridDpr) + 0.5) / gridDpr;
+    };
+    auto hzToXf = [this](double hz, const QRect& r) {
+        const double lowHz = m_centerHz - m_bandwidthHz / 2.0;
+        return r.left() + (hz - lowHz) / m_bandwidthHz * r.width();
+    };
+    auto senkrecht = [&](double hz) {
+        if (m_gridHairline) {
+            const qreal x = aufGeraetepixel(hzToXf(hz, specRect));
+            p.drawLine(QLineF(x, specRect.top(), x, specRect.bottom() + 1));
+        } else {
+            const int x = hzToX(hz, specRect);
+            p.drawLine(x, specRect.top(), x, specRect.bottom());
+        }
+    };
+
     // Horizontal dBm grid lines (major).
-    p.setPen(QPen(m_hGridColor, 1));
+    p.setPen(QPen(m_hGridColor, gridPenW));
 
     float bottom = m_refLevel - m_dynamicRange;
     float step = 10.0f;  // 10 dB steps
@@ -4349,12 +4419,17 @@ void SpectrumWidget::drawGrid(QPainter& p, const QRect& specRect)
     }
 
     for (float dbm = bottom + step; dbm < m_refLevel; dbm += step) {
-        int y = dbmToY(dbm, specRect);
-        p.drawLine(specRect.left(), y, specRect.right(), y);
+        if (m_gridHairline) {
+            const qreal y = aufGeraetepixel(dbmToYf(dbm, specRect));
+            p.drawLine(QLineF(specRect.left(), y, specRect.right() + 1, y));
+        } else {
+            int y = dbmToY(dbm, specRect);
+            p.drawLine(specRect.left(), y, specRect.right(), y);
+        }
     }
 
     // Vertical frequency grid lines (major).
-    p.setPen(QPen(m_gridColor, 1));
+    p.setPen(QPen(m_gridColor, gridPenW));
 
     // Compute a nice frequency step
     double freqStep = 10000.0;  // 10 kHz default
@@ -4368,17 +4443,15 @@ void SpectrumWidget::drawGrid(QPainter& p, const QRect& specRect)
 
     double startFreq = std::ceil((m_centerHz - m_bandwidthHz / 2.0) / freqStep) * freqStep;
     for (double f = startFreq; f < m_centerHz + m_bandwidthHz / 2.0; f += freqStep) {
-        int x = hzToX(f, specRect);
-        p.drawLine(x, specRect.top(), x, specRect.bottom());
+        senkrecht(f);
     }
 
     // Fine (minor) vertical grid at 1/5 step. Drawn in m_gridFineColor.
-    p.setPen(QPen(m_gridFineColor, 1, Qt::DotLine));
+    p.setPen(QPen(m_gridFineColor, gridPenW, Qt::DotLine));
     const double fineStep = freqStep / 5.0;
     double startFine = std::ceil((m_centerHz - m_bandwidthHz / 2.0) / fineStep) * fineStep;
     for (double f = startFine; f < m_centerHz + m_bandwidthHz / 2.0; f += fineStep) {
-        int x = hzToX(f, specRect);
-        p.drawLine(x, specRect.top(), x, specRect.bottom());
+        senkrecht(f);
     }
 }
 
@@ -12881,7 +12954,8 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         Kurve::Streifen streifen[Kurve::kStreifenHoechstens];
         const int nStrips = Kurve::baue(m_traceSoftEdge, m_traceHalo,
                                         lineHalfWidthPx, dpr,
-                                        kTraceAlpha, streifen);
+                                        kTraceAlpha, streifen,
+                                        m_traceEdgePx);
         m_lineStripCount = nStrips;
 
         QVector<float> lineVerts(static_cast<qsizetype>(n) * 2 * kFftVertStride * nStrips);
@@ -13029,7 +13103,8 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             Kurve::Streifen pStreifen[Kurve::kStreifenHoechstens];
             const int nPeakStrips = Kurve::baue(m_traceSoftEdge, /*hof*/ false,
                                                 peakHalfWidthPx, dpr,
-                                                kPeakAlpha, pStreifen);
+                                                kPeakAlpha, pStreifen,
+                                                m_traceEdgePx);
             m_peakStripCount = nPeakStrips;
             QVector<float> peakVerts(
                 static_cast<qsizetype>(n) * 2 * kFftVertStride * nPeakStrips);

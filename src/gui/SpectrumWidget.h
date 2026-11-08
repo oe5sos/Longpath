@@ -665,6 +665,35 @@ public:
     void setHeatmapEnabled(bool on);
     bool heatmapEnabled() const { return m_heatmapEnabled; }
 
+    // ── Schaerfe-Entwuerfe (2026-11-08) ─────────────────────────────────
+    //
+    // Betreiber: „was kannst du graphisch beim Panadapter noch verbessern,
+    // auch in Hinsicht auf schaerfere Grafik". Drei Stellschrauben, die
+    // der Zeichenweg bisher fest verdrahtet hatte. ALLE DREI AUS ab Werk:
+    // ohne sie zeichnet der Panadapter Bild fuer Bild wie vorher. Der
+    // Betreiber waehlt an den Entwurfsblaettern (tst_rendering_werkbank,
+    // Varianten s_*), erst danach wird eine davon zur Vorgabe.
+    //
+    // * Wasserfall in Geraete-Pixeln. Das Wasserfallbild war in LOGISCHEN
+    //   Pixeln angelegt (applyResizeSettled), die Kurve darueber rechnet
+    //   seit 2026-08-26 in Geraete-Pixeln. Auf dem Retina-Schirm (dpr 2)
+    //   streckte die GPU jede Wasserfallspalte linear auf zwei Punkte --
+    //   weich, und schmale Traeger bekamen die halbe Aufloesung. Die
+    //   HOEHE bleibt logisch: eine Zeile je Takt, also dieselbe Zeit je
+    //   Bildschirmhoehe wie bisher.
+    void setWaterfallDevicePixels(bool on);
+    bool waterfallDevicePixels() const { return m_wfDevicePixels; }
+    // * Raster als Haarlinie: ein Geraete-Pixel statt eines logischen
+    //   (zwei Punkte auf Retina), und an derselben stetigen Stelle wie
+    //   die Kurve statt auf ganze logische Pixel gerundet.
+    void setGridHairline(bool on);
+    bool gridHairline() const { return m_gridHairline; }
+    // * Auslauf der weichen Kurvenkante in Geraete-Pixeln. Ab Werk 1,0
+    //   (Kurve::kKantePixel); kleiner glaettet nur die Treppe, statt die
+    //   Linie weich zu zeichnen.
+    void setTraceEdgePx(float px);
+    float traceEdgePx() const { return m_traceEdgePx; }
+
     // Display calibration offset added to every bin before it's mapped
     // to screen Y. Ported from Thetis Display.RX1DisplayCalOffset
     // (display.cs:1372). Range: -30 .. +30 dB.
@@ -2751,6 +2780,11 @@ private:
     float       m_lineWidth{1.0f};
     bool        m_traceSoftEdge{true};    // AN ab Werk, siehe setTraceSoftEdge
     bool        m_traceHalo{false};       // AUS ab Werk, siehe setTraceHalo
+    // Schaerfe-Entwuerfe (2026-11-08), siehe setWaterfallDevicePixels.
+    // Vor jedem GPU-#ifdef, weil die Zugriffsmethoden ungeschuetzt sind.
+    bool        m_wfDevicePixels{false};
+    bool        m_gridHairline{false};
+    float       m_traceEdgePx{1.0f};      // = Kurve::kKantePixel
     // Wie viele Streifen im jeweiligen Puffer stehen. Gesetzt beim Bauen
     // der Scheitelpunkte, gelesen beim Zeichnen -- zwei Stellen, eine
     // Zahl, sonst zeichnet die GPU aus einem halb gefuellten Puffer.

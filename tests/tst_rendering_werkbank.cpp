@@ -247,6 +247,50 @@ private slots:
                  w.setTraceSoftEdge(true);
                  w.setTraceHalo(true);
              }},
+            // ── Schaerfe-Entwuerfe (2026-11-08) ─────────────────────────
+            // Betreiber: „was kannst du graphisch beim Panadapter noch
+            // verbessern, auch in Hinsicht auf schaerfere Grafik". Grund
+            // ist DIESMAL sein ganzer Anzeige-Stand: loadSettings() liest
+            // die mit LONGPATH_RENDER_SETTINGS uebernommenen Schluessel
+            // (die Varianten oben setzten nur einzelne Werte von Hand,
+            // loadSettings lief dort nie). Jede Variante aendert genau
+            // EINE Sache gegen s0, s6 nimmt alle zusammen.
+            {QStringLiteral("s0_heute"), [](SpectrumWidget& w) {
+                 w.loadSettings();
+             }},
+            {QStringLiteral("s1_wasserfall_voll"), [](SpectrumWidget& w) {
+                 w.loadSettings();
+                 w.setWaterfallDevicePixels(true);
+             }},
+            {QStringLiteral("s2_wf_detektor_peak"), [](SpectrumWidget& w) {
+                 w.loadSettings();
+                 w.setWaterfallDetector(SpectrumDetector::Peak);
+             }},
+            {QStringLiteral("s3_haarlinien"), [](SpectrumWidget& w) {
+                 w.loadSettings();
+                 w.setGridHairline(true);
+             }},
+            {QStringLiteral("s4_kante_kurz"), [](SpectrumWidget& w) {
+                 w.loadSettings();
+                 w.setTraceEdgePx(0.5f);
+             }},
+            {QStringLiteral("s5_verlauf"), [](SpectrumWidget& w) {
+                 w.loadSettings();
+                 w.setGradientEnabled(true);
+             }},
+            {QStringLiteral("s6_alles"), [](SpectrumWidget& w) {
+                 w.loadSettings();
+                 w.setWaterfallDevicePixels(true);
+                 w.setWaterfallDetector(SpectrumDetector::Peak);
+                 w.setGridHairline(true);
+                 w.setTraceEdgePx(0.5f);
+                 w.setGradientEnabled(true);
+             }},
+            {QStringLiteral("s7_wasserfall_voll_peak"), [](SpectrumWidget& w) {
+                 w.loadSettings();
+                 w.setWaterfallDevicePixels(true);
+                 w.setWaterfallDetector(SpectrumDetector::Peak);
+             }},
         };
 
         for (const Variant& v : variants) {
@@ -258,11 +302,19 @@ private slots:
             w.setFrequencyRange(kCenterHz, kSampleHz);
             w.setVfoFrequency(14111500.0);
             w.setFilterOffset(150, 2850);
+            v.apply(w);
+            // loadSettings (s_*) liest auch die gespeicherte Zoombreite
+            // (DisplayBandwidth) -- die Szene ist 48 kHz breit, also hier
+            // noch einmal setzen, fuer alle Varianten gleich.
+            w.setFrequencyRange(kCenterHz, kSampleHz);
+            // Nach apply: loadSettings (s_*) bringt den Bereich des
+            // Betreibers fuer SEIN Band mit; die Szene liegt aber bei
+            // -135 dBm Rauschen. Bereich und Clarity-Fenster gehoeren zur
+            // Szene, nicht zum Entwurf -- fuer alle Varianten gleich.
             w.setDbmRange(-150.0f, -60.0f);
             // Clarity wie im Betrieb: Fenster Boden-5 .. Boden+55
             w.setClarityActive(true);
             w.setClarityWaterfallThresholds(-140.0f, -80.0f, -135.0f);
-            v.apply(w);
             // LONGPATH_RENDER_HIDDEN=1: waehrend der Einspielung versteckt.
             // Bei schlafendem Bildschirm drosselt macOS ein sichtbares
             // GPU-Fenster auf wenige Bilder/s, der GUI-Thread steht bis
@@ -272,8 +324,12 @@ private slots:
             // =2: erst zeigen (Textur anlegen), dann verstecken -- wie ein
             // schwebendes Panadapter-Fenster, das sich versteckt, solange
             // Longpath nicht die aktive App ist (hidesOnDeactivate).
+            // =3: nie zeigen. QRhiWidget::grabFramebuffer() zeichnet auch
+            // ohne Fenster auf dem Schirm (Qt-Doku) -- dann erscheint auf
+            // dem Bildschirm des Betreibers gar nichts (2026-11-08).
             const int hiddenMode = qEnvironmentVariableIntValue("LONGPATH_RENDER_HIDDEN");
             const bool hidden = hiddenMode != 0;
+            const bool neverShow = hiddenMode == 3;
             if (!hidden || hiddenMode == 2) {
                 w.show();
                 QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
@@ -286,7 +342,12 @@ private slots:
             Scene scene(20260925);
             // ~12 s Verlauf bei 30 Bildern/s, damit der Wasserfall voll ist
             const bool echoProbe = v.id.startsWith(QLatin1String("g_echo"));
-            for (int n = 0; n < 360; ++n) {
+            // LONGPATH_RENDER_FRAMES: mehr Bilder fuellen den Wasserfall
+            // auch bei langsamem Zeilentakt (Betreiber: 101 ms je Zeile).
+            const int frames = qMax(1, qEnvironmentVariableIntValue("LONGPATH_RENDER_FRAMES") > 0
+                                           ? qEnvironmentVariableIntValue("LONGPATH_RENDER_FRAMES")
+                                           : 360);
+            for (int n = 0; n < frames; ++n) {
                 QVector<float> f = scene.frame(n);
                 // Echo-Probe: ein starker Traeger nur in den letzten Bildern.
                 // Oben muss er stehen, an der Unterkante darf er nicht
@@ -298,7 +359,7 @@ private slots:
                 w.updateSpectrumLinear(0, f, 1.0, 0.0);
                 QTest::qWait(33);
             }
-            if (hidden) {
+            if (hidden && !neverShow) {
                 w.show();
                 QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
                 QTest::qWait(300);
