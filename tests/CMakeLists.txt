@@ -1124,6 +1124,16 @@ if(TEST tst_transverter_anzeige)
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
+# Transverter "nur Empfang" (2026-11-08): das SDR an IFo2 darf nicht
+# senden, und der Bandplan-Waechter faengt das nicht (28,300 -> 144,300
+# ist erlaubt). MOX/TUNE ueber die echte MOX-Pruefung, die Flex-Wege und
+# das Kaestchen auf der Seite. Ein Fall liest RadioModel.cpp.
+longpath_add_test(tst_transverter_nur_empfang)
+if(TEST tst_transverter_nur_empfang)
+    set_tests_properties(tst_transverter_nur_empfang PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 # Die Marke im Panadapter: wo sie sitzt (in der ZF) und was daran
 # steht (auf der Antenne) -- zwei Dinge, die man leicht vertauscht.
 longpath_add_test(tst_begleitgeraet_marke)

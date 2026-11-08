@@ -2760,10 +2760,13 @@ void SpectrumWidget::setShowPeakValueOverlay(bool on)
                 const double leftHz   = m_centerHz - m_bandwidthHz / 2.0;
                 const double pxWidth  = (n > 1) ? m_bandwidthHz / (n - 1) : 0.0;
                 const double peakHz   = leftHz + peakPx * pxWidth;
+                // Die Achse ist die ZF, der Text nennt die Antenne: mit
+                // Transverter stand hier bis 2026-11-08 „@ 28.0498 MHz"
+                // unter einem 2-m-Bild. Ohne Transverter die Gleichheit.
                 m_peakTextCache = QStringLiteral("Peak: ")
                     + QString::number(static_cast<double>(peakDbm), 'f', 1)
                     + QStringLiteral(" dBm @ ")
-                    + QString::number(peakHz / 1.0e6, 'f', 4)
+                    + QString::number(rfFuerAnzeige(peakHz) / 1.0e6, 'f', 4)
                     + QStringLiteral(" MHz");
                 markOverlayDirty();
                 update();
@@ -4458,15 +4461,9 @@ void SpectrumWidget::drawGrid(QPainter& p, const QRect& specRect)
     // Vertical frequency grid lines (major).
     p.setPen(QPen(m_gridColor, gridPenW));
 
-    // Compute a nice frequency step
-    double freqStep = 10000.0;  // 10 kHz default
-    if (m_bandwidthHz > 500000.0) {
-        freqStep = 50000.0;
-    } else if (m_bandwidthHz > 100000.0) {
-        freqStep = 25000.0;
-    } else if (m_bandwidthHz < 50000.0) {
-        freqStep = 5000.0;
-    }
+    // Compute a nice frequency step -- dieselbe Regel wie die Skala
+    // darunter, damit Linien und Zahlen uebereinander stehen.
+    const double freqStep = frequenzSchritt(m_bandwidthHz, specRect.width());
 
     double startFreq = std::ceil((m_centerHz - m_bandwidthHz / 2.0) / freqStep) * freqStep;
     for (double f = startFreq; f < m_centerHz + m_bandwidthHz / 2.0; f += freqStep) {
@@ -5490,6 +5487,48 @@ void SpectrumWidget::drawTuneGuide(QPainter& p, const QRect& specRect)
 // jeden Abstand ab 10 kHz -- beim 25-kHz-Raster (Spanne 100..500 kHz, z. B.
 // 192 kHz Abtastrate) stand dann "14.18" an der Marke 14,175 und "14.22" an
 // 14,225: die Skala zeigte Frequenzen, die dort nicht liegen.
+// ── Teilstrich-Abstand der Frequenzachse (2026-11-08) ───────────────
+//
+// Raster und Skala hatten je eine eigene, gleich lautende Treppe:
+// 5 kHz unter 50 kHz Breite, 10 kHz bis 100 kHz, 25 kHz bis 500 kHz,
+// darueber 50 kHz -- und dort hoerte sie auf. Bei 4 MHz (2 m, das ganze
+// Fenster des MV-2 an IFo2) waren das 80 Beschriftungen auf 1130 Punkte,
+// uebereinander gedruckt und unlesbar; der Flex zeigt bis 14 MHz.
+//
+// Die alte Treppe bleibt der Anfang -- bis 500 kHz an einem normal
+// breiten Fenster steht jede Zahl, wo sie stand. Nur wenn die Zahlen
+// enger als kMindestAbstandPx (55) stuenden, geht es auf den naechsten
+// runden Schritt.
+double SpectrumWidget::frequenzSchritt(double bandwidthHz, int breitePx)
+{
+    double step = 25000.0;
+    if (bandwidthHz > 500000.0) {
+        step = 50000.0;
+    } else if (bandwidthHz < 50000.0) {
+        step = 5000.0;
+    } else if (bandwidthHz < 100000.0) {
+        step = 10000.0;
+    }
+    if (bandwidthHz <= 0.0 || breitePx <= 0) {
+        return step;
+    }
+    // 55 Punkte: der engste Abstand, den die alte Treppe selbst ergab
+    // (25 kHz bei 500 kHz Breite auf 1130 Punkte = 56,5) -- dort aendert
+    // sich also nichts. Eine Zahl wie "144.25" ist bei 11 Pixeln gut 40
+    // Punkte breit; es bleibt eine Luecke.
+    constexpr double kMindestAbstandPx = 55.0;
+    static constexpr double kLeiter[] = {
+        5.0e3, 10.0e3, 25.0e3, 50.0e3, 100.0e3, 250.0e3, 500.0e3,
+        1.0e6, 2.5e6, 5.0e6, 10.0e6,
+    };
+    for (double s : kLeiter) {
+        if (s < step) { continue; }
+        step = s;
+        if (breitePx * s / bandwidthHz >= kMindestAbstandPx) { break; }
+    }
+    return step;
+}
+
 QString SpectrumWidget::freqScaleLabel(double hz, double stepHz)
 {
     int decimals = 1;
@@ -5519,14 +5558,7 @@ void SpectrumWidget::drawFreqScale(QPainter& p, const QRect& r)
     // From Thetis display.cs:2003 — grid_text_color (now configurable).
     p.setPen(m_gridTextColor);
 
-    double freqStep = 25000.0;
-    if (m_bandwidthHz > 500000.0) {
-        freqStep = 50000.0;
-    } else if (m_bandwidthHz < 50000.0) {
-        freqStep = 5000.0;
-    } else if (m_bandwidthHz < 100000.0) {
-        freqStep = 10000.0;
-    }
+    const double freqStep = frequenzSchritt(m_bandwidthHz, r.width());
 
     // Phase 3G-8 commit 5: Thetis 5-mode label alignment.
     // Left / Center / Right / Auto (center with fallback) / Off.
@@ -5854,7 +5886,12 @@ void SpectrumWidget::drawBandPlan(QPainter& p, const QRect& specRect)
         if (spot.freqMhz < startMhz || spot.freqMhz > endMhz) {
             continue;
         }
-        const int sx = hzToX(spot.freqMhz * 1.0e6, specRect);
+        // Wie die Abschnitte oben: der Merkpunkt ist eine Antennen-
+        // frequenz, die Achse eine ZF. Bis 2026-11-08 stand hier die
+        // Antennenfrequenz roh -- mit Transverter lag ein 144,300-Punkt
+        // weit rechts ausserhalb eines 28-MHz-Bildes. Es fiel nicht auf,
+        // weil der Plan auf 2 m bis dahin keine Merkpunkte hatte.
+        const int sx = hzToX(zfFuerAchse(spot.freqMhz * 1.0e6), specRect);
         p.drawEllipse(QPoint(sx, bandY + bandH / 2), 4, 4);
     }
     p.setRenderHint(QPainter::Antialiasing, false);
@@ -7854,7 +7891,8 @@ void SpectrumWidget::drawCursorInfo(QPainter& p, const QRect& specRect)
 
     // formatCursorFreq always returns MHz format ("14.2700 MHz") — see its
     // doc comment for why the Hz alternative was retired.
-    QString label = formatCursorFreq(hz);
+    // Antennenfrequenz, nicht ZF (2026-11-08) -- wie die Achse darunter.
+    QString label = formatCursorFreq(rfFuerAnzeige(hz));
 
     QFont font = p.font();
     font.setPixelSize(11);

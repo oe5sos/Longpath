@@ -70,7 +70,20 @@
     {"low": 50.500, "high": 51.000, "label": "ALL", "license": "", "color": "#ffd000"},
     {"low": 51.000, "high": 52.000, "label": "FM/RPT", "license": "", "color": "#ffd000"},
     {"low": 52.000, "high": 54.000, "label": "ALL", "license": "", "color": "#ff8000"},
-    {"low": 144.000, "high": 146.000, "label": "2m", "license": "", "color": "#30b030"}
+    {"low": 144.000, "high": 144.025, "label": "SAT", "license": "", "color": "#9030c0"},
+    {"low": 144.025, "high": 144.100, "label": "CW", "license": "", "color": "#3060ff"},
+    {"low": 144.100, "high": 144.150, "label": "CW/DIGI", "license": "", "color": "#3060ff"},
+    {"low": 144.150, "high": 144.400, "label": "SSB/CW/DIGI", "license": "", "color": "#30b030"},
+    {"low": 144.400, "high": 144.490, "label": "BCN", "license": "", "color": "#00d0d0"},
+    {"low": 144.491, "high": 144.493, "label": "BCN/DIGI", "license": "", "color": "#00d0d0"},
+    {"low": 144.500, "high": 144.794, "label": "ALL", "license": "", "color": "#ff8000"},
+    {"low": 144.794, "high": 144.9625, "label": "DIGI", "license": "", "color": "#c03030"},
+    {"low": 144.975, "high": 145.194, "label": "RPT IN", "license": "", "color": "#ffd000"},
+    {"low": 145.194, "high": 145.206, "label": "SAT", "license": "", "color": "#9030c0"},
+    {"low": 145.206, "high": 145.5625, "label": "FM", "license": "", "color": "#ffd000"},
+    {"low": 145.575, "high": 145.7935, "label": "RPT OUT", "license": "", "color": "#ffd000"},
+    {"low": 145.794, "high": 145.806, "label": "SAT", "license": "", "color": "#9030c0"},
+    {"low": 145.806, "high": 146.000, "label": "SAT", "license": "", "color": "#9030c0"}
   ],
   "spots": [
     {"freq": 1.836, "label": "CW QRP CoA"},
@@ -155,6 +168,15 @@
     {"freq": 50.2936, "label": "WSPR"},
     {"freq": 50.305, "label": "PSK CoA"},
     {"freq": 50.313, "label": "FT8"},
-    {"freq": 50.318, "label": "FT4 / JS8Call"}
+    {"freq": 50.318, "label": "FT4 / JS8Call"},
+    {"freq": 144.050, "label": "CW CoA"},
+    {"freq": 144.100, "label": "Random MS"},
+    {"freq": 144.300, "label": "SSB CoA"},
+    {"freq": 144.500, "label": "Image CoA"},
+    {"freq": 144.600, "label": "Data CoA"},
+    {"freq": 144.750, "label": "ATV talk back"},
+    {"freq": 144.800, "label": "APRS"},
+    {"freq": 145.375, "label": "DV calling"},
+    {"freq": 145.500, "label": "FM calling"}
   ]
 }

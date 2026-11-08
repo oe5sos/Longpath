@@ -33,7 +33,9 @@
 #include <random>
 
 #include "core/AppSettings.h"
+#include "core/TransverterSetup.h"
 #include "gui/SpectrumWidget.h"
+#include "models/BandPlanManager.h"
 
 #include <QFile>
 #include <QXmlStreamReader>
@@ -114,6 +116,102 @@ private:
         }
     }
 
+    std::mt19937 m_rng;
+};
+
+// ── 2-m-Szene fuer das IFo2-Bandbild (2026-11-08) ─────────────────────
+//
+// Betreiber: das SDR an IFo2 des MV-2 als breites Bandbild neben dem
+// TS-590. Die Szene liegt auf der ANTENNE (144 MHz); das Widget sieht,
+// wie im Betrieb, die ZF (28 MHz) und rechnet ueber den Transverter um.
+// Belegung erfunden, aber nach dem IARU-R1-Plan: CW unten, SSB-Gedraenge
+// um 144,300, FT8 bei 144,174 (Gewohnheit, nicht im Plan), Baken ab
+// 144,400, FM-Anruf 145,500, Relais-Ausgaenge ab 145,600.
+class ZweiMeterSzene {
+public:
+    ZweiMeterSzene(double mitteRfHz, double rateHz, int bins, quint32 seed)
+        : m_mitte(mitteRfHz), m_rate(rateHz), m_bins(bins), m_rng(seed) {}
+
+    QVector<float> frame(int n)
+    {
+        QVector<float> b(m_bins);
+        std::exponential_distribution<double> expo(1.0);
+        const double boden = db2p(-135.0);
+        for (int i = 0; i < m_bins; ++i) { b[i] = static_cast<float>(boden * expo(m_rng)); }
+        // LONGPATH_2M_RASTER=1: nur Pruefton alle 250 kHz (-90 dBm), um die
+        // Abbildung Frequenz -> Bildpunkt ueber die ganze Breite zu messen.
+        if (qEnvironmentVariableIntValue("LONGPATH_2M_RASTER") == 1) {
+            for (double f = 144000000.0; f <= 148000000.0; f += 250000.0) { ton(b, f, -90.0); }
+            return b;
+        }
+
+        // CW
+        ton(b, 144050000.0, -96.0);
+        if (((n / 5) % 6) < 4) { ton(b, 144062500.0, -117.0); }
+        if (((n / 3) % 5) < 3) { ton(b, 144083000.0, -112.0); }
+        // FT8 um 144,174 (Takt wie oben)
+        if ((n % 240) < 180) {
+            const double lv[5] = {-112, -118, -109, -121, -115};
+            for (int k = 0; k < 5; ++k) { ton(b, 144174300.0 + k * 420.0, lv[k]); }
+        }
+        // SSB-Gedraenge
+        const double ssb[][2] = {
+            {144195000, -108}, {144210000, -96}, {144226000, -113}, {144241000, -101},
+            {144256000, -110}, {144270000, -90}, {144285000, -104}, {144300000, -82},
+            {144318000, -99},  {144333000, -111}, {144349000, -94}, {144366000, -107},
+            {144381000, -115},
+        };
+        int k = 0;
+        for (const auto& st : ssb) {
+            const bool spricht = std::sin(n * (0.21 + 0.037 * k) + k) > -0.3;
+            if (spricht) { band(b, st[0], 2400.0, st[1]); }
+            ++k;
+        }
+        // Baken
+        const double bake[][2] = {
+            {144408000, -118}, {144418000, -106}, {144425000, -121}, {144437000, -112},
+            {144451000, -116}, {144462000, -109}, {144475000, -120},
+        };
+        for (const auto& bk : bake) { ton(b, bk[0], bk[1]); }
+        // FM: Anruf und Relaisausgaenge (12,5-kHz-Raster), 12 kHz breit
+        if ((n / 40) % 3 != 2) { band(b, 145500000.0 - 6000.0, 12000.0, -88.0); }
+        const double rpt[] = {145600000.0, 145625000.0, 145687500.0, 145737500.0, 145775000.0};
+        int r = 0;
+        for (double f : rpt) {
+            if (((n / 30) + r) % 4 != 0) { band(b, f - 6000.0, 12000.0, -80.0 - 6.0 * r); }
+            ++r;
+        }
+        // APRS-Pakete
+        if ((n % 90) < 8) { band(b, 144800000.0 - 6000.0, 12000.0, -92.0); }
+        return b;
+    }
+
+private:
+    int binFuer(double hz) const
+    {
+        return static_cast<int>(std::lround((hz - m_mitte) / (m_rate / m_bins))) + m_bins / 2;
+    }
+    void ton(QVector<float>& b, double hz, double dbm)
+    {
+        const int c = binFuer(hz);
+        const double w[5] = {db2p(-20), db2p(-6), 1.0, db2p(-6), db2p(-20)};
+        for (int i = -2; i <= 2; ++i) {
+            const int x = c + i;
+            if (x >= 0 && x < m_bins) { b[x] += static_cast<float>(db2p(dbm) * w[i + 2]); }
+        }
+    }
+    void band(QVector<float>& b, double unten, double breite, double dbm)
+    {
+        std::exponential_distribution<double> expo(1.0);
+        const int b0 = binFuer(unten), b1 = std::max(b0 + 1, binFuer(unten + breite));
+        for (int x = b0; x < b1; ++x) {
+            if (x >= 0 && x < m_bins) {
+                b[x] += static_cast<float>(db2p(dbm) * (0.4 + expo(m_rng)));
+            }
+        }
+    }
+    double m_mitte, m_rate;
+    int m_bins;
     std::mt19937 m_rng;
 };
 
@@ -380,6 +478,85 @@ private slots:
             QVERIFY(img.save(path));
             qInfo().noquote() << "geschrieben:" << path << img.size();
         }
+    }
+
+    // Das IFo2-Bandbild (2026-11-08): z1 = Contest-Ausschnitt 144,0-144,5,
+    // z2 = das ganze Fenster des MV-2, 144-148. Senden duerfte das Geraet
+    // dort ohnehin nicht (Region 1 endet bei 146) -- es geht nur ums Bild.
+    void zweiMeter()
+    {
+        const QString dir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+        if (dir.isEmpty()) { QSKIP("LONGPATH_GRAB_DIR nicht gesetzt"); }
+        if (QGuiApplication::platformName() == QLatin1String("offscreen")) {
+            QSKIP("Offscreen-Plattform: kein GPU-Framebuffer.");
+        }
+        QDir().mkpath(dir);
+        const QString settingsFile = qEnvironmentVariable("LONGPATH_RENDER_SETTINGS");
+        if (!settingsFile.isEmpty()) { importDisplaySettings(settingsFile); }
+        const QStringList wanted = qEnvironmentVariable("LONGPATH_RENDER_VARIANTS")
+                                       .split(QLatin1Char(','), Qt::SkipEmptyParts);
+
+        TransverterSetup tv;
+        tv.enabled  = true;
+        tv.ifLowHz  = 28000000;
+        tv.ifHighHz = 32000000;
+        tv.offsetHz = 116000000;
+        TransverterSetup::setCurrent(tv);
+
+        BandPlanManager plaene;
+        plaene.loadPlans();
+        plaene.setActivePlan(QStringLiteral("IARU Region 1"));
+
+        struct Fall { QString id; double mitteRf; double rate; int bins; };
+        const QList<Fall> faelle = {
+            {QStringLiteral("z1_contest_144_0_bis_144_5"), 144250000.0, 500000.0, 16384},
+            {QStringLiteral("z2_voll_144_bis_148"),        146000000.0, 4000000.0, 65536},
+        };
+        for (const Fall& fall : faelle) {
+            if (!wanted.isEmpty() && !wanted.contains(fall.id)) { continue; }
+            SpectrumWidget w;
+            w.resize(1170, 620);
+            w.loadSettings();
+            w.setBandPlanManager(&plaene);
+            w.setBandPlanFontSize(qMax(6, AppSettings::instance()
+                                              .value(QStringLiteral("BandPlanFontSize"), 6).toInt()));
+            const double mitteZf = fall.mitteRf - tv.offsetHz;
+            // VFO ZUERST: ohne CTUN scrollt setVfoFrequency das Bild nach,
+            // sobald der VFO in den aeusseren 10 % steht (Thetis
+            // console.cs:31371). Bei 144-148 tut 144,300 das -- am Geraet
+            // stimmt die Scheibe dann nach, hier gibt es keine, und das Bild
+            // ragte 100 kHz ueber die gelieferten Bins hinaus (gestreckt um
+            // 2,6 %, gemessen 2026-11-08). Erst danach das Fenster setzen.
+            w.setVfoFrequency(144300000.0 - tv.offsetHz);
+            w.setSampleRate(fall.rate);
+            w.setDdcCenterFrequency(mitteZf);
+            w.setFrequencyRange(mitteZf, fall.rate);
+            w.setFilterOffset(150, 2850);
+            w.setCompanionMarker(true, 144300000 - tv.offsetHz, QStringLiteral("TS-590"));
+            w.setDbmRange(-150.0f, -60.0f);
+            w.setClarityActive(true);
+            w.setClarityWaterfallThresholds(-140.0f, -80.0f, -135.0f);
+
+            ZweiMeterSzene szene(fall.mitteRf, fall.rate, fall.bins, 20261108);
+            const int frames = qMax(1, qEnvironmentVariableIntValue("LONGPATH_RENDER_FRAMES") > 0
+                                           ? qEnvironmentVariableIntValue("LONGPATH_RENDER_FRAMES")
+                                           : 360);
+            for (int n = 0; n < frames; ++n) {
+                w.updateSpectrumLinear(0, szene.frame(n), 1.0, 0.0);
+                QTest::qWait(33);
+            }
+            qInfo().noquote() << fall.id << "Mitte" << w.centerFrequency() << "Breite" << w.bandwidth()
+                              << "Rate" << w.sampleRate() << "DDC" << w.ddcCenterFrequency();
+            const QImage img = grabSpectrum(w);
+            if (img.isNull()) {
+                QSKIP("Kein QRhi/GPU-Backend: grabFramebuffer() liefert kein Bild.");
+            }
+            const QString path = dir + QLatin1Char('/') + fall.id + QStringLiteral(".png");
+            QVERIFY(img.save(path));
+            qInfo().noquote() << "geschrieben:" << path << img.size();
+            w.setBandPlanManager(nullptr);
+        }
+        TransverterSetup::setCurrent(TransverterSetup{});
     }
 };
 

@@ -7794,6 +7794,15 @@ bool RadioModel::flexTasten(bool tasten)
         // Jedes einzeln melden: „es sendet nicht" ohne Grund hat am
         // 2026-10-22 einen Abend gekostet, als das Abstimmen still ins
         // Leere lief.
+        //
+        // Davor ein viertes, das nichts mit der Maschine zu tun hat:
+        // haengt sie am Empfangsausgang des Transverters (IFo2), darf sie
+        // gar nicht senden (2026-11-08, TransverterSetup::nurEmpfang).
+        if (TransverterSetup::current().sperrtSenden()) {
+            qCWarning(lcConnection)
+                << "Flex: nicht getastet — Transverter steht auf nur Empfang (IFo2)";
+            return false;
+        }
         if (m_flexSendescheibenId.isEmpty()) {
             qCWarning(lcConnection)
                 << "Flex: nicht getastet — keine Sendescheibe gesetzt";
@@ -7933,6 +7942,13 @@ bool RadioModel::flexAbstimmen(bool an)
         << ", darf senden " << m_flexDarfSenden;
     if (!m_flexConnection || !m_flexConnection->isConnected()) {
         qCWarning(lcConnection) << "Flex: nicht abgestimmt — keine Verbindung";
+        return false;
+    }
+    // Am Empfangsausgang des Transverters ist auch der Abstimmtraeger
+    // Senden (2026-11-08) -- siehe `flexTasten`.
+    if (an && TransverterSetup::current().sperrtSenden()) {
+        qCWarning(lcConnection)
+            << "Flex: nicht abgestimmt — Transverter steht auf nur Empfang (IFo2)";
         return false;
     }
     // Dieselbe Trennung wie beim Tasten: nur ein gehoertes Nein ist
@@ -13037,6 +13053,18 @@ void RadioModel::installBandPlanMoxCheck()
         if (m_lastRadioInfo.protocol == ProtocolVersion::CatRig) {
             return {false, QStringLiteral("%1 transmits at the rig, not from Longpath")
                                .arg(m_lastRadioInfo.name)};
+        }
+        // ── Am Empfangsausgang des Transverters (2026-11-08) ─────────
+        //
+        // Vor der Bandkante, nicht danach: die Bandkante wuerde 28,300
+        // als 144,300 freigeben, und genau das ist hier falsch -- der
+        // Anschluss dieses Geraets haengt an IFo2, einem EMPFANGSausgang.
+        // Siehe TransverterSetup::nurEmpfang.
+        if (TransverterSetup::current().sperrtSenden()) {
+            return {false, QStringLiteral(
+                "Transverter is set to receive only (IFo2): this radio "
+                "feeds the panadapter and must not transmit "
+                "(Setup → Companion rig → Transverter)")};
         }
 
         // ── The guard was reading a key nobody wrote ──────────────────

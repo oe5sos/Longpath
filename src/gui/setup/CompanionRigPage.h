@@ -124,6 +124,7 @@ private:
 
     // Transverter
     QCheckBox*      m_tvEin{nullptr};
+    QCheckBox*      m_tvNurEmpfang{nullptr};
     QComboBox*      m_tvVorgabe{nullptr};
     QDoubleSpinBox* m_tvVon{nullptr};
     QDoubleSpinBox* m_tvBis{nullptr};

@@ -62,8 +62,28 @@ namespace Longpath {
 struct TransverterSetup {
     bool   enabled  {false};
     qint64 ifLowHz  {28000000};
-    qint64 ifHighHz {30000000};
+    qint64 ifHighHz {32000000};    ///< MV-2: 28-32 -> 144-148 (2026-11-08)
     qint64 offsetHz {116000000};   ///< RF = ZF + offsetHz
+
+    // ── Nur Empfang (2026-11-08) ────────────────────────────────────
+    //
+    // Die Station: der TS-590 sendet ueber DRV in den MV-2 (IFi) und
+    // empfaengt an IFo1; Longpaths SDR haengt an IFo2, dem ZWEITEN
+    // Empfangsausgang (MC-1), und zeigt das Band. Sendet dieses SDR,
+    // geht seine Leistung rueckwaerts in einen Empfangsausgang.
+    //
+    // BandPlanGuard schuetzt davor NICHT: er rechnet 28,300 auf 144,300
+    // um, findet 2 m in Region 1 erlaubt und gibt frei. Darum dieser
+    // Schalter. AN ab Werk, weil das die verdrahtete Station ist; wer
+    // das SDR selbst als Treiber an IFi haengt (Flex XVTR), schaltet
+    // ihn ab. Er wirkt nur, solange der Transverter aktiv ist -- ohne
+    // Transverter sendet Longpath wie immer.
+    bool   nurEmpfang {true};
+
+    /// Darf Longpaths Funkgeraet senden? Nein, solange der Transverter
+    /// aktiv ist und auf "nur Empfang" steht -- gleich auf welcher
+    /// Frequenz, denn der Anschluss haengt am Empfangsausgang.
+    bool sperrtSenden() const { return active() && nurEmpfang; }
 
     /// Ist das Fenster brauchbar und der Versatz von Null verschieden?
     bool configured() const
@@ -121,7 +141,8 @@ struct TransverterSetup {
 
     // ── Einstellungen ───────────────────────────────────────────────
     //
-    // Schluessel: Transverter/Enabled, /IfLowHz, /IfHighHz, /OffsetHz.
+    // Schluessel: Transverter/Enabled, /IfLowHz, /IfHighHz, /OffsetHz,
+    // /RxOnly (nurEmpfang, 2026-11-08).
     static TransverterSetup load();
     void save() const;
 

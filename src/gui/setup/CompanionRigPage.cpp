@@ -364,6 +364,22 @@ void CompanionRigPage::baueTransverterGruppe()
         "with this on and you still see 14 MHz."));
     grid->addWidget(m_tvEin, row++, 0, 1, 2);
 
+    // Nur Empfang (2026-11-08): siehe TransverterSetup::nurEmpfang.
+    m_tvNurEmpfang = new QCheckBox(
+        QStringLiteral("Receive only — this radio is on the transverter's "
+                       "second IF output (IFo2)"), group);
+    m_tvNurEmpfang->setObjectName(QStringLiteral("transverterRxOnly"));
+    m_tvNurEmpfang->setStyleSheet(QString::fromLatin1(Style::kCheckBoxStyle));
+    m_tvNurEmpfang->setChecked(m_tv.nurEmpfang);
+    m_tvNurEmpfang->setToolTip(QStringLiteral(
+        "On: while the transverter is on, Longpath never keys this radio — "
+        "MOX, TUNE and every digital mode are refused. Its antenna socket is "
+        "wired to a receive output; transmitting would drive power into it. "
+        "The band plan cannot catch this, because 28.300 MHz converts to a "
+        "legal 144.300 MHz. Turn it off only if this radio drives the "
+        "transverter's IF input itself."));
+    grid->addWidget(m_tvNurEmpfang, row++, 0, 1, 2);
+
     auto* vorgabeLabel = new QLabel(QStringLiteral("Preset:"), group);
     vorgabeLabel->setStyleSheet(
         QString::fromLatin1(Style::kSecondaryLabelStyle));
@@ -438,6 +454,11 @@ void CompanionRigPage::baueTransverterGruppe()
         m_tv.enabled = on;
         speichereTransverter();
     });
+    connect(m_tvNurEmpfang, &QCheckBox::toggled, this, [this](bool on) {
+        if (m_fuellt) { return; }
+        m_tv.nurEmpfang = on;
+        speichereTransverter();
+    });
     connect(m_tvVorgabe, &QComboBox::currentIndexChanged, this, [this](int) {
         if (m_fuellt) { return; }
         const int i = m_tvVorgabe->currentData().toInt();
@@ -474,6 +495,7 @@ void CompanionRigPage::zeigeTransverter()
 {
     m_fuellt = true;
     m_tvEin->setChecked(m_tv.enabled);
+    m_tvNurEmpfang->setChecked(m_tv.nurEmpfang);
     m_tvVon->setValue(static_cast<double>(m_tv.ifLowHz) / 1e6);
     m_tvBis->setValue(static_cast<double>(m_tv.ifHighHz) / 1e6);
     m_tvVersatz->setValue(static_cast<double>(m_tv.offsetHz) / 1e6);

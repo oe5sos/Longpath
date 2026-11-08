@@ -1734,6 +1734,9 @@ public:
     }
     double rfFuerAnzeigeForTest(double ifHz) const { return rfFuerAnzeige(ifHz); }
     double zfFuerAchseForTest(double rfHz)  const { return zfFuerAchse(rfHz); }
+    static double frequenzSchrittForTest(double bandwidthHz, int breitePx) {
+        return frequenzSchritt(bandwidthHz, breitePx);
+    }
     static QString freqScaleLabelForTest(double hz, double stepHz) {
         return freqScaleLabel(hz, stepHz);
     }
@@ -2495,6 +2498,8 @@ public:
     // Beschriftung einer Frequenzmarke (MHz) mit den Nachkommastellen, die
     // der Markenabstand stepHz braucht (25 kHz -> 3, 50 kHz -> 2, 100 kHz -> 1).
     static QString freqScaleLabel(double hz, double stepHz);
+    /// Teilstrich-Abstand fuer Raster und Skala (2026-11-08), siehe .cpp.
+    static double frequenzSchritt(double bandwidthHz, int breitePx);
     /// Der Wert fuer Wasserfall-Zeilenpunkt x, wenn `scale` Quellpunkte
     /// (Geraete-Pixel der Pipeline) auf einen Zeilenpunkt (logisches
     /// Pixel) fallen -- auf Retina zwei --, zusammengefasst nach der Regel

@@ -43,12 +43,19 @@ QString TransverterSetup::describe() const
 
 QVector<TransverterSetup::Preset> TransverterSetup::presets()
 {
-    // Die ZF-Fenster sind 2 MHz breit, weil die Transverter so gebaut
-    // sind: der MV-2 mischt 144-148 auf 28-32, die 70-cm- und
-    // 23-cm-Geraete ebenso in 2- bis 4-MHz-Scheiben. Wer eine andere
-    // ZF hat, stellt die drei Zahlen von Hand ein.
+    // Die ZF-Fenster folgen dem, was die Transverter mischen: der MV-2
+    // 144-148 auf 28-32 (HA1YA, mv2_doku.pdf: „IF 28-32 MHz, RF 144-148
+    // MHz"), die 70-cm- und 23-cm-Geraete in 2- bis 4-MHz-Scheiben. Wer
+    // eine andere ZF hat, stellt die drei Zahlen von Hand ein.
+    //
+    // 2 m war bis 2026-11-08 nur 28-30 (= 144-146). Betreiber: „koennen
+    // wir auch 144-148 machen" -- „der Konverter kann es". Das Fenster
+    // bestimmt, was die Achse UMRECHNET (Anzeige, Empfang, Spots). Ob
+    // gesendet werden darf, entscheidet es NICHT: BandPlanGuard prueft
+    // die Antennenfrequenz gegen die Region, und Region 1 endet bei
+    // 146 MHz (kRegion1BandRanges, Band2m).
     return {
-        {"2 m (144 MHz) from 28 MHz IF",    28000000, 30000000,  116000000},
+        {"2 m (144 MHz) from 28 MHz IF",    28000000, 32000000,  116000000},
         {"2 m (144 MHz) from 14 MHz IF",    14000000, 16000000,  130000000},
         {"70 cm (432 MHz) from 28 MHz IF",  28000000, 30000000,  404000000},
         {"23 cm (1296 MHz) from 28 MHz IF", 28000000, 30000000, 1268000000},
@@ -75,6 +82,10 @@ TransverterSetup TransverterSetup::load()
                          QVariant::fromValue<qint64>(t.ifHighHz)).toLongLong();
     t.offsetHz = s.value(QStringLiteral("Transverter/OffsetHz"),
                          QVariant::fromValue<qint64>(t.offsetHz)).toLongLong();
+    // Fehlt der Schluessel, gilt die sichere Seite: nur Empfang.
+    t.nurEmpfang = s.value(QStringLiteral("Transverter/RxOnly"),
+                           QStringLiteral("True")).toString()
+                   == QStringLiteral("True");
     return t;
 }
 
@@ -86,6 +97,8 @@ void TransverterSetup::save() const
     s.setValue(QStringLiteral("Transverter/IfLowHz"),  QVariant::fromValue(ifLowHz));
     s.setValue(QStringLiteral("Transverter/IfHighHz"), QVariant::fromValue(ifHighHz));
     s.setValue(QStringLiteral("Transverter/OffsetHz"), QVariant::fromValue(offsetHz));
+    s.setValue(QStringLiteral("Transverter/RxOnly"),
+               nurEmpfang ? QStringLiteral("True") : QStringLiteral("False"));
 }
 
 // ── Die prozessweite Fassung ────────────────────────────────────────
