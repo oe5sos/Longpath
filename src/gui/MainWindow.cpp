@@ -19854,6 +19854,13 @@ void MainWindow::fuelleContestPanelMenu(QMenu* menu)
             contestPanelAlsFenster(e.id);
         }
     });
+    QAction* bereit = menu->addAction(tr("Start check (ready?)..."));
+    bereit->setObjectName(QStringLiteral("actContestStartcheck"));
+    bereit->setToolTip(tr("Callsign, contest, CAT, transverter, rotor, clock, backup stick"));
+    bereit->setEnabled(m_contestFenster && m_contestFenster->istOffen());
+    connect(bereit, &QAction::triggered, this, [this]() {
+        if (m_contestFenster) { m_contestFenster->zeigeStartcheck(); }
+    });
     QAction* zurueck = menu->addAction(tr("All panels back into the logbook"));
     zurueck->setObjectName(QStringLiteral("actContestPanelsZurueck"));
     zurueck->setEnabled(m_contestFenster && m_contestFenster->istOffen());

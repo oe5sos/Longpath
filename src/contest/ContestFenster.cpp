@@ -123,6 +123,7 @@ struct ContestFenster::Innen {
     std::unique_ptr<Contestprogramm::SingleInstanceGuard> wache;
     std::unique_ptr<Contestprogramm::AppController>       steuerung;
     QPointer<Contestprogramm::MainWindow>                 fenster;
+    QPointer<QWidget>                                     startcheck;
     QPointer<LogbuchKreuz>                                kreuz;
 };
 
@@ -552,6 +553,18 @@ void ContestFenster::schliesse()
     m_innen->steuerung.reset();
     if (m_innen->wache) { m_innen->wache->release(); }
     m_innen->wache.reset();
+}
+
+bool ContestFenster::zeigeStartcheck()
+{
+    if (!m_innen->fenster) { return false; }
+    m_innen->startcheck = m_innen->fenster->zeigeStartcheck(m_innen->kreuz != nullptr);
+    return m_innen->startcheck != nullptr;
+}
+
+QWidget* ContestFenster::startcheckForTest() const
+{
+    return m_innen->startcheck;
 }
 
 bool ContestFenster::istOffen() const

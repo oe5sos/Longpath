@@ -77,6 +77,25 @@ private slots:
         fenster.schliesse();
     }
 
+    // Der Startcheck nennt den fehlenden Stick -- und er ist von Longpath aus
+    // zu oeffnen, obwohl das Menue des Logbuchs dort fehlt.
+    void derStartcheckGehtAuf()
+    {
+        QTemporaryDir ordner;
+        QVERIFY(ordner.isValid());
+        qputenv("CONTESTPROGRAMM_DATA_DIR", ordner.path().toUtf8());
+        QVERIFY(belegeLogVor(ordner.path(), QStringLiteral("/Volumes/gibt-es-nicht-4711/x")));
+
+        ContestFenster fenster;
+        QString grund;
+        QVERIFY2(fenster.oeffne(&grund), qPrintable(grund));
+        QVERIFY(fenster.zeigeStartcheck());
+        QWidget* bereit = fenster.startcheckForTest();
+        QVERIFY(bereit);
+        QTRY_VERIFY_WITH_TIMEOUT(bereit->isVisible(), 5000);
+        fenster.schliesse();
+    }
+
     void mitStickBleibtEsStill()
     {
         QTemporaryDir ordner;

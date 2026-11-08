@@ -146,6 +146,11 @@ public:
 
     bool istOffen() const;
 
+    /// Der Startcheck des Logbuchs („bereit?"). Sein Menue gibt es in
+    /// Longpath nicht. false, wenn das Logbuch nicht offen ist.
+    bool zeigeStartcheck();
+    QWidget* startcheckForTest() const;
+
     // Das offene Logbuch-Fenster oder nullptr -- fuer den Wirt, der es beim
     // Minimieren mit ins Dock nimmt (MainWindow::legeSchwebendeFensterInsDock).
     QWidget* fenster() const;
