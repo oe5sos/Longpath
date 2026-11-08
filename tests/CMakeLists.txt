@@ -1842,6 +1842,8 @@ longpath_add_test(tst_alex_controller)
 # persisted antenna, and !caps.hasAlex writes zero routing (Thetis SetAntBits
 # parity). Uses LONGPATH_BUILD_TESTS hooks on RadioModel for injection/simulation.
 longpath_add_test(tst_antenna_routing_model)
+
+longpath_add_test(tst_antenne_je_band_zweite_ablage)
 target_compile_definitions(tst_antenna_routing_model PRIVATE LONGPATH_BUILD_TESTS)
 
 # Smoke test for Antenna Control sub-sub-tab UI (Phase 3P-F Task 3):

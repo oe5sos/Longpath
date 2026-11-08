@@ -2919,8 +2919,26 @@ void SliceModel::saveToSettings(Band band)
     }
     s.setValue(sp + QStringLiteral("AfGain"),     m_afGain);
     s.setValue(sp + QStringLiteral("RfGain"),     m_rfGain);
-    s.setValue(sp + QStringLiteral("RxAntenna"),  m_rxAntenna);
-    s.setValue(sp + QStringLiteral("TxAntenna"),  m_txAntenna);
+    // ── KEINE zweite Antennenablage (2026-11-08) ─────────────────────
+    //
+    // Hier standen `RxAntenna` und `TxAntenna` unter `Slice<N>/` — also
+    // OHNE Band, waehrend die Antennen je Band in der Alex-Tabelle
+    // liegen (`hardware/<mac>/alex/antenna/<band>/…`). Zwei Ablagen fuer
+    // dieselbe Sache, und die bandlose gewann beim Wiederherstellen: die
+    // Scheibe trug danach die Antenne des zuletzt benutzten Bandes,
+    // waehrend die Maschine die des aktuellen Bandes geschaltet hatte.
+    // Am 2026-11-08 im Prueflauf festgehalten
+    // (tst_antenne_je_band_zweite_ablage): Scheibe „ANT3", Tabelle 40 m
+    // „ANT2" — die Anzeige behauptete etwas anderes als der Draht tat.
+    //
+    // NereusSDRs CLAUDE.md sagt es seit dem 2026-10-25 ausdruecklich:
+    // die Alex-Tabelle ist „the only antenna store; slices take their
+    // labels from it". Genau so ist es jetzt: beim Wiederherstellen
+    // setzt `RadioModel::loadSliceState` die Beschriftung aus der
+    // Tabelle (`refreshAntennasFromAlex`).
+    //
+    // Alte Schluessel bleiben in der Einstellungsdatei liegen und werden
+    // nicht mehr gelesen; sie schaden nicht.
 
     // Track the most recently saved band so RadioModel::loadSliceState() on
     // the next launch can land on the user's actual last-used frequency,
@@ -3375,12 +3393,9 @@ void SliceModel::restoreFromSettings(Band band)
     if (s.contains(sp + QStringLiteral("RfGain"))) {
         setRfGain(s.value(sp + QStringLiteral("RfGain")).toInt());
     }
-    if (s.contains(sp + QStringLiteral("RxAntenna"))) {
-        setRxAntenna(s.value(sp + QStringLiteral("RxAntenna")).toString());
-    }
-    if (s.contains(sp + QStringLiteral("TxAntenna"))) {
-        setTxAntenna(s.value(sp + QStringLiteral("TxAntenna")).toString());
-    }
+    // Die Antennen kommen NICHT von hier, sondern aus der Alex-Tabelle
+    // je Band — siehe den Block in `saveToSettings`. `loadSliceState`
+    // setzt sie direkt nach diesem Aufruf.
 }
 
 // One-shot migration of the legacy flat key format (VfoFrequency, VfoDspMode,
@@ -3435,14 +3450,11 @@ void SliceModel::migrateLegacyKeys()
         s.setValue(sp + QStringLiteral("RfGain"),
                    s.value(QStringLiteral("VfoRfGain")));
     }
-    if (s.contains(QStringLiteral("VfoRxAntenna"))) {
-        s.setValue(sp + QStringLiteral("RxAntenna"),
-                   s.value(QStringLiteral("VfoRxAntenna")));
-    }
-    if (s.contains(QStringLiteral("VfoTxAntenna"))) {
-        s.setValue(sp + QStringLiteral("TxAntenna"),
-                   s.value(QStringLiteral("VfoTxAntenna")));
-    }
+    // `VfoRxAntenna` / `VfoTxAntenna` werden NICHT mehr umgezogen: ihr
+    // Ziel (`Slice<N>/RxAntenna`) wird seit dem 2026-11-08 nicht mehr
+    // gelesen — die Antenne steht je Band in der Alex-Tabelle. Ein
+    // Umzug in einen toten Schluessel waere Arbeit ohne Wirkung. Die
+    // alten Schluessel werden unten wie alle anderen entfernt.
 
     // Remove all legacy flat keys.
     s.remove(QStringLiteral("VfoFrequency"));

@@ -14816,6 +14816,25 @@ void RadioModel::loadSliceState(SliceModel* slice)
     slice->restoreFromSettings(currentBand);
     // Beim Hochfahren dieselbe Regel wie beim Banddruck — siehe
     // onBandButtonClicked.
+    // ── Die Antenne kommt aus der Tabelle, nicht aus der Scheibe ─────
+    //
+    // `restoreFromSettings` traegt alles Bandbezogene ein; die Antenne
+    // gehoert nicht dazu, sie steht je Band in der Alex-Tabelle
+    // (`hardware/<mac>/alex/antenna/<band>/…`). Bis zum 2026-11-08 gab
+    // es daneben eine zweite, BANDLOSE Ablage in der Scheibe, und die
+    // gewann hier: die Anzeige trug danach die Antenne des zuletzt
+    // benutzten Bandes, waehrend die Maschine die des aktuellen
+    // geschaltet hatte. Jetzt setzt die Tabelle die Beschriftung —
+    // derselbe Weg wie beim Bandwechsel (T13, der Rueckweg in
+    // `AlexController::antennaChanged`).
+    //
+    // Nur mit Alex: eine Maschine ohne Antennenweiche (HL2, SunSDR) hat
+    // keine Tabelle, aus der sich etwas holen liesze.
+    if (boardCapabilities().hasAlex) {
+        const SkuUiProfile sku = skuUiProfileFor(m_hardwareProfile.model);
+        slice->refreshAntennasFromAlex(m_alexController, currentBand, &sku);
+    }
+
     richteSeitenbandAus(slice, currentBand);
 
     // Capture the restored rate for the post-bind re-apply (2026-08-12,
