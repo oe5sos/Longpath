@@ -2436,6 +2436,7 @@ void SpectrumWidget::setPassbandMagnifier(int modus)
     m_lupenModus = modus;
     m_lupeGlatt.clear();
     m_lupeErster = -1;
+    m_lupeHoeheDa = false;
     scheduleSettingsSave();
 #ifdef LONGPATH_GPU_SPECTRUM
     m_overlayDynamicDirty = true;
@@ -8161,6 +8162,9 @@ void SpectrumWidget::fuehreLupeNach()
             10.0 * std::log10(skala * m_fullLinearBins[b.erster + k] + 1.0e-30));
         m_lupeGlatt[k] = neu ? roh : 0.85f * m_lupeGlatt[k] + 0.15f * roh;
     }
+    const Durchlass::Hoehe ziel = Durchlass::lupenHoehe(m_lupeGlatt);
+    m_lupeHoehe = (neu || !m_lupeHoeheDa) ? ziel : Durchlass::fuehreNach(m_lupeHoehe, ziel);
+    m_lupeHoeheDa = true;
 }
 
 bool SpectrumWidget::lupeSichtbar() const
@@ -8378,12 +8382,25 @@ void SpectrumWidget::paintDurchlassLupe(QPainter& p, const QRect& specRect)
     auto xVon = [&](double hz) {
         return flaeche.left() + (hz - von) / (bis - von) * flaeche.width();
     };
-    const float unterkante = m_refLevel - m_dynamicRange;
-    const float verschieb  = m_dbmCalOffset + normalizeShiftDb();
+    // Eigener Hoehenmassstab (Durchlass::lupenHoehe), nicht der des
+    // Hauptbilds -- dort waren die Ausschlaege kaum zu sehen.
+    const float boden  = m_lupeHoehe.unten;
+    const float spanne = std::max(1.0f, m_lupeHoehe.oben - m_lupeHoehe.unten);
     auto yVon = [&](float dbm) {
-        const float frac = qBound(0.0f, (dbm + verschieb - unterkante) / m_dynamicRange, 1.0f);
+        const float frac = qBound(0.0f, (dbm - boden) / spanne, 1.0f);
         return flaeche.bottom() - frac * flaeche.height();
     };
+    // Alle 10 dB eine feine Linie, auf runden Werten der Anzeige
+    // (mit Kalibrierversatz), damit die Hoehe ablesbar bleibt.
+    {
+        const float verschieb = m_dbmCalOffset + normalizeShiftDb();
+        p.setPen(QPen(m_gridFineColor, 1.0));
+        for (float a = std::ceil((boden + verschieb) / 10.0f) * 10.0f;
+             a < boden + verschieb + spanne; a += 10.0f) {
+            const qreal y = yVon(a - verschieb);
+            p.drawLine(QPointF(flaeche.left(), y), QPointF(flaeche.right(), y));
+        }
+    }
 
     // Durchlass und VFO wie im Hauptbild (dieselbe Farbe des Betreibers).
     const qreal xa = xVon(m_vfoHz + std::min(m_filterLowHz, m_filterHighHz));

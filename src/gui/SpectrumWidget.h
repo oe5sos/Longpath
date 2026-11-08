@@ -747,6 +747,8 @@ public:
     bool magnifierVisibleForTest() const { return lupeSichtbar(); }
     /// Die Lupe in dBm je Bin, wie sie gezeichnet wuerde (geglaettet).
     QVector<float> magnifierBinsForTest() const { return m_lupeGlatt; }
+    QPair<float, float> magnifierRangeForTest() const
+    { return {m_lupeHoehe.unten, m_lupeHoehe.oben}; }
     /// Klammern, Luecken und Lupe in ein Bild malen. Im Pruefstand gibt es
     /// keine GPU -- und ohne Malen keine Klickflaechen der Luecken.
     QImage paintPassbandOverlaysForTest();
@@ -2856,6 +2858,8 @@ private:
     QVector<QPair<QRectF, double>> m_lueckenKlick;   // Flaeche, ZF in Hz
     QVector<float>             m_lupeGlatt;
     int                        m_lupeErster{-1};
+    Durchlass::Hoehe           m_lupeHoehe;     // eigener Hoehenmassstab
+    bool                       m_lupeHoeheDa{false};
     bool                       m_sStufenSkala{false};   // S-Stufen statt dBm
     // Schaerfe (2026-11-08), siehe setWaterfallDevicePixels. AN ab Werk.
     // Vor jedem GPU-#ifdef, weil die Zugriffsmethoden ungeschuetzt sind.

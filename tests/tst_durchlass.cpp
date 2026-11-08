@@ -117,6 +117,24 @@ private slots:
         QCOMPARE(bandplanTextX(0, 30, 40, {}), -1);     // passt gar nicht
     }
 
+    // Eigener Hoehenmassstab: Boden unten, Spitze oben, mindestens 30 dB.
+    void dieLupeHatIhreEigeneHoehe()
+    {
+        QVector<float> v = rauschen(200);          // Boden -135 dBm
+        setze(v, 90, 110, -105.0f);                // 30 dB darueber
+        const Hoehe h = lupenHoehe(v);
+        QVERIFY(std::abs(h.unten - (-135.0f - kLupeUnterBodenDb)) <= 1.0f);
+        QVERIFY(std::abs(h.oben - (-105.0f + kLupeUeberSpitzeDb)) <= 0.01f);
+        // Reines Rauschen wird nicht aufgeblaeht.
+        const Hoehe r = lupenHoehe(rauschen(200));
+        QVERIFY(r.oben - r.unten >= kLupeMindestDb - 0.01f);
+        // Nachfuehren: nach oben schnell, nach unten langsam.
+        Hoehe hoch = fuehreNach(r, h);
+        QVERIFY(hoch.oben - r.oben >= 0.5f * (h.oben - r.oben) - 0.01f);
+        Hoehe runter = fuehreNach(h, r);
+        QVERIFY(h.oben - runter.oben <= 0.06f * (h.oben - r.oben) + 0.01f);
+    }
+
     void dieLupeNimmtDieRichtigenBins()
     {
         const BinBereich b = lupenBins(4096, 10.0, 0.0, 1000.0, 2000.0);

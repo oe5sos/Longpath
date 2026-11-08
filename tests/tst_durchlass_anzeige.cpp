@@ -16,6 +16,8 @@
 // QTest::mouseClick verpufft ohne echten Schirm -- darum sendEvent.
 
 #include <QtTest/QtTest>
+
+#include <algorithm>
 #include <QApplication>
 #include <QMenu>
 #include <QMouseEvent>
@@ -252,6 +254,25 @@ private slots:
         w.setPassbandMagnifier(2);
         QCOMPARE(w.passbandMagnifier(), 1);
         QVERIFY(w.magnifierVisibleForTest());
+    }
+
+    // "sehr minimal die ausschlaege" (Betreiber 2026-11-08): ein Signal
+    // 35 dB ueber dem Rauschen steht in der Lupe oben, auch wenn das
+    // Hauptbild 180 dB hoch ist.
+    void dieAusschlaegeFuellenDieLupe()
+    {
+        SpectrumWidget w;
+        einstellen(w, 192000.0);
+        w.setDbmRange(-150.0f, 30.0f);              // 180 dB wie beim Betreiber
+        fuettern(w, szene(192000.0, kMitte, {{14110000.0, -100.0}}));
+        QVERIFY(w.magnifierVisibleForTest());
+        const QVector<float> b = w.magnifierBinsForTest();
+        QVERIFY(!b.isEmpty());
+        const float spitze = *std::max_element(b.cbegin(), b.cend());
+        const QPair<float, float> h = w.magnifierRangeForTest();
+        const float stelle = (spitze - h.first) / (h.second - h.first);
+        QVERIFY2(stelle > 0.8f,
+                 qPrintable(QStringLiteral("die Spitze steht bei %1 der Hoehe").arg(stelle)));
     }
 
     void dieVierHakenImZahnrad()

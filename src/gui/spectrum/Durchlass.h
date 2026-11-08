@@ -140,6 +140,28 @@ struct BinBereich {
 BinBereich lupenBins(int binZahl, double binHz, double fftUntenHz,
                      double vonHz, double bisHz);
 
+/// Hoehenmassstab der Lupe (2026-11-08). Bis dahin zeichnete sie mit
+/// dem des Hauptbilds -- beim Betreiber rund 180 dB, und ein Signal
+/// 20 dB ueber dem Rauschen fuellte gut ein Zehntel der Hoehe ("sehr
+/// minimal die ausschlaege"). Jetzt: unten knapp unter dem Rauschboden,
+/// oben knapp ueber der staerksten Stelle, mindestens 30 dB -- sonst
+/// blaeht sie reines Rauschen zu Bergen auf.
+struct Hoehe {
+    float unten{0.0f};
+    float oben{0.0f};
+};
+inline constexpr float kLupeUnterBodenDb  = 6.0f;
+inline constexpr float kLupeUeberSpitzeDb = 4.0f;
+inline constexpr float kLupeMindestDb     = 30.0f;
+
+/// Der Massstab fuer diese Werte (dBm je Bin).
+Hoehe lupenHoehe(const QVector<float>& dbm);
+
+/// Nachfuehren je Bild: nach oben schnell (ein neues Signal steht
+/// sofort im Bild), nach unten langsam (keine pumpende Kurve, wenn
+/// eine SSB-Station Pausen macht).
+Hoehe fuehreNach(const Hoehe& alt, const Hoehe& ziel);
+
 // ── Bandplan-Streifen: Beschriftung und Merkpunkte (2026-11-08) ──────
 
 /// Linke Kante einer Abschnittsbeschriftung der Breite `textW` im

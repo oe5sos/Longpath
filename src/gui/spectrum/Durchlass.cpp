@@ -189,6 +189,27 @@ BinBereich lupenBins(int binZahl, double binHz, double fftUntenHz,
     return b;
 }
 
+Hoehe lupenHoehe(const QVector<float>& dbm)
+{
+    Hoehe h;
+    if (dbm.isEmpty()) { return h; }
+    const float boden  = rauschboden(dbm);
+    const float spitze = *std::max_element(dbm.cbegin(), dbm.cend());
+    h.unten = boden - kLupeUnterBodenDb;
+    h.oben  = std::max(spitze + kLupeUeberSpitzeDb, h.unten + kLupeMindestDb);
+    return h;
+}
+
+Hoehe fuehreNach(const Hoehe& alt, const Hoehe& ziel)
+{
+    Hoehe h;
+    h.unten = alt.unten + 0.10f * (ziel.unten - alt.unten);
+    const float k = (ziel.oben > alt.oben) ? 0.50f : 0.05f;
+    h.oben = alt.oben + k * (ziel.oben - alt.oben);
+    h.oben = std::max(h.oben, h.unten + kLupeMindestDb);
+    return h;
+}
+
 int bandplanTextX(int x1, int x2, int textW, const QVector<int>& punkte, int frei)
 {
     const int kandidaten[3] = {(x1 + x2 - textW) / 2, x1 + 4, x2 - 4 - textW};
