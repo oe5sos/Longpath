@@ -1152,6 +1152,13 @@ longpath_add_test(tst_rotor_bereich)
 #   Logbuch-Ideen aus einer Logbuch-Kopie (LONGPATH_LOGBOOK_FIXTURE +
 #   LONGPATH_GRAB_DIR); ohne beide uebersprungen.
 longpath_add_test(tst_logbuch_blaetter)
+# tst_logbuch_bilder (2026-11-08): Bedarfs-Matrix, Band x Stunde und
+#   Richtungsrose -- Rechnung und Einbindung ins Logbuch-Fenster.
+longpath_add_test(tst_logbuch_bilder)
+if(TEST tst_logbuch_bilder)
+    set_tests_properties(tst_logbuch_bilder PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 if(TEST tst_transverter_nur_empfang)
     set_tests_properties(tst_transverter_nur_empfang PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")

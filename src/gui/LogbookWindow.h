@@ -60,6 +60,7 @@ class QMoveEvent;
 class QPushButton;
 class QResizeEvent;
 class QSplitter;
+class QStackedWidget;
 class QTableWidget;
 class QTimer;
 class QVBoxLayout;
@@ -333,6 +334,14 @@ private:
     // Numbers about the filtered view: per band, per mode, per year,
     // unique calls and squares, furthest DX. (2026-08-10)
     void showStatistics();
+public:
+    /// Fuer Pruefstaende: die drei Logbuch-Bilder.
+    class BedarfsMatrixWidget* bedarfForTest() const { return m_bedarf; }
+    void aktualisiereBedarfForTest() { aktualisiereBedarf(); }
+    class BandStundeWidget* bandStundeForTest() const { return m_bandStunde; }
+    class RichtungsRoseWidget* roseForTest() const { return m_rose; }
+    void zeigeStatistikSeiteForTest(int seite) { zeigeStatistikSeite(seite); }
+private:
     // Send these records. With rows marked in the table it is those;
     // with none marked it is everything not yet uploaded, which is the
     // question an operator actually has after a session.
@@ -381,6 +390,20 @@ private:
     QPushButton*  m_entryLogBtn{nullptr};
     QLabel*       m_entryHint{nullptr};
     QTimer*       m_entryLookup{nullptr};
+    // Bedarfs-Matrix unter der Eingabezeile (2026-11-08).
+    class BedarfsMatrixWidget* m_bedarf{nullptr};
+    QTimer*       m_bedarfTimer{nullptr};
+    void aktualisiereBedarf();
+    /// Der eigene Locator: aus dem juengsten QSO, das ihn traegt.
+    QString meinFeld() const;
+    // Statistikfenster mit drei Seiten (2026-11-08): Kacheln, Band x
+    // Stunde, Richtungen.
+    QStackedWidget* m_statsSeiten{nullptr};
+    QList<QPushButton*> m_statsSeitenKnoepfe;
+    class BandStundeWidget* m_bandStunde{nullptr};
+    class RichtungsRoseWidget* m_rose{nullptr};
+    QComboBox* m_bandStundeFilter{nullptr};
+    void zeigeStatistikSeite(int seite);
     // Tippen in der Suche: Karte und Kennzahlen erst nach einer kurzen
     // Pause nachziehen (Vorschlag 2026-09-27, siehe .cpp).
     QTimer*       m_followUpTimer{nullptr};

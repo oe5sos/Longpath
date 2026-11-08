@@ -21,11 +21,20 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QFontMetricsF>
+#include <QDialog>
+#include <QElapsedTimer>
+#include <QLineEdit>
+#include <QTemporaryDir>
 
 #include <algorithm>
 #include <cmath>
 
 #include "core/AdifLog.h"
+#include "core/LogbuchBilder.h"
+#include "core/RotorBereich.h"
+#include "gui/LogbookWindow.h"
+#include "gui/widgets/LogbuchBilderWidgets.h"
+#include "FensterFrist.h"
 #include "core/CtyDatParser.h"
 #include "core/Maidenhead.h"
 #include "core/QsoConfirmation.h"
@@ -99,6 +108,7 @@ private slots:
     void bedarfsMatrix();
     void bandUndStunde();
     void richtungsrose();
+    void echteWidgets();
 
 private:
     QString land(const QString& call) const { return m_cty.resolvePrimaryPrefix(call); }
@@ -663,6 +673,80 @@ void TstLogbuchBlaetter::richtungsrose()
     zeichneRose(QStringLiteral("C3_2m_mit_rotor.png"), QStringLiteral("2 m"),
                 [](const LogEntry& e) { return e.band.compare(QStringLiteral("2m"), Qt::CaseInsensitive) == 0; },
                 true, true);
+}
+
+// Nach der Wahl (Betreiber: „Alle drei"): dieselben Faelle mit den
+// ECHTEN Widgets und im echten Logbuch-Fenster.
+void TstLogbuchBlaetter::echteWidgets()
+{
+    const QString dir = m_aus + QStringLiteral("/../echt");
+    QDir().mkpath(dir);
+    auto speichere = [&](QWidget& w, const QString& name) {
+        QImage img(w.size() * 2, QImage::Format_ARGB32_Premultiplied);
+        img.setDevicePixelRatio(2.0);
+        img.fill(farbe(Style::kPanelBg));
+        w.render(&img);
+        QVERIFY(img.save(dir + QLatin1Char('/') + name));
+    };
+    // A -- mit Band und Betriebsart, wie vom Funkgeraet.
+    struct Fall { QString call, band, mode, name; };
+    for (const Fall& f : {Fall{QStringLiteral("CR6WWA"), QStringLiteral("15m"), QStringLiteral("USB"), QStringLiteral("A1_echt.png")},
+                          Fall{QStringLiteral("3V8LL"), QStringLiteral("15m"), QStringLiteral("USB"), QStringLiteral("A2_echt.png")},
+                          Fall{QStringLiteral("3Y0Z"), QStringLiteral("20m"), QStringLiteral("USB"), QStringLiteral("A3_echt.png")}}) {
+        QElapsedTimer t; t.start();
+        const LogbuchBilder::Bedarf b = LogbuchBilder::bedarf(m_log, f.call, f.band, f.mode, &m_cty, kMeinFeld);
+        qInfo().noquote() << "Bedarf" << f.call << "ueber" << m_log.size() << "QSOs:" << t.elapsed() << "ms";
+        BedarfsMatrixWidget w;
+        w.resize(800, 150);
+        w.setBedarf(b);
+        speichere(w, f.name);
+    }
+    // B
+    BandStundeWidget bs;
+    bs.setDaten(LogbuchBilder::bandStunde(m_log), QStringLiteral("all continents"), kMeinFeld);
+    bs.resize(bs.sizeHint());
+    speichere(bs, QStringLiteral("B1_echt.png"));
+    // C
+    RichtungsRoseWidget r1;
+    r1.resize(600, 668);
+    r1.setRose(LogbuchBilder::rose(m_log, &m_cty, kMeinFeld), QStringLiteral("all bands"));
+    speichere(r1, QStringLiteral("C1_echt.png"));
+    QVector<LogEntry> zwei;
+    for (const LogEntry& e : m_log) { if (e.band.compare(QStringLiteral("2m"), Qt::CaseInsensitive) == 0) { zwei << e; } }
+    RichtungsRoseWidget r3;
+    r3.resize(600, 668);
+    r3.setRose(LogbuchBilder::rose(zwei, &m_cty, kMeinFeld), QStringLiteral("2 m"));
+    RotorBereich bereich; bereich.an = true; bereich.vonGrad = 270.0; bereich.bisGrad = 90.0;
+    r3.setRotor(74.3, 40.0, bereich);
+    speichere(r3, QStringLiteral("C3_echt.png"));
+
+    // Im echten Fenster: tippen, Matrix erscheint; die zwei Statistikseiten.
+    QTemporaryDir tmp;
+    const QString kopie = tmp.filePath(QStringLiteral("logbook.adi"));
+    QVERIFY(QFile::copy(qEnvironmentVariable("LONGPATH_LOGBOOK_FIXTURE"), kopie));
+    LogbookWindow w(kopie);
+    w.setCtyDat(&m_cty);
+    w.resize(1500, 950);
+    w.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+    QTest::keyClicks(w.entryCallForTest(), QStringLiteral("3v8ll"));
+    QTRY_VERIFY_WITH_TIMEOUT(w.bedarfForTest()->isVisible(), 3000);
+    QTest::qWait(900);                       // Karteikarte und Filter setzen sich
+    QVERIFY(w.grab().save(dir + QStringLiteral("/fenster_eingabe.png")));
+    w.zeigeStatistikSeiteForTest(1);
+    QDialog* d = nullptr;
+    for (QDialog* x : w.findChildren<QDialog*>()) { if (x->isVisible()) { d = x; } }
+    QVERIFY(d);
+    // Ohne Filter: Esc leert die Suche, damit die Statistik das ganze Log zeigt.
+    QTest::keyClick(w.entryCallForTest(), Qt::Key_Escape);
+    w.zeigeStatistikSeiteForTest(1);
+    d->resize(1000, 520);
+    QTest::qWait(200);
+    QVERIFY(d->grab().save(dir + QStringLiteral("/statistik_band_stunde.png")));
+    w.zeigeStatistikSeiteForTest(2);
+    d->resize(820, 760);
+    QTest::qWait(200);
+    QVERIFY(d->grab().save(dir + QStringLiteral("/statistik_richtungen.png")));
 }
 
 QTEST_MAIN(TstLogbuchBlaetter)
