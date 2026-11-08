@@ -665,14 +665,16 @@ public:
     void setHeatmapEnabled(bool on);
     bool heatmapEnabled() const { return m_heatmapEnabled; }
 
-    // ── Schaerfe-Entwuerfe (2026-11-08) ─────────────────────────────────
+    // ── Schaerfe (2026-11-08) ───────────────────────────────────────────
     //
     // Betreiber: „was kannst du graphisch beim Panadapter noch verbessern,
     // auch in Hinsicht auf schaerfere Grafik". Drei Stellschrauben, die
-    // der Zeichenweg bisher fest verdrahtet hatte. ALLE DREI AUS ab Werk:
-    // ohne sie zeichnet der Panadapter Bild fuer Bild wie vorher. Der
-    // Betreiber waehlt an den Entwurfsblaettern (tst_rendering_werkbank,
-    // Varianten s_*), erst danach wird eine davon zur Vorgabe.
+    // der Zeichenweg bisher fest verdrahtet hatte. Erst als Entwurf (alle
+    // aus) an den Blaettern der Rendering-Werkbank verglichen (Varianten
+    // s_*), dann vom Betreiber gewaehlt: „Alles zusammen". Seitdem ALLE
+    // DREI AN ab Werk und je Panadapter gespeichert. Wer das alte Bild
+    // will: DisplayWaterfallDevicePixels / DisplayGridHairline = False,
+    // DisplayTraceEdgePx = 1.0.
     //
     // * Wasserfall in Geraete-Pixeln. Das Wasserfallbild war in LOGISCHEN
     //   Pixeln angelegt (applyResizeSettled), die Kurve darueber rechnet
@@ -688,11 +690,13 @@ public:
     //   die Kurve statt auf ganze logische Pixel gerundet.
     void setGridHairline(bool on);
     bool gridHairline() const { return m_gridHairline; }
-    // * Auslauf der weichen Kurvenkante in Geraete-Pixeln. Ab Werk 1,0
-    //   (Kurve::kKantePixel); kleiner glaettet nur die Treppe, statt die
-    //   Linie weich zu zeichnen.
+    // * Auslauf der weichen Kurvenkante in Geraete-Pixeln. Ab Werk 0,5
+    //   (vorher fest Kurve::kKantePixel = 1,0): glaettet nur die Treppe,
+    //   statt die Linie weich zu zeichnen.
     void setTraceEdgePx(float px);
     float traceEdgePx() const { return m_traceEdgePx; }
+    /// Pruefstand (tst_panadapter_schaerfe): Groesse des Wasserfallbilds.
+    QSize waterfallImageSizeForTest() const { return m_waterfall.size(); }
 
     // Display calibration offset added to every bin before it's mapped
     // to screen Y. Ported from Thetis Display.RX1DisplayCalOffset
@@ -2780,11 +2784,11 @@ private:
     float       m_lineWidth{1.0f};
     bool        m_traceSoftEdge{true};    // AN ab Werk, siehe setTraceSoftEdge
     bool        m_traceHalo{false};       // AUS ab Werk, siehe setTraceHalo
-    // Schaerfe-Entwuerfe (2026-11-08), siehe setWaterfallDevicePixels.
+    // Schaerfe (2026-11-08), siehe setWaterfallDevicePixels. AN ab Werk.
     // Vor jedem GPU-#ifdef, weil die Zugriffsmethoden ungeschuetzt sind.
-    bool        m_wfDevicePixels{false};
-    bool        m_gridHairline{false};
-    float       m_traceEdgePx{1.0f};      // = Kurve::kKantePixel
+    bool        m_wfDevicePixels{true};
+    bool        m_gridHairline{true};
+    float       m_traceEdgePx{0.5f};      // war Kurve::kKantePixel (1,0)
     // Wie viele Streifen im jeweiligen Puffer stehen. Gesetzt beim Bauen
     // der Scheitelpunkte, gelesen beim Zeichnen -- zwei Stellen, eine
     // Zahl, sonst zeichnet die GPU aus einem halb gefuellten Puffer.

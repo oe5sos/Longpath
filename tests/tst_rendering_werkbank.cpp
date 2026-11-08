@@ -291,6 +291,14 @@ private slots:
                  w.setWaterfallDevicePixels(true);
                  w.setWaterfallDetector(SpectrumDetector::Peak);
              }},
+            // Seit der Wahl („Alles zusammen") ist s0 der NEUE Stand ab
+            // Werk. s8 zeigt zum Vergleich den alten: alle drei aus.
+            {QStringLiteral("s8_vorher"), [](SpectrumWidget& w) {
+                 w.loadSettings();
+                 w.setWaterfallDevicePixels(false);
+                 w.setGridHairline(false);
+                 w.setTraceEdgePx(1.0f);
+             }},
         };
 
         for (const Variant& v : variants) {

@@ -1095,6 +1095,25 @@ void SpectrumWidget::loadSettings()
     // nach den drei Blaettern. Siehe setTraceSoftEdge im Header.
     m_traceSoftEdge   = readBool(QStringLiteral("DisplayTraceSoftEdge"), true);
     m_traceHalo       = readBool(QStringLiteral("DisplayTraceHalo"), false);
+    // Schaerfe (2026-11-08, Betreiber an den Entwurfsblaettern: „Alles
+    // zusammen"): alle drei AN ab Werk, siehe setWaterfallDevicePixels.
+    m_gridHairline    = readBool(QStringLiteral("DisplayGridHairline"), true);
+    m_traceEdgePx     = qBound(0.25f,
+                               readFloat(QStringLiteral("DisplayTraceEdgePx"), 0.5f),
+                               2.0f);
+    {
+        const bool wfDev = readBool(QStringLiteral("DisplayWaterfallDevicePixels"), true);
+        if (wfDev != m_wfDevicePixels) {
+            m_wfDevicePixels = wfDev;
+            // Ein schon angelegtes Bild hat die alte Breite -- neu anlegen,
+            // sonst gilt der Schalter erst nach der naechsten Groessen-
+            // aenderung.
+            if (!m_waterfall.isNull()) {
+                m_waterfall = QImage();
+                stelleWasserfallbildSicher();
+            }
+        }
+    }
     // Delay the peak hold enable path until the timer infra is ready.
     if (peakOn) {
         setPeakHoldEnabled(true);
@@ -1448,6 +1467,11 @@ void SpectrumWidget::saveSettings()
               m_traceSoftEdge ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayTraceHalo"), m_panIndex),
               m_traceHalo ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayWaterfallDevicePixels"), m_panIndex),
+              m_wfDevicePixels ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayGridHairline"), m_panIndex),
+              m_gridHairline ? QStringLiteral("True") : QStringLiteral("False"));
+    writeFloat(QStringLiteral("DisplayTraceEdgePx"), m_traceEdgePx);
 
     // Phase 3G-8 commit 4: waterfall renderer state.
     s.setValue(settingsKey(QStringLiteral("DisplayWfAgc"), m_panIndex),
@@ -2273,10 +2297,10 @@ void SpectrumWidget::setTraceHalo(bool on)
     update();
 }
 
-// ── Schaerfe-Entwuerfe (2026-11-08) ──────────────────────────────────
-// Alle drei werden (noch) nicht gespeichert: Entwurfsschalter fuer die
-// Blaetter, siehe den Kommentar im Header. Erst wenn der Betreiber eine
-// Fassung waehlt, bekommt sie einen Schluessel und wird zur Vorgabe.
+// ── Schaerfe (2026-11-08) ────────────────────────────────────────────
+// Erst Entwurfsschalter fuer die Blaetter, dann vom Betreiber gewaehlt
+// („Alles zusammen"): alle drei AN ab Werk und je Panadapter gespeichert
+// (DisplayWaterfallDevicePixels / DisplayGridHairline / DisplayTraceEdgePx).
 
 void SpectrumWidget::setWaterfallDevicePixels(bool on)
 {
@@ -2284,6 +2308,7 @@ void SpectrumWidget::setWaterfallDevicePixels(bool on)
         return;
     }
     m_wfDevicePixels = on;
+    scheduleSettingsSave();
     // Neue Bildbreite: das Bild verwerfen und beim naechsten Bedarf in
     // der richtigen Groesse anlegen (stelleWasserfallbildSicher). Der
     // Verlauf geht dabei verloren, genau wie bei einer Groessenaenderung.
@@ -2298,6 +2323,7 @@ void SpectrumWidget::setGridHairline(bool on)
         return;
     }
     m_gridHairline = on;
+    scheduleSettingsSave();
     markOverlayDirty();
     update();
 }
@@ -2309,6 +2335,7 @@ void SpectrumWidget::setTraceEdgePx(float px)
         return;
     }
     m_traceEdgePx = px;
+    scheduleSettingsSave();
     update();
 }
 

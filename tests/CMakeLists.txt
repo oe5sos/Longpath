@@ -8341,6 +8341,13 @@ longpath_add_test(tst_rendering_werkbank)
 longpath_add_test(tst_waterfall_column_reduce)
 longpath_add_test(tst_freq_scale_labels)
 
+# tst_panadapter_schaerfe (2026-11-08): Betreiber an den Entwurfsblaettern
+#   „Alles zusammen" -- Wasserfall in Geraete-Pixeln, Haarlinien-Raster,
+#   kurze Kurvenkante sind AN ab Werk. Prueft die Vorgabe, das Speichern
+#   und (mit QT_SCALE_FACTOR=2, auch offscreen) eine Wasserfallspalte je
+#   Geraete-Pixel. Gegenprobe gegen die alte Fassung gefahren.
+longpath_add_test(tst_panadapter_schaerfe)
+
 # ── Weiche Kante und Hof: die Zusage "beide aus = wie vorher" (2026-10-08) ──
 # tst_kurven_streifen: `Kurve::baue` entscheidet, aus wie vielen Baendern die
 #   GPU die Kurve zeichnet. Die Vorgabe beider Schalter ist AUS, und sie taugt
