@@ -900,6 +900,7 @@ set(GUI_SOURCES
     src/core/RundumLauf.cpp
     src/core/RotorBereich.cpp
     src/core/LogbuchBilder.cpp
+    src/core/SingleInstanceGuard.cpp
     src/gui/spectrum/SpectrumAvenger.cpp
     src/gui/DssRenderer.cpp
     src/gui/SpectrumWidget.cpp

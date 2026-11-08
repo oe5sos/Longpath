@@ -96,6 +96,11 @@ void setPaletteWindowLevel(QWidget* widget, bool floating)
     }
 }
 
+void activateThisApplication()
+{
+    [NSApp activateIgnoringOtherApps:YES];
+}
+
 bool anyMouseButtonDown()
 {
     return [NSEvent pressedMouseButtons] != 0;

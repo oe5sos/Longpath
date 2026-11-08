@@ -1154,6 +1154,10 @@ longpath_add_test(tst_rotor_bereich)
 longpath_add_test(tst_logbuch_blaetter)
 # tst_logbuch_bilder (2026-11-08): Bedarfs-Matrix, Band x Stunde und
 #   Richtungsrose -- Rechnung und Einbindung ins Logbuch-Fenster.
+# tst_single_instance_guard (2026-11-08): ein Longpath je Einstellungsordner;
+#   ein zweiter Start holt den laufenden nach vorne bzw. laesst ihn in den
+#   neueren Bau neu starten (aus dem Contestprogramm uebernommen).
+longpath_add_test(tst_single_instance_guard)
 longpath_add_test(tst_logbuch_bilder)
 if(TEST tst_logbuch_bilder)
     set_tests_properties(tst_logbuch_bilder PROPERTIES
