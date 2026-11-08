@@ -168,6 +168,8 @@
 #include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
+#include <QFontMetricsF>
+#include <QLinearGradient>
 #include <QResizeEvent>
 #include <QMouseEvent>
 #include <QKeyEvent>
@@ -1101,6 +1103,11 @@ void SpectrumWidget::loadSettings()
     m_traceEdgePx     = qBound(0.25f,
                                readFloat(QStringLiteral("DisplayTraceEdgePx"), 0.5f),
                                2.0f);
+    // Durchlass und Bandbreite (2026-11-08): alle vier AN ab Werk.
+    m_zeigeBandbreite = readBool(QStringLiteral("DisplayPassbandLabel"), true);
+    m_zeigeKlammern   = readBool(QStringLiteral("DisplaySignalBrackets"), true);
+    m_zeigeLuecken    = readBool(QStringLiteral("DisplayGapFinder"), true);
+    m_lupenModus      = qBound(0, readInt(QStringLiteral("DisplayPassbandMagnifier"), 1), 2);
     {
         const bool wfDev = readBool(QStringLiteral("DisplayWaterfallDevicePixels"), true);
         if (wfDev != m_wfDevicePixels) {
@@ -1472,6 +1479,13 @@ void SpectrumWidget::saveSettings()
     s.setValue(settingsKey(QStringLiteral("DisplayGridHairline"), m_panIndex),
               m_gridHairline ? QStringLiteral("True") : QStringLiteral("False"));
     writeFloat(QStringLiteral("DisplayTraceEdgePx"), m_traceEdgePx);
+    s.setValue(settingsKey(QStringLiteral("DisplayPassbandLabel"), m_panIndex),
+              m_zeigeBandbreite ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplaySignalBrackets"), m_panIndex),
+              m_zeigeKlammern ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(settingsKey(QStringLiteral("DisplayGapFinder"), m_panIndex),
+              m_zeigeLuecken ? QStringLiteral("True") : QStringLiteral("False"));
+    writeInt(QStringLiteral("DisplayPassbandMagnifier"), m_lupenModus);
 
     // Phase 3G-8 commit 4: waterfall renderer state.
     s.setValue(settingsKey(QStringLiteral("DisplayWfAgc"), m_panIndex),
@@ -2336,6 +2350,61 @@ void SpectrumWidget::setTraceEdgePx(float px)
     }
     m_traceEdgePx = px;
     scheduleSettingsSave();
+    update();
+}
+
+// ── Durchlass und Bandbreite (2026-11-08) ────────────────────────────
+// Begruendung und Messkern: gui/spectrum/Durchlass.h. Die Zahl am
+// Durchlass liegt in der statischen Schicht (sie aendert sich mit
+// VFO/Filter), Klammern, Luecken und Lupe in der dynamischen (sie
+// aendern sich mit dem Spektrum).
+
+void SpectrumWidget::setPassbandLabelShown(bool on)
+{
+    if (m_zeigeBandbreite == on) { return; }
+    m_zeigeBandbreite = on;
+    scheduleSettingsSave();
+    markOverlayDirty();
+    update();
+}
+
+void SpectrumWidget::setSignalBracketsShown(bool on)
+{
+    if (m_zeigeKlammern == on) { return; }
+    m_zeigeKlammern = on;
+    m_klammerHaltung.leeren();
+    scheduleSettingsSave();
+#ifdef LONGPATH_GPU_SPECTRUM
+    m_overlayDynamicDirty = true;
+#endif
+    update();
+}
+
+void SpectrumWidget::setGapFinderShown(bool on)
+{
+    if (m_zeigeLuecken == on) { return; }
+    m_zeigeLuecken = on;
+    m_luecken.clear();
+    m_lueckenKlick.clear();
+    m_besteLuecke = -1;
+    scheduleSettingsSave();
+#ifdef LONGPATH_GPU_SPECTRUM
+    m_overlayDynamicDirty = true;
+#endif
+    update();
+}
+
+void SpectrumWidget::setPassbandMagnifier(int modus)
+{
+    modus = qBound(0, modus, 2);
+    if (m_lupenModus == modus) { return; }
+    m_lupenModus = modus;
+    m_lupeGlatt.clear();
+    m_lupeErster = -1;
+    scheduleSettingsSave();
+#ifdef LONGPATH_GPU_SPECTRUM
+    m_overlayDynamicDirty = true;
+#endif
     update();
 }
 
@@ -3876,6 +3945,13 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     // does the proper fix (static/dynamic layer split: chrome cached
     // on state change, dynamic overlays in a smaller spectrum-area
     // texture rebuilt every frame).
+    // Durchlass und Bandbreite (2026-11-08): Klammern und Luecken hoechstens
+    // alle 200 ms ausgewertet, die Lupe je Spektrum geglaettet. VOR der
+    // GPU-Weiche -- der QPainter-Rueckfall braucht dieselben Werte (der
+    // CPU-Bau fand das am 2026-11-08: dort lief beides nie).
+    werteDurchlassAus();
+    fuehreLupeNach();
+
 #ifdef LONGPATH_GPU_SPECTRUM
     // Mode3D: die Bandbreite liegt dort in dieser Schicht
     // (paintPassbandOverSurface) und muss mit der Flaeche Schritt
@@ -3896,6 +3972,7 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
     if (m_activePeakHold.enabled() || m_peakBlobs.enabled()
         || m_showNoiseFloor
         || imdTorOffen
+        || lupeSichtbar()
         || m_renderMode == SpectrumRenderMode::Mode3D) {
         const qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
         // 2026-05-26 KG4VCF dual-layer overlay split: peak-hold trace
@@ -4581,6 +4658,12 @@ void SpectrumWidget::drawSpectrum(QPainter& p, const QRect& specRect)
     if (m_peakBlobs.enabled() && !m_peakBlobs.blobs().isEmpty()) {
         paintPeakBlobs(p, specRect);
     }
+
+    // Durchlass und Bandbreite (2026-11-08) -- im GPU-Weg in der
+    // dynamischen Schicht, hier im QPainter-Rueckfall direkt.
+    paintSignalKlammern(p, specRect);
+    paintLueckenfinder(p, specRect);
+    paintDurchlassLupe(p, specRect);
 
     // Zero line (0 dBm) — Phase 3G-8 commit 5 (G7).
     // Plan 4 D9c-1: uses m_rxZeroLineColor (was m_zeroLineColor).
@@ -7760,6 +7843,506 @@ void SpectrumWidget::drawSliceMarker(QPainter& p, const QRect& specRect,
             << QPoint(vfoX, triTop + kTriH);
         p.drawPolygon(tri);
     }
+
+    // Bandbreite ablesbar (2026-11-08): Zahl am Durchlass, beim Ziehen
+    // die Kante und ihr Wert. Nicht waehrend des Sendens (dort steht die
+    // TX-Marke mit eigener Beschriftung) und nicht im 3D-Modus.
+    if (!m_moxOverlay && !overSurface) {
+        paintBandbreite(p, specRect, xLo, xHi, g.centreHz, specBottomClipped,
+                        g.filterLowHz, g.filterHighHz);
+    }
+}
+
+// ── Durchlass und Bandbreite (2026-11-08) ────────────────────────────
+//
+// Die vier Entwuerfe, die der Betreiber gewaehlt hat („Alle vier
+// bauen"): Bandbreite ablesbar, Signal-Klammern, Lueckenfinder,
+// Durchlass-Lupe. Gemessen wird in gui/spectrum/Durchlass.*, hier wird
+// nur gezeichnet. Farben ausschliesslich aus StyleConstants: Bernstein
+// heisst gemessen, Akzentblau heisst anklickbar (HAUSSTIL).
+
+namespace {
+
+QFont durchlassSchrift(const QFont& basis, int px, bool fett)
+{
+    QFont f(basis);
+    f.setPixelSize(px);
+    f.setBold(fett);
+    return f;
+}
+
+// Ein Glas-Chip mit Text. `anker` ist der Punkt, an dem `ausr` den Chip
+// festmacht (wie bei QPainter::drawText mit Rechteck).
+QRectF durchlassChip(QPainter& p, const QPointF& anker, Qt::Alignment ausr,
+                     const QString& text, const QFont& f, const QColor& farbe)
+{
+    const QFontMetricsF fm(f);
+    const qreal w = fm.horizontalAdvance(text) + 10.0;
+    const qreal h = fm.height() + 4.0;
+    qreal x = anker.x();
+    qreal y = anker.y();
+    if (ausr & Qt::AlignHCenter)     { x -= w / 2.0; }
+    else if (ausr & Qt::AlignRight)  { x -= w; }
+    if (ausr & Qt::AlignVCenter)     { y -= h / 2.0; }
+    else if (ausr & Qt::AlignBottom) { y -= h; }
+    const QRectF r(x, y, w, h);
+    QColor grund(Style::kGlassPanelBot);
+    grund.setAlpha(225);
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setPen(QPen(QColor(Style::kBorder), 1.0));
+    p.setBrush(grund);
+    p.drawRoundedRect(r, Style::kGlassChipRadius, Style::kGlassChipRadius);
+    p.setFont(f);
+    p.setPen(farbe);
+    p.drawText(r, Qt::AlignCenter, text);
+    p.restore();
+    return r;
+}
+
+} // namespace
+
+void SpectrumWidget::paintBandbreite(QPainter& p, const QRect& specRect,
+                                     int xLo, int xHi, double centreHz,
+                                     int specBottomClipped, int loHz, int hiHz)
+{
+    if (!m_zeigeBandbreite || specBottomClipped <= specRect.top()) {
+        return;
+    }
+    const QFont gross = durchlassSchrift(p.font(), Style::kFontSmall, true);
+    const QFont klein = durchlassSchrift(p.font(), Style::kFontCaption, false);
+    const QColor text(Style::kTextPrimary);
+    const QColor leise(Style::kTextSecondary);
+    const QString breite = Durchlass::bandbreiteText(loHz, hiHz);
+    const int fW = xHi - xLo;
+    const qreal chipW = QFontMetricsF(gross).horizontalAdvance(breite) + 10.0;
+    const int vfoX = hzToX(centreHz, specRect);
+
+    if (fW >= chipW + 8.0) {
+        // Breit genug: die Zahl oben im Durchlass, unter dem Dreieck,
+        // und wenn auch das passt, die beiden Kanten unten.
+        durchlassChip(p, QPointF((xLo + xHi) / 2.0, specRect.top() + 14),
+                      Qt::AlignHCenter | Qt::AlignTop, breite, gross, text);
+        const QFontMetricsF fk(klein);
+        const QString lo = QString::number(std::abs(loHz));
+        const QString hi = QString::number(std::abs(hiHz));
+        if (fW >= fk.horizontalAdvance(lo) + fk.horizontalAdvance(hi) + 16.0) {
+            p.save();
+            p.setFont(klein);
+            p.setPen(leise);
+            const int links  = (loHz <= hiHz) ? xLo : xHi;   // wo die untere Kante steht
+            const QString lt = (links == xLo) ? lo : hi;
+            const QString rt = (links == xLo) ? hi : lo;
+            // Ueber der Leiste des Lueckenfinders (die liegt in den
+            // untersten 12 Punkten), sonst deckt ein Lueckenbalken die Zahl.
+            const qreal grund = specBottomClipped - 16.0;
+            p.drawText(QPointF(xLo + 4, grund), lt);
+            p.drawText(QPointF(xHi - 4 - fk.horizontalAdvance(rt), grund), rt);
+            p.restore();
+        }
+    } else {
+        // Schmal (breites Bild, CW): die Zahl neben der Marke.
+        durchlassChip(p, QPointF(vfoX + 10, specRect.top() + 30),
+                      Qt::AlignLeft | Qt::AlignVCenter,
+                      Durchlass::bandbreiteKurz(loHz, hiHz), gross, text);
+    }
+
+    // Beim Ziehen einer Kante: die Kante hell, ihr Wert daneben.
+    if (m_draggingFilter != FilterEdge::None) {
+        const bool unten = (m_draggingFilter == FilterEdge::Low);
+        const int wert   = unten ? loHz : hiHz;
+        const int xK     = hzToX(centreHz + wert, specRect);
+        p.save();
+        p.setPen(QPen(text, 2.0));
+        p.drawLine(xK, specRect.top(), xK, specBottomClipped);
+        p.restore();
+        const bool rechts = (xK >= (xLo + xHi) / 2);
+        const Qt::Alignment a = (rechts ? Qt::AlignLeft : Qt::AlignRight) | Qt::AlignVCenter;
+        const qreal x = rechts ? xK + 8.0 : xK - 8.0;
+        const qreal y = specRect.top() + 0.45 * (specBottomClipped - specRect.top());
+        durchlassChip(p, QPointF(x, y), a, QStringLiteral("%1 Hz").arg(std::abs(wert)),
+                      gross, text);
+        durchlassChip(p, QPointF(x, y + 24), a,
+                      tr("Width %1 · %2").arg(breite,
+                          m_kanteFein ? tr("fine") : tr("snap %1 Hz").arg(Durchlass::kKantenRastHz)),
+                      klein, leise);
+    }
+}
+
+void SpectrumWidget::werteDurchlassAus(bool sofort)
+{
+    if (!m_zeigeKlammern && !m_zeigeLuecken) {
+        return;
+    }
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+    if (!sofort && jetzt - m_durchlassZuletztMs < 200) {
+        return;
+    }
+    m_durchlassZuletztMs = jetzt;
+
+    const int n = m_renderedPixels.size();
+    if (n < 16 || m_bandwidthHz <= 0.0) {
+        m_klammerHaltung.leeren();
+        m_luecken.clear();
+        m_besteLuecke = -1;
+        return;
+    }
+    // Punkt i liegt bei links + i * Breite/(n-1) -- dieselbe Abbildung
+    // wie die Kurve und die Spitzenanzeige.
+    const double hzJePx = m_bandwidthHz / (n - 1);
+    const double links  = m_centerHz - m_bandwidthHz / 2.0;
+    const float boden   = Durchlass::rauschboden(m_renderedPixels);
+    m_klammerBoden = boden;
+
+    if (m_zeigeKlammern) {
+        m_klammerHaltung.einspielen(
+            Durchlass::erkenneSignale(m_renderedPixels, hzJePx, boden));
+    }
+    if (m_zeigeLuecken) {
+        // Gesucht wird im Bandplan-Abschnitt, in dem der VFO steht (auf 2 m:
+        // SSB/CW/DIGI 144,150-144,400); ohne Bandplan im ganzen Bild.
+        int von = 0;
+        int bis = n;
+        if (m_bandPlanMgr) {
+            const double vfoMhz = rfFuerAnzeige(m_vfoHz) / 1.0e6;
+            for (const auto& seg : m_bandPlanMgr->segments()) {
+                if (vfoMhz >= seg.lowMhz && vfoMhz < seg.highMhz) {
+                    von = static_cast<int>(std::floor(
+                        (zfFuerAchse(seg.lowMhz * 1.0e6) - links) / hzJePx));
+                    bis = static_cast<int>(std::ceil(
+                        (zfFuerAchse(seg.highMhz * 1.0e6) - links) / hzJePx));
+                    break;
+                }
+            }
+        }
+        m_luecken = Durchlass::findeLuecken(m_renderedPixels, hzJePx, von, bis, boden);
+        m_besteLuecke = -1;
+        double bester = 1.0e18;
+        const double vfoPx = (m_vfoHz - links) / hzJePx;
+        for (int i = 0; i < m_luecken.size(); ++i) {
+            const double d = std::abs(0.5 * (m_luecken[i].a + m_luecken[i].e) - vfoPx);
+            if (d < bester) { bester = d; m_besteLuecke = i; }
+        }
+    }
+#ifdef LONGPATH_GPU_SPECTRUM
+    m_overlayDynamicDirty = true;
+#endif
+}
+
+QImage SpectrumWidget::paintPassbandOverlaysForTest()
+{
+    QImage img(size(), QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::transparent);
+    QPainter p(&img);
+    const QRect r = spectrumRect();
+    paintSignalKlammern(p, r);
+    paintLueckenfinder(p, r);
+    paintDurchlassLupe(p, r);
+    return img;
+}
+
+// Die Lupe im Datenweg nachfuehren, nicht beim Malen: gemalt wird nur,
+// wenn ein Bild entsteht, gemittelt werden muss aber jedes Spektrum --
+// sonst zeigt die Lupe ein einzelnes Rohbild, waehrend das Hauptbild
+// ueber die eingestellte Zeit mittelt (in der Werkbank am 2026-11-08
+// so gesehen: die SSB-Station unter dem VFO fehlte in der Lupe).
+void SpectrumWidget::fuehreLupeNach()
+{
+    if (!lupeSichtbar()) {
+        return;
+    }
+    const int binZahl = m_fullLinearBins.size();
+    const double binHz = m_sampleRateHz / binZahl;
+    const double fftUnten = m_ddcCenterHz - m_sampleRateHz / 2.0;
+    const Durchlass::BinBereich b = Durchlass::lupenBins(
+        binZahl, binHz, fftUnten,
+        m_vfoHz - Durchlass::kLupeHalbHz, m_vfoHz + Durchlass::kLupeHalbHz);
+    if (b.leer()) {
+        return;
+    }
+    // Bins in dBm wie der Detektor "Average" (Bin / ENB, mal 10^(Versatz/10),
+    // dann 10 log10), ueber die Zeit geglaettet (etwa 200 ms bei 30 Bildern).
+    const int m = b.letzter - b.erster + 1;
+    const double skala = std::pow(10.0, m_lastDbmOffset / 10.0) / m_fftWindowEnb;
+    const bool neu = (m_lupeErster != b.erster || m_lupeGlatt.size() != m);
+    if (neu) {
+        m_lupeGlatt.resize(m);
+        m_lupeErster = b.erster;
+    }
+    for (int k = 0; k < m; ++k) {
+        const float roh = static_cast<float>(
+            10.0 * std::log10(skala * m_fullLinearBins[b.erster + k] + 1.0e-30));
+        m_lupeGlatt[k] = neu ? roh : 0.85f * m_lupeGlatt[k] + 0.15f * roh;
+    }
+}
+
+bool SpectrumWidget::lupeSichtbar() const
+{
+    if (m_lupenModus == 0 || m_moxOverlay || m_fullLinearBins.isEmpty()
+        || m_sampleRateHz <= 0.0 || m_bandwidthHz <= 0.0) {
+        return false;
+    }
+    if (m_lupenModus == 2) {
+        return true;
+    }
+    const int w = width() - effectiveStripW();
+    if (w <= 0) {
+        return false;
+    }
+    const double px = std::abs(m_filterHighHz - m_filterLowHz) / m_bandwidthHz * w;
+    return px < Durchlass::kLupeAbPunkten;
+}
+
+void SpectrumWidget::paintSignalKlammern(QPainter& p, const QRect& specRect)
+{
+    if (!m_zeigeKlammern || m_moxOverlay) {
+        return;
+    }
+    const QVector<Durchlass::Signal>& sig = m_klammerHaltung.gezeigt();
+    const int n = m_renderedPixels.size();
+    if (sig.isEmpty() || n < 2) {
+        return;
+    }
+    const double pxW    = static_cast<double>(specRect.width()) / (n - 1);
+    const double hzJePx = m_bandwidthHz / (n - 1);
+    const double links  = m_centerHz - m_bandwidthHz / 2.0;
+    const bool spitzen  = m_activePeakHold.enabled() && m_activePeakHold.size() == n;
+
+    QColor bernstein(Style::kAmberText);
+    bernstein.setAlpha(235);
+    const QFont f = durchlassSchrift(p.font(), Style::kFontCaption, true);
+    const QFontMetricsF fm(f);
+
+    // Die Station im Durchlass bekommt die ganze Zeile.
+    const double mitteDurchlassPx =
+        (m_vfoHz + 0.5 * (m_filterLowHz + m_filterHighHz) - links) / hzJePx;
+    int eigen = -1;
+    for (int i = 0; i < sig.size(); ++i) {
+        if (mitteDurchlassPx >= sig[i].a - 2 && mitteDurchlassPx <= sig[i].e + 1) {
+            eigen = i;
+            break;
+        }
+    }
+
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setFont(f);
+    QVector<QRectF> belegt;
+    for (int i = 0; i < sig.size(); ++i) {
+        const Durchlass::Signal& s = sig[i];
+        // Ueber dem, was gezeichnet ist: Kurve UND Spitzenhaltelinie.
+        float oben = -1.0e30f;
+        for (int k = std::max(0, s.a); k < std::min(n, s.e); ++k) {
+            oben = std::max(oben, m_renderedPixels[k]);
+            if (spitzen) { oben = std::max(oben, m_activePeakHold.peak(k)); }
+        }
+        if (oben < -1.0e29f) { continue; }
+        const qreal x0 = specRect.left() + (s.a - 0.5) * pxW - 1.0;
+        const qreal x1 = specRect.left() + (s.e - 0.5) * pxW + 1.0;
+        const qreal y  = dbmToYf(oben, specRect) - 6.0;
+        if (y < specRect.top() + 4) { continue; }
+        QPainterPath klammer;
+        klammer.moveTo(x0, y + 5.0);
+        klammer.lineTo(x0, y);
+        klammer.lineTo(x1, y);
+        klammer.lineTo(x1, y + 5.0);
+        p.setPen(QPen(bernstein, 1.5));
+        p.setBrush(Qt::NoBrush);
+        p.drawPath(klammer);
+
+        const QString zahl = QString::number(qRound(s.snrDb));
+        const qreal tw = fm.horizontalAdvance(zahl);
+        QRectF r((x0 + x1 - tw) / 2.0, y - 3.0 - fm.height(), tw, fm.height());
+        // Hoechstens eine Zeile ausweichen; findet die Zahl dann keinen
+        // Platz, bleibt nur die Klammer. Ein Turm aus Zahlen (2-m-Contest
+        // im 4-MHz-Bild, 2026-11-08) liest niemand.
+        bool frei = false;
+        for (int versuch = 0; versuch < 2 && !frei; ++versuch) {
+            frei = true;
+            for (const QRectF& b : belegt) {
+                if (b.adjusted(-2, 0, 2, 0).intersects(r)) { frei = false; break; }
+            }
+            if (!frei) { r.translate(0, -fm.height()); }
+        }
+        if (!frei) { continue; }
+        belegt << r;
+        p.setPen(bernstein);
+        p.drawText(r, Qt::AlignCenter, zahl);
+    }
+    p.restore();
+
+    if (eigen >= 0) {
+        const Durchlass::Signal& s = sig[eigen];
+        const double mhz = rfFuerAnzeige(links + s.mittePx * hzJePx) / 1.0e6;
+        const QString zeile = tr("%1 · %2 kHz · SNR %3 dB")
+            .arg(mhz, 0, 'f', 4)
+            .arg(s.breiteHz / 1000.0, 0, 'f', 1)
+            .arg(qRound(s.snrDb));
+        const int vfoX = hzToX(m_vfoHz, specRect);
+        durchlassChip(p, QPointF(vfoX + 14, specRect.top() + 0.22 * specRect.height()),
+                      Qt::AlignLeft | Qt::AlignVCenter, zeile,
+                      durchlassSchrift(p.font(), Style::kFontSmall, true), bernstein);
+    }
+}
+
+void SpectrumWidget::paintLueckenfinder(QPainter& p, const QRect& specRect)
+{
+    m_lueckenKlick.clear();
+    const int n = m_renderedPixels.size();
+    if (!m_zeigeLuecken || m_moxOverlay || m_luecken.isEmpty() || n < 2) {
+        return;
+    }
+    const double pxW    = static_cast<double>(specRect.width()) / (n - 1);
+    const double hzJePx = m_bandwidthHz / (n - 1);
+    const double links  = m_centerHz - m_bandwidthHz / 2.0;
+    const qreal boden   = specRect.bottom() - bandPlanStripHeight();
+
+    QColor blau(Style::kAccent);
+    blau.setAlpha(210);
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, true);
+    for (int i = 0; i < m_luecken.size(); ++i) {
+        const Durchlass::Luecke& l = m_luecken[i];
+        const qreal x0 = specRect.left() + l.a * pxW;
+        const qreal x1 = specRect.left() + l.e * pxW;
+        const QRectF balken(x0, boden - 7.0, std::max<qreal>(2.0, x1 - x0), 4.0);
+        p.setPen(Qt::NoPen);
+        p.setBrush(blau);
+        p.drawRoundedRect(balken, 2.0, 2.0);
+        const double mitteZf = links + 0.5 * (l.a + l.e) * hzJePx;
+        m_lueckenKlick.push_back({balken.adjusted(0, -8, 0, 5), mitteZf});
+
+        if (i == m_besteLuecke) {
+            p.setPen(QPen(QColor(Style::kTextPrimary), 1.5));
+            p.setBrush(Qt::NoBrush);
+            p.drawRoundedRect(balken.adjusted(-1, -2, 1, 2), 3.0, 3.0);
+            const qreal xm = 0.5 * (x0 + x1);
+            p.drawLine(QPointF(xm, boden - 10.0), QPointF(xm, boden - 30.0));
+            const QString text = tr("CQ %1 · %2 kHz free")
+                .arg(rfFuerAnzeige(mitteZf) / 1.0e6, 0, 'f', 3)
+                .arg(qRound((l.e - l.a) * hzJePx / 1000.0));
+            const QRectF chip = durchlassChip(
+                p, QPointF(xm, boden - 30.0), Qt::AlignHCenter | Qt::AlignBottom, text,
+                durchlassSchrift(p.font(), Style::kFontSmall, true), QColor(Style::kTextPrimary));
+            m_lueckenKlick.push_back({chip, mitteZf});
+        }
+    }
+    p.restore();
+}
+
+void SpectrumWidget::paintDurchlassLupe(QPainter& p, const QRect& specRect)
+{
+    if (!lupeSichtbar()) {
+        return;
+    }
+    const int binZahl = m_fullLinearBins.size();
+    const double binHz = m_sampleRateHz / binZahl;
+    const double fftUnten = m_ddcCenterHz - m_sampleRateHz / 2.0;
+    const double von = m_vfoHz - Durchlass::kLupeHalbHz;
+    const double bis = m_vfoHz + Durchlass::kLupeHalbHz;
+    const Durchlass::BinBereich b = Durchlass::lupenBins(binZahl, binHz, fftUnten, von, bis);
+    const int m = b.letzter - b.erster + 1;
+    // Die Werte fuehrt fuehreLupeNach() im Datenweg; passen sie nicht zum
+    // Bereich (gerade umgestimmt), dieses eine Bild auslassen.
+    if (b.leer() || m < 3 || m_lupeErster != b.erster || m_lupeGlatt.size() != m) {
+        return;
+    }
+
+    const int bandH = bandPlanStripHeight();
+    const qreal h = std::min<qreal>(170.0, (specRect.height() - bandH) * 0.42);
+    const qreal w = std::min<qreal>(420.0, specRect.width() * 0.40);
+    if (h < 60.0 || w < 160.0) {
+        return;
+    }
+    // Auf die Seite, die vom VFO abgewandt ist: neben dem VFO stehen die
+    // Zahl am Durchlass und die Zeile der eigenen Station.
+    const bool vfoRechts = hzToX(m_vfoHz, specRect) > specRect.center().x();
+    const qreal xRahmen = vfoRechts ? specRect.left() + 12.0 : specRect.right() - w - 12.0;
+    const QRectF rahmen(xRahmen, specRect.top() + 28.0, w, h);
+    const QRectF flaeche = rahmen.adjusted(8.0, 20.0, -8.0, -6.0);
+
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, true);
+    QLinearGradient verlauf(rahmen.topLeft(), rahmen.bottomLeft());
+    QColor oben(Style::kGlassPanelTop);
+    QColor unten(Style::kGlassPanelBot);
+    // Deckend: was darunter liegt (Klammer-Zahlen), soll nicht durchscheinen.
+    oben.setAlpha(255);
+    unten.setAlpha(255);
+    verlauf.setColorAt(0.0, oben);
+    verlauf.setColorAt(1.0, unten);
+    p.setPen(QPen(QColor(Style::kBorder), 1.0));
+    p.setBrush(verlauf);
+    p.drawRoundedRect(rahmen, Style::kGlassPanelRadius, Style::kGlassPanelRadius);
+
+    const QFont kopf = durchlassSchrift(p.font(), Style::kFontCaption, true);
+    p.setFont(kopf);
+    p.setPen(QColor(Style::kTextSecondary));
+    const QRectF kopfZeile(rahmen.left() + 10.0, rahmen.top() + 3.0, rahmen.width() - 20.0, 16.0);
+    p.drawText(kopfZeile, Qt::AlignLeft | Qt::AlignVCenter,
+               tr("MAGNIFIER ±%1 kHz · %2")
+                   .arg(qRound(Durchlass::kLupeHalbHz / 1000.0))
+                   .arg(rfFuerAnzeige(m_vfoHz) / 1.0e6, 0, 'f', 3));
+    p.drawText(kopfZeile, Qt::AlignRight | Qt::AlignVCenter,
+               tr("%1 Hz/bin").arg(binHz, 0, 'f', binHz < 10.0 ? 1 : 0));
+
+    p.setClipRect(flaeche);
+    auto xVon = [&](double hz) {
+        return flaeche.left() + (hz - von) / (bis - von) * flaeche.width();
+    };
+    const float unterkante = m_refLevel - m_dynamicRange;
+    const float verschieb  = m_dbmCalOffset + normalizeShiftDb();
+    auto yVon = [&](float dbm) {
+        const float frac = qBound(0.0f, (dbm + verschieb - unterkante) / m_dynamicRange, 1.0f);
+        return flaeche.bottom() - frac * flaeche.height();
+    };
+
+    // Durchlass und VFO wie im Hauptbild (dieselbe Farbe des Betreibers).
+    const qreal xa = xVon(m_vfoHz + std::min(m_filterLowHz, m_filterHighHz));
+    const qreal xe = xVon(m_vfoHz + std::max(m_filterLowHz, m_filterHighHz));
+    p.fillRect(QRectF(xa, flaeche.top(), xe - xa, flaeche.height()), m_rxFilterColor);
+
+    // Kurve: bei mehr Bins als Punkten je Spalte das Maximum.
+    QPainterPath kurve;
+    const int spalten = static_cast<int>(flaeche.width());
+    const bool verdichten = m > spalten;
+    bool erster = true;
+    auto punkt = [&](qreal x, float dbm) {
+        const QPointF q(x, yVon(dbm));
+        if (erster) { kurve.moveTo(q); erster = false; } else { kurve.lineTo(q); }
+    };
+    if (verdichten) {
+        for (int c = 0; c < spalten; ++c) {
+            const int k0 = c * m / spalten;
+            const int k1 = std::max(k0 + 1, (c + 1) * m / spalten);
+            float v = m_lupeGlatt[k0];
+            for (int k = k0 + 1; k < k1 && k < m; ++k) { v = std::max(v, m_lupeGlatt[k]); }
+            punkt(flaeche.left() + c + 0.5, v);
+        }
+    } else {
+        for (int k = 0; k < m; ++k) {
+            punkt(xVon(fftUnten + (b.erster + k + 0.5) * binHz), m_lupeGlatt[k]);
+        }
+    }
+    QPainterPath fuellung = kurve;
+    fuellung.lineTo(kurve.currentPosition().x(), flaeche.bottom());
+    fuellung.lineTo(kurve.elementAt(0).x, flaeche.bottom());
+    fuellung.closeSubpath();
+    QColor fuell(m_fillColor);
+    fuell.setAlpha(70);
+    p.fillPath(fuellung, fuell);
+    QColor linie(m_fillColor);
+    linie.setAlpha(230);
+    p.setPen(QPen(linie, 1.0));
+    p.setBrush(Qt::NoBrush);
+    p.drawPath(kurve);
+
+    QColor vfoFarbe(m_rxFilterColor);
+    vfoFarbe.setAlpha(220);
+    p.setPen(QPen(vfoFarbe, 1.0));
+    const qreal xv = xVon(m_vfoHz);
+    p.drawLine(QPointF(xv, flaeche.top()), QPointF(xv, flaeche.bottom()));
+    p.restore();
 }
 
 // ---- Die Bandbreite UEBER der 3D-Flaeche ----
@@ -10659,6 +11242,8 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         } else {
             m_draggingFilter = loHit ? FilterEdge::Low : FilterEdge::High;
         }
+        // Die gegriffene Kante wird hell und zeigt ihren Wert (2026-11-08).
+        markOverlayDirty();
         m_filterDragStartX = mx;
         m_filterDragStartHz = (m_draggingFilter == FilterEdge::Low)
             ? m_filterLowHz : m_filterHighHz;
@@ -10867,6 +11452,12 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
         double hzPerPx = m_bandwidthHz / specRect.width();
         int newHz = m_filterDragStartHz +
             static_cast<int>(std::round((mx - m_filterDragStartX) * hzPerPx));
+        // Rast auf 50 Hz (2026-11-08, Entwurf "Bandbreite ablesbar"); mit
+        // Shift fein, ohne Rast. Die Zahl an der Kante sagt, welches gilt.
+        m_kanteFein = (event->modifiers() & Qt::ShiftModifier);
+        if (!m_kanteFein) {
+            newHz = Durchlass::raste(newHz);
+        }
         int low = m_filterLowHz;
         int high = m_filterHighHz;
         if (m_draggingFilter == FilterEdge::Low) {
@@ -10880,6 +11471,8 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
             m_filterHighHz = high;
             emit filterEdgeDragged(low, high);
         }
+        // Die Marke samt Kantenwert liegt in der statischen Schicht.
+        markOverlayDirty();
         update();
         return;
     }
@@ -11433,7 +12026,21 @@ void SpectrumWidget::mouseReleaseEvent(QMouseEvent* event)
             // Spektrum wieder ein Verschieben (Aether-Verhalten), und
             // waere die Bedingung noch an m_draggingPan gebunden,
             // koennte man ueberhaupt nicht mehr per Klick abstimmen.
-            if (dx <= 4) {
+            bool lueckeGetroffen = false;
+            if (dx <= 4 && m_zeigeLuecken) {
+                // Lueckenfinder (2026-11-08): ein Klick auf einen blauen
+                // Balken oder den CQ-Chip stimmt in die Mitte der Luecke.
+                for (const auto& k : m_lueckenKlick) {
+                    if (k.first.contains(event->position())) {
+                        const double ziel = (m_stepHz > 0)
+                            ? std::round(k.second / m_stepHz) * m_stepHz : k.second;
+                        emit frequencyClicked(ziel);
+                        lueckeGetroffen = true;
+                        break;
+                    }
+                }
+            }
+            if (dx <= 4 && !lueckeGetroffen) {
                 int w = width();
                 int specH = static_cast<int>(height() * m_spectrumFrac);
                 QRect specRect(0, 0, w - effectiveStripW(), specH);
@@ -11481,7 +12088,11 @@ void SpectrumWidget::mouseReleaseEvent(QMouseEvent* event)
         }
 
         m_draggingDbm = false;
-        m_draggingFilter = FilterEdge::None;
+        if (m_draggingFilter != FilterEdge::None) {
+            // Kante losgelassen: die helle Kante und ihr Wert verschwinden.
+            m_draggingFilter = FilterEdge::None;
+            markOverlayDirty();
+        }
         m_draggingVfo = false;
         m_draggingDivider = false;
         m_draggingPan  = false;
@@ -12880,6 +13491,12 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
                 }
             }
             paintNoiseFloorOverlay(pd, specRect);
+            // Durchlass und Bandbreite (2026-11-08): Klammern, Luecken, Lupe.
+            pd.setRenderHint(QPainter::Antialiasing, false);
+            paintSignalKlammern(pd, specRect);
+            paintLueckenfinder(pd, specRect);
+            paintDurchlassLupe(pd, specRect);
+            pd.setRenderHint(QPainter::Antialiasing, false);
             // Im 3D-Modus die Bandbreite UEBER die Flaeche — siehe
             // drawSliceMarker fuer den Grund.
             paintPassbandOverSurface(pd, specRect);

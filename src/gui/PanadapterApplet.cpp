@@ -863,6 +863,34 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
             [this](bool an) { setSwrReadoutShown(an); });
     menu->addSeparator();
 
+    // Durchlass und Bandbreite (2026-11-08): die vier Entwuerfe, die der
+    // Betreiber gewaehlt hat. Alle an ab Werk; hier je einzeln aus.
+    if (m_spectrum) {
+        QAction* breite = menu->addAction(tr("Bandwidth label"));
+        breite->setCheckable(true);
+        breite->setChecked(m_spectrum->passbandLabelShown());
+        connect(breite, &QAction::toggled, m_spectrum,
+                &SpectrumWidget::setPassbandLabelShown);
+        QAction* klammern = menu->addAction(tr("Signal brackets (width, SNR)"));
+        klammern->setCheckable(true);
+        klammern->setChecked(m_spectrum->signalBracketsShown());
+        connect(klammern, &QAction::toggled, m_spectrum,
+                &SpectrumWidget::setSignalBracketsShown);
+        QAction* luecken = menu->addAction(tr("Gap finder (CQ)"));
+        luecken->setCheckable(true);
+        luecken->setChecked(m_spectrum->gapFinderShown());
+        connect(luecken, &QAction::toggled, m_spectrum,
+                &SpectrumWidget::setGapFinderShown);
+        QAction* lupe = menu->addAction(tr("Passband magnifier"));
+        lupe->setCheckable(true);
+        lupe->setChecked(m_spectrum->passbandMagnifier() != 0);
+        lupe->setToolTip(tr("Shows ±10 kHz around the VFO when the passband "
+                            "is too narrow to read in the main view."));
+        connect(lupe, &QAction::toggled, m_spectrum,
+                [this](bool an) { m_spectrum->setPassbandMagnifier(an ? 1 : 0); });
+        menu->addSeparator();
+    }
+
     menu->addAction(tr("Choose background image…"), this, [this]() {
         // ── Der Dialog gehoert dem FENSTER, nicht dem Applet ─────
         //

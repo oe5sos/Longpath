@@ -177,6 +177,7 @@ mw0lge@grange-lane.co.uk
 
 #include "core/ConnectionState.h"
 #include "core/SignalHistoryStore.h"
+#include "gui/spectrum/Durchlass.h"
 #include "core/WdspTypes.h"  // DSPMode — for TX filter IQ-space mapping (Plan 4 D9)
 #include "core/NoiseFloorEstimator.h"  // Rauschboden der Wasserfall-Bildpunkte
 
@@ -697,6 +698,45 @@ public:
     float traceEdgePx() const { return m_traceEdgePx; }
     /// Pruefstand (tst_panadapter_schaerfe): Groesse des Wasserfallbilds.
     QSize waterfallImageSizeForTest() const { return m_waterfall.size(); }
+
+    // ── Durchlass und Bandbreite (2026-11-08) ───────────────────────────
+    //
+    // Betreiber an den Entwurfsblaettern: „Alle vier bauen". Messkern und
+    // Begruendung in gui/spectrum/Durchlass.h. Alle vier AN ab Werk, je
+    // Panadapter gespeichert, abschaltbar im Zahnrad des Panadapters.
+    //
+    //   Bandbreite   Zahl am Durchlass, Kantenwerte und Rast beim Ziehen
+    //   Klammern     belegte Breite und SNR jedes Signals
+    //   Luecken      freie Stellen zum CQ-Rufen, Klick stimmt hin
+    //   Lupe         +/-10 kHz um den VFO, aus den vollen FFT-Bins;
+    //                0 aus, 1 nur wenn der Durchlass schmal ist, 2 immer
+    void setPassbandLabelShown(bool on);
+    bool passbandLabelShown() const { return m_zeigeBandbreite; }
+    void setSignalBracketsShown(bool on);
+    bool signalBracketsShown() const { return m_zeigeKlammern; }
+    void setGapFinderShown(bool on);
+    bool gapFinderShown() const { return m_zeigeLuecken; }
+    void setPassbandMagnifier(int modus);
+    int  passbandMagnifier() const { return m_lupenModus; }
+
+    /// Pruefstand: die Auswertung sofort, ohne die 200-ms-Bremse.
+    void werteDurchlassAusForTest() { werteDurchlassAus(/*sofort=*/true); }
+    QVector<Durchlass::Signal> signalBracketsForTest() const { return m_klammerHaltung.gezeigt(); }
+    QVector<Durchlass::Luecke> gapsForTest() const { return m_luecken; }
+    int bestGapForTest() const { return m_besteLuecke; }
+    /// Die Klickflaechen der Luecken in Widget-Koordinaten (nach dem Malen).
+    QVector<QRectF> gapClickRectsForTest() const
+    {
+        QVector<QRectF> r;
+        for (const auto& k : m_lueckenKlick) { r << k.first; }
+        return r;
+    }
+    bool magnifierVisibleForTest() const { return lupeSichtbar(); }
+    /// Die Lupe in dBm je Bin, wie sie gezeichnet wuerde (geglaettet).
+    QVector<float> magnifierBinsForTest() const { return m_lupeGlatt; }
+    /// Klammern, Luecken und Lupe in ein Bild malen. Im Pruefstand gibt es
+    /// keine GPU -- und ohne Malen keine Klickflaechen der Luecken.
+    QImage paintPassbandOverlaysForTest();
 
     // Display calibration offset added to every bin before it's mapped
     // to screen Y. Ported from Thetis Display.RX1DisplayCalOffset
@@ -2789,6 +2829,20 @@ private:
     float       m_lineWidth{1.0f};
     bool        m_traceSoftEdge{true};    // AN ab Werk, siehe setTraceSoftEdge
     bool        m_traceHalo{false};       // AUS ab Werk, siehe setTraceHalo
+    // Durchlass und Bandbreite (2026-11-08), siehe setPassbandLabelShown.
+    bool        m_zeigeBandbreite{true};
+    bool        m_zeigeKlammern{true};
+    bool        m_zeigeLuecken{true};
+    int         m_lupenModus{1};            // 0 aus, 1 auto, 2 immer
+    bool        m_kanteFein{false};         // Shift beim Ziehen: ohne Rast
+    Durchlass::Haltung         m_klammerHaltung;
+    float                      m_klammerBoden{0.0f};
+    QVector<Durchlass::Luecke> m_luecken;
+    int                        m_besteLuecke{-1};
+    qint64                     m_durchlassZuletztMs{0};
+    QVector<QPair<QRectF, double>> m_lueckenKlick;   // Flaeche, ZF in Hz
+    QVector<float>             m_lupeGlatt;
+    int                        m_lupeErster{-1};
     // Schaerfe (2026-11-08), siehe setWaterfallDevicePixels. AN ab Werk.
     // Vor jedem GPU-#ifdef, weil die Zugriffsmethoden ungeschuetzt sind.
     bool        m_wfDevicePixels{true};
@@ -3649,6 +3703,16 @@ private:
     /// wenn das Fenster dafuer noch keine Groesse hat. Siehe den
     /// Kommentar im Rumpf (Befund des Betreibers, 2026-10-31).
     bool stelleWasserfallbildSicher();
+
+    // Durchlass und Bandbreite (2026-11-08)
+    void werteDurchlassAus(bool sofort = false);
+    void fuehreLupeNach();
+    bool lupeSichtbar() const;
+    void paintBandbreite(QPainter& p, const QRect& specRect, int xLo, int xHi,
+                         double centreHz, int specBottomClipped, int loHz, int hiHz);
+    void paintSignalKlammern(QPainter& p, const QRect& specRect);
+    void paintLueckenfinder(QPainter& p, const QRect& specRect);
+    void paintDurchlassLupe(QPainter& p, const QRect& specRect);
 };
 
 } // namespace Longpath

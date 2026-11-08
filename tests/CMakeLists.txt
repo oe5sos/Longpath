@@ -8371,6 +8371,13 @@ longpath_add_test(tst_panadapter_schaerfe)
 #   Reine Geometrie -- kein Fenster, keine GPU, laeuft offscreen im CI.
 longpath_add_test(tst_kurven_streifen)
 
+# tst_durchlass (2026-11-08): der Messkern hinter Bandbreite ablesbar,
+#   Signal-Klammern, Durchlass-Lupe und Lueckenfinder -- ohne Fenster.
+longpath_add_test(tst_durchlass)
+# tst_durchlass_anzeige: dieselben vier am Widget, mit echten Maus-
+#   ereignissen (Luecken-Klick, Kanten-Rast) und den Haken im Zahnrad.
+longpath_add_test(tst_durchlass_anzeige)
+
 # tst_kurve_setup_schalter: der haeufigste Fehler an einem neuen Schalter ist
 #   nicht, dass er falsch rechnet, sondern dass er NICHTS tut -- Kaestchen
 #   gebaut, Signal vergessen -- oder dass er beim Oeffnen der Seite seinen

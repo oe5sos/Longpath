@@ -28,6 +28,7 @@
 #include <QGuiApplication>
 #include <QDir>
 #include <QImage>
+#include <QMouseEvent>
 
 #include <array>
 #include <cmath>
@@ -445,6 +446,15 @@ private slots:
                  w.setWaterfallDevicePixels(true);
                  w.setWaterfallDetector(SpectrumDetector::Peak);
              }},
+            // Durchlass und Bandbreite (2026-11-08), vom echten Bau: d1 in
+            // Ruhe, d2 beim Ziehen der oberen Kante (echte Mausereignisse,
+            // siehe unten nach der Einspielung).
+            {QStringLiteral("d1_bandbreite_20m"), [](SpectrumWidget& w) {
+                 w.loadSettings();
+             }},
+            {QStringLiteral("d2_kante_ziehen"), [](SpectrumWidget& w) {
+                 w.loadSettings();
+             }},
             // Seit der Wahl („Alles zusammen") ist s0 der NEUE Stand ab
             // Werk. s8 zeigt zum Vergleich den alten: alle drei aus.
             {QStringLiteral("s8_vorher"), [](SpectrumWidget& w) {
@@ -520,6 +530,21 @@ private slots:
                 }
                 w.updateSpectrumLinear(0, f, 1.0, 0.0);
                 QTest::qWait(33);
+            }
+            if (v.id.startsWith(QLatin1String("d2_"))) {
+                // Die obere Kante greifen und 7 Punkte nach rechts ziehen --
+                // nicht loslassen, damit der Wert an der Kante im Bild steht.
+                const QRect r = w.spectrumRect();
+                const double links = w.centerFrequency() - w.bandwidth() / 2.0;
+                const double x = r.left() + (14111500.0 + 2850.0 - links) / w.bandwidth() * r.width();
+                const QPointF a(x, r.top() + 0.5 * r.height());
+                const QPointF b(x + 7.0, a.y());
+                QMouseEvent druck(QEvent::MouseButtonPress, a, w.mapToGlobal(a),
+                                  Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+                QApplication::sendEvent(&w, &druck);
+                QMouseEvent zug(QEvent::MouseMove, b, w.mapToGlobal(b),
+                                Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+                QApplication::sendEvent(&w, &zug);
             }
             if (hidden && !neverShow) {
                 w.show();
