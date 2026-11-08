@@ -117,10 +117,12 @@ RundumDialog::RundumDialog(RadioModel* radio, SpectrumWidget* spektrum, QWidget*
 {
     setWindowTitle(tr("Rotor sweep"));
     auto* lay = new QVBoxLayout(this);
-    auto* text = new QLabel(tr("Turns the antenna once around in 30° steps and "
-                               "records, per direction, the activity in the "
-                               "panadapter (amber) and the noise floor (line). "
-                               "It returns to the starting bearing."), this);
+    auto* text = new QLabel(tr("Turns the antenna through the range it may reach "
+                               "(Rotor settings → Limit rotation; otherwise the "
+                               "full circle) in 30° steps and records, per "
+                               "direction, the activity in the panadapter (amber) "
+                               "and the noise floor (line). It returns to the "
+                               "starting bearing."), this);
     text->setWordWrap(true);
     text->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
     lay->addWidget(text);

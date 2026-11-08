@@ -898,6 +898,7 @@ set(GUI_SOURCES
     src/core/SMeterSkala.cpp
     src/core/FrequenzEichung.cpp
     src/core/RundumLauf.cpp
+    src/core/RotorBereich.cpp
     src/gui/spectrum/SpectrumAvenger.cpp
     src/gui/DssRenderer.cpp
     src/gui/SpectrumWidget.cpp

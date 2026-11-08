@@ -10,8 +10,10 @@
 // 2026-11-08, Betreiber: „starte wie du meinst" (aus der Ideenliste:
 // Richtungs-Scan mit dem Rotor). Fuer KW-Beam und 2-m-Stapel gleich.
 //
-// Der Rotor dreht in zwoelf 30-Grad-Schritten einmal herum und kommt auf
-// die Ausgangsrichtung zurueck. Waehrend er dreht, liefert der
+// Der Rotor faehrt den Bereich ab, den er von seiner Richtung aus
+// erreichen darf (core/RotorBereich.h; ohne Grenze der ganze Kreis, ab
+// dem Anschlag): erst an dessen Anfang, dann in 30-Grad-Schritten bis
+// zum Ende, dann zurueck auf die Ausgangsrichtung. Waehrend er dreht, liefert der
 // Panadapter je Bild drei Zahlen ueber den sichtbaren Ausschnitt:
 // Rauschboden (Median), Belegung (Summe der dB ueber Boden + 6 dB je
 // Bildpunkt) und die Zahl der erkannten Signale. Sie werden nach der
@@ -29,6 +31,8 @@
 // mal Meldeabstand (GS-232 etwa 6 Grad/s bei ~1 s, also ein Sektor).
 
 #pragma once
+
+#include "core/RotorBereich.h"
 
 #include <QObject>
 #include <QPointer>
@@ -86,6 +90,11 @@ public:
     void setStillstandMs(int ms) { m_wache.setInterval(ms); }
     Phase phase() const { return m_phase; }
     const RundumKarte& karte() const { return m_karte; }
+    const QVector<double>& plan() const { return m_plan; }
+
+    /// Die Ziele fuer einen Lauf ab `startAz` im Bereich `b` -- rein.
+    /// Leer, wenn `startAz` selbst nicht erlaubt ist.
+    static QVector<double> plane(double startAz, const RotorBereich& b);
 
     /// Startet; false (und fehler()), wenn kein Rotor verbunden ist oder
     /// seine Position nicht frisch ist.
@@ -113,6 +122,7 @@ private:
     double m_startAz{0.0};
     double m_ziel{0.0};
     int    m_schritt{0};
+    QVector<double> m_plan;              ///< die Ziele der Reihe nach
     double m_az{0.0};
     bool   m_azFrisch{false};
     QTimer m_wache;

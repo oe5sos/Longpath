@@ -15,6 +15,7 @@
 #include <cmath>
 
 #include "core/AppSettings.h"
+#include "core/RotorBereich.h"
 #include "core/RotorController.h"
 #include "core/RundumLauf.h"
 #include "gui/RundumDialog.h"
@@ -32,7 +33,8 @@ public:
     bool hasFreshPosition() const override { return m_frisch; }
     void connectToRotor() override { m_verbunden = true; }
     void disconnectFromRotor() override { m_verbunden = false; }
-    void moveTo(double az) override { ziele.push_back(az); }
+    // Wie die echten Treiber: erst der erlaubte Bereich.
+    void moveTo(double az) override { if (pruefeZiel(az)) { ziele.push_back(az); } }
     void stop() override { ++stopps; }
 
     // Faehrt in 5-Grad-Schritten zum letzten Ziel, meldet jede Stellung
@@ -102,11 +104,12 @@ private slots:
         }
         QCOMPARE(fertig.size(), 1);
         QCOMPARE(fertig.first().first().toBool(), true);
-        QCOMPARE(rotor.ziele.size(), 12);
-        for (int i = 0; i < 12; ++i) {
-            QCOMPARE(rotor.ziele[i], std::fmod(100.0 + (i + 1) * 30.0, 360.0));
-        }
-        QCOMPARE(rotor.ziele.last(), 100.0);        // zurueck auf den Anfang
+        // Ohne Grenze: ab dem Bogenanfang ganz herum (0, 30 ... 330, 359),
+        // dann zurueck auf den Anfang.
+        QCOMPARE(rotor.ziele.size(), 14);
+        for (int i = 0; i < 12; ++i) { QCOMPARE(rotor.ziele[i], i * 30.0); }
+        QCOMPARE(rotor.ziele[12], 359.0);
+        QCOMPARE(rotor.ziele.last(), 100.0);
         QCOMPARE(lauf.karte().abgedeckt(), RundumKarte::kSektoren);
         QCOMPARE(lauf.karte().meisteBelegung(), 210);
         float laut = 0.0f;
@@ -120,6 +123,46 @@ private slots:
             bild.resize(380, 380);
             bild.grab().save(dir + QStringLiteral("/rundum-lauf.png"));
         }
+    }
+
+    // Zu Hause: nur 300 -> 60 ueber Nord, Anschlag Sued.
+    void imErlaubtenBereich()
+    {
+        auto& st = AppSettings::instance();
+        st.setValue(QStringLiteral("RotorEndStopDeg"), 180.0);
+        st.setValue(QStringLiteral("Rotor/LimitOn"), QStringLiteral("True"));
+        st.setValue(QStringLiteral("Rotor/LimitFromDeg"), 300.0);
+        st.setValue(QStringLiteral("Rotor/LimitToDeg"), 60.0);
+        NachgebildeterRotor rotor;
+        rotor.m_az = 10.0;
+        RundumLauf lauf;
+        lauf.setRotor(&rotor);
+        QSignalSpy fertig(&lauf, &RundumLauf::fertig);
+        QVERIFY(lauf.start());
+        lauf.nimmBandLage(-120.0f, 0.0f, 0);
+        int sicherung = 0;
+        while (fertig.isEmpty() && ++sicherung < 40) {
+            rotor.fahre([&](double az) { lauf.nimmBandLage(-120.0f, 1.0f, 0); });
+        }
+        QCOMPARE(fertig.size(), 1);
+        QCOMPARE(fertig.first().first().toBool(), true);
+        QCOMPARE(rotor.ziele, (QVector<double>{300.0, 330.0, 0.0, 30.0, 60.0, 10.0}));
+        const RotorBereich b = RotorBereich::load();
+        for (int i = 0; i < RundumKarte::kSektoren; ++i) {
+            if (lauf.karte().sektoren()[i].proben > 0) {
+                QVERIFY2(b.erlaubt(i * RundumKarte::kSektorGrad),
+                         qPrintable(QStringLiteral("gemessen bei %1").arg(i * 5)));
+            }
+        }
+        // Ausserhalb stehend wird gar nicht erst gedreht.
+        NachgebildeterRotor draussen;
+        draussen.m_az = 180.0;
+        RundumLauf l2;
+        l2.setRotor(&draussen);
+        QSignalSpy fehler(&l2, &RundumLauf::fehler);
+        QVERIFY(!l2.start());
+        QCOMPARE(fehler.size(), 1);
+        QVERIFY(draussen.ziele.isEmpty());
     }
 
     void ohneFrischePositionKeineWerte()

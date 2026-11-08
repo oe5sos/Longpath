@@ -1144,6 +1144,10 @@ longpath_add_test(tst_frequenz_eichung)
 # tst_rundum_lauf (2026-11-08): Rotor einmal herum in 30-Grad-Schritten,
 #   Belegung und Rauschboden je 5-Grad-Sektor, Rueckkehr, Abbruch.
 longpath_add_test(tst_rundum_lauf)
+# tst_rotor_bereich (2026-11-08): erlaubter Bereich des Rotors -- der Weg
+#   zaehlt, nicht nur das Ziel (Anschlag Nord/Sued/frei), und der
+#   Rundum-Lauf bleibt darin.
+longpath_add_test(tst_rotor_bereich)
 if(TEST tst_transverter_nur_empfang)
     set_tests_properties(tst_transverter_nur_empfang PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")

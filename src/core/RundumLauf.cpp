@@ -4,6 +4,7 @@
 
 #include "core/RundumLauf.h"
 
+#include "core/RotorBereich.h"
 #include "core/RotorController.h"
 
 #include <cmath>
@@ -73,6 +74,22 @@ int RundumKarte::lautesterBoden(float* ueberRuhigstemDb) const
 
 // ── RundumLauf ──────────────────────────────────────────────────────
 
+QVector<double> RundumLauf::plane(double startAz, const RotorBereich& b)
+{
+    QVector<double> ziele;
+    double anfang = 0.0, spanne = 0.0;
+    if (!b.reichweite(startAz, &anfang, &spanne)) { return ziele; }
+    // Der volle Kreis endet einen Grad vor dem Anfang: "0" und "360" sind
+    // fuer einen Rotor mit Anschlag zwei verschiedene Lagen.
+    const double ende = (spanne >= 359.5) ? 359.0 : spanne;
+    for (double k = 0.0; k < ende - 0.5; k += kSchrittGrad) {
+        ziele.push_back(norm360(anfang + k));
+    }
+    ziele.push_back(norm360(anfang + ende));
+    ziele.push_back(norm360(startAz));                // zurueck
+    return ziele;
+}
+
 RundumLauf::RundumLauf(QObject* parent)
     : QObject(parent)
 {
@@ -102,6 +119,12 @@ bool RundumLauf::start()
     }
     m_karte.leeren();
     m_startAz = norm360(m_rotor->azimuth());
+    m_plan = plane(m_startAz, RotorBereich::load());
+    if (m_plan.isEmpty()) {
+        emit fehler(tr("The antenna points outside the allowed range — "
+                       "turn it back inside first."));
+        return false;
+    }
     m_az = m_startAz;
     m_azFrisch = true;
     m_schritt = 0;
@@ -125,15 +148,30 @@ void RundumLauf::abbrechen()
 void RundumLauf::naechsterSchritt()
 {
     ++m_schritt;
-    const int schritte = 360 / kSchrittGrad;
+    const int schritte = m_plan.size();
     if (m_schritt > schritte) {
         m_wache.stop();
         m_phase = Phase::Ruhe;
         emit fertig(true);
         return;
     }
-    m_ziel = norm360(m_startAz + m_schritt * kSchrittGrad);
+    m_ziel = m_plan[m_schritt - 1];
     emit fortschritt(m_schritt, schritte, m_az);
+    // Steht der Schritt (noch) im erlaubten Bereich? Sonst nicht warten,
+    // bis die Stillstandswache zuschlaegt.
+    if (m_rotor && !m_rotor->zielErlaubt(m_ziel)) {
+        emit fehler(tr("Step to %1° is outside the allowed range — sweep stopped.")
+                        .arg(qRound(m_ziel)));
+        m_wache.stop();
+        m_phase = Phase::Ruhe;
+        emit fertig(false);
+        return;
+    }
+    // Schon dort (der Plan beginnt oft an der eigenen Richtung)?
+    if (abstand(m_az, m_ziel) <= kAngekommenGrad) {
+        naechsterSchritt();
+        return;
+    }
     if (m_rotor) { m_rotor->moveTo(m_ziel); }
     m_wache.start();
 }
