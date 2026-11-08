@@ -115,7 +115,15 @@ void CatRigBruecke::vomGeraetFrequenz(qint64 hz)
 
 void CatRigBruecke::vomGeraetModus(const QString& modus)
 {
-    if (!m_scheibe || fristLaeuft()) { return; }
+    if (!m_scheibe) { return; }
+    // Hat die Scheibe eine Betriebsart, die das Geraet nicht kennt (SAM,
+    // DSB ...), und meldet das Geraet unveraendert dasselbe, hat am Geraet
+    // niemand umgeschaltet. Die nach der Frist erzwungene Meldung haette
+    // die Scheibe sonst auf AM gekippt (Durchsicht vom 08.11.).
+    const bool unveraendert = modus == m_letzterGeraeteModus;
+    m_letzterGeraeteModus = modus;
+    if (unveraendert && modusFuerGeraet(m_scheibe->dspMode()).isEmpty()) { return; }
+    if (fristLaeuft()) { return; }
     DSPMode m = DSPMode::USB;
     if (!modusAusGeraet(modus, m) || m_scheibe->dspMode() == m) { return; }
     m_uebernimmtVomGeraet = true;
@@ -160,7 +168,7 @@ void CatRigBruecke::vomGeraetFilter()
 
 void CatRigBruecke::vonScheibeFilter(int low, int high)
 {
-    if (!m_rig || !m_scheibe || m_uebernimmtVomGeraet) { return; }
+    if (!m_rig || !m_scheibe || m_uebernimmtVomGeraet || !m_rig->istTs590()) { return; }
     const DSPMode modus = m_scheibe->dspMode();
     if (modus != DSPMode::USB && modus != DSPMode::LSB
         && modus != DSPMode::CWU && modus != DSPMode::CWL) {

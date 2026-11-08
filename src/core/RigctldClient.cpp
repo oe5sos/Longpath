@@ -314,6 +314,13 @@ void RigctldClient::onReadyRead()
     m_buffer += m_socket.readAll();
 
     while (m_awaiting != Pending::None) {
+        // Eine Null am Anfang ist der Rest der vorigen Rohantwort, die in
+        // einem eigenen Paket kam. Sie gehoert nicht zur naechsten Antwort --
+        // ausser, auf genau eine Null wird gewartet.
+        if (m_awaiting != Pending::Nullbyte) {
+            while (!m_buffer.isEmpty() && m_buffer.front() == '\0') { m_buffer.remove(0, 1); }
+            if (m_buffer.isEmpty()) { return; }
+        }
         if (m_awaiting == Pending::Nullbyte) {
             const qsizetype null = m_buffer.indexOf('\0');
             const qsizetype zeile = m_buffer.indexOf('\n');

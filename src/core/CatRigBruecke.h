@@ -96,6 +96,7 @@ private:
     int m_filterVonHz{0};
     int m_filterBisHz{0};
     int m_filterBreiteHz{0};
+    QString m_letzterGeraeteModus;
 };
 
 } // namespace Longpath

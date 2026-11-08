@@ -292,9 +292,17 @@ bool CompanionRigController::darfAbstimmen() const
     return (m_eingeschaltet || m_catBetrieb) && verbunden();
 }
 
+bool CompanionRigController::istTs590() const
+{
+    return m_modell == kModellTs590S;
+}
+
 void CompanionRigController::stelle(const QByteArray& zeile)
 {
-    if (!darfAbstimmen()) { return; }
+    // Die Zeilen aus Ts590Cat sind Kenwood-Bytes mit den Tabellen des
+    // TS-590S. An ein anderes Geraet (auch den TS-590SG mit anderen
+    // Tabellen) gehen sie nicht -- gefunden in der Durchsicht vom 08.11.
+    if (!darfAbstimmen() || !istTs590()) { return; }
     m_client->schickeZeile(zeile);
     m_client->frageRohListeNach();
 }
@@ -314,7 +322,7 @@ void CompanionRigController::rohAntwortLesen(const QByteArray& antwort)
 // Kurzwelle ist genau dieser Stand richtig.
 void CompanionRigController::pruefeTransverterWege()
 {
-    const bool falsch = TransverterSetup::current().enabled
+    const bool falsch = TransverterSetup::current().active()
                         && (m_catZustand.rxAnt == 0 || m_catZustand.drive == 0);
     if (falsch == m_wegeWarnung) { return; }
     m_wegeWarnung = falsch;

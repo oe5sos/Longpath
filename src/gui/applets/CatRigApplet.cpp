@@ -59,8 +59,12 @@ CatRigApplet::CatRigApplet(RadioModel* model, QWidget* parent)
         connect(m_rfGain, &QSlider::sliderReleased, this, [this, schicke]() {
             schicke(Ts590Cat::stelleRfGain(m_rfGain->value()));
         });
-        connect(m_rfGain, &QSlider::valueChanged, this, [this](int wert) {
+        connect(m_rfGain, &QSlider::valueChanged, this, [this, schicke](int wert) {
             m_rfWert->setText(QString::number(wert));
+            // Mausrad, Tasten, Klick neben den Griff: kein sliderReleased.
+            // Der Abgleich vom Geraet setzt den Wert unter einer Signalsperre
+            // und landet darum nicht hier.
+            if (!m_rfGain->isSliderDown()) { schicke(Ts590Cat::stelleRfGain(wert)); }
         });
     }
     syncFromModel();
@@ -143,7 +147,7 @@ void CatRigApplet::syncFromModel()
                             .arg(z.rxAnt == 1 ? tr("on") : tr("off"))
                             .arg(z.drive == 1 ? tr("on") : tr("off")));
     }
-    const bool falsch = TransverterSetup::current().enabled
+    const bool falsch = TransverterSetup::current().active()
                         && (z.rxAnt == 0 || z.drive == 0);
     m_wege->setStyleSheet(falsch
         ? QStringLiteral("color: %1;").arg(QString::fromLatin1(Style::kTxRed))

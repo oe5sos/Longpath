@@ -121,6 +121,8 @@ public:
     // ── Was das Geraet sagt ─────────────────────────────────────────
 
     RigctldClient* client() const { return m_client.get(); }
+    /// Nur dann gelten die Zeilen aus Ts590Cat (Hamlib-Modell 2031).
+    bool istTs590() const;
 
     bool    aktiv() const { return m_eingeschaltet; }
     bool    verbunden() const { return m_client && m_client->isConnected(); }
