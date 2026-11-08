@@ -881,6 +881,14 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
         luecken->setChecked(m_spectrum->gapFinderShown());
         connect(luecken, &QAction::toggled, m_spectrum,
                 &SpectrumWidget::setGapFinderShown);
+        QAction* sStufen = menu->addAction(tr("S-units on the scale"));
+        sStufen->setCheckable(true);
+        sStufen->setChecked(m_spectrum->sUnitsScaleShown());
+        sStufen->setToolTip(tr("S1…S9, +10…+60 instead of dBm. Below 30 MHz "
+                               "S9 = −73 dBm, above (2 m) −93 dBm, judged at "
+                               "the antenna frequency."));
+        connect(sStufen, &QAction::toggled, m_spectrum,
+                &SpectrumWidget::setSUnitsScaleShown);
         QAction* lupe = menu->addAction(tr("Passband magnifier"));
         lupe->setCheckable(true);
         lupe->setChecked(m_spectrum->passbandMagnifier() != 0);

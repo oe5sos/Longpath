@@ -129,6 +129,7 @@ private:
     QDoubleSpinBox* m_tvVon{nullptr};
     QDoubleSpinBox* m_tvBis{nullptr};
     QDoubleSpinBox* m_tvVersatz{nullptr};
+    QDoubleSpinBox* m_tvRxGain{nullptr};    // RX-Verstaerkung (2026-11-08)
     QLabel*         m_tvText{nullptr};
 
     RadioModel* m_model{nullptr};

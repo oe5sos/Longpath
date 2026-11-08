@@ -719,6 +719,19 @@ public:
     void setPassbandMagnifier(int modus);
     int  passbandMagnifier() const { return m_lupenModus; }
 
+    // ── S-Stufen an der dBm-Skala (2026-11-08) ──────────────────────────
+    //
+    // Statt dBm-Zahlen S1 ... S9, +10 ... +60 -- nach Thetis' Bezug
+    // (core/SMeterSkala): unter 30 MHz S9 = -73 dBm, darueber -93 dBm,
+    // entschieden an der ANTENNENfrequenz des VFO (mit Transverter also
+    // 2 m, nicht 28 MHz). Die Striche zeigen den kalibrierten Pegel --
+    // anders als die dBm-Zahlen, die roh ablesen (Befund 2026-09-25).
+    // Ab Werk aus, Haken im Zahnrad.
+    void setSUnitsScaleShown(bool on);
+    bool sUnitsScaleShown() const { return m_sStufenSkala; }
+    /// Pruefstand: Beschriftung und Rohwert (fuer dbmToY) je Strich.
+    QVector<QPair<QString, float>> sUnitTicksForTest() const { return sStufenStriche(); }
+
     /// Pruefstand: die Auswertung sofort, ohne die 200-ms-Bremse.
     void werteDurchlassAusForTest() { werteDurchlassAus(/*sofort=*/true); }
     QVector<Durchlass::Signal> signalBracketsForTest() const { return m_klammerHaltung.gezeigt(); }
@@ -2843,6 +2856,7 @@ private:
     QVector<QPair<QRectF, double>> m_lueckenKlick;   // Flaeche, ZF in Hz
     QVector<float>             m_lupeGlatt;
     int                        m_lupeErster{-1};
+    bool                       m_sStufenSkala{false};   // S-Stufen statt dBm
     // Schaerfe (2026-11-08), siehe setWaterfallDevicePixels. AN ab Werk.
     // Vor jedem GPU-#ifdef, weil die Zugriffsmethoden ungeschuetzt sind.
     bool        m_wfDevicePixels{true};
@@ -3713,6 +3727,7 @@ private:
     void paintSignalKlammern(QPainter& p, const QRect& specRect);
     void paintLueckenfinder(QPainter& p, const QRect& specRect);
     void paintDurchlassLupe(QPainter& p, const QRect& specRect);
+    QVector<QPair<QString, float>> sStufenStriche() const;
 };
 
 } // namespace Longpath

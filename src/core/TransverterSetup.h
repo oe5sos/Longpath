@@ -85,6 +85,23 @@ struct TransverterSetup {
     /// Frequenz, denn der Anschluss haengt am Empfangsausgang.
     bool sperrtSenden() const { return active() && nurEmpfang; }
 
+    // ── RX-Verstaerkung (2026-11-08) ────────────────────────────────
+    //
+    // Was der Empfangszweig des Transverters verstaerkt, wie ihn DIESES
+    // Geraet sieht (MV-2 ab Werk 22 dB; an IFo2 abzueglich der Teilung
+    // im MC-1). Sie wird von jedem Empfangspegel abgezogen -- die
+    // Rechnung und ihre Herkunft stehen bei RadioModel::rxMeterOffsetDb.
+    // Damit beziehen sich Spektrum, S-Meter und S-Stufen auf die ANTENNE.
+    // Ab Werk 0: ohne Eintrag aendert sich kein Pegel.
+    double rxGainDb {0.0};
+
+    /// Der Pegelversatz fuer eine Empfangs-ZF: -rxGainDb, solange der
+    /// Transverter aktiv ist und die ZF in seinem Fenster liegt, sonst 0.
+    double pegelVersatzDb(qint64 ifHz) const
+    {
+        return (active() && coversIf(ifHz)) ? -rxGainDb : 0.0;
+    }
+
     /// Ist das Fenster brauchbar und der Versatz von Null verschieden?
     bool configured() const
     {
@@ -142,7 +159,7 @@ struct TransverterSetup {
     // ── Einstellungen ───────────────────────────────────────────────
     //
     // Schluessel: Transverter/Enabled, /IfLowHz, /IfHighHz, /OffsetHz,
-    // /RxOnly (nurEmpfang, 2026-11-08).
+    // /RxOnly (nurEmpfang), /RxGainDb (rxGainDb), beide 2026-11-08.
     static TransverterSetup load();
     void save() const;
 

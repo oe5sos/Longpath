@@ -1690,6 +1690,9 @@ public:
     // AGC_AV / AGC_GAIN do NOT take the offset (Thetis line 46831-46835
     // omit +offset for the same reason).
     double rxMeterOffsetDb() const;
+    /// Den Pegelversatz neu rechnen und bei Aenderung rxMeterOffsetChanged
+    /// senden (Abschwaecher, Vorverstaerker, Transverter; 2026-11-08).
+    void pruefeRxMeterOffset();
 
 signals:
     // Emitted when rxMeterOffsetDb() changes (model swap, preamp change,

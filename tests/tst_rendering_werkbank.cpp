@@ -621,6 +621,10 @@ private slots:
             const bool lupe = fall.id.startsWith(QLatin1String("z3_"));
             w.setCompanionMarker(!lupe, 144300000 - tv.offsetHz, QStringLiteral("TS-590"));
             if (lupe) { w.setShowPeakValueOverlay(false); }
+            // LONGPATH_S_STUFEN=1: S-Stufen statt dBm an der Skala (2026-11-08).
+            if (qEnvironmentVariableIntValue("LONGPATH_S_STUFEN") == 1) {
+                w.setSUnitsScaleShown(true);
+            }
             w.setDbmRange(-150.0f, -60.0f);
             w.setClarityActive(true);
             w.setClarityWaterfallThresholds(-140.0f, -80.0f, -135.0f);

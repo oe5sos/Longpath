@@ -86,6 +86,7 @@ TransverterSetup TransverterSetup::load()
     t.nurEmpfang = s.value(QStringLiteral("Transverter/RxOnly"),
                            QStringLiteral("True")).toString()
                    == QStringLiteral("True");
+    t.rxGainDb = s.value(QStringLiteral("Transverter/RxGainDb"), 0.0).toDouble();
     return t;
 }
 
@@ -99,6 +100,7 @@ void TransverterSetup::save() const
     s.setValue(QStringLiteral("Transverter/OffsetHz"), QVariant::fromValue(offsetHz));
     s.setValue(QStringLiteral("Transverter/RxOnly"),
                nurEmpfang ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(QStringLiteral("Transverter/RxGainDb"), rxGainDb);
 }
 
 // ── Die prozessweite Fassung ────────────────────────────────────────

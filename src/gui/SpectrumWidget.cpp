@@ -169,6 +169,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QFontMetricsF>
+#include "core/SMeterSkala.h"
 #include <QLinearGradient>
 #include <QResizeEvent>
 #include <QMouseEvent>
@@ -1108,6 +1109,7 @@ void SpectrumWidget::loadSettings()
     m_zeigeKlammern   = readBool(QStringLiteral("DisplaySignalBrackets"), true);
     m_zeigeLuecken    = readBool(QStringLiteral("DisplayGapFinder"), true);
     m_lupenModus      = qBound(0, readInt(QStringLiteral("DisplayPassbandMagnifier"), 1), 2);
+    m_sStufenSkala    = readBool(QStringLiteral("DisplaySUnitsScale"), false);
     {
         const bool wfDev = readBool(QStringLiteral("DisplayWaterfallDevicePixels"), true);
         if (wfDev != m_wfDevicePixels) {
@@ -1486,6 +1488,8 @@ void SpectrumWidget::saveSettings()
     s.setValue(settingsKey(QStringLiteral("DisplayGapFinder"), m_panIndex),
               m_zeigeLuecken ? QStringLiteral("True") : QStringLiteral("False"));
     writeInt(QStringLiteral("DisplayPassbandMagnifier"), m_lupenModus);
+    s.setValue(settingsKey(QStringLiteral("DisplaySUnitsScale"), m_panIndex),
+              m_sStufenSkala ? QStringLiteral("True") : QStringLiteral("False"));
 
     // Phase 3G-8 commit 4: waterfall renderer state.
     s.setValue(settingsKey(QStringLiteral("DisplayWfAgc"), m_panIndex),
@@ -2392,6 +2396,36 @@ void SpectrumWidget::setGapFinderShown(bool on)
     m_overlayDynamicDirty = true;
 #endif
     update();
+}
+
+void SpectrumWidget::setSUnitsScaleShown(bool on)
+{
+    if (m_sStufenSkala == on) { return; }
+    m_sStufenSkala = on;
+    scheduleSettingsSave();
+    markOverlayDirty();
+    update();
+}
+
+// Die Striche der S-Skala: Beschriftung und der ROHwert, den dbmToY()
+// bekommt. dbmToY schlaegt den Kalibrierversatz auf; der Strich fuer die
+// Stufe s soll aber dort stehen, wo ein Signal mit dem KALIBRIERTEN
+// Antennenpegel dbmFuer(s) liegt -- also Rohwert = dbmFuer(s) - Versatz.
+// So zeigt ein S9-Traeger im Spektrum auf den S9-Strich, wie das S-Meter.
+QVector<QPair<QString, float>> SpectrumWidget::sStufenStriche() const
+{
+    const bool vhf = SMeter::ueberGrenze(rfFuerAnzeige(m_vfoHz) / 1.0e6);
+    QVector<QPair<QString, float>> striche;
+    for (int s : {1, 3, 5, 7, 9}) {
+        striche.push_back({QStringLiteral("S%1").arg(s),
+                           static_cast<float>(SMeter::dbmFuer(s, vhf) - m_dbmCalOffset)});
+    }
+    for (int plus : {10, 20, 40, 60}) {
+        striche.push_back({QStringLiteral("+%1").arg(plus),
+                           static_cast<float>(SMeter::dbmFuer(9.0 + plus / 6.0, vhf)
+                                              - m_dbmCalOffset)});
+    }
+    return striche;
 }
 
 void SpectrumWidget::setPassbandMagnifier(int modus)
@@ -5758,6 +5792,30 @@ void SpectrumWidget::drawDbmScale(QPainter& p, const QRect& specRect)
     // (y + ascent/2); to keep visual-identical placement, drawStaticText
     // takes y = (y + ascent/2) - ascent = y - ascent/2.
     const qreal staticAscent = fm.ascent();
+
+    if (m_sStufenSkala) {
+        // S-Stufen statt dBm (2026-11-08), siehe sStufenStriche().
+        for (const auto& strich : sStufenStriche()) {
+            const int y = dbmToY(strich.second, specRect);
+            if (y < labelTop || y > specRect.bottom() - 5) { continue; }
+            p.setPen(QColor(Style::kTextTertiary));
+            p.drawLine(strip.left(), y, strip.left() + 4, y);
+            auto cit = m_dbmLabelCache.find(strich.first);
+            if (cit == m_dbmLabelCache.end()) {
+                QStaticText st(strich.first);
+                st.setPerformanceHint(QStaticText::AggressiveCaching);
+                cit = m_dbmLabelCache.insert(strich.first, std::move(st));
+            }
+            cit.value().prepare(p.transform(), f);
+            // S9 hervorgehoben -- an ihr liest man Rapporte ab.
+            p.setPen(strich.first == QLatin1String("S9")
+                         ? QColor(Style::kAmberText)
+                         : QColor(Style::kSpectrumGridText));
+            p.drawStaticText(QPointF(strip.left() + 6, y - staticAscent / 2.0),
+                             cit.value());
+        }
+        return;
+    }
 
     for (float dbm = firstLabel; dbm <= m_refLevel; dbm += stepDb) {
         // Route through dbmToY() so m_dbmCalOffset is applied consistently with

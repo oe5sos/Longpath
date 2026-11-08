@@ -895,6 +895,7 @@ set(GUI_SOURCES
     src/gui/spectrum/PeakBlobDetector.cpp
     src/gui/spectrum/SpectrumDetector.cpp
     src/gui/spectrum/Durchlass.cpp
+    src/core/SMeterSkala.cpp
     src/gui/spectrum/SpectrumAvenger.cpp
     src/gui/DssRenderer.cpp
     src/gui/SpectrumWidget.cpp

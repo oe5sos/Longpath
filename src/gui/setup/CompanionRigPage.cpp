@@ -438,6 +438,28 @@ void CompanionRigPage::baueTransverterGruppe()
     m_tvVersatz->setRange(-30000.0, 30000.0);
     grid->addWidget(m_tvVersatz, row++, 1);
 
+    // RX-Verstaerkung (2026-11-08) -- Thetis "RX Gain" im Transverter-
+    // Fenster: von jedem Empfangspegel abgezogen, damit Spektrum, S-Meter
+    // und S-Stufen die Antenne meinen. Siehe TransverterSetup::rxGainDb.
+    auto* gainLabel = new QLabel(QStringLiteral("RX gain:"), group);
+    gainLabel->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
+    grid->addWidget(gainLabel, row, 0);
+    m_tvRxGain = new QDoubleSpinBox(group);
+    m_tvRxGain->setObjectName(QStringLiteral("transverterRxGain"));
+    m_tvRxGain->setStyleSheet(Style::doubleSpinBoxStyle());
+    m_tvRxGain->setLocale(QLocale::c());
+    m_tvRxGain->setDecimals(1);
+    m_tvRxGain->setRange(-20.0, 60.0);
+    m_tvRxGain->setSingleStep(0.5);
+    m_tvRxGain->setSuffix(QStringLiteral(" dB"));
+    m_tvRxGain->setToolTip(QStringLiteral(
+        "Gain of the transverter's receive path as this radio sees it — the "
+        "MV-2 ships with 22 dB; on the second IF output (IFo2) subtract the "
+        "split loss of the MC-1. It is subtracted from every receive level, "
+        "so the spectrum, the S-meter and the S-units refer to the antenna. "
+        "Applies only while the VFO is inside the IF window. 0 = no change."));
+    grid->addWidget(m_tvRxGain, row++, 1);
+
     m_tvText = new QLabel(QString(), group);
     m_tvText->setObjectName(QStringLiteral("transverterSummary"));
     m_tvText->setStyleSheet(
@@ -485,6 +507,11 @@ void CompanionRigPage::baueTransverterGruppe()
         m_tvText->setText(m_tv.describe());
         speichereTransverter();
     };
+    connect(m_tvRxGain, &QDoubleSpinBox::editingFinished, this, [this]() {
+        if (m_fuellt) { return; }
+        m_tv.rxGainDb = m_tvRxGain->value();
+        speichereTransverter();
+    });
     connect(m_tvVon, &QDoubleSpinBox::editingFinished, this, ausDenFeldern);
     connect(m_tvBis, &QDoubleSpinBox::editingFinished, this, ausDenFeldern);
     connect(m_tvVersatz, &QDoubleSpinBox::editingFinished,
@@ -499,6 +526,7 @@ void CompanionRigPage::zeigeTransverter()
     m_tvVon->setValue(static_cast<double>(m_tv.ifLowHz) / 1e6);
     m_tvBis->setValue(static_cast<double>(m_tv.ifHighHz) / 1e6);
     m_tvVersatz->setValue(static_cast<double>(m_tv.offsetHz) / 1e6);
+    m_tvRxGain->setValue(m_tv.rxGainDb);
 
     // Trifft die Einstellung eine Vorgabe, soll die Auswahl das zeigen.
     int treffer = 0;

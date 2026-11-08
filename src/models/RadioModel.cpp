@@ -1978,6 +1978,14 @@ RadioModel::RadioModel(QObject* parent)
     // prozessweite Fassung ab (die Anzeige liest ihn dort), verbindet
     // aber nicht -- das tut MainWindow, wenn die Oberflaeche steht.
     m_companionRig        = std::make_unique<CompanionRigController>(this);
+    // Transverter-Einstellung geaendert (Versatz, Fenster, RX-Verstaerkung):
+    // der Pegelversatz kann sich damit aendern (2026-11-08).
+    connect(m_companionRig.get(), &CompanionRigController::versatzGeaendert,
+            this, &RadioModel::pruefeRxMeterOffset);
+    // Eine andere aktive Scheibe kann innerhalb oder ausserhalb des
+    // ZF-Fensters liegen.
+    connect(this, &RadioModel::activeSliceChanged,
+            this, [this](int) { pruefeRxMeterOffset(); });
     // 2026-05-12 bench fix: SpotTableModel ownership moved from
     // SpotHubDialog so it stays populated from app start.  Prior
     // behaviour: the table only existed once the user opened
@@ -3101,13 +3109,9 @@ void RadioModel::setStepAttController(StepAttenuatorController* c)
     // actually changed from the cached value, so we don't fire redundant
     // updates on every controller tick.
     if (c) {
-        auto recompute = [this]() {
-            const double v = rxMeterOffsetDb();
-            if (!qFuzzyCompare(1.0 + v, 1.0 + m_lastEmittedRxMeterOffsetDb)) {
-                m_lastEmittedRxMeterOffsetDb = v;
-                emit rxMeterOffsetChanged(v);
-            }
-        };
+        // Seit 2026-11-08 eine Methode: auch der Transverter (Einstellung,
+        // VFO ueber die Fenstergrenze) loest sie aus.
+        auto recompute = [this]() { pruefeRxMeterOffset(); };
         connect(c, &StepAttenuatorController::attenuationChanged,
                 this, [recompute](int) { recompute(); });
         connect(c, &StepAttenuatorController::preampModeChanged,
@@ -3941,7 +3945,9 @@ int RadioModel::maxSlices() const
 //   RXPreampOffset(1)  = step_att_enabled ? attenuator_data
 //                                         : preamp_offset[preamp_mode]
 //   RXCalibrationOffset(1) = _rx1_meter_cal_offset
-//                            (+ _rx1_xvtr_gain_offset deferred to XVTR epic)
+//                            + _rx1_xvtr_gain_offset (seit 2026-11-08: die
+//                              RX-Verstaerkung aus TransverterSetup, nur im
+//                              ZF-Fenster; siehe calibrationXvtr)
 //                            (+ _rx1_6m_gain_offset   deferred to 6m epic)
 //
 // _rx1_meter_cal_offset defaults to rxMeterCalOffsetDefaultFor(model)
@@ -3989,7 +3995,30 @@ double RadioModel::rxMeterOffsetDb() const
         }
     }
 
-    return static_cast<double>(preampOffset + meterCalOffset);
+    // Transverter (2026-11-08): seine RX-Verstaerkung kommt, wie bei
+    // Thetis, in den Kalibrierversatz -- nur solange der VFO in seinem
+    // ZF-Fenster steht. Siehe TransverterSetup::rxGainDb.
+    //   From Thetis console.cs:20997 [@852bf0e]:
+    //     fOffset = _rx1_meter_cal_offset + _rx1_xvtr_gain_offset + _rx1_6m_gain_offset;
+    //   From Thetis console.cs:31532-31534 [@852bf0e] (nur im Transverter-Band):
+    //     if (rx1_xvtr_index >= 0)
+    //         RX1XVTRGainOffset = XVTRForm.GetRXGain(rx1_xvtr_index);
+    //   GetRXGain liefert den negativen Eintrag (Thetis xvtr.cs:5605:
+    //   ret_val = -(float)rx_gain[index].Value), daher -rxGainDb.
+    const qint64 zf = m_activeSlice
+        ? static_cast<qint64>(m_activeSlice->frequency()) : 0;
+    const double transverter = TransverterSetup::current().pegelVersatzDb(zf);
+
+    return static_cast<double>(preampOffset + meterCalOffset) + transverter;
+}
+
+void RadioModel::pruefeRxMeterOffset()
+{
+    const double v = rxMeterOffsetDb();
+    if (!qFuzzyCompare(1.0 + v, 1.0 + m_lastEmittedRxMeterOffsetDb)) {
+        m_lastEmittedRxMeterOffsetDb = v;
+        emit rxMeterOffsetChanged(v);
+    }
 }
 
 // ── Phase 3F Sub-Epic I: DDC stream pool ────────────────────────────────────
@@ -5579,6 +5608,13 @@ int RadioModel::addSlice(const QString& initialPanId, bool suppressAutoStreamBin
 {
     auto* slice = new SliceModel(this);
     slice->setSuppressAutoStreamBinding(suppressAutoStreamBinding);
+
+    // Ueber die Fenstergrenze des Transverters getunt: der Pegelversatz
+    // (seine RX-Verstaerkung) gilt nur im ZF-Fenster (2026-11-08). Hier
+    // und nicht in wireSliceSignals -- das kehrt ohne Funkgeraet um.
+    connect(slice, &SliceModel::frequencyChanged, this, [this, slice]() {
+        if (slice == m_activeSlice) { pruefeRxMeterOffset(); }
+    });
 
     // Phase 3F Sub-Epic I closeout, defect C3: lowest id not currently in
     // use, NOT m_slices.size().
@@ -18029,7 +18065,15 @@ QStringList RadioModel::txProfilesList() const
 // persistence are added.
 double RadioModel::calibrationMeter(int rx) const     { (void)rx; return 0.0; }
 double RadioModel::calibrationDisplay(int rx) const   { (void)rx; return 0.0; }
-double RadioModel::calibrationXvtr(int rx) const      { (void)rx; return 0.0; }
+// Seit 2026-11-08 kein Stummel mehr: der Versatz, den rxMeterOffsetDb
+// fuer RX1 einrechnet (Thetis _rx1_xvtr_gain_offset). RX2 fuehrt Longpath
+// ohne eigenen Transverter -- dort 0 wie bisher.
+double RadioModel::calibrationXvtr(int rx) const
+{
+    if (rx != 0) { return 0.0; }
+    const qint64 zf = m_activeSlice ? static_cast<qint64>(m_activeSlice->frequency()) : 0;
+    return TransverterSetup::current().pegelVersatzDb(zf);
+}
 double RadioModel::calibrationSixMeter(int rx) const  { (void)rx; return 0.0; }
 double RadioModel::calibrationTxDisplay(int rx) const { (void)rx; return 0.0; }
 

@@ -1133,6 +1133,10 @@ longpath_add_test(tst_transverter_nur_empfang)
 #   Handbetrieb noch PTT-Modus (Thetis console.cs:30061-30069) -- vorher
 #   meldete es "transmit tune=1" an TGXL/PGXL, ohne Traeger.
 longpath_add_test(tst_tune_abgewiesen)
+# tst_s_stufen (2026-11-08): S-Stufen nach Thetis common.cs mit VHF-Bezug
+#   (S9 = -93 dBm ueber 30 MHz), die RX-Verstaerkung des Transverters im
+#   Pegelversatz (Thetis RXCalibrationOffset) und die S-Striche am Panadapter.
+longpath_add_test(tst_s_stufen)
 if(TEST tst_transverter_nur_empfang)
     set_tests_properties(tst_transverter_nur_empfang PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
