@@ -1679,6 +1679,33 @@ void LogbookWindow::editSelected()
     for (const QLineEdit* le : dlg.findChildren<QLineEdit*>()) { shown.insert(le, le->text()); }
     const auto edited = [&shown](const QLineEdit* le) { return le->text() != shown.value(le); };
 
+    // ── Bei SOTA der Locator des Gipfels (Betreiber 2026-11-10) ──────
+    // Steht in "My activation" ein Gipfel, kommt sein Locator sichtbar in
+    // "My grid" (ebenso fuer die Gegenseite) -- erst "Save" schreibt ihn.
+    // Ein noch unbekannter Gipfel wird nachgeschlagen; die Antwort fuellt
+    // das Feld nach, solange der Dialog offen ist.
+    const auto gipfelLocator = [myActivation, myGrid, theirActivation, grid]() {
+        const SotaGipfelVerzeichnis& v = SotaGipfelVerzeichnis::instanz();
+        const QString mein = v.gipfelLocator(myActivation->text());
+        if (!mein.isEmpty() && !myGrid->text().trimmed().toUpper().startsWith(mein)) {
+            myGrid->setText(mein);
+        }
+        const QString ihr = v.gipfelLocator(theirActivation->text());
+        if (!ihr.isEmpty() && !grid->text().trimmed().toUpper().startsWith(ihr)) {
+            grid->setText(ihr);
+        }
+    };
+    const auto nachschlagen = [gipfelLocator](const QString& text) {
+        SotaGipfelVerzeichnis::instanz().anfragen(text);
+        gipfelLocator();
+    };
+    connect(myActivation, &QLineEdit::textChanged, &dlg, nachschlagen);
+    connect(theirActivation, &QLineEdit::textChanged, &dlg, nachschlagen);
+    connect(&SotaGipfelVerzeichnis::instanz(), &SotaGipfelVerzeichnis::gipfelBekannt,
+            &dlg, gipfelLocator);
+    nachschlagen(myActivation->text());
+    nachschlagen(theirActivation->text());
+
     if (dlg.exec() != QDialog::Accepted) { return; }
     // Waehrend des Dialogs neu eingelesen? Dann steht der Kontakt
     // anderswo -- oder gar nicht mehr.
@@ -2298,6 +2325,10 @@ void LogbookWindow::prepareMap(QsoMapWindow* map)
     // being right for an imported log made from a different station.
     QString home;
     for (const LogEntry& e : m_all) {
+        // Ein QSO vom Gipfel sagt nicht, wo zu Hause ist -- seit es den
+        // Locator des Gipfels traegt (2026-11-10), waere sonst nach jeder
+        // Aktivierung der Gipfel das Zuhause.
+        if (!e.mySotaRef.trimmed().isEmpty()) { continue; }
         if (!e.myGridSquare.trimmed().isEmpty()) {
             home = e.myGridSquare;
             break;   // m_all is newest first
@@ -2683,6 +2714,7 @@ void LogbookWindow::refreshRadioReadout()
 QString LogbookWindow::meinFeld() const
 {
     for (const LogEntry& e : m_all) {                 // m_all: neueste zuerst
+        if (!e.mySotaRef.trimmed().isEmpty()) { continue; }   // Gipfel, nicht zu Hause
         if (isValidGridSquare(e.myGridSquare.trimmed())) { return e.myGridSquare.trimmed(); }
     }
     return AppSettings::instance().value(QStringLiteral("StationGridSquare")).toString().trimmed();
@@ -2849,6 +2881,13 @@ bool LogbookWindow::sotaVorschlaegeAnwenden(const QVector<SotaNachtrag::Vorschla
     if (gewaehlt.isEmpty()) { return false; }
     QVector<LogEntry> neu = m_all;
     if (SotaNachtrag::anwenden(neu, gewaehlt) == 0) { return false; }
+    // Bei SOTA gilt der Locator des Gipfels (Betreiber 2026-11-10); der
+    // Dialog zeigt die Aenderung in der Spalte "Your grid".
+    for (const SotaNachtrag::Vorschlag& v : gewaehlt) {
+        if (v.index >= 0 && v.index < neu.size()) {
+            SotaGipfelVerzeichnis::instanz().wendeGipfelLocatorAn(neu[v.index]);
+        }
+    }
 
     // Erst sichern, dann schreiben -- und ohne Sicherung gar nicht.
     QString ziel;

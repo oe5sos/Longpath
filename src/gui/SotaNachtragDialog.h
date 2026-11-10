@@ -49,6 +49,11 @@ private:
     void waehleDatei();
     void zeige();
     void zaehle();
+    // Spalte "Your grid": bei SOTA gilt der Locator des Gipfels
+    // (Betreiber 2026-11-10). Neu, sobald ein Gipfel bekannt ist.
+    void zeigeLocatoren();
+    QString locatorText(const SotaNachtrag::Vorschlag& v) const;
+    bool wartetAufGipfel() const;
 
     QVector<LogEntry> m_log;
     SotaNachtrag::Ergebnis m_erg;

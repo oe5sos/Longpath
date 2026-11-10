@@ -101,6 +101,12 @@ private slots:
         QCOMPARE(g.altM, 884);
         QCOMPARE(g.lat, 47.9058);
         QCOMPARE(g.lon, 13.7353);
+        QCOMPARE(g.locator, QStringLiteral("JN67UV"));          // "JN67uv" in der Antwort
+        // Ohne "locator" in der Antwort: aus der Lage gerechnet.
+        SotaGipfel ohne;
+        QVERIFY(SotaGipfelVerzeichnis::leseAntwort(
+            "{\"summitCode\":\"OE/OO-106\",\"latitude\":47.9058,\"longitude\":13.7353}", ohne));
+        QCOMPARE(ohne.locator, QStringLiteral("JN67UV"));
         QVERIFY(!SotaGipfelVerzeichnis::leseAntwort("Not found", g));
         QVERIFY(!SotaGipfelVerzeichnis::leseAntwort("{\"summitCode\":\"OE/OO-106\"}", g));
     }
@@ -136,6 +142,7 @@ private slots:
             SotaGipfel g;
             QVERIFY(v.finde(QStringLiteral("OE/OO-106"), g));
             QCOMPARE(g.name, QStringLiteral("Gmundnerberg"));
+            QCOMPARE(g.locator, QStringLiteral("JN67UV"));      // aus dem Cache
             v.anfragen(QStringLiteral("OE/OO-106"));
             QTest::qWait(50);
             QCOMPARE(netz.gefragt.size(), 1);
@@ -211,6 +218,46 @@ private slots:
         QCOMPARE(netz.gefragt.size(), 1);           // eine unterwegs, zwei warten
         QTRY_COMPARE_WITH_TIMEOUT(fehler.size(), 2, 3000);
         QCOMPARE(netz.gefragt.size(), 3);
+    }
+
+    void beiSotaGiltDerGipfelLocator()
+    {
+        // Martin 2026-11-10: „bei sota muss immer der locator der
+        // sotareferenz angenommen werden".
+        QTemporaryDir dir;
+        Attrappe netz;
+        SotaGipfelVerzeichnis v(dir.filePath(QStringLiteral("s.json")));
+        v.setAbruf(netz.abruf());
+        v.setTakt(0);
+        LogEntry e = sn7l();                         // MY_GRIDSQUARE JN67VV (Tal)
+        QCOMPARE(v.wendeGipfelLocatorAn(e), 0);      // Gipfel noch unbekannt
+        QCOMPARE(e.myGridSquare, QStringLiteral("JN67VV"));
+
+        QSignalSpy bekannt(&v, &SotaGipfelVerzeichnis::gipfelBekannt);
+        v.anfragen(e.mySotaRef);
+        QVERIFY(bekannt.wait(2000));
+        QCOMPARE(v.gipfelLocator(QStringLiteral("oe/oo-106")), QStringLiteral("JN67UV"));
+        QCOMPARE(v.wendeGipfelLocatorAn(e), 1);
+        QCOMPARE(e.myGridSquare, QStringLiteral("JN67UV"));
+        QCOMPARE(e.gridSquare, QStringLiteral("JO70SS"));   // kein SOTA_REF: bleibt
+        QCOMPARE(v.wendeGipfelLocatorAn(e), 0);             // schon richtig
+
+        // Ein genauerer Locator im selben Quadrat bleibt stehen.
+        LogEntry genau = sn7l();
+        genau.myGridSquare = QStringLiteral("jn67uv41");
+        QCOMPARE(v.wendeGipfelLocatorAn(genau), 0);
+
+        // Gipfel zu Gipfel: auch GRIDSQUARE der Gegenseite.
+        LogEntry s2s = sn7l();
+        s2s.sotaRef = QStringLiteral("OE/OO-106");
+        QCOMPARE(v.wendeGipfelLocatorAn(s2s), 2);
+        QCOMPARE(s2s.gridSquare, QStringLiteral("JN67UV"));
+
+        // Ohne Gipfel: nichts.
+        LogEntry heim = sn7l();
+        heim.mySotaRef.clear();
+        QCOMPARE(v.wendeGipfelLocatorAn(heim), 0);
+        QCOMPARE(heim.myGridSquare, QStringLiteral("JN67VV"));
     }
 
     void streckeVomGipfel()

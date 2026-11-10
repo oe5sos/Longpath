@@ -26,6 +26,7 @@
 #include <QDoubleSpinBox>
 #include <QFile>
 #include <QJsonArray>
+#include <QLineEdit>
 #include <QJsonDocument>
 #include <QMouseEvent>
 #include <QNetworkAccessManager>
@@ -310,6 +311,15 @@ private slots:
 
     void logbuchNachtragSichertUndSchreibt()
     {
+        // Der Gipfel muss bekannt sein, bevor angewendet wird -- wie im
+        // Dialog, der "Apply" bis dahin sperrt.
+        SotaGipfel bekanntG;
+        if (!SotaGipfelVerzeichnis::instanz().finde(QStringLiteral("OE/OO-106"), bekanntG)) {
+            QSignalSpy bekannt(&SotaGipfelVerzeichnis::instanz(),
+                               &SotaGipfelVerzeichnis::gipfelBekannt);
+            SotaGipfelVerzeichnis::instanz().anfragen(QStringLiteral("OE/OO-106"));
+            QVERIFY(bekannt.wait(kFensterFrist));
+        }
         QTemporaryDir dir;
         const QString pfad = dir.filePath(QStringLiteral("logbook.adi"));
         QVector<LogEntry> log{
@@ -349,10 +359,19 @@ private slots:
         const QVector<LogEntry> neu = AdifLog::read(pfad);
         int mitGipfel = 0;
         for (const LogEntry& x : neu) {
-            if (x.mySotaRef == QLatin1String("OE/OO-106")) { ++mitGipfel; }
-            if (x.call == QLatin1String("IZ7HNO")) { QVERIFY(x.mySotaRef.isEmpty()); }
+            if (x.mySotaRef == QLatin1String("OE/OO-106")) {
+                ++mitGipfel;
+                // Bei SOTA der Locator des Gipfels, nicht das Tal.
+                QCOMPARE(x.myGridSquare, QStringLiteral("JN67UV"));
+            }
+            if (x.call == QLatin1String("IZ7HNO")) {
+                QVERIFY(x.mySotaRef.isEmpty());
+                QCOMPARE(x.myGridSquare, QStringLiteral("JN67VV"));
+            }
         }
         QCOMPARE(mitGipfel, 2);
+        // Zu Hause bleibt JN67VV, auch wenn die neuesten QSOs vom Gipfel sind.
+        QCOMPARE(w.meinFeldForTest(), QStringLiteral("JN67VV"));
 
         // Nach dem Neueinlesen: SN7L vom Gipfel gemessen (344,39 km statt
         // 343,89) -- sobald der Gipfel nachgeschlagen ist (laeuft der Fall
@@ -388,6 +407,9 @@ private slots:
         QTableWidget* t = dlg.tabelleForTest();
         QCOMPARE(t->rowCount(), 3);
         QCOMPARE(dlg.gewaehlt().size(), 2);
+        // "Apply" erst, wenn der Gipfel (und damit sein Locator) da ist.
+        QTRY_VERIFY_WITH_TIMEOUT(dlg.anwendenForTest()->isEnabled(), kFensterFrist);
+        QCOMPARE(t->item(0, 6)->text(), QStringLiteral("JN67VV → JN67UV"));
         QCOMPARE(dlg.anwendenForTest()->text(), QStringLiteral("Apply to 2 contacts"));
         QVERIFY(dlg.zusammenfassung().contains(QStringLiteral("1 activation day without")));
         // Die nicht bestaetigte Zeile (IZ7HNO) anhaken: drei.
@@ -416,6 +438,60 @@ private slots:
             QApplication::processEvents();
             QVERIFY(dlg.grab().save(ziel + QStringLiteral("/sota-nachtrag-dialog.png")));
         }
+    }
+
+    void bearbeitenTraegtGipfelLocatorEin()
+    {
+        // Im Bearbeiten-Dialog "My activation" = OE/OO-106 tippen: "My grid"
+        // wird sichtbar JN67UV, und erst Save schreibt es.
+        QTemporaryDir dir;
+        const QString pfad = dir.filePath(QStringLiteral("logbook.adi"));
+        QVERIFY(AdifLog::write(pfad, {zweiMeter(QStringLiteral("SN7L"), QStringLiteral("JO70SS"),
+                                                4, 7, 19, 26)}));
+        LogbookWindow w(pfad);
+        auto* tabelle = w.findChild<QTableWidget*>();
+        QVERIFY(tabelle);
+        tabelle->setCurrentCell(0, 2);
+        QPushButton* edit = nullptr;
+        for (QPushButton* b : w.findChildren<QPushButton*>()) {
+            if (b->text() == QStringLiteral("Edit…")) { edit = b; }
+        }
+        QVERIFY(edit);
+
+        QString gesehen;
+        bool fertig = false;
+        QTimer::singleShot(0, this, [&]() {
+            auto* dlg = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+            if (!dlg) { return; }
+            QLineEdit* aktivierung = nullptr;
+            QLineEdit* meinFeld = nullptr;
+            for (QLineEdit* le : dlg->findChildren<QLineEdit*>()) {
+                if (le->placeholderText().startsWith(QStringLiteral("summit or park"))) { aktivierung = le; }
+                if (le->text() == QLatin1String("JN67VV")) { meinFeld = le; }
+            }
+            if (!aktivierung || !meinFeld) { dlg->reject(); return; }
+            aktivierung->setText(QStringLiteral("oe/oo-106"));
+            // Kennt das Verzeichnis den Gipfel schon, sofort; sonst nach
+            // der Antwort.
+            QTimer* t = new QTimer(dlg);
+            QObject::connect(t, &QTimer::timeout, dlg, [&, dlg, meinFeld, t]() {
+                if (meinFeld->text() == QLatin1String("JN67UV")) {
+                    t->stop();
+                    gesehen = meinFeld->text();
+                    dlg->accept();
+                }
+            });
+            t->start(20);
+            QTimer::singleShot(kFensterFrist, dlg, [dlg]() { dlg->reject(); });
+            fertig = true;
+        });
+        klick(edit);
+        QVERIFY(fertig);
+        QCOMPARE(gesehen, QStringLiteral("JN67UV"));
+        const QVector<LogEntry> neu = AdifLog::read(pfad);
+        QCOMPARE(neu.size(), 1);
+        QCOMPARE(neu.first().mySotaRef, QStringLiteral("OE/OO-106"));
+        QCOMPARE(neu.first().myGridSquare, QStringLiteral("JN67UV"));
     }
 
     void bilderAusDemEchtenLog()

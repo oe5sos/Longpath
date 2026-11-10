@@ -55,6 +55,9 @@ struct SotaGipfel {
     double  lat{0.0};
     double  lon{0.0};
     int     altM{0};
+    /// 6-stellig, gross: "JN67UV". Aus der API ("locator"), sonst aus
+    /// der Lage gerechnet.
+    QString locator;
 
     bool gueltig() const { return !ref.isEmpty(); }
 };
@@ -95,6 +98,21 @@ public:
     bool wartet(const QString& ref) const;
     /// Wie viele Abfragen wirklich hinausgingen (fuer Pruefstaende).
     int abfragenGestellt() const { return m_gestellt; }
+
+    // ── Bei SOTA gilt der Locator des Gipfels (Betreiber 2026-11-10) ──
+    //
+    // „bei sota muss immer der locator der sotareferenz angenommen
+    // werden": Martins Logger schreibt auch auf dem Gipfel JN67VV. Ein QSO
+    // mit MY_SOTA_REF bekommt den Locator des Gipfels als MY_GRIDSQUARE,
+    // eines mit SOTA_REF den des anderen Gipfels als GRIDSQUARE.
+    // Geschrieben wird das nur dort, wo der Betreiber bestaetigt: im
+    // Nachtrag-Dialog ("Apply") und im Bearbeiten-Dialog ("Save"), wo das
+    // Feld sichtbar ausgefuellt wird.
+    /// Locator eines bekannten Gipfels, sonst leer.
+    QString gipfelLocator(const QString& ref) const;
+    /// Die Locatoren eines QSOs auf seine Gipfel setzen, wo diese bekannt
+    /// sind. Liefert die Zahl der geaenderten Felder (0..2).
+    int wendeGipfelLocatorAn(LogEntry& e) const;
 
     // ── Die beiden Enden eines QSOs ──────────────────────────────────
     bool eigenerGipfel(const LogEntry& e, SotaGipfel& aus) const;

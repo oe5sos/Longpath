@@ -88,6 +88,12 @@ bool SotaGipfelVerzeichnis::leseAntwort(const QByteArray& json, SotaGipfel& aus)
     aus.lat = lat;
     aus.lon = lon;
     aus.altM = o.value(QStringLiteral("altM")).toInt();
+    // "JN67uv" in der Antwort; sechs Zeichen reichen fuer den Locator
+    // eines Gipfels, gross geschrieben wie ueberall im Log.
+    aus.locator = o.value(QStringLiteral("locator")).toString().trimmed().left(6).toUpper();
+    if (!isValidGridSquare(aus.locator) || aus.locator.size() < 6) {
+        aus.locator = gridSquareFromLatLon(lat, lon).left(6).toUpper();
+    }
     return true;
 }
 
@@ -200,6 +206,10 @@ void SotaGipfelVerzeichnis::laden()
         s.lat = g.value(QStringLiteral("lat")).toDouble();
         s.lon = g.value(QStringLiteral("lon")).toDouble();
         s.altM = g.value(QStringLiteral("altM")).toInt();
+        s.locator = g.value(QStringLiteral("locator")).toString().trimmed().toUpper();
+        if (!isValidGridSquare(s.locator) || s.locator.size() < 6) {
+            s.locator = gridSquareFromLatLon(s.lat, s.lon).left(6).toUpper();
+        }
         m_gipfel.insert(ref, s);
     }
     for (const QJsonValue& v : o.value(QStringLiteral("unknown")).toArray()) {
@@ -217,6 +227,7 @@ void SotaGipfelVerzeichnis::speichern() const
         g.insert(QStringLiteral("lat"), it.value().lat);
         g.insert(QStringLiteral("lon"), it.value().lon);
         g.insert(QStringLiteral("altM"), it.value().altM);
+        g.insert(QStringLiteral("locator"), it.value().locator);
         gipfel.insert(it.key(), g);
     }
     QStringList unbekannt(m_unbekannt.cbegin(), m_unbekannt.cend());
@@ -234,6 +245,29 @@ void SotaGipfelVerzeichnis::speichern() const
     }
     f.write(QJsonDocument(o).toJson(QJsonDocument::Indented));
     f.commit();
+}
+
+QString SotaGipfelVerzeichnis::gipfelLocator(const QString& ref) const
+{
+    SotaGipfel g;
+    return finde(ref, g) ? g.locator : QString();
+}
+
+int SotaGipfelVerzeichnis::wendeGipfelLocatorAn(LogEntry& e) const
+{
+    int n = 0;
+    const QString mein = gipfelLocator(e.mySotaRef);
+    // Ein genauerer Locator im selben Quadrat ("JN67UV12") bleibt.
+    if (!mein.isEmpty() && !e.myGridSquare.trimmed().toUpper().startsWith(mein)) {
+        e.myGridSquare = mein;
+        ++n;
+    }
+    const QString ihr = gipfelLocator(e.sotaRef);
+    if (!ihr.isEmpty() && !e.gridSquare.trimmed().toUpper().startsWith(ihr)) {
+        e.gridSquare = ihr;
+        ++n;
+    }
+    return n;
 }
 
 bool SotaGipfelVerzeichnis::eigenerGipfel(const LogEntry& e, SotaGipfel& aus) const

@@ -8,6 +8,7 @@
 
 #include "gui/SotaNachtragDialog.h"
 
+#include "core/SotaGipfel.h"
 #include "gui/StyleConstants.h"
 
 #include <QFile>
@@ -23,7 +24,7 @@
 namespace Longpath {
 
 namespace {
-enum Spalte { kHaken, kZeit, kRuf, kBand, kMode, kGipfel, kS2s, kHinweis, kSpalten };
+enum Spalte { kHaken, kZeit, kRuf, kBand, kMode, kGipfel, kLocator, kS2s, kHinweis, kSpalten };
 }
 
 SotaNachtragDialog::SotaNachtragDialog(const QVector<LogEntry>& log, QWidget* parent)
@@ -41,8 +42,8 @@ SotaNachtragDialog::SotaNachtragDialog(const QVector<LogEntry>& log, QWidget* pa
 
     m_erklaerung = new QLabel(QStringLiteral(
         "Fills in MY_SOTA_REF (and SOTA_REF for summit-to-summit contacts) from your "
-        "SOTA activator log, so bearings, distances and path profiles start at the "
-        "summit instead of the centre of your locator.\n"
+        "SOTA activator log, and sets your grid (MY_GRIDSQUARE) to the summit's locator, "
+        "so bearings, distances and path profiles start at the summit.\n"
         "On sotadata.org.uk: Logs → Activator → Download complete log (CSV). Contacts "
         "are matched by UTC date. Nothing is written until you press Apply, and the "
         "log is backed up first."), this);
@@ -67,6 +68,7 @@ SotaNachtragDialog::SotaNachtragDialog(const QVector<LogEntry>& log, QWidget* pa
     m_tabelle->setHorizontalHeaderLabels({QString(), QStringLiteral("UTC"),
                                           QStringLiteral("Call"), QStringLiteral("Band"),
                                           QStringLiteral("Mode"), QStringLiteral("Summit"),
+                                          QStringLiteral("Your grid"),
                                           QStringLiteral("S2S"), QStringLiteral("Note")});
     m_tabelle->verticalHeader()->setVisible(false);
     m_tabelle->setSelectionMode(QAbstractItemView::NoSelection);
@@ -94,6 +96,10 @@ SotaNachtragDialog::SotaNachtragDialog(const QVector<LogEntry>& log, QWidget* pa
     col->addLayout(unten);
 
     m_summe->setText(QStringLiteral("No file chosen yet."));
+
+    SotaGipfelVerzeichnis& v = SotaGipfelVerzeichnis::instanz();
+    connect(&v, &SotaGipfelVerzeichnis::gipfelBekannt, this, &SotaNachtragDialog::zeigeLocatoren);
+    connect(&v, &SotaGipfelVerzeichnis::gipfelFehler, this, &SotaNachtragDialog::zeigeLocatoren);
 }
 
 void SotaNachtragDialog::waehleDatei()
@@ -122,6 +128,12 @@ bool SotaNachtragDialog::ladeCsvDaten(const QByteArray& csv, const QString& name
     QString fehler;
     const SotaNachtrag::Datei d = SotaNachtrag::leseCsv(csv, &fehler);
     m_erg = SotaNachtrag::vorschlaege(m_log, d);
+    // Die Gipfel nachschlagen (je Gipfel einmal) -- ihr Locator kommt in
+    // MY_GRIDSQUARE.
+    for (const SotaNachtrag::Vorschlag& v : m_erg.vorschlaege) {
+        SotaGipfelVerzeichnis::instanz().anfragen(v.gipfel);
+        SotaGipfelVerzeichnis::instanz().anfragen(v.gegenGipfel);
+    }
     zeige();
     if (d.zeilen.isEmpty()) {
         m_summe->setText(QStringLiteral("%1: %2").arg(name, fehler));
@@ -150,6 +162,7 @@ void SotaNachtragDialog::zeige()
         text(kBand, e.band);
         text(kMode, e.mode);
         text(kGipfel, v.gipfel);
+        text(kLocator, locatorText(v));
         text(kS2s, v.gegenGipfel);
         text(kHinweis, v.hinweis);
     }
@@ -160,11 +173,55 @@ void SotaNachtragDialog::zeige()
 void SotaNachtragDialog::zaehle()
 {
     const int n = gewaehlt().size();
-    m_anwenden->setEnabled(n > 0);
-    m_anwenden->setText(n > 0 ? QStringLiteral("Apply to %1 contact%2")
-                                    .arg(n).arg(n == 1 ? QString() : QStringLiteral("s"))
-                              : QStringLiteral("Apply"));
+    const bool wartet = wartetAufGipfel();
+    // Erst wenn die Locatoren der Gipfel da sind -- sonst kaeme der
+    // Gipfel ohne seinen Locator ins Log.
+    m_anwenden->setEnabled(n > 0 && !wartet);
+    if (wartet) {
+        m_anwenden->setText(QStringLiteral("Looking up summits…"));
+    } else {
+        m_anwenden->setText(n > 0 ? QStringLiteral("Apply to %1 contact%2")
+                                        .arg(n).arg(n == 1 ? QString() : QStringLiteral("s"))
+                                  : QStringLiteral("Apply"));
+    }
     m_summe->setText(zusammenfassung());
+}
+
+QString SotaNachtragDialog::locatorText(const SotaNachtrag::Vorschlag& v) const
+{
+    const SotaGipfelVerzeichnis& g = SotaGipfelVerzeichnis::instanz();
+    const QString jetzt = m_log.at(v.index).myGridSquare.trimmed().toUpper();
+    const QString gipfel = g.gipfelLocator(v.gipfel);
+    if (!gipfel.isEmpty()) {
+        if (jetzt.startsWith(gipfel)) { return jetzt; }
+        return jetzt.isEmpty() ? QStringLiteral("→ %1").arg(gipfel)
+                               : QStringLiteral("%1 → %2").arg(jetzt, gipfel);
+    }
+    if (g.wartet(v.gipfel)) { return QStringLiteral("%1 (looking up summit…)").arg(jetzt); }
+    if (g.istUnbekannt(v.gipfel)) {
+        return QStringLiteral("%1 (summit not in the SOTA list)").arg(jetzt);
+    }
+    return QStringLiteral("%1 (couldn't look up the summit)").arg(jetzt);
+}
+
+bool SotaNachtragDialog::wartetAufGipfel() const
+{
+    const SotaGipfelVerzeichnis& g = SotaGipfelVerzeichnis::instanz();
+    for (const SotaNachtrag::Vorschlag& v : m_erg.vorschlaege) {
+        if (g.wartet(v.gipfel) || g.wartet(v.gegenGipfel)) { return true; }
+    }
+    return false;
+}
+
+void SotaNachtragDialog::zeigeLocatoren()
+{
+    for (int r = 0; r < m_tabelle->rowCount() && r < m_erg.vorschlaege.size(); ++r) {
+        if (QTableWidgetItem* it = m_tabelle->item(r, kLocator)) {
+            it->setText(locatorText(m_erg.vorschlaege.at(r)));
+        }
+    }
+    m_tabelle->resizeColumnToContents(kLocator);
+    zaehle();
 }
 
 QString SotaNachtragDialog::zusammenfassung() const

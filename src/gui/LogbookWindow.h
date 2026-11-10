@@ -321,6 +321,7 @@ public:
     /// Wie viele Verbindungen das Logbuch gerade fuehrt. Nur fuer Tests.
     int entryCountForTesting() const { return m_all.size(); }
     const QVector<LogEntry>& entriesForTest() const { return m_all; }
+    QString meinFeldForTest() const { return meinFeld(); }
 
     /// Rueckfragen und Meldungen des Imports umleiten. Fuer Tests: die
     /// eine Funktion antwortet, die andere schreibt mit. Nicht gesetzt

@@ -48,8 +48,8 @@ QString endeName(const SotaGipfelVerzeichnis::Ende& e)
 QString endeHerkunft(const SotaGipfelVerzeichnis::Ende& e)
 {
     if (e.gipfel) {
-        return QStringLiteral("%1 from the SOTA database (%2 m)")
-            .arg(endeName(e)).arg(e.g.altM);
+        return QStringLiteral("%1, %2, from the SOTA database (%3 m)")
+            .arg(endeName(e), e.g.locator).arg(e.g.altM);
     }
     return QStringLiteral("centre of locator %1 (%2)")
         .arg(e.locator, Hoehenprofil::locatorGenauigkeit(e.locator));
