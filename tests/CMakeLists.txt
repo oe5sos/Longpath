@@ -1163,6 +1163,21 @@ if(TEST tst_logbuch_bilder)
     set_tests_properties(tst_logbuch_bilder PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
+# tst_hoehenprofil / tst_sota_gipfel / tst_sota_nachtrag /
+#   tst_hoehenprofil_fenster (2026-11-11): UKW-Hoehenprofil je QSO und der
+#   eigene Standort vom SOTA-Gipfel -- Geometrie gegen Handrechnung und
+#   gegen das Entwurfsblatt, Gipfel-Cache, CSV-Nachtrag, die Bedienung.
+#   Aufgezeichnete Hoehen/Antworten in tests/data/hoehenprofil, kein Netz.
+longpath_add_test(tst_hoehenprofil)
+longpath_add_test(tst_sota_gipfel)
+longpath_add_test(tst_sota_nachtrag)
+longpath_add_test(tst_hoehenprofil_fenster)
+foreach(_t tst_hoehenprofil tst_sota_gipfel tst_sota_nachtrag tst_hoehenprofil_fenster)
+    if(TEST ${_t})
+        set_tests_properties(${_t} PROPERTIES
+            ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+    endif()
+endforeach()
 if(TEST tst_transverter_nur_empfang)
     set_tests_properties(tst_transverter_nur_empfang PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")

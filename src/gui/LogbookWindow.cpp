@@ -35,6 +35,9 @@
 #include "core/Maidenhead.h"
 #include "core/CtyDatParser.h"
 #include "core/LogbuchBilder.h"
+#include "core/SotaGipfel.h"
+#include "core/SotaNachtrag.h"
+#include "gui/SotaNachtragDialog.h"
 #include "core/RotorBereich.h"
 #include "core/TransverterSetup.h"
 #include "gui/widgets/LogbuchBilderWidgets.h"
@@ -57,6 +60,7 @@
 #include <QMoveEvent>
 #include <QResizeEvent>
 #include <QDialogButtonBox>
+#include <QDir>
 #include <QFile>
 #include <QFileDialog>
 #include <QFormLayout>
@@ -426,8 +430,14 @@ void LogbookWindow::buildUi()
         "Contacts per band, mode and week, top countries, awards — "
         "as a row under the table, for whatever the filters currently show"));
     QPushButton* statsBtn = m_statsToggle;
+    auto* sotaBtn = new QPushButton(QStringLiteral("SOTA…"), this);
+    sotaBtn->setToolTip(QStringLiteral(
+        "Fill in your summit references (MY_SOTA_REF) from your SOTA activator "
+        "log (sotadata.org.uk → Logs → Activator → Download complete log), so "
+        "bearings, distances and path profiles start at the summit"));
+    connect(sotaBtn, &QPushButton::clicked, this, &LogbookWindow::sotaNachtragen);
     for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn, mapBtn,
-                           statsBtn, importBtn, m_syncBtn, adifBtn, csvBtn, cabrBtn}) {
+                           statsBtn, importBtn, m_syncBtn, sotaBtn, adifBtn, csvBtn, cabrBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle());
         top->addWidget(b);
     }
@@ -572,6 +582,14 @@ void LogbookWindow::buildUi()
     // owns a rotor decide.
     connect(m_detail, &QsoDetailPane::turnRotorRequested,
             this, &LogbookWindow::turnRotorRequested);
+    // Ein Gipfel ist nachgeschlagen: Entfernungen und Peilungen neu.
+    connect(&SotaGipfelVerzeichnis::instanz(), &SotaGipfelVerzeichnis::gipfelBekannt,
+            this, [this]() {
+        if (SotaGipfelVerzeichnis::instanz().korrigiereStrecken(m_all) > 0) {
+            refreshTable();
+            updateStats();
+        }
+    });
     connect(m_detail, &QsoDetailPane::editRequested,
             this, &LogbookWindow::editSelected);
 
@@ -980,6 +998,11 @@ void LogbookWindow::reload()
         QMessageBox::warning(this, QStringLiteral("Logbook"),
             QStringLiteral("Couldn't read the log:\n%1").arg(err));
     }
+    // Vom Gipfel (2026-11-11): Entfernung und Peilung der QSOs mit
+    // MY_SOTA_REF / SOTA_REF aus der Lage des Gipfels, nicht aus der
+    // Locatormitte. Unbekannte Gipfel werden einmal nachgeschlagen.
+    SotaGipfelVerzeichnis::instanz().anfragenFuer(m_all);
+    SotaGipfelVerzeichnis::instanz().korrigiereStrecken(m_all);
     std::stable_sort(m_all.begin(), m_all.end(), newerFirst);
     refreshFilterChoices();
     applyFilter();
@@ -2780,6 +2803,74 @@ void LogbookWindow::applyRotorToMap()
     m_mapPanel->setRotorBeamWidth(m_rotorBeamDeg);
     m_mapPanel->setRotorHeading(m_rotorDeg);
     m_mapPanel->setRotorTarget(m_rotorTargetDeg);
+}
+
+// ── MY_SOTA_REF aus dem SOTAdata-Log (2026-11-11) ───────────────────
+
+void LogbookWindow::sotaNachtragen()
+{
+    const QString pfad = QFileDialog::getOpenFileName(
+        this, QStringLiteral("SOTA activator log"), QString{},
+        QStringLiteral("CSV (*.csv *.txt);;All files (*)"));
+    if (pfad.isEmpty()) { return; }
+
+    // Der Dialog arbeitet auf einer Kopie. Waehrend er offen ist, kann ein
+    // QSO aus WSJT-X das Log neu einlesen -- die Vorschlaege werden danach
+    // am ganzen Datensatz wiedergefunden, nicht am alten Index.
+    const QVector<LogEntry> stand = m_all;
+    ScopedChildWidget<SotaNachtragDialog> besitzer(stand, this);
+    SotaNachtragDialog& dlg = *besitzer.get();
+    dlg.ladeCsv(pfad);
+    if (dlg.exec() != QDialog::Accepted) { return; }
+
+    QVector<SotaNachtrag::Vorschlag> gewaehlt = dlg.gewaehlt();
+    QSet<int> vergeben;
+    for (SotaNachtrag::Vorschlag& v : gewaehlt) {
+        v.index = indexOfRecord(m_all, stand.at(v.index).toAdifRecord(), v.index, vergeben);
+        if (v.index >= 0) { vergeben.insert(v.index); }
+    }
+    gewaehlt.erase(std::remove_if(gewaehlt.begin(), gewaehlt.end(),
+                                  [](const SotaNachtrag::Vorschlag& v) { return v.index < 0; }),
+                   gewaehlt.end());
+
+    QString sicherung;
+    const int vorher = gewaehlt.size();
+    if (sotaVorschlaegeAnwenden(gewaehlt, &sicherung)) {
+        tellOperator(QStringLiteral("Summit references added to %1 contact%2. "
+                                    "The log before this change: %3")
+                         .arg(vorher).arg(vorher == 1 ? QString() : QStringLiteral("s"),
+                              QDir::toNativeSeparators(sicherung)));
+    }
+}
+
+bool LogbookWindow::sotaVorschlaegeAnwenden(const QVector<SotaNachtrag::Vorschlag>& gewaehlt,
+                                            QString* sicherung)
+{
+    if (gewaehlt.isEmpty()) { return false; }
+    QVector<LogEntry> neu = m_all;
+    if (SotaNachtrag::anwenden(neu, gewaehlt) == 0) { return false; }
+
+    // Erst sichern, dann schreiben -- und ohne Sicherung gar nicht.
+    QString ziel;
+    if (QFile::exists(m_path)) {
+        ziel = m_path + QStringLiteral(".before-sota-")
+               + QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd-HHmmss"));
+        if (!QFile::copy(m_path, ziel)) {
+            QMessageBox::critical(this, QStringLiteral("Logbook"),
+                QStringLiteral("Couldn't back up the log to\n%1\n\nNothing was changed.")
+                    .arg(QDir::toNativeSeparators(ziel)));
+            return false;
+        }
+    }
+    const QVector<LogEntry> alt = m_all;
+    m_all = neu;
+    if (!saveAll()) {
+        m_all = alt;
+        return false;
+    }
+    if (sicherung) { *sicherung = ziel; }
+    reload();
+    return true;
 }
 
 } // namespace Longpath

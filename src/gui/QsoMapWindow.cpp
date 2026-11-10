@@ -945,7 +945,15 @@ void QsoMapWindow::showStationInfo(const QString& label)
     }
     if (isValidGridSquare(last.gridSquare)) {
         text += QStringLiteral(" · %1").arg(last.gridSquare.toHtmlEscaped());
-        if (isValidGridSquare(m_homeGrid)) {
+        if (!last.mySotaRef.trimmed().isEmpty() || !last.sotaRef.trimmed().isEmpty()) {
+            // Vom Gipfel (2026-11-11): das Logbuch hat Entfernung und
+            // Peilung dieses QSOs schon aus der Lage des Gipfels gerechnet
+            // (SotaGipfelVerzeichnis::korrigiereStrecken) -- die Mitte
+            // des Heimatlocators laege sieben Kilometer daneben.
+            text += QStringLiteral(" · %1 km · %2°")
+                .arg(last.distanceKm, 0, 'f', 0)
+                .arg(last.bearingDeg, 0, 'f', 0);
+        } else if (isValidGridSquare(m_homeGrid)) {
             text += QStringLiteral(" · %1 km · %2°")
                 .arg(calculateDistanceKm(m_homeGrid, last.gridSquare),
                      0, 'f', 0)

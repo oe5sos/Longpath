@@ -19,6 +19,9 @@
 #include "core/Maidenhead.h"
 #include "core/QrzClient.h"
 #include "core/QsoConfirmation.h"
+#include "core/Hoehenprofil.h"
+#include "core/SotaGipfel.h"
+#include "gui/HoehenprofilFenster.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/StationPhoto.h"
 
@@ -310,7 +313,21 @@ void QsoDetailPane::buildUi()
     m_qrzPageBtn = new QPushButton(QStringLiteral("On qrz.com"), this);
     actions->addWidget(m_editBtn, 1);
     actions->addWidget(m_qrzPageBtn, 1);
+    m_profilBtn = new QPushButton(QStringLiteral("Profile"), this);
+    actions->addWidget(m_profilBtn, 1);
     col->addLayout(actions);
+    connect(m_profilBtn, &QPushButton::clicked, this, &QsoDetailPane::oeffneProfil);
+    // Ein Gipfel, der nachgeschlagen ist, aendert Peilung und Entfernung.
+    auto gipfel = [this](const QString& ref) {
+        if (!m_haveEntry) { return; }
+        const QString r = SotaGipfelVerzeichnis::normalisiere(ref);
+        if (r == SotaGipfelVerzeichnis::normalisiere(m_entry.mySotaRef)
+            || r == SotaGipfelVerzeichnis::normalisiere(m_entry.sotaRef)) {
+            refreshBeam();
+        }
+    };
+    connect(&SotaGipfelVerzeichnis::instanz(), &SotaGipfelVerzeichnis::gipfelBekannt,
+            this, gipfel);
 
     connect(m_editBtn, &QPushButton::clicked,
             this, &QsoDetailPane::editRequested);
@@ -578,7 +595,13 @@ bool QsoDetailPane::beamNow(double& bearingDeg, double& km) const
     double lat = 0.0, lon = 0.0;
     const QString logged = m_entry.gridSquare.trimmed();
     const QString looked = m_info.grid.trimmed();
-    if (m_info.isValid() && m_info.hasLatLon) {
+    // 2026-11-11: steht die Gegenstation auf einem Gipfel (SOTA_REF), gilt
+    // der -- die QRZ-Adresse eines Aktivierers ist sein Zuhause.
+    SotaGipfel ihrGipfel;
+    if (SotaGipfelVerzeichnis::instanz().gegenGipfel(m_entry, ihrGipfel)) {
+        lat = ihrGipfel.lat;
+        lon = ihrGipfel.lon;
+    } else if (m_info.isValid() && m_info.hasLatLon) {
         lat = m_info.latitude;
         lon = m_info.longitude;
     } else if (m_info.isValid() && isValidGridSquare(looked)
@@ -600,6 +623,15 @@ bool QsoDetailPane::beamNow(double& bearingDeg, double& km) const
     if (!isValidGridSquare(home)) { return false; }
     double hlat = 0.0, hlon = 0.0;
     calculateLatLonFromGridSquare(home, hlat, hlon);
+    // 2026-11-11: vom Gipfel (MY_SOTA_REF), nicht aus der Locatormitte --
+    // Martins JN67VV liegt im Tal, sieben Kilometer neben OE/OO-106.
+    // (Ohne jeden eigenen Locator gibt es weiter keine Peilung; das
+    // betrifft nur ein QSO mit Gipfel und ohne MY_GRIDSQUARE.)
+    SotaGipfel meinGipfel;
+    if (SotaGipfelVerzeichnis::instanz().eigenerGipfel(m_entry, meinGipfel)) {
+        hlat = meinGipfel.lat;
+        hlon = meinGipfel.lon;
+    }
 
     const BeamHeading::GreatCircle g = BeamHeading::greatCircle(hlat, hlon, lat, lon);
     bearingDeg = g.bearingDeg;
@@ -744,6 +776,7 @@ void QsoDetailPane::refreshExtras()
 
 void QsoDetailPane::refresh()
 {
+    refreshProfil();
     if (!m_haveEntry) {
         m_call->setText(QStringLiteral("—"));
         m_name->setVisible(false);
@@ -799,6 +832,58 @@ void QsoDetailPane::refresh()
 
     refreshBeam();
     refreshExtras();
+}
+
+// ── Hoehenprofil (2026-11-11) ────────────────────────────────────────
+
+QString QsoDetailPane::ersatzLocator()
+{
+    return AppSettings::instance()
+        .value(QStringLiteral("StationGridSquare"), QString{})
+        .toString().trimmed();
+}
+
+void QsoDetailPane::refreshProfil()
+{
+    if (!m_profilBtn) { return; }
+    const bool ukw = m_haveEntry && !m_notLogged
+                     && Hoehenprofil::istUkwBand(m_entry.band, m_entry.freqMHz);
+    m_profilBtn->setVisible(ukw);
+    if (!ukw) { return; }
+
+    // Die Gipfel dieses QSOs nachschlagen (je Gipfel hoechstens einmal,
+    // siehe SotaGipfel.h) -- fuer die Peilung und fuer das Profil.
+    SotaGipfelVerzeichnis& v = SotaGipfelVerzeichnis::instanz();
+    v.anfragen(m_entry.mySotaRef);
+    v.anfragen(m_entry.sotaRef);
+
+    const bool gegenstelle = v.gegenEnde(m_entry).gueltig
+                             || !SotaGipfelVerzeichnis::normalisiere(m_entry.sotaRef).isEmpty();
+    m_profilBtn->setEnabled(gegenstelle);
+    m_profilBtn->setToolTip(gegenstelle
+        ? QStringLiteral("Terrain between you and %1: line of sight, Fresnel zone, "
+                         "horizon rays").arg(m_entry.call)
+        : QStringLiteral("Needs their locator (GRIDSQUARE) or summit (SOTA_REF)"));
+}
+
+HoehenprofilFenster* QsoDetailPane::profilFensterForTest() const
+{
+    return m_profilFenster.data();
+}
+
+void QsoDetailPane::oeffneProfil()
+{
+    if (!m_haveEntry) { return; }
+    if (!m_profilFenster) {
+        // Am Fenster des Logbuchs, nicht an der Karte: es ueberlebt einen
+        // Wechsel der Auswahl und schliesst sich mit dem Logbuch.
+        m_profilFenster = new HoehenprofilFenster(window());
+        m_profilFenster->setAttribute(Qt::WA_DeleteOnClose);
+    }
+    m_profilFenster->setEntry(m_entry, ersatzLocator());
+    m_profilFenster->show();
+    m_profilFenster->raise();
+    m_profilFenster->activateWindow();
 }
 
 } // namespace Longpath

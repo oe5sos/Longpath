@@ -51,6 +51,7 @@
 #include "core/CallsignInfo.h"
 #include "models/LogEntry.h"
 
+#include <QPointer>
 #include <QWidget>
 
 class QFormLayout;
@@ -62,6 +63,7 @@ class QVBoxLayout;
 namespace Longpath {
 
 class CallsignCache;
+class HoehenprofilFenster;
 class QrzClient;
 class StationPhoto;
 
@@ -100,6 +102,9 @@ public:
     // rather than only where it will end up. NaN when unknown, which is
     // the honest state when no rotor is connected.
     void setRotorBearing(double deg);
+
+    QPushButton* profilButtonForTest() const { return m_profilBtn; }
+    HoehenprofilFenster* profilFensterForTest() const;
 
 signals:
     void turnRotorRequested(double bearingDeg, const QString& call);
@@ -161,6 +166,17 @@ private:
     QPushButton* m_lookupBtn{nullptr};
     QPushButton* m_editBtn{nullptr};
     QPushButton* m_qrzPageBtn{nullptr};
+
+    // ── Hoehenprofil (2026-11-11) ─────────────────────────────────────
+    // "Profile" fuer 2-m-, 70-cm- und 23-cm-QSOs; ein Fenster, das beim
+    // naechsten Druck den Inhalt wechselt (HoehenprofilFenster.h sagt,
+    // warum hier und nicht in der Karte).
+    QPushButton* m_profilBtn{nullptr};
+    QPointer<HoehenprofilFenster> m_profilFenster;
+    void refreshProfil();
+    void oeffneProfil();
+    // Der eigene Locator, wenn das QSO keinen hat.
+    static QString ersatzLocator();
 
     double m_rotorDeg{0.0};
     bool   m_haveRotor{false};
