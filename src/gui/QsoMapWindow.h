@@ -35,6 +35,12 @@
 //                 Anschluss aus dem Logbuch: wer dort eine Station
 //                 nachschlaegt, sieht sie hier landen. Martin Fischer,
 //                 AI-assisted via Anthropic Claude.
+//   2026-11-10 — Vierte Ansicht „Azimuthal": die Azimutalkarte um das
+//                 eigene QTH (AzimutalKarteWidget) mit jedem gezeigten
+//                 QSO als Strahl, dem Rotor live und der nachgeschlagenen
+//                 Station mit kurzem und langem Weg. Die gewaehlte
+//                 Ansicht wird gemerkt (QsoMapView). Martin Fischer,
+//                 AI-assisted via Anthropic Claude (Claude Code).
 // =================================================================
 
 #include "models/LogEntry.h"
@@ -123,6 +129,8 @@ public:
     FlatMapWidget* flatMapForTest() const { return m_flat; }
     class DxRadarWidget* radarForTest() const { return m_radar; }
     QPushButton* radarButtonForTest() const { return m_radarBtn; }
+    class AzimutalKarteWidget* azimutalForTest() const { return m_azimut; }
+    QPushButton* azimutalButtonForTest() const { return m_azimutBtn; }
     /// Wie viele Kontakte die Karte beim letzten Aufbau gezeichnet hat.
     int shownCountForTest() const { return m_lastShown.size(); }
     /// Ein Rufzeichen so behandeln, als waere es im Feld eingegeben.
@@ -194,11 +202,24 @@ private:
     GlobeWidget*    m_globe{nullptr};
     FlatMapWidget*  m_flat{nullptr};
     class DxRadarWidget* m_radar{nullptr};   // dritte Ansicht (2026-09-22)
+    class AzimutalKarteWidget* m_azimut{nullptr};   // vierte (2026-11-10)
     class DxRadarWidget* m_rotorRadar{nullptr};   // klein, links (2026-09-26)
     bool m_rotorRadarShown{false};
     void updateRotorRadarVisibility();
     QPushButton*    m_radarBtn{nullptr};
-    int             m_viewBeforeRadar{0};    // Kugel oder flach, wohin „Radar" aus zurueckfuehrt
+    QPushButton*    m_azimutBtn{nullptr};
+    int             m_viewBeforeRadar{0};    // Kugel oder flach, wohin „Radar"/„Azimuthal" aus zurueckfuehrt
+    // Stapelplaetze. Radar und Azimutalkarte liegen UEBER Kugel/flach:
+    // ihr Knopf ist ein Haken, der dorthin zurueckfuehrt, wo man herkam.
+    static constexpr int kViewGlobe = 0;
+    static constexpr int kViewFlat = 1;
+    static constexpr int kViewRadar = 2;
+    static constexpr int kViewAzimuthal = 3;
+    // Die vom Betreiber gewaehlte Ansicht merken / beim Oeffnen
+    // wiederherstellen. Nur Knopfdruecke zaehlen -- ein Hinflug oder das
+    // Durchzoomen schalten auch um, sind aber keine Wahl.
+    void rememberView() const;
+    void restoreView();
 
     // ── Wahl des Kartenhintergrunds ─────────────────────────────────
     //

@@ -6220,6 +6220,9 @@ longpath_add_test(tst_logbook_one_page)
 longpath_add_test(tst_blue_marble_fetcher)
 # -- DX-Radar: Wurzelskala, Himmelsrichtungen, Punkte, dritte Ansicht --
 longpath_add_test(tst_dx_radar)
+# -- Azimutalkarte als vierte Ansicht der QSO-Karte: Projektion hin und
+#    zurueck, Strahlenebene, Rotorkeil, Ziel, Ansichtswechsel --
+longpath_add_test(tst_azimutalkarte)
 # -- Verbindungsfenster: der lange Fehlschlag-Text passt (Leiste + darunter, Hinweis) --
 longpath_add_test(tst_connect_failure_text_fits)
 
