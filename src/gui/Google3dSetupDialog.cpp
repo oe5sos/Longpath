@@ -18,14 +18,18 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QLoggingCategory>
 #include <QPointer>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QTimer>
 #include <QVBoxLayout>
 
 namespace Longpath {
 
 namespace {
+Q_LOGGING_CATEGORY(lcGoogle3dSetup, "longpath.flug3d.einrichtung")
+
 QPointer<Google3dSetupDialog>& openInstance()
 {
     static QPointer<Google3dSetupDialog> p;
@@ -43,12 +47,26 @@ Google3dSetupDialog* Google3dSetupDialog::showFor(QWidget* parent)
 {
     QPointer<Google3dSetupDialog>& p = openInstance();
     if (!p) {
-        p = new Google3dSetupDialog(parent);
+        // Am FENSTER aufhaengen, nicht an der Spalte, aus der geklickt
+        // wurde: die Kartenspalte im Logbuch ist ein eingebettetes Widget,
+        // und ein Dialog soll dem Fenster gehoeren, vor dem er aufgeht.
+        p = new Google3dSetupDialog(parent ? parent->window() : nullptr);
         p->setAttribute(Qt::WA_DeleteOnClose);
     }
     p->show();
     p->raise();
     p->activateWindow();
+    // Noch einmal nach dem Klick: Maus-Loslassen und die Fensterebenen
+    // (AuxiliaryWindowLeveler) ordnen erst danach -- der Dialog soll
+    // danach vorne liegen, nicht davor.
+    QTimer::singleShot(0, p.data(), [d = p.data()]() {
+        d->raise();
+        d->activateWindow();
+    });
+    qCInfo(lcGoogle3dSetup).noquote()
+        << "Google-3D-Einrichtung offen, vor"
+        << (p->parentWidget() ? QString::fromLatin1(p->parentWidget()->metaObject()->className())
+                              : QStringLiteral("none"));
     return p.data();
 }
 

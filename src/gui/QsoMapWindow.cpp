@@ -52,6 +52,7 @@
 #include <QFileDialog>
 #include <QImage>
 #include <QKeyEvent>
+#include <QLoggingCategory>
 #include <QHBoxLayout>
 #include <QResizeEvent>
 #include <QLabel>
@@ -69,6 +70,12 @@
 #include <cmath>
 
 namespace Longpath {
+
+namespace {
+// Der 3D-Knopf meldet jeden Druck ins Protokoll: Schluessel da, WebEngine
+// da, wo (Live-Befund 2026-11-10: „tut nichts" -- und keine Zeile dazu).
+Q_LOGGING_CATEGORY(lcQsoMap3d, "longpath.flug3d.karte")
+} // namespace
 
 QsoMapWindow::QsoMapWindow(QWidget* parent) : QDialog(parent)
 {
@@ -384,8 +391,32 @@ void QsoMapWindow::buildUi()
     m_3dBtn->setCheckable(true);
     m_3dBtn->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
     bar->addWidget(m_3dBtn);
-    connect(m_3dBtn, &QPushButton::clicked, this, [this](bool checked) {
-        if (!GoogleMapsKey::isSet()) {
+    // toggled, nicht clicked (Live-Befund 2026-11-10): die Bedienhilfe
+    // (AXPress, VoiceOver, Automatisierung) drueckt einen ankreuzbaren
+    // Knopf ueber toggle(), und das sendet KEIN clicked -- der Knopf tat
+    // dann sichtbar nichts. Eigene Umstellungen laufen ueber
+    // update3dButton() hinter einem QSignalBlocker und kommen hier nicht an.
+    connect(m_3dBtn, &QPushButton::toggled, this, [this](bool checked) {
+        const bool built = Station3dSurface::isAvailable();
+        const bool key   = GoogleMapsKey::isSet();
+        qCInfo(lcQsoMap3d).noquote()
+            << "3D-Knopf:" << (checked ? "an" : "aus")
+            << "| Schluessel" << (key ? "da" : "fehlt")
+            << "| WebEngine" << (built ? "da" : "fehlt")
+            << "|" << (m_embedded ? "Logbuch-Spalte" : "Kartenfenster");
+        if (!built) {
+            // Ein abgeschalteter Knopf, der nichts sagt, ist genau das
+            // „tut nichts". Also an bleiben und sagen, warum nicht.
+            update3dButton();
+            m_info->setText(QStringLiteral(
+                "<b>3D</b> — this build of Longpath has no Qt WebEngine, so "
+                "Google's 3D view is not available here. "
+                "\"View in Google Earth\" shows the station in 3D in your browser."));
+            m_info->setVisible(true);
+            if (m_lastFlight.valid) { m_googleEarthBtn->setVisible(true); }
+            return;
+        }
+        if (!key) {
             update3dButton();
             Google3dSetupDialog::showFor(this);
             return;
@@ -1489,7 +1520,8 @@ void QsoMapWindow::update3dButton()
     const bool built = Station3dSurface::isAvailable();
     const bool key   = GoogleMapsKey::isSet();
     QSignalBlocker b(m_3dBtn);
-    m_3dBtn->setEnabled(built);
+    // Immer bedienbar: ohne WebEngine sagt der Klick, warum es nicht geht.
+    m_3dBtn->setEnabled(true);
     m_3dBtn->setChecked(built && key && m_3dWanted);
     if (!built) {
         m_3dBtn->setToolTip(QStringLiteral(

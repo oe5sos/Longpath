@@ -104,8 +104,14 @@ private slots:
 
         QPushButton* b3d = w.threeDButtonForTest();
         QVERIFY(b3d);
-        QVERIFY(!b3d->isEnabled());
         QVERIFY(b3d->toolTip().contains(QLatin1String("WebEngine")));
+        // Nicht stumm abgeschaltet (Live-Befund 2026-11-10: „tut nichts"):
+        // der Druck sagt, warum es hier kein 3D gibt, und rastet nicht ein.
+        QVERIFY(b3d->isEnabled());
+        b3d->click();
+        QVERIFY(!b3d->isChecked());
+        QVERIFY2(w.infoTextForTest().contains(QLatin1String("no Qt WebEngine")),
+                 qPrintable(w.infoTextForTest()));
 
         w.flyToStation(QStringLiteral("w1aw"), kStaLat, kStaLon, QStringLiteral("Newington"));
         QCOMPARE(w.currentViewForTest(), 1);
