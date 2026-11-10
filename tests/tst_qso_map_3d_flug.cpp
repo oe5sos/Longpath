@@ -25,11 +25,16 @@
 #include "core/Maidenhead.h"
 #include "gui/Google3dSetupDialog.h"
 #include "gui/QsoMapWindow.h"
+#include "gui/widgets/DxRadarWidget.h"
 #include "gui/widgets/FlatMapWidget.h"
+#include "gui/widgets/FlowLayout.h"
 #include "gui/widgets/GibsTileLayer.h"
 #include "gui/widgets/Station3dSurface.h"
 
 #include <QApplication>
+#include <QDateTime>
+
+#include <tuple>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLineEdit>
@@ -297,6 +302,69 @@ private slots:
         QCOMPARE(g_lastFake->flights.last().secret, kKey);
     }
 
+    // Betreiber nach dem ersten echten Flug (2026-11-10): „die groesse der
+    // ansicht von 3d muss groesser sein". Im 3D-Bild treten Band-/Modus-
+    // Pillen, Zaehlung und kleine Rotor-Grafik zurueck -- und kommen wieder,
+    // sobald die flache Karte zurueck ist.
+    void in_3d_the_picture_gets_the_room()
+    {
+        installFake();
+        GoogleMapsKey::save(kKey);
+        QsoMapWindow w;
+        w.resize(1100, 620);
+        w.setHomeGrid(QStringLiteral("JN78GH"));
+        w.imagery()->setNetworkEnabled(false);
+        QVector<LogEntry> log;
+        const QDateTime t = QDateTime::currentDateTimeUtc().addDays(-1);
+        for (const auto& [call, band, mode] : {std::tuple{"W1AW", "20m", "SSB"},
+                                               std::tuple{"K1TTT", "40m", "CW"}}) {
+            LogEntry e;
+            e.call = QString::fromLatin1(call);
+            e.band = QString::fromLatin1(band);
+            e.mode = QString::fromLatin1(mode);
+            e.timeOn = t;
+            e.gridSquare = QStringLiteral("FN31");
+            log << e;
+        }
+        w.setEntries(log);
+        w.setRotorRadarShown(true);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+
+        auto pillsShown = [&w]() {
+            int shown = 0;
+            FlowLayout* row = w.pillRowForTest();
+            for (int i = 0; i < row->count(); ++i) {
+                if (QWidget* p = row->itemAt(i)->widget(); p && p->isVisible()) { ++shown; }
+            }
+            return shown;
+        };
+        // Flach (Kugel) zuerst: alles da.
+        QVERIFY(pillsShown() > 0);
+        QVERIFY(w.summaryForTest()->isVisible());
+        QVERIFY(w.rotorRadarForTest()->isVisible());
+
+        w.flyToStation(QStringLiteral("W1AW"), kStaLat, kStaLon);
+        QCOMPARE(w.currentViewForTest(), int(QsoMapWindow::kView3d));
+        QCOMPARE(pillsShown(), 0);
+        QVERIFY(!w.summaryForTest()->isVisible());
+        QVERIFY(!w.flatOnlyControlsForTest().isEmpty());
+        for (QWidget* c : w.flatOnlyControlsForTest()) { QVERIFY(!c->isVisible()); }
+        // Der Weg hinaus und das Feld zum Weiterfliegen bleiben.
+        QVERIFY(w.threeDButtonForTest()->isVisible());
+        QVERIFY(!w.rotorRadarForTest()->isVisible());
+        // Das Bild bekommt die Breite, die die Rotor-Grafik hatte.
+        QVERIFY(w.threeDSurfaceForTest()->width() > w.width() * 0.9);
+
+        // Zurueck auf die flache Karte: alles wieder da.
+        w.threeDButtonForTest()->click();
+        QCOMPARE(w.currentViewForTest(), 1);
+        QVERIFY(pillsShown() > 0);
+        QVERIFY(w.summaryForTest()->isVisible());
+        QVERIFY(w.rotorRadarForTest()->isVisible());
+        for (QWidget* c : w.flatOnlyControlsForTest()) { QVERIFY(c->isVisible()); }
+    }
+
     void the_page_is_pinned_and_sets_no_global_ion_token()
     {
         const QString html = Station3dPage::html();
@@ -318,6 +386,12 @@ private slots:
         // global (Cesiums eigener Weg puffert eine Absage bis zum Neustart).
         QCOMPARE(html.count(QLatin1String("defaultAccessToken =")), 1);
         QVERIFY(html.contains(QLatin1String("const ION_GOOGLE_3D = 2275207;")));
+        // Schmal: die Anzeige wird knapp, Name/Ort fallen weg (2026-11-10).
+        // ... auch, wenn die Spalte breit, aber niedrig ist (live 2026-11-10).
+        const int narrow = html.indexOf(QLatin1String(
+            "@media (max-width: 560px), (max-height: 460px)"));
+        QVERIFY(narrow > 0);
+        QVERIFY(html.indexOf(QLatin1String("#caption { display: none; }"), narrow) > narrow);
         QVERIFY(html.contains(QLatin1String(
             "IonResource.fromAssetId(ION_GOOGLE_3D, { accessToken: f.token })")));
         QVERIFY(html.contains(QLatin1String("baseLayer: false")));

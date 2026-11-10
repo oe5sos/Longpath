@@ -48,6 +48,19 @@
   #caption { color: #a6a6ac; margin-top: 2px; }
   #figures { color: #d8a55f; margin-top: 6px; font-size: 16px; }
   #togo { color: #a6a6ac; margin-top: 2px; font-size: 11px; }
+  /* Knapp -- die Spalte neben dem Logbuch. Betreiber 2026-11-10 (live):
+     „das fenster ist sehr klein, das call wird dann noch zusaetzlich sehr
+     gross geschrieben". Die Spalte ist oft BREIT, aber NIEDRIG -- darum
+     gilt das auch fuer die Hoehe. Rufzeichen, Entfernung und Peilung
+     bleiben; Name und Ort stehen in der Stationskarte darunter. Die
+     Quellenzeile von Cesium und Google bleibt unangetastet. */
+  @media (max-width: 560px), (max-height: 460px) {
+    #hud { left: 6px; top: 6px; max-width: 46%; padding: 3px 7px; border-radius: 4px; }
+    #call { font-size: 13px; letter-spacing: 0; }
+    #caption { display: none; }
+    #figures { font-size: 11px; margin-top: 0; }
+    #togo { font-size: 9px; margin-top: 0; }
+  }
 </style>
 <script>
   window.CESIUM_BASE_URL = "@@CESIUM_BASE@@";
@@ -314,6 +327,10 @@
       complete: function () {
         if (id !== lp.id) { return; }
         hud(f, "Drag to look around · scroll to zoom");
+        // Der Hinweis hat nach ein paar Sekunden seinen Dienst getan.
+        setTimeout(function () {
+          if (id === lp.id) { document.getElementById("togo").textContent = ""; }
+        }, 6000);
         lpSend({ event: "arrived", ground: g });
         orbit(centre, offset, id);
       }

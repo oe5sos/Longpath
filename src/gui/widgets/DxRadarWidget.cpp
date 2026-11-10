@@ -79,7 +79,9 @@ double DxRadarWidget::radiusFor(double km, double maxKm)
 
 double DxRadarWidget::radiusPx() const
 {
-    return std::max(10.0, std::min(width(), height()) * 0.5 - 28.0);
+    // Kompakt stehen aussen nur noch N/E/S/W: weniger Rand, groesserer Schirm.
+    const double margin = m_rotorCompact ? 18.0 : 28.0;
+    return std::max(10.0, std::min(width(), height()) * 0.5 - margin);
 }
 
 QPointF DxRadarWidget::centre() const
@@ -150,6 +152,16 @@ void DxRadarWidget::paintEvent(QPaintEvent*)
     p.setFont(f);
     const QFontMetrics fm(f);
 
+    // ── Kompakt (die kleine Rotor-Grafik neben der Karte, 2026-11-10) ──
+    //
+    // Betreiber: „der rotor bzw die grafik muss ueberarbeitet werden". In
+    // der schmalen Spalte lagen die sechs Entfernungszahlen uebereinander
+    // und ueber dem Stationsnamen, zwoelf Gradzahlen und Speichen bis zur
+    // Mitte taten den Rest. Kompakt bleiben: Ringe ohne Zahlen, kurze
+    // Striche am Rand, nur N/E/S/W -- die Ablesung steht unten links in
+    // Ziffern, die Grafik muss nur zeigen, WOHIN.
+    const bool compact = m_rotorCompact;
+
     // Entfernungsringe mit Beschriftung oben rechts am Ring.
     p.setBrush(Qt::NoBrush);
     for (double km : kRingsKm) {
@@ -157,6 +169,7 @@ void DxRadarWidget::paintEvent(QPaintEvent*)
         const double r = radiusFor(km, m_maxKm) * R;
         p.setPen(QPen(grid, 1.0, km == m_maxKm ? Qt::SolidLine : Qt::DotLine));
         p.drawEllipse(c, r, r);
+        if (compact) { continue; }
         const QString lbl = km >= 1000.0 ? QStringLiteral("%1 000").arg(int(km / 1000))
                                           : QString::number(int(km));
         p.setPen(text);
@@ -168,7 +181,13 @@ void DxRadarWidget::paintEvent(QPaintEvent*)
         const double a = deg * kPi / 180.0;
         const QPointF dir(std::sin(a), -std::cos(a));
         p.setPen(QPen(grid, deg % 90 == 0 ? 1.2 : 0.8));
-        p.drawLine(c + dir * (R * 0.06), c + dir * R);
+        if (compact) {
+            const double inner = deg % 90 == 0 ? 0.84 : 0.91;
+            p.drawLine(c + dir * (R * inner), c + dir * R);
+            if (deg % 90 != 0) { continue; }
+        } else {
+            p.drawLine(c + dir * (R * 0.06), c + dir * R);
+        }
         QString name;
         switch (deg) {
             case 0:   name = QStringLiteral("N"); break;
@@ -177,7 +196,7 @@ void DxRadarWidget::paintEvent(QPaintEvent*)
             case 270: name = QStringLiteral("W"); break;
             default:  name = QString::number(deg); break;
         }
-        const QPointF at = c + dir * (R + 14.0);
+        const QPointF at = c + dir * (R + (compact ? 10.0 : 14.0));
         const int tw = fm.horizontalAdvance(name);
         p.setPen(deg % 90 == 0 ? QColor(Style::kTextPrimary) : text);
         p.drawText(QPointF(at.x() - tw / 2.0, at.y() + fm.ascent() / 2.0 - 1.0), name);
