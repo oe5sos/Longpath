@@ -244,6 +244,16 @@ void QsoDetailPane::buildUi()
     beam->addWidget(m_longPath,  1, 1);
     beam->addWidget(keyLabel(QStringLiteral("distance")),   2, 0);
     beam->addWidget(m_distance,  2, 1);
+    // Woher die Lage stammt (2026-11-10): Adresse, Locator oder nur die
+    // Mitte des Landes. Bernstein, wenn es nur grob ist.
+    m_lageLabel = valueLabel();
+    m_lageLabel->setWordWrap(true);
+    m_lageLabel->setToolTip(QStringLiteral(
+        "Where the station's position comes from. A street address or the "
+        "station's own entry is exact; a locator is a square of a few km; a "
+        "country centre only gives the rough direction."));
+    beam->addWidget(keyLabel(QStringLiteral("position")),   3, 0);
+    beam->addWidget(m_lageLabel, 3, 1);
     beam->setColumnStretch(0, 1);
     col->addLayout(beam);
 
@@ -566,7 +576,7 @@ void QsoDetailPane::applyInfo(const CallsignInfo& info, bool stale)
     }
 }
 
-bool QsoDetailPane::beamNow(double& bearingDeg, double& km) const
+bool QsoDetailPane::beamNow(double& bearingDeg, double& km, Lage* lage) const
 {
     // ── Wo die Station ist ── 2026-09-26 ────────────────────────────
     //
@@ -576,16 +586,25 @@ bool QsoDetailPane::beamNow(double& bearingDeg, double& km) const
     // Karte daneben sagte 11°. Reihenfolge wie in applyInfo(): QRZ-
     // Koordinaten, dann ein genauerer QRZ-Locator, dann der aus dem Log.
     double lat = 0.0, lon = 0.0;
+    Lage woher = Lage::Keine;
     const QString logged = m_entry.gridSquare.trimmed();
     const QString looked = m_info.grid.trimmed();
     if (m_info.isValid() && m_info.hasLatLon) {
         lat = m_info.latitude;
         lon = m_info.longitude;
+        woher = Lage::QrzKoordinaten;
     } else if (m_info.isValid() && isValidGridSquare(looked)
                && looked.size() > logged.size()) {
         calculateLatLonFromGridSquare(looked, lat, lon);
+        woher = Lage::QrzLocator;
     } else if (isValidGridSquare(logged)) {
         calculateLatLonFromGridSquare(logged, lat, lon);
+        woher = Lage::LogLocator;
+    } else if (m_fallback && m_fallback(m_entry.call, lat, lon)) {
+        // Ohne QRZ und ohne Locator: die Mitte des Landes (cty.dat).
+        // Fuer die Richtung reicht das meist, fuer die Entfernung nicht
+        // -- darum steht es dabei (lageText).
+        woher = Lage::Landesmitte;
     } else {
         return false;
     }
@@ -597,6 +616,10 @@ bool QsoDetailPane::beamNow(double& bearingDeg, double& km) const
                    .value(QStringLiteral("StationGridSquare"), QString{})
                    .toString().trimmed();
     }
+    // Und sonst der eigene Locator aus dem juengsten QSO (LogbookWindow::
+    // meinFeld) -- fuer eine Station, die nicht im Log steht, gab es
+    // bisher keinen Ausgangspunkt.
+    if (!isValidGridSquare(home) && m_homeGrid) { home = m_homeGrid().trimmed(); }
     if (!isValidGridSquare(home)) { return false; }
     double hlat = 0.0, hlon = 0.0;
     calculateLatLonFromGridSquare(home, hlat, hlon);
@@ -604,7 +627,85 @@ bool QsoDetailPane::beamNow(double& bearingDeg, double& km) const
     const BeamHeading::GreatCircle g = BeamHeading::greatCircle(hlat, hlon, lat, lon);
     bearingDeg = g.bearingDeg;
     km = g.km;
+    if (lage) { *lage = woher; }
     return true;
+}
+
+void QsoDetailPane::setPositionFallback(PositionFallback fn)
+{
+    m_fallback = std::move(fn);
+    refreshBeam();
+}
+
+void QsoDetailPane::setHomeGrid(std::function<QString()> fn)
+{
+    m_homeGrid = std::move(fn);
+    refreshBeam();
+}
+
+bool QsoDetailPane::peilung(double& bearingDeg, double& km) const
+{
+    if (!m_haveBeam) { return false; }
+    bearingDeg = m_beamDeg;
+    km = m_beamKm;
+    return true;
+}
+
+namespace {
+// Wie genau ein Locator ist: halbe Kantenlaenge, gerundet.
+QString locatorGenauigkeit(const QString& grid)
+{
+    const int n = grid.trimmed().size();
+    if (n >= 8) { return QStringLiteral("±300 m"); }
+    if (n >= 6) { return QStringLiteral("±3 km"); }
+    return QStringLiteral("±60 km");
+}
+} // namespace
+
+QString QsoDetailPane::lageText() const
+{
+    switch (m_lage) {
+    case Lage::QrzKoordinaten: {
+        // QRZ sagt mit <geoloc>, woher seine Koordinaten stammen.
+        const QString g = m_info.geoloc;
+        if (g == QLatin1String("user"))    { return QStringLiteral("set by the station (QRZ)"); }
+        if (g == QLatin1String("geocode")) { return QStringLiteral("street address (QRZ)"); }
+        if (g == QLatin1String("grid"))    {
+            return QStringLiteral("locator %1 (QRZ, %2)")
+                .arg(m_info.grid.trimmed(), locatorGenauigkeit(m_info.grid));
+        }
+        if (g == QLatin1String("zip"))     { return QStringLiteral("postcode centre (QRZ)"); }
+        if (g == QLatin1String("state"))   { return QStringLiteral("state centre (QRZ) — rough"); }
+        if (g == QLatin1String("dxcc") || g == QLatin1String("none")) {
+            return QStringLiteral("country centre (QRZ) — rough");
+        }
+        return QStringLiteral("coordinates (QRZ)");
+    }
+    case Lage::QrzLocator:
+        return QStringLiteral("locator %1 (QRZ, %2)")
+            .arg(m_info.grid.trimmed(), locatorGenauigkeit(m_info.grid));
+    case Lage::LogLocator:
+        return QStringLiteral("locator %1 (your log, %2)")
+            .arg(m_entry.gridSquare.trimmed(), locatorGenauigkeit(m_entry.gridSquare));
+    case Lage::Landesmitte:
+        return QStringLiteral("country centre — rough");
+    case Lage::Keine:
+        break;
+    }
+    return QString();
+}
+
+bool QsoDetailPane::lageGrob() const
+{
+    if (m_lage == Lage::Landesmitte) { return true; }
+    if (m_lage == Lage::QrzKoordinaten) {
+        const QString g = m_info.geoloc;
+        return g == QLatin1String("state") || g == QLatin1String("dxcc")
+            || g == QLatin1String("none");
+    }
+    const QString grid = m_lage == Lage::QrzLocator ? m_info.grid : m_entry.gridSquare;
+    return (m_lage == Lage::QrzLocator || m_lage == Lage::LogLocator)
+        && grid.trimmed().size() < 6;
 }
 
 void QsoDetailPane::refreshBeam()
@@ -613,7 +714,15 @@ void QsoDetailPane::refreshBeam()
     // antenna due north because a position is missing is worse than
     // offering nothing.
     double sp = 0.0, km = 0.0;
-    const bool have = m_haveEntry && beamNow(sp, km) && km > 0.0;
+    Lage woher = Lage::Keine;
+    const bool have = m_haveEntry && beamNow(sp, km, &woher) && km > 0.0;
+    m_lage = have ? woher : Lage::Keine;
+    m_beamKm = have ? km : 0.0;
+    if (m_lageLabel) {
+        m_lageLabel->setText(have ? lageText() : QStringLiteral("—"));
+        m_lageLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(
+            QLatin1String(have && lageGrob() ? Style::kAmberWarn : Style::kTextPrimary)));
+    }
     const double before = m_haveBeam ? m_beamDeg : -1.0;
     m_haveBeam = have;
     m_beamDeg = have ? BeamHeading::wrap360(sp) : 0.0;
@@ -634,13 +743,17 @@ void QsoDetailPane::refreshBeam()
         } else if (m_notLogged) {
             // Not "your locator and theirs are missing" — there is no
             // contact here to have locators. Say the true thing.
+            // Seit 2026-11-10 gibt es fuer eine neue Station eine Peilung,
+            // sobald ihre Lage bekannt ist (QRZ, Locator oder Landesmitte).
+            // Fehlt sie trotzdem, ist das der ehrliche Grund.
             m_travel->setText(QStringLiteral(
-                "Not in your log — no bearing until you work them."));
+                "Not in your log — no position known for this station yet."));
         } else {
             m_travel->setText(QStringLiteral(
                 "No bearing — needs your locator and theirs."));
         }
         m_travel->setVisible(m_haveEntry);
+        emit peilungNeu();
         return;
     }
 
@@ -677,6 +790,7 @@ void QsoDetailPane::refreshBeam()
                                     .arg(QLatin1String(Style::kTextScale)));
         m_travel->setVisible(true);
     }
+    emit peilungNeu();
 }
 
 void QsoDetailPane::refreshExtras()

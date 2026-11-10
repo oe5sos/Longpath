@@ -2742,6 +2742,9 @@ if(TEST tst_flex_auto_sql)
     set_tests_properties(tst_flex_auto_sql PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
+# tst_logbuch_rotor_knopf (2026-11-10): ROTOR in der Eingabezeile --
+#   Peilung auch fuer neue Stationen, Rotate/LP, erlaubter Bereich, Lagequelle.
+longpath_add_test(tst_logbuch_rotor_knopf)
 
 longpath_add_test(tst_kombi_entwuerfe)
 longpath_add_test(tst_startmaske)

@@ -239,6 +239,11 @@ public:
     QLabel*      entryModeForTest() const { return m_entryMode; }
     QLabel*      entryHintForTest() const { return m_entryHint; }
     QPushButton* entryLogButtonForTest() const { return m_entryLogBtn; }
+    QPushButton* entryRotorForTest() const { return m_entryRotorBtn; }
+    QPushButton* entryRotateForTest() const { return m_entryRotate; }
+    QPushButton* entryLongPathForTest() const { return m_entryLp; }
+    QLabel*      entryPeilungForTest() const { return m_entryPeilung; }
+    class QsoDetailPane* detailForTest() const { return m_detail; }
     QLineEdit*   searchForTest() const { return m_search; }
 
 signals:
@@ -389,6 +394,15 @@ private:
     QLineEdit*    m_entryComment{nullptr};
     QPushButton*  m_entryLogBtn{nullptr};
     QLabel*       m_entryHint{nullptr};
+    // ROTOR in der Eingabezeile (2026-11-10): zeigt Rotor und Station,
+    // dann drehen -- kurzer oder langer Weg, im erlaubten Bereich.
+    QPushButton*  m_entryRotorBtn{nullptr};
+    QPushButton*  m_entryRotate{nullptr};
+    QPushButton*  m_entryLp{nullptr};
+    QLabel*       m_entryPeilung{nullptr};
+    bool          m_rotorZeile{false};
+    void          zeigeRotorZeile();
+    void          aktualisiereRotorZeile();
     QTimer*       m_entryLookup{nullptr};
     // Bedarfs-Matrix unter der Eingabezeile (2026-11-08).
     class BedarfsMatrixWidget* m_bedarf{nullptr};
