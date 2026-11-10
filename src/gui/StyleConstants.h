@@ -222,6 +222,33 @@ constexpr auto kPanadapterBg    = "#141e27";
 // Schwarzbild. Aus dem GIBS-Foto gemessen (Pazifik, Level 3), nicht
 // aus der Hauspalette — die Kugel ist ein Foto, kein Chrom.
 constexpr auto kMapOceanDeep    = "#081024";
+// ── Azimutalkarte des Logbuchs (2026-11-10) ─────────────────────────
+//
+// Die Bandfarben des Entwurfsblatts vom 09.11. (Betreiber: „absoluter
+// wahnsinn"): gedaempft, damit tausende Strahlen uebereinander nicht
+// zu einem Farbbrei werden. 20 m traegt Bernstein (kAmberText), 6 m
+// Kupfer statt Rot, nirgends Auswahl-Blau. Eine Sprache fuer Strahl,
+// Punkt und Legende -- darum hier und nicht im Widget.
+constexpr auto kAzBand160m      = "#7f78a8";
+constexpr auto kAzBand80m       = "#9a7aa0";
+constexpr auto kAzBand60m       = "#8a8a8a";
+constexpr auto kAzBand40m       = "#5f9aa8";
+constexpr auto kAzBand30m       = "#6fa58a";
+constexpr auto kAzBand17m       = "#c4b35a";
+constexpr auto kAzBand15m       = "#a8c46a";
+constexpr auto kAzBand12m       = "#7fbf9a";
+constexpr auto kAzBand10m       = "#e0c890";
+constexpr auto kAzBand6m        = "#c98a6a";
+constexpr auto kAzBand4m        = "#b89a7a";
+constexpr auto kAzBand2m        = "#efe6cf";
+constexpr auto kAzBand70cm      = "#b0a090";
+constexpr auto kAzBand23cm      = "#a09888";
+// Entfernungsringe und kurze Gradstriche (GRID des Blatts).
+constexpr auto kAzRing          = "#2a2a30";
+// Die nachgeschlagene Station: warmes Weiss, heller als jedes Band.
+constexpr auto kAzZiel          = "#f2e6c8";
+// Die Nachtseite, als Lasur ueber dem Weltbild (Deckung im Widget).
+constexpr auto kAzNacht         = "#04060e";
 // ── Eigener Wert, nicht derselbe wie der Seitengrund ────────────────
 //
 // kInsetBg trug bis zum 2026-08-21 EXAKT denselben Wert wie kAppBg

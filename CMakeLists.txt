@@ -901,6 +901,8 @@ set(GUI_SOURCES
     src/core/RotorBereich.cpp
     src/core/FlexAutoRauschsperre.cpp
     src/core/LogbuchBilder.cpp
+    src/core/LogbuchGesamtbilder.cpp
+    src/core/SolarFluxArchiv.cpp
     src/core/SingleInstanceGuard.cpp
     src/gui/spectrum/SpectrumAvenger.cpp
     src/gui/DssRenderer.cpp
@@ -1320,6 +1322,7 @@ set(GUI_SOURCES
     src/gui/TraegerEichDialog.cpp
     src/gui/RundumDialog.cpp
     src/gui/widgets/LogbuchBilderWidgets.cpp
+    src/gui/widgets/LogbuchGesamtbilderWidgets.cpp
     src/gui/applets/BandwidthFilterApplet.cpp
     src/gui/applets/CatApplet.cpp
     src/gui/applets/TunerApplet.cpp

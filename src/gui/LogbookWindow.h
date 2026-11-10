@@ -341,6 +341,18 @@ public:
     class BandStundeWidget* bandStundeForTest() const { return m_bandStunde; }
     class RichtungsRoseWidget* roseForTest() const { return m_rose; }
     void zeigeStatistikSeiteForTest(int seite) { zeigeStatistikSeite(seite); }
+    /// Fuer Pruefstaende: die drei Gesamtbilder (2026-11-10) und die
+    /// Reiter, ueber die der Betreiber sie erreicht.
+    class SonnenzyklusWidget* sonnenzyklusForTest() const { return m_sonne; }
+    class KontinentUhrWidget* kontinentUhrForTest() const { return m_uhr; }
+    class DxccWandWidget* dxccWandForTest() const { return m_wand; }
+    class SolarFluxArchiv* solarFluxForTest() const { return m_flux; }
+    QList<QPushButton*> statistikReiterForTest() const { return m_statsSeitenKnoepfe; }
+    QDialog* statistikDialogForTest() const { return m_statsDialog; }
+    /// Wie gross der Statistikdialog fuer die Gesamtbilder mindestens
+    /// werden soll: 1240 x 820, auf kleinen Schirmen weniger. Er waechst
+    /// darauf zu und schrumpft nie.
+    static QSize gesamtbildGroesse(const QWidget* dialog);
 private:
     // Send these records. With rows marked in the table it is those;
     // with none marked it is everything not yet uploaded, which is the
@@ -403,6 +415,12 @@ private:
     class BandStundeWidget* m_bandStunde{nullptr};
     class RichtungsRoseWidget* m_rose{nullptr};
     QComboBox* m_bandStundeFilter{nullptr};
+    // Drei weitere Seiten (2026-11-10): Sonnenzyklus, Kontinent-Uhr,
+    // DXCC-Wand; der Flux kommt aus einem eigenen Cache (SolarFluxArchiv).
+    class SonnenzyklusWidget* m_sonne{nullptr};
+    class KontinentUhrWidget* m_uhr{nullptr};
+    class DxccWandWidget* m_wand{nullptr};
+    class SolarFluxArchiv* m_flux{nullptr};
     void zeigeStatistikSeite(int seite);
     // Tippen in der Suche: Karte und Kennzahlen erst nach einer kurzen
     // Pause nachziehen (Vorschlag 2026-09-27, siehe .cpp).

@@ -35,9 +35,12 @@
 #include "core/Maidenhead.h"
 #include "core/CtyDatParser.h"
 #include "core/LogbuchBilder.h"
+#include "core/LogbuchGesamtbilder.h"
+#include "core/SolarFluxArchiv.h"
 #include "core/RotorBereich.h"
 #include "core/TransverterSetup.h"
 #include "gui/widgets/LogbuchBilderWidgets.h"
+#include "gui/widgets/LogbuchGesamtbilderWidgets.h"
 #include "models/Band.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -49,7 +52,9 @@
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QComboBox>
+#include <QScreen>
 #include <QStackedWidget>
+#include <QStandardPaths>
 #include <QDateEdit>
 #include <QDateTimeEdit>
 #include <QHash>
@@ -589,6 +594,7 @@ void LogbookWindow::buildUi()
         head->addWidget(cap);
         head->addStretch(1);
         auto* popOut = new QPushButton(QStringLiteral("\u2197"), m_statsSection);
+        popOut->setObjectName(QStringLiteral("statsPopOut"));
         popOut->setStyleSheet(Style::buttonBaseStyle());
         popOut->setToolTip(QStringLiteral("Open the statistics in their own window"));
         connect(popOut, &QPushButton::clicked, this, &LogbookWindow::showStatistics);
@@ -2134,13 +2140,15 @@ void LogbookWindow::showStatistics()
         auto* lay = new QVBoxLayout(m_statsDialog);
         lay->setContentsMargins(0, 0, 0, 0);
 
-        // Drei Seiten (2026-11-08): die Kacheln, Band x Stunde, Richtungen.
-        // Alle drei zeigen, was die Filter des Logbuchs zeigen.
+        // Drei Seiten (2026-11-08): die Kacheln, Band x Stunde, Richtungen;
+        // drei weitere (2026-11-10): Sonnenzyklus, Kontinent-Uhr, DXCC-Wand.
+        // Alle zeigen, was die Filter des Logbuchs zeigen.
         auto* reiter = new QHBoxLayout;
         reiter->setContentsMargins(10, 8, 10, 0);
         reiter->setSpacing(6);
         const QStringList namen = {QStringLiteral("Overview"), QStringLiteral("Band × hour"),
-                                   QStringLiteral("Directions")};
+                                   QStringLiteral("Directions"), QStringLiteral("Solar cycle"),
+                                   QStringLiteral("Continent clock"), QStringLiteral("DXCC wall")};
         m_statsSeitenKnoepfe.clear();
         for (int i = 0; i < namen.size(); ++i) {
             auto* k = new QPushButton(namen[i], m_statsDialog);
@@ -2193,6 +2201,18 @@ void LogbookWindow::showStatistics()
 
         m_rose = new RichtungsRoseWidget(m_statsSeiten);
         m_statsSeiten->addWidget(m_rose);
+
+        m_sonne = new SonnenzyklusWidget(m_statsSeiten);
+        m_statsSeiten->addWidget(m_sonne);
+        m_uhr = new KontinentUhrWidget(m_statsSeiten);
+        m_statsSeiten->addWidget(m_uhr);
+        m_wand = new DxccWandWidget(m_statsSeiten);
+        m_statsSeiten->addWidget(m_wand);
+        m_flux = new SolarFluxArchiv(QString(), this);
+        // Kommen neue Flux-Werte, solange die Seite offen ist: nachziehen.
+        connect(m_flux, &SolarFluxArchiv::aktualisiert, this, [this]() {
+            if (m_statsSeiten && m_statsSeiten->currentWidget() == m_sonne) { refreshStatsView(); }
+        });
         lay->addWidget(m_statsSeiten, 1);
         m_statsSeitenKnoepfe.first()->setChecked(true);
         auto* closeBtn = new QPushButton(QStringLiteral("Close"), m_statsDialog);
@@ -2210,6 +2230,15 @@ void LogbookWindow::showStatistics()
     refreshStatsView();   // after show(): it only works on a visible dialog
 }
 
+QSize LogbookWindow::gesamtbildGroesse(const QWidget* dialog)
+{
+    QSize z(1240, 820);
+    if (const QScreen* sc = dialog ? dialog->screen() : nullptr) {
+        z = z.boundedTo(sc->availableGeometry().size() - QSize(40, 60));
+    }
+    return z;
+}
+
 void LogbookWindow::zeigeStatistikSeite(int seite)
 {
     showStatistics();
@@ -2217,6 +2246,12 @@ void LogbookWindow::zeigeStatistikSeite(int seite)
     seite = std::clamp(seite, 0, m_statsSeiten->count() - 1);
     m_statsSeiten->setCurrentIndex(seite);
     if (seite < m_statsSeitenKnoepfe.size()) { m_statsSeitenKnoepfe[seite]->setChecked(true); }
+    // Die drei Gesamtbilder brauchen mehr Flaeche als die Kacheln: das
+    // Fenster waechst (nie schrumpft es), soweit der Bildschirm reicht.
+    if (m_statsDialog && seite >= 3) {
+        const QSize ziel = m_statsDialog->size().expandedTo(gesamtbildGroesse(m_statsDialog));
+        if (ziel != m_statsDialog->size()) { m_statsDialog->resize(ziel); }
+    }
     refreshStatsView();
 }
 
@@ -2258,6 +2293,23 @@ void LogbookWindow::refreshStatsView()
             m_rose->setRose(LogbuchBilder::rose(shown, m_cty, meinFeld()),
                             QStringLiteral("this view"));
             m_rose->setRotor(m_rotorDeg, m_rotorBeamDeg, RotorBereich::load());
+        }
+        if (seite == 3 && m_sonne && m_flux) {
+            m_flux->ladeCache();
+            // Pruefstaende holen nie aus dem Netz; die Regel, WANN geholt
+            // wird, steht in SolarFluxArchiv::brauchtAbruf.
+            if (!QStandardPaths::isTestModeEnabled()) {
+                m_flux->holeWennNoetig(QDateTime::currentDateTimeUtc());
+            }
+            m_sonne->setDaten(LogbuchBilder::sonnenzyklus(shown, m_flux->werte(),
+                                                          QDateTime::currentDateTimeUtc().date()),
+                              m_flux->stand(), m_flux->laeuft());
+        }
+        if (seite == 4 && m_uhr) {
+            m_uhr->setDaten(LogbuchBilder::kontinentUhr(shown, m_cty));
+        }
+        if (seite == 5 && m_wand) {
+            m_wand->setDaten(LogbuchBilder::dxccWand(shown, m_cty));
         }
     }
 }
