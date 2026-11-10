@@ -6166,6 +6166,9 @@ longpath_add_test(tst_qso_map_3d_flug)
 # 2026-11-10: der QRZ-Zugang war seit 57d524b0f (2026-08-07) ueber kein
 # Menue mehr erreichbar, waehrend vier Stellen „in Tools" auf ihn zeigten.
 longpath_add_test(tst_qrz_konto_im_menue)
+# 2026-11-10, Live-Befund: „3D" in der eingebetteten Logbuch-Karte tat
+# ohne Schluessel sichtbar nichts. Echter Mausklick im echten Logbuch.
+longpath_add_test(tst_logbuch_3d_knopf)
 # Die WebEngine-Fassung selbst, nur wo Qt WebEngine gefunden wurde
 # (Homebrew-Qt am Mac; die Linux-/Windows-Laeufer haben es nicht).
 if(LONGPATH_HAS_WEBENGINE)
