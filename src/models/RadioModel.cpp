@@ -289,6 +289,7 @@ warren@wpratt.com
 #include "core/audio/RealtimeAudioPriority.h"
 #include "core/audio/VaxTxMicSource.h"
 #include "core/audio/CompositeTxMicRouter.h"
+#include "core/hotkeys/HotKeyBindings.h"
 #include "core/audio/TxMicSource.h"
 #include "core/RadioConnection.h"
 #include "core/RadioConnectionTeardown.h"
@@ -924,6 +925,47 @@ RadioModel::RadioModel(QObject* parent)
     //udRX2StepAttData.Enabled = true; //[2.10.3.6]MW0LGE att_fixes  [console.cs:29648]
     // Display.TXAttenuatorOffset = 0; //[2.10.3.6]MW0LGE att_fixes  [console.cs:29659]
     m_moxController = new MoxController(this);
+
+    // ── Sprachspeicher: Senden und Aufnehmen (2026-11-10) ───────────
+    //
+    // Der Spieler kennt weder Router noch MoxController; er bekommt
+    // beides als Haken. Getastet wird wie beim eigenen FT8
+    // (Ft8Applet): erst den Weg legen, dann setMox, eine Ablehnung des
+    // Bandplans kommt synchron als moxRejected und wird zum Satz fuer
+    // den Betreiber. Der Router entsteht erst beim Verbinden -- bis
+    // dahin sagt routeToVoiceKeyer() nein, und es wird nichts getastet.
+    m_voiceKeyerPlayer = std::make_unique<VoiceKeyerPlayer>(&m_voiceKeyer);
+    m_hotKeyBindings = std::make_unique<HotKeyBindings>();
+    {
+        VoiceKeyerPlayer::Hooks hooks;
+        hooks.routeToVoiceKeyer = [this]() {
+            if (!m_compositeMicRouter) { return false; }
+            m_dvkQuelleVorher = static_cast<int>(m_compositeMicRouter->activeSource());
+            m_compositeMicRouter->setActiveSource(MicSource::Dvk);
+            return true;
+        };
+        hooks.restoreRoute = [this]() {
+            if (!m_compositeMicRouter) { return; }
+            m_compositeMicRouter->setActiveSource(static_cast<MicSource>(m_dvkQuelleVorher));
+        };
+        hooks.key = [this](bool on) {
+            QString grund;
+            if (!m_moxController) { return QStringLiteral("no transmit controller"); }
+            const QMetaObject::Connection c = connect(
+                m_moxController, &MoxController::moxRejected, this,
+                [&grund](const QString& g) { grund = g; });
+            m_moxController->setMox(on);
+            disconnect(c);
+            return grund;
+        };
+        hooks.keyed = [this]() {
+            return m_moxController != nullptr && m_moxController->isMox();
+        };
+        hooks.txWorker = [this]() { return m_txWorker.get(); };
+        m_voiceKeyerPlayer->setHooks(std::move(hooks));
+        connect(m_moxController, &MoxController::moxStateChanged,
+                m_voiceKeyerPlayer.get(), &VoiceKeyerPlayer::onKeyedChanged);
+    }
 
     // ── Phase 3F Sub-Epic C Task 6: TxSliceArbiter construction + wiring ──
     // Owned QObject child of RadioModel (Qt parent semantics handle the
@@ -10010,6 +10052,13 @@ void RadioModel::connectToRadio(const RadioInfo& info)
             // MoxController.
             m_rttyTxSource = std::make_unique<RttyTxSource>(48000);
             m_compositeMicRouter->setRttySource(m_rttyTxSource.get());
+
+            // Der Sprachspeicher (2026-11-10): ebenfalls angemeldet und
+            // still, bis der Spieler MicSource::Dvk waehlt. Getastet
+            // wird ueber den MoxController, nicht hier.
+            if (m_voiceKeyerPlayer) {
+                m_compositeMicRouter->setDvkSource(m_voiceKeyerPlayer->source());
+            }
 
             // Replace the 3M-1a NullMicSource stub with the composite router.
             m_txChannel->setMicRouter(m_compositeMicRouter.get());

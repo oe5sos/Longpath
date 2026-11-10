@@ -882,9 +882,12 @@ void TxWorkerThread::dispatchOneBlock()
     // Basisband nach m_in geschrieben, und alle anderen
     // Uebersteuerungszweige hier tragen deshalb schon ein
     // `path != TxPath::Rade`.
+    // Der Sprachspeicher (2026-11-10) ist eine eigene Tonquelle, aber
+    // eine Stimme: er wird oben geholt wie FT8, faellt hier aber NICHT
+    // unter `datenSignal` und geht durch den Kanalzug wie das Mikrofon.
     const bool datenSignal =
         path == TxPath::Rade
-        || (eigene != nullptr && eigene->eigeneTonquelleAktiv());
+        || (eigene != nullptr && eigene->eigenesDatensignalAktiv());
 
     if (path != TxPath::Rade
         && eigene != nullptr && eigene->eigeneTonquelleAktiv()) {
