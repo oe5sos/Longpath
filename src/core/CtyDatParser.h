@@ -19,6 +19,10 @@
 //                                    isLoaded) follow upstream
 //                                    byte-for-byte. AI tooling:
 //                                    Anthropic Claude Code.
+//   2026-11-10  Martin Fischer / OE5SOS  allEntities(): jedes Gebiet
+//                                    der Datei, fuer die DXCC-Wand
+//                                    im Logbuch. KI-gestuetzt ueber
+//                                    Anthropic Claude (Claude Code).
 
 #pragma once
 
@@ -74,6 +78,9 @@ public:
     const DxccEntity* entityByPrefix(const QString& primaryPrefix) const;
 
     int entityCount() const { return m_entityByPrefix.size(); }
+    /// Every entity in the file, WAE-only rows ("*" prefix) included,
+    /// in no particular order.
+    QList<DxccEntity> allEntities() const { return m_entityByPrefix.values(); }
     bool isLoaded()   const { return !m_entityByPrefix.isEmpty(); }
 
 private:

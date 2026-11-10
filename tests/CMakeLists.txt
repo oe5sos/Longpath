@@ -1163,6 +1163,15 @@ if(TEST tst_logbuch_bilder)
     set_tests_properties(tst_logbuch_bilder PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
+# tst_logbuch_gesamtbilder (2026-11-10): Sonnenzyklus, Kontinent-Uhr und
+#   DXCC-Wand -- Rechnung, Flux-Cache, Widgets und der Weg ueber Stats/↗/
+#   Reiter im Logbuch-Fenster. Ein Renderfall aus einer Logbuch-Kopie nur
+#   mit LONGPATH_LOGBOOK_FIXTURE + LONGPATH_GRAB_DIR.
+longpath_add_test(tst_logbuch_gesamtbilder)
+if(TEST tst_logbuch_gesamtbilder)
+    set_tests_properties(tst_logbuch_gesamtbilder PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 if(TEST tst_transverter_nur_empfang)
     set_tests_properties(tst_transverter_nur_empfang PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
