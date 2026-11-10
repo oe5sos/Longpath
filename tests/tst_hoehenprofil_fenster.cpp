@@ -274,6 +274,36 @@ private slots:
         QCOMPARE(HoehenprofilFenster::vorgabeGegen(), 10.0);
     }
 
+    // Probe-Merge Rotor + Hoehenprofil (2026-11-10): steht die Gegenstation
+    // auf einem Gipfel (SOTA_REF), nimmt beamNow() dessen Lage -- und die
+    // Lage-Zeile des Rotor-Zweigs sagt das, statt "—" zu zeigen.
+    void gegenstationAmGipfelHatLageGipfel()
+    {
+        LogEntry e = zweiMeter(QStringLiteral("OE5XYZ"), QStringLiteral("JN68XF"), 4, 7, 19, 26);
+        e.sotaRef = QStringLiteral("OE/OO-106");
+
+        QsoDetailPane pane;
+        pane.resize(320, 700);
+        pane.show();
+        QSignalSpy bekannt(&SotaGipfelVerzeichnis::instanz(),
+                           &SotaGipfelVerzeichnis::gipfelBekannt);
+        pane.setEntry(e);
+        SotaGipfel g;
+        if (!SotaGipfelVerzeichnis::instanz().finde(e.sotaRef, g)) {
+            QVERIFY(bekannt.wait(kFensterFrist));
+        }
+        QTRY_COMPARE_WITH_TIMEOUT(pane.lage(), QsoDetailPane::Lage::Gipfel, kFensterFrist);
+        QCOMPARE(pane.lageText(), QStringLiteral("summit OE/OO-106 (SOTA)"));
+        QVERIFY(!pane.lageGrob());
+        // Peilung vom eigenen Locator zum Gipfel, nicht zu JN68XF.
+        double hlat = 0.0, hlon = 0.0;
+        calculateLatLonFromGridSquare(QStringLiteral("JN67VV"), hlat, hlon);
+        const BeamHeading::GreatCircle soll = BeamHeading::greatCircle(hlat, hlon, 47.9058, 13.7353);
+        double deg = 0.0, km = 0.0;
+        QVERIFY(pane.peilung(deg, km));
+        QVERIFY2(std::abs(km - soll.km) < 1e-6, qPrintable(QString::number(km, 'f', 3)));
+    }
+
     void gipfelUnbekanntNimmtLocator()
     {
         LogEntry e = zweiMeter(QStringLiteral("OM2Y"), QStringLiteral("JN88RS"), 4, 7, 19, 8);

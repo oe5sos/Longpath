@@ -25,6 +25,7 @@
 #include "core/Maidenhead.h"
 #include "gui/Google3dSetupDialog.h"
 #include "gui/QsoMapWindow.h"
+#include "gui/widgets/AzimutalKarteWidget.h"
 #include "gui/widgets/DxRadarWidget.h"
 #include "gui/widgets/FlatMapWidget.h"
 #include "gui/widgets/FlowLayout.h"
@@ -363,6 +364,77 @@ private slots:
         QVERIFY(w.summaryForTest()->isVisible());
         QVERIFY(w.rotorRadarForTest()->isVisible());
         for (QWidget* c : w.flatOnlyControlsForTest()) { QVERIFY(c->isVisible()); }
+    }
+
+    // Probe-Merge Azimutalkarte + 3D (2026-11-10): beide wollten Stapel-
+    // platz 3. Jetzt 3 = Azimutalkarte, 4 = 3D. Eine gezeigte
+    // Azimutalkarte bleibt beim Nachschlagen stehen; der Knopf „3D" holt
+    // ausdruecklich ins 3D-Bild; Radar und Azimutalkarte fuehren dorthin
+    // zurueck, wo man herkam -- auch ins 3D-Bild, aber nicht mehr, wenn
+    // 3D inzwischen abgewaehlt ist.
+    void azimuthal_map_and_3d_share_the_stack()
+    {
+        installFake();
+        GoogleMapsKey::save(kKey);
+        AppSettings::instance().setValue(QStringLiteral("QsoMapView"), QString());
+        QsoMapWindow w;
+        prepare(w, nullptr);
+        QPushButton* az = w.azimutalButtonForTest();
+        QPushButton* radar = w.radarButtonForTest();
+        QPushButton* b3d = w.threeDButtonForTest();
+        QVERIFY(az && radar && b3d);
+        QVERIFY(b3d->isChecked());
+        constexpr int kAz = 3;
+        QCOMPARE(int(QsoMapWindow::kView3d), 4);
+
+        // Azimutalkarte gezeigt: das Rufzeichen landet dort, kein 3D-Flug.
+        az->click();
+        QCOMPARE(w.currentViewForTest(), kAz);
+        w.flyToStation(QStringLiteral("W1AW"), kStaLat, kStaLon);
+        QCOMPARE(w.currentViewForTest(), kAz);
+        QVERIFY(az->isChecked());
+        QVERIFY(w.azimutalForTest()->hatZiel());
+        QCOMPARE(w.azimutalForTest()->zielCall(), QStringLiteral("W1AW"));
+        QVERIFY(!g_lastFake || g_lastFake->flights.isEmpty());
+
+        // „3D" ab und wieder an: ausdruecklich gewollt -> 3D-Bild.
+        b3d->click();
+        QCOMPARE(w.currentViewForTest(), kAz);
+        b3d->click();
+        QCOMPARE(w.currentViewForTest(), int(QsoMapWindow::kView3d));
+        QVERIFY(!az->isChecked());
+        QVERIFY(g_lastFake);
+        QCOMPARE(g_lastFake->flights.size(), 1);
+        QCOMPARE(g_lastFake->flights.last().call, QStringLiteral("W1AW"));
+
+        // Ohne Azimutalkarte fliegt das naechste Rufzeichen 3D -- die
+        // Azimutalkarte bekommt das Ziel trotzdem.
+        w.flyToStation(QStringLiteral("K1TTT"), 42.6, -73.1);
+        QCOMPARE(w.currentViewForTest(), int(QsoMapWindow::kView3d));
+        QCOMPARE(g_lastFake->flights.size(), 2);
+        QCOMPARE(w.azimutalForTest()->zielCall(), QStringLiteral("K1TTT"));
+        QVERIFY(!w.rotorRadarForTest()->isVisible());
+
+        // Aus dem 3D-Bild in Azimutalkarte/Radar und zurueck ins 3D-Bild.
+        az->click();
+        QCOMPARE(w.currentViewForTest(), kAz);
+        az->click();
+        QCOMPARE(w.currentViewForTest(), int(QsoMapWindow::kView3d));
+        radar->click();
+        QCOMPARE(w.currentViewForTest(), 2);
+        radar->click();
+        QCOMPARE(w.currentViewForTest(), int(QsoMapWindow::kView3d));
+
+        // 3D abgewaehlt: flache Karte; die Azimutalkarte fuehrt dann
+        // nicht mehr ins 3D-Bild zurueck.
+        b3d->click();
+        QCOMPARE(w.currentViewForTest(), 1);
+        az->click();
+        QCOMPARE(w.currentViewForTest(), kAz);
+        az->click();
+        QCOMPARE(w.currentViewForTest(), 1);
+
+        AppSettings::instance().setValue(QStringLiteral("QsoMapView"), QString());
     }
 
     void the_page_is_pinned_and_sets_no_global_ion_token()
