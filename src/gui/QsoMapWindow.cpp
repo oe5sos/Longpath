@@ -12,6 +12,9 @@
 //                 grid overlay switch, Google Earth (KML) export; see
 //                 QsoMapWindow.h. AI-assisted via Anthropic Claude
 //                 (Cowork), operator Martin Fischer.
+//   2026-11-10 — Azimutalkarte als vierte Ansicht, gemerkte Ansicht;
+//                 see QsoMapWindow.h. Martin Fischer, AI-assisted via
+//                 Anthropic Claude (Claude Code).
 // =================================================================
 
 #include "QsoMapWindow.h"
@@ -24,6 +27,7 @@
 #include "gui/StyleConstants.h"
 #include "gui/widgets/FlatMapWidget.h"
 #include "gui/widgets/DxRadarWidget.h"
+#include "gui/widgets/AzimutalKarteWidget.h"
 #include "gui/widgets/FlowLayout.h"
 #include "gui/widgets/GibsTileLayer.h"
 #include "core/sat/SatelliteService.h"
@@ -108,6 +112,12 @@ void QsoMapWindow::keyPressEvent(QKeyEvent* e)
     case Qt::Key_Equal:  zoomActiveView(1.25);  return;
     case Qt::Key_Minus:  zoomActiveView(1 / 1.25); return;
     case Qt::Key_0:      resetActiveView();     return;
+    // Enter gehoert dem Feld, in dem er gedrueckt wurde (Rufzeichen:
+    // hinfliegen). QDialog drueckte sonst seinen Standardknopf -- beim
+    // Zeigen der erste Knopf der Fokuskette, „24 h" -- und stellte den
+    // Zeitraum still auf heute: „0 contacts in range" (Befund 2026-11-10).
+    case Qt::Key_Return:
+    case Qt::Key_Enter:  e->accept();           return;
     default: break;
     }
     // Eingebettet ist Escape kein „Fenster zu" — QDialog wuerde das
@@ -133,14 +143,16 @@ void QsoMapWindow::setEmbedded(bool on)
 
 void QsoMapWindow::zoomActiveView(double factor)
 {
-    if (m_stack->currentIndex() == 2) { return; }   // der Radar zoomt nicht
+    // Radar und Azimutalkarte zoomen nicht: beide zeigen immer die
+    // ganze Welt um das eigene QTH.
+    if (m_stack->currentIndex() >= kViewRadar) { return; }
     if (m_stack->currentIndex() == 0) { m_globe->zoomBy(factor); }
     else                              { m_flat->zoomBy(factor); }
 }
 
 void QsoMapWindow::resetActiveView()
 {
-    if (m_stack->currentIndex() == 2) { return; }
+    if (m_stack->currentIndex() >= kViewRadar) { return; }
     if (m_stack->currentIndex() == 0) { m_globe->resetView(); }
     else                              { m_flat->resetView(); }
 }
@@ -363,6 +375,18 @@ void QsoMapWindow::buildUi()
         "north up, rings at 500 … 20 000 km"));
     bar->addWidget(m_radarBtn);
 
+    // Azimutalkarte: die ganze Welt um das eigene QTH, mittabstandstreu.
+    // Wie das Radar ein Haken, der dorthin zurueckfuehrt, wo man herkam.
+    m_azimutBtn = new QPushButton(QStringLiteral("Azimuthal"), this);
+    m_azimutBtn->setCheckable(true);
+    m_azimutBtn->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
+    m_azimutBtn->setToolTip(QStringLiteral(
+        "Azimuthal map around your QTH: every straight line from the centre "
+        "is a rotor heading, every ring a distance — each contact as a ray "
+        "in its band colour, the rotor live, a looked-up station with short "
+        "and long path"));
+    bar->addWidget(m_azimutBtn);
+
     // Nur eingebettet sichtbar: das grosse Fenster holen.
     m_popOutBtn = new QPushButton(QStringLiteral("\u2197"), this);
     m_popOutBtn->setStyleSheet(Style::buttonBaseStyle());
@@ -395,6 +419,8 @@ void QsoMapWindow::buildUi()
     m_stack->addWidget(m_globe);
     m_stack->addWidget(m_flat);
     m_stack->addWidget(m_radar);   // Index 2
+    m_azimut = new AzimutalKarteWidget(this);
+    m_stack->addWidget(m_azimut);  // Index 3
 
     // Das kleine Rotor-Radar links der Karte. Quadratisch, so hoch wie
     // die Flaeche (resizeEvent); die Gradzahlen stehen in der Karteikarte.
@@ -462,26 +488,48 @@ void QsoMapWindow::buildUi()
             this, &QsoMapWindow::showGridInfo);
 
     connect(m_viewBtn, &QPushButton::clicked, this, [this]() {
-        // Aus dem Radar heraus fuehrt der Knopf zur jeweils anderen
-        // Kartenansicht; der Radar-Haken geht dabei aus.
-        const int cur = m_stack->currentIndex() == 2 ? m_viewBeforeRadar
-                                                     : m_stack->currentIndex();
-        const bool toFlat = cur == 0;
-        if (m_radarBtn && m_radarBtn->isChecked()) {
-            QSignalBlocker b(m_radarBtn);
-            m_radarBtn->setChecked(false);
+        // Aus Radar oder Azimutalkarte heraus fuehrt der Knopf zur jeweils
+        // anderen Kartenansicht; deren Haken geht dabei aus.
+        const int cur = m_stack->currentIndex() >= kViewRadar ? m_viewBeforeRadar
+                                                              : m_stack->currentIndex();
+        const bool toFlat = cur == kViewGlobe;
+        for (QPushButton* b : {m_radarBtn, m_azimutBtn}) {
+            if (b && b->isChecked()) {
+                QSignalBlocker block(b);
+                b->setChecked(false);
+            }
         }
-        m_stack->setCurrentIndex(toFlat ? 1 : 0);
+        m_stack->setCurrentIndex(toFlat ? kViewFlat : kViewGlobe);
         m_viewBtn->setText(toFlat ? QStringLiteral("Globe")
                                   : QStringLiteral("Flat map"));
+        rememberView();
     });
-    connect(m_radarBtn, &QPushButton::toggled, this, [this](bool on) {
+    // Radar und Azimutalkarte schliessen einander aus; beide merken sich
+    // Kugel oder flach als den Weg zurueck.
+    const auto overlayToggled = [this](int index, QPushButton* other, bool on) {
         if (on) {
-            if (m_stack->currentIndex() != 2) { m_viewBeforeRadar = m_stack->currentIndex(); }
-            m_stack->setCurrentIndex(2);
-        } else if (m_stack->currentIndex() == 2) {
+            if (other && other->isChecked()) {
+                QSignalBlocker block(other);
+                other->setChecked(false);
+            }
+            if (m_stack->currentIndex() < kViewRadar) {
+                m_viewBeforeRadar = m_stack->currentIndex();
+            }
+            m_stack->setCurrentIndex(index);
+        } else if (m_stack->currentIndex() == index) {
             m_stack->setCurrentIndex(m_viewBeforeRadar);
         }
+        rememberView();
+    };
+    connect(m_radarBtn, &QPushButton::toggled, this, [this, overlayToggled](bool on) {
+        overlayToggled(kViewRadar, m_azimutBtn, on);
+    });
+    connect(m_azimutBtn, &QPushButton::toggled, this, [this, overlayToggled](bool on) {
+        overlayToggled(kViewAzimuthal, m_radarBtn, on);
+    });
+    connect(m_azimut, &AzimutalKarteWidget::pointClicked, this,
+            [this](const QString& label, double, double) {
+        showStationInfo(label);
     });
     connect(m_stack, &QStackedWidget::currentChanged,
             this, [this](int) { updateRotorRadarVisibility(); });
@@ -531,6 +579,37 @@ void QsoMapWindow::buildUi()
         for (QWidget* w : m_rangeControls) { w->setEnabled(!on); }
         rebuild();
     });
+
+    restoreView();
+}
+
+// ── Die gewaehlte Ansicht (2026-11-10) ──────────────────────────────
+
+void QsoMapWindow::rememberView() const
+{
+    QString name = QStringLiteral("globe");
+    switch (m_stack->currentIndex()) {
+    case kViewFlat:      name = QStringLiteral("flat"); break;
+    case kViewRadar:     name = QStringLiteral("radar"); break;
+    case kViewAzimuthal: name = QStringLiteral("azimuthal"); break;
+    default: break;
+    }
+    AppSettings::instance().setValue(QStringLiteral("QsoMapView"), name);
+}
+
+void QsoMapWindow::restoreView()
+{
+    const QString name = AppSettings::instance()
+                             .value(QStringLiteral("QsoMapView"), QString{})
+                             .toString();
+    if (name == QLatin1String("flat")) {
+        m_stack->setCurrentIndex(kViewFlat);
+        m_viewBtn->setText(QStringLiteral("Globe"));
+    } else if (name == QLatin1String("radar")) {
+        m_radarBtn->setChecked(true);
+    } else if (name == QLatin1String("azimuthal")) {
+        m_azimutBtn->setChecked(true);
+    }
 }
 
 void QsoMapWindow::setSelection(const QVector<LogEntry>& selected)
@@ -603,11 +682,13 @@ void QsoMapWindow::setHomeGrid(const QString& grid)
         m_globe->resetView();
         m_flat->setHome(lat, lon);
         m_radar->setHome(lat, lon);
+        m_azimut->setHome(lat, lon, m_homeGrid.left(6));
         m_rotorRadar->setHome(lat, lon);
         applyStationMarker();
     } else {
         m_flat->clearHome();
         m_radar->clearHome();
+        m_azimut->clearHome();
         m_rotorRadar->clearHome();
     }
 }
@@ -760,6 +841,11 @@ void QsoMapWindow::rebuild()
     const QDate to   = m_to->date();
 
     QVector<MapPoint> points;
+    // Die Azimutalkarte bekommt JEDEN gezeigten Kontakt, nicht einen je
+    // Ort: dort ist die Dichte die Aussage -- ein Strahl wird hell, wo
+    // viele zusammenlaufen. Ihre Strahlen liegen als fertige Ebene vor,
+    // die Obergrenze fuer markierte Linien (Kugel) gilt hier nicht.
+    QVector<AzimutalKarteWidget::Punkt> azPunkte;
     QSet<QString> seenPlaces;
     int considered   = 0;
     int noGrid       = 0;
@@ -813,6 +899,10 @@ void QsoMapWindow::rebuild()
             continue;
         }
 
+        azPunkte.append(AzimutalKarteWidget::Punkt{lat, lon, e.band.trimmed(),
+                                                   e.call.trimmed().toUpper(),
+                                                   !approximate, marked});
+
         if (marked) {
             // Every marked contact gets its own line, not one per
             // place. Two marked QSOs in the same square draw the same
@@ -834,6 +924,7 @@ void QsoMapWindow::rebuild()
     m_globe->setPoints(points);
     m_flat->setPoints(points);
     m_radar->setPoints(points);
+    m_azimut->setPunkte(azPunkte);
     // Das kleine Rotor-Radar neben der Karte nur mit dem, was markiert
     // ist -- der gewaehlten Station (Betreiber 2026-09-27, Blatt R3). Die
     // Karte daneben zeigt schon jeden Kontakt; zwischen 9271 Punkten
@@ -1260,18 +1351,25 @@ void QsoMapWindow::lookupAndFly(const QString& text)
 void QsoMapWindow::flyToStation(const QString& call, double lat, double lon,
                                 const QString& caption)
 {
-    // Der Flug ist eine Sache der flachen Karte; die Kugel kennt ihn
-    // nicht. Also erst umschalten, dann fliegen.
-    if (m_stack->currentIndex() != 1) {
+    const QString c = call.trimmed().toUpper();
+
+    // Die Azimutalkarte bekommt die Station immer -- kurzer Weg hell,
+    // langer gestrichelt. Ist sie die gezeigte Ansicht, bleibt sie es:
+    // Peilung und beide Wege sind genau die Antwort, die man dort sucht.
+    m_azimut->setZiel(c, lat, lon);
+    const bool stayAzimuthal = m_stack->currentIndex() == kViewAzimuthal;
+
+    // Sonst ist der Flug eine Sache der flachen Karte; die Kugel kennt
+    // ihn nicht. Also erst umschalten, dann fliegen.
+    if (!stayAzimuthal && m_stack->currentIndex() != kViewFlat) {
         if (m_radarBtn && m_radarBtn->isChecked()) {
             QSignalBlocker b(m_radarBtn);
             m_radarBtn->setChecked(false);
         }
-        m_stack->setCurrentIndex(1);
+        m_stack->setCurrentIndex(kViewFlat);
     }
-    if (m_viewBtn) { m_viewBtn->setText(QStringLiteral("Globe")); }
+    if (m_viewBtn && !stayAzimuthal) { m_viewBtn->setText(QStringLiteral("Globe")); }
 
-    const QString c = call.trimmed().toUpper();
     m_flat->setFocusStation(c, lat, lon);
     // ~55 m je Bildpunkt: bei 900 px Breite ein Ausschnitt von 50 km,
     // in dem man Stadt und Landschaft erkennt und Landsat noch scharf ist.
@@ -1305,8 +1403,9 @@ void QsoMapWindow::setRotorRadarShown(bool on)
 void QsoMapWindow::updateRotorRadarVisibility()
 {
     if (!m_rotorRadar) { return; }
-    // Zeigt die Flaeche schon das Radar, waere ein zweites daneben doppelt.
-    const bool bigRadar = m_stack && m_stack->currentIndex() == 2;
+    // Zeigt die Flaeche schon das Radar, waere ein zweites daneben doppelt;
+    // die Azimutalkarte traegt den Rotorkeil ebenfalls selbst.
+    const bool bigRadar = m_stack && m_stack->currentIndex() >= kViewRadar;
     // Zu schmal zum Ablesen: dann lieber nur die Karte.
     const bool roomy = width() >= 420;
     m_rotorRadar->setVisible(m_rotorRadarShown && !bigRadar && roomy);
@@ -1322,6 +1421,7 @@ void QsoMapWindow::setRotorHeading(double deg)
 {
     m_rotorRadar->setRotorHeading(deg);
     m_radar->setRotorHeading(deg);
+    m_azimut->setRotorHeading(deg);
 }
 
 void QsoMapWindow::setRotorTarget(double deg)
@@ -1334,6 +1434,7 @@ void QsoMapWindow::setRotorBeamWidth(double deg)
 {
     m_rotorRadar->setRotorBeamWidth(deg);
     m_radar->setRotorBeamWidth(deg);
+    m_azimut->setRotorBeamWidth(deg);
 }
 
 void QsoMapWindow::showRadarViewForTest(bool on)
