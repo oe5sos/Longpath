@@ -22,6 +22,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QTimer>
+#include <QTransform>
 
 #include <algorithm>
 #include <cmath>
@@ -45,28 +46,38 @@ constexpr int kRechenMax = 1600;
 constexpr int kNachtPx = 512;
 
 // Unten eine Zeile fuer die Bandlegende, damit sie nicht in die
-// 180-Grad-Beschriftung laeuft.
+// 180-Grad-Beschriftung laeuft (nur in der vollen Stufe).
 constexpr double kLegendePx = 18.0;
+// Rand um die Scheibe je Stufe: voll zwoelf Gradzahlen aussen, knapp
+// nur die vier Haupt­richtungen (seitlich breiter: „270°"), winzig keiner.
+constexpr double kRandVoll = 34.0;
+constexpr double kRandKnappH = 30.0;
+constexpr double kRandKnappV = 16.0;
+constexpr double kRandWinzig = 3.0;
+// Ab hier lohnt die naechste Stufe.
+constexpr double kRadiusVoll = 120.0;
+constexpr double kRadiusKnapp = 60.0;
+// Eine Seitenspalte nur, wenn sie wenigstens so breit wird.
+constexpr double kSeiteMin = 110.0;
 
 double kmAusBogen(double bogenRad) { return bogenRad * kHalbumfangKm / kPi; }
 
 QColor farbe(const char* hex) { return QColor(QLatin1String(hex)); }
 
-// Schrift ueber dichten Punkten: ein dunkler Hof darunter, sonst geht
-// „JN67VV" im Haufen Europa unter (auf dem Entwurfsblatt ebenso).
-void textMitHof(QPainter& p, const QPointF& at, const QString& t, const QColor& farbeText)
+QFont schrift(const QFont& basis, int px, bool fett = false)
 {
-    QPainterPath pfad;
-    pfad.addText(at, p.font(), t);
-    QColor hof(Style::hexRole(Style::kPanelBg));
-    hof.setAlphaF(0.8);
-    p.save();
-    p.setBrush(Qt::NoBrush);
-    p.setPen(QPen(hof, 3.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    p.drawPath(pfad);
-    p.restore();
-    p.setPen(farbeText);
-    p.drawText(at, t);
+    QFont f = basis;
+    f.setPixelSize(px);
+    f.setBold(fett);
+    return f;
+}
+
+// Das Rechteck einer Zeile, deren Grundlinie bei `at` beginnt.
+QRectF zeilenRechteck(const QFont& f, const QPointF& at, const QString& t)
+{
+    const QFontMetricsF fm(f);
+    return QRectF(at.x(), at.y() - fm.ascent(), fm.horizontalAdvance(t),
+                  fm.ascent() + fm.descent());
 }
 } // namespace
 
@@ -148,21 +159,60 @@ bool AzimutalKarteWidget::umkehrung(double homeLat, double homeLon, double x, do
     return true;
 }
 
+AzimutalKarteWidget::Lage AzimutalKarteWidget::lage() const
+{
+    const double w = width(), h = height();
+    Lage L;
+
+    // Voll: zwoelf Gradzahlen aussen, Legende in einer eigenen Zeile.
+    const double rVoll = std::min(w, h - kLegendePx) * 0.5 - kRandVoll;
+    if (rVoll >= kRadiusVoll) {
+        L.stufe = Stufe::Voll;
+        L.radius = rVoll;
+        L.mitte = QPointF(w * 0.5, (h - kLegendePx) * 0.5);
+        return L;
+    }
+
+    // Knapp: vier Hauptrichtungen; sonst winzig: bis an den Rand.
+    const double rKnapp = std::min(w * 0.5 - kRandKnappH, h * 0.5 - kRandKnappV);
+    double randH = 0.0;
+    if (rKnapp >= kRadiusKnapp) {
+        L.stufe = Stufe::Knapp;
+        L.radius = rKnapp;
+        randH = kRandKnappH;
+    } else {
+        L.stufe = Stufe::Winzig;
+        L.radius = std::max(10.0, std::min(w, h) * 0.5 - kRandWinzig);
+        randH = kRandWinzig;
+    }
+
+    // Bleibt neben der Scheibe genug Breite, rueckt sie nach links und
+    // Ziel, Rotor und Legende bekommen rechts eine Spalte -- statt quer
+    // ueber der kleinen Scheibe zu liegen.
+    const double rechtsVonScheibe = 2.0 * (randH + L.radius) + 8.0;
+    if (w - rechtsVonScheibe - 6.0 >= kSeiteMin) {
+        L.mitte = QPointF(randH + L.radius, h * 0.5);
+        L.seite = QRectF(rechtsVonScheibe, 6.0, w - rechtsVonScheibe - 6.0, h - 12.0);
+    } else {
+        L.mitte = QPointF(w * 0.5, h * 0.5);
+    }
+    return L;
+}
+
 double AzimutalKarteWidget::radiusPx() const
 {
-    // Rand fuer die Gradzahlen aussen am Ring.
-    return std::max(20.0, std::min(double(width()), height() - kLegendePx) * 0.5 - 34.0);
+    return lage().radius;
 }
 
 QPointF AzimutalKarteWidget::mitte() const
 {
-    return QPointF(width() * 0.5, (height() - kLegendePx) * 0.5);
+    return lage().mitte;
 }
 
 QPointF AzimutalKarteWidget::bildpunktNormiert(const QPointF& q) const
 {
-    const double R = radiusPx();
-    return mitte() + QPointF(q.x() * R, -q.y() * R);
+    const Lage L = lage();
+    return L.mitte + QPointF(q.x() * L.radius, -q.y() * L.radius);
 }
 
 QPointF AzimutalKarteWidget::bildpunkt(double lat, double lon) const
@@ -454,17 +504,21 @@ void AzimutalKarteWidget::paintEvent(QPaintEvent*)
     p.setRenderHint(QPainter::Antialiasing);
     p.setRenderHint(QPainter::SmoothPixmapTransform);
     p.fillRect(rect(), QColor(Style::hexRole(Style::kPanelBg)));
-
-    const QPointF c = mitte();
-    const double R = radiusPx();
-    const QRectF scheibe(c.x() - R, c.y() - R, 2 * R, 2 * R);
+    m_schrift.clear();
 
     if (!m_hasHome) {
         p.setPen(farbe(Style::kTextScale));
-        p.drawText(rect(), Qt::AlignCenter,
+        p.drawText(rect().adjusted(6, 0, -6, 0), Qt::AlignCenter | Qt::TextWordWrap,
                    QStringLiteral("No home locator — set MY in the Rotor / Log panel"));
         return;
     }
+
+    const Lage L = lage();
+    const QPointF c = L.mitte;
+    const double R = L.radius;
+    const QRectF scheibe(c.x() - R, c.y() - R, 2 * R, 2 * R);
+
+    // ── Flaechen und Linien ──
     if (!m_hintergrund.isNull()) { p.drawImage(scheibe, m_hintergrund); }
     if (!m_nacht.isNull()) {
         // Die Nacht ist grob gerechnet und weich skaliert -- an der
@@ -476,89 +530,154 @@ void AzimutalKarteWidget::paintEvent(QPaintEvent*)
         p.drawImage(scheibe, m_nacht);
         p.restore();
     }
-    zeichneSkala(p);
-    zeichneRotor(p);
+    zeichneGitter(p, L);
+    zeichneRotorKeil(p, L);
     if (!m_strahlen.isNull()) { p.drawImage(QPointF(0, 0), m_strahlen); }
-    zeichneZiel(p);
+    zeichneZielLinien(p, L);
 
     // Der eigene Standort.
-    const QColor amber = farbe(Style::kAmberText);
     p.setPen(QPen(QColor(Style::hexRole(Style::kPanelBg)), 1.5));
-    p.setBrush(amber);
-    p.drawEllipse(c, 4.5, 4.5);
-    if (!m_homeLocator.isEmpty()) {
-        QFont f = p.font();
-        f.setPixelSize(11);
-        f.setBold(true);
-        p.setFont(f);
-        textMitHof(p, c + QPointF(8.0, 15.0), m_homeLocator, amber);
-    }
+    p.setBrush(farbe(Style::kAmberText));
+    const double heim = L.stufe == Stufe::Winzig ? 3.0 : 4.5;
+    p.drawEllipse(c, heim, heim);
 
-    zeichneHover(p);
-    zeichneLegende(p);
-
-    // Was das gewaehlte Weltbild an Vermerk verlangt, unten rechts.
-    const QString vermerk = WorldTexture::requiredAttribution();
-    if (!vermerk.isEmpty() && !m_hintergrund.isNull()) {
-        QFont f = p.font();
-        f.setPixelSize(9);
-        f.setBold(false);
-        p.setFont(f);
-        p.setPen(farbe(Style::kTextScale));
-        p.drawText(rect().adjusted(0, 0, -8, -6), Qt::AlignRight | Qt::AlignBottom, vermerk);
+    // ── Schrift, in Vorrangfolge: was zuerst steht, behaelt seinen Platz ──
+    zeichneSkalaSchrift(p, L);
+    zeichneVermerk(p);
+    if (!L.seite.isEmpty()) {
+        zeichneSeite(p, L);
+        zeichneHeimSchrift(p, L);
+    } else {
+        zeichneHeimSchrift(p, L);
+        zeichneZielSchrift(p, L);
+        zeichneRotorSchrift(p, L);
+        zeichneLegende(p, L);
     }
+    zeichneHover(p, L);
 }
 
-void AzimutalKarteWidget::zeichneSkala(QPainter& p) const
+bool AzimutalKarteWidget::frei(const QRectF& r) const
 {
-    const QPointF c = mitte();
-    const double R = radiusPx();
+    if (!QRectF(rect()).adjusted(1, 1, -1, -1).contains(r)) { return false; }
+    const QRectF innen = r.adjusted(0.5, 0.5, -0.5, -0.5);
+    for (const Beschriftung& b : m_schrift) {
+        if (b.rechteck.intersects(innen)) { return false; }
+    }
+    return true;
+}
+
+void AzimutalKarteWidget::schreibe(QPainter& p, const QPointF& grundlinie, const QString& t,
+                                   const QColor& farbeText, bool hof)
+{
+    // Schrift ueber dichten Punkten: ein dunkler Hof darunter, sonst geht
+    // „JN67VV" im Haufen Europa unter (auf dem Entwurfsblatt ebenso).
+    if (hof) {
+        QPainterPath pfad;
+        pfad.addText(grundlinie, p.font(), t);
+        QColor dunkel(Style::hexRole(Style::kPanelBg));
+        dunkel.setAlphaF(0.8);
+        p.save();
+        p.setBrush(Qt::NoBrush);
+        p.setPen(QPen(dunkel, 3.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.drawPath(pfad);
+        p.restore();
+    }
+    p.setPen(farbeText);
+    p.drawText(grundlinie, t);
+    m_schrift.append({zeilenRechteck(p.font(), grundlinie, t), t});
+}
+
+void AzimutalKarteWidget::zeichneGitter(QPainter& p, const Lage& L) const
+{
+    const QPointF c = L.mitte;
+    const double R = L.radius;
     const QColor gitter = farbe(Style::kAzRing);
-    const QColor schrift = farbe(Style::kTextScale);
-    QFont klein = p.font();
-    klein.setPixelSize(9);
-    klein.setBold(false);
-    QFont grad = klein;
-    grad.setPixelSize(11);
-    const QFontMetricsF fmGrad(grad);
-    const QLocale ort;
+    const QColor schriftFarbe = farbe(Style::kTextScale);
 
     p.setBrush(Qt::NoBrush);
-    p.setFont(klein);
     for (double km : kRingeKm) {
         const double r = km / kHalbumfangKm * R;
+        if (r < 4.0) { continue; }
         p.setPen(QPen(gitter, 0.8));
         p.drawEllipse(c, r, r);
-        // Zu eng beieinander, um zu lesen: nur der Ring.
-        if (r < 18.0) { continue; }
-        p.setPen(schrift);
-        p.drawText(QPointF(c.x() + 3.0, c.y() - r - 3.0),
-                   QStringLiteral("%1 km").arg(ort.toString(int(km))));
     }
     p.setPen(QPen(gitter, 1.0));
     p.drawEllipse(c, R, R);
 
+    // Striche: voll alle 10 Grad (lang alle 30), knapp alle 30 Grad,
+    // winzig nur die vier Hauptrichtungen und nach innen.
     for (int g = 0; g < 360; g += 10) {
         const double a = g * kRad;
         const QPointF dir(std::sin(a), -std::cos(a));
         const bool dreissig = g % 30 == 0;
-        p.setPen(QPen(dreissig ? schrift : gitter, 1.0));
-        p.drawLine(c + dir * R, c + dir * (R + (dreissig ? 9.0 : 4.0)));
-        if (!dreissig) { continue; }
-        const QString t = QStringLiteral("%1°").arg(g);
-        const QPointF at = c + dir * (R + 20.0);
-        p.setFont(grad);
-        p.setPen(QColor(Style::kTextPrimary));
-        p.drawText(QPointF(at.x() - fmGrad.horizontalAdvance(t) / 2.0,
-                           at.y() + fmGrad.ascent() / 2.0 - 1.0), t);
+        const bool haupt = g % 90 == 0;
+        switch (L.stufe) {
+        case Stufe::Voll:
+            p.setPen(QPen(dreissig ? schriftFarbe : gitter, 1.0));
+            p.drawLine(c + dir * R, c + dir * (R + (dreissig ? 9.0 : 4.0)));
+            break;
+        case Stufe::Knapp:
+            if (!dreissig) { break; }
+            p.setPen(QPen(haupt ? schriftFarbe : gitter, 1.0));
+            p.drawLine(c + dir * R, c + dir * (R + 3.0));
+            break;
+        case Stufe::Winzig:
+            if (!haupt) { break; }
+            p.setPen(QPen(schriftFarbe, 1.0));
+            p.drawLine(c + dir * (R - 5.0), c + dir * R);
+            break;
+        }
     }
 }
 
-void AzimutalKarteWidget::zeichneRotor(QPainter& p) const
+void AzimutalKarteWidget::zeichneSkalaSchrift(QPainter& p, const Lage& L)
+{
+    if (L.stufe == Stufe::Winzig) { return; }
+    const QPointF c = L.mitte;
+    const double R = L.radius;
+    const bool voll = L.stufe == Stufe::Voll;
+
+    // Gradzahlen: voll alle 30, knapp nur 0/90/180/270 und kleiner.
+    const QFont grad = schrift(p.font(), voll ? 11 : 9);
+    const QFontMetricsF fm(grad);
+    p.setFont(grad);
+    for (int g = 0; g < 360; g += voll ? 30 : 90) {
+        const double a = g * kRad;
+        const QPointF dir(std::sin(a), -std::cos(a));
+        const QString t = QStringLiteral("%1°").arg(g);
+        const QPointF at = c + dir * (R + (voll ? 20.0 : 4.0 + fm.ascent() * 0.5));
+        // Seitlich an den Ring gelehnt statt mittig, damit „270°" in den
+        // knappen Rand passt.
+        double x = at.x() - fm.horizontalAdvance(t) / 2.0;
+        if (!voll && g == 90)  { x = c.x() + R + 5.0; }
+        if (!voll && g == 270) { x = c.x() - R - 5.0 - fm.horizontalAdvance(t); }
+        const QPointF grundlinie(x, at.y() + fm.ascent() / 2.0 - 1.0);
+        if (frei(zeilenRechteck(grad, grundlinie, t))) {
+            schreibe(p, grundlinie, t, QColor(Style::kTextPrimary), false);
+        }
+    }
+    if (!voll) { return; }
+
+    // Ringbeschriftung, nur voll.
+    const QFont klein = schrift(p.font(), 9);
+    p.setFont(klein);
+    const QLocale ort;
+    for (double km : kRingeKm) {
+        const double r = km / kHalbumfangKm * R;
+        if (r < 18.0) { continue; }
+        const QString t = QStringLiteral("%1 km").arg(ort.toString(int(km)));
+        const QPointF grundlinie(c.x() + 3.0, c.y() - r - 3.0);
+        if (frei(zeilenRechteck(klein, grundlinie, t))) {
+            schreibe(p, grundlinie, t, farbe(Style::kTextScale), false);
+        }
+    }
+}
+
+void AzimutalKarteWidget::zeichneRotorKeil(QPainter& p, const Lage& L) const
 {
     if (m_rotorDeg < 0.0) { return; }
-    const QPointF c = mitte();
-    const double R = radiusPx();
+    const QPointF c = L.mitte;
+    const double R = L.radius;
     const QColor amber = farbe(Style::kAmberText);
 
     // Der Keil in Strahlbreite. QPainter: 0 Grad = 3 Uhr, gegen den
@@ -573,127 +692,311 @@ void AzimutalKarteWidget::zeichneRotor(QPainter& p) const
 
     // Die Nadel.
     const double a = m_rotorDeg * kRad;
-    const QPointF dir(std::sin(a), -std::cos(a));
-    p.setPen(QPen(amber, 1.6));
-    p.drawLine(c, c + dir * R);
+    p.setPen(QPen(amber, L.stufe == Stufe::Voll ? 1.6 : 1.3));
+    p.drawLine(c, c + QPointF(std::sin(a), -std::cos(a)) * R);
+}
 
-    // Beschriftung an der Nadel entlang, wie auf dem Blatt -- aufrecht
-    // lesbar, also auf der linken Haelfte um 180 Grad gedreht.
-    QFont f = p.font();
-    f.setPixelSize(11);
-    f.setBold(false);
-    p.setFont(f);
+void AzimutalKarteWidget::zeichneRotorSchrift(QPainter& p, const Lage& L)
+{
+    if (m_rotorDeg < 0.0 || L.stufe == Stufe::Winzig) { return; }
+    const QPointF c = L.mitte;
+    const double R = L.radius;
+    const double a = m_rotorDeg * kRad;
+    const QPointF dir(std::sin(a), -std::cos(a));
+
+    // An der Nadel entlang, wie auf dem Blatt -- aufrecht lesbar, also
+    // auf der linken Haelfte um 180 Grad gedreht. Die erste freie Stelle
+    // entlang der Nadel; keine frei, dann keine Beschriftung.
+    const QFont f = schrift(p.font(), L.stufe == Stufe::Voll ? 11 : 9);
+    const QFontMetricsF fm(f);
     double winkel = std::atan2(dir.y(), dir.x()) / kRad;
     if (winkel > 90.0)  { winkel -= 180.0; }
     if (winkel < -90.0) { winkel += 180.0; }
     const QString t = QStringLiteral("Rotor %1°").arg(m_rotorDeg, 0, 'f', 0);
-    const QFontMetricsF fm(f);
-    p.save();
-    p.translate(c + dir * (R * 0.62));
-    p.rotate(winkel);
-    p.setPen(amber);
-    p.drawText(QPointF(-fm.horizontalAdvance(t) / 2.0, -5.0), t);
-    p.restore();
+    const double breite = fm.horizontalAdvance(t);
+    if (breite > R * 0.9) { return; }
+    const QRectF lokal(-breite / 2.0, -5.0 - fm.ascent(), breite, fm.ascent() + fm.descent());
+    for (double anteil : {0.62, 0.48, 0.76, 0.34}) {
+        QTransform tr;
+        tr.translate(c.x() + dir.x() * R * anteil, c.y() + dir.y() * R * anteil);
+        tr.rotate(winkel);
+        const QRectF huelle = tr.mapRect(lokal);
+        if (!frei(huelle)) { continue; }
+        p.save();
+        p.setTransform(tr, true);
+        p.setFont(f);
+        p.setPen(farbe(Style::kAmberText));
+        p.drawText(QPointF(-breite / 2.0, -5.0), t);
+        p.restore();
+        m_schrift.append({huelle, t});
+        return;
+    }
 }
 
-void AzimutalKarteWidget::zeichneZiel(QPainter& p) const
+void AzimutalKarteWidget::zeichneZielLinien(QPainter& p, const Lage& L) const
 {
     if (!m_hatZiel) { return; }
-    const QPointF c = mitte();
-    const double R = radiusPx();
+    const QPointF c = L.mitte;
+    const double R = L.radius;
     const double sp = GlobeWidget::initialBearing(m_homeLat, m_homeLon, m_zielLat, m_zielLon);
-    const double km = kmAusBogen(GlobeWidget::angularDistance(m_homeLat, m_homeLon,
-                                                              m_zielLat, m_zielLon) * kRad);
     const double lp = std::fmod(sp + 180.0, 360.0);
     const QPointF z = bildpunkt(m_zielLat, m_zielLon);
     const QColor hell = farbe(Style::kAzZiel);
+    const bool voll = L.stufe == Stufe::Voll;
 
     // Langer Weg: aus der Mitte in Richtung LP bis zum Rand (dem
     // Gegenpunkt), von dort auf der SP-Linie herein bis zur Station.
     QColor lang = hell;
     lang.setAlphaF(0.55);
-    p.setPen(QPen(lang, 1.3, Qt::DashLine));
+    p.setPen(QPen(lang, voll ? 1.3 : 1.0, Qt::DashLine));
     const QPointF dirLp(std::sin(lp * kRad), -std::cos(lp * kRad));
     const QPointF dirSp(std::sin(sp * kRad), -std::cos(sp * kRad));
     p.drawLine(c, c + dirLp * R);
     p.drawLine(c + dirSp * R, z);
 
     // Kurzer Weg: kraeftig.
-    p.setPen(QPen(hell, 2.2, Qt::SolidLine, Qt::RoundCap));
+    p.setPen(QPen(hell, voll ? 2.2 : 1.6, Qt::SolidLine, Qt::RoundCap));
     p.drawLine(c, z);
     p.setBrush(hell);
     p.setPen(QPen(QColor(Style::hexRole(Style::kPanelBg)), 1.2));
-    p.drawEllipse(z, 5.0, 5.0);
-
-    // Rufzeichen und die beiden Wege; im Widget gehalten, auch wenn die
-    // Station am rechten Rand liegt.
-    QFont fCall = p.font();
-    fCall.setPixelSize(13);
-    fCall.setBold(true);
-    QFont fWeg = fCall;
-    fWeg.setPixelSize(11);
-    fWeg.setBold(false);
-    const QString weg = QStringLiteral("SP %1° · %2 km   LP %3° · %4 km")
-                            .arg(sp, 0, 'f', 0).arg(km, 0, 'f', 0)
-                            .arg(lp, 0, 'f', 0).arg(2.0 * kHalbumfangKm - km, 0, 'f', 0);
-    const double breite = std::max(QFontMetricsF(fCall).horizontalAdvance(m_zielCall),
-                                   QFontMetricsF(fWeg).horizontalAdvance(weg));
-    double x = z.x() + 9.0;
-    if (x + breite > width() - 6.0) { x = z.x() - 9.0 - breite; }
-    x = std::max(6.0, x);
-    p.setFont(fCall);
-    textMitHof(p, QPointF(x, z.y() - 8.0), m_zielCall, hell);
-    p.setFont(fWeg);
-    textMitHof(p, QPointF(x, z.y() + 8.0), weg, hell);
+    const double punkt = voll ? 5.0 : 3.5;
+    p.drawEllipse(z, punkt, punkt);
 }
 
-void AzimutalKarteWidget::zeichneHover(QPainter& p) const
+void AzimutalKarteWidget::zeichneHeimSchrift(QPainter& p, const Lage& L)
+{
+    if (m_homeLocator.isEmpty() || L.stufe == Stufe::Winzig) { return; }
+    const QPointF c = L.mitte;
+    const QFont f = schrift(p.font(), L.stufe == Stufe::Voll ? 11 : 9, true);
+    p.setFont(f);
+    const QFontMetricsF fm(f);
+    const double w = fm.horizontalAdvance(m_homeLocator);
+    // Unten rechts wie auf dem Blatt; sonst die anderen drei Ecken.
+    for (const QPointF& at : {c + QPointF(8.0, 4.0 + fm.ascent()),
+                              c + QPointF(8.0, -6.0),
+                              c + QPointF(-8.0 - w, 4.0 + fm.ascent()),
+                              c + QPointF(-8.0 - w, -6.0)}) {
+        if (frei(zeilenRechteck(f, at, m_homeLocator))) {
+            schreibe(p, at, m_homeLocator, farbe(Style::kAmberText), true);
+            return;
+        }
+    }
+}
+
+void AzimutalKarteWidget::zeichneZielSchrift(QPainter& p, const Lage& L)
+{
+    if (!m_hatZiel) { return; }
+    const double sp = GlobeWidget::initialBearing(m_homeLat, m_homeLon, m_zielLat, m_zielLon);
+    const double km = kmAusBogen(GlobeWidget::angularDistance(m_homeLat, m_homeLon,
+                                                              m_zielLat, m_zielLon) * kRad);
+    const double lp = std::fmod(sp + 180.0, 360.0);
+    const QPointF z = bildpunkt(m_zielLat, m_zielLon);
+    const QColor hell = farbe(Style::kAzZiel);
+    const bool voll = L.stufe == Stufe::Voll;
+
+    // Voll: Rufzeichen und beide Wege in zwei Zeilen. Knapp/winzig ohne
+    // Seitenspalte: eine Zeile, nur der kurze Weg.
+    QStringList zeilen;
+    QVector<QFont> fonts;
+    if (voll) {
+        zeilen << m_zielCall
+               << QStringLiteral("SP %1° · %2 km   LP %3° · %4 km")
+                      .arg(sp, 0, 'f', 0).arg(km, 0, 'f', 0)
+                      .arg(lp, 0, 'f', 0).arg(2.0 * kHalbumfangKm - km, 0, 'f', 0);
+        fonts << schrift(p.font(), 13, true) << schrift(p.font(), 11);
+    } else {
+        zeilen << QStringLiteral("%1  %2° · %3 km").arg(m_zielCall).arg(sp, 0, 'f', 0)
+                      .arg(km, 0, 'f', 0);
+        fonts << schrift(p.font(), 9, true);
+        if (QFontMetricsF(fonts[0]).horizontalAdvance(zeilen[0]) > width() - 12) {
+            zeilen[0] = m_zielCall;
+        }
+    }
+    double bw = 0.0, bh = 0.0;
+    QVector<double> hoehen;
+    for (int i = 0; i < zeilen.size(); ++i) {
+        const QFontMetricsF fm(fonts[i]);
+        bw = std::max(bw, fm.horizontalAdvance(zeilen[i]));
+        hoehen << fm.ascent() + fm.descent();
+        bh += hoehen.last();
+    }
+    const double abst = voll ? 9.0 : 6.0;
+    // Die Ecke links oben des Blocks: rechts, links, darueber, darunter.
+    const QPointF kandidaten[] = {
+        {z.x() + abst, z.y() - bh / 2.0}, {z.x() - abst - bw, z.y() - bh / 2.0},
+        {z.x() - bw / 2.0, z.y() - abst - bh}, {z.x() - bw / 2.0, z.y() + abst},
+    };
+    const auto zeilenAb = [&](const QPointF& ecke) {
+        QVector<QPointF> g;
+        double y = ecke.y();
+        for (int i = 0; i < zeilen.size(); ++i) {
+            g << QPointF(ecke.x(), y + QFontMetricsF(fonts[i]).ascent());
+            y += hoehen[i];
+        }
+        return g;
+    };
+    const auto passt = [&](const QPointF& ecke) {
+        const QVector<QPointF> g = zeilenAb(ecke);
+        for (int i = 0; i < zeilen.size(); ++i) {
+            if (!frei(zeilenRechteck(fonts[i], g[i], zeilen[i]))) { return false; }
+        }
+        return true;
+    };
+    QPointF ecke = kandidaten[0];
+    bool gefunden = false;
+    for (const QPointF& k : kandidaten) {
+        if (passt(k)) { ecke = k; gefunden = true; break; }
+    }
+    if (!gefunden) {
+        // Kein freier Platz: wenigstens ganz im Widget.
+        ecke.setX(std::clamp(ecke.x(), 2.0, std::max(2.0, width() - bw - 2.0)));
+        ecke.setY(std::clamp(ecke.y(), 2.0, std::max(2.0, height() - bh - 2.0)));
+    }
+    const QVector<QPointF> g = zeilenAb(ecke);
+    for (int i = 0; i < zeilen.size(); ++i) {
+        p.setFont(fonts[i]);
+        schreibe(p, g[i], zeilen[i], hell, true);
+    }
+}
+
+QVector<QPair<QString, int>> AzimutalKarteWidget::legendenEintraege() const
+{
+    QMap<QString, int> zahl;
+    for (const Punkt& q : m_punkte) { ++zahl[q.band.trimmed().toLower()]; }
+    QVector<QPair<QString, int>> sortiert;
+    for (auto it = zahl.cbegin(); it != zahl.cend(); ++it) {
+        if (!it.key().isEmpty()) { sortiert.append({it.key(), it.value()}); }
+    }
+    std::stable_sort(sortiert.begin(), sortiert.end(),
+                     [](const auto& a, const auto& b) { return a.second > b.second; });
+    return sortiert;
+}
+
+void AzimutalKarteWidget::zeichneLegende(QPainter& p, const Lage& L)
+{
+    // Unten links, nur voll: die haeufigsten Baender mit Zahl.
+    if (L.stufe != Stufe::Voll) { return; }
+    const QFont f = schrift(p.font(), 11);
+    p.setFont(f);
+    const QFontMetricsF fm(f);
+    double x = 10.0;
+    const double y = height() - 8.0;
+    const auto eintraege = legendenEintraege();
+    for (int i = 0; i < eintraege.size() && i < 10; ++i) {
+        const QString t = QStringLiteral("● %1 %2").arg(eintraege[i].first).arg(eintraege[i].second);
+        if (!frei(zeilenRechteck(f, QPointF(x, y), t))) { break; }
+        schreibe(p, QPointF(x, y), t, bandFarbe(eintraege[i].first), false);
+        x += fm.horizontalAdvance(t) + 12.0;
+    }
+}
+
+void AzimutalKarteWidget::zeichneVermerk(QPainter& p)
+{
+    // Was das gewaehlte Weltbild an Vermerk verlangt, unten rechts -- vor
+    // der Legende gesetzt, damit sie ihm weicht und nicht umgekehrt.
+    const QString vermerk = WorldTexture::requiredAttribution();
+    if (vermerk.isEmpty() || m_hintergrund.isNull()) { return; }
+    const QFont k = schrift(p.font(), 9);
+    const QFontMetricsF fm(k);
+    const QString t = fm.elidedText(vermerk, Qt::ElideRight, width() - 12.0);
+    p.setFont(k);
+    const QPointF at(width() - 6.0 - fm.horizontalAdvance(t), height() - 4.0 - fm.descent());
+    if (frei(zeilenRechteck(k, at, t))) {
+        schreibe(p, at, t, farbe(Style::kTextScale), false);
+    }
+}
+
+void AzimutalKarteWidget::zeichneSeite(QPainter& p, const Lage& L)
+{
+    // Die Spalte neben einer kleinen Scheibe: Ziel, Rotor, Legende --
+    // untereinander, so viel davon, wie hineinpasst.
+    const QRectF s = L.seite;
+    double y = s.top();
+    const auto zeile = [&](const QString& text, const QFont& f, const QColor& col) {
+        const QFontMetricsF fm(f);
+        if (y + fm.ascent() + fm.descent() > s.bottom()) { return false; }
+        const QString t = fm.elidedText(text, Qt::ElideRight, s.width());
+        p.setFont(f);
+        schreibe(p, QPointF(s.left(), y + fm.ascent()), t, col, false);
+        y += fm.ascent() + fm.descent() + 1.0;
+        return true;
+    };
+
+    if (m_hatZiel) {
+        const double sp = GlobeWidget::initialBearing(m_homeLat, m_homeLon, m_zielLat, m_zielLon);
+        const double km = kmAusBogen(GlobeWidget::angularDistance(m_homeLat, m_homeLon,
+                                                                  m_zielLat, m_zielLon) * kRad);
+        const double lp = std::fmod(sp + 180.0, 360.0);
+        const QColor hell = farbe(Style::kAzZiel);
+        zeile(m_zielCall, schrift(p.font(), 11, true), hell);
+        zeile(QStringLiteral("SP %1° · %2 km").arg(sp, 0, 'f', 0).arg(km, 0, 'f', 0),
+              schrift(p.font(), 11), hell);
+        QColor gedimmt = hell;
+        gedimmt.setAlphaF(0.7);
+        zeile(QStringLiteral("LP %1° · %2 km").arg(lp, 0, 'f', 0)
+                  .arg(2.0 * kHalbumfangKm - km, 0, 'f', 0),
+              schrift(p.font(), 11), gedimmt);
+        y += 4.0;
+    }
+    if (m_rotorDeg >= 0.0) {
+        zeile(QStringLiteral("Rotor %1°").arg(m_rotorDeg, 0, 'f', 0),
+              schrift(p.font(), 11), farbe(Style::kAmberText));
+        y += 4.0;
+    }
+
+    // Die Legende fliessend, Zeile um Zeile, bis die Spalte voll ist.
+    const QFont f = schrift(p.font(), 9);
+    const QFontMetricsF fm(f);
+    const double zh = fm.ascent() + fm.descent() + 1.0;
+    p.setFont(f);
+    double x = s.left();
+    for (const auto& e : legendenEintraege()) {
+        const QString t = QStringLiteral("● %1 %2").arg(e.first).arg(e.second);
+        const double w = fm.horizontalAdvance(t);
+        if (x > s.left() && x + w > s.right()) {
+            x = s.left();
+            y += zh;
+        }
+        if (y + zh > s.bottom() + 1.0 || w > s.width()) { break; }
+        schreibe(p, QPointF(x, y + fm.ascent()), t, bandFarbe(e.first), false);
+        x += w + 10.0;
+    }
+}
+
+void AzimutalKarteWidget::zeichneHover(QPainter& p, const Lage& L) const
 {
     if (m_hover < 0 || m_hover >= m_punkte.size()) { return; }
     const Punkt& q = m_punkte.at(m_hover);
     const double az = GlobeWidget::initialBearing(m_homeLat, m_homeLon, q.lat, q.lon);
     const double km = kmAusBogen(GlobeWidget::angularDistance(m_homeLat, m_homeLon,
                                                               q.lat, q.lon) * kRad);
-    const QString t = QStringLiteral("%1  ·  %2  ·  %3°  ·  %4 km%5")
-                          .arg(q.call, q.band).arg(az, 0, 'f', 0).arg(km, 0, 'f', 0)
-                          .arg(q.genau ? QString() : QStringLiteral("  (country centre)"));
-    QFont f = p.font();
-    f.setPixelSize(11);
-    f.setBold(false);
-    p.setFont(f);
+    QString t = QStringLiteral("%1  ·  %2  ·  %3°  ·  %4 km%5")
+                    .arg(q.call, q.band).arg(az, 0, 'f', 0).arg(km, 0, 'f', 0)
+                    .arg(q.genau ? QString() : QStringLiteral("  (country centre)"));
+    const QFont f = schrift(p.font(), L.stufe == Stufe::Voll ? 11 : 9);
     const QFontMetricsF fm(f);
+    t = fm.elidedText(t, Qt::ElideRight, width() - 8.0);
+    const double w = fm.horizontalAdvance(t);
     const QPointF pt = bildpunktNormiert(m_proj.at(m_hover));
     double x = pt.x() + 8.0;
-    if (x + fm.horizontalAdvance(t) > width() - 6.0) { x = pt.x() - 8.0 - fm.horizontalAdvance(t); }
-    textMitHof(p, QPointF(std::max(6.0, x), pt.y() - 6.0), t, QColor(Style::kTextPrimary));
-}
+    if (x + w > width() - 4.0) { x = pt.x() - 8.0 - w; }
+    x = std::clamp(x, 4.0, std::max(4.0, width() - w - 4.0));
+    const double y = std::clamp(pt.y() - 6.0, fm.ascent() + 2.0, height() - fm.descent() - 2.0);
 
-void AzimutalKarteWidget::zeichneLegende(QPainter& p) const
-{
-    // Die haeufigsten Baender unten links, mit Zahl.
-    QMap<QString, int> zahl;
-    for (const Punkt& q : m_punkte) { ++zahl[q.band.trimmed().toLower()]; }
-    QVector<QPair<int, QString>> sortiert;
-    for (auto it = zahl.cbegin(); it != zahl.cend(); ++it) {
-        if (!it.key().isEmpty()) { sortiert.append({it.value(), it.key()}); }
-    }
-    std::stable_sort(sortiert.begin(), sortiert.end(),
-                     [](const auto& a, const auto& b) { return a.first > b.first; });
-    QFont f = p.font();
-    f.setPixelSize(11);
-    f.setBold(false);
+    // Der Hof wie bei den anderen Beschriftungen, aber nicht in die
+    // Liste: der Hinweis ist fluechtig und darf ueber allem liegen.
+    QPainterPath pfad;
+    pfad.addText(QPointF(x, y), f, t);
+    QColor dunkel(Style::hexRole(Style::kPanelBg));
+    dunkel.setAlphaF(0.8);
+    p.save();
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(dunkel, 3.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    p.drawPath(pfad);
+    p.restore();
     p.setFont(f);
-    const QFontMetricsF fm(f);
-    double x = 10.0;
-    const double y = height() - 8.0;
-    for (int i = 0; i < sortiert.size() && i < 10; ++i) {
-        const QString t = QStringLiteral("● %1 %2").arg(sortiert[i].second).arg(sortiert[i].first);
-        const double w = fm.horizontalAdvance(t);
-        if (x + w > width() - 10.0) { break; }
-        p.setPen(bandFarbe(sortiert[i].second));
-        p.drawText(QPointF(x, y), t);
-        x += w + 12.0;
-    }
+    p.setPen(QColor(Style::kTextPrimary));
+    p.drawText(QPointF(x, y), t);
 }
 
 // ── Maus ────────────────────────────────────────────────────────────

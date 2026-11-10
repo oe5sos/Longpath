@@ -35,6 +35,26 @@
 // (Weltbild, Nacht, Strahlen) tragen ein „veraltet" und werden im
 // paintEvent nachgezogen. Die Karte liegt meist verdeckt im Stapel, und
 // jede Filteraenderung im Logbuch ruft setPunkte().
+//
+// ── Drei Groessen (2026-11-10, am laufenden Programm gefunden) ───────
+//
+// Eingebettet im Logbuch ist das Kartenfeld oft nur 410 x 130 Punkte.
+// Mit dem Rand fuer zwoelf Gradzahlen blieb der Scheibe ein Radius von
+// 30 Punkten, Gradzahlen und Ringbeschriftung lagen uebereinander, der
+// Zieltext quer ueber der Scheibe. Darum drei Stufen:
+//   Voll   (Radius >= 120): alles wie auf dem Blatt, Legende unten.
+//   Knapp  (Radius >= 60):  nur 0/90/180/270, keine Ringbeschriftung.
+//   Winzig (darunter):      keine Gradzahlen, die Scheibe bis an den Rand.
+// In Knapp und Winzig rueckt die Scheibe in einem flachen Feld nach
+// links, und Ziel, Rotor und Legende stehen in einer Spalte rechts
+// daneben statt auf der Scheibe. Rund bleibt rund: mehr als min(w, h)
+// kann eine Scheibe nicht nutzen, ohne beschnitten zu werden -- der
+// Gewinn liegt im Rand, den die Beschriftung nicht mehr braucht.
+//
+// Jede Beschriftung sucht sich ihren Platz unter den schon gesetzten;
+// was keinen freien Platz findet, entfaellt lieber, als ueber einer
+// anderen zu liegen (der Zieltext ausgenommen -- er wird notfalls nur
+// ins Widget geholt).
 // =================================================================
 // Modification history (Longpath):
 //   2026-11-10 — Created in C++20/Qt6 for Longpath by Martin Fischer,
@@ -45,7 +65,9 @@
 
 #include <QDateTime>
 #include <QImage>
+#include <QPair>
 #include <QPointF>
+#include <QRectF>
 #include <QString>
 #include <QVector>
 #include <QWidget>
@@ -108,6 +130,13 @@ public:
     QPointF bildpunktForTest(double lat, double lon) const { return bildpunkt(lat, lon); }
     QPointF mitteForTest() const { return mitte(); }
     double  radiusForTest() const { return radiusPx(); }
+    // Groessenstufe (0 voll, 1 knapp, 2 winzig) und die Seitenspalte
+    // (leer, wenn es keine gibt).
+    int     stufeForTest() const { return int(lage().stufe); }
+    QRectF  seiteForTest() const { return lage().seite; }
+    // Was beim letzten Zeichnen beschriftet wurde, mit seinem Rechteck.
+    struct Beschriftung { QRectF rechteck; QString text; };
+    QVector<Beschriftung> beschriftungenForTest() const { return m_schrift; }
 
     QSize sizeHint() const override { return {520, 520}; }
     QSize minimumSizeHint() const override { return {220, 220}; }
@@ -125,6 +154,15 @@ protected:
     void leaveEvent(QEvent*) override;
 
 private:
+    enum class Stufe { Voll = 0, Knapp = 1, Winzig = 2 };
+    struct Lage {
+        QPointF mitte;
+        double  radius{20.0};
+        Stufe   stufe{Stufe::Voll};
+        QRectF  seite;          // Spalte fuer Ziel/Rotor/Legende, sonst leer
+    };
+    Lage    lage() const;
+
     double  radiusPx() const;
     QPointF mitte() const;
     QPointF bildpunkt(double lat, double lon) const;
@@ -137,11 +175,25 @@ private:
     void    baueStrahlen();           // QSO-Strahlen, bei Punkten/Groesse
     void    projiziereNeu();          // m_proj aus m_punkte
 
-    void    zeichneSkala(QPainter& p) const;
-    void    zeichneRotor(QPainter& p) const;
-    void    zeichneZiel(QPainter& p) const;
-    void    zeichneLegende(QPainter& p) const;
-    void    zeichneHover(QPainter& p) const;
+    // Linien (unter den Strahlen) ...
+    void    zeichneGitter(QPainter& p, const Lage& L) const;
+    void    zeichneRotorKeil(QPainter& p, const Lage& L) const;
+    void    zeichneZielLinien(QPainter& p, const Lage& L) const;
+    // ... und Schrift (darueber), in Vorrangfolge gesetzt.
+    void    zeichneSkalaSchrift(QPainter& p, const Lage& L);
+    void    zeichneHeimSchrift(QPainter& p, const Lage& L);
+    void    zeichneZielSchrift(QPainter& p, const Lage& L);
+    void    zeichneRotorSchrift(QPainter& p, const Lage& L);
+    void    zeichneLegende(QPainter& p, const Lage& L);
+    void    zeichneVermerk(QPainter& p);
+    void    zeichneSeite(QPainter& p, const Lage& L);
+    void    zeichneHover(QPainter& p, const Lage& L) const;
+
+    // Platz fuer Schrift: im Widget und ueber keiner schon gesetzten.
+    bool    frei(const QRectF& r) const;
+    void    schreibe(QPainter& p, const QPointF& grundlinie, const QString& t,
+                     const QColor& farbe, bool hof);
+    QVector<QPair<QString, int>> legendenEintraege() const;
 
     bool    m_hasHome{false};
     double  m_homeLat{0.0}, m_homeLon{0.0};
@@ -178,6 +230,8 @@ private:
     QDateTime m_zeitTest;
 
     int     m_hover{-1};
+
+    QVector<Beschriftung> m_schrift;   // beim Zeichnen gesetzt
 };
 
 } // namespace Longpath

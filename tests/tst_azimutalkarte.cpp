@@ -31,6 +31,7 @@
 #include <QDir>
 #include <QPushButton>
 #include <QRandomGenerator>
+#include <QRegularExpression>
 #include <QSignalSpy>
 #include <QStackedWidget>
 #include <QTimeZone>
@@ -257,6 +258,100 @@ private slots:
         const QImage nacht = w.nachtForTest();
         QVERIFY(qAlpha(nacht.pixel(mitte)) > 100);
         QVERIFY(tag != nacht);
+    }
+
+    // ── Kleine Felder (2026-11-10, Befund am laufenden Programm) ─────
+    //
+    // Eingebettet im Logbuch war das Feld 410 x 130: Radius 30, Gradzahlen
+    // und Ringbeschriftung uebereinander, der Zieltext quer ueber der
+    // Scheibe. Jetzt: drei Stufen, eine Seitenspalte in flachen Feldern,
+    // und keine Beschriftung liegt ueber einer anderen oder ausserhalb.
+    void kleineFelderBleibenLesbar_data()
+    {
+        QTest::addColumn<QSize>("groesse");
+        QTest::addColumn<int>("stufe");          // 0 voll, 1 knapp, 2 winzig
+        QTest::addColumn<double>("minRadius");
+        QTest::addColumn<bool>("seite");
+        QTest::addColumn<int>("gradzahlen");
+        QTest::newRow("eingebettet 410x130") << QSize(410, 130) << 2 << 60.0 << true << 0;
+        QTest::newRow("flach 420x140")       << QSize(420, 140) << 2 << 64.0 << true << 0;
+        QTest::newRow("halbhoch 420x220")    << QSize(420, 220) << 1 << 90.0 << true << 4;
+        QTest::newRow("quadrat 220x220")     << QSize(220, 220) << 1 << 75.0 << false << 4;
+        QTest::newRow("klein 130x130")       << QSize(130, 130) << 2 << 60.0 << false << 0;
+        QTest::newRow("fenster 900x620")     << QSize(900, 620) << 0 << 250.0 << false << 12;
+        QTest::newRow("gross 1100x1100")     << QSize(1100, 1100) << 0 << 500.0 << false << 12;
+    }
+
+    void kleineFelderBleibenLesbar()
+    {
+        QFETCH(QSize, groesse);
+        QFETCH(int, stufe);
+        QFETCH(double, minRadius);
+        QFETCH(bool, seite);
+        QFETCH(int, gradzahlen);
+
+        const QString welt = qEnvironmentVariable("LONGPATH_WELTBILD");
+        if (!welt.isEmpty()) { QVERIFY(WorldTexture::setPath(welt)); }
+
+        AzimutalKarteWidget w;
+        w.resize(groesse);
+        w.setHome(kHomeLat, kHomeLon, QStringLiteral("JN67VV"));
+        QVector<AzimutalKarteWidget::Punkt> pkt;
+        const char* baender[] = {"20m", "15m", "40m", "10m", "17m", "6m", "12m", "2m", "80m", "160m"};
+        for (int i = 0; i < 300; ++i) {
+            const double lat = 20.0 + (i * 37 % 50);
+            const double lon = -100.0 + (i * 53 % 240);
+            pkt.append({lat, lon, QString::fromLatin1(baender[i % 10 < 4 ? 0 : i % 10]),
+                        QStringLiteral("T%1").arg(i), true, false});
+        }
+        w.setPunkte(pkt);
+        w.setRotorHeading(300.0);
+        w.setRotorBeamWidth(30.0);
+        // Die Station aus dem Befund: nah, also mitten im Gedraenge.
+        w.setZiel(QStringLiteral("LZ5R"), 42.7, 23.3);
+        w.setZeitForTest(QDateTime(QDate(2026, 11, 10), QTime(17, 0), QTimeZone::UTC));
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+        const QImage bild = w.grab().toImage();
+
+        QCOMPARE(w.stufeForTest(), stufe);
+        QVERIFY2(w.radiusForTest() >= minRadius,
+                 qPrintable(QString::number(w.radiusForTest())));
+        QCOMPARE(!w.seiteForTest().isEmpty(), seite);
+
+        const auto b = w.beschriftungenForTest();
+        QVERIFY(!b.isEmpty());
+        const QRectF feld(QPointF(0, 0), QSizeF(groesse));
+        int grad = 0;
+        const QRegularExpression gradzahl(QStringLiteral("^\\d+°$"));
+        const AzimutalKarteWidget::Beschriftung* ziel = nullptr;
+        for (const auto& x : b) {
+            QVERIFY2(feld.contains(x.rechteck),
+                     qPrintable(QStringLiteral("„%1\" ausserhalb").arg(x.text)));
+            if (gradzahl.match(x.text).hasMatch()) { ++grad; }
+            if (x.text.startsWith(QLatin1String("LZ5R"))) { ziel = &x; }
+        }
+        for (int i = 0; i < b.size(); ++i) {
+            for (int j = i + 1; j < b.size(); ++j) {
+                QVERIFY2(!b[i].rechteck.adjusted(0.5, 0.5, -0.5, -0.5)
+                             .intersects(b[j].rechteck.adjusted(0.5, 0.5, -0.5, -0.5)),
+                         qPrintable(QStringLiteral("„%1\" ueber „%2\"").arg(b[i].text, b[j].text)));
+            }
+        }
+        QCOMPARE(grad, gradzahlen);
+        // Die Station ist beschriftet -- mit Seitenspalte neben der
+        // Scheibe, nicht quer darueber.
+        QVERIFY(ziel);
+        if (seite) {
+            QVERIFY(ziel->rechteck.left() >= w.mitteForTest().x() + w.radiusForTest());
+        }
+
+        const QString grabDir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+        if (!grabDir.isEmpty()) {
+            QDir().mkpath(grabDir);
+            QVERIFY(bild.save(grabDir + QStringLiteral("/azimutalkarte-%1x%2.png")
+                                            .arg(groesse.width()).arg(groesse.height())));
+        }
     }
 
     void imKartenfensterAlsVierteAnsicht()
