@@ -41,6 +41,13 @@
 //                 Station mit kurzem und langem Weg. Die gewaehlte
 //                 Ansicht wird gemerkt (QsoMapView). Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Claude Code).
+//   2026-11-10 — 3D-Flug: mit eigenem Google-Schluessel (Map Tiles API)
+//                 fliegt eine vierte Ansicht vom QTH den Grosskreis
+//                 entlang bis aufs Dach der Station (Station3dSurface,
+//                 nur mit Qt WebEngine). Ohne Schluessel oder WebEngine
+//                 bleibt der NASA-Flug, dazu „View in Google Earth".
+//                 Martin Fischer (OE5SOS), AI-assisted via Anthropic
+//                 Claude.
 // =================================================================
 
 #include "models/LogEntry.h"
@@ -49,6 +56,8 @@
 #include <QSet>
 #include <QTimer>
 #include <QVector>
+
+#include <QUrl>
 
 #include <functional>
 
@@ -136,6 +145,25 @@ public:
     /// Ein Rufzeichen so behandeln, als waere es im Feld eingegeben.
     void lookupAndFly(const QString& call);
 
+    // ── 3D-Flug mit Googles Kacheln (2026-11-10) ─────────────────────
+    //
+    // Seite 4 im Stapel (hinter der Azimutalkarte auf 3). Die Flaeche entsteht erst beim ersten 3D-Flug
+    // (WebEngine startet einen eigenen Prozess -- nicht fuer jeden, der
+    // die Karte nur oeffnet). Ohne WebEngine im Bau, ohne Schluessel
+    // oder mit abgewaehltem „3D" fliegt die flache Karte wie bisher, und
+    // „View in Google Earth" erscheint neben der Stationskarte.
+    static constexpr int kView3d = 4;
+    QPushButton* threeDButtonForTest() const { return m_3dBtn; }
+    QPushButton* googleEarthButtonForTest() const { return m_googleEarthBtn; }
+    class Station3dSurface* threeDSurfaceForTest() const { return m_3d; }
+    int currentViewForTest() const;
+    QWidget* summaryForTest() const;
+    class FlowLayout* pillRowForTest() const { return m_pillRow; }
+    const QVector<QWidget*>& flatOnlyControlsForTest() const { return m_flatOnlyControls; }
+    QString infoTextForTest() const;
+    /// Statt QDesktopServices: der Pruefstand faengt die URL ab.
+    void setUrlOpenerForTest(std::function<void(const QUrl&)> fn) { m_openUrl = std::move(fn); }
+
     /// Satelliten ueber dem Horizont als Schicht auf der flachen Karte:
     /// Subsatellitenpunkt, Name, Elevation; alle 10 s neu gerechnet.
     /// Der Dienst gehoert dem Hauptfenster.
@@ -208,13 +236,16 @@ private:
     void updateRotorRadarVisibility();
     QPushButton*    m_radarBtn{nullptr};
     QPushButton*    m_azimutBtn{nullptr};
-    int             m_viewBeforeRadar{0};    // Kugel oder flach, wohin „Radar"/„Azimuthal" aus zurueckfuehrt
+    int             m_viewBeforeRadar{0};    // Kugel, flach oder 3D, wohin „Radar"/„Azimuthal" aus zurueckfuehrt
     // Stapelplaetze. Radar und Azimutalkarte liegen UEBER Kugel/flach:
     // ihr Knopf ist ein Haken, der dorthin zurueckfuehrt, wo man herkam.
     static constexpr int kViewGlobe = 0;
     static constexpr int kViewFlat = 1;
     static constexpr int kViewRadar = 2;
     static constexpr int kViewAzimuthal = 3;
+    // Radar und Azimutalkarte liegen ueber Kugel/flach und fuehren dorthin
+    // zurueck; das 3D-Bild (kView3d) ist KEIN Overlay.
+    static constexpr bool isOverlayView(int i) { return i == kViewRadar || i == kViewAzimuthal; }
     // Die vom Betreiber gewaehlte Ansicht merken / beim Oeffnen
     // wiederherstellen. Nur Knopfdruecke zaehlen -- ein Hinflug oder das
     // Durchzoomen schalten auch um, sind aber keine Wahl.
@@ -266,11 +297,39 @@ private:
     // while only the selection is shown — a live date field that
     // changes nothing is worse than a disabled one.
     QVector<QWidget*> m_rangeControls;
+    QVector<QWidget*> m_flatOnlyControls;   // im 3D-Bild ausgeblendet
     QWidget*          m_rangeBox{nullptr};
     QWidget*          m_backgroundBox{nullptr};   // KARTE + Auswahl
     QPushButton*      m_earthBtn{nullptr};
     QPushButton*      m_popOutBtn{nullptr};
     bool              m_embedded{false};
+
+    // ── 3D-Flug ──────────────────────────────────────────────────────
+    struct LastFlight {
+        bool    valid{false};
+        QString call;
+        QString caption;     // Rich Text, wie die Stationskarte ihn zeigt
+        double  lat{0.0};
+        double  lon{0.0};
+    };
+    bool use3d() const;
+    void ensure3d();
+    void update3dButton();
+    void flyFlat(const QString& call, double lat, double lon);
+    void fly3d();
+    void on3dFailed(const QString& reason, bool keyProblem);
+    void openGoogleEarth();
+    void showFlightCard(const QString& extra);
+    void apply3dRoom();   // im 3D-Bild treten Pillen, Zaehlung, Rotor-Grafik zurueck
+    QPushButton*      m_3dBtn{nullptr};
+    QPushButton*      m_googleEarthBtn{nullptr};
+    QWidget*          m_3dHost{nullptr};
+    class Station3dSurface* m_3d{nullptr};
+    bool              m_3dWanted{true};
+    QString           m_3dRefusedKey;    // Zugang (Quelle:Text), der abgelehnt wurde
+    static QString    accessIdentity();
+    LastFlight        m_lastFlight;
+    std::function<void(const QUrl&)> m_openUrl;
 };
 
 } // namespace Longpath

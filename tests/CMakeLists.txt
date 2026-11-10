@@ -6235,6 +6235,24 @@ longpath_add_test(tst_logbook_entry_row)
 # Logbuch-Durchgangstest (Nacht 2026-09-26): Neuschreiben verliert nichts, alle Ablaeufe.
 longpath_add_test(tst_logbook_durchgang)
 longpath_add_test(tst_qso_map_flyto_window)
+# 2026-11-10: das Logbuch soll herausstechen -- der eigene Google-Schluessel
+# (Schluesselbund, Test gegen die Map Tiles API, Anleitung) und der 3D-Flug
+# im Kartenfenster samt Rueckfall auf NASA + Google Earth. Beide ohne
+# WebEngine: die Karte kennt nur die Schnittstelle Station3dSurface.
+longpath_add_test(tst_google_map_tiles)
+longpath_add_test(tst_qso_map_3d_flug)
+# 2026-11-10: der QRZ-Zugang war seit 57d524b0f (2026-08-07) ueber kein
+# Menue mehr erreichbar, waehrend vier Stellen „in Tools" auf ihn zeigten.
+longpath_add_test(tst_qrz_konto_im_menue)
+# 2026-11-10, Live-Befund: „3D" in der eingebetteten Logbuch-Karte tat
+# ohne Schluessel sichtbar nichts. Echter Mausklick im echten Logbuch.
+longpath_add_test(tst_logbuch_3d_knopf)
+# Die WebEngine-Fassung selbst, nur wo Qt WebEngine gefunden wurde
+# (Homebrew-Qt am Mac; die Linux-/Windows-Laeufer haben es nicht).
+if(LONGPATH_HAS_WEBENGINE)
+    longpath_add_test(tst_station3d_view)
+    target_link_libraries(tst_station3d_view PRIVATE LongpathWeb3d)
+endif()
 # -- Satelliten ueber dem Horizont auf der Karte + Stempel im Detailpaneel --
 longpath_add_test(tst_qso_map_satellites)
 # -- Logbuch-Werkzeugleiste bricht um statt das Fenster breit zu halten --

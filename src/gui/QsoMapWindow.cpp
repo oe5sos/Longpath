@@ -15,6 +15,10 @@
 //   2026-11-10 — Azimutalkarte als vierte Ansicht, gemerkte Ansicht;
 //                 see QsoMapWindow.h. Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Claude Code).
+//   2026-11-10 — 3D-Flug ueber Googles Photorealistic 3D Tiles mit dem
+//                 eigenen Schluessel, Rueckfall NASA + Google Earth; siehe
+//                 QsoMapWindow.h. Martin Fischer (OE5SOS), AI-assisted via
+//                 Anthropic Claude.
 // =================================================================
 
 #include "QsoMapWindow.h"
@@ -35,6 +39,9 @@
 #include "core/QrzClient.h"
 #include "gui/widgets/StationPhoto.h"
 #include "core/CallsignCache.h"
+#include "core/GoogleMapTiles.h"
+#include "gui/Google3dSetupDialog.h"
+#include "gui/widgets/Station3dSurface.h"
 
 #include <QCheckBox>
 #include <QTimer>
@@ -49,6 +56,7 @@
 #include <QFileDialog>
 #include <QImage>
 #include <QKeyEvent>
+#include <QLoggingCategory>
 #include <QHBoxLayout>
 #include <QResizeEvent>
 #include <QLabel>
@@ -57,14 +65,22 @@
 #include <QSet>
 #include <QStackedWidget>
 #include <QStandardPaths>
+#include <QTextDocumentFragment>
 #include <QTimeZone>
 #include <QUrl>
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <utility>
 #include <cmath>
 
 namespace Longpath {
+
+namespace {
+// Der 3D-Knopf meldet jeden Druck ins Protokoll: Schluessel da, WebEngine
+// da, wo (Live-Befund 2026-11-10: „tut nichts" -- und keine Zeile dazu).
+Q_LOGGING_CATEGORY(lcQsoMap3d, "longpath.flug3d.karte")
+} // namespace
 
 QsoMapWindow::QsoMapWindow(QWidget* parent) : QDialog(parent)
 {
@@ -92,6 +108,10 @@ QsoMapWindow::QsoMapWindow(QWidget* parent) : QDialog(parent)
     } else {
         resize(1100, 660);
     }
+
+    m_openUrl = [](const QUrl& u) { QDesktopServices::openUrl(u); };
+    m_3dWanted = AppSettings::instance()
+        .value(QStringLiteral("QsoMap3dFlight"), true).toBool();
 
     buildUi();
 }
@@ -144,15 +164,16 @@ void QsoMapWindow::setEmbedded(bool on)
 void QsoMapWindow::zoomActiveView(double factor)
 {
     // Radar und Azimutalkarte zoomen nicht: beide zeigen immer die
-    // ganze Welt um das eigene QTH.
-    if (m_stack->currentIndex() >= kViewRadar) { return; }
+    // ganze Welt um das eigene QTH. 3D auch nicht ueber die Knoepfe;
+    // dort dreht das Rad.
+    if (isOverlayView(m_stack->currentIndex()) || m_stack->currentIndex() == kView3d) { return; }
     if (m_stack->currentIndex() == 0) { m_globe->zoomBy(factor); }
     else                              { m_flat->zoomBy(factor); }
 }
 
 void QsoMapWindow::resetActiveView()
 {
-    if (m_stack->currentIndex() >= kViewRadar) { return; }
+    if (isOverlayView(m_stack->currentIndex()) || m_stack->currentIndex() == kView3d) { return; }
     if (m_stack->currentIndex() == 0) { m_globe->resetView(); }
     else                              { m_flat->resetView(); }
 }
@@ -360,6 +381,11 @@ void QsoMapWindow::buildUi()
     connect(fit, &QPushButton::clicked,
             this, [this]() { resetActiveView(); });
 
+    // Was nur Kugel und flache Karte betrifft -- im 3D-Bild treten diese
+    // Schalter zurueck und geben dem Bild ihre Zeile (apply3dRoom).
+    m_flatOnlyControls << m_onlySelected << m_paths << m_grid << m_imagery
+                       << m_satellites << zoomOut << zoomIn << fit;
+
     m_viewBtn = new QPushButton(QStringLiteral("Flat map"), this);
     m_viewBtn->setStyleSheet(Style::buttonBaseStyle());
     m_viewBtn->setToolTip(QStringLiteral(
@@ -386,6 +412,68 @@ void QsoMapWindow::buildUi()
         "in its band colour, the rotor live, a looked-up station with short "
         "and long path"));
     bar->addWidget(m_azimutBtn);
+
+    // 3D: Googles fotorealistische Kacheln, wenn der Bediener einen
+    // eigenen Schluessel hat. Ohne Schluessel oeffnet der Knopf die
+    // Einrichtung; ohne WebEngine im Bau ist er aus und sagt warum.
+    m_3dBtn = new QPushButton(QStringLiteral("3D"), this);
+    m_3dBtn->setObjectName(QStringLiteral("qsoMap3dButton"));
+    m_3dBtn->setCheckable(true);
+    m_3dBtn->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
+    bar->addWidget(m_3dBtn);
+    // toggled, nicht clicked (Live-Befund 2026-11-10): die Bedienhilfe
+    // (AXPress, VoiceOver, Automatisierung) drueckt einen ankreuzbaren
+    // Knopf ueber toggle(), und das sendet KEIN clicked -- der Knopf tat
+    // dann sichtbar nichts. Eigene Umstellungen laufen ueber
+    // update3dButton() hinter einem QSignalBlocker und kommen hier nicht an.
+    connect(m_3dBtn, &QPushButton::toggled, this, [this](bool checked) {
+        const bool built = Station3dSurface::isAvailable();
+        const bool key   = Map3dAccess::isSet();
+        qCInfo(lcQsoMap3d).noquote()
+            << "3D-Knopf:" << (checked ? "an" : "aus")
+            << "| Zugang" << Map3dAccess::sourceName(Map3dAccess::chosenSource())
+            << (key ? "da" : "fehlt")
+            << "| WebEngine" << (built ? "da" : "fehlt")
+            << "|" << (m_embedded ? "Logbuch-Spalte" : "Kartenfenster");
+        if (!built) {
+            // Ein abgeschalteter Knopf, der nichts sagt, ist genau das
+            // „tut nichts". Also an bleiben und sagen, warum nicht.
+            update3dButton();
+            m_info->setText(QStringLiteral(
+                "<b>3D</b> — this build of Longpath has no Qt WebEngine, so "
+                "Google's 3D view is not available here. "
+                "\"View in Google Earth\" shows the station in 3D in your browser."));
+            m_info->setVisible(true);
+            if (m_lastFlight.valid) { m_googleEarthBtn->setVisible(true); }
+            return;
+        }
+        if (!key) {
+            update3dButton();
+            Google3dSetupDialog::showFor(this);
+            return;
+        }
+        m_3dWanted = checked;
+        AppSettings::instance().setValue(QStringLiteral("QsoMap3dFlight"), checked);
+        if (!m_lastFlight.valid) { return; }
+        if (checked) {
+            m_3dRefusedKey.clear();   // ausdruecklich gewollt: noch einmal fragen
+            // Ausdruecklich gewollt heisst auch: aus der Azimutalkarte
+            // heraus, in der flyToStation() sonst stehen bliebe.
+            if (use3d()) {
+                fly3d();
+            } else {
+                flyToStation(m_lastFlight.call, m_lastFlight.lat, m_lastFlight.lon,
+                             m_lastFlight.caption);
+            }
+        } else if (m_stack->currentIndex() == kView3d) {
+            flyFlat(m_lastFlight.call, m_lastFlight.lat, m_lastFlight.lon);
+            m_googleEarthBtn->setVisible(true);
+        }
+    });
+    connect(&Map3dAccess::notifier(), &Map3dAccess::changed, this, [this]() {
+        m_3dRefusedKey.clear();
+        update3dButton();
+    });
 
     // Nur eingebettet sichtbar: das grosse Fenster holen.
     m_popOutBtn = new QPushButton(QStringLiteral("\u2197"), this);
@@ -420,7 +508,17 @@ void QsoMapWindow::buildUi()
     m_stack->addWidget(m_flat);
     m_stack->addWidget(m_radar);   // Index 2
     m_azimut = new AzimutalKarteWidget(this);
-    m_stack->addWidget(m_azimut);  // Index 3
+    m_stack->addWidget(m_azimut);  // Index 3 (kViewAzimuthal)
+    // Index 4 (kView3d): Platz fuer die 3D-Flaeche, die erst beim ersten
+    // Flug entsteht (ensure3d).
+    m_3dHost = new QWidget(this);
+    {
+        auto* l = new QVBoxLayout(m_3dHost);
+        l->setContentsMargins(0, 0, 0, 0);
+    }
+    m_stack->addWidget(m_3dHost);
+    Q_ASSERT(m_stack->indexOf(m_azimut) == kViewAzimuthal);
+    Q_ASSERT(m_stack->indexOf(m_3dHost) == kView3d);
 
     // Das kleine Rotor-Radar links der Karte. Quadratisch, so hoch wie
     // die Flaeche (resizeEvent); die Gradzahlen stehen in der Karteikarte.
@@ -464,7 +562,30 @@ void QsoMapWindow::buildUi()
         .arg(QString::fromLatin1(Style::kTextPrimary),
              QString::fromLatin1(Style::kInsetBg),
              QString::fromLatin1(Style::kBorderSubtle)));
-    col->addWidget(m_info);
+    connect(m_info, &QLabel::linkActivated, this, [this](const QString& link) {
+        if (link == QLatin1String("longpath:google3d")) { Google3dSetupDialog::showFor(this); }
+    });
+
+    // Der Rueckfall fuer den Blick aufs Dach: dieselbe Station in Google
+    // Earth im Browser -- ohne Schluessel, ohne WebEngine, auf jedem
+    // System. Nur sichtbar, wenn der Flug flach war.
+    m_googleEarthBtn = new QPushButton(QStringLiteral("View in Google Earth \u2197"), this);
+    m_googleEarthBtn->setObjectName(QStringLiteral("qsoMapGoogleEarthStation"));
+    m_googleEarthBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_googleEarthBtn->setToolTip(QStringLiteral(
+        "Open this station in Google Earth in your browser — 3D houses and "
+        "trees wherever Google has them, no key needed"));
+    m_googleEarthBtn->setVisible(false);
+    connect(m_googleEarthBtn, &QPushButton::clicked, this, &QsoMapWindow::openGoogleEarth);
+    {
+        auto* infoRow = new QHBoxLayout;
+        infoRow->setContentsMargins(0, 0, 0, 0);
+        infoRow->setSpacing(8);
+        infoRow->addWidget(m_info, 1);
+        infoRow->addWidget(m_googleEarthBtn, 0, Qt::AlignTop);
+        col->addLayout(infoRow);
+    }
+    update3dButton();
 
     m_tiles = new GibsTileLayer(this);
     m_flat->setImagery(m_tiles);
@@ -490,8 +611,10 @@ void QsoMapWindow::buildUi()
     connect(m_viewBtn, &QPushButton::clicked, this, [this]() {
         // Aus Radar oder Azimutalkarte heraus fuehrt der Knopf zur jeweils
         // anderen Kartenansicht; deren Haken geht dabei aus.
-        const int cur = m_stack->currentIndex() >= kViewRadar ? m_viewBeforeRadar
-                                                              : m_stack->currentIndex();
+        // 3D zaehlt hier nicht als Overlay: dort steht auf dem Knopf
+        // „Globe", und dorthin fuehrt er.
+        const int cur = isOverlayView(m_stack->currentIndex()) ? m_viewBeforeRadar
+                                                               : m_stack->currentIndex();
         const bool toFlat = cur == kViewGlobe;
         for (QPushButton* b : {m_radarBtn, m_azimutBtn}) {
             if (b && b->isChecked()) {
@@ -512,7 +635,9 @@ void QsoMapWindow::buildUi()
                 QSignalBlocker block(other);
                 other->setChecked(false);
             }
-            if (m_stack->currentIndex() < kViewRadar) {
+            // Kugel, flach -- oder 3D: wer aus dem 3D-Bild ins Radar
+            // schaut, kommt dorthin zurueck (so im 3D-Zweig).
+            if (!isOverlayView(m_stack->currentIndex())) {
                 m_viewBeforeRadar = m_stack->currentIndex();
             }
             m_stack->setCurrentIndex(index);
@@ -532,7 +657,10 @@ void QsoMapWindow::buildUi()
         showStationInfo(label);
     });
     connect(m_stack, &QStackedWidget::currentChanged,
-            this, [this](int) { updateRotorRadarVisibility(); });
+            this, [this](int) {
+        updateRotorRadarVisibility();
+        apply3dRoom();
+    });
     connect(m_radar, &DxRadarWidget::pointClicked, this,
             [this](const QString& label, double, double) {
         showStationInfo(label);
@@ -808,6 +936,32 @@ void QsoMapWindow::rebuildFilterPills()
         for (const QString& m : modeList) { addPill(m, m, false); }
     }
     m_pillRow->addStretch();
+    apply3dRoom();   // frisch gebaute Pillen folgen der Ansicht
+}
+
+// ── Platz fuer die 3D-Ansicht (2026-11-10) ───────────────────────────
+//
+// Betreiber nach dem ersten echten Flug: „die groesse der ansicht von 3d
+// muss groesser sein". In der Logbuch-Spalte blieben dem Bild gut 160 von
+// 360 Punkten Hoehe: darueber die Band- und Betriebsarten-Pillen (sie
+// filtern Kontakte auf Kugel und flacher Karte, im 3D-Flug tun sie
+// nichts), darunter die Zaehlung, daneben die kleine Rotor-Grafik. Im
+// 3D-Bild treten alle drei zurueck; die Leiste mit „3D"/„Globe" bleibt,
+// damit man wieder hinauskommt.
+void QsoMapWindow::apply3dRoom()
+{
+    const bool in3d = m_stack && m_stack->currentIndex() == kView3d;
+    if (m_pillRow) {
+        for (int i = 0; i < m_pillRow->count(); ++i) {
+            if (QWidget* w = m_pillRow->itemAt(i)->widget()) { w->setVisible(!in3d); }
+        }
+        m_pillRow->invalidate();
+    }
+    if (m_summary) { m_summary->setVisible(!in3d); }
+    // Live 2026-11-10: in der Logbuch-Spalte war das 3D-Bild ein flacher
+    // Streifen. Die Schalter, die im 3D-Bild nichts tun, geben ihre Zeile
+    // ab; „Fly to call", Globe, Radar, 3D und ↗ bleiben.
+    for (QWidget* w : std::as_const(m_flatOnlyControls)) { w->setVisible(!in3d); }
 }
 
 namespace {
@@ -1359,12 +1513,34 @@ void QsoMapWindow::lookupAndFly(const QString& text)
 void QsoMapWindow::flyToStation(const QString& call, double lat, double lon,
                                 const QString& caption)
 {
-    const QString c = call.trimmed().toUpper();
+    m_lastFlight.valid   = true;
+    m_lastFlight.call    = call.trimmed().toUpper();
+    m_lastFlight.caption = caption;
+    m_lastFlight.lat     = lat;
+    m_lastFlight.lon     = lon;
 
     // Die Azimutalkarte bekommt die Station immer -- kurzer Weg hell,
     // langer gestrichelt. Ist sie die gezeigte Ansicht, bleibt sie es:
     // Peilung und beide Wege sind genau die Antwort, die man dort sucht.
-    m_azimut->setZiel(c, lat, lon);
+    // Darum fliegt 3D nur, wenn NICHT die Azimutalkarte gezeigt wird
+    // (Probe-Merge Azimutalkarte + 3D); der Knopf „3D" holt ausdruecklich
+    // ins 3D-Bild.
+    m_azimut->setZiel(m_lastFlight.call, lat, lon);
+    if (m_stack->currentIndex() != kViewAzimuthal && use3d()) {
+        fly3d();
+        return;
+    }
+    flyFlat(m_lastFlight.call, lat, lon);
+    showFlightCard(QString());
+    // Kein 3D hier -- der Blick aufs Dach geht trotzdem, im Browser.
+    m_googleEarthBtn->setVisible(true);
+}
+
+void QsoMapWindow::flyFlat(const QString& c, double lat, double lon)
+{
+    // Wer das 3D-Bild verlaesst, soll aus Radar/Azimutalkarte nicht
+    // dorthin zurueckkehren (es kann abgelehnt oder abgewaehlt sein).
+    if (m_viewBeforeRadar == kView3d) { m_viewBeforeRadar = kViewFlat; }
     const bool stayAzimuthal = m_stack->currentIndex() == kViewAzimuthal;
 
     // Sonst ist der Flug eine Sache der flachen Karte; die Kugel kennt
@@ -1382,20 +1558,160 @@ void QsoMapWindow::flyToStation(const QString& call, double lat, double lon,
     // ~55 m je Bildpunkt: bei 900 px Breite ein Ausschnitt von 50 km,
     // in dem man Stadt und Landschaft erkennt und Landsat noch scharf ist.
     m_flat->flyTo(lat, lon, m_flat->zoomForDegPerPixel(0.0005));
+}
 
-    QString text = QStringLiteral("<b>%1</b>").arg(c.toHtmlEscaped());
-    if (!caption.isEmpty()) { text += QStringLiteral(" — ") + caption; }
+void QsoMapWindow::showFlightCard(const QString& extra)
+{
+    const LastFlight& f = m_lastFlight;
+    QString text = QStringLiteral("<b>%1</b>").arg(f.call.toHtmlEscaped());
+    if (!f.caption.isEmpty()) { text += QStringLiteral(" — ") + f.caption; }
     if (isValidGridSquare(m_homeGrid)) {
         double hlat = 0.0, hlon = 0.0;
         calculateLatLonFromGridSquare(m_homeGrid, hlat, hlon);
         // Entfernung und Peilung ueber den Grosskreis, wie die Karte sie
         // zeichnet -- dieselbe Rechnung wie die Karteikarte daneben.
-        const BeamHeading::GreatCircle g = BeamHeading::greatCircle(hlat, hlon, lat, lon);
+        const BeamHeading::GreatCircle g = BeamHeading::greatCircle(hlat, hlon, f.lat, f.lon);
         text += QStringLiteral(" · %1 km · %2°")
                     .arg(g.km, 0, 'f', 0).arg(g.bearingDeg, 0, 'f', 0);
     }
+    text += extra;
     m_info->setText(text);
     m_info->setVisible(true);
+}
+
+// ── 3D-Flug (2026-11-10) ─────────────────────────────────────────────
+
+int QsoMapWindow::currentViewForTest() const { return m_stack->currentIndex(); }
+QWidget* QsoMapWindow::summaryForTest() const { return m_summary; }
+QString QsoMapWindow::infoTextForTest() const { return m_info->text(); }
+
+bool QsoMapWindow::use3d() const
+{
+    if (!m_3dWanted || !Station3dSurface::isAvailable()) { return false; }
+    const QString key = Map3dAccess::secret();
+    if (key.isEmpty()) { return false; }
+    // Einmal abgelehnt heisst: bis zu einem neuen Zugang (oder dem
+    // ausdruecklichen Klick auf „3D") nicht bei jedem Rufzeichen wieder
+    // die 3D-Seite aufziehen, nur um gleich zurueckzufallen. Quelle und
+    // Zugang zusammen: derselbe Text als ion-Token und als Google-
+    // Schluessel waeren zwei verschiedene Zugaenge.
+    return accessIdentity() != m_3dRefusedKey;
+}
+
+void QsoMapWindow::ensure3d()
+{
+    if (m_3d) { return; }
+    m_3d = Station3dSurface::create(m_3dHost);
+    if (!m_3d) { return; }
+    m_3dHost->layout()->addWidget(m_3d);
+    connect(m_3d, &Station3dSurface::failed, this, &QsoMapWindow::on3dFailed);
+}
+
+void QsoMapWindow::fly3d()
+{
+    ensure3d();
+    if (!m_3d) {
+        flyFlat(m_lastFlight.call, m_lastFlight.lat, m_lastFlight.lon);
+        showFlightCard(QString());
+        m_googleEarthBtn->setVisible(true);
+        return;
+    }
+    for (QPushButton* b : {m_radarBtn, m_azimutBtn}) {
+        if (b && b->isChecked()) {
+            QSignalBlocker block(b);
+            b->setChecked(false);
+        }
+    }
+    m_stack->setCurrentIndex(kView3d);
+    if (m_viewBtn) { m_viewBtn->setText(QStringLiteral("Globe")); }
+    // Die flache Karte kennt die Station trotzdem: wer zurueckschaltet,
+    // sieht sie dort, wo der Flug geendet hat.
+    m_flat->setFocusStation(m_lastFlight.call, m_lastFlight.lat, m_lastFlight.lon);
+    m_googleEarthBtn->setVisible(false);
+    showFlightCard(QStringLiteral(" · Google 3D"));
+
+    Station3dFlight f;
+    f.call    = m_lastFlight.call;
+    f.caption = QTextDocumentFragment::fromHtml(m_lastFlight.caption).toPlainText();
+    f.lat     = m_lastFlight.lat;
+    f.lon     = m_lastFlight.lon;
+    f.viaCesiumIon = Map3dAccess::chosenSource() == Map3dAccess::Source::CesiumIon;
+    f.secret       = Map3dAccess::secret();
+    if (isValidGridSquare(m_homeGrid)) {
+        f.hasHome = true;
+        calculateLatLonFromGridSquare(m_homeGrid, f.homeLat, f.homeLon);
+        const BeamHeading::GreatCircle g =
+            BeamHeading::greatCircle(f.homeLat, f.homeLon, f.lat, f.lon);
+        f.km = g.km;
+        f.bearingDeg = g.bearingDeg;
+    }
+    m_3d->fly(f);
+}
+
+void QsoMapWindow::on3dFailed(const QString& reason, bool keyProblem)
+{
+    if (keyProblem) { m_3dRefusedKey = accessIdentity(); }
+    if (!m_lastFlight.valid) { return; }
+    // Zurueck auf den alten Weg, mit dem Grund in der Stationskarte.
+    flyFlat(m_lastFlight.call, m_lastFlight.lat, m_lastFlight.lon);
+    QString extra = QStringLiteral("<br>Google 3D: %1").arg(reason.toHtmlEscaped());
+    if (keyProblem) {
+        extra += QStringLiteral(" — <a href=\"longpath:google3d\" style=\"color:%1;\">"
+                                "Google 3D settings…</a>")
+                     .arg(QLatin1String(Style::kAccent));
+    }
+    showFlightCard(extra);
+    m_googleEarthBtn->setVisible(true);
+}
+
+void QsoMapWindow::openGoogleEarth()
+{
+    if (!m_lastFlight.valid) { return; }
+    double heading = 0.0;
+    if (isValidGridSquare(m_homeGrid)) {
+        double hlat = 0.0, hlon = 0.0;
+        calculateLatLonFromGridSquare(m_homeGrid, hlat, hlon);
+        heading = BeamHeading::greatCircle(hlat, hlon, m_lastFlight.lat, m_lastFlight.lon)
+                      .bearingDeg;
+    }
+    if (m_openUrl) {
+        m_openUrl(Station3dPage::googleEarthWebUrl(m_lastFlight.lat, m_lastFlight.lon, heading));
+    }
+}
+
+void QsoMapWindow::update3dButton()
+{
+    if (!m_3dBtn) { return; }
+    const bool built = Station3dSurface::isAvailable();
+    const bool key   = Map3dAccess::isSet();
+    QSignalBlocker b(m_3dBtn);
+    // Immer bedienbar: ohne WebEngine sagt der Klick, warum es nicht geht.
+    m_3dBtn->setEnabled(true);
+    m_3dBtn->setChecked(built && key && m_3dWanted);
+    if (!built) {
+        m_3dBtn->setToolTip(QStringLiteral(
+            "This build of Longpath has no Qt WebEngine, so the 3D view is not "
+            "available. Use \"View in Google Earth\" next to the station card."));
+    } else if (!key) {
+        m_3dBtn->setToolTip(QStringLiteral(
+            "Show looked-up stations in Google's photorealistic 3D, down to the "
+            "house and the antenna. Needs a free Cesium ion account (or your own "
+            "Google key) — click to set it up."));
+    } else {
+        m_3dBtn->setToolTip(QStringLiteral(
+            "Fly to looked-up stations in Google's photorealistic 3D (via %1). "
+            "Untick for the flat map with NASA imagery.")
+            .arg(Map3dAccess::chosenSource() == Map3dAccess::Source::CesiumIon
+                     ? QStringLiteral("your Cesium ion account")
+                     : QStringLiteral("your Google key")));
+    }
+}
+
+QString QsoMapWindow::accessIdentity()
+{
+    const QString secret = Map3dAccess::secret();
+    if (secret.isEmpty()) { return QString(); }
+    return Map3dAccess::sourceName(Map3dAccess::chosenSource()) + QLatin1Char(':') + secret;
 }
 
 
@@ -1412,8 +1728,11 @@ void QsoMapWindow::updateRotorRadarVisibility()
 {
     if (!m_rotorRadar) { return; }
     // Zeigt die Flaeche schon das Radar, waere ein zweites daneben doppelt;
-    // die Azimutalkarte traegt den Rotorkeil ebenfalls selbst.
-    const bool bigRadar = m_stack && m_stack->currentIndex() >= kViewRadar;
+    // die Azimutalkarte traegt den Rotorkeil ebenfalls selbst. Im 3D-Bild
+    // gehoert die ganze Breite dem Bild (2026-11-10); wohin die Station
+    // liegt, sagt dort die Anzeige im Bild.
+    const bool bigRadar = m_stack && (isOverlayView(m_stack->currentIndex())
+                                      || m_stack->currentIndex() == kView3d);
     // Zu schmal zum Ablesen: dann lieber nur die Karte.
     const bool roomy = width() >= 420;
     m_rotorRadar->setVisible(m_rotorRadarShown && !bigRadar && roomy);
