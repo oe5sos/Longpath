@@ -35,6 +35,13 @@
 //                 Anschluss aus dem Logbuch: wer dort eine Station
 //                 nachschlaegt, sieht sie hier landen. Martin Fischer,
 //                 AI-assisted via Anthropic Claude.
+//   2026-11-10 — 3D-Flug: mit eigenem Google-Schluessel (Map Tiles API)
+//                 fliegt eine vierte Ansicht vom QTH den Grosskreis
+//                 entlang bis aufs Dach der Station (Station3dSurface,
+//                 nur mit Qt WebEngine). Ohne Schluessel oder WebEngine
+//                 bleibt der NASA-Flug, dazu „View in Google Earth".
+//                 Martin Fischer (OE5SOS), AI-assisted via Anthropic
+//                 Claude.
 // =================================================================
 
 #include "models/LogEntry.h"
@@ -43,6 +50,8 @@
 #include <QSet>
 #include <QTimer>
 #include <QVector>
+
+#include <QUrl>
 
 #include <functional>
 
@@ -127,6 +136,22 @@ public:
     int shownCountForTest() const { return m_lastShown.size(); }
     /// Ein Rufzeichen so behandeln, als waere es im Feld eingegeben.
     void lookupAndFly(const QString& call);
+
+    // ── 3D-Flug mit Googles Kacheln (2026-11-10) ─────────────────────
+    //
+    // Seite 3 im Stapel. Die Flaeche entsteht erst beim ersten 3D-Flug
+    // (WebEngine startet einen eigenen Prozess -- nicht fuer jeden, der
+    // die Karte nur oeffnet). Ohne WebEngine im Bau, ohne Schluessel
+    // oder mit abgewaehltem „3D" fliegt die flache Karte wie bisher, und
+    // „View in Google Earth" erscheint neben der Stationskarte.
+    static constexpr int kView3d = 3;
+    QPushButton* threeDButtonForTest() const { return m_3dBtn; }
+    QPushButton* googleEarthButtonForTest() const { return m_googleEarthBtn; }
+    class Station3dSurface* threeDSurfaceForTest() const { return m_3d; }
+    int currentViewForTest() const;
+    QString infoTextForTest() const;
+    /// Statt QDesktopServices: der Pruefstand faengt die URL ab.
+    void setUrlOpenerForTest(std::function<void(const QUrl&)> fn) { m_openUrl = std::move(fn); }
 
     /// Satelliten ueber dem Horizont als Schicht auf der flachen Karte:
     /// Subsatellitenpunkt, Name, Elevation; alle 10 s neu gerechnet.
@@ -250,6 +275,31 @@ private:
     QPushButton*      m_earthBtn{nullptr};
     QPushButton*      m_popOutBtn{nullptr};
     bool              m_embedded{false};
+
+    // ── 3D-Flug ──────────────────────────────────────────────────────
+    struct LastFlight {
+        bool    valid{false};
+        QString call;
+        QString caption;     // Rich Text, wie die Stationskarte ihn zeigt
+        double  lat{0.0};
+        double  lon{0.0};
+    };
+    bool use3d() const;
+    void ensure3d();
+    void update3dButton();
+    void flyFlat(const QString& call, double lat, double lon);
+    void fly3d();
+    void on3dFailed(const QString& reason, bool keyProblem);
+    void openGoogleEarth();
+    void showFlightCard(const QString& extra);
+    QPushButton*      m_3dBtn{nullptr};
+    QPushButton*      m_googleEarthBtn{nullptr};
+    QWidget*          m_3dHost{nullptr};
+    class Station3dSurface* m_3d{nullptr};
+    bool              m_3dWanted{true};
+    QString           m_3dRefusedKey;    // Schluessel, den Google abgelehnt hat
+    LastFlight        m_lastFlight;
+    std::function<void(const QUrl&)> m_openUrl;
 };
 
 } // namespace Longpath
