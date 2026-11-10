@@ -3743,6 +3743,12 @@ public:
     int streamSampleRateHzForTest(int streamIndex) const {
         return m_streamAllocator.streamSampleRateHz(streamIndex);
     }
+    /// Die Rate, die der Zuteiler diesem Strom gibt, 0 ausserhalb des
+    /// Pools (z. B. der SunSDR-Pseudostrom). MainWindow liest sie beim
+    /// Ratenwechsel fuer jeden zwischengespeicherten Strom (2026-11-10).
+    int streamSampleRateHz(int streamIndex) const {
+        return m_streamAllocator.streamSampleRateHz(streamIndex);
+    }
     bool streamActiveForTest(int streamIndex) const {
         return m_streamAllocator.isStreamActive(streamIndex);
     }
@@ -4591,6 +4597,10 @@ private:
     // G.4 fixup: changed from 50 (initial value mismatch with TransmitModel);
     // harmless after the cold-off guard in setTune(false) but kept for hygiene.
     int m_savedPowerPct{100};
+    // Das Sendeband, auf dem m_savedPowerPct gemerkt wurde (2026-11-10).
+    // Wechselt das Band, bevor TUNE ganz aus ist, gehoert der gemerkte Wert
+    // dem alten Band -- completeTuneOff stellt ihn dann nicht zurueck.
+    Band m_savedPowerBand{Band::GEN};
     //
     // m_isTuning: True while TUN is engaged (between setTune(true) and
     //   setTune(false)).  Used as the idempotent guard at the top of

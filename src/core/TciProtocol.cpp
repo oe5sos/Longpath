@@ -996,11 +996,32 @@ QString TciProtocol::buildTxFrequencyThetisLine(qint64 hz, const QString& band,
 
 // ── Mode / filter helpers ───────────────────────────────────────────────────
 
-// From Thetis TCIServer.cs:2136-2157 [v2.10.3.13] — sendMode format string.
-// MW0LGE_22b mods are uppercase on the sun, replicate
+// From Thetis TCIServer.cs:2186-2191 [@852bf0e] — sendMode: der Schalter
+// „CWL/CWU becomes CW" aendert nur, was gemeldet wird, nie die DSP-Betriebsart.
+//   if (m_server != null && m_server.CWLUbecomesCW && (mode == DSPMode.CWL || mode == DSPMode.CWU))
+//       sMode = "cw";
+// MW0LGE_22b mods are uppcase on the sun, replicate  [original inline comment from TCIServer.cs:2193]
+// 2026-11-10: bis hierher wirkte der Schalter nur auf modulations_list; jede
+// Modusmeldung (Anfangszustand, Abfrage, Quittung, Rundruf) schickte weiter
+// CWL/CWU. Uebernommen aus Upstream NereusSDR d29d19248 (#725, J.J. Boyd
+// KG4VCF).
+QString TciProtocol::tciModeForWire(const QString& modeUpper)
+{
+    const bool cwluBecomesCw = AppSettings::instance().value(
+        QStringLiteral("TciCwluBecomesCw"), QStringLiteral("False")).toString()
+        == QStringLiteral("True");
+    if (cwluBecomesCw
+        && (modeUpper == QStringLiteral("CWL") || modeUpper == QStringLiteral("CWU"))) {
+        return QStringLiteral("CW");
+    }
+    return modeUpper;
+}
+
+// From Thetis TCIServer.cs:2193 [@852bf0e] — sendMode format string.
+// MW0LGE_22b mods are uppcase on the sun, replicate
 QString TciProtocol::buildModulationLine(int rx, const QString& modeUpper)
 {
-    return QStringLiteral("modulation:%1,%2;").arg(rx).arg(modeUpper);
+    return QStringLiteral("modulation:%1,%2;").arg(rx).arg(tciModeForWire(modeUpper));
 }
 
 // From Thetis TCIServer.cs:2349-2353 [v2.10.3.13] — sendFilterBand.
@@ -1747,8 +1768,8 @@ QString TciProtocol::handleLockCommand(const QStringList& args)
 // handleModulationMessage at TCIServer.cs:3837-3940 [v2.10.3.13] dispatches by args.size():
 //   args.size() == 2 → set (parse mode string, set DSPMode + enqueue notification)
 //   args.size() == 1 → query (return current mode uppercase)
-// CWLUbecomesCW transform at TCIServer.cs:2148-2153 [v2.10.3.13] is DEFERRED
-//   (send-side, Phase 11/12 follow-up — wiring requires touching buildModulationLine).
+// CWLUbecomesCW wirkt seit 2026-11-10 auf jede ausgehende Modusmeldung
+//   (buildModulationLine / tciModeForWire).
 // CWbecomesCWUabove10mhz transform at TCIServer.cs:3868-3895 [v2.10.3.13] is DEFERRED
 //   (needs VFOATX/VFOBTX accessors on TestMockRadioModel — future phase).
 QString TciProtocol::handleModulationCommand(const QStringList& args)
@@ -1769,7 +1790,7 @@ QString TciProtocol::handleModulationCommand(const QStringList& args)
         QMetaObject::invokeMethod(m_radio, "mode", Qt::DirectConnection,
                                   Q_RETURN_ARG(QString, currentMode),
                                   Q_ARG(int, rx));
-        return QStringLiteral("modulation:%1,%2;").arg(rx).arg(currentMode.toUpper());
+        return buildModulationLine(rx, currentMode.toUpper());
     }
 
     if (args.size() >= 2) {
@@ -1810,7 +1831,7 @@ QString TciProtocol::handleModulationCommand(const QStringList& args)
         // MW0LGE_22b mods are uppcase on the sun, replicate
         // From Thetis TCIServer.cs:2155 [v2.10.3.13] — sendMode format string.
         // Upstream tags preserved: //MW0LGE (from cited TCIServer.cs:2154) [v2.10.3.15]
-        m_pendingNotifications << QStringLiteral("modulation:%1,%2;").arg(rx).arg(modeOut);
+        m_pendingNotifications << buildModulationLine(rx, modeOut);
         return {};
     }
 

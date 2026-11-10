@@ -6470,6 +6470,40 @@ void MainWindow::buildUI()
             const double clampedBw = (currentBw > rateHz) ? rateHz : currentBw;
             activeSpectrumWidget()->setFrequencyRange(freq, clampedBw);
         }
+
+        // Jeder Pan, nicht nur der aktive (2026-11-10).
+        //
+        // Ein Ratenwechsel auf der Radio-Info-Seite (RadioModel::
+        // setSampleRateLive) stellt den Zuteiler um, ohne
+        // streamCentreChanged zu senden -- dieses Signal ist die einzige
+        // Nachricht davon. Bis hierher bekam nur der aktive Pan die neue
+        // Rate: jeder andere zeichnete die neuen Bins mit der alten Rate,
+        // also um den Faktor alt/neu zu breit oder zu schmal, und
+        // m_streamWindows behielt die alte Rate, die applyStreamWindowToPan
+        // beim naechsten Scheibenwechsel wieder einspielte.
+        //
+        // Jede Anzeige folgt der Rate ihres eigenen Empfaengers:
+        //   From Thetis console.cs:19848,19889 [@852bf0e]
+        //     Display.SampleRateRX1 = value; ... Display.SampleRateRX2 = value;
+        // Uebernommen aus Upstream NereusSDR a617cdb43 (Issue 701, J.J.
+        // Boyd KG4VCF), auf unseren Baum zugeschnitten: die Rate jedes
+        // Stroms kommt aus dem Zuteiler, und jeder Pan auf ihm geht durch
+        // applyStreamWindowToPan, das auch die Spanne begrenzt.
+        if (m_radioModel) {
+            for (auto it = m_streamWindows.begin(); it != m_streamWindows.end(); ++it) {
+                const int rate = m_radioModel->streamSampleRateHz(it.key());
+                if (rate > 0) {
+                    it->sampleRateHz = rate;
+                }
+            }
+            if (auto* router = m_radioModel->fftRouter()) {
+                for (auto it = m_streamWindows.cbegin(); it != m_streamWindows.cend(); ++it) {
+                    for (const QString& panId : router->pansForReceiver(it.key())) {
+                        applyStreamWindowToPan(panId, it.key());
+                    }
+                }
+            }
+        }
     });
     // Spectrum/waterfall FPS — load persisted value (default 30), apply to
     // BOTH the FFT engine (row production cadence) and the SpectrumWidget

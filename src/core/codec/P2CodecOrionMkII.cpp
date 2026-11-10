@@ -1170,9 +1170,24 @@ DdcAssignment P2CodecOrionMkII::applyDdcAssignment(
     //
     // DDC6 ist an diesem Geraet nicht mitgeschnitten. DDC4 bleibt in der
     // Tabelle, damit ein fuenfter Strom noch einen Empfaenger bekommt.
+    //
+    // 2026-11-10: die Reihenfolge ist ein Wunsch, kein Versprechen. Die
+    // Gateware-Zahl NR wechselt zwischen Firmware-Staenden; was das Geraet
+    // nicht hat (ctx.ddcIndexLimit, aus Discovery-Byte 20), faellt heraus:
+    // gemeldet 5 ergibt DDC2, DDC3, DDC4; gemeldet 8 oder nichts behaelt die
+    // ganze Reihe. Upstream NereusSDR a15d7a80a (#764, J.J. Boyd KG4VCF),
+    // Bank 2026-11-06 an einer Anvelina Pro 3 mit Gateware 22.15: DDC5 und
+    // DDC6 liefern dort nichts.
     static constexpr int kAnvelinaStreamToDdc[5] = {2, 3, 5, 6, 4};
-    const int* const streamToDdc = (ctx.model == HPSDRModel::ANVELINAPRO3)
+    const int* const preferredDdcs = (ctx.model == HPSDRModel::ANVELINAPRO3)
         ? kAnvelinaStreamToDdc : kStreamToDdc;
+    int streamToDdc[5] = {};
+    int usableStreams = 0;
+    for (int i = 0; i < 5; ++i) {
+        if (ctx.ddcIndexLimit <= 0 || preferredDdcs[i] < ctx.ddcIndexLimit) {
+            streamToDdc[usableStreams++] = preferredDdcs[i];
+        }
+    }
 
     // ADC control from Thetis console.cs:8249 [v2.10.3.15]:
     //   cntrl1 = rx_adc_ctrl1 & 0xff;  (default rx_adc_ctrl1=4, console.cs:15099)
@@ -1193,6 +1208,9 @@ DdcAssignment P2CodecOrionMkII::applyDdcAssignment(
     // (DDC5, DDC6, DDC4 auf einer Anvelina Pro 3; siehe kAnvelinaStreamToDdc).
     for (int i = 0; i < 5; ++i) {
         if (!slices[i].live) { continue; }
+        // Der Strom-Pool ist passend klein (RadioModel::connectToRadio);
+        // kommt trotzdem ein Strom jenseits an, bekommt er keinen DDC.
+        if (i >= usableStreams) { continue; }
         const int ddc = streamToDdc[i];
         // Phase 3F Sub-Epic I Task 7b: publish the mapping explicitly.
         a.streamDdc[i] = ddc;

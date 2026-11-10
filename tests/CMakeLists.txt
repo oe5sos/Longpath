@@ -339,6 +339,9 @@ longpath_add_test(tst_noise_floor_tracker)
 # Auto AGC-T misst nicht beim Senden; TransmitModel-MOX folgt dem
 # MoxController (2026-11-10, aus Upstream NereusSDR e5b3997bc / #720).
 longpath_add_test(tst_auto_agc_beim_senden)
+# Abgleich mit Upstream 2026.11.x (2026-11-10): TUNE/Zweiton-Leistung je
+# Band, TCI CWL/CWU als CW, Anvelina-DDC-Grenze aus Discovery-Byte 20.
+longpath_add_test(tst_abgleich_2026_11)
 # RX-Messwerte: PB SNR nach Thetis, feste Zahlenbreite (2026-09-27).
 longpath_add_test(tst_rx_meter_readings)
 longpath_add_test(tst_clarity_controller)

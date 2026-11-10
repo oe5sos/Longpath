@@ -9556,12 +9556,22 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     // returns 1 until isConnected() is true, and m_connection is not
     // assigned until further down this function.
     const int poolSlices = caps.maxSlices > 0 ? caps.maxSlices : 1;
-    configureStreamPool(caps.userDdcCount, poolSlices, wdspInputRate);
+    // 2026-11-10: wo das Geraet meldet, welche DDCs es hat, kommt der Pool
+    // nicht darueber hinaus -- DDC0 und DDC1 sind auf diesen Platinen
+    // reserviert und gehen von der Grenze ab (gemeldet 5 -> drei Stroeme,
+    // DDC2 bis DDC4). Upstream NereusSDR a15d7a80a (#764).
+    constexpr int kReservedDdcs = 2;
+    const int ddcLimit = BoardCapsTable::ddcIndexLimit(
+        caps, info.protocol == ProtocolVersion::Protocol2, info.reportedReceivers);
+    const int poolStreams = ddcLimit > 0
+        ? std::min(caps.userDdcCount, ddcLimit - kReservedDdcs)
+        : caps.userDdcCount;
+    configureStreamPool(poolStreams, poolSlices, wdspInputRate);
 
     // One ReceiverManager receiver per stream. Receiver 0 was created above
     // with the board's primary-DDC mapping; the rest are auto-assigned and
     // stay inactive until a slice binds to them.
-    for (int st = 1; st < caps.userDdcCount; ++st) {
+    for (int st = 1; st < poolStreams; ++st) {
         if (m_receiverManager->receiverConfig(st).receiverIndex < 0) {
             m_receiverManager->createReceiver();
         }
@@ -9573,7 +9583,10 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     // is also where Slice B and friends come back.
     bindUnboundSlices();
 
-    qCInfo(lcConnection) << "Sub-Epic I: streams=" << caps.userDdcCount
+    qCInfo(lcConnection) << "Sub-Epic I: streams=" << poolStreams
+                         << "(Tabelle" << caps.userDdcCount
+                         << ", Geraet meldet" << info.reportedReceivers
+                         << "Empfaenger)"
                          << "channels=" << poolSlices;
 
     // 3M-1a G.1 fixup: explicit disconnect in teardownConnection() prevents
@@ -16916,6 +16929,8 @@ void RadioModel::setTune(bool on)
         // Cite: console.cs:30033 [v2.10.3.13]: PreviousPWR = ptbPWR.Value;
         //   //MW0LGE_22b  [original inline comment from console.cs:30033]
         m_savedPowerPct = m_transmitModel.power();
+        m_savedPowerBand = txSlice ? bandFromFrequency(txSlice->frequency())
+                                   : m_lastBand;
 
         // ── COMPUTE tune-tone frequency (sign-selected by current DSP mode) ────
         // Cite: console.cs:30024-30037 [v2.10.3.13] — switch on Audio.TXDSPMode.
@@ -18265,11 +18280,31 @@ void RadioModel::completeTuneOff()
     // bFromTune=false routes through txMode 0 (drive-slider source)
     // since TUN is now off and the user's saved drive-slider value
     // is the canonical post-restore source.
-    m_transmitModel.setPower(m_savedPowerPct);
+    //
+    // 2026-11-10: nur noch unter FIXED und nur auf dem Band, auf dem TUNE
+    // begann. Thetis stellt PWR ausschliesslich unter FIXED zurueck:
+    //   From Thetis console.cs:30110-30115 [@852bf0e]
+    //     //MW0LGE_22b
+    //     if (_tuneDrivePowerSource == DrivePowerSource.FIXED)
+    //     {
+    //         PWRSliderLimitEnabled = true;
+    //         PWR = PreviousPWR;
+    //     }
+    // Hier stand das Zuruecksetzen ohne Bedingung. Mit der Vorgabe
+    // DriveSlider hiess das: ein Bandwechsel waehrend TUNE oder in den
+    // ~130 ms bis hierher setzte PWR auf den Wert des neuen Bandes, und
+    // diese Zeile schrieb den des alten darueber -- die txMode-0-Rechnung
+    // unten legte ihn dann als Antrieb des NEUEN Bandes auf die Platte.
+    // Die Band-Bedingung ist eine Abweichung von Thetis (das den Fehler
+    // unter FIXED teilt), wie Upstream NereusSDR 3314e6599.
     const SliceModel* const txSlice = txBoundSlice();
     const Band offBand = txSlice
                             ? bandFromFrequency(txSlice->frequency())
                             : m_lastBand;
+    if (m_transmitModel.tuneDrivePowerSource() == DrivePowerSource::Fixed
+        && offBand == m_savedPowerBand) {
+        m_transmitModel.setPower(m_savedPowerPct);
+    }
     if (m_paProfileManager) {
         const PaProfile* activeProfile = m_paProfileManager->activeProfile();
         if (activeProfile) {
@@ -19551,6 +19586,12 @@ Longpath::CodecContext RadioModel::currentCodecContext() const
     // Pro 3 meldet sich als OrionMkII; nur dieses Feld unterscheidet sie
     // (siehe kAnvelinaStreamToDdc in P2CodecOrionMkII.cpp).
     ctx.model = m_hardwareProfile.model;
+    // Welche DDCs das Geraet hat -- aus demselben RadioInfo wie der Pool,
+    // damit Pool und Codec sich auf jedem Verbindungsweg einig sind.
+    ctx.ddcIndexLimit = BoardCapsTable::ddcIndexLimit(
+        boardCapabilities(),
+        m_lastRadioInfo.protocol == ProtocolVersion::Protocol2,
+        m_lastRadioInfo.reportedReceivers);
 
     if (m_ddcCtxForTest) {
         ctx.mox           = m_ddcCtxMoxForTest;

@@ -128,6 +128,12 @@ struct RadioInfo {
     QString firmwareText;
     int adcCount{1};                     // Derived from boardType (1 or 2)
     int maxReceivers{4};                 // Board-dependent max simultaneous RX
+    // Die Empfaengerzahl, die das Geraet selbst in Byte 20 meldet, 0 wenn es
+    // keine meldet (Byte 0, kurze Antwort, von Hand eingetragen oder aus der
+    // gespeicherten Liste). maxReceivers traegt dann die Tabellen-Vorgabe;
+    // dieses Feld haelt beides auseinander, damit der Strom-Pool der Zahl
+    // des Geraets folgen kann (BoardCapsTable::ddcIndexLimit). 2026-11-10.
+    int reportedReceivers{0};
 
     // Protocol
     ProtocolVersion protocol{ProtocolVersion::Protocol1};
