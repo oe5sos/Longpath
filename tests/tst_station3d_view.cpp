@@ -1,0 +1,122 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// tests/tst_station3d_view.cpp  (Longpath)
+//
+// Longpath-original. No Thetis port.
+// no-port-check: Longpath-original.
+//
+// Die WebEngine-Fassung der 3D-Flaeche, so weit es ohne Bildschirm und
+// ohne Netz geht (nur gebaut, wenn Qt WebEngine gefunden wurde):
+//
+//   * die Deutung der Meldungen aus der Seite (Googles Absage -> Satz,
+//     Schluesselproblem ja/nein) -- ohne Seite, direkt gefuettert,
+//   * die echte Seite in einem echten Chromium, aber mit einer
+//     unerreichbaren CesiumJS-Quelle: sie muss ihr Scheitern ueber die
+//     Konsole melden, und die Flaeche muss es als failed() weitergeben.
+//     Das prueft die Bruecke Seite -> C++ und den Rueckfallweg.
+//
+// Mit LONGPATH_NETZ_3D=1 laedt der letzte Fall CesiumJS wirklich vom CDN
+// (festgenagelt, SRI) und wartet auf "ready" -- oder auf die ehrliche
+// Absage "webgl", wenn die Darstellung ohne Bildschirm kein WebGL hat.
+
+#include <QtTest>
+
+#include "gui/widgets/Station3dView.h"
+
+#include <QSignalSpy>
+
+using namespace Longpath;
+
+class TstStation3dView : public QObject { Q_OBJECT
+private slots:
+    void google_refusal_from_the_page_is_a_key_problem()
+    {
+        Station3dView v(nullptr, QStringLiteral("http://127.0.0.1:9/"));
+        QSignalSpy failed(&v, &Station3dSurface::failed);
+        v.handlePageMessage(QStringLiteral(
+            "{\"event\":\"failed\",\"kind\":\"tiles\",\"status\":403,\"body\":"
+            "\"{\\\"error\\\":{\\\"code\\\":403,\\\"message\\\":\\\"x\\\",\\\"status\\\":"
+            "\\\"PERMISSION_DENIED\\\",\\\"details\\\":[{\\\"reason\\\":\\\"SERVICE_DISABLED\\\"}]}}\","
+            "\"message\":\"Request has failed. Status Code: 403\"}"));
+        QCOMPARE(failed.count(), 1);
+        QVERIFY2(failed.at(0).at(0).toString().contains(QLatin1String("Map Tiles API")),
+                 qPrintable(failed.at(0).at(0).toString()));
+        QCOMPARE(failed.at(0).at(1).toBool(), true);
+
+        // Kein HTTP-Status: Netz, kein Schluesselproblem.
+        v.handlePageMessage(QStringLiteral(
+            "{\"event\":\"failed\",\"kind\":\"tiles\",\"status\":0,\"body\":\"\","
+            "\"message\":\"offline\"}"));
+        QCOMPARE(failed.count(), 2);
+        QCOMPARE(failed.at(1).at(1).toBool(), false);
+
+        // "ready" holt einen wartenden Flug nach; "arrived" wird gemeldet.
+        QSignalSpy ready(&v, &Station3dView::ready);
+        QSignalSpy arrived(&v, &Station3dSurface::arrived);
+        v.handlePageMessage(QStringLiteral("{\"event\":\"ready\",\"cesium\":\"1.146\"}"));
+        QCOMPARE(ready.count(), 1);
+        QVERIFY(v.isReadyForTest());
+        v.handlePageMessage(QStringLiteral("{\"event\":\"arrived\",\"ground\":312.5}"));
+        QCOMPARE(arrived.count(), 1);
+    }
+
+    void unreachable_cesium_is_reported_by_the_real_page()
+    {
+        // Port 9 (discard) auf der eigenen Maschine: niemand hoert dort,
+        // die Anfrage scheitert sofort und ohne Netz nach aussen.
+        Station3dView v(nullptr, QStringLiteral("http://127.0.0.1:9/cesium/"));
+        v.resize(400, 300);
+        QSignalSpy failed(&v, &Station3dSurface::failed);
+        v.show();
+        QTRY_VERIFY_WITH_TIMEOUT(failed.count() >= 1, 25000);
+        const QString why = failed.at(0).at(0).toString();
+        QVERIFY2(why.contains(QLatin1String("CesiumJS")), qPrintable(why));
+        QCOMPARE(failed.at(0).at(1).toBool(), false);
+        QVERIFY(!v.isReadyForTest());
+
+        // Ein Flug auf eine tote Seite faellt sofort zurueck, statt zu warten.
+        Station3dFlight f;
+        f.call = QStringLiteral("W1AW");
+        v.fly(f);
+        QTRY_COMPARE_WITH_TIMEOUT(failed.count(), 2, 2000);
+    }
+
+    void real_cesium_from_the_cdn()
+    {
+        if (qEnvironmentVariable("LONGPATH_NETZ_3D") != QLatin1String("1")) {
+            QSKIP("LONGPATH_NETZ_3D=1 laedt CesiumJS wirklich vom CDN");
+        }
+        Station3dView v;
+        v.resize(640, 400);
+        QSignalSpy ready(&v, &Station3dView::ready);
+        QSignalSpy failed(&v, &Station3dSurface::failed);
+        v.show();
+        QTRY_VERIFY_WITH_TIMEOUT(ready.count() + failed.count() >= 1, 60000);
+        if (failed.count() > 0) {
+            const QString why = failed.at(0).at(0).toString();
+            qInfo() << "page reported:" << why;
+            // Ohne Bildschirm darf WebGL fehlen -- aber CesiumJS muss
+            // geladen sein (SRI passt, CDN erreichbar).
+            QVERIFY2(why.contains(QLatin1String("WebGL")), qPrintable(why));
+            return;
+        }
+
+        // Ein Flug mit einem ERFUNDENEN Schluessel: Google lehnt ab, und
+        // die Absage muss den ganzen Weg zurueck -- CesiumJS-Fehler ->
+        // Konsole -> interpret() -- als Schluesselproblem ankommen.
+        Station3dFlight f;
+        f.call = QStringLiteral("W1AW");
+        f.lat = 41.7147; f.lon = -72.7272;
+        f.hasHome = true; f.homeLat = 48.3; f.homeLon = 14.5;
+        f.km = 6700; f.bearingDeg = 296;
+        f.apiKey = QStringLiteral("AIzaPruefstandNichtEchtXXXXXXXXXXXXXXXX");
+        v.fly(f);
+        QTRY_VERIFY_WITH_TIMEOUT(failed.count() >= 1, 30000);
+        const QString why = failed.at(0).at(0).toString();
+        qInfo() << "Google with an invented key:" << why;
+        QVERIFY2(why.contains(QLatin1String("does not know this key")), qPrintable(why));
+        QCOMPARE(failed.at(0).at(1).toBool(), true);
+    }
+};
+
+QTEST_MAIN(TstStation3dView)
+#include "tst_station3d_view.moc"

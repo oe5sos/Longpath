@@ -246,6 +246,7 @@ warren@wpratt.com
 #include "gui/MacVollflaeche.h"
 #include "gui/DxccSpotColours.h"
 #include "gui/ScopedChildWidget.h"
+#include "gui/Google3dSetupDialog.h"
 #include "gui/styles/ThemeQss.h"
 #include "ConnectionPanel.h"
 #include "NetworkDiagnosticsDialog.h"
@@ -13337,6 +13338,19 @@ void MainWindow::buildMenuBar()
             "Set up Cloudlog / Wavelog and a local logger such as Log4OM."));
         connect(svcAction, &QAction::triggered,
                 this, &MainWindow::openLoggingServicesDialog);
+    }
+
+    // Der eigene Google-Schluessel fuer den 3D-Flug im Logbuch
+    // (2026-11-10). Optional; ohne ihn bleibt die Karte bei NASA.
+    {
+        QAction* g3dAction =
+            toolsMenu->addAction(QStringLiteral("Google &3D map..."));
+        g3dAction->setObjectName(QStringLiteral("actGoogle3dMap"));
+        g3dAction->setToolTip(QStringLiteral(
+            "Optional: your own Google key, so looked-up stations are shown "
+            "in photorealistic 3D, down to the house and the antenna."));
+        connect(g3dAction, &QAction::triggered, this,
+                [this]() { Google3dSetupDialog::showFor(this); });
     }
 
     // Phase 3J-2 H1: FreeDV Reporter live station map.

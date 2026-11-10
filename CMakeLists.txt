@@ -1201,6 +1201,8 @@ set(GUI_SOURCES
     src/gui/SettingsBackupDialog.cpp
     src/gui/widgets/RxProfilePopup.cpp
     src/gui/QsoMapWindow.cpp
+    src/gui/Google3dSetupDialog.cpp
+    src/gui/widgets/Station3dSurface.cpp
     src/core/DxccFlag.cpp
     src/core/SolarTimes.cpp
     src/core/AdifLog.cpp
@@ -1208,6 +1210,7 @@ set(GUI_SOURCES
     src/core/WorkedBefore.cpp
     src/core/LogFilter.cpp
     src/core/CredentialStore.cpp
+    src/core/GoogleMapTiles.cpp
     src/core/QrzClient.cpp
     src/core/QrzLogbookUploader.cpp
     src/core/QrzLogbookFetcher.cpp
@@ -1479,6 +1482,45 @@ if(LONGPATH_LTO_AVAILABLE)
         INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
 else()
     target_link_libraries(Longpath PRIVATE LongpathObjs)
+endif()
+
+# ── Qt WebEngine: der 3D-Flug im Logbuch (2026-11-10) ──────────────────
+#
+# Betreiber: das Logbuch soll herausstechen -- nach dem Rufzeichen fliegt
+# eine Ansicht mit Googles fotorealistischen 3D-Kacheln bis aufs Dach der
+# Station. Dafuer CesiumJS in einem QWebEngineView.
+#
+# OPTIONAL, und zwar mit Absicht (anders als WebSockets oben): ohne
+# WebEngine faellt nichts weg, was der Bediener schon hatte -- die Karte
+# fliegt wie bisher ueber NASA-Bilder und bietet „View in Google Earth".
+# Homebrew-Qt auf dem Mac hat WebEngine, die Linux- und Windows-Laeufer
+# der CI nicht. -DLONGPATH_WEBENGINE=OFF schaltet es auch dort ab, wo es
+# da waere.
+#
+# Eine EIGENE kleine Bibliothek statt LongpathObjs: daran haengt jeder der
+# ~600 Pruefstaende, und keiner davon soll WebEngine mitlinken. Die Karte
+# kennt nur die Schnittstelle Station3dSurface; main.cpp meldet die
+# WebEngine-Fassung beim Start an (Station3dView::registerFactory).
+option(LONGPATH_WEBENGINE
+       "Build the Google 3D fly-to view in the logbook map (needs Qt WebEngine)" ON)
+set(LONGPATH_HAS_WEBENGINE OFF)
+if(LONGPATH_WEBENGINE)
+    find_package(Qt6 QUIET COMPONENTS WebEngineWidgets)
+    if(Qt6WebEngineWidgets_FOUND)
+        set(LONGPATH_HAS_WEBENGINE ON)
+    endif()
+endif()
+if(LONGPATH_HAS_WEBENGINE)
+    message(STATUS "Qt6::WebEngineWidgets found — Google 3D fly-to enabled")
+    add_library(LongpathWeb3d STATIC src/gui/widgets/Station3dView.cpp)
+    target_include_directories(LongpathWeb3d PUBLIC ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(LongpathWeb3d PUBLIC
+        Qt6::Core Qt6::Widgets Qt6::Network Qt6::WebEngineWidgets)
+    target_compile_definitions(LongpathWeb3d PUBLIC LONGPATH_HAS_WEBENGINE=1)
+    target_link_libraries(Longpath PRIVATE LongpathWeb3d)
+else()
+    message(STATUS "Qt6::WebEngineWidgets not found or disabled — Google 3D "
+                   "fly-to off (NASA imagery + Google Earth button instead)")
 endif()
 
 # ── Das Contestprogramm als Fenster in Longpath (2026-11-04) ──────────────

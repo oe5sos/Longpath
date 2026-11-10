@@ -21,6 +21,9 @@
 #include "core/mmio/ExternalVariableEngine.h"
 #include "core/LogCategories.h"
 #include "core/DevAutomationServer.h"
+#ifdef LONGPATH_HAS_WEBENGINE
+#include "gui/widgets/Station3dView.h"
+#endif
 
 // Generated into the build tree by cmake/LongpathBuildTag.cmake, once per
 // build, so LONGPATH_BUILD_TAG names the commit actually being compiled
@@ -665,6 +668,12 @@ int main(int argc, char* argv[])
         static QElapsedTimer startUhr;
         startUhr.start();
 
+#ifdef LONGPATH_HAS_WEBENGINE
+        // Der 3D-Flug im Logbuch (2026-11-10): mit Qt WebEngine gebaut,
+        // also darf die Karte die Google-3D-Flaeche bauen. Erzeugt wird
+        // sie erst beim ersten Flug, nicht hier.
+        Longpath::Station3dView::registerFactory();
+#endif
         Longpath::MainWindow window;
         const qint64 nachKonstruktor = startUhr.elapsed();
 
