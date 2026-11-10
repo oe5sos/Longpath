@@ -153,8 +153,8 @@ QString TstLogbuchBlaetter::feldVon(const LogEntry& e, bool nurLocator, bool* au
     if (ausLand) { *ausLand = true; }
     const DxccEntity* d = m_cty.entityByPrefix(land(e.call));
     if (!d) { return {}; }
-    // cty.dat schreibt Laengen positiv nach WESTEN.
-    return gridSquareFromLatLon(d->latitude, -d->longitude);
+    // DxccEntity::longitude ist schon OST-positiv (CtyDatParser dreht um).
+    return gridSquareFromLatLon(d->latitude, d->longitude);
 }
 
 // ── A  Bedarfs-Matrix ────────────────────────────────────────────────
@@ -228,7 +228,7 @@ void TstLogbuchBlaetter::zeichneBedarf(const QString& datei, const QString& call
     // Links: Land, Entfernung, dieses Rufzeichen.
     double km = 0.0, grad = 0.0;
     if (d) {
-        const QString feld = gridSquareFromLatLon(d->latitude, -d->longitude);
+        const QString feld = gridSquareFromLatLon(d->latitude, d->longitude);
         km = calculateDistanceKm(kMeinFeld, feld);
         grad = calculateBearingInDegrees(kMeinFeld, feld);
     }

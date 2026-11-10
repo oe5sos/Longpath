@@ -18,7 +18,8 @@
 //   5. Im Logbuch-Fenster: Stats -> ↗ -> Reiter, mit echten Maus-
 //      ereignissen; jede der drei Seiten rechnet, was die Filter zeigen.
 //   6. Renderfall (nur mit LONGPATH_LOGBOOK_FIXTURE + LONGPATH_GRAB_DIR):
-//      die drei Seiten aus einer Kopie des echten Logs als PNG.
+//      die drei Seiten (und die Richtungen) aus einer Kopie des echten
+//      Logs als PNG.
 
 #include <QtTest/QtTest>
 #include <QApplication>
@@ -416,16 +417,16 @@ private slots:
         QDialog* d = w.statistikDialogForTest();
         QVERIFY(d);
         d->resize(1240, 820);
-        const QStringList namen = {QStringLiteral("2-sonnenzyklus"), QStringLiteral("3-kontinent-uhr"),
-                                   QStringLiteral("4-dxcc-wand")};
-        for (int s = 3; s <= 5; ++s) {
+        const QStringList namen = {QStringLiteral("1-richtungen"), QStringLiteral("2-sonnenzyklus"),
+                                   QStringLiteral("3-kontinent-uhr"), QStringLiteral("4-dxcc-wand")};
+        for (int s = 2; s <= 5; ++s) {
             w.zeigeStatistikSeiteForTest(s);
             QTest::qWait(150);
             QImage bild(d->size() * 2, QImage::Format_ARGB32_Premultiplied);
             bild.setDevicePixelRatio(2.0);
             bild.fill(Qt::black);
             d->render(&bild);
-            QVERIFY(bild.save(aus + QStringLiteral("/") + namen[s - 3] + QStringLiteral(".png")));
+            QVERIFY(bild.save(aus + QStringLiteral("/") + namen[s - 2] + QStringLiteral(".png")));
         }
         qInfo().noquote() << "Wand:" << w.dxccWandForTest()->titel()
                           << "| Uhr:" << w.kontinentUhrForTest()->daten().gesamt
