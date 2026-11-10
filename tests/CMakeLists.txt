@@ -336,6 +336,9 @@ longpath_add_test(tst_clarity_defaults)
 # ── Phase 3G-9c Clarity adaptive display tuning ──────────────────────────
 longpath_add_test(tst_noise_floor_estimator)
 longpath_add_test(tst_noise_floor_tracker)
+# Auto AGC-T misst nicht beim Senden; TransmitModel-MOX folgt dem
+# MoxController (2026-11-10, aus Upstream NereusSDR e5b3997bc / #720).
+longpath_add_test(tst_auto_agc_beim_senden)
 # RX-Messwerte: PB SNR nach Thetis, feste Zahlenbreite (2026-09-27).
 longpath_add_test(tst_rx_meter_readings)
 longpath_add_test(tst_clarity_controller)

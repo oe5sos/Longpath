@@ -16,6 +16,12 @@
 //                 GPLv3).
 //   2026-09-27 -- cwPitch()/setCwPitch()/cwPitchChanged(int) (Martin
 //                 Fischer, OE5SOS, AI-assisted via Anthropic Claude).
+//   2026-11-10 -- Auto AGC-T misst nicht mehr beim Senden: Messabschnitte
+//                 (autoAgcAcquisitionEpoch, rawIqDataForAutoAgc), aus
+//                 Upstream NereusSDR e5b3997bc (#720, J.J. Boyd KG4VCF);
+//                 dazu folgt der MOX-Riegel des TransmitModel jetzt dem
+//                 MoxController. Martin Fischer (OE5SOS), KI-gestuetzt mit
+//                 Anthropic Claude Code.
 // =================================================================
 
 //=================================================================
@@ -146,6 +152,7 @@
 #include <algorithm>  // std::clamp (used by computeWireDriveForTest)
 #include <array>      // std::array (HL2 temp averaging ring)
 #include <memory>  // std::unique_ptr
+#include <atomic>
 #include <optional>
 
 namespace Longpath {
@@ -1064,16 +1071,26 @@ public:
     // Implementation in RadioModel.cpp.
     void setStepAttController(class StepAttenuatorController* c);
     NoiseFloorTracker* noiseFloorTracker() const { return m_noiseFloorTracker; }
-    void setNoiseFloorTracker(NoiseFloorTracker* t) { m_noiseFloorTracker = t; }
+    void setNoiseFloorTracker(NoiseFloorTracker* t);
+
+    /// Messabschnitt fuer Auto AGC-T (Upstream NereusSDR e5b3997bc, #720).
+    /// Ungerade: gesperrt -- keine Verbindung, MOX, oder der MoxController
+    /// ist nicht in Rx (also auch der Weg hinein und heraus). Gerade: es
+    /// wird empfangen. Jeder Wechsel zaehlt eins weiter; forkIqToTaps
+    /// stempelt jeden I/Q-Block mit dem Stand beim Eintreffen.
+    quint64 autoAgcAcquisitionEpoch() const noexcept {
+        return m_autoAgcAcquisitionEpoch.load();
+    }
+    bool autoAgcAcquisitionInhibited() const noexcept {
+        return (autoAgcAcquisitionEpoch() & 1U) != 0;
+    }
 
     /// Register the tracker measuring one DDC stream's band.
     ///
     /// Auto AGC-T derives its threshold from the noise floor, so a slice has
     /// to measure the band it is on. With one shared tracker (stream 0's), a
     /// 20m slice would take its threshold from 40m's noise floor.
-    void setStreamNoiseFloorTracker(int streamIndex, NoiseFloorTracker* t) {
-        if (t) { m_streamNoiseFloors.insert(streamIndex, t); }
-    }
+    void setStreamNoiseFloorTracker(int streamIndex, NoiseFloorTracker* t);
 
     /// The tracker for this slice's stream, falling back to the global one
     /// when the slice is unbound or its stream has no tracker yet.
@@ -3009,6 +3026,13 @@ signals:
     // reach its own engine (and from there its own panadapter).
     // Emitted from the same Connection-thread fork as rawIqData.
     void rawIqDataForStream(int streamIndex, const QVector<float>& samples);
+    // Derselbe Block mit dem Messabschnitt, den er beim Eintreffen auf dem
+    // Verbindungsfaden hatte -- bevor eine Warteschlange dazwischenkommt.
+    // Upstream NereusSDR e5b3997bc (#720).
+    void rawIqDataForAutoAgc(int streamIndex, const QVector<float>& samples,
+                             quint64 epoch);
+    // Der Messabschnitt hat gewechselt (siehe autoAgcAcquisitionEpoch).
+    void autoAgcAcquisitionChanged(quint64 epoch);
 
     // Phase 3Q-6: forwarded from the active RadioConnection::frameReceived()
     // so TitleBar::ConnectionSegment can pulse its activity LED without
@@ -4535,6 +4559,10 @@ private:
 
     // From Thetis v2.10.3.13 console.cs:46057 — tmrAutoAGC (500ms interval)
     QTimer* m_autoAgcTimer{nullptr};
+    // Start: gesperrt (1), bis eine Verbindung steht. Atomar, weil
+    // forkIqToTaps ihn auf dem Verbindungsfaden liest.
+    std::atomic<quint64> m_autoAgcAcquisitionEpoch{1};
+    void refreshAutoAgcAcquisition();
     NoiseFloorTracker* m_noiseFloorTracker{nullptr};
     QMap<int, NoiseFloorTracker*> m_streamNoiseFloors;
     // Task 3.1 view hook — non-owning, set by MainWindow.

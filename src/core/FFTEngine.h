@@ -12,6 +12,12 @@
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
+//   2026-11-10 — Messabschnitt je I/Q-Block fuer Auto AGC-T: ein Bild
+//                 geht nur dann an den Rauschbodenmesser, wenn sein ganzes
+//                 Fenster aus EINEM Empfangsabschnitt stammt. Anzeige und
+//                 Bilder bleiben unveraendert. Uebernommen aus Upstream
+//                 NereusSDR e5b3997bc (#720, J.J. Boyd KG4VCF). Martin
+//                 Fischer (OE5SOS), KI-gestuetzt mit Anthropic Claude Code.
 // =================================================================
 
 //=================================================================
@@ -194,6 +200,12 @@ public slots:
     // Format: [I0, Q0, I1, Q1, ...] as float pairs.
     // Accumulates until fftSize samples are collected, then runs FFT.
     void feedIQ(const QVector<float>& interleavedIQ);
+    /// Wie feedIQ(), dazu die Nummer des Messabschnitts, in dem der Block
+    /// AUF DEM VERBINDUNGSFADEN ankam (RadioModel::forkIqToTaps). Nur der
+    /// Rauschbodenmesser fuer Auto AGC-T liest sie; Proben, Anzeige und
+    /// Bilder sind dieselben. Ein Block ueber feedIQ() zaehlt als
+    /// gesperrter Abschnitt (1). Upstream NereusSDR e5b3997bc (#720).
+    void feedIQForAutoAgc(const QVector<float>& interleavedIQ, quint64 epoch);
 
     /// Das angefangene Fenster verwerfen — nach einem Loch im Datenstrom.
     ///
@@ -280,6 +292,11 @@ signals:
     // binsDbm contains fftSize float values (full FFT-shifted bins, neg-freq
     // first then pos-freq), representing power in dBm at each frequency bin.
     void fftReady(int receiverId, const QVector<float>& binsDbm);
+    /// Dieselben Bins wie fftReady, aber nur fuer ein Fenster, das ganz aus
+    /// einem Empfangsabschnitt (gerade Nummer) stammt. Ein Bild, in dessen
+    /// Fenster noch Proben aus der Sendezeit liegen, kommt hier nie an.
+    void autoAgcFrameReady(int receiverId, const QVector<float>& binsDbm,
+                           quint64 epoch);
 
     // Linear-power side-channel for the Thetis-faithful display pipeline.
     //
@@ -317,6 +334,7 @@ signals:
     void spectrumSettingsChanged(int receiverId);
 
 private:
+    void feedIQWithAutoAgcEpoch(const QVector<float>& interleavedIQ, quint64 epoch);
     /// Der Vorschub zwischen zwei Bildern, in dezimierten
     /// Eingangspaaren — der Taktmass fuer
     /// kGapResetStallFrameIntervals. NereusSDR-original.
@@ -410,6 +428,11 @@ private:
     // I/Q accumulation buffer (interleaved pairs)
     QVector<float> m_iqBuffer;
     int m_iqWritePos{0};  // write position in sample pairs
+    // Messabschnitt des zuletzt eingespeisten Blocks und wie viele Proben
+    // am Ende des Fensters aus ihm stammen (hoechstens die FFT-Groesse).
+    // Nur auf dem Arbeitsfaden. Upstream NereusSDR e5b3997bc (#720).
+    quint64 m_autoAgcInputEpoch{1};
+    int m_autoAgcCleanSamples{0};
     std::atomic<bool>    m_windowResetPending{false};  // von requestWindowReset()
     std::atomic<quint64> m_windowResets{0};            // nur Diagnose
     std::atomic<quint64> m_windowResetsSkipped{0};     // nur Diagnose

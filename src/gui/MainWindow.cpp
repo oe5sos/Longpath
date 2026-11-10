@@ -3801,10 +3801,17 @@ FFTEngine* MainWindow::createFftEngineForStream(int streamIndex)
     // thread; the alternative -- reading m_fftEngines from the Connection
     // thread -- would need synchronisation AND lose Qt's automatic
     // disconnect-on-destroy, which is what makes this safe at shutdown.
-    connect(m_radioModel, &RadioModel::rawIqDataForStream, engine,
-            [engine, streamIndex](int idx, const QVector<float>& samples) {
+    //
+    // 2026-11-10: ueber rawIqDataForAutoAgc statt rawIqDataForStream --
+    // dieselben Proben, dazu der Messabschnitt, den forkIqToTaps beim
+    // Eintreffen gestempelt hat. Die Anzeige bekommt genau das Gleiche;
+    // nur der Rauschbodenmesser fuer Auto AGC-T sieht den Stempel
+    // (Upstream NereusSDR e5b3997bc, #720).
+    connect(m_radioModel, &RadioModel::rawIqDataForAutoAgc, engine,
+            [engine, streamIndex](int idx, const QVector<float>& samples,
+                                  quint64 epoch) {
         if (idx != streamIndex) { return; }
-        engine->feedIQ(samples);
+        engine->feedIQForAutoAgc(samples, epoch);
     });
 
     // Linear-power frame -> every pan subscribed to this stream.
@@ -3821,10 +3828,12 @@ FFTEngine* MainWindow::createFftEngineForStream(int streamIndex)
     auto* nf = new NoiseFloorTracker;
     m_streamNoiseFloors.insert(streamIndex, nf);
     if (m_radioModel) { m_radioModel->setStreamNoiseFloorTracker(streamIndex, nf); }
-    connect(engine, &FFTEngine::fftReady, this,
-            [nf](int, const QVector<float>& binsDbm) {
+    // Nur Bilder, deren ganzes Fenster aus einem Empfangsabschnitt stammt
+    // (FFTEngine::autoAgcFrameReady) -- nie eines mit Sendesignal darin.
+    connect(engine, &FFTEngine::autoAgcFrameReady, this,
+            [nf](int, const QVector<float>& binsDbm, quint64 epoch) {
         static constexpr float kFrameIntervalMs = 33.0f;
-        nf->feed(binsDbm, kFrameIntervalMs);
+        nf->feedForEpoch(binsDbm, kFrameIntervalMs, epoch);
     });
 
     // TCI-Spektrumstrom: Strom 0 und 1 sind die TCI-Empfaenger 0 und 1.
@@ -6735,10 +6744,11 @@ void MainWindow::buildUI()
     auto* nfTracker = new NoiseFloorTracker;
     m_radioModel->setNoiseFloorTracker(nfTracker);
 
-    connect(primaryFftEngine(), &FFTEngine::fftReady,
-            this, [nfTracker](int /*rxId*/, const QVector<float>& binsDbm) {
+    connect(primaryFftEngine(), &FFTEngine::autoAgcFrameReady,
+            this, [nfTracker](int /*rxId*/, const QVector<float>& binsDbm,
+                              quint64 epoch) {
         static constexpr float kFrameIntervalMs = 33.0f;
-        nfTracker->feed(binsDbm, kFrameIntervalMs);
+        nfTracker->feedForEpoch(binsDbm, kFrameIntervalMs, epoch);
     });
 
     // Max Bin detector: feed FFTEngine dBm bins into WdspEngine's Longpath-native

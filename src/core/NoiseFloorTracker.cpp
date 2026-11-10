@@ -10,6 +10,10 @@
 //   2026-04-16 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
+//   2026-11-10 — Messabschnitte (Epochen), siehe NoiseFloorTracker.h.
+//                 Uebernommen aus Upstream NereusSDR e5b3997bc (#720,
+//                 J.J. Boyd KG4VCF). Martin Fischer (OE5SOS), KI-gestuetzt
+//                 mit Anthropic Claude Code.
 // =================================================================
 
 //=================================================================
@@ -67,11 +71,35 @@ namespace Longpath {
 
 NoiseFloorTracker::NoiseFloorTracker() = default;
 
-void NoiseFloorTracker::feed(const QVector<float>& binsDbm, float frameIntervalMs)
+// Longpath/NereusSDR-original (Upstream NereusSDR e5b3997bc): die Nummer
+// wechselt, der Schaetzwert bleibt.
+void NoiseFloorTracker::setAcquisitionEpoch(quint64 epoch)
 {
-    if (binsDbm.isEmpty()) {
+    if (m_acquisitionEpoch != epoch) {
+        m_acquisitionEpoch = epoch;
+        m_acquisitionCurrent = false;
+    }
+}
+
+void NoiseFloorTracker::feedForEpoch(const QVector<float>& binsDbm,
+                                     float frameIntervalMs, quint64 epoch)
+{
+    // Ein Bild aus einem anderen Abschnitt -- typisch: aus der Sendezeit,
+    // auf dem Spektrumfaden noch unterwegs, als umgeschaltet wurde.
+    if (epoch != m_acquisitionEpoch) {
         return;
     }
+    feed(binsDbm, frameIntervalMs);
+}
+
+void NoiseFloorTracker::feed(const QVector<float>& binsDbm, float frameIntervalMs)
+{
+    // Ungerade: gesperrt (Senden). From Thetis display.cs:5387 [@852bf0e]
+    // -- `if (!local_mox)` um processNoiseFloor.
+    if (binsDbm.isEmpty() || (m_acquisitionEpoch & 1U) != 0) {
+        return;
+    }
+    m_acquisitionCurrent = true;
 
     // Compute bin average
     const float binAverage = std::accumulate(binsDbm.cbegin(), binsDbm.cend(), 0.0f)
