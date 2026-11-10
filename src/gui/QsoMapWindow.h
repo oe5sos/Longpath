@@ -149,6 +149,9 @@ public:
     QPushButton* googleEarthButtonForTest() const { return m_googleEarthBtn; }
     class Station3dSurface* threeDSurfaceForTest() const { return m_3d; }
     int currentViewForTest() const;
+    QWidget* summaryForTest() const;
+    class FlowLayout* pillRowForTest() const { return m_pillRow; }
+    const QVector<QWidget*>& flatOnlyControlsForTest() const { return m_flatOnlyControls; }
     QString infoTextForTest() const;
     /// Statt QDesktopServices: der Pruefstand faengt die URL ab.
     void setUrlOpenerForTest(std::function<void(const QUrl&)> fn) { m_openUrl = std::move(fn); }
@@ -270,6 +273,7 @@ private:
     // while only the selection is shown — a live date field that
     // changes nothing is worse than a disabled one.
     QVector<QWidget*> m_rangeControls;
+    QVector<QWidget*> m_flatOnlyControls;   // im 3D-Bild ausgeblendet
     QWidget*          m_rangeBox{nullptr};
     QWidget*          m_backgroundBox{nullptr};   // KARTE + Auswahl
     QPushButton*      m_earthBtn{nullptr};
@@ -292,6 +296,7 @@ private:
     void on3dFailed(const QString& reason, bool keyProblem);
     void openGoogleEarth();
     void showFlightCard(const QString& extra);
+    void apply3dRoom();   // im 3D-Bild treten Pillen, Zaehlung, Rotor-Grafik zurueck
     QPushButton*      m_3dBtn{nullptr};
     QPushButton*      m_googleEarthBtn{nullptr};
     QWidget*          m_3dHost{nullptr};

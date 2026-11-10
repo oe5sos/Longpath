@@ -67,6 +67,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <utility>
 #include <cmath>
 
 namespace Longpath {
@@ -368,6 +369,11 @@ void QsoMapWindow::buildUi()
     connect(fit, &QPushButton::clicked,
             this, [this]() { resetActiveView(); });
 
+    // Was nur Kugel und flache Karte betrifft -- im 3D-Bild treten diese
+    // Schalter zurueck und geben dem Bild ihre Zeile (apply3dRoom).
+    m_flatOnlyControls << m_onlySelected << m_paths << m_grid << m_imagery
+                       << m_satellites << zoomOut << zoomIn << fit;
+
     m_viewBtn = new QPushButton(QStringLiteral("Flat map"), this);
     m_viewBtn->setStyleSheet(Style::buttonBaseStyle());
     m_viewBtn->setToolTip(QStringLiteral(
@@ -591,7 +597,10 @@ void QsoMapWindow::buildUi()
         }
     });
     connect(m_stack, &QStackedWidget::currentChanged,
-            this, [this](int) { updateRotorRadarVisibility(); });
+            this, [this](int) {
+        updateRotorRadarVisibility();
+        apply3dRoom();
+    });
     connect(m_radar, &DxRadarWidget::pointClicked, this,
             [this](const QString& label, double, double) {
         showStationInfo(label);
@@ -834,6 +843,32 @@ void QsoMapWindow::rebuildFilterPills()
         for (const QString& m : modeList) { addPill(m, m, false); }
     }
     m_pillRow->addStretch();
+    apply3dRoom();   // frisch gebaute Pillen folgen der Ansicht
+}
+
+// ── Platz fuer die 3D-Ansicht (2026-11-10) ───────────────────────────
+//
+// Betreiber nach dem ersten echten Flug: „die groesse der ansicht von 3d
+// muss groesser sein". In der Logbuch-Spalte blieben dem Bild gut 160 von
+// 360 Punkten Hoehe: darueber die Band- und Betriebsarten-Pillen (sie
+// filtern Kontakte auf Kugel und flacher Karte, im 3D-Flug tun sie
+// nichts), darunter die Zaehlung, daneben die kleine Rotor-Grafik. Im
+// 3D-Bild treten alle drei zurueck; die Leiste mit „3D"/„Globe" bleibt,
+// damit man wieder hinauskommt.
+void QsoMapWindow::apply3dRoom()
+{
+    const bool in3d = m_stack && m_stack->currentIndex() == kView3d;
+    if (m_pillRow) {
+        for (int i = 0; i < m_pillRow->count(); ++i) {
+            if (QWidget* w = m_pillRow->itemAt(i)->widget()) { w->setVisible(!in3d); }
+        }
+        m_pillRow->invalidate();
+    }
+    if (m_summary) { m_summary->setVisible(!in3d); }
+    // Live 2026-11-10: in der Logbuch-Spalte war das 3D-Bild ein flacher
+    // Streifen. Die Schalter, die im 3D-Bild nichts tun, geben ihre Zeile
+    // ab; „Fly to call", Globe, Radar, 3D und ↗ bleiben.
+    for (QWidget* w : std::as_const(m_flatOnlyControls)) { w->setVisible(!in3d); }
 }
 
 namespace {
@@ -1424,6 +1459,7 @@ void QsoMapWindow::showFlightCard(const QString& extra)
 // ── 3D-Flug (2026-11-10) ─────────────────────────────────────────────
 
 int QsoMapWindow::currentViewForTest() const { return m_stack->currentIndex(); }
+QWidget* QsoMapWindow::summaryForTest() const { return m_summary; }
 QString QsoMapWindow::infoTextForTest() const { return m_info->text(); }
 
 bool QsoMapWindow::use3d() const
@@ -1567,7 +1603,10 @@ void QsoMapWindow::updateRotorRadarVisibility()
 {
     if (!m_rotorRadar) { return; }
     // Zeigt die Flaeche schon das Radar, waere ein zweites daneben doppelt.
-    const bool bigRadar = m_stack && m_stack->currentIndex() == 2;
+    // Im 3D-Bild gehoert die ganze Breite dem Bild (2026-11-10); wohin die
+    // Station liegt, sagt dort die Anzeige im Bild.
+    const bool bigRadar = m_stack && (m_stack->currentIndex() == 2
+                                      || m_stack->currentIndex() == kView3d);
     // Zu schmal zum Ablesen: dann lieber nur die Karte.
     const bool roomy = width() >= 420;
     m_rotorRadar->setVisible(m_rotorRadarShown && !bigRadar && roomy);
