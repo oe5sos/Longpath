@@ -13306,15 +13306,17 @@ void MainWindow::buildMenuBar()
                 this, &MainWindow::openLoggingServicesDialog);
     }
 
-    // Der eigene Google-Schluessel fuer den 3D-Flug im Logbuch
-    // (2026-11-10). Optional; ohne ihn bleibt die Karte bei NASA.
+    // Der eigene Zugang fuer den 3D-Flug im Logbuch (2026-11-10):
+    // kostenloses Cesium-ion-Konto oder eigener Google-Schluessel.
+    // Optional; ohne ihn bleibt die Karte bei NASA.
     {
         QAction* g3dAction =
             toolsMenu->addAction(QStringLiteral("Google &3D map..."));
         g3dAction->setObjectName(QStringLiteral("actGoogle3dMap"));
         g3dAction->setToolTip(QStringLiteral(
-            "Optional: your own Google key, so looked-up stations are shown "
-            "in photorealistic 3D, down to the house and the antenna."));
+            "Optional: a free Cesium ion account (or your own Google key), so "
+            "looked-up stations are shown in photorealistic 3D, down to the "
+            "house and the antenna."));
         connect(g3dAction, &QAction::triggered, this,
                 [this]() { Google3dSetupDialog::showFor(this); });
     }

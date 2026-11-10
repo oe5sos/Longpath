@@ -7,10 +7,14 @@
 
   Der 3D-Flug zur nachgeschlagenen Station: vom eigenen QTH den Grosskreis
   entlang, hinauf, hinueber, hinunter bis aufs Dach -- auf Googles
-  Photorealistic 3D Tiles mit dem EIGENEN Schluessel des Bedieners (Map
-  Tiles API). Kein Cesium-ion-Zugang, keine ion-Bilder: Cesium.Ion bekommt
-  einen leeren Zugang, damit ein versehentlicher ion-Abruf laut scheitert
-  statt still einen fremden Dienst zu benutzen.
+  Photorealistic 3D Tiles -- auf einem von zwei Wegen, beide mit dem
+  EIGENEN Zugang des Bedieners: ein kostenloses Cesium-ion-Konto (Googles
+  Kacheln sind dort das Asset 2275207, ohne Google-Cloud-Konto und ohne
+  Kreditkarte) oder ein eigener Schluessel fuer Googles Map Tiles API.
+  Keine ion-Bilder (baseLayer:false). Cesium.Ion.defaultAccessToken bleibt
+  LEER: der ion-Zugang geht nur an IonResource.fromAssetId() -- Cesiums
+  eigener Weg ohne Schluessel puffert das Versprechen fuer 2275207 fuer
+  immer, ein einmal abgelehnter Zugang bliebe dann bis zum Neustart kaputt.
 
   Drittsoftware -- CesiumJS 1.146.0, Copyright 2011-2026 Cesium GS, Inc.
   and Contributors, Apache License 2.0
@@ -70,6 +74,7 @@
   "use strict";
   if (typeof Cesium === "undefined") { return; }   // onerror hat es gemeldet
 
+  const ION_GOOGLE_3D = 2275207;   // Googles Photorealistic 3D Tiles bei Cesium ion
   const D2R = Math.PI / 180, R2D = 180 / Math.PI;
   const EARTH_KM = 6371.0088;
   const lp = { viewer: null, tileset: null, key: null, id: 0, raf: 0,
@@ -133,15 +138,24 @@
     return v;
   }
 
-  async function tileset(key) {
+  async function tileset(f) {
     const v = viewer();
-    if (lp.tileset && lp.key === key) { return lp.tileset; }
+    const viaIon = f.source === "ion";
+    const id = (viaIon ? "ion:" + f.token : "google:" + f.key);
+    if (lp.tileset && lp.key === id) { return lp.tileset; }
     if (lp.tileset) { v.scene.primitives.remove(lp.tileset); lp.tileset = null; }
-    lp.key = key;
+    lp.key = id;
     lp.tileFailSent = false;
-    const ts = await Cesium.createGooglePhotorealistic3DTileset(
-      { key: key, onlyUsingWithGoogleGeocoder: true },
-      { showCreditsOnScreen: true, enableCollision: true });
+    const opts = { showCreditsOnScreen: true, enableCollision: true };
+    let ts;
+    if (viaIon) {
+      // Eigener Zugang je Abruf, kein globaler (siehe Kopf).
+      const res = await Cesium.IonResource.fromAssetId(ION_GOOGLE_3D, { accessToken: f.token });
+      ts = await Cesium.Cesium3DTileset.fromUrl(res, opts);
+    } else {
+      ts = await Cesium.createGooglePhotorealistic3DTileset(
+        { key: f.key, onlyUsingWithGoogleGeocoder: true }, opts);
+    }
     ts.tileFailed.addEventListener(function (e) {
       if (lp.tileFailSent) { return; }
       lp.tileFailSent = true;
@@ -324,11 +338,11 @@
     requestAnimationFrame(turn);
   }
 
-  function fail(err) {
+  function fail(source, err) {
     const status = err && typeof err.statusCode === "number" ? err.statusCode : 0;
     let body = err && err.response !== undefined ? err.response : "";
     if (typeof body !== "string") { try { body = JSON.stringify(body); } catch (e) { body = ""; } }
-    lpSend({ event: "failed", kind: "tiles", status: status, body: body,
+    lpSend({ event: "failed", kind: "tiles", source: source, status: status, body: body,
              message: String(err && (err.message || err) || "unknown error") });
   }
 
@@ -341,12 +355,15 @@
       lp.groundH = null;
       if (lp.viewer) { lp.viewer.camera.cancelFlight(); }
       hud(f, "");
-      tileset(f.key).then(function () {
+      tileset(f).then(function () {
         if (id !== lp.id) { return; }
         marks(f, f.home || null);
         sampleGround(f, id);
         travel(f, id);
-      }).catch(fail);
+      }).catch(function (err) {
+        lp.key = null;   // naechster Flug fragt neu, statt am Fehler zu kleben
+        fail(f.source === "ion" ? "ion" : "google", err);
+      });
     }
   };
 

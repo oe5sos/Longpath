@@ -16,6 +16,7 @@
 
 #include <QtTest>
 
+#include "core/AppSettings.h"
 #include "core/CredentialStore.h"
 #include "core/GoogleMapTiles.h"
 #include "gui/Google3dSetupDialog.h"
@@ -24,6 +25,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QSignalSpy>
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -35,6 +37,14 @@ namespace {
 
 // Ein Schluessel in Googles Form, aber erfunden: "AIza" + 35 Zeichen.
 const QString kFakeKey = QStringLiteral("AIzaPruefstandNichtEchtXXXXXXXXXXXXXXXX");
+// Ein erfundener ion-Zugang in JWT-Form (drei base64url-Teile).
+const QString kFakeToken = QStringLiteral(
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJwcnVlZnN0YW5kIn0.UHJ1ZWZzdGFuZE5pY2h0RWNodA");
+// Was Cesium ion fuer Googles Asset liefert (externes 3D-Tileset).
+const QByteArray kIonEndpoint =
+    "{\"type\":\"3DTILES\",\"externalType\":\"3DTILES\","
+    "\"options\":{\"url\":\"https://tile.googleapis.com/v1/3dtiles/root.json?key=x\"},"
+    "\"attributions\":[]}";
 
 // Antwortet auf genau eine Anfrage mit Status und Koerper und merkt sich
 // die erste Anfragezeile.
@@ -43,6 +53,7 @@ public:
     int status{200};
     QByteArray body;
     QByteArray firstLine;
+    QByteArray headers;
 
     FakeTiles()
     {
@@ -53,6 +64,7 @@ public:
                 m_buf += s->readAll();
                 if (!m_buf.contains("\r\n\r\n")) { return; }
                 firstLine = m_buf.left(m_buf.indexOf("\r\n"));
+                headers = m_buf.left(m_buf.indexOf("\r\n\r\n"));
                 const QByteArray reason = status == 200 ? "OK" : "Error";
                 QByteArray resp = "HTTP/1.1 " + QByteArray::number(status) + " " + reason
                     + "\r\nContent-Type: application/json\r\nContent-Length: "
@@ -93,11 +105,14 @@ private slots:
     {
         GoogleMapsKey::erase();
         GoogleMapsKey::forgetCachedForTest();
+        CesiumIonToken::erase();
+        CesiumIonToken::forgetCachedForTest();
+        Map3dAccess::setChosenSource(Map3dAccess::Source::CesiumIon);
     }
 
     void key_goes_to_the_credential_store_and_back()
     {
-        QSignalSpy changed(&GoogleMapsKey::notifier(), &GoogleMapsKey::changed);
+        QSignalSpy changed(&Map3dAccess::notifier(), &Map3dAccess::changed);
         QVERIFY(!GoogleMapsKey::isSet());
 
         QVERIFY(GoogleMapsKey::save(QStringLiteral("  ") + kFakeKey + QStringLiteral("\n")));
@@ -234,7 +249,7 @@ private slots:
 
     void guide_names_every_step()
     {
-        const QString g = Google3dSetupDialog::guideHtml();
+        const QString g = Google3dSetupDialog::guideHtml(Map3dAccess::Source::Google);
         for (const char* must : {"Create a project", "console.cloud.google.com",
                                  "billing account", "even for the free",
                                  "Enable the Map Tiles API", "tile.googleapis.com",
@@ -264,6 +279,10 @@ private slots:
         dlg->probeForTest()->setEndpointForTest(fake.base());
         dlg->show();
         QVERIFY(QTest::qWaitForWindowExposed(dlg));
+        // Vorgabe ist Cesium ion; hier der Google-Weg.
+        QCOMPARE(dlg->shownSource(), Map3dAccess::Source::CesiumIon);
+        dlg->googleChoiceForTest()->click();
+        QCOMPARE(dlg->shownSource(), Map3dAccess::Source::Google);
 
         // Mit LONGPATH_GRAB_DIR: das Bild des Dialogs, wie der Bediener
         // ihn zuerst sieht (das Blatt, das kein Pruefstand ersetzt).
@@ -299,10 +318,16 @@ private slots:
         QPointer<Google3dSetupDialog> alive(dlg);
         dlg->saveButtonForTest()->click();
         QCOMPARE(GoogleMapsKey::load(), kFakeKey);
+        // Gespeichert heisst auch: diese Quelle gilt jetzt.
+        QCOMPARE(Map3dAccess::chosenSource(), Map3dAccess::Source::Google);
+        QCOMPARE(Map3dAccess::secret(), kFakeKey);
+        QVERIFY(CesiumIonToken::load().isEmpty());
         QTRY_VERIFY(alive.isNull());   // geschlossen und freigegeben
 
-        // Wieder auf: der Schluessel steht drin, „Remove key" loescht ihn.
+        // Wieder auf: die Quelle von zuletzt, der Schluessel steht drin,
+        // „Remove" loescht ihn.
         Google3dSetupDialog* again = Google3dSetupDialog::showFor(nullptr);
+        QCOMPARE(again->shownSource(), Map3dAccess::Source::Google);
         QCOMPARE(again->keyEditForTest()->text(), kFakeKey);
         QVERIFY(again->removeButtonForTest()->isEnabled());
         again->removeButtonForTest()->click();
@@ -311,6 +336,183 @@ private slots:
         // showFor() holt denselben offenen Dialog statt eines zweiten.
         QCOMPARE(Google3dSetupDialog::showFor(nullptr), again);
         again->close();
+    }
+
+    // ── Cesium ion: der kostenlose Weg (2026-11-10, abends) ─────────────
+
+    void ion_token_goes_to_the_credential_store_and_back()
+    {
+        QSignalSpy changed(&Map3dAccess::notifier(), &Map3dAccess::changed);
+        QVERIFY(!Map3dAccess::isSet());
+        QVERIFY(CesiumIonToken::save(QStringLiteral(" ") + kFakeToken));
+        QCOMPARE(changed.count(), 1);
+        QCOMPARE(CredentialStore::retrieve(CesiumIonToken::credentialKey(),
+                                           CesiumIonToken::credentialAccount()), kFakeToken);
+        CesiumIonToken::forgetCachedForTest();
+        QCOMPARE(CesiumIonToken::load(), kFakeToken);
+        // Vorgabe-Quelle ist ion: der Zugang gilt sofort.
+        QCOMPARE(Map3dAccess::chosenSource(), Map3dAccess::Source::CesiumIon);
+        QCOMPARE(Map3dAccess::secret(), kFakeToken);
+        // Ein Google-Schluessel daneben aendert nichts, solange ion gewaehlt ist.
+        GoogleMapsKey::save(kFakeKey);
+        QCOMPARE(Map3dAccess::secret(), kFakeToken);
+        Map3dAccess::setChosenSource(Map3dAccess::Source::Google);
+        QCOMPARE(Map3dAccess::secret(), kFakeKey);
+        Map3dAccess::setChosenSource(Map3dAccess::Source::CesiumIon);
+
+        QVERIFY(CesiumIonToken::save(QString()));
+        CesiumIonToken::forgetCachedForTest();
+        QVERIFY(CesiumIonToken::load().isEmpty());
+        QVERIFY(!Map3dAccess::isSet());
+    }
+
+    // Die VORGABE, ohne dass je jemand gewaehlt hat: Cesium ion -- der
+    // Weg ohne Kreditkarte (Betreiber 2026-11-10). Die anderen Faelle
+    // setzen die Quelle ausdruecklich; dieser loescht sie.
+    void default_source_is_cesium_ion()
+    {
+        AppSettings::instance().remove(QStringLiteral("Map3dSource"));
+        QVERIFY(!AppSettings::instance().contains(QStringLiteral("Map3dSource")));
+        QCOMPARE(Map3dAccess::chosenSource(), Map3dAccess::Source::CesiumIon);
+
+        auto* dlg = new Google3dSetupDialog;
+        dlg->setAttribute(Qt::WA_DeleteOnClose);
+        QCOMPARE(dlg->shownSource(), Map3dAccess::Source::CesiumIon);
+        QVERIFY(dlg->ionChoiceForTest()->isChecked());
+        QVERIFY(dlg->guideForTest()->text().contains(QLatin1String("ion.cesium.com")));
+        dlg->close();
+    }
+
+    void ion_token_shape_hint()
+    {
+        QVERIFY(CesiumIonToken::looksLikeToken(kFakeToken));
+        QVERIFY(!CesiumIonToken::looksLikeToken(kFakeToken.left(40)));   // abgeschnitten
+        QVERIFY(!CesiumIonToken::looksLikeToken(kFakeKey));              // Google-Schluessel
+        QVERIFY(!CesiumIonToken::looksLikeToken(QString()));
+    }
+
+    void ion_answers_become_sentences_data()
+    {
+        QTest::addColumn<int>("status");
+        QTest::addColumn<QByteArray>("body");
+        QTest::addColumn<int>("verdict");
+        QTest::addColumn<QString>("mentions");
+        using V = GoogleTilesProbe::Verdict;
+        QTest::newRow("ok-external") << 200 << kIonEndpoint << int(V::Ok)
+                                     << QStringLiteral("Token accepted");
+        QTest::newRow("ok-own") << 200
+            << QByteArray("{\"type\":\"3DTILES\",\"url\":\"https://assets.ion.cesium.com/1/tileset.json\","
+                          "\"accessToken\":\"x\"}")
+            << int(V::Ok) << QStringLiteral("Token accepted");
+        QTest::newRow("portal") << 200 << QByteArray("<html>login</html>")
+                                << int(V::Other) << QStringLiteral("refused");
+        // So am 2026-11-10 gemessen, mit einem erfundenen Zugang.
+        QTest::newRow("invalid") << 401
+            << QByteArray("{\"code\":\"INVALID_TOKEN\",\"message\":\"Invalid access token\"}")
+            << int(V::InvalidKey) << QStringLiteral("eyJ");
+        QTest::newRow("missing") << 404
+            << QByteArray("{\"code\":\"ResourceNotFound\",\"message\":\"Asset not found\"}")
+            << int(V::AssetMissing) << QStringLiteral("My Assets");
+        QTest::newRow("scope") << 403
+            << QByteArray("{\"code\":\"Forbidden\",\"message\":\"Insufficient scope\"}")
+            << int(V::AssetMissing) << QStringLiteral("read assets");
+        QTest::newRow("quota") << 429
+            << QByteArray("{\"code\":\"TooManyRequests\",\"message\":\"Slow down\"}")
+            << int(V::Quota) << QStringLiteral("next month");
+    }
+    void ion_answers_become_sentences()
+    {
+        QFETCH(int, status);
+        QFETCH(QByteArray, body);
+        QFETCH(int, verdict);
+        QFETCH(QString, mentions);
+        QString detail;
+        const GoogleTilesProbe::Verdict v = GoogleTilesProbe::interpretIon(status, body, &detail);
+        QCOMPARE(int(v), verdict);
+        const QString s = GoogleTilesProbe::sentenceIon(v, detail);
+        QVERIFY2(s.contains(mentions, Qt::CaseInsensitive), qPrintable(s));
+    }
+
+    void ion_probe_asks_asset_2275207_with_the_token_in_the_header()
+    {
+        FakeTiles fake;
+        fake.status = 401;
+        fake.body = "{\"code\":\"INVALID_TOKEN\",\"message\":\"Invalid access token\"}";
+        GoogleTilesProbe probe;
+        probe.setIonEndpointForTest(fake.base());
+        QSignalSpy done(&probe, &GoogleTilesProbe::finished);
+        probe.check(Map3dAccess::Source::CesiumIon, kFakeToken);
+        QTRY_COMPARE_WITH_TIMEOUT(done.count(), 1, 10000);
+        QCOMPARE(done.at(0).at(0).value<GoogleTilesProbe::Verdict>(),
+                 GoogleTilesProbe::Verdict::InvalidKey);
+        QVERIFY2(done.at(0).at(1).toString().contains(QLatin1String("Cesium ion")),
+                 qPrintable(done.at(0).at(1).toString()));
+        QVERIFY2(fake.firstLine.startsWith("GET /v1/assets/2275207/endpoint "),
+                 fake.firstLine.constData());
+        // Der Zugang steht im Kopf, nicht in der Adresse.
+        QVERIFY(!fake.firstLine.contains(kFakeToken.toLatin1()));
+        QVERIFY2(fake.headers.contains("Authorization: Bearer " + kFakeToken.toLatin1()),
+                 fake.headers.constData());
+    }
+
+    void guide_for_ion_names_every_step()
+    {
+        const QString g = Google3dSetupDialog::guideHtml(Map3dAccess::Source::CesiumIon);
+        for (const char* must : {"Create a free account", "ion.cesium.com/signup",
+                                 "Community", "non-commercial", "no payment details",
+                                 "Access Tokens", "ion.cesium.com/tokens", "eyJ",
+                                 "My Assets", "Google Photorealistic 3D Tiles",
+                                 "assetdepot/2275207", "Test", "Save"}) {
+            QVERIFY2(g.contains(QLatin1String(must)), must);
+        }
+        QVERIFY(!g.contains(QLatin1String("billing")));
+    }
+
+    void dialog_with_ion_tests_and_saves()
+    {
+        FakeTiles fake;
+        fake.body = kIonEndpoint;
+        auto* dlg = new Google3dSetupDialog;
+        dlg->setAttribute(Qt::WA_DeleteOnClose);
+        dlg->probeForTest()->setIonEndpointForTest(fake.base());
+        dlg->show();
+        QVERIFY(QTest::qWaitForWindowExposed(dlg));
+
+        // Vorgabe: Cesium ion, mit der ion-Anleitung.
+        QVERIFY(dlg->ionChoiceForTest()->isChecked());
+        QVERIFY(dlg->guideForTest()->text().contains(QLatin1String("ion.cesium.com")));
+        QVERIFY(dlg->keyEditForTest()->placeholderText().contains(QLatin1String("Cesium ion")));
+
+        const QString grabDir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+        if (!grabDir.isEmpty()) {
+            QVERIFY(dlg->grab().save(grabDir + QStringLiteral("/longpath-grab-Google3dSetupDialog-ion.png")));
+        }
+
+        dlg->testButtonForTest()->click();
+        QVERIFY(dlg->statusForTest()->text().contains(QLatin1String("Cesium ion token first")));
+        dlg->keyEditForTest()->setText(kFakeKey);   // Google-Schluessel ins ion-Feld
+        QVERIFY(dlg->statusForTest()->text().contains(QLatin1String("Cesium ion token")));
+
+        dlg->keyEditForTest()->setText(kFakeToken);
+        dlg->testButtonForTest()->click();
+        QTRY_VERIFY_WITH_TIMEOUT(
+            dlg->statusForTest()->text().contains(QLatin1String("Token accepted")), 10000);
+        QVERIFY(!CesiumIonToken::isSet());
+
+        // Umschalten und zurueck verliert nichts und mischt nichts.
+        dlg->googleChoiceForTest()->click();
+        QVERIFY(dlg->keyEditForTest()->text().isEmpty());
+        QVERIFY(dlg->guideForTest()->text().contains(QLatin1String("billing")));
+        dlg->ionChoiceForTest()->click();
+
+        dlg->keyEditForTest()->setText(kFakeToken);
+        QPointer<Google3dSetupDialog> alive(dlg);
+        dlg->saveButtonForTest()->click();
+        QCOMPARE(CesiumIonToken::load(), kFakeToken);
+        QVERIFY(GoogleMapsKey::load().isEmpty());
+        QCOMPARE(Map3dAccess::chosenSource(), Map3dAccess::Source::CesiumIon);
+        QCOMPARE(Map3dAccess::secret(), kFakeToken);
+        QTRY_VERIFY(alive.isNull());
     }
 };
 

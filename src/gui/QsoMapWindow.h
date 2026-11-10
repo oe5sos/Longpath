@@ -297,7 +297,8 @@ private:
     QWidget*          m_3dHost{nullptr};
     class Station3dSurface* m_3d{nullptr};
     bool              m_3dWanted{true};
-    QString           m_3dRefusedKey;    // Schluessel, den Google abgelehnt hat
+    QString           m_3dRefusedKey;    // Zugang (Quelle:Text), der abgelehnt wurde
+    static QString    accessIdentity();
     LastFlight        m_lastFlight;
     std::function<void(const QUrl&)> m_openUrl;
 };

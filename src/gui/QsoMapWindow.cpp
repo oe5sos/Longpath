@@ -398,10 +398,11 @@ void QsoMapWindow::buildUi()
     // update3dButton() hinter einem QSignalBlocker und kommen hier nicht an.
     connect(m_3dBtn, &QPushButton::toggled, this, [this](bool checked) {
         const bool built = Station3dSurface::isAvailable();
-        const bool key   = GoogleMapsKey::isSet();
+        const bool key   = Map3dAccess::isSet();
         qCInfo(lcQsoMap3d).noquote()
             << "3D-Knopf:" << (checked ? "an" : "aus")
-            << "| Schluessel" << (key ? "da" : "fehlt")
+            << "| Zugang" << Map3dAccess::sourceName(Map3dAccess::chosenSource())
+            << (key ? "da" : "fehlt")
             << "| WebEngine" << (built ? "da" : "fehlt")
             << "|" << (m_embedded ? "Logbuch-Spalte" : "Kartenfenster");
         if (!built) {
@@ -433,7 +434,7 @@ void QsoMapWindow::buildUi()
             m_googleEarthBtn->setVisible(true);
         }
     });
-    connect(&GoogleMapsKey::notifier(), &GoogleMapsKey::changed, this, [this]() {
+    connect(&Map3dAccess::notifier(), &Map3dAccess::changed, this, [this]() {
         m_3dRefusedKey.clear();
         update3dButton();
     });
@@ -1428,12 +1429,14 @@ QString QsoMapWindow::infoTextForTest() const { return m_info->text(); }
 bool QsoMapWindow::use3d() const
 {
     if (!m_3dWanted || !Station3dSurface::isAvailable()) { return false; }
-    const QString key = GoogleMapsKey::load();
+    const QString key = Map3dAccess::secret();
     if (key.isEmpty()) { return false; }
-    // Einmal abgelehnt heisst: bis zu einem neuen Schluessel (oder dem
+    // Einmal abgelehnt heisst: bis zu einem neuen Zugang (oder dem
     // ausdruecklichen Klick auf „3D") nicht bei jedem Rufzeichen wieder
-    // die 3D-Seite aufziehen, nur um gleich zurueckzufallen.
-    return key != m_3dRefusedKey;
+    // die 3D-Seite aufziehen, nur um gleich zurueckzufallen. Quelle und
+    // Zugang zusammen: derselbe Text als ion-Token und als Google-
+    // Schluessel waeren zwei verschiedene Zugaenge.
+    return accessIdentity() != m_3dRefusedKey;
 }
 
 void QsoMapWindow::ensure3d()
@@ -1471,7 +1474,8 @@ void QsoMapWindow::fly3d()
     f.caption = QTextDocumentFragment::fromHtml(m_lastFlight.caption).toPlainText();
     f.lat     = m_lastFlight.lat;
     f.lon     = m_lastFlight.lon;
-    f.apiKey  = GoogleMapsKey::load();
+    f.viaCesiumIon = Map3dAccess::chosenSource() == Map3dAccess::Source::CesiumIon;
+    f.secret       = Map3dAccess::secret();
     if (isValidGridSquare(m_homeGrid)) {
         f.hasHome = true;
         calculateLatLonFromGridSquare(m_homeGrid, f.homeLat, f.homeLon);
@@ -1485,7 +1489,7 @@ void QsoMapWindow::fly3d()
 
 void QsoMapWindow::on3dFailed(const QString& reason, bool keyProblem)
 {
-    if (keyProblem) { m_3dRefusedKey = GoogleMapsKey::load(); }
+    if (keyProblem) { m_3dRefusedKey = accessIdentity(); }
     if (!m_lastFlight.valid) { return; }
     // Zurueck auf den alten Weg, mit dem Grund in der Stationskarte.
     flyFlat(m_lastFlight.call, m_lastFlight.lat, m_lastFlight.lon);
@@ -1518,7 +1522,7 @@ void QsoMapWindow::update3dButton()
 {
     if (!m_3dBtn) { return; }
     const bool built = Station3dSurface::isAvailable();
-    const bool key   = GoogleMapsKey::isSet();
+    const bool key   = Map3dAccess::isSet();
     QSignalBlocker b(m_3dBtn);
     // Immer bedienbar: ohne WebEngine sagt der Klick, warum es nicht geht.
     m_3dBtn->setEnabled(true);
@@ -1530,12 +1534,23 @@ void QsoMapWindow::update3dButton()
     } else if (!key) {
         m_3dBtn->setToolTip(QStringLiteral(
             "Show looked-up stations in Google's photorealistic 3D, down to the "
-            "house and the antenna. Needs your own Google key — click to set it up."));
+            "house and the antenna. Needs a free Cesium ion account (or your own "
+            "Google key) — click to set it up."));
     } else {
         m_3dBtn->setToolTip(QStringLiteral(
-            "Fly to looked-up stations in Google's photorealistic 3D (your Google "
-            "key). Untick for the flat map with NASA imagery."));
+            "Fly to looked-up stations in Google's photorealistic 3D (via %1). "
+            "Untick for the flat map with NASA imagery.")
+            .arg(Map3dAccess::chosenSource() == Map3dAccess::Source::CesiumIon
+                     ? QStringLiteral("your Cesium ion account")
+                     : QStringLiteral("your Google key")));
     }
+}
+
+QString QsoMapWindow::accessIdentity()
+{
+    const QString secret = Map3dAccess::secret();
+    if (secret.isEmpty()) { return QString(); }
+    return Map3dAccess::sourceName(Map3dAccess::chosenSource()) + QLatin1Char(':') + secret;
 }
 
 
