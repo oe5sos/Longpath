@@ -25,6 +25,9 @@
 // Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-11-10 — subsolarPoint() added: the globe's terminator now comes
+//                 from the same model as solarInfo(). AI-assisted via
+//                 Anthropic Claude (Claude Code), operator Martin Fischer.
 // =================================================================
 
 #include <QDateTime>
@@ -60,5 +63,21 @@ struct SolarInfo {
 // corrected cty.dat coordinates. (cty.dat itself stores positive west;
 // CtyDatParser already flips it.)
 SolarInfo solarInfo(const QDateTime& utc, double lat, double lonEast);
+
+// Where the sun stands overhead at this instant: latitude is the
+// declination, longitude the meridian where it is local apparent noon.
+// Longitude positive EAST, in [-180, 180).
+//
+// Same model as solarInfo() — the same mean anomaly, equation of
+// centre and transit terms — so the elevation a great-circle angle to
+// this point gives and the elevation solarInfo() reports agree to a few
+// hundredths of a degree. Against the NOAA spreadsheet: declination
+// within 0.2°, longitude within 0.4° over the year.
+//
+// It replaced a day-of-year sine fit in GlobeWidget (2026-11-10) whose
+// equation of time was up to 17 minutes wrong — the globe drew its
+// terminator up to 4° of longitude away from where the logbook's grey
+// line verdict (core/Grauzone.h) put it.
+void subsolarPoint(const QDateTime& utc, double& lat, double& lonEast);
 
 } // namespace Longpath

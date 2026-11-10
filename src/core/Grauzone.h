@@ -15,13 +15,11 @@
 //
 // Die Sonnenhoehe rechnet NICHT neu: sie kommt aus solarInfo()
 // (core/SolarTimes.cpp, Sonnenaufgangsgleichung, gegen NOAA auf etwa
-// zwei Minuten genau). GlobeWidget::subsolarPoint() — die Rechnung fuer
-// die Schattengrenze auf dem Globus — ist hier mit Absicht NICHT
-// genommen: am 2026-11-10 gegen die NOAA-Formeln nachgerechnet, liegt
-// ihre Zeitgleichung bis zu 17 Minuten daneben (30. Maerz: +12,9 statt
-// −4,4 min), der Subsolarpunkt also bis gut 4° in der Laenge, und die
-// Sonnenhoehe am Horizont bis 4,3° — so viel wie die halbe Grauzone.
-// Das ist ein eigener Befund fuer den Globus, nicht Teil dieses Zweigs.
+// zwei Minuten genau). Die Schattengrenze auf dem Globus kommt seit
+// 2026-11-10 aus demselben Modell (subsolarPoint() in SolarTimes);
+// vorher rechnete GlobeWidget eine eigene Naeherung, deren Zeitgleichung
+// bis 17 Minuten danebenlag — bis 4,3° Sonnenhoehe am Horizont, so viel
+// wie die halbe Grauzone. Globus und Logbuch sagen jetzt dasselbe.
 //
 // ── Woher die beiden Orte kommen ────────────────────────────────────
 //
