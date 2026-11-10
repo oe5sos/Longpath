@@ -53,6 +53,8 @@
 
 #include <QWidget>
 
+#include <functional>
+
 class QFormLayout;
 class QLabel;
 class QPushButton;
@@ -101,6 +103,33 @@ public:
     // the honest state when no rotor is connected.
     void setRotorBearing(double deg);
 
+    // ── Peilung auch fuer Stationen, die nicht im Log stehen (2026-11-10)
+    //
+    // Betreiber: Rufzeichen eingeben, ROTOR, sehen wohin der Rotor zeigt
+    // und wo die Station steht. Bis heute stand dort fuer jede neue
+    // Station „Not in your log — no bearing until you work them": der
+    // eigene Standort kam nur aus dem QSO (MY_GRIDSQUARE) oder aus
+    // StationGridSquare, und das ist bei Martin leer. Jetzt:
+    //   eigener Standort  QSO -> StationGridSquare -> setHomeGrid()
+    //   Station           QRZ-Koordinaten -> QRZ-Locator -> Log-Locator
+    //                     -> Landesmitte (setPositionFallback, cty.dat)
+    // und die Karte sagt, woher die Lage stammt -- eine Landesmitte ist
+    // keine Hausnummer.
+    using PositionFallback =
+        std::function<bool(const QString& call, double& lat, double& lon)>;
+    void setPositionFallback(PositionFallback fn);
+    void setHomeGrid(std::function<QString()> fn);
+
+    enum class Lage { Keine, QrzKoordinaten, QrzLocator, LogLocator, Landesmitte };
+    // Woher die Lage der Station gerade stammt, und wie genau sie ist --
+    // als Satz fuer die Oberflaeche ("street address (QRZ)").
+    Lage    lage() const { return m_lage; }
+    QString lageText() const;
+    bool    lageGrob() const;
+    // Peilung (kurzer Weg) und Entfernung, wie die Karte sie zeigt.
+    bool peilung(double& bearingDeg, double& km) const;
+    QString gezeigtesRufzeichen() const { return m_haveEntry ? m_entry.call : QString(); }
+
 signals:
     void turnRotorRequested(double bearingDeg, const QString& call);
     /// Ein Lookup hat die Station verortet (QRZ-Koordinaten oder
@@ -111,6 +140,10 @@ signals:
     // Die Richtung zur gezeigten Station, sobald sie sich aendert (-1 =
     // keine). Fuer das Rotor-Radar neben der Karte (2026-09-26).
     void beamChanged(double bearingDeg);
+    // Nach JEDER Neuberechnung der Peilung, auch wenn die Richtung gleich
+    // bleibt (JA1XY -> JA1XYZ: beide Landesmitte). Fuer die Rotorzeile
+    // im Logbuch, die Rufzeichen und Lagequelle mitzeigt (2026-11-10).
+    void peilungNeu();
 
 private:
     void buildUi();
@@ -171,7 +204,12 @@ private:
     bool   m_haveBeam{false};
     // Peilung und Entfernung von hier zur Station, aus QRZ-Koordinaten
     // vor dem Locator, und nicht aus dem Wert im Log.
-    bool beamNow(double& bearingDeg, double& km) const;
+    bool beamNow(double& bearingDeg, double& km, Lage* lage = nullptr) const;
+    double m_beamKm{0.0};
+    Lage   m_lage{Lage::Keine};
+    QLabel* m_lageLabel{nullptr};
+    PositionFallback       m_fallback;
+    std::function<QString()> m_homeGrid;
 };
 
 } // namespace Longpath

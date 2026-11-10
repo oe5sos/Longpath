@@ -559,6 +559,12 @@ void LogbookWindow::buildUi()
         m_rotorTargetDeg = deg;
         applyRotorToMap();
     });
+    // Die Rotorzeile folgt jeder Neuberechnung, nicht nur einer neuen
+    // Richtung -- sonst bliebe sie bei JA1XY -> JA1XYZ stehen.
+    connect(m_detail, &QsoDetailPane::peilungNeu, this, &LogbookWindow::aktualisiereRotorZeile);
+    // Eigener Standort fuer Stationen, die nicht im Log stehen
+    // (2026-11-10): der juengste MY_GRIDSQUARE, wie bei der Bedarfs-Matrix.
+    m_detail->setHomeGrid([this]() { return meinFeld(); });
     auto* detailScroll = new QScrollArea(m_split);
     detailScroll->setWidgetResizable(true);
     detailScroll->setFrameShape(QFrame::NoFrame);
@@ -1750,6 +1756,7 @@ void LogbookWindow::deleteSelected()
 void LogbookWindow::setPositionFallback(PositionFallback fn)
 {
     m_fallback = std::move(fn);
+    if (m_detail) { m_detail->setPositionFallback(m_fallback); }
     if (m_map) { m_map->setPositionFallback(m_fallback); }
 }
 
@@ -2513,6 +2520,38 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
         "so you see at once whether and when you worked them before."));
     row->addWidget(m_entryCall);
 
+    // ── ROTOR (2026-11-10) ───────────────────────────────────────────
+    //
+    // Betreiber: „wenn man im logbuch das call eingibt und auf ROTOR
+    // klickt, sollte man sehen, wohin der rotor zeigt und wo das call
+    // steht. mit rotate sollte sich dann der rotor auch dorthin drehen."
+    // ROTOR oeffnet die Karte mit dem Rotor-Radar (Keil = Stellung,
+    // Marke = Station) und zeigt daneben Peilung, Entfernung und woher
+    // die Lage stammt; Rotate / LP drehen. Der erlaubte Bereich
+    // (RotorBereich) gilt -- ein Weg hinaus wird gesagt, nicht versucht.
+    m_entryRotorBtn = new QPushButton(QStringLiteral("Rotor"), this);
+    m_entryRotorBtn->setAutoDefault(false);
+    m_entryRotorBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_entryRotorBtn->setToolTip(QStringLiteral(
+        "Show where the rotor points and where this station is, "
+        "then turn to it"));
+    row->addWidget(m_entryRotorBtn);
+    m_entryPeilung = new QLabel(this);
+    m_entryPeilung->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                      .arg(QLatin1String(Style::kTextPrimary)));
+    m_entryPeilung->setVisible(false);
+    row->addWidget(m_entryPeilung);
+    m_entryRotate = new QPushButton(QStringLiteral("Rotate"), this);
+    m_entryRotate->setAutoDefault(false);
+    m_entryRotate->setStyleSheet(Style::buttonBaseStyle());
+    m_entryRotate->setVisible(false);
+    row->addWidget(m_entryRotate);
+    m_entryLp = new QPushButton(QStringLiteral("LP"), this);
+    m_entryLp->setAutoDefault(false);
+    m_entryLp->setStyleSheet(Style::buttonBaseStyle());
+    m_entryLp->setVisible(false);
+    row->addWidget(m_entryLp);
+
     m_entryLive = new QLabel(QStringLiteral("●"), this);
     row->addWidget(m_entryLive);
     m_entryFreq = new QLabel(QStringLiteral("—"), this);
@@ -2591,6 +2630,17 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
         e->installEventFilter(this);
     }
     connect(m_entryLogBtn, &QPushButton::clicked, this, &LogbookWindow::requestLog);
+    connect(m_entryRotorBtn, &QPushButton::clicked, this, &LogbookWindow::zeigeRotorZeile);
+    connect(m_entryRotate, &QPushButton::clicked, this, [this]() {
+        double sp = 0.0, km = 0.0;
+        if (!m_detail || !m_detail->peilung(sp, km)) { return; }
+        emit turnRotorRequested(sp, m_detail->gezeigtesRufzeichen());
+    });
+    connect(m_entryLp, &QPushButton::clicked, this, [this]() {
+        double sp = 0.0, km = 0.0;
+        if (!m_detail || !m_detail->peilung(sp, km)) { return; }
+        emit turnRotorRequested(BeamHeading::longPath(sp), m_detail->gezeigtesRufzeichen());
+    });
 
     // Tippen filtert das Log (Doppelt-Blick) und zeigt die Station nach
     // einer kurzen Pause in der Karteikarte -- entprellt wie im
@@ -2610,6 +2660,9 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
             m_entryCall->setCursorPosition(pos);
         }
         if (m_search) { m_search->setText(Callsigns::normalized(up)); }
+        // Eine stehende Rotorzeile zeigt nicht die Peilung des alten
+        // Rufzeichens unter dem neuen (bis die Karte nachzieht).
+        if (m_rotorZeile) { aktualisiereRotorZeile(); }
         m_entryLookup->start();
         m_bedarfTimer->start();
         m_entryHint->setText(QStringLiteral("Enter logs · Esc clears"));
@@ -2778,8 +2831,74 @@ void LogbookWindow::reportLogged(bool ok, const QString& message)
     Q_UNUSED(call);
 }
 
+void LogbookWindow::zeigeRotorZeile()
+{
+    const QString call = Callsigns::normalized(m_entryCall->text());
+    if (call.size() < 3 || !Callsigns::isLikelyCallsign(call)) {
+        m_entryCall->setFocus();
+        return;
+    }
+    m_rotorZeile = true;
+    // Nicht auf die Entprellung warten: wer ROTOR drueckt, will es jetzt.
+    m_entryLookup->stop();
+    if (!m_detail || m_detail->gezeigtesRufzeichen() != call) { showStationFor(call); }
+    setMapPanelShown(true);
+    aktualisiereRotorZeile();
+}
+
+void LogbookWindow::aktualisiereRotorZeile()
+{
+    if (!m_entryPeilung) { return; }
+    for (QWidget* w : std::initializer_list<QWidget*>{m_entryPeilung, m_entryRotate, m_entryLp}) {
+        w->setVisible(m_rotorZeile);
+    }
+    if (!m_rotorZeile) { return; }
+
+    const QString call = Callsigns::normalized(m_entryCall->text());
+    double sp = 0.0, km = 0.0;
+    const bool hat = m_detail && m_detail->gezeigtesRufzeichen() == call
+                  && m_detail->peilung(sp, km);
+    if (!hat) {
+        m_entryPeilung->setText(QStringLiteral("%1 — no position yet").arg(call));
+        m_entryRotate->setEnabled(false);
+        m_entryLp->setEnabled(false);
+        return;
+    }
+    const double lp = BeamHeading::longPath(sp);
+    QString text = QStringLiteral("%1°  ·  %2 km  ·  %3")
+                       .arg(sp, 0, 'f', 0).arg(km, 0, 'f', 0).arg(m_detail->lageText());
+    text += m_rotorDeg >= 0.0 ? QStringLiteral("  ·  rotor at %1°").arg(m_rotorDeg, 0, 'f', 0)
+                              : QStringLiteral("  ·  rotor not connected");
+
+    // Der erlaubte Bereich gilt fuer jeden Drehbefehl (RotorLogbookPanel
+    // verweigert ihn dort) -- hier wird es gesagt, bevor jemand drueckt.
+    const RotorBereich bereich = RotorBereich::load();
+    const auto geht = [&](double ziel) {
+        return bereich.erlaubt(ziel)
+            && (m_rotorDeg < 0.0 || bereich.wegErlaubt(m_rotorDeg, ziel));
+    };
+    const bool spGeht = geht(sp), lpGeht = geht(lp);
+    m_entryRotate->setEnabled(spGeht);
+    m_entryLp->setEnabled(lpGeht);
+    m_entryRotate->setText(QStringLiteral("Rotate %1°").arg(sp, 0, 'f', 0));
+    m_entryLp->setText(QStringLiteral("LP %1°").arg(lp, 0, 'f', 0));
+    const QString draussen = QStringLiteral("Outside the allowed rotation range (%1)")
+                                 .arg(bereich.beschreibung());
+    m_entryRotate->setToolTip(spGeht ? QStringLiteral("Turn the rotor to the short path")
+                                     : draussen);
+    m_entryLp->setToolTip(lpGeht ? QStringLiteral(
+        "Turn the rotor the other way round the world. On the low bands and "
+        "at grey line this is often the stronger signal.") : draussen);
+    if (!spGeht) { text += QStringLiteral("  ·  short path outside allowed range"); }
+    m_entryPeilung->setText(text);
+    m_entryPeilung->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(
+        QLatin1String(m_detail->lageGrob() || !spGeht ? Style::kAmberWarn : Style::kTextPrimary)));
+}
+
 void LogbookWindow::clearEntry()
 {
+    m_rotorZeile = false;
+    aktualisiereRotorZeile();
     m_entryLookup->stop();
     if (m_bedarfTimer) { m_bedarfTimer->stop(); }
     if (m_bedarf) { m_bedarf->setVisible(false); }
@@ -2818,6 +2937,7 @@ void LogbookWindow::setRotorBearing(double deg)
     m_rotorDeg = std::isnan(deg) ? -1.0 : deg;
     if (m_detail) { m_detail->setRotorBearing(deg); }
     applyRotorToMap();
+    aktualisiereRotorZeile();
 }
 
 void LogbookWindow::setRotorBeamWidth(double deg)
