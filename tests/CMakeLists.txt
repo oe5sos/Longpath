@@ -1163,6 +1163,12 @@ if(TEST tst_logbuch_bilder)
     set_tests_properties(tst_logbuch_bilder PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
+# tst_grauzone (2026-11-10): Grauzone an beiden Enden je QSO, SFI und Kp
+#   des Tages aus der GFZ-Datei (aufgezeichneter Ausschnitt, kein Netz),
+#   Filter, Statistik und die Zeile in der Detailkarte.
+longpath_add_test(tst_grauzone)
+target_compile_definitions(tst_grauzone PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 if(TEST tst_transverter_nur_empfang)
     set_tests_properties(tst_transverter_nur_empfang PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")

@@ -12,6 +12,7 @@
 
 #include "LogFilter.h"
 
+#include "core/Grauzone.h"
 #include "core/QsoConfirmation.h"
 
 namespace Longpath {
@@ -31,7 +32,7 @@ bool LogFilter::isActive() const
 {
     return !blank(text) || !blank(band) || !blank(mode) || !blank(grid)
            || !blank(country) || !blank(activation) || useDates
-           || unconfirmedOnly;
+           || unconfirmedOnly || greyLineOnly;
 }
 
 bool LogFilter::matches(const LogEntry& e) const
@@ -93,6 +94,12 @@ bool LogFilter::matches(const LogEntry& e) const
             || e.submode.contains(needle, Qt::CaseInsensitive)
             || e.comment.contains(needle, Qt::CaseInsensitive);
         if (!hit) { return false; }
+    }
+
+    // Zuletzt: die einzige Pruefung, die rechnet.
+    if (greyLineOnly
+        && !Grauzone::fuer(e, greyLineHome, greyLineCty).grauzonenQso()) {
+        return false;
     }
 
     return true;
