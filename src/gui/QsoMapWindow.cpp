@@ -112,6 +112,12 @@ void QsoMapWindow::keyPressEvent(QKeyEvent* e)
     case Qt::Key_Equal:  zoomActiveView(1.25);  return;
     case Qt::Key_Minus:  zoomActiveView(1 / 1.25); return;
     case Qt::Key_0:      resetActiveView();     return;
+    // Enter gehoert dem Feld, in dem er gedrueckt wurde (Rufzeichen:
+    // hinfliegen). QDialog drueckte sonst seinen Standardknopf -- beim
+    // Zeigen der erste Knopf der Fokuskette, „24 h" -- und stellte den
+    // Zeitraum still auf heute: „0 contacts in range" (Befund 2026-11-10).
+    case Qt::Key_Return:
+    case Qt::Key_Enter:  e->accept();           return;
     default: break;
     }
     // Eingebettet ist Escape kein „Fenster zu" — QDialog wuerde das
