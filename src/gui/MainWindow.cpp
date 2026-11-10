@@ -13277,6 +13277,22 @@ void MainWindow::buildMenuBar()
                 this, &MainWindow::openLogbookWindow);
     }
 
+    // The QRZ login (XML lookups) and the QRZ logbook key. Back in the
+    // menu 2026-11-10: the only way in was a "QRZ…" button in the old
+    // rotor window, which went with it on 2026-08-07 (57d524b0f) --
+    // while four places kept telling the operator "Add your QRZ account
+    // in Tools".
+    {
+        QAction* qrzAction =
+            toolsMenu->addAction(QStringLiteral("&QRZ account..."));
+        qrzAction->setObjectName(QStringLiteral("actQrzAccount"));
+        qrzAction->setToolTip(QStringLiteral(
+            "Your QRZ login for callsign lookups, and the logbook key for "
+            "uploading QSOs."));
+        connect(qrzAction, &QAction::triggered,
+                this, &MainWindow::openQrzCredentialsDialog);
+    }
+
     // Where logged contacts can be sent on to. Separate from the QRZ
     // account entry, because these are separate services with separate
     // credentials and one combined dialog would invite mixing them up.
@@ -18288,7 +18304,12 @@ void MainWindow::openQrzCredentialsDialog()
     ensureQrzClient();
     ensureQrzUploader();
 
-    QDialog dlg(this);
+    // Nicht auf dem Stapel: stirbt das Hauptfenster waehrend exec(),
+    // raeumt Qt den Dialog ab und der Rahmenausgang gaebe ihn ein
+    // zweites Mal frei (siehe ScopedChildWidget.h).
+    ScopedChildWidget<QDialog> dlgOwner(this);
+    QDialog& dlg = *dlgOwner.get();
+    dlg.setObjectName(QStringLiteral("qrzAccountDialog"));
     dlg.setWindowTitle(QStringLiteral("QRZ account"));
     Style::applyDarkPageStyle(&dlg);
 
