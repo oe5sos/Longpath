@@ -65,7 +65,10 @@ QString flightScript(const Station3dFlight& fl)
     }
     if (fl.km >= 0.0)         { o.insert(QStringLiteral("km"), fl.km); }
     if (fl.bearingDeg >= 0.0) { o.insert(QStringLiteral("bearing"), fl.bearingDeg); }
-    o.insert(QStringLiteral("key"), fl.apiKey);
+    // Die Seite nimmt "token" fuer Cesium ion, "key" fuer Google.
+    o.insert(QStringLiteral("source"), fl.viaCesiumIon ? QStringLiteral("ion")
+                                                       : QStringLiteral("google"));
+    o.insert(fl.viaCesiumIon ? QStringLiteral("token") : QStringLiteral("key"), fl.secret);
     const QString json = QString::fromUtf8(QJsonDocument(o).toJson(QJsonDocument::Compact));
     return QStringLiteral("window.longpath && window.longpath.fly(%1);").arg(json);
 }

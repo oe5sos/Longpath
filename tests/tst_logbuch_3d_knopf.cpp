@@ -73,6 +73,9 @@ private slots:
         AppSettings::instance().setValue(QStringLiteral("QsoMap3dFlight"), true);
         GoogleMapsKey::erase();
         GoogleMapsKey::forgetCachedForTest();
+        CesiumIonToken::erase();
+        CesiumIonToken::forgetCachedForTest();
+        Map3dAccess::setChosenSource(Map3dAccess::Source::CesiumIon);
         Station3dSurface::setFactory([](QWidget* p) -> Station3dSurface* {
             return new FakeSurface(p);
         });
@@ -112,7 +115,10 @@ private slots:
 
         // Schluessel eintragen und speichern: der Knopf der Spalte rastet ein.
         Google3dSetupDialog* d = visibleSetup();
-        d->keyEditForTest()->setText(QStringLiteral("AIzaPruefstandNichtEchtXXXXXXXXXXXXXXXX"));
+        // Vorgabe Cesium ion: ein (erfundener) ion-Zugang reicht.
+        QCOMPARE(d->shownSource(), Map3dAccess::Source::CesiumIon);
+        d->keyEditForTest()->setText(QStringLiteral(
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJwcnVlZnN0YW5kIn0.UHJ1ZWZzdGFuZE5pY2h0RWNodA"));
         d->saveButtonForTest()->click();
         QVERIFY(b->isChecked());
     }

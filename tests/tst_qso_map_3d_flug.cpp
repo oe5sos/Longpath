@@ -43,6 +43,8 @@ namespace {
 
 const QString kKey  = QStringLiteral("AIzaPruefstandNichtEchtXXXXXXXXXXXXXXXX");
 const QString kKey2 = QStringLiteral("AIzaPruefstandZweiterXXXXXXXXXXXXXXXXXX");
+const QString kToken = QStringLiteral(
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJwcnVlZnN0YW5kIn0.UHJ1ZWZzdGFuZE5pY2h0RWNodA");
 
 class FakeSurface : public Station3dSurface {
 public:
@@ -84,6 +86,10 @@ private slots:
         g_lastFake = nullptr;
         GoogleMapsKey::erase();
         GoogleMapsKey::forgetCachedForTest();
+        CesiumIonToken::erase();
+        CesiumIonToken::forgetCachedForTest();
+        // Die alten Faelle fahren den Google-Weg; der ion-Weg hat seine eigenen.
+        Map3dAccess::setChosenSource(Map3dAccess::Source::Google);
         AppSettings::instance().setValue(QStringLiteral("QsoMap3dFlight"), true);
     }
     void cleanup()
@@ -181,7 +187,8 @@ private slots:
         QCOMPARE(g_lastFake->flights.size(), 1);
         const Station3dFlight f = g_lastFake->flights.first();
         QCOMPARE(f.call, QStringLiteral("W1AW"));
-        QCOMPARE(f.apiKey, kKey);
+        QCOMPARE(f.secret, kKey);
+        QVERIFY(!f.viaCesiumIon);
         QCOMPARE(f.lat, kStaLat);
         QCOMPARE(f.lon, kStaLon);
         // Klartext fuer die Anzeige in der Seite, nicht HTML.
@@ -245,7 +252,7 @@ private slots:
         w.flyToStation(QStringLiteral("K1TTT"), 42.6, -73.1);
         QCOMPARE(w.currentViewForTest(), int(QsoMapWindow::kView3d));
         QCOMPARE(g_lastFake->flights.size(), 2);
-        QCOMPARE(g_lastFake->flights.last().apiKey, kKey2);
+        QCOMPARE(g_lastFake->flights.last().secret, kKey2);
 
         // Ein Netzproblem sperrt nichts: der naechste Flug versucht es wieder.
         emit g_lastFake->failed(QStringLiteral("no internet"), false);
@@ -255,7 +262,42 @@ private slots:
         QCOMPARE(g_lastFake->flights.size(), 3);
     }
 
-    void the_page_is_pinned_and_ion_free()
+    // Der kostenlose Weg (2026-11-10, abends): ein Cesium-ion-Zugang.
+    void with_cesium_ion_the_flight_goes_to_3d()
+    {
+        installFake();
+        Map3dAccess::setChosenSource(Map3dAccess::Source::CesiumIon);
+        GoogleMapsKey::save(kKey);   // liegt daneben, gilt aber nicht
+        QsoMapWindow w;
+        prepare(w, nullptr);
+        QVERIFY(!w.threeDButtonForTest()->isChecked());   // ion gewaehlt, aber leer
+        QVERIFY(w.threeDButtonForTest()->toolTip().contains(QLatin1String("Cesium ion")));
+
+        CesiumIonToken::save(kToken);
+        QVERIFY(w.threeDButtonForTest()->isChecked());
+        QVERIFY(w.threeDButtonForTest()->toolTip().contains(QLatin1String("Cesium ion")));
+
+        w.flyToStation(QStringLiteral("W1AW"), kStaLat, kStaLon);
+        QCOMPARE(w.currentViewForTest(), int(QsoMapWindow::kView3d));
+        QVERIFY(g_lastFake);
+        QCOMPARE(g_lastFake->flights.size(), 1);
+        QVERIFY(g_lastFake->flights.first().viaCesiumIon);
+        QCOMPARE(g_lastFake->flights.first().secret, kToken);
+
+        // ion lehnt ab: zurueck, und dieser Zugang wird nicht wieder versucht.
+        emit g_lastFake->failed(QStringLiteral("Cesium ion does not know this token"), true);
+        QCOMPARE(w.currentViewForTest(), 1);
+        w.flyToStation(QStringLiteral("W1AW"), kStaLat, kStaLon);
+        QCOMPARE(g_lastFake->flights.size(), 1);
+        // Umschalten auf Google: ein anderer Zugang, also wieder 3D.
+        Map3dAccess::setChosenSource(Map3dAccess::Source::Google);
+        w.flyToStation(QStringLiteral("W1AW"), kStaLat, kStaLon);
+        QCOMPARE(g_lastFake->flights.size(), 2);
+        QVERIFY(!g_lastFake->flights.last().viaCesiumIon);
+        QCOMPARE(g_lastFake->flights.last().secret, kKey);
+    }
+
+    void the_page_is_pinned_and_sets_no_global_ion_token()
     {
         const QString html = Station3dPage::html();
         QVERIFY(!html.isEmpty());
@@ -272,6 +314,12 @@ private slots:
         // Google direkt mit dem eigenen Schluessel; ion bekommt keinen Zugang.
         QVERIFY(html.contains(QLatin1String("createGooglePhotorealistic3DTileset")));
         QVERIFY(html.contains(QLatin1String("Cesium.Ion.defaultAccessToken = \"\"")));
+        // ... und bleibt leer: der ion-Zugang geht nur an fromAssetId, nie
+        // global (Cesiums eigener Weg puffert eine Absage bis zum Neustart).
+        QCOMPARE(html.count(QLatin1String("defaultAccessToken =")), 1);
+        QVERIFY(html.contains(QLatin1String("const ION_GOOGLE_3D = 2275207;")));
+        QVERIFY(html.contains(QLatin1String(
+            "IonResource.fromAssetId(ION_GOOGLE_3D, { accessToken: f.token })")));
         QVERIFY(html.contains(QLatin1String("baseLayer: false")));
         QVERIFY(!html.contains(QLatin1String("fromIonAssetId")));
 
@@ -289,7 +337,7 @@ private slots:
         f.lat = kStaLat; f.lon = kStaLon;
         f.hasHome = true; f.homeLat = 48.3; f.homeLon = 14.5;
         f.km = 6543.2; f.bearingDeg = 296.4;
-        f.apiKey = kKey;
+        f.secret = kKey;
         const QString js = Station3dPage::flightScript(f);
         QVERIFY(js.startsWith(QLatin1String("window.longpath && window.longpath.fly(")));
         QVERIFY(js.endsWith(QLatin1String(");")));
@@ -300,6 +348,18 @@ private slots:
         QCOMPARE(o.value(QStringLiteral("call")).toString(), f.call);
         QCOMPARE(o.value(QStringLiteral("caption")).toString(), f.caption);
         QCOMPARE(o.value(QStringLiteral("key")).toString(), kKey);
+        QCOMPARE(o.value(QStringLiteral("source")).toString(), QStringLiteral("google"));
+        QVERIFY(!o.contains(QStringLiteral("token")));
+
+        // Ueber Cesium ion: "token" statt "key", und die Quelle dazu.
+        f.viaCesiumIon = true;
+        f.secret = kToken;
+        const QString jsIon = Station3dPage::flightScript(f);
+        const QJsonObject oi = QJsonDocument::fromJson(
+            jsIon.mid(jsIon.indexOf(QLatin1Char('(')) + 1).chopped(2).toUtf8()).object();
+        QCOMPARE(oi.value(QStringLiteral("source")).toString(), QStringLiteral("ion"));
+        QCOMPARE(oi.value(QStringLiteral("token")).toString(), kToken);
+        QVERIFY(!oi.contains(QStringLiteral("key")));
         QCOMPARE(o.value(QStringLiteral("home")).toObject().value(QStringLiteral("lat")).toDouble(), 48.3);
         QCOMPARE(o.value(QStringLiteral("bearing")).toDouble(), 296.4);
 

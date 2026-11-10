@@ -33,7 +33,7 @@ private slots:
         Station3dView v(nullptr, QStringLiteral("http://127.0.0.1:9/"));
         QSignalSpy failed(&v, &Station3dSurface::failed);
         v.handlePageMessage(QStringLiteral(
-            "{\"event\":\"failed\",\"kind\":\"tiles\",\"status\":403,\"body\":"
+            "{\"event\":\"failed\",\"kind\":\"tiles\",\"source\":\"google\",\"status\":403,\"body\":"
             "\"{\\\"error\\\":{\\\"code\\\":403,\\\"message\\\":\\\"x\\\",\\\"status\\\":"
             "\\\"PERMISSION_DENIED\\\",\\\"details\\\":[{\\\"reason\\\":\\\"SERVICE_DISABLED\\\"}]}}\","
             "\"message\":\"Request has failed. Status Code: 403\"}"));
@@ -42,12 +42,23 @@ private slots:
                  qPrintable(failed.at(0).at(0).toString()));
         QCOMPARE(failed.at(0).at(1).toBool(), true);
 
+        // Cesium ion: dieselbe Bruecke, Cesiums Absage, Cesiums Satz.
+        QSignalSpy ionFailed(&v, &Station3dSurface::failed);
+        v.handlePageMessage(QStringLiteral(
+            "{\"event\":\"failed\",\"kind\":\"tiles\",\"source\":\"ion\",\"status\":401,"
+            "\"body\":\"{\\\"code\\\":\\\"INVALID_TOKEN\\\",\\\"message\\\":"
+            "\\\"Invalid access token\\\"}\",\"message\":\"Request has failed.\"}"));
+        QCOMPARE(ionFailed.count(), 1);
+        QVERIFY2(ionFailed.at(0).at(0).toString().contains(QLatin1String("Cesium ion does not know")),
+                 qPrintable(ionFailed.at(0).at(0).toString()));
+        QCOMPARE(ionFailed.at(0).at(1).toBool(), true);
+
         // Kein HTTP-Status: Netz, kein Schluesselproblem.
         v.handlePageMessage(QStringLiteral(
             "{\"event\":\"failed\",\"kind\":\"tiles\",\"status\":0,\"body\":\"\","
             "\"message\":\"offline\"}"));
-        QCOMPARE(failed.count(), 2);
-        QCOMPARE(failed.at(1).at(1).toBool(), false);
+        QCOMPARE(failed.count(), 3);   // Google, ion, jetzt das Netz
+        QCOMPARE(failed.at(2).at(1).toBool(), false);
 
         // "ready" holt einen wartenden Flug nach; "arrived" wird gemeldet.
         QSignalSpy ready(&v, &Station3dView::ready);
@@ -108,13 +119,31 @@ private slots:
         f.lat = 41.7147; f.lon = -72.7272;
         f.hasHome = true; f.homeLat = 48.3; f.homeLon = 14.5;
         f.km = 6700; f.bearingDeg = 296;
-        f.apiKey = QStringLiteral("AIzaPruefstandNichtEchtXXXXXXXXXXXXXXXX");
+        f.secret = QStringLiteral("AIzaPruefstandNichtEchtXXXXXXXXXXXXXXXX");
         v.fly(f);
         QTRY_VERIFY_WITH_TIMEOUT(failed.count() >= 1, 30000);
         const QString why = failed.at(0).at(0).toString();
         qInfo() << "Google with an invented key:" << why;
         QVERIFY2(why.contains(QLatin1String("does not know this key")), qPrintable(why));
         QCOMPARE(failed.at(0).at(1).toBool(), true);
+
+        // Derselbe Weg ueber Cesium ion mit einem erfundenen Zugang -- und
+        // danach ein zweiter Versuch: er muss wieder fragen, nicht an der
+        // ersten Absage kleben (Cesiums eigener Weg wuerde puffern).
+        for (int round = 1; round <= 2; ++round) {
+            Station3dFlight g = f;
+            g.viaCesiumIon = true;
+            g.secret = QStringLiteral(
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJwcnVlZnN0YW5kIn0.UHJ1ZWZzdGFuZE5pY2h0RWNodA");
+            const int before = failed.count();
+            v.fly(g);
+            QTRY_VERIFY_WITH_TIMEOUT(failed.count() > before, 30000);
+            const QString whyIon = failed.last().at(0).toString();
+            qInfo() << "Cesium ion with an invented token, round" << round << ":" << whyIon;
+            QVERIFY2(whyIon.contains(QLatin1String("Cesium ion does not know this token")),
+                     qPrintable(whyIon));
+            QCOMPARE(failed.last().at(1).toBool(), true);
+        }
     }
 };
 

@@ -16,10 +16,16 @@
 //
 // Nicht modal und auf dem Haufen (tst_kein_kind_auf_dem_stapel): ein
 // Bediener soll nebenher in der Google-Konsole klicken koennen.
+//
+// Zwei Quellen (2026-11-10, abends -- Betreiber: „ich habe keine
+// kreditkarte … und geld will ich auch keines zahlen"): oben die Wahl,
+// darunter Anleitung, Feld und Test fuer GENAU diese Quelle. Vorgewaehlt
+// ist Cesium ion, weil es ohne Rechnungskonto geht.
 // =================================================================
 // Modification history (Longpath):
 //   2026-11-10 — Created for Longpath by Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude.
+//   2026-11-10 — Quelle waehlbar: Cesium ion (kostenlos) oder Google.
 // =================================================================
 #pragma once
 
@@ -30,6 +36,7 @@
 class QLabel;
 class QLineEdit;
 class QPushButton;
+class QRadioButton;
 
 namespace Longpath {
 
@@ -44,7 +51,13 @@ public:
 
     /// Die Anleitung als Rich Text -- eigene Funktion, damit der
     /// Pruefstand den Inhalt lesen kann, ohne einen Dialog zu bauen.
-    static QString guideHtml();
+    static QString guideHtml(Map3dAccess::Source s);
+
+    /// Die Quelle, die der Dialog gerade zeigt.
+    Map3dAccess::Source shownSource() const { return m_source; }
+    QRadioButton* ionChoiceForTest() const { return m_ionChoice; }
+    QRadioButton* googleChoiceForTest() const { return m_googleChoice; }
+    QLabel*       guideForTest() const { return m_guide; }
 
     QLineEdit*   keyEditForTest() const { return m_keyEdit; }
     QPushButton* testButtonForTest() const { return m_testBtn; }
@@ -54,12 +67,19 @@ public:
     GoogleTilesProbe* probeForTest() const { return m_probe; }
 
 private:
+    void showSource(Map3dAccess::Source s);
     void runTest();
     void onProbeFinished(GoogleTilesProbe::Verdict v, const QString& message);
     void save();
     void removeKey();
     void setStatus(const QString& text, bool good);
 
+    Map3dAccess::Source m_source{Map3dAccess::Source::CesiumIon};
+    QRadioButton* m_ionChoice{nullptr};
+    QRadioButton* m_googleChoice{nullptr};
+    QLabel*      m_guide{nullptr};
+    QLabel*      m_keyCaption{nullptr};
+    QLabel*      m_costNote{nullptr};
     QLineEdit*   m_keyEdit{nullptr};
     QPushButton* m_testBtn{nullptr};
     QPushButton* m_saveBtn{nullptr};

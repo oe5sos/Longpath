@@ -27,6 +27,7 @@
 // Modification history (Longpath):
 //   2026-11-10 — Created for Longpath by Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude.
+//   2026-11-10 — Zweite Quelle: Cesium ion (viaCesiumIon / secret).
 // =================================================================
 #pragma once
 
@@ -49,7 +50,10 @@ struct Station3dFlight {
     double  homeLon{0.0};
     double  km{-1.0};        // Grosskreis vom QTH; < 0 = unbekannt
     double  bearingDeg{-1.0};
-    QString apiKey;
+    // Der Zugang: ein kostenloser Cesium-ion-Zugang (Googles Kacheln als
+    // ion-Asset 2275207) oder ein eigener Google-Schluessel.
+    bool    viaCesiumIon{false};
+    QString secret;
 };
 
 class Station3dSurface : public QWidget {

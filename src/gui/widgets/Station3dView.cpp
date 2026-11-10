@@ -7,6 +7,7 @@
 // Modification history (Longpath):
 //   2026-11-10 — Created for Longpath by Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude.
+//   2026-11-10 — Absagen von Cesium ion und Google je Quelle gedeutet.
 // =================================================================
 
 #include "gui/widgets/Station3dView.h"
@@ -184,29 +185,33 @@ void Station3dView::handlePageMessage(const QString& json)
                                          "view (WebGL: %1)").arg(message), false);
             return;
         }
-        // Googles Absage: dieselbe Deutung wie der Test im Dialog, damit
-        // der Bediener an beiden Stellen denselben Satz liest.
+        // Die Absage des Dienstes: dieselbe Deutung wie der Test im
+        // Dialog, damit der Bediener an beiden Stellen denselben Satz liest.
+        const Map3dAccess::Source src =
+            o.value(QStringLiteral("source")).toString() == QLatin1String("ion")
+                ? Map3dAccess::Source::CesiumIon : Map3dAccess::Source::Google;
         const int status = o.value(QStringLiteral("status")).toInt();
         const QByteArray body = o.value(QStringLiteral("body")).toString().toUtf8();
         if (status == 0) {
-            reportFailure(QStringLiteral("Google's 3D tiles could not be reached — %1")
-                              .arg(message), false);
+            reportFailure(QStringLiteral("%1 could not be reached — %2")
+                              .arg(src == Map3dAccess::Source::CesiumIon
+                                       ? QStringLiteral("Cesium ion")
+                                       : QStringLiteral("Google's 3D tiles"),
+                                   message), false);
             return;
         }
         QString detail;
-        const GoogleTilesProbe::Verdict v = GoogleTilesProbe::interpret(status, body, &detail);
-        const bool keyProblem = v == GoogleTilesProbe::Verdict::InvalidKey
-                             || v == GoogleTilesProbe::Verdict::ApiNotEnabled
-                             || v == GoogleTilesProbe::Verdict::KeyRestricted
-                             || v == GoogleTilesProbe::Verdict::AppRestricted
-                             || v == GoogleTilesProbe::Verdict::NoBilling
-                             || v == GoogleTilesProbe::Verdict::Quota;
+        const GoogleTilesProbe::Verdict v = src == Map3dAccess::Source::CesiumIon
+            ? GoogleTilesProbe::interpretIon(status, body, &detail)
+            : GoogleTilesProbe::interpret(status, body, &detail);
+        const bool keyProblem = GoogleTilesProbe::isAccessProblem(v);
         // Nach einem gelungenen Start bleibt die Seite benutzbar; nur der
         // Flug faellt zurueck.
         m_startTimer->stop();
         m_pending.reset();
-        qCWarning(lcFlug3d) << "Google refused the 3D tiles:" << status << detail;
-        emit failed(GoogleTilesProbe::sentence(v, detail), keyProblem);
+        qCWarning(lcFlug3d) << Map3dAccess::sourceName(src) << "refused the 3D tiles:"
+                            << status << detail;
+        emit failed(GoogleTilesProbe::sentenceFor(src, v, detail), keyProblem);
         return;
     }
     if (ev == QLatin1String("tileFailed") || ev == QLatin1String("jsError")) {
