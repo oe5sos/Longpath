@@ -6795,6 +6795,14 @@ if(Qt6WebSockets_FOUND)
     target_link_libraries(tst_tci_audio_roundtrip PRIVATE Qt6::WebSockets)
 endif()
 
+# TCI-Clients-Panel: eine Zeile behaelt ihre Widgets, waehrend die Dauer
+# hochzaehlt, und der Kasten bleibt gleich hoch (2026-11-10, Upstream
+# NereusSDR d96e834b3 / #765).
+if(Qt6WebSockets_FOUND)
+    longpath_add_test(tst_tci_clients_panel_ruhig)
+    target_link_libraries(tst_tci_clients_panel_ruhig PRIVATE Qt6::WebSockets)
+endif()
+
 # ── Phase 3J-1 Task 18.1: IQ binary stream pipeline + IQSwap + AlwaysStreamIQ ──
 # Spins up a real TciServer + real QWebSocket client, subscribes to IQ for
 # slice 0, injects synthetic I/Q via the test-only injectRawIqForTest hook,

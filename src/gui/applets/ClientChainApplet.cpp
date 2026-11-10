@@ -219,6 +219,7 @@ QWidget* ClientChainApplet::buildClientRow(
     row->setStyleSheet(QStringLiteral(
         "QWidget { background: transparent; border-bottom: 1px solid %1; }"
     ).arg(Style::kBorderSubtle));
+    row->setObjectName(QStringLiteral("tciClientRow"));
 
     auto* vbox = new QVBoxLayout(row);
     vbox->setContentsMargins(6, 4, 6, 4);
