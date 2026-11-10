@@ -39,6 +39,7 @@
 #include "core/CallsignCache.h"
 #include "core/LogFilter.h"
 #include "models/LogEntry.h"
+#include "core/SotaNachtrag.h"
 
 #include <QDialog>
 #include <QTimer>
@@ -296,6 +297,19 @@ public:
     /// Der Dialog ruft das hier auf; Tests koennen es direkt aufrufen.
     void importAdifFile(const QString& path);
 
+    // ── MY_SOTA_REF aus dem SOTAdata-Log (2026-11-11) ───────────────
+    //
+    // Knopf "SOTA…": CSV waehlen, Vorschlaege im SotaNachtragDialog
+    // ansehen und anhaken, erst "Apply" schreibt. Vorher eine eigene
+    // Sicherung neben dem Log (logbook.adi.before-sota-<UTC>), denn die
+    // .bak1-3 sind nach drei weiteren Speicherungen weg.
+    void sotaNachtragen();
+    /// Ohne Dialog -- der Dialog ruft das auf, Tests direkt. Die Indizes
+    /// beziehen sich auf das Log, wie es gerade ist. `sicherung` bekommt
+    /// den Pfad der Sicherung. false, wenn nichts geschrieben wurde.
+    bool sotaVorschlaegeAnwenden(const QVector<SotaNachtrag::Vorschlag>& gewaehlt,
+                                 QString* sicherung = nullptr);
+
     // ── QRZ-Logbuch abholen ─────────────────────────────────────────
     //
     // Der Weg zurueck: was im QRZ-Logbuch steht — dort geloggte
@@ -311,6 +325,8 @@ public:
 
     /// Wie viele Verbindungen das Logbuch gerade fuehrt. Nur fuer Tests.
     int entryCountForTesting() const { return m_all.size(); }
+    const QVector<LogEntry>& entriesForTest() const { return m_all; }
+    QString meinFeldForTest() const { return meinFeld(); }
 
     /// Rueckfragen und Meldungen des Imports umleiten. Fuer Tests: die
     /// eine Funktion antwortet, die andere schreibt mit. Nicht gesetzt

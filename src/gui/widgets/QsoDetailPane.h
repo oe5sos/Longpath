@@ -51,6 +51,7 @@
 #include "core/CallsignInfo.h"
 #include "models/LogEntry.h"
 
+#include <QPointer>
 #include <QWidget>
 
 #include <functional>
@@ -64,6 +65,7 @@ class QVBoxLayout;
 namespace Longpath {
 
 class CallsignCache;
+class HoehenprofilFenster;
 class QrzClient;
 class StationPhoto;
 
@@ -111,7 +113,7 @@ public:
     // eigene Standort kam nur aus dem QSO (MY_GRIDSQUARE) oder aus
     // StationGridSquare, und das ist bei Martin leer. Jetzt:
     //   eigener Standort  QSO -> StationGridSquare -> setHomeGrid()
-    //   Station           QRZ-Koordinaten -> QRZ-Locator -> Log-Locator
+    //   Station           SOTA-Gipfel -> QRZ-Koordinaten -> QRZ-Locator -> Log-Locator
     //                     -> Landesmitte (setPositionFallback, cty.dat)
     // und die Karte sagt, woher die Lage stammt -- eine Landesmitte ist
     // keine Hausnummer.
@@ -120,7 +122,9 @@ public:
     void setPositionFallback(PositionFallback fn);
     void setHomeGrid(std::function<QString()> fn);
 
-    enum class Lage { Keine, QrzKoordinaten, QrzLocator, LogLocator, Landesmitte };
+    // Gipfel (Probe-Merge Rotor + Hoehenprofil): die Gegenstation steht auf
+    // einem SOTA-Gipfel (SOTA_REF) -- dessen Lage geht allem anderen vor.
+    enum class Lage { Keine, Gipfel, QrzKoordinaten, QrzLocator, LogLocator, Landesmitte };
     // Woher die Lage der Station gerade stammt, und wie genau sie ist --
     // als Satz fuer die Oberflaeche ("street address (QRZ)").
     Lage    lage() const { return m_lage; }
@@ -129,6 +133,8 @@ public:
     // Peilung (kurzer Weg) und Entfernung, wie die Karte sie zeigt.
     bool peilung(double& bearingDeg, double& km) const;
     QString gezeigtesRufzeichen() const { return m_haveEntry ? m_entry.call : QString(); }
+    QPushButton* profilButtonForTest() const { return m_profilBtn; }
+    HoehenprofilFenster* profilFensterForTest() const;
 
 signals:
     void turnRotorRequested(double bearingDeg, const QString& call);
@@ -194,6 +200,17 @@ private:
     QPushButton* m_lookupBtn{nullptr};
     QPushButton* m_editBtn{nullptr};
     QPushButton* m_qrzPageBtn{nullptr};
+
+    // ── Hoehenprofil (2026-11-11) ─────────────────────────────────────
+    // "Profile" fuer 2-m-, 70-cm- und 23-cm-QSOs; ein Fenster, das beim
+    // naechsten Druck den Inhalt wechselt (HoehenprofilFenster.h sagt,
+    // warum hier und nicht in der Karte).
+    QPushButton* m_profilBtn{nullptr};
+    QPointer<HoehenprofilFenster> m_profilFenster;
+    void refreshProfil();
+    void oeffneProfil();
+    // Der eigene Locator, wenn das QSO keinen hat.
+    static QString ersatzLocator();
 
     double m_rotorDeg{0.0};
     bool   m_haveRotor{false};

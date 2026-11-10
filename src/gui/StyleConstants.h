@@ -1594,4 +1594,16 @@ inline QFont monoFontPt(int pt, QFont::Weight w = QFont::Normal)
     return f;
 }
 
+// ── Hoehenprofil fuer UKW-QSOs (2026-11-11) ─────────────────────────
+//
+// Aus dem Entwurfsblatt, das der Betreiber gewaehlt hat
+// (werkzeug/logbuch-2026-11-09/blaetter/5-hoehenprofil-2m.png, Farben in
+// blaetter.py/profil.py). Grund und Bernstein sind schon benannt:
+// kPanelBg (#0c0c0e) und kAmberText (#d8a55f).
+constexpr auto kProfilGitter    = "#2a2a30";   // Gitterlinien
+constexpr auto kProfilText      = "#e6e1d6";   // Sichtlinie, Urteil
+constexpr auto kProfilTextLeise = "#8a8578";   // Achsen, Fusszeile
+constexpr auto kProfilGelaende  = "#3d372d";   // Gelaendeflaeche
+constexpr auto kProfilKante     = "#9a8b70";   // Gelaendekante
+
 } // namespace Longpath::Style
