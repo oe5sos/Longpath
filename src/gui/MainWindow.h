@@ -461,8 +461,10 @@ public:
     /// das Hauptfenster bekommt einen neuen Rahmen, und jedes schwebende
     /// Fenster (dieselbe Aufzaehlung wie beim Schutzrahmen: Qt::Tool-
     /// Kinder des Hauptfensters, keine Dialoge) wird von der alten Lage
-    /// IM VERHAELTNIS zum alten Rahmen auf den neuen abgebildet. Die
-    /// Groesse bleibt dem Betreiber. Laeuft im Nachlauf des Schutzrahmens
+    /// IM VERHAELTNIS zum alten Rahmen auf den neuen abgebildet. Seit
+    /// 2026-11-11 auch die Groesse („wenn ich das mache, müssen alle
+    /// anderen fenster auch im verhältnis kleiner werden"); ein reiner
+    /// Zug laesst sie, wie sie ist. Laeuft im Nachlauf des Schutzrahmens
     /// (250 ms), VOR dem Herausholen aus den Sperrstreifen.
     ///
     /// `m_hauptrahmenBasis` ist der Rahmen, zu dem die Lagen zuletzt

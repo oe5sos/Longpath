@@ -4365,6 +4365,25 @@ void MainWindow::wireImdOverlayForPan(SpectrumWidget* sw)
         // Geraet: die Einstellung stand gespeichert auf True, das Spektrum
         // meldete showImd=false, und ein Messlauf ging ins Leere.
         sw->setShowIMDMeasurements(ps->show2ToneMeasurements());
+    } else {
+        // ── Am Flex gibt es den Koordinator NICHT (2026-11-11) ───────
+        //
+        // `PureSignal` entsteht nur mit WDSP, also nur an einer
+        // OpenHPSDR-Maschine. Am Flex blieb `showImd` damit fuer immer
+        // false — und ohne dieses vierte Tor zeichnet
+        // `drawImdOverlay` nie, selbst wenn MOX, Zweiton und Duplex
+        // stimmen. Am 2026-11-11 an der FLEX-8400 im Protokoll
+        // gesehen: `mox=true testIMD=true showImd=false duplex=true`
+        // waehrend der Betreiber mit dem Zweiton der Maschine getastet
+        // hat. Der Haken selbst stand in den Einstellungen auf True.
+        //
+        // Also dort lesen, wo er steht. Denselben Schluessel benutzt
+        // `PureSignal::loadShow2ToneSetting` (PureSignal.cpp:853).
+        sw->setShowIMDMeasurements(
+            AppSettings::instance()
+                .value(QStringLiteral("PsShow2ToneMeasurements"),
+                       QStringLiteral("False"))
+                .toString() == QStringLiteral("True"));
     }
 }
 
@@ -17157,13 +17176,14 @@ void MainWindow::schutzrahmenNachziehen()
     // angestossen hat.
     const QRect jetzt = frameGeometry();
     if (eigeneBewegungLebt() || m_aufbauBewegung || !isVisible()) {
+        // Die Schwelle steht in istRasterNachhall (WindowPlacement):
+        // fuer die Groesse anderthalb Rasterweiten, weil beide Kanten
+        // einrasten (2026-11-11, am Geraet: +15/-21 unter der
+        // Menueleiste galt sonst als eigene Bewegung).
         const bool rasterNachhall =
             m_fremdeBewegungAnhaengig
-            && m_schutzrahmenTimer->isActive() && m_letzterHauptrahmen.isValid()
-            && qAbs(jetzt.x() - m_letzterHauptrahmen.x()) < kSnapGridPx
-            && qAbs(jetzt.y() - m_letzterHauptrahmen.y()) < kSnapGridPx
-            && qAbs(jetzt.width() - m_letzterHauptrahmen.width()) < kSnapGridPx
-            && qAbs(jetzt.height() - m_letzterHauptrahmen.height()) < kSnapGridPx;
+            && m_schutzrahmenTimer->isActive()
+            && istRasterNachhall(jetzt, m_letzterHauptrahmen);
         if (!rasterNachhall) {
             m_hauptrahmenBasis = jetzt;
             m_fremdeBewegungAnhaengig = false;
@@ -17200,19 +17220,54 @@ int MainWindow::schwebendeMitziehen()
         const QRect r = w->frameGeometry();
         QPoint ziel(neu.x() + qRound(double(r.x() - alt.x()) * fx),
                     neu.y() + qRound(double(r.y() - alt.y()) * fy));
+
+        // ── Die Groesse im selben Verhaeltnis (2026-11-11) ──────────
+        //
+        // Betreiber: „ich hatte es bewusst kleiner gemacht, das
+        // hauptfenster. wenn ich das mache, müssen alle anderen fenster
+        // auch im verhältnis kleiner werden." Bis heute zog nur die
+        // LAGE mit; die Groesse blieb, und ein verkleinertes
+        // Hauptfenster schob die schwebenden Fenster uebereinander und
+        // ueber seinen Rand. Bei einem reinen Zug (fx = fy = 1) bleibt
+        // die Groesse, wie sie ist. Mindest- und Hoechstgroesse des
+        // Fensters gelten weiter.
+        const QSize innenAlt = w->size();
+        QSize innen = innenAlt;
+        if (fx != 1.0 || fy != 1.0) {
+            innen = QSize(qRound(double(innenAlt.width()) * fx),
+                          qRound(double(innenAlt.height()) * fy))
+                        .expandedTo(w->minimumSize())
+                        .boundedTo(w->maximumSize());
+        }
+        // Der Rahmen (Titelleiste) waechst nicht mit.
+        QSize rahmen = r.size() - innenAlt + innen;
+
         // Auf dem Schirm bleiben: ein Fenster, dessen Titelleiste
-        // draussen liegt, laesst sich nicht mehr fassen.
+        // draussen liegt, laesst sich nicht mehr fassen -- und keines
+        // waechst ueber den Schirm hinaus.
         if (QScreen* scr = w->screen()) {
             const QRect platz = scr->availableGeometry();
+            if (rahmen.width() > platz.width() || rahmen.height() > platz.height()) {
+                const QSize ueber(qMax(0, rahmen.width() - platz.width()),
+                                  qMax(0, rahmen.height() - platz.height()));
+                innen = (innen - ueber).expandedTo(w->minimumSize());
+                rahmen = r.size() - innenAlt + innen;
+            }
             ziel.setX(qBound(platz.left(), ziel.x(),
-                             qMax(platz.left(), platz.right() - r.width() + 1)));
+                             qMax(platz.left(), platz.right() - rahmen.width() + 1)));
             ziel.setY(qBound(platz.top(), ziel.y(),
-                             qMax(platz.top(), platz.bottom() - r.height() + 1)));
+                             qMax(platz.top(), platz.bottom() - rahmen.height() + 1)));
         }
-        if (ziel != r.topLeft()) {
-            // move(), nicht setGeometry(): die GROESSE gehoert dem
-            // Betreiber (siehe schwebendeAusDemSchutzrahmenHolen).
+        bool geaendert = false;
+        if (innen != innenAlt) {
+            w->resize(innen);
+            geaendert = true;
+        }
+        if (ziel != w->frameGeometry().topLeft()) {
             w->move(ziel);
+            geaendert = true;
+        }
+        if (geaendert) {
             ++bewegt;
         }
     }
