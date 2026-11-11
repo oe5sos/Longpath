@@ -108,6 +108,8 @@
 //                 (RX vs VAC at cmaster.cs:912-943 [v2.10.3.13]); see commit
 //                 message for rationale.  J.J. Boyd (KG4VCF), AI-assisted via
 //                 Anthropic Claude Code.
+//   2026-11-11 — txRefusalReason() probe (see header). Martin Fischer
+//                 (OE5SOS), AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 // no-port-check: Longpath-original file; Thetis state-machine
@@ -414,6 +416,38 @@ void MoxController::onModeChanged(DSPMode mode)
 void MoxController::setTune(bool on)
 {
     if (on) {
+        // ── Erst fragen, dann Merker setzen (Longpath, 2026-11-08) ───────
+        //
+        // From Thetis console.cs:30061-30069 [@852bf0e]:
+        //   chkMOX.Checked = true;
+        //   await Task.Delay(100); // MW0LGE_21k8
+        //   // go for it
+        //   if (!_mox)
+        //   {
+        //       chkTUN.Checked = false;
+        //       return;
+        //   }
+        //
+        // In Thetis fallen _current_ptt_mode und _manual_mox erst NACH dieser
+        // Pruefung -- ein verweigertes MOX setzt sie nie. Longpath setzt sie
+        // davor (Reihenfolge oben begruendet) und hatte keinen Rueckweg: ein
+        // abgewiesenes TUNE meldete manualMoxChanged(true), RadioModel gab
+        // das als "transmit tune=1" an TGXL/PGXL weiter (SmartSdrApiListener)
+        // -- ein Tuner-Durchlauf ohne Traeger -- und gleich danach tune=0.
+        //
+        // Darum: die Pruefung, die setMox() ohnehin zuerst macht, schon hier.
+        // Wird abgewiesen, faellt kein Merker und kein Signal ausser
+        // moxRejected. RadioModel nimmt die TUNE-Taste dann selbst zurueck
+        // (setTune: `if (!isMox()) setTune(false)`).
+        if (m_moxCheck) {
+            const auto vorab = m_moxCheck();
+            if (!vorab.ok) {
+                emit moxRejected(vorab.reason);
+                return;
+            }
+        }
+        const PttMode alterModus = m_pttMode;
+
         // ── TUN-on: set flags BEFORE engaging MOX ────────────────────────
         // (Ordering deviation from Thetis documented above.)
 
@@ -435,6 +469,17 @@ void MoxController::setTune(bool on)
         // hardwareFlipped(true) → start rfDelay → ... → txReady.
         // From Thetis console.cs:30081 [v2.10.3.13]: chkMOX.Checked = true;
         setMox(true);
+
+        // Kam MOX trotzdem nicht (eine Sperre NACH der Bandplan-Pruefung,
+        // z. B. die TxInterlockPolicy): die Merker zuruecknehmen, wie Thetis
+        // sie in diesem Fall gar nicht erst setzt (`if (!_mox) return;`).
+        if (!m_mox) {
+            if (!wasManual) {
+                m_manualMox = false;
+                emit manualMoxChanged(false);
+            }
+            setPttMode(alterModus);
+        }
 
     } else {
         // ── TUN-off: release MOX BEFORE clearing the flag ─────────────────
@@ -724,6 +769,25 @@ void MoxController::releaseKeyBlock()
 bool MoxController::keyBlockLatched() const noexcept
 {
     return m_keyBlockLatched;
+}
+
+// Longpath-original (2026-11-11): the two gates at the top of setMox(true),
+// asked without consequence. See the header for why the interlock policy is
+// left out.
+QString MoxController::txRefusalReason() const
+{
+    if (m_keyBlockLatched) {
+        return m_keyBlockReason.isEmpty() ? QStringLiteral("key blocked")
+                                          : m_keyBlockReason;
+    }
+    if (m_moxCheck) {
+        const auto result = m_moxCheck();
+        if (!result.ok) {
+            return result.reason.isEmpty() ? QStringLiteral("band plan")
+                                           : result.reason;
+        }
+    }
+    return {};
 }
 
 // ---------------------------------------------------------------------------

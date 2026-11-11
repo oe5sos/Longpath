@@ -10,10 +10,13 @@
 // (Zug am Titelbalken, das "+" links oben, Vollbild), blieben sie bisher
 // stehen, wo sie waren. Jetzt folgen sie: ein Zug verschiebt sie um
 // denselben Betrag, eine Groessenaenderung bildet ihre Lage im Verhaeltnis
-// zum alten Rahmen auf den neuen ab. Die Groesse der schwebenden Fenster
-// bleibt dem Betreiber.
+// zum alten Rahmen auf den neuen ab -- und seit 2026-11-11 auch ihre
+// Groesse. Betreiber: „ich hatte es bewusst kleiner gemacht, das
+// hauptfenster. wenn ich das mache, müssen alle anderen fenster auch im
+// verhältnis kleiner werden."
 //
 // Alte Fassung: die Faelle 1 und 2 fallen um (das Fenster steht noch).
+// Fassung vom 2026-11-04: Fall 2 und 2b fallen um (die Groesse blieb).
 //
 // Bewusst nicht abgeraeumt (wie tst_dock_ablage_nimmt_fenster_mit).
 //
@@ -21,6 +24,9 @@
 // Modification history (Longpath):
 //   2026-11-04 — Original fuer Longpath von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 — Groesse im Verhaeltnis (Fall 2, neuer Fall 2b).
+//                 Martin Fischer (OE5SOS), KI-gestuetzt mit Anthropic
+//                 Claude Code.
 // =================================================================
 
 // no-port-check: Longpath-original test file.
@@ -156,7 +162,7 @@ private slots:
         const QRect f = m_abgeloest->frameGeometry();
         const double fx = double(f.x() - alt.x()) / alt.width();
         const double fy = double(f.y() - alt.y()) / alt.height();
-        const QSize groesse = f.size();
+        const QSize innen = m_abgeloest->size();
 
         m_mw->resize(alt.width() + 480, alt.height() + 160);
         QTest::qWait(kNachlaufMs);
@@ -171,16 +177,46 @@ private slots:
                  qPrintable(QStringLiteral(
                      "Lage (%1,%2), erwartet im Verhaeltnis (%3,%4)")
                      .arg(g.x()).arg(g.y()).arg(sollX).arg(sollY)));
-        // Die Groesse gehoert dem Betreiber: das Mitziehen ruft move(),
-        // nie setGeometry(). Was danach noch an der Groesse ruehrt, ist
-        // Longpaths Raster, das alle vier Kanten des Rahmens einrasten
-        // laesst -- gemessen 365x429 -> 349x413, genau eine Rasterweite,
-        // wie bei einem Zug von Hand auch.
-        QVERIFY2(qAbs(g.width() - groesse.width()) <= kSnapGridPx
-                     && qAbs(g.height() - groesse.height()) <= kSnapGridPx,
-                 qPrintable(QStringLiteral("Groesse %1x%2, vorher %3x%4")
-                                .arg(g.width()).arg(g.height())
-                                .arg(groesse.width()).arg(groesse.height())));
+        // Die Groesse waechst im selben Verhaeltnis (2026-11-11). Was
+        // danach noch an ihr ruehrt, ist Longpaths Raster, das alle vier
+        // Kanten des Rahmens einrasten laesst -- eine Rasterweite, wie
+        // bei einem Zug von Hand auch.
+        const QSize soll(qRound(innen.width() * double(neu.width()) / alt.width()),
+                         qRound(innen.height() * double(neu.height()) / alt.height()));
+        const QSize ist = m_abgeloest->size();
+        QVERIFY2(qAbs(ist.width() - soll.width()) <= kSnapGridPx
+                     && qAbs(ist.height() - soll.height()) <= kSnapGridPx,
+                 qPrintable(QStringLiteral("Groesse %1x%2, erwartet %3x%4 (vorher %5x%6)")
+                                .arg(ist.width()).arg(ist.height())
+                                .arg(soll.width()).arg(soll.height())
+                                .arg(innen.width()).arg(innen.height())));
+    }
+
+    // ── Fall 2b: verkleinert der Betreiber das Hauptfenster, werden die
+    //    schwebenden Fenster im Verhaeltnis kleiner (2026-11-11) ───────────
+    void verkleinernMachtSieKleiner()
+    {
+        const QRect alt = m_mw->frameGeometry();
+        const QSize innen = m_abgeloest->size();
+
+        m_mw->resize(alt.width() - 360, alt.height() - 120);
+        QTest::qWait(kNachlaufMs);
+
+        const QRect neu = m_mw->frameGeometry();
+        QVERIFY2(neu.width() < alt.width(), "das Hauptfenster muss kleiner geworden sein");
+        const QSize ist = m_abgeloest->size();
+        const QSize soll = QSize(qRound(innen.width() * double(neu.width()) / alt.width()),
+                                 qRound(innen.height() * double(neu.height()) / alt.height()))
+                               .expandedTo(m_abgeloest->minimumSize());
+        QVERIFY2(ist.width() < innen.width() || ist.width() == m_abgeloest->minimumWidth(),
+                 qPrintable(QStringLiteral("Breite %1, vorher %2 -- nicht kleiner geworden")
+                                .arg(ist.width()).arg(innen.width())));
+        QVERIFY2(qAbs(ist.width() - soll.width()) <= kSnapGridPx
+                     && qAbs(ist.height() - soll.height()) <= kSnapGridPx,
+                 qPrintable(QStringLiteral("Groesse %1x%2, erwartet %3x%4 (vorher %5x%6)")
+                                .arg(ist.width()).arg(ist.height())
+                                .arg(soll.width()).arg(soll.height())
+                                .arg(innen.width()).arg(innen.height())));
     }
 
     // ── Fall 3: eine Profilanwendung (eigene Bewegung) zieht NICHT ───────

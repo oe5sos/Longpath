@@ -263,6 +263,7 @@ class SliceModel : public QObject {
     Q_PROPERTY(double audioPan        READ audioPan        WRITE setAudioPan        NOTIFY audioPanChanged)
     Q_PROPERTY(bool   ssqlEnabled     READ ssqlEnabled     WRITE setSsqlEnabled     NOTIFY ssqlEnabledChanged)
     Q_PROPERTY(double ssqlThresh      READ ssqlThresh      WRITE setSsqlThresh      NOTIFY ssqlThreshChanged)
+    Q_PROPERTY(bool   ssqlAuto        READ ssqlAuto        WRITE setSsqlAuto        NOTIFY ssqlAutoChanged)
     Q_PROPERTY(bool   amsqEnabled     READ amsqEnabled     WRITE setAmsqEnabled     NOTIFY amsqEnabledChanged)
     Q_PROPERTY(double amsqThresh      READ amsqThresh      WRITE setAmsqThresh      NOTIFY amsqThreshChanged)
     Q_PROPERTY(bool   fmsqEnabled     READ fmsqEnabled     WRITE setFmsqEnabled     NOTIFY fmsqEnabledChanged)
@@ -858,6 +859,12 @@ public:
     double ssqlThresh()      const { return m_ssqlThresh; }
     void   setSsqlThresh(double dB);
 
+    // Auto-SQL (2026-11-08): nur an der Flex wirksam. Die Schwelle folgt
+    // dort dem gemessenen Rauschen (FlexAutoRauschsperre), ssqlThresh
+    // bleibt der Wert fuer SQL von Hand und wird nicht ueberschrieben.
+    bool   ssqlAuto()        const { return m_ssqlAuto; }
+    void   setSsqlAuto(bool v);
+
     bool   amsqEnabled()     const { return m_amsqEnabled; }
     void   setAmsqEnabled(bool v);
 
@@ -1245,7 +1252,26 @@ public:
     bool hasSettingsFor(Band band) const;
 
     void saveToSettings(Longpath::Band band);
-    void restoreFromSettings(Longpath::Band band);
+    // `restoreTuning` false laesst Frequenz, Betriebsart und Filter stehen
+    // und stellt nur den Rest des Bandgedaechtnisses her (AGC, NB, Schritt,
+    // Antennen, Abtastrate ...). So ruft der Bandstapel einen Eintrag ab:
+    // erst das Gedaechtnis des Bandes ohne Abstimmung, dann Frequenz,
+    // Betriebsart und Filter aus dem Eintrag. 2026-11-11, nach Upstream
+    // NereusSDR (restoreFromSettings(band, false)).
+    void restoreFromSettings(Longpath::Band band, bool restoreTuning = true);
+
+    // Was das Bandgedaechtnis dieser Scheibe fuer `band` haelt, so wie ein
+    // Bandwechsel es lesen wuerde -- nullopt, wenn Frequenz oder
+    // Betriebsart nie abgelegt wurden. Der Filter ist 0..0, wenn fuer die
+    // Betriebsart keiner abgelegt ist. Liest nur, aendert nichts.
+    // 2026-11-11, fuer den Bandstapel; nach Upstream NereusSDR.
+    struct SavedBandSpot {
+        double  frequencyHz{0.0};
+        DSPMode mode{DSPMode::USB};
+        int     filterLow{0};
+        int     filterHigh{0};
+    };
+    std::optional<SavedBandSpot> savedBandSpot(Longpath::Band band) const;
     static void migrateLegacyKeys();
 
     // Reads the persisted "last band" marker for this slice index from
@@ -1336,6 +1362,7 @@ signals:
     void audioPanChanged(double pan);
     void ssqlEnabledChanged(bool v);
     void ssqlThreshChanged(double dB);
+    void ssqlAutoChanged(bool v);
     void amsqEnabledChanged(bool v);
     void amsqThreshChanged(double dB);
     void fmsqEnabledChanged(bool v);
@@ -1521,6 +1548,7 @@ private:
     double m_audioPan{0.0};           // Neutral default — center pan (−1..+1), no Thetis citation needed
     bool   m_ssqlEnabled{false};      // Neutral default — feature off at start
     double m_ssqlThresh{16.0};        // Slider units 0–100; From Thetis radio.cs:1187 _fSSqlThreshold = 0.16f → 16 in slider scale
+    bool   m_ssqlAuto{false};         // Neutral default — Auto-SQL off at start
     bool   m_amsqEnabled{false};      // Neutral default — feature off at start
     double m_amsqThresh{-150.0};      // From Thetis radio.cs:1164-1165 — rx_squelch_threshold = -150.0f (AM reuses same field)
     bool   m_fmsqEnabled{false};      // Neutral default — feature off at start

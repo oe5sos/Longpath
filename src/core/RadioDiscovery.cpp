@@ -483,6 +483,7 @@ bool RadioDiscovery::parseP1Reply(const QByteArray& bytes, const QHostAddress& s
     // Optional extra fields (len > 20) — From Thetis parseDiscoveryReply P1 branch
     if (bytes.size() > 20) {
         out.maxReceivers = static_cast<quint8>(bytes[20]);
+        out.reportedReceivers = out.maxReceivers;
         if (out.maxReceivers <= 0) {
             out.maxReceivers = RadioInfo::maxReceiversForBoard(out.boardType);
         }
@@ -555,6 +556,7 @@ bool RadioDiscovery::parseP2Reply(const QByteArray& bytes, const QHostAddress& s
     // From Thetis: if (len > 20) — receivers count
     if (bytes.size() > 20) {
         int hwRx = static_cast<quint8>(bytes[20]);
+        out.reportedReceivers = hwRx;
         out.maxReceivers = (hwRx > 0) ? hwRx : RadioInfo::maxReceiversForBoard(out.boardType);
     }
 
@@ -577,7 +579,10 @@ bool RadioDiscovery::parseP2Reply(const QByteArray& bytes, const QHostAddress& s
     qCDebug(lcDiscovery) << "P2 response from" << out.address.toString()
                          << "board:" << BoardCapsTable::forBoard(out.boardType).displayName
                          << "fw:" << out.firmwareVersion
-                         << "in use:" << out.inUse;
+                         << "in use:" << out.inUse
+                         // Byte 20: wie viele Empfaenger die Gateware
+                         // meldet, 0 = keine Angabe (2026-11-10).
+                         << "rx gemeldet:" << out.reportedReceivers;
 
     return true;
 }

@@ -23,6 +23,13 @@
 //                1 Hz refresh with auto-refresh checkbox at top.
 //                TciServer accessors clients() + activeTxAudioClient()
 //                added in same commit (Phase 22).
+//   2026-11-10 — Die Zeilen werden nur noch neu gebaut, wenn sich ihre
+//                Gestalt aendert (Programm kommt/geht, Reihenfolge, Marken);
+//                sonst bekommt jede Zeile nur neuen Text. Vorher wurde jede
+//                Sekunde alles neu gebaut, und die Spalte darunter sprang.
+//                Uebernommen aus Upstream NereusSDR d96e834b3 (#765, J.J.
+//                Boyd KG4VCF). Martin Fischer (OE5SOS), KI-gestuetzt mit
+//                Anthropic Claude Code.
 // =================================================================
 
 #pragma once
@@ -32,6 +39,8 @@
 #include "AppletWidget.h"
 
 #include <memory>
+#include <QList>
+#include <QPointer>
 
 class QCheckBox;
 class QLabel;
@@ -110,6 +119,28 @@ private:
 
     // Scrollable rows area — rebuilt on every refresh tick.
     QVBoxLayout* m_rowsLayout{nullptr};
+
+    // Die Teile einer Zeile, die eigene Widgets sind. Gleiche Gestalt in
+    // gleicher Reihenfolge: nur der Text wird nachgezogen (Upstream
+    // NereusSDR d96e834b3, #765).
+    struct RowShape {
+        QWebSocket* socket{nullptr};
+        bool tx{false};
+        QList<int> iq;
+        QList<int> audio;
+        bool rxSensors{false};
+        bool txSensors{false};
+        bool hasCommandAge{false};
+        bool hasDrops{false};
+        bool operator==(const RowShape& other) const = default;
+    };
+    RowShape shapeOf(QWebSocket* socket,
+                     const std::shared_ptr<TciClientSession>& session) const;
+    // Den wechselnden Text einer von buildClientRow() gebauten Zeile setzen.
+    void updateClientRowText(QWidget* row,
+                             const std::shared_ptr<TciClientSession>& session) const;
+    QList<RowShape> m_rowShapes;
+    QList<QPointer<QWidget>> m_rows;
 
     // Shown when server is stopped or there are no connected clients.
     QWidget*     m_emptyStatePanel{nullptr};

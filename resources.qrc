@@ -12,6 +12,11 @@
         <file alias="iaru-region3.json">resources/bandplans/iaru-region3.json</file>
         <file alias="rac-canada.json">resources/bandplans/rac-canada.json</file>
     </qresource>
+    <!-- Der 3D-Flug im Logbuch (2026-11-10): CesiumJS-Seite, laedt die
+         festgenagelte Fassung vom CDN; siehe Station3dSurface.h. -->
+    <qresource prefix="/flug3d">
+        <file alias="flug3d.html">resources/flug3d/flug3d.html</file>
+    </qresource>
     <qresource prefix="/help">
         <file alias="getting-started.md">resources/help/getting-started.md</file>
     </qresource>

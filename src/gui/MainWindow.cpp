@@ -246,6 +246,7 @@ warren@wpratt.com
 #include "gui/MacVollflaeche.h"
 #include "gui/DxccSpotColours.h"
 #include "gui/ScopedChildWidget.h"
+#include "gui/Google3dSetupDialog.h"
 #include "gui/styles/ThemeQss.h"
 #include "ConnectionPanel.h"
 #include "NetworkDiagnosticsDialog.h"
@@ -267,6 +268,7 @@ warren@wpratt.com
 #include "StyleConstants.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "models/bandstack/BandStackController.h"
 #include "widgets/CommandBar.h"
 #include "widgets/ProfileRail.h"
 #include "widgets/WidgetPicker.h"
@@ -338,6 +340,8 @@ warren@wpratt.com
 #include "applets/AppletPanelWidget.h"
 #include "applets/FrequencyApplet.h"
 #include "applets/InstrumentApplet.h"
+#include "TraegerEichDialog.h"
+#include "RundumDialog.h"
 #include "gui/widgets/RasterOverlay.h"
 #include "gui/WindowPlacement.h"
 #include "gui/SideAreaWindow.h"
@@ -402,7 +406,9 @@ warren@wpratt.com
 #include "applets/RttyDecoderApplet.h"
 #include "applets/CwDecoderApplet.h"
 #include "applets/Ft8Applet.h"
+#include "Ft8KartenBruecke.h"
 #include "applets/Ft8PlaetzeApplet.h"
+#include "applets/BandStackApplet.h"
 #include "applets/PanelAutomatik.h"
 #include "applets/QsoRecorderApplet.h"
 #include "applets/RecordingApplet.h"
@@ -1210,6 +1216,18 @@ MainWindow::MainWindow(QWidget* parent)
         showToast(reason, ToastSeverity::Warning, 3000);
     });
 
+    // Bandstapel (2026-11-11): wohin ein Druck gefuehrt hat, etwa
+    // „40m: 7.185 LSB, 5 of 6" -- sonst springt die Frequenz beim zweiten
+    // Druck auf dieselbe Taste ohne Erklaerung.
+    if (BandStackController* stapel = m_radioModel->bandStack()) {
+        connect(stapel, &BandStackController::recalled,
+                this, [this](int /*sliceId*/, const QString& bericht) {
+            if (!bericht.isEmpty()) {
+                showToast(bericht, ToastSeverity::Info, 2500);
+            }
+        });
+    }
+
     // Jeder gescheiterte Verbindungsversuch sagt jetzt, WARUM — auch der
     // von Hand angestossene. 14 Sekunden, weil der Text zwei Saetze hat
     // und der Bediener in dem Moment ohnehin ratlos ist.
@@ -1497,6 +1515,9 @@ MainWindow::MainWindow(QWidget* parent)
         // shutdown (SIGTERM / force-quit). Idempotent with the
         // closeEvent path above.
         saveMainWindowGeometry();
+        if (m_radioModel && m_radioModel->bandStack()) {
+            m_radioModel->bandStack()->flush();
+        }
         AppSettings::instance().save();
         qWarning() << "[ProfileSaveOnQuit:aboutToQuit] AppSettings::save() done";
         takeShutdownBackupIfWanted();
@@ -3802,10 +3823,17 @@ FFTEngine* MainWindow::createFftEngineForStream(int streamIndex)
     // thread; the alternative -- reading m_fftEngines from the Connection
     // thread -- would need synchronisation AND lose Qt's automatic
     // disconnect-on-destroy, which is what makes this safe at shutdown.
-    connect(m_radioModel, &RadioModel::rawIqDataForStream, engine,
-            [engine, streamIndex](int idx, const QVector<float>& samples) {
+    //
+    // 2026-11-10: ueber rawIqDataForAutoAgc statt rawIqDataForStream --
+    // dieselben Proben, dazu der Messabschnitt, den forkIqToTaps beim
+    // Eintreffen gestempelt hat. Die Anzeige bekommt genau das Gleiche;
+    // nur der Rauschbodenmesser fuer Auto AGC-T sieht den Stempel
+    // (Upstream NereusSDR e5b3997bc, #720).
+    connect(m_radioModel, &RadioModel::rawIqDataForAutoAgc, engine,
+            [engine, streamIndex](int idx, const QVector<float>& samples,
+                                  quint64 epoch) {
         if (idx != streamIndex) { return; }
-        engine->feedIQ(samples);
+        engine->feedIQForAutoAgc(samples, epoch);
     });
 
     // Linear-power frame -> every pan subscribed to this stream.
@@ -3822,10 +3850,12 @@ FFTEngine* MainWindow::createFftEngineForStream(int streamIndex)
     auto* nf = new NoiseFloorTracker;
     m_streamNoiseFloors.insert(streamIndex, nf);
     if (m_radioModel) { m_radioModel->setStreamNoiseFloorTracker(streamIndex, nf); }
-    connect(engine, &FFTEngine::fftReady, this,
-            [nf](int, const QVector<float>& binsDbm) {
+    // Nur Bilder, deren ganzes Fenster aus einem Empfangsabschnitt stammt
+    // (FFTEngine::autoAgcFrameReady) -- nie eines mit Sendesignal darin.
+    connect(engine, &FFTEngine::autoAgcFrameReady, this,
+            [nf](int, const QVector<float>& binsDbm, quint64 epoch) {
         static constexpr float kFrameIntervalMs = 33.0f;
-        nf->feed(binsDbm, kFrameIntervalMs);
+        nf->feedForEpoch(binsDbm, kFrameIntervalMs, epoch);
     });
 
     // TCI-Spektrumstrom: Strom 0 und 1 sind die TCI-Empfaenger 0 und 1.
@@ -4080,6 +4110,9 @@ void MainWindow::wirePanNotchHandlers()
         // pan from sender() instead.
         connect(sw, &SpectrumWidget::notchCreateRequested,
                 this, &MainWindow::onNotchCreateFromPan,
+                Qt::UniqueConnection);
+        connect(sw, &SpectrumWidget::traegerGemessen,
+                this, &MainWindow::zeigeTraegerEichung,
                 Qt::UniqueConnection);
         connect(sw, &SpectrumWidget::notchMoveRequested,
                 this, &MainWindow::onNotchMoveRequested,
@@ -4359,6 +4392,25 @@ void MainWindow::wireImdOverlayForPan(SpectrumWidget* sw)
         // Geraet: die Einstellung stand gespeichert auf True, das Spektrum
         // meldete showImd=false, und ein Messlauf ging ins Leere.
         sw->setShowIMDMeasurements(ps->show2ToneMeasurements());
+    } else {
+        // ── Am Flex gibt es den Koordinator NICHT (2026-11-11) ───────
+        //
+        // `PureSignal` entsteht nur mit WDSP, also nur an einer
+        // OpenHPSDR-Maschine. Am Flex blieb `showImd` damit fuer immer
+        // false — und ohne dieses vierte Tor zeichnet
+        // `drawImdOverlay` nie, selbst wenn MOX, Zweiton und Duplex
+        // stimmen. Am 2026-11-11 an der FLEX-8400 im Protokoll
+        // gesehen: `mox=true testIMD=true showImd=false duplex=true`
+        // waehrend der Betreiber mit dem Zweiton der Maschine getastet
+        // hat. Der Haken selbst stand in den Einstellungen auf True.
+        //
+        // Also dort lesen, wo er steht. Denselben Schluessel benutzt
+        // `PureSignal::loadShow2ToneSetting` (PureSignal.cpp:853).
+        sw->setShowIMDMeasurements(
+            AppSettings::instance()
+                .value(QStringLiteral("PsShow2ToneMeasurements"),
+                       QStringLiteral("False"))
+                .toString() == QStringLiteral("True"));
     }
 }
 
@@ -4500,6 +4552,20 @@ void MainWindow::wireSpectrumSliceControls(SpectrumWidget* sw,
                                            const QString& panId)
 {
     if (!sw || !m_radioModel) { return; }
+
+    // Bandstapel (2026-11-11, Entwurf D1): ein Klick auf eine Marke an
+    // der Skala fuehrt die Scheibe DIESES Panadapters zum Eintrag.
+    connect(sw, &SpectrumWidget::bandStackMarkClicked, this,
+            [this, panId](const QString& eintrag) {
+        SliceModel* s = sliceForPan(panId);
+        BandStackController* stapel = m_radioModel ? m_radioModel->bandStack() : nullptr;
+        if (!s || !stapel) { return; }
+        QString grund;
+        if (!stapel->goTo(s->sliceIndex(), eintrag, {}, &grund) && !grund.isEmpty()) {
+            showToast(grund, ToastSeverity::Warning, 3000);
+        }
+    });
+    bandstapelMarkenFuer(sw, panId);
 
     // Click on the spectrum tunes this pan's slice.
     connect(sw, &SpectrumWidget::frequencyClicked, this,
@@ -6462,6 +6528,40 @@ void MainWindow::buildUI()
             const double clampedBw = (currentBw > rateHz) ? rateHz : currentBw;
             activeSpectrumWidget()->setFrequencyRange(freq, clampedBw);
         }
+
+        // Jeder Pan, nicht nur der aktive (2026-11-10).
+        //
+        // Ein Ratenwechsel auf der Radio-Info-Seite (RadioModel::
+        // setSampleRateLive) stellt den Zuteiler um, ohne
+        // streamCentreChanged zu senden -- dieses Signal ist die einzige
+        // Nachricht davon. Bis hierher bekam nur der aktive Pan die neue
+        // Rate: jeder andere zeichnete die neuen Bins mit der alten Rate,
+        // also um den Faktor alt/neu zu breit oder zu schmal, und
+        // m_streamWindows behielt die alte Rate, die applyStreamWindowToPan
+        // beim naechsten Scheibenwechsel wieder einspielte.
+        //
+        // Jede Anzeige folgt der Rate ihres eigenen Empfaengers:
+        //   From Thetis console.cs:19848,19889 [@852bf0e]
+        //     Display.SampleRateRX1 = value; ... Display.SampleRateRX2 = value;
+        // Uebernommen aus Upstream NereusSDR a617cdb43 (Issue 701, J.J.
+        // Boyd KG4VCF), auf unseren Baum zugeschnitten: die Rate jedes
+        // Stroms kommt aus dem Zuteiler, und jeder Pan auf ihm geht durch
+        // applyStreamWindowToPan, das auch die Spanne begrenzt.
+        if (m_radioModel) {
+            for (auto it = m_streamWindows.begin(); it != m_streamWindows.end(); ++it) {
+                const int rate = m_radioModel->streamSampleRateHz(it.key());
+                if (rate > 0) {
+                    it->sampleRateHz = rate;
+                }
+            }
+            if (auto* router = m_radioModel->fftRouter()) {
+                for (auto it = m_streamWindows.cbegin(); it != m_streamWindows.cend(); ++it) {
+                    for (const QString& panId : router->pansForReceiver(it.key())) {
+                        applyStreamWindowToPan(panId, it.key());
+                    }
+                }
+            }
+        }
     });
     // Spectrum/waterfall FPS — load persisted value (default 30), apply to
     // BOTH the FFT engine (row production cadence) and the SpectrumWidget
@@ -6736,10 +6836,11 @@ void MainWindow::buildUI()
     auto* nfTracker = new NoiseFloorTracker;
     m_radioModel->setNoiseFloorTracker(nfTracker);
 
-    connect(primaryFftEngine(), &FFTEngine::fftReady,
-            this, [nfTracker](int /*rxId*/, const QVector<float>& binsDbm) {
+    connect(primaryFftEngine(), &FFTEngine::autoAgcFrameReady,
+            this, [nfTracker](int /*rxId*/, const QVector<float>& binsDbm,
+                              quint64 epoch) {
         static constexpr float kFrameIntervalMs = 33.0f;
-        nfTracker->feed(binsDbm, kFrameIntervalMs);
+        nfTracker->feedForEpoch(binsDbm, kFrameIntervalMs, epoch);
     });
 
     // Max Bin detector: feed FFTEngine dBm bins into WdspEngine's Longpath-native
@@ -8344,6 +8445,10 @@ void MainWindow::populateDefaultMeter()
     m_ft8Applet = new Ft8Applet(m_radioModel, nullptr);
     panel->addApplet(m_ft8Applet);
     m_ft8Applet->setVisible(false);
+    // Locator-Jagd (2026-11-11): die QSO-Karte bekommt jede gehoerte
+    // Station und ruft per Klick ueber DIESES Fenster an -- denselben
+    // Weg wie ein Doppelklick in der Fundliste. Siehe Ft8KartenBruecke.h.
+    Ft8KartenBruecke::instanz().verbinde(m_ft8Applet);
 
     // Ein fertiges QSO aus dem FT8-Ablauf geht denselben Weg wie eines
     // aus WSJT-X (siehe die Verdrahtung von WsjtxClient::qsoLogged
@@ -8632,6 +8737,25 @@ void MainWindow::populateDefaultMeter()
     m_frequencyApplet->restoreState();
     panel->addApplet(m_frequencyApplet);
 
+    // Der Bandstapel (2026-11-11), direkt unter der Frequenz: Betreiber
+    // hat Entwurf A gewaehlt („A und D1"), das Applet in der Spalte.
+    // Er gehoert zum Abstimmen, also in dieselbe Gruppe.
+    m_bandStackApplet = new BandStackApplet(m_radioModel, nullptr);
+    panel->addApplet(m_bandStackApplet);
+    connect(m_bandStackApplet, &BandStackApplet::hinweis, this,
+            [this](const QString& text, bool warnung) {
+        showToast(text, warnung ? ToastSeverity::Warning : ToastSeverity::Info,
+                  warnung ? 3000 : 2500);
+    });
+    connect(m_bandStackApplet, &BandStackApplet::markenSchalterGeaendert,
+            this, [this](bool) { bandstapelMarkenNachziehen(); });
+    if (BandStackController* stapel = m_radioModel->bandStack()) {
+        connect(stapel, &BandStackController::changed,
+                this, &MainWindow::bandstapelMarkenNachziehen);
+    }
+    connect(m_radioModel, &RadioModel::activeSliceChanged,
+            this, [this](int) { bandstapelMarkenNachziehen(); });
+
     // ── Die KIWI-Kachel an den richtigen Panadapter ──────────────────
     //
     // Die Kachel meldet nur, DASS sie gedrueckt wurde, und nennt ihre
@@ -8760,6 +8884,8 @@ void MainWindow::populateDefaultMeter()
     panel->addApplet(m_asrApplet);
     connect(m_asrApplet, &AsrApplet::enableRequested,
             this, &MainWindow::setAsrEnabled);
+    connect(m_asrApplet, &AsrApplet::languageChanged,
+            this, [this](const QString&) { uebernehmeAsrSprache(); });
 
     // Phase 23: TCI applets — live in Container #0 below the existing applets.
     // Visibility is now managed by AppletVisibilityController below
@@ -9324,6 +9450,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Kpa500")]     = m_kpa500Applet;
     m_appletsById[QStringLiteral("Acom")]       = m_acomApplet;
     m_appletsById[QStringLiteral("Frequency")]        = m_frequencyApplet;
+    m_appletsById[QStringLiteral("BandStack")]        = m_bandStackApplet;
     m_appletsById[QStringLiteral("SwrInstrument")]    = m_swrInstrument;
     m_appletsById[QStringLiteral("SignalInstrument")] = m_signalInstrument;
 
@@ -9512,6 +9639,9 @@ void MainWindow::populateDefaultMeter()
     // Plus aus wie jedes andere Widget.
     m_appletVis->registerApplet(QStringLiteral("Frequency"),
                                 tr("Frequency"),                true);
+    // Vorgabe an: der Betreiber hat das Applet am 2026-11-11 ausgesucht.
+    m_appletVis->registerApplet(QStringLiteral("BandStack"),
+                                tr("Band Stack"),               true);
     m_appletVis->registerApplet(QStringLiteral("SwrInstrument"),
                                 tr("SWR"),                      true);
     m_appletVis->registerApplet(QStringLiteral("SignalInstrument"),
@@ -9582,6 +9712,11 @@ void MainWindow::populateDefaultMeter()
     // tippt, auch. Sie stehen nicht in tr(): eine Uebersetzung wuerde
     // die deutschen Wege abschalten, sobald die Oberflaeche englisch
     // ist, also genau dann, wenn er sie braucht.
+    m_appletVis->describeApplet(QStringLiteral("BandStack"),
+        tr("Tuning"),
+        {QStringLiteral("bandstapel"), QStringLiteral("band stack"),
+         QStringLiteral("stack"), QStringLiteral("speicher"),
+         QStringLiteral("memories"), QStringLiteral("band")});
     m_appletVis->describeApplet(QStringLiteral("Frequency"),
         tr("Tuning"),
         {QStringLiteral("frequenz"), QStringLiteral("frequency"),
@@ -12651,9 +12786,14 @@ void MainWindow::buildMenuBar()
     bandMenu->addSeparator();
 
     {
+        // Bandstapel (2026-11-11): holt das Applet in die Spalte.
         QAction* bandStackAction = bandMenu->addAction(QStringLiteral("Band &Stacking..."));
-        bandStackAction->setEnabled(false);
-        bandStackAction->setToolTip(QStringLiteral("NYI — Phase X"));
+        bandStackAction->setToolTip(QStringLiteral("Show the Band Stack panel"));
+        connect(bandStackAction, &QAction::triggered, this, [this] {
+            if (m_appletVis) {
+                m_appletVis->ensureVisible(QStringLiteral("BandStack"));
+            }
+        });
     }
 
     // =========================================================================
@@ -13202,6 +13342,16 @@ void MainWindow::buildMenuBar()
             "Open the antenna rotator dial."));
         connect(rotorAction, &QAction::triggered,
                 this, &MainWindow::openRotorDial);
+
+        // Rundum-Lauf (2026-11-08): der Rotor dreht einmal herum, der
+        // Panadapter misst je Richtung Belegung und Rauschboden.
+        QAction* sweepAction = toolsMenu->addAction(QStringLiteral("Rotor &sweep..."));
+        sweepAction->setObjectName(QStringLiteral("actRotorSweep"));
+        sweepAction->setToolTip(QStringLiteral(
+            "Turn the antenna once around and see, per direction, how busy the "
+            "band is and where the noise comes from."));
+        connect(sweepAction, &QAction::triggered,
+                this, &MainWindow::oeffneRundumLauf);
     }
 
     // The channel strip. Next to the voice check because they are two
@@ -13277,6 +13427,22 @@ void MainWindow::buildMenuBar()
                 this, &MainWindow::openLogbookWindow);
     }
 
+    // The QRZ login (XML lookups) and the QRZ logbook key. Back in the
+    // menu 2026-11-10: the only way in was a "QRZ…" button in the old
+    // rotor window, which went with it on 2026-08-07 (57d524b0f) --
+    // while four places kept telling the operator "Add your QRZ account
+    // in Tools".
+    {
+        QAction* qrzAction =
+            toolsMenu->addAction(QStringLiteral("&QRZ account..."));
+        qrzAction->setObjectName(QStringLiteral("actQrzAccount"));
+        qrzAction->setToolTip(QStringLiteral(
+            "Your QRZ login for callsign lookups, and the logbook key for "
+            "uploading QSOs."));
+        connect(qrzAction, &QAction::triggered,
+                this, &MainWindow::openQrzCredentialsDialog);
+    }
+
     // Where logged contacts can be sent on to. Separate from the QRZ
     // account entry, because these are separate services with separate
     // credentials and one combined dialog would invite mixing them up.
@@ -13288,6 +13454,21 @@ void MainWindow::buildMenuBar()
             "Set up Cloudlog / Wavelog and a local logger such as Log4OM."));
         connect(svcAction, &QAction::triggered,
                 this, &MainWindow::openLoggingServicesDialog);
+    }
+
+    // Der eigene Zugang fuer den 3D-Flug im Logbuch (2026-11-10):
+    // kostenloses Cesium-ion-Konto oder eigener Google-Schluessel.
+    // Optional; ohne ihn bleibt die Karte bei NASA.
+    {
+        QAction* g3dAction =
+            toolsMenu->addAction(QStringLiteral("Google &3D map..."));
+        g3dAction->setObjectName(QStringLiteral("actGoogle3dMap"));
+        g3dAction->setToolTip(QStringLiteral(
+            "Optional: a free Cesium ion account (or your own Google key), so "
+            "looked-up stations are shown in photorealistic 3D, down to the "
+            "house and the antenna."));
+        connect(g3dAction, &QAction::triggered, this,
+                [this]() { Google3dSetupDialog::showFor(this); });
     }
 
     // Phase 3J-2 H1: FreeDV Reporter live station map.
@@ -13733,8 +13914,11 @@ void MainWindow::buildStatusBar()
         painter.end();
         bandStackLabel->setPixmap(pm);
     }
-    bandStackLabel->setToolTip(QStringLiteral("Band Stack (NYI)"));
+    // Bandstapel (2026-11-11): ein Klick holt das Applet in die Spalte
+    // (MainWindow::eventFilter), wie Band > Band Stacking...
+    bandStackLabel->setToolTip(QStringLiteral("Band Stack"));
     bandStackLabel->setCursor(Qt::PointingHandCursor);
+    bandStackLabel->installEventFilter(this);
 
     // +PAN icon. From AetherSDR MainWindow.cpp:4368-4396 [@c6481cb]: a jagged
     // spectrum polyline with a plus in the upper right. An icon reads as a
@@ -15711,8 +15895,10 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
         // FT8/FT4 liegen in den Datenmodi -- beiden, nicht nur DIGL:
         // FT8 wird ueblicherweise in USB/DIGU gehoert, und wer DIGL
         // stellt, soll den Dekoder nicht verlieren.
+        // Seit 2026-11-11 die EINE Regel in Ft8Applet::istFt8Modus --
+        // dieselbe, nach der ein Klick auf der QSO-Karte anrufen darf.
         m_appletVis->setAvailable(QStringLiteral("Ft8Decoder"),
-                                  mode == DSPMode::DIGU || mode == DSPMode::DIGL);
+                                  Ft8Applet::istFt8Modus(mode));
     };
     applyForMode(slice->dspMode());
 
@@ -16743,6 +16929,48 @@ void MainWindow::bandUmschalten(Band band)
 
     const Band bandVorher = bandFromFrequency(slice->frequency());
 
+    // ── Bandstapel (2026-11-11) ──────────────────────────────────────
+    //
+    // Mit verbundenem Geraet geht ein Druck durch den Stapel: auf einem
+    // anderen Band zur eigenen Stelle dort, auf demselben Band zur
+    // naechsten (Umschalt: zur vorigen; Cmd/Strg: die aktuelle Stelle
+    // als neuen Eintrag ablegen). Thetis console.cs preBandSelect, nach
+    // Upstream NereusSDR MainWindow::pressBand.
+    //
+    // Ausnahme: lief Digi und geht es auf ein ANDERES Band, bleibt es
+    // beim alten Weg mit dem Nachziehen unten -- die Anrufstelle des
+    // neuen Bandes gewinnt ohnehin, und eine FT8-Frequenz gehoert nicht
+    // in einen Sprecheintrag. Die Scheibe steht danach neben ihrer
+    // Stelle; ein Verlassen schreibt nichts hinein.
+    if (BandStackController* stapel = m_radioModel->bandStack();
+        stapel && stapel->isReady()) {
+        const int sliceId = slice->sliceIndex();
+        const bool gleichesBand = stapel->stackBandFor(sliceId) == band;
+        if (gleichesBand || !digiLief) {
+            const Qt::KeyboardModifiers tasten = QGuiApplication::keyboardModifiers();
+            QString grund;
+            bool erledigt = false;
+            if (gleichesBand && tasten.testFlag(Qt::ControlModifier)) {
+                erledigt = stapel->add(sliceId, {}, &grund);
+                if (erledigt) {
+                    showToast(QStringLiteral("Band stack: added %1")
+                                  .arg(stapel->positionText(sliceId)),
+                              ToastSeverity::Info, 2500);
+                }
+            } else {
+                const BandStackDirection richtung =
+                    gleichesBand && tasten.testFlag(Qt::ShiftModifier)
+                        ? BandStackDirection::Previous
+                        : BandStackDirection::Next;
+                erledigt = stapel->press(sliceId, band, richtung, {}, &grund);
+            }
+            if (!erledigt && !grund.isEmpty()) {
+                showToast(grund, ToastSeverity::Warning, 3000);
+            }
+            return;
+        }
+    }
+
     m_radioModel->onBandButtonClicked(band);
 
     if (!digiLief) { return; }
@@ -16759,6 +16987,53 @@ void MainWindow::bandUmschalten(Band band)
         << "Bandwechsel nach" << bandLabel(band)
         << "— Digi lief, stelle wieder her.";
     aufDigiStellen(m_letzterDigiModus);
+}
+
+void MainWindow::bandstapelMarkenNachziehen()
+{
+    if (!m_panStack) { return; }
+    for (PanadapterApplet* applet : m_panStack->allApplets()) {
+        if (applet && applet->spectrumWidget()) {
+            bandstapelMarkenFuer(applet->spectrumWidget(), applet->panId());
+        }
+    }
+}
+
+void MainWindow::bandstapelMarkenFuer(SpectrumWidget* sw, const QString& panId)
+{
+    if (!sw) { return; }
+    BandStackController* stapel = m_radioModel ? m_radioModel->bandStack() : nullptr;
+    SliceModel* scheibe = sliceForPan(panId);
+    if (!stapel || !stapel->isReady() || !scheibe || !BandStackApplet::markenImSpektrum()) {
+        sw->setBandStackMarks({});
+        return;
+    }
+    // Alle Eintraege; das Spektrum zeichnet nur, was im Bild liegt. Ein
+    // paar hundert Marken sind ein kleines Feld, und so muss niemand beim
+    // Verschieben des Bildes nachliefern.
+    const int id = scheibe->sliceIndex();
+    const Band eigenesBand = stapel->stackBandFor(id);
+    const QString stelle = stapel->shownPlace(id, eigenesBand);
+    QVector<SpectrumWidget::BandStackMark> marken;
+    for (int i = 0; i < static_cast<int>(Band::Count); ++i) {
+        const Band band = static_cast<Band>(i);
+        if (band == Band::XVTR) { continue; }
+        const QList<BandStackEntry> eintraege = stapel->store().entries(band);
+        for (const BandStackEntry& e : eintraege) {
+            SpectrumWidget::BandStackMark m;
+            m.id = e.id;
+            m.hz = e.frequencyHz;
+            m.place = band == eigenesBand && e.id == stelle;
+            m.locked = e.locked;
+            m.tip = QStringLiteral("%1 %2").arg(BandStackStore::displayFrequency(e.frequencyHz),
+                                               e.mode);
+            if (!e.name.isEmpty()) {
+                m.tip += QStringLiteral(" — ") + e.name;
+            }
+            marken.append(m);
+        }
+    }
+    sw->setBandStackMarks(marken);
 }
 
 void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
@@ -17102,13 +17377,14 @@ void MainWindow::schutzrahmenNachziehen()
     // angestossen hat.
     const QRect jetzt = frameGeometry();
     if (eigeneBewegungLebt() || m_aufbauBewegung || !isVisible()) {
+        // Die Schwelle steht in istRasterNachhall (WindowPlacement):
+        // fuer die Groesse anderthalb Rasterweiten, weil beide Kanten
+        // einrasten (2026-11-11, am Geraet: +15/-21 unter der
+        // Menueleiste galt sonst als eigene Bewegung).
         const bool rasterNachhall =
             m_fremdeBewegungAnhaengig
-            && m_schutzrahmenTimer->isActive() && m_letzterHauptrahmen.isValid()
-            && qAbs(jetzt.x() - m_letzterHauptrahmen.x()) < kSnapGridPx
-            && qAbs(jetzt.y() - m_letzterHauptrahmen.y()) < kSnapGridPx
-            && qAbs(jetzt.width() - m_letzterHauptrahmen.width()) < kSnapGridPx
-            && qAbs(jetzt.height() - m_letzterHauptrahmen.height()) < kSnapGridPx;
+            && m_schutzrahmenTimer->isActive()
+            && istRasterNachhall(jetzt, m_letzterHauptrahmen);
         if (!rasterNachhall) {
             m_hauptrahmenBasis = jetzt;
             m_fremdeBewegungAnhaengig = false;
@@ -17145,19 +17421,54 @@ int MainWindow::schwebendeMitziehen()
         const QRect r = w->frameGeometry();
         QPoint ziel(neu.x() + qRound(double(r.x() - alt.x()) * fx),
                     neu.y() + qRound(double(r.y() - alt.y()) * fy));
+
+        // ── Die Groesse im selben Verhaeltnis (2026-11-11) ──────────
+        //
+        // Betreiber: „ich hatte es bewusst kleiner gemacht, das
+        // hauptfenster. wenn ich das mache, müssen alle anderen fenster
+        // auch im verhältnis kleiner werden." Bis heute zog nur die
+        // LAGE mit; die Groesse blieb, und ein verkleinertes
+        // Hauptfenster schob die schwebenden Fenster uebereinander und
+        // ueber seinen Rand. Bei einem reinen Zug (fx = fy = 1) bleibt
+        // die Groesse, wie sie ist. Mindest- und Hoechstgroesse des
+        // Fensters gelten weiter.
+        const QSize innenAlt = w->size();
+        QSize innen = innenAlt;
+        if (fx != 1.0 || fy != 1.0) {
+            innen = QSize(qRound(double(innenAlt.width()) * fx),
+                          qRound(double(innenAlt.height()) * fy))
+                        .expandedTo(w->minimumSize())
+                        .boundedTo(w->maximumSize());
+        }
+        // Der Rahmen (Titelleiste) waechst nicht mit.
+        QSize rahmen = r.size() - innenAlt + innen;
+
         // Auf dem Schirm bleiben: ein Fenster, dessen Titelleiste
-        // draussen liegt, laesst sich nicht mehr fassen.
+        // draussen liegt, laesst sich nicht mehr fassen -- und keines
+        // waechst ueber den Schirm hinaus.
         if (QScreen* scr = w->screen()) {
             const QRect platz = scr->availableGeometry();
+            if (rahmen.width() > platz.width() || rahmen.height() > platz.height()) {
+                const QSize ueber(qMax(0, rahmen.width() - platz.width()),
+                                  qMax(0, rahmen.height() - platz.height()));
+                innen = (innen - ueber).expandedTo(w->minimumSize());
+                rahmen = r.size() - innenAlt + innen;
+            }
             ziel.setX(qBound(platz.left(), ziel.x(),
-                             qMax(platz.left(), platz.right() - r.width() + 1)));
+                             qMax(platz.left(), platz.right() - rahmen.width() + 1)));
             ziel.setY(qBound(platz.top(), ziel.y(),
-                             qMax(platz.top(), platz.bottom() - r.height() + 1)));
+                             qMax(platz.top(), platz.bottom() - rahmen.height() + 1)));
         }
-        if (ziel != r.topLeft()) {
-            // move(), nicht setGeometry(): die GROESSE gehoert dem
-            // Betreiber (siehe schwebendeAusDemSchutzrahmenHolen).
+        bool geaendert = false;
+        if (innen != innenAlt) {
+            w->resize(innen);
+            geaendert = true;
+        }
+        if (ziel != w->frameGeometry().topLeft()) {
             w->move(ziel);
+            geaendert = true;
+        }
+        if (geaendert) {
             ++bewegt;
         }
     }
@@ -17312,6 +17623,10 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
         if (watched == m_tciIndicator) {
             openTciSetupPage();
             return true;  // event consumed
+        }
+        if (watched == m_bandStackLabel && m_bandStackLabel && m_appletVis) {
+            m_appletVis->ensureVisible(QStringLiteral("BandStack"));
+            return true;
         }
     }
 
@@ -18275,7 +18590,12 @@ void MainWindow::openQrzCredentialsDialog()
     ensureQrzClient();
     ensureQrzUploader();
 
-    QDialog dlg(this);
+    // Nicht auf dem Stapel: stirbt das Hauptfenster waehrend exec(),
+    // raeumt Qt den Dialog ab und der Rahmenausgang gaebe ihn ein
+    // zweites Mal frei (siehe ScopedChildWidget.h).
+    ScopedChildWidget<QDialog> dlgOwner(this);
+    QDialog& dlg = *dlgOwner.get();
+    dlg.setObjectName(QStringLiteral("qrzAccountDialog"));
     dlg.setWindowTitle(QStringLiteral("QRZ account"));
     Style::applyDarkPageStyle(&dlg);
 
@@ -21260,12 +21580,59 @@ void MainWindow::checkVaxFirstRun()
     dlg->show();
 }
 
+void MainWindow::oeffneRundumLauf()
+{
+    if (m_rundumDialog) {
+        m_rundumDialog->raise();
+        m_rundumDialog->activateWindow();
+        return;
+    }
+    // Gemessen wird am aktiven Panadapter -- dem, den der Betreiber sieht.
+    SpectrumWidget* sw = nullptr;
+    if (m_panStack) {
+        const QString aktiv = m_panStack->activePanId();
+        for (PanadapterApplet* a : m_panStack->allApplets()) {
+            if (!a) { continue; }
+            if (!sw || a->panId() == aktiv) { sw = a->spectrumWidget(); }
+            if (a->panId() == aktiv) { break; }
+        }
+    }
+    auto* d = new RundumDialog(m_radioModel, sw, this);
+    d->setAttribute(Qt::WA_DeleteOnClose);
+    m_rundumDialog = d;
+    d->show();
+}
+
+void MainWindow::zeigeTraegerEichung(bool gefunden, double geraetHz, double anzeigeHz,
+                                     float snrDb)
+{
+    // open(), nicht exec(): keine verschachtelte Schleife, und das
+    // Fenster raeumt sich selbst weg (WA_DeleteOnClose).
+    auto* d = new TraegerEichDialog(m_radioModel, gefunden, geraetHz, anzeigeHz,
+                                    snrDb, this);
+    d->open();
+}
+
+InstrumentApplet* MainWindow::signalInstrumentForTest() const
+{
+    return m_signalInstrument;
+}
+
 void MainWindow::closeEvent(QCloseEvent* event)
 {
     // Mark shutting-down BEFORE anything else so the "auto-open
     // ConnectionPanel on Disconnect" slot below doesn't re-trigger
     // discovery via ConnectionPanel's ctor while teardown runs.
     m_shuttingDown = true;
+
+    // Wer ordentlich beendet, ist durchgekommen (2026-11-08). Der
+    // Startwaechter zaehlte jeden Lauf unter 20 s als steckengeblieben --
+    // auch einen, den der Betreiber nach 18 s sauber geschlossen hat
+    // (Protokoll 13:37 -> „1 Start(s) in Folge kamen nicht durch" um
+    // 15:03). Zweimal so, und der dritte Start kaeme ohne seine Anordnung
+    // hoch. Ein haengender Start erreicht dieses closeEvent nicht, ein
+    // Absturz auch nicht -- die bleiben gezaehlt.
+    StartWatch::markRunning();
 
     // ── Profil-Stand sichern, SOFORT, nicht ueber aboutToQuit ────────
     //
@@ -21379,6 +21746,14 @@ void MainWindow::closeEvent(QCloseEvent* event)
     // state. Captured BEFORE close so the saved blob reflects the
     // user-visible state, not Qt's mid-teardown geometry.
     saveMainWindowGeometry();
+
+    // Bandstapel (2026-11-11): sein Dokument geht sonst erst eine
+    // Sekunde nach der letzten Aenderung in die Einstellungen. Beim
+    // Beenden mit Cmd+Q laeuft kein Destruktor (exit() mitten in
+    // closeEvent), also hier, vor dem Speichern.
+    if (m_radioModel && m_radioModel->bandStack()) {
+        m_radioModel->bandStack()->flush();
+    }
 
     AppSettings::instance().save();
     qWarning() << "[ProfileSaveOnQuit:closeEvent] AppSettings::save() done";

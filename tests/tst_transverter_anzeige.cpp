@@ -22,6 +22,8 @@
 //
 // Die Marke selbst wird am Widget geprueft (tst_begleitgeraet_marke).
 
+#include <algorithm>
+
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -284,7 +286,11 @@ private slots:
     }
 
     // Der Bandplan reichte nur bis 54 MHz; mit Transverter zeigte der
-    // Panadapter auf 2 m darum gar keine Bandgrenze.
+    // Panadapter auf 2 m darum gar keine Bandgrenze. Seit 2026-11-08
+    // steht dort nicht mehr EIN Abschnitt 144-146, sondern die
+    // Teilbereiche nach dem IARU-R1-VHF-Handbuch 10.03 (S. 38). Die
+    // Zusage bleibt dieselbe: die Abschnitte reichen von 144,000 bis
+    // 146,000, und keiner ragt darueber hinaus.
     void derBandplanKenntJetztZweiMeter()
     {
         const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
@@ -295,16 +301,76 @@ private slots:
         const QJsonDocument d = QJsonDocument::fromJson(f.readAll());
         QVERIFY2(!d.isNull(), "der Bandplan ist kein gueltiges JSON");
         const QJsonArray segs = d.object().value(QStringLiteral("segments")).toArray();
-        bool zweiMeter = false;
+        double unten = 1.0e9;
+        double oben  = 0.0;
+        bool ssb = false;
+        bool baken = false;
         for (const QJsonValue& v : segs) {
             const QJsonObject o = v.toObject();
-            if (o.value(QStringLiteral("low")).toDouble() == 144.0
-                && o.value(QStringLiteral("high")).toDouble() == 146.0) {
-                zweiMeter = true;
-            }
+            const double lo = o.value(QStringLiteral("low")).toDouble();
+            const double hi = o.value(QStringLiteral("high")).toDouble();
+            if (hi <= 140.0 || lo >= 150.0) { continue; }   // nicht 2 m
+            unten = std::min(unten, lo);
+            oben  = std::max(oben, hi);
+            if (lo == 144.150 && hi == 144.400) { ssb = true; }
+            if (lo == 144.400 && hi == 144.490) { baken = true; }
         }
-        QVERIFY2(zweiMeter, "144-146 MHz fehlt — auf 2 m zeigt der "
-                            "Panadapter keine Bandgrenze");
+        QVERIFY2(unten == 144.0, "der 2-m-Plan beginnt nicht bei 144,000 -- "
+                                 "auf 2 m fehlt die untere Bandgrenze");
+        QVERIFY2(oben == 146.0, "der 2-m-Plan endet nicht bei 146,000 -- Region 1 "
+                                "hoert dort auf, auch wenn der Transverter 148 kann");
+        QVERIFY2(ssb, "144,150-144,400 (Telegrafie, SSB, MGM) fehlt");
+        QVERIFY2(baken, "144,400-144,490 (Baken) fehlt");
+    }
+
+    // Die weissen Merkpunkte des Bandplans (144,300 SSB, 144,050 CW ...)
+    // sind Antennenfrequenzen wie die Abschnitte. Bis 2026-11-08 legte
+    // drawBandPlan sie ROH auf die Achse -- mit Transverter weit rechts
+    // ausserhalb des 28-MHz-Bildes. Dieselbe Falle wie bei den Spots oben.
+    void dieMerkpunkteGehenDurchDenTransverter()
+    {
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+        QFile f(QString::fromLocal8Bit(root)
+                + QStringLiteral("/src/gui/SpectrumWidget.cpp"));
+        QVERIFY2(f.open(QIODevice::ReadOnly), qPrintable(f.fileName()));
+        const QString src = QString::fromUtf8(f.readAll());
+
+        const int a = src.indexOf(QStringLiteral("void SpectrumWidget::drawBandPlan("));
+        QVERIFY2(a > 0, "drawBandPlan ist nicht mehr zu finden");
+        const int e = src.indexOf(QStringLiteral("\n}\n"), a);
+        QVERIFY(e > a);
+        const QString rumpf = src.mid(a, e - a);
+        QVERIFY2(!rumpf.contains(QStringLiteral("hzToX(spot.freqMhz * 1.0e6")),
+                 "der Merkpunkt wird roh auf die Achse gelegt");
+        QVERIFY2(rumpf.contains(QStringLiteral("zfFuerAchse(spot.freqMhz")),
+                 "der Merkpunkt geht nicht durch den Transverter");
+    }
+
+    // Spitzenanzeige („Peak: ... dBm @ ... MHz") und Mauszeiger-Frequenz
+    // nannten die ZF -- unter einem 2-m-Bild stand „@ 28.0498 MHz"
+    // (Rendering-Werkbank, 2026-11-08). Beide muessen durch rfFuerAnzeige.
+    void dieTexteNennenDieAntennenfrequenz()
+    {
+        const QByteArray root = qgetenv("LONGPATH_SOURCE_DIR");
+        if (root.isEmpty()) { QSKIP("LONGPATH_SOURCE_DIR nicht gesetzt"); }
+        QFile f(QString::fromLocal8Bit(root)
+                + QStringLiteral("/src/gui/SpectrumWidget.cpp"));
+        QVERIFY2(f.open(QIODevice::ReadOnly), qPrintable(f.fileName()));
+        const QString src = QString::fromUtf8(f.readAll());
+
+        QVERIFY2(!src.contains(QStringLiteral("QString::number(peakHz / 1.0e6")),
+                 "die Spitzenanzeige nennt die ZF");
+        QVERIFY2(src.contains(QStringLiteral("rfFuerAnzeige(peakHz)")),
+                 "die Spitzenanzeige geht nicht durch den Transverter");
+
+        const int a = src.indexOf(QStringLiteral("void SpectrumWidget::drawCursorInfo("));
+        QVERIFY2(a > 0, "drawCursorInfo ist nicht mehr zu finden");
+        const int e = src.indexOf(QStringLiteral("\n}\n"), a);
+        QVERIFY(e > a);
+        const QString rumpf = src.mid(a, e - a);
+        QVERIFY2(rumpf.contains(QStringLiteral("formatCursorFreq(rfFuerAnzeige(")),
+                 "die Frequenz am Mauszeiger geht nicht durch den Transverter");
     }
 };
 

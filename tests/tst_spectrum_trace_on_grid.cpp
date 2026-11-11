@@ -126,6 +126,13 @@ private slots:
         w.setBandPlanManager(bandPlan ? &plans : nullptr);
         w.setDispNormalize(normalize);
         w.setDbmCalOffset(calDb);
+        // Dieser Lauf misst die Kurve gegen das RASTER in leeren Spalten.
+        // Die Durchlass-Ebenen (2026-11-08: Zahl, Klammern, Luecken, Lupe)
+        // zeichnen dort, wo er misst -- fuer ihn gehoeren sie nicht ins Bild.
+        w.setPassbandLabelShown(false);
+        w.setSignalBracketsShown(false);
+        w.setGapFinderShown(false);
+        w.setPassbandMagnifier(0);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 

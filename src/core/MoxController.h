@@ -139,6 +139,12 @@
 //                 the only valid anti-VOX cancellation reference.  See
 //                 commit message for full rationale.  J.J. Boyd (KG4VCF),
 //                 AI-assisted via Anthropic Claude Code.
+//   2026-11-11 — txRefusalReason(): asks the key-block latch and the
+//                 installed band-plan check what setMox(true) would answer,
+//                 without keying. For the FT8 locator hunt on the QSO map,
+//                 whose click must say why it cannot call instead of doing
+//                 nothing. Martin Fischer (OE5SOS), AI-assisted via
+//                 Anthropic Claude Code.
 // =================================================================
 
 // no-port-check: Longpath-original file; Thetis state-machine
@@ -305,6 +311,22 @@ public:
     void latchKeyBlock(const QString& reason);
     void releaseKeyBlock();
     bool keyBlockLatched() const noexcept;
+
+    // ── Probe (2026-11-11) ───────────────────────────────────────────────────
+    //
+    // What setMox(true) would answer right now, WITHOUT keying: the key-block
+    // latch first, then the installed band-plan check (the same two gates, in
+    // the same order, as the top of setMox()). Empty when neither refuses.
+    //
+    // The interlock policy is deliberately not consulted: its
+    // evaluateTxRequest() emits warned/denied as a side effect, and a probe
+    // must not raise a toast. It still runs on the real setMox(true).
+    //
+    // A caller that needs to explain a refusal BEFORE it starts a transmit
+    // sequence uses this (the FT8 locator hunt on the QSO map). The real
+    // gate stays setMox(true) — this is an early explanation, not a second
+    // gate.
+    QString txRefusalReason() const;
 
     // ── Setter ───────────────────────────────────────────────────────────────
     // setPttMode: idempotent; emits pttModeChanged on actual transition.

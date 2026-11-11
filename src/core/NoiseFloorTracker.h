@@ -10,6 +10,11 @@
 //   2026-04-16 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
+//   2026-11-10 — Messabschnitte (Epochen): waehrend des Sendens haelt der
+//                 Messer seinen Wert, danach zaehlen nur Bilder aus der
+//                 Empfangszeit. Uebernommen aus Upstream NereusSDR
+//                 e5b3997bc (#720, J.J. Boyd KG4VCF). Martin Fischer
+//                 (OE5SOS), KI-gestuetzt mit Anthropic Claude Code.
 // =================================================================
 
 //=================================================================
@@ -61,6 +66,7 @@
 #pragma once
 
 #include <QVector>
+#include <QtGlobal>
 
 namespace Longpath {
 
@@ -74,10 +80,30 @@ public:
     float noiseFloor() const noexcept { return m_lerpAverage; }
     bool isGood() const noexcept { return m_isGood; }
     void triggerFastAttack();
+
+    // Messabschnitt (Upstream NereusSDR e5b3997bc, #720). Ungerade Nummern
+    // sperren die Messung (Senden, keine Verbindung), gerade lassen sie zu.
+    // Ein Wechsel haelt den Schaetzwert und seine Einschwingzeit an, setzt
+    // aber nichts zurueck: nach dem Senden geht es mit dem Wert von vorher
+    // weiter, bis das erste ganz saubere Bild kommt.
+    //
+    // Thetis sperrt die Messung beim Senden genauso (display.cs:5387
+    // `if (!local_mox)` um processNoiseFloor [@852bf0e]); die Nummer ist
+    // noetig, weil unsere Bilder auf einem eigenen Faden entstehen und ein
+    // Bild aus der Sendezeit noch NACH dem Umschalten ankommen kann.
+    void setAcquisitionEpoch(quint64 epoch);
+    void feedForEpoch(const QVector<float>& binsDbm, float frameIntervalMs,
+                      quint64 epoch);
+    quint64 acquisitionEpoch() const noexcept { return m_acquisitionEpoch; }
+    // Seit dem letzten Wechsel kam mindestens ein Bild dieses Abschnitts.
+    bool acquisitionCurrent() const noexcept { return m_acquisitionCurrent; }
+
     float attackTimeMs() const noexcept { return m_attackTimeMs; }
     void setAttackTimeMs(float ms) { m_attackTimeMs = ms; }
 
 private:
+    quint64 m_acquisitionEpoch{0};
+    bool m_acquisitionCurrent{false};
     float m_lerpAverage{-200.0f};      // From Thetis v2.10.3.13 display.cs:4628
     float m_attackTimeMs{2000.0f};     // From Thetis v2.10.3.13 display.cs:4638
     bool m_isGood{false};              // From Thetis v2.10.3.13 display.cs:4630

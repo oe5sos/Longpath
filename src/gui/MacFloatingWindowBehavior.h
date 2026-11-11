@@ -67,6 +67,10 @@ class QWidget;
 namespace Longpath {
 void enableFullScreenAuxiliaryBehavior(QWidget* window);
 void setPaletteWindowLevel(QWidget* window, bool floating);
+// Holt das ganze Programm nach vorne (2026-11-08, fuer den zweiten Start:
+// SingleInstanceGuard). activateWindow() allein macht unter macOS nur das
+// Fenster zum Schluesselfenster eines schon aktiven Programms.
+void activateThisApplication();
 /// Ist gerade eine Maustaste gedrueckt? Waehrend das System ein Fenster
 /// an der Titelleiste zieht, sieht Qt keine Maustasten (die Geste gehoert
 /// dem Fenstersystem) -- [NSEvent pressedMouseButtons] schon. Gebraucht
@@ -79,6 +83,7 @@ bool anyMouseButtonDown();
 namespace Longpath {
 inline void enableFullScreenAuxiliaryBehavior(QWidget*) {}
 inline void setPaletteWindowLevel(QWidget*, bool) {}
+inline void activateThisApplication() {}
 inline bool anyMouseButtonDown()
 { return QGuiApplication::mouseButtons() != Qt::NoButton; }
 }

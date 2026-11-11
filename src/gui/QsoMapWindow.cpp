@@ -12,6 +12,16 @@
 //                 grid overlay switch, Google Earth (KML) export; see
 //                 QsoMapWindow.h. AI-assisted via Anthropic Claude
 //                 (Cowork), operator Martin Fischer.
+//   2026-11-10 — Azimutalkarte als vierte Ansicht, gemerkte Ansicht;
+//                 see QsoMapWindow.h. Martin Fischer, AI-assisted via
+//                 Anthropic Claude (Claude Code).
+//   2026-11-10 — 3D-Flug ueber Googles Photorealistic 3D Tiles mit dem
+//                 eigenen Schluessel, Rueckfall NASA + Google Earth; siehe
+//                 QsoMapWindow.h. Martin Fischer (OE5SOS), AI-assisted via
+//                 Anthropic Claude.
+//   2026-11-11 — Locator-Jagd mit FT8 (Mosaik, gehoerte Stationen, Klick
+//                 ruft an, Zaehler); siehe QsoMapWindow.h. Martin Fischer
+//                 (OE5SOS), AI-assisted via Anthropic Claude (Claude Code).
 // =================================================================
 
 #include "QsoMapWindow.h"
@@ -24,6 +34,7 @@
 #include "gui/StyleConstants.h"
 #include "gui/widgets/FlatMapWidget.h"
 #include "gui/widgets/DxRadarWidget.h"
+#include "gui/widgets/AzimutalKarteWidget.h"
 #include "gui/widgets/FlowLayout.h"
 #include "gui/widgets/GibsTileLayer.h"
 #include "core/sat/SatelliteService.h"
@@ -31,8 +42,13 @@
 #include "core/QrzClient.h"
 #include "gui/widgets/StationPhoto.h"
 #include "core/CallsignCache.h"
+#include "core/GoogleMapTiles.h"
+#include "gui/Google3dSetupDialog.h"
+#include "gui/Ft8KartenBruecke.h"
+#include "gui/widgets/Station3dSurface.h"
 
 #include <QCheckBox>
+#include <QSpinBox>
 #include <QTimer>
 #include <QComboBox>
 #include <QStandardItemModel>
@@ -45,6 +61,7 @@
 #include <QFileDialog>
 #include <QImage>
 #include <QKeyEvent>
+#include <QLoggingCategory>
 #include <QHBoxLayout>
 #include <QResizeEvent>
 #include <QLabel>
@@ -53,14 +70,22 @@
 #include <QSet>
 #include <QStackedWidget>
 #include <QStandardPaths>
+#include <QTextDocumentFragment>
 #include <QTimeZone>
 #include <QUrl>
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <utility>
 #include <cmath>
 
 namespace Longpath {
+
+namespace {
+// Der 3D-Knopf meldet jeden Druck ins Protokoll: Schluessel da, WebEngine
+// da, wo (Live-Befund 2026-11-10: „tut nichts" -- und keine Zeile dazu).
+Q_LOGGING_CATEGORY(lcQsoMap3d, "longpath.flug3d.karte")
+} // namespace
 
 QsoMapWindow::QsoMapWindow(QWidget* parent) : QDialog(parent)
 {
@@ -89,6 +114,10 @@ QsoMapWindow::QsoMapWindow(QWidget* parent) : QDialog(parent)
         resize(1100, 660);
     }
 
+    m_openUrl = [](const QUrl& u) { QDesktopServices::openUrl(u); };
+    m_3dWanted = AppSettings::instance()
+        .value(QStringLiteral("QsoMap3dFlight"), true).toBool();
+
     buildUi();
 }
 
@@ -108,6 +137,12 @@ void QsoMapWindow::keyPressEvent(QKeyEvent* e)
     case Qt::Key_Equal:  zoomActiveView(1.25);  return;
     case Qt::Key_Minus:  zoomActiveView(1 / 1.25); return;
     case Qt::Key_0:      resetActiveView();     return;
+    // Enter gehoert dem Feld, in dem er gedrueckt wurde (Rufzeichen:
+    // hinfliegen). QDialog drueckte sonst seinen Standardknopf -- beim
+    // Zeigen der erste Knopf der Fokuskette, „24 h" -- und stellte den
+    // Zeitraum still auf heute: „0 contacts in range" (Befund 2026-11-10).
+    case Qt::Key_Return:
+    case Qt::Key_Enter:  e->accept();           return;
     default: break;
     }
     // Eingebettet ist Escape kein „Fenster zu" — QDialog wuerde das
@@ -133,14 +168,17 @@ void QsoMapWindow::setEmbedded(bool on)
 
 void QsoMapWindow::zoomActiveView(double factor)
 {
-    if (m_stack->currentIndex() == 2) { return; }   // der Radar zoomt nicht
+    // Radar und Azimutalkarte zoomen nicht: beide zeigen immer die
+    // ganze Welt um das eigene QTH. 3D auch nicht ueber die Knoepfe;
+    // dort dreht das Rad.
+    if (isOverlayView(m_stack->currentIndex()) || m_stack->currentIndex() == kView3d) { return; }
     if (m_stack->currentIndex() == 0) { m_globe->zoomBy(factor); }
     else                              { m_flat->zoomBy(factor); }
 }
 
 void QsoMapWindow::resetActiveView()
 {
-    if (m_stack->currentIndex() == 2) { return; }
+    if (isOverlayView(m_stack->currentIndex()) || m_stack->currentIndex() == kView3d) { return; }
     if (m_stack->currentIndex() == 0) { m_globe->resetView(); }
     else                              { m_flat->resetView(); }
 }
@@ -280,11 +318,72 @@ void QsoMapWindow::buildUi()
 
     m_grid = new QCheckBox(QStringLiteral("Grid"), this);
     m_grid->setToolTip(QStringLiteral(
-        "Maidenhead locator overlay on the flat map. Click a square to "
+        "Maidenhead locator overlay on the flat and the azimuthal map, with "
+        "every square of the log filled in: green confirmed, sand worked, "
+        "empty never — for the band chosen next to it. Click a square to "
         "see its name and what the log has there."));
     m_grid->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                               .arg(QString::fromLatin1(Style::kTextPrimary)));
     bar->addWidget(m_grid);
+
+    // ── Locator-Jagd mit FT8 (2026-11-11) ───────────────────────────
+    //
+    // Betreiber: „besonders bei FT8 sehen, welche Locator ich noch nicht
+    // gearbeitet habe und welche gerade erreichbar sind". Das Band des
+    // Mosaiks folgt von selbst dem, was das FT8-Fenster hoert -- wer auf
+    // 20 m jagt, fragt nach 20 m.
+    m_mosaikBand = new QComboBox(this);
+    m_mosaikBand->setObjectName(QStringLiteral("qsoMapMosaicBand"));
+    m_mosaikBand->setToolTip(QStringLiteral(
+        "Which band the square mosaic shows. \"FT8 band\" follows the band "
+        "the FT8 decoder is listening on."));
+    m_mosaikBand->setFocusPolicy(Qt::NoFocus);   // keep the +/- keys working
+    // Waechst mit „FT8 band (20m)" -- sonst blieb es bei der Breite
+    // von „FT8 band" und die Klammer war abgeschnitten.
+    m_mosaikBand->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    bar->addWidget(m_mosaikBand);
+
+    m_nurFt8 = new QCheckBox(QStringLiteral("FT8 only"), this);
+    m_nurFt8->setObjectName(QStringLiteral("qsoMapMosaicFt8Only"));
+    m_nurFt8->setToolTip(QStringLiteral(
+        "Count only FT8 contacts for the mosaic and for what is new: a "
+        "square worked on SSB is then still new for FT8."));
+    m_nurFt8->setChecked(AppSettings::instance()
+        .value(QStringLiteral("QsoMapMosaicFt8Only"), QStringLiteral("False"))
+        .toString() == QStringLiteral("True"));
+    m_nurFt8->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
+                                .arg(QString::fromLatin1(Style::kTextPrimary)));
+    bar->addWidget(m_nurFt8);
+
+    // Der Zaehler und das Fenster der gehoerten Stationen. Unsichtbar,
+    // bis das FT8-Fenster etwas meldet -- ohne FT8 waere „0 new squares"
+    // nur Rauschen in der Leiste.
+    {
+        m_liveBox = new QWidget(this);
+        auto* h = new QHBoxLayout(m_liveBox);
+        h->setContentsMargins(0, 0, 0, 0);
+        h->setSpacing(4);
+        m_liveZaehler = new QLabel(QString{}, m_liveBox);
+        m_liveZaehler->setObjectName(QStringLiteral("qsoMapFt8Counter"));
+        m_liveZaehler->setToolTip(QStringLiteral(
+            "Squares heard on FT8 within the window that are not yet in your "
+            "log on that band. Click an amber point on the map to call."));
+        m_liveMinuten = new QSpinBox(m_liveBox);
+        m_liveMinuten->setRange(1, 60);
+        m_liveMinuten->setPrefix(QStringLiteral("last "));
+        m_liveMinuten->setSuffix(QStringLiteral(" min"));
+        m_liveMinuten->setToolTip(QStringLiteral(
+            "How long a station heard on FT8 stays on the map"));
+        const int sek = AppSettings::instance()
+            .value(QStringLiteral("QsoMapFt8LiveSeconds"),
+                   LiveSchicht::kVorgabeSekunden).toInt();
+        m_live.setFensterSekunden(sek);
+        m_liveMinuten->setValue(std::max(1, m_live.fensterSekunden() / 60));
+        h->addWidget(m_liveZaehler);
+        h->addWidget(m_liveMinuten);
+        m_liveBox->setVisible(false);
+        bar->addWidget(m_liveBox);
+    }
 
     // Luftbild: Blue Marble und Landsat von NASA GIBS, gezeichnet sobald
     // die Karte hineingezoomt ist. Voreingestellt an — wer die Karte
@@ -348,6 +447,11 @@ void QsoMapWindow::buildUi()
     connect(fit, &QPushButton::clicked,
             this, [this]() { resetActiveView(); });
 
+    // Was nur Kugel und flache Karte betrifft -- im 3D-Bild treten diese
+    // Schalter zurueck und geben dem Bild ihre Zeile (apply3dRoom).
+    m_flatOnlyControls << m_onlySelected << m_paths << m_grid << m_imagery
+                       << m_satellites << zoomOut << zoomIn << fit;
+
     m_viewBtn = new QPushButton(QStringLiteral("Flat map"), this);
     m_viewBtn->setStyleSheet(Style::buttonBaseStyle());
     m_viewBtn->setToolTip(QStringLiteral(
@@ -362,6 +466,84 @@ void QsoMapWindow::buildUi()
         "DX radar: the same contacts by bearing and distance from home — "
         "north up, rings at 500 … 20 000 km"));
     bar->addWidget(m_radarBtn);
+
+    // Azimutalkarte: die ganze Welt um das eigene QTH, mittabstandstreu.
+    // Wie das Radar ein Haken, der dorthin zurueckfuehrt, wo man herkam.
+    m_azimutBtn = new QPushButton(QStringLiteral("Azimuthal"), this);
+    m_azimutBtn->setCheckable(true);
+    m_azimutBtn->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
+    m_azimutBtn->setToolTip(QStringLiteral(
+        "Azimuthal map around your QTH: every straight line from the centre "
+        "is a rotor heading, every ring a distance — each contact as a ray "
+        "in its band colour, the rotor live, a looked-up station with short "
+        "and long path"));
+    bar->addWidget(m_azimutBtn);
+
+    // 3D: Googles fotorealistische Kacheln, wenn der Bediener einen
+    // eigenen Schluessel hat. Ohne Schluessel oeffnet der Knopf die
+    // Einrichtung; ohne WebEngine im Bau ist er aus und sagt warum.
+    m_3dBtn = new QPushButton(QStringLiteral("3D"), this);
+    m_3dBtn->setObjectName(QStringLiteral("qsoMap3dButton"));
+    m_3dBtn->setCheckable(true);
+    // Als Pille, nicht als Werkzeugknopf (Betreiber 2026-11-11: „er sollte
+    // glaube ich auch durch eine pille angezeigt werden" -- in der Leiste
+    // fand er ihn nicht). Er steht als erste Pille vor BAND und MODE,
+    // siehe rebuildFilterPills().
+    m_3dBtn->setStyleSheet(Style::buttonBaseStyle() + Style::greenCheckedStyle());
+    m_3dBtn->setFocusPolicy(Qt::NoFocus);   // +/- bleiben bei der Karte
+    // toggled, nicht clicked (Live-Befund 2026-11-10): die Bedienhilfe
+    // (AXPress, VoiceOver, Automatisierung) drueckt einen ankreuzbaren
+    // Knopf ueber toggle(), und das sendet KEIN clicked -- der Knopf tat
+    // dann sichtbar nichts. Eigene Umstellungen laufen ueber
+    // update3dButton() hinter einem QSignalBlocker und kommen hier nicht an.
+    connect(m_3dBtn, &QPushButton::toggled, this, [this](bool checked) {
+        const bool built = Station3dSurface::isAvailable();
+        const bool key   = Map3dAccess::isSet();
+        qCInfo(lcQsoMap3d).noquote()
+            << "3D-Knopf:" << (checked ? "an" : "aus")
+            << "| Zugang" << Map3dAccess::sourceName(Map3dAccess::chosenSource())
+            << (key ? "da" : "fehlt")
+            << "| WebEngine" << (built ? "da" : "fehlt")
+            << "|" << (m_embedded ? "Logbuch-Spalte" : "Kartenfenster");
+        if (!built) {
+            // Ein abgeschalteter Knopf, der nichts sagt, ist genau das
+            // „tut nichts". Also an bleiben und sagen, warum nicht.
+            update3dButton();
+            m_info->setText(QStringLiteral(
+                "<b>3D</b> — this build of Longpath has no Qt WebEngine, so "
+                "Google's 3D view is not available here. "
+                "\"View in Google Earth\" shows the station in 3D in your browser."));
+            m_info->setVisible(true);
+            if (m_lastFlight.valid) { m_googleEarthBtn->setVisible(true); }
+            return;
+        }
+        if (!key) {
+            update3dButton();
+            Google3dSetupDialog::showFor(this);
+            return;
+        }
+        m_3dWanted = checked;
+        AppSettings::instance().setValue(QStringLiteral("QsoMap3dFlight"), checked);
+        if (!m_lastFlight.valid) { return; }
+        if (checked) {
+            m_3dRefusedKey.clear();   // ausdruecklich gewollt: noch einmal fragen
+            // Ausdruecklich gewollt heisst auch: aus der Azimutalkarte
+            // heraus, in der flyToStation() sonst stehen bliebe.
+            if (use3d()) {
+                fly3d();
+            } else {
+                flyToStation(m_lastFlight.call, m_lastFlight.lat, m_lastFlight.lon,
+                             m_lastFlight.caption);
+            }
+        } else if (m_stack->currentIndex() == kView3d) {
+            flyFlat(m_lastFlight.call, m_lastFlight.lat, m_lastFlight.lon);
+            m_googleEarthBtn->setVisible(true);
+        }
+    });
+    connect(&Map3dAccess::notifier(), &Map3dAccess::changed, this, [this]() {
+        m_3dRefusedKey.clear();
+        update3dButton();
+    });
 
     // Nur eingebettet sichtbar: das grosse Fenster holen.
     m_popOutBtn = new QPushButton(QStringLiteral("\u2197"), this);
@@ -382,6 +564,8 @@ void QsoMapWindow::buildUi()
     // 187 px.
     m_pillRow = new FlowLayout(nullptr, 4, 4);
     col->addLayout(m_pillRow);
+    // Die 3D-Pille steht da, bevor das Log die anderen bringt.
+    m_pillRow->addWidget(m_3dBtn);
 
     m_globe = new GlobeWidget(this);
     // No beam spread here: the flanking arcs answer a question about
@@ -395,6 +579,18 @@ void QsoMapWindow::buildUi()
     m_stack->addWidget(m_globe);
     m_stack->addWidget(m_flat);
     m_stack->addWidget(m_radar);   // Index 2
+    m_azimut = new AzimutalKarteWidget(this);
+    m_stack->addWidget(m_azimut);  // Index 3 (kViewAzimuthal)
+    // Index 4 (kView3d): Platz fuer die 3D-Flaeche, die erst beim ersten
+    // Flug entsteht (ensure3d).
+    m_3dHost = new QWidget(this);
+    {
+        auto* l = new QVBoxLayout(m_3dHost);
+        l->setContentsMargins(0, 0, 0, 0);
+    }
+    m_stack->addWidget(m_3dHost);
+    Q_ASSERT(m_stack->indexOf(m_azimut) == kViewAzimuthal);
+    Q_ASSERT(m_stack->indexOf(m_3dHost) == kView3d);
 
     // Das kleine Rotor-Radar links der Karte. Quadratisch, so hoch wie
     // die Flaeche (resizeEvent); die Gradzahlen stehen in der Karteikarte.
@@ -438,7 +634,30 @@ void QsoMapWindow::buildUi()
         .arg(QString::fromLatin1(Style::kTextPrimary),
              QString::fromLatin1(Style::kInsetBg),
              QString::fromLatin1(Style::kBorderSubtle)));
-    col->addWidget(m_info);
+    connect(m_info, &QLabel::linkActivated, this, [this](const QString& link) {
+        if (link == QLatin1String("longpath:google3d")) { Google3dSetupDialog::showFor(this); }
+    });
+
+    // Der Rueckfall fuer den Blick aufs Dach: dieselbe Station in Google
+    // Earth im Browser -- ohne Schluessel, ohne WebEngine, auf jedem
+    // System. Nur sichtbar, wenn der Flug flach war.
+    m_googleEarthBtn = new QPushButton(QStringLiteral("View in Google Earth \u2197"), this);
+    m_googleEarthBtn->setObjectName(QStringLiteral("qsoMapGoogleEarthStation"));
+    m_googleEarthBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_googleEarthBtn->setToolTip(QStringLiteral(
+        "Open this station in Google Earth in your browser — 3D houses and "
+        "trees wherever Google has them, no key needed"));
+    m_googleEarthBtn->setVisible(false);
+    connect(m_googleEarthBtn, &QPushButton::clicked, this, &QsoMapWindow::openGoogleEarth);
+    {
+        auto* infoRow = new QHBoxLayout;
+        infoRow->setContentsMargins(0, 0, 0, 0);
+        infoRow->setSpacing(8);
+        infoRow->addWidget(m_info, 1);
+        infoRow->addWidget(m_googleEarthBtn, 0, Qt::AlignTop);
+        col->addLayout(infoRow);
+    }
+    update3dButton();
 
     m_tiles = new GibsTileLayer(this);
     m_flat->setImagery(m_tiles);
@@ -450,6 +669,8 @@ void QsoMapWindow::buildUi()
 
     connect(m_grid, &QCheckBox::toggled, this, [this](bool on) {
         m_flat->setShowGrid(on);
+        // Das Mosaik auch auf der Azimutalkarte (2026-11-11).
+        m_azimut->setShowMosaik(on);
         // The overlay lives on the flat map; looking at the globe with
         // Grid ticked would show nothing and look broken.
         if (on && m_stack->currentIndex() == 0) { m_viewBtn->click(); }
@@ -461,30 +682,95 @@ void QsoMapWindow::buildUi()
     connect(m_flat, &FlatMapWidget::gridClicked,
             this, &QsoMapWindow::showGridInfo);
 
+    // ── Locator-Jagd (2026-11-11) ───────────────────────────────────
+    connect(m_flat, &FlatMapWidget::livePunktGeklickt,
+            this, [this](const QString& call) { rufeLive(call); });
+    connect(m_azimut, &AzimutalKarteWidget::livePunktGeklickt,
+            this, [this](const QString& call) { rufeLive(call); });
+    connect(m_mosaikBand, QOverload<int>::of(&QComboBox::activated), this, [this](int) {
+        AppSettings::instance().setValue(QStringLiteral("QsoMapMosaicBand"),
+                                         m_mosaikBand->currentData().toString());
+        refreshMosaik();
+    });
+    connect(m_nurFt8, &QCheckBox::toggled, this, [this](bool on) {
+        AppSettings::instance().setValue(QStringLiteral("QsoMapMosaicFt8Only"),
+                                         on ? QStringLiteral("True")
+                                            : QStringLiteral("False"));
+        m_mosaik.baue(m_hatMosaikLog ? m_mosaikLog : m_all, on);
+        refreshMosaik();
+        refreshLive();
+    });
+    connect(m_liveMinuten, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int min) {
+        m_live.setFensterSekunden(min * 60);
+        AppSettings::instance().setValue(QStringLiteral("QsoMapFt8LiveSeconds"),
+                                         m_live.fensterSekunden());
+        refreshLive();
+    });
+    connect(&Ft8KartenBruecke::instanz(), &Ft8KartenBruecke::gehoert,
+            this, &QsoMapWindow::nimmFt8);
+    // Altern lassen: wer still ist, faellt nach dem Fenster von der
+    // Karte, auch wenn keine neuen Funde mehr kommen (Band gewechselt,
+    // FT8 aus).
+    m_liveTakt = new QTimer(this);
+    m_liveTakt->setInterval(5000);
+    connect(m_liveTakt, &QTimer::timeout, this, [this]() {
+        if (m_live.anzahl() > 0) { refreshLive(); }
+    });
+    m_liveTakt->start();
+
     connect(m_viewBtn, &QPushButton::clicked, this, [this]() {
-        // Aus dem Radar heraus fuehrt der Knopf zur jeweils anderen
-        // Kartenansicht; der Radar-Haken geht dabei aus.
-        const int cur = m_stack->currentIndex() == 2 ? m_viewBeforeRadar
-                                                     : m_stack->currentIndex();
-        const bool toFlat = cur == 0;
-        if (m_radarBtn && m_radarBtn->isChecked()) {
-            QSignalBlocker b(m_radarBtn);
-            m_radarBtn->setChecked(false);
+        // Aus Radar oder Azimutalkarte heraus fuehrt der Knopf zur jeweils
+        // anderen Kartenansicht; deren Haken geht dabei aus.
+        // 3D zaehlt hier nicht als Overlay: dort steht auf dem Knopf
+        // „Globe", und dorthin fuehrt er.
+        const int cur = isOverlayView(m_stack->currentIndex()) ? m_viewBeforeRadar
+                                                               : m_stack->currentIndex();
+        const bool toFlat = cur == kViewGlobe;
+        for (QPushButton* b : {m_radarBtn, m_azimutBtn}) {
+            if (b && b->isChecked()) {
+                QSignalBlocker block(b);
+                b->setChecked(false);
+            }
         }
-        m_stack->setCurrentIndex(toFlat ? 1 : 0);
+        m_stack->setCurrentIndex(toFlat ? kViewFlat : kViewGlobe);
         m_viewBtn->setText(toFlat ? QStringLiteral("Globe")
                                   : QStringLiteral("Flat map"));
+        rememberView();
     });
-    connect(m_radarBtn, &QPushButton::toggled, this, [this](bool on) {
+    // Radar und Azimutalkarte schliessen einander aus; beide merken sich
+    // Kugel oder flach als den Weg zurueck.
+    const auto overlayToggled = [this](int index, QPushButton* other, bool on) {
         if (on) {
-            if (m_stack->currentIndex() != 2) { m_viewBeforeRadar = m_stack->currentIndex(); }
-            m_stack->setCurrentIndex(2);
-        } else if (m_stack->currentIndex() == 2) {
+            if (other && other->isChecked()) {
+                QSignalBlocker block(other);
+                other->setChecked(false);
+            }
+            // Kugel, flach -- oder 3D: wer aus dem 3D-Bild ins Radar
+            // schaut, kommt dorthin zurueck (so im 3D-Zweig).
+            if (!isOverlayView(m_stack->currentIndex())) {
+                m_viewBeforeRadar = m_stack->currentIndex();
+            }
+            m_stack->setCurrentIndex(index);
+        } else if (m_stack->currentIndex() == index) {
             m_stack->setCurrentIndex(m_viewBeforeRadar);
         }
+        rememberView();
+    };
+    connect(m_radarBtn, &QPushButton::toggled, this, [this, overlayToggled](bool on) {
+        overlayToggled(kViewRadar, m_azimutBtn, on);
+    });
+    connect(m_azimutBtn, &QPushButton::toggled, this, [this, overlayToggled](bool on) {
+        overlayToggled(kViewAzimuthal, m_radarBtn, on);
+    });
+    connect(m_azimut, &AzimutalKarteWidget::pointClicked, this,
+            [this](const QString& label, double, double) {
+        showStationInfo(label);
     });
     connect(m_stack, &QStackedWidget::currentChanged,
-            this, [this](int) { updateRotorRadarVisibility(); });
+            this, [this](int) {
+        updateRotorRadarVisibility();
+        apply3dRoom();
+    });
     connect(m_radar, &DxRadarWidget::pointClicked, this,
             [this](const QString& label, double, double) {
         showStationInfo(label);
@@ -531,6 +817,37 @@ void QsoMapWindow::buildUi()
         for (QWidget* w : m_rangeControls) { w->setEnabled(!on); }
         rebuild();
     });
+
+    restoreView();
+}
+
+// ── Die gewaehlte Ansicht (2026-11-10) ──────────────────────────────
+
+void QsoMapWindow::rememberView() const
+{
+    QString name = QStringLiteral("globe");
+    switch (m_stack->currentIndex()) {
+    case kViewFlat:      name = QStringLiteral("flat"); break;
+    case kViewRadar:     name = QStringLiteral("radar"); break;
+    case kViewAzimuthal: name = QStringLiteral("azimuthal"); break;
+    default: break;
+    }
+    AppSettings::instance().setValue(QStringLiteral("QsoMapView"), name);
+}
+
+void QsoMapWindow::restoreView()
+{
+    const QString name = AppSettings::instance()
+                             .value(QStringLiteral("QsoMapView"), QString{})
+                             .toString();
+    if (name == QLatin1String("flat")) {
+        m_stack->setCurrentIndex(kViewFlat);
+        m_viewBtn->setText(QStringLiteral("Globe"));
+    } else if (name == QLatin1String("radar")) {
+        m_radarBtn->setChecked(true);
+    } else if (name == QLatin1String("azimuthal")) {
+        m_azimutBtn->setChecked(true);
+    }
 }
 
 void QsoMapWindow::setSelection(const QVector<LogEntry>& selected)
@@ -603,13 +920,17 @@ void QsoMapWindow::setHomeGrid(const QString& grid)
         m_globe->resetView();
         m_flat->setHome(lat, lon);
         m_radar->setHome(lat, lon);
+        m_azimut->setHome(lat, lon, m_homeGrid.left(6));
         m_rotorRadar->setHome(lat, lon);
         applyStationMarker();
     } else {
         m_flat->clearHome();
         m_radar->clearHome();
+        m_azimut->clearHome();
         m_rotorRadar->clearHome();
     }
+    // Entfernung und Richtung der gehoerten Stationen haengen daran.
+    if (m_live.anzahl() > 0) { refreshLive(); }
 }
 
 // ── Der eigene Standort als Bild ─────────────────────────────────────
@@ -650,6 +971,11 @@ void QsoMapWindow::setEntries(const QVector<LogEntry>& entries)
     m_all = entries;
     rebuildFilterPills();
     rebuild();
+    if (!m_hatMosaikLog) {
+        m_mosaik.baue(m_all, m_nurFt8 && m_nurFt8->isChecked());
+        refreshMosaik();
+        refreshLive();
+    }
 }
 
 // ── Filters ─────────────────────────────────────────────────────────
@@ -669,9 +995,14 @@ QString QsoMapWindow::modeKey(const LogEntry& e)
 void QsoMapWindow::rebuildFilterPills()
 {
     while (QLayoutItem* it = m_pillRow->takeAt(0)) {
-        delete it->widget();
+        // Die 3D-Pille lebt laenger als die Band-/Modus-Pillen: sie haelt
+        // ihre Verbindungen und ihren Zustand.
+        if (it->widget() != m_3dBtn) { delete it->widget(); }
         delete it;
     }
+    // Immer zuerst, immer an derselben Stelle -- auch wenn das Log nur ein
+    // Band und eine Betriebsart hat und sonst keine Pille da waere.
+    m_pillRow->addWidget(m_3dBtn);
 
     QSet<QString> bands, modes;
     for (const LogEntry& e : m_all) {
@@ -727,6 +1058,34 @@ void QsoMapWindow::rebuildFilterPills()
         for (const QString& m : modeList) { addPill(m, m, false); }
     }
     m_pillRow->addStretch();
+    apply3dRoom();   // frisch gebaute Pillen folgen der Ansicht
+}
+
+// ── Platz fuer die 3D-Ansicht (2026-11-10) ───────────────────────────
+//
+// Betreiber nach dem ersten echten Flug: „die groesse der ansicht von 3d
+// muss groesser sein". In der Logbuch-Spalte blieben dem Bild gut 160 von
+// 360 Punkten Hoehe: darueber die Band- und Betriebsarten-Pillen (sie
+// filtern Kontakte auf Kugel und flacher Karte, im 3D-Flug tun sie
+// nichts), darunter die Zaehlung, daneben die kleine Rotor-Grafik. Im
+// 3D-Bild treten alle drei zurueck; die Leiste mit „3D"/„Globe" bleibt,
+// damit man wieder hinauskommt.
+void QsoMapWindow::apply3dRoom()
+{
+    const bool in3d = m_stack && m_stack->currentIndex() == kView3d;
+    if (m_pillRow) {
+        for (int i = 0; i < m_pillRow->count(); ++i) {
+            QWidget* w = m_pillRow->itemAt(i)->widget();
+            // Die 3D-Pille bleibt: sie ist der Weg zurueck.
+            if (w && w != m_3dBtn) { w->setVisible(!in3d); }
+        }
+        m_pillRow->invalidate();
+    }
+    if (m_summary) { m_summary->setVisible(!in3d); }
+    // Live 2026-11-10: in der Logbuch-Spalte war das 3D-Bild ein flacher
+    // Streifen. Die Schalter, die im 3D-Bild nichts tun, geben ihre Zeile
+    // ab; „Fly to call", Globe, Radar, 3D und ↗ bleiben.
+    for (QWidget* w : std::as_const(m_flatOnlyControls)) { w->setVisible(!in3d); }
 }
 
 namespace {
@@ -760,6 +1119,11 @@ void QsoMapWindow::rebuild()
     const QDate to   = m_to->date();
 
     QVector<MapPoint> points;
+    // Die Azimutalkarte bekommt JEDEN gezeigten Kontakt, nicht einen je
+    // Ort: dort ist die Dichte die Aussage -- ein Strahl wird hell, wo
+    // viele zusammenlaufen. Ihre Strahlen liegen als fertige Ebene vor,
+    // die Obergrenze fuer markierte Linien (Kugel) gilt hier nicht.
+    QVector<AzimutalKarteWidget::Punkt> azPunkte;
     QSet<QString> seenPlaces;
     int considered   = 0;
     int noGrid       = 0;
@@ -813,6 +1177,10 @@ void QsoMapWindow::rebuild()
             continue;
         }
 
+        azPunkte.append(AzimutalKarteWidget::Punkt{lat, lon, e.band.trimmed(),
+                                                   e.call.trimmed().toUpper(),
+                                                   !approximate, marked});
+
         if (marked) {
             // Every marked contact gets its own line, not one per
             // place. Two marked QSOs in the same square draw the same
@@ -834,6 +1202,7 @@ void QsoMapWindow::rebuild()
     m_globe->setPoints(points);
     m_flat->setPoints(points);
     m_radar->setPoints(points);
+    m_azimut->setPunkte(azPunkte);
     // Das kleine Rotor-Radar neben der Karte nur mit dem, was markiert
     // ist -- der gewaehlten Station (Betreiber 2026-09-27, Blatt R3). Die
     // Karte daneben zeigt schon jeden Kontakt; zwischen 9271 Punkten
@@ -904,6 +1273,114 @@ void QsoMapWindow::rebuild()
     }
 }
 
+// ── Locator-Jagd mit FT8 (2026-11-11) ───────────────────────────────
+
+QDateTime QsoMapWindow::jetzt() const
+{
+    return m_uhr ? m_uhr() : QDateTime::currentDateTimeUtc();
+}
+
+void QsoMapWindow::setMosaikLog(const QVector<LogEntry>& ganzesLog)
+{
+    // Das Logbuchfenster ruft das bei jedem Filterwechsel. Dasselbe
+    // Logbuch (geteilte Daten, Qt-Kopie beim Schreiben) muss nicht neu
+    // gezaehlt werden.
+    if (m_hatMosaikLog && ganzesLog.constData() == m_mosaikLog.constData()
+        && ganzesLog.size() == m_mosaikLog.size()) {
+        return;
+    }
+    m_mosaikLog = ganzesLog;
+    m_hatMosaikLog = true;
+    m_mosaik.baue(m_mosaikLog, m_nurFt8 && m_nurFt8->isChecked());
+    refreshMosaik();
+    refreshLive();
+}
+
+QString QsoMapWindow::mosaikBand() const
+{
+    if (!m_mosaikBand || m_mosaikBand->currentIndex() < 0) { return m_liveBand; }
+    const QString d = m_mosaikBand->currentData().toString();
+    // „FT8 band": das Band, auf dem zuletzt gehoert wurde -- solange
+    // nichts gehoert wurde, alle Baender.
+    return d == QStringLiteral("*") ? m_liveBand : d;
+}
+
+void QsoMapWindow::refreshMosaik()
+{
+    // Die Auswahl neu fuellen: Baender kommen und gehen mit dem Logbuch.
+    if (m_mosaikBand) {
+        QString gewaehlt = m_mosaikBand->currentIndex() >= 0
+            ? m_mosaikBand->currentData().toString()
+            : AppSettings::instance().value(QStringLiteral("QsoMapMosaicBand"),
+                                            QStringLiteral("*")).toString();
+        QSignalBlocker block(m_mosaikBand);
+        m_mosaikBand->clear();
+        m_mosaikBand->addItem(m_liveBand.isEmpty()
+                                  ? QStringLiteral("FT8 band")
+                                  : QStringLiteral("FT8 band (%1)").arg(m_liveBand),
+                              QStringLiteral("*"));
+        m_mosaikBand->addItem(QStringLiteral("All bands"), QString());
+        for (const QString& b : m_mosaik.baender()) {
+            m_mosaikBand->addItem(b, b);
+        }
+        int i = m_mosaikBand->findData(gewaehlt);
+        if (i < 0) { i = 0; }
+        m_mosaikBand->setCurrentIndex(i);
+    }
+    const QHash<QString, FeldStand> felder = m_mosaik.felder(mosaikBand());
+    m_flat->setMosaik(felder);
+    m_azimut->setMosaik(felder);
+}
+
+void QsoMapWindow::refreshLive()
+{
+    const QDateTime t = jetzt();
+    m_live.altere(t);
+    const QVector<LivePunkt> punkte = m_live.punkte(t, m_mosaik, m_homeGrid);
+    m_flat->setLivePunkte(punkte);
+    m_azimut->setLivePunkte(punkte);
+
+    if (!m_liveZaehler) { return; }
+    if (m_liveBand.isEmpty() && m_live.anzahl() == 0) { return; }
+    m_liveBox->setVisible(true);
+    const int neu = LiveSchicht::neueFelder(punkte, m_liveBand);
+    m_liveZaehler->setText(LiveSchicht::zaehlerText(neu, m_liveBand));
+    m_liveZaehler->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+        .arg(QString::fromLatin1(neu > 0 ? Style::kJagdNeu : Style::kTextSecondary)));
+}
+
+void QsoMapWindow::nimmFt8(const Ft8Gehoert& g)
+{
+    m_live.nimm(g);
+    if (!g.band.isEmpty() && g.band != m_liveBand) {
+        m_liveBand = g.band;
+        // Das Mosaik folgt dem FT8-Band (wenn so gewaehlt), und die
+        // Beschriftung „FT8 band (20m)" ebenso.
+        refreshMosaik();
+    }
+    refreshLive();
+}
+
+QString QsoMapWindow::rufeLive(const QString& rufzeichen)
+{
+    const QString call = rufzeichen.trimmed().toUpper();
+    const Ft8Gehoert* g = m_live.finde(call);
+    const QString grund = g ? Ft8KartenBruecke::instanz().rufe(*g)
+                            : QStringLiteral("%1 is no longer heard").arg(call);
+    if (grund.isEmpty()) {
+        m_info->setText(QStringLiteral(
+            "<b>Calling %1</b> — answering “%2” in the FT8 window, exactly as "
+            "a double-click there would. The QSO runs to 73 and is logged; "
+            "Stop is in the FT8 window.")
+            .arg(call.toHtmlEscaped(), g->nachricht.toHtmlEscaped()));
+    } else {
+        m_info->setText(QStringLiteral("<b>Cannot call %1</b> — %2")
+            .arg(call.toHtmlEscaped(), grund.toHtmlEscaped()));
+    }
+    m_info->setVisible(true);
+    return grund;
+}
+
 // ── Click answers ───────────────────────────────────────────────────
 
 void QsoMapWindow::showStationInfo(const QString& label)
@@ -945,7 +1422,15 @@ void QsoMapWindow::showStationInfo(const QString& label)
     }
     if (isValidGridSquare(last.gridSquare)) {
         text += QStringLiteral(" · %1").arg(last.gridSquare.toHtmlEscaped());
-        if (isValidGridSquare(m_homeGrid)) {
+        if (!last.mySotaRef.trimmed().isEmpty() || !last.sotaRef.trimmed().isEmpty()) {
+            // Vom Gipfel (2026-11-11): das Logbuch hat Entfernung und
+            // Peilung dieses QSOs schon aus der Lage des Gipfels gerechnet
+            // (SotaGipfelVerzeichnis::korrigiereStrecken) -- die Mitte
+            // des Heimatlocators laege sieben Kilometer daneben.
+            text += QStringLiteral(" · %1 km · %2°")
+                .arg(last.distanceKm, 0, 'f', 0)
+                .arg(last.bearingDeg, 0, 'f', 0);
+        } else if (isValidGridSquare(m_homeGrid)) {
             text += QStringLiteral(" · %1 km · %2°")
                 .arg(calculateDistanceKm(m_homeGrid, last.gridSquare),
                      0, 'f', 0)
@@ -1260,36 +1745,205 @@ void QsoMapWindow::lookupAndFly(const QString& text)
 void QsoMapWindow::flyToStation(const QString& call, double lat, double lon,
                                 const QString& caption)
 {
-    // Der Flug ist eine Sache der flachen Karte; die Kugel kennt ihn
-    // nicht. Also erst umschalten, dann fliegen.
-    if (m_stack->currentIndex() != 1) {
+    m_lastFlight.valid   = true;
+    m_lastFlight.call    = call.trimmed().toUpper();
+    m_lastFlight.caption = caption;
+    m_lastFlight.lat     = lat;
+    m_lastFlight.lon     = lon;
+
+    // Die Azimutalkarte bekommt die Station immer -- kurzer Weg hell,
+    // langer gestrichelt. Ist sie die gezeigte Ansicht, bleibt sie es:
+    // Peilung und beide Wege sind genau die Antwort, die man dort sucht.
+    // Darum fliegt 3D nur, wenn NICHT die Azimutalkarte gezeigt wird
+    // (Probe-Merge Azimutalkarte + 3D); der Knopf „3D" holt ausdruecklich
+    // ins 3D-Bild.
+    m_azimut->setZiel(m_lastFlight.call, lat, lon);
+    if (m_stack->currentIndex() != kViewAzimuthal && use3d()) {
+        fly3d();
+        return;
+    }
+    flyFlat(m_lastFlight.call, lat, lon);
+    showFlightCard(QString());
+    // Kein 3D hier -- der Blick aufs Dach geht trotzdem, im Browser.
+    m_googleEarthBtn->setVisible(true);
+}
+
+void QsoMapWindow::flyFlat(const QString& c, double lat, double lon)
+{
+    // Wer das 3D-Bild verlaesst, soll aus Radar/Azimutalkarte nicht
+    // dorthin zurueckkehren (es kann abgelehnt oder abgewaehlt sein).
+    if (m_viewBeforeRadar == kView3d) { m_viewBeforeRadar = kViewFlat; }
+    const bool stayAzimuthal = m_stack->currentIndex() == kViewAzimuthal;
+
+    // Sonst ist der Flug eine Sache der flachen Karte; die Kugel kennt
+    // ihn nicht. Also erst umschalten, dann fliegen.
+    if (!stayAzimuthal && m_stack->currentIndex() != kViewFlat) {
         if (m_radarBtn && m_radarBtn->isChecked()) {
             QSignalBlocker b(m_radarBtn);
             m_radarBtn->setChecked(false);
         }
-        m_stack->setCurrentIndex(1);
+        m_stack->setCurrentIndex(kViewFlat);
     }
-    if (m_viewBtn) { m_viewBtn->setText(QStringLiteral("Globe")); }
+    if (m_viewBtn && !stayAzimuthal) { m_viewBtn->setText(QStringLiteral("Globe")); }
 
-    const QString c = call.trimmed().toUpper();
     m_flat->setFocusStation(c, lat, lon);
     // ~55 m je Bildpunkt: bei 900 px Breite ein Ausschnitt von 50 km,
     // in dem man Stadt und Landschaft erkennt und Landsat noch scharf ist.
     m_flat->flyTo(lat, lon, m_flat->zoomForDegPerPixel(0.0005));
+}
 
-    QString text = QStringLiteral("<b>%1</b>").arg(c.toHtmlEscaped());
-    if (!caption.isEmpty()) { text += QStringLiteral(" — ") + caption; }
+void QsoMapWindow::showFlightCard(const QString& extra)
+{
+    const LastFlight& f = m_lastFlight;
+    QString text = QStringLiteral("<b>%1</b>").arg(f.call.toHtmlEscaped());
+    if (!f.caption.isEmpty()) { text += QStringLiteral(" — ") + f.caption; }
     if (isValidGridSquare(m_homeGrid)) {
         double hlat = 0.0, hlon = 0.0;
         calculateLatLonFromGridSquare(m_homeGrid, hlat, hlon);
         // Entfernung und Peilung ueber den Grosskreis, wie die Karte sie
         // zeichnet -- dieselbe Rechnung wie die Karteikarte daneben.
-        const BeamHeading::GreatCircle g = BeamHeading::greatCircle(hlat, hlon, lat, lon);
+        const BeamHeading::GreatCircle g = BeamHeading::greatCircle(hlat, hlon, f.lat, f.lon);
         text += QStringLiteral(" · %1 km · %2°")
                     .arg(g.km, 0, 'f', 0).arg(g.bearingDeg, 0, 'f', 0);
     }
+    text += extra;
     m_info->setText(text);
     m_info->setVisible(true);
+}
+
+// ── 3D-Flug (2026-11-10) ─────────────────────────────────────────────
+
+int QsoMapWindow::currentViewForTest() const { return m_stack->currentIndex(); }
+QWidget* QsoMapWindow::summaryForTest() const { return m_summary; }
+QString QsoMapWindow::infoTextForTest() const { return m_info->text(); }
+
+bool QsoMapWindow::use3d() const
+{
+    if (!m_3dWanted || !Station3dSurface::isAvailable()) { return false; }
+    const QString key = Map3dAccess::secret();
+    if (key.isEmpty()) { return false; }
+    // Einmal abgelehnt heisst: bis zu einem neuen Zugang (oder dem
+    // ausdruecklichen Klick auf „3D") nicht bei jedem Rufzeichen wieder
+    // die 3D-Seite aufziehen, nur um gleich zurueckzufallen. Quelle und
+    // Zugang zusammen: derselbe Text als ion-Token und als Google-
+    // Schluessel waeren zwei verschiedene Zugaenge.
+    return accessIdentity() != m_3dRefusedKey;
+}
+
+void QsoMapWindow::ensure3d()
+{
+    if (m_3d) { return; }
+    m_3d = Station3dSurface::create(m_3dHost);
+    if (!m_3d) { return; }
+    m_3dHost->layout()->addWidget(m_3d);
+    connect(m_3d, &Station3dSurface::failed, this, &QsoMapWindow::on3dFailed);
+}
+
+void QsoMapWindow::fly3d()
+{
+    ensure3d();
+    if (!m_3d) {
+        flyFlat(m_lastFlight.call, m_lastFlight.lat, m_lastFlight.lon);
+        showFlightCard(QString());
+        m_googleEarthBtn->setVisible(true);
+        return;
+    }
+    for (QPushButton* b : {m_radarBtn, m_azimutBtn}) {
+        if (b && b->isChecked()) {
+            QSignalBlocker block(b);
+            b->setChecked(false);
+        }
+    }
+    m_stack->setCurrentIndex(kView3d);
+    if (m_viewBtn) { m_viewBtn->setText(QStringLiteral("Globe")); }
+    // Die flache Karte kennt die Station trotzdem: wer zurueckschaltet,
+    // sieht sie dort, wo der Flug geendet hat.
+    m_flat->setFocusStation(m_lastFlight.call, m_lastFlight.lat, m_lastFlight.lon);
+    m_googleEarthBtn->setVisible(false);
+    showFlightCard(QStringLiteral(" · Google 3D"));
+
+    Station3dFlight f;
+    f.call    = m_lastFlight.call;
+    f.caption = QTextDocumentFragment::fromHtml(m_lastFlight.caption).toPlainText();
+    f.lat     = m_lastFlight.lat;
+    f.lon     = m_lastFlight.lon;
+    f.viaCesiumIon = Map3dAccess::chosenSource() == Map3dAccess::Source::CesiumIon;
+    f.secret       = Map3dAccess::secret();
+    if (isValidGridSquare(m_homeGrid)) {
+        f.hasHome = true;
+        calculateLatLonFromGridSquare(m_homeGrid, f.homeLat, f.homeLon);
+        const BeamHeading::GreatCircle g =
+            BeamHeading::greatCircle(f.homeLat, f.homeLon, f.lat, f.lon);
+        f.km = g.km;
+        f.bearingDeg = g.bearingDeg;
+    }
+    m_3d->fly(f);
+}
+
+void QsoMapWindow::on3dFailed(const QString& reason, bool keyProblem)
+{
+    if (keyProblem) { m_3dRefusedKey = accessIdentity(); }
+    if (!m_lastFlight.valid) { return; }
+    // Zurueck auf den alten Weg, mit dem Grund in der Stationskarte.
+    flyFlat(m_lastFlight.call, m_lastFlight.lat, m_lastFlight.lon);
+    QString extra = QStringLiteral("<br>Google 3D: %1").arg(reason.toHtmlEscaped());
+    if (keyProblem) {
+        extra += QStringLiteral(" — <a href=\"longpath:google3d\" style=\"color:%1;\">"
+                                "Google 3D settings…</a>")
+                     .arg(QLatin1String(Style::kAccent));
+    }
+    showFlightCard(extra);
+    m_googleEarthBtn->setVisible(true);
+}
+
+void QsoMapWindow::openGoogleEarth()
+{
+    if (!m_lastFlight.valid) { return; }
+    double heading = 0.0;
+    if (isValidGridSquare(m_homeGrid)) {
+        double hlat = 0.0, hlon = 0.0;
+        calculateLatLonFromGridSquare(m_homeGrid, hlat, hlon);
+        heading = BeamHeading::greatCircle(hlat, hlon, m_lastFlight.lat, m_lastFlight.lon)
+                      .bearingDeg;
+    }
+    if (m_openUrl) {
+        m_openUrl(Station3dPage::googleEarthWebUrl(m_lastFlight.lat, m_lastFlight.lon, heading));
+    }
+}
+
+void QsoMapWindow::update3dButton()
+{
+    if (!m_3dBtn) { return; }
+    const bool built = Station3dSurface::isAvailable();
+    const bool key   = Map3dAccess::isSet();
+    QSignalBlocker b(m_3dBtn);
+    // Immer bedienbar: ohne WebEngine sagt der Klick, warum es nicht geht.
+    m_3dBtn->setEnabled(true);
+    m_3dBtn->setChecked(built && key && m_3dWanted);
+    if (!built) {
+        m_3dBtn->setToolTip(QStringLiteral(
+            "This build of Longpath has no Qt WebEngine, so the 3D view is not "
+            "available. Use \"View in Google Earth\" next to the station card."));
+    } else if (!key) {
+        m_3dBtn->setToolTip(QStringLiteral(
+            "Show looked-up stations in Google's photorealistic 3D, down to the "
+            "house and the antenna. Needs a free Cesium ion account (or your own "
+            "Google key) — click to set it up."));
+    } else {
+        m_3dBtn->setToolTip(QStringLiteral(
+            "Fly to looked-up stations in Google's photorealistic 3D (via %1). "
+            "Untick for the flat map with NASA imagery.")
+            .arg(Map3dAccess::chosenSource() == Map3dAccess::Source::CesiumIon
+                     ? QStringLiteral("your Cesium ion account")
+                     : QStringLiteral("your Google key")));
+    }
+}
+
+QString QsoMapWindow::accessIdentity()
+{
+    const QString secret = Map3dAccess::secret();
+    if (secret.isEmpty()) { return QString(); }
+    return Map3dAccess::sourceName(Map3dAccess::chosenSource()) + QLatin1Char(':') + secret;
 }
 
 
@@ -1305,8 +1959,12 @@ void QsoMapWindow::setRotorRadarShown(bool on)
 void QsoMapWindow::updateRotorRadarVisibility()
 {
     if (!m_rotorRadar) { return; }
-    // Zeigt die Flaeche schon das Radar, waere ein zweites daneben doppelt.
-    const bool bigRadar = m_stack && m_stack->currentIndex() == 2;
+    // Zeigt die Flaeche schon das Radar, waere ein zweites daneben doppelt;
+    // die Azimutalkarte traegt den Rotorkeil ebenfalls selbst. Im 3D-Bild
+    // gehoert die ganze Breite dem Bild (2026-11-10); wohin die Station
+    // liegt, sagt dort die Anzeige im Bild.
+    const bool bigRadar = m_stack && (isOverlayView(m_stack->currentIndex())
+                                      || m_stack->currentIndex() == kView3d);
     // Zu schmal zum Ablesen: dann lieber nur die Karte.
     const bool roomy = width() >= 420;
     m_rotorRadar->setVisible(m_rotorRadarShown && !bigRadar && roomy);
@@ -1322,6 +1980,7 @@ void QsoMapWindow::setRotorHeading(double deg)
 {
     m_rotorRadar->setRotorHeading(deg);
     m_radar->setRotorHeading(deg);
+    m_azimut->setRotorHeading(deg);
 }
 
 void QsoMapWindow::setRotorTarget(double deg)
@@ -1334,6 +1993,7 @@ void QsoMapWindow::setRotorBeamWidth(double deg)
 {
     m_rotorRadar->setRotorBeamWidth(deg);
     m_radar->setRotorBeamWidth(deg);
+    m_azimut->setRotorBeamWidth(deg);
 }
 
 void QsoMapWindow::showRadarViewForTest(bool on)
