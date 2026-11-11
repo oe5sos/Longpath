@@ -451,7 +451,12 @@ private slots:
                  fake.firstLine.constData());
         // Der Zugang steht im Kopf, nicht in der Adresse.
         QVERIFY(!fake.firstLine.contains(kFakeToken.toLatin1()));
-        QVERIFY2(fake.headers.contains("Authorization: Bearer " + kFakeToken.toLatin1()),
+        // Kopfnamen sind nach RFC 9110 gross/klein-unabhaengig; Qt unter
+        // Linux schickt "authorization:", unter macOS "Authorization:"
+        // (CI #422, Linux 3/4). Der Name wird darum klein verglichen,
+        // der Wert (Bearer + Zugang) wortgetreu.
+        QVERIFY2(fake.headers.toLower().contains("authorization: bearer ")
+                     && fake.headers.contains("Bearer " + kFakeToken.toLatin1()),
                  fake.headers.constData());
     }
 
