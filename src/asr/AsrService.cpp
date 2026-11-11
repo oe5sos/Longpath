@@ -8,6 +8,8 @@
 // Modification history (Longpath):
 //   2026-08-23 — Angelegt fuer Longpath von Martin Fischer,
 //                KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-11-11 — Schneiden am Rauschboden eingeschaltet. Martin
+//                Fischer, KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 #include "asr/AsrService.h"
@@ -26,6 +28,10 @@ namespace {
 // arbeitet in 10-ms-Rahmen, und der Ring fasst weit mehr.
 constexpr int kPumpIntervalMs = 50;
 constexpr int kAsrRateHz = 16000;   // was jeder Whisper-Dienst erwartet
+// Sprache = Pegel ueber dem Doppelten des Rauschbodens. Am 2026-11-11
+// gegen 1,5 und 3 gemessen: 1,5 liess noch Abschnitte am Deckel, 3 warf
+// beim zweiten Mitschnitt vier Fuenftel der Sprache weg (16 statt 97).
+constexpr float kRauschbodenFaktor = 2.0f;
 // Hoechstzahl Rahmen je Wandleraufruf. Muss zur Groesse passen,
 // mit der der Resampler gebaut wird — sonst rechnet er auf einem
 // Puffer, der ihm zu klein ist.
@@ -83,6 +89,15 @@ AsrService::AsrService(QObject* parent)
     m_pump = new QTimer(this);
     m_pump->setInterval(kPumpIntervalMs);
     connect(m_pump, &QTimer::timeout, this, &AsrService::drainRing);
+
+    // ── Schneiden am Rauschboden (2026-11-11) ───────────────────────
+    //
+    // Die feste Schwelle fand im Pileup keine einzige Pause: fast jeder
+    // Abschnitt lief bis zum 20-s-Deckel, die Mitschrift kam also bis
+    // zu 20 s zu spaet und das Rufzeichen oft zerschnitten. Faktor 2
+    // ueber dem Rauschboden schnitt denselben Mitschnitt in Durchgaenge
+    // von 3–4 s. Messung und Begruendung: AsrSegmenter.h, noiseFactor.
+    m_segmenter.setNoiseFactor(kRauschbodenFaktor);
 }
 
 AsrService::~AsrService()

@@ -8764,6 +8764,8 @@ void MainWindow::populateDefaultMeter()
     panel->addApplet(m_asrApplet);
     connect(m_asrApplet, &AsrApplet::enableRequested,
             this, &MainWindow::setAsrEnabled);
+    connect(m_asrApplet, &AsrApplet::languageChanged,
+            this, [this](const QString&) { uebernehmeAsrSprache(); });
 
     // Phase 23: TCI applets — live in Container #0 below the existing applets.
     // Visibility is now managed by AppletVisibilityController below

@@ -1541,6 +1541,9 @@ private:
     void releaseKiwiSdrSlice(int sliceId, const QString& profileId,
                               const QString& reason);
     void setAsrEnabled(bool on);
+    // Neue Sprache aus dem ⚙ der Mitschrift: laeuft sie, mit der neuen
+    // Sprache neu aufsetzen (MainWindow_Asr.cpp, 2026-11-11).
+    void uebernehmeAsrSprache();
 
     // SunSDR — siehe MainWindow_SunSdr.cpp.
     void wireSunSdr();

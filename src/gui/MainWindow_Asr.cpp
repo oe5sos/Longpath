@@ -31,6 +31,9 @@
 //   2026-10-21 — Eine Sonde bleibt offline: isolierte Laeufe nehmen
 //                 von selbst keine Verbindung auf. Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 — uebernehmeAsrSprache(): Sprache aus dem ⚙ der
+//                 Mitschrift gilt sofort. Martin Fischer,
+//                 KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 #include "gui/MainWindow.h"
@@ -148,6 +151,18 @@ void MainWindow::setAsrEnabled(bool on)
     qCInfo(lcDsp).nospace()
         << "Spracherkennung an: " << url << ", Scheibe " << m_asrTapSlice
         << ", Sprache " << cfg.language;
+}
+
+void MainWindow::uebernehmeAsrSprache()
+{
+    // Die Sprache steckt im Erkenner, der beim Einschalten gebaut wird
+    // (RemoteAsrConfig). Statt ihn im Lauf umzubauen — der Arbeiter
+    // haelt einen nackten Zeiger darauf, siehe AsrService::setBackend —
+    // einmal aus und wieder an. Kostet einen halben Durchgang, und nur
+    // dann, wenn der Betreiber die Sprache wechselt.
+    if (!m_asrService || !m_asrService->isRunning()) { return; }
+    setAsrEnabled(false);
+    setAsrEnabled(true);
 }
 
 } // namespace Longpath
