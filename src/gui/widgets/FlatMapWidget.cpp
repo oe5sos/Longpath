@@ -140,6 +140,13 @@ bool FlatMapWidget::event(QEvent* e)
     return QWidget::event(e);
 }
 
+void FlatMapWidget::setJagdModus(bool an)
+{
+    if (m_jagdModus == an) { return; }
+    m_jagdModus = an;
+    update();
+}
+
 void FlatMapWidget::paintMosaik(QPainter& p)
 {
     if (m_mosaik.isEmpty()) { return; }
@@ -157,7 +164,7 @@ void FlatMapWidget::paintMosaik(QPainter& p)
         const double latS = fy * 10.0 - 90.0 + sy;
         const QRectF feld(project(latS + 1.0, lonW), project(latS, lonW + 2.0));
         if (!feld.intersects(sicht)) { continue; }
-        p.setBrush(LocatorJagdZeichen::feldFuellung(it.value()));
+        p.setBrush(LocatorJagdZeichen::feldFuellung(it.value(), m_jagdModus));
         p.drawRect(feld);
     }
     p.restore();
@@ -1008,14 +1015,11 @@ void FlatMapWidget::mouseReleaseEvent(QMouseEvent* e)
         // which square is that.
         if (!m_moved) {
             const QPointF pos = e->position();
-            // Ein gehoerter FT8-Punkt liegt obenauf und geht vor
-            // (2026-11-11): wer auf ihn zielt, will anrufen, nicht die
-            // Karteikarte eines alten QSOs darunter sehen.
-            const int live = livePunktAt(pos);
-            if (live >= 0) {
-                emit livePunktGeklickt(m_live.at(live).g.rufzeichen);
-                return;
-            }
+            // Anrufen tut der DOPPELklick, nicht dieser hier (Betreiber
+            // 2026-11-11: „doppelklick, sofern ich diesen sender
+            // empfangen kann, und das ft8 geht los"). Ein einzelner
+            // Klick darf keine Taste druecken -- er zeigt nur, was unter
+            // dem Zeiger liegt. Siehe mouseDoubleClickEvent().
             const int hit = pointAt(pos);
             if (hit >= 0) {
                 const MapPoint& pt = m_points.at(hit);
@@ -1037,6 +1041,16 @@ void FlatMapWidget::mouseReleaseEvent(QMouseEvent* e)
 void FlatMapWidget::mouseDoubleClickEvent(QMouseEvent* e)
 {
     if (e->button() == Qt::LeftButton) {
+        // Ein gehoerter FT8-Punkt liegt obenauf und geht vor: wer ihn
+        // doppelt trifft, will anrufen, nicht die Ansicht zuruecksetzen.
+        // Dasselbe Handgriff wie der Doppelklick in der Fundliste, und
+        // derselbe Weg dahinter (Ft8KartenBruecke -> rufeVonDerKarte ->
+        // kartenSperre -> nimmFundAn).
+        const int live = livePunktAt(e->position());
+        if (live >= 0) {
+            emit livePunktGeklickt(m_live.at(live).g.rufzeichen);
+            return;
+        }
         resetView();
         return;
     }

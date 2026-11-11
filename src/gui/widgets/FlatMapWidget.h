@@ -113,6 +113,12 @@ public:
     void setMosaik(const QHash<QString, FeldStand>& felder);
     int  mosaikAnzahl() const { return m_mosaik.size(); }
 
+    // Jagdmodus: das Mosaik deckt, statt zu tuschen. Der Schalter sitzt
+    // im Kartenfenster ("Locator hunt"), nicht hier -- dieses Widget
+    // weiss nur, wie kraeftig es malen soll.
+    void setJagdModus(bool an);
+    bool jagdModus() const { return m_jagdModus; }
+
     // Die gehoerten FT8-Stationen. Unabhaengig vom Grid zu sehen: wer
     // FT8 hoert, will die Punkte auch ohne Gitter finden.
     void setLivePunkte(const QVector<LivePunkt>& punkte);
@@ -285,6 +291,7 @@ private:
     bool m_showPaths{true};
     bool m_showTerminator{true};
     bool m_showGrid{false};
+    bool m_jagdModus{false};
     QString m_clickedGrid;   // highlighted square, empty for none
 
     QHash<QString, FeldStand> m_mosaik;

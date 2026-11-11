@@ -225,6 +225,9 @@ public:
     QComboBox* mosaikBandForTest() const { return m_mosaikBand; }
     QCheckBox* nurFt8ForTest() const { return m_nurFt8; }
     QCheckBox* gridForTest() const { return m_grid; }
+    QPushButton* jagdButtonForTest() const { return m_jagdBtn; }
+    QCheckBox* pathsForTest() const { return m_paths; }
+    QCheckBox* imageryForTest() const { return m_imagery; }
     QSpinBox*  liveMinutenForTest() const { return m_liveMinuten; }
     void       refreshLiveForTest() { refreshLive(); }
 
@@ -305,6 +308,26 @@ private:
 
     QDateEdit*   m_from{nullptr};
     QDateEdit*   m_to{nullptr};
+    // ── Locator-Jagd: ein Knopf statt drei Vorwissen (2026-11-11) ───
+    //
+    // Betreiber: „es muss eine weltkarte sein, mit der ich sofort sehe,
+    // was noch nicht erreicht ist und wo aktuell gesendet wird" -- und
+    // davor: „wenn man dies nicht weiss...". Vorher musste man wissen,
+    // dass der Haken `Grid` heisst, dass er im 3D-Bild verschwindet und
+    // dass `Paths` und `Imagery` ihn zudecken. Dieser Knopf stellt die
+    // ganze Buehne auf einmal und raeumt sie wieder weg.
+    QPushButton* m_jagdBtn{nullptr};
+    struct JagdVorher {
+        bool gueltig{false};
+        bool pfade{false};
+        bool luftbild{false};
+        bool gitter{false};
+        bool nurFt8{false};
+        int  ansicht{0};
+    };
+    JagdVorher   m_jagdVorher;
+    void setzeJagd(bool an);
+
     QCheckBox*   m_paths{nullptr};
     QCheckBox*   m_grid{nullptr};
     QCheckBox*   m_imagery{nullptr};

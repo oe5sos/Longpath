@@ -26,22 +26,29 @@
 
 namespace Longpath::LocatorJagdZeichen {
 
-QColor feldFuellung(FeldStand s)
+QColor feldFuellung(FeldStand s, bool kraeftig)
 {
-    // Gedaempft: das Mosaik ist der Hintergrund der Jagd, nicht ihr
-    // Gegenstand. Bei voller Deckung waere Europa ein gruener Fleck, in
-    // dem kein Punkt mehr zu sehen ist.
+    // Zwei Staerken, weil das Mosaik zwei Rollen hat.
+    //
+    // Nebenher (`kraeftig == false`) ist es der Hintergrund einer Karte,
+    // auf der es um die QSOs geht -- bei voller Deckung waere Europa ein
+    // gruener Fleck, in dem kein Punkt mehr zu sehen ist.
+    //
+    // Im Jagdmodus ist es der GEGENSTAND: der Betreiber will auf einen
+    // Blick sehen, was ihm fehlt. Dann deckt es (2026-11-11 am eigenen
+    // Bild: 150/125 ueber dem Blue-Marble-Foto und unter 9313 Pfaden war
+    // schlicht nicht zu erkennen -- „da kann man nichts erkennen").
     switch (s) {
     // Erste Fassung (105/80) war auf dem Blue-Marble-Bild kaum zu sehen
     // -- am eigenen Bild nachgezogen (2026-11-11).
     case FeldStand::Bestaetigt: {
         QColor c(Style::kJagdFeldBestaetigt);
-        c.setAlpha(150);
+        c.setAlpha(kraeftig ? 235 : 150);
         return c;
     }
     case FeldStand::Gearbeitet: {
         QColor c(Style::kJagdFeldGearbeitet);
-        c.setAlpha(125);
+        c.setAlpha(kraeftig ? 215 : 125);
         return c;
     }
     case FeldStand::Nie:

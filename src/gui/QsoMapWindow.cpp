@@ -183,6 +183,49 @@ void QsoMapWindow::resetActiveView()
     else                              { m_flat->resetView(); }
 }
 
+void QsoMapWindow::setzeJagd(bool an)
+{
+    if (an) {
+        // Erst merken, was der Betreiber eingestellt hatte -- der Knopf
+        // raeumt auf, er wirft nichts weg.
+        m_jagdVorher.pfade    = m_paths   && m_paths->isChecked();
+        m_jagdVorher.luftbild = m_imagery && m_imagery->isChecked();
+        m_jagdVorher.gitter   = m_grid    && m_grid->isChecked();
+        m_jagdVorher.nurFt8   = m_nurFt8  && m_nurFt8->isChecked();
+        m_jagdVorher.ansicht  = m_stack ? m_stack->currentIndex() : kViewFlat;
+        m_jagdVorher.gueltig  = true;
+
+        // Aus dem 3D heraus: dort gibt es kein Mosaik, und genau dort
+        // hat der Betreiber am 2026-11-11 danach gesucht.
+        if (m_3dBtn && m_3dBtn->isChecked()) { m_3dBtn->setChecked(false); }
+        for (QPushButton* b : {m_radarBtn, m_azimutBtn}) {
+            if (b && b->isChecked()) { b->setChecked(false); }
+        }
+        if (m_stack) { m_stack->setCurrentIndex(kViewFlat); }
+        if (m_viewBtn) { m_viewBtn->setText(QStringLiteral("Globe")); }
+
+        if (m_grid)    { m_grid->setChecked(true); }
+        if (m_nurFt8)  { m_nurFt8->setChecked(true); }
+        // Die beiden Decken weg: 9313 Pfade und ein Satellitenfoto haben
+        // das Mosaik unlesbar gemacht.
+        if (m_paths)   { m_paths->setChecked(false); }
+        if (m_imagery) { m_imagery->setChecked(false); }
+
+        if (m_flat) { m_flat->setJagdModus(true); }
+        rememberView();
+        resetActiveView();   // die ganze Welt, nicht der eigene Vorgarten
+        return;
+    }
+
+    if (m_flat) { m_flat->setJagdModus(false); }
+    if (!m_jagdVorher.gueltig) { return; }
+    if (m_paths)   { m_paths->setChecked(m_jagdVorher.pfade); }
+    if (m_imagery) { m_imagery->setChecked(m_jagdVorher.luftbild); }
+    if (m_grid)    { m_grid->setChecked(m_jagdVorher.gitter); }
+    if (m_nurFt8)  { m_nurFt8->setChecked(m_jagdVorher.nurFt8); }
+    m_jagdVorher.gueltig = false;
+}
+
 void QsoMapWindow::buildUi()
 {
     setStyleSheet(QStringLiteral("QDialog { background: %1; }")
@@ -324,6 +367,30 @@ void QsoMapWindow::buildUi()
         "see its name and what the log has there."));
     m_grid->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                               .arg(QString::fromLatin1(Style::kTextPrimary)));
+    // ── Locator-Jagd: der eine Knopf ───────────────────────────────
+    //
+    // Er steht VOR dem Gitterhaken und gehoert bewusst NICHT zu
+    // m_flatOnlyControls: er muss auch im 3D-Bild sichtbar sein, denn
+    // einer seiner Handgriffe ist, von dort herauszuholen.
+    m_jagdBtn = new QPushButton(QStringLiteral("Locator hunt"), this);
+    m_jagdBtn->setObjectName(QStringLiteral("qsoMapHuntButton"));
+    m_jagdBtn->setCheckable(true);
+    m_jagdBtn->setStyleSheet(Style::buttonBaseStyle() + Style::amberCheckedStyle());
+    m_jagdBtn->setFocusPolicy(Qt::NoFocus);   // +/- bleiben bei der Karte
+    m_jagdBtn->setToolTip(QStringLiteral(
+        "The whole world, and on it what you are still missing: every "
+        "square you have worked filled in, everything empty still open, "
+        "and the stations heard right now on top — the callsign of anyone "
+        "transmitting from a square you do not have yet. Double-click one "
+        "to call it.\n\nOne press sets the map up for that: out of 3D, "
+        "flat map, grid on, FT8 only, paths and imagery out of the way. "
+        "Press again and the map is as it was."));
+    // toggled, nicht clicked: ein ankreuzbarer Knopf wird von der
+    // Bedienhilfe ueber toggle() gedrueckt, und das sendet kein clicked
+    // (derselbe Befund wie beim 3D-Knopf, 2026-11-10).
+    connect(m_jagdBtn, &QPushButton::toggled, this, &QsoMapWindow::setzeJagd);
+    bar->addWidget(m_jagdBtn);
+
     bar->addWidget(m_grid);
 
     // ── Locator-Jagd mit FT8 (2026-11-11) ───────────────────────────
