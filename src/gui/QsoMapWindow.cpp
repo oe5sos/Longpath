@@ -19,6 +19,9 @@
 //                 eigenen Schluessel, Rueckfall NASA + Google Earth; siehe
 //                 QsoMapWindow.h. Martin Fischer (OE5SOS), AI-assisted via
 //                 Anthropic Claude.
+//   2026-11-11 — Locator-Jagd mit FT8 (Mosaik, gehoerte Stationen, Klick
+//                 ruft an, Zaehler); siehe QsoMapWindow.h. Martin Fischer
+//                 (OE5SOS), AI-assisted via Anthropic Claude (Claude Code).
 // =================================================================
 
 #include "QsoMapWindow.h"
@@ -41,9 +44,11 @@
 #include "core/CallsignCache.h"
 #include "core/GoogleMapTiles.h"
 #include "gui/Google3dSetupDialog.h"
+#include "gui/Ft8KartenBruecke.h"
 #include "gui/widgets/Station3dSurface.h"
 
 #include <QCheckBox>
+#include <QSpinBox>
 #include <QTimer>
 #include <QComboBox>
 #include <QStandardItemModel>
@@ -313,11 +318,72 @@ void QsoMapWindow::buildUi()
 
     m_grid = new QCheckBox(QStringLiteral("Grid"), this);
     m_grid->setToolTip(QStringLiteral(
-        "Maidenhead locator overlay on the flat map. Click a square to "
+        "Maidenhead locator overlay on the flat and the azimuthal map, with "
+        "every square of the log filled in: green confirmed, sand worked, "
+        "empty never — for the band chosen next to it. Click a square to "
         "see its name and what the log has there."));
     m_grid->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                               .arg(QString::fromLatin1(Style::kTextPrimary)));
     bar->addWidget(m_grid);
+
+    // ── Locator-Jagd mit FT8 (2026-11-11) ───────────────────────────
+    //
+    // Betreiber: „besonders bei FT8 sehen, welche Locator ich noch nicht
+    // gearbeitet habe und welche gerade erreichbar sind". Das Band des
+    // Mosaiks folgt von selbst dem, was das FT8-Fenster hoert -- wer auf
+    // 20 m jagt, fragt nach 20 m.
+    m_mosaikBand = new QComboBox(this);
+    m_mosaikBand->setObjectName(QStringLiteral("qsoMapMosaicBand"));
+    m_mosaikBand->setToolTip(QStringLiteral(
+        "Which band the square mosaic shows. \"FT8 band\" follows the band "
+        "the FT8 decoder is listening on."));
+    m_mosaikBand->setFocusPolicy(Qt::NoFocus);   // keep the +/- keys working
+    // Waechst mit „FT8 band (20m)" -- sonst blieb es bei der Breite
+    // von „FT8 band" und die Klammer war abgeschnitten.
+    m_mosaikBand->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    bar->addWidget(m_mosaikBand);
+
+    m_nurFt8 = new QCheckBox(QStringLiteral("FT8 only"), this);
+    m_nurFt8->setObjectName(QStringLiteral("qsoMapMosaicFt8Only"));
+    m_nurFt8->setToolTip(QStringLiteral(
+        "Count only FT8 contacts for the mosaic and for what is new: a "
+        "square worked on SSB is then still new for FT8."));
+    m_nurFt8->setChecked(AppSettings::instance()
+        .value(QStringLiteral("QsoMapMosaicFt8Only"), QStringLiteral("False"))
+        .toString() == QStringLiteral("True"));
+    m_nurFt8->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
+                                .arg(QString::fromLatin1(Style::kTextPrimary)));
+    bar->addWidget(m_nurFt8);
+
+    // Der Zaehler und das Fenster der gehoerten Stationen. Unsichtbar,
+    // bis das FT8-Fenster etwas meldet -- ohne FT8 waere „0 new squares"
+    // nur Rauschen in der Leiste.
+    {
+        m_liveBox = new QWidget(this);
+        auto* h = new QHBoxLayout(m_liveBox);
+        h->setContentsMargins(0, 0, 0, 0);
+        h->setSpacing(4);
+        m_liveZaehler = new QLabel(QString{}, m_liveBox);
+        m_liveZaehler->setObjectName(QStringLiteral("qsoMapFt8Counter"));
+        m_liveZaehler->setToolTip(QStringLiteral(
+            "Squares heard on FT8 within the window that are not yet in your "
+            "log on that band. Click an amber point on the map to call."));
+        m_liveMinuten = new QSpinBox(m_liveBox);
+        m_liveMinuten->setRange(1, 60);
+        m_liveMinuten->setPrefix(QStringLiteral("last "));
+        m_liveMinuten->setSuffix(QStringLiteral(" min"));
+        m_liveMinuten->setToolTip(QStringLiteral(
+            "How long a station heard on FT8 stays on the map"));
+        const int sek = AppSettings::instance()
+            .value(QStringLiteral("QsoMapFt8LiveSeconds"),
+                   LiveSchicht::kVorgabeSekunden).toInt();
+        m_live.setFensterSekunden(sek);
+        m_liveMinuten->setValue(std::max(1, m_live.fensterSekunden() / 60));
+        h->addWidget(m_liveZaehler);
+        h->addWidget(m_liveMinuten);
+        m_liveBox->setVisible(false);
+        bar->addWidget(m_liveBox);
+    }
 
     // Luftbild: Blue Marble und Landsat von NASA GIBS, gezeichnet sobald
     // die Karte hineingezoomt ist. Voreingestellt an — wer die Karte
@@ -597,6 +663,8 @@ void QsoMapWindow::buildUi()
 
     connect(m_grid, &QCheckBox::toggled, this, [this](bool on) {
         m_flat->setShowGrid(on);
+        // Das Mosaik auch auf der Azimutalkarte (2026-11-11).
+        m_azimut->setShowMosaik(on);
         // The overlay lives on the flat map; looking at the globe with
         // Grid ticked would show nothing and look broken.
         if (on && m_stack->currentIndex() == 0) { m_viewBtn->click(); }
@@ -607,6 +675,42 @@ void QsoMapWindow::buildUi()
     });
     connect(m_flat, &FlatMapWidget::gridClicked,
             this, &QsoMapWindow::showGridInfo);
+
+    // ── Locator-Jagd (2026-11-11) ───────────────────────────────────
+    connect(m_flat, &FlatMapWidget::livePunktGeklickt,
+            this, [this](const QString& call) { rufeLive(call); });
+    connect(m_azimut, &AzimutalKarteWidget::livePunktGeklickt,
+            this, [this](const QString& call) { rufeLive(call); });
+    connect(m_mosaikBand, QOverload<int>::of(&QComboBox::activated), this, [this](int) {
+        AppSettings::instance().setValue(QStringLiteral("QsoMapMosaicBand"),
+                                         m_mosaikBand->currentData().toString());
+        refreshMosaik();
+    });
+    connect(m_nurFt8, &QCheckBox::toggled, this, [this](bool on) {
+        AppSettings::instance().setValue(QStringLiteral("QsoMapMosaicFt8Only"),
+                                         on ? QStringLiteral("True")
+                                            : QStringLiteral("False"));
+        m_mosaik.baue(m_hatMosaikLog ? m_mosaikLog : m_all, on);
+        refreshMosaik();
+        refreshLive();
+    });
+    connect(m_liveMinuten, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int min) {
+        m_live.setFensterSekunden(min * 60);
+        AppSettings::instance().setValue(QStringLiteral("QsoMapFt8LiveSeconds"),
+                                         m_live.fensterSekunden());
+        refreshLive();
+    });
+    connect(&Ft8KartenBruecke::instanz(), &Ft8KartenBruecke::gehoert,
+            this, &QsoMapWindow::nimmFt8);
+    // Altern lassen: wer still ist, faellt nach dem Fenster von der
+    // Karte, auch wenn keine neuen Funde mehr kommen (Band gewechselt,
+    // FT8 aus).
+    m_liveTakt = new QTimer(this);
+    m_liveTakt->setInterval(5000);
+    connect(m_liveTakt, &QTimer::timeout, this, [this]() {
+        if (m_live.anzahl() > 0) { refreshLive(); }
+    });
+    m_liveTakt->start();
 
     connect(m_viewBtn, &QPushButton::clicked, this, [this]() {
         // Aus Radar oder Azimutalkarte heraus fuehrt der Knopf zur jeweils
@@ -819,6 +923,8 @@ void QsoMapWindow::setHomeGrid(const QString& grid)
         m_azimut->clearHome();
         m_rotorRadar->clearHome();
     }
+    // Entfernung und Richtung der gehoerten Stationen haengen daran.
+    if (m_live.anzahl() > 0) { refreshLive(); }
 }
 
 // ── Der eigene Standort als Bild ─────────────────────────────────────
@@ -859,6 +965,11 @@ void QsoMapWindow::setEntries(const QVector<LogEntry>& entries)
     m_all = entries;
     rebuildFilterPills();
     rebuild();
+    if (!m_hatMosaikLog) {
+        m_mosaik.baue(m_all, m_nurFt8 && m_nurFt8->isChecked());
+        refreshMosaik();
+        refreshLive();
+    }
 }
 
 // ── Filters ─────────────────────────────────────────────────────────
@@ -1147,6 +1258,114 @@ void QsoMapWindow::rebuild()
             "QLabel { color: %1; font-size: 11px; }")
             .arg(QString::fromLatin1(Style::kTextSecondary)));
     }
+}
+
+// ── Locator-Jagd mit FT8 (2026-11-11) ───────────────────────────────
+
+QDateTime QsoMapWindow::jetzt() const
+{
+    return m_uhr ? m_uhr() : QDateTime::currentDateTimeUtc();
+}
+
+void QsoMapWindow::setMosaikLog(const QVector<LogEntry>& ganzesLog)
+{
+    // Das Logbuchfenster ruft das bei jedem Filterwechsel. Dasselbe
+    // Logbuch (geteilte Daten, Qt-Kopie beim Schreiben) muss nicht neu
+    // gezaehlt werden.
+    if (m_hatMosaikLog && ganzesLog.constData() == m_mosaikLog.constData()
+        && ganzesLog.size() == m_mosaikLog.size()) {
+        return;
+    }
+    m_mosaikLog = ganzesLog;
+    m_hatMosaikLog = true;
+    m_mosaik.baue(m_mosaikLog, m_nurFt8 && m_nurFt8->isChecked());
+    refreshMosaik();
+    refreshLive();
+}
+
+QString QsoMapWindow::mosaikBand() const
+{
+    if (!m_mosaikBand || m_mosaikBand->currentIndex() < 0) { return m_liveBand; }
+    const QString d = m_mosaikBand->currentData().toString();
+    // „FT8 band": das Band, auf dem zuletzt gehoert wurde -- solange
+    // nichts gehoert wurde, alle Baender.
+    return d == QStringLiteral("*") ? m_liveBand : d;
+}
+
+void QsoMapWindow::refreshMosaik()
+{
+    // Die Auswahl neu fuellen: Baender kommen und gehen mit dem Logbuch.
+    if (m_mosaikBand) {
+        QString gewaehlt = m_mosaikBand->currentIndex() >= 0
+            ? m_mosaikBand->currentData().toString()
+            : AppSettings::instance().value(QStringLiteral("QsoMapMosaicBand"),
+                                            QStringLiteral("*")).toString();
+        QSignalBlocker block(m_mosaikBand);
+        m_mosaikBand->clear();
+        m_mosaikBand->addItem(m_liveBand.isEmpty()
+                                  ? QStringLiteral("FT8 band")
+                                  : QStringLiteral("FT8 band (%1)").arg(m_liveBand),
+                              QStringLiteral("*"));
+        m_mosaikBand->addItem(QStringLiteral("All bands"), QString());
+        for (const QString& b : m_mosaik.baender()) {
+            m_mosaikBand->addItem(b, b);
+        }
+        int i = m_mosaikBand->findData(gewaehlt);
+        if (i < 0) { i = 0; }
+        m_mosaikBand->setCurrentIndex(i);
+    }
+    const QHash<QString, FeldStand> felder = m_mosaik.felder(mosaikBand());
+    m_flat->setMosaik(felder);
+    m_azimut->setMosaik(felder);
+}
+
+void QsoMapWindow::refreshLive()
+{
+    const QDateTime t = jetzt();
+    m_live.altere(t);
+    const QVector<LivePunkt> punkte = m_live.punkte(t, m_mosaik, m_homeGrid);
+    m_flat->setLivePunkte(punkte);
+    m_azimut->setLivePunkte(punkte);
+
+    if (!m_liveZaehler) { return; }
+    if (m_liveBand.isEmpty() && m_live.anzahl() == 0) { return; }
+    m_liveBox->setVisible(true);
+    const int neu = LiveSchicht::neueFelder(punkte, m_liveBand);
+    m_liveZaehler->setText(LiveSchicht::zaehlerText(neu, m_liveBand));
+    m_liveZaehler->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+        .arg(QString::fromLatin1(neu > 0 ? Style::kJagdNeu : Style::kTextSecondary)));
+}
+
+void QsoMapWindow::nimmFt8(const Ft8Gehoert& g)
+{
+    m_live.nimm(g);
+    if (!g.band.isEmpty() && g.band != m_liveBand) {
+        m_liveBand = g.band;
+        // Das Mosaik folgt dem FT8-Band (wenn so gewaehlt), und die
+        // Beschriftung „FT8 band (20m)" ebenso.
+        refreshMosaik();
+    }
+    refreshLive();
+}
+
+QString QsoMapWindow::rufeLive(const QString& rufzeichen)
+{
+    const QString call = rufzeichen.trimmed().toUpper();
+    const Ft8Gehoert* g = m_live.finde(call);
+    const QString grund = g ? Ft8KartenBruecke::instanz().rufe(*g)
+                            : QStringLiteral("%1 is no longer heard").arg(call);
+    if (grund.isEmpty()) {
+        m_info->setText(QStringLiteral(
+            "<b>Calling %1</b> — answering “%2” in the FT8 window, exactly as "
+            "a double-click there would. The QSO runs to 73 and is logged; "
+            "Stop is in the FT8 window.")
+            .arg(call.toHtmlEscaped(), g->nachricht.toHtmlEscaped()));
+    } else {
+        m_info->setText(QStringLiteral("<b>Cannot call %1</b> — %2")
+            .arg(call.toHtmlEscaped(), grund.toHtmlEscaped()));
+    }
+    m_info->setVisible(true);
+    return grund;
 }
 
 // ── Click answers ───────────────────────────────────────────────────

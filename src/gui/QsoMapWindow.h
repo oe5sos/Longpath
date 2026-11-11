@@ -48,8 +48,16 @@
 //                 bleibt der NASA-Flug, dazu „View in Google Earth".
 //                 Martin Fischer (OE5SOS), AI-assisted via Anthropic
 //                 Claude.
+//   2026-11-11 — Locator-Jagd mit FT8: zum Grid-Haken das Mosaik je Band
+//                 (bestaetigt / gearbeitet / noch nie, wahlweise nur FT8),
+//                 auf flacher Karte und Azimutalkarte; die gehoerten
+//                 FT8-Stationen der letzten Minuten als Punkte; ein Klick
+//                 ruft ueber das FT8-Fenster an (Ft8KartenBruecke), der
+//                 Zaehler „N new squares heard now on 20m". Martin Fischer
+//                 (OE5SOS), AI-assisted via Anthropic Claude (Claude Code).
 // =================================================================
 
+#include "core/LocatorJagd.h"
 #include "models/LogEntry.h"
 
 #include <QDialog>
@@ -71,6 +79,7 @@ class QStackedWidget;
 class QComboBox;
 class QEvent;
 class QLineEdit;
+class QSpinBox;
 
 namespace Longpath {
 
@@ -191,6 +200,33 @@ public:
     class DxRadarWidget* rotorRadarForTest() const { return m_rotorRadar; }
     void showRadarViewForTest(bool on);
     bool isEmbedded() const { return m_embedded; }
+
+    // ── Locator-Jagd mit FT8 (2026-11-11) ───────────────────────────
+    //
+    // Das Mosaik fragt das GANZE Logbuch („welches Feld fehlt mir"),
+    // nicht das gefilterte: eingebettet bekommt die Karte nur, was die
+    // Tabelle gerade zeigt, und ein Filter auf „diese Woche" machte die
+    // halbe Welt zu „noch nie". Ohne Aufruf gilt, was setEntries() kam.
+    void setMosaikLog(const QVector<LogEntry>& ganzesLog);
+    /// Eine gehoerte Station (von Ft8KartenBruecke, im Pruefstand direkt).
+    void nimmFt8(const Longpath::Ft8Gehoert& g);
+    /// Ein Klick auf einen FT8-Punkt. Leer heisst: der Anruf laeuft;
+    /// sonst der Grund, warum nicht. Die Antwort steht auch in der
+    /// Infozeile unter der Karte.
+    QString rufeLive(const QString& rufzeichen);
+    /// Das Band, fuer das das Mosaik gerade steht („" = alle).
+    QString mosaikBand() const;
+
+    // Fuer Pruefstaende.
+    void setUhrForTest(std::function<QDateTime()> uhr) { m_uhr = std::move(uhr); }
+    const LocatorMosaik& mosaikForTest() const { return m_mosaik; }
+    const LiveSchicht&   liveForTest() const { return m_live; }
+    QLabel*    liveZaehlerForTest() const { return m_liveZaehler; }
+    QComboBox* mosaikBandForTest() const { return m_mosaikBand; }
+    QCheckBox* nurFt8ForTest() const { return m_nurFt8; }
+    QCheckBox* gridForTest() const { return m_grid; }
+    QSpinBox*  liveMinutenForTest() const { return m_liveMinuten; }
+    void       refreshLiveForTest() { refreshLive(); }
 
 signals:
     void popOutRequested();
@@ -329,6 +365,23 @@ private:
     QString           m_3dRefusedKey;    // Zugang (Quelle:Text), der abgelehnt wurde
     static QString    accessIdentity();
     LastFlight        m_lastFlight;
+
+    // ── Locator-Jagd (2026-11-11) ─────────────────────────────────
+    void refreshMosaik();
+    void refreshLive();
+    QDateTime jetzt() const;
+    QVector<LogEntry> m_mosaikLog;
+    bool              m_hatMosaikLog{false};
+    LocatorMosaik     m_mosaik;
+    LiveSchicht       m_live;
+    QString           m_liveBand;          // Band der zuletzt gehoerten Station
+    QComboBox*        m_mosaikBand{nullptr};
+    QCheckBox*        m_nurFt8{nullptr};
+    QWidget*          m_liveBox{nullptr};
+    QLabel*           m_liveZaehler{nullptr};
+    QSpinBox*         m_liveMinuten{nullptr};
+    QTimer*           m_liveTakt{nullptr};
+    std::function<QDateTime()> m_uhr;
     std::function<void(const QUrl&)> m_openUrl;
 };
 

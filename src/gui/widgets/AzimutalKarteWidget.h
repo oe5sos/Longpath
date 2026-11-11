@@ -59,11 +59,19 @@
 // Modification history (Longpath):
 //   2026-11-10 — Created in C++20/Qt6 for Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Claude Code).
+//   2026-11-11 — Locator-Jagd: Mosaik als eigene Ebene (die Felder, auf
+//                 die Scheibe projiziert), gehoerte FT8-Stationen als
+//                 Punkte mit Hinweis, Klick meldet livePunktGeklickt.
+//                 Martin Fischer, AI-assisted via Anthropic Claude
+//                 (Claude Code).
 // =================================================================
 
 #pragma once
 
+#include "core/LocatorJagd.h"
+
 #include <QDateTime>
+#include <QHash>
 #include <QImage>
 #include <QPair>
 #include <QPointF>
@@ -110,6 +118,22 @@ public:
     bool    hatZiel() const { return m_hatZiel; }
     QString zielCall() const { return m_zielCall; }
 
+    // ── Locator-Jagd (2026-11-11) ───────────────────────────────────
+    //
+    // Das Mosaik: jedes gearbeitete Feld, auf die Scheibe projiziert --
+    // eine Ebene wie die Strahlen, gebaut beim naechsten Zeichnen.
+    // Gezeigt nur mit `setShowMosaik(true)` (der Grid-Haken der Karte).
+    void setMosaik(const QHash<QString, FeldStand>& felder);
+    void setShowMosaik(bool on);
+    bool showMosaik() const { return m_zeigeMosaik; }
+    QImage mosaikForTest() { sorgeFuerEbenen(); return m_mosaikBild; }
+
+    // Die gehoerten FT8-Stationen, obenauf und anklickbar.
+    void setLivePunkte(const QVector<LivePunkt>& punkte);
+    const QVector<LivePunkt>& livePunkte() const { return m_live; }
+    QPointF livePunktBildpunkt(int i) const;
+    int     livePunktAt(const QPointF& pos) const;
+
     // Bandfarben -- eine Sprache fuer Strahl, Punkt und Legende.
     // Gedaempft, kein kraeftiges Rot, kein Auswahl-Blau (Hausregeln).
     static QColor bandFarbe(const QString& band);
@@ -145,6 +169,8 @@ signals:
     // Ein Klick auf einen Punkt -- wie beim Radar, damit das Fenster
     // dieselbe Karteikarte zeigt.
     void pointClicked(const QString& label, double lat, double lon);
+    // Ein gehoerter FT8-Punkt (2026-11-11). Vorrang vor dem QSO-Punkt.
+    void livePunktGeklickt(const QString& rufzeichen);
 
 protected:
     void paintEvent(QPaintEvent*) override;
@@ -152,6 +178,7 @@ protected:
     void mouseMoveEvent(QMouseEvent*) override;
     void mousePressEvent(QMouseEvent*) override;
     void leaveEvent(QEvent*) override;
+    bool event(QEvent*) override;
 
 private:
     enum class Stufe { Voll = 0, Knapp = 1, Winzig = 2 };
@@ -174,6 +201,9 @@ private:
     void    baueNacht();              // Nachtlasur, minuetlich
     void    baueStrahlen();           // QSO-Strahlen, bei Punkten/Groesse
     void    projiziereNeu();          // m_proj aus m_punkte
+    void    baueMosaik();             // Felder auf die Scheibe, bei Mosaik/Groesse
+    void    zeichneLive(QPainter& p, const Lage& L) const;
+    void    zeichneLiveSchrift(QPainter& p, const Lage& L);
 
     // Linien (unter den Strahlen) ...
     void    zeichneGitter(QPainter& p, const Lage& L) const;
@@ -230,6 +260,12 @@ private:
     QDateTime m_zeitTest;
 
     int     m_hover{-1};
+
+    QHash<QString, FeldStand> m_mosaik;
+    bool    m_zeigeMosaik{false};
+    QImage  m_mosaikBild;
+    bool    m_mosaikAlt{true};
+    QVector<LivePunkt> m_live;
 
     QVector<Beschriftung> m_schrift;   // beim Zeichnen gesetzt
 };

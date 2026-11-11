@@ -401,6 +401,7 @@ warren@wpratt.com
 #include "applets/RttyDecoderApplet.h"
 #include "applets/CwDecoderApplet.h"
 #include "applets/Ft8Applet.h"
+#include "Ft8KartenBruecke.h"
 #include "applets/Ft8PlaetzeApplet.h"
 #include "applets/PanelAutomatik.h"
 #include "applets/QsoRecorderApplet.h"
@@ -8384,6 +8385,10 @@ void MainWindow::populateDefaultMeter()
     m_ft8Applet = new Ft8Applet(m_radioModel, nullptr);
     panel->addApplet(m_ft8Applet);
     m_ft8Applet->setVisible(false);
+    // Locator-Jagd (2026-11-11): die QSO-Karte bekommt jede gehoerte
+    // Station und ruft per Klick ueber DIESES Fenster an -- denselben
+    // Weg wie ein Doppelklick in der Fundliste. Siehe Ft8KartenBruecke.h.
+    Ft8KartenBruecke::instanz().verbinde(m_ft8Applet);
 
     // Ein fertiges QSO aus dem FT8-Ablauf geht denselben Weg wie eines
     // aus WSJT-X (siehe die Verdrahtung von WsjtxClient::qsoLogged
@@ -15782,8 +15787,10 @@ void MainWindow::rebindRttyRadeAvailability(SliceModel* slice)
         // FT8/FT4 liegen in den Datenmodi -- beiden, nicht nur DIGL:
         // FT8 wird ueblicherweise in USB/DIGU gehoert, und wer DIGL
         // stellt, soll den Dekoder nicht verlieren.
+        // Seit 2026-11-11 die EINE Regel in Ft8Applet::istFt8Modus --
+        // dieselbe, nach der ein Klick auf der QSO-Karte anrufen darf.
         m_appletVis->setAvailable(QStringLiteral("Ft8Decoder"),
-                                  mode == DSPMode::DIGU || mode == DSPMode::DIGL);
+                                  Ft8Applet::istFt8Modus(mode));
     };
     applyForMode(slice->dspMode());
 

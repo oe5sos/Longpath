@@ -1606,4 +1606,23 @@ constexpr auto kProfilTextLeise = "#8a8578";   // Achsen, Fusszeile
 constexpr auto kProfilGelaende  = "#3d372d";   // Gelaendeflaeche
 constexpr auto kProfilKante     = "#9a8b70";   // Gelaendekante
 
+// ── Locator-Jagd mit FT8 (2026-11-11) ───────────────────────────────
+//
+// Mosaik und Live-Punkte auf flacher Karte und Azimutalkarte. Keine
+// neue Farbe -- nur Rollen fuer schon benannte Toene, damit beide
+// Karten dieselbe Sprache sprechen:
+//   * bestaetigt  -- das Gruen der Hausfarben, gedaempft im Widget
+//   * gearbeitet  -- warmer Sand (die Gelaendekante des Hoehenprofils)
+//   * noch nie    -- keine Fuellung: die Karte selbst
+//   * NEU         -- Bernstein (Hausregel: Bernstein fuer „neu"),
+//                    ein neues Land zusaetzlich mit warmweissem Rand
+//   * schon gearbeitet / gewoehnlich -- Grautoene
+// Kein kraeftiges Rot, kein Auswahl-Blau.
+constexpr auto kJagdFeldBestaetigt = kGreenText;
+constexpr auto kJagdFeldGearbeitet = kProfilKante;
+constexpr auto kJagdNeu            = kAmberText;
+constexpr auto kJagdNeuesLandRand  = kAzZiel;
+constexpr auto kJagdGearbeitet     = kTextScale;
+constexpr auto kJagdGewoehnlich    = kTextSecondary;
+
 } // namespace Longpath::Style

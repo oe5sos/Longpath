@@ -33,10 +33,17 @@
 //                 auf einen Ort, setFocusStation() zeichnet die Zielstation
 //                 mit Grosskreis vom eigenen Standort. Martin Fischer,
 //                 AI-assisted via Anthropic Claude.
+//   2026-11-11 — Locator-Jagd: das Mosaik (Felder je Band aus dem Logbuch)
+//                 als Teil der Grid-Ueberlagerung, gehoerte FT8-Stationen
+//                 als Punkte mit Hinweis; ein Klick darauf meldet
+//                 livePunktGeklickt. Martin Fischer (OE5SOS), AI-assisted
+//                 via Anthropic Claude (Claude Code).
 // =================================================================
 
 #include "MapPoint.h"
+#include "core/LocatorJagd.h"
 
+#include <QHash>
 #include <QImage>
 #include <QPixmap>
 #include <QPointF>
@@ -97,6 +104,25 @@ public:
     // identifies the square under the cursor and highlights it.
     void setShowGrid(bool on);
     bool showGrid() const { return m_showGrid; }
+
+    // ── Locator-Jagd (2026-11-11) ─────────────────────────────────────
+    //
+    // Das Mosaik gehoert zur Grid-Ueberlagerung, nicht daneben: es ist
+    // dieselbe Frage („welches Feld ist das?"), nur mit der Antwort aus
+    // dem Logbuch. Gezeichnet wird es nur bei eingeschaltetem Grid.
+    void setMosaik(const QHash<QString, FeldStand>& felder);
+    int  mosaikAnzahl() const { return m_mosaik.size(); }
+
+    // Die gehoerten FT8-Stationen. Unabhaengig vom Grid zu sehen: wer
+    // FT8 hoert, will die Punkte auch ohne Gitter finden.
+    void setLivePunkte(const QVector<LivePunkt>& punkte);
+    const QVector<LivePunkt>& livePunkte() const { return m_live; }
+    /// Wo der i-te Punkt gerade gezeichnet wird (Widget-Koordinaten).
+    QPointF livePunktBildpunkt(int i) const;
+    /// Der Punkt unter `pos` (Trefferradius), oder -1.
+    int livePunktAt(const QPointF& pos) const;
+    /// Felder, die im letzten Bild als „neu gehoert" umrandet wurden.
+    int neueFelderGemaltForTest() const { return m_neueFelderGemalt; }
 
     // Re-read the shared world image, e.g. after a download.
     void refreshTexture();
@@ -213,6 +239,10 @@ signals:
     // square it landed in.
     void gridClicked(const QString& locator);
 
+    // Ein gehoerter FT8-Punkt wurde angeklickt (2026-11-11). Er hat
+    // Vorrang vor Logbuchpunkt und Gitter: er liegt obenauf.
+    void livePunktGeklickt(const QString& rufzeichen);
+
 protected:
     void paintEvent(QPaintEvent*) override;
     void resizeEvent(QResizeEvent*) override;
@@ -221,6 +251,7 @@ protected:
     void mouseReleaseEvent(QMouseEvent*) override;
     void mouseDoubleClickEvent(QMouseEvent*) override;
     void wheelEvent(QWheelEvent*) override;
+    bool event(QEvent*) override;
 
 private:
     // Map area inside the widget at the current zoom and pan.
@@ -236,6 +267,8 @@ private:
     bool paintImagery(QPainter& p, const QRectF& r);
     void paintFocusStation(QPainter& p);
     void paintSatellites(QPainter& p);
+    void paintMosaik(QPainter& p);
+    void paintLive(QPainter& p, const QRectF& r);
 
     QVector<MapPoint> m_points;
     double m_homeLat{0.0}, m_homeLon{0.0};
@@ -253,6 +286,10 @@ private:
     bool m_showTerminator{true};
     bool m_showGrid{false};
     QString m_clickedGrid;   // highlighted square, empty for none
+
+    QHash<QString, FeldStand> m_mosaik;
+    QVector<LivePunkt>        m_live;
+    int                       m_neueFelderGemalt{0};
 
     QImage m_night;          // coarse shading, scaled up on draw
     bool   m_nightDirty{true};
