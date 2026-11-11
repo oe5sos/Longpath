@@ -448,13 +448,19 @@ jobs:
         # clang_64 ist universell (x86_64 + arm64). qtserialport
         # (2026-09-29): fehlte in der Intel-Fassung, also kein serielles
         # PTT/CW dort. qtimageformats: WebP/TIFF fuer die Bilddialoge.
+        # qtwebengine + qtwebchannel + qtpositioning (2026-11-11): der
+        # 3D-Flug im Logbuch (Station3dView). Betreiberentscheid "mit 3D";
+        # macdeployqt buendelt QtWebEngineCore samt QtWebEngineProcess.app
+        # (lokal gemessen: +204 MB entpackt, ~80 MB gepackt). Ad-hoc-
+        # signiert ohne hardened runtime laeuft der Hilfsprozess ohne
+        # weitere Berechtigungen.
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.*'
           host: 'mac'
           target: 'desktop'
           arch: 'clang_64'
-          modules: 'qtmultimedia qtshadertools qtwebsockets qtserialport qtimageformats'
+          modules: 'qtmultimedia qtshadertools qtwebsockets qtserialport qtimageformats qtwebengine qtwebchannel qtpositioning'
           cache: true
 
       - name: Build FFTW from source (both precisions)
