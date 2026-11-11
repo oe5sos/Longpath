@@ -5519,6 +5519,11 @@ longpath_add_test(tst_real_status_bar_chain_indicators)
 longpath_add_test(tst_app_settings_autosave)
 longpath_add_test(tst_whisper_server_launcher)
 target_link_libraries(tst_whisper_server_launcher PRIVATE Qt6::Network)
+# -- Mitschrift im Contest (2026-11-11): Schneiden am Rauschboden statt
+#    an einer festen Schwelle (im Pileup lief jeder Abschnitt bis zum
+#    20-s-Deckel), und die Sprache hinter dem Zahnrad der Mitschrift. --
+longpath_add_test(tst_asr_rauschboden)
+longpath_add_test(tst_asr_sprache_menue)
 longpath_add_test(tst_pan_options_button)
 longpath_add_test(tst_window_widgets)
 # -- Roter Knopf = zu, auch beim naechsten Start (2026-09-27): Kanalzug,

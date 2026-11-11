@@ -53,10 +53,36 @@ QString WhisperServerLauncher::defaultBinary()
 
 QString WhisperServerLauncher::defaultModel()
 {
-    const QDir dir(QDir::homePath() + QStringLiteral("/whisper"));
+    return bestModelIn(QDir::homePath() + QStringLiteral("/whisper"));
+}
+
+QString WhisperServerLauncher::bestModelIn(const QString& path)
+{
+    // ── Nach Guete, nicht nach dem Alphabet (2026-11-11) ─────────────
+    //
+    // Hier stand "das erste nach Namen". Das nahm "base" vor "small"
+    // und haette "large-v3" vor "large-v3-turbo" genommen, obwohl turbo
+    // mit 4 statt 32 Decoderschichten der fuer den Lauf gebaute ist.
+    // Gemessen am 2026-11-11 an Contest-Mitschnitten (NT6X, CQ WW SSB):
+    // turbo fand je 7 Minuten 10 bzw. 15 echte Anruferrufzeichen, small
+    // 6 bzw. 11 — bei 8-facher Echtzeit auf einem M4. Darum die Liste;
+    // was darin nicht vorkommt, kommt wie bisher nach dem Namen.
+    const QDir dir(path);
     const QStringList models = dir.entryList({QStringLiteral("ggml-*.bin")},
                                              QDir::Files, QDir::Name);
-    return models.isEmpty() ? QString() : dir.absoluteFilePath(models.first());
+    if (models.isEmpty()) { return QString(); }
+    static const char* const kVorrang[] = {
+        "ggml-large-v3-turbo.bin",       "ggml-large-v3-turbo-q8_0.bin",
+        "ggml-large-v3-turbo-q5_0.bin",  "ggml-large-v3.bin",
+        "ggml-large-v2.bin",             "ggml-medium.bin",
+        "ggml-small.bin",                "ggml-base.bin",
+        "ggml-tiny.bin",
+    };
+    for (const char* name : kVorrang) {
+        const QString n = QString::fromLatin1(name);
+        if (models.contains(n)) { return dir.absoluteFilePath(n); }
+    }
+    return dir.absoluteFilePath(models.first());
 }
 
 WhisperServerLauncher::Config WhisperServerLauncher::configFromSettings()

@@ -31,6 +31,36 @@ class TestWhisperServerLauncher : public QObject
 {
     Q_OBJECT
 private slots:
+    // 2026-11-11: das beste Modell, nicht das erste nach dem Alphabet.
+    // Vorher gewann "base" gegen "small" und "large-v3" gegen
+    // "large-v3-turbo" — gemessen hoert turbo Contest-Rufzeichen am
+    // besten. Gegenprobe mit der alten Regel: Fall 2 und 3 fielen um.
+    void bestesModellNachGuete()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        auto lege = [&](const char* name) {
+            QFile f(dir.filePath(QString::fromLatin1(name)));
+            QVERIFY(f.open(QIODevice::WriteOnly));
+        };
+        QCOMPARE(WhisperServerLauncher::bestModelIn(dir.path()), QString());
+
+        lege("ggml-zz-eigenes.bin");
+        lege("ggml-aa-eigenes.bin");
+        QCOMPARE(QFileInfo(WhisperServerLauncher::bestModelIn(dir.path())).fileName(),
+                 QStringLiteral("ggml-aa-eigenes.bin"));   // unbekannt: wie bisher
+
+        lege("ggml-small.bin");
+        lege("ggml-base.bin");
+        QCOMPARE(QFileInfo(WhisperServerLauncher::bestModelIn(dir.path())).fileName(),
+                 QStringLiteral("ggml-small.bin"));
+
+        lege("ggml-large-v3.bin");
+        lege("ggml-large-v3-turbo.bin");
+        QCOMPARE(QFileInfo(WhisperServerLauncher::bestModelIn(dir.path())).fileName(),
+                 QStringLiteral("ggml-large-v3-turbo.bin"));
+    }
+
     void argumentsCarryModelPortAndLanguage()
     {
         WhisperServerLauncher::Config c;

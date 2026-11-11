@@ -25,6 +25,8 @@
 // Modification history (Longpath):
 //   2026-08-23 — Angelegt fuer Longpath von Martin Fischer,
 //                KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-11-11 — Sprache hinter dem ⚙ (Deutsch/Englisch/Automatisch).
+//                Martin Fischer, KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 #include "gui/applets/AppletWidget.h"
@@ -33,6 +35,7 @@
 
 class QPushButton;
 class QLabel;
+class QMenu;
 class QPlainTextEdit;
 
 namespace Longpath {
@@ -55,13 +58,31 @@ public:
     /// Fuer Pruefungen: was gerade im Feld steht.
     QString text() const;
 
+    // ── Sprache hinter dem ⚙ (2026-11-11) ───────────────────────────
+    //
+    // Betreiber: die Mitschrift soll im Contest "die calls gleich als
+    // kontrolle" liefern. Gemessen: mit der Vorgabe "de" hoert Whisper
+    // englischen Contestbetrieb als Deutsch ("Roger" -> "Raja",
+    // "November Tango" -> "Norway Tango") und findet nur halb so viele
+    // Rufzeichen wie mit "en". Die Sprache war bisher nur unter
+    // Setup > Transcription zu aendern; jetzt mit einem Griff im
+    // Panelkopf (Martins Regel: Optionen rechts oben hinter dem ⚙).
+    bool hasExtendedSettings() const override { return true; }
+    void openExtendedSettings() override;
+    /// Das Menue hinter dem ⚙. Oeffentlich fuer die Pruefung.
+    QMenu* baueOptionsMenue(QWidget* parent);
+
 signals:
     /// Der Betreiber will die Erkennung an- oder abschalten. Das
     /// Applet schaltet NICHT selbst — MainWindow kennt den Abgriff und
     /// die Scheibe, dieses Feld kennt nur Buchstaben.
     void enableRequested(bool on);
+    /// Die Sprache wurde im ⚙-Menue gewechselt und ist gespeichert
+    /// (AsrLanguage). MainWindow uebernimmt sie in den laufenden Dienst.
+    void languageChanged(const QString& code);
 
 private:
+    QString sprachZusatz() const;
     void appendLine(const QString& text, float confidence);
     void setStatus(const QString& s, const QString& colour);
 
