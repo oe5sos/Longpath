@@ -886,10 +886,12 @@ int PortAudioBus::paCallback(const void* in, void* out,
         self->m_ringRead.store(r, std::memory_order_release);
         // Entspannte Ordnung genuegt: an dieser Zahl haengt keine
         // Entscheidung im Rueckruf, sie wird nur von aussen angesehen.
-        if (r > rAnfang) {
-            self->m_verbrauchteFloats.fetch_add(r - rAnfang,
-                                                std::memory_order_relaxed);
-        }
+        // Als Verbrauch zaehlt der ganze Block, den das Geraet abgeholt hat,
+        // auch Stille beim Leerlauf -- wie Thetis xrmatchOUT
+        // (rmatch.c:464 [v2.10.3.15]). Siehe verbrauchJeRueckruf.
+        self->m_verbrauchteFloats.fetch_add(
+            verbrauchJeRueckruf(static_cast<qint64>(want), r - rAnfang),
+            std::memory_order_relaxed);
         self->m_lastOutL = lastL;
         self->m_lastOutR = lastR;
         self->m_crossfadeFramesRem = crossfadeRem;
