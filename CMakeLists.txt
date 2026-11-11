@@ -1197,6 +1197,7 @@ set(GUI_SOURCES
     src/gui/applets/AppletVisibilityController.cpp
     src/gui/widgets/NotchEditPopup.cpp
     src/gui/widgets/RotorDialWidget.cpp
+    src/gui/widgets/RotorBandWidget.cpp
     src/gui/widgets/RotorLogbookPanel.cpp
     src/gui/widgets/GlobeWidget.cpp
     src/gui/widgets/FlatMapWidget.cpp

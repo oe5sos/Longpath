@@ -251,6 +251,8 @@ public:
     QPushButton* entryLongPathForTest() const { return m_entryLp; }
     QLabel*      entryPeilungForTest() const { return m_entryPeilung; }
     QLabel*      entryDrehForTest() const { return m_entryDreh; }
+    class RotorBandWidget* rotorBandForTest() const { return m_rotorBand; }
+    QWidget*     rotorZeileForTest() const { return m_rotorZeileW; }
     void         setStillstandMsForTest(int ms) { m_stillstandMs = ms; }
     class QsoDetailPane* detailForTest() const { return m_detail; }
     QLineEdit*   searchForTest() const { return m_search; }
@@ -436,6 +438,10 @@ private:
     QPushButton*  m_entryRotate{nullptr};
     QPushButton*  m_entryLp{nullptr};
     QLabel*       m_entryPeilung{nullptr};
+    QWidget*      m_rotorZeileW{nullptr};   // die Zeile unter der Eingabe (Entwurf C)
+    class RotorBandWidget* m_rotorBand{nullptr};
+    QLabel*       m_entryGrad{nullptr};
+    QLabel*       m_entryKm{nullptr};
     bool          m_rotorZeile{false};
     QString       m_rotorRuf;      // fuer dieses Rufzeichen wurde ROTOR gedrueckt
     // Dreht er wirklich? (2026-11-11, Betreiber: „sobald ich ROTATE klicke,

@@ -32,6 +32,7 @@
 #include "gui/StyleConstants.h"
 #include "gui/WindowChrome.h"
 #include "gui/widgets/QsoDetailPane.h"
+#include "gui/widgets/RotorBandWidget.h"
 #include "core/Maidenhead.h"
 #include "core/CtyDatParser.h"
 #include "core/LogbuchBilder.h"
@@ -2628,26 +2629,57 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
         "Show where the rotor points and where this station is, "
         "then turn to it"));
     row->addWidget(m_entryRotorBtn);
-    m_entryPeilung = new QLabel(this);
-    m_entryPeilung->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
-                                      .arg(QLatin1String(Style::kTextPrimary)));
-    m_entryPeilung->setVisible(false);
-    row->addWidget(m_entryPeilung);
-    m_entryRotate = new QPushButton(QStringLiteral("Rotate"), this);
+
+    // ── Die Rotorzeile: eine eigene Zeile UNTER der Eingabe (2026-11-11) ──
+    //
+    // Betreiber: „weiters sollte alles sehr übersichtlich gestaltet
+    // werden" -- gewaehlt Entwurf C (Blatt C-band.png). Die QSO-Zeile
+    // bleibt, wie sie ohne Rotor war; darunter, nur nach ROTOR, feste
+    // Plaetze: Band (Nadel = Rotor, Dreieck = Station), Peilung gross,
+    // Entfernung, Herkunft, darunter der Zustand, dann Rotate / LP.
+    m_rotorZeileW = new QWidget(this);
+    m_rotorZeileW->setVisible(false);
+    auto* rz = new QHBoxLayout(m_rotorZeileW);
+    rz->setContentsMargins(0, 0, 0, 0);
+    rz->setSpacing(6);
+    auto* rotorKopf = new QLabel(QStringLiteral("ROTOR"), m_rotorZeileW);
+    rotorKopf->setStyleSheet(caption->styleSheet());
+    // So breit wie „NEW QSO": das Band steht genau unter dem Rufzeichen.
+    rotorKopf->setFixedWidth(caption->sizeHint().width());
+    rz->addWidget(rotorKopf);
+    m_rotorBand = new RotorBandWidget(m_rotorZeileW);
+    rz->addWidget(m_rotorBand);
+    rz->addSpacing(4);
+    auto* texte = new QVBoxLayout;
+    texte->setSpacing(1);
+    auto* oben = new QHBoxLayout;
+    oben->setSpacing(10);
+    m_entryGrad = new QLabel(m_rotorZeileW);
+    m_entryGrad->setFont(Style::monoFont(m_entryGrad->font(), 14, QFont::Bold));
+    m_entryGrad->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                                   .arg(QLatin1String(Style::kTextPrimary)));
+    oben->addWidget(m_entryGrad);
+    m_entryKm = new QLabel(m_rotorZeileW);
+    m_entryKm->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                 .arg(QLatin1String(Style::kTextSecondary)));
+    oben->addWidget(m_entryKm);
+    m_entryPeilung = new QLabel(m_rotorZeileW);
+    oben->addWidget(m_entryPeilung);
+    oben->addStretch(1);
+    texte->addLayout(oben);
+    m_entryDreh = new QLabel(m_rotorZeileW);
+    texte->addWidget(m_entryDreh);
+    rz->addLayout(texte);
+    rz->addSpacing(4);
+    m_entryRotate = new QPushButton(QStringLiteral("Rotate"), m_rotorZeileW);
     m_entryRotate->setAutoDefault(false);
     m_entryRotate->setStyleSheet(Style::buttonBaseStyle());
-    m_entryRotate->setVisible(false);
-    row->addWidget(m_entryRotate);
-    m_entryLp = new QPushButton(QStringLiteral("LP"), this);
+    rz->addWidget(m_entryRotate);
+    m_entryLp = new QPushButton(QStringLiteral("LP"), m_rotorZeileW);
     m_entryLp->setAutoDefault(false);
     m_entryLp->setStyleSheet(Style::buttonBaseStyle());
-    m_entryLp->setVisible(false);
-    row->addWidget(m_entryLp);
-    // Gleich neben Rotate/LP: dreht er wirklich? Wo steht er, ist er am
-    // Ziel, hat der Rotor abgelehnt, haengt er? (2026-11-11)
-    m_entryDreh = new QLabel(this);
-    m_entryDreh->setVisible(false);
-    row->addWidget(m_entryDreh);
+    rz->addWidget(m_entryLp);
+    rz->addStretch(1);
     m_stillstandMs = RundumLauf::kStillstandMs;
     m_drehWache = new QTimer(this);
     m_drehWache->setInterval(1000);
@@ -2714,6 +2746,7 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
     row->addWidget(m_entryHint);
 
     col->addLayout(row);
+    col->addWidget(m_rotorZeileW);
 
     // Bedarfs-Matrix (2026-11-08): sobald ein Rufzeichen dasteht, was das
     // Land auf jedem Band und in jeder Betriebsart schon hat -- und ob der
@@ -2974,30 +3007,39 @@ void LogbookWindow::zeigeRotorZeile()
 
 void LogbookWindow::aktualisiereRotorZeile()
 {
-    if (!m_entryPeilung) { return; }
-    for (QWidget* w : std::initializer_list<QWidget*>{m_entryPeilung, m_entryRotate, m_entryLp,
-                                                      m_entryDreh}) {
-        w->setVisible(m_rotorZeile);
-    }
+    if (!m_rotorZeileW) { return; }
+    m_rotorZeileW->setVisible(m_rotorZeile);
     if (!m_rotorZeile) { return; }
-    aktualisiereDrehZeile();
 
     const QString call = m_rotorRuf;
     double sp = 0.0, km = 0.0;
     const bool hat = m_detail && m_detail->gezeigtesRufzeichen() == call
                   && m_detail->peilung(sp, km);
+    m_rotorBand->setStation(hat ? sp : -1.0);
+    aktualisiereDrehZeile();
     if (!hat) {
+        m_entryGrad->setText(QStringLiteral("—"));
+        m_entryKm->clear();
         m_entryPeilung->setText(QStringLiteral("%1 — no position yet").arg(call));
+        m_entryPeilung->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                          .arg(QLatin1String(Style::kTextScale)));
+        m_entryRotate->setText(QStringLiteral("Rotate"));
+        m_entryLp->setText(QStringLiteral("LP"));
         m_entryRotate->setEnabled(false);
         m_entryLp->setEnabled(false);
         return;
     }
     const double lp = BeamHeading::longPath(sp);
-    QString text = QStringLiteral("%1°  ·  %2 km  ·  %3")
-                       .arg(sp, 0, 'f', 0).arg(km, 0, 'f', 0).arg(m_detail->lageText());
+    m_entryGrad->setText(QStringLiteral("%1°").arg(sp, 0, 'f', 0));
+    m_entryKm->setText(QStringLiteral("%1 km").arg(km, 0, 'f', 0));
+    m_entryPeilung->setText(m_detail->lageText());
+    m_entryPeilung->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(
+        QLatin1String(m_detail->lageGrob() ? Style::kAmberWarn : Style::kTextScale)));
 
     // Der erlaubte Bereich gilt fuer jeden Drehbefehl (RotorLogbookPanel
-    // verweigert ihn dort) -- hier wird es gesagt, bevor jemand drueckt.
+    // verweigert ihn dort) -- hier wird es gesagt, bevor jemand drueckt:
+    // auf dem Knopf selbst, weil ein gesperrter Knopf im Hausstil sonst
+    // aussieht wie ein freier.
     const RotorBereich bereich = RotorBereich::load();
     const auto geht = [&](double ziel) {
         return bereich.erlaubt(ziel)
@@ -3006,8 +3048,11 @@ void LogbookWindow::aktualisiereRotorZeile()
     const bool spGeht = geht(sp), lpGeht = geht(lp);
     m_entryRotate->setEnabled(spGeht);
     m_entryLp->setEnabled(lpGeht);
-    m_entryRotate->setText(QStringLiteral("Rotate %1°").arg(sp, 0, 'f', 0));
-    m_entryLp->setText(QStringLiteral("LP %1°").arg(lp, 0, 'f', 0));
+    const QString gesperrt = QStringLiteral(" — blocked");
+    m_entryRotate->setText(QStringLiteral("Rotate %1°").arg(sp, 0, 'f', 0)
+                           + (spGeht ? QString() : gesperrt));
+    m_entryLp->setText(QStringLiteral("LP %1°").arg(lp, 0, 'f', 0)
+                       + (lpGeht ? QString() : gesperrt));
     const QString draussen = QStringLiteral("Outside the allowed rotation range (%1)")
                                  .arg(bereich.beschreibung());
     m_entryRotate->setToolTip(spGeht ? QStringLiteral("Turn the rotor to the short path")
@@ -3015,10 +3060,6 @@ void LogbookWindow::aktualisiereRotorZeile()
     m_entryLp->setToolTip(lpGeht ? QStringLiteral(
         "Turn the rotor the other way round the world. On the low bands and "
         "at grey line this is often the stronger signal.") : draussen);
-    if (!spGeht) { text += QStringLiteral("  ·  short path outside allowed range"); }
-    m_entryPeilung->setText(text);
-    m_entryPeilung->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(
-        QLatin1String(m_detail->lageGrob() || !spGeht ? Style::kAmberWarn : Style::kTextPrimary)));
 }
 
 void LogbookWindow::drehe(double ziel)
@@ -3093,6 +3134,11 @@ void LogbookWindow::aktualisiereDrehZeile()
     m_entryDreh->setText(text);
     m_entryDreh->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
                                    .arg(QLatin1String(farbe)));
+    // Das Band: Nadel nur aus echten Ablesungen; gruen am Ziel, sonst in
+    // der Farbe der Ablesung am Zifferblatt (Bernstein).
+    m_rotorBand->setStand(rotorDa ? m_rotorDeg : -1.0);
+    m_rotorBand->setZiel(m_drehZiel >= 0.0);
+    m_rotorBand->setFarbe(farbe == Style::kGreenText ? Style::kGreenText : Style::kAmberText);
     if (!wachen && m_drehWache) { m_drehWache->stop(); }
 }
 
