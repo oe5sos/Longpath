@@ -2237,7 +2237,18 @@ void LogbookWindow::showStatistics()
             k->setCheckable(true);
             k->setAutoExclusive(true);
             k->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
-            connect(k, &QPushButton::clicked, this, [this, i]() { zeigeStatistikSeite(i); });
+            // toggled, nicht clicked (Live-Befund 2026-11-11, wie beim 3D-
+            // Knopf): die Bedienhilfe (AXPress, VoiceOver, Automatisierung)
+            // drueckt einen ankreuzbaren Knopf ueber toggle(), und das sendet
+            // KEIN clicked -- der Reiter rastete ein, die Seite blieb stehen.
+            // zeigeStatistikSeite() stellt die Seite vor setChecked() um;
+            // dessen toggled kommt hier mit currentIndex() == i an und ruft
+            // nicht ein zweites Mal.
+            connect(k, &QPushButton::toggled, this, [this, i](bool an) {
+                if (an && m_statsSeiten && m_statsSeiten->currentIndex() != i) {
+                    zeigeStatistikSeite(i);
+                }
+            });
             reiter->addWidget(k);
             m_statsSeitenKnoepfe << k;
         }

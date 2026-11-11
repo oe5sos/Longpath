@@ -22,12 +22,15 @@
 //      Logs als PNG.
 
 #include <QtTest/QtTest>
+#include <QAccessible>
+#include <QAccessibleActionInterface>
 #include <QApplication>
 #include <QDialog>
 #include <QLineEdit>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPushButton>
+#include <QStackedWidget>
 #include <QTemporaryDir>
 
 #include <cmath>
@@ -389,6 +392,63 @@ private slots:
         w.searchForTest()->setText(QStringLiteral("JA1XYZ"));
         QTRY_COMPARE_WITH_TIMEOUT(w.dxccWandForTest()->daten().gearbeitet, 1, 3000);
         w.searchForTest()->clear();
+        QFile::remove(SolarFluxArchiv::standardPfad());
+    }
+
+    // ── 5b Reiter per Bedienhilfe (Live-Befund 2026-11-11) ──────────
+    // Die Bedienhilfe (AXPress, VoiceOver, Automatisierung) drueckt einen
+    // ankreuzbaren Knopf ueber toggle() -- das sendet toggled, aber kein
+    // clicked. Am laufenden Programm rastete der Reiter ein, die Seite
+    // blieb auf "Overview". Jede angebotene Handlung muss umschalten.
+    void reiterPerBedienhilfe()
+    {
+        QTemporaryDir dir;
+        const QString pfad = dir.filePath(QStringLiteral("logbook.adi"));
+        QVERIFY(AdifLog::write(pfad, beispielLog()));
+        LogbookWindow w(pfad);
+        w.setCtyDat(&m_cty);
+        w.resize(1400, 900);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+        w.zeigeStatistikSeiteForTest(0);
+        QDialog* d = w.statistikDialogForTest();
+        QVERIFY(d && d->isVisible());
+        const QList<QPushButton*> reiter = w.statistikReiterForTest();
+        QCOMPARE(reiter.size(), 6);
+        // Die Seite, die ein Reiter zeigen muss: der Stapel steht auf ihr,
+        // und bei den drei Gesamtbildern ist das Bild selbst zu sehen.
+        auto* stapel = d->findChild<QStackedWidget*>(QString(), Qt::FindDirectChildrenOnly);
+        QVERIFY(stapel);
+        QCOMPARE(stapel->count(), 6);
+        const auto zeigt = [&](int seite) {
+            if (stapel->currentIndex() != seite) { return false; }
+            switch (seite) {
+            case 3: return w.sonnenzyklusForTest()->isVisible();
+            case 4: return w.kontinentUhrForTest()->isVisible();
+            case 5: return w.dxccWandForTest()->isVisible();
+            default: return stapel->currentWidget()->isVisible();
+            }
+        };
+        int gedrueckt = 0;
+        for (int seite : {3, 4, 5, 0, 5, 2, 3}) {
+            QAccessibleInterface* iface = QAccessible::queryAccessibleInterface(reiter[seite]);
+            QVERIFY(iface && iface->actionInterface());
+            const QStringList handlungen = iface->actionInterface()->actionNames();
+            QVERIFY2(!handlungen.isEmpty(), "keine Handlung angeboten");
+            for (const QString& h : handlungen) {
+                if (h == QAccessibleActionInterface::setFocusAction()) { continue; }
+                // Vorher woanders hin, damit die Handlung etwas zu tun hat.
+                w.zeigeStatistikSeiteForTest(seite == 1 ? 2 : 1);
+                QVERIFY(!zeigt(seite));
+                iface->actionInterface()->doAction(h);
+                const QByteArray warum = QStringLiteral("%1 auf \"%2\" schaltet nicht um")
+                                             .arg(h, reiter[seite]->text()).toUtf8();
+                QTRY_VERIFY2_WITH_TIMEOUT(zeigt(seite), warum.constData(), 3000);
+                QVERIFY(reiter[seite]->isChecked());
+                ++gedrueckt;
+            }
+        }
+        QVERIFY(gedrueckt >= 7);
         QFile::remove(SolarFluxArchiv::standardPfad());
     }
 
