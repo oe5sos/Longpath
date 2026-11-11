@@ -80,6 +80,15 @@ public:
     ///
     /// Gesetzt schlaegt das Netzziel die serielle Schnittstelle.
     void setNetworkTarget(const QString& host, quint16 port = 4001);
+
+    /// Steht im Feld fuer die serielle Schnittstelle in Wahrheit ein
+    /// Netzziel? `172.30.30.16:4001` oder `arco.local:4001` -- ja;
+    /// `/dev/tty.usbserial-1`, `COM3` -- nein. 2026-11-11 live: der
+    /// Rotordialog oeffnete Martins Netz-Rotor als „Serial port on this
+    /// computer", „Connect" schrieb die Adresse als Schnittstelle und
+    /// der Treiber versuchte, die Datei „172.30.30.16:4001" zu oeffnen.
+    static bool parseNetworkTarget(const QString& text, QString* host,
+                                   quint16* port);
     QString host() const { return m_host; }
     quint16 networkPort() const { return m_netPort; }
 
