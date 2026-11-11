@@ -183,6 +183,10 @@ QList<QPixmap> istZeilen(int breite)
             if (g.top() < call.top() - 8 || g.top() > call.bottom() + 70) { continue; }
             r = r.united(g);
         }
+        // Die Rotorzeile darunter gehoert dazu (seit Entwurf C umgesetzt).
+        if (QWidget* rz = w.rotorZeileForTest(); rz && rz->isVisible()) {
+            r = r.united(QRect(rz->mapTo(eltern, QPoint(0, 0)), rz->size()));
+        }
         r.setLeft(0);
         r.setRight(breite - 1);
         // Aus dem Fenster greifen, nicht aus dem Kind: den dunklen Grund
@@ -523,6 +527,14 @@ private slots:
         const QString ziel = qEnvironmentVariable("LONGPATH_GRAB_DIR");
         if (ziel.isEmpty()) { QSKIP("nur mit LONGPATH_GRAB_DIR"); }
         QDir().mkpath(ziel);
+        if (qEnvironmentVariableIsSet("LONGPATH_NUR_ECHT")) {
+            blatt(ziel + QStringLiteral("/C-umgesetzt.png"),
+                  QStringLiteral("Entwurf C — umgesetzt (echtes Logbuchfenster)"),
+                  QStringLiteral("QSO-Zeile unverändert; darunter, nur nach ROTOR: Band (Nadel = Rotor, "
+                                 "Dreieck = Station), Peilung, Entfernung, Herkunft, Zustand, Rotate / LP."),
+                  istZeilen(kBreite));
+            return;
+        }
         blatt(ziel + QStringLiteral("/0-ist.png"),
               QStringLiteral("Ist — so steht es heute (echtes Logbuchfenster)"),
               QStringLiteral("Rotor, Peilung, Rotate, LP und Zustand sitzen mitten in der QSO-Zeile; "

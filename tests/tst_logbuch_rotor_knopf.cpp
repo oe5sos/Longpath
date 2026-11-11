@@ -24,6 +24,9 @@
 //   7. (2026-11-11) Nach Rotate/LP zeigt die Zeile, ob er wirklich dreht:
 //      kein Rotor, dreht (mit Stand), am Ziel, steht, abgelehnt -- und
 //      ein Durchlauf mit echtem Rotorfenster und Ersatz-rotctld.
+//   8. (2026-11-11, Entwurf C) Eigene Rotorzeile unter der Eingabe: die
+//      QSO-Zeile bleibt unveraendert, das Band zeigt Rotor und Station,
+//      gesperrt steht auf dem Knopf.
 
 #include <QtTest/QtTest>
 #include <QLabel>
@@ -35,6 +38,7 @@
 #include <QHostAddress>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <limits>
 
 #include "FensterFrist.h"
 #include "core/AdifLog.h"
@@ -47,6 +51,7 @@
 #include "gui/QsoMapWindow.h"
 #include "gui/widgets/QsoDetailPane.h"
 #include "gui/widgets/RotorLogbookPanel.h"
+#include "gui/widgets/RotorBandWidget.h"
 #include "gui/StyleConstants.h"
 #include "models/LogEntry.h"
 
@@ -410,6 +415,84 @@ private slots:
         QVERIFY2(dreh->text().contains(QStringLiteral("rotor: Rotator stopped answering")),
                  qPrintable(dreh->text()));
         w->hide();
+    }
+
+    // ── Entwurf C (2026-11-11): eigene Rotorzeile unter der Eingabe ─────
+    // Betreiber: „weiters sollte alles sehr übersichtlich gestaltet
+    // werden" -- gewaehlt C. Die QSO-Zeile bleibt, wie sie ohne Rotor war
+    // (Log QSO rutscht nicht weg); darunter Band, Peilung, Zustand, Knoepfe.
+    void dieRotorzeileStehtUnterDerEingabe()
+    {
+        QTemporaryDir dir;
+        const QString pfad = dir.filePath(QStringLiteral("logbook.adi"));
+        QVERIFY(AdifLog::write(pfad, {qso(QStringLiteral("DL1ABC"), QStringLiteral("JO62"))}));
+        LogbookWindow w(pfad);
+        w.setPositionFallback(&landesmitte);
+        w.resize(1400, 900);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+        QWidget* zeile = w.rotorZeileForTest();
+        QVERIFY(zeile && !zeile->isVisible());
+        QTest::keyClicks(w.entryCallForTest(), QStringLiteral("EA8ABC"));
+        const QPoint logVorher = w.entryLogButtonForTest()->mapTo(&w, QPoint(0, 0));
+        w.setRotorBearing(231.0);
+        w.entryRotorForTest()->click();
+        QCoreApplication::processEvents();
+        QVERIFY(zeile->isVisible());
+
+        // Die QSO-Zeile bleibt: Log QSO auf derselben Hoehe wie das Rufzeichen,
+        // an derselben Stelle wie ohne Rotorzeile.
+        const QPoint call = w.entryCallForTest()->mapTo(&w, QPoint(0, 0));
+        const QPoint log = w.entryLogButtonForTest()->mapTo(&w, QPoint(0, 0));
+        QCOMPARE(log, logVorher);
+        QVERIFY2(std::abs(log.y() - call.y()) < w.entryCallForTest()->height(),
+                 qPrintable(QStringLiteral("Log QSO y=%1, Rufzeichen y=%2").arg(log.y()).arg(call.y())));
+        // Die Rotorzeile liegt darunter, das Band genau unter dem Rufzeichen.
+        RotorBandWidget* band = w.rotorBandForTest();
+        const QPoint b = band->mapTo(&w, QPoint(0, 0));
+        QVERIFY(b.y() >= call.y() + w.entryCallForTest()->height());
+        QVERIFY2(std::abs(b.x() - call.x()) <= 2,
+                 qPrintable(QStringLiteral("Band x=%1, Rufzeichen x=%2").arg(b.x()).arg(call.x())));
+        QVERIFY(w.entryRotateForTest()->mapTo(&w, QPoint(0, 0)).y() > call.y());
+
+        // Das Band: Nadel = Rotor, Dreieck = Station (hohl), dann Ziel.
+        double sp = 0.0, km = 0.0;
+        QVERIFY(w.detailForTest()->peilung(sp, km));
+        QCOMPARE(band->stand(), 231.0);
+        QVERIFY(std::abs(band->station() - sp) < 0.01);
+        QVERIFY(!band->istZiel());
+        w.entryRotateForTest()->click();
+        QVERIFY(band->istZiel());
+        QCOMPARE(QByteArray(band->farbe()), QByteArray(Style::kAmberText));
+        w.setRotorBearing(sp);
+        QCOMPARE(QByteArray(band->farbe()), QByteArray(Style::kGreenText));
+        // Ohne Rotor keine Nadel -- keine erfundene Lage.
+        w.setRotorBearing(std::numeric_limits<double>::quiet_NaN());
+        QCOMPARE(band->stand(), -1.0);
+    }
+
+    // Gesperrt steht AUF dem Knopf -- ein gesperrter Knopf sieht im
+    // Hausstil sonst aus wie ein freier.
+    void einGesperrterWegStehtAufDemKnopf()
+    {
+        RotorBereich b;
+        b.an = true; b.vonGrad = 180.0; b.bisGrad = 0.0;
+        b.save();
+        QTemporaryDir dir;
+        const QString pfad = dir.filePath(QStringLiteral("logbook.adi"));
+        QVERIFY(AdifLog::write(pfad, {qso(QStringLiteral("DL1ABC"), QStringLiteral("JO62"))}));
+        LogbookWindow w(pfad);
+        w.setPositionFallback(&landesmitte);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+        w.setRotorBearing(231.0);
+        QTest::keyClicks(w.entryCallForTest(), QStringLiteral("JA1XYZ"));
+        w.entryRotorForTest()->click();
+        QVERIFY(!w.entryRotateForTest()->isEnabled());
+        QVERIFY2(w.entryRotateForTest()->text().contains(QStringLiteral("blocked")),
+                 qPrintable(w.entryRotateForTest()->text()));
+        QVERIFY(w.entryLongPathForTest()->isEnabled());
+        QVERIFY(!w.entryLongPathForTest()->text().contains(QStringLiteral("blocked")));
     }
 
     void derErlaubteBereichGilt()
