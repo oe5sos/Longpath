@@ -23,11 +23,80 @@
 #include "gui/widgets/Station3dView.h"
 
 #include <QSignalSpy>
+#include <QTcpServer>
+#include <QTcpSocket>
 
 using namespace Longpath;
 
+namespace {
+// Nimmt Verbindungen an und antwortet nie: so haengt die Seite beim Laden
+// von CesiumJS -- weder "ready" noch ein Fehler, nur die Startfrist
+// entscheidet. Ohne Netz nach aussen.
+class SilentServer {
+public:
+    SilentServer()
+    {
+        m_srv.listen(QHostAddress::LocalHost, 0);
+        QObject::connect(&m_srv, &QTcpServer::newConnection, [this]() {
+            while (QTcpSocket* s = m_srv.nextPendingConnection()) { m_held << s; }
+        });
+    }
+    QString base() const
+    {
+        return QStringLiteral("http://127.0.0.1:%1/cesium/").arg(m_srv.serverPort());
+    }
+private:
+    QTcpServer m_srv;
+    QList<QTcpSocket*> m_held;
+};
+} // namespace
+
 class TstStation3dView : public QObject { Q_OBJECT
 private slots:
+    // Live-Befund 2026-11-11 (Probebau logbuch/gesamt): Logbuch offen,
+    // Karte verborgen -- 30 s spaeter "the 3D view did not start", und die
+    // Flaeche blieb tot, bis man 3D aus- und einschaltete. Eine nie
+    // gezeigte QWebEngineView laedt und zeichnet nicht; die Frist lief
+    // trotzdem ab dem Konstruktor. Jetzt: die Frist zaehlt nur, solange die
+    // Ansicht zu sehen ist, und ein Zeitablauf ist nicht endgueltig.
+    void hidden_view_does_not_time_out_and_a_timeout_is_not_final()
+    {
+        SilentServer silent;
+        Station3dView v(nullptr, silent.base());
+        v.setStartTimeoutMsForTest(400);
+        QSignalSpy failed(&v, &Station3dSurface::failed);
+
+        // Verborgen: auch weit ueber die Frist hinaus kein Fehler.
+        QTest::qWait(1500);
+        QCOMPARE(failed.count(), 0);
+
+        // Gezeigt: jetzt laeuft die Frist.
+        v.resize(320, 200);
+        v.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&v));
+        QTRY_COMPARE_WITH_TIMEOUT(failed.count(), 1, 5000);
+        QVERIFY2(failed.at(0).at(0).toString().contains(QLatin1String("did not start")),
+                 qPrintable(failed.at(0).at(0).toString()));
+
+        // Nicht endgueltig: der naechste Flug startet die Seite neu, statt
+        // sofort aufzugeben -- und bekommt eine neue Frist.
+        Station3dFlight f;
+        f.call = QStringLiteral("W1AW");
+        v.fly(f);
+        QTest::qWait(150);
+        QCOMPARE(failed.count(), 1);
+        QTRY_COMPARE_WITH_TIMEOUT(failed.count(), 2, 5000);
+
+        // Verborgen waehrend eines neuen Versuchs: die Frist ruht.
+        v.hide();
+        v.fly(f);
+        QTest::qWait(1200);
+        QCOMPARE(failed.count(), 2);
+        // Wieder zu sehen: die Frist laeuft weiter (und schlaegt hier zu).
+        v.show();
+        QTRY_COMPARE_WITH_TIMEOUT(failed.count(), 3, 5000);
+    }
+
     void google_refusal_from_the_page_is_a_key_problem()
     {
         Station3dView v(nullptr, QStringLiteral("http://127.0.0.1:9/"));
