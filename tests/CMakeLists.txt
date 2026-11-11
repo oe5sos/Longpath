@@ -993,6 +993,7 @@ longpath_add_test(tst_dig_rtty_wire)
 
 # ── Phase 3G-10 Stage 2: per-slice-per-band DSP persistence (S2.P) ───────────
 longpath_add_test(tst_slice_persistence_per_band)
+longpath_add_test(tst_rate_schritt_je_scheibe)
 
 # ── v0.2.0 regression: band-change lambda reentrancy guard ───────────────────
 longpath_add_test(tst_band_change_recursion_guard)

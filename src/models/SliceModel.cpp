@@ -30,6 +30,13 @@
 //                 Thetis release ever carried; DIGU/DIGL default F5 +-500
 //                 (was +-600 "1.2k", likewise never upstream); FM/SPEC/DRM
 //                 marked Longpath-own; unused commonPresetsForMode removed.
+//   2026-11-11 -- One tune step and one sample rate per slice on every band,
+//                 as upstream NereusSDR 419dd88c4 / dd800ce9b / 89e41cd91
+//                 (J.J. Boyd, KG4VCF): Slice<N>/StepHz and
+//                 hardware/<mac>/slices/<N>/SampleRate; a band change leaves
+//                 both alone; older per-band values are read only as the
+//                 fallback. Martin Fischer (OE5SOS), AI-assisted via
+//                 Anthropic Claude Code.
 // =================================================================
 
 //=================================================================
@@ -187,6 +194,7 @@
 #include "models/RadioModel.h"
 
 #include <QFile>
+#include <QScopedValueRollback>
 #include <QRegularExpression>
 #include <QStandardPaths>
 
@@ -2806,6 +2814,73 @@ std::optional<SliceModel::SavedBandSpot> SliceModel::savedBandSpot(Band band) co
     return spot;
 }
 
+// ── Ein Schritt und eine Rate je Scheibe (2026-11-11) ────────────────
+//
+// Wie Upstream NereusSDR 419dd88c4, dd800ce9b und 89e41cd91 (J.J. Boyd,
+// KG4VCF, 2026-11-05). Martin am 2026-11-11: „Ja, umstellen".
+
+void SliceModel::setSettingsRadioMac(const QString& mac)
+{
+    m_settingsRadioMac = mac;
+}
+
+QString SliceModel::sampleRateSettingsKey() const
+{
+    // Je Geraet: ein Rechner fuehrt mehrere Funkgeraete, und jedes hat
+    // seine eigenen Raten. Ohne bekanntes Geraet gibt es keinen Schluessel.
+    if (m_settingsRadioMac.isEmpty() || m_sliceIndex < 0) {
+        return {};
+    }
+    return QStringLiteral("hardware/%1/slices/%2/SampleRate")
+        .arg(m_settingsRadioMac)
+        .arg(m_sliceIndex);
+}
+
+int SliceModel::savedSampleRateHz() const
+{
+    auto& s = AppSettings::instance();
+    QString key = sampleRateSettingsKey();
+    if (key.isEmpty() || !s.contains(key)) {
+        // Gespeichert, bevor eine Scheibe eine Rate hatte: die Rate des
+        // Bandes, auf dem sie zuletzt stand. Das erste Speichern mit
+        // bekanntem Geraet schreibt den Schluessel oben.
+        const auto lastBand = loadLastBandFromSettings(m_sliceIndex);
+        if (!lastBand) {
+            return 0;
+        }
+        key = bandPrefix(m_sliceIndex, *lastBand) + QStringLiteral("SampleRate");
+        if (!s.contains(key)) {
+            return 0;
+        }
+    }
+    bool ok = false;
+    const int rate = s.value(key).toInt(&ok);
+    return ok && rate > 0 ? rate : 0;
+}
+
+void SliceModel::restoreFromSettingsForBandChange(Band band, bool restoreTuning)
+{
+    const QScopedValueRollback<bool> keepStep(m_keepStepOnRestore, true);
+    restoreFromSettings(band, restoreTuning);
+}
+
+void SliceModel::restoreStepFromSettings(Band band)
+{
+    auto& s = AppSettings::instance();
+    QString key = slicePrefix(m_sliceIndex) + QStringLiteral("StepHz");
+    if (!s.contains(key)) {
+        // Gespeichert, bevor eine Scheibe einen Schritt hatte: der Schritt
+        // des Bandes, auf dem sie zuletzt stand, oder ohne LastBand der des
+        // Bandes, das gerade hergestellt wird. Die alten Werte bleiben
+        // liegen; das erste Speichern schreibt den Schluessel oben.
+        const Band aelter = loadLastBandFromSettings(m_sliceIndex).value_or(band);
+        key = bandPrefix(m_sliceIndex, aelter) + QStringLiteral("StepHz");
+    }
+    if (s.contains(key)) {
+        setStepHz(s.value(key).toInt());
+    }
+}
+
 void SliceModel::saveToSettings(Band band)
 {
     auto& s = AppSettings::instance();
@@ -2837,7 +2912,11 @@ void SliceModel::saveToSettings(Band band)
     }
     s.setValue(bp + QStringLiteral("DspMode"),      static_cast<int>(m_dspMode));
     s.setValue(bp + QStringLiteral("AgcMode"),      static_cast<int>(m_agcMode));
-    s.setValue(bp + QStringLiteral("StepHz"),       m_stepHz);
+    // Ein Abstimmschritt je Scheibe, auf jedem Band (2026-11-11, wie
+    // Upstream NereusSDR 419dd88c4, „JJ's ruling"). Thetis fuehrt ebenfalls
+    // nur einen: tune_step_index (console.cs:1984 [v2.10.3.15]), gespeichert
+    // als wheel_tune_index (console.cs:3205 [v2.10.3.15]).
+    s.setValue(sp + QStringLiteral("StepHz"),       m_stepHz);
 
     // Noise-blanker mode (per-band). Tri-state Off/NB/NB2 mirrors Thetis
     // chkNB state per-receiver. NB TUNING (threshold / tau / lag / lead) is
@@ -2845,10 +2924,15 @@ void SliceModel::saveToSettings(Band band)
     // SliceModel.h for the 2026-04-22 removal note.
     s.setValue(bp + QStringLiteral("NbMode"), static_cast<int>(m_nbMode));
 
-    // Phase 3F: per-slice DDC sample rate, persisted per-band so each band
-    // can independently remember its preferred rate (e.g. 192 kHz on 40m,
-    // 1536 kHz on 10m for a wider pan). Longpath-original (no Thetis cite).
-    s.setValue(bp + QStringLiteral("SampleRate"), m_sampleRateHz);
+    // Phase 3F: per-slice DDC sample rate. Eine Rate je Scheibe auf jedem
+    // Band, und je Geraet (2026-11-11, wie Upstream NereusSDR dd800ce9b und
+    // 89e41cd91): vorher je Band, und ein Bandwechsel stellte eine alte Rate
+    // zurueck. Thetis kennt nur die Rate im Setup, und ein Bandwechsel
+    // laesst sie stehen (setup.cs:7066 [v2.10.3.15]). Ohne bekanntes
+    // Geraet wird sie nicht gespeichert.
+    if (const QString rateKey = sampleRateSettingsKey(); !rateKey.isEmpty()) {
+        s.setValue(rateKey, m_sampleRateHz);
+    }
 
     // Phase 3F Sub-Epic G Task 2: per-band diversity tuning. The 8-memory
     // slots (T3) + direction-finding fields (T11) join this block when they
@@ -3127,8 +3211,10 @@ void SliceModel::restoreFromSettings(Band band, bool restoreTuning)
                               << rawAgcMode << "for" << bp;
         }
     }
-    if (s.contains(bp + QStringLiteral("StepHz"))) {
-        setStepHz(s.value(bp + QStringLiteral("StepHz")).toInt());
+    // Ein Schritt je Scheibe (2026-11-11): ein Bandwechsel laesst ihn
+    // stehen, nur der Start liest ihn.
+    if (!m_keepStepOnRestore) {
+        restoreStepFromSettings(band);
     }
 
     // Noise blanker mode (per-band). Tuning keys (NbThreshold/NbTauMs/
@@ -3140,11 +3226,10 @@ void SliceModel::restoreFromSettings(Band band, bool restoreTuning)
             s.value(bp + QStringLiteral("NbMode")).toInt()));
     }
 
-    // Phase 3F: per-slice DDC sample rate (per-band). Default 192000 when key
-    // absent (new install or pre-3F settings file).
-    if (s.contains(bp + QStringLiteral("SampleRate"))) {
-        setSampleRateHz(s.value(bp + QStringLiteral("SampleRate")).toInt());
-    }
+    // Phase 3F: die Abtastrate kommt hier NICHT mehr zurueck (2026-11-11):
+    // eine Rate je Scheibe und Geraet, siehe savedSampleRateHz(); ein
+    // Bandwechsel laesst sie stehen. RadioModel::loadSliceState setzt sie
+    // beim Start.
 
     // Phase 3F Sub-Epic G Task 2: per-band diversity tuning. Defaults match
     // the SliceModel member-init values (0.0 deg, 0.0 dB, fine-null off) so
@@ -3461,8 +3546,9 @@ void SliceModel::migrateLegacyKeys()
         s.setValue(bp + QStringLiteral("AgcMode"),
                    s.value(QStringLiteral("VfoAgcMode")));
     }
+    // Der Schritt hat keinen Bandteil mehr (2026-11-11).
     if (s.contains(QStringLiteral("VfoStepHz"))) {
-        s.setValue(bp + QStringLiteral("StepHz"),
+        s.setValue(sp + QStringLiteral("StepHz"),
                    s.value(QStringLiteral("VfoStepHz")));
     }
 

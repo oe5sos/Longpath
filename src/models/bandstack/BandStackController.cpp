@@ -516,7 +516,8 @@ bool BandStackController::performRecall(const Request& request, QString* refusal
     if (memoryChanges) {
         // Alles ausser Frequenz, Betriebsart und Filter; die bringt der
         // Eintrag.
-        slice->restoreFromSettings(targetMemory, false);
+        // Schritt und Rate bleiben (eine je Scheibe, 2026-11-11).
+        slice->restoreFromSettingsForBandChange(targetMemory, false);
     }
 
     slice->setFrequency(targetHz);
