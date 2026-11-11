@@ -36,6 +36,7 @@
 #include "core/CtyDatParser.h"
 #include "core/LogbuchBilder.h"
 #include "core/RotorBereich.h"
+#include "core/RundumLauf.h"
 #include "core/TransverterSetup.h"
 #include "gui/widgets/LogbuchBilderWidgets.h"
 #include "models/Band.h"
@@ -2499,6 +2500,15 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
     m_entryLp->setStyleSheet(Style::buttonBaseStyle());
     m_entryLp->setVisible(false);
     row->addWidget(m_entryLp);
+    // Gleich neben Rotate/LP: dreht er wirklich? Wo steht er, ist er am
+    // Ziel, hat der Rotor abgelehnt, haengt er? (2026-11-11)
+    m_entryDreh = new QLabel(this);
+    m_entryDreh->setVisible(false);
+    row->addWidget(m_entryDreh);
+    m_stillstandMs = RundumLauf::kStillstandMs;
+    m_drehWache = new QTimer(this);
+    m_drehWache->setInterval(1000);
+    connect(m_drehWache, &QTimer::timeout, this, &LogbookWindow::aktualisiereRotorZeile);
 
     m_entryLive = new QLabel(QStringLiteral("●"), this);
     row->addWidget(m_entryLive);
@@ -2590,12 +2600,12 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
     connect(m_entryRotate, &QPushButton::clicked, this, [this, peilungFuerRotor]() {
         double sp = 0.0;
         if (!peilungFuerRotor(sp)) { return; }
-        emit turnRotorRequested(sp, m_rotorRuf);
+        drehe(sp);
     });
     connect(m_entryLp, &QPushButton::clicked, this, [this, peilungFuerRotor]() {
         double sp = 0.0;
         if (!peilungFuerRotor(sp)) { return; }
-        emit turnRotorRequested(BeamHeading::longPath(sp), m_rotorRuf);
+        drehe(BeamHeading::longPath(sp));
     });
     // Leeres oder anderes Rufzeichen: die Rotorzeile geht weg (2026-11-11).
     // textChanged, nicht textEdited -- auch ein Wert, der per
@@ -2606,6 +2616,7 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
         if (Callsigns::normalized(text) == m_rotorRuf) { return; }
         m_rotorZeile = false;
         m_rotorRuf.clear();
+        drehZeileLeeren();
         aktualisiereRotorZeile();
     });
 
@@ -2814,10 +2825,12 @@ void LogbookWindow::zeigeRotorZeile()
 void LogbookWindow::aktualisiereRotorZeile()
 {
     if (!m_entryPeilung) { return; }
-    for (QWidget* w : std::initializer_list<QWidget*>{m_entryPeilung, m_entryRotate, m_entryLp}) {
+    for (QWidget* w : std::initializer_list<QWidget*>{m_entryPeilung, m_entryRotate, m_entryLp,
+                                                      m_entryDreh}) {
         w->setVisible(m_rotorZeile);
     }
     if (!m_rotorZeile) { return; }
+    aktualisiereDrehZeile();
 
     const QString call = m_rotorRuf;
     double sp = 0.0, km = 0.0;
@@ -2832,8 +2845,6 @@ void LogbookWindow::aktualisiereRotorZeile()
     const double lp = BeamHeading::longPath(sp);
     QString text = QStringLiteral("%1°  ·  %2 km  ·  %3")
                        .arg(sp, 0, 'f', 0).arg(km, 0, 'f', 0).arg(m_detail->lageText());
-    text += m_rotorDeg >= 0.0 ? QStringLiteral("  ·  rotor at %1°").arg(m_rotorDeg, 0, 'f', 0)
-                              : QStringLiteral("  ·  rotor not connected");
 
     // Der erlaubte Bereich gilt fuer jeden Drehbefehl (RotorLogbookPanel
     // verweigert ihn dort) -- hier wird es gesagt, bevor jemand drueckt.
@@ -2860,10 +2871,86 @@ void LogbookWindow::aktualisiereRotorZeile()
         QLatin1String(m_detail->lageGrob() || !spGeht ? Style::kAmberWarn : Style::kTextPrimary)));
 }
 
+void LogbookWindow::drehe(double ziel)
+{
+    m_drehZiel = BeamHeading::wrap360(ziel);
+    m_drehMeldung.clear();
+    m_drehUhr.restart();
+    // Synchron: lehnt der Rotor ab, kommt setRotorMeldung() noch in
+    // diesem Aufruf an -- und steht dann gleich in der Zeile.
+    emit turnRotorRequested(m_drehZiel, m_rotorRuf);
+    m_drehWache->start();
+    aktualisiereRotorZeile();
+}
+
+void LogbookWindow::drehZeileLeeren()
+{
+    m_drehZiel = -1.0;
+    m_drehMeldung.clear();
+    if (m_drehWache) { m_drehWache->stop(); }
+}
+
+void LogbookWindow::setRotorMeldung(const QString& text)
+{
+    // Nur zu einem Drehbefehl aus der Eingabezeile; was der Rotor sonst
+    // meldet, steht im Rotorfenster.
+    if (m_drehZiel < 0.0) { return; }
+    m_drehMeldung = text.trimmed();
+    aktualisiereRotorZeile();
+}
+
+void LogbookWindow::aktualisiereDrehZeile()
+{
+    // ── Dreht er wirklich? ── 2026-11-11 ─────────────────────────────
+    //
+    // Gezeigt wird nur, was der Rotor selbst meldet (setRotorBearing --
+    // echte Ablesungen, nie die Stellvertreter-Nadel). Am Ziel heisst
+    // innerhalb RundumLauf::kAngekommenGrad, „steht" heisst so lange
+    // ohne neue Position wie dort (kStillstandMs) -- Rotorfenster,
+    // Rundumlauf und Logbuch urteilen gleich. Farben wie am Zifferblatt:
+    // in Bewegung Bernstein, am Ziel Gruen.
+    const bool rotorDa = m_rotorDeg >= 0.0;
+    const auto grad = [](double d) { return QString::number(qRound(BeamHeading::wrap360(d)) % 360); };
+    QString text;
+    const char* farbe = Style::kTextScale;
+    bool wachen = false;
+    if (m_drehZiel < 0.0) {
+        text = rotorDa ? QStringLiteral("rotor at %1°").arg(grad(m_rotorDeg))
+                       : QStringLiteral("rotor not connected");
+    } else if (!m_drehMeldung.isEmpty()) {
+        text = QStringLiteral("rotor: %1").arg(m_drehMeldung);
+        farbe = Style::kAmberWarn;
+    } else if (!rotorDa) {
+        text = QStringLiteral("no rotor connected — the antenna does not turn");
+        farbe = Style::kAmberWarn;
+    } else {
+        double weg = std::fmod(std::abs(m_rotorDeg - m_drehZiel), 360.0);
+        if (weg > 180.0) { weg = 360.0 - weg; }
+        if (weg <= RundumLauf::kAngekommenGrad) {
+            text = QStringLiteral("rotor at %1° — on target").arg(grad(m_rotorDeg));
+            farbe = Style::kGreenText;
+        } else if (m_drehUhr.isValid() && m_drehUhr.elapsed() > m_stillstandMs) {
+            text = QStringLiteral("rotor not moving — at %1°, target %2°")
+                       .arg(grad(m_rotorDeg), grad(m_drehZiel));
+            farbe = Style::kAmberWarn;
+        } else {
+            text = QStringLiteral("turning to %1°  ·  now %2°")
+                       .arg(grad(m_drehZiel), grad(m_rotorDeg));
+            farbe = Style::kAmberText;
+            wachen = true;
+        }
+    }
+    m_entryDreh->setText(text);
+    m_entryDreh->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                   .arg(QLatin1String(farbe)));
+    if (!wachen && m_drehWache) { m_drehWache->stop(); }
+}
+
 void LogbookWindow::clearEntry()
 {
     m_rotorZeile = false;
     m_rotorRuf.clear();
+    drehZeileLeeren();
     aktualisiereRotorZeile();
     m_entryLookup->stop();
     if (m_bedarfTimer) { m_bedarfTimer->stop(); }
@@ -2900,7 +2987,10 @@ void LogbookWindow::showStationFor(const QString& raw)
 
 void LogbookWindow::setRotorBearing(double deg)
 {
+    const double vorher = m_rotorDeg;
     m_rotorDeg = std::isnan(deg) ? -1.0 : deg;
+    // Eine neue Position heisst: er bewegt sich (Stillstandswache).
+    if (m_rotorDeg >= 0.0 && std::abs(m_rotorDeg - vorher) > 0.05) { m_drehUhr.restart(); }
     if (m_detail) { m_detail->setRotorBearing(deg); }
     applyRotorToMap();
     aktualisiereRotorZeile();

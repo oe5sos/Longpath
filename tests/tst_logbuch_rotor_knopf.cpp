@@ -21,6 +21,9 @@
 //      ausserhalb seines Feldes -- Peilung und Karte gleich (SN7L).
 //   6. (2026-11-11) Leeres/anderes Rufzeichen nimmt die Rotorzeile weg,
 //      auch wenn der Wert nicht getippt wurde.
+//   7. (2026-11-11) Nach Rotate/LP zeigt die Zeile, ob er wirklich dreht:
+//      kein Rotor, dreht (mit Stand), am Ziel, steht, abgelehnt -- und
+//      ein Durchlauf mit echtem Rotorfenster und Ersatz-rotctld.
 
 #include <QtTest/QtTest>
 #include <QLabel>
@@ -29,15 +32,22 @@
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
+#include <QHostAddress>
+#include <QTcpServer>
+#include <QTcpSocket>
 
 #include "FensterFrist.h"
 #include "core/AdifLog.h"
+#include "core/AppSettings.h"
+#include "core/RotorController.h"
 #include "core/CallsignCache.h"
 #include "core/Maidenhead.h"
 #include "core/RotorBereich.h"
 #include "gui/LogbookWindow.h"
 #include "gui/QsoMapWindow.h"
 #include "gui/widgets/QsoDetailPane.h"
+#include "gui/widgets/RotorLogbookPanel.h"
+#include "gui/StyleConstants.h"
 #include "models/LogEntry.h"
 
 using namespace Longpath;
@@ -70,6 +80,8 @@ CallsignInfo qrz(const QString& call, double lat, double lon)
 bool landesmitte(const QString& call, double& lat, double& lon)
 {
     if (call.startsWith(QStringLiteral("JA"))) { lat = 36.0; lon = 138.0; return true; }
+    // Kanaren: ~240 Grad von JN67VV -- im Westen, wie Martins Rotor derzeit darf.
+    if (call.startsWith(QStringLiteral("EA8"))) { lat = 28.32; lon = -15.85; return true; }
     return false;
 }
 } // namespace
@@ -77,8 +89,20 @@ bool landesmitte(const QString& call, double& lat, double& lon)
 class TstLogbuchRotorKnopf : public QObject {
     Q_OBJECT
 private slots:
-    void initTestCase() { QStandardPaths::setTestModeEnabled(true); }
-    void init() { RotorBereich{}.save(); }
+    void initTestCase()
+    {
+        QStandardPaths::setTestModeEnabled(true);
+        // Das Rotorfenster liest LogbookDatei::pfad(); eine gesetzte
+        // Sandbox-Variable lenkte das auf einen echten Ordner -- hier nie.
+        qunsetenv("LONGPATH_CONFIG_DIR");
+    }
+    void init()
+    {
+        RotorBereich{}.save();
+        // Jeder Fall beginnt ohne eingestellten eigenen Locator -- sonst
+        // trüge ein frueherer Lauf (Sandbox-Datei) die Heimatfeld-Probe.
+        AppSettings::instance().setValue(QStringLiteral("StationGridSquare"), QString());
+    }
 
     void eineNeueStationBekommtEinePeilung()
     {
@@ -257,6 +281,137 @@ private slots:
         QVERIFY(std::abs(karte.last().at(1).toDouble() - 47.98) < 1e-9);
     }
 
+    // ── Dreht er wirklich? (2026-11-11) ────────────────────────────────
+    // Betreiber: „im logbuch sollte auch ersichtlich sein, dass sobald ich
+    // ROTATE klicke, der rotator auch wirklich dreht." Gezeigt wird nur,
+    // was der Rotor meldet: kein Rotor, dreht, am Ziel, steht, abgelehnt.
+    void rotateZeigtObErWirklichDreht()
+    {
+        QTemporaryDir dir;
+        const QString pfad = dir.filePath(QStringLiteral("logbook.adi"));
+        QVERIFY(AdifLog::write(pfad, {qso(QStringLiteral("DL1ABC"), QStringLiteral("JO62"))}));
+        LogbookWindow w(pfad);
+        w.setPositionFallback(&landesmitte);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+        QLabel* dreh = w.entryDrehForTest();
+        QTest::keyClicks(w.entryCallForTest(), QStringLiteral("JA1XYZ"));
+        w.entryRotorForTest()->click();
+        QVERIFY(dreh->isVisible());
+        QVERIFY2(dreh->text().contains(QStringLiteral("rotor not connected")), qPrintable(dreh->text()));
+
+        // Ohne Rotor: Rotate sagt, dass sich nichts dreht.
+        w.entryRotateForTest()->click();
+        QVERIFY2(dreh->text().contains(QStringLiteral("does not turn")), qPrintable(dreh->text()));
+
+        // Der Rotor meldet sich: er faehrt, die Zeile zaehlt mit.
+        w.setRotorBearing(0.0);
+        QVERIFY2(dreh->text().contains(QStringLiteral("turning to 42°")), qPrintable(dreh->text()));
+        QVERIFY(dreh->text().contains(QStringLiteral("now 0°")));
+        QVERIFY(dreh->styleSheet().contains(QLatin1String(Style::kAmberText)));
+        w.setRotorBearing(20.0);
+        QVERIFY2(dreh->text().contains(QStringLiteral("now 20°")), qPrintable(dreh->text()));
+        // Am Ziel (innerhalb von 4 Grad): gruen.
+        w.setRotorBearing(40.0);
+        QVERIFY2(dreh->text().contains(QStringLiteral("on target")), qPrintable(dreh->text()));
+        QVERIFY(dreh->styleSheet().contains(QLatin1String(Style::kGreenText)));
+
+        // Keine neue Position mehr: er steht -- und das wird gesagt.
+        w.setStillstandMsForTest(300);
+        w.entryLongPathForTest()->click();
+        QVERIFY2(dreh->text().contains(QStringLiteral("turning to 222°")), qPrintable(dreh->text()));
+        QTRY_VERIFY_WITH_TIMEOUT(dreh->text().contains(QStringLiteral("not moving")), 4000);
+        QVERIFY(dreh->styleSheet().contains(QLatin1String(Style::kAmberWarn)));
+
+        // Der Rotor lehnt ab (wie RotorController::pruefeZiel, synchron
+        // im Drehbefehl): die Ablehnung steht in der Zeile.
+        auto ablehnen = connect(&w, &LogbookWindow::turnRotorRequested, &w, [&w]() {
+            w.setRotorMeldung(QStringLiteral("Not turned — outside the allowed range"));
+        });
+        w.entryRotateForTest()->click();
+        QVERIFY2(dreh->text().contains(QStringLiteral("rotor: Not turned")), qPrintable(dreh->text()));
+        disconnect(ablehnen);
+
+        // Eine Meldung ohne Drehbefehl aus der Zeile gehoert ins Rotorfenster.
+        w.entryCallForTest()->setText(QString());
+        w.setRotorMeldung(QStringLiteral("irgendwas"));
+        w.entryCallForTest()->setText(QStringLiteral("JA1XYZ"));
+        w.entryRotorForTest()->click();
+        QVERIFY2(!dreh->text().contains(QStringLiteral("irgendwas")), qPrintable(dreh->text()));
+        QVERIFY(dreh->text().contains(QStringLiteral("rotor at 40°")));
+    }
+
+    // Durchlauf mit dem echten Rotorfenster und einem Ersatz-rotctld:
+    // Rotate in der Eingabezeile -> "P 240" beim Rotor -> er faehrt in
+    // Schritten -> die Zeile zeigt "turning", dann "on target".
+    void rotateDrehtDenRotorWirklich()
+    {
+        double az = 231.0, ziel = 231.0;
+        QStringList befehle;
+        QTcpServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost, 0));
+        connect(&server, &QTcpServer::newConnection, this, [&]() {
+            QTcpSocket* c = server.nextPendingConnection();
+            connect(c, &QTcpSocket::readyRead, c, [c, &az, &ziel, &befehle]() {
+                for (const QByteArray& zeile : c->readAll().split('\n')) {
+                    const QByteArray z = zeile.trimmed();
+                    if (z.isEmpty()) { continue; }
+                    if (z == "p") {
+                        // Drei Grad je Abfrage Richtung Ziel -- wie ein Rotor faehrt.
+                        if (std::abs(ziel - az) <= 3.0) { az = ziel; }
+                        else { az += ziel > az ? 3.0 : -3.0; }
+                        c->write(QByteArray::number(az, 'f', 6) + "\n0.000000\n");
+                    } else {
+                        if (z.startsWith("P ")) {
+                            befehle << QString::fromLatin1(z);
+                            ziel = z.split(' ').value(1).toDouble();
+                        }
+                        c->write("RPRT 0\n");
+                    }
+                }
+                c->flush();
+            });
+        });
+        AppSettings& s = AppSettings::instance();
+        s.setValue(QStringLiteral("StationGridSquare"), QStringLiteral("JN67VV"));
+        s.setValue(QStringLiteral("RotorUseLocalSerial"), false);
+        s.setValue(QStringLiteral("RotorRotctldHost"), QStringLiteral("127.0.0.1"));
+        s.setValue(QStringLiteral("RotorRotctldPort"), int(server.serverPort()));
+
+        RotorLogbookPanel panel(nullptr, nullptr, nullptr);
+        QString err;
+        QVERIFY2(panel.connectRotorFromSettings(&err), qPrintable(err));
+        QTRY_VERIFY_WITH_TIMEOUT(panel.rotorForTest() && panel.rotorForTest()->isConnected(), 8000);
+        panel.showLogbook();
+        LogbookWindow* w = panel.findChild<LogbookWindow*>();
+        QVERIFY(w);
+        QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
+        w->setPositionFallback(&landesmitte);
+
+        QTest::keyClicks(w->entryCallForTest(), QStringLiteral("EA8ABC"));
+        w->entryRotorForTest()->click();
+        QLabel* dreh = w->entryDrehForTest();
+        QTRY_VERIFY_WITH_TIMEOUT(dreh->text().contains(QStringLiteral("rotor at 231°")), 8000);
+        double sp = 0.0, km = 0.0;
+        QVERIFY(w->detailForTest()->peilung(sp, km));
+        QVERIFY2(sp > 235.0 && sp < 245.0, qPrintable(QString::number(sp)));
+
+        w->entryRotateForTest()->click();
+        QTRY_VERIFY_WITH_TIMEOUT(!befehle.isEmpty(), 4000);
+        QVERIFY2(std::abs(befehle.first().split(' ').value(1).toDouble() - sp) < 0.6,
+                 qPrintable(befehle.first()));
+        QVERIFY2(dreh->text().contains(QStringLiteral("turning to")), qPrintable(dreh->text()));
+        QTRY_VERIFY_WITH_TIMEOUT(dreh->text().contains(QStringLiteral("on target")), 15000);
+
+        // Was der Rotor zu einem Drehbefehl meldet, reicht das Rotorfenster
+        // an die Zeile weiter (RotorController::errorOccurred).
+        w->entryRotateForTest()->click();
+        emit panel.rotorForTest()->errorOccurred(QStringLiteral("Rotator stopped answering"));
+        QVERIFY2(dreh->text().contains(QStringLiteral("rotor: Rotator stopped answering")),
+                 qPrintable(dreh->text()));
+        w->hide();
+    }
+
     void derErlaubteBereichGilt()
     {
         RotorBereich b;
@@ -276,7 +431,7 @@ private slots:
         QVERIFY(w.entryRotateForTest()->isEnabled());
         QVERIFY(!w.entryLongPathForTest()->isEnabled());
         QVERIFY(w.entryLongPathForTest()->toolTip().contains(QStringLiteral("Outside")));
-        QVERIFY(w.entryPeilungForTest()->text().contains(QStringLiteral("rotor at 0")));
+        QVERIFY(w.entryDrehForTest()->text().contains(QStringLiteral("rotor at 0")));
     }
 
     // Woher die Lage stammt -- QRZ meldet es mit <geoloc>.
