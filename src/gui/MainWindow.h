@@ -169,6 +169,11 @@ class TciLogWindow;
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
+    // Die Tastenkuerzel (2026-11-10) gehen an dieselben Stellen wie die
+    // Bedienelemente und brauchen dafuer m_radioModel, m_shuttingDown
+    // und die zwei Wege darunter (stimmeVomBediener, panoramaZoomen).
+    friend class MainWindowHotKeyTargets;
+
 public:
 
     /// Die Scheibenflaggen ein- oder ausschalten (View > Slice
@@ -427,6 +432,9 @@ public:
     /// 2026-10-23 musste an drei Stellen einzeln nachgetragen werden,
     /// weil es diesen einen Weg noch nicht gab.
     void bandUmschalten(Longpath::Band band);
+
+    /// Die Tastenkuerzel (2026-11-10): der Verteiler, fuer Pruefstaende.
+    class HotKeyDispatcher* hotKeyDispatcher() const { return m_hotKeyDispatcher.get(); }
     /// Das an Band/Modus/Digimodus gebundene Layoutprofil aktivieren,
     /// falls eines passt. Siehe `LayoutProfiles::profileFor`.
     void profilNachstellen(
@@ -2054,6 +2062,24 @@ private:
     class DiversityApplet*  m_diversityApplet{nullptr};
     class CwxApplet*        m_cwxApplet{nullptr};
     class DvkApplet*        m_dvkApplet{nullptr};
+
+    // ── Tastenkuerzel (2026-11-10) ──────────────────────────────────
+    //
+    // Die Belegung liegt in RadioModel (hotKeyBindings). Hier die drei
+    // Teile, die das Fenster braucht. Reihenfolge ist Absicht: als
+    // Mitglieder werden sie in umgekehrter Reihenfolge abgebaut, also
+    // erst die Weiche (sie haengt als Ereignisfilter an der ganzen
+    // Anwendung), dann der Verteiler, zuletzt die Ziele -- und alle drei
+    // VOR den Kindern des Fensters, zu denen RadioModel gehoert.
+    void richteTastenkuerzelEin();
+    // Abstimmen wie ein Klick ins Panorama: Sperre meldet sich,
+    // Begleitgeraet folgt.
+    void stimmeVomBediener(class SliceModel* s, double hz);
+    // Die Lupe im Panorama: Faktor < 1 vergroessert.
+    void panoramaZoomen(double factor);
+    std::unique_ptr<class MainWindowHotKeyTargets> m_hotKeyTargets;
+    std::unique_ptr<class HotKeyDispatcher>        m_hotKeyDispatcher;
+    std::unique_ptr<class KeyboardRouter>          m_keyboardRouter;
     class QsoRecorderApplet* m_qsoRecorderApplet{nullptr};
     class RecordingApplet*   m_recordingApplet{nullptr};
 

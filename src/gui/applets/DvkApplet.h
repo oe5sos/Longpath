@@ -20,6 +20,11 @@
 //                 Port of AetherSDR `src/gui/DvkPanel.{h,cpp}` (DVK F-key
 //                 slot grid + record/play controls). Renamed to
 //                 DvkApplet in Longpath. All controls NYI.
+//   2026-11-10 — Senden, Stopp, Wiederholen und Aufnahmepegel ueber den
+//                 VoiceKeyerPlayer; die Aufnahme ist dorthin umgezogen.
+//                 Die Taste je Zeile kommt aus den Tastenkuerzeln.
+//                 Martin Fischer (OE5SOS), KI-gestuetzt ueber Anthropic
+//                 Claude.
 // =================================================================
 
 #pragma once
@@ -28,6 +33,7 @@
 class QPushButton;
 class QLabel;
 class QSlider;
+class QTimer;
 
 namespace Longpath {
 
@@ -73,24 +79,22 @@ private:
     QPushButton* m_loadBtn[kSlots]   = {};
 
     void refreshSlot(int index);
+    void refreshKeys();
+    void refreshButtons();
 
-    // Zebra, oder rot wenn diese Zeile gerade aufnimmt.
+    // Zebra; die ganze Zeile rot, wenn sie aufnimmt, bernstein, wenn sie
+    // sendet.
     void applyRowStyle(int index);
 
-    // Aufnahme vom Mikrofon in einen Platz. Nimmt denselben Weg wie der
-    // Sprach-Selbsttest: TxWorkerThread::preStripAudioReady in einen
-    // TxAudioRecorder, also VOR der Sprachbearbeitung. Eine Ansage soll
-    // klingen wie die Stimme, nicht wie die Stimme durch den heutigen
-    // Kompressor — die Bearbeitung kommt beim Senden ohnehin darueber.
-    //
-    // SENDET NICHT. Der Abgriff liest mit, was das Mikrofon liefert;
-    // getastet wird nichts.
-    void startRecording(int index);
-    void finishRecording();
-
-    class TxAudioRecorder* m_recorder = nullptr;
-    QMetaObject::Connection m_micTap;
+    // Aufnahme und Senden macht der VoiceKeyerPlayer im RadioModel --
+    // derselbe, den die Tasten F1…F10 und Strg+Umschalt+F1…F10 rufen.
+    // Hier nur Knoepfe und Anzeige. Die Aufnahme SENDET NICHT: sie liest
+    // am Mikrofonabgriff mit, VOR der Sprachbearbeitung.
+    class VoiceKeyerPlayer* player() const;
+    void onPlayerState();
     int   m_recordingSlot = -1;
+    int   m_playingSlot   = -1;
+    QTimer* m_levelTimer = nullptr;
 
     // Control 2 — record level gauge (0-100)
     HGauge*      m_recLevel      = nullptr;

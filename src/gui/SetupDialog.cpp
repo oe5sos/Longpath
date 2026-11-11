@@ -844,7 +844,9 @@ void SetupDialog::buildTree()
 
     // ── Keyboard ──────────────────────────────────────────────────────────────
     QTreeWidgetItem* keyboard = addCategory("Keyboard");
-    registerPage(keyboard, "Shortcuts", [] { return new KeyboardShortcutsPage; });
+    registerPage(keyboard, "Shortcuts", [this] {
+        return new KeyboardShortcutsPage(m_model ? m_model->hotKeyBindings() : nullptr);
+    });
 
     tick("Keyboard");
 
