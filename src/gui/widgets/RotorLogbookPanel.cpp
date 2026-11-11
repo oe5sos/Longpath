@@ -1343,6 +1343,9 @@ void RotorLogbookPanel::ensureRotor()
     connect(m_rotor, &RotorController::errorOccurred, this,
             [this](const QString& msg) {
         setStatus(QStringLiteral("Rotator: %1").arg(msg), true);
+        // Nach Rotate/LP in der Eingabezeile des Logbuchs steht es auch
+        // dort -- wer dort gedrueckt hat, schaut dort hin (2026-11-11).
+        if (m_logWindow) { m_logWindow->setRotorMeldung(msg); }
     });
 
     // 2026-09-16, found live against a microHAM ARCO on the LAN: the

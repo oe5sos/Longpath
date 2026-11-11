@@ -235,6 +235,10 @@ public:
     // an das Rotor-Radar neben der Karte (2026-09-26).
     void setRotorBearing(double deg);
     void setRotorBeamWidth(double deg);
+    // Was der Rotor zu einem Drehbefehl sagt: Ablehnung (erlaubter
+    // Bereich), Transportfehler (RotorController::errorOccurred). Nach
+    // Rotate/LP aus der Eingabezeile steht es dort (2026-11-11).
+    void setRotorMeldung(const QString& text);
 
     QLineEdit*   entryCallForTest() const { return m_entryCall; }
     QLineEdit*   entryCommentForTest() const { return m_entryComment; }
@@ -246,6 +250,8 @@ public:
     QPushButton* entryRotateForTest() const { return m_entryRotate; }
     QPushButton* entryLongPathForTest() const { return m_entryLp; }
     QLabel*      entryPeilungForTest() const { return m_entryPeilung; }
+    QLabel*      entryDrehForTest() const { return m_entryDreh; }
+    void         setStillstandMsForTest(int ms) { m_stillstandMs = ms; }
     class QsoDetailPane* detailForTest() const { return m_detail; }
     QLineEdit*   searchForTest() const { return m_search; }
 
@@ -431,6 +437,19 @@ private:
     QPushButton*  m_entryLp{nullptr};
     QLabel*       m_entryPeilung{nullptr};
     bool          m_rotorZeile{false};
+    QString       m_rotorRuf;      // fuer dieses Rufzeichen wurde ROTOR gedrueckt
+    // Dreht er wirklich? (2026-11-11, Betreiber: „sobald ich ROTATE klicke,
+    // soll ersichtlich sein, dass der Rotor auch wirklich dreht.")
+    // m_drehZiel < 0: kein Drehbefehl aus der Eingabezeile offen.
+    QLabel*       m_entryDreh{nullptr};
+    double        m_drehZiel{-1.0};
+    QString       m_drehMeldung;
+    QElapsedTimer m_drehUhr;       // seit der letzten neuen Position
+    QTimer*       m_drehWache{nullptr};
+    int           m_stillstandMs{0};
+    void          drehe(double ziel);
+    void          drehZeileLeeren();
+    void          aktualisiereDrehZeile();
     void          zeigeRotorZeile();
     void          aktualisiereRotorZeile();
     QTimer*       m_entryLookup{nullptr};
