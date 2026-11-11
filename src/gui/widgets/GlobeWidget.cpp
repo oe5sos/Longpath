@@ -12,12 +12,16 @@
 //                 setShowAtmosphere(); see GlobeWidget.h. AI-assisted
 //                 via Anthropic Claude (Cowork), operator Martin
 //                 Fischer.
+//   2026-11-10 — subsolarPoint() from core/SolarTimes: the old equation
+//                 of time was up to 17 min wrong. AI-assisted via
+//                 Anthropic Claude (Claude Code), operator Martin Fischer.
 // =================================================================
 
 #include "GlobeWidget.h"
 #include "gui/ScopedChildWidget.h"
 #include "WorldTexture.h"
 #include "core/AppSettings.h"
+#include "core/SolarTimes.h"
 #include "gui/ColorSwatchButton.h"
 #include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
@@ -619,21 +623,18 @@ void GlobeWidget::useCurrentSubsolarPoint()
 
 void GlobeWidget::subsolarPoint(const QDateTime& utc, double& lat, double& lon)
 {
-    // Low-precision solar position: good to a fraction of a degree,
-    // which is far better than a terminator drawn on a 300 px globe
-    // needs. Declination from the day of year, longitude from UTC.
-    const int doy = utc.date().dayOfYear();
-    const double frac = utc.time().msecsSinceStartOfDay() / 86400000.0;
-
-    // Axial tilt projected onto the year, with perihelion offset.
-    const double g = (2.0 * M_PI / 365.24) * (doy + frac - 1.0);
-    lat = 23.44 * std::sin((2.0 * M_PI / 365.24) * (doy + frac - 80.0));
-
-    // The sun is overhead at the meridian where it is local noon.
-    // Equation of time shifts that by up to ~16 minutes over the year.
-    const double eot = 7.66 * std::sin(g - 0.0489)
-                     - 9.87 * std::sin(2.0 * (g + 0.3319));   // minutes
-    lon = norm180(180.0 - frac * 360.0 - eot * 0.25);
+    // ── Aus core/SolarTimes, nicht mehr selbst gerechnet (2026-11-10) ──
+    //
+    // Hier stand eine Naeherung aus dem Tag des Jahres: Deklination als
+    // Sinus, Zeitgleichung als 7,66·sin − 9,87·sin(2·). Gegen die NOAA-
+    // Formeln nachgerechnet lag diese Zeitgleichung bis 17 Minuten
+    // daneben (30. Maerz +12,9 statt −4,4 min, 3. November +3 statt
+    // +16,4) — die Schattengrenze stand bis 4° in der Laenge falsch,
+    // und der Globus widersprach dem Grauzonen-Urteil im Logbuch.
+    // Jetzt dasselbe Modell wie solarInfo(); tst_globe_geometry prueft
+    // es ueber das Jahr gegen NOAA.
+    Longpath::subsolarPoint(utc, lat, lon);
+    lon = norm180(lon);
 }
 
 void GlobeWidget::interpolateGreatCircle(double latA, double lonA,

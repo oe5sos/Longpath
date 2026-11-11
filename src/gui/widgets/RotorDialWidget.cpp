@@ -578,7 +578,7 @@ void RotorDialWidget::paintTape(QPainter& p)
     p.setFont(small);
     p.setPen(kMuted);
     QString line2 = m_hasTarget
-        ? QStringLiteral("Ziel %1 · %2%3°")
+        ? QStringLiteral("Target %1 · %2%3°")   // war „Ziel" -- Oberflaeche englisch (2026-11-11)
               .arg(degText(m_target),
                    travelDegrees() >= 0 ? QStringLiteral("CW ")
                                         : QStringLiteral("CCW "))

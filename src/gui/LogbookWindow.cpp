@@ -32,12 +32,20 @@
 #include "gui/StyleConstants.h"
 #include "gui/WindowChrome.h"
 #include "gui/widgets/QsoDetailPane.h"
+#include "gui/widgets/RotorBandWidget.h"
 #include "core/Maidenhead.h"
 #include "core/CtyDatParser.h"
 #include "core/LogbuchBilder.h"
+#include "core/LogbuchGesamtbilder.h"
+#include "core/SolarFluxArchiv.h"
+#include "core/SotaGipfel.h"
+#include "core/SotaNachtrag.h"
+#include "gui/SotaNachtragDialog.h"
 #include "core/RotorBereich.h"
+#include "core/RundumLauf.h"
 #include "core/TransverterSetup.h"
 #include "gui/widgets/LogbuchBilderWidgets.h"
+#include "gui/widgets/LogbuchGesamtbilderWidgets.h"
 #include "models/Band.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -49,7 +57,9 @@
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QComboBox>
+#include <QScreen>
 #include <QStackedWidget>
+#include <QStandardPaths>
 #include <QDateEdit>
 #include <QDateTimeEdit>
 #include <QHash>
@@ -57,6 +67,7 @@
 #include <QMoveEvent>
 #include <QResizeEvent>
 #include <QDialogButtonBox>
+#include <QDir>
 #include <QFile>
 #include <QFileDialog>
 #include <QFormLayout>
@@ -426,8 +437,14 @@ void LogbookWindow::buildUi()
         "Contacts per band, mode and week, top countries, awards — "
         "as a row under the table, for whatever the filters currently show"));
     QPushButton* statsBtn = m_statsToggle;
+    auto* sotaBtn = new QPushButton(QStringLiteral("SOTA…"), this);
+    sotaBtn->setToolTip(QStringLiteral(
+        "Fill in your summit references (MY_SOTA_REF) from your SOTA activator "
+        "log (sotadata.org.uk → Logs → Activator → Download complete log), so "
+        "bearings, distances and path profiles start at the summit"));
+    connect(sotaBtn, &QPushButton::clicked, this, &LogbookWindow::sotaNachtragen);
     for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn, mapBtn,
-                           statsBtn, importBtn, m_syncBtn, adifBtn, csvBtn, cabrBtn}) {
+                           statsBtn, importBtn, m_syncBtn, sotaBtn, adifBtn, csvBtn, cabrBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle());
         top->addWidget(b);
     }
@@ -554,6 +571,12 @@ void LogbookWindow::buildUi()
         m_rotorTargetDeg = deg;
         applyRotorToMap();
     });
+    // Die Rotorzeile folgt jeder Neuberechnung, nicht nur einer neuen
+    // Richtung -- sonst bliebe sie bei JA1XY -> JA1XYZ stehen.
+    connect(m_detail, &QsoDetailPane::peilungNeu, this, &LogbookWindow::aktualisiereRotorZeile);
+    // Eigener Standort fuer Stationen, die nicht im Log stehen
+    // (2026-11-10): der juengste MY_GRIDSQUARE, wie bei der Bedarfs-Matrix.
+    m_detail->setHomeGrid([this]() { return meinFeld(); });
     auto* detailScroll = new QScrollArea(m_split);
     detailScroll->setWidgetResizable(true);
     detailScroll->setFrameShape(QFrame::NoFrame);
@@ -572,6 +595,14 @@ void LogbookWindow::buildUi()
     // owns a rotor decide.
     connect(m_detail, &QsoDetailPane::turnRotorRequested,
             this, &LogbookWindow::turnRotorRequested);
+    // Ein Gipfel ist nachgeschlagen: Entfernungen und Peilungen neu.
+    connect(&SotaGipfelVerzeichnis::instanz(), &SotaGipfelVerzeichnis::gipfelBekannt,
+            this, [this]() {
+        if (SotaGipfelVerzeichnis::instanz().korrigiereStrecken(m_all) > 0) {
+            refreshTable();
+            updateStats();
+        }
+    });
     connect(m_detail, &QsoDetailPane::editRequested,
             this, &LogbookWindow::editSelected);
 
@@ -589,6 +620,7 @@ void LogbookWindow::buildUi()
         head->addWidget(cap);
         head->addStretch(1);
         auto* popOut = new QPushButton(QStringLiteral("\u2197"), m_statsSection);
+        popOut->setObjectName(QStringLiteral("statsPopOut"));
         popOut->setStyleSheet(Style::buttonBaseStyle());
         popOut->setToolTip(QStringLiteral("Open the statistics in their own window"));
         connect(popOut, &QPushButton::clicked, this, &LogbookWindow::showStatistics);
@@ -824,6 +856,19 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
         "because it is."));
     row->addWidget(m_unconfirmedOnly);
 
+    // ── Nur Grauzonen-QSOs (2026-11-10) ──────────────────────────────
+    m_greyLineOnly = new QCheckBox(QStringLiteral("Grey line"), this);
+    m_greyLineOnly->setObjectName(QStringLiteral("logbookGreyLineOnly"));
+    m_greyLineOnly->setStyleSheet(
+        QStringLiteral("QCheckBox { color: %1; }")
+            .arg(QString::fromLatin1(Style::kTextPrimary)));
+    m_greyLineOnly->setToolTip(QStringLiteral(
+        "Only contacts with the sun between −6° and +6° at one end or "
+        "both, at the time of the contact.\n\nPositions come from the "
+        "locators; without one, their end is the country centre from "
+        "cty.dat and your end is the newest MY_GRIDSQUARE in the log."));
+    row->addWidget(m_greyLineOnly);
+
     m_useDates = new QCheckBox(QStringLiteral("Dates"), this);
     m_useDates->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                                   .arg(QString::fromLatin1(Style::kTextPrimary)));
@@ -880,6 +925,8 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
     connect(m_toDate, &QDateEdit::dateChanged, this, reapply);
     connect(m_unconfirmedOnly, &QCheckBox::toggled, this,
             [reapply](bool) { reapply(); });
+    connect(m_greyLineOnly, &QCheckBox::toggled, this,
+            [reapply](bool) { reapply(); });
     connect(m_useDates, &QCheckBox::toggled, this, [this, reapply](bool on) {
         m_fromDate->setEnabled(on);
         m_toDate->setEnabled(on);
@@ -897,6 +944,8 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
         // 2026-09-26).
         QSignalBlocker b8(m_unconfirmedOnly);
         m_unconfirmedOnly->setChecked(false);
+        QSignalBlocker b9(m_greyLineOnly);
+        m_greyLineOnly->setChecked(false);
         m_search->clear();
         m_bandBox->setCurrentIndex(0);
         m_modeBox->setCurrentIndex(0);
@@ -962,6 +1011,11 @@ LogFilter LogbookWindow::currentFilter() const
     }
 
     f.unconfirmedOnly = m_unconfirmedOnly->isChecked();
+    f.greyLineOnly = m_greyLineOnly->isChecked();
+    if (f.greyLineOnly) {
+        f.greyLineCty  = m_cty;
+        f.greyLineHome = meinFeld();
+    }
     f.useDates = m_useDates->isChecked();
     if (f.useDates) {
         f.from = m_fromDate->date();
@@ -980,6 +1034,11 @@ void LogbookWindow::reload()
         QMessageBox::warning(this, QStringLiteral("Logbook"),
             QStringLiteral("Couldn't read the log:\n%1").arg(err));
     }
+    // Vom Gipfel (2026-11-11): Entfernung und Peilung der QSOs mit
+    // MY_SOTA_REF / SOTA_REF aus der Lage des Gipfels, nicht aus der
+    // Locatormitte. Unbekannte Gipfel werden einmal nachgeschlagen.
+    SotaGipfelVerzeichnis::instanz().anfragenFuer(m_all);
+    SotaGipfelVerzeichnis::instanz().korrigiereStrecken(m_all);
     std::stable_sort(m_all.begin(), m_all.end(), newerFirst);
     refreshFilterChoices();
     applyFilter();
@@ -1292,6 +1351,9 @@ void LogbookWindow::refreshTable()
     // The first row is the right default because the table is sorted
     // newest-first: the contact you want is nearly always the last one
     // you made. (2026-08-10)
+    // Das eigene Feld fuer QSOs ohne MY_GRIDSQUARE (Grauzone), bevor
+    // das Paneel ein QSO bekommt.
+    if (m_detail) { m_detail->setMeinFeldErsatz(meinFeld()); }
     if (m_table->rowCount() > 0) {
         if (m_table->currentRow() < 0) {
             m_table->setCurrentCell(0, ColCall);
@@ -1656,6 +1718,33 @@ void LogbookWindow::editSelected()
     for (const QLineEdit* le : dlg.findChildren<QLineEdit*>()) { shown.insert(le, le->text()); }
     const auto edited = [&shown](const QLineEdit* le) { return le->text() != shown.value(le); };
 
+    // ── Bei SOTA der Locator des Gipfels (Betreiber 2026-11-10) ──────
+    // Steht in "My activation" ein Gipfel, kommt sein Locator sichtbar in
+    // "My grid" (ebenso fuer die Gegenseite) -- erst "Save" schreibt ihn.
+    // Ein noch unbekannter Gipfel wird nachgeschlagen; die Antwort fuellt
+    // das Feld nach, solange der Dialog offen ist.
+    const auto gipfelLocator = [myActivation, myGrid, theirActivation, grid]() {
+        const SotaGipfelVerzeichnis& v = SotaGipfelVerzeichnis::instanz();
+        const QString mein = v.gipfelLocator(myActivation->text());
+        if (!mein.isEmpty() && !myGrid->text().trimmed().toUpper().startsWith(mein)) {
+            myGrid->setText(mein);
+        }
+        const QString ihr = v.gipfelLocator(theirActivation->text());
+        if (!ihr.isEmpty() && !grid->text().trimmed().toUpper().startsWith(ihr)) {
+            grid->setText(ihr);
+        }
+    };
+    const auto nachschlagen = [gipfelLocator](const QString& text) {
+        SotaGipfelVerzeichnis::instanz().anfragen(text);
+        gipfelLocator();
+    };
+    connect(myActivation, &QLineEdit::textChanged, &dlg, nachschlagen);
+    connect(theirActivation, &QLineEdit::textChanged, &dlg, nachschlagen);
+    connect(&SotaGipfelVerzeichnis::instanz(), &SotaGipfelVerzeichnis::gipfelBekannt,
+            &dlg, gipfelLocator);
+    nachschlagen(myActivation->text());
+    nachschlagen(theirActivation->text());
+
     if (dlg.exec() != QDialog::Accepted) { return; }
     // Waehrend des Dialogs neu eingelesen? Dann steht der Kontakt
     // anderswo -- oder gar nicht mehr.
@@ -1744,6 +1833,7 @@ void LogbookWindow::deleteSelected()
 void LogbookWindow::setPositionFallback(PositionFallback fn)
 {
     m_fallback = std::move(fn);
+    if (m_detail) { m_detail->setPositionFallback(m_fallback); }
     if (m_map) { m_map->setPositionFallback(m_fallback); }
 }
 
@@ -2134,20 +2224,33 @@ void LogbookWindow::showStatistics()
         auto* lay = new QVBoxLayout(m_statsDialog);
         lay->setContentsMargins(0, 0, 0, 0);
 
-        // Drei Seiten (2026-11-08): die Kacheln, Band x Stunde, Richtungen.
-        // Alle drei zeigen, was die Filter des Logbuchs zeigen.
+        // Drei Seiten (2026-11-08): die Kacheln, Band x Stunde, Richtungen;
+        // drei weitere (2026-11-10): Sonnenzyklus, Kontinent-Uhr, DXCC-Wand.
+        // Alle zeigen, was die Filter des Logbuchs zeigen.
         auto* reiter = new QHBoxLayout;
         reiter->setContentsMargins(10, 8, 10, 0);
         reiter->setSpacing(6);
         const QStringList namen = {QStringLiteral("Overview"), QStringLiteral("Band × hour"),
-                                   QStringLiteral("Directions")};
+                                   QStringLiteral("Directions"), QStringLiteral("Solar cycle"),
+                                   QStringLiteral("Continent clock"), QStringLiteral("DXCC wall")};
         m_statsSeitenKnoepfe.clear();
         for (int i = 0; i < namen.size(); ++i) {
             auto* k = new QPushButton(namen[i], m_statsDialog);
             k->setCheckable(true);
             k->setAutoExclusive(true);
             k->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
-            connect(k, &QPushButton::clicked, this, [this, i]() { zeigeStatistikSeite(i); });
+            // toggled, nicht clicked (Live-Befund 2026-11-11, wie beim 3D-
+            // Knopf): die Bedienhilfe (AXPress, VoiceOver, Automatisierung)
+            // drueckt einen ankreuzbaren Knopf ueber toggle(), und das sendet
+            // KEIN clicked -- der Reiter rastete ein, die Seite blieb stehen.
+            // zeigeStatistikSeite() stellt die Seite vor setChecked() um;
+            // dessen toggled kommt hier mit currentIndex() == i an und ruft
+            // nicht ein zweites Mal.
+            connect(k, &QPushButton::toggled, this, [this, i](bool an) {
+                if (an && m_statsSeiten && m_statsSeiten->currentIndex() != i) {
+                    zeigeStatistikSeite(i);
+                }
+            });
             reiter->addWidget(k);
             m_statsSeitenKnoepfe << k;
         }
@@ -2193,6 +2296,18 @@ void LogbookWindow::showStatistics()
 
         m_rose = new RichtungsRoseWidget(m_statsSeiten);
         m_statsSeiten->addWidget(m_rose);
+
+        m_sonne = new SonnenzyklusWidget(m_statsSeiten);
+        m_statsSeiten->addWidget(m_sonne);
+        m_uhr = new KontinentUhrWidget(m_statsSeiten);
+        m_statsSeiten->addWidget(m_uhr);
+        m_wand = new DxccWandWidget(m_statsSeiten);
+        m_statsSeiten->addWidget(m_wand);
+        m_flux = new SolarFluxArchiv(QString(), this);
+        // Kommen neue Flux-Werte, solange die Seite offen ist: nachziehen.
+        connect(m_flux, &SolarFluxArchiv::aktualisiert, this, [this]() {
+            if (m_statsSeiten && m_statsSeiten->currentWidget() == m_sonne) { refreshStatsView(); }
+        });
         lay->addWidget(m_statsSeiten, 1);
         m_statsSeitenKnoepfe.first()->setChecked(true);
         auto* closeBtn = new QPushButton(QStringLiteral("Close"), m_statsDialog);
@@ -2210,6 +2325,15 @@ void LogbookWindow::showStatistics()
     refreshStatsView();   // after show(): it only works on a visible dialog
 }
 
+QSize LogbookWindow::gesamtbildGroesse(const QWidget* dialog)
+{
+    QSize z(1240, 820);
+    if (const QScreen* sc = dialog ? dialog->screen() : nullptr) {
+        z = z.boundedTo(sc->availableGeometry().size() - QSize(40, 60));
+    }
+    return z;
+}
+
 void LogbookWindow::zeigeStatistikSeite(int seite)
 {
     showStatistics();
@@ -2217,6 +2341,12 @@ void LogbookWindow::zeigeStatistikSeite(int seite)
     seite = std::clamp(seite, 0, m_statsSeiten->count() - 1);
     m_statsSeiten->setCurrentIndex(seite);
     if (seite < m_statsSeitenKnoepfe.size()) { m_statsSeitenKnoepfe[seite]->setChecked(true); }
+    // Die drei Gesamtbilder brauchen mehr Flaeche als die Kacheln: das
+    // Fenster waechst (nie schrumpft es), soweit der Bildschirm reicht.
+    if (m_statsDialog && seite >= 3) {
+        const QSize ziel = m_statsDialog->size().expandedTo(gesamtbildGroesse(m_statsDialog));
+        if (ziel != m_statsDialog->size()) { m_statsDialog->resize(ziel); }
+    }
     refreshStatsView();
 }
 
@@ -2231,7 +2361,8 @@ void LogbookWindow::refreshStatsView()
     shown.reserve(m_visible.size());
     for (int i : m_visible) { shown.push_back(m_all.at(i)); }
     const LogbookStats stats = LogbookStats::compute(shown, m_cty,
-                                                     QDateTime::currentDateTimeUtc());
+                                                     QDateTime::currentDateTimeUtc(),
+                                                     meinFeld());
     if (dialogWants) { m_statsView->setStats(stats); }
     if (rowWants)    { m_statsRow->setStats(stats); }
 
@@ -2259,6 +2390,23 @@ void LogbookWindow::refreshStatsView()
                             QStringLiteral("this view"));
             m_rose->setRotor(m_rotorDeg, m_rotorBeamDeg, RotorBereich::load());
         }
+        if (seite == 3 && m_sonne && m_flux) {
+            m_flux->ladeCache();
+            // Pruefstaende holen nie aus dem Netz; die Regel, WANN geholt
+            // wird, steht in SolarFluxArchiv::brauchtAbruf.
+            if (!QStandardPaths::isTestModeEnabled()) {
+                m_flux->holeWennNoetig(QDateTime::currentDateTimeUtc());
+            }
+            m_sonne->setDaten(LogbuchBilder::sonnenzyklus(shown, m_flux->werte(),
+                                                          QDateTime::currentDateTimeUtc().date()),
+                              m_flux->stand(), m_flux->laeuft());
+        }
+        if (seite == 4 && m_uhr) {
+            m_uhr->setDaten(LogbuchBilder::kontinentUhr(shown, m_cty));
+        }
+        if (seite == 5 && m_wand) {
+            m_wand->setDaten(LogbuchBilder::dxccWand(shown, m_cty));
+        }
     }
 }
 
@@ -2275,12 +2423,19 @@ void LogbookWindow::prepareMap(QsoMapWindow* map)
     // being right for an imported log made from a different station.
     QString home;
     for (const LogEntry& e : m_all) {
+        // Ein QSO vom Gipfel sagt nicht, wo zu Hause ist -- seit es den
+        // Locator des Gipfels traegt (2026-11-10), waere sonst nach jeder
+        // Aktivierung der Gipfel das Zuhause.
+        if (!e.mySotaRef.trimmed().isEmpty()) { continue; }
         if (!e.myGridSquare.trimmed().isEmpty()) {
             home = e.myGridSquare;
             break;   // m_all is newest first
         }
     }
     map->setHomeGrid(home);
+    // Das Mosaik der Locator-Jagd fragt das GANZE Logbuch, auch wenn die
+    // eingebettete Karte nur die gefilterten Zeilen zeigt (2026-11-11).
+    map->setMosaikLog(m_all);
 }
 
 void LogbookWindow::setMapPanelShown(bool on)
@@ -2461,6 +2616,78 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
         "so you see at once whether and when you worked them before."));
     row->addWidget(m_entryCall);
 
+    // ── ROTOR (2026-11-10) ───────────────────────────────────────────
+    //
+    // Betreiber: „wenn man im logbuch das call eingibt und auf ROTOR
+    // klickt, sollte man sehen, wohin der rotor zeigt und wo das call
+    // steht. mit rotate sollte sich dann der rotor auch dorthin drehen."
+    // ROTOR oeffnet die Karte mit dem Rotor-Radar (Keil = Stellung,
+    // Marke = Station) und zeigt daneben Peilung, Entfernung und woher
+    // die Lage stammt; Rotate / LP drehen. Der erlaubte Bereich
+    // (RotorBereich) gilt -- ein Weg hinaus wird gesagt, nicht versucht.
+    m_entryRotorBtn = new QPushButton(QStringLiteral("Rotor"), this);
+    m_entryRotorBtn->setAutoDefault(false);
+    m_entryRotorBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_entryRotorBtn->setToolTip(QStringLiteral(
+        "Show where the rotor points and where this station is, "
+        "then turn to it"));
+    row->addWidget(m_entryRotorBtn);
+
+    // ── Die Rotorzeile: eine eigene Zeile UNTER der Eingabe (2026-11-11) ──
+    //
+    // Betreiber: „weiters sollte alles sehr übersichtlich gestaltet
+    // werden" -- gewaehlt Entwurf C (Blatt C-band.png). Die QSO-Zeile
+    // bleibt, wie sie ohne Rotor war; darunter, nur nach ROTOR, feste
+    // Plaetze: Band (Nadel = Rotor, Dreieck = Station), Peilung gross,
+    // Entfernung, Herkunft, darunter der Zustand, dann Rotate / LP.
+    m_rotorZeileW = new QWidget(this);
+    m_rotorZeileW->setVisible(false);
+    auto* rz = new QHBoxLayout(m_rotorZeileW);
+    rz->setContentsMargins(0, 0, 0, 0);
+    rz->setSpacing(6);
+    auto* rotorKopf = new QLabel(QStringLiteral("ROTOR"), m_rotorZeileW);
+    rotorKopf->setStyleSheet(caption->styleSheet());
+    // So breit wie „NEW QSO": das Band steht genau unter dem Rufzeichen.
+    rotorKopf->setFixedWidth(caption->sizeHint().width());
+    rz->addWidget(rotorKopf);
+    m_rotorBand = new RotorBandWidget(m_rotorZeileW);
+    rz->addWidget(m_rotorBand);
+    rz->addSpacing(4);
+    auto* texte = new QVBoxLayout;
+    texte->setSpacing(1);
+    auto* oben = new QHBoxLayout;
+    oben->setSpacing(10);
+    m_entryGrad = new QLabel(m_rotorZeileW);
+    m_entryGrad->setFont(Style::monoFont(m_entryGrad->font(), 14, QFont::Bold));
+    m_entryGrad->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                                   .arg(QLatin1String(Style::kTextPrimary)));
+    oben->addWidget(m_entryGrad);
+    m_entryKm = new QLabel(m_rotorZeileW);
+    m_entryKm->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                 .arg(QLatin1String(Style::kTextSecondary)));
+    oben->addWidget(m_entryKm);
+    m_entryPeilung = new QLabel(m_rotorZeileW);
+    oben->addWidget(m_entryPeilung);
+    oben->addStretch(1);
+    texte->addLayout(oben);
+    m_entryDreh = new QLabel(m_rotorZeileW);
+    texte->addWidget(m_entryDreh);
+    rz->addLayout(texte);
+    rz->addSpacing(4);
+    m_entryRotate = new QPushButton(QStringLiteral("Rotate"), m_rotorZeileW);
+    m_entryRotate->setAutoDefault(false);
+    m_entryRotate->setStyleSheet(Style::buttonBaseStyle());
+    rz->addWidget(m_entryRotate);
+    m_entryLp = new QPushButton(QStringLiteral("LP"), m_rotorZeileW);
+    m_entryLp->setAutoDefault(false);
+    m_entryLp->setStyleSheet(Style::buttonBaseStyle());
+    rz->addWidget(m_entryLp);
+    rz->addStretch(1);
+    m_stillstandMs = RundumLauf::kStillstandMs;
+    m_drehWache = new QTimer(this);
+    m_drehWache->setInterval(1000);
+    connect(m_drehWache, &QTimer::timeout, this, &LogbookWindow::aktualisiereRotorZeile);
+
     m_entryLive = new QLabel(QStringLiteral("●"), this);
     row->addWidget(m_entryLive);
     m_entryFreq = new QLabel(QStringLiteral("—"), this);
@@ -2522,6 +2749,7 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
     row->addWidget(m_entryHint);
 
     col->addLayout(row);
+    col->addWidget(m_rotorZeileW);
 
     // Bedarfs-Matrix (2026-11-08): sobald ein Rufzeichen dasteht, was das
     // Land auf jedem Band und in jeder Betriebsart schon hat -- und ob der
@@ -2539,6 +2767,37 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
         e->installEventFilter(this);
     }
     connect(m_entryLogBtn, &QPushButton::clicked, this, &LogbookWindow::requestLog);
+    connect(m_entryRotorBtn, &QPushButton::clicked, this, &LogbookWindow::zeigeRotorZeile);
+    // Gedreht wird nur zu dem Rufzeichen, fuer das ROTOR gedrueckt wurde
+    // -- und nur, solange die Karte genau diese Station zeigt.
+    const auto peilungFuerRotor = [this](double& sp) {
+        double km = 0.0;
+        return m_rotorZeile && m_detail
+            && m_detail->gezeigtesRufzeichen() == m_rotorRuf
+            && m_detail->peilung(sp, km);
+    };
+    connect(m_entryRotate, &QPushButton::clicked, this, [this, peilungFuerRotor]() {
+        double sp = 0.0;
+        if (!peilungFuerRotor(sp)) { return; }
+        drehe(sp);
+    });
+    connect(m_entryLp, &QPushButton::clicked, this, [this, peilungFuerRotor]() {
+        double sp = 0.0;
+        if (!peilungFuerRotor(sp)) { return; }
+        drehe(BeamHeading::longPath(sp));
+    });
+    // Leeres oder anderes Rufzeichen: die Rotorzeile geht weg (2026-11-11).
+    // textChanged, nicht textEdited -- auch ein Wert, der per
+    // Bedienungshilfe oder aus dem Programm gesetzt wird, darf kein
+    // „Rotate" zu einem alten Ziel stehen lassen.
+    connect(m_entryCall, &QLineEdit::textChanged, this, [this](const QString& text) {
+        if (!m_rotorZeile) { return; }
+        if (Callsigns::normalized(text) == m_rotorRuf) { return; }
+        m_rotorZeile = false;
+        m_rotorRuf.clear();
+        drehZeileLeeren();
+        aktualisiereRotorZeile();
+    });
 
     // Tippen filtert das Log (Doppelt-Blick) und zeigt die Station nach
     // einer kurzen Pause in der Karteikarte -- entprellt wie im
@@ -2657,9 +2916,16 @@ void LogbookWindow::refreshRadioReadout()
     if (m_bedarf && m_bedarf->isVisible()) { aktualisiereBedarf(); }
 }
 
+void LogbookWindow::setCtyDat(const CtyDatParser* cty)
+{
+    m_cty = cty;
+    if (m_detail) { m_detail->setCty(cty); }
+}
+
 QString LogbookWindow::meinFeld() const
 {
     for (const LogEntry& e : m_all) {                 // m_all: neueste zuerst
+        if (!e.mySotaRef.trimmed().isEmpty()) { continue; }   // Gipfel, nicht zu Hause
         if (isValidGridSquare(e.myGridSquare.trimmed())) { return e.myGridSquare.trimmed(); }
     }
     return AppSettings::instance().value(QStringLiteral("StationGridSquare")).toString().trimmed();
@@ -2726,8 +2992,165 @@ void LogbookWindow::reportLogged(bool ok, const QString& message)
     Q_UNUSED(call);
 }
 
+void LogbookWindow::zeigeRotorZeile()
+{
+    const QString call = Callsigns::normalized(m_entryCall->text());
+    if (call.size() < 3 || !Callsigns::isLikelyCallsign(call)) {
+        m_entryCall->setFocus();
+        return;
+    }
+    m_rotorZeile = true;
+    m_rotorRuf = call;
+    // Nicht auf die Entprellung warten: wer ROTOR drueckt, will es jetzt.
+    m_entryLookup->stop();
+    if (!m_detail || m_detail->gezeigtesRufzeichen() != call) { showStationFor(call); }
+    setMapPanelShown(true);
+    aktualisiereRotorZeile();
+}
+
+void LogbookWindow::aktualisiereRotorZeile()
+{
+    if (!m_rotorZeileW) { return; }
+    m_rotorZeileW->setVisible(m_rotorZeile);
+    if (!m_rotorZeile) { return; }
+
+    const QString call = m_rotorRuf;
+    double sp = 0.0, km = 0.0;
+    const bool hat = m_detail && m_detail->gezeigtesRufzeichen() == call
+                  && m_detail->peilung(sp, km);
+    m_rotorBand->setStation(hat ? sp : -1.0);
+    aktualisiereDrehZeile();
+    if (!hat) {
+        m_entryGrad->setText(QStringLiteral("—"));
+        m_entryKm->clear();
+        m_entryPeilung->setText(QStringLiteral("%1 — no position yet").arg(call));
+        m_entryPeilung->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                          .arg(QLatin1String(Style::kTextScale)));
+        m_entryRotate->setText(QStringLiteral("Rotate"));
+        m_entryLp->setText(QStringLiteral("LP"));
+        m_entryRotate->setEnabled(false);
+        m_entryLp->setEnabled(false);
+        return;
+    }
+    const double lp = BeamHeading::longPath(sp);
+    m_entryGrad->setText(QStringLiteral("%1°").arg(sp, 0, 'f', 0));
+    m_entryKm->setText(QStringLiteral("%1 km").arg(km, 0, 'f', 0));
+    m_entryPeilung->setText(m_detail->lageText());
+    m_entryPeilung->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(
+        QLatin1String(m_detail->lageGrob() ? Style::kAmberWarn : Style::kTextScale)));
+
+    // Der erlaubte Bereich gilt fuer jeden Drehbefehl (RotorLogbookPanel
+    // verweigert ihn dort) -- hier wird es gesagt, bevor jemand drueckt:
+    // auf dem Knopf selbst, weil ein gesperrter Knopf im Hausstil sonst
+    // aussieht wie ein freier.
+    const RotorBereich bereich = RotorBereich::load();
+    const auto geht = [&](double ziel) {
+        return bereich.erlaubt(ziel)
+            && (m_rotorDeg < 0.0 || bereich.wegErlaubt(m_rotorDeg, ziel));
+    };
+    const bool spGeht = geht(sp), lpGeht = geht(lp);
+    m_entryRotate->setEnabled(spGeht);
+    m_entryLp->setEnabled(lpGeht);
+    const QString gesperrt = QStringLiteral(" — blocked");
+    m_entryRotate->setText(QStringLiteral("Rotate %1°").arg(sp, 0, 'f', 0)
+                           + (spGeht ? QString() : gesperrt));
+    m_entryLp->setText(QStringLiteral("LP %1°").arg(lp, 0, 'f', 0)
+                       + (lpGeht ? QString() : gesperrt));
+    const QString draussen = QStringLiteral("Outside the allowed rotation range (%1)")
+                                 .arg(bereich.beschreibung());
+    m_entryRotate->setToolTip(spGeht ? QStringLiteral("Turn the rotor to the short path")
+                                     : draussen);
+    m_entryLp->setToolTip(lpGeht ? QStringLiteral(
+        "Turn the rotor the other way round the world. On the low bands and "
+        "at grey line this is often the stronger signal.") : draussen);
+}
+
+void LogbookWindow::drehe(double ziel)
+{
+    m_drehZiel = BeamHeading::wrap360(ziel);
+    m_drehMeldung.clear();
+    m_drehUhr.restart();
+    // Synchron: lehnt der Rotor ab, kommt setRotorMeldung() noch in
+    // diesem Aufruf an -- und steht dann gleich in der Zeile.
+    emit turnRotorRequested(m_drehZiel, m_rotorRuf);
+    m_drehWache->start();
+    aktualisiereRotorZeile();
+}
+
+void LogbookWindow::drehZeileLeeren()
+{
+    m_drehZiel = -1.0;
+    m_drehMeldung.clear();
+    if (m_drehWache) { m_drehWache->stop(); }
+}
+
+void LogbookWindow::setRotorMeldung(const QString& text)
+{
+    // Nur zu einem Drehbefehl aus der Eingabezeile; was der Rotor sonst
+    // meldet, steht im Rotorfenster.
+    if (m_drehZiel < 0.0) { return; }
+    m_drehMeldung = text.trimmed();
+    aktualisiereRotorZeile();
+}
+
+void LogbookWindow::aktualisiereDrehZeile()
+{
+    // ── Dreht er wirklich? ── 2026-11-11 ─────────────────────────────
+    //
+    // Gezeigt wird nur, was der Rotor selbst meldet (setRotorBearing --
+    // echte Ablesungen, nie die Stellvertreter-Nadel). Am Ziel heisst
+    // innerhalb RundumLauf::kAngekommenGrad, „steht" heisst so lange
+    // ohne neue Position wie dort (kStillstandMs) -- Rotorfenster,
+    // Rundumlauf und Logbuch urteilen gleich. Farben wie am Zifferblatt:
+    // in Bewegung Bernstein, am Ziel Gruen.
+    const bool rotorDa = m_rotorDeg >= 0.0;
+    const auto grad = [](double d) { return QString::number(qRound(BeamHeading::wrap360(d)) % 360); };
+    QString text;
+    const char* farbe = Style::kTextScale;
+    bool wachen = false;
+    if (m_drehZiel < 0.0) {
+        text = rotorDa ? QStringLiteral("rotor at %1°").arg(grad(m_rotorDeg))
+                       : QStringLiteral("rotor not connected");
+    } else if (!m_drehMeldung.isEmpty()) {
+        text = QStringLiteral("rotor: %1").arg(m_drehMeldung);
+        farbe = Style::kAmberWarn;
+    } else if (!rotorDa) {
+        text = QStringLiteral("no rotor connected — the antenna does not turn");
+        farbe = Style::kAmberWarn;
+    } else {
+        double weg = std::fmod(std::abs(m_rotorDeg - m_drehZiel), 360.0);
+        if (weg > 180.0) { weg = 360.0 - weg; }
+        if (weg <= RundumLauf::kAngekommenGrad) {
+            text = QStringLiteral("rotor at %1° — on target").arg(grad(m_rotorDeg));
+            farbe = Style::kGreenText;
+        } else if (m_drehUhr.isValid() && m_drehUhr.elapsed() > m_stillstandMs) {
+            text = QStringLiteral("rotor not moving — at %1°, target %2°")
+                       .arg(grad(m_rotorDeg), grad(m_drehZiel));
+            farbe = Style::kAmberWarn;
+        } else {
+            text = QStringLiteral("turning to %1°  ·  now %2°")
+                       .arg(grad(m_drehZiel), grad(m_rotorDeg));
+            farbe = Style::kAmberText;
+            wachen = true;
+        }
+    }
+    m_entryDreh->setText(text);
+    m_entryDreh->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                   .arg(QLatin1String(farbe)));
+    // Das Band: Nadel nur aus echten Ablesungen; gruen am Ziel, sonst in
+    // der Farbe der Ablesung am Zifferblatt (Bernstein).
+    m_rotorBand->setStand(rotorDa ? m_rotorDeg : -1.0);
+    m_rotorBand->setZiel(m_drehZiel >= 0.0);
+    m_rotorBand->setFarbe(farbe == Style::kGreenText ? Style::kGreenText : Style::kAmberText);
+    if (!wachen && m_drehWache) { m_drehWache->stop(); }
+}
+
 void LogbookWindow::clearEntry()
 {
+    m_rotorZeile = false;
+    m_rotorRuf.clear();
+    drehZeileLeeren();
+    aktualisiereRotorZeile();
     m_entryLookup->stop();
     if (m_bedarfTimer) { m_bedarfTimer->stop(); }
     if (m_bedarf) { m_bedarf->setVisible(false); }
@@ -2763,9 +3186,13 @@ void LogbookWindow::showStationFor(const QString& raw)
 
 void LogbookWindow::setRotorBearing(double deg)
 {
+    const double vorher = m_rotorDeg;
     m_rotorDeg = std::isnan(deg) ? -1.0 : deg;
+    // Eine neue Position heisst: er bewegt sich (Stillstandswache).
+    if (m_rotorDeg >= 0.0 && std::abs(m_rotorDeg - vorher) > 0.05) { m_drehUhr.restart(); }
     if (m_detail) { m_detail->setRotorBearing(deg); }
     applyRotorToMap();
+    aktualisiereRotorZeile();
 }
 
 void LogbookWindow::setRotorBeamWidth(double deg)
@@ -2780,6 +3207,81 @@ void LogbookWindow::applyRotorToMap()
     m_mapPanel->setRotorBeamWidth(m_rotorBeamDeg);
     m_mapPanel->setRotorHeading(m_rotorDeg);
     m_mapPanel->setRotorTarget(m_rotorTargetDeg);
+}
+
+// ── MY_SOTA_REF aus dem SOTAdata-Log (2026-11-11) ───────────────────
+
+void LogbookWindow::sotaNachtragen()
+{
+    const QString pfad = QFileDialog::getOpenFileName(
+        this, QStringLiteral("SOTA activator log"), QString{},
+        QStringLiteral("CSV (*.csv *.txt);;All files (*)"));
+    if (pfad.isEmpty()) { return; }
+
+    // Der Dialog arbeitet auf einer Kopie. Waehrend er offen ist, kann ein
+    // QSO aus WSJT-X das Log neu einlesen -- die Vorschlaege werden danach
+    // am ganzen Datensatz wiedergefunden, nicht am alten Index.
+    const QVector<LogEntry> stand = m_all;
+    ScopedChildWidget<SotaNachtragDialog> besitzer(stand, this);
+    SotaNachtragDialog& dlg = *besitzer.get();
+    dlg.ladeCsv(pfad);
+    if (dlg.exec() != QDialog::Accepted) { return; }
+
+    QVector<SotaNachtrag::Vorschlag> gewaehlt = dlg.gewaehlt();
+    QSet<int> vergeben;
+    for (SotaNachtrag::Vorschlag& v : gewaehlt) {
+        v.index = indexOfRecord(m_all, stand.at(v.index).toAdifRecord(), v.index, vergeben);
+        if (v.index >= 0) { vergeben.insert(v.index); }
+    }
+    gewaehlt.erase(std::remove_if(gewaehlt.begin(), gewaehlt.end(),
+                                  [](const SotaNachtrag::Vorschlag& v) { return v.index < 0; }),
+                   gewaehlt.end());
+
+    QString sicherung;
+    const int vorher = gewaehlt.size();
+    if (sotaVorschlaegeAnwenden(gewaehlt, &sicherung)) {
+        tellOperator(QStringLiteral("Summit references added to %1 contact%2. "
+                                    "The log before this change: %3")
+                         .arg(vorher).arg(vorher == 1 ? QString() : QStringLiteral("s"),
+                              QDir::toNativeSeparators(sicherung)));
+    }
+}
+
+bool LogbookWindow::sotaVorschlaegeAnwenden(const QVector<SotaNachtrag::Vorschlag>& gewaehlt,
+                                            QString* sicherung)
+{
+    if (gewaehlt.isEmpty()) { return false; }
+    QVector<LogEntry> neu = m_all;
+    if (SotaNachtrag::anwenden(neu, gewaehlt) == 0) { return false; }
+    // Bei SOTA gilt der Locator des Gipfels (Betreiber 2026-11-10); der
+    // Dialog zeigt die Aenderung in der Spalte "Your grid".
+    for (const SotaNachtrag::Vorschlag& v : gewaehlt) {
+        if (v.index >= 0 && v.index < neu.size()) {
+            SotaGipfelVerzeichnis::instanz().wendeGipfelLocatorAn(neu[v.index]);
+        }
+    }
+
+    // Erst sichern, dann schreiben -- und ohne Sicherung gar nicht.
+    QString ziel;
+    if (QFile::exists(m_path)) {
+        ziel = m_path + QStringLiteral(".before-sota-")
+               + QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd-HHmmss"));
+        if (!QFile::copy(m_path, ziel)) {
+            QMessageBox::critical(this, QStringLiteral("Logbook"),
+                QStringLiteral("Couldn't back up the log to\n%1\n\nNothing was changed.")
+                    .arg(QDir::toNativeSeparators(ziel)));
+            return false;
+        }
+    }
+    const QVector<LogEntry> alt = m_all;
+    m_all = neu;
+    if (!saveAll()) {
+        m_all = alt;
+        return false;
+    }
+    if (sicherung) { *sicherung = ziel; }
+    reload();
+    return true;
 }
 
 } // namespace Longpath

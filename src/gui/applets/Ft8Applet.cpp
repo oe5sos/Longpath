@@ -1770,76 +1770,152 @@ bool Ft8Applet::eventFilter(QObject* obj, QEvent* ev)
         auto* me = static_cast<QMouseEvent*>(ev);
         QTextCursor c = m_list->cursorForPosition(me->pos());
         c.select(QTextCursor::LineUnderCursor);
-        const QString antwort = antwortAuf(c.selectedText(),
-                                           eigenesRufzeichen(),
-                                           eigenerLocator());
-        if (antwort.isEmpty()) {
-            if (m_status && eigenesRufzeichen().isEmpty()) {
-                m_status->setText(tr("set your callsign first"));
-            }
-        } else if (m_textFeld) {
-            m_textFeld->setText(antwort);
-            m_textFeld->setFocus();
-
-            // Ein Doppelklick nimmt das QSO an — und ab hier laeuft es
-            // bis 73 von selbst. Betreiber am 2026-10-22: „wichtig ist
-            // auch, dass nach der annahme des qso das qso automatisch
-            // anlaeuft bis 73."
-            //
-            // Davor stand hier der Schalter „Auto", und er stand aus:
-            // der Doppelklick legte die Antwort nur ins Feld, gesendet
-            // wurde nichts. Derselbe Fehlgriff wie beim CQ-Knopf
-            // (#315). Angehalten wird mit „Stop".
-            //
-            // ── Auch WAEHREND einer Sendung (2026-10-30) ─────
-            //
-            // Hier stand `if (!m_sendet)`, und das verschluckte jeden
-            // Doppelklick, der in eine laufende Sendung fiel.
-            // Betreiber: „doppelklick loest kein automatisches qso
-            // aus."
-            //
-            // Bei FT8 ist das die Haelfte der Zeit: 13,2 s von 15
-            // wird getastet, und wer in der Liste etwas sieht,
-            // klickt genau dann. Der Druck war weg, ohne dass
-            // irgendwo etwas stand.
-            //
-            // Der Ablauf wird jetzt IMMER gesetzt. Geht gerade etwas
-            // hinaus, laeuft es aus -- und der neue Zug uebernimmt
-            // beim naechsten Fenster. Dafuer gibt es die
-            // Zug-in-der-Frist-Pruefung seit dem 2026-10-28: sie
-            // fragt nach der Dekoderfrist noch einmal, was wirklich
-            // zu senden ist. `ablaufSchritt()` kehrt bei laufender
-            // Sendung von selbst um, es geht also nichts doppelt
-            // hinaus.
-            {
-                const QString nachricht = nachrichtAusZeile(c.selectedText());
-                const QString sauber = c.selectedText().simplified();
-                const int snr = sauber.section(QLatin1Char(' '), 1, 1).toInt();
-                m_qsoGemeldet = false;
-                // Eine Einzelentscheidung: danach nicht von selbst
-                // weiter CQ rufen.
-                m_cqAutomatik = false;
-                if (m_houndBetrieb) {
-                    // Im Fox-Betrieb ruft man die Expedition; den
-                    // Schluss macht sie. Siehe `starteAlsHound`.
-                    uebernimmContest();   // siehe oben
-                    m_ablauf.starteAlsHound(senderCallsign(nachricht),
-                                            eigenesRufzeichen(),
-                                            eigenerLocator());
-                    ablaufSchritt();
-                    return true;
-                }
-                uebernimmContest();   // siehe oben
-                m_ablauf.starteAlsAntworter(senderCallsign(nachricht),
-                                            eigenesRufzeichen(),
-                                            eigenerLocator(), snr,
-                                            locatorAusNachricht(nachricht));
-                ablaufSchritt();
-            }
-        }
+        // Der Doppelklick ist nur der Ausloeser; was er tut, steht in
+        // nimmFundAn() -- dort, wo auch der Klick auf der Karte ankommt.
+        nimmFundAn(c.selectedText());
         return true;
     }
     return AppletWidget::eventFilter(obj, ev);
+}
+
+// ── Einen Fund annehmen (2026-11-11) ─────────────────────────────────
+//
+// Wortgleich der Rumpf, der bis heute im Doppelklick stand -- nur
+// herausgezogen, damit der Klick auf der QSO-Karte DENSELBEN Weg geht
+// (Betreiber: „damit ich auf der Karte draufklicken kann und es
+// probiere"). Neu sind nur die Rueckgabe (warum nicht) und das Signal
+// fundAngenommen() fuer den Pruefstand.
+QString Ft8Applet::nimmFundAn(const QString& zeile)
+{
+    const QString antwort = antwortAuf(zeile,
+                                       eigenesRufzeichen(),
+                                       eigenerLocator());
+    if (antwort.isEmpty()) {
+        if (eigenesRufzeichen().isEmpty()) {
+            if (m_status) { m_status->setText(tr("set your callsign first")); }
+            return tr("set your callsign first");
+        }
+        return tr("no callsign to answer in this line");
+    }
+    if (!m_textFeld) { return tr("the FT8 window is not built"); }
+    {
+        m_textFeld->setText(antwort);
+        m_textFeld->setFocus();
+
+        // Ein Doppelklick nimmt das QSO an — und ab hier laeuft es
+        // bis 73 von selbst. Betreiber am 2026-10-22: „wichtig ist
+        // auch, dass nach der annahme des qso das qso automatisch
+        // anlaeuft bis 73."
+        //
+        // Davor stand hier der Schalter „Auto", und er stand aus:
+        // der Doppelklick legte die Antwort nur ins Feld, gesendet
+        // wurde nichts. Derselbe Fehlgriff wie beim CQ-Knopf
+        // (#315). Angehalten wird mit „Stop".
+        //
+        // ── Auch WAEHREND einer Sendung (2026-10-30) ─────
+        //
+        // Hier stand `if (!m_sendet)`, und das verschluckte jeden
+        // Doppelklick, der in eine laufende Sendung fiel.
+        // Betreiber: „doppelklick loest kein automatisches qso
+        // aus."
+        //
+        // Bei FT8 ist das die Haelfte der Zeit: 13,2 s von 15
+        // wird getastet, und wer in der Liste etwas sieht,
+        // klickt genau dann. Der Druck war weg, ohne dass
+        // irgendwo etwas stand.
+        //
+        // Der Ablauf wird jetzt IMMER gesetzt. Geht gerade etwas
+        // hinaus, laeuft es aus -- und der neue Zug uebernimmt
+        // beim naechsten Fenster. Dafuer gibt es die
+        // Zug-in-der-Frist-Pruefung seit dem 2026-10-28: sie
+        // fragt nach der Dekoderfrist noch einmal, was wirklich
+        // zu senden ist. `ablaufSchritt()` kehrt bei laufender
+        // Sendung von selbst um, es geht also nichts doppelt
+        // hinaus.
+        {
+            const QString nachricht = nachrichtAusZeile(zeile);
+            const QString sauber = zeile.simplified();
+            const int snr = sauber.section(QLatin1Char(' '), 1, 1).toInt();
+            m_qsoGemeldet = false;
+            // Eine Einzelentscheidung: danach nicht von selbst
+            // weiter CQ rufen.
+            m_cqAutomatik = false;
+            if (m_houndBetrieb) {
+                // Im Fox-Betrieb ruft man die Expedition; den
+                // Schluss macht sie. Siehe `starteAlsHound`.
+                uebernimmContest();   // siehe oben
+                m_ablauf.starteAlsHound(senderCallsign(nachricht),
+                                        eigenesRufzeichen(),
+                                        eigenerLocator());
+                ablaufSchritt();
+                emit fundAngenommen(zeile, m_ablauf.partner());
+                return {};
+            }
+            uebernimmContest();   // siehe oben
+            m_ablauf.starteAlsAntworter(senderCallsign(nachricht),
+                                        eigenesRufzeichen(),
+                                        eigenerLocator(), snr,
+                                        locatorAusNachricht(nachricht));
+            ablaufSchritt();
+            emit fundAngenommen(zeile, m_ablauf.partner());
+        }
+    }
+    return {};
+}
+
+bool Ft8Applet::istFt8Modus(DSPMode modus)
+{
+    return modus == DSPMode::DIGU || modus == DSPMode::DIGL;
+}
+
+QString Ft8Applet::kartenSperre() const
+{
+    // Dieselbe Regel, nach der MainWindow das Fenster zeigt: ohne
+    // Datenmodus ist es kein FT8-Betrieb, egal was die Karte zeigt.
+    if (!m_slice || !istFt8Modus(m_slice->dspMode())) {
+        return tr("FT8 is not active — switch the receiver to DIGU "
+                  "(FT8 button) first");
+    }
+    if (eigenesRufzeichen().isEmpty()) {
+        return tr("set your callsign first");
+    }
+    // Dieselbe Bedingung, an der sendeNachricht() abbricht.
+    if (!m_model || !m_model->ft8TxSource()) {
+        return tr("no transmit path — connect a radio first");
+    }
+    // Was setMox(true) jetzt sagen wuerde: Tastensperre und Bandplan.
+    // Nur eine fruehe Erklaerung -- getastet wird spaeter ueber
+    // setMox(true), und dort gilt die Pruefung noch einmal.
+    if (MoxController* mox = m_model->moxController()) {
+        const QString grund = mox->txRefusalReason();
+        if (!grund.isEmpty()) {
+            return tr("transmit not allowed: %1").arg(grund);
+        }
+    }
+    return {};
+}
+
+QString Ft8Applet::rufeVonDerKarte(const QString& zeile)
+{
+    const QString sperre = kartenSperre();
+    if (!sperre.isEmpty()) {
+        qCInfo(lcFt8Senden).noquote()
+            << "Anruf von der Karte abgelehnt:" << sperre;
+        return sperre;
+    }
+    qCInfo(lcFt8Senden).noquote()
+        << "Anruf von der Karte:" << nachrichtAusZeile(zeile);
+    return nimmFundAn(zeile);
+}
+
+QString Ft8Applet::bandFuerLog(double hz)
+{
+    // Wie in logEintrag(): erst das Band der Frequenz, dann -- mit
+    // Transverter -- das der Antenne.
+    double mhz = hz / 1.0e6;
+    QString band = bandLabel(bandFromFrequency(hz));
+    TransverterSetup::logbuchFrequenz(std::llround(hz), &mhz, &band);
+    return band;
 }
 
 void Ft8Applet::sendeNachricht(const QString& text)
@@ -2609,6 +2685,32 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
             spot.utcTime  = periodStart.toUTC().time();
             m_model->onNativeFt8Decode(spot);
         }
+
+        // ── An die QSO-Karte (2026-11-11) ─────────────────────
+        //
+        // Jede Station mit Rufzeichen, auch ohne Locator: wer vorhin
+        // mit Feld gehoert wurde und jetzt einen Rapport schickt, ist
+        // noch da -- die Karte frischt ihn auf. Die ZEILE geht mit,
+        // weil ein Klick dort genau diese Zeile beantwortet.
+        if (!ruf.isEmpty()) {
+            const double hz = wahlHz + (unteresSeitenband ? -double(d.freqHz)
+                                                          : double(d.freqHz));
+            Ft8Gehoert g;
+            g.rufzeichen = ruf;
+            g.locator    = locatorAusNachricht(d.text);
+            g.snrDb      = snr;
+            g.dtSek      = d.dtSeconds;
+            g.tonHz      = static_cast<int>(std::lround(d.freqHz));
+            g.freqMHz    = hz / 1.0e6;
+            g.band       = bandFuerLog(hz);
+            g.modus      = modus;
+            g.zeit       = periodStart.toUTC();
+            g.nachricht  = d.text;
+            g.zeile      = zeile;
+            g.land       = landFuer(ruf);
+            g.neuesLand  = istNeuesLand(ruf);
+            emit gehoert(g);
+        }
     }
 
     if (m_lineCount > kMaxLines) {
@@ -2716,6 +2818,23 @@ QString Ft8Applet::spaltenkopf()
         .arg(tr("DT"), 5)
         .arg(tr("Freq"), 5)
         .arg(tr("Message"));
+}
+
+// Bis zum 2026-11-11 stand diese Abfrage nur in zeigeZeile(). Jetzt
+// fragt auch die Meldung an die Karte -- dieselbe Antwort, darum EINE
+// Stelle.
+bool Ft8Applet::istNeuesLand(const QString& senderRuf) const
+{
+    if (senderRuf.isEmpty() || !m_model || !m_model->dxccColorProvider()) {
+        return false;
+    }
+    auto* dxcc = m_model->dxccColorProvider();
+    if (!dxcc->isEnabled()) { return false; }
+    const double mhz = (m_slice ? m_slice->frequency() : 0.0) / 1.0e6;
+    const QString modus = protocol() == Ft8Decoder::Protocol::Ft4
+                              ? QStringLiteral("FT4")
+                              : QStringLiteral("FT8");
+    return dxcc->statusForSpot(senderRuf, mhz, modus) == DxccStatus::NewDxcc;
 }
 
 QString Ft8Applet::landFuer(const QString& rufzeichen) const
@@ -2991,19 +3110,14 @@ void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
     // dem Zeilenspeicher wuerde sie sonst bei jedem Pillendruck fuer
     // vierhundert Zeilen neu laufen.
     const QString senderRuf = senderCallsign(nachricht);
-    if (m_model && m_model->dxccColorProvider() && !senderRuf.isEmpty()) {
-        auto* dxcc = m_model->dxccColorProvider();
-        if (dxcc->isEnabled()) {
-            const double mhz = (m_slice ? m_slice->frequency() : 0.0) / 1.0e6;
-            const QString modus = protocol() == Ft8Decoder::Protocol::Ft4
-                                      ? QStringLiteral("FT4")
-                                      : QStringLiteral("FT8");
-            z.neuesLand = dxcc->statusForSpot(senderRuf, mhz, modus)
-                          == DxccStatus::NewDxcc;
-            if (z.neuesLand) {
-                z.landFarbe = dxcc->colorForSpot(senderRuf, mhz, modus);
-            }
-        }
+    z.neuesLand = istNeuesLand(senderRuf);
+    if (z.neuesLand) {
+        const double mhz = (m_slice ? m_slice->frequency() : 0.0) / 1.0e6;
+        const QString modus = protocol() == Ft8Decoder::Protocol::Ft4
+                                  ? QStringLiteral("FT4")
+                                  : QStringLiteral("FT8");
+        z.landFarbe = m_model->dxccColorProvider()
+                          ->colorForSpot(senderRuf, mhz, modus);
     }
 
     // ── Fehlt mir dieses Grossfeld? (2026-10-30) ─────────────

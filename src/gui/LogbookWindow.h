@@ -39,6 +39,7 @@
 #include "core/CallsignCache.h"
 #include "core/LogFilter.h"
 #include "models/LogEntry.h"
+#include "core/SotaNachtrag.h"
 
 #include <QDialog>
 #include <QTimer>
@@ -186,7 +187,9 @@ public:
 
     // cty.dat for the Kennzahlen (entity per contact, DXCC / continent /
     // zone). Optional: without it the ADIF DXCC field is all there is.
-    void setCtyDat(const class CtyDatParser* cty) { m_cty = cty; }
+    // Reicht es auch an das Detailpaneel weiter (Landesmitte fuer die
+    // Grauzone, wenn der Locator fehlt).
+    void setCtyDat(const class CtyDatParser* cty);
 
 signals:
     // ── Point the beam at a contact ──────────────────────────────────
@@ -232,6 +235,10 @@ public:
     // an das Rotor-Radar neben der Karte (2026-09-26).
     void setRotorBearing(double deg);
     void setRotorBeamWidth(double deg);
+    // Was der Rotor zu einem Drehbefehl sagt: Ablehnung (erlaubter
+    // Bereich), Transportfehler (RotorController::errorOccurred). Nach
+    // Rotate/LP aus der Eingabezeile steht es dort (2026-11-11).
+    void setRotorMeldung(const QString& text);
 
     QLineEdit*   entryCallForTest() const { return m_entryCall; }
     QLineEdit*   entryCommentForTest() const { return m_entryComment; }
@@ -239,6 +246,15 @@ public:
     QLabel*      entryModeForTest() const { return m_entryMode; }
     QLabel*      entryHintForTest() const { return m_entryHint; }
     QPushButton* entryLogButtonForTest() const { return m_entryLogBtn; }
+    QPushButton* entryRotorForTest() const { return m_entryRotorBtn; }
+    QPushButton* entryRotateForTest() const { return m_entryRotate; }
+    QPushButton* entryLongPathForTest() const { return m_entryLp; }
+    QLabel*      entryPeilungForTest() const { return m_entryPeilung; }
+    QLabel*      entryDrehForTest() const { return m_entryDreh; }
+    class RotorBandWidget* rotorBandForTest() const { return m_rotorBand; }
+    QWidget*     rotorZeileForTest() const { return m_rotorZeileW; }
+    void         setStillstandMsForTest(int ms) { m_stillstandMs = ms; }
+    class QsoDetailPane* detailForTest() const { return m_detail; }
     QLineEdit*   searchForTest() const { return m_search; }
 
 signals:
@@ -291,6 +307,19 @@ public:
     /// Der Dialog ruft das hier auf; Tests koennen es direkt aufrufen.
     void importAdifFile(const QString& path);
 
+    // ── MY_SOTA_REF aus dem SOTAdata-Log (2026-11-11) ───────────────
+    //
+    // Knopf "SOTA…": CSV waehlen, Vorschlaege im SotaNachtragDialog
+    // ansehen und anhaken, erst "Apply" schreibt. Vorher eine eigene
+    // Sicherung neben dem Log (logbook.adi.before-sota-<UTC>), denn die
+    // .bak1-3 sind nach drei weiteren Speicherungen weg.
+    void sotaNachtragen();
+    /// Ohne Dialog -- der Dialog ruft das auf, Tests direkt. Die Indizes
+    /// beziehen sich auf das Log, wie es gerade ist. `sicherung` bekommt
+    /// den Pfad der Sicherung. false, wenn nichts geschrieben wurde.
+    bool sotaVorschlaegeAnwenden(const QVector<SotaNachtrag::Vorschlag>& gewaehlt,
+                                 QString* sicherung = nullptr);
+
     // ── QRZ-Logbuch abholen ─────────────────────────────────────────
     //
     // Der Weg zurueck: was im QRZ-Logbuch steht — dort geloggte
@@ -306,6 +335,8 @@ public:
 
     /// Wie viele Verbindungen das Logbuch gerade fuehrt. Nur fuer Tests.
     int entryCountForTesting() const { return m_all.size(); }
+    const QVector<LogEntry>& entriesForTest() const { return m_all; }
+    QString meinFeldForTest() const { return meinFeld(); }
 
     /// Rueckfragen und Meldungen des Imports umleiten. Fuer Tests: die
     /// eine Funktion antwortet, die andere schreibt mit. Nicht gesetzt
@@ -341,6 +372,18 @@ public:
     class BandStundeWidget* bandStundeForTest() const { return m_bandStunde; }
     class RichtungsRoseWidget* roseForTest() const { return m_rose; }
     void zeigeStatistikSeiteForTest(int seite) { zeigeStatistikSeite(seite); }
+    /// Fuer Pruefstaende: die drei Gesamtbilder (2026-11-10) und die
+    /// Reiter, ueber die der Betreiber sie erreicht.
+    class SonnenzyklusWidget* sonnenzyklusForTest() const { return m_sonne; }
+    class KontinentUhrWidget* kontinentUhrForTest() const { return m_uhr; }
+    class DxccWandWidget* dxccWandForTest() const { return m_wand; }
+    class SolarFluxArchiv* solarFluxForTest() const { return m_flux; }
+    QList<QPushButton*> statistikReiterForTest() const { return m_statsSeitenKnoepfe; }
+    QDialog* statistikDialogForTest() const { return m_statsDialog; }
+    /// Wie gross der Statistikdialog fuer die Gesamtbilder mindestens
+    /// werden soll: 1240 x 820, auf kleinen Schirmen weniger. Er waechst
+    /// darauf zu und schrumpft nie.
+    static QSize gesamtbildGroesse(const QWidget* dialog);
 private:
     // Send these records. With rows marked in the table it is those;
     // with none marked it is everything not yet uploaded, which is the
@@ -389,6 +432,32 @@ private:
     QLineEdit*    m_entryComment{nullptr};
     QPushButton*  m_entryLogBtn{nullptr};
     QLabel*       m_entryHint{nullptr};
+    // ROTOR in der Eingabezeile (2026-11-10): zeigt Rotor und Station,
+    // dann drehen -- kurzer oder langer Weg, im erlaubten Bereich.
+    QPushButton*  m_entryRotorBtn{nullptr};
+    QPushButton*  m_entryRotate{nullptr};
+    QPushButton*  m_entryLp{nullptr};
+    QLabel*       m_entryPeilung{nullptr};
+    QWidget*      m_rotorZeileW{nullptr};   // die Zeile unter der Eingabe (Entwurf C)
+    class RotorBandWidget* m_rotorBand{nullptr};
+    QLabel*       m_entryGrad{nullptr};
+    QLabel*       m_entryKm{nullptr};
+    bool          m_rotorZeile{false};
+    QString       m_rotorRuf;      // fuer dieses Rufzeichen wurde ROTOR gedrueckt
+    // Dreht er wirklich? (2026-11-11, Betreiber: „sobald ich ROTATE klicke,
+    // soll ersichtlich sein, dass der Rotor auch wirklich dreht.")
+    // m_drehZiel < 0: kein Drehbefehl aus der Eingabezeile offen.
+    QLabel*       m_entryDreh{nullptr};
+    double        m_drehZiel{-1.0};
+    QString       m_drehMeldung;
+    QElapsedTimer m_drehUhr;       // seit der letzten neuen Position
+    QTimer*       m_drehWache{nullptr};
+    int           m_stillstandMs{0};
+    void          drehe(double ziel);
+    void          drehZeileLeeren();
+    void          aktualisiereDrehZeile();
+    void          zeigeRotorZeile();
+    void          aktualisiereRotorZeile();
     QTimer*       m_entryLookup{nullptr};
     // Bedarfs-Matrix unter der Eingabezeile (2026-11-08).
     class BedarfsMatrixWidget* m_bedarf{nullptr};
@@ -403,6 +472,12 @@ private:
     class BandStundeWidget* m_bandStunde{nullptr};
     class RichtungsRoseWidget* m_rose{nullptr};
     QComboBox* m_bandStundeFilter{nullptr};
+    // Drei weitere Seiten (2026-11-10): Sonnenzyklus, Kontinent-Uhr,
+    // DXCC-Wand; der Flux kommt aus einem eigenen Cache (SolarFluxArchiv).
+    class SonnenzyklusWidget* m_sonne{nullptr};
+    class KontinentUhrWidget* m_uhr{nullptr};
+    class DxccWandWidget* m_wand{nullptr};
+    class SolarFluxArchiv* m_flux{nullptr};
     void zeigeStatistikSeite(int seite);
     // Tippen in der Suche: Karte und Kennzahlen erst nach einer kurzen
     // Pause nachziehen (Vorschlag 2026-09-27, siehe .cpp).
@@ -426,6 +501,7 @@ private:
     QLineEdit*    m_gridEdit{nullptr};
     QLineEdit*    m_countryEdit{nullptr};
     QCheckBox*    m_unconfirmedOnly{nullptr};
+    QCheckBox*    m_greyLineOnly{nullptr};     // 2026-11-10, core/Grauzone.h
     QCheckBox*    m_useDates{nullptr};
     QDateEdit*    m_fromDate{nullptr};
     QDateEdit*    m_toDate{nullptr};

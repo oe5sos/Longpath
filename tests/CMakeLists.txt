@@ -1163,6 +1163,36 @@ if(TEST tst_logbuch_bilder)
     set_tests_properties(tst_logbuch_bilder PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
+# tst_logbuch_gesamtbilder (2026-11-10): Sonnenzyklus, Kontinent-Uhr und
+#   DXCC-Wand -- Rechnung, Flux-Cache, Widgets und der Weg ueber Stats/↗/
+#   Reiter im Logbuch-Fenster. Ein Renderfall aus einer Logbuch-Kopie nur
+#   mit LONGPATH_LOGBOOK_FIXTURE + LONGPATH_GRAB_DIR.
+longpath_add_test(tst_logbuch_gesamtbilder)
+if(TEST tst_logbuch_gesamtbilder)
+    set_tests_properties(tst_logbuch_gesamtbilder PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+# tst_hoehenprofil / tst_sota_gipfel / tst_sota_nachtrag /
+#   tst_hoehenprofil_fenster (2026-11-11): UKW-Hoehenprofil je QSO und der
+#   eigene Standort vom SOTA-Gipfel -- Geometrie gegen Handrechnung und
+#   gegen das Entwurfsblatt, Gipfel-Cache, CSV-Nachtrag, die Bedienung.
+#   Aufgezeichnete Hoehen/Antworten in tests/data/hoehenprofil, kein Netz.
+longpath_add_test(tst_hoehenprofil)
+longpath_add_test(tst_sota_gipfel)
+longpath_add_test(tst_sota_nachtrag)
+longpath_add_test(tst_hoehenprofil_fenster)
+foreach(_t tst_hoehenprofil tst_sota_gipfel tst_sota_nachtrag tst_hoehenprofil_fenster)
+    if(TEST ${_t})
+        set_tests_properties(${_t} PROPERTIES
+            ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+    endif()
+endforeach()
+# tst_grauzone (2026-11-10): Grauzone an beiden Enden je QSO, SFI und Kp
+#   des Tages aus der GFZ-Datei (aufgezeichneter Ausschnitt, kein Netz),
+#   Filter, Statistik und die Zeile in der Detailkarte.
+longpath_add_test(tst_grauzone)
+target_compile_definitions(tst_grauzone PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 if(TEST tst_transverter_nur_empfang)
     set_tests_properties(tst_transverter_nur_empfang PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
@@ -2742,6 +2772,12 @@ if(TEST tst_flex_auto_sql)
     set_tests_properties(tst_flex_auto_sql PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
+# tst_logbuch_rotor_knopf (2026-11-10): ROTOR in der Eingabezeile --
+#   Peilung auch fuer neue Stationen, Rotate/LP, erlaubter Bereich, Lagequelle.
+longpath_add_test(tst_logbuch_rotor_knopf)
+# tst_rotorzeile_entwuerfe (2026-11-11): Werkzeug, Entwurfsblaetter der
+#   Rotorzeile (nur mit LONGPATH_GRAB_DIR, sonst uebersprungen).
+longpath_add_test(tst_rotorzeile_entwuerfe)
 
 longpath_add_test(tst_kombi_entwuerfe)
 longpath_add_test(tst_startmaske)
@@ -6213,6 +6249,24 @@ longpath_add_test(tst_logbook_entry_row)
 # Logbuch-Durchgangstest (Nacht 2026-09-26): Neuschreiben verliert nichts, alle Ablaeufe.
 longpath_add_test(tst_logbook_durchgang)
 longpath_add_test(tst_qso_map_flyto_window)
+# 2026-11-10: das Logbuch soll herausstechen -- der eigene Google-Schluessel
+# (Schluesselbund, Test gegen die Map Tiles API, Anleitung) und der 3D-Flug
+# im Kartenfenster samt Rueckfall auf NASA + Google Earth. Beide ohne
+# WebEngine: die Karte kennt nur die Schnittstelle Station3dSurface.
+longpath_add_test(tst_google_map_tiles)
+longpath_add_test(tst_qso_map_3d_flug)
+# 2026-11-10: der QRZ-Zugang war seit 57d524b0f (2026-08-07) ueber kein
+# Menue mehr erreichbar, waehrend vier Stellen „in Tools" auf ihn zeigten.
+longpath_add_test(tst_qrz_konto_im_menue)
+# 2026-11-10, Live-Befund: „3D" in der eingebetteten Logbuch-Karte tat
+# ohne Schluessel sichtbar nichts. Echter Mausklick im echten Logbuch.
+longpath_add_test(tst_logbuch_3d_knopf)
+# Die WebEngine-Fassung selbst, nur wo Qt WebEngine gefunden wurde
+# (Homebrew-Qt am Mac; die Linux-/Windows-Laeufer haben es nicht).
+if(LONGPATH_HAS_WEBENGINE)
+    longpath_add_test(tst_station3d_view)
+    target_link_libraries(tst_station3d_view PRIVATE LongpathWeb3d)
+endif()
 # -- Satelliten ueber dem Horizont auf der Karte + Stempel im Detailpaneel --
 longpath_add_test(tst_qso_map_satellites)
 # -- Logbuch-Werkzeugleiste bricht um statt das Fenster breit zu halten --
@@ -6225,6 +6279,13 @@ longpath_add_test(tst_logbook_one_page)
 longpath_add_test(tst_blue_marble_fetcher)
 # -- DX-Radar: Wurzelskala, Himmelsrichtungen, Punkte, dritte Ansicht --
 longpath_add_test(tst_dx_radar)
+# -- Azimutalkarte als vierte Ansicht der QSO-Karte: Projektion hin und
+#    zurueck, Strahlenebene, Rotorkeil, Ziel, Ansichtswechsel --
+longpath_add_test(tst_azimutalkarte)
+# -- Locator-Jagd mit FT8 (2026-11-11): Mosaik je Band, gehoerte Stationen,
+#    der Klick auf der Karte geht denselben Weg wie der Doppelklick in der
+#    Fundliste, und ohne FT8 sagt er warum nicht --
+longpath_add_test(tst_ft8_locatorjagd)
 # -- Verbindungsfenster: der lange Fehlschlag-Text passt (Leiste + darunter, Hinweis) --
 longpath_add_test(tst_connect_failure_text_fits)
 

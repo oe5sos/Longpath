@@ -56,6 +56,7 @@ QJsonObject CallsignCache::toJson(const CallsignInfo& i)
     str("country",   i.country);
     str("county",    i.county);
     str("grid",      i.grid);
+    str("geoloc",    i.geoloc);
     str("class",     i.licenseClass);
     str("email",     i.email);
     str("url",       i.url);
@@ -83,6 +84,7 @@ CallsignInfo CallsignCache::fromJson(const QJsonObject& o)
     i.country      = o.value(QStringLiteral("country")).toString();
     i.county       = o.value(QStringLiteral("county")).toString();
     i.grid         = o.value(QStringLiteral("grid")).toString();
+    i.geoloc       = o.value(QStringLiteral("geoloc")).toString();
     i.licenseClass = o.value(QStringLiteral("class")).toString();
     i.email        = o.value(QStringLiteral("email")).toString();
     i.url          = o.value(QStringLiteral("url")).toString();

@@ -79,6 +79,12 @@ struct LogbookStats {
     int       last365Days{0};
     double    longestKm{0.0};
     QString   longestCall;
+    // Grauzonen-QSOs (core/Grauzone.h): mindestens ein Ende in der
+    // Grauzone. `greyLineJudged` zaehlt die QSOs, bei denen sich
+    // ueberhaupt ein Ende verorten liess — der Anteil ist nur gegen die
+    // ehrlich.
+    int       greyLine{0};
+    int       greyLineJudged{0};
 
     // ── Distributions ────────────────────────────────────────────────
     QVector<Bucket>  byBand;       // dial order (160m first)
@@ -105,10 +111,12 @@ struct LogbookStats {
     static constexpr int kCqZones = 40;
 
     // `cty` may be null. `nowUtc` anchors "last N days" and the weekly
-    // buckets (week kWeeks-1 ends at nowUtc).
+    // buckets (week kWeeks-1 ends at nowUtc). `meinFeld` is the own
+    // locator for contacts without MY_GRIDSQUARE (grey-line count).
     static LogbookStats compute(const QVector<LogEntry>& entries,
                                 const CtyDatParser* cty,
-                                const QDateTime& nowUtc);
+                                const QDateTime& nowUtc,
+                                const QString& meinFeld = QString());
 
     // The DXCC entity key for one record: cty.dat primary prefix with the
     // non-DXCC entries folded, or "#<DXCC>" from the ADIF field, or empty.

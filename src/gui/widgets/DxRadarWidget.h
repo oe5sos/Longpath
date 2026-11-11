@@ -17,6 +17,8 @@
 // Modification history (Longpath):
 //   2026-09-22 — Created for Longpath by Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude.
+//   2026-11-10 — Kompakt ruhiger: keine Entfernungszahlen, nur N/E/S/W,
+//                 Randstriche statt Speichen, groesserer Schirm.
 // =================================================================
 #pragma once
 
@@ -72,6 +74,9 @@ public:
     void setRotorCompact(bool on);
     void setRotorStatusShown(bool on);
     double rotorHeading() const { return m_rotorDeg; }
+    /// Fuer Pruefstaende: wo der Schirm sitzt und wie gross er ist.
+    QPointF centreForTest() const { return centre(); }
+    double radiusForTest() const { return radiusPx(); }
     double rotorTarget() const { return m_rotorTargetDeg; }
 
     // ── Geometrie, fuer Pruefstaende ─────────────────────────────────

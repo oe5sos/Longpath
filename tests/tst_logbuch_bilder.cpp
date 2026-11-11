@@ -5,7 +5,8 @@
 // Betreiber: „Alle drei" (Entwurfsblaetter werkzeug/logbuch-2026-11-08).
 //   1. Bedarf: Zellen, Urteil, die Betriebsart des Funkgeraets (CWU = CW).
 //   2. Band x Stunde: Zaehlung und Filter.
-//   3. Rose: Peilung, Sektor, UKW nur mit Locator, KW mit Landesmitte.
+//   3. Rose: Peilung, Sektor, UKW nur mit Locator, KW mit Landesmitte
+//      (und die Landesmitte auf der richtigen Seite des Nullmeridians).
 //   4. Im Logbuch-Fenster: Tippen zeigt die Matrix, Esc nimmt sie weg;
 //      die Statistik hat ihre zwei neuen Seiten und rechnet sie.
 
@@ -80,6 +81,11 @@ private slots:
         QVERIFY(b.gearbeitet.contains(QStringLiteral("40m|DATA")));
         QVERIFY(b.diesesCall.contains(QStringLiteral("40m|DATA")));
         QVERIFY(b.lageBekannt && b.km > 300.0);
+        // Landesmitte (51 N, 10 E) von JN67VV: gut 440 km nach Nordwesten.
+        // Mit dem doppelten Minus (bis 2026-11-10) lag sie bei 10 W:
+        // 1746 km, 290 Grad.
+        QVERIFY2(b.km > 380.0 && b.km < 500.0, qPrintable(QString::number(b.km)));
+        QVERIFY2(b.grad > 310.0 && b.grad < 335.0, qPrintable(QString::number(b.grad)));
         // 15 m: neues Band.
         b = LogbuchBilder::bedarf(log, QStringLiteral("DL1ABC"), QStringLiteral("15m"),
                                   QStringLiteral("USB"), &m_cty, feld);
@@ -125,6 +131,17 @@ private slots:
         bool westen = false;
         for (const auto& q : r.punkte) { if (q.km > 6000.0 && q.grad > 280.0 && q.grad < 310.0) { westen = true; } }
         QVERIFY(westen);
+        // K1ABC ohne Locator steht an der Landesmitte der USA (37,5 N,
+        // 91,7 W): rund 8000 km bei gut 300 Grad -- nicht gespiegelt in
+        // Asien (6200 km, 70 Grad), wo sie bis 2026-11-10 lag.
+        bool usaMitte = false;
+        for (const auto& q : r.punkte) {
+            if (q.km > 7500.0 && q.km < 8500.0) {
+                QVERIFY2(q.grad > 295.0 && q.grad < 320.0, qPrintable(QString::number(q.grad)));
+                usaMitte = true;
+            }
+        }
+        QVERIFY(usaMitte);
         int a = -1, l = 0;
         r.groessteLuecke(&a, &l);
         QVERIFY(l > 10);                  // der Sueden ist leer

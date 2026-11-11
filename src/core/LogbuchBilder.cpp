@@ -22,8 +22,11 @@ QString feldDerLandesmitte(const CtyDatParser* cty, const QString& land)
     if (!cty || land.isEmpty()) { return {}; }
     const DxccEntity* d = cty->entityByPrefix(land);
     if (!d) { return {}; }
-    // cty.dat schreibt Laengen positiv nach WESTEN.
-    return gridSquareFromLatLon(d->latitude, -d->longitude);
+    // cty.dat schreibt Laengen positiv nach WESTEN -- aber CtyDatParser
+    // dreht sie beim Lesen schon um (DxccEntity::longitude ist OST-
+    // positiv). Bis 2026-11-10 stand hier ein zweites Minus: jede Landes-
+    // mitte lag am Nullmeridian gespiegelt, die USA in Asien.
+    return gridSquareFromLatLon(d->latitude, d->longitude);
 }
 } // namespace
 
