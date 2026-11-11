@@ -27,7 +27,8 @@
 // Modification history (Longpath):
 //   2026-11-10 - Uebernommen fuer Longpath von Martin Fischer (OE5SOS),
 //                KI-gestuetzt ueber Anthropic Claude.
-//   2026-11-11 - F-Tasten ins Protokoll (Diagnose). KI-gestuetzt ueber
+//   2026-11-11 - F-Tasten ins Protokoll (Diagnose); F-Tasten und Esc
+//                gelten auch im Textfeld (N1MM). KI-gestuetzt ueber
 //                Anthropic Claude.
 // =================================================================
 // no-port-check: NereusSDR-original, in Longpath uebernommen.
@@ -265,16 +266,20 @@ namespace {
 
 // Diagnose 2026-11-11: F1 „tat nichts" beim Betreiber, ohne dass zu sehen
 // war, wo die Taste blieb. Fuer F-Tasten steht jetzt im Protokoll, was die
-// Weiche damit machte -- einmal je Druck, obwohl der Filter dieselbe Taste
-// an mehreren Widgets sieht (die Entscheidung faellt am ersten).
-void notiereFTaste(const QKeyEvent* event, const QString& was)
+// Weiche damit machte -- einmal je Druck: der Filter sieht dieselbe Taste
+// an mehreren Widgets, die Entscheidung faellt am ersten, und das ist das
+// Widget mit dem Fokus (ohne Fokus das Fenster). Die Adresse des
+// Ereignisses taugt dafuer nicht -- Qt baut den naechsten Druck oft an
+// derselben Stelle.
+void notiereFTaste(const QWidget* receiver, const QKeyEvent* event, const QString& was)
 {
-    static const QKeyEvent* zuletzt = nullptr;
-    if (event->key() < Qt::Key_F1 || event->key() > Qt::Key_F35 || event->isAutoRepeat()
-        || event == zuletzt) {
+    if (event->key() < Qt::Key_F1 || event->key() > Qt::Key_F35 || event->isAutoRepeat()) {
         return;
     }
-    zuletzt = event;
+    const QWidget* const focus = QApplication::focusWidget();
+    if (focus != nullptr ? receiver != focus : receiver != receiver->window()) {
+        return;
+    }
     qCInfo(lcHotKeys) << "Taste" << KeyboardRouter::chordFromEvent(event) << "->" << was;
 }
 
@@ -291,7 +296,7 @@ QString fensterName(const QWidget* w)
 bool KeyboardRouter::handlePress(QWidget* receiver, QKeyEvent* event)
 {
     if (!m_bindings->enabled()) {
-        notiereFTaste(event, QStringLiteral("Tastenkuerzel sind aus"));
+        notiereFTaste(receiver, event, QStringLiteral("Tastenkuerzel sind aus"));
         return false;
     }
     const auto down = m_down.find(physicalKey(event));
@@ -308,11 +313,11 @@ bool KeyboardRouter::handlePress(QWidget* receiver, QKeyEvent* event)
     const QString id = m_bindings->actionForChord(chord);
     const HotKeyAction* const action = HotKeyActionList::find(id);
     if (action == nullptr) {
-        notiereFTaste(event, QStringLiteral("nicht belegt"));
+        notiereFTaste(receiver, event, QStringLiteral("nicht belegt"));
         return false;
     }
     if (!windowTakesKeys(receiver)) {
-        notiereFTaste(event, QStringLiteral("nicht angenommen: vorne ist %1, %2")
+        notiereFTaste(receiver, event, QStringLiteral("nicht angenommen: vorne ist %1, %2")
                                  .arg(fensterName(QApplication::activeWindow()),
                                       QApplication::activeModalWidget() != nullptr
                                           ? QStringLiteral("ein Dialog ist offen")
@@ -320,14 +325,14 @@ bool KeyboardRouter::handlePress(QWidget* receiver, QKeyEvent* event)
         return false;
     }
     if (focusKeeps(receiver, event)) {
-        notiereFTaste(event, QStringLiteral("bleibt bei %1").arg(fensterName(QApplication::focusWidget())));
+        notiereFTaste(receiver, event, QStringLiteral("bleibt bei %1").arg(fensterName(QApplication::focusWidget())));
         return false;
     }
     if (!event->isAutoRepeat() && !m_dispatcher->takesKey(id)) {
-        notiereFTaste(event, QStringLiteral("%1 nimmt sie gerade nicht").arg(id));
+        notiereFTaste(receiver, event, QStringLiteral("%1 nimmt sie gerade nicht").arg(id));
         return false;
     }
-    notiereFTaste(event, id);
+    notiereFTaste(receiver, event, id);
 
     m_down.insert(physicalKey(event), id);
     event->accept();
@@ -462,7 +467,14 @@ bool KeyboardRouter::focusKeeps(const QWidget* receiver, const QKeyEvent* event)
     const int key = event->key();
     const QWidget* const focus = QApplication::focusWidget();
     if (takesTypedText(focus)) {
-        return true;
+        // Longpath, Betreiber 2026-11-11 („die F1-F2 Tasten priorisieren"):
+        // im N1MM-Stil gelten die F-Tasten und Esc auch, waehrend man ein
+        // Rufzeichen tippt. Das Rotor/Log-Fenster kommt beim Start nach
+        // vorne, sein Rufzeichenfeld hat den Fokus -- und F1 blieb darin
+        // stecken. Ein Textfeld macht mit beiden nichts; Esc nimmt die
+        // Weiche ohnehin nur, solange eine Ansage laeuft (takesKey).
+        const bool fTaste = key >= Qt::Key_F1 && key <= Qt::Key_F35;
+        return !(fTaste || key == Qt::Key_Escape);
     }
     // Longpath: das Panorama mit dem Fokus behaelt seine Pfeile. Es
     // stimmt damit seit dem 2026-08-22 SEINEN Empfaenger sofort ab

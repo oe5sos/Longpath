@@ -9,7 +9,9 @@
 //
 // Geprueft:
 //   * eine Taste wirkt auf den aktiven Empfaenger (Pfeil, R, B, L, ])
-//   * in einem Textfeld bleiben die Tasten beim Textfeld
+//   * in einem Textfeld bleiben die Tasten beim Textfeld -- ausser den
+//     F-Tasten und Esc (N1MM: senden, waehrend man das Rufzeichen tippt;
+//     2026-11-11)
 //   * der Ausschalter schaltet wirklich aus
 //   * Esc ohne laufende Ansage wird NICHT geschluckt
 //   * F1 ohne Funkgeraet sendet nichts
@@ -51,6 +53,21 @@
 using namespace Longpath;
 
 namespace {
+
+// Ein Textfeld, das mitschreibt, welche Tasten bei ihm ankommen.
+class FeldZeuge : public QLineEdit
+{
+public:
+    explicit FeldZeuge(QWidget* parent) : QLineEdit(parent) {}
+    QList<int> gesehen;
+
+protected:
+    void keyPressEvent(QKeyEvent* e) override
+    {
+        gesehen.append(e->key());
+        QLineEdit::keyPressEvent(e);
+    }
+};
 
 SliceModel* scheibe(MainWindow& mw)
 {
@@ -188,6 +205,29 @@ private slots:
         QCOMPARE(feld->text(), QStringLiteral("r"));
         QCOMPARE(s->activeNr(), NrSlot::Off);
         QCOMPARE(qint64(s->frequency()), qint64(7'100'000));
+    }
+
+    void fTastenGeltenAuchBeimTippen()
+    {
+        // Rufzeichen tippen und mit F1 rufen, wie in N1MM. Das Feld
+        // bekommt die Buchstaben, die Weiche die F-Tasten. Esc ohne
+        // laufende Ansage bleibt beim Feld.
+        MainWindow mw;
+        QVERIFY(scheibe(mw) != nullptr);
+        auto* feld = new FeldZeuge(&mw);
+        feld->show();
+        QVERIFY(aktiv(&mw));
+        feld->setFocus();
+        QTRY_VERIFY(feld->hasFocus());
+
+        QTest::keyClicks(feld, QStringLiteral("oe5"));
+        QTest::keyClick(feld, Qt::Key_F1);
+        QTest::keyClick(feld, Qt::Key_F2, Qt::ControlModifier | Qt::ShiftModifier);
+        QTest::keyClick(feld, Qt::Key_Escape);
+        QCOMPARE(feld->text(), QStringLiteral("oe5"));
+        QVERIFY(!feld->gesehen.contains(Qt::Key_F1));
+        QVERIFY(!feld->gesehen.contains(Qt::Key_F2));
+        QVERIFY(feld->gesehen.contains(Qt::Key_Escape));
     }
 
     void derAusschalterSchaltetAus()
