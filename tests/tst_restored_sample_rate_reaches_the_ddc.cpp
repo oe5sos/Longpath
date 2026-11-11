@@ -185,6 +185,16 @@ private slots:
         QVERIFY(slice);
         QVERIFY(slice->streamIndex() >= 0);
 
+        // Seit 2026-11-11 eine Rate je Scheibe und Geraet
+        // (hardware/<mac>/slices/<N>/SampleRate), nicht mehr je Band; ohne
+        // Geraet wird keine gespeichert. Hier ist nichts verbunden, also
+        // nennt der Pruefstand das Geraet selbst.
+        const QString mac = QStringLiteral("aa:bb:cc:dd:ee:06");
+        slice->setSettingsRadioMac(mac);
+        const QString rateKey =
+            QStringLiteral("hardware/%1/slices/%2/SampleRate").arg(mac).arg(slice->sliceIndex());
+        AppSettings::instance().remove(rateKey);
+
         // The stomp half of the finding, first: bindSliceToStream just
         // ADOPTED the stream default (192 kHz) via setSampleRateHz. That
         // adoption is derived state, not operator intent, and must NOT
@@ -192,10 +202,7 @@ private slots:
         // and the adoption overwrote the operator's persisted choice in
         // the settings map before the restore could read it.
         model.flushPendingSettingsSave();
-        QCOMPARE(AppSettings::instance()
-                     .value(QStringLiteral("Slice0/Band20m/SampleRate"), -1)
-                     .toInt(),
-                 -1);
+        QCOMPARE(AppSettings::instance().value(rateKey, -1).toInt(), -1);
 
         // The intent site is what persists.
         model.requestSliceSampleRate(id, 48000);
@@ -203,10 +210,9 @@ private slots:
         // test flushes the same way.
         model.flushPendingSettingsSave();
 
-        const int persisted = AppSettings::instance()
-            .value(QStringLiteral("Slice0/Band20m/SampleRate"), -1)
-            .toInt();
+        const int persisted = AppSettings::instance().value(rateKey, -1).toInt();
         QCOMPARE(persisted, 48000);
+        AppSettings::instance().remove(rateKey);
     }
 
     // ── 7. The launch anchor survives the pre-Connected stomp ───────────

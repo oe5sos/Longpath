@@ -41,6 +41,12 @@
 //                 sidetone and the MOX VFO shift are CW TX, deferred);
 //                 APF centre = CWPitch + tune from the setting instead of
 //                 a fixed 600 (setup.cs tbRX1APFTune_Scroll).
+//   2026-11-11 -- A band change leaves the slice's tune step and sample rate
+//                 alone; the rate is saved per slice and radio, and a Setup
+//                 rate change saves it on the slice -- as upstream NereusSDR
+//                 419dd88c4 / dd800ce9b / 89e41cd91 (J.J. Boyd, KG4VCF).
+//                 Martin Fischer (OE5SOS), AI-assisted via Anthropic Claude
+//                 Code.
 // =================================================================
 
 //=================================================================
@@ -5748,6 +5754,9 @@ int RadioModel::addSlice(const QString& initialPanId, bool suppressAutoStreamBin
 {
     auto* slice = new SliceModel(this);
     slice->setSuppressAutoStreamBinding(suppressAutoStreamBinding);
+    // Die Rate wird je Geraet gespeichert (2026-11-11); eine neue Scheibe
+    // gehoert zum Geraet, mit dem gerade verbunden ist.
+    slice->setSettingsRadioMac(currentRadioMac());
 
     // Ueber die Fenstergrenze des Transverters getunt: der Pegelversatz
     // (seine RX-Verstaerkung) gilt nur im ZF-Fenster (2026-11-08). Hier
@@ -7036,7 +7045,10 @@ void RadioModel::onBandButtonClicked(Band band)
 
     if (slice->hasSettingsFor(band)) {
         // Second+ visit: restore last-used state for the clicked band.
-        slice->restoreFromSettings(band);
+        // Schritt und Abtastrate bleiben, wie sie sind: eine je Scheibe auf
+        // jedem Band (2026-11-11, wie Upstream NereusSDR 419dd88c4 /
+        // dd800ce9b).
+        slice->restoreFromSettingsForBandChange(band);
 
         // ── Das Seitenband nach dem Band richten (2026-10-23) ──────
         //
@@ -7056,10 +7068,9 @@ void RadioModel::onBandButtonClicked(Band band)
         // gehoert zu FT8 und bleibt. Und gleich wieder ablegen, damit
         // der falsche Eintrag verheilt.
         richteSeitenbandAus(slice, band);
-        // And put the restored rate on the DDC, not just on the menu.
-        // Codex review round 7, PR #293: restoreFromSettings sets the
-        // display property; this is the half that reaches the radio.
-        applyRestoredSampleRate(slice);
+        // Hier stand applyRestoredSampleRate(slice): der Bandwechsel holte
+        // eine je Band gespeicherte Rate zurueck. Seit 2026-11-11 bleibt
+        // die Rate beim Bandwechsel stehen (Upstream dd800ce9b).
         return;
     }
 
@@ -9443,6 +9454,15 @@ void RadioModel::connectToRadio(const RadioInfo& info)
         teardownConnection();
     }
     teardownFlexConnection();
+
+    // Die Rate wird je Geraet gespeichert (2026-11-11, Upstream 89e41cd91).
+    // Ab hier gehoert jede Scheibe zum neuen Geraet -- auch an der Flex, die
+    // sonst die Rate des vorigen Geraets ueberschriebe.
+    for (SliceModel* s : std::as_const(m_slices)) {
+        if (s != nullptr) {
+            s->setSettingsRadioMac(info.macAddress);
+        }
+    }
 
     // Flex-Treiber Stufe 1: eine FlexRadio-Maschine geht einen eigenen
     // Weg und kommt nie durch den Rest dieser Funktion. Alles darunter
@@ -15126,7 +15146,17 @@ void RadioModel::loadSliceState(SliceModel* slice)
     }
     m_lastBand = currentBand;
 
+    // Die Rate gehoert zum Geraet (2026-11-11, Upstream 89e41cd91): erst das
+    // Geraet nennen, dann lesen. loadSliceState laeuft in connectToRadio,
+    // nachdem m_lastRadioInfo gesetzt ist.
+    slice->setSettingsRadioMac(m_lastRadioInfo.macAddress);
     slice->restoreFromSettings(currentBand);
+    // Eine Rate je Scheibe und Geraet, nicht mehr je Band (Upstream
+    // dd800ce9b). Die bisherige Kette darunter -- Anker fuer das
+    // Verbinden, applyRestoredSampleRate -- bleibt unveraendert.
+    if (const int gespeichert = slice->savedSampleRateHz(); gespeichert > 0) {
+        slice->setSampleRateHz(gespeichert);
+    }
     // Beim Hochfahren dieselbe Regel wie beim Banddruck — siehe
     // onBandButtonClicked.
     richteSeitenbandAus(slice, currentBand);
@@ -18991,6 +19021,12 @@ qint64 RadioModel::setSampleRateLive(int newRateHz,
             m_lastRadioInfo.macAddress,
             QStringLiteral("radioInfo/sampleRate"),
             newRateHz);
+    }
+    // Und auf der Scheibe, sonst stellt die dort gespeicherte Rate beim
+    // naechsten Verbinden die alte zurueck (2026-11-11, Upstream
+    // dd800ce9b, finishSampleRateChange).
+    if (m_activeSlice != nullptr && m_activeSlice->streamIndex() >= 0) {
+        scheduleSettingsSave();
     }
 
     const qint64 elapsedMs = t.elapsed();
