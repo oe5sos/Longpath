@@ -27,6 +27,8 @@
 // Modification history (Longpath):
 //   2026-11-10 - Uebernommen fuer Longpath von Martin Fischer (OE5SOS),
 //                KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 - F-Tasten ins Protokoll (Diagnose). KI-gestuetzt ueber
+//                Anthropic Claude.
 // =================================================================
 // no-port-check: NereusSDR-original, in Longpath uebernommen.
 
@@ -259,9 +261,37 @@ bool KeyboardRouter::eventFilter(QObject* watched, QEvent* event)
     }
 }
 
+namespace {
+
+// Diagnose 2026-11-11: F1 „tat nichts" beim Betreiber, ohne dass zu sehen
+// war, wo die Taste blieb. Fuer F-Tasten steht jetzt im Protokoll, was die
+// Weiche damit machte -- einmal je Druck, obwohl der Filter dieselbe Taste
+// an mehreren Widgets sieht (die Entscheidung faellt am ersten).
+void notiereFTaste(const QKeyEvent* event, const QString& was)
+{
+    static const QKeyEvent* zuletzt = nullptr;
+    if (event->key() < Qt::Key_F1 || event->key() > Qt::Key_F35 || event->isAutoRepeat()
+        || event == zuletzt) {
+        return;
+    }
+    zuletzt = event;
+    qCInfo(lcHotKeys) << "Taste" << KeyboardRouter::chordFromEvent(event) << "->" << was;
+}
+
+QString fensterName(const QWidget* w)
+{
+    if (w == nullptr) {
+        return QStringLiteral("kein Fenster");
+    }
+    return QString::fromLatin1(w->metaObject()->className());
+}
+
+} // namespace
+
 bool KeyboardRouter::handlePress(QWidget* receiver, QKeyEvent* event)
 {
     if (!m_bindings->enabled()) {
+        notiereFTaste(event, QStringLiteral("Tastenkuerzel sind aus"));
         return false;
     }
     const auto down = m_down.find(physicalKey(event));
@@ -277,12 +307,27 @@ bool KeyboardRouter::handlePress(QWidget* receiver, QKeyEvent* event)
     }
     const QString id = m_bindings->actionForChord(chord);
     const HotKeyAction* const action = HotKeyActionList::find(id);
-    if (action == nullptr || !windowTakesKeys(receiver) || focusKeeps(receiver, event)) {
+    if (action == nullptr) {
+        notiereFTaste(event, QStringLiteral("nicht belegt"));
+        return false;
+    }
+    if (!windowTakesKeys(receiver)) {
+        notiereFTaste(event, QStringLiteral("nicht angenommen: vorne ist %1, %2")
+                                 .arg(fensterName(QApplication::activeWindow()),
+                                      QApplication::activeModalWidget() != nullptr
+                                          ? QStringLiteral("ein Dialog ist offen")
+                                          : QStringLiteral("kein Dialog")));
+        return false;
+    }
+    if (focusKeeps(receiver, event)) {
+        notiereFTaste(event, QStringLiteral("bleibt bei %1").arg(fensterName(QApplication::focusWidget())));
         return false;
     }
     if (!event->isAutoRepeat() && !m_dispatcher->takesKey(id)) {
+        notiereFTaste(event, QStringLiteral("%1 nimmt sie gerade nicht").arg(id));
         return false;
     }
+    notiereFTaste(event, id);
 
     m_down.insert(physicalKey(event), id);
     event->accept();

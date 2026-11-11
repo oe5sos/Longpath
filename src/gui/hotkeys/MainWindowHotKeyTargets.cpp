@@ -11,6 +11,8 @@
 // Modification history (Longpath):
 //   2026-11-10 - Fuer Longpath neu geschrieben von Martin Fischer
 //                (OE5SOS), KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 - Hinweise auch ins Protokoll. KI-gestuetzt ueber
+//                Anthropic Claude.
 // =================================================================
 // no-port-check: NereusSDR-original in der Gestalt, Inhalt Longpath-original.
 
@@ -349,6 +351,9 @@ void MainWindowHotKeyTargets::toast(const QString& text)
     if (m_window->m_shuttingDown) {
         return;
     }
+    // Auch ins Protokoll: ob ein Hinweis kam, soll man nachlesen koennen,
+    // nicht nur sehen (2026-11-11).
+    qCInfo(lcHotKeys) << "Hinweis:" << text;
     m_window->showToast(text, ToastSeverity::Info, 3000);
 }
 
