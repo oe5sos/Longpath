@@ -559,6 +559,29 @@ private slots:
         QCOMPARE(LocatorJagdZeichen::feldFuellung(FeldStand::Nie, true).alpha(), 0);
     }
 
+    // Vollbild: nur im eigenen Fenster, und Escape fuehrt zurueck
+    // statt die Karte zuzumachen (Betreiber 2026-11-11).
+    void vollbildNurImEigenenFenster()
+    {
+        QsoMapWindow karte;
+        karte.imagery()->setNetworkEnabled(false);
+        QVERIFY(karte.vollbildButtonForTest() != nullptr);
+
+        // Eingebettet in die Logbuchspalte: kein Vollbild, dafuer der
+        // Pfeil, der ins eigene Fenster fuehrt.
+        karte.setEmbedded(true);
+        QVERIFY2(!karte.vollbildButtonForTest()->isVisibleTo(&karte),
+                 "in der Spalte gibt es nichts zu vergroessern");
+
+        karte.setEmbedded(false);
+        QVERIFY(karte.vollbildButtonForTest()->isVisibleTo(&karte));
+        QVERIFY(!karte.isFullScreen());
+        karte.vollbildButtonForTest()->setChecked(true);
+        QVERIFY2(karte.isFullScreen(), "der Knopf muss das Fenster fuellen");
+        karte.vollbildButtonForTest()->setChecked(false);
+        QVERIFY(!karte.isFullScreen());
+    }
+
     // ── Die Karte: Mosaik am Grid, Zaehler, Altern ──────────────────
     void karteZeigtMosaikZaehlerUndAltert()
     {

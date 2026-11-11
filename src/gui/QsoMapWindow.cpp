@@ -148,6 +148,17 @@ void QsoMapWindow::keyPressEvent(QKeyEvent* e)
     // Eingebettet ist Escape kein „Fenster zu" — QDialog wuerde das
     // Widget sonst mitten aus dem Logbuch ausblenden.
     if (m_embedded && e->key() == Qt::Key_Escape) { e->ignore(); return; }
+    // Im Vollbild ist Escape der Rueckweg, nicht „Fenster zu" -- sonst
+    // waere die Karte nach einem Tastendruck ganz weg.
+    if (!m_embedded && isFullScreen() && e->key() == Qt::Key_Escape) {
+        if (m_vollbildBtn) { m_vollbildBtn->setChecked(false); }
+        else               { showNormal(); }
+        return;
+    }
+    if (!m_embedded && e->key() == Qt::Key_F11) {
+        if (m_vollbildBtn) { m_vollbildBtn->setChecked(!m_vollbildBtn->isChecked()); }
+        return;
+    }
     QDialog::keyPressEvent(e);
 }
 
@@ -163,6 +174,10 @@ void QsoMapWindow::setEmbedded(bool on)
     if (m_backgroundBox) { m_backgroundBox->setVisible(!on); }
     if (m_earthBtn) { m_earthBtn->setVisible(!on); }
     if (m_popOutBtn) { m_popOutBtn->setVisible(on); }
+    if (m_vollbildBtn) {
+        m_vollbildBtn->setVisible(!on);
+        if (on && m_vollbildBtn->isChecked()) { m_vollbildBtn->setChecked(false); }
+    }
     rebuild();
 }
 
@@ -181,6 +196,16 @@ void QsoMapWindow::resetActiveView()
     if (isOverlayView(m_stack->currentIndex()) || m_stack->currentIndex() == kView3d) { return; }
     if (m_stack->currentIndex() == 0) { m_globe->resetView(); }
     else                              { m_flat->resetView(); }
+}
+
+void QsoMapWindow::setzeVollbild(bool an)
+{
+    if (m_embedded) { return; }   // in der Spalte gibt es kein Vollbild
+    if (an) { showFullScreen(); }
+    else    { showNormal(); }
+    // Das Vollbild stellt das Fenster neu auf; die Karte soll dabei
+    // nicht an ihrem alten Ausschnitt kleben.
+    QTimer::singleShot(0, this, [this]() { resetActiveView(); });
 }
 
 void QsoMapWindow::setzeJagd(bool an)
@@ -619,6 +644,19 @@ void QsoMapWindow::buildUi()
     m_popOutBtn->setVisible(false);
     bar->addWidget(m_popOutBtn);
     connect(m_popOutBtn, &QPushButton::clicked, this, &QsoMapWindow::popOutRequested);
+
+    // Vollbild -- nur im eigenen Fenster sinnvoll; in der Logbuchspalte
+    // gibt es nichts zu vergroessern, da fuehrt der Pfeil daneben heraus.
+    m_vollbildBtn = new QPushButton(QStringLiteral("\u26f6"), this);
+    m_vollbildBtn->setObjectName(QStringLiteral("qsoMapFullScreenButton"));
+    m_vollbildBtn->setCheckable(true);
+    m_vollbildBtn->setStyleSheet(Style::buttonBaseStyle() + Style::quietCheckedStyle());
+    m_vollbildBtn->setFocusPolicy(Qt::NoFocus);   // +/- bleiben bei der Karte
+    m_vollbildBtn->setToolTip(QStringLiteral(
+        "Fill the screen with the map  (F11, Escape back)"));
+    bar->addWidget(m_vollbildBtn);
+    // toggled, nicht clicked: die Bedienhilfe drueckt ueber toggle().
+    connect(m_vollbildBtn, &QPushButton::toggled, this, &QsoMapWindow::setzeVollbild);
 
     col->addLayout(bar);
 

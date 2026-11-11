@@ -226,6 +226,7 @@ public:
     QCheckBox* nurFt8ForTest() const { return m_nurFt8; }
     QCheckBox* gridForTest() const { return m_grid; }
     QPushButton* jagdButtonForTest() const { return m_jagdBtn; }
+    QPushButton* vollbildButtonForTest() const { return m_vollbildBtn; }
     QCheckBox* pathsForTest() const { return m_paths; }
     QCheckBox* imageryForTest() const { return m_imagery; }
     QSpinBox*  liveMinutenForTest() const { return m_liveMinuten; }
@@ -361,6 +362,11 @@ private:
     QWidget*          m_backgroundBox{nullptr};   // KARTE + Auswahl
     QPushButton*      m_earthBtn{nullptr};
     QPushButton*      m_popOutBtn{nullptr};
+    // Vollbild: nur im eigenen Fenster, nicht in der Logbuchspalte.
+    // Betreiber 2026-11-11: „es sollte die moeglichkeit geben, dass auf
+    // vollbild zu vergroessern".
+    QPushButton*      m_vollbildBtn{nullptr};
+    void setzeVollbild(bool an);
     bool              m_embedded{false};
 
     // ── 3D-Flug ──────────────────────────────────────────────────────
