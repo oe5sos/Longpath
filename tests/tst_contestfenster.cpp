@@ -19,6 +19,9 @@
 #include <QWidget>
 #include <QScreen>
 #include <QVBoxLayout>
+#include <QDir>
+#include <QTcpServer>
+#include <QTcpSocket>
 
 #include "ContestFenster.h"
 #include "FensterFrist.h"
@@ -36,6 +39,12 @@ private:
     // -- ueber SQLite direkt, damit dieser Pruefstand keine Kopfdatei des
     // Contestprogramms braucht (siehe ContestFenster.h zu den Kollisionen).
     static bool belegeLogVor(const QString& ordner)
+    {
+        return belegeLogVor(ordner, {});
+    }
+
+    static bool belegeLogVor(const QString& ordner,
+                             const QList<QPair<QString, QString>>& zusatz)
     {
         const QString name = QStringLiteral("vorbelegung");
         {
@@ -56,7 +65,7 @@ private:
                 {QStringLiteral("esm_enabled"),      QStringLiteral("0")},
                 {QStringLiteral("spectrum_enabled"), QStringLiteral("0")},
             };
-            for (const auto& kv : werte) {
+            for (const auto& kv : werte + zusatz) {
                 q.prepare(QStringLiteral("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)"));
                 q.addBindValue(kv.first);
                 q.addBindValue(kv.second);
@@ -504,6 +513,93 @@ private slots:
         bruecke.schliesse();
         QVERIFY2(chatZeiger.isNull(), "das Panel muss mit dem Logbuch gehen");
         QVERIFY(!bruecke.istOffen());
+    }
+
+    // ── Abbau mit verbundenem CAT (Absturz 2026-11-10 22:07) ────────
+    //
+    // Die installierte App stuerzte beim Beenden ab (SIGSEGV in
+    // QProcessPrivate::start): ContestFenster::schliesse() baut die
+    // Steuerung des Logbuchs ab, ihr RigctldClient meldet beim eigenen
+    // Abbau noch "getrennt" (~QAbstractSocket ruft disconnectFromHost),
+    // und die Aufsicht startete rigctld neu -- in ein RigctldProcess, das
+    // schon abgebaut war. Behoben im Contestprogramm (#79: die Leitungen
+    // werden vor dem Abbau gekappt); eingebettet startet das Logbuch
+    // ausserdem gar keinen eigenen rigctld, Longpath haelt den Anschluss.
+    //
+    // Hier: ein CAT-Anschluss, der wirklich verbunden ist und antwortet,
+    // ein Stellvertreter-rigctld auf PATH, der seinen Start mitschreibt,
+    // dann zu. Der Exitcode ist die Zusicherung; dazu darf weder waehrend
+    // des Laufs noch beim Abbau ein rigctld gestartet worden sein.
+    void derAbbauMitVerbundenemCatStartetKeinRigctld()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("Der Stellvertreter-rigctld ist ein Shell-Skript; unter Windows startet QProcess es nicht.");
+#endif
+        QTemporaryDir ordner;
+        QVERIFY(ordner.isValid());
+        qputenv("CONTESTPROGRAMM_DATA_DIR", ordner.path().toUtf8());
+
+        // Der Stellvertreter: schreibt, dass er gestartet wurde, und bleibt.
+        QTemporaryDir bin;
+        QVERIFY(bin.isValid());
+        const QString gestartet = bin.filePath(QStringLiteral("rigctld.gestartet"));
+        {
+            QFile skript(bin.filePath(QStringLiteral("rigctld")));
+            QVERIFY(skript.open(QIODevice::WriteOnly | QIODevice::Text));
+            skript.write(QStringLiteral("#!/bin/sh\necho \"$@\" > \"%1\"\nexec sleep 60\n")
+                             .arg(gestartet).toUtf8());
+            skript.close();
+            skript.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+        }
+        const QByteArray altPfad = qgetenv("PATH");
+        qputenv("PATH", (bin.path() + QLatin1Char(':')).toUtf8() + altPfad);
+
+        // Der CAT-Anschluss: antwortet auf die drei Abfragen des Takts
+        // und quittiert alles andere, damit der Klient verbunden BLEIBT
+        // (ein stummer Server liesse ihn ueber die Frist wieder fallen).
+        QTcpServer anschluss;
+        QVERIFY(anschluss.listen(QHostAddress::LocalHost, 0));
+        int anrufe = 0;
+        QByteArray rest;
+        connect(&anschluss, &QTcpServer::newConnection, this, [&] {
+            QTcpSocket* s = anschluss.nextPendingConnection();
+            if (!s) { return; }
+            ++anrufe;
+            connect(s, &QTcpSocket::readyRead, s, [&rest, s] {
+                rest.append(s->readAll());
+                int nl = -1;
+                while ((nl = rest.indexOf('\n')) >= 0) {
+                    const QByteArray zeile = rest.left(nl).trimmed();
+                    rest.remove(0, nl + 1);
+                    if (zeile == "f") { s->write("14074000\n"); }
+                    else if (zeile == "m") { s->write("USB\n2700\n"); }
+                    else if (zeile == "t") { s->write("0\n"); }
+                    else if (!zeile.isEmpty()) { s->write("RPRT 0\n"); }
+                }
+            });
+        });
+
+        QVERIFY(belegeLogVor(ordner.path(), {
+            {QStringLiteral("rigctld_host"),         QStringLiteral("127.0.0.1")},
+            {QStringLiteral("rigctld_port"),         QString::number(anschluss.serverPort())},
+            {QStringLiteral("rigctld_hamlib_model"), QStringLiteral("2037")},
+            {QStringLiteral("rigctld_device"),       QStringLiteral("/dev/cu.stellvertreter")},
+            {QStringLiteral("rigctld_baud"),         QStringLiteral("115200")},
+        }));
+
+        ContestFenster bruecke;
+        QString grund;
+        QVERIFY2(bruecke.oeffne(&grund), qPrintable(grund));
+        QTRY_VERIFY_WITH_TIMEOUT(anrufe > 0, kFensterFrist);
+        // Einen Abfragetakt lang verbunden stehen lassen.
+        QTest::qWait(1500);
+
+        bruecke.schliesse();
+        QVERIFY(!bruecke.istOffen());
+        QTest::qWait(500);
+        qputenv("PATH", altPfad);
+        QVERIFY2(!QFile::exists(gestartet),
+                 "das Logbuch hat einen eigenen rigctld gestartet (eingebettet haelt Longpath den Anschluss)");
     }
 
     void einZweiterSchreiberWirdAbgewiesen()

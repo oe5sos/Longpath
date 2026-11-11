@@ -397,6 +397,9 @@ warren@wpratt.com
 #include "applets/DiversityApplet.h"
 #include "applets/CwxApplet.h"
 #include "applets/DvkApplet.h"
+#include "gui/hotkeys/HotKeyDispatcher.h"
+#include "gui/hotkeys/KeyboardRouter.h"
+#include "gui/hotkeys/MainWindowHotKeyTargets.h"
 #include "applets/RttyDecoderApplet.h"
 #include "applets/CwDecoderApplet.h"
 #include "applets/Ft8Applet.h"
@@ -1526,6 +1529,11 @@ MainWindow::MainWindow(QWidget* parent)
         qInfo() << "[Autosave] Einstellungen gesichert";
     });
     autosave->start();
+
+    // Tastenkuerzel (2026-11-10) -- als Letztes, damit jedes Menue und
+    // jedes QShortcut schon steht: deren Tasten sind fuer Kuerzel
+    // gesperrt, und die Sperrliste wird aus ihnen gelesen.
+    richteTastenkuerzelEin();
 }
 
 MainWindow::~MainWindow()
@@ -4509,48 +4517,9 @@ void MainWindow::wireSpectrumSliceControls(SpectrumWidget* sw,
                           << "Scheibe" << (s ? s->sliceIndex() : -1)
                           << "gesperrt" << (s && s->locked());
         if (!s) { return; }
-
-        // ── Eine Sperre muss sich melden ────────────────────────────
-        //
-        // SliceModel::setFrequency() beginnt mit "if (m_locked)
-        // return;" — wortlos. Der Betreiber am 2026-08-22: "balken
-        // spring nicht dort hin." Im Quelltext und im echten Fenster
-        // stimmt der Klick nachweislich ab (gemessen: 7,100 ->
-        // 7,128 MHz), live tut er es nicht — und eine gesperrte
-        // Scheibe ist der einzige Weg, auf dem das schweigend
-        // passieren kann.
-        //
-        // Ob es diesmal die Ursache war, weiss ich nicht. Aber ein
-        // Bedienelement, das ohne ein Wort nichts tut, hat uns heute
-        // schon Stunden gekostet — und wenn es nicht die Ursache ist,
-        // erscheint der Hinweis nie und wir haben sie ausgeschlossen.
-        if (s->locked()) {
-            showToast(tr("This slice's frequency is locked — the padlock in the VFO bar "
-                          "releases it."),
-                      ToastSeverity::Info, 5000);
-            return;
-        }
-        s->setFrequency(hz);
-
-        // ── Und das Begleitgeraet mit (2026-10-28) ───────────────────
-        //
-        // Der Klick geht in BEIDE Richtungen: Longpaths eigene Scheibe
-        // und, wenn eingeschaltet, das fremde Funkgeraet. Das ist der
-        // Nutzen des Panadapters an einer ZF-Station -- der Betreiber
-        // sieht das Signal hier und hoert es dort.
-        //
-        // Nur hier, nicht bei jeder Frequenzaenderung der Scheibe. Ein
-        // Band- oder Speicherwechsel, ein Drehknopf, ein Spot: das
-        // alles bewegt die Scheibe ebenfalls, und wuerde man das
-        // weiterschicken, liefen Programm und Geraet gegeneinander,
-        // sobald das Geraet auch zurueckmeldet. Ein Klick ist eine
-        // Ansage des Bedieners, kein Zustand.
-        //
-        // Die Zahl geht unverwandelt hinueber: hz ist eine Frequenz auf
-        // DIESER Achse, also die ZF, und genau die will das Geraet.
-        if (m_radioModel && m_radioModel->companionRig()) {
-            m_radioModel->companionRig()->stimmeAbZf(std::llround(hz));
-        }
+        // Sperre, Abstimmen und Begleitgeraet: seit 2026-11-10 in
+        // stimmeVomBediener(), weil die Pfeiltasten denselben Weg nehmen.
+        stimmeVomBediener(s, hz);
     });
 
     // Drag a filter edge on this pan.
@@ -7344,13 +7313,9 @@ void MainWindow::buildUI()
         // laesst einen die Bandkante noch finden. Untergrenze
         // 2 kHz (darunter sieht man nur noch die eigene Bandbreite),
         // Obergrenze die Abtastrate (mehr liefert der Empfaenger nicht).
-        auto zoomBy = [this](double factor) {
-            SpectrumWidget* sw = activeSpectrumWidget();
-            if (!sw) { return; }
-            const double maxBw = sw->sampleRate() > 0.0 ? sw->sampleRate() : 384000.0;
-            const double bw = qBound(2000.0, sw->bandwidth() * factor, maxBw);
-            sw->setFrequencyRange(sw->centerFrequency(), bw);
-        };
+        // Die Rechnung steht seit 2026-11-10 in panoramaZoomen(): die
+        // Tasten = und - zoomen auf demselben Weg.
+        auto zoomBy = [this](double factor) { panoramaZoomen(factor); };
         connect(m_overlayPanel, &SpectrumOverlayPanel::zoomIn,  this,
                 [zoomBy]() { zoomBy(1.0 / 1.5); });
         connect(m_overlayPanel, &SpectrumOverlayPanel::zoomOut, this,
@@ -13345,7 +13310,11 @@ void MainWindow::buildMenuBar()
     {
         QAction* fdvAction = toolsMenu->addAction(QStringLiteral("&FreeDV Reporter..."));
         fdvAction->setObjectName(QStringLiteral("actFreeDVReporter"));
-        fdvAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+R")));
+        // Kein Kuerzel mehr (2026-11-10): Strg+Umschalt+R hat seit dem
+        // 2026-08-22 auch View > Remove active slice, das Gegenstueck zu
+        // Strg+R. Zwei Aktionen auf einer Taste loest Qt gar nicht aus
+        // („ambiguous shortcut"); das Schliessen der Scheibe ist das
+        // Kuerzel, das der Betreiber verlangt hat.
         fdvAction->setToolTip(QStringLiteral(
             "Open the FreeDV Reporter dialog (live stations on qso.freedv.org)."));
         connect(fdvAction, &QAction::triggered, this, &MainWindow::openFreeDVReporter);
@@ -13541,13 +13510,19 @@ void MainWindow::buildMenuBar()
         dlg.exec();
     });
 
-    // Phase 3J-2 H1: Ctrl+Shift+K clears all rows in SpotModel. Mirrors the
+    // Phase 3J-2 H1: Ctrl+Shift+X clears all rows in SpotModel. Mirrors the
     // "Clear All Spots" button on SpotHubDialog's Display tab so the user
     // can wipe stale spots without opening the dialog. Application-scoped
     // QShortcut so it fires regardless of which child widget has focus.
+    //
+    // Hier stand bis 2026-11-10 Strg+Umschalt+K -- dieselbe Taste wie
+    // Radio > Disconnect. Qt nennt das „ambiguous shortcut" und loest
+    // KEINE von beiden aus. Gefunden beim Einbau der Tastenkuerzel;
+    // Upstream NereusSDR hat denselben Fall am 2026-09-23 genauso geloest
+    // (R-R3-21: „clearing spots moves to Ctrl+Shift+X").
     {
         auto* clearSpotsShortcut = new QShortcut(
-            QKeySequence(QStringLiteral("Ctrl+Shift+K")), this);
+            QKeySequence(QStringLiteral("Ctrl+Shift+X")), this);
         clearSpotsShortcut->setContext(Qt::ApplicationShortcut);
         connect(clearSpotsShortcut, &QShortcut::activated, this, [this]() {
             if (m_radioModel && m_radioModel->spotModel()) {
