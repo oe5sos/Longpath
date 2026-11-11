@@ -2745,6 +2745,9 @@ endif()
 # tst_logbuch_rotor_knopf (2026-11-10): ROTOR in der Eingabezeile --
 #   Peilung auch fuer neue Stationen, Rotate/LP, erlaubter Bereich, Lagequelle.
 longpath_add_test(tst_logbuch_rotor_knopf)
+# tst_rotorzeile_entwuerfe (2026-11-11): Werkzeug, Entwurfsblaetter der
+#   Rotorzeile (nur mit LONGPATH_GRAB_DIR, sonst uebersprungen).
+longpath_add_test(tst_rotorzeile_entwuerfe)
 
 longpath_add_test(tst_kombi_entwuerfe)
 longpath_add_test(tst_startmaske)
