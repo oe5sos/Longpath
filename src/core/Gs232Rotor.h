@@ -50,6 +50,7 @@
 
 #include <QByteArray>
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QString>
 
 class QIODevice;
@@ -86,6 +87,27 @@ public:
     /// ein Rotor dreht rund 5 Grad je Sekunde, schneller zu fragen
     /// bringt keine neue Zahl.
     void setPollIntervalMs(int ms);
+
+    // ── Von selbst wieder verbinden (Netz) ── 2026-11-11 ────────────────
+    //
+    // Live am ARCO: war er beim Start von Longpath noch aus, blieb der
+    // Rotor bis zum naechsten Programmstart weg -- „Host unreachable",
+    // dann nichts mehr. Der rotctld-Weg kann das seit 2026-09-16
+    // (RotctldClient::kRetryAfterDropMs); der GS-232-Weg jetzt auch:
+    // nach einem gescheiterten Verbinden, einer Trennung, einem
+    // Verbindungsaufbau, der nicht fertig wird, und einem Geraet, das
+    // still verstummt (Strom weg, die TCP-Seite merkt es nicht). Die
+    // Wartezeit waechst bis kWiederholungMaxMs, damit ein ausgeschalteter
+    // ARCO das Protokoll nicht im Sekundentakt fuellt; gemeldet wird nur
+    // der erste Fehlschlag einer Reihe. disconnectFromRotor() beendet es.
+    static constexpr int kWiederholungMs    = 3000;
+    static constexpr int kWiederholungMaxMs = 30000;
+    static constexpr int kAnschlussFristMs  = 5000;
+    static constexpr int kStummMs           = 6000;
+    /// Fuer Pruefstaende: kuerzere Zeiten.
+    void setWiederholungMs(int ms);
+    void setAnschlussFristMs(int ms);
+    void setStummMs(int ms) { m_stummMs = ms; }
 
     QString description() const override;
     State   state() const override { return m_state; }
@@ -139,6 +161,7 @@ private:
     void send(const QByteArray& command);
     void setState(State s);
     void fail(const QString& why);
+    void netzVerloren(QIODevice* dev, const QString& grund);
 
     QIODevice* m_dev{nullptr};
     bool       m_ownsDev{true};
@@ -155,6 +178,15 @@ private:
     double     m_azimuth{0.0};
     double     m_elevation{0.0};
     QDateTime  m_lastReading;
+    // Neu verbinden (Netz)
+    QTimer*    m_neu{nullptr};
+    QTimer*    m_frist{nullptr};
+    bool       m_soll{false};          // verbunden sein wollen
+    int        m_ersteWartenMs{kWiederholungMs};
+    int        m_wartenMs{kWiederholungMs};
+    int        m_fehlversuche{0};
+    int        m_stummMs{kStummMs};
+    QElapsedTimer m_gehoert;           // seit der letzten Antwort
 };
 
 } // namespace Longpath

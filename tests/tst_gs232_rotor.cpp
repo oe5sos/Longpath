@@ -17,6 +17,10 @@
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>
+#include <QPointer>
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QHostAddress>
 
 #include "core/AppSettings.h"
 #include "core/Gs232Rotor.h"
@@ -73,6 +77,41 @@ private:
     QByteArray m_rx;
     QByteArray m_tx;
 };
+
+} // namespace
+
+namespace {
+// Ein Ersatz-ARCO: antwortet auf jede Abfrage mit einer Lage -- oder,
+// wenn stumm, gar nicht.
+struct ErsatzArco {
+    QTcpServer server;
+    QList<QPointer<QTcpSocket>> kunden;
+    bool stumm{false};
+    int verbindungen{0};
+    bool lausche(quint16 port)
+    {
+        QObject::connect(&server, &QTcpServer::newConnection, &server, [this]() {
+            while (QTcpSocket* c = server.nextPendingConnection()) {
+                ++verbindungen;
+                kunden << c;
+                QObject::connect(c, &QTcpSocket::readyRead, c, [this, c]() {
+                    c->readAll();
+                    if (!stumm) { c->write("AZ=231 EL=000\r"); }
+                });
+            }
+        });
+        return server.listen(QHostAddress::LocalHost, port);
+    }
+};
+
+quint16 freierPort()
+{
+    QTcpServer probe;
+    probe.listen(QHostAddress::LocalHost, 0);
+    const quint16 p = probe.serverPort();
+    probe.close();
+    return p;
+}
 
 } // namespace
 
@@ -435,6 +474,101 @@ private slots:
         QVERIFY2(rest <= 5.0,
                  qPrintable(QStringLiteral("Rest zum Ausgangswert: %1 Grad")
                                 .arg(rest)));
+    }
+
+    // ── Von selbst wieder verbinden (Netz) ── 2026-11-11 ────────────────
+    // Live am ARCO: beim Start von Longpath noch aus -> der Rotor blieb
+    // bis zum naechsten Programmstart weg.
+
+    void kommt_von_selbst_wenn_der_arco_spaeter_angeht()
+    {
+        const quint16 port = freierPort();
+        Gs232Rotor rotor;
+        rotor.setNetworkTarget(QStringLiteral("127.0.0.1"), port);
+        rotor.setWiederholungMs(150);
+        QSignalSpy fehler(&rotor, &Gs232Rotor::errorOccurred);
+        rotor.connectToRotor();
+        QTRY_COMPARE_WITH_TIMEOUT(rotor.state(), RotorController::State::Disconnected, 3000);
+        // Mehrere Versuche ins Leere (150, 300, 600 ms ...) -- gemeldet wird einer.
+        QTest::qWait(1200);
+        QCOMPARE(fehler.count(), 1);
+
+        ErsatzArco arco;
+        QVERIFY(arco.lausche(port));
+        QTRY_VERIFY_WITH_TIMEOUT(rotor.hasFreshPosition(), 8000);
+        QCOMPARE(rotor.state(), RotorController::State::Idle);
+        QCOMPARE(rotor.azimuth(), 231.0);
+    }
+
+    void verbindet_neu_wenn_die_verbindung_abbricht()
+    {
+        ErsatzArco arco;
+        QVERIFY(arco.lausche(freierPort()));
+        Gs232Rotor rotor;
+        rotor.setNetworkTarget(QStringLiteral("127.0.0.1"), arco.server.serverPort());
+        rotor.setWiederholungMs(100);
+        rotor.connectToRotor();
+        QTRY_VERIFY_WITH_TIMEOUT(rotor.hasFreshPosition(), 5000);
+        QCOMPARE(arco.verbindungen, 1);
+        // Der ARCO legt auf (z. B. Neustart des Geraets).
+        for (const auto& k : std::as_const(arco.kunden)) { if (k) { k->close(); } }
+        QTRY_VERIFY_WITH_TIMEOUT(arco.verbindungen >= 2, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(rotor.state(), RotorController::State::Idle, 5000);
+    }
+
+    void verstummt_er_wird_neu_verbunden()
+    {
+        // Strom weg: die Verbindung steht scheinbar, aber niemand antwortet.
+        ErsatzArco arco;
+        QVERIFY(arco.lausche(freierPort()));
+        Gs232Rotor rotor;
+        rotor.setNetworkTarget(QStringLiteral("127.0.0.1"), arco.server.serverPort());
+        rotor.setPollIntervalMs(50);
+        rotor.setWiederholungMs(100);
+        rotor.setStummMs(400);
+        QSignalSpy fehler(&rotor, &Gs232Rotor::errorOccurred);
+        rotor.connectToRotor();
+        QTRY_VERIFY_WITH_TIMEOUT(rotor.hasFreshPosition(), 5000);
+        arco.stumm = true;
+        QTRY_VERIFY_WITH_TIMEOUT(arco.verbindungen >= 2, 5000);
+        QVERIFY(!fehler.isEmpty());
+        QVERIFY2(fehler.first().first().toString().contains(QStringLiteral("stopped answering")),
+                 qPrintable(fehler.first().first().toString()));
+    }
+
+    void getrennt_heisst_getrennt()
+    {
+        const quint16 port = freierPort();
+        Gs232Rotor rotor;
+        rotor.setNetworkTarget(QStringLiteral("127.0.0.1"), port);
+        rotor.setWiederholungMs(100);
+        rotor.connectToRotor();
+        QTRY_COMPARE_WITH_TIMEOUT(rotor.state(), RotorController::State::Disconnected, 3000);
+        rotor.disconnectFromRotor();
+        ErsatzArco arco;
+        QVERIFY(arco.lausche(port));
+        QTest::qWait(800);
+        QCOMPARE(arco.verbindungen, 0);
+        QCOMPARE(rotor.state(), RotorController::State::Disconnected);
+    }
+
+    void abbau_sendet_nichts_mehr()
+    {
+        // Der Destruktor schliesst den Socket; das darf nicht als Trennung
+        // mit Neuversuch und Zustandswechsel hinausgehen.
+        ErsatzArco arco;
+        QVERIFY(arco.lausche(freierPort()));
+        auto* rotor = new Gs232Rotor;
+        rotor->setNetworkTarget(QStringLiteral("127.0.0.1"), arco.server.serverPort());
+        rotor->connectToRotor();
+        QTRY_VERIFY_WITH_TIMEOUT(rotor->hasFreshPosition(), 5000);
+        int wechsel = 0, fehler = 0;
+        connect(rotor, &Gs232Rotor::stateChanged, this, [&wechsel]() { ++wechsel; });
+        connect(rotor, &Gs232Rotor::errorOccurred, this, [&fehler]() { ++fehler; });
+        delete rotor;
+        QCoreApplication::processEvents();
+        QCOMPARE(wechsel, 0);
+        QCOMPARE(fehler, 0);
     }
 
     void beschreibung_sagt_die_schnittstelle()

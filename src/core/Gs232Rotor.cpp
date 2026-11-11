@@ -46,13 +46,77 @@ Gs232Rotor::Gs232Rotor(QObject* parent)
     m_poll = new QTimer(this);
     m_poll->setInterval(m_pollMs);
     connect(m_poll, &QTimer::timeout, this, &Gs232Rotor::poll);
+
+    // Neu verbinden (Netz, 2026-11-11) -- siehe Gs232Rotor.h.
+    m_neu = new QTimer(this);
+    m_neu->setSingleShot(true);
+    connect(m_neu, &QTimer::timeout, this, [this]() {
+        if (m_soll && m_state == State::Disconnected && !m_host.isEmpty()) { connectToRotor(); }
+    });
+    // Ein Verbindungsaufbau zu einem stummen Ziel haengt sonst so lange,
+    // wie das Betriebssystem SYN wiederholt (auf dem Mac ueber eine Minute).
+    m_frist = new QTimer(this);
+    m_frist->setSingleShot(true);
+    m_frist->setInterval(kAnschlussFristMs);
+    connect(m_frist, &QTimer::timeout, this, [this]() {
+        if (m_state != State::Connecting) { return; }
+        netzVerloren(m_dev, QStringLiteral("%1:%2 did not answer the connection")
+                                .arg(m_host).arg(m_netPort));
+    });
+}
+
+void Gs232Rotor::setWiederholungMs(int ms)
+{
+    m_ersteWartenMs = std::max(10, ms);
+    m_wartenMs = m_ersteWartenMs;
+}
+
+void Gs232Rotor::setAnschlussFristMs(int ms)
+{
+    m_frist->setInterval(std::max(10, ms));
+}
+
+void Gs232Rotor::netzVerloren(QIODevice* dev, const QString& grund)
+{
+    // Doppelt gemeldet (errorOccurred, dann disconnected) oder eine alte
+    // Verbindung, die schon ersetzt ist: nichts zu tun.
+    if (!dev || dev != m_dev) { return; }
+    m_poll->stop();
+    m_frist->stop();
+    m_dev = nullptr;
+    dev->disconnect(this);
+    if (auto* sock = qobject_cast<QAbstractSocket*>(dev)) { sock->abort(); }
+    dev->deleteLater();
+    m_buffer.clear();
+    m_lastReading = {};
+    ++m_fehlversuche;
+    // Nur der erste Fehlschlag einer Reihe geht an die Oberflaeche und
+    // ins Protokoll; ein ausgeschalteter ARCO soll nicht stuendlich
+    // hunderte Zeilen schreiben.
+    if (m_fehlversuche == 1) {
+        qCWarning(lcRotor) << "GS-232:" << grund;
+        emit errorOccurred(grund);
+    } else {
+        qCDebug(lcRotor) << "GS-232:" << grund << "-- Versuch" << m_fehlversuche;
+    }
+    setState(State::Disconnected);
+    if (m_soll && !m_host.isEmpty()) {
+        qCDebug(lcRotor) << "GS-232: neuer Versuch in" << m_wartenMs << "ms";
+        m_neu->start(m_wartenMs);
+        m_wartenMs = std::min(m_wartenMs * 2, kWiederholungMaxMs);
+    }
 }
 
 Gs232Rotor::~Gs232Rotor()
 {
     // Die Schnittstelle gehoert uns nur, wenn wir sie selbst geoeffnet
     // haben; eine eingehaengte Pruefstandsnaht wird nicht geschlossen.
+    // Erst die Signale weg: close() meldet sonst disconnected(), und
+    // netzVerloren() sendete mitten im Abbau an Empfaenger, die es
+    // vielleicht schon nicht mehr gibt (2026-11-11).
+    m_soll = false;
     if (m_dev && m_ownsDev) {
+        m_dev->disconnect(this);
         m_dev->close();
     }
 }
@@ -147,7 +211,16 @@ void Gs232Rotor::connectToRotor()
         return;
     }
 
+    m_soll = true;
+    m_neu->stop();
     if (m_dev && m_dev->isOpen()) { return; }
+    if (m_dev && m_ownsDev) {
+        // Ein gescheiterter Versuch von vorher: weg damit.
+        QIODevice* alt = m_dev;
+        m_dev = nullptr;
+        alt->disconnect(this);
+        alt->deleteLater();
+    }
 
     // Netzserver schlaegt serielle Schnittstelle.
     if (!m_host.isEmpty()) {
@@ -157,6 +230,13 @@ void Gs232Rotor::connectToRotor()
         m_ownsDev = true;
         connect(sock, &QIODevice::readyRead, this, &Gs232Rotor::onReadyRead);
         connect(sock, &QTcpSocket::connected, this, [this]() {
+            m_frist->stop();
+            if (m_fehlversuche > 0) {
+                qCInfo(lcRotor) << "GS-232: wieder da nach" << m_fehlversuche << "Versuch(en)";
+            }
+            m_fehlversuche = 0;
+            m_wartenMs = m_ersteWartenMs;
+            m_gehoert.restart();
             qCInfo(lcRotor) << "GS-232: Netzserver offen" << m_host << m_netPort;
             setState(State::Idle);
             m_poll->start();
@@ -164,11 +244,20 @@ void Gs232Rotor::connectToRotor()
         });
         connect(sock, &QTcpSocket::errorOccurred, this,
                 [this, sock](QAbstractSocket::SocketError) {
-                    const QString grund = sock->errorString();
-                    m_poll->stop();
-                    fail(QStringLiteral("%1:%2 nicht erreichbar: %3")
-                             .arg(m_host).arg(m_netPort).arg(grund));
+                    // Stand die Verbindung schon, ist sie verloren -- sonst
+                    // war das Ziel nicht erreichbar.
+                    const bool stand = m_state == State::Idle || m_state == State::Moving;
+                    netzVerloren(sock, QStringLiteral("%1:%2 %3: %4")
+                                           .arg(m_host).arg(m_netPort)
+                                           .arg(stand ? QStringLiteral("connection lost")
+                                                      : QStringLiteral("not reachable"))
+                                           .arg(sock->errorString()));
                 });
+        connect(sock, &QTcpSocket::disconnected, this, [this, sock]() {
+            netzVerloren(sock, QStringLiteral("%1:%2 closed the connection")
+                                   .arg(m_host).arg(m_netPort));
+        });
+        m_frist->start();
         sock->connectToHost(m_host, m_netPort);
         return;
     }
@@ -216,6 +305,13 @@ void Gs232Rotor::connectToRotor()
 
 void Gs232Rotor::disconnectFromRotor()
 {
+    // Ausdruecklich getrennt: auch nicht mehr neu verbinden.
+    m_soll = false;
+    m_neu->stop();
+    m_frist->stop();
+    m_fehlversuche = 0;
+    m_wartenMs = m_ersteWartenMs;
+    if (m_dev && m_ownsDev) { m_dev->disconnect(this); }
     m_poll->stop();
     if (m_dev && m_ownsDev) {
         m_dev->close();
@@ -250,6 +346,15 @@ void Gs232Rotor::stop()
 void Gs232Rotor::poll()
 {
     if (!m_dev || !m_dev->isOpen()) { return; }
+    // Stummwache (Netz): ein ARCO, dem der Strom fehlt, schliesst keine
+    // Verbindung -- die TCP-Seite merkt es erst nach Minuten. Wer auf die
+    // Abfragen so lange nichts sagt, gilt als weg; dann neu verbinden.
+    if (!m_host.isEmpty() && m_ownsDev && m_gehoert.isValid()
+        && m_gehoert.elapsed() > m_stummMs) {
+        netzVerloren(m_dev, QStringLiteral("%1:%2 stopped answering — reconnecting")
+                                .arg(m_host).arg(m_netPort));
+        return;
+    }
     send(pollCommand());
 }
 
@@ -262,6 +367,7 @@ void Gs232Rotor::send(const QByteArray& command)
 void Gs232Rotor::onReadyRead()
 {
     if (!m_dev) { return; }
+    m_gehoert.restart();
     m_buffer.append(m_dev->readAll());
 
     for (;;) {
