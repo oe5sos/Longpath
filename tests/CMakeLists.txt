@@ -6349,6 +6349,10 @@ longpath_add_test(tst_profilschiene_bindung)
 #    ben Rundgang in der Sichtbarkeits-Karte --
 longpath_add_test(tst_real_layout_profile_roundtrip)
 
+# -- Ein Bau ohne Contestprogramm wirft die Contest-Anordnung der Profile
+#    nicht weg (2026-11-11). Mit Contestprogramm uebersprungen.
+longpath_add_test(tst_profil_contest_ohne_contestprogramm)
+
 # -- Widgets im rechten Stapel verschieben. Geprueft wird die eine
 #    Eigenschaft, an der so etwas scheitert: dass die sichtbare Reihen-
 #    folge und die gespeicherte Liste dasselbe sagen. Dazu der Zug, der

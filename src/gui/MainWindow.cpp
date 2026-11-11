@@ -20,6 +20,10 @@
 //                 src/gui/TitleBar.{h,cpp}. AetherSDR has no per-file
 //                 headers; project-level citation per docs/attribution/
 //                 HOW-TO-PORT.md rule 6.
+//   2026-11-11 -- A build without the contest program keeps the contest
+//                 layout (contestPanels, contestLogbook) of a layout profile
+//                 instead of dropping it on capture. Martin Fischer
+//                 (OE5SOS), AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 /*  MeterManager.cs
@@ -10344,6 +10348,20 @@ void MainWindow::populateDefaultMeter()
                     s.insert(QStringLiteral("contestLogbook"),
                              m_contestAnordnungGemerkt.value(QStringLiteral("contestLogbook")));
                 }
+#else
+                // Ein Bau OHNE Contestprogramm (2026-11-11): er kann die
+                // Anordnung nicht herstellen, darf sie aber nicht
+                // wegwerfen. Bis heute schrieb jeder Lauf aus einem Baum
+                // ohne das Submodul alle erfassten Profile ohne diese zwei
+                // Felder zurueck -- Martins Unified-Log-Fenster im Profil
+                // CONTEST war danach weg. Jetzt geht zurueck, was das
+                // Profil beim Anwenden mitbrachte.
+                for (const QString& feld : {QStringLiteral("contestPanels"),
+                                            QStringLiteral("contestLogbook")}) {
+                    if (m_contestAnordnungGemerkt.contains(feld)) {
+                        s.insert(feld, m_contestAnordnungGemerkt.value(feld));
+                    }
+                }
 #endif
 
                 // ── Panadapter-Schwebefenster ───────────────────────
@@ -11155,6 +11173,10 @@ void MainWindow::populateDefaultMeter()
                 QTimer::singleShot(0, this, [this, s]() {
                     if (!m_shuttingDown) { stelleContestAnordnungHer(s); }
                 });
+#else
+                // Ohne Contestprogramm nur merken, sofort -- siehe die
+                // Erfassung (2026-11-11).
+                stelleContestAnordnungHer(s);
 #endif
 
                 // Die Anzeigezeile: was das Profil nicht nennt, ist aus.
@@ -20022,7 +20044,16 @@ void MainWindow::fuelleContestPanelMenu(QMenu* menu)
 void MainWindow::stelleContestAnordnungHer(const QVariantMap& s)
 {
 #ifndef LONGPATH_HAVE_CONTESTPROGRAMM
-    Q_UNUSED(s);
+    // Ein Bau ohne Contestprogramm stellt nichts her, merkt sich aber, was
+    // das Profil sagt -- auch, dass es nichts sagt: ein Profil ohne diese
+    // Felder bekommt keine aus dem vorigen Profil (2026-11-11).
+    m_contestAnordnungGemerkt.clear();
+    for (const QString& feld : {QStringLiteral("contestPanels"),
+                                QStringLiteral("contestLogbook")}) {
+        if (s.contains(feld)) {
+            m_contestAnordnungGemerkt.insert(feld, s.value(feld));
+        }
+    }
 #else
     const QVariantMap panels = s.value(QStringLiteral("contestPanels")).toMap();
     const bool logbuch = s.value(QStringLiteral("contestLogbook")).toBool();
