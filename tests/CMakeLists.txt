@@ -2344,6 +2344,11 @@ longpath_add_test(tst_audio_rate_matcher)
 #   leeren Puffer und regelt dagegen an, bis der Ton verstimmt ist.
 #   Dazu die Gegenprobe ohne Ausgleich, die leerlaufen MUSS.
 longpath_add_test(tst_rx_raten_angleich)
+# tst_rx_drift_flex_schuebe (2026-11-11): an der FLEX-8400 zog der Ausgleich
+#   -8000 ppm, weil der Bus nur zaehlte, was aus dem Ring kam. In Schueben
+#   misst die Vorsteuerung dann ihr eigenes Verhaeltnis. Zaehlregel jetzt wie
+#   Thetis xrmatchOUT: die volle Blocklaenge, auch bei Stille.
+longpath_add_test(tst_rx_drift_flex_schuebe)
 
 # ── Der Schalter fuer den Driftausgleich (2026-10-06) ───────────────────────
 # tst_rx_drift_schalter: ein Haekchen, das nichts schaltet, ist schlimmer als
