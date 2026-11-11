@@ -183,6 +183,9 @@ bool ContestFenster::lade(QString* grund, QWidget* elternFenster)
     }
 
     auto steuerung = std::make_unique<Contestprogramm::AppController>();
+    // CAT kommt hier von Longpath selbst; ein zweiter rigctld wuerde ihm
+    // den Anschluss wegnehmen.
+    steuerung->setRigctldSelbstStarten(false);
     QString fehler;
     if (!steuerung->openDatabase(Contestprogramm::datenbankPfad(ordner), &fehler)) {
         if (grund) {
