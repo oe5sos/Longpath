@@ -66,6 +66,7 @@ namespace Longpath {
 
 class CallsignCache;
 class HoehenprofilFenster;
+class CtyDatParser;
 class QrzClient;
 class StationPhoto;
 
@@ -135,6 +136,15 @@ public:
     QString gezeigtesRufzeichen() const { return m_haveEntry ? m_entry.call : QString(); }
     QPushButton* profilButtonForTest() const { return m_profilBtn; }
     HoehenprofilFenster* profilFensterForTest() const;
+    // ── Grauzone, SFI, Kp (2026-11-10) ───────────────────────────────
+    //
+    // Die Zeile unter BEAM: wie das Licht an beiden Enden stand und wie
+    // Sonne und Magnetfeld an dem Tag waren (core/Grauzone.h,
+    // core/GfzIndizes.h). cty.dat fuer die Landesmitte, wenn der Locator
+    // fehlt; das Ersatzfeld fuer QSOs ohne MY_GRIDSQUARE (im Logbuch: das
+    // juengste im Log). Beides nicht besessen.
+    void setCty(const CtyDatParser* cty);
+    void setMeinFeldErsatz(const QString& feld);
 
 signals:
     void turnRotorRequested(double bearingDeg, const QString& call);
@@ -156,6 +166,7 @@ private:
     void refresh();               // redraw from m_entry + m_info
     void refreshExtras();         // the ADIF fields with no column
     void refreshBeam();
+    void refreshLicht();
     void applyInfo(const CallsignInfo& info, bool stale);
     void requestLookup();
     void wireQrz();
@@ -192,6 +203,10 @@ private:
     QPushButton* m_turnShort{nullptr};
     QPushButton* m_turnLong{nullptr};
     QLabel*      m_travel{nullptr};
+    QLabel*      m_licht{nullptr};      // "Grey line at their end · SFI 142 · Kp 2"
+
+    const CtyDatParser* m_cty{nullptr};
+    QString             m_meinFeldErsatz;
 
     QWidget*     m_extrasBox{nullptr};
     QFormLayout* m_extras{nullptr};

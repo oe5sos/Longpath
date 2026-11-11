@@ -187,7 +187,9 @@ public:
 
     // cty.dat for the Kennzahlen (entity per contact, DXCC / continent /
     // zone). Optional: without it the ADIF DXCC field is all there is.
-    void setCtyDat(const class CtyDatParser* cty) { m_cty = cty; }
+    // Reicht es auch an das Detailpaneel weiter (Landesmitte fuer die
+    // Grauzone, wenn der Locator fehlt).
+    void setCtyDat(const class CtyDatParser* cty);
 
 signals:
     // ── Point the beam at a contact ──────────────────────────────────
@@ -474,6 +476,7 @@ private:
     QLineEdit*    m_gridEdit{nullptr};
     QLineEdit*    m_countryEdit{nullptr};
     QCheckBox*    m_unconfirmedOnly{nullptr};
+    QCheckBox*    m_greyLineOnly{nullptr};     // 2026-11-10, core/Grauzone.h
     QCheckBox*    m_useDates{nullptr};
     QDateEdit*    m_fromDate{nullptr};
     QDateEdit*    m_toDate{nullptr};

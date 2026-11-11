@@ -854,6 +854,19 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
         "because it is."));
     row->addWidget(m_unconfirmedOnly);
 
+    // ── Nur Grauzonen-QSOs (2026-11-10) ──────────────────────────────
+    m_greyLineOnly = new QCheckBox(QStringLiteral("Grey line"), this);
+    m_greyLineOnly->setObjectName(QStringLiteral("logbookGreyLineOnly"));
+    m_greyLineOnly->setStyleSheet(
+        QStringLiteral("QCheckBox { color: %1; }")
+            .arg(QString::fromLatin1(Style::kTextPrimary)));
+    m_greyLineOnly->setToolTip(QStringLiteral(
+        "Only contacts with the sun between −6° and +6° at one end or "
+        "both, at the time of the contact.\n\nPositions come from the "
+        "locators; without one, their end is the country centre from "
+        "cty.dat and your end is the newest MY_GRIDSQUARE in the log."));
+    row->addWidget(m_greyLineOnly);
+
     m_useDates = new QCheckBox(QStringLiteral("Dates"), this);
     m_useDates->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                                   .arg(QString::fromLatin1(Style::kTextPrimary)));
@@ -910,6 +923,8 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
     connect(m_toDate, &QDateEdit::dateChanged, this, reapply);
     connect(m_unconfirmedOnly, &QCheckBox::toggled, this,
             [reapply](bool) { reapply(); });
+    connect(m_greyLineOnly, &QCheckBox::toggled, this,
+            [reapply](bool) { reapply(); });
     connect(m_useDates, &QCheckBox::toggled, this, [this, reapply](bool on) {
         m_fromDate->setEnabled(on);
         m_toDate->setEnabled(on);
@@ -927,6 +942,8 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
         // 2026-09-26).
         QSignalBlocker b8(m_unconfirmedOnly);
         m_unconfirmedOnly->setChecked(false);
+        QSignalBlocker b9(m_greyLineOnly);
+        m_greyLineOnly->setChecked(false);
         m_search->clear();
         m_bandBox->setCurrentIndex(0);
         m_modeBox->setCurrentIndex(0);
@@ -992,6 +1009,11 @@ LogFilter LogbookWindow::currentFilter() const
     }
 
     f.unconfirmedOnly = m_unconfirmedOnly->isChecked();
+    f.greyLineOnly = m_greyLineOnly->isChecked();
+    if (f.greyLineOnly) {
+        f.greyLineCty  = m_cty;
+        f.greyLineHome = meinFeld();
+    }
     f.useDates = m_useDates->isChecked();
     if (f.useDates) {
         f.from = m_fromDate->date();
@@ -1327,6 +1349,9 @@ void LogbookWindow::refreshTable()
     // The first row is the right default because the table is sorted
     // newest-first: the contact you want is nearly always the last one
     // you made. (2026-08-10)
+    // Das eigene Feld fuer QSOs ohne MY_GRIDSQUARE (Grauzone), bevor
+    // das Paneel ein QSO bekommt.
+    if (m_detail) { m_detail->setMeinFeldErsatz(meinFeld()); }
     if (m_table->rowCount() > 0) {
         if (m_table->currentRow() < 0) {
             m_table->setCurrentCell(0, ColCall);
@@ -2323,7 +2348,8 @@ void LogbookWindow::refreshStatsView()
     shown.reserve(m_visible.size());
     for (int i : m_visible) { shown.push_back(m_all.at(i)); }
     const LogbookStats stats = LogbookStats::compute(shown, m_cty,
-                                                     QDateTime::currentDateTimeUtc());
+                                                     QDateTime::currentDateTimeUtc(),
+                                                     meinFeld());
     if (dialogWants) { m_statsView->setStats(stats); }
     if (rowWants)    { m_statsRow->setStats(stats); }
 
@@ -2814,6 +2840,12 @@ void LogbookWindow::refreshRadioReadout()
     m_entrySource->setText(live ? QStringLiteral("from radio")
                                 : QStringLiteral("radio not connected"));
     if (m_bedarf && m_bedarf->isVisible()) { aktualisiereBedarf(); }
+}
+
+void LogbookWindow::setCtyDat(const CtyDatParser* cty)
+{
+    m_cty = cty;
+    if (m_detail) { m_detail->setCty(cty); }
 }
 
 QString LogbookWindow::meinFeld() const

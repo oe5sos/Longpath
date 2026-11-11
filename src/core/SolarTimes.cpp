@@ -8,6 +8,8 @@
 // Modification history (Longpath):
 //   2026-08-07 — Created in C++20/Qt6 for NereusSDR, AI-assisted via
 //                 Anthropic Claude (Cowork), operator Martin Fischer.
+//   2026-11-10 — subsolarPoint(); see SolarTimes.h. AI-assisted via
+//                 Anthropic Claude (Claude Code), operator Martin Fischer.
 // =================================================================
 
 #include "SolarTimes.h"
@@ -47,6 +49,33 @@ double normDeg(double d)
     return d < 0.0 ? d + 360.0 : d;
 }
 
+// Mean anomaly and ecliptic longitude for a day number since J2000.0.
+// One place for both solarInfo() and subsolarPoint(), so the globe and
+// the grey-line verdict cannot drift apart.
+void ecliptic(double j, double& m, double& lambda)
+{
+    m = normDeg(357.5291 + 0.98560028 * j);
+    // Equation of centre — the Earth's orbit is an ellipse, so the sun
+    // runs ahead of the mean by up to about two degrees.
+    const double c = 1.9148 * std::sin(m * kDeg)
+                   + 0.0200 * std::sin(2 * m * kDeg)
+                   + 0.0003 * std::sin(3 * m * kDeg);
+    lambda = normDeg(m + c + 180.0 + 102.9372);
+}
+
+// The transit correction in days: how far the sun's crossing of a
+// meridian runs from mean noon. Times 1440 it is the equation of time
+// (with the opposite sign).
+double transitTerm(double m, double lambda)
+{
+    return 0.0053 * std::sin(m * kDeg) - 0.0069 * std::sin(2 * lambda * kDeg);
+}
+
+double sinDeclination(double lambda)
+{
+    return std::sin(lambda * kDeg) * std::sin(23.4397 * kDeg);
+}
+
 } // namespace
 
 SolarInfo solarInfo(const QDateTime& utc, double lat, double lonEast)
@@ -65,23 +94,15 @@ SolarInfo solarInfo(const QDateTime& utc, double lat, double lonEast)
     const double n     = std::round(days - 0.0009 - lw / 360.0);
     const double jStar = 0.0009 + lw / 360.0 + n;
 
-    // Solar mean anomaly, then the equation of centre — the Earth's
-    // orbit is an ellipse, so the sun runs ahead of the mean by up to
-    // about two degrees.
-    const double m = normDeg(357.5291 + 0.98560028 * jStar);
-    const double c = 1.9148 * std::sin(m * kDeg)
-                   + 0.0200 * std::sin(2 * m * kDeg)
-                   + 0.0003 * std::sin(3 * m * kDeg);
-
-    const double lambda = normDeg(m + c + 180.0 + 102.9372);
+    // Solar mean anomaly and ecliptic longitude (see ecliptic()).
+    double m = 0.0, lambda = 0.0;
+    ecliptic(jStar, m, lambda);
 
     // Solar transit: the instant the sun crosses the local meridian.
-    const double jTransit = 2451545.0 + jStar
-                          + 0.0053 * std::sin(m * kDeg)
-                          - 0.0069 * std::sin(2 * lambda * kDeg);
+    const double jTransit = 2451545.0 + jStar + transitTerm(m, lambda);
 
     // Declination: how far north or south the sun is standing today.
-    const double sinDec = std::sin(lambda * kDeg) * std::sin(23.4397 * kDeg);
+    const double sinDec = sinDeclination(lambda);
     const double dec    = std::asin(sinDec);
 
     const double phi = lat * kDeg;
@@ -115,6 +136,27 @@ SolarInfo solarInfo(const QDateTime& utc, double lat, double lonEast)
     info.greyline = std::abs(info.elevationDeg) <= 6.0;
 
     return info;
+}
+
+void subsolarPoint(const QDateTime& utc, double& lat, double& lonEast)
+{
+    lat = 0.0;
+    lonEast = 0.0;
+    if (!utc.isValid()) { return; }
+
+    const double days = julianDate(utc) - 2451545.0;
+    double m = 0.0, lambda = 0.0;
+    ecliptic(days, m, lambda);
+    lat = std::asin(sinDeclination(lambda)) / kDeg;
+
+    // solarInfo() puts the transit at longitude lw (positive west) at
+    //   2451545 + 0.0009 + lw/360 + n + transitTerm.
+    // Solved for the lw whose transit is now: only the fraction of a
+    // day matters, so it is taken before scaling to degrees.
+    double frac = days - 0.0009 - transitTerm(m, lambda);
+    frac -= std::floor(frac);
+    const double lw = frac * 360.0;
+    lonEast = lw > 180.0 ? 360.0 - lw : -lw;      // [-180, 180)
 }
 
 } // namespace Longpath

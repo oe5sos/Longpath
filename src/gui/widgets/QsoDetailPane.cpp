@@ -16,6 +16,8 @@
 #include "core/AppSettings.h"
 #include "core/BeamHeading.h"
 #include "core/CallsignCache.h"
+#include "core/GfzIndizes.h"
+#include "core/Grauzone.h"
 #include "core/Maidenhead.h"
 #include "core/QrzClient.h"
 #include "core/QsoConfirmation.h"
@@ -278,6 +280,17 @@ void QsoDetailPane::buildUi()
     m_travel->setWordWrap(true);
     col->addWidget(m_travel);
 
+    // Grauzone · SFI · Kp. Gedaempft wie die Beschriftungen daneben; ein
+    // Grauzonen-QSO in der Primaerfarbe — keine Signalfarbe, es ist eine
+    // Erklaerung, keine Warnung.
+    m_licht = new QLabel(this);
+    m_licht->setObjectName(QStringLiteral("qsoLicht"));
+    m_licht->setWordWrap(true);
+    m_licht->setVisible(false);
+    col->addWidget(m_licht);
+    connect(&GfzQuelle::instanz(), &GfzQuelle::aktualisiert,
+            this, &QsoDetailPane::refreshLicht);
+
     connect(m_turnShort, &QPushButton::clicked, this, [this]() {
         if (!m_haveEntry || !m_haveBeam) { return; }
         emit turnRotorRequested(m_beamDeg, m_entry.call);
@@ -434,6 +447,57 @@ void QsoDetailPane::setRotorBearing(double deg)
     m_haveRotor = !std::isnan(deg);
     m_rotorDeg  = m_haveRotor ? BeamHeading::wrap360(deg) : 0.0;
     refreshBeam();
+}
+
+void QsoDetailPane::setCty(const CtyDatParser* cty)
+{
+    m_cty = cty;
+    refreshLicht();
+}
+
+void QsoDetailPane::setMeinFeldErsatz(const QString& feld)
+{
+    if (m_meinFeldErsatz == feld) { return; }
+    m_meinFeldErsatz = feld;
+    refreshLicht();
+}
+
+void QsoDetailPane::refreshLicht()
+{
+    if (!m_licht) { return; }
+    // Kein QSO, kein Licht: eine nachgeschlagene Station hat keine Zeit.
+    if (!m_haveEntry || m_notLogged || !m_entry.timeOn.isValid()) {
+        m_licht->clear();
+        m_licht->setToolTip(QString());
+        m_licht->setVisible(false);
+        return;
+    }
+    const Grauzone::QsoLicht licht = Grauzone::fuer(m_entry, m_meinFeldErsatz, m_cty);
+    const GfzIndizes& gfz = GfzQuelle::instanz().daten();
+
+    QStringList teile;
+    const QString satz = Grauzone::kurztext(licht);
+    if (!satz.isEmpty()) { teile << satz; }
+    const QString wetter = gfz.kurztext(m_entry.timeOn);
+    if (!wetter.isEmpty()) { teile << wetter; }
+    if (teile.isEmpty()) {
+        m_licht->clear();
+        m_licht->setVisible(false);
+        return;
+    }
+    m_licht->setText(teile.join(QStringLiteral(" · ")));
+    m_licht->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+        .arg(QLatin1String(licht.grauzonenQso() ? Style::kTextPrimary
+                                                : Style::kTextScale)));
+
+    QStringList hinweis;
+    const QString h1 = Grauzone::hinweis(licht);
+    if (!h1.isEmpty()) { hinweis << h1; }
+    const QString h2 = gfz.hinweis(m_entry.timeOn);
+    if (!h2.isEmpty()) { hinweis << h2; }
+    else { hinweis << QStringLiteral("No solar flux or Kp on file for this day."); }
+    m_licht->setToolTip(hinweis.join(QStringLiteral("\n\n")));
+    m_licht->setVisible(true);
 }
 
 void QsoDetailPane::clearEntry()
@@ -907,6 +971,7 @@ void QsoDetailPane::refresh()
         m_editBtn->setEnabled(false);
         m_qrzPageBtn->setEnabled(false);
         refreshBeam();
+        refreshLicht();
         refreshExtras();
         return;
     }
@@ -949,6 +1014,7 @@ void QsoDetailPane::refresh()
     }
 
     refreshBeam();
+    refreshLicht();
     refreshExtras();
 }
 

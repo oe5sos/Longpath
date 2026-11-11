@@ -908,6 +908,8 @@ set(GUI_SOURCES
     src/core/HttpAbruf.cpp
     src/core/SotaGipfel.cpp
     src/core/SotaNachtrag.cpp
+    src/core/Grauzone.cpp
+    src/core/GfzIndizes.cpp
     src/core/SingleInstanceGuard.cpp
     src/gui/spectrum/SpectrumAvenger.cpp
     src/gui/DssRenderer.cpp
