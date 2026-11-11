@@ -435,6 +435,8 @@ public:
 
     /// Die Tastenkuerzel (2026-11-10): der Verteiler, fuer Pruefstaende.
     class HotKeyDispatcher* hotKeyDispatcher() const { return m_hotKeyDispatcher.get(); }
+    /// Am Mac: F1…F12 als F-Tasten, solange Longpath vorne ist (2026-11-11).
+    class FKeyPriority* fKeyPriority() const { return m_fKeyPriority.get(); }
     /// Das an Band/Modus/Digimodus gebundene Layoutprofil aktivieren,
     /// falls eines passt. Siehe `LayoutProfiles::profileFor`.
     void profilNachstellen(
@@ -2080,6 +2082,7 @@ private:
     std::unique_ptr<class MainWindowHotKeyTargets> m_hotKeyTargets;
     std::unique_ptr<class HotKeyDispatcher>        m_hotKeyDispatcher;
     std::unique_ptr<class KeyboardRouter>          m_keyboardRouter;
+    std::unique_ptr<class FKeyPriority>            m_fKeyPriority;
     class QsoRecorderApplet* m_qsoRecorderApplet{nullptr};
     class RecordingApplet*   m_recordingApplet{nullptr};
 
