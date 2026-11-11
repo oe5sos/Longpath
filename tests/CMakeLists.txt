@@ -1041,6 +1041,14 @@ longpath_add_test(tst_slice_has_settings_for)
 longpath_add_test(tst_band_defaults)
 longpath_add_test(tst_radio_model_band_click)
 
+# ── Bandstapel (2026-11-11, nach Upstream NereusSDR PR #748) ─────────────
+longpath_add_test(tst_bandstack_seeds)
+longpath_add_test(tst_bandstack_store)
+longpath_add_test(tst_bandstack_controller)
+longpath_add_test(tst_bandstack_applet)
+# Das echte Hauptfenster offscreen, Verbindung vorgetaeuscht.
+longpath_add_test(tst_bandstapel_im_fenster)
+
 # ── About dialog ─────────────────────────────────────────────────────────
 longpath_add_test(tst_about_dialog)
 longpath_add_test(tst_support_dialog)
@@ -2344,6 +2352,11 @@ longpath_add_test(tst_audio_rate_matcher)
 #   leeren Puffer und regelt dagegen an, bis der Ton verstimmt ist.
 #   Dazu die Gegenprobe ohne Ausgleich, die leerlaufen MUSS.
 longpath_add_test(tst_rx_raten_angleich)
+# tst_rx_drift_flex_schuebe (2026-11-11): an der FLEX-8400 zog der Ausgleich
+#   -8000 ppm, weil der Bus nur zaehlte, was aus dem Ring kam. In Schueben
+#   misst die Vorsteuerung dann ihr eigenes Verhaeltnis. Zaehlregel jetzt wie
+#   Thetis xrmatchOUT: die volle Blocklaenge, auch bei Stille.
+longpath_add_test(tst_rx_drift_flex_schuebe)
 
 # ── Der Schalter fuer den Driftausgleich (2026-10-06) ───────────────────────
 # tst_rx_drift_schalter: ein Haekchen, das nichts schaltet, ist schlimmer als
@@ -5935,6 +5948,9 @@ longpath_add_test(tst_filter_follows_the_panadapter)
 longpath_add_test(tst_filter_pane_sheet)
 longpath_add_test(tst_tx_entwurf_sheet)
 longpath_add_test(tst_band_flyout_highlight_entwurf)
+# Zeichenwerkzeug, kein Prueflauf: ueberspringt sich ohne
+# LONGPATH_GRAB_DIR UND LONGPATH_ENTWURF=1.
+longpath_add_test(tst_bandstapel_entwurf)
 longpath_add_test(tst_band_flyout_highlight)
 longpath_add_test(tst_band_buttons)
 longpath_add_test(tst_container_title_does_not_shove)

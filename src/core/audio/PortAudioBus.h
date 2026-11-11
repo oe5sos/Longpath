@@ -118,6 +118,24 @@ public:
     AudioFormat negotiatedFormat() const override { return m_negFormat; }
     qint64 queuedFrames() const override;
     qint64 consumedFrames() const override;
+
+    // Was ein Ausgabe-Rueckruf als Verbrauch meldet (consumedFrames), in
+    // Floats: `gewollt` ist die Blocklaenge, die das Geraet abgeholt hat,
+    // `ausDemRing` was davon aus dem Ring kam (samt uebersprungener Rahmen).
+    // Oeffentlich und statisch, damit der Pruefstand des Driftausgleichs
+    // dieselbe Regel faehrt wie der Rueckruf.
+    //
+    // Seit 2026-11-11 die volle Blocklaenge, wie Thetis: xrmatchOUT meldet
+    // jeden Ruf mit `control (a, -(a->outsize))`, auch beim Leerlauf
+    // (rmatch.c:464 [v2.10.3.15]). Der Verbrauch ist damit der Takt des
+    // Geraets. Vorher zaehlte nur, was aus dem Ring kam; in Schueben
+    // (Flex-Ton, laengste Pause 650 ms) mass die Vorsteuerung dann ihr
+    // eigenes Verhaeltnis und lief weg, an der FLEX-8400 auf -8000 ppm.
+    static constexpr qint64 verbrauchJeRueckruf(qint64 gewollt, qint64 ausDemRing)
+    {
+        (void)ausDemRing;
+        return gewollt;
+    }
     QString     errorString() const override { return m_err; }
 
     // Diagnostics: drop-oldest overrun accounting.  Output-mode push()

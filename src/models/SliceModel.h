@@ -1252,7 +1252,26 @@ public:
     bool hasSettingsFor(Band band) const;
 
     void saveToSettings(Longpath::Band band);
-    void restoreFromSettings(Longpath::Band band);
+    // `restoreTuning` false laesst Frequenz, Betriebsart und Filter stehen
+    // und stellt nur den Rest des Bandgedaechtnisses her (AGC, NB, Schritt,
+    // Antennen, Abtastrate ...). So ruft der Bandstapel einen Eintrag ab:
+    // erst das Gedaechtnis des Bandes ohne Abstimmung, dann Frequenz,
+    // Betriebsart und Filter aus dem Eintrag. 2026-11-11, nach Upstream
+    // NereusSDR (restoreFromSettings(band, false)).
+    void restoreFromSettings(Longpath::Band band, bool restoreTuning = true);
+
+    // Was das Bandgedaechtnis dieser Scheibe fuer `band` haelt, so wie ein
+    // Bandwechsel es lesen wuerde -- nullopt, wenn Frequenz oder
+    // Betriebsart nie abgelegt wurden. Der Filter ist 0..0, wenn fuer die
+    // Betriebsart keiner abgelegt ist. Liest nur, aendert nichts.
+    // 2026-11-11, fuer den Bandstapel; nach Upstream NereusSDR.
+    struct SavedBandSpot {
+        double  frequencyHz{0.0};
+        DSPMode mode{DSPMode::USB};
+        int     filterLow{0};
+        int     filterHigh{0};
+    };
+    std::optional<SavedBandSpot> savedBandSpot(Longpath::Band band) const;
     static void migrateLegacyKeys();
 
     // Reads the persisted "last band" marker for this slice index from

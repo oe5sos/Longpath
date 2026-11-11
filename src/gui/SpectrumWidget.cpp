@@ -4429,6 +4429,8 @@ void SpectrumWidget::paintEvent(QPaintEvent* event)
     drawBandPlan(p, specRect);
     // Nach dem Bandplan, damit die Linie ueber dem Streifen liegt.
     drawCompanionMarker(p, specRect);
+    // Bandstapel-Marken, auch im GPU-Weg unten (zwei Zeichenwege).
+    drawBandStackMarks(p, specRect);
     // Sub-epic E: time-scale + LIVE button on the right edge of the
     // waterfall area (always painted; widens automatically when paused).
     // Use a full-width wfRect (not the clipped `wfRect` at line 1141) so the
@@ -5883,6 +5885,95 @@ void SpectrumWidget::setCompanionMarker(bool shown, qint64 ifHz,
     m_companionIfHz  = ifHz;
     m_companionLabel = label;
     update();
+}
+
+// ── Bandstapel-Marken (2026-11-11, Entwurf D1) ──────────────────────
+
+namespace {
+// Masze aus dem gewaehlten Blatt (tests/tst_bandstapel_entwurf.cpp).
+constexpr int kBsMarkHoehe = 8;      // Dreieck
+constexpr int kBsMarkHalb  = 4;      // halbe Grundlinie
+constexpr int kBsTreffer   = 6;      // waagrecht anklickbar, je Seite
+constexpr int kBsTrefferH  = 14;     // vom unteren Rand nach oben
+constexpr int kBsVfoFrei   = 4;      // die VFO-Marke gewinnt
+}
+
+void SpectrumWidget::setBandStackMarks(const QVector<BandStackMark>& marks)
+{
+    const bool gleich = marks.size() == m_bandStackMarks.size()
+        && std::equal(marks.cbegin(), marks.cend(), m_bandStackMarks.cbegin(),
+                      [](const BandStackMark& a, const BandStackMark& b) {
+                          return a.id == b.id && a.hz == b.hz && a.place == b.place
+                              && a.locked == b.locked && a.tip == b.tip;
+                      });
+    if (gleich) { return; }
+    m_bandStackMarks = marks;
+    // Die Marken liegen in der zwischengespeicherten Ueberlagerung des
+    // GPU-Wegs; ein blosses update() zeichnete sie dort nicht neu.
+    markOverlayDirty();
+    update();
+}
+
+QString SpectrumWidget::bandStackMarkAt(int x, int y, const QRect& specRect) const
+{
+    if (m_bandStackMarks.isEmpty() || m_moxOverlay) { return {}; }
+    if (y > specRect.bottom() || y < specRect.bottom() - kBsTrefferH) { return {}; }
+    // Upstream V17: die Marke der Scheibe gewinnt gegen einen Strich
+    // darunter, damit Ziehen weiter geht.
+    if (std::abs(x - hzToX(m_vfoHz, specRect)) <= kBsVfoFrei) { return {}; }
+    QString best;
+    int bestAbstand = kBsTreffer + 1;
+    for (const BandStackMark& m : m_bandStackMarks) {
+        const int mx = hzToX(static_cast<double>(m.hz), specRect);
+        const int abstand = std::abs(x - mx);
+        if (abstand < bestAbstand) {
+            bestAbstand = abstand;
+            best = m.id;
+        }
+    }
+    return best;
+}
+
+QString SpectrumWidget::bandStackMarkAtForTest(int x, int y) const
+{
+    const int specH = specHFromHeight(height(), m_spectrumFrac, kFreqScaleH + kDividerH);
+    return bandStackMarkAt(x, y, QRect(0, 0, width() - effectiveStripW(), specH));
+}
+
+void SpectrumWidget::drawBandStackMarks(QPainter& p, const QRect& specRect)
+{
+    if (m_bandStackMarks.isEmpty() || m_moxOverlay) { return; }
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing, true);
+    const QColor leise = roleColor("text-scale", Style::kTextScale);
+    const QColor hell  = roleColor("text", Style::kTextPrimary);
+    const int unten = specRect.bottom();
+    for (const BandStackMark& m : m_bandStackMarks) {
+        const int x = hzToX(static_cast<double>(m.hz), specRect);
+        if (x < specRect.left() + kBsMarkHalb || x > specRect.right() - kBsMarkHalb) {
+            continue;
+        }
+        const QColor farbe = m.place ? hell : leise;
+        QPainterPath dreieck;
+        dreieck.moveTo(x, unten - kBsMarkHoehe);
+        dreieck.lineTo(x - kBsMarkHalb - 0.5, unten);
+        dreieck.lineTo(x + kBsMarkHalb + 0.5, unten);
+        dreieck.closeSubpath();
+        p.setPen(Qt::NoPen);
+        p.setBrush(farbe);
+        p.drawPath(dreieck);
+        if (m.locked) {
+            // Ein kleines Schloss darueber: Buegel und Koerper.
+            const QPointF c(x, unten - kBsMarkHoehe - 6);
+            p.setPen(QPen(leise, 1.1));
+            p.setBrush(Qt::NoBrush);
+            p.drawArc(QRectF(c.x() - 2.6, c.y() - 6.0, 5.2, 6.0), 0, 180 * 16);
+            p.setPen(Qt::NoPen);
+            p.setBrush(leise);
+            p.drawRoundedRect(QRectF(c.x() - 3.6, c.y() - 2.6, 7.2, 5.6), 1.0, 1.0);
+        }
+    }
+    p.restore();
 }
 
 void SpectrumWidget::drawCompanionMarker(QPainter& p, const QRect& specRect)
@@ -10918,6 +11009,18 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
     int mx = static_cast<int>(event->position().x());
     int my = static_cast<int>(event->position().y());
 
+    // Bandstapel (2026-11-11): ein Klick auf eine Marke an der Skala
+    // fuehrt zu diesem Eintrag. Vor allem anderen, sonst stimmte der
+    // Klick nur auf die Frequenz ab und der Eintrag bliebe ungenutzt.
+    if (event->button() == Qt::LeftButton
+        && event->type() == QEvent::MouseButtonPress) {
+        const QString marke = bandStackMarkAt(mx, my, specRect);
+        if (!marke.isEmpty()) {
+            emit bandStackMarkClicked(marke);
+            return;
+        }
+    }
+
     // Double-click on off-screen indicator → recenter pan on VFO
     if (event->type() == QEvent::MouseButtonDblClick
         && event->button() == Qt::LeftButton
@@ -11551,6 +11654,19 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
     int h = height();
     int specH = specHFromHeight(h, m_spectrumFrac, kFreqScaleH + kDividerH);
     QRect specRect(0, 0, w - effectiveStripW(), specH);
+
+    // Bandstapel (2026-11-11): Ueberfahren einer Marke zeigt den Eintrag.
+    if (event->buttons() == Qt::NoButton && !m_bandStackMarks.isEmpty()) {
+        const QString marke = bandStackMarkAt(mx, my, specRect);
+        if (!marke.isEmpty()) {
+            for (const BandStackMark& m : std::as_const(m_bandStackMarks)) {
+                if (m.id == marke) {
+                    QToolTip::showText(event->globalPosition().toPoint(), m.tip, this);
+                    break;
+                }
+            }
+        }
+    }
 
     // --- Active drag modes ---
 
@@ -13328,6 +13444,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
             // darunter warnt: der QPainter-Weg oben ist die
             // Rueckfallebene, dieser hier malt im Betrieb.
             drawCompanionMarker(p, specRect);
+            drawBandStackMarks(p, specRect);
 
             // ── Auch HIER, nicht nur im CPU-Weg ──────────────────────
             //

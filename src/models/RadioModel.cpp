@@ -252,6 +252,7 @@ warren@wpratt.com
 */
 
 #include "RadioModel.h"
+#include "bandstack/BandStackController.h"
 #include "MemoryList.h"
 #include "MemoryRecord.h"
 #include "BandDefaults.h"
@@ -2584,6 +2585,13 @@ RadioModel::RadioModel(QObject* parent)
         m_widebandFftEngines[i] = new Longpath::WidebandFftEngine(this);
         m_widebandFftEngines[i]->setAdcSampleRateHz(122880000.0);
     }
+
+    // ── Bandstapel (2026-11-11) ─────────────────────────────────────────
+    // Zuletzt, damit er die Scheiben, den Filtervorgaben-Speicher und die
+    // Verbindungssignale schon vorfindet. Er laedt sein Dokument, sobald
+    // ein Geraet verbunden ist (currentRadioMac), und haengt als Kind am
+    // Modell. Nach Upstream NereusSDR (PR #748).
+    m_bandStack = new BandStackController(this);
 }
 
 RadioModel::~RadioModel()

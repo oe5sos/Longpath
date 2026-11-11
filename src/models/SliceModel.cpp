@@ -2776,6 +2776,36 @@ bool SliceModel::hasSettingsFor(Band band) const
     return s.contains(bandPrefix(m_sliceIndex, band) + QStringLiteral("DspMode"));
 }
 
+// Fuer den Bandstapel (2026-11-11), nach Upstream NereusSDR: dieselben
+// Schluessel und dieselbe Reihenfolge wie restoreFromSettings -- erst der
+// Filter von Band und Betriebsart, dann der alte Filter des Bandes.
+std::optional<SliceModel::SavedBandSpot> SliceModel::savedBandSpot(Band band) const
+{
+    auto& s = AppSettings::instance();
+    const QString bp = bandPrefix(m_sliceIndex, band);
+    if (!s.contains(bp + QStringLiteral("Frequency"))
+        || !s.contains(bp + QStringLiteral("DspMode"))) {
+        return std::nullopt;
+    }
+    const int rawMode = s.value(bp + QStringLiteral("DspMode")).toInt();
+    if (rawMode < static_cast<int>(DSPMode::LSB)
+        || rawMode > static_cast<int>(DSPMode::RADE_L)) {
+        return std::nullopt;
+    }
+    SavedBandSpot spot;
+    spot.frequencyHz = s.value(bp + QStringLiteral("Frequency")).toDouble();
+    spot.mode = static_cast<DSPMode>(rawMode);
+    for (const QString& prefix : {bandModePrefix(m_sliceIndex, band, spot.mode), bp}) {
+        if (s.contains(prefix + QStringLiteral("FilterLow"))
+            && s.contains(prefix + QStringLiteral("FilterHigh"))) {
+            spot.filterLow = s.value(prefix + QStringLiteral("FilterLow")).toInt();
+            spot.filterHigh = s.value(prefix + QStringLiteral("FilterHigh")).toInt();
+            break;
+        }
+    }
+    return spot;
+}
+
 void SliceModel::saveToSettings(Band band)
 {
     auto& s = AppSettings::instance();
@@ -2938,7 +2968,7 @@ void SliceModel::saveToSettings(Band band)
     s.setValue(sp + QStringLiteral("LastBand"), bandKeyName(band));
 }
 
-void SliceModel::restoreFromSettings(Band band)
+void SliceModel::restoreFromSettings(Band band, bool restoreTuning)
 {
     auto& s = AppSettings::instance();
     const QString bp = bandPrefix(m_sliceIndex, band);
@@ -2968,7 +2998,9 @@ void SliceModel::restoreFromSettings(Band band)
     // Geprueft wird gegen die eingestellte Region (hier „Europe"),
     // nicht gegen die Region-2-Tabelle in Band.h: nach der waere 7,225
     // im Band, und genau das war der Fehler.
-    if (s.contains(bp + QStringLiteral("Frequency"))) {
+    // `restoreTuning` false (Bandstapel, 2026-11-11): Frequenz,
+    // Betriebsart und Filter bringt der Eintrag, nicht das Gedaechtnis.
+    if (restoreTuning && s.contains(bp + QStringLiteral("Frequency"))) {
         const double gemerkt = s.value(bp + QStringLiteral("Frequency")).toDouble();
         setFrequency(BandDefaults::frequenzImBand(band, gemerkt));
     }
@@ -3002,7 +3034,7 @@ void SliceModel::restoreFromSettings(Band band)
     if (s.contains(bp + QStringLiteral("AgcMaxGain"))) {
         setAgcMaxGain(s.value(bp + QStringLiteral("AgcMaxGain")).toInt());
     }
-    if (s.contains(bp + QStringLiteral("DspMode"))) {
+    if (restoreTuning && s.contains(bp + QStringLiteral("DspMode"))) {
         // Set mode WITHOUT applying the default filter — filter follows below.
         // We must update m_dspMode before reading FilterLow/FilterHigh so
         // the final setFilter call is not superseded by setDspMode's default.
@@ -3045,7 +3077,7 @@ void SliceModel::restoreFromSettings(Band band)
     // for pre-Item-4 settings files.  m_dspMode was set above (line ~1491)
     // before reaching this restore block, so it reflects the destination
     // mode for the band restore.
-    {
+    if (restoreTuning) {
         // ── Wache gegen einen Durchlass auf dem falschen Seitenband ──
         //
         // Der Betreiber am 2026-09-17: "hört sich auf 40 meter
