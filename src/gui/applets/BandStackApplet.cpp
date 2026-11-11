@@ -667,7 +667,11 @@ void BandStackApplet::auffrischen()
                                 : QStringLiteral("Connect to a radio to use band stacks."));
     } else if (s->shownPlace(id, s->stackBandFor(id)).isEmpty()
                && stand.contains(QStringLiteral("–/"))) {
-        m_erklaerung->setText(QStringLiteral("Tuned here by hand: leaving %1 saves nothing.")
+        // Keine Stelle auf diesem Band: von einem anderen Band her von Hand
+        // hineingestimmt, oder die eigene Stelle wurde geloescht. Am
+        // Geraet am 2026-11-11 gesehen: nach „Delete" stand hier
+        // „Tuned here by hand" -- die Folge stimmte, der Grund nicht.
+        m_erklaerung->setText(QStringLiteral("No saved spot here: leaving %1 saves nothing.")
                                   .arg(bandLabel(s->stackBandFor(id))));
     } else {
         m_erklaerung->setText(

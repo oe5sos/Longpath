@@ -1514,6 +1514,9 @@ MainWindow::MainWindow(QWidget* parent)
         // shutdown (SIGTERM / force-quit). Idempotent with the
         // closeEvent path above.
         saveMainWindowGeometry();
+        if (m_radioModel && m_radioModel->bandStack()) {
+            m_radioModel->bandStack()->flush();
+        }
         AppSettings::instance().save();
         qWarning() << "[ProfileSaveOnQuit:aboutToQuit] AppSettings::save() done";
         takeShutdownBackupIfWanted();
@@ -21742,6 +21745,14 @@ void MainWindow::closeEvent(QCloseEvent* event)
     // state. Captured BEFORE close so the saved blob reflects the
     // user-visible state, not Qt's mid-teardown geometry.
     saveMainWindowGeometry();
+
+    // Bandstapel (2026-11-11): sein Dokument geht sonst erst eine
+    // Sekunde nach der letzten Aenderung in die Einstellungen. Beim
+    // Beenden mit Cmd+Q laeuft kein Destruktor (exit() mitten in
+    // closeEvent), also hier, vor dem Speichern.
+    if (m_radioModel && m_radioModel->bandStack()) {
+        m_radioModel->bandStack()->flush();
+    }
 
     AppSettings::instance().save();
     qWarning() << "[ProfileSaveOnQuit:closeEvent] AppSettings::save() done";

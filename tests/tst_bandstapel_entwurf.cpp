@@ -383,7 +383,7 @@ void appletZeichnen(QPainter& p, const QRectF& r, bool aufStelle)
     p.drawText(QRectF(r.left() + 12, r.top() + 38, r.width() - 24, 30),
                Qt::AlignLeft | Qt::TextWordWrap,
                aufStelle ? QStringLiteral("Saved spots per band. Press the band again for the next.")
-                         : QStringLiteral("Tuned here by hand: leaving 40m saves nothing."));
+                         : QStringLiteral("No saved spot here: leaving 40m saves nothing."));
     liste(p, QRectF(r.left(), r.top() + 72, r.width(), r.height() - 80), aufStelle, true, false);
 }
 

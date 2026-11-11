@@ -219,6 +219,20 @@ private slots:
         QVERIFY(s.stapel->store().entry(id)->locked);
     }
 
+    // Am Geraet am 2026-11-11 gesehen: nach „Delete" der eigenen Stelle
+    // stand „Tuned here by hand". Die Folge stimmt, der Grund nicht.
+    void nachLoeschenDerStelleKeinFalscherGrund()
+    {
+        Stand s = aufbauen();
+        QVERIFY(s.stapel->press(s.id, Band::Band40m, BandStackDirection::Next, {}, nullptr));
+        QVERIFY(s.stapel->remove(idBei(s, Band::Band40m, 7090000), nullptr));
+        QCoreApplication::processEvents();
+        const QString text = s.applet->erklaerungForTest()->text();
+        QVERIFY2(text.contains(QStringLiteral("No saved spot here")), qPrintable(text));
+        QVERIFY2(!text.contains(QStringLiteral("by hand")), qPrintable(text));
+        QCOMPARE(s.applet->standForTest()->text(), QStringLiteral("40m \u2013/4"));
+    }
+
     void gruppeKlapptAuf()
     {
         Stand s = aufbauen();
