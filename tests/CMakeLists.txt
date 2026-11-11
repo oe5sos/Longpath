@@ -1046,6 +1046,8 @@ longpath_add_test(tst_bandstack_seeds)
 longpath_add_test(tst_bandstack_store)
 longpath_add_test(tst_bandstack_controller)
 longpath_add_test(tst_bandstack_applet)
+# Das echte Hauptfenster offscreen, Verbindung vorgetaeuscht.
+longpath_add_test(tst_bandstapel_im_fenster)
 
 # ── About dialog ─────────────────────────────────────────────────────────
 longpath_add_test(tst_about_dialog)

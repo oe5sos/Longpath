@@ -204,9 +204,16 @@ void BandStackListe::neuAufbauen()
     };
 
     // Das eigene Band zuerst, offen; die anderen darunter, zu.
+    //
+    // Die Rundfunkbaender (120 m bis 11 m) nur, wenn die Scheibe gerade
+    // auf einem steht: Longpath hat fuer sie keine Bandtasten, und mit
+    // ihren dreizehn Gruppen wurde das Applet im echten Fenster fast
+    // 900 Punkte hoch -- der gewaehlte Entwurf A zeigt sie nicht.
     gruppeFuer(m_band);
     for (const Band band : anzeigeReihe()) {
-        if (band != m_band && !store.entries(band).isEmpty()) {
+        const bool rundfunk = static_cast<int>(band) >= static_cast<int>(Band::SwlFirst)
+                              && static_cast<int>(band) <= static_cast<int>(Band::SwlLast);
+        if (band != m_band && !rundfunk && !store.entries(band).isEmpty()) {
             gruppeFuer(band);
         }
     }

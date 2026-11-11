@@ -139,6 +139,11 @@ private slots:
         QVERIFY(liste->zeileRectForTest(idBei(s, Band::Band40m, 7005000)).isValid());
         // Zeilen anderer Baender sind zugeklappt, also nicht da.
         QVERIFY(!liste->zeileRectForTest(idBei(s, Band::Band20m, 14155000)).isValid());
+        // Die Rundfunkbaender stehen nicht in der Liste (Entwurf A), GEN
+        // und WWV schon.
+        QVERIFY(!liste->gruppeRectForTest(Band::Band31m).isValid());
+        QVERIFY(liste->gruppeRectForTest(Band::WWV).isValid());
+        QVERIFY(liste->gruppeRectForTest(Band::GEN).isValid());
     }
 
     void klickAufZeileFuehrtHin()
