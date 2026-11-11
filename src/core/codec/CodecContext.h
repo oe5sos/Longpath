@@ -47,6 +47,12 @@ struct SliceConfig {
 };
 
 struct CodecContext {
+    // Der erste DDC-Index, den das Geraet nicht hat, 0 = keine Grenze
+    // (BoardCapsTable::ddcIndexLimit). P2CodecOrionMkII::applyDdcAssignment
+    // liest es, RadioModel::currentCodecContext setzt es. 2026-11-10,
+    // Upstream NereusSDR a15d7a80a (#764).
+    int ddcIndexLimit{0};
+
     // Das logische Modell (nicht die Platine). P2 waehlt den Codec ueber
     // HPSDRHW, eine Anvelina Pro 3 meldet sich aber als OrionMkII — ohne
     // dieses Feld kann ein Codec die zwei nicht unterscheiden. Gebraucht

@@ -1090,8 +1090,11 @@ void TciServer::wireSliceForBroadcast(SliceModel* slice, int sliceId)
     connect(slice, &SliceModel::dspModeChanged, this,
             [this, sliceId](Longpath::DSPMode mode) {
                 const QString modeStr = SliceModel::modeName(mode);
+                // Mit „CWL/CWU becomes CW" wie jede andere Modusmeldung
+                // (TciProtocol::tciModeForWire, 2026-11-10).
                 m_protocol->enqueueLocalBroadcast(
-                    QStringLiteral("modulation:%1,%2;").arg(sliceId).arg(modeStr));
+                    QStringLiteral("modulation:%1,%2;").arg(sliceId).arg(
+                        TciProtocol::tciModeForWire(modeStr)));
             });
 
     // ── Filter (rx_filter_band: line) ───────────────────────────────────────

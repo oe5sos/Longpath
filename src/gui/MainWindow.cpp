@@ -3805,10 +3805,17 @@ FFTEngine* MainWindow::createFftEngineForStream(int streamIndex)
     // thread; the alternative -- reading m_fftEngines from the Connection
     // thread -- would need synchronisation AND lose Qt's automatic
     // disconnect-on-destroy, which is what makes this safe at shutdown.
-    connect(m_radioModel, &RadioModel::rawIqDataForStream, engine,
-            [engine, streamIndex](int idx, const QVector<float>& samples) {
+    //
+    // 2026-11-10: ueber rawIqDataForAutoAgc statt rawIqDataForStream --
+    // dieselben Proben, dazu der Messabschnitt, den forkIqToTaps beim
+    // Eintreffen gestempelt hat. Die Anzeige bekommt genau das Gleiche;
+    // nur der Rauschbodenmesser fuer Auto AGC-T sieht den Stempel
+    // (Upstream NereusSDR e5b3997bc, #720).
+    connect(m_radioModel, &RadioModel::rawIqDataForAutoAgc, engine,
+            [engine, streamIndex](int idx, const QVector<float>& samples,
+                                  quint64 epoch) {
         if (idx != streamIndex) { return; }
-        engine->feedIQ(samples);
+        engine->feedIQForAutoAgc(samples, epoch);
     });
 
     // Linear-power frame -> every pan subscribed to this stream.
@@ -3825,10 +3832,12 @@ FFTEngine* MainWindow::createFftEngineForStream(int streamIndex)
     auto* nf = new NoiseFloorTracker;
     m_streamNoiseFloors.insert(streamIndex, nf);
     if (m_radioModel) { m_radioModel->setStreamNoiseFloorTracker(streamIndex, nf); }
-    connect(engine, &FFTEngine::fftReady, this,
-            [nf](int, const QVector<float>& binsDbm) {
+    // Nur Bilder, deren ganzes Fenster aus einem Empfangsabschnitt stammt
+    // (FFTEngine::autoAgcFrameReady) -- nie eines mit Sendesignal darin.
+    connect(engine, &FFTEngine::autoAgcFrameReady, this,
+            [nf](int, const QVector<float>& binsDbm, quint64 epoch) {
         static constexpr float kFrameIntervalMs = 33.0f;
-        nf->feed(binsDbm, kFrameIntervalMs);
+        nf->feedForEpoch(binsDbm, kFrameIntervalMs, epoch);
     });
 
     // TCI-Spektrumstrom: Strom 0 und 1 sind die TCI-Empfaenger 0 und 1.
@@ -6487,6 +6496,40 @@ void MainWindow::buildUI()
             const double clampedBw = (currentBw > rateHz) ? rateHz : currentBw;
             activeSpectrumWidget()->setFrequencyRange(freq, clampedBw);
         }
+
+        // Jeder Pan, nicht nur der aktive (2026-11-10).
+        //
+        // Ein Ratenwechsel auf der Radio-Info-Seite (RadioModel::
+        // setSampleRateLive) stellt den Zuteiler um, ohne
+        // streamCentreChanged zu senden -- dieses Signal ist die einzige
+        // Nachricht davon. Bis hierher bekam nur der aktive Pan die neue
+        // Rate: jeder andere zeichnete die neuen Bins mit der alten Rate,
+        // also um den Faktor alt/neu zu breit oder zu schmal, und
+        // m_streamWindows behielt die alte Rate, die applyStreamWindowToPan
+        // beim naechsten Scheibenwechsel wieder einspielte.
+        //
+        // Jede Anzeige folgt der Rate ihres eigenen Empfaengers:
+        //   From Thetis console.cs:19848,19889 [@852bf0e]
+        //     Display.SampleRateRX1 = value; ... Display.SampleRateRX2 = value;
+        // Uebernommen aus Upstream NereusSDR a617cdb43 (Issue 701, J.J.
+        // Boyd KG4VCF), auf unseren Baum zugeschnitten: die Rate jedes
+        // Stroms kommt aus dem Zuteiler, und jeder Pan auf ihm geht durch
+        // applyStreamWindowToPan, das auch die Spanne begrenzt.
+        if (m_radioModel) {
+            for (auto it = m_streamWindows.begin(); it != m_streamWindows.end(); ++it) {
+                const int rate = m_radioModel->streamSampleRateHz(it.key());
+                if (rate > 0) {
+                    it->sampleRateHz = rate;
+                }
+            }
+            if (auto* router = m_radioModel->fftRouter()) {
+                for (auto it = m_streamWindows.cbegin(); it != m_streamWindows.cend(); ++it) {
+                    for (const QString& panId : router->pansForReceiver(it.key())) {
+                        applyStreamWindowToPan(panId, it.key());
+                    }
+                }
+            }
+        }
     });
     // Spectrum/waterfall FPS — load persisted value (default 30), apply to
     // BOTH the FFT engine (row production cadence) and the SpectrumWidget
@@ -6761,10 +6804,11 @@ void MainWindow::buildUI()
     auto* nfTracker = new NoiseFloorTracker;
     m_radioModel->setNoiseFloorTracker(nfTracker);
 
-    connect(primaryFftEngine(), &FFTEngine::fftReady,
-            this, [nfTracker](int /*rxId*/, const QVector<float>& binsDbm) {
+    connect(primaryFftEngine(), &FFTEngine::autoAgcFrameReady,
+            this, [nfTracker](int /*rxId*/, const QVector<float>& binsDbm,
+                              quint64 epoch) {
         static constexpr float kFrameIntervalMs = 33.0f;
-        nfTracker->feed(binsDbm, kFrameIntervalMs);
+        nfTracker->feedForEpoch(binsDbm, kFrameIntervalMs, epoch);
     });
 
     // Max Bin detector: feed FFTEngine dBm bins into WdspEngine's Longpath-native

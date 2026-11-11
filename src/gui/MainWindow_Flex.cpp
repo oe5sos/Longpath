@@ -1973,7 +1973,17 @@ void MainWindow::verdrahteFlexSenden()
             } else {
                 // Die Bedienung zeigt sonst „sendet", waehrend nichts
                 // hinausgeht. Der Grund steht im Protokoll.
-                m_radioModel->transmitModel().setMox(false);
+                //
+                // 2026-11-10: hier stand transmitModel().setMox(false).
+                // Mit MoxController ist der Riegel nur noch ein Spiegel
+                // des Controllers (RadioModel-Konstruktor) -- das haette
+                // nichts ausgetastet und waere beim naechsten Schritt des
+                // Controllers wieder auf „sendet" gesprungen. Darum der
+                // echte Weg, in die Warteschlange gelegt: wir stehen hier
+                // mitten in hardwareFlipped, also mitten in setMox().
+                QMetaObject::invokeMethod(m_radioModel, [rm = m_radioModel]() {
+                    rm->setMox(false);
+                }, Qt::QueuedConnection);
             }
         } else {
             if (m_flexSendePumpe) { m_flexSendePumpe->stop(); }

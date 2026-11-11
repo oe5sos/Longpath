@@ -425,9 +425,15 @@ void TciApplet::updateStatusWidgets()
     if (m_statusDot) {
         const char* color = !running ? kDotOff
                           : (count > 0 ? kDotClients : kDotRunning);
-        m_statusDot->setStyleSheet(QStringLiteral(
+        // Nur bei geaenderter Farbe (2026-11-10): ein neues Stylesheet
+        // alle 200 ms polierte das Widget jedes Mal neu -- in derselben
+        // Spalte, in der das TCI-Clients-Panel sprang.
+        const QString sheet = QStringLiteral(
             "QLabel { background: %1; border-radius: 6px; }"
-        ).arg(QLatin1String(color)));
+        ).arg(QLatin1String(color));
+        if (m_statusDot->styleSheet() != sheet) {
+            m_statusDot->setStyleSheet(sheet);
+        }
     }
 
     if (m_portLabel) {

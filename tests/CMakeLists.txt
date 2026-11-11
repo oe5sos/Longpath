@@ -336,6 +336,12 @@ longpath_add_test(tst_clarity_defaults)
 # ── Phase 3G-9c Clarity adaptive display tuning ──────────────────────────
 longpath_add_test(tst_noise_floor_estimator)
 longpath_add_test(tst_noise_floor_tracker)
+# Auto AGC-T misst nicht beim Senden; TransmitModel-MOX folgt dem
+# MoxController (2026-11-10, aus Upstream NereusSDR e5b3997bc / #720).
+longpath_add_test(tst_auto_agc_beim_senden)
+# Abgleich mit Upstream 2026.11.x (2026-11-10): TUNE/Zweiton-Leistung je
+# Band, TCI CWL/CWU als CW, Anvelina-DDC-Grenze aus Discovery-Byte 20.
+longpath_add_test(tst_abgleich_2026_11)
 # RX-Messwerte: PB SNR nach Thetis, feste Zahlenbreite (2026-09-27).
 longpath_add_test(tst_rx_meter_readings)
 longpath_add_test(tst_clarity_controller)
@@ -6909,6 +6915,14 @@ endif()
 if(Qt6WebSockets_FOUND)
     longpath_add_test(tst_tci_audio_roundtrip)
     target_link_libraries(tst_tci_audio_roundtrip PRIVATE Qt6::WebSockets)
+endif()
+
+# TCI-Clients-Panel: eine Zeile behaelt ihre Widgets, waehrend die Dauer
+# hochzaehlt, und der Kasten bleibt gleich hoch (2026-11-10, Upstream
+# NereusSDR d96e834b3 / #765).
+if(Qt6WebSockets_FOUND)
+    longpath_add_test(tst_tci_clients_panel_ruhig)
+    target_link_libraries(tst_tci_clients_panel_ruhig PRIVATE Qt6::WebSockets)
 endif()
 
 # ── Phase 3J-1 Task 18.1: IQ binary stream pipeline + IQSwap + AlwaysStreamIQ ──
