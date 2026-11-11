@@ -436,6 +436,15 @@ public:
 
     /// Die Tastenkuerzel (2026-11-10): der Verteiler, fuer Pruefstaende.
     class HotKeyDispatcher* hotKeyDispatcher() const { return m_hotKeyDispatcher.get(); }
+
+    /// Bandstapel (2026-11-11, Entwurf D1): die Marken aller
+    /// Panadapter neu setzen -- nach jeder Aenderung am Stapel, einem
+    /// Wechsel der Scheibe oder dem Schalter im Zahnrad des Applets.
+    void bandstapelMarkenNachziehen();
+    /// Dasselbe fuer einen Panadapter: die Eintraege mit der Stelle der
+    /// Scheibe, die er zeigt (sliceForPan). Leer, wenn der Schalter aus
+    /// ist oder kein Geraet verbunden.
+    void bandstapelMarkenFuer(class SpectrumWidget* sw, const QString& panId);
     /// Das an Band/Modus/Digimodus gebundene Layoutprofil aktivieren,
     /// falls eines passt. Siehe `LayoutProfiles::profileFor`.
     void profilNachstellen(
@@ -2600,6 +2609,8 @@ private:
     /// geloeschte S-Meter (Absturzbericht 12:35, NeedleInstrument::
     /// onReading mit this = 0, 57 ms nach closeEvent).
     QPointer<class FrequencyApplet>  m_frequencyApplet;
+    // Bandstapel (2026-11-11, Entwurf A): das Applet unter der Frequenz.
+    QPointer<class BandStackApplet>  m_bandStackApplet;
     QPointer<class InstrumentApplet> m_swrInstrument;
     QPointer<class InstrumentApplet> m_signalInstrument;
     QPointer<class RundumDialog>     m_rundumDialog;   // Rundum-Lauf (2026-11-08)

@@ -407,6 +407,7 @@ warren@wpratt.com
 #include "applets/Ft8Applet.h"
 #include "Ft8KartenBruecke.h"
 #include "applets/Ft8PlaetzeApplet.h"
+#include "applets/BandStackApplet.h"
 #include "applets/PanelAutomatik.h"
 #include "applets/QsoRecorderApplet.h"
 #include "applets/RecordingApplet.h"
@@ -4547,6 +4548,20 @@ void MainWindow::wireSpectrumSliceControls(SpectrumWidget* sw,
                                            const QString& panId)
 {
     if (!sw || !m_radioModel) { return; }
+
+    // Bandstapel (2026-11-11, Entwurf D1): ein Klick auf eine Marke an
+    // der Skala fuehrt die Scheibe DIESES Panadapters zum Eintrag.
+    connect(sw, &SpectrumWidget::bandStackMarkClicked, this,
+            [this, panId](const QString& eintrag) {
+        SliceModel* s = sliceForPan(panId);
+        BandStackController* stapel = m_radioModel ? m_radioModel->bandStack() : nullptr;
+        if (!s || !stapel) { return; }
+        QString grund;
+        if (!stapel->goTo(s->sliceIndex(), eintrag, {}, &grund) && !grund.isEmpty()) {
+            showToast(grund, ToastSeverity::Warning, 3000);
+        }
+    });
+    bandstapelMarkenFuer(sw, panId);
 
     // Click on the spectrum tunes this pan's slice.
     connect(sw, &SpectrumWidget::frequencyClicked, this,
@@ -8718,6 +8733,25 @@ void MainWindow::populateDefaultMeter()
     m_frequencyApplet->restoreState();
     panel->addApplet(m_frequencyApplet);
 
+    // Der Bandstapel (2026-11-11), direkt unter der Frequenz: Betreiber
+    // hat Entwurf A gewaehlt („A und D1"), das Applet in der Spalte.
+    // Er gehoert zum Abstimmen, also in dieselbe Gruppe.
+    m_bandStackApplet = new BandStackApplet(m_radioModel, nullptr);
+    panel->addApplet(m_bandStackApplet);
+    connect(m_bandStackApplet, &BandStackApplet::hinweis, this,
+            [this](const QString& text, bool warnung) {
+        showToast(text, warnung ? ToastSeverity::Warning : ToastSeverity::Info,
+                  warnung ? 3000 : 2500);
+    });
+    connect(m_bandStackApplet, &BandStackApplet::markenSchalterGeaendert,
+            this, [this](bool) { bandstapelMarkenNachziehen(); });
+    if (BandStackController* stapel = m_radioModel->bandStack()) {
+        connect(stapel, &BandStackController::changed,
+                this, &MainWindow::bandstapelMarkenNachziehen);
+    }
+    connect(m_radioModel, &RadioModel::activeSliceChanged,
+            this, [this](int) { bandstapelMarkenNachziehen(); });
+
     // ── Die KIWI-Kachel an den richtigen Panadapter ──────────────────
     //
     // Die Kachel meldet nur, DASS sie gedrueckt wurde, und nennt ihre
@@ -9412,6 +9446,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Kpa500")]     = m_kpa500Applet;
     m_appletsById[QStringLiteral("Acom")]       = m_acomApplet;
     m_appletsById[QStringLiteral("Frequency")]        = m_frequencyApplet;
+    m_appletsById[QStringLiteral("BandStack")]        = m_bandStackApplet;
     m_appletsById[QStringLiteral("SwrInstrument")]    = m_swrInstrument;
     m_appletsById[QStringLiteral("SignalInstrument")] = m_signalInstrument;
 
@@ -9600,6 +9635,9 @@ void MainWindow::populateDefaultMeter()
     // Plus aus wie jedes andere Widget.
     m_appletVis->registerApplet(QStringLiteral("Frequency"),
                                 tr("Frequency"),                true);
+    // Vorgabe an: der Betreiber hat das Applet am 2026-11-11 ausgesucht.
+    m_appletVis->registerApplet(QStringLiteral("BandStack"),
+                                tr("Band Stack"),               true);
     m_appletVis->registerApplet(QStringLiteral("SwrInstrument"),
                                 tr("SWR"),                      true);
     m_appletVis->registerApplet(QStringLiteral("SignalInstrument"),
@@ -9670,6 +9708,11 @@ void MainWindow::populateDefaultMeter()
     // tippt, auch. Sie stehen nicht in tr(): eine Uebersetzung wuerde
     // die deutschen Wege abschalten, sobald die Oberflaeche englisch
     // ist, also genau dann, wenn er sie braucht.
+    m_appletVis->describeApplet(QStringLiteral("BandStack"),
+        tr("Tuning"),
+        {QStringLiteral("bandstapel"), QStringLiteral("band stack"),
+         QStringLiteral("stack"), QStringLiteral("speicher"),
+         QStringLiteral("memories"), QStringLiteral("band")});
     m_appletVis->describeApplet(QStringLiteral("Frequency"),
         tr("Tuning"),
         {QStringLiteral("frequenz"), QStringLiteral("frequency"),
@@ -12739,9 +12782,14 @@ void MainWindow::buildMenuBar()
     bandMenu->addSeparator();
 
     {
+        // Bandstapel (2026-11-11): holt das Applet in die Spalte.
         QAction* bandStackAction = bandMenu->addAction(QStringLiteral("Band &Stacking..."));
-        bandStackAction->setEnabled(false);
-        bandStackAction->setToolTip(QStringLiteral("NYI — Phase X"));
+        bandStackAction->setToolTip(QStringLiteral("Show the Band Stack panel"));
+        connect(bandStackAction, &QAction::triggered, this, [this] {
+            if (m_appletVis) {
+                m_appletVis->ensureVisible(QStringLiteral("BandStack"));
+            }
+        });
     }
 
     // =========================================================================
@@ -13862,8 +13910,11 @@ void MainWindow::buildStatusBar()
         painter.end();
         bandStackLabel->setPixmap(pm);
     }
-    bandStackLabel->setToolTip(QStringLiteral("Band Stack (NYI)"));
+    // Bandstapel (2026-11-11): ein Klick holt das Applet in die Spalte
+    // (MainWindow::eventFilter), wie Band > Band Stacking...
+    bandStackLabel->setToolTip(QStringLiteral("Band Stack"));
     bandStackLabel->setCursor(Qt::PointingHandCursor);
+    bandStackLabel->installEventFilter(this);
 
     // +PAN icon. From AetherSDR MainWindow.cpp:4368-4396 [@c6481cb]: a jagged
     // spectrum polyline with a plus in the upper right. An icon reads as a
@@ -16934,6 +16985,53 @@ void MainWindow::bandUmschalten(Band band)
     aufDigiStellen(m_letzterDigiModus);
 }
 
+void MainWindow::bandstapelMarkenNachziehen()
+{
+    if (!m_panStack) { return; }
+    for (PanadapterApplet* applet : m_panStack->allApplets()) {
+        if (applet && applet->spectrumWidget()) {
+            bandstapelMarkenFuer(applet->spectrumWidget(), applet->panId());
+        }
+    }
+}
+
+void MainWindow::bandstapelMarkenFuer(SpectrumWidget* sw, const QString& panId)
+{
+    if (!sw) { return; }
+    BandStackController* stapel = m_radioModel ? m_radioModel->bandStack() : nullptr;
+    SliceModel* scheibe = sliceForPan(panId);
+    if (!stapel || !stapel->isReady() || !scheibe || !BandStackApplet::markenImSpektrum()) {
+        sw->setBandStackMarks({});
+        return;
+    }
+    // Alle Eintraege; das Spektrum zeichnet nur, was im Bild liegt. Ein
+    // paar hundert Marken sind ein kleines Feld, und so muss niemand beim
+    // Verschieben des Bildes nachliefern.
+    const int id = scheibe->sliceIndex();
+    const Band eigenesBand = stapel->stackBandFor(id);
+    const QString stelle = stapel->shownPlace(id, eigenesBand);
+    QVector<SpectrumWidget::BandStackMark> marken;
+    for (int i = 0; i < static_cast<int>(Band::Count); ++i) {
+        const Band band = static_cast<Band>(i);
+        if (band == Band::XVTR) { continue; }
+        const QList<BandStackEntry> eintraege = stapel->store().entries(band);
+        for (const BandStackEntry& e : eintraege) {
+            SpectrumWidget::BandStackMark m;
+            m.id = e.id;
+            m.hz = e.frequencyHz;
+            m.place = band == eigenesBand && e.id == stelle;
+            m.locked = e.locked;
+            m.tip = QStringLiteral("%1 %2").arg(BandStackStore::displayFrequency(e.frequencyHz),
+                                               e.mode);
+            if (!e.name.isEmpty()) {
+                m.tip += QStringLiteral(" — ") + e.name;
+            }
+            marken.append(m);
+        }
+    }
+    sw->setBandStackMarks(marken);
+}
+
 void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
 {
     // ── Diese Stelle MELDET, was sie tut (2026-10-28) ────────────────
@@ -17521,6 +17619,10 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
         if (watched == m_tciIndicator) {
             openTciSetupPage();
             return true;  // event consumed
+        }
+        if (watched == m_bandStackLabel && m_bandStackLabel && m_appletVis) {
+            m_appletVis->ensureVisible(QStringLiteral("BandStack"));
+            return true;
         }
     }
 

@@ -44,7 +44,16 @@
 
 #include <cmath>
 
+#include "core/AppSettings.h"
+#include "core/RadioDiscovery.h"
+#include "gui/SpectrumWidget.h"
 #include "gui/StyleConstants.h"
+#include "gui/applets/AppletFloatingWindow.h"
+#include "gui/applets/BandStackApplet.h"
+#include "gui/styles/AppTheme.h"
+#include "models/RadioModel.h"
+#include "models/SliceModel.h"
+#include "models/bandstack/BandStackController.h"
 
 using namespace Longpath;
 
@@ -81,8 +90,8 @@ const Eintrag kVierzig[] = {
 constexpr int kVierzigAnzahl = int(sizeof(kVierzig) / sizeof(kVierzig[0]));
 constexpr int kStelle = 4;  // 7.090
 
-struct Band { const char* name; int anzahl; int gesperrt; };
-const Band kAndere[] = {
+struct BandZeile { const char* name; int anzahl; int gesperrt; };
+const BandZeile kAndere[] = {
     {"160M", 4, 0}, {"80M", 5, 0}, {"60M", 1, 0}, {"30M", 4, 0},
     {"20M", 6, 1}, {"17M", 4, 0}, {"15M", 5, 0}, {"12M", 4, 0},
     {"10M", 6, 0}, {"6M", 4, 0}, {"GEN", 9, 0}, {"WWV", 6, 6},
@@ -307,7 +316,7 @@ double liste(QPainter& p, const QRectF& r, bool aufStelle, bool alleGruppen, boo
     if (alleGruppen) {
         p.setPen(c(Style::kBorderSubtle));
         p.drawLine(QPointF(r.left() + 8, y - 4), QPointF(r.right() - 8, y - 4));
-        for (const Band& b : kAndere) {
+        for (const BandZeile& b : kAndere) {
             gruppenkopf(p, QRectF(r.left(), y, r.width(), 22), QString::fromLatin1(b.name),
                         b.anzahl, b.gesperrt, false);
             y += 22;
@@ -647,6 +656,132 @@ private slots:
                            "Eintrag, ⇧ = voriger, ⌘ = Stelle ablegen). Der Stand steht in "
                            "der Statusleiste. Am wenigsten Fläche; dafür sieht man den "
                            "Stapel nur auf Abruf."));
+    }
+
+    // ── Nach der Wahl (2026-11-11, „A und D1"): das ECHTE Applet ──────
+    void echtA_applet()
+    {
+        applyAppBaselineQss(*qApp);   // wie im Programm (main.cpp)
+        AppSettings::instance().clear();
+        AppSettings::instance().setValue(QStringLiteral("Region"), QStringLiteral("Europe"));
+        RadioModel modell;
+        RadioInfo info;
+        info.macAddress = QStringLiteral("02:00:00:00:BA:EE");
+        modell.setLastRadioInfoForTest(info);
+        modell.addSlice();
+        SliceModel* s = modell.activeSlice();
+        s->setFrequency(14225000.0);
+        s->setDspMode(DSPMode::USB);
+        modell.setConnectionStateForTest(ConnectionState::Connected);
+        BandStackController* stapel = modell.bandStack();
+        const int id = s->sliceIndex();
+        QVERIFY(stapel->press(id, Band::Band40m, BandStackDirection::Next, {}, nullptr));
+        // Wie im Blatt: ein eigener gesperrter FT8-Eintrag und ein benannter.
+        s->setFrequency(7074000.0);
+        s->setDspMode(DSPMode::DIGU);
+        QVERIFY(stapel->add(id, {}, nullptr));
+        s->setFrequency(7155000.0);
+        s->setDspMode(DSPMode::LSB);
+        QVERIFY(stapel->add(id, {}, nullptr));
+        for (const BandStackEntry& e : stapel->store().entries(Band::Band40m)) {
+            if (e.frequencyHz == 7074000) { stapel->edit(e.id, QStringLiteral("FT8"), true, nullptr); }
+            if (e.frequencyHz == 7155000) {
+                stapel->edit(e.id, QStringLiteral("Runde Sonntag"), std::nullopt, nullptr);
+            }
+            if (e.frequencyHz == 7090000) { stapel->goTo(id, e.id, {}, nullptr); }
+        }
+
+        const auto aufnehmen = [&](const QString& name) {
+            auto* applet = new BandStackApplet(&modell);
+            AppletFloatingWindow win(applet, QStringLiteral("BandStack"), 0);
+            win.setAttribute(Qt::WA_DontShowOnScreen);
+            win.show();
+            QCoreApplication::processEvents();
+            win.resize(320, 600);
+            QCoreApplication::processEvents();
+            QImage flach(win.size() * 2, QImage::Format_RGB32);
+            flach.fill(QColor(Style::kAppBg));
+            QPainter p(&flach);
+            p.setRenderHint(QPainter::Antialiasing);
+            p.scale(2.0, 2.0);
+            win.render(&p);
+            p.end();
+            return flach;
+        };
+        const QImage aufStelle = aufnehmen(QStringLiteral("stelle"));
+        // Daneben steht man nur, wenn man von einem ANDEREN Band her von
+        // Hand hineinstimmt; innerhalb von 40 m steht man noch auf der
+        // Stelle, und Verlassen speichert dorthin (Thetis).
+        QVERIFY(stapel->press(id, Band::Band20m, BandStackDirection::Next, {}, nullptr));
+        s->setFrequency(7131000.0);
+        QCoreApplication::processEvents();
+        const QImage daneben = aufnehmen(QStringLiteral("daneben"));
+
+        QImage beide(aufStelle.width() + daneben.width() + 48 * int(kSkalierung),
+                     std::max(aufStelle.height(), daneben.height()) + 30 * int(kSkalierung),
+                     QImage::Format_RGB32);
+        beide.fill(kBlatt);
+        QPainter p(&beide);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.scale(kSkalierung, kSkalierung);
+        fallTitel(p, QPointF(0, 18), QStringLiteral("Auf der Stelle"));
+        fallTitel(p, QPointF((aufStelle.width() + 48 * kSkalierung) / kSkalierung, 18),
+                  QStringLiteral("Von 20 m her von Hand auf 7.131"));
+        p.resetTransform();
+        p.drawImage(0, int(30 * kSkalierung), aufStelle);
+        p.drawImage(aufStelle.width() + int(48 * kSkalierung), int(30 * kSkalierung), daneben);
+        p.end();
+        blattSpeichern(qEnvironmentVariable("LONGPATH_GRAB_DIR"),
+                       QStringLiteral("bandstapel-A-echt.png"), beide,
+                       QStringLiteral("Bandstapel — das echte Applet (Entwurf A)"),
+                       QStringLiteral(
+                           "Gerendert mit dem eingebauten Applet im schwebenden Fenster, "
+                           "Region Europa, Scheibe A auf 7.090 LSB. Rechts kam sie von 20 m "
+                           "her von Hand auf 7.131: die Stelle ist nicht markiert, die Kapsel "
+                           "zeigt „–“, und Verlassen speichert nichts. Wer dagegen INNERHALB "
+                           "von 40 m weiterstimmt, bleibt auf seiner Stelle, und Verlassen "
+                           "speichert die neue Frequenz dorthin (Thetis)."));
+        AppSettings::instance().clear();
+    }
+
+    void echtD1_marken()
+    {
+        const double w = 1000;
+        const double h = 2 * 250 + 3 * 24;
+        QImage img = leinwand(w, h);
+        QPainter p(&img);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.scale(kSkalierung, kSkalierung);
+        SpectrumWidget sw;
+        sw.setFrequencyRange(7100000.0, 200000.0);
+        const double fs[] = {7.005, 7.010, 7.045, 7.074, 7.090, 7.100, 7.155};
+        for (int fall = 0; fall < 2; ++fall) {
+            const double top = 24 + fall * (250 + 24);
+            fallTitel(p, QPointF(24, top - 6),
+                      fall == 0 ? QStringLiteral("Auf der Stelle 7.090")
+                                : QStringLiteral("Von 20 m her von Hand auf 7.131"));
+            Pan pan{QRectF(24, top, w - 48, 240), 7.000, 7.200};
+            panZeichnen(p, pan, fall == 0 ? 7.090 : 7.131);
+            QVector<SpectrumWidget::BandStackMark> marken;
+            for (int i = 0; i < kVierzigAnzahl; ++i) {
+                marken.append({QString::number(i), qRound64(fs[i] * 1e6),
+                               fall == 0 && i == kStelle, kVierzig[i].gesperrt, QString()});
+            }
+            sw.setBandStackMarks(marken);
+            // Das Spektrum ohne die Skala darunter, wie im Widget.
+            const QRect spek(int(pan.r.left()), int(pan.r.top()), int(pan.r.width()),
+                             int(pan.r.height() - 18));
+            sw.drawBandStackMarksForTest(p, spek);
+        }
+        p.end();
+        blattSpeichern(qEnvironmentVariable("LONGPATH_GRAB_DIR"),
+                       QStringLiteral("bandstapel-D1-echt.png"), img,
+                       QStringLiteral("Bandstapel — die echten Marken an der Skala (Entwurf D1)"),
+                       QStringLiteral(
+                           "Die Marken zeichnet SpectrumWidget::drawBandStackMarks, derselbe "
+                           "Code wie im Programm; Spektrum und Skala darunter sind die Skizze "
+                           "aus dem Entwurf. Klick auf eine Marke = hin, Überfahren zeigt "
+                           "den Eintrag, beim Senden ausgeblendet."));
     }
 
     void entwurfD_striche()

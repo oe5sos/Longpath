@@ -1045,6 +1045,7 @@ longpath_add_test(tst_radio_model_band_click)
 longpath_add_test(tst_bandstack_seeds)
 longpath_add_test(tst_bandstack_store)
 longpath_add_test(tst_bandstack_controller)
+longpath_add_test(tst_bandstack_applet)
 
 # ── About dialog ─────────────────────────────────────────────────────────
 longpath_add_test(tst_about_dialog)

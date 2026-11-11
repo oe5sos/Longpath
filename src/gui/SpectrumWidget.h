@@ -367,6 +367,29 @@ public:
     // und beide liefen davon.
     void setCompanionMarker(bool shown, qint64 ifHz,
                             const QString& label = QString{});
+
+    // ── Bandstapel: Marken an der Skala (2026-11-11) ───────────────
+    //
+    // Betreiber hat am 2026-11-11 Entwurf D1 gewaehlt: jeder Eintrag
+    // des Bandstapels ein kleines Dreieck am unteren Rand des Spektrums,
+    // direkt ueber der Frequenzskala; die Stelle der Scheibe heller,
+    // gesperrte mit Schloss. Klick = hin (bandStackMarkClicked),
+    // Ueberfahren zeigt den Eintrag. Nichts liegt ueber dem Signal.
+    // Beim Senden nicht gezeichnet und nicht anklickbar.
+    //
+    // Die Frequenzen sind die der Scheibe (dieselbe Achse wie die
+    // VFO-Marke). Eine leere Liste blendet alles aus.
+    struct BandStackMark {
+        QString id;
+        qint64  hz{0};
+        bool    place{false};
+        bool    locked{false};
+        QString tip;
+    };
+    void setBandStackMarks(const QVector<BandStackMark>& marks);
+    const QVector<BandStackMark>& bandStackMarks() const { return m_bandStackMarks; }
+    /// Die Marke unter (x, y), leer wenn keine.
+    QString bandStackMarkAtForTest(int x, int y) const;
     bool   companionMarkerShown() const { return m_companionShown; }
     qint64 companionMarkerHz()    const { return m_companionIfHz; }
     void setCenterFrequency(double centerHz);
@@ -1797,6 +1820,9 @@ public:
     // "...ForTest" hinter einem Waechter uebersetzt lokal durch den
     // vorkompilierten Kopf und faellt erst in der CI um -- der Fall vom
     // 2026-10-16, nachzulesen in docs.
+    void drawBandStackMarksForTest(QPainter& p, const QRect& specRect) {
+        drawBandStackMarks(p, specRect);
+    }
     void drawCompanionMarkerForTest(QPainter& p, const QRect& specRect) {
         drawCompanionMarker(p, specRect);
     }
@@ -2068,6 +2094,8 @@ signals:
     // Phase 3Q-8: emitted on a left-click while not Connected.
     // MainWindow wires this to showConnectionPanel().
     void disconnectedClickRequest();
+    /// Klick auf eine Bandstapel-Marke an der Skala.
+    void bandStackMarkClicked(const QString& entryId);
 
     // Emitted when user clicks on spectrum/waterfall to tune
     void frequencyClicked(double hz);
@@ -2296,6 +2324,10 @@ private:
     /// Frequenz daran. Warm, nicht blau -- der Hausstil haelt Blau
     /// fuer Anfassbares, und diese Zahl ist gemessen, nicht gestellt.
     void drawCompanionMarker(QPainter& p, const QRect& specRect);
+
+    /// Bandstapel-Marken am unteren Rand des Spektrums (Entwurf D1).
+    void drawBandStackMarks(QPainter& p, const QRect& specRect);
+    QString bandStackMarkAt(int x, int y, const QRect& specRect) const;
 
     // ── ZF und Antenne (2026-10-28) ─────────────────────────────────
     //
@@ -3029,6 +3061,9 @@ private:
     bool    m_companionShown{false};
     qint64  m_companionIfHz{0};
     QString m_companionLabel;
+
+    // Bandstapel-Marken (setBandStackMarks).
+    QVector<BandStackMark> m_bandStackMarks;
     int                          m_bandPlanFontSize{6};   // 0 = off; AetherSDR default
     bool                         m_squelchLineVisible{false};
     double                       m_squelchDbm{-150.0};

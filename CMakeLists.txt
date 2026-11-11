@@ -1341,6 +1341,7 @@ set(GUI_SOURCES
     src/gui/applets/RttyDecoderApplet.cpp
     src/gui/applets/CwDecoderApplet.cpp
     src/gui/applets/Ft8Applet.cpp
+    src/gui/applets/BandStackApplet.cpp
     src/gui/applets/Ft8PlaetzeApplet.cpp
     src/gui/Ft8KartenBruecke.cpp
     src/gui/applets/QsoRecorderApplet.cpp
