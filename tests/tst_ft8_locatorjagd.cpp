@@ -50,6 +50,7 @@
 #include "gui/Ft8KartenBruecke.h"
 #include "gui/QsoMapWindow.h"
 #include "gui/widgets/LocatorJagdZeichen.h"
+#include <QTableWidget>
 #include "gui/applets/Ft8Applet.h"
 #include "gui/widgets/AzimutalKarteWidget.h"
 #include "gui/widgets/FlatMapWidget.h"
@@ -775,6 +776,43 @@ private slots:
             QVERIFY(gross.grab().save(grabDir + QStringLiteral("/ft8-jagd-azimutal-gross.png")));
         }
         karte.azimutalButtonForTest()->setChecked(false);
+
+        // ── Entwuerfe fuer die Jagdtafel (2026-11-11) ────────────────
+        //
+        // Vier Blaetter, aus demselben Logbuch und denselben gehoerten
+        // Stationen -- Betreiber: „mache mir grafische vorschlaege".
+        // Jedes Blatt beantwortet dieselbe Frage anders: „sofort sehen,
+        // was noch nicht erreicht ist und wo gerade gesendet wird".
+        karte.resize(1600, 900);
+        karte.jagdButtonForTest()->setChecked(true);
+        QTest::qWait(250);
+        QVERIFY(karte.jagdSpalteForTest()->isVisible());
+        QVERIFY(karte.jagdListeForTest()->rowCount() > 0);
+
+        // A: vierstellige Quadrate (so, wie es heute malt) + Liste.
+        karte.flatMapForTest()->setGrosseFelder(false);
+        QTest::qWait(120);
+        QVERIFY(karte.grab().save(grabDir + QStringLiteral("/jagdtafel-A-quadrate-liste.png")));
+
+        // B: Grossfelder statt Quadrate -- auf der Weltkarte lesbar.
+        karte.flatMapForTest()->setGrosseFelder(true);
+        QTest::qWait(120);
+        QVERIFY(karte.grab().save(grabDir + QStringLiteral("/jagdtafel-B-grossfelder-liste.png")));
+
+        // C: umgekehrt gedacht -- gefaerbt wird, was FEHLT.
+        karte.flatMapForTest()->setLueckenBetonen(true);
+        QTest::qWait(120);
+        QVERIFY(karte.grab().save(grabDir + QStringLiteral("/jagdtafel-C-luecken-liste.png")));
+
+        // D: nur die Karte, ohne Spalte -- alles Platz fuers Bild.
+        karte.flatMapForTest()->setLueckenBetonen(false);
+        karte.jagdSpalteForTest()->setVisible(false);
+        QTest::qWait(120);
+        QVERIFY(karte.grab().save(grabDir + QStringLiteral("/jagdtafel-D-nur-karte.png")));
+        karte.jagdSpalteForTest()->setVisible(true);
+
+        karte.flatMapForTest()->setGrosseFelder(false);
+        karte.jagdButtonForTest()->setChecked(false);
         AppSettings::instance().setValue(QStringLiteral("QsoMapView"), QString{});
     }
 };

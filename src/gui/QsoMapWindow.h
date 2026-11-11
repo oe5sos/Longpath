@@ -80,6 +80,8 @@ class QComboBox;
 class QEvent;
 class QLineEdit;
 class QSpinBox;
+class QTableWidget;
+class QTableWidgetItem;
 
 namespace Longpath {
 
@@ -227,6 +229,8 @@ public:
     QCheckBox* gridForTest() const { return m_grid; }
     QPushButton* jagdButtonForTest() const { return m_jagdBtn; }
     QPushButton* vollbildButtonForTest() const { return m_vollbildBtn; }
+    QTableWidget* jagdListeForTest() const { return m_jagdListe; }
+    QWidget* jagdSpalteForTest() const { return m_jagdSpalte; }
     QCheckBox* pathsForTest() const { return m_paths; }
     QCheckBox* imageryForTest() const { return m_imagery; }
     QSpinBox*  liveMinutenForTest() const { return m_liveMinuten; }
@@ -367,6 +371,18 @@ private:
     // vollbild zu vergroessern".
     QPushButton*      m_vollbildBtn{nullptr};
     void setzeVollbild(bool an);
+
+    // ── Die Jagdliste neben der Karte (2026-11-11) ─────────────────
+    //
+    // Betreiber: „somit sehe ich sofort das call, welches aus einem
+    // locator sendet, welches ich noch nicht erreicht und bestaetigt
+    // habe." Die Karte sagt WO, diese Spalte sagt WEN -- auf der
+    // Weltkarte ist ein Feld nur rund sechs Bildpunkte breit, ein
+    // Rufzeichen in einer Zeile hat dieses Problem nicht.
+    QTableWidget* m_jagdListe{nullptr};
+    QLabel*       m_jagdListeKopf{nullptr};
+    QWidget*      m_jagdSpalte{nullptr};
+    void fuelleJagdListe(const QVector<Longpath::LivePunkt>& punkte);
     bool              m_embedded{false};
 
     // ── 3D-Flug ──────────────────────────────────────────────────────

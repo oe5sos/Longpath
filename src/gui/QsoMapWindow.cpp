@@ -50,6 +50,8 @@
 #include <QCheckBox>
 #include <QSpinBox>
 #include <QTimer>
+#include <QTableWidget>
+#include <QHeaderView>
 #include <QComboBox>
 #include <QStandardItemModel>
 #include "gui/widgets/WorldMapCatalog.h"
@@ -198,6 +200,80 @@ void QsoMapWindow::resetActiveView()
     else                              { m_flat->resetView(); }
 }
 
+void QsoMapWindow::fuelleJagdListe(const QVector<LivePunkt>& punkte)
+{
+    if (m_jagdListe == nullptr) { return; }
+
+    // Nur, was fehlt. Wer schon im Logbuch steht, gehoert nicht auf
+    // eine Liste, deren ganzer Zweck die Luecke ist.
+    QVector<LivePunkt> offen;
+    for (const LivePunkt& lp : punkte) {
+        if (lp.art == LiveArt::NeuesLand || lp.feldNeu) { offen.append(lp); }
+    }
+    // Neues Land vor neuem Feld, dann der frischeste, dann der lauteste.
+    std::sort(offen.begin(), offen.end(), [](const LivePunkt& a, const LivePunkt& b) {
+        const int ra = a.art == LiveArt::NeuesLand ? 0 : 1;
+        const int rb = b.art == LiveArt::NeuesLand ? 0 : 1;
+        if (ra != rb) { return ra < rb; }
+        if (a.alterSek != b.alterSek) { return a.alterSek < b.alterSek; }
+        return a.g.snrDb > b.g.snrDb;
+    });
+
+    m_jagdListe->setRowCount(offen.size());
+    const QColor neu(Style::kJagdNeu);
+    const QColor leise(Style::kTextSecondary);
+    for (int r = 0; r < offen.size(); ++r) {
+        const LivePunkt& lp = offen.at(r);
+        const bool land = lp.art == LiveArt::NeuesLand;
+        // Die Raute steht fuer ein neues Land -- dasselbe Zeichen wie
+        // auf der Karte, damit Liste und Bild dieselbe Sprache sprechen.
+        auto* ruf = new QTableWidgetItem(
+            (land ? QStringLiteral("\u25c6 ") : QString{}) + lp.g.rufzeichen);
+        ruf->setData(Qt::UserRole, lp.g.rufzeichen);
+        ruf->setForeground(neu);
+        QFont f = ruf->font();
+        f.setBold(true);
+        ruf->setFont(f);
+        ruf->setToolTip(land
+            ? QStringLiteral("%1 — %2, a country you have never worked")
+                  .arg(lp.g.rufzeichen, lp.g.land.isEmpty()
+                                            ? QStringLiteral("new DXCC")
+                                            : lp.g.land)
+            : QStringLiteral("%1 — %2 is still missing on %3")
+                  .arg(lp.g.rufzeichen, lp.feld, lp.g.band));
+        m_jagdListe->setItem(r, 0, ruf);
+
+        auto* feld = new QTableWidgetItem(lp.feld);
+        feld->setForeground(leise);
+        m_jagdListe->setItem(r, 1, feld);
+
+        auto* snr = new QTableWidgetItem(QStringLiteral("%1").arg(lp.g.snrDb));
+        snr->setForeground(leise);
+        snr->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        m_jagdListe->setItem(r, 2, snr);
+
+        auto* km = new QTableWidgetItem(
+            lp.km < 0.0 ? QStringLiteral("—")
+                        : QString::number(qRound(lp.km)));
+        km->setForeground(leise);
+        km->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        m_jagdListe->setItem(r, 3, km);
+
+        auto* alt = new QTableWidgetItem(QStringLiteral("%1s").arg(lp.alterSek));
+        alt->setForeground(leise);
+        alt->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        m_jagdListe->setItem(r, 4, alt);
+    }
+
+    if (m_jagdListeKopf != nullptr) {
+        m_jagdListeKopf->setText(offen.isEmpty()
+            ? QStringLiteral("Nothing missing on the air right now.")
+            : QStringLiteral("%1 transmitting now from squares you do not "
+                             "have — double-click to call")
+                  .arg(offen.size()));
+    }
+}
+
 void QsoMapWindow::setzeVollbild(bool an)
 {
     if (m_embedded) { return; }   // in der Spalte gibt es kein Vollbild
@@ -237,12 +313,15 @@ void QsoMapWindow::setzeJagd(bool an)
         if (m_imagery) { m_imagery->setChecked(false); }
 
         if (m_flat) { m_flat->setJagdModus(true); }
+        if (m_jagdSpalte) { m_jagdSpalte->setVisible(true); }
+        refreshLive();
         rememberView();
         resetActiveView();   // die ganze Welt, nicht der eigene Vorgarten
         return;
     }
 
     if (m_flat) { m_flat->setJagdModus(false); }
+    if (m_jagdSpalte) { m_jagdSpalte->setVisible(false); }
     if (!m_jagdVorher.gueltig) { return; }
     if (m_paths)   { m_paths->setChecked(m_jagdVorher.pfade); }
     if (m_imagery) { m_imagery->setChecked(m_jagdVorher.luftbild); }
@@ -717,6 +796,67 @@ void QsoMapWindow::buildUi()
     mapRow->setSpacing(8);
     mapRow->addWidget(m_rotorRadar, 1);
     mapRow->addWidget(m_stack, 3);
+
+    // ── Die Jagdliste: wer sendet gerade aus einem Feld, das fehlt ──
+    //
+    // Sie steht neben der Karte und nur im Jagdmodus. Die Karte
+    // beantwortet „wo", die Liste „wen" -- und das Rufzeichen steht
+    // darin lesbar, auch wenn das Feld auf der Weltkarte sechs
+    // Bildpunkte breit ist.
+    m_jagdSpalte = new QWidget(this);
+    auto* jagdCol = new QVBoxLayout(m_jagdSpalte);
+    jagdCol->setContentsMargins(0, 0, 0, 0);
+    jagdCol->setSpacing(4);
+    m_jagdListeKopf = new QLabel(QString{}, m_jagdSpalte);
+    m_jagdListeKopf->setWordWrap(true);
+    m_jagdListeKopf->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; }")
+            .arg(QString::fromLatin1(Style::kTextSecondary)));
+    jagdCol->addWidget(m_jagdListeKopf);
+
+    m_jagdListe = new QTableWidget(0, 5, m_jagdSpalte);
+    m_jagdListe->setObjectName(QStringLiteral("qsoMapHuntList"));
+    m_jagdListe->setHorizontalHeaderLabels(
+        {QStringLiteral("CALL"), QStringLiteral("GRID"),
+         QStringLiteral("SNR"),  QStringLiteral("KM"),
+         QStringLiteral("AGE")});
+    m_jagdListe->verticalHeader()->setVisible(false);
+    m_jagdListe->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_jagdListe->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_jagdListe->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_jagdListe->setShowGrid(false);
+    m_jagdListe->setAlternatingRowColors(false);
+    // Das Rufzeichen bekommt den Platz, die Zahlen nur, was sie
+    // brauchen -- mit setStretchLastSection stand rechts eine leere
+    // sechste Spalte (am Bild gesehen, 2026-11-11).
+    m_jagdListe->horizontalHeader()->setStretchLastSection(false);
+    m_jagdListe->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    for (int c = 1; c < 5; ++c) {
+        m_jagdListe->horizontalHeader()->setSectionResizeMode(c, QHeaderView::ResizeToContents);
+    }
+    m_jagdListe->setStyleSheet(QStringLiteral(
+        "QTableWidget { background: %1; border: 1px solid %2; color: %3;"
+        "               font-size: 11px; gridline-color: %2; }"
+        "QHeaderView::section { background: %1; color: %4; border: 0;"
+        "                       border-bottom: 1px solid %2; padding: 3px;"
+        "                       font-size: 10px; }")
+            .arg(QString::fromLatin1(Style::kPanelBg),
+                 QString::fromLatin1(Style::kBorder),
+                 QString::fromLatin1(Style::kTextPrimary),
+                 QString::fromLatin1(Style::kTextScale)));
+    // Anrufen haengt am Doppelklick -- derselbe Handgriff wie auf der
+    // Karte und in der Fundliste. Ein einzelner Klick waehlt nur aus.
+    connect(m_jagdListe, &QTableWidget::itemDoubleClicked, this,
+            [this](QTableWidgetItem* item) {
+        if (item == nullptr) { return; }
+        const QString ruf = m_jagdListe->item(item->row(), 0)
+                                ->data(Qt::UserRole).toString();
+        if (!ruf.isEmpty()) { rufeLive(ruf); }
+    });
+    jagdCol->addWidget(m_jagdListe, 1);
+    m_jagdSpalte->setVisible(false);
+    mapRow->addWidget(m_jagdSpalte, 1);
+
     col->addLayout(mapRow, 1);
 
     m_summary = new QLabel(QString{}, this);
@@ -1444,6 +1584,7 @@ void QsoMapWindow::refreshLive()
     const QVector<LivePunkt> punkte = m_live.punkte(t, m_mosaik, m_homeGrid);
     m_flat->setLivePunkte(punkte);
     m_azimut->setLivePunkte(punkte);
+    fuelleJagdListe(punkte);
 
     if (!m_liveZaehler) { return; }
     if (m_liveBand.isEmpty() && m_live.anzahl() == 0) { return; }
