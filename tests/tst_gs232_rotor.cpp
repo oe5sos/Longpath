@@ -215,6 +215,30 @@ private slots:
         QCOMPARE(rotor.state(), RotorController::State::Idle);
     }
 
+    // Erlaubter Bereich (2026-11-08): der echte Treiber schickt nichts
+    // hinaus, wenn das Ziel ausserhalb liegt.
+    void ausserhalb_des_bereichs_wird_nicht_gedreht()
+    {
+        auto& st = AppSettings::instance();
+        st.setValue(QStringLiteral("RotorEndStopDeg"), -1.0);
+        st.setValue(QStringLiteral("Rotor/LimitOn"), QStringLiteral("True"));
+        st.setValue(QStringLiteral("Rotor/LimitFromDeg"), 270.0);
+        st.setValue(QStringLiteral("Rotor/LimitToDeg"), 90.0);
+        FakeWire draht;
+        QVERIFY(draht.open(QIODevice::ReadWrite));
+        Gs232Rotor rotor;
+        rotor.useDeviceForTest(&draht);
+        rotor.connectToRotor();
+        draht.loescheGesendet();
+        QSignalSpy fehler(&rotor, &Gs232Rotor::errorOccurred);
+        rotor.moveTo(180.0);
+        QVERIFY2(!draht.gesendet().contains("W180"), draht.gesendet().constData());
+        QCOMPARE(fehler.count(), 1);
+        rotor.moveTo(350.0);
+        QVERIFY(draht.gesendet().contains("W350"));
+        st.setValue(QStringLiteral("Rotor/LimitOn"), QStringLiteral("False"));
+    }
+
     void ohne_verbindung_wird_nicht_gedreht()
     {
         Gs232Rotor rotor;

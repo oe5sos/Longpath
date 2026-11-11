@@ -177,6 +177,7 @@ mw0lge@grange-lane.co.uk
 
 #include "core/ConnectionState.h"
 #include "core/SignalHistoryStore.h"
+#include "gui/spectrum/Durchlass.h"
 #include "core/WdspTypes.h"  // DSPMode — for TX filter IQ-space mapping (Plan 4 D9)
 #include "core/NoiseFloorEstimator.h"  // Rauschboden der Wasserfall-Bildpunkte
 
@@ -664,6 +665,109 @@ public:
     /// taten — siehe die Notiz bei m_heatmapEnabled.
     void setHeatmapEnabled(bool on);
     bool heatmapEnabled() const { return m_heatmapEnabled; }
+
+    // ── Schaerfe (2026-11-08) ───────────────────────────────────────────
+    //
+    // Betreiber: „was kannst du graphisch beim Panadapter noch verbessern,
+    // auch in Hinsicht auf schaerfere Grafik". Drei Stellschrauben, die
+    // der Zeichenweg bisher fest verdrahtet hatte. Erst als Entwurf (alle
+    // aus) an den Blaettern der Rendering-Werkbank verglichen (Varianten
+    // s_*), dann vom Betreiber gewaehlt: „Alles zusammen". Seitdem ALLE
+    // DREI AN ab Werk und je Panadapter gespeichert. Wer das alte Bild
+    // will: DisplayWaterfallDevicePixels / DisplayGridHairline = False,
+    // DisplayTraceEdgePx = 1.0.
+    //
+    // * Wasserfall in Geraete-Pixeln. Das Wasserfallbild war in LOGISCHEN
+    //   Pixeln angelegt (applyResizeSettled), die Kurve darueber rechnet
+    //   seit 2026-08-26 in Geraete-Pixeln. Auf dem Retina-Schirm (dpr 2)
+    //   streckte die GPU jede Wasserfallspalte linear auf zwei Punkte --
+    //   weich, und schmale Traeger bekamen die halbe Aufloesung. Die
+    //   HOEHE bleibt logisch: eine Zeile je Takt, also dieselbe Zeit je
+    //   Bildschirmhoehe wie bisher.
+    void setWaterfallDevicePixels(bool on);
+    bool waterfallDevicePixels() const { return m_wfDevicePixels; }
+    // * Raster als Haarlinie: ein Geraete-Pixel statt eines logischen
+    //   (zwei Punkte auf Retina), und an derselben stetigen Stelle wie
+    //   die Kurve statt auf ganze logische Pixel gerundet.
+    void setGridHairline(bool on);
+    bool gridHairline() const { return m_gridHairline; }
+    // * Auslauf der weichen Kurvenkante in Geraete-Pixeln. Ab Werk 0,5
+    //   (vorher fest Kurve::kKantePixel = 1,0): glaettet nur die Treppe,
+    //   statt die Linie weich zu zeichnen.
+    void setTraceEdgePx(float px);
+    float traceEdgePx() const { return m_traceEdgePx; }
+    /// Pruefstand (tst_panadapter_schaerfe): Groesse des Wasserfallbilds.
+    QSize waterfallImageSizeForTest() const { return m_waterfall.size(); }
+
+    // ── Durchlass und Bandbreite (2026-11-08) ───────────────────────────
+    //
+    // Betreiber an den Entwurfsblaettern: „Alle vier bauen". Messkern und
+    // Begruendung in gui/spectrum/Durchlass.h. Alle vier AN ab Werk, je
+    // Panadapter gespeichert, abschaltbar im Zahnrad des Panadapters.
+    //
+    //   Bandbreite   Zahl am Durchlass, Kantenwerte und Rast beim Ziehen
+    //   Klammern     belegte Breite und SNR jedes Signals
+    //   Luecken      freie Stellen zum CQ-Rufen, Klick stimmt hin
+    //   Lupe         +/-10 kHz um den VFO, aus den vollen FFT-Bins;
+    //                0 aus, 1 nur wenn der Durchlass schmal ist, 2 immer
+    void setPassbandLabelShown(bool on);
+    bool passbandLabelShown() const { return m_zeigeBandbreite; }
+    void setSignalBracketsShown(bool on);
+    bool signalBracketsShown() const { return m_zeigeKlammern; }
+    void setGapFinderShown(bool on);
+    bool gapFinderShown() const { return m_zeigeLuecken; }
+    void setPassbandMagnifier(int modus);
+
+    // ── Einmessen an einem Traeger (2026-11-08) ────────────────────────
+    /// Mittelt die naechsten zehn Spektren und sucht +/-2,5 kHz um die
+    /// Stelle `widgetPos` (oder `geraetHz`) den staerksten Traeger;
+    /// meldet sich mit traegerGemessen. Wie Thetis' Freq Cal, aber an
+    /// der angeklickten Stelle. false, wenn die Stelle nicht im Spektrum
+    /// liegt oder noch keine Daten da sind.
+    bool starteTraegerMessungBei(const QPoint& widgetPos);
+    bool starteTraegerMessung(double geraetHz);
+    bool traegerMessungLaeuft() const { return m_eichZielHz > 0.0; }
+
+    // ── Bandlage fuer den Rundum-Lauf (2026-11-08) ─────────────────────
+    /// Meldet hoechstens alle 100 ms bandLage(): Rauschboden (Median des
+    /// sichtbaren Ausschnitts), Belegung (mittlerer dB-Ueberschuss ueber
+    /// Boden + 6 dB je Bildpunkt) und die Zahl erkannter Signale.
+    void setBandLageMelden(bool an) { m_bandLageMelden = an; }
+    int  passbandMagnifier() const { return m_lupenModus; }
+
+    // ── S-Stufen an der dBm-Skala (2026-11-08) ──────────────────────────
+    //
+    // Statt dBm-Zahlen S1 ... S9, +10 ... +60 -- nach Thetis' Bezug
+    // (core/SMeterSkala): unter 30 MHz S9 = -73 dBm, darueber -93 dBm,
+    // entschieden an der ANTENNENfrequenz des VFO (mit Transverter also
+    // 2 m, nicht 28 MHz). Die Striche zeigen den kalibrierten Pegel --
+    // anders als die dBm-Zahlen, die roh ablesen (Befund 2026-09-25).
+    // Ab Werk aus, Haken im Zahnrad.
+    void setSUnitsScaleShown(bool on);
+    bool sUnitsScaleShown() const { return m_sStufenSkala; }
+    /// Pruefstand: Beschriftung und Rohwert (fuer dbmToY) je Strich.
+    QVector<QPair<QString, float>> sUnitTicksForTest() const { return sStufenStriche(); }
+
+    /// Pruefstand: die Auswertung sofort, ohne die 200-ms-Bremse.
+    void werteDurchlassAusForTest() { werteDurchlassAus(/*sofort=*/true); }
+    QVector<Durchlass::Signal> signalBracketsForTest() const { return m_klammerHaltung.gezeigt(); }
+    QVector<Durchlass::Luecke> gapsForTest() const { return m_luecken; }
+    int bestGapForTest() const { return m_besteLuecke; }
+    /// Die Klickflaechen der Luecken in Widget-Koordinaten (nach dem Malen).
+    QVector<QRectF> gapClickRectsForTest() const
+    {
+        QVector<QRectF> r;
+        for (const auto& k : m_lueckenKlick) { r << k.first; }
+        return r;
+    }
+    bool magnifierVisibleForTest() const { return lupeSichtbar(); }
+    /// Die Lupe in dBm je Bin, wie sie gezeichnet wuerde (geglaettet).
+    QVector<float> magnifierBinsForTest() const { return m_lupeGlatt; }
+    QPair<float, float> magnifierRangeForTest() const
+    { return {m_lupeHoehe.unten, m_lupeHoehe.oben}; }
+    /// Klammern, Luecken und Lupe in ein Bild malen. Im Pruefstand gibt es
+    /// keine GPU -- und ohne Malen keine Klickflaechen der Luecken.
+    QImage paintPassbandOverlaysForTest();
 
     // Display calibration offset added to every bin before it's mapped
     // to screen Y. Ported from Thetis Display.RX1DisplayCalOffset
@@ -1701,6 +1805,9 @@ public:
     }
     double rfFuerAnzeigeForTest(double ifHz) const { return rfFuerAnzeige(ifHz); }
     double zfFuerAchseForTest(double rfHz)  const { return zfFuerAchse(rfHz); }
+    static double frequenzSchrittForTest(double bandwidthHz, int breitePx) {
+        return frequenzSchritt(bandwidthHz, breitePx);
+    }
     static QString freqScaleLabelForTest(double hz, double stepHz) {
         return freqScaleLabel(hz, stepHz);
     }
@@ -2019,6 +2126,13 @@ signals:
     // in MainWindow::refreshPanNotchMarkers.  Emitters land with the
     // interaction layer (design sections 7.1 through 7.4).
     void notchCreateRequested(double freqHz, bool narrow);
+
+    /// Einmessen (2026-11-08): die Messung nach starteTraegerMessung ist
+    /// fertig. geraetHz = Traeger am Geraet, anzeigeHz = auf der Antenne
+    /// (mit Transverter umgerechnet). Siehe core/FrequenzEichung.h.
+    void traegerGemessen(bool gefunden, double geraetHz, double anzeigeHz,
+                         float snrDb);
+    void bandLage(float bodenDbm, float belegung, int signale);
     void notchMoveRequested(int id, double newFreqHz);
     void notchWidthRequested(int id, double widthHz);
     /// Emitted when a notch drag ends, so the coalesced DSP push can flush
@@ -2462,6 +2576,8 @@ public:
     // Beschriftung einer Frequenzmarke (MHz) mit den Nachkommastellen, die
     // der Markenabstand stepHz braucht (25 kHz -> 3, 50 kHz -> 2, 100 kHz -> 1).
     static QString freqScaleLabel(double hz, double stepHz);
+    /// Teilstrich-Abstand fuer Raster und Skala (2026-11-08), siehe .cpp.
+    static double frequenzSchritt(double bandwidthHz, int breitePx);
     /// Der Wert fuer Wasserfall-Zeilenpunkt x, wenn `scale` Quellpunkte
     /// (Geraete-Pixel der Pipeline) auf einen Zeilenpunkt (logisches
     /// Pixel) fallen -- auf Retina zwei --, zusammengefasst nach der Regel
@@ -2751,6 +2867,35 @@ private:
     float       m_lineWidth{1.0f};
     bool        m_traceSoftEdge{true};    // AN ab Werk, siehe setTraceSoftEdge
     bool        m_traceHalo{false};       // AUS ab Werk, siehe setTraceHalo
+    // Durchlass und Bandbreite (2026-11-08), siehe setPassbandLabelShown.
+    bool        m_zeigeBandbreite{true};
+    bool        m_zeigeKlammern{true};
+    bool        m_zeigeLuecken{true};
+    int         m_lupenModus{1};            // 0 aus, 1 an (immer sichtbar)
+    bool        m_kanteFein{false};         // Shift beim Ziehen: ohne Rast
+    Durchlass::Haltung         m_klammerHaltung;
+    float                      m_klammerBoden{0.0f};
+    QVector<Durchlass::Luecke> m_luecken;
+    int                        m_besteLuecke{-1};
+    qint64                     m_durchlassZuletztMs{0};
+    QVector<QPair<QRectF, double>> m_lueckenKlick;   // Flaeche, ZF in Hz
+    QVector<float>             m_lupeGlatt;
+    int                        m_lupeErster{-1};
+    Durchlass::Hoehe           m_lupeHoehe;     // eigener Hoehenmassstab
+    double                     m_eichZielHz{0.0};   // Einmessen: Suchmitte (Geraet)
+    bool                       m_bandLageMelden{false};
+    qint64                     m_bandLageZuletztMs{0};
+    void meldeBandLage();
+    QVector<double>            m_eichSumme;         // gemittelte Leistung je Bin
+    int                        m_eichBilder{0};
+    void fuehreEichungNach();
+    bool                       m_lupeHoeheDa{false};
+    bool                       m_sStufenSkala{false};   // S-Stufen statt dBm
+    // Schaerfe (2026-11-08), siehe setWaterfallDevicePixels. AN ab Werk.
+    // Vor jedem GPU-#ifdef, weil die Zugriffsmethoden ungeschuetzt sind.
+    bool        m_wfDevicePixels{true};
+    bool        m_gridHairline{true};
+    float       m_traceEdgePx{0.5f};      // war Kurve::kKantePixel (1,0)
     // Wie viele Streifen im jeweiligen Puffer stehen. Gesetzt beim Bauen
     // der Scheitelpunkte, gelesen beim Zeichnen -- zwei Stellen, eine
     // Zahl, sonst zeichnet die GPU aus einem halb gefuellten Puffer.
@@ -3606,6 +3751,17 @@ private:
     /// wenn das Fenster dafuer noch keine Groesse hat. Siehe den
     /// Kommentar im Rumpf (Befund des Betreibers, 2026-10-31).
     bool stelleWasserfallbildSicher();
+
+    // Durchlass und Bandbreite (2026-11-08)
+    void werteDurchlassAus(bool sofort = false);
+    void fuehreLupeNach();
+    bool lupeSichtbar() const;
+    void paintBandbreite(QPainter& p, const QRect& specRect, int xLo, int xHi,
+                         double centreHz, int specBottomClipped, int loHz, int hiHz);
+    void paintSignalKlammern(QPainter& p, const QRect& specRect);
+    void paintLueckenfinder(QPainter& p, const QRect& specRect);
+    void paintDurchlassLupe(QPainter& p, const QRect& specRect);
+    QVector<QPair<QString, float>> sStufenStriche() const;
 };
 
 } // namespace Longpath

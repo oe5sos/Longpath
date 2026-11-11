@@ -152,9 +152,12 @@ public:
 
     // Format a signal-level dBm value in the requested unit.
     // S: IARU S-meter scale — S9 = -73 dBm at HF, 6 dB per S unit.
+    //    sVersatzDb (from sVersatz()) moves only the S reading: +20 dB
+    //    above the S9 frequency, where S9 = -93 dBm.
     // dBm: plain numeric string (with or without decimal).
     // uV: microvolts at 50Ω derived from dBm.
-    static QString formatValue(float dBm, MeterUnit unit, bool decimal = true);
+    static QString formatValue(float dBm, MeterUnit unit, bool decimal = true,
+                               float sVersatzDb = 0.0f);
 
     virtual void setUnitMode(MeterUnit u)   { m_unitMode = u; }
     MeterUnit unitMode() const              { return m_unitMode; }
@@ -175,6 +178,11 @@ public:
 
     int bindingId() const { return m_bindingId; }
     void setBindingId(int id) { m_bindingId = id; }
+
+    // Versatz der Signal-Lesungen (SignalPeak / SignalAvg / MaxBin)
+    // ueber der S9-Grenze: +20 dB auf Stelle und S-Text, nie auf eine
+    // dBm-Zahl. 0 fuer alle anderen Groessen. Siehe MeterItem.cpp.
+    float sVersatz() const;
     double value() const { return m_value; }
     virtual void setValue(double v) { m_value = v; }
 

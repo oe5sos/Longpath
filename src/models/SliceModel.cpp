@@ -1438,6 +1438,14 @@ void SliceModel::setSsqlEnabled(bool v)
     }
 }
 
+void SliceModel::setSsqlAuto(bool v)
+{
+    if (m_ssqlAuto != v) {
+        m_ssqlAuto = v;
+        emit ssqlAutoChanged(v);
+    }
+}
+
 void SliceModel::setSsqlThresh(double dB)
 {
     // qFuzzyCompare is undefined when either arg is 0.0; use the subtraction-to-zero pattern.

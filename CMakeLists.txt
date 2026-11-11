@@ -898,6 +898,14 @@ set(GUI_SOURCES
     src/gui/spectrum/ActivePeakHoldTrace.cpp
     src/gui/spectrum/PeakBlobDetector.cpp
     src/gui/spectrum/SpectrumDetector.cpp
+    src/gui/spectrum/Durchlass.cpp
+    src/core/SMeterSkala.cpp
+    src/core/FrequenzEichung.cpp
+    src/core/RundumLauf.cpp
+    src/core/RotorBereich.cpp
+    src/core/FlexAutoRauschsperre.cpp
+    src/core/LogbuchBilder.cpp
+    src/core/SingleInstanceGuard.cpp
     src/gui/spectrum/SpectrumAvenger.cpp
     src/gui/DssRenderer.cpp
     src/gui/SpectrumWidget.cpp
@@ -1317,6 +1325,9 @@ set(GUI_SOURCES
     src/gui/applets/QsoRecorderApplet.cpp
     src/gui/applets/RecordingApplet.cpp
     src/gui/RecordingScheduleDialog.cpp
+    src/gui/TraegerEichDialog.cpp
+    src/gui/RundumDialog.cpp
+    src/gui/widgets/LogbuchBilderWidgets.cpp
     src/gui/applets/BandwidthFilterApplet.cpp
     src/gui/applets/CatApplet.cpp
     src/gui/applets/TunerApplet.cpp

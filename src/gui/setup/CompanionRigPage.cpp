@@ -364,6 +364,22 @@ void CompanionRigPage::baueTransverterGruppe()
         "with this on and you still see 14 MHz."));
     grid->addWidget(m_tvEin, row++, 0, 1, 2);
 
+    // Nur Empfang (2026-11-08): siehe TransverterSetup::nurEmpfang.
+    m_tvNurEmpfang = new QCheckBox(
+        QStringLiteral("Receive only — this radio is on the transverter's "
+                       "second IF output (IFo2)"), group);
+    m_tvNurEmpfang->setObjectName(QStringLiteral("transverterRxOnly"));
+    m_tvNurEmpfang->setStyleSheet(QString::fromLatin1(Style::kCheckBoxStyle));
+    m_tvNurEmpfang->setChecked(m_tv.nurEmpfang);
+    m_tvNurEmpfang->setToolTip(QStringLiteral(
+        "On: while the transverter is on, Longpath never keys this radio — "
+        "MOX, TUNE and every digital mode are refused. Its antenna socket is "
+        "wired to a receive output; transmitting would drive power into it. "
+        "The band plan cannot catch this, because 28.300 MHz converts to a "
+        "legal 144.300 MHz. Turn it off only if this radio drives the "
+        "transverter's IF input itself."));
+    grid->addWidget(m_tvNurEmpfang, row++, 0, 1, 2);
+
     auto* vorgabeLabel = new QLabel(QStringLiteral("Preset:"), group);
     vorgabeLabel->setStyleSheet(
         QString::fromLatin1(Style::kSecondaryLabelStyle));
@@ -422,6 +438,51 @@ void CompanionRigPage::baueTransverterGruppe()
     m_tvVersatz->setRange(-30000.0, 30000.0);
     grid->addWidget(m_tvVersatz, row++, 1);
 
+    // RX-Verstaerkung (2026-11-08) -- Thetis "RX Gain" im Transverter-
+    // Fenster: von jedem Empfangspegel abgezogen, damit Spektrum, S-Meter
+    // und S-Stufen die Antenne meinen. Siehe TransverterSetup::rxGainDb.
+    auto* gainLabel = new QLabel(QStringLiteral("RX gain:"), group);
+    gainLabel->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
+    grid->addWidget(gainLabel, row, 0);
+    m_tvRxGain = new QDoubleSpinBox(group);
+    m_tvRxGain->setObjectName(QStringLiteral("transverterRxGain"));
+    m_tvRxGain->setStyleSheet(Style::doubleSpinBoxStyle());
+    m_tvRxGain->setLocale(QLocale::c());
+    m_tvRxGain->setDecimals(1);
+    m_tvRxGain->setRange(-20.0, 60.0);
+    m_tvRxGain->setSingleStep(0.5);
+    m_tvRxGain->setSuffix(QStringLiteral(" dB"));
+    m_tvRxGain->setToolTip(QStringLiteral(
+        "Gain of the transverter's receive path as this radio sees it — the "
+        "MV-2 ships with 22 dB; on the second IF output (IFo2) subtract the "
+        "split loss of the MC-1. It is subtracted from every receive level, "
+        "so the spectrum, the S-meter and the S-units refer to the antenna. "
+        "Applies only while the VFO is inside the IF window. 0 = no change."));
+    grid->addWidget(m_tvRxGain, row++, 1);
+
+    // LO-Fehler (2026-11-08) -- Thetis "LO Error (kHz)" im Transverter-
+    // Fenster, drei Stellen, +/-1000 kHz (siehe TransverterSetup::loErrorKhz).
+    // Schritt 10 Hz statt Thetis' 1 kHz: der Fehler eines Quarzoszillators
+    // liegt bei einigen hundert Hz, und ein kHz-Schritt traefe ihn nie.
+    auto* loLabel = new QLabel(QStringLiteral("LO error:"), group);
+    loLabel->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
+    grid->addWidget(loLabel, row, 0);
+    m_tvLoFehler = new QDoubleSpinBox(group);
+    m_tvLoFehler->setObjectName(QStringLiteral("transverterLoError"));
+    m_tvLoFehler->setStyleSheet(Style::doubleSpinBoxStyle());
+    m_tvLoFehler->setLocale(QLocale::c());
+    m_tvLoFehler->setDecimals(3);
+    m_tvLoFehler->setRange(-TransverterSetup::kLoErrorGrenzeKhz,
+                           TransverterSetup::kLoErrorGrenzeKhz);
+    m_tvLoFehler->setSingleStep(0.010);
+    m_tvLoFehler->setSuffix(QStringLiteral(" kHz"));
+    m_tvLoFehler->setToolTip(QStringLiteral(
+        "How far the transverter's local oscillator is off, in kHz "
+        "(0.250 = 250 Hz). Corrects the displayed antenna frequency and "
+        "what is sent to the radio. Easiest to set with a right-click on "
+        "a beacon in the panadapter: \"Calibrate on this carrier\"."));
+    grid->addWidget(m_tvLoFehler, row++, 1);
+
     m_tvText = new QLabel(QString(), group);
     m_tvText->setObjectName(QStringLiteral("transverterSummary"));
     m_tvText->setStyleSheet(
@@ -436,6 +497,11 @@ void CompanionRigPage::baueTransverterGruppe()
 
     connect(m_tvEin, &QCheckBox::toggled, this, [this](bool on) {
         m_tv.enabled = on;
+        speichereTransverter();
+    });
+    connect(m_tvNurEmpfang, &QCheckBox::toggled, this, [this](bool on) {
+        if (m_fuellt) { return; }
+        m_tv.nurEmpfang = on;
         speichereTransverter();
     });
     connect(m_tvVorgabe, &QComboBox::currentIndexChanged, this, [this](int) {
@@ -464,6 +530,17 @@ void CompanionRigPage::baueTransverterGruppe()
         m_tvText->setText(m_tv.describe());
         speichereTransverter();
     };
+    connect(m_tvRxGain, &QDoubleSpinBox::editingFinished, this, [this]() {
+        if (m_fuellt) { return; }
+        m_tv.rxGainDb = m_tvRxGain->value();
+        speichereTransverter();
+    });
+    connect(m_tvLoFehler, &QDoubleSpinBox::editingFinished, this, [this]() {
+        if (m_fuellt) { return; }
+        m_tv.loErrorKhz = m_tvLoFehler->value();
+        m_tvText->setText(m_tv.describe());
+        speichereTransverter();
+    });
     connect(m_tvVon, &QDoubleSpinBox::editingFinished, this, ausDenFeldern);
     connect(m_tvBis, &QDoubleSpinBox::editingFinished, this, ausDenFeldern);
     connect(m_tvVersatz, &QDoubleSpinBox::editingFinished,
@@ -474,9 +551,12 @@ void CompanionRigPage::zeigeTransverter()
 {
     m_fuellt = true;
     m_tvEin->setChecked(m_tv.enabled);
+    m_tvNurEmpfang->setChecked(m_tv.nurEmpfang);
     m_tvVon->setValue(static_cast<double>(m_tv.ifLowHz) / 1e6);
     m_tvBis->setValue(static_cast<double>(m_tv.ifHighHz) / 1e6);
     m_tvVersatz->setValue(static_cast<double>(m_tv.offsetHz) / 1e6);
+    m_tvRxGain->setValue(m_tv.rxGainDb);
+    m_tvLoFehler->setValue(m_tv.loErrorKhz);
 
     // Trifft die Einstellung eine Vorgabe, soll die Auswahl das zeigen.
     int treffer = 0;

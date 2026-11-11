@@ -678,9 +678,32 @@ void RxApplet::buildUi()
             // FM-Zweig RXFMSquelchOn = true, SSqlOn/RXAMSquelchOn = false.
             if (m_slice->dspMode() == DSPMode::FM) {
                 m_slice->setFmsqEnabled(on);
+            } else if (autoSqlAngeboten()) {
+                // ── Drei Stellungen an der Flex (2026-11-08) ──────────
+                //
+                // Aus -> SQL -> AUTO -> Aus, wie AetherSDRs cycleSqlMode
+                // (RxApplet.cpp:963 [@d58e2b8a]). Der Knopf bleibt ein
+                // Umschalter: SQL -> AUTO waere sonst ein „aus", darum
+                // wird er dort wieder eingerastet.
+                if (on) {
+                    m_slice->setSsqlAuto(false);
+                    m_slice->setSsqlEnabled(true);
+                } else if (!m_slice->ssqlAuto()) {
+                    {
+                        QSignalBlocker bl(m_sqlBtn);
+                        m_sqlBtn->setChecked(true);
+                    }
+                    qCInfo(lcDsp).nospace()
+                        << "SQL-Knopf AUTO (Scheibe " << m_slice->sliceIndex() << ")";
+                    m_slice->setSsqlAuto(true);
+                } else {
+                    m_slice->setSsqlEnabled(false);
+                    m_slice->setSsqlAuto(false);
+                }
             } else {
                 m_slice->setSsqlEnabled(on);
             }
+            applySqlModeVisuals();
         });
         row->addWidget(m_sqlBtn);
 
@@ -696,8 +719,15 @@ void RxApplet::buildUi()
             if (m_updatingFromModel || !m_slice) { return; }
             if (m_slice->dspMode() == DSPMode::FM) {
                 m_slice->setFmsqThresh(fmSquelchDbFromSlider(val));
+            } else if (autoSqlAktiv()) {
+                // In AUTO der Abstand ueber dem Rauschen. Der Wert fuer
+                // SQL von Hand (ssqlThresh) bleibt, wie er war.
+                m_autoSqlMarge = val;
+                emit autoSqlMargeGeaendert(val);
+                applySqlModeVisuals();
             } else {
                 m_slice->setSsqlThresh(static_cast<double>(val));
+                applySqlModeVisuals();
             }
         });
         row->addWidget(m_sqlSlider, 1);
@@ -1557,6 +1587,7 @@ void RxApplet::connectSlice(SliceModel* s)
     // SQL zeigt in FM die FM-Rauschsperre, sonst die Sprach-Sperre.
     connect(s, &SliceModel::ssqlEnabledChanged, this, [this](bool) { syncSquelchFromModel(); });
     connect(s, &SliceModel::ssqlThreshChanged, this, [this](double) { syncSquelchFromModel(); });
+    connect(s, &SliceModel::ssqlAutoChanged, this, [this](bool) { syncSquelchFromModel(); });
     connect(s, &SliceModel::fmsqEnabledChanged, this, [this](bool) { syncSquelchFromModel(); });
     connect(s, &SliceModel::fmsqThreshChanged, this, [this](double) { syncSquelchFromModel(); });
     connect(s, &SliceModel::dspModeChanged, this, [this](DSPMode) { syncSquelchFromModel(); });
@@ -2262,10 +2293,87 @@ void RxApplet::syncSquelchFromModel()
         QSignalBlocker bl(m_sqlBtn);
         m_sqlBtn->setChecked(fm ? m_slice->fmsqEnabled() : m_slice->ssqlEnabled());
     }
+    applySqlModeVisuals();
+}
+
+// ── Auto-SQL (2026-11-08) ───────────────────────────────────────────
+void RxApplet::setAutoSqlVerfuegbar(std::function<bool()> verfuegbar)
+{
+    m_autoSqlVerfuegbar = std::move(verfuegbar);
+    applySqlModeVisuals();
+}
+
+void RxApplet::setAutoSqlMarge(int db)
+{
+    m_autoSqlMarge = std::clamp(db, FlexAutoRauschsperre::kMargeMinDb,
+                                FlexAutoRauschsperre::kMargeMaxDb);
+    applySqlModeVisuals();
+}
+
+void RxApplet::setAutoSqlStand(double rauschDbm, int stufe)
+{
+    m_autoSqlRauschDbm = rauschDbm;
+    m_autoSqlStufe     = stufe;
+    applySqlModeVisuals();
+}
+
+bool RxApplet::autoSqlAngeboten() const
+{
+    return m_autoSqlVerfuegbar && m_autoSqlVerfuegbar();
+}
+
+bool RxApplet::autoSqlAktiv() const
+{
+    return m_slice && m_slice->dspMode() != DSPMode::FM
+        && m_slice->ssqlEnabled() && m_slice->ssqlAuto()
+        && autoSqlAngeboten();
+}
+
+void RxApplet::applySqlModeVisuals()
+{
+    if (!m_sqlBtn || !m_sqlSlider) { return; }
+    const bool angeboten = autoSqlAngeboten();
+    const bool automatik = autoSqlAktiv();
+    const bool fm = m_slice && m_slice->dspMode() == DSPMode::FM;
+    m_sqlBtn->setText(automatik ? QStringLiteral("AUTO") : QStringLiteral("SQL"));
     {
         QSignalBlocker bl(m_sqlSlider);
-        m_sqlSlider->setValue(fm ? fmSquelchSliderFromDb(m_slice->fmsqThresh())
-                                 : qRound(m_slice->ssqlThresh()));
+        if (automatik) {
+            m_sqlSlider->setRange(FlexAutoRauschsperre::kMargeMinDb,
+                                  FlexAutoRauschsperre::kMargeMaxDb);
+            m_sqlSlider->setValue(m_autoSqlMarge);
+        } else {
+            m_sqlSlider->setRange(0, 100);
+            if (m_slice) {
+                m_sqlSlider->setValue(fm ? fmSquelchSliderFromDb(m_slice->fmsqThresh())
+                                         : qRound(m_slice->ssqlThresh()));
+            }
+        }
+    }
+    // Die Skala der Maschine sichtbar machen: Stufe 90 ist -70 dBm.
+    // Ohne diese Zeile sieht „90" aus wie neunzig Prozent von etwas.
+    if (!angeboten || fm) {
+        m_sqlBtn->setToolTip(QString());
+        m_sqlSlider->setToolTip(QString());
+        return;
+    }
+    m_sqlBtn->setToolTip(QStringLiteral(
+        "Squelch: Off, SQL (manual level), AUTO (follows the measured noise)"));
+    if (automatik) {
+        QString t = QStringLiteral("Auto squelch: %1 dB above the noise")
+                        .arg(m_autoSqlMarge);
+        if (m_autoSqlStufe >= 0) {
+            t += QStringLiteral("\nNoise %1 dBm, level %2 (%3 dBm)")
+                     .arg(m_autoSqlRauschDbm, 0, 'f', 1)
+                     .arg(m_autoSqlStufe)
+                     .arg(FlexAutoRauschsperre::dbmFuerStufe(m_autoSqlStufe), 0, 'f', 0);
+        }
+        m_sqlSlider->setToolTip(t);
+    } else if (m_slice) {
+        const int stufe = qRound(m_slice->ssqlThresh());
+        m_sqlSlider->setToolTip(QStringLiteral("Squelch level %1 (%2 dBm)")
+                                    .arg(stufe)
+                                    .arg(FlexAutoRauschsperre::dbmFuerStufe(stufe), 0, 'f', 0));
     }
 }
 

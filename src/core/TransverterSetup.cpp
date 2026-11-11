@@ -1,3 +1,6 @@
+// Independently implemented from TransverterSetup.h interface.
+// (Laden, Speichern und Vorgaben sind Longpath-eigen; der portierte
+// LO-Fehler steht im Header und ist dort belegt.)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Longpath-original. Siehe TransverterSetup.h fuer den Anlass.
@@ -9,6 +12,8 @@
 #include "core/TransverterSetup.h"
 
 #include "core/AppSettings.h"
+
+#include <algorithm>
 
 namespace Longpath {
 
@@ -32,23 +37,34 @@ QString TransverterSetup::describe() const
     const QString sign = offsetHz >= 0 ? QStringLiteral("+") : QStringLiteral("-");
     const qint64  mag  = offsetHz >= 0 ? offsetHz : -offsetHz;
 
-    return QStringLiteral("%1-%2 MHz → %3-%4 MHz (%5%6 MHz)")
+    QString t = QStringLiteral("%1-%2 MHz → %3-%4 MHz (%5%6 MHz)")
         .arg(mhz(ifLowHz),
              mhz(ifHighHz),
              mhz(ifLowHz + offsetHz),
              mhz(ifHighHz + offsetHz),
              sign,
              mhz(mag));
+    if (loErrorHz() != 0) {
+        t += QStringLiteral(", LO error %1 Hz").arg(loErrorHz());
+    }
+    return t;
 }
 
 QVector<TransverterSetup::Preset> TransverterSetup::presets()
 {
-    // Die ZF-Fenster sind 2 MHz breit, weil die Transverter so gebaut
-    // sind: der MV-2 mischt 144-148 auf 28-32, die 70-cm- und
-    // 23-cm-Geraete ebenso in 2- bis 4-MHz-Scheiben. Wer eine andere
-    // ZF hat, stellt die drei Zahlen von Hand ein.
+    // Die ZF-Fenster folgen dem, was die Transverter mischen: der MV-2
+    // 144-148 auf 28-32 (HA1YA, mv2_doku.pdf: „IF 28-32 MHz, RF 144-148
+    // MHz"), die 70-cm- und 23-cm-Geraete in 2- bis 4-MHz-Scheiben. Wer
+    // eine andere ZF hat, stellt die drei Zahlen von Hand ein.
+    //
+    // 2 m war bis 2026-11-08 nur 28-30 (= 144-146). Betreiber: „koennen
+    // wir auch 144-148 machen" -- „der Konverter kann es". Das Fenster
+    // bestimmt, was die Achse UMRECHNET (Anzeige, Empfang, Spots). Ob
+    // gesendet werden darf, entscheidet es NICHT: BandPlanGuard prueft
+    // die Antennenfrequenz gegen die Region, und Region 1 endet bei
+    // 146 MHz (kRegion1BandRanges, Band2m).
     return {
-        {"2 m (144 MHz) from 28 MHz IF",    28000000, 30000000,  116000000},
+        {"2 m (144 MHz) from 28 MHz IF",    28000000, 32000000,  116000000},
         {"2 m (144 MHz) from 14 MHz IF",    14000000, 16000000,  130000000},
         {"70 cm (432 MHz) from 28 MHz IF",  28000000, 30000000,  404000000},
         {"23 cm (1296 MHz) from 28 MHz IF", 28000000, 30000000, 1268000000},
@@ -75,6 +91,14 @@ TransverterSetup TransverterSetup::load()
                          QVariant::fromValue<qint64>(t.ifHighHz)).toLongLong();
     t.offsetHz = s.value(QStringLiteral("Transverter/OffsetHz"),
                          QVariant::fromValue<qint64>(t.offsetHz)).toLongLong();
+    // Fehlt der Schluessel, gilt die sichere Seite: nur Empfang.
+    t.nurEmpfang = s.value(QStringLiteral("Transverter/RxOnly"),
+                           QStringLiteral("True")).toString()
+                   == QStringLiteral("True");
+    t.rxGainDb = s.value(QStringLiteral("Transverter/RxGainDb"), 0.0).toDouble();
+    t.loErrorKhz = std::clamp(
+        s.value(QStringLiteral("Transverter/LoErrorKhz"), 0.0).toDouble(),
+        -TransverterSetup::kLoErrorGrenzeKhz, TransverterSetup::kLoErrorGrenzeKhz);
     return t;
 }
 
@@ -86,6 +110,10 @@ void TransverterSetup::save() const
     s.setValue(QStringLiteral("Transverter/IfLowHz"),  QVariant::fromValue(ifLowHz));
     s.setValue(QStringLiteral("Transverter/IfHighHz"), QVariant::fromValue(ifHighHz));
     s.setValue(QStringLiteral("Transverter/OffsetHz"), QVariant::fromValue(offsetHz));
+    s.setValue(QStringLiteral("Transverter/RxOnly"),
+               nurEmpfang ? QStringLiteral("True") : QStringLiteral("False"));
+    s.setValue(QStringLiteral("Transverter/RxGainDb"), rxGainDb);
+    s.setValue(QStringLiteral("Transverter/LoErrorKhz"), loErrorKhz);
 }
 
 // ── Die prozessweite Fassung ────────────────────────────────────────

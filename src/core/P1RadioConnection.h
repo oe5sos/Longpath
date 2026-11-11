@@ -147,6 +147,13 @@ public:
     // Phase 3P-D Task 3 — called by RadioModel::connectToRadio().
     void setOcMatrix(const OcMatrix* matrix);
 
+    // Frequenzkorrektur (2026-11-08). Thetis multipliziert JEDE an das
+    // Geraet gehende VFO-Frequenz mit dem Korrekturfaktor -- bei P1 in Hz,
+    // bei P2 im Phasenwort (NetworkIO.cs VFOfreq). Longpath tat es nur bei
+    // P2; an einem P1-Geraet (ANAN 10E, HL2) blieb der Faktor wirkungslos.
+    // Ohne Controller 1.0: Ausgabe byte-gleich wie vorher.
+    void setCalibrationController(const class CalibrationController* cal);
+
     // Phase 3P-E Task 2: wire IoBoardHl2 for I2C intercept (HL2 only).
     // On HL2, pushes the pointer into P1CodecHl2 and stores it locally for
     // the ep6 response parser.  On non-HL2 boards this is a noop.
@@ -886,6 +893,7 @@ private:
     // the legacy m_ocOutput field.  Null in test seams that don't wire
     // RadioModel (falls back to m_ocOutput == 0).  Phase 3P-D Task 3.
     const OcMatrix* m_ocMatrix{nullptr};
+    const class CalibrationController* m_calController{nullptr};
 
     // Non-owning pointer to RadioModel's IoBoardHl2.  Set via setIoBoard()
     // at connect time; null on non-HL2 boards and in tests that don't wire
@@ -989,6 +997,7 @@ public:
     // Expose private composeCcForBank for regression-freeze capture (Task 1) and
     // byte-table assertion tests (Task 16).
     void composeCcForBankForTest(int bankIdx, quint8 out[5]) const { composeCcForBank(bankIdx, out); }
+    CodecContext buildCodecContextForTest() const { return buildCodecContext(); }
     // Expose parseI2cResponse for ep6 read path unit tests (Phase 3P-E Task 2).
     void parseI2cResponseForTest(quint8 c0, quint8 c1, quint8 c2, quint8 c3, quint8 c4) {
         parseI2cResponse(c0, c1, c2, c3, c4);
