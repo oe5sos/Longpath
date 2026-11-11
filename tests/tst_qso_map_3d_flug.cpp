@@ -33,9 +33,11 @@
 #include "gui/widgets/Station3dSurface.h"
 
 #include <QApplication>
+#include <QPointer>
 #include <QDateTime>
 
 #include <tuple>
+#include <utility>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLineEdit>
@@ -345,9 +347,15 @@ private slots:
         QVERIFY(w.summaryForTest()->isVisible());
         QVERIFY(w.rotorRadarForTest()->isVisible());
 
+        // Die 3D-Pille steht als erste in der Pillenreihe (2026-11-11).
+        QCOMPARE(w.pillRowForTest()->itemAt(0)->widget(),
+                 static_cast<QWidget*>(w.threeDButtonForTest()));
+
         w.flyToStation(QStringLiteral("W1AW"), kStaLat, kStaLon);
         QCOMPARE(w.currentViewForTest(), int(QsoMapWindow::kView3d));
-        QCOMPARE(pillsShown(), 0);
+        // Nur die 3D-Pille bleibt -- der Weg zurueck.
+        QCOMPARE(pillsShown(), 1);
+        QVERIFY(w.threeDButtonForTest()->isVisible());
         QVERIFY(!w.summaryForTest()->isVisible());
         QVERIFY(!w.flatOnlyControlsForTest().isEmpty());
         for (QWidget* c : w.flatOnlyControlsForTest()) { QVERIFY(!c->isVisible()); }
@@ -435,6 +443,44 @@ private slots:
         QCOMPARE(w.currentViewForTest(), 1);
 
         AppSettings::instance().setValue(QStringLiteral("QsoMapView"), QString());
+    // Martin (2026-11-11): „er sollte glaube ich auch durch eine pille
+    // angezeigt werden". Die 3D-Pille steht in der Pillenreihe -- auch ohne
+    // Log (dann ist sie die einzige) -- und ueberlebt den Neuaufbau der
+    // Band-/Modus-Pillen mit ihrem Zustand.
+    void the_3d_switch_is_a_pill_that_survives_rebuilds()
+    {
+        installFake();
+        GoogleMapsKey::save(kKey);
+        QsoMapWindow w;
+        prepare(w, nullptr);
+        QPointer<QPushButton> pill = w.threeDButtonForTest();
+        QVERIFY(pill);
+        QCOMPARE(w.pillRowForTest()->itemAt(0)->widget(), static_cast<QWidget*>(pill.data()));
+        QVERIFY(pill->isVisible());
+        QVERIFY(pill->isChecked());
+
+        // Zweimal ein Log mit mehreren Baendern: die Pillen werden neu gebaut.
+        QVector<LogEntry> log;
+        for (const auto& [band, mode] : {std::pair{"20m", "SSB"}, std::pair{"40m", "CW"}}) {
+            LogEntry e;
+            e.call = QStringLiteral("W1AW");
+            e.band = QString::fromLatin1(band);
+            e.mode = QString::fromLatin1(mode);
+            e.timeOn = QDateTime::currentDateTimeUtc().addDays(-1);
+            log << e;
+        }
+        w.setEntries(log);
+        w.setEntries(log);
+        QVERIFY2(pill, "die 3D-Pille wurde beim Neuaufbau geloescht");
+        QCOMPARE(w.pillRowForTest()->itemAt(0)->widget(), static_cast<QWidget*>(pill.data()));
+        QVERIFY(pill->isChecked());
+        QVERIFY(w.pillRowForTest()->count() > 3);   // 3D + BAND/MODE mit Pillen
+
+        // Und sie wirkt weiter: Druck schaltet 3D ab.
+        w.flyToStation(QStringLiteral("W1AW"), kStaLat, kStaLon);
+        QCOMPARE(w.currentViewForTest(), int(QsoMapWindow::kView3d));
+        pill->click();
+        QCOMPARE(w.currentViewForTest(), 1);
     }
 
     void the_page_is_pinned_and_sets_no_global_ion_token()

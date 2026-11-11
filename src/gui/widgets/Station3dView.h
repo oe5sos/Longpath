@@ -43,6 +43,8 @@ public:
     static void registerFactory();
 
     bool isReadyForTest() const { return m_ready; }
+    /// Fuer den Pruefstand: die Startfrist (sonst 30 s).
+    void setStartTimeoutMsForTest(int ms);
 
     /// Eine Zeile aus der Konsole der Seite, wie die Seite sie schickt.
     /// Oeffentlich, damit der Pruefstand die Deutung ohne Netz fahren kann.
@@ -51,10 +53,19 @@ public:
 signals:
     void ready();
 
+protected:
+    // Die Startfrist zaehlt nur, solange die Ansicht zu sehen ist: eine
+    // verborgene QWebEngineView laedt und zeichnet nicht (Live-Befund
+    // 2026-11-11). Nach einem Fehlstart versucht das Sichtbarwerden neu.
+    void showEvent(QShowEvent* e) override;
+    void hideEvent(QHideEvent* e) override;
+
 private:
+    void startPage();
     void reportFailure(const QString& reason, bool keyProblem);
 
     QWebEngineView* m_view{nullptr};
+    QString m_cesiumBase;
     QTimer* m_startTimer{nullptr};
     bool m_ready{false};
     bool m_dead{false};

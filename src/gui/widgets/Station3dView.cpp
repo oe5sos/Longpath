@@ -8,6 +8,8 @@
 //   2026-11-10 — Created for Longpath by Martin Fischer (OE5SOS),
 //                 AI-assisted via Anthropic Claude.
 //   2026-11-10 — Absagen von Cesium ion und Google je Quelle gedeutet.
+//   2026-11-11 — Startfrist nur, solange sichtbar; ein Fehlstart ist nicht
+//                 endgueltig (naechster Flug / Sichtbarwerden laedt neu).
 // =================================================================
 
 #include "gui/widgets/Station3dView.h"
@@ -82,6 +84,7 @@ void Station3dView::registerFactory()
 Station3dView::Station3dView(QWidget* parent, const QString& cesiumBase)
     : Station3dSurface(parent)
     , m_view(new QWebEngineView(this))
+    , m_cesiumBase(cesiumBase)
     , m_startTimer(new QTimer(this))
 {
     auto* lay = new QVBoxLayout(this);
@@ -102,9 +105,11 @@ Station3dView::Station3dView(QWidget* parent, const QString& cesiumBase)
     m_startTimer->setSingleShot(true);
     m_startTimer->setInterval(kStartTimeoutMs);
     connect(m_startTimer, &QTimer::timeout, this, [this]() {
-        if (!m_ready) {
+        // Verborgen zaehlt nicht -- hideEvent haelt die Uhr eigentlich an,
+        // das hier ist nur die zweite Sicherung.
+        if (!m_ready && isVisible()) {
             reportFailure(QStringLiteral("the 3D view did not start within %1 s")
-                              .arg(kStartTimeoutMs / 1000), false);
+                              .arg(m_startTimer->interval() / 1000), false);
         }
     });
     connect(m_view, &QWebEngineView::loadFinished, this, [this](bool ok) {
@@ -113,7 +118,16 @@ Station3dView::Station3dView(QWidget* parent, const QString& cesiumBase)
         }
     });
 
-    const QString html = Station3dPage::html(cesiumBase);
+    // Die Uhr laeuft noch nicht: erst showEvent() startet sie.
+    startPage();
+}
+
+void Station3dView::startPage()
+{
+    m_ready = false;
+    m_dead = false;
+    m_startTimer->stop();
+    const QString html = Station3dPage::html(m_cesiumBase);
     if (html.isEmpty()) {
         // Die Ressource fehlt -- ein Baufehler, kein Netzproblem.
         QTimer::singleShot(0, this, [this]() {
@@ -124,16 +138,39 @@ Station3dView::Station3dView(QWidget* parent, const QString& cesiumBase)
     // Eine https-Basis gibt der Seite einen sicheren Ursprung; geladen
     // wird von dort nichts (.invalid ist reserviert, RFC 2606).
     m_view->setHtml(html, QUrl(QStringLiteral("https://longpath.invalid/flug3d/")));
-    m_startTimer->start();
+    if (isVisible()) { m_startTimer->start(); }
+}
+
+void Station3dView::showEvent(QShowEvent* e)
+{
+    Station3dSurface::showEvent(e);
+    if (m_dead) {
+        // Nach einem Fehlstart: neu laden statt tot zu bleiben.
+        startPage();
+        return;
+    }
+    if (!m_ready && !m_startTimer->isActive()) { m_startTimer->start(); }
+}
+
+void Station3dView::hideEvent(QHideEvent* e)
+{
+    Station3dSurface::hideEvent(e);
+    if (!m_ready) { m_startTimer->stop(); }
+}
+
+void Station3dView::setStartTimeoutMsForTest(int ms)
+{
+    m_startTimer->setInterval(ms);
 }
 
 void Station3dView::fly(const Station3dFlight& flight)
 {
     if (m_dead) {
-        // Die Seite ist nicht hochgekommen; der Aufrufer faellt zurueck.
-        QTimer::singleShot(0, this, [this]() {
-            emit failed(QStringLiteral("the 3D view is not running"), false);
-        });
+        // Die Seite ist nicht hochgekommen (Zeitablauf, kein Netz, CesiumJS
+        // nicht geladen). Kein Urteil fuer immer: neu laden, der Flug wartet,
+        // und eine neue Frist laeuft, sobald die Ansicht zu sehen ist.
+        m_pending = flight;
+        startPage();
         return;
     }
     if (!m_ready) {
