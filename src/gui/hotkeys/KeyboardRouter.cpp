@@ -286,7 +286,7 @@ void notiereFTaste(const QWidget* receiver, const QKeyEvent* event, const QStrin
 QString fensterName(const QWidget* w)
 {
     if (w == nullptr) {
-        return QStringLiteral("kein Fenster");
+        return QStringLiteral("no window");
     }
     return QString::fromLatin1(w->metaObject()->className());
 }
@@ -296,7 +296,7 @@ QString fensterName(const QWidget* w)
 bool KeyboardRouter::handlePress(QWidget* receiver, QKeyEvent* event)
 {
     if (!m_bindings->enabled()) {
-        notiereFTaste(receiver, event, QStringLiteral("Tastenkuerzel sind aus"));
+        notiereFTaste(receiver, event, QStringLiteral("shortcuts are off"));
         return false;
     }
     const auto down = m_down.find(physicalKey(event));
@@ -313,23 +313,23 @@ bool KeyboardRouter::handlePress(QWidget* receiver, QKeyEvent* event)
     const QString id = m_bindings->actionForChord(chord);
     const HotKeyAction* const action = HotKeyActionList::find(id);
     if (action == nullptr) {
-        notiereFTaste(receiver, event, QStringLiteral("nicht belegt"));
+        notiereFTaste(receiver, event, QStringLiteral("not bound"));
         return false;
     }
     if (!windowTakesKeys(receiver)) {
-        notiereFTaste(receiver, event, QStringLiteral("nicht angenommen: vorne ist %1, %2")
+        notiereFTaste(receiver, event, QStringLiteral("not taken: %1 is in front, %2")
                                  .arg(fensterName(QApplication::activeWindow()),
                                       QApplication::activeModalWidget() != nullptr
-                                          ? QStringLiteral("ein Dialog ist offen")
-                                          : QStringLiteral("kein Dialog")));
+                                          ? QStringLiteral("a dialog is open")
+                                          : QStringLiteral("no dialog")));
         return false;
     }
     if (focusKeeps(receiver, event)) {
-        notiereFTaste(receiver, event, QStringLiteral("bleibt bei %1").arg(fensterName(QApplication::focusWidget())));
+        notiereFTaste(receiver, event, QStringLiteral("stays with %1").arg(fensterName(QApplication::focusWidget())));
         return false;
     }
     if (!event->isAutoRepeat() && !m_dispatcher->takesKey(id)) {
-        notiereFTaste(receiver, event, QStringLiteral("%1 nimmt sie gerade nicht").arg(id));
+        notiereFTaste(receiver, event, QStringLiteral("%1 does not take it now").arg(id));
         return false;
     }
     notiereFTaste(receiver, event, id);
