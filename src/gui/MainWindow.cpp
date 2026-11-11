@@ -17120,13 +17120,14 @@ void MainWindow::schutzrahmenNachziehen()
     // angestossen hat.
     const QRect jetzt = frameGeometry();
     if (eigeneBewegungLebt() || m_aufbauBewegung || !isVisible()) {
+        // Die Schwelle steht in istRasterNachhall (WindowPlacement):
+        // fuer die Groesse anderthalb Rasterweiten, weil beide Kanten
+        // einrasten (2026-11-11, am Geraet: +15/-21 unter der
+        // Menueleiste galt sonst als eigene Bewegung).
         const bool rasterNachhall =
             m_fremdeBewegungAnhaengig
-            && m_schutzrahmenTimer->isActive() && m_letzterHauptrahmen.isValid()
-            && qAbs(jetzt.x() - m_letzterHauptrahmen.x()) < kSnapGridPx
-            && qAbs(jetzt.y() - m_letzterHauptrahmen.y()) < kSnapGridPx
-            && qAbs(jetzt.width() - m_letzterHauptrahmen.width()) < kSnapGridPx
-            && qAbs(jetzt.height() - m_letzterHauptrahmen.height()) < kSnapGridPx;
+            && m_schutzrahmenTimer->isActive()
+            && istRasterNachhall(jetzt, m_letzterHauptrahmen);
         if (!rasterNachhall) {
             m_hauptrahmenBasis = jetzt;
             m_fremdeBewegungAnhaengig = false;
