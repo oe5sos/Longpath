@@ -61,6 +61,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QTimer>
+#include <QVector>
 
 #include <atomic>
 #include <functional>
@@ -100,6 +101,12 @@ public:
         std::function<bool()> keyed;
         // Fuer die Aufnahme; nullptr, solange keine Verbindung steht.
         std::function<TxWorkerThread*()> txWorker;
+        // Aufnahme OHNE Sendefaden (Flex, 2026-11-11): das Mikrofon
+        // direkt abholen. micPullable sagt, ob es den Weg gerade gibt;
+        // pullMic liefert bis zu n Monowerte (kRateHz) und gibt zurueck,
+        // wie viele es waren.
+        std::function<bool()> micPullable;
+        std::function<int(float* dst, int n)> pullMic;
     };
 
     explicit VoiceKeyerPlayer(VoiceKeyerStore* store, QObject* parent = nullptr);
@@ -172,6 +179,11 @@ private:
     QTimer m_pollTimer;
     QTimer m_tailTimer;
     QTimer m_gapTimer;
+
+    // Der Abholweg ohne Sendefaden: alle kPollMs abholen, was liegt.
+    void pullMicOnce();
+    QTimer m_micPullTimer;
+    QVector<float> m_micPullBuf;
 
     TxAudioRecorder* m_recorder{nullptr};
     QPointer<TxWorkerThread> m_tapWorker;

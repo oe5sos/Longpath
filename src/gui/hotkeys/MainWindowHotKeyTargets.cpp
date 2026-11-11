@@ -11,8 +11,8 @@
 // Modification history (Longpath):
 //   2026-11-10 - Fuer Longpath neu geschrieben von Martin Fischer
 //                (OE5SOS), KI-gestuetzt ueber Anthropic Claude.
-//   2026-11-11 - Hinweise auch ins Protokoll. KI-gestuetzt ueber
-//                Anthropic Claude.
+//   2026-11-11 - Hinweise auch ins Protokoll; Sendetasten auch an der
+//                Flex. KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 // no-port-check: NereusSDR-original in der Gestalt, Inhalt Longpath-original.
 
@@ -204,7 +204,10 @@ QString MainWindowHotKeyTargets::unavailableReason(const QString& id) const
     }
     RadioModel* const m = model();
     const bool needsRadio = action->transmits || id.startsWith(QLatin1String("voice.rec"));
-    if (needsRadio && (m == nullptr || !m->isConnected())) {
+    // istIrgendwieVerbunden: auch die Flex (2026-11-11). Mit
+    // isConnected() hiess es dort „Not connected to a radio.", waehrend
+    // die Maschine Ton und Bild schickte.
+    if (needsRadio && (m == nullptr || !m->istIrgendwieVerbunden())) {
         return QStringLiteral("Not connected to a radio.");
     }
     return {};

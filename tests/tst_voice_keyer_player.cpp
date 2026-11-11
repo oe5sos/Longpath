@@ -14,20 +14,27 @@
 // Dazu der Router: MicSource::Dvk wird geholt wie FT8, ist aber KEIN
 // Datensignal -- die Stimme geht durch den Sprach-Kanalzug.
 //
+// Und die Flex (2026-11-11): ohne Sendefaden nimmt der Spieler das
+// Mikrofon direkt ab und verwirft, was vor dem Tastendruck im Eingang lag.
+//
 // =================================================================
 // Modification history (Longpath):
 //   2026-11-10 — Original fuer Longpath von Martin Fischer (OE5SOS),
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 — Aufnahme ohne Sendefaden (Flex). KI-gestuetzt ueber
+//                 Anthropic Claude.
 // =================================================================
 
 #include <QtTest>
 #include <QSignalSpy>
+#include <QFile>
 #include <QTemporaryDir>
 
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/audio/VoiceKeyer.h"
 #include "core/audio/VoiceKeyerPlayer.h"
 
+#include <algorithm>
 #include <cmath>
 
 using namespace Longpath;
@@ -196,6 +203,59 @@ private slots:
         QVERIFY2(r.contains(QStringLiteral("connect")), qPrintable(r));
         QCOMPARE(p.state(), VoiceKeyerPlayer::State::Idle);
         QCOMPARE(rig.keyOn, 0);
+    }
+
+    // Flex (2026-11-11): kein Sendefaden, aber ein offenes Mikrofon.
+    // Die Aufnahme holt es direkt ab -- und wirft weg, was schon vor dem
+    // Tastendruck im Eingang lag.
+    void recordingWithoutWorkerPullsTheMic()
+    {
+        Rig rig;
+        VoiceKeyerPlayer p(m_store);
+        VoiceKeyerPlayer::Hooks h = hooksFor(rig);
+        QVector<float> eingang(4800, 0.9f);   // alt: 0,1 s laut, vor dem Druck
+        h.micPullable = []() { return true; };
+        h.pullMic = [&eingang](float* dst, int n) {
+            const int k = std::min<int>(n, int(eingang.size()));
+            std::copy_n(eingang.constData(), k, dst);
+            eingang.remove(0, k);
+            return k;
+        };
+        p.setHooks(std::move(h));
+
+        m_store->clearSlot(2);
+        QVERIFY(p.record(2).isEmpty());
+        QCOMPARE(p.state(), VoiceKeyerPlayer::State::Recording);
+        QVERIFY(eingang.isEmpty());           // das Alte ist weg
+
+        // Jetzt spricht der Betreiber: 0,5 s, abgeholt im Takt.
+        eingang = tone(24000, 0.25f);
+        QTRY_VERIFY_WITH_TIMEOUT(eingang.isEmpty(), 2000);
+        QVERIFY(p.takeRecordPeak() > 0.2f);
+        QVERIFY(p.record(2).isEmpty());       // dieselbe Taste beendet
+        QCOMPARE(p.state(), VoiceKeyerPlayer::State::Idle);
+
+        const VoiceKeyerSlot& s = m_store->slot(2);
+        QVERIFY(!s.isEmpty());
+        QVERIFY(QFile::exists(s.wavPath));
+        // Genau das Gesprochene, ohne die laute Vorgeschichte.
+        WavTxSource src;
+        QString err;
+        QVERIFY2(src.load(s.wavPath, VoiceKeyerPlayer::kRateHz, &err), qPrintable(err));
+        QVERIFY(std::abs(src.seconds() - 0.5) < 0.02);
+    }
+
+    void withoutWorkerAndWithoutMicNothingIsRecorded()
+    {
+        Rig rig;
+        VoiceKeyerPlayer p(m_store);
+        VoiceKeyerPlayer::Hooks h = hooksFor(rig);
+        h.micPullable = []() { return false; };   // keine Flex verbunden
+        h.pullMic = [](float*, int) { return 0; };
+        p.setHooks(std::move(h));
+        const QString r = p.record(2);
+        QVERIFY2(r.contains(QStringLiteral("connect")), qPrintable(r));
+        QCOMPARE(p.state(), VoiceKeyerPlayer::State::Idle);
     }
 
     // ── Senden ───────────────────────────────────────────────────────
