@@ -17,6 +17,9 @@
 //   4. Anvelina: Stroeme nur auf DDCs, die das Geraet meldet (a15d7a80a).
 //
 // Martin Fischer (OE5SOS), KI-gestuetzt mit Anthropic Claude Code.
+//
+// no-port-check: Pruefstand; die Thetis-Stellen oben sind das erwartete
+// Verhalten, die Behebungen stehen in RadioModel und TwoToneController.
 // =================================================================
 
 #include <QtTest/QtTest>
