@@ -6277,6 +6277,10 @@ longpath_add_test(tst_dx_radar)
 # -- Azimutalkarte als vierte Ansicht der QSO-Karte: Projektion hin und
 #    zurueck, Strahlenebene, Rotorkeil, Ziel, Ansichtswechsel --
 longpath_add_test(tst_azimutalkarte)
+# -- Locator-Jagd mit FT8 (2026-11-11): Mosaik je Band, gehoerte Stationen,
+#    der Klick auf der Karte geht denselben Weg wie der Doppelklick in der
+#    Fundliste, und ohne FT8 sagt er warum nicht --
+longpath_add_test(tst_ft8_locatorjagd)
 # -- Verbindungsfenster: der lange Fehlschlag-Text passt (Leiste + darunter, Hinweis) --
 longpath_add_test(tst_connect_failure_text_fits)
 

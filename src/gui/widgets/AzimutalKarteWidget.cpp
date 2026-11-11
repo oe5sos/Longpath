@@ -6,15 +6,21 @@
 // Modification history (Longpath):
 //   2026-11-10 — Created in C++20/Qt6 for Longpath by Martin Fischer,
 //                 AI-assisted via Anthropic Claude (Claude Code).
+//   2026-11-11 — Locator-Jagd: Mosaik-Ebene, FT8-Punkte, Hinweis, Klick
+//                 (siehe Header). Martin Fischer, AI-assisted via
+//                 Anthropic Claude (Claude Code).
 // =================================================================
 
 #include "gui/widgets/AzimutalKarteWidget.h"
+#include "gui/widgets/LocatorJagdZeichen.h"
 
 #include "gui/StyleConstants.h"
 #include "gui/widgets/GlobeWidget.h"
 #include "gui/widgets/WorldTexture.h"
 
 #include <QFontMetricsF>
+#include <QHelpEvent>
+#include <QToolTip>
 #include <QHash>
 #include <QLocale>
 #include <QMap>
@@ -240,6 +246,7 @@ void AzimutalKarteWidget::setHome(double lat, double lon, const QString& locator
     m_homeLat = lat;
     m_homeLon = lon;
     m_hintergrundAlt = m_nachtAlt = m_strahlenAlt = true;
+    m_mosaikAlt = true;
     projiziereNeu();
     update();
 }
@@ -253,6 +260,153 @@ void AzimutalKarteWidget::clearHome()
     m_hintergrundAlt = m_nachtAlt = m_strahlenAlt = true;
     m_hover = -1;
     update();
+}
+
+// ── Locator-Jagd (2026-11-11) ───────────────────────────────────────
+
+void AzimutalKarteWidget::setMosaik(const QHash<QString, FeldStand>& felder)
+{
+    m_mosaik = felder;
+    m_mosaikAlt = true;
+    if (m_zeigeMosaik) { update(); }
+}
+
+void AzimutalKarteWidget::setShowMosaik(bool on)
+{
+    if (m_zeigeMosaik == on) { return; }
+    m_zeigeMosaik = on;
+    update();
+}
+
+void AzimutalKarteWidget::setLivePunkte(const QVector<LivePunkt>& punkte)
+{
+    m_live = punkte;
+    update();
+}
+
+QPointF AzimutalKarteWidget::livePunktBildpunkt(int i) const
+{
+    if (i < 0 || i >= m_live.size() || !m_hasHome) { return {}; }
+    const QVector<QPointF> v = LocatorJagdZeichen::versaetze(m_live);
+    return bildpunkt(m_live.at(i).lat, m_live.at(i).lon) + v.at(i);
+}
+
+int AzimutalKarteWidget::livePunktAt(const QPointF& pos) const
+{
+    if (m_live.isEmpty() || !m_hasHome) { return -1; }
+    const QVector<QPointF> v = LocatorJagdZeichen::versaetze(m_live);
+    int best = -1;
+    double bestD = LocatorJagdZeichen::kTrefferPx;
+    for (int i = m_live.size() - 1; i >= 0; --i) {
+        const QPointF s = bildpunkt(m_live.at(i).lat, m_live.at(i).lon) + v.at(i);
+        const double d = std::hypot(s.x() - pos.x(), s.y() - pos.y());
+        if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+}
+
+void AzimutalKarteWidget::baueMosaik()
+{
+    m_mosaikBild = QImage();
+    if (!m_hasHome || width() <= 0 || height() <= 0 || m_mosaik.isEmpty()) { return; }
+    const qreal dpr = devicePixelRatioF();
+    QImage bild(size() * dpr, QImage::Format_ARGB32_Premultiplied);
+    bild.setDevicePixelRatio(dpr);
+    bild.fill(Qt::transparent);
+    QPainter p(&bild);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setPen(Qt::NoPen);
+
+    // Ein Feld ist 2 x 1 Grad. Auf der Scheibe ist es kein Rechteck mehr:
+    // je Kante drei Stuetzstellen reichen bis weit hinaus, erst am
+    // Gegenpunkt zerfaellt ein Feld zu einem Ring -- dort wird es
+    // weggelassen statt quer ueber die Scheibe gezogen.
+    constexpr int kStuetz = 3;
+    constexpr double kRandGrenze = 0.97;
+    for (auto it = m_mosaik.cbegin(); it != m_mosaik.cend(); ++it) {
+        const QString& f = it.key();
+        if (f.size() != 4) { continue; }
+        const double lonW = (f.at(0).toLatin1() - 'A') * 20.0 - 180.0
+                            + (f.at(2).toLatin1() - '0') * 2.0;
+        const double latS = (f.at(1).toLatin1() - 'A') * 10.0 - 90.0
+                            + (f.at(3).toLatin1() - '0');
+        QPolygonF poly;
+        bool zuWeit = false;
+        const auto nimm = [&](double la, double lo) {
+            const QPointF q = projektion(m_homeLat, m_homeLon, la, lo);
+            if (std::hypot(q.x(), q.y()) > kRandGrenze) { zuWeit = true; }
+            poly << bildpunktNormiert(q);
+        };
+        for (int i = 0; i < kStuetz; ++i) { nimm(latS, lonW + 2.0 * i / kStuetz); }
+        for (int i = 0; i < kStuetz; ++i) { nimm(latS + 1.0 * i / kStuetz, lonW + 2.0); }
+        for (int i = 0; i < kStuetz; ++i) { nimm(latS + 1.0, lonW + 2.0 - 2.0 * i / kStuetz); }
+        for (int i = 0; i < kStuetz; ++i) { nimm(latS + 1.0 - 1.0 * i / kStuetz, lonW); }
+        if (zuWeit) { continue; }
+        p.setBrush(LocatorJagdZeichen::feldFuellung(it.value()));
+        p.drawPolygon(poly);
+    }
+    p.end();
+    m_mosaikBild = bild;
+}
+
+void AzimutalKarteWidget::zeichneLive(QPainter& p, const Lage& L) const
+{
+    Q_UNUSED(L);
+    if (m_live.isEmpty()) { return; }
+    const QVector<QPointF> v = LocatorJagdZeichen::versaetze(m_live);
+    for (int i = 0; i < m_live.size(); ++i) {
+        const QPointF c = bildpunkt(m_live.at(i).lat, m_live.at(i).lon) + v.at(i);
+        LocatorJagdZeichen::punkt(p, c, m_live.at(i).art);
+    }
+}
+
+void AzimutalKarteWidget::zeichneLiveSchrift(QPainter& p, const Lage& L)
+{
+    if (m_live.isEmpty() || L.stufe == Stufe::Winzig) { return; }
+    const QVector<QPointF> v = LocatorJagdZeichen::versaetze(m_live);
+    const QFont f = schrift(p.font(), L.stufe == Stufe::Voll ? 10 : 9, true);
+    p.setFont(f);
+    const QFontMetricsF fm(f);
+    // Die wichtigsten zuerst: sie bekommen den Platz (die Liste ist
+    // aufsteigend nach Wichtigkeit sortiert, also von hinten).
+    for (int i = m_live.size() - 1; i >= 0; --i) {
+        const LivePunkt& lp = m_live.at(i);
+        if (!LocatorJagdZeichen::beschriften(lp.art, m_live.size())) { continue; }
+        const QPointF c = bildpunkt(lp.lat, lp.lon) + v.at(i);
+        const QString& t = lp.g.rufzeichen;
+        const double w = fm.horizontalAdvance(t);
+        const QColor fa = lp.art == LiveArt::NeuesLand
+                              ? farbe(Style::kJagdNeuesLandRand)
+                              : LocatorJagdZeichen::farbe(lp.art);
+        for (const QPointF& at : {c + QPointF(10.0, fm.ascent() / 2.0 - 1.0),
+                                  c + QPointF(-10.0 - w, fm.ascent() / 2.0 - 1.0),
+                                  c + QPointF(-w / 2.0, -10.0),
+                                  c + QPointF(-w / 2.0, 10.0 + fm.ascent())}) {
+            if (frei(zeilenRechteck(f, at, t))) {
+                schreibe(p, at, t, fa, true);
+                break;
+            }
+        }
+    }
+}
+
+bool AzimutalKarteWidget::event(QEvent* e)
+{
+    if (e->type() == QEvent::ToolTip) {
+        auto* he = static_cast<QHelpEvent*>(e);
+        const int i = livePunktAt(he->pos());
+        if (i >= 0) {
+            QToolTip::showText(he->globalPos(),
+                               LiveSchicht::hinweis(m_live.at(i),
+                                                    QDateTime::currentDateTimeUtc()),
+                               this);
+            return true;
+        }
+        QToolTip::hideText();
+        e->ignore();
+        return true;
+    }
+    return QWidget::event(e);
 }
 
 void AzimutalKarteWidget::setPunkte(const QVector<Punkt>& punkte)
@@ -350,6 +504,12 @@ void AzimutalKarteWidget::sorgeFuerEbenen()
         || m_strahlen.size() != size() * dpr) {
         baueStrahlen();
         m_strahlenAlt = false;
+    }
+    if (m_zeigeMosaik
+        && (m_mosaikAlt || m_mosaikBild.devicePixelRatio() != dpr
+            || m_mosaikBild.size() != size() * dpr)) {
+        baueMosaik();
+        m_mosaikAlt = false;
     }
 }
 
@@ -492,6 +652,7 @@ void AzimutalKarteWidget::baueStrahlen()
 void AzimutalKarteWidget::resizeEvent(QResizeEvent*)
 {
     m_strahlenAlt = true;
+    m_mosaikAlt = true;
 }
 
 // ── Zeichnen ────────────────────────────────────────────────────────
@@ -530,10 +691,16 @@ void AzimutalKarteWidget::paintEvent(QPaintEvent*)
         p.drawImage(scheibe, m_nacht);
         p.restore();
     }
+    // Das Mosaik unter Gitter und Strahlen (2026-11-11).
+    if (m_zeigeMosaik && !m_mosaikBild.isNull()) {
+        p.drawImage(QPointF(0, 0), m_mosaikBild);
+    }
     zeichneGitter(p, L);
     zeichneRotorKeil(p, L);
     if (!m_strahlen.isNull()) { p.drawImage(QPointF(0, 0), m_strahlen); }
     zeichneZielLinien(p, L);
+    // Die gehoerten FT8-Stationen ueber den Strahlen der QSOs.
+    zeichneLive(p, L);
 
     // Der eigene Standort.
     p.setPen(QPen(QColor(Style::hexRole(Style::kPanelBg)), 1.5));
@@ -547,11 +714,21 @@ void AzimutalKarteWidget::paintEvent(QPaintEvent*)
     if (!L.seite.isEmpty()) {
         zeichneSeite(p, L);
         zeichneHeimSchrift(p, L);
+        zeichneLiveSchrift(p, L);
     } else {
         zeichneHeimSchrift(p, L);
+        zeichneLiveSchrift(p, L);
         zeichneZielSchrift(p, L);
         zeichneRotorSchrift(p, L);
         zeichneLegende(p, L);
+    }
+    // Die Legende der Jagd oben links -- unten steht die Bandlegende.
+    if (L.stufe != Stufe::Winzig) {
+        const bool mosaik = m_zeigeMosaik && !m_mosaik.isEmpty();
+        const bool live = !m_live.isEmpty();
+        if (mosaik || live) {
+            LocatorJagdZeichen::legende(p, QRectF(0.0, 0.0, width(), 30.0), mosaik, live);
+        }
     }
     zeichneHover(p, L);
 }
@@ -1003,6 +1180,16 @@ void AzimutalKarteWidget::zeichneHover(QPainter& p, const Lage& L) const
 
 void AzimutalKarteWidget::mouseMoveEvent(QMouseEvent* e)
 {
+    // Ueber einem FT8-Punkt: die Hand, kein QSO-Hinweis darunter.
+    if (livePunktAt(e->position()) >= 0) {
+        setCursor(Qt::PointingHandCursor);
+        if (m_hover != -1) {
+            m_hover = -1;
+            update();
+        }
+        return;
+    }
+    unsetCursor();
     int best = -1;
     double bestD = 8.0 * 8.0;
     for (int i = 0; i < m_proj.size(); ++i) {
@@ -1018,6 +1205,13 @@ void AzimutalKarteWidget::mouseMoveEvent(QMouseEvent* e)
 
 void AzimutalKarteWidget::mousePressEvent(QMouseEvent* e)
 {
+    if (e->button() == Qt::LeftButton) {
+        const int live = livePunktAt(e->position());
+        if (live >= 0) {
+            emit livePunktGeklickt(m_live.at(live).g.rufzeichen);
+            return;
+        }
+    }
     if (e->button() == Qt::LeftButton && m_hover >= 0 && m_hover < m_punkte.size()) {
         const Punkt& q = m_punkte.at(m_hover);
         emit pointClicked(q.call, q.lat, q.lon);

@@ -2433,6 +2433,9 @@ void LogbookWindow::prepareMap(QsoMapWindow* map)
         }
     }
     map->setHomeGrid(home);
+    // Das Mosaik der Locator-Jagd fragt das GANZE Logbuch, auch wenn die
+    // eingebettete Karte nur die gefilterten Zeilen zeigt (2026-11-11).
+    map->setMosaikLog(m_all);
 }
 
 void LogbookWindow::setMapPanelShown(bool on)

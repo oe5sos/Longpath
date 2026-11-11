@@ -563,6 +563,8 @@ set(CORE_SOURCES
     src/core/Ft8Tonwahl.cpp
     src/core/Ft8Warteschlange.cpp
     src/core/GridsGearbeitet.cpp
+    # Locator-Jagd: Mosaik je Band + gehoerte Stationen (2026-11-11)
+    src/core/LocatorJagd.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CatProtocol.cpp
@@ -1214,6 +1216,7 @@ set(GUI_SOURCES
     src/gui/widgets/BlueMarbleFetcher.cpp
     src/gui/widgets/DxRadarWidget.cpp
     src/gui/widgets/AzimutalKarteWidget.cpp
+    src/gui/widgets/LocatorJagdZeichen.cpp
     src/gui/widgets/WorldMapCatalog.cpp
     src/gui/widgets/WorldTexture.cpp
     src/gui/LogbookWindow.cpp
@@ -1336,6 +1339,7 @@ set(GUI_SOURCES
     src/gui/applets/CwDecoderApplet.cpp
     src/gui/applets/Ft8Applet.cpp
     src/gui/applets/Ft8PlaetzeApplet.cpp
+    src/gui/Ft8KartenBruecke.cpp
     src/gui/applets/QsoRecorderApplet.cpp
     src/gui/applets/RecordingApplet.cpp
     src/gui/RecordingScheduleDialog.cpp

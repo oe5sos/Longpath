@@ -108,6 +108,8 @@
 //                 (RX vs VAC at cmaster.cs:912-943 [v2.10.3.13]); see commit
 //                 message for rationale.  J.J. Boyd (KG4VCF), AI-assisted via
 //                 Anthropic Claude Code.
+//   2026-11-11 — txRefusalReason() probe (see header). Martin Fischer
+//                 (OE5SOS), AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 // no-port-check: Longpath-original file; Thetis state-machine
@@ -767,6 +769,25 @@ void MoxController::releaseKeyBlock()
 bool MoxController::keyBlockLatched() const noexcept
 {
     return m_keyBlockLatched;
+}
+
+// Longpath-original (2026-11-11): the two gates at the top of setMox(true),
+// asked without consequence. See the header for why the interlock policy is
+// left out.
+QString MoxController::txRefusalReason() const
+{
+    if (m_keyBlockLatched) {
+        return m_keyBlockReason.isEmpty() ? QStringLiteral("key blocked")
+                                          : m_keyBlockReason;
+    }
+    if (m_moxCheck) {
+        const auto result = m_moxCheck();
+        if (!result.ok) {
+            return result.reason.isEmpty() ? QStringLiteral("band plan")
+                                           : result.reason;
+        }
+    }
+    return {};
 }
 
 // ---------------------------------------------------------------------------
