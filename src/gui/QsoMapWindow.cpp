@@ -50,6 +50,7 @@
 #include <QCheckBox>
 #include <QSpinBox>
 #include <QTimer>
+#include <QApplication>
 #include <QTableWidget>
 #include <QHeaderView>
 #include <QComboBox>
@@ -377,6 +378,9 @@ void QsoMapWindow::fuelleJagdListe(const QVector<LivePunkt>& punkte)
             m_jagdAlarmText->setText(QStringLiteral("\u25b6  ") + text);
             m_jagdAlarmText->setVisible(true);
             m_jagdAlarmUhr.start(land ? 20000 : 10000);
+        }
+        if (land && m_jagdTon != nullptr && m_jagdTon->isChecked()) {
+            QApplication::beep();
         }
     }
     for (const QString& r : jetztDa) { m_jagdGesehen.insert(r); }
@@ -918,7 +922,9 @@ void QsoMapWindow::buildUi()
     m_jagdAlarmText = new QLabel(QString{}, m_jagdSpalte);
     m_jagdAlarmText->setWordWrap(true);
     m_jagdAlarmText->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; font-size: 12px; font-weight: bold; }")
+        // 13 statt 12: Schriftgroessen stehen auf der Leiter in
+        // StyleConstants.h (7/9/11/13/16/22/38/48).
+        "QLabel { color: %1; font-size: 13px; font-weight: bold; }")
             .arg(QString::fromLatin1(Style::kJagdNeu)));
     m_jagdAlarmText->setVisible(false);
     jagdCol->addWidget(m_jagdAlarmText);
@@ -966,7 +972,9 @@ void QsoMapWindow::buildUi()
         "               font-size: 11px; gridline-color: %2; }"
         "QHeaderView::section { background: %1; color: %4; border: 0;"
         "                       border-bottom: 1px solid %2; padding: 3px;"
-        "                       font-size: 10px; }")
+        // 9 statt 10: die Leiter in StyleConstants.h kennt kein 10 px,
+        // und verify-style-drift.py zaehlt genau das (2026-10-20).
+        "                       font-size: 9px; }")
             .arg(QString::fromLatin1(Style::kPanelBg),
                  QString::fromLatin1(Style::kBorder),
                  QString::fromLatin1(Style::kTextPrimary),
@@ -1004,6 +1012,24 @@ void QsoMapWindow::buildUi()
         "QLabel { color: %1; font-size: 11px; }")
             .arg(QString::fromLatin1(Style::kTextScale)));
     jagdCol->addWidget(m_jagdBaender);
+
+    m_jagdTon = new QCheckBox(QStringLiteral("Beep on a new country"), m_jagdSpalte);
+    m_jagdTon->setToolTip(QStringLiteral(
+        "Sound the system alert when a station from a country you have "
+        "never worked appears. Not for every new square — during a band "
+        "opening that would never stop. It is the system sound, not the "
+        "radio: a notice must never sound like a signal."));
+    m_jagdTon->setStyleSheet(QStringLiteral("QCheckBox { color: %1; font-size: 11px; }")
+        .arg(QString::fromLatin1(Style::kTextSecondary)));
+    m_jagdTon->setChecked(AppSettings::instance()
+        .value(QStringLiteral("QsoMapHuntBeep"), QStringLiteral("False"))
+        .toString() == QStringLiteral("True"));
+    connect(m_jagdTon, &QCheckBox::toggled, this, [](bool an) {
+        AppSettings::instance().setValue(QStringLiteral("QsoMapHuntBeep"),
+                                         an ? QStringLiteral("True")
+                                            : QStringLiteral("False"));
+    });
+    jagdCol->addWidget(m_jagdTon);
 
     m_jagdSpalte->setVisible(false);
     mapRow->addWidget(m_jagdSpalte, 1);

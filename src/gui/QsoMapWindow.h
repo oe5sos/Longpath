@@ -404,6 +404,11 @@ private:
     /// die Meldung dort, wo der Betreiber ohnehin hinsieht.
     class QLabel* m_jagdAlarmText{nullptr};
     QTimer        m_jagdAlarmUhr;
+    /// Ein Ton bei einem neuen Land -- nur dort, nicht bei jedem neuen
+    /// Feld: bei einer Bandoeffnung piepte es sonst ununterbrochen.
+    /// Geht ueber QApplication::beep() und damit NICHT durch den
+    /// Funkweg: ein Hinweiston darf nie wie ein Signal klingen.
+    QCheckBox*    m_jagdTon{nullptr};
     bool              m_embedded{false};
 
     // ── 3D-Flug ──────────────────────────────────────────────────────
