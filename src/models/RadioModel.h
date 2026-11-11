@@ -164,6 +164,7 @@ class WdspEngine;
 class RxDspWorker;
 class NoiseFloorTracker;
 class MemoryList;
+class BandStackController;
 struct MemoryRecord;
 // Phase 3F Sub-Epic F Task 5: per-ADC wideband FFT engine. Forward decl
 // here; included in RadioModel.cpp so we don't pull fftw3.h into every
@@ -1214,6 +1215,12 @@ public:
     // FilterPresetsSetupPage can read/write user-customised presets.
     // Constructed once in RadioModel ctor; lifetime is RadioModel's lifetime.
     FilterPresetStore* filterPresetStore() const { return m_filterPresetStore; }
+
+    // Bandstapel (2026-11-11): je Band eine Liste gespeicherter Stellen;
+    // ein Druck auf die Bandtaste geht zur Stelle, ein weiterer zur
+    // naechsten. Angelegt am Ende des Konstruktors, lebt so lange wie das
+    // Modell. Siehe src/models/bandstack/BandStackController.h.
+    BandStackController* bandStack() const { return m_bandStack; }
 
     // ── CW-Tonhoehe (2026-09-27) ───────────────────────────────────────────
     // Thetis console.cs CWPitch: EIN Wert fuer alle Empfaenger, der die
@@ -4939,6 +4946,7 @@ private:
     // Stage C2 — filter preset user-override store.
     // Constructed in RadioModel ctor; QObject child so dtor cleans up.
     FilterPresetStore* m_filterPresetStore{nullptr};
+    BandStackController* m_bandStack{nullptr};
 
     // ── Phase 3J-2 H2: spot-system ownership ────────────────────────────────
     //

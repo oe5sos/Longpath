@@ -1041,6 +1041,11 @@ longpath_add_test(tst_slice_has_settings_for)
 longpath_add_test(tst_band_defaults)
 longpath_add_test(tst_radio_model_band_click)
 
+# ── Bandstapel (2026-11-11, nach Upstream NereusSDR PR #748) ─────────────
+longpath_add_test(tst_bandstack_seeds)
+longpath_add_test(tst_bandstack_store)
+longpath_add_test(tst_bandstack_controller)
+
 # ── About dialog ─────────────────────────────────────────────────────────
 longpath_add_test(tst_about_dialog)
 longpath_add_test(tst_support_dialog)
@@ -5935,6 +5940,9 @@ longpath_add_test(tst_filter_follows_the_panadapter)
 longpath_add_test(tst_filter_pane_sheet)
 longpath_add_test(tst_tx_entwurf_sheet)
 longpath_add_test(tst_band_flyout_highlight_entwurf)
+# Zeichenwerkzeug, kein Prueflauf: ueberspringt sich ohne
+# LONGPATH_GRAB_DIR UND LONGPATH_ENTWURF=1.
+longpath_add_test(tst_bandstapel_entwurf)
 longpath_add_test(tst_band_flyout_highlight)
 longpath_add_test(tst_band_buttons)
 longpath_add_test(tst_container_title_does_not_shove)

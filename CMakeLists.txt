@@ -834,6 +834,9 @@ set(MODEL_SOURCES
     src/models/MeterModel.cpp
     src/models/TransmitModel.cpp
     src/models/FilterPresetStore.cpp
+    src/models/bandstack/BandStackStore.cpp
+    src/models/bandstack/BandStackSeeds.cpp
+    src/models/bandstack/BandStackController.cpp
     src/models/NotchModel.cpp
     src/models/SpotModel.cpp
     src/models/SpotTableModel.cpp

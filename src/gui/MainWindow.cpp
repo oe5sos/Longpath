@@ -268,6 +268,7 @@ warren@wpratt.com
 #include "StyleConstants.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
+#include "models/bandstack/BandStackController.h"
 #include "widgets/CommandBar.h"
 #include "widgets/ProfileRail.h"
 #include "widgets/WidgetPicker.h"
@@ -1212,6 +1213,18 @@ MainWindow::MainWindow(QWidget* parent)
             this, [this](Band /*band*/, const QString& reason) {
         showToast(reason, ToastSeverity::Warning, 3000);
     });
+
+    // Bandstapel (2026-11-11): wohin ein Druck gefuehrt hat, etwa
+    // „40m: 7.185 LSB, 5 of 6" -- sonst springt die Frequenz beim zweiten
+    // Druck auf dieselbe Taste ohne Erklaerung.
+    if (BandStackController* stapel = m_radioModel->bandStack()) {
+        connect(stapel, &BandStackController::recalled,
+                this, [this](int /*sliceId*/, const QString& bericht) {
+            if (!bericht.isEmpty()) {
+                showToast(bericht, ToastSeverity::Info, 2500);
+            }
+        });
+    }
 
     // Jeder gescheiterte Verbindungsversuch sagt jetzt, WARUM — auch der
     // von Hand angestossene. 14 Sekunden, weil der Text zwei Saetze hat
@@ -16860,6 +16873,48 @@ void MainWindow::bandUmschalten(Band band)
     const bool digiLief = imDigi && (fensterOffen || aufAnrufstelle);
 
     const Band bandVorher = bandFromFrequency(slice->frequency());
+
+    // ── Bandstapel (2026-11-11) ──────────────────────────────────────
+    //
+    // Mit verbundenem Geraet geht ein Druck durch den Stapel: auf einem
+    // anderen Band zur eigenen Stelle dort, auf demselben Band zur
+    // naechsten (Umschalt: zur vorigen; Cmd/Strg: die aktuelle Stelle
+    // als neuen Eintrag ablegen). Thetis console.cs preBandSelect, nach
+    // Upstream NereusSDR MainWindow::pressBand.
+    //
+    // Ausnahme: lief Digi und geht es auf ein ANDERES Band, bleibt es
+    // beim alten Weg mit dem Nachziehen unten -- die Anrufstelle des
+    // neuen Bandes gewinnt ohnehin, und eine FT8-Frequenz gehoert nicht
+    // in einen Sprecheintrag. Die Scheibe steht danach neben ihrer
+    // Stelle; ein Verlassen schreibt nichts hinein.
+    if (BandStackController* stapel = m_radioModel->bandStack();
+        stapel && stapel->isReady()) {
+        const int sliceId = slice->sliceIndex();
+        const bool gleichesBand = stapel->stackBandFor(sliceId) == band;
+        if (gleichesBand || !digiLief) {
+            const Qt::KeyboardModifiers tasten = QGuiApplication::keyboardModifiers();
+            QString grund;
+            bool erledigt = false;
+            if (gleichesBand && tasten.testFlag(Qt::ControlModifier)) {
+                erledigt = stapel->add(sliceId, {}, &grund);
+                if (erledigt) {
+                    showToast(QStringLiteral("Band stack: added %1")
+                                  .arg(stapel->positionText(sliceId)),
+                              ToastSeverity::Info, 2500);
+                }
+            } else {
+                const BandStackDirection richtung =
+                    gleichesBand && tasten.testFlag(Qt::ShiftModifier)
+                        ? BandStackDirection::Previous
+                        : BandStackDirection::Next;
+                erledigt = stapel->press(sliceId, band, richtung, {}, &grund);
+            }
+            if (!erledigt && !grund.isEmpty()) {
+                showToast(grund, ToastSeverity::Warning, 3000);
+            }
+            return;
+        }
+    }
 
     m_radioModel->onBandButtonClicked(band);
 
