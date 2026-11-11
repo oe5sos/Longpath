@@ -722,6 +722,10 @@ set(CORE_SOURCES
     src/core/audio/WavFile.cpp
     src/core/audio/WavPlayer.cpp
     src/core/audio/VoiceKeyer.cpp
+    src/core/audio/VoiceKeyerPlayer.cpp
+    src/core/hotkeys/HotKeyActionList.cpp
+    src/core/hotkeys/HotKeyBindings.cpp
+    src/core/hotkeys/HotKeyChord.cpp
     src/core/audio/QsoRecorder.cpp
     src/core/audio/WavRecorder.cpp
     src/core/audio/WavRecorderController.cpp
@@ -1034,6 +1038,10 @@ set(GUI_SOURCES
     src/gui/MainWindow_Asr.cpp
     src/gui/MainWindow_SunSdr.cpp
     src/gui/MainWindow_SideArea.cpp
+    src/gui/MainWindow_HotKeys.cpp
+    src/gui/hotkeys/HotKeyDispatcher.cpp
+    src/gui/hotkeys/KeyboardRouter.cpp
+    src/gui/hotkeys/MainWindowHotKeyTargets.cpp
     src/gui/KiwiPublicReceiverPicker.cpp
     src/gui/LanScanDialog.cpp
     src/gui/LanScanDialog.h
@@ -1359,6 +1367,7 @@ set(GUI_SOURCES
 if(APPLE)
     list(APPEND GUI_SOURCES src/gui/MacFloatingWindowBehavior.mm)
     list(APPEND GUI_SOURCES src/gui/MacVollflaeche.mm)
+    list(APPEND GUI_SOURCES src/gui/hotkeys/MacMenuTrackingWatch.mm)
     list(APPEND GUI_SOURCES src/gui/MacFloatingWindowBehavior.h)
 endif()
 
@@ -2289,6 +2298,8 @@ if(APPLE)
     set_source_files_properties(src/gui/MacFloatingWindowBehavior.mm
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
     set_source_files_properties(src/gui/MacVollflaeche.mm
+        PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+    set_source_files_properties(src/gui/hotkeys/MacMenuTrackingWatch.mm
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 endif()
 if(LONGPATH_USE_PCH)

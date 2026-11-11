@@ -73,6 +73,7 @@
 #include "core/CouplerZero.h"
 #include "core/FlexAutoRauschsperre.h"
 #include "core/audio/VoiceKeyer.h"
+#include "core/audio/VoiceKeyerPlayer.h"
 #include "core/audio/QsoRecorderController.h"
 #include "RecordingModel.h"
 #include "core/PgxlConnection.h"
@@ -175,6 +176,7 @@ class PcMicSource;
 class RadioMicSource;
 class VaxTxMicSource;  // VAX TX consumer (added 2026-05-06).
 class CompositeTxMicRouter;
+class HotKeyBindings;
 // 3M-1c L.1 / L.2: forward declarations for the MicProfileManager bank
 // (chunk F) + the TwoToneController activation orchestrator (chunk I).
 class MicProfileManager;
@@ -501,6 +503,15 @@ public:
     // dieselben Plaetze fuehren.
     VoiceKeyerStore& voiceKeyer() { return m_voiceKeyer; }
     const VoiceKeyerStore& voiceKeyer() const { return m_voiceKeyer; }
+    // Senden, Wiederholen und Aufnehmen der Ansagen (2026-11-10): ein
+    // Spieler fuer Panel und Tastenkuerzel. Tastet ueber den
+    // MoxController, spielt ueber den Mikrofon-Router (MicSource::Dvk).
+    VoiceKeyerPlayer* voiceKeyerPlayer() const { return m_voiceKeyerPlayer.get(); }
+    // Die Tastenkuerzel (2026-11-10). Hier, damit Setup-Seite und
+    // Sprachspeicher-Panel dieselbe Belegung sehen wie die Tastaturweiche
+    // im Hauptfenster. Gelesen wird sie vom Hauptfenster, sobald dessen
+    // Menues stehen (die Menue-Kuerzel sind fuer Tasten gesperrt).
+    HotKeyBindings* hotKeyBindings() const { return m_hotKeyBindings.get(); }
 
     // Die QSO-Aufnahme. Sie haengt an AudioEngine und TxWorkerThread,
     // sobald beide stehen — angeschlossen wird in wireConnectionSignals,
@@ -4328,6 +4339,11 @@ private:
     // MAC and load() are called on connect. Phase 3P-F Task 5a.
     ApolloController m_apolloController;
     VoiceKeyerStore m_voiceKeyer;
+    // VOR m_compositeMicRouter erklaert und damit NACH ihm zerstoert:
+    // der Router haelt einen nackten Zeiger auf die Quelle des Spielers.
+    std::unique_ptr<VoiceKeyerPlayer> m_voiceKeyerPlayer;
+    std::unique_ptr<HotKeyBindings> m_hotKeyBindings;
+    int m_dvkQuelleVorher{0};   // MicSource vor der Ansage
     QsoRecorderController m_qsoRecorder;
     RecordingModel        m_recording;
     // Der Pfad wartet hier, bis die Fabrik die Verbindung gebaut hat:

@@ -396,6 +396,10 @@ private slots:
         SliceModel scheibe;
         scheibe.setDspMode(DSPMode::LSB);
         CatRigBruecke bruecke(&rig, &scheibe);
+        // Die Frist lang machen: auf einem langsamen CI-Rechner lief sie
+        // zwischen Befehl und abweichender Meldung schon ab (macOS-CI,
+        // rot ab 2026-11-08). Aufgehoben wird sie unten ausdruecklich.
+        bruecke.setFristForTest(10000);
 
         // Das Geraet gibt den Stand vor.
         QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28078400), 3000);

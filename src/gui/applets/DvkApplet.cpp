@@ -20,12 +20,18 @@
 //                 Port of AetherSDR `src/gui/DvkPanel.{h,cpp}` (DVK F-key
 //                 slot grid + record/play controls). Renamed to
 //                 DvkApplet in Longpath. All controls NYI.
+//   2026-11-10 — Senden, Stopp, Wiederholen und Aufnahmepegel ueber den
+//                 VoiceKeyerPlayer; die Aufnahme ist dorthin umgezogen.
+//                 Die Taste je Zeile kommt aus den Tastenkuerzeln.
+//                 Martin Fischer (OE5SOS), KI-gestuetzt ueber Anthropic
+//                 Claude.
 // =================================================================
 
 #include "DvkApplet.h"
 #include "models/RadioModel.h"
-#include "core/TxWorkerThread.h"
-#include "core/TxAudioRecorder.h"
+#include "core/audio/VoiceKeyerPlayer.h"
+#include "core/hotkeys/HotKeyBindings.h"
+#include "gui/setup/KeyboardSetupPages.h"
 #include <QMessageBox>
 #include <QFileDialog>
 #include "NyiOverlay.h"
@@ -38,14 +44,11 @@
 #include <QLabel>
 #include <QSlider>
 #include <QFrame>
+#include <QTimer>
+
+#include <algorithm>
 
 namespace Longpath {
-
-namespace {
-// Mikrofonrate des Sendewegs — dieselbe Zahl, die der Sprach-Selbsttest
-// nimmt; beide lesen denselben Abgriff.
-constexpr int kMicRateHz = 48000;
-}
 
 
 DvkApplet::DvkApplet(RadioModel* model, QWidget* parent)
@@ -54,91 +57,75 @@ DvkApplet::DvkApplet(RadioModel* model, QWidget* parent)
     buildUI();
 }
 
-// ── Aufnahme ─────────────────────────────────────────────────────────
-//
-// Derselbe Weg wie der Sprach-Selbsttest (TxVoiceCheckDialog): der
-// Abgriff preStripAudioReady laeuft auf dem Sendefaden und reicht die
-// Mikrofonwerte direkt in einen TxAudioRecorder. VOR der
-// Sprachbearbeitung — eine Ansage soll klingen wie die Stimme, nicht
-// wie die Stimme durch den heutigen Kompressor; beim Senden laeuft die
-// Bearbeitung ohnehin darueber.
-//
-// ES WIRD NICHTS GETASTET. Der Abgriff liest mit, was das Mikrofon
-// liefert; der Sender bleibt aus.
-void DvkApplet::startRecording(int index)
+VoiceKeyerPlayer* DvkApplet::player() const
 {
-    if (!m_model || index < 0 || index >= kSlots) { return; }
+    return m_model ? m_model->voiceKeyerPlayer() : nullptr;
+}
 
-    TxWorkerThread* worker = m_model->txWorker();
-    if (!worker) {
-        QMessageBox::information(this, QStringLiteral("Voice Keyer"),
-            QStringLiteral("The transmit path is not up yet — connect to "
-                           "the radio first, then record."));
-        return;
+// Der Spieler hat seinen Zustand gewechselt: Zeilen faerben, Knoepfe
+// sperren oder freigeben, den Pegel laufen lassen.
+void DvkApplet::onPlayerState()
+{
+    VoiceKeyerPlayer* p = player();
+    const int oldRec  = m_recordingSlot;
+    const int oldPlay = m_playingSlot;
+    m_recordingSlot = (p && p->state() == VoiceKeyerPlayer::State::Recording) ? p->activeSlot() : -1;
+    m_playingSlot   = (p && (p->state() == VoiceKeyerPlayer::State::Playing
+                             || p->state() == VoiceKeyerPlayer::State::Gap)) ? p->activeSlot() : -1;
+    for (int i : {oldRec, oldPlay, m_recordingSlot, m_playingSlot}) {
+        if (i >= 0) { applyRowStyle(i); }
     }
-
-    if (!m_recorder) {
-        m_recorder = new TxAudioRecorder(this);
-        m_recorder->setSampleRate(kMicRateHz);
-        connect(m_recorder, &TxAudioRecorder::recordingFull, this,
-                [this]() { finishRecording(); });
+    if (m_recordingSlot >= 0) {
+        if (m_levelTimer && !m_levelTimer->isActive()) { m_levelTimer->start(); }
+    } else {
+        if (m_levelTimer) { m_levelTimer->stop(); }
+        if (m_recLevel) { m_recLevel->setValue(0.0); }
     }
-    m_recorder->clear();
-    m_recorder->start();
+    refreshButtons();
+}
 
-    QObject::disconnect(m_micTap);
-    m_micTap = connect(worker, &TxWorkerThread::preStripAudioReady, m_recorder,
-                       [this](const float* samples, int frames) {
-        m_recorder->feed(samples, frames);
-    }, Qt::DirectConnection);
-    worker->setVoiceTapUser(TxWorkerThread::VoiceTapUser::Dvk, true);
-
-    m_recordingSlot = index;
-    applyRowStyle(index);
-    if (m_recBtn[index])  { m_recBtn[index]->setText(QStringLiteral("\u25A0")); }
+void DvkApplet::refreshButtons()
+{
+    VoiceKeyerPlayer* p = player();
+    const bool recording = m_recordingSlot >= 0;
+    const bool txUp = m_model && m_model->txWorker() != nullptr;
     for (int i = 0; i < kSlots; ++i) {
-        if (i != index && m_recBtn[i]) { m_recBtn[i]->setEnabled(false); }
-        if (m_loadBtn[i]) { m_loadBtn[i]->setEnabled(false); }
+        if (!m_recBtn[i]) { continue; }
+        const bool empty = !m_model || m_model->voiceKeyer().slot(i).isEmpty();
+        m_recBtn[i]->setText(i == m_recordingSlot ? QStringLiteral("\u25A0") : QStringLiteral("\u25CF"));
+        // Waehrend einer Aufnahme geht nur deren eigener Stopp.
+        m_recBtn[i]->setEnabled(recording ? i == m_recordingSlot : txUp);
+        m_loadBtn[i]->setEnabled(!recording);
+        m_playBtn[i]->setEnabled(p && !recording && !empty);
+        m_stopBtn[i]->setEnabled(p && (i == m_playingSlot || i == m_recordingSlot));
     }
 }
 
-void DvkApplet::finishRecording()
+// Die Taste je Zeile aus den Tastenkuerzeln (voice.msgN), so wie der
+// Betreiber sie liest. Belegt er sie um, steht hier die neue.
+void DvkApplet::refreshKeys()
 {
-    if (m_recordingSlot < 0 || !m_recorder) { return; }
-    const int index = m_recordingSlot;
-    m_recordingSlot = -1;
-    applyRowStyle(index);
-
-    // Reihenfolge wie im Sprach-Selbsttest: erst das Tor zu, dann die
-    // Verbindung loesen. Andersherum liefe der Abgriff noch, waehrend
-    // niemand mehr zuhoert.
-    if (m_model && m_model->txWorker()) {
-        m_model->txWorker()->setVoiceTapUser(
-            TxWorkerThread::VoiceTapUser::Dvk, false);
-    }
-    QObject::disconnect(m_micTap);
-    m_recorder->stop();
-
-    if (m_recBtn[index]) { m_recBtn[index]->setText(QStringLiteral("\u25CF")); }
+    HotKeyBindings* b = m_model ? m_model->hotKeyBindings() : nullptr;
     for (int i = 0; i < kSlots; ++i) {
-        if (m_recBtn[i])  { m_recBtn[i]->setEnabled(m_model && m_model->txWorker()); }
-        if (m_loadBtn[i]) { m_loadBtn[i]->setEnabled(true); }
+        if (!m_slotKey[i]) { continue; }
+        const QString id = QStringLiteral("voice.msg%1").arg(i + 1);
+        const QStringList keys = b ? b->keysFor(id) : QStringList{};
+        const QString text = keys.isEmpty() ? QString()
+                                            : KeyboardShortcutsPage::nativeKeyText(keys.first());
+        m_slotKey[i]->setText(text);
+        const QStringList rec = b ? b->keysFor(QStringLiteral("voice.rec%1").arg(i + 1)) : QStringList{};
+        m_slotKey[i]->setToolTip(QStringLiteral("%1 sends this message%2. Esc stops.")
+            .arg(text.isEmpty() ? QStringLiteral("No key") : text,
+                 rec.isEmpty() ? QString()
+                               : QStringLiteral(", %1 records it")
+                                     .arg(KeyboardShortcutsPage::nativeKeyText(rec.first()))));
+        if (m_playBtn[i]) {
+            m_playBtn[i]->setToolTip(QStringLiteral(
+                "Send this announcement on air — keys the transmitter and "
+                "lets go when it ends%1.").arg(text.isEmpty() ? QString()
+                                                             : QStringLiteral(" (key %1)").arg(text)));
+        }
     }
-
-    if (!m_model) { return; }
-
-    QVector<float> samples(m_recorder->recordedFrames());
-    if (!samples.isEmpty()) {
-        std::copy_n(m_recorder->samples(), samples.size(), samples.begin());
-    }
-
-    QString err;
-    if (!m_model->voiceKeyer().setRecording(index, samples, kMicRateHz, &err)) {
-        QMessageBox::warning(this, QStringLiteral("Voice Keyer"),
-            QStringLiteral("Nothing was stored: %1").arg(err));
-        return;
-    }
-    refreshSlot(index);
 }
 
 // Eine Zeile auffrischen: Taste, Beschriftung, Dauer.
@@ -147,9 +134,6 @@ void DvkApplet::refreshSlot(int index)
     if (index < 0 || index >= kSlots || !m_model) { return; }
     const VoiceKeyerSlot& s = m_model->voiceKeyer().slot(index);
 
-    if (m_slotKey[index]) {
-        m_slotKey[index]->setText(s.shortcut);
-    }
     if (m_slotLabel[index]) {
         // Ein leerer Platz sagt „empty" und sagt es kursiv und blass.
         // „Slot 3" allein laesst offen, ob da etwas liegt.
@@ -197,6 +181,13 @@ void DvkApplet::applyRowStyle(int index)
                                  " border-left: 2px solid %2; }")
                       .arg(QLatin1String(Style::kInsetBg),
                            QLatin1String(Style::kRedBg)));
+    } else if (index == m_playingSlot) {
+        // Auf Sendung: Messing, wie die Sendetaste -- kein kraeftiges Rot.
+        m_slotRow[index]->setStyleSheet(
+            sel + QStringLiteral(" { background: %1;"
+                                 " border-left: 2px solid %2; }")
+                      .arg(QLatin1String(Style::kInsetBg),
+                           QLatin1String(Style::kAmberBorder)));
     } else if (index % 2 == 1) {
         m_slotRow[index]->setStyleSheet(
             sel + QStringLiteral(" { background: %1;"
@@ -251,7 +242,9 @@ void DvkApplet::buildUI()
         // Die TASTE steht links. Im Betrieb greift man nach der Taste,
         // nicht nach dem Namen.
         m_slotKey[i] = new QLabel(m_slotRow[i]);
-        m_slotKey[i]->setFixedWidth(26);
+        // Mindestbreite statt fester: eine umbelegte Taste („⌘⇧F3")
+        // ist breiter als „F1".
+        m_slotKey[i]->setMinimumWidth(26);
         m_slotKey[i]->setAlignment(Qt::AlignCenter);
         m_slotKey[i]->setStyleSheet(QStringLiteral(
             "QLabel { color: %1; font-size: 11px; font-weight: bold;"
@@ -292,9 +285,8 @@ void DvkApplet::buildUI()
             "Record from the microphone into this slot (up to 30 s). "
             "Press again to stop. This does NOT transmit — it listens to "
             "what the microphone delivers. Needs a connected radio."));
-        m_playBtn[i]->setToolTip(QStringLiteral(
-            "Send this announcement — needs the transmit path, which is "
-            "the next step."));
+        m_stopBtn[i]->setToolTip(QStringLiteral(
+            "Stop sending or recording (Esc does the same)."));
         m_loadBtn[i]->setToolTip(QStringLiteral(
             "Load a WAV file into this slot. Works now: the file is read "
             "and checked immediately, not when you press send."));
@@ -312,15 +304,26 @@ void DvkApplet::buildUI()
         refreshSlot(i);
 
         // Aufnahme geht, sobald der Sendeweg steht — sie TASTET NICHT,
-        // sie liest nur mit. Wiedergabe bleibt gesperrt, bis die Tastung
-        // im MoxController haengt; der Tooltip sagt es.
-        m_recBtn[i]->setEnabled(m_model && m_model->txWorker() != nullptr);
-        m_playBtn[i]->setEnabled(false);
-        m_stopBtn[i]->setEnabled(false);
-
+        // sie liest nur mit. Senden tastet ueber den MoxController
+        // (VoiceKeyerPlayer); refreshButtons() setzt die Sperren.
         connect(m_recBtn[i], &QPushButton::clicked, this, [this, i]() {
-            if (m_recordingSlot == i) { finishRecording(); }
-            else if (m_recordingSlot < 0) { startRecording(i); }
+            VoiceKeyerPlayer* p = player();
+            if (!p) { return; }
+            const QString refusal = p->record(i);
+            if (!refusal.isEmpty()) {
+                QMessageBox::information(this, QStringLiteral("Voice Keyer"), refusal);
+            }
+        });
+        connect(m_playBtn[i], &QPushButton::clicked, this, [this, i]() {
+            VoiceKeyerPlayer* p = player();
+            if (!p) { return; }
+            const QString refusal = p->play(i);
+            if (!refusal.isEmpty()) {
+                QMessageBox::information(this, QStringLiteral("Voice Keyer"), refusal);
+            }
+        });
+        connect(m_stopBtn[i], &QPushButton::clicked, this, [this]() {
+            if (VoiceKeyerPlayer* p = player()) { p->stop(); }
         });
 
         const int slot = i;
@@ -343,7 +346,13 @@ void DvkApplet::buildUI()
 
     if (m_model) {
         connect(&m_model->voiceKeyer(), &VoiceKeyerStore::slotChanged,
-                this, &DvkApplet::refreshSlot);
+                this, [this](int index) { refreshSlot(index); refreshButtons(); });
+        if (VoiceKeyerPlayer* p = player()) {
+            connect(p, &VoiceKeyerPlayer::stateChanged, this, &DvkApplet::onPlayerState);
+        }
+        if (HotKeyBindings* b = m_model->hotKeyBindings()) {
+            connect(b, &HotKeyBindings::bindingsChanged, this, &DvkApplet::refreshKeys);
+        }
     }
 
     // Was ab hier kommt, gilt fuer den GANZEN Speicher, nicht fuer eine
@@ -367,7 +376,17 @@ void DvkApplet::buildUI()
     m_recLevel->setRedStart(90.0);
     m_recLevel->setTitle(QStringLiteral("Rec Level"));
     vbox->addWidget(m_recLevel);
-    NyiOverlay::markNyi(m_recLevel, QStringLiteral("3I-1"));
+    m_recLevel->setToolTip(QStringLiteral(
+        "Microphone peak while a message is recording."));
+    // Der Pegel laeuft nur waehrend einer Aufnahme: 20 Mal je Sekunde
+    // den Spitzenwert seit dem letzten Blick abholen.
+    m_levelTimer = new QTimer(this);
+    m_levelTimer->setInterval(50);
+    connect(m_levelTimer, &QTimer::timeout, this, [this]() {
+        VoiceKeyerPlayer* p = player();
+        if (!p || !m_recLevel) { return; }
+        m_recLevel->setValue(std::min(100.0, 100.0 * p->takeRecordPeak()));
+    });
 
     // --- Control 3: Repeat toggle + interval slider (1..60s) ---
     {
@@ -389,8 +408,29 @@ void DvkApplet::buildUI()
 
         vbox->addLayout(row);
 
-        NyiOverlay::markNyi(m_repeatBtn,    QStringLiteral("3I-1"));
-        NyiOverlay::markNyi(m_repeatSlider, QStringLiteral("3I-1"));
+        m_repeatBtn->setToolTip(QStringLiteral(
+            "Repeat: after the message the transmitter lets go, you listen "
+            "for the set seconds, then the message goes out again. "
+            "Esc, Stop or keying yourself ends it."));
+        m_repeatSlider->setToolTip(QStringLiteral(
+            "Seconds of listening between two repeats."));
+        if (VoiceKeyerPlayer* p = player()) {
+            m_repeatBtn->setChecked(p->repeat());
+            m_repeatSlider->setValue(p->repeatSeconds());
+            m_repeatValue->setText(QString::number(p->repeatSeconds()));
+            connect(m_repeatBtn, &QPushButton::toggled, p, &VoiceKeyerPlayer::setRepeat);
+            connect(m_repeatSlider, &QSlider::valueChanged, this, [this, p](int v) {
+                p->setRepeatSeconds(v);
+                m_repeatValue->setText(QString::number(v));
+            });
+            connect(p, &VoiceKeyerPlayer::repeatChanged, this, [this](bool on, int secs) {
+                QSignalBlocker b1(m_repeatBtn);
+                QSignalBlocker b2(m_repeatSlider);
+                m_repeatBtn->setChecked(on);
+                m_repeatSlider->setValue(secs);
+                m_repeatValue->setText(QString::number(secs));
+            });
+        }
     }
 
     // --- Control 4: Semi break-in toggle ---
@@ -406,6 +446,9 @@ void DvkApplet::buildUI()
 
     vbox->addStretch();
     root->addWidget(body);
+
+    refreshKeys();
+    onPlayerState();
 }
 
 void DvkApplet::syncFromModel()
@@ -416,6 +459,8 @@ void DvkApplet::syncFromModel()
     for (int i = 0; i < kSlots; ++i) {
         refreshSlot(i);
     }
+    refreshKeys();
+    refreshButtons();
 }
 
 } // namespace Longpath
