@@ -147,7 +147,9 @@ void FKeyPriority::release()
         return;
     }
     m_engaged = false;
-    if (!write(kModeSpecial)) {
+    if (write(kModeSpecial)) {
+        qCInfo(lcHotKeys) << "F-Tasten: zurueck auf die Mac-Belegung";
+    } else {
         qCWarning(lcHotKeys) << "F-Tasten: Rueckstellen hat macOS nicht angenommen";
     }
     setMarker(false);
@@ -189,6 +191,9 @@ void FKeyPriority::apply()
         return;
     }
     m_engaged = true;
+    // Ob es geklappt hat, soll man im Protokoll sehen -- ohne diese Zeile
+    // sah ein erfolgreicher Lauf genauso aus wie einer, der nie vorne war.
+    qCInfo(lcHotKeys) << "F-Tasten: F1…F12 sind F-Tasten, solange Longpath vorne ist";
 }
 
 int FKeyPriority::read() const
