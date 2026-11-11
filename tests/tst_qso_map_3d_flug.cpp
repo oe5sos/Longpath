@@ -443,6 +443,8 @@ private slots:
         QCOMPARE(w.currentViewForTest(), 1);
 
         AppSettings::instance().setValue(QStringLiteral("QsoMapView"), QString());
+    }
+
     // Martin (2026-11-11): „er sollte glaube ich auch durch eine pille
     // angezeigt werden". Die 3D-Pille steht in der Pillenreihe -- auch ohne
     // Log (dann ist sie die einzige) -- und ueberlebt den Neuaufbau der
