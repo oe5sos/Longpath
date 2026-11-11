@@ -395,8 +395,12 @@ void QsoMapWindow::buildUi()
     m_3dBtn = new QPushButton(QStringLiteral("3D"), this);
     m_3dBtn->setObjectName(QStringLiteral("qsoMap3dButton"));
     m_3dBtn->setCheckable(true);
-    m_3dBtn->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
-    bar->addWidget(m_3dBtn);
+    // Als Pille, nicht als Werkzeugknopf (Betreiber 2026-11-11: „er sollte
+    // glaube ich auch durch eine pille angezeigt werden" -- in der Leiste
+    // fand er ihn nicht). Er steht als erste Pille vor BAND und MODE,
+    // siehe rebuildFilterPills().
+    m_3dBtn->setStyleSheet(Style::buttonBaseStyle() + Style::greenCheckedStyle());
+    m_3dBtn->setFocusPolicy(Qt::NoFocus);   // +/- bleiben bei der Karte
     // toggled, nicht clicked (Live-Befund 2026-11-10): die Bedienhilfe
     // (AXPress, VoiceOver, Automatisierung) drueckt einen ankreuzbaren
     // Knopf ueber toggle(), und das sendet KEIN clicked -- der Knopf tat
@@ -464,6 +468,8 @@ void QsoMapWindow::buildUi()
     // 187 px.
     m_pillRow = new FlowLayout(nullptr, 4, 4);
     col->addLayout(m_pillRow);
+    // Die 3D-Pille steht da, bevor das Log die anderen bringt.
+    m_pillRow->addWidget(m_3dBtn);
 
     m_globe = new GlobeWidget(this);
     // No beam spread here: the flanking arcs answer a question about
@@ -785,9 +791,14 @@ QString QsoMapWindow::modeKey(const LogEntry& e)
 void QsoMapWindow::rebuildFilterPills()
 {
     while (QLayoutItem* it = m_pillRow->takeAt(0)) {
-        delete it->widget();
+        // Die 3D-Pille lebt laenger als die Band-/Modus-Pillen: sie haelt
+        // ihre Verbindungen und ihren Zustand.
+        if (it->widget() != m_3dBtn) { delete it->widget(); }
         delete it;
     }
+    // Immer zuerst, immer an derselben Stelle -- auch wenn das Log nur ein
+    // Band und eine Betriebsart hat und sonst keine Pille da waere.
+    m_pillRow->addWidget(m_3dBtn);
 
     QSet<QString> bands, modes;
     for (const LogEntry& e : m_all) {
@@ -860,7 +871,9 @@ void QsoMapWindow::apply3dRoom()
     const bool in3d = m_stack && m_stack->currentIndex() == kView3d;
     if (m_pillRow) {
         for (int i = 0; i < m_pillRow->count(); ++i) {
-            if (QWidget* w = m_pillRow->itemAt(i)->widget()) { w->setVisible(!in3d); }
+            QWidget* w = m_pillRow->itemAt(i)->widget();
+            // Die 3D-Pille bleibt: sie ist der Weg zurueck.
+            if (w && w != m_3dBtn) { w->setVisible(!in3d); }
         }
         m_pillRow->invalidate();
     }
