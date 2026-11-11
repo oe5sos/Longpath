@@ -119,11 +119,24 @@ void TestBandPlanManager::setActivePlan_segmentsReflectActivePlan()
 {
     BandPlanManager mgr;
     mgr.loadPlans();
+    // Compare the segments themselves, not their number: since the 2 m
+    // sub-segments went into IARU Region 1 (2026-11-08, Longpath) both
+    // plans happen to hold 71 segments, and a count says nothing about
+    // which plan is active.
+    auto fingerprint = [&mgr]() {
+        QStringList l;
+        for (const auto& s : mgr.segments()) {
+            l << QStringLiteral("%1-%2 %3").arg(s.lowMhz).arg(s.highMhz).arg(s.label);
+        }
+        return l;
+    };
     mgr.setActivePlan("ARRL (US)");
-    const int arrlCount = mgr.segments().size();
+    const QStringList arrl = fingerprint();
     mgr.setActivePlan("IARU Region 1");
-    const int r1Count = mgr.segments().size();
-    QVERIFY(arrlCount != r1Count);   // different region = different segment count
+    const QStringList r1 = fingerprint();
+    QVERIFY(!arrl.isEmpty());
+    QVERIFY(!r1.isEmpty());
+    QVERIFY(arrl != r1);   // different region = different segments
 }
 
 void TestBandPlanManager::loadPlans_defaultsToArrlUs()

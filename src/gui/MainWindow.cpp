@@ -338,6 +338,8 @@ warren@wpratt.com
 #include "applets/AppletPanelWidget.h"
 #include "applets/FrequencyApplet.h"
 #include "applets/InstrumentApplet.h"
+#include "TraegerEichDialog.h"
+#include "RundumDialog.h"
 #include "gui/widgets/RasterOverlay.h"
 #include "gui/WindowPlacement.h"
 #include "gui/SideAreaWindow.h"
@@ -4088,6 +4090,9 @@ void MainWindow::wirePanNotchHandlers()
         // pan from sender() instead.
         connect(sw, &SpectrumWidget::notchCreateRequested,
                 this, &MainWindow::onNotchCreateFromPan,
+                Qt::UniqueConnection);
+        connect(sw, &SpectrumWidget::traegerGemessen,
+                this, &MainWindow::zeigeTraegerEichung,
                 Qt::UniqueConnection);
         connect(sw, &SpectrumWidget::notchMoveRequested,
                 this, &MainWindow::onNotchMoveRequested,
@@ -13245,6 +13250,16 @@ void MainWindow::buildMenuBar()
             "Open the antenna rotator dial."));
         connect(rotorAction, &QAction::triggered,
                 this, &MainWindow::openRotorDial);
+
+        // Rundum-Lauf (2026-11-08): der Rotor dreht einmal herum, der
+        // Panadapter misst je Richtung Belegung und Rauschboden.
+        QAction* sweepAction = toolsMenu->addAction(QStringLiteral("Rotor &sweep..."));
+        sweepAction->setObjectName(QStringLiteral("actRotorSweep"));
+        sweepAction->setToolTip(QStringLiteral(
+            "Turn the antenna once around and see, per direction, how busy the "
+            "band is and where the noise comes from."));
+        connect(sweepAction, &QAction::triggered,
+                this, &MainWindow::oeffneRundumLauf);
     }
 
     // The channel strip. Next to the voice check because they are two
@@ -21303,12 +21318,59 @@ void MainWindow::checkVaxFirstRun()
     dlg->show();
 }
 
+void MainWindow::oeffneRundumLauf()
+{
+    if (m_rundumDialog) {
+        m_rundumDialog->raise();
+        m_rundumDialog->activateWindow();
+        return;
+    }
+    // Gemessen wird am aktiven Panadapter -- dem, den der Betreiber sieht.
+    SpectrumWidget* sw = nullptr;
+    if (m_panStack) {
+        const QString aktiv = m_panStack->activePanId();
+        for (PanadapterApplet* a : m_panStack->allApplets()) {
+            if (!a) { continue; }
+            if (!sw || a->panId() == aktiv) { sw = a->spectrumWidget(); }
+            if (a->panId() == aktiv) { break; }
+        }
+    }
+    auto* d = new RundumDialog(m_radioModel, sw, this);
+    d->setAttribute(Qt::WA_DeleteOnClose);
+    m_rundumDialog = d;
+    d->show();
+}
+
+void MainWindow::zeigeTraegerEichung(bool gefunden, double geraetHz, double anzeigeHz,
+                                     float snrDb)
+{
+    // open(), nicht exec(): keine verschachtelte Schleife, und das
+    // Fenster raeumt sich selbst weg (WA_DeleteOnClose).
+    auto* d = new TraegerEichDialog(m_radioModel, gefunden, geraetHz, anzeigeHz,
+                                    snrDb, this);
+    d->open();
+}
+
+InstrumentApplet* MainWindow::signalInstrumentForTest() const
+{
+    return m_signalInstrument;
+}
+
 void MainWindow::closeEvent(QCloseEvent* event)
 {
     // Mark shutting-down BEFORE anything else so the "auto-open
     // ConnectionPanel on Disconnect" slot below doesn't re-trigger
     // discovery via ConnectionPanel's ctor while teardown runs.
     m_shuttingDown = true;
+
+    // Wer ordentlich beendet, ist durchgekommen (2026-11-08). Der
+    // Startwaechter zaehlte jeden Lauf unter 20 s als steckengeblieben --
+    // auch einen, den der Betreiber nach 18 s sauber geschlossen hat
+    // (Protokoll 13:37 -> „1 Start(s) in Folge kamen nicht durch" um
+    // 15:03). Zweimal so, und der dritte Start kaeme ohne seine Anordnung
+    // hoch. Ein haengender Start erreicht dieses closeEvent nicht, ein
+    // Absturz auch nicht -- die bleiben gezaehlt.
+    StartWatch::markRunning();
 
     // ── Profil-Stand sichern, SOFORT, nicht ueber aboutToQuit ────────
     //

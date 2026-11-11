@@ -233,6 +233,7 @@ void Gs232Rotor::moveTo(double azimuthDeg)
         emit errorOccurred(QStringLiteral("Der Rotor ist nicht verbunden — nichts gedreht."));
         return;
     }
+    if (!pruefeZiel(azimuthDeg)) { return; }      // erlaubter Bereich
     send(moveCommand(azimuthDeg, 0.0));
     setState(State::Moving);
 }

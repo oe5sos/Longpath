@@ -33,6 +33,11 @@
 #include "gui/WindowChrome.h"
 #include "gui/widgets/QsoDetailPane.h"
 #include "core/Maidenhead.h"
+#include "core/CtyDatParser.h"
+#include "core/LogbuchBilder.h"
+#include "core/RotorBereich.h"
+#include "core/TransverterSetup.h"
+#include "gui/widgets/LogbuchBilderWidgets.h"
 #include "models/Band.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -44,6 +49,7 @@
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QComboBox>
+#include <QStackedWidget>
 #include <QDateEdit>
 #include <QDateTimeEdit>
 #include <QHash>
@@ -586,6 +592,15 @@ void LogbookWindow::buildUi()
         popOut->setStyleSheet(Style::buttonBaseStyle());
         popOut->setToolTip(QStringLiteral("Open the statistics in their own window"));
         connect(popOut, &QPushButton::clicked, this, &LogbookWindow::showStatistics);
+        // Die zwei weiteren Bilder (2026-11-08): direkt auf ihre Seite.
+        for (const auto& [text, seite] : {std::pair<const char*, int>{"Band × hour", 1},
+                                          std::pair<const char*, int>{"Directions", 2}}) {
+            auto* k = new QPushButton(QString::fromUtf8(text), m_statsSection);
+            k->setStyleSheet(Style::buttonBaseStyle());
+            const int s = seite;
+            connect(k, &QPushButton::clicked, this, [this, s]() { zeigeStatistikSeite(s); });
+            head->addWidget(k);
+        }
         head->addWidget(popOut);
         v->addLayout(head);
         m_statsRow = new LogbookStatsWidget(m_statsSection);
@@ -2118,14 +2133,68 @@ void LogbookWindow::showStatistics()
                                          .arg(QLatin1String(Style::kAppBg)));
         auto* lay = new QVBoxLayout(m_statsDialog);
         lay->setContentsMargins(0, 0, 0, 0);
-        auto* scroll = new QScrollArea(m_statsDialog);
+
+        // Drei Seiten (2026-11-08): die Kacheln, Band x Stunde, Richtungen.
+        // Alle drei zeigen, was die Filter des Logbuchs zeigen.
+        auto* reiter = new QHBoxLayout;
+        reiter->setContentsMargins(10, 8, 10, 0);
+        reiter->setSpacing(6);
+        const QStringList namen = {QStringLiteral("Overview"), QStringLiteral("Band × hour"),
+                                   QStringLiteral("Directions")};
+        m_statsSeitenKnoepfe.clear();
+        for (int i = 0; i < namen.size(); ++i) {
+            auto* k = new QPushButton(namen[i], m_statsDialog);
+            k->setCheckable(true);
+            k->setAutoExclusive(true);
+            k->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
+            connect(k, &QPushButton::clicked, this, [this, i]() { zeigeStatistikSeite(i); });
+            reiter->addWidget(k);
+            m_statsSeitenKnoepfe << k;
+        }
+        reiter->addStretch(1);
+        lay->addLayout(reiter);
+        m_statsSeiten = new QStackedWidget(m_statsDialog);
+
+        auto* scroll = new QScrollArea(m_statsSeiten);
         scroll->setWidgetResizable(true);
         scroll->setFrameShape(QFrame::NoFrame);
         scroll->setStyleSheet(QStringLiteral("QScrollArea { background: %1; border: none; }")
                                   .arg(QLatin1String(Style::kAppBg)));
         m_statsView = new LogbookStatsWidget(scroll);
         scroll->setWidget(m_statsView);
-        lay->addWidget(scroll, 1);
+        m_statsSeiten->addWidget(scroll);
+
+        auto* seiteB = new QWidget(m_statsSeiten);
+        {
+            auto* v = new QVBoxLayout(seiteB);
+            v->setContentsMargins(10, 8, 10, 8);
+            auto* zeile = new QHBoxLayout;
+            auto* l = new QLabel(QStringLiteral("Contacts with"), seiteB);
+            l->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                 .arg(QLatin1String(Style::kTextSecondary)));
+            zeile->addWidget(l);
+            m_bandStundeFilter = new QComboBox(seiteB);
+            m_bandStundeFilter->setObjectName(QStringLiteral("bandStundeFilter"));
+            m_bandStundeFilter->addItem(QStringLiteral("all continents"), QString());
+            m_bandStundeFilter->addItem(QStringLiteral("outside Europe"), QStringLiteral("!EU"));
+            for (const char* k : {"EU", "NA", "SA", "AF", "AS", "OC"}) {
+                m_bandStundeFilter->addItem(QString::fromLatin1(k), QString::fromLatin1(k));
+            }
+            connect(m_bandStundeFilter, &QComboBox::currentIndexChanged, this,
+                    [this](int) { refreshStatsView(); });
+            zeile->addWidget(m_bandStundeFilter);
+            zeile->addStretch(1);
+            v->addLayout(zeile);
+            m_bandStunde = new BandStundeWidget(seiteB);
+            v->addWidget(m_bandStunde);
+            v->addStretch(1);
+        }
+        m_statsSeiten->addWidget(seiteB);
+
+        m_rose = new RichtungsRoseWidget(m_statsSeiten);
+        m_statsSeiten->addWidget(m_rose);
+        lay->addWidget(m_statsSeiten, 1);
+        m_statsSeitenKnoepfe.first()->setChecked(true);
         auto* closeBtn = new QPushButton(QStringLiteral("Close"), m_statsDialog);
         closeBtn->setStyleSheet(Style::buttonBaseStyle());
         connect(closeBtn, &QPushButton::clicked, m_statsDialog, &QDialog::hide);
@@ -2139,6 +2208,16 @@ void LogbookWindow::showStatistics()
     m_statsDialog->raise();
     m_statsDialog->activateWindow();
     refreshStatsView();   // after show(): it only works on a visible dialog
+}
+
+void LogbookWindow::zeigeStatistikSeite(int seite)
+{
+    showStatistics();
+    if (!m_statsSeiten) { return; }
+    seite = std::clamp(seite, 0, m_statsSeiten->count() - 1);
+    m_statsSeiten->setCurrentIndex(seite);
+    if (seite < m_statsSeitenKnoepfe.size()) { m_statsSeitenKnoepfe[seite]->setChecked(true); }
+    refreshStatsView();
 }
 
 void LogbookWindow::refreshStatsView()
@@ -2155,6 +2234,32 @@ void LogbookWindow::refreshStatsView()
                                                      QDateTime::currentDateTimeUtc());
     if (dialogWants) { m_statsView->setStats(stats); }
     if (rowWants)    { m_statsRow->setStats(stats); }
+
+    // Die zwei weiteren Seiten -- nur die gezeigte rechnet.
+    if (dialogWants && m_statsSeiten) {
+        const int seite = m_statsSeiten->currentIndex();
+        if (seite == 1 && m_bandStunde) {
+            const QString k = m_bandStundeFilter ? m_bandStundeFilter->currentData().toString()
+                                                 : QString();
+            const CtyDatParser* cty = m_cty;
+            auto nimm = [cty, k](const LogEntry& e) {
+                if (k.isEmpty() || !cty) { return true; }
+                const DxccEntity* d = cty->entityByPrefix(cty->resolvePrimaryPrefix(e.call));
+                if (!d) { return false; }
+                return k == QLatin1String("!EU") ? d->continent != QLatin1String("EU")
+                                                 : d->continent == k;
+            };
+            m_bandStunde->setDaten(LogbuchBilder::bandStunde(shown, nimm),
+                                   m_bandStundeFilter ? m_bandStundeFilter->currentText()
+                                                      : QStringLiteral("all"),
+                                   meinFeld());
+        }
+        if (seite == 2 && m_rose) {
+            m_rose->setRose(LogbuchBilder::rose(shown, m_cty, meinFeld()),
+                            QStringLiteral("this view"));
+            m_rose->setRotor(m_rotorDeg, m_rotorBeamDeg, RotorBereich::load());
+        }
+    }
 }
 
 // ── Eine Seite: Karte und Kennzahlen im Fenster ──────────────────────
@@ -2418,6 +2523,18 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
 
     col->addLayout(row);
 
+    // Bedarfs-Matrix (2026-11-08): sobald ein Rufzeichen dasteht, was das
+    // Land auf jedem Band und in jeder Betriebsart schon hat -- und ob der
+    // Platz, auf dem das Funkgeraet gerade steht, neu ist. Entprellt wie
+    // die Karteikarte, aber kuerzer: es ist eine Rechnung, keine Anfrage.
+    m_bedarf = new BedarfsMatrixWidget(this);
+    m_bedarf->setVisible(false);
+    col->addWidget(m_bedarf);
+    m_bedarfTimer = new QTimer(this);
+    m_bedarfTimer->setSingleShot(true);
+    m_bedarfTimer->setInterval(250);
+    connect(m_bedarfTimer, &QTimer::timeout, this, &LogbookWindow::aktualisiereBedarf);
+
     for (QLineEdit* e : {m_entryCall, m_entryRstS, m_entryRstR, m_entryComment}) {
         e->installEventFilter(this);
     }
@@ -2442,6 +2559,7 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
         }
         if (m_search) { m_search->setText(Callsigns::normalized(up)); }
         m_entryLookup->start();
+        m_bedarfTimer->start();
         m_entryHint->setText(QStringLiteral("Enter logs · Esc clears"));
         m_entryHint->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
                                        .arg(QLatin1String(Style::kTextScale)));
@@ -2524,14 +2642,42 @@ void LogbookWindow::refreshRadioReadout()
                                        : QStringLiteral("no radio"));
         return;
     }
-    m_entryFreq->setText(dottedHz(s->frequency()));
+    // Auf der Antenne, nicht am Geraet (2026-11-08): am Transverter stand
+    // hier 28.300.000 und "10m" fuer ein QSO auf 144,300.
+    const double antenne = static_cast<double>(TransverterSetup::displayHz(
+        static_cast<qint64>(s->frequency())));
+    m_entryFreq->setText(dottedHz(antenne));
     m_entryMode->setText(SliceModel::modeName(s->dspMode()));
     m_entryMode->setVisible(true);
-    const QString band = bandLabel(bandFromFrequency(s->frequency()));
+    const QString band = bandLabel(bandFromFrequency(antenne));
     m_entryBand->setText(band);
     m_entryBand->setVisible(!band.isEmpty());
     m_entrySource->setText(live ? QStringLiteral("from radio")
                                 : QStringLiteral("radio not connected"));
+    if (m_bedarf && m_bedarf->isVisible()) { aktualisiereBedarf(); }
+}
+
+QString LogbookWindow::meinFeld() const
+{
+    for (const LogEntry& e : m_all) {                 // m_all: neueste zuerst
+        if (isValidGridSquare(e.myGridSquare.trimmed())) { return e.myGridSquare.trimmed(); }
+    }
+    return AppSettings::instance().value(QStringLiteral("StationGridSquare")).toString().trimmed();
+}
+
+void LogbookWindow::aktualisiereBedarf()
+{
+    if (!m_bedarf || !m_entryCall) { return; }
+    const QString call = Callsigns::normalized(m_entryCall->text());
+    if (call.size() < 3 || !Callsigns::isLikelyCallsign(call) || !m_cty) {
+        m_bedarf->setVisible(false);
+        return;
+    }
+    const bool funk = m_entryMode && m_entryMode->isVisible();
+    const QString band = (funk && m_entryBand->isVisible()) ? m_entryBand->text() : QString();
+    const QString mode = funk ? m_entryMode->text() : QString();
+    m_bedarf->setBedarf(LogbuchBilder::bedarf(m_all, call, band, mode, m_cty, meinFeld()));
+    m_bedarf->setVisible(true);
 }
 
 void LogbookWindow::requestLog()
@@ -2583,6 +2729,8 @@ void LogbookWindow::reportLogged(bool ok, const QString& message)
 void LogbookWindow::clearEntry()
 {
     m_entryLookup->stop();
+    if (m_bedarfTimer) { m_bedarfTimer->stop(); }
+    if (m_bedarf) { m_bedarf->setVisible(false); }
     m_entryCall->clear();
     m_entryComment->clear();
     if (m_search) { m_search->clear(); }

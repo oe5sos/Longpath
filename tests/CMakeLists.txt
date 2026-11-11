@@ -1130,6 +1130,50 @@ if(TEST tst_transverter_anzeige)
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
+# Transverter "nur Empfang" (2026-11-08): das SDR an IFo2 darf nicht
+# senden, und der Bandplan-Waechter faengt das nicht (28,300 -> 144,300
+# ist erlaubt). MOX/TUNE ueber die echte MOX-Pruefung, die Flex-Wege und
+# das Kaestchen auf der Seite. Ein Fall liest RadioModel.cpp.
+longpath_add_test(tst_transverter_nur_empfang)
+# tst_tune_abgewiesen (2026-11-08): ein abgewiesenes TUNE setzt weder
+#   Handbetrieb noch PTT-Modus (Thetis console.cs:30061-30069) -- vorher
+#   meldete es "transmit tune=1" an TGXL/PGXL, ohne Traeger.
+longpath_add_test(tst_tune_abgewiesen)
+# tst_s_stufen (2026-11-08): S-Stufen nach Thetis common.cs mit VHF-Bezug
+#   (S9 = -93 dBm ueber 30 MHz), die RX-Verstaerkung des Transverters im
+#   Pegelversatz (Thetis RXCalibrationOffset) und die S-Striche am Panadapter.
+longpath_add_test(tst_s_stufen)
+# tst_frequenz_eichung (2026-11-08): LO-Fehler des Transverters (Thetis
+#   xvtr.cs), Einmessen an einem Traeger (Thetis CalibrateFreq) auf KW und
+#   UKW, und der Korrekturfaktor auch bei P1 (Thetis NetworkIO.cs VFOfreq).
+longpath_add_test(tst_frequenz_eichung)
+# tst_rundum_lauf (2026-11-08): Rotor einmal herum in 30-Grad-Schritten,
+#   Belegung und Rauschboden je 5-Grad-Sektor, Rueckkehr, Abbruch.
+longpath_add_test(tst_rundum_lauf)
+# tst_rotor_bereich (2026-11-08): erlaubter Bereich des Rotors -- der Weg
+#   zaehlt, nicht nur das Ziel (Anschlag Nord/Sued/frei), und der
+#   Rundum-Lauf bleibt darin.
+longpath_add_test(tst_rotor_bereich)
+# tst_logbuch_blaetter (2026-11-08): Entwurfswerkzeug, rendert drei
+#   Logbuch-Ideen aus einer Logbuch-Kopie (LONGPATH_LOGBOOK_FIXTURE +
+#   LONGPATH_GRAB_DIR); ohne beide uebersprungen.
+longpath_add_test(tst_logbuch_blaetter)
+# tst_logbuch_bilder (2026-11-08): Bedarfs-Matrix, Band x Stunde und
+#   Richtungsrose -- Rechnung und Einbindung ins Logbuch-Fenster.
+# tst_single_instance_guard (2026-11-08): ein Longpath je Einstellungsordner;
+#   ein zweiter Start holt den laufenden nach vorne bzw. laesst ihn in den
+#   neueren Bau neu starten (aus dem Contestprogramm uebernommen).
+longpath_add_test(tst_single_instance_guard)
+longpath_add_test(tst_logbuch_bilder)
+if(TEST tst_logbuch_bilder)
+    set_tests_properties(tst_logbuch_bilder PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+if(TEST tst_transverter_nur_empfang)
+    set_tests_properties(tst_transverter_nur_empfang PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 # Die Marke im Panadapter: wo sie sitzt (in der ZF) und was daran
 # steht (auf der Antenne) -- zwei Dinge, die man leicht vertauscht.
 longpath_add_test(tst_begleitgeraet_marke)
@@ -2695,6 +2739,13 @@ endif()
 longpath_add_test(tst_flex_rauschsperre)
 if(TEST tst_flex_rauschsperre)
     set_tests_properties(tst_flex_rauschsperre PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+# tst_flex_auto_sql (2026-11-08): Auto-SQL an der Flex -- Stufe = Rauschen
+#   der Scheibe (unteres Zehntel, 20 s) + Abstand; Knopf Aus/SQL/AUTO.
+longpath_add_test(tst_flex_auto_sql)
+if(TEST tst_flex_auto_sql)
+    set_tests_properties(tst_flex_auto_sql PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
@@ -8360,6 +8411,13 @@ longpath_add_test(tst_rendering_werkbank)
 longpath_add_test(tst_waterfall_column_reduce)
 longpath_add_test(tst_freq_scale_labels)
 
+# tst_panadapter_schaerfe (2026-11-08): Betreiber an den Entwurfsblaettern
+#   „Alles zusammen" -- Wasserfall in Geraete-Pixeln, Haarlinien-Raster,
+#   kurze Kurvenkante sind AN ab Werk. Prueft die Vorgabe, das Speichern
+#   und (mit QT_SCALE_FACTOR=2, auch offscreen) eine Wasserfallspalte je
+#   Geraete-Pixel. Gegenprobe gegen die alte Fassung gefahren.
+longpath_add_test(tst_panadapter_schaerfe)
+
 # ── Weiche Kante und Hof: die Zusage "beide aus = wie vorher" (2026-10-08) ──
 # tst_kurven_streifen: `Kurve::baue` entscheidet, aus wie vielen Baendern die
 #   GPU die Kurve zeichnet. Die Vorgabe beider Schalter ist AUS, und sie taugt
@@ -8372,6 +8430,13 @@ longpath_add_test(tst_freq_scale_labels)
 #   Schalterkombination schreibt mehr Streifen, als der GPU-Puffer hat.
 #   Reine Geometrie -- kein Fenster, keine GPU, laeuft offscreen im CI.
 longpath_add_test(tst_kurven_streifen)
+
+# tst_durchlass (2026-11-08): der Messkern hinter Bandbreite ablesbar,
+#   Signal-Klammern, Durchlass-Lupe und Lueckenfinder -- ohne Fenster.
+longpath_add_test(tst_durchlass)
+# tst_durchlass_anzeige: dieselben vier am Widget, mit echten Maus-
+#   ereignissen (Luecken-Klick, Kanten-Rast) und den Haken im Zahnrad.
+longpath_add_test(tst_durchlass_anzeige)
 
 # tst_kurve_setup_schalter: der haeufigste Fehler an einem neuen Schalter ist
 #   nicht, dass er falsch rechnet, sondern dass er NICHTS tut -- Kaestchen

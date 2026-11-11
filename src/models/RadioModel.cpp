@@ -256,6 +256,8 @@ warren@wpratt.com
 #include "MemoryRecord.h"
 #include "BandDefaults.h"
 #include "RxDspWorker.h"
+#include "core/FrequenzEichung.h"
+#include "core/SMeterSkala.h"
 #include "core/TransverterSetup.h"
 #include "core/FFTEngine.h"
 // 3M-1a G.1: TX-side integration — MoxController + TxChannel view.
@@ -597,6 +599,10 @@ RadioModel::RadioModel(QObject* parent)
     // zustand (console.cs:3236-3237 [@852bf0e], GetStateList: RadioButton
     // -> Name/Checked).
     m_fmDeviationHz = SliceModel::fmDeviationHz();
+
+    // Auto-SQL der Flex: der Abstand ueber dem Rauschen ist eine Zahl
+    // fuer alle Baender (FlexAutoRauschsperre.h).
+    m_flexAutoSql.setMarge(FlexAutoRauschsperre::ladeMarge());
 
     // Frequency memories. From Thetis console.cs:2006-2007 [@852bf0e]:
     //   MemoryList = MemoryList.Restore();
@@ -2052,6 +2058,14 @@ RadioModel::RadioModel(QObject* parent)
     // prozessweite Fassung ab (die Anzeige liest ihn dort), verbindet
     // aber nicht -- das tut MainWindow, wenn die Oberflaeche steht.
     m_companionRig        = std::make_unique<CompanionRigController>(this);
+    // Transverter-Einstellung geaendert (Versatz, Fenster, RX-Verstaerkung):
+    // der Pegelversatz kann sich damit aendern (2026-11-08).
+    connect(m_companionRig.get(), &CompanionRigController::versatzGeaendert,
+            this, &RadioModel::pruefeRxMeterOffset);
+    // Eine andere aktive Scheibe kann innerhalb oder ausserhalb des
+    // ZF-Fensters liegen.
+    connect(this, &RadioModel::activeSliceChanged,
+            this, [this](int) { pruefeRxMeterOffset(); });
     // 2026-05-12 bench fix: SpotTableModel ownership moved from
     // SpotHubDialog so it stays populated from app start.  Prior
     // behaviour: the table only existed once the user opened
@@ -3175,13 +3189,9 @@ void RadioModel::setStepAttController(StepAttenuatorController* c)
     // actually changed from the cached value, so we don't fire redundant
     // updates on every controller tick.
     if (c) {
-        auto recompute = [this]() {
-            const double v = rxMeterOffsetDb();
-            if (!qFuzzyCompare(1.0 + v, 1.0 + m_lastEmittedRxMeterOffsetDb)) {
-                m_lastEmittedRxMeterOffsetDb = v;
-                emit rxMeterOffsetChanged(v);
-            }
-        };
+        // Seit 2026-11-08 eine Methode: auch der Transverter (Einstellung,
+        // VFO ueber die Fenstergrenze) loest sie aus.
+        auto recompute = [this]() { pruefeRxMeterOffset(); };
         connect(c, &StepAttenuatorController::attenuationChanged,
                 this, [recompute](int) { recompute(); });
         connect(c, &StepAttenuatorController::preampModeChanged,
@@ -4015,7 +4025,9 @@ int RadioModel::maxSlices() const
 //   RXPreampOffset(1)  = step_att_enabled ? attenuator_data
 //                                         : preamp_offset[preamp_mode]
 //   RXCalibrationOffset(1) = _rx1_meter_cal_offset
-//                            (+ _rx1_xvtr_gain_offset deferred to XVTR epic)
+//                            + _rx1_xvtr_gain_offset (seit 2026-11-08: die
+//                              RX-Verstaerkung aus TransverterSetup, nur im
+//                              ZF-Fenster; siehe calibrationXvtr)
 //                            (+ _rx1_6m_gain_offset   deferred to 6m epic)
 //
 // _rx1_meter_cal_offset defaults to rxMeterCalOffsetDefaultFor(model)
@@ -4063,7 +4075,82 @@ double RadioModel::rxMeterOffsetDb() const
         }
     }
 
-    return static_cast<double>(preampOffset + meterCalOffset);
+    // Transverter (2026-11-08): seine RX-Verstaerkung kommt, wie bei
+    // Thetis, in den Kalibrierversatz -- nur solange der VFO in seinem
+    // ZF-Fenster steht. Siehe TransverterSetup::rxGainDb.
+    //   From Thetis console.cs:20997 [@852bf0e]:
+    //     fOffset = _rx1_meter_cal_offset + _rx1_xvtr_gain_offset + _rx1_6m_gain_offset;
+    //   From Thetis console.cs:31532-31534 [@852bf0e] (nur im Transverter-Band):
+    //     if (rx1_xvtr_index >= 0)
+    //         RX1XVTRGainOffset = XVTRForm.GetRXGain(rx1_xvtr_index);
+    //   GetRXGain liefert den negativen Eintrag (Thetis xvtr.cs:5605:
+    //   ret_val = -(float)rx_gain[index].Value), daher -rxGainDb.
+    const qint64 zf = m_activeSlice
+        ? static_cast<qint64>(m_activeSlice->frequency()) : 0;
+    const double transverter = TransverterSetup::current().pegelVersatzDb(zf);
+
+    return static_cast<double>(preampOffset + meterCalOffset) + transverter;
+}
+
+RadioModel::EichZiel RadioModel::eichZielFuer(double geraetHz) const
+{
+    const TransverterSetup t = TransverterSetup::current();
+    if (t.active() && t.coversIf(qRound64(geraetHz))) {
+        return EichZiel::Transverter;
+    }
+    if (qobject_cast<const P1RadioConnection*>(m_connection)
+        || qobject_cast<const P2RadioConnection*>(m_connection)) {
+        return EichZiel::Geraet;
+    }
+    return EichZiel::NurAnzeige;
+}
+
+bool RadioModel::uebernimmEichung(double geraetHz, double anzeigeHz, double wahrHz)
+{
+    switch (eichZielFuer(geraetHz)) {
+    case EichZiel::Transverter: {
+        TransverterSetup t = TransverterSetup::load();
+        t.loErrorKhz = std::clamp(t.loErrorFuer(qRound64(anzeigeHz), qRound64(wahrHz)),
+                                  -TransverterSetup::kLoErrorGrenzeKhz,
+                                  TransverterSetup::kLoErrorGrenzeKhz);
+        t.save();
+        // Laedt neu, legt es prozessweit ab und meldet versatzGeaendert:
+        // VFO-Zahl, Achse, Bandplan und Spots ziehen nach.
+        companionRig()->einstellungenGeaendert();
+        return true;
+    }
+    case EichZiel::Geraet: {
+        // Mit externem 10-MHz-Bezug nimmt Thetis den 10-MHz-Faktor, und
+        // eine Eichung am Traeger aendert nichts (setup.cs:14036-14050);
+        // dann wird nicht so getan, als ob.
+        if (m_calController.using10MHzRef()) { return false; }
+        m_calController.setFreqCorrectionFactor(FrequenzEichung::neuerFaktor(
+            m_calController.freqCorrectionFactor(), geraetHz, wahrHz));
+        m_calController.save();
+        return true;
+    }
+    case EichZiel::NurAnzeige:
+        break;
+    }
+    return false;
+}
+
+void RadioModel::pruefeRxMeterOffset()
+{
+    // Dieselben Anlaesse (Abstimmen, andere Scheibe, Transverter)
+    // fuehren auch die S9-Grenze nach -- an der ANTENNENfrequenz.
+    // From Thetis MeterManager.cs:4508 [@852bf0e]:
+    //   _rx1VHForAbove = newFreq >= _s9Frequency;
+    if (m_activeSlice) {
+        const qint64 antenne = TransverterSetup::current().rfFrequencyHz(
+            static_cast<qint64>(m_activeSlice->frequency()));
+        SMeter::setzeUeberGrenze(SMeter::ueberGrenze(antenne / 1.0e6));
+    }
+    const double v = rxMeterOffsetDb();
+    if (!qFuzzyCompare(1.0 + v, 1.0 + m_lastEmittedRxMeterOffsetDb)) {
+        m_lastEmittedRxMeterOffsetDb = v;
+        emit rxMeterOffsetChanged(v);
+    }
 }
 
 // ── Phase 3F Sub-Epic I: DDC stream pool ────────────────────────────────────
@@ -5653,6 +5740,13 @@ int RadioModel::addSlice(const QString& initialPanId, bool suppressAutoStreamBin
 {
     auto* slice = new SliceModel(this);
     slice->setSuppressAutoStreamBinding(suppressAutoStreamBinding);
+
+    // Ueber die Fenstergrenze des Transverters getunt: der Pegelversatz
+    // (seine RX-Verstaerkung) gilt nur im ZF-Fenster (2026-11-08). Hier
+    // und nicht in wireSliceSignals -- das kehrt ohne Funkgeraet um.
+    connect(slice, &SliceModel::frequencyChanged, this, [this, slice]() {
+        if (slice == m_activeSlice) { pruefeRxMeterOffset(); }
+    });
 
     // Phase 3F Sub-Epic I closeout, defect C3: lowest id not currently in
     // use, NOT m_slices.size().
@@ -7602,6 +7696,66 @@ void RadioModel::sendeFlexRauschsperre(bool an, double stufe0bis100)
         << "Flex: Rauschsperre " << (an ? "an" : "aus") << ", Stufe " << stufe;
 }
 
+// ── Auto-SQL (2026-11-08) ───────────────────────────────────────────
+//
+// Warum und wie: FlexAutoRauschsperre.h. Hier nur der Anschluss --
+// der Pegel der Scheibe kommt aus dem Messwertstrom (zehnmal je
+// Sekunde), die Stufe geht ueber denselben Befehl hinaus wie der
+// Regler von Hand.
+void RadioModel::fuehreFlexAutoSqlNach(double dbm, qint64 jetztMs)
+{
+    // Beim Senden misst die Scheibe nicht das Band. AetherSDR prueft
+    // dafuer m_transmitting (SpectrumWidget.cpp:4600 [@d58e2b8a]).
+    if (m_flexSendetGerade) { return; }
+    m_flexAutoSql.messung(dbm, jetztMs);
+    if (m_flexAutoSqlAn) { sendeFlexAutoStufe(jetztMs); }
+}
+
+void RadioModel::sendeFlexAutoStufe(qint64 jetztMs)
+{
+    const auto stufe = m_flexAutoSql.faellig(jetztMs);
+    if (!stufe) { return; }
+    const double rausch = m_flexAutoSql.rauschDbm().value_or(0.0);
+    qCInfo(lcConnection).nospace()
+        << "Flex: Auto-SQL — Rauschen " << rausch << " dBm + "
+        << m_flexAutoSql.marge() << " dB → Stufe " << *stufe
+        << " (" << FlexAutoRauschsperre::dbmFuerStufe(*stufe) << " dBm)";
+    emit flexAutoRauschsperreGestellt(rausch, *stufe);
+    sendeFlexRauschsperre(true, *stufe);
+}
+
+void RadioModel::setFlexAutoRauschsperre(bool an)
+{
+    if (an == m_flexAutoSqlAn) { return; }
+    m_flexAutoSqlAn = an;
+    qCInfo(lcConnection) << "Flex: Auto-SQL" << (an ? "an" : "aus");
+    if (!an) { return; }
+    // Sofort die erste Stufe, wenn schon gemessen ist -- gemessen wird
+    // auch bei ausgeschalteter Automatik, also meist ja. Sonst kommt
+    // sie mit der zehnten Probe, eine Sekunde spaeter.
+    m_flexAutoSql.neuSenden();
+    sendeFlexAutoStufe(QDateTime::currentMSecsSinceEpoch());
+}
+
+void RadioModel::setFlexAutoMarge(int db)
+{
+    const int vorher = m_flexAutoSql.marge();
+    m_flexAutoSql.setMarge(db);
+    if (m_flexAutoSql.marge() == vorher) { return; }
+    FlexAutoRauschsperre::speichereMarge(m_flexAutoSql.marge());
+    // Nicht auf die naechste Probe warten: wer am Regler zieht, soll
+    // die Wirkung sofort hoeren (setMarge hat neuSenden gesetzt).
+    if (m_flexAutoSqlAn) { sendeFlexAutoStufe(QDateTime::currentMSecsSinceEpoch()); }
+}
+
+void RadioModel::flexAutoSqlNeuMessen(const char* grund)
+{
+    m_flexAutoSql.zuruecksetzen();
+    if (m_flexAutoSqlAn) {
+        qCInfo(lcConnection) << "Flex: Auto-SQL misst neu —" << grund;
+    }
+}
+
 // ── Die uebrigen Regler der Scheibe (2026-11-01) ───────────────────
 //
 // Derselbe Grund wie bei der Rauschsperre, nur breiter:
@@ -7868,6 +8022,15 @@ bool RadioModel::flexTasten(bool tasten)
         // Jedes einzeln melden: „es sendet nicht" ohne Grund hat am
         // 2026-10-22 einen Abend gekostet, als das Abstimmen still ins
         // Leere lief.
+        //
+        // Davor ein viertes, das nichts mit der Maschine zu tun hat:
+        // haengt sie am Empfangsausgang des Transverters (IFo2), darf sie
+        // gar nicht senden (2026-11-08, TransverterSetup::nurEmpfang).
+        if (TransverterSetup::current().sperrtSenden()) {
+            qCWarning(lcConnection)
+                << "Flex: nicht getastet — Transverter steht auf nur Empfang (IFo2)";
+            return false;
+        }
         if (m_flexSendescheibenId.isEmpty()) {
             qCWarning(lcConnection)
                 << "Flex: nicht getastet — keine Sendescheibe gesetzt";
@@ -8007,6 +8170,13 @@ bool RadioModel::flexAbstimmen(bool an)
         << ", darf senden " << m_flexDarfSenden;
     if (!m_flexConnection || !m_flexConnection->isConnected()) {
         qCWarning(lcConnection) << "Flex: nicht abgestimmt — keine Verbindung";
+        return false;
+    }
+    // Am Empfangsausgang des Transverters ist auch der Abstimmtraeger
+    // Senden (2026-11-08) -- siehe `flexTasten`.
+    if (an && TransverterSetup::current().sperrtSenden()) {
+        qCWarning(lcConnection)
+            << "Flex: nicht abgestimmt — Transverter steht auf nur Empfang (IFo2)";
         return false;
     }
     // Dieselbe Trennung wie beim Tasten: nur ein gehoertes Nein ist
@@ -8624,6 +8794,7 @@ void RadioModel::startFlexStreams()
                 if (const auto wert = FlexVita::meterScaled(s.raw, def.second)) {
                     m_flexPegelDbm     = *wert;
                     m_flexPegelStempel = jetzt;
+                    fuehreFlexAutoSqlNach(*wert, jetzt);
                 }
                 break;
             }
@@ -8997,6 +9168,14 @@ void RadioModel::tuneFlexSlice(double hz)
     if (befehl.isEmpty()) { return; }
     m_flexConnection->sendCommand(befehl);
 
+    // Auto-SQL: an einer anderen Stelle des Bandes (oder auf einem
+    // anderen Band) rauscht es anders. Wer nur ein Stueck weiterdreht,
+    // behaelt seine Messung; erst ein Sprung misst neu.
+    if (std::abs(hz - m_flexAutoSqlBezugHz) > 20000.0) {
+        m_flexAutoSqlBezugHz = hz;
+        flexAutoSqlNeuMessen("Sprung der Frequenz");
+    }
+
     // ── Und das Bild mitnehmen, wenn die Scheibe hinauslaeuft ───────
     //
     // `autopan=0` oben haelt das Bild beim Drehen ruhig — unser
@@ -9084,6 +9263,7 @@ void RadioModel::setFlexSliceMode(DSPMode mode)
         FlexCommandWire::setSliceModeCommand(m_flexSliceId, name);
     if (befehl.isEmpty()) { return; }
     m_flexConnection->sendCommand(befehl);
+    flexAutoSqlNeuMessen("andere Betriebsart");
 }
 
 void RadioModel::setFlexSliceFilter(int lowHz, int highHz)
@@ -9105,6 +9285,9 @@ void RadioModel::setFlexSliceFilter(int lowHz, int highHz)
         FlexCommandWire::setSliceFilterCommand(m_flexSliceId, lowHz, highHz);
     if (befehl.isEmpty()) { return; }
     m_flexConnection->sendCommand(befehl);
+    // Ein breiterer Durchlass rauscht lauter (6 kHz gegen 2,7 kHz sind
+    // 3,5 dB) -- mit der alten Messung laege die Schwelle zu tief.
+    flexAutoSqlNeuMessen("andere Flanken");
 }
 
 void RadioModel::setFlexSliceNoise(bool nr, bool nb, bool anf)
@@ -11787,10 +11970,14 @@ void RadioModel::connectToRadio(const RadioInfo& info)
     }
 
     // Wire CalibrationController to P2RadioConnection so hzToPhaseWord()
-    // applies effectiveFreqCorrectionFactor(). P1 uses raw Hz (not phase words),
-    // so P1 doesn't need this. Phase 3P-G.
+    // applies effectiveFreqCorrectionFactor(). Phase 3P-G.
+    // P1 ebenso (2026-11-08): hier stand "P1 uses raw Hz, so P1 doesn't need
+    // this" -- falsch, Thetis korrigiert die Hz genauso (NetworkIO.cs
+    // VFOfreq), sonst wirkt die Frequenzeichung an P1-Geraeten nicht.
     if (auto* p2 = qobject_cast<class P2RadioConnection*>(m_connection)) {
         p2->setCalibrationController(&m_calController);
+    } else if (auto* p1 = qobject_cast<class P1RadioConnection*>(m_connection)) {
+        p1->setCalibrationController(&m_calController);
     }
 
     // Wire IoBoardHl2 so P1CodecHl2 can dequeue I2C transactions into C&C
@@ -13131,6 +13318,18 @@ void RadioModel::installBandPlanMoxCheck()
         if (m_lastRadioInfo.protocol == ProtocolVersion::CatRig) {
             return {false, QStringLiteral("%1 transmits at the rig, not from Longpath")
                                .arg(m_lastRadioInfo.name)};
+        }
+        // ── Am Empfangsausgang des Transverters (2026-11-08) ─────────
+        //
+        // Vor der Bandkante, nicht danach: die Bandkante wuerde 28,300
+        // als 144,300 freigeben, und genau das ist hier falsch -- der
+        // Anschluss dieses Geraets haengt an IFo2, einem EMPFANGSausgang.
+        // Siehe TransverterSetup::nurEmpfang.
+        if (TransverterSetup::current().sperrtSenden()) {
+            return {false, QStringLiteral(
+                "Transverter is set to receive only (IFo2): this radio "
+                "feeds the panadapter and must not transmit "
+                "(Setup → Companion rig → Transverter)")};
         }
 
         // ── The guard was reading a key nobody wrote ──────────────────
@@ -18115,7 +18314,15 @@ QStringList RadioModel::txProfilesList() const
 // persistence are added.
 double RadioModel::calibrationMeter(int rx) const     { (void)rx; return 0.0; }
 double RadioModel::calibrationDisplay(int rx) const   { (void)rx; return 0.0; }
-double RadioModel::calibrationXvtr(int rx) const      { (void)rx; return 0.0; }
+// Seit 2026-11-08 kein Stummel mehr: der Versatz, den rxMeterOffsetDb
+// fuer RX1 einrechnet (Thetis _rx1_xvtr_gain_offset). RX2 fuehrt Longpath
+// ohne eigenen Transverter -- dort 0 wie bisher.
+double RadioModel::calibrationXvtr(int rx) const
+{
+    if (rx != 0) { return 0.0; }
+    const qint64 zf = m_activeSlice ? static_cast<qint64>(m_activeSlice->frequency()) : 0;
+    return TransverterSetup::current().pegelVersatzDb(zf);
+}
 double RadioModel::calibrationSixMeter(int rx) const  { (void)rx; return 0.0; }
 double RadioModel::calibrationTxDisplay(int rx) const { (void)rx; return 0.0; }
 

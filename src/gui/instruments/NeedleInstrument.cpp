@@ -349,7 +349,7 @@ void NeedleInstrument::paintInto(QPainter& painter, QSize forSize, bool bare)
     QPainter& p = painter;
     p.setRenderHint(QPainter::Antialiasing, true);
 
-    const double f = d->fraction(m_value);
+    const double f = d->valueFraction(m_value);
     const QColor col = Instrument::valueColour(*d, m_value);
     const double thresholdF = d->threshold.has_value()
                                   ? d->fraction(d->threshold.value())
@@ -421,7 +421,7 @@ void NeedleInstrument::paintInto(QPainter& painter, QSize forSize, bool bare)
 
     // Nachlaufzeiger: ein kurzer Strich am äusseren Rand, matt.
     if (m_peak.enabled() && m_peak.value() > m_value) {
-        Instrument::paintPeakNeedle(p, spine, d->fraction(m_peak.value()),
+        Instrument::paintPeakNeedle(p, spine, d->valueFraction(m_peak.value()),
                                     Instrument::measuredDim());
     }
 
@@ -432,7 +432,7 @@ void NeedleInstrument::paintInto(QPainter& painter, QSize forSize, bool bare)
     if (const ReadingDescriptor* d2 = m_hasSecond ? readingFor(m_secondary)
                                                   : nullptr) {
         if (d2->hasScale) {
-            Instrument::paintNeedle(p, spine, d2->fraction(m_secondValue),
+            Instrument::paintNeedle(p, spine, d2->valueFraction(m_secondValue),
                                     Instrument::measuredDim(),
                                     Instrument::NeedleWeight::Secondary,
                                     /*withEdge=*/false);

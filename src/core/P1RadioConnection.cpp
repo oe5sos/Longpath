@@ -260,6 +260,7 @@ mw0lge@grange-lane.co.uk
 // Migrated to VS2026 - 18/12/25 MW0LGE v2.10.3.12
 
 #include "P1RadioConnection.h"
+#include "CalibrationController.h"
 #include "SendeFehler.h"
 #include "LogCategories.h"
 #include "OcMatrix.h"
@@ -2366,6 +2367,11 @@ void P1RadioConnection::selectCodec()
 // Called by RadioModel::connectToRadio() on the main thread before the
 // connection thread is started, so no synchronisation is needed.
 // ---------------------------------------------------------------------------
+void P1RadioConnection::setCalibrationController(const CalibrationController* cal)
+{
+    m_calController = cal;
+}
+
 void P1RadioConnection::setOcMatrix(const OcMatrix* matrix)
 {
     m_ocMatrix = matrix;
@@ -2604,8 +2610,21 @@ CodecContext P1RadioConnection::buildCodecContext() const
     // to claim. Bank 10 C4 is the Alex0 word, and Alex0 carries the receive
     // selection while unkeyed (netInterface.c:705-717 [v2.10.3.15]).
     ctx.alexLpfBits    = effectiveAlexLpfBits();
-    ctx.txFreqHz       = m_txFreqHz;
-    for (int i = 0; i < 7; ++i) { ctx.rxFreqHz[i]   = m_rxFreqHz[i]; }
+    // Frequenzkorrektur auf jede ausgehende VFO-Frequenz, wie Thetis:
+    //   From Thetis Project Files/Source/Console/HPSDR/NetworkIO.cs:219 [@852bf0e]:
+    //     f_freq = (int)((f * 1e6) * _freq_correction_factor);
+    //   (P1 = RadioProtocol.USB: "sending freq Hz to firmware", :221-222)
+    // Abgeschnitten wie dort; bei 1.0 unveraendert.
+    {
+        const double faktor = m_calController
+            ? m_calController->effectiveFreqCorrectionFactor() : 1.0;
+        auto korrigiert = [faktor](quint64 hz) -> quint64 {
+            if (faktor == 1.0) { return hz; }
+            return static_cast<quint64>(static_cast<double>(hz) * faktor);
+        };
+        ctx.txFreqHz = korrigiert(m_txFreqHz);
+        for (int i = 0; i < 7; ++i) { ctx.rxFreqHz[i] = korrigiert(m_rxFreqHz[i]); }
+    }
     for (int i = 0; i < 3; ++i) { ctx.rxStepAttn[i] = m_stepAttn[i]; }
     // m_txStepAttn is a single int; broadcast to all 3 ADCs (HL2 codec
     // only uses index 0). Standard codec uses a separate path for

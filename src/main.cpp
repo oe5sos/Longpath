@@ -1,5 +1,7 @@
 #include "gui/FensterKnoepfe.h"
 #include "core/StartWatch.h"
+#include "core/SingleInstanceGuard.h"
+#include "gui/MacFloatingWindowBehavior.h"
 
 #include <QTimer>
 #include "gui/MainWindow.h"
@@ -41,6 +43,8 @@
 #include <execinfo.h>   // backtrace() for the null-widget diagnostic
 #endif
 #include <QCommandLineParser>
+#include <QFileInfo>
+#include <QProcess>
 #include <QIcon>
 #include <QStyleFactory>
 #include <QDir>
@@ -176,6 +180,26 @@ static QString extractProfileFromArgv(int argc, char* argv[])
     }
     return {};
 }
+
+namespace {
+// Den neueren Bau starten, sobald DIESER Prozess ganz weg ist (2026-11-08)
+// -- erst dann sind TCI-, rigctld-Port und die Cluster-Sitzung frei. Nach
+// app.exec() laeuft bei Cmd+Q nichts mehr (siehe closeEvent), darum ein
+// kleiner Waechter, der auf das Ende dieser Prozessnummer wartet.
+void starteNachDemEnde(const QString& program)
+{
+    const QStringList args = QCoreApplication::arguments().mid(1);
+#ifdef Q_OS_UNIX
+    QStringList sh = {QStringLiteral("-c"),
+        QStringLiteral("while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; shift; exec \"$@\""),
+        QStringLiteral("longpath-neustart"),
+        QString::number(QCoreApplication::applicationPid()), program};
+    sh += args;
+    if (QProcess::startDetached(QStringLiteral("/bin/sh"), sh)) { return; }
+#endif
+    QProcess::startDetached(program, args);
+}
+} // namespace
 
 int main(int argc, char* argv[])
 {
@@ -600,6 +624,19 @@ int main(int argc, char* argv[])
     // bevor irgendetwas Gespeichertes geladen wird. Bleibt Longpath
     // beim Hochfahren stecken, findet der naechste Start sie vor.
     // Siehe core/StartWatch.h.
+    // Ein Longpath je Einstellungsordner (2026-11-08): ein zweiter Start
+    // holt den laufenden nach vorne -- oder laesst ihn, wenn er ein anderer
+    // Bau ist, in diesen neu starten -- und endet. VOR dem Startwaechter:
+    // ein abgewiesener Start soll keine Startmarke hinterlassen.
+    Longpath::SingleInstanceGuard instanzSperre(
+        QFileInfo(Longpath::AppSettings::instance().filePath()).absolutePath());
+    if (!instanzSperre.tryAcquire()) {
+        qInfo().noquote() << QStringLiteral(
+            "Longpath laeuft schon -- die laufende Instanz kommt nach vorne "
+            "(oder startet in diesen Bau neu); dieser Start endet hier.");
+        return 0;
+    }
+
     const int steckengebliebeneStarts = Longpath::StartWatch::beginStart();
     if (steckengebliebeneStarts > 0) {
         qInfo().noquote() << QStringLiteral(
@@ -630,6 +667,27 @@ int main(int argc, char* argv[])
 
         Longpath::MainWindow window;
         const qint64 nachKonstruktor = startUhr.elapsed();
+
+        // Zweiter Start desselben Baus: nach vorne. Ein anderer Bau (gebaut
+        // und gestartet, waehrend dieser lief): ordentlich beenden und den
+        // gestarteten Bau starten, sobald dieser Prozess weg ist.
+        QObject::connect(&instanzSperre, &Longpath::SingleInstanceGuard::activateRequested,
+                         &window, [&window]() {
+            window.setWindowState((window.windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
+            window.show();
+            window.raise();
+            Longpath::activateThisApplication();
+            window.activateWindow();
+        });
+        QObject::connect(&instanzSperre, &Longpath::SingleInstanceGuard::newerBuildStarted,
+                         &window, [&window](const QString& program) {
+            const QString ziel = program.isEmpty() ? QCoreApplication::applicationFilePath()
+                                                   : program;
+            qInfo().noquote() << QStringLiteral("Ein anderer Bau wurde gestartet -- Neustart in")
+                              << ziel;
+            starteNachDemEnde(ziel);
+            window.close();
+        });
 
         window.show();
         const qint64 nachShow = startUhr.elapsed();

@@ -257,6 +257,7 @@ public:
     class KiwiSdrManager* kiwiSdrManagerForTest() const
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
+    class InstrumentApplet* signalInstrumentForTest() const;
     class ContestFenster* contestFensterForTest() const { return m_contestFenster; }
     QByteArray layoutprofilAlsJsonForTest(const QString& name) { return layoutprofilAlsJson(name); }
     void holeContestInsKombiFeldForTest(const QString& id, bool zweites = false)
@@ -760,6 +761,12 @@ private slots:
     /// on a functor target, it refuses the connect outright and returns an
     /// invalid Connection. As a lambda this signal was not connected at all.
     void onNotchCreateFromPan(double freqHz, bool narrow);
+    // Einmessen an einem Traeger (2026-11-08): Ergebnis der Messung eines
+    // Panadapters -> Dialog (TraegerEichDialog).
+    void zeigeTraegerEichung(bool gefunden, double geraetHz, double anzeigeHz,
+                             float snrDb);
+    // Rundum-Lauf (2026-11-08): Tools -> Rotor sweep.
+    void oeffneRundumLauf();
     void onNotchCreateRequested(const QString& panId, double freqHz, bool narrow);
     void onNotchMoveRequested(int id, double newFreqHz);
     void onNotchWidthRequested(int id, double widthHz);
@@ -2168,6 +2175,7 @@ private:
     /// nie die Maschine.
     QMetaObject::Connection m_flexSqlAnBand;
     QMetaObject::Connection m_flexSqlStufeBand;
+    QMetaObject::Connection m_flexSqlAutoBand;
     /// Die uebrigen Regler der Scheibe -- aus demselben Grund eigene
     /// Baender: am Flex laeuft `wireSliceSignals` nicht.
     QMetaObject::Connection m_flexAgcBand;
@@ -2580,9 +2588,16 @@ private:
     /// Die beiden Zeiger-/Balkeninstrumente (2026-08-17). Sie hängen an
     /// MeterPoller::readingUpdated, also am selben Umlauf wie die
     /// Meter-Items.
-    class FrequencyApplet*  m_frequencyApplet{nullptr};
-    class InstrumentApplet* m_swrInstrument{nullptr};
-    class InstrumentApplet* m_signalInstrument{nullptr};
+    ///
+    /// QPointer, nicht roh (2026-11-08): closeEvent loescht die
+    /// schwebenden Applet-Fenster samt Applet, und bis quit() laeuft die
+    /// Ereignisschleife weiter -- ein Meter-Takt danach traf das
+    /// geloeschte S-Meter (Absturzbericht 12:35, NeedleInstrument::
+    /// onReading mit this = 0, 57 ms nach closeEvent).
+    QPointer<class FrequencyApplet>  m_frequencyApplet;
+    QPointer<class InstrumentApplet> m_swrInstrument;
+    QPointer<class InstrumentApplet> m_signalInstrument;
+    QPointer<class RundumDialog>     m_rundumDialog;   // Rundum-Lauf (2026-11-08)
     // Betreiber 2026-09-03: "leider funktioniert die Frequenzanzeige
     // nicht im S-Meter" -- die urspruengliche Verdrahtung (buildUI())
     // lief EINMAL gegen die beim Start aktive Scheibe; ein frisches

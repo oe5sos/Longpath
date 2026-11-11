@@ -172,6 +172,10 @@ private:
     QCheckBox* m_gradientToggle{nullptr};    // S14 gradient enabled
     QCheckBox* m_softEdgeToggle{nullptr};    // weiche Kante an der Kurve
     QCheckBox* m_haloToggle{nullptr};        // Hof um die lebende Kurve
+    // Schaerfe (2026-11-08), siehe SpectrumWidget::setWaterfallDevicePixels
+    QCheckBox* m_wfFullResToggle{nullptr};   // Wasserfall in Geraete-Pixeln
+    QCheckBox* m_hairlineToggle{nullptr};    // Raster als Haarlinie
+    QCheckBox* m_shortEdgeToggle{nullptr};   // kurze Kurvenkante (0,5 statt 1,0)
 
     // Section: Colors moved to Setup → Appearance → Colors & Theme (S11/S12/S13).
 

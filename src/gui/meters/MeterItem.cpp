@@ -108,6 +108,7 @@ mw0lge@grange-lane.co.uk
 
 #include "MeterItem.h"
 #include "MeterPoller.h"  // MeterBinding namespace
+#include "core/SMeterSkala.h"
 
 #include <QPainter>
 #include <QMouseEvent>
@@ -185,13 +186,37 @@ QString readingName(int bindingId)
 //      is preserved here for accuracy; both agree to <1% across the ham-band
 //      signal range.
 // ---------------------------------------------------------------------------
-QString MeterItem::formatValue(float dBm, MeterUnit unit, bool decimal)
+// ---------------------------------------------------------------------------
+// MeterItem::sVersatz — die Lesung rueckt ueber der S9-Grenze (2026-11-08)
+//
+// From Thetis MeterManager.cs:41049-41052 [@852bf0e] (getPerc):
+//   if (mi.ReadingSource == Reading.SIGNAL_STRENGTH || mi.ReadingSource == Reading.AVG_SIGNAL_STRENGTH)
+//   {
+//       value += MeterManager.dbmOffsetForAboveS9Frequency(_rx);
+//   }
+// Max Bin rueckt mit (Abweichung, begruendet in ReadingSource.h).
+// Die Kennung fuehrt RadioModel nach (core/SMeterSkala).
+// ---------------------------------------------------------------------------
+float MeterItem::sVersatz() const
+{
+    switch (m_bindingId) {
+    case MeterBinding::SignalPeak:
+    case MeterBinding::SignalAvg:
+    case MeterBinding::SignalMaxBin:
+        return SMeter::versatzUeberGrenze();
+    default:
+        return 0.0f;
+    }
+}
+
+QString MeterItem::formatValue(float dBm, MeterUnit unit, bool decimal,
+                               float sVersatzDb)
 {
     switch (unit) {
         case MeterUnit::S: {
             // IARU S-meter: S9 = -73 dBm, 6 dB/S-unit
             // From Thetis console.cs getMeterData dBm→S conversion [v2.10.3.13]
-            const float diff = dBm - (-73.0f);
+            const float diff = dBm + sVersatzDb - (-73.0f);
             const int sUnits = qBound(0, qRound(9.0f + diff / 6.0f), 19);
             if (sUnits <= 9) {
                 return QStringLiteral("S%1").arg(sUnits);
@@ -453,6 +478,9 @@ void BarItem::addScaleCalibration(double value, float normalizedX)
 
 float BarItem::valueToNormalizedX(double value) const
 {
+    // Signal-Lesungen ruecken ueber der S9-Grenze (Thetis getPerc, siehe
+    // MeterItem::sVersatz). Die Kalibrierpunkte bleiben, wie sie sind.
+    value += static_cast<double>(sVersatz());
     // Empty calibration: fall back to linear minVal..maxVal mapping. This
     // preserves pre-A4 behavior for every Filled/Edge preset.
     if (m_scaleCalibration.isEmpty()) {
@@ -623,7 +651,7 @@ void BarItem::paint(QPainter& p, int widgetW, int widgetH)
             // Task 3.2 — unit-mode fan-out: signal-level bars route through
             // formatValue so the MultimeterPage unit combo drives the readout.
             const QString s = formatValue(static_cast<float>(m_smoothedValue),
-                                          m_unitMode, m_showDecimal);
+                                          m_unitMode, m_showDecimal, sVersatz());
             p.drawText(rect.left() + 2,
                        rect.top() + fm.ascent(),
                        s);
@@ -631,7 +659,8 @@ void BarItem::paint(QPainter& p, int widgetW, int widgetH)
         if (m_showPeakValue) {
             const QString s = std::isfinite(m_peakValue)
                 // Task 3.2 — peak value also routed through formatValue
-                ? formatValue(static_cast<float>(m_peakValue), m_unitMode, m_showDecimal)
+                ? formatValue(static_cast<float>(m_peakValue), m_unitMode, m_showDecimal,
+                              sVersatz())
                 : QStringLiteral("--");
             p.setPen(peakFontColour());
             const int w = fm.horizontalAdvance(s);
@@ -1241,7 +1270,8 @@ void TextItem::paint(QPainter& p, int widgetW, int widgetH)
         if (m_suffix == QStringLiteral(" dBm") &&
             (m_unitMode == MeterUnit::S || m_unitMode == MeterUnit::uV))
         {
-            text = formatValue(static_cast<float>(m_value), m_unitMode, m_showDecimal);
+            text = formatValue(static_cast<float>(m_value), m_unitMode, m_showDecimal,
+                               sVersatz());
         } else {
             // Honor m_showDecimal for dBm mode — matches Thetis
             // chkDisplayMeterShowDecimal [v2.10.3.13]
@@ -1351,12 +1381,15 @@ void NeedleItem::setValue(double v)
     // returns the first calibration point — the symptom was every
     // calibrated needle drawing as a near-horizontal line at the
     // offset row.
+    // Die Grenzen gelten der ANZEIGE: ueber der S9-Grenze liegt S0 bei
+    // -147 dBm, nicht bei -127 (sVersatz, Thetis ZeroReading :2025-2028).
+    const float sv = sVersatz();
     if (m_scaleCalibration.isEmpty()) {
-        m_smoothedDbm = std::clamp(m_smoothedDbm, kS0Dbm, kMaxDbm);
+        m_smoothedDbm = std::clamp(m_smoothedDbm, kS0Dbm - sv, kMaxDbm - sv);
     } else {
         const float minKey = m_scaleCalibration.firstKey();
         const float maxKey = m_scaleCalibration.lastKey();
-        m_smoothedDbm = std::clamp(m_smoothedDbm, minKey, maxKey);
+        m_smoothedDbm = std::clamp(m_smoothedDbm, minKey - sv, maxKey - sv);
     }
 
     // Peak tracking (from AetherSDR Medium preset: 500ms hold, 10 dB/sec decay)
@@ -1477,7 +1510,7 @@ void NeedleItem::paint(QPainter& p, int widgetW, int widgetH)
     const float cy = rect.top() + ph + radius - ph * kCenterYRatio;
     const float pivotY = rect.top() + ph + 6.0f;
 
-    const float frac = dbmToFraction(m_smoothedDbm);
+    const float frac = dbmToFraction(m_smoothedDbm + sVersatz());
     const float angleRad = qDegreesToRadians(kArcEndDeg - frac * (kArcEndDeg - kArcStartDeg));
     const float tipDist = radius + 14.0f;
     const float tipX = cx + tipDist * std::cos(angleRad);
@@ -1590,7 +1623,8 @@ void NeedleItem::emitVertices(QVector<float>& verts, int widgetW, int widgetH)
         // Tip: calibrated normalized position for the current value,
         // then apply per-axis radius ratio and length factor as an
         // offset from the pivot.
-        const QPointF tipNorm = calibratedPosition(static_cast<float>(m_smoothedDbm));
+        const QPointF tipNorm = calibratedPosition(static_cast<float>(m_smoothedDbm)
+                                                   + sVersatz());
         const float dxN = (static_cast<float>(tipNorm.x()) - static_cast<float>(m_needleOffset.x()))
                         * static_cast<float>(m_radiusRatio.x()) * m_lengthFactor;
         const float dyN = (static_cast<float>(tipNorm.y()) - static_cast<float>(m_needleOffset.y()))
@@ -1606,7 +1640,7 @@ void NeedleItem::emitVertices(QVector<float>& verts, int widgetW, int widgetH)
         pivotX = arcCx;
         pivotY = rect.top() + ph + 6.0f;
 
-        const float frac = dbmToFraction(m_smoothedDbm);
+        const float frac = dbmToFraction(m_smoothedDbm + sVersatz());
         const float angleDeg = kArcEndDeg - frac * (kArcEndDeg - kArcStartDeg);
         const float angleRad = qDegreesToRadians(angleDeg);
 
@@ -1678,7 +1712,7 @@ void NeedleItem::emitVertices(QVector<float>& verts, int widgetW, int widgetH)
     // Phase 3G-6 block 2: calibration mode (TX power/SWR/etc.) has no
     // peak marker — skip emitting the triangle entirely.
     if (!calibrated && m_peakDbm > m_smoothedDbm + 1.0f) {
-        const float peakFrac = dbmToFraction(m_peakDbm);
+        const float peakFrac = dbmToFraction(m_peakDbm + sVersatz());
         const float peakAngleDeg = kArcEndDeg - peakFrac * (kArcEndDeg - kArcStartDeg);
         const float peakAngleRad = qDegreesToRadians(peakAngleDeg);
 
@@ -1832,7 +1866,7 @@ void NeedleItem::paintOverlayDynamic(QPainter& p, int widgetW, int widgetH)
     // S-unit text (left, cyan) — from AetherSDR SMeterWidget.cpp line 533
     // AetherSDR uses drawText(x, topY, text) where topY is the baseline.
     // QPointF overload also treats Y as baseline — pass topY directly, no ascent offset.
-    const QString sText = sUnitsText(m_smoothedDbm);
+    const QString sText = sUnitsText(m_smoothedDbm + sVersatz());
     // War das abgeschaffte Tuerkis (#00b4d8) -- ein Messwert, Betreiber
     // 2026-09-05: wie HGauge.cpp auf die Bernstein-Rolle "measured".
     p.setPen(QColor(Style::role("measured", Style::kAmberText)));
@@ -1845,7 +1879,7 @@ void NeedleItem::paintOverlayDynamic(QPainter& p, int widgetW, int widgetH)
     const QString dbmText = (m_unitMode == MeterUnit::dBm)
         ? (QString::number(static_cast<int>(std::round(m_smoothedDbm)))
            + QStringLiteral(" dBm"))
-        : formatValue(m_smoothedDbm, m_unitMode, m_showDecimal);
+        : formatValue(m_smoothedDbm, m_unitMode, m_showDecimal, sVersatz());
     p.setPen(QColor(0xc8, 0xd8, 0xe8));
     const int dbmW = valFm.horizontalAdvance(dbmText);
     p.drawText(QPointF(rect.right() - dbmW - 6.0f, topY), dbmText);
