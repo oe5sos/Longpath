@@ -583,6 +583,64 @@ private slots:
         QVERIFY(!karte.isFullScreen());
     }
 
+    // Die Jagdliste: nur was fehlt, in der richtigen Reihenfolge, und
+    // die Peilungsspalte dreht statt anzurufen.
+    void dieJagdlisteZeigtNurDieLuecken()
+    {
+        QsoMapWindow karte;
+        karte.resize(1400, 800);
+        karte.imagery()->setNetworkEnabled(false);
+        karte.setHomeGrid(QStringLiteral("JN67VV"));
+        karte.setEntries(kleinesLog());
+        QDateTime uhr(QDate(2026, 11, 11), QTime(6, 0, 0), QTimeZone::UTC);
+        karte.setUhrForTest([&uhr]() { return uhr; });
+        karte.jagdButtonForTest()->setChecked(true);
+        // Ohne „FT8 only": sonst zaehlt das SSB-QSO in JO31 nicht und
+        // JO31 waere auf 40 m eine Luecke statt einer fehlenden QSL.
+        karte.nurFt8ForTest()->setChecked(false);
+
+        // JO31 ist auf 40 m gearbeitet, aber nicht bestaetigt (kleinesLog),
+        // KO02 ist nie gearbeitet. Beide senden.
+        karte.nimmFt8(gehoert(QStringLiteral("SP9XYZ"), QStringLiteral("KO02"), uhr,
+                              -10, false, QStringLiteral("40m")));
+        karte.nimmFt8(gehoert(QStringLiteral("DL1ABC"), QStringLiteral("JO31"), uhr,
+                              -10, false, QStringLiteral("40m")));
+        // JN78 ist auf 20 m bestaetigt -- wer von dort sendet, gehoert
+        // auf gar keine Liste, deren Zweck die Luecke ist.
+        karte.nimmFt8(gehoert(QStringLiteral("OE3RPU"), QStringLiteral("JN78"), uhr));
+
+        QTableWidget* liste = karte.jagdListeForTest();
+        QVERIFY(liste != nullptr);
+        QStringList rufe;
+        for (int r = 0; r < liste->rowCount(); ++r) {
+            rufe << liste->item(r, 0)->data(Qt::UserRole).toString();
+        }
+        QVERIFY2(!rufe.contains(QStringLiteral("OE3RPU")),
+                 qPrintable(QStringLiteral("bestaetigt gehoert nicht in die "
+                                           "Liste: %1").arg(rufe.join(QLatin1Char(' ')))));
+        QVERIFY(rufe.contains(QStringLiteral("SP9XYZ")));
+        // Die fehlende Luecke steht VOR der fehlenden QSL.
+        QVERIFY2(rufe.indexOf(QStringLiteral("SP9XYZ"))
+                     < rufe.indexOf(QStringLiteral("DL1ABC")),
+                 qPrintable(rufe.join(QLatin1Char(' '))));
+
+        // Ein Doppelklick in die Peilungsspalte dreht, statt anzurufen.
+        QSignalSpy dreh(&karte, &QsoMapWindow::rotorZielGewuenscht);
+        const int zeile = rufe.indexOf(QStringLiteral("SP9XYZ"));
+        QVERIFY(zeile >= 0);
+        QTableWidgetItem* az = liste->item(zeile, 4);
+        QVERIFY(az != nullptr);
+        QVERIFY2(az->data(Qt::UserRole).isValid(),
+                 "ohne Peilung kann die Spalte nichts drehen");
+        emit liste->itemDoubleClicked(az);
+        QCOMPARE(dreh.count(), 1);
+        QCOMPARE(dreh.at(0).at(1).toString(), QStringLiteral("SP9XYZ"));
+
+        // Der Jagdmodus legt `FT8 only` um und merkt es sich; wer ihn
+        // angelassen stehen laesst, veraendert den naechsten Prueflauf.
+        karte.jagdButtonForTest()->setChecked(false);
+    }
+
     // ── Die Karte: Mosaik am Grid, Zaehler, Altern ──────────────────
     void karteZeigtMosaikZaehlerUndAltert()
     {

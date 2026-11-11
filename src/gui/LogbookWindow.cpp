@@ -1855,6 +1855,10 @@ void LogbookWindow::openMap()
                 [this](const QString& call, double lat, double lon, const QString& caption) {
             if (m_map && m_map->isVisible()) { m_map->flyToStation(call, lat, lon, caption); }
         });
+        connect(m_map, &QsoMapWindow::rotorZielGewuenscht, this,
+                [this](double grad, const QString& call) {
+            emit turnRotorRequested(grad, call);
+        });
     }
     prepareMap(m_map);
     m_map->setEntries(m_all);
@@ -2447,6 +2451,12 @@ void LogbookWindow::setMapPanelShown(bool on)
         applyRotorToMap();
         m_split->insertWidget(1, m_mapPanel);
         connect(m_mapPanel, &QsoMapWindow::popOutRequested, this, &LogbookWindow::openMap);
+        // Die Jagdliste darf die Antenne drehen -- das Kartenfenster
+        // kennt keinen Rotor, das Logbuch schon (2026-11-11).
+        connect(m_mapPanel, &QsoMapWindow::rotorZielGewuenscht, this,
+                [this](double grad, const QString& call) {
+            emit turnRotorRequested(grad, call);
+        });
         connect(m_detail, &QsoDetailPane::stationLocated, m_mapPanel,
                 [this](const QString& call, double lat, double lon, const QString& caption) {
             if (m_mapPanel && m_mapPanel->isVisibleTo(this)) {

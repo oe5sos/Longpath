@@ -238,6 +238,10 @@ public:
 
 signals:
     void popOutRequested();
+    /// Die Jagdliste bittet um eine Peilung. Das Kartenfenster kennt
+    /// keinen Rotor -- es sagt nur, wohin; das Logbuch reicht es an
+    /// seinen `turnRotorRequested` weiter.
+    void rotorZielGewuenscht(double grad, const QString& rufzeichen);
 
 protected:
     void closeEvent(QCloseEvent*) override;

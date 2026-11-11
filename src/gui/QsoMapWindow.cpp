@@ -204,16 +204,28 @@ void QsoMapWindow::fuelleJagdListe(const QVector<LivePunkt>& punkte)
 {
     if (m_jagdListe == nullptr) { return; }
 
-    // Nur, was fehlt. Wer schon im Logbuch steht, gehoert nicht auf
-    // eine Liste, deren ganzer Zweck die Luecke ist.
+    // „Erreicht UND bestaetigt" sind zwei Jagden (Betreiber 2026-11-11).
+    // Drei Raenge:
+    //   0  neues Land   -- noch nie gearbeitet
+    //   1  neues Feld   -- auf diesem Band noch nie gearbeitet
+    //   2  QSL fehlt    -- gearbeitet, aber nie bestaetigt. Das ist kein
+    //                     Funkproblem, sondern ein Papierproblem: hier
+    //                     hilft kein Anruf, sondern ein Hochladen oder
+    //                     eine Nachfrage. Darum unten und in Sand.
     QVector<LivePunkt> offen;
+    QHash<QString, int> rang;
     for (const LivePunkt& lp : punkte) {
-        if (lp.art == LiveArt::NeuesLand || lp.feldNeu) { offen.append(lp); }
+        int r = -1;
+        if (lp.art == LiveArt::NeuesLand)    { r = 0; }
+        else if (lp.feldNeu)                 { r = 1; }
+        else if (m_mosaik.stand(lp.feld, lp.g.band) == FeldStand::Gearbeitet) { r = 2; }
+        if (r < 0) { continue; }
+        rang.insert(lp.g.rufzeichen, r);
+        offen.append(lp);
     }
-    // Neues Land vor neuem Feld, dann der frischeste, dann der lauteste.
-    std::sort(offen.begin(), offen.end(), [](const LivePunkt& a, const LivePunkt& b) {
-        const int ra = a.art == LiveArt::NeuesLand ? 0 : 1;
-        const int rb = b.art == LiveArt::NeuesLand ? 0 : 1;
+    std::sort(offen.begin(), offen.end(), [&rang](const LivePunkt& a, const LivePunkt& b) {
+        const int ra = rang.value(a.g.rufzeichen, 9);
+        const int rb = rang.value(b.g.rufzeichen, 9);
         if (ra != rb) { return ra < rb; }
         if (a.alterSek != b.alterSek) { return a.alterSek < b.alterSek; }
         return a.g.snrDb > b.g.snrDb;
@@ -221,20 +233,30 @@ void QsoMapWindow::fuelleJagdListe(const QVector<LivePunkt>& punkte)
 
     m_jagdListe->setRowCount(offen.size());
     const QColor neu(Style::kJagdNeu);
+    const QColor sand(Style::kJagdFeldGearbeitet);
     const QColor leise(Style::kTextSecondary);
+    int fehlend = 0;
     for (int r = 0; r < offen.size(); ++r) {
         const LivePunkt& lp = offen.at(r);
+        const int rg = rang.value(lp.g.rufzeichen, 9);
+        const bool qsl = rg == 2;
+        if (!qsl) { ++fehlend; }
         const bool land = lp.art == LiveArt::NeuesLand;
         // Die Raute steht fuer ein neues Land -- dasselbe Zeichen wie
         // auf der Karte, damit Liste und Bild dieselbe Sprache sprechen.
         auto* ruf = new QTableWidgetItem(
             (land ? QStringLiteral("\u25c6 ") : QString{}) + lp.g.rufzeichen);
         ruf->setData(Qt::UserRole, lp.g.rufzeichen);
-        ruf->setForeground(neu);
+        ruf->setForeground(qsl ? sand : neu);
         QFont f = ruf->font();
-        f.setBold(true);
+        f.setBold(!qsl);
         ruf->setFont(f);
-        ruf->setToolTip(land
+        ruf->setToolTip(qsl
+            ? QStringLiteral("%1 — %2 is worked on %3 but never confirmed. "
+                             "Calling again will not change that: it needs a "
+                             "QSL, not a QSO.")
+                  .arg(lp.g.rufzeichen, lp.feld, lp.g.band)
+            : land
             ? QStringLiteral("%1 — %2, a country you have never worked")
                   .arg(lp.g.rufzeichen, lp.g.land.isEmpty()
                                             ? QStringLiteral("new DXCC")
@@ -243,8 +265,9 @@ void QsoMapWindow::fuelleJagdListe(const QVector<LivePunkt>& punkte)
                   .arg(lp.g.rufzeichen, lp.feld, lp.g.band));
         m_jagdListe->setItem(r, 0, ruf);
 
-        auto* feld = new QTableWidgetItem(lp.feld);
-        feld->setForeground(leise);
+        auto* feld = new QTableWidgetItem(
+            qsl ? lp.feld + QStringLiteral(" QSL?") : lp.feld);
+        feld->setForeground(qsl ? sand : leise);
         m_jagdListe->setItem(r, 1, feld);
 
         auto* snr = new QTableWidgetItem(QStringLiteral("%1").arg(lp.g.snrDb));
@@ -259,18 +282,39 @@ void QsoMapWindow::fuelleJagdListe(const QVector<LivePunkt>& punkte)
         km->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
         m_jagdListe->setItem(r, 3, km);
 
+        auto* az = new QTableWidgetItem(
+            lp.azimutGrad < 0.0 ? QStringLiteral("—")
+                                : QStringLiteral("%1").arg(qRound(lp.azimutGrad)));
+        az->setForeground(leise);
+        az->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        if (lp.azimutGrad >= 0.0) {
+            az->setData(Qt::UserRole, lp.azimutGrad);
+            az->setToolTip(QStringLiteral(
+                "Double-click to point the antenna at %1°").arg(qRound(lp.azimutGrad)));
+        }
+        m_jagdListe->setItem(r, 4, az);
+
         auto* alt = new QTableWidgetItem(QStringLiteral("%1s").arg(lp.alterSek));
         alt->setForeground(leise);
         alt->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        m_jagdListe->setItem(r, 4, alt);
+        m_jagdListe->setItem(r, 5, alt);
     }
 
     if (m_jagdListeKopf != nullptr) {
-        m_jagdListeKopf->setText(offen.isEmpty()
-            ? QStringLiteral("Nothing missing on the air right now.")
-            : QStringLiteral("%1 transmitting now from squares you do not "
-                             "have — double-click to call")
-                  .arg(offen.size()));
+        const int qslZahl = offen.size() - fehlend;
+        QString text;
+        if (offen.isEmpty()) {
+            text = QStringLiteral("Nothing missing on the air right now.");
+        } else if (qslZahl == 0) {
+            text = QStringLiteral("%1 transmitting now from squares you do "
+                                  "not have — double-click to call")
+                       .arg(fehlend);
+        } else {
+            text = QStringLiteral("%1 from squares you do not have, %2 worked "
+                                  "but unconfirmed — double-click to call")
+                       .arg(fehlend).arg(qslZahl);
+        }
+        m_jagdListeKopf->setText(text);
     }
 }
 
@@ -814,12 +858,15 @@ void QsoMapWindow::buildUi()
             .arg(QString::fromLatin1(Style::kTextSecondary)));
     jagdCol->addWidget(m_jagdListeKopf);
 
-    m_jagdListe = new QTableWidget(0, 5, m_jagdSpalte);
+    m_jagdListe = new QTableWidget(0, 6, m_jagdSpalte);
     m_jagdListe->setObjectName(QStringLiteral("qsoMapHuntList"));
     m_jagdListe->setHorizontalHeaderLabels(
         {QStringLiteral("CALL"), QStringLiteral("GRID"),
          QStringLiteral("SNR"),  QStringLiteral("KM"),
-         QStringLiteral("AGE")});
+         QStringLiteral("\u00b0"), QStringLiteral("AGE")});
+    m_jagdListe->horizontalHeaderItem(4)->setToolTip(QStringLiteral(
+        "Bearing from your QTH. Double-click this cell to point the "
+        "antenna there; double-click anywhere else in the row to call."));
     m_jagdListe->verticalHeader()->setVisible(false);
     m_jagdListe->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_jagdListe->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -831,7 +878,7 @@ void QsoMapWindow::buildUi()
     // sechste Spalte (am Bild gesehen, 2026-11-11).
     m_jagdListe->horizontalHeader()->setStretchLastSection(false);
     m_jagdListe->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
-    for (int c = 1; c < 5; ++c) {
+    for (int c = 1; c < 6; ++c) {
         m_jagdListe->horizontalHeader()->setSectionResizeMode(c, QHeaderView::ResizeToContents);
     }
     m_jagdListe->setStyleSheet(QStringLiteral(
@@ -849,9 +896,22 @@ void QsoMapWindow::buildUi()
     connect(m_jagdListe, &QTableWidget::itemDoubleClicked, this,
             [this](QTableWidgetItem* item) {
         if (item == nullptr) { return; }
-        const QString ruf = m_jagdListe->item(item->row(), 0)
-                                ->data(Qt::UserRole).toString();
-        if (!ruf.isEmpty()) { rufeLive(ruf); }
+        QTableWidgetItem* erste = m_jagdListe->item(item->row(), 0);
+        if (erste == nullptr) { return; }
+        const QString ruf = erste->data(Qt::UserRole).toString();
+        if (ruf.isEmpty()) { return; }
+        // Die Peilungsspalte dreht die Antenne, der Rest ruft an. Zwei
+        // verschiedene Handgriffe, weil es zwei verschiedene Fragen
+        // sind -- und weil beides zugleich an einem Doppelklick zu
+        // haengen zu viel waere.
+        if (item->column() == 4) {
+            const QVariant grad = item->data(Qt::UserRole);
+            if (grad.isValid()) {
+                emit rotorZielGewuenscht(grad.toDouble(), ruf);
+            }
+            return;
+        }
+        rufeLive(ruf);
     });
     jagdCol->addWidget(m_jagdListe, 1);
     m_jagdSpalte->setVisible(false);
