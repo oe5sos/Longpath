@@ -505,16 +505,14 @@ void QsoDetailPane::applyInfo(const CallsignInfo& info, bool stale)
 {
     m_info = info;
 
-    // Verortet? Dann darf die Karte hinfliegen. QRZ-Koordinaten vor dem
-    // Locator, weil der Locator nur ein Feld von 4-6 Zeichen ist.
+    // Verortet? Dann darf die Karte hinfliegen -- an dieselbe Stelle, die
+    // die Peilung nimmt (stationsPunkt). Bis 2026-11-11 hatte die Karte
+    // ihre eigene Reihenfolge: bei SN7L Peilung 21° und Karte 42°.
     {
         double lat = 0.0, lon = 0.0;
-        bool placed = false;
-        if (info.hasLatLon) {
-            lat = info.latitude; lon = info.longitude; placed = true;
-        } else if (isValidGridSquare(info.grid)) {
-            calculateLatLonFromGridSquare(info.grid, lat, lon); placed = true;
-        }
+        Lage woher = Lage::Keine;
+        const bool qrzSagtEtwas = info.hasLatLon || isValidGridSquare(info.grid);
+        const bool placed = qrzSagtEtwas && stationsPunkt(lat, lon, woher, false);
         if (placed && !stale) {
             QStringList bits;
             if (!info.displayName().isEmpty()) { bits << info.displayName().toHtmlEscaped(); }
@@ -576,20 +574,37 @@ void QsoDetailPane::applyInfo(const CallsignInfo& info, bool stale)
     }
 }
 
-bool QsoDetailPane::beamNow(double& bearingDeg, double& km, Lage* lage) const
+bool QsoDetailPane::logLocatorSchlaegtQrz() const
 {
-    // ── Wo die Station ist ── 2026-09-26 ────────────────────────────
+    // ── Contest, portabel: die QRZ-Adresse ist woanders ── 2026-11-11 ──
     //
-    // Nicht die Peilung aus dem Log: die kam aus dem Locator, oft nur
-    // vier Zeichen. OE5VVM in Laakirchen, 9 km noerdlich, stand mit dem
-    // Mittelpunkt von JN67 74 km im Suedwesten -- "Turn to 234°", die
-    // Karte daneben sagte 11°. Reihenfolge wie in applyInfo(): QRZ-
-    // Koordinaten, dann ein genauerer QRZ-Locator, dann der aus dem Log.
-    double lat = 0.0, lon = 0.0;
-    Lage woher = Lage::Keine;
+    // SN7L (2 m, 2026-07-04) steht im Log mit JO70SS -- 21°, 344 km. Nach
+    // dem QRZ-Abruf sprang die Karte auf die Klubadresse in Lodz: 42°,
+    // 592 km. Ein sechsstelliger Locator im Log ist auf ±3 km genau und
+    // sagt, wo die Station an DIESEM Tag stand. Liegt der QRZ-Punkt in
+    // diesem Feld, ist er genauer und bleibt; liegt er draussen, ist er
+    // ein anderer Ort. Ein vierstelliger Log-Locator (OE5VVM, JN67) ist
+    // 75 km breit und schlaegt nichts.
+    const QString logged = m_entry.gridSquare.trimmed();
+    if (logged.size() < 6 || !isValidGridSquare(logged)) { return false; }
+    if (!m_info.isValid() || !m_info.hasLatLon) { return false; }
+    const QString qrzFeld = gridSquareFromLatLon(m_info.latitude, m_info.longitude);
+    return qrzFeld.left(6).compare(logged.left(6), Qt::CaseInsensitive) != 0;
+}
+
+bool QsoDetailPane::stationsPunkt(double& lat, double& lon, Lage& woher,
+                                  bool mitLandesmitte) const
+{
+    // Reihenfolge: ein genauer Log-Locator, dem der QRZ-Punkt
+    // widerspricht; QRZ-Koordinaten; ein genauerer QRZ-Locator; der
+    // Locator aus dem Log; zuletzt die Landesmitte (nur fuer die
+    // Peilung -- die Karte fliegt dafuer nicht los).
     const QString logged = m_entry.gridSquare.trimmed();
     const QString looked = m_info.grid.trimmed();
-    if (m_info.isValid() && m_info.hasLatLon) {
+    if (logLocatorSchlaegtQrz()) {
+        calculateLatLonFromGridSquare(logged, lat, lon);
+        woher = Lage::LogLocator;
+    } else if (m_info.isValid() && m_info.hasLatLon) {
         lat = m_info.latitude;
         lon = m_info.longitude;
         woher = Lage::QrzKoordinaten;
@@ -600,7 +615,7 @@ bool QsoDetailPane::beamNow(double& bearingDeg, double& km, Lage* lage) const
     } else if (isValidGridSquare(logged)) {
         calculateLatLonFromGridSquare(logged, lat, lon);
         woher = Lage::LogLocator;
-    } else if (m_fallback && m_fallback(m_entry.call, lat, lon)) {
+    } else if (mitLandesmitte && m_fallback && m_fallback(m_entry.call, lat, lon)) {
         // Ohne QRZ und ohne Locator: die Mitte des Landes (cty.dat).
         // Fuer die Richtung reicht das meist, fuer die Entfernung nicht
         // -- darum steht es dabei (lageText).
@@ -608,6 +623,23 @@ bool QsoDetailPane::beamNow(double& bearingDeg, double& km, Lage* lage) const
     } else {
         return false;
     }
+    return true;
+}
+
+bool QsoDetailPane::beamNow(double& bearingDeg, double& km, Lage* lage) const
+{
+    // ── Wo die Station ist ── 2026-09-26 ────────────────────────────
+    //
+    // Nicht die Peilung aus dem Log: die kam aus dem Locator, oft nur
+    // vier Zeichen. OE5VVM in Laakirchen, 9 km noerdlich, stand mit dem
+    // Mittelpunkt von JN67 74 km im Suedwesten -- "Turn to 234°", die
+    // Karte daneben sagte 11°. Reihenfolge wie in applyInfo(): QRZ-
+    // Koordinaten, dann ein genauerer QRZ-Locator, dann der aus dem Log.
+    // Seit 2026-11-11 steht die Reihenfolge an EINER Stelle
+    // (stationsPunkt), die auch applyInfo() fuer die Karte nimmt.
+    double lat = 0.0, lon = 0.0;
+    Lage woher = Lage::Keine;
+    if (!stationsPunkt(lat, lon, woher, true)) { return false; }
 
     // Von wo: der eigene Locator dieses QSOs, sonst der der Station.
     QString home = m_entry.myGridSquare.trimmed();

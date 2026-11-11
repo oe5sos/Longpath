@@ -2579,15 +2579,34 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
     }
     connect(m_entryLogBtn, &QPushButton::clicked, this, &LogbookWindow::requestLog);
     connect(m_entryRotorBtn, &QPushButton::clicked, this, &LogbookWindow::zeigeRotorZeile);
-    connect(m_entryRotate, &QPushButton::clicked, this, [this]() {
-        double sp = 0.0, km = 0.0;
-        if (!m_detail || !m_detail->peilung(sp, km)) { return; }
-        emit turnRotorRequested(sp, m_detail->gezeigtesRufzeichen());
+    // Gedreht wird nur zu dem Rufzeichen, fuer das ROTOR gedrueckt wurde
+    // -- und nur, solange die Karte genau diese Station zeigt.
+    const auto peilungFuerRotor = [this](double& sp) {
+        double km = 0.0;
+        return m_rotorZeile && m_detail
+            && m_detail->gezeigtesRufzeichen() == m_rotorRuf
+            && m_detail->peilung(sp, km);
+    };
+    connect(m_entryRotate, &QPushButton::clicked, this, [this, peilungFuerRotor]() {
+        double sp = 0.0;
+        if (!peilungFuerRotor(sp)) { return; }
+        emit turnRotorRequested(sp, m_rotorRuf);
     });
-    connect(m_entryLp, &QPushButton::clicked, this, [this]() {
-        double sp = 0.0, km = 0.0;
-        if (!m_detail || !m_detail->peilung(sp, km)) { return; }
-        emit turnRotorRequested(BeamHeading::longPath(sp), m_detail->gezeigtesRufzeichen());
+    connect(m_entryLp, &QPushButton::clicked, this, [this, peilungFuerRotor]() {
+        double sp = 0.0;
+        if (!peilungFuerRotor(sp)) { return; }
+        emit turnRotorRequested(BeamHeading::longPath(sp), m_rotorRuf);
+    });
+    // Leeres oder anderes Rufzeichen: die Rotorzeile geht weg (2026-11-11).
+    // textChanged, nicht textEdited -- auch ein Wert, der per
+    // Bedienungshilfe oder aus dem Programm gesetzt wird, darf kein
+    // „Rotate" zu einem alten Ziel stehen lassen.
+    connect(m_entryCall, &QLineEdit::textChanged, this, [this](const QString& text) {
+        if (!m_rotorZeile) { return; }
+        if (Callsigns::normalized(text) == m_rotorRuf) { return; }
+        m_rotorZeile = false;
+        m_rotorRuf.clear();
+        aktualisiereRotorZeile();
     });
 
     // Tippen filtert das Log (Doppelt-Blick) und zeigt die Station nach
@@ -2608,9 +2627,6 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
             m_entryCall->setCursorPosition(pos);
         }
         if (m_search) { m_search->setText(Callsigns::normalized(up)); }
-        // Eine stehende Rotorzeile zeigt nicht die Peilung des alten
-        // Rufzeichens unter dem neuen (bis die Karte nachzieht).
-        if (m_rotorZeile) { aktualisiereRotorZeile(); }
         m_entryLookup->start();
         m_bedarfTimer->start();
         m_entryHint->setText(QStringLiteral("Enter logs · Esc clears"));
@@ -2787,6 +2803,7 @@ void LogbookWindow::zeigeRotorZeile()
         return;
     }
     m_rotorZeile = true;
+    m_rotorRuf = call;
     // Nicht auf die Entprellung warten: wer ROTOR drueckt, will es jetzt.
     m_entryLookup->stop();
     if (!m_detail || m_detail->gezeigtesRufzeichen() != call) { showStationFor(call); }
@@ -2802,7 +2819,7 @@ void LogbookWindow::aktualisiereRotorZeile()
     }
     if (!m_rotorZeile) { return; }
 
-    const QString call = Callsigns::normalized(m_entryCall->text());
+    const QString call = m_rotorRuf;
     double sp = 0.0, km = 0.0;
     const bool hat = m_detail && m_detail->gezeigtesRufzeichen() == call
                   && m_detail->peilung(sp, km);
@@ -2846,6 +2863,7 @@ void LogbookWindow::aktualisiereRotorZeile()
 void LogbookWindow::clearEntry()
 {
     m_rotorZeile = false;
+    m_rotorRuf.clear();
     aktualisiereRotorZeile();
     m_entryLookup->stop();
     if (m_bedarfTimer) { m_bedarfTimer->stop(); }

@@ -401,6 +401,7 @@ private:
     QPushButton*  m_entryLp{nullptr};
     QLabel*       m_entryPeilung{nullptr};
     bool          m_rotorZeile{false};
+    QString       m_rotorRuf;      // fuer dieses Rufzeichen wurde ROTOR gedrueckt
     void          zeigeRotorZeile();
     void          aktualisiereRotorZeile();
     QTimer*       m_entryLookup{nullptr};

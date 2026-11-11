@@ -205,6 +205,12 @@ private:
     // Peilung und Entfernung von hier zur Station, aus QRZ-Koordinaten
     // vor dem Locator, und nicht aus dem Wert im Log.
     bool beamNow(double& bearingDeg, double& km, Lage* lage = nullptr) const;
+    // Wo die Station steht, in EINER Reihenfolge fuer Peilung und Karte
+    // (2026-11-11). mitLandesmitte: cty.dat als letzter Ausweg.
+    bool stationsPunkt(double& lat, double& lon, Lage& woher, bool mitLandesmitte) const;
+    // Ein 6-stelliger Log-Locator, in dessen Feld der QRZ-Punkt NICHT
+    // liegt -- Contest, portabel: dann gilt das Log.
+    bool logLocatorSchlaegtQrz() const;
     double m_beamKm{0.0};
     Lage   m_lage{Lage::Keine};
     QLabel* m_lageLabel{nullptr};

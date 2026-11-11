@@ -17,6 +17,10 @@
 //      sagt warum.
 //   4. Die Karte sagt, woher die Lage stammt (QRZ-Adresse, Locator,
 //      Landesmitte) und wann sie nur grob ist.
+//   5. (2026-11-11) Ein 6-stelliger Log-Locator schlaegt eine QRZ-Adresse
+//      ausserhalb seines Feldes -- Peilung und Karte gleich (SN7L).
+//   6. (2026-11-11) Leeres/anderes Rufzeichen nimmt die Rotorzeile weg,
+//      auch wenn der Wert nicht getippt wurde.
 
 #include <QtTest/QtTest>
 #include <QLabel>
@@ -29,6 +33,7 @@
 #include "FensterFrist.h"
 #include "core/AdifLog.h"
 #include "core/CallsignCache.h"
+#include "core/Maidenhead.h"
 #include "core/RotorBereich.h"
 #include "gui/LogbookWindow.h"
 #include "gui/QsoMapWindow.h"
@@ -48,6 +53,18 @@ LogEntry qso(const QString& call, const QString& grid)
     e.myGridSquare = QStringLiteral("JN67VV");
     e.timeOn = QDateTime(QDate(2026, 10, 1), QTime(12, 0), QTimeZone::UTC);
     return e;
+}
+// Eine frische QRZ-Antwort mit Koordinaten (Adresse).
+CallsignInfo qrz(const QString& call, double lat, double lon)
+{
+    CallsignInfo i;
+    i.call = call;
+    i.latitude = lat;
+    i.longitude = lon;
+    i.hasLatLon = true;
+    i.geoloc = QStringLiteral("user");
+    i.fetchedUtc = QDateTime::currentSecsSinceEpoch();
+    return i;
 }
 // Landesmitte wie cty.dat sie liefert (hier fest: Japan).
 bool landesmitte(const QString& call, double& lat, double& lon)
@@ -122,10 +139,11 @@ private slots:
         QVERIFY(std::abs(drehen.at(1).at(0).toDouble() - std::fmod(sp + 180.0, 360.0)) < 0.01);
     }
 
-    // Weitertippen nach ROTOR: die Zeile zeigt nie die Peilung des alten
-    // Rufzeichens unter dem neuen, und sie zieht nach, auch wenn die
-    // Richtung gleich bleibt (beide Landesmitte Japan).
-    void dieZeileFolgtDemNeuenRufzeichen()
+    // Leeres oder anderes Rufzeichen nach ROTOR: die Zeile geht weg, kein
+    // „Rotate" zu einem alten Ziel bleibt stehen -- auch nicht, wenn der
+    // Wert per Bedienungshilfe oder aus dem Programm kommt (textChanged,
+    // nicht textEdited). Befund aus dem Probebau 2026-11-11 (W1AW).
+    void einAnderesRufzeichenNimmtDieZeileWeg()
     {
         QTemporaryDir dir;
         const QString pfad = dir.filePath(QStringLiteral("logbook.adi"));
@@ -134,19 +152,109 @@ private slots:
         w.setPositionFallback(&landesmitte);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+        QSignalSpy drehen(&w, &LogbookWindow::turnRotorRequested);
+        const auto zeileSichtbar = [&w]() {
+            return w.entryPeilungForTest()->isVisible() || w.entryRotateForTest()->isVisible()
+                || w.entryLongPathForTest()->isVisible();
+        };
+
+        // Getippt: ein Zeichen mehr ist ein anderes Rufzeichen.
         QTest::keyClicks(w.entryCallForTest(), QStringLiteral("JA1XY"));
         w.entryRotorForTest()->click();
-        QVERIFY(w.entryPeilungForTest()->text().contains(QStringLiteral("country centre")));
-
+        QVERIFY(zeileSichtbar());
         QTest::keyClicks(w.entryCallForTest(), QStringLiteral("Z"));
-        QVERIFY2(w.entryPeilungForTest()->text().contains(QStringLiteral("no position yet")),
-                 qPrintable(w.entryPeilungForTest()->text()));
-        QVERIFY(!w.entryRotateForTest()->isEnabled());
-        QTRY_COMPARE_WITH_TIMEOUT(w.detailForTest()->gezeigtesRufzeichen(),
-                                  QStringLiteral("JA1XYZ"), 5000);
-        QVERIFY2(w.entryPeilungForTest()->text().contains(QStringLiteral("country centre")),
-                 qPrintable(w.entryPeilungForTest()->text()));
+        QVERIFY2(!zeileSichtbar(), qPrintable(w.entryPeilungForTest()->text()));
+
+        // ROTOR fuer das neue Rufzeichen zeigt es wieder.
+        w.entryRotorForTest()->click();
+        QVERIFY(zeileSichtbar());
+        QCOMPARE(w.detailForTest()->gezeigtesRufzeichen(), QStringLiteral("JA1XYZ"));
+        QVERIFY(w.entryPeilungForTest()->text().contains(QStringLiteral("country centre")));
         QVERIFY(w.entryRotateForTest()->isEnabled());
+
+        // Von aussen geleert (setText, kein Tippen).
+        w.entryCallForTest()->setText(QString());
+        QVERIFY(!zeileSichtbar());
+        w.entryRotateForTest()->click();
+        w.entryLongPathForTest()->click();
+        QCOMPARE(drehen.count(), 0);
+
+        // Von aussen ein anderes Rufzeichen gesetzt.
+        w.entryCallForTest()->setText(QStringLiteral("JA1XYZ"));
+        w.entryRotorForTest()->click();
+        QVERIFY(zeileSichtbar());
+        w.entryCallForTest()->setText(QStringLiteral("W1AW"));
+        QVERIFY(!zeileSichtbar());
+        w.entryRotateForTest()->click();
+        QCOMPARE(drehen.count(), 0);
+    }
+
+    // ── Lage-Vorrang (2026-11-11) ──────────────────────────────────────
+    // SN7L (2 m, 2026-07-04): JO70SS im Log -- 21°, 344 km. Die QRZ-Adresse
+    // ist der Klub in Lodz (42°, 592 km). Ein genauer Log-Locator, dem der
+    // QRZ-Punkt widerspricht, gewinnt -- bei Peilung UND Karte.
+    void einGenauerLogLocatorSchlaegtDieQrzAdresse()
+    {
+        QTemporaryDir dir;
+        CallsignCache cache(dir.filePath(QStringLiteral("cache.json")));
+        cache.put(QStringLiteral("SN7L"), qrz(QStringLiteral("SN7L"), 51.77, 19.46));
+
+        QsoDetailPane pane;
+        pane.setCache(&cache);
+        QSignalSpy karte(&pane, &QsoDetailPane::stationLocated);
+        pane.setEntry(qso(QStringLiteral("SN7L"), QStringLiteral("JO70SS")));
+
+        QCOMPARE(pane.lage(), QsoDetailPane::Lage::LogLocator);
+        double sp = 0.0, km = 0.0;
+        QVERIFY(pane.peilung(sp, km));
+        QVERIFY2(sp > 19.0 && sp < 24.0, qPrintable(QString::number(sp)));
+        QVERIFY2(km > 330.0 && km < 360.0, qPrintable(QString::number(km)));
+        QVERIFY(pane.lageText().contains(QStringLiteral("JO70SS")));
+        // Die Karte fliegt dorthin, wohin die Peilung zeigt -- nicht nach Lodz.
+        QVERIFY(!karte.isEmpty());
+        const double lat = karte.last().at(1).toDouble();
+        const double lon = karte.last().at(2).toDouble();
+        QCOMPARE(gridSquareFromLatLon(lat, lon).left(6).toUpper(), QStringLiteral("JO70SS"));
+    }
+
+    // Liegt der QRZ-Punkt IM Feld des Log-Locators, ist er genauer und bleibt.
+    void einQrzPunktImFeldBleibt()
+    {
+        QTemporaryDir dir;
+        CallsignCache cache(dir.filePath(QStringLiteral("cache.json")));
+        double feldLat = 0.0, feldLon = 0.0;
+        calculateLatLonFromGridSquare(QStringLiteral("JO70SS"), feldLat, feldLon);
+        const double qLat = feldLat + 0.01, qLon = feldLon - 0.02;   // im Feld, nicht die Mitte
+        QCOMPARE(gridSquareFromLatLon(qLat, qLon).left(6).toUpper(), QStringLiteral("JO70SS"));
+        cache.put(QStringLiteral("SN7L"), qrz(QStringLiteral("SN7L"), qLat, qLon));
+
+        QsoDetailPane pane;
+        pane.setCache(&cache);
+        QSignalSpy karte(&pane, &QsoDetailPane::stationLocated);
+        pane.setEntry(qso(QStringLiteral("SN7L"), QStringLiteral("JO70SS")));
+        QCOMPARE(pane.lage(), QsoDetailPane::Lage::QrzKoordinaten);
+        QVERIFY(!karte.isEmpty());
+        QVERIFY(std::abs(karte.last().at(1).toDouble() - qLat) < 1e-9);
+        QVERIFY(std::abs(karte.last().at(2).toDouble() - qLon) < 1e-9);
+    }
+
+    // OE5VVM (2026-09-26): nur JN67 im Log, 75 km breit -- QRZ gewinnt weiter.
+    void einVierstelligerLogLocatorSchlaegtNichts()
+    {
+        QTemporaryDir dir;
+        CallsignCache cache(dir.filePath(QStringLiteral("cache.json")));
+        cache.put(QStringLiteral("OE5VVM"), qrz(QStringLiteral("OE5VVM"), 47.98, 13.82));
+
+        QsoDetailPane pane;
+        pane.setCache(&cache);
+        QSignalSpy karte(&pane, &QsoDetailPane::stationLocated);
+        pane.setEntry(qso(QStringLiteral("OE5VVM"), QStringLiteral("JN67")));
+        QCOMPARE(pane.lage(), QsoDetailPane::Lage::QrzKoordinaten);
+        double sp = 0.0, km = 0.0;
+        QVERIFY(pane.peilung(sp, km));
+        QVERIFY2(km < 20.0, qPrintable(QString::number(km)));   // Laakirchen, nicht JN67-Mitte
+        QVERIFY(!karte.isEmpty());
+        QVERIFY(std::abs(karte.last().at(1).toDouble() - 47.98) < 1e-9);
     }
 
     void derErlaubteBereichGilt()
