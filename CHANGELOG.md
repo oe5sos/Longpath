@@ -40,11 +40,14 @@ Contestprogramm als eigene Ebene, ein schärferer Panadapter mit
   #400, #402, #404).
 - **Die Contest-Anordnung gehört zum Layoutprofil** (#403, #407), beim
   Start gilt das zuletzt aktive Profil (#408), und „Save Current Layout“
-  nimmt immer das aktive (#406).
+  nimmt immer das aktive (#406). Nach dem Herstellen eines Profils bleibt
+  das Hauptfenster aktiv (mit Menüleiste), und Fenster aus dem Profil
+  rücken in den Schirm (#405).
 - **Mitschrift im Contest:** Rauschboden-Schneider und Sprache hinter
   dem Zahnrad (#426).
 - **Ein zweites Combined-Feld** (#409); Panels wechseln das Feld per
-  Klick, Ziehen oder Reiter-Menü (#411).
+  Klick, Ziehen oder Reiter-Menü (#411); die Pille zeigt die Seite, die
+  sie verspricht (#399).
 - **Cmd+Q beendet Hamlib-Daemon und Logbuch mit** (#414).
 
 ### Panadapter und 2 m
