@@ -834,6 +834,9 @@ set(MODEL_SOURCES
     src/models/MeterModel.cpp
     src/models/TransmitModel.cpp
     src/models/FilterPresetStore.cpp
+    src/models/bandstack/BandStackStore.cpp
+    src/models/bandstack/BandStackSeeds.cpp
+    src/models/bandstack/BandStackController.cpp
     src/models/NotchModel.cpp
     src/models/SpotModel.cpp
     src/models/SpotTableModel.cpp
@@ -1338,6 +1341,7 @@ set(GUI_SOURCES
     src/gui/applets/RttyDecoderApplet.cpp
     src/gui/applets/CwDecoderApplet.cpp
     src/gui/applets/Ft8Applet.cpp
+    src/gui/applets/BandStackApplet.cpp
     src/gui/applets/Ft8PlaetzeApplet.cpp
     src/gui/Ft8KartenBruecke.cpp
     src/gui/applets/QsoRecorderApplet.cpp
