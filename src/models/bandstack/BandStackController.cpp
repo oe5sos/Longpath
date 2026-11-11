@@ -23,6 +23,7 @@
 #include <QTimer>
 #include <QUuid>
 
+#include <algorithm>
 #include <utility>
 
 #include "core/AppSettings.h"
@@ -553,6 +554,10 @@ bool BandStackController::performRecall(const Request& request, QString* refusal
 
     const QChar letter = slice->sliceLetter();
     m_store = std::move(r.after);
+    // Das Verlassen kann den Eintrag weit verschoben haben (am Geraet am
+    // 2026-11-11: 14.010 CWU -> 14.254.300 USB stand danach als zweite
+    // Zeile zwischen den CW-Eintraegen).
+    nachFrequenzOrdnen(r.leftBand);
     m_lastUsed[letter][r.leftBand] = r.leftSpot;
     m_lastUsed[letter][r.band] = currentSpot(slice, {}, nullptr);
     m_recalledBand[letter] = {r.band, BandDefaults::bandGridBandFromFrequency(targetHz)};
@@ -609,6 +614,7 @@ bool BandStackController::saveHere(int sliceId, const QString& entryId, const Ba
         return false;
     }
     m_store.saveHere(slice->sliceLetter(), entryId, currentSpot(slice, view, entry), nowMs());
+    nachFrequenzOrdnen(stackBandForSlice(slice));
     m_detached.remove(slice->sliceLetter());
     markChanged();
     return true;
@@ -1051,6 +1057,27 @@ void BandStackController::followRegion()
     }
     m_store.setRegion(region);
     markChanged();
+}
+
+void BandStackController::nachFrequenzOrdnen(Band band)
+{
+    QList<BandStackEntry> eintraege = m_store.entries(band);
+    std::stable_sort(eintraege.begin(), eintraege.end(),
+                     [](const BandStackEntry& a, const BandStackEntry& b) {
+                         return a.frequencyHz < b.frequencyHz;
+                     });
+    QStringList ids;
+    ids.reserve(eintraege.size());
+    for (const BandStackEntry& e : eintraege) {
+        ids.append(e.id);
+    }
+    QStringList jetzt;
+    for (const BandStackEntry& e : m_store.entries(band)) {
+        jetzt.append(e.id);
+    }
+    if (ids != jetzt) {
+        m_store.reorder(band, ids);
+    }
 }
 
 void BandStackController::markChanged()

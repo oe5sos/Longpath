@@ -192,6 +192,11 @@ private:
     void adoptSavedSpots(const SliceModel* slice);
     void followRegion();
     void markChanged();
+    /// Die Eintraege von `band` nach Frequenz ordnen, wie Thetis es immer
+    /// tut (clsBandStackManager GenerateFilteredList). Longpath hat kein
+    /// Umsortieren per Hand; ein Speichern, das einen Eintrag weit
+    /// verschiebt, liess ihn sonst an seinem alten Platz stehen.
+    void nachFrequenzOrdnen(Band band);
     void writeDocument();
     QString documentKey() const;
 

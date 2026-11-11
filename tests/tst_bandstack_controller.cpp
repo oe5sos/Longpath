@@ -164,6 +164,23 @@ private slots:
         QCOMPARE(hz(s), qint64(7093000));
     }
 
+    // Am Geraet am 2026-11-11: auf der Stelle 14.010 CWU weit
+    // weitergestimmt, dann verlassen -- der Eintrag stand danach als
+    // 14.254 USB an zweiter Stelle. Wie Thetis wird nach dem Speichern
+    // nach Frequenz geordnet.
+    void verlassenOrdnetNachFrequenz()
+    {
+        Stand s = aufbauen();
+        QVERIFY(druck(s, Band::Band40m));                 // 7.090
+        QVERIFY(druck(s, Band::Band40m, BandStackDirection::Previous)); // 7.045
+        QVERIFY(druck(s, Band::Band40m, BandStackDirection::Previous)); // 7.010
+        QCOMPARE(hz(s), qint64(7010000));
+        s.scheibe->setFrequency(7095000.0);
+        QVERIFY(druck(s, Band::Band20m));
+        QCOMPARE(frequenzen(s, Band::Band40m),
+                 QList<qint64>({7005000, 7045000, 7090000, 7095000, 7100000}));
+    }
+
     // Auf ein Band gestimmt statt abgerufen: die Scheibe steht neben ihrer
     // Stelle, der Stand zeigt „-", und Verlassen schreibt nichts hinein.
     void hineingestimmtSpeichertNichts()
