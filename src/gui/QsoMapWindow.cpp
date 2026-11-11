@@ -316,6 +316,70 @@ void QsoMapWindow::fuelleJagdListe(const QVector<LivePunkt>& punkte)
         }
         m_jagdListeKopf->setText(text);
     }
+
+    // ── Welches Band hat gerade die meisten Luecken ────────────────
+    if (m_jagdBaender != nullptr) {
+        QHash<QString, QSet<QString>> jeBand;   // Band -> fehlende Felder
+        for (const LivePunkt& lp : punkte) {
+            if (lp.g.band.isEmpty()) { continue; }
+            if (lp.art != LiveArt::NeuesLand && !lp.feldNeu) { continue; }
+            jeBand[lp.g.band].insert(lp.feld);
+        }
+        QVector<QPair<QString, int>> zeilen;
+        for (auto it = jeBand.cbegin(); it != jeBand.cend(); ++it) {
+            zeilen.append({it.key(), it.value().size()});
+        }
+        std::sort(zeilen.begin(), zeilen.end(),
+                  [](const QPair<QString, int>& a, const QPair<QString, int>& b) {
+            if (a.second != b.second) { return a.second > b.second; }
+            return a.first < b.first;
+        });
+        QStringList stueck;
+        for (const auto& z : zeilen) {
+            stueck << QStringLiteral("%1 %2").arg(z.first).arg(z.second);
+        }
+        m_jagdBaender->setText(stueck.isEmpty()
+            ? QString{}
+            : QStringLiteral("new squares on the air:  ")
+                  + stueck.join(QStringLiteral("  ·  ")));
+    }
+
+    // ── Hinweis, wenn etwas NEU auftaucht ──────────────────────────
+    //
+    // Der Zaehler nuetzt nur, wer hinsieht. Gemeldet wird nur, was seit
+    // dem letzten Auffrischen dazugekommen ist, und nur das Wertvollste
+    // davon -- sonst steht nach einer Bandoeffnung ein Stapel Hinweise
+    // auf der Karte.
+    QSet<QString> jetztDa;
+    const LivePunkt* melden = nullptr;
+    int weitere = 0;
+    for (const LivePunkt& lp : offen) {
+        if (rang.value(lp.g.rufzeichen, 9) == 2) { continue; }   // QSL eilt nicht
+        jetztDa.insert(lp.g.rufzeichen);
+        if (m_jagdGesehen.contains(lp.g.rufzeichen)) { continue; }
+        if (melden == nullptr) { melden = &lp; } else { ++weitere; }
+    }
+    // Wer verschwunden ist, darf beim naechsten Mal wieder melden.
+    m_jagdGesehen.intersect(jetztDa);
+    if (melden != nullptr) {
+        const bool land = melden->art == LiveArt::NeuesLand;
+        QString text = land
+            ? QStringLiteral("%1 — new DXCC (%2)")
+                  .arg(melden->g.rufzeichen,
+                       melden->g.land.isEmpty() ? melden->feld : melden->g.land)
+            : QStringLiteral("%1 — %2 is new on %3")
+                  .arg(melden->g.rufzeichen, melden->feld, melden->g.band);
+        if (weitere > 0) {
+            text += QStringLiteral("  (+%1 more)").arg(weitere);
+        }
+        emit jagdAlarm(melden->g.rufzeichen, melden->feld, land);
+        if (m_jagdAlarmText != nullptr) {
+            m_jagdAlarmText->setText(QStringLiteral("\u25b6  ") + text);
+            m_jagdAlarmText->setVisible(true);
+            m_jagdAlarmUhr.start(land ? 20000 : 10000);
+        }
+    }
+    for (const QString& r : jetztDa) { m_jagdGesehen.insert(r); }
 }
 
 void QsoMapWindow::setzeVollbild(bool an)
@@ -851,6 +915,18 @@ void QsoMapWindow::buildUi()
     auto* jagdCol = new QVBoxLayout(m_jagdSpalte);
     jagdCol->setContentsMargins(0, 0, 0, 0);
     jagdCol->setSpacing(4);
+    m_jagdAlarmText = new QLabel(QString{}, m_jagdSpalte);
+    m_jagdAlarmText->setWordWrap(true);
+    m_jagdAlarmText->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 12px; font-weight: bold; }")
+            .arg(QString::fromLatin1(Style::kJagdNeu)));
+    m_jagdAlarmText->setVisible(false);
+    jagdCol->addWidget(m_jagdAlarmText);
+    m_jagdAlarmUhr.setSingleShot(true);
+    connect(&m_jagdAlarmUhr, &QTimer::timeout, this, [this]() {
+        if (m_jagdAlarmText) { m_jagdAlarmText->setVisible(false); }
+    });
+
     m_jagdListeKopf = new QLabel(QString{}, m_jagdSpalte);
     m_jagdListeKopf->setWordWrap(true);
     m_jagdListeKopf->setStyleSheet(QStringLiteral(
@@ -918,6 +994,17 @@ void QsoMapWindow::buildUi()
         rufeLive(ruf);
     });
     jagdCol->addWidget(m_jagdListe, 1);
+
+    // Welches Band gerade die meisten Luecken auf der Luft hat. Die
+    // Karte zeigt immer nur ein Band; diese Zeile sagt, ob woanders
+    // mehr zu holen waere.
+    m_jagdBaender = new QLabel(QString{}, m_jagdSpalte);
+    m_jagdBaender->setWordWrap(true);
+    m_jagdBaender->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; }")
+            .arg(QString::fromLatin1(Style::kTextScale)));
+    jagdCol->addWidget(m_jagdBaender);
+
     m_jagdSpalte->setVisible(false);
     mapRow->addWidget(m_jagdSpalte, 1);
 

@@ -641,6 +641,39 @@ private slots:
         karte.jagdButtonForTest()->setChecked(false);
     }
 
+    // Der Hinweis meldet nur, was NEU dazukommt -- nicht bei jedem
+    // Auffrischen dieselben Stationen.
+    void derHinweisMeldetNurNeues()
+    {
+        QsoMapWindow karte;
+        karte.resize(1400, 800);
+        karte.imagery()->setNetworkEnabled(false);
+        karte.setHomeGrid(QStringLiteral("JN67VV"));
+        karte.setEntries(kleinesLog());
+        QDateTime uhr(QDate(2026, 11, 11), QTime(6, 0, 0), QTimeZone::UTC);
+        karte.setUhrForTest([&uhr]() { return uhr; });
+        karte.jagdButtonForTest()->setChecked(true);
+
+        QSignalSpy alarm(&karte, &QsoMapWindow::jagdAlarm);
+        karte.nimmFt8(gehoert(QStringLiteral("SP9XYZ"), QStringLiteral("KO02"), uhr));
+        QCOMPARE(alarm.count(), 1);
+        QCOMPARE(alarm.at(0).at(0).toString(), QStringLiteral("SP9XYZ"));
+
+        // Dieselbe Station noch einmal: kein zweiter Hinweis.
+        karte.nimmFt8(gehoert(QStringLiteral("SP9XYZ"), QStringLiteral("KO02"), uhr));
+        QCOMPARE(alarm.count(), 1);
+
+        // Eine andere, aus einem anderen fehlenden Feld: ja.
+        karte.nimmFt8(gehoert(QStringLiteral("LZ1XX"), QStringLiteral("KN22"), uhr));
+        QCOMPARE(alarm.count(), 2);
+
+        // Eine Station aus einem BESTAETIGTEN Feld meldet gar nichts.
+        karte.nimmFt8(gehoert(QStringLiteral("OE3RPU"), QStringLiteral("JN78"), uhr));
+        QCOMPARE(alarm.count(), 2);
+
+        karte.jagdButtonForTest()->setChecked(false);
+    }
+
     // ── Die Karte: Mosaik am Grid, Zaehler, Altern ──────────────────
     void karteZeigtMosaikZaehlerUndAltert()
     {

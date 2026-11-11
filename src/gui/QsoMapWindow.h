@@ -242,6 +242,11 @@ signals:
     /// keinen Rotor -- es sagt nur, wohin; das Logbuch reicht es an
     /// seinen `turnRotorRequested` weiter.
     void rotorZielGewuenscht(double grad, const QString& rufzeichen);
+    /// Eine Station aus einem fehlenden Feld ist neu aufgetaucht. Das
+    /// Kartenfenster zeigt selbst einen Hinweis; dieses Signal ist
+    /// dafuer da, dass spaeter ein Ton oder eine Meldung daran haengen
+    /// kann, ohne dass die Karte davon wissen muss.
+    void jagdAlarm(const QString& rufzeichen, const QString& feld, bool neuesLand);
 
 protected:
     void closeEvent(QCloseEvent*) override;
@@ -387,6 +392,18 @@ private:
     QLabel*       m_jagdListeKopf{nullptr};
     QWidget*      m_jagdSpalte{nullptr};
     void fuelleJagdListe(const QVector<Longpath::LivePunkt>& punkte);
+    /// Wer schon in der Liste stand. Nur was NEU dazukommt, ist ein
+    /// Anlass fuer einen Hinweis -- sonst melde ich bei jedem
+    /// Auffrischen dieselben zehn Stationen.
+    QSet<QString> m_jagdGesehen;
+    class QLabel* m_jagdBaender{nullptr};
+    /// Die Meldung ueber dem Kopf, wenn etwas Neues auftaucht. Kein
+    /// eigenes Hinweisfenster: StatusToast ist ein rahmenloses
+    /// Oberfenster am Hauptfenster, mit eigener Abbau-Falle
+    /// (MainWindow::showToast, 2026-10-15) -- in der Jagdtafel steht
+    /// die Meldung dort, wo der Betreiber ohnehin hinsieht.
+    class QLabel* m_jagdAlarmText{nullptr};
+    QTimer        m_jagdAlarmUhr;
     bool              m_embedded{false};
 
     // ── 3D-Flug ──────────────────────────────────────────────────────
