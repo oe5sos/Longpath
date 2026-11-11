@@ -11,6 +11,10 @@
 //   2026-10-21 — Eine Sonde bleibt offline: ein isolierter Lauf startet
 //                 rotctld nicht von selbst. Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 — Rotordialog: GS-232 am Netzserver oeffnet im Netzmodus
+//                 mit Host/Port vorbelegt; host:port in der Schnittstelle
+//                 gilt als Netzziel. Martin Fischer, KI-gestuetzt ueber
+//                 Anthropic Claude.
 //   2026-08-10 — workSpot() entry point for "Turn rotor to <call>" from
 //                 the Spot Hub. Enter in the callsign field now only
 //                 looks the station up (it used to also start the
@@ -1256,11 +1260,18 @@ void RotorLogbookPanel::ensureRotor()
             // /dev/tty* (gemessen 2026-10-21, siehe Gs232Rotor.h).
             const QString host =
                 sb.value(QStringLiteral("Rotor/Host"), QString{}).toString().trimmed();
+            QString netzHost;
+            quint16 netzPort = 0;
             if (!host.isEmpty()) {
                 gs232->setNetworkTarget(
                     host,
                     static_cast<quint16>(
                         sb.value(QStringLiteral("Rotor/NetPort"), 4001).toInt()));
+            } else if (Gs232Rotor::parseNetworkTarget(gs232->portName(),
+                                                      &netzHost, &netzPort)) {
+                // 2026-11-11: „172.30.30.16:4001" als Schnittstelle ist
+                // ein Netzziel, keine Datei (siehe parseNetworkTarget).
+                gs232->setNetworkTarget(netzHost, netzPort);
             }
             m_rotor   = gs232;
             m_rotctld = nullptr;
@@ -1464,11 +1475,38 @@ void RotorLogbookPanel::openRotorSetupDialog()
             .toString().trimmed().toLower() == QStringLiteral("gs232") ? 1 : 0);
     col->addWidget(driverBox);
 
+    // ── Wie er angeschlossen ist, beim GS-232 aus dessen eigenen
+    // Schluesseln (2026-11-11) ──────────────────────────────────────
+    //
+    // `RotorUseLocalSerial` gehoert zum rotctld-Weg. Martins ARCO laeuft
+    // seit 2026-10-21 ueber den direkten GS-232-Treiber am Netzserver
+    // (Rotor/Host = 172.30.30.16), der alte Schluessel stand aber noch
+    // auf „lokal". Der Dialog zeigte darum „Serial port on this
+    // computer", und „Connect" loeschte Rotor/Host und schrieb die
+    // Adresse als Schnittstelle -- danach „No such file or directory".
+    // Beim GS-232 sagt Rotor/Host (oder ein host:port in der
+    // Schnittstelle), ob er am Netz haengt.
+    const bool gs232Gespeichert =
+        s.value(QStringLiteral("Rotor/Backend"), QStringLiteral("rotctld"))
+            .toString().trimmed().toLower() == QStringLiteral("gs232");
+    QString gs232Host =
+        s.value(QStringLiteral("Rotor/Host"), QString{}).toString().trimmed();
+    quint16 gs232Port = static_cast<quint16>(
+        s.value(QStringLiteral("Rotor/NetPort"), 4001).toInt());
+    if (gs232Gespeichert && gs232Host.isEmpty()) {
+        Gs232Rotor::parseNetworkTarget(
+            s.value(QStringLiteral("Rotor/SerialPort"), QString{}).toString(),
+            &gs232Host, &gs232Port);
+    }
+    const bool gs232AmNetz = gs232Gespeichert && !gs232Host.isEmpty();
+
     auto* modeBox = new QComboBox(&dlg);
+    modeBox->setObjectName(QStringLiteral("rotorDialogMode"));
     modeBox->addItem(QStringLiteral("Controller on this computer"));
     modeBox->addItem(QStringLiteral("rotctld already running (network)"));
     modeBox->setCurrentIndex(
-        s.value(kRotorUseSerialKey, true).toBool() ? 0 : 1);
+        gs232Gespeichert ? (gs232AmNetz ? 1 : 0)
+                         : (s.value(kRotorUseSerialKey, true).toBool() ? 0 : 1));
     col->addWidget(modeBox);
 
     // Mechanical end stop (2026-08-10). The dial computes its travel
@@ -1716,11 +1754,20 @@ void RotorLogbookPanel::openRotorSetupDialog()
     auto* netBox = new QWidget(&dlg);
     auto* netForm = new QFormLayout(netBox);
     netForm->setContentsMargins(0, 0, 0, 0);
-    auto* hostEdit = new QLineEdit(m_rotctld ? m_rotctld->host() : QString{}, netBox);
+    // Beim GS-232 am Netzserver stehen hier dessen Adresse und Port
+    // (2026-11-11) -- vorher kamen beide aus rotctld, das es auf diesem
+    // Weg nicht gibt, und die Felder standen leer bzw. auf 4533.
+    auto* hostEdit = new QLineEdit(
+        gs232AmNetz ? gs232Host : (m_rotctld ? m_rotctld->host() : QString{}), netBox);
+    hostEdit->setObjectName(QStringLiteral("rotorDialogHost"));
     hostEdit->setPlaceholderText(
         QStringLiteral("address running rotctld, e.g. 192.168.1.20"));
     netForm->addRow(QStringLiteral("Host"), hostEdit);
-    auto* portEdit = new QLineEdit(QString::number(m_rotctld ? m_rotctld->port() : 4533), netBox);
+    auto* portEdit = new QLineEdit(
+        QString::number(gs232AmNetz ? gs232Port
+                                    : (m_rotctld ? m_rotctld->port() : 4533)),
+        netBox);
+    portEdit->setObjectName(QStringLiteral("rotorDialogPort"));
     portEdit->setPlaceholderText(QStringLiteral("4533"));
     netForm->addRow(QStringLiteral("Port"), portEdit);
     col->addWidget(netBox);
@@ -1762,6 +1809,11 @@ void RotorLogbookPanel::openRotorSetupDialog()
                 ? QStringLiteral("Serial server on the network (ser2net, Moxa …)")
                 : QStringLiteral("rotctld already running (network)"));
         }
+        hostEdit->setPlaceholderText(gs232
+            ? QStringLiteral("address of the serial server, e.g. 192.168.1.20")
+            : QStringLiteral("address running rotctld, e.g. 192.168.1.20"));
+        portEdit->setPlaceholderText(gs232 ? QStringLiteral("4001")
+                                           : QStringLiteral("4533"));
 
         localBox->setVisible(local);
         netBox->setVisible(!local);
@@ -1887,7 +1939,16 @@ void RotorLogbookPanel::openRotorSetupDialog()
         // ist als das, was gerade laeuft.
         if (driverBox->currentIndex() == 1) {
             s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("gs232"));
-            if (local) {
+            QString netzHost;
+            quint16 netzPort = 0;
+            if (local && Gs232Rotor::parseNetworkTarget(
+                             portCombo->currentText(), &netzHost, &netzPort)) {
+                // „172.30.30.16:4001" im Schnittstellenfeld: ein Netzziel,
+                // keine Datei (2026-11-11). Als solches ablegen.
+                s.setValue(kRotorUseSerialKey, false);
+                s.setValue(QStringLiteral("Rotor/Host"), netzHost);
+                s.setValue(QStringLiteral("Rotor/NetPort"), netzPort);
+            } else if (local) {
                 s.setValue(QStringLiteral("Rotor/SerialPort"),
                            portCombo->currentText().trimmed());
                 s.setValue(QStringLiteral("Rotor/BaudRate"),

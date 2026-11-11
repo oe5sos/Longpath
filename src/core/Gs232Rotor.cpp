@@ -127,6 +127,23 @@ void Gs232Rotor::setPort(const QString& portName, int baudRate)
     m_baud     = baudRate > 0 ? baudRate : 9600;
 }
 
+bool Gs232Rotor::parseNetworkTarget(const QString& text, QString* host,
+                                    quint16* port)
+{
+    // Ein Name oder eine IPv4-Adresse, dann Doppelpunkt und Port. Kein
+    // Schraegstrich (Geraetedatei), kein Leerzeichen; „COM3" hat keinen
+    // Doppelpunkt und faellt so von selbst heraus.
+    static const QRegularExpression re(
+        QStringLiteral("^([A-Za-z0-9][A-Za-z0-9.-]*):([0-9]{1,5})$"));
+    const QRegularExpressionMatch m = re.match(text.trimmed());
+    if (!m.hasMatch()) { return false; }
+    const uint p = m.captured(2).toUInt();
+    if (p == 0 || p > 65535) { return false; }
+    if (host) { *host = m.captured(1); }
+    if (port) { *port = static_cast<quint16>(p); }
+    return true;
+}
+
 void Gs232Rotor::setNetworkTarget(const QString& host, quint16 port)
 {
     m_host    = host.trimmed();

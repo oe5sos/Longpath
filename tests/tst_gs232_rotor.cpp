@@ -21,6 +21,11 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QHostAddress>
+#include <QApplication>
+#include <QComboBox>
+#include <QDialog>
+#include <QLineEdit>
+#include <QTimer>
 
 #include "core/AppSettings.h"
 #include "core/Gs232Rotor.h"
@@ -336,6 +341,103 @@ private slots:
         }
 
         s.setValue(QStringLiteral("Rotor/Backend"), vorher);
+    }
+
+    // ── host:port in der Schnittstelle ist ein Netzziel (2026-11-11) ──
+    void netzziel_im_schnittstellenfeld_erkannt()
+    {
+        QString h;
+        quint16 p = 0;
+        QVERIFY(Gs232Rotor::parseNetworkTarget(QStringLiteral("172.30.30.16:4001"), &h, &p));
+        QCOMPARE(h, QStringLiteral("172.30.30.16"));
+        QCOMPARE(p, quint16(4001));
+        QVERIFY(Gs232Rotor::parseNetworkTarget(QStringLiteral(" arco.local:4001 "), &h, &p));
+        QCOMPARE(h, QStringLiteral("arco.local"));
+        QVERIFY(!Gs232Rotor::parseNetworkTarget(QStringLiteral("/dev/tty.usbserial-1"), &h, &p));
+        QVERIFY(!Gs232Rotor::parseNetworkTarget(QStringLiteral("COM3"), &h, &p));
+        QVERIFY(!Gs232Rotor::parseNetworkTarget(QStringLiteral("host:0"), &h, &p));
+        QVERIFY(!Gs232Rotor::parseNetworkTarget(QStringLiteral("host:70000"), &h, &p));
+        QVERIFY(!Gs232Rotor::parseNetworkTarget(QString{}, &h, &p));
+    }
+
+    void schnittstelle_mit_netzziel_wird_netz()
+    {
+        AppSettings& s = AppSettings::instance();
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("gs232"));
+        s.setValue(QStringLiteral("Rotor/Host"), QString{});
+        s.setValue(QStringLiteral("Rotor/SerialPort"), QStringLiteral("172.30.30.16:4001"));
+        RotorLogbookPanel panel(nullptr, nullptr, nullptr);
+        panel.ensureRotorForTest();
+        auto* gs = qobject_cast<Gs232Rotor*>(panel.rotorForTest());
+        QVERIFY(gs != nullptr);
+        // Vorher: „GS-232 172.30.30.16:4001, 9600 Bd" -- eine Datei dieses
+        // Namens gibt es nicht („No such file or directory").
+        QCOMPARE(gs->description(), QStringLiteral("GS-232 über 172.30.30.16:4001"));
+        s.setValue(QStringLiteral("Rotor/SerialPort"), QString{});
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("rotctld"));
+    }
+
+    // Martins Einstellungen vom 2026-11-11: GS-232 am Netzserver, aber
+    // der alte rotctld-Schluessel steht auf „lokal". Der Dialog muss im
+    // Netzmodus oeffnen und Host/Port zeigen -- sonst loescht „Connect"
+    // die Netzanbindung.
+    void dialog_oeffnet_netz_rotor_im_netzmodus_data()
+    {
+        QTest::addColumn<QString>("host");
+        QTest::addColumn<QString>("schnittstelle");
+        QTest::newRow("Rotor/Host gesetzt") << QStringLiteral("172.30.30.16")
+                                            << QStringLiteral("172.30.30.16:4001");
+        QTest::newRow("nur host:port als Schnittstelle") << QString{}
+                                                         << QStringLiteral("172.30.30.16:4001");
+    }
+    void dialog_oeffnet_netz_rotor_im_netzmodus()
+    {
+        QFETCH(QString, host);
+        QFETCH(QString, schnittstelle);
+        AppSettings& s = AppSettings::instance();
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("gs232"));
+        s.setValue(QStringLiteral("Rotor/Host"), host);
+        s.setValue(QStringLiteral("Rotor/NetPort"), 4001);
+        s.setValue(QStringLiteral("Rotor/SerialPort"), schnittstelle);
+        s.setValue(QStringLiteral("RotorUseLocalSerial"), true);
+
+        RotorLogbookPanel panel(nullptr, nullptr, nullptr);
+        int modus = -1;
+        QString hostText, portText;
+        bool gefunden = false;
+        QTimer::singleShot(0, this, [&]() {
+            auto* dlg = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+            if (!dlg) {
+                for (QWidget* w : QApplication::topLevelWidgets()) {
+                    if (auto* d = qobject_cast<QDialog*>(w);
+                        d && d->windowTitle() == QStringLiteral("Rotator")) {
+                        dlg = d;
+                    }
+                }
+            }
+            if (!dlg) { return; }
+            gefunden = true;
+            if (auto* m = dlg->findChild<QComboBox*>(QStringLiteral("rotorDialogMode"))) {
+                modus = m->currentIndex();
+            }
+            if (auto* e = dlg->findChild<QLineEdit*>(QStringLiteral("rotorDialogHost"))) {
+                hostText = e->text();
+            }
+            if (auto* e = dlg->findChild<QLineEdit*>(QStringLiteral("rotorDialogPort"))) {
+                portText = e->text();
+            }
+            dlg->reject();
+        });
+        panel.openRotorSetupDialogForTest();
+
+        QVERIFY2(gefunden, "Rotordialog nicht gefunden");
+        QCOMPARE(modus, 1);   // „Serial server on the network"
+        QCOMPARE(hostText, QStringLiteral("172.30.30.16"));
+        QCOMPARE(portText, QStringLiteral("4001"));
+
+        s.setValue(QStringLiteral("Rotor/Host"), QString{});
+        s.setValue(QStringLiteral("Rotor/SerialPort"), QString{});
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("rotctld"));
     }
 
     // ── Am ECHTEN Gerät ─────────────────────────────────────────────
