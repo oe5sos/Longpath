@@ -864,6 +864,10 @@ void QsoMapWindow::buildUi()
         {QStringLiteral("CALL"), QStringLiteral("GRID"),
          QStringLiteral("SNR"),  QStringLiteral("KM"),
          QStringLiteral("\u00b0"), QStringLiteral("AGE")});
+    // Die Kopfzeile links, wie die Werte darunter -- zentriert sah es
+    // ueber der breiten CALL-Spalte wie eine leere Spalte davor aus.
+    m_jagdListe->horizontalHeaderItem(0)->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    m_jagdListe->horizontalHeaderItem(1)->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     m_jagdListe->horizontalHeaderItem(4)->setToolTip(QStringLiteral(
         "Bearing from your QTH. Double-click this cell to point the "
         "antenna there; double-click anywhere else in the row to call."));
