@@ -328,6 +328,8 @@ private slots:
         }
         QTest::qWait(kNachlaufMs);
         QCOMPARE(m_abgeloest->frameGeometry().topLeft(), gespeichert.topLeft());
+        // Ein frischer Start kennt keine Grundlage vom letzten Mal.
+        m_mw->vergissMitziehBasisForTest();
 
         // Das Profil kennt seinen Rahmen: umrechnen.
         m_mw->setProfilRahmenForTest(gross);

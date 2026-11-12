@@ -544,6 +544,7 @@ public:
     // anzufassen. Also ein Stellvertreter: irgendein Fenster in die
     // Liste legen und danach fragen, ob es schon zurueck ist.
     int schwebendeMitziehenForTest() { return schwebendeMitziehen(); }
+    void vergissMitziehBasisForTest() { m_mitziehBasis.clear(); }   // wie ein frischer Start
     void setProfilRahmenForTest(const QRect& r) { m_profilRahmen = r; m_profilRahmenOffen = r.isValid(); }
     bool schwebendeNachProfilrahmenForTest() { return schwebendeNachProfilrahmen(); }
     QMargins leistenRaenderForTest() const { return leistenRaender(); }
