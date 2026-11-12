@@ -1131,7 +1131,10 @@ longpath_add_test(tst_cat_funkgeraet)
 # Rund 40 Faelle gegen ein rigctld-Doppel, viele warten auf die naechste
 # Abfragerunde. Lokal ~60 s; auf dem macOS-Laeufer liefen schon am 08.11.
 # (vor den Sprachspeicher-Faellen) die 120 s ab. 300 s nur fuer diesen.
-set_tests_properties(tst_cat_funkgeraet PROPERTIES TIMEOUT 300)
+# Nur im Shard, der ihn baut (Linux teilt die Pruefstaende auf).
+if(TEST tst_cat_funkgeraet)
+    set_tests_properties(tst_cat_funkgeraet PROPERTIES TIMEOUT 300)
+endif()
 # Jeder Klick holt das Fenster nach vorne, auch aus der Spalte.
 longpath_add_test(tst_klick_holt_nach_vorne)
 # Der 590 geht aus und kommt wieder: die Wache startet rigctld neu.
