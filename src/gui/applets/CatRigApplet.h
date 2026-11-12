@@ -44,6 +44,16 @@ private:
     QPushButton* m_nr{nullptr};
     QComboBox*   m_agc{nullptr};
     QPushButton* m_filter{nullptr};
+    QPushButton* m_rit{nullptr};
+    QPushButton* m_ritRunter{nullptr};
+    QPushButton* m_ritHoch{nullptr};
+    QPushButton* m_ritNull{nullptr};
+    QLabel*      m_ritWert{nullptr};
+    QPushButton* m_notch{nullptr};
+    QSlider*     m_nbPegel{nullptr};
+    QLabel*      m_nbPegelWert{nullptr};
+    QSlider*     m_nrPegel{nullptr};
+    QLabel*      m_nrPegelWert{nullptr};
     QSlider*     m_rfGain{nullptr};
     QLabel*      m_rfWert{nullptr};
     QLabel*      m_messwerte{nullptr};

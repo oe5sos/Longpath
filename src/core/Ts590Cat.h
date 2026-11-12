@@ -54,6 +54,12 @@ struct Zustand {
     int  lowCutHz{-1};
     int  highCutHz{-1};
     int  cwBreiteHz{-1};       // nur in CW, sonst bleibt der letzte Wert
+    int  ritAn{-1};            // 0/1
+    int  ritHz{0};             // Versatz, -9999..9999
+    int  notch{-1};            // 0 aus, 1 Auto, 2 von Hand
+    int  nbPegel{-1};          // 1..10, nur bei NB an
+    int  nrPegel{-1};          // 1..10, nur bei NR1
+    int  alcPunkte{-1};        // 0..30, beim Senden, wenn das Geraet ALC zeigt
     int  filter{-1};           // 1 = Filter A, 2 = Filter B
 
     bool operator==(const Zustand&) const = default;
@@ -93,5 +99,11 @@ QByteArray stelleLowCut(int hz);
 QByteArray stelleHighCut(int hz);
 QByteArray stelleCwBreite(int hz);
 QByteArray stelleFilter(int filter);      // 1 = A, 2 = B
+QByteArray stelleRit(bool an);
+QByteArray stelleRitSchritt(int hz);      // + hoch, - runter
+QByteArray stelleRitNull();
+QByteArray stelleNotch(bool an);          // Auto-Notch
+QByteArray stelleNbPegel(int pegel);      // 1..10
+QByteArray stelleNrPegel(int pegel);      // 1..10
 
 } // namespace Longpath::Ts590Cat

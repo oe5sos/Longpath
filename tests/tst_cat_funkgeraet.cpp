@@ -87,7 +87,9 @@ public:
     QHash<QByteArray, QByteArray> roh{
         {"SM0;", "SM00015;"}, {"RM;", "RM10007;"}, {"AN;", "AN100;"}, {"PA;", "PA10;"},
         {"RA;", "RA0000;"}, {"RG;", "RG200;"}, {"GC;", "GC2;"}, {"NB;", "NB0;"},
-        {"NR;", "NR1;"}, {"SL;", "SL02;"}, {"SH;", "SH09;"}, {"PC;", "PC005;"}};
+        {"NR;", "NR1;"}, {"SL;", "SL02;"}, {"SH;", "SH09;"}, {"PC;", "PC005;"},
+        {"IF;", "IF00028078400      000000000020000080;"}, {"NT;", "NT00;"},
+        {"NL;", "?;"}, {"RL;", "RL05;"}};
 
     bool hatGetastet() const
     {
@@ -96,9 +98,13 @@ public:
             if (t.startsWith("T ") || t.startsWith("\\set_ptt") || t.startsWith("b ")) {
                 return true;
             }
-            if (t.startsWith("W ") && !t.startsWith("W GC") && !t.startsWith("W SH")
-                && !t.startsWith("W SL") && !t.startsWith("W FW") && !t.startsWith("W FL")) {
-                return true;
+            if (t.startsWith("W ")) {
+                bool erlaubt = false;
+                for (const char* k : {"W GC", "W SH", "W SL", "W FW", "W FL", "W RT", "W RU",
+                                      "W RD", "W RC", "W NT", "W NL", "W RL"}) {
+                    if (t.startsWith(k)) { erlaubt = true; }
+                }
+                if (!erlaubt) { return true; }
             }
             for (const char* verboten : {"w TX", "w KY", "w PB", "w PS", "w EX", "w PC1", "l RFPOWER"}) {
                 if (t.startsWith(verboten)) { return true; }
@@ -334,6 +340,20 @@ private slots:
         QCOMPARE(z.cwBreiteHz, 250);
         QVERIFY(Ts590Cat::leseAntwort("FL2;", z));
         QCOMPARE(z.filter, 2);
+        // So am TS-590S gelesen (2026-11-12): -120 Hz, RIT an.
+        QVERIFY(Ts590Cat::leseAntwort("IF00014090000     -012010000020000080;", z));
+        QCOMPARE(z.ritHz, -120);
+        QCOMPARE(z.ritAn, 1);
+        QVERIFY(Ts590Cat::leseAntwort("IF00014090000      020010000020000080;", z));
+        QCOMPARE(z.ritHz, 200);
+        QVERIFY(Ts590Cat::leseAntwort("NT10;", z));
+        QCOMPARE(z.notch, 1);
+        QVERIFY(Ts590Cat::leseAntwort("NL006;", z));
+        QCOMPARE(z.nbPegel, 6);
+        QVERIFY(Ts590Cat::leseAntwort("RL05;", z));
+        QCOMPARE(z.nrPegel, 5);
+        QVERIFY(Ts590Cat::leseAntwort("RM30012;", z));
+        QCOMPARE(z.alcPunkte, 12);
         QVERIFY(!Ts590Cat::leseAntwort("?;", z));
         QVERIFY(Ts590Cat::leseAntwort("PC005;", z));
         QCOMPARE(z.leistungW, 5);
@@ -363,6 +383,14 @@ private slots:
         QCOMPARE(Ts590Cat::stelleHighCut(2850), QByteArray("W SH09; 0\n"));
         QCOMPARE(Ts590Cat::stelleCwBreite(480), QByteArray("W FW0500; 0\n"));
         QCOMPARE(Ts590Cat::stelleFilter(1), QByteArray("W FL1; 0\n"));
+        QCOMPARE(Ts590Cat::stelleRit(true), QByteArray("W RT1; 0\n"));
+        QCOMPARE(Ts590Cat::stelleRitSchritt(10), QByteArray("W RU00010; 0\n"));
+        QCOMPARE(Ts590Cat::stelleRitSchritt(-10), QByteArray("W RD00010; 0\n"));
+        QCOMPARE(Ts590Cat::stelleRitNull(), QByteArray("W RC; 0\n"));
+        QCOMPARE(Ts590Cat::stelleNotch(true), QByteArray("W NT10; 0\n"));
+        QCOMPARE(Ts590Cat::stelleNotch(false), QByteArray("W NT00; 0\n"));
+        QCOMPARE(Ts590Cat::stelleNbPegel(5), QByteArray("W NL005; 0\n"));
+        QCOMPARE(Ts590Cat::stelleNrPegel(12), QByteArray("W RL10; 0\n"));
         QCOMPARE(Ts590Cat::stelleFilter(2), QByteArray("W FL2; 0\n"));
         QCOMPARE(Ts590Cat::stelleAgc(Ts590Cat::Agc::Aus), QByteArray("W GC0; 0\n"));
         QCOMPARE(Ts590Cat::stelleAgc(Ts590Cat::Agc::Langsam), QByteArray("W GC1; 0\n"));
@@ -606,6 +634,76 @@ private slots:
         // Schaltet man am Geraet wirklich um, gilt das weiter.
         doppel.modus = QStringLiteral("USB");
         QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 20000);
+    }
+
+    // Die neuen Regler im Feld schicken, was am Geraet gemessen wurde.
+    void rit_notch_und_pegel_gehen_zum_geraet()
+    {
+        RigctldDoppel doppel;
+        doppel.roh["NB;"] = "NB1;";
+        doppel.roh["NL;"] = "NL006;";
+        zielAuf(doppel.port());
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+        RadioModel radio;
+        radio.setLastRadioInfoForTest(*info);
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 20000);
+        CatRigApplet feld(&radio);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->catZustand().nbPegel == 6, 20000);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->catZustand().ritAn == 0, 20000);
+
+        const auto drueck = [&](const char* name) {
+            auto* t = feld.findChild<QPushButton*>(QLatin1String(name));
+            QVERIFY2(t, name);
+            t->click();
+        };
+        doppel.befehle.clear();
+        drueck("catRigRit");
+        drueck("catRigRitHoch");
+        drueck("catRigRitRunter");
+        drueck("catRigRitNull");
+        drueck("catRigNotch");
+        for (const char* b : {"W RT1; 0\n", "W RU00010; 0\n", "W RD00010; 0\n", "W RC; 0\n",
+                              "W NT10; 0\n"}) {
+            QTRY_VERIFY2_WITH_TIMEOUT(doppel.befehle.contains(QByteArray(b)), b, 20000);
+        }
+        auto* nb = feld.findChild<QSlider*>(QStringLiteral("catRigNbPegel"));
+        QVERIFY(nb);
+        QTRY_VERIFY_WITH_TIMEOUT(nb->isEnabled() && nb->value() == 6, 20000);
+        nb->triggerAction(QAbstractSlider::SliderSingleStepAdd);
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W NL007; 0\n"), 20000);
+        // NR steht im Doppel auf NR1, der Pegel ist bedienbar; bei NR2 nicht.
+        auto* nr = feld.findChild<QSlider*>(QStringLiteral("catRigNrPegel"));
+        QTRY_VERIFY_WITH_TIMEOUT(nr->isEnabled() && nr->value() == 5, 20000);
+        doppel.roh["NR;"] = "NR2;";
+        QTRY_VERIFY_WITH_TIMEOUT(!nr->isEnabled(), 20000);
+        QVERIFY(!doppel.hatGetastet());
+
+        // Der Versatz steht im Feld.
+        doppel.roh["IF;"] = "IF00028078400     -012010000020000080;";
+        auto* wert = feld.findChild<QLabel*>(QStringLiteral("catRigRitWert"));
+        QVERIFY(wert);
+        QTRY_COMPARE_WITH_TIMEOUT(wert->text(), QStringLiteral("-120 Hz"), 20000);
+    }
+
+    // Beim Senden zeigt das Feld ALC, wenn das Geraet ALC als Instrument hat.
+    void beim_senden_steht_alc_im_feld()
+    {
+        RigctldDoppel doppel;
+        doppel.gesendet = true;
+        doppel.roh["RM;"] = "RM30007;";
+        zielAuf(doppel.port());
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        RadioModel radio;
+        radio.setLastRadioInfoForTest(*info);
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 20000);
+        CatRigApplet feld(&radio);
+        auto* mess = feld.findChild<QLabel*>(QStringLiteral("catRigMesswerte"));
+        QVERIFY(mess);
+        QTRY_VERIFY2_WITH_TIMEOUT(mess->text().contains(QStringLiteral("ALC 7")),
+                                  qPrintable(mess->text()), 20000);
     }
 
     // Mausrad und Tasten loesen kein sliderReleased aus; RF Gain muss trotzdem

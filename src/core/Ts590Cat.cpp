@@ -55,7 +55,9 @@ QList<QByteArray> abfragen()
     return {QByteArrayLiteral("AN;"), QByteArrayLiteral("PA;"), QByteArrayLiteral("RA;"),
             QByteArrayLiteral("RG;"), QByteArrayLiteral("GC;"), QByteArrayLiteral("NB;"),
             QByteArrayLiteral("NR;"), QByteArrayLiteral("SL;"), QByteArrayLiteral("SH;"),
-            QByteArrayLiteral("PC;"), QByteArrayLiteral("FW;"), QByteArrayLiteral("FL;")};
+            QByteArrayLiteral("PC;"), QByteArrayLiteral("FW;"), QByteArrayLiteral("FL;"),
+            QByteArrayLiteral("IF;"), QByteArrayLiteral("NT;"), QByteArrayLiteral("NL;"),
+            QByteArrayLiteral("RL;")};
 }
 
 QByteArray abfrageMeter() { return QByteArrayLiteral("SM0;"); }
@@ -85,10 +87,27 @@ bool leseAntwort(QByteArray a, Zustand& z)
     if (k == "PC") { z.leistungW = zahl(a, 2, 3); return z.leistungW >= 0; }
     if (k == "SM" && a.size() >= 7) { z.meterPunkte = zahl(a, 3, 4); return z.meterPunkte >= 0; }
     if (k == "RM" && a.size() >= 7) {
-        if (a.at(2) != '1') { return true; }   // nur SWR; COMP und ALC kommen hier nicht an
-        z.swrPunkte = zahl(a, 3, 4);
-        return z.swrPunkte >= 0;
+        // Das Geraet meldet nur das Instrument, das an ihm gewaehlt ist:
+        // 1 SWR, 2 Kompression, 3 ALC.
+        const int wert = zahl(a, 3, 4);
+        if (wert < 0) { return false; }
+        if (a.at(2) == '1') { z.swrPunkte = wert; }
+        if (a.at(2) == '3') { z.alcPunkte = wert; }
+        return true;
     }
+    // IF: an Stelle 18 das Vorzeichen (Leerzeichen heisst +), 19-22 der
+    // Versatz in Hz, 23 RIT an. Am TS-590S gemessen (2026-11-12).
+    if (k == "IF" && a.size() >= 24) {
+        const int hz = zahl(a, 19, 4);
+        const int an = zahl(a, 23, 1);
+        if (hz < 0 || an < 0) { return false; }
+        z.ritHz = a.at(18) == '-' ? -hz : hz;
+        z.ritAn = an;
+        return true;
+    }
+    if (k == "NT") { z.notch = zahl(a, 2, 1); return z.notch >= 0; }
+    if (k == "NL") { z.nbPegel = zahl(a, 2, 3); return z.nbPegel >= 0; }
+    if (k == "RL") { z.nrPegel = zahl(a, 2, 2); return z.nrPegel >= 0; }
     if (k == "SL") {
         const int i = zahl(a, 2, 2);
         if (i < 0 || i >= int(kLowCut.size())) { return false; }
@@ -186,6 +205,36 @@ QByteArray stelleCwBreite(int hz)
 {
     return QStringLiteral("W FW%1; 0\n")
         .arg(naechsteCwBreite(hz), 4, 10, QLatin1Char('0')).toLatin1();
+}
+
+QByteArray stelleRit(bool an)
+{
+    return an ? QByteArrayLiteral("W RT1; 0\n") : QByteArrayLiteral("W RT0; 0\n");
+}
+
+QByteArray stelleRitSchritt(int hz)
+{
+    const int betrag = std::clamp(std::abs(hz), 1, 9999);
+    return QStringLiteral("W %1%2; 0\n")
+        .arg(hz < 0 ? QStringLiteral("RD") : QStringLiteral("RU"))
+        .arg(betrag, 5, 10, QLatin1Char('0')).toLatin1();
+}
+
+QByteArray stelleRitNull() { return QByteArrayLiteral("W RC; 0\n"); }
+
+QByteArray stelleNotch(bool an)
+{
+    return an ? QByteArrayLiteral("W NT10; 0\n") : QByteArrayLiteral("W NT00; 0\n");
+}
+
+QByteArray stelleNbPegel(int pegel)
+{
+    return QStringLiteral("W NL%1; 0\n").arg(std::clamp(pegel, 1, 10), 3, 10, QLatin1Char('0')).toLatin1();
+}
+
+QByteArray stelleNrPegel(int pegel)
+{
+    return QStringLiteral("W RL%1; 0\n").arg(std::clamp(pegel, 1, 10), 2, 10, QLatin1Char('0')).toLatin1();
 }
 
 QByteArray stelleFilter(int filter)
