@@ -9917,8 +9917,23 @@ void RadioModel::connectToRadio(const RadioInfo& info)
                                      m_activeSlice->filterHigh());
                 rxCh->setAgcMode(m_activeSlice->agcMode());
                 rxCh->setAgcTop(m_activeSlice->rfGain());
-                // AGC advanced — push slice state to WDSP (Stage 2)
-                rxCh->setAgcThreshold(m_activeSlice->agcThreshold());
+                // AGC-Schwelle: ABLEITEN, nicht schreiben (2026-11-12).
+                //
+                // Hier stand `setAgcThreshold(m_activeSlice->agcThreshold())`.
+                // Schwelle und Maximalverstaerkung sind in wcpAGC.c dieselbe
+                // Groesse; der gespeicherte Vorgabewert -20 bedeutet eine
+                // Maximalverstaerkung von -6,5 dB (gemessen, siehe
+                // tests/tst_nr1_pegel_und_agc_schwelle.cpp) und riss den
+                // Empfaenger um 96 dB ein, sobald er die Gleichheitsschranke
+                // in setAgcThreshold ueberhaupt passierte.
+                {
+                    const int schwelle = rxCh->setzeMaxVerstaerkungUndMeldeSchwelle(
+                        m_activeSlice->agcMaxGain());
+                    const bool vorher = m_syncingAgc;
+                    m_syncingAgc = true;
+                    m_activeSlice->setAgcThreshold(schwelle);
+                    m_syncingAgc = vorher;
+                }
                 rxCh->setAgcHang(m_activeSlice->agcHang());
                 rxCh->setAgcSlope(m_activeSlice->agcSlope());
                 rxCh->setAgcAttack(m_activeSlice->agcAttack());
@@ -14088,6 +14103,12 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
             if (slice->rfGain() != rfGain) {
                 slice->setRfGain(rfGain);
             }
+            // Und die Setup-Zahl mit: sie meint dieselbe Groesse
+            // (2026-11-12). Blieb sie stehen, zeigte Setup 90 dB an,
+            // waehrend WDSP laengst auf -6 stand.
+            if (slice->agcMaxGain() != rfGain) {
+                slice->setAgcMaxGain(rfGain);
+            }
             m_syncingAgc = false;
         }
         scheduleSettingsSave();
@@ -14143,7 +14164,14 @@ void RadioModel::wireSliceSignals(SliceModel* slice)
     connect(slice, &SliceModel::agcMaxGainChanged, this, [this, slice](int dB) {
         RxChannel* rxCh = m_wdspEngine->rxChannel(slice->sliceIndex());
         if (rxCh) {
-            rxCh->setAgcMaxGain(dB);
+            // Setzen UND die dazu passende Schwelle in die Anzeige
+            // zurueckschreiben -- sonst stehen zwei Zahlen fuer dieselbe
+            // Groesse nebeneinander und widersprechen sich (2026-11-12).
+            const int schwelle = rxCh->setzeMaxVerstaerkungUndMeldeSchwelle(dB);
+            const bool vorher = m_syncingAgc;
+            m_syncingAgc = true;
+            slice->setAgcThreshold(schwelle);
+            m_syncingAgc = vorher;
         }
         scheduleSettingsSave();
     });
