@@ -42,6 +42,7 @@
 #include "core/MoxController.h"
 #include "core/safety/BandPlanGuard.h"
 #include "models/RadioModel.h"
+#include "models/SliceModel.h"
 #include "gui/applets/Ft8Applet.h"
 #include "core/Resampler.h"
 #include "core/audio/CompositeTxMicRouter.h"
@@ -626,6 +627,68 @@ private slots:
         QVERIFY2(sicht.contains(QStringLiteral("G4MHJ")),
                  qPrintable(QStringLiteral("IO83 fehlt und muss stehen:\n")
                             + sicht));
+    }
+
+    // ── Dasselbe Feld, anderes Band (2026-11-12) ────────────────────
+    //
+    // Betreiber heute: die Locatorjagd „sollte optimiert werden und
+    // eher am programm ft8 und nicht im logprogramm zu finden sein."
+    //
+    // Bis dahin kannte das FT8-Fenster nur `GridsGearbeitet`, und die
+    // kennt kein Band: ein Feld, das irgendwann auf 80 m im Logbuch
+    // landete, galt auf 20 m als erledigt. Die Rechnung je Band
+    // (`LocatorMosaik`) gab es laengst -- aber nur hinter der Karte im
+    // Logbuchfenster, also dort, wo niemand FT8 faehrt.
+    //
+    // Derselbe WEG wie oben, eine Stufe tiefer:
+    //
+    //   Logbuch -> LocatorMosaik::stand(feld, band) -> z.neuesGridBand
+    //   -> zeilenart -> Farbe
+    //
+    // Das Band kommt aus `bandFuerLog`, nicht aus einer eigenen
+    // Rechnung -- sonst stuende am 2-m-Konverter das ZF-Band da.
+    void einFeldAufAnderemBandIstDieZweiteStufe()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        applet.setProtocol(Ft8Decoder::Protocol::Ft8);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        QVERIFY(slice);
+        slice->setFrequency(14074000.0);          // 20 m
+        applet.setSlice(slice);
+
+        // Das Feld STEHT im Logbuch -- also nicht „ganz neu" ...
+        applet.gridsForTest().merke(QStringLiteral("JO31"));
+        // ... aber nur auf 80 m.
+        LogEntry e;
+        e.call       = QStringLiteral("DL1ABC");
+        e.band       = QStringLiteral("80m");
+        e.mode       = QStringLiteral("FT8");
+        e.gridSquare = QStringLiteral("JO31");
+        applet.mosaikForTest().baue(QVector<LogEntry>{e}, false);
+
+        Ft8Decode d;
+        d.text   = QStringLiteral("CQ DL1ABC JO31");
+        d.snrDb  = -10;
+        d.freqHz = 1500.0;
+        applet.fundForTest(d);
+
+        QCOMPARE(applet.letzteZeilenartForTest(),
+                 Ft8Applet::Zeilenart::NeuesGridBand);
+
+        // Gegenprobe, ohne die das Gruene nichts belegt: dasselbe Feld
+        // auf DIESEM Band gearbeitet -- dann ist nichts mehr zu holen
+        // und es bleibt ein gewoehnliches CQ.
+        e.band = QStringLiteral("20m");
+        applet.mosaikForTest().baue(QVector<LogEntry>{e}, false);
+        applet.fundForTest(d);
+        QCOMPARE(applet.letzteZeilenartForTest(),
+                 Ft8Applet::Zeilenart::Cq);
     }
 
     // Ohne gelesenes Logbuch waere JEDES Feld neu, und die Markierung
