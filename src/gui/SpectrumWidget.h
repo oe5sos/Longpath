@@ -3164,6 +3164,15 @@ private:
     QVector<SpotMarker>  m_spotMarkers;
     QVector<SpotHitRect> m_spotClickRects;
     QVector<SpotCluster> m_spotClusters;
+    // Der erste Klick eines Doppelklicks auf einen Spot stimmt ab. Wo das
+    // Bild der Abstimmung folgt (TS-590, jedes Geraet ohne CTUN), steht
+    // der Spot danach in der Mitte -- unter der Maus liegt leere Flaeche
+    // oder ein ANDERER Spot. Der Doppelklick nimmt darum das Rufzeichen
+    // vom ersten Klick (Martin am 12.11.: „hat nicht funktioniert").
+    QString m_spotKlickRufzeichen;
+    QPoint  m_spotKlickPos;
+    double  m_spotKlickHz{0.0};
+    qint64  m_spotKlickMs{0};
     bool   m_showSpots{true};
     // Vorgabe aus: das Merkmal ist neu, es gibt keinen Istzustand zu
     // erhalten (anders als bei der Verlaengerung in den Wasserfall).

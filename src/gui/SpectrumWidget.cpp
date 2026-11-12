@@ -141,6 +141,7 @@
 #include <QClipboard>
 #include <QDesktopServices>
 #include <QGuiApplication>
+#include <QStyleHints>
 #include <QHoverEvent>
 #include <QLabel>
 #include <QPropertyAnimation>
@@ -11310,6 +11311,15 @@ void SpectrumWidget::mousePressEvent(QMouseEvent* event)
         const QPoint pos(mx, my);
         for (const auto& hr : m_spotClickRects) {
             if (hr.rect.contains(pos)) {
+                // Fuer einen folgenden Doppelklick merken, BEVOR das
+                // Abstimmen das Bild verschiebt (siehe m_spotKlickRufzeichen).
+                if (hr.markerIndex >= 0 && hr.markerIndex < m_spotMarkers.size()) {
+                    m_spotKlickRufzeichen =
+                        m_spotMarkers[hr.markerIndex].callsign.trimmed();
+                    m_spotKlickPos = pos;
+                    m_spotKlickHz  = hr.freqMhz * 1.0e6;
+                    m_spotKlickMs  = QDateTime::currentMSecsSinceEpoch();
+                }
                 // Longpath signal contract: frequencyClicked(double hz).
                 // AetherSDR emits MHz; multiply by 1e6 to match Hz signature.
                 emit frequencyClicked(hr.freqMhz * 1.0e6);
@@ -12222,6 +12232,27 @@ void SpectrumWidget::mouseDoubleClickEvent(QMouseEvent* event)
 
     if (event->button() == Qt::LeftButton && m_showSpots) {
         const QPoint pos = event->position().toPoint();
+        // Zuerst der Spot des ersten Klicks: er hat abgestimmt, und wo
+        // das Bild der Abstimmung folgt, liegt er jetzt woanders. Ein
+        // Spot, der inzwischen unter die Maus gerutscht ist, waere der
+        // falsche.
+        if (!m_spotKlickRufzeichen.isEmpty()) {
+            const QString call = m_spotKlickRufzeichen;
+            const qint64 alter =
+                QDateTime::currentMSecsSinceEpoch() - m_spotKlickMs;
+            const int nah = qMax(4, QGuiApplication::styleHints()->startDragDistance());
+            m_spotKlickRufzeichen.clear();
+            if (alter >= 0
+                && alter <= QGuiApplication::styleHints()->mouseDoubleClickInterval() + 200
+                && (pos - m_spotKlickPos).manhattanLength() <= nah) {
+                // Noch einmal abstimmen: lieferte das System einen
+                // zweiten Druck, hat der auf leerer Flaeche abgestimmt.
+                emit frequencyClicked(m_spotKlickHz);
+                emit spotLogRequested(call);
+                event->accept();
+                return;
+            }
+        }
         for (const auto& hr : m_spotClickRects) {
             if (!hr.rect.contains(pos)) { continue; }
             if (hr.markerIndex < 0 || hr.markerIndex >= m_spotMarkers.size()) {
