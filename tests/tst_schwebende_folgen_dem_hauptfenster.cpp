@@ -314,6 +314,18 @@ private slots:
     // es gespeichert war.
     void startsprungGibtDieGespeicherteLage()
     {
+        // Platz nach unten: das Hauptfenster darf nicht unter 600 hoch,
+        // und die 58 Punkte muessen wirklich ankommen.
+        m_mw->resize(1300, 900);
+        QTest::qWait(kNachlaufMs);
+        QVERIFY(m_mw->height() >= 900 - kSnapGridPx);
+        // Tief im Fenster, wie das S-Meter des Betreibers: dort wirkt der
+        // Sprung am staerksten (rund 30 Punkte).
+        {
+            const EigeneBewegung wirSelbst;
+            m_abgeloest->move(m_mw->frameGeometry().topLeft() + QPoint(300, 520));
+        }
+        QTest::qWait(kNachlaufMs);
         const QRect gross = m_mw->frameGeometry();
         const QSize innenGross = m_mw->size();
         const QRect gespeichert = m_abgeloest->frameGeometry();
@@ -326,6 +338,7 @@ private slots:
             m_mw->resize(innenGross.width(), innenGross.height() - 58);
             QCoreApplication::processEvents();
         }
+        QVERIFY(m_mw->height() <= innenGross.height() - 58 + kSnapGridPx);
         QTest::qWait(kNachlaufMs);
         QCOMPARE(m_abgeloest->frameGeometry().topLeft(), gespeichert.topLeft());
         // Ein frischer Start kennt keine Grundlage vom letzten Mal.
@@ -344,8 +357,8 @@ private slots:
                 << "Hauptfenster" << gross << "->" << m_mw->frameGeometry();
         QVERIFY2(qAbs(nachher.x() - gespeichert.x()) <= kToleranzPx
                      && qAbs(nachher.y() - gespeichert.y()) <= kToleranzPx
-                     && qAbs(nachher.width() - gespeichert.width()) <= kSnapGridPx
-                     && qAbs(nachher.height() - gespeichert.height()) <= kSnapGridPx,
+                     && qAbs(nachher.width() - gespeichert.width()) <= 2
+                     && qAbs(nachher.height() - gespeichert.height()) <= 2,
                  qPrintable(QStringLiteral("gespeichert %1,%2 %3x%4 -- nachher %5,%6 %7x%8")
                      .arg(gespeichert.x()).arg(gespeichert.y())
                      .arg(gespeichert.width()).arg(gespeichert.height())
