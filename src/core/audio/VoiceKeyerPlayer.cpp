@@ -9,6 +9,8 @@
 // Modification history (Longpath):
 //   2026-11-10 — Original fuer Longpath von Martin Fischer (OE5SOS),
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 — Aufnahme ohne Sendefaden (Flex): das Mikrofon direkt
+//                 abholen. KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 #include "core/audio/VoiceKeyerPlayer.h"
@@ -48,6 +50,9 @@ VoiceKeyerPlayer::VoiceKeyerPlayer(VoiceKeyerStore* store, QObject* parent)
     m_pollTimer.setTimerType(Qt::PreciseTimer);
     connect(&m_pollTimer, &QTimer::timeout, this, &VoiceKeyerPlayer::poll);
 
+    m_micPullTimer.setInterval(kPollMs);
+    connect(&m_micPullTimer, &QTimer::timeout, this, &VoiceKeyerPlayer::pullMicOnce);
+
     m_tailTimer.setSingleShot(true);
     m_tailTimer.setTimerType(Qt::PreciseTimer);
     m_tailTimer.setInterval(kTailMs);
@@ -75,6 +80,10 @@ VoiceKeyerPlayer::~VoiceKeyerPlayer()
     // sein. Nur den Abgriff loesen, damit der Sendefaden nicht in einen
     // geloeschten Rekorder schreibt.
     m_source.stop();
+    if (m_micPullTimer.isActive()) {
+        m_micPullTimer.stop();
+        pullMicOnce();   // was seit dem letzten Takt kam, gehoert dazu
+    }
     if (m_tapWorker) {
         m_tapWorker->setVoiceTapUser(TxWorkerThread::VoiceTapUser::Dvk, false);
     }
@@ -293,7 +302,11 @@ QString VoiceKeyerPlayer::record(int slot)
     }
 
     TxWorkerThread* worker = m_hooks.txWorker ? m_hooks.txWorker() : nullptr;
-    if (!worker) {
+    // Ohne Sendefaden (Flex): das Mikrofon direkt abholen, wenn es den
+    // Weg gibt.
+    const bool pullWay = worker == nullptr && m_hooks.micPullable && m_hooks.pullMic
+                         && m_hooks.micPullable();
+    if (!worker && !pullWay) {
         return QStringLiteral("The transmit path is not up yet — connect to the radio first, then record.");
     }
 
@@ -313,6 +326,20 @@ QString VoiceKeyerPlayer::record(int slot)
     m_recordPeak.store(0.0f, std::memory_order_relaxed);
 
     QObject::disconnect(m_micTap);
+    if (pullWay) {
+        // Was schon im Eingang liegt, ist von vor dem Tastendruck --
+        // weg damit, die Ansage beginnt jetzt.
+        m_micPullBuf.resize(kRateHz / 10);
+        for (int guard = 0; guard < 100; ++guard) {
+            if (m_hooks.pullMic(m_micPullBuf.data(), int(m_micPullBuf.size())) <= 0) {
+                break;
+            }
+        }
+        m_micPullTimer.start();
+        qCInfo(lcVoiceKeyer) << "Aufnahme Platz" << slot + 1 << "beginnt (Mikrofon direkt)";
+        setState(State::Recording, slot);
+        return {};
+    }
     m_micTap = connect(worker, &TxWorkerThread::preStripAudioReady, m_recorder,
                        [this](const float* samples, int frames) {
         // Sendefaden: nur rechnen und atomar ablegen.
@@ -362,6 +389,25 @@ void VoiceKeyerPlayer::finishRecording()
         return;
     }
     qCInfo(lcVoiceKeyer) << "Aufnahme Platz" << slot + 1 << "gespeichert," << samples.size() << "Proben";
+}
+
+void VoiceKeyerPlayer::pullMicOnce()
+{
+    if (!m_recorder || !m_hooks.pullMic) { return; }
+    // Alles abholen, was liegt -- ein Takt kann sich verspaeten.
+    for (int guard = 0; guard < 100; ++guard) {
+        const int got = m_hooks.pullMic(m_micPullBuf.data(), int(m_micPullBuf.size()));
+        if (got <= 0) { return; }
+        float peak = 0.0f;
+        for (int i = 0; i < got; ++i) {
+            peak = std::max(peak, std::fabs(m_micPullBuf[i]));
+        }
+        if (peak > m_recordPeak.load(std::memory_order_relaxed)) {
+            m_recordPeak.store(peak, std::memory_order_relaxed);
+        }
+        m_recorder->feed(m_micPullBuf.constData(), got);
+        if (got < m_micPullBuf.size()) { return; }
+    }
 }
 
 float VoiceKeyerPlayer::takeRecordPeak()

@@ -8,6 +8,8 @@
 // Modification history (Longpath):
 //   2026-11-10 — Platzhalter durch die echte Seite ersetzt von Martin
 //                 Fischer (OE5SOS), KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 — Schalter „F1…F12 als F-Tasten" (macOS), KI-gestuetzt
+//                 ueber Anthropic Claude.
 // =================================================================
 
 #include "KeyboardSetupPages.h"
@@ -151,6 +153,10 @@ KeyboardShortcutsPage::KeyboardShortcutsPage(HotKeyBindings* bindings, QWidget* 
             m_enabledCheck->setChecked(on);
             updateButtons();
         });
+        connect(m_bindings, &HotKeyBindings::fKeysFirstChanged, this, [this](bool on) {
+            QSignalBlocker block(m_fKeysCheck);
+            m_fKeysCheck->setChecked(on);
+        });
     }
 }
 
@@ -170,11 +176,24 @@ void KeyboardShortcutsPage::buildUI()
         "One switch for every shortcut on this page. Menu shortcuts (Ctrl+K, Ctrl+R …) stay on."));
     vLayout->addWidget(m_enabledCheck);
 
+    // Am Mac liefern F1…F12 ab Werk Helligkeit, Lautstaerke usw.; der
+    // Sprachspeicher kaeme nur mit fn (Betreiber 2026-11-11). Siehe
+    // FKeyPriority.
+    m_fKeysCheck = new QCheckBox(
+        QStringLiteral("F1…F12 are plain F keys while Longpath is in front"), group);
+    m_fKeysCheck->setStyleSheet(QString::fromLatin1(Style::kCheckBoxStyle));
+    m_fKeysCheck->setToolTip(QStringLiteral(
+        "Brightness, volume and the other Mac functions on these keys then need fn. "
+        "As soon as another program is in front, or Longpath quits, the keys work as before."));
+    vLayout->addWidget(m_fKeysCheck);
+#ifndef Q_OS_MACOS
+    m_fKeysCheck->setVisible(false);
+#endif
+
     auto* note = new QLabel(
         QStringLiteral("Keys work in the Longpath window and its panels — not while you type in a "
-                       "text field, and not in a dialog. On a Mac, Ctrl is ⌘, and the F keys may "
-                       "need fn. Voice keyer: F1…F10 sends a message, Ctrl+Shift+F1…F10 "
-                       "records it, Esc stops."),
+                       "text field, and not in a dialog. On a Mac, Ctrl is ⌘. Voice keyer: "
+                       "F1…F10 sends a message, Ctrl+Shift+F1…F10 records it, Esc stops."),
         group);
     note->setWordWrap(true);
     note->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
@@ -259,6 +278,9 @@ void KeyboardShortcutsPage::buildUI()
         m_bindings->setEnabled(on);
         updateButtons();
     });
+    connect(m_fKeysCheck, &QCheckBox::toggled, this, [this](bool on) {
+        m_bindings->setFKeysFirst(on);
+    });
     connect(m_searchEdit, &QLineEdit::textChanged, this, &KeyboardShortcutsPage::applyFilter);
     connect(m_table, &QTreeWidget::itemSelectionChanged, this, &KeyboardShortcutsPage::updateButtons);
     connect(m_table, &QTreeWidget::itemDoubleClicked, this, [this](QTreeWidgetItem* item, int) {
@@ -282,6 +304,10 @@ void KeyboardShortcutsPage::refresh()
     {
         QSignalBlocker block(m_enabledCheck);
         m_enabledCheck->setChecked(m_bindings->enabled());
+    }
+    {
+        QSignalBlocker block(m_fKeysCheck);
+        m_fKeysCheck->setChecked(m_bindings->fKeysFirst());
     }
     for (auto it = m_itemById.cbegin(); it != m_itemById.cend(); ++it) {
         const QStringList keys = m_bindings->keysFor(it.key());
@@ -328,6 +354,7 @@ void KeyboardShortcutsPage::updateButtons()
     m_resetAllButton->setEnabled(have);
     m_importButton->setEnabled(have);
     m_exportButton->setEnabled(have);
+    m_fKeysCheck->setEnabled(have && m_bindings->enabled());
 }
 
 QString KeyboardShortcutsPage::shownKeysFor(const QString& id) const

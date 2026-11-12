@@ -437,6 +437,8 @@ public:
 
     /// Die Tastenkuerzel (2026-11-10): der Verteiler, fuer Pruefstaende.
     class HotKeyDispatcher* hotKeyDispatcher() const { return m_hotKeyDispatcher.get(); }
+    /// Am Mac: F1…F12 als F-Tasten, solange Longpath vorne ist (2026-11-11).
+    class FKeyPriority* fKeyPriority() const { return m_fKeyPriority.get(); }
 
     /// Bandstapel (2026-11-11, Entwurf D1): die Marken aller
     /// Panadapter neu setzen -- nach jeder Aenderung am Stapel, einem
@@ -482,6 +484,19 @@ public:
     /// setzt nur die Basis neu und zieht nichts: dort setzt das Profil
     /// die schwebenden Fenster ohnehin selbst.
     int schwebendeMitziehen();
+    /// Abstand der Arbeitsflaeche zum Rahmen: oben Titel-, Menue- und
+    /// Befehlsleiste, unten die Statusleiste (2026-11-12). Diese Leisten
+    /// wachsen nicht mit; umgerechnet wird nur die Flaeche dazwischen.
+    QMargins leistenRaender() const;
+    /// Je schwebendem Fenster seine Lage und Groesse als Anteil der
+    /// Arbeitsflaeche (2026-11-12). Gilt, solange das Fenster dort steht,
+    /// wo das Mitziehen oder der Schutzrahmen es zuletzt hingesetzt hat;
+    /// steht es woanders (eigener Zug, Profil, Anordnen), wird neu
+    /// gemessen. So kommen nach Klein- und wieder Grossziehen alle
+    /// Fenster genau zurueck, auch wenn eines unterwegs an seiner
+    /// Untergrenze hing oder aus einer Leiste geschoben wurde.
+    struct MitziehBasis { double x{0}, y{0}, w{0}, h{0}; QRect gesetzt; };
+    QHash<const QWidget*, MitziehBasis> m_mitziehBasis;
     QRect m_hauptrahmenBasis;
     /// Der Rahmen beim letzten Lage-/Groessenereignis -- um den kleinen
     /// Nachhall des Rasters von einer echten eigenen Bewegung zu trennen.
@@ -509,6 +524,7 @@ public:
     // anzufassen. Also ein Stellvertreter: irgendein Fenster in die
     // Liste legen und danach fragen, ob es schon zurueck ist.
     int schwebendeMitziehenForTest() { return schwebendeMitziehen(); }
+    QMargins leistenRaenderForTest() const { return leistenRaender(); }
     void rememberFloatingWindowBehindConnectMaskForTest(QWidget* w)
     {
         if (!w) { return; }
@@ -2110,6 +2126,7 @@ private:
     std::unique_ptr<class MainWindowHotKeyTargets> m_hotKeyTargets;
     std::unique_ptr<class HotKeyDispatcher>        m_hotKeyDispatcher;
     std::unique_ptr<class KeyboardRouter>          m_keyboardRouter;
+    std::unique_ptr<class FKeyPriority>            m_fKeyPriority;
     class QsoRecorderApplet* m_qsoRecorderApplet{nullptr};
     class RecordingApplet*   m_recordingApplet{nullptr};
 

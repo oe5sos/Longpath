@@ -952,7 +952,11 @@ RadioModel::RadioModel(QObject* parent)
     {
         VoiceKeyerPlayer::Hooks hooks;
         hooks.routeToVoiceKeyer = [this]() {
-            if (!m_compositeMicRouter) { return false; }
+            // Flex (2026-11-11): kein Router -- die Flex-Sendepumpe holt
+            // die Ansage selbst beim Spieler ab (MainWindow_Flex.cpp).
+            if (!m_compositeMicRouter) {
+                return m_flexConnection && m_flexConnection->isConnected();
+            }
             m_dvkQuelleVorher = static_cast<int>(m_compositeMicRouter->activeSource());
             m_compositeMicRouter->setActiveSource(MicSource::Dvk);
             return true;
@@ -975,6 +979,17 @@ RadioModel::RadioModel(QObject* parent)
             return m_moxController != nullptr && m_moxController->isMox();
         };
         hooks.txWorker = [this]() { return m_txWorker.get(); };
+        // Aufnahme an der Flex: kein Sendefaden, aber der Mikrofon-
+        // eingang ist offen (AudioEngine::start() beim Verbinden,
+        // MainWindow_Flex.cpp). Dieselbe Abholung wie die Flex-
+        // Sendepumpe, nur ausserhalb der Sendung.
+        hooks.micPullable = [this]() {
+            return m_audioEngine != nullptr && m_flexConnection
+                   && m_flexConnection->isConnected();
+        };
+        hooks.pullMic = [this](float* dst, int n) {
+            return m_audioEngine ? m_audioEngine->pullTxMic(dst, n) : 0;
+        };
         m_voiceKeyerPlayer->setHooks(std::move(hooks));
         connect(m_moxController, &MoxController::moxStateChanged,
                 m_voiceKeyerPlayer.get(), &VoiceKeyerPlayer::onKeyedChanged);

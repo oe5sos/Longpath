@@ -20,6 +20,8 @@
 // Modification history (Longpath):
 //   2026-11-10 - Uebernommen fuer Longpath von Martin Fischer (OE5SOS),
 //                KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 - Schalter „F-Tasten zuerst" (macOS, FKeyPriority).
+//                KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 // no-port-check: NereusSDR-original, in Longpath uebernommen.
 
@@ -46,6 +48,12 @@ constexpr QChar kFieldSeparator = QLatin1Char('\t');
 const QString& enabledKey()
 {
     static const QString kKey = QStringLiteral("HotKeys/Enabled");
+    return kKey;
+}
+
+const QString& fKeysFirstKey()
+{
+    static const QString kKey = QStringLiteral("HotKeys/MacFKeysFirst");
     return kKey;
 }
 
@@ -170,6 +178,8 @@ void HotKeyBindings::load()
 
     const bool wasEnabled = m_enabled;
     m_enabled = settings.value(enabledKey(), QStringLiteral("True")).toString() == QLatin1String("True");
+    const bool wasFKeysFirst = m_fKeysFirst;
+    m_fKeysFirst = settings.value(fKeysFirstKey(), QStringLiteral("True")).toString() == QLatin1String("True");
 
     // A setting for an action that no longer exists goes away for good.
     const QStringList allKeys = settings.allKeys();
@@ -245,6 +255,9 @@ void HotKeyBindings::load()
     if (wasEnabled != m_enabled) {
         emit enabledChanged(m_enabled);
     }
+    if (wasFKeysFirst != m_fKeysFirst) {
+        emit fKeysFirstChanged(m_fKeysFirst);
+    }
 }
 
 void HotKeyBindings::save()
@@ -255,6 +268,11 @@ void HotKeyBindings::save()
         settings.remove(enabledKey());
     } else {
         settings.setValue(enabledKey(), QStringLiteral("False"));
+    }
+    if (m_fKeysFirst) {
+        settings.remove(fKeysFirstKey());
+    } else {
+        settings.setValue(fKeysFirstKey(), QStringLiteral("False"));
     }
 
     for (const HotKeyAction& action : HotKeyActionList::all()) {
@@ -419,6 +437,20 @@ void HotKeyBindings::setEnabled(bool on)
     }
     m_enabled = on;
     emit enabledChanged(on);
+}
+
+bool HotKeyBindings::fKeysFirst() const
+{
+    return m_fKeysFirst;
+}
+
+void HotKeyBindings::setFKeysFirst(bool on)
+{
+    if (m_fKeysFirst == on) {
+        return;
+    }
+    m_fKeysFirst = on;
+    emit fKeysFirstChanged(on);
 }
 
 QString HotKeyBindings::exportText() const

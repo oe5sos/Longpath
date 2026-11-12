@@ -208,7 +208,24 @@ AppletFloatingWindow::AppletFloatingWindow(AppletWidget* applet,
         applet->setAutoFillBackground(false);
         lay->addWidget(m_scroll);
     }
-    setMinimumWidth(Style::kAppletPanelW);
+    // ── Die Untergrenze kommt vom Inhalt (2026-11-12) ───────────────
+    //
+    // Betreiber, mit Bild: „ich habe das fenster kleiner gezogen, hier
+    // sollten dann alle fenster auch kleiner werden". Hier stand fest
+    // kAppletPanelW (260) -- die Breite der Applet-SPALTE, nicht die
+    // eines Instruments. Frequenz, SWR und S-Meter sind ~269 breit und
+    // konnten darum beim Verkleinern des Hauptfensters (#425) nicht
+    // mitgehen; ihre Lage rueckte im Verhaeltnis zusammen, ihre
+    // Groesse nicht, und sie schoben sich unter Bandfilter und
+    // Panadapter. Jetzt: was der Inhalt selbst mindestens braucht,
+    // hoechstens aber die alten 260 und nie unter 120.
+    {
+        constexpr int kUntergrenze = 120;
+        const int inhalt = applet
+            ? applet->minimumSizeHint().width() + 4
+            : Style::kAppletPanelW;
+        setMinimumWidth(qBound(kUntergrenze, inhalt, Style::kAppletPanelW));
+    }
 
     // ── Ziehen und Groessenaendern, wie bei AetherSDR ────────────────
     //

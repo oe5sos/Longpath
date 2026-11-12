@@ -117,7 +117,12 @@ public:
     void setFrequencyHz(double hz);
 
     QSize sizeHint() const override { return {320, 210}; }
-    QSize minimumSizeHint() const override { return {200, 140}; }
+    // 150 x 110 statt 200 x 140 (2026-11-12, Betreiber mit Bild: „SWR
+    // und S-Meter gehen nicht mit"). Das Zifferblatt rechnet Radius und
+    // Lagen aus der Flaeche; die alte Untergrenze hielt die beiden
+    // Instrumente beim Verkleinern des Hauptfensters breiter als ihre
+    // Nachbarn, und sie schoben sich unter den Panadapter.
+    QSize minimumSizeHint() const override { return {150, 110}; }
 
 
 private:

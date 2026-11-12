@@ -60,6 +60,8 @@
 // Modification history (Longpath):
 //   2026-10-18 — Original for Longpath by Martin Fischer, AI-assisted
 //                 via Anthropic Claude (Cowork).
+//   2026-11-11 — Der Sprachspeicher als Quelle der Sendepumpe (F1…F10
+//                 an der Flex). KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 #include "gui/MainWindow.h"
@@ -86,6 +88,7 @@
 #include <algorithm>
 #include "gui/SpectrumWidget.h"
 #include "gui/widgets/CommandBar.h"
+#include "core/audio/VoiceKeyerPlayer.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "models/BandDefaults.h"
@@ -1700,10 +1703,21 @@ void MainWindow::verdrahteFlexSenden()
             // Quellen zu mischen hiesze, sich selbst zu stoeren.
             int geholt = 0;
             bool vonFt8 = false;
+            //
+            // Der Sprachspeicher (2026-11-11) ist eine dritte Quelle,
+            // aber kein Datensignal: eine Ansage ist aufgenommene
+            // Stimme und geht darum durch dieselbe Aufbereitung wie das
+            // Mikrofon (vonFt8 bleibt false). Beim eigenen Geraet holt
+            // ihn der Mikrofon-Router ab; den hat die Flex nicht, also
+            // hier -- sonst ging F1 mit offenem Mikrofon auf Sendung.
+            VoiceKeyerPlayer* const ansage = m_radioModel->voiceKeyerPlayer();
             if (Ft8TxSource* ft8 = m_radioModel->ft8TxSource();
                 ft8 && ft8->laeuft()) {
                 geholt = ft8->pullSamples(m_flexMikMono.data(), kRahmen);
                 vonFt8 = true;
+            } else if (ansage != nullptr
+                       && ansage->state() == VoiceKeyerPlayer::State::Playing) {
+                geholt = ansage->source()->pullSamples(m_flexMikMono.data(), kRahmen);
             } else {
                 geholt = ae->pullTxMic(m_flexMikMono.data(), kRahmen);
                 ++m_flexTxVomMik;

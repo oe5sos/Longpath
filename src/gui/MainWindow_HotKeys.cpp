@@ -17,6 +17,8 @@
 //                 KI-gestuetzt ueber Anthropic Claude. Der Abstimmweg
 //                 stand bis dahin im Klick-Handler von
 //                 wireSpectrumSliceControls (MainWindow.cpp).
+//   2026-11-11 — F-Tasten zuerst am Mac (FKeyPriority), KI-gestuetzt
+//                 ueber Anthropic Claude.
 // =================================================================
 
 #include "gui/MainWindow.h"
@@ -28,6 +30,7 @@
 #include "core/hotkeys/HotKeyBindings.h"
 #include "core/hotkeys/HotKeyChord.h"
 #include "gui/SpectrumWidget.h"
+#include "gui/hotkeys/FKeyPriority.h"
 #include "gui/hotkeys/HotKeyDispatcher.h"
 #include "gui/hotkeys/KeyboardRouter.h"
 #include "gui/hotkeys/MainWindowHotKeyTargets.h"
@@ -36,7 +39,9 @@
 #include "models/SliceModel.h"
 
 #include <QAction>
+#include <QGuiApplication>
 #include <QHash>
+#include <QStandardPaths>
 #include <QKeySequence>
 #include <QShortcut>
 
@@ -143,6 +148,35 @@ void MainWindow::richteTastenkuerzelEin()
     // Laden verbunden, damit der Start selbst nichts schreibt.
     connect(bindings, &HotKeyBindings::bindingsChanged, this, [bindings]() { bindings->save(); });
     connect(bindings, &HotKeyBindings::enabledChanged, this, [bindings]() { bindings->save(); });
+    connect(bindings, &HotKeyBindings::fKeysFirstChanged, this, [bindings]() { bindings->save(); });
+
+    // ── Am Mac: F1…F12 als F-Tasten, solange Longpath vorne ist ──────
+    //
+    // Betreiber 2026-11-11: „bitte am Mac die F1-F2 Tasten priorisieren"
+    // -- ab Werk liefern sie Helligkeit und Co., der Sprachspeicher kam
+    // nur mit fn. Ein Pruefstand und das Fenster ohne Schirm fassen den
+    // Tastaturmodus des Rechners nie an: sie bekommen den leeren Weg.
+    const bool echt = !QStandardPaths::isTestModeEnabled()
+                      && QGuiApplication::platformName() != QLatin1String("offscreen");
+    m_fKeyPriority = std::make_unique<FKeyPriority>(
+        echt ? FKeyPriority::systemBackend() : FKeyPriority::Backend{},
+        echt ? FKeyPriority::defaultMarkerPath() : QString());
+    FKeyPriority* const fKeys = m_fKeyPriority.get();
+    const auto wunsch = [fKeys, bindings]() {
+        fKeys->setWanted(bindings->enabled() && bindings->fKeysFirst());
+    };
+    connect(bindings, &HotKeyBindings::enabledChanged, this, wunsch);
+    connect(bindings, &HotKeyBindings::fKeysFirstChanged, this, wunsch);
+    connect(qGuiApp, &QGuiApplication::applicationStateChanged, this,
+            [fKeys](Qt::ApplicationState state) { fKeys->setActive(state == Qt::ApplicationActive); });
+    connect(qGuiApp, &QCoreApplication::aboutToQuit, this, [fKeys]() { fKeys->release(); });
+    connect(fKeys, &FKeyPriority::failed, this, [this](const QString& text) {
+        if (!m_shuttingDown) {
+            showToast(text, ToastSeverity::Warning, 6000);
+        }
+    });
+    wunsch();
+    fKeys->setActive(QGuiApplication::applicationState() == Qt::ApplicationActive);
 
     qCInfo(lcHotKeys) << "Tastenkuerzel eingerichtet:" << HotKeyActionList::all().size()
                       << "Handlungen," << reserved.size() << "Menue-Kuerzel gesperrt,"

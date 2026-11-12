@@ -135,8 +135,26 @@ void ensureOnVisibleScreen(QWidget* w, QWidget* anchor, QSize minSize)
                   && overlap.height() >= kMinOverlapH;
     }
 
-    if (onScreen && !atOrigin && nearAnchor
-        && g.width() >= minW && g.height() >= minH) {
+    // ── Zu klein ist kein Grund, das Fenster zu VERSCHIEBEN (2026-11-12) ─
+    //
+    // Betreiber, mit drei Bildern: „dann lade ich das Profil 01 und die
+    // frequenz ist wieder in der mitte, so war sie nicht abgespeichert".
+    // Hier stand die Groesse in derselben Bedingung wie die Lage: ein
+    // Fenster an tadelloser Stelle, aber niedriger als minSize, fiel
+    // durch und wurde in die Mitte des Hauptfensters gesetzt. Genau das
+    // passiert den schwebenden Applets ohne Verbindung -- ihr Inhalt
+    // fehlt, das Fenster ist kurz nur 93 hoch (gegen 120 als Mindest-
+    // hoehe), und das Profil-Herstellen ruft diese Stelle. Frequenz und
+    // SWR lagen danach auf demselben Punkt (656,400 am 12.11. frueh),
+    // verdeckt hinter dem Panadapter, und der naechste Profilwechsel
+    // sicherte die Mitte ins Profil.
+    //
+    // Jetzt: liegt es gut, waechst es an Ort und Stelle. In die Mitte
+    // kommt nur, was wirklich verloren ist.
+    if (onScreen && !atOrigin && nearAnchor) {
+        if (g.width() < minW || g.height() < minH) {
+            w->resize(qMax(g.width(), minW), qMax(g.height(), minH));
+        }
         return;
     }
     if (!screen) {
