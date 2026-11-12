@@ -80,6 +80,8 @@ class QComboBox;
 class QEvent;
 class QLineEdit;
 class QSpinBox;
+class QTableWidget;
+class QTableWidgetItem;
 
 namespace Longpath {
 
@@ -225,11 +227,26 @@ public:
     QComboBox* mosaikBandForTest() const { return m_mosaikBand; }
     QCheckBox* nurFt8ForTest() const { return m_nurFt8; }
     QCheckBox* gridForTest() const { return m_grid; }
+    QPushButton* jagdButtonForTest() const { return m_jagdBtn; }
+    QPushButton* vollbildButtonForTest() const { return m_vollbildBtn; }
+    QTableWidget* jagdListeForTest() const { return m_jagdListe; }
+    QWidget* jagdSpalteForTest() const { return m_jagdSpalte; }
+    QCheckBox* pathsForTest() const { return m_paths; }
+    QCheckBox* imageryForTest() const { return m_imagery; }
     QSpinBox*  liveMinutenForTest() const { return m_liveMinuten; }
     void       refreshLiveForTest() { refreshLive(); }
 
 signals:
     void popOutRequested();
+    /// Die Jagdliste bittet um eine Peilung. Das Kartenfenster kennt
+    /// keinen Rotor -- es sagt nur, wohin; das Logbuch reicht es an
+    /// seinen `turnRotorRequested` weiter.
+    void rotorZielGewuenscht(double grad, const QString& rufzeichen);
+    /// Eine Station aus einem fehlenden Feld ist neu aufgetaucht. Das
+    /// Kartenfenster zeigt selbst einen Hinweis; dieses Signal ist
+    /// dafuer da, dass spaeter ein Ton oder eine Meldung daran haengen
+    /// kann, ohne dass die Karte davon wissen muss.
+    void jagdAlarm(const QString& rufzeichen, const QString& feld, bool neuesLand);
 
 protected:
     void closeEvent(QCloseEvent*) override;
@@ -305,6 +322,26 @@ private:
 
     QDateEdit*   m_from{nullptr};
     QDateEdit*   m_to{nullptr};
+    // ── Locator-Jagd: ein Knopf statt drei Vorwissen (2026-11-11) ───
+    //
+    // Betreiber: „es muss eine weltkarte sein, mit der ich sofort sehe,
+    // was noch nicht erreicht ist und wo aktuell gesendet wird" -- und
+    // davor: „wenn man dies nicht weiss...". Vorher musste man wissen,
+    // dass der Haken `Grid` heisst, dass er im 3D-Bild verschwindet und
+    // dass `Paths` und `Imagery` ihn zudecken. Dieser Knopf stellt die
+    // ganze Buehne auf einmal und raeumt sie wieder weg.
+    QPushButton* m_jagdBtn{nullptr};
+    struct JagdVorher {
+        bool gueltig{false};
+        bool pfade{false};
+        bool luftbild{false};
+        bool gitter{false};
+        bool nurFt8{false};
+        int  ansicht{0};
+    };
+    JagdVorher   m_jagdVorher;
+    void setzeJagd(bool an);
+
     QCheckBox*   m_paths{nullptr};
     QCheckBox*   m_grid{nullptr};
     QCheckBox*   m_imagery{nullptr};
@@ -338,6 +375,40 @@ private:
     QWidget*          m_backgroundBox{nullptr};   // KARTE + Auswahl
     QPushButton*      m_earthBtn{nullptr};
     QPushButton*      m_popOutBtn{nullptr};
+    // Vollbild: nur im eigenen Fenster, nicht in der Logbuchspalte.
+    // Betreiber 2026-11-11: „es sollte die moeglichkeit geben, dass auf
+    // vollbild zu vergroessern".
+    QPushButton*      m_vollbildBtn{nullptr};
+    void setzeVollbild(bool an);
+
+    // ── Die Jagdliste neben der Karte (2026-11-11) ─────────────────
+    //
+    // Betreiber: „somit sehe ich sofort das call, welches aus einem
+    // locator sendet, welches ich noch nicht erreicht und bestaetigt
+    // habe." Die Karte sagt WO, diese Spalte sagt WEN -- auf der
+    // Weltkarte ist ein Feld nur rund sechs Bildpunkte breit, ein
+    // Rufzeichen in einer Zeile hat dieses Problem nicht.
+    QTableWidget* m_jagdListe{nullptr};
+    QLabel*       m_jagdListeKopf{nullptr};
+    QWidget*      m_jagdSpalte{nullptr};
+    void fuelleJagdListe(const QVector<Longpath::LivePunkt>& punkte);
+    /// Wer schon in der Liste stand. Nur was NEU dazukommt, ist ein
+    /// Anlass fuer einen Hinweis -- sonst melde ich bei jedem
+    /// Auffrischen dieselben zehn Stationen.
+    QSet<QString> m_jagdGesehen;
+    class QLabel* m_jagdBaender{nullptr};
+    /// Die Meldung ueber dem Kopf, wenn etwas Neues auftaucht. Kein
+    /// eigenes Hinweisfenster: StatusToast ist ein rahmenloses
+    /// Oberfenster am Hauptfenster, mit eigener Abbau-Falle
+    /// (MainWindow::showToast, 2026-10-15) -- in der Jagdtafel steht
+    /// die Meldung dort, wo der Betreiber ohnehin hinsieht.
+    class QLabel* m_jagdAlarmText{nullptr};
+    QTimer        m_jagdAlarmUhr;
+    /// Ein Ton bei einem neuen Land -- nur dort, nicht bei jedem neuen
+    /// Feld: bei einer Bandoeffnung piepte es sonst ununterbrochen.
+    /// Geht ueber QApplication::beep() und damit NICHT durch den
+    /// Funkweg: ein Hinweiston darf nie wie ein Signal klingen.
+    QCheckBox*    m_jagdTon{nullptr};
     bool              m_embedded{false};
 
     // ── 3D-Flug ──────────────────────────────────────────────────────

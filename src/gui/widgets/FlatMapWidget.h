@@ -113,6 +113,27 @@ public:
     void setMosaik(const QHash<QString, FeldStand>& felder);
     int  mosaikAnzahl() const { return m_mosaik.size(); }
 
+    // Jagdmodus: das Mosaik deckt, statt zu tuschen. Der Schalter sitzt
+    // im Kartenfenster ("Locator hunt"), nicht hier -- dieses Widget
+    // weiss nur, wie kraeftig es malen soll.
+    void setJagdModus(bool an);
+    bool jagdModus() const { return m_jagdModus; }
+
+    // Grosse Felder: auf der Weltkarte ist ein vierstelliges Feld rund
+    // sechs Bildpunkte breit -- zu klein, um eine Luecke zu sehen. Dann
+    // faerbt das Mosaik stattdessen die ZWEIstelligen Felder (20x10
+    // Grad, die Kaestchen, die ohnehin schon beschriftet sind), und ein
+    // Feld gilt als bestaetigt, sobald EIN Quadrat darin bestaetigt ist.
+    void setGrosseFelder(bool an);
+    bool grosseFelder() const { return m_grosseFelder; }
+
+    // Umgekehrt gedacht: nicht faerben, was ich HABE, sondern was mir
+    // FEHLT. „Es muss eine weltkarte sein, mit der ich sofort sehe, was
+    // noch nicht erreicht ist" -- die Luecke ist der Gegenstand, nicht
+    // der Besitz. Nur zusammen mit grossen Feldern sinnvoll.
+    void setLueckenBetonen(bool an);
+    bool lueckenBetonen() const { return m_luecken; }
+
     // Die gehoerten FT8-Stationen. Unabhaengig vom Grid zu sehen: wer
     // FT8 hoert, will die Punkte auch ohne Gitter finden.
     void setLivePunkte(const QVector<LivePunkt>& punkte);
@@ -285,6 +306,9 @@ private:
     bool m_showPaths{true};
     bool m_showTerminator{true};
     bool m_showGrid{false};
+    bool m_jagdModus{false};
+    bool m_grosseFelder{false};
+    bool m_luecken{false};
     QString m_clickedGrid;   // highlighted square, empty for none
 
     QHash<QString, FeldStand> m_mosaik;

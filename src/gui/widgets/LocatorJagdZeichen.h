@@ -31,7 +31,11 @@ class QPainter;
 namespace Longpath::LocatorJagdZeichen {
 
 /// Fuellung eines Feldes im Mosaik (mit Deckung). `Nie` ist durchsichtig.
-QColor feldFuellung(FeldStand s);
+// `kraeftig` ist der Jagdmodus: dann ist das Mosaik der Gegenstand der
+// Karte und nicht ihr Hintergrund, also deckt es auch. Betreiber am
+// 2026-11-11, vor der Weltkarte mit 9313 Pfaden darueber: „da kann man
+// nichts erkennen".
+QColor feldFuellung(FeldStand s, bool kraeftig = false);
 
 /// Die Farbe einer Art -- Punkt, Schrift, Rahmen.
 QColor farbe(LiveArt a);

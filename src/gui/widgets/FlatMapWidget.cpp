@@ -140,12 +140,85 @@ bool FlatMapWidget::event(QEvent* e)
     return QWidget::event(e);
 }
 
+void FlatMapWidget::setJagdModus(bool an)
+{
+    if (m_jagdModus == an) { return; }
+    m_jagdModus = an;
+    update();
+}
+
+void FlatMapWidget::setGrosseFelder(bool an)
+{
+    if (m_grosseFelder == an) { return; }
+    m_grosseFelder = an;
+    update();
+}
+
+void FlatMapWidget::setLueckenBetonen(bool an)
+{
+    if (m_luecken == an) { return; }
+    m_luecken = an;
+    update();
+}
+
 void FlatMapWidget::paintMosaik(QPainter& p)
 {
     if (m_mosaik.isEmpty()) { return; }
     p.save();
     p.setPen(Qt::NoPen);
     const QRectF sicht(rect());
+
+    if (m_grosseFelder) {
+        // Je Grossfeld der BESTE Stand darin: ein bestaetigtes Quadrat
+        // macht das Feld bestaetigt. Das ist die Frage, die auf der
+        // Weltkarte zaehlt -- „war ich da schon mal?", nicht „welches
+        // der hundert Quadrate fehlt mir noch".
+        QHash<QString, FeldStand> gross;
+        for (auto it = m_mosaik.cbegin(); it != m_mosaik.cend(); ++it) {
+            if (it.key().size() != 4) { continue; }
+            const QString gf = it.key().left(2);
+            const FeldStand da = gross.value(gf, FeldStand::Nie);
+            if (it.value() == FeldStand::Bestaetigt
+                || (it.value() == FeldStand::Gearbeitet && da == FeldStand::Nie)) {
+                gross.insert(gf, it.value());
+            }
+        }
+        if (m_luecken) {
+            // Alle 18x18 Grossfelder durchgehen und das faerben, was
+            // NICHT im Logbuch steht. Bernstein, die Hausfarbe fuer
+            // „neu" -- gedaempft, sonst waere der halbe Globus ein Fleck.
+            QColor luecke(Style::kJagdNeu);
+            luecke.setAlpha(m_jagdModus ? 70 : 40);
+            p.setBrush(luecke);
+            for (int fx = 0; fx < 18; ++fx) {
+                for (int fy = 0; fy < 18; ++fy) {
+                    const QString gf = QString(QLatin1Char('A' + char(fx)))
+                                     + QLatin1Char('A' + char(fy));
+                    if (gross.contains(gf)) { continue; }
+                    const QRectF feld(project(fy * 10.0 - 90.0 + 10.0, fx * 20.0 - 180.0),
+                                      project(fy * 10.0 - 90.0, fx * 20.0 - 180.0 + 20.0));
+                    if (!feld.intersects(sicht)) { continue; }
+                    p.drawRect(feld);
+                }
+            }
+            p.restore();
+            return;
+        }
+        for (auto it = gross.cbegin(); it != gross.cend(); ++it) {
+            const int fx = it.key().at(0).toLatin1() - 'A';
+            const int fy = it.key().at(1).toLatin1() - 'A';
+            const double lonW = fx * 20.0 - 180.0;
+            const double latS = fy * 10.0 - 90.0;
+            const QRectF feld(project(latS + 10.0, lonW),
+                              project(latS, lonW + 20.0));
+            if (!feld.intersects(sicht)) { continue; }
+            p.setBrush(LocatorJagdZeichen::feldFuellung(it.value(), m_jagdModus));
+            p.drawRect(feld);
+        }
+        p.restore();
+        return;
+    }
+
     for (auto it = m_mosaik.cbegin(); it != m_mosaik.cend(); ++it) {
         const QString& f = it.key();
         if (f.size() != 4) { continue; }
@@ -157,7 +230,7 @@ void FlatMapWidget::paintMosaik(QPainter& p)
         const double latS = fy * 10.0 - 90.0 + sy;
         const QRectF feld(project(latS + 1.0, lonW), project(latS, lonW + 2.0));
         if (!feld.intersects(sicht)) { continue; }
-        p.setBrush(LocatorJagdZeichen::feldFuellung(it.value()));
+        p.setBrush(LocatorJagdZeichen::feldFuellung(it.value(), m_jagdModus));
         p.drawRect(feld);
     }
     p.restore();
@@ -1008,14 +1081,11 @@ void FlatMapWidget::mouseReleaseEvent(QMouseEvent* e)
         // which square is that.
         if (!m_moved) {
             const QPointF pos = e->position();
-            // Ein gehoerter FT8-Punkt liegt obenauf und geht vor
-            // (2026-11-11): wer auf ihn zielt, will anrufen, nicht die
-            // Karteikarte eines alten QSOs darunter sehen.
-            const int live = livePunktAt(pos);
-            if (live >= 0) {
-                emit livePunktGeklickt(m_live.at(live).g.rufzeichen);
-                return;
-            }
+            // Anrufen tut der DOPPELklick, nicht dieser hier (Betreiber
+            // 2026-11-11: „doppelklick, sofern ich diesen sender
+            // empfangen kann, und das ft8 geht los"). Ein einzelner
+            // Klick darf keine Taste druecken -- er zeigt nur, was unter
+            // dem Zeiger liegt. Siehe mouseDoubleClickEvent().
             const int hit = pointAt(pos);
             if (hit >= 0) {
                 const MapPoint& pt = m_points.at(hit);
@@ -1037,6 +1107,16 @@ void FlatMapWidget::mouseReleaseEvent(QMouseEvent* e)
 void FlatMapWidget::mouseDoubleClickEvent(QMouseEvent* e)
 {
     if (e->button() == Qt::LeftButton) {
+        // Ein gehoerter FT8-Punkt liegt obenauf und geht vor: wer ihn
+        // doppelt trifft, will anrufen, nicht die Ansicht zuruecksetzen.
+        // Dasselbe Handgriff wie der Doppelklick in der Fundliste, und
+        // derselbe Weg dahinter (Ft8KartenBruecke -> rufeVonDerKarte ->
+        // kartenSperre -> nimmFundAn).
+        const int live = livePunktAt(e->position());
+        if (live >= 0) {
+            emit livePunktGeklickt(m_live.at(live).g.rufzeichen);
+            return;
+        }
         resetView();
         return;
     }

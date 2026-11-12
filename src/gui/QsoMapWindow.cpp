@@ -50,6 +50,9 @@
 #include <QCheckBox>
 #include <QSpinBox>
 #include <QTimer>
+#include <QApplication>
+#include <QTableWidget>
+#include <QHeaderView>
 #include <QComboBox>
 #include <QStandardItemModel>
 #include "gui/widgets/WorldMapCatalog.h"
@@ -148,6 +151,17 @@ void QsoMapWindow::keyPressEvent(QKeyEvent* e)
     // Eingebettet ist Escape kein „Fenster zu" — QDialog wuerde das
     // Widget sonst mitten aus dem Logbuch ausblenden.
     if (m_embedded && e->key() == Qt::Key_Escape) { e->ignore(); return; }
+    // Im Vollbild ist Escape der Rueckweg, nicht „Fenster zu" -- sonst
+    // waere die Karte nach einem Tastendruck ganz weg.
+    if (!m_embedded && isFullScreen() && e->key() == Qt::Key_Escape) {
+        if (m_vollbildBtn) { m_vollbildBtn->setChecked(false); }
+        else               { showNormal(); }
+        return;
+    }
+    if (!m_embedded && e->key() == Qt::Key_F11) {
+        if (m_vollbildBtn) { m_vollbildBtn->setChecked(!m_vollbildBtn->isChecked()); }
+        return;
+    }
     QDialog::keyPressEvent(e);
 }
 
@@ -163,6 +177,10 @@ void QsoMapWindow::setEmbedded(bool on)
     if (m_backgroundBox) { m_backgroundBox->setVisible(!on); }
     if (m_earthBtn) { m_earthBtn->setVisible(!on); }
     if (m_popOutBtn) { m_popOutBtn->setVisible(on); }
+    if (m_vollbildBtn) {
+        m_vollbildBtn->setVisible(!on);
+        if (on && m_vollbildBtn->isChecked()) { m_vollbildBtn->setChecked(false); }
+    }
     rebuild();
 }
 
@@ -181,6 +199,247 @@ void QsoMapWindow::resetActiveView()
     if (isOverlayView(m_stack->currentIndex()) || m_stack->currentIndex() == kView3d) { return; }
     if (m_stack->currentIndex() == 0) { m_globe->resetView(); }
     else                              { m_flat->resetView(); }
+}
+
+void QsoMapWindow::fuelleJagdListe(const QVector<LivePunkt>& punkte)
+{
+    if (m_jagdListe == nullptr) { return; }
+
+    // „Erreicht UND bestaetigt" sind zwei Jagden (Betreiber 2026-11-11).
+    // Drei Raenge:
+    //   0  neues Land   -- noch nie gearbeitet
+    //   1  neues Feld   -- auf diesem Band noch nie gearbeitet
+    //   2  QSL fehlt    -- gearbeitet, aber nie bestaetigt. Das ist kein
+    //                     Funkproblem, sondern ein Papierproblem: hier
+    //                     hilft kein Anruf, sondern ein Hochladen oder
+    //                     eine Nachfrage. Darum unten und in Sand.
+    QVector<LivePunkt> offen;
+    QHash<QString, int> rang;
+    for (const LivePunkt& lp : punkte) {
+        int r = -1;
+        if (lp.art == LiveArt::NeuesLand)    { r = 0; }
+        else if (lp.feldNeu)                 { r = 1; }
+        else if (m_mosaik.stand(lp.feld, lp.g.band) == FeldStand::Gearbeitet) { r = 2; }
+        if (r < 0) { continue; }
+        rang.insert(lp.g.rufzeichen, r);
+        offen.append(lp);
+    }
+    std::sort(offen.begin(), offen.end(), [&rang](const LivePunkt& a, const LivePunkt& b) {
+        const int ra = rang.value(a.g.rufzeichen, 9);
+        const int rb = rang.value(b.g.rufzeichen, 9);
+        if (ra != rb) { return ra < rb; }
+        if (a.alterSek != b.alterSek) { return a.alterSek < b.alterSek; }
+        return a.g.snrDb > b.g.snrDb;
+    });
+
+    m_jagdListe->setRowCount(offen.size());
+    const QColor neu(Style::kJagdNeu);
+    const QColor sand(Style::kJagdFeldGearbeitet);
+    const QColor leise(Style::kTextSecondary);
+    int fehlend = 0;
+    for (int r = 0; r < offen.size(); ++r) {
+        const LivePunkt& lp = offen.at(r);
+        const int rg = rang.value(lp.g.rufzeichen, 9);
+        const bool qsl = rg == 2;
+        if (!qsl) { ++fehlend; }
+        const bool land = lp.art == LiveArt::NeuesLand;
+        // Die Raute steht fuer ein neues Land -- dasselbe Zeichen wie
+        // auf der Karte, damit Liste und Bild dieselbe Sprache sprechen.
+        auto* ruf = new QTableWidgetItem(
+            (land ? QStringLiteral("\u25c6 ") : QString{}) + lp.g.rufzeichen);
+        ruf->setData(Qt::UserRole, lp.g.rufzeichen);
+        ruf->setForeground(qsl ? sand : neu);
+        QFont f = ruf->font();
+        f.setBold(!qsl);
+        ruf->setFont(f);
+        ruf->setToolTip(qsl
+            ? QStringLiteral("%1 — %2 is worked on %3 but never confirmed. "
+                             "Calling again will not change that: it needs a "
+                             "QSL, not a QSO.")
+                  .arg(lp.g.rufzeichen, lp.feld, lp.g.band)
+            : land
+            ? QStringLiteral("%1 — %2, a country you have never worked")
+                  .arg(lp.g.rufzeichen, lp.g.land.isEmpty()
+                                            ? QStringLiteral("new DXCC")
+                                            : lp.g.land)
+            : QStringLiteral("%1 — %2 is still missing on %3")
+                  .arg(lp.g.rufzeichen, lp.feld, lp.g.band));
+        m_jagdListe->setItem(r, 0, ruf);
+
+        auto* feld = new QTableWidgetItem(
+            qsl ? lp.feld + QStringLiteral(" QSL?") : lp.feld);
+        feld->setForeground(qsl ? sand : leise);
+        m_jagdListe->setItem(r, 1, feld);
+
+        auto* snr = new QTableWidgetItem(QStringLiteral("%1").arg(lp.g.snrDb));
+        snr->setForeground(leise);
+        snr->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        m_jagdListe->setItem(r, 2, snr);
+
+        auto* km = new QTableWidgetItem(
+            lp.km < 0.0 ? QStringLiteral("—")
+                        : QString::number(qRound(lp.km)));
+        km->setForeground(leise);
+        km->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        m_jagdListe->setItem(r, 3, km);
+
+        auto* az = new QTableWidgetItem(
+            lp.azimutGrad < 0.0 ? QStringLiteral("—")
+                                : QStringLiteral("%1").arg(qRound(lp.azimutGrad)));
+        az->setForeground(leise);
+        az->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        if (lp.azimutGrad >= 0.0) {
+            az->setData(Qt::UserRole, lp.azimutGrad);
+            az->setToolTip(QStringLiteral(
+                "Double-click to point the antenna at %1°").arg(qRound(lp.azimutGrad)));
+        }
+        m_jagdListe->setItem(r, 4, az);
+
+        auto* alt = new QTableWidgetItem(QStringLiteral("%1s").arg(lp.alterSek));
+        alt->setForeground(leise);
+        alt->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        m_jagdListe->setItem(r, 5, alt);
+    }
+
+    if (m_jagdListeKopf != nullptr) {
+        const int qslZahl = offen.size() - fehlend;
+        QString text;
+        if (offen.isEmpty()) {
+            text = QStringLiteral("Nothing missing on the air right now.");
+        } else if (qslZahl == 0) {
+            text = QStringLiteral("%1 transmitting now from squares you do "
+                                  "not have — double-click to call")
+                       .arg(fehlend);
+        } else {
+            text = QStringLiteral("%1 from squares you do not have, %2 worked "
+                                  "but unconfirmed — double-click to call")
+                       .arg(fehlend).arg(qslZahl);
+        }
+        m_jagdListeKopf->setText(text);
+    }
+
+    // ── Welches Band hat gerade die meisten Luecken ────────────────
+    if (m_jagdBaender != nullptr) {
+        QHash<QString, QSet<QString>> jeBand;   // Band -> fehlende Felder
+        for (const LivePunkt& lp : punkte) {
+            if (lp.g.band.isEmpty()) { continue; }
+            if (lp.art != LiveArt::NeuesLand && !lp.feldNeu) { continue; }
+            jeBand[lp.g.band].insert(lp.feld);
+        }
+        QVector<QPair<QString, int>> zeilen;
+        for (auto it = jeBand.cbegin(); it != jeBand.cend(); ++it) {
+            zeilen.append({it.key(), it.value().size()});
+        }
+        std::sort(zeilen.begin(), zeilen.end(),
+                  [](const QPair<QString, int>& a, const QPair<QString, int>& b) {
+            if (a.second != b.second) { return a.second > b.second; }
+            return a.first < b.first;
+        });
+        QStringList stueck;
+        for (const auto& z : zeilen) {
+            stueck << QStringLiteral("%1 %2").arg(z.first).arg(z.second);
+        }
+        m_jagdBaender->setText(stueck.isEmpty()
+            ? QString{}
+            : QStringLiteral("new squares on the air:  ")
+                  + stueck.join(QStringLiteral("  ·  ")));
+    }
+
+    // ── Hinweis, wenn etwas NEU auftaucht ──────────────────────────
+    //
+    // Der Zaehler nuetzt nur, wer hinsieht. Gemeldet wird nur, was seit
+    // dem letzten Auffrischen dazugekommen ist, und nur das Wertvollste
+    // davon -- sonst steht nach einer Bandoeffnung ein Stapel Hinweise
+    // auf der Karte.
+    QSet<QString> jetztDa;
+    const LivePunkt* melden = nullptr;
+    int weitere = 0;
+    for (const LivePunkt& lp : offen) {
+        if (rang.value(lp.g.rufzeichen, 9) == 2) { continue; }   // QSL eilt nicht
+        jetztDa.insert(lp.g.rufzeichen);
+        if (m_jagdGesehen.contains(lp.g.rufzeichen)) { continue; }
+        if (melden == nullptr) { melden = &lp; } else { ++weitere; }
+    }
+    // Wer verschwunden ist, darf beim naechsten Mal wieder melden.
+    m_jagdGesehen.intersect(jetztDa);
+    if (melden != nullptr) {
+        const bool land = melden->art == LiveArt::NeuesLand;
+        QString text = land
+            ? QStringLiteral("%1 — new DXCC (%2)")
+                  .arg(melden->g.rufzeichen,
+                       melden->g.land.isEmpty() ? melden->feld : melden->g.land)
+            : QStringLiteral("%1 — %2 is new on %3")
+                  .arg(melden->g.rufzeichen, melden->feld, melden->g.band);
+        if (weitere > 0) {
+            text += QStringLiteral("  (+%1 more)").arg(weitere);
+        }
+        emit jagdAlarm(melden->g.rufzeichen, melden->feld, land);
+        if (m_jagdAlarmText != nullptr) {
+            m_jagdAlarmText->setText(QStringLiteral("\u25b6  ") + text);
+            m_jagdAlarmText->setVisible(true);
+            m_jagdAlarmUhr.start(land ? 20000 : 10000);
+        }
+        if (land && m_jagdTon != nullptr && m_jagdTon->isChecked()) {
+            QApplication::beep();
+        }
+    }
+    for (const QString& r : jetztDa) { m_jagdGesehen.insert(r); }
+}
+
+void QsoMapWindow::setzeVollbild(bool an)
+{
+    if (m_embedded) { return; }   // in der Spalte gibt es kein Vollbild
+    if (an) { showFullScreen(); }
+    else    { showNormal(); }
+    // Das Vollbild stellt das Fenster neu auf; die Karte soll dabei
+    // nicht an ihrem alten Ausschnitt kleben.
+    QTimer::singleShot(0, this, [this]() { resetActiveView(); });
+}
+
+void QsoMapWindow::setzeJagd(bool an)
+{
+    if (an) {
+        // Erst merken, was der Betreiber eingestellt hatte -- der Knopf
+        // raeumt auf, er wirft nichts weg.
+        m_jagdVorher.pfade    = m_paths   && m_paths->isChecked();
+        m_jagdVorher.luftbild = m_imagery && m_imagery->isChecked();
+        m_jagdVorher.gitter   = m_grid    && m_grid->isChecked();
+        m_jagdVorher.nurFt8   = m_nurFt8  && m_nurFt8->isChecked();
+        m_jagdVorher.ansicht  = m_stack ? m_stack->currentIndex() : kViewFlat;
+        m_jagdVorher.gueltig  = true;
+
+        // Aus dem 3D heraus: dort gibt es kein Mosaik, und genau dort
+        // hat der Betreiber am 2026-11-11 danach gesucht.
+        if (m_3dBtn && m_3dBtn->isChecked()) { m_3dBtn->setChecked(false); }
+        for (QPushButton* b : {m_radarBtn, m_azimutBtn}) {
+            if (b && b->isChecked()) { b->setChecked(false); }
+        }
+        if (m_stack) { m_stack->setCurrentIndex(kViewFlat); }
+        if (m_viewBtn) { m_viewBtn->setText(QStringLiteral("Globe")); }
+
+        if (m_grid)    { m_grid->setChecked(true); }
+        if (m_nurFt8)  { m_nurFt8->setChecked(true); }
+        // Die beiden Decken weg: 9313 Pfade und ein Satellitenfoto haben
+        // das Mosaik unlesbar gemacht.
+        if (m_paths)   { m_paths->setChecked(false); }
+        if (m_imagery) { m_imagery->setChecked(false); }
+
+        if (m_flat) { m_flat->setJagdModus(true); }
+        if (m_jagdSpalte) { m_jagdSpalte->setVisible(true); }
+        refreshLive();
+        rememberView();
+        resetActiveView();   // die ganze Welt, nicht der eigene Vorgarten
+        return;
+    }
+
+    if (m_flat) { m_flat->setJagdModus(false); }
+    if (m_jagdSpalte) { m_jagdSpalte->setVisible(false); }
+    if (!m_jagdVorher.gueltig) { return; }
+    if (m_paths)   { m_paths->setChecked(m_jagdVorher.pfade); }
+    if (m_imagery) { m_imagery->setChecked(m_jagdVorher.luftbild); }
+    if (m_grid)    { m_grid->setChecked(m_jagdVorher.gitter); }
+    if (m_nurFt8)  { m_nurFt8->setChecked(m_jagdVorher.nurFt8); }
+    m_jagdVorher.gueltig = false;
 }
 
 void QsoMapWindow::buildUi()
@@ -324,6 +583,30 @@ void QsoMapWindow::buildUi()
         "see its name and what the log has there."));
     m_grid->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                               .arg(QString::fromLatin1(Style::kTextPrimary)));
+    // ── Locator-Jagd: der eine Knopf ───────────────────────────────
+    //
+    // Er steht VOR dem Gitterhaken und gehoert bewusst NICHT zu
+    // m_flatOnlyControls: er muss auch im 3D-Bild sichtbar sein, denn
+    // einer seiner Handgriffe ist, von dort herauszuholen.
+    m_jagdBtn = new QPushButton(QStringLiteral("Locator hunt"), this);
+    m_jagdBtn->setObjectName(QStringLiteral("qsoMapHuntButton"));
+    m_jagdBtn->setCheckable(true);
+    m_jagdBtn->setStyleSheet(Style::buttonBaseStyle() + Style::amberCheckedStyle());
+    m_jagdBtn->setFocusPolicy(Qt::NoFocus);   // +/- bleiben bei der Karte
+    m_jagdBtn->setToolTip(QStringLiteral(
+        "The whole world, and on it what you are still missing: every "
+        "square you have worked filled in, everything empty still open, "
+        "and the stations heard right now on top — the callsign of anyone "
+        "transmitting from a square you do not have yet. Double-click one "
+        "to call it.\n\nOne press sets the map up for that: out of 3D, "
+        "flat map, grid on, FT8 only, paths and imagery out of the way. "
+        "Press again and the map is as it was."));
+    // toggled, nicht clicked: ein ankreuzbarer Knopf wird von der
+    // Bedienhilfe ueber toggle() gedrueckt, und das sendet kein clicked
+    // (derselbe Befund wie beim 3D-Knopf, 2026-11-10).
+    connect(m_jagdBtn, &QPushButton::toggled, this, &QsoMapWindow::setzeJagd);
+    bar->addWidget(m_jagdBtn);
+
     bar->addWidget(m_grid);
 
     // ── Locator-Jagd mit FT8 (2026-11-11) ───────────────────────────
@@ -553,6 +836,19 @@ void QsoMapWindow::buildUi()
     bar->addWidget(m_popOutBtn);
     connect(m_popOutBtn, &QPushButton::clicked, this, &QsoMapWindow::popOutRequested);
 
+    // Vollbild -- nur im eigenen Fenster sinnvoll; in der Logbuchspalte
+    // gibt es nichts zu vergroessern, da fuehrt der Pfeil daneben heraus.
+    m_vollbildBtn = new QPushButton(QStringLiteral("\u26f6"), this);
+    m_vollbildBtn->setObjectName(QStringLiteral("qsoMapFullScreenButton"));
+    m_vollbildBtn->setCheckable(true);
+    m_vollbildBtn->setStyleSheet(Style::buttonBaseStyle() + Style::quietCheckedStyle());
+    m_vollbildBtn->setFocusPolicy(Qt::NoFocus);   // +/- bleiben bei der Karte
+    m_vollbildBtn->setToolTip(QStringLiteral(
+        "Fill the screen with the map  (F11, Escape back)"));
+    bar->addWidget(m_vollbildBtn);
+    // toggled, nicht clicked: die Bedienhilfe drueckt ueber toggle().
+    connect(m_vollbildBtn, &QPushButton::toggled, this, &QsoMapWindow::setzeVollbild);
+
     col->addLayout(bar);
 
     // Second row: one pill per band and mode the log actually has,
@@ -612,6 +908,132 @@ void QsoMapWindow::buildUi()
     mapRow->setSpacing(8);
     mapRow->addWidget(m_rotorRadar, 1);
     mapRow->addWidget(m_stack, 3);
+
+    // ── Die Jagdliste: wer sendet gerade aus einem Feld, das fehlt ──
+    //
+    // Sie steht neben der Karte und nur im Jagdmodus. Die Karte
+    // beantwortet „wo", die Liste „wen" -- und das Rufzeichen steht
+    // darin lesbar, auch wenn das Feld auf der Weltkarte sechs
+    // Bildpunkte breit ist.
+    m_jagdSpalte = new QWidget(this);
+    auto* jagdCol = new QVBoxLayout(m_jagdSpalte);
+    jagdCol->setContentsMargins(0, 0, 0, 0);
+    jagdCol->setSpacing(4);
+    m_jagdAlarmText = new QLabel(QString{}, m_jagdSpalte);
+    m_jagdAlarmText->setWordWrap(true);
+    m_jagdAlarmText->setStyleSheet(QStringLiteral(
+        // 13 statt 12: Schriftgroessen stehen auf der Leiter in
+        // StyleConstants.h (7/9/11/13/16/22/38/48).
+        "QLabel { color: %1; font-size: 13px; font-weight: bold; }")
+            .arg(QString::fromLatin1(Style::kJagdNeu)));
+    m_jagdAlarmText->setVisible(false);
+    jagdCol->addWidget(m_jagdAlarmText);
+    m_jagdAlarmUhr.setSingleShot(true);
+    connect(&m_jagdAlarmUhr, &QTimer::timeout, this, [this]() {
+        if (m_jagdAlarmText) { m_jagdAlarmText->setVisible(false); }
+    });
+
+    m_jagdListeKopf = new QLabel(QString{}, m_jagdSpalte);
+    m_jagdListeKopf->setWordWrap(true);
+    m_jagdListeKopf->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; }")
+            .arg(QString::fromLatin1(Style::kTextSecondary)));
+    jagdCol->addWidget(m_jagdListeKopf);
+
+    m_jagdListe = new QTableWidget(0, 6, m_jagdSpalte);
+    m_jagdListe->setObjectName(QStringLiteral("qsoMapHuntList"));
+    m_jagdListe->setHorizontalHeaderLabels(
+        {QStringLiteral("CALL"), QStringLiteral("GRID"),
+         QStringLiteral("SNR"),  QStringLiteral("KM"),
+         QStringLiteral("\u00b0"), QStringLiteral("AGE")});
+    // Die Kopfzeile links, wie die Werte darunter -- zentriert sah es
+    // ueber der breiten CALL-Spalte wie eine leere Spalte davor aus.
+    m_jagdListe->horizontalHeaderItem(0)->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    m_jagdListe->horizontalHeaderItem(1)->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    m_jagdListe->horizontalHeaderItem(4)->setToolTip(QStringLiteral(
+        "Bearing from your QTH. Double-click this cell to point the "
+        "antenna there; double-click anywhere else in the row to call."));
+    m_jagdListe->verticalHeader()->setVisible(false);
+    m_jagdListe->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_jagdListe->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_jagdListe->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_jagdListe->setShowGrid(false);
+    m_jagdListe->setAlternatingRowColors(false);
+    // Das Rufzeichen bekommt den Platz, die Zahlen nur, was sie
+    // brauchen -- mit setStretchLastSection stand rechts eine leere
+    // sechste Spalte (am Bild gesehen, 2026-11-11).
+    m_jagdListe->horizontalHeader()->setStretchLastSection(false);
+    m_jagdListe->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    for (int c = 1; c < 6; ++c) {
+        m_jagdListe->horizontalHeader()->setSectionResizeMode(c, QHeaderView::ResizeToContents);
+    }
+    m_jagdListe->setStyleSheet(QStringLiteral(
+        "QTableWidget { background: %1; border: 1px solid %2; color: %3;"
+        "               font-size: 11px; gridline-color: %2; }"
+        "QHeaderView::section { background: %1; color: %4; border: 0;"
+        "                       border-bottom: 1px solid %2; padding: 3px;"
+        // 9 statt 10: die Leiter in StyleConstants.h kennt kein 10 px,
+        // und verify-style-drift.py zaehlt genau das (2026-10-20).
+        "                       font-size: 9px; }")
+            .arg(QString::fromLatin1(Style::kPanelBg),
+                 QString::fromLatin1(Style::kBorder),
+                 QString::fromLatin1(Style::kTextPrimary),
+                 QString::fromLatin1(Style::kTextScale)));
+    // Anrufen haengt am Doppelklick -- derselbe Handgriff wie auf der
+    // Karte und in der Fundliste. Ein einzelner Klick waehlt nur aus.
+    connect(m_jagdListe, &QTableWidget::itemDoubleClicked, this,
+            [this](QTableWidgetItem* item) {
+        if (item == nullptr) { return; }
+        QTableWidgetItem* erste = m_jagdListe->item(item->row(), 0);
+        if (erste == nullptr) { return; }
+        const QString ruf = erste->data(Qt::UserRole).toString();
+        if (ruf.isEmpty()) { return; }
+        // Die Peilungsspalte dreht die Antenne, der Rest ruft an. Zwei
+        // verschiedene Handgriffe, weil es zwei verschiedene Fragen
+        // sind -- und weil beides zugleich an einem Doppelklick zu
+        // haengen zu viel waere.
+        if (item->column() == 4) {
+            const QVariant grad = item->data(Qt::UserRole);
+            if (grad.isValid()) {
+                emit rotorZielGewuenscht(grad.toDouble(), ruf);
+            }
+            return;
+        }
+        rufeLive(ruf);
+    });
+    jagdCol->addWidget(m_jagdListe, 1);
+
+    // Welches Band gerade die meisten Luecken auf der Luft hat. Die
+    // Karte zeigt immer nur ein Band; diese Zeile sagt, ob woanders
+    // mehr zu holen waere.
+    m_jagdBaender = new QLabel(QString{}, m_jagdSpalte);
+    m_jagdBaender->setWordWrap(true);
+    m_jagdBaender->setStyleSheet(QStringLiteral(
+        "QLabel { color: %1; font-size: 11px; }")
+            .arg(QString::fromLatin1(Style::kTextScale)));
+    jagdCol->addWidget(m_jagdBaender);
+
+    m_jagdTon = new QCheckBox(QStringLiteral("Beep on a new country"), m_jagdSpalte);
+    m_jagdTon->setToolTip(QStringLiteral(
+        "Sound the system alert when a station from a country you have "
+        "never worked appears. Not for every new square — during a band "
+        "opening that would never stop. It is the system sound, not the "
+        "radio: a notice must never sound like a signal."));
+    m_jagdTon->setStyleSheet(QStringLiteral("QCheckBox { color: %1; font-size: 11px; }")
+        .arg(QString::fromLatin1(Style::kTextSecondary)));
+    m_jagdTon->setChecked(AppSettings::instance()
+        .value(QStringLiteral("QsoMapHuntBeep"), QStringLiteral("False"))
+        .toString() == QStringLiteral("True"));
+    connect(m_jagdTon, &QCheckBox::toggled, this, [](bool an) {
+        AppSettings::instance().setValue(QStringLiteral("QsoMapHuntBeep"),
+                                         an ? QStringLiteral("True")
+                                            : QStringLiteral("False"));
+    });
+    jagdCol->addWidget(m_jagdTon);
+
+    m_jagdSpalte->setVisible(false);
+    mapRow->addWidget(m_jagdSpalte, 1);
+
     col->addLayout(mapRow, 1);
 
     m_summary = new QLabel(QString{}, this);
@@ -1339,6 +1761,7 @@ void QsoMapWindow::refreshLive()
     const QVector<LivePunkt> punkte = m_live.punkte(t, m_mosaik, m_homeGrid);
     m_flat->setLivePunkte(punkte);
     m_azimut->setLivePunkte(punkte);
+    fuelleJagdListe(punkte);
 
     if (!m_liveZaehler) { return; }
     if (m_liveBand.isEmpty() && m_live.anzahl() == 0) { return; }

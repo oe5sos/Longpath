@@ -49,6 +49,8 @@
 #include "core/MoxController.h"
 #include "gui/Ft8KartenBruecke.h"
 #include "gui/QsoMapWindow.h"
+#include "gui/widgets/LocatorJagdZeichen.h"
+#include <QTableWidget>
 #include "gui/applets/Ft8Applet.h"
 #include "gui/widgets/AzimutalKarteWidget.h"
 #include "gui/widgets/FlatMapWidget.h"
@@ -136,6 +138,23 @@ void klick(QWidget* w, const QPointF& at)
     QMouseEvent druck(QEvent::MouseButtonPress, at, g, Qt::LeftButton,
                       Qt::LeftButton, Qt::NoModifier);
     QCoreApplication::sendEvent(w, &druck);
+    QMouseEvent los(QEvent::MouseButtonRelease, at, g, Qt::LeftButton,
+                    Qt::NoButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(w, &los);
+}
+
+/// Ein Doppelklick auf der Karte. Ein einzelner Klick darf NICHT
+/// anrufen (Betreiber 2026-11-11: „doppelklick, sofern ich diesen
+/// sender empfangen kann, und das ft8 geht los") -- also geht hier
+/// erst ein voller Klick durch und dann das DoubleClick-Ereignis,
+/// genau wie Qt es einem echten Doppelklick schickt.
+void doppelklick(QWidget* w, const QPointF& at)
+{
+    klick(w, at);
+    const QPointF g = w->mapToGlobal(at);
+    QMouseEvent zwei(QEvent::MouseButtonDblClick, at, g, Qt::LeftButton,
+                     Qt::LeftButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(w, &zwei);
     QMouseEvent los(QEvent::MouseButtonRelease, at, g, Qt::LeftButton,
                     Qt::NoButton, Qt::NoModifier);
     QCoreApplication::sendEvent(w, &los);
@@ -346,9 +365,17 @@ private slots:
                  QStringLiteral("1 new square heard now on 20m"));
         QVERIFY(karte.liveZaehlerForTest()->isVisibleTo(&karte));
 
-        // ── B: der Klick auf der flachen Karte ──
+        // ── B: der DOPPELklick auf der flachen Karte ──
+        //
+        // Geaendert am 2026-11-11 auf Ansage des Betreibers: ein
+        // einzelner Klick darf keine Taste druecken. Erst der zweite
+        // ruft an -- derselbe Handgriff wie in der Fundliste.
         QSignalSpy klickSpy(flach, &FlatMapWidget::livePunktGeklickt);
         klick(flach, flach->livePunktBildpunkt(0));
+        QVERIFY2(klickSpy.count() == 0,
+                 "ein einzelner Klick darf NICHT anrufen");
+        QCOMPARE(angenommen.count(), 0);
+        doppelklick(flach, flach->livePunktBildpunkt(0));
         QCOMPARE(klickSpy.count(), 1);
         QCOMPARE(angenommen.count(), 1);
         const QString zeileKarte = angenommen.at(0).at(0).toString();
@@ -455,6 +482,196 @@ private slots:
         Ft8KartenBruecke::instanz().verbinde(nullptr);
         QVERIFY(karte.rufeLive(QStringLiteral("SP9XYZ")).contains(QStringLiteral("not running")));
         QCOMPARE(angenommen.count(), 0);
+    }
+
+    // ── Der eine Knopf: „Locator hunt" ─────────────────────────────
+    //
+    // Betreiber am 2026-11-11, nachdem er das Mosaik dreimal nicht
+    // gefunden hatte: „es muss eine weltkarte sein, mit der ich sofort
+    // sehe, was noch nicht erreicht ist und wo aktuell gesendet wird" --
+    // und davor „wenn man dies nicht weiss...". Der Knopf muss die ganze
+    // Buehne stellen, nicht einen Haken umlegen.
+    void derJagdknopfStelltDieGanzeBuehne()
+    {
+        QsoMapWindow karte;
+        karte.resize(1100, 700);
+        karte.imagery()->setNetworkEnabled(false);
+        karte.setHomeGrid(QStringLiteral("JN67VV"));
+        karte.setEntries(kleinesLog());
+
+        // So, wie es beim Betreiber stand: Pfade und Luftbild an,
+        // Gitter aus.
+        karte.pathsForTest()->setChecked(true);
+        karte.imageryForTest()->setChecked(true);
+        karte.gridForTest()->setChecked(false);
+        karte.nurFt8ForTest()->setChecked(false);
+
+        QVERIFY(karte.jagdButtonForTest() != nullptr);
+        karte.jagdButtonForTest()->setChecked(true);
+
+        // Alles auf einmal, ohne Vorwissen:
+        QVERIFY2(karte.gridForTest()->isChecked(), "Mosaik muss an sein");
+        QVERIFY2(karte.nurFt8ForTest()->isChecked(), "FT8 only muss an sein");
+        QVERIFY2(!karte.pathsForTest()->isChecked(),
+                 "9313 Pfade decken das Mosaik zu");
+        QVERIFY2(!karte.imageryForTest()->isChecked(),
+                 "das Satellitenfoto decke das Mosaik zu");
+        QCOMPARE(karte.currentViewForTest(), 1);   // kViewFlat: die Weltkarte
+        QVERIFY2(karte.flatMapForTest()->jagdModus(),
+                 "das Mosaik muss decken, nicht tuschen");
+
+        // Und wieder zurueck: der Knopf raeumt auf, er wirft nichts weg.
+        karte.jagdButtonForTest()->setChecked(false);
+        QVERIFY(karte.pathsForTest()->isChecked());
+        QVERIFY(karte.imageryForTest()->isChecked());
+        QVERIFY(!karte.gridForTest()->isChecked());
+        QVERIFY(!karte.nurFt8ForTest()->isChecked());
+        QVERIFY(!karte.flatMapForTest()->jagdModus());
+    }
+
+    // Der Knopf gehoert NICHT zu den Schaltern, die im 3D-Bild
+    // zuruecktreten -- einer seiner Handgriffe ist ja, von dort
+    // herauszuholen. Genau daran ist der Betreiber haengengeblieben:
+    // der `Grid`-Haken war im 3D unsichtbar.
+    void derJagdknopfBleibtAuchIm3dSichtbar()
+    {
+        QsoMapWindow karte;
+        karte.imagery()->setNetworkEnabled(false);
+        const QVector<QWidget*>& nurFlach = karte.flatOnlyControlsForTest();
+        QVERIFY2(nurFlach.contains(karte.gridForTest()),
+                 "der Grid-Haken verschwindet im 3D -- das ist der Befund");
+        QVERIFY2(!nurFlach.contains(karte.jagdButtonForTest()),
+                 "der Jagdknopf darf im 3D NICHT verschwinden");
+    }
+
+    // Im Jagdmodus deckt das Mosaik. Gemessen, nicht behauptet.
+    void imJagdmodusDecktDasMosaik()
+    {
+        for (FeldStand f : {FeldStand::Bestaetigt, FeldStand::Gearbeitet}) {
+            const int leise = LocatorJagdZeichen::feldFuellung(f, false).alpha();
+            const int laut  = LocatorJagdZeichen::feldFuellung(f, true).alpha();
+            QVERIFY2(laut > leise + 60,
+                     qPrintable(QStringLiteral("leise=%1 laut=%2")
+                                    .arg(leise).arg(laut)));
+            QVERIFY(laut <= 255);
+        }
+        // Was nie gearbeitet wurde, bleibt in BEIDEN Staerken leer --
+        // sonst waere die Luecke keine Luecke mehr.
+        QCOMPARE(LocatorJagdZeichen::feldFuellung(FeldStand::Nie, true).alpha(), 0);
+    }
+
+    // Vollbild: nur im eigenen Fenster, und Escape fuehrt zurueck
+    // statt die Karte zuzumachen (Betreiber 2026-11-11).
+    void vollbildNurImEigenenFenster()
+    {
+        QsoMapWindow karte;
+        karte.imagery()->setNetworkEnabled(false);
+        QVERIFY(karte.vollbildButtonForTest() != nullptr);
+
+        // Eingebettet in die Logbuchspalte: kein Vollbild, dafuer der
+        // Pfeil, der ins eigene Fenster fuehrt.
+        karte.setEmbedded(true);
+        QVERIFY2(!karte.vollbildButtonForTest()->isVisibleTo(&karte),
+                 "in der Spalte gibt es nichts zu vergroessern");
+
+        karte.setEmbedded(false);
+        QVERIFY(karte.vollbildButtonForTest()->isVisibleTo(&karte));
+        QVERIFY(!karte.isFullScreen());
+        karte.vollbildButtonForTest()->setChecked(true);
+        QVERIFY2(karte.isFullScreen(), "der Knopf muss das Fenster fuellen");
+        karte.vollbildButtonForTest()->setChecked(false);
+        QVERIFY(!karte.isFullScreen());
+    }
+
+    // Die Jagdliste: nur was fehlt, in der richtigen Reihenfolge, und
+    // die Peilungsspalte dreht statt anzurufen.
+    void dieJagdlisteZeigtNurDieLuecken()
+    {
+        QsoMapWindow karte;
+        karte.resize(1400, 800);
+        karte.imagery()->setNetworkEnabled(false);
+        karte.setHomeGrid(QStringLiteral("JN67VV"));
+        karte.setEntries(kleinesLog());
+        QDateTime uhr(QDate(2026, 11, 11), QTime(6, 0, 0), QTimeZone::UTC);
+        karte.setUhrForTest([&uhr]() { return uhr; });
+        karte.jagdButtonForTest()->setChecked(true);
+        // Ohne „FT8 only": sonst zaehlt das SSB-QSO in JO31 nicht und
+        // JO31 waere auf 40 m eine Luecke statt einer fehlenden QSL.
+        karte.nurFt8ForTest()->setChecked(false);
+
+        // JO31 ist auf 40 m gearbeitet, aber nicht bestaetigt (kleinesLog),
+        // KO02 ist nie gearbeitet. Beide senden.
+        karte.nimmFt8(gehoert(QStringLiteral("SP9XYZ"), QStringLiteral("KO02"), uhr,
+                              -10, false, QStringLiteral("40m")));
+        karte.nimmFt8(gehoert(QStringLiteral("DL1ABC"), QStringLiteral("JO31"), uhr,
+                              -10, false, QStringLiteral("40m")));
+        // JN78 ist auf 20 m bestaetigt -- wer von dort sendet, gehoert
+        // auf gar keine Liste, deren Zweck die Luecke ist.
+        karte.nimmFt8(gehoert(QStringLiteral("OE3RPU"), QStringLiteral("JN78"), uhr));
+
+        QTableWidget* liste = karte.jagdListeForTest();
+        QVERIFY(liste != nullptr);
+        QStringList rufe;
+        for (int r = 0; r < liste->rowCount(); ++r) {
+            rufe << liste->item(r, 0)->data(Qt::UserRole).toString();
+        }
+        QVERIFY2(!rufe.contains(QStringLiteral("OE3RPU")),
+                 qPrintable(QStringLiteral("bestaetigt gehoert nicht in die "
+                                           "Liste: %1").arg(rufe.join(QLatin1Char(' ')))));
+        QVERIFY(rufe.contains(QStringLiteral("SP9XYZ")));
+        // Die fehlende Luecke steht VOR der fehlenden QSL.
+        QVERIFY2(rufe.indexOf(QStringLiteral("SP9XYZ"))
+                     < rufe.indexOf(QStringLiteral("DL1ABC")),
+                 qPrintable(rufe.join(QLatin1Char(' '))));
+
+        // Ein Doppelklick in die Peilungsspalte dreht, statt anzurufen.
+        QSignalSpy dreh(&karte, &QsoMapWindow::rotorZielGewuenscht);
+        const int zeile = rufe.indexOf(QStringLiteral("SP9XYZ"));
+        QVERIFY(zeile >= 0);
+        QTableWidgetItem* az = liste->item(zeile, 4);
+        QVERIFY(az != nullptr);
+        QVERIFY2(az->data(Qt::UserRole).isValid(),
+                 "ohne Peilung kann die Spalte nichts drehen");
+        emit liste->itemDoubleClicked(az);
+        QCOMPARE(dreh.count(), 1);
+        QCOMPARE(dreh.at(0).at(1).toString(), QStringLiteral("SP9XYZ"));
+
+        // Der Jagdmodus legt `FT8 only` um und merkt es sich; wer ihn
+        // angelassen stehen laesst, veraendert den naechsten Prueflauf.
+        karte.jagdButtonForTest()->setChecked(false);
+    }
+
+    // Der Hinweis meldet nur, was NEU dazukommt -- nicht bei jedem
+    // Auffrischen dieselben Stationen.
+    void derHinweisMeldetNurNeues()
+    {
+        QsoMapWindow karte;
+        karte.resize(1400, 800);
+        karte.imagery()->setNetworkEnabled(false);
+        karte.setHomeGrid(QStringLiteral("JN67VV"));
+        karte.setEntries(kleinesLog());
+        QDateTime uhr(QDate(2026, 11, 11), QTime(6, 0, 0), QTimeZone::UTC);
+        karte.setUhrForTest([&uhr]() { return uhr; });
+        karte.jagdButtonForTest()->setChecked(true);
+
+        QSignalSpy alarm(&karte, &QsoMapWindow::jagdAlarm);
+        karte.nimmFt8(gehoert(QStringLiteral("SP9XYZ"), QStringLiteral("KO02"), uhr));
+        QCOMPARE(alarm.count(), 1);
+        QCOMPARE(alarm.at(0).at(0).toString(), QStringLiteral("SP9XYZ"));
+
+        // Dieselbe Station noch einmal: kein zweiter Hinweis.
+        karte.nimmFt8(gehoert(QStringLiteral("SP9XYZ"), QStringLiteral("KO02"), uhr));
+        QCOMPARE(alarm.count(), 1);
+
+        // Eine andere, aus einem anderen fehlenden Feld: ja.
+        karte.nimmFt8(gehoert(QStringLiteral("LZ1XX"), QStringLiteral("KN22"), uhr));
+        QCOMPARE(alarm.count(), 2);
+
+        // Eine Station aus einem BESTAETIGTEN Feld meldet gar nichts.
+        karte.nimmFt8(gehoert(QStringLiteral("OE3RPU"), QStringLiteral("JN78"), uhr));
+        QCOMPARE(alarm.count(), 2);
+
+        karte.jagdButtonForTest()->setChecked(false);
     }
 
     // ── Die Karte: Mosaik am Grid, Zaehler, Altern ──────────────────
@@ -607,6 +824,18 @@ private slots:
         // kein Rahmen.
         QCOMPARE(karte.flatMapForTest()->neueFelderGemaltForTest(), 0);
 
+        // Dasselbe im Jagdmodus: EIN Knopf, und die Weltkarte zeigt, was
+        // fehlt und wer gerade sendet (Betreiber 2026-11-11).
+        karte.jagdButtonForTest()->setChecked(true);
+        QTest::qWait(150);
+        QVERIFY(karte.flatMapForTest()->jagdModus());
+        QVERIFY(karte.flatMapForTest()->grab().save(
+            grabDir + QStringLiteral("/ft8-jagd-weltkarte.png")));
+        QVERIFY(karte.grab().save(
+            grabDir + QStringLiteral("/ft8-jagd-weltkarte-fenster.png")));
+        karte.jagdButtonForTest()->setChecked(false);
+        QTest::qWait(100);
+
         // Hineingezoomt auf Mitteleuropa: jetzt bekommen die neuen Felder
         // ihren Bernsteingrund.
         karte.flatMapForTest()->flyTo(50.0, 16.0, 5.0, 0);
@@ -638,6 +867,43 @@ private slots:
             QVERIFY(gross.grab().save(grabDir + QStringLiteral("/ft8-jagd-azimutal-gross.png")));
         }
         karte.azimutalButtonForTest()->setChecked(false);
+
+        // ── Entwuerfe fuer die Jagdtafel (2026-11-11) ────────────────
+        //
+        // Vier Blaetter, aus demselben Logbuch und denselben gehoerten
+        // Stationen -- Betreiber: „mache mir grafische vorschlaege".
+        // Jedes Blatt beantwortet dieselbe Frage anders: „sofort sehen,
+        // was noch nicht erreicht ist und wo gerade gesendet wird".
+        karte.resize(1600, 900);
+        karte.jagdButtonForTest()->setChecked(true);
+        QTest::qWait(250);
+        QVERIFY(karte.jagdSpalteForTest()->isVisible());
+        QVERIFY(karte.jagdListeForTest()->rowCount() > 0);
+
+        // A: vierstellige Quadrate (so, wie es heute malt) + Liste.
+        karte.flatMapForTest()->setGrosseFelder(false);
+        QTest::qWait(120);
+        QVERIFY(karte.grab().save(grabDir + QStringLiteral("/jagdtafel-A-quadrate-liste.png")));
+
+        // B: Grossfelder statt Quadrate -- auf der Weltkarte lesbar.
+        karte.flatMapForTest()->setGrosseFelder(true);
+        QTest::qWait(120);
+        QVERIFY(karte.grab().save(grabDir + QStringLiteral("/jagdtafel-B-grossfelder-liste.png")));
+
+        // C: umgekehrt gedacht -- gefaerbt wird, was FEHLT.
+        karte.flatMapForTest()->setLueckenBetonen(true);
+        QTest::qWait(120);
+        QVERIFY(karte.grab().save(grabDir + QStringLiteral("/jagdtafel-C-luecken-liste.png")));
+
+        // D: nur die Karte, ohne Spalte -- alles Platz fuers Bild.
+        karte.flatMapForTest()->setLueckenBetonen(false);
+        karte.jagdSpalteForTest()->setVisible(false);
+        QTest::qWait(120);
+        QVERIFY(karte.grab().save(grabDir + QStringLiteral("/jagdtafel-D-nur-karte.png")));
+        karte.jagdSpalteForTest()->setVisible(true);
+
+        karte.flatMapForTest()->setGrosseFelder(false);
+        karte.jagdButtonForTest()->setChecked(false);
         AppSettings::instance().setValue(QStringLiteral("QsoMapView"), QString{});
     }
 };
