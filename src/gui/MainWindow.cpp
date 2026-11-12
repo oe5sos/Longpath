@@ -9954,7 +9954,11 @@ void MainWindow::populateDefaultMeter()
     // Schlagwoerter zweisprachig — wie bei den Applets darueber: die
     // Oberflaeche ist englisch, der Betreiber denkt deutsch.
     static const WindowEntry kWindows[] = {
-        {"WinLogbook", QT_TR_NOOP("Logbook"), QT_TR_NOOP("Recording"),
+        // Eigene Gruppe (2026-11-12, Betreiber: „logbook ist unter
+        // recording, passt dort nicht hin"). „Recording" gab es nur
+        // fuer diesen einen Eintrag -- die Aufnahme steht unter
+        // „Aufnahme".
+        {"WinLogbook", QT_TR_NOOP("Logbook"), QT_TR_NOOP("Logbook"),
          {"logbuch", "logbook", "log", "qso", "adif", "kontakte",
           "contacts", "eintraege"}},
         {"WinRotorLog", QT_TR_NOOP("Rotor / Log"), QT_TR_NOOP("Tuning"),
@@ -11195,11 +11199,14 @@ void MainWindow::populateDefaultMeter()
             });
 
         m_layoutProfiles->load();
-        // Das zuletzt aktive Profil (Betreiber 2026-11-06, "Zuletzt
-        // aktives": sein Contest-Profil ist "C", und Longpath kam jeden
-        // Morgen mit "N" herauf). Vom 2026-09-27 bis heute galt "immer
-        // Profil 1" (startWithFirst); siehe LayoutProfiles.h.
-        m_layoutProfiles->startWithLastActive();
+        // Beim Start IMMER Profil 1 (Betreiber 2026-11-12: "das erste
+        // Profil, bei mir N muss immer das Startprofil sein. Ich will
+        // nichts anderes!!!!!"). Vom 2026-11-06 bis 2026-11-12 galt das
+        // zuletzt aktive (startWithLastActive, #408) -- am Morgen des
+        // 12.11. kam Longpath darum mit FT8 herauf. Davor, seit dem
+        // 2026-09-27, galt schon einmal Profil 1. Nicht wieder umstellen
+        // ohne ausdrueckliche Ansage; siehe LayoutProfiles.h.
+        m_layoutProfiles->startWithFirst();
         // Betreiber 2026-09-01: "letzter Zustand nie beim Öffnen
         // sichtbar" -- zeigt, was TATSAECHLICH von der Platte kam,
         // bevor applyCurrent() irgendetwas damit tut. Vergleich mit
@@ -17418,6 +17425,19 @@ void MainWindow::schutzrahmenNachziehen()
     m_schutzrahmenTimer->start();
 }
 
+QMargins MainWindow::leistenRaender() const
+{
+    if (!m_outerSplitter || !m_outerSplitter->isVisible()) { return {}; }
+    const QRect rahmen = frameGeometry();
+    const QPoint oben  = m_outerSplitter->mapToGlobal(QPoint(0, 0));
+    const QPoint unten = m_outerSplitter->mapToGlobal(
+        QPoint(0, m_outerSplitter->height()));
+    const int top    = qMax(0, oben.y() - rahmen.top());
+    const int bottom = qMax(0, rahmen.bottom() + 1 - unten.y());
+    if (top + bottom >= rahmen.height()) { return {}; }
+    return QMargins(0, top, 0, bottom);
+}
+
 int MainWindow::schwebendeMitziehen()
 {
     if (m_shuttingDown) { return 0; }
@@ -17429,10 +17449,28 @@ int MainWindow::schwebendeMitziehen()
     }
     if (isMinimized()) { return 0; }
 
-    const double fx = double(neu.width()) / double(alt.width());
-    const double fy = double(neu.height()) / double(alt.height());
+    // ── Nur die Arbeitsflaeche wird umgerechnet (2026-11-12) ─────────
+    //
+    // Betreiber, mit Bild nach dem Verkleinern: Combined lag ueber den
+    // Profilknoepfen. Gerechnet wurde im Verhaeltnis des GANZEN Rahmens,
+    // samt Titel-, Menue- und Befehlsleiste oben und Statusleiste unten
+    // -- die werden aber nicht kleiner. Ein Fenster 127 Punkte unter der
+    // Oberkante (direkt unter der Befehlsleiste) rutschte bei 88 % Hoehe
+    // auf 112 und damit in die Leiste. Jetzt bezieht sich alles auf die
+    // Flaeche zwischen den Leisten; ein reiner Zug bleibt ein reiner Zug.
+    const QMargins leisten = leistenRaender();
+    QRect altA = alt.marginsRemoved(leisten);
+    QRect neuA = neu.marginsRemoved(leisten);
+    if (altA.width() <= 0 || altA.height() <= 0
+        || neuA.width() <= 0 || neuA.height() <= 0) {
+        altA = alt;
+        neuA = neu;
+    }
+    const double fx = double(neuA.width()) / double(altA.width());
+    const double fy = double(neuA.height()) / double(altA.height());
 
     int bewegt = 0;
+    QHash<const QWidget*, MitziehBasis> neueBasis;
     const EigeneBewegung wirSelbst;
     for (QWidget* w : QApplication::topLevelWidgets()) {
         if (!w || w == this || !w->isVisible()) { continue; }
@@ -17441,8 +17479,27 @@ int MainWindow::schwebendeMitziehen()
         if (w->isMaximized() || w->isFullScreen()) { continue; }
 
         const QRect r = w->frameGeometry();
-        QPoint ziel(neu.x() + qRound(double(r.x() - alt.x()) * fx),
-                    neu.y() + qRound(double(r.y() - alt.y()) * fy));
+        const QSize innenAlt = w->size();
+
+        // Die Anteile von der Grundlage, solange das Fenster noch dort
+        // steht, wo wir es zuletzt hingesetzt haben -- sonst frisch
+        // gemessen (siehe m_mitziehBasis).
+        MitziehBasis basis;
+        // Nicht auf den Punkt genau: nach dem Setzen rastet das Fenster
+        // noch ins Raster ein (snapToGridAfterSettle, eigene Bewegung).
+        // Das ist derselbe Nachhall wie beim Hauptfenster.
+        if (const auto bi = m_mitziehBasis.constFind(w);
+            bi != m_mitziehBasis.constEnd()
+            && (bi->gesetzt == r || istRasterNachhall(r, bi->gesetzt))) {
+            basis = *bi;
+        } else {
+            basis.x = double(r.x() - altA.x()) / double(altA.width());
+            basis.y = double(r.y() - altA.y()) / double(altA.height());
+            basis.w = double(innenAlt.width())  / double(altA.width());
+            basis.h = double(innenAlt.height()) / double(altA.height());
+        }
+        QPoint ziel(neuA.x() + qRound(basis.x * neuA.width()),
+                    neuA.y() + qRound(basis.y * neuA.height()));
 
         // ── Die Groesse im selben Verhaeltnis (2026-11-11) ──────────
         //
@@ -17454,11 +17511,10 @@ int MainWindow::schwebendeMitziehen()
         // ueber seinen Rand. Bei einem reinen Zug (fx = fy = 1) bleibt
         // die Groesse, wie sie ist. Mindest- und Hoechstgroesse des
         // Fensters gelten weiter.
-        const QSize innenAlt = w->size();
         QSize innen = innenAlt;
         if (fx != 1.0 || fy != 1.0) {
-            innen = QSize(qRound(double(innenAlt.width()) * fx),
-                          qRound(double(innenAlt.height()) * fy))
+            innen = QSize(qRound(basis.w * neuA.width()),
+                          qRound(basis.h * neuA.height()))
                         .expandedTo(w->minimumSize())
                         .boundedTo(w->maximumSize());
         }
@@ -17493,7 +17549,11 @@ int MainWindow::schwebendeMitziehen()
         if (geaendert) {
             ++bewegt;
         }
+        basis.gesetzt = w->frameGeometry();
+        neueBasis.insert(w, basis);
     }
+    // Was nicht mehr schwebt (angedockt, geschlossen), faellt heraus.
+    m_mitziehBasis = std::move(neueBasis);
     if (bewegt > 0) {
         qCInfo(lcContainer) << "Hauptfenster" << alt << "->" << neu << ":"
                             << bewegt << "schwebende Fenster mitgezogen";
@@ -17535,6 +17595,11 @@ int MainWindow::schwebendeAusDemSchutzrahmenHolen()
             // ebenfalls, also stimmt es ohne Umrechnung.
             const EigeneBewegung wirSelbst;
             w->move(neu.topLeft());
+            // Aus der Leiste geschoben ist keine neue Grundlage: die
+            // Anteile bleiben, nur der Ort gilt als von uns gesetzt.
+            if (auto bi = m_mitziehBasis.find(w); bi != m_mitziehBasis.end()) {
+                bi->gesetzt = w->frameGeometry();
+            }
             ++verschoben;
         }
     }

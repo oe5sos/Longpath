@@ -158,20 +158,25 @@ private slots:
     // ── Fall 2: eine Groessenaenderung haelt das Verhaeltnis ─────────────
     void groessenaenderungHaeltDasVerhaeltnis()
     {
+        // Seit 2026-11-12 im Verhaeltnis der ARBEITSFLAECHE (ohne die
+        // Leisten oben und unten, die nicht mitwachsen).
+        const QMargins leisten = m_mw->leistenRaenderForTest();
         const QRect alt = m_mw->frameGeometry();
+        const QRect altA = alt.marginsRemoved(leisten);
         const QRect f = m_abgeloest->frameGeometry();
-        const double fx = double(f.x() - alt.x()) / alt.width();
-        const double fy = double(f.y() - alt.y()) / alt.height();
+        const double fx = double(f.x() - altA.x()) / altA.width();
+        const double fy = double(f.y() - altA.y()) / altA.height();
         const QSize innen = m_abgeloest->size();
 
         m_mw->resize(alt.width() + 480, alt.height() + 160);
         QTest::qWait(kNachlaufMs);
 
         const QRect neu = m_mw->frameGeometry();
+        const QRect neuA = neu.marginsRemoved(leisten);
         QVERIFY2(neu.size() != alt.size(), "das Hauptfenster muss gewachsen sein");
         const QRect g = m_abgeloest->frameGeometry();
-        const int sollX = neu.x() + qRound(fx * neu.width());
-        const int sollY = neu.y() + qRound(fy * neu.height());
+        const int sollX = neuA.x() + qRound(fx * neuA.width());
+        const int sollY = neuA.y() + qRound(fy * neuA.height());
         QVERIFY2(qAbs(g.x() - sollX) <= kToleranzPx
                      && qAbs(g.y() - sollY) <= kToleranzPx,
                  qPrintable(QStringLiteral(
@@ -181,8 +186,8 @@ private slots:
         // danach noch an ihr ruehrt, ist Longpaths Raster, das alle vier
         // Kanten des Rahmens einrasten laesst -- eine Rasterweite, wie
         // bei einem Zug von Hand auch.
-        const QSize soll(qRound(innen.width() * double(neu.width()) / alt.width()),
-                         qRound(innen.height() * double(neu.height()) / alt.height()));
+        const QSize soll(qRound(innen.width() * double(neuA.width()) / altA.width()),
+                         qRound(innen.height() * double(neuA.height()) / altA.height()));
         const QSize ist = m_abgeloest->size();
         QVERIFY2(qAbs(ist.width() - soll.width()) <= kSnapGridPx
                      && qAbs(ist.height() - soll.height()) <= kSnapGridPx,
@@ -196,17 +201,20 @@ private slots:
     //    schwebenden Fenster im Verhaeltnis kleiner (2026-11-11) ───────────
     void verkleinernMachtSieKleiner()
     {
+        const QMargins leisten = m_mw->leistenRaenderForTest();
         const QRect alt = m_mw->frameGeometry();
+        const QRect altA = alt.marginsRemoved(leisten);
         const QSize innen = m_abgeloest->size();
 
         m_mw->resize(alt.width() - 360, alt.height() - 120);
         QTest::qWait(kNachlaufMs);
 
         const QRect neu = m_mw->frameGeometry();
+        const QRect neuA = neu.marginsRemoved(leisten);
         QVERIFY2(neu.width() < alt.width(), "das Hauptfenster muss kleiner geworden sein");
         const QSize ist = m_abgeloest->size();
-        const QSize soll = QSize(qRound(innen.width() * double(neu.width()) / alt.width()),
-                                 qRound(innen.height() * double(neu.height()) / alt.height()))
+        const QSize soll = QSize(qRound(innen.width() * double(neuA.width()) / altA.width()),
+                                 qRound(innen.height() * double(neuA.height()) / altA.height()))
                                .expandedTo(m_abgeloest->minimumSize());
         QVERIFY2(ist.width() < innen.width() || ist.width() == m_abgeloest->minimumWidth(),
                  qPrintable(QStringLiteral("Breite %1, vorher %2 -- nicht kleiner geworden")
@@ -227,6 +235,70 @@ private slots:
     // 2026-11-04 fuenf Fenster gezogen wurden (Geraetelog 12:09:43,
     // "wieder irgendeine zusammensetzung der panels"). Ohne fremde
     // Bewegung davor darf das nichts ziehen.
+    // 2026-11-12, Betreiber mit Bild: nach dem Verkleinern lag Combined
+    // ueber den Profilknoepfen. Ein Fenster direkt unter der
+    // Befehlsleiste bleibt beim Verkleinern unter ihr.
+    void verkleinernSchiebtNichtsInDieLeiste()
+    {
+        const QMargins leisten = m_mw->leistenRaenderForTest();
+        QVERIFY2(leisten.top() > 0, "ohne Leiste oben prueft der Fall nichts");
+        const QRect alt = m_mw->frameGeometry();
+        m_abgeloest->move(alt.x() + 300, alt.y() + leisten.top() + 4);
+        QTest::qWait(kNachlaufMs);
+        m_mw->schwebendeMitziehenForTest();   // Basis = jetzt
+
+        m_mw->resize(alt.width() - 200, alt.height() - 160);
+        QTest::qWait(kNachlaufMs);
+
+        const QRect neu = m_mw->frameGeometry();
+        QVERIFY2(neu.height() < alt.height(), "das Hauptfenster muss niedriger geworden sein");
+        const int unterDerLeiste = neu.y() + leisten.top();
+        const QRect g = m_abgeloest->frameGeometry();
+        qInfo() << "Leisten" << leisten << "Hauptfenster" << neu << "Fenster" << g;
+        QVERIFY2(g.y() >= unterDerLeiste - kToleranzPx,
+                 qPrintable(QStringLiteral("Fenster oben bei %1, Leiste endet bei %2")
+                                .arg(g.y()).arg(unterDerLeiste)));
+    }
+
+    // 2026-11-12, Betreiber: „nicht alle windows werden automatisch
+    // angepasst". Jeder Zug rechnete vom LETZTEN Stand weiter: hing ein
+    // Fenster beim Verkleinern an seiner Untergrenze, kam es beim
+    // Vergroessern nicht mehr auf seine alte Groesse zurueck. Jetzt gilt
+    // je Fenster eine feste Grundlage (Anteile der Arbeitsflaeche).
+    void kleinUndWiederGrossGibtDieAlteLage()
+    {
+        const QRect alt = m_mw->frameGeometry();
+        const QSize hauptInnen = m_mw->size();
+        const QRect vorher = m_abgeloest->frameGeometry();
+        const QSize innenVorher = m_abgeloest->size();
+        const int minAlt = m_abgeloest->minimumWidth();
+        // Die Untergrenze erzwingen: kleiner als jetzt darf es nicht.
+        m_abgeloest->setMinimumWidth(innenVorher.width());
+        m_mw->schwebendeMitziehenForTest();   // Basis = jetzt
+
+        m_mw->resize(hauptInnen.width() - 400, hauptInnen.height() - 100);
+        QTest::qWait(kNachlaufMs);
+        QCOMPARE(m_abgeloest->width(), innenVorher.width());   // hing an der Grenze
+
+        m_mw->resize(hauptInnen);
+        QTest::qWait(kNachlaufMs);
+        m_abgeloest->setMinimumWidth(minAlt);
+
+        const QRect nachher = m_abgeloest->frameGeometry();
+        qInfo() << "Hauptfenster" << alt << "->" << m_mw->frameGeometry()
+                << "Fenster vorher" << vorher << "nachher" << nachher;
+        QVERIFY2(qAbs(m_mw->width() - hauptInnen.width()) <= kSnapGridPx
+                     && qAbs(m_mw->height() - hauptInnen.height()) <= kSnapGridPx,
+                 "das Hauptfenster muss wieder seine alte Groesse haben");
+        QVERIFY2(qAbs(nachher.width() - vorher.width()) <= kSnapGridPx
+                     && qAbs(nachher.height() - vorher.height()) <= kSnapGridPx
+                     && qAbs(nachher.x() - vorher.x()) <= kToleranzPx
+                     && qAbs(nachher.y() - vorher.y()) <= kToleranzPx,
+                 qPrintable(QStringLiteral("vorher %1,%2 %3x%4 -- nachher %5,%6 %7x%8")
+                     .arg(vorher.x()).arg(vorher.y()).arg(vorher.width()).arg(vorher.height())
+                     .arg(nachher.x()).arg(nachher.y()).arg(nachher.width()).arg(nachher.height())));
+    }
+
     void eigeneBewegungZiehtNicht()
     {
         const QPoint vorher = m_abgeloest->frameGeometry().topLeft();
