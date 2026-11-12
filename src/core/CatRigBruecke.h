@@ -39,6 +39,8 @@
 
 #include "core/WdspTypes.h"
 
+class QTimer;
+
 namespace Longpath {
 
 class CompanionRigController;
@@ -52,6 +54,10 @@ public:
     /// Abfrage. Eine kuerzere Frist liesse die alte Frequenz durch.
     static constexpr int kFristNachBefehlMs = 400;
 
+    /// Beim Ziehen an der Bandbreite kommt jede Bewegung einzeln. Geschickt
+    /// wird erst, wenn so lange nichts Neues kam.
+    static constexpr int kFilterZugMs = 120;
+
     CatRigBruecke(CompanionRigController* rig, SliceModel* scheibe,
                   QObject* parent = nullptr);
 
@@ -64,12 +70,11 @@ public:
     /// Fuer den Pruefstand: die Frist sofort als abgelaufen behandeln.
     void fristAufhebenForTest() { m_befehlGesendet = false; }
 
-    /// Fuer den Pruefstand: die Frist verlaengern. Auf einem langsamen
-    /// CI-Rechner vergingen zwischen Befehl und abweichender Meldung
-    /// mehr als 400 ms, und die Pruefung „in der Frist zaehlt das Geraet
-    /// nicht" sah dann eine abgelaufene Frist (tst_cat_funkgeraet, macOS,
-    /// mehrfach rot ab 2026-11-08). Der Pruefstand hebt die Frist danach
-    /// ohnehin ausdruecklich auf.
+    /// Fuer den Pruefstand: eine langsame Maschine soll nicht die Frist
+    /// ablaufen lassen, bevor die Meldung da ist, die sie abfangen soll.
+    /// Auf main kam derselbe Zugang als setFristForTest (2026-11-08);
+    /// beide Namen bleiben, damit beide Pruefstaende bauen.
+    void fristSetzenForTest(int ms) { m_fristMs = ms; }
     void setFristForTest(int ms) { m_fristMs = ms; }
 
 private:
@@ -77,6 +82,11 @@ private:
     void vomGeraetModus(const QString& modus);
     void vonScheibeFrequenz(double hz);
     void vonScheibeModus(DSPMode modus);
+    void vomGeraetFilter();
+    void vonScheibeFilter(int low, int high);
+    void schickeFilter();
+    void starteFrist();
+    void nachDerFrist();
     bool fristLaeuft() const;
 
     QPointer<CompanionRigController> m_rig;
@@ -84,7 +94,13 @@ private:
     QElapsedTimer m_seitBefehl;
     bool m_befehlGesendet{false};
     bool m_uebernimmtVomGeraet{false};
-    int  m_fristMs{kFristNachBefehlMs};
+    int m_fristMs{kFristNachBefehlMs};
+    QTimer* m_filterZug{nullptr};
+    QTimer* m_fristEnde{nullptr};
+    int m_filterVonHz{0};
+    int m_filterBisHz{0};
+    int m_filterBreiteHz{0};
+    QString m_letzterGeraeteModus;
 };
 
 } // namespace Longpath

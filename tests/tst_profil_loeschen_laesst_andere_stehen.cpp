@@ -38,6 +38,8 @@
 // no-port-check: Longpath-original test file.
 
 #include <QtTest>
+#include <cstdio>
+#include <cstdlib>
 #include <QApplication>
 #include <QDialog>
 #include <QFile>
@@ -168,11 +170,6 @@ private slots:
                                 .arg(fa.keys().join(QLatin1Char(',')))));
     }
 
-    // Bewusst nicht abgeraeumt, wie in tst_real_layout_profile_roundtrip:
-    // MainWindow startet Arbeitsfaeden, deren geordnetes Ende an einer
-    // laufenden Ereignisschleife haengt (unter Cocoa sonst SIGSEGV beim
-    // Beenden, mit Absturzmeldung auf dem Schirm).
-
     // 1. Der normale Weg: CONTEST und zurueck.
     void umschaltenUeberContestLaesstNStehen()
     {
@@ -279,5 +276,21 @@ private slots:
     }
 };
 
-QTEST_MAIN(TstProfilLoeschenLaesstAndereStehen)
+// Kein QTEST_MAIN: das Abraeumen stuerzt ab, und jeder Absturz legt
+// Martin eine Meldung auf den Schirm (am 12.11. sechs Stueck). Offscreen
+// faellt ~QApplication an einem Contest-Fenster um, das keinem Elternteil
+// gehoert (QOffscreenBackingStore::clearHash); ein delete des
+// Hauptfensters laeuft offscreen in endlose createWinId-Rekursion und
+// unter Cocoa in SIGSEGV. Darum nach dem Lauf sofort hinaus, mit dem
+// Ergebnis des Laufs als Rueckgabe.
+int main(int argc, char** argv)
+{
+    QApplication app(argc, argv);
+    app.setAttribute(Qt::AA_Use96Dpi, true);
+    TstProfilLoeschenLaesstAndereStehen t;
+    QTEST_SET_MAIN_SOURCE_PATH
+    const int rc = QTest::qExec(&t, argc, argv);
+    std::fflush(nullptr);
+    std::_Exit(rc);
+}
 #include "tst_profil_loeschen_laesst_andere_stehen.moc"
