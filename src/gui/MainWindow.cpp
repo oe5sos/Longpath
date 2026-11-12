@@ -10170,6 +10170,18 @@ void MainWindow::populateDefaultMeter()
         m_addWidgetBtn->setZusatzEintraege(liste);
     }
 #endif
+    // Der FT8-Dekoder steht nur in einer Datenbetriebsart bereit. Seine
+    // Karte schaltet darum selbst auf FT8 -- derselbe Weg wie der
+    // FT8-Knopf der Leiste (Martin 2026-11-12: „eigens kann man es nicht
+    // ... hinzufügen. das muss geändert werden").
+    {
+        QHash<QString, WidgetPicker::Einschalter> e;
+        e.insert(QStringLiteral("Ft8Decoder"),
+                 WidgetPicker::Einschalter{
+                     tr("Click switches to FT8 (or the FT4 you used last) and opens it."),
+                     [this]() { aufDigiStellen(m_letzterDigiModus); }});
+        m_addWidgetBtn->setEinschalter(e);
+    }
     m_addWidgetBtn->raise();
     m_addWidgetBtn->show();
     positionAddWidgetButton();
