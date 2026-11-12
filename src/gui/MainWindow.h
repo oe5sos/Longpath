@@ -193,6 +193,10 @@ public:
     /// Liste liest und nicht eine zweite fuehrt.
     static QStringList fieldLayoutKeepIds();
 
+    /// Panorama im Betrieb ueber CAT (TS-590): +-6 kHz um den Traeger,
+    /// denn ueber USB kommt hoechstens ein Seitenband (~5 kHz) an.
+    static constexpr double kCatRigBildHz = 12000.0;
+
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 

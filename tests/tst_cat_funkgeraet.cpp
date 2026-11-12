@@ -63,6 +63,7 @@
 #include "gui/applets/AppletPanelWidget.h"
 #include "gui/applets/CatRigApplet.h"
 #include "gui/SpectrumWidget.h"
+#include "gui/PanadapterApplet.h"
 #include "gui/WindowPlacement.h"
 
 using namespace Longpath;
@@ -1687,6 +1688,42 @@ private slots:
         QVERIFY(!radio.mox());
         QTest::qWait(100);
         QVERIFY2(!doppel.hatGetastet(), "MOX kam beim fremden Geraet an");
+    }
+    // Steht als letzter Fall: die Hauptfenster bleiben stehen (wie oben
+    // ueblich) und stoerten sonst das_feld_wartet_auf_die_fenster_hinter_der_maske.
+    //
+    // Ueber USB kommt hoechstens ein Seitenband (~5 kHz, am 590 gemessen).
+    // Beim Verbinden geht ein breiteres Panorama auf +-6 kHz; ein engeres
+    // bleibt, wie es ist.
+    void das_panorama_ist_so_breit_wie_der_usb_ton()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+
+        for (const double vorher : {40000.0, 8000.0}) {
+            auto* fenster = new MainWindow();   // bewusst nicht abgeraeumt
+            fenster->resize(1280, 800);
+            fenster->show();
+            QVERIFY(QTest::qWaitForWindowExposed(fenster, 20000));
+            auto* pan = fenster->findChild<PanadapterApplet*>();
+            QVERIFY(pan && pan->spectrumWidget());
+            SpectrumWidget* sw = pan->spectrumWidget();
+            sw->setFrequencyRange(14090000.0, vorher);
+
+            VerbundeneCatRig verbindung(*info);
+            RadioModel& radio = *fenster->radioModelForTest();
+            radio.injectConnectionForTest(&verbindung);
+            radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+
+            const double soll = std::min(vorher, MainWindow::kCatRigBildHz);
+            QTRY_COMPARE_WITH_TIMEOUT(sw->bandwidth(), soll, 20000);
+            QTest::qWait(300);
+            QCOMPARE(sw->bandwidth(), soll);
+            radio.injectConnectionForTest(nullptr);
+            fenster->hide();
+        }
     }
 };
 

@@ -6772,6 +6772,21 @@ void MainWindow::buildUI()
         for (PanadapterApplet* applet : m_panStack->allApplets()) {
             if (applet) { applet->zeigeDasGeraet(); }
         }
+        // ── Das Bild ist nur so breit wie der USB-Ton (2026-11-12) ────
+        //
+        // Ueber USB kommt hoechstens ein Seitenband: am TS-590 gemessen
+        // -6 dB bei 3,0 kHz und -20 dB bei 5,1 kHz, mit dem breitesten
+        // Filter (SL00/SH13). Die 48 kHz Abtastrate liessen 40 kHz
+        // Panorama zu, 35 davon leer. Mitte bleibt der Traeger, also
+        // +-6 kHz: das Seitenband passt ganz hinein. Nur verengen, nie
+        // verbreitern -- wer schon enger gezoomt hat, behaelt das; wer
+        // danach weiter aufzieht, darf es.
+        for (PanadapterApplet* applet : m_panStack->allApplets()) {
+            SpectrumWidget* sw = applet ? applet->spectrumWidget() : nullptr;
+            if (sw && sw->bandwidth() > kCatRigBildHz) {
+                sw->setFrequencyRange(sw->centerFrequency(), kCatRigBildHz);
+            }
+        }
         // Nicht setVisible(): das steigt aus, wenn der gemerkte Zustand
         // schon „sichtbar" sagt. Und sichtbar in einer Spalte, die das
         // Profil gar nicht zeigt, ist unsichtbar -- im Profil CONTEST war
@@ -16146,8 +16161,16 @@ void MainWindow::wireSliceToSpectrum()
     // fall back to the full-span default (768 kHz = sample rate).
     double freq = slice->frequency();
     const double loadedBw = activeSpectrumWidget()->bandwidth();
-    const double initialBw = (loadedBw >= 10000.0 && loadedBw <= 768000.0)
-                             ? loadedBw : 768000.0;
+    double initialBw = (loadedBw >= 10000.0 && loadedBw <= 768000.0)
+                       ? loadedBw : 768000.0;
+    // Am TS-590 ueber CAT kommt hoechstens ein Seitenband ueber USB
+    // (siehe kCatRigBildHz). Hier, nicht nur beim Verbinden: dieser Pfad
+    // laeuft danach und setzte ein Panorama unter 10 kHz auf 768 kHz.
+    if (const RadioConnection* v = m_radioModel ? m_radioModel->connection() : nullptr;
+        v && v->radioInfo().protocol == ProtocolVersion::CatRig) {
+        initialBw = (loadedBw >= 2000.0 && loadedBw <= kCatRigBildHz) ? loadedBw
+                                                                      : kCatRigBildHz;
+    }
     // ── Nicht ueber ein fremdes Bild schreiben (2026-10-27) ──────────
     //
     // Diese drei Zeilen setzen den Ausschnitt aus der Scheibe und
