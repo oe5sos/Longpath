@@ -19,6 +19,7 @@
 #include "gui/widgets/FlatMapWidget.h"
 #include "gui/widgets/GibsTileLayer.h"
 
+#include <QDateEdit>
 #include <QLabel>
 #include <QLineEdit>
 #include <QSignalSpy>
@@ -28,6 +29,38 @@ using namespace Longpath;
 
 class TstQsoMapFlyToWindow : public QObject { Q_OBJECT
 private slots:
+    // Befund 2026-11-10 am laufenden Programm: das herausgeloeste Fenster
+    // stand nach einem Rufzeichen + Enter auf FROM = TO = heute, „0
+    // contacts in range". QDialog macht beim Zeigen den ersten Knopf der
+    // Fokuskette zum Standardknopf -- hier „24 h" -- und Enter in einem
+    // Eingabefeld drueckt den Standardknopf.
+    void enter_in_the_call_field_keeps_the_date_range()
+    {
+        QsoMapWindow w;
+        w.resize(1100, 620);
+        w.setHomeGrid(QStringLiteral("JN78GH"));
+        w.imagery()->setNetworkEnabled(false);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+
+        const QList<QDateEdit*> daten = w.findChildren<QDateEdit*>();
+        QCOMPARE(daten.size(), 2);
+        const QDate von = daten.at(0)->date();
+        const QDate bis = daten.at(1)->date();
+        QVERIFY(von < bis);
+
+        auto* edit = w.findChild<QLineEdit*>();
+        QVERIFY(edit);
+        QTest::keyClicks(edit, QStringLiteral("lz5r"));
+        QTest::keyClick(edit, Qt::Key_Return);
+        QTest::keyClick(edit, Qt::Key_Enter, Qt::KeypadModifier);
+        QCoreApplication::processEvents();
+
+        QCOMPARE(daten.at(0)->date(), von);
+        QCOMPARE(daten.at(1)->date(), bis);
+        QVERIFY(w.isVisible());   // und Enter schliesst auch nichts
+    }
+
     void enter_in_the_call_field_flies_the_flat_map_there()
     {
         QsoMapWindow w;

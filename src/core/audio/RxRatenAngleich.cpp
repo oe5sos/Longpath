@@ -29,6 +29,11 @@
 //                 Code. Zielverzoegerung 50 ms (halber Ring, wie
 //                 Thetis) und nur der Lautsprecherweg — beides
 //                 Entscheidungen des Betreibers vom 2026-10-06.
+//   2026-11-11 — Eine Pause der Quelle ueber eine Sekunde setzt den
+//                 Regler zurueck, seit der Bus den Geraetetakt zaehlt
+//                 (PortAudioBus::verbrauchJeRueckruf, wie Thetis
+//                 xrmatchOUT). Martin Fischer (OE5SOS), AI-assisted via
+//                 Anthropic Claude Code.
 // =================================================================
 
 // /*  rmatch.c
@@ -202,6 +207,22 @@ RxRatenAngleich::Ausgabe RxRatenAngleich::verarbeite(
             const std::int64_t verbraucht = verbrauchtGesamt - letzterVerbrauch;
             // Ein Zaehler laeuft nur vorwaerts. Geht er zurueck, wurde der
             // Bus neu geoeffnet -- dann ist die Differenz keine Messung.
+            //
+            // Seit 2026-11-11 zaehlt der Bus den Takt des Geraets, auch
+            // Stille (PortAudioBus::verbrauchJeRueckruf, wie Thetis
+            // xrmatchOUT). Hat die QUELLE laenger als eine Sekunde
+            // geschwiegen -- getrennt, Geraet aus --, ist der Verbrauch
+            // dieser Zeit kein Takt, sondern eine Pause: der Regler faengt
+            // neu an, statt sie nachzuregeln. Eine Stockung des Flex-Tons
+            // (laengste gemessen 650 ms) bleibt darunter und zaehlt mit.
+            if (verbraucht > std::int64_t(m_rate)) {
+                zuruecksetzen();
+                m_letzterVerbrauch.store(verbrauchtGesamt, std::memory_order_relaxed);
+                m_regler.melde(rahmen, fuellungRahmen, ringRahmen);
+                m_letzteFuellung.store(fuellungRahmen, std::memory_order_relaxed);
+                m_letzteAusgabe = rahmen;
+                return { ein, rahmen };
+            }
             if (verbraucht > 0) {
                 m_regler.melde(
                     -static_cast<int>(std::min<std::int64_t>(verbraucht, 1 << 20)),

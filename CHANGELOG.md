@@ -1,5 +1,100 @@
 # Changelog
 
+## [0.10.0] - 2026-11-11
+
+37 Stände seit 0.9.0. Der größte Teil ist das **Logbuch**: aus der
+Liste wird ein Werkzeug, das zeigt, wo eine Station steht, wie der
+Weg dorthin aussieht und wohin der Rotor muss. Dazu das eingebettete
+Contestprogramm als eigene Ebene, ein schärferer Panadapter mit
+2-m-Bandbild und die Tastenkürzel.
+
+### Das Logbuch
+
+- **ROTOR in der Eingabezeile** (#422) — Rufzeichen tippen, ROTOR
+  zeigt Peilung, Entfernung und woher die Lage stammt; „Rotate“ und
+  „LP“ drehen. Eine eigene Rotorzeile mit schmalem Band. Ein genauer
+  Log-Locator schlägt die QRZ-Adresse, bei SOTA gilt der Gipfel.
+- **Azimutalkarte** als vierte Kartenansicht — abstandstreu um das
+  eigene QTH, kurzer Weg hell, langer gestrichelt.
+- **3D-Flug zur Station** über Googles fotorealistische 3D-Kacheln —
+  mit eigenem kostenlosem Cesium-ion-Zugang (ohne Kreditkarte) oder
+  eigenem Google-Schlüssel, Anleitung im Dialog. Die macOS-Pakete
+  liefern dafür Qt WebEngine mit.
+- **Statistikbilder:** Sonnenzyklus, Kontinent-Uhr, DXCC-Wand,
+  Bedarfs-Matrix, Band × Stunde und Richtungsrose (#421, #422).
+- **UKW-Höhenprofil je QSO** mit Fresnel-Zone und gemeinsamem
+  Volumen; der eigene Standort kommt vom SOTA-Gipfel, „SOTA…“ liest
+  die SOTAdata-CSV nach.
+- **Grauzone, SFI und Kp je QSO**; der Globus rechnet den Sonnenstand
+  jetzt richtig (die Zeitgleichung lag bis 17 Minuten daneben).
+- **FT8-Locator-Jagd:** ein Mosaik der gearbeiteten Felder je Band,
+  dazu die gerade gehörten Stationen in neuen Feldern — ein Klick ruft
+  an.
+- **Das Logbuch auf der Ebene der Panels** (#386), und **der Abbau mit
+  verbundenem CAT stürzt nicht mehr ab** (#420).
+
+### Das Contestprogramm in Longpath
+
+- **Contest-Panels als eigene Geschwister** mit ✕ an jedem, im
+  Combined-Feld, im Containers-Menü und hinter dem Plus (#393, #395,
+  #400, #402, #404).
+- **Die Contest-Anordnung gehört zum Layoutprofil** (#403, #407), beim
+  Start gilt das zuletzt aktive Profil (#408), und „Save Current Layout“
+  nimmt immer das aktive (#406). Nach dem Herstellen eines Profils bleibt
+  das Hauptfenster aktiv (mit Menüleiste), und Fenster aus dem Profil
+  rücken in den Schirm (#405).
+- **Mitschrift im Contest:** Rauschboden-Schneider und Sprache hinter
+  dem Zahnrad (#426).
+- **Ein zweites Combined-Feld** (#409); Panels wechseln das Feld per
+  Klick, Ziehen oder Reiter-Menü (#411); die Pille zeigt die Seite, die
+  sie verspricht (#399).
+- **Cmd+Q beendet Hamlib-Daemon und Logbuch mit** (#414).
+
+### Panadapter und 2 m
+
+- **Panadapter schärfer** (#421): Wasserfall in Geräte-Pixeln, Raster
+  als Haarlinie, feinere Kurvenkante; Durchlass und Bandbreite mit
+  Zahl, Klammern, Lückenfinder und Lupe.
+- **2-m-Bandbild** für den Transverter: Bandplan 144–148 MHz, Sendesperre
+  bei „nur Empfang“, S-Stufen mit VHF-Bezug (#394, #421).
+- **Einmessen am Träger** (KW + UKW), auch bei Protocol 1.
+- **Anzeigezeile im Panadapter**: Frequenz und SWR als Option (#410).
+- Das alte Blau ist weg, an der Quelle (#398, #401).
+
+### Bedienung
+
+- **Tastenkürzel und Sprachspeicher per Taste** (#418): F1–F10 senden,
+  Strg+Umschalt+F1–F10 nimmt auf, Esc hält an.
+- **Schwebende Fenster wachsen mit dem Hauptfenster** im Verhältnis
+  (#425); alles sperren und freigeben mit einem Griff (#396).
+- **Ein Longpath je Einstellungsordner** — ein zweiter Start übergibt
+  an den laufenden.
+
+### Rotor
+
+- **Der erlaubte Bereich gilt für jeden Drehbefehl**; Rundum-Lauf mit
+  Belegung und Rauschboden je Richtung (#421).
+- **Der Rotordialog zerlegt die Netzanbindung nicht mehr** (#427): ein
+  GS-232 am Netzserver öffnet im Netzmodus, „host:port“ ist ein
+  Netzziel.
+
+### Funkgeräte
+
+- **FLEX-8400:** Auto-SQL — die Schwelle folgt dem Rauschen der Scheibe
+  (#421); die automatische Kerbe hat eine Stärke (#390); ein Schritt
+  zurück im Zähler ist kein Verlust (#412); das Tor der IMD-Messung geht
+  auch an der Maschine auf (#374); der TCI-Spektrumstrom hing an der
+  falschen Quelle (#378).
+- **TS-590 als eigenes Funkgerät** (#415).
+- **FT8: der EU-VHF-Contest, durchgängig** (#385, #392).
+- **Abgleich mit Upstream 2026.11** (#424): AUTO-AGC beim Senden,
+  MOX-Riegel, TCI-Panel und sechs Behebungen.
+
+### Updater
+
+- **Jeder Schritt wird angesagt** statt 30 s still zu warten (#388),
+  und ein Entwicklerbau ist kein Ziel für eine Fassung (#397).
+
 ## [0.9.0] - 2026-11-04
 
 52 Stände seit 0.8.2, und die meisten davon sind am Gerät entstanden:

@@ -218,7 +218,9 @@ QString SignalTextItem::formatValue(float dbm) const
 {
     switch (m_units) {
         case Units::Dbm:    return formatDbm(dbm);
-        case Units::SUnits: return formatSUnits(dbm);
+        // Ueber der S9-Grenze ist S9 -93 dBm (sVersatz; Thetis
+        // SMeterFromDBM2(st.Value, IsAboveS9Frequency(_rx), ...)).
+        case Units::SUnits: return formatSUnits(dbm + sVersatz());
         case Units::Uv:     return formatUv(dbm);
     }
     return formatDbm(dbm);

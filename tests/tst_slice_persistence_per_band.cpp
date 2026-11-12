@@ -94,7 +94,7 @@ private:
                  QStringLiteral("XitEnabled"), QStringLiteral("XitHz"),
                  QStringLiteral("AfGain"),     QStringLiteral("RfGain"),
                  QStringLiteral("RxAntenna"),  QStringLiteral("TxAntenna"),
-                 QStringLiteral("LastBand") }) {
+                 QStringLiteral("LastBand"),   QStringLiteral("StepHz") }) {
             s.remove(sp + field);
         }
         // Legacy keys.
@@ -282,8 +282,11 @@ private slots:
         QVERIFY(s.contains(bp20 + QStringLiteral("AgcMode")));
         QCOMPARE(s.value(bp20 + QStringLiteral("AgcMode")).toInt(),
                  static_cast<int>(AGCMode::Fast));
-        QVERIFY(s.contains(bp20 + QStringLiteral("StepHz")));
-        QCOMPARE(s.value(bp20 + QStringLiteral("StepHz")).toInt(), 500);
+        // Der Schritt hat seit 2026-11-11 keinen Bandteil mehr: einer je
+        // Scheibe (Upstream NereusSDR 419dd88c4).
+        QVERIFY(!s.contains(bp20 + QStringLiteral("StepHz")));
+        QVERIFY(s.contains(QStringLiteral("Slice0/StepHz")));
+        QCOMPARE(s.value(QStringLiteral("Slice0/StepHz")).toInt(), 500);
 
         // Session keys must exist under Slice0/.
         const QString sp = QStringLiteral("Slice0/");

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Longpath VERSION 0.9.0 LANGUAGES C CXX)
+project(Longpath VERSION 0.10.0 LANGUAGES C CXX)
 
 # ── ccache compiler launcher (2026-07-25) ──────────────────────────────
 # CI has always configured ccache explicitly; local dev machines never
@@ -563,6 +563,8 @@ set(CORE_SOURCES
     src/core/Ft8Tonwahl.cpp
     src/core/Ft8Warteschlange.cpp
     src/core/GridsGearbeitet.cpp
+    # Locator-Jagd: Mosaik je Band + gehoerte Stationen (2026-11-11)
+    src/core/LocatorJagd.cpp
     src/core/BeamHeading.cpp
     src/core/BoardCapabilities.cpp
     src/core/CatProtocol.cpp
@@ -722,6 +724,10 @@ set(CORE_SOURCES
     src/core/audio/WavFile.cpp
     src/core/audio/WavPlayer.cpp
     src/core/audio/VoiceKeyer.cpp
+    src/core/audio/VoiceKeyerPlayer.cpp
+    src/core/hotkeys/HotKeyActionList.cpp
+    src/core/hotkeys/HotKeyBindings.cpp
+    src/core/hotkeys/HotKeyChord.cpp
     src/core/audio/QsoRecorder.cpp
     src/core/audio/WavRecorder.cpp
     src/core/audio/WavRecorderController.cpp
@@ -828,6 +834,9 @@ set(MODEL_SOURCES
     src/models/MeterModel.cpp
     src/models/TransmitModel.cpp
     src/models/FilterPresetStore.cpp
+    src/models/bandstack/BandStackStore.cpp
+    src/models/bandstack/BandStackSeeds.cpp
+    src/models/bandstack/BandStackController.cpp
     src/models/NotchModel.cpp
     src/models/SpotModel.cpp
     src/models/SpotTableModel.cpp
@@ -894,6 +903,23 @@ set(GUI_SOURCES
     src/gui/spectrum/ActivePeakHoldTrace.cpp
     src/gui/spectrum/PeakBlobDetector.cpp
     src/gui/spectrum/SpectrumDetector.cpp
+    src/gui/spectrum/Durchlass.cpp
+    src/core/SMeterSkala.cpp
+    src/core/FrequenzEichung.cpp
+    src/core/RundumLauf.cpp
+    src/core/RotorBereich.cpp
+    src/core/FlexAutoRauschsperre.cpp
+    src/core/LogbuchBilder.cpp
+    src/core/LogbuchGesamtbilder.cpp
+    src/core/SolarFluxArchiv.cpp
+    src/core/Hoehenprofil.cpp
+    src/core/HoehenDaten.cpp
+    src/core/HttpAbruf.cpp
+    src/core/SotaGipfel.cpp
+    src/core/SotaNachtrag.cpp
+    src/core/Grauzone.cpp
+    src/core/GfzIndizes.cpp
+    src/core/SingleInstanceGuard.cpp
     src/gui/spectrum/SpectrumAvenger.cpp
     src/gui/DssRenderer.cpp
     src/gui/SpectrumWidget.cpp
@@ -1017,6 +1043,11 @@ set(GUI_SOURCES
     src/gui/MainWindow_Asr.cpp
     src/gui/MainWindow_SunSdr.cpp
     src/gui/MainWindow_SideArea.cpp
+    src/gui/MainWindow_HotKeys.cpp
+    src/gui/hotkeys/FKeyPriority.cpp
+    src/gui/hotkeys/HotKeyDispatcher.cpp
+    src/gui/hotkeys/KeyboardRouter.cpp
+    src/gui/hotkeys/MainWindowHotKeyTargets.cpp
     src/gui/KiwiPublicReceiverPicker.cpp
     src/gui/LanScanDialog.cpp
     src/gui/LanScanDialog.h
@@ -1180,6 +1211,7 @@ set(GUI_SOURCES
     src/gui/applets/AppletVisibilityController.cpp
     src/gui/widgets/NotchEditPopup.cpp
     src/gui/widgets/RotorDialWidget.cpp
+    src/gui/widgets/RotorBandWidget.cpp
     src/gui/widgets/RotorLogbookPanel.cpp
     src/gui/widgets/GlobeWidget.cpp
     src/gui/widgets/FlatMapWidget.cpp
@@ -1187,12 +1219,16 @@ set(GUI_SOURCES
     src/gui/widgets/FlowLayout.cpp
     src/gui/widgets/BlueMarbleFetcher.cpp
     src/gui/widgets/DxRadarWidget.cpp
+    src/gui/widgets/AzimutalKarteWidget.cpp
+    src/gui/widgets/LocatorJagdZeichen.cpp
     src/gui/widgets/WorldMapCatalog.cpp
     src/gui/widgets/WorldTexture.cpp
     src/gui/LogbookWindow.cpp
     src/gui/SettingsBackupDialog.cpp
     src/gui/widgets/RxProfilePopup.cpp
     src/gui/QsoMapWindow.cpp
+    src/gui/Google3dSetupDialog.cpp
+    src/gui/widgets/Station3dSurface.cpp
     src/core/DxccFlag.cpp
     src/core/SolarTimes.cpp
     src/core/AdifLog.cpp
@@ -1200,6 +1236,7 @@ set(GUI_SOURCES
     src/core/WorkedBefore.cpp
     src/core/LogFilter.cpp
     src/core/CredentialStore.cpp
+    src/core/GoogleMapTiles.cpp
     src/core/QrzClient.cpp
     src/core/QrzLogbookUploader.cpp
     src/core/QrzLogbookFetcher.cpp
@@ -1305,10 +1342,19 @@ set(GUI_SOURCES
     src/gui/applets/RttyDecoderApplet.cpp
     src/gui/applets/CwDecoderApplet.cpp
     src/gui/applets/Ft8Applet.cpp
+    src/gui/applets/BandStackApplet.cpp
     src/gui/applets/Ft8PlaetzeApplet.cpp
+    src/gui/Ft8KartenBruecke.cpp
     src/gui/applets/QsoRecorderApplet.cpp
     src/gui/applets/RecordingApplet.cpp
     src/gui/RecordingScheduleDialog.cpp
+    src/gui/TraegerEichDialog.cpp
+    src/gui/RundumDialog.cpp
+    src/gui/widgets/LogbuchBilderWidgets.cpp
+    src/gui/widgets/LogbuchGesamtbilderWidgets.cpp
+    src/gui/widgets/HoehenprofilWidget.cpp
+    src/gui/HoehenprofilFenster.cpp
+    src/gui/SotaNachtragDialog.cpp
     src/gui/applets/BandwidthFilterApplet.cpp
     src/gui/applets/CatApplet.cpp
     src/gui/applets/TunerApplet.cpp
@@ -1330,6 +1376,7 @@ set(GUI_SOURCES
 if(APPLE)
     list(APPEND GUI_SOURCES src/gui/MacFloatingWindowBehavior.mm)
     list(APPEND GUI_SOURCES src/gui/MacVollflaeche.mm)
+    list(APPEND GUI_SOURCES src/gui/hotkeys/MacMenuTrackingWatch.mm)
     list(APPEND GUI_SOURCES src/gui/MacFloatingWindowBehavior.h)
 endif()
 
@@ -1468,6 +1515,45 @@ if(LONGPATH_LTO_AVAILABLE)
         INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
 else()
     target_link_libraries(Longpath PRIVATE LongpathObjs)
+endif()
+
+# ── Qt WebEngine: der 3D-Flug im Logbuch (2026-11-10) ──────────────────
+#
+# Betreiber: das Logbuch soll herausstechen -- nach dem Rufzeichen fliegt
+# eine Ansicht mit Googles fotorealistischen 3D-Kacheln bis aufs Dach der
+# Station. Dafuer CesiumJS in einem QWebEngineView.
+#
+# OPTIONAL, und zwar mit Absicht (anders als WebSockets oben): ohne
+# WebEngine faellt nichts weg, was der Bediener schon hatte -- die Karte
+# fliegt wie bisher ueber NASA-Bilder und bietet „View in Google Earth".
+# Homebrew-Qt auf dem Mac hat WebEngine, die Linux- und Windows-Laeufer
+# der CI nicht. -DLONGPATH_WEBENGINE=OFF schaltet es auch dort ab, wo es
+# da waere.
+#
+# Eine EIGENE kleine Bibliothek statt LongpathObjs: daran haengt jeder der
+# ~600 Pruefstaende, und keiner davon soll WebEngine mitlinken. Die Karte
+# kennt nur die Schnittstelle Station3dSurface; main.cpp meldet die
+# WebEngine-Fassung beim Start an (Station3dView::registerFactory).
+option(LONGPATH_WEBENGINE
+       "Build the Google 3D fly-to view in the logbook map (needs Qt WebEngine)" ON)
+set(LONGPATH_HAS_WEBENGINE OFF)
+if(LONGPATH_WEBENGINE)
+    find_package(Qt6 QUIET COMPONENTS WebEngineWidgets)
+    if(Qt6WebEngineWidgets_FOUND)
+        set(LONGPATH_HAS_WEBENGINE ON)
+    endif()
+endif()
+if(LONGPATH_HAS_WEBENGINE)
+    message(STATUS "Qt6::WebEngineWidgets found — Google 3D fly-to enabled")
+    add_library(LongpathWeb3d STATIC src/gui/widgets/Station3dView.cpp)
+    target_include_directories(LongpathWeb3d PUBLIC ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(LongpathWeb3d PUBLIC
+        Qt6::Core Qt6::Widgets Qt6::Network Qt6::WebEngineWidgets)
+    target_compile_definitions(LongpathWeb3d PUBLIC LONGPATH_HAS_WEBENGINE=1)
+    target_link_libraries(Longpath PRIVATE LongpathWeb3d)
+else()
+    message(STATUS "Qt6::WebEngineWidgets not found or disabled — Google 3D "
+                   "fly-to off (NASA imagery + Google Earth button instead)")
 endif()
 
 # ── Das Contestprogramm als Fenster in Longpath (2026-11-04) ──────────────
@@ -1632,6 +1718,10 @@ if(APPLE)
     # matching this project's practice of declaring the frameworks a
     # source file directly calls into (see the AVFoundation line above).
     target_link_libraries(LongpathObjs PUBLIC "-framework AppKit")
+
+    # IOKit: der F-Tasten-Modus des Systems (kIOHIDFKeyModeKey), solange
+    # Longpath vorne ist (src/gui/hotkeys/FKeyPriority.cpp).
+    target_link_libraries(LongpathObjs PUBLIC "-framework IOKit")
 
     # CoreAudio framework for AudioObjectGetPropertyData +
     # kAudioDevicePropertyIOThreadOSWorkgroup used by
@@ -2221,6 +2311,8 @@ if(APPLE)
     set_source_files_properties(src/gui/MacFloatingWindowBehavior.mm
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
     set_source_files_properties(src/gui/MacVollflaeche.mm
+        PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+    set_source_files_properties(src/gui/hotkeys/MacMenuTrackingWatch.mm
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 endif()
 if(LONGPATH_USE_PCH)

@@ -1,0 +1,167 @@
+// =================================================================
+// src/core/SMeterSkala.h  (Longpath)
+// =================================================================
+//
+// Ported from Thetis source:
+//   Project Files/Source/Console/common.cs, original licence from Thetis source is included below
+//   Project Files/Source/Console/MeterManager.cs, original licence from Thetis source is included below
+//
+// =================================================================
+// Modification history (Longpath):
+//   2026-11-08 — Reimplemented in C++20/Qt6 for Longpath by Martin
+//                 Fischer (OE5SOS), with AI-assisted transformation via
+//                 Anthropic Claude Code. Thetis v2.10.3.15-5 [@852bf0e].
+// =================================================================
+
+// --- From common.cs ---
+//=================================================================
+// common.cs
+//=================================================================
+// PowerSDR is a C# implementation of a Software Defined Radio.
+// Copyright (C) 2004-2012  FlexRadio Systems
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+//
+// You may contact us via email at: gpl@flexradio.com.
+// Paper mail may be sent to: 
+//    FlexRadio Systems
+//    4616 W. Howard Lane  Suite 1-150
+//    Austin, TX 78728
+//    USA
+//
+//=================================================================
+// Continual modifications Copyright (C) 2019-2026 Richard Samphire (MW0LGE)
+//=================================================================
+//
+//============================================================================================//
+// Dual-Licensing Statement (Applies Only to Author's Contributions, Richard Samphire MW0LGE) //
+// ------------------------------------------------------------------------------------------ //
+// For any code originally written by Richard Samphire MW0LGE, or for any modifications       //
+// made by him, the copyright holder for those portions (Richard Samphire) reserves the       //
+// right to use, license, and distribute such code under different terms, including           //
+// closed-source and proprietary licences, in addition to the GNU General Public License      //
+// granted above. Nothing in this statement restricts any rights granted to recipients under  //
+// the GNU GPL. Code contributed by others (not Richard Samphire) remains licensed under      //
+// its original terms and is not affected by this dual-licensing statement in any way.        //
+// Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
+//============================================================================================//
+
+// --- From MeterManager.cs ---
+/*  MeterManager.cs
+
+This file is part of a program that implements a Software-Defined Radio.
+
+This code/file can be found on GitHub : https://github.com/ramdor/Thetis
+
+Copyright (C) 2020-2026 Richard Samphire MW0LGE
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+The author can be reached by email at
+
+mw0lge@grange-lane.co.uk
+*/
+//
+//============================================================================================//
+// Dual-Licensing Statement (Applies Only to Author's Contributions, Richard Samphire MW0LGE) //
+// ------------------------------------------------------------------------------------------ //
+// For any code originally written by Richard Samphire MW0LGE, or for any modifications       //
+// made by him, the copyright holder for those portions (Richard Samphire) reserves the       //
+// right to use, license, and distribute such code under different terms, including           //
+// closed-source and proprietary licences, in addition to the GNU General Public License      //
+// granted above. Nothing in this statement restricts any rights granted to recipients under  //
+// the GNU GPL. Code contributed by others (not Richard Samphire) remains licensed under      //
+// its original terms and is not affected by this dual-licensing statement in any way.        //
+// Richard Samphire can be reached by email at :  mw0lge@grange-lane.co.uk                    //
+//============================================================================================//
+
+#pragma once
+
+#include <QString>
+
+namespace Longpath::SMeter {
+
+// ── S-Stufen nach Thetis, mit dem VHF-Bezug (2026-11-08) ──────────────
+//
+// Thetis rechnet die S-Stufe ueber oder unter einer Grenzfrequenz
+// verschieden: darunter S9 = -73 dBm (KW), darueber S9 = -93 dBm
+// (VHF/UHF, IARU), 6 dB je Stufe. Longpath hatte nur den KW-Bezug --
+// auf 2 m stand eine S9-Station als "S9+20" da.
+
+/// Grenze ab Werk, in MHz.
+/// From Thetis MeterManager.cs:358 [@852bf0e]: _s9Frequency = 30.0;
+/// (Setup kennt 30 oder 144: setup.cs:29395-29405 [@852bf0e].)
+inline constexpr double kS9GrenzeMhzVorgabe = 30.0;
+
+/// Liegt diese Antennenfrequenz ueber der Grenze?
+/// From Thetis MeterManager.cs:3342 [@852bf0e]:
+///   _rx1VHForAbove = _console.VFOAFreq >= _s9Frequency;
+inline bool ueberGrenze(double antenneMhz, double grenzeMhz = kS9GrenzeMhzVorgabe)
+{
+    return antenneMhz >= grenzeMhz;
+}
+
+// ── Die Kennung des gemessenen Empfaengers ──────────────────────────
+//
+// Thetis haelt je Empfaenger eine statische Kennung, die beim Abstimmen
+// nachgefuehrt wird, und schiebt damit Zeiger, Balken und S-Text:
+//   From Thetis MeterManager.cs:273 [@852bf0e]:
+//     private static bool _rx1VHForAbove;
+//   From Thetis MeterManager.cs:4508 [@852bf0e] (OnVFOA):
+//     _rx1VHForAbove = newFreq >= _s9Frequency;
+//   From Thetis MeterManager.cs:5419-5425 [@852bf0e]:
+//     private static float dbmOffsetForAboveS9Frequency(int rx)
+//     { if (IsAboveS9Frequency(rx)) return 20f; else return 0f; }
+// Longpath misst EINEN Empfaenger (MeterPoller haengt an der aktiven
+// Scheibe), daher eine Kennung. RadioModel setzt sie aus der
+// Antennenfrequenz der aktiven Scheibe (beim Transverter 144,300,
+// nicht 28,300 -- Thetis' VFOAFreq ist ebenfalls die angezeigte).
+
+/// Setzen (RadioModel) und lesen (Instrumente, Meter).
+void setzeUeberGrenze(bool ueber);
+bool istUeberGrenze();
+
+/// Der Versatz, den Thetis' getPerc auf Signal-Lesungen anrechnet,
+/// bevor es die Stelle auf der Skala sucht (MeterManager.cs:41049-41052
+/// [@852bf0e]). Die Skala bleibt in KW-dBm beschriftet; der Wert
+/// rueckt um 20 dB, damit -93 dBm auf dem S9-Strich steht.
+inline constexpr float kVersatzUeberGrenzeDb = 20.0f;
+float versatzUeberGrenze();
+
+/// Stetige S-Stufe (9 = S9).
+/// From Thetis common.cs:881-887 [@852bf0e] GetSMeterUnits.
+double einheiten(double dbm, bool ueberS9Frequenz);
+
+/// Die Umkehrung: der dBm-Wert einer S-Stufe (S9+20 = 9 + 20/6).
+/// Longpath-eigen, die Algebra zu einheiten().
+double dbmFuer(double einheiten, bool ueberS9Frequenz);
+
+/// "S0" ... "S9", "S9+5" ... "S9+60" -- die Tabelle aus Thetis.
+/// From Thetis common.cs:834-880 [@852bf0e] SMeterFromDBM_Spaceless.
+QString text(double dbm, bool ueberS9Frequenz);
+
+} // namespace Longpath::SMeter

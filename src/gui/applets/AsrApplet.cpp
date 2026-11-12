@@ -8,17 +8,23 @@
 // Modification history (Longpath):
 //   2026-08-23 — Angelegt fuer Longpath von Martin Fischer,
 //                KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-11-11 — Sprache hinter dem ⚙, Sprache in der Zustandszeile.
+//                Martin Fischer, KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 #include "gui/applets/AsrApplet.h"
 #include "asr/WhisperServerLauncher.h"
 
 #include "asr/AsrService.h"
+#include "core/AppSettings.h"
 #include "gui/StyleConstants.h"
 
+#include <QActionGroup>
+#include <QPointer>
 #include <QPushButton>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMenu>
 #include <QPlainTextEdit>
 #include <QScrollBar>
 #include <QTime>
@@ -116,7 +122,10 @@ void AsrApplet::setService(AsrService* svc)
         // Rueckmeldung, die zeigt, dass der Abgriff wirklich Ton sieht
         // — ohne sie wuesste der Betreiber bei offbleibendem Text
         // nicht, ob niemand spricht oder nichts ankommt.
-        setStatus(on ? tr("listening") : tr("wartet"),
+        // Die Sprache steht dabei (2026-11-11): mit der falschen hoert
+        // Whisper ein Rufzeichen halb so oft richtig, und das sieht man
+        // dem Text nicht an.
+        setStatus((on ? tr("listening") : tr("wartet")) + sprachZusatz(),
                   on ? Style::role("live", Style::kLiveGreen)
                      : Style::role("text-scale", Style::kTextScale));
     });
@@ -132,6 +141,63 @@ void AsrApplet::setService(AsrService* svc)
 QString AsrApplet::text() const
 {
     return m_text ? m_text->toPlainText() : QString();
+}
+
+QString AsrApplet::sprachZusatz() const
+{
+    const QString code = AppSettings::instance()
+                             .value(QStringLiteral("AsrLanguage"), QStringLiteral("de"))
+                             .toString().trimmed();
+    return code.isEmpty() ? QString() : QStringLiteral(" · %1").arg(code.toUpper());
+}
+
+QMenu* AsrApplet::baueOptionsMenue(QWidget* parent)
+{
+    auto* menu = new QMenu(parent);
+    menu->addSection(tr("Language"));
+
+    // Dieselben Codes wie das Feld unter Setup > Transcription — beide
+    // schreiben AsrLanguage, es gibt nur eine Sprache.
+    const QString current = AppSettings::instance()
+                                .value(QStringLiteral("AsrLanguage"), QStringLiteral("de"))
+                                .toString().trimmed();
+    auto* group = new QActionGroup(menu);
+    group->setExclusive(true);
+    const struct {
+        const char* code;
+        QString label;
+    } choices[] = {
+        {"de", tr("German")},
+        {"en", tr("English (contests)")},
+        {"auto", tr("Detect automatically")},
+    };
+    for (const auto& c : choices) {
+        const QString code = QString::fromLatin1(c.code);
+        QAction* a = menu->addAction(c.label);
+        a->setCheckable(true);
+        a->setChecked(current.compare(code, Qt::CaseInsensitive) == 0);
+        a->setData(code);
+        group->addAction(a);
+        connect(a, &QAction::triggered, this, [this, code] {
+            auto& s = AppSettings::instance();
+            if (s.value(QStringLiteral("AsrLanguage"), QStringLiteral("de")).toString() == code) {
+                return;
+            }
+            s.setValue(QStringLiteral("AsrLanguage"), code);
+            emit languageChanged(code);
+        });
+    }
+    return menu;
+}
+
+void AsrApplet::openExtendedSettings()
+{
+    // Dieselbe Hand wie FrequencyApplet: am Fenster haengen und
+    // ueberleben, falls das Fenster waehrend exec() stirbt.
+    QMenu* menu = baueOptionsMenue(window());
+    QPointer<QMenu> lebtNoch(menu);
+    menu->exec(mapToGlobal(rect().center()));
+    if (lebtNoch) { lebtNoch->deleteLater(); }
 }
 
 void AsrApplet::appendLine(const QString& text, float confidence)

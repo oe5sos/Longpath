@@ -282,6 +282,7 @@ QrzClient::ParsedResponse QrzClient::parseXml(const QByteArray& xml)
                 else if (name == QLatin1String("country"))  i.country = text;
                 else if (name == QLatin1String("county"))   i.county = text;
                 else if (name == QLatin1String("grid"))     i.grid = text;
+                else if (name == QLatin1String("geoloc"))   i.geoloc = text.trimmed().toLower();
                 else if (name == QLatin1String("class"))    i.licenseClass = text;
                 else if (name == QLatin1String("email"))    i.email = text;
                 else if (name == QLatin1String("url"))      i.url = text;

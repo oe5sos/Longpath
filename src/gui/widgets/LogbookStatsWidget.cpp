@@ -305,6 +305,14 @@ void LogbookStatsWidget::rebuild()
     lines += row(QStringLiteral("confirmed"),
                  okOpen + num(s.confirmed) + close
                  + QStringLiteral(" (%1)").arg(percent(s.confirmed, s.total)));
+    // Grauzonen-QSOs (2026-11-10): Anteil an den QSOs, bei denen sich
+    // ein Ende verorten liess — nicht an allen, sonst drueckt ein Log
+    // voller QSOs ohne Locator und ohne Land den Anteil.
+    if (s.greyLineJudged > 0) {
+        lines += row(QStringLiteral("grey line"),
+                     num(s.greyLine)
+                     + QStringLiteral(" (%1)").arg(percent(s.greyLine, s.greyLineJudged)));
+    }
     if (s.longestKm > 0.0) {
         lines += row(QStringLiteral("furthest"),
                      QStringLiteral("%1 km %2")

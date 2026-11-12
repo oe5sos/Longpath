@@ -169,6 +169,11 @@ class TciLogWindow;
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
+    // Die Tastenkuerzel (2026-11-10) gehen an dieselben Stellen wie die
+    // Bedienelemente und brauchen dafuer m_radioModel, m_shuttingDown
+    // und die zwei Wege darunter (stimmeVomBediener, panoramaZoomen).
+    friend class MainWindowHotKeyTargets;
+
 public:
 
     /// Die Scheibenflaggen ein- oder ausschalten (View > Slice
@@ -252,6 +257,7 @@ public:
     class KiwiSdrManager* kiwiSdrManagerForTest() const
     { return m_kiwiSdrManager; }
     RadioModel* radioModelForTest() const { return m_radioModel; }
+    class InstrumentApplet* signalInstrumentForTest() const;
     class ContestFenster* contestFensterForTest() const { return m_contestFenster; }
     QByteArray layoutprofilAlsJsonForTest(const QString& name) { return layoutprofilAlsJson(name); }
     void holeContestInsKombiFeldForTest(const QString& id, bool zweites = false)
@@ -427,6 +433,20 @@ public:
     /// 2026-10-23 musste an drei Stellen einzeln nachgetragen werden,
     /// weil es diesen einen Weg noch nicht gab.
     void bandUmschalten(Longpath::Band band);
+
+    /// Die Tastenkuerzel (2026-11-10): der Verteiler, fuer Pruefstaende.
+    class HotKeyDispatcher* hotKeyDispatcher() const { return m_hotKeyDispatcher.get(); }
+    /// Am Mac: F1…F12 als F-Tasten, solange Longpath vorne ist (2026-11-11).
+    class FKeyPriority* fKeyPriority() const { return m_fKeyPriority.get(); }
+
+    /// Bandstapel (2026-11-11, Entwurf D1): die Marken aller
+    /// Panadapter neu setzen -- nach jeder Aenderung am Stapel, einem
+    /// Wechsel der Scheibe oder dem Schalter im Zahnrad des Applets.
+    void bandstapelMarkenNachziehen();
+    /// Dasselbe fuer einen Panadapter: die Eintraege mit der Stelle der
+    /// Scheibe, die er zeigt (sliceForPan). Leer, wenn der Schalter aus
+    /// ist oder kein Geraet verbunden.
+    void bandstapelMarkenFuer(class SpectrumWidget* sw, const QString& panId);
     /// Das an Band/Modus/Digimodus gebundene Layoutprofil aktivieren,
     /// falls eines passt. Siehe `LayoutProfiles::profileFor`.
     void profilNachstellen(
@@ -452,8 +472,10 @@ public:
     /// das Hauptfenster bekommt einen neuen Rahmen, und jedes schwebende
     /// Fenster (dieselbe Aufzaehlung wie beim Schutzrahmen: Qt::Tool-
     /// Kinder des Hauptfensters, keine Dialoge) wird von der alten Lage
-    /// IM VERHAELTNIS zum alten Rahmen auf den neuen abgebildet. Die
-    /// Groesse bleibt dem Betreiber. Laeuft im Nachlauf des Schutzrahmens
+    /// IM VERHAELTNIS zum alten Rahmen auf den neuen abgebildet. Seit
+    /// 2026-11-11 auch die Groesse („wenn ich das mache, müssen alle
+    /// anderen fenster auch im verhältnis kleiner werden"); ein reiner
+    /// Zug laesst sie, wie sie ist. Laeuft im Nachlauf des Schutzrahmens
     /// (250 ms), VOR dem Herausholen aus den Sperrstreifen.
     ///
     /// `m_hauptrahmenBasis` ist der Rahmen, zu dem die Lagen zuletzt
@@ -752,6 +774,12 @@ private slots:
     /// on a functor target, it refuses the connect outright and returns an
     /// invalid Connection. As a lambda this signal was not connected at all.
     void onNotchCreateFromPan(double freqHz, bool narrow);
+    // Einmessen an einem Traeger (2026-11-08): Ergebnis der Messung eines
+    // Panadapters -> Dialog (TraegerEichDialog).
+    void zeigeTraegerEichung(bool gefunden, double geraetHz, double anzeigeHz,
+                             float snrDb);
+    // Rundum-Lauf (2026-11-08): Tools -> Rotor sweep.
+    void oeffneRundumLauf();
     void onNotchCreateRequested(const QString& panId, double freqHz, bool narrow);
     void onNotchMoveRequested(int id, double newFreqHz);
     void onNotchWidthRequested(int id, double widthHz);
@@ -1526,6 +1554,9 @@ private:
     void releaseKiwiSdrSlice(int sliceId, const QString& profileId,
                               const QString& reason);
     void setAsrEnabled(bool on);
+    // Neue Sprache aus dem ⚙ der Mitschrift: laeuft sie, mit der neuen
+    // Sprache neu aufsetzen (MainWindow_Asr.cpp, 2026-11-11).
+    void uebernehmeAsrSprache();
 
     // SunSDR — siehe MainWindow_SunSdr.cpp.
     void wireSunSdr();
@@ -2054,6 +2085,25 @@ private:
     class DiversityApplet*  m_diversityApplet{nullptr};
     class CwxApplet*        m_cwxApplet{nullptr};
     class DvkApplet*        m_dvkApplet{nullptr};
+
+    // ── Tastenkuerzel (2026-11-10) ──────────────────────────────────
+    //
+    // Die Belegung liegt in RadioModel (hotKeyBindings). Hier die drei
+    // Teile, die das Fenster braucht. Reihenfolge ist Absicht: als
+    // Mitglieder werden sie in umgekehrter Reihenfolge abgebaut, also
+    // erst die Weiche (sie haengt als Ereignisfilter an der ganzen
+    // Anwendung), dann der Verteiler, zuletzt die Ziele -- und alle drei
+    // VOR den Kindern des Fensters, zu denen RadioModel gehoert.
+    void richteTastenkuerzelEin();
+    // Abstimmen wie ein Klick ins Panorama: Sperre meldet sich,
+    // Begleitgeraet folgt.
+    void stimmeVomBediener(class SliceModel* s, double hz);
+    // Die Lupe im Panorama: Faktor < 1 vergroessert.
+    void panoramaZoomen(double factor);
+    std::unique_ptr<class MainWindowHotKeyTargets> m_hotKeyTargets;
+    std::unique_ptr<class HotKeyDispatcher>        m_hotKeyDispatcher;
+    std::unique_ptr<class KeyboardRouter>          m_keyboardRouter;
+    std::unique_ptr<class FKeyPriority>            m_fKeyPriority;
     class QsoRecorderApplet* m_qsoRecorderApplet{nullptr};
     class RecordingApplet*   m_recordingApplet{nullptr};
 
@@ -2142,6 +2192,7 @@ private:
     /// nie die Maschine.
     QMetaObject::Connection m_flexSqlAnBand;
     QMetaObject::Connection m_flexSqlStufeBand;
+    QMetaObject::Connection m_flexSqlAutoBand;
     /// Die uebrigen Regler der Scheibe -- aus demselben Grund eigene
     /// Baender: am Flex laeuft `wireSliceSignals` nicht.
     QMetaObject::Connection m_flexAgcBand;
@@ -2554,9 +2605,18 @@ private:
     /// Die beiden Zeiger-/Balkeninstrumente (2026-08-17). Sie hängen an
     /// MeterPoller::readingUpdated, also am selben Umlauf wie die
     /// Meter-Items.
-    class FrequencyApplet*  m_frequencyApplet{nullptr};
-    class InstrumentApplet* m_swrInstrument{nullptr};
-    class InstrumentApplet* m_signalInstrument{nullptr};
+    ///
+    /// QPointer, nicht roh (2026-11-08): closeEvent loescht die
+    /// schwebenden Applet-Fenster samt Applet, und bis quit() laeuft die
+    /// Ereignisschleife weiter -- ein Meter-Takt danach traf das
+    /// geloeschte S-Meter (Absturzbericht 12:35, NeedleInstrument::
+    /// onReading mit this = 0, 57 ms nach closeEvent).
+    QPointer<class FrequencyApplet>  m_frequencyApplet;
+    // Bandstapel (2026-11-11, Entwurf A): das Applet unter der Frequenz.
+    QPointer<class BandStackApplet>  m_bandStackApplet;
+    QPointer<class InstrumentApplet> m_swrInstrument;
+    QPointer<class InstrumentApplet> m_signalInstrument;
+    QPointer<class RundumDialog>     m_rundumDialog;   // Rundum-Lauf (2026-11-08)
     // Betreiber 2026-09-03: "leider funktioniert die Frequenzanzeige
     // nicht im S-Meter" -- die urspruengliche Verdrahtung (buildUI())
     // lief EINMAL gegen die beim Start aktive Scheibe; ein frisches

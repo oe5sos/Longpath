@@ -58,6 +58,8 @@
 
 #pragma once
 
+#include <optional>
+
 #include "../core/WdspTypes.h"
 #include "Band.h"
 
@@ -110,6 +112,17 @@ DSPMode korrigiereSeitenband(Band b, DSPMode mode);
 /// und genau darauf stand das Geraet des Betreibers am 2026-10-29,
 /// als die Flex `NOT_READY reason=OUT_OF_BAND` meldete.
 double frequenzImBand(Band b, double hz);
+
+/// Das Band, auf dem der Bandstapel `hz` sieht: das Amateurband oder WWV
+/// (bandFromFrequency), sonst das Rundfunkband, dessen Bereich `hz`
+/// enthaelt (Thetis-Frequenzdaten der Region US), sonst GEN. 2026-11-11,
+/// fuer den Bandstapel; nach Upstream NereusSDR.
+Band bandGridBandFromFrequency(double hz);
+
+/// Die Mitte von `band`: sein Bereich bei einem Amateur- oder
+/// Rundfunkband, seine Startfrequenz bei WWV und GEN, die keinen Bereich
+/// haben. Nullopt fuer XVTR.
+std::optional<double> bandMiddleHz(Band band);
 
 } // namespace BandDefaults
 } // namespace Longpath

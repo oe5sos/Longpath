@@ -16,6 +16,7 @@
 #include "FlatMapWidget.h"
 #include "GibsTileLayer.h"
 #include "WorldTexture.h"
+#include "LocatorJagdZeichen.h"
 
 #include "core/SolarTimes.h"
 #include "gui/StyleConstants.h"
@@ -24,9 +25,12 @@
 #include <QDateTime>
 #include <QEasingCurve>
 #include <QFontMetrics>
+#include <QHelpEvent>
+#include <QToolTip>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QSet>
 #include <QVariantAnimation>
 #include <QWheelEvent>
 
@@ -78,6 +82,248 @@ FlatMapWidget::FlatMapWidget(QWidget* parent) : QWidget(parent)
 
     setToolTip(QStringLiteral(
         "Drag to pan · wheel to zoom · double-click to reset"));
+    // Fuer den Zeiger ueber einem FT8-Punkt (2026-11-11): eine Hand
+    // sagt „hier kann man klicken", bevor der Hinweis aufgeht.
+    setMouseTracking(true);
+}
+
+// ── Locator-Jagd (2026-11-11) ───────────────────────────────────────
+
+void FlatMapWidget::setMosaik(const QHash<QString, FeldStand>& felder)
+{
+    m_mosaik = felder;
+    if (m_showGrid) { update(); }
+}
+
+void FlatMapWidget::setLivePunkte(const QVector<LivePunkt>& punkte)
+{
+    m_live = punkte;
+    update();
+}
+
+QPointF FlatMapWidget::livePunktBildpunkt(int i) const
+{
+    if (i < 0 || i >= m_live.size()) { return {}; }
+    const QVector<QPointF> v = LocatorJagdZeichen::versaetze(m_live);
+    return project(m_live.at(i).lat, m_live.at(i).lon) + v.at(i);
+}
+
+int FlatMapWidget::livePunktAt(const QPointF& pos) const
+{
+    if (m_live.isEmpty()) { return -1; }
+    const QVector<QPointF> v = LocatorJagdZeichen::versaetze(m_live);
+    int best = -1;
+    double bestD = LocatorJagdZeichen::kTrefferPx;
+    // Von oben nach unten: was zuletzt gemalt wurde, liegt obenauf und
+    // wird bei Gleichstand genommen.
+    for (int i = m_live.size() - 1; i >= 0; --i) {
+        const QPointF s = project(m_live.at(i).lat, m_live.at(i).lon) + v.at(i);
+        const double d = std::hypot(s.x() - pos.x(), s.y() - pos.y());
+        if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+}
+
+bool FlatMapWidget::event(QEvent* e)
+{
+    if (e->type() == QEvent::ToolTip) {
+        auto* he = static_cast<QHelpEvent*>(e);
+        const int i = livePunktAt(he->pos());
+        if (i >= 0) {
+            QToolTip::showText(he->globalPos(),
+                               LiveSchicht::hinweis(m_live.at(i),
+                                                    QDateTime::currentDateTimeUtc()),
+                               this);
+            return true;
+        }
+    }
+    return QWidget::event(e);
+}
+
+void FlatMapWidget::setJagdModus(bool an)
+{
+    if (m_jagdModus == an) { return; }
+    m_jagdModus = an;
+    update();
+}
+
+void FlatMapWidget::setGrosseFelder(bool an)
+{
+    if (m_grosseFelder == an) { return; }
+    m_grosseFelder = an;
+    update();
+}
+
+void FlatMapWidget::setLueckenBetonen(bool an)
+{
+    if (m_luecken == an) { return; }
+    m_luecken = an;
+    update();
+}
+
+void FlatMapWidget::paintMosaik(QPainter& p)
+{
+    if (m_mosaik.isEmpty()) { return; }
+    p.save();
+    p.setPen(Qt::NoPen);
+    const QRectF sicht(rect());
+
+    if (m_grosseFelder) {
+        // Je Grossfeld der BESTE Stand darin: ein bestaetigtes Quadrat
+        // macht das Feld bestaetigt. Das ist die Frage, die auf der
+        // Weltkarte zaehlt -- „war ich da schon mal?", nicht „welches
+        // der hundert Quadrate fehlt mir noch".
+        QHash<QString, FeldStand> gross;
+        for (auto it = m_mosaik.cbegin(); it != m_mosaik.cend(); ++it) {
+            if (it.key().size() != 4) { continue; }
+            const QString gf = it.key().left(2);
+            const FeldStand da = gross.value(gf, FeldStand::Nie);
+            if (it.value() == FeldStand::Bestaetigt
+                || (it.value() == FeldStand::Gearbeitet && da == FeldStand::Nie)) {
+                gross.insert(gf, it.value());
+            }
+        }
+        if (m_luecken) {
+            // Alle 18x18 Grossfelder durchgehen und das faerben, was
+            // NICHT im Logbuch steht. Bernstein, die Hausfarbe fuer
+            // „neu" -- gedaempft, sonst waere der halbe Globus ein Fleck.
+            QColor luecke(Style::kJagdNeu);
+            luecke.setAlpha(m_jagdModus ? 70 : 40);
+            p.setBrush(luecke);
+            for (int fx = 0; fx < 18; ++fx) {
+                for (int fy = 0; fy < 18; ++fy) {
+                    const QString gf = QString(QLatin1Char('A' + char(fx)))
+                                     + QLatin1Char('A' + char(fy));
+                    if (gross.contains(gf)) { continue; }
+                    const QRectF feld(project(fy * 10.0 - 90.0 + 10.0, fx * 20.0 - 180.0),
+                                      project(fy * 10.0 - 90.0, fx * 20.0 - 180.0 + 20.0));
+                    if (!feld.intersects(sicht)) { continue; }
+                    p.drawRect(feld);
+                }
+            }
+            p.restore();
+            return;
+        }
+        for (auto it = gross.cbegin(); it != gross.cend(); ++it) {
+            const int fx = it.key().at(0).toLatin1() - 'A';
+            const int fy = it.key().at(1).toLatin1() - 'A';
+            const double lonW = fx * 20.0 - 180.0;
+            const double latS = fy * 10.0 - 90.0;
+            const QRectF feld(project(latS + 10.0, lonW),
+                              project(latS, lonW + 20.0));
+            if (!feld.intersects(sicht)) { continue; }
+            p.setBrush(LocatorJagdZeichen::feldFuellung(it.value(), m_jagdModus));
+            p.drawRect(feld);
+        }
+        p.restore();
+        return;
+    }
+
+    for (auto it = m_mosaik.cbegin(); it != m_mosaik.cend(); ++it) {
+        const QString& f = it.key();
+        if (f.size() != 4) { continue; }
+        const int fx = f.at(0).toLatin1() - 'A';
+        const int fy = f.at(1).toLatin1() - 'A';
+        const int sx = f.at(2).toLatin1() - '0';
+        const int sy = f.at(3).toLatin1() - '0';
+        const double lonW = fx * 20.0 - 180.0 + sx * 2.0;
+        const double latS = fy * 10.0 - 90.0 + sy;
+        const QRectF feld(project(latS + 1.0, lonW), project(latS, lonW + 2.0));
+        if (!feld.intersects(sicht)) { continue; }
+        p.setBrush(LocatorJagdZeichen::feldFuellung(it.value(), m_jagdModus));
+        p.drawRect(feld);
+    }
+    p.restore();
+}
+
+void FlatMapWidget::paintLive(QPainter& p, const QRectF& r)
+{
+    m_neueFelderGemalt = 0;
+    if (m_live.isEmpty()) { return; }
+    const QVector<QPointF> v = LocatorJagdZeichen::versaetze(m_live);
+
+    // Mit Gitter: das neue Feld selbst bekommt einen Bernsteinrahmen.
+    // Der Punkt sagt „hier ist jemand", der Rahmen „und das Feld fehlt
+    // dir" -- auch dort, wo sich die Punkte drängen.
+    if (m_showGrid) {
+        QSet<QString> gerahmt;
+        QColor rand(Style::kJagdNeu);
+        p.save();
+        p.setBrush(Qt::NoBrush);
+        p.setPen(QPen(rand, 1.4));
+        QColor fuellung(Style::kJagdNeu);
+        fuellung.setAlpha(45);
+        for (const LivePunkt& lp : m_live) {
+            if (!lp.feldNeu || gerahmt.contains(lp.feld)) { continue; }
+            const int fx = lp.feld.at(0).toLatin1() - 'A';
+            const int fy = lp.feld.at(1).toLatin1() - 'A';
+            const int sx = lp.feld.at(2).toLatin1() - '0';
+            const int sy = lp.feld.at(3).toLatin1() - '0';
+            const double lonW = fx * 20.0 - 180.0 + sx * 2.0;
+            const double latS = fy * 10.0 - 90.0 + sy;
+            const QRectF feld(project(latS + 1.0, lonW), project(latS, lonW + 2.0));
+            // Erst wenn das Feld groesser als der Punkt ist: ein Rahmen
+            // knapp um den Punkt sah am Bild aus wie ein Kamerasymbol.
+            if (feld.width() < 22.0) { continue; }
+            gerahmt.insert(lp.feld);
+            p.setBrush(fuellung);
+            p.drawRect(feld);
+        }
+        p.restore();
+        m_neueFelderGemalt = gerahmt.size();
+    }
+
+    for (int i = 0; i < m_live.size(); ++i) {
+        const QPointF c = project(m_live.at(i).lat, m_live.at(i).lon) + v.at(i);
+        if (!r.adjusted(-20, -20, 20, 20).contains(c)) { continue; }
+        LocatorJagdZeichen::punkt(p, c, m_live.at(i).art);
+    }
+
+    // Rufzeichen auf einer dunklen Platte, wie bei den Satelliten:
+    // ueber Luftbild und Mosaik ist jede Schriftfarbe irgendwo unlesbar.
+    QFont f = p.font();
+    f.setPixelSize(9);
+    f.setBold(true);
+    p.save();
+    p.setFont(f);
+    const QFontMetrics fm(f);
+    // Die wichtigsten zuerst (die Liste ist aufsteigend sortiert), und
+    // keine Platte ueber einer anderen: in Europa lagen am ersten Bild
+    // sechs Rufzeichen uebereinander. Was keinen Platz findet, steht im
+    // Hinweis unter dem Zeiger.
+    QVector<QRectF> belegt;
+    for (int i = m_live.size() - 1; i >= 0; --i) {
+        const LivePunkt& lp = m_live.at(i);
+        if (!LocatorJagdZeichen::beschriften(lp.art, m_live.size())) { continue; }
+        const QPointF c = project(lp.lat, lp.lon) + v.at(i);
+        if (!r.contains(c)) { continue; }
+        const QString text = lp.g.rufzeichen;
+        const int tw = fm.horizontalAdvance(text);
+        const double bh = fm.height() + 2.0;
+        QRectF box;
+        for (const QPointF& at : {QPointF(c.x() + 9.0, c.y() - bh / 2.0),
+                                  QPointF(c.x() - 9.0 - (tw + 8.0), c.y() - bh / 2.0),
+                                  QPointF(c.x() - (tw + 8.0) / 2.0, c.y() - 9.0 - bh),
+                                  QPointF(c.x() - (tw + 8.0) / 2.0, c.y() + 9.0)}) {
+            const QRectF versuch(at, QSizeF(tw + 8.0, bh));
+            bool frei = QRectF(rect()).contains(versuch);
+            for (const QRectF& b : belegt) {
+                if (b.intersects(versuch)) { frei = false; break; }
+            }
+            if (frei) { box = versuch; break; }
+        }
+        if (box.isNull()) { continue; }
+        belegt.append(box);
+        QColor bg(Style::hexRole(Style::kAppBg));
+        bg.setAlpha(175);
+        p.setPen(Qt::NoPen);
+        p.setBrush(bg);
+        p.drawRoundedRect(box, 3.0, 3.0);
+        p.setPen(lp.art == LiveArt::NeuesLand ? QColor(Style::kJagdNeuesLandRand)
+                                              : LocatorJagdZeichen::farbe(lp.art));
+        p.drawText(box, Qt::AlignCenter | Qt::TextSingleLine, text);
+    }
+    p.restore();
 }
 
 // ── Inputs ──────────────────────────────────────────────────────────
@@ -564,6 +810,10 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
         }
     }
 
+    // Die gehoerten FT8-Stationen ueber den Logbuchpunkten: sie sind das,
+    // worauf man jetzt klicken will (2026-11-11).
+    paintLive(p, r);
+
     // Die gesuchte Station vor dem eigenen Standort: der Grosskreis
     // endet unter dem Foto, nicht darueber.
     paintFocusStation(p);
@@ -641,6 +891,16 @@ void FlatMapWidget::paintEvent(QPaintEvent*)
         p.setFont(f);
     }
 
+    // Die Legende der Jagd, sobald es etwas zu erklaeren gibt.
+    {
+        const bool mosaik = m_showGrid && !m_mosaik.isEmpty();
+        const bool live = !m_live.isEmpty();
+        if (mosaik || live) {
+            LocatorJagdZeichen::legende(p, QRectF(rect()).adjusted(0, 0, 0, -10),
+                                        mosaik, live);
+        }
+    }
+
     if (tex.isNull()) {
         p.setPen(QColor(Style::kTextScale));
         p.setFont(f);
@@ -663,6 +923,10 @@ void FlatMapWidget::paintGridOverlay(QPainter& p, const QRectF& r)
     if (vis.isEmpty()) { return; }
     p.save();
     p.setClipRect(vis);
+
+    // Das Mosaik unter den Linien (2026-11-11): erst die Fuellung, dann
+    // das Gitter darueber -- sonst verschwaenden die Linien im Gruen.
+    paintMosaik(p);
 
     double latTop = 0, lonLeft = 0, latBot = 0, lonRight = 0;
     unproject(vis.topLeft() + QPointF(1, 1), latTop, lonLeft);
@@ -793,7 +1057,12 @@ void FlatMapWidget::mousePressEvent(QMouseEvent* e)
 
 void FlatMapWidget::mouseMoveEvent(QMouseEvent* e)
 {
-    if (!m_dragging) { QWidget::mouseMoveEvent(e); return; }
+    if (!m_dragging) {
+        setCursor(livePunktAt(e->position()) >= 0 ? Qt::PointingHandCursor
+                                                  : Qt::OpenHandCursor);
+        QWidget::mouseMoveEvent(e);
+        return;
+    }
     const QPoint d = e->position().toPoint() - m_dragFrom;
     if (!m_moved && d.manhattanLength() > 4) { m_moved = true; }
     if (!m_moved) { return; }
@@ -812,6 +1081,11 @@ void FlatMapWidget::mouseReleaseEvent(QMouseEvent* e)
         // which square is that.
         if (!m_moved) {
             const QPointF pos = e->position();
+            // Anrufen tut der DOPPELklick, nicht dieser hier (Betreiber
+            // 2026-11-11: „doppelklick, sofern ich diesen sender
+            // empfangen kann, und das ft8 geht los"). Ein einzelner
+            // Klick darf keine Taste druecken -- er zeigt nur, was unter
+            // dem Zeiger liegt. Siehe mouseDoubleClickEvent().
             const int hit = pointAt(pos);
             if (hit >= 0) {
                 const MapPoint& pt = m_points.at(hit);
@@ -833,6 +1107,16 @@ void FlatMapWidget::mouseReleaseEvent(QMouseEvent* e)
 void FlatMapWidget::mouseDoubleClickEvent(QMouseEvent* e)
 {
     if (e->button() == Qt::LeftButton) {
+        // Ein gehoerter FT8-Punkt liegt obenauf und geht vor: wer ihn
+        // doppelt trifft, will anrufen, nicht die Ansicht zuruecksetzen.
+        // Dasselbe Handgriff wie der Doppelklick in der Fundliste, und
+        // derselbe Weg dahinter (Ft8KartenBruecke -> rufeVonDerKarte ->
+        // kartenSperre -> nimmFundAn).
+        const int live = livePunktAt(e->position());
+        if (live >= 0) {
+            emit livePunktGeklickt(m_live.at(live).g.rufzeichen);
+            return;
+        }
         resetView();
         return;
     }

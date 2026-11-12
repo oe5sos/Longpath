@@ -130,7 +130,7 @@ work.
 
 | File | Source data | License |
 | --- | --- | --- |
-| `iaru-region1.json` | IARU Region 1 band plan (https://www.iaru-r1.org/reference/band-plans/) | GPL-2.0-or-later (arrangement) |
+| `iaru-region1.json` | IARU Region 1 band plan (https://www.iaru-r1.org/reference/band-plans/); 144–146 MHz segments and centres of activity from the IARU R1 VHF Handbook 10.03 (Feb 2026), p. 38, identical to the published VHF-Bandplan.pdf (Dec 2020) — added 2026-11-08 | GPL-2.0-or-later (arrangement) |
 | `iaru-region2.json` | IARU Region 2 band plan (https://www.iaru-r2.org/) | GPL-2.0-or-later (arrangement) |
 | `iaru-region3.json` | IARU Region 3 band plan (https://www.iaru-r3.org/) | GPL-2.0-or-later (arrangement) |
 | `arrl-us.json` | ARRL US Amateur Radio Band Plan (https://www.arrl.org/band-plan) | GPL-2.0-or-later (arrangement) |

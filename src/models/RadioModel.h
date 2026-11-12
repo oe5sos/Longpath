@@ -16,6 +16,12 @@
 //                 GPLv3).
 //   2026-09-27 -- cwPitch()/setCwPitch()/cwPitchChanged(int) (Martin
 //                 Fischer, OE5SOS, AI-assisted via Anthropic Claude).
+//   2026-11-10 -- Auto AGC-T misst nicht mehr beim Senden: Messabschnitte
+//                 (autoAgcAcquisitionEpoch, rawIqDataForAutoAgc), aus
+//                 Upstream NereusSDR e5b3997bc (#720, J.J. Boyd KG4VCF);
+//                 dazu folgt der MOX-Riegel des TransmitModel jetzt dem
+//                 MoxController. Martin Fischer (OE5SOS), KI-gestuetzt mit
+//                 Anthropic Claude Code.
 // =================================================================
 
 //=================================================================
@@ -71,7 +77,9 @@
 
 #include "core/ConnectionState.h"
 #include "core/CouplerZero.h"
+#include "core/FlexAutoRauschsperre.h"
 #include "core/audio/VoiceKeyer.h"
+#include "core/audio/VoiceKeyerPlayer.h"
 #include "core/audio/QsoRecorderController.h"
 #include "RecordingModel.h"
 #include "core/PgxlConnection.h"
@@ -145,6 +153,7 @@
 #include <algorithm>  // std::clamp (used by computeWireDriveForTest)
 #include <array>      // std::array (HL2 temp averaging ring)
 #include <memory>  // std::unique_ptr
+#include <atomic>
 #include <optional>
 
 namespace Longpath {
@@ -155,6 +164,7 @@ class WdspEngine;
 class RxDspWorker;
 class NoiseFloorTracker;
 class MemoryList;
+class BandStackController;
 struct MemoryRecord;
 // Phase 3F Sub-Epic F Task 5: per-ADC wideband FFT engine. Forward decl
 // here; included in RadioModel.cpp so we don't pull fftw3.h into every
@@ -174,6 +184,7 @@ class PcMicSource;
 class RadioMicSource;
 class VaxTxMicSource;  // VAX TX consumer (added 2026-05-06).
 class CompositeTxMicRouter;
+class HotKeyBindings;
 // 3M-1c L.1 / L.2: forward declarations for the MicProfileManager bank
 // (chunk F) + the TwoToneController activation orchestrator (chunk I).
 class MicProfileManager;
@@ -500,6 +511,15 @@ public:
     // dieselben Plaetze fuehren.
     VoiceKeyerStore& voiceKeyer() { return m_voiceKeyer; }
     const VoiceKeyerStore& voiceKeyer() const { return m_voiceKeyer; }
+    // Senden, Wiederholen und Aufnehmen der Ansagen (2026-11-10): ein
+    // Spieler fuer Panel und Tastenkuerzel. Tastet ueber den
+    // MoxController, spielt ueber den Mikrofon-Router (MicSource::Dvk).
+    VoiceKeyerPlayer* voiceKeyerPlayer() const { return m_voiceKeyerPlayer.get(); }
+    // Die Tastenkuerzel (2026-11-10). Hier, damit Setup-Seite und
+    // Sprachspeicher-Panel dieselbe Belegung sehen wie die Tastaturweiche
+    // im Hauptfenster. Gelesen wird sie vom Hauptfenster, sobald dessen
+    // Menues stehen (die Menue-Kuerzel sind fuer Tasten gesperrt).
+    HotKeyBindings* hotKeyBindings() const { return m_hotKeyBindings.get(); }
 
     // Die QSO-Aufnahme. Sie haengt an AudioEngine und TxWorkerThread,
     // sobald beide stehen — angeschlossen wird in wireConnectionSignals,
@@ -1053,16 +1073,26 @@ public:
     // Implementation in RadioModel.cpp.
     void setStepAttController(class StepAttenuatorController* c);
     NoiseFloorTracker* noiseFloorTracker() const { return m_noiseFloorTracker; }
-    void setNoiseFloorTracker(NoiseFloorTracker* t) { m_noiseFloorTracker = t; }
+    void setNoiseFloorTracker(NoiseFloorTracker* t);
+
+    /// Messabschnitt fuer Auto AGC-T (Upstream NereusSDR e5b3997bc, #720).
+    /// Ungerade: gesperrt -- keine Verbindung, MOX, oder der MoxController
+    /// ist nicht in Rx (also auch der Weg hinein und heraus). Gerade: es
+    /// wird empfangen. Jeder Wechsel zaehlt eins weiter; forkIqToTaps
+    /// stempelt jeden I/Q-Block mit dem Stand beim Eintreffen.
+    quint64 autoAgcAcquisitionEpoch() const noexcept {
+        return m_autoAgcAcquisitionEpoch.load();
+    }
+    bool autoAgcAcquisitionInhibited() const noexcept {
+        return (autoAgcAcquisitionEpoch() & 1U) != 0;
+    }
 
     /// Register the tracker measuring one DDC stream's band.
     ///
     /// Auto AGC-T derives its threshold from the noise floor, so a slice has
     /// to measure the band it is on. With one shared tracker (stream 0's), a
     /// 20m slice would take its threshold from 40m's noise floor.
-    void setStreamNoiseFloorTracker(int streamIndex, NoiseFloorTracker* t) {
-        if (t) { m_streamNoiseFloors.insert(streamIndex, t); }
-    }
+    void setStreamNoiseFloorTracker(int streamIndex, NoiseFloorTracker* t);
 
     /// The tracker for this slice's stream, falling back to the global one
     /// when the slice is unbound or its stream has no tracker yet.
@@ -1185,6 +1215,12 @@ public:
     // FilterPresetsSetupPage can read/write user-customised presets.
     // Constructed once in RadioModel ctor; lifetime is RadioModel's lifetime.
     FilterPresetStore* filterPresetStore() const { return m_filterPresetStore; }
+
+    // Bandstapel (2026-11-11): je Band eine Liste gespeicherter Stellen;
+    // ein Druck auf die Bandtaste geht zur Stelle, ein weiterer zur
+    // naechsten. Angelegt am Ende des Konstruktors, lebt so lange wie das
+    // Modell. Siehe src/models/bandstack/BandStackController.h.
+    BandStackController* bandStack() const { return m_bandStack; }
 
     // ── CW-Tonhoehe (2026-09-27) ───────────────────────────────────────────
     // Thetis console.cs CWPitch: EIN Wert fuer alle Empfaenger, der die
@@ -1690,6 +1726,9 @@ public:
     // AGC_AV / AGC_GAIN do NOT take the offset (Thetis line 46831-46835
     // omit +offset for the same reason).
     double rxMeterOffsetDb() const;
+    /// Den Pegelversatz neu rechnen und bei Aenderung rxMeterOffsetChanged
+    /// senden (Abschwaecher, Vorverstaerker, Transverter; 2026-11-08).
+    void pruefeRxMeterOffset();
 
 signals:
     // Emitted when rxMeterOffsetDb() changes (model swap, preamp change,
@@ -1702,6 +1741,21 @@ signals:
 public:
 
     bool isConnected() const;
+
+    // ── Einmessen an einem Traeger (2026-11-08) ────────────────────────
+    //
+    // Wohin wirkt eine Traegermessung? Liegt der Traeger im ZF-Fenster
+    // eines aktiven Transverters, ist es dessen LO-Fehler (2 m); haengt
+    // ein OpenHPSDR-Geraet (P1/P2) dran, dessen Korrekturfaktor (KW,
+    // Thetis Freq Cal); sonst wird nur angezeigt -- fuer die Flex u. a.
+    // gibt es keine belegte Quelle, wie deren Bezug zu stellen waere.
+    enum class EichZiel { Transverter, Geraet, NurAnzeige };
+    EichZiel eichZielFuer(double geraetHz) const;
+
+    /// Uebernimmt eine Messung: der Traeger erschien bei geraetHz (am
+    /// Geraet) bzw. anzeigeHz (auf der Antenne), wahr ist wahrHz (auf
+    /// der Antenne). false bei NurAnzeige oder externem 10-MHz-Bezug.
+    bool uebernimmEichung(double geraetHz, double anzeigeHz, double wahrHz);
 
     /// Steht IRGENDEINE Funkverbindung — eigenes Geraet ODER Flex.
     ///
@@ -2842,6 +2896,9 @@ signals:
     void flexAbstimmZielUnerreichbar(double istWatt, double zielWatt);
     /// Die Maschine sendet / sendet nicht mehr — gleich wer getastet hat.
     void flexSendetGeaendert(bool sendet);
+    /// Auto-SQL hat eine Stufe gestellt (rauschDbm = gemessenes Rauschen
+    /// der Scheibe, stufe = was an die Maschine ging).
+    void flexAutoRauschsperreGestellt(double rauschDbm, int stufe);
 
     /// Die Maschine hat ihre Scheibe gemeldet -- ab jetzt kann ein
     /// Befehl an sie ueberhaupt hinausgehen.
@@ -2998,6 +3055,13 @@ signals:
     // reach its own engine (and from there its own panadapter).
     // Emitted from the same Connection-thread fork as rawIqData.
     void rawIqDataForStream(int streamIndex, const QVector<float>& samples);
+    // Derselbe Block mit dem Messabschnitt, den er beim Eintreffen auf dem
+    // Verbindungsfaden hatte -- bevor eine Warteschlange dazwischenkommt.
+    // Upstream NereusSDR e5b3997bc (#720).
+    void rawIqDataForAutoAgc(int streamIndex, const QVector<float>& samples,
+                             quint64 epoch);
+    // Der Messabschnitt hat gewechselt (siehe autoAgcAcquisitionEpoch).
+    void autoAgcAcquisitionChanged(quint64 epoch);
 
     // Phase 3Q-6: forwarded from the active RadioConnection::frameReceived()
     // so TitleBar::ConnectionSegment can pulse its activity LED without
@@ -3708,6 +3772,12 @@ public:
     int streamSampleRateHzForTest(int streamIndex) const {
         return m_streamAllocator.streamSampleRateHz(streamIndex);
     }
+    /// Die Rate, die der Zuteiler diesem Strom gibt, 0 ausserhalb des
+    /// Pools (z. B. der SunSDR-Pseudostrom). MainWindow liest sie beim
+    /// Ratenwechsel fuer jeden zwischengespeicherten Strom (2026-11-10).
+    int streamSampleRateHz(int streamIndex) const {
+        return m_streamAllocator.streamSampleRateHz(streamIndex);
+    }
     bool streamActiveForTest(int streamIndex) const {
         return m_streamAllocator.isStreamActive(streamIndex);
     }
@@ -3882,6 +3952,18 @@ public:
     /// SIE die Aufbereitung -- unsere WDSP-Sperre hat dort kein Ziel
     /// (Befund des Betreibers, 2026-10-31).
     void sendeFlexRauschsperre(bool an, double stufe0bis100);
+
+    /// Auto-SQL an der Flex (2026-11-08, siehe FlexAutoRauschsperre.h):
+    /// die Stufe folgt dem Pegel der Scheibe plus Abstand. Gemessen
+    /// wird immer (ausser beim Senden), gesendet nur, solange an.
+    void setFlexAutoRauschsperre(bool an);
+    bool flexAutoRauschsperre() const { return m_flexAutoSqlAn; }
+    void setFlexAutoMarge(int db);
+    int  flexAutoMarge() const { return m_flexAutoSql.marge(); }
+    const FlexAutoRauschsperre& flexAutoSchaetzer() const { return m_flexAutoSql; }
+    /// Fuer den Pruefstand: ein Pegel der Scheibe, als kaeme er aus dem
+    /// Messwertstrom -- derselbe Weg wie dort.
+    void flexPegelFuerTest(double dbm, qint64 jetztMs) { fuehreFlexAutoSqlNach(dbm, jetztMs); }
 
     /// Die uebrigen Regler der Scheibe, einzeln an die Maschine.
     ///
@@ -4194,6 +4276,12 @@ private:
     /// Der S-Meter-Umlauf liest WDSP, und beim Flex rechnet das Radio —
     /// dort steht nichts. Darum kommt die Zahl von der Maschine.
     double               m_flexPegelDbm{0.0};
+    void                 fuehreFlexAutoSqlNach(double dbm, qint64 jetztMs);
+    void                 sendeFlexAutoStufe(qint64 jetztMs);
+    void                 flexAutoSqlNeuMessen(const char* grund);
+    FlexAutoRauschsperre m_flexAutoSql;
+    bool                 m_flexAutoSqlAn{false};
+    double               m_flexAutoSqlBezugHz{0.0};
     qint64               m_flexPegelStempel{0};
     ReceiverManager* m_receiverManager{nullptr};
     AudioEngine*     m_audioEngine{nullptr};
@@ -4288,6 +4376,11 @@ private:
     // MAC and load() are called on connect. Phase 3P-F Task 5a.
     ApolloController m_apolloController;
     VoiceKeyerStore m_voiceKeyer;
+    // VOR m_compositeMicRouter erklaert und damit NACH ihm zerstoert:
+    // der Router haelt einen nackten Zeiger auf die Quelle des Spielers.
+    std::unique_ptr<VoiceKeyerPlayer> m_voiceKeyerPlayer;
+    std::unique_ptr<HotKeyBindings> m_hotKeyBindings;
+    int m_dvkQuelleVorher{0};   // MicSource vor der Ansage
     QsoRecorderController m_qsoRecorder;
     RecordingModel        m_recording;
     // Der Pfad wartet hier, bis die Fabrik die Verbindung gebaut hat:
@@ -4519,6 +4612,10 @@ private:
 
     // From Thetis v2.10.3.13 console.cs:46057 — tmrAutoAGC (500ms interval)
     QTimer* m_autoAgcTimer{nullptr};
+    // Start: gesperrt (1), bis eine Verbindung steht. Atomar, weil
+    // forkIqToTaps ihn auf dem Verbindungsfaden liest.
+    std::atomic<quint64> m_autoAgcAcquisitionEpoch{1};
+    void refreshAutoAgcAcquisition();
     NoiseFloorTracker* m_noiseFloorTracker{nullptr};
     QMap<int, NoiseFloorTracker*> m_streamNoiseFloors;
     // Task 3.1 view hook — non-owning, set by MainWindow.
@@ -4547,6 +4644,10 @@ private:
     // G.4 fixup: changed from 50 (initial value mismatch with TransmitModel);
     // harmless after the cold-off guard in setTune(false) but kept for hygiene.
     int m_savedPowerPct{100};
+    // Das Sendeband, auf dem m_savedPowerPct gemerkt wurde (2026-11-10).
+    // Wechselt das Band, bevor TUNE ganz aus ist, gehoert der gemerkte Wert
+    // dem alten Band -- completeTuneOff stellt ihn dann nicht zurueck.
+    Band m_savedPowerBand{Band::GEN};
     //
     // m_isTuning: True while TUN is engaged (between setTune(true) and
     //   setTune(false)).  Used as the idempotent guard at the top of
@@ -4845,6 +4946,7 @@ private:
     // Stage C2 — filter preset user-override store.
     // Constructed in RadioModel ctor; QObject child so dtor cleans up.
     FilterPresetStore* m_filterPresetStore{nullptr};
+    BandStackController* m_bandStack{nullptr};
 
     // ── Phase 3J-2 H2: spot-system ownership ────────────────────────────────
     //

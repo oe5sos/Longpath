@@ -29,6 +29,12 @@
 // Modification history (Longpath):
 //   2026-10-15 — Original fuer Longpath von Martin Fischer (OE5SOS),
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 — Locator-Jagd: nimmFundAn() ist der EINE Weg, auf dem ein
+//                 Fund angenommen wird (Doppelklick in der Liste und Klick
+//                 auf der QSO-Karte), rufeVonDerKarte()/kartenSperre() sagen
+//                 vorher, warum es nicht geht; gehoert() meldet jede Station
+//                 mit Locator an die Karte. Martin Fischer (OE5SOS),
+//                 KI-gestuetzt ueber Anthropic Claude (Claude Code).
 // =================================================================
 
 #pragma once
@@ -46,6 +52,8 @@
 #include "Ft8PlatzStand.h"
 #include "core/Ft8Tonwahl.h"
 #include "core/Ft8Tx.h"
+#include "core/LocatorJagd.h"
+#include "core/WdspTypes.h"
 
 #include <QDateTime>
 #include <QPointer>
@@ -244,6 +252,39 @@ public:
     /// ist — wie antwortAuf().
     static QString cqRuf(const QString& meinRuf, const QString& meinLocator);
 
+    // ── Einen Fund annehmen (2026-11-11) ────────────────────────────
+    //
+    // Bis hierher stand das im Doppelklick selbst (eventFilter). Seit
+    // die QSO-Karte gehoerte Stationen zeigt und ein Klick dort anrufen
+    // soll, gibt es ZWEI Ausloeser -- und es darf nur EINEN Weg geben:
+    // dieselbe Antwort ins Feld, derselbe Ablauf bis 73, dieselbe
+    // Hound-/Contest-Behandlung. Ein zweiter Ablauf fuer die Karte
+    // haette beim ersten Unterschied zwei Meinungen darueber, was ein
+    // angenommener Anruf ist.
+
+    /// Eine Zeile der Fundliste annehmen, als waere sie doppelgeklickt.
+    /// Leer heisst angenommen; sonst steht da, warum nicht.
+    QString nimmFundAn(const QString& zeile);
+
+    /// Der Klick auf der Karte: erst kartenSperre(), dann nimmFundAn().
+    /// Leer heisst angenommen.
+    QString rufeVonDerKarte(const QString& zeile);
+
+    /// Warum von der Karte aus gerade NICHT angerufen werden kann, oder
+    /// leer. Die Liste braucht das nicht -- sie ist nur in FT8 zu sehen,
+    /// und ihre Sendeversuche sagen am Ende des Weges, woran es lag. Die
+    /// Karte ist ein anderes Fenster, oft auf dem anderen Schirm: ein
+    /// Klick dort, der stumm nichts tut, saehe aus wie ein Fehler.
+    QString kartenSperre() const;
+
+    /// FT8/FT4 liegen in den Datenmodi -- beiden. Die EINE Regel fuer
+    /// die Sichtbarkeit des Fensters (MainWindow) und fuer kartenSperre().
+    static bool istFt8Modus(DSPMode modus);
+
+    /// Das Band, unter dem ein QSO auf `hz` ins Logbuch ginge (mit
+    /// Transverter das der Antenne). Dieselbe Rechnung wie logEintrag().
+    static QString bandFuerLog(double hz);
+
     static QString eigenesRufzeichen();
     static QString eigenerLocator();
 
@@ -371,6 +412,16 @@ signals:
 
     void qsoFertig(const Longpath::LogEntry& eintrag);
 
+    /// Ein Fund wurde angenommen -- aus der Liste oder von der Karte.
+    /// `zeile` ist die angenommene Zeile, `partner` das Rufzeichen.
+    /// Fuer den Pruefstand: beide Ausloeser muessen hier dasselbe
+    /// abliefern.
+    void fundAngenommen(const QString& zeile, const QString& partner);
+
+    /// Jede gehoerte Station mit Rufzeichen, je Fund (2026-11-11). Die
+    /// QSO-Karte haengt daran (ueber Ft8KartenBruecke).
+    void gehoert(const Longpath::Ft8Gehoert& g);
+
 
 protected:
     /// Doppelklick in die Fundliste: die Zeile wird zur Antwort im
@@ -392,6 +443,9 @@ private:
     void zeigeOptionen();
     void updateAudioTap();
     void updateStatus();
+    /// Ein Land, das noch nie im Logbuch stand? EINE Stelle fuer die
+    /// Faerbung der Liste und die Meldung an die Karte.
+    bool istNeuesLand(const QString& senderRuf) const;
 
     QPointer<SliceModel> m_slice;
     Ft8Stream* m_stream{nullptr};

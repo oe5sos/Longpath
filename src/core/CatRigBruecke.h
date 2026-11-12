@@ -29,6 +29,7 @@
 // Modification history (Longpath):
 //   2026-11-07 — Original fuer Longpath von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 — setFristForTest gegen einen zeitabhaengigen Pruefstand.
 // =================================================================
 
 #include <QElapsedTimer>
@@ -63,6 +64,14 @@ public:
     /// Fuer den Pruefstand: die Frist sofort als abgelaufen behandeln.
     void fristAufhebenForTest() { m_befehlGesendet = false; }
 
+    /// Fuer den Pruefstand: die Frist verlaengern. Auf einem langsamen
+    /// CI-Rechner vergingen zwischen Befehl und abweichender Meldung
+    /// mehr als 400 ms, und die Pruefung „in der Frist zaehlt das Geraet
+    /// nicht" sah dann eine abgelaufene Frist (tst_cat_funkgeraet, macOS,
+    /// mehrfach rot ab 2026-11-08). Der Pruefstand hebt die Frist danach
+    /// ohnehin ausdruecklich auf.
+    void setFristForTest(int ms) { m_fristMs = ms; }
+
 private:
     void vomGeraetFrequenz(qint64 hz);
     void vomGeraetModus(const QString& modus);
@@ -75,6 +84,7 @@ private:
     QElapsedTimer m_seitBefehl;
     bool m_befehlGesendet{false};
     bool m_uebernimmtVomGeraet{false};
+    int  m_fristMs{kFristNachBefehlMs};
 };
 
 } // namespace Longpath

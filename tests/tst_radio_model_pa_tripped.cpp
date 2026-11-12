@@ -21,8 +21,27 @@
 
 #include "models/RadioModel.h"
 #include "models/TransmitModel.h"
+#include "models/SliceModel.h"
+#include "core/MoxController.h"
+#include "core/AppSettings.h"
 
 using namespace Longpath;
+
+namespace {
+// MOX so tasten, wie die Bedienung es tut: ueber den MoxController, mit
+// sofortigem Zeitplan und einer Scheibe im Band (BandPlanGuard).
+void keyThroughController(RadioModel& model)
+{
+    model.moxController()->setTimerIntervals(0, 0, 0, 0, 0, 0);
+    model.addSlice();
+    SliceModel* slice = model.activeSlice();
+    QVERIFY(slice != nullptr);
+    slice->setFrequency(3700000.0);
+    slice->setDspMode(DSPMode::LSB);
+    model.moxController()->setMox(true);
+    QCoreApplication::processEvents();
+}
+} // namespace
 
 class TestRadioModelPaTripped : public QObject {
     Q_OBJECT
@@ -92,13 +111,21 @@ void TestRadioModelPaTripped::ganymedeTripMessage_dropsMoxIfActive()
     // Safety side-effect from Andromeda.cs:920 [v2.10.3.13]:
     //   if (_ganymede_pa_issue && MOX) MOX = false; //if there is a fault, undo mox if active
     // G8NJJ: handlers for Ganymede 500W PA protection
+    //
+    // 2026-11-10: bis hier wurde MOX mit transmitModel().setMox(true)
+    // „getastet" -- das setzte nur den Riegel, den im Betrieb nie jemand
+    // setzte, und bestaetigte so einen Schutz, der am echten Sender nie
+    // griff. Jetzt ueber den MoxController, wie die Bedienung tastet.
     RadioModel model;
-    model.transmitModel().setMox(true);
+    keyThroughController(model);
+    QVERIFY(model.mox());
     QVERIFY(model.transmitModel().isMox());
 
     model.handleGanymedeTrip(0x01);
+    QCoreApplication::processEvents();
     QVERIFY(model.paTripped());
-    QVERIFY(!model.transmitModel().isMox()); // safety drop per Andromeda.cs:920
+    QVERIFY(!model.mox());                   // safety drop per Andromeda.cs:920
+    QVERIFY(!model.transmitModel().isMox());
 }
 
 // Codex P2 follow-up to PR #139: a second non-zero trip CAT message while the
@@ -110,21 +137,25 @@ void TestRadioModelPaTripped::secondTripWhileMoxReasserted_dropsMoxAgain()
     RadioModel model;
 
     // First trip: MOX on → latches and drops MOX.
-    model.transmitModel().setMox(true);
+    keyThroughController(model);
     model.handleGanymedeTrip(0x01);
+    QCoreApplication::processEvents();
     QVERIFY(model.paTripped());
-    QVERIFY(!model.transmitModel().isMox());
+    QVERIFY(!model.mox());
 
     // User manually re-keys mid-fault.
-    model.transmitModel().setMox(true);
-    QVERIFY(model.transmitModel().isMox());
+    model.moxController()->setMox(true);
+    QCoreApplication::processEvents();
+    QVERIFY(model.mox());
 
     // Second trip CAT message arrives. Trip state is unchanged (still asserted),
     // but the safety MOX-drop must fire again.
     QSignalSpy spy(&model, &RadioModel::paTrippedChanged);
     model.handleGanymedeTrip(0x02); // drain-current trip — different sub-cause, still asserted
+    QCoreApplication::processEvents();
     QVERIFY(model.paTripped());
-    QVERIFY(!model.transmitModel().isMox()); // dropped again per Andromeda.cs:920
+    QVERIFY(!model.mox());                   // dropped again per Andromeda.cs:920
+    QVERIFY(!model.transmitModel().isMox());
     QCOMPARE(spy.count(), 0); // no transition signal — already tripped
 }
 

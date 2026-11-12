@@ -38,6 +38,9 @@
 // Modification history (Longpath):
 //   2026-09-17 — Angelegt fuer Longpath von Martin Fischer,
 //                KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-11-11 — Modellwahl nach Guete statt nach dem Alphabet
+//                (bestModelIn). Martin Fischer, KI-gestuetzt ueber
+//                Anthropic Claude.
 // =================================================================
 
 #include <QObject>
@@ -77,8 +80,13 @@ public:
     static Config configFromSettings();
     /// Wo whisper-server ueblicherweise liegt (Homebrew), sonst leer.
     static QString defaultBinary();
-    /// Das erste ggml-*.bin in ~/whisper, sonst leer.
+    /// Das beste ggml-*.bin in ~/whisper (siehe bestModelIn), sonst leer.
     static QString defaultModel();
+    /// Das beste ggml-*.bin in `dir`: large-v3-turbo vor large-v3 vor
+    /// medium vor small vor base vor tiny; sonst das erste nach Namen.
+    /// Leer, wenn dort keines liegt. Getrennt von defaultModel() fuer
+    /// den Pruefstand.
+    static QString bestModelIn(const QString& dir);
     /// Die Argumente, die start() dem Programm gibt — fuer Pruefstaende.
     static QStringList argumentsFor(const Config& cfg);
     /// Ob die Adresse auf diesen Rechner zeigt (nur dann lohnt Starten).

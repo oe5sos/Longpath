@@ -269,6 +269,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "BoardCapabilities.h"
 
+#include <algorithm>
+
 namespace Longpath {
 namespace {
 
@@ -1638,6 +1640,36 @@ int stepAttMaxDb(HPSDRHW hw, bool alexPresent) noexcept
     default:
         return 31;
     }
+}
+
+// Upstream NereusSDR a15d7a80a (#764, J.J. Boyd KG4VCF). Siehe die
+// Deklaration.
+//
+// Befund dort, 2026-11-06, Anvelina Pro 3 auf Gateware 22.15: das Geraet
+// meldet 5 Empfaenger (DDC0 bis DDC4). Mit DDC2 bis DDC6 eingeschaltet
+// liefern die Ports von DDC2 bis DDC4 voll, die von DDC5 und DDC6 nichts --
+// der dritte und vierte Pan blieben schwarz und zeigten LIVE.
+int ddcIndexLimit(const BoardCapabilities& caps, bool protocol2,
+                  int reportedReceivers) noexcept
+{
+    // Platinen mit einem ADC haben eigene Codecs und legen einen Strom auf
+    // DDC0; Protocol 1 nimmt die Zahl aus dem Schlitzplan des Rahmens.
+    if (!protocol2 || reportedReceivers <= 0 || caps.adcCount != 2) {
+        return 0;
+    }
+    // Saturns Zahl ist ein fester Wert in p2app, nicht die DDC-Zahl:
+    //   Saturn sw_projects/P2_app/p2app.c:427 [@4b0b76f]  -- 4, // 4DDC
+    //   Saturn sw_projects/common/saturnregisters.h:22 [@4b0b76f]
+    //     #define VNUMDDC 10   // downconverters available
+    // (zitiert nach Upstream NereusSDR a15d7a80a). Danach zu begrenzen
+    // naehme einer G2 zwei ihrer vier Pans.
+    if (caps.board == HPSDRHW::Saturn || caps.board == HPSDRHW::SaturnMKII) {
+        return 0;
+    }
+    // Empfaenger 0 sitzt beim Verbinden immer auf DDC2, was das Geraet auch
+    // meldet; die Grenze laesst ihn also stets stehen.
+    constexpr int kFirstDdcBeyondPrimary = 3;
+    return std::max(reportedReceivers, kFirstDdcBeyondPrimary);
 }
 
 } // namespace BoardCapsTable
