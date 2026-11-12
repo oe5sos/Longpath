@@ -146,6 +146,11 @@ public:
 
     bool istOffen() const;
 
+    /// Der Startcheck des Logbuchs („bereit?"). Sein Menue gibt es in
+    /// Longpath nicht. false, wenn das Logbuch nicht offen ist.
+    bool zeigeStartcheck();
+    QWidget* startcheckForTest() const;
+
     // Das offene Logbuch-Fenster oder nullptr -- fuer den Wirt, der es beim
     // Minimieren mit ins Dock nimmt (MainWindow::legeSchwebendeFensterInsDock).
     QWidget* fenster() const;
@@ -158,6 +163,19 @@ signals:
     // ausgeblendet, oder das Logbuch-Fenster ging auf oder zu -- der
     // Wirt schreibt die Anordnung dann ins Profil.
     void anordnungGeaendert();
+    // Der zweite Sicherungsordner (der Stick) ist nicht erreichbar. Die
+    // Statuszeile des Logbuchs, die das eigenstaendig zeigt, ist in
+    // Longpath nicht zu sehen; der Wirt zeigt es selbst.
+    void sicherungsWarnung(const QString& text);
+    // Was das Logbuch in seine Statuszeile schreibt -- ohne das, was dort
+    // nur dauernd mitlaeuft (QSO-Zaehler, Frequenzecho, Band, Betriebsart).
+    // Eingebettet ist diese Zeile nicht zu sehen; der Wirt zeigt es selbst.
+    void logbuchMeldung(const QString& text, bool warnung);
+
+public:
+    /// Ob eine Zeile aus der Statuszeile des Logbuchs nach Longpath gehoert,
+    /// und ob sie eine Warnung ist. Ohne Fenster pruefbar.
+    static bool meldungGehoertNachAussen(const QString& text, bool* warnung = nullptr);
 
 private:
     struct Innen;

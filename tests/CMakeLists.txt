@@ -1128,6 +1128,17 @@ longpath_add_test(tst_begleitgeraet_seite)
 # befragen, und der Versatz beim Laden.
 longpath_add_test(tst_begleitgeraet_regler)
 longpath_add_test(tst_cat_funkgeraet)
+# Rund 40 Faelle gegen ein rigctld-Doppel, viele warten auf die naechste
+# Abfragerunde. Lokal ~60 s; auf dem macOS-Laeufer liefen schon am 08.11.
+# (vor den Sprachspeicher-Faellen) die 120 s ab. 300 s nur fuer diesen.
+# Nur im Shard, der ihn baut (Linux teilt die Pruefstaende auf).
+if(TEST tst_cat_funkgeraet)
+    set_tests_properties(tst_cat_funkgeraet PROPERTIES TIMEOUT 300)
+endif()
+# Jeder Klick holt das Fenster nach vorne, auch aus der Spalte.
+longpath_add_test(tst_klick_holt_nach_vorne)
+# Der 590 geht aus und kommt wieder: die Wache startet rigctld neu.
+longpath_add_test(tst_590_kommt_wieder)
 
 # Der Versatz dort, wo er vor dem Betreiber landet -- und vor allem:
 # dass OHNE Transverter bitgleich nichts passiert.
@@ -6976,6 +6987,9 @@ if(LONGPATH_CONTESTPROGRAMM)
     target_link_libraries(tst_contestfenster PRIVATE Qt6::Sql)
     target_link_libraries(tst_contest_panels_im_containers_menu PRIVATE Qt6::Sql)
     target_link_libraries(tst_cmdq_schliesst_das_logbuch PRIVATE Qt6::Sql)
+    # Ohne Stick soll es in Longpath auffallen, nicht nur im Protokoll stehen.
+    longpath_add_test(tst_logbuch_meldet_den_stick)
+    target_link_libraries(tst_logbuch_meldet_den_stick PRIVATE Qt6::Sql)
 endif()
 
 # ── Phase 3J-1 Task 17.1: TX audio binary pipeline + single-client mutex ──────

@@ -615,7 +615,9 @@ set(CORE_SOURCES
     src/core/PlaybackRadioConnection.cpp
     src/core/AudioZuIq.cpp
     src/core/CatRigConnection.cpp
+    src/core/Ts590Cat.cpp
     src/core/CatRigBruecke.cpp
+    src/core/Ts590Sprache.cpp
     src/core/SunSdrRadioConnection.cpp
     src/core/ReceiverManager.cpp
     src/core/AudioEngine.cpp
@@ -1337,6 +1339,7 @@ set(GUI_SOURCES
     src/gui/applets/DigitalApplet.cpp
     src/gui/applets/PureSignalApplet.cpp
     src/gui/applets/DiversityApplet.cpp
+    src/gui/applets/CatRigApplet.cpp
     src/gui/applets/CwxApplet.cpp
     src/gui/applets/DvkApplet.cpp
     src/gui/applets/RttyDecoderApplet.cpp

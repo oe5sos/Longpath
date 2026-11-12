@@ -419,6 +419,7 @@ warren@wpratt.com
 #include "applets/KiwiSdrApplet.h"
 #include "KiwiWaterfallPanel.h"
 #include "applets/AsrApplet.h"
+#include "applets/CatRigApplet.h"
 #include "asr/AsrService.h"
 #include "asr/RemoteAsrBackend.h"
 #include "core/audio/AudioTapRing.h"
@@ -2839,6 +2840,40 @@ void MainWindow::bringAppletToFront(const QString& id)
     });
 }
 
+// ── Jeder Klick holt das Fenster nach vorne (2026-11-07) ─────────────
+//
+// Betreiber: „wir hatten vereinbart, dass jeder klick auf ein fenster
+// diese in den vordergrund rueckt". Der Filter vom 2026-11-01 sitzt nur in
+// zwei Fensterarten. Hier gilt es fuer alle schwebenden, und fuer das, was
+// kein eigenes Fenster hat: ein Applet in der Spalte liegt im Hauptfenster,
+// und das kommt nie ueber die Werkzeugfenster (siehe bringAppletToFront).
+// Verdeckt loest es darum der Klick ab. Der Druck wird dann geschluckt:
+// er soll das Feld holen und keine halb verdeckte Taste ausloesen.
+bool MainWindow::klickHoltNachVorne(QWidget* ziel)
+{
+    if (!ziel || m_shuttingDown) { return false; }
+    QWidget* fenster = ziel->window();
+    if (fenster != this) {
+        if (fenster->windowType() == Qt::Tool) { fenster->raise(); }
+        return false;
+    }
+    if (!m_appletPanel || !m_appletPanel->isAncestorOf(ziel)) { return false; }
+    if (QApplication::activeModalWidget()
+        || (m_connectionPanel && m_connectionPanel->isVisible())) {
+        return false;   // Die Maske deckt alles ab; das ist kein Verdecken.
+    }
+    for (QWidget* w = ziel; w; w = w->parentWidget()) {
+        auto* applet = qobject_cast<AppletWidget*>(w);
+        if (!applet) { continue; }
+        if (!appletHiddenInColumn(applet, false)) { return false; }
+        const QString id = panelIdFor(applet);
+        if (id.isEmpty()) { return false; }
+        bringAppletToFront(id);
+        return true;
+    }
+    return false;
+}
+
 bool MainWindow::appletHiddenInColumn(QWidget* applet, bool countScrolledAway) const
 {
     if (!applet || !isVisible() || isMinimized() || !applet->isVisible()) {
@@ -2879,6 +2914,35 @@ bool MainWindow::appletHiddenInColumn(QWidget* applet, bool countScrolledAway) c
         covers.append(w->frameGeometry());
     }
     return coveredFraction(onScreen, covers) >= 0.25;
+}
+
+void MainWindow::zeigeCatRigFeld()
+{
+    const QString id = QStringLiteral("CatRig");
+    const bool hatteFenster = m_floatingApplets.contains(id);
+    bringAppletToFront(id);
+    if (hatteFenster) { return; }   // Die Lage gehoert dem Profil.
+
+    // Einen Umlauf spaeter: dann hat bringAppletToFront abgeloest.
+    QTimer::singleShot(0, this, [this, id]() {
+        QWidget* fenster = m_floatingApplets.value(id, nullptr);
+        if (m_shuttingDown || !fenster) { return; }
+        QList<QRect> belegt = schutzrahmen();
+        const auto tops = QApplication::topLevelWidgets();
+        for (QWidget* w : tops) {
+            if (!w || w == this || w == fenster || !w->isVisible() || w->isMinimized()) {
+                continue;
+            }
+            const Qt::WindowType art = w->windowType();
+            if (art == Qt::Popup || art == Qt::ToolTip) { continue; }
+            belegt.append(w->frameGeometry());
+        }
+        const QRect platz = freierPlatz(fenster->frameGeometry().size(), frameGeometry(), belegt);
+        if (platz.isEmpty()) { return; }
+        const EigeneBewegung eigene;
+        fenster->move(platz.topLeft());
+        fenster->raise();
+    });
 }
 
 // ── Das Plaetze-Panel wirklich SICHTBAR machen (2026-10-30) ──────────
@@ -6677,6 +6741,8 @@ void MainWindow::buildUI()
         }
     });
 
+    new KlickHoltNachVorne([this](QWidget* w) { return klickHoltNachVorne(w); }, this);
+
     // Ein Geraet hinter CAT hat keinen KiwiSDR neben sich. Stand der
     // Panadapter noch aus einer anderen Sitzung auf KIWI, verwarf er jeden
     // Rahmen des Geraets, und das Bild blieb leer (gemessen 2026-11-07).
@@ -6689,7 +6755,51 @@ void MainWindow::buildUI()
         for (PanadapterApplet* applet : m_panStack->allApplets()) {
             if (applet) { applet->zeigeDasGeraet(); }
         }
+        // Nicht setVisible(): das steigt aus, wenn der gemerkte Zustand
+        // schon „sichtbar" sagt. Und sichtbar in einer Spalte, die das
+        // Profil gar nicht zeigt, ist unsichtbar -- im Profil CONTEST war
+        // das Feld so nicht zu erreichen (am Geraet gesehen, 2026-11-07).
+        // bringAppletToFront loest es dann als eigenes Fenster ab.
+        //
+        // Aber nicht, solange die Maske steht: dann sind die schwebenden
+        // Fenster versteckt, die Spalte gilt als frei, und danach liegen
+        // sie wieder darueber (am Geraet gesehen, Profil N: das Feld
+        // schaute nur im Spalt zwischen zwei Fenstern hervor).
+        if (m_appletVis) {
+            m_appletVis->ensureVisible(QStringLiteral("CatRig"));
+            const bool maskeSteht = !m_floatingContainersHiddenPreConnect.isEmpty()
+                                    || (m_connectionPanel && m_connectionPanel->isVisible());
+            if (maskeSteht) {
+                m_catRigFeldNachDerMaske = true;
+            } else {
+                zeigeCatRigFeld();
+            }
+        }
     });
+
+    // Das Geraet meldet, Longpath zeigt: S-Meter und ON AIR kommen im
+    // Betrieb ohne SDR von dort.
+    if (auto* rig = m_radioModel->companionRig()) {
+        connect(rig, &CompanionRigController::catZustandGeaendert, this, [this, rig]() {
+            if (!m_meterPoller || !rig->catBetrieb()) { return; }
+            const int punkte = rig->catZustand().meterPunkte;
+            if (punkte >= 0 && !rig->sendet()) {
+                m_meterPoller->setExternesSMeter(Ts590Cat::punkteZuDbm(punkte));
+            }
+        });
+        connect(rig, &CompanionRigController::sendetGeaendert, this, [this, rig](bool tx) {
+            if (!m_txStatusBadge || m_txInhibited || !rig->catBetrieb()) { return; }
+            m_txStatusBadge->setVariant(tx ? StatusBadge::Variant::Tx
+                                           : StatusBadge::Variant::Off);
+            m_txStatusBadge->setToolTip(tx ? tr("Transmitting at the rig")
+                                           : tr("Receive"));
+        });
+        connect(m_radioModel, &RadioModel::connectionStateChanged, this, [this, rig]() {
+            if (m_meterPoller && !rig->catBetrieb()) {
+                m_meterPoller->loescheExternesSMeter();
+            }
+        });
+    }
 
     // Phase 3Q-8: clicking the spectrum while disconnected opens ConnectionPanel.
     connect(activeSpectrumWidget(), &SpectrumWidget::disconnectedClickRequest,
@@ -8886,6 +8996,8 @@ void MainWindow::populateDefaultMeter()
     // Genau darum ist die Rueckmeldung im Applet so ausfuehrlich.
     m_asrApplet = new AsrApplet(m_radioModel, nullptr);
     panel->addApplet(m_asrApplet);
+    m_catRigApplet = new CatRigApplet(m_radioModel, nullptr);
+    panel->addApplet(m_catRigApplet);
     connect(m_asrApplet, &AsrApplet::enableRequested,
             this, &MainWindow::setAsrEnabled);
     connect(m_asrApplet, &AsrApplet::languageChanged,
@@ -9472,6 +9584,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("KiwiSdr")] = m_kiwiSdrApplet;
     m_appletsById[QStringLiteral("KiwiWaterfalls")] = m_kiwiWaterfallPanel;
     m_appletsById[QStringLiteral("Asr")]     = m_asrApplet;
+    m_appletsById[QStringLiteral("CatRig")]  = m_catRigApplet;
 #ifdef HAVE_WEBSOCKETS
     if (m_tciApplet) {
         m_appletsById[QStringLiteral("Tci")]        = m_tciApplet;
@@ -9660,6 +9773,8 @@ void MainWindow::populateDefaultMeter()
                                 tr("KIWI WATERFALLS"), false);
     m_appletVis->registerApplet(QStringLiteral("Asr"),
                                 tr("Transcript"),               true);
+    m_appletVis->registerApplet(QStringLiteral("CatRig"),
+                                tr("CAT RIG"),                  false);
 
     // ── Kategorie und Schlagwoerter ──────────────────────────────────
     //
@@ -11194,6 +11309,41 @@ void MainWindow::populateDefaultMeter()
                         pan->setSwrReadoutShown(z.value(QStringLiteral("swr")).toBool());
                     }
                 }
+
+                // ── Nach dem Inhalt noch einmal die Plaetze ──────────────
+                //
+                // Betreiber 2026-11-07: "alleine nur das aendern des profils
+                // macht probleme", mit Bild: Combined auf drei Zeilen
+                // zusammengefallen, und "Frequency" lag ueber dem Panadapter,
+                // wo er es nie gesehen hatte.
+                //
+                // Beides kommt aus der Reihenfolge. Die Fenster bekommen ihre
+                // Groesse, BEVOR holeKombiInhaltZurueck ihnen den Inhalt
+                // zurueckgibt, und ein leeres Feld faellt zusammen. Beim Start
+                // kommt der Panadapter nach den Applets und liegt damit oben,
+                // beim Wechsel hebt show() die Applets ueber ihn.
+                //
+                // Also einmal nachziehen, wenn die Fenster sich gesetzt
+                // haben: dieselbe Lage und dieselbe Stapelung wie beim Start.
+                QTimer::singleShot(0, this, [this, s]() {
+                    if (m_shuttingDown) { return; }
+                    const EigeneBewegung wirSelbst;
+                    const QVariantMap geloest =
+                        s.value(QStringLiteral("floatingApplets")).toMap();
+                    for (auto it = geloest.constBegin(); it != geloest.constEnd(); ++it) {
+                        AppletFloatingWindow* w = m_floatingApplets.value(it.key(), nullptr);
+                        if (!w) { continue; }
+                        const QRect soll = lageAusProfil(it.value().toMap());
+                        if (soll.isValid() && w->geometry() != soll) { w->setGeometry(soll); }
+                    }
+                    if (!m_panStack) { return; }
+                    for (PanadapterApplet* pan : m_panStack->allApplets()) {
+                        if (!pan) { continue; }
+                        if (auto* fenster = m_panStack->floatingWindowForTest(pan->panId())) {
+                            fenster->raise();
+                        }
+                    }
+                });
 
                 qWarning() << "[ProfileApply:Step] 6/6 fertig";
             });
@@ -18182,6 +18332,11 @@ void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
         m_raiseLogbookAfterConnectMask = false;
         QTimer::singleShot(0, this, [this]() { raiseLogbookIfOpen(); });
     }
+
+    if (m_catRigFeldNachDerMaske) {
+        m_catRigFeldNachDerMaske = false;
+        if (m_radioModel && m_radioModel->isConnected()) { zeigeCatRigFeld(); }
+    }
 }
 
 // ── Ablage ins Dock nimmt die schwebenden Fenster mit (2026-11-03) ────────
@@ -20034,6 +20189,17 @@ void MainWindow::bereiteContestFensterVor()
         });
         connect(m_contestFenster, &ContestFenster::anordnungGeaendert,
                 m_contestAnordnungTimer, qOverload<>(&QTimer::start));
+        // Ohne zweite Sicherung soll es auffallen, nicht nur im Protokoll stehen.
+        connect(m_contestFenster, &ContestFenster::sicherungsWarnung,
+                this, [this](const QString& text) {
+            showToast(text, ToastSeverity::Warning, 15000);
+        });
+        // Die Statuszeile des Logbuchs ist eingebettet nicht zu sehen.
+        connect(m_contestFenster, &ContestFenster::logbuchMeldung,
+                this, [this](const QString& text, bool warnung) {
+            showToast(text, warnung ? ToastSeverity::Warning : ToastSeverity::Info,
+                      warnung ? 10000 : 6000);
+        });
     }
 
     // Das Contestprogramm liest die Frequenz ueber rigctld (4532). Laeuft
@@ -20064,6 +20230,11 @@ void MainWindow::bereiteContestFensterVor()
 #endif
 }
 
+void MainWindow::detachAppletForTest(AppletWidget* applet)
+{
+    detachApplet(applet, 0);
+}
+
 void MainWindow::fuelleContestPanelMenu(QMenu* menu)
 {
 #ifdef LONGPATH_HAVE_CONTESTPROGRAMM
@@ -20092,6 +20263,13 @@ void MainWindow::fuelleContestPanelMenu(QMenu* menu)
         for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
             contestPanelAlsFenster(e.id);
         }
+    });
+    QAction* bereit = menu->addAction(tr("Start check (ready?)..."));
+    bereit->setObjectName(QStringLiteral("actContestStartcheck"));
+    bereit->setToolTip(tr("Callsign, contest, CAT, transverter, rotor, clock, backup stick"));
+    bereit->setEnabled(m_contestFenster && m_contestFenster->istOffen());
+    connect(bereit, &QAction::triggered, this, [this]() {
+        if (m_contestFenster) { m_contestFenster->zeigeStartcheck(); }
     });
     QAction* zurueck = menu->addAction(tr("All panels back into the logbook"));
     zurueck->setObjectName(QStringLiteral("actContestPanelsZurueck"));
@@ -21900,6 +22078,16 @@ void MainWindow::closeEvent(QCloseEvent* event)
     // ersten Anlauf (c8d8161a) uebersehen wurde. Eine Probe im echten
     // Hauptfenster hat den Absturz dann geliefert: abloesen, schliessen,
     // SIGSEGV.
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // Das Logbuch JETZT zumachen, nicht erst im Destruktor, und VOR den
+    // schwebenden Fenstern: bei Cmd+Q laeuft ~ContestFenster nie (exit()
+    // kommt noch in diesem closeEvent, gemessen 2026-11-07), und ein
+    // Panel in Combined stirbt sonst mit seinem Gehaeuse. Die letzte
+    // Log-Sicherung haengt am Abbau des Controllers. Das Profil ist ganz
+    // oben in diesem closeEvent schon aufgenommen.
+    if (m_contestFenster) { m_contestFenster->schliesse(); }
+#endif
+
     if (m_panStack) { m_panStack->shutDownFloating(); }
 
     for (AppletFloatingWindow* w : m_floatingApplets) { delete w; }
@@ -21985,16 +22173,6 @@ void MainWindow::closeEvent(QCloseEvent* event)
         w->deleteLater();
     }
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-
-#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
-    // Das Logbuch JETZT zumachen und nicht erst im Destruktor: bei Cmd+Q
-    // und quit() laeuft ~ContestFenster nie (exit() kommt noch in diesem
-    // closeEvent, gemessen 2026-11-07). Die letzte Log-Sicherung haengt
-    // am Abbau des Controllers und fiele sonst aus. Die Stelle steht
-    // bewusst hier hinten: so ist alles andere im selben Zustand wie beim
-    // roten Punkt, nur der Zeitpunkt ist frueher.
-    if (m_contestFenster) { m_contestFenster->schliesse(); }
-#endif
 
     event->accept();
 

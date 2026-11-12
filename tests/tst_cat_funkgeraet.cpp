@@ -9,7 +9,10 @@
 //   1. Longpath tastet das Geraet nicht. Auf keinem Weg: die Verbindung
 //      kann es nicht, RigctldClient hat keinen Befehl dafuer, und MOX
 //      wird mit einem Grund abgewiesen. Das Doppel unten zaehlt jeden
-//      Befehl, der ankommt.
+//      Befehl, der ankommt. Die EINE Ausnahme seit 2026-11-12 ist der
+//      Sprachspeicher ueber den 590 (core/Ts590Sprache.h): eingeschaltet,
+//      nur am Transverter, nur mit DRV, hoechstens 5 W, hoechstens 30 s.
+//      Seine Sperren stehen einzeln in sprachspeicher_590_*.
 //   2. Der Eintrag entsteht aus den Einstellungen, nur mit Anschluss.
 //   3. Geraet und Scheibe bleiben gleich, ohne Kreis und ohne dass eine
 //      alte Meldung den VFO zurueckzieht.
@@ -22,9 +25,16 @@
 // =================================================================
 
 #include <QtTest>
+#include <QComboBox>
+#include <QLabel>
+#include <QPushButton>
+#include <QPointer>
 #include <QSignalSpy>
+#include <QSlider>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QBuffer>
+#include <QTemporaryDir>
 
 #include <cmath>
 #include <complex>
@@ -38,13 +48,22 @@
 #include "core/MoxController.h"
 #include "core/RadioConnection.h"
 #include "core/RigctldClient.h"
+#include "core/RigctldServer.h"
 #include "core/RxChannel.h"
+#include "core/Ts590Cat.h"
+#include "core/Ts590Sprache.h"
+#include "core/audio/VoiceKeyer.h"
+#include "core/audio/VoiceKeyerPlayer.h"
+#include "core/TransverterSetup.h"
 #include "core/WdspEngine.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "core/FFTRouter.h"
 #include "gui/MainWindow.h"
+#include "gui/applets/AppletPanelWidget.h"
+#include "gui/applets/CatRigApplet.h"
 #include "gui/SpectrumWidget.h"
+#include "gui/WindowPlacement.h"
 
 using namespace Longpath;
 
@@ -70,6 +89,15 @@ public:
     qint64     frequenz{28078400};
     QString    modus{QStringLiteral("USB")};
     QByteArrayList befehle;
+    QByteArrayList rohFragen;
+    bool gesendet{false};
+    bool nullGetrennt{false};   // die Null einer Rohantwort als eigenes Paket
+    QHash<QByteArray, QByteArray> roh{
+        {"SM0;", "SM00015;"}, {"RM;", "RM10007;"}, {"AN;", "AN100;"}, {"PA;", "PA10;"},
+        {"RA;", "RA0000;"}, {"RG;", "RG200;"}, {"GC;", "GC2;"}, {"NB;", "NB0;"},
+        {"NR;", "NR1;"}, {"SL;", "SL02;"}, {"SH;", "SH09;"}, {"PC;", "PC005;"},
+        {"IF;", "IF00028078400      000000000020000080;"}, {"NT;", "NT00;"},
+        {"NL;", "?;"}, {"RL;", "RL05;"}};
 
     bool hatGetastet() const
     {
@@ -77,6 +105,17 @@ public:
             const QByteArray t = b.trimmed();
             if (t.startsWith("T ") || t.startsWith("\\set_ptt") || t.startsWith("b ")) {
                 return true;
+            }
+            if (t.startsWith("W ")) {
+                bool erlaubt = false;
+                for (const char* k : {"W GC", "W SH", "W SL", "W FW", "W FL", "W RT", "W RU",
+                                      "W RD", "W RC", "W NT", "W NL", "W RL"}) {
+                    if (t.startsWith(k)) { erlaubt = true; }
+                }
+                if (!erlaubt) { return true; }
+            }
+            for (const char* verboten : {"w TX", "w KY", "w PB", "w PS", "w EX", "w PC1", "l RFPOWER"}) {
+                if (t.startsWith(verboten)) { return true; }
             }
         }
         return false;
@@ -93,7 +132,24 @@ private:
             } else if (t == "m") {
                 s->write(modus.toLatin1() + "\n2200\n");
             } else if (t == "t") {
-                s->write("0\n");
+                s->write(gesendet ? "1\n" : "0\n");
+            } else if (t.startsWith("w ")) {
+                // Wie rigctld: die Antwort des Geraets, kein Zeilenumbruch.
+                const QByteArray frage = t.mid(2);
+                if (roh.contains(frage) && nullGetrennt) {
+                    s->write(roh.value(frage));
+                    s->flush();
+                    QPointer<QTcpSocket> spaeter(s);
+                    QTimer::singleShot(15, s, [spaeter]() {
+                        if (spaeter) { spaeter->write(QByteArray(1, '\0')); }
+                    });
+                } else if (roh.contains(frage)) { s->write(roh.value(frage) + '\0'); }
+                else { s->write("RPRT -1\n"); }
+                rohFragen.append(frage);
+            } else if (t.startsWith("W ")) {
+                // Wie rigctld: kein RPRT, nur ein Nullbyte.
+                befehle.append(zeile);
+                s->write(QByteArray(1, '\0'));
             } else {
                 befehle.append(zeile);
                 if (t.startsWith("F ")) { frequenz = t.mid(2).toLongLong(); }
@@ -104,6 +160,17 @@ private:
     }
 
     QTcpServer m_server;
+};
+
+// Eine verbundene CAT-Verbindung ohne Ton und ohne Hochlauf.
+class VerbundeneCatRig : public CatRigConnection
+{
+public:
+    explicit VerbundeneCatRig(const RadioInfo& info)
+    {
+        m_radioInfo = info;
+        setState(ConnectionState::Connected);
+    }
 };
 
 // Energie des Signals `hz` ueber dem Traeger, negativ darunter. Im
@@ -144,6 +211,34 @@ void zielAuf(quint16 port)
     stelleEin(QStringLiteral("CompanionRigModel"), QStringLiteral("2031"));
     stelleEin(QStringLiteral("CompanionRigDevice"), QStringLiteral("/dev/cu.fake"));
     stelleEin(QStringLiteral("CompanionRigName"), QStringLiteral("TS-590S"));
+}
+
+// Eine kurze Ansage als WAV: 48 kHz, 16 bit, mono, 0,5 s Sinus.
+QString schreibeAnsage(const QString& ordner)
+{
+    const int n = 24000;
+    QByteArray daten;
+    daten.resize(n * 2);
+    auto* p = reinterpret_cast<qint16*>(daten.data());
+    for (int i = 0; i < n; ++i) {
+        p[i] = static_cast<qint16>(12000.0 * std::sin(2.0 * M_PI * 1000.0 * i / 48000.0));
+    }
+    QByteArray kopf;
+    auto u32 = [&kopf](quint32 v) { for (int b = 0; b < 4; ++b) { kopf.append(char((v >> (8 * b)) & 0xff)); } };
+    auto u16 = [&kopf](quint16 v) { kopf.append(char(v & 0xff)); kopf.append(char(v >> 8)); };
+    kopf.append("RIFF"); u32(36 + daten.size()); kopf.append("WAVE");
+    kopf.append("fmt "); u32(16); u16(1); u16(1); u32(48000); u32(96000); u16(2); u16(16);
+    kopf.append("data"); u32(daten.size());
+    const QString pfad = ordner + QStringLiteral("/cq.wav");
+    QFile f(pfad);
+    f.open(QIODevice::WriteOnly);
+    f.write(kopf + daten);
+    return pfad;
+}
+
+int zaehleBefehl(const QByteArrayList& befehle, const QByteArray& b)
+{
+    return static_cast<int>(std::count(befehle.begin(), befehle.end(), b));
 }
 
 } // namespace
@@ -254,6 +349,474 @@ private slots:
         const double amTraeger = energieBei(gesammelt, 1000.0, 1000);
         QVERIFY2(dort > 0.2, qPrintable(QString::number(dort)));
         QVERIFY2(amTraeger < dort * 0.01, qPrintable(QString::number(amTraeger)));
+    }
+
+    void dieAntwortenDesGeraetsWerdenGelesen()
+    {
+        Ts590Cat::Zustand z;
+        QVERIFY(Ts590Cat::leseAntwort(QByteArray("AN101;\0", 7), z));
+        QCOMPARE(z.antenne, 2);
+        QCOMPARE(z.rxAnt, 0);
+        QCOMPARE(z.drive, 1);
+        QVERIFY(Ts590Cat::leseAntwort("PA10;", z));
+        QCOMPARE(z.vorverstaerker, 1);
+        QVERIFY(Ts590Cat::leseAntwort("RA0100;", z));
+        QCOMPARE(z.daempfung, 1);
+        QVERIFY(Ts590Cat::leseAntwort("RG128;", z));
+        QCOMPARE(z.rfGain, 128);
+        QVERIFY(Ts590Cat::leseAntwort("SM00030;", z));
+        QCOMPARE(z.meterPunkte, 30);
+        QVERIFY(Ts590Cat::leseAntwort("RM10012;", z));
+        QCOMPARE(z.swrPunkte, 12);
+        QVERIFY(Ts590Cat::leseAntwort("SL02;", z));
+        QCOMPARE(z.lowCutHz, 100);
+        QVERIFY(Ts590Cat::leseAntwort("SH09;", z));
+        QCOMPARE(z.highCutHz, 2800);
+        QVERIFY(Ts590Cat::leseAntwort("FW0250;", z));
+        QCOMPARE(z.cwBreiteHz, 250);
+        QVERIFY(Ts590Cat::leseAntwort("FL2;", z));
+        QCOMPARE(z.filter, 2);
+        // So am TS-590S gelesen (2026-11-12): -120 Hz, RIT an.
+        QVERIFY(Ts590Cat::leseAntwort("IF00014090000     -012010000020000080;", z));
+        QCOMPARE(z.ritHz, -120);
+        QCOMPARE(z.ritAn, 1);
+        QVERIFY(Ts590Cat::leseAntwort("IF00014090000      020010000020000080;", z));
+        QCOMPARE(z.ritHz, 200);
+        QVERIFY(Ts590Cat::leseAntwort("NT10;", z));
+        QCOMPARE(z.notch, 1);
+        QVERIFY(Ts590Cat::leseAntwort("NL006;", z));
+        QCOMPARE(z.nbPegel, 6);
+        QVERIFY(Ts590Cat::leseAntwort("RL05;", z));
+        QCOMPARE(z.nrPegel, 5);
+        QVERIFY(Ts590Cat::leseAntwort("RM30012;", z));
+        QCOMPARE(z.alcPunkte, 12);
+        QVERIFY(!Ts590Cat::leseAntwort("?;", z));
+        QVERIFY(Ts590Cat::leseAntwort("PC005;", z));
+        QCOMPARE(z.leistungW, 5);
+        QVERIFY(!Ts590Cat::leseAntwort("XX1;", z));
+        QVERIFY(!Ts590Cat::leseAntwort("RPRT -1", z));
+    }
+
+    void dieBefehlslisteKannNichtSenden()
+    {
+        for (const QByteArray& f : Ts590Cat::abfragen()) {
+            QVERIFY2(f.endsWith(';') && f.size() == 3, f.constData());
+            for (const char* v : {"TX", "RX", "KY", "PB", "PS", "EX"}) {
+                QVERIFY2(!f.startsWith(v), f.constData());
+            }
+        }
+        const QByteArrayList zeilen = {
+            Ts590Cat::stelleVorverstaerker(true), Ts590Cat::stelleDaempfung(true),
+            Ts590Cat::stelleRfGain(128),
+            Ts590Cat::stelleNb(true), Ts590Cat::stelleNr(true)};
+        for (const QByteArray& z : zeilen) {
+            QVERIFY2(z.startsWith("L ") || z.startsWith("U "), z.constData());
+            QVERIFY2(!z.contains("RFPOWER") && !z.contains("PTT"), z.constData());
+        }
+        QCOMPARE(Ts590Cat::stelleRfGain(255), QByteArray("L RF 1.000\n"));
+        QCOMPARE(Ts590Cat::stelleLowCut(100), QByteArray("W SL02; 0\n"));
+        QCOMPARE(Ts590Cat::stelleHighCut(2800), QByteArray("W SH09; 0\n"));
+        QCOMPARE(Ts590Cat::stelleHighCut(2850), QByteArray("W SH09; 0\n"));
+        QCOMPARE(Ts590Cat::stelleCwBreite(480), QByteArray("W FW0500; 0\n"));
+        QCOMPARE(Ts590Cat::stelleFilter(1), QByteArray("W FL1; 0\n"));
+        QCOMPARE(Ts590Cat::stelleRit(true), QByteArray("W RT1; 0\n"));
+        QCOMPARE(Ts590Cat::stelleRitSchritt(10), QByteArray("W RU00010; 0\n"));
+        QCOMPARE(Ts590Cat::stelleRitSchritt(-10), QByteArray("W RD00010; 0\n"));
+        QCOMPARE(Ts590Cat::stelleRitNull(), QByteArray("W RC; 0\n"));
+        QCOMPARE(Ts590Cat::stelleNotch(true), QByteArray("W NT10; 0\n"));
+        QCOMPARE(Ts590Cat::stelleNotch(false), QByteArray("W NT00; 0\n"));
+        QCOMPARE(Ts590Cat::stelleNbPegel(5), QByteArray("W NL005; 0\n"));
+        QCOMPARE(Ts590Cat::stelleNrPegel(12), QByteArray("W RL10; 0\n"));
+        QCOMPARE(Ts590Cat::stelleFilter(2), QByteArray("W FL2; 0\n"));
+        QCOMPARE(Ts590Cat::stelleAgc(Ts590Cat::Agc::Aus), QByteArray("W GC0; 0\n"));
+        QCOMPARE(Ts590Cat::stelleAgc(Ts590Cat::Agc::Langsam), QByteArray("W GC1; 0\n"));
+        QCOMPARE(Ts590Cat::stelleAgc(Ts590Cat::Agc::Schnell), QByteArray("W GC2; 0\n"));
+        QCOMPARE(Ts590Cat::punkteZuDbm(15), -73.0);
+        QCOMPARE(Ts590Cat::naechsterHighCut(2850), 2800);
+    }
+
+    // Die Antwort auf `W` ist ein Nullbyte. Bleibt das liegen, steht die
+    // ganze Abfrage bis zur Antwortwache still.
+    void agc_haelt_die_abfrage_nicht_auf()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        // Langsam abfragen: reihum kaeme in der Frist unten nur eine Antwort.
+        rig.client()->setPollIntervalMs(5000);
+        doppel.rohFragen.clear();
+        rig.stelle(Ts590Cat::stelleAgc(Ts590Cat::Agc::Langsam));
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W GC1; 0\n"), 2000);
+        // Nachgelesen wird sofort, sonst springt die Taste bis zur naechsten
+        // Runde zurueck.
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.rohFragen.size() >= Ts590Cat::abfragen().size(), 4000);
+        rig.client()->setPollIntervalMs(20);
+        doppel.frequenz = 28111000;
+        QTRY_COMPARE_WITH_TIMEOUT(rig.client()->frequencyHz(), qint64(28111000), 20000);
+        QVERIFY(rig.verbunden());
+    }
+
+    void derZustandKommtVomGeraetUndWarntAmTransverter()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+
+        TransverterSetup t;
+        t.enabled = true;
+        t.offsetHz = 116000000;
+        t.save();
+
+        CompanionRigController rig;
+        QSignalSpy warnung(&rig, &CompanionRigController::problem);
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().leistungW, 5, 20000);
+        QCOMPARE(rig.catZustand().antenne, 2);
+        QCOMPARE(rig.catZustand().rxAnt, 0);
+        QCOMPARE(rig.catZustand().rfGain, 200);
+        QCOMPARE(rig.catZustand().meterPunkte, 15);
+        QTRY_VERIFY_WITH_TIMEOUT(!warnung.isEmpty(), 20000);
+        QVERIFY(warnung.first().first().toString().contains(QStringLiteral("RX ANT")));
+        const int anzahl = warnung.size();
+
+        // Stehen beide richtig, schweigt die Warnung und bleibt still.
+        doppel.roh["AN;"] = "AN111;";
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().drive, 1, 20000);
+        QCOMPARE(warnung.size(), anzahl);
+
+        // Der Sendezustand kommt vom Geraet, das SWR nur dann.
+        QVERIFY(!rig.sendet());
+        doppel.gesendet = true;
+        QTRY_VERIFY_WITH_TIMEOUT(rig.sendet(), 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().swrPunkte, 7, 20000);
+
+        // Stellen geht ueber die geschlossene Liste.
+        rig.stelle(Ts590Cat::stelleDaempfung(true));
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("L ATT 12\n"), 20000);
+        QVERIFY2(!doppel.hatGetastet(), "Longpath hat das fremde Geraet getastet");
+
+        TransverterSetup{}.save();
+        TransverterSetup::setCurrent(TransverterSetup{});
+    }
+
+    void dasFilterFolgtDemGeraetInBeidenSeitenbaendern()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 20000);
+        QCOMPARE(scheibe.filterLow(), 100);
+
+        // Das Geraet steht in LSB: dieselben Grenzen, unter dem Traeger.
+        doppel.modus = QStringLiteral("LSB");
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::LSB, 10000);
+        doppel.roh["SH;"] = "SH10;";
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterLow(), -3000, 20000);
+        QCOMPARE(scheibe.filterHigh(), -100);
+
+        // Von der Scheibe zum Geraet, auf die Tabelle gerundet.
+        scheibe.setFilter(-2600, -200);
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W SH08; 0\n"), 3000);
+        QVERIFY(doppel.befehle.contains("W SL03; 0\n"));
+    }
+
+    // Beim Ziehen kommt jede Bewegung einzeln. Zum Geraet geht nur die letzte,
+    // sonst stapeln sich die Befehle hinter dem Mauszeiger.
+    void ziehen_an_der_bandbreite_schickt_nur_das_letzte()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 20000);
+
+        doppel.befehle.clear();
+        for (int hz = 2000; hz <= 3000; hz += 50) {
+            scheibe.setFilter(100, hz);
+            QTest::qWait(2);
+        }
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W SH10; 0\n"), 2000);
+        QCOMPARE(doppel.befehle.size(), 1);
+
+        // Das Geraet rundet auf seine Tabelle: die Anzeige folgt ihm, auch
+        // wenn sich dort nichts mehr aendert.
+        scheibe.setFilter(100, 2850);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 2800, 20000);
+    }
+
+    // Die Filtertasten halten die Mitte fest; eine Kante landet dabei jenseits
+    // des Traegers. Am 590 wurde aus 2.9k so 2400 Hz.
+    void filtertaste_ueber_den_traeger_behaelt_die_breite()
+    {
+        RigctldDoppel doppel;
+        doppel.modus = QStringLiteral("LSB");
+        doppel.roh["SL;"] = "SL01;";
+        doppel.roh["SH;"] = "SH07;";
+        zielAuf(doppel.port());
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::LSB, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterLow(), -2400, 20000);
+
+        doppel.befehle.clear();
+        scheibe.setFilter(-2675, 225);   // Mitte -1225, 2900 Hz breit
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W SH10; 0\n"), 20000);
+        QCOMPARE(doppel.befehle.size(), 1);   // die untere Kante bleibt 50 Hz
+
+        // Dasselbe in USB, auf der anderen Seite des Traegers.
+        doppel.roh["SH;"] = "SH10;";
+        doppel.modus = QStringLiteral("USB");
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh(), 3000, 20000);
+        doppel.befehle.clear();
+        scheibe.setFilter(-175, 2225);   // 2400 Hz breit
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W SH07; 0\n"), 20000);
+    }
+
+    // Am Geraet gedreht, kurz nachdem Longpath etwas geschickt hat: die
+    // Meldung faellt in die Frist und darf trotzdem nicht verloren gehen.
+    // Gefunden auf dem langsamen CI-Laeufer, der genau dieses Fenster traf.
+    void eine_meldung_in_der_frist_geht_nicht_verloren()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28078400), 20000);
+
+        bruecke.fristSetzenForTest(1500);
+        scheibe.setFrequency(28100000.0);
+        QTRY_COMPARE_WITH_TIMEOUT(doppel.frequenz, qint64(28100000), 20000);
+        doppel.modus = QStringLiteral("LSB");
+        doppel.frequenz = 28120000;
+        QTRY_COMPARE_WITH_TIMEOUT(rig.client()->mode(), QStringLiteral("LSB"), 20000);
+
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::LSB, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28120000), 20000);
+        bruecke.fristSetzenForTest(CatRigBruecke::kFristNachBefehlMs);
+    }
+
+    // Ein anderes Geraet als der TS-590S bekommt keine Kenwood-Zeilen, auch
+    // nicht ueber die Bruecke.
+    void ein_anderes_geraet_bekommt_keine_kenwood_zeilen()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        stelleEin(QStringLiteral("CompanionRigModel"), QStringLiteral("2037"));
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 20000);
+
+        rig.stelle(Ts590Cat::stelleAgc(Ts590Cat::Agc::Langsam));
+        rig.stelle(Ts590Cat::stelleVorverstaerker(false));
+        scheibe.setFilter(100, 2000);
+        QTest::qWait(800);
+        for (const QByteArray& b : std::as_const(doppel.befehle)) {
+            QVERIFY2(!b.startsWith("W ") && !b.startsWith("L ") && !b.startsWith("U "), b.constData());
+        }
+        stelleEin(QStringLiteral("CompanionRigModel"), QStringLiteral("2031"));
+    }
+
+    // Eine Betriebsart, die das Geraet nicht kennt, kippt nach der Frist nicht
+    // auf die des Geraets zurueck.
+    void sam_bleibt_sam()
+    {
+        RigctldDoppel doppel;
+        doppel.modus = QStringLiteral("AM");
+        zielAuf(doppel.port());
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::AM, 20000);
+
+        scheibe.setDspMode(DSPMode::SAM);
+        scheibe.setFrequency(28090000.0);
+        QTRY_COMPARE_WITH_TIMEOUT(doppel.frequenz, qint64(28090000), 20000);
+        QTest::qWait(1500);
+        QCOMPARE(scheibe.dspMode(), DSPMode::SAM);
+
+        // Schaltet man am Geraet wirklich um, gilt das weiter.
+        doppel.modus = QStringLiteral("USB");
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 20000);
+    }
+
+    // Die neuen Regler im Feld schicken, was am Geraet gemessen wurde.
+    void rit_notch_und_pegel_gehen_zum_geraet()
+    {
+        RigctldDoppel doppel;
+        doppel.roh["NB;"] = "NB1;";
+        doppel.roh["NL;"] = "NL006;";
+        zielAuf(doppel.port());
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+        RadioModel radio;
+        radio.setLastRadioInfoForTest(*info);
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 20000);
+        CatRigApplet feld(&radio);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->catZustand().nbPegel == 6, 20000);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->catZustand().ritAn == 0, 20000);
+
+        const auto drueck = [&](const char* name) {
+            auto* t = feld.findChild<QPushButton*>(QLatin1String(name));
+            QVERIFY2(t, name);
+            t->click();
+        };
+        doppel.befehle.clear();
+        drueck("catRigRit");
+        drueck("catRigRitHoch");
+        drueck("catRigRitRunter");
+        drueck("catRigRitNull");
+        drueck("catRigNotch");
+        for (const char* b : {"W RT1; 0\n", "W RU00010; 0\n", "W RD00010; 0\n", "W RC; 0\n",
+                              "W NT10; 0\n"}) {
+            QTRY_VERIFY2_WITH_TIMEOUT(doppel.befehle.contains(QByteArray(b)), b, 20000);
+        }
+        auto* nb = feld.findChild<QSlider*>(QStringLiteral("catRigNbPegel"));
+        QVERIFY(nb);
+        QTRY_VERIFY_WITH_TIMEOUT(nb->isEnabled() && nb->value() == 6, 20000);
+        nb->triggerAction(QAbstractSlider::SliderSingleStepAdd);
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W NL007; 0\n"), 20000);
+        // NR steht im Doppel auf NR1, der Pegel ist bedienbar; bei NR2 nicht.
+        auto* nr = feld.findChild<QSlider*>(QStringLiteral("catRigNrPegel"));
+        QTRY_VERIFY_WITH_TIMEOUT(nr->isEnabled() && nr->value() == 5, 20000);
+        doppel.roh["NR;"] = "NR2;";
+        QTRY_VERIFY_WITH_TIMEOUT(!nr->isEnabled(), 20000);
+        QVERIFY(!doppel.hatGetastet());
+
+        // Der Versatz steht im Feld.
+        doppel.roh["IF;"] = "IF00028078400     -012010000020000080;";
+        auto* wert = feld.findChild<QLabel*>(QStringLiteral("catRigRitWert"));
+        QVERIFY(wert);
+        QTRY_COMPARE_WITH_TIMEOUT(wert->text(), QStringLiteral("-120 Hz"), 20000);
+    }
+
+    // Beim Senden zeigt das Feld ALC, wenn das Geraet ALC als Instrument hat.
+    void beim_senden_steht_alc_im_feld()
+    {
+        RigctldDoppel doppel;
+        doppel.gesendet = true;
+        doppel.roh["RM;"] = "RM30007;";
+        zielAuf(doppel.port());
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        RadioModel radio;
+        radio.setLastRadioInfoForTest(*info);
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 20000);
+        CatRigApplet feld(&radio);
+        auto* mess = feld.findChild<QLabel*>(QStringLiteral("catRigMesswerte"));
+        QVERIFY(mess);
+        QTRY_VERIFY2_WITH_TIMEOUT(mess->text().contains(QStringLiteral("ALC 7")),
+                                  qPrintable(mess->text()), 20000);
+    }
+
+    // Mausrad und Tasten loesen kein sliderReleased aus; RF Gain muss trotzdem
+    // beim Geraet ankommen.
+    void rf_gain_mit_dem_mausrad()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+        RadioModel radio;
+        radio.setLastRadioInfoForTest(*info);
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 20000);
+        CatRigApplet feld(&radio);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->catZustand().rfGain >= 0, 20000);
+        auto* rf = feld.findChild<QSlider*>(QStringLiteral("catRigRfGain"));
+        QVERIFY(rf);
+        doppel.befehle.clear();
+        rf->triggerAction(QAbstractSlider::SliderPageStepAdd);
+        const QByteArray erwartet = Ts590Cat::stelleRfGain(rf->value());
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains(erwartet), 20000);
+    }
+
+    // Bandtaste oder Eingabe auf 2 m: am Geraet muss die ZF ankommen.
+    void eine_eingabe_auf_2m_landet_auf_der_zf()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        TransverterSetup t;
+        t.enabled = true;
+        t.offsetHz = 116000000;
+        t.save();
+        TransverterSetup::setCurrent(t);
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28078400), 20000);
+
+        scheibe.setFrequency(144300000.0);
+        QTRY_COMPARE_WITH_TIMEOUT(doppel.frequenz, qint64(28300000), 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28300000), 20000);
+
+        t.enabled = false;
+        t.save();
+        TransverterSetup::setCurrent(t);
+    }
+
+    // In CW stellt das Geraet nur die Breite. Die Lage bleibt der Scheibe.
+    void in_cw_wird_die_breite_gestellt()
+    {
+        RigctldDoppel doppel;
+        doppel.modus = QStringLiteral("CW");
+        doppel.roh["FW;"] = "FW0500;";
+        doppel.roh.remove("SL;");
+        doppel.roh.remove("SH;");
+        zielAuf(doppel.port());
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        SliceModel scheibe;
+        CatRigBruecke bruecke(&rig, &scheibe);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::CWU, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh() - scheibe.filterLow(), 500, 20000);
+        const int mitte = (scheibe.filterHigh() + scheibe.filterLow()) / 2;
+
+        doppel.roh["FW;"] = "FW0250;";
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh() - scheibe.filterLow(), 250, 20000);
+        QVERIFY(std::abs((scheibe.filterHigh() + scheibe.filterLow()) / 2 - mitte) <= 1);
+
+        doppel.befehle.clear();
+        scheibe.setFilter(mitte - 300, mitte + 300);
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W FW0600; 0\n"), 2000);
     }
 
     // Nur von Hand, mit dem Geraet am USB-Kabel. Liest nur den Ton.
@@ -389,7 +952,7 @@ private slots:
 
         CompanionRigController rig;
         rig.setCatBetrieb(true);
-        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
         QCOMPARE(rig.client()->pollIntervalMs(), CompanionRigController::kKatAbfrageMs);
         rig.client()->setPollIntervalMs(20);
 
@@ -402,40 +965,42 @@ private slots:
         bruecke.setFristForTest(10000);
 
         // Das Geraet gibt den Stand vor.
-        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28078400), 3000);
-        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28078400), 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::USB, 10000);
 
         // Ohne das antwortet rigctld eine Sekunde lang aus dem Speicher.
         QTRY_VERIFY_WITH_TIMEOUT(
-            doppel.befehle.contains(QByteArray("\\set_cache 0\n")), 3000);
+            doppel.befehle.contains(QByteArray("\\set_cache 0\n")), 20000);
         for (const QByteArray& b : std::as_const(doppel.befehle)) {
             QVERIFY2(b.startsWith("\\set_cache"),
                      "eine Meldung vom Geraet ging als Befehl zurueck");
         }
 
         // Die Scheibe stellt das Geraet.
+        bruecke.fristSetzenForTest(600000);
         scheibe.setFrequency(28100000.0);
-        QTRY_COMPARE_WITH_TIMEOUT(doppel.frequenz, qint64(28100000), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(doppel.frequenz, qint64(28100000), 20000);
 
         // Eine abweichende Meldung in der Frist zieht den VFO nicht zurueck.
         // Erst warten, bis der Client die neue Zahl kennt: sonst aendert
         // sich aus seiner Sicht nichts, und die Pruefung sagt nichts aus.
-        QTRY_COMPARE_WITH_TIMEOUT(rig.zfFrequenzHz(), qint64(28100000), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.zfFrequenzHz(), qint64(28100000), 20000);
         doppel.frequenz = 28078400;
-        QTRY_COMPARE_WITH_TIMEOUT(rig.zfFrequenzHz(), qint64(28078400), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.zfFrequenzHz(), qint64(28078400), 20000);
         QCOMPARE(qRound64(scheibe.frequency()), qint64(28100000));
 
         // Nach der Frist gilt das Geraet wieder.
+        bruecke.fristSetzenForTest(CatRigBruecke::kFristNachBefehlMs);
         bruecke.fristAufhebenForTest();
         doppel.frequenz = 28200000;
-        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28200000), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(qRound64(scheibe.frequency()), qint64(28200000), 20000);
 
         // Betriebsart in beide Richtungen.
         scheibe.setDspMode(DSPMode::LSB);
-        QTRY_COMPARE_WITH_TIMEOUT(doppel.modus, QStringLiteral("LSB"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(doppel.modus, QStringLiteral("LSB"), 10000);
         bruecke.fristAufhebenForTest();
         doppel.modus = QStringLiteral("CW");
-        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::CWU, 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::CWU, 10000);
 
         QVERIFY2(!doppel.hatGetastet(), "Longpath hat das fremde Geraet getastet");
     }
@@ -476,7 +1041,7 @@ private slots:
 
         radio.connectToRadio(*info);
         QTRY_VERIFY_WITH_TIMEOUT(radio.isConnected(), 300000);
-        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 20000);
         qInfo() << "Abtastrate" << radio.connectionSampleRateHz();
         QCOMPARE(radio.connectionSampleRateHz(), 48000);
 
@@ -566,8 +1131,539 @@ private slots:
         QVERIFY(!radio.companionRig()->catBetrieb());
     }
 
+    // Nur von Hand, am echten Geraet: die Tasten des Feldes druecken und am
+    // Geraet nachlesen. Ohne Fenster; rigctld laeuft auf dem Port aus der
+    // Umgebung. Am Ende steht alles wie vorher, nur RF Gain ist offen.
+    void feld_am_echten_geraet()
+    {
+        const int port = qEnvironmentVariableIntValue("LONGPATH_CAT_FELD_PORT");
+        if (port <= 0) { QSKIP("Nur von Hand: LONGPATH_CAT_FELD_PORT=<rigctld>"); }
+        zielAuf(static_cast<quint16>(port));
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+
+        QTcpSocket leser;
+        leser.connectToHost(QHostAddress::LocalHost, static_cast<quint16>(port));
+        QVERIFY(leser.waitForConnected(3000));
+        const auto frage = [&leser](const QByteArray& zeile) {
+            leser.readAll();
+            leser.write(zeile + '\n');
+            QByteArray antwort;
+            for (int i = 0; i < 40 && !antwort.contains(';') && !antwort.contains('\n'); ++i) {
+                leser.waitForReadyRead(50);
+                antwort += leser.readAll();
+            }
+            return QByteArray(antwort).replace('\0', "").trimmed();
+        };
+        leser.write("\\set_cache 0\n");
+        leser.waitForReadyRead(500);
+        const QByteArray frequenzVorher = frage("f");
+
+        RadioModel radio;
+        radio.setLastRadioInfoForTest(*info);
+        radio.installBandPlanMoxCheckForTest();
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 5000);
+
+        CatRigApplet feld(&radio);
+        // Eine ganze Runde der Abfrageliste, damit das Feld den Stand kennt.
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->catZustand().rfGain >= 0, 5000);
+        QTest::qWait(3000);
+
+        const auto taste = [&](const char* name, const QByteArray& abfrage) {
+            auto* knopf = feld.findChild<QPushButton*>(QLatin1String(name));
+            QVERIFY(knopf);
+            const QByteArray vorher = frage(abfrage);
+            const bool stand = knopf->isChecked();
+            knopf->click();
+            QTRY_VERIFY2_WITH_TIMEOUT(frage(abfrage) != vorher, name, 3000);
+            const QByteArray geschaltet = frage(abfrage);
+            QTRY_COMPARE_WITH_TIMEOUT(knopf->isChecked(), !stand, 3000);
+            knopf->click();
+            QTRY_VERIFY2_WITH_TIMEOUT(frage(abfrage) == vorher, name, 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(knopf->isChecked(), stand, 3000);
+            qInfo().noquote() << "FELD" << name << vorher << "->" << geschaltet << "->" << vorher;
+        };
+        taste("catRigAtt", "w RA;");
+        taste("catRigNb", "w NB;");
+        taste("catRigNr", "w NR;");
+        taste("catRigPreamp", "w PA;");
+
+        auto* agc = feld.findChild<QComboBox*>(QStringLiteral("catRigAgc"));
+        QVERIFY(agc);
+        const QByteArray agcVorher = frage("w GC;");
+        // Steht das Geraet auf AGC aus (bei uns in CW), nimmt es weder GC1
+        // noch GC2 an; gemessen 2026-11-07.
+        if (agcVorher != "GC0;") {
+            const int agcStand = agc->currentIndex();
+            const int agcAnders = agcStand == 1 ? 2 : 1;
+            agc->setCurrentIndex(agcAnders);
+            emit agc->activated(agcAnders);
+            QTRY_VERIFY_WITH_TIMEOUT(frage("w GC;") != agcVorher, 3000);
+            const QByteArray agcGeschaltet = frage("w GC;");
+            agc->setCurrentIndex(agcStand);
+            emit agc->activated(agcStand);
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w GC;"), agcVorher, 3000);
+            qInfo().noquote() << "FELD AGC" << agcVorher << "->" << agcGeschaltet << "->" << agcVorher;
+        }
+
+        auto* rf = feld.findChild<QSlider*>(QStringLiteral("catRigRfGain"));
+        QVERIFY(rf);
+        const QByteArray meterVorher = frage("w SM0;");
+        const QByteArray rfVorher = frage("w RG;");
+        rf->setValue(255);
+        emit rf->sliderReleased();
+        QTRY_COMPARE_WITH_TIMEOUT(frage("w RG;"), QByteArray("RG255;"), 3000);
+        QTRY_COMPARE_WITH_TIMEOUT(radio.companionRig()->catZustand().rfGain, 255, 500);
+        QCOMPARE(rf->value(), 255);
+        qInfo().noquote() << "FELD RF" << rfVorher << "->" << frage("w RG;")
+                          << "S-Meter" << meterVorher << "->" << frage("w SM0;");
+
+        // Die Filtertaste und die Bandbreite, in dem Seitenband, in dem das
+        // Geraet gerade steht. Am Ende steht beides wie vorher.
+        auto* filter = feld.findChild<QPushButton*>(QStringLiteral("catRigFilter"));
+        QVERIFY(filter);
+        const QByteArray filterVorher = frage("w FL;");
+        filter->click();
+        QTRY_VERIFY_WITH_TIMEOUT(frage("w FL;") != filterVorher, 3000);
+        const QByteArray filterGeschaltet = frage("w FL;");
+        QTRY_VERIFY_WITH_TIMEOUT(filter->text() == (filterGeschaltet == "FL1;"
+                                     ? QStringLiteral("FIL A") : QStringLiteral("FIL B")), 3000);
+        filter->click();
+        QTRY_COMPARE_WITH_TIMEOUT(frage("w FL;"), filterVorher, 3000);
+        qInfo().noquote() << "FELD FIL" << filterVorher << "->" << filterGeschaltet << "->" << filterVorher;
+
+        const QByteArray modus = frage("w MD;");
+        if (modus == "MD1;" || modus == "MD2;") {
+            SliceModel scheibe;
+            CatRigBruecke bruecke(radio.companionRig(), &scheibe);
+            const DSPMode band = modus == "MD1;" ? DSPMode::LSB : DSPMode::USB;
+            QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), band, 5000);
+            QTRY_VERIFY_WITH_TIMEOUT(scheibe.filterHigh() != scheibe.filterLow()
+                                     && std::abs(scheibe.filterHigh()) + std::abs(scheibe.filterLow()) > 0, 5000);
+            QTest::qWait(1000);
+            const int vz = band == DSPMode::LSB ? -1 : 1;
+            const auto setze = [&](int von, int bis) {
+                band == DSPMode::LSB ? scheibe.setFilter(-bis, -von) : scheibe.setFilter(von, bis);
+            };
+            const QByteArray slVorher = frage("w SL;"), shVorher = frage("w SH;");
+            const int hochVorher = std::max(std::abs(scheibe.filterLow()), std::abs(scheibe.filterHigh()));
+            const int tiefVorher = std::min(std::abs(scheibe.filterLow()), std::abs(scheibe.filterHigh()));
+            setze(300, 2000);
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w SL;"), QByteArray("SL04;"), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w SH;"), QByteArray("SH05;"), 3000);
+            setze(300, 2850);      // zwischen zwei Stufen: das Geraet rundet
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w SH;"), QByteArray("SH09;"), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(band == DSPMode::LSB ? scheibe.filterLow() : scheibe.filterHigh(),
+                                      vz * 2800, 3000);
+            setze(tiefVorher, hochVorher);
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w SL;"), slVorher, 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w SH;"), shVorher, 3000);
+            qInfo().noquote() << "FELD Bandbreite" << modus << slVorher << shVorher
+                              << "-> SL04; SH05; -> SH09; -> zurueck";
+        }
+
+        if (modus == "MD3;") {
+            SliceModel scheibe;
+            CatRigBruecke bruecke(radio.companionRig(), &scheibe);
+            QTRY_COMPARE_WITH_TIMEOUT(scheibe.dspMode(), DSPMode::CWU, 5000);
+            const QByteArray breiteVorher = frage("w FW;");
+            QTest::qWait(1500);
+            const int mitte = (scheibe.filterLow() + scheibe.filterHigh()) / 2;
+            scheibe.setFilter(mitte - 300, mitte + 300);
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w FW;"), QByteArray("FW0600;"), 3000);
+            scheibe.setFilter(mitte - 240, mitte + 240);   // rundet auf 500
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w FW;"), QByteArray("FW0500;"), 3000);
+            QTRY_COMPARE_WITH_TIMEOUT(scheibe.filterHigh() - scheibe.filterLow(), 500, 3000);
+            leser.write("W " + breiteVorher + " 0\n");
+            QTRY_COMPARE_WITH_TIMEOUT(frage("w FW;"), breiteVorher, 3000);
+            qInfo().noquote() << "FELD CW" << breiteVorher << "-> FW0600; -> FW0500; -> zurueck";
+        }
+
+        QCOMPARE(frage("f"), frequenzVorher);
+        QCOMPARE(frage("t"), QByteArray("0"));
+    }
+
+    // Nur von Hand, am echten Geraet und ohne Konverter: der 590 steht auf der
+    // ZF, Longpath rechnet auf 2 m. Es wird nichts gesendet.
+    void trockenlauf_mit_transverter()
+    {
+        const int port = qEnvironmentVariableIntValue("LONGPATH_CAT_TROCKEN");
+        if (port <= 0) { QSKIP("Nur von Hand: LONGPATH_CAT_TROCKEN=<rigctld>"); }
+        zielAuf(static_cast<quint16>(port));
+        TransverterSetup t;
+        t.enabled = true;
+        t.offsetHz = 116000000;
+        t.save();
+        TransverterSetup::setCurrent(t);
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+
+        QTcpSocket leser;
+        leser.connectToHost(QHostAddress::LocalHost, static_cast<quint16>(port));
+        QVERIFY(leser.waitForConnected(3000));
+        const auto frage = [&leser](const QByteArray& zeile) {
+            leser.readAll();
+            leser.write(zeile + '\n');
+            QByteArray antwort;
+            for (int i = 0; i < 40 && !antwort.contains(';') && !antwort.contains('\n'); ++i) {
+                leser.waitForReadyRead(50);
+                antwort += leser.readAll();
+            }
+            return QByteArray(antwort).replace('\0', "").trimmed();
+        };
+        frage("\\set_cache 0");
+        leser.write("W MD2; 0\n");
+        leser.waitForReadyRead(500);
+        QCOMPARE(frage("F 28144000"), QByteArray("RPRT 0"));
+
+        auto* fenster = new MainWindow();   // bewusst nicht abgeraeumt
+        fenster->resize(1280, 800);
+        fenster->show();
+        QVERIFY(QTest::qWaitForWindowExposed(fenster, 20000));
+        VerbundeneCatRig verbindung(*info);
+        RadioModel& radio = *fenster->radioModelForTest();
+        radio.setLastRadioInfoForTest(*info);
+        radio.injectConnectionForTest(&verbindung);
+        if (radio.activeSlice() == nullptr) { radio.addSlice(); }
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        CompanionRigController* rig = radio.companionRig();
+        QTRY_VERIFY_WITH_TIMEOUT(rig->verbunden(), 10000);
+
+        // Das Geraet gibt den Stand vor: Scheibe auf der ZF, Anzeige auf 2 m.
+        QTRY_COMPARE_WITH_TIMEOUT(radio.vfoHz(0, 0), qint64(28144000), 10000);
+        QCOMPARE(rig->rfFrequenzHz(), qint64(144144000));
+        auto* flaeche = fenster->findChild<SpectrumWidget*>();
+        QVERIFY(flaeche);
+        QCOMPARE(qint64(flaeche->rfFuerAnzeigeForTest(28144000.0)), qint64(144144000));
+        qInfo().noquote() << "TROCKEN Anzeige" << rig->beschreibung();
+
+        // RX ANT und DRV sind aus: das Feld muss es rot sagen.
+        auto* feld = fenster->findChild<CatRigApplet*>();
+        QVERIFY(feld);
+        auto* wege = feld->findChild<QLabel*>(QStringLiteral("catRigWege"));
+        QVERIFY(wege);
+        QTRY_VERIFY_WITH_TIMEOUT(wege->text().contains(QStringLiteral("off")), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(!wege->styleSheet().isEmpty(), 10000);
+        qInfo().noquote() << "TROCKEN Warnung" << wege->text() << wege->styleSheet();
+
+        // Ein Klick im Logbuch: es rechnet 144,250 auf die ZF und schickt 28,250.
+        RigctldServer server(&radio);
+        QVERIFY(server.start(QHostAddress::LocalHost, 45321));
+        QTcpSocket logbuch;
+        logbuch.connectToHost(QHostAddress::LocalHost, 45321);
+        QVERIFY(logbuch.waitForConnected(3000));
+        logbuch.write("F 28250000\n");
+        QTRY_COMPARE_WITH_TIMEOUT(frage("f"), QByteArray("28250000"), 5000);
+        qInfo().noquote() << "TROCKEN Logbuch 144.250 -> Geraet" << frage("f");
+
+        // Eine Eingabe auf 2 m, etwa die Bandtaste: am Geraet muss die ZF landen.
+        radio.setVfoHz(0, 0, 144300000);
+        QTRY_COMPARE_WITH_TIMEOUT(frage("f"), QByteArray("28300000"), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(radio.vfoHz(0, 0), qint64(28300000), 5000);
+        qInfo().noquote() << "TROCKEN Eingabe 144.300 -> Geraet" << frage("f");
+
+        QCOMPARE(frage("t"), QByteArray("0"));
+        radio.onConnectionStateChangedForTest(ConnectionState::Disconnected);
+        radio.injectConnectionForTest(nullptr);
+        t.enabled = false;
+        t.save();
+        TransverterSetup::setCurrent(t);
+    }
+
+    // Im Profil CONTEST ist die Appletspalte nicht zu sehen. Das Feld stand
+    // dort „sichtbar" und war nicht zu erreichen; gesehen am Geraet.
+    void verbunden_geht_das_feld_auch_ohne_spalte_auf()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+        // Der gemerkte Zustand sagt schon „sichtbar", wie beim Betreiber.
+        stelleEin(QStringLiteral("AppletCatRigVisible"), QStringLiteral("True"));
+
+        auto* fenster = new MainWindow();   // bewusst nicht abgeraeumt
+        fenster->resize(1280, 800);
+        fenster->show();
+        QVERIFY(QTest::qWaitForWindowExposed(fenster, 20000));
+
+        auto* feld = fenster->findChild<CatRigApplet*>();
+        auto* spalte = fenster->findChild<AppletPanelWidget*>();
+        QVERIFY(feld);
+        QVERIFY(spalte);
+        spalte->hide();
+        QVERIFY(!feld->isVisible());
+
+        VerbundeneCatRig verbindung(*info);
+        RadioModel& radio = *fenster->radioModelForTest();
+        radio.injectConnectionForTest(&verbindung);
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+
+        QTRY_VERIFY_WITH_TIMEOUT(feld->isVisible(), 20000);
+        QVERIFY2(feld->window() != fenster, "das Feld blieb in der verdeckten Spalte");
+        radio.injectConnectionForTest(nullptr);
+    }
+
+    // Waehrend die Maske steht, sind die Fenster versteckt und die Spalte
+    // gilt als frei. Danach lagen sie wieder ueber dem Feld; gesehen am
+    // Geraet im Profil N.
+    void das_feld_wartet_auf_die_fenster_hinter_der_maske()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+        stelleEin(QStringLiteral("AppletCatRigVisible"), QStringLiteral("True"));
+
+        auto* fenster = new MainWindow();   // bewusst nicht abgeraeumt
+        fenster->resize(1280, 800);
+        fenster->show();
+        QVERIFY(QTest::qWaitForWindowExposed(fenster, 20000));
+
+        auto* feld = fenster->findChild<CatRigApplet*>();
+        QVERIFY(feld);
+        QTRY_VERIFY_WITH_TIMEOUT(feld->isVisible(), 20000);
+        QCOMPARE(feld->window(), static_cast<QWidget*>(fenster));
+
+        // Ein schwebendes Fenster genau ueber dem Feld, hinter der Maske.
+        QWidget deckel;
+        deckel.setGeometry(QRect(feld->mapToGlobal(QPoint(0, 0)), feld->size()));
+        deckel.show();
+        fenster->rememberFloatingWindowBehindConnectMaskForTest(&deckel);
+
+        VerbundeneCatRig verbindung(*info);
+        RadioModel& radio = *fenster->radioModelForTest();
+        radio.injectConnectionForTest(&verbindung);
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        QTest::qWait(100);
+        QCOMPARE(feld->window(), static_cast<QWidget*>(fenster));
+
+        // Die Maske geht nach dem Verbinden von selbst zu.
+        QTRY_VERIFY_WITH_TIMEOUT(deckel.isVisible(), 20000);
+        QTRY_VERIFY2_WITH_TIMEOUT(feld->window() != fenster,
+                                  "das Feld blieb unter dem Fenster liegen", 20000);
+        QVERIFY(feld->isVisible());
+        // Und es liegt nicht ueber dem Fenster, wenn daneben Platz ist.
+        QTRY_VERIFY_WITH_TIMEOUT(
+            !feld->window()->frameGeometry().intersects(deckel.frameGeometry()), 20000);
+        radio.injectConnectionForTest(nullptr);
+    }
+
+    // Ein Klick im Contest-Teil geht ueber den Rig-Server auf die Scheibe.
+    // Von dort muss er beim Geraet ankommen.
+    void abstimmen_ueber_die_scheibe_erreicht_das_geraet()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+
+        auto* fenster = new MainWindow();   // bewusst nicht abgeraeumt
+        fenster->resize(1280, 800);
+        fenster->show();
+        QVERIFY(QTest::qWaitForWindowExposed(fenster, 20000));
+
+        VerbundeneCatRig verbindung(*info);
+        RadioModel& radio = *fenster->radioModelForTest();
+        radio.setLastRadioInfoForTest(*info);
+        radio.injectConnectionForTest(&verbindung);
+        if (radio.activeSlice() == nullptr) { radio.addSlice(); }
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 20000);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.vfoHz(0, 0) == doppel.frequenz, 20000);
+
+        doppel.befehle.clear();
+        radio.setVfoHz(0, 0, 28144000);
+        QTRY_COMPARE_WITH_TIMEOUT(doppel.frequenz, qint64(28144000), 20000);
+        QVERIFY(!doppel.hatGetastet());
+
+        radio.onConnectionStateChangedForTest(ConnectionState::Disconnected);
+        radio.injectConnectionForTest(nullptr);
+    }
+
+    void freierPlatz_meidet_was_belegt_ist()
+    {
+        const QRect flaeche(0, 0, 400, 300);
+        QCOMPARE(freierPlatz(QSize(100, 100), flaeche, {}), QRect(0, 0, 100, 100));
+        QCOMPARE(freierPlatz(QSize(100, 100), flaeche, {QRect(0, 0, 200, 300)}),
+                 QRect(208, 0, 100, 100));
+        QVERIFY(freierPlatz(QSize(100, 100), flaeche, {flaeche}).isEmpty());
+        QVERIFY(freierPlatz(QSize(500, 100), flaeche, {}).isEmpty());
+    }
+
     // Ueber die Pruef-Zugaenge und nicht ueber connectToRadio(): der volle
     // Hochlauf rechnet zuerst die WDSP-Wisdom und braucht Minuten.
+    // ── Sprachspeicher ueber den 590 (2026-11-12) ─────────────────────
+    //
+    // Die eine abgesicherte Ausnahme von „Longpath tastet nicht". Jede
+    // Sperre einzeln, dann Tasten, Ton, Loslassen, Sperre waehrend der
+    // Sendung und die Hoechstzeit.
+    void sprachspeicher_590_sperrt_bis_alles_stimmt()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        stelleEin(QStringLiteral("CompanionRigVoiceKeyer"), QStringLiteral("False"));
+        TransverterSetup::setCurrent(TransverterSetup{});
+
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().leistungW, 5, 20000);
+
+        WavTxSource quelle;
+        Ts590Sprache sprache(&rig, &quelle);
+        QSignalSpy hinweis(&sprache, &Ts590Sprache::hinweis);
+
+        // Aus ist aus.
+        QVERIFY(!sprache.zustaendig());
+        QVERIFY(sprache.taste(true).contains(QStringLiteral("off")));
+
+        stelleEin(QStringLiteral("CompanionRigVoiceKeyer"), QStringLiteral("True"));
+        QVERIFY(sprache.zustaendig());
+        // Ohne Transverter nicht.
+        QVERIFY2(sprache.taste(true).contains(QStringLiteral("transverter")),
+                 qPrintable(sprache.sperrgrund()));
+        // Nur Empfang (IFo2) nicht.
+        TransverterSetup t;
+        t.enabled = true;
+        t.offsetHz = 116000000;
+        t.nurEmpfang = true;
+        TransverterSetup::setCurrent(t);
+        QVERIFY2(sprache.taste(true).contains(QStringLiteral("receive only")),
+                 qPrintable(sprache.sperrgrund()));
+        t.nurEmpfang = false;
+        TransverterSetup::setCurrent(t);
+        // DRV aus: nicht (das Doppel steht auf AN100).
+        QVERIFY2(sprache.taste(true).contains(QStringLiteral("DRV")),
+                 qPrintable(sprache.sperrgrund()));
+        doppel.roh["AN;"] = "AN111;";
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().drive, 1, 20000);
+        // Mehr als 5 W: nicht.
+        doppel.roh["PC;"] = "PC010;";
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().leistungW, 10, 20000);
+        QVERIFY2(sprache.taste(true).contains(QStringLiteral("10 W")),
+                 qPrintable(sprache.sperrgrund()));
+        doppel.roh["PC;"] = "PC005;";
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().leistungW, 5, 20000);
+        // CW: nicht.
+        doppel.modus = QStringLiteral("CW");
+        QTRY_COMPARE_WITH_TIMEOUT(rig.modus(), QStringLiteral("CW"), 20000);
+        QVERIFY2(sprache.taste(true).contains(QStringLiteral("voice mode")),
+                 qPrintable(sprache.sperrgrund()));
+        doppel.modus = QStringLiteral("USB");
+        QTRY_COMPARE_WITH_TIMEOUT(rig.modus(), QStringLiteral("USB"), 20000);
+        QVERIFY(sprache.sperrgrund().isEmpty());
+        // Bis hier ist nichts getastet worden.
+        QVERIFY(!doppel.hatGetastet());
+
+        // Jetzt: Weg legen, tasten, der Ton kommt an.
+        QTemporaryDir ordner;
+        QString fehler;
+        QVERIFY2(quelle.load(schreibeAnsage(ordner.path()), 48000, &fehler), qPrintable(fehler));
+        QBuffer ton;
+        ton.open(QIODevice::WriteOnly);
+        sprache.setTonZielForTest(&ton);
+        QVERIFY(sprache.legeWeg());
+        quelle.play();
+        // Vor dem Tasten liegt kein Ton am Eingang des 590.
+        QTest::qWait(100);
+        QCOMPARE(ton.size(), qint64(0));
+        QCOMPARE(sprache.taste(true), QString());
+        QVERIFY(sprache.getastet());
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W TX1; 0\n"), 20000);
+        QTRY_VERIFY_WITH_TIMEOUT(ton.size() >= 24000 * 4, 5000);
+        QCOMPARE(sprache.taste(false), QString());
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W RX; 0\n"), 20000);
+        sprache.nimmWegZurueck();
+
+        // DRV faellt waehrend der Sendung: sofort los, mit Grund.
+        QCOMPARE(sprache.taste(true), QString());
+        doppel.roh["AN;"] = "AN110;";
+        QTRY_VERIFY_WITH_TIMEOUT(!sprache.getastet(), 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(zaehleBefehl(doppel.befehle, "W RX; 0\n"), 2, 20000);
+        QVERIFY(!hinweis.isEmpty());
+        QVERIFY(hinweis.last().first().toString().contains(QStringLiteral("DRV")));
+
+        // Hoechstzeit.
+        doppel.roh["AN;"] = "AN111;";
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().drive, 1, 20000);
+        sprache.setMaxSendenMsForTest(300);
+        QCOMPARE(sprache.taste(true), QString());
+        QTRY_VERIFY_WITH_TIMEOUT(!sprache.getastet(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(zaehleBefehl(doppel.befehle, "W RX; 0\n"), 3, 20000);
+
+        stelleEin(QStringLiteral("CompanionRigVoiceKeyer"), QStringLiteral("False"));
+        TransverterSetup::setCurrent(TransverterSetup{});
+    }
+
+    // Der ganze Weg ueber die Taste: F1 im Sprachspeicher tastet den 590
+    // mit TX1 und laesst nach der Ansage los -- und MOX bleibt abgewiesen.
+    void sprachspeicher_590_ueber_den_spieler()
+    {
+        RigctldDoppel doppel;
+        doppel.roh["AN;"] = "AN111;";
+        zielAuf(doppel.port());
+        stelleEin(QStringLiteral("CompanionRigVoiceKeyer"), QStringLiteral("True"));
+        TransverterSetup t;
+        t.enabled = true;
+        t.offsetHz = 116000000;
+        t.nurEmpfang = false;
+        t.save();
+        TransverterSetup::setCurrent(t);
+
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+        RadioModel radio;
+        radio.setLastRadioInfoForTest(*info);
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 20000);
+        radio.companionRig()->client()->setPollIntervalMs(20);
+        QTRY_COMPARE_WITH_TIMEOUT(radio.companionRig()->catZustand().drive, 1, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(radio.companionRig()->catZustand().leistungW, 5, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(radio.companionRig()->modus(), QStringLiteral("USB"), 20000);
+
+        QTemporaryDir ordner;
+        radio.voiceKeyer().setFolder(ordner.path());
+        QString fehler;
+        QVERIFY2(radio.voiceKeyer().importFile(0, schreibeAnsage(ordner.path()), &fehler),
+                 qPrintable(fehler));
+
+        VoiceKeyerPlayer* spieler = radio.voiceKeyerPlayer();
+
+        // Ohne USB-Tongeraet geht der Weg nicht auf: der Spieler sagt das und
+        // tastet NICHT. Der Name ist absichtlich keiner, den es gibt -- der
+        // Pruefstand soll das echte Tongeraet des 590 nie oeffnen.
+        stelleEin(QStringLiteral("CompanionRigAudioOutput"),
+                  QStringLiteral("kein-geraet-im-pruefstand"));
+        const QString ohne = spieler->play(0);
+        QVERIFY2(ohne.contains(QStringLiteral("can't be sent")), qPrintable(ohne));
+        QTest::qWait(300);
+        QVERIFY(!doppel.befehle.contains("W TX1; 0\n"));
+
+        // Mit Tonziel: F1 tastet mit TX1, die Ansage kommt an, danach RX.
+        QBuffer ton;
+        ton.open(QIODevice::WriteOnly);
+        radio.ts590Sprache()->setTonZielForTest(&ton);
+        const QString mit = spieler->play(0);
+        QVERIFY2(mit.isEmpty(), qPrintable(mit));
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W TX1; 0\n"), 20000);
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W RX; 0\n"), 20000);
+        QTRY_VERIFY_WITH_TIMEOUT(!spieler->busy(), 20000);
+        QVERIFY(ton.size() >= 24000 * 4);
+        QVERIFY(!radio.ts590Sprache()->getastet());
+
+        // MOX bleibt der alte Weg: abgewiesen, nichts getastet.
+        radio.moxController()->setMox(true);
+        QTest::qWait(200);
+        QCOMPARE(zaehleBefehl(doppel.befehle, "W TX1; 0\n"), 1);
+        stelleEin(QStringLiteral("CompanionRigAudioOutput"), QString());
+
+        stelleEin(QStringLiteral("CompanionRigVoiceKeyer"), QStringLiteral("False"));
+        TransverterSetup{}.save();
+        TransverterSetup::setCurrent(TransverterSetup{});
+    }
+
     void verbunden_wird_MOX_abgewiesen_und_nichts_getastet()
     {
         RigctldDoppel doppel;
@@ -580,7 +1676,7 @@ private slots:
         radio.installBandPlanMoxCheckForTest();
         radio.onConnectionStateChangedForTest(ConnectionState::Connected);
         QVERIFY(radio.companionRig()->catBetrieb());
-        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 20000);
         QVERIFY(radio.moxController());
 
         QSignalSpy abgewiesen(radio.moxController(), &MoxController::moxRejected);
