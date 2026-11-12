@@ -56,7 +56,6 @@ public:
 
 private:
     RemoteAsrConfig m_config;
-    std::unique_ptr<QNetworkAccessManager> m_nam;
     bool m_loaded = false;
 };
 
