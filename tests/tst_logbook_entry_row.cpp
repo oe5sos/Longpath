@@ -163,7 +163,7 @@ private slots:
     // Kegel = Rotorstellung, Marke = Richtung zur gezeigten Station.
     void theRotorRadarBesideTheMapFollowsRotorAndStation()
     {
-        AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"), QStringLiteral("True"));
+        AppSettings::instance().setValue(QStringLiteral("LogbookMode"), QStringLiteral("Log"));
         QTemporaryDir dir;
         LogbookWindow w(writeAdif(QDir(dir.path())));
         w.resize(1600, 900);

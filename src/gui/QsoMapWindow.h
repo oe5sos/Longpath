@@ -217,6 +217,12 @@ public:
     class DxRadarWidget* rotorRadarForTest() const { return m_rotorRadar; }
     void showRadarViewForTest(bool on);
     bool isEmbedded() const { return m_embedded; }
+    /// Nur Bild und Zoom, ohne Leiste und Auskunft (kleine Karte in Browse).
+    void setKompakt(bool on);
+    bool isKompakt() const { return m_kompakt; }
+    /// Das Rufzeichen der markierten Logzeile, fuer den 3D-Knopf in der
+    /// Logbuch-Spalte (leer: keine Auswahl).
+    void setAuswahlRuf(std::function<QString()> f) { m_auswahlRuf = std::move(f); }
 
     // ── Locator-Jagd mit FT8 (2026-11-11) ───────────────────────────
     //
@@ -377,6 +383,12 @@ private:
     // Filter pills and their state. An empty active set means "no
     // filtering" (everything shown), so a fresh window hides nothing.
     FlowLayout*   m_pillRow{nullptr};
+    class QPushButton* m_ebenenBtn{nullptr};   // Layers-Knopf (2026-11-12)
+    QWidget*      m_zoomLeiste{nullptr};       // Zoom auf dem Bild
+    QWidget*      m_leiste{nullptr};           // die obere Leiste als Ganzes
+    bool          m_kompakt{false};
+    std::function<QString()> m_auswahlRuf;
+    bool          m_3dNachEinrichtung{false};
     QSet<QString> m_offBands;    // pills the operator has turned OFF
     QSet<QString> m_offModes;
 

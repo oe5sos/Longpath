@@ -51,6 +51,8 @@
 
 #include <functional>
 
+class QAction;
+class QButtonGroup;
 class QCheckBox;
 class QCloseEvent;
 class QComboBox;
@@ -60,6 +62,7 @@ class QLineEdit;
 class QMoveEvent;
 class QPushButton;
 class QResizeEvent;
+class QScrollArea;
 class QSplitter;
 class QStackedWidget;
 class QTableWidget;
@@ -411,9 +414,11 @@ public:
     class QsoMapWindow* mapPanelForTest() const { return m_mapPanel; }
     class LogbookStatsWidget* statsRowForTest() const { return m_statsRow; }
     QWidget* statsSectionForTest() const { return m_statsSection; }
-    class QPushButton* mapToggleForTest() const { return m_mapToggle; }
-    class QPushButton* threeDToggleForTest() const { return m_3dToggle; }
-    class QPushButton* statsToggleForTest() const { return m_statsToggle; }
+    /// Seit Entwurf C die Knoepfe „Log" und „Statistics" des Umschalters.
+    class QPushButton* mapToggleForTest() const;
+    /// Seit Entwurf C der 3D-Knopf in der Kartenleiste.
+    class QPushButton* threeDToggleForTest() const;
+    class QPushButton* statsToggleForTest() const;
 
 private:
     bool saveAll();
@@ -534,6 +539,51 @@ private:
     QPushButton*  m_deleteBtn{nullptr};
     QPushButton*  m_uploadBtn{nullptr};
 
+    // ── Kopf nach Entwurf A (2026-11-12) ────────────────────────────
+    QWidget*      m_filterChips{nullptr};   // aktive Filter als Kapseln
+    QWidget*      m_filterBar{nullptr};     // Filterspalte in „Browse"
+    QWidget*      m_bandWahl{nullptr};      // SchnellWahl (LogbookWindow.cpp)
+    QWidget*      m_modeWahl{nullptr};
+    class QAction* m_importAction{nullptr};
+    class QAction* m_exportAdifAction{nullptr};
+    class QAction* m_exportCsvAction{nullptr};
+    class QAction* m_cabrilloAction{nullptr};
+    class QAction* m_uploadAction{nullptr};
+    class QAction* m_syncAction{nullptr};
+    class QAction* m_sotaAction{nullptr};
+    class QAction* m_statsWindowAction{nullptr};
+    void uploadMenuAt(const QPoint& globalPos);
+    void showOptionsMenu();
+    void updateFilterChips();
+
+    // ── Drei Arbeitsweisen (Entwurf C, 2026-11-12) ──────────────────
+    enum Modus { ModusLog = 0, ModusBrowse = 1, ModusStats = 2 };
+    int                  m_modus{ModusLog};
+    class QButtonGroup*  m_modusGruppe{nullptr};
+    QLabel*              m_modusHinweis{nullptr};
+    QWidget*             m_auswahlBox{nullptr};   // Edit/Delete (Browse)
+    QWidget*             m_eingabe{nullptr};      // Eingabe (Log)
+    class QStackedWidget* m_seiten{nullptr};
+    class QSplitter*     m_logSplit{nullptr};
+    class QSplitter*     m_logMitte{nullptr};
+    class QSplitter*     m_browseRechts{nullptr};
+    class QVBoxLayout*   m_logKarteLay{nullptr};
+    class QVBoxLayout*   m_logMapLay{nullptr};
+    class QVBoxLayout*   m_logListeLay{nullptr};
+    class QVBoxLayout*   m_logRechtsLay{nullptr};
+    class QVBoxLayout*   m_browseListeLay{nullptr};
+    class QVBoxLayout*   m_browseMapLay{nullptr};
+    class QVBoxLayout*   m_browseKarteLay{nullptr};
+    class QVBoxLayout*   m_statsSeiteLay{nullptr};
+    class QScrollArea*   m_detailScroll{nullptr};
+    QLabel*              m_bedarfLeer{nullptr};
+    void setModus(int modus);
+    void ensureMapPanel();
+public:
+    int modusForTest() const { return m_modus; }
+    void setModusForTest(int m) { setModus(m); }
+private:
+
     QVector<QsoUploader*> m_uploaders;
 
     // One map window, reused, so a second click raises the existing one
@@ -554,11 +604,8 @@ private:
     class QsoMapWindow*       m_mapPanel{nullptr};    // eingebettet, faul angelegt
     class LogbookStatsWidget* m_statsRow{nullptr};
     QWidget*                  m_statsSection{nullptr};
-    class QPushButton*        m_mapToggle{nullptr};
-    class QPushButton*        m_3dToggle{nullptr};   // „3D" gleich neben „Map" (2026-11-12)
     void set3dShown(bool on);
     void spiegle3d();
-    class QPushButton*        m_statsToggle{nullptr};
     void setMapPanelShown(bool on);
     void setStatsRowShown(bool on);
     void refreshMapPanel();

@@ -16,6 +16,7 @@
 // lesen koennen, was wir selbst schreiben.
 
 #include <QtTest>
+#include <QAction>
 #include <QAbstractItemModel>
 #include <QDir>
 #include <QFile>
@@ -211,13 +212,17 @@ private slots:
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
+        // Seit 2026-11-12 hinter dem Zahnrad der Titelleiste: der Eintrag
+        // muss da und an, das Zahnrad zu sehen und im Fenster sein.
+        auto* eintrag = w.findChild<QAction*>(QStringLiteral("logbookImportAction"));
+        QVERIFY2(eintrag && eintrag->isEnabled(), "Kein Einlese-Eintrag hinter dem Zahnrad");
         QPushButton* imp = nullptr;
         for (QPushButton* b : w.findChildren<QPushButton*>()) {
-            if (b->text().contains(QLatin1String("mport"))) { imp = b; break; }
+            if (b->text() == QStringLiteral("⚙")) { imp = b; break; }
         }
-        QVERIFY2(imp, "Kein Einlese-Knopf im Logbuch");
-        QVERIFY2(imp->isVisible(), "Der Einlese-Knopf ist nicht zu sehen");
-        QVERIFY2(imp->isEnabled(), "Der Einlese-Knopf ist tot");
+        QVERIFY2(imp, "Kein Zahnrad im Logbuch");
+        QVERIFY2(imp->isVisible(), "Das Zahnrad ist nicht zu sehen");
+        QVERIFY2(imp->isEnabled(), "Das Zahnrad ist tot");
 
         // Und er liegt im Fenster, nicht rechts daneben abgeschnitten.
         const QPoint tl = imp->mapTo(&w, QPoint(0, 0));
@@ -260,7 +265,7 @@ private slots:
                            [](const QString&) {});
         w.reload();
 
-        QTableWidget* table = w.findChild<QTableWidget*>();
+        QTableWidget* table = w.findChild<QTableWidget*>(QStringLiteral("logbookTable"));
         QVERIFY2(table, "Kein QTableWidget im Logbuch-Fenster");
         QAbstractItemModel* model = table->model();
         QVERIFY(model);

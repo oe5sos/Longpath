@@ -62,6 +62,7 @@
 #include <QStandardPaths>
 #include <QDateEdit>
 #include <QDateTimeEdit>
+#include <QCursor>
 #include <QHash>
 #include <QMenu>
 #include <QMoveEvent>
@@ -86,10 +87,14 @@
 #include <QTimer>
 #include <QTextStream>
 #include <QTimeZone>
+#include <QButtonGroup>
+#include <QGridLayout>
 #include <QVBoxLayout>
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
+#include <memory>
 
 #include <algorithm>
 
@@ -165,13 +170,11 @@ LogbookWindow::LogbookWindow(const QString& adifPath, QWidget* parent)
     // Eine Seite: Karte und Kennzahlen zeigen, wie beim letzten Mal —
     // beim ersten Mal beides an, das ist der Sinn der Sache.
     {
-        AppSettings& s = AppSettings::instance();
-        const bool map = s.value(QStringLiteral("LogbookShowMap"), QStringLiteral("True"))
-                             .toString() == QStringLiteral("True");
-        const bool stats = s.value(QStringLiteral("LogbookShowStats"), QStringLiteral("True"))
-                               .toString() == QStringLiteral("True");
-        setMapPanelShown(map);
-        setStatsRowShown(stats);
+        // Entwurf C: die Arbeitsweise vom letzten Mal, beim ersten Mal „Log".
+        const QString m = AppSettings::instance()
+            .value(QStringLiteral("LogbookMode"), QStringLiteral("Log")).toString();
+        setModus(m == QStringLiteral("Browse") ? ModusBrowse
+                 : m == QStringLiteral("Statistics") ? ModusStats : ModusLog);
     }
 }
 
@@ -334,14 +337,27 @@ void LogbookWindow::stopSettling()
 
 void LogbookWindow::restoreSplitState()
 {
-    const QByteArray st = AppSettings::instance()
-        .value(QStringLiteral("LogbookSplitState3")).toByteArray();
-    if (!st.isEmpty() && m_split->restoreState(st)) { return; }
-    // A first run, or a saved state from a build with a different
-    // number of panes. Give the table the room and the pane enough to
-    // read a callsign in; the map column in the middle takes its share
-    // only while it is shown.
-    m_split->setSizes({620, 340, 280});
+    // Je Teiler ein Schluessel. Gibt es keinen (erster Start, oder ein
+    // Zustand aus einem Bau mit anderen Spalten), die Breiten aus Entwurf C.
+    const struct { QSplitter* teiler; const char* key; QList<int> vorgabe; } alle[] = {
+        {m_logSplit,     "LogbookLogSplit",    {300, 860, 300}},
+        {m_logMitte,     "LogbookLogMitte",    {520, 210}},
+        {m_split,        "LogbookBrowseSplit", {240, 900, 320}},
+        {m_browseRechts, "LogbookBrowseRight", {200, 560}},
+    };
+    for (const auto& a : alle) {
+        if (!a.teiler) { continue; }
+        const QByteArray st = AppSettings::instance()
+            .value(QString::fromLatin1(a.key)).toByteArray();
+        if (st.isEmpty() || !a.teiler->restoreState(st)) { a.teiler->setSizes(a.vorgabe); }
+        // Jeder Teiler merkt sich selbst (restoreSplitState laeuft einmal,
+        // aus dem Konstruktor).
+        QSplitter* t = a.teiler;
+        const QString key = QString::fromLatin1(a.key);
+        connect(t, &QSplitter::splitterMoved, this, [t, key](int, int) {
+            AppSettings::instance().setValue(key, t->saveState());
+        });
+    }
 }
 
 void LogbookWindow::setQrzClient(QrzClient* qrz)
@@ -390,150 +406,159 @@ void LogbookWindow::buildUi()
     // und liessen es nicht schmaler ziehen — die Leiste bricht jetzt in
     // eine zweite Zeile um (Betreiber, 2026-09-21). Das Suchfeld nimmt,
     // was in seiner Zeile uebrig bleibt.
-    buildEntryRow(col);
-
+    // ── Drei Arbeitsweisen (2026-11-12, Entwurf C) ───────────────────
+    //
+    // Betreiber: „ich möchte dies überarbeiten und übersichtlicher
+    // gestalten", dann „bitte doch C". Oben waehlt man, was man gerade
+    // tut: „Log" ist der Platz zum Loggen (grosse Eingabe, Station, Weg,
+    // was mit diesem Land noch fehlt, darunter die letzten QSOs),
+    // „Browse" das Archiv (alle Filter links, die Liste ueber die ganze
+    // Breite, rechts die Auswahl), „Statistics" die Kennzahlen ueber das
+    // ganze Fenster. Datei- und Online-Arbeit liegt hinter dem Zahnrad in
+    // der Titelleiste, wo jedes Longpath-Fenster seine Optionen hat.
     auto* top = new FlowLayout(nullptr, 6, 6);
-    m_search = new QLineEdit(this);
-    m_search->setPlaceholderText(
-        QStringLiteral("Search call, name, QTH, country, grid or comment"));
-    m_search->setClearButtonEnabled(true);
-    m_search->setStyleSheet(Style::lineEditStyle());
-    m_search->setMinimumWidth(220);
-    top->addWidget(m_search);
+    {
+        auto* box = new QWidget(this);
+        auto* h = new QHBoxLayout(box);
+        h->setContentsMargins(0, 0, 0, 0);
+        h->setSpacing(2);
+        m_modusGruppe = new QButtonGroup(this);
+        m_modusGruppe->setExclusive(true);
+        const struct { const char* text; const char* name; const char* tip; } modi[] = {
+            {"Log", "logbookModeLog",
+             "Log a contact: the station, the path, the rotor and what you still "
+             "need with this country — and the last contacts below"},
+            {"Browse", "logbookModeBrowse",
+             "The whole log: search and filter on the left, the list in the "
+             "middle, the selected contact on the right"},
+            {"Statistics", "logbookModeStats",
+             "Contacts per band, mode and month, countries and awards — for what "
+             "the filters in Browse show"},
+        };
+        for (int k = 0; k < 3; ++k) {
+            auto* b = new QPushButton(QString::fromUtf8(modi[k].text), box);
+            b->setObjectName(QString::fromLatin1(modi[k].name));
+            b->setToolTip(QString::fromUtf8(modi[k].tip));
+            b->setCheckable(true);
+            b->setFocusPolicy(Qt::NoFocus);
+            b->setMinimumHeight(30);
+            b->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle()
+                             + QStringLiteral("QPushButton { padding: 4px 16px; font-size: 13px; }"));
+            m_modusGruppe->addButton(b, k);
+            h->addWidget(b);
+        }
+        top->addWidget(box);
+    }
+    m_modusHinweis = new QLabel(QString{}, this);
+    m_modusHinweis->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; padding-left: 8px; }")
+                                      .arg(QString::fromLatin1(Style::kTextScale)));
+    top->addWidget(m_modusHinweis);
+    top->addStretch();
 
     m_editBtn   = new QPushButton(QStringLiteral("Edit…"), this);
     m_deleteBtn = new QPushButton(QStringLiteral("Delete"), this);
+    // Hochladen und Abholen stehen hinter dem Zahnrad. Die Knoepfe bleiben
+    // als Zustandsanzeige: waehrend einer Uebertragung erscheinen sie mit
+    // ihrem Fortschritt in der Leiste und verschwinden danach wieder.
     m_uploadBtn = new QPushButton(QStringLiteral("Upload…"), this);
     m_uploadBtn->setToolTip(
         QStringLiteral("Send the selected contacts to a logging service"));
-    // „Map" und „Stats" schalten die eingebettete Karte und die
-    // Kennzahlenreihe — eine Seite statt drei Fenster (2026-09-22). Die
-    // Fenster gibt es weiter, ueber „↗" in der Karte bzw. der Reihe.
-    m_mapToggle = new QPushButton(QStringLiteral("Map"), this);
-    m_mapToggle->setCheckable(true);
-    m_mapToggle->setToolTip(
-        QStringLiteral("Show the contacts on a globe or a world map "
-                       "beside the table — what the filters show"));
-    QPushButton* mapBtn = m_mapToggle;
-    // „3D" gleich neben „Map" (Betreiber 2026-11-12: „3d war nicht zu
-    // finden"). Die Pille in der Kartenspalte gibt es weiter; dieser Knopf
-    // holt die Karte UND das 3D-Bild in einem Druck -- zur markierten
-    // Station, sonst zur zuletzt geflogenen, sonst zum eigenen QTH. Er
-    // zeigt, was zu sehen ist: eingerastet heisst, das 3D-Bild steht.
-    m_3dToggle = new QPushButton(QStringLiteral("3D"), this);
-    m_3dToggle->setObjectName(QStringLiteral("logbook3dButton"));
-    m_3dToggle->setCheckable(true);
-    m_3dToggle->setToolTip(QStringLiteral(
-        "Fly to the selected contact in photorealistic 3D — down to the house "
-        "and the antenna. Nothing selected: your own station."));
-    auto* importBtn = new QPushButton(QStringLiteral("Import…"), this);
-    importBtn->setToolTip(QStringLiteral(
-        "Merge an ADIF file into this log, skipping contacts it already has"));
+    m_uploadBtn->setVisible(false);
     m_syncBtn = new QPushButton(QStringLiteral("Sync QRZ"), this);
     m_syncBtn->setToolTip(QStringLiteral(
         "Fetch your QRZ logbook and merge it into this log: contacts "
         "logged there are added, confirmations and QRZ log ids fill in, "
         "nothing you can see and edit here is overwritten. Needs the "
         "logbook key from Tools > QRZ."));
-    auto* adifBtn = new QPushButton(QStringLiteral("Export ADIF…"), this);
-    auto* csvBtn  = new QPushButton(QStringLiteral("Export CSV…"), this);
-    auto* cabrBtn = new QPushButton(QStringLiteral("Cabrillo…"), this);
-    cabrBtn->setToolTip(QStringLiteral(
-        "Export the filtered view as a Cabrillo 3.0 skeleton — check "
-        "the exchange column against the contest's rules before "
-        "submitting"));
-    m_statsToggle = new QPushButton(QStringLiteral("Stats"), this);
-    m_statsToggle->setCheckable(true);
-    m_statsToggle->setToolTip(QStringLiteral(
-        "Contacts per band, mode and week, top countries, awards — "
-        "as a row under the table, for whatever the filters currently show"));
-    QPushButton* statsBtn = m_statsToggle;
-    auto* sotaBtn = new QPushButton(QStringLiteral("SOTA…"), this);
-    sotaBtn->setToolTip(QStringLiteral(
-        "Fill in your summit references (MY_SOTA_REF) from your SOTA activator "
-        "log (sotadata.org.uk → Logs → Activator → Download complete log), so "
-        "bearings, distances and path profiles start at the summit"));
-    connect(sotaBtn, &QPushButton::clicked, this, &LogbookWindow::sotaNachtragen);
-    for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn, mapBtn, m_3dToggle,
-                           statsBtn, importBtn, m_syncBtn, sotaBtn, adifBtn, csvBtn, cabrBtn}) {
+    m_syncBtn->setVisible(false);
+    for (QPushButton* b : {m_uploadBtn, m_syncBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle());
         top->addWidget(b);
     }
-    // Die zwei Schalter muessen als Schalter zu sehen sein: gedrueckt blau.
-    for (QPushButton* b : {mapBtn, statsBtn}) {
-        b->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
+    // Bearbeiten und Loeschen gelten der Auswahl -- sie stehen in Browse.
+    m_auswahlBox = new QWidget(this);
+    {
+        auto* h = new QHBoxLayout(m_auswahlBox);
+        h->setContentsMargins(0, 0, 0, 0);
+        h->setSpacing(6);
+        for (QPushButton* b : {m_editBtn, m_deleteBtn}) {
+            b->setStyleSheet(Style::buttonBaseStyle());
+            h->addWidget(b);
+        }
     }
-    // Gruen wie die 3D-Pille in der Karte: derselbe Schalter, zweimal zu sehen.
-    m_3dToggle->setStyleSheet(Style::buttonBaseStyle() + Style::greenCheckedStyle());
+    top->addWidget(m_auswahlBox);
     col->addLayout(top);
-    connect(mapBtn, &QPushButton::toggled, this, &LogbookWindow::setMapPanelShown);
-    // toggled, nicht clicked: die Bedienhilfe drueckt ueber toggle().
-    connect(m_3dToggle, &QPushButton::toggled, this, &LogbookWindow::set3dShown);
-    connect(statsBtn, &QPushButton::toggled, this, &LogbookWindow::setStatsRowShown);
-    connect(cabrBtn, &QPushButton::clicked,
-            this, &LogbookWindow::exportCabrillo);
-    connect(importBtn, &QPushButton::clicked,
-            this, &LogbookWindow::importAdif);
+    connect(m_modusGruppe, &QButtonGroup::idClicked, this, &LogbookWindow::setModus);
     connect(m_syncBtn, &QPushButton::clicked,
             this, &LogbookWindow::syncFromQrz);
-
     connect(m_uploadBtn, &QPushButton::clicked, this, [this]() {
-        if (m_uploaders.isEmpty()) {
-            QMessageBox::information(this, QStringLiteral("Upload"),
-                QStringLiteral("No logging service is set up yet.\n\n"
-                               "Add one under Tools."));
-            return;
-        }
-        // Decide what is being sent before asking where. Marked rows
-        // if there are any; otherwise everything not yet uploaded —
-        // "what still needs to go" is the question after a session, and
-        // making the operator select it by hand every time is the
-        // reason people stop bothering.
-        QList<int> rows = selectedSourceRows();
-        const bool fromSelection = !rows.isEmpty();
-        if (!fromSelection) { rows = outstandingRows(); }
-
-        if (rows.isEmpty()) {
-            QMessageBox::information(this, QStringLiteral("Upload"),
-                QStringLiteral("Everything is already uploaded."));
-            return;
-        }
-
-        ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
-        QMenu& menu = *menuOwner.get();
-        auto* header = menu.addAction(fromSelection
-            ? QStringLiteral("Send %1 marked contacts to…").arg(rows.size())
-            : QStringLiteral("Send %1 not yet uploaded to…").arg(rows.size()));
-        header->setEnabled(false);
-        menu.addSeparator();
-
-        QHash<QAction*, QsoUploader*> map;
-        for (QsoUploader* u : m_uploaders) {
-            QAction* a = menu.addAction(u->serviceName());
-            // Listed but disabled rather than hidden: an operator who
-            // set one up last week and sees it missing assumes the
-            // feature is broken, not that a credential went astray.
-            a->setEnabled(u->isConfigured());
-            if (!u->isConfigured()) {
-                a->setText(u->serviceName()
-                           + QStringLiteral("  (not configured)"));
-            }
-            map.insert(a, u);
-        }
-        QAction* chosen = menu.exec(m_uploadBtn->mapToGlobal(
-            QPoint(0, m_uploadBtn->height())));
-        // Das Elternteil kann waehrend exec() gestorben sein — dann ist
-        // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-        if (!menuOwner) { return; }
-        if (chosen && map.contains(chosen)) {
-            uploadEntries(rows, map.value(chosen));
-        }
+        uploadMenuAt(m_uploadBtn->mapToGlobal(QPoint(0, m_uploadBtn->height())));
     });
 
-    buildFilterBar(col);
+    // Die Eingabe: nur im Modus „Log".
+    m_eingabe = new QWidget(this);
+    m_eingabe->setObjectName(QStringLiteral("logbookEntryArea"));
+    {
+        auto* ev = new QVBoxLayout(m_eingabe);
+        ev->setContentsMargins(0, 0, 0, 0);
+        ev->setSpacing(6);
+        buildEntryRow(ev);
+    }
+    col->addWidget(m_eingabe);
+
+    // ── Das Zahnrad: Datei und Online ────────────────────────────────
+    //
+    // Die Handlungen existieren als QAction von Anfang an (nicht erst beim
+    // Aufklappen) -- so finden Pruefstaende und die Bedienhilfe sie, und
+    // das Menue ist nur ihre Anordnung.
+    auto aktion = [this](const QString& text, const QString& name, const QString& tip) {
+        auto* a = new QAction(text, this);
+        a->setObjectName(name);
+        a->setToolTip(tip);
+        return a;
+    };
+    m_importAction = aktion(QStringLiteral("Import ADIF…"), QStringLiteral("logbookImportAction"),
+        QStringLiteral("Merge an ADIF file into this log, skipping contacts it already has"));
+    m_exportAdifAction = aktion(QStringLiteral("Export ADIF…"), QStringLiteral("logbookExportAdifAction"),
+        QStringLiteral("Export what the filters show as an ADIF file"));
+    m_exportCsvAction = aktion(QStringLiteral("Export CSV…"), QStringLiteral("logbookExportCsvAction"),
+        QStringLiteral("Export what the filters show as a CSV table"));
+    m_cabrilloAction = aktion(QStringLiteral("Export Cabrillo…"), QStringLiteral("logbookCabrilloAction"),
+        QStringLiteral("Export the filtered view as a Cabrillo 3.0 skeleton — check "
+                       "the exchange column against the contest's rules before "
+                       "submitting"));
+    m_uploadAction = aktion(QStringLiteral("Upload to a logging service…"),
+        QStringLiteral("logbookUploadAction"),
+        QStringLiteral("Send the marked contacts — or everything not yet uploaded — "
+                       "to LoTW, QRZ or another service set up under Tools"));
+    m_syncAction = aktion(QStringLiteral("Sync with QRZ"), QStringLiteral("logbookSyncAction"),
+        m_syncBtn->toolTip());
+    m_sotaAction = aktion(QStringLiteral("SOTA…"), QStringLiteral("logbookSotaAction"),
+        QStringLiteral(
+        "Fill in your summit references (MY_SOTA_REF) from your SOTA activator "
+        "log (sotadata.org.uk → Logs → Activator → Download complete log), so "
+        "bearings, distances and path profiles start at the summit"));
+    m_statsWindowAction = aktion(QStringLiteral("Statistics in their own window…"),
+        QStringLiteral("logbookStatsWindowAction"),
+        QStringLiteral("All statistics pages in a separate window"));
+    connect(m_importAction, &QAction::triggered, this, &LogbookWindow::importAdif);
+    connect(m_exportAdifAction, &QAction::triggered, this, &LogbookWindow::exportAdif);
+    connect(m_exportCsvAction, &QAction::triggered, this, &LogbookWindow::exportCsv);
+    connect(m_cabrilloAction, &QAction::triggered, this, &LogbookWindow::exportCabrillo);
+    connect(m_uploadAction, &QAction::triggered, this, [this]() { uploadMenuAt(QCursor::pos()); });
+    connect(m_syncAction, &QAction::triggered, this, &LogbookWindow::syncFromQrz);
+    connect(m_sotaAction, &QAction::triggered, this, &LogbookWindow::sotaNachtragen);
+    connect(m_statsWindowAction, &QAction::triggered, this, &LogbookWindow::showStatistics);
+    m_titleBar->setOptionsVisible(true);
+    connect(m_titleBar, &WindowTitleBar::optionsRequested, this, &LogbookWindow::showOptionsMenu);
+
+    buildFilterBar(nullptr);
 
     // Table
     m_table = new QTableWidget(0, ColumnCount, this);
+    // Mit Namen: seit Entwurf C liegt die Karte (mit ihrer Jagdliste, auch
+    // eine QTableWidget) in derselben Seite.
+    m_table->setObjectName(QStringLiteral("logbookTable"));
     m_table->setHorizontalHeaderLabels(headerLabels());
     m_table->verticalHeader()->setVisible(false);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -571,15 +596,6 @@ void LogbookWindow::buildUi()
     // A splitter rather than a fixed width: on a laptop the pane is
     // most of the window, and an operator who wants the table back
     // should be able to drag it away rather than turn the feature off.
-    m_split = new QSplitter(Qt::Horizontal, this);
-    m_split->setChildrenCollapsible(true);
-    m_split->addWidget(m_table);
-
-    // Das Detailpaneel in einem Rollbereich: wird das Fenster niedriger
-    // als Foto, Kopf, Peilung und Knoepfe zusammen, rollt es, statt dass
-    // die Abschnitte uebereinanderrutschen (gesehen beim Verkleinern
-    // auf 420 × 500, 2026-09-21). Waagrecht rollt nichts — das Paneel
-    // nimmt die Breite des Rollbereichs.
     m_detail = new QsoDetailPane;
     m_detail->setCache(&m_callCache);
     connect(m_detail, &QsoDetailPane::beamChanged, this, [this](double deg) {
@@ -592,18 +608,112 @@ void LogbookWindow::buildUi()
     // Eigener Standort fuer Stationen, die nicht im Log stehen
     // (2026-11-10): der juengste MY_GRIDSQUARE, wie bei der Bedarfs-Matrix.
     m_detail->setHomeGrid([this]() { return meinFeld(); });
-    auto* detailScroll = new QScrollArea(m_split);
-    detailScroll->setWidgetResizable(true);
-    detailScroll->setFrameShape(QFrame::NoFrame);
-    detailScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    detailScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    detailScroll->setStyleSheet(QStringLiteral("QScrollArea { background: transparent; }"));
-    detailScroll->setMinimumWidth(230);
-    detailScroll->setWidget(m_detail);
-    m_split->addWidget(detailScroll);
-    m_split->setStretchFactor(0, 1);
-    m_split->setStretchFactor(1, 0);
-    col->addWidget(m_split, 1);
+    // Das Detailpaneel in einem Rollbereich: wird das Fenster niedriger
+    // als Foto, Kopf, Peilung und Knoepfe zusammen, rollt es, statt dass
+    // die Abschnitte uebereinanderrutschen (gesehen beim Verkleinern
+    // auf 420 × 500, 2026-09-21). Waagrecht rollt nichts — das Paneel
+    // nimmt die Breite des Rollbereichs.
+    m_detailScroll = new QScrollArea(this);
+    m_detailScroll->setWidgetResizable(true);
+    m_detailScroll->setFrameShape(QFrame::NoFrame);
+    m_detailScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_detailScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    m_detailScroll->setStyleSheet(QStringLiteral("QScrollArea { background: transparent; }"));
+    m_detailScroll->setMinimumWidth(230);
+    m_detailScroll->setWidget(m_detail);
+
+    // ── Die drei Seiten (Entwurf C) ──────────────────────────────────
+    //
+    // Karte, Stationskarte und Liste gibt es je einmal; setModus() setzt
+    // sie in die Seite, die gerade gilt. Zwei Karten waeren zwei Globen,
+    // zwei Kachelspeicher und zwei 3D-Flaechen fuer dasselbe Bild.
+    auto platz = [](QWidget* w) {
+        auto* v = new QVBoxLayout(w);
+        v->setContentsMargins(0, 0, 0, 0);
+        v->setSpacing(4);
+        return v;
+    };
+    auto kopf = [this](const QString& t, QWidget* parent) {
+        auto* l = new QLabel(t, parent);
+        l->setFont(Style::capsFont(font(), 9));
+        l->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                             .arg(QString::fromLatin1(Style::kTextScale)));
+        return l;
+    };
+    m_seiten = new QStackedWidget(this);
+
+    // Log: Station | Karte ueber den letzten QSOs | was noch fehlt
+    m_logSplit = new QSplitter(Qt::Horizontal, m_seiten);
+    m_logSplit->setChildrenCollapsible(false);
+    {
+        auto* links = new QWidget(m_logSplit);
+        m_logKarteLay = platz(links);
+        m_logMitte = new QSplitter(Qt::Vertical, m_logSplit);
+        m_logMitte->setChildrenCollapsible(false);
+        auto* karte = new QWidget(m_logMitte);
+        m_logMapLay = platz(karte);
+        auto* liste = new QWidget(m_logMitte);
+        m_logListeLay = platz(liste);
+        m_logListeLay->addWidget(kopf(QStringLiteral("LAST QSOS  ·  double-click to edit"), liste));
+        auto* rechts = new QWidget(m_logSplit);
+        m_logRechtsLay = platz(rechts);
+        m_logRechtsLay->setSpacing(8);
+        m_logRechtsLay->addWidget(kopf(QStringLiteral("IN YOUR LOG"), rechts));
+        m_bedarfLeer = new QLabel(QStringLiteral(
+            "Type a call: what you have with this station and its country — "
+            "band by mode — shows here."), rechts);
+        m_bedarfLeer->setWordWrap(true);
+        m_bedarfLeer->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                        .arg(QString::fromLatin1(Style::kTextScale)));
+        m_logRechtsLay->addWidget(m_bedarfLeer);
+        // Die Bedarfs-Matrix (2026-11-08) stand unter der Eingabe; jetzt
+        // in ihrer eigenen Spalte daneben.
+        m_logRechtsLay->addWidget(m_bedarf);
+        m_logRechtsLay->addStretch(1);
+        m_logSplit->setStretchFactor(0, 0);
+        m_logSplit->setStretchFactor(1, 1);
+        m_logSplit->setStretchFactor(2, 0);
+    }
+    m_seiten->addWidget(m_logSplit);
+
+    // Browse: Filter | Liste | Karte ueber der Station
+    m_split = new QSplitter(Qt::Horizontal, m_seiten);
+    m_split->setChildrenCollapsible(false);
+    {
+        auto* filterRoll = new QScrollArea(m_split);
+        filterRoll->setWidgetResizable(true);
+        filterRoll->setFrameShape(QFrame::NoFrame);
+        filterRoll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        filterRoll->setStyleSheet(QStringLiteral("QScrollArea { background: transparent; }"));
+        filterRoll->setWidget(m_filterBar);
+        // setWidget() schaltet das Fuellen ein; mit hellem Systemschema
+        // stand die Spalte dann hellgrau im dunklen Fenster.
+        m_filterBar->setAutoFillBackground(false);
+        filterRoll->viewport()->setAutoFillBackground(false);
+        filterRoll->setMinimumWidth(200);
+        auto* liste = new QWidget(m_split);
+        m_browseListeLay = platz(liste);
+        m_browseRechts = new QSplitter(Qt::Vertical, m_split);
+        m_browseRechts->setChildrenCollapsible(false);
+        auto* karte = new QWidget(m_browseRechts);
+        m_browseMapLay = platz(karte);
+        auto* station = new QWidget(m_browseRechts);
+        m_browseKarteLay = platz(station);
+        m_split->setStretchFactor(0, 0);
+        m_split->setStretchFactor(1, 1);
+        m_split->setStretchFactor(2, 0);
+    }
+    m_seiten->addWidget(m_split);
+
+    // Statistics: die Kennzahlen ueber das ganze Fenster
+    auto* seiteStats = new QWidget(m_seiten);
+    m_statsSeiteLay = platz(seiteStats);
+    m_seiten->addWidget(seiteStats);
+
+    col->addWidget(m_seiten, 1);
+    // Liste und Stationskarte gleich in die Log-Seite (siehe ensureMapPanel).
+    m_logListeLay->addWidget(m_table, 1);
+    m_logKarteLay->addWidget(m_detailScroll);
 
     // The pane can turn the antenna, but it must not know there is one
     // — same reason the window does not. Pass it on and let whoever
@@ -651,7 +761,8 @@ void LogbookWindow::buildUi()
         head->addWidget(popOut);
         v->addLayout(head);
         m_statsRow = new LogbookStatsWidget(m_statsSection);
-        m_statsRow->setSingleRow(true);
+        // In der mittleren Spalte duerfen die Kacheln umbrechen.
+        m_statsRow->setSingleRow(false);
         // Gedeckelt und rollbar: bricht die Reihe bei schmalem Fenster in
         // zwei oder drei Kachelzeilen um, darf sie der Tabelle nicht die
         // Hoehe nehmen.
@@ -663,11 +774,9 @@ void LogbookWindow::buildUi()
         scroll->setStyleSheet(QStringLiteral("QScrollArea { background: transparent; }"));
         scroll->setWidget(m_statsRow);
         scroll->setMinimumHeight(120);
-        scroll->setMaximumHeight(240);
-        v->addWidget(scroll);
+        v->addWidget(scroll, 1);
     }
-    m_statsSection->setVisible(false);
-    col->addWidget(m_statsSection);
+    m_statsSeiteLay->addWidget(m_statsSection, 1);
 
     m_stats = new QLabel(QString{}, this);
     m_stats->setWordWrap(true);
@@ -746,10 +855,6 @@ void LogbookWindow::buildUi()
     connect(m_table, &QTableWidget::itemSelectionChanged,
             this, &LogbookWindow::syncMapPanelSelection);
 
-    connect(m_split, &QSplitter::splitterMoved, this, [this](int, int) {
-        AppSettings::instance().setValue(QStringLiteral("LogbookSplitState3"),
-                                         m_split->saveState());
-    });
 
     // ── Tippen bleibt fluessig (Vorschlag 2026-09-27) ────────────────
     //
@@ -792,60 +897,201 @@ void LogbookWindow::buildUi()
     });
     connect(m_editBtn,   &QPushButton::clicked, this, &LogbookWindow::editSelected);
     connect(m_deleteBtn, &QPushButton::clicked, this, &LogbookWindow::deleteSelected);
-    connect(adifBtn,     &QPushButton::clicked, this, &LogbookWindow::exportAdif);
-    connect(csvBtn,      &QPushButton::clicked, this, &LogbookWindow::exportCsv);
     connect(m_table, &QTableWidget::itemDoubleClicked,
             this, [this](QTableWidgetItem*) { editSelected(); });
 }
 
+namespace {
+
+// ── Drei sichtbar, der Rest hinter „…" (2026-11-12) ──────────────────
+//
+// Betreiber: „die anzahl aller modi und baender sind gross und kosten
+// platz". Hausstil, Regel 2: genau ein Knopf pro Gruppe leuchtet, drei
+// sichtbar, nicht dreizehn. Die QComboBox dahinter bleibt die eine
+// Wahrheit fuer den Filter; diese Knoepfe stellen sie nur. Steht dort
+// ein Wert, der nicht unter den dreien ist, traegt „…" ihn und leuchtet.
+class SchnellWahl : public QWidget {
+public:
+    SchnellWahl(QComboBox* box, QWidget* parent)
+        : QWidget(parent), m_box(box)
+    {
+        m_lay = new QHBoxLayout(this);
+        m_lay->setContentsMargins(0, 0, 0, 0);
+        m_lay->setSpacing(2);
+        QObject::connect(box, &QComboBox::currentTextChanged, this,
+                         [this](const QString&) { aktualisiere(); });
+        baue();
+    }
+
+    void setHaeufigste(const QStringList& top)
+    {
+        if (top == m_top && !m_knoepfe.isEmpty()) { aktualisiere(); return; }
+        m_top = top;
+        baue();
+    }
+
+private:
+    QPushButton* knopf(const QString& text)
+    {
+        auto* b = new QPushButton(text, this);
+        b->setCheckable(true);
+        b->setFocusPolicy(Qt::NoFocus);
+        b->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
+        m_lay->addWidget(b);
+        m_knoepfe.append(b);
+        return b;
+    }
+
+    void baue()
+    {
+        for (QPushButton* b : std::as_const(m_knoepfe)) {
+            m_lay->removeWidget(b);
+            b->deleteLater();
+        }
+        m_knoepfe.clear();
+        QStringList zeigen{QStringLiteral("any")};
+        zeigen << m_top;
+        for (const QString& t : std::as_const(zeigen)) {
+            QPushButton* b = knopf(t);
+            b->setProperty("wert", t);
+            QObject::connect(b, &QPushButton::clicked, this, [this, t]() {
+                const int i = m_box->findText(t);
+                m_box->setCurrentIndex(i < 0 ? 0 : i);
+                aktualisiere();
+            });
+        }
+        m_mehr = knopf(QStringLiteral("…"));
+        m_mehr->setToolTip(QStringLiteral("Every value in the log"));
+        QObject::connect(m_mehr, &QPushButton::clicked, this, [this]() {
+            ScopedChildWidget<QMenu> menuOwner(this);
+            QMenu& menu = *menuOwner.get();
+            for (int i = 1; i < m_box->count(); ++i) {
+                QAction* a = menu.addAction(m_box->itemText(i));
+                a->setCheckable(true);
+                a->setChecked(i == m_box->currentIndex());
+                a->setData(i);
+            }
+            QAction* gewaehlt = menu.exec(m_mehr->mapToGlobal(QPoint(0, m_mehr->height())));
+            if (!menuOwner) { return; }
+            if (gewaehlt) { m_box->setCurrentIndex(gewaehlt->data().toInt()); }
+            aktualisiere();
+        });
+        aktualisiere();
+    }
+
+    void aktualisiere()
+    {
+        const QString jetzt = m_box->currentIndex() > 0 ? m_box->currentText()
+                                                        : QStringLiteral("any");
+        bool gezeigt = false;
+        for (QPushButton* b : std::as_const(m_knoepfe)) {
+            if (b == m_mehr) { continue; }
+            const bool an = b->property("wert").toString() == jetzt;
+            b->setChecked(an);
+            gezeigt = gezeigt || an;
+        }
+        if (m_mehr) {
+            m_mehr->setChecked(!gezeigt);
+            m_mehr->setText(gezeigt ? QStringLiteral("…") : jetzt + QStringLiteral(" ▾"));
+        }
+    }
+
+    QComboBox*           m_box{nullptr};
+    QHBoxLayout*         m_lay{nullptr};
+    QStringList          m_top;
+    QList<QPushButton*>  m_knoepfe;
+    QPushButton*         m_mehr{nullptr};
+};
+
+// Die drei haeufigsten Werte, fuer SchnellWahl.
+QStringList haeufigste(const QStringList& alle, int n)
+{
+    QHash<QString, int> zahl;
+    for (const QString& v : alle) { ++zahl[v]; }
+    QStringList werte = zahl.keys();
+    std::sort(werte.begin(), werte.end(), [&zahl](const QString& a, const QString& b) {
+        return zahl.value(a) != zahl.value(b) ? zahl.value(a) > zahl.value(b) : a < b;
+    });
+    return werte.mid(0, n);
+}
+
+} // namespace
+
 void LogbookWindow::buildFilterBar(QVBoxLayout* col)
 {
-    // Dieselbe Umbruch-Leiste wie oben; „Clear" bleibt rechts, solange
-    // die Zeile es hergibt.
-    auto* row = new FlowLayout(nullptr, 6, 6);
+    // ── Die Filterspalte in „Browse" (Entwurf C, 2026-11-12) ─────────
+    //
+    // Alle Filter links untereinander, jede Gruppe mit Ueberschrift (Haus-
+    // stil, Regel 1); gewaehlt ist eine Mulde. Oben die Suche, darunter die
+    // aktiven Filter als Kapseln -- ein Klick nimmt einen weg.
+    m_filterBar = new QWidget(this);
+    m_filterBar->setObjectName(QStringLiteral("logbookFilterBar"));
+    auto* spalte = new QVBoxLayout(m_filterBar);
+    spalte->setContentsMargins(0, 0, 8, 0);
+    spalte->setSpacing(6);
+
+    m_search = new QLineEdit(this);
+    m_search->setPlaceholderText(
+        QStringLiteral("Search call, name, QTH, country, grid or comment"));
+    m_search->setClearButtonEnabled(true);
+    m_search->setStyleSheet(Style::lineEditStyle());
+    m_search->setMinimumWidth(200);
+    spalte->addWidget(m_search);
+
+    m_filterChips = new QWidget(this);
+    m_filterChips->setObjectName(QStringLiteral("logbookFilterChips"));
+    new FlowLayout(m_filterChips, 4, 4);
+    m_filterChips->layout()->setContentsMargins(0, 0, 0, 0);
+    m_filterChips->setVisible(false);
+    spalte->addWidget(m_filterChips);
 
     auto caption = [this](const QString& t) {
         auto* l = new QLabel(t, this);
-        l->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+        l->setFont(Style::capsFont(font(), 9));
+        l->setStyleSheet(QStringLiteral("QLabel { color: %1; padding-top: 8px; }")
                              .arg(QString::fromLatin1(Style::kTextScale)));
         return l;
     };
-    // Beschriftung und Feld als EIN Element, damit der Umbruch sie nie
-    // trennt — „BAND" allein am Zeilenende, das Feld in der naechsten,
-    // liest niemand.
-    auto pair = [this, &row](QLabel* label, QWidget* field, QWidget* second = nullptr) {
+    // Ueberschrift, darunter das Feld (oder zwei nebeneinander).
+    auto pair = [this, &spalte](QLabel* label, QWidget* field, QWidget* second = nullptr) {
+        spalte->addWidget(label);
+        if (!second) { spalte->addWidget(field); return; }
         auto* box = new QWidget(this);
         auto* h = new QHBoxLayout(box);
         h->setContentsMargins(0, 0, 0, 0);
-        h->setSpacing(4);
-        h->addWidget(label);
-        h->addWidget(field);
-        if (second) { h->addWidget(second); }
-        row->addWidget(box);
+        h->setSpacing(6);
+        h->addWidget(field, 1);
+        h->addWidget(second);
+        spalte->addWidget(box);
     };
 
+    // Band und Betriebsart: drei Knoepfe und „…" statt einer Klappliste.
+    // Die Klappliste bleibt als Speicher dahinter, unsichtbar.
     m_bandBox = new QComboBox(this);
-    m_bandBox->setMinimumWidth(80);
-    pair(caption(QStringLiteral("BAND")), m_bandBox);
+    m_bandBox->setVisible(false);
+    m_bandWahl = new SchnellWahl(m_bandBox, this);
+    m_bandWahl->setObjectName(QStringLiteral("logbookBandChoice"));
+    pair(caption(QStringLiteral("BAND")), m_bandWahl);
 
     m_modeBox = new QComboBox(this);
-    m_modeBox->setMinimumWidth(80);
-    pair(caption(QStringLiteral("MODE")), m_modeBox);
+    m_modeBox->setVisible(false);
+    m_modeWahl = new SchnellWahl(m_modeBox, this);
+    m_modeWahl->setObjectName(QStringLiteral("logbookModeChoice"));
+    pair(caption(QStringLiteral("MODE")), m_modeWahl);
 
     m_gridEdit = new QLineEdit(this);
     m_gridEdit->setPlaceholderText(QStringLiteral("JN, JN67, JN67VV"));
     m_gridEdit->setToolTip(QStringLiteral(
         "Matches from the start, so two characters find a whole field"));
-    m_gridEdit->setFixedWidth(92);
-    pair(caption(QStringLiteral("GRID")), m_gridEdit);
+    m_gridEdit->setFixedWidth(80);
 
     m_countryEdit = new QLineEdit(this);
     m_countryEdit->setPlaceholderText(QStringLiteral("part of the name"));
-    m_countryEdit->setFixedWidth(100);
-    pair(caption(QStringLiteral("COUNTRY")), m_countryEdit);
+    pair(caption(QStringLiteral("COUNTRY · GRID")), m_countryEdit, m_gridEdit);
 
     m_activationBox = new QComboBox(this);
     m_activationBox->setMinimumWidth(100);
+    m_activationBox->setStyleSheet(Style::formFieldStyle());
     m_activationBox->setToolTip(QStringLiteral(
         "SOTA summit or POTA park this contact was logged from.\n\n"
         "Pick one to see just that activation — Export ADIF exports "
@@ -869,7 +1115,8 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
         "Hide contacts confirmed by LoTW, a card or eQSL.\n\nA contact "
         "with a QSL merely REQUESTED still counts as unconfirmed, "
         "because it is."));
-    row->addWidget(m_unconfirmedOnly);
+    spalte->addWidget(caption(QStringLiteral("ONLY")));
+    spalte->addWidget(m_unconfirmedOnly);
 
     // ── Nur Grauzonen-QSOs (2026-11-10) ──────────────────────────────
     m_greyLineOnly = new QCheckBox(QStringLiteral("Grey line"), this);
@@ -882,7 +1129,7 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
         "both, at the time of the contact.\n\nPositions come from the "
         "locators; without one, their end is the country centre from "
         "cty.dat and your end is the newest MY_GRIDSQUARE in the log."));
-    row->addWidget(m_greyLineOnly);
+    spalte->addWidget(m_greyLineOnly);
 
     m_useDates = new QCheckBox(QStringLiteral("Dates"), this);
     m_useDates->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
@@ -899,31 +1146,35 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
     m_toDate->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
     m_toDate->setEnabled(false);
     m_toDate->setFixedWidth(118);
-    // Haken und beide Daten als ein Element: ein Datumsbereich, der auf
-    // zwei Zeilen zerfaellt, ist keiner mehr.
+    // Haken und beide Daten als ein Element: ein Datumsbereich, der
+    // zerfaellt, ist keiner mehr. In der schmalen Spalte die Daten unter
+    // dem Haken nebeneinander.
     {
+        spalte->addWidget(caption(QStringLiteral("DATES")));
         auto* box = new QWidget(this);
-        auto* h = new QHBoxLayout(box);
-        h->setContentsMargins(0, 0, 0, 0);
-        h->setSpacing(6);
-        h->addWidget(m_useDates);
-        h->addWidget(m_fromDate);
-        h->addWidget(m_toDate);
-        row->addWidget(box);
+        auto* g = new QGridLayout(box);
+        g->setContentsMargins(0, 0, 0, 0);
+        g->setSpacing(6);
+        g->addWidget(m_useDates, 0, 0, 1, 2);
+        m_fromDate->setFixedWidth(104);
+        m_toDate->setFixedWidth(104);
+        g->addWidget(m_fromDate, 1, 0);
+        g->addWidget(m_toDate, 1, 1);
+        spalte->addWidget(box);
     }
-
-    row->addStretch();
 
     m_clearBtn = new QPushButton(QStringLiteral("Clear"), this);
     m_clearBtn->setStyleSheet(Style::buttonBaseStyle());
     m_clearBtn->setToolTip(QStringLiteral("Empty every filter box"));
-    row->addWidget(m_clearBtn);
+    spalte->addSpacing(10);
+    spalte->addWidget(m_clearBtn);
+    spalte->addStretch(1);
 
     for (QLineEdit* e : {m_gridEdit, m_countryEdit}) {
         e->setClearButtonEnabled(true);
         e->setStyleSheet(Style::lineEditStyle());
     }
-    col->addLayout(row);
+    Q_UNUSED(col);   // die Spalte setzt buildUi() in die Seite „Browse"
 
     auto reapply = [this]() {
         applyFilter();
@@ -974,6 +1225,150 @@ void LogbookWindow::buildFilterBar(QVBoxLayout* col)
     });
 }
 
+void LogbookWindow::uploadMenuAt(const QPoint& globalPos)
+{
+    if (m_uploaders.isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("Upload"),
+            QStringLiteral("No logging service is set up yet.\n\n"
+                           "Add one under Tools."));
+        return;
+    }
+    // Decide what is being sent before asking where. Marked rows
+    // if there are any; otherwise everything not yet uploaded —
+    // "what still needs to go" is the question after a session, and
+    // making the operator select it by hand every time is the
+    // reason people stop bothering.
+    QList<int> rows = selectedSourceRows();
+    const bool fromSelection = !rows.isEmpty();
+    if (!fromSelection) { rows = outstandingRows(); }
+
+    if (rows.isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("Upload"),
+            QStringLiteral("Everything is already uploaded."));
+        return;
+    }
+
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
+    auto* header = menu.addAction(fromSelection
+        ? QStringLiteral("Send %1 marked contacts to…").arg(rows.size())
+        : QStringLiteral("Send %1 not yet uploaded to…").arg(rows.size()));
+    header->setEnabled(false);
+    menu.addSeparator();
+
+    QHash<QAction*, QsoUploader*> map;
+    for (QsoUploader* u : m_uploaders) {
+        QAction* a = menu.addAction(u->serviceName());
+        // Listed but disabled rather than hidden: an operator who
+        // set one up last week and sees it missing assumes the
+        // feature is broken, not that a credential went astray.
+        a->setEnabled(u->isConfigured());
+        if (!u->isConfigured()) {
+            a->setText(u->serviceName()
+                       + QStringLiteral("  (not configured)"));
+        }
+        map.insert(a, u);
+    }
+    QAction* chosen = menu.exec(globalPos);
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner) { return; }
+    if (chosen && map.contains(chosen)) {
+        uploadEntries(rows, map.value(chosen));
+    }
+}
+
+void LogbookWindow::showOptionsMenu()
+{
+    ScopedChildWidget<QMenu> menuOwner(this);   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    QMenu& menu = *menuOwner.get();
+    menu.setToolTipsVisible(true);
+    menu.addSection(QStringLiteral("File"));
+    menu.addAction(m_importAction);
+    menu.addAction(m_exportAdifAction);
+    menu.addAction(m_exportCsvAction);
+    menu.addAction(m_cabrilloAction);
+    menu.addSection(QStringLiteral("Online"));
+    // Laeuft gerade eine Uebertragung, ist der Eintrag aus -- wie vorher
+    // der Knopf.
+    m_uploadAction->setEnabled(m_uploadBtn == nullptr || m_uploadBtn->isEnabled());
+    m_syncAction->setEnabled(m_syncBtn == nullptr || m_syncBtn->isEnabled());
+    menu.addAction(m_uploadAction);
+    menu.addAction(m_syncAction);
+    menu.addAction(m_sotaAction);
+    menu.addSection(QStringLiteral("Window"));
+    menu.addAction(m_statsWindowAction);
+    // Unter dem Zahnrad aufklappen, nicht irgendwo: der Knopf ist das
+    // einzige Kind der Titelleiste, das „⚙" heisst.
+    QPoint at = QCursor::pos();
+    for (QPushButton* b : m_titleBar->findChildren<QPushButton*>()) {
+        if (b->text() == QStringLiteral("⚙")) {
+            at = b->mapToGlobal(QPoint(b->width() - menu.sizeHint().width(), b->height() + 2));
+        }
+    }
+    menu.exec(at);
+    if (!menuOwner) { return; }
+}
+
+void LogbookWindow::updateFilterChips()
+{
+    if (!m_filterChips || !m_bandBox) { return; }
+    QLayout* lay = m_filterChips->layout();
+    if (!lay) { return; }
+    while (QLayoutItem* it = lay->takeAt(0)) {
+        std::unique_ptr<QLayoutItem> weg(it);
+        if (QWidget* w = it->widget()) { w->deleteLater(); }
+    }
+
+    // Was die Liste gerade kuerzt -- jedes als Kapsel, ein Klick nimmt es
+    // weg. Die Suche selbst steht im Feld und braucht keine.
+    struct Kapsel { QString text; std::function<void()> weg; };
+    QVector<Kapsel> kapseln;
+    if (m_bandBox->currentIndex() > 0) {
+        kapseln.push_back({m_bandBox->currentText(), [this]() { m_bandBox->setCurrentIndex(0); }});
+    }
+    if (m_modeBox->currentIndex() > 0) {
+        kapseln.push_back({m_modeBox->currentText(), [this]() { m_modeBox->setCurrentIndex(0); }});
+    }
+    if (m_activationBox->currentIndex() > 0) {
+        kapseln.push_back({m_activationBox->currentText(),
+                           [this]() { m_activationBox->setCurrentIndex(0); }});
+    }
+    if (!m_gridEdit->text().trimmed().isEmpty()) {
+        kapseln.push_back({QStringLiteral("grid ") + m_gridEdit->text().trimmed().toUpper(),
+                           [this]() { m_gridEdit->clear(); }});
+    }
+    if (!m_countryEdit->text().trimmed().isEmpty()) {
+        kapseln.push_back({m_countryEdit->text().trimmed(), [this]() { m_countryEdit->clear(); }});
+    }
+    if (m_unconfirmedOnly->isChecked()) {
+        kapseln.push_back({QStringLiteral("unconfirmed"),
+                           [this]() { m_unconfirmedOnly->setChecked(false); }});
+    }
+    if (m_greyLineOnly->isChecked()) {
+        kapseln.push_back({QStringLiteral("grey line"),
+                           [this]() { m_greyLineOnly->setChecked(false); }});
+    }
+    if (m_useDates->isChecked()) {
+        kapseln.push_back({m_fromDate->date().toString(QStringLiteral("yyyy-MM-dd"))
+                               + QStringLiteral(" – ")
+                               + m_toDate->date().toString(QStringLiteral("yyyy-MM-dd")),
+                           [this]() { m_useDates->setChecked(false); }});
+    }
+
+    for (const Kapsel& k : std::as_const(kapseln)) {
+        auto* b = new QPushButton(k.text + QStringLiteral("  ✕"), m_filterChips);
+        b->setFocusPolicy(Qt::NoFocus);
+        b->setToolTip(QStringLiteral("Remove this filter"));
+        b->setStyleSheet(Style::buttonBaseStyle()
+                         + QStringLiteral("QPushButton { border-radius: 10px; padding: 1px 9px; }"));
+        const std::function<void()> weg = k.weg;
+        connect(b, &QPushButton::clicked, this, [weg]() { weg(); });
+        lay->addWidget(b);
+    }
+    m_filterChips->setVisible(!kapseln.isEmpty());
+}
+
 void LogbookWindow::refreshFilterChoices()
 {
     // Only what the log actually contains. A list of every band in
@@ -994,11 +1389,17 @@ void LogbookWindow::refreshFilterChoices()
 
     QStringList bands;
     QStringList modes;
+    QStringList modeZahl;
     QStringList activations;
     for (const LogEntry& e : m_all) {
         if (!e.band.trimmed().isEmpty())    { bands << e.band.trimmed(); }
         if (!e.mode.trimmed().isEmpty())    { modes << e.mode.trimmed(); }
         if (!e.submode.trimmed().isEmpty()) { modes << e.submode.trimmed(); }
+        // Fuer die drei Schnellknoepfe zaehlt die Betriebsart, wie man sie
+        // nennt: FT4 statt MFSK, aber SSB statt USB/LSB.
+        const QString sub = e.submode.trimmed().toUpper();
+        modeZahl << ((sub.isEmpty() || sub == QStringLiteral("USB") || sub == QStringLiteral("LSB"))
+                         ? e.mode.trimmed() : e.submode.trimmed());
         if (!e.mySotaRef.trimmed().isEmpty()) {
             activations << e.mySotaRef.trimmed();
         }
@@ -1006,9 +1407,15 @@ void LogbookWindow::refreshFilterChoices()
             activations << e.myPotaRef.trimmed();
         }
     }
+    // Die drei haeufigsten vor dem Fuellen zaehlen -- fill() macht die
+    // Listen eindeutig.
+    const QStringList bandTop = haeufigste(bands, 3);
+    const QStringList modeTop = haeufigste(modeZahl, 3);
     fill(m_bandBox, bands);
     fill(m_modeBox, modes);
     fill(m_activationBox, activations);
+    if (m_bandWahl) { static_cast<SchnellWahl*>(m_bandWahl)->setHaeufigste(bandTop); }
+    if (m_modeWahl) { static_cast<SchnellWahl*>(m_modeWahl)->setHaeufigste(modeTop); }
 }
 
 LogFilter LogbookWindow::currentFilter() const
@@ -1071,6 +1478,7 @@ void LogbookWindow::applyFilter()
     for (int i = 0; i < m_all.size(); ++i) {
         if (f.matches(m_all.at(i))) { m_visible.append(i); }
     }
+    updateFilterChips();
 }
 
 void LogbookWindow::saveHeaderState()
@@ -1536,6 +1944,7 @@ void LogbookWindow::onUploadFinished(const QString& call, bool ok,
             m_failures.clear();
             m_uploadBatch.clear();
             m_uploadBtn->setEnabled(true);
+            m_uploadBtn->setVisible(false);   // Fortschritt vorbei: zurueck hinters Zahnrad
 
             if (anyFailed) {
                 QMessageBox::warning(this, QStringLiteral("Upload"), text);
@@ -1577,6 +1986,7 @@ void LogbookWindow::uploadEntries(const QList<int>& sourceRows,
     m_uploadBatch = sourceRows;
     m_failures.clear();
     m_uploadBtn->setEnabled(false);
+    m_uploadBtn->setVisible(true);   // der Fortschritt steht in der Leiste
 
     for (int idx : sourceRows) { target->upload(m_all.at(idx)); }
 }
@@ -2457,37 +2867,116 @@ void LogbookWindow::prepareMap(QsoMapWindow* map)
     map->setMosaikLog(m_all);
 }
 
+QPushButton* LogbookWindow::mapToggleForTest() const
+{
+    return m_modusGruppe ? qobject_cast<QPushButton*>(m_modusGruppe->button(ModusLog)) : nullptr;
+}
+
+QPushButton* LogbookWindow::statsToggleForTest() const
+{
+    return m_modusGruppe ? qobject_cast<QPushButton*>(m_modusGruppe->button(ModusStats)) : nullptr;
+}
+
+QPushButton* LogbookWindow::threeDToggleForTest() const
+{
+    return m_mapPanel ? m_mapPanel->threeDButtonForTest() : nullptr;
+}
+
+void LogbookWindow::ensureMapPanel()
+{
+    if (m_mapPanel) { return; }
+    m_mapPanel = new QsoMapWindow(this);
+    m_mapPanel->setEmbedded(true);
+    // Gleich in eine Seite: ein Kind ohne Layout laege sonst frei ueber
+    // dem Fenster (gesehen beim Oeffnen direkt in „Statistics").
+    m_logMapLay->addWidget(m_mapPanel, 1);
+    // Der Rotor steht in der Stationskarte -- das kleine Radar links der
+    // Karte zeigte dasselbe ein zweites Mal.
+    m_mapPanel->setRotorRadarShown(false);
+    applyRotorToMap();
+    connect(m_mapPanel, &QsoMapWindow::popOutRequested, this, &LogbookWindow::openMap);
+    // Die Jagdliste darf die Antenne drehen -- das Kartenfenster
+    // kennt keinen Rotor, das Logbuch schon (2026-11-11).
+    connect(m_mapPanel, &QsoMapWindow::rotorZielGewuenscht, this,
+            [this](double grad, const QString& call) {
+        emit turnRotorRequested(grad, call);
+    });
+    connect(m_detail, &QsoDetailPane::stationLocated, m_mapPanel,
+            [this](const QString& call, double lat, double lon, const QString& caption) {
+        if (m_mapPanel && m_mapPanel->isVisibleTo(this)) {
+            m_mapPanel->flyToStation(call, lat, lon, caption);
+        }
+    });
+    connect(m_mapPanel, &QsoMapWindow::dreiDSichtbar, this, &LogbookWindow::spiegle3d);
+    // 3D steht seit Entwurf C in der Kartenleiste; es fliegt zur Auswahl.
+    m_mapPanel->setAuswahlRuf([this]() {
+        const QList<int> rows = selectedSourceRows();
+        return rows.isEmpty() ? QString() : m_all.at(rows.first()).call;
+    });
+}
+
+void LogbookWindow::setModus(int modus)
+{
+    modus = std::clamp(modus, 0, 2);
+    m_modus = modus;
+    ensureMapPanel();
+    // Karte, Station und Liste in die Seite, die jetzt gilt.
+    if (modus == ModusLog) {
+        m_logKarteLay->addWidget(m_detailScroll);
+        m_logMapLay->addWidget(m_mapPanel, 1);
+        m_logListeLay->addWidget(m_table, 1);
+        m_mapPanel->setKompakt(false);
+        // Das kleine Rotor-Radar neben der Karte (Betreiber 2026-11-10:
+        // „sehen, wohin der rotor zeigt und wo das call steht").
+        m_mapPanel->setRotorRadarShown(true);
+    } else if (modus == ModusBrowse) {
+        m_browseKarteLay->addWidget(m_detailScroll);
+        m_browseMapLay->addWidget(m_mapPanel, 1);
+        m_browseListeLay->addWidget(m_table, 1);
+        // Klein ueber der Station: nur das Bild, die Leiste waere dort
+        // drei Zeilen hoch.
+        m_mapPanel->setKompakt(true);
+        m_mapPanel->setRotorRadarShown(false);
+    }
+    if (modus != ModusStats) {
+        // Umgehaengt heisst versteckt, bis Qt sie wieder zeigt -- gleich
+        // zeigen, damit die Pruefungen danach stimmen.
+        for (QWidget* w : {static_cast<QWidget*>(m_detailScroll), static_cast<QWidget*>(m_mapPanel),
+                           static_cast<QWidget*>(m_table)}) {
+            if (w) { w->show(); }
+        }
+    }
+    m_seiten->setCurrentIndex(modus);
+    if (m_eingabe)    { m_eingabe->setVisible(modus == ModusLog); }
+    if (m_auswahlBox) { m_auswahlBox->setVisible(modus == ModusBrowse); }
+    if (QAbstractButton* b = m_modusGruppe ? m_modusGruppe->button(modus) : nullptr) {
+        if (!b->isChecked()) { b->setChecked(true); }
+    }
+    static const char* const hinweis[] = {
+        "enter a call — station, path and what is still needed",
+        "search, filter and edit the whole log",
+        "what the filters in Browse show",
+    };
+    if (m_modusHinweis) { m_modusHinweis->setText(QString::fromUtf8(hinweis[modus])); }
+    static const char* const namen[] = {"Log", "Browse", "Statistics"};
+    AppSettings::instance().setValue(QStringLiteral("LogbookMode"), QString::fromLatin1(namen[modus]));
+    if (modus == ModusStats) {
+        refreshStatsView();
+    } else {
+        refreshMapPanel();
+    }
+    spiegle3d();
+}
+
 void LogbookWindow::setMapPanelShown(bool on)
 {
-    if (on && !m_mapPanel) {
-        m_mapPanel = new QsoMapWindow(this);
-        m_mapPanel->setEmbedded(true);
-        m_mapPanel->setRotorRadarShown(true);
-        applyRotorToMap();
-        m_split->insertWidget(1, m_mapPanel);
-        connect(m_mapPanel, &QsoMapWindow::popOutRequested, this, &LogbookWindow::openMap);
-        // Die Jagdliste darf die Antenne drehen -- das Kartenfenster
-        // kennt keinen Rotor, das Logbuch schon (2026-11-11).
-        connect(m_mapPanel, &QsoMapWindow::rotorZielGewuenscht, this,
-                [this](double grad, const QString& call) {
-            emit turnRotorRequested(grad, call);
-        });
-        connect(m_detail, &QsoDetailPane::stationLocated, m_mapPanel,
-                [this](const QString& call, double lat, double lon, const QString& caption) {
-            if (m_mapPanel && m_mapPanel->isVisibleTo(this)) {
-                m_mapPanel->flyToStation(call, lat, lon, caption);
-            }
-        });
-        connect(m_mapPanel, &QsoMapWindow::dreiDSichtbar, this, &LogbookWindow::spiegle3d);
-        // Frisch eingefuegt: erst jetzt hat der Teiler drei Spalten.
-        restoreSplitState();
-    }
-    if (m_mapPanel) { m_mapPanel->setVisible(on); }
-    spiegle3d();
-    if (m_mapToggle && m_mapToggle->isChecked() != on) { m_mapToggle->setChecked(on); }
-    AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"),
-                                     on ? QStringLiteral("True") : QStringLiteral("False"));
+    // Seit Entwurf C gehoert die Karte zu „Log" und „Browse"; wer sie
+    // will, bekommt sie dort.
+    if (on && m_modus == ModusStats) { setModus(ModusLog); }
+    ensureMapPanel();
+    m_mapPanel->setVisible(on);
     if (on) { refreshMapPanel(); }
+    spiegle3d();
 }
 
 void LogbookWindow::set3dShown(bool on)
@@ -2506,21 +2995,14 @@ void LogbookWindow::set3dShown(bool on)
 
 void LogbookWindow::spiegle3d()
 {
-    if (!m_3dToggle) { return; }
-    const bool an = m_mapPanel && m_mapPanel->isVisibleTo(this) && m_mapPanel->zeigt3d();
-    if (m_3dToggle->isChecked() != an) {
-        QSignalBlocker b(m_3dToggle);
-        m_3dToggle->setChecked(an);
-    }
+    // Seit Entwurf C zeigt der 3D-Knopf der Karte selbst, ob das 3D-Bild
+    // steht (QsoMapWindow::update3dButton); hier ist nichts mehr zu spiegeln.
 }
 
 void LogbookWindow::setStatsRowShown(bool on)
 {
-    if (m_statsSection) { m_statsSection->setVisible(on); }
-    if (m_statsToggle && m_statsToggle->isChecked() != on) { m_statsToggle->setChecked(on); }
-    AppSettings::instance().setValue(QStringLiteral("LogbookShowStats"),
-                                     on ? QStringLiteral("True") : QStringLiteral("False"));
-    if (on) { refreshStatsView(); }
+    if (on) { setModus(ModusStats); }
+    else if (m_modus == ModusStats) { setModus(ModusLog); }
 }
 
 void LogbookWindow::refreshMapPanel()
@@ -2574,6 +3056,7 @@ void LogbookWindow::syncFromQrz()
             if (m_syncBtn) {
                 m_syncBtn->setEnabled(true);
                 m_syncBtn->setText(QStringLiteral("Sync QRZ"));
+                m_syncBtn->setVisible(false);
             }
             if (!ok) {
                 tellOperator(QStringLiteral("Couldn't fetch your QRZ logbook:\n%1")
@@ -2590,6 +3073,7 @@ void LogbookWindow::syncFromQrz()
     if (m_qrzFetcher->isBusy()) { return; }
     m_qrzFetcher->setApiKey(key);
     if (m_syncBtn) {
+        m_syncBtn->setVisible(true);   // der Fortschritt steht in der Leiste
         m_syncBtn->setEnabled(false);
         m_syncBtn->setText(QStringLiteral("Syncing…"));
     }
@@ -2657,8 +3141,10 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
     m_entryCall = new QLineEdit(this);
     m_entryCall->setPlaceholderText(QStringLiteral("callsign"));
     m_entryCall->setStyleSheet(Style::lineEditStyle());
-    m_entryCall->setFont(Style::monoFont(m_entryCall->font(), 14, QFont::Bold));
-    m_entryCall->setFixedWidth(170);
+    // Gross wie bei N1MM (Entwurf C): das Rufzeichen ist die Zeile.
+    m_entryCall->setFont(Style::monoFont(m_entryCall->font(), 22, QFont::Bold));
+    m_entryCall->setFixedWidth(240);
+    m_entryCall->setMinimumHeight(36);
     // Fest, nicht "Expanding" (Vorgabe von QLineEdit): sonst gibt das
     // FlowLayout dem Feld Platz, den es nicht nehmen kann -- eine Luecke.
     m_entryCall->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
@@ -2807,7 +3293,7 @@ void LogbookWindow::buildEntryRow(QVBoxLayout* col)
     // Platz, auf dem das Funkgeraet gerade steht, neu ist. Entprellt wie
     // die Karteikarte, aber kuerzer: es ist eine Rechnung, keine Anfrage.
     m_bedarf = new BedarfsMatrixWidget(this);
-    m_bedarf->setVisible(false);
+    m_bedarf->setVisible(false); if (m_bedarfLeer) { m_bedarfLeer->setVisible(true); }
     col->addWidget(m_bedarf);
     m_bedarfTimer = new QTimer(this);
     m_bedarfTimer->setSingleShot(true);
@@ -2987,7 +3473,7 @@ void LogbookWindow::aktualisiereBedarf()
     if (!m_bedarf || !m_entryCall) { return; }
     const QString call = Callsigns::normalized(m_entryCall->text());
     if (call.size() < 3 || !Callsigns::isLikelyCallsign(call) || !m_cty) {
-        m_bedarf->setVisible(false);
+        m_bedarf->setVisible(false); if (m_bedarfLeer) { m_bedarfLeer->setVisible(true); }
         return;
     }
     const bool funk = m_entryMode && m_entryMode->isVisible();
@@ -2995,6 +3481,7 @@ void LogbookWindow::aktualisiereBedarf()
     const QString mode = funk ? m_entryMode->text() : QString();
     m_bedarf->setBedarf(LogbuchBilder::bedarf(m_all, call, band, mode, m_cty, meinFeld()));
     m_bedarf->setVisible(true);
+    if (m_bedarfLeer) { m_bedarfLeer->setVisible(false); }
 }
 
 void LogbookWindow::requestLog()
@@ -3204,7 +3691,7 @@ void LogbookWindow::clearEntry()
     aktualisiereRotorZeile();
     m_entryLookup->stop();
     if (m_bedarfTimer) { m_bedarfTimer->stop(); }
-    if (m_bedarf) { m_bedarf->setVisible(false); }
+    if (m_bedarf) { m_bedarf->setVisible(false); if (m_bedarfLeer) { m_bedarfLeer->setVisible(true); } }
     m_entryCall->clear();
     m_entryComment->clear();
     if (m_search) { m_search->clear(); }

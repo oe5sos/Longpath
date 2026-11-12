@@ -72,7 +72,7 @@ class TstLogbuch3dKnopf : public QObject { Q_OBJECT
 private slots:
     void init()
     {
-        AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"), QStringLiteral("True"));
+        AppSettings::instance().setValue(QStringLiteral("LogbookMode"), QStringLiteral("Log"));
         AppSettings::instance().setValue(QStringLiteral("QsoMap3dFlight"), true);
         GoogleMapsKey::erase();
         GoogleMapsKey::forgetCachedForTest();
@@ -104,17 +104,18 @@ private slots:
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
-        QPushButton* map = w.mapToggleForTest();
-        QPushButton* b   = w.threeDToggleForTest();
-        QVERIFY2(b, "kein 3D-Knopf in der Logbuchleiste");
-        QVERIFY(b->isVisible());
+        // Seit Entwurf C (2026-11-12) in der Ansichtsgruppe der Karte,
+        // unmittelbar rechts von „Azimuthal".
+        QPushButton* az = w.mapPanelForTest()->azimutalButtonForTest();
+        QPushButton* b  = w.threeDToggleForTest();
+        QVERIFY2(b, "kein 3D-Knopf in der Kartenleiste");
+        QTRY_VERIFY(b->isVisible());
         QCOMPARE(b->text(), QStringLiteral("3D"));
-        // Dieselbe Reihe, unmittelbar rechts von „Map".
-        QCOMPARE(b->y(), map->y());
-        QVERIFY2(b->x() > map->x() + map->width()
-                     && b->x() - (map->x() + map->width()) < 20,
-                 qPrintable(QStringLiteral("Map %1..%2, 3D ab %3")
-                                .arg(map->x()).arg(map->x() + map->width()).arg(b->x())));
+        QCOMPARE(b->y(), az->y());
+        QVERIFY2(b->x() > az->x() + az->width()
+                     && b->x() - (az->x() + az->width()) < 20,
+                 qPrintable(QStringLiteral("Azimuthal %1..%2, 3D ab %3")
+                                .arg(az->x()).arg(az->x() + az->width()).arg(b->x())));
         // Und kein anderes Widget liegt darueber.
         QWidget* hit = w.childAt(b->mapTo(&w, b->rect().center()));
         QVERIFY2(hit == b, "ueber dem 3D-Knopf liegt etwas");
@@ -132,7 +133,7 @@ private slots:
         w.resize(1400, 760);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
-        if (QTableWidget* t = w.findChild<QTableWidget*>()) { t->clearSelection(); }
+        if (QTableWidget* t = w.findChild<QTableWidget*>(QStringLiteral("logbookTable"))) { t->clearSelection(); }
 
         QPushButton* b = w.threeDToggleForTest();
         QTest::mouseClick(b, Qt::LeftButton, Qt::NoModifier, b->rect().center());
@@ -164,7 +165,7 @@ private slots:
         w.resize(1400, 760);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
-        QTableWidget* t = w.findChild<QTableWidget*>();
+        QTableWidget* t = w.findChild<QTableWidget*>(QStringLiteral("logbookTable"));
         QVERIFY(t && t->rowCount() == 1);
         t->selectRow(0);
 

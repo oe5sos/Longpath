@@ -347,14 +347,14 @@ private slots:
         QVERIFY(w.summaryForTest()->isVisible());
         QVERIFY(w.rotorRadarForTest()->isVisible());
 
-        // Die 3D-Pille steht als erste in der Pillenreihe (2026-11-11).
-        QCOMPARE(w.pillRowForTest()->itemAt(0)->widget(),
-                 static_cast<QWidget*>(w.threeDButtonForTest()));
+        // Seit Entwurf C (2026-11-12) steht 3D in der Ansichtsgruppe der
+        // Leiste, gleich rechts von „Azimuthal" -- nicht mehr als Pille.
+        QCOMPARE(w.threeDButtonForTest()->y(), w.azimutalButtonForTest()->y());
 
         w.flyToStation(QStringLiteral("W1AW"), kStaLat, kStaLon);
         QCOMPARE(w.currentViewForTest(), int(QsoMapWindow::kView3d));
-        // Nur die 3D-Pille bleibt -- der Weg zurueck.
-        QCOMPARE(pillsShown(), 1);
+        // Keine Pille bleibt; der Weg zurueck ist 3D in der Leiste.
+        QCOMPARE(pillsShown(), 0);
         QVERIFY(w.threeDButtonForTest()->isVisible());
         QVERIFY(!w.summaryForTest()->isVisible());
         QVERIFY(!w.flatOnlyControlsForTest().isEmpty());
@@ -371,7 +371,9 @@ private slots:
         QVERIFY(pillsShown() > 0);
         QVERIFY(w.summaryForTest()->isVisible());
         QVERIFY(w.rotorRadarForTest()->isVisible());
-        for (QWidget* c : w.flatOnlyControlsForTest()) { QVERIFY(c->isVisible()); }
+        // isHidden statt isVisible: die Haken stehen seit 2026-11-12 im
+        // Ebenen-Menue und sind nur bei offenem Menue „sichtbar".
+        for (QWidget* c : w.flatOnlyControlsForTest()) { QVERIFY(!c->isHidden()); }
     }
 
     // Probe-Merge Azimutalkarte + 3D (2026-11-10): beide wollten Stapel-
@@ -457,7 +459,7 @@ private slots:
         prepare(w, nullptr);
         QPointer<QPushButton> pill = w.threeDButtonForTest();
         QVERIFY(pill);
-        QCOMPARE(w.pillRowForTest()->itemAt(0)->widget(), static_cast<QWidget*>(pill.data()));
+        QCOMPARE(pill->y(), w.azimutalButtonForTest()->y());   // Ansichtsgruppe (Entwurf C)
         QVERIFY(pill->isVisible());
         QVERIFY(pill->isChecked());
 
@@ -474,9 +476,8 @@ private slots:
         w.setEntries(log);
         w.setEntries(log);
         QVERIFY2(pill, "die 3D-Pille wurde beim Neuaufbau geloescht");
-        QCOMPARE(w.pillRowForTest()->itemAt(0)->widget(), static_cast<QWidget*>(pill.data()));
         QVERIFY(pill->isChecked());
-        QVERIFY(w.pillRowForTest()->count() > 3);   // 3D + BAND/MODE mit Pillen
+        QVERIFY(w.pillRowForTest()->count() > 2);   // BAND/MODE mit Pillen
 
         // Und sie wirkt weiter: Druck schaltet 3D ab.
         w.flyToStation(QStringLiteral("W1AW"), kStaLat, kStaLon);

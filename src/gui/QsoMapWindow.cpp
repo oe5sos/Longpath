@@ -76,7 +76,10 @@
 #include <QTextDocumentFragment>
 #include <QTimeZone>
 #include <QUrl>
+#include <QGridLayout>
+#include <QMenu>
 #include <QVBoxLayout>
+#include <QWidgetAction>
 
 #include <algorithm>
 #include <utility>
@@ -177,11 +180,25 @@ void QsoMapWindow::setEmbedded(bool on)
     if (m_backgroundBox) { m_backgroundBox->setVisible(!on); }
     if (m_earthBtn) { m_earthBtn->setVisible(!on); }
     if (m_popOutBtn) { m_popOutBtn->setVisible(on); }
+    rebuildFilterPills();
+    update3dButton();   // eingebettet zeigt er, was zu sehen ist
     if (m_vollbildBtn) {
         m_vollbildBtn->setVisible(!on);
         if (on && m_vollbildBtn->isChecked()) { m_vollbildBtn->setChecked(false); }
     }
     rebuild();
+}
+
+void QsoMapWindow::setKompakt(bool on)
+{
+    // Die kleine Karte ueber der Station in „Browse" (Entwurf C): nur das
+    // Bild und der Zoom. Leiste, Zaehlung und Auskunft kaemen dort auf
+    // drei Zeilen und liessen der Karte nichts.
+    m_kompakt = on;
+    if (m_leiste)  { m_leiste->setVisible(!on); }
+    if (m_summary) { m_summary->setVisible(!on && !(m_stack && m_stack->currentIndex() == kView3d)); }
+    if (on && m_info) { m_info->setVisible(false); }
+    if (on && m_googleEarthBtn) { m_googleEarthBtn->setVisible(false); }
 }
 
 void QsoMapWindow::zoomActiveView(double factor)
@@ -567,13 +584,11 @@ void QsoMapWindow::buildUi()
         "stay marked in colour among the rest."));
     m_onlySelected->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                                       .arg(QString::fromLatin1(Style::kAmberText)));
-    bar->addWidget(m_onlySelected);
 
     m_paths = new QCheckBox(QStringLiteral("Paths"), this);
     m_paths->setChecked(true);
     m_paths->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                                .arg(QString::fromLatin1(Style::kTextPrimary)));
-    bar->addWidget(m_paths);
 
     m_grid = new QCheckBox(QStringLiteral("Grid"), this);
     m_grid->setToolTip(QStringLiteral(
@@ -606,8 +621,6 @@ void QsoMapWindow::buildUi()
     // (derselbe Befund wie beim 3D-Knopf, 2026-11-10).
     connect(m_jagdBtn, &QPushButton::toggled, this, &QsoMapWindow::setzeJagd);
     bar->addWidget(m_jagdBtn);
-
-    bar->addWidget(m_grid);
 
     // ── Locator-Jagd mit FT8 (2026-11-11) ───────────────────────────
     //
@@ -679,7 +692,6 @@ void QsoMapWindow::buildUi()
         "disk; untick to stay offline."));
     m_imagery->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                                  .arg(QString::fromLatin1(Style::kTextPrimary)));
-    bar->addWidget(m_imagery);
 
     // Satelliten ueber dem Horizont, als Dreiecke auf der flachen Karte.
     // Voreingestellt an; ohne Bahndaten (kein Netz, noch nie geholt)
@@ -692,7 +704,30 @@ void QsoMapWindow::buildUi()
         "from CelesTrak, fetched once a day)."));
     m_satellites->setStyleSheet(QStringLiteral("QCheckBox { color: %1; }")
                                     .arg(QString::fromLatin1(Style::kTextPrimary)));
-    bar->addWidget(m_satellites);
+
+    // ── Ebenen: ein Menue statt fuenf Haken (2026-11-12, Entwurf A) ──
+    //
+    // Betreiber: „teilweise fehlt mir die uebersichtlichkeit". Die Haken
+    // selbst ziehen ins Menue um (QWidgetAction) -- dieselben Objekte,
+    // dieselben Verbindungen, nur nicht mehr dauernd in der Leiste.
+    m_ebenenBtn = new QPushButton(QStringLiteral("Layers"), this);
+    m_ebenenBtn->setObjectName(QStringLiteral("qsoMapLayersButton"));
+    m_ebenenBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_ebenenBtn->setFocusPolicy(Qt::NoFocus);   // +/- bleiben bei der Karte
+    m_ebenenBtn->setToolTip(QStringLiteral(
+        "What the map draws: paths, locator grid, satellite imagery, "
+        "satellites, only the marked rows"));
+    {
+        auto* menu = new QMenu(m_ebenenBtn);
+        for (QCheckBox* c : {m_paths, m_grid, m_imagery, m_satellites, m_onlySelected}) {
+            c->setStyleSheet(c->styleSheet() + QStringLiteral(" QCheckBox { padding: 4px 14px; }"));
+            auto* wa = new QWidgetAction(menu);
+            wa->setDefaultWidget(c);
+            menu->addAction(wa);
+        }
+        m_ebenenBtn->setMenu(menu);
+    }
+    bar->addWidget(m_ebenenBtn);
     connect(m_satellites, &QCheckBox::toggled, this, [this](bool on) {
         m_flat->setShowSatellites(on);
         m_globe->setShowSatellites(on);
@@ -718,10 +753,20 @@ void QsoMapWindow::buildUi()
     zoomIn->setToolTip(QStringLiteral("Zoom in  (+ key, or the wheel)"));
     fit->setToolTip(QStringLiteral("Back to the whole view  (0 key, or "
                                    "double-click)"));
-    for (QPushButton* b : {zoomOut, zoomIn, fit}) {
-        b->setStyleSheet(Style::buttonBaseStyle());
-        b->setFocusPolicy(Qt::NoFocus);   // keep the +/- keys working
-        bar->addWidget(b);
+    // Auf dem Bild, unten rechts, wie bei jeder Karte (Entwurf A) --
+    // nicht mehr drei Knoepfe in der Leiste.
+    m_zoomLeiste = new QWidget(this);
+    m_zoomLeiste->setObjectName(QStringLiteral("qsoMapZoomOverlay"));
+    {
+        auto* v = new QVBoxLayout(m_zoomLeiste);
+        v->setContentsMargins(0, 0, 8, 8);
+        v->setSpacing(4);
+        for (QPushButton* b : {zoomIn, zoomOut, fit}) {
+            b->setStyleSheet(Style::buttonBaseStyle());
+            b->setFocusPolicy(Qt::NoFocus);   // keep the +/- keys working
+            b->setFixedWidth(40);
+            v->addWidget(b);
+        }
     }
     connect(zoomOut, &QPushButton::clicked,
             this, [this]() { zoomActiveView(1 / 1.25); });
@@ -733,7 +778,7 @@ void QsoMapWindow::buildUi()
     // Was nur Kugel und flache Karte betrifft -- im 3D-Bild treten diese
     // Schalter zurueck und geben dem Bild ihre Zeile (apply3dRoom).
     m_flatOnlyControls << m_onlySelected << m_paths << m_grid << m_imagery
-                       << m_satellites << zoomOut << zoomIn << fit;
+                       << m_satellites << zoomOut << zoomIn << fit << m_ebenenBtn;
 
     m_viewBtn = new QPushButton(QStringLiteral("Flat map"), this);
     m_viewBtn->setStyleSheet(Style::buttonBaseStyle());
@@ -772,7 +817,10 @@ void QsoMapWindow::buildUi()
     // glaube ich auch durch eine pille angezeigt werden" -- in der Leiste
     // fand er ihn nicht). Er steht als erste Pille vor BAND und MODE,
     // siehe rebuildFilterPills().
-    m_3dBtn->setStyleSheet(Style::buttonBaseStyle() + Style::greenCheckedStyle());
+    // In der Ansichtsgruppe neben Radar und Azimuthal (Entwurf C,
+    // 2026-11-12) -- nicht mehr als Pille vor den Band-Pillen. Mulde wie
+    // seine Nachbarn; Gruen heisst in Longpath „bestaetigt".
+    m_3dBtn->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
     m_3dBtn->setFocusPolicy(Qt::NoFocus);   // +/- bleiben bei der Karte
     // toggled, nicht clicked (Live-Befund 2026-11-10): die Bedienhilfe
     // (AXPress, VoiceOver, Automatisierung) drueckt einen ankreuzbaren
@@ -796,13 +844,24 @@ void QsoMapWindow::buildUi()
                 "<b>3D</b> — this build of Longpath has no Qt WebEngine, so "
                 "Google's 3D view is not available here. "
                 "\"View in Google Earth\" shows the station in 3D in your browser."));
-            m_info->setVisible(true);
+            m_info->setVisible(!m_kompakt);
             if (m_lastFlight.valid) { m_googleEarthBtn->setVisible(true); }
             return;
         }
         if (!key) {
             update3dButton();
+            // In der Logbuch-Spalte: ist der Zugang eingetragen, gleich
+            // fliegen -- der Klick galt dem Bild, nicht der Einrichtung.
+            m_3dNachEinrichtung = m_embedded;
             Google3dSetupDialog::showFor(this);
+            return;
+        }
+        // In der Logbuch-Spalte (seit Entwurf C steht 3D hier, nicht mehr
+        // in der Logbuchleiste): wie dort -- zur markierten Station, sonst
+        // zur zuletzt geflogenen, sonst zum eigenen QTH. Nie „nichts"
+        // (Betreiber 2026-11-12: „3d war nicht zu finden").
+        if (checked && m_embedded && m_auswahlRuf) {
+            zeige3d(m_auswahlRuf());
             return;
         }
         m_3dWanted = checked;
@@ -826,7 +885,13 @@ void QsoMapWindow::buildUi()
     connect(&Map3dAccess::notifier(), &Map3dAccess::changed, this, [this]() {
         m_3dRefusedKey.clear();
         update3dButton();
+        if (m_3dNachEinrichtung && Map3dAccess::isSet() && m_embedded && m_auswahlRuf) {
+            m_3dNachEinrichtung = false;
+            zeige3d(m_auswahlRuf());
+        }
     });
+
+    bar->addWidget(m_3dBtn);
 
     // Nur eingebettet sichtbar: das grosse Fenster holen.
     m_popOutBtn = new QPushButton(QStringLiteral("\u2197"), this);
@@ -849,7 +914,11 @@ void QsoMapWindow::buildUi()
     // toggled, nicht clicked: die Bedienhilfe drueckt ueber toggle().
     connect(m_vollbildBtn, &QPushButton::toggled, this, &QsoMapWindow::setzeVollbild);
 
-    col->addLayout(bar);
+    // Als Widget, damit die kleine Karte in „Browse" sie ganz weglassen
+    // kann (setKompakt).
+    m_leiste = new QWidget(this);
+    m_leiste->setLayout(bar);
+    col->addWidget(m_leiste);
 
     // Second row: one pill per band and mode the log actually has,
     // filled in by rebuildFilterPills() once entries arrive.
@@ -860,8 +929,6 @@ void QsoMapWindow::buildUi()
     // 187 px.
     m_pillRow = new FlowLayout(nullptr, 4, 4);
     col->addLayout(m_pillRow);
-    // Die 3D-Pille steht da, bevor das Log die anderen bringt.
-    m_pillRow->addWidget(m_3dBtn);
 
     m_globe = new GlobeWidget(this);
     // No beam spread here: the flanking arcs answer a question about
@@ -907,7 +974,16 @@ void QsoMapWindow::buildUi()
     mapRow->setContentsMargins(0, 0, 0, 0);
     mapRow->setSpacing(8);
     mapRow->addWidget(m_rotorRadar, 1);
-    mapRow->addWidget(m_stack, 3);
+    {
+        // Karte und Zoom in derselben Zelle: der Zoom liegt auf dem Bild.
+        auto* flaeche = new QWidget(this);
+        auto* g = new QGridLayout(flaeche);
+        g->setContentsMargins(0, 0, 0, 0);
+        g->addWidget(m_stack, 0, 0);
+        g->addWidget(m_zoomLeiste, 0, 0, Qt::AlignRight | Qt::AlignBottom);
+        m_zoomLeiste->raise();
+        mapRow->addWidget(flaeche, 3);
+    }
 
     // ── Die Jagdliste: wer sendet gerade aus einem Feld, das fehlt ──
     //
@@ -1089,6 +1165,15 @@ void QsoMapWindow::buildUi()
         m_flat->setShowImagery(on);
     });
 
+    // Mosaik-Band und „FT8 only" gehoeren zum Gitter: ohne Gitter
+    // stehen sie nicht in der Leiste (Entwurf A).
+    auto mosaikZeigen = [this]() {
+        const bool an = m_grid && m_grid->isChecked();
+        if (m_mosaikBand) { m_mosaikBand->setVisible(an); }
+        if (m_nurFt8)     { m_nurFt8->setVisible(an); }
+    };
+    mosaikZeigen();
+    connect(m_grid, &QCheckBox::toggled, this, mosaikZeigen);
     connect(m_grid, &QCheckBox::toggled, this, [this](bool on) {
         m_flat->setShowGrid(on);
         // Das Mosaik auch auf der Azimutalkarte (2026-11-11).
@@ -1192,6 +1277,7 @@ void QsoMapWindow::buildUi()
             this, [this](int i) {
         updateRotorRadarVisibility();
         apply3dRoom();
+        if (m_embedded) { update3dButton(); }
         emit dreiDSichtbar(i == kView3d);
     });
     connect(m_radar, &DxRadarWidget::pointClicked, this,
@@ -1423,9 +1509,6 @@ void QsoMapWindow::rebuildFilterPills()
         if (it->widget() != m_3dBtn) { delete it->widget(); }
         delete it;
     }
-    // Immer zuerst, immer an derselben Stelle -- auch wenn das Log nur ein
-    // Band und eine Betriebsart hat und sonst keine Pille da waere.
-    m_pillRow->addWidget(m_3dBtn);
 
     QSet<QString> bands, modes;
     for (const LogEntry& e : m_all) {
@@ -1470,6 +1553,18 @@ void QsoMapWindow::rebuildFilterPills()
         m_pillRow->addWidget(b);
     };
 
+    // In der Logbuch-Spalte keine Pillen (Entwurf A, 2026-11-12): dort
+    // filtert die Filterzeile des Logbuchs, und dreizehn Band- plus neun
+    // Betriebsart-Pillen kosteten der Karte zwei Zeilen (Betreiber: „die
+    // anzahl aller modi und baender sind gross und kosten platz"). Damit
+    // kein abgeschalteter Wert unsichtbar weiterfiltert, gilt dort alles.
+    if (m_embedded) {
+        m_offBands.clear();
+        m_offModes.clear();
+        m_pillRow->addStretch();
+        apply3dRoom();
+        return;
+    }
     // Pills only earn their row when there is something to choose
     // between; a log entirely on one band in one mode gets no row.
     if (bandList.size() > 1) {
@@ -1504,7 +1599,7 @@ void QsoMapWindow::apply3dRoom()
         }
         m_pillRow->invalidate();
     }
-    if (m_summary) { m_summary->setVisible(!in3d); }
+    if (m_summary) { m_summary->setVisible(!in3d && !m_kompakt); }
     // Live 2026-11-10: in der Logbuch-Spalte war das 3D-Bild ein flacher
     // Streifen. Die Schalter, die im 3D-Bild nichts tun, geben ihre Zeile
     // ab; „Fly to call", Globe, Radar, 3D und ↗ bleiben.
@@ -1801,7 +1896,7 @@ QString QsoMapWindow::rufeLive(const QString& rufzeichen)
         m_info->setText(QStringLiteral("<b>Cannot call %1</b> — %2")
             .arg(call.toHtmlEscaped(), grund.toHtmlEscaped()));
     }
-    m_info->setVisible(true);
+    m_info->setVisible(!m_kompakt);
     return grund;
 }
 
@@ -1821,7 +1916,7 @@ void QsoMapWindow::showStationInfo(const QString& label)
     if (mine.isEmpty()) {
         m_info->setText(QStringLiteral("<b>%1</b> — not in the log")
                             .arg(call.toHtmlEscaped()));
-        m_info->setVisible(true);
+        m_info->setVisible(!m_kompakt);
         return;
     }
 
@@ -1885,7 +1980,7 @@ void QsoMapWindow::showStationInfo(const QString& label)
     }
 
     m_info->setText(text);
-    m_info->setVisible(true);
+    m_info->setVisible(!m_kompakt);
 }
 
 void QsoMapWindow::showGridInfo(const QString& locator)
@@ -1917,7 +2012,7 @@ void QsoMapWindow::showGridInfo(const QString& locator)
         }
         m_info->setText(text);
     }
-    m_info->setVisible(true);
+    m_info->setVisible(!m_kompakt);
 }
 
 // ── Google Earth ────────────────────────────────────────────────────
@@ -1927,7 +2022,7 @@ void QsoMapWindow::exportKml()
     if (m_lastShown.isEmpty()) {
         m_info->setText(QStringLiteral(
             "Nothing to export — the current filters show no contacts."));
-        m_info->setVisible(true);
+        m_info->setVisible(!m_kompakt);
         return;
     }
 
@@ -1948,7 +2043,7 @@ void QsoMapWindow::exportKml()
     if (!KmlExport::writeKml(path, m_lastShown, opt, &err, &res)) {
         m_info->setText(QStringLiteral("KML export failed: %1")
                             .arg(err.toHtmlEscaped()));
-        m_info->setVisible(true);
+        m_info->setVisible(!m_kompakt);
         return;
     }
 
@@ -1961,7 +2056,7 @@ void QsoMapWindow::exportKml()
                     .arg(res.skipped);
     }
     m_info->setText(text);
-    m_info->setVisible(true);
+    m_info->setVisible(!m_kompakt);
 
     // Whatever handles .kml — Google Earth when installed, otherwise
     // the OS says so, which is a better error than any dialog here.
@@ -2096,7 +2191,7 @@ void QsoMapWindow::setQrzClient(QrzClient* qrz)
         } else if (!(m_fallback && m_fallback(call, lat, lon))) {
             m_info->setText(QStringLiteral("<b>%1</b> — QRZ has no position for this call")
                                 .arg(call.toHtmlEscaped()));
-            m_info->setVisible(true);
+            m_info->setVisible(!m_kompakt);
             return;
         }
         QStringList bits;
@@ -2121,7 +2216,7 @@ void QsoMapWindow::setQrzClient(QrzClient* qrz)
         }
         m_info->setText(QStringLiteral("<b>%1</b> — %2")
                             .arg(call.toHtmlEscaped(), message.toHtmlEscaped()));
-        m_info->setVisible(true);
+        m_info->setVisible(!m_kompakt);
     });
 }
 
@@ -2151,7 +2246,7 @@ void QsoMapWindow::lookupAndFly(const QString& text)
     if (m_qrz && m_qrz->hasCredentials()) {
         m_pendingCall = call;
         m_info->setText(QStringLiteral("Looking up <b>%1</b>…").arg(call.toHtmlEscaped()));
-        m_info->setVisible(true);
+        m_info->setVisible(!m_kompakt);
         m_qrz->lookup(call);
         return;
     }
@@ -2163,7 +2258,7 @@ void QsoMapWindow::lookupAndFly(const QString& text)
     }
     m_info->setText(QStringLiteral("<b>%1</b> — not in the log, and no QRZ account to ask")
                         .arg(call.toHtmlEscaped()));
-    m_info->setVisible(true);
+    m_info->setVisible(!m_kompakt);
 }
 
 void QsoMapWindow::flyToStation(const QString& call, double lat, double lon,
@@ -2233,7 +2328,7 @@ void QsoMapWindow::showFlightCard(const QString& extra)
     }
     text += extra;
     m_info->setText(text);
-    m_info->setVisible(true);
+    m_info->setVisible(!m_kompakt);
 }
 
 // ── 3D-Flug (2026-11-10) ─────────────────────────────────────────────
@@ -2337,7 +2432,7 @@ void QsoMapWindow::zeige3d(const QString& rufzeichen)
         m_info->setText(QStringLiteral(
             "<b>3D</b> — select a contact or type a call in \"Fly to call\". "
             "With your locator in Setup, 3D also shows your own station."));
-        m_info->setVisible(true);
+        m_info->setVisible(!m_kompakt);
         return;
     }
     double lat = 0.0, lon = 0.0;
@@ -2400,7 +2495,12 @@ void QsoMapWindow::update3dButton()
     QSignalBlocker b(m_3dBtn);
     // Immer bedienbar: ohne WebEngine sagt der Klick, warum es nicht geht.
     m_3dBtn->setEnabled(true);
-    m_3dBtn->setChecked(built && key && m_3dWanted);
+    // In der Logbuch-Spalte zeigt der Knopf, was ZU SEHEN ist (wie der
+    // fruehere Knopf in der Logbuchleiste, #439): eingerastet heisst, das
+    // 3D-Bild steht. Im eigenen Fenster bleibt es der Wunsch.
+    const bool an = m_embedded ? (m_stack && m_stack->currentIndex() == kView3d)
+                               : m_3dWanted;
+    m_3dBtn->setChecked(built && key && an);
     if (!built) {
         m_3dBtn->setToolTip(QStringLiteral(
             "This build of Longpath has no Qt WebEngine, so the 3D view is not "

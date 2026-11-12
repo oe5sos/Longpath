@@ -6321,6 +6321,8 @@ endif()
 longpath_add_test(tst_qso_map_satellites)
 # -- Logbuch-Werkzeugleiste bricht um statt das Fenster breit zu halten --
 longpath_add_test(tst_logbook_toolbar_wraps)
+# Logbuch nach Entwurf A (2026-11-12): Zahnrad, Filterkapseln, ein Ansichtsschalter.
+longpath_add_test(tst_logbuch_ordnung)
 # Das Logbuch geht in der vorgesehenen Groesse auf (2026-09-26).
 longpath_add_test(tst_logbook_opens_at_its_size)
 # -- Logbuch als eine Seite: Karte als Spalte, Kennzahlen als Reihe --
