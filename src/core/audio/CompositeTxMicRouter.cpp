@@ -84,7 +84,24 @@ bool CompositeTxMicRouter::eigeneTonquelleAktiv() const
     if (q == MicSource::Rtty) {
         return m_rttySource.load(std::memory_order_acquire) != nullptr;
     }
+    if (q == MicSource::Dvk) {
+        return m_dvkSource.load(std::memory_order_acquire) != nullptr;
+    }
     return false;
+}
+
+bool CompositeTxMicRouter::eigenesDatensignalAktiv() const
+{
+    const MicSource q = m_activeSource.load(std::memory_order_acquire);
+    if (q == MicSource::Dvk) {
+        return false;
+    }
+    return eigeneTonquelleAktiv();
+}
+
+void CompositeTxMicRouter::setDvkSource(TxMicRouter* source)
+{
+    m_dvkSource.store(source, std::memory_order_release);
 }
 
 void CompositeTxMicRouter::setFt8Source(TxMicRouter* source)
@@ -121,6 +138,14 @@ int CompositeTxMicRouter::pullSamples(float* dst, int n)
         TxMicRouter* rtty = m_rttySource.load(std::memory_order_acquire);
         if (rtty != nullptr) {
             return rtty->pullSamples(dst, n);
+        }
+        // Wie bei FT8 und VAX: lieber das Mikrofon als Totenstille.
+    }
+
+    if (source == MicSource::Dvk) {
+        TxMicRouter* dvk = m_dvkSource.load(std::memory_order_acquire);
+        if (dvk != nullptr) {
+            return dvk->pullSamples(dst, n);
         }
         // Wie bei FT8 und VAX: lieber das Mikrofon als Totenstille.
     }

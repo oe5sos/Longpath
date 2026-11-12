@@ -214,6 +214,7 @@ void RotctldClient::moveTo(double azimuthDeg)
         emit errorOccurred(QStringLiteral("Rotator is not connected"));
         return;
     }
+    if (!pruefeZiel(azimuthDeg)) { return; }      // erlaubter Bereich
     m_commanded = norm360(azimuthDeg);
     m_haveCommanded = true;
     // Send the elevation the rotator last reported, not 0: "P az el"

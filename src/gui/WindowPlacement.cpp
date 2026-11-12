@@ -240,6 +240,22 @@ QRect snappedFrameRect(const QRect& frame, const QSize& minSize, int grid,
     return QRect(left, top, right - luft - left, bottom - luft - top);
 }
 
+QPoint bezugspunktFuerProfil(Qt::WindowStates zustand, const QRect& rahmen,
+                             const QRect& verfuegbar)
+{
+    if ((zustand & Qt::WindowMaximized) && !(zustand & Qt::WindowFullScreen)
+        && verfuegbar.isValid()) {
+        return verfuegbar.topLeft();
+    }
+    return rahmen.topLeft();
+}
+
+bool hauptrahmenSteht(Qt::WindowStates zustand, const QRect& rahmen,
+                      const QRect& verfuegbar)
+{
+    return rahmen.topLeft() == bezugspunktFuerProfil(zustand, rahmen, verfuegbar);
+}
+
 QRect mitMindestabstand(const QRect& wunsch, const QList<QRect>& nachbarn,
                         int abstand, int maxUeberlappung)
 {
@@ -317,6 +333,15 @@ EigeneBewegung::EigeneBewegung()  { ++s_eigeneBewegungen; }
 EigeneBewegung::~EigeneBewegung() { --s_eigeneBewegungen; }
 
 bool eigeneBewegungLebt() { return s_eigeneBewegungen > 0; }
+
+bool istRasterNachhall(const QRect& jetzt, const QRect& vorher, int grid)
+{
+    if (!jetzt.isValid() || !vorher.isValid()) { return false; }
+    return qAbs(jetzt.x() - vorher.x()) < grid
+        && qAbs(jetzt.y() - vorher.y()) < grid
+        && qAbs(jetzt.width() - vorher.width()) < grid + grid / 2
+        && qAbs(jetzt.height() - vorher.height()) < grid + grid / 2;
+}
 EigeneBewegungBruecke::EigeneBewegungBruecke()  { ++s_eigeneBewegungen; }
 EigeneBewegungBruecke::~EigeneBewegungBruecke() { --s_eigeneBewegungen; }
 

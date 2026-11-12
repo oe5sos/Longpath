@@ -431,10 +431,7 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     // lassen" (Betreiber, 2026-08-27). Turning it back on stays a
     // deliberate right-click menu action, not a click on an absent pill.
     connect(m_statusOverlay, &SpectrumStatusOverlay::kiwiBadgeClicked, this,
-            [this]() {
-        m_spectrum->setKiwiDisplaySource(false);
-        m_statusOverlay->setKiwiActive(false);
-    });
+            &PanadapterApplet::zeigeDasGeraet);
 
     // Phase 3F Sub-Epic F Task 13: restore persisted extended-view
     // toggle (default true) and apply it to the embedded spectrum immediately.
@@ -445,6 +442,12 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
 }
 
 PanadapterApplet::~PanadapterApplet() = default;
+
+void PanadapterApplet::zeigeDasGeraet()
+{
+    m_spectrum->setKiwiDisplaySource(false);
+    m_statusOverlay->setKiwiActive(false);
+}
 
 void PanadapterApplet::addSlice(int sliceIndex)
 {
@@ -761,6 +764,11 @@ void PanadapterApplet::contextMenuEvent(QContextMenuEvent* event)
     // Am Fenster, nicht am Applet (2026-09-30): das Applet ist nativ (es
     // traegt den Panadapter), und ein Menue daran bekam von Qt keinen
     // Fensterbezug („... must be a top level window.").
+    m_menuSpektrumPos = QPoint(-1, -1);
+    if (SpectrumWidget* sw = spectrumWidget()) {
+        const QPoint p = sw->mapFrom(this, event->pos());
+        if (sw->rect().contains(p)) { m_menuSpektrumPos = p; }
+    }
     QMenu* menu = buildContextMenu(window());
     // Das Fenster kann waehrend exec() sterben; dann hat Qt das Menue als
     // sein Kind schon geholt und der Zeiger hier ist tot.
@@ -797,6 +805,26 @@ QMenu* PanadapterApplet::buildContextMenu(QObject* parent)
         emit floatRequested(panId());
     });
     menu->addSeparator();
+
+    // ── Einmessen an einem Traeger (2026-11-08) ─────────────────────
+    //
+    // Auf 2 m stellt es den LO-Fehler des Transverters, auf KW an einem
+    // OpenHPSDR-Geraet den Korrekturfaktor (Thetis Freq Cal) -- an der
+    // Stelle des Rechtsklicks, nicht an einer festen Eichfrequenz. Das
+    // Ergebnis kommt ueber SpectrumWidget::traegerGemessen ins
+    // Hauptfenster, das den Dialog zeigt.
+    if (spectrumWidget()) {
+        QAction* eich = menu->addAction(tr("Calibrate frequency on this carrier…"));
+        eich->setToolTip(tr("Measures the strongest carrier within ±2.5 kHz of "
+                            "this point (ten spectra averaged) and corrects the "
+                            "transverter LO error or the radio's reference."));
+        const QPoint p = m_menuSpektrumPos;
+        eich->setEnabled(p.x() >= 0);
+        connect(eich, &QAction::triggered, this, [this, p]() {
+            if (SpectrumWidget* w = spectrumWidget()) { w->starteTraegerMessungBei(p); }
+        });
+        menu->addSeparator();
+    }
 
     // ── Anzeigequelle: Geraet oder KiwiSDR (Stufe 6, 2026-08-23) ────
     //
@@ -859,6 +887,42 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
     connect(zeileSwr, &QAction::toggled, this,
             [this](bool an) { setSwrReadoutShown(an); });
     menu->addSeparator();
+
+    // Durchlass und Bandbreite (2026-11-08): die vier Entwuerfe, die der
+    // Betreiber gewaehlt hat. Alle an ab Werk; hier je einzeln aus.
+    if (m_spectrum) {
+        QAction* breite = menu->addAction(tr("Bandwidth label"));
+        breite->setCheckable(true);
+        breite->setChecked(m_spectrum->passbandLabelShown());
+        connect(breite, &QAction::toggled, m_spectrum,
+                &SpectrumWidget::setPassbandLabelShown);
+        QAction* klammern = menu->addAction(tr("Signal brackets (width, SNR)"));
+        klammern->setCheckable(true);
+        klammern->setChecked(m_spectrum->signalBracketsShown());
+        connect(klammern, &QAction::toggled, m_spectrum,
+                &SpectrumWidget::setSignalBracketsShown);
+        QAction* luecken = menu->addAction(tr("Gap finder (CQ)"));
+        luecken->setCheckable(true);
+        luecken->setChecked(m_spectrum->gapFinderShown());
+        connect(luecken, &QAction::toggled, m_spectrum,
+                &SpectrumWidget::setGapFinderShown);
+        QAction* sStufen = menu->addAction(tr("S-units on the scale"));
+        sStufen->setCheckable(true);
+        sStufen->setChecked(m_spectrum->sUnitsScaleShown());
+        sStufen->setToolTip(tr("S1…S9, +10…+60 instead of dBm. Below 30 MHz "
+                               "S9 = −73 dBm, above (2 m) −93 dBm, judged at "
+                               "the antenna frequency."));
+        connect(sStufen, &QAction::toggled, m_spectrum,
+                &SpectrumWidget::setSUnitsScaleShown);
+        QAction* lupe = menu->addAction(tr("Passband magnifier"));
+        lupe->setCheckable(true);
+        lupe->setChecked(m_spectrum->passbandMagnifier() != 0);
+        lupe->setToolTip(tr("Shows ±10 kHz around the VFO with the passband, "
+                            "at every zoom level."));
+        connect(lupe, &QAction::toggled, m_spectrum,
+                [this](bool an) { m_spectrum->setPassbandMagnifier(an ? 1 : 0); });
+        menu->addSeparator();
+    }
 
     menu->addAction(tr("Choose background image…"), this, [this]() {
         // ── Der Dialog gehoert dem FENSTER, nicht dem Applet ─────

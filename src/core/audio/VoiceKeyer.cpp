@@ -62,6 +62,8 @@ mw0lge@grange-lane.co.uk
 
 #include "core/audio/VoiceKeyer.h"
 
+#include <thread>
+
 #include "core/AppSettings.h"
 #include "core/audio/WavFile.h"
 
@@ -252,6 +254,19 @@ bool WavTxSource::load(const QString& path, int txSampleRate, QString* error)
 {
     stop();
 
+    // ── Erst den Sendefaden hinauslassen ─────────────────────────────
+    //
+    // stop() setzt m_playing auf false; ein pullSamples(), das danach
+    // beginnt, fasst m_samples nicht mehr an. Eines, das VORHER begonnen
+    // hat, liest aber vielleicht noch. pullSamples() setzt m_inPull,
+    // BEVOR es m_playing liest, und hier wird m_inPull erst NACH dem
+    // Abschalten gelesen -- beides sequentiell konsistent. Damit sieht
+    // einer der beiden den anderen, und das Warten dauert hoechstens
+    // einen Block (Mikrosekunden).
+    while (m_inPull.load(std::memory_order_seq_cst)) {
+        std::this_thread::yield();
+    }
+
     if (txSampleRate <= 0) {
         if (error) { *error = QStringLiteral("invalid TX sample rate"); }
         return false;
@@ -296,7 +311,7 @@ void WavTxSource::play()
 
 void WavTxSource::stop()
 {
-    m_playing.store(false, std::memory_order_release);
+    m_playing.store(false, std::memory_order_seq_cst);
     m_pos.store(0, std::memory_order_relaxed);
 }
 
@@ -318,9 +333,16 @@ int WavTxSource::pullSamples(float* dst, int n)
 {
     if (dst == nullptr || n <= 0) { return 0; }
 
+    // Erst ankuendigen, dann nachsehen -- Gegenstueck in load().
+    m_inPull.store(true, std::memory_order_seq_cst);
+    struct InPullGuard {
+        std::atomic<bool>& flag;
+        ~InPullGuard() { flag.store(false, std::memory_order_seq_cst); }
+    } guard{m_inPull};
+
     // Nicht am Spielen: Stille liefern statt nichts. Ein Sendeweg, der
     // keine Abtastwerte bekommt, laeuft leer und knackt.
-    if (!m_playing.load(std::memory_order_acquire) || m_samples.isEmpty()) {
+    if (!m_playing.load(std::memory_order_seq_cst) || m_samples.isEmpty()) {
         std::fill_n(dst, n, 0.0f);
         return n;
     }

@@ -20,6 +20,7 @@
 #include "models/TransmitModel.h"
 
 #include <QFormLayout>
+#include <QCheckBox>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -188,6 +189,52 @@ void TestTwoTonePage::buildUi()
 
     connect(m_driveButtonGroup, &QButtonGroup::idToggled,
             this, &TestTwoTonePage::onDrivePowerRadioToggled);
+
+    // ── Group 5: der Zweiton der FLEX-Maschine (2026-11-01) ─────────────────
+    //
+    // Alles darueber stellt WDSPs Zweiton ein — den gibt es am Flex
+    // nicht: dort rechnet die Maschine, und sie bringt einen eigenen
+    // mit (`transmit set tune_mode=two_tone`, am Geraet gemessen).
+    //
+    // Die Gruppe zeigt sich nur mit verbundenem Flex. Sie TASTET
+    // NICHT: sie stellt den Modus, ausgeloest wird er mit TUNE, und
+    // das bleibt beim Betreiber.
+    if (model() && model()->istFlexVerbunden()) {
+        QGroupBox* flexGroup = addSection(QStringLiteral("FlexRadio two-tone"));
+
+        auto* col = new QVBoxLayout();
+        col->setContentsMargins(0, 0, 0, 0);
+
+        m_flexTwoToneCheck = new QCheckBox(
+            QStringLiteral("Use the radio's own two-tone generator"), flexGroup);
+        m_flexTwoToneCheck->setToolTip(QStringLiteral(
+            "Sends 'transmit set tune_mode=two_tone'. The radio generates the "
+            "two tones itself — Longpath's own generator has no target on a "
+            "FlexRadio. This only arms it: press TUNE to put it on the air."));
+        m_flexTwoToneCheck->setChecked(model()->flexZweitonAktiv());
+        connect(m_flexTwoToneCheck, &QCheckBox::toggled, this, [this](bool on) {
+            if (model()) { model()->flexZweitonModus(on); }
+        });
+        col->addWidget(m_flexTwoToneCheck);
+
+        auto* hinweis = new QLabel(QStringLiteral(
+            "With the two-tone carrier on the air, the IMD measurement on the "
+            "panadapter opens by itself — it watches the radio's own transmit "
+            "state, not Longpath's."), flexGroup);
+        hinweis->setWordWrap(true);
+        col->addWidget(hinweis);
+
+        if (auto* vlay = qobject_cast<QVBoxLayout*>(flexGroup->layout())) {
+            vlay->addLayout(col);
+        }
+
+        connect(model(), &RadioModel::flexZweitonGeaendert, this,
+                [this](bool aktiv) {
+            if (!m_flexTwoToneCheck) { return; }
+            const QSignalBlocker block(m_flexTwoToneCheck);
+            m_flexTwoToneCheck->setChecked(aktiv || model()->flexZweitonAktiv());
+        });
+    }
 }
 
 // ---------------------------------------------------------------------------

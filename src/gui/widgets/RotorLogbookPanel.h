@@ -238,6 +238,9 @@ public:
     /// GS-232-Treiber braucht keinen, und genau das ist die Aussage,
     /// die ein Lauf festhalten können muss.
     bool rotctldRunningForTest() const { return m_rotorProc.isRunning(); }
+    /// Prüfstandsnaht: den Rotordialog öffnen (modal; der Lauf schließt
+    /// ihn selbst wieder). 2026-11-11, Netz-Rotor im falschen Modus.
+    void openRotorSetupDialogForTest() { openRotorSetupDialog(); }
 #endif
 
     /// Das Ziel-Menue bauen, ohne es aufzuklappen. Fuer Pruefungen:

@@ -1,0 +1,397 @@
+<!doctype html>
+<!--
+  resources/flug3d/flug3d.html  (Longpath)
+  SPDX-License-Identifier: GPL-3.0-or-later
+  Longpath-original. 2026-11-10, Martin Fischer (OE5SOS), AI-assisted via
+  Anthropic Claude.
+
+  Der 3D-Flug zur nachgeschlagenen Station: vom eigenen QTH den Grosskreis
+  entlang, hinauf, hinueber, hinunter bis aufs Dach -- auf Googles
+  Photorealistic 3D Tiles -- auf einem von zwei Wegen, beide mit dem
+  EIGENEN Zugang des Bedieners: ein kostenloses Cesium-ion-Konto (Googles
+  Kacheln sind dort das Asset 2275207, ohne Google-Cloud-Konto und ohne
+  Kreditkarte) oder ein eigener Schluessel fuer Googles Map Tiles API.
+  Keine ion-Bilder (baseLayer:false). Cesium.Ion.defaultAccessToken bleibt
+  LEER: der ion-Zugang geht nur an IonResource.fromAssetId() -- Cesiums
+  eigener Weg ohne Schluessel puffert das Versprechen fuer 2275207 fuer
+  immer, ein einmal abgelehnter Zugang bliebe dann bis zum Neustart kaputt.
+
+  Drittsoftware -- CesiumJS 1.146.0, Copyright 2011-2026 Cesium GS, Inc.
+  and Contributors, Apache License 2.0
+  (https://github.com/CesiumGS/cesium/blob/1.146/LICENSE.md). NICHT im
+  Quellbaum: zur Laufzeit vom jsDelivr-CDN geladen, auf die genaue Fassung
+  festgenagelt und per Subresource Integrity (sha384) geprueft -- eine
+  veraenderte Datei laedt nicht. Neue Fassung = Versionsnummer hier, in
+  Station3dSurface.h (kCesiumVersion) UND beide integrity-Werte neu.
+
+  Mit C++ spricht die Seite ueber console.log("longpath:{json}")
+  (Station3dView liest das ueber javaScriptConsoleMessage) und nimmt
+  Fluege ueber window.longpath.fly({...}) entgegen.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="@@CESIUM_BASE@@Widgets/widgets.css"
+      integrity="sha384-ghEeMdcWWzRv/BPeUcX835vcKDGrxvROXisl/Btpv3GeekBUXTSPVcFJpI1Tcrgp"
+      crossorigin="anonymous">
+<style>
+  html, body, #globe { margin: 0; padding: 0; width: 100%; height: 100%;
+                       overflow: hidden; background: #000; }
+  #hud { position: absolute; left: 12px; top: 12px; max-width: 60%;
+         padding: 8px 12px; border-radius: 6px;
+         background: rgba(5, 5, 7, 0.72); border: 1px solid #1f1f23;
+         color: #dcdce1; font: 13px -apple-system, "Segoe UI", sans-serif;
+         pointer-events: none; }
+  #hud[hidden] { display: none; }
+  #call { font-size: 22px; font-weight: 600; letter-spacing: 0.5px; }
+  #caption { color: #a6a6ac; margin-top: 2px; }
+  #figures { color: #d8a55f; margin-top: 6px; font-size: 16px; }
+  #togo { color: #a6a6ac; margin-top: 2px; font-size: 11px; }
+  /* Knapp -- die Spalte neben dem Logbuch. Betreiber 2026-11-10 (live):
+     „das fenster ist sehr klein, das call wird dann noch zusaetzlich sehr
+     gross geschrieben". Die Spalte ist oft BREIT, aber NIEDRIG -- darum
+     gilt das auch fuer die Hoehe. Rufzeichen, Entfernung und Peilung
+     bleiben; Name und Ort stehen in der Stationskarte darunter. Die
+     Quellenzeile von Cesium und Google bleibt unangetastet. */
+  @media (max-width: 560px), (max-height: 460px) {
+    #hud { left: 6px; top: 6px; max-width: 46%; padding: 3px 7px; border-radius: 4px; }
+    #call { font-size: 13px; letter-spacing: 0; }
+    #caption { display: none; }
+    #figures { font-size: 11px; margin-top: 0; }
+    #togo { font-size: 9px; margin-top: 0; }
+  }
+</style>
+<script>
+  window.CESIUM_BASE_URL = "@@CESIUM_BASE@@";
+  function lpSend(o) { console.log("longpath:" + JSON.stringify(o)); }
+  window.addEventListener("error", function (e) {
+    lpSend({ event: "jsError", message: String(e.message || e) });
+  });
+</script>
+<script src="@@CESIUM_BASE@@Cesium.js"
+        integrity="sha384-1lWK5deN/B+lLaUw4lk6xKp/L19ii/98SZLk6K8YthDskgvc+GbdixLzbCnSS2Wn"
+        crossorigin="anonymous"
+        onerror="lpSend({event:'failed', kind:'cesium', message:'CesiumJS could not be loaded'})"></script>
+</head>
+<body>
+<div id="globe"></div>
+<div id="hud" hidden>
+  <div id="call"></div>
+  <div id="caption"></div>
+  <div id="figures"></div>
+  <div id="togo"></div>
+</div>
+<script>
+(function () {
+  "use strict";
+  if (typeof Cesium === "undefined") { return; }   // onerror hat es gemeldet
+
+  const ION_GOOGLE_3D = 2275207;   // Googles Photorealistic 3D Tiles bei Cesium ion
+  const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+  const EARTH_KM = 6371.0088;
+  const lp = { viewer: null, tileset: null, key: null, id: 0, raf: 0,
+               orbit: null, groundH: null, marker: null, needle: null,
+               path: null, tileFailSent: false };
+
+  // ── Kugelrechnung fuer den Kamerapfad ─────────────────────────────
+  // Die ANGEZEIGTEN Zahlen (km, Grad) kommen aus C++ (BeamHeading), damit
+  // Karteikarte, Karte und Flug nie verschiedene Werte nennen.
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  function vec(lat, lon) {
+    const la = lat * D2R, lo = lon * D2R;
+    return [Math.cos(la) * Math.cos(lo), Math.cos(la) * Math.sin(lo), Math.sin(la)];
+  }
+  function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+  function slerp(a, b, t) {
+    const d = Math.acos(clamp(dot(a, b), -1, 1));
+    if (d < 1e-9) { return a.slice(); }
+    const s = Math.sin(d), k1 = Math.sin((1 - t) * d) / s, k2 = Math.sin(t * d) / s;
+    return [a[0] * k1 + b[0] * k2, a[1] * k1 + b[1] * k2, a[2] * k1 + b[2] * k2];
+  }
+  function latLon(v) {
+    return { lat: Math.atan2(v[2], Math.hypot(v[0], v[1])) * R2D,
+             lon: Math.atan2(v[1], v[0]) * R2D };
+  }
+  function course(p, q) {       // Anfangsrichtung von p nach q, Grad
+    const f1 = p.lat * D2R, f2 = q.lat * D2R, dl = (q.lon - p.lon) * D2R;
+    const y = Math.sin(dl) * Math.cos(f2);
+    const x = Math.cos(f1) * Math.sin(f2) - Math.sin(f1) * Math.cos(f2) * Math.cos(dl);
+    return (Math.atan2(y, x) * R2D + 360) % 360;
+  }
+  function destination(p, brgDeg, km) {   // von p aus km in Richtung brg
+    const d = km / EARTH_KM, b = brgDeg * D2R, f1 = p.lat * D2R, l1 = p.lon * D2R;
+    const f2 = Math.asin(Math.sin(f1) * Math.cos(d) + Math.cos(f1) * Math.sin(d) * Math.cos(b));
+    const l2 = l1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(f1),
+                               Math.cos(d) - Math.sin(f1) * Math.sin(f2));
+    return { lat: f2 * R2D, lon: ((l2 * R2D + 540) % 360) - 180 };
+  }
+  const smooth = t => t * t * (3 - 2 * t);
+  function fmtKm(km) { return Math.round(km).toLocaleString("en-US").replace(/,/g, " "); }
+
+  // ── Ansicht ────────────────────────────────────────────────────────
+  function viewer() {
+    if (lp.viewer) { return lp.viewer; }
+    Cesium.Ion.defaultAccessToken = "";
+    const v = new Cesium.Viewer("globe", {
+      globe: false, baseLayer: false, baseLayerPicker: false, geocoder: false,
+      homeButton: false, sceneModePicker: false, navigationHelpButton: false,
+      animation: false, timeline: false, fullscreenButton: false,
+      infoBox: false, selectionIndicator: false,
+      useBrowserRecommendedResolution: false
+    });
+    v.scene.skyAtmosphere.show = true;
+    v.scene.screenSpaceCameraController.enableCollisionDetection = true;
+    // Jede Beruehrung haelt das Kreisen an: wer selbst dreht, will nicht
+    // gegen die Automatik kaempfen.
+    const stop = () => { lp.orbit = null; };
+    v.canvas.addEventListener("pointerdown", stop);
+    v.canvas.addEventListener("wheel", stop, { passive: true });
+    lp.viewer = v;
+    return v;
+  }
+
+  async function tileset(f) {
+    const v = viewer();
+    const viaIon = f.source === "ion";
+    const id = (viaIon ? "ion:" + f.token : "google:" + f.key);
+    if (lp.tileset && lp.key === id) { return lp.tileset; }
+    if (lp.tileset) { v.scene.primitives.remove(lp.tileset); lp.tileset = null; }
+    lp.key = id;
+    lp.tileFailSent = false;
+    const opts = { showCreditsOnScreen: true, enableCollision: true };
+    let ts;
+    if (viaIon) {
+      // Eigener Zugang je Abruf, kein globaler (siehe Kopf).
+      const res = await Cesium.IonResource.fromAssetId(ION_GOOGLE_3D, { accessToken: f.token });
+      ts = await Cesium.Cesium3DTileset.fromUrl(res, opts);
+    } else {
+      ts = await Cesium.createGooglePhotorealistic3DTileset(
+        { key: f.key, onlyUsingWithGoogleGeocoder: true }, opts);
+    }
+    ts.tileFailed.addEventListener(function (e) {
+      if (lp.tileFailSent) { return; }
+      lp.tileFailSent = true;
+      lpSend({ event: "tileFailed", message: String(e && e.message || e) });
+    });
+    v.scene.primitives.add(ts);
+    lp.tileset = ts;
+    return ts;
+  }
+
+  // ── Anzeige oben links ─────────────────────────────────────────────
+  function hud(f, togo) {
+    const el = id => document.getElementById(id);
+    el("hud").hidden = false;
+    el("call").textContent = f.call || "";
+    el("caption").textContent = f.caption || "";
+    const bits = [];
+    if (typeof f.km === "number") { bits.push(fmtKm(f.km) + " km"); }
+    if (typeof f.bearing === "number") { bits.push(Math.round(f.bearing) + "°"); }
+    el("figures").textContent = bits.join(" · ");
+    el("togo").textContent = togo || "";
+  }
+
+  // ── Marke und Grosskreis ───────────────────────────────────────────
+  function marks(f, home) {
+    const v = viewer();
+    for (const e of [lp.marker, lp.needle, lp.path]) { if (e) { v.entities.remove(e); } }
+    const g = lp.groundH === null ? 0 : lp.groundH;
+    lp.marker = v.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(f.lon, f.lat, g + 32),
+      point: { pixelSize: 10, color: Cesium.Color.fromCssColorString("#d8a55f"),
+               outlineColor: Cesium.Color.BLACK, outlineWidth: 2,
+               disableDepthTestDistance: Number.POSITIVE_INFINITY },
+      label: { text: f.call || "", font: "600 15px sans-serif",
+               fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK,
+               outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+               pixelOffset: new Cesium.Cartesian2(0, -20),
+               disableDepthTestDistance: Number.POSITIVE_INFINITY }
+    });
+    lp.needle = v.entities.add({
+      polyline: { positions: Cesium.Cartesian3.fromDegreesArrayHeights(
+                    [f.lon, f.lat, g, f.lon, f.lat, g + 32]),
+                  width: 2, material: Cesium.Color.fromCssColorString("#d8a55f") }
+    });
+    if (!home) { return; }
+    const a = vec(home.lat, home.lon), b = vec(f.lat, f.lon), pts = [];
+    for (let i = 0; i <= 96; i++) { const p = latLon(slerp(a, b, i / 96)); pts.push(p.lon, p.lat); }
+    const colour = Cesium.Color.fromCssColorString("#d8a55f").withAlpha(0.85);
+    const ground = Cesium.GroundPolylinePrimitive.isSupported(v.scene);
+    lp.path = v.entities.add({
+      polyline: ground
+        ? { positions: Cesium.Cartesian3.fromDegreesArray(pts), width: 4,
+            clampToGround: true, arcType: Cesium.ArcType.GEODESIC,
+            classificationType: Cesium.ClassificationType.CESIUM_3D_TILE,
+            material: colour }
+        : { positions: Cesium.Cartesian3.fromDegreesArray(pts), width: 3,
+            arcType: Cesium.ArcType.GEODESIC, material: colour,
+            depthFailMaterial: colour.withAlpha(0.35) }
+    });
+  }
+
+  function moveMarks(f) {
+    if (lp.groundH === null) { return; }
+    const g = lp.groundH;
+    if (lp.marker) { lp.marker.position = Cesium.Cartesian3.fromDegrees(f.lon, f.lat, g + 32); }
+    if (lp.needle) {
+      lp.needle.polyline.positions = Cesium.Cartesian3.fromDegreesArrayHeights(
+        [f.lon, f.lat, g, f.lon, f.lat, g + 32]);
+    }
+  }
+
+  // Bodenhoehe an der Station: fein im Hintergrund (laedt die Kacheln
+  // dort), grob aus dem, was gerade gezeichnet ist, am Ende der Reise.
+  function sampleGround(f, id) {
+    const v = viewer();
+    if (!v.scene.sampleHeightSupported) { return; }
+    v.scene.sampleHeightMostDetailed([Cesium.Cartographic.fromDegrees(f.lon, f.lat)],
+                                     [lp.marker, lp.needle, lp.path].filter(Boolean))
+      .then(function (r) {
+        if (id !== lp.id || !r || !r[0] || typeof r[0].height !== "number") { return; }
+        lp.groundH = r[0].height;
+        moveMarks(f);
+      })
+      .catch(function () {});
+  }
+  function groundNow(f) {
+    const v = viewer();
+    if (lp.groundH !== null) { return lp.groundH; }
+    if (v.scene.sampleHeightSupported) {
+      const h = v.scene.sampleHeight(Cesium.Cartographic.fromDegrees(f.lon, f.lat),
+                                     [lp.marker, lp.needle, lp.path].filter(Boolean));
+      if (typeof h === "number") { return h; }
+    }
+    return 0;
+  }
+
+  // ── Der Flug ───────────────────────────────────────────────────────
+  const BACK_KM = 3.0;   // so weit hinter der Station endet die Reise
+
+  function travel(f, id) {
+    const v = viewer();
+    v.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+    const st = { lat: f.lat, lon: f.lon };
+    const home = f.home || null;
+    const B = vec(st.lat, st.lon);
+    const A = home ? vec(home.lat, home.lon) : B;
+    const ang = Math.acos(clamp(dot(A, B), -1, 1));
+    const km = ang * EARTH_KM;
+
+    // Ankunftsrichtung: die Flugrichtung am Ziel; ohne Heimat Norden.
+    const arrive = km > 1 ? (course(st, latLon(slerp(A, B, Math.max(0, 1 - 1 / km)))) + 180) % 360
+                          : (typeof f.bearing === "number" ? f.bearing : 0);
+    const endPt = destination(st, (arrive + 180) % 360, BACK_KM);
+    const E = vec(endPt.lat, endPt.lon);
+    const start = home ? A : E;
+
+    const peak = home ? clamp(km * 1000 * 0.4, 8000, 6.0e6) : 2.0e6;
+    const T = 1000 * clamp(3 + 2.5 * Math.log10(1 + km / 30), 3.5, 12);
+    const t0 = performance.now();
+
+    function frame(now) {
+      if (id !== lp.id) { return; }
+      const s = clamp((now - t0) / T, 0, 1), e = smooth(s);
+      const here = latLon(slerp(start, E, e));
+      const g = lp.groundH === null ? 0 : lp.groundH;
+      const hStart = home ? 4000 : peak, hEnd = g + 1500;
+      const h = hStart + (hEnd - hStart) * e
+              + Math.max(0, peak - Math.max(hStart, hEnd)) * Math.sin(Math.PI * e);
+      const heading = (km > 1 && e < 0.999) ? course(here, st) : arrive;
+      // Mit Heimat: flach los, senkrecht ueber der Mitte, flach an.
+      // Ohne: senkrecht von oben herab, zuletzt schraeg auf die Station.
+      const pitch = home ? -(28 + 62 * Math.pow(Math.sin(Math.PI * e), 0.7))
+                         : -90 + 62 * e;
+      v.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(here.lon, here.lat, h),
+        orientation: { heading: heading * D2R, pitch: pitch * D2R, roll: 0 }
+      });
+      if (home) {
+        hud(f, fmtKm(Math.max(0, (1 - e) * (typeof f.km === "number" ? f.km : km))) + " km to go");
+      }
+      if (s < 1) { lp.raf = requestAnimationFrame(frame); return; }
+      approach(f, id, arrive);
+    }
+    lp.raf = requestAnimationFrame(frame);
+  }
+
+  function approach(f, id, headingDeg) {
+    const v = viewer();
+    const g = groundNow(f);
+    const centre = Cesium.Cartesian3.fromDegrees(f.lon, f.lat, g + 8);
+    // 170 m schraeg von oben: ein Haus fuellt ein Zehntel des Bildes,
+    // ein Mast mit Beam ist zu erkennen.
+    const offset = new Cesium.HeadingPitchRange(headingDeg * D2R, -35 * D2R, 170);
+    v.camera.flyToBoundingSphere(new Cesium.BoundingSphere(centre, 30), {
+      offset: offset, duration: 3.5,
+      complete: function () {
+        if (id !== lp.id) { return; }
+        hud(f, "Drag to look around · scroll to zoom");
+        // Der Hinweis hat nach ein paar Sekunden seinen Dienst getan.
+        setTimeout(function () {
+          if (id === lp.id) { document.getElementById("togo").textContent = ""; }
+        }, 6000);
+        lpSend({ event: "arrived", ground: g });
+        orbit(centre, offset, id);
+      }
+    });
+  }
+
+  // Langsam um die Station kreisen, bis der Bediener selbst anfasst:
+  // eine volle Runde in 90 s zeigt den Mast von allen Seiten.
+  function orbit(centre, offset, id) {
+    const v = viewer();
+    lp.orbit = { heading: offset.heading, t: performance.now() };
+    v.camera.lookAt(centre, offset);
+    function turn(now) {
+      if (id !== lp.id || !lp.orbit) { return; }
+      const dt = (now - lp.orbit.t) / 1000;
+      lp.orbit.t = now;
+      lp.orbit.heading += dt * (2 * Math.PI / 90);
+      v.camera.lookAt(centre, new Cesium.HeadingPitchRange(lp.orbit.heading,
+                                                           offset.pitch, offset.range));
+      requestAnimationFrame(turn);
+    }
+    requestAnimationFrame(turn);
+  }
+
+  function fail(source, err) {
+    const status = err && typeof err.statusCode === "number" ? err.statusCode : 0;
+    let body = err && err.response !== undefined ? err.response : "";
+    if (typeof body !== "string") { try { body = JSON.stringify(body); } catch (e) { body = ""; } }
+    lpSend({ event: "failed", kind: "tiles", source: source, status: status, body: body,
+             message: String(err && (err.message || err) || "unknown error") });
+  }
+
+  window.longpath = {
+    fly: function (f) {
+      lp.id += 1;
+      const id = lp.id;
+      cancelAnimationFrame(lp.raf);
+      lp.orbit = null;
+      lp.groundH = null;
+      if (lp.viewer) { lp.viewer.camera.cancelFlight(); }
+      hud(f, "");
+      tileset(f).then(function () {
+        if (id !== lp.id) { return; }
+        marks(f, f.home || null);
+        sampleGround(f, id);
+        travel(f, id);
+      }).catch(function (err) {
+        lp.key = null;   // naechster Flug fragt neu, statt am Fehler zu kleben
+        fail(f.source === "ion" ? "ion" : "google", err);
+      });
+    }
+  };
+
+  try {
+    viewer();
+  } catch (e) {
+    lpSend({ event: "failed", kind: "webgl", message: String(e && e.message || e) });
+    return;
+  }
+  lpSend({ event: "ready", cesium: Cesium.VERSION });
+})();
+</script>
+</body>
+</html>

@@ -336,6 +336,12 @@ longpath_add_test(tst_clarity_defaults)
 # ── Phase 3G-9c Clarity adaptive display tuning ──────────────────────────
 longpath_add_test(tst_noise_floor_estimator)
 longpath_add_test(tst_noise_floor_tracker)
+# Auto AGC-T misst nicht beim Senden; TransmitModel-MOX folgt dem
+# MoxController (2026-11-10, aus Upstream NereusSDR e5b3997bc / #720).
+longpath_add_test(tst_auto_agc_beim_senden)
+# Abgleich mit Upstream 2026.11.x (2026-11-10): TUNE/Zweiton-Leistung je
+# Band, TCI CWL/CWU als CW, Anvelina-DDC-Grenze aus Discovery-Byte 20.
+longpath_add_test(tst_abgleich_2026_11)
 # RX-Messwerte: PB SNR nach Thetis, feste Zahlenbreite (2026-09-27).
 longpath_add_test(tst_rx_meter_readings)
 longpath_add_test(tst_clarity_controller)
@@ -987,6 +993,7 @@ longpath_add_test(tst_dig_rtty_wire)
 
 # ── Phase 3G-10 Stage 2: per-slice-per-band DSP persistence (S2.P) ───────────
 longpath_add_test(tst_slice_persistence_per_band)
+longpath_add_test(tst_rate_schritt_je_scheibe)
 
 # ── v0.2.0 regression: band-change lambda reentrancy guard ───────────────────
 longpath_add_test(tst_band_change_recursion_guard)
@@ -1034,6 +1041,14 @@ longpath_add_test(tst_band_from_name)
 longpath_add_test(tst_slice_has_settings_for)
 longpath_add_test(tst_band_defaults)
 longpath_add_test(tst_radio_model_band_click)
+
+# ── Bandstapel (2026-11-11, nach Upstream NereusSDR PR #748) ─────────────
+longpath_add_test(tst_bandstack_seeds)
+longpath_add_test(tst_bandstack_store)
+longpath_add_test(tst_bandstack_controller)
+longpath_add_test(tst_bandstack_applet)
+# Das echte Hauptfenster offscreen, Verbindung vorgetaeuscht.
+longpath_add_test(tst_bandstapel_im_fenster)
 
 # ── About dialog ─────────────────────────────────────────────────────────
 longpath_add_test(tst_about_dialog)
@@ -1112,6 +1127,7 @@ longpath_add_test(tst_begleitgeraet_seite)
 # Die Dauerverbindung: nicht von selbst verbinden, nicht sich selbst
 # befragen, und der Versatz beim Laden.
 longpath_add_test(tst_begleitgeraet_regler)
+longpath_add_test(tst_cat_funkgeraet)
 
 # Der Versatz dort, wo er vor dem Betreiber landet -- und vor allem:
 # dass OHNE Transverter bitgleich nichts passiert.
@@ -1120,6 +1136,80 @@ longpath_add_test(tst_transverter_anzeige)
 # Datei -- ohne diesen Pfad ueberspraengen sie sich still (2026-10-31).
 if(TEST tst_transverter_anzeige)
     set_tests_properties(tst_transverter_anzeige PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
+# Transverter "nur Empfang" (2026-11-08): das SDR an IFo2 darf nicht
+# senden, und der Bandplan-Waechter faengt das nicht (28,300 -> 144,300
+# ist erlaubt). MOX/TUNE ueber die echte MOX-Pruefung, die Flex-Wege und
+# das Kaestchen auf der Seite. Ein Fall liest RadioModel.cpp.
+longpath_add_test(tst_transverter_nur_empfang)
+# tst_tune_abgewiesen (2026-11-08): ein abgewiesenes TUNE setzt weder
+#   Handbetrieb noch PTT-Modus (Thetis console.cs:30061-30069) -- vorher
+#   meldete es "transmit tune=1" an TGXL/PGXL, ohne Traeger.
+longpath_add_test(tst_tune_abgewiesen)
+# tst_s_stufen (2026-11-08): S-Stufen nach Thetis common.cs mit VHF-Bezug
+#   (S9 = -93 dBm ueber 30 MHz), die RX-Verstaerkung des Transverters im
+#   Pegelversatz (Thetis RXCalibrationOffset) und die S-Striche am Panadapter.
+longpath_add_test(tst_s_stufen)
+# tst_frequenz_eichung (2026-11-08): LO-Fehler des Transverters (Thetis
+#   xvtr.cs), Einmessen an einem Traeger (Thetis CalibrateFreq) auf KW und
+#   UKW, und der Korrekturfaktor auch bei P1 (Thetis NetworkIO.cs VFOfreq).
+longpath_add_test(tst_frequenz_eichung)
+# tst_rundum_lauf (2026-11-08): Rotor einmal herum in 30-Grad-Schritten,
+#   Belegung und Rauschboden je 5-Grad-Sektor, Rueckkehr, Abbruch.
+longpath_add_test(tst_rundum_lauf)
+# tst_rotor_bereich (2026-11-08): erlaubter Bereich des Rotors -- der Weg
+#   zaehlt, nicht nur das Ziel (Anschlag Nord/Sued/frei), und der
+#   Rundum-Lauf bleibt darin.
+longpath_add_test(tst_rotor_bereich)
+# tst_logbuch_blaetter (2026-11-08): Entwurfswerkzeug, rendert drei
+#   Logbuch-Ideen aus einer Logbuch-Kopie (LONGPATH_LOGBOOK_FIXTURE +
+#   LONGPATH_GRAB_DIR); ohne beide uebersprungen.
+longpath_add_test(tst_logbuch_blaetter)
+# tst_logbuch_bilder (2026-11-08): Bedarfs-Matrix, Band x Stunde und
+#   Richtungsrose -- Rechnung und Einbindung ins Logbuch-Fenster.
+# tst_single_instance_guard (2026-11-08): ein Longpath je Einstellungsordner;
+#   ein zweiter Start holt den laufenden nach vorne bzw. laesst ihn in den
+#   neueren Bau neu starten (aus dem Contestprogramm uebernommen).
+longpath_add_test(tst_single_instance_guard)
+longpath_add_test(tst_logbuch_bilder)
+if(TEST tst_logbuch_bilder)
+    set_tests_properties(tst_logbuch_bilder PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+# tst_logbuch_gesamtbilder (2026-11-10): Sonnenzyklus, Kontinent-Uhr und
+#   DXCC-Wand -- Rechnung, Flux-Cache, Widgets und der Weg ueber Stats/↗/
+#   Reiter im Logbuch-Fenster. Ein Renderfall aus einer Logbuch-Kopie nur
+#   mit LONGPATH_LOGBOOK_FIXTURE + LONGPATH_GRAB_DIR.
+longpath_add_test(tst_logbuch_gesamtbilder)
+if(TEST tst_logbuch_gesamtbilder)
+    set_tests_properties(tst_logbuch_gesamtbilder PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+# tst_hoehenprofil / tst_sota_gipfel / tst_sota_nachtrag /
+#   tst_hoehenprofil_fenster (2026-11-11): UKW-Hoehenprofil je QSO und der
+#   eigene Standort vom SOTA-Gipfel -- Geometrie gegen Handrechnung und
+#   gegen das Entwurfsblatt, Gipfel-Cache, CSV-Nachtrag, die Bedienung.
+#   Aufgezeichnete Hoehen/Antworten in tests/data/hoehenprofil, kein Netz.
+longpath_add_test(tst_hoehenprofil)
+longpath_add_test(tst_sota_gipfel)
+longpath_add_test(tst_sota_nachtrag)
+longpath_add_test(tst_hoehenprofil_fenster)
+foreach(_t tst_hoehenprofil tst_sota_gipfel tst_sota_nachtrag tst_hoehenprofil_fenster)
+    if(TEST ${_t})
+        set_tests_properties(${_t} PROPERTIES
+            ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+    endif()
+endforeach()
+# tst_grauzone (2026-11-10): Grauzone an beiden Enden je QSO, SFI und Kp
+#   des Tages aus der GFZ-Datei (aufgezeichneter Ausschnitt, kein Netz),
+#   Filter, Statistik und die Zeile in der Detailkarte.
+longpath_add_test(tst_grauzone)
+target_compile_definitions(tst_grauzone PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
+if(TEST tst_transverter_nur_empfang)
+    set_tests_properties(tst_transverter_nur_empfang PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
@@ -2263,6 +2353,11 @@ longpath_add_test(tst_audio_rate_matcher)
 #   leeren Puffer und regelt dagegen an, bis der Ton verstimmt ist.
 #   Dazu die Gegenprobe ohne Ausgleich, die leerlaufen MUSS.
 longpath_add_test(tst_rx_raten_angleich)
+# tst_rx_drift_flex_schuebe (2026-11-11): an der FLEX-8400 zog der Ausgleich
+#   -8000 ppm, weil der Bus nur zaehlte, was aus dem Ring kam. In Schueben
+#   misst die Vorsteuerung dann ihr eigenes Verhaeltnis. Zaehlregel jetzt wie
+#   Thetis xrmatchOUT: die volle Blocklaenge, auch bei Stille.
+longpath_add_test(tst_rx_drift_flex_schuebe)
 
 # ── Der Schalter fuer den Driftausgleich (2026-10-06) ───────────────────────
 # tst_rx_drift_schalter: ein Haekchen, das nichts schaltet, ist schlimmer als
@@ -2690,6 +2785,19 @@ if(TEST tst_flex_rauschsperre)
     set_tests_properties(tst_flex_rauschsperre PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
+# tst_flex_auto_sql (2026-11-08): Auto-SQL an der Flex -- Stufe = Rauschen
+#   der Scheibe (unteres Zehntel, 20 s) + Abstand; Knopf Aus/SQL/AUTO.
+longpath_add_test(tst_flex_auto_sql)
+if(TEST tst_flex_auto_sql)
+    set_tests_properties(tst_flex_auto_sql PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+# tst_logbuch_rotor_knopf (2026-11-10): ROTOR in der Eingabezeile --
+#   Peilung auch fuer neue Stationen, Rotate/LP, erlaubter Bereich, Lagequelle.
+longpath_add_test(tst_logbuch_rotor_knopf)
+# tst_rotorzeile_entwuerfe (2026-11-11): Werkzeug, Entwurfsblaetter der
+#   Rotorzeile (nur mit LONGPATH_GRAB_DIR, sonst uebersprungen).
+longpath_add_test(tst_rotorzeile_entwuerfe)
 
 longpath_add_test(tst_kombi_entwuerfe)
 longpath_add_test(tst_startmaske)
@@ -2705,6 +2813,12 @@ if(TEST tst_kombi_feld)
 endif()
 
 longpath_add_test(tst_flex_socketmeldung)
+
+longpath_add_test(tst_flex_zweiton_tor)
+if(TEST tst_flex_zweiton_tor)
+    set_tests_properties(tst_flex_zweiton_tor PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 
 longpath_add_test(tst_flex_vorverzerrung)
 if(TEST tst_flex_vorverzerrung)
@@ -5436,6 +5550,8 @@ longpath_add_test(tst_dock_ablage_nimmt_fenster_mit)
 longpath_add_test(tst_alles_sperren)
 longpath_add_test(tst_haekchen_sichtbar)
 longpath_add_test(tst_schwebende_folgen_dem_hauptfenster)
+# Raster-Nachhall des Hauptfensters (2026-11-11, am Geraet gemessen).
+longpath_add_test(tst_raster_nachhall)
 # Dieser Pruefstand misst Lagen von Fenstern GEGEN das Hauptfenster, und
 # das Hauptfenster ist mindestens 800x600 -- auf dem 800x800-Schirm, den
 # das offscreen-Plugin von sich aus hat, stoesst jedes schwebende Fenster
@@ -5461,6 +5577,11 @@ longpath_add_test(tst_real_status_bar_chain_indicators)
 longpath_add_test(tst_app_settings_autosave)
 longpath_add_test(tst_whisper_server_launcher)
 target_link_libraries(tst_whisper_server_launcher PRIVATE Qt6::Network)
+# -- Mitschrift im Contest (2026-11-11): Schneiden am Rauschboden statt
+#    an einer festen Schwelle (im Pileup lief jeder Abschnitt bis zum
+#    20-s-Deckel), und die Sprache hinter dem Zahnrad der Mitschrift. --
+longpath_add_test(tst_asr_rauschboden)
+longpath_add_test(tst_asr_sprache_menue)
 longpath_add_test(tst_pan_options_button)
 longpath_add_test(tst_window_widgets)
 # -- Roter Knopf = zu, auch beim naechsten Start (2026-09-27): Kanalzug,
@@ -5828,6 +5949,9 @@ longpath_add_test(tst_filter_follows_the_panadapter)
 longpath_add_test(tst_filter_pane_sheet)
 longpath_add_test(tst_tx_entwurf_sheet)
 longpath_add_test(tst_band_flyout_highlight_entwurf)
+# Zeichenwerkzeug, kein Prueflauf: ueberspringt sich ohne
+# LONGPATH_GRAB_DIR UND LONGPATH_ENTWURF=1.
+longpath_add_test(tst_bandstapel_entwurf)
 longpath_add_test(tst_band_flyout_highlight)
 longpath_add_test(tst_band_buttons)
 longpath_add_test(tst_container_title_does_not_shove)
@@ -5986,6 +6110,7 @@ longpath_add_test(tst_anf_tuning)
 # -- rotctld command line and the curated controller list: loopback
 #    only, no stray -r, and ARCO/ERC reachable from the picker --
 longpath_add_test(tst_rotctld_process)
+longpath_add_test(tst_daemon_ueberlebt_beenden_nicht)
 
 # -- Installing Hamlib for the operator: reading `rotctl --list` and
 #    `--version` by shape rather than by column, and the rule that the
@@ -6149,6 +6274,24 @@ longpath_add_test(tst_logbook_entry_row)
 # Logbuch-Durchgangstest (Nacht 2026-09-26): Neuschreiben verliert nichts, alle Ablaeufe.
 longpath_add_test(tst_logbook_durchgang)
 longpath_add_test(tst_qso_map_flyto_window)
+# 2026-11-10: das Logbuch soll herausstechen -- der eigene Google-Schluessel
+# (Schluesselbund, Test gegen die Map Tiles API, Anleitung) und der 3D-Flug
+# im Kartenfenster samt Rueckfall auf NASA + Google Earth. Beide ohne
+# WebEngine: die Karte kennt nur die Schnittstelle Station3dSurface.
+longpath_add_test(tst_google_map_tiles)
+longpath_add_test(tst_qso_map_3d_flug)
+# 2026-11-10: der QRZ-Zugang war seit 57d524b0f (2026-08-07) ueber kein
+# Menue mehr erreichbar, waehrend vier Stellen „in Tools" auf ihn zeigten.
+longpath_add_test(tst_qrz_konto_im_menue)
+# 2026-11-10, Live-Befund: „3D" in der eingebetteten Logbuch-Karte tat
+# ohne Schluessel sichtbar nichts. Echter Mausklick im echten Logbuch.
+longpath_add_test(tst_logbuch_3d_knopf)
+# Die WebEngine-Fassung selbst, nur wo Qt WebEngine gefunden wurde
+# (Homebrew-Qt am Mac; die Linux-/Windows-Laeufer haben es nicht).
+if(LONGPATH_HAS_WEBENGINE)
+    longpath_add_test(tst_station3d_view)
+    target_link_libraries(tst_station3d_view PRIVATE LongpathWeb3d)
+endif()
 # -- Satelliten ueber dem Horizont auf der Karte + Stempel im Detailpaneel --
 longpath_add_test(tst_qso_map_satellites)
 # -- Logbuch-Werkzeugleiste bricht um statt das Fenster breit zu halten --
@@ -6161,6 +6304,13 @@ longpath_add_test(tst_logbook_one_page)
 longpath_add_test(tst_blue_marble_fetcher)
 # -- DX-Radar: Wurzelskala, Himmelsrichtungen, Punkte, dritte Ansicht --
 longpath_add_test(tst_dx_radar)
+# -- Azimutalkarte als vierte Ansicht der QSO-Karte: Projektion hin und
+#    zurueck, Strahlenebene, Rotorkeil, Ziel, Ansichtswechsel --
+longpath_add_test(tst_azimutalkarte)
+# -- Locator-Jagd mit FT8 (2026-11-11): Mosaik je Band, gehoerte Stationen,
+#    der Klick auf der Karte geht denselben Weg wie der Doppelklick in der
+#    Fundliste, und ohne FT8 sagt er warum nicht --
+longpath_add_test(tst_ft8_locatorjagd)
 # -- Verbindungsfenster: der lange Fehlschlag-Text passt (Leiste + darunter, Hinweis) --
 longpath_add_test(tst_connect_failure_text_fits)
 
@@ -6199,6 +6349,10 @@ longpath_add_test(tst_profilschiene_bindung)
 #    eigenen Fenster und die zwei Chrome-Eintraege ueberstehen densel-
 #    ben Rundgang in der Sichtbarkeits-Karte --
 longpath_add_test(tst_real_layout_profile_roundtrip)
+
+# -- Ein Bau ohne Contestprogramm wirft die Contest-Anordnung der Profile
+#    nicht weg (2026-11-11). Mit Contestprogramm uebersprungen.
+longpath_add_test(tst_profil_contest_ohne_contestprogramm)
 
 # -- Widgets im rechten Stapel verschieben. Geprueft wird die eine
 #    Eigenschaft, an der so etwas scheitert: dass die sichtbare Reihen-
@@ -6306,6 +6460,12 @@ if(TEST tst_settings_migration_longpath)
 endif()
 longpath_add_test(tst_wav_file)
 longpath_add_test(tst_voice_keyer)
+# Tastenkuerzel und Sprachspeicher-Senden (2026-11-10).
+longpath_add_test(tst_voice_keyer_player)
+longpath_add_test(tst_hot_key_bindings)
+longpath_add_test(tst_hot_key_dispatcher)
+longpath_add_test(tst_hot_key_window)
+longpath_add_test(tst_fkey_priority)
 longpath_add_test(tst_qso_recorder)
 longpath_add_test(tst_wav_recorder)
 longpath_add_test(tst_wav_recorder_controller)
@@ -6779,6 +6939,14 @@ if(Qt6WebSockets_FOUND)
     target_link_libraries(tst_tci_audio_roundtrip PRIVATE Qt6::WebSockets)
 endif()
 
+# TCI-Clients-Panel: eine Zeile behaelt ihre Widgets, waehrend die Dauer
+# hochzaehlt, und der Kasten bleibt gleich hoch (2026-11-10, Upstream
+# NereusSDR d96e834b3 / #765).
+if(Qt6WebSockets_FOUND)
+    longpath_add_test(tst_tci_clients_panel_ruhig)
+    target_link_libraries(tst_tci_clients_panel_ruhig PRIVATE Qt6::WebSockets)
+endif()
+
 # ── Phase 3J-1 Task 18.1: IQ binary stream pipeline + IQSwap + AlwaysStreamIQ ──
 # Spins up a real TciServer + real QWebSocket client, subscribes to IQ for
 # slice 0, injects synthetic I/Q via the test-only injectRawIqForTest hook,
@@ -6799,10 +6967,12 @@ endif()
 if(LONGPATH_CONTESTPROGRAMM)
     longpath_add_test(tst_contestfenster)
     longpath_add_test(tst_contest_panels_im_containers_menu)
+    longpath_add_test(tst_cmdq_schliesst_das_logbuch)
     # Qt6::Sql kommt ueber das Submodul (find_package dort); der Pruefstand
     # belegt das Log vorab ueber SQLite, ohne Koepfe des Contestprogramms.
     target_link_libraries(tst_contestfenster PRIVATE Qt6::Sql)
     target_link_libraries(tst_contest_panels_im_containers_menu PRIVATE Qt6::Sql)
+    target_link_libraries(tst_cmdq_schliesst_das_logbuch PRIVATE Qt6::Sql)
 endif()
 
 # ── Phase 3J-1 Task 17.1: TX audio binary pipeline + single-client mutex ──────
@@ -8331,6 +8501,13 @@ longpath_add_test(tst_rendering_werkbank)
 longpath_add_test(tst_waterfall_column_reduce)
 longpath_add_test(tst_freq_scale_labels)
 
+# tst_panadapter_schaerfe (2026-11-08): Betreiber an den Entwurfsblaettern
+#   „Alles zusammen" -- Wasserfall in Geraete-Pixeln, Haarlinien-Raster,
+#   kurze Kurvenkante sind AN ab Werk. Prueft die Vorgabe, das Speichern
+#   und (mit QT_SCALE_FACTOR=2, auch offscreen) eine Wasserfallspalte je
+#   Geraete-Pixel. Gegenprobe gegen die alte Fassung gefahren.
+longpath_add_test(tst_panadapter_schaerfe)
+
 # ── Weiche Kante und Hof: die Zusage "beide aus = wie vorher" (2026-10-08) ──
 # tst_kurven_streifen: `Kurve::baue` entscheidet, aus wie vielen Baendern die
 #   GPU die Kurve zeichnet. Die Vorgabe beider Schalter ist AUS, und sie taugt
@@ -8343,6 +8520,13 @@ longpath_add_test(tst_freq_scale_labels)
 #   Schalterkombination schreibt mehr Streifen, als der GPU-Puffer hat.
 #   Reine Geometrie -- kein Fenster, keine GPU, laeuft offscreen im CI.
 longpath_add_test(tst_kurven_streifen)
+
+# tst_durchlass (2026-11-08): der Messkern hinter Bandbreite ablesbar,
+#   Signal-Klammern, Durchlass-Lupe und Lueckenfinder -- ohne Fenster.
+longpath_add_test(tst_durchlass)
+# tst_durchlass_anzeige: dieselben vier am Widget, mit echten Maus-
+#   ereignissen (Luecken-Klick, Kanten-Rast) und den Haken im Zahnrad.
+longpath_add_test(tst_durchlass_anzeige)
 
 # tst_kurve_setup_schalter: der haeufigste Fehler an einem neuen Schalter ist
 #   nicht, dass er falsch rechnet, sondern dass er NICHTS tut -- Kaestchen

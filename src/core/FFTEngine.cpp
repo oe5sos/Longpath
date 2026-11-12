@@ -10,6 +10,12 @@
 //   2026-04-17 — Reimplemented in C++20/Qt6 for NereusSDR by J.J. Boyd
 //                 (KG4VCF), with AI-assisted transformation via Anthropic
 //                 Claude Code.
+//   2026-11-10 — Messabschnitt je I/Q-Block fuer Auto AGC-T: ein Bild
+//                 geht nur dann an den Rauschbodenmesser, wenn sein ganzes
+//                 Fenster aus EINEM Empfangsabschnitt stammt. Anzeige und
+//                 Bilder bleiben unveraendert. Uebernommen aus Upstream
+//                 NereusSDR e5b3997bc (#720, J.J. Boyd KG4VCF). Martin
+//                 Fischer (OE5SOS), KI-gestuetzt mit Anthropic Claude Code.
 // =================================================================
 
 //=================================================================
@@ -237,6 +243,22 @@ void FFTEngine::setDecimation(int factor)
 
 void FFTEngine::feedIQ(const QVector<float>& interleavedIQ)
 {
+    feedIQWithAutoAgcEpoch(interleavedIQ, 1);
+}
+
+void FFTEngine::feedIQForAutoAgc(const QVector<float>& interleavedIQ, quint64 epoch)
+{
+    feedIQWithAutoAgcEpoch(interleavedIQ, epoch);
+}
+
+void FFTEngine::feedIQWithAutoAgcEpoch(const QVector<float>& interleavedIQ, quint64 epoch)
+{
+    // Upstream NereusSDR e5b3997bc (#720): ein neuer Abschnitt faengt mit
+    // null sauberen Proben an.
+    if (m_autoAgcInputEpoch != epoch) {
+        m_autoAgcInputEpoch = epoch;
+        m_autoAgcCleanSamples = 0;
+    }
 #ifdef HAVE_FFTW3
     // Ein Loch im Strom macht das angefangene Fenster wertlos: der
     // Sprung an der Nahtstelle ist breitbandig und malt einen Schmierer
@@ -299,6 +321,9 @@ void FFTEngine::feedIQ(const QVector<float>& interleavedIQ)
         m_iqRaw[m_iqWritePos][0] = interleavedIQ[i * 2 + 1];  // Q -> I
         m_iqRaw[m_iqWritePos][1] = interleavedIQ[i * 2];      // I -> Q
         m_iqWritePos++;
+        // Bei jeder Probe zaehlen, nicht nach dem Block: ein Block kann
+        // mehrere Fenster fuellen, darunter sein erstes gemischtes.
+        m_autoAgcCleanSamples = qMin(m_autoAgcCleanSamples + 1, m_currentFftSize);
     }
 #else
     Q_UNUSED(interleavedIQ);
@@ -332,6 +357,7 @@ bool FFTEngine::applyPendingWindowReset()
         return false;
     }
     m_iqWritePos = 0;
+    m_autoAgcCleanSamples = 0;
     m_refillingAfterReset = true;
     m_windowResets.fetch_add(1);
     return true;
@@ -412,6 +438,7 @@ void FFTEngine::replanFft()
 
     m_currentFftSize = size;
     m_iqWritePos = 0;
+    m_autoAgcCleanSamples = 0;
 
     // Recompute window coefficients
     computeWindow();
@@ -699,6 +726,11 @@ void FFTEngine::processFrame()
     // term at line 348 above.  Both ride the same signal — keeps slot
     // and bins in lock-step without a separate setter coordination dance.
     emit fftReady(m_receiverId, binsDbm);
+    // Nur ein ganzes Fenster aus einem Empfangsabschnitt (gerade Nummer).
+    if ((m_autoAgcInputEpoch & 1U) == 0
+        && m_autoAgcCleanSamples == m_currentFftSize) {
+        emit autoAgcFrameReady(m_receiverId, binsDbm, m_autoAgcInputEpoch);
+    }
     emit fftReadyLinear(m_receiverId, binsLinear,
                         m_windowEnb, static_cast<double>(m_dbmOffset));
 
@@ -724,8 +756,10 @@ void FFTEngine::processFrame()
                      m_iqRaw + advance,
                      static_cast<size_t>(overlap) * sizeof(fftwf_complex));
         m_iqWritePos = overlap;
+        m_autoAgcCleanSamples = qMin(m_autoAgcCleanSamples, overlap);
     } else {
         m_iqWritePos = 0;
+        m_autoAgcCleanSamples = 0;
     }
 
     // 2026-05-26 KG4VCF: record FFT compute time after all per-frame

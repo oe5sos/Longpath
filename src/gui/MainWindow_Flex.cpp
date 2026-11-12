@@ -60,10 +60,13 @@
 // Modification history (Longpath):
 //   2026-10-18 — Original for Longpath by Martin Fischer, AI-assisted
 //                 via Anthropic Claude (Cowork).
+//   2026-11-11 — Der Sprachspeicher als Quelle der Sendepumpe (F1…F10
+//                 an der Flex). KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 #include "gui/MainWindow.h"
 #include "gui/widgets/StatusToast.h"
+#include "gui/applets/RxApplet.h"
 
 #include "core/AudioEngine.h"
 #include "core/Ft8Tx.h"
@@ -85,6 +88,7 @@
 #include <algorithm>
 #include "gui/SpectrumWidget.h"
 #include "gui/widgets/CommandBar.h"
+#include "core/audio/VoiceKeyerPlayer.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "models/BandDefaults.h"
@@ -479,6 +483,14 @@ void MainWindow::wireFlex()
         // verdrahtet -- Art, Flanken, Rauschminderung.
         auto sperreHinaus = [this, ziel]() {
             if (m_shuttingDown || !m_radioModel) { return; }
+            // ── Auto-SQL (2026-11-08) ───────────────────────────────
+            //
+            // In AUTO stellt der Pegel der Scheibe die Stufe, nicht der
+            // Regler (FlexAutoRauschsperre.h) -- dann geht hier nichts
+            // hinaus, sonst ueberschriebe die Hand-Stufe die Automatik.
+            const bool automatik = ziel->ssqlEnabled() && ziel->ssqlAuto();
+            m_radioModel->setFlexAutoRauschsperre(automatik);
+            if (automatik) { return; }
             m_radioModel->sendeFlexRauschsperre(ziel->ssqlEnabled(),
                                                 ziel->ssqlThresh());
         };
@@ -488,6 +500,24 @@ void MainWindow::wireFlex()
         disconnect(m_flexSqlStufeBand);
         m_flexSqlStufeBand = connect(ziel, &SliceModel::ssqlThreshChanged, this,
                                      [sperreHinaus](double) { sperreHinaus(); });
+        disconnect(m_flexSqlAutoBand);
+        m_flexSqlAutoBand = connect(ziel, &SliceModel::ssqlAutoChanged, this,
+                                    [sperreHinaus](bool) { sperreHinaus(); });
+        // Der Knopf bietet AUTO an, solange eine Flex steht; der Regler
+        // zeigt dann den gespeicherten Abstand.
+        if (m_rxApplet) {
+            m_rxApplet->setAutoSqlMarge(m_radioModel->flexAutoMarge());
+            m_rxApplet->setAutoSqlVerfuegbar([this]() {
+                return !m_shuttingDown && m_radioModel
+                    && m_radioModel->istFlexVerbunden();
+            });
+            connect(m_rxApplet, &RxApplet::autoSqlMargeGeaendert,
+                    m_radioModel, &RadioModel::setFlexAutoMarge,
+                    Qt::UniqueConnection);
+            connect(m_radioModel, &RadioModel::flexAutoRauschsperreGestellt,
+                    m_rxApplet, &RxApplet::setAutoSqlStand,
+                    Qt::UniqueConnection);
+        }
 
         // ── Und die uebrigen Regler der Scheibe (2026-11-01) ────────
         //
@@ -1673,10 +1703,21 @@ void MainWindow::verdrahteFlexSenden()
             // Quellen zu mischen hiesze, sich selbst zu stoeren.
             int geholt = 0;
             bool vonFt8 = false;
+            //
+            // Der Sprachspeicher (2026-11-11) ist eine dritte Quelle,
+            // aber kein Datensignal: eine Ansage ist aufgenommene
+            // Stimme und geht darum durch dieselbe Aufbereitung wie das
+            // Mikrofon (vonFt8 bleibt false). Beim eigenen Geraet holt
+            // ihn der Mikrofon-Router ab; den hat die Flex nicht, also
+            // hier -- sonst ging F1 mit offenem Mikrofon auf Sendung.
+            VoiceKeyerPlayer* const ansage = m_radioModel->voiceKeyerPlayer();
             if (Ft8TxSource* ft8 = m_radioModel->ft8TxSource();
                 ft8 && ft8->laeuft()) {
                 geholt = ft8->pullSamples(m_flexMikMono.data(), kRahmen);
                 vonFt8 = true;
+            } else if (ansage != nullptr
+                       && ansage->state() == VoiceKeyerPlayer::State::Playing) {
+                geholt = ansage->source()->pullSamples(m_flexMikMono.data(), kRahmen);
             } else {
                 geholt = ae->pullTxMic(m_flexMikMono.data(), kRahmen);
                 ++m_flexTxVomMik;
@@ -1946,7 +1987,17 @@ void MainWindow::verdrahteFlexSenden()
             } else {
                 // Die Bedienung zeigt sonst „sendet", waehrend nichts
                 // hinausgeht. Der Grund steht im Protokoll.
-                m_radioModel->transmitModel().setMox(false);
+                //
+                // 2026-11-10: hier stand transmitModel().setMox(false).
+                // Mit MoxController ist der Riegel nur noch ein Spiegel
+                // des Controllers (RadioModel-Konstruktor) -- das haette
+                // nichts ausgetastet und waere beim naechsten Schritt des
+                // Controllers wieder auf „sendet" gesprungen. Darum der
+                // echte Weg, in die Warteschlange gelegt: wir stehen hier
+                // mitten in hardwareFlipped, also mitten in setMox().
+                QMetaObject::invokeMethod(m_radioModel, [rm = m_radioModel]() {
+                    rm->setMox(false);
+                }, Qt::QueuedConnection);
             }
         } else {
             if (m_flexSendePumpe) { m_flexSendePumpe->stop(); }

@@ -16,9 +16,14 @@
 #include "core/AppSettings.h"
 #include "core/BeamHeading.h"
 #include "core/CallsignCache.h"
+#include "core/GfzIndizes.h"
+#include "core/Grauzone.h"
 #include "core/Maidenhead.h"
 #include "core/QrzClient.h"
 #include "core/QsoConfirmation.h"
+#include "core/Hoehenprofil.h"
+#include "core/SotaGipfel.h"
+#include "gui/HoehenprofilFenster.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/StationPhoto.h"
 
@@ -244,6 +249,16 @@ void QsoDetailPane::buildUi()
     beam->addWidget(m_longPath,  1, 1);
     beam->addWidget(keyLabel(QStringLiteral("distance")),   2, 0);
     beam->addWidget(m_distance,  2, 1);
+    // Woher die Lage stammt (2026-11-10): Adresse, Locator oder nur die
+    // Mitte des Landes. Bernstein, wenn es nur grob ist.
+    m_lageLabel = valueLabel();
+    m_lageLabel->setWordWrap(true);
+    m_lageLabel->setToolTip(QStringLiteral(
+        "Where the station's position comes from. A street address or the "
+        "station's own entry is exact; a locator is a square of a few km; a "
+        "country centre only gives the rough direction."));
+    beam->addWidget(keyLabel(QStringLiteral("position")),   3, 0);
+    beam->addWidget(m_lageLabel, 3, 1);
     beam->setColumnStretch(0, 1);
     col->addLayout(beam);
 
@@ -264,6 +279,17 @@ void QsoDetailPane::buildUi()
                                 .arg(QLatin1String(Style::kAmberWarn)));
     m_travel->setWordWrap(true);
     col->addWidget(m_travel);
+
+    // Grauzone · SFI · Kp. Gedaempft wie die Beschriftungen daneben; ein
+    // Grauzonen-QSO in der Primaerfarbe — keine Signalfarbe, es ist eine
+    // Erklaerung, keine Warnung.
+    m_licht = new QLabel(this);
+    m_licht->setObjectName(QStringLiteral("qsoLicht"));
+    m_licht->setWordWrap(true);
+    m_licht->setVisible(false);
+    col->addWidget(m_licht);
+    connect(&GfzQuelle::instanz(), &GfzQuelle::aktualisiert,
+            this, &QsoDetailPane::refreshLicht);
 
     connect(m_turnShort, &QPushButton::clicked, this, [this]() {
         if (!m_haveEntry || !m_haveBeam) { return; }
@@ -310,7 +336,21 @@ void QsoDetailPane::buildUi()
     m_qrzPageBtn = new QPushButton(QStringLiteral("On qrz.com"), this);
     actions->addWidget(m_editBtn, 1);
     actions->addWidget(m_qrzPageBtn, 1);
+    m_profilBtn = new QPushButton(QStringLiteral("Profile"), this);
+    actions->addWidget(m_profilBtn, 1);
     col->addLayout(actions);
+    connect(m_profilBtn, &QPushButton::clicked, this, &QsoDetailPane::oeffneProfil);
+    // Ein Gipfel, der nachgeschlagen ist, aendert Peilung und Entfernung.
+    auto gipfel = [this](const QString& ref) {
+        if (!m_haveEntry) { return; }
+        const QString r = SotaGipfelVerzeichnis::normalisiere(ref);
+        if (r == SotaGipfelVerzeichnis::normalisiere(m_entry.mySotaRef)
+            || r == SotaGipfelVerzeichnis::normalisiere(m_entry.sotaRef)) {
+            refreshBeam();
+        }
+    };
+    connect(&SotaGipfelVerzeichnis::instanz(), &SotaGipfelVerzeichnis::gipfelBekannt,
+            this, gipfel);
 
     connect(m_editBtn, &QPushButton::clicked,
             this, &QsoDetailPane::editRequested);
@@ -409,6 +449,57 @@ void QsoDetailPane::setRotorBearing(double deg)
     refreshBeam();
 }
 
+void QsoDetailPane::setCty(const CtyDatParser* cty)
+{
+    m_cty = cty;
+    refreshLicht();
+}
+
+void QsoDetailPane::setMeinFeldErsatz(const QString& feld)
+{
+    if (m_meinFeldErsatz == feld) { return; }
+    m_meinFeldErsatz = feld;
+    refreshLicht();
+}
+
+void QsoDetailPane::refreshLicht()
+{
+    if (!m_licht) { return; }
+    // Kein QSO, kein Licht: eine nachgeschlagene Station hat keine Zeit.
+    if (!m_haveEntry || m_notLogged || !m_entry.timeOn.isValid()) {
+        m_licht->clear();
+        m_licht->setToolTip(QString());
+        m_licht->setVisible(false);
+        return;
+    }
+    const Grauzone::QsoLicht licht = Grauzone::fuer(m_entry, m_meinFeldErsatz, m_cty);
+    const GfzIndizes& gfz = GfzQuelle::instanz().daten();
+
+    QStringList teile;
+    const QString satz = Grauzone::kurztext(licht);
+    if (!satz.isEmpty()) { teile << satz; }
+    const QString wetter = gfz.kurztext(m_entry.timeOn);
+    if (!wetter.isEmpty()) { teile << wetter; }
+    if (teile.isEmpty()) {
+        m_licht->clear();
+        m_licht->setVisible(false);
+        return;
+    }
+    m_licht->setText(teile.join(QStringLiteral(" · ")));
+    m_licht->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+        .arg(QLatin1String(licht.grauzonenQso() ? Style::kTextPrimary
+                                                : Style::kTextScale)));
+
+    QStringList hinweis;
+    const QString h1 = Grauzone::hinweis(licht);
+    if (!h1.isEmpty()) { hinweis << h1; }
+    const QString h2 = gfz.hinweis(m_entry.timeOn);
+    if (!h2.isEmpty()) { hinweis << h2; }
+    else { hinweis << QStringLiteral("No solar flux or Kp on file for this day."); }
+    m_licht->setToolTip(hinweis.join(QStringLiteral("\n\n")));
+    m_licht->setVisible(true);
+}
+
 void QsoDetailPane::clearEntry()
 {
     m_lookupDelay->stop();
@@ -495,16 +586,14 @@ void QsoDetailPane::applyInfo(const CallsignInfo& info, bool stale)
 {
     m_info = info;
 
-    // Verortet? Dann darf die Karte hinfliegen. QRZ-Koordinaten vor dem
-    // Locator, weil der Locator nur ein Feld von 4-6 Zeichen ist.
+    // Verortet? Dann darf die Karte hinfliegen -- an dieselbe Stelle, die
+    // die Peilung nimmt (stationsPunkt). Bis 2026-11-11 hatte die Karte
+    // ihre eigene Reihenfolge: bei SN7L Peilung 21° und Karte 42°.
     {
         double lat = 0.0, lon = 0.0;
-        bool placed = false;
-        if (info.hasLatLon) {
-            lat = info.latitude; lon = info.longitude; placed = true;
-        } else if (isValidGridSquare(info.grid)) {
-            calculateLatLonFromGridSquare(info.grid, lat, lon); placed = true;
-        }
+        Lage woher = Lage::Keine;
+        const bool qrzSagtEtwas = info.hasLatLon || isValidGridSquare(info.grid);
+        const bool placed = qrzSagtEtwas && stationsPunkt(lat, lon, woher, false);
         if (placed && !stale) {
             QStringList bits;
             if (!info.displayName().isEmpty()) { bits << info.displayName().toHtmlEscaped(); }
@@ -566,7 +655,69 @@ void QsoDetailPane::applyInfo(const CallsignInfo& info, bool stale)
     }
 }
 
-bool QsoDetailPane::beamNow(double& bearingDeg, double& km) const
+bool QsoDetailPane::logLocatorSchlaegtQrz() const
+{
+    // ── Contest, portabel: die QRZ-Adresse ist woanders ── 2026-11-11 ──
+    //
+    // SN7L (2 m, 2026-07-04) steht im Log mit JO70SS -- 21°, 344 km. Nach
+    // dem QRZ-Abruf sprang die Karte auf die Klubadresse in Lodz: 42°,
+    // 592 km. Ein sechsstelliger Locator im Log ist auf ±3 km genau und
+    // sagt, wo die Station an DIESEM Tag stand. Liegt der QRZ-Punkt in
+    // diesem Feld, ist er genauer und bleibt; liegt er draussen, ist er
+    // ein anderer Ort. Ein vierstelliger Log-Locator (OE5VVM, JN67) ist
+    // 75 km breit und schlaegt nichts.
+    const QString logged = m_entry.gridSquare.trimmed();
+    if (logged.size() < 6 || !isValidGridSquare(logged)) { return false; }
+    if (!m_info.isValid() || !m_info.hasLatLon) { return false; }
+    const QString qrzFeld = gridSquareFromLatLon(m_info.latitude, m_info.longitude);
+    return qrzFeld.left(6).compare(logged.left(6), Qt::CaseInsensitive) != 0;
+}
+
+bool QsoDetailPane::stationsPunkt(double& lat, double& lon, Lage& woher,
+                                  bool mitLandesmitte) const
+{
+    // Reihenfolge: der SOTA-Gipfel der Gegenstation; ein genauer
+    // Log-Locator, dem der QRZ-Punkt
+    // widerspricht; QRZ-Koordinaten; ein genauerer QRZ-Locator; der
+    // Locator aus dem Log; zuletzt die Landesmitte (nur fuer die
+    // Peilung -- die Karte fliegt dafuer nicht los).
+    const QString logged = m_entry.gridSquare.trimmed();
+    const QString looked = m_info.grid.trimmed();
+    // 2026-11-11: steht die Gegenstation auf einem Gipfel (SOTA_REF), gilt
+    // der -- die QRZ-Adresse eines Aktivierers ist sein Zuhause. Vor allem
+    // anderen, auch vor dem genauen Log-Locator (Probe-Merge Rotor +
+    // Hoehenprofil): der Gipfel ist punktgenau.
+    SotaGipfel ihrGipfel;
+    if (SotaGipfelVerzeichnis::instanz().gegenGipfel(m_entry, ihrGipfel)) {
+        lat = ihrGipfel.lat;
+        lon = ihrGipfel.lon;
+        woher = Lage::Gipfel;
+    } else if (logLocatorSchlaegtQrz()) {
+        calculateLatLonFromGridSquare(logged, lat, lon);
+        woher = Lage::LogLocator;
+    } else if (m_info.isValid() && m_info.hasLatLon) {
+        lat = m_info.latitude;
+        lon = m_info.longitude;
+        woher = Lage::QrzKoordinaten;
+    } else if (m_info.isValid() && isValidGridSquare(looked)
+               && looked.size() > logged.size()) {
+        calculateLatLonFromGridSquare(looked, lat, lon);
+        woher = Lage::QrzLocator;
+    } else if (isValidGridSquare(logged)) {
+        calculateLatLonFromGridSquare(logged, lat, lon);
+        woher = Lage::LogLocator;
+    } else if (mitLandesmitte && m_fallback && m_fallback(m_entry.call, lat, lon)) {
+        // Ohne QRZ und ohne Locator: die Mitte des Landes (cty.dat).
+        // Fuer die Richtung reicht das meist, fuer die Entfernung nicht
+        // -- darum steht es dabei (lageText).
+        woher = Lage::Landesmitte;
+    } else {
+        return false;
+    }
+    return true;
+}
+
+bool QsoDetailPane::beamNow(double& bearingDeg, double& km, Lage* lage) const
 {
     // ── Wo die Station ist ── 2026-09-26 ────────────────────────────
     //
@@ -575,20 +726,11 @@ bool QsoDetailPane::beamNow(double& bearingDeg, double& km) const
     // Mittelpunkt von JN67 74 km im Suedwesten -- "Turn to 234°", die
     // Karte daneben sagte 11°. Reihenfolge wie in applyInfo(): QRZ-
     // Koordinaten, dann ein genauerer QRZ-Locator, dann der aus dem Log.
+    // Seit 2026-11-11 steht die Reihenfolge an EINER Stelle
+    // (stationsPunkt), die auch applyInfo() fuer die Karte nimmt.
     double lat = 0.0, lon = 0.0;
-    const QString logged = m_entry.gridSquare.trimmed();
-    const QString looked = m_info.grid.trimmed();
-    if (m_info.isValid() && m_info.hasLatLon) {
-        lat = m_info.latitude;
-        lon = m_info.longitude;
-    } else if (m_info.isValid() && isValidGridSquare(looked)
-               && looked.size() > logged.size()) {
-        calculateLatLonFromGridSquare(looked, lat, lon);
-    } else if (isValidGridSquare(logged)) {
-        calculateLatLonFromGridSquare(logged, lat, lon);
-    } else {
-        return false;
-    }
+    Lage woher = Lage::Keine;
+    if (!stationsPunkt(lat, lon, woher, true)) { return false; }
 
     // Von wo: der eigene Locator dieses QSOs, sonst der der Station.
     QString home = m_entry.myGridSquare.trimmed();
@@ -597,14 +739,108 @@ bool QsoDetailPane::beamNow(double& bearingDeg, double& km) const
                    .value(QStringLiteral("StationGridSquare"), QString{})
                    .toString().trimmed();
     }
+    // Und sonst der eigene Locator aus dem juengsten QSO (LogbookWindow::
+    // meinFeld) -- fuer eine Station, die nicht im Log steht, gab es
+    // bisher keinen Ausgangspunkt.
+    if (!isValidGridSquare(home) && m_homeGrid) { home = m_homeGrid().trimmed(); }
     if (!isValidGridSquare(home)) { return false; }
     double hlat = 0.0, hlon = 0.0;
     calculateLatLonFromGridSquare(home, hlat, hlon);
+    // 2026-11-11: vom Gipfel (MY_SOTA_REF), nicht aus der Locatormitte --
+    // Martins JN67VV liegt im Tal, sieben Kilometer neben OE/OO-106.
+    // (Ohne jeden eigenen Locator gibt es weiter keine Peilung; das
+    // betrifft nur ein QSO mit Gipfel und ohne MY_GRIDSQUARE.)
+    SotaGipfel meinGipfel;
+    if (SotaGipfelVerzeichnis::instanz().eigenerGipfel(m_entry, meinGipfel)) {
+        hlat = meinGipfel.lat;
+        hlon = meinGipfel.lon;
+    }
 
     const BeamHeading::GreatCircle g = BeamHeading::greatCircle(hlat, hlon, lat, lon);
     bearingDeg = g.bearingDeg;
     km = g.km;
+    if (lage) { *lage = woher; }
     return true;
+}
+
+void QsoDetailPane::setPositionFallback(PositionFallback fn)
+{
+    m_fallback = std::move(fn);
+    refreshBeam();
+}
+
+void QsoDetailPane::setHomeGrid(std::function<QString()> fn)
+{
+    m_homeGrid = std::move(fn);
+    refreshBeam();
+}
+
+bool QsoDetailPane::peilung(double& bearingDeg, double& km) const
+{
+    if (!m_haveBeam) { return false; }
+    bearingDeg = m_beamDeg;
+    km = m_beamKm;
+    return true;
+}
+
+namespace {
+// Wie genau ein Locator ist: halbe Kantenlaenge, gerundet.
+QString locatorGenauigkeit(const QString& grid)
+{
+    const int n = grid.trimmed().size();
+    if (n >= 8) { return QStringLiteral("±300 m"); }
+    if (n >= 6) { return QStringLiteral("±3 km"); }
+    return QStringLiteral("±60 km");
+}
+} // namespace
+
+QString QsoDetailPane::lageText() const
+{
+    switch (m_lage) {
+    case Lage::QrzKoordinaten: {
+        // QRZ sagt mit <geoloc>, woher seine Koordinaten stammen.
+        const QString g = m_info.geoloc;
+        if (g == QLatin1String("user"))    { return QStringLiteral("set by the station (QRZ)"); }
+        if (g == QLatin1String("geocode")) { return QStringLiteral("street address (QRZ)"); }
+        if (g == QLatin1String("grid"))    {
+            return QStringLiteral("locator %1 (QRZ, %2)")
+                .arg(m_info.grid.trimmed(), locatorGenauigkeit(m_info.grid));
+        }
+        if (g == QLatin1String("zip"))     { return QStringLiteral("postcode centre (QRZ)"); }
+        if (g == QLatin1String("state"))   { return QStringLiteral("state centre (QRZ) — rough"); }
+        if (g == QLatin1String("dxcc") || g == QLatin1String("none")) {
+            return QStringLiteral("country centre (QRZ) — rough");
+        }
+        return QStringLiteral("coordinates (QRZ)");
+    }
+    case Lage::QrzLocator:
+        return QStringLiteral("locator %1 (QRZ, %2)")
+            .arg(m_info.grid.trimmed(), locatorGenauigkeit(m_info.grid));
+    case Lage::LogLocator:
+        return QStringLiteral("locator %1 (your log, %2)")
+            .arg(m_entry.gridSquare.trimmed(), locatorGenauigkeit(m_entry.gridSquare));
+    case Lage::Landesmitte:
+        return QStringLiteral("country centre — rough");
+    case Lage::Gipfel:
+        return QStringLiteral("summit %1 (SOTA)")
+            .arg(SotaGipfelVerzeichnis::normalisiere(m_entry.sotaRef));
+    case Lage::Keine:
+        break;
+    }
+    return QString();
+}
+
+bool QsoDetailPane::lageGrob() const
+{
+    if (m_lage == Lage::Landesmitte) { return true; }
+    if (m_lage == Lage::QrzKoordinaten) {
+        const QString g = m_info.geoloc;
+        return g == QLatin1String("state") || g == QLatin1String("dxcc")
+            || g == QLatin1String("none");
+    }
+    const QString grid = m_lage == Lage::QrzLocator ? m_info.grid : m_entry.gridSquare;
+    return (m_lage == Lage::QrzLocator || m_lage == Lage::LogLocator)
+        && grid.trimmed().size() < 6;
 }
 
 void QsoDetailPane::refreshBeam()
@@ -613,7 +849,15 @@ void QsoDetailPane::refreshBeam()
     // antenna due north because a position is missing is worse than
     // offering nothing.
     double sp = 0.0, km = 0.0;
-    const bool have = m_haveEntry && beamNow(sp, km) && km > 0.0;
+    Lage woher = Lage::Keine;
+    const bool have = m_haveEntry && beamNow(sp, km, &woher) && km > 0.0;
+    m_lage = have ? woher : Lage::Keine;
+    m_beamKm = have ? km : 0.0;
+    if (m_lageLabel) {
+        m_lageLabel->setText(have ? lageText() : QStringLiteral("—"));
+        m_lageLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(
+            QLatin1String(have && lageGrob() ? Style::kAmberWarn : Style::kTextPrimary)));
+    }
     const double before = m_haveBeam ? m_beamDeg : -1.0;
     m_haveBeam = have;
     m_beamDeg = have ? BeamHeading::wrap360(sp) : 0.0;
@@ -634,13 +878,17 @@ void QsoDetailPane::refreshBeam()
         } else if (m_notLogged) {
             // Not "your locator and theirs are missing" — there is no
             // contact here to have locators. Say the true thing.
+            // Seit 2026-11-10 gibt es fuer eine neue Station eine Peilung,
+            // sobald ihre Lage bekannt ist (QRZ, Locator oder Landesmitte).
+            // Fehlt sie trotzdem, ist das der ehrliche Grund.
             m_travel->setText(QStringLiteral(
-                "Not in your log — no bearing until you work them."));
+                "Not in your log — no position known for this station yet."));
         } else {
             m_travel->setText(QStringLiteral(
                 "No bearing — needs your locator and theirs."));
         }
         m_travel->setVisible(m_haveEntry);
+        emit peilungNeu();
         return;
     }
 
@@ -677,6 +925,7 @@ void QsoDetailPane::refreshBeam()
                                     .arg(QLatin1String(Style::kTextScale)));
         m_travel->setVisible(true);
     }
+    emit peilungNeu();
 }
 
 void QsoDetailPane::refreshExtras()
@@ -744,6 +993,7 @@ void QsoDetailPane::refreshExtras()
 
 void QsoDetailPane::refresh()
 {
+    refreshProfil();
     if (!m_haveEntry) {
         m_call->setText(QStringLiteral("—"));
         m_name->setVisible(false);
@@ -756,6 +1006,7 @@ void QsoDetailPane::refresh()
         m_editBtn->setEnabled(false);
         m_qrzPageBtn->setEnabled(false);
         refreshBeam();
+        refreshLicht();
         refreshExtras();
         return;
     }
@@ -798,7 +1049,60 @@ void QsoDetailPane::refresh()
     }
 
     refreshBeam();
+    refreshLicht();
     refreshExtras();
+}
+
+// ── Hoehenprofil (2026-11-11) ────────────────────────────────────────
+
+QString QsoDetailPane::ersatzLocator()
+{
+    return AppSettings::instance()
+        .value(QStringLiteral("StationGridSquare"), QString{})
+        .toString().trimmed();
+}
+
+void QsoDetailPane::refreshProfil()
+{
+    if (!m_profilBtn) { return; }
+    const bool ukw = m_haveEntry && !m_notLogged
+                     && Hoehenprofil::istUkwBand(m_entry.band, m_entry.freqMHz);
+    m_profilBtn->setVisible(ukw);
+    if (!ukw) { return; }
+
+    // Die Gipfel dieses QSOs nachschlagen (je Gipfel hoechstens einmal,
+    // siehe SotaGipfel.h) -- fuer die Peilung und fuer das Profil.
+    SotaGipfelVerzeichnis& v = SotaGipfelVerzeichnis::instanz();
+    v.anfragen(m_entry.mySotaRef);
+    v.anfragen(m_entry.sotaRef);
+
+    const bool gegenstelle = v.gegenEnde(m_entry).gueltig
+                             || !SotaGipfelVerzeichnis::normalisiere(m_entry.sotaRef).isEmpty();
+    m_profilBtn->setEnabled(gegenstelle);
+    m_profilBtn->setToolTip(gegenstelle
+        ? QStringLiteral("Terrain between you and %1: line of sight, Fresnel zone, "
+                         "horizon rays").arg(m_entry.call)
+        : QStringLiteral("Needs their locator (GRIDSQUARE) or summit (SOTA_REF)"));
+}
+
+HoehenprofilFenster* QsoDetailPane::profilFensterForTest() const
+{
+    return m_profilFenster.data();
+}
+
+void QsoDetailPane::oeffneProfil()
+{
+    if (!m_haveEntry) { return; }
+    if (!m_profilFenster) {
+        // Am Fenster des Logbuchs, nicht an der Karte: es ueberlebt einen
+        // Wechsel der Auswahl und schliesst sich mit dem Logbuch.
+        m_profilFenster = new HoehenprofilFenster(window());
+        m_profilFenster->setAttribute(Qt::WA_DeleteOnClose);
+    }
+    m_profilFenster->setEntry(m_entry, ersatzLocator());
+    m_profilFenster->show();
+    m_profilFenster->raise();
+    m_profilFenster->activateWindow();
 }
 
 } // namespace Longpath

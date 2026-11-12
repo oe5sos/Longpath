@@ -127,7 +127,7 @@ void RigctldClient::setTarget(const QString& host, quint16 port)
 
 void RigctldClient::setPollIntervalMs(int ms)
 {
-    m_pollMs = qBound(50, ms, 5000);
+    m_pollMs = qBound(20, ms, 5000);
     m_poll->setInterval(m_pollMs);
 }
 
@@ -175,6 +175,30 @@ void RigctldClient::setFrequencyHz(qint64 hz)
 {
     if (!isConnected() || hz <= 0) { return; }
     send(setFrequencyCommand(hz), Pending::Report);
+}
+
+QByteArray RigctldClient::setModeCommand(const QString& mode)
+{
+    const QString m = mode.trimmed().toUpper();
+    if (m.isEmpty()) { return {}; }
+    for (const QChar c : m) {
+        if (!c.isLetterOrNumber()) { return {}; }
+    }
+    return QStringLiteral("M %1 0\n").arg(m).toLatin1();
+}
+
+void RigctldClient::schalteZwischenspeicherAus()
+{
+    if (!isConnected()) { return; }
+    send(QByteArrayLiteral("\\set_cache 0\n"), Pending::Report);
+}
+
+void RigctldClient::setMode(const QString& mode)
+{
+    if (!isConnected()) { return; }
+    const QByteArray befehl = setModeCommand(mode);
+    if (befehl.isEmpty()) { return; }
+    send(befehl, Pending::Report);
 }
 
 void RigctldClient::poll()

@@ -72,8 +72,11 @@ inline constexpr float kKernMindestens = 0.35f;
 /// Ohne weiche Kante und ohne Hof: genau ein Streifen
 /// `{ +halbPx, deckkraft, -halbPx, deckkraft }` -- Wert fuer Wert der
 /// Stand vor diesem Entwurf.
+///
+/// `kante`      Breite des Auslaufs in Geraete-Pixeln (ab Werk
+///              kKantePixel; Schaerfe-Entwurf 2026-11-08: kleiner)
 inline int baue(bool weicheKante, bool hof, float halbPx, float dpr,
-                float deckkraft, Streifen* aus)
+                float deckkraft, Streifen* aus, float kante = kKantePixel)
 {
     int n = 0;
     if (hof) {
@@ -85,10 +88,10 @@ inline int baue(bool weicheKante, bool hof, float halbPx, float dpr,
     }
     if (weicheKante) {
         const float kern =
-            std::max(kKernMindestens, halbPx - 0.5f * kKantePixel);
-        aus[n++] = { kern + kKantePixel, 0.0f, kern, deckkraft };
+            std::max(kKernMindestens, halbPx - 0.5f * kante);
+        aus[n++] = { kern + kante, 0.0f, kern, deckkraft };
         aus[n++] = { kern, deckkraft, -kern, deckkraft };
-        aus[n++] = { -kern, deckkraft, -kern - kKantePixel, 0.0f };
+        aus[n++] = { -kern, deckkraft, -kern - kante, 0.0f };
     } else {
         aus[n++] = { halbPx, deckkraft, -halbPx, deckkraft };
     }

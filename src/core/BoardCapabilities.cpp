@@ -269,6 +269,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "BoardCapabilities.h"
 
+#include <algorithm>
+
 namespace Longpath {
 namespace {
 
@@ -1426,11 +1428,28 @@ const BoardCapabilities kUnknown = {
 // Size bumped from 10 → 12 in Phase 3M-0 Task 1 (added kHermesLiteRxOnly,
 // kAndromeda). Bumped 12 → 13 in ANAN-G2E port (added kHermesC10). //N1GP G2E added
 // Bumped 13 → 14 for the SunSDR native driver (added kSunSdr2Qrp), 2026-08-26.
+// Ein Funkgeraet hinter CAT: kein I/Q, keine OpenHPSDR-Hardware, und
+// gesendet wird am Geraet. Darum die sicheren Vorgaben von kUnknown, nur
+// mit eigener Kennung und isRxOnlySku. Siehe core/CatRigConnection.h.
+const BoardCapabilities kCatRig = [] {
+    BoardCapabilities c = kUnknown;
+    c.board       = HPSDRHW::CatRig;
+    c.protocol    = ProtocolVersion::CatRig;
+    c.isRxOnlySku = true;
+    c.displayName = "CAT rig";
+    // Ein Strom fuer den Ton. kUnknown hat keinen: ohne ihn bindet sich die
+    // Scheibe an nichts, und der Panadapter bleibt leer, obwohl die
+    // FFT rechnet und der Ton zu hoeren ist (gemessen 2026-11-07).
+    c.userDdcCount = 1;
+    c.maxSlices    = 1;
+    return c;
+}();
+
 // kUnknown remains last as the forBoard() fallback.
-const std::array<BoardCapabilities, 14> kTable = {
+const std::array<BoardCapabilities, 15> kTable = {
     kAtlas, kHermes, kHermesII, kAngelia, kOrion,
     kOrionMKII, kHermesC10, kHermesLite, kHermesLiteRxOnly,
-    kSaturn, kSaturnMKII, kAndromeda, kSunSdr2Qrp, kUnknown
+    kSaturn, kSaturnMKII, kAndromeda, kSunSdr2Qrp, kCatRig, kUnknown
 };
 
 } // anonymous namespace
@@ -1621,6 +1640,36 @@ int stepAttMaxDb(HPSDRHW hw, bool alexPresent) noexcept
     default:
         return 31;
     }
+}
+
+// Upstream NereusSDR a15d7a80a (#764, J.J. Boyd KG4VCF). Siehe die
+// Deklaration.
+//
+// Befund dort, 2026-11-06, Anvelina Pro 3 auf Gateware 22.15: das Geraet
+// meldet 5 Empfaenger (DDC0 bis DDC4). Mit DDC2 bis DDC6 eingeschaltet
+// liefern die Ports von DDC2 bis DDC4 voll, die von DDC5 und DDC6 nichts --
+// der dritte und vierte Pan blieben schwarz und zeigten LIVE.
+int ddcIndexLimit(const BoardCapabilities& caps, bool protocol2,
+                  int reportedReceivers) noexcept
+{
+    // Platinen mit einem ADC haben eigene Codecs und legen einen Strom auf
+    // DDC0; Protocol 1 nimmt die Zahl aus dem Schlitzplan des Rahmens.
+    if (!protocol2 || reportedReceivers <= 0 || caps.adcCount != 2) {
+        return 0;
+    }
+    // Saturns Zahl ist ein fester Wert in p2app, nicht die DDC-Zahl:
+    //   Saturn sw_projects/P2_app/p2app.c:427 [@4b0b76f]  -- 4, // 4DDC
+    //   Saturn sw_projects/common/saturnregisters.h:22 [@4b0b76f]
+    //     #define VNUMDDC 10   // downconverters available
+    // (zitiert nach Upstream NereusSDR a15d7a80a). Danach zu begrenzen
+    // naehme einer G2 zwei ihrer vier Pans.
+    if (caps.board == HPSDRHW::Saturn || caps.board == HPSDRHW::SaturnMKII) {
+        return 0;
+    }
+    // Empfaenger 0 sitzt beim Verbinden immer auf DDC2, was das Geraet auch
+    // meldet; die Grenze laesst ihn also stets stehen.
+    constexpr int kFirstDdcBeyondPrimary = 3;
+    return std::max(reportedReceivers, kFirstDdcBeyondPrimary);
 }
 
 } // namespace BoardCapsTable

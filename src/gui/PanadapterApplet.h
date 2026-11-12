@@ -156,6 +156,10 @@ public:
     /// is held at extendedMode == false regardless of zoom (forced off);
     /// when true, the zoom auto-derive decides extendedMode dynamically.
     bool extendedViewEnabled() const { return m_extendedViewEnabled; }
+    /// Zeigt wieder das Geraet statt des KiwiSDR, wie der Klick auf die
+    /// KIWI-Plakette.
+    void zeigeDasGeraet();
+
     void setExtendedViewEnabled(bool on);
 
     /// Test-only: build and return the right-click context menu without
@@ -164,6 +168,7 @@ public:
     /// AmpApplet::buildContextMenuForTesting().
     /// Longpath-native test seam.
     QMenu* buildContextMenuForTesting() { return buildContextMenu(this); }
+    void setMenuSpektrumPosForTesting(const QPoint& p) { m_menuSpektrumPos = p; }
 
     // ── Die Anzeigezeile (2026-11-06) ────────────────────────────────
     //
@@ -263,6 +268,9 @@ private:
     /// deleteLater()s it, buildContextMenuForTesting() hands it to a test
     /// untouched. Mirrors AmpApplet::buildContextMenu().
     QMenu* buildContextMenu(QObject* parent);
+    // Wo der Rechtsklick im Spektrum lag (Koordinaten des SpectrumWidget),
+    // fuer "Calibrate frequency on this carrier"; (-1,-1) = nicht im Bild.
+    QPoint m_menuSpektrumPos{-1, -1};
 
     /// Das Menue hinter dem Zahnrad in der Kopfleiste: Hintergrundbild,
     /// Deckkraft, Grundfarbe, und der Weg in den Setup-Dialog.

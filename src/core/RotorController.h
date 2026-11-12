@@ -31,6 +31,8 @@
 #include <QObject>
 #include <QString>
 
+#include "core/RotorBereich.h"
+
 namespace Longpath {
 
 class RotorController : public QObject {
@@ -74,6 +76,31 @@ public:
 
     // Halt where it is.
     virtual void stop() = 0;
+
+    // Erlaubter Bereich (2026-11-08, core/RotorBereich.h): darf ein
+    // Drehbefehl auf `azimuthDeg` ausgefuehrt werden? Geprueft wird der
+    // ganze Weg ab der gemeldeten Lage, solange sie frisch ist, sonst nur
+    // das Ziel. Jede Umsetzung ruft das am Anfang ihres moveTo().
+    bool zielErlaubt(double azimuthDeg) const
+    {
+        const RotorBereich b = RotorBereich::load();
+        if (!b.an) { return true; }
+        return hasFreshPosition() ? b.wegErlaubt(azimuth(), azimuthDeg)
+                                  : b.erlaubt(azimuthDeg);
+    }
+
+protected:
+    // Fuer moveTo(): ablehnen und sagen, warum. true = darf drehen.
+    bool pruefeZiel(double azimuthDeg)
+    {
+        if (zielErlaubt(azimuthDeg)) { return true; }
+        emit errorOccurred(QStringLiteral(
+            "Not turned — %1° or the way there is outside the allowed range "
+            "(%2).").arg(qRound(azimuthDeg)).arg(RotorBereich::load().beschreibung()));
+        return false;
+    }
+
+public:
 
 signals:
     void stateChanged(Longpath::RotorController::State state);

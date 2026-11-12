@@ -193,6 +193,7 @@ public:
 
     // ── Pure geometry, exposed for tests ─────────────────────────────
     // Subsolar point for a UTC instant: where the sun is overhead.
+    // Delegates to core/SolarTimes subsolarPoint() since 2026-11-10.
     static void subsolarPoint(const QDateTime& utc, double& lat, double& lon);
     // Point `f` of the way (0..1) along the great circle from a to b.
     static void interpolateGreatCircle(double latA, double lonA,

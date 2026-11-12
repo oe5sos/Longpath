@@ -23,6 +23,12 @@
 // Modification history (Longpath):
 //   2026-04-23 — New file for NereusSDR by J.J. Boyd (KG4VCF), with
 //                 AI-assisted transformation via Anthropic Claude Code.
+//   2026-11-11 — bandGridBandFromFrequency + bandMiddleHz fuer den
+//                 Bandstapel, mit den SWL-Bereichen aus
+//                 clsBandStackManager.cs:1360-1372 [@852bf0e]; nach
+//                 Upstream NereusSDR (2026-11-05, J.J. Boyd KG4VCF).
+//                 Martin Fischer (OE5SOS), KI-gestuetzt mit Anthropic
+//                 Claude Code.
 // =================================================================
 
 //=================================================================
@@ -210,6 +216,65 @@ double frequenzImBand(Band b, double hz)
         << " MHz liegt auszerhalb des Bandes — es wird die Vorgabe "
         << (saat.frequencyHz / 1.0e6) << " MHz genommen";
     return saat.frequencyHz;
+}
+
+namespace {
+
+struct SwlRange {
+    Band band;
+    double lowHz;
+    double highHz;
+};
+
+// From Thetis clsBandStackManager.cs:1360-1372 [@852bf0e] (case
+// FRSRegion.US, the SWL BandFrequencyData rows, low and high in MHz).
+// Die Rundfunkbaender haben bei uns keine Bandknoepfe; ihre Eintraege
+// im Bandstapel liegen unter diesen Baendern (Thetis-Startbelegung).
+constexpr SwlRange kSwlRanges[] = {
+    {Band::Band120m,  1800000.0,  3000000.0},  // 1.8, 3.0
+    {Band::Band90m,   3000000.0,  4100000.0},  // 3.0, 4.1
+    {Band::Band61m,   4100000.0,  5060000.0},  // 4.1, 5.06
+    {Band::Band49m,   5060000.0,  7200000.0},  // 5.06, 7.2
+    {Band::Band41m,   7200000.0,  9000000.0},  // 7.2, 9
+    {Band::Band31m,   9000000.0, 11600000.0},  // 9.0, 11.6
+    {Band::Band25m,  11600000.0, 13570000.0},  // 11.6, 13.57
+    {Band::Band22m,  13570000.0, 13870000.0},  // 13.57, 13.87
+    {Band::Band19m,  13870000.0, 17000000.0},  // 13.87, 17.0
+    {Band::Band16m,  17000000.0, 18000000.0},  // 17, 18.0
+    {Band::Band14m,  18000000.0, 21000000.0},  // 18.0, 21.0
+    {Band::Band13m,  21000000.0, 25000000.0},  // 21.0, 25
+    {Band::Band11m,  25000000.0, 28000000.0},  // 25.0, 28.0
+};
+
+} // namespace
+
+Band bandGridBandFromFrequency(double hz)
+{
+    // Die Amateurbaender und WWV zuerst, wie in bandFromFrequency.
+    const Band band = bandFromFrequency(hz);
+    if (band != Band::GEN) { return band; }
+    // From Thetis clsBandStackManager.cs:1240 [@852bf0e]:
+    //   if (freq >= low && freq <= high) - the first row that holds it.
+    for (const SwlRange& range : kSwlRanges) {
+        if (hz >= range.lowHz && hz <= range.highHz) { return range.band; }
+    }
+    return Band::GEN;
+}
+
+std::optional<double> bandMiddleHz(Band band)
+{
+    double low = 0.0;
+    double high = 0.0;
+    if (bandRangeHz(band, low, high)) {
+        return (low + high) / 2.0;
+    }
+    for (const SwlRange& range : kSwlRanges) {
+        if (range.band == band) {
+            return (range.lowHz + range.highHz) / 2.0;
+        }
+    }
+    const BandSeed seed = seedFor(band);
+    return seed.valid ? std::optional<double>(seed.frequencyHz) : std::nullopt;
 }
 
 } // namespace BandDefaults

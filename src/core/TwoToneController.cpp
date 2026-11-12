@@ -554,11 +554,6 @@ void TwoToneController::continueDeactivation()
         m_txChannel->setTxPostGenRun(false);
     }
 
-    if (m_savedPwrValid && m_tx) {
-        m_tx->setPower(m_savedPwr);
-        m_savedPwrValid = false;
-    }
-
     // Phase 4B of #167: clear the TransmitModel two-tone-active mirror.
     // The next setPowerUsingTargetDbm call (e.g. from RadioModel's
     // powerChanged lambda when MOX drops) will see m_twoToneActive=false
@@ -569,8 +564,28 @@ void TwoToneController::continueDeactivation()
     //
     // Cite: console.cs:11151-11177 [v2.10.3.13] — setActive(false) maps
     //       console.TwoTone = false at line 11154.
+    //
+    // 2026-11-10: VOR dem Zuruecksetzen von PWR, wie in Thetis:
+    //   From Thetis setup.cs:11194-11201 [@852bf0e]
+    //     console.TwoTone = false; // MW0LGE_21a
+    //     //MW0LGE_22b
+    //     if (console.TwoToneDrivePowerOrigin == DrivePowerSource.FIXED)
+    //         console.PWR = console.PreviousPWR;
+    // Hier lief es umgekehrt. Beim Start unter FIXED setzt setPower(twoTonePower)
+    // den Wert, bevor der Zweiton aktiv ist; die txMode-0-Rechnung legt ihn
+    // als Antrieb des Bandes ab (Thetis genauso). Thetis holt ihn beim Ende
+    // zurueck, weil PWR = PreviousPWR schon wieder im Normalbetrieb rechnet.
+    // Bei uns kam setPower(m_savedPwr) noch im Zweiton an,
+    // restoreNormalTxDrive stieg aus, und das Band behielt die
+    // Zweiton-Leistung bis zum naechsten Tasten -- nach einem Bandwechsel
+    // fuer immer.
     if (m_tx) {
         m_tx->setTwoToneActive(false);
+    }
+
+    if (m_savedPwrValid && m_tx) {
+        m_tx->setPower(m_savedPwr);
+        m_savedPwrValid = false;
     }
 
     if (m_active) {

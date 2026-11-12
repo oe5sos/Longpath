@@ -256,20 +256,40 @@ void SetAllRates (int channel, int in_rate, int dsp_rate, int out_rate)
 }
 
 PORT
+// Longpath-Aenderung (2026-11-10, aus Upstream NereusSDR 50610aafb /
+// 1271c1adc / 4056f13f9, J.J. Boyd KG4VCF): ein Ausschalten mit Warten
+// (state 0, dmode 1), das nach 100 ms aufgibt, setzte die drei Fahnen
+// blind zurueck -- auch wenn das letzte fexchange den Abfall schon beendet
+// und den Flush angefordert hatte (iobuffs.c: exchange loeschen und
+// Sem_Flush freigeben, beides unter csEXCH). Dieser Flush konnte dann NACH
+// dem naechsten SetChannelState(ch, 1, 0) laufen, setzte exec_bypass auf
+// einem laufenden Kanal, und ein blockierendes fexchange0 wartete ewig auf
+// Ausgabe. Jetzt werden die Fahnen unter csEXCH gesetzt und
+// zurueckgesetzt, und wenn ein Flush unterwegs ist, wird auf ihn gewartet.
+// Ein Ausschalten, das rechtzeitig fertig wird, ist unveraendert.
+// Upstream WDSP und Thetis (wdsp/channel.c:259-286 [@852bf0e]) haben die
+// Luecke ebenfalls.
 int SetChannelState (int channel, int state, int dmode)
 {
 	IOB a = ch[channel].iob.pc;
 	int prior_state = ch[channel].state;
 	int count = 0;
 	const int timeout = 100;
+	int was_exchanging = 0;	// Longpath (2026-11-10): siehe oben
 	if (ch[channel].state != state)
 	{
 		ch[channel].state = state;
 		switch (ch[channel].state)
 		{
 		case 0:
+			// Longpath (2026-11-10): beide Fahnen unter csEXCH. Ein Abfall,
+			// der zwischen den zwei Zeilen endete, forderte sonst einen
+			// Flush an, bevor flushflag stand, und niemand loeschte ihn.
+			EnterCriticalSection (&ch[channel].csEXCH);
+			was_exchanging = _InterlockedAnd (&ch[channel].exchange, 1);
 			InterlockedBitTestAndSet (&a->slew.downflag, 0);
 			InterlockedBitTestAndSet (&ch[channel].flushflag, 0);
+			LeaveCriticalSection (&ch[channel].csEXCH);
 			if (dmode)
 			{
 				while (_InterlockedAnd (&ch[channel].flushflag, 1) && count < timeout) 
@@ -280,9 +300,22 @@ int SetChannelState (int channel, int state, int dmode)
 			}
 			if (count >= timeout)
 			{
+				// Longpath (2026-11-10): ein Flush ist genau dann unterwegs,
+				// wenn exchange zu Beginn stand und jetzt geloescht ist --
+				// nur das fexchange0/2, das den Abfall beendet, loescht es
+				// waehrend eines Ausschaltens, zusammen mit der Freigabe von
+				// Sem_Flush, unter csEXCH. flushChannel loescht flushflag,
+				// sobald es gelaufen ist. Dann warten statt zuruecksetzen.
+				int flush_pending;
+				EnterCriticalSection (&ch[channel].csEXCH);
+				flush_pending = was_exchanging && !_InterlockedAnd (&ch[channel].exchange, 1);
 				InterlockedBitTestAndReset (&ch[channel].exchange, 0);
-				InterlockedBitTestAndReset (&ch[channel].flushflag, 0);
+				if (!flush_pending)
+					InterlockedBitTestAndReset (&ch[channel].flushflag, 0);
 				InterlockedBitTestAndReset (&a->slew.downflag, 0);
+				LeaveCriticalSection (&ch[channel].csEXCH);
+				while (flush_pending && _InterlockedAnd (&ch[channel].flushflag, 1))
+					Sleep(1);
 			}
 			break;
 		case 1:

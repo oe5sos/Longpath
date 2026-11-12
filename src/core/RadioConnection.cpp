@@ -8,6 +8,7 @@
 #include "P1RadioConnection.h"
 #include "P2RadioConnection.h"
 #include "SunSdrRadioConnection.h"
+#include "CatRigConnection.h"
 #include "PlaybackRadioConnection.h"
 #include "LogCategories.h"
 
@@ -37,6 +38,8 @@ std::unique_ptr<RadioConnection> RadioConnection::create(const RadioInfo& info)
         // Weg gehen wie bei einem Geraet — und nicht ein zweiter,
         // halber Weg daneben entsteht.
         return std::make_unique<PlaybackRadioConnection>();
+    case ProtocolVersion::CatRig:
+        return std::make_unique<CatRigConnection>();
     case ProtocolVersion::Flex:
         // Es gibt bewusst keine RadioConnection-Unterklasse fuer Flex.
         // Diese Basis ist durch und durch OpenHPSDR (Alex-Wege,

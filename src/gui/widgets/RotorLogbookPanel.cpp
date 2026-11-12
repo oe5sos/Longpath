@@ -11,6 +11,10 @@
 //   2026-10-21 — Eine Sonde bleibt offline: ein isolierter Lauf startet
 //                 rotctld nicht von selbst. Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 — Rotordialog: GS-232 am Netzserver oeffnet im Netzmodus
+//                 mit Host/Port vorbelegt; host:port in der Schnittstelle
+//                 gilt als Netzziel. Martin Fischer, KI-gestuetzt ueber
+//                 Anthropic Claude.
 //   2026-08-10 — workSpot() entry point for "Turn rotor to <call>" from
 //                 the Spot Hub. Enter in the callsign field now only
 //                 looks the station up (it used to also start the
@@ -68,6 +72,8 @@
 #include <QAction>
 #include <QColorDialog>
 #include <QComboBox>
+#include <QSpinBox>
+#include <QCheckBox>
 #include <QCryptographicHash>
 #include <QDialog>
 #include <QDir>
@@ -1178,6 +1184,12 @@ void RotorLogbookPanel::beginTurn()
 
     if (m_rotor && m_rotor->isConnected()) {
         m_dial->setSimulated(false);
+        // Erlaubter Bereich (2026-11-08): eine Ablehnung soll nicht als
+        // "dreht" stehen bleiben. Den Grund meldet moveTo() selbst.
+        if (!m_rotor->zielErlaubt(bearing)) {
+            m_dial->clearTarget();
+            m_dial->setState(RotorDialWidget::State::Idle);
+        }
         m_rotor->moveTo(bearing);
         return;
     }
@@ -1248,11 +1260,18 @@ void RotorLogbookPanel::ensureRotor()
             // /dev/tty* (gemessen 2026-10-21, siehe Gs232Rotor.h).
             const QString host =
                 sb.value(QStringLiteral("Rotor/Host"), QString{}).toString().trimmed();
+            QString netzHost;
+            quint16 netzPort = 0;
             if (!host.isEmpty()) {
                 gs232->setNetworkTarget(
                     host,
                     static_cast<quint16>(
                         sb.value(QStringLiteral("Rotor/NetPort"), 4001).toInt()));
+            } else if (Gs232Rotor::parseNetworkTarget(gs232->portName(),
+                                                      &netzHost, &netzPort)) {
+                // 2026-11-11: „172.30.30.16:4001" als Schnittstelle ist
+                // ein Netzziel, keine Datei (siehe parseNetworkTarget).
+                gs232->setNetworkTarget(netzHost, netzPort);
             }
             m_rotor   = gs232;
             m_rotctld = nullptr;
@@ -1335,6 +1354,9 @@ void RotorLogbookPanel::ensureRotor()
     connect(m_rotor, &RotorController::errorOccurred, this,
             [this](const QString& msg) {
         setStatus(QStringLiteral("Rotator: %1").arg(msg), true);
+        // Nach Rotate/LP in der Eingabezeile des Logbuchs steht es auch
+        // dort -- wer dort gedrueckt hat, schaut dort hin (2026-11-11).
+        if (m_logWindow) { m_logWindow->setRotorMeldung(msg); }
     });
 
     // 2026-09-16, found live against a microHAM ARCO on the LAN: the
@@ -1453,11 +1475,38 @@ void RotorLogbookPanel::openRotorSetupDialog()
             .toString().trimmed().toLower() == QStringLiteral("gs232") ? 1 : 0);
     col->addWidget(driverBox);
 
+    // ── Wie er angeschlossen ist, beim GS-232 aus dessen eigenen
+    // Schluesseln (2026-11-11) ──────────────────────────────────────
+    //
+    // `RotorUseLocalSerial` gehoert zum rotctld-Weg. Martins ARCO laeuft
+    // seit 2026-10-21 ueber den direkten GS-232-Treiber am Netzserver
+    // (Rotor/Host = 172.30.30.16), der alte Schluessel stand aber noch
+    // auf „lokal". Der Dialog zeigte darum „Serial port on this
+    // computer", und „Connect" loeschte Rotor/Host und schrieb die
+    // Adresse als Schnittstelle -- danach „No such file or directory".
+    // Beim GS-232 sagt Rotor/Host (oder ein host:port in der
+    // Schnittstelle), ob er am Netz haengt.
+    const bool gs232Gespeichert =
+        s.value(QStringLiteral("Rotor/Backend"), QStringLiteral("rotctld"))
+            .toString().trimmed().toLower() == QStringLiteral("gs232");
+    QString gs232Host =
+        s.value(QStringLiteral("Rotor/Host"), QString{}).toString().trimmed();
+    quint16 gs232Port = static_cast<quint16>(
+        s.value(QStringLiteral("Rotor/NetPort"), 4001).toInt());
+    if (gs232Gespeichert && gs232Host.isEmpty()) {
+        Gs232Rotor::parseNetworkTarget(
+            s.value(QStringLiteral("Rotor/SerialPort"), QString{}).toString(),
+            &gs232Host, &gs232Port);
+    }
+    const bool gs232AmNetz = gs232Gespeichert && !gs232Host.isEmpty();
+
     auto* modeBox = new QComboBox(&dlg);
+    modeBox->setObjectName(QStringLiteral("rotorDialogMode"));
     modeBox->addItem(QStringLiteral("Controller on this computer"));
     modeBox->addItem(QStringLiteral("rotctld already running (network)"));
     modeBox->setCurrentIndex(
-        s.value(kRotorUseSerialKey, true).toBool() ? 0 : 1);
+        gs232Gespeichert ? (gs232AmNetz ? 1 : 0)
+                         : (s.value(kRotorUseSerialKey, true).toBool() ? 0 : 1));
     col->addWidget(modeBox);
 
     // Mechanical end stop (2026-08-10). The dial computes its travel
@@ -1493,6 +1542,78 @@ void RotorLogbookPanel::openRotorSetupDialog()
     });
     stopRow->addWidget(stopCombo, 1);
     col->addLayout(stopRow);
+
+    // ── Erlaubter Bereich (2026-11-08) ───────────────────────────────
+    //
+    // Betreiber: „zu hause ... soll der rotor nicht 360 drehen". Gilt fuer
+    // jeden Drehbefehl aus Longpath (RotorController::pruefeZiel) und
+    // rechnet mit dem Anschlag darueber: geprueft wird der WEG, nicht nur
+    // das Ziel (core/RotorBereich.h).
+    {
+        auto* limitRow = new QHBoxLayout;
+        auto* limitOn = new QCheckBox(QStringLiteral("Limit rotation to"), &dlg);
+        limitOn->setObjectName(QStringLiteral("rotorLimitOn"));
+        auto* vonSpin = new QSpinBox(&dlg);
+        auto* bisSpin = new QSpinBox(&dlg);
+        for (QSpinBox* sp : {vonSpin, bisSpin}) {
+            sp->setRange(0, 359);
+            sp->setWrapping(true);
+            sp->setSuffix(QStringLiteral("°"));
+            sp->setStyleSheet(Style::doubleSpinBoxStyle());
+        }
+        vonSpin->setObjectName(QStringLiteral("rotorLimitFrom"));
+        bisSpin->setObjectName(QStringLiteral("rotorLimitTo"));
+        auto* bisLabel = new QLabel(QStringLiteral("to"), &dlg);
+        auto* uhrLabel = new QLabel(QStringLiteral("clockwise"), &dlg);
+        limitRow->addWidget(limitOn);
+        limitRow->addWidget(vonSpin);
+        limitRow->addWidget(bisLabel);
+        limitRow->addWidget(bisSpin);
+        limitRow->addWidget(uhrLabel);
+        limitRow->addStretch(1);
+        col->addLayout(limitRow);
+        auto* limitNote = new QLabel(&dlg);
+        limitNote->setObjectName(QStringLiteral("rotorLimitNote"));
+        limitNote->setWordWrap(true);
+        limitNote->setStyleSheet(QString::fromLatin1(Style::kSecondaryLabelStyle));
+        col->addWidget(limitNote);
+
+        const RotorBereich b = RotorBereich::load();
+        limitOn->setChecked(b.an);
+        vonSpin->setValue(qRound(b.vonGrad) % 360);
+        bisSpin->setValue(qRound(b.bisGrad) % 360);
+
+        auto zeige = [limitOn, vonSpin, bisSpin, limitNote]() {
+            const RotorBereich r = RotorBereich::load();
+            vonSpin->setEnabled(limitOn->isChecked());
+            bisSpin->setEnabled(limitOn->isChecked());
+            QString t = QStringLiteral(
+                "Applies to every turn Longpath commands, including the way "
+                "there: %1.").arg(r.beschreibung());
+            double anfang = 0.0, spanne = 0.0;
+            if (r.an && r.anschlagGrad >= 0.0 && r.reichweite(r.vonGrad, &anfang, &spanne)
+                && spanne + 1.0 < std::fmod(r.bisGrad - r.vonGrad + 360.0, 360.0)) {
+                t += QStringLiteral(" The end stop lies inside this range, so the "
+                                    "rotator cannot pass from one side of it to the "
+                                    "other.");
+            }
+            limitNote->setText(t);
+        };
+        auto speichere = [limitOn, vonSpin, bisSpin, zeige]() {
+            RotorBereich r = RotorBereich::load();
+            r.an = limitOn->isChecked();
+            r.vonGrad = vonSpin->value();
+            r.bisGrad = bisSpin->value();
+            r.save();
+            zeige();
+        };
+        connect(limitOn, &QCheckBox::toggled, &dlg, speichere);
+        connect(vonSpin, &QSpinBox::valueChanged, &dlg, speichere);
+        connect(bisSpin, &QSpinBox::valueChanged, &dlg, speichere);
+        // Der Anschlag steht eine Zeile darueber und aendert die Rechnung.
+        connect(stopCombo, &QComboBox::currentIndexChanged, &dlg, zeige);
+        zeige();
+    }
 
     // ── Local: model + port + baud ───────────────────────────────────
     auto* localBox = new QWidget(&dlg);
@@ -1633,11 +1754,20 @@ void RotorLogbookPanel::openRotorSetupDialog()
     auto* netBox = new QWidget(&dlg);
     auto* netForm = new QFormLayout(netBox);
     netForm->setContentsMargins(0, 0, 0, 0);
-    auto* hostEdit = new QLineEdit(m_rotctld ? m_rotctld->host() : QString{}, netBox);
+    // Beim GS-232 am Netzserver stehen hier dessen Adresse und Port
+    // (2026-11-11) -- vorher kamen beide aus rotctld, das es auf diesem
+    // Weg nicht gibt, und die Felder standen leer bzw. auf 4533.
+    auto* hostEdit = new QLineEdit(
+        gs232AmNetz ? gs232Host : (m_rotctld ? m_rotctld->host() : QString{}), netBox);
+    hostEdit->setObjectName(QStringLiteral("rotorDialogHost"));
     hostEdit->setPlaceholderText(
         QStringLiteral("address running rotctld, e.g. 192.168.1.20"));
     netForm->addRow(QStringLiteral("Host"), hostEdit);
-    auto* portEdit = new QLineEdit(QString::number(m_rotctld ? m_rotctld->port() : 4533), netBox);
+    auto* portEdit = new QLineEdit(
+        QString::number(gs232AmNetz ? gs232Port
+                                    : (m_rotctld ? m_rotctld->port() : 4533)),
+        netBox);
+    portEdit->setObjectName(QStringLiteral("rotorDialogPort"));
     portEdit->setPlaceholderText(QStringLiteral("4533"));
     netForm->addRow(QStringLiteral("Port"), portEdit);
     col->addWidget(netBox);
@@ -1679,6 +1809,11 @@ void RotorLogbookPanel::openRotorSetupDialog()
                 ? QStringLiteral("Serial server on the network (ser2net, Moxa …)")
                 : QStringLiteral("rotctld already running (network)"));
         }
+        hostEdit->setPlaceholderText(gs232
+            ? QStringLiteral("address of the serial server, e.g. 192.168.1.20")
+            : QStringLiteral("address running rotctld, e.g. 192.168.1.20"));
+        portEdit->setPlaceholderText(gs232 ? QStringLiteral("4001")
+                                           : QStringLiteral("4533"));
 
         localBox->setVisible(local);
         netBox->setVisible(!local);
@@ -1804,7 +1939,16 @@ void RotorLogbookPanel::openRotorSetupDialog()
         // ist als das, was gerade laeuft.
         if (driverBox->currentIndex() == 1) {
             s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("gs232"));
-            if (local) {
+            QString netzHost;
+            quint16 netzPort = 0;
+            if (local && Gs232Rotor::parseNetworkTarget(
+                             portCombo->currentText(), &netzHost, &netzPort)) {
+                // „172.30.30.16:4001" im Schnittstellenfeld: ein Netzziel,
+                // keine Datei (2026-11-11). Als solches ablegen.
+                s.setValue(kRotorUseSerialKey, false);
+                s.setValue(QStringLiteral("Rotor/Host"), netzHost);
+                s.setValue(QStringLiteral("Rotor/NetPort"), netzPort);
+            } else if (local) {
                 s.setValue(QStringLiteral("Rotor/SerialPort"),
                            portCombo->currentText().trimmed());
                 s.setValue(QStringLiteral("Rotor/BaudRate"),

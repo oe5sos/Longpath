@@ -140,6 +140,27 @@ QRect mitMindestabstand(const QRect& wunsch, const QList<QRect>& nachbarn,
                         int abstand,
                         int maxUeberlappung = kSnapGridPx / 2);
 
+// Der Bezugspunkt fuer die Lage eines schwebenden Fensters im Profil.
+//
+// Gemessen 2026-11-07: die Fenster wanderten von Lauf zu Lauf um genau
+// 16 Punkte nach unten (Bandbreitenfilter 160, 176, 192). Auf macOS steht
+// ein frisch maximiertes Hauptfenster noch kurz an seinem alten Platz
+// (Geraetelog: y=48 statt 33), waehrend die Fenster schon gesetzt werden.
+// Alle landen damit 15 Punkte zu tief, das Raster macht 16 daraus, und
+// beim Beenden wird das als neue Lage gespeichert.
+//
+// Ein maximiertes Fenster steht aber fest in der linken oberen Ecke der
+// verfuegbaren Flaeche, auch solange es noch unterwegs ist. Das ist der
+// Bezugspunkt, nicht der noch veraltete Rahmen.
+QPoint bezugspunktFuerProfil(Qt::WindowStates zustand, const QRect& rahmen,
+                             const QRect& verfuegbar);
+
+// Steht das Hauptfenster schon dort, wo es hingehoert? Solange nicht,
+// liegen auch die Bedienleisten noch am falschen Platz, und der
+// Schutzrahmen schoebe Fenster, die gar nicht im Weg sind.
+bool hauptrahmenSteht(Qt::WindowStates zustand, const QRect& rahmen,
+                      const QRect& verfuegbar);
+
 // Von moveEvent() jeder schwebenden Fensterklasse mit einer Zeile
 // aufzurufen. Legt bei Bedarf einen einmaligen, an `w` gebundenen
 // Debounce-Timer an (kein Member in der aufrufenden Klasse noetig) und
@@ -154,6 +175,21 @@ QRect mitMindestabstand(const QRect& wunsch, const QList<QRect>& nachbarn,
 // bleiben unberuehrt.
 void snapToGridAfterSettle(QWidget* w, int grid = kSnapGridPx,
                            int delayMs = 180, bool snapSize = true);
+
+/// Ist der Sprung von `vorher` nach `jetzt` nur das Nachrasten des
+/// Rasters (snapToGridAfterSettle), keine Bewegung fuer sich?
+///
+/// Lage: unter einer Rasterweite je Achse -- eine Kante rueckt hoechstens
+/// um eine halbe Weite, die obere unter der Menueleiste um knapp eine
+/// ganze (y = 33 darf nicht auf 32, also auf 48).
+/// Groesse: unter ANDERTHALB Rasterweiten -- beide Kanten rasten ein,
+/// die obere unter der Menueleiste um bis zu 15, die untere um bis zu 8,
+/// zusammen hoechstens 23. Gerade beim Hauptfenster addiert sich das: am
+/// Geraet am 2026-11-11 gemessen y 33 -> 48 (+15) und Hoehe 738 -> 717
+/// (-21). Mit der alten Schwelle (eine Weite auch fuer die Groesse)
+/// galt das als eigene Bewegung, und die schwebenden Fenster blieben
+/// bei einem schnellen Groessenzug stehen.
+bool istRasterNachhall(const QRect& jetzt, const QRect& vorher, int grid = kSnapGridPx);
 
 /// Dafür sorgen, dass `w` auf einem verbundenen Bildschirm zu sehen
 /// ist. Verschoben wird, wenn (a) keine Geometrie gespeichert war,

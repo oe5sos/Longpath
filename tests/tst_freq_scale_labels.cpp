@@ -13,6 +13,37 @@ using namespace Longpath;
 class TestFreqScaleLabels : public QObject {
     Q_OBJECT
 private slots:
+    // Bis 500 kHz an einem normal breiten Fenster (1130 Punkte) bleibt die
+    // alte Treppe Wert fuer Wert (2026-11-08) -- niemand soll auf seinem
+    // gewohnten Bild eine Zahl wandern sehen.
+    void dieAlteTreppeBleibtBisFuenfhundertKilohertz()
+    {
+        QCOMPARE(SpectrumWidget::frequenzSchrittForTest(48000.0, 1130), 5000.0);
+        QCOMPARE(SpectrumWidget::frequenzSchrittForTest(96000.0, 1130), 10000.0);
+        QCOMPARE(SpectrumWidget::frequenzSchrittForTest(192000.0, 1130), 25000.0);
+        QCOMPARE(SpectrumWidget::frequenzSchrittForTest(500000.0, 1130), 25000.0);
+        QCOMPARE(SpectrumWidget::frequenzSchrittForTest(768000.0, 1130), 50000.0);
+    }
+
+    // Breiter als die alte Treppe reichte: 2 m ganz (4 MHz) und das, was
+    // der Flex kann (14 MHz). Die Zahlen duerfen nicht enger als 55 Punkte
+    // stehen -- vorher waren es bei 4 MHz 80 Zahlen auf 1130 Punkte.
+    void breiteBilderBekommenLesbareZahlen()
+    {
+        for (double bw : {1.0e6, 2.0e6, 4.0e6, 7.68e6, 14.0e6}) {
+            for (int px : {600, 1130, 2000}) {
+                const double s = SpectrumWidget::frequenzSchrittForTest(bw, px);
+                QVERIFY2(px * s / bw >= 55.0,
+                         qPrintable(QStringLiteral("%1 Hz auf %2 Punkte: Schritt %3")
+                                        .arg(bw).arg(px).arg(s)));
+            }
+        }
+        // 4 MHz auf 1130 Punkte: 250 kHz, also 16 Zahlen wie 144.25, 144.50.
+        QCOMPARE(SpectrumWidget::frequenzSchrittForTest(4.0e6, 1130), 250000.0);
+        QCOMPARE(SpectrumWidget::freqScaleLabelForTest(144250000.0, 250000.0),
+                 QStringLiteral("144.25"));
+    }
+
     void labelNamesTheFrequencyItStandsAt()
     {
         // 25 kHz: drei Stellen, sonst luegt jede zweite Marke.

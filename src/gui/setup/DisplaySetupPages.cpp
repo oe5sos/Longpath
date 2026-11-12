@@ -248,6 +248,9 @@ void SpectrumDefaultsPage::loadFromRenderer()
     m_gradientToggle->setChecked(sw->gradientEnabled());
     m_softEdgeToggle->setChecked(sw->traceSoftEdge());
     m_haloToggle->setChecked(sw->traceHalo());
+    m_wfFullResToggle->setChecked(sw->waterfallDevicePixels());
+    m_hairlineToggle->setChecked(sw->gridHairline());
+    m_shortEdgeToggle->setChecked(sw->traceEdgePx() < 0.75f);
     m_calOffsetSpin->setValue(static_cast<double>(sw->dbmCalOffset()));
     m_peakHoldToggle->setChecked(sw->peakHoldEnabled());
     m_peakHoldDelaySpin->setValue(sw->peakHoldDelayMs());
@@ -892,6 +895,46 @@ void SpectrumDefaultsPage::buildUI()
         }
     });
     renderForm->addRow(QString(), m_haloToggle);
+
+    // ── Schaerfe (2026-11-08) ────────────────────────────────────────
+    //
+    // Betreiber an den Entwurfsblaettern: „Alles zusammen" -- alle drei
+    // AN ab Werk. Hier lassen sie sich einzeln zuruecknehmen; vorher ging
+    // das nur ueber die Einstellungsdatei.
+    m_wfFullResToggle = new QCheckBox(QStringLiteral("Waterfall at full resolution"), renderGroup);
+    m_wfFullResToggle->setToolTip(QStringLiteral(
+        "One waterfall column per screen pixel. Off: one column per two pixels "
+        "on a Retina display, stretched and softened by the GPU — narrow "
+        "carriers (CW, FT8) look blurred."));
+    connect(m_wfFullResToggle, &QCheckBox::toggled, this, [this](bool on) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setWaterfallDevicePixels(on);
+        }
+    });
+    renderForm->addRow(QString(), m_wfFullResToggle);
+
+    m_hairlineToggle = new QCheckBox(QStringLiteral("Hairline grid"), renderGroup);
+    m_hairlineToggle->setToolTip(QStringLiteral(
+        "Grid lines one screen pixel wide, placed exactly where the trace is "
+        "drawn. Off: two pixels wide on a Retina display, rounded to whole "
+        "points."));
+    connect(m_hairlineToggle, &QCheckBox::toggled, this, [this](bool on) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setGridHairline(on);
+        }
+    });
+    renderForm->addRow(QString(), m_hairlineToggle);
+
+    m_shortEdgeToggle = new QCheckBox(QStringLiteral("Short trace edge"), renderGroup);
+    m_shortEdgeToggle->setToolTip(QStringLiteral(
+        "With the soft edge on: fade over half a pixel instead of a whole one. "
+        "Smooths the steps on steep slopes without making the line look soft."));
+    connect(m_shortEdgeToggle, &QCheckBox::toggled, this, [this](bool on) {
+        if (auto* w = model() ? model()->spectrumWidget() : nullptr) {
+            w->setTraceEdgePx(on ? 0.5f : 1.0f);
+        }
+    });
+    renderForm->addRow(QString(), m_shortEdgeToggle);
 
     contentLayout()->addWidget(renderGroup);
 

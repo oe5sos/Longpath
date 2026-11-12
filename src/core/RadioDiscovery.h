@@ -104,7 +104,11 @@ enum class ProtocolVersion : int {
     // Weg, den ein echtes Geraet speist (Phase 3M, Variante A des
     // Plans). Nichts davon wird erkannt — eine solche RadioInfo
     // entsteht nur, wenn der Betreiber eine Datei oeffnet.
-    Playback  = 5
+    Playback  = 5,
+    // Ein klassisches Funkgeraet, nur per CAT gefuehrt: kein I/Q, kein
+    // Senden aus Longpath. Wird nicht im Netz erkannt, sondern aus den
+    // CompanionRig*-Einstellungen gebaut. Siehe core/CatRigConnection.h.
+    CatRig    = 6
 };
 
 // Information about a discovered OpenHPSDR radio.
@@ -124,6 +128,12 @@ struct RadioInfo {
     QString firmwareText;
     int adcCount{1};                     // Derived from boardType (1 or 2)
     int maxReceivers{4};                 // Board-dependent max simultaneous RX
+    // Die Empfaengerzahl, die das Geraet selbst in Byte 20 meldet, 0 wenn es
+    // keine meldet (Byte 0, kurze Antwort, von Hand eingetragen oder aus der
+    // gespeicherten Liste). maxReceivers traegt dann die Tabellen-Vorgabe;
+    // dieses Feld haelt beides auseinander, damit der Strom-Pool der Zahl
+    // des Geraets folgen kann (BoardCapsTable::ddcIndexLimit). 2026-11-10.
+    int reportedReceivers{0};
 
     // Protocol
     ProtocolVersion protocol{ProtocolVersion::Protocol1};

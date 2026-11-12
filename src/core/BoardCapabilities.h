@@ -585,6 +585,20 @@ namespace BoardCapsTable {
     const BoardCapabilities& forModel(HPSDRModel m) noexcept;
     std::span<const BoardCapabilities> all() noexcept;
 
+    // Der erste DDC-Index, den das Geraet NICHT hat, oder 0 fuer keine
+    // Grenze. Kein Strom bekommt einen DDC an oder ueber ihr, und der
+    // Strom-Pool schrumpft mit (RadioModel::connectToRadio).
+    //
+    // Longpath-/NereusSDR-eigene Regel, kein Thetis-Port: Thetis behaelt die
+    // Zahl nur fuer seine Geraeteliste und schaltet DDC4 bis DDC6 auf dieser
+    // Familie nie ein; wir tun es. Gilt nur fuer Protocol 2 und die Platinen
+    // mit zwei ADCs, deren Gateware die Zahl sendet (Angelia, Orion,
+    // OrionMKII samt Anvelina Pro 3, Andromeda) -- nicht fuer Saturn, wo
+    // p2app die Zahl fest auf 4 setzt, obwohl zehn DDCs da sind.
+    // Uebernommen aus Upstream NereusSDR a15d7a80a (#764).
+    int ddcIndexLimit(const BoardCapabilities& caps, bool protocol2,
+                      int reportedReceivers) noexcept;
+
     // --- Per-model preamp/attenuator helpers ---
     // Porting from Thetis console.cs:40755-40825 SetComboPreampForHPSDR().
 

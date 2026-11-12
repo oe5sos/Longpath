@@ -1,0 +1,54 @@
+# PURPOSE: This file distributes the geomagnetic planetary three-hour index Kp and associated geomagnetic indices as well as relevant solar indices.
+# LICENSE: CC BY 4.0, except for the sunspot numbers contained in this file, which have the CC BY-NC 4.0 license
+# SOURCE: Geomagnetic Observatory Niemegk, GFZ Helmholtz Centre for Geosciences
+# PLEASE CITE: Matzka, J., Stolle, C., Yamazaki, Y., Bronkalla, O. and Morschhauser, A., 2021. The geomagnetic Kp index 
+# and derived indices of geomagnetic activity. Space Weather, https://doi.org/10.1029/2020SW002641
+#
+# Kp, ap and Ap
+# The three-hourly equivalent planetary amplitude ap is derived from Kp and the daily equivalent planetary amplitude Ap is the daily mean of ap.
+# Kp is unitless. Ap and ap are unitless and can be multiplied by 2 nT to yield the average geomagnetic disturbance at 50 degree geomagnetic latitude.
+# Kp, ap and Ap were introduced by Bartels (1949, 1957) and are produced by Geomagnetic Observatory Niemegk, GFZ Helmholtz Centre for Geosciences.
+# Described in: Matzka et al. (2021), see reference above.
+# Data publication: Matzka, J., Bronkalla, O., Tornow, K., Elger, K. and Stolle, C., 2021. Geomagnetic Kp index. V. 1.0. GFZ Data Services, 
+# https://doi.org/10.5880/Kp.0001
+# Note: the most recent values are nowcast values and will be replaced by definitive values as soon as they become available.
+# 
+# International Sunspot Number SN
+# The international sunspot number SN (written with subscript N) is given as the daily total sunspot number version 2.0 introduced in 2015.
+# The sunspot data is available under the licence CC BY-NC 4.0 from WDC-SILSO, Royal Observatory of Belgium, Brussels. Described in:
+# Clette, F., Lefevre, L., 2016. The New Sunspot Number: assembling all corrections. Solar Physics, 291, https://doi.org/10.1007/s11207-016-1014-y 
+# Note: the most recent values are preliminary and replaced by definitive values as soon as they become available.
+#
+# F10.7 Solar Radio Flux
+# Local noon-time observed (F10.7obs) and adjusted (F10.7adj) solar radio flux F10.7 in s.f.u. (10^-22 W m^-2 Hz^-1) is provided by 
+# Dominion Radio Astrophysical Observatory and Natural Resources Canada.
+# Described in: Tapping, K.F., 2013. The 10.7 cm solar radio flux (F10.7). Space Weather, 11, 394-406, https://doi.org/10.1002/swe.20064 
+# Note: For ionospheric and atmospheric studies the use of F10.7obs is recommended.
+# 
+# Short file description (for a detailed file description, see Kp_ap_Ap_SN_F107_format.txt):
+# 40 header lines, all starting with #
+# ASCII, blank separated and fixed length, missing data indicated by -1.000 for Kp, -1 for ap and SN, -1.0 for F10.7
+# YYYY MM DD is date of UT day, days is days since 1932-01-01 00:00 UT to start of UT day, days_m is days since 1932-01-01 00:00 UT to midday of UT day
+# BSR is Bartels solar rotation number, dB is day within BSR 
+# Kp1 to Kp8 (Kp for the eight eighth of the UT day), ap1 to ap8 (ap for the eight eighth of the UT day), Ap, SN, F10.7obs, F10.7adj
+# D indicates if the Kp and SN values are definitive or preliminary. D=0: Kp and SN preliminary; D=1: Kp definitive, SN preliminary; D=2 Kp and SN definitive
+#
+#
+# The format for each line is (i stands for integer, f for float):
+#iii ii ii iiiii fffff.f iiii ii ff.fff ff.fff ff.fff ff.fff ff.fff ff.fff ff.fff ff.fff iiii iiii iiii iiii iiii iiii iiii iiii  iiii iii ffffff.f ffffff.f i
+# The parameters in each line are:
+#YYY MM DD  days  days_m  Bsr dB    Kp1    Kp2    Kp3    Kp4    Kp5    Kp6    Kp7    Kp8  ap1  ap2  ap3  ap4  ap5  ap6  ap7  ap8    Ap  SN F10.7obs F10.7adj D
+1947 02 14  5523  5523.5 1556 25  0.000  0.000  1.667  1.333  1.000  1.333  1.667  1.000    0    0    6    5    4    5    6    4     4 282    260.4    254.0 2
+1947 02 15  5524  5524.5 1556 26  0.667  0.667  1.333  1.667  1.667  1.667  0.667  0.333    3    3    5    6    6    6    3    2     4 235     -1.0     -1.0 2
+2003 10 29 26234 26234.5 2323 27  4.667  4.000  9.000  8.000  7.667  7.667  8.667  8.667   39   27  400  207  179  179  300  300   204 250    291.7    287.7 2
+2003 10 30 26235 26235.5 2324  1  8.667  7.333  5.333  4.667  5.000  7.000  9.000  9.000  300  154   56   39   48  132  400  400   191 250    271.4    267.6 2
+2024 05 10 33733 33733.5 2601 20  2.667  2.667  2.333  2.000  3.667  7.667  8.667  8.667   12   12    9    7   22  179  300  300   105 172    223.4    227.9 2
+2024 05 11 33734 33734.5 2601 21  9.000  8.333  8.333  9.000  8.667  8.333  7.667  7.667  400  236  236  400  300  236  179  179   271 173    213.7    218.0 2
+2026 11 02 34639 34639.5 2635  8  0.667  1.333  2.333  2.000  1.333  1.667  1.000  0.000    3    5    9    7    5    6    4    0     5  49     97.3     95.8 0
+2026 11 03 34640 34640.5 2635  9  0.000  1.667  1.333  1.000  0.667  1.333  1.667  1.000    0    6    5    4    3    5    6    4     4  45     99.9     98.3 0
+2026 11 04 34641 34641.5 2635 10  2.000  2.667  3.333  2.333  2.333  1.000  1.333  1.667    7   12   18    9    9    4    5    6     9  77    110.6    108.8 0
+2026 11 05 34642 34642.5 2635 11  0.667  1.333  1.000  1.000  0.667  0.667  2.333  2.667    3    5    4    4    3    3    9   12     5  97    123.7    121.6 0
+2026 11 06 34643 34643.5 2635 12  2.333  0.667  2.333  2.000  2.000  2.000  2.333  3.000    9    3    9    7    7    7    9   15     8 113    125.3    123.1 0
+2026 11 07 34644 34644.5 2635 13  3.000  2.333  2.667  3.667  3.000  3.000  5.000  3.667   15    9   12   22   15   15   48   22    20  94    127.4    125.1 0
+2026 11 08 34645 34645.5 2635 14  4.667  3.333  3.333  3.333  2.667  3.333  4.000  2.667   39   18   18   18   12   18   27   12    20  75    127.6    125.3 0
+2026 11 09 34646 34646.5 2635 15  2.333  3.333  2.667  2.667  2.000  2.667  2.667  2.000    9   18   12   12    7   12   12    7    11  93    128.8    126.3 0

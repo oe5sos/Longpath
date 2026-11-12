@@ -16,6 +16,7 @@
 
 #include "core/AdifLog.h"
 #include "core/CtyDatParser.h"
+#include "core/Grauzone.h"
 #include "core/QsoConfirmation.h"
 
 #include <QHash>
@@ -123,7 +124,8 @@ QString LogbookStats::wasState(const LogEntry& e, const QString& key)
 
 LogbookStats LogbookStats::compute(const QVector<LogEntry>& entries,
                                    const CtyDatParser* cty,
-                                   const QDateTime& nowUtc)
+                                   const QDateTime& nowUtc,
+                                   const QString& meinFeld)
 {
     LogbookStats s;
     const QDateTime now = nowUtc.isValid() ? nowUtc.toUTC() : QDateTime::currentDateTimeUtc();
@@ -196,6 +198,13 @@ LogbookStats LogbookStats::compute(const QVector<LogEntry>& entries,
         if (e.distanceKm > s.longestKm) {
             s.longestKm = e.distanceKm;
             s.longestCall = e.call.trimmed();
+        }
+
+        const Grauzone::QsoLicht licht = Grauzone::fuer(e, meinFeld, cty);
+        if (licht.hier.licht != Grauzone::Licht::Unbekannt
+            || licht.dort.licht != Grauzone::Licht::Unbekannt) {
+            ++s.greyLineJudged;
+            if (licht.grauzonenQso()) { ++s.greyLine; }
         }
 
         const QString grid = e.gridSquare.trimmed().toUpper();

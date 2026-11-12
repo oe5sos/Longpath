@@ -50,6 +50,9 @@
 //                 CAT-Daemon (rigctld) denselben Rumpf benutzt statt
 //                 einer Abschrift. Verhalten unveraendert.
 //                 KI-gestuetzt ueber Anthropic Claude Code.
+//   2026-11-07 — Der Daemon stirbt mit dem Programm, auch auf dem Weg
+//                 ueber exit() (Cmd+Q unter macOS), siehe .cpp.
+//                 KI-gestuetzt ueber Anthropic Claude Code.
 // =================================================================
 
 #include <QObject>
@@ -156,6 +159,7 @@ private:
     quint16 m_defaultPort{0};
 
     QProcess m_proc;
+    qint64   m_gemerktePid{0};   // fuer den Weg ueber exit(), siehe .cpp
     quint16  m_listenPort{0};
     bool     m_stopRequested{false};
 

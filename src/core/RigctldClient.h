@@ -94,6 +94,7 @@ public:
     /// soll der Hand am Knopf folgen, nicht hinterherkriechen; ein
     /// Viertelsekundentakt auf der Rueckschleife kostet nichts.
     void setPollIntervalMs(int ms);
+    static constexpr int kStandardAbfrageMs = 250;
     int  pollIntervalMs() const { return m_pollMs; }
 
     /// Aelter als das, und die Frequenz wird nicht mehr angezeigt.
@@ -135,6 +136,18 @@ public:
     /// keine Verbindung steht.
     void setFrequencyHz(qint64 hz);
 
+    /// Schaltet den Zwischenspeicher von rigctld ab. Ab Werk beantwortet
+    /// Hamlib eine Frequenzfrage eine Sekunde lang aus dem Speicher
+    /// (gemessen: `get_cache` meldet 1000 ms, eine Antwort dauert 0,1 ms).
+    /// Fuer die Marke ist das gleichgueltig, fuer einen VFO, der dem Knopf
+    /// folgen soll, ist es ein Sekundentakt. Ohne Speicher fragt rigctld
+    /// wirklich das Geraet, in rund 3 ms.
+    void schalteZwischenspeicherAus();
+
+    /// Das Geraet auf diese Betriebsart stellen ("USB", "LSB", ...).
+    /// Tut nichts, wenn keine Verbindung steht.
+    void setMode(const QString& mode);
+
     // ── Protokoll, als reine Funktionen ─────────────────────────────
 
     /// "145000000\n" -> 145000000. Liefert false fuer alles, was keine
@@ -162,6 +175,11 @@ public:
     /// und ein Gebietsschema mit Tausenderpunkten waere eine
     /// Ablehnung.
     static QByteArray setFrequencyCommand(qint64 hz);
+
+    /// Der Befehl fuer die Betriebsart. Die 0 laesst die Durchlassbreite
+    /// beim Geraet. Nur Buchstaben und Ziffern gehen durch, damit ein
+    /// Text nie zu einem zweiten Befehl wird; alles andere ergibt leer.
+    static QByteArray setModeCommand(const QString& mode);
 
 signals:
     void stateChanged(State s);
@@ -221,7 +239,7 @@ private:
     QTimer* m_poll{nullptr};
     QTimer* m_retry{nullptr};
     QTimer* m_deadline{nullptr};
-    int     m_pollMs{250};
+    int     m_pollMs{kStandardAbfrageMs};
     quint64 m_tick{0};
 
     State     m_state{State::Disconnected};
