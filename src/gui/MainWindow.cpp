@@ -403,6 +403,7 @@ warren@wpratt.com
 #include "applets/DiversityApplet.h"
 #include "applets/CwxApplet.h"
 #include "applets/DvkApplet.h"
+#include "gui/hotkeys/FKeyPriority.h"
 #include "gui/hotkeys/HotKeyDispatcher.h"
 #include "gui/hotkeys/KeyboardRouter.h"
 #include "gui/hotkeys/MainWindowHotKeyTargets.h"

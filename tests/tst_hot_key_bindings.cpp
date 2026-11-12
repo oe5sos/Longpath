@@ -532,6 +532,35 @@ private slots:
         QCOMPARE(spy.at(0).at(0).toBool(), false);
     }
 
+    // Longpath, 2026-11-11: „F-Tasten zuerst" am Mac. Vorgabe an,
+    // gespeichert wird nur das Aus, resetAll laesst ihn stehen.
+    void fKeysFirstWirdGemerkt()
+    {
+        HotKeyBindings first;
+        QVERIFY(first.fKeysFirst());
+        QSignalSpy spy(&first, &HotKeyBindings::fKeysFirstChanged);
+        first.setFKeysFirst(true);
+        QCOMPARE(spy.count(), 0);
+        first.setFKeysFirst(false);
+        QCOMPARE(spy.count(), 1);
+        first.save();
+        QCOMPARE(storedHotKeySettings(), QStringList{"HotKeys/MacFKeysFirst"});
+        QCOMPARE(AppSettings::instance().value("HotKeys/MacFKeysFirst").toString(),
+                 QStringLiteral("False"));
+
+        HotKeyBindings second;
+        QSignalSpy spy2(&second, &HotKeyBindings::fKeysFirstChanged);
+        second.load();
+        QVERIFY(!second.fKeysFirst());
+        QCOMPARE(spy2.count(), 1);
+        second.resetAll();
+        QVERIFY(!second.fKeysFirst());
+
+        second.setFKeysFirst(true);
+        second.save();
+        QVERIFY(storedHotKeySettings().isEmpty());
+    }
+
     void saveStoresOnlyWhatDiffers()
     {
         HotKeyBindings first;

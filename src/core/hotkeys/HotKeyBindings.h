@@ -22,6 +22,8 @@
 // Modification history (Longpath):
 //   2026-11-10 - Uebernommen fuer Longpath von Martin Fischer (OE5SOS),
 //                KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 - Schalter „F-Tasten zuerst" (macOS, FKeyPriority).
+//                KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 // no-port-check: NereusSDR-original, in Longpath uebernommen.
 
@@ -76,6 +78,11 @@ public:
     bool enabled() const;
     void setEnabled(bool on);
 
+    // Nur macOS: F1…F12 liefern die F-Tasten, solange Longpath vorne ist
+    // (FKeyPriority). Vorgabe an.
+    bool fKeysFirst() const;
+    void setFKeysFirst(bool on);
+
     QString exportText() const;
     // Lines that fail are skipped and returned with reasons; good lines apply.
     // A key on a good line leaves any action the text does not list.
@@ -91,6 +98,7 @@ public:
 signals:
     void bindingsChanged();
     void enabledChanged(bool on);
+    void fKeysFirstChanged(bool on);
 
 private:
     void setDefaults();
@@ -100,6 +108,7 @@ private:
     QHash<QString, QChar> m_pins;
     QHash<QString, QString> m_actionByChord;
     bool m_enabled{true};
+    bool m_fKeysFirst{true};
 };
 
 } // namespace Longpath

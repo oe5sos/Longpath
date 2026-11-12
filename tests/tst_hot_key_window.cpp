@@ -9,10 +9,15 @@
 //
 // Geprueft:
 //   * eine Taste wirkt auf den aktiven Empfaenger (Pfeil, R, B, L, ])
-//   * in einem Textfeld bleiben die Tasten beim Textfeld
+//   * in einem Textfeld bleiben die Tasten beim Textfeld -- ausser den
+//     F-Tasten und Esc (N1MM: senden, waehrend man das Rufzeichen tippt;
+//     2026-11-11)
 //   * der Ausschalter schaltet wirklich aus
 //   * Esc ohne laufende Ansage wird NICHT geschluckt
 //   * F1 ohne Funkgeraet sendet nichts
+//   * am Mac F1…F12 als F-Tasten nur, solange Longpath vorne ist, und
+//     der Pruefstand selbst fasst den Tastaturmodus des Rechners nie an
+//     (2026-11-11)
 //   * kein Menue-Kuerzel ist doppelt vergeben (Strg+Umschalt+K und
 //     Strg+Umschalt+R waren es bis 2026-11-10 -- Qt loest dann keines
 //     von beiden aus), und die Sperrliste kennt die Menue-Kuerzel
@@ -21,6 +26,8 @@
 // Modification history (Longpath):
 //   2026-11-10 — Original fuer Longpath von Martin Fischer (OE5SOS),
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 — F-Tasten zuerst (FKeyPriority), KI-gestuetzt ueber
+//                 Anthropic Claude.
 // =================================================================
 
 #include <QtTest/QtTest>
@@ -31,6 +38,7 @@
 #include "core/audio/VoiceKeyerPlayer.h"
 #include "core/hotkeys/HotKeyBindings.h"
 #include "gui/MainWindow.h"
+#include "gui/hotkeys/FKeyPriority.h"
 #include "gui/hotkeys/HotKeyDispatcher.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -45,6 +53,21 @@
 using namespace Longpath;
 
 namespace {
+
+// Ein Textfeld, das mitschreibt, welche Tasten bei ihm ankommen.
+class FeldZeuge : public QLineEdit
+{
+public:
+    explicit FeldZeuge(QWidget* parent) : QLineEdit(parent) {}
+    QList<int> gesehen;
+
+protected:
+    void keyPressEvent(QKeyEvent* e) override
+    {
+        gesehen.append(e->key());
+        QLineEdit::keyPressEvent(e);
+    }
+};
 
 SliceModel* scheibe(MainWindow& mw)
 {
@@ -184,6 +207,29 @@ private slots:
         QCOMPARE(qint64(s->frequency()), qint64(7'100'000));
     }
 
+    void fTastenGeltenAuchBeimTippen()
+    {
+        // Rufzeichen tippen und mit F1 rufen, wie in N1MM. Das Feld
+        // bekommt die Buchstaben, die Weiche die F-Tasten. Esc ohne
+        // laufende Ansage bleibt beim Feld.
+        MainWindow mw;
+        QVERIFY(scheibe(mw) != nullptr);
+        auto* feld = new FeldZeuge(&mw);
+        feld->show();
+        QVERIFY(aktiv(&mw));
+        feld->setFocus();
+        QTRY_VERIFY(feld->hasFocus());
+
+        QTest::keyClicks(feld, QStringLiteral("oe5"));
+        QTest::keyClick(feld, Qt::Key_F1);
+        QTest::keyClick(feld, Qt::Key_F2, Qt::ControlModifier | Qt::ShiftModifier);
+        QTest::keyClick(feld, Qt::Key_Escape);
+        QCOMPARE(feld->text(), QStringLiteral("oe5"));
+        QVERIFY(!feld->gesehen.contains(Qt::Key_F1));
+        QVERIFY(!feld->gesehen.contains(Qt::Key_F2));
+        QVERIFY(feld->gesehen.contains(Qt::Key_Escape));
+    }
+
     void derAusschalterSchaltetAus()
     {
         MainWindow mw;
@@ -238,6 +284,47 @@ private slots:
         // Leertaste: Sprechtaste -- ohne Funkgeraet ebenfalls nichts.
         taste(mw, Qt::Key_Space);
         QVERIFY(!rm->moxController() || !rm->moxController()->isMox());
+    }
+
+    void fTastenNurSolangeVorne()
+    {
+        int modus = FKeyPriority::kModeSpecial;
+        {
+            MainWindow mw;
+            QVERIFY(scheibe(mw) != nullptr);
+            FKeyPriority* fk = mw.fKeyPriority();
+            QVERIFY(fk != nullptr);
+            HotKeyBindings* b = mw.radioModelForTest()->hotKeyBindings();
+
+            // Der Pruefstand hat den leeren Weg: vorne und gewuenscht, und
+            // trotzdem nichts umgestellt.
+            QVERIFY(aktiv(&mw));
+            QTRY_COMPARE(QGuiApplication::applicationState(), Qt::ApplicationActive);
+            QVERIFY(!fk->engaged());
+
+            fk->setBackendForTest(FKeyPriority::Backend{
+                [&modus]() { return modus; },
+                [&modus](int m) { modus = m; return true; }});
+            QCOMPARE(modus, FKeyPriority::kModeFKeys);
+
+            // Ein anderes Programm vorne, dann wieder Longpath.
+            emit qGuiApp->applicationStateChanged(Qt::ApplicationInactive);
+            QCOMPARE(modus, FKeyPriority::kModeSpecial);
+            emit qGuiApp->applicationStateChanged(Qt::ApplicationActive);
+            QCOMPARE(modus, FKeyPriority::kModeFKeys);
+
+            // Beide Schalter auf der Setup-Seite.
+            b->setFKeysFirst(false);
+            QCOMPARE(modus, FKeyPriority::kModeSpecial);
+            b->setFKeysFirst(true);
+            QCOMPARE(modus, FKeyPriority::kModeFKeys);
+            b->setEnabled(false);
+            QCOMPARE(modus, FKeyPriority::kModeSpecial);
+            b->setEnabled(true);
+            QCOMPARE(modus, FKeyPriority::kModeFKeys);
+        }
+        // Das Fenster geht: zurueckgestellt.
+        QCOMPARE(modus, FKeyPriority::kModeSpecial);
     }
 
     void keinMenueKuerzelIstDoppelt()

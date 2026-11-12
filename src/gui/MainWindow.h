@@ -436,6 +436,8 @@ public:
 
     /// Die Tastenkuerzel (2026-11-10): der Verteiler, fuer Pruefstaende.
     class HotKeyDispatcher* hotKeyDispatcher() const { return m_hotKeyDispatcher.get(); }
+    /// Am Mac: F1…F12 als F-Tasten, solange Longpath vorne ist (2026-11-11).
+    class FKeyPriority* fKeyPriority() const { return m_fKeyPriority.get(); }
 
     /// Bandstapel (2026-11-11, Entwurf D1): die Marken aller
     /// Panadapter neu setzen -- nach jeder Aenderung am Stapel, einem
@@ -2101,6 +2103,7 @@ private:
     std::unique_ptr<class MainWindowHotKeyTargets> m_hotKeyTargets;
     std::unique_ptr<class HotKeyDispatcher>        m_hotKeyDispatcher;
     std::unique_ptr<class KeyboardRouter>          m_keyboardRouter;
+    std::unique_ptr<class FKeyPriority>            m_fKeyPriority;
     class QsoRecorderApplet* m_qsoRecorderApplet{nullptr};
     class RecordingApplet*   m_recordingApplet{nullptr};
 

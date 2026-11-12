@@ -1044,6 +1044,7 @@ set(GUI_SOURCES
     src/gui/MainWindow_SunSdr.cpp
     src/gui/MainWindow_SideArea.cpp
     src/gui/MainWindow_HotKeys.cpp
+    src/gui/hotkeys/FKeyPriority.cpp
     src/gui/hotkeys/HotKeyDispatcher.cpp
     src/gui/hotkeys/KeyboardRouter.cpp
     src/gui/hotkeys/MainWindowHotKeyTargets.cpp
@@ -1717,6 +1718,10 @@ if(APPLE)
     # matching this project's practice of declaring the frameworks a
     # source file directly calls into (see the AVFoundation line above).
     target_link_libraries(LongpathObjs PUBLIC "-framework AppKit")
+
+    # IOKit: der F-Tasten-Modus des Systems (kIOHIDFKeyModeKey), solange
+    # Longpath vorne ist (src/gui/hotkeys/FKeyPriority.cpp).
+    target_link_libraries(LongpathObjs PUBLIC "-framework IOKit")
 
     # CoreAudio framework for AudioObjectGetPropertyData +
     # kAudioDevicePropertyIOThreadOSWorkgroup used by
