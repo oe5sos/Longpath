@@ -2151,6 +2151,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // dann auf den Schirm des Hauptfensters, statt es erst hinaus- und
     // dann wieder hereinzuschieben.
     bool trustedRectApplied = false;
+    QRect gesetztesRechteck;
     if (rect.isValid()) {
         bool screenStillHere = screenKey.isEmpty();
         QScreen* matchedScreen = nullptr;
@@ -2203,6 +2204,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
                                                    avail);
             }
             win->setGeometry(clamped);
+            gesetztesRechteck = clamped;
             trustedRectApplied = true;
         }
     }
@@ -2259,6 +2261,21 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     if (!m_appletVis || m_appletVis->isEffectivelyVisible(id)) {
         win->show();
         tShow = loeseTeile.elapsed();
+        // ── Nach dem ersten show() noch einmal (2026-11-12) ─────────
+        //
+        // Martin: „wenn ich was lösche kann sich das andere profil nicht
+        // ändern" und „zum hundersten mal!!!!!!!!!". Gemessen unter
+        // Cocoa (tst_profil_loeschen_laesst_andere_stehen, nur mit
+        // QT_QPA_PLATFORM=cocoa rot): ein Panel, das aus dem Kombi-Feld
+        // eines anderen Profils kommt, bekommt hier 269x141 gesetzt; beim
+        // show() meldet das native Fenster 164x30 zurueck (spontan), Qt
+        // uebernimmt das, und die Mindestgroesse zieht es auf 173x109.
+        // geometrySettled sichert DAS 400 ms spaeter ins Profil. So kam
+        // N nach jedem Weg ueber CONTEST mit kleinem Frequency, SWR und
+        // Combined zurueck. Offscreen tritt es nie auf.
+        if (trustedRectApplied && win->geometry() != gesetztesRechteck) {
+            win->setGeometry(gesetztesRechteck);
+        }
         // Erst JETZT die Groesse: vor dem Anzeigen verlangt die
         // Anordnung fast nichts, danach ihre echte Untergrenze — und
         // die zieht das Fenster bildschirmfuellend auf. Nur wenn das

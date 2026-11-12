@@ -5562,6 +5562,12 @@ longpath_add_test(tst_raster_nachhall)
 # Schleife am Ende dieser Datei, die QT_QPA_PLATFORM fuer alle Tests
 # setzt -- siehe dort (`_longpath_grosser_schirm`).
 set(_longpath_grosser_schirm tst_schwebende_folgen_dem_hauptfenster)
+# Ein Profil loeschen laesst die anderen stehen (2026-11-12, Martin:
+# „wenn ich was lösche kann sich das andere profil nicht ändern").
+longpath_add_test(tst_profil_loeschen_laesst_andere_stehen)
+target_compile_definitions(tst_profil_loeschen_laesst_andere_stehen PRIVATE
+    LONGPATH_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
+list(APPEND _longpath_grosser_schirm tst_profil_loeschen_laesst_andere_stehen)
 longpath_add_test(tst_real_pan_float)
 longpath_add_test(tst_real_rotor_window)
 
