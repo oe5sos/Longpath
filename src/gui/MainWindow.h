@@ -498,6 +498,27 @@ public:
     struct MitziehBasis { double x{0}, y{0}, w{0}, h{0}; QRect gesetzt; };
     QHash<const QWidget*, MitziehBasis> m_mitziehBasis;
     QRect m_hauptrahmenBasis;
+    // Die Rechnung selbst: Lagen und Groessen von `alt` auf `neu`
+    // (beide Hauptfenster-Rahmen). basisFrisch: die Anteile neu messen,
+    // auch wenn eine Grundlage da waere.
+    int schwebendeUmrechnen(const QRect& alt, const QRect& neu, bool basisFrisch);
+
+    // ── Die Lage gehoert zu ihrem Hauptfenster (2026-11-12) ──────────
+    // Betreiber: „ich habe alles gespeichert und wieder ist alles
+    // verschoben" -- „für was speichere ich die ab wenn sie immer anders
+    // erscheinen". Ein Profil nimmt seit heute den Hauptfenster-Rahmen
+    // mit auf. Beim Herstellen werden die schwebenden Fenster von DIESEM
+    // Rahmen auf den heutigen umgerechnet, und die Anteile bleiben die
+    // Grundlage fuer jedes weitere Mitziehen. Vorher galten die
+    // gespeicherten Punkte absolut: das Hauptfenster kam 865 hoch herauf
+    // (ueber dem Dock), sprang spaeter auf 923, alle Fenster zogen um
+    // 6,7 % mit -- und genau das wurde beim Beenden gespeichert. Jeder
+    // Start schob weiter.
+    QRect m_profilRahmen;
+    bool  m_profilRahmenOffen{false};
+    /// Rechnet um, sobald Hauptfenster und schwebende Fenster stehen.
+    /// true, wenn es getan ist (dann ist nichts mehr offen).
+    bool schwebendeNachProfilrahmen();
     /// Der Rahmen beim letzten Lage-/Groessenereignis -- um den kleinen
     /// Nachhall des Rasters von einer echten eigenen Bewegung zu trennen.
     QRect m_letzterHauptrahmen;
@@ -524,6 +545,9 @@ public:
     // anzufassen. Also ein Stellvertreter: irgendein Fenster in die
     // Liste legen und danach fragen, ob es schon zurueck ist.
     int schwebendeMitziehenForTest() { return schwebendeMitziehen(); }
+    void vergissMitziehBasisForTest() { m_mitziehBasis.clear(); }   // wie ein frischer Start
+    void setProfilRahmenForTest(const QRect& r) { m_profilRahmen = r; m_profilRahmenOffen = r.isValid(); }
+    bool schwebendeNachProfilrahmenForTest() { return schwebendeNachProfilrahmen(); }
     QMargins leistenRaenderForTest() const { return leistenRaender(); }
     void rememberFloatingWindowBehindConnectMaskForTest(QWidget* w)
     {
@@ -2615,6 +2639,7 @@ private:
     QHBoxLayout* m_profileRailRow{nullptr};
     QWidget*     m_profileRailHome{nullptr};
     class AddWidgetButton* m_addWidgetBtn{nullptr};
+    void richtePlusEin(class AddWidgetButton* plus);
 
     /// Welche Applets als freie Kachel auf der Flaeche liegen:
     /// Panelkennung -> Container-Kennung.

@@ -29,6 +29,7 @@
 #include <QDir>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QTableWidget>
 #include <QTemporaryDir>
 #include "FensterFrist.h"
 
@@ -36,10 +37,12 @@ using namespace Longpath;
 
 namespace {
 
+QVector<Station3dFlight> g_fluege;   // was die Attrappe zu fliegen bekam
+
 class FakeSurface : public Station3dSurface {
 public:
     using Station3dSurface::Station3dSurface;
-    void fly(const Station3dFlight&) override {}
+    void fly(const Station3dFlight& f) override { g_fluege << f; }
 };
 
 QString writeAdif(const QDir& dir)
@@ -79,11 +82,117 @@ private slots:
         Station3dSurface::setFactory([](QWidget* p) -> Station3dSurface* {
             return new FakeSurface(p);
         });
+        g_fluege.clear();
     }
     void cleanup()
     {
         if (Google3dSetupDialog* d = visibleSetup()) { d->close(); }
         Station3dSurface::setFactory({});
+    }
+
+    // ── Oben neben „Map" (2026-11-12) ────────────────────────────────
+    // Betreiber: „3d war nicht zu finden". Die Pille in der Kartenspalte
+    // stand klein unter „Azimuthal"; ohne nachgeschlagene Station tat sie
+    // nichts. Jetzt steht „3D" in der oberen Leiste direkt hinter „Map",
+    // holt die Karte mit und zeigt SOFORT ein Bild.
+    void oben_direkt_neben_map()
+    {
+        AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"), QStringLiteral("False"));
+        QTemporaryDir dir;
+        LogbookWindow w(writeAdif(QDir(dir.path())));
+        w.resize(1400, 760);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+
+        QPushButton* map = w.mapToggleForTest();
+        QPushButton* b   = w.threeDToggleForTest();
+        QVERIFY2(b, "kein 3D-Knopf in der Logbuchleiste");
+        QVERIFY(b->isVisible());
+        QCOMPARE(b->text(), QStringLiteral("3D"));
+        // Dieselbe Reihe, unmittelbar rechts von „Map".
+        QCOMPARE(b->y(), map->y());
+        QVERIFY2(b->x() > map->x() + map->width()
+                     && b->x() - (map->x() + map->width()) < 20,
+                 qPrintable(QStringLiteral("Map %1..%2, 3D ab %3")
+                                .arg(map->x()).arg(map->x() + map->width()).arg(b->x())));
+        // Und kein anderes Widget liegt darueber.
+        QWidget* hit = w.childAt(b->mapTo(&w, b->rect().center()));
+        QVERIFY2(hit == b, "ueber dem 3D-Knopf liegt etwas");
+    }
+
+    // Nichts markiert: ein Druck holt die Karte und fliegt im 3D zum
+    // eigenen QTH -- nicht „nichts".
+    void ohne_auswahl_fliegt_er_zum_eigenen_qth()
+    {
+        AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"), QStringLiteral("False"));
+        QVERIFY(CesiumIonToken::save(QStringLiteral(
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJwcnVlZnN0YW5kIn0.UHJ1ZWZzdGFuZE5pY2h0RWNodA")));
+        QTemporaryDir dir;
+        LogbookWindow w(writeAdif(QDir(dir.path())));
+        w.resize(1400, 760);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+        if (QTableWidget* t = w.findChild<QTableWidget*>()) { t->clearSelection(); }
+
+        QPushButton* b = w.threeDToggleForTest();
+        QTest::mouseClick(b, Qt::LeftButton, Qt::NoModifier, b->rect().center());
+
+        QsoMapWindow* m = w.mapPanelForTest();
+        QVERIFY2(m && m->isVisible(), "die Karte kam nicht mit");
+        QVERIFY2(m->zeigt3d(), "kein 3D-Bild");
+        QVERIFY(b->isChecked());
+        QVERIFY(w.mapToggleForTest()->isChecked());
+        QCOMPARE(g_fluege.size(), 1);
+        QCOMPARE(g_fluege.last().call, QStringLiteral("JN67UT"));
+        QVERIFY2(!g_fluege.last().hasHome, "Grosskreis vom QTH zu sich selbst");
+
+        // Noch ein Druck: zurueck auf die flache Karte, der Knopf rastet aus.
+        QTest::mouseClick(b, Qt::LeftButton, Qt::NoModifier, b->rect().center());
+        QVERIFY(!m->zeigt3d());
+        QVERIFY(!b->isChecked());
+        QVERIFY(m->isVisible());   // die Karte bleibt, nur flach
+    }
+
+    // Eine markierte Zeile ist das Ziel.
+    void mit_auswahl_fliegt_er_zur_markierten_station()
+    {
+        AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"), QStringLiteral("False"));
+        QVERIFY(CesiumIonToken::save(QStringLiteral(
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJwcnVlZnN0YW5kIn0.UHJ1ZWZzdGFuZE5pY2h0RWNodA")));
+        QTemporaryDir dir;
+        LogbookWindow w(writeAdif(QDir(dir.path())));
+        w.resize(1400, 760);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+        QTableWidget* t = w.findChild<QTableWidget*>();
+        QVERIFY(t && t->rowCount() == 1);
+        t->selectRow(0);
+
+        QPushButton* b = w.threeDToggleForTest();
+        QTest::mouseClick(b, Qt::LeftButton, Qt::NoModifier, b->rect().center());
+
+        QVERIFY(w.mapPanelForTest()->zeigt3d());
+        QVERIFY(b->isChecked());
+        QVERIFY(!g_fluege.isEmpty());
+        QCOMPARE(g_fluege.last().call, QStringLiteral("K1ABC"));
+        QVERIFY(g_fluege.last().hasHome);   // mit Grosskreis von daheim
+    }
+
+    // Ohne Zugang: derselbe Weg wie die Pille -- die Einrichtung, und
+    // der Knopf rastet nicht ein.
+    void ohne_zugang_oeffnet_er_die_einrichtung()
+    {
+        AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"), QStringLiteral("False"));
+        QTemporaryDir dir;
+        LogbookWindow w(writeAdif(QDir(dir.path())));
+        w.resize(1400, 760);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+        QPushButton* b = w.threeDToggleForTest();
+        QTest::mouseClick(b, Qt::LeftButton, Qt::NoModifier, b->rect().center());
+        QTRY_VERIFY2_WITH_TIMEOUT(visibleSetup() != nullptr, "keine Einrichtung", 3000);
+        QVERIFY(!b->isChecked());
+        QVERIFY(g_fluege.isEmpty());
     }
 
     void click_without_key_opens_the_setup()

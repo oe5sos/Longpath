@@ -1,0 +1,678 @@
+{
+ "current": "Neu",
+ "profiles": [
+  {
+   "bands": [],
+   "digis": [],
+   "modes": [],
+   "name": "Neu",
+   "state": {
+    "containerGeometry": {},
+    "contestLogbook": false,
+    "contestPanels": {},
+    "floatingApplets": {
+     "Asr": {
+      "dockIndex": 13,
+      "dx": 15,
+      "dy": 127,
+      "h": 269,
+      "screen": "Built-in Retina Display",
+      "w": 269,
+      "x": 16,
+      "y": 160
+     },
+     "BwFilter": {
+      "dockIndex": 25,
+      "dx": 303,
+      "dy": 127,
+      "h": 173,
+      "screen": "Built-in Retina Display",
+      "w": 813,
+      "x": 304,
+      "y": 160
+     },
+     "Frequency": {
+      "dockIndex": 14,
+      "dx": 15,
+      "dy": 367,
+      "h": 141,
+      "screen": "Built-in Retina Display",
+      "w": 269,
+      "x": 16,
+      "y": 400
+     },
+     "Kombi": {
+      "dockIndex": 15,
+      "dx": 1135,
+      "dy": 159,
+      "h": 701,
+      "screen": "Built-in Retina Display",
+      "w": 317,
+      "x": 1136,
+      "y": 192
+     },
+     "SignalInstrument": {
+      "dockIndex": 17,
+      "dx": 15,
+      "dy": 687,
+      "h": 125,
+      "screen": "Built-in Retina Display",
+      "w": 269,
+      "x": 16,
+      "y": 720
+     },
+     "SwrInstrument": {
+      "dockIndex": 12,
+      "dx": 15,
+      "dy": 511,
+      "h": 189,
+      "screen": "Built-in Retina Display",
+      "w": 269,
+      "x": 16,
+      "y": 544
+     }
+    },
+    "floatingPans": {
+     "pan-0": {
+      "dx": 303,
+      "dy": 287,
+      "h": 573,
+      "screen": "Built-in Retina Display",
+      "w": 813,
+      "x": 304,
+      "y": 320
+     }
+    },
+    "kombiInhalt": [
+     "RotorLog",
+     "Tx",
+     "Rx"
+    ],
+    "kombiInhalt2": [],
+    "mainWindow": {
+     "fullScreen": false,
+     "maximized": true
+    },
+    "order": [
+     "RfKit",
+     "PhoneCw",
+     "Rade",
+     "Vax",
+     "PureSignal",
+     "Tci",
+     "ClientChain",
+     "Amp",
+     "Tuner",
+     "Dvk",
+     "KiwiSdr",
+     "QsoRec",
+     "KiwiWaterfalls",
+     "RttyDecoder",
+     "CwDecoder",
+     "Ft8Decoder",
+     "Eq",
+     "Cat",
+     "Spe",
+     "Kpa500",
+     "Acom",
+     "Rec",
+     "Ft8Slots",
+     "Kombi2",
+     "BandStack"
+    ],
+    "panReadouts": {
+     "pan-0": {
+      "frequency": true,
+      "swr": true
+     }
+    },
+    "rotor": {
+     "form": "docked"
+    },
+    "rotorDockVisible": false,
+    "splitter": [
+     1194,
+     264
+    ],
+    "visible": {
+     "Acom": true,
+     "Amp": false,
+     "Asr": true,
+     "BandStack": true,
+     "BwFilter": true,
+     "Cat": false,
+     "ChromeSpectrumButtons": false,
+     "ChromeStatusBar": true,
+     "ClientChain": false,
+     "CwDecoder": true,
+     "Dvk": false,
+     "Eq": false,
+     "Frequency": true,
+     "Ft8Decoder": true,
+     "Ft8Slots": false,
+     "KiwiSdr": false,
+     "KiwiWaterfalls": false,
+     "Kombi": true,
+     "Kombi2": true,
+     "Kpa500": true,
+     "PhoneCw": false,
+     "PureSignal": false,
+     "QsoRec": true,
+     "Rade": false,
+     "Rec": false,
+     "RfKit": false,
+     "RttyDecoder": true,
+     "Rx": false,
+     "SignalInstrument": true,
+     "Spe": true,
+     "SwrInstrument": true,
+     "Tci": false,
+     "Tuner": false,
+     "Tx": false,
+     "Vax": false,
+     "WinAntenna": false,
+     "WinChannelStrip": false,
+     "WinLogbook": false,
+     "WinRotorLog": true,
+     "WinSpotHub": false
+    },
+    "worldImage": "/Users/ralphmartinfischer/Library/Preferences/Longpath/Longpath/world.jpg"
+   }
+  },
+  {
+   "bands": [],
+   "digis": [
+    0
+   ],
+   "modes": [],
+   "name": "FT8",
+   "state": {
+    "containerGeometry": {},
+    "contestLogbook": false,
+    "contestPanels": {},
+    "floatingApplets": {},
+    "floatingPans": {},
+    "kombiInhalt": [
+     "RotorLog",
+     "Tx",
+     "Rx"
+    ],
+    "kombiInhalt2": [],
+    "mainWindow": {
+     "fullScreen": false,
+     "maximized": true
+    },
+    "order": [
+     "RfKit",
+     "PhoneCw",
+     "Rade",
+     "Vax",
+     "PureSignal",
+     "Tci",
+     "ClientChain",
+     "Amp",
+     "Tuner",
+     "Dvk",
+     "KiwiSdr",
+     "QsoRec",
+     "SwrInstrument",
+     "KiwiWaterfalls",
+     "Frequency",
+     "Asr",
+     "Ft8Decoder",
+     "RttyDecoder",
+     "Kombi",
+     "CwDecoder",
+     "Eq",
+     "SignalInstrument",
+     "Cat",
+     "Spe",
+     "Ft8Slots",
+     "Kpa500",
+     "Acom",
+     "Rec",
+     "BwFilter",
+     "Kombi2",
+     "BandStack"
+    ],
+    "panReadouts": {
+     "pan-0": {
+      "frequency": true,
+      "swr": true
+     }
+    },
+    "rotor": {
+     "form": "docked"
+    },
+    "rotorDockVisible": false,
+    "splitter": [
+     654,
+     804
+    ],
+    "visible": {
+     "Acom": true,
+     "Amp": false,
+     "Asr": false,
+     "BandStack": true,
+     "BwFilter": true,
+     "Cat": false,
+     "ChromeSpectrumButtons": false,
+     "ChromeStatusBar": true,
+     "ClientChain": false,
+     "CwDecoder": true,
+     "Dvk": false,
+     "Eq": true,
+     "Frequency": true,
+     "Ft8Decoder": true,
+     "Ft8Slots": true,
+     "KiwiSdr": false,
+     "KiwiWaterfalls": false,
+     "Kombi": true,
+     "Kombi2": true,
+     "Kpa500": true,
+     "PhoneCw": false,
+     "PureSignal": false,
+     "QsoRec": true,
+     "Rade": false,
+     "Rec": false,
+     "RfKit": false,
+     "RttyDecoder": true,
+     "Rx": false,
+     "SignalInstrument": true,
+     "Spe": true,
+     "SwrInstrument": true,
+     "Tci": false,
+     "Tuner": false,
+     "Tx": false,
+     "Vax": false,
+     "WinAntenna": false,
+     "WinChannelStrip": false,
+     "WinLogbook": false,
+     "WinRotorLog": true,
+     "WinSpotHub": false
+    },
+    "worldImage": "/Users/ralphmartinfischer/Library/Preferences/Longpath/Longpath/world.jpg"
+   }
+  },
+  {
+   "bands": [],
+   "digis": [],
+   "modes": [],
+   "name": "CONTEST",
+   "state": {
+    "containerGeometry": {},
+    "contestLogbook": false,
+    "contestPanels": {},
+    "floatingApplets": {},
+    "floatingPans": {
+     "pan-0": {
+      "dx": -1,
+      "dy": 463,
+      "h": 333,
+      "screen": "Built-in Retina Display",
+      "w": 749,
+      "x": 0,
+      "y": 496
+     }
+    },
+    "kombiInhalt": [
+     "Rx",
+     "Tx",
+     "Frequency",
+     "SwrInstrument"
+    ],
+    "kombiInhalt2": [
+     "Contest:rotorrow",
+     "Contest:chat"
+    ],
+    "mainWindow": {
+     "fullScreen": false,
+     "maximized": true
+    },
+    "order": [
+     "RfKit",
+     "PhoneCw",
+     "Rade",
+     "Vax",
+     "PureSignal",
+     "Tci",
+     "ClientChain",
+     "Amp",
+     "Tuner",
+     "Dvk",
+     "KiwiSdr",
+     "QsoRec",
+     "KiwiWaterfalls",
+     "Asr",
+     "RttyDecoder",
+     "Kombi",
+     "CwDecoder",
+     "Ft8Decoder",
+     "SignalInstrument",
+     "Eq",
+     "Cat",
+     "Spe",
+     "Kpa500",
+     "Acom",
+     "Rec",
+     "Ft8Slots",
+     "Kombi2",
+     "BwFilter",
+     "BandStack"
+    ],
+    "panReadouts": {
+     "pan-0": {
+      "frequency": false,
+      "swr": false
+     }
+    },
+    "rotor": {
+     "form": "docked"
+    },
+    "rotorDockVisible": false,
+    "splitter": [
+     881,
+     577
+    ],
+    "visible": {
+     "Acom": false,
+     "Amp": false,
+     "Asr": false,
+     "BandStack": true,
+     "BwFilter": false,
+     "Cat": false,
+     "ChromeSpectrumButtons": false,
+     "ChromeStatusBar": false,
+     "ClientChain": false,
+     "CwDecoder": false,
+     "Dvk": false,
+     "Eq": false,
+     "Frequency": true,
+     "Ft8Decoder": false,
+     "Ft8Slots": false,
+     "KiwiSdr": false,
+     "KiwiWaterfalls": false,
+     "Kombi": true,
+     "Kombi2": true,
+     "Kpa500": false,
+     "PhoneCw": false,
+     "PureSignal": false,
+     "QsoRec": false,
+     "Rade": false,
+     "Rec": false,
+     "RfKit": false,
+     "RttyDecoder": false,
+     "Rx": true,
+     "SignalInstrument": false,
+     "Spe": false,
+     "SwrInstrument": true,
+     "Tci": false,
+     "Tuner": false,
+     "Tx": true,
+     "Vax": false,
+     "WinAntenna": false,
+     "WinChannelStrip": false,
+     "WinLogbook": false,
+     "WinRotorLog": false,
+     "WinSpotHub": false
+    },
+    "worldImage": "/Users/ralphmartinfischer/Library/Preferences/Longpath/Longpath/world.jpg"
+   }
+  },
+  {
+   "bands": [],
+   "digis": [],
+   "modes": [],
+   "name": "TEST",
+   "state": {
+    "containerGeometry": {},
+    "contestLogbook": false,
+    "contestPanels": {},
+    "floatingApplets": {},
+    "floatingPans": {
+     "pan-0": {
+      "dx": 15,
+      "dy": 127,
+      "h": 509,
+      "screen": "Built-in Retina Display",
+      "w": 813,
+      "x": 16,
+      "y": 160
+     }
+    },
+    "kombiInhalt": [],
+    "kombiInhalt2": [],
+    "mainWindow": {
+     "fullScreen": false,
+     "maximized": true
+    },
+    "order": [
+     "RfKit",
+     "PhoneCw",
+     "Rade",
+     "Vax",
+     "PureSignal",
+     "Tci",
+     "ClientChain",
+     "Amp",
+     "Tuner",
+     "Dvk",
+     "KiwiSdr",
+     "QsoRec",
+     "SwrInstrument",
+     "KiwiWaterfalls",
+     "Frequency",
+     "Kombi",
+     "Asr",
+     "RttyDecoder",
+     "CwDecoder",
+     "Ft8Decoder",
+     "SignalInstrument",
+     "Eq",
+     "Cat",
+     "Spe",
+     "Kpa500",
+     "BwFilter",
+     "Acom",
+     "Rec",
+     "Ft8Slots",
+     "Kombi2",
+     "Tx",
+     "Rx",
+     "BandStack"
+    ],
+    "panReadouts": {
+     "pan-0": {
+      "frequency": false,
+      "swr": false
+     }
+    },
+    "rotor": {
+     "form": "docked"
+    },
+    "rotorDockVisible": false,
+    "splitter": [
+     534,
+     924
+    ],
+    "visible": {
+     "Acom": false,
+     "Amp": false,
+     "Asr": false,
+     "BandStack": true,
+     "BwFilter": false,
+     "Cat": false,
+     "ChromeSpectrumButtons": false,
+     "ChromeStatusBar": false,
+     "ClientChain": false,
+     "CwDecoder": false,
+     "Dvk": false,
+     "Eq": false,
+     "Frequency": false,
+     "Ft8Decoder": false,
+     "Ft8Slots": false,
+     "KiwiSdr": false,
+     "KiwiWaterfalls": false,
+     "Kombi": false,
+     "Kombi2": false,
+     "Kpa500": false,
+     "PhoneCw": false,
+     "PureSignal": false,
+     "QsoRec": false,
+     "Rade": false,
+     "Rec": false,
+     "RfKit": false,
+     "RttyDecoder": false,
+     "Rx": false,
+     "SignalInstrument": false,
+     "Spe": false,
+     "SwrInstrument": false,
+     "Tci": false,
+     "Tuner": false,
+     "Tx": false,
+     "Vax": false,
+     "WinAntenna": false,
+     "WinChannelStrip": false,
+     "WinLogbook": false,
+     "WinRotorLog": false,
+     "WinSpotHub": false
+    },
+    "worldImage": "/Users/ralphmartinfischer/Library/Preferences/Longpath/Longpath/world.jpg"
+   }
+  },
+  {
+   "bands": [],
+   "digis": [],
+   "modes": [],
+   "name": "New",
+   "state": {
+    "containerGeometry": {},
+    "contestLogbook": false,
+    "contestPanels": {
+     "chat": {
+      "h": 509,
+      "w": 733,
+      "x": 0,
+      "y": 432
+     }
+    },
+    "floatingApplets": {
+     "Kombi": {
+      "dockIndex": 18,
+      "dx": 719,
+      "dy": 591,
+      "h": 237,
+      "screen": "Built-in Retina Display",
+      "w": 717,
+      "x": 720,
+      "y": 624
+     }
+    },
+    "floatingPans": {},
+    "kombiInhalt": [
+     "Rx",
+     "Tx",
+     "Frequency",
+     "Contest:unifiedlog",
+     "Contest:rotorrow",
+     "Contest:ratemeter",
+     "Contest:bandmap",
+     "Contest:wasserfall"
+    ],
+    "kombiInhalt2": [],
+    "mainWindow": {
+     "fullScreen": false,
+     "maximized": true
+    },
+    "order": [
+     "RfKit",
+     "PhoneCw",
+     "Rade",
+     "Vax",
+     "PureSignal",
+     "Tci",
+     "ClientChain",
+     "Amp",
+     "Tuner",
+     "Dvk",
+     "KiwiSdr",
+     "QsoRec",
+     "SwrInstrument",
+     "KiwiWaterfalls",
+     "Asr",
+     "Ft8Decoder",
+     "RttyDecoder",
+     "CwDecoder",
+     "Eq",
+     "SignalInstrument",
+     "Cat",
+     "Spe",
+     "Ft8Slots",
+     "Kpa500",
+     "Acom",
+     "Rec",
+     "BwFilter",
+     "Kombi2",
+     "BandStack"
+    ],
+    "panReadouts": {
+     "pan-0": {
+      "frequency": false,
+      "swr": false
+     }
+    },
+    "rotor": {
+     "form": "docked"
+    },
+    "rotorDockVisible": false,
+    "splitter": [
+     654,
+     804
+    ],
+    "visible": {
+     "Acom": false,
+     "Amp": false,
+     "Asr": false,
+     "BandStack": false,
+     "BwFilter": true,
+     "Cat": false,
+     "ChromeSpectrumButtons": false,
+     "ChromeStatusBar": false,
+     "ClientChain": false,
+     "CwDecoder": false,
+     "Dvk": false,
+     "Eq": true,
+     "Frequency": false,
+     "Ft8Decoder": true,
+     "Ft8Slots": false,
+     "KiwiSdr": false,
+     "KiwiWaterfalls": false,
+     "Kombi": true,
+     "Kombi2": false,
+     "Kpa500": false,
+     "PhoneCw": false,
+     "PureSignal": false,
+     "QsoRec": false,
+     "Rade": false,
+     "Rec": false,
+     "RfKit": false,
+     "RttyDecoder": false,
+     "Rx": true,
+     "SignalInstrument": false,
+     "Spe": false,
+     "SwrInstrument": true,
+     "Tci": false,
+     "Tuner": false,
+     "Tx": true,
+     "Vax": false,
+     "WinAntenna": false,
+     "WinChannelStrip": false,
+     "WinLogbook": false,
+     "WinRotorLog": false,
+     "WinSpotHub": false
+    },
+    "worldImage": "/Users/ralphmartinfischer/Library/Preferences/Longpath/Longpath/world.jpg"
+   }
+  }
+ ]
+}

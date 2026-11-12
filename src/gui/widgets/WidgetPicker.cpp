@@ -228,11 +228,13 @@ void WidgetPicker::rebuild()
 
     for (const QString& id : m_vis->registeredIds()) {
         const bool avail = m_vis->isAvailable(id);
+        // Hinter einer Betriebsart: bedienbar, der Klick schaltet sie ein.
+        const bool bedienbar = avail || m_einschalter.contains(id);
 
         auto* frame = new CardFrame(this);
         frame->setAttribute(Qt::WA_StyledBackground, true);
-        frame->setCursor(avail ? Qt::PointingHandCursor : Qt::ArrowCursor);
-        frame->setEnabled(avail);
+        frame->setCursor(bedienbar ? Qt::PointingHandCursor : Qt::ArrowCursor);
+        frame->setEnabled(bedienbar);
 
         auto* col = new QVBoxLayout(frame);
         col->setContentsMargins(15, 11, 15, 12);
@@ -249,27 +251,27 @@ void WidgetPicker::rebuild()
             name->setFont(f);
         }
         titleRow->addWidget(name);
-        if (!avail) {
-            // Die Vorlage schreibt DISABLED neben den Namen und den
-            // Grund darunter. Sagen, wo man es einschaltet, ist der
-            // Unterschied zwischen einer Auskunft und einem grauen Feld.
-            auto* badge = new QLabel(tr("OFF"), frame);
+        // Die Vorlage schreibt DISABLED neben den Namen und den Grund
+        // darunter. Sagen, wo man es einschaltet, ist der Unterschied
+        // zwischen einer Auskunft und einem grauen Feld. Immer gebaut,
+        // in refresh() gezeigt oder versteckt: mit einem Einschalter
+        // aendert sich die Verfuegbarkeit, waehrend die Karte steht.
+        auto* badge = new QLabel(tr("OFF"), frame);
+        {
             QFont bf = badge->font();
             bf.setPixelSize(9);
             bf.setBold(true);
             bf.setLetterSpacing(QFont::AbsoluteSpacing, 1.2);
             badge->setFont(bf);
-            badge->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
-                .arg(QString::fromLatin1(Style::kAmberText)));
-            titleRow->addWidget(badge);
         }
+        badge->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+            .arg(QString::fromLatin1(Style::kAmberText)));
+        badge->setVisible(!avail);
+        titleRow->addWidget(badge);
         titleRow->addStretch(1);
         col->addLayout(titleRow);
 
-        const QString sub = avail
-            ? m_vis->keywords(id).join(QStringLiteral(" · "))
-            : tr("The hardware or master switch behind it is off.");
-        auto* keys = new QLabel(sub, frame);
+        auto* keys = new QLabel(unterzeileFuer(id, avail), frame);
         {
             QFont f = keys->font();
             f.setPixelSize(11);
@@ -281,6 +283,17 @@ void WidgetPicker::rebuild()
 
         auto click = [this, id]() {
             if (!m_vis) { return; }
+            if (!m_vis->isAvailable(id)) {
+                const auto it = m_einschalter.constFind(id);
+                if (it == m_einschalter.cend() || !it->schalte) { return; }
+                it->schalte();
+                if (m_vis->isAvailable(id) && !m_vis->isVisible(id)) {
+                    m_vis->setVisible(id, true);
+                }
+                refresh();
+                emit toggled(id, m_vis->isVisible(id));
+                return;
+            }
             const bool next = !m_vis->isVisible(id);
             m_vis->setVisible(id, next);
             emit toggled(id, next);
@@ -289,7 +302,8 @@ void WidgetPicker::rebuild()
         frame->dragId = id;
 
         m_cards->insertWidget(m_cards->count() - 1, frame);
-        m_byId.insert(id, Card{frame, id, avail, m_vis->isVisible(id), click});
+        m_byId.insert(id, Card{frame, id, bedienbar, m_vis->isVisible(id), click,
+                               badge, keys});
         m_order << id;
     }
 
@@ -345,6 +359,22 @@ void WidgetPicker::setZusatzEintraege(const QList<ZusatzEintrag>& liste)
     rebuild();
 }
 
+void WidgetPicker::setEinschalter(const QHash<QString, Einschalter>& e)
+{
+    m_einschalter = e;
+    rebuild();
+}
+
+QString WidgetPicker::unterzeileFuer(const QString& id, bool verfuegbar) const
+{
+    if (verfuegbar) {
+        return m_vis ? m_vis->keywords(id).join(QStringLiteral(" · ")) : QString();
+    }
+    const auto it = m_einschalter.constFind(id);
+    if (it != m_einschalter.cend() && !it->hinweis.isEmpty()) { return it->hinweis; }
+    return tr("The hardware or master switch behind it is off.");
+}
+
 void WidgetPicker::refresh()
 {
     if (!m_vis) { return; }
@@ -356,11 +386,15 @@ void WidgetPicker::refresh()
             c.checked = z->istAn ? z->istAn() : false;
             c.enabled = true;
         } else {
+            const bool avail = m_vis->isAvailable(id);
             c.checked = m_vis->isVisible(id);
-            c.enabled = m_vis->isAvailable(id);
+            c.enabled = avail || m_einschalter.contains(id);
+            if (c.offMarke) { c.offMarke->setVisible(!avail); }
+            if (c.unterzeile) { c.unterzeile->setText(unterzeileFuer(id, avail)); }
         }
         if (!c.frame) { continue; }
         c.frame->setEnabled(c.enabled);
+        c.frame->setCursor(c.enabled ? Qt::PointingHandCursor : Qt::ArrowCursor);
         // Eine gewählte Karte trägt den Auswahlrahmen — genau eine
         // Eigenschaft, zwei Zustände, kein Haken nötig. Angehakt = eine
         // Mulde (kGlassSel*), kein Blau: Betreiber 2026-11-02 "kein
@@ -792,6 +826,12 @@ void AddWidgetButton::setZusatzEintraege(const QList<WidgetPicker::ZusatzEintrag
     if (m_picker) { m_picker->setZusatzEintraege(liste); }
 }
 
+void AddWidgetButton::setEinschalter(const QHash<QString, WidgetPicker::Einschalter>& e)
+{
+    m_einschalter = e;
+    if (m_picker) { m_picker->setEinschalter(e); }
+}
+
 void AddWidgetButton::openPicker()
 {
     if (!m_picker) {
@@ -810,6 +850,7 @@ void AddWidgetButton::openPicker()
         // bleibt offen, bleibt über dem Hauptfenster.
         m_picker = new WidgetPicker(m_vis, this);
         if (!m_zusatz.isEmpty()) { m_picker->setZusatzEintraege(m_zusatz); }
+        if (!m_einschalter.isEmpty()) { m_picker->setEinschalter(m_einschalter); }
         m_picker->setWindowFlags(Qt::Tool);
         m_picker->setWindowTitle(tr("Add a widget"));
         connect(m_picker, &WidgetPicker::toggled,

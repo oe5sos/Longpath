@@ -2152,6 +2152,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // dann auf den Schirm des Hauptfensters, statt es erst hinaus- und
     // dann wieder hereinzuschieben.
     bool trustedRectApplied = false;
+    QRect gesetztesRechteck;
     if (rect.isValid()) {
         bool screenStillHere = screenKey.isEmpty();
         QScreen* matchedScreen = nullptr;
@@ -2204,6 +2205,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
                                                    avail);
             }
             win->setGeometry(clamped);
+            gesetztesRechteck = clamped;
             trustedRectApplied = true;
         }
     }
@@ -2260,6 +2262,21 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     if (!m_appletVis || m_appletVis->isEffectivelyVisible(id)) {
         win->show();
         tShow = loeseTeile.elapsed();
+        // ── Nach dem ersten show() noch einmal (2026-11-12) ─────────
+        //
+        // Martin: „wenn ich was lösche kann sich das andere profil nicht
+        // ändern" und „zum hundersten mal!!!!!!!!!". Gemessen unter
+        // Cocoa (tst_profil_loeschen_laesst_andere_stehen, nur mit
+        // QT_QPA_PLATFORM=cocoa rot): ein Panel, das aus dem Kombi-Feld
+        // eines anderen Profils kommt, bekommt hier 269x141 gesetzt; beim
+        // show() meldet das native Fenster 164x30 zurueck (spontan), Qt
+        // uebernimmt das, und die Mindestgroesse zieht es auf 173x109.
+        // geometrySettled sichert DAS 400 ms spaeter ins Profil. So kam
+        // N nach jedem Weg ueber CONTEST mit kleinem Frequency, SWR und
+        // Combined zurueck. Offscreen tritt es nie auf.
+        if (trustedRectApplied && win->geometry() != gesetztesRechteck) {
+            win->setGeometry(gesetztesRechteck);
+        }
         // Erst JETZT die Groesse: vor dem Anzeigen verlangt die
         // Anordnung fast nichts, danach ihre echte Untergrenze — und
         // die zieht das Fenster bildschirmfuellend auf. Nur wenn das
@@ -10123,36 +10140,7 @@ void MainWindow::populateDefaultMeter()
         if (visible) { bringAppletToFront(id); }
     });
     m_addWidgetBtn->setToolTip(tr("Add or remove windows"));
-#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
-    // Die Panels des Contestprogramms auch hinter dem "+" (Betreiber
-    // 2026-11-04: "am besten waere auch, wenn ich durch das + alles
-    // hinzufuegen kann"). Keine Applets, darum als Zusatzeintraege mit
-    // Zustand und Schalter aus der Bruecke; derselbe Weg wie Tools >
-    // Contest logbook panels und das Containers-Menue.
-    {
-        QList<WidgetPicker::ZusatzEintrag> liste;
-        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
-            WidgetPicker::ZusatzEintrag z;
-            z.id = QStringLiteral("Contest:%1").arg(e.id);
-            z.titel = QStringLiteral("Contest · %1").arg(e.titel);
-            z.kategorie = tr("Contest logbook");
-            z.schlagworte = e.schlagworte;
-            const QString id = e.id;
-            z.istAn = [this, id]() {
-                return m_contestFenster && m_contestFenster->istPanelSchwebend(id);
-            };
-            z.schalte = [this, id](bool an) {
-                if (an) {
-                    contestPanelAlsFenster(id);
-                } else if (m_contestFenster) {
-                    m_contestFenster->dockePanel(id);
-                }
-            };
-            liste.append(z);
-        }
-        m_addWidgetBtn->setZusatzEintraege(liste);
-    }
-#endif
+    richtePlusEin(m_addWidgetBtn);
     m_addWidgetBtn->raise();
     m_addWidgetBtn->show();
     positionAddWidgetButton();
@@ -10602,6 +10590,13 @@ void MainWindow::populateDefaultMeter()
                 QVariantMap mw;
                 mw.insert(QStringLiteral("fullScreen"), m_borderlessFullSize);
                 mw.insert(QStringLiteral("maximized"), isMaximized());
+                // Der Rahmen, zu dem die Lagen der schwebenden Fenster
+                // gehoeren (2026-11-12, siehe m_profilRahmen).
+                {
+                    const QRect f = frameGeometry();
+                    mw.insert(QStringLiteral("rahmen"),
+                              QVariantList{f.x(), f.y(), f.width(), f.height()});
+                }
                 s.insert(QStringLiteral("mainWindow"), mw);
 
                 // Seitenbereich: Seiten, aktive Seite, zu/auf, Lage. Fehlt
@@ -11336,11 +11331,43 @@ void MainWindow::populateDefaultMeter()
                         const QRect soll = lageAusProfil(it.value().toMap());
                         if (soll.isValid() && w->geometry() != soll) { w->setGeometry(soll); }
                     }
-                    if (!m_panStack) { return; }
-                    for (PanadapterApplet* pan : m_panStack->allApplets()) {
-                        if (!pan) { continue; }
-                        if (auto* fenster = m_panStack->floatingWindowForTest(pan->panId())) {
-                            fenster->raise();
+                    if (m_panStack) {
+                        for (PanadapterApplet* pan : m_panStack->allApplets()) {
+                            if (!pan) { continue; }
+                            if (auto* fenster = m_panStack->floatingWindowForTest(pan->panId())) {
+                                fenster->raise();
+                            }
+                        }
+                    }
+
+                    // Erst NACH dem Nachziehen oben umrechnen: es setzt die
+                    // rohen Profillagen, und die gehoeren zum Rahmen beim
+                    // Aufnehmen (2026-11-12, siehe m_profilRahmen). Andersrum
+                    // ueberschriebe es die Umrechnung wieder.
+                    {
+                        const QVariantList rl = s.value(QStringLiteral("mainWindow")).toMap()
+                                                    .value(QStringLiteral("rahmen")).toList();
+                        if (rl.size() == 4) {
+                            m_profilRahmen = QRect(rl.at(0).toInt(), rl.at(1).toInt(),
+                                                   rl.at(2).toInt(), rl.at(3).toInt());
+                            m_profilRahmenOffen = m_profilRahmen.isValid();
+                            if (m_profilRahmenOffen) {
+                                // Gleich versuchen; steht noch nichts, holt es
+                                // der Nachlauf des Schutzrahmens nach.
+                                if (!schwebendeNachProfilrahmen()) {
+                                    schutzrahmenNachziehen();
+                                    // Beim Start erscheinen die schwebenden
+                                    // Fenster erst nach dem Aufbau; ohne eine
+                                    // weitere Bewegung kaeme kein Nachlauf.
+                                    for (int ms : {600, 1500, 3000}) {
+                                        QTimer::singleShot(ms, this, [this]() {
+                                            if (m_profilRahmenOffen) { schwebendeNachProfilrahmen(); }
+                                        });
+                                    }
+                                }
+                            }
+                        } else {
+                            m_profilRahmenOffen = false;
                         }
                     }
                 });
@@ -11558,6 +11585,7 @@ void MainWindow::populateDefaultMeter()
             if (visible) { bringAppletToFront(id); }
         });
         m_commandBar->addTrailing(m_addWidget);
+        richtePlusEin(m_addWidget);
     }
 
     // Apply initial visibility state from the controller (in case
@@ -17215,6 +17243,61 @@ void MainWindow::bandstapelMarkenFuer(SpectrumWidget* sw, const QString& panId)
     sw->setBandStackMarks(marken);
 }
 
+// ── Beide Plus-Knoepfe gleich einrichten (2026-11-12) ────────────────
+//
+// Es gibt zwei: unten rechts ueber der Arbeitsflaeche (m_addWidgetBtn)
+// und oben in der Befehlsleiste (m_addWidget). Martin oeffnete den
+// Auswaehler oben, und dort fehlte der FT8-Einschalter, den ich nur
+// unten eingerichtet hatte -- und die Contest-Panels fehlten oben schon
+// seit dem 2026-11-04. Dieselbe Lehre wie [Erreichbar heisst: in ALLEN
+// Gehaeusen]: eine Stelle fuer beide.
+void MainWindow::richtePlusEin(AddWidgetButton* plus)
+{
+    if (!plus) { return; }
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // Die Panels des Contestprogramms auch hinter dem "+" (Betreiber
+    // 2026-11-04: "am besten waere auch, wenn ich durch das + alles
+    // hinzufuegen kann"). Keine Applets, darum als Zusatzeintraege mit
+    // Zustand und Schalter aus der Bruecke; derselbe Weg wie Tools >
+    // Contest logbook panels und das Containers-Menue.
+    {
+        QList<WidgetPicker::ZusatzEintrag> liste;
+        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+            WidgetPicker::ZusatzEintrag z;
+            z.id = QStringLiteral("Contest:%1").arg(e.id);
+            z.titel = QStringLiteral("Contest · %1").arg(e.titel);
+            z.kategorie = tr("Contest logbook");
+            z.schlagworte = e.schlagworte;
+            const QString id = e.id;
+            z.istAn = [this, id]() {
+                return m_contestFenster && m_contestFenster->istPanelSchwebend(id);
+            };
+            z.schalte = [this, id](bool an) {
+                if (an) {
+                    contestPanelAlsFenster(id);
+                } else if (m_contestFenster) {
+                    m_contestFenster->dockePanel(id);
+                }
+            };
+            liste.append(z);
+        }
+        plus->setZusatzEintraege(liste);
+    }
+#endif
+    // Der FT8-Dekoder steht nur in einer Datenbetriebsart bereit. Seine
+    // Karte schaltet darum selbst auf FT8 -- derselbe Weg wie der
+    // FT8-Knopf der Leiste (Martin 2026-11-12: „eigens kann man es nicht
+    // ... hinzufügen. das muss geändert werden").
+    {
+        QHash<QString, WidgetPicker::Einschalter> e;
+        e.insert(QStringLiteral("Ft8Decoder"),
+                 WidgetPicker::Einschalter{
+                     tr("Click switches to FT8 (or the FT4 you used last) and opens it."),
+                     [this]() { aufDigiStellen(m_letzterDigiModus); }});
+        plus->setEinschalter(e);
+    }
+}
+
 void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
 {
     // ── Diese Stelle MELDET, was sie tut (2026-10-28) ────────────────
@@ -17523,7 +17606,9 @@ void MainWindow::schutzrahmenNachziehen()
             // noch heruntergeschoben. Gezogen wird NUR, wenn in diesem
             // Nachlauf eine fremde Bewegung war; sonst wird die Basis
             // nur nachgefuehrt.
-            if (m_fremdeBewegungAnhaengig) {
+            if (m_profilRahmenOffen && schwebendeNachProfilrahmen()) {
+                // erledigt: Lagen vom Rahmen des Profils umgerechnet
+            } else if (m_fremdeBewegungAnhaengig) {
                 schwebendeMitziehen();
             } else {
                 m_hauptrahmenBasis = frameGeometry();
@@ -17598,6 +17683,46 @@ int MainWindow::schwebendeMitziehen()
         return 0;
     }
     if (isMinimized()) { return 0; }
+    const int bewegt = schwebendeUmrechnen(alt, neu, false);
+    if (bewegt > 0) {
+        qCInfo(lcContainer) << "Hauptfenster" << alt << "->" << neu << ":"
+                            << bewegt << "schwebende Fenster mitgezogen";
+    }
+    return bewegt;
+}
+
+bool MainWindow::schwebendeNachProfilrahmen()
+{
+    if (!m_profilRahmenOffen || m_shuttingDown) { return false; }
+    if (!isVisible() || isMinimized()) { return false; }
+    // Das Hauptfenster muss stehen: beim Start kommt das Maximieren erst
+    // nach dem Aufbau an, und dann waere der heutige Rahmen der falsche.
+    if (const QScreen* schirm = screen();
+        schirm && !hauptrahmenSteht(windowState(), frameGeometry(),
+                                    schirm->availableGeometry())) {
+        return false;
+    }
+    bool einesSichtbar = false;
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (w && w != this && w->isVisible() && schwebtUnter(w, this)) {
+            einesSichtbar = true;
+            break;
+        }
+    }
+    if (!einesSichtbar) { return false; }
+
+    const QRect neu = frameGeometry();
+    m_profilRahmenOffen = false;
+    m_hauptrahmenBasis = neu;
+    const int bewegt = schwebendeUmrechnen(m_profilRahmen, neu, true);
+    qCInfo(lcContainer) << "Profilrahmen" << m_profilRahmen << "->" << neu << ":"
+                        << bewegt << "schwebende Fenster umgerechnet";
+    return true;
+}
+
+int MainWindow::schwebendeUmrechnen(const QRect& alt, const QRect& neu, bool basisFrisch)
+{
+    if (!alt.isValid() || alt.width() <= 0 || alt.height() <= 0) { return 0; }
 
     // ── Nur die Arbeitsflaeche wird umgerechnet (2026-11-12) ─────────
     //
@@ -17638,10 +17763,12 @@ int MainWindow::schwebendeMitziehen()
         // Nicht auf den Punkt genau: nach dem Setzen rastet das Fenster
         // noch ins Raster ein (snapToGridAfterSettle, eigene Bewegung).
         // Das ist derselbe Nachhall wie beim Hauptfenster.
+        bool wiederverwendet = false;
         if (const auto bi = m_mitziehBasis.constFind(w);
-            bi != m_mitziehBasis.constEnd()
+            !basisFrisch && bi != m_mitziehBasis.constEnd()
             && (bi->gesetzt == r || istRasterNachhall(r, bi->gesetzt))) {
             basis = *bi;
+            wiederverwendet = true;
         } else {
             basis.x = double(r.x() - altA.x()) / double(altA.width());
             basis.y = double(r.y() - altA.y()) / double(altA.height());
@@ -17662,7 +17789,7 @@ int MainWindow::schwebendeMitziehen()
         // die Groesse, wie sie ist. Mindest- und Hoechstgroesse des
         // Fensters gelten weiter.
         QSize innen = innenAlt;
-        if (fx != 1.0 || fy != 1.0) {
+        if (wiederverwendet || fx != 1.0 || fy != 1.0) {
             innen = QSize(qRound(basis.w * neuA.width()),
                           qRound(basis.h * neuA.height()))
                         .expandedTo(w->minimumSize())
@@ -17704,10 +17831,6 @@ int MainWindow::schwebendeMitziehen()
     }
     // Was nicht mehr schwebt (angedockt, geschlossen), faellt heraus.
     m_mitziehBasis = std::move(neueBasis);
-    if (bewegt > 0) {
-        qCInfo(lcContainer) << "Hauptfenster" << alt << "->" << neu << ":"
-                            << bewegt << "schwebende Fenster mitgezogen";
-    }
     return bewegt;
 }
 

@@ -62,6 +62,7 @@
 #include <QStringList>
 #include <QWidget>
 
+class QLabel;
 class QLineEdit;
 class QListWidget;
 class QVBoxLayout;
@@ -114,6 +115,20 @@ public:
         std::function<void(bool)> schalte;
     };
     void setZusatzEintraege(const QList<ZusatzEintrag>& liste);
+
+    // ── Einschalter fuer Fenster hinter einer Betriebsart (2026-11-12) ─
+    //
+    // Martin, mit Bild vom Auswaehler (FT8 Decoder: OFF): „eigens kann
+    // man es nicht ... hinzufügen. das muss geändert werden". Der
+    // FT8-Dekoder steht nur in einer Datenbetriebsart bereit; ohne das
+    // war seine Karte grau, und der Weg dahin stand nirgends. Mit einem
+    // Einschalter bleibt sie bedienbar: ein Klick stellt die Betriebsart
+    // her (derselbe Weg wie der FT8-Knopf) und zeigt das Fenster.
+    struct Einschalter {
+        QString hinweis;                 // steht unter dem Namen
+        std::function<void()> schalte;
+    };
+    void setEinschalter(const QHash<QString, Einschalter>& e);
     bool isChecked(const QString& id) const;
     bool isEnabled(const QString& id) const;
     /// Eine Karte auslösen, als hätte jemand geklickt. false, wenn sie
@@ -135,10 +150,13 @@ private:
         // Ein static_cast waere die Alternative gewesen: richtig,
         // solange niemand einen zweiten Widget-Typ in diese Liste haengt.
         std::function<void()> click;
+        QWidget* offMarke{nullptr};
+        QLabel* unterzeile{nullptr};
     };
 
     void rebuild();
     void applyFilter();
+    QString unterzeileFuer(const QString& id, bool verfuegbar) const;
     Card* card(const QString& id);
     const Card* card(const QString& id) const;
 
@@ -149,6 +167,7 @@ private:
     QHash<QString, Card> m_byId;
     QStringList m_order;
     QList<ZusatzEintrag> m_zusatz;
+    QHash<QString, Einschalter> m_einschalter;
     QString m_category;
     QString m_needle;
 };
@@ -166,6 +185,7 @@ public:
     // Siehe WidgetPicker::setZusatzEintraege; der Auswaehler entsteht
     // erst beim ersten Oeffnen, darum hier gemerkt.
     void setZusatzEintraege(const QList<WidgetPicker::ZusatzEintrag>& liste);
+    void setEinschalter(const QHash<QString, WidgetPicker::Einschalter>& e);
 
     /// Wo der Auswähler aufgehen soll: unter dem Plus, rechtsbündig,
     /// und in den sichtbaren Bildschirm geschoben. Öffentlich, damit
@@ -196,6 +216,7 @@ private:
     WidgetPicker* m_picker{nullptr};
     QWidget* m_glyph{nullptr};
     QList<WidgetPicker::ZusatzEintrag> m_zusatz;
+    QHash<QString, WidgetPicker::Einschalter> m_einschalter;
 };
 
 } // namespace Longpath

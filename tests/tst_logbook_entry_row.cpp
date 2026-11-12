@@ -30,6 +30,8 @@
 #include "gui/QsoMapWindow.h"
 #include "gui/widgets/DxRadarWidget.h"
 #include "gui/widgets/RotorLogbookPanel.h"
+#include "core/CallsignInfo.h"
+#include "gui/widgets/QsoDetailPane.h"
 #include "FensterFrist.h"
 
 using namespace Longpath;
@@ -215,6 +217,45 @@ private slots:
     }
 
     // Der ganze Weg: Eingabezeile -> Rotor/Log-Feld -> Datei -> Tabelle.
+    // ── Doppelklick auf einen Spot (2026-11-12) ──────────────────────
+    // Betreiber: „ein doppelklick im panadapter sollte auch im logbuch
+    // sofort das call übernehmen und alle daten anzeigen". Der Doppelklick
+    // landet in RotorLogbookPanel::takeSpot; das Logbuchfenster muss
+    // dasselbe Rufzeichen bekommen -- Zeile, Filter, Karteikarte, sofort.
+    void aSpotDoubleClickFillsTheLogbook()
+    {
+        QFile::remove(RotorLogbookPanel::logbookPath());
+        RotorLogbookPanel panel(nullptr, nullptr, nullptr);
+        panel.showLogbook();
+        LogbookWindow* w = panel.findChild<LogbookWindow*>();
+        QVERIFY(w);
+        QVERIFY(QTest::qWaitForWindowExposed(w, kFensterFrist));
+
+        panel.takeSpot(QStringLiteral("gw6ovd/p"));
+
+        QCOMPARE(w->entryCallForTest()->text(), QStringLiteral("GW6OVD/P"));
+        QCOMPARE(w->searchForTest()->text(),
+                 Callsigns::normalized(QStringLiteral("GW6OVD/P")));
+        // Ohne die Tipppause: die Karteikarte zeigt die Station sofort.
+        QCOMPARE(w->detailForTest()->gezeigtesRufzeichen().toUpper(),
+                 QStringLiteral("GW6OVD/P"));
+        w->hide();
+        QFile::remove(RotorLogbookPanel::logbookPath());
+    }
+
+    // Steht die Station im Log, zeigt die Karteikarte DIESE Verbindung.
+    void aKnownStationShowsItsContact()
+    {
+        QTemporaryDir dir;
+        LogbookWindow w(writeAdif(QDir(dir.path())));
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+        w.uebernimmRufzeichen(QStringLiteral("k1abc"));
+        QCOMPARE(w.entryCallForTest()->text(), QStringLiteral("K1ABC"));
+        QCOMPARE(w.searchForTest()->text(), QStringLiteral("K1ABC"));
+        QCOMPARE(w.detailForTest()->gezeigtesRufzeichen(), QStringLiteral("K1ABC"));
+    }
+
     void theRotorPanelWritesWhatTheLogbookAsks()
     {
         QFile::remove(RotorLogbookPanel::logbookPath());
