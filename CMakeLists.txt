@@ -617,6 +617,7 @@ set(CORE_SOURCES
     src/core/CatRigConnection.cpp
     src/core/Ts590Cat.cpp
     src/core/CatRigBruecke.cpp
+    src/core/Ts590Sprache.cpp
     src/core/SunSdrRadioConnection.cpp
     src/core/ReceiverManager.cpp
     src/core/AudioEngine.cpp

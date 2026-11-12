@@ -193,6 +193,24 @@ void CompanionRigPage::baueCatGruppe()
         "at it."));
     grid->addWidget(m_selbstStarten, row++, 0, 1, 2);
 
+    // Sprachspeicher ueber den 590 (2026-11-12). Vorgabe aus; die
+    // Bedingungen stehen im Tooltip, damit niemand raten muss, warum F1
+    // nicht sendet.
+    m_sprache590 = new QCheckBox(
+        QStringLiteral("Voice keyer transmits through the TS-590 (transverter only)"), group);
+    m_sprache590->setObjectName(QStringLiteral("companionRigVoiceKeyer"));
+    m_sprache590->setStyleSheet(QString::fromLatin1(Style::kCheckBoxStyle));
+    m_sprache590->setChecked(
+        s2bool(s.value(QStringLiteral("CompanionRigVoiceKeyer"),
+                       QStringLiteral("False"))));
+    m_sprache590->setToolTip(QStringLiteral(
+        "F1…F10 key the TS-590 with TX1 (DATA SEND) and play the memory into "
+        "its USB audio input (menu 63 = USB). Only when a transverter is set "
+        "and not receive-only, DRV is on at the rig, the power is 5 W or less "
+        "and the rig is in USB, LSB, FM or AM. Released after 30 s at the "
+        "latest. Off: the TS-590 only transmits from its own PTT."));
+    grid->addWidget(m_sprache590, row++, 0, 1, 2);
+
     auto* hostLabel = new QLabel(QStringLiteral("rigctld host:"), group);
     hostLabel->setStyleSheet(
         QString::fromLatin1(Style::kSecondaryLabelStyle));
@@ -247,6 +265,8 @@ void CompanionRigPage::baueCatGruppe()
     connect(m_baud, &QComboBox::currentIndexChanged,
             this, &CompanionRigPage::speichereCat);
     connect(m_selbstStarten, &QCheckBox::toggled,
+            this, &CompanionRigPage::speichereCat);
+    connect(m_sprache590, &QCheckBox::toggled,
             this, &CompanionRigPage::speichereCat);
     connect(m_host, &QLineEdit::editingFinished,
             this, &CompanionRigPage::speichereCat);
@@ -341,6 +361,8 @@ void CompanionRigPage::speichereCat()
                m_baud->currentData().toInt());
     s.setValue(QStringLiteral("CompanionRigStartDaemon"),
                bool2s(m_selbstStarten->isChecked()));
+    s.setValue(QStringLiteral("CompanionRigVoiceKeyer"),
+               bool2s(m_sprache590->isChecked()));
     s.setValue(QStringLiteral("CompanionRigHost"), m_host->text().trimmed());
     s.setValue(QStringLiteral("CompanionRigPort"), m_port->value());
 }

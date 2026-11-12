@@ -9,7 +9,10 @@
 //   1. Longpath tastet das Geraet nicht. Auf keinem Weg: die Verbindung
 //      kann es nicht, RigctldClient hat keinen Befehl dafuer, und MOX
 //      wird mit einem Grund abgewiesen. Das Doppel unten zaehlt jeden
-//      Befehl, der ankommt.
+//      Befehl, der ankommt. Die EINE Ausnahme seit 2026-11-12 ist der
+//      Sprachspeicher ueber den 590 (core/Ts590Sprache.h): eingeschaltet,
+//      nur am Transverter, nur mit DRV, hoechstens 5 W, hoechstens 30 s.
+//      Seine Sperren stehen einzeln in sprachspeicher_590_*.
 //   2. Der Eintrag entsteht aus den Einstellungen, nur mit Anschluss.
 //   3. Geraet und Scheibe bleiben gleich, ohne Kreis und ohne dass eine
 //      alte Meldung den VFO zurueckzieht.
@@ -30,6 +33,8 @@
 #include <QSlider>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QBuffer>
+#include <QTemporaryDir>
 
 #include <cmath>
 #include <complex>
@@ -46,6 +51,9 @@
 #include "core/RigctldServer.h"
 #include "core/RxChannel.h"
 #include "core/Ts590Cat.h"
+#include "core/Ts590Sprache.h"
+#include "core/audio/VoiceKeyer.h"
+#include "core/audio/VoiceKeyerPlayer.h"
 #include "core/TransverterSetup.h"
 #include "core/WdspEngine.h"
 #include "models/RadioModel.h"
@@ -203,6 +211,34 @@ void zielAuf(quint16 port)
     stelleEin(QStringLiteral("CompanionRigModel"), QStringLiteral("2031"));
     stelleEin(QStringLiteral("CompanionRigDevice"), QStringLiteral("/dev/cu.fake"));
     stelleEin(QStringLiteral("CompanionRigName"), QStringLiteral("TS-590S"));
+}
+
+// Eine kurze Ansage als WAV: 48 kHz, 16 bit, mono, 0,5 s Sinus.
+QString schreibeAnsage(const QString& ordner)
+{
+    const int n = 24000;
+    QByteArray daten;
+    daten.resize(n * 2);
+    auto* p = reinterpret_cast<qint16*>(daten.data());
+    for (int i = 0; i < n; ++i) {
+        p[i] = static_cast<qint16>(12000.0 * std::sin(2.0 * M_PI * 1000.0 * i / 48000.0));
+    }
+    QByteArray kopf;
+    auto u32 = [&kopf](quint32 v) { for (int b = 0; b < 4; ++b) { kopf.append(char((v >> (8 * b)) & 0xff)); } };
+    auto u16 = [&kopf](quint16 v) { kopf.append(char(v & 0xff)); kopf.append(char(v >> 8)); };
+    kopf.append("RIFF"); u32(36 + daten.size()); kopf.append("WAVE");
+    kopf.append("fmt "); u32(16); u16(1); u16(1); u32(48000); u32(96000); u16(2); u16(16);
+    kopf.append("data"); u32(daten.size());
+    const QString pfad = ordner + QStringLiteral("/cq.wav");
+    QFile f(pfad);
+    f.open(QIODevice::WriteOnly);
+    f.write(kopf + daten);
+    return pfad;
+}
+
+int zaehleBefehl(const QByteArrayList& befehle, const QByteArray& b)
+{
+    return static_cast<int>(std::count(befehle.begin(), befehle.end(), b));
 }
 
 } // namespace
@@ -1457,6 +1493,177 @@ private slots:
 
     // Ueber die Pruef-Zugaenge und nicht ueber connectToRadio(): der volle
     // Hochlauf rechnet zuerst die WDSP-Wisdom und braucht Minuten.
+    // ── Sprachspeicher ueber den 590 (2026-11-12) ─────────────────────
+    //
+    // Die eine abgesicherte Ausnahme von „Longpath tastet nicht". Jede
+    // Sperre einzeln, dann Tasten, Ton, Loslassen, Sperre waehrend der
+    // Sendung und die Hoechstzeit.
+    void sprachspeicher_590_sperrt_bis_alles_stimmt()
+    {
+        RigctldDoppel doppel;
+        zielAuf(doppel.port());
+        stelleEin(QStringLiteral("CompanionRigVoiceKeyer"), QStringLiteral("False"));
+        TransverterSetup::setCurrent(TransverterSetup{});
+
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().leistungW, 5, 20000);
+
+        WavTxSource quelle;
+        Ts590Sprache sprache(&rig, &quelle);
+        QSignalSpy hinweis(&sprache, &Ts590Sprache::hinweis);
+
+        // Aus ist aus.
+        QVERIFY(!sprache.zustaendig());
+        QVERIFY(sprache.taste(true).contains(QStringLiteral("off")));
+
+        stelleEin(QStringLiteral("CompanionRigVoiceKeyer"), QStringLiteral("True"));
+        QVERIFY(sprache.zustaendig());
+        // Ohne Transverter nicht.
+        QVERIFY2(sprache.taste(true).contains(QStringLiteral("transverter")),
+                 qPrintable(sprache.sperrgrund()));
+        // Nur Empfang (IFo2) nicht.
+        TransverterSetup t;
+        t.enabled = true;
+        t.offsetHz = 116000000;
+        t.nurEmpfang = true;
+        TransverterSetup::setCurrent(t);
+        QVERIFY2(sprache.taste(true).contains(QStringLiteral("receive only")),
+                 qPrintable(sprache.sperrgrund()));
+        t.nurEmpfang = false;
+        TransverterSetup::setCurrent(t);
+        // DRV aus: nicht (das Doppel steht auf AN100).
+        QVERIFY2(sprache.taste(true).contains(QStringLiteral("DRV")),
+                 qPrintable(sprache.sperrgrund()));
+        doppel.roh["AN;"] = "AN111;";
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().drive, 1, 20000);
+        // Mehr als 5 W: nicht.
+        doppel.roh["PC;"] = "PC010;";
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().leistungW, 10, 20000);
+        QVERIFY2(sprache.taste(true).contains(QStringLiteral("10 W")),
+                 qPrintable(sprache.sperrgrund()));
+        doppel.roh["PC;"] = "PC005;";
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().leistungW, 5, 20000);
+        // CW: nicht.
+        doppel.modus = QStringLiteral("CW");
+        QTRY_COMPARE_WITH_TIMEOUT(rig.modus(), QStringLiteral("CW"), 20000);
+        QVERIFY2(sprache.taste(true).contains(QStringLiteral("voice mode")),
+                 qPrintable(sprache.sperrgrund()));
+        doppel.modus = QStringLiteral("USB");
+        QTRY_COMPARE_WITH_TIMEOUT(rig.modus(), QStringLiteral("USB"), 20000);
+        QVERIFY(sprache.sperrgrund().isEmpty());
+        // Bis hier ist nichts getastet worden.
+        QVERIFY(!doppel.hatGetastet());
+
+        // Jetzt: Weg legen, tasten, der Ton kommt an.
+        QTemporaryDir ordner;
+        QString fehler;
+        QVERIFY2(quelle.load(schreibeAnsage(ordner.path()), 48000, &fehler), qPrintable(fehler));
+        QBuffer ton;
+        ton.open(QIODevice::WriteOnly);
+        sprache.setTonZielForTest(&ton);
+        QVERIFY(sprache.legeWeg());
+        quelle.play();
+        // Vor dem Tasten liegt kein Ton am Eingang des 590.
+        QTest::qWait(100);
+        QCOMPARE(ton.size(), qint64(0));
+        QCOMPARE(sprache.taste(true), QString());
+        QVERIFY(sprache.getastet());
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W TX1; 0\n"), 20000);
+        QTRY_VERIFY_WITH_TIMEOUT(ton.size() >= 24000 * 4, 5000);
+        QCOMPARE(sprache.taste(false), QString());
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W RX; 0\n"), 20000);
+        sprache.nimmWegZurueck();
+
+        // DRV faellt waehrend der Sendung: sofort los, mit Grund.
+        QCOMPARE(sprache.taste(true), QString());
+        doppel.roh["AN;"] = "AN110;";
+        QTRY_VERIFY_WITH_TIMEOUT(!sprache.getastet(), 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(zaehleBefehl(doppel.befehle, "W RX; 0\n"), 2, 20000);
+        QVERIFY(!hinweis.isEmpty());
+        QVERIFY(hinweis.last().first().toString().contains(QStringLiteral("DRV")));
+
+        // Hoechstzeit.
+        doppel.roh["AN;"] = "AN111;";
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().drive, 1, 20000);
+        sprache.setMaxSendenMsForTest(300);
+        QCOMPARE(sprache.taste(true), QString());
+        QTRY_VERIFY_WITH_TIMEOUT(!sprache.getastet(), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(zaehleBefehl(doppel.befehle, "W RX; 0\n"), 3, 20000);
+
+        stelleEin(QStringLiteral("CompanionRigVoiceKeyer"), QStringLiteral("False"));
+        TransverterSetup::setCurrent(TransverterSetup{});
+    }
+
+    // Der ganze Weg ueber die Taste: F1 im Sprachspeicher tastet den 590
+    // mit TX1 und laesst nach der Ansage los -- und MOX bleibt abgewiesen.
+    void sprachspeicher_590_ueber_den_spieler()
+    {
+        RigctldDoppel doppel;
+        doppel.roh["AN;"] = "AN111;";
+        zielAuf(doppel.port());
+        stelleEin(QStringLiteral("CompanionRigVoiceKeyer"), QStringLiteral("True"));
+        TransverterSetup t;
+        t.enabled = true;
+        t.offsetHz = 116000000;
+        t.nurEmpfang = false;
+        t.save();
+        TransverterSetup::setCurrent(t);
+
+        const auto info = CompanionRigController::radioInfoAusEinstellungen();
+        QVERIFY(info.has_value());
+        RadioModel radio;
+        radio.setLastRadioInfoForTest(*info);
+        radio.onConnectionStateChangedForTest(ConnectionState::Connected);
+        QTRY_VERIFY_WITH_TIMEOUT(radio.companionRig()->verbunden(), 20000);
+        radio.companionRig()->client()->setPollIntervalMs(20);
+        QTRY_COMPARE_WITH_TIMEOUT(radio.companionRig()->catZustand().drive, 1, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(radio.companionRig()->catZustand().leistungW, 5, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(radio.companionRig()->modus(), QStringLiteral("USB"), 20000);
+
+        QTemporaryDir ordner;
+        radio.voiceKeyer().setFolder(ordner.path());
+        QString fehler;
+        QVERIFY2(radio.voiceKeyer().importFile(0, schreibeAnsage(ordner.path()), &fehler),
+                 qPrintable(fehler));
+
+        VoiceKeyerPlayer* spieler = radio.voiceKeyerPlayer();
+
+        // Ohne USB-Tongeraet geht der Weg nicht auf: der Spieler sagt das und
+        // tastet NICHT. Der Name ist absichtlich keiner, den es gibt -- der
+        // Pruefstand soll das echte Tongeraet des 590 nie oeffnen.
+        stelleEin(QStringLiteral("CompanionRigAudioOutput"),
+                  QStringLiteral("kein-geraet-im-pruefstand"));
+        const QString ohne = spieler->play(0);
+        QVERIFY2(ohne.contains(QStringLiteral("can't be sent")), qPrintable(ohne));
+        QTest::qWait(300);
+        QVERIFY(!doppel.befehle.contains("W TX1; 0\n"));
+
+        // Mit Tonziel: F1 tastet mit TX1, die Ansage kommt an, danach RX.
+        QBuffer ton;
+        ton.open(QIODevice::WriteOnly);
+        radio.ts590Sprache()->setTonZielForTest(&ton);
+        const QString mit = spieler->play(0);
+        QVERIFY2(mit.isEmpty(), qPrintable(mit));
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W TX1; 0\n"), 20000);
+        QTRY_VERIFY_WITH_TIMEOUT(doppel.befehle.contains("W RX; 0\n"), 20000);
+        QTRY_VERIFY_WITH_TIMEOUT(!spieler->busy(), 20000);
+        QVERIFY(ton.size() >= 24000 * 4);
+        QVERIFY(!radio.ts590Sprache()->getastet());
+
+        // MOX bleibt der alte Weg: abgewiesen, nichts getastet.
+        radio.moxController()->setMox(true);
+        QTest::qWait(200);
+        QCOMPARE(zaehleBefehl(doppel.befehle, "W TX1; 0\n"), 1);
+        stelleEin(QStringLiteral("CompanionRigAudioOutput"), QString());
+
+        stelleEin(QStringLiteral("CompanionRigVoiceKeyer"), QStringLiteral("False"));
+        TransverterSetup{}.save();
+        TransverterSetup::setCurrent(TransverterSetup{});
+    }
+
     void verbunden_wird_MOX_abgewiesen_und_nichts_getastet()
     {
         RigctldDoppel doppel;
