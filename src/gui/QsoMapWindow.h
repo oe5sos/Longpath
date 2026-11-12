@@ -384,6 +384,16 @@ private:
     // filtering" (everything shown), so a fresh window hides nothing.
     FlowLayout*   m_pillRow{nullptr};
     class QPushButton* m_ebenenBtn{nullptr};   // Layers-Knopf (2026-11-12)
+    QWidget*      m_pfadGruppe{nullptr};       // Paths an/aus + Betriebsart (2026-11-12)
+    class QPushButton* m_pfadKnopf{nullptr};
+    class QHBoxLayout* m_modusLay{nullptr};
+    QString       m_pfadModus;                 // leer: alle Betriebsarten
+    static QString anzeigeModus(const LogEntry& e);
+    void baueModusKnoepfe();
+    void setzePfadModus(const QString& modus);
+public:
+    QString pfadModusForTest() const { return m_pfadModus; }
+private:
     QWidget*      m_zoomLeiste{nullptr};       // Zoom auf dem Bild
     QWidget*      m_leiste{nullptr};           // die obere Leiste als Ganzes
     bool          m_kompakt{false};

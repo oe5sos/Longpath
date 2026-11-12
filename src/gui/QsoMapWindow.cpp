@@ -25,6 +25,7 @@
 // =================================================================
 
 #include "QsoMapWindow.h"
+#include "gui/ScopedChildWidget.h"
 
 #include "core/AdifLog.h"
 #include "core/AppSettings.h"
@@ -76,6 +77,8 @@
 #include <QTextDocumentFragment>
 #include <QTimeZone>
 #include <QUrl>
+#include <QHash>
+#include <memory>
 #include <QGridLayout>
 #include <QMenu>
 #include <QVBoxLayout>
@@ -728,6 +731,40 @@ void QsoMapWindow::buildUi()
         m_ebenenBtn->setMenu(menu);
     }
     bar->addWidget(m_ebenenBtn);
+
+    // ── Wege an/aus und nach Betriebsart (2026-11-12) ────────────────
+    //
+    // Betreiber: „die blauen linien solle man ein und ausblenden können,
+    // aber auch ft8, ft4 bzw. ssb ändern können". Direkt an der Karte,
+    // nicht im Menue: „Paths" schaltet die Linien, daneben die drei
+    // haeufigsten Betriebsarten des Logs und „…" fuer den Rest. Die Wahl
+    // gilt fuer alles, was die Karte zeigt -- Punkte ohne ihre Linie
+    // waeren ein halbes Bild.
+    m_pfadGruppe = new QWidget(this);
+    m_pfadGruppe->setObjectName(QStringLiteral("qsoMapPathGroup"));
+    {
+        auto* h = new QHBoxLayout(m_pfadGruppe);
+        h->setContentsMargins(0, 0, 0, 0);
+        h->setSpacing(2);
+        m_pfadKnopf = new QPushButton(QStringLiteral("Paths"), m_pfadGruppe);
+        m_pfadKnopf->setObjectName(QStringLiteral("qsoMapPathsToggle"));
+        m_pfadKnopf->setCheckable(true);
+        m_pfadKnopf->setChecked(m_paths->isChecked());
+        m_pfadKnopf->setFocusPolicy(Qt::NoFocus);
+        m_pfadKnopf->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
+        m_pfadKnopf->setToolTip(QStringLiteral("Show or hide the lines from home to each contact"));
+        h->addWidget(m_pfadKnopf);
+        h->addSpacing(6);
+        m_modusLay = new QHBoxLayout;
+        m_modusLay->setContentsMargins(0, 0, 0, 0);
+        m_modusLay->setSpacing(2);
+        h->addLayout(m_modusLay);
+        // toggled, nicht clicked: die Bedienhilfe drueckt ueber toggle().
+        connect(m_pfadKnopf, &QPushButton::toggled, this, [this](bool an) {
+            if (m_paths && m_paths->isChecked() != an) { m_paths->setChecked(an); }
+        });
+    }
+    bar->addWidget(m_pfadGruppe);
     connect(m_satellites, &QCheckBox::toggled, this, [this](bool on) {
         m_flat->setShowSatellites(on);
         m_globe->setShowSatellites(on);
@@ -1277,6 +1314,9 @@ void QsoMapWindow::buildUi()
             this, [this](int i) {
         updateRotorRadarVisibility();
         apply3dRoom();
+        // Radar und Azimutalkarte zoomen nicht (zoomActiveView), 3D dreht
+        // am Rad -- dort waeren +/-/Fit Knoepfe, die nichts tun.
+        if (m_zoomLeiste) { m_zoomLeiste->setVisible(!isOverlayView(i) && i != kView3d); }
         if (m_embedded) { update3dButton(); }
         emit dreiDSichtbar(i == kView3d);
     });
@@ -1315,6 +1355,10 @@ void QsoMapWindow::buildUi()
         m_globe->resetView();
     });
     connect(m_paths, &QCheckBox::toggled, this, [this](bool on) {
+        if (m_pfadKnopf && m_pfadKnopf->isChecked() != on) {
+            QSignalBlocker b(m_pfadKnopf);
+            m_pfadKnopf->setChecked(on);
+        }
         m_globe->setShowPointPaths(on);
         m_flat->setShowPaths(on);
     });
@@ -1479,6 +1523,7 @@ void QsoMapWindow::setEntries(const QVector<LogEntry>& entries)
 {
     m_all = entries;
     rebuildFilterPills();
+    baueModusKnoepfe();
     rebuild();
     if (!m_hatMosaikLog) {
         m_mosaik.baue(m_all, m_nurFt8 && m_nurFt8->isChecked());
@@ -1493,6 +1538,81 @@ QString QsoMapWindow::bandKey(const LogEntry& e)
 {
     const QString b = e.band.trimmed().toLower();
     return b.isEmpty() ? QStringLiteral("?") : b;
+}
+
+QString QsoMapWindow::anzeigeModus(const LogEntry& e)
+{
+    // Wie man sie nennt: FT4 statt MFSK, aber SSB statt USB/LSB.
+    const QString sub = e.submode.trimmed().toUpper();
+    if (!sub.isEmpty() && sub != QStringLiteral("USB") && sub != QStringLiteral("LSB")) { return sub; }
+    return modeKey(e);
+}
+
+void QsoMapWindow::baueModusKnoepfe()
+{
+    if (!m_modusLay) { return; }
+    while (QLayoutItem* it = m_modusLay->takeAt(0)) {
+        std::unique_ptr<QLayoutItem> weg(it);
+        if (QWidget* w = it->widget()) { w->deleteLater(); }
+    }
+    QHash<QString, int> zahl;
+    for (const LogEntry& e : std::as_const(m_all)) { ++zahl[anzeigeModus(e)]; }
+    QStringList alle = zahl.keys();
+    std::sort(alle.begin(), alle.end(), [&zahl](const QString& a, const QString& b) {
+        return zahl.value(a) != zahl.value(b) ? zahl.value(a) > zahl.value(b) : a < b;
+    });
+    // Eine gewaehlte Betriebsart, die es nicht mehr gibt, filtert nicht
+    // unsichtbar weiter.
+    if (!m_pfadModus.isEmpty() && !zahl.contains(m_pfadModus)) { m_pfadModus.clear(); }
+    if (alle.size() < 2) { return; }   // nichts zu waehlen
+
+    const QStringList oben = alle.mid(0, 3);
+    auto knopf = [this](const QString& text, const QString& wert) {
+        auto* b = new QPushButton(text, m_pfadGruppe);
+        b->setCheckable(true);
+        b->setChecked(wert == m_pfadModus);
+        b->setFocusPolicy(Qt::NoFocus);
+        b->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
+        b->setProperty("modus", wert);
+        connect(b, &QPushButton::clicked, this, [this, wert]() { setzePfadModus(wert); });
+        m_modusLay->addWidget(b);
+        return b;
+    };
+    knopf(QStringLiteral("All"), QString());
+    for (const QString& m : oben) { knopf(m, m); }
+    if (alle.size() > 3) {
+        const bool anderer = !m_pfadModus.isEmpty() && !oben.contains(m_pfadModus);
+        auto* mehr = new QPushButton(anderer ? m_pfadModus + QStringLiteral(" \u25be")
+                                             : QStringLiteral("…"), m_pfadGruppe);
+        mehr->setCheckable(true);
+        mehr->setChecked(anderer);
+        mehr->setFocusPolicy(Qt::NoFocus);
+        mehr->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
+        mehr->setToolTip(QStringLiteral("Every mode in the log"));
+        const QStringList rest = alle.mid(3);
+        connect(mehr, &QPushButton::clicked, this, [this, mehr, rest]() {
+            ScopedChildWidget<QMenu> menuOwner(this);
+            QMenu& menu = *menuOwner.get();
+            for (const QString& m : rest) {
+                QAction* a = menu.addAction(m);
+                a->setCheckable(true);
+                a->setChecked(m == m_pfadModus);
+                a->setData(m);
+            }
+            QAction* gewaehlt = menu.exec(mehr->mapToGlobal(QPoint(0, mehr->height())));
+            if (!menuOwner) { return; }
+            if (gewaehlt) { setzePfadModus(gewaehlt->data().toString()); }
+            else { baueModusKnoepfe(); }   // Haken des Knopfs zuruecksetzen
+        });
+        m_modusLay->addWidget(mehr);
+    }
+}
+
+void QsoMapWindow::setzePfadModus(const QString& modus)
+{
+    m_pfadModus = modus;
+    baueModusKnoepfe();
+    rebuild();
 }
 
 QString QsoMapWindow::modeKey(const LogEntry& e)
@@ -1560,7 +1680,7 @@ void QsoMapWindow::rebuildFilterPills()
     // kein abgeschalteter Wert unsichtbar weiterfiltert, gilt dort alles.
     if (m_embedded) {
         m_offBands.clear();
-        m_offModes.clear();
+        m_offModes.clear();   // die sichtbare Wahl ist m_pfadModus (Paths-Gruppe)
         m_pillRow->addStretch();
         apply3dRoom();
         return;
@@ -1669,6 +1789,7 @@ void QsoMapWindow::rebuild()
         // that intent does not flip with the Only-marked tick.
         if (m_offBands.contains(bandKey(e))) { continue; }
         if (m_offModes.contains(modeKey(e))) { continue; }
+        if (!m_pfadModus.isEmpty() && anzeigeModus(e) != m_pfadModus) { continue; }
 
         ++considered;
         // What the KML export sends: exactly what the filters let

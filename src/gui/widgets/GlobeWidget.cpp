@@ -811,14 +811,21 @@ void GlobeWidget::resizeEvent(QResizeEvent*)
 
 void GlobeWidget::renderSphere()
 {
-    const int w = width();
-    const int h = height();
+    // ── Volle Pixeldichte (2026-11-12) ───────────────────────────────
+    //
+    // Betreiber: „die qualität der kugel finde ich hässlich". Die Kugel
+    // wurde in Layoutpunkten gerechnet und auf dem Retina-Schirm doppelt
+    // hochgezogen -- daher weich UND treppig. Jetzt in Geraetepixeln.
+    const double dpr = std::max(1.0, devicePixelRatioF());
+    const int w = static_cast<int>(std::lround(width() * dpr));
+    const int h = static_cast<int>(std::lround(height() * dpr));
     if (w <= 0 || h <= 0) { return; }
 
     m_frame = QImage(w, h, QImage::Format_ARGB32_Premultiplied);
+    m_frame.setDevicePixelRatio(dpr);
     m_frame.fill(Qt::transparent);
 
-    const double r  = radiusPx();
+    const double r  = radiusPx() * dpr;
     const double cx = w * 0.5;
     const double cy = h * 0.5;
     const double vla = m_viewLat * kDeg;
@@ -838,7 +845,25 @@ void GlobeWidget::renderSphere()
     // Ohne eigene Textur des Betreibers tritt der schematische
     // Duotone-Ersatz (m_syntheticMask) an dieselbe Stelle -- derselbe
     // Abtastpfad unten gilt fuer beide, kein zweiter Sonderfall.
-    const QImage customTexture = WorldTexture::styledImage();
+    // Das Weltbild auf etwa die Groesse verkleinert, in der die Kugel es
+    // zeigt (Umfang in Pixeln, mit Reserve). Ein 5400 px breites Bild,
+    // auf einen 300 px grossen Ball punktweise abgetastet, flimmert an
+    // jeder Kueste -- vorher glaetten, dann bilinear abtasten.
+    const QImage voll = WorldTexture::styledImage();
+    QImage customTexture = voll;
+    if (!voll.isNull()) {
+        const int ziel = std::clamp(static_cast<int>(std::ceil(2.0 * M_PI * r * 1.5)),
+                                    512, voll.width());
+        if (ziel < voll.width()) {
+            if (m_texturKlein.isNull() || m_texturKleinVon != voll.cacheKey()
+                || m_texturKlein.width() != ziel) {
+                m_texturKlein = voll.scaled(ziel, ziel / 2, Qt::IgnoreAspectRatio,
+                                            Qt::SmoothTransformation);
+                m_texturKleinVon = voll.cacheKey();
+            }
+            customTexture = m_texturKlein;
+        }
+    }
     const bool haveCustomTexture = !customTexture.isNull();
     if (!haveCustomTexture && m_syntheticMaskDirty) { rebuildSyntheticMask(); }
     const QImage& texture = haveCustomTexture ? customTexture : m_syntheticMask;
@@ -856,10 +881,13 @@ void GlobeWidget::renderSphere()
         for (int px = x0; px <= x1; ++px) {
             const double dx = (px - cx) / r;
             const double rr = dx * dx + dy * dy;
-            if (rr > 1.0) { continue; }
+            // Ein Pixel Saum ausserhalb: dort nur der geglaettete Rand.
+            const double randPx = (std::sqrt(rr) - 1.0) * r;
+            if (randPx > 1.0) { continue; }
+            const double deckung = std::clamp(0.5 - randPx, 0.0, 1.0);
 
             // Surface normal in camera space; z towards the viewer.
-            const double nz = std::sqrt(1.0 - rr);
+            const double nz = std::sqrt(std::max(0.0, 1.0 - std::min(rr, 1.0)));
 
             // Un-rotate into geographic coordinates.
             const double lat = std::asin(dy * std::cos(vla) + nz * std::sin(vla));
@@ -920,10 +948,13 @@ void GlobeWidget::renderSphere()
             // Limb darkening towards the edge sells the curvature.
             lit *= 0.55 + 0.45 * nz;
 
-            line[px] = qRgb(
-                static_cast<int>(qRed(base)   * lit),
-                static_cast<int>(qGreen(base) * lit),
-                static_cast<int>(qBlue(base)  * lit));
+            // Vormultipliziert: am Rand die Deckung auf alle vier Kanaele.
+            const double k = lit * deckung;
+            line[px] = qRgba(
+                static_cast<int>(qRed(base)   * k),
+                static_cast<int>(qGreen(base) * k),
+                static_cast<int>(qBlue(base)  * k),
+                static_cast<int>(255.0 * deckung + 0.5));
         }
     }
     m_frameDirty = false;
@@ -984,7 +1015,7 @@ void GlobeWidget::paintEvent(QPaintEvent*)
     p.setRenderHint(QPainter::Antialiasing);
     p.fillRect(rect(), QColor(Style::hexRole(Style::kPanelBg)));
 
-    if (m_frameDirty || m_frame.size() != size()) { renderSphere(); }
+    if (m_frameDirty || m_frame.deviceIndependentSize().toSize() != size()) { renderSphere(); }
 
     const double r  = radiusPx();
     const QPointF c(width() * 0.5, height() * 0.5);

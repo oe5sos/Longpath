@@ -115,6 +115,16 @@ private slots:
                               "LogbookBrowseRight"}) {
             s.setValue(QString::fromLatin1(k), QByteArray());
         }
+        // Fuer die Bilder: das echte Weltbild und die Kartenansicht des
+        // Betreibers -- ohne Weltbild zeichnet Longpath die schematische
+        // Notkugel, und die sah im Bild aus wie ein Fehler (2026-11-12).
+        const QString welt = qEnvironmentVariable("LONGPATH_GRAB_WELT");
+        if (!welt.isEmpty()) {
+            s.setValue(QStringLiteral("GlobeWorldImagePath"), welt);
+            s.setValue(QStringLiteral("GlobeWorldImageStyle"), QStringLiteral("Crisp"));
+        }
+        const QString ansicht = qEnvironmentVariable("LONGPATH_GRAB_ANSICHT");
+        if (!ansicht.isEmpty()) { s.setValue(QStringLiteral("QsoMapView"), ansicht); }
     }
 
     // Datei- und Online-Arbeit steht nicht mehr in der Leiste, sondern
@@ -249,6 +259,34 @@ private slots:
         auto* zoom = karte->findChild<QWidget*>(QStringLiteral("qsoMapZoomOverlay"));
         QVERIFY(zoom && zoom->isVisible());
         QVERIFY(karte->threeDButtonForTest() && karte->threeDButtonForTest()->isVisible());
+
+        // Wege an/aus und nach Betriebsart direkt an der Karte (Betreiber
+        // 2026-11-12: „die blauen linien solle man ein und ausblenden
+        // können, aber auch ft8, ft4 bzw. ssb ändern können").
+        auto* pfade = karte->findChild<QPushButton*>(QStringLiteral("qsoMapPathsToggle"));
+        QVERIFY(pfade && pfade->isVisible() && pfade->isChecked());
+        auto* gruppe = karte->findChild<QWidget*>(QStringLiteral("qsoMapPathGroup"));
+        QPushButton* ft8 = nullptr;
+        QPushButton* alle = nullptr;
+        for (QPushButton* b : gruppe->findChildren<QPushButton*>()) {
+            if (b->text() == QStringLiteral("FT8")) { ft8 = b; }
+            if (b->text() == QStringLiteral("All")) { alle = b; }
+        }
+        QVERIFY2(ft8 && alle, "keine Betriebsart-Knoepfe an der Karte");
+        QTRY_VERIFY(karte->shownCountForTest() > 0);
+        const int gesamt = karte->shownCountForTest();
+        ft8->click();
+        QCOMPARE(karte->pfadModusForTest(), QStringLiteral("FT8"));
+        QTRY_VERIFY(karte->shownCountForTest() < gesamt);
+        for (QPushButton* b : gruppe->findChildren<QPushButton*>()) {
+            if (b->text() == QStringLiteral("All")) { alle = b; }
+        }
+        alle->click();
+        QTRY_COMPARE(karte->shownCountForTest(), gesamt);
+        pfade->click();
+        QVERIFY(!pfade->isChecked());
+        pfade->click();
+        QVERIFY(pfade->isChecked());
 
         // Fall 1 aus dem Entwurf: ein Rufzeichen in der Eingabe.
         for (QLineEdit* e : w.findChildren<QLineEdit*>()) {
