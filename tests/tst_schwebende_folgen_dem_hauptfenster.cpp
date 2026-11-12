@@ -299,6 +299,58 @@ private slots:
                      .arg(nachher.x()).arg(nachher.y()).arg(nachher.width()).arg(nachher.height())));
     }
 
+    // ── Der Startsprung schiebt nichts mehr (2026-11-12) ─────────────
+    //
+    // Betreiber: „ich habe alles gespeichert und wieder ist alles
+    // verschoben". Im Protokoll jedes Starts: das Profil stellt die
+    // Fenster an ihre gespeicherten Punkte, das Hauptfenster kommt aber
+    // 58 Punkte niedriger herauf (ueber dem Dock), springt spaeter auf
+    // die alte Hoehe -- und alle Fenster ziehen um 6,7 % mit. Gespeichert
+    // wurde dann DAS, und der naechste Start schob weiter.
+    //
+    // Hier: Lage zum grossen Rahmen gespeichert, Hauptfenster kommt klein
+    // herauf (eigene Bewegung, wie das Maximieren beim Aufbau), springt
+    // auf gross (fremd). Am Ende muss das Fenster genau dort stehen, wo
+    // es gespeichert war.
+    void startsprungGibtDieGespeicherteLage()
+    {
+        const QRect gross = m_mw->frameGeometry();
+        const QSize innenGross = m_mw->size();
+        const QRect gespeichert = m_abgeloest->frameGeometry();
+        m_mw->schwebendeMitziehenForTest();   // Basis = jetzt
+
+        // „Start": kleiner herauf, als eigene Bewegung; das Profil hat
+        // das Fenster an seinen gespeicherten Punkt gestellt.
+        {
+            const EigeneBewegung wirSelbst;
+            m_mw->resize(innenGross.width(), innenGross.height() - 58);
+            QCoreApplication::processEvents();
+        }
+        QTest::qWait(kNachlaufMs);
+        QCOMPARE(m_abgeloest->frameGeometry().topLeft(), gespeichert.topLeft());
+
+        // Das Profil kennt seinen Rahmen: umrechnen.
+        m_mw->setProfilRahmenForTest(gross);
+        QVERIFY(m_mw->schwebendeNachProfilrahmenForTest());
+
+        // Und der Sprung auf die alte Hoehe, von aussen.
+        m_mw->resize(innenGross);
+        QTest::qWait(kNachlaufMs);
+
+        const QRect nachher = m_abgeloest->frameGeometry();
+        qInfo() << "gespeichert" << gespeichert << "nachher" << nachher
+                << "Hauptfenster" << gross << "->" << m_mw->frameGeometry();
+        QVERIFY2(qAbs(nachher.x() - gespeichert.x()) <= kToleranzPx
+                     && qAbs(nachher.y() - gespeichert.y()) <= kToleranzPx
+                     && qAbs(nachher.width() - gespeichert.width()) <= kSnapGridPx
+                     && qAbs(nachher.height() - gespeichert.height()) <= kSnapGridPx,
+                 qPrintable(QStringLiteral("gespeichert %1,%2 %3x%4 -- nachher %5,%6 %7x%8")
+                     .arg(gespeichert.x()).arg(gespeichert.y())
+                     .arg(gespeichert.width()).arg(gespeichert.height())
+                     .arg(nachher.x()).arg(nachher.y())
+                     .arg(nachher.width()).arg(nachher.height())));
+    }
+
     void eigeneBewegungZiehtNicht()
     {
         const QPoint vorher = m_abgeloest->frameGeometry().topLeft();

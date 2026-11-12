@@ -10487,6 +10487,13 @@ void MainWindow::populateDefaultMeter()
                 QVariantMap mw;
                 mw.insert(QStringLiteral("fullScreen"), m_borderlessFullSize);
                 mw.insert(QStringLiteral("maximized"), isMaximized());
+                // Der Rahmen, zu dem die Lagen der schwebenden Fenster
+                // gehoeren (2026-11-12, siehe m_profilRahmen).
+                {
+                    const QRect f = frameGeometry();
+                    mw.insert(QStringLiteral("rahmen"),
+                              QVariantList{f.x(), f.y(), f.width(), f.height()});
+                }
                 s.insert(QStringLiteral("mainWindow"), mw);
 
                 // Seitenbereich: Seiten, aktive Seite, zu/auf, Lage. Fehlt
@@ -11192,6 +11199,35 @@ void MainWindow::populateDefaultMeter()
                         const QVariantMap z = zeilen.value(pan->panId()).toMap();
                         pan->setFrequencyReadoutShown(z.value(QStringLiteral("frequency")).toBool());
                         pan->setSwrReadoutShown(z.value(QStringLiteral("swr")).toBool());
+                    }
+                }
+
+                // Die Lagen gehoeren zum Rahmen beim Aufnehmen: umrechnen,
+                // sobald alles steht (2026-11-12, siehe m_profilRahmen).
+                {
+                    const QVariantList rl = s.value(QStringLiteral("mainWindow")).toMap()
+                                                .value(QStringLiteral("rahmen")).toList();
+                    if (rl.size() == 4) {
+                        m_profilRahmen = QRect(rl.at(0).toInt(), rl.at(1).toInt(),
+                                               rl.at(2).toInt(), rl.at(3).toInt());
+                        m_profilRahmenOffen = m_profilRahmen.isValid();
+                        if (m_profilRahmenOffen) {
+                            // Gleich versuchen; steht noch nichts, holt es
+                            // der Nachlauf des Schutzrahmens nach.
+                            if (!schwebendeNachProfilrahmen()) {
+                                schutzrahmenNachziehen();
+                                // Beim Start erscheinen die schwebenden
+                                // Fenster erst nach dem Aufbau; ohne eine
+                                // weitere Bewegung kaeme kein Nachlauf.
+                                for (int ms : {600, 1500, 3000}) {
+                                    QTimer::singleShot(ms, this, [this]() {
+                                        if (m_profilRahmenOffen) { schwebendeNachProfilrahmen(); }
+                                    });
+                                }
+                            }
+                        }
+                    } else {
+                        m_profilRahmenOffen = false;
                     }
                 }
 
@@ -17373,7 +17409,9 @@ void MainWindow::schutzrahmenNachziehen()
             // noch heruntergeschoben. Gezogen wird NUR, wenn in diesem
             // Nachlauf eine fremde Bewegung war; sonst wird die Basis
             // nur nachgefuehrt.
-            if (m_fremdeBewegungAnhaengig) {
+            if (m_profilRahmenOffen && schwebendeNachProfilrahmen()) {
+                // erledigt: Lagen vom Rahmen des Profils umgerechnet
+            } else if (m_fremdeBewegungAnhaengig) {
                 schwebendeMitziehen();
             } else {
                 m_hauptrahmenBasis = frameGeometry();
@@ -17448,6 +17486,46 @@ int MainWindow::schwebendeMitziehen()
         return 0;
     }
     if (isMinimized()) { return 0; }
+    const int bewegt = schwebendeUmrechnen(alt, neu, false);
+    if (bewegt > 0) {
+        qCInfo(lcContainer) << "Hauptfenster" << alt << "->" << neu << ":"
+                            << bewegt << "schwebende Fenster mitgezogen";
+    }
+    return bewegt;
+}
+
+bool MainWindow::schwebendeNachProfilrahmen()
+{
+    if (!m_profilRahmenOffen || m_shuttingDown) { return false; }
+    if (!isVisible() || isMinimized()) { return false; }
+    // Das Hauptfenster muss stehen: beim Start kommt das Maximieren erst
+    // nach dem Aufbau an, und dann waere der heutige Rahmen der falsche.
+    if (const QScreen* schirm = screen();
+        schirm && !hauptrahmenSteht(windowState(), frameGeometry(),
+                                    schirm->availableGeometry())) {
+        return false;
+    }
+    bool einesSichtbar = false;
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (w && w != this && w->isVisible() && schwebtUnter(w, this)) {
+            einesSichtbar = true;
+            break;
+        }
+    }
+    if (!einesSichtbar) { return false; }
+
+    const QRect neu = frameGeometry();
+    m_profilRahmenOffen = false;
+    m_hauptrahmenBasis = neu;
+    const int bewegt = schwebendeUmrechnen(m_profilRahmen, neu, true);
+    qCInfo(lcContainer) << "Profilrahmen" << m_profilRahmen << "->" << neu << ":"
+                        << bewegt << "schwebende Fenster umgerechnet";
+    return true;
+}
+
+int MainWindow::schwebendeUmrechnen(const QRect& alt, const QRect& neu, bool basisFrisch)
+{
+    if (!alt.isValid() || alt.width() <= 0 || alt.height() <= 0) { return 0; }
 
     // ── Nur die Arbeitsflaeche wird umgerechnet (2026-11-12) ─────────
     //
@@ -17488,10 +17566,12 @@ int MainWindow::schwebendeMitziehen()
         // Nicht auf den Punkt genau: nach dem Setzen rastet das Fenster
         // noch ins Raster ein (snapToGridAfterSettle, eigene Bewegung).
         // Das ist derselbe Nachhall wie beim Hauptfenster.
+        bool wiederverwendet = false;
         if (const auto bi = m_mitziehBasis.constFind(w);
-            bi != m_mitziehBasis.constEnd()
+            !basisFrisch && bi != m_mitziehBasis.constEnd()
             && (bi->gesetzt == r || istRasterNachhall(r, bi->gesetzt))) {
             basis = *bi;
+            wiederverwendet = true;
         } else {
             basis.x = double(r.x() - altA.x()) / double(altA.width());
             basis.y = double(r.y() - altA.y()) / double(altA.height());
@@ -17512,7 +17592,7 @@ int MainWindow::schwebendeMitziehen()
         // die Groesse, wie sie ist. Mindest- und Hoechstgroesse des
         // Fensters gelten weiter.
         QSize innen = innenAlt;
-        if (fx != 1.0 || fy != 1.0) {
+        if (wiederverwendet || fx != 1.0 || fy != 1.0) {
             innen = QSize(qRound(basis.w * neuA.width()),
                           qRound(basis.h * neuA.height()))
                         .expandedTo(w->minimumSize())
@@ -17554,10 +17634,6 @@ int MainWindow::schwebendeMitziehen()
     }
     // Was nicht mehr schwebt (angedockt, geschlossen), faellt heraus.
     m_mitziehBasis = std::move(neueBasis);
-    if (bewegt > 0) {
-        qCInfo(lcContainer) << "Hauptfenster" << alt << "->" << neu << ":"
-                            << bewegt << "schwebende Fenster mitgezogen";
-    }
     return bewegt;
 }
 
