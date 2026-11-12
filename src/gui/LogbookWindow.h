@@ -233,6 +233,10 @@ public:
     // Wo der Rotor gerade steht (NaN = unbekannt / kein Rotor) und wie
     // breit der Strahl ist. Geht an die Karteikarte ("Rotor at ...") und
     // an das Rotor-Radar neben der Karte (2026-09-26).
+    /// Ein Rufzeichen von aussen, etwa per Doppelklick auf einen Spot im
+    /// Panadapter (2026-11-12): wie getippt -- Eingabezeile, Filter,
+    /// Karteikarte mit QRZ, Karte, Bedarf -- nur ohne die Tipppause.
+    void uebernimmRufzeichen(const QString& rufzeichen);
     void setRotorBearing(double deg);
     void setRotorBeamWidth(double deg);
     // Was der Rotor zu einem Drehbefehl sagt: Ablehnung (erlaubter

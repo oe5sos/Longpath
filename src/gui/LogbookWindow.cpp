@@ -3211,6 +3211,29 @@ void LogbookWindow::clearEntry()
     m_entryCall->setFocus();
 }
 
+void LogbookWindow::uebernimmRufzeichen(const QString& rufzeichen)
+{
+    // Betreiber 2026-11-12: „ein doppelklick im panadapter sollte auch
+    // im logbuch sofort das call übernehmen und alle daten anzeigen."
+    // Bis heute ging der Doppelklick nur ins Rotor/Log-Feld; dieses
+    // Fenster erfuhr nichts davon. Derselbe Weg wie das Tippen (siehe
+    // textEdited der Eingabezeile), aber ohne die 700 ms Entprellung:
+    // ein Doppelklick ist kein halbes Rufzeichen.
+    const QString up = rufzeichen.trimmed().toUpper();
+    if (up.isEmpty() || !m_entryCall) { return; }
+    m_entryCall->setText(up);
+    if (m_search) { m_search->setText(Callsigns::normalized(up)); }
+    if (m_entryLookup) { m_entryLookup->stop(); }
+    if (m_entryHint) {
+        m_entryHint->setText(QStringLiteral("Enter logs · Esc clears"));
+        m_entryHint->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                       .arg(QLatin1String(Style::kTextScale)));
+    }
+    showStationFor(up);
+    if (m_bedarfTimer) { m_bedarfTimer->stop(); }
+    aktualisiereBedarf();
+}
+
 void LogbookWindow::showStationFor(const QString& raw)
 {
     const QString call = Callsigns::normalized(raw);
