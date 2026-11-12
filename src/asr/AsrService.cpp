@@ -21,6 +21,8 @@
 #include <QThread>
 #include <QTimer>
 
+#include <deque>
+
 namespace Longpath {
 
 namespace {
@@ -32,6 +34,13 @@ constexpr int kAsrRateHz = 16000;   // was jeder Whisper-Dienst erwartet
 // gegen 1,5 und 3 gemessen: 1,5 liess noch Abschnitte am Deckel, 3 warf
 // beim zweiten Mitschnitt vier Fuenftel der Sprache weg (16 statt 97).
 constexpr float kRauschbodenFaktor = 2.0f;
+// Stille, die einen Abschnitt beendet (2026-11-12). 300 ms (Vorgabe des
+// Zerlegers) ist im Gespraech jede Atempause: Martins Mitschrift eines
+// deutschen QSOs auf 40 m bestand aus Satzfetzen ("...was Werder die ganze
+// Lange / hatte."), 12 von 30 Abschnitten unter 2 s, und Whisper riet aus
+// einer Sekunde Ton ("Endstube", "SL 2100" fuer die FL-2100). 700 ms haelt
+// einen Satz zusammen; zwischen zwei Anrufern im Pileup ist die Pause laenger.
+constexpr int kNachlaufMs = 700;
 // Hoechstzahl Rahmen je Wandleraufruf. Muss zur Groesse passen,
 // mit der der Resampler gebaut wird — sonst rechnet er auf einem
 // Puffer, der ihm zu klein ist.
@@ -49,18 +58,49 @@ public:
     explicit AsrWorker(IAsrBackend* backend) : m_backend(backend) {}
 
 public slots:
+    // ── Einer nach dem anderen (2026-11-12) ──────────────────────────
+    //
+    // Martin: „transcribe funktioniert schlecht". Im Protokoll des
+    // Whisper-Dienstes 22 von 41 Abschnitten „client disconnected,
+    // aborted processing". Der Erkenner wartet in einer eigenen
+    // Ereignisschleife auf die Antwort, und die arbeitet auch die
+    // Warteschlange DIESES Fadens ab: der naechste Abschnitt kam hier
+    // mitten im Warten an, schickte seine Anfrage los und wartete selbst
+    // -- alles ging zugleich hinaus, der Dienst rechnet nacheinander, und
+    // was hinten stand, lief in die Zeitgrenze.
+    //
+    // Jetzt: ein Aufruf, der hineinkommt, waehrend einer laeuft, legt
+    // seinen Ton nur ab. Der laufende holt ihn danach -- und legt alles,
+    // was inzwischen wartet, zu EINER Anfrage zusammen (mit kurzer Stille
+    // dazwischen), damit ein langsamer Dienst nicht immer weiter
+    // zurueckfaellt.
     void transcribe(const std::vector<float>& pcm16k)
     {
-        if (!m_backend) { return; }
-        QString error;
-        const AsrTranscript t = m_backend->transcribe(pcm16k, &error);
-        if (!error.isEmpty()) {
-            emit failed(error);
-            return;
+        if (!m_backend || pcm16k.empty()) { return; }
+        m_wartet.push_back(pcm16k);
+        if (m_laeuft) { return; }        // wieder eingetreten: siehe oben
+        m_laeuft = true;
+        while (!m_wartet.empty()
+               && !QThread::currentThread()->isInterruptionRequested()) {
+            std::vector<float> stueck = std::move(m_wartet.front());
+            m_wartet.pop_front();
+            while (!m_wartet.empty()
+                   && stueck.size() + kPause + m_wartet.front().size() <= kHoechstens) {
+                stueck.insert(stueck.end(), kPause, 0.0f);
+                stueck.insert(stueck.end(), m_wartet.front().begin(), m_wartet.front().end());
+                m_wartet.pop_front();
+            }
+            QString error;
+            const AsrTranscript t = m_backend->transcribe(stueck, &error);
+            if (!error.isEmpty()) {
+                emit failed(error);
+                continue;
+            }
+            if (!t.text.trimmed().isEmpty()) {
+                emit done(t.text.trimmed(), t.confidence);
+            }
         }
-        if (!t.text.trimmed().isEmpty()) {
-            emit done(t.text.trimmed(), t.confidence);
-        }
+        m_laeuft = false;
     }
 
 signals:
@@ -68,7 +108,14 @@ signals:
     void failed(const QString& reason);
 
 private:
+    // 16 kHz: 0,3 s Stille zwischen zusammengelegten Abschnitten, und
+    // hoechstens 28 s je Anfrage (Whisper rechnet in 30-s-Fenstern).
+    static constexpr std::size_t kPause = 16000 * 3 / 10;
+    static constexpr std::size_t kHoechstens = 16000 * 28;
+
     IAsrBackend* m_backend{nullptr};
+    std::deque<std::vector<float>> m_wartet;
+    bool m_laeuft{false};
 };
 
 AsrService::AsrService(QObject* parent)
@@ -98,6 +145,7 @@ AsrService::AsrService(QObject* parent)
     // ueber dem Rauschboden schnitt denselben Mitschnitt in Durchgaenge
     // von 3–4 s. Messung und Begruendung: AsrSegmenter.h, noiseFactor.
     m_segmenter.setNoiseFactor(kRauschbodenFaktor);
+    m_segmenter.setHangoverMs(kNachlaufMs);
 }
 
 AsrService::~AsrService()
@@ -161,6 +209,11 @@ void AsrService::stop()
     m_pump->stop();
 
     if (m_worker) {
+        // Erst unterbrechen: wartet der Arbeiter gerade auf den Dienst,
+        // steht er in einer eigenen Ereignisschleife, die quit() nicht
+        // erreicht -- er liefe in die Zeitgrenze (30 s) und meldete
+        // „timed out", obwohl nur angehalten wurde.
+        m_worker->requestInterruption();
         m_worker->quit();
         // Warten, nicht nur bitten: der Arbeiter haelt einen Zeiger auf
         // den Erkenner, und der wird gleich freigegeben. Ohne dieses

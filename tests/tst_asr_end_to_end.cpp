@@ -182,7 +182,7 @@ private slots:
 
         QSignalSpy got(&svc, &AsrService::transcript);
 
-        const QVector<float> audio = speechThenSilence(800, 600);
+        const QVector<float> audio = speechThenSilence(800, 1000);
         svc.feedForTest(audio.constData(), audio.size() / 2, 48000);
 
         // Der Erkenner sitzt auf einem eigenen Faden; das Ergebnis
@@ -196,9 +196,10 @@ private slots:
 
         // ── Die Umtastung ist wirklich passiert ─────────────────────
         //
-        // 800 ms Sprache PLUS 300 ms Nachlauf, den der Zerleger
-        // absichtlich mitnimmt (hangoverMs), sind 1100 ms. Bei 16 kHz
-        // also 17 600 Werte. Kaeme der Ton ungetastet an, waeren es
+        // 800 ms Sprache PLUS 700 ms Nachlauf, den der Zerleger
+        // absichtlich mitnimmt (hangoverMs, seit 2026-11-12 700 statt
+        // 300 ms, siehe kNachlaufMs), sind 1500 ms. Bei 16 kHz also
+        // 24 000 Werte. Kaeme der Ton ungetastet an, waeren es
         // dreimal so viele — und Whisper bekaeme 48 kHz vorgesetzt, wo
         // es 16 erwartet, und lieferte etwas, das plausibel klingt und
         // nicht stimmt.
@@ -215,8 +216,8 @@ private slots:
         // Die erste Fassung dieser Zeile erwartete 12 800 und war
         // damit selbst falsch — der Nachlauf war mir entgangen.
         const int n = raw->lastSamples.load();
-        qInfo() << "Werte an den Erkenner:" << n << "(erwartet 17600)";
-        QVERIFY2(n > 15000 && n < 20000,
+        qInfo() << "Werte an den Erkenner:" << n << "(erwartet 24000)";
+        QVERIFY2(n > 21000 && n < 27000,
                  qPrintable(QStringLiteral("%1 Werte — die Umtastung "
                                            "stimmt nicht").arg(n)));
         svc.stop();
@@ -257,7 +258,7 @@ private slots:
         // rechnete es nacheinander, und was hinten stand, lief in die
         // Zeitgrenze.
         //
-        // Vier Durchgaenge kurz hintereinander gegen einen Dienst, der
+        // Vier Durchgaenge (800 ms Sprache, 1 s Stille) kurz hintereinander gegen einen Dienst, der
         // je 1,5 s rechnet, bei 4 s Zeitgrenze: nacheinander geht das
         // auf, alles zugleich nicht.
         LangsamerDienst dienst(1500);
@@ -276,12 +277,12 @@ private slots:
 
         constexpr int kDurchgaenge = 4;
         QVector<float> audio;
-        for (int i = 0; i < kDurchgaenge; ++i) { audio += speechThenSilence(800, 600); }
+        for (int i = 0; i < kDurchgaenge; ++i) { audio += speechThenSilence(800, 1000); }
         svc.feedForTest(audio.constData(), audio.size() / 2, 48000);
 
-        // Je Durchgang 17 600 Werte (siehe tonWirdZuText). Gewartet wird,
+        // Je Durchgang 24 000 Werte (siehe tonWirdZuText). Gewartet wird,
         // bis aller Ton beim Dienst angekommen ODER verworfen ist.
-        constexpr qint64 kJeDurchgang = 17600;
+        constexpr qint64 kJeDurchgang = 24000;   // 800 ms + 700 ms Nachlauf
         QTRY_VERIFY_WITH_TIMEOUT(
             dienst.werteBeantwortet + dienst.werteAbgebrochen
                 >= kDurchgaenge * kJeDurchgang * 9 / 10

@@ -20,6 +20,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QThread>
 #include <QTimer>
 #include <QUrl>
 
@@ -44,9 +45,6 @@ bool RemoteAsrBackend::load(const QString& /*modelPath*/, QString* error)
             *error = QStringLiteral("No remote ASR endpoint configured.");
         }
         return false;
-    }
-    if (!m_nam) {
-        m_nam = std::make_unique<QNetworkAccessManager>();
     }
     m_loaded = true;
     qCInfo(lcAsrRemote) << "Remote ASR endpoint:" << m_config.url << "model:" << m_config.model;
@@ -86,7 +84,7 @@ QByteArray RemoteAsrBackend::encodeWav16(const std::vector<float>& pcm16k, int s
 
 AsrTranscript RemoteAsrBackend::transcribe(const std::vector<float>& pcm16k, QString* error)
 {
-    if (!m_loaded || m_nam == nullptr) {
+    if (!m_loaded) {
         if (error != nullptr) {
             *error = QStringLiteral("Remote backend not loaded.");
         }
@@ -123,7 +121,16 @@ AsrTranscript RemoteAsrBackend::transcribe(const std::vector<float>& pcm16k, QSt
         request.setRawHeader("Authorization", "Bearer " + m_config.apiKey.toUtf8());
     }
 
-    QNetworkReply* reply = m_nam->post(request, multi);
+    // ── Der Netzzugang gehoert dem Faden, der ihn benutzt (2026-11-12) ─
+    //
+    // Bis heute legte load() ihn an -- auf dem Hauptfaden --, benutzt
+    // wurde er hier auf dem Arbeiterfaden. Martins Protokoll: „QObject:
+    // Cannot create children for a parent that is in a different thread
+    // (Parent is QNetworkAccessManager ...)" bei jeder Anfrage. Ein
+    // eigener je Anfrage kostet bei einer Anfrage alle paar Sekunden
+    // nichts und hat keine Frage, wem er gehoert und wer ihn abraeumt.
+    QNetworkAccessManager nam;
+    QNetworkReply* reply = nam.post(request, multi);
     multi->setParent(reply); // freed with the reply
 
     // Synchronous round-trip on this (worker) thread, with a timeout.
@@ -133,7 +140,21 @@ AsrTranscript RemoteAsrBackend::transcribe(const std::vector<float>& pcm16k, QSt
     QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
     QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
     timeout.start(m_config.timeoutMs);
+    // Anhalten (AsrService::stop) bittet den Faden um Unterbrechung; die
+    // eigene Schleife hier hoert sonst nur auf Antwort oder Zeitgrenze.
+    QTimer unterbrochen;
+    QObject::connect(&unterbrochen, &QTimer::timeout, &loop, [&loop]() {
+        if (QThread::currentThread()->isInterruptionRequested()) { loop.quit(); }
+    });
+    unterbrochen.start(100);
     loop.exec();
+    unterbrochen.stop();
+
+    if (reply->isRunning() && QThread::currentThread()->isInterruptionRequested()) {
+        reply->abort();
+        reply->deleteLater();
+        return {};                  // angehalten, kein Fehler
+    }
 
     if (reply->isRunning()) {
         reply->abort();
