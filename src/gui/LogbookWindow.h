@@ -408,6 +408,7 @@ public:
     class LogbookStatsWidget* statsRowForTest() const { return m_statsRow; }
     QWidget* statsSectionForTest() const { return m_statsSection; }
     class QPushButton* mapToggleForTest() const { return m_mapToggle; }
+    class QPushButton* threeDToggleForTest() const { return m_3dToggle; }
     class QPushButton* statsToggleForTest() const { return m_statsToggle; }
 
 private:
@@ -550,6 +551,9 @@ private:
     class LogbookStatsWidget* m_statsRow{nullptr};
     QWidget*                  m_statsSection{nullptr};
     class QPushButton*        m_mapToggle{nullptr};
+    class QPushButton*        m_3dToggle{nullptr};   // „3D" gleich neben „Map" (2026-11-12)
+    void set3dShown(bool on);
+    void spiegle3d();
     class QPushButton*        m_statsToggle{nullptr};
     void setMapPanelShown(bool on);
     void setStatsRowShown(bool on);

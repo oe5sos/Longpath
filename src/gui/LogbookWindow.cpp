@@ -415,6 +415,17 @@ void LogbookWindow::buildUi()
         QStringLiteral("Show the contacts on a globe or a world map "
                        "beside the table — what the filters show"));
     QPushButton* mapBtn = m_mapToggle;
+    // „3D" gleich neben „Map" (Betreiber 2026-11-12: „3d war nicht zu
+    // finden"). Die Pille in der Kartenspalte gibt es weiter; dieser Knopf
+    // holt die Karte UND das 3D-Bild in einem Druck -- zur markierten
+    // Station, sonst zur zuletzt geflogenen, sonst zum eigenen QTH. Er
+    // zeigt, was zu sehen ist: eingerastet heisst, das 3D-Bild steht.
+    m_3dToggle = new QPushButton(QStringLiteral("3D"), this);
+    m_3dToggle->setObjectName(QStringLiteral("logbook3dButton"));
+    m_3dToggle->setCheckable(true);
+    m_3dToggle->setToolTip(QStringLiteral(
+        "Fly to the selected contact in photorealistic 3D — down to the house "
+        "and the antenna. Nothing selected: your own station."));
     auto* importBtn = new QPushButton(QStringLiteral("Import…"), this);
     importBtn->setToolTip(QStringLiteral(
         "Merge an ADIF file into this log, skipping contacts it already has"));
@@ -443,7 +454,7 @@ void LogbookWindow::buildUi()
         "log (sotadata.org.uk → Logs → Activator → Download complete log), so "
         "bearings, distances and path profiles start at the summit"));
     connect(sotaBtn, &QPushButton::clicked, this, &LogbookWindow::sotaNachtragen);
-    for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn, mapBtn,
+    for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn, mapBtn, m_3dToggle,
                            statsBtn, importBtn, m_syncBtn, sotaBtn, adifBtn, csvBtn, cabrBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle());
         top->addWidget(b);
@@ -452,8 +463,12 @@ void LogbookWindow::buildUi()
     for (QPushButton* b : {mapBtn, statsBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
     }
+    // Gruen wie die 3D-Pille in der Karte: derselbe Schalter, zweimal zu sehen.
+    m_3dToggle->setStyleSheet(Style::buttonBaseStyle() + Style::greenCheckedStyle());
     col->addLayout(top);
     connect(mapBtn, &QPushButton::toggled, this, &LogbookWindow::setMapPanelShown);
+    // toggled, nicht clicked: die Bedienhilfe drueckt ueber toggle().
+    connect(m_3dToggle, &QPushButton::toggled, this, &LogbookWindow::set3dShown);
     connect(statsBtn, &QPushButton::toggled, this, &LogbookWindow::setStatsRowShown);
     connect(cabrBtn, &QPushButton::clicked,
             this, &LogbookWindow::exportCabrillo);
@@ -2463,14 +2478,40 @@ void LogbookWindow::setMapPanelShown(bool on)
                 m_mapPanel->flyToStation(call, lat, lon, caption);
             }
         });
+        connect(m_mapPanel, &QsoMapWindow::dreiDSichtbar, this, &LogbookWindow::spiegle3d);
         // Frisch eingefuegt: erst jetzt hat der Teiler drei Spalten.
         restoreSplitState();
     }
     if (m_mapPanel) { m_mapPanel->setVisible(on); }
+    spiegle3d();
     if (m_mapToggle && m_mapToggle->isChecked() != on) { m_mapToggle->setChecked(on); }
     AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"),
                                      on ? QStringLiteral("True") : QStringLiteral("False"));
     if (on) { refreshMapPanel(); }
+}
+
+void LogbookWindow::set3dShown(bool on)
+{
+    if (on) {
+        setMapPanelShown(true);
+        QString call;
+        const QList<int> rows = selectedSourceRows();
+        if (!rows.isEmpty()) { call = m_all.at(rows.first()).call; }
+        if (m_mapPanel) { m_mapPanel->zeige3d(call); }
+    } else if (m_mapPanel) {
+        m_mapPanel->verlasse3d();
+    }
+    spiegle3d();
+}
+
+void LogbookWindow::spiegle3d()
+{
+    if (!m_3dToggle) { return; }
+    const bool an = m_mapPanel && m_mapPanel->isVisibleTo(this) && m_mapPanel->zeigt3d();
+    if (m_3dToggle->isChecked() != an) {
+        QSignalBlocker b(m_3dToggle);
+        m_3dToggle->setChecked(an);
+    }
 }
 
 void LogbookWindow::setStatsRowShown(bool on)

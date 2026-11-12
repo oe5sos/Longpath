@@ -164,6 +164,21 @@ public:
     // oder mit abgewaehltem „3D" fliegt die flache Karte wie bisher, und
     // „View in Google Earth" erscheint neben der Stationskarte.
     static constexpr int kView3d = 4;
+
+    // ── Der Weg ins 3D von aussen (2026-11-12) ────────────────────────
+    // Betreiber: „3d war nicht zu finden". Die Pille in der Kartenspalte
+    // fiel neben den Kartenschaltern nicht auf, und ohne nachgeschlagene
+    // Station tat sie nichts. Das Logbuch hat darum oben neben „Map" einen
+    // eigenen Knopf; er ruft diese beiden.
+    //
+    // zeige3d: 3D an und SOFORT ein Bild -- das genannte Rufzeichen, sonst
+    // die zuletzt geflogene Station, sonst das eigene QTH. Fehlt WebEngine
+    // oder der Zugang, sagt die Pille wie bisher, was fehlt.
+    void zeige3d(const QString& rufzeichen = QString());
+    /// Zurueck auf die flache Karte (wie die Pille abwaehlen).
+    void verlasse3d();
+    bool zeigt3d() const;
+
     QPushButton* threeDButtonForTest() const { return m_3dBtn; }
     QPushButton* googleEarthButtonForTest() const { return m_googleEarthBtn; }
     class Station3dSurface* threeDSurfaceForTest() const { return m_3d; }
@@ -238,6 +253,8 @@ public:
 
 signals:
     void popOutRequested();
+    /// Das 3D-Bild ist jetzt zu sehen (an) oder nicht mehr (aus).
+    void dreiDSichtbar(bool an);
     /// Die Jagdliste bittet um eine Peilung. Das Kartenfenster kennt
     /// keinen Rotor -- es sagt nur, wohin; das Logbuch reicht es an
     /// seinen `turnRotorRequested` weiter.
@@ -418,6 +435,7 @@ private:
         QString caption;     // Rich Text, wie die Stationskarte ihn zeigt
         double  lat{0.0};
         double  lon{0.0};
+        bool    heim{false};   // das eigene QTH: kein Grosskreis zu sich selbst
     };
     bool use3d() const;
     void ensure3d();
