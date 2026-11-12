@@ -17484,8 +17484,12 @@ int MainWindow::schwebendeMitziehen()
         // steht, wo wir es zuletzt hingesetzt haben -- sonst frisch
         // gemessen (siehe m_mitziehBasis).
         MitziehBasis basis;
+        // Nicht auf den Punkt genau: nach dem Setzen rastet das Fenster
+        // noch ins Raster ein (snapToGridAfterSettle, eigene Bewegung).
+        // Das ist derselbe Nachhall wie beim Hauptfenster.
         if (const auto bi = m_mitziehBasis.constFind(w);
-            bi != m_mitziehBasis.constEnd() && bi->gesetzt == r) {
+            bi != m_mitziehBasis.constEnd()
+            && (bi->gesetzt == r || istRasterNachhall(r, bi->gesetzt))) {
             basis = *bi;
         } else {
             basis.x = double(r.x() - altA.x()) / double(altA.width());
