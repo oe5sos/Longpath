@@ -9953,7 +9953,11 @@ void MainWindow::populateDefaultMeter()
     // Schlagwoerter zweisprachig — wie bei den Applets darueber: die
     // Oberflaeche ist englisch, der Betreiber denkt deutsch.
     static const WindowEntry kWindows[] = {
-        {"WinLogbook", QT_TR_NOOP("Logbook"), QT_TR_NOOP("Recording"),
+        // Eigene Gruppe (2026-11-12, Betreiber: „logbook ist unter
+        // recording, passt dort nicht hin"). „Recording" gab es nur
+        // fuer diesen einen Eintrag -- die Aufnahme steht unter
+        // „Aufnahme".
+        {"WinLogbook", QT_TR_NOOP("Logbook"), QT_TR_NOOP("Logbook"),
          {"logbuch", "logbook", "log", "qso", "adif", "kontakte",
           "contacts", "eintraege"}},
         {"WinRotorLog", QT_TR_NOOP("Rotor / Log"), QT_TR_NOOP("Tuning"),
