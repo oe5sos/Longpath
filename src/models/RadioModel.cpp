@@ -15172,8 +15172,6 @@ void RadioModel::loadSliceState(SliceModel* slice)
     if (const int gespeichert = slice->savedSampleRateHz(); gespeichert > 0) {
         slice->setSampleRateHz(gespeichert);
     }
-    // Beim Hochfahren dieselbe Regel wie beim Banddruck — siehe
-    // onBandButtonClicked.
     // ── Die Antenne kommt aus der Tabelle, nicht aus der Scheibe ─────
     //
     // `restoreFromSettings` traegt alles Bandbezogene ein; die Antenne
@@ -15193,6 +15191,8 @@ void RadioModel::loadSliceState(SliceModel* slice)
         slice->refreshAntennasFromAlex(m_alexController, currentBand, &sku);
     }
 
+    // Beim Hochfahren dieselbe Regel wie beim Banddruck — siehe
+    // onBandButtonClicked.
     richteSeitenbandAus(slice, currentBand);
 
     // Capture the restored rate for the post-bind re-apply (2026-08-12,
