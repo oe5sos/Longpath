@@ -17424,6 +17424,19 @@ void MainWindow::schutzrahmenNachziehen()
     m_schutzrahmenTimer->start();
 }
 
+QMargins MainWindow::leistenRaender() const
+{
+    if (!m_outerSplitter || !m_outerSplitter->isVisible()) { return {}; }
+    const QRect rahmen = frameGeometry();
+    const QPoint oben  = m_outerSplitter->mapToGlobal(QPoint(0, 0));
+    const QPoint unten = m_outerSplitter->mapToGlobal(
+        QPoint(0, m_outerSplitter->height()));
+    const int top    = qMax(0, oben.y() - rahmen.top());
+    const int bottom = qMax(0, rahmen.bottom() + 1 - unten.y());
+    if (top + bottom >= rahmen.height()) { return {}; }
+    return QMargins(0, top, 0, bottom);
+}
+
 int MainWindow::schwebendeMitziehen()
 {
     if (m_shuttingDown) { return 0; }
@@ -17435,8 +17448,25 @@ int MainWindow::schwebendeMitziehen()
     }
     if (isMinimized()) { return 0; }
 
-    const double fx = double(neu.width()) / double(alt.width());
-    const double fy = double(neu.height()) / double(alt.height());
+    // ── Nur die Arbeitsflaeche wird umgerechnet (2026-11-12) ─────────
+    //
+    // Betreiber, mit Bild nach dem Verkleinern: Combined lag ueber den
+    // Profilknoepfen. Gerechnet wurde im Verhaeltnis des GANZEN Rahmens,
+    // samt Titel-, Menue- und Befehlsleiste oben und Statusleiste unten
+    // -- die werden aber nicht kleiner. Ein Fenster 127 Punkte unter der
+    // Oberkante (direkt unter der Befehlsleiste) rutschte bei 88 % Hoehe
+    // auf 112 und damit in die Leiste. Jetzt bezieht sich alles auf die
+    // Flaeche zwischen den Leisten; ein reiner Zug bleibt ein reiner Zug.
+    const QMargins leisten = leistenRaender();
+    QRect altA = alt.marginsRemoved(leisten);
+    QRect neuA = neu.marginsRemoved(leisten);
+    if (altA.width() <= 0 || altA.height() <= 0
+        || neuA.width() <= 0 || neuA.height() <= 0) {
+        altA = alt;
+        neuA = neu;
+    }
+    const double fx = double(neuA.width()) / double(altA.width());
+    const double fy = double(neuA.height()) / double(altA.height());
 
     int bewegt = 0;
     const EigeneBewegung wirSelbst;
@@ -17447,8 +17477,8 @@ int MainWindow::schwebendeMitziehen()
         if (w->isMaximized() || w->isFullScreen()) { continue; }
 
         const QRect r = w->frameGeometry();
-        QPoint ziel(neu.x() + qRound(double(r.x() - alt.x()) * fx),
-                    neu.y() + qRound(double(r.y() - alt.y()) * fy));
+        QPoint ziel(neuA.x() + qRound(double(r.x() - altA.x()) * fx),
+                    neuA.y() + qRound(double(r.y() - altA.y()) * fy));
 
         // ── Die Groesse im selben Verhaeltnis (2026-11-11) ──────────
         //

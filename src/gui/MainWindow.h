@@ -481,6 +481,10 @@ public:
     /// setzt nur die Basis neu und zieht nichts: dort setzt das Profil
     /// die schwebenden Fenster ohnehin selbst.
     int schwebendeMitziehen();
+    /// Abstand der Arbeitsflaeche zum Rahmen: oben Titel-, Menue- und
+    /// Befehlsleiste, unten die Statusleiste (2026-11-12). Diese Leisten
+    /// wachsen nicht mit; umgerechnet wird nur die Flaeche dazwischen.
+    QMargins leistenRaender() const;
     QRect m_hauptrahmenBasis;
     /// Der Rahmen beim letzten Lage-/Groessenereignis -- um den kleinen
     /// Nachhall des Rasters von einer echten eigenen Bewegung zu trennen.
@@ -508,6 +512,7 @@ public:
     // anzufassen. Also ein Stellvertreter: irgendein Fenster in die
     // Liste legen und danach fragen, ob es schon zurueck ist.
     int schwebendeMitziehenForTest() { return schwebendeMitziehen(); }
+    QMargins leistenRaenderForTest() const { return leistenRaender(); }
     void rememberFloatingWindowBehindConnectMaskForTest(QWidget* w)
     {
         if (!w) { return; }

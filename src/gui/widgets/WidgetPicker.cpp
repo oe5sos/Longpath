@@ -642,27 +642,34 @@ protected:
         QPainter g(this);
         g.setRenderHint(QPainter::Antialiasing, true);
 
-        const QColor ruhe(QString::fromLatin1(Style::kBorder));
-        const QColor wach(QString::fromLatin1(Style::kBlueBorder));
-        const QColor zeichenRuhe(QString::fromLatin1(Style::kTextScale));
-        const QColor zeichenWach(QString::fromLatin1(Style::kTextPrimary));
+        // ── Orange-gelbe Taste, schwarzes Zeichen (2026-11-12) ──────
+        //
+        // Betreiber: „den plus punkt fuer das adden von window bitte in
+        // anderer farbe machen" und dann genauer: „der hintergrund
+        // eigentlich orange gelb ist und das plus schwarz bleibt" --
+        // „ev eine animation". Vorher: grauer, gestrichelter Rand mit
+        // grauem Zeichen, das Atmen ein Hauch Blau im Rand; auf dem
+        // Bildschirmfoto kaum zu finden. Jetzt eine gefuellte Taste in
+        // der Familie der Sendetaste (Messing, dunkle Schrift), nur
+        // heller und gelber, damit sie nicht mit ihr verwechselt wird.
+        // Das Atmen hebt und senkt die Helligkeit der Flaeche, der
+        // Zeiger hellt sie auf, der offene Auswaehler dunkelt sie ab.
+        const QColor obenRuhe(0xf0, 0xb4, 0x4c);
+        const QColor untenRuhe(0xd1, 0x8f, 0x2a);
+        const QColor randRuhe(0xf5, 0xc5, 0x6a);
+        const QColor zeichen(QString::fromLatin1(Style::kTxKeyText));
 
-        // Das Aufgehen des Auswaehlers zaehlt wie ein Zeiger darauf:
-        // solange er offen ist, bleibt das Plus wach, auch wenn die
-        // Maus laengst woanders ist. Sonst sieht ein gedrehtes Kreuz
-        // aus wie ein ausgegrauter Knopf.
         const qreal wachheit = std::max(m_hover, m_turn);
-
-        // Der Ruf: nur solange nichts anderes wach ist, und hoechstens
-        // ein knappes Drittel des Weges zum wachen Rand. Mehr waere
-        // ein Blinken.
+        // Der Ruf: nur solange nichts anderes wach ist. Ein Atemzug
+        // hebt die Flaeche um hoechstens 14 Prozent -- sichtbar, aber
+        // kein Blinken.
         const qreal ruf = (1.0 - wachheit) * m_puls;
-
-        const QColor rand    = mix(ruhe, wach, wachheit + 0.30 * ruf);
-        const QColor zeichen = m_turn > 0.01
-            ? mix(mix(zeichenRuhe, zeichenWach, wachheit),
-                  QColor(QString::fromLatin1(Style::kGlassSelText)), m_turn)
-            : mix(zeichenRuhe, zeichenWach, wachheit);
+        const int heller = 100 + int(14.0 * ruf) + int(10.0 * m_hover);
+        const int dunkler = 100 + int(18.0 * m_turn);
+        auto ton = [&](QColor c) {
+            c = c.lighter(heller);
+            return m_turn > 0.01 ? c.darker(dunkler) : c;
+        };
 
         const qreal schrumpf = 1.0 - 0.06 * m_press;
         const QRectF voll(rect());
@@ -670,40 +677,11 @@ protected:
         feld.moveCenter(voll.center());
         feld.adjust(0.5, 0.5, -0.5, -0.5);
 
-        // Die Fuellung sagt zwei verschiedene Dinge, und sie duerfen
-        // nicht gleich aussehen: ein Zeiger darauf ist eine Andeutung,
-        // ein offener Auswaehler ist ein ZUSTAND. Hausstil Regel 2 --
-        // „genau ein Knopf leuchtet, aktiv gefuellt".
-        //
-        // Am gerenderten Blatt nachgebessert: erst stand hier fuer
-        // beides dieselbe Flaeche aus kButtonBg, und die liegt so
-        // dicht am Grund, dass auf dem Bild kein Unterschied zu sehen
-        // war. Jetzt traegt der offene Zustand den gedeckten
-        // Auswahlverlauf der Kommandoleiste (kGlassSel*) -- dieselbe
-        // Antwort, die jede aktive Pille im Fenster gibt.
-        if (m_turn > 0.01) {
-            QLinearGradient sel(feld.topLeft(), feld.bottomLeft());
-            QColor top(QString::fromLatin1(Style::kGlassSelTop));
-            QColor bot(QString::fromLatin1(Style::kGlassSelBot));
-            top.setAlphaF(float(m_turn));
-            bot.setAlphaF(float(m_turn));
-            sel.setColorAt(0.0, top);
-            sel.setColorAt(1.0, bot);
-            g.setBrush(sel);
-        } else if (m_hover > 0.0) {
-            QColor flaeche(QString::fromLatin1(Style::kButtonHover));
-            flaeche.setAlphaF(float(m_hover));
-            g.setBrush(flaeche);
-        } else {
-            g.setBrush(Qt::NoBrush);
-        }
-
-        // Gestrichelt bleibt gestrichelt: der Rand sagt "hier ist noch
-        // nichts, hier kann etwas hin", und das gilt im Ruhezustand
-        // wie im gedrehten.
-        QPen stift(rand, 1.0, Qt::DashLine);
-        stift.setDashPattern({3.0, 2.5});
-        g.setPen(stift);
+        QLinearGradient flaeche(feld.topLeft(), feld.bottomLeft());
+        flaeche.setColorAt(0.0, ton(obenRuhe));
+        flaeche.setColorAt(1.0, ton(untenRuhe));
+        g.setBrush(flaeche);
+        g.setPen(QPen(ton(randRuhe), 1.0));
         g.drawRoundedRect(feld, 6.0, 6.0);
 
         // Zwei Balken um die Mitte. 45 Grad daraus machen ein Kreuz.
@@ -713,7 +691,7 @@ protected:
         g.setPen(Qt::NoPen);
         g.setBrush(zeichen);
         const qreal arm  = feld.width() * 0.28;
-        const qreal dick = 1.6;
+        const qreal dick = 2.2;   // schwarz auf Gelb: etwas kraeftiger
         g.drawRoundedRect(QRectF(-arm, -dick / 2.0, arm * 2.0, dick),
                           dick / 2.0, dick / 2.0);
         g.drawRoundedRect(QRectF(-dick / 2.0, -arm, dick, arm * 2.0),
