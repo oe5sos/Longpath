@@ -2639,6 +2639,7 @@ private:
     QHBoxLayout* m_profileRailRow{nullptr};
     QWidget*     m_profileRailHome{nullptr};
     class AddWidgetButton* m_addWidgetBtn{nullptr};
+    void richtePlusEin(class AddWidgetButton* plus);
 
     /// Welche Applets als freie Kachel auf der Flaeche liegen:
     /// Panelkennung -> Container-Kennung.

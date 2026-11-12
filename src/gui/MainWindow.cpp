@@ -10140,48 +10140,7 @@ void MainWindow::populateDefaultMeter()
         if (visible) { bringAppletToFront(id); }
     });
     m_addWidgetBtn->setToolTip(tr("Add or remove windows"));
-#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
-    // Die Panels des Contestprogramms auch hinter dem "+" (Betreiber
-    // 2026-11-04: "am besten waere auch, wenn ich durch das + alles
-    // hinzufuegen kann"). Keine Applets, darum als Zusatzeintraege mit
-    // Zustand und Schalter aus der Bruecke; derselbe Weg wie Tools >
-    // Contest logbook panels und das Containers-Menue.
-    {
-        QList<WidgetPicker::ZusatzEintrag> liste;
-        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
-            WidgetPicker::ZusatzEintrag z;
-            z.id = QStringLiteral("Contest:%1").arg(e.id);
-            z.titel = QStringLiteral("Contest · %1").arg(e.titel);
-            z.kategorie = tr("Contest logbook");
-            z.schlagworte = e.schlagworte;
-            const QString id = e.id;
-            z.istAn = [this, id]() {
-                return m_contestFenster && m_contestFenster->istPanelSchwebend(id);
-            };
-            z.schalte = [this, id](bool an) {
-                if (an) {
-                    contestPanelAlsFenster(id);
-                } else if (m_contestFenster) {
-                    m_contestFenster->dockePanel(id);
-                }
-            };
-            liste.append(z);
-        }
-        m_addWidgetBtn->setZusatzEintraege(liste);
-    }
-#endif
-    // Der FT8-Dekoder steht nur in einer Datenbetriebsart bereit. Seine
-    // Karte schaltet darum selbst auf FT8 -- derselbe Weg wie der
-    // FT8-Knopf der Leiste (Martin 2026-11-12: „eigens kann man es nicht
-    // ... hinzufügen. das muss geändert werden").
-    {
-        QHash<QString, WidgetPicker::Einschalter> e;
-        e.insert(QStringLiteral("Ft8Decoder"),
-                 WidgetPicker::Einschalter{
-                     tr("Click switches to FT8 (or the FT4 you used last) and opens it."),
-                     [this]() { aufDigiStellen(m_letzterDigiModus); }});
-        m_addWidgetBtn->setEinschalter(e);
-    }
+    richtePlusEin(m_addWidgetBtn);
     m_addWidgetBtn->raise();
     m_addWidgetBtn->show();
     positionAddWidgetButton();
@@ -11626,6 +11585,7 @@ void MainWindow::populateDefaultMeter()
             if (visible) { bringAppletToFront(id); }
         });
         m_commandBar->addTrailing(m_addWidget);
+        richtePlusEin(m_addWidget);
     }
 
     // Apply initial visibility state from the controller (in case
@@ -17281,6 +17241,61 @@ void MainWindow::bandstapelMarkenFuer(SpectrumWidget* sw, const QString& panId)
         }
     }
     sw->setBandStackMarks(marken);
+}
+
+// ── Beide Plus-Knoepfe gleich einrichten (2026-11-12) ────────────────
+//
+// Es gibt zwei: unten rechts ueber der Arbeitsflaeche (m_addWidgetBtn)
+// und oben in der Befehlsleiste (m_addWidget). Martin oeffnete den
+// Auswaehler oben, und dort fehlte der FT8-Einschalter, den ich nur
+// unten eingerichtet hatte -- und die Contest-Panels fehlten oben schon
+// seit dem 2026-11-04. Dieselbe Lehre wie [Erreichbar heisst: in ALLEN
+// Gehaeusen]: eine Stelle fuer beide.
+void MainWindow::richtePlusEin(AddWidgetButton* plus)
+{
+    if (!plus) { return; }
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // Die Panels des Contestprogramms auch hinter dem "+" (Betreiber
+    // 2026-11-04: "am besten waere auch, wenn ich durch das + alles
+    // hinzufuegen kann"). Keine Applets, darum als Zusatzeintraege mit
+    // Zustand und Schalter aus der Bruecke; derselbe Weg wie Tools >
+    // Contest logbook panels und das Containers-Menue.
+    {
+        QList<WidgetPicker::ZusatzEintrag> liste;
+        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+            WidgetPicker::ZusatzEintrag z;
+            z.id = QStringLiteral("Contest:%1").arg(e.id);
+            z.titel = QStringLiteral("Contest · %1").arg(e.titel);
+            z.kategorie = tr("Contest logbook");
+            z.schlagworte = e.schlagworte;
+            const QString id = e.id;
+            z.istAn = [this, id]() {
+                return m_contestFenster && m_contestFenster->istPanelSchwebend(id);
+            };
+            z.schalte = [this, id](bool an) {
+                if (an) {
+                    contestPanelAlsFenster(id);
+                } else if (m_contestFenster) {
+                    m_contestFenster->dockePanel(id);
+                }
+            };
+            liste.append(z);
+        }
+        plus->setZusatzEintraege(liste);
+    }
+#endif
+    // Der FT8-Dekoder steht nur in einer Datenbetriebsart bereit. Seine
+    // Karte schaltet darum selbst auf FT8 -- derselbe Weg wie der
+    // FT8-Knopf der Leiste (Martin 2026-11-12: „eigens kann man es nicht
+    // ... hinzufügen. das muss geändert werden").
+    {
+        QHash<QString, WidgetPicker::Einschalter> e;
+        e.insert(QStringLiteral("Ft8Decoder"),
+                 WidgetPicker::Einschalter{
+                     tr("Click switches to FT8 (or the FT4 you used last) and opens it."),
+                     [this]() { aufDigiStellen(m_letzterDigiModus); }});
+        plus->setEinschalter(e);
+    }
 }
 
 void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)

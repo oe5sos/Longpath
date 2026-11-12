@@ -5579,6 +5579,9 @@ longpath_add_test(tst_profil_loeschen_laesst_andere_stehen)
 target_compile_definitions(tst_profil_loeschen_laesst_andere_stehen PRIVATE
     LONGPATH_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
 list(APPEND _longpath_grosser_schirm tst_profil_loeschen_laesst_andere_stehen)
+# Beide Plus-Knoepfe bieten dasselbe an (2026-11-12, Martin: „beim plus
+# oben oder unten muss alles natürlich erreichbar sein").
+longpath_add_test(tst_beide_plus_gleich)
 longpath_add_test(tst_real_pan_float)
 longpath_add_test(tst_real_rotor_window)
 
