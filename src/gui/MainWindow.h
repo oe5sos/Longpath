@@ -485,6 +485,15 @@ public:
     /// Befehlsleiste, unten die Statusleiste (2026-11-12). Diese Leisten
     /// wachsen nicht mit; umgerechnet wird nur die Flaeche dazwischen.
     QMargins leistenRaender() const;
+    /// Je schwebendem Fenster seine Lage und Groesse als Anteil der
+    /// Arbeitsflaeche (2026-11-12). Gilt, solange das Fenster dort steht,
+    /// wo das Mitziehen oder der Schutzrahmen es zuletzt hingesetzt hat;
+    /// steht es woanders (eigener Zug, Profil, Anordnen), wird neu
+    /// gemessen. So kommen nach Klein- und wieder Grossziehen alle
+    /// Fenster genau zurueck, auch wenn eines unterwegs an seiner
+    /// Untergrenze hing oder aus einer Leiste geschoben wurde.
+    struct MitziehBasis { double x{0}, y{0}, w{0}, h{0}; QRect gesetzt; };
+    QHash<const QWidget*, MitziehBasis> m_mitziehBasis;
     QRect m_hauptrahmenBasis;
     /// Der Rahmen beim letzten Lage-/Groessenereignis -- um den kleinen
     /// Nachhall des Rasters von einer echten eigenen Bewegung zu trennen.

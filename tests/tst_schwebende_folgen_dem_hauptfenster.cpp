@@ -260,6 +260,45 @@ private slots:
                                 .arg(g.y()).arg(unterDerLeiste)));
     }
 
+    // 2026-11-12, Betreiber: „nicht alle windows werden automatisch
+    // angepasst". Jeder Zug rechnete vom LETZTEN Stand weiter: hing ein
+    // Fenster beim Verkleinern an seiner Untergrenze, kam es beim
+    // Vergroessern nicht mehr auf seine alte Groesse zurueck. Jetzt gilt
+    // je Fenster eine feste Grundlage (Anteile der Arbeitsflaeche).
+    void kleinUndWiederGrossGibtDieAlteLage()
+    {
+        const QRect alt = m_mw->frameGeometry();
+        const QSize hauptInnen = m_mw->size();
+        const QRect vorher = m_abgeloest->frameGeometry();
+        const QSize innenVorher = m_abgeloest->size();
+        const int minAlt = m_abgeloest->minimumWidth();
+        // Die Untergrenze erzwingen: kleiner als jetzt darf es nicht.
+        m_abgeloest->setMinimumWidth(innenVorher.width());
+        m_mw->schwebendeMitziehenForTest();   // Basis = jetzt
+
+        m_mw->resize(hauptInnen.width() - 400, hauptInnen.height() - 100);
+        QTest::qWait(kNachlaufMs);
+        QCOMPARE(m_abgeloest->width(), innenVorher.width());   // hing an der Grenze
+
+        m_mw->resize(hauptInnen);
+        QTest::qWait(kNachlaufMs);
+        m_abgeloest->setMinimumWidth(minAlt);
+
+        const QRect nachher = m_abgeloest->frameGeometry();
+        qInfo() << "Hauptfenster" << alt << "->" << m_mw->frameGeometry()
+                << "Fenster vorher" << vorher << "nachher" << nachher;
+        QVERIFY2(qAbs(m_mw->width() - hauptInnen.width()) <= kSnapGridPx
+                     && qAbs(m_mw->height() - hauptInnen.height()) <= kSnapGridPx,
+                 "das Hauptfenster muss wieder seine alte Groesse haben");
+        QVERIFY2(qAbs(nachher.width() - vorher.width()) <= kSnapGridPx
+                     && qAbs(nachher.height() - vorher.height()) <= kSnapGridPx
+                     && qAbs(nachher.x() - vorher.x()) <= kToleranzPx
+                     && qAbs(nachher.y() - vorher.y()) <= kToleranzPx,
+                 qPrintable(QStringLiteral("vorher %1,%2 %3x%4 -- nachher %5,%6 %7x%8")
+                     .arg(vorher.x()).arg(vorher.y()).arg(vorher.width()).arg(vorher.height())
+                     .arg(nachher.x()).arg(nachher.y()).arg(nachher.width()).arg(nachher.height())));
+    }
+
     void eigeneBewegungZiehtNicht()
     {
         const QPoint vorher = m_abgeloest->frameGeometry().topLeft();

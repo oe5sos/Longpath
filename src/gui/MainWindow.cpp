@@ -17469,6 +17469,7 @@ int MainWindow::schwebendeMitziehen()
     const double fy = double(neuA.height()) / double(altA.height());
 
     int bewegt = 0;
+    QHash<const QWidget*, MitziehBasis> neueBasis;
     const EigeneBewegung wirSelbst;
     for (QWidget* w : QApplication::topLevelWidgets()) {
         if (!w || w == this || !w->isVisible()) { continue; }
@@ -17477,8 +17478,23 @@ int MainWindow::schwebendeMitziehen()
         if (w->isMaximized() || w->isFullScreen()) { continue; }
 
         const QRect r = w->frameGeometry();
-        QPoint ziel(neuA.x() + qRound(double(r.x() - altA.x()) * fx),
-                    neuA.y() + qRound(double(r.y() - altA.y()) * fy));
+        const QSize innenAlt = w->size();
+
+        // Die Anteile von der Grundlage, solange das Fenster noch dort
+        // steht, wo wir es zuletzt hingesetzt haben -- sonst frisch
+        // gemessen (siehe m_mitziehBasis).
+        MitziehBasis basis;
+        if (const auto bi = m_mitziehBasis.constFind(w);
+            bi != m_mitziehBasis.constEnd() && bi->gesetzt == r) {
+            basis = *bi;
+        } else {
+            basis.x = double(r.x() - altA.x()) / double(altA.width());
+            basis.y = double(r.y() - altA.y()) / double(altA.height());
+            basis.w = double(innenAlt.width())  / double(altA.width());
+            basis.h = double(innenAlt.height()) / double(altA.height());
+        }
+        QPoint ziel(neuA.x() + qRound(basis.x * neuA.width()),
+                    neuA.y() + qRound(basis.y * neuA.height()));
 
         // ── Die Groesse im selben Verhaeltnis (2026-11-11) ──────────
         //
@@ -17490,11 +17506,10 @@ int MainWindow::schwebendeMitziehen()
         // ueber seinen Rand. Bei einem reinen Zug (fx = fy = 1) bleibt
         // die Groesse, wie sie ist. Mindest- und Hoechstgroesse des
         // Fensters gelten weiter.
-        const QSize innenAlt = w->size();
         QSize innen = innenAlt;
         if (fx != 1.0 || fy != 1.0) {
-            innen = QSize(qRound(double(innenAlt.width()) * fx),
-                          qRound(double(innenAlt.height()) * fy))
+            innen = QSize(qRound(basis.w * neuA.width()),
+                          qRound(basis.h * neuA.height()))
                         .expandedTo(w->minimumSize())
                         .boundedTo(w->maximumSize());
         }
@@ -17529,7 +17544,11 @@ int MainWindow::schwebendeMitziehen()
         if (geaendert) {
             ++bewegt;
         }
+        basis.gesetzt = w->frameGeometry();
+        neueBasis.insert(w, basis);
     }
+    // Was nicht mehr schwebt (angedockt, geschlossen), faellt heraus.
+    m_mitziehBasis = std::move(neueBasis);
     if (bewegt > 0) {
         qCInfo(lcContainer) << "Hauptfenster" << alt << "->" << neu << ":"
                             << bewegt << "schwebende Fenster mitgezogen";
@@ -17571,6 +17590,11 @@ int MainWindow::schwebendeAusDemSchutzrahmenHolen()
             // ebenfalls, also stimmt es ohne Umrechnung.
             const EigeneBewegung wirSelbst;
             w->move(neu.topLeft());
+            // Aus der Leiste geschoben ist keine neue Grundlage: die
+            // Anteile bleiben, nur der Ort gilt als von uns gesetzt.
+            if (auto bi = m_mitziehBasis.find(w); bi != m_mitziehBasis.end()) {
+                bi->gesetzt = w->frameGeometry();
+            }
             ++verschoben;
         }
     }

@@ -212,7 +212,12 @@ QSize FrequencyInstrument::minimumSizeHint() const
     if (m_vfoRow && !m_vfoRow->isVisible()) {
         h = qMax(40, h - m_vfoRow->sizeHint().height() - 4);
     }
-    return {qMax(240, w), h};
+    // Untergrenze 160 statt 240 (2026-11-12, Betreiber: „ich habe das
+    // fenster kleiner gezogen, hier sollten dann alle fenster auch
+    // kleiner werden"). Die 240 lagen weit ueber dem, was die kleinste
+    // Ziffernstufe braucht (w oben), und hielten das Frequenzfenster
+    // breiter als seine Nachbarn -- es schob sich unter den Bandfilter.
+    return {qMax(160, w), h};
 }
 
 QSize FrequencyInstrument::sizeHint() const
