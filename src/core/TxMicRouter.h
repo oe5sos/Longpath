@@ -79,6 +79,16 @@ public:
     /// Vorgabe `false`: eine gewoehnliche Mikrofonquelle ersetzt
     /// nichts.
     virtual bool eigeneTonquelleAktiv() const { return false; }
+
+    /// Ist dieser eigene Ton ein fertig moduliertes DATENSIGNAL (FT8,
+    /// RTTY), das der Sprach-Kanalzug nicht anfassen darf?
+    ///
+    /// Seit dem 2026-11-10 getrennt von eigeneTonquelleAktiv(): der
+    /// Sprachspeicher liefert ebenfalls einen eigenen Ton, aber eine
+    /// STIMME. Die soll durch denselben Kanalzug wie das Mikrofon --
+    /// aufgenommen wird sie VOR dem Kanalzug (preStripAudioReady).
+    /// Vorgabe: jeder eigene Ton ist ein Datensignal, wie bis heute.
+    virtual bool eigenesDatensignalAktiv() const { return eigeneTonquelleAktiv(); }
 };
 
 /// 3M-1a stub: emits zero-padded samples.

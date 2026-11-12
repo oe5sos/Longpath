@@ -29,6 +29,8 @@
 #include "gui/MainWindow.h"
 #include "gui/applets/AppletFloatingWindow.h"
 #include "gui/applets/AppletWidget.h"
+#include "gui/applets/InstrumentApplet.h"
+#include "gui/meters/MeterPoller.h"
 #include "gui/WindowChrome.h"
 #include "FensterFrist.h"
 
@@ -125,6 +127,33 @@ private slots:
         QVERIFY2(alive.isNull() || !static_cast<QWidget*>(alive.data())->isVisible(),
                  "Ein Dialog steht noch offen, nachdem das Hauptfenster zu "
                  "ist — sein Loeschen faellt in den Programmabbau");
+
+        delete mw;
+    }
+
+    // Absturz 2026-11-08 12:35 beim Beenden: closeEvent loescht die
+    // schwebenden Applet-Fenster samt S-Meter, die Ereignisschleife
+    // laeuft bis quit() weiter, und der naechste Meter-Takt rief
+    // onReading auf dem geloeschten Applet (NeedleInstrument mit
+    // this = 0). Das Hauptfenster muss den Verlust bemerken.
+    void aMeterTickAfterTheSMeterIsGoneHitsNothing()
+    {
+        auto* mw = new MainWindow();
+        mw->resize(1400, 900);
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, kFensterFrist));
+        for (int i = 0; i < 6; ++i) { QCoreApplication::processEvents(); }
+
+        InstrumentApplet* sm = mw->signalInstrumentForTest();
+        QVERIFY2(sm, "kein S-Meter-Applet -- der Test prueft sonst nichts");
+        auto* poller = mw->findChild<MeterPoller*>();
+        QVERIFY(poller);
+
+        delete sm;   // wie closeEvent mit dem schwebenden Fenster
+        QVERIFY2(mw->signalInstrumentForTest() == nullptr,
+                 "das Hauptfenster haelt das geloeschte S-Meter noch fest");
+        emit poller->readingUpdated(MeterBinding::SignalAvg, -80.0);
+        emit poller->readingUpdated(MeterBinding::TxSwr, 1.2);
 
         delete mw;
     }

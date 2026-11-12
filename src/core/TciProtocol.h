@@ -70,6 +70,13 @@ class TciProtocol : public QObject {
     Q_OBJECT
 public:
     explicit TciProtocol(QObject* radio = nullptr, QObject* parent = nullptr);
+
+    // Die Betriebsart, wie sie auf den Draht geht: mit „CWL/CWU becomes CW"
+    // (TciCwluBecomesCw) wird CWL/CWU als CW gemeldet, die DSP bleibt.
+    // From Thetis TCIServer.cs:2174-2195 [@852bf0e] — sendMode. Oeffentlich,
+    // damit der Rundruf je Scheibe (TciServer) dieselbe Regel nimmt.
+    // MW0LGE_22b mods are uppcase on the sun, replicate  [original inline comment from TCIServer.cs:2193]
+    static QString tciModeForWire(const QString& modeUpper);
     ~TciProtocol() override = default;
 
     // Dispatch a single TCI command line. Returns the synchronous response
@@ -205,7 +212,7 @@ private:
     // handleModulationMessage at TCIServer.cs:3837 [v2.10.3.13] dispatches by args.size():
     //   args.size() == 2 → set (parse mode string, set DSPMode + enqueue notification)
     //   args.size() == 1 → query (return current mode uppercase)
-    // CWLUbecomesCW (TCIServer.cs:2148-2153 [v2.10.3.13]) DEFERRED (Phase 11/12 follow-up).
+    // CWLUbecomesCW wirkt auf jede ausgehende Modusmeldung (tciModeForWire).
     // CWbecomesCWUabove10mhz (TCIServer.cs:3868-3895 [v2.10.3.13]) DEFERRED (needs VFOATX/VFOBTX).
     QString handleModulationCommand(const QStringList& args);
 

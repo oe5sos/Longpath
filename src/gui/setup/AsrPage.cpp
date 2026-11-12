@@ -204,9 +204,11 @@ void AsrPage::buildHintGroup()
     m_modelPathEdit->setPlaceholderText(cfg.model.isEmpty()
         ? tr("no ggml-*.bin in ~/whisper")
         : cfg.model);
-    m_modelPathEdit->setToolTip(tr("The model file (ggml-*.bin). Empty: the first one in "
-                                    "~/whisper. \"small\" is fast, \"medium\" understands "
-                                    "considerably more."));
+    m_modelPathEdit->setToolTip(tr("The model file (ggml-*.bin). Empty: the best one in "
+                                    "~/whisper (large-v3-turbo, then large-v3, medium, "
+                                    "small, base, tiny). large-v3-turbo hears contest "
+                                    "callsigns best and runs faster than real time on "
+                                    "Apple Silicon."));
     connect(m_modelPathEdit, &QLineEdit::editingFinished, this, [this] {
         storeTrimmed(QStringLiteral("AsrModelPath"), m_modelPathEdit->text());
     });

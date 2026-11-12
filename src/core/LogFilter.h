@@ -31,6 +31,8 @@
 
 namespace Longpath {
 
+class CtyDatParser;
+
 struct LogFilter {
     // Anything: callsign, name, QTH, country, grid, band, mode,
     // comment. The box for when you do not want to decide which field
@@ -73,6 +75,17 @@ struct LogFilter {
     // See core/QsoConfirmation.h for why that distinction is worth the
     // code it costs.
     bool  unconfirmedOnly{false};
+
+    // ── Nur Grauzonen-QSOs (2026-11-10) ──────────────────────────────
+    //
+    // Mindestens ein Ende in der Grauzone, siehe core/Grauzone.h. Das
+    // Urteil braucht zwei Dinge, die ein Filterwert allein nicht hat:
+    // cty.dat (Landesmitte, wenn der Locator fehlt) und das eigene Feld
+    // fuer QSOs ohne MY_GRIDSQUARE. Beide setzt der Aufrufer mit; ohne
+    // sie urteilt der Filter nur aus den Locatoren.
+    bool                      greyLineOnly{false};
+    const CtyDatParser*       greyLineCty{nullptr};
+    QString                   greyLineHome;
 
     bool  useDates{false};
     QDate from;

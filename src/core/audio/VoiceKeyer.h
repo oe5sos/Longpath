@@ -101,6 +101,9 @@ mw0lge@grange-lane.co.uk
 // Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-11-10 — WavTxSource::load() wartet auf den Sendefaden
+//                 (m_inPull); Martin Fischer (OE5SOS), KI-gestuetzt
+//                 ueber Anthropic Claude.
 // =================================================================
 
 #include "core/TxMicRouter.h"
@@ -208,6 +211,12 @@ private:
     std::atomic<int>    m_pos{0};
     std::atomic<bool>   m_playing{false};
     std::atomic<bool>   m_repeat{false};
+    // Der Sendefaden steht gerade in pullSamples(). load() wartet, bis er
+    // draussen ist, bevor es m_samples neu belegt -- sonst laese er aus
+    // einem Feld, das unter ihm freigegeben wird. Das passiert genau
+    // dann, wenn waehrend einer Ansage die naechste Taste kommt
+    // (F1, dann gleich F2). Siehe load().
+    std::atomic<bool>   m_inPull{false};
 };
 
 } // namespace Longpath

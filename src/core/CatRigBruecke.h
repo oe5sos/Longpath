@@ -29,6 +29,7 @@
 // Modification history (Longpath):
 //   2026-11-07 — Original fuer Longpath von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-11 — setFristForTest gegen einen zeitabhaengigen Pruefstand.
 // =================================================================
 
 #include <QElapsedTimer>
@@ -71,7 +72,10 @@ public:
 
     /// Fuer den Pruefstand: eine langsame Maschine soll nicht die Frist
     /// ablaufen lassen, bevor die Meldung da ist, die sie abfangen soll.
+    /// Auf main kam derselbe Zugang als setFristForTest (2026-11-08);
+    /// beide Namen bleiben, damit beide Pruefstaende bauen.
     void fristSetzenForTest(int ms) { m_fristMs = ms; }
+    void setFristForTest(int ms) { m_fristMs = ms; }
 
 private:
     void vomGeraetFrequenz(qint64 hz);

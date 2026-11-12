@@ -52,6 +52,9 @@ struct CallsignInfo {
     double  latitude{0.0};
     double  longitude{0.0};
     bool    hasLatLon{false};
+    // QRZ <geoloc>: woher lat/lon stammen -- "user", "geocode" (Adresse),
+    // "grid", "zip", "state", "dxcc", "none". Leer bei alten Cache-Eintraegen.
+    QString geoloc;
     bool    lotw{false};    // accepts QSL via Logbook of The World
     bool    eqsl{false};    // accepts QSL via eQSL
     bool    mailQsl{false}; // returns paper QSL, QRZ <mqsl>

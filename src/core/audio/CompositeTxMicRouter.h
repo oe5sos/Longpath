@@ -69,6 +69,7 @@ enum class MicSource : int {
     Vax   = 2,  ///< VAX TX virtual device (3rd-party app → /nereussdr-vax-tx)
     Ft8   = 3,  ///< der eigene FT8/FT4-Sender (core/Ft8Tx.h), 2026-10-15
     Rtty  = 4,  ///< der eigene RTTY-Sender (core/RttyTx.h), 2026-10-16
+    Dvk   = 5,  ///< der Sprachspeicher (core/audio/VoiceKeyerPlayer.h), 2026-11-10
 };
 
 /// CompositeTxMicRouter — selector that holds PcMicSource + RadioMicSource
@@ -125,6 +126,10 @@ public:
     /// Mikrofon zurueck (siehe pullSamples), und dann waere es
     /// falsch, den Sendefaden das Mikrofon abklemmen zu lassen.
     bool eigeneTonquelleAktiv() const override;
+
+    /// FT8 und RTTY ja, der Sprachspeicher nein: der ist eine Stimme und
+    /// geht durch den Kanalzug wie das Mikrofon.
+    bool eigenesDatensignalAktiv() const override;
 
     /// User-facing source selection.
     ///
@@ -206,6 +211,17 @@ public:
         return m_rttySource.load(std::memory_order_acquire);
     }
 
+    /// Den Sprachspeicher anmelden (2026-11-10). Dieselbe Abmachung wie
+    /// setFt8Source(): nicht besitzend, ueber std::atomic gelesen, ohne
+    /// angemeldete Quelle faellt MicSource::Dvk auf Pc zurueck.
+    void setDvkSource(TxMicRouter* source);
+
+    /// Angemeldete Sprachspeicher-Quelle (kann null sein).
+    TxMicRouter* dvkSource() const
+    {
+        return m_dvkSource.load(std::memory_order_acquire);
+    }
+
     /// Currently registered VAX TX source pointer (may be null).
     /// Audio-thread accessor for tests.
     VaxTxMicSource* vaxSource() const
@@ -234,6 +250,7 @@ private:
     std::atomic<bool>      m_moxActive {false};
     std::atomic<TxMicRouter*> m_ft8Source{nullptr};
     std::atomic<TxMicRouter*> m_rttySource{nullptr};
+    std::atomic<TxMicRouter*> m_dvkSource{nullptr};
     std::atomic<VaxTxMicSource*> m_vaxSource {nullptr};  // non-owning; registered post-ctor
 };
 

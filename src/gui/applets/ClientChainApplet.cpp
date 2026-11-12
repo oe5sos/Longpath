@@ -23,6 +23,9 @@
 //                1 Hz refresh with auto-refresh checkbox at top.
 //                TciServer accessors clients() + activeTxAudioClient()
 //                added in same commit (Phase 22).
+//   2026-11-10 — Zeilen nur bei geaenderter Gestalt neu bauen, sonst Text
+//                nachziehen (Upstream NereusSDR d96e834b3, #765). Martin
+//                Fischer (OE5SOS), KI-gestuetzt mit Anthropic Claude Code.
 // =================================================================
 
 #ifdef HAVE_WEBSOCKETS
@@ -216,6 +219,7 @@ QWidget* ClientChainApplet::buildClientRow(
     row->setStyleSheet(QStringLiteral(
         "QWidget { background: transparent; border-bottom: 1px solid %1; }"
     ).arg(Style::kBorderSubtle));
+    row->setObjectName(QStringLiteral("tciClientRow"));
 
     auto* vbox = new QVBoxLayout(row);
     vbox->setContentsMargins(6, 4, 6, 4);
@@ -246,12 +250,14 @@ QWidget* ClientChainApplet::buildClientRow(
             "QLabel { color: %1; font-size: 11px; font-weight: bold; }"
         ).arg(Style::kTextPrimary));
         peerLbl->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        peerLbl->setObjectName(QStringLiteral("tciPeer"));
         hbox->addWidget(peerLbl);
 
         // Name: User-Agent (best-effort)
         auto* nameLbl = makeSecondaryLabel(
             QStringLiteral("(%1)").arg(session->userAgent), row);
         nameLbl->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        nameLbl->setObjectName(QStringLiteral("tciName"));
         hbox->addWidget(nameLbl);
 
         hbox->addStretch();
@@ -259,6 +265,7 @@ QWidget* ClientChainApplet::buildClientRow(
         // Connection duration
         auto* durLbl = makeTertiaryLabel(
             formatDuration(session->connectedAt.elapsed()), row);
+        durLbl->setObjectName(QStringLiteral("tciDauer"));
         hbox->addWidget(durLbl);
 
         vbox->addLayout(hbox);
@@ -328,12 +335,14 @@ QWidget* ClientChainApplet::buildClientRow(
             "QLabel { color: %1; font-size: 9px; }"
         ).arg(Style::kTextTertiary));
         cmdLbl->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        cmdLbl->setObjectName(QStringLiteral("tciBefehl"));
         hbox->addWidget(cmdLbl, 1);
 
         // Last command age
         if (session->lastCommandAt > 0) {
             auto* ageLbl = makeTertiaryLabel(
                 formatLastCommandAge(session->lastCommandAt), row);
+            ageLbl->setObjectName(QStringLiteral("tciBefehlsalter"));
             hbox->addWidget(ageLbl);
         }
 
@@ -344,6 +353,7 @@ QWidget* ClientChainApplet::buildClientRow(
         if (drops > 0) {
             auto* dropLbl = new QLabel(
                 QStringLiteral("%1 dropped").arg(drops), row);
+            dropLbl->setObjectName(QStringLiteral("tciVerworfen"));
             dropLbl->setStyleSheet(QStringLiteral(
                 "QLabel { color: %1; font-size: 9px; font-weight: bold; }"
             ).arg(Style::kRedBorder));
@@ -394,6 +404,35 @@ void ClientChainApplet::rebuildRows()
         return;
     }
     QScopedValueRollback<bool> guard(m_rebuildInProgress, true);
+
+    // Gleiche Programme in gleicher Reihenfolge mit gleichen Marken: nur
+    // den Text nachziehen. Ein Neubau jede Sekunde -- weil die
+    // Verbindungsdauer jede Sekunde anders ist -- liess die Spalte unter
+    // dem Kasten springen (Upstream NereusSDR d96e834b3, #765).
+    if (m_server && m_server->isRunning() && !m_rows.isEmpty()) {
+        const auto snapshot = m_server->clients();
+        QList<RowShape> shapes;
+        QList<std::shared_ptr<TciClientSession>> sessions;
+        for (auto it = snapshot.cbegin(); it != snapshot.cend(); ++it) {
+            if (!it.key() || !it.value()) {
+                continue;
+            }
+            shapes.append(shapeOf(it.key(), it.value()));
+            sessions.append(it.value());
+        }
+        bool alleDa = (m_rows.size() == shapes.size());
+        for (const QPointer<QWidget>& r : std::as_const(m_rows)) {
+            if (!r) { alleDa = false; break; }
+        }
+        if (alleDa && shapes == m_rowShapes) {
+            for (int i = 0; i < m_rows.size(); ++i) {
+                updateClientRowText(m_rows.at(i), sessions.at(i));
+            }
+            return;
+        }
+    }
+    m_rows.clear();
+    m_rowShapes.clear();
 
     // Remove all items except m_emptyStatePanel and the trailing stretch.
     // Iterate in reverse so indices stay valid while we remove.
@@ -465,7 +504,61 @@ void ClientChainApplet::rebuildRows()
             QWidget* rowWidget = buildClientRow(socket, session);
             m_rowsLayout->insertWidget(stretchIdx, rowWidget);
             ++stretchIdx;
+            m_rows.append(rowWidget);
+            m_rowShapes.append(shapeOf(socket, session));
         }
+    }
+}
+
+// ── Gestalt und Text einer Zeile ──────────────────────────────────────────────
+
+ClientChainApplet::RowShape ClientChainApplet::shapeOf(
+    QWebSocket* socket, const std::shared_ptr<TciClientSession>& session) const
+{
+    RowShape shape;
+    shape.socket = socket;
+    shape.tx = (m_server && socket == m_server->activeTxAudioClient());
+    // Reihenfolge wie beim Bau (QSet-Iteration); zum Vergleichen sortiert
+    // waere falsch, weil die Marken in Iterationsreihenfolge stehen.
+    for (const int rx : std::as_const(session->iqStreamEnabled)) {
+        shape.iq.append(rx);
+    }
+    for (const int rx : std::as_const(session->audioStreamEnabled)) {
+        shape.audio.append(rx);
+    }
+    shape.rxSensors = session->rxSensorsEnabled;
+    shape.txSensors = session->txSensorsEnabled;
+    shape.hasCommandAge = session->lastCommandAt > 0;
+    shape.hasDrops = (session->sendQueue.dropCount() + session->txFramesDropped) > 0;
+    return shape;
+}
+
+void ClientChainApplet::updateClientRowText(
+    QWidget* row, const std::shared_ptr<TciClientSession>& session) const
+{
+    if (!row || !session) {
+        return;
+    }
+    auto setText = [row](const char* name, const QString& text) {
+        if (auto* lbl = row->findChild<QLabel*>(QLatin1String(name))) {
+            if (lbl->text() != text) {
+                lbl->setText(text);
+            }
+        }
+    };
+    setText("tciPeer", session->peer.isEmpty()
+                           ? QStringLiteral("(unknown peer)") : session->peer);
+    setText("tciName", QStringLiteral("(%1)").arg(session->userAgent));
+    setText("tciDauer", formatDuration(session->connectedAt.elapsed()));
+    setText("tciBefehl", session->lastCommand.isEmpty()
+                             ? QStringLiteral("(no command yet)")
+                             : session->lastCommand.left(40));
+    if (session->lastCommandAt > 0) {
+        setText("tciBefehlsalter", formatLastCommandAge(session->lastCommandAt));
+    }
+    const int drops = session->sendQueue.dropCount() + session->txFramesDropped;
+    if (drops > 0) {
+        setText("tciVerworfen", QStringLiteral("%1 dropped").arg(drops));
     }
 }
 

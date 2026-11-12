@@ -38,6 +38,8 @@ private slots:
     void subsolar_latitude_tracks_the_seasons();
     void subsolar_longitude_tracks_the_clock();
     void subsolar_longitude_stays_in_range();
+    void subsolar_point_matches_noaa_over_the_year_data();
+    void subsolar_point_matches_noaa_over_the_year();
     void interpolation_hits_both_endpoints();
     void interpolated_points_lie_on_the_great_circle();
     void path_over_the_pole_is_not_a_straight_lat_lon_line();
@@ -103,6 +105,66 @@ void TstGlobeGeometry::subsolar_longitude_stays_in_range()
                  qPrintable(QStringLiteral("hour %1: %2").arg(h).arg(lon)));
         QVERIFY(lat >= -23.5 && lat <= 23.5);
     }
+}
+
+// ── Gegen NOAA, ueber das ganze Jahr (2026-11-10) ───────────────────
+//
+// Die drei Pruefungen darueber lassen „ein paar Grad" zu und haben
+// deshalb nie gesehen, dass die alte Zeitgleichung bis 17 Minuten
+// danebenlag (Schattengrenze bis 4,4° in der Laenge falsch). Hier die
+// Werte nach den Formeln des NOAA-Solar-Calculator-Blatts (Meeus), in
+// einem eigenen Skript gerechnet: Deklination und der Meridian, auf dem
+// es wahrer Mittag ist. Je Monat der 1. zu wandernder Stunde und der
+// 15. um 12 UTC, dazu die zwei schlimmsten Tage der alten Formel.
+void TstGlobeGeometry::subsolar_point_matches_noaa_over_the_year_data()
+{
+    QTest::addColumn<QDateTime>("t");
+    QTest::addColumn<double>("noaaLat");
+    QTest::addColumn<double>("noaaLon");
+
+    QTest::newRow("2026-01-01 01:00") << utc(2026, 1, 1, 1, 0) << -23.01 << 165.84;   // EoT -3.4 min
+    QTest::newRow("2026-01-15 12:00") << utc(2026, 1, 15, 12, 0) << -21.07 << 2.35;   // EoT -9.4 min
+    QTest::newRow("2026-02-01 03:00") << utc(2026, 2, 1, 3, 0) << -17.12 << 138.38;   // EoT -13.5 min
+    QTest::newRow("2026-02-15 12:00") << utc(2026, 2, 15, 12, 0) << -12.58 << 3.53;   // EoT -14.1 min
+    QTest::newRow("2026-03-01 05:00") << utc(2026, 3, 1, 5, 0) << -7.58 << 108.09;   // EoT -12.4 min
+    QTest::newRow("2026-03-15 12:00") << utc(2026, 3, 15, 12, 0) << -2.02 << 2.22;   // EoT -8.9 min
+    QTest::newRow("2026-04-01 07:00") << utc(2026, 4, 1, 7, 0) << 4.58 << 75.97;   // EoT -3.9 min
+    QTest::newRow("2026-04-15 12:00") << utc(2026, 4, 15, 12, 0) << 9.87 << 0.01;   // EoT -0.0 min
+    QTest::newRow("2026-05-01 09:00") << utc(2026, 5, 1, 9, 0) << 15.13 << 44.28;   // EoT +2.9 min
+    QTest::newRow("2026-05-15 12:00") << utc(2026, 5, 15, 12, 0) << 18.94 << -0.91;   // EoT +3.6 min
+    QTest::newRow("2026-06-01 11:00") << utc(2026, 6, 1, 11, 0) << 22.09 << 14.47;   // EoT +2.1 min
+    QTest::newRow("2026-06-15 12:00") << utc(2026, 6, 15, 12, 0) << 23.32 << 0.13;   // EoT -0.5 min
+    QTest::newRow("2026-07-01 13:00") << utc(2026, 7, 1, 13, 0) << 23.08 << -14.02;   // EoT -3.9 min
+    QTest::newRow("2026-07-15 12:00") << utc(2026, 7, 15, 12, 0) << 21.47 << 1.50;   // EoT -6.0 min
+    QTest::newRow("2026-08-01 15:00") << utc(2026, 8, 1, 15, 0) << 17.90 << -43.41;   // EoT -6.4 min
+    QTest::newRow("2026-08-15 12:00") << utc(2026, 8, 15, 12, 0) << 13.95 << 1.13;   // EoT -4.5 min
+    QTest::newRow("2026-09-01 17:00") << utc(2026, 9, 1, 17, 0) << 8.09 << -75.01;   // EoT +0.0 min
+    QTest::newRow("2026-09-15 12:00") << utc(2026, 9, 15, 12, 0) << 2.91 << -1.19;   // EoT +4.8 min
+    QTest::newRow("2026-10-01 19:00") << utc(2026, 10, 1, 19, 0) << -3.42 << -107.61;   // EoT +10.4 min
+    QTest::newRow("2026-10-15 12:00") << utc(2026, 10, 15, 12, 0) << -8.62 << -3.56;   // EoT +14.2 min
+    QTest::newRow("2026-11-01 21:00") << utc(2026, 11, 1, 21, 0) << -14.64 << -139.12;   // EoT +16.5 min
+    QTest::newRow("2026-11-15 12:00") << utc(2026, 11, 15, 12, 0) << -18.55 << -3.86;   // EoT +15.4 min
+    QTest::newRow("2026-12-01 23:00") << utc(2026, 12, 1, 23, 0) << -21.91 << -167.70;   // EoT +10.8 min
+    QTest::newRow("2026-12-15 12:00") << utc(2026, 12, 15, 12, 0) << -23.28 << -1.22;   // EoT +4.9 min
+    QTest::newRow("2026-03-30 12:00") << utc(2026, 3, 30, 12, 0) << 3.88 << 1.11;   // EoT -4.4 min
+    QTest::newRow("2026-11-03 12:00") << utc(2026, 11, 3, 12, 0) << -15.15 << -4.12;   // EoT +16.5 min
+    QTest::newRow("2027-02-11 06:15") << utc(2027, 2, 11, 6, 15) << -14.08 << 89.81;   // EoT -14.2 min
+}
+
+void TstGlobeGeometry::subsolar_point_matches_noaa_over_the_year()
+{
+    QFETCH(QDateTime, t);
+    QFETCH(double, noaaLat);
+    QFETCH(double, noaaLon);
+    double lat = 0.0, lon = 0.0;
+    GlobeWidget::subsolarPoint(t, lat, lon);
+    double dLon = std::fmod(lon - noaaLon + 540.0, 360.0) - 180.0;
+    // 0,3° Breite, 0,5° Laenge: das Modell aus core/SolarTimes liegt
+    // ueber das Jahr bei hoechstens 0,18° bzw. 0,4°.
+    QVERIFY2(std::abs(lat - noaaLat) < 0.3,
+             qPrintable(QStringLiteral("Breite %1 statt %2").arg(lat).arg(noaaLat)));
+    QVERIFY2(std::abs(dLon) < 0.5,
+             qPrintable(QStringLiteral("Laenge %1 statt %2").arg(lon).arg(noaaLon)));
 }
 
 void TstGlobeGeometry::interpolation_hits_both_endpoints()

@@ -51,7 +51,10 @@
 #include "core/CallsignInfo.h"
 #include "models/LogEntry.h"
 
+#include <QPointer>
 #include <QWidget>
+
+#include <functional>
 
 class QFormLayout;
 class QLabel;
@@ -62,6 +65,8 @@ class QVBoxLayout;
 namespace Longpath {
 
 class CallsignCache;
+class HoehenprofilFenster;
+class CtyDatParser;
 class QrzClient;
 class StationPhoto;
 
@@ -101,6 +106,46 @@ public:
     // the honest state when no rotor is connected.
     void setRotorBearing(double deg);
 
+    // ── Peilung auch fuer Stationen, die nicht im Log stehen (2026-11-10)
+    //
+    // Betreiber: Rufzeichen eingeben, ROTOR, sehen wohin der Rotor zeigt
+    // und wo die Station steht. Bis heute stand dort fuer jede neue
+    // Station „Not in your log — no bearing until you work them": der
+    // eigene Standort kam nur aus dem QSO (MY_GRIDSQUARE) oder aus
+    // StationGridSquare, und das ist bei Martin leer. Jetzt:
+    //   eigener Standort  QSO -> StationGridSquare -> setHomeGrid()
+    //   Station           SOTA-Gipfel -> QRZ-Koordinaten -> QRZ-Locator -> Log-Locator
+    //                     -> Landesmitte (setPositionFallback, cty.dat)
+    // und die Karte sagt, woher die Lage stammt -- eine Landesmitte ist
+    // keine Hausnummer.
+    using PositionFallback =
+        std::function<bool(const QString& call, double& lat, double& lon)>;
+    void setPositionFallback(PositionFallback fn);
+    void setHomeGrid(std::function<QString()> fn);
+
+    // Gipfel (Probe-Merge Rotor + Hoehenprofil): die Gegenstation steht auf
+    // einem SOTA-Gipfel (SOTA_REF) -- dessen Lage geht allem anderen vor.
+    enum class Lage { Keine, Gipfel, QrzKoordinaten, QrzLocator, LogLocator, Landesmitte };
+    // Woher die Lage der Station gerade stammt, und wie genau sie ist --
+    // als Satz fuer die Oberflaeche ("street address (QRZ)").
+    Lage    lage() const { return m_lage; }
+    QString lageText() const;
+    bool    lageGrob() const;
+    // Peilung (kurzer Weg) und Entfernung, wie die Karte sie zeigt.
+    bool peilung(double& bearingDeg, double& km) const;
+    QString gezeigtesRufzeichen() const { return m_haveEntry ? m_entry.call : QString(); }
+    QPushButton* profilButtonForTest() const { return m_profilBtn; }
+    HoehenprofilFenster* profilFensterForTest() const;
+    // ── Grauzone, SFI, Kp (2026-11-10) ───────────────────────────────
+    //
+    // Die Zeile unter BEAM: wie das Licht an beiden Enden stand und wie
+    // Sonne und Magnetfeld an dem Tag waren (core/Grauzone.h,
+    // core/GfzIndizes.h). cty.dat fuer die Landesmitte, wenn der Locator
+    // fehlt; das Ersatzfeld fuer QSOs ohne MY_GRIDSQUARE (im Logbuch: das
+    // juengste im Log). Beides nicht besessen.
+    void setCty(const CtyDatParser* cty);
+    void setMeinFeldErsatz(const QString& feld);
+
 signals:
     void turnRotorRequested(double bearingDeg, const QString& call);
     /// Ein Lookup hat die Station verortet (QRZ-Koordinaten oder
@@ -111,12 +156,17 @@ signals:
     // Die Richtung zur gezeigten Station, sobald sie sich aendert (-1 =
     // keine). Fuer das Rotor-Radar neben der Karte (2026-09-26).
     void beamChanged(double bearingDeg);
+    // Nach JEDER Neuberechnung der Peilung, auch wenn die Richtung gleich
+    // bleibt (JA1XY -> JA1XYZ: beide Landesmitte). Fuer die Rotorzeile
+    // im Logbuch, die Rufzeichen und Lagequelle mitzeigt (2026-11-10).
+    void peilungNeu();
 
 private:
     void buildUi();
     void refresh();               // redraw from m_entry + m_info
     void refreshExtras();         // the ADIF fields with no column
     void refreshBeam();
+    void refreshLicht();
     void applyInfo(const CallsignInfo& info, bool stale);
     void requestLookup();
     void wireQrz();
@@ -153,6 +203,10 @@ private:
     QPushButton* m_turnShort{nullptr};
     QPushButton* m_turnLong{nullptr};
     QLabel*      m_travel{nullptr};
+    QLabel*      m_licht{nullptr};      // "Grey line at their end · SFI 142 · Kp 2"
+
+    const CtyDatParser* m_cty{nullptr};
+    QString             m_meinFeldErsatz;
 
     QWidget*     m_extrasBox{nullptr};
     QFormLayout* m_extras{nullptr};
@@ -161,6 +215,17 @@ private:
     QPushButton* m_lookupBtn{nullptr};
     QPushButton* m_editBtn{nullptr};
     QPushButton* m_qrzPageBtn{nullptr};
+
+    // ── Hoehenprofil (2026-11-11) ─────────────────────────────────────
+    // "Profile" fuer 2-m-, 70-cm- und 23-cm-QSOs; ein Fenster, das beim
+    // naechsten Druck den Inhalt wechselt (HoehenprofilFenster.h sagt,
+    // warum hier und nicht in der Karte).
+    QPushButton* m_profilBtn{nullptr};
+    QPointer<HoehenprofilFenster> m_profilFenster;
+    void refreshProfil();
+    void oeffneProfil();
+    // Der eigene Locator, wenn das QSO keinen hat.
+    static QString ersatzLocator();
 
     double m_rotorDeg{0.0};
     bool   m_haveRotor{false};
@@ -171,7 +236,18 @@ private:
     bool   m_haveBeam{false};
     // Peilung und Entfernung von hier zur Station, aus QRZ-Koordinaten
     // vor dem Locator, und nicht aus dem Wert im Log.
-    bool beamNow(double& bearingDeg, double& km) const;
+    bool beamNow(double& bearingDeg, double& km, Lage* lage = nullptr) const;
+    // Wo die Station steht, in EINER Reihenfolge fuer Peilung und Karte
+    // (2026-11-11). mitLandesmitte: cty.dat als letzter Ausweg.
+    bool stationsPunkt(double& lat, double& lon, Lage& woher, bool mitLandesmitte) const;
+    // Ein 6-stelliger Log-Locator, in dessen Feld der QRZ-Punkt NICHT
+    // liegt -- Contest, portabel: dann gilt das Log.
+    bool logLocatorSchlaegtQrz() const;
+    double m_beamKm{0.0};
+    Lage   m_lage{Lage::Keine};
+    QLabel* m_lageLabel{nullptr};
+    PositionFallback       m_fallback;
+    std::function<QString()> m_homeGrid;
 };
 
 } // namespace Longpath

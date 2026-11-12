@@ -16,6 +16,8 @@
 #include "gui/widgets/GibsTileLayer.h"
 #include "gui/widgets/MapPoint.h"
 
+#include <QImage>
+
 #include <QDir>
 #include <QPushButton>
 #include <QSignalSpy>
@@ -123,6 +125,64 @@ private slots:
             QDir().mkpath(grabDir);
             w.grab().save(grabDir + QStringLiteral("/dx-radar.png"));
         }
+    }
+
+    // Die kleine Rotor-Grafik neben der Karte (Betreiber 2026-11-10: „der
+    // rotor bzw die grafik muss ueberarbeitet werden"): in der schmalen
+    // Spalte ueberlagerten sich die Entfernungszahlen oben rechts, dazu
+    // zwoelf Gradzahlen und Speichen bis zur Mitte. Kompakt heisst jetzt:
+    // keine Entfernungszahlen, nur N/E/S/W -- Nadel, Kegel, Ziel und
+    // Ablesung bleiben. Geprueft an den Stellen, wo die Zahlen stuenden.
+    void the_compact_rotor_dial_is_quiet()
+    {
+        DxRadarWidget r;
+        r.setRotorReadout(true);
+        r.setRotorCompact(true);
+        r.setRotorStatusShown(true);
+        r.resize(240, 280);
+        r.setHome(48.25, 14.04);
+        MapPoint og;
+        og.lat = 60.66; og.lon = 22.0; og.label = QStringLiteral("OG3B"); og.highlight = true;
+        r.setPoints({og});
+        r.setRotorBeamWidth(40.0);
+        r.setRotorHeading(230.0);
+        r.setRotorTarget(17.0);
+        const QImage img = r.grab().toImage();
+
+        const QString grabDir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+        if (!grabDir.isEmpty()) {
+            QDir().mkpath(grabDir);
+            img.save(grabDir + QStringLiteral("/rotor-kompakt.png"));
+        }
+
+        // Helle Schriftpunkte in einem Rechteck (Hintergrund und Ringe sind
+        // dunkel, Schrift ist hell).
+        const qreal dpr = img.devicePixelRatio();
+        auto bright = [&](const QRectF& rect) {
+            int n = 0;
+            const QRect px = QRectF(rect.topLeft() * dpr, rect.size() * dpr).toAlignedRect()
+                                 .intersected(img.rect());
+            for (int y = px.top(); y <= px.bottom(); ++y) {
+                for (int x = px.left(); x <= px.right(); ++x) {
+                    const QColor col = img.pixelColor(x, y);
+                    if (std::max({col.red(), col.green(), col.blue()}) > 90) { ++n; }
+                }
+            }
+            return n;
+        };
+        const QPointF c = r.centreForTest();
+        const double R = r.radiusForTest();
+        const double k = 0.7071;
+        // Wo die Zahl am aeussersten Ring stuende (oben rechts, 45°).
+        QCOMPARE(bright(QRectF(c.x() + R * k + 3.0, c.y() - R * k - 11.0, 34.0, 10.0)), 0);
+        // Wo „30" und „60" stuenden.
+        for (double deg : {30.0, 60.0}) {
+            const double a = deg * M_PI / 180.0;
+            const QPointF at = c + QPointF(std::sin(a), -std::cos(a)) * (R + 14.0);
+            QCOMPARE(bright(QRectF(at.x() - 9.0, at.y() - 7.0, 18.0, 12.0)), 0);
+        }
+        // Norden bleibt beschriftet.
+        QVERIFY(bright(QRectF(c.x() - 9.0, c.y() - R - 24.0, 18.0, 22.0)) > 0);
     }
 };
 

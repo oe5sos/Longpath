@@ -8,6 +8,9 @@
 //
 // Modification history (Longpath):
 //   2026-08-23 — Portiert. Namensraum angepasst, sonst zeichengetreu.
+//   2026-11-11 — Schwelle am Rauschboden (noiseFactor), Longpath-eigen;
+//                Begruendung bei Config::noiseFactor. Martin Fischer,
+//                KI-gestuetzt ueber Anthropic Claude.
 //
 #include <string>
 #include <vector>
@@ -37,6 +40,25 @@ public:
         int minSpeechMs = 200;       // discard utterances shorter than this
         int hangoverMs = 300;        // trailing silence that closes a segment
         int maxSegmentMs = 20000;    // force-close cap (a very long over)
+
+        // ── Schwelle am Rauschboden (Longpath, 2026-11-11) ─────────
+        //
+        // Gemessen an einem Pileup-Mitschnitt (NT6X, CQ WW SSB): der
+        // Pegel liegt dort im Median bei 0,084, also nie unter der
+        // festen Schwelle 0,010. 19 von 22 Abschnitten liefen bis zum
+        // 20-s-Deckel und wurden mitten im Rufzeichen abgeschnitten,
+        // weil auf einem belebten Band nie "Stille" ist, nur leiser.
+        //
+        // Ist noiseFactor > 0, gilt ein Rahmen erst dann als Sprache,
+        // wenn er ueber noiseFactor x Rauschboden liegt (und weiterhin
+        // ueber speechRms). Der Rauschboden ist das 20-%-Perzentil der
+        // Rahmenpegel der letzten noiseWindowMs. Mit Faktor 2 schnitt
+        // derselbe Mitschnitt 79 Abschnitte, Median 4,2 s, keiner am
+        // Deckel — so lang wie ein Durchgang.
+        //
+        // 0 = aus: dann entscheidet speechRms allein, wie bei AetherSDR.
+        float noiseFactor = 0.0f;
+        int noiseWindowMs = 30000;
         // Optional Silero VAD model (.onnx). Empty = built-in energy VAD. The
         // worker (not the segmenter) consumes this to build the detector; carried
         // here because Config is the worker's construction bundle.
@@ -81,11 +103,26 @@ public:
     float speechRms() const { return m_config.speechRms; }
     int hangoverMs() const { return m_config.hangoverMs; }
 
+    // Schwelle am Rauschboden (siehe Config::noiseFactor). 0 schaltet ab.
+    void setNoiseFactor(float factor) { m_config.noiseFactor = factor; }
+    float noiseFactor() const { return m_config.noiseFactor; }
+    // Der zuletzt geschaetzte Rauschboden (RMS); 0, solange noch keine
+    // Sekunde Ton gesehen wurde oder die Schaetzung abgeschaltet ist.
+    float noiseFloor() const { return m_noiseFloor; }
+    // Die Schwelle, die gerade gilt: max(speechRms, noiseFactor x Boden).
+    float effectiveThreshold() const;
+
     bool inSpeech() const { return m_inSpeech; }
 
 private:
     int framesToSamples(int ms) const;
     void closeSegment(std::vector<std::vector<float>>& out);
+    // Die Zustandsmaschine fuer EINEN Rahmen (unveraendert aus dem Port,
+    // nur herausgezogen, damit der Anlauf sie nachspielen kann).
+    void processFrame(const float* frame, int n, bool speechFrame,
+                      std::vector<std::vector<float>>& out);
+    void trackNoiseFloor(float frameRms);
+    void replayStartup(std::vector<std::vector<float>>& out);
 
     Config m_config;
     int m_frameSamples = 160;
@@ -99,6 +136,16 @@ private:
     bool m_inSpeech = false;
     int m_trailingSilence = 0;      // samples of silence since last speech frame
     int m_speechSamples = 0;        // speech-only samples (excludes hangover), gates minSpeech
+
+    // Rauschboden: Ring der Rahmenpegel ueber noiseWindowMs.
+    std::vector<float> m_rmsHistory;
+    int m_rmsHead = 0;
+    int m_rmsCount = 0;
+    int m_framesSinceEstimate = 0;
+    bool m_floorEstimated = false;
+    float m_noiseFloor = 0.0f;
+    // Die erste Sekunde, aufgehoben bis der Boden bekannt ist.
+    std::vector<float> m_startup;
 };
 
 } // namespace Longpath

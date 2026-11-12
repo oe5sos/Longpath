@@ -177,6 +177,21 @@ bool hauptrahmenSteht(Qt::WindowStates zustand, const QRect& rahmen,
 void snapToGridAfterSettle(QWidget* w, int grid = kSnapGridPx,
                            int delayMs = 180, bool snapSize = true);
 
+/// Ist der Sprung von `vorher` nach `jetzt` nur das Nachrasten des
+/// Rasters (snapToGridAfterSettle), keine Bewegung fuer sich?
+///
+/// Lage: unter einer Rasterweite je Achse -- eine Kante rueckt hoechstens
+/// um eine halbe Weite, die obere unter der Menueleiste um knapp eine
+/// ganze (y = 33 darf nicht auf 32, also auf 48).
+/// Groesse: unter ANDERTHALB Rasterweiten -- beide Kanten rasten ein,
+/// die obere unter der Menueleiste um bis zu 15, die untere um bis zu 8,
+/// zusammen hoechstens 23. Gerade beim Hauptfenster addiert sich das: am
+/// Geraet am 2026-11-11 gemessen y 33 -> 48 (+15) und Hoehe 738 -> 717
+/// (-21). Mit der alten Schwelle (eine Weite auch fuer die Groesse)
+/// galt das als eigene Bewegung, und die schwebenden Fenster blieben
+/// bei einem schnellen Groessenzug stehen.
+bool istRasterNachhall(const QRect& jetzt, const QRect& vorher, int grid = kSnapGridPx);
+
 /// Dafür sorgen, dass `w` auf einem verbundenen Bildschirm zu sehen
 /// ist. Verschoben wird, wenn (a) keine Geometrie gespeichert war,
 /// (b) die gespeicherte bei (0,0) liegt, (c) sie ausserhalb jedes

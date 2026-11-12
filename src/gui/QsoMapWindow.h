@@ -35,14 +35,37 @@
 //                 Anschluss aus dem Logbuch: wer dort eine Station
 //                 nachschlaegt, sieht sie hier landen. Martin Fischer,
 //                 AI-assisted via Anthropic Claude.
+//   2026-11-10 — Vierte Ansicht „Azimuthal": die Azimutalkarte um das
+//                 eigene QTH (AzimutalKarteWidget) mit jedem gezeigten
+//                 QSO als Strahl, dem Rotor live und der nachgeschlagenen
+//                 Station mit kurzem und langem Weg. Die gewaehlte
+//                 Ansicht wird gemerkt (QsoMapView). Martin Fischer,
+//                 AI-assisted via Anthropic Claude (Claude Code).
+//   2026-11-10 — 3D-Flug: mit eigenem Google-Schluessel (Map Tiles API)
+//                 fliegt eine vierte Ansicht vom QTH den Grosskreis
+//                 entlang bis aufs Dach der Station (Station3dSurface,
+//                 nur mit Qt WebEngine). Ohne Schluessel oder WebEngine
+//                 bleibt der NASA-Flug, dazu „View in Google Earth".
+//                 Martin Fischer (OE5SOS), AI-assisted via Anthropic
+//                 Claude.
+//   2026-11-11 — Locator-Jagd mit FT8: zum Grid-Haken das Mosaik je Band
+//                 (bestaetigt / gearbeitet / noch nie, wahlweise nur FT8),
+//                 auf flacher Karte und Azimutalkarte; die gehoerten
+//                 FT8-Stationen der letzten Minuten als Punkte; ein Klick
+//                 ruft ueber das FT8-Fenster an (Ft8KartenBruecke), der
+//                 Zaehler „N new squares heard now on 20m". Martin Fischer
+//                 (OE5SOS), AI-assisted via Anthropic Claude (Claude Code).
 // =================================================================
 
+#include "core/LocatorJagd.h"
 #include "models/LogEntry.h"
 
 #include <QDialog>
 #include <QSet>
 #include <QTimer>
 #include <QVector>
+
+#include <QUrl>
 
 #include <functional>
 
@@ -56,6 +79,9 @@ class QStackedWidget;
 class QComboBox;
 class QEvent;
 class QLineEdit;
+class QSpinBox;
+class QTableWidget;
+class QTableWidgetItem;
 
 namespace Longpath {
 
@@ -123,10 +149,31 @@ public:
     FlatMapWidget* flatMapForTest() const { return m_flat; }
     class DxRadarWidget* radarForTest() const { return m_radar; }
     QPushButton* radarButtonForTest() const { return m_radarBtn; }
+    class AzimutalKarteWidget* azimutalForTest() const { return m_azimut; }
+    QPushButton* azimutalButtonForTest() const { return m_azimutBtn; }
     /// Wie viele Kontakte die Karte beim letzten Aufbau gezeichnet hat.
     int shownCountForTest() const { return m_lastShown.size(); }
     /// Ein Rufzeichen so behandeln, als waere es im Feld eingegeben.
     void lookupAndFly(const QString& call);
+
+    // ── 3D-Flug mit Googles Kacheln (2026-11-10) ─────────────────────
+    //
+    // Seite 4 im Stapel (hinter der Azimutalkarte auf 3). Die Flaeche entsteht erst beim ersten 3D-Flug
+    // (WebEngine startet einen eigenen Prozess -- nicht fuer jeden, der
+    // die Karte nur oeffnet). Ohne WebEngine im Bau, ohne Schluessel
+    // oder mit abgewaehltem „3D" fliegt die flache Karte wie bisher, und
+    // „View in Google Earth" erscheint neben der Stationskarte.
+    static constexpr int kView3d = 4;
+    QPushButton* threeDButtonForTest() const { return m_3dBtn; }
+    QPushButton* googleEarthButtonForTest() const { return m_googleEarthBtn; }
+    class Station3dSurface* threeDSurfaceForTest() const { return m_3d; }
+    int currentViewForTest() const;
+    QWidget* summaryForTest() const;
+    class FlowLayout* pillRowForTest() const { return m_pillRow; }
+    const QVector<QWidget*>& flatOnlyControlsForTest() const { return m_flatOnlyControls; }
+    QString infoTextForTest() const;
+    /// Statt QDesktopServices: der Pruefstand faengt die URL ab.
+    void setUrlOpenerForTest(std::function<void(const QUrl&)> fn) { m_openUrl = std::move(fn); }
 
     /// Satelliten ueber dem Horizont als Schicht auf der flachen Karte:
     /// Subsatellitenpunkt, Name, Elevation; alle 10 s neu gerechnet.
@@ -156,8 +203,50 @@ public:
     void showRadarViewForTest(bool on);
     bool isEmbedded() const { return m_embedded; }
 
+    // ── Locator-Jagd mit FT8 (2026-11-11) ───────────────────────────
+    //
+    // Das Mosaik fragt das GANZE Logbuch („welches Feld fehlt mir"),
+    // nicht das gefilterte: eingebettet bekommt die Karte nur, was die
+    // Tabelle gerade zeigt, und ein Filter auf „diese Woche" machte die
+    // halbe Welt zu „noch nie". Ohne Aufruf gilt, was setEntries() kam.
+    void setMosaikLog(const QVector<LogEntry>& ganzesLog);
+    /// Eine gehoerte Station (von Ft8KartenBruecke, im Pruefstand direkt).
+    void nimmFt8(const Longpath::Ft8Gehoert& g);
+    /// Ein Klick auf einen FT8-Punkt. Leer heisst: der Anruf laeuft;
+    /// sonst der Grund, warum nicht. Die Antwort steht auch in der
+    /// Infozeile unter der Karte.
+    QString rufeLive(const QString& rufzeichen);
+    /// Das Band, fuer das das Mosaik gerade steht („" = alle).
+    QString mosaikBand() const;
+
+    // Fuer Pruefstaende.
+    void setUhrForTest(std::function<QDateTime()> uhr) { m_uhr = std::move(uhr); }
+    const LocatorMosaik& mosaikForTest() const { return m_mosaik; }
+    const LiveSchicht&   liveForTest() const { return m_live; }
+    QLabel*    liveZaehlerForTest() const { return m_liveZaehler; }
+    QComboBox* mosaikBandForTest() const { return m_mosaikBand; }
+    QCheckBox* nurFt8ForTest() const { return m_nurFt8; }
+    QCheckBox* gridForTest() const { return m_grid; }
+    QPushButton* jagdButtonForTest() const { return m_jagdBtn; }
+    QPushButton* vollbildButtonForTest() const { return m_vollbildBtn; }
+    QTableWidget* jagdListeForTest() const { return m_jagdListe; }
+    QWidget* jagdSpalteForTest() const { return m_jagdSpalte; }
+    QCheckBox* pathsForTest() const { return m_paths; }
+    QCheckBox* imageryForTest() const { return m_imagery; }
+    QSpinBox*  liveMinutenForTest() const { return m_liveMinuten; }
+    void       refreshLiveForTest() { refreshLive(); }
+
 signals:
     void popOutRequested();
+    /// Die Jagdliste bittet um eine Peilung. Das Kartenfenster kennt
+    /// keinen Rotor -- es sagt nur, wohin; das Logbuch reicht es an
+    /// seinen `turnRotorRequested` weiter.
+    void rotorZielGewuenscht(double grad, const QString& rufzeichen);
+    /// Eine Station aus einem fehlenden Feld ist neu aufgetaucht. Das
+    /// Kartenfenster zeigt selbst einen Hinweis; dieses Signal ist
+    /// dafuer da, dass spaeter ein Ton oder eine Meldung daran haengen
+    /// kann, ohne dass die Karte davon wissen muss.
+    void jagdAlarm(const QString& rufzeichen, const QString& feld, bool neuesLand);
 
 protected:
     void closeEvent(QCloseEvent*) override;
@@ -194,11 +283,27 @@ private:
     GlobeWidget*    m_globe{nullptr};
     FlatMapWidget*  m_flat{nullptr};
     class DxRadarWidget* m_radar{nullptr};   // dritte Ansicht (2026-09-22)
+    class AzimutalKarteWidget* m_azimut{nullptr};   // vierte (2026-11-10)
     class DxRadarWidget* m_rotorRadar{nullptr};   // klein, links (2026-09-26)
     bool m_rotorRadarShown{false};
     void updateRotorRadarVisibility();
     QPushButton*    m_radarBtn{nullptr};
-    int             m_viewBeforeRadar{0};    // Kugel oder flach, wohin „Radar" aus zurueckfuehrt
+    QPushButton*    m_azimutBtn{nullptr};
+    int             m_viewBeforeRadar{0};    // Kugel, flach oder 3D, wohin „Radar"/„Azimuthal" aus zurueckfuehrt
+    // Stapelplaetze. Radar und Azimutalkarte liegen UEBER Kugel/flach:
+    // ihr Knopf ist ein Haken, der dorthin zurueckfuehrt, wo man herkam.
+    static constexpr int kViewGlobe = 0;
+    static constexpr int kViewFlat = 1;
+    static constexpr int kViewRadar = 2;
+    static constexpr int kViewAzimuthal = 3;
+    // Radar und Azimutalkarte liegen ueber Kugel/flach und fuehren dorthin
+    // zurueck; das 3D-Bild (kView3d) ist KEIN Overlay.
+    static constexpr bool isOverlayView(int i) { return i == kViewRadar || i == kViewAzimuthal; }
+    // Die vom Betreiber gewaehlte Ansicht merken / beim Oeffnen
+    // wiederherstellen. Nur Knopfdruecke zaehlen -- ein Hinflug oder das
+    // Durchzoomen schalten auch um, sind aber keine Wahl.
+    void rememberView() const;
+    void restoreView();
 
     // ── Wahl des Kartenhintergrunds ─────────────────────────────────
     //
@@ -217,6 +322,26 @@ private:
 
     QDateEdit*   m_from{nullptr};
     QDateEdit*   m_to{nullptr};
+    // ── Locator-Jagd: ein Knopf statt drei Vorwissen (2026-11-11) ───
+    //
+    // Betreiber: „es muss eine weltkarte sein, mit der ich sofort sehe,
+    // was noch nicht erreicht ist und wo aktuell gesendet wird" -- und
+    // davor: „wenn man dies nicht weiss...". Vorher musste man wissen,
+    // dass der Haken `Grid` heisst, dass er im 3D-Bild verschwindet und
+    // dass `Paths` und `Imagery` ihn zudecken. Dieser Knopf stellt die
+    // ganze Buehne auf einmal und raeumt sie wieder weg.
+    QPushButton* m_jagdBtn{nullptr};
+    struct JagdVorher {
+        bool gueltig{false};
+        bool pfade{false};
+        bool luftbild{false};
+        bool gitter{false};
+        bool nurFt8{false};
+        int  ansicht{0};
+    };
+    JagdVorher   m_jagdVorher;
+    void setzeJagd(bool an);
+
     QCheckBox*   m_paths{nullptr};
     QCheckBox*   m_grid{nullptr};
     QCheckBox*   m_imagery{nullptr};
@@ -245,11 +370,90 @@ private:
     // while only the selection is shown — a live date field that
     // changes nothing is worse than a disabled one.
     QVector<QWidget*> m_rangeControls;
+    QVector<QWidget*> m_flatOnlyControls;   // im 3D-Bild ausgeblendet
     QWidget*          m_rangeBox{nullptr};
     QWidget*          m_backgroundBox{nullptr};   // KARTE + Auswahl
     QPushButton*      m_earthBtn{nullptr};
     QPushButton*      m_popOutBtn{nullptr};
+    // Vollbild: nur im eigenen Fenster, nicht in der Logbuchspalte.
+    // Betreiber 2026-11-11: „es sollte die moeglichkeit geben, dass auf
+    // vollbild zu vergroessern".
+    QPushButton*      m_vollbildBtn{nullptr};
+    void setzeVollbild(bool an);
+
+    // ── Die Jagdliste neben der Karte (2026-11-11) ─────────────────
+    //
+    // Betreiber: „somit sehe ich sofort das call, welches aus einem
+    // locator sendet, welches ich noch nicht erreicht und bestaetigt
+    // habe." Die Karte sagt WO, diese Spalte sagt WEN -- auf der
+    // Weltkarte ist ein Feld nur rund sechs Bildpunkte breit, ein
+    // Rufzeichen in einer Zeile hat dieses Problem nicht.
+    QTableWidget* m_jagdListe{nullptr};
+    QLabel*       m_jagdListeKopf{nullptr};
+    QWidget*      m_jagdSpalte{nullptr};
+    void fuelleJagdListe(const QVector<Longpath::LivePunkt>& punkte);
+    /// Wer schon in der Liste stand. Nur was NEU dazukommt, ist ein
+    /// Anlass fuer einen Hinweis -- sonst melde ich bei jedem
+    /// Auffrischen dieselben zehn Stationen.
+    QSet<QString> m_jagdGesehen;
+    class QLabel* m_jagdBaender{nullptr};
+    /// Die Meldung ueber dem Kopf, wenn etwas Neues auftaucht. Kein
+    /// eigenes Hinweisfenster: StatusToast ist ein rahmenloses
+    /// Oberfenster am Hauptfenster, mit eigener Abbau-Falle
+    /// (MainWindow::showToast, 2026-10-15) -- in der Jagdtafel steht
+    /// die Meldung dort, wo der Betreiber ohnehin hinsieht.
+    class QLabel* m_jagdAlarmText{nullptr};
+    QTimer        m_jagdAlarmUhr;
+    /// Ein Ton bei einem neuen Land -- nur dort, nicht bei jedem neuen
+    /// Feld: bei einer Bandoeffnung piepte es sonst ununterbrochen.
+    /// Geht ueber QApplication::beep() und damit NICHT durch den
+    /// Funkweg: ein Hinweiston darf nie wie ein Signal klingen.
+    QCheckBox*    m_jagdTon{nullptr};
     bool              m_embedded{false};
+
+    // ── 3D-Flug ──────────────────────────────────────────────────────
+    struct LastFlight {
+        bool    valid{false};
+        QString call;
+        QString caption;     // Rich Text, wie die Stationskarte ihn zeigt
+        double  lat{0.0};
+        double  lon{0.0};
+    };
+    bool use3d() const;
+    void ensure3d();
+    void update3dButton();
+    void flyFlat(const QString& call, double lat, double lon);
+    void fly3d();
+    void on3dFailed(const QString& reason, bool keyProblem);
+    void openGoogleEarth();
+    void showFlightCard(const QString& extra);
+    void apply3dRoom();   // im 3D-Bild treten Pillen, Zaehlung, Rotor-Grafik zurueck
+    QPushButton*      m_3dBtn{nullptr};
+    QPushButton*      m_googleEarthBtn{nullptr};
+    QWidget*          m_3dHost{nullptr};
+    class Station3dSurface* m_3d{nullptr};
+    bool              m_3dWanted{true};
+    QString           m_3dRefusedKey;    // Zugang (Quelle:Text), der abgelehnt wurde
+    static QString    accessIdentity();
+    LastFlight        m_lastFlight;
+
+    // ── Locator-Jagd (2026-11-11) ─────────────────────────────────
+    void refreshMosaik();
+    void refreshLive();
+    QDateTime jetzt() const;
+    QVector<LogEntry> m_mosaikLog;
+    bool              m_hatMosaikLog{false};
+    LocatorMosaik     m_mosaik;
+    LiveSchicht       m_live;
+    QString           m_liveBand;          // Band der zuletzt gehoerten Station
+    QComboBox*        m_mosaikBand{nullptr};
+    QCheckBox*        m_nurFt8{nullptr};
+    QWidget*          m_liveBox{nullptr};
+    QLabel*           m_liveZaehler{nullptr};
+    QSpinBox*         m_liveMinuten{nullptr};
+    QTimer*           m_liveTakt{nullptr};
+    std::function<QDateTime()> m_uhr;
+    std::function<void(const QUrl&)> m_openUrl;
 };
 
 } // namespace Longpath

@@ -168,6 +168,7 @@ public:
     /// AmpApplet::buildContextMenuForTesting().
     /// Longpath-native test seam.
     QMenu* buildContextMenuForTesting() { return buildContextMenu(this); }
+    void setMenuSpektrumPosForTesting(const QPoint& p) { m_menuSpektrumPos = p; }
 
     // ── Die Anzeigezeile (2026-11-06) ────────────────────────────────
     //
@@ -267,6 +268,9 @@ private:
     /// deleteLater()s it, buildContextMenuForTesting() hands it to a test
     /// untouched. Mirrors AmpApplet::buildContextMenu().
     QMenu* buildContextMenu(QObject* parent);
+    // Wo der Rechtsklick im Spektrum lag (Koordinaten des SpectrumWidget),
+    // fuer "Calibrate frequency on this carrier"; (-1,-1) = nicht im Bild.
+    QPoint m_menuSpektrumPos{-1, -1};
 
     /// Das Menue hinter dem Zahnrad in der Kopfleiste: Hintergrundbild,
     /// Deckkraft, Grundfarbe, und der Weg in den Setup-Dialog.

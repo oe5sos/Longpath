@@ -121,6 +121,37 @@ private slots:
         QVERIFY(s.kurve.traceHalo());    // und nimmt ihn auch nicht mit
     }
 
+    // Schaerfe (2026-11-08): drei Kaestchen neben weicher Kante und Hof.
+    // Ab Werk an (Betreiber: „Alles zusammen"), Klick erreicht das Widget,
+    // und eine Seite auf einem abgeschalteten Widget steht richtig da.
+    void dieSchaerfeSchalterStehenDaUndWirken()
+    {
+        Stand s;
+        {
+            SpectrumDefaultsPage seite(&s.modell);
+            QCheckBox* wf    = kaestchen(&seite, QStringLiteral("Waterfall at full resolution"));
+            QCheckBox* haar  = kaestchen(&seite, QStringLiteral("Hairline grid"));
+            QCheckBox* kante = kaestchen(&seite, QStringLiteral("Short trace edge"));
+            QVERIFY2(wf && haar && kante, "ein Schaerfe-Kaestchen fehlt");
+            QVERIFY(!wf->toolTip().isEmpty() && !haar->toolTip().isEmpty()
+                    && !kante->toolTip().isEmpty());
+            QVERIFY(wf->isChecked() && haar->isChecked() && kante->isChecked());
+
+            wf->setChecked(false);
+            QVERIFY(!s.kurve.waterfallDevicePixels());
+            haar->setChecked(false);
+            QVERIFY(!s.kurve.gridHairline());
+            kante->setChecked(false);
+            QCOMPARE(s.kurve.traceEdgePx(), 1.0f);
+            kante->setChecked(true);
+            QCOMPARE(s.kurve.traceEdgePx(), 0.5f);
+        }
+        SpectrumDefaultsPage seite2(&s.modell);
+        QVERIFY(!kaestchen(&seite2, QStringLiteral("Waterfall at full resolution"))->isChecked());
+        QVERIFY(!kaestchen(&seite2, QStringLiteral("Hairline grid"))->isChecked());
+        QVERIFY(kaestchen(&seite2, QStringLiteral("Short trace edge"))->isChecked());
+    }
+
     // Rueckweg: eine Seite, die auf ein bereits eingeschaltetes Widget
     // gebaut wird, steht richtig da.
     void dieSeiteLiestDenZustandZurueck()

@@ -11,6 +11,7 @@
 
 #include "core/SolarTimes.h"
 
+#include <algorithm>
 #include <cmath>
 
 using namespace Longpath;
@@ -43,6 +44,7 @@ private slots:
     void elevation_is_negative_at_local_midnight();
     void greyline_brackets_the_horizon();
     void invalid_input_is_survivable();
+    void subsolar_point_agrees_with_elevation();
 };
 
 void TstSolarTimes::midlatitude_summer_matches_noaa()
@@ -172,4 +174,42 @@ void TstSolarTimes::invalid_input_is_survivable()
 }
 
 QTEST_APPLESS_MAIN(TstSolarTimes)
+// subsolarPoint() und solarInfo() sind ein Modell (2026-11-10). Der
+// Winkel zum Subsolarpunkt muss dieselbe Hoehe ergeben, die solarInfo()
+// meldet — sonst zeichnet der Globus die Grauzone woanders hin, als das
+// Logbuch sie beurteilt (core/Grauzone.h). Uebrig bleibt nur, dass
+// solarInfo() die Deklination des naechsten Mittags nimmt: hoechstens
+// 0,2° am Horizont. Die alte Globus-Rechnung lag dort bis 4,3° daneben.
+void TstSolarTimes::subsolar_point_agrees_with_elevation()
+{
+    struct Ort { double lat; double lon; };
+    const Ort orte[] = {{47.5, 13.0}, {40.7, -74.0}, {-33.9, 151.2},
+                        {64.0, -21.0}, {0.0, 0.0}, {70.0, 25.0}, {-60.0, -60.0}};
+    constexpr double d = M_PI / 180.0;
+    double schlimmste = 0.0;
+    for (int tag = 0; tag < 366; tag += 5) {
+        for (int stunde = 0; stunde < 24; stunde += 1) {
+            const QDateTime t = utc(2026, 1, 1, 0, 17).addDays(tag).addSecs(stunde * 3600);
+            double sLat = 0.0, sLon = 0.0;
+            subsolarPoint(t, sLat, sLon);
+            QVERIFY(sLon >= -180.0 && sLon < 180.0);
+            for (const Ort& o : orte) {
+                const double h = solarInfo(t, o.lat, o.lon).elevationDeg;
+                if (std::abs(h) > 20.0) { continue; }    // nur nahe dem Horizont zaehlt
+                const double ausPunkt = std::asin(
+                    std::sin(o.lat * d) * std::sin(sLat * d)
+                    + std::cos(o.lat * d) * std::cos(sLat * d) * std::cos((o.lon - sLon) * d)) / d;
+                schlimmste = std::max(schlimmste, std::abs(h - ausPunkt));
+            }
+        }
+    }
+    QVERIFY2(schlimmste < 0.3, qPrintable(QStringLiteral("%1 Grad").arg(schlimmste)));
+
+    // Ohne Zeit: Nullen, kein NaN.
+    double lat = 1.0, lon = 1.0;
+    subsolarPoint(QDateTime{}, lat, lon);
+    QCOMPARE(lat, 0.0);
+    QCOMPARE(lon, 0.0);
+}
+
 #include "tst_solar_times.moc"

@@ -17,6 +17,15 @@
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>
+#include <QPointer>
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QHostAddress>
+#include <QApplication>
+#include <QComboBox>
+#include <QDialog>
+#include <QLineEdit>
+#include <QTimer>
 
 #include "core/AppSettings.h"
 #include "core/Gs232Rotor.h"
@@ -73,6 +82,41 @@ private:
     QByteArray m_rx;
     QByteArray m_tx;
 };
+
+} // namespace
+
+namespace {
+// Ein Ersatz-ARCO: antwortet auf jede Abfrage mit einer Lage -- oder,
+// wenn stumm, gar nicht.
+struct ErsatzArco {
+    QTcpServer server;
+    QList<QPointer<QTcpSocket>> kunden;
+    bool stumm{false};
+    int verbindungen{0};
+    bool lausche(quint16 port)
+    {
+        QObject::connect(&server, &QTcpServer::newConnection, &server, [this]() {
+            while (QTcpSocket* c = server.nextPendingConnection()) {
+                ++verbindungen;
+                kunden << c;
+                QObject::connect(c, &QTcpSocket::readyRead, c, [this, c]() {
+                    c->readAll();
+                    if (!stumm) { c->write("AZ=231 EL=000\r"); }
+                });
+            }
+        });
+        return server.listen(QHostAddress::LocalHost, port);
+    }
+};
+
+quint16 freierPort()
+{
+    QTcpServer probe;
+    probe.listen(QHostAddress::LocalHost, 0);
+    const quint16 p = probe.serverPort();
+    probe.close();
+    return p;
+}
 
 } // namespace
 
@@ -215,6 +259,30 @@ private slots:
         QCOMPARE(rotor.state(), RotorController::State::Idle);
     }
 
+    // Erlaubter Bereich (2026-11-08): der echte Treiber schickt nichts
+    // hinaus, wenn das Ziel ausserhalb liegt.
+    void ausserhalb_des_bereichs_wird_nicht_gedreht()
+    {
+        auto& st = AppSettings::instance();
+        st.setValue(QStringLiteral("RotorEndStopDeg"), -1.0);
+        st.setValue(QStringLiteral("Rotor/LimitOn"), QStringLiteral("True"));
+        st.setValue(QStringLiteral("Rotor/LimitFromDeg"), 270.0);
+        st.setValue(QStringLiteral("Rotor/LimitToDeg"), 90.0);
+        FakeWire draht;
+        QVERIFY(draht.open(QIODevice::ReadWrite));
+        Gs232Rotor rotor;
+        rotor.useDeviceForTest(&draht);
+        rotor.connectToRotor();
+        draht.loescheGesendet();
+        QSignalSpy fehler(&rotor, &Gs232Rotor::errorOccurred);
+        rotor.moveTo(180.0);
+        QVERIFY2(!draht.gesendet().contains("W180"), draht.gesendet().constData());
+        QCOMPARE(fehler.count(), 1);
+        rotor.moveTo(350.0);
+        QVERIFY(draht.gesendet().contains("W350"));
+        st.setValue(QStringLiteral("Rotor/LimitOn"), QStringLiteral("False"));
+    }
+
     void ohne_verbindung_wird_nicht_gedreht()
     {
         Gs232Rotor rotor;
@@ -273,6 +341,103 @@ private slots:
         }
 
         s.setValue(QStringLiteral("Rotor/Backend"), vorher);
+    }
+
+    // ── host:port in der Schnittstelle ist ein Netzziel (2026-11-11) ──
+    void netzziel_im_schnittstellenfeld_erkannt()
+    {
+        QString h;
+        quint16 p = 0;
+        QVERIFY(Gs232Rotor::parseNetworkTarget(QStringLiteral("172.30.30.16:4001"), &h, &p));
+        QCOMPARE(h, QStringLiteral("172.30.30.16"));
+        QCOMPARE(p, quint16(4001));
+        QVERIFY(Gs232Rotor::parseNetworkTarget(QStringLiteral(" arco.local:4001 "), &h, &p));
+        QCOMPARE(h, QStringLiteral("arco.local"));
+        QVERIFY(!Gs232Rotor::parseNetworkTarget(QStringLiteral("/dev/tty.usbserial-1"), &h, &p));
+        QVERIFY(!Gs232Rotor::parseNetworkTarget(QStringLiteral("COM3"), &h, &p));
+        QVERIFY(!Gs232Rotor::parseNetworkTarget(QStringLiteral("host:0"), &h, &p));
+        QVERIFY(!Gs232Rotor::parseNetworkTarget(QStringLiteral("host:70000"), &h, &p));
+        QVERIFY(!Gs232Rotor::parseNetworkTarget(QString{}, &h, &p));
+    }
+
+    void schnittstelle_mit_netzziel_wird_netz()
+    {
+        AppSettings& s = AppSettings::instance();
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("gs232"));
+        s.setValue(QStringLiteral("Rotor/Host"), QString{});
+        s.setValue(QStringLiteral("Rotor/SerialPort"), QStringLiteral("172.30.30.16:4001"));
+        RotorLogbookPanel panel(nullptr, nullptr, nullptr);
+        panel.ensureRotorForTest();
+        auto* gs = qobject_cast<Gs232Rotor*>(panel.rotorForTest());
+        QVERIFY(gs != nullptr);
+        // Vorher: „GS-232 172.30.30.16:4001, 9600 Bd" -- eine Datei dieses
+        // Namens gibt es nicht („No such file or directory").
+        QCOMPARE(gs->description(), QStringLiteral("GS-232 über 172.30.30.16:4001"));
+        s.setValue(QStringLiteral("Rotor/SerialPort"), QString{});
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("rotctld"));
+    }
+
+    // Martins Einstellungen vom 2026-11-11: GS-232 am Netzserver, aber
+    // der alte rotctld-Schluessel steht auf „lokal". Der Dialog muss im
+    // Netzmodus oeffnen und Host/Port zeigen -- sonst loescht „Connect"
+    // die Netzanbindung.
+    void dialog_oeffnet_netz_rotor_im_netzmodus_data()
+    {
+        QTest::addColumn<QString>("host");
+        QTest::addColumn<QString>("schnittstelle");
+        QTest::newRow("Rotor/Host gesetzt") << QStringLiteral("172.30.30.16")
+                                            << QStringLiteral("172.30.30.16:4001");
+        QTest::newRow("nur host:port als Schnittstelle") << QString{}
+                                                         << QStringLiteral("172.30.30.16:4001");
+    }
+    void dialog_oeffnet_netz_rotor_im_netzmodus()
+    {
+        QFETCH(QString, host);
+        QFETCH(QString, schnittstelle);
+        AppSettings& s = AppSettings::instance();
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("gs232"));
+        s.setValue(QStringLiteral("Rotor/Host"), host);
+        s.setValue(QStringLiteral("Rotor/NetPort"), 4001);
+        s.setValue(QStringLiteral("Rotor/SerialPort"), schnittstelle);
+        s.setValue(QStringLiteral("RotorUseLocalSerial"), true);
+
+        RotorLogbookPanel panel(nullptr, nullptr, nullptr);
+        int modus = -1;
+        QString hostText, portText;
+        bool gefunden = false;
+        QTimer::singleShot(0, this, [&]() {
+            auto* dlg = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+            if (!dlg) {
+                for (QWidget* w : QApplication::topLevelWidgets()) {
+                    if (auto* d = qobject_cast<QDialog*>(w);
+                        d && d->windowTitle() == QStringLiteral("Rotator")) {
+                        dlg = d;
+                    }
+                }
+            }
+            if (!dlg) { return; }
+            gefunden = true;
+            if (auto* m = dlg->findChild<QComboBox*>(QStringLiteral("rotorDialogMode"))) {
+                modus = m->currentIndex();
+            }
+            if (auto* e = dlg->findChild<QLineEdit*>(QStringLiteral("rotorDialogHost"))) {
+                hostText = e->text();
+            }
+            if (auto* e = dlg->findChild<QLineEdit*>(QStringLiteral("rotorDialogPort"))) {
+                portText = e->text();
+            }
+            dlg->reject();
+        });
+        panel.openRotorSetupDialogForTest();
+
+        QVERIFY2(gefunden, "Rotordialog nicht gefunden");
+        QCOMPARE(modus, 1);   // „Serial server on the network"
+        QCOMPARE(hostText, QStringLiteral("172.30.30.16"));
+        QCOMPARE(portText, QStringLiteral("4001"));
+
+        s.setValue(QStringLiteral("Rotor/Host"), QString{});
+        s.setValue(QStringLiteral("Rotor/SerialPort"), QString{});
+        s.setValue(QStringLiteral("Rotor/Backend"), QStringLiteral("rotctld"));
     }
 
     // ── Am ECHTEN Gerät ─────────────────────────────────────────────
@@ -411,6 +576,101 @@ private slots:
         QVERIFY2(rest <= 5.0,
                  qPrintable(QStringLiteral("Rest zum Ausgangswert: %1 Grad")
                                 .arg(rest)));
+    }
+
+    // ── Von selbst wieder verbinden (Netz) ── 2026-11-11 ────────────────
+    // Live am ARCO: beim Start von Longpath noch aus -> der Rotor blieb
+    // bis zum naechsten Programmstart weg.
+
+    void kommt_von_selbst_wenn_der_arco_spaeter_angeht()
+    {
+        const quint16 port = freierPort();
+        Gs232Rotor rotor;
+        rotor.setNetworkTarget(QStringLiteral("127.0.0.1"), port);
+        rotor.setWiederholungMs(150);
+        QSignalSpy fehler(&rotor, &Gs232Rotor::errorOccurred);
+        rotor.connectToRotor();
+        QTRY_COMPARE_WITH_TIMEOUT(rotor.state(), RotorController::State::Disconnected, 3000);
+        // Mehrere Versuche ins Leere (150, 300, 600 ms ...) -- gemeldet wird einer.
+        QTest::qWait(1200);
+        QCOMPARE(fehler.count(), 1);
+
+        ErsatzArco arco;
+        QVERIFY(arco.lausche(port));
+        QTRY_VERIFY_WITH_TIMEOUT(rotor.hasFreshPosition(), 8000);
+        QCOMPARE(rotor.state(), RotorController::State::Idle);
+        QCOMPARE(rotor.azimuth(), 231.0);
+    }
+
+    void verbindet_neu_wenn_die_verbindung_abbricht()
+    {
+        ErsatzArco arco;
+        QVERIFY(arco.lausche(freierPort()));
+        Gs232Rotor rotor;
+        rotor.setNetworkTarget(QStringLiteral("127.0.0.1"), arco.server.serverPort());
+        rotor.setWiederholungMs(100);
+        rotor.connectToRotor();
+        QTRY_VERIFY_WITH_TIMEOUT(rotor.hasFreshPosition(), 5000);
+        QCOMPARE(arco.verbindungen, 1);
+        // Der ARCO legt auf (z. B. Neustart des Geraets).
+        for (const auto& k : std::as_const(arco.kunden)) { if (k) { k->close(); } }
+        QTRY_VERIFY_WITH_TIMEOUT(arco.verbindungen >= 2, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(rotor.state(), RotorController::State::Idle, 5000);
+    }
+
+    void verstummt_er_wird_neu_verbunden()
+    {
+        // Strom weg: die Verbindung steht scheinbar, aber niemand antwortet.
+        ErsatzArco arco;
+        QVERIFY(arco.lausche(freierPort()));
+        Gs232Rotor rotor;
+        rotor.setNetworkTarget(QStringLiteral("127.0.0.1"), arco.server.serverPort());
+        rotor.setPollIntervalMs(50);
+        rotor.setWiederholungMs(100);
+        rotor.setStummMs(400);
+        QSignalSpy fehler(&rotor, &Gs232Rotor::errorOccurred);
+        rotor.connectToRotor();
+        QTRY_VERIFY_WITH_TIMEOUT(rotor.hasFreshPosition(), 5000);
+        arco.stumm = true;
+        QTRY_VERIFY_WITH_TIMEOUT(arco.verbindungen >= 2, 5000);
+        QVERIFY(!fehler.isEmpty());
+        QVERIFY2(fehler.first().first().toString().contains(QStringLiteral("stopped answering")),
+                 qPrintable(fehler.first().first().toString()));
+    }
+
+    void getrennt_heisst_getrennt()
+    {
+        const quint16 port = freierPort();
+        Gs232Rotor rotor;
+        rotor.setNetworkTarget(QStringLiteral("127.0.0.1"), port);
+        rotor.setWiederholungMs(100);
+        rotor.connectToRotor();
+        QTRY_COMPARE_WITH_TIMEOUT(rotor.state(), RotorController::State::Disconnected, 3000);
+        rotor.disconnectFromRotor();
+        ErsatzArco arco;
+        QVERIFY(arco.lausche(port));
+        QTest::qWait(800);
+        QCOMPARE(arco.verbindungen, 0);
+        QCOMPARE(rotor.state(), RotorController::State::Disconnected);
+    }
+
+    void abbau_sendet_nichts_mehr()
+    {
+        // Der Destruktor schliesst den Socket; das darf nicht als Trennung
+        // mit Neuversuch und Zustandswechsel hinausgehen.
+        ErsatzArco arco;
+        QVERIFY(arco.lausche(freierPort()));
+        auto* rotor = new Gs232Rotor;
+        rotor->setNetworkTarget(QStringLiteral("127.0.0.1"), arco.server.serverPort());
+        rotor->connectToRotor();
+        QTRY_VERIFY_WITH_TIMEOUT(rotor->hasFreshPosition(), 5000);
+        int wechsel = 0, fehler = 0;
+        connect(rotor, &Gs232Rotor::stateChanged, this, [&wechsel]() { ++wechsel; });
+        connect(rotor, &Gs232Rotor::errorOccurred, this, [&fehler]() { ++fehler; });
+        delete rotor;
+        QCoreApplication::processEvents();
+        QCOMPARE(wechsel, 0);
+        QCOMPARE(fehler, 0);
     }
 
     void beschreibung_sagt_die_schnittstelle()
