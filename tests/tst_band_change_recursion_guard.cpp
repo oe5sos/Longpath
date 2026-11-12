@@ -60,6 +60,8 @@ private:
                 s.remove(bp + field);
             }
         }
+        // Der Schritt je Scheibe (2026-11-11) und die Rate je Scheibe ohne Geraet.
+        s.remove(QStringLiteral("Slice0/StepHz"));
         const QString sp = QStringLiteral("Slice0/");
         for (const QString& field : {
                  QStringLiteral("Locked"),     QStringLiteral("Muted"),

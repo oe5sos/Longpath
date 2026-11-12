@@ -23,6 +23,12 @@
 //   2026-09-28 -- presetNamesForMode (Thetis InitFilterPresets names),
 //                 commonPresetsForMode removed (no caller). Martin
 //                 Fischer (OE5SOS), AI-assisted via Anthropic Claude.
+//   2026-11-11 -- One tune step and one sample rate per slice on every band
+//                 (savedSampleRateHz, setSettingsRadioMac,
+//                 restoreFromSettingsForBandChange), as upstream NereusSDR
+//                 419dd88c4 / dd800ce9b / 89e41cd91 (J.J. Boyd, KG4VCF).
+//                 Martin Fischer (OE5SOS), AI-assisted via Anthropic Claude
+//                 Code.
 // =================================================================
 
 //=================================================================
@@ -1272,6 +1278,25 @@ public:
         int     filterHigh{0};
     };
     std::optional<SavedBandSpot> savedBandSpot(Longpath::Band band) const;
+
+    // Ein Schritt und eine Rate je Scheibe, auf jedem Band (2026-11-11, wie
+    // Upstream NereusSDR 419dd88c4 / dd800ce9b / 89e41cd91).
+    //
+    // Der Wiederherstellungsweg eines Bandwechsels: alles, was
+    // restoreFromSettings zurueckholt, ausser dem Abstimmschritt -- der
+    // bleibt, wie er ist, auch wenn ein neuerer Schritt noch nicht
+    // gespeichert ist. Die Rate holt restoreFromSettings ohnehin nicht mehr.
+    void restoreFromSettingsForBandChange(Longpath::Band band,
+                                          bool restoreTuning = true);
+    // Das Geraet, unter dem die Rate gespeichert wird
+    // (hardware/<mac>/slices/<N>/SampleRate). Leer: die Rate wird nicht
+    // gespeichert. RadioModel setzt es beim Verbinden.
+    void setSettingsRadioMac(const QString& mac);
+    QString settingsRadioMac() const { return m_settingsRadioMac; }
+    // Die gespeicherte Rate dieser Scheibe an diesem Geraet, oder 0. Aeltere
+    // Einstellungen liefern die Rate des Bandes, auf dem die Scheibe zuletzt
+    // stand. Liest nur.
+    int savedSampleRateHz() const;
     static void migrateLegacyKeys();
 
     // Reads the persisted "last band" marker for this slice index from
@@ -1476,6 +1501,12 @@ signals:
     void lastRadeRxCallsignChanged(const QString& callsign);
 
 private:
+    // 2026-11-11: siehe savedSampleRateHz / restoreFromSettingsForBandChange.
+    QString sampleRateSettingsKey() const;
+    void restoreStepFromSettings(Longpath::Band band);
+    QString m_settingsRadioMac;
+    bool m_keepStepOnRestore{false};
+
     // Phase 3R Task J3 - resolves the RadeChannel model-path argument
     // used when setDspMode transitions into DSPMode::RADE_U or
     // DSPMode::RADE_L.  Lookup
