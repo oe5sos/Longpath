@@ -152,6 +152,33 @@ private slots:
         QCOMPARE(w.geometry(), wunsch);
     }
 
+    // 2026-11-12, Betreiber: „die frequenz ist wieder in der mitte, so
+    // war sie nicht abgespeichert". Das Frequenzfenster (269 breit) lag
+    // links unter dem Bandfilter; ohne Verbindung ist es kurz nur 93
+    // hoch, und MainWindow ruft hier mit (kAppletPanelW, 120). Frueher
+    // hiess „niedriger als 120": ab in die Mitte des Hauptfensters.
+    // Jetzt bleibt die Lage, nur die Hoehe waechst.
+    void einZuNiedrigesFensterAnGuterStelleBleibtDort()
+    {
+        QScreen* screen = QGuiApplication::primaryScreen();
+        QVERIFY(screen);
+        const QRect avail = screen->availableGeometry();
+
+        QWidget anker;
+        anker.setGeometry(avail.x(), avail.y(), qMin(1470, avail.width()),
+                          qMin(866, avail.height()));
+
+        QWidget w;
+        const QPoint links(anker.x() + 16, anker.y() + 351);
+        w.setGeometry(QRect(links, QSize(269, 93)));
+        Longpath::ensureOnVisibleScreen(&w, &anker, QSize(260, 120));
+
+        qInfo() << "Anker" << anker.geometry() << "Fenster" << w.geometry();
+        QCOMPARE(w.pos(), links);
+        QCOMPARE(w.width(), 269);
+        QVERIFY(w.height() >= 120);
+    }
+
 };
 
 QTEST_MAIN(TstWindowPlacementOversized)
