@@ -11194,11 +11194,14 @@ void MainWindow::populateDefaultMeter()
             });
 
         m_layoutProfiles->load();
-        // Das zuletzt aktive Profil (Betreiber 2026-11-06, "Zuletzt
-        // aktives": sein Contest-Profil ist "C", und Longpath kam jeden
-        // Morgen mit "N" herauf). Vom 2026-09-27 bis heute galt "immer
-        // Profil 1" (startWithFirst); siehe LayoutProfiles.h.
-        m_layoutProfiles->startWithLastActive();
+        // Beim Start IMMER Profil 1 (Betreiber 2026-11-12: "das erste
+        // Profil, bei mir N muss immer das Startprofil sein. Ich will
+        // nichts anderes!!!!!"). Vom 2026-11-06 bis 2026-11-12 galt das
+        // zuletzt aktive (startWithLastActive, #408) -- am Morgen des
+        // 12.11. kam Longpath darum mit FT8 herauf. Davor, seit dem
+        // 2026-09-27, galt schon einmal Profil 1. Nicht wieder umstellen
+        // ohne ausdrueckliche Ansage; siehe LayoutProfiles.h.
+        m_layoutProfiles->startWithFirst();
         // Betreiber 2026-09-01: "letzter Zustand nie beim Öffnen
         // sichtbar" -- zeigt, was TATSAECHLICH von der Platte kam,
         // bevor applyCurrent() irgendetwas damit tut. Vergleich mit

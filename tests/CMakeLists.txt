@@ -5785,6 +5785,9 @@ longpath_add_test(tst_skala_enden_lesbar)
 # 2026-10-15: ein Eintrag fuer das Feldbetrieb-Bild — und der Nachweis,
 # dass er in ein EIGENES Profil schreibt.
 longpath_add_test(tst_feldbetrieb)
+# 2026-11-12: beim Start IMMER Profil 1 („bei mir N muss immer das
+# Startprofil sein") -- im echten MainWindow, zwei Starts hintereinander.
+longpath_add_test(tst_startprofil)
 # 2026-10-15: zwei Abstuerze beim Beenden in zwei Stunden, beide
 # „Kind meldet sein Ende, Rumpf greift ins halb abgebaute Fenster".
 # Der WEG zum Plaetze-Fenster, im echten MainWindow gefahren. Sechs
