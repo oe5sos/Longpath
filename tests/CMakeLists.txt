@@ -1128,6 +1128,17 @@ longpath_add_test(tst_begleitgeraet_seite)
 # befragen, und der Versatz beim Laden.
 longpath_add_test(tst_begleitgeraet_regler)
 longpath_add_test(tst_cat_funkgeraet)
+# Rund 40 Faelle gegen ein rigctld-Doppel, viele warten auf die naechste
+# Abfragerunde. Lokal ~60 s; auf dem macOS-Laeufer liefen schon am 08.11.
+# (vor den Sprachspeicher-Faellen) die 120 s ab. 300 s nur fuer diesen.
+# Nur im Shard, der ihn baut (Linux teilt die Pruefstaende auf).
+if(TEST tst_cat_funkgeraet)
+    set_tests_properties(tst_cat_funkgeraet PROPERTIES TIMEOUT 300)
+endif()
+# Jeder Klick holt das Fenster nach vorne, auch aus der Spalte.
+longpath_add_test(tst_klick_holt_nach_vorne)
+# Der 590 geht aus und kommt wieder: die Wache startet rigctld neu.
+longpath_add_test(tst_590_kommt_wieder)
 
 # Der Versatz dort, wo er vor dem Betreiber landet -- und vor allem:
 # dass OHNE Transverter bitgleich nichts passiert.
@@ -5564,6 +5575,15 @@ longpath_add_test(tst_raster_nachhall)
 # Schleife am Ende dieser Datei, die QT_QPA_PLATFORM fuer alle Tests
 # setzt -- siehe dort (`_longpath_grosser_schirm`).
 set(_longpath_grosser_schirm tst_schwebende_folgen_dem_hauptfenster)
+# Ein Profil loeschen laesst die anderen stehen (2026-11-12, Martin:
+# „wenn ich was lösche kann sich das andere profil nicht ändern").
+longpath_add_test(tst_profil_loeschen_laesst_andere_stehen)
+target_compile_definitions(tst_profil_loeschen_laesst_andere_stehen PRIVATE
+    LONGPATH_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
+list(APPEND _longpath_grosser_schirm tst_profil_loeschen_laesst_andere_stehen)
+# Beide Plus-Knoepfe bieten dasselbe an (2026-11-12, Martin: „beim plus
+# oben oder unten muss alles natürlich erreichbar sein").
+longpath_add_test(tst_beide_plus_gleich)
 longpath_add_test(tst_real_pan_float)
 longpath_add_test(tst_real_rotor_window)
 
@@ -5787,6 +5807,9 @@ longpath_add_test(tst_skala_enden_lesbar)
 # 2026-10-15: ein Eintrag fuer das Feldbetrieb-Bild — und der Nachweis,
 # dass er in ein EIGENES Profil schreibt.
 longpath_add_test(tst_feldbetrieb)
+# 2026-11-12: beim Start IMMER Profil 1 („bei mir N muss immer das
+# Startprofil sein") -- im echten MainWindow, zwei Starts hintereinander.
+longpath_add_test(tst_startprofil)
 # 2026-10-15: zwei Abstuerze beim Beenden in zwei Stunden, beide
 # „Kind meldet sein Ende, Rumpf greift ins halb abgebaute Fenster".
 # Der WEG zum Plaetze-Fenster, im echten MainWindow gefahren. Sechs
@@ -6975,6 +6998,9 @@ if(LONGPATH_CONTESTPROGRAMM)
     target_link_libraries(tst_contestfenster PRIVATE Qt6::Sql)
     target_link_libraries(tst_contest_panels_im_containers_menu PRIVATE Qt6::Sql)
     target_link_libraries(tst_cmdq_schliesst_das_logbuch PRIVATE Qt6::Sql)
+    # Ohne Stick soll es in Longpath auffallen, nicht nur im Protokoll stehen.
+    longpath_add_test(tst_logbuch_meldet_den_stick)
+    target_link_libraries(tst_logbuch_meldet_den_stick PRIVATE Qt6::Sql)
 endif()
 
 # ── Phase 3J-1 Task 17.1: TX audio binary pipeline + single-client mutex ──────

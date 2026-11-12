@@ -45,12 +45,15 @@
 // =================================================================
 
 #include <QObject>
+#include <QElapsedTimer>
+#include <QTimer>
 #include <QString>
 #include <memory>
 #include <optional>
 
 #include "core/RadioDiscovery.h"
 #include "core/RigctldClient.h"
+#include "core/Ts590Cat.h"
 
 namespace Longpath {
 
@@ -120,6 +123,8 @@ public:
     // ── Was das Geraet sagt ─────────────────────────────────────────
 
     RigctldClient* client() const { return m_client.get(); }
+    /// Nur dann gelten die Zeilen aus Ts590Cat (Hamlib-Modell 2031).
+    bool istTs590() const;
 
     bool    aktiv() const { return m_eingeschaltet; }
     bool    verbunden() const { return m_client && m_client->isConnected(); }
@@ -153,6 +158,16 @@ public:
     /// Darf ein Klick im Panadapter das fremde Geraet bewegen?
     bool darfAbstimmen() const;
 
+    /// Was das Geraet zuletzt gemeldet hat. Leer, solange es kein TS-590S
+    /// im Betrieb ohne SDR ist.
+    const Ts590Cat::Zustand& catZustand() const { return m_catZustand; }
+
+    /// Sendet das Geraet gerade? Es meldet das, Longpath loest es nie aus.
+    bool sendet() const { return m_sendet; }
+
+    /// Schickt eine Zeile aus core/Ts590Cat.h ans Geraet.
+    void stelle(const QByteArray& zeile);
+
     /// Stellt die Betriebsart des fremden Geraets ("USB", "LSB", ...).
     /// Gleiche Bedingungen wie stimmeAbZf().
     void stelleModus(const QString& modus);
@@ -171,6 +186,12 @@ signals:
     /// Das Geraet meldet eine andere ZF-Frequenz. Die Marke haengt hier.
     void zfFrequenzGeaendert(qint64 ifHz);
 
+    /// catZustand() hat sich geaendert.
+    void catZustandGeaendert();
+
+    /// Das Geraet sendet, oder es hat aufgehoert.
+    void sendetGeaendert(bool sendet);
+
     /// Das Geraet meldet eine andere Betriebsart.
     void modusGeaendert(const QString& modus);
 
@@ -188,12 +209,40 @@ signals:
 private:
     void baueClient();
     void starteDaemonWennGewuenscht();
+    void rohAntwortLesen(const QByteArray& antwort);
+    void pruefeTransverterWege();
+    void wacheSchlaegt();
+
+public:
+    /// Wie oft die Wache schaut, und nach wie vielen stillen Schlaegen sie
+    /// rigctld neu startet. Fuer den Pruefstand oeffentlich.
+    static constexpr int kWacheMs          = 2000;
+    static constexpr int kStilleSchlaege   = 3;
+    /// Nach jedem Start: so lange zaehlt Stille nicht. rigctld oeffnet den
+    /// Anschluss, der Client wird beim ersten Versuch oft abgewiesen.
+    static constexpr int kAnlaufMs         = 8000;
+    void setWacheMsForTest(int ms) { m_wache.setInterval(ms); }
+    bool ausfallForTest() const { return m_ausfall; }
+    qint64 daemonPidForTest() const;
+
+private:
+    // Geht der 590 aus oder faellt der USB-Stecker, bleibt rigctld mit
+    // einem toten Anschluss stehen (oder beendet sich), und der Client
+    // verbindet sich endlos mit etwas, das nie antwortet. Der Daemon ist
+    // unserer: die Wache startet ihn neu, bis wieder eine Frequenz kommt.
+    QTimer m_wache;
+    int    m_stilleSchlaege{0};
+    bool   m_ausfall{false};
+    QElapsedTimer m_seitStart;
 
     std::unique_ptr<RigctldProcess> m_proc;
     std::unique_ptr<RigctldClient>  m_client;
 
     bool    m_eingeschaltet{false};
     bool    m_catBetrieb{false};
+    bool    m_sendet{false};
+    bool    m_wegeWarnung{false};
+    Ts590Cat::Zustand m_catZustand;
     bool    m_daemonSelbstStarten{false};
     int     m_modell{0};
     QString m_anschluss;

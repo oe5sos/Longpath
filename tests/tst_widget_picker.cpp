@@ -28,6 +28,7 @@
 //     als eines, das sie grau zeigt.
 
 #include <QtTest>
+#include <QSignalSpy>
 #include <QAbstractButton>
 
 #include "gui/applets/AppletVisibilityController.h"
@@ -193,6 +194,49 @@ private slots:
         vis.setAvailable(QStringLiteral("Tuner"), true);
         QVERIFY2(p.isEnabled(QStringLiteral("Tuner")),
                  "die Zeile blieb grau, obwohl das Geraet wieder da ist");
+    }
+
+    // Martin 2026-11-12, Bild vom Auswaehler mit „FT8 Decoder OFF":
+    // „eigens kann man es nicht ... hinzufügen. das muss geändert
+    // werden". Ein Fenster hinter einer Betriebsart bekommt einen
+    // Einschalter: die Karte bleibt bedienbar, der Klick stellt die
+    // Betriebsart her und zeigt das Fenster.
+    void anOffWidgetWithASwitchCanBeAdded()
+    {
+        AppletVisibilityController vis;
+        registerThree(vis);
+        vis.setAvailable(QStringLiteral("Tuner"), false);
+        vis.setVisible(QStringLiteral("Tuner"), false);
+
+        WidgetPicker p(&vis);
+        int geschaltet = 0;
+        p.setEinschalter({{QStringLiteral("Tuner"),
+            WidgetPicker::Einschalter{QStringLiteral("Klick schaltet ein"),
+                [&]() { ++geschaltet;
+                        vis.setAvailable(QStringLiteral("Tuner"), true); }}}});
+
+        QVERIFY2(p.isEnabled(QStringLiteral("Tuner")),
+                 "die Karte blieb grau, obwohl ein Klick sie einschalten kann");
+        QSignalSpy spy(&p, &WidgetPicker::toggled);
+        QVERIFY2(p.toggle(QStringLiteral("Tuner")), "der Klick wurde abgelehnt");
+        QCOMPARE(geschaltet, 1);
+        QVERIFY2(vis.isVisible(QStringLiteral("Tuner")),
+                 "eingeschaltet, aber das Fenster nicht gezeigt");
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.first().at(1).toBool(), true);
+    }
+
+    // Ohne Einschalter bleibt es wie bisher: grau, nicht bedienbar.
+    void withoutASwitchAnOffWidgetStaysInert()
+    {
+        AppletVisibilityController vis;
+        registerThree(vis);
+        vis.setAvailable(QStringLiteral("Tuner"), false);
+        WidgetPicker p(&vis);
+        p.setEinschalter({{QStringLiteral("Rx"),
+            WidgetPicker::Einschalter{QString(), []() {}}}});
+        QVERIFY(!p.isEnabled(QStringLiteral("Tuner")));
+        QVERIFY(!p.toggle(QStringLiteral("Tuner")));
     }
 
     void anUnknownIdIsRefusedQuietly()

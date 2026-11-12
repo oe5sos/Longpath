@@ -172,6 +172,7 @@ struct MemoryRecord;
 class WidebandFftEngine;
 // 3M-1a G.1: forward declarations for TX-side components.
 class MoxController;
+class Ts590Sprache;
 class TxChannel;
 class StripChain;
 // Phase 3F Sub-Epic J Task 11: forward decl for rxChannelForSlice()'s
@@ -515,6 +516,7 @@ public:
     // Spieler fuer Panel und Tastenkuerzel. Tastet ueber den
     // MoxController, spielt ueber den Mikrofon-Router (MicSource::Dvk).
     VoiceKeyerPlayer* voiceKeyerPlayer() const { return m_voiceKeyerPlayer.get(); }
+    Ts590Sprache* ts590Sprache() const { return m_ts590Sprache.get(); }
     // Die Tastenkuerzel (2026-11-10). Hier, damit Setup-Seite und
     // Sprachspeicher-Panel dieselbe Belegung sehen wie die Tastaturweiche
     // im Hauptfenster. Gelesen wird sie vom Hauptfenster, sobald dessen
@@ -4968,6 +4970,9 @@ private:
     // Nur im Betrieb ohne SDR, siehe core/CatRigConnection.h. Steht hinter
     // m_companionRig: die Bruecke geht beim Abbau zuerst.
     std::unique_ptr<CatRigBruecke>          m_catRigBruecke;
+    // Sprachspeicher ueber den 590. Steht hinter m_companionRig: geht beim
+    // Abbau zuerst und laesst dabei einen getasteten Sender noch los.
+    std::unique_ptr<Ts590Sprache>           m_ts590Sprache;
     QMetaObject::Connection                 m_catSpiegel;
     QMetaObject::Connection                 m_catTraeger;
     void starteCatBetriebWennNoetig();

@@ -24,6 +24,9 @@ Q_LOGGING_CATEGORY(lcCompanionRig, "longpath.companionrig")
 
 namespace {
 
+// Hamlibs Nummer. Filtertabellen und Menues des SG weichen ab.
+constexpr int kModellTs590S = 2031;
+
 /// AppSettings schreibt Wahrheitswerte als "True"/"False" (so wie
 /// Thetis es tat), nicht als 0/1. Wer hier toBool() nimmt, bekommt bei
 /// "False" ein true -- ein nicht leerer String ist wahr.
@@ -49,11 +52,14 @@ QString mhz(qint64 hz)
 CompanionRigController::CompanionRigController(QObject* parent)
     : QObject(parent)
 {
+    m_wache.setInterval(kWacheMs);
+    connect(&m_wache, &QTimer::timeout, this, &CompanionRigController::wacheSchlaegt);
     ladeEinstellungen();
 }
 
 CompanionRigController::~CompanionRigController()
 {
+    m_wache.stop();
     // Reihenfolge: erst der Client (er haengt am Socket), dann der
     // Daemon. Umgekehrt stirbt rigctld unter einer stehenden
     // Verbindung, und der Client meldet beim Abbau einen Fehler, den
@@ -135,6 +141,15 @@ void CompanionRigController::baueClient()
     connect(m_client.get(), &RigctldClient::frequencyChanged, this,
             [this](qint64 hz) { emit zfFrequenzGeaendert(hz); });
 
+    connect(m_client.get(), &RigctldClient::rohAntwort,
+            this, &CompanionRigController::rohAntwortLesen);
+
+    connect(m_client.get(), &RigctldClient::pttChanged, this, [this](bool keyed) {
+        if (m_sendet == keyed) { return; }
+        m_sendet = keyed;
+        emit sendetGeaendert(keyed);
+    });
+
     connect(m_client.get(), &RigctldClient::modeChanged, this,
             [this](const QString& modus, int) { emit modusGeaendert(modus); });
 
@@ -179,9 +194,13 @@ void CompanionRigController::starteDaemonWennGewuenscht()
     // Loopback, weil der Prozess nur dort bindet.
     m_host = QStringLiteral("127.0.0.1");
     m_port = m_proc->listenPort();
+    m_stilleSchlaege = 0;
+    m_seitStart.start();
+    m_wache.start();
 
     connect(m_proc.get(), &RigctldProcess::exited, this,
             [this](int code, const QString& err) {
+        if (m_ausfall) { return; }   // die Wache hat es schon gesagt
         emit problem(tr("rigctld stopped (%1): %2")
                          .arg(QString::number(code),
                               RigctldProcess::grundAus(err)));
@@ -255,11 +274,60 @@ void CompanionRigController::verbinde()
 
 void CompanionRigController::trenne()
 {
+    m_wache.stop();
+    m_ausfall = false;
+    m_stilleSchlaege = 0;
     if (m_client) { m_client->disconnectFromRig(); }
     if (m_proc) {
         m_proc->stop();
         m_proc.reset();
     }
+}
+
+// Die Wache. Neu gestartet wird erst nach kStilleSchlaege Schlaegen ohne
+// frische Frequenz (rund sechs Sekunden): beim Verbinden und nach einem
+// Neustart braucht die erste Antwort ihre Zeit. Gesagt wird es einmal beim
+// Ausfall und einmal, wenn das Geraet wieder da ist -- nicht bei jedem
+// Versuch.
+void CompanionRigController::wacheSchlaegt()
+{
+    if (!m_proc || !m_client) { return; }
+
+    if (m_client->hasFreshFrequency()) {
+        m_stilleSchlaege = 0;
+        if (m_ausfall) {
+            m_ausfall = false;
+            qCInfo(lcCompanionRig) << "Begleitgeraet antwortet wieder";
+            emit problem(tr("The companion rig answers again."));
+        }
+        return;
+    }
+
+    if (m_seitStart.isValid() && m_seitStart.elapsed() < kAnlaufMs) { return; }
+    if (++m_stilleSchlaege < kStilleSchlaege) { return; }
+    m_stilleSchlaege = 0;
+
+    if (!m_ausfall) {
+        m_ausfall = true;
+        emit problem(tr("The companion rig does not answer (switched off, USB "
+                        "unplugged?) — restarting rigctld until it is back."));
+    }
+
+    QString fehler;
+    if (!m_proc->restart(&fehler)) {
+        qCWarning(lcCompanionRig) << "rigctld neu starten ging nicht:" << fehler;
+        return;
+    }
+    m_seitStart.start();
+    m_port = m_proc->listenPort();
+    qCInfo(lcCompanionRig) << "rigctld neu gestartet auf Port" << m_port;
+    m_client->setTarget(QStringLiteral("127.0.0.1"), m_port);
+    m_client->connectToRig();
+}
+
+qint64 CompanionRigController::daemonPidForTest() const
+{
+    return m_proc ? m_proc->pidForTest() : 0;
 }
 
 qint64 CompanionRigController::zfFrequenzHz() const
@@ -278,6 +346,46 @@ qint64 CompanionRigController::rfFrequenzHz() const
 bool CompanionRigController::darfAbstimmen() const
 {
     return (m_eingeschaltet || m_catBetrieb) && verbunden();
+}
+
+bool CompanionRigController::istTs590() const
+{
+    return m_modell == kModellTs590S;
+}
+
+void CompanionRigController::stelle(const QByteArray& zeile)
+{
+    // Die Zeilen aus Ts590Cat sind Kenwood-Bytes mit den Tabellen des
+    // TS-590S. An ein anderes Geraet (auch den TS-590SG mit anderen
+    // Tabellen) gehen sie nicht -- gefunden in der Durchsicht vom 08.11.
+    if (!darfAbstimmen() || !istTs590()) { return; }
+    m_client->schickeZeile(zeile);
+    m_client->frageRohListeNach();
+}
+
+void CompanionRigController::rohAntwortLesen(const QByteArray& antwort)
+{
+    Ts590Cat::Zustand neu = m_catZustand;
+    if (!Ts590Cat::leseAntwort(antwort, neu) || neu == m_catZustand) { return; }
+    m_catZustand = neu;
+    pruefeTransverterWege();
+    emit catZustandGeaendert();
+}
+
+// Am Transverter muss das Geraet ueber RX ANT empfangen und auf DRV senden.
+// Steht beides anders, geht die volle Leistung an die Antennenbuchse. Gesagt
+// wird das, geaendert nichts: die Buchsen gehoeren dem Betreiber, und auf
+// Kurzwelle ist genau dieser Stand richtig.
+void CompanionRigController::pruefeTransverterWege()
+{
+    const bool falsch = TransverterSetup::current().active()
+                        && (m_catZustand.rxAnt == 0 || m_catZustand.drive == 0);
+    if (falsch == m_wegeWarnung) { return; }
+    m_wegeWarnung = falsch;
+    if (falsch) {
+        emit problem(tr("Transverter active, but RX ANT or DRV is off at the rig. "
+                        "Check both before you transmit."));
+    }
 }
 
 void CompanionRigController::stelleModus(const QString& modus)
@@ -326,11 +434,20 @@ void CompanionRigController::setCatBetrieb(bool an)
         if (m_client) {
             m_client->setPollIntervalMs(kKatAbfrageMs);
             m_client->schalteZwischenspeicherAus();   // falls schon verbunden
+            if (m_modell == kModellTs590S) {
+                m_client->setRohAbfragen(Ts590Cat::abfragen(), Ts590Cat::abfrageMeter(),
+                                         Ts590Cat::abfrageSwr());
+            }
         }
         return;
     }
 
-    if (m_client) { m_client->setPollIntervalMs(RigctldClient::kStandardAbfrageMs); }
+    if (m_client) {
+        m_client->setPollIntervalMs(RigctldClient::kStandardAbfrageMs);
+        m_client->setRohAbfragen({}, {}, {});
+    }
+    m_catZustand = Ts590Cat::Zustand{};
+    m_wegeWarnung = false;
     ladeEinstellungen();
     if (!m_eingeschaltet) { trenne(); }
 }

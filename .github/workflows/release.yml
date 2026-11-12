@@ -333,6 +333,17 @@ jobs:
           echo "Adding $LIBRADE_DIR to LD_LIBRARY_PATH for linuxdeploy"
           export LD_LIBRARY_PATH="$PWD/$LIBRADE_DIR:$LD_LIBRARY_PATH"
 
+          # Nur der SQLite-Treiber (2026-11-12, v0.10.0): seit dem
+          # Contestprogramm linkt Longpath Qt6::Sql, und linuxdeploy-plugin-qt
+          # packt dann JEDEN Treiber aus $QTDIR/plugins/sqldrivers ein --
+          # libqsqlmimer.so scheiterte an libmimerapi.so ("Could not find
+          # dependency", Lauf 43085433061). Das Logbuch braucht nur SQLite;
+          # dasselbe macht die CI des Contestprogramms. $QTDIR ist die
+          # aqt-Installation dieses Laufs, nichts Geteiltes.
+          find "$QTDIR/plugins/sqldrivers" -name 'libqsql*.so' ! -name 'libqsqlite.so' -delete
+          test -f "$QTDIR/plugins/sqldrivers/libqsqlite.so" \
+            || { echo "::error::libqsqlite.so fehlt in $QTDIR/plugins/sqldrivers"; exit 1; }
+
           ./linuxdeploy-${{ matrix.arch }}.AppImage \
             --appdir AppDir \
             --plugin qt \
@@ -595,6 +606,16 @@ jobs:
           # macdeployqt from aqtinstall on both rows (QT_ROOT_DIR, set by
           # jurplel/install-qt-action).
           "$QT_ROOT_DIR/bin/macdeployqt" build/Longpath.app -verbose=1 -always-overwrite
+          # Nur der SQLite-Treiber (2026-11-12, v0.10.0): macdeployqt legt
+          # mit Qt6::Sql (Contestprogramm) alle Treiber ins Paket, und
+          # odbc/psql/mimer verweisen auf Bibliotheken ausserhalb
+          # (/usr/local/..., Postgres.app) -- check-min-macos.sh weist das
+          # Paket zu Recht ab (Lauf 43085433061). Geloescht wird im Paket,
+          # nicht in $QT_ROOT_DIR: das liegt im Cache von install-qt-action.
+          SQLDRV=build/Longpath.app/Contents/PlugIns/sqldrivers
+          find "$SQLDRV" -name 'libqsql*.dylib' ! -name 'libqsqlite.dylib' -delete
+          test -f "$SQLDRV/libqsqlite.dylib" \
+            || { echo "::error::libqsqlite.dylib fehlt in $SQLDRV"; exit 1; }
 
       - name: Copy license notices into app bundle
         run: |
@@ -827,10 +848,19 @@ jobs:
           # ShaderTools or Gui private modules. v0.1.1 silently shipped
           # without GPU spectrum because this flag was implicit; never
           # again.
+          #
+          # ZLIB_USE_STATIC_LIBS=ON (2026-11-12, v0.10.0), wie in ci.yml:
+          # vcpkgs statisches zlib 1.3.2 heisst unter Windows zs.lib, und
+          # FindZLIB sucht "zs" NUR mit diesem Schalter. Ohne ihn fand es
+          # die Kopfdatei und nicht die Bibliothek -- "Could NOT find ZLIB
+          # (missing: ZLIB_LIBRARY) (found version 1.3.2)", Lauf
+          # 43085433061. Die CI des Contestprogramms merkt das nicht, weil
+          # sie die vcpkg-Toolchain-Datei nimmt (deren Huelle sucht zs).
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DLONGPATH_GPU_SPECTRUM=ON \
-            -DZLIB_ROOT="$VCPKG_INSTALLATION_ROOT/installed/x64-windows-static-md"
+            -DZLIB_ROOT="$VCPKG_INSTALLATION_ROOT/installed/x64-windows-static-md" \
+            -DZLIB_USE_STATIC_LIBS=ON
 
       - name: Build
         shell: bash

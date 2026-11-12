@@ -136,6 +136,27 @@ public:
     /// keine Verbindung steht.
     void setFrequencyHz(qint64 hz);
 
+    /// Zusaetzliche Abfragen im Rundlauf, roh wie das Geraet sie versteht
+    /// ("PA;"). Sie teilen sich den geraden Takt mit PTT und Betriebsart;
+    /// die Frequenz behaelt ihren. `haeufig` kommt jedes zweite Mal dran,
+    /// `beimSenden` vertritt die Liste, solange das Geraet sendet.
+    /// Die Antworten kommen ueber rohAntwort().
+    void setRohAbfragen(const QList<QByteArray>& liste, const QByteArray& haeufig,
+                        const QByteArray& beimSenden);
+
+    /// Eine fertige Zeile fuer rigctld schicken. Nur fuer Zeilen aus
+    /// core/Ts590Cat.h: dort steht die geschlossene Liste.
+    void schickeZeile(const QByteArray& zeile);
+    /// Die Rohabfragen sofort, nicht reihum: eine Runde dauert fast zwei
+    /// Sekunden, und solange spraengen Tasten auf den alten Stand zurueck.
+    /// Mehrere Aufrufe kurz hintereinander lesen nur einmal nach.
+    void frageRohListeNach();
+
+    /// Die naechste Antwort auf f und m meldet sich auch dann, wenn sie
+    /// gleich geblieben ist. Fuer die CAT-Bruecke: eine Meldung, die in
+    /// ihre Frist fiel, kaeme sonst nie wieder.
+    void erzwingeNaechsteMeldung() { m_meldeFrequenz = true; m_meldeModus = true; }
+
     /// Schaltet den Zwischenspeicher von rigctld ab. Ab Werk beantwortet
     /// Hamlib eine Frequenzfrage eine Sekunde lang aus dem Speicher
     /// (gemessen: `get_cache` meldet 1000 ms, eine Antwort dauert 0,1 ms).
@@ -193,6 +214,9 @@ signals:
     /// Der PTT-Zustand des fremden Geraets. NUR gelesen -- siehe Kopf.
     void pttChanged(bool keyed);
 
+    /// Antwort auf eine Rohabfrage, etwa "PA10;".
+    void rohAntwort(const QByteArray& antwort);
+
     /// Etwas, das der Betreiber sehen soll: eine Zeile, kein Code.
     void errorOccurred(const QString& message);
 
@@ -205,7 +229,7 @@ signals:
     void replyTimedOut();
 
 private:
-    enum class Pending { None, Frequency, Mode, Ptt, Report };
+    enum class Pending { None, Frequency, Mode, Ptt, Report, Roh, Nullbyte };
 
     void send(const QByteArray& command, Pending expect);
     void pump();
@@ -239,8 +263,17 @@ private:
     QTimer* m_poll{nullptr};
     QTimer* m_retry{nullptr};
     QTimer* m_deadline{nullptr};
+    QTimer* m_nachlesen{nullptr};
+    bool m_meldeFrequenz{false};
+    bool m_meldeModus{false};
     int     m_pollMs{kStandardAbfrageMs};
     quint64 m_tick{0};
+    QList<QByteArray> m_rohListe;
+    QByteArray m_rohHaeufig;
+    QByteArray m_rohBeimSenden;
+    int     m_rohIndex{0};
+    int     m_rohRunde{0};
+    int     m_geraderTakt{0};
 
     State     m_state{State::Disconnected};
     bool      m_wanted{false};          ///< Hat jemand connectToRig() gerufen?

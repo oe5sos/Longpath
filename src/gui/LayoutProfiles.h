@@ -164,7 +164,13 @@ public:
     /// nichts zu sichern, und eine Aufnahme des noch nicht hergestellten
     /// Fensters ueberschriebe das zuletzt aktive Profil mit der Vorgabe.
     /// Danach wie immer applyCurrent().
+    ///
+    /// 2026-11-12 wieder DIE Startregel (Betreiber: „das erste Profil,
+    /// bei mir N muss immer das Startprofil sein. Ich will nichts
+    /// anderes!!!!!"); MainWindow ruft das, nicht startWithLastActive().
     void startWithFirst();
+    /// NICHT MEHR beim Start benutzt (seit 2026-11-12, siehe
+    /// startWithFirst()); bleibt fuer seinen Pruefstand.
     /// Beim Start gilt das zuletzt aktive Profil (Betreiber 2026-11-06,
     /// "Zuletzt aktives" -- sein Contest-Profil ist "C", und Longpath kam
     /// jeden Morgen mit "N" herauf). Kennt die Liste das zuletzt aktive

@@ -1437,6 +1437,11 @@ void RotorLogbookPanel::takeSpot(const QString& call)
     m_callEdit->setText(c);
     m_callEdit->setFocus();
 
+    // Das Logbuchfenster bekommt dasselbe Rufzeichen (2026-11-12,
+    // Betreiber: „sollte auch im logbuch sofort das call übernehmen und
+    // alle daten anzeigen"). Ist es nicht offen, steht es beim Oeffnen da.
+    if (m_logWindow) { m_logWindow->uebernimmRufzeichen(c); }
+
     // Kein beginTurn(): siehe Begruendung am Kopf der Deklaration. Wer
     // drehen will, hat den Rotate-Knopf daneben und sieht vorher, wohin.
     if (!m_dial->hasTarget()) {

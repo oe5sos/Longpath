@@ -1189,9 +1189,10 @@ void QsoMapWindow::buildUi()
         showStationInfo(label);
     });
     connect(m_stack, &QStackedWidget::currentChanged,
-            this, [this](int) {
+            this, [this](int i) {
         updateRotorRadarVisibility();
         apply3dRoom();
+        emit dreiDSichtbar(i == kView3d);
     });
     connect(m_radar, &DxRadarWidget::pointClicked, this,
             [this](const QString& label, double, double) {
@@ -2173,6 +2174,7 @@ void QsoMapWindow::flyToStation(const QString& call, double lat, double lon,
     m_lastFlight.caption = caption;
     m_lastFlight.lat     = lat;
     m_lastFlight.lon     = lon;
+    m_lastFlight.heim    = false;
 
     // Die Azimutalkarte bekommt die Station immer -- kurzer Weg hell,
     // langer gestrichelt. Ist sie die gezeigte Ansicht, bleibt sie es:
@@ -2292,7 +2294,7 @@ void QsoMapWindow::fly3d()
     f.lon     = m_lastFlight.lon;
     f.viaCesiumIon = Map3dAccess::chosenSource() == Map3dAccess::Source::CesiumIon;
     f.secret       = Map3dAccess::secret();
-    if (isValidGridSquare(m_homeGrid)) {
+    if (!m_lastFlight.heim && isValidGridSquare(m_homeGrid)) {
         f.hasHome = true;
         calculateLatLonFromGridSquare(m_homeGrid, f.homeLat, f.homeLon);
         const BeamHeading::GreatCircle g =
@@ -2301,6 +2303,62 @@ void QsoMapWindow::fly3d()
         f.bearingDeg = g.bearingDeg;
     }
     m_3d->fly(f);
+}
+
+void QsoMapWindow::zeige3d(const QString& rufzeichen)
+{
+    if (!m_3dBtn) { return; }
+    if (!Station3dSurface::isAvailable() || !Map3dAccess::isSet()) {
+        // Die Pille sagt, was fehlt (Hinweis ohne WebEngine, sonst die
+        // Einrichtung). update3dButton() haelt sie in diesem Fall unten,
+        // also feuert setChecked(true) ihren Griff sicher.
+        m_3dBtn->setChecked(true);
+        return;
+    }
+    // Ausdruecklich gewollt -- wie ein Druck auf die Pille.
+    m_3dRefusedKey.clear();
+    m_3dWanted = true;
+    AppSettings::instance().setValue(QStringLiteral("QsoMap3dFlight"), true);
+    update3dButton();
+
+    const QString call = rufzeichen.trimmed().toUpper();
+    if (!call.isEmpty() && (!m_lastFlight.valid || m_lastFlight.call != call)) {
+        lookupAndFly(call);   // fliegt selbst; steht es nicht im Log, fragt QRZ
+    }
+    if (m_lastFlight.valid && (call.isEmpty() || m_lastFlight.call == call)) {
+        // Auch aus Radar oder Azimutalkarte heraus: fly3d nimmt sie zurueck.
+        if (m_stack->currentIndex() != kView3d) { fly3d(); }
+        return;
+    }
+    if (!call.isEmpty()) { return; }   // QRZ antwortet noch -- dann ins 3D
+
+    // Nichts nachgeschlagen: das eigene QTH. Ein Bild statt nichts.
+    if (!isValidGridSquare(m_homeGrid)) {
+        m_info->setText(QStringLiteral(
+            "<b>3D</b> — select a contact or type a call in \"Fly to call\". "
+            "With your locator in Setup, 3D also shows your own station."));
+        m_info->setVisible(true);
+        return;
+    }
+    double lat = 0.0, lon = 0.0;
+    calculateLatLonFromGridSquare(m_homeGrid, lat, lon);
+    m_lastFlight.valid   = true;
+    m_lastFlight.call    = m_homeGrid.left(6);
+    m_lastFlight.caption = QStringLiteral("your station");
+    m_lastFlight.lat     = lat;
+    m_lastFlight.lon     = lon;
+    m_lastFlight.heim    = true;
+    fly3d();
+}
+
+void QsoMapWindow::verlasse3d()
+{
+    if (m_3dBtn && m_3dBtn->isChecked()) { m_3dBtn->setChecked(false); }
+}
+
+bool QsoMapWindow::zeigt3d() const
+{
+    return m_stack && m_stack->currentIndex() == kView3d;
 }
 
 void QsoMapWindow::on3dFailed(const QString& reason, bool keyProblem)

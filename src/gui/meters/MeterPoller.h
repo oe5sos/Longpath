@@ -147,6 +147,11 @@ public:
 
     void setRxChannel(RxChannel* channel);
 
+    /// Ein S-Wert von aussen statt aus WDSP, in dBm. Ein Geraet hinter CAT
+    /// misst an seiner Antenne; die Rechnung hier saehe nur seinen Ton.
+    void setExternesSMeter(double dbm);
+    void loescheExternesSMeter();
+
     void setWdspEngine(WdspEngine* engine);
 
     // ── TX meter bindings (H.2, Phase 3M-1a) ─────────────────────────────
@@ -301,6 +306,7 @@ private slots:
     void poll();
 
 private:
+    std::optional<double> m_externesS;
     /// Emit sliceSmeterUpdated for each slice in m_sliceChannels. Independent
     /// of pollSMeter's analog-widget and m_rxChannel guards.
     void pollSliceSMeters();

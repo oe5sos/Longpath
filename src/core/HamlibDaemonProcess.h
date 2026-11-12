@@ -119,6 +119,7 @@ public:
     static QString grundAus(const QString& stderrText);
 
     bool isRunning() const;
+    qint64 pidForTest() const { return m_proc.processId(); }
 
     // Start the daemon. Returns false and fills `error` if the binary is
     // missing or the process refuses to start; a daemon that starts and
