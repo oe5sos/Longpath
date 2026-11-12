@@ -52,11 +52,14 @@ QString mhz(qint64 hz)
 CompanionRigController::CompanionRigController(QObject* parent)
     : QObject(parent)
 {
+    m_wache.setInterval(kWacheMs);
+    connect(&m_wache, &QTimer::timeout, this, &CompanionRigController::wacheSchlaegt);
     ladeEinstellungen();
 }
 
 CompanionRigController::~CompanionRigController()
 {
+    m_wache.stop();
     // Reihenfolge: erst der Client (er haengt am Socket), dann der
     // Daemon. Umgekehrt stirbt rigctld unter einer stehenden
     // Verbindung, und der Client meldet beim Abbau einen Fehler, den
@@ -191,9 +194,13 @@ void CompanionRigController::starteDaemonWennGewuenscht()
     // Loopback, weil der Prozess nur dort bindet.
     m_host = QStringLiteral("127.0.0.1");
     m_port = m_proc->listenPort();
+    m_stilleSchlaege = 0;
+    m_seitStart.start();
+    m_wache.start();
 
     connect(m_proc.get(), &RigctldProcess::exited, this,
             [this](int code, const QString& err) {
+        if (m_ausfall) { return; }   // die Wache hat es schon gesagt
         emit problem(tr("rigctld stopped (%1): %2")
                          .arg(QString::number(code),
                               RigctldProcess::grundAus(err)));
@@ -267,11 +274,60 @@ void CompanionRigController::verbinde()
 
 void CompanionRigController::trenne()
 {
+    m_wache.stop();
+    m_ausfall = false;
+    m_stilleSchlaege = 0;
     if (m_client) { m_client->disconnectFromRig(); }
     if (m_proc) {
         m_proc->stop();
         m_proc.reset();
     }
+}
+
+// Die Wache. Neu gestartet wird erst nach kStilleSchlaege Schlaegen ohne
+// frische Frequenz (rund sechs Sekunden): beim Verbinden und nach einem
+// Neustart braucht die erste Antwort ihre Zeit. Gesagt wird es einmal beim
+// Ausfall und einmal, wenn das Geraet wieder da ist -- nicht bei jedem
+// Versuch.
+void CompanionRigController::wacheSchlaegt()
+{
+    if (!m_proc || !m_client) { return; }
+
+    if (m_client->hasFreshFrequency()) {
+        m_stilleSchlaege = 0;
+        if (m_ausfall) {
+            m_ausfall = false;
+            qCInfo(lcCompanionRig) << "Begleitgeraet antwortet wieder";
+            emit problem(tr("The companion rig answers again."));
+        }
+        return;
+    }
+
+    if (m_seitStart.isValid() && m_seitStart.elapsed() < kAnlaufMs) { return; }
+    if (++m_stilleSchlaege < kStilleSchlaege) { return; }
+    m_stilleSchlaege = 0;
+
+    if (!m_ausfall) {
+        m_ausfall = true;
+        emit problem(tr("The companion rig does not answer (switched off, USB "
+                        "unplugged?) — restarting rigctld until it is back."));
+    }
+
+    QString fehler;
+    if (!m_proc->restart(&fehler)) {
+        qCWarning(lcCompanionRig) << "rigctld neu starten ging nicht:" << fehler;
+        return;
+    }
+    m_seitStart.start();
+    m_port = m_proc->listenPort();
+    qCInfo(lcCompanionRig) << "rigctld neu gestartet auf Port" << m_port;
+    m_client->setTarget(QStringLiteral("127.0.0.1"), m_port);
+    m_client->connectToRig();
+}
+
+qint64 CompanionRigController::daemonPidForTest() const
+{
+    return m_proc ? m_proc->pidForTest() : 0;
 }
 
 qint64 CompanionRigController::zfFrequenzHz() const

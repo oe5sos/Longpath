@@ -1130,6 +1130,8 @@ longpath_add_test(tst_begleitgeraet_regler)
 longpath_add_test(tst_cat_funkgeraet)
 # Jeder Klick holt das Fenster nach vorne, auch aus der Spalte.
 longpath_add_test(tst_klick_holt_nach_vorne)
+# Der 590 geht aus und kommt wieder: die Wache startet rigctld neu.
+longpath_add_test(tst_590_kommt_wieder)
 
 # Der Versatz dort, wo er vor dem Betreiber landet -- und vor allem:
 # dass OHNE Transverter bitgleich nichts passiert.

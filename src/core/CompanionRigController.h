@@ -45,6 +45,8 @@
 // =================================================================
 
 #include <QObject>
+#include <QElapsedTimer>
+#include <QTimer>
 #include <QString>
 #include <memory>
 #include <optional>
@@ -209,6 +211,29 @@ private:
     void starteDaemonWennGewuenscht();
     void rohAntwortLesen(const QByteArray& antwort);
     void pruefeTransverterWege();
+    void wacheSchlaegt();
+
+public:
+    /// Wie oft die Wache schaut, und nach wie vielen stillen Schlaegen sie
+    /// rigctld neu startet. Fuer den Pruefstand oeffentlich.
+    static constexpr int kWacheMs          = 2000;
+    static constexpr int kStilleSchlaege   = 3;
+    /// Nach jedem Start: so lange zaehlt Stille nicht. rigctld oeffnet den
+    /// Anschluss, der Client wird beim ersten Versuch oft abgewiesen.
+    static constexpr int kAnlaufMs         = 8000;
+    void setWacheMsForTest(int ms) { m_wache.setInterval(ms); }
+    bool ausfallForTest() const { return m_ausfall; }
+    qint64 daemonPidForTest() const;
+
+private:
+    // Geht der 590 aus oder faellt der USB-Stecker, bleibt rigctld mit
+    // einem toten Anschluss stehen (oder beendet sich), und der Client
+    // verbindet sich endlos mit etwas, das nie antwortet. Der Daemon ist
+    // unserer: die Wache startet ihn neu, bis wieder eine Frequenz kommt.
+    QTimer m_wache;
+    int    m_stilleSchlaege{0};
+    bool   m_ausfall{false};
+    QElapsedTimer m_seitStart;
 
     std::unique_ptr<RigctldProcess> m_proc;
     std::unique_ptr<RigctldClient>  m_client;
