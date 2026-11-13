@@ -710,6 +710,10 @@ void LogbookWindow::buildUi()
     m_statsSeiteLay = platz(seiteStats);
     m_seiten->addWidget(seiteStats);
 
+    // Die Teiler wie im Hauptfenster (Style::splitterStyle).
+    for (QSplitter* t : {m_logSplit, m_logMitte, m_split, m_browseRechts}) {
+        t->setStyleSheet(Style::splitterStyle());
+    }
     col->addWidget(m_seiten, 1);
     // Liste und Stationskarte gleich in die Log-Seite (siehe ensureMapPanel).
     m_logListeLay->addWidget(m_table, 1);

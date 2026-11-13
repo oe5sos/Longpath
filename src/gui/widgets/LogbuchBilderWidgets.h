@@ -24,11 +24,19 @@ public:
     void setBedarf(const LogbuchBilder::Bedarf& b);
     const LogbuchBilder::Bedarf& bedarf() const { return m_b; }
     QSize sizeHint() const override { return {780, 150}; }
-    QSize minimumSizeHint() const override { return {520, 150}; }
+    /// Schmal geht seit 2026-11-13: unter kBreitAb steht das Gitter unter
+    /// dem Text statt daneben (rechte Spalte der Seite „Log").
+    QSize minimumSizeHint() const override { return {260, 150}; }
+    static constexpr int kBreitAb = 600;
+    static constexpr int kHoeheBreit = 150;
+    static constexpr int kHoeheGestapelt = 292;
+    bool istGestapelt() const { return m_gestapelt; }
 protected:
     void paintEvent(QPaintEvent*) override;
+    void resizeEvent(QResizeEvent*) override;
 private:
     LogbuchBilder::Bedarf m_b;
+    bool m_gestapelt{false};
 };
 
 /// B  Band x UTC-Stunde.
