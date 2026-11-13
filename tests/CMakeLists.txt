@@ -5271,6 +5271,12 @@ longpath_add_test(tst_parametric_eq_widget_json)
 # ── Task 1.2: RxChannel captureState/applyState round-trip ───────────────
 longpath_add_test(tst_rx_channel_rebuild)
 
+# ── Messstand 2026-11-12: "sehr leise, mit NR1 zu leise" ─────────────────
+# Misst am echten WDSP, was NR1 an Pegel kostet, und wie weit die
+# gespeicherte AGC-Schwelle und die gespeicherte Maximalverstaerkung
+# auseinanderliegen (beide schreiben max_gain in wcpAGC.c).
+longpath_add_test(tst_nr1_pegel_und_agc_schwelle)
+
 # ── Post-v0.3.2 sample-rate-live crash regression ───────────────────────
 # Verifies RxChannel::setSampleRate keeps the same object alive (Thetis
 # cmaster.c::SetXcmInrate pattern, NOT destroy-and-recreate).

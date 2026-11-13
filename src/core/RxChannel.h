@@ -321,6 +321,22 @@ public:
     int agcThreshold() const { return m_agcThreshold.load(); }
     void setAgcThreshold(int dBu);
 
+    // Maximalverstaerkung setzen und die dazu passende AGC-Schwelle
+    // zurueckgeben (2026-11-12).
+    //
+    // Schwelle und Maximalverstaerkung sind in wcpAGC.c DIESELBE Groesse
+    // (`max_gain`); wer beide getrennt speichert, speichert zwei Zahlen
+    // fuer einen Wert. Gemessen am echten WDSP:
+    //   MaxGain 90 dB  -> dazu gehoert die Schwelle -117,5 dBm
+    //   Schwelle -21   -> daraus wird eine Maximalverstaerkung von -6,5 dB
+    // Die Anzeige gehoert also abgeleitet, nicht gespeichert.
+    //
+    // Ohne Gleichheitsschranke, anders als setAgcMaxGain: WDSPs eigener
+    // Anfangswert ist `max_gain = 10000` = 80 dB (rxa.c), unser
+    // Zwischenspeicher steht auf 90 -- genau dieser Fall faellt sonst
+    // still durch und der Empfaenger laeuft 10 dB leiser als angezeigt.
+    int setzeMaxVerstaerkungUndMeldeSchwelle(int dB);
+
     int agcHang() const { return m_agcHang.load(); }
     void setAgcHang(int ms);
 

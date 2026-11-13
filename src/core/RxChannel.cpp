@@ -657,6 +657,21 @@ void RxChannel::setAgcFixedGain(int dB)
 #endif
 }
 
+int RxChannel::setzeMaxVerstaerkungUndMeldeSchwelle(int dB)
+{
+    m_agcMaxGain.store(dB);
+
+#ifdef HAVE_WDSP
+    // Dieselbe WDSP-Stelle wie setAgcMaxGain (setup.cs:9011), nur ohne
+    // die Gleichheitsschranke -- siehe Begruendung im Kopf.
+    SetRXAAGCTop(m_channelId, static_cast<double>(dB));
+#endif
+
+    const int schwelle = static_cast<int>(std::lround(readBackAgcThresh()));
+    m_agcThreshold.store(schwelle);
+    return schwelle;
+}
+
 void RxChannel::setAgcMaxGain(int dB)
 {
     if (dB == m_agcMaxGain.load()) {
