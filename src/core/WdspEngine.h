@@ -108,6 +108,8 @@ warren@wpratt.com
 class TestWdspEngineTxChannel;
 // Phase 3M-3a-iii Task 20: same pattern for the create_dexp lifecycle test.
 class TstWdspEngineDexpInit;
+// Messstand 2026-11-12: NR1-Pegelverlust und AGC-Schwelle am echten WDSP.
+class TestNr1PegelUndAgcSchwelle;
 // Phase 3M-4 Task 4: same pattern for the PsFeedbackChannel lifecycle test.
 class TstPsFeedbackChannel;
 // Phase 3R Task J3: same pattern for the SliceModel RADE mode-swap test;
@@ -818,6 +820,8 @@ private:
     friend class ::TestWdspEngineTxChannel;
     // Phase 3M-3a-iii Task 20: same friendship for the create_dexp test.
     friend class ::TstWdspEngineDexpInit;
+    // Messstand 2026-11-12 (NR1-Pegel / AGC-Schwelle): derselbe Zugriff.
+    friend class ::TestNr1PegelUndAgcSchwelle;
     // Phase 3M-4 Task 4: same friendship for the PsFeedbackChannel test.
     friend class ::TstPsFeedbackChannel;
     // Phase 3R Task J3: same friendship for the SliceModel RADE mode-swap test.
