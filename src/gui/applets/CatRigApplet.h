@@ -45,6 +45,7 @@ private:
     QComboBox*   m_agc{nullptr};
     QPushButton* m_filter{nullptr};
     QPushButton* m_rit{nullptr};
+    QPushButton* m_xit{nullptr};
     QPushButton* m_ritRunter{nullptr};
     QPushButton* m_ritHoch{nullptr};
     QPushButton* m_ritNull{nullptr};

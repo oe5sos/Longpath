@@ -56,6 +56,7 @@ struct Zustand {
     int  cwBreiteHz{-1};       // nur in CW, sonst bleibt der letzte Wert
     int  ritAn{-1};            // 0/1
     int  ritHz{0};             // Versatz, -9999..9999
+    int  xitAn{-1};            // 0/1, teilt sich den Versatz mit RIT
     int  notch{-1};            // 0 aus, 1 Auto, 2 von Hand
     int  nbPegel{-1};          // 1..10, nur bei NB an
     int  nrPegel{-1};          // 1..10, nur bei NR1
@@ -102,6 +103,14 @@ QByteArray stelleFilter(int filter);      // 1 = A, 2 = B
 QByteArray stelleRit(bool an);
 QByteArray stelleRitSchritt(int hz);      // + hoch, - runter
 QByteArray stelleRitNull();
+
+// XIT am TS-590 (2026-11-13). Das Geraet fuehrt EIN Versatzregister fuer
+// beide: `RU`/`RD`/`RC` verschieben und loeschen es, `RT` schaltet es auf
+// den Empfang, `XT` auf das Senden. Darum gibt es hier kein
+// stelleXitSchritt() und kein stelleXitNull() -- das waeren dieselben
+// Befehle unter zweitem Namen, und der Anschein zweier getrennter
+// Versaetze waere schlimmer als die fehlende Funktion.
+QByteArray stelleXit(bool an);
 QByteArray stelleNotch(bool an);          // Auto-Notch
 QByteArray stelleNbPegel(int pegel);      // 1..10
 QByteArray stelleNrPegel(int pegel);      // 1..10

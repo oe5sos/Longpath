@@ -383,8 +383,28 @@ private slots:
         QVERIFY(Ts590Cat::leseAntwort("IF00014090000     -012010000020000080;", z));
         QCOMPARE(z.ritHz, -120);
         QCOMPARE(z.ritAn, 1);
+        QCOMPARE(z.xitAn, 0);   // Stelle 24, in dieser Antwort aus
         QVERIFY(Ts590Cat::leseAntwort("IF00014090000      020010000020000080;", z));
         QCOMPARE(z.ritHz, 200);
+        // XIT an, RIT aus: dieselbe Antwort, Stelle 23 auf 0 und 24 auf 1.
+        // Die beiden duerfen sich nicht verwechseln -- sie stehen
+        // nebeneinander und waren vor dem 2026-11-13 nur eine Stelle.
+        QVERIFY(Ts590Cat::leseAntwort("IF00014090000     -012001000020000080;", z));
+        QCOMPARE(z.ritAn, 0);
+        QCOMPARE(z.xitAn, 1);
+        QCOMPARE(z.ritHz, -120);   // EIN Versatzregister fuer beide
+        // Beide an -- das Geraet laesst es zu, also muss es ankommen.
+        QVERIFY(Ts590Cat::leseAntwort("IF00014090000     -012011000020000080;", z));
+        QCOMPARE(z.ritAn, 1);
+        QCOMPARE(z.xitAn, 1);
+        // Eine zu kurze Antwort darf RIT NICHT mitreissen: die Schranke
+        // steht weiter bei 24, XIT wird nur gelesen, wenn Stelle 24 da
+        // ist. Sonst nimmt das neue Feld beim alten Geraet das alte mit.
+        Ts590Cat::Zustand kurz;
+        QVERIFY(Ts590Cat::leseAntwort("IF00014090000     -01201;", kurz));
+        QCOMPARE(kurz.ritHz, -120);
+        QCOMPARE(kurz.ritAn, 1);
+        QCOMPARE(kurz.xitAn, -1);   // unbekannt, nicht geraten
         QVERIFY(Ts590Cat::leseAntwort("NT10;", z));
         QCOMPARE(z.notch, 1);
         QVERIFY(Ts590Cat::leseAntwort("NL006;", z));
@@ -426,6 +446,10 @@ private slots:
         QCOMPARE(Ts590Cat::stelleRitSchritt(10), QByteArray("W RU00010; 0\n"));
         QCOMPARE(Ts590Cat::stelleRitSchritt(-10), QByteArray("W RD00010; 0\n"));
         QCOMPARE(Ts590Cat::stelleRitNull(), QByteArray("W RC; 0\n"));
+        // XIT (2026-11-13): eigener Schalter, aber KEIN eigener Versatz --
+        // RU/RD/RC gelten fuer beide, das Geraet fuehrt nur ein Register.
+        QCOMPARE(Ts590Cat::stelleXit(true), QByteArray("W XT1; 0\n"));
+        QCOMPARE(Ts590Cat::stelleXit(false), QByteArray("W XT0; 0\n"));
         QCOMPARE(Ts590Cat::stelleNotch(true), QByteArray("W NT10; 0\n"));
         QCOMPARE(Ts590Cat::stelleNotch(false), QByteArray("W NT00; 0\n"));
         QCOMPARE(Ts590Cat::stelleNbPegel(5), QByteArray("W NL005; 0\n"));
