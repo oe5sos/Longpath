@@ -31,6 +31,7 @@
 #include "gui/FramelessResizer.h"
 #include "gui/StyleConstants.h"
 #include "gui/WindowChrome.h"
+#include "gui/WindowPlacement.h"
 #include "gui/widgets/QsoDetailPane.h"
 #include "gui/widgets/RotorBandWidget.h"
 #include "core/Maidenhead.h"
@@ -58,6 +59,8 @@
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QScreen>
+#include <QGuiApplication>
+#include <QPointer>
 #include <QStackedWidget>
 #include <QStandardPaths>
 #include <QDateEdit>
@@ -2302,6 +2305,78 @@ void LogbookWindow::openMap()
     m_map->show();
     m_map->raise();
     m_map->activateWindow();
+
+    // ── Und zwar SICHTBAR (2026-11-13) ──────────────────────────────
+    //
+    // Betreiber: „neben dem 3d ist ein pfeil, der funktioniert auch
+    // nicht." Er funktionierte: das Fenster ging auf, arbeitete (eine
+    // Azimutalkarte mit markiertem Kontakt) -- und lag deckungsgleich
+    // hinter dem Logbuch. Gemessen an der laufenden App: Karte
+    // 1470x923 an (0,33), Logbuch 1468x790 an (1,109). Wer das
+    // Logbuch weiter vor sich sieht, schliesst auf „tut nichts", und
+    // das zu Recht.
+    //
+    // `QsoMapGeometry` ist die Lage, die der Betreiber dem Fenster
+    // selbst gegeben hat -- die wird nicht ueberschrieben. Nur wenn
+    // sie es unter dem Logbuch verschwinden laesst, sucht es sich
+    // einen freien Platz. Dieselbe Hilfe und dasselbe Muster wie beim
+    // CAT-Feld (MainWindow::zeigeCatRigFeld, 2026-11-07, aus dem
+    // gleichen Anlass: „wieder ein window, welches ich nicht oeffnen
+    // kann"), einschliesslich `EigeneBewegung` -- ein Zug, den das
+    // Programm selbst macht, ist kein Ziehen des Betreibers.
+    //
+    // Einen Umlauf spaeter, weil show() die endgueltige Rahmenlage
+    // erst danach kennt.
+    QPointer<QsoMapWindow> karte = m_map;
+    QTimer::singleShot(0, this, [this, karte]() {
+        if (!karte || !karte->isVisible()) { return; }
+        const QRect kartenRahmen = karte->frameGeometry();
+        // Verdeckt dieses Logbuch sie so weit, dass man sie uebersieht?
+        //
+        // Die Zahl stammt aus dem gemeldeten Fall, nicht aus dem Gefuehl:
+        // Karte 1470x923 an (0,33), Logbuch 1468x790 an (1,109) -- das
+        // Logbuch deckt 0,86 der Karte. Eine Schwelle von 0,90 (der erste
+        // Versuch) haette genau diesen Fall durchgelassen; aufgefallen an
+        // der Gegenprobe, nicht am Lauf. Bei 0,86 sieht der Betreiber
+        // zwei schmale Streifen am Rand, in derselben dunklen Farbe wie
+        // alles andere -- das ist kein Sehen.
+        //
+        // Drei Viertel: darunter steht ein gutes Stueck Karte frei, und
+        // wer das Fenster gerade geholt hat, erkennt es daran.
+        constexpr double kVerdecktGenug = 0.75;
+        const double verdeckt =
+            Longpath::coveredFraction(kartenRahmen, { frameGeometry() });
+        if (verdeckt < kVerdecktGenug) { return; }
+
+        QScreen* schirm = karte->screen() ? karte->screen() : QGuiApplication::primaryScreen();
+        if (!schirm) { return; }
+        const QRect platz = Longpath::freierPlatz(
+            kartenRahmen.size(), schirm->availableGeometry(), { frameGeometry() });
+        if (!platz.isEmpty()) {
+            const Longpath::EigeneBewegung eigene;
+            karte->move(platz.topLeft());
+            karte->raise();
+            return;
+        }
+
+        // Kein freier Platz -- und das ist der haeufige Fall, nicht der
+        // seltene: die Karte des Betreibers misst 1470x923 auf einem
+        // Schirm von 1470x956. Ein bildschirmfuellendes Fenster kann
+        // nirgends ausweichen.
+        //
+        // Dann tritt das Logbuch zurueck. Nicht „die Karte nach vorne" --
+        // das war der erste Versuch, und er genuegt nicht: `show()` +
+        // `raise()` stehen oben schon und haben genau dieses Verdecken
+        // nicht verhindert. Umgekehrt ist es ausserdem das richtige
+        // Verhaeltnis: der Betreiber hat eben auf den Pfeil gedrueckt,
+        // also will er die Karte sehen, nicht das Logbuch.
+        //
+        // Das Logbuch bleibt offen und an seinem Platz; es liegt nur
+        // darunter, und ein Klick holt es jederzeit zurueck.
+        lower();
+        karte->raise();
+        karte->activateWindow();
+    });
 }
 
 // ── Import ──────────────────────────────────────────────────────────
