@@ -179,19 +179,20 @@ private slots:
         // unten heraus und ist nie mehr als zu zwei Dritteln verdeckt;
         // der Lauf blieb dann auch mit stillgelegter Behebung gruen.
         LogbookWindow w(writeAdif(QDir(dir.path())));
-        // Die linke Haelfte, volle Hoehe. Beides hat einen Grund:
-        //   - volle Hoehe, damit die Karte mit ihrer Mindesthoehe (rund
-        //     540) ganz hineinpasst und wirklich verdeckt wird,
-        //   - nur die Haelfte der Breite, damit rechts daneben ein Platz
-        //     frei bleibt, der breit genug fuer die Karte ist.
-        // Auf dem kleinen Offscreen-Schirm (800x800) heisst das 400x800
-        // gegen eine Karte von 317x536 -- beides geht sich aus, und der
-        // Lauf misst auch in der CI statt sich zu ueberspringen.
-        QScreen* schirm0 = QGuiApplication::primaryScreen();
-        QVERIFY(schirm0);
-        const QRect flaeche = schirm0->availableGeometry();
-        w.setGeometry(QRect(flaeche.topLeft(),
-                            QSize(flaeche.width() / 2, flaeche.height())));
+        // `setFixedSize`, nicht `resize`: das Logbuch hat eine
+        // Mindestgroesse aus seinem Layout, die ein resize() nicht
+        // unterschreitet -- auf main sind das 596x1098, mehr als der
+        // Offscreen-Schirm hoch ist (800). Eine erzwungene Groesse
+        // staucht das Layout; fuer eine Messung von LAGEN ist das in
+        // Ordnung, und nur darum geht es hier.
+        //
+        // 420x420 hat zwei Gruende: gross genug, dass die Karte (rund
+        // 320x330 offscreen, 317x366 unter cocoa) ganz hineinpasst und
+        // wirklich verdeckt wird -- und schmal genug, dass rechts
+        // daneben Platz fuer sie frei bleibt. Damit traegt der Lauf auf
+        // beiden Schirmen und ueberspringt sich nicht in der CI.
+        w.setFixedSize(420, 420);
+        w.move(0, 0);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
 
@@ -283,13 +284,10 @@ private slots:
     {
         QTemporaryDir dir;
         LogbookWindow w(writeAdif(QDir(dir.path())));
-        // Klein und links oben, damit daneben ueberhaupt Platz bleibt:
-        // der Offscreen-Schirm misst 800x800, und das Logbuch fuellt ihn
-        // sonst ganz aus (gemessen 798x757). Die Mindestgroesse gilt der
-        // Bedienbarkeit, nicht dieser Messung -- hier geht es nur um
-        // Lagen, und die Karte liegt in beiden Faellen woanders.
-        w.setMinimumSize(0, 0);
-        w.resize(360, 280);
+        // Klein und links oben, damit daneben Platz bleibt -- per
+        // `setFixedSize` aus demselben Grund wie oben: das Logbuch
+        // fuellt den kleinen Offscreen-Schirm sonst ganz aus.
+        w.setFixedSize(420, 420);
         w.move(0, 0);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
