@@ -397,6 +397,69 @@ private slots:
                           << "Schild:" << applet.uhrWarnungForTest()->text();
     }
 
+    /// Drueckt das Schild die Fundzahl weg?
+    ///
+    /// Die Sichtreihe traegt sechs Pillen, die Fundzahl und jetzt das
+    /// Schild. Das ist die Stelle, an der bei schmalem Fenster etwas
+    /// verschwindet -- und das Erste waere die Zahl, auf die man sieht.
+    ///
+    /// Gemessen am 2026-11-13: das Panel laesst sich gar nicht unter
+    /// rund 700 Punkte druecken (die Pillenreihe darueber setzt die
+    /// Untergrenze), und bei dieser Breite stehen Fundzahl und Schild
+    /// GENAU auf ihrem sizeHint -- 80 und 156. Der Fall haelt das
+    /// fest, damit eine kuenftige Verengung hier auffaellt statt im
+    /// Bild des Betreibers.
+    void beiSchmalemPanelBleibtDieFundzahlLesbar()
+    {
+        RadioModel radio;
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        QVERIFY(slice);
+        slice->setFrequency(14074000.0);
+        slice->setDspMode(DSPMode::DIGU);
+
+        Longpath::Ft8Applet applet(&radio);
+        applet.setProtocol(Longpath::Ft8Decoder::Protocol::Ft8);
+        applet.setSlice(slice);
+        applet.resize(380, 420);   // so schmal, wie es sich druecken laesst
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet));
+
+        for (int i = 0; i < 6; ++i) {
+            applet.periodeForTest(funde({1.9, 2.0, 2.1}));
+        }
+        QCoreApplication::processEvents();
+
+        QLabel* zahl   = applet.lastLabelForTest();
+        QLabel* schild = applet.uhrWarnungForTest();
+        QVERIFY(zahl && schild);
+        QVERIFY2(schild->isVisible(), "das Schild muss zu sehen sein");
+        // Die Fundzahl darf nicht auf null gedrueckt werden.
+        QVERIFY2(zahl->width() > 0 && zahl->isVisible(),
+                 qPrintable(QStringLiteral("Fundzahl %1 breit, Schild %2")
+                                .arg(zahl->width()).arg(schild->width())));
+        // Und keines der beiden darf aus dem Panel hinausragen.
+        const int rand = applet.width();
+        QVERIFY2(schild->geometry().right() <= rand,
+                 qPrintable(QStringLiteral("Schild endet bei %1, Panel ist %2")
+                                .arg(schild->geometry().right()).arg(rand)));
+        qInfo().noquote() << "schmal:" << applet.width()
+                          << "| Fundzahl" << zahl->width()
+                          << "braucht" << zahl->sizeHint().width()
+                          << QStringLiteral("'%1'").arg(zahl->text())
+                          << "| Schild" << schild->width()
+                          << "braucht" << schild->sizeHint().width();
+        // Gedrueckt heisst abgeschnitten: ein QLabel kuerzt nicht, es
+        // schneidet. Was hier zu schmal steht, fehlt im Bild.
+        QVERIFY2(zahl->width() >= zahl->sizeHint().width(),
+                 qPrintable(QStringLiteral("Fundzahl abgeschnitten: %1 statt %2 fuer '%3'")
+                                .arg(zahl->width()).arg(zahl->sizeHint().width())
+                                .arg(zahl->text())));
+        QVERIFY2(schild->width() >= schild->sizeHint().width(),
+                 qPrintable(QStringLiteral("Schild abgeschnitten: %1 statt %2")
+                                .arg(schild->width()).arg(schild->sizeHint().width())));
+    }
+
     void dieSchwelleSelbstWarntSchon()
     {
         Ft8Uhrversatz u;
