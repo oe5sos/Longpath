@@ -2981,11 +2981,23 @@ bool Ft8Applet::inSicht(const Fundzeile& z) const
     case Sicht::AnMich: return z.anMich;
     case Sicht::Cq:     return z.istCq || z.anMich;
     case Sicht::NeuesLand: return z.neuesLand || z.anMich;
-    // Beide Stufen (2026-11-12): wer die Jagd einschaltet, will das
-    // Band voll sehen -- ganz fehlende Felder UND solche, die hier
-    // oben noch fehlen. Die Farbe trennt sie, der Filter nicht.
+    // Nur ganz fehlende Felder (2026-11-13).
+    //
+    // Der Filter zeigte bis heute beide Stufen: ganz fehlende Felder UND
+    // solche, die nur auf diesem Band noch fehlen. Begruendung damals:
+    // „wer die Jagd einschaltet, will das Band voll sehen."
+    //
+    // Betreiber am Geraet: „hier sind einige grids, die sicher schon
+    // hatte -- hier sollen nur jene stehen, die ich noch nicht erreicht
+    // habe." An seinen Zahlen nachgerechnet, auf 20 m: JN79 (hat er auf
+    // 15 m, 2 m, 40 m), KP30 (15 m, 6 m), KO26 (10 m, 15 m, 6 m, 80 m)
+    // -- alle drei standen als „neu" da, und keines davon ist neu.
+    //
+    // Die zweite Stufe ist damit nicht weg, nur nicht mehr in diesem
+    // Filter: ihre Farbe bleibt und ist in „All" zu sehen. Eine Jagd
+    // nach fehlenden Feldern ist eine Liste dessen, was fehlt.
     case Sicht::NeuesGrid:
-        return z.neuesGrid || z.neuesGridBand || z.anMich;
+        return z.neuesGrid || z.anMich;
     case Sicht::MeineFrequenz:
         // Dieselbe Regel wie frueher die rechte Spalte: das Fenster
         // ist die Signalbreite von FT8/FT4 (50 Hz), kein gegriffener
