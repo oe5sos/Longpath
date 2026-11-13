@@ -131,6 +131,58 @@ private slots:
                  QStringLiteral("False"));
     }
 
+    // ── 5b. Ein gespeicherter Stummschalter wird beim Start geloest ────────
+    //
+    // Betreiber, 2026-11-13: „wieder kein ton" — und in den fuenf
+    // Protokollen seit dem Vorabend stand die Warnung „Hauptausgang
+    // startet STUMM" fuenfmal. Jeder Start war stumm, und zu sehen war
+    // davon nur ein Knopf, der aussieht wie immer.
+    //
+    // Die Lautstaerke bleibt dabei unangetastet: ein Regler auf 0 ist
+    // sichtbar, ein Stummschalter nicht.
+
+    void gespeichertStummWirdBeimStartGeloest() {
+        auto& s = AppSettings::instance();
+        s.setValue(QStringLiteral("audio/Master/Muted"), QStringLiteral("True"));
+        s.setValue(QStringLiteral("audio/Master/Volume"), QStringLiteral("0.4"));
+
+        AudioEngine engine;
+        MasterOutputWidget w(&engine);
+
+        auto* btn = w.findChild<QPushButton*>("speakerBtn");
+        QVERIFY(btn);
+        QVERIFY2(!btn->isChecked(), "der Lautsprecherknopf steht noch auf stumm");
+        QVERIFY2(!engine.masterMuted(), "die Tonmaschine ist noch stumm");
+        // Und in der Ablage auch, sonst stuende beim naechsten Start
+        // wieder True da, falls diese Sitzung nichts mehr schreibt.
+        QCOMPARE(s.value(QStringLiteral("audio/Master/Muted")).toString(),
+                 QStringLiteral("False"));
+
+        // Die Lautstaerke hat das nicht angefasst.
+        auto* slider = w.findChild<QSlider*>("masterSlider");
+        QVERIFY(slider);
+        QCOMPARE(slider->value(), 40);
+    }
+
+    // ── 5c. Waehrend des Betriebs bleibt stumm stumm ───────────────────────
+    //
+    // Die Gegenrichtung: geloest wird nur der gespeicherte Zustand beim
+    // Start. Wer im Betrieb stumm schaltet, will stumm sein.
+
+    void stummImBetriebBleibt() {
+        AudioEngine engine;
+        MasterOutputWidget w(&engine);
+        auto* btn = w.findChild<QPushButton*>("speakerBtn");
+        QVERIFY(btn);
+
+        btn->click();
+        QVERIFY(btn->isChecked());
+        QVERIFY(engine.masterMuted());
+        QCOMPARE(AppSettings::instance()
+                     .value(QStringLiteral("audio/Master/Muted")).toString(),
+                 QStringLiteral("True"));
+    }
+
     // ── 6. Engine volume echo updates slider without re-firing engine ──────
 
     void engineVolumeEchoesToSlider() {
@@ -223,8 +275,15 @@ private slots:
         // bereit, I/Q lief —, also suchte man ueberall sonst. Ohne
         // diese Zeile faellt der Hinweis beim naechsten Umbau still
         // wieder heraus.
+        //
+        // Der Wortlaut hat sich am 2026-11-13 geaendert, und mit ihm die
+        // Erwartung weiter unten: der gespeicherte Stummschalter wird
+        // jetzt GELOEST statt wiederhergestellt. Grund waren fuenf
+        // stumme Starts in zwei Tagen („wieder kein ton") -- das
+        // Protokoll half dem, der Protokolle liest, nicht dem, der
+        // funken will. Siehe MasterOutputWidget.cpp.
         QTest::ignoreMessage(QtWarningMsg,
-            QRegularExpression(QStringLiteral("Hauptausgang startet STUMM")));
+            QRegularExpression(QStringLiteral("Hauptausgang war STUMM gespeichert")));
 
         MasterOutputWidget w(&engine);
 
@@ -232,10 +291,13 @@ private slots:
         auto* btn    = w.findChild<QPushButton*>("speakerBtn");
         QVERIFY(slider && btn);
 
+        // Die Lautstaerke kommt zurueck wie gespeichert ...
         QCOMPARE(slider->value(), 60);
-        QCOMPARE(btn->isChecked(), true);
         QVERIFY(std::abs(engine.volume() - 0.60f) < 1e-3f);
-        QCOMPARE(engine.masterMuted(), true);
+        // ... der Stummschalter nicht. Ein Regler auf 0 ist sichtbar,
+        // ein Stummschalter nicht, und genau das war das Problem.
+        QCOMPARE(btn->isChecked(), false);
+        QCOMPARE(engine.masterMuted(), false);
     }
 
     // ── 10. Saved device name applies at construction (smoke) ─────────────
