@@ -58,6 +58,9 @@ mw0lge@grange-lane.co.uk
 // Modification history (Longpath):
 //   2026-08-19 — Original fuer NereusSDR von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Cowork).
+//   2026-11-13 — WavTxSource::load() zaehlt mit (m_loadCount);
+//                 Martin Fischer (OE5SOS), KI-gestuetzt ueber Anthropic
+//                 Claude.
 // =================================================================
 
 #include "core/audio/VoiceKeyer.h"
@@ -299,6 +302,7 @@ bool WavTxSource::load(const QString& path, int txSampleRate, QString* error)
 
     m_rate = txSampleRate;
     m_pos.store(0, std::memory_order_relaxed);
+    ++m_loadCount;
     return true;
 }
 

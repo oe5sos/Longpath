@@ -52,6 +52,7 @@
 #include "Ft8PlatzStand.h"
 #include "core/Ft8Tonwahl.h"
 #include "core/Ft8Tx.h"
+#include "core/Ft8Uhrversatz.h"
 #include "core/LocatorJagd.h"
 #include "core/WdspTypes.h"
 
@@ -316,6 +317,12 @@ public:
     /// einzige Weg, auf dem der Ablauf vorankommt, also auch der
     /// einzige, auf dem er sich pruefen laesst.
     void fundForTest(const Longpath::Ft8Decode& d);
+    /// Eine GANZE Periode auf einmal -- `fundForTest` ist eine
+    /// Periode mit einem einzigen Fund, und solche zaehlt der
+    /// Uhrversatz bewusst nicht mit.
+    void periodeForTest(const QVector<Longpath::Ft8Decode>& funde);
+    QLabel* uhrWarnungForTest() const { return m_uhrWarnung; }
+    const Ft8Uhrversatz& uhrversatzForTest() const { return m_uhrversatz; }
     /// Ein gesendetes Fenster ist um. Im Betrieb kommt das von einem
     /// Zeitgeber nach bis zu 15 s — im Prueflauf waere das eine
     /// Viertelminute Warten je Zug.
@@ -513,6 +520,14 @@ private:
     void haengeAn(const Fundzeile& z);
     /// „10 Funde" bzw. „3 von 10" rechts neben den Pillen.
     void zeigeFundZahl();
+    /// Die Uhr als Fehlerquelle sichtbar machen.
+    ///
+    /// Eine falsch gehende Rechneruhr sieht von innen aus wie ein
+    /// totes Band: erst fallen die schwachen Funde weg, dann die
+    /// halben Perioden. Das Schild steht neben der Fundzahl, weil
+    /// dorthin sieht, wer sich fragt, ob ueberhaupt etwas ankommt.
+    /// Es bleibt unsichtbar, solange die Lage in Ordnung ist.
+    void zeigeUhrversatz();
     /// Die Arbeitsleiste nachziehen: mit wem, welcher Zug, was danach.
     void zeigeArbeit();
 
@@ -568,6 +583,8 @@ private:
     QPushButton* m_sichtNeuesLand{nullptr};
     QPushButton* m_sichtFreq{nullptr};
     QLabel*      m_fundZahl{nullptr};
+    QLabel*      m_uhrWarnung{nullptr};
+    Ft8Uhrversatz m_uhrversatz;
     QLabel*      m_spaltenkopf{nullptr};
 
     // ── Die Arbeitsleiste (Entwurf C, 2026-10-30) ────────────

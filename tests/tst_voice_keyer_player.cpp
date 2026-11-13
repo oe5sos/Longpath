@@ -224,6 +224,7 @@ private slots:
         p.setHooks(std::move(h));
 
         m_store->clearSlot(2);
+        QVERIFY(p.canRecord());
         QVERIFY(p.record(2).isEmpty());
         QCOMPARE(p.state(), VoiceKeyerPlayer::State::Recording);
         QVERIFY(eingang.isEmpty());           // das Alte ist weg
@@ -253,9 +254,71 @@ private slots:
         h.micPullable = []() { return false; };   // keine Flex verbunden
         h.pullMic = [](float*, int) { return 0; };
         p.setHooks(std::move(h));
+        QVERIFY(!p.canRecord());
         const QString r = p.record(2);
         QVERIFY2(r.contains(QStringLiteral("connect")), qPrintable(r));
         QCOMPARE(p.state(), VoiceKeyerPlayer::State::Idle);
+    }
+
+    // Contest (2026-11-13): der Klick der Taste, die Stille davor und
+    // danach kommen nicht in die Ansage, und der Betreiber erfaehrt, dass
+    // sie gespeichert ist.
+    void recordingIsTrimmedForTheContest()
+    {
+        Rig rig;
+        VoiceKeyerPlayer p(m_store);
+        VoiceKeyerPlayer::Hooks h = hooksFor(rig);
+        QVector<float> eingang;
+        h.micPullable = []() { return true; };
+        h.pullMic = [&eingang](float* dst, int n) {
+            const int k = std::min<int>(n, int(eingang.size()));
+            std::copy_n(eingang.constData(), k, dst);
+            eingang.remove(0, k);
+            return k;
+        };
+        p.setHooks(std::move(h));
+        QSignalSpy hinweis(&p, &VoiceKeyerPlayer::notice);
+
+        m_store->clearSlot(3);
+        QVERIFY(p.record(3).isEmpty());
+
+        // 0,6 s Stille mit dem Klick der Taste, 1 s Sprache in Silben,
+        // 0,8 s Stille.
+        QVector<float> rede(48000 * 24 / 10, 0.0f);
+        for (int i = 0; i < 720; ++i) {
+            rede[1440 + i] = 0.6f * std::exp(-float(i) / 144.0f) * ((i % 7 < 3) ? 1.0f : -1.0f);
+        }
+        for (int i = 0; i < 48000; ++i) {
+            const double t = double(i) / 48000.0;
+            const double silbe = 0.55 + 0.45 * std::sin(2.0 * M_PI * 4.0 * t);
+            rede[28800 + i] = float(0.2 * silbe * std::sin(2.0 * M_PI * 300.0 * t));
+        }
+        eingang = rede;
+        QTRY_VERIFY_WITH_TIMEOUT(eingang.isEmpty(), 3000);
+        QVERIFY(p.record(3).isEmpty());
+
+        const VoiceKeyerSlot& s = m_store->slot(3);
+        QVERIFY(!s.isEmpty());
+        WavTxSource src;
+        QString err;
+        QVERIFY2(src.load(s.wavPath, VoiceKeyerPlayer::kRateHz, &err), qPrintable(err));
+        // 1 s Sprache + 80 ms davor + 200 ms danach, nicht 2,4 s.
+        QVERIFY2(std::abs(src.seconds() - 1.28) < 0.05, qPrintable(QString::number(src.seconds())));
+        QVERIFY(!hinweis.isEmpty());
+        QVERIFY2(hinweis.last().first().toString().contains(QStringLiteral("recorded")),
+                 qPrintable(hinweis.last().first().toString()));
+    }
+
+    void listeningNeedsAMessageAndNoRecording()
+    {
+        Rig rig;
+        VoiceKeyerPlayer p(m_store);
+        p.setHooks(hooksFor(rig));
+        m_store->clearSlot(4);
+        const QString leer = p.listen(4);
+        QVERIFY2(leer.contains(QStringLiteral("empty")), qPrintable(leer));
+        QCOMPARE(p.listeningSlot(), -1);
+        QVERIFY(!p.listen(99).isEmpty());
     }
 
     // ── Senden ───────────────────────────────────────────────────────

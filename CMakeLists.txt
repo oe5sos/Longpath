@@ -558,6 +558,7 @@ set(CORE_SOURCES
     src/core/Ft8Ablauf.cpp
     src/core/Ft8Mehrfach.cpp
     src/core/Ft8Stream.cpp
+    src/core/Ft8Uhrversatz.cpp
     src/core/Ft8Tx.cpp
     # Eine freie Sendestelle suchen -- Longpath-eigen, weder WSJT-X
     # noch MSHV tun das (2026-10-30)
@@ -728,6 +729,7 @@ set(CORE_SOURCES
     src/core/audio/WavPlayer.cpp
     src/core/audio/VoiceKeyer.cpp
     src/core/audio/VoiceKeyerPlayer.cpp
+    src/core/audio/AnsageAufbereitung.cpp
     src/core/hotkeys/HotKeyActionList.cpp
     src/core/hotkeys/HotKeyBindings.cpp
     src/core/hotkeys/HotKeyChord.cpp

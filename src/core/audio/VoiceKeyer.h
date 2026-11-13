@@ -104,6 +104,10 @@ mw0lge@grange-lane.co.uk
 //   2026-11-10 — WavTxSource::load() wartet auf den Sendefaden
 //                 (m_inPull); Martin Fischer (OE5SOS), KI-gestuetzt
 //                 ueber Anthropic Claude.
+//   2026-11-13 — WavTxSource gibt die geladene Ansage und einen
+//                 Ladezaehler heraus (590-Weg: Pegel je Ansage);
+//                 Martin Fischer (OE5SOS), KI-gestuetzt ueber Anthropic
+//                 Claude.
 // =================================================================
 
 #include "core/TxMicRouter.h"
@@ -201,6 +205,13 @@ public:
     int sampleCount() const { return m_samples.size(); }
     double seconds() const;
 
+    // Fuer den 590-Weg (2026-11-13): die geladene Ansage als Ganzes und
+    // ein Zaehler, der sich bei jedem load() aendert. Nur im Hauptfaden
+    // lesen -- dort laeuft auch load().
+    const QVector<float>& samples() const { return m_samples; }
+    int rate() const { return m_rate; }
+    int loadCount() const { return m_loadCount; }
+
     // TxMicRouter
     int pullSamples(float* dst, int n) override;
 
@@ -208,6 +219,7 @@ private:
     QVector<float>      m_samples;
     int                 m_rate{0};
     int                 m_gapSamples{0};
+    int                 m_loadCount{0};
     std::atomic<int>    m_pos{0};
     std::atomic<bool>   m_playing{false};
     std::atomic<bool>   m_repeat{false};
