@@ -66,6 +66,16 @@ public:
     static constexpr int kKachelLuft = 8;
     static constexpr int kRandX     = 10;
     static constexpr int kStufen    = 5;
+    /// Ein FREIER Platz, als Streifen (Entwurf B, 2026-11-13).
+    ///
+    /// Betreiber mit `slots 3` vor einem Fenster, das „1 of 3" und
+    /// eine einzige Kachel zeigte: „schön wäre es, wenn man dann auch
+    /// alle 3 sieht, sprich 3 fenster und ein fenster durch 3
+    /// geteilt." Aus drei Blaettern waehlte er B: belegte Plaetze
+    /// bleiben die volle Kachel, freie kosten nur eine Zeile -- so
+    /// sind alle zu sehen, ohne dass das Fenster bei `slots 6` zur
+    /// Haelfte aus Luft besteht.
+    static constexpr int kFreiH     = 30;
 
 protected:
     void paintEvent(QPaintEvent*) override;
@@ -74,6 +84,8 @@ private:
     /// Gibt die Hoehe zurueck, die sie gebraucht hat.
     int  maleKopfzeile(QPainter& p);
     void maleKachel(QPainter& p, int y, int nummer, const Ft8PlatzStand& z);
+    /// Ein freier Platz als Streifen (Entwurf B).
+    void maleFreien(QPainter& p, int y, int nummer);
     void maleWartende(QPainter& p, int y);
 
     Ft8PlaetzeStand m_stand;

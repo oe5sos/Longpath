@@ -255,6 +255,66 @@ private slots:
                  3 * (Ft8PlaetzeFlaeche::kKachelH
                       + Ft8PlaetzeFlaeche::kKachelLuft));
     }
+
+    // ── Freie Plaetze stehen auch da (Entwurf B, 2026-11-13) ─────────
+    //
+    // Betreiber mit `slots 3` vor einem Fenster, das „1 of 3" und EINE
+    // Kachel zeigte: „schön wäre es, wenn man dann auch alle 3 sieht,
+    // sprich 3 fenster und ein fenster durch 3 geteilt."
+    //
+    // Aus drei Blaettern waehlte er B: belegte Plaetze bleiben die
+    // volle Kachel, freie kosten nur einen Streifen. Der Unterschied
+    // zu A faellt bei `slots 6` ins Gewicht -- dort stuenden sonst
+    // fuenf leere Kacheln zu je 92 Punkten.
+    void freiePlaetzeStehenAlsStreifenDa()
+    {
+        Ft8PlaetzeFlaeche f;
+        Ft8PlaetzeStand st;
+        // ZWEI belegte, nicht einer: mit einem liegt die Hoehe noch
+        // unter der Untergrenze von 150 (dem leeren Hinweistext in
+        // lesbarer Breite), `qMax` greift, und gemessen waere dann die
+        // Grenze statt der Streifen. Erst beim zweiten Platz rechnet
+        // die Funktion wirklich.
+        st.plaetze.append(Ft8PlatzStand{});
+        st.plaetze.append(Ft8PlatzStand{});
+        st.plaetzeGesamt = 2;
+        f.setzeStand(st);
+        const int zweiOhneFreie = f.noetigeHoehe();
+        QVERIFY2(zweiOhneFreie > 150, "die Untergrenze greift noch — "
+                                      "der Vergleich misst sie statt der Streifen");
+
+        // Dieselben zwei Belegten, aber vier eingestellt: zwei
+        // Streifen kommen dazu.
+        st.plaetzeGesamt = 4;
+        f.setzeStand(st);
+        const int vierEingestellt = f.noetigeHoehe();
+        QVERIFY2(vierEingestellt > zweiOhneFreie,
+                 "bei slots 4 muessen die zwei freien Plaetze zu sehen sein");
+        QCOMPARE(vierEingestellt - zweiOhneFreie,
+                 2 * (Ft8PlaetzeFlaeche::kFreiH
+                      + Ft8PlaetzeFlaeche::kKachelLuft));
+
+        // Und ein Streifen ist DEUTLICH schmaler als eine Kachel --
+        // das ist der ganze Unterschied zwischen Entwurf B und A.
+        QVERIFY2(Ft8PlaetzeFlaeche::kFreiH * 2 < Ft8PlaetzeFlaeche::kKachelH,
+                 "ein freier Streifen soll nicht fast so hoch sein wie "
+                 "eine belegte Kachel");
+    }
+
+    // GEGENPROBE: ein leeres Panel geht deswegen nicht von selbst auf.
+    //
+    // `hatInhalt()` bleibt unberuehrt. Ein Fenster, das nur „3x free"
+    // zeigt, hat nichts zu sagen -- die Streifen erscheinen erst,
+    // wenn ohnehin etwas laeuft.
+    void leereePlaetzeOeffnenDasPanelNicht()
+    {
+        Ft8PlaetzeStand st;
+        st.plaetzeGesamt = 6;        // sechs eingestellt ...
+        QVERIFY2(!hatInhalt(st), "sechs FREIE Plaetze sind kein Inhalt");
+
+        st.plaetze.append(Ft8PlatzStand{});   // ... einer belegt
+        QVERIFY(hatInhalt(st));
+    }
 };
 
 QTEST_MAIN(TstFt8PlaetzePanel)
