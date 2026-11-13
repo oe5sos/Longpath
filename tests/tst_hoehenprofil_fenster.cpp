@@ -363,11 +363,10 @@ private slots:
         const QByteArray vorher = lies(pfad);
 
         LogbookWindow w(pfad);
-        bool knopf = false;
-        for (QPushButton* b : w.findChildren<QPushButton*>()) {
-            if (b->text() == QStringLiteral("SOTA…")) { knopf = b->isEnabled(); }
-        }
-        QVERIFY2(knopf, "no enabled SOTA… button in the logbook");
+        // Seit 2026-11-12 hinter dem Zahnrad des Logbuchs (Entwurf C).
+        auto* sota = w.findChild<QAction*>(QStringLiteral("logbookSotaAction"));
+        QVERIFY2(sota && sota->isEnabled() && sota->text() == QStringLiteral("SOTA…"),
+                 "no enabled SOTA… entry behind the logbook's gear");
 
         const QByteArray csv =
             "V2,OE5SOS/P,OE/OO-106,04/07/2026,1908,144MHz,SSB,OM2Y,,\n"
@@ -479,7 +478,7 @@ private slots:
         QVERIFY(AdifLog::write(pfad, {zweiMeter(QStringLiteral("SN7L"), QStringLiteral("JO70SS"),
                                                 4, 7, 19, 26)}));
         LogbookWindow w(pfad);
-        auto* tabelle = w.findChild<QTableWidget*>();
+        auto* tabelle = w.findChild<QTableWidget*>(QStringLiteral("logbookTable"));
         QVERIFY(tabelle);
         tabelle->setCurrentCell(0, 2);
         QPushButton* edit = nullptr;

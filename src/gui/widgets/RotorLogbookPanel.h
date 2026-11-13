@@ -31,6 +31,7 @@
 
 #include <limits>
 
+class QAction;
 class QTimer;
 
 class QLabel;
@@ -307,7 +308,7 @@ private:
     RotorDialWidget* m_dial{nullptr};
     GlobeWidget*     m_globe{nullptr};
     QStackedWidget*  m_viewStack{nullptr};
-    QPushButton*     m_globeBtn{nullptr};
+    class QAction*   m_globeBtn{nullptr};   // Rose/Kugel, hinter dem Zahnrad
     StationPhoto*    m_photo{nullptr};
     QString          m_flagEmoji;
     // Created on first portrait fetch — a panel that never looks anyone
@@ -398,6 +399,19 @@ private:
     // out, so the compass keeps whatever is left. Wrapper widgets
     // rather than the layouts themselves, because QLayout has no
     // setVisible().
+    // ── Entwurf R (2026-11-12) ──────────────────────────────────────
+    class QPushButton*     m_optionenBtn{nullptr};
+    class QPushButton*     m_rotateBtn{nullptr};
+    class QPushButton*     m_lpBtn{nullptr};
+    class RotorBandWidget* m_rotorBand{nullptr};
+    QLabel*                m_roKurz{nullptr};
+    QLabel*                m_roLang{nullptr};
+    QLabel*                m_roWeite{nullptr};
+    double                 m_kurzGrad{-1.0};   // Kurzweg zur Station, < 0: keine
+    void zeigeOptionen();
+    void zeigeWeltbildMenue(const QPoint& at);
+    void aktualisiereAblesung(double kurzGrad, double km);
+    void aktualisiereDrehknoepfe();
     QWidget* m_rowCall{nullptr};
     QWidget* m_rowCard{nullptr};
     QWidget* m_rowGrid{nullptr};

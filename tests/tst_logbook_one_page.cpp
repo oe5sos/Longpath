@@ -51,10 +51,11 @@ class TstLogbookOnePage : public QObject { Q_OBJECT
 private slots:
     void init()
     {
-        AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"), QStringLiteral("True"));
-        AppSettings::instance().setValue(QStringLiteral("LogbookShowStats"), QStringLiteral("True"));
+        AppSettings::instance().setValue(QStringLiteral("LogbookMode"), QStringLiteral("Log"));
     }
 
+    // Seit Entwurf C (2026-11-12): Karte in „Log" und „Browse", Kennzahlen
+    // als eigene Seite „Statistics" -- beide folgen dem Filter der Liste.
     void mapAndStatsFollowTheTable()
     {
         QTemporaryDir dir;
@@ -67,16 +68,13 @@ private slots:
         QVERIFY2(map, "keine eingebettete Karte");
         map->imagery()->setNetworkEnabled(false);
         QVERIFY(map->isEmbedded());
-        QVERIFY(map->isVisible());
+        QTRY_VERIFY(map->isVisible());
         QVERIFY(!map->isWindow());   // eine Spalte, kein Fenster
-        LogbookStatsWidget* row = w.statsRowForTest();
-        QVERIFY(row && row->isVisible() && row->singleRow());
 
         // Alles, was die Tabelle zeigt: vier Kontakte, vier Punkte.
         QTRY_COMPARE_WITH_TIMEOUT(map->shownCountForTest(), 4, 3000);
-        QCOMPARE(row->totalLabel()->text(), QStringLiteral("4"));
 
-        // Filtern: nur die zwei auf 40 m — Karte und Reihe folgen.
+        // Filtern: nur W2XYZ — die Karte folgt.
         QLineEdit* search = nullptr;
         for (QLineEdit* e : w.findChildren<QLineEdit*>()) {
             if (e->placeholderText().startsWith(QLatin1String("Search"))) { search = e; }
@@ -84,23 +82,22 @@ private slots:
         QVERIFY(search);
         search->setText(QStringLiteral("W2XYZ"));
         QTRY_COMPARE_WITH_TIMEOUT(map->shownCountForTest(), 1, 3000);
-        QCOMPARE(row->totalLabel()->text(), QStringLiteral("1"));
-        search->clear();
-        QTRY_COMPARE_WITH_TIMEOUT(map->shownCountForTest(), 4, 3000);
 
-        // Abschalten: weg, und gemerkt.
-        w.mapToggleForTest()->setChecked(false);
-        w.statsToggleForTest()->setChecked(false);
+        // Die Kennzahlen auf ihrer Seite zaehlen dasselbe.
+        w.setModusForTest(2);
+        LogbookStatsWidget* row = w.statsRowForTest();
+        QTRY_VERIFY(row && row->isVisible());
         QVERIFY(!map->isVisible());
-        QVERIFY(!row->isVisible());
-        QCOMPARE(AppSettings::instance().value(QStringLiteral("LogbookShowMap")).toString(),
-                 QStringLiteral("False"));
-        QCOMPARE(AppSettings::instance().value(QStringLiteral("LogbookShowStats")).toString(),
-                 QStringLiteral("False"));
+        QTRY_COMPARE(row->totalLabel()->text(), QStringLiteral("1"));
+        search->clear();
+        QTRY_COMPARE(row->totalLabel()->text(), QStringLiteral("4"));
+        QCOMPARE(AppSettings::instance().value(QStringLiteral("LogbookMode")).toString(),
+                 QStringLiteral("Statistics"));
 
-        w.mapToggleForTest()->setChecked(true);
-        w.statsToggleForTest()->setChecked(true);
-        QVERIFY(map->isVisible() && row->isVisible());
+        w.setModusForTest(1);   // Browse: Karte klein ueber der Station
+        QTRY_VERIFY(map->isVisible());
+        QVERIFY(map->isKompakt());
+        QTRY_COMPARE_WITH_TIMEOUT(map->shownCountForTest(), 4, 3000);
 
         const QString grabDir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
         if (!grabDir.isEmpty()) {
@@ -112,16 +109,14 @@ private slots:
 
     void theSettingIsHonouredOnOpen()
     {
-        AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"), QStringLiteral("False"));
-        AppSettings::instance().setValue(QStringLiteral("LogbookShowStats"), QStringLiteral("False"));
+        AppSettings::instance().setValue(QStringLiteral("LogbookMode"), QStringLiteral("Statistics"));
         QTemporaryDir dir;
         LogbookWindow w(writeAdif(QDir(dir.path())));
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
-        QVERIFY(!w.mapPanelForTest());               // gar nicht erst gebaut
-        QVERIFY(!w.statsRowForTest()->isVisible());
-        QVERIFY(!w.mapToggleForTest()->isChecked());
-        QVERIFY(!w.statsToggleForTest()->isChecked());
+        QCOMPARE(w.modusForTest(), 2);
+        QTRY_VERIFY(w.statsRowForTest()->isVisible());
+        QVERIFY(!w.mapPanelForTest() || !w.mapPanelForTest()->isVisible());
     }
 };
 

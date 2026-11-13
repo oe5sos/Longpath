@@ -56,7 +56,7 @@ private slots:
         QFile file(m_log);
         QVERIFY(file.open(QIODevice::WriteOnly));
         file.write(out);
-        AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"), QStringLiteral("True"));
+        AppSettings::instance().setValue(QStringLiteral("LogbookMode"), QStringLiteral("Log"));
         AppSettings::instance().setValue(QStringLiteral("LogbookShowStats"), QStringLiteral("True"));
     }
 

@@ -343,9 +343,9 @@ private slots:
         // Stats -> Reihe -> ↗ -> Dialog
         QVERIFY(w.statsToggleForTest());
         QVERIFY(w.statsToggleForTest()->isVisible() && w.statsToggleForTest()->isEnabled());
-        // Die Reihe ist von Haus aus offen (LogbookShowStats); den
-        // Vorzustand hier herstellen: zu, dann mit einem Klick auf.
-        if (w.statsToggleForTest()->isChecked()) { klick(w.statsToggleForTest()); }
+        // Seit Entwurf C ist „Statistics" eine eigene Seite: von „Log" aus
+        // mit einem Klick dorthin.
+        w.setModusForTest(0);
         QVERIFY(!w.statsSectionForTest()->isVisible());
         klick(w.statsToggleForTest());
         QTRY_VERIFY_WITH_TIMEOUT(w.statsSectionForTest()->isVisible(), 2000);

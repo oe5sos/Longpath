@@ -203,11 +203,11 @@ private slots:
         w.reload();
         QCOMPARE(w.entryCountForTesting(), 3);
 
-        // Seit 2026-09-22 ist „Stats" ein Schalter fuer die Reihe unter
-        // der Tabelle; das eigene Fenster kommt ueber „↗" in der Reihe.
-        QPushButton* stats = button(w, QStringLiteral("Stats"));
-        QVERIFY2(stats, "kein Stats-Knopf im Logbuchfenster");
-        stats->setChecked(true);
+        // Seit Entwurf C (2026-11-12) ist „Statistics" eine eigene Seite;
+        // das eigene Fenster kommt ueber „↗" auf der Seite.
+        QPushButton* stats = button(w, QStringLiteral("Statistics"));
+        QVERIFY2(stats, "kein Statistics-Knopf im Logbuchfenster");
+        stats->click();
         QVERIFY(w.statsRowForTest()->isVisibleTo(&w));
         // Der ↗ der Reihe, nicht der der eingebetteten Karte.
         QPushButton* popOut = button(*w.statsSectionForTest(), QStringLiteral("\u2197"));

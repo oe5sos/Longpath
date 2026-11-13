@@ -256,6 +256,8 @@ private:
                  const QColor& col, double width, double opacity,
                  int steps) const;
 
+    QImage m_texturKlein;          // Weltbild, auf die Kugel verkleinert (2026-11-12)
+    qint64 m_texturKleinVon{0};    // cacheKey des Bildes, aus dem es stammt
     QImage m_frame;        // rendered sphere, cached until something moves
 
     QColor m_landColour;          // schematic-fallback land tint, operator-chosen

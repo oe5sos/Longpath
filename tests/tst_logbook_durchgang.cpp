@@ -16,6 +16,7 @@
 // Zerleger.
 
 #include <QtTest>
+#include <QAction>
 #include <memory>
 #include <QCheckBox>
 #include <QComboBox>
@@ -220,6 +221,9 @@ void grab(QWidget* w, const QString& name)
 QComboBox* comboWith(QWidget* w, const QString& item)
 {
     for (QComboBox* c : w->findChildren<QComboBox*>()) {
+        // Das Mosaik-Band der Karte kennt dieselben Baender -- seit
+        // Entwurf C liegt die Karte vor den Filtern im Baum.
+        if (c->objectName() == QStringLiteral("qsoMapMosaicBand")) { continue; }
         if (c->findText(item, Qt::MatchFixedString) >= 0) { return c; }
     }
     return nullptr;
@@ -750,41 +754,36 @@ private slots:
         QCOMPARE(w.entryCountForTesting(), before + 2);
     }
 
-    // Karte und Kennzahlen ein und aus, das Rotor-Radar dabei.
+    // Die drei Arbeitsweisen (Entwurf C, 2026-11-12): Log mit grosser
+    // Karte, Browse mit der Liste ueber die ganze Breite, Statistics.
     void mapAndStatsToggle()
     {
-        AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"), QStringLiteral("True"));
-        AppSettings::instance().setValue(QStringLiteral("LogbookShowStats"), QStringLiteral("True"));
+        AppSettings::instance().setValue(QStringLiteral("LogbookMode"), QStringLiteral("Log"));
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
         QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
         QVERIFY(w.mapPanelForTest());
-        QVERIFY(w.mapPanelForTest()->isVisible());
-        QVERIFY(w.statsSectionForTest()->isVisible());
+        QTRY_VERIFY(w.mapPanelForTest()->isVisible());
         w.setRotorBearing(120.0);
         QTest::qWait(100);
         grab(&w, QStringLiteral("03-karte-statistik-rotor"));
         QTableWidget* table = logTable(&w);
         QTest::qWait(100);
-        const QSize withBoth = table->size();
-        qInfo().noquote() << "Karte: Mindestbreite" << w.mapPanelForTest()->minimumSizeHint().width()
-                          << "px, Fenster" << w.width() << "px";
-        w.mapToggleForTest()->click();
-        QVERIFY(!w.mapPanelForTest()->isVisible());
-        w.statsToggleForTest()->click();
-        QVERIFY(!w.statsSectionForTest()->isVisible());
+        const QSize imLog = table->size();
+        w.setModusForTest(1);   // Browse
         QTest::qWait(100);
-        const QSize without = table->size();
-        qInfo().noquote() << "Tabelle mit Karte+Statistik" << withBoth << "ohne" << without;
+        const QSize imBrowse = table->size();
+        qInfo().noquote() << "Tabelle in Log" << imLog << "in Browse" << imBrowse;
         grab(&w, QStringLiteral("04-ohne-karte-statistik"));
-        // Was Karte und Kennzahlen freigeben, bekommt die Tabelle.
-        QVERIFY2(without.width() > withBoth.width(), "Tabelle wird ohne Karte nicht breiter");
-        QVERIFY2(without.height() > withBoth.height(), "Tabelle wird ohne Kennzahlen nicht hoeher");
-        w.mapToggleForTest()->click();
-        w.statsToggleForTest()->click();
-        QVERIFY(w.mapPanelForTest()->isVisible());
-        QVERIFY(w.statsSectionForTest()->isVisible());
+        // In Browse hat die Liste die Mitte und die Hoehe.
+        QVERIFY2(imBrowse.height() > imLog.height(), "Liste in Browse nicht hoeher als in Log");
+        w.setModusForTest(2);   // Statistics
+        QTRY_VERIFY(w.statsSectionForTest()->isVisible());
+        QVERIFY(!w.mapPanelForTest()->isVisible());
+        w.setModusForTest(0);
+        QTRY_VERIFY(w.mapPanelForTest()->isVisible());
+        QVERIFY(!w.statsSectionForTest()->isVisible());
     }
 
     // Exporte: was gefiltert zu sehen ist, geht hinaus -- beim ADIF jedes
@@ -819,9 +818,13 @@ private slots:
                     box->accept();
                 }
             });
-            QPushButton* b = buttonWith(&w, button);
-            if (!b) { qWarning() << "kein Knopf" << button; delete t; return QString(); }
-            b->click();
+            // Seit 2026-11-12 hinter dem Zahnrad: die Eintraege dort.
+            QAction* b = nullptr;
+            for (QAction* a : w.findChildren<QAction*>()) {
+                if (a->text().endsWith(button)) { b = a; }
+            }
+            if (!b) { qWarning() << "kein Eintrag" << button; delete t; return QString(); }
+            b->trigger();
             delete t;
             return *chosen;
         };
@@ -1213,7 +1216,7 @@ private slots:
     // kein Absturz, und am Ende zeigt sie wieder dasselbe.
     void everyMapControlRoundTrips()
     {
-        AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"), QStringLiteral("True"));
+        AppSettings::instance().setValue(QStringLiteral("LogbookMode"), QStringLiteral("Log"));
         LogbookWindow w(m_log);
         w.resize(1600, 950);
         w.show();
@@ -1291,10 +1294,12 @@ private slots:
             if (b->isCheckable() && b->text().endsWith(QLatin1Char('m')) && b != radar) { pills << b; }
         }
         qInfo() << "Band-Knoepfe:" << pills.size();
+        // Seit Entwurf C (2026-11-12) hat die eingebettete Karte keine
+        // Band-Pillen mehr -- es filtert die Filterspalte des Logbuchs.
+        QVERIFY2(pills.isEmpty(), "Band-Pillen ueber der eingebetteten Karte");
         for (QPushButton* p : pills) {
             timed(QStringLiteral("Band ") + p->text() + QStringLiteral(" aus"), [&]() { p->click(); });
         }
-        QVERIFY(map->shownCountForTest() < all);
         for (QPushButton* p : pills) {
             timed(QStringLiteral("Band ") + p->text() + QStringLiteral(" an"), [&]() { p->click(); });
         }

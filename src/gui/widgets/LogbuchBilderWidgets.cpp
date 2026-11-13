@@ -9,6 +9,7 @@
 #include <QDateTime>
 #include <QFontMetricsF>
 #include <QPainter>
+#include <QResizeEvent>
 #include <QPainterPath>
 
 #include <algorithm>
@@ -62,6 +63,23 @@ BedarfsMatrixWidget::BedarfsMatrixWidget(QWidget* parent)
     setObjectName(QStringLiteral("bedarfsMatrix"));
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setFixedHeight(150);
+}
+
+// ── Schmal: Gitter unter dem Text (2026-11-13) ──────────────────────
+//
+// Betreiber mit Bild: „kann das mittlere window nicht nach rechts ziehen
+// und größer machen". In der rechten Spalte der Seite „Log" verlangte die
+// Matrix 520 Punkte (Text links, Gitter rechts), und der Teiler blieb
+// daran haengen. Unter kBreitAb steht das Gitter jetzt unter dem Text.
+void BedarfsMatrixWidget::resizeEvent(QResizeEvent* ev)
+{
+    QWidget::resizeEvent(ev);
+    const bool gestapelt = width() < kBreitAb;
+    if (gestapelt != m_gestapelt || height() != (gestapelt ? kHoeheGestapelt : kHoeheBreit)) {
+        m_gestapelt = gestapelt;
+        setFixedHeight(gestapelt ? kHoeheGestapelt : kHoeheBreit);
+        update();
+    }
 }
 
 void BedarfsMatrixWidget::setBedarf(const LogbuchBilder::Bedarf& b)
@@ -123,12 +141,14 @@ void BedarfsMatrixWidget::paintEvent(QPaintEvent*)
         p.drawText(chip, Qt::AlignCenter, urteil);
     }
 
-    // Rechts: die Matrix, so breit es geht.
+    // Rechts die Matrix, so breit es geht -- in einer schmalen Spalte
+    // darunter.
     const QStringList& baender = LogbuchBilder::baender();
     const QStringList& gruppen = LogbuchBilder::gruppen();
-    const double x0 = 330.0;
-    const double zw = std::clamp((width() - 16.0 - x0) / baender.size(), 20.0, 40.0);
-    const double zh = 30.0, y0 = 30.0;
+    const double x0 = m_gestapelt ? 52.0 : 330.0;
+    const double zw = std::clamp((width() - 12.0 - x0) / baender.size(),
+                                 m_gestapelt ? 14.0 : 20.0, 40.0);
+    const double zh = 30.0, y0 = m_gestapelt ? 172.0 : 30.0;
     const QString jetztBand = m_b.jetzt.section(QLatin1Char('|'), 0, 0);
     const QString jetztGruppe = m_b.jetzt.section(QLatin1Char('|'), 1, 1);
     p.setFont(mono(Style::kFontCaption));
@@ -178,6 +198,10 @@ void BedarfsMatrixWidget::paintEvent(QPaintEvent*)
     }
     // Legende
     const double ly = y0 + 3 * zh + 12;
+    // Schmal: die Legende ab dem linken Rand, enger gesetzt.
+    const double lx = m_gestapelt ? L : x0;
+    const double s1 = m_gestapelt ? 76.0 : 100.0, s2 = m_gestapelt ? 136.0 : 190.0,
+                 s3 = m_gestapelt ? 192.0 : 270.0;
     p.setFont(schrift(Style::kFontCaption));
     auto legende = [&](double x, int art, const QString& text) {
         const QRectF z(x, ly, 14, 12);
@@ -189,10 +213,10 @@ void BedarfsMatrixWidget::paintEvent(QPaintEvent*)
         p.setPen(farbe(Style::kTextTertiary));
         p.drawText(QRectF(x + 20, ly - 2, 110, 16), Qt::AlignLeft | Qt::AlignVCenter, text);
     };
-    legende(x0, 0, QStringLiteral("confirmed"));
-    legende(x0 + 100, 1, QStringLiteral("worked"));
-    legende(x0 + 190, 2, QStringLiteral("never"));
-    legende(x0 + 270, 3, QStringLiteral("this call"));
+    legende(lx, 0, QStringLiteral("confirmed"));
+    legende(lx + s1, 1, QStringLiteral("worked"));
+    legende(lx + s2, 2, QStringLiteral("never"));
+    legende(lx + s3, 3, QStringLiteral("this call"));
 }
 
 // ── B  Band x UTC-Stunde ─────────────────────────────────────────────

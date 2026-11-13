@@ -36,6 +36,8 @@
 // =================================================================
 
 #include "RotorLogbookPanel.h"
+#include "core/RotorBereich.h"
+#include "gui/widgets/RotorBandWidget.h"
 #include "core/TransverterSetup.h"
 
 #include <QLoggingCategory>
@@ -89,6 +91,7 @@
 #include <QLineEdit>
 #include <QInputDialog>
 #include <QMenu>
+#include <QPointer>
 #include <cmath>
 #include <limits>
 #include <QMessageBox>
@@ -353,6 +356,26 @@ void RotorLogbookPanel::buildUi()
     quickLogBtn->setAutoDefault(true);
     setTabOrder(m_callEdit, quickLogBtn);
 
+    // ── Das Zahnrad (2026-11-12, Entwurf R) ─────────────────────────
+    //
+    // Betreiber: „viele sachen werden auch angezeigt, nicht unwichtig
+    // sind ... die wir auch in optionen einbinden können". Weltbild,
+    // Rotor-Einrichtung, Ansicht (Rose/Kugel), der eigene Locator, die
+    // QRZ-Fotos und das Logbuch stehen jetzt hier statt als Knoepfe und
+    // Zeilen im Feld. Im Feld selbst, nicht im Kopf des Gehaeuses: das
+    // Feld wohnt in vier verschiedenen Gehaeusen, und erreichbar heisst
+    // in allen.
+    m_optionenBtn = new QPushButton(QStringLiteral("⚙"), this);
+    m_optionenBtn->setObjectName(QStringLiteral("rotorLogOptions"));
+    m_optionenBtn->setStyleSheet(Style::buttonBaseStyle());
+    m_optionenBtn->setFixedWidth(30);
+    m_optionenBtn->setFocusPolicy(Qt::NoFocus);
+    m_optionenBtn->setToolTip(QStringLiteral(
+        "Options: rose or globe, world image, rotor setup, your own locator, "
+        "QRZ photos, the logbook"));
+    callRow->addWidget(m_optionenBtn);
+    connect(m_optionenBtn, &QPushButton::clicked, this, &RotorLogbookPanel::zeigeOptionen);
+
     m_rowCall = addShedRow(col, callRow, this);
 
     // Station card: portrait on top, name line below. Was a side-by-side
@@ -432,22 +455,55 @@ void RotorLogbookPanel::buildUi()
     // m_solarLine above: still maintained, not shown here.
     m_workedLine = new QLabel(QString{}, this);
     m_workedLine->setWordWrap(true);
+    m_workedLine->setAlignment(Qt::AlignHCenter);
     m_workedLine->setVisible(false);
+    // Seit Entwurf R (2026-11-12) wieder zu sehen: neu, neues Band, wie
+    // oft schon gearbeitet -- die Frage, die man beim Loggen stellt.
+    cardRow->addWidget(m_workedLine);
 
     m_rowCard = addShedRow(col, cardRow, this);
 
-    // Locators
-    auto* gridRow = new QHBoxLayout;
-    gridRow->setSpacing(6);
-    gridRow->addWidget(caption(QStringLiteral("MY"), this));
+    // ── Ablesegitter (2026-11-12, Entwurf R) ─────────────────────────
+    //
+    // Kurzweg, Langweg, Entfernung und Locator als vier Zahlen in
+    // schwarzem Glas (Hausstil: Ablesegitter, Zahlen in Monospace). Der
+    // eigene Locator steht nicht mehr im Feld -- er aendert sich fast
+    // nie und liegt hinter dem Zahnrad; das Feld bleibt als Speicher.
     m_myGrid = new QLineEdit(
         AppSettings::instance().value(kMyGridKey, QString{}).toString(), this);
     m_myGrid->setPlaceholderText(QStringLiteral("your locator"));
-    gridRow->addWidget(m_myGrid, 1);
-    gridRow->addWidget(caption(QStringLiteral("DX"), this));
+    m_myGrid->setVisible(false);
     m_dxGrid = new QLineEdit(this);
-    m_dxGrid->setPlaceholderText(QStringLiteral("their locator"));
-    gridRow->addWidget(m_dxGrid, 1);
+    m_dxGrid->setPlaceholderText(QStringLiteral("locator"));
+    m_dxGrid->setToolTip(QStringLiteral(
+        "Their locator — filled in from QRZ or the log; type one when neither knows"));
+    auto* gridRow = new QHBoxLayout;
+    gridRow->setSpacing(4);
+    auto zelle = [this, gridRow](const QString& titel, QWidget* wert) {
+        auto* box = new QWidget(this);
+        auto* v = new QVBoxLayout(box);
+        v->setContentsMargins(0, 0, 0, 0);
+        v->setSpacing(1);
+        auto* t = new QLabel(titel, box);
+        t->setFont(Style::capsFont(font(), 8));
+        t->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(Style::kTextScale));
+        v->addWidget(t);
+        v->addWidget(wert);
+        gridRow->addWidget(box, 1);
+    };
+    auto ablesung = [this]() {
+        auto* l = new QLabel(QStringLiteral("—"), this);
+        l->setStyleSheet(Style::insetValueStyle());
+        l->setMinimumHeight(22);
+        return l;
+    };
+    m_roKurz  = ablesung();
+    m_roLang  = ablesung();
+    m_roWeite = ablesung();
+    zelle(QStringLiteral("SHORT"), m_roKurz);
+    zelle(QStringLiteral("LONG"), m_roLang);
+    zelle(QStringLiteral("DIST"), m_roWeite);
+    zelle(QStringLiteral("LOC"), m_dxGrid);
     m_rowGrid = addShedRow(col, gridRow, this);
 
     // Dial and globe share one slot rather than stacking vertically: in a
@@ -463,13 +519,6 @@ void RotorLogbookPanel::buildUi()
     globeCol->setContentsMargins(0, 0, 0, 0);
     globeCol->setSpacing(4);
     globeCol->addWidget(m_globe, 1);
-    auto* worldBtn = new QPushButton(QStringLiteral("World image…"), globePage);
-    worldBtn->setStyleSheet(Style::buttonBaseStyle());
-    worldBtn->setToolTip(QStringLiteral(
-        "Paint the globe with an equirectangular world map (2:1), or "
-        "keep the schematic duotone globe and pick its land colour — "
-        "click for all of it in one menu."));
-    globeCol->addWidget(worldBtn);
 
     m_viewStack = new QStackedWidget(this);
     m_viewStack->addWidget(m_dial);
@@ -486,99 +535,39 @@ void RotorLogbookPanel::buildUi()
     // Bedienwege fuer dieselbe Sache (wie das Weltbild aussieht). Jetzt
     // beides hier, im einen Knopf, der schon fuer "wie sieht die Kugel
     // aus" zustaendig ist.
-    connect(worldBtn, &QPushButton::clicked, this, [this, worldBtn]() {
-        ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
-        const QPointer<RotorLogbookPanel> self(this);   // Menue am Fenster: am nativen Feld bekam es keinen Fensterbezug (2026-09-27)
-        QMenu& menu = *menuOwner.get();
-        QAction* small = menu.addAction(
-            QStringLiteral("Download from NASA — 2048 × 1024 (about 1 MB)"));
-        QAction* large = menu.addAction(
-            QStringLiteral("Download from NASA — 5400 × 2700 (about 7 MB)"));
-        menu.addSeparator();
-        QAction* pick = menu.addAction(QStringLiteral("Choose a file…"));
-
-        menu.addSeparator();
-        QAction* schematic = nullptr;
-        QAction* landColour = nullptr;
-        QAction* styleNatural = nullptr;
-        QAction* styleMuted = nullptr;
-        QAction* styleNight = nullptr;
-        QAction* styleCrisp = nullptr;
-        if (m_globe->hasTexture()) {
-            schematic = menu.addAction(QStringLiteral("Use schematic globe"));
-
-            // Betreiber 2026-09-02: drei Tonwertkurven gezeigt, alle drei
-            // gefielen -- also waehlbar statt entschieden. Nur sichtbar,
-            // wenn ein echtes Foto geladen ist; der schematische Globus
-            // hat sein eigenes, unabhaengiges Glimmen.
-            QMenu* styleMenu = menu.addMenu(QStringLiteral("Photo style"));
-            const WorldTexture::Style cur = WorldTexture::style();
-            styleNatural = styleMenu->addAction(QStringLiteral("Natural"));
-            styleNatural->setCheckable(true);
-            styleNatural->setChecked(cur == WorldTexture::Style::Natural);
-            styleMuted = styleMenu->addAction(QStringLiteral("Muted"));
-            styleMuted->setCheckable(true);
-            styleMuted->setChecked(cur == WorldTexture::Style::Muted);
-            styleNight = styleMenu->addAction(QStringLiteral("Night wash"));
-            styleNight->setCheckable(true);
-            styleNight->setChecked(cur == WorldTexture::Style::NightWash);
-            styleCrisp = styleMenu->addAction(QStringLiteral("Crisp"));
-            styleCrisp->setCheckable(true);
-            styleCrisp->setChecked(cur == WorldTexture::Style::Crisp);
-        } else {
-            landColour = menu.addAction(QStringLiteral("Land colour…"));
-        }
-
-        QAction* chosen = menu.exec(worldBtn->mapToGlobal(
-            QPoint(0, worldBtn->height())));
-        // Das Elternteil kann waehrend exec() gestorben sein — dann ist
-        // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
-        if (!menuOwner || !self) { return; }
-        if (chosen == small) {
-            downloadWorldImage(smallCandidates(), 0,
-                               QStringLiteral("2048 × 1024"));
-        } else if (chosen == large) {
-            downloadWorldImage(largeCandidates(), 0,
-                               QStringLiteral("5400 × 2700"));
-        } else if (chosen == pick) {
-            chooseWorldImage();
-        } else if (chosen == schematic) {
-            m_globe->clearTexture();
-            setStatus(QStringLiteral("Schematic globe"));
-        } else if (chosen == landColour) {
-            const QColor picked = QColorDialog::getColor(
-                m_globe->landColour(), this, tr("Land colour"), QColorDialog::DontUseNativeDialog);
-            if (picked.isValid()) { m_globe->setLandColour(picked); }
-        } else if (chosen == styleNatural) {
-            WorldTexture::setStyle(WorldTexture::Style::Natural);
-        } else if (chosen == styleMuted) {
-            WorldTexture::setStyle(WorldTexture::Style::Muted);
-        } else if (chosen == styleNight) {
-            WorldTexture::setStyle(WorldTexture::Style::NightWash);
-        } else if (chosen == styleCrisp) {
-            WorldTexture::setStyle(WorldTexture::Style::Crisp);
-        }
-    });
-
     // Rotor buttons
+    // ── Rotorband und Drehknoepfe (2026-11-12, Entwurf R) ──────────
+    //
+    // Das Band aus der Rotorzeile des Logbuchs (Entwurf C vom 11.11.):
+    // Nadel = Stand, Dreieck = Station. Die Knoepfe sagen, wohin sie
+    // drehen, und ein Weg hinter dem Berg heisst „blocked" (der
+    // erlaubte Bereich, core/RotorBereich.h) -- vorher sah ein gesperrter
+    // Knopf aus wie ein freier.
+    auto* bandRow = new QVBoxLayout;
+    bandRow->setSpacing(6);
+    m_rotorBand = new RotorBandWidget(this);
+    m_rotorBand->setObjectName(QStringLiteral("rotorLogBand"));
+    bandRow->addWidget(m_rotorBand);
     auto* btnRow = new QHBoxLayout;
     btnRow->setSpacing(6);
     auto* rotateBtn = new QPushButton(QStringLiteral("Rotate"), this);
+    m_rotateBtn = rotateBtn;
+    m_lpBtn = new QPushButton(QStringLiteral("LP"), this);
+    m_lpBtn->setObjectName(QStringLiteral("rotorLogLongPath"));
+    m_lpBtn->setToolTip(QStringLiteral("Turn to the long path of the station"));
     auto* stopBtn   = new QPushButton(QStringLiteral("Stop"), this);
-    // The wide "Long path" button that used to sit here was retired on
-    // 2026-08-11 (bench finding #4): it duplicated the preset row's
-    // "LP", minus LP's empty-aim hint. One control, one behaviour.
-    for (QPushButton* b : {rotateBtn, stopBtn}) {
+    for (QPushButton* b : {rotateBtn, m_lpBtn, stopBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle());
-        btnRow->addWidget(b);
+        btnRow->addWidget(b, b == stopBtn ? 0 : 1);
     }
-    auto* setupBtn = new QPushButton(QStringLiteral("Rotor…"), this);
-    setupBtn->setStyleSheet(Style::buttonBaseStyle());
-    setupBtn->setToolTip(QStringLiteral(
-        "Connect to a rotator through Hamlib's rotctld"));
-    btnRow->addWidget(setupBtn);
-    connect(setupBtn, &QPushButton::clicked,
-            this, &RotorLogbookPanel::openRotorSetupDialog);
+    connect(m_lpBtn, &QPushButton::clicked, this, [this]() {
+        if (m_kurzGrad < 0.0) { return; }
+        m_dial->setTargetBearing(std::fmod(m_kurzGrad + 180.0, 360.0));
+        beginTurn();
+        aktualisiereDrehknoepfe();
+    });
+    connect(m_dial, &RotorDialWidget::targetPicked, this,
+            [this](double) { aktualisiereDrehknoepfe(); });
 
     // ── Die zwei Knopfreihen sind gefallen (2026-08-21) ─────────────
     //
@@ -595,12 +584,13 @@ void RotorLogbookPanel::buildUi()
 
 
 
-    m_globeBtn = new QPushButton(QStringLiteral("Globe"), this);
+    // Rose oder Kugel: hinter dem Zahnrad (Entwurf R). Eine Handlung,
+    // kein versteckter Knopf -- ein Knopf ohne Platz im Layout kann nie
+    // erscheinen (tst_reachability_audit).
+    m_globeBtn = new QAction(QStringLiteral("Show the globe"), this);
+    m_globeBtn->setObjectName(QStringLiteral("rotorLogGlobeAction"));
     m_globeBtn->setCheckable(true);
-    m_globeBtn->setStyleSheet(Style::buttonBaseStyle());
-    m_globeBtn->setToolTip(QStringLiteral("Swap the dial for the globe view"));
-    btnRow->addWidget(m_globeBtn);
-    connect(m_globeBtn, &QPushButton::toggled, this, [this](bool on) {
+    connect(m_globeBtn, &QAction::toggled, this, [this](bool on) {
         m_viewStack->setCurrentIndex(on ? 1 : 0);
         // Idle spin only while the globe is the thing being looked at —
         // motion in a hidden page is wasted, and in a visible corner it
@@ -608,7 +598,8 @@ void RotorLogbookPanel::buildUi()
         m_globe->setAutoRotate(false);
         if (on) { updateGlobeFromLocators(); }
     });
-    m_rowBtn = addShedRow(col, btnRow, this);
+    bandRow->addLayout(btnRow);
+    m_rowBtn = addShedRow(col, bandRow, this);
 
     // Report + log
     auto* rstRow = new QHBoxLayout;
@@ -645,17 +636,15 @@ void RotorLogbookPanel::buildUi()
     auto* logRow = new QHBoxLayout;
     logRow->setSpacing(6);
     auto* logBtn = new QPushButton(QStringLiteral("Log QSO"), this);
+    // Der Knopf, um den es im Feld geht: in Bernstein, nicht in Gruen
+    // (Gruen heisst in Longpath „bestaetigt").
     logBtn->setStyleSheet(Style::buttonBaseStyle()
-                          + Style::greenCheckedStyle());
+                          + QStringLiteral("QPushButton { color: %1; border-color: %2; }")
+                                .arg(Style::kAmberText, Style::kAmberBorder));
+    logBtn->setMinimumHeight(30);
     logRow->addWidget(logBtn, 1);
-    auto* bookBtn = new QPushButton(QStringLiteral("Logbook…"), this);
-    bookBtn->setStyleSheet(Style::buttonBaseStyle());
-    bookBtn->setToolTip(QStringLiteral(
-        "Search, correct and export the whole log"));
-    logRow->addWidget(bookBtn);
+    // „Logbook…" steht hinter dem Zahnrad (Entwurf R).
     m_rowLog = addShedRow(col, logRow, this);
-    connect(bookBtn, &QPushButton::clicked,
-            this, &RotorLogbookPanel::openLogbookWindow);
 
     m_status = new QLabel(QString{}, this);
     m_status->setWordWrap(true);
@@ -1305,6 +1294,7 @@ void RotorLogbookPanel::ensureRotor()
         m_simTimer->stop();
         m_dial->setSimulated(false);
         m_dial->setActualBearing(az);
+        if (m_rotorBand) { m_rotorBand->setStand(az); }
         // Das Logbuch zeigt ihn auch -- nur echte Ablesungen, nie die
         // Stellvertreter-Nadel (2026-09-26).
         m_lastRotorAz = az;
@@ -2212,6 +2202,7 @@ void RotorLogbookPanel::onCallsignEdited(const QString& raw)
         m_stationLine->clear();
         m_solarLine->clear();
         m_workedLine->clear();
+        m_workedLine->setVisible(false);
         m_photo->showPlaceholder(QString{});
         m_photo->setVisible(false);
         m_hasDxPos = false;
@@ -2287,6 +2278,7 @@ void RotorLogbookPanel::updateWorkedLine(const QString& call)
 {
     if (call.trimmed().isEmpty()) {
         m_workedLine->clear();
+        m_workedLine->setVisible(false);
         return;
     }
 
@@ -2332,6 +2324,7 @@ void RotorLogbookPanel::updateWorkedLine(const QString& call)
     }
 
     m_workedLine->setText(bits.join(QStringLiteral(" · ")));
+    m_workedLine->setVisible(!bits.isEmpty());
     m_workedLine->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 11px; }").arg(colour));
 }
@@ -3054,11 +3047,17 @@ void RotorLogbookPanel::applyLocators()
             : QStringLiteral("%1 is not a valid locator").arg(mine), true);
         return;
     }
-    if (!isValidGridSquare(dx)) { return; }
+    if (!isValidGridSquare(dx)) {
+        m_kurzGrad = -1.0;
+        aktualisiereAblesung(-1.0, -1.0);
+        return;
+    }
 
     const double km  = calculateDistanceKm(mine, dx);
     const double deg = calculateBearingInDegrees(mine, dx);
     m_dial->setTargetBearing(deg);
+    m_kurzGrad = deg;
+    aktualisiereAblesung(deg, km);
     updateGlobeFromLocators();
     updateSolarLine();
     setStatus(QStringLiteral("%1 km · %2° %3")
@@ -3088,6 +3087,188 @@ void RotorLogbookPanel::updateGlobeFromLocators()
     // The sun moves; a terminator computed once at startup would be
     // visibly wrong by evening.
     m_globe->useCurrentSubsolarPoint();
+}
+
+void RotorLogbookPanel::zeigeWeltbildMenue(const QPoint& at)
+{
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<RotorLogbookPanel> self(this);   // Menue am Fenster: am nativen Feld bekam es keinen Fensterbezug (2026-09-27)
+    QMenu& menu = *menuOwner.get();
+    QAction* small = menu.addAction(
+        QStringLiteral("Download from NASA — 2048 × 1024 (about 1 MB)"));
+    QAction* large = menu.addAction(
+        QStringLiteral("Download from NASA — 5400 × 2700 (about 7 MB)"));
+    menu.addSeparator();
+    QAction* pick = menu.addAction(QStringLiteral("Choose a file…"));
+
+    menu.addSeparator();
+    QAction* schematic = nullptr;
+    QAction* landColour = nullptr;
+    QAction* styleNatural = nullptr;
+    QAction* styleMuted = nullptr;
+    QAction* styleNight = nullptr;
+    QAction* styleCrisp = nullptr;
+    if (m_globe->hasTexture()) {
+        schematic = menu.addAction(QStringLiteral("Use schematic globe"));
+
+        // Betreiber 2026-09-02: drei Tonwertkurven gezeigt, alle drei
+        // gefielen -- also waehlbar statt entschieden. Nur sichtbar,
+        // wenn ein echtes Foto geladen ist; der schematische Globus
+        // hat sein eigenes, unabhaengiges Glimmen.
+        QMenu* styleMenu = menu.addMenu(QStringLiteral("Photo style"));
+        const WorldTexture::Style cur = WorldTexture::style();
+        styleNatural = styleMenu->addAction(QStringLiteral("Natural"));
+        styleNatural->setCheckable(true);
+        styleNatural->setChecked(cur == WorldTexture::Style::Natural);
+        styleMuted = styleMenu->addAction(QStringLiteral("Muted"));
+        styleMuted->setCheckable(true);
+        styleMuted->setChecked(cur == WorldTexture::Style::Muted);
+        styleNight = styleMenu->addAction(QStringLiteral("Night wash"));
+        styleNight->setCheckable(true);
+        styleNight->setChecked(cur == WorldTexture::Style::NightWash);
+        styleCrisp = styleMenu->addAction(QStringLiteral("Crisp"));
+        styleCrisp->setCheckable(true);
+        styleCrisp->setChecked(cur == WorldTexture::Style::Crisp);
+    } else {
+        landColour = menu.addAction(QStringLiteral("Land colour…"));
+    }
+
+    QAction* chosen = menu.exec(at);
+    // Das Elternteil kann waehrend exec() gestorben sein — dann ist
+    // auch das Menue weg und `this` eine Leiche. Siehe ScopedChildWidget.h.
+    if (!menuOwner || !self) { return; }
+    if (chosen == small) {
+        downloadWorldImage(smallCandidates(), 0,
+                           QStringLiteral("2048 × 1024"));
+    } else if (chosen == large) {
+        downloadWorldImage(largeCandidates(), 0,
+                           QStringLiteral("5400 × 2700"));
+    } else if (chosen == pick) {
+        chooseWorldImage();
+    } else if (chosen == schematic) {
+        m_globe->clearTexture();
+        setStatus(QStringLiteral("Schematic globe"));
+    } else if (chosen == landColour) {
+        const QColor picked = QColorDialog::getColor(
+            m_globe->landColour(), this, tr("Land colour"), QColorDialog::DontUseNativeDialog);
+        if (picked.isValid()) { m_globe->setLandColour(picked); }
+    } else if (chosen == styleNatural) {
+        WorldTexture::setStyle(WorldTexture::Style::Natural);
+    } else if (chosen == styleMuted) {
+        WorldTexture::setStyle(WorldTexture::Style::Muted);
+    } else if (chosen == styleNight) {
+        WorldTexture::setStyle(WorldTexture::Style::NightWash);
+    } else if (chosen == styleCrisp) {
+        WorldTexture::setStyle(WorldTexture::Style::Crisp);
+    }
+    }
+
+
+// ── Entwurf R (2026-11-12) ──────────────────────────────────────────
+
+void RotorLogbookPanel::aktualisiereAblesung(double kurzGrad, double km)
+{
+    if (!m_roKurz) { return; }
+    if (kurzGrad < 0.0) {
+        m_roKurz->setText(QStringLiteral("—"));
+        m_roLang->setText(QStringLiteral("—"));
+        m_roWeite->setText(QStringLiteral("—"));
+        if (m_rotorBand) { m_rotorBand->setStation(-1.0); }
+    } else {
+        const double lang = std::fmod(kurzGrad + 180.0, 360.0);
+        m_roKurz->setText(QStringLiteral("%1°").arg(kurzGrad, 0, 'f', 0));
+        m_roLang->setText(QStringLiteral("%1°").arg(lang, 0, 'f', 0));
+        m_roWeite->setText(QStringLiteral("%1 km").arg(km, 0, 'f', 0));
+        if (m_rotorBand) { m_rotorBand->setStation(kurzGrad); }
+    }
+    aktualisiereDrehknoepfe();
+}
+
+void RotorLogbookPanel::aktualisiereDrehknoepfe()
+{
+    if (!m_rotateBtn || !m_lpBtn) { return; }
+    const RotorBereich bereich = RotorBereich::load();
+    if (m_dial->hasTarget()) {
+        const double ziel = m_dial->targetBearing();
+        const bool frei = bereich.erlaubt(ziel);
+        m_rotateBtn->setText(frei ? QStringLiteral("Rotate %1°").arg(ziel, 0, 'f', 0)
+                                  : QStringLiteral("%1° — blocked").arg(ziel, 0, 'f', 0));
+        m_rotateBtn->setEnabled(frei);
+        m_rotateBtn->setToolTip(frei ? QStringLiteral("Turn the antenna to %1°").arg(ziel, 0, 'f', 0)
+                                     : QStringLiteral("%1° is outside the rotor's allowed range "
+                                                      "(Rotor setup)").arg(ziel, 0, 'f', 0));
+    } else {
+        m_rotateBtn->setText(QStringLiteral("Rotate"));
+        m_rotateBtn->setEnabled(true);
+    }
+    if (m_kurzGrad >= 0.0) {
+        const double lang = std::fmod(m_kurzGrad + 180.0, 360.0);
+        const bool frei = bereich.erlaubt(lang);
+        m_lpBtn->setText(frei ? QStringLiteral("LP %1°").arg(lang, 0, 'f', 0)
+                              : QStringLiteral("LP %1° — blocked").arg(lang, 0, 'f', 0));
+        m_lpBtn->setEnabled(frei);
+    } else {
+        m_lpBtn->setText(QStringLiteral("LP"));
+        m_lpBtn->setEnabled(false);
+    }
+}
+
+void RotorLogbookPanel::zeigeOptionen()
+{
+    ScopedChildWidget<QMenu> menuOwner(window());   // stirbt nicht mit dem Rahmen, siehe ScopedChildWidget.h
+    const QPointer<RotorLogbookPanel> self(this);
+    QMenu& menu = *menuOwner.get();
+    menu.addSection(QStringLiteral("Rotor / Log"));
+    QAction* rose = menu.addAction(QStringLiteral("Show the rose"));
+    QAction* kugel = menu.addAction(QStringLiteral("Show the globe"));
+    rose->setCheckable(true);
+    kugel->setCheckable(true);
+    const bool globus = m_globeBtn && m_globeBtn->isChecked();
+    rose->setChecked(!globus);
+    kugel->setChecked(globus);
+    QAction* welt = menu.addAction(QStringLiteral("World image…"));
+    menu.addSeparator();
+    QAction* rotor = menu.addAction(QStringLiteral("Rotor setup…"));
+    const QString mein = m_myGrid->text().trimmed().toUpper();
+    QAction* locator = menu.addAction(mein.isEmpty()
+        ? QStringLiteral("Your locator…")
+        : QStringLiteral("Your locator: %1…").arg(mein));
+    QAction* foto = menu.addAction(QStringLiteral("Show QRZ photos"));
+    foto->setCheckable(true);
+    foto->setChecked(AppSettings::instance().value(kShowPhotoKey, true).toBool());
+    menu.addSeparator();
+    QAction* buch = menu.addAction(QStringLiteral("Open logbook…"));
+
+    const QPoint at = m_optionenBtn->mapToGlobal(
+        QPoint(m_optionenBtn->width() - menu.sizeHint().width(), m_optionenBtn->height() + 2));
+    QAction* gewaehlt = menu.exec(at);
+    if (!menuOwner || !self) { return; }
+    if (gewaehlt == rose) {
+        m_globeBtn->setChecked(false);
+    } else if (gewaehlt == kugel) {
+        m_globeBtn->setChecked(true);
+    } else if (gewaehlt == welt) {
+        if (!m_globeBtn->isChecked()) { m_globeBtn->setChecked(true); }
+        zeigeWeltbildMenue(at);
+    } else if (gewaehlt == rotor) {
+        openRotorSetupDialog();
+    } else if (gewaehlt == locator) {
+        bool ok = false;
+        const QString neu = QInputDialog::getText(this, QStringLiteral("Your locator"),
+            QStringLiteral("Your own Maidenhead locator (4 or 6 characters):"),
+            QLineEdit::Normal, mein, &ok).trimmed().toUpper();
+        if (ok && !neu.isEmpty()) { m_myGrid->setText(neu); }
+    } else if (gewaehlt == foto) {
+        AppSettings::instance().setValue(kShowPhotoKey, foto->isChecked());
+        if (!foto->isChecked()) {
+            m_photo->showPlaceholder(QString{});
+            m_photo->setVisible(false);
+        }
+        setStatus(foto->isChecked() ? QStringLiteral("QRZ photos on — from the next lookup")
+                                    : QStringLiteral("QRZ photos off"));
+    } else if (gewaehlt == buch) {
+        openLogbookWindow();
+    }
 }
 
 } // namespace Longpath
