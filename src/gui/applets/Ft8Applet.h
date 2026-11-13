@@ -178,9 +178,10 @@ public:
     /// `NeuesGrid` steht zwischen Land und CQ: ein Land, das fehlt,
     /// ist mehr wert als ein Feld, das fehlt -- und beides mehr als
     /// ein beliebiges CQ.
-    enum class Zeilenart { AnMich, NeuesLand, NeuesGrid, Cq, Gewoehnlich };
+    enum class Zeilenart { AnMich, NeuesLand, NeuesGrid, NeuesGridBand,
+                           Cq, Gewoehnlich };
     static Zeilenart zeilenart(bool anMich, bool neuesLand, bool neuesGrid,
-                               bool istCq);
+                               bool neuesGridBand, bool istCq);
 
     /// Die Spaltenueberschrift ueber der Fundliste. Aus DENSELBEN
     /// Breiten wie `zeilentext` -- zwei Stellen mit eigenen Zahlen
@@ -368,6 +369,15 @@ public:
     /// Die gearbeiteten Grossfelder, um im Lauf ein Logbuch zu
     /// stellen statt eine ADIF-Datei unterzuschieben.
     GridsGearbeitet& gridsForTest() { return m_grids; }
+    Longpath::LocatorMosaik& mosaikForTest() { return m_mosaik; }
+    /// Die Zeilenart der zuletzt gemerkten Fundzeile (2026-11-12).
+    /// Ohne diesen Zugang laesst sich die zweite Stufe gar nicht
+    /// belegen: im Text der Liste sehen „ganz neues Feld" und „auf
+    /// diesem Band neu" gleich aus, sie unterscheiden sich nur in
+    /// der Farbe -- und eine Farbe aus einem QPlainTextEdit
+    /// zurueckzulesen waere eine Pruefung der Schriftart, nicht des
+    /// Weges.
+    Zeilenart letzteZeilenartForTest() const;
     QPushButton*    sichtAllesButtonForTest() const { return m_sichtAlles; }
     QPushButton*    sichtAnMichButtonForTest() const { return m_sichtAnMich; }
     QPushButton*    sichtFreqButtonForTest() const { return m_sichtFreq; }
@@ -476,6 +486,10 @@ private:
         bool    istCq{false};
         bool    neuesLand{false};
         bool    neuesGrid{false};
+        /// Das Feld steht im Logbuch, aber NICHT auf diesem Band
+        /// (2026-11-12). Die schwaechere der beiden Stufen; siehe
+        /// `Zeilenart::NeuesGridBand`.
+        bool    neuesGridBand{false};
         QColor  landFarbe;
         bool    eigeneSendung{false};
     };
@@ -642,6 +656,18 @@ private:
     /// 2026-10-30: „interessant waere zu sehen, welche grids ich
     /// noch nicht habe und diese dann zb blau zu markieren."
     GridsGearbeitet  m_grids;
+    /// ── Dasselbe je Band (2026-11-12) ───────────────────────────
+    ///
+    /// Betreiber: die Locatorjagd „sollte optimiert werden und eher am
+    /// programm ft8 und nicht im logprogramm zu finden sein."
+    ///
+    /// `m_grids` beantwortet nur „steht dieses Feld irgendwo im
+    /// Logbuch". Das Mosaik beantwortet dieselbe Frage JE BAND --
+    /// genau die Stufe, die es bei den Laendern mit DxccStatus
+    /// (NewDxcc / NewBand) laengst gibt und bei den Feldern fehlte.
+    /// Bis heute stand diese Rechnung nur hinter der Karte im
+    /// Logbuchfenster, also dort, wo niemand FT8 fährt.
+    Longpath::LocatorMosaik m_mosaik;
     QPushButton*     m_sichtNeuesGrid{nullptr};
 
     Ft8Warteschlange m_schlange;

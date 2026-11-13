@@ -293,30 +293,52 @@ private slots:
         using Art = Ft8Applet::Zeilenart;
 
         // an mich schlaegt alles
-        QCOMPARE(Ft8Applet::zeilenart(true, true, true, true), Art::AnMich);
-        QCOMPARE(Ft8Applet::zeilenart(true, false, false, false),
+        QCOMPARE(Ft8Applet::zeilenart(true, true, true, false, true), Art::AnMich);
+        QCOMPARE(Ft8Applet::zeilenart(true, false, false, false, false),
                  Art::AnMich);
         // neues Land OHNE CQ -> trotzdem hervorgehoben
-        QCOMPARE(Ft8Applet::zeilenart(false, true, false, false),
+        QCOMPARE(Ft8Applet::zeilenart(false, true, false, false, false),
                  Art::NeuesLand);
         // neues Land MIT CQ -> das Land schlaegt das CQ
-        QCOMPARE(Ft8Applet::zeilenart(false, true, false, true),
+        QCOMPARE(Ft8Applet::zeilenart(false, true, false, false, true),
                  Art::NeuesLand);
         // ── Das neue Grossfeld (2026-10-30) ───────────────────
         //
         // Zwischen Land und CQ. Ein fehlendes LAND ist mehr wert als
         // ein fehlendes Feld -- wer beides hat, will das Land sehen.
-        QCOMPARE(Ft8Applet::zeilenart(false, true, true, false),
+        QCOMPARE(Ft8Applet::zeilenart(false, true, true, false, false),
                  Art::NeuesLand);
-        QCOMPARE(Ft8Applet::zeilenart(false, false, true, false),
+        QCOMPARE(Ft8Applet::zeilenart(false, false, true, false, false),
                  Art::NeuesGrid);
         // ... und es schlaegt das CQ, aus demselben Grund wie das Land.
-        QCOMPARE(Ft8Applet::zeilenart(false, false, true, true),
+        QCOMPARE(Ft8Applet::zeilenart(false, false, true, false, true),
                  Art::NeuesGrid);
+        // ── Die zweite Stufe: fehlt nur auf DIESEM Band (2026-11-12) ──
+        //
+        // Betreiber heute: die Locatorjagd „sollte optimiert werden und
+        // eher am programm ft8 und nicht im logprogramm zu finden sein."
+        // Bis dahin kannte das FT8-Fenster nur „steht nirgends im
+        // Logbuch" -- die Rechnung je Band stand allein hinter der
+        // Karte im Logbuch.
+        //
+        // Unter dem ganz fehlenden Feld, denn ein Feld, das man noch
+        // NIE hatte, ist mehr wert als eines, das nur auf diesem Band
+        // fehlt:
+        QCOMPARE(Ft8Applet::zeilenart(false, false, true, true, false),
+                 Art::NeuesGrid);
+        QCOMPARE(Ft8Applet::zeilenart(false, false, false, true, false),
+                 Art::NeuesGridBand);
+        // ... aber ueber dem CQ: ein CQ ist ein Angebot, ein fehlendes
+        // Band ist ein Grund.
+        QCOMPARE(Ft8Applet::zeilenart(false, false, false, true, true),
+                 Art::NeuesGridBand);
+        // Und unter dem Land, wie das ganz fehlende Feld auch.
+        QCOMPARE(Ft8Applet::zeilenart(false, true, false, true, false),
+                 Art::NeuesLand);
         // nur CQ
-        QCOMPARE(Ft8Applet::zeilenart(false, false, false, true), Art::Cq);
+        QCOMPARE(Ft8Applet::zeilenart(false, false, false, false, true), Art::Cq);
         // ein fremdes QSO
-        QCOMPARE(Ft8Applet::zeilenart(false, false, false, false),
+        QCOMPARE(Ft8Applet::zeilenart(false, false, false, false, false),
                  Art::Gewoehnlich);
     }
 
