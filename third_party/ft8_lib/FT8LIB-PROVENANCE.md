@@ -131,6 +131,45 @@ Locator-Schranken-Fall wurde dabei geschärft — er prüft jetzt auf
 ebenfalls einen Fehler lieferte (nur einen anderen) und ein „irgendein
 Fehler" nichts belegt hätte.
 
+### Erweiterung: a-priori-Dekodierung — 2026-11-13
+
+**Warum:** Wer auf mein CQ antwortet, schreibt MEIN Rufzeichen in die
+Nachricht. Das steht fest, bevor ein einziges Bit entziffert ist. Diese
+Gewissheit in die Fehlerkorrektur einzuspeisen holt die schwachen
+Schlusszeichen heraus (RR73, 73), an denen ein QSO sonst unvollendet
+liegen bleibt. ft8_lib kann es von sich aus nicht; WSJT-X und JTDX tun
+es seit Jahren.
+
+**Gemessen** (`tests/tst_ft8_apriori.cpp`, derselbe Rauschmaßstab wie
+`tst_ft8_stoerabstand`, Bezug 2500 Hz):
+
+| | Grenze |
+| --- | --- |
+| ohne Vorwissen | −18,0 dB |
+| mit Vorwissen | −22,0 dB |
+| **Gewinn** | **4,0 dB** |
+
+**Geändert, je als `Longpath-Abweichung (2026-11-13)` im Quelltext
+markiert:**
+
+* `ft8/ldpc.h` + `ldpc.c` — neu `bp_decode_ap()`: dieselbe Rechnung wie
+  `bp_decode`, aber maskierte Bits nehmen keine Korrektur der
+  Prüfknoten an. `bp_decode()` ruft sie jetzt mit leerer Maske, statt
+  die Schleife zu doppeln. Vorbild: WSJT-X `lib/ft8/decode174_91.f90:55`.
+* `ft8/decode.h` + `decode.c` — neu `ftx_decode_candidate_ap()`: setzt
+  nach `ftx_normalize_logl` die bekannten Bits auf ein Prozent über dem
+  größten gemessenen Betrag (WSJT-X `ft8b.f90:241`) und dekodiert mit
+  Maske. `ftx_decode_candidate()` ruft sie ohne Vorgaben — Verhalten
+  unverändert, belegt durch alle 25 FT8-Prüfläufe.
+
+**Die Sicherung bleibt der CRC.** Eine Maske, die danebenliegt, erzeugt
+ein Codewort, das die Prüfsumme nicht besteht; die Nachricht fällt durch
+wie jedes Rauschen. Falsche Vorgaben kosten Rechenzeit, keine
+Richtigkeit — eigens geprüft in `falschesVorwissenErfindetKeinQso`.
+
+Die Masken selbst stehen NICHT hier, sondern in `src/core/Ft8Apriori.h`:
+sie hängen an Rufzeichen und Betriebsart, nicht am fremden Quelltext.
+
 ### Erweiterung: Typ 5 SENDEN — 2026-11-04
 
 | Datei | Was |

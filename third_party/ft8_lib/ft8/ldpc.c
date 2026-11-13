@@ -129,6 +129,15 @@ static int ldpc_check(uint8_t codeword[])
 
 void bp_decode(float codeword[], int max_iters, uint8_t plain[], int* ok)
 {
+    // Longpath 2026-11-13: ein Durchgang ohne bekannte Bits ist genau
+    // der alte. Eine zweite Abschrift der Schleife waere die Stelle,
+    // an der die beiden Fassungen eines Tages auseinanderlaufen.
+    bp_decode_ap(codeword, 0, max_iters, plain, ok);
+}
+
+void bp_decode_ap(float codeword[], const uint8_t* ap_mask, int max_iters,
+                  uint8_t plain[], int* ok)
+{
     float tov[FTX_LDPC_N][3];
     float toc[FTX_LDPC_M][7];
 
@@ -146,7 +155,12 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int* ok)
         int plain_sum = 0;
         for (int n = 0; n < FTX_LDPC_N; ++n)
         {
-            plain[n] = ((codeword[n] + tov[n][0] + tov[n][1] + tov[n][2]) > 0) ? 1 : 0;
+            // Longpath 2026-11-13: ein bekanntes Bit nimmt keine
+            // Korrektur an -- siehe decode174_91.f90:55.
+            const float summe = (ap_mask && ap_mask[n])
+                                    ? codeword[n]
+                                    : (codeword[n] + tov[n][0] + tov[n][1] + tov[n][2]);
+            plain[n] = (summe > 0) ? 1 : 0;
             plain_sum += plain[n];
         }
 
@@ -178,11 +192,16 @@ void bp_decode(float codeword[], int max_iters, uint8_t plain[], int* ok)
                 int n = kFTX_LDPC_Nm[m][n_idx] - 1;
                 // for each (n, m)
                 float Tnm = codeword[n];
-                for (int m_idx = 0; m_idx < 3; ++m_idx)
+                // Longpath 2026-11-13: ein bekanntes Bit gibt seine
+                // Ueberzeugung weiter, nimmt aber keine entgegen.
+                if (!ap_mask || !ap_mask[n])
                 {
-                    if ((kFTX_LDPC_Mn[n][m_idx] - 1) != m)
+                    for (int m_idx = 0; m_idx < 3; ++m_idx)
                     {
-                        Tnm += tov[n][m_idx];
+                        if ((kFTX_LDPC_Mn[n][m_idx] - 1) != m)
+                        {
+                            Tnm += tov[n][m_idx];
+                        }
                     }
                 }
                 toc[m][n_idx] = fast_tanh(-Tnm / 2);

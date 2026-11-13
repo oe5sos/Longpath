@@ -89,6 +89,39 @@ int ftx_find_candidates(const ftx_waterfall_t* power, int num_candidates, ftx_ca
 /// @return True if the decoding was successful, false otherwise (check status for details)
 bool ftx_decode_candidate(const ftx_waterfall_t* power, const ftx_candidate_t* cand, int max_iterations, ftx_message_t* message, ftx_decode_status_t* status);
 
+// ── Longpath-Abweichung (2026-11-13): a-priori-Dekodierung ──────────
+//
+// Dasselbe wie `ftx_decode_candidate`, aber mit bekannten Bits.
+//
+// WOFUER: Wer auf mein CQ antwortet, schreibt MEIN Rufzeichen in die
+// Nachricht -- das steht fest, bevor ein einziges Bit entziffert ist.
+// Diese Gewissheit in die Entscheidung einzuspeisen, holt genau die
+// schwachen Schlusszeichen heraus (RR73, 73), an denen ein QSO sonst
+// unvollendet liegen bleibt. ft8_lib kann es von sich aus nicht.
+//
+// Vorbild: WSJT-X `lib/ft8/ft8b.f90:300ff` (Masken je Typ) und
+// `lib/ft8/decode174_91.f90:55` (wie die Maske im Dekoder wirkt).
+//
+// `ap_bits` und `ap_mask` zeigen auf je FTX_LDPC_N Flaggen (0/1); wo
+// `ap_mask[i]` gesetzt ist, gilt das Bit `ap_bits[i]` als bekannt.
+// Sind beide NULL, ist das Ergebnis Bit fuer Bit das von
+// `ftx_decode_candidate`.
+//
+// Bits, nicht Zuverlaessigkeiten: wie STARK eine Gewissheit wiegen
+// muss, haengt davon ab, wie stark das gemessene Signal ist, und das
+// weiss nur diese Funktion. Sie nimmt darum WSJT-X' Mass -- ein
+// Prozent ueber dem groessten gemessenen Betrag (`ft8b.f90:241`,
+// `apmag=maxval(abs(llra))*1.01`). Der Aufrufer sagt WAS er weiss,
+// nicht wie laut er es sagen darf.
+//
+// ACHTUNG: Ein Treffer ist KEIN Beweis, dass geraten richtig war --
+// er ist einer, weil der CRC stimmt. Darum darf der Aufrufer die
+// Masken frei waehlen, aber niemals die CRC-Pruefung ueberspringen.
+bool ftx_decode_candidate_ap(const ftx_waterfall_t* power, const ftx_candidate_t* cand,
+                             int max_iterations,
+                             const uint8_t* ap_bits, const uint8_t* ap_mask,
+                             ftx_message_t* message, ftx_decode_status_t* status);
+
 #ifdef __cplusplus
 }
 #endif
