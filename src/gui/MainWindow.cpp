@@ -10777,7 +10777,27 @@ void MainWindow::populateDefaultMeter()
                 // Formatfuellend ueber showMaximized(), nicht ueber
                 // das rahmenlose Vollbild -- siehe den Block darueber.
                 if (m_borderlessFullSize) { exitBorderlessFullSize(); }
-                if (!isMaximized()) { showMaximized(); }
+                if (!isMaximized()) {
+                    showMaximized();
+                } else if (const QScreen* schirm = screen();
+                           schirm && ragtUeberDenFreienPlatz(frameGeometry(),
+                                                             schirm->availableGeometry())) {
+                    // ── Maximiert, aber groesser als der freie Platz ──
+                    //
+                    // Protokoll 12.11., 17:17: CONTEST -> Neu, das
+                    // Hauptfenster stand noch 1470x923 -- bis unter das
+                    // Dock -- und galt als maximiert. showMaximized()
+                    // wurde uebersprungen, und die Fenster von „Neu"
+                    // wurden von 865 auf 923 hochgerechnet; beim naechsten
+                    // Start (867) wieder herunter. macOS zieht ein
+                    // gezoomtes Fenster nicht nach, wenn das Dock wieder
+                    // Platz braucht. Also neu maximieren.
+                    qWarning() << "[ProfileApply] maximiert, aber" << frameGeometry()
+                               << "statt" << schirm->availableGeometry()
+                               << "-- neu maximiert";
+                    showNormal();
+                    showMaximized();
+                }
 
                 // Erst das Weltbild: es loest den Geber aus, und die
                 // Ansichten sollen einmal neu zeichnen und nicht
@@ -17737,6 +17757,22 @@ bool MainWindow::schwebendeNachProfilrahmen()
     const QRect neu = frameGeometry();
     m_profilRahmenOffen = false;
     m_hauptrahmenBasis = neu;
+
+    // ── Unterhalb des Rasters ist es dasselbe Hauptfenster (2026-11-13) ──
+    //
+    // Betreiber: „oft nervt es, dass ich zum 20 mal ... die fenster zum
+    // beispiel verschoben haben". Sein Protokoll vom 12.11.: bei JEDEM
+    // Start `Profilrahmen 1470x867 -> 1470x865 : 7 schwebende Fenster
+    // umgerechnet`, danach 4 bis 9 aus den Leisten geschoben. Das
+    // maximierte Fenster kommt mal 865, mal (nach dem Raster) 867 hoch --
+    // zwei Punkte, und alle Fenster wurden neu gerechnet, gerundet,
+    // gesichert, beim naechsten Start wieder. Unterhalb des Rasters
+    // bleiben sie, wo das Profil sie hingestellt hat.
+    if (istRasterNachhall(neu, m_profilRahmen)) {
+        qCInfo(lcContainer) << "Profilrahmen" << m_profilRahmen << "->" << neu
+                            << ": gleich bis aufs Raster, nichts umgerechnet";
+        return true;
+    }
     const int bewegt = schwebendeUmrechnen(m_profilRahmen, neu, true);
     qCInfo(lcContainer) << "Profilrahmen" << m_profilRahmen << "->" << neu << ":"
                         << bewegt << "schwebende Fenster umgerechnet";

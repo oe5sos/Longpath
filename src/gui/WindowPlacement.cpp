@@ -361,6 +361,18 @@ bool istRasterNachhall(const QRect& jetzt, const QRect& vorher, int grid)
         && qAbs(jetzt.width() - vorher.width()) < grid + grid / 2
         && qAbs(jetzt.height() - vorher.height()) < grid + grid / 2;
 }
+bool ragtUeberDenFreienPlatz(const QRect& rahmen, const QRect& frei, int grid)
+{
+    if (!rahmen.isValid() || !frei.isValid()) { return false; }
+    // Um weniger als das Raster daneben ist kein Ueberstand: das
+    // maximierte Fenster steht mal bei (1,33 1468x865), mal eingerastet
+    // bei (0,33 1470x867).
+    return rahmen.left()   < frei.left()   - grid
+        || rahmen.top()    < frei.top()    - grid
+        || rahmen.right()  > frei.right()  + grid
+        || rahmen.bottom() > frei.bottom() + grid;
+}
+
 EigeneBewegungBruecke::EigeneBewegungBruecke()  { ++s_eigeneBewegungen; }
 EigeneBewegungBruecke::~EigeneBewegungBruecke() { --s_eigeneBewegungen; }
 

@@ -55,6 +55,11 @@ void Ft8Stream::setClock(std::function<qint64()> utcMs)
     if (utcMs) { m_uhr = std::move(utcMs); }
 }
 
+void Ft8Stream::setVorwissenQuelle(std::function<QVector<ApVorgabe>()> quelle)
+{
+    m_vorwissenQuelle = std::move(quelle);
+}
+
 int Ft8Stream::slotMs() const
 {
     return m_protocol == Ft8Decoder::Protocol::Ft4 ? 7500 : 15000;
@@ -152,10 +157,17 @@ void Ft8Stream::schliesseFenster(qint64 neuerBeginnMs)
         if (durchgaenge < 1) { durchgaenge = 1; }
         if (durchgaenge > 3) { durchgaenge = 3; }
 
+        // Je Fenster frisch geholt: zwischen zwei Durchgaengen kann
+        // das QSO gewechselt haben, und ein Vorwissen von vorhin
+        // zeigt dann auf das falsche Gegenueber.
+        const QVector<ApVorgabe> vorwissen =
+            m_vorwissenQuelle ? m_vorwissenQuelle() : QVector<ApVorgabe>{};
+
         const auto funde = Ft8Decoder::decodeBlock(m_fenster.constData() + versatz,
                                                    m_fenster.size() - versatz,
                                                    m_protocol,
-                                                   durchgaenge);
+                                                   durchgaenge,
+                                                   vorwissen);
         qCInfo(lcFt8).noquote()
             << QStringLiteral("Fenster: %1 Funde, %2 Runde(n), %3")
                    .arg(funde.size())

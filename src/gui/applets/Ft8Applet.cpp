@@ -15,6 +15,7 @@
 #include "core/Ft8Stream.h"
 #include "core/Ft8Ablauf.h"
 #include "core/Ft8Tx.h"
+#include "core/AdifLog.h"
 #include "core/LogbookDatei.h"
 #include "gui/widgets/Ft8Fensterbalken.h"
 #include "models/Band.h"
@@ -137,6 +138,34 @@ Ft8Applet::Ft8Applet(RadioModel* model, QWidget* parent)
 
     m_stream = new Ft8Stream(this);
     connect(m_stream, &Ft8Stream::decoded, this, &Ft8Applet::onDecoded);
+
+    // ── Was vor dem Hinhoeren schon feststeht (2026-11-13) ─────────
+    //
+    // Der Strom holt sich die Vorgabe je Fenster hier ab, statt dass
+    // sie ihm zugeschoben wird: nur dieses Fenster weiss, mit WEM
+    // gerade ein QSO laeuft, und das wechselt mitten im Betrieb.
+    //
+    // Die Rangfolge ist Absicht und entscheidet mit: der erste
+    // Treffer gewinnt, also steht die staerkste Gewissheit vorn.
+    // Laeuft ein QSO, sind beide Rufzeichen bekannt -- das ist die
+    // Vorgabe, die den Schluss rettet (RR73, 73). Sonst bleibt „wer
+    // immer mich ruft".
+    m_stream->setVorwissenQuelle([this]() {
+        QVector<Longpath::ApVorgabe> v;
+        const QString meiner = eigenesRufzeichen();
+        if (meiner.isEmpty()) { return v; }
+
+        const QString partner = m_ablauf.laeuft() ? m_ablauf.partner()
+                                                  : QString();
+        if (!partner.isEmpty()) {
+            auto a = Longpath::baueApVorgabe(
+                Longpath::ApTyp::MeinRufUndSeiner, meiner, partner);
+            if (a.brauchbar) { v.push_back(a); }
+        }
+        auto b = Longpath::baueApVorgabe(Longpath::ApTyp::MeinRuf, meiner);
+        if (b.brauchbar) { v.push_back(b); }
+        return v;
+    });
 
     if (m_model) {
         // Dieselbe Sicherung wie beim CW-Dekoder: eine fallengelassene
@@ -586,8 +615,10 @@ void Ft8Applet::buildUI()
     m_sichtCq->setToolTip(tr("Only CQ calls."));
     m_sichtNeuesLand->setToolTip(tr("Only countries that are not in the "
                                     "log yet."));
-    m_sichtNeuesGrid->setToolTip(tr("Only grid squares that are not in "
-                                    "the log yet.\nBlue in the list."));
+    m_sichtNeuesGrid->setToolTip(tr("Grid squares you still need. Blue "
+                                    "in the list: not in the log at all. "
+                                    "Dimmed blue: in the log, but not on "
+                                    "this band."));
 
     // ── Das Logbuch einmal lesen (2026-10-30) ────────────────────
     //
@@ -605,6 +636,24 @@ void Ft8Applet::buildUI()
         qCInfo(lcFt8Senden).noquote()
             << "Grossfelder aus dem Logbuch:" << m_grids.anzahl()
             << "verschiedene aus" << gelesen << "Eintraegen";
+
+        // ── Dieselbe Datei, je Band gelesen (2026-11-12) ──────────
+        //
+        // Zweimal lesen, nicht einmal: `GridsGearbeitet` zieht nur die
+        // Felder heraus und ist darum billig, das Mosaik braucht die
+        // ganzen Eintraege (Band, Betriebsart, Bestaetigung). Beides
+        // laeuft EINMAL beim Bauen des Fensters, nicht je Fund.
+        //
+        // `nurFt8` bleibt falsch: ein Feld, das in SSB im Logbuch
+        // steht, ist gearbeitet. Wer es in FT8 noch sucht, sucht ein
+        // Band-und-Modus-Haekchen -- das ist eine andere Frage, und
+        // sie bekommt erst eine Bedienung, wenn der Betreiber sie
+        // stellt.
+        const QVector<LogEntry> log = AdifLog::read(LogbookDatei::pfad());
+        m_mosaik.baue(log, false);
+        qCInfo(lcFt8Senden).noquote()
+            << "Mosaik je Band:" << m_mosaik.baender().size()
+            << "Baender aus" << log.size() << "Eintraegen";
     }
     m_sichtFreq->setToolTip(tr("Decodes within 50 Hz of your transmit "
                                "tone, plus anything addressed to you — "
@@ -2752,14 +2801,27 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
 // appendHtml(): die Liste steht in fester Schrittweite, und HTML
 // faltet mehrfache Leerzeichen zusammen -- die Spalten (Zeit, dB, DT,
 // Hz) stuenden danach nicht mehr untereinander.
+Ft8Applet::Zeilenart Ft8Applet::letzteZeilenartForTest() const
+{
+    if (m_zeilen.isEmpty()) { return Zeilenart::Gewoehnlich; }
+    const Fundzeile& z = m_zeilen.last();
+    return zeilenart(z.anMich, z.neuesLand, z.neuesGrid, z.neuesGridBand,
+                     z.istCq);
+}
+
 Ft8Applet::Zeilenart Ft8Applet::zeilenart(bool anMich, bool neuesLand,
-                                         bool neuesGrid, bool istCq)
+                                         bool neuesGrid,
+                                         bool neuesGridBand, bool istCq)
 {
     if (anMich)    { return Zeilenart::AnMich; }
     if (neuesLand) { return Zeilenart::NeuesLand; }
     // Zwischen Land und CQ: ein fehlendes Land ist mehr wert als ein
     // fehlendes Feld, und beides mehr als ein beliebiges CQ.
     if (neuesGrid) { return Zeilenart::NeuesGrid; }
+    // Darunter die schwaechere Stufe (2026-11-12): das Feld ist im
+    // Logbuch, aber nicht auf diesem Band. Sie steht VOR dem CQ --
+    // ein CQ ist nur ein Angebot, ein fehlendes Band ist ein Grund.
+    if (neuesGridBand) { return Zeilenart::NeuesGridBand; }
     if (istCq)     { return Zeilenart::Cq; }
     return Zeilenart::Gewoehnlich;
 }
@@ -2919,7 +2981,23 @@ bool Ft8Applet::inSicht(const Fundzeile& z) const
     case Sicht::AnMich: return z.anMich;
     case Sicht::Cq:     return z.istCq || z.anMich;
     case Sicht::NeuesLand: return z.neuesLand || z.anMich;
-    case Sicht::NeuesGrid: return z.neuesGrid || z.anMich;
+    // Nur ganz fehlende Felder (2026-11-13).
+    //
+    // Der Filter zeigte bis heute beide Stufen: ganz fehlende Felder UND
+    // solche, die nur auf diesem Band noch fehlen. Begruendung damals:
+    // „wer die Jagd einschaltet, will das Band voll sehen."
+    //
+    // Betreiber am Geraet: „hier sind einige grids, die sicher schon
+    // hatte -- hier sollen nur jene stehen, die ich noch nicht erreicht
+    // habe." An seinen Zahlen nachgerechnet, auf 20 m: JN79 (hat er auf
+    // 15 m, 2 m, 40 m), KP30 (15 m, 6 m), KO26 (10 m, 15 m, 6 m, 80 m)
+    // -- alle drei standen als „neu" da, und keines davon ist neu.
+    //
+    // Die zweite Stufe ist damit nicht weg, nur nicht mehr in diesem
+    // Filter: ihre Farbe bleibt und ist in „All" zu sehen. Eine Jagd
+    // nach fehlenden Feldern ist eine Liste dessen, was fehlt.
+    case Sicht::NeuesGrid:
+        return z.neuesGrid || z.anMich;
     case Sicht::MeineFrequenz:
         // Dieselbe Regel wie frueher die rechte Spalte: das Fenster
         // ist die Signalbreite von FT8/FT4 (50 Hz), kein gegriffener
@@ -2950,7 +3028,8 @@ void Ft8Applet::haengeAn(const Fundzeile& z)
         f.setFontWeight(QFont::Bold);
     } else {
         const Zeilenart art = zeilenart(z.anMich, z.neuesLand,
-                                        z.neuesGrid, z.istCq);
+                                        z.neuesGrid, z.neuesGridBand,
+                                        z.istCq);
         if (art == Zeilenart::AnMich) {
             f.setForeground(QColor(QString::fromLatin1(Style::kGreenText)));
             f.setFontWeight(QFont::Bold);
@@ -2979,6 +3058,17 @@ void Ft8Applet::haengeAn(const Fundzeile& z)
             // Feld, und wenn beides fett waere, hoben sich die
             // Stufen gegenseitig auf.
             f.setForeground(QColor(QString::fromLatin1(Style::kAccent)));
+        } else if (art == Zeilenart::NeuesGridBand) {
+            // ── Dasselbe Blau, leiser (2026-11-12) ──────────────
+            //
+            // Das Feld fehlt nur auf DIESEM Band. Keine zweite Farbe
+            // dafuer: zwei Blaus nebeneinander waeren schon zwei zu
+            // viel, und die Stufe soll man sehen, ohne sie zu lesen.
+            // Also dieselbe Farbe, dunkler gestellt -- genau die
+            // Rangfolge, die „nicht fett" schon zwischen Land und
+            // Feld herstellt.
+            f.setForeground(
+                QColor(QString::fromLatin1(Style::kAccent)).darker(145));
         } else if (art == Zeilenart::Cq) {
             f.setForeground(QColor(QString::fromLatin1(Style::kAmberText)));
         } else {
@@ -3131,8 +3221,31 @@ void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
     // `leer()` schuetzt vor der schlimmsten Form: ohne gelesenes
     // Logbuch waere JEDES Feld neu, und die Markierung sagte nichts
     // mehr. Dann lieber keine.
-    if (!m_grids.leer()) {
-        z.neuesGrid = m_grids.istNeu(locatorAusNachricht(nachricht));
+    const QString locator = locatorAusNachricht(nachricht);
+    if (!m_grids.leer() && !locator.isEmpty()) {
+        z.neuesGrid = m_grids.istNeu(locator);
+
+        // ── Und die zweite Stufe: neu AUF DIESEM BAND (2026-11-12) ──
+        //
+        // Nur wenn das Feld nicht ohnehin ganz fehlt -- sonst stuenden
+        // beide Fahnen an derselben Zeile und die schwaechere
+        // entwertete die staerkere.
+        //
+        // `baender()` leer heisst: kein Logbuch gelesen. Dann gilt
+        // dasselbe wie oben bei `leer()` -- lieber keine Markierung
+        // als eine, die jede Zeile trifft.
+        if (!z.neuesGrid && !m_mosaik.baender().isEmpty()) {
+            const QString feld = Longpath::LocatorMosaik::feld(locator);
+            // `bandFuerLog`, nicht selbst gerechnet: es ist DIE Stelle,
+            // die auch `Ft8Gehoert::band` und den Logbucheintrag fuellt,
+            // und sie beachtet den Transverter. Mit einer eigenen
+            // Rechnung stuende am 2-m-Konverter das ZF-Band da, und das
+            // Feld waere gegen die falsche Spalte geprueft.
+            const QString band = bandFuerLog(m_slice ? m_slice->frequency()
+                                                     : 0.0);
+            z.neuesGridBand = !feld.isEmpty() && !band.isEmpty()
+                && m_mosaik.stand(feld, band) == Longpath::FeldStand::Nie;
+        }
     }
 
     // Gemerkt wird JEDE Zeile, gezeigt nur die, die in die Sicht

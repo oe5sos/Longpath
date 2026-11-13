@@ -5850,6 +5850,7 @@ longpath_add_test(tst_ft8_dekodiert)
 # ── 2026-10-31: die dB-Spalte war der Sync-Score ────────────────────
 # Gegen Signale mit BEKANNTEM Stoerabstand gefahren (0 bis −19 dB),
 # damit eine neue Rechnung nicht wieder bloss plausibel aussieht.
+longpath_add_test(tst_ft8_apriori)
 longpath_add_test(tst_ft8_stoerabstand)
 # 2026-10-21: die Subtraktion aus MSHV -- zieht sie ein Signal heraus,
 # und kommt darunter ein zweites zum Vorschein?
@@ -6311,6 +6312,10 @@ longpath_add_test(tst_qrz_konto_im_menue)
 # 2026-11-10, Live-Befund: „3D" in der eingebetteten Logbuch-Karte tat
 # ohne Schluessel sichtbar nichts. Echter Mausklick im echten Logbuch.
 longpath_add_test(tst_logbuch_3d_knopf)
+# 2026-11-13, Live-Befund: „neben dem 3d ist ein pfeil, der funktioniert
+# auch nicht". tst_logbook_durchgang sendet popOutRequested SELBST und
+# belegt den Knopf damit nie. Hier klickt die Maus.
+longpath_add_test(tst_logbuch_karte_pfeil)
 # Die WebEngine-Fassung selbst, nur wo Qt WebEngine gefunden wurde
 # (Homebrew-Qt am Mac; die Linux-/Windows-Laeufer haben es nicht).
 if(LONGPATH_HAS_WEBENGINE)
