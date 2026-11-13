@@ -906,6 +906,79 @@ private slots:
         karte.jagdButtonForTest()->setChecked(false);
         AppSettings::instance().setValue(QStringLiteral("QsoMapView"), QString{});
     }
+
+    // ── „New grid" zeigt nur, was ganz fehlt (2026-11-13) ─────────────
+    //
+    // Betreiber am Geraet: „hier sind einige grids, die sicher schon
+    // hatte -- hier sollen nur jene stehen, die ich noch nicht erreicht
+    // habe."
+    //
+    // Belegt an seinen eigenen Zahlen, auf 20 m: JN79 hat er auf 15 m,
+    // 2 m und 40 m, KP30 auf 15 m und 6 m, KO26 auf vier Baendern --
+    // alle drei standen im Filter als „neu" da. Der Filter fragte bis
+    // heute beide Stufen ab (`neuesGrid || neuesGridBand`), weil „wer
+    // die Jagd einschaltet, das Band voll sehen will" (2026-11-12).
+    //
+    // Die zweite Stufe ist nicht weg, nur nicht mehr in diesem Filter:
+    // ihre FARBE bleibt und ist in „All" zu sehen. Dieser Lauf prueft
+    // beides -- was der Filter zeigt und dass die Farbe bleibt.
+    void derGridfilterZeigtNurGanzFehlende()
+    {
+        RadioModel radio;
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        QVERIFY(slice);
+        slice->setFrequency(14074000.0);    // 20 m
+        slice->setDspMode(DSPMode::DIGU);
+
+        Ft8Applet applet(&radio);
+        applet.setProtocol(Ft8Decoder::Protocol::Ft8);
+        applet.setSlice(slice);
+
+        // JN79 steht im Logbuch -- aber auf 15 m, nicht auf 20 m. Genau
+        // Martins Fall.
+        QVector<LogEntry> log;
+        log << qso(QStringLiteral("OK1ABC"), QStringLiteral("JN79"),
+                   QStringLiteral("15m"), QStringLiteral("FT8"));
+        applet.mosaikForTest().baue(log, false);
+        applet.gridsForTest().merke(QStringLiteral("JN79"));
+        QVERIFY2(!applet.gridsForTest().leer(), "ohne Grundlage markiert nichts");
+        QVERIFY2(applet.mosaikForTest().stand(QStringLiteral("JN79"),
+                                              QStringLiteral("20m"))
+                     == Longpath::FeldStand::Nie,
+                 "die Ausgangslage stimmt nicht: JN79 gilt auf 20 m als gearbeitet");
+
+        auto fund = [&applet](const QString& text, double hz) {
+            Ft8Decode d;
+            d.text   = text;
+            d.snrDb  = -10.0;
+            d.freqHz = hz;
+            applet.fundForTest(d);
+        };
+        fund(QStringLiteral("CQ OK1JRD JN79"), 800.0);   // hat er -- nur nicht auf 20 m
+        fund(QStringLiteral("CQ JS6TWW PL55"), 1200.0);  // hat er nie
+
+        // Die FARBE unterscheidet beide weiterhin.
+        QVERIFY(applet.listForTest());
+        const QString alles = applet.listForTest()->toPlainText();
+        QVERIFY2(alles.contains(QStringLiteral("OK1JRD")), qPrintable(alles));
+        QVERIFY2(alles.contains(QStringLiteral("JS6TWW")), qPrintable(alles));
+
+        // Und jetzt die Jagd.
+        QPushButton* jagd = applet.sichtNeuesGridButtonForTest();
+        QVERIFY(jagd);
+        jagd->setChecked(true);
+        jagd->click();
+        QCoreApplication::processEvents();
+
+        const QString gefiltert = applet.listForTest()->toPlainText();
+        QVERIFY2(gefiltert.contains(QStringLiteral("JS6TWW")),
+                 qPrintable(QStringLiteral("das nie gearbeitete Feld fehlt: %1")
+                                .arg(gefiltert)));
+        QVERIFY2(!gefiltert.contains(QStringLiteral("OK1JRD")),
+                 qPrintable(QStringLiteral("JN79 hat er laengst — es gehoert nicht "
+                                           "in die Jagd: %1").arg(gefiltert)));
+    }
 };
 
 QTEST_MAIN(TstFt8Locatorjagd)
