@@ -8,6 +8,7 @@
 // wohnt.
 
 #include <QtTest>
+#include <QElapsedTimer>
 #include <QScopeGuard>
 #include <QGuiApplication>
 #include <QScreen>
@@ -56,10 +57,51 @@ bool hasAncestor(const QWidget* w, const QWidget* ancestor)
     return false;
 }
 
+/// Warten, bis der Rahmen wirklich STEHT -- nicht bis die Uhr
+/// abgelaufen ist.
+///
+/// `snapToGridAfterSettle` (WindowPlacement.h) rastet den Rahmen erst
+/// 180 ms nach dem Loslassen ein. Eine feste Wartezeit genuegt dafuer
+/// nur, solange der Taktgeber puenktlich drankommt; auf einem
+/// ausgelasteten Linux-Laeufer tut er das nicht. Dann wird die Breite
+/// VOR dem Rasten gelesen und spaeter mit der danach verglichen --
+/// genau so fiel dieser Fall am 2026-11-03 und noch einmal am
+/// 2026-11-13, beide Male mit DERSELBEN Zahl: 429 statt 420.
+///
+/// Also erst die Frist abwarten (vorher hat das Rasten gar nicht
+/// begonnen, und „ruhig" waere eine Luege), dann auf Ruhe warten: bis
+/// sich der Rahmen drei Messungen lang nicht mehr aendert.
+///
+/// Gibt false zurueck, wenn er bis zur Obergrenze nicht zur Ruhe kam --
+/// der Aufrufer soll das als Fehlschlag melden, nicht uebergehen
+/// ([[feedback-abwesenheit-ist-keine-aussage]]: ein stillschweigend
+/// weiterlaufender Fall sieht aus wie ein Erfolg).
+bool warteBisDerRahmenSteht(QWidget* w, int rastFristMs, int hoechstensMs = 4000)
+{
+    if (w == nullptr) { return false; }
+    QTest::qWait(rastFristMs);
+    QRect vorher = w->frameGeometry();
+    QElapsedTimer uhr;
+    uhr.start();
+    int ruhig = 0;
+    while (uhr.elapsed() < hoechstensMs) {
+        QTest::qWait(60);
+        const QRect jetzt = w->frameGeometry();
+        if (jetzt == vorher) {
+            if (++ruhig >= 3) { return true; }
+        } else {
+            ruhig  = 0;
+            vorher = jetzt;
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 // Laenger als die 180 ms von snapToGridAfterSettle (WindowPlacement.h),
-// mit Luft fuer einen langsamen Laeufer.
+// mit Luft fuer einen langsamen Laeufer. Seit 2026-11-13 nur noch die
+// UNTERGRENZE: danach wartet `warteBisDerRahmenSteht` auf Ruhe.
 static constexpr int kRastFristMs = 400;
 
 class TestSideAreaIntegration : public QObject
@@ -348,11 +390,13 @@ private slots:
         // auf dem langsamen Linux-Laeufer fiel genau das in die Messung
         // (429 statt 420, 2026-11-03). Breiten erst nach dem Rasten lesen.
         win->setGeometry(abRunden(avail.left() + 96), winY, 2 * kGrid, 304);
-        QTest::qWait(kRastFristMs);
+        QVERIFY2(warteBisDerRahmenSteht(win, kRastFristMs),
+                 "der Rahmen kam nach dem Setzen nicht zur Ruhe");
         const int w0 = win->width();
         const int winX = areaX - w0 - Style::kFensterLuftPx;
         win->move(winX, winY);
-        QTest::qWait(kRastFristMs);
+        QVERIFY2(warteBisDerRahmenSteht(win, kRastFristMs),
+                 "der Rahmen kam nach dem Ruecken nicht zur Ruhe");
         QCOMPARE(win->width(), w0);
 
         // Die Voraussetzung ausdruecklich pruefen, statt sie zu hoffen:
@@ -403,7 +447,8 @@ private slots:
         // weiter gerechnet wird -- bei x = 0 rastet die rechte Kante neu.
         const int fernX = avail.left();
         win->move(fernX, winY);
-        QTest::qWait(kRastFristMs);
+        QVERIFY2(warteBisDerRahmenSteht(win, kRastFristMs),
+                 "der Rahmen kam nach dem Wegruecken nicht zur Ruhe");
         const int fernW = win->width();
         QVERIFY2(areaX - (fernX + fernW) > kNeighbourSlackPxFuerTest,
                  qPrintable(QStringLiteral(
