@@ -419,6 +419,7 @@ warren@wpratt.com
 #include "applets/KiwiSdrApplet.h"
 #include "KiwiWaterfallPanel.h"
 #include "applets/AsrApplet.h"
+#include "applets/CatRigApplet.h"
 #include "asr/AsrService.h"
 #include "asr/RemoteAsrBackend.h"
 #include "core/audio/AudioTapRing.h"
@@ -2151,6 +2152,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     // dann auf den Schirm des Hauptfensters, statt es erst hinaus- und
     // dann wieder hereinzuschieben.
     bool trustedRectApplied = false;
+    QRect gesetztesRechteck;
     if (rect.isValid()) {
         bool screenStillHere = screenKey.isEmpty();
         QScreen* matchedScreen = nullptr;
@@ -2203,6 +2205,7 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
                                                    avail);
             }
             win->setGeometry(clamped);
+            gesetztesRechteck = clamped;
             trustedRectApplied = true;
         }
     }
@@ -2259,6 +2262,21 @@ void MainWindow::detachApplet(AppletWidget* applet, int dockIndex,
     if (!m_appletVis || m_appletVis->isEffectivelyVisible(id)) {
         win->show();
         tShow = loeseTeile.elapsed();
+        // ── Nach dem ersten show() noch einmal (2026-11-12) ─────────
+        //
+        // Martin: „wenn ich was lösche kann sich das andere profil nicht
+        // ändern" und „zum hundersten mal!!!!!!!!!". Gemessen unter
+        // Cocoa (tst_profil_loeschen_laesst_andere_stehen, nur mit
+        // QT_QPA_PLATFORM=cocoa rot): ein Panel, das aus dem Kombi-Feld
+        // eines anderen Profils kommt, bekommt hier 269x141 gesetzt; beim
+        // show() meldet das native Fenster 164x30 zurueck (spontan), Qt
+        // uebernimmt das, und die Mindestgroesse zieht es auf 173x109.
+        // geometrySettled sichert DAS 400 ms spaeter ins Profil. So kam
+        // N nach jedem Weg ueber CONTEST mit kleinem Frequency, SWR und
+        // Combined zurueck. Offscreen tritt es nie auf.
+        if (trustedRectApplied && win->geometry() != gesetztesRechteck) {
+            win->setGeometry(gesetztesRechteck);
+        }
         // Erst JETZT die Groesse: vor dem Anzeigen verlangt die
         // Anordnung fast nichts, danach ihre echte Untergrenze — und
         // die zieht das Fenster bildschirmfuellend auf. Nur wenn das
@@ -2839,6 +2857,40 @@ void MainWindow::bringAppletToFront(const QString& id)
     });
 }
 
+// ── Jeder Klick holt das Fenster nach vorne (2026-11-07) ─────────────
+//
+// Betreiber: „wir hatten vereinbart, dass jeder klick auf ein fenster
+// diese in den vordergrund rueckt". Der Filter vom 2026-11-01 sitzt nur in
+// zwei Fensterarten. Hier gilt es fuer alle schwebenden, und fuer das, was
+// kein eigenes Fenster hat: ein Applet in der Spalte liegt im Hauptfenster,
+// und das kommt nie ueber die Werkzeugfenster (siehe bringAppletToFront).
+// Verdeckt loest es darum der Klick ab. Der Druck wird dann geschluckt:
+// er soll das Feld holen und keine halb verdeckte Taste ausloesen.
+bool MainWindow::klickHoltNachVorne(QWidget* ziel)
+{
+    if (!ziel || m_shuttingDown) { return false; }
+    QWidget* fenster = ziel->window();
+    if (fenster != this) {
+        if (fenster->windowType() == Qt::Tool) { fenster->raise(); }
+        return false;
+    }
+    if (!m_appletPanel || !m_appletPanel->isAncestorOf(ziel)) { return false; }
+    if (QApplication::activeModalWidget()
+        || (m_connectionPanel && m_connectionPanel->isVisible())) {
+        return false;   // Die Maske deckt alles ab; das ist kein Verdecken.
+    }
+    for (QWidget* w = ziel; w; w = w->parentWidget()) {
+        auto* applet = qobject_cast<AppletWidget*>(w);
+        if (!applet) { continue; }
+        if (!appletHiddenInColumn(applet, false)) { return false; }
+        const QString id = panelIdFor(applet);
+        if (id.isEmpty()) { return false; }
+        bringAppletToFront(id);
+        return true;
+    }
+    return false;
+}
+
 bool MainWindow::appletHiddenInColumn(QWidget* applet, bool countScrolledAway) const
 {
     if (!applet || !isVisible() || isMinimized() || !applet->isVisible()) {
@@ -2879,6 +2931,35 @@ bool MainWindow::appletHiddenInColumn(QWidget* applet, bool countScrolledAway) c
         covers.append(w->frameGeometry());
     }
     return coveredFraction(onScreen, covers) >= 0.25;
+}
+
+void MainWindow::zeigeCatRigFeld()
+{
+    const QString id = QStringLiteral("CatRig");
+    const bool hatteFenster = m_floatingApplets.contains(id);
+    bringAppletToFront(id);
+    if (hatteFenster) { return; }   // Die Lage gehoert dem Profil.
+
+    // Einen Umlauf spaeter: dann hat bringAppletToFront abgeloest.
+    QTimer::singleShot(0, this, [this, id]() {
+        QWidget* fenster = m_floatingApplets.value(id, nullptr);
+        if (m_shuttingDown || !fenster) { return; }
+        QList<QRect> belegt = schutzrahmen();
+        const auto tops = QApplication::topLevelWidgets();
+        for (QWidget* w : tops) {
+            if (!w || w == this || w == fenster || !w->isVisible() || w->isMinimized()) {
+                continue;
+            }
+            const Qt::WindowType art = w->windowType();
+            if (art == Qt::Popup || art == Qt::ToolTip) { continue; }
+            belegt.append(w->frameGeometry());
+        }
+        const QRect platz = freierPlatz(fenster->frameGeometry().size(), frameGeometry(), belegt);
+        if (platz.isEmpty()) { return; }
+        const EigeneBewegung eigene;
+        fenster->move(platz.topLeft());
+        fenster->raise();
+    });
 }
 
 // ── Das Plaetze-Panel wirklich SICHTBAR machen (2026-10-30) ──────────
@@ -6677,6 +6758,8 @@ void MainWindow::buildUI()
         }
     });
 
+    new KlickHoltNachVorne([this](QWidget* w) { return klickHoltNachVorne(w); }, this);
+
     // Ein Geraet hinter CAT hat keinen KiwiSDR neben sich. Stand der
     // Panadapter noch aus einer anderen Sitzung auf KIWI, verwarf er jeden
     // Rahmen des Geraets, und das Bild blieb leer (gemessen 2026-11-07).
@@ -6689,7 +6772,66 @@ void MainWindow::buildUI()
         for (PanadapterApplet* applet : m_panStack->allApplets()) {
             if (applet) { applet->zeigeDasGeraet(); }
         }
+        // ── Das Bild ist nur so breit wie der USB-Ton (2026-11-12) ────
+        //
+        // Ueber USB kommt hoechstens ein Seitenband: am TS-590 gemessen
+        // -6 dB bei 3,0 kHz und -20 dB bei 5,1 kHz, mit dem breitesten
+        // Filter (SL00/SH13). Die 48 kHz Abtastrate liessen 40 kHz
+        // Panorama zu, 35 davon leer. Mitte bleibt der Traeger, also
+        // +-6 kHz: das Seitenband passt ganz hinein. Nur verengen, nie
+        // verbreitern -- wer schon enger gezoomt hat, behaelt das; wer
+        // danach weiter aufzieht, darf es.
+        for (PanadapterApplet* applet : m_panStack->allApplets()) {
+            SpectrumWidget* sw = applet ? applet->spectrumWidget() : nullptr;
+            if (sw && sw->bandwidth() > kCatRigBildHz) {
+                sw->setFrequencyRange(sw->centerFrequency(), kCatRigBildHz);
+            }
+        }
+        // Nicht setVisible(): das steigt aus, wenn der gemerkte Zustand
+        // schon „sichtbar" sagt. Und sichtbar in einer Spalte, die das
+        // Profil gar nicht zeigt, ist unsichtbar -- im Profil CONTEST war
+        // das Feld so nicht zu erreichen (am Geraet gesehen, 2026-11-07).
+        // bringAppletToFront loest es dann als eigenes Fenster ab.
+        //
+        // Aber nicht, solange die Maske steht: dann sind die schwebenden
+        // Fenster versteckt, die Spalte gilt als frei, und danach liegen
+        // sie wieder darueber (am Geraet gesehen, Profil N: das Feld
+        // schaute nur im Spalt zwischen zwei Fenstern hervor).
+        if (m_appletVis) {
+            m_appletVis->ensureVisible(QStringLiteral("CatRig"));
+            const bool maskeSteht = !m_floatingContainersHiddenPreConnect.isEmpty()
+                                    || (m_connectionPanel && m_connectionPanel->isVisible());
+            if (maskeSteht) {
+                m_catRigFeldNachDerMaske = true;
+            } else {
+                zeigeCatRigFeld();
+            }
+        }
     });
+
+    // Das Geraet meldet, Longpath zeigt: S-Meter und ON AIR kommen im
+    // Betrieb ohne SDR von dort.
+    if (auto* rig = m_radioModel->companionRig()) {
+        connect(rig, &CompanionRigController::catZustandGeaendert, this, [this, rig]() {
+            if (!m_meterPoller || !rig->catBetrieb()) { return; }
+            const int punkte = rig->catZustand().meterPunkte;
+            if (punkte >= 0 && !rig->sendet()) {
+                m_meterPoller->setExternesSMeter(Ts590Cat::punkteZuDbm(punkte));
+            }
+        });
+        connect(rig, &CompanionRigController::sendetGeaendert, this, [this, rig](bool tx) {
+            if (!m_txStatusBadge || m_txInhibited || !rig->catBetrieb()) { return; }
+            m_txStatusBadge->setVariant(tx ? StatusBadge::Variant::Tx
+                                           : StatusBadge::Variant::Off);
+            m_txStatusBadge->setToolTip(tx ? tr("Transmitting at the rig")
+                                           : tr("Receive"));
+        });
+        connect(m_radioModel, &RadioModel::connectionStateChanged, this, [this, rig]() {
+            if (m_meterPoller && !rig->catBetrieb()) {
+                m_meterPoller->loescheExternesSMeter();
+            }
+        });
+    }
 
     // Phase 3Q-8: clicking the spectrum while disconnected opens ConnectionPanel.
     connect(activeSpectrumWidget(), &SpectrumWidget::disconnectedClickRequest,
@@ -8886,6 +9028,8 @@ void MainWindow::populateDefaultMeter()
     // Genau darum ist die Rueckmeldung im Applet so ausfuehrlich.
     m_asrApplet = new AsrApplet(m_radioModel, nullptr);
     panel->addApplet(m_asrApplet);
+    m_catRigApplet = new CatRigApplet(m_radioModel, nullptr);
+    panel->addApplet(m_catRigApplet);
     connect(m_asrApplet, &AsrApplet::enableRequested,
             this, &MainWindow::setAsrEnabled);
     connect(m_asrApplet, &AsrApplet::languageChanged,
@@ -9472,6 +9616,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("KiwiSdr")] = m_kiwiSdrApplet;
     m_appletsById[QStringLiteral("KiwiWaterfalls")] = m_kiwiWaterfallPanel;
     m_appletsById[QStringLiteral("Asr")]     = m_asrApplet;
+    m_appletsById[QStringLiteral("CatRig")]  = m_catRigApplet;
 #ifdef HAVE_WEBSOCKETS
     if (m_tciApplet) {
         m_appletsById[QStringLiteral("Tci")]        = m_tciApplet;
@@ -9660,6 +9805,8 @@ void MainWindow::populateDefaultMeter()
                                 tr("KIWI WATERFALLS"), false);
     m_appletVis->registerApplet(QStringLiteral("Asr"),
                                 tr("Transcript"),               true);
+    m_appletVis->registerApplet(QStringLiteral("CatRig"),
+                                tr("CAT RIG"),                  false);
 
     // ── Kategorie und Schlagwoerter ──────────────────────────────────
     //
@@ -10008,36 +10155,7 @@ void MainWindow::populateDefaultMeter()
         if (visible) { bringAppletToFront(id); }
     });
     m_addWidgetBtn->setToolTip(tr("Add or remove windows"));
-#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
-    // Die Panels des Contestprogramms auch hinter dem "+" (Betreiber
-    // 2026-11-04: "am besten waere auch, wenn ich durch das + alles
-    // hinzufuegen kann"). Keine Applets, darum als Zusatzeintraege mit
-    // Zustand und Schalter aus der Bruecke; derselbe Weg wie Tools >
-    // Contest logbook panels und das Containers-Menue.
-    {
-        QList<WidgetPicker::ZusatzEintrag> liste;
-        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
-            WidgetPicker::ZusatzEintrag z;
-            z.id = QStringLiteral("Contest:%1").arg(e.id);
-            z.titel = QStringLiteral("Contest · %1").arg(e.titel);
-            z.kategorie = tr("Contest logbook");
-            z.schlagworte = e.schlagworte;
-            const QString id = e.id;
-            z.istAn = [this, id]() {
-                return m_contestFenster && m_contestFenster->istPanelSchwebend(id);
-            };
-            z.schalte = [this, id](bool an) {
-                if (an) {
-                    contestPanelAlsFenster(id);
-                } else if (m_contestFenster) {
-                    m_contestFenster->dockePanel(id);
-                }
-            };
-            liste.append(z);
-        }
-        m_addWidgetBtn->setZusatzEintraege(liste);
-    }
-#endif
+    richtePlusEin(m_addWidgetBtn);
     m_addWidgetBtn->raise();
     m_addWidgetBtn->show();
     positionAddWidgetButton();
@@ -10487,6 +10605,13 @@ void MainWindow::populateDefaultMeter()
                 QVariantMap mw;
                 mw.insert(QStringLiteral("fullScreen"), m_borderlessFullSize);
                 mw.insert(QStringLiteral("maximized"), isMaximized());
+                // Der Rahmen, zu dem die Lagen der schwebenden Fenster
+                // gehoeren (2026-11-12, siehe m_profilRahmen).
+                {
+                    const QRect f = frameGeometry();
+                    mw.insert(QStringLiteral("rahmen"),
+                              QVariantList{f.x(), f.y(), f.width(), f.height()});
+                }
                 s.insert(QStringLiteral("mainWindow"), mw);
 
                 // Seitenbereich: Seiten, aktive Seite, zu/auf, Lage. Fehlt
@@ -10652,7 +10777,27 @@ void MainWindow::populateDefaultMeter()
                 // Formatfuellend ueber showMaximized(), nicht ueber
                 // das rahmenlose Vollbild -- siehe den Block darueber.
                 if (m_borderlessFullSize) { exitBorderlessFullSize(); }
-                if (!isMaximized()) { showMaximized(); }
+                if (!isMaximized()) {
+                    showMaximized();
+                } else if (const QScreen* schirm = screen();
+                           schirm && ragtUeberDenFreienPlatz(frameGeometry(),
+                                                             schirm->availableGeometry())) {
+                    // ── Maximiert, aber groesser als der freie Platz ──
+                    //
+                    // Protokoll 12.11., 17:17: CONTEST -> Neu, das
+                    // Hauptfenster stand noch 1470x923 -- bis unter das
+                    // Dock -- und galt als maximiert. showMaximized()
+                    // wurde uebersprungen, und die Fenster von „Neu"
+                    // wurden von 865 auf 923 hochgerechnet; beim naechsten
+                    // Start (867) wieder herunter. macOS zieht ein
+                    // gezoomtes Fenster nicht nach, wenn das Dock wieder
+                    // Platz braucht. Also neu maximieren.
+                    qWarning() << "[ProfileApply] maximiert, aber" << frameGeometry()
+                               << "statt" << schirm->availableGeometry()
+                               << "-- neu maximiert";
+                    showNormal();
+                    showMaximized();
+                }
 
                 // Erst das Weltbild: es loest den Geber aus, und die
                 // Ansichten sollen einmal neu zeichnen und nicht
@@ -11195,6 +11340,73 @@ void MainWindow::populateDefaultMeter()
                     }
                 }
 
+                // ── Nach dem Inhalt noch einmal die Plaetze ──────────────
+                //
+                // Betreiber 2026-11-07: "alleine nur das aendern des profils
+                // macht probleme", mit Bild: Combined auf drei Zeilen
+                // zusammengefallen, und "Frequency" lag ueber dem Panadapter,
+                // wo er es nie gesehen hatte.
+                //
+                // Beides kommt aus der Reihenfolge. Die Fenster bekommen ihre
+                // Groesse, BEVOR holeKombiInhaltZurueck ihnen den Inhalt
+                // zurueckgibt, und ein leeres Feld faellt zusammen. Beim Start
+                // kommt der Panadapter nach den Applets und liegt damit oben,
+                // beim Wechsel hebt show() die Applets ueber ihn.
+                //
+                // Also einmal nachziehen, wenn die Fenster sich gesetzt
+                // haben: dieselbe Lage und dieselbe Stapelung wie beim Start.
+                QTimer::singleShot(0, this, [this, s]() {
+                    if (m_shuttingDown) { return; }
+                    const EigeneBewegung wirSelbst;
+                    const QVariantMap geloest =
+                        s.value(QStringLiteral("floatingApplets")).toMap();
+                    for (auto it = geloest.constBegin(); it != geloest.constEnd(); ++it) {
+                        AppletFloatingWindow* w = m_floatingApplets.value(it.key(), nullptr);
+                        if (!w) { continue; }
+                        const QRect soll = lageAusProfil(it.value().toMap());
+                        if (soll.isValid() && w->geometry() != soll) { w->setGeometry(soll); }
+                    }
+                    if (m_panStack) {
+                        for (PanadapterApplet* pan : m_panStack->allApplets()) {
+                            if (!pan) { continue; }
+                            if (auto* fenster = m_panStack->floatingWindowForTest(pan->panId())) {
+                                fenster->raise();
+                            }
+                        }
+                    }
+
+                    // Erst NACH dem Nachziehen oben umrechnen: es setzt die
+                    // rohen Profillagen, und die gehoeren zum Rahmen beim
+                    // Aufnehmen (2026-11-12, siehe m_profilRahmen). Andersrum
+                    // ueberschriebe es die Umrechnung wieder.
+                    {
+                        const QVariantList rl = s.value(QStringLiteral("mainWindow")).toMap()
+                                                    .value(QStringLiteral("rahmen")).toList();
+                        if (rl.size() == 4) {
+                            m_profilRahmen = QRect(rl.at(0).toInt(), rl.at(1).toInt(),
+                                                   rl.at(2).toInt(), rl.at(3).toInt());
+                            m_profilRahmenOffen = m_profilRahmen.isValid();
+                            if (m_profilRahmenOffen) {
+                                // Gleich versuchen; steht noch nichts, holt es
+                                // der Nachlauf des Schutzrahmens nach.
+                                if (!schwebendeNachProfilrahmen()) {
+                                    schutzrahmenNachziehen();
+                                    // Beim Start erscheinen die schwebenden
+                                    // Fenster erst nach dem Aufbau; ohne eine
+                                    // weitere Bewegung kaeme kein Nachlauf.
+                                    for (int ms : {600, 1500, 3000}) {
+                                        QTimer::singleShot(ms, this, [this]() {
+                                            if (m_profilRahmenOffen) { schwebendeNachProfilrahmen(); }
+                                        });
+                                    }
+                                }
+                            }
+                        } else {
+                            m_profilRahmenOffen = false;
+                        }
+                    }
+                });
+
                 qWarning() << "[ProfileApply:Step] 6/6 fertig";
             });
 
@@ -11408,6 +11620,7 @@ void MainWindow::populateDefaultMeter()
             if (visible) { bringAppletToFront(id); }
         });
         m_commandBar->addTrailing(m_addWidget);
+        richtePlusEin(m_addWidget);
     }
 
     // Apply initial visibility state from the controller (in case
@@ -15968,8 +16181,16 @@ void MainWindow::wireSliceToSpectrum()
     // fall back to the full-span default (768 kHz = sample rate).
     double freq = slice->frequency();
     const double loadedBw = activeSpectrumWidget()->bandwidth();
-    const double initialBw = (loadedBw >= 10000.0 && loadedBw <= 768000.0)
-                             ? loadedBw : 768000.0;
+    double initialBw = (loadedBw >= 10000.0 && loadedBw <= 768000.0)
+                       ? loadedBw : 768000.0;
+    // Am TS-590 ueber CAT kommt hoechstens ein Seitenband ueber USB
+    // (siehe kCatRigBildHz). Hier, nicht nur beim Verbinden: dieser Pfad
+    // laeuft danach und setzte ein Panorama unter 10 kHz auf 768 kHz.
+    if (const RadioConnection* v = m_radioModel ? m_radioModel->connection() : nullptr;
+        v && v->radioInfo().protocol == ProtocolVersion::CatRig) {
+        initialBw = (loadedBw >= 2000.0 && loadedBw <= kCatRigBildHz) ? loadedBw
+                                                                      : kCatRigBildHz;
+    }
     // ── Nicht ueber ein fremdes Bild schreiben (2026-10-27) ──────────
     //
     // Diese drei Zeilen setzen den Ausschnitt aus der Scheibe und
@@ -17065,6 +17286,61 @@ void MainWindow::bandstapelMarkenFuer(SpectrumWidget* sw, const QString& panId)
     sw->setBandStackMarks(marken);
 }
 
+// ── Beide Plus-Knoepfe gleich einrichten (2026-11-12) ────────────────
+//
+// Es gibt zwei: unten rechts ueber der Arbeitsflaeche (m_addWidgetBtn)
+// und oben in der Befehlsleiste (m_addWidget). Martin oeffnete den
+// Auswaehler oben, und dort fehlte der FT8-Einschalter, den ich nur
+// unten eingerichtet hatte -- und die Contest-Panels fehlten oben schon
+// seit dem 2026-11-04. Dieselbe Lehre wie [Erreichbar heisst: in ALLEN
+// Gehaeusen]: eine Stelle fuer beide.
+void MainWindow::richtePlusEin(AddWidgetButton* plus)
+{
+    if (!plus) { return; }
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // Die Panels des Contestprogramms auch hinter dem "+" (Betreiber
+    // 2026-11-04: "am besten waere auch, wenn ich durch das + alles
+    // hinzufuegen kann"). Keine Applets, darum als Zusatzeintraege mit
+    // Zustand und Schalter aus der Bruecke; derselbe Weg wie Tools >
+    // Contest logbook panels und das Containers-Menue.
+    {
+        QList<WidgetPicker::ZusatzEintrag> liste;
+        for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
+            WidgetPicker::ZusatzEintrag z;
+            z.id = QStringLiteral("Contest:%1").arg(e.id);
+            z.titel = QStringLiteral("Contest · %1").arg(e.titel);
+            z.kategorie = tr("Contest logbook");
+            z.schlagworte = e.schlagworte;
+            const QString id = e.id;
+            z.istAn = [this, id]() {
+                return m_contestFenster && m_contestFenster->istPanelSchwebend(id);
+            };
+            z.schalte = [this, id](bool an) {
+                if (an) {
+                    contestPanelAlsFenster(id);
+                } else if (m_contestFenster) {
+                    m_contestFenster->dockePanel(id);
+                }
+            };
+            liste.append(z);
+        }
+        plus->setZusatzEintraege(liste);
+    }
+#endif
+    // Der FT8-Dekoder steht nur in einer Datenbetriebsart bereit. Seine
+    // Karte schaltet darum selbst auf FT8 -- derselbe Weg wie der
+    // FT8-Knopf der Leiste (Martin 2026-11-12: „eigens kann man es nicht
+    // ... hinzufügen. das muss geändert werden").
+    {
+        QHash<QString, WidgetPicker::Einschalter> e;
+        e.insert(QStringLiteral("Ft8Decoder"),
+                 WidgetPicker::Einschalter{
+                     tr("Click switches to FT8 (or the FT4 you used last) and opens it."),
+                     [this]() { aufDigiStellen(m_letzterDigiModus); }});
+        plus->setEinschalter(e);
+    }
+}
+
 void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
 {
     // ── Diese Stelle MELDET, was sie tut (2026-10-28) ────────────────
@@ -17373,7 +17649,9 @@ void MainWindow::schutzrahmenNachziehen()
             // noch heruntergeschoben. Gezogen wird NUR, wenn in diesem
             // Nachlauf eine fremde Bewegung war; sonst wird die Basis
             // nur nachgefuehrt.
-            if (m_fremdeBewegungAnhaengig) {
+            if (m_profilRahmenOffen && schwebendeNachProfilrahmen()) {
+                // erledigt: Lagen vom Rahmen des Profils umgerechnet
+            } else if (m_fremdeBewegungAnhaengig) {
                 schwebendeMitziehen();
             } else {
                 m_hauptrahmenBasis = frameGeometry();
@@ -17448,6 +17726,62 @@ int MainWindow::schwebendeMitziehen()
         return 0;
     }
     if (isMinimized()) { return 0; }
+    const int bewegt = schwebendeUmrechnen(alt, neu, false);
+    if (bewegt > 0) {
+        qCInfo(lcContainer) << "Hauptfenster" << alt << "->" << neu << ":"
+                            << bewegt << "schwebende Fenster mitgezogen";
+    }
+    return bewegt;
+}
+
+bool MainWindow::schwebendeNachProfilrahmen()
+{
+    if (!m_profilRahmenOffen || m_shuttingDown) { return false; }
+    if (!isVisible() || isMinimized()) { return false; }
+    // Das Hauptfenster muss stehen: beim Start kommt das Maximieren erst
+    // nach dem Aufbau an, und dann waere der heutige Rahmen der falsche.
+    if (const QScreen* schirm = screen();
+        schirm && !hauptrahmenSteht(windowState(), frameGeometry(),
+                                    schirm->availableGeometry())) {
+        return false;
+    }
+    bool einesSichtbar = false;
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (w && w != this && w->isVisible() && schwebtUnter(w, this)) {
+            einesSichtbar = true;
+            break;
+        }
+    }
+    if (!einesSichtbar) { return false; }
+
+    const QRect neu = frameGeometry();
+    m_profilRahmenOffen = false;
+    m_hauptrahmenBasis = neu;
+
+    // ── Unterhalb des Rasters ist es dasselbe Hauptfenster (2026-11-13) ──
+    //
+    // Betreiber: „oft nervt es, dass ich zum 20 mal ... die fenster zum
+    // beispiel verschoben haben". Sein Protokoll vom 12.11.: bei JEDEM
+    // Start `Profilrahmen 1470x867 -> 1470x865 : 7 schwebende Fenster
+    // umgerechnet`, danach 4 bis 9 aus den Leisten geschoben. Das
+    // maximierte Fenster kommt mal 865, mal (nach dem Raster) 867 hoch --
+    // zwei Punkte, und alle Fenster wurden neu gerechnet, gerundet,
+    // gesichert, beim naechsten Start wieder. Unterhalb des Rasters
+    // bleiben sie, wo das Profil sie hingestellt hat.
+    if (istRasterNachhall(neu, m_profilRahmen)) {
+        qCInfo(lcContainer) << "Profilrahmen" << m_profilRahmen << "->" << neu
+                            << ": gleich bis aufs Raster, nichts umgerechnet";
+        return true;
+    }
+    const int bewegt = schwebendeUmrechnen(m_profilRahmen, neu, true);
+    qCInfo(lcContainer) << "Profilrahmen" << m_profilRahmen << "->" << neu << ":"
+                        << bewegt << "schwebende Fenster umgerechnet";
+    return true;
+}
+
+int MainWindow::schwebendeUmrechnen(const QRect& alt, const QRect& neu, bool basisFrisch)
+{
+    if (!alt.isValid() || alt.width() <= 0 || alt.height() <= 0) { return 0; }
 
     // ── Nur die Arbeitsflaeche wird umgerechnet (2026-11-12) ─────────
     //
@@ -17488,10 +17822,12 @@ int MainWindow::schwebendeMitziehen()
         // Nicht auf den Punkt genau: nach dem Setzen rastet das Fenster
         // noch ins Raster ein (snapToGridAfterSettle, eigene Bewegung).
         // Das ist derselbe Nachhall wie beim Hauptfenster.
+        bool wiederverwendet = false;
         if (const auto bi = m_mitziehBasis.constFind(w);
-            bi != m_mitziehBasis.constEnd()
+            !basisFrisch && bi != m_mitziehBasis.constEnd()
             && (bi->gesetzt == r || istRasterNachhall(r, bi->gesetzt))) {
             basis = *bi;
+            wiederverwendet = true;
         } else {
             basis.x = double(r.x() - altA.x()) / double(altA.width());
             basis.y = double(r.y() - altA.y()) / double(altA.height());
@@ -17512,7 +17848,7 @@ int MainWindow::schwebendeMitziehen()
         // die Groesse, wie sie ist. Mindest- und Hoechstgroesse des
         // Fensters gelten weiter.
         QSize innen = innenAlt;
-        if (fx != 1.0 || fy != 1.0) {
+        if (wiederverwendet || fx != 1.0 || fy != 1.0) {
             innen = QSize(qRound(basis.w * neuA.width()),
                           qRound(basis.h * neuA.height()))
                         .expandedTo(w->minimumSize())
@@ -17554,10 +17890,6 @@ int MainWindow::schwebendeMitziehen()
     }
     // Was nicht mehr schwebt (angedockt, geschlossen), faellt heraus.
     m_mitziehBasis = std::move(neueBasis);
-    if (bewegt > 0) {
-        qCInfo(lcContainer) << "Hauptfenster" << alt << "->" << neu << ":"
-                            << bewegt << "schwebende Fenster mitgezogen";
-    }
     return bewegt;
 }
 
@@ -18181,6 +18513,11 @@ void MainWindow::restoreFloatingWindowsHiddenBehindConnectMask()
     if (restoredAny || m_raiseLogbookAfterConnectMask) {
         m_raiseLogbookAfterConnectMask = false;
         QTimer::singleShot(0, this, [this]() { raiseLogbookIfOpen(); });
+    }
+
+    if (m_catRigFeldNachDerMaske) {
+        m_catRigFeldNachDerMaske = false;
+        if (m_radioModel && m_radioModel->isConnected()) { zeigeCatRigFeld(); }
     }
 }
 
@@ -20034,6 +20371,17 @@ void MainWindow::bereiteContestFensterVor()
         });
         connect(m_contestFenster, &ContestFenster::anordnungGeaendert,
                 m_contestAnordnungTimer, qOverload<>(&QTimer::start));
+        // Ohne zweite Sicherung soll es auffallen, nicht nur im Protokoll stehen.
+        connect(m_contestFenster, &ContestFenster::sicherungsWarnung,
+                this, [this](const QString& text) {
+            showToast(text, ToastSeverity::Warning, 15000);
+        });
+        // Die Statuszeile des Logbuchs ist eingebettet nicht zu sehen.
+        connect(m_contestFenster, &ContestFenster::logbuchMeldung,
+                this, [this](const QString& text, bool warnung) {
+            showToast(text, warnung ? ToastSeverity::Warning : ToastSeverity::Info,
+                      warnung ? 10000 : 6000);
+        });
     }
 
     // Das Contestprogramm liest die Frequenz ueber rigctld (4532). Laeuft
@@ -20064,6 +20412,11 @@ void MainWindow::bereiteContestFensterVor()
 #endif
 }
 
+void MainWindow::detachAppletForTest(AppletWidget* applet)
+{
+    detachApplet(applet, 0);
+}
+
 void MainWindow::fuelleContestPanelMenu(QMenu* menu)
 {
 #ifdef LONGPATH_HAVE_CONTESTPROGRAMM
@@ -20092,6 +20445,13 @@ void MainWindow::fuelleContestPanelMenu(QMenu* menu)
         for (const ContestFenster::PanelEintrag& e : ContestFenster::panels()) {
             contestPanelAlsFenster(e.id);
         }
+    });
+    QAction* bereit = menu->addAction(tr("Start check (ready?)..."));
+    bereit->setObjectName(QStringLiteral("actContestStartcheck"));
+    bereit->setToolTip(tr("Callsign, contest, CAT, transverter, rotor, clock, backup stick"));
+    bereit->setEnabled(m_contestFenster && m_contestFenster->istOffen());
+    connect(bereit, &QAction::triggered, this, [this]() {
+        if (m_contestFenster) { m_contestFenster->zeigeStartcheck(); }
     });
     QAction* zurueck = menu->addAction(tr("All panels back into the logbook"));
     zurueck->setObjectName(QStringLiteral("actContestPanelsZurueck"));
@@ -21900,6 +22260,16 @@ void MainWindow::closeEvent(QCloseEvent* event)
     // ersten Anlauf (c8d8161a) uebersehen wurde. Eine Probe im echten
     // Hauptfenster hat den Absturz dann geliefert: abloesen, schliessen,
     // SIGSEGV.
+#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
+    // Das Logbuch JETZT zumachen, nicht erst im Destruktor, und VOR den
+    // schwebenden Fenstern: bei Cmd+Q laeuft ~ContestFenster nie (exit()
+    // kommt noch in diesem closeEvent, gemessen 2026-11-07), und ein
+    // Panel in Combined stirbt sonst mit seinem Gehaeuse. Die letzte
+    // Log-Sicherung haengt am Abbau des Controllers. Das Profil ist ganz
+    // oben in diesem closeEvent schon aufgenommen.
+    if (m_contestFenster) { m_contestFenster->schliesse(); }
+#endif
+
     if (m_panStack) { m_panStack->shutDownFloating(); }
 
     for (AppletFloatingWindow* w : m_floatingApplets) { delete w; }
@@ -21985,16 +22355,6 @@ void MainWindow::closeEvent(QCloseEvent* event)
         w->deleteLater();
     }
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
-
-#ifdef LONGPATH_HAVE_CONTESTPROGRAMM
-    // Das Logbuch JETZT zumachen und nicht erst im Destruktor: bei Cmd+Q
-    // und quit() laeuft ~ContestFenster nie (exit() kommt noch in diesem
-    // closeEvent, gemessen 2026-11-07). Die letzte Log-Sicherung haengt
-    // am Abbau des Controllers und fiele sonst aus. Die Stelle steht
-    // bewusst hier hinten: so ist alles andere im selben Zustand wie beim
-    // roten Punkt, nur der Zeitpunkt ist frueher.
-    if (m_contestFenster) { m_contestFenster->schliesse(); }
-#endif
 
     event->accept();
 

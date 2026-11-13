@@ -31,6 +31,7 @@
 #include "gui/FramelessResizer.h"
 #include "gui/StyleConstants.h"
 #include "gui/WindowChrome.h"
+#include "gui/WindowPlacement.h"
 #include "gui/widgets/QsoDetailPane.h"
 #include "gui/widgets/RotorBandWidget.h"
 #include "core/Maidenhead.h"
@@ -58,6 +59,8 @@
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QScreen>
+#include <QGuiApplication>
+#include <QPointer>
 #include <QStackedWidget>
 #include <QStandardPaths>
 #include <QDateEdit>
@@ -415,6 +418,17 @@ void LogbookWindow::buildUi()
         QStringLiteral("Show the contacts on a globe or a world map "
                        "beside the table — what the filters show"));
     QPushButton* mapBtn = m_mapToggle;
+    // „3D" gleich neben „Map" (Betreiber 2026-11-12: „3d war nicht zu
+    // finden"). Die Pille in der Kartenspalte gibt es weiter; dieser Knopf
+    // holt die Karte UND das 3D-Bild in einem Druck -- zur markierten
+    // Station, sonst zur zuletzt geflogenen, sonst zum eigenen QTH. Er
+    // zeigt, was zu sehen ist: eingerastet heisst, das 3D-Bild steht.
+    m_3dToggle = new QPushButton(QStringLiteral("3D"), this);
+    m_3dToggle->setObjectName(QStringLiteral("logbook3dButton"));
+    m_3dToggle->setCheckable(true);
+    m_3dToggle->setToolTip(QStringLiteral(
+        "Fly to the selected contact in photorealistic 3D — down to the house "
+        "and the antenna. Nothing selected: your own station."));
     auto* importBtn = new QPushButton(QStringLiteral("Import…"), this);
     importBtn->setToolTip(QStringLiteral(
         "Merge an ADIF file into this log, skipping contacts it already has"));
@@ -443,7 +457,7 @@ void LogbookWindow::buildUi()
         "log (sotadata.org.uk → Logs → Activator → Download complete log), so "
         "bearings, distances and path profiles start at the summit"));
     connect(sotaBtn, &QPushButton::clicked, this, &LogbookWindow::sotaNachtragen);
-    for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn, mapBtn,
+    for (QPushButton* b : {m_editBtn, m_deleteBtn, m_uploadBtn, mapBtn, m_3dToggle,
                            statsBtn, importBtn, m_syncBtn, sotaBtn, adifBtn, csvBtn, cabrBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle());
         top->addWidget(b);
@@ -452,8 +466,12 @@ void LogbookWindow::buildUi()
     for (QPushButton* b : {mapBtn, statsBtn}) {
         b->setStyleSheet(Style::buttonBaseStyle() + Style::blueCheckedStyle());
     }
+    // Gruen wie die 3D-Pille in der Karte: derselbe Schalter, zweimal zu sehen.
+    m_3dToggle->setStyleSheet(Style::buttonBaseStyle() + Style::greenCheckedStyle());
     col->addLayout(top);
     connect(mapBtn, &QPushButton::toggled, this, &LogbookWindow::setMapPanelShown);
+    // toggled, nicht clicked: die Bedienhilfe drueckt ueber toggle().
+    connect(m_3dToggle, &QPushButton::toggled, this, &LogbookWindow::set3dShown);
     connect(statsBtn, &QPushButton::toggled, this, &LogbookWindow::setStatsRowShown);
     connect(cabrBtn, &QPushButton::clicked,
             this, &LogbookWindow::exportCabrillo);
@@ -1873,6 +1891,78 @@ void LogbookWindow::openMap()
     m_map->show();
     m_map->raise();
     m_map->activateWindow();
+
+    // ── Und zwar SICHTBAR (2026-11-13) ──────────────────────────────
+    //
+    // Betreiber: „neben dem 3d ist ein pfeil, der funktioniert auch
+    // nicht." Er funktionierte: das Fenster ging auf, arbeitete (eine
+    // Azimutalkarte mit markiertem Kontakt) -- und lag deckungsgleich
+    // hinter dem Logbuch. Gemessen an der laufenden App: Karte
+    // 1470x923 an (0,33), Logbuch 1468x790 an (1,109). Wer das
+    // Logbuch weiter vor sich sieht, schliesst auf „tut nichts", und
+    // das zu Recht.
+    //
+    // `QsoMapGeometry` ist die Lage, die der Betreiber dem Fenster
+    // selbst gegeben hat -- die wird nicht ueberschrieben. Nur wenn
+    // sie es unter dem Logbuch verschwinden laesst, sucht es sich
+    // einen freien Platz. Dieselbe Hilfe und dasselbe Muster wie beim
+    // CAT-Feld (MainWindow::zeigeCatRigFeld, 2026-11-07, aus dem
+    // gleichen Anlass: „wieder ein window, welches ich nicht oeffnen
+    // kann"), einschliesslich `EigeneBewegung` -- ein Zug, den das
+    // Programm selbst macht, ist kein Ziehen des Betreibers.
+    //
+    // Einen Umlauf spaeter, weil show() die endgueltige Rahmenlage
+    // erst danach kennt.
+    QPointer<QsoMapWindow> karte = m_map;
+    QTimer::singleShot(0, this, [this, karte]() {
+        if (!karte || !karte->isVisible()) { return; }
+        const QRect kartenRahmen = karte->frameGeometry();
+        // Verdeckt dieses Logbuch sie so weit, dass man sie uebersieht?
+        //
+        // Die Zahl stammt aus dem gemeldeten Fall, nicht aus dem Gefuehl:
+        // Karte 1470x923 an (0,33), Logbuch 1468x790 an (1,109) -- das
+        // Logbuch deckt 0,86 der Karte. Eine Schwelle von 0,90 (der erste
+        // Versuch) haette genau diesen Fall durchgelassen; aufgefallen an
+        // der Gegenprobe, nicht am Lauf. Bei 0,86 sieht der Betreiber
+        // zwei schmale Streifen am Rand, in derselben dunklen Farbe wie
+        // alles andere -- das ist kein Sehen.
+        //
+        // Drei Viertel: darunter steht ein gutes Stueck Karte frei, und
+        // wer das Fenster gerade geholt hat, erkennt es daran.
+        constexpr double kVerdecktGenug = 0.75;
+        const double verdeckt =
+            Longpath::coveredFraction(kartenRahmen, { frameGeometry() });
+        if (verdeckt < kVerdecktGenug) { return; }
+
+        QScreen* schirm = karte->screen() ? karte->screen() : QGuiApplication::primaryScreen();
+        if (!schirm) { return; }
+        const QRect platz = Longpath::freierPlatz(
+            kartenRahmen.size(), schirm->availableGeometry(), { frameGeometry() });
+        if (!platz.isEmpty()) {
+            const Longpath::EigeneBewegung eigene;
+            karte->move(platz.topLeft());
+            karte->raise();
+            return;
+        }
+
+        // Kein freier Platz -- und das ist der haeufige Fall, nicht der
+        // seltene: die Karte des Betreibers misst 1470x923 auf einem
+        // Schirm von 1470x956. Ein bildschirmfuellendes Fenster kann
+        // nirgends ausweichen.
+        //
+        // Dann tritt das Logbuch zurueck. Nicht „die Karte nach vorne" --
+        // das war der erste Versuch, und er genuegt nicht: `show()` +
+        // `raise()` stehen oben schon und haben genau dieses Verdecken
+        // nicht verhindert. Umgekehrt ist es ausserdem das richtige
+        // Verhaeltnis: der Betreiber hat eben auf den Pfeil gedrueckt,
+        // also will er die Karte sehen, nicht das Logbuch.
+        //
+        // Das Logbuch bleibt offen und an seinem Platz; es liegt nur
+        // darunter, und ein Klick holt es jederzeit zurueck.
+        lower();
+        karte->raise();
+        karte->activateWindow();
+    });
 }
 
 // ── Import ──────────────────────────────────────────────────────────
@@ -2463,14 +2553,40 @@ void LogbookWindow::setMapPanelShown(bool on)
                 m_mapPanel->flyToStation(call, lat, lon, caption);
             }
         });
+        connect(m_mapPanel, &QsoMapWindow::dreiDSichtbar, this, &LogbookWindow::spiegle3d);
         // Frisch eingefuegt: erst jetzt hat der Teiler drei Spalten.
         restoreSplitState();
     }
     if (m_mapPanel) { m_mapPanel->setVisible(on); }
+    spiegle3d();
     if (m_mapToggle && m_mapToggle->isChecked() != on) { m_mapToggle->setChecked(on); }
     AppSettings::instance().setValue(QStringLiteral("LogbookShowMap"),
                                      on ? QStringLiteral("True") : QStringLiteral("False"));
     if (on) { refreshMapPanel(); }
+}
+
+void LogbookWindow::set3dShown(bool on)
+{
+    if (on) {
+        setMapPanelShown(true);
+        QString call;
+        const QList<int> rows = selectedSourceRows();
+        if (!rows.isEmpty()) { call = m_all.at(rows.first()).call; }
+        if (m_mapPanel) { m_mapPanel->zeige3d(call); }
+    } else if (m_mapPanel) {
+        m_mapPanel->verlasse3d();
+    }
+    spiegle3d();
+}
+
+void LogbookWindow::spiegle3d()
+{
+    if (!m_3dToggle) { return; }
+    const bool an = m_mapPanel && m_mapPanel->isVisibleTo(this) && m_mapPanel->zeigt3d();
+    if (m_3dToggle->isChecked() != an) {
+        QSignalBlocker b(m_3dToggle);
+        m_3dToggle->setChecked(an);
+    }
 }
 
 void LogbookWindow::setStatsRowShown(bool on)
@@ -3168,6 +3284,29 @@ void LogbookWindow::clearEntry()
     m_entryComment->clear();
     if (m_search) { m_search->clear(); }
     m_entryCall->setFocus();
+}
+
+void LogbookWindow::uebernimmRufzeichen(const QString& rufzeichen)
+{
+    // Betreiber 2026-11-12: „ein doppelklick im panadapter sollte auch
+    // im logbuch sofort das call übernehmen und alle daten anzeigen."
+    // Bis heute ging der Doppelklick nur ins Rotor/Log-Feld; dieses
+    // Fenster erfuhr nichts davon. Derselbe Weg wie das Tippen (siehe
+    // textEdited der Eingabezeile), aber ohne die 700 ms Entprellung:
+    // ein Doppelklick ist kein halbes Rufzeichen.
+    const QString up = rufzeichen.trimmed().toUpper();
+    if (up.isEmpty() || !m_entryCall) { return; }
+    m_entryCall->setText(up);
+    if (m_search) { m_search->setText(Callsigns::normalized(up)); }
+    if (m_entryLookup) { m_entryLookup->stop(); }
+    if (m_entryHint) {
+        m_entryHint->setText(QStringLiteral("Enter logs · Esc clears"));
+        m_entryHint->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }")
+                                       .arg(QLatin1String(Style::kTextScale)));
+    }
+    showStationFor(up);
+    if (m_bedarfTimer) { m_bedarfTimer->stop(); }
+    aktualisiereBedarf();
 }
 
 void LogbookWindow::showStationFor(const QString& raw)

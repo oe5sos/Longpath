@@ -12,6 +12,7 @@
 #include "app/AppController.h"
 #include "app/Datenverzeichnis.h"
 #include "app/SingleInstanceGuard.h"
+#include "data/LogBackup.h"
 #include "ui/MainWindow.h"
 #include "ui/PanelContainerWidget.h"
 #include "ui/StyleKit.h"
@@ -19,6 +20,9 @@
 
 #include <QDir>
 #include <QEvent>
+#include <QFileInfo>
+#include <QRegularExpression>
+#include <QStatusBar>
 #include <QScreen>
 #include <QPointer>
 #include <QTimer>
@@ -121,6 +125,7 @@ struct ContestFenster::Innen {
     std::unique_ptr<Contestprogramm::SingleInstanceGuard> wache;
     std::unique_ptr<Contestprogramm::AppController>       steuerung;
     QPointer<Contestprogramm::MainWindow>                 fenster;
+    QPointer<QWidget>                                     startcheck;
     QPointer<LogbuchKreuz>                                kreuz;
 };
 
@@ -226,6 +231,46 @@ bool ContestFenster::lade(QString* grund, QWidget* elternFenster)
     m_innen->wache     = std::move(wache);
     m_innen->steuerung = std::move(steuerung);
     m_innen->fenster   = fenster;
+
+    // ── Der Stick (2026-11-08) ────────────────────────────────────────
+    //
+    // Am 07.11. stand den ganzen Nachmittag „Zweiter Sicherungsordner nicht
+    // erreichbar" im Protokoll, und niemand sah es: eigenstaendig zeigt das
+    // Logbuch das in seiner Statuszeile, und die gibt es in Longpath nicht.
+    // Gemeldet wird beim Oeffnen, nicht erst beim ersten QSO, damit es vor
+    // dem Contest auffaellt. Dieselbe Pruefung wie im Startcheck.
+    // Spaetere Fehlschlaege kommen ueber die Statuszeile (unten), hier nur
+    // der Stand beim Oeffnen.
+    if (Contestprogramm::LogBackup* sicherung = m_innen->steuerung->logBackup()) {
+        const QString zweit = sicherung->mirrorDirectory();
+        const bool erreichbar = zweit.isEmpty()
+            || QFileInfo(zweit).isWritable()
+            || (!QFileInfo::exists(zweit) && QFileInfo(QFileInfo(zweit).path()).isWritable());
+        if (!erreichbar) {
+            QTimer::singleShot(0, this, [this, zweit]() {
+                emit sicherungsWarnung(
+                    QStringLiteral("Zweiter Sicherungsordner nicht erreichbar: %1 — Stick eingesteckt?")
+                        .arg(zweit));
+            });
+        }
+    }
+    // ── Die Statuszeile des Logbuchs (2026-11-08) ─────────────────────
+    //
+    // Eingebettet ist sie nicht zu sehen, und darin steht, was der Betreiber
+    // wissen muss: „Exchange unvollstaendig -- Enter nochmals loggt
+    // trotzdem", „dieses Band hat der Contest nicht", „Journal konnte nicht
+    // geschrieben werden", geloeschte QSOs mit Strg+Z, Sked-Vorschlaege.
+    // Gefunden, weil die Stick-Warnung am 07.11. genauso verschwand.
+    if (elternFenster) {
+        connect(fenster->statusBar(), &QStatusBar::messageChanged, this,
+                [this](const QString& text) {
+            bool warnung = false;
+            if (meldungGehoertNachAussen(text, &warnung)) {
+                emit logbuchMeldung(text, warnung);
+            }
+        });
+    }
+
     if (elternFenster) {
         m_innen->kreuz = new LogbuchKreuz(fenster, this);
         for (const PanelEintrag& e : panels()) {
@@ -505,7 +550,14 @@ void ContestFenster::schliesse()
         // Hauptfenster (2026-11-04), nicht mehr am Logbuch: vor dem
         // Loeschen zurueck in die Flaeche, sonst ueberlebten sie es mit
         // totem Controller.
+        //
+        // Dasselbe fuer ein Panel in einem fremden Gehaeuse (Combined): geht
+        // das Gehaeuse zuerst, stirbt das Panel mit ihm, und ~MainWindow des
+        // Logbuchs greift in einen toten Zeiger. So endeten seit dem
+        // 2026-11-04 acht Beenden in einem Absturz, jedesmal VOR der letzten
+        // Sicherung.
         for (const PanelEintrag& e : panels()) {
+            if (panelInFremdemGehaeuse(e.id)) { nimmPanelZurueck(e.id, QRect()); }
             if (f->istPanelSchwebend(e.id)) { f->setzePanelSchwebend(e.id, false); }
         }
         m_innen->fenster = nullptr;
@@ -520,6 +572,46 @@ void ContestFenster::schliesse()
     m_innen->steuerung.reset();
     if (m_innen->wache) { m_innen->wache->release(); }
     m_innen->wache.reset();
+}
+
+bool ContestFenster::meldungGehoertNachAussen(const QString& text, bool* warnung)
+{
+    const QString t = text.trimmed();
+    if (t.isEmpty()) { return false; }
+    // Was nur mitlaeuft: der Dauerstand „Ruf | Contest | n QSOs", das Echo
+    // jeder Frequenz „144.300 MHz · 2m", Band und Betriebsart (zeigt
+    // Longpath selbst), die Morsegeschwindigkeit und das Umraeumen der Panels.
+    static const QRegularExpression rauschen(QStringLiteral(
+        "^(.* \\| .* \\| \\d+ QSOs"
+        "|[0-9.]+ MHz · .*"
+        "|Band \\S+"
+        "|Betriebsart \\S+"
+        "|CW \\d+ WpM"
+        "|ESM: .*"
+        "|.* liegt (jetzt im Seitenbereich|wieder auf der Fläche))$"));
+    if (rauschen.match(t).hasMatch()) { return false; }
+    if (warnung) {
+        static const QRegularExpression schlecht(QStringLiteral(
+            "(fehlgeschlagen|nicht erreichbar|nicht verstanden|konnte nicht|"
+            "unvollständig|außerhalb|hat der Contest nicht|nicht beschreibbar|"
+            "kommt kein Ton|beendet \\(Code)"), QRegularExpression::CaseInsensitiveOption);
+        *warnung = schlecht.match(t).hasMatch()
+                   || t.startsWith(QStringLiteral("rigctld"))
+                   || t.startsWith(QStringLiteral("rotctld"));
+    }
+    return true;
+}
+
+bool ContestFenster::zeigeStartcheck()
+{
+    if (!m_innen->fenster) { return false; }
+    m_innen->startcheck = m_innen->fenster->zeigeStartcheck(m_innen->kreuz != nullptr);
+    return m_innen->startcheck != nullptr;
+}
+
+QWidget* ContestFenster::startcheckForTest() const
+{
+    return m_innen->startcheck;
 }
 
 bool ContestFenster::istOffen() const

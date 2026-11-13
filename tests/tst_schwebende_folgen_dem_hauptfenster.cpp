@@ -299,6 +299,107 @@ private slots:
                      .arg(nachher.x()).arg(nachher.y()).arg(nachher.width()).arg(nachher.height())));
     }
 
+    // ── Der Startsprung schiebt nichts mehr (2026-11-12) ─────────────
+    //
+    // Betreiber: „ich habe alles gespeichert und wieder ist alles
+    // verschoben". Im Protokoll jedes Starts: das Profil stellt die
+    // Fenster an ihre gespeicherten Punkte, das Hauptfenster kommt aber
+    // 58 Punkte niedriger herauf (ueber dem Dock), springt spaeter auf
+    // die alte Hoehe -- und alle Fenster ziehen um 6,7 % mit. Gespeichert
+    // wurde dann DAS, und der naechste Start schob weiter.
+    //
+    // Hier: Lage zum grossen Rahmen gespeichert, Hauptfenster kommt klein
+    // herauf (eigene Bewegung, wie das Maximieren beim Aufbau), springt
+    // auf gross (fremd). Am Ende muss das Fenster genau dort stehen, wo
+    // es gespeichert war.
+    void startsprungGibtDieGespeicherteLage()
+    {
+        // Platz nach unten: das Hauptfenster darf nicht unter 600 hoch,
+        // und die 58 Punkte muessen wirklich ankommen.
+        m_mw->resize(1300, 900);
+        QTest::qWait(kNachlaufMs);
+        QVERIFY(m_mw->height() >= 900 - kSnapGridPx);
+        // Tief im Fenster, wie das S-Meter des Betreibers: dort wirkt der
+        // Sprung am staerksten (rund 30 Punkte).
+        {
+            const EigeneBewegung wirSelbst;
+            m_abgeloest->move(m_mw->frameGeometry().topLeft() + QPoint(300, 520));
+        }
+        QTest::qWait(kNachlaufMs);
+        const QRect gross = m_mw->frameGeometry();
+        const QSize innenGross = m_mw->size();
+        const QRect gespeichert = m_abgeloest->frameGeometry();
+        m_mw->schwebendeMitziehenForTest();   // Basis = jetzt
+
+        // „Start": kleiner herauf, als eigene Bewegung; das Profil hat
+        // das Fenster an seinen gespeicherten Punkt gestellt.
+        {
+            const EigeneBewegung wirSelbst;
+            m_mw->resize(innenGross.width(), innenGross.height() - 58);
+            QCoreApplication::processEvents();
+        }
+        QVERIFY(m_mw->height() <= innenGross.height() - 58 + kSnapGridPx);
+        QTest::qWait(kNachlaufMs);
+        QCOMPARE(m_abgeloest->frameGeometry().topLeft(), gespeichert.topLeft());
+        // Ein frischer Start kennt keine Grundlage vom letzten Mal.
+        m_mw->vergissMitziehBasisForTest();
+
+        // Das Profil kennt seinen Rahmen: umrechnen.
+        m_mw->setProfilRahmenForTest(gross);
+        QVERIFY(m_mw->schwebendeNachProfilrahmenForTest());
+
+        // Und der Sprung auf die alte Hoehe, von aussen.
+        m_mw->resize(innenGross);
+        QTest::qWait(kNachlaufMs);
+
+        const QRect nachher = m_abgeloest->frameGeometry();
+        qInfo() << "gespeichert" << gespeichert << "nachher" << nachher
+                << "Hauptfenster" << gross << "->" << m_mw->frameGeometry();
+        QVERIFY2(qAbs(nachher.x() - gespeichert.x()) <= kToleranzPx
+                     && qAbs(nachher.y() - gespeichert.y()) <= kToleranzPx
+                     && qAbs(nachher.width() - gespeichert.width()) <= 2
+                     && qAbs(nachher.height() - gespeichert.height()) <= 2,
+                 qPrintable(QStringLiteral("gespeichert %1,%2 %3x%4 -- nachher %5,%6 %7x%8")
+                     .arg(gespeichert.x()).arg(gespeichert.y())
+                     .arg(gespeichert.width()).arg(gespeichert.height())
+                     .arg(nachher.x()).arg(nachher.y())
+                     .arg(nachher.width()).arg(nachher.height())));
+    }
+
+    // ── Zwei Punkte sind kein anderes Hauptfenster (2026-11-13) ──────────
+    //
+    // Betreiber: „oft nervt es, dass ich zum 20 mal ... die fenster zum
+    // beispiel verschoben haben". Sein Protokoll vom 12.11., 21:50:
+    // `Profilrahmen 1470x867 -> 1470x865 : 7 schwebende Fenster
+    // umgerechnet`, danach 9 aus den Leisten geschoben -- bei JEDEM Start,
+    // weil das maximierte Hauptfenster mal 865, mal (nach dem Raster) 867
+    // hoch ist. Ein Unterschied unterhalb des Rasters ist kein anderes
+    // Hauptfenster: die Fenster bleiben, wo das Profil sie hingestellt hat.
+    void rasterUnterschiedRechnetNichtsUm()
+    {
+        m_mw->resize(1300, 900);
+        QTest::qWait(kNachlaufMs);
+        {
+            const EigeneBewegung wirSelbst;
+            m_abgeloest->move(m_mw->frameGeometry().topLeft() + QPoint(300, 520));
+        }
+        QTest::qWait(kNachlaufMs);
+        const QRect jetzt = m_mw->frameGeometry();
+        const QRect vorher = m_abgeloest->frameGeometry();
+        const QSize innenVorher = m_abgeloest->size();
+        m_mw->vergissMitziehBasisForTest();   // ein frischer Start
+
+        // Gespeichert mit 2 Punkten mehr Hoehe -- 867 gegen 865.
+        m_mw->setProfilRahmenForTest(QRect(jetzt.x(), jetzt.y(),
+                                           jetzt.width(), jetzt.height() + 2));
+        QVERIFY(m_mw->schwebendeNachProfilrahmenForTest());
+        // Sofort, vor jedem Raster: nichts angefasst.
+        QCOMPARE(m_abgeloest->size(), innenVorher);
+        QCOMPARE(m_abgeloest->frameGeometry(), vorher);
+        QTest::qWait(kNachlaufMs);
+        QCOMPARE(m_abgeloest->frameGeometry(), vorher);
+    }
+
     void eigeneBewegungZiehtNicht()
     {
         const QPoint vorher = m_abgeloest->frameGeometry().topLeft();

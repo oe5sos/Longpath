@@ -61,6 +61,18 @@ public:
     /// fuenfzehn Sekunden zu warten.
     void setClock(std::function<qint64()> utcMs);
 
+    /// ── Was vor dem Hinhoeren schon feststeht (2026-11-13) ───────
+    ///
+    /// Ein Lieferant, kein Wert: die Vorgabe haengt am laufenden QSO
+    /// und wechselt mitten im Betrieb. Wuerde sie hier liegen, muesste
+    /// jeder, der den Ablauf anfasst, daran denken sie nachzuziehen --
+    /// und genau das vergisst man. So wird sie je Fenster frisch
+    /// geholt, von der Stelle, die sie ohnehin kennt.
+    ///
+    /// Nicht gesetzt oder leere Antwort heisst: dekodieren wie frueher.
+    /// Siehe core/Ft8Apriori.h.
+    void setVorwissenQuelle(std::function<QVector<ApVorgabe>()> quelle);
+
     /// Stereo, 48 kHz, so wie der CW-Abgriff. Wird gemischt und auf
     /// 12 kHz gebracht.
     void feedAudio(const float* interleavedStereo, int frames);
@@ -130,6 +142,7 @@ private:
     Ft8Decoder::Protocol m_protocol{Ft8Decoder::Protocol::Ft8};
     std::function<qint64()> m_uhr;
     std::unique_ptr<Resampler> m_umtaster;
+    std::function<QVector<ApVorgabe>()> m_vorwissenQuelle;
     QVector<float> m_fenster;      ///< 12 kHz, laufendes Fenster
     qint64 m_fensterBeginnMs{-1};  ///< UTC, Anfang des laufenden Fensters
 };

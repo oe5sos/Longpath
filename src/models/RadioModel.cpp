@@ -317,6 +317,7 @@ warren@wpratt.com
 #include "core/RxChannel.h"
 #include "core/AppSettings.h"
 #include "core/CatRigConnection.h"
+#include "core/Ts590Sprache.h"
 #include "core/SampleRateCatalog.h"
 #include "core/LogCategories.h"
 #include "core/NoiseFloorTracker.h"
@@ -952,6 +953,9 @@ RadioModel::RadioModel(QObject* parent)
     {
         VoiceKeyerPlayer::Hooks hooks;
         hooks.routeToVoiceKeyer = [this]() {
+            if (m_ts590Sprache && m_ts590Sprache->zustaendig()) {
+                return m_ts590Sprache->legeWeg();
+            }
             // Flex (2026-11-11): kein Router -- die Flex-Sendepumpe holt
             // die Ansage selbst beim Spieler ab (MainWindow_Flex.cpp).
             if (!m_compositeMicRouter) {
@@ -962,10 +966,20 @@ RadioModel::RadioModel(QObject* parent)
             return true;
         };
         hooks.restoreRoute = [this]() {
+            if (m_ts590Sprache && m_ts590Sprache->zustaendig()) {
+                m_ts590Sprache->nimmWegZurueck();
+                return;
+            }
             if (!m_compositeMicRouter) { return; }
             m_compositeMicRouter->setActiveSource(static_cast<MicSource>(m_dvkQuelleVorher));
         };
         hooks.key = [this](bool on) {
+            // Der 590 tastet nur ueber seinen eigenen, abgesicherten Weg --
+            // und das Loslassen geht immer dorthin, wenn er getastet hat.
+            if (m_ts590Sprache && (m_ts590Sprache->getastet()
+                                   || (on && m_ts590Sprache->zustaendig()))) {
+                return m_ts590Sprache->taste(on);
+            }
             QString grund;
             if (!m_moxController) { return QStringLiteral("no transmit controller"); }
             const QMetaObject::Connection c = connect(
@@ -976,6 +990,10 @@ RadioModel::RadioModel(QObject* parent)
             return grund;
         };
         hooks.keyed = [this]() {
+            if (m_ts590Sprache && m_ts590Sprache->zustaendig()) {
+                return m_ts590Sprache->getastet()
+                       || (m_companionRig && m_companionRig->sendet());
+            }
             return m_moxController != nullptr && m_moxController->isMox();
         };
         hooks.txWorker = [this]() { return m_txWorker.get(); };
@@ -2080,6 +2098,14 @@ RadioModel::RadioModel(QObject* parent)
     // prozessweite Fassung ab (die Anzeige liest ihn dort), verbindet
     // aber nicht -- das tut MainWindow, wenn die Oberflaeche steht.
     m_companionRig        = std::make_unique<CompanionRigController>(this);
+    // Sprachspeicher ueber den 590 (2026-11-12): die abgesicherte Ausnahme
+    // von „Longpath tastet kein fremdes Geraet", siehe Ts590Sprache.h.
+    m_ts590Sprache = std::make_unique<Ts590Sprache>(
+        m_companionRig.get(), m_voiceKeyerPlayer->source());
+    connect(m_ts590Sprache.get(), &Ts590Sprache::getastetGeaendert,
+            m_voiceKeyerPlayer.get(), &VoiceKeyerPlayer::onKeyedChanged);
+    connect(m_ts590Sprache.get(), &Ts590Sprache::hinweis,
+            m_voiceKeyerPlayer.get(), &VoiceKeyerPlayer::notice);
     // Transverter-Einstellung geaendert (Versatz, Fenster, RX-Verstaerkung):
     // der Pegelversatz kann sich damit aendern (2026-11-08).
     connect(m_companionRig.get(), &CompanionRigController::versatzGeaendert,
@@ -15200,6 +15226,25 @@ void RadioModel::loadSliceState(SliceModel* slice)
     if (const int gespeichert = slice->savedSampleRateHz(); gespeichert > 0) {
         slice->setSampleRateHz(gespeichert);
     }
+    // ── Die Antenne kommt aus der Tabelle, nicht aus der Scheibe ─────
+    //
+    // `restoreFromSettings` traegt alles Bandbezogene ein; die Antenne
+    // gehoert nicht dazu, sie steht je Band in der Alex-Tabelle
+    // (`hardware/<mac>/alex/antenna/<band>/…`). Bis zum 2026-11-08 gab
+    // es daneben eine zweite, BANDLOSE Ablage in der Scheibe, und die
+    // gewann hier: die Anzeige trug danach die Antenne des zuletzt
+    // benutzten Bandes, waehrend die Maschine die des aktuellen
+    // geschaltet hatte. Jetzt setzt die Tabelle die Beschriftung —
+    // derselbe Weg wie beim Bandwechsel (T13, der Rueckweg in
+    // `AlexController::antennaChanged`).
+    //
+    // Nur mit Alex: eine Maschine ohne Antennenweiche (HL2, SunSDR) hat
+    // keine Tabelle, aus der sich etwas holen liesze.
+    if (boardCapabilities().hasAlex) {
+        const SkuUiProfile sku = skuUiProfileFor(m_hardwareProfile.model);
+        slice->refreshAntennasFromAlex(m_alexController, currentBand, &sku);
+    }
+
     // Beim Hochfahren dieselbe Regel wie beim Banddruck — siehe
     // onBandButtonClicked.
     richteSeitenbandAus(slice, currentBand);

@@ -117,6 +117,7 @@ private:
     QLineEdit*   m_anschluss{nullptr};
     QComboBox*   m_baud{nullptr};
     QCheckBox*   m_selbstStarten{nullptr};
+    QCheckBox*   m_sprache590{nullptr};
     QLineEdit*   m_host{nullptr};
     QSpinBox*    m_port{nullptr};
     QPushButton* m_test{nullptr};

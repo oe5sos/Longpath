@@ -1128,6 +1128,17 @@ longpath_add_test(tst_begleitgeraet_seite)
 # befragen, und der Versatz beim Laden.
 longpath_add_test(tst_begleitgeraet_regler)
 longpath_add_test(tst_cat_funkgeraet)
+# Rund 40 Faelle gegen ein rigctld-Doppel, viele warten auf die naechste
+# Abfragerunde. Lokal ~60 s; auf dem macOS-Laeufer liefen schon am 08.11.
+# (vor den Sprachspeicher-Faellen) die 120 s ab. 300 s nur fuer diesen.
+# Nur im Shard, der ihn baut (Linux teilt die Pruefstaende auf).
+if(TEST tst_cat_funkgeraet)
+    set_tests_properties(tst_cat_funkgeraet PROPERTIES TIMEOUT 300)
+endif()
+# Jeder Klick holt das Fenster nach vorne, auch aus der Spalte.
+longpath_add_test(tst_klick_holt_nach_vorne)
+# Der 590 geht aus und kommt wieder: die Wache startet rigctld neu.
+longpath_add_test(tst_590_kommt_wieder)
 
 # Der Versatz dort, wo er vor dem Betreiber landet -- und vor allem:
 # dass OHNE Transverter bitgleich nichts passiert.
@@ -1931,6 +1942,8 @@ longpath_add_test(tst_alex_controller)
 # persisted antenna, and !caps.hasAlex writes zero routing (Thetis SetAntBits
 # parity). Uses LONGPATH_BUILD_TESTS hooks on RadioModel for injection/simulation.
 longpath_add_test(tst_antenna_routing_model)
+
+longpath_add_test(tst_antenne_je_band_zweite_ablage)
 target_compile_definitions(tst_antenna_routing_model PRIVATE LONGPATH_BUILD_TESTS)
 
 # Smoke test for Antenna Control sub-sub-tab UI (Phase 3P-F Task 3):
@@ -5568,6 +5581,15 @@ longpath_add_test(tst_raster_nachhall)
 # Schleife am Ende dieser Datei, die QT_QPA_PLATFORM fuer alle Tests
 # setzt -- siehe dort (`_longpath_grosser_schirm`).
 set(_longpath_grosser_schirm tst_schwebende_folgen_dem_hauptfenster)
+# Ein Profil loeschen laesst die anderen stehen (2026-11-12, Martin:
+# „wenn ich was lösche kann sich das andere profil nicht ändern").
+longpath_add_test(tst_profil_loeschen_laesst_andere_stehen)
+target_compile_definitions(tst_profil_loeschen_laesst_andere_stehen PRIVATE
+    LONGPATH_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
+list(APPEND _longpath_grosser_schirm tst_profil_loeschen_laesst_andere_stehen)
+# Beide Plus-Knoepfe bieten dasselbe an (2026-11-12, Martin: „beim plus
+# oben oder unten muss alles natürlich erreichbar sein").
+longpath_add_test(tst_beide_plus_gleich)
 longpath_add_test(tst_real_pan_float)
 longpath_add_test(tst_real_rotor_window)
 
@@ -5834,6 +5856,7 @@ longpath_add_test(tst_ft8_dekodiert)
 # ── 2026-10-31: die dB-Spalte war der Sync-Score ────────────────────
 # Gegen Signale mit BEKANNTEM Stoerabstand gefahren (0 bis −19 dB),
 # damit eine neue Rechnung nicht wieder bloss plausibel aussieht.
+longpath_add_test(tst_ft8_apriori)
 longpath_add_test(tst_ft8_stoerabstand)
 # 2026-10-21: die Subtraktion aus MSHV -- zieht sie ein Signal heraus,
 # und kommt darunter ein zweites zum Vorschein?
@@ -6295,6 +6318,10 @@ longpath_add_test(tst_qrz_konto_im_menue)
 # 2026-11-10, Live-Befund: „3D" in der eingebetteten Logbuch-Karte tat
 # ohne Schluessel sichtbar nichts. Echter Mausklick im echten Logbuch.
 longpath_add_test(tst_logbuch_3d_knopf)
+# 2026-11-13, Live-Befund: „neben dem 3d ist ein pfeil, der funktioniert
+# auch nicht". tst_logbook_durchgang sendet popOutRequested SELBST und
+# belegt den Knopf damit nie. Hier klickt die Maus.
+longpath_add_test(tst_logbuch_karte_pfeil)
 # Die WebEngine-Fassung selbst, nur wo Qt WebEngine gefunden wurde
 # (Homebrew-Qt am Mac; die Linux-/Windows-Laeufer haben es nicht).
 if(LONGPATH_HAS_WEBENGINE)
@@ -6982,6 +7009,9 @@ if(LONGPATH_CONTESTPROGRAMM)
     target_link_libraries(tst_contestfenster PRIVATE Qt6::Sql)
     target_link_libraries(tst_contest_panels_im_containers_menu PRIVATE Qt6::Sql)
     target_link_libraries(tst_cmdq_schliesst_das_logbuch PRIVATE Qt6::Sql)
+    # Ohne Stick soll es in Longpath auffallen, nicht nur im Protokoll stehen.
+    longpath_add_test(tst_logbuch_meldet_den_stick)
+    target_link_libraries(tst_logbuch_meldet_den_stick PRIVATE Qt6::Sql)
 endif()
 
 # ── Phase 3J-1 Task 17.1: TX audio binary pipeline + single-client mutex ──────

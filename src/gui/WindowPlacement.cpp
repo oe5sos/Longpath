@@ -16,6 +16,7 @@
 #include <cmath>
 
 #include <QApplication>
+#include <QEvent>
 #include <QGuiApplication>
 #include <QHash>
 #include <QLoggingCategory>
@@ -360,6 +361,18 @@ bool istRasterNachhall(const QRect& jetzt, const QRect& vorher, int grid)
         && qAbs(jetzt.width() - vorher.width()) < grid + grid / 2
         && qAbs(jetzt.height() - vorher.height()) < grid + grid / 2;
 }
+bool ragtUeberDenFreienPlatz(const QRect& rahmen, const QRect& frei, int grid)
+{
+    if (!rahmen.isValid() || !frei.isValid()) { return false; }
+    // Um weniger als das Raster daneben ist kein Ueberstand: das
+    // maximierte Fenster steht mal bei (1,33 1468x865), mal eingerastet
+    // bei (0,33 1470x867).
+    return rahmen.left()   < frei.left()   - grid
+        || rahmen.top()    < frei.top()    - grid
+        || rahmen.right()  > frei.right()  + grid
+        || rahmen.bottom() > frei.bottom() + grid;
+}
+
 EigeneBewegungBruecke::EigeneBewegungBruecke()  { ++s_eigeneBewegungen; }
 EigeneBewegungBruecke::~EigeneBewegungBruecke() { --s_eigeneBewegungen; }
 
@@ -389,6 +402,39 @@ void meldeZug(QWidget* bewegtes)
     // Fensters in ein Bild (Vorschaubilder der Fensteranordnung).
     if (!bewegtes->isVisible()) { return; }
     if (s_zugmelder) { s_zugmelder(bewegtes); }
+}
+
+KlickHoltNachVorne::KlickHoltNachVorne(std::function<bool(QWidget*)> melder, QObject* eltern)
+    : QObject(eltern), m_melder(std::move(melder))
+{
+    if (qApp) { qApp->installEventFilter(this); }
+}
+
+bool KlickHoltNachVorne::eventFilter(QObject* ziel, QEvent* ereignis)
+{
+    if (ereignis->type() != QEvent::MouseButtonPress) { return false; }
+    auto* widget = qobject_cast<QWidget*>(ziel);
+    return widget && m_melder(widget);
+}
+
+QRect freierPlatz(const QSize& groesse, const QRect& flaeche,
+                  const QList<QRect>& belegt, int schritt)
+{
+    const auto aufRaster = [schritt](int wert) {
+        const int rest = ((wert % schritt) + schritt) % schritt;
+        return rest == 0 ? wert : wert + schritt - rest;
+    };
+    for (int y = aufRaster(flaeche.top()); y + groesse.height() - 1 <= flaeche.bottom();
+         y += schritt) {
+        for (int x = aufRaster(flaeche.left()); x + groesse.width() - 1 <= flaeche.right();
+             x += schritt) {
+            const QRect lage(QPoint(x, y), groesse);
+            const bool frei = std::none_of(belegt.cbegin(), belegt.cend(),
+                [&lage](const QRect& r) { return r.intersects(lage); });
+            if (frei) { return lage; }
+        }
+    }
+    return {};
 }
 
 QRect ausSperrstreifenSchieben(const QRect& wunsch,
