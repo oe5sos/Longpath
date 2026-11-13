@@ -5851,6 +5851,11 @@ longpath_add_test(tst_ft8_dekodiert)
 # Gegen Signale mit BEKANNTEM Stoerabstand gefahren (0 bis −19 dB),
 # damit eine neue Rechnung nicht wieder bloss plausibel aussieht.
 longpath_add_test(tst_ft8_apriori)
+# ── 2026-11-13: die Uhr als Fehlerquelle sichtbar machen ────────────
+# Eine falsch gehende Uhr sieht von innen aus wie ein totes Band.
+# Mehr Gegenproben als Nachweise: eine falsche Warnung kostet mehr
+# als eine verpasste.
+longpath_add_test(tst_ft8_uhrversatz)
 longpath_add_test(tst_ft8_stoerabstand)
 # 2026-10-21: die Subtraktion aus MSHV -- zieht sie ein Signal heraus,
 # und kommt darunter ein zweites zum Vorschein?

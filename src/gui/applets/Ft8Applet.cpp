@@ -665,6 +665,19 @@ void Ft8Applet::buildUI()
                                   .arg(Style::kTextInactive));
     sichtReihe->addWidget(m_fundZahl);
 
+    // ── Die Uhr, wenn sie falsch geht (2026-11-13) ──────────────
+    //
+    // Hier und nirgends sonst: wer sich fragt, warum nichts
+    // hereinkommt, sieht auf die Fundzahl. Genau daneben gehoert die
+    // einzige Erklaerung, die nicht am Band liegt. Messing, nicht
+    // Rot -- das ist ein Hinweis, kein Alarm.
+    m_uhrWarnung = new QLabel(QString(), this);
+    m_uhrWarnung->setFont(Style::monoFont(font(), Style::kFontMicro));
+    m_uhrWarnung->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                                    .arg(Style::kAmberWarn));
+    m_uhrWarnung->setVisible(false);
+    sichtReihe->addWidget(m_uhrWarnung);
+
     m_clearBtn = styledButton(tr("Clear"), 54);
     m_clearBtn->setCheckable(false);   // leert die Liste, rastet nicht ein
     connect(m_clearBtn, &QPushButton::clicked, this, [this]() {
@@ -1453,6 +1466,11 @@ LogEntry Ft8Applet::logEintrag(const Ft8Ablauf& ablauf,
 void Ft8Applet::fundForTest(const Ft8Decode& d)
 {
     onDecoded({d}, QDateTime::currentDateTimeUtc());
+}
+
+void Ft8Applet::periodeForTest(const QVector<Ft8Decode>& funde)
+{
+    onDecoded(funde, QDateTime::currentDateTimeUtc());
 }
 
 void Ft8Applet::meldeFertigesQso()
@@ -2640,6 +2658,22 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
                           const QDateTime& periodStart)
 {
     m_lastPeriodCount = funde.size();
+
+    // ── Die Uhr mitlesen (2026-11-13) ───────────────────────────
+    //
+    // Jeder Fund traegt seinen Zeitversatz im Fenster. Einzeln sagt
+    // er nichts ueber die EIGENE Uhr -- die Gegenstation kann
+    // ebensogut danebenliegen. Ueber Funde und Perioden hinweg
+    // bleibt nur der gemeinsame Anteil stehen, und der ist der
+    // eigene. `setzeFt4` zuerst: ein Protokollwechsel leert, was
+    // zum alten Fenster gehoerte.
+    m_uhrversatz.setzeFt4(protocol() == Ft8Decoder::Protocol::Ft4);
+    for (const Ft8Decode& d : funde) {
+        m_uhrversatz.merke(double(d.dtSeconds));
+    }
+    m_uhrversatz.periodeFertig();
+    zeigeUhrversatz();
+
     updateStatus();
     zeigeFundZahl();
     if (funde.isEmpty()) { return; }
@@ -3096,6 +3130,54 @@ void Ft8Applet::zeichneListe()
     m_list->moveCursor(QTextCursor::End);
     m_list->ensureCursorVisible();
     zeigeFundZahl();
+}
+
+// ── Die Uhr, wenn sie falsch geht ────────────────────────────────────
+//
+// Sie stellt nichts. Sie sagt nur, was sie gemessen hat, und was das
+// bedeutet -- in dieser Reihenfolge, damit ein Betreiber, der seine
+// Uhr fuer richtig haelt, die Zahl pruefen kann statt dem Urteil
+// glauben zu muessen.
+void Ft8Applet::zeigeUhrversatz()
+{
+    if (!m_uhrWarnung) { return; }
+
+    const auto lage = m_uhrversatz.lage();
+    if (lage == Ft8Uhrversatz::Lage::Unbekannt
+        || lage == Ft8Uhrversatz::Lage::Ok) {
+        // Im Normalfall steht hier NICHTS. Eine Zeile, die immer da
+        // ist, liest nach drei Tagen niemand mehr -- und genau dann
+        // wuerde sie gebraucht.
+        m_uhrWarnung->setVisible(false);
+        m_uhrWarnung->clear();
+        return;
+    }
+
+    const double v = m_uhrversatz.versatzSek();
+    const QString zahl = QStringLiteral("%1%2 s")
+                             .arg(v >= 0.0 ? QStringLiteral("+")
+                                           : QStringLiteral("\u2212"))
+                             .arg(std::abs(v), 0, 'f', 1);
+    m_uhrWarnung->setText(
+        lage == Ft8Uhrversatz::Lage::Schlecht
+            ? tr("clock %1 \u2014 decodes are being lost").arg(zahl)
+            : tr("clock %1").arg(zahl));
+    m_uhrWarnung->setToolTip(
+        tr("Median time offset of the last %1 periods: %2.\n\n"
+           "The decoder only searches a narrow window around zero "
+           "(%3 s for %4). A clock that is off does not kill reception "
+           "at once \u2014 it takes the weak decodes first, then whole "
+           "periods. From the inside that looks like a dead band.\n\n"
+           "This is your computer's clock, not the radio's. Longpath "
+           "does not change it.")
+            .arg(m_uhrversatz.periodenGezaehlt())
+            .arg(zahl)
+            .arg(m_uhrversatz.istFt4()
+                     ? QStringLiteral("\u22120.48 \u2026 +0.91")
+                     : QStringLiteral("\u22121.60 \u2026 +3.04"))
+            .arg(m_uhrversatz.istFt4() ? QStringLiteral("FT4")
+                                       : QStringLiteral("FT8")));
+    m_uhrWarnung->setVisible(true);
 }
 
 void Ft8Applet::zeigeFundZahl()
