@@ -73,6 +73,11 @@ int Ft8PlaetzeFlaeche::noetigeHoehe() const
 {
     int h = 10 + 22;   // 22 fuer die Kopfzeile
     h += m_stand.plaetze.size() * (kKachelH + kKachelLuft);
+    // Die freien Plaetze dazu (Entwurf B, 2026-11-13): sie stehen als
+    // Streifen unter den belegten, damit „slots 3" auch drei Zeilen
+    // zeigt und nicht nur die eine, die gerade arbeitet.
+    h += qMax(0, m_stand.plaetzeGesamt - m_stand.plaetze.size())
+         * (kFreiH + kKachelLuft);
     if (!m_stand.wartende.isEmpty()) {
         h += 28 + m_stand.wartende.size() * 22 + 10;
     }
@@ -113,6 +118,13 @@ void Ft8PlaetzeFlaeche::paintEvent(QPaintEvent*)
     for (int i = 0; i < m_stand.plaetze.size(); ++i) {
         maleKachel(p, y, i + 1, m_stand.plaetze.at(i));
         y += kKachelH + kKachelLuft;
+    }
+    // Und die freien darunter (Entwurf B, 2026-11-13). Sie stehen
+    // IMMER da, sobald mehr als ein Platz eingestellt ist -- das war
+    // der Wunsch: „schön wäre es, wenn man dann auch alle 3 sieht."
+    for (int i = m_stand.plaetze.size(); i < m_stand.plaetzeGesamt; ++i) {
+        maleFreien(p, y, i + 1);
+        y += kFreiH + kKachelLuft;
     }
     if (!m_stand.wartende.isEmpty()) {
         maleWartende(p, y);
@@ -249,6 +261,41 @@ void Ft8PlaetzeFlaeche::maleKachel(QPainter& p, int y, int nummer,
                                         : Style::kBorder), 2));
         p.drawLine(x0, sy, x0 + 9, sy);
     }
+}
+
+// ── Ein freier Platz (Entwurf B, 2026-11-13) ─────────────────────────
+//
+// Betreiber mit `slots 3` vor einem Fenster, das „1 of 3" und eine
+// einzige Kachel zeigte: „schön wäre es, wenn man dann auch alle 3
+// sieht, sprich 3 fenster und ein fenster durch 3 geteilt."
+//
+// Aus drei Blaettern waehlte er B. Der Unterschied zu A (jeder Platz
+// dieselbe volle Kachel) ist die Hoehe: bei `slots 6` und einem
+// Rufer stuenden dort fuenf leere Kacheln zu je 92 Punkten -- ein
+// Fenster, das zu fuenf Sechsteln aus Luft besteht. Als Streifen
+// kostet ein freier Platz 30 statt 92, und alle sind trotzdem da.
+//
+// Kein gestrichelter Rand wie im Blatt: durchgezogen, nur ohne
+// Fuellung. Die Mulde unterscheidet belegt von frei schon, und eine
+// zweite Unterscheidung an derselben Stelle sagt nichts dazu.
+void Ft8PlaetzeFlaeche::maleFreien(QPainter& p, int y, int nummer)
+{
+    const int w = width() - 2 * kRandX;
+    if (w < 80) { return; }
+    const QRect r(kRandX, y, w, kFreiH);
+
+    p.setPen(farbe(Style::kBorderSubtle));
+    p.setBrush(Qt::NoBrush);
+    p.drawRoundedRect(QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5), 8, 8);
+
+    QFont klein = font();
+    klein.setPointSizeF(9.0);
+    p.setFont(klein);
+    p.setPen(farbe(Style::kTextInactive));
+    p.drawText(QRect(r.left() + 8, r.top(), 14, kFreiH),
+               Qt::AlignLeft | Qt::AlignVCenter, QString::number(nummer));
+    p.drawText(QRect(r.left() + 28, r.top(), w - 40, kFreiH),
+               Qt::AlignLeft | Qt::AlignVCenter, tr("free"));
 }
 
 void Ft8PlaetzeFlaeche::maleWartende(QPainter& p, int y)

@@ -2811,6 +2811,10 @@ longpath_add_test(tst_logbuch_rotor_knopf)
 # tst_rotorzeile_entwuerfe (2026-11-11): Werkzeug, Entwurfsblaetter der
 #   Rotorzeile (nur mit LONGPATH_GRAB_DIR, sonst uebersprungen).
 longpath_add_test(tst_rotorzeile_entwuerfe)
+# tst_ft8_plaetze_entwuerfe (2026-11-13): Werkzeug, Entwurfsblaetter fuer
+# „alle Plaetze sehen". Betreiber mit slots 3 vor „1 of 3": „schön wäre
+# es, wenn man dann auch alle 3 sieht."
+longpath_add_test(tst_ft8_plaetze_entwuerfe)
 
 longpath_add_test(tst_kombi_entwuerfe)
 longpath_add_test(tst_startmaske)
