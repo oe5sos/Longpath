@@ -366,6 +366,40 @@ private slots:
                      .arg(nachher.width()).arg(nachher.height())));
     }
 
+    // ── Zwei Punkte sind kein anderes Hauptfenster (2026-11-13) ──────────
+    //
+    // Betreiber: „oft nervt es, dass ich zum 20 mal ... die fenster zum
+    // beispiel verschoben haben". Sein Protokoll vom 12.11., 21:50:
+    // `Profilrahmen 1470x867 -> 1470x865 : 7 schwebende Fenster
+    // umgerechnet`, danach 9 aus den Leisten geschoben -- bei JEDEM Start,
+    // weil das maximierte Hauptfenster mal 865, mal (nach dem Raster) 867
+    // hoch ist. Ein Unterschied unterhalb des Rasters ist kein anderes
+    // Hauptfenster: die Fenster bleiben, wo das Profil sie hingestellt hat.
+    void rasterUnterschiedRechnetNichtsUm()
+    {
+        m_mw->resize(1300, 900);
+        QTest::qWait(kNachlaufMs);
+        {
+            const EigeneBewegung wirSelbst;
+            m_abgeloest->move(m_mw->frameGeometry().topLeft() + QPoint(300, 520));
+        }
+        QTest::qWait(kNachlaufMs);
+        const QRect jetzt = m_mw->frameGeometry();
+        const QRect vorher = m_abgeloest->frameGeometry();
+        const QSize innenVorher = m_abgeloest->size();
+        m_mw->vergissMitziehBasisForTest();   // ein frischer Start
+
+        // Gespeichert mit 2 Punkten mehr Hoehe -- 867 gegen 865.
+        m_mw->setProfilRahmenForTest(QRect(jetzt.x(), jetzt.y(),
+                                           jetzt.width(), jetzt.height() + 2));
+        QVERIFY(m_mw->schwebendeNachProfilrahmenForTest());
+        // Sofort, vor jedem Raster: nichts angefasst.
+        QCOMPARE(m_abgeloest->size(), innenVorher);
+        QCOMPARE(m_abgeloest->frameGeometry(), vorher);
+        QTest::qWait(kNachlaufMs);
+        QCOMPARE(m_abgeloest->frameGeometry(), vorher);
+    }
+
     void eigeneBewegungZiehtNicht()
     {
         const QPoint vorher = m_abgeloest->frameGeometry().topLeft();
