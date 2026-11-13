@@ -111,8 +111,13 @@ public:
             }
             if (t.startsWith("W ")) {
                 bool erlaubt = false;
-                for (const char* k : {"W GC", "W SH", "W SL", "W FW", "W FL", "W RT", "W RU",
-                                      "W RD", "W RC", "W NT", "W NL", "W RL"}) {
+                // Positivliste: was NICHT daraufsteht, gilt als gefaehrlich.
+                // "W XT" kam am 2026-11-13 dazu und hat die Schranke beim
+                // ersten Lauf prompt ausgeloest -- genau dafuer ist sie da.
+                // XT legt den Versatz auf das SENDEN um; es tastet nicht,
+                // so wenig wie RT den Empfang tastet.
+                for (const char* k : {"W GC", "W SH", "W SL", "W FW", "W FL", "W RT", "W XT",
+                                      "W RU", "W RD", "W RC", "W NT", "W NL", "W RL"}) {
                     if (t.startsWith(k)) { erlaubt = true; }
                 }
                 if (!erlaubt) { return true; }
@@ -723,11 +728,13 @@ private slots:
         };
         doppel.befehle.clear();
         drueck("catRigRit");
+        drueck("catRigXit");
         drueck("catRigRitHoch");
         drueck("catRigRitRunter");
         drueck("catRigRitNull");
         drueck("catRigNotch");
-        for (const char* b : {"W RT1; 0\n", "W RU00010; 0\n", "W RD00010; 0\n", "W RC; 0\n",
+        for (const char* b : {"W RT1; 0\n", "W XT1; 0\n", "W RU00010; 0\n",
+                              "W RD00010; 0\n", "W RC; 0\n",
                               "W NT10; 0\n"}) {
             QTRY_VERIFY2_WITH_TIMEOUT(doppel.befehle.contains(QByteArray(b)), b, 20000);
         }
@@ -748,6 +755,20 @@ private slots:
         auto* wert = feld.findChild<QLabel*>(QStringLiteral("catRigRitWert"));
         QVERIFY(wert);
         QTRY_COMPARE_WITH_TIMEOUT(wert->text(), QStringLiteral("-120 Hz"), 20000);
+
+        // Und der XIT-Schalter folgt dem Geraet, nicht dem letzten Klick
+        // (2026-11-13). In der Antwort oben steht Stelle 23 auf 1 und 24
+        // auf 0: RIT an, XIT aus -- obwohl wir XIT gerade eingeschaltet
+        // haben. Das Geraet hat das letzte Wort, sonst zeigt das Feld
+        // einen Zustand, den die Station nicht hat.
+        auto* xit = feld.findChild<QPushButton*>(QStringLiteral("catRigXit"));
+        QVERIFY(xit);
+        QTRY_VERIFY_WITH_TIMEOUT(!xit->isChecked(), 20000);
+        doppel.roh["IF;"] = "IF00028078400     -012001000020000080;";
+        QTRY_VERIFY_WITH_TIMEOUT(xit->isChecked(), 20000);
+        // Dabei darf nichts getastet worden sein -- XIT stellt den Sender
+        // um, es taetet ihn nicht.
+        QVERIFY(!doppel.hatGetastet());
     }
 
     // Beim Senden zeigt das Feld ALC, wenn das Geraet ALC als Instrument hat.
