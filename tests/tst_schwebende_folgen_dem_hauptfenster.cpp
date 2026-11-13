@@ -27,6 +27,10 @@
 //   2026-11-11 — Groesse im Verhaeltnis (Fall 2, neuer Fall 2b).
 //                 Martin Fischer (OE5SOS), KI-gestuetzt mit Anthropic
 //                 Claude Code.
+//   2026-11-13 — Fall "klein und wieder gross" stellte seine Lage nie
+//                 her (stehengebliebene Anteile aus dem Fall davor).
+//                 Martin Fischer (OE5SOS), KI-gestuetzt mit Anthropic
+//                 Claude Code.
 // =================================================================
 
 // no-port-check: Longpath-original test file.
@@ -269,6 +273,26 @@ private slots:
     {
         const QRect alt = m_mw->frameGeometry();
         const QSize hauptInnen = m_mw->size();
+
+        // ── Die Grundlage frisch erzwingen (2026-11-13) ──────────────
+        //
+        // schwebendeMitziehenForTest() setzt nur den Hauptrahmen als
+        // Basis. Die ANTEILE je Fenster (m_mitziehBasis) bleiben dagegen
+        // stehen, solange das Fenster noch dort steht, wo das Mitziehen
+        // es hingesetzt hat -- so ist es gewollt (MainWindow::
+        // schwebendeUmrechnen: "solange das Fenster noch dort steht").
+        // Dieser Fall rechnete deshalb mit den Anteilen aus dem Fall
+        // davor weiter, und die stammten aus einem Stand, in dem das
+        // Fenster im Verhaeltnis BREITER war: auf macOS kamen 269 Punkte
+        // heraus, wo 260 die eben gesetzte Untergrenze war (CI-Lauf
+        // 43497937016, Shard 2/2). Erst auf Linux, dann auf macOS -- der
+        // Fall war nie hergestellt, nicht die Behebung war falsch.
+        // Ein Zug von Hand (ohne EigeneBewegung, mehr als eine
+        // Rasterweite) macht die Anteile ungueltig, dann messen sie
+        // beim naechsten Umrechnen frisch.
+        m_abgeloest->move(m_abgeloest->frameGeometry().topLeft() + QPoint(32, 32));
+        QTest::qWait(kNachlaufMs);
+
         const QRect vorher = m_abgeloest->frameGeometry();
         const QSize innenVorher = m_abgeloest->size();
         const int minAlt = m_abgeloest->minimumWidth();
@@ -278,6 +302,14 @@ private slots:
 
         m_mw->resize(hauptInnen.width() - 400, hauptInnen.height() - 100);
         QTest::qWait(kNachlaufMs);
+        // Vor dem Vergleich sagen, was gemessen wurde: ein Fehlschlag in
+        // der CI soll die Zahlen zeigen, nicht nur zwei Breiten.
+        qInfo() << "Hauptfenster" << hauptInnen << "->" << m_mw->size()
+                << "Untergrenze" << innenVorher.width()
+                << "Fenster" << m_abgeloest->size();
+        QVERIFY2(m_mw->width() < hauptInnen.width(),
+                 "das Hauptfenster muss schmaler geworden sein, sonst "
+                 "haengt das Fenster nie an seiner Untergrenze");
         QCOMPARE(m_abgeloest->width(), innenVorher.width());   // hing an der Grenze
 
         m_mw->resize(hauptInnen);
