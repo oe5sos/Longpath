@@ -103,29 +103,44 @@ MasterOutputWidget::MasterOutputWidget(AudioEngine* audio, QWidget* parent)
     auto& s = AppSettings::instance();
     const float savedVolume = s.value(QStringLiteral("audio/Master/Volume"),
                                       QStringLiteral("1.0")).toString().toFloat();
-    const bool savedMuted = s.value(QStringLiteral("audio/Master/Muted"),
-                                    QStringLiteral("False")).toString()
-                            == QStringLiteral("True");
+    const bool gespeichertStumm = s.value(QStringLiteral("audio/Master/Muted"),
+                                          QStringLiteral("False")).toString()
+                                  == QStringLiteral("True");
     const QString savedDevice = s.value(QStringLiteral("audio/Speakers/DeviceName"),
                                         QString()).toString();
     m_currentDeviceName = savedDevice;
 
-    // Ins Protokoll, wenn das Programm STUMM startet (2026-10-15).
+    // ── Der Hauptausgang startet nie stumm (2026-11-13) ───────────────
     //
-    // Am 2026-10-15 kostete „kein Ton" eine Stunde: hier stand `True`,
-    // der Lautsprecherknopf sass stumm da, und sonst sagte es nichts —
-    // weder das Protokoll noch eine Meldung. Alles andere war in
-    // Ordnung (Geraet offen, WDSP bereit, I/Q lief), also suchte man
-    // ueberall sonst.
+    // Am 2026-10-15 kostete „kein Ton" eine Stunde, weil hier `True`
+    // stand und nichts es sagte. Die Entscheidung damals: „Der Knopf
+    // bleibt wie er ist; nur steht der Zustand jetzt auch dort, wo man
+    // bei Stille zuerst nachsieht." Das Protokoll kam, der Knopf blieb.
     //
-    // Der Knopf bleibt wie er ist; nur steht der Zustand jetzt auch
-    // dort, wo man bei Stille zuerst nachsieht.
-    if (savedMuted) {
+    // Einen Monat spaeter ist dieselbe Meldung wieder da („wieder kein
+    // ton", 2026-11-13), und diesmal mit Zahlen: in den fuenf
+    // Protokollen seit dem 2026-11-12 abends steht die Warnung
+    // fuenfmal. JEDER Start war stumm. Das Protokoll hat die Suche von
+    // einer Stunde auf zwei Minuten verkuerzt -- aber gefunden hat es
+    // der, der Protokolle liest, nicht der, der funken will.
+    //
+    // Also die andere Haelfte: ein gespeicherter Stummschalter wird
+    // beim Start geloest. Niemand startet ein Funkprogramm, um nichts
+    // zu hoeren; ein stummer Hauptausgang in der Einstellungsdatei ist
+    // ein Versehen der letzten Sitzung, kein Wunsch. Waehrend des
+    // Betriebs bleibt der Knopf unveraendert -- wer stumm schaltet,
+    // will stumm sein, bis er es zuruecknimmt.
+    //
+    // Die Lautstaerke wird NICHT angefasst: ein Regler auf 0 ist
+    // sichtbar, ein Stummschalter nicht, und genau das war das Problem.
+    const bool savedMuted = false;
+    if (gespeichertStumm) {
+        s.setValue(QStringLiteral("audio/Master/Muted"), QStringLiteral("False"));
         qCWarning(lcAudio).noquote()
-            << QStringLiteral("Hauptausgang startet STUMM "
-                              "(audio/Master/Muted=True) — der "
-                              "Lautsprecherknopf in der Hauptausgabe "
-                              "loest ihn.");
+            << QStringLiteral("Hauptausgang war STUMM gespeichert "
+                              "(audio/Master/Muted=True) — beim Start "
+                              "geloest. Der Lautsprecherknopf in der "
+                              "Hauptausgabe schaltet ihn wieder stumm.");
     }
 
     // ── Speaker button ─────────────────────────────────────────────────────
