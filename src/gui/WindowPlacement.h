@@ -192,6 +192,12 @@ void snapToGridAfterSettle(QWidget* w, int grid = kSnapGridPx,
 /// bei einem schnellen Groessenzug stehen.
 bool istRasterNachhall(const QRect& jetzt, const QRect& vorher, int grid = kSnapGridPx);
 
+// Ragt ein (maximiertes) Hauptfenster ueber den freien Platz des Schirms
+// hinaus -- mehr als das Raster? Dann war es mit einem anderen freien
+// Platz maximiert (Dock damals weg) und muss neu maximiert werden
+// (2026-11-13, Protokoll 12.11.: 1470x923 bei freien 1470x867).
+bool ragtUeberDenFreienPlatz(const QRect& rahmen, const QRect& frei, int grid = kSnapGridPx);
+
 /// Dafür sorgen, dass `w` auf einem verbundenen Bildschirm zu sehen
 /// ist. Verschoben wird, wenn (a) keine Geometrie gespeichert war,
 /// (b) die gespeicherte bei (0,0) liegt, (c) sie ausserhalb jedes

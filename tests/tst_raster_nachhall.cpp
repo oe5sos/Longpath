@@ -54,6 +54,21 @@ private slots:
         QVERIFY(!istRasterNachhall(QRect(0, 48, 1100, 637), QRect(0, 48, 1069, 637), 16));
     }
 
+    // 2026-11-13: Protokoll 12.11., 17:17 -- maximiert, aber 1470x923
+    // bei freien 1470x867 (Dock). Das muss neu maximiert werden; die zwei
+    // Lagen eines normal maximierten Fensters (vor und nach dem Raster)
+    // nicht.
+    void ueberDenFreienPlatz()
+    {
+        const QRect frei(0, 33, 1470, 867);
+        QVERIFY(ragtUeberDenFreienPlatz(QRect(0, 33, 1470, 923), frei));
+        QVERIFY(!ragtUeberDenFreienPlatz(QRect(1, 33, 1468, 865), frei));
+        QVERIFY(!ragtUeberDenFreienPlatz(QRect(0, 33, 1470, 867), frei));
+        QVERIFY(!ragtUeberDenFreienPlatz(QRect(0, 33, 1470, 869), frei));   // Raster
+        QVERIFY(!ragtUeberDenFreienPlatz(QRect(200, 100, 800, 600), frei)); // kleiner
+        QVERIFY(!ragtUeberDenFreienPlatz(QRect(), frei));
+    }
+
     void ungueltigIstKeinNachhall()
     {
         QVERIFY(!istRasterNachhall(QRect(), QRect(0, 0, 100, 100), 16));
