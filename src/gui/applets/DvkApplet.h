@@ -75,6 +75,8 @@ private:
     QLabel*      m_slotLen[kSlots]   = {};
     QPushButton* m_recBtn[kSlots]    = {};
     QPushButton* m_playBtn[kSlots]   = {};
+    // Anhoeren ueber den Lautsprecher, ohne zu senden (2026-11-13).
+    QPushButton* m_listenBtn[kSlots] = {};
     QPushButton* m_stopBtn[kSlots]   = {};
     QPushButton* m_loadBtn[kSlots]   = {};
 

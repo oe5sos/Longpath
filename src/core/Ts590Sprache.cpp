@@ -8,6 +8,8 @@
 // Modification history (Longpath):
 //   2026-11-12 — Original fuer Longpath von Martin Fischer (OE5SOS),
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-13 — Vorlauf nach TX1, Hochpass und fester Pegel je
+//                 Ansage; KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 #include "core/Ts590Sprache.h"
@@ -191,6 +193,8 @@ QString Ts590Sprache::taste(bool an)
     if (!grund.isEmpty()) { return grund; }
     m_rig->stelle(befehlSenden());
     m_getastet = true;
+    m_vorlaufRest = kVorlaufMs * kRateHz / 1000;
+    m_hochpass.zuruecksetzen();
     m_hoechstens.start();
     qCInfo(lcConnection) << "TS-590 voice keyer: TX1";
     emit getastetGeaendert(true);
@@ -224,8 +228,28 @@ void Ts590Sprache::pumpe()
     const int rahmen = static_cast<int>(std::min<qint64>(frei / 4, kRateHz / 10));
     if (rahmen <= 0) { return; }
     m_mono.resize(rahmen);
-    const int n = m_quelle->pullSamples(m_mono.data(), rahmen);
-    if (n <= 0) { return; }
+    int n = 0;
+    if (m_vorlaufRest > 0) {
+        // Vorlauf: Stille, bis 590 und Transverter umgeschaltet haben.
+        // Die Ansage wartet so lange -- sie wird erst hier abgeholt.
+        n = std::min(rahmen, m_vorlaufRest);
+        std::fill_n(m_mono.data(), n, 0.0f);
+        m_vorlaufRest -= n;
+    } else {
+        if (m_quelle->loadCount() != m_geladen) {
+            // Eine neue Ansage: Pegel aus der ganzen Datei.
+            m_geladen = m_quelle->loadCount();
+            const int rate = m_quelle->rate() > 0 ? m_quelle->rate() : kRateHz;
+            m_verstaerkung = AnsageAufbereitung::verstaerkungFuerSendung(m_quelle->samples(), rate);
+            m_hochpass.setze(rate);
+            qCInfo(lcConnection) << "TS-590 voice keyer: level x" << m_verstaerkung;
+        }
+        n = m_quelle->pullSamples(m_mono.data(), rahmen);
+        if (n <= 0) { return; }
+        for (int i = 0; i < n; ++i) {
+            m_mono[i] = m_hochpass(m_mono[i]) * m_verstaerkung;
+        }
+    }
     m_stereo.resize(n * 4);
     auto* p = reinterpret_cast<qint16*>(m_stereo.data());
     for (int i = 0; i < n; ++i) {

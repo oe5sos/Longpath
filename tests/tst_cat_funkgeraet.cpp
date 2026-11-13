@@ -52,8 +52,10 @@
 #include "core/RxChannel.h"
 #include "core/Ts590Cat.h"
 #include "core/Ts590Sprache.h"
+#include "core/audio/AnsageAufbereitung.h"
 #include "core/audio/VoiceKeyer.h"
 #include "core/audio/VoiceKeyerPlayer.h"
+#include "core/audio/WavFile.h"
 #include "core/TransverterSetup.h"
 #include "core/WdspEngine.h"
 #include "models/RadioModel.h"
@@ -1595,6 +1597,90 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(zaehleBefehl(doppel.befehle, "W RX; 0\n"), 3, 20000);
 
         stelleEin(QStringLiteral("CompanionRigVoiceKeyer"), QStringLiteral("False"));
+        TransverterSetup::setCurrent(TransverterSetup{});
+    }
+
+    // Contest (2026-11-13): nach TX1 erst kVorlaufMs Stille (590 und
+    // Transverter schalten um), dann die Ansage -- auf festem Pegel, auch
+    // wenn sie leise aufgenommen wurde.
+    void sprachspeicher_590_vorlauf_und_fester_pegel()
+    {
+        RigctldDoppel doppel;
+        doppel.roh["AN;"] = "AN111;";
+        zielAuf(doppel.port());
+        stelleEin(QStringLiteral("CompanionRigVoiceKeyer"), QStringLiteral("True"));
+        TransverterSetup t;
+        t.enabled = true;
+        t.offsetHz = 116000000;
+        t.nurEmpfang = false;
+        t.save();   // der Regler liest ihn beim Verbinden neu
+        TransverterSetup::setCurrent(t);
+
+        CompanionRigController rig;
+        rig.setCatBetrieb(true);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.verbunden(), 20000);
+        rig.client()->setPollIntervalMs(20);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().drive, 1, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.catZustand().leistungW, 5, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(rig.modus(), QStringLiteral("USB"), 20000);
+
+        // Leise aufgenommen: Sprachpegel um -40 dBFS, gleich ab der ersten
+        // Probe (so liegt eine gekuerzte Aufnahme vor).
+        const int n = 48000;
+        QVector<float> leise(n);
+        for (int i = 0; i < n; ++i) {
+            const double z = double(i) / 48000.0;
+            const double silbe = 0.55 + 0.45 * std::sin(2.0 * M_PI * 4.0 * z);
+            leise[i] = float(0.015 * silbe * std::sin(2.0 * M_PI * 400.0 * z));
+        }
+        leise.append(QVector<float>(9600, 0.0f));
+        QTemporaryDir ordner;
+        const QString pfad = ordner.filePath(QStringLiteral("leise.wav"));
+        QString fehler;
+        QVERIFY2(writeWavMono(pfad, leise, 48000, &fehler), qPrintable(fehler));
+
+        WavTxSource quelle;
+        Ts590Sprache sprache(&rig, &quelle);
+        QVERIFY2(quelle.load(pfad, 48000, &fehler), qPrintable(fehler));
+        QBuffer ton;
+        ton.open(QIODevice::WriteOnly);
+        sprache.setTonZielForTest(&ton);
+        QVERIFY(sprache.legeWeg());
+        quelle.play();
+        QCOMPARE(sprache.taste(true), QString());
+        const int vorlauf = Ts590Sprache::kVorlaufMs * 48;
+        QVERIFY(vorlauf >= 4800);   // mindestens 100 ms, sonst ist die erste Silbe weg
+        const int ganz = int(leise.size());
+        QTRY_VERIFY_WITH_TIMEOUT(ton.size() >= qint64(vorlauf + ganz) * 4, 10000);
+        QCOMPARE(sprache.taste(false), QString());
+        sprache.nimmWegZurueck();
+
+        // Linker Kanal als float.
+        const auto* p = reinterpret_cast<const qint16*>(ton.data().constData());
+        const int frames = int(ton.size() / 4);
+        QVector<float> links(frames);
+        for (int i = 0; i < frames; ++i) { links[i] = p[2 * i] / 32767.0f; }
+
+        // Der Vorlauf ist still, danach kommt die Ansage sofort.
+        for (int i = 0; i < vorlauf; ++i) {
+            QVERIFY2(links[i] == 0.0f, qPrintable(QStringLiteral("Probe %1 im Vorlauf").arg(i)));
+        }
+        float danach = 0.0f;
+        for (int i = vorlauf; i < vorlauf + 480; ++i) { danach = std::max(danach, std::fabs(links[i])); }
+        QVERIFY2(danach > 0.01f, qPrintable(QString::number(danach)));
+
+        // Und der Pegel ist der feste, nicht der leise der Aufnahme --
+        // gemessen ueber dieselbe Strecke wie beim Laden (samt Stille).
+        const QVector<float> ansage(links.constBegin() + vorlauf, links.constBegin() + vorlauf + ganz);
+        const AnsageAufbereitung::Befund b = AnsageAufbereitung::miss(ansage, 48000);
+        QVERIFY(b.sprache);
+        QVERIFY2(std::abs(b.spracheDb - AnsageAufbereitung::kZielSpracheDb) < 1.5f,
+                 qPrintable(QStringLiteral("Sprache %1 dBFS").arg(b.spracheDb)));
+        QVERIFY2(b.spitzeDb <= AnsageAufbereitung::kZielSpitzeDb + 0.2f,
+                 qPrintable(QStringLiteral("Spitze %1 dBFS").arg(b.spitzeDb)));
+
+        stelleEin(QStringLiteral("CompanionRigVoiceKeyer"), QStringLiteral("False"));
+        TransverterSetup{}.save();
         TransverterSetup::setCurrent(TransverterSetup{});
     }
 

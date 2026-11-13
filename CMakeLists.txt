@@ -728,6 +728,7 @@ set(CORE_SOURCES
     src/core/audio/WavPlayer.cpp
     src/core/audio/VoiceKeyer.cpp
     src/core/audio/VoiceKeyerPlayer.cpp
+    src/core/audio/AnsageAufbereitung.cpp
     src/core/hotkeys/HotKeyActionList.cpp
     src/core/hotkeys/HotKeyBindings.cpp
     src/core/hotkeys/HotKeyChord.cpp

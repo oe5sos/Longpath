@@ -35,11 +35,28 @@
 // Der Ton geht als 48 kHz Stereo an das USB-Tongeraet des 590; die
 // Ansage holt diese Klasse selbst aus der WavTxSource des Spielers.
 //
+// ── Contesttauglich (2026-11-13) ───────────────────────────────────
+//
+// Zwischen dem 590 und der Ansage liegt keine Sprachbearbeitung von
+// Longpath (an der ANAN laeuft dafuer die ganze WDSP-Kette). Darum hier:
+//
+//   * Vorlauf kVorlaufMs Stille nach TX1: der 590 und der Transverter
+//     dahinter schalten erst um. Ohne ihn verschluckt der Sender die
+//     erste Silbe -- und die Aufnahme beginnt seit heute direkt mit ihr.
+//   * Hochpass und ein fester Pegel je Ansage (AnsageAufbereitung):
+//     jede Ansage treibt die ALC gleich, egal wie laut sie aufgenommen
+//     wurde. Die Verstaerkung wird bei jeder neu geladenen Ansage aus der
+//     GANZEN Datei bestimmt, nicht im Lauf geregelt.
+//
 // =================================================================
 // Modification history (Longpath):
 //   2026-11-12 — Original fuer Longpath von Martin Fischer (OE5SOS),
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-13 — Vorlauf nach TX1, Hochpass und fester Pegel je
+//                 Ansage; KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
+
+#include "core/audio/AnsageAufbereitung.h"
 
 #include <QObject>
 #include <QPointer>
@@ -66,6 +83,10 @@ public:
     static constexpr int kMaxSendenMs  = 30000;
     static constexpr int kPumpeMs      = 10;
     static constexpr int kRateHz       = 48000;
+    // Stille nach TX1, bevor die Ansage beginnt. Der 590 schaltet in
+    // einigen zehn ms um, der Transverter (PTT ueber REMOTE) dahinter
+    // auch; 150 ms decken beides mit Reserve und fallen im Ruf nicht auf.
+    static constexpr int kVorlaufMs    = 150;
 
     static QByteArray befehlSenden()   { return QByteArrayLiteral("W TX1; 0\n"); }
     static QByteArray befehlEmpfangen() { return QByteArrayLiteral("W RX; 0\n"); }
@@ -92,6 +113,8 @@ public:
     /// Fuer den Pruefstand: statt des USB-Tongeraets hier hinein schreiben.
     void setTonZielForTest(QIODevice* ziel) { m_testZiel = ziel; }
     void setMaxSendenMsForTest(int ms) { m_hoechstens.setInterval(ms); }
+    float verstaerkungForTest() const { return m_verstaerkung; }
+    void pumpeForTest() { pumpe(); }
 
 signals:
     /// Der Sender ist durch diese Klasse an- oder ausgegangen.
@@ -115,6 +138,11 @@ private:
     QTimer                  m_hoechstens;
     QVector<float>          m_mono;
     QByteArray              m_stereo;
+
+    int                     m_vorlaufRest{0};
+    int                     m_geladen{-1};       // loadCount der Quelle
+    float                   m_verstaerkung{1.0f};
+    AnsageAufbereitung::Hochpass m_hochpass;
 };
 
 } // namespace Longpath
