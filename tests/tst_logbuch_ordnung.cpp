@@ -20,8 +20,10 @@
 #include <QtTest>
 
 #include "core/AppSettings.h"
+#include "core/CtyDatParser.h"
 #include "gui/LogbookWindow.h"
 #include "gui/QsoMapWindow.h"
+#include "gui/widgets/LogbuchBilderWidgets.h"
 #include "gui/widgets/GibsTileLayer.h"
 #include "FensterFrist.h"
 
@@ -32,6 +34,7 @@
 #include <QFile>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSplitter>
 #include <QTableWidget>
 #include <QTemporaryDir>
 
@@ -297,6 +300,57 @@ private slots:
 
         w.findChild<QPushButton*>(QStringLiteral("logbookModeStats"))->click();
         bild(w, QStringLiteral("C3-statistics.png"));
+    }
+
+    // Betreiber 2026-11-13 mit Bild: „kann das mittlere window nicht nach
+    // rechts ziehen und größer machen". Die Bedarfs-Matrix verlangte 520
+    // Punkte und hielt die rechte Spalte breit. Jetzt laesst sich die
+    // Spalte schmal ziehen, und die Matrix stellt das Gitter unter den Text.
+    void rechte_spalte_laesst_sich_schmal_ziehen()
+    {
+        // Mit Laenderdatei: ohne sie bleibt die Matrix verborgen und
+        // verlangt keine Breite -- dann prueft der Fall nichts.
+        CtyDatParser cty;
+        const QString pfad = qEnvironmentVariable("LONGPATH_SOURCE_DIR") + QStringLiteral("/cty.dat");
+        QVERIFY2(cty.loadFromFile(pfad), qPrintable(pfad));
+        QTemporaryDir dir;
+        LogbookWindow w(schreibeLog(QDir(dir.path())));
+        w.setCtyDat(&cty);
+        w.resize(1468, 790);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w, kFensterFrist));
+        w.setModusForTest(0);
+        for (QLineEdit* e : w.findChildren<QLineEdit*>()) {
+            // Getippt, nicht gesetzt: die Matrix folgt dem Tippen.
+            if (e->placeholderText() == QStringLiteral("callsign")) {
+                QTest::keyClicks(e, QStringLiteral("OG3B"));
+            }
+        }
+        QWidget* matrix = w.findChild<QWidget*>(QStringLiteral("bedarfsMatrix"));
+        QVERIFY(matrix);
+        QTRY_VERIFY2(matrix->isVisible(), "die Bedarfs-Matrix erscheint nicht");
+        QSplitter* teiler = nullptr;
+        for (QSplitter* sp : w.findChildren<QSplitter*>()) {
+            if (sp->orientation() == Qt::Horizontal && sp->count() == 3
+                && sp->widget(2)->isAncestorOf(matrix)) { teiler = sp; }
+        }
+        QVERIFY2(teiler, "kein Teiler mit der Bedarfs-Matrix rechts");
+        teiler->setSizes({300, 1000, 280});
+        QCoreApplication::processEvents();
+        QTRY_VERIFY2(teiler->widget(2)->width() < 400,
+                     qPrintable(QStringLiteral("rechte Spalte bleibt %1 breit")
+                                    .arg(teiler->widget(2)->width())));
+        QTRY_VERIFY(teiler->widget(1)->width() > 800);
+        // Gitter unter dem Text: an einer frei stehenden Matrix, denn ohne
+        // Laenderdatei (cty.dat) bleibt die im Fenster verborgen.
+        BedarfsMatrixWidget einzeln;
+        einzeln.resize(300, 150);
+        einzeln.show();
+        QTRY_COMPARE(einzeln.height(), int(BedarfsMatrixWidget::kHoeheGestapelt));
+        QVERIFY(einzeln.istGestapelt());
+        einzeln.resize(900, 150);
+        QTRY_COMPARE(einzeln.height(), int(BedarfsMatrixWidget::kHoeheBreit));
+        bild(w, QStringLiteral("C1-rechts-schmal.png"));
     }
 };
 
