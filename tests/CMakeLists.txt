@@ -5850,6 +5850,7 @@ longpath_add_test(tst_ft8_dekodiert)
 # ── 2026-10-31: die dB-Spalte war der Sync-Score ────────────────────
 # Gegen Signale mit BEKANNTEM Stoerabstand gefahren (0 bis −19 dB),
 # damit eine neue Rechnung nicht wieder bloss plausibel aussieht.
+longpath_add_test(tst_ft8_apriori)
 longpath_add_test(tst_ft8_stoerabstand)
 # 2026-10-21: die Subtraktion aus MSHV -- zieht sie ein Signal heraus,
 # und kommt darunter ein zweites zum Vorschein?

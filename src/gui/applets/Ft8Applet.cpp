@@ -138,6 +138,34 @@ Ft8Applet::Ft8Applet(RadioModel* model, QWidget* parent)
     m_stream = new Ft8Stream(this);
     connect(m_stream, &Ft8Stream::decoded, this, &Ft8Applet::onDecoded);
 
+    // ── Was vor dem Hinhoeren schon feststeht (2026-11-13) ─────────
+    //
+    // Der Strom holt sich die Vorgabe je Fenster hier ab, statt dass
+    // sie ihm zugeschoben wird: nur dieses Fenster weiss, mit WEM
+    // gerade ein QSO laeuft, und das wechselt mitten im Betrieb.
+    //
+    // Die Rangfolge ist Absicht und entscheidet mit: der erste
+    // Treffer gewinnt, also steht die staerkste Gewissheit vorn.
+    // Laeuft ein QSO, sind beide Rufzeichen bekannt -- das ist die
+    // Vorgabe, die den Schluss rettet (RR73, 73). Sonst bleibt „wer
+    // immer mich ruft".
+    m_stream->setVorwissenQuelle([this]() {
+        QVector<Longpath::ApVorgabe> v;
+        const QString meiner = eigenesRufzeichen();
+        if (meiner.isEmpty()) { return v; }
+
+        const QString partner = m_ablauf.laeuft() ? m_ablauf.partner()
+                                                  : QString();
+        if (!partner.isEmpty()) {
+            auto a = Longpath::baueApVorgabe(
+                Longpath::ApTyp::MeinRufUndSeiner, meiner, partner);
+            if (a.brauchbar) { v.push_back(a); }
+        }
+        auto b = Longpath::baueApVorgabe(Longpath::ApTyp::MeinRuf, meiner);
+        if (b.brauchbar) { v.push_back(b); }
+        return v;
+    });
+
     if (m_model) {
         // Dieselbe Sicherung wie beim CW-Dekoder: eine fallengelassene
         // Scheibe darf keinen alten sliceIndex im Abgriff hinterlassen,

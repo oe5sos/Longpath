@@ -252,7 +252,8 @@ float stoerabstandDb(const ftx_waterfall_t* wf,
 /// Dekoder; jetzt ist es die innere Runde von decodeBlock().
 QVector<Ft8Decode> eineRunde(const float* samples, int count,
                              Ft8Decoder::Protocol protocol,
-                             std::vector<Abzug>* abzuege)
+                             std::vector<Abzug>* abzuege,
+                             const QVector<ApVorgabe>& vorwissen)
 {
     QVector<Ft8Decode> out;
     if (!samples || count <= 0) { return out; }
@@ -290,9 +291,31 @@ QVector<Ft8Decode> eineRunde(const float* samples, int count,
 
         ftx_message_t nachricht{};
         ftx_decode_status_t status{};
+        bool mitVorwissen = false;
         if (!ftx_decode_candidate(wf, kand, kLdpcIterations, &nachricht,
                                   &status)) {
-            continue;   // LDPC oder CRC — kein Fund, kein Fehler
+            // ── Zweiter Anlauf mit dem, was feststeht (2026-11-13) ──
+            //
+            // Erst wenn der gewoehnliche Weg nichts findet: jeder
+            // Durchgang kostet Rechenzeit, und wo ohnehin dekodiert
+            // wird, braucht es kein Vorwissen.
+            //
+            // Der erste Treffer gewinnt, darum steht die staerkste
+            // Gewissheit vorn. Ein Treffer ist hier genauso durch den
+            // CRC gedeckt wie oben -- eine falsche Maske erzeugt kein
+            // falsches QSO, sondern gar keines.
+            for (const ApVorgabe& v : vorwissen) {
+                if (!v.brauchbar) { continue; }
+                if (ftx_decode_candidate_ap(wf, kand, kLdpcIterations,
+                                            v.bits.data(), v.maske.data(),
+                                            &nachricht, &status)) {
+                    mitVorwissen = true;
+                    break;
+                }
+            }
+            if (!mitVorwissen) {
+                continue;   // LDPC oder CRC — kein Fund, kein Fehler
+            }
         }
 
         bool schonDa = false;
@@ -321,6 +344,7 @@ QVector<Ft8Decode> eineRunde(const float* samples, int count,
         }
 
         Ft8Decode d;
+        d.mitVorwissen = mitVorwissen;
         d.score     = kand->score;
         // Nicht mehr `score * 0.5f` — das war der Sync-Score, kein
         // Stoerabstand. Siehe `stoerabstandDb` oben.
@@ -369,10 +393,12 @@ QVector<Ft8Decode> eineRunde(const float* samples, int count,
 // Dekoder nur die starke, danach die schwache.
 QVector<Ft8Decode> Ft8Decoder::decodeBlock(const float* samples, int count,
                                            Protocol protocol,
-                                           int durchgaenge)
+                                           int durchgaenge,
+                                           const QVector<ApVorgabe>& vorwissen)
 {
     std::vector<Abzug> abzuege;
-    QVector<Ft8Decode> out = eineRunde(samples, count, protocol, &abzuege);
+    QVector<Ft8Decode> out = eineRunde(samples, count, protocol, &abzuege,
+                                       vorwissen);
 
     // FT4 bleibt einrundig: Ft8Subtract rechnet mit 79 Symbolen zu
     // 1920 Proben, und das ist FT8. Lieber eine Runde als ein falsch
@@ -400,7 +426,8 @@ QVector<Ft8Decode> Ft8Decoder::decodeBlock(const float* samples, int count,
 
         abzuege.clear();
         const QVector<Ft8Decode> weitere =
-            eineRunde(arbeit.data(), int(arbeit.size()), protocol, &abzuege);
+            eineRunde(arbeit.data(), int(arbeit.size()), protocol, &abzuege,
+                      vorwissen);
         if (weitere.isEmpty()) { break; }
 
         // Nur das Neue anhaengen. Dieselbe Nachricht faellt in beiden
