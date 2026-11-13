@@ -31,6 +31,7 @@
 
 #include <limits>
 
+class QAction;
 class QTimer;
 
 class QLabel;
@@ -307,7 +308,7 @@ private:
     RotorDialWidget* m_dial{nullptr};
     GlobeWidget*     m_globe{nullptr};
     QStackedWidget*  m_viewStack{nullptr};
-    QPushButton*     m_globeBtn{nullptr};
+    class QAction*   m_globeBtn{nullptr};   // Rose/Kugel, hinter dem Zahnrad
     StationPhoto*    m_photo{nullptr};
     QString          m_flagEmoji;
     // Created on first portrait fetch — a panel that never looks anyone

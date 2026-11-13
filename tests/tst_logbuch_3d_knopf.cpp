@@ -12,6 +12,7 @@
 // Maus auf den Knopf.
 
 #include <QtTest>
+#include <QLayout>
 
 #include "core/AppSettings.h"
 #include "core/GoogleMapTiles.h"
@@ -111,11 +112,12 @@ private slots:
         QVERIFY2(b, "kein 3D-Knopf in der Kartenleiste");
         QTRY_VERIFY(b->isVisible());
         QCOMPARE(b->text(), QStringLiteral("3D"));
-        QCOMPARE(b->y(), az->y());
-        QVERIFY2(b->x() > az->x() + az->width()
-                     && b->x() - (az->x() + az->width()) < 20,
-                 qPrintable(QStringLiteral("Azimuthal %1..%2, 3D ab %3")
-                                .arg(az->x()).arg(az->x() + az->width()).arg(b->x())));
+        // In der Reihenfolge der Leiste direkt dahinter -- die Zeile selbst
+        // haengt an Schrift und Breite (unter Linux bricht die Leiste
+        // frueher um, CI 2026-11-13).
+        QLayout* leiste = b->parentWidget() ? b->parentWidget()->layout() : nullptr;
+        QVERIFY(leiste && az->parentWidget() == b->parentWidget());
+        QCOMPARE(leiste->indexOf(b), leiste->indexOf(az) + 1);
         // Und kein anderes Widget liegt darueber.
         QWidget* hit = w.childAt(b->mapTo(&w, b->rect().center()));
         QVERIFY2(hit == b, "ueber dem 3D-Knopf liegt etwas");

@@ -584,12 +584,13 @@ void RotorLogbookPanel::buildUi()
 
 
 
-    // Rose oder Kugel: hinter dem Zahnrad (Entwurf R). Der Knopf bleibt
-    // als Schalter dahinter, unsichtbar.
-    m_globeBtn = new QPushButton(QStringLiteral("Globe"), this);
+    // Rose oder Kugel: hinter dem Zahnrad (Entwurf R). Eine Handlung,
+    // kein versteckter Knopf -- ein Knopf ohne Platz im Layout kann nie
+    // erscheinen (tst_reachability_audit).
+    m_globeBtn = new QAction(QStringLiteral("Show the globe"), this);
+    m_globeBtn->setObjectName(QStringLiteral("rotorLogGlobeAction"));
     m_globeBtn->setCheckable(true);
-    m_globeBtn->setVisible(false);
-    connect(m_globeBtn, &QPushButton::toggled, this, [this](bool on) {
+    connect(m_globeBtn, &QAction::toggled, this, [this](bool on) {
         m_viewStack->setCurrentIndex(on ? 1 : 0);
         // Idle spin only while the globe is the thing being looked at —
         // motion in a hidden page is wasted, and in a visible corner it

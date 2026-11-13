@@ -20,6 +20,7 @@
 #include "gui/widgets/RotorLogbookPanel.h"
 #include "FensterFrist.h"
 
+#include <QAction>
 #include <QDir>
 #include <QLabel>
 #include <QLineEdit>
@@ -81,8 +82,8 @@ private slots:
     void kugelZeigen(RotorLogbookPanel& p)
     {
         if (qEnvironmentVariable("LONGPATH_GRAB_WELT").isEmpty()) { return; }
-        for (QPushButton* b : p.findChildren<QPushButton*>()) {
-            if (b->text() == QStringLiteral("Globe")) { b->setChecked(true); }
+        if (auto* kugel = p.findChild<QAction*>(QStringLiteral("rotorLogGlobeAction"))) {
+            kugel->setChecked(true);
         }
     }
 

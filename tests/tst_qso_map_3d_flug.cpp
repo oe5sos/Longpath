@@ -18,6 +18,7 @@
 //   * die Seite selbst: festgenagelte CesiumJS-Fassung mit SRI, kein ion.
 
 #include <QtTest>
+#include <QLayout>
 
 #include "core/AppSettings.h"
 #include "core/BeamHeading.h"
@@ -349,7 +350,10 @@ private slots:
 
         // Seit Entwurf C (2026-11-12) steht 3D in der Ansichtsgruppe der
         // Leiste, gleich rechts von „Azimuthal" -- nicht mehr als Pille.
-        QCOMPARE(w.threeDButtonForTest()->y(), w.azimutalButtonForTest()->y());
+        {
+            QLayout* l = w.threeDButtonForTest()->parentWidget()->layout();
+            QCOMPARE(l->indexOf(w.threeDButtonForTest()), l->indexOf(w.azimutalButtonForTest()) + 1);
+        }
 
         w.flyToStation(QStringLiteral("W1AW"), kStaLat, kStaLon);
         QCOMPARE(w.currentViewForTest(), int(QsoMapWindow::kView3d));
@@ -459,7 +463,10 @@ private slots:
         prepare(w, nullptr);
         QPointer<QPushButton> pill = w.threeDButtonForTest();
         QVERIFY(pill);
-        QCOMPARE(pill->y(), w.azimutalButtonForTest()->y());   // Ansichtsgruppe (Entwurf C)
+        {   // Ansichtsgruppe (Entwurf C): direkt hinter „Azimuthal"
+            QLayout* l = pill->parentWidget()->layout();
+            QCOMPARE(l->indexOf(pill.data()), l->indexOf(w.azimutalButtonForTest()) + 1);
+        }
         QVERIFY(pill->isVisible());
         QVERIFY(pill->isChecked());
 
