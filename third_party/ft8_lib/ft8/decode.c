@@ -326,6 +326,15 @@ static void ftx_normalize_logl(float* log174)
 
 bool ftx_decode_candidate(const ftx_waterfall_t* wf, const ftx_candidate_t* cand, int max_iterations, ftx_message_t* message, ftx_decode_status_t* status)
 {
+    // Longpath 2026-11-13: ohne bekannte Bits ist das der alte Weg.
+    return ftx_decode_candidate_ap(wf, cand, max_iterations, 0, 0, message, status);
+}
+
+bool ftx_decode_candidate_ap(const ftx_waterfall_t* wf, const ftx_candidate_t* cand,
+                             int max_iterations,
+                             const uint8_t* ap_bits, const uint8_t* ap_mask,
+                             ftx_message_t* message, ftx_decode_status_t* status)
+{
     float log174[FTX_LDPC_N]; // message bits encoded as likelihood
     if (wf->protocol == FTX_PROTOCOL_FT4)
     {
@@ -338,8 +347,36 @@ bool ftx_decode_candidate(const ftx_waterfall_t* wf, const ftx_candidate_t* cand
 
     ftx_normalize_logl(log174);
 
+    // ── Longpath 2026-11-13: die bekannten Bits einsetzen ──────────
+    //
+    // NACH dem Normalisieren, nicht davor: `ftx_normalize_logl` zieht
+    // den Durchschnitt ab und teilt durch die Streuung, und eine
+    // Gewissheit, die das mitmacht, waere keine mehr.
+    if (ap_bits && ap_mask)
+    {
+        // Ein Prozent ueber dem groessten gemessenen Betrag, wie
+        // WSJT-X `ft8b.f90:241`: stark genug, um jede Messung zu
+        // ueberstimmen, und nicht so stark, dass die Rechnung
+        // ueberlaeuft.
+        float groesster = 0.0f;
+        for (int i = 0; i < FTX_LDPC_N; ++i)
+        {
+            const float b = (log174[i] < 0) ? -log174[i] : log174[i];
+            if (b > groesster) { groesster = b; }
+        }
+        const float apmag = groesster * 1.01f;
+
+        for (int i = 0; i < FTX_LDPC_N; ++i)
+        {
+            if (ap_mask[i])
+            {
+                log174[i] = ap_bits[i] ? apmag : -apmag;
+            }
+        }
+    }
+
     uint8_t plain174[FTX_LDPC_N]; // message bits (0/1)
-    bp_decode(log174, max_iterations, plain174, &status->ldpc_errors);
+    bp_decode_ap(log174, ap_mask, max_iterations, plain174, &status->ldpc_errors);
     // ldpc_decode(log174, max_iterations, plain174, &status->ldpc_errors);
 
     if (status->ldpc_errors > 0)

@@ -38,6 +38,8 @@
 //                 KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
+#include "core/Ft8Apriori.h"
+
 #include <QString>
 #include <QVector>
 
@@ -50,6 +52,12 @@ struct Ft8Decode {
     float   freqHz{0.0f};   ///< Tonlage im Durchlassbereich
     int     score{0};       ///< Costas-Sync-Wert, roh
     QString text;           ///< „CQ DX OE5SOS JN78"
+    /// Wahr, wenn dieser Fund erst mit bekannten Bits zustande kam
+    /// (2026-11-13, siehe core/Ft8Apriori.h). Er ist durch den CRC
+    /// gedeckt wie jeder andere -- aber der Betreiber soll ihn
+    /// unterscheiden koennen, so wie WSJT-X ihn mit „a2"/„a3"
+    /// kennzeichnet.
+    bool    mitVorwissen{false};
 };
 
 class Ft8Decoder {
@@ -73,10 +81,18 @@ public:
     /// auffindbar werden (siehe core/Ft8Subtract.h). 1 = wie frueher,
     /// ohne Abzug. Fuer FT4 gilt immer 1 -- die Subtraktion rechnet
     /// mit FT8-Massen.
+    ///
+    /// `vorwissen` sind Vorgaben fuer zusaetzliche Durchgaenge: findet
+    /// der gewoehnliche Weg nichts, wird der Kandidat damit noch
+    /// einmal gefahren (a priori, core/Ft8Apriori.h). Leer heisst:
+    /// genau wie frueher. Die Reihenfolge ist die Rangfolge -- die
+    /// staerkste Gewissheit zuerst, denn der erste Treffer gewinnt.
     static QVector<Ft8Decode> decodeBlock(const float* samples,
                                           int count,
                                           Protocol protocol = Protocol::Ft8,
-                                          int durchgaenge = 2);
+                                          int durchgaenge = 2,
+                                          const QVector<ApVorgabe>& vorwissen
+                                              = QVector<ApVorgabe>{});
 
     /// Dieselbe Rechnung rueckwaerts, fuer den Pruefstand und spaeter
     /// fuer das Senden: Nachricht -> Tonproben.
