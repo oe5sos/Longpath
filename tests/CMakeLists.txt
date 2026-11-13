@@ -6497,6 +6497,8 @@ longpath_add_test(tst_wav_file)
 longpath_add_test(tst_voice_keyer)
 # Tastenkuerzel und Sprachspeicher-Senden (2026-11-10).
 longpath_add_test(tst_voice_keyer_player)
+# Ansagen contesttauglich: kuerzen, Pegel, Hochpass (2026-11-13).
+longpath_add_test(tst_ansage_aufbereitung)
 longpath_add_test(tst_hot_key_bindings)
 longpath_add_test(tst_hot_key_dispatcher)
 longpath_add_test(tst_hot_key_window)

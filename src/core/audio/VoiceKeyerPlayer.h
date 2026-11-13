@@ -53,6 +53,10 @@
 //                 KI-gestuetzt ueber Anthropic Claude. Die Aufnahme
 //                 ist aus DvkApplet hierher umgezogen, damit sie auch
 //                 ohne offenes Panel per Taste geht.
+//   2026-11-13 — Contest am 590: Aufnahme wird gekuerzt (Stille,
+//                 Tastenklick) und gemessen; Anhoeren ohne Senden.
+//                 Martin Fischer (OE5SOS), KI-gestuetzt ueber Anthropic
+//                 Claude.
 // =================================================================
 
 #include "core/audio/VoiceKeyer.h"
@@ -65,6 +69,10 @@
 
 #include <atomic>
 #include <functional>
+#include <memory>
+
+class QAudioSink;
+class QBuffer;
 
 namespace Longpath {
 
@@ -127,6 +135,15 @@ public:
     // Aufnahme beginnen. Laeuft schon eine auf DIESEM Platz, wird sie
     // beendet und gespeichert -- dieselbe Taste startet und stoppt.
     QString record(int slot);
+    // Gibt es gerade einen Weg zum Mikrofon (Sendefaden oder direkt)?
+    bool canRecord() const;
+
+    // Eine Ansage hier anhoeren -- ueber den Lautsprecher, NICHT auf
+    // Sendung. Aufbereitet wie fuer den 590 (fuerSendung). Noch einmal
+    // auf demselben Platz: aus. Leer bei Erfolg, sonst der Grund.
+    QString listen(int slot);
+    void stopListening();
+    int listeningSlot() const { return m_listenSlot; }
 
     State state() const { return m_state; }
     int activeSlot() const { return m_slot; }
@@ -151,6 +168,8 @@ signals:
     // Etwas, das der Betreiber wissen muss, ohne dass er gefragt hat
     // (Aufnahme voll, Speichern fehlgeschlagen).
     void notice(const QString& text);
+    // Anhoeren hat begonnen (Platz) oder aufgehoert (-1).
+    void listeningChanged(int slot);
 
 private:
     void setState(State state, int slot);
@@ -189,6 +208,13 @@ private:
     QPointer<TxWorkerThread> m_tapWorker;
     QMetaObject::Connection m_micTap;
     std::atomic<float> m_recordPeak{0.0f};
+
+    // Anhoeren: ein Speicherpuffer durch einen QAudioSink, wie im
+    // Sprach-Selbsttest (TxVoiceCheckDialog::playBuffer).
+    std::unique_ptr<QAudioSink> m_listenSink;
+    std::unique_ptr<QBuffer> m_listenBuf;
+    QByteArray m_listenPcm;
+    int m_listenSlot{-1};
 };
 
 } // namespace Longpath

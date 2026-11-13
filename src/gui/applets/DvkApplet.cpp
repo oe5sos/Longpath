@@ -25,6 +25,9 @@
 //                 Die Taste je Zeile kommt aus den Tastenkuerzeln.
 //                 Martin Fischer (OE5SOS), KI-gestuetzt ueber Anthropic
 //                 Claude.
+//   2026-11-13 — Anhoeren je Platz (ohne Senden); Aufnahme auch ohne
+//                 Sendefaden (Flex). Martin Fischer (OE5SOS),
+//                 KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 #include "DvkApplet.h"
@@ -88,7 +91,8 @@ void DvkApplet::refreshButtons()
 {
     VoiceKeyerPlayer* p = player();
     const bool recording = m_recordingSlot >= 0;
-    const bool txUp = m_model && m_model->txWorker() != nullptr;
+    const bool txUp = p && p->canRecord();
+    const int listening = p ? p->listeningSlot() : -1;
     for (int i = 0; i < kSlots; ++i) {
         if (!m_recBtn[i]) { continue; }
         const bool empty = !m_model || m_model->voiceKeyer().slot(i).isEmpty();
@@ -97,7 +101,10 @@ void DvkApplet::refreshButtons()
         m_recBtn[i]->setEnabled(recording ? i == m_recordingSlot : txUp);
         m_loadBtn[i]->setEnabled(!recording);
         m_playBtn[i]->setEnabled(p && !recording && !empty);
-        m_stopBtn[i]->setEnabled(p && (i == m_playingSlot || i == m_recordingSlot));
+        m_listenBtn[i]->setText(i == listening ? QStringLiteral("\u25A0") : QStringLiteral("\u25B7"));
+        m_listenBtn[i]->setEnabled(p && !recording && m_playingSlot < 0 && !empty);
+        m_stopBtn[i]->setEnabled(p && (i == m_playingSlot || i == m_recordingSlot
+                                       || i == listening));
     }
 }
 
@@ -278,6 +285,7 @@ void DvkApplet::buildUI()
 
         m_recBtn[i]  = styledButton(QStringLiteral("\u25CF"));
         m_playBtn[i] = styledButton(QStringLiteral("\u25BA"));
+        m_listenBtn[i] = styledButton(QStringLiteral("\u25B7"));
         m_stopBtn[i] = styledButton(QStringLiteral("\u25A0"));
         m_loadBtn[i] = styledButton(QStringLiteral("WAV"));
 
@@ -285,14 +293,19 @@ void DvkApplet::buildUI()
             "Record from the microphone into this slot (up to 30 s). "
             "Press again to stop. This does NOT transmit — it listens to "
             "what the microphone delivers. Needs a connected radio."));
+        m_listenBtn[i]->setToolTip(QStringLiteral(
+            "Listen to this message here, on the speaker — nothing is transmitted. "
+            "It plays the way it goes out through the TS-590: low rumble removed, "
+            "set to the sending level."));
         m_stopBtn[i]->setToolTip(QStringLiteral(
-            "Stop sending or recording (Esc does the same)."));
+            "Stop sending, recording or listening (Esc does the same)."));
         m_loadBtn[i]->setToolTip(QStringLiteral(
             "Load a WAV file into this slot. Works now: the file is read "
             "and checked immediately, not when you press send."));
 
         row->addWidget(m_recBtn[i]);
         row->addWidget(m_playBtn[i]);
+        row->addWidget(m_listenBtn[i]);
         row->addWidget(m_stopBtn[i]);
         row->addWidget(m_loadBtn[i]);
 
@@ -318,6 +331,14 @@ void DvkApplet::buildUI()
             VoiceKeyerPlayer* p = player();
             if (!p) { return; }
             const QString refusal = p->play(i);
+            if (!refusal.isEmpty()) {
+                QMessageBox::information(this, QStringLiteral("Voice Keyer"), refusal);
+            }
+        });
+        connect(m_listenBtn[i], &QPushButton::clicked, this, [this, i]() {
+            VoiceKeyerPlayer* p = player();
+            if (!p) { return; }
+            const QString refusal = p->listen(i);
             if (!refusal.isEmpty()) {
                 QMessageBox::information(this, QStringLiteral("Voice Keyer"), refusal);
             }
@@ -349,6 +370,7 @@ void DvkApplet::buildUI()
                 this, [this](int index) { refreshSlot(index); refreshButtons(); });
         if (VoiceKeyerPlayer* p = player()) {
             connect(p, &VoiceKeyerPlayer::stateChanged, this, &DvkApplet::onPlayerState);
+            connect(p, &VoiceKeyerPlayer::listeningChanged, this, &DvkApplet::refreshButtons);
         }
         if (HotKeyBindings* b = m_model->hotKeyBindings()) {
             connect(b, &HotKeyBindings::bindingsChanged, this, &DvkApplet::refreshKeys);
