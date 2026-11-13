@@ -89,6 +89,42 @@ private:
         return wins.last();
     }
 
+    // Das abgeloeste Fenster tief, aber SICHER innerhalb der
+    // Arbeitsflaeche stellen (2026-11-13).
+    //
+    // Eine feste Zahl wie "520 Punkte unter der Oberkante" traegt nicht:
+    // auf macOS wird dasselbe Fenster doppelt so hoch wie unter der
+    // offscreen-Plattform hier (301 gegen 157 Punkte), und die Leisten
+    // fressen dort 150 Punkte statt weniger. Das Fenster ragte dann in
+    // die Statusleiste, der Schutzrahmen schob es waehrend der Messung
+    // heraus -- und der Pruefstand zaehlte das als "zog mit"
+    // (CI-Lauf 43523526068, Shard macOS 2/2: zwei Faelle, Versatz
+    // (0,-192) und 224 Punkte).
+    //
+    // `reserveUnten` ist der Platz, den der Fall selbst noch verliert:
+    // die Hoehe, um die er das Hauptfenster danach verkleinert, oder der
+    // Weg, um den er es nach oben zieht.
+    void tiefAberSicherStellen(int reserveUnten)
+    {
+        const QMargins leisten = m_mw->leistenRaenderForTest();
+        const QRect arbeit = m_mw->frameGeometry().marginsRemoved(leisten);
+        const int hoch = m_abgeloest->frameGeometry().height();
+        const int hoechstesY =
+            arbeit.bottom() + 1 - reserveUnten - kSnapGridPx - hoch;
+        const int y = qMin(arbeit.y() + 520, hoechstesY);
+        QVERIFY2(y >= arbeit.y(),
+                 qPrintable(QStringLiteral(
+                     "kein Platz: Arbeitsflaeche %1..%2, Fenster %3 hoch, "
+                     "Reserve %4")
+                     .arg(arbeit.y()).arg(arbeit.bottom()).arg(hoch)
+                     .arg(reserveUnten)));
+        {
+            const EigeneBewegung wirSelbst;
+            m_abgeloest->move(arbeit.x() + 300, y);
+        }
+        QTest::qWait(kNachlaufMs);
+    }
+
     // Das Hauptfenster in eine bekannte, NICHT maximierte Lage bringen
     // und warten, bis Raster und Nachlauf durch sind.
     void hauptfensterStellen(const QRect& r)
@@ -290,8 +326,11 @@ private slots:
         // Ein Zug von Hand (ohne EigeneBewegung, mehr als eine
         // Rasterweite) macht die Anteile ungueltig, dann messen sie
         // beim naechsten Umrechnen frisch.
-        m_abgeloest->move(m_abgeloest->frameGeometry().topLeft() + QPoint(32, 32));
-        QTest::qWait(kNachlaufMs);
+        // (Das Stellen ist eine eigene Bewegung, zieht also nichts --
+        // aber das Fenster steht danach nicht mehr dort, wo das
+        // Mitziehen es hingesetzt hat, und genau daran haengt die
+        // Frische der Anteile.)
+        tiefAberSicherStellen(100);
 
         const QRect vorher = m_abgeloest->frameGeometry();
         const QSize innenVorher = m_abgeloest->size();
@@ -352,12 +391,9 @@ private slots:
         QTest::qWait(kNachlaufMs);
         QVERIFY(m_mw->height() >= 900 - kSnapGridPx);
         // Tief im Fenster, wie das S-Meter des Betreibers: dort wirkt der
-        // Sprung am staerksten (rund 30 Punkte).
-        {
-            const EigeneBewegung wirSelbst;
-            m_abgeloest->move(m_mw->frameGeometry().topLeft() + QPoint(300, 520));
-        }
-        QTest::qWait(kNachlaufMs);
+        // Sprung am staerksten (rund 30 Punkte). Der Fall verliert
+        // danach 58 Punkte Hoehe -- so viel Reserve muss bleiben.
+        tiefAberSicherStellen(58);
         const QRect gross = m_mw->frameGeometry();
         const QSize innenGross = m_mw->size();
         const QRect gespeichert = m_abgeloest->frameGeometry();
@@ -411,11 +447,7 @@ private slots:
     {
         m_mw->resize(1300, 900);
         QTest::qWait(kNachlaufMs);
-        {
-            const EigeneBewegung wirSelbst;
-            m_abgeloest->move(m_mw->frameGeometry().topLeft() + QPoint(300, 520));
-        }
-        QTest::qWait(kNachlaufMs);
+        tiefAberSicherStellen(0);
         const QRect jetzt = m_mw->frameGeometry();
         const QRect vorher = m_abgeloest->frameGeometry();
         const QSize innenVorher = m_abgeloest->size();
@@ -434,6 +466,10 @@ private slots:
 
     void eigeneBewegungZiehtNicht()
     {
+        // Eigene Ausgangslage: das Hauptfenster zieht gleich um 41
+        // Punkte nach oben, seine Statusleiste kommt dem stehenden
+        // Fenster also um 41 Punkte entgegen.
+        tiefAberSicherStellen(41);
         const QPoint vorher = m_abgeloest->frameGeometry().topLeft();
         {
             const EigeneBewegung wirSelbst;
