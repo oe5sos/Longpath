@@ -11,6 +11,9 @@
  * Modification history (Longpath):
  *   2026-11-14 — Angelegt fuer Longpath von Martin Fischer,
  *                KI-gestuetzt ueber Anthropic Claude.
+ *   2026-11-14 — MBEDTLS_PLATFORM_C: unter MinGW verlangt check_config.h
+ *                es (snprintf-Ersatz fuer Windows), die Windows-CI brach ab.
+ *                Ueberall an, damit alle drei Systeme denselben Weg nehmen.
  */
 #ifndef LONGPATH_MBEDTLS_CONFIG_H
 #define LONGPATH_MBEDTLS_CONFIG_H
@@ -26,5 +29,6 @@
 #define MBEDTLS_SHA256_C
 #define MBEDTLS_ASN1_PARSE_C
 #define MBEDTLS_ASN1_WRITE_C
+#define MBEDTLS_PLATFORM_C
 
 #endif /* LONGPATH_MBEDTLS_CONFIG_H */

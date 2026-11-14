@@ -29,8 +29,8 @@ Byte für Byte, geprüft mit `cmp` gegen die Upstream-Kopie:
 - `LICENSE`
 - `library/`: `asn1parse.c`, `asn1write.c`, `bignum.c`, `bignum_core.c`,
   `constant_time.c`, `ecdsa.c`, `ecp.c`, `ecp_curves.c`, `hmac_drbg.c`,
-  `md.c`, `platform_util.c`, `sha256.c` und die 13 internen Kopfdateien,
-  die sie einbinden
+  `md.c`, `platform.c`, `platform_util.c`, `sha256.c` und die 12 internen
+  Kopfdateien, die sie einbinden
 - `include/mbedtls/`: die 24 Kopfdateien, die diese Teile einbinden
 
 Ausgewählt mit `clang -MM` unter der Longpath-Konfiguration: genau die

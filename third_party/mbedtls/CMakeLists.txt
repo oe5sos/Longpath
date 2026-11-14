@@ -6,8 +6,8 @@
 # Die Dateien unter include/ und library/ sind Byte fuer Byte aus dem
 # offiziellen Archiv mbedtls-3.6.7.tar.bz2 (SHA-256 a7e8bcbe...d11f6),
 # ueber die Kopie, die das Upstream NereusSDR fuer seine iPhone-App
-# fuehrt (ios/NereusKit/Sources/CMbedTLS @ 9036ffc04). Nur die zwoelf
-# Uebersetzungseinheiten und 37 Kopfdateien, die die Konfiguration in
+# fuehrt (ios/NereusKit/Sources/CMbedTLS @ 9036ffc04). Nur die dreizehn
+# Uebersetzungseinheiten und 36 Kopfdateien, die die Konfiguration in
 # longpath/ wirklich braucht. Siehe README-LONGPATH.md und
 # docs/attribution/MBEDTLS-PROVENANCE.md.
 #
@@ -25,6 +25,7 @@ add_library(longpath_mbedcrypto STATIC
     library/ecp_curves.c
     library/hmac_drbg.c
     library/md.c
+    library/platform.c
     library/platform_util.c
     library/sha256.c
 )
