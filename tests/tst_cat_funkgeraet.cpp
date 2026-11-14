@@ -402,6 +402,17 @@ private slots:
         QVERIFY(Ts590Cat::leseAntwort("IF00014090000     -012011000020000080;", z));
         QCOMPARE(z.ritAn, 1);
         QCOMPARE(z.xitAn, 1);
+        // Am echten TS-590 gemessen (2026-11-14, 7,252448 MHz, 115200 Bd
+        // mit Hardware-Handschlag): `XT1;` setzt Stelle 24, `XT0;` nimmt
+        // sie zurueck. Das sind die beiden Antworten des Geraets, Zeichen
+        // fuer Zeichen -- der Beleg, dass die Stelle wirklich XIT ist.
+        QVERIFY(Ts590Cat::leseAntwort("IF00007252448      000001000010000080;", z));
+        QCOMPARE(z.xitAn, 1);
+        QCOMPARE(z.ritAn, 0);
+        QCOMPARE(z.ritHz, 0);
+        QVERIFY(Ts590Cat::leseAntwort("IF00007252448      000000000010000080;", z));
+        QCOMPARE(z.xitAn, 0);
+        QCOMPARE(z.ritAn, 0);
         // Eine zu kurze Antwort darf RIT NICHT mitreissen: die Schranke
         // steht weiter bei 24, XIT wird nur gelesen, wenn Stelle 24 da
         // ist. Sonst nimmt das neue Feld beim alten Geraet das alte mit.
