@@ -49,6 +49,37 @@ private:
     static QRect untenStreifen() { return QRect(0, 1071, 1728, 46); }
     static QList<QRect> rahmen() { return {obenStreifen(), untenStreifen()}; }
 
+    // Wartet, bis das Hauptfenster WIRKLICH steht -- Muster aus
+    // `warteBisDerRahmenSteht()` in tst_side_area_integration.cpp
+    // (#451): auf Ruhe, nicht auf die Uhr.
+    //
+    // Die Mindestfrist ist kein Schmuck. Nach dem Aufbau setzt
+    // MainWindow ZWEI Nachlaeufe an (MainWindow.cpp, "Zwei
+    // Nachlaeufe"): `singleShot(0)` und `singleShot(500)`, beide rufen
+    // `schwebendeAusDemSchutzrahmenHolen()`. Der zweite ist der, der
+    // diesem Prueffall am 2026-11-14 das Fenster unter der Messung
+    // weggezogen hat.
+    static bool warteBisDasHauptfensterSteht(QWidget* w, int hoechstensMs = 20000)
+    {
+        if (w == nullptr) { return false; }
+        QTest::qWait(600);              // ueber die 500 ms des zweiten Nachlaufs
+        QRect vorher = w->frameGeometry();
+        QElapsedTimer uhr;
+        uhr.start();
+        int ruhig = 0;
+        while (uhr.elapsed() < hoechstensMs) {
+            QTest::qWait(60);
+            const QRect jetzt = w->frameGeometry();
+            if (jetzt == vorher) {
+                if (++ruhig >= 3) { return true; }
+            } else {
+                ruhig  = 0;
+                vorher = jetzt;
+            }
+        }
+        return false;
+    }
+
 private slots:
     // Gemessen am 2026-11-07: Bandbreitenfilter 160, 176, 192, von Lauf
     // zu Lauf. Das Hauptfenster steht beim Aufbau noch auf y=48, die
@@ -481,6 +512,34 @@ private slots:
         // reicht, reicht dort nicht.
         QTRY_VERIFY_WITH_TIMEOUT(!mw.schutzrahmenHinweisSichtbarFuerTest(), 5000);
 
+        // ── Auf Ruhe warten, nicht auf die Uhr (2026-11-14) ─────────
+        //
+        // Dieser Fall war auf main rot (Linux-Shard 3/4, 1 von 304 --
+        // derselbe Fall und derselbe Shard wie am 2026-10-20). Die
+        // Ursache stand im VOLLEN Protokoll, eine Zeile vor dem
+        // Fehlschlag, und nicht in den FAIL-Zeilen:
+        //
+        //     Schutzrahmen: 1 schwebende Fenster lagen auf einer
+        //     Bedienleiste und wurden heruntergeschoben
+        //
+        // Das Programm hat also vollkommen richtig gearbeitet: nach dem
+        // Aufbau setzt MainWindow zwei Nachlaeufe an (singleShot(0) und
+        // singleShot(500)), die `schwebendeAusDemSchutzrahmenHolen()`
+        // rufen. Der zweite kam auf dem lastigen Laeufer erst MITTEN IN
+        // DER MESSUNG -- er holte den eben platzierten Schweber von der
+        // Sperrzone weg, und danach beruehrte nichts mehr etwas, also
+        // schwieg `meldeZug()` zu Recht. Der Lauf meldete das als „der
+        // Rahmen bleibt beim Ziehen unsichtbar".
+        //
+        // Dazu kommt: solange `m_aufbauBewegung` lebt, steigt
+        // `meldeZug()` als ERSTES aus (`if (s_eigeneBewegungen > 0)`),
+        // und `m_fensterAufbauFertig` gilt auch noch nicht. Beide
+        // fallen im selben singleShot. Darum beides abwarten.
+        QVERIFY2(warteBisDasHauptfensterSteht(&mw),
+                 "das Hauptfenster kam nicht zur Ruhe -- die Nachlaeufe des "
+                 "Schutzrahmens wuerden mitten in die Messung fallen");
+        QTRY_VERIFY_WITH_TIMEOUT(!eigeneBewegungLebt(), 20000);
+
         // Ein schwebendes Fenster meldet eine Bewegung -- genau das tut
         // `meldeZug()` aus dem moveEvent der drei Fensterarten.
         auto* schweber = new QWidget(&mw, Qt::Window);
@@ -494,7 +553,10 @@ private slots:
         QCOMPARE(sperren.size(), 2);
         const int mitte = (sperren.at(0).bottom() + sperren.at(1).top()) / 2;
         schweber->move(sperren.at(0).left() + 40, mitte - 60);
-        QCoreApplication::processEvents();
+        // KEIN processEvents() zwischen move() und meldeZug(): genau in
+        // dieser Luecke lief der 500-ms-Nachlauf und schob das Fenster
+        // weg. `meldeZug()` liest `frameGeometry()` direkt, und das
+        // steht nach `move()` schon -- es braucht keine Ereignisrunde.
         meldeZug(schweber);
         QCoreApplication::processEvents();
         QVERIFY2(!mw.schutzrahmenHinweisSichtbarFuerTest(),
@@ -502,14 +564,93 @@ private slots:
 
         // Auf den Rahmen zu: jetzt soll er zu sehen sein.
         schweber->move(sperren.at(0).left() + 40, sperren.at(0).top() + 8);
-        QCoreApplication::processEvents();
+        const QRect platziert = schweber->frameGeometry();
+        QVERIFY2(sperren.at(0).intersects(platziert),
+                 qPrintable(QStringLiteral("die Lage kam nicht an: %1,%2 %3x%4 "
+                                           "trifft die Sperrzone nicht")
+                                .arg(platziert.x()).arg(platziert.y())
+                                .arg(platziert.width()).arg(platziert.height())));
         meldeZug(schweber);
-        QCoreApplication::processEvents();
         QVERIFY2(mw.schutzrahmenHinweisSichtbarFuerTest(),
-                 "der Rahmen bleibt beim Ziehen unsichtbar");
+                 qPrintable(QStringLiteral(
+                     "der Rahmen bleibt beim Ziehen unsichtbar. Liegt das "
+                     "Fenster noch auf der Sperrzone? jetzt %1,%2 -- wenn "
+                     "nicht, hat ein Nachlauf des Schutzrahmens es geholt "
+                     "(siehe \"heruntergeschoben\" im Protokoll)")
+                         .arg(schweber->frameGeometry().x())
+                         .arg(schweber->frameGeometry().y())));
 
         // Und er geht von selbst wieder weg.
         QTRY_VERIFY_WITH_TIMEOUT(!mw.schutzrahmenHinweisSichtbarFuerTest(), 3000);
+    }
+
+    // ── Platzieren ist kein Ziehen: die Wache selbst (2026-11-14) ───
+    //
+    // `meldeZug()` steigt als ERSTES an der Aufbau-Marke aus:
+    //
+    //     if (s_eigeneBewegungen > 0) { return; }
+    //
+    // Diese Wache war NIRGENDS festgenagelt -- in keinem der vier
+    // Prueffaelle, die `EigeneBewegung` ueberhaupt nennen. Darum konnte
+    // sie still zuschlagen: beim Rotlauf vom 2026-11-14 habe ich sie
+    // zuerst fuer die Ursache gehalten, weil nichts sie ausschloss.
+    // Sie war es nicht -- aber ein Prueffall, der eine Vermutung
+    // ausschliesst, ist genau so viel wert wie einer, der sie bestaetigt.
+    //
+    // Ohne die Wache stuende der Hinweis schon beim Start da: waehrend
+    // des Aufbaus bewegt das Programm seine Fenster selbst.
+    void einePlatzierungLoestDenHinweisNICHTAus()
+    {
+        QStandardPaths::setTestModeEnabled(true);
+        MainWindow mw;
+        mw.resize(1600, 1000);
+        mw.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&mw, 20000));
+        QVERIFY2(warteBisDasHauptfensterSteht(&mw),
+                 "das Hauptfenster kam nicht zur Ruhe");
+        QTRY_VERIFY_WITH_TIMEOUT(!eigeneBewegungLebt(), 20000);
+        QTRY_VERIFY_WITH_TIMEOUT(!mw.schutzrahmenHinweisSichtbarFuerTest(), 5000);
+
+        auto* schweber = new QWidget(&mw, Qt::Window);
+        schweber->resize(300, 120);
+        schweber->show();
+        QVERIFY(QTest::qWaitForWindowExposed(schweber, 15000));
+
+        const QList<QRect> sperren = mw.schutzrahmen();
+        QCOMPARE(sperren.size(), 2);
+        const int mitte = (sperren.at(0).bottom() + sperren.at(1).top()) / 2;
+
+        // Erst eine Meldung weit weg, damit das Fenster eine
+        // Vorgeschichte hat -- die ERSTE Meldung zaehlt nie.
+        schweber->move(sperren.at(0).left() + 40, mitte - 60);
+        meldeZug(schweber);
+
+        // Jetzt auf die Sperrzone, aber ALS PLATZIERUNG angesagt.
+        // Genau das tut das Programm beim Aufbau und beim Anwenden
+        // eines Profils, und genau dann darf nichts blinken.
+        {
+            const EigeneBewegung wirSelbst;
+            schweber->move(sperren.at(0).left() + 40, sperren.at(0).top() + 8);
+            QVERIFY(sperren.at(0).intersects(schweber->frameGeometry()));
+            meldeZug(schweber);
+            QVERIFY2(!mw.schutzrahmenHinweisSichtbarFuerTest(),
+                     "der Hinweis blinkt beim PLATZIEREN. Dann steht er beim "
+                     "Start da, bevor jemand die Maus angefasst hat -- siehe "
+                     "s_eigeneBewegungen in WindowPlacement.cpp");
+        }
+
+        // Und ohne die Marke zaehlt dieselbe Lage wieder als Zug: die
+        // Wache darf den Fall nicht miterschlagen, fuer den der Hinweis
+        // da ist. (Eine Lage, die sich NICHT geaendert hat, meldet
+        // nichts -- also erst weg, dann wieder hin.)
+        schweber->move(sperren.at(0).left() + 40, mitte - 60);
+        meldeZug(schweber);
+        schweber->move(sperren.at(0).left() + 40, sperren.at(0).top() + 8);
+        QVERIFY(sperren.at(0).intersects(schweber->frameGeometry()));
+        meldeZug(schweber);
+        QVERIFY2(mw.schutzrahmenHinweisSichtbarFuerTest(),
+                 "nach dem Platzieren zaehlt ein echter Zug nicht mehr -- die "
+                 "Marke ist haengen geblieben");
     }
 
     void einFREMDESFensterLaesstDenRahmenInRuhe()
