@@ -20595,6 +20595,8 @@ void MainWindow::openSpotHub()
         connect(m_spotHubDialog.data(), &QDialog::finished, this, [this]() {
             noteWindowClosedByOperator(QStringLiteral("WinSpotHub"));
         });
+        // Roundtable (2026-11-14): der Reiter mit der Erstfrage.
+        m_spotHubDialog->attachRoundtable(m_radioModel->roundtableHub());
         // Bridge spotsClearedAll (Display tab's "Clear All Spots" button)
         // to SpotModel::clear so the global QShortcut and the dialog
         // button share one truth-source.

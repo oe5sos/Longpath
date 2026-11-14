@@ -5637,6 +5637,8 @@ if(TEST tst_roundtable_e2e)
     set_tests_properties(tst_roundtable_e2e PROPERTIES
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
+# Der Reiter im Spot Hub: Erstfrage, Umschalter, Auto-Start.
+longpath_add_test(tst_roundtable_spothub)
 longpath_add_test(tst_roundtable_key)
 if(TEST tst_roundtable_key)
     set_tests_properties(tst_roundtable_key PROPERTIES
