@@ -35,6 +35,19 @@ using namespace Longpath;
 class TstRoundtableSpotHub : public QObject {
     Q_OBJECT
 
+    // Fuer den Betreiber: mit LONGPATH_BILD_DIR legt der Lauf ein Bild des
+    // Reiters ab, damit die Gestaltung ohne laufendes Programm zu sehen ist.
+    static void bildAblegen(QWidget& w, const QString& name)
+    {
+        const QString dir = QString::fromLocal8Bit(qgetenv("LONGPATH_BILD_DIR"));
+        if (dir.isEmpty()) {
+            return;
+        }
+        w.resize(760, 520);
+        QCoreApplication::processEvents();
+        w.grab().save(dir + QLatin1Char('/') + name);
+    }
+
 private slots:
     void initTestCase()
     {
@@ -102,6 +115,7 @@ private slots:
         QVERIFY(status->text().contains(QStringLiteral("nothing is sent")));
         QVERIFY(call->text().contains(QStringLiteral("OE5SOS")));
         QCOMPARE(hub->client()->linkState(), RoundtableClient::LinkState::Off);
+        bildAblegen(dlg, QStringLiteral("roundtable-reiter-vor-der-antwort.png"));
 
         // "Stay hidden": die Antwort steht in den Einstellungen.
         QTest::mouseClick(stay, Qt::LeftButton);
@@ -113,6 +127,7 @@ private slots:
         QVERIFY(!stay->isVisible());
         QVERIFY(toggle->isVisible());
         QCOMPARE(toggle->text(), QStringLiteral("Go live"));
+        bildAblegen(dlg, QStringLiteral("roundtable-reiter-verborgen.png"));
 
         // Umschalten auf live und zurueck.
         QTest::mouseClick(toggle, Qt::LeftButton);
