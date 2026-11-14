@@ -5629,6 +5629,14 @@ if(TARGET tst_roundtable_client)
         LONGPATH_ROUNDTABLE_CONFORMANCE_DIR="${CMAKE_SOURCE_DIR}/roundtable/conformance/v1")
 endif()
 longpath_add_test(tst_roundtable_hub)
+# Der ganze Weg gegen Upstreams Referenzserver auf 127.0.0.1. Braucht
+# Python mit websockets + cryptography (LONGPATH_ROUNDTABLE_PYTHON),
+# sonst uebersprungen.
+longpath_add_test(tst_roundtable_e2e)
+if(TEST tst_roundtable_e2e)
+    set_tests_properties(tst_roundtable_e2e PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 longpath_add_test(tst_roundtable_key)
 if(TEST tst_roundtable_key)
     set_tests_properties(tst_roundtable_key PROPERTIES
