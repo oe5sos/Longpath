@@ -5620,6 +5620,14 @@ if(TARGET tst_roundtable_wire)
     target_compile_definitions(tst_roundtable_wire PRIVATE
         LONGPATH_ROUNDTABLE_CONFORMANCE_DIR="${CMAKE_SOURCE_DIR}/roundtable/conformance/v1")
 endif()
+longpath_add_test(tst_roundtable_signal_floor)
+# Der Client gegen einen Schein-Server auf 127.0.0.1, mit Schein-Uhren.
+# Nichts verlaesst den Rechner.
+longpath_add_test(tst_roundtable_client)
+if(TARGET tst_roundtable_client)
+    target_compile_definitions(tst_roundtable_client PRIVATE
+        LONGPATH_ROUNDTABLE_CONFORMANCE_DIR="${CMAKE_SOURCE_DIR}/roundtable/conformance/v1")
+endif()
 longpath_add_test(tst_roundtable_key)
 if(TEST tst_roundtable_key)
     set_tests_properties(tst_roundtable_key PROPERTIES

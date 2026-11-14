@@ -734,6 +734,8 @@ set(CORE_SOURCES
     src/core/hotkeys/HotKeyBindings.cpp
     src/core/roundtable/RoundtableWire.cpp
     src/core/roundtable/RoundtableKey.cpp
+    src/core/roundtable/RoundtableClient.cpp
+    src/core/roundtable/RoundtableSignalFloor.cpp
     src/core/hotkeys/HotKeyChord.cpp
     src/core/audio/QsoRecorder.cpp
     src/core/audio/WavRecorder.cpp
