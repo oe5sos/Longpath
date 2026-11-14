@@ -5628,6 +5628,7 @@ if(TARGET tst_roundtable_client)
     target_compile_definitions(tst_roundtable_client PRIVATE
         LONGPATH_ROUNDTABLE_CONFORMANCE_DIR="${CMAKE_SOURCE_DIR}/roundtable/conformance/v1")
 endif()
+longpath_add_test(tst_roundtable_hub)
 longpath_add_test(tst_roundtable_key)
 if(TEST tst_roundtable_key)
     set_tests_properties(tst_roundtable_key PROPERTIES

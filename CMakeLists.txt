@@ -848,6 +848,7 @@ set(MODEL_SOURCES
     src/models/bandstack/BandStackController.cpp
     src/models/NotchModel.cpp
     src/models/SpotModel.cpp
+    src/models/RoundtableHub.cpp
     src/models/SpotTableModel.cpp
     src/models/BandFilterProxy.cpp
     src/models/AlertsTableModel.cpp
