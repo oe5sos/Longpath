@@ -31,6 +31,10 @@
 //                 her (stehengebliebene Anteile aus dem Fall davor).
 //                 Martin Fischer (OE5SOS), KI-gestuetzt mit Anthropic
 //                 Claude Code.
+//   2026-11-14 — Die Meldung eines roten Falles gibt jetzt die Maasse
+//                 des Fensters, den Schirmplatz und die Grundlage des
+//                 Mitziehens mit. Martin Fischer (OE5SOS), KI-gestuetzt
+//                 mit Anthropic Claude Code.
 // =================================================================
 
 // no-port-check: Longpath-original test file.
@@ -38,6 +42,7 @@
 #include <QtTest>
 #include <QPushButton>
 #include <QScreen>
+#include <QStringList>
 
 #include "gui/MainWindow.h"
 #include "gui/applets/AppletFloatingWindow.h"
@@ -127,6 +132,44 @@ private:
 
     // Das Hauptfenster in eine bekannte, NICHT maximierte Lage bringen
     // und warten, bis Raster und Nachlauf durch sind.
+    // ── Was eine rote Meldung sonst nicht hergibt (2026-11-14) ──────
+    //
+    // Im CI-Lauf 43619257941 (Shard Linux 2/4) fiel Fall 2 einmal mit
+    // 285x269 statt 395x251 (vorher 269x189) und war im Neulauf gruen.
+    // Schmaeler UND hoeher als das Verhaeltnis: ein noch ausstehender
+    // Nachlauf erklaert das nicht, der geht in eine Richtung. In Frage
+    // kamen `expandedTo(minimumSize)`, die Schirmbegrenzung und eine aus
+    // dem Fall davor wiederverwendete Grundlage (MainWindow::
+    // schwebendeUmrechnen) -- aus den Protokollzahlen allein nicht zu
+    // entscheiden. Also gibt die Meldung jetzt die Zeugen mit, damit der
+    // naechste rote Lauf die Frage selbst beantwortet.
+    QString zustandDesFensters() const
+    {
+        if (!m_abgeloest) { return QStringLiteral(" [kein Fenster]"); }
+        auto masz = [](const QString& was, const QSize& s) {
+            return QStringLiteral("%1 %2x%3").arg(was).arg(s.width()).arg(s.height());
+        };
+        QStringList teile;
+        teile << QStringLiteral("Applet \"%1\"").arg(m_abgeloest->appletId())
+              << masz(QStringLiteral("minimumSize"), m_abgeloest->minimumSize())
+              << masz(QStringLiteral("minimumSizeHint"), m_abgeloest->minimumSizeHint())
+              << masz(QStringLiteral("sizeHint"), m_abgeloest->sizeHint())
+              << masz(QStringLiteral("maximumSize"), m_abgeloest->maximumSize());
+        const QRect rahmen = m_abgeloest->frameGeometry();
+        teile << QStringLiteral("Rahmen %1,%2 %3x%4")
+                     .arg(rahmen.x()).arg(rahmen.y())
+                     .arg(rahmen.width()).arg(rahmen.height());
+        if (const QScreen* scr = m_abgeloest->screen()) {
+            const QRect platz = scr->availableGeometry();
+            teile << QStringLiteral("Schirmplatz %1,%2 %3x%4")
+                         .arg(platz.x()).arg(platz.y())
+                         .arg(platz.width()).arg(platz.height());
+        }
+        teile << QStringLiteral("Grundlage: %1")
+                     .arg(m_mw->mitziehBasisAlsTextForTest(m_abgeloest));
+        return QStringLiteral(" [%1]").arg(teile.join(QStringLiteral("; ")));
+    }
+
     void hauptfensterStellen(const QRect& r)
     {
         if (m_mw->isMaximized() || m_mw->isFullScreen()) { m_mw->showNormal(); }
@@ -220,8 +263,9 @@ private slots:
         QVERIFY2(qAbs(g.x() - sollX) <= kToleranzPx
                      && qAbs(g.y() - sollY) <= kToleranzPx,
                  qPrintable(QStringLiteral(
-                     "Lage (%1,%2), erwartet im Verhaeltnis (%3,%4)")
-                     .arg(g.x()).arg(g.y()).arg(sollX).arg(sollY)));
+                     "Lage (%1,%2), erwartet im Verhaeltnis (%3,%4)%5")
+                     .arg(g.x()).arg(g.y()).arg(sollX).arg(sollY)
+                     .arg(zustandDesFensters())));
         // Die Groesse waechst im selben Verhaeltnis (2026-11-11). Was
         // danach noch an ihr ruehrt, ist Longpaths Raster, das alle vier
         // Kanten des Rahmens einrasten laesst -- eine Rasterweite, wie
@@ -231,10 +275,11 @@ private slots:
         const QSize ist = m_abgeloest->size();
         QVERIFY2(qAbs(ist.width() - soll.width()) <= kSnapGridPx
                      && qAbs(ist.height() - soll.height()) <= kSnapGridPx,
-                 qPrintable(QStringLiteral("Groesse %1x%2, erwartet %3x%4 (vorher %5x%6)")
+                 qPrintable(QStringLiteral("Groesse %1x%2, erwartet %3x%4 (vorher %5x%6)%7")
                                 .arg(ist.width()).arg(ist.height())
                                 .arg(soll.width()).arg(soll.height())
-                                .arg(innen.width()).arg(innen.height())));
+                                .arg(innen.width()).arg(innen.height())
+                                .arg(zustandDesFensters())));
     }
 
     // ── Fall 2b: verkleinert der Betreiber das Hauptfenster, werden die
@@ -261,10 +306,11 @@ private slots:
                                 .arg(ist.width()).arg(innen.width())));
         QVERIFY2(qAbs(ist.width() - soll.width()) <= kSnapGridPx
                      && qAbs(ist.height() - soll.height()) <= kSnapGridPx,
-                 qPrintable(QStringLiteral("Groesse %1x%2, erwartet %3x%4 (vorher %5x%6)")
+                 qPrintable(QStringLiteral("Groesse %1x%2, erwartet %3x%4 (vorher %5x%6)%7")
                                 .arg(ist.width()).arg(ist.height())
                                 .arg(soll.width()).arg(soll.height())
-                                .arg(innen.width()).arg(innen.height())));
+                                .arg(innen.width()).arg(innen.height())
+                                .arg(zustandDesFensters())));
     }
 
     // ── Fall 3: eine Profilanwendung (eigene Bewegung) zieht NICHT ───────
