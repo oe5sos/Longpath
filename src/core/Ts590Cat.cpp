@@ -103,6 +103,13 @@ bool leseAntwort(QByteArray a, Zustand& z)
         if (hz < 0 || an < 0) { return false; }
         z.ritHz = a.at(18) == '-' ? -hz : hz;
         z.ritAn = an;
+        // Stelle 24 ist XIT (2026-11-13). Die Schranke oben bleibt bei 24,
+        // nicht 25: eine kuerzere Antwort soll weiter RIT liefern statt
+        // ganz durchzufallen -- sonst nimmt das neue Feld das alte mit.
+        if (a.size() >= 25) {
+            const int xan = zahl(a, 24, 1);
+            if (xan >= 0) { z.xitAn = xan; }
+        }
         return true;
     }
     if (k == "NT") { z.notch = zahl(a, 2, 1); return z.notch >= 0; }
@@ -221,6 +228,11 @@ QByteArray stelleRitSchritt(int hz)
 }
 
 QByteArray stelleRitNull() { return QByteArrayLiteral("W RC; 0\n"); }
+
+QByteArray stelleXit(bool an)
+{
+    return an ? QByteArrayLiteral("W XT1; 0\n") : QByteArrayLiteral("W XT0; 0\n");
+}
 
 QByteArray stelleNotch(bool an)
 {

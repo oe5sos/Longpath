@@ -55,6 +55,8 @@ CatRigApplet::CatRigApplet(RadioModel* model, QWidget* parent)
         });
         connect(m_rit, &QPushButton::clicked, this,
                 [schicke](bool an) { schicke(Ts590Cat::stelleRit(an)); });
+        connect(m_xit, &QPushButton::clicked, this,
+                [schicke](bool an) { schicke(Ts590Cat::stelleXit(an)); });
         connect(m_ritRunter, &QPushButton::clicked, this,
                 [schicke]() { schicke(Ts590Cat::stelleRitSchritt(-10)); });
         connect(m_ritHoch, &QPushButton::clicked, this,
@@ -130,15 +132,25 @@ void CatRigApplet::buildUI()
     ritZeile->setSpacing(4);
     m_rit = greenToggle(QStringLiteral("RIT"));
     m_rit->setObjectName(QStringLiteral("catRigRit"));
+    m_rit->setToolTip(tr("Offset the receive frequency"));
+    // XIT (2026-11-13): ohne sie ist Split am 590 nicht zu fahren, und
+    // Split ist auf Kurzwelle bei DX der Normalfall. Das Geraet fuehrt
+    // EIN Versatzregister fuer beide -- die drei Knoepfe daneben stellen
+    // darum immer beides. Das steht in den Hinweisen, damit niemand zwei
+    // getrennte Versaetze sucht, die es im Geraet nicht gibt.
+    m_xit = greenToggle(QStringLiteral("XIT"));
+    m_xit->setObjectName(QStringLiteral("catRigXit"));
+    m_xit->setToolTip(tr("Offset the transmit frequency — for split. "
+                         "Shares one offset with RIT, as in the radio."));
     m_ritRunter = new QPushButton(QStringLiteral("−"), this);
     m_ritRunter->setObjectName(QStringLiteral("catRigRitRunter"));
-    m_ritRunter->setToolTip(tr("RIT down 10 Hz"));
+    m_ritRunter->setToolTip(tr("Offset down 10 Hz (RIT and XIT)"));
     m_ritHoch = new QPushButton(QStringLiteral("+"), this);
     m_ritHoch->setObjectName(QStringLiteral("catRigRitHoch"));
-    m_ritHoch->setToolTip(tr("RIT up 10 Hz"));
+    m_ritHoch->setToolTip(tr("Offset up 10 Hz (RIT and XIT)"));
     m_ritNull = new QPushButton(QStringLiteral("0"), this);
     m_ritNull->setObjectName(QStringLiteral("catRigRitNull"));
-    m_ritNull->setToolTip(tr("Clear RIT"));
+    m_ritNull->setToolTip(tr("Clear the offset (RIT and XIT)"));
     for (QPushButton* b : {m_ritRunter, m_ritHoch, m_ritNull}) { b->setFixedWidth(28); }
     m_ritWert = insetValue(QStringLiteral("0 Hz"), 64);
     m_ritWert->setObjectName(QStringLiteral("catRigRitWert"));
@@ -146,6 +158,7 @@ void CatRigApplet::buildUI()
     m_notch->setObjectName(QStringLiteral("catRigNotch"));
     m_notch->setToolTip(tr("Auto notch"));
     ritZeile->addWidget(m_rit);
+    ritZeile->addWidget(m_xit);
     ritZeile->addWidget(m_ritRunter);
     ritZeile->addWidget(m_ritHoch);
     ritZeile->addWidget(m_ritNull);
@@ -231,6 +244,7 @@ void CatRigApplet::syncFromModel()
         m_agc->setCurrentIndex(z.agc);
     }
     setzeTaste(m_rit, z.ritAn);
+    setzeTaste(m_xit, z.xitAn);
     setzeTaste(m_notch, z.notch);
     if (z.ritAn >= 0) {
         m_ritWert->setText(z.ritHz == 0 ? QStringLiteral("0 Hz")

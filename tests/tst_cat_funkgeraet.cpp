@@ -111,8 +111,13 @@ public:
             }
             if (t.startsWith("W ")) {
                 bool erlaubt = false;
-                for (const char* k : {"W GC", "W SH", "W SL", "W FW", "W FL", "W RT", "W RU",
-                                      "W RD", "W RC", "W NT", "W NL", "W RL"}) {
+                // Positivliste: was NICHT daraufsteht, gilt als gefaehrlich.
+                // "W XT" kam am 2026-11-13 dazu und hat die Schranke beim
+                // ersten Lauf prompt ausgeloest -- genau dafuer ist sie da.
+                // XT legt den Versatz auf das SENDEN um; es tastet nicht,
+                // so wenig wie RT den Empfang tastet.
+                for (const char* k : {"W GC", "W SH", "W SL", "W FW", "W FL", "W RT", "W XT",
+                                      "W RU", "W RD", "W RC", "W NT", "W NL", "W RL"}) {
                     if (t.startsWith(k)) { erlaubt = true; }
                 }
                 if (!erlaubt) { return true; }
@@ -383,8 +388,39 @@ private slots:
         QVERIFY(Ts590Cat::leseAntwort("IF00014090000     -012010000020000080;", z));
         QCOMPARE(z.ritHz, -120);
         QCOMPARE(z.ritAn, 1);
+        QCOMPARE(z.xitAn, 0);   // Stelle 24, in dieser Antwort aus
         QVERIFY(Ts590Cat::leseAntwort("IF00014090000      020010000020000080;", z));
         QCOMPARE(z.ritHz, 200);
+        // XIT an, RIT aus: dieselbe Antwort, Stelle 23 auf 0 und 24 auf 1.
+        // Die beiden duerfen sich nicht verwechseln -- sie stehen
+        // nebeneinander und waren vor dem 2026-11-13 nur eine Stelle.
+        QVERIFY(Ts590Cat::leseAntwort("IF00014090000     -012001000020000080;", z));
+        QCOMPARE(z.ritAn, 0);
+        QCOMPARE(z.xitAn, 1);
+        QCOMPARE(z.ritHz, -120);   // EIN Versatzregister fuer beide
+        // Beide an -- das Geraet laesst es zu, also muss es ankommen.
+        QVERIFY(Ts590Cat::leseAntwort("IF00014090000     -012011000020000080;", z));
+        QCOMPARE(z.ritAn, 1);
+        QCOMPARE(z.xitAn, 1);
+        // Am echten TS-590 gemessen (2026-11-14, 7,252448 MHz, 115200 Bd
+        // mit Hardware-Handschlag): `XT1;` setzt Stelle 24, `XT0;` nimmt
+        // sie zurueck. Das sind die beiden Antworten des Geraets, Zeichen
+        // fuer Zeichen -- der Beleg, dass die Stelle wirklich XIT ist.
+        QVERIFY(Ts590Cat::leseAntwort("IF00007252448      000001000010000080;", z));
+        QCOMPARE(z.xitAn, 1);
+        QCOMPARE(z.ritAn, 0);
+        QCOMPARE(z.ritHz, 0);
+        QVERIFY(Ts590Cat::leseAntwort("IF00007252448      000000000010000080;", z));
+        QCOMPARE(z.xitAn, 0);
+        QCOMPARE(z.ritAn, 0);
+        // Eine zu kurze Antwort darf RIT NICHT mitreissen: die Schranke
+        // steht weiter bei 24, XIT wird nur gelesen, wenn Stelle 24 da
+        // ist. Sonst nimmt das neue Feld beim alten Geraet das alte mit.
+        Ts590Cat::Zustand kurz;
+        QVERIFY(Ts590Cat::leseAntwort("IF00014090000     -01201;", kurz));
+        QCOMPARE(kurz.ritHz, -120);
+        QCOMPARE(kurz.ritAn, 1);
+        QCOMPARE(kurz.xitAn, -1);   // unbekannt, nicht geraten
         QVERIFY(Ts590Cat::leseAntwort("NT10;", z));
         QCOMPARE(z.notch, 1);
         QVERIFY(Ts590Cat::leseAntwort("NL006;", z));
@@ -426,6 +462,10 @@ private slots:
         QCOMPARE(Ts590Cat::stelleRitSchritt(10), QByteArray("W RU00010; 0\n"));
         QCOMPARE(Ts590Cat::stelleRitSchritt(-10), QByteArray("W RD00010; 0\n"));
         QCOMPARE(Ts590Cat::stelleRitNull(), QByteArray("W RC; 0\n"));
+        // XIT (2026-11-13): eigener Schalter, aber KEIN eigener Versatz --
+        // RU/RD/RC gelten fuer beide, das Geraet fuehrt nur ein Register.
+        QCOMPARE(Ts590Cat::stelleXit(true), QByteArray("W XT1; 0\n"));
+        QCOMPARE(Ts590Cat::stelleXit(false), QByteArray("W XT0; 0\n"));
         QCOMPARE(Ts590Cat::stelleNotch(true), QByteArray("W NT10; 0\n"));
         QCOMPARE(Ts590Cat::stelleNotch(false), QByteArray("W NT00; 0\n"));
         QCOMPARE(Ts590Cat::stelleNbPegel(5), QByteArray("W NL005; 0\n"));
@@ -699,11 +739,13 @@ private slots:
         };
         doppel.befehle.clear();
         drueck("catRigRit");
+        drueck("catRigXit");
         drueck("catRigRitHoch");
         drueck("catRigRitRunter");
         drueck("catRigRitNull");
         drueck("catRigNotch");
-        for (const char* b : {"W RT1; 0\n", "W RU00010; 0\n", "W RD00010; 0\n", "W RC; 0\n",
+        for (const char* b : {"W RT1; 0\n", "W XT1; 0\n", "W RU00010; 0\n",
+                              "W RD00010; 0\n", "W RC; 0\n",
                               "W NT10; 0\n"}) {
             QTRY_VERIFY2_WITH_TIMEOUT(doppel.befehle.contains(QByteArray(b)), b, 20000);
         }
@@ -724,6 +766,20 @@ private slots:
         auto* wert = feld.findChild<QLabel*>(QStringLiteral("catRigRitWert"));
         QVERIFY(wert);
         QTRY_COMPARE_WITH_TIMEOUT(wert->text(), QStringLiteral("-120 Hz"), 20000);
+
+        // Und der XIT-Schalter folgt dem Geraet, nicht dem letzten Klick
+        // (2026-11-13). In der Antwort oben steht Stelle 23 auf 1 und 24
+        // auf 0: RIT an, XIT aus -- obwohl wir XIT gerade eingeschaltet
+        // haben. Das Geraet hat das letzte Wort, sonst zeigt das Feld
+        // einen Zustand, den die Station nicht hat.
+        auto* xit = feld.findChild<QPushButton*>(QStringLiteral("catRigXit"));
+        QVERIFY(xit);
+        QTRY_VERIFY_WITH_TIMEOUT(!xit->isChecked(), 20000);
+        doppel.roh["IF;"] = "IF00028078400     -012001000020000080;";
+        QTRY_VERIFY_WITH_TIMEOUT(xit->isChecked(), 20000);
+        // Dabei darf nichts getastet worden sein -- XIT stellt den Sender
+        // um, es taetet ihn nicht.
+        QVERIFY(!doppel.hatGetastet());
     }
 
     // Beim Senden zeigt das Feld ALC, wenn das Geraet ALC als Instrument hat.
