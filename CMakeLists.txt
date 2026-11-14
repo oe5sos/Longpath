@@ -732,6 +732,8 @@ set(CORE_SOURCES
     src/core/audio/AnsageAufbereitung.cpp
     src/core/hotkeys/HotKeyActionList.cpp
     src/core/hotkeys/HotKeyBindings.cpp
+    src/core/roundtable/RoundtableWire.cpp
+    src/core/roundtable/RoundtableKey.cpp
     src/core/hotkeys/HotKeyChord.cpp
     src/core/audio/QsoRecorder.cpp
     src/core/audio/WavRecorder.cpp
@@ -1970,6 +1972,14 @@ target_link_libraries(LongpathObjs PUBLIC sgp4)
 # --------------------------------------------------------------------------
 add_subdirectory(third_party/ggmorse)
 target_link_libraries(LongpathObjs PUBLIC ggmorse)
+
+# --------------------------------------------------------------------------
+# Mbed TLS 3.6.7, nur ECDSA P-256 + SHA-256 (Apache-2.0) -- die Anmeldung
+# bei Roundtable (src/core/roundtable/RoundtableKey, 2026-11-14). Byte fuer
+# Byte uebernommen; siehe third_party/mbedtls/README-LONGPATH.md.
+# --------------------------------------------------------------------------
+add_subdirectory(third_party/mbedtls)
+target_link_libraries(LongpathObjs PUBLIC longpath_mbedcrypto)
 
 # ── ft8_lib (FT8/FT4, MIT) ──────────────────────────────────────────
 #
