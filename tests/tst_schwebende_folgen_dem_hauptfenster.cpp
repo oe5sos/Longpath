@@ -165,7 +165,11 @@ private:
                          .arg(platz.x()).arg(platz.y())
                          .arg(platz.width()).arg(platz.height());
         }
-        teile << QStringLiteral("Grundlage: %1")
+        const QRect bezug = m_mw->hauptrahmenBasisForTest();
+        teile << QStringLiteral("Bezugsrahmen %1,%2 %3x%4")
+                     .arg(bezug.x()).arg(bezug.y())
+                     .arg(bezug.width()).arg(bezug.height())
+              << QStringLiteral("Grundlage: %1")
                      .arg(m_mw->mitziehBasisAlsTextForTest(m_abgeloest));
         return QStringLiteral(" [%1]").arg(teile.join(QStringLiteral("; ")));
     }
@@ -241,6 +245,24 @@ private slots:
     // ── Fall 2: eine Groessenaenderung haelt das Verhaeltnis ─────────────
     void groessenaenderungHaeltDasVerhaeltnis()
     {
+        // ── Erst die Grundlage vergessen (2026-11-14) ───────────────
+        //
+        // Dieser Fall rechnet sein Soll aus der Groesse, die das Fenster
+        // JETZT hat. Longpath rechnet aber aus `m_mitziehBasis` -- den
+        // Anteilen, die beim letzten Mitziehen galten, und die bleiben
+        // absichtlich stehen, solange das Fenster dort steht, wo wir es
+        // hingesetzt haben (2026-11-13, fuer „klein und wieder gross").
+        // Wuchs das Fenster seither nach (Layout nach dem Setzen), sind
+        // das zwei verschiedene Rechnungen und der Fall faellt scheinbar
+        // zufaellig: CI-Lauf 43636263627, Shard Linux 2/4, gemessen
+        // 285x269 statt 395x251 -- mit Anteilen w=0.1984 h=0.4086 statt
+        // der 0.2634/0.3881, die zu 269x189 auf 1021x487 gehoeren.
+        //
+        // Die Wiederverwendung selbst prueft Fall 5
+        // (`kleinUndWiederGrossGibtDieAlteLage`). HIER soll frisch
+        // gemessen werden, sonst misst der Fall nicht, was er behauptet.
+        m_mw->vergissMitziehBasisForTest();
+
         // Seit 2026-11-12 im Verhaeltnis der ARBEITSFLAECHE (ohne die
         // Leisten oben und unten, die nicht mitwachsen).
         const QMargins leisten = m_mw->leistenRaenderForTest();
@@ -286,6 +308,10 @@ private slots:
     //    schwebenden Fenster im Verhaeltnis kleiner (2026-11-11) ───────────
     void verkleinernMachtSieKleiner()
     {
+        // Wie in Fall 2: frisch messen, sonst rechnet Longpath mit den
+        // Anteilen von dort und der Fall misst etwas anderes.
+        m_mw->vergissMitziehBasisForTest();
+
         const QMargins leisten = m_mw->leistenRaenderForTest();
         const QRect alt = m_mw->frameGeometry();
         const QRect altA = alt.marginsRemoved(leisten);
