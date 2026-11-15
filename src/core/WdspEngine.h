@@ -158,6 +158,7 @@ class TestAgcSaatBeimOeffnen;
 // PureSignal 3: der Lauf oeffnet einen echten Sendekanal und baut ihn
 // wieder ab, um die NURB-Anpassung und den Steuerfaden zu pruefen.
 class TestPureSignal3Kette;
+class TestPsGedaechtnis;
 #endif
 
 namespace Longpath {
@@ -865,6 +866,9 @@ private:
     friend class ::TestAgcSaatBeimOeffnen;
     // PureSignal 3: dieselbe Freundschaft, echter Sendekanal.
     friend class ::TestPureSignal3Kette;
+    // PureSignal-Satz aus Zeus 2.0.71: dieselbe Freundschaft, echter
+    // Sendekanal (Schalter + Abbau mitten im Einspielen).
+    friend class ::TestPsGedaechtnis;
 #endif
 };
 

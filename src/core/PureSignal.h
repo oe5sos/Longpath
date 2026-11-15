@@ -49,6 +49,9 @@
 //   2026-05-06 — Created by J.J. Boyd (KG4VCF) for Phase 3M-4 Task 7
 //                 PureSignal coordinator, with AI-assisted source-first
 //                 protocol via Anthropic Claude Code.
+//   2026-11-15 — memoryCorrection property. Zeus Station Engine v2.0.71
+//                 PureSignal set, see WDSP-PROVENANCE.md.
+//                 Longpath, AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 #pragma once
@@ -471,6 +474,21 @@ public:
     /// ihn sich, anders als Thetis -- siehe die Begruendung an
     /// setShow2ToneMeasurements().
     void loadShow2ToneSetting();
+
+    /// Opt-in memory correction (calcc/iqc memory term).  Cancels the part
+    /// of the amplifier distortion that depends on what the amp did a
+    /// moment ago -- the lopsided IMD3, one side of the two-tone worse
+    /// than the other.  Off unless the operator switches it on;
+    /// remembered as `PsMemoryCorrection`.  Re-applied whenever a TX
+    /// channel is handed over (a fresh calcc starts with it off).
+    /// From Zeus Station Engine v2.0.71: native/wdsp/calcc.c
+    /// SetPSMemoryCorrection and Zeus.Dsp/Wdsp/WdspDspEngine.cs
+    /// SetPsMemoryCorrection ("Native SetPSMemoryCorrection only forgets
+    /// the learned coefficient; it never resets calcc or arms
+    /// PureSignal" -- so it may change while keyed).
+    bool memoryCorrection() const noexcept { return m_memoryCorrection; }
+    void setMemoryCorrection(bool on);
+    void loadMemoryCorrectionSetting();
     // From Thetis PSForm.cs:792-803 PSpeak_TextChanged [v2.10.3.13] →
     // puresignal.SetPSHWPeak(_txachannel, value).  Stored for UI read-back.
     // (//MW0LGE attribution preserved — author tag from upstream
@@ -651,6 +669,7 @@ signals:
     void saveRestoreEnabledChanged(bool enabled);
     void loopbackChanged(bool);
     void show2ToneMeasurementsChanged(bool);
+    void memoryCorrectionChanged(bool);
     void hwPeakChanged(double);
 
 private:
@@ -834,6 +853,7 @@ private:
     bool   m_saveRestoreEnabled{true};
     bool   m_loopback{false};       // checkLoopback default unchecked
     bool   m_show2Tone{false};      // chkShow2ToneMeasurements default unchecked
+    bool   m_memoryCorrection{false}; // Zeus v2.0.71: off at create
     double m_hwPeak{0.0};           // populated by applyBoardCapabilities
 
     // ── AmpView buffer-sizing (Task 9) ────────────────────────────────────

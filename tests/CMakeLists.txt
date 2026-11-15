@@ -8686,6 +8686,13 @@ longpath_add_test(tst_genius_status_tor)
 #   kommt, calibrationCountChanged NICHT -- der alte Taktgeber waere still).
 longpath_add_test(tst_puresignal3_kette)
 
+# tst_ps_gedaechtnis: der PureSignal-Satz aus der Zeus Station Engine v2.0.71.
+#   Fit-zu-Fit-Toleranz (ps_scheck), Schaetzer der Gedaechtniskorrektur
+#   (ps_memcorr), die zwei Schalter an einem ECHTEN Sendekanal, und der Abbau,
+#   waehrend der Worker doPSCorrChange eine eingespielte Korrektur an iqc
+#   uebergibt -- mit der alten Reihenfolge in destroy_calcc ein Doppel-Free.
+longpath_add_test(tst_ps_gedaechtnis)
+
 # tst_gs232_rotor: der serielle GS-232A/B-Treiber ohne Rotor am Tisch
 #   (eine nachgestellte Leitung statt der Schnittstelle). Haelt die Befehlsform fest (drei Ziffern
 #   je Feld, 360 wird 0, Hoehe geklemmt statt gefaltet), beide Antwortformen,

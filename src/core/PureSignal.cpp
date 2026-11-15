@@ -15,6 +15,10 @@
 //   2026-05-06 — Created by J.J. Boyd (KG4VCF) for Phase 3M-4 Task 7
 //                 PureSignal coordinator, with AI-assisted source-first
 //                 protocol via Anthropic Claude Code.
+//   2026-11-15 — memoryCorrection setting (`PsMemoryCorrection`, off by
+//                 default), re-applied in setTxChannel(). Zeus Station
+//                 Engine v2.0.71 PureSignal set, see WDSP-PROVENANCE.md.
+//                 Longpath, AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 #include "PureSignal.h"
@@ -72,6 +76,12 @@ PureSignal::PureSignal(WdspEngine* engine,
     // stimmen, wenn jemand nur den Zustand abfragt.
     loadStabilitySettings();
     loadShow2ToneSetting();
+    loadMemoryCorrectionSetting();
+    // Der erste Verbindungsaufbau reicht den Sendekanal hier herein, nicht
+    // ueber setTxChannel() -- also auch hier den Schalter nachtragen.
+    if (m_tx && m_memoryCorrection) {
+        m_tx->setPSMemoryCorrection(true);
+    }
 
     m_pollTimer.setInterval(kPollIntervalMs);
     m_pollTimer.setTimerType(Qt::CoarseTimer);
@@ -253,6 +263,13 @@ void PureSignal::setStabilityEnabled(bool on)
 void PureSignal::setTxChannel(TxChannel* tx)
 {
     m_tx = tx;
+    // A fresh calcc starts with memory correction off; re-assert the
+    // operator's setting so a new TX channel never runs on the default.
+    // From Zeus Station Engine Zeus.Dsp/Wdsp/WdspDspEngine.cs @v2.0.71
+    // (ApplyPsMemoryCorrectionLocked at TXA open).
+    if (m_tx && m_memoryCorrection) {
+        m_tx->setPSMemoryCorrection(true);
+    }
 }
 
 void PureSignal::setPsFeedbackChannel(PsFeedbackChannel* fb)
@@ -855,6 +872,31 @@ void PureSignal::loadShow2ToneSetting()
     m_show2Tone =
         AppSettings::instance()
             .value(QStringLiteral("PsShow2ToneMeasurements"),
+                   QStringLiteral("False"))
+            .toString() == QStringLiteral("True");
+}
+
+void PureSignal::setMemoryCorrection(bool on)
+{
+    if (on == m_memoryCorrection) { return; }
+    m_memoryCorrection = on;
+    if (m_tx) {
+        m_tx->setPSMemoryCorrection(on);
+    }
+    AppSettings::instance().setValue(
+        QStringLiteral("PsMemoryCorrection"),
+        on ? QStringLiteral("True") : QStringLiteral("False"));
+    qCInfo(lcDsp) << "PureSignal-Gedaechtniskorrektur:" << (on ? "an" : "aus");
+    emit memoryCorrectionChanged(on);
+}
+
+// Ohne Signal, wie loadShow2ToneSetting(): beim Aufbau haengt noch nichts
+// daran, und ein TX-Kanal bekommt den Wert in setTxChannel().
+void PureSignal::loadMemoryCorrectionSetting()
+{
+    m_memoryCorrection =
+        AppSettings::instance()
+            .value(QStringLiteral("PsMemoryCorrection"),
                    QStringLiteral("False"))
             .toString() == QStringLiteral("True");
 }

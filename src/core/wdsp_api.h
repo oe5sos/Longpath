@@ -158,6 +158,13 @@
 //                 (nbp.h:96-100), the same situation as the existing
 //                 RXANBPSetShiftFrequency declaration.
 //                 AI-assisted transformation via Anthropic Claude Code.
+//   2026-11-15  SetPSFastTracking, GetPSFastTracking, SetPSMemoryCorrection,
+//                 GetPSMemoryCorrection declarations added for the PureSignal
+//                 set taken over from the Zeus Station Engine v2.0.71
+//                 (third_party/wdsp/src/calcc.c, see WDSP-PROVENANCE.md).
+//                 Signatures match Zeus native/wdsp/wdsp.h:277-280 @v2.0.71.
+//                 Longpath, AI-assisted transformation via Anthropic Claude
+//                 Code.
 // =================================================================
 
 /*  wdsp.cs
@@ -1548,6 +1555,13 @@ double SetPSTXDelay(int channel, double delay);
 void SetPSHWPeak(int channel, double peak);
 void GetPSHWPeak(int channel, double* peak);
 void GetPSMaxTX(int channel, double* maxtx);
+// Zeus Station Engine v2.0.71, native/wdsp/wdsp.h:277-280: faster
+// curve/control-point smoothing (only while the two-tone runs) and the
+// opt-in memory correction with its learned coefficient.
+void SetPSFastTracking(int channel, int fast);
+int GetPSFastTracking(int channel);
+void SetPSMemoryCorrection(int channel, int run);
+void GetPSMemoryCorrection(int channel, double* beta_re, double* beta_im);
 // void SetPSPtol(int channel, double ptol);   // in PureSignal 3 entfallen
 void GetPSDisp(int channel, double* x, double* ym, double* yc, double* ys,
                double* cm, double* cc, double* cs);

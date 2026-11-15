@@ -324,3 +324,37 @@ die Dateien bleiben, wo sie waren (v1.29 bzw. der PureSignal-3-Satz vom
 Gemisch (v1.29 + Thetis-Teilabgleiche + NNR aus 2.10 + PureSignal 3 aus
 2.11 + diese Rosinen), keine 2.11-Fassung. Die Zahl erst anheben, wenn ein
 Vollabgleich gefahren ist — `UPSTREAM-SYNC-PROTOCOL.md` §6.
+
+## PureSignal-Satz aus der Zeus Station Engine v2.0.71 (2026-11-15)
+
+Pin: `Zeus-SDR/station-engine` Tag `v2.0.71` (`c64cdd4`, „Release v2.0.71:
+station engine source"), GPL-2.0-or-later, Douglas J. Cerrato KB2UKA /
+Christian Suarez N9WAR and contributors (`ATTRIBUTIONS.md` dort). Zeus fuehrt
+denselben `calcc.c`-Stand wie wir (TAPR 2.11 `e69de50`, bis auf `psccF` und
+den gespeicherten `SetPSTXDelay`-Wert); der Satz ist darum der Unterschied
+`git diff v2.0.70 v2.0.71 -- native/wdsp/`, von Hand eingespielt, und Zeus'
+Begruendungen stehen in `native/wdsp/ZEUS-PATCHES.md` („Integration patches
+to preserve").
+
+| File | Was uebernommen wurde | Source | Date |
+| --- | --- | --- | --- |
+| `third_party/wdsp/src/calcc.c` | (1) `destroy_calcc` loescht `iqc.busy`, bis der Worker wirklich beendet ist, und gibt Restore-/Save-Kurven erst danach frei; `doPSCorrChange` nullt calccs Kurvenzeiger VOR `SetTXAiqcStart`/`Swap` (iqc besitzt sie ab dort) — upstream gab eine wiederhergestellte Kurve doppelt frei, wenn der TX-Kanal mitten in Restore/Fit schloss. (2) `scheck()` ueber `ps_scheck_deviates`. (3) `SetPSFastTracking`/`GetPSFastTracking` (Kontrollpunkt-EMA 0,50, Kurven 0,60/0,60 statt 0,10 und 0,30/0,30). (4) Gedaechtniskorrektur: `struct _mem`, `mem_publish`/`mem_reset`/`mem_estimate`, `SetPSMemoryCorrection`/`GetPSMemoryCorrection`, Ruecksetzen bei LRESET/LTURNON/`PSRestoreCorr`/`SetPSFeedbackRate` | `native/wdsp/calcc.c` @ `v2.0.71` | 2026-11-15 |
+| `third_party/wdsp/src/calcc.h` | Die vier Erklaerungen, `__declspec(dllexport)` fallengelassen | `native/wdsp/calcc.h` @ `v2.0.71` | 2026-11-15 |
+| `third_party/wdsp/src/iqc.c` | Speicherterm `in * beta * d|in|^2/dt` in `xiqc` (nur im Zustand RUN), `flush_iqc` setzt `mem_prev_x2`, `SetTXAiqcMemoryBeta` unter `csDSP` | `native/wdsp/iqc.c` @ `v2.0.71` | 2026-11-15 |
+| `third_party/wdsp/src/iqc.h` | `mem_beta_re`/`mem_beta_im`/`mem_prev_x2`, `SetTXAiqcMemoryBeta` | `native/wdsp/iqc.h` @ `v2.0.71` | 2026-11-15 |
+| `third_party/wdsp/src/ps_memcorr.c` | Neu, wortgleich: Schaetzer des Speicherterms (3x3-Normalgleichungen, Fenster 0,5 s, Lernrate 0,08, \|beta\| <= 0,02) | `native/wdsp/ps_memcorr.c` @ `v2.0.71` | 2026-11-15 |
+| `third_party/wdsp/src/ps_memcorr.h` | Neu, wortgleich | `native/wdsp/ps_memcorr.h` @ `v2.0.71` | 2026-11-15 |
+| `third_party/wdsp/src/ps_scheck.c` | Neu, wortgleich: Fit-zu-Fit-Toleranz, Betrag unter Huellkurve 0,20 ausgangsbezogen (`0,10 * 0,20 / max(x, 0,04)`) | `native/wdsp/ps_scheck.c` @ `v2.0.71` | 2026-11-15 |
+| `third_party/wdsp/src/ps_scheck.h` | Neu, wortgleich | `native/wdsp/ps_scheck.h` @ `v2.0.71` | 2026-11-15 |
+
+**Bewusst NICHT uebernommen:** der gespeicherte, tatsaechlich gesetzte
+`SetPSTXDelay`-Wert (`a->txdel = adelay`, aelterer Zeus-Patch). Geprueft
+2026-11-17: 2.11 merkt sich den WUNSCHwert und `SetPSFeedbackRate` legt
+`txdelay` damit neu an -- bei einem Ratenwechsel wird also vom Wunsch aus
+neu gerundet, nicht vom schon gerundeten Wert. Der negative Zweig (Verzoegerung
+auf der RX-Seite), an dem beide Fassungen den Wert beim Ratenwechsel
+verlieren wuerden, ist bei uns nicht erreichbar: AMP Delay faengt bei 0 an
+(`src/gui/PsForm.cpp`, `m_spinAmpDelay->setMinimum(0)`); `psccF` (bei uns entfallen);
+Zeus' Zweiton-Pegel 0,49999 (wir hatten ihn schon, Thetis `setup.cs:11056`);
+die Pruefprogramme in `native/wdsp/tests/` als Datei — sie sind in
+`tests/tst_ps_gedaechtnis.cpp` nachgebaut.

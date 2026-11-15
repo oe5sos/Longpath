@@ -22,6 +22,8 @@
 //                 approximating Thetis x/y absolute positions (Thetis-
 //                 userland-parity-with-our-spin per
 //                 docs/architecture/feedback_thetis_userland_parity.md).
+//   2026-11-15 — m_chkMemoryCorrection + slot (Zeus Station Engine v2.0.71).
+//                 Longpath, AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 /*  PSForm.cs
@@ -176,6 +178,7 @@ private slots:
     void onQuickAttenuateToggled(bool on);
     void onLoopbackToggled(bool on);
     void onShow2ToneMeasurementsToggled(bool on);
+    void onMemoryCorrectionToggled(bool on);
 
     // Spinboxes / combo
     void onMoxDelayChanged(double v);
@@ -259,6 +262,7 @@ private:
 
     // Bottom row
     QCheckBox* m_chkLoopback{nullptr};   // PSForm.designer.cs:466-479 checkLoopback
+    QCheckBox* m_chkMemoryCorrection{nullptr}; // not in Thetis -- Zeus v2.0.71 PS memory correction
     QCheckBox* m_chkOnTop{nullptr};      // PSForm.designer.cs:95-106 chkPSOnTop
 
     // Calibration Information (advanced section, hidden when collapsed)

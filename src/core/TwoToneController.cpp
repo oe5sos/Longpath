@@ -13,6 +13,9 @@
 //                start()/stop() through Phase 3C
 //                TransmitModel::setPowerUsingTargetDbm with bTwoTone=true.
 //                See header for full attribution.
+//   2026-11-15 — PureSignal fast tracking on while the two-tone PostGen
+//                runs, off at every stop (Zeus Station Engine v2.0.71).
+//                Longpath, AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 // no-port-check: Longpath-original file; Thetis-derived activation flow
@@ -343,6 +346,10 @@ void TwoToneController::continueActivation()
     //     [v2.10.3.13]:
     //       console.radio.GetDSPTX(0).TXPostGenRun = 1;
     m_txChannel->setTxPostGenRun(true);
+    // PureSignal: faster smoothing while (and only while) the two-tone
+    // runs, so the IMD reading settles in ~6 s instead of 20+.  From Zeus
+    // Station Engine Zeus.Dsp/Wdsp/WdspDspEngine.cs @v2.0.71 (SetTwoTone).
+    m_txChannel->setPSFastTracking(true);
 
     // ── Stage 7: DrivePowerSource handling.  From Thetis setup.cs:11109-
     //     11120 [v2.10.3.13]:
@@ -552,6 +559,7 @@ void TwoToneController::continueDeactivation()
 
     if (m_txChannel) {
         m_txChannel->setTxPostGenRun(false);
+        m_txChannel->setPSFastTracking(false);   // voice keeps stock smoothing
     }
 
     // Phase 4B of #167: clear the TransmitModel two-tone-active mirror.
@@ -627,6 +635,7 @@ void TwoToneController::onMoxRejected(const QString& reason)
     // Tear down the gen if it was started in continueActivation.
     if (m_txChannel) {
         m_txChannel->setTxPostGenRun(false);
+        m_txChannel->setPSFastTracking(false);   // voice keeps stock smoothing
     }
 
     // Restore PWR if we had snapshotted it.

@@ -7,14 +7,18 @@
 //
 // Verbatim vendor of TAPR OpenHPSDR-wdsp **2.11** (PureSignal 3):
 //   `wdsp 2.11/Source/iqc.h` @ e69de50d1d702216098019013899ad87534c64e0
-// Keine Longpath-Aenderungen am Quelltext ausser dem Fallenlassen von
-// `__declspec(dllexport)` (statischer Bau, siehe WDSP-PROVENANCE.md).
+// Darueber der PureSignal-Satz der Zeus Station Engine v2.0.71
+// (GPL-2.0-or-later, Douglas J. Cerrato KB2UKA / Christian Suarez
+// N9WAR and contributors), `native/wdsp/iqc.h` @c64cdd4; Umfang in
+// WDSP-PROVENANCE.md. Sonst nur `__declspec(dllexport)` weg.
 // Die urspruengliche GPLv2-or-later-Kopfzeile von NR0V steht unveraendert
 // darunter.
 //
 // Modification history (Longpath):
 //   2026-10-21 — PureSignal 3: aus 1.29 (Thetis-Stand) auf 2.11 gehoben.
 //                Longpath, KI-gestuetzt via Anthropic Claude Code.
+//   2026-11-15 — Zeus-v2.0.71-PureSignal-Satz (oben). Longpath, KI-
+//                gestuetzt via Anthropic Claude Code.
 // =================================================================
 
 /*  iqc.h
@@ -64,6 +68,12 @@ typedef struct _iqc
 	int count;
 	int ntup;
 	int state;
+	// Zeus: memory correction term (ps_memcorr.h), out += in * beta * D(in).
+	// beta is written by calcc through SetTXAiqcMemoryBeta under the
+	// channel's csDSP; exactly zero (the default) adds nothing.
+	double mem_beta_re;
+	double mem_beta_im;
+	double mem_prev_x2;			// |in|^2 of the previous sample, every state
 	
 } iqc, *IQC;
 
@@ -99,5 +109,7 @@ extern void SetTXAiqcStart(int channel,
 	NS_Spline* s_spline, CurveEMA* s_calavg, double s_prev_y);
 
 extern void SetTXAiqcEnd (int channel);
+
+extern void SetTXAiqcMemoryBeta (int channel, double beta_re, double beta_im);
 
 #endif
