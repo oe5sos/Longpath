@@ -166,15 +166,24 @@ MasterOutputWidget::MasterOutputWidget(AudioEngine* audio, QWidget* parent)
     // dann stumm schaltet, kann es gewollt haben.
     if (SystemOutputMute::isMuted() == SystemOutputMute::Muted) {
         const bool geloest = SystemOutputMute::setMuted(false);
-        qCWarning(lcAudio).noquote()
-            << (geloest
-                    ? QStringLiteral("Der Ausgang des Betriebssystems war "
-                                     "STUMM — beim Start geloest. Am Mac ist "
-                                     "das die F10-Taste, wenn Longpath nicht "
-                                     "vorne ist.")
-                    : QStringLiteral("Der Ausgang des Betriebssystems ist "
-                                     "STUMM und liess sich nicht loesen — "
-                                     "ohne ihn bleibt Longpath still."));
+        // Zwei getrennte Rufe statt eines Fragezeichens: der
+        // Englisch-Pruefstand neutralisiert Protokollzeilen nur, wenn
+        // das Literal an einer Zeile haengt, die mit `qC` oder `<<`
+        // beginnt. In der Ternaerform stand es hinter einem `?` -- und
+        // damit zaehlten diese beiden Protokolltexte als deutsche
+        // OBERFLAECHE (CI 14.11., tst_oberflaeche_englisch: 12 statt 9).
+        if (geloest) {
+            qCWarning(lcAudio).noquote()
+                << QStringLiteral("Der Ausgang des Betriebssystems war "
+                                  "STUMM — beim Start geloest. Am Mac ist "
+                                  "das die F10-Taste, wenn Longpath nicht "
+                                  "vorne ist.");
+        } else {
+            qCWarning(lcAudio).noquote()
+                << QStringLiteral("Der Ausgang des Betriebssystems ist "
+                                  "STUMM und liess sich nicht loesen — "
+                                  "ohne ihn bleibt Longpath still.");
+        }
     }
 
     // ── Speaker button ─────────────────────────────────────────────────────
@@ -340,9 +349,11 @@ void MasterOutputWidget::pruefeSystemStumm()
                               "STUMM geworden — Longpath selbst ist offen. "
                               "Am Mac ist das die F10-Taste, wenn Longpath "
                               "nicht vorne ist.");
+        // Englisch, weil es im FENSTER steht: der Sprechblasentext ist
+        // Oberflaeche, keine Protokollzeile (Betreiber: „englisch
+        // durchgehend, aber deutsch als option").
         m_speakerBtn->setToolTip(
-            QStringLiteral("Der Ausgang des Betriebssystems ist STUMM — "
-                           "Longpath selbst ist offen.\n")
+            tr("The system output is muted — Longpath itself is open.\n")
             + m_speakerTipBase);
         emit systemOutputMutedDetected();
     } else {
