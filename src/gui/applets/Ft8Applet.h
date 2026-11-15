@@ -104,6 +104,9 @@ public:
     /// Wie beim CW- und RTTY-Dekoder: eine Flaeche, die der jeweils
     /// aktiven Scheibe folgt.
     void setSlice(SliceModel* slice);
+    /// Steht die Skala auf einer FT8- oder FT4-Anrufstelle, folgt der
+    /// Dekoder ihr (2026-11-15). Oeffentlich fuer den Pruefstand.
+    void folgeDerSkala(double skalaHz);
 
     void setProtocol(Ft8Decoder::Protocol p);
     Ft8Decoder::Protocol protocol() const;
@@ -618,6 +621,8 @@ private:
     // gibt es seit dem 2026-10-30; zu sehen war von ihr nur
     // „2 waiting" im Kopf der Fundliste.
     Longpath::Ft8DannListe* m_dann{nullptr};
+    /// frequencyChanged der Scheibe -> folgeDerSkala.
+    QMetaObject::Connection m_skalaVerbindung;
     /// Laesst das Alter jede Sekunde weiterlaufen -- nur solange
     /// jemand wartet.
     QTimer*      m_dannUhr{nullptr};

@@ -1109,8 +1109,56 @@ void Ft8Applet::setSlice(SliceModel* slice)
 {
     if (m_slice == slice) { return; }
     m_slice = slice;
+    QObject::disconnect(m_skalaVerbindung);
+    if (m_slice) {
+        m_skalaVerbindung = connect(m_slice.data(), &SliceModel::frequencyChanged,
+                                    this, &Ft8Applet::folgeDerSkala);
+        folgeDerSkala(m_slice->frequency());
+    }
     updateAudioTap();
     updateStatus();
+}
+
+// ── Der Dekoder folgt der Skala (2026-11-15) ─────────────────────────
+//
+// Betreiber nach dem Start um 11:28: „Versuch es noch einmal" -- seit
+// zwei Minuten nach dem Start 0 Funde in jedem Fenster. Die Sitzung
+// davor hatte er um 10:17 mit dem Knopf FT4 auf 14,080 MHz gestellt
+// und bis zuletzt FT4 dekodiert (bis zu 14 Funde je Fenster). Beim
+// Neustart behielt die Flex ihre 14,080 MHz („die Maschine gewinnt"),
+// der Dekoder aber kam -- wie immer -- in FT8 hoch und suchte
+// FT8-Signale auf der FT4-Anrufstelle. Gesagt hat das niemand.
+//
+// Die Knoepfe FT8/FT4 stellen seit dem 2026-10-21 die Skala. Hier die
+// Gegenrichtung: steht die Skala AUF einer Anrufstelle (±500 Hz,
+// dieselbe Tafel), dekodiert der Dekoder deren Verfahren. Daneben --
+// irgendwo im Band -- bleibt es bei der Wahl des Betreibers; das
+// Funkgeraet wird hier nie verstellt. Die Tafel gilt fuer oberes
+// Seitenband, also nicht in DIGL. Und nicht mitten in einer Sendung:
+// der Wechsel aendert die Fensterlaenge.
+void Ft8Applet::folgeDerSkala(double skalaHz)
+{
+    if (!m_slice || m_slice->dspMode() == DSPMode::DIGL || m_sendet) {
+        return;
+    }
+    const qint64 hz = static_cast<qint64>(std::llround(skalaHz));
+    const bool ft4 = DigiFrequenzen::stehtSchonDort(
+        hz, DigiFrequenzen::Digimodus::Ft4);
+    const bool ft8 = DigiFrequenzen::stehtSchonDort(
+        hz, DigiFrequenzen::Digimodus::Ft8);
+    if (ft4 == ft8) { return; }   // keine Anrufstelle: Wahl bleibt
+    const Ft8Decoder::Protocol soll = ft4 ? Ft8Decoder::Protocol::Ft4
+                                          : Ft8Decoder::Protocol::Ft8;
+    if (protocol() == soll) { return; }
+    const QString name = ft4 ? QStringLiteral("FT4") : QStringLiteral("FT8");
+    qCInfo(lcFt8Senden).noquote()
+        << "Skala" << hz << "Hz steht auf der" << name
+        << "-Anrufstelle — der Dekoder folgt";
+    setProtocol(soll);
+    if (m_status) {
+        m_status->setText(tr("dial is on the %1 frequency — decoding %1")
+                              .arg(name));
+    }
 }
 
 void Ft8Applet::updateAudioTap()
