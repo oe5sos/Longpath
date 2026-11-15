@@ -1528,7 +1528,7 @@ void Ft8Applet::zeigePilleBei(const QPoint& pos)
     // ist, bevor man klickt.
     QTextEdit::ExtraSelection sel;
     sel.cursor = QTextCursor(b);
-    sel.format.setBackground(QColor(0x14, 0x14, 0x18));
+    sel.format.setBackground(QColor(QString::fromLatin1(Style::kTileActiveBg)));
     sel.format.setProperty(QTextFormat::FullWidthSelection, true);
     m_list->setExtraSelections({sel});
 }

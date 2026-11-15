@@ -220,9 +220,9 @@ protected:
         QPainter p(this);
         const QRect r = rect();
         if (m_ueber) {
-            p.fillRect(r, QColor(0x16, 0x16, 0x1a));
+            p.fillRect(r, QColor(farbe(Style::kTileActiveBg)));
         } else if (m_erste && !m_blass) {
-            p.fillRect(r, QColor(0x12, 0x11, 0x10));
+            p.fillRect(r, QColor(farbe(Style::kFt8NaechsterBg)));
         }
         if (m_erste) {
             p.fillRect(QRect(r.left(), r.top(), 2, r.height()),
