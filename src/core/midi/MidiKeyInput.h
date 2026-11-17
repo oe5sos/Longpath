@@ -54,7 +54,12 @@
 #include <memory>
 #include <vector>
 
+// RtMidi 6 fuehrt seine Klassen in rt::midi (und oeffnet den Namensraum
+// am Ende seines Kopfs). Eine Vorwaertsdeklaration im globalen
+// Namensraum waere eine ZWEITE Klasse gleichen Namens.
+namespace rt::midi {
 class RtMidiIn;
+}
 
 namespace Longpath {
 
@@ -123,7 +128,7 @@ signals:
     void geschlossen();
 
 private:
-    std::unique_ptr<RtMidiIn> m_eingang;
+    std::unique_ptr<rt::midi::RtMidiIn> m_eingang;
     std::atomic<bool> m_offen{false};
     QString m_portName;
     QString m_fehler;

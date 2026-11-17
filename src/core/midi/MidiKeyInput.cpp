@@ -142,7 +142,10 @@ void MidiKeyInput::schliesse()
     }
     // Ein Kontakt, der beim Abziehen „gedrueckt" stand, darf nicht
     // haengen bleiben: alles loslassen.
-    if (m_punkt.exchange(false) | m_strich.exchange(false)) {
+    // Beide zuruecksetzen, nicht nur den ersten -- darum zwei Schritte.
+    const bool punktWar = m_punkt.exchange(false);
+    const bool strichWar = m_strich.exchange(false);
+    if (punktWar || strichWar) {
         if (m_paddleSenke) { m_paddleSenke(false, false); }
         emit paddle(false, false);
     }

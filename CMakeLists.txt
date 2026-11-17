@@ -733,6 +733,10 @@ set(CORE_SOURCES
     src/core/audio/AnsageAufbereitung.cpp
     src/core/hotkeys/HotKeyActionList.cpp
     src/core/hotkeys/HotKeyBindings.cpp
+    src/core/cw/IambicKeyer.cpp
+    src/core/cw/CwMithoerton.cpp
+    src/core/cw/CwTastung.cpp
+    src/core/midi/MidiKeyInput.cpp
     src/core/roundtable/RoundtableWire.cpp
     src/core/roundtable/RoundtableKey.cpp
     src/core/roundtable/RoundtableClient.cpp
@@ -850,6 +854,7 @@ set(MODEL_SOURCES
     src/models/NotchModel.cpp
     src/models/SpotModel.cpp
     src/models/RoundtableHub.cpp
+    src/models/FlexCwTastziel.cpp
     src/models/SpotTableModel.cpp
     src/models/BandFilterProxy.cpp
     src/models/AlertsTableModel.cpp
