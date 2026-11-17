@@ -36,9 +36,19 @@ MIDI-Note ─► MidiKeyInput ─┬─► PTT ───────────
 | `CwMithoerton` (`src/core/cw/`) | Lokaler Sinus mit 5-ms-Kosinusflanken; `fuelle()` ist rein. |
 | `CwTastung` (`src/core/cw/`) | Die Steuerung: Einstellungen (`CwKey/…`), zwei Schalter, Sendefreigabe, Nachlauf, Wachen. Gehört `RadioModel`. |
 | `FlexCwTastziel` (`src/models/`) | Die schmale Stelle zum Gerät: `bereit / sendet / freigabeSteht / fordereSenden / taste`. |
+| `HaliKeyGroup` (`src/gui/setup/`) | Die Einstellgruppe, auf Setup → CAT & Network → MIDI Control. |
 
 RtMidi 6.0.0 liegt unter `third_party/rtmidi/`, so wie AetherSDR es führt
 (`docs/attribution/RTMIDI-PROVENANCE.md`).
+
+## Wo es steht
+
+**Setup → CAT & Network → MIDI Control.** Dort hat der Betreiber am
+17.11. gesucht; die Seite zeigte noch den Platzhalter („MIDI mapping
+table will appear here", ein gesperrtes „Learn…"), während die Gruppe
+einen Commit lang unter Keyboard → Shortcuts lag. Der Platzhalter ist
+weg, die Gruppe steht an seiner Stelle. Eine Einstellung gehört dorthin,
+wo man nach ihr sieht.
 
 ## Zwei Schalter
 
@@ -135,7 +145,7 @@ in CW auch der MOX-Knopf drücken. Ohne Taste sendet die Flex dabei nichts.
 | `tst_iambic_keyer` | Punkt, Strich = 3 Punkte, Zusammendrücken A und B, am geplanten Zeitpunkt gemessen |
 | `tst_cw_tastung` | Üben schickt nichts; verweigertes Senden tastet nie; Nachlauf; fremdes Senden bleibt; Ende von außen; Wachen; Fußtaster auf beiden Wegen |
 | `tst_cw_tastweg_freigabe` | CW-Öffnung nur mit Ansage und nie über die Bandkante; MOX allein reicht nicht; `RadioModel` ab Werk aus |
-| `tst_cw_key_setup_page` | Ab Werk nichts angehakt, zweiter Schalter ohne den ersten gesperrt |
+| `tst_cw_key_setup_page` | Die Gruppe steht auf MIDI Control, kein Platzhalter mehr; ab Werk nichts angehakt, zweiter Schalter ohne den ersten gesperrt |
 
 Zu jeder Gruppe ist eine Gegenprobe gegen die neutralisierte Fassung
 gefahren (rot gesehen).

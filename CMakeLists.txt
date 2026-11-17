@@ -1204,6 +1204,7 @@ set(GUI_SOURCES
     src/gui/setup/FlexApdPage.cpp
     src/gui/setup/TciLogWindow.cpp
     src/gui/setup/KeyboardSetupPages.cpp
+    src/gui/setup/HaliKeyGroup.cpp
     src/gui/setup/DiagnosticsSetupPages.cpp
     src/gui/diagnostics/RadioStatusPage.cpp
     src/gui/diagnostics/DiagnosticsPhaseHPages.cpp

@@ -18,9 +18,6 @@
 // Modification history (Longpath):
 //   2026-11-10 — Platzhalter durch die echte Seite ersetzt von Martin
 //                 Fischer (OE5SOS), KI-gestuetzt ueber Anthropic Claude.
-//   2026-11-17 — Gruppe „CW key (MIDI)" fuer die Morsetaste am HaliKey
-//                 (src/core/cw/CwTastung), KI-gestuetzt ueber Anthropic
-//                 Claude.
 // =================================================================
 
 #include "gui/SetupPage.h"
@@ -28,19 +25,14 @@
 #include <QHash>
 
 class QCheckBox;
-class QComboBox;
-class QGroupBox;
 class QLabel;
 class QLineEdit;
 class QPushButton;
-class QSlider;
-class QSpinBox;
 class QTreeWidget;
 class QTreeWidgetItem;
 
 namespace Longpath {
 
-class CwTastung;
 class HotKeyBindings;
 
 // ---------------------------------------------------------------------------
@@ -52,18 +44,12 @@ class KeyboardShortcutsPage : public SetupPage {
 public:
     // bindings darf null sein (Pruefstand ohne Funkmodell): dann bleibt
     // die Seite stehen, aber gesperrt, mit einem Satz warum.
-    // cwKey darf ebenfalls null sein: dann steht die Gruppe „CW key
-    // (MIDI)" da, aber gesperrt.
-    explicit KeyboardShortcutsPage(HotKeyBindings* bindings, CwTastung* cwKey = nullptr,
-                                   QWidget* parent = nullptr);
+    explicit KeyboardShortcutsPage(HotKeyBindings* bindings, QWidget* parent = nullptr);
 
     // Fuer den Pruefstand: die Taste einer Handlung so, wie die Tabelle
     // sie zeigt.
     QString shownKeysFor(const QString& id) const;
     QTreeWidget* table() const { return m_table; }
-    QGroupBox* cwKeyGroup() const { return m_cwGroup; }
-    QCheckBox* cwKeyTransmitCheck() const { return m_cwKeyTx; }
-    QLabel* cwKeyStatus() const { return m_cwStatus; }
 
     // Die Taste einer Handlung so, wie der Betreiber sie liest (auf dem
     // Mac mit ⌘ und ⇧). Leer bleibt leer.
@@ -84,30 +70,7 @@ private:
     void exportFile();
     void say(const QString& text, bool warning);
 
-    void buildCwKeyGroup();
-    void refreshCwKey();
-    void refreshCwPorts();
-
     HotKeyBindings* m_bindings{nullptr};
-    CwTastung*      m_cwKey{nullptr};
-
-    QGroupBox*   m_cwGroup{nullptr};
-    QCheckBox*   m_cwEnabled{nullptr};
-    QCheckBox*   m_cwKeyTx{nullptr};
-    QComboBox*   m_cwPort{nullptr};
-    QPushButton* m_cwRescan{nullptr};
-    QComboBox*   m_cwType{nullptr};
-    QSpinBox*    m_cwWpm{nullptr};
-    QCheckBox*   m_cwSwap{nullptr};
-    QCheckBox*   m_cwSidetone{nullptr};
-    QSpinBox*    m_cwPitch{nullptr};
-    QSlider*     m_cwVolume{nullptr};
-    QSpinBox*    m_cwHang{nullptr};
-    QSpinBox*    m_cwNoteDit{nullptr};
-    QSpinBox*    m_cwNoteDah{nullptr};
-    QSpinBox*    m_cwNoteKey{nullptr};
-    QSpinBox*    m_cwNotePtt{nullptr};
-    QLabel*      m_cwStatus{nullptr};
 
     QCheckBox*   m_enabledCheck{nullptr};
     QCheckBox*   m_fKeysCheck{nullptr};   // nur macOS sichtbar
