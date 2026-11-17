@@ -18,6 +18,8 @@ NereusSDR-eigener Code, ohne Thetis- oder AetherSDR-Anteile.
 | `roundtable/README.md`, `roundtable/conformance/`, `roundtable/server/`, `roundtable/tests/` (292 Dateien: Referenzserver, seine Tests, die Konformitätssuite v1) | `upstream/main` @ 9036ffc04 | **unverändert, Byte für Byte** |
 | `src/core/roundtable/RoundtableWire.{h,cpp}` | `upstream/main` @ 9036ffc04 | übernommen; Namensraum `Longpath`, kein Export-Makro, Longpath-Kopf (Upstream-Verlauf wörtlich behalten) |
 | `tests/tst_roundtable_wire.cpp` | `upstream/main` @ 9036ffc04 | übernommen; Signieren/Prüfen über `RoundtableKey` statt `StationIdentity` |
+| `src/core/roundtable/RoundtableClient.{h,cpp}`, `src/core/roundtable/RoundtableSignalFloor.{h,cpp}`, `tests/tst_roundtable_client.cpp`, `tests/tst_roundtable_signal_floor.cpp` | `upstream/main` @ 9036ffc04 | übernommen (Stufe 1, 2026-11-14); Abweichungen im Kopf des Clients (keine Verbindung vor der Erstantwort, `RoundtableKey`, `software: "Longpath"`) |
+| Nachtrag `RoundtableSliceState::paused` in `RoundtableWire.h`, `RoundtableClient.cpp`; Prüffall `noReadingWhilePlayingThePast` | `upstream/main` @ e56b3b44c (Commit 8230eb57f) | übernommen (Stufe 2, 2026-11-18), wörtlich. Longpath hat keine Aufnahme mit Zurückspulen (`RecordingService`); `paused` wird darum heute nirgends gesetzt — der Client kann es, sobald es eine Quelle gibt |
 
 Nicht übernommen: `roundtable/deploy/`, `roundtable/deploy.sh` (der Betrieb
 von JJs öffentlichem Server ist nicht unsere Sache).
