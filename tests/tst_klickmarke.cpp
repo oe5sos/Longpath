@@ -92,7 +92,16 @@ private slots:
         QVERIFY(QTest::qWaitForWindowExposed(&fenster, kFensterFrist));
 
         const QImage ruhe = knopf->grab().toImage();
-        QCOMPARE(orangePunkte(ruhe), 0);
+        // In Ruhe so gut wie nichts -- aber nicht „genau null": unter
+        // Linux glaettet Qt die Schrift ueber die Farbkanaele, und die
+        // Raender der Buchstaben haben dann einzelne warme Bildpunkte
+        // (CI 17.11., Linux x64: dieser Vergleich fiel auf `== 0`). Die
+        // Marke selbst deckt die halbe Flaeche; fuenf Prozent sind weit
+        // darunter und weit ueber jedem Schriftrand.
+        const int ruhePunkte = orangePunkte(ruhe);
+        QVERIFY2(ruhePunkte < ruhe.width() * ruhe.height() / 20,
+                 qPrintable(QStringLiteral("schon in Ruhe %1 orange Bildpunkte")
+                                .arg(ruhePunkte)));
         QVERIFY(!marke.markeFuerTest(knopf));
         schreibeBild(fenster.grab().toImage(), QStringLiteral("klickmarke-1-ruhe.png"));
 
@@ -115,7 +124,8 @@ private slots:
         // Ausklang: danach ist sie ganz weg, auch aus dem Bild.
         QTRY_VERIFY_WITH_TIMEOUT(!marke.markeFuerTest(knopf),
                                  KlickMarke::kAusklangMs * 10);
-        QCOMPARE(orangePunkte(knopf->grab().toImage()), 0);
+        // Wieder genau wie vorher -- dieselben Schriftraender, nicht mehr.
+        QCOMPARE(orangePunkte(knopf->grab().toImage()), ruhePunkte);
     }
 
     void werKeineBekommt()
