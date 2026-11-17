@@ -51,7 +51,10 @@ EXPECTED = {
     # wdsp_align.h -- neun Dateien mit Warren Pratts eigener
     # GPL-2-or-later-Kopfzeile. calcc/iqc wurden nur gehoben, nicht neu
     # gezaehlt.
-    "gpl2-or-later": 152,
+    # 152 -> 156 (2026-11-15): ps_memcorr.c/.h und ps_scheck.c/.h aus der
+    # Zeus Station Engine v2.0.71 -- die GPL-2-or-later-Kopfzeile der
+    # Vorlage steht unveraendert unter dem Longpath-Block.
+    "gpl2-or-later": 156,
     "copyright-no-permission-block": 0,
     "no-header": 10,
 }

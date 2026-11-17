@@ -309,6 +309,9 @@ warren@wpratt.com
 //                 wdsp/calcc.c:891-1132 [v2.10.3.13] + Thetis
 //                 cmaster.cs:143-147 [v2.10.3.13].  AI-assisted
 //                 transformation via Anthropic Claude Code.
+//   2026-11-15 — setPSFastTracking / setPSMemoryCorrection /
+//                 getPSMemoryCorrection (Zeus Station Engine v2.0.71).
+//                 Longpath, AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 #pragma once
@@ -2281,6 +2284,24 @@ public:
     /// reset.  Wraps GetPSMaxTX (returns `ctrl.env_maxtx`).
     /// From Thetis wdsp/calcc.c:1042 [v2.10.3.13].
     double getPSMaxTX();
+
+    /// Faster calcc smoothing (control points 0.50, curves 0.60 instead of
+    /// 0.10 / 0.30) -- for the two-tone only, never for voice.  Wraps
+    /// SetPSFastTracking.  From Zeus Station Engine v2.0.71
+    /// native/wdsp/calcc.c SetPSFastTracking and
+    /// Zeus.Dsp/Wdsp/WdspDspEngine.cs (selected only while the two-tone
+    /// PostGen runs).
+    void setPSFastTracking(bool fast);
+
+    /// Opt-in PureSignal memory correction (off at create).  Any change
+    /// forgets the learned coefficient; calcc itself is not reset.
+    /// Wraps SetPSMemoryCorrection.  From Zeus Station Engine v2.0.71
+    /// native/wdsp/calcc.c SetPSMemoryCorrection.
+    void setPSMemoryCorrection(bool on);
+
+    /// The learned memory coefficient beta (|beta| <= 0.02, zero while
+    /// off or not yet learned).  Wraps GetPSMemoryCorrection.
+    void getPSMemoryCorrection(double& betaRe, double& betaIm);
 
     /// Set the calibration-tolerance threshold.  Wraps SetPSPtol.
     /// From Thetis wdsp/calcc.c:1050 [v2.10.3.13].

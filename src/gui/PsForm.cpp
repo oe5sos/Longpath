@@ -15,6 +15,10 @@
 //   2026-05-06 — Phase 3M-4 Task 8: created by J.J. Boyd (KG4VCF),
 //                 with AI-assisted transformation via Anthropic Claude
 //                 Code.
+//   2026-11-15 — "Memory correction" checkbox in the bottom row (not in
+//                 Thetis; Zeus Station Engine v2.0.71). Placement is a
+//                 placeholder pending the operator.
+//                 Longpath, AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 /*  PSForm.cs
@@ -438,6 +442,19 @@ void PsForm::buildUi()
         tr("Use top and bottom panadapters to display the two feedback streams."));
     bottomRow->addWidget(m_chkLoopback);
 
+    // Memory correction (opt-in, off by default).  Not in Thetis: the
+    // switch and its wording come from the Zeus Station Engine v2.0.71
+    // PureSignal set (Hardware card, "Memory correction"); the layout spot
+    // here is a placeholder for the operator to decide.
+    m_chkMemoryCorrection = new QCheckBox(tr("Memory correction"), this);
+    m_chkMemoryCorrection->setObjectName(QStringLiteral("chkPSMemoryCorrection"));
+    m_chkMemoryCorrection->setToolTip(
+        tr("Learns the part of the amplifier distortion that depends on what "
+           "the amp was doing a moment ago (lopsided IMD3) and cancels it. "
+           "It needs some ten seconds of transmitting before it has learned "
+           "the amplifier."));
+    bottomRow->addWidget(m_chkMemoryCorrection);
+
     bottomRow->addStretch();
 
     m_chkOnTop = new QCheckBox(tr("Always On Top"), this);
@@ -479,6 +496,7 @@ void PsForm::buildUi()
     m_advancedSectionWidgets.append(m_lblTint);
     m_advancedSectionWidgets.append(m_comboTint);
     m_advancedSectionWidgets.append(m_chkLoopback);
+    m_advancedSectionWidgets.append(m_chkMemoryCorrection);
     m_advancedSectionWidgets.append(m_chkOnTop);
     m_advancedSectionWidgets.append(m_grpCalInfo);
 
@@ -523,6 +541,8 @@ void PsForm::buildUi()
             this, &PsForm::onQuickAttenuateToggled);
     connect(m_chkLoopback,             &QCheckBox::toggled,
             this, &PsForm::onLoopbackToggled);
+    connect(m_chkMemoryCorrection,     &QCheckBox::toggled,
+            this, &PsForm::onMemoryCorrectionToggled);
     connect(m_chkShow2ToneMeasurements, &QCheckBox::toggled,
             this, &PsForm::onShow2ToneMeasurementsToggled);
 
@@ -809,6 +829,7 @@ void PsForm::syncFromPureSignal()
     m_spinCalDelay->setValue(m_pureSignal->calDelay());
     m_spinAmpDelay->setValue(m_pureSignal->ampDelay());
     m_chkLoopback->setChecked(m_pureSignal->loopback());
+    m_chkMemoryCorrection->setChecked(m_pureSignal->memoryCorrection());
     m_chkShow2ToneMeasurements->setChecked(
         m_pureSignal->show2ToneMeasurements());
 
@@ -1095,6 +1116,12 @@ void PsForm::onLoopbackToggled(bool on)
 {
     if (m_updatingFromModel || !m_pureSignal) { return; }
     m_pureSignal->setLoopback(on);
+}
+
+void PsForm::onMemoryCorrectionToggled(bool on)
+{
+    if (m_updatingFromModel || !m_pureSignal) { return; }
+    m_pureSignal->setMemoryCorrection(on);
 }
 
 void PsForm::onShow2ToneMeasurementsToggled(bool on)

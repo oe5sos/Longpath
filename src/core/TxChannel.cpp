@@ -335,6 +335,10 @@ warren@wpratt.com
 //                 crackling with no intelligible audio. P1 (48 kHz DUC,
 //                 factor 1) unaffected. By Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork).
+//   2026-11-15 — setPSFastTracking / setPSMemoryCorrection /
+//                 getPSMemoryCorrection wrappers; TUN edge drops fast
+//                 tracking. Zeus Station Engine v2.0.71 PureSignal set.
+//                 Longpath, AI-assisted via Anthropic Claude Code.
 // =================================================================
 
 #include "TxChannel.h"  // brings in WdspTypes.h (DSPMode)
@@ -997,6 +1001,13 @@ void TxChannel::setTuneTone(bool on, double freqHz, double magnitude)
     SetTXAPostGenMode(m_channelId, 0);                   // gen.c:792 [v2.10.3.13] — 0 = sine tone
     SetTXAPostGenToneMag(m_channelId, magnitude);        // gen.c:800 [v2.10.3.13]
     SetTXAPostGenRun(m_channelId, on ? 1 : 0);           // gen.c:784 [v2.10.3.13]
+
+    // Either TUN edge ends any two-tone: TUN-on replaces it with a single
+    // tone, TUN-off stops PostGen.  So both select stock PureSignal
+    // smoothing; fast tracking returns only with the next two-tone start.
+    // From Zeus Station Engine Zeus.Dsp/Wdsp/WdspDspEngine.cs @v2.0.71
+    // (TUN edge -> SetPsFastTrackingLocked(txa, false)).
+    ::SetPSFastTracking(m_channelId, 0);
 #else
     Q_UNUSED(on);
     Q_UNUSED(freqHz);
@@ -4818,6 +4829,41 @@ double TxChannel::getPSMaxTX()
     return maxtx;
 #else
     return 0.0;
+#endif
+}
+
+// From Zeus Station Engine v2.0.71 native/wdsp/calcc.c SetPSFastTracking:
+// the alphas are switched live under cs_update, the fit thread takes a
+// snapshot per fit.  The host selects it only while the two-tone runs
+// (Zeus.Dsp/Wdsp/WdspDspEngine.cs @v2.0.71: "PS fast tracking follows it,
+// so voice never gets it").
+void TxChannel::setPSFastTracking(bool fast)
+{
+#ifdef HAVE_WDSP
+    if (txa[m_channelId].rsmpin.p == nullptr) return;
+    ::SetPSFastTracking(m_channelId, fast ? 1 : 0);
+#else
+    Q_UNUSED(fast);
+#endif
+}
+
+void TxChannel::setPSMemoryCorrection(bool on)
+{
+#ifdef HAVE_WDSP
+    if (txa[m_channelId].rsmpin.p == nullptr) return;
+    ::SetPSMemoryCorrection(m_channelId, on ? 1 : 0);
+#else
+    Q_UNUSED(on);
+#endif
+}
+
+void TxChannel::getPSMemoryCorrection(double& betaRe, double& betaIm)
+{
+    betaRe = 0.0;
+    betaIm = 0.0;
+#ifdef HAVE_WDSP
+    if (txa[m_channelId].rsmpin.p == nullptr) return;
+    ::GetPSMemoryCorrection(m_channelId, &betaRe, &betaIm);
 #endif
 }
 
