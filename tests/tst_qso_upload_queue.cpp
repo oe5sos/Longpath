@@ -189,6 +189,29 @@ private slots:
         QVERIFY2(!QFile::exists(m_store), "nichts wartet, also keine Datei");
     }
 
+    // Die Statuszeile nennt die Dienste in fester Reihenfolge, nicht in
+    // der, in der sie antworten. Im ersten CI-Lauf dieser Klasse stand
+    // "uploaded to Wavelog, QRZ", weil Wavelog schneller war.
+    void dieReihenfolgeHaengtNichtAnDerAntwortzeit()
+    {
+        FakeService qrz(QStringLiteral("qrz"), QStringLiteral("QRZ"));
+        FakeService wavelog(QStringLiteral("cloudlog"), QStringLiteral("Wavelog"));
+        qrz.hold = true;                       // QRZ laesst sich Zeit
+        QsoUploadQueue q(m_store);
+        Ergebnis e;
+        mitschreiben(q, e);
+        q.setUploaders({&qrz, &wavelog});
+        q.submit(ft8(QStringLiteral("DL1ABC"), 1));
+        QTRY_COMPARE(wavelog.received.size(), 1);
+        QTRY_COMPARE(q.waitingCount(QStringLiteral("cloudlog")), 0);   // Wavelog ist fertig
+        QTRY_COMPARE(qrz.held.size(), 1);
+        QVERIFY(e.fertig.isEmpty());
+        qrz.release();
+        QTRY_COMPARE(e.fertig.size(), 1);
+        QCOMPARE(QsoUploadQueue::statusLine(QStringLiteral("DL1ABC"), e.fertig.first().second),
+                 QStringLiteral("DL1ABC — uploaded to QRZ, Wavelog"));
+    }
+
     void nichtsEingerichtetHeisstNichtsGemeldet()
     {
         FakeService qrz(QStringLiteral("qrz"), QStringLiteral("QRZ"));

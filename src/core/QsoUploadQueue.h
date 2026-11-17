@@ -54,6 +54,7 @@
 
 #include <QHash>
 #include <QList>
+#include <QMap>
 #include <QObject>
 #include <QPointer>
 #include <QString>
@@ -163,8 +164,14 @@ private:
     struct Batch {
         LogEntry         entry;
         int              outstanding{0};
-        QVector<Outcome> outcomes;
+        // Keyed by the service's place in setUploaders(), NOT in the
+        // order the answers came in: "uploaded to QRZ, Wavelog" must
+        // not read "Wavelog, QRZ" whenever Wavelog happens to answer
+        // first (it did, on the first CI run of this class).
+        QMap<int, Outcome> outcomes;
     };
+    int placeOf(const Lane* lane) const;
+    void record(quint64 batchId, const Lane* lane, const Outcome& outcome);
 
     Lane* laneFor(const QString& id, bool create);
     static int indexOf(const Lane& lane, quint64 itemId);

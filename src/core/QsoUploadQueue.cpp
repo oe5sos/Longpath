@@ -220,17 +220,10 @@ void QsoUploadQueue::pump(Lane* lane)
             if (b == lane->batchOf.constEnd()) { continue; }
             const quint64 batchId = b.value();
             lane->batchOf.remove(id);
-            auto it = m_batches.find(batchId);
-            if (it == m_batches.end()) { continue; }
             Outcome o;
             o.service = lane->uploader ? lane->uploader->shortName() : lane->id;
             o.message = QStringLiteral("not set up");
-            it->outcomes.append(o);
-            if (--it->outstanding <= 0) {
-                const Batch done = it.value();
-                m_batches.erase(it);
-                emit qsoFinished(done.entry, done.outcomes);
-            }
+            record(batchId, lane, o);
         }
         endRoundIfIdle(lane);
         return;
@@ -306,20 +299,12 @@ void QsoUploadQueue::finish(Lane* lane, const QString& call, bool ok,
     }
 
     if (fresh) {
-        auto it = m_batches.find(batchId);
-        if (it != m_batches.end()) {
-            Outcome o;
-            o.service = shortName;
-            o.ok = ok;
-            o.duplicate = duplicate;
-            o.message = message;
-            it->outcomes.append(o);
-            if (--it->outstanding <= 0) {
-                const Batch done = it.value();
-                m_batches.erase(it);
-                emit qsoFinished(done.entry, done.outcomes);
-            }
-        }
+        Outcome o;
+        o.service = shortName;
+        o.ok = ok;
+        o.duplicate = duplicate;
+        o.message = message;
+        record(batchId, lane, o);
         // A fresh contact got through, so the service is reachable and
         // the key is good: now is the moment for what was left over.
         if (ok) {
@@ -329,6 +314,26 @@ void QsoUploadQueue::finish(Lane* lane, const QString& call, bool ok,
     }
 
     schedulePump(lane);
+}
+
+int QsoUploadQueue::placeOf(const Lane* lane) const
+{
+    for (std::size_t i = 0; i < m_lanes.size(); ++i) {
+        if (m_lanes[i].get() == lane) { return static_cast<int>(i); }
+    }
+    return -1;
+}
+
+void QsoUploadQueue::record(quint64 batchId, const Lane* lane,
+                            const Outcome& outcome)
+{
+    auto it = m_batches.find(batchId);
+    if (it == m_batches.end()) { return; }
+    it->outcomes.insert(placeOf(lane), outcome);
+    if (--it->outstanding > 0) { return; }
+    const Batch done = it.value();
+    m_batches.erase(it);
+    emit qsoFinished(done.entry, done.outcomes.values().toVector());
 }
 
 void QsoUploadQueue::endRoundIfIdle(Lane* lane)
