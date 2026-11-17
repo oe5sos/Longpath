@@ -120,6 +120,38 @@ private slots:
         QCOMPARE(ptt.at(0).at(0).toBool(), true);
         QCOMPARE(ptt.at(1).at(0).toBool(), false);
     }
+
+    // schliesse() laesst los -- der Besitzer soll es erfahren.
+    void schliessenLaesstLos()
+    {
+        MidiKeyInput eingang;
+        QList<QPair<bool, bool>> paddle;
+        QList<bool> taste;
+        eingang.setPaddleSenke([&paddle](bool p, bool s) { paddle.append({p, s}); });
+        eingang.setTastenSenke([&taste](bool u) { taste.append(u); });
+        eingang.verarbeite({0x90, 20, 100});
+        paddle.clear();
+        eingang.schliesse();
+        const QList<QPair<bool, bool>> soll{{false, false}};
+        QCOMPARE(paddle, soll);
+        QCOMPARE(taste, (QList<bool>{false}));
+    }
+
+    // Der Abbau dagegen ruft niemanden mehr: die Senke gehoert meist
+    // jemandem, der sich gerade selbst abbaut. So gefunden auf der
+    // macOS-CI (SIGABRT am Ende von senkenUndSignale, 2026-11-17).
+    void abbauRuftKeineSenke()
+    {
+        int rufe = 0;
+        {
+            MidiKeyInput eingang;
+            eingang.setPaddleSenke([&rufe](bool, bool) { ++rufe; });
+            eingang.setTastenSenke([&rufe](bool) { ++rufe; });
+            eingang.verarbeite({0x90, 20, 100});   // ein Kontakt steht noch
+            rufe = 0;
+        }
+        QCOMPARE(rufe, 0);
+    }
 };
 
 QTEST_GUILESS_MAIN(TstMidiKeyInput)

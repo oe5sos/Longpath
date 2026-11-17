@@ -130,6 +130,7 @@ signals:
 private:
     std::unique_ptr<rt::midi::RtMidiIn> m_eingang;
     std::atomic<bool> m_offen{false};
+    bool m_imAbbau{false};   ///< der Destruktor laeuft: keine Senke, kein Signal
     QString m_portName;
     QString m_fehler;
 

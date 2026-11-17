@@ -6582,6 +6582,12 @@ longpath_add_test(tst_fkey_priority)
 longpath_add_test(tst_midi_key_input)
 longpath_add_test(tst_cw_mithoerton)
 longpath_add_test(tst_iambic_keyer)
+# Echtzeit auf einem eigenen Faden: nebeneinander mit Hunderten anderer
+# Pruefstaende misst er den Laeufer, nicht den Geber (macOS-CI,
+# 2026-11-17: ein Punkt von 40 ms mass 88). Siehe den Kopf des Laufs.
+if(TEST tst_iambic_keyer)
+    set_tests_properties(tst_iambic_keyer PROPERTIES RUN_SERIAL TRUE)
+endif()
 longpath_add_test(tst_cw_tastung)
 longpath_add_test(tst_cw_tastweg_freigabe)
 longpath_add_test(tst_cw_key_setup_page)

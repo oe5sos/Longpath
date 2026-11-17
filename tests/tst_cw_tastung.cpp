@@ -426,19 +426,24 @@ private slots:
                                         QStringLiteral("taste 0")}));
     }
 
-    // Und mit dem Geber dazwischen: ein Punkt bei 40 WpM ist eine Kante
-    // hinunter und eine hinauf.
+    // Und mit dem Geber dazwischen: ein Punkt ist eine Kante hinunter
+    // und eine hinauf. Bei 5 WpM (Punkt und Pause je 240 ms) und mit dem
+    // Loslassen erst NACH der ersten Kante -- ein belasteter CI-Laeufer
+    // haelt einen Faden leicht 100 ms an, und bei hohem Tempo waere dann
+    // schon der zweite Punkt unterwegs.
     void paddleUeberDenGeber()
     {
         CwTastung t;
         Attrappe a;
         richteEin(t, a, true, CwTastung::Art::JambusA);
-        t.setWpm(40);
+        t.setWpm(5);
         t.eingang()->verarbeite({0x90, 20, 100});
-        QTest::qWait(10);
+        QTRY_COMPARE_WITH_TIMEOUT(a.zahl(QStringLiteral("taste 1")), 1, 5000);
         t.eingang()->verarbeite({0x80, 20, 0});
-        QTRY_COMPARE_WITH_TIMEOUT(a.zahl(QStringLiteral("taste 0")), 1, 2000);
+        QTRY_COMPARE_WITH_TIMEOUT(a.zahl(QStringLiteral("taste 0")), 1, 5000);
+        QTest::qWait(600);   // es kommt kein zweiter Punkt nach
         QCOMPARE(a.zahl(QStringLiteral("taste 1")), 1);
+        QCOMPARE(a.zahl(QStringLiteral("taste 0")), 1);
     }
 
     // ── Einstellungen ────────────────────────────────────────────────

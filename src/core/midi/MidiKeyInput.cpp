@@ -64,6 +64,14 @@ MidiKeyInput::MidiKeyInput(QObject* eltern) : QObject(eltern) {}
 
 MidiKeyInput::~MidiKeyInput()
 {
+    // Im Abbau wird niemand mehr gerufen: wer die Senken gesetzt hat,
+    // baut sich in aller Regel gerade selbst ab, und die Senke griffe in
+    // etwas, das es nicht mehr gibt. Genau so gefunden: die macOS-CI
+    // brach tst_midi_key_input mit SIGABRT ab (2026-11-17), weil der
+    // Destruktor die Tasten-Senke mit „los" rief und die in eine schon
+    // zerstoerte Liste schrieb. Wer beim Schliessen ein „los" braucht,
+    // ruft schliesse() selbst, solange er noch steht.
+    m_imAbbau = true;
     schliesse();
 }
 
@@ -145,6 +153,7 @@ void MidiKeyInput::schliesse()
     // Beide zuruecksetzen, nicht nur den ersten -- darum zwei Schritte.
     const bool punktWar = m_punkt.exchange(false);
     const bool strichWar = m_strich.exchange(false);
+    if (m_imAbbau) { return; }   // siehe den Destruktor
     if (punktWar || strichWar) {
         if (m_paddleSenke) { m_paddleSenke(false, false); }
         emit paddle(false, false);
