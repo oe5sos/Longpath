@@ -204,6 +204,10 @@ private:
     qint64 m_fensterBeginnMs{-1};  ///< UTC, Anfang des laufenden Fensters
     /// FT2: dieses Fenster ist schon ausgewertet (vor der Grenze).
     bool m_schonAusgewertet{false};
+    /// Wann (UTC, Uhr des Stroms) die erste Probe dieses Fensters kam.
+    /// Fuer den Mitschnitt: ohne sie weiss man nicht, wo im Fenster die
+    /// Grenze lag.
+    qint64 m_erstesStueckMs{-1};
 };
 
 } // namespace Longpath

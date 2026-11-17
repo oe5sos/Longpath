@@ -12,6 +12,9 @@
 
 #include "core/Resampler.h"
 #include "core/AppSettings.h"
+#include "core/audio/WavFile.h"
+
+#include <QDir>
 
 #include <QLoggingCategory>
 
@@ -106,6 +109,8 @@ void Ft8Stream::feedAudio(const float* interleavedStereo, int frames)
         schliesseFenster(beginn);
     }
 
+    if (m_erstesStueckMs < 0) { m_erstesStueckMs = jetzt; }
+
     // Stereo -> Mono -> 12 kHz.
     QVector<float> mono(frames);
     for (int i = 0; i < frames; ++i) {
@@ -142,12 +147,40 @@ void Ft8Stream::schliesseFenster(qint64 neuerBeginnMs)
     m_fenster.clear();
     m_fensterBeginnMs = neuerBeginnMs;
     m_schonAusgewertet = false;
+    m_erstesStueckMs = -1;
 }
 
 void Ft8Stream::werteAus()
 {
     const QDateTime beginn =
         QDateTime::fromMSecsSinceEpoch(m_fensterBeginnMs, Qt::UTC);
+
+    // ── Mitschnitt fuer die Fehlersuche (2026-11-17) ───────────────
+    //
+    // Am Geraet: auf 80 m FT2-Signale hoerbar und im Wasserfall zu
+    // sehen, 0 Funde. Raten hilft da nicht -- es braucht den Ton, so
+    // wie ihn der Dekoder bekam. Nur mit der Umgebungsvariablen
+    // LONGPATH_FT8_MITSCHNITT=<Ordner>; ohne sie geschieht nichts.
+    // Je Fenster eine WAV (12 kHz, mono, ab der ersten Probe nach der
+    // Grenze); der Dateiname traegt, wie spaet diese erste Probe kam.
+    static const QString mitschnitt =
+        qEnvironmentVariable("LONGPATH_FT8_MITSCHNITT");
+    if (!mitschnitt.isEmpty()) {
+        QDir().mkpath(mitschnitt);
+        const qint64 spaeter = m_erstesStueckMs >= 0
+                                   ? m_erstesStueckMs - m_fensterBeginnMs : -1;
+        const QString pfad = mitschnitt + QLatin1Char('/')
+            + beginn.toString(QStringLiteral("yyMMdd_HHmmss_zzz"))
+            + QStringLiteral("_%1_erste+%2ms.wav")
+                  .arg(QLatin1String(Ft8Decoder::name(m_protocol)))
+                  .arg(spaeter);
+        QString fehler;
+        if (writeWavMono(pfad, m_fenster, Ft8Decoder::kSampleRate, &fehler)) {
+            qCInfo(lcFt8).noquote() << "Mitschnitt:" << pfad;
+        } else {
+            qCWarning(lcFt8).noquote() << "Mitschnitt fehlgeschlagen:" << fehler;
+        }
+    }
     {
         // Bei FT4 beginnt der Block spaeter als das Fenster — siehe
         // Ft8Stream.h, kFt4BlockVersatzMs, mit der Messung dazu. Die

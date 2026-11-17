@@ -63,6 +63,34 @@ struct Stelle {
 // nachgeprueft -- Decodiums Zahl bleibt, bis das Band etwas anderes
 // sagt.
 //
+// ── Alle Quellen nebeneinander (2026-11-17, „suche alle gueltigen") ──
+//
+//            Decodium-   DXZone-     Decodium-     am Band
+//            Programm    Testliste   Handbuch*     (PSK, 20–21 Uhr)
+//   160 m    1,843       1,843       –             –
+//    80 m    3,568       3,578       3,580         3,578–3,580  -> 3,578
+//    60 m    5,360       5,360       –             –
+//    40 m    7,062 **    7,052       7,080         7,053        -> 7,052
+//    30 m   10,144      10,144      10,137         –
+//    20 m   14,084      14,084      14,080        14,084–14,086 -> 14,084
+//    17 m   18,108      18,108      18,105         –
+//    15 m   21,144      21,144      21,080         –
+//    12 m   24,923      24,923      24,920        24,924        -> 24,923
+//    10 m   28,184      28,184      28,180        28,185        -> 28,184
+//     6 m   50,316       –          50,318         –
+//     2 m  144,177       –           –             –
+//
+//   *  Decodium 4.0 Handbuch v1.0.262, 5.1.1 „Standard FT2 frequencies".
+//      NICHT uebernommen: 14,080 / 28,180 / 50,318 sind die
+//      FT4-Anrufstellen, das Programm selbst stellt andere Zahlen ein,
+//      und am Band liegt der Betrieb auf denen des Programms.
+//   ** Das FT2-Team (IU8LMC, IZ8XXE, ARI Caserta) hat 40 m von 7,052 auf
+//      7,062 verlegt, „to align with the IARU Region 1 bandplan"
+//      (vu3dxr.in, „FT2 moving to 7062 kHz"). Am 17.11. abends funkte
+//      dort niemand, auf 7,052 schon. Darum stellt der Knopf 7,052 ein;
+//      7,062 steht unten bei den WEITEREN Stellen, und wer dort hinstellt,
+//      bekommt den FT2-Dekoder genauso.
+//
 // Jede Stelle liegt mindestens 2 kHz neben der FT4- und FT8-Stelle
 // desselben Bandes -- `stehtSchonDort` mit seinen 500 Hz verwechselt
 // sie also nicht (geprueft in tests/tst_ft2.cpp).
@@ -78,6 +106,26 @@ constexpr Stelle kStellen[] = {
     { Band::Band12m,  24'915'000, 24'919'000, 24'923'000 },
     { Band::Band10m,  28'074'000, 28'180'000, 28'184'000 },
     { Band::Band6m,   50'313'000, 50'318'000, 50'316'000 },
+    // 2 m nur fuer FT2: Decodium `Modes::FT2, IARURegions::ALL`. FT8 und
+    // FT4 haben hier (noch) keinen Eintrag -- nicht Teil dieses Auftrags.
+    { Band::Band2m,            0,          0, 144'177'000 },
+};
+
+// ── Weitere gueltige FT2-Stellen ─────────────────────────────────────
+//
+// Auf diese stellt der Knopf NICHT, aber steht die Skala dort, erkennt
+// Longpath FT2 (`stehtSchonDort`, und damit Ft8Applet::folgeDerSkala).
+//
+//   3,568 / 7,062  Decodium-Programm bzw. FT2-Team (siehe oben)
+//   70,157         4 m, Decodium `IARURegions::R1`
+//   432,177        70 cm, Decodium `IARURegions::ALL`
+//   1296,177       23 cm, Decodium `IARURegions::ALL`
+//
+// Nicht aufgenommen: 222,177 MHz (Decodium `IARURegions::R2`, kein
+// Amateurband in Region 1) und 1,839 (4X4XM, 160 m) -- dafuer gibt es
+// keine zweite Quelle, und 1,840 ist die FT8-Stelle daneben.
+constexpr qint64 kFt2Weitere[] = {
+    3'568'000, 7'062'000, 70'157'000, 432'177'000, 1'296'177'000,
 };
 
 qint64 stelleFuer(const Stelle& s, Digimodus modus)
@@ -116,6 +164,14 @@ bool stehtSchonDort(qint64 skalenfrequenzHz, Digimodus modus,
                                    ? skalenfrequenzHz - ziel
                                    : ziel - skalenfrequenzHz;
         if (abstand <= spielraumHz) { return true; }
+    }
+    if (modus == Digimodus::Ft2) {
+        for (const qint64 ziel : kFt2Weitere) {
+            const qint64 abstand = skalenfrequenzHz > ziel
+                                       ? skalenfrequenzHz - ziel
+                                       : ziel - skalenfrequenzHz;
+            if (abstand <= spielraumHz) { return true; }
+        }
     }
     return false;
 }

@@ -492,6 +492,35 @@ private slots:
                  qint64(3'578'000));
         QCOMPARE(DigiFrequenzen::anruffrequenz(Band::Band10m, Digimodus::Ft2),
                  qint64(28'184'000));
+        QCOMPARE(DigiFrequenzen::anruffrequenz(Band::Band12m, Digimodus::Ft2),
+                 qint64(24'923'000));
+        QCOMPARE(DigiFrequenzen::anruffrequenz(Band::Band2m, Digimodus::Ft2),
+                 qint64(144'177'000));
+        // 2 m hat (noch) keine FT8/FT4-Stelle -- der Eintrag darf keine
+        // erfinden.
+        QCOMPARE(DigiFrequenzen::anruffrequenz(Band::Band2m, Digimodus::Ft8),
+                 qint64(0));
+
+        // Die weiteren gueltigen Stellen: der Knopf stellt nicht dorthin,
+        // aber wer dort steht, wird als FT2 erkannt.
+        for (const qint64 weiter : { qint64(7'062'000), qint64(3'568'000),
+                                     qint64(70'157'000), qint64(432'177'000),
+                                     qint64(1'296'177'000) }) {
+            QVERIFY2(DigiFrequenzen::stehtSchonDort(weiter, Digimodus::Ft2),
+                     qPrintable(QStringLiteral("%1 nicht als FT2 erkannt").arg(weiter)));
+            QVERIFY2(!DigiFrequenzen::stehtSchonDort(weiter, Digimodus::Ft8),
+                     qPrintable(QStringLiteral("%1 ist auch FT8").arg(weiter)));
+            QVERIFY2(!DigiFrequenzen::stehtSchonDort(weiter, Digimodus::Ft4),
+                     qPrintable(QStringLiteral("%1 ist auch FT4").arg(weiter)));
+        }
+        // Und die FT4-Stellen bleiben FT4: das Decodium-Handbuch nennt
+        // 14,080 / 28,180 / 50,318 als FT2 -- uebernommen haette das die
+        // FT4-Erkennung auf drei Baendern zerstoert.
+        for (const qint64 ft4 : { qint64(14'080'000), qint64(28'180'000),
+                                  qint64(50'318'000) }) {
+            QVERIFY(DigiFrequenzen::stehtSchonDort(ft4, Digimodus::Ft4));
+            QVERIFY(!DigiFrequenzen::stehtSchonDort(ft4, Digimodus::Ft2));
+        }
         QCOMPARE(DigiFrequenzen::anruffrequenz(Band::Band6m, Digimodus::Ft2),
                  qint64(50'316'000));
         QVERIFY(DigiFrequenzen::stehtSchonDort(14'084'200, Digimodus::Ft2));

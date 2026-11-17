@@ -63,6 +63,9 @@ inline const char* name(Digimodus modus)
 qint64 anruffrequenz(Band band, Digimodus modus);
 
 /// Ob die Skalenfrequenz schon auf der Anrufstelle ihres Bandes steht.
+/// Bei FT2 zaehlen auch die weiteren gueltigen Stellen (7,062, 3,568,
+/// 4 m, 70 cm, 23 cm -- siehe DigiFrequenzen.cpp), auf die der Knopf
+/// selbst nicht stellt.
 ///
 /// Mit Spielraum, weil ein Geraet nicht immer auf das Hertz genau
 /// meldet (und weil der Betreiber von Hand ein paar hundert Hertz
