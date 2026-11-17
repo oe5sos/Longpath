@@ -1979,6 +1979,11 @@ target_link_libraries(LongpathObjs PUBLIC sgp4)
 add_subdirectory(third_party/ggmorse)
 target_link_libraries(LongpathObjs PUBLIC ggmorse)
 
+# RtMidi (MIT-style) -- MIDI input for the CW key (HaliKey MIDI, 2026-11-17).
+# Taken as AetherSDR carries it; see third_party/rtmidi/README-LONGPATH.md.
+add_subdirectory(third_party/rtmidi)
+target_link_libraries(LongpathObjs PUBLIC rtmidi)
+
 # --------------------------------------------------------------------------
 # Mbed TLS 3.6.7, nur ECDSA P-256 + SHA-256 (Apache-2.0) -- die Anmeldung
 # bei Roundtable (src/core/roundtable/RoundtableKey, 2026-11-14). Byte fuer

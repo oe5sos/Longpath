@@ -128,6 +128,8 @@ def classify(path: str) -> str:
         return "sgp4-vendored"
     if path.startswith("third_party/ggmorse/"):
         return "ggmorse-vendored"
+    if path.startswith("third_party/rtmidi/"):
+        return "rtmidi-vendored"
     if path in THETIS_PORTS:
         # Future refinement: split mi0bot-port vs thetis-port by inspecting
         # the PROVENANCE variant cell. For now, "thetis-port" covers both.
@@ -176,6 +178,7 @@ REQUIRED_MARKERS: dict[str, list] = {
     # no per-file header (the licence is the repository-level LICENSE),
     # so nothing to require -- see docs/attribution/GGMORSE-PROVENANCE.md.
     "ggmorse-vendored": [],
+    "rtmidi-vendored": [],
     "nereussdr-original": [],
     "attribution-doc": [],
     "docs": [],
