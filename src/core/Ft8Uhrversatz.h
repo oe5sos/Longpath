@@ -105,16 +105,15 @@ public:
     /// FT4: ein Drittel davon, abgerundet auf runde Zahlen.
     static constexpr double kAuffaelligFt4 = 0.25;
     static constexpr double kSchlechtFt4   = 0.50;
-    /// FT2 (2026-11-17): das Suchband ist −10..+19 Symbole zu 0,024 s
-    /// ab Blockbeginn; weil ft8_lib den Anfang um ein Symbol spaet
-    /// meldet (tests/tst_ft2.cpp), erscheint es als −0,22 … +0,48 s.
-    /// NICHT einfach die Haelfte von FT4: Decodium sendet auf dem Mac
-    /// 300 ms nach der Grenze (Modulator.cpp:213), das erscheint hier
-    /// schon als +0,288 s und ist trotzdem in Ordnung -- auch mit
-    /// etwas Laufzeit im Tonweg. Auffaellig ab 0,35 s; schlecht ab
-    /// 0,45 s, ein Symbol vor dem oberen Rand.
-    static constexpr double kAuffaelligFt2 = 0.35;
-    static constexpr double kSchlechtFt2   = 0.45;
+    /// FT2 (2026-11-17): zwei Bloecke (Ft8Stream::kFt2ZweiterBlockMs),
+    /// zusammen −10..+39 Symbole zu 0,024 s ab dem ersten Block; weil
+    /// ft8_lib den Anfang um ein Symbol spaet meldet (tests/tst_ft2.cpp),
+    /// erscheint es als −0,22 … +0,96 s. Decodium sendet auf dem Mac
+    /// 300 ms nach der Grenze (+0,288 s hier), und der Ton der Flex
+    /// bringt Laufzeit mit -- beides ist kein Uhrfehler. Auffaellig ab
+    /// 0,70 s; schlecht ab 0,90 s, kurz vor dem oberen Rand.
+    static constexpr double kAuffaelligFt2 = 0.70;
+    static constexpr double kSchlechtFt2   = 0.90;
 
 private:
     static double median(std::vector<double> werte);

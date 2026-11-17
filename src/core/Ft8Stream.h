@@ -137,6 +137,23 @@ public:
     /// Luft nach unten, 300 ms knapp 200 nach oben.
     static constexpr int kFt2BlockVersatzMs = 40;
 
+    /// ── Und ein ZWEITER Block, 480 ms spaeter (2026-11-17, abends) ───
+    ///
+    /// Am Geraet (FLEX-8400, 3,578 MHz): kraeftige FT2-Signale im
+    /// Wasserfall, im Takt von 3,75 s -- und 0 Funde in jedem Fenster.
+    /// Das Suchband oben reicht bis +496 ms; kommt der Ton der Flex mit
+    /// ein paar hundert Millisekunden Laufzeit an, liegt jede Sendung
+    /// dahinter. WSJT-X Improved sucht weiter: FT4-Sync von
+    /// `ibmin=-344` bis `ibmax=1012` bei 12000/18 Hz
+    /// (`lib/ft4_decode.f90:402-411`), fuer FT2 auf halbe Zeit
+    /// gestreckt also −0,26 … +0,76 s.
+    ///
+    /// ft8_libs Band ist fest (−10..+19 Symbole), darum ein zweiter
+    /// Durchlauf auf demselben Fenster, um 20 Symbole (480 ms) versetzt:
+    /// zusammen −200 … +976 ms ab der Grenze. Was beide finden, steht
+    /// einmal da; der Zeitversatz gilt immer ab dem ERSTEN Block.
+    static constexpr int kFt2ZweiterBlockMs = kFt2BlockVersatzMs + 480;
+
     /// ── FT2 wird VOR der Fenstergrenze dekodiert ────────────────────
     ///
     /// Bei FT8 und FT4 wird an der Grenze dekodiert, und die Antwort
@@ -146,12 +163,19 @@ public:
     ///
     /// WSJT-X Improved dekodiert FT2 nach `23*1728` Proben
     /// (`widgets/mainwindow.cpp:2646`, `m_hsymStop=23` mit 1728 je
-    /// Schritt), also nach 3,312 s. Dasselbe hier: sobald so viele
-    /// Proben im Fenster liegen, wird ausgewertet und gemeldet; der
-    /// Rest bis zur Grenze wird verworfen. Das letzte Symbol eines
-    /// Signals, das am oberen Rand des Suchbandes beginnt, endet bei
-    /// 40 + (19 + 105) x 24 = 3016 ms -- also liegt es drin.
-    static constexpr int kFt2DekodierProben = 23 * 1728;
+    /// Schritt), also nach 3,312 s. Hier etwas spaeter, nach 3,5 s:
+    /// mit dem zweiten Block (oben) kann eine Sendung bis +976 ms
+    /// beginnen und endet dann bei 976 + 2520 = 3496 ms. Danach bleiben
+    /// bis zur Grenze 250 ms -- dekodiert ist ein FT2-Fenster in
+    /// wenigen Millisekunden. Der Rest bis zur Grenze wird verworfen.
+    static constexpr int kFt2DekodierProben = 42000;   // 3,5 s bei 12 kHz
+
+    /// FT2 auswerten wie im Betrieb: beide Bloecke, zusammengefuehrt.
+    /// `fenster` beginnt an der Fenstergrenze. Oeffentlich, damit der
+    /// Pruefstand GENAU diesen Weg faehrt und keinen nachgebauten.
+    static QVector<Ft8Decode> dekodiereFt2(const float* fenster, int proben,
+                                           const QVector<ApVorgabe>& vorwissen
+                                               = QVector<ApVorgabe>{});
 
 signals:
     /// Ein Fenster ist zu Ende und ausgewertet. periodStart ist seine

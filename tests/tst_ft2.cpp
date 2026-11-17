@@ -164,14 +164,11 @@ QVector<float> fensterMit(const QVector<float>& welle, double rate, int versatzM
     return f;
 }
 
-/// So dekodieren, wie Ft8Stream es tut: der Block beginnt
-/// kFt2BlockVersatzMs nach der Grenze.
+/// So dekodieren, wie Ft8Stream es tut -- DERSELBE Weg, nicht
+/// nachgebaut: beide Bloecke, zusammengefuehrt.
 QVector<Ft8Decode> dekodiereWieDerStrom(const QVector<float>& fenster12k)
 {
-    const int versatz = kRate * Ft8Stream::kFt2BlockVersatzMs / 1000;
-    return Ft8Decoder::decodeBlock(fenster12k.constData() + versatz,
-                                   fenster12k.size() - versatz,
-                                   Ft8Decoder::Protocol::Ft2);
+    return Ft8Stream::dekodiereFt2(fenster12k.constData(), fenster12k.size());
 }
 
 QStringList wortlaute(const QVector<Ft8Decode>& funde)
@@ -242,8 +239,13 @@ private slots:
         QTest::newRow("Decodium Linux 0 ms")      << 0   << 0;
         QTest::newRow("WSJT-X Improved 150 ms")   << 150 << 1;
         QTest::newRow("Decodium macOS 300 ms")    << 300 << 2;
-        // Und mit Laufzeit im eigenen Tonweg obendrauf.
+        // Und mit Laufzeit im eigenen Tonweg obendrauf. Die beiden
+        // letzten fielen vor dem zweiten Block durch (Suchband bis
+        // +496 ms) -- genau das war am Geraet zu sehen: kraeftige
+        // FT2-Signale im Wasserfall, 0 Funde (FLEX-8400, 2026-11-17).
         QTest::newRow("300 ms + 100 ms Laufzeit") << 400 << 0;
+        QTest::newRow("150 ms + 500 ms Laufzeit") << 650 << 1;
+        QTest::newRow("300 ms + 600 ms Laufzeit") << 900 << 2;
     }
 
     void liestMshvsSignal()
@@ -254,7 +256,10 @@ private slots:
 
         const QVector<float> welle = mshvWelle(folgeAus(b.toene), kRate, 1500.0);
         QCOMPARE(welle.size(), (kFt2Symbole + 2) * 288);
-        const auto funde = dekodiereWieDerStrom(fensterMit(welle, kRate, versatzMs));
+        // Nur so viel, wie im Betrieb vorliegt, wenn ausgewertet wird.
+        QVector<float> f = fensterMit(welle, kRate, versatzMs);
+        f.resize(Ft8Stream::kFt2DekodierProben);
+        const auto funde = dekodiereWieDerStrom(f);
         qInfo().noquote() << versatzMs << "ms ->" << wortlaute(funde);
         QVERIFY2(wortlaute(funde).contains(QLatin1String(b.text)),
                  qPrintable(QStringLiteral("bei %1 ms gelesen: %2")
@@ -278,18 +283,37 @@ private slots:
                                 .arg(double(d.dtSeconds)).arg(erwartet)));
     }
 
-    // Die Grenze des Suchbandes: −10..+19 Symbole ab Blockbeginn, also
-    // bis 40 + 456 = 496 ms. Bei 600 ms kann nichts mehr kommen -- das
-    // haelt fest, dass die Zahlen in Ft8Stream.h stimmen und nicht nur
-    // „irgendwie" funktionieren.
+    // Die Grenze des Suchbandes: zweiter Block bei 520 ms, −10..+19
+    // Symbole, also bis 520 + 456 = 976 ms. Bei 1100 ms kann nichts
+    // mehr kommen -- das haelt fest, dass die Zahlen in Ft8Stream.h
+    // stimmen und nicht nur „irgendwie" funktionieren. (Das Fenster
+    // waere ohnehin zu kurz: 1100 + 2520 > 3500.)
     void ausserhalbDesSuchbandesNichts()
     {
         const QVector<float> welle =
             mshvWelle(folgeAus(kMshvFolgen[0].toene), kRate, 1500.0);
-        const auto funde = dekodiereWieDerStrom(fensterMit(welle, kRate, 600));
+        QVector<float> f = fensterMit(welle, kRate, 1100);
+        f.resize(Ft8Stream::kFt2DekodierProben);   // so viel liegt vor
+        const auto funde = dekodiereWieDerStrom(f);
         QVERIFY2(funde.isEmpty(),
-                 qPrintable(QStringLiteral("bei 600 ms gefunden: %1")
+                 qPrintable(QStringLiteral("bei 1100 ms gefunden: %1")
                                 .arg(wortlaute(funde).join(QLatin1String(" | ")))));
+    }
+
+    // Und der Zweck des zweiten Blocks, als Gegenprobe gefahren: nur
+    // mit dem ersten Block (dem Stand vor dem Geraetetest) ist eine
+    // Sendung 650 ms nach der Grenze unsichtbar.
+    void ohneZweitenBlockUnsichtbar()
+    {
+        const QVector<float> welle =
+            mshvWelle(folgeAus(kMshvFolgen[1].toene), kRate, 1500.0);
+        const QVector<float> f = fensterMit(welle, kRate, 650);
+        const int ab = kRate * Ft8Stream::kFt2BlockVersatzMs / 1000;
+        const auto nurErster = Ft8Decoder::decodeBlock(
+            f.constData() + ab, f.size() - ab, Ft8Decoder::Protocol::Ft2);
+        QVERIFY2(nurErster.isEmpty(), "der erste Block allein fand sie doch");
+        QVERIFY(wortlaute(dekodiereWieDerStrom(f))
+                    .contains(QLatin1String(kMshvFolgen[1].text)));
     }
 
     // Und als FT4 gehoert ist dasselbe Signal nichts: der Dekoder
@@ -520,9 +544,9 @@ private slots:
         // meldet der Dekoder als +0,288 s (siehe liestMshvsSignal) --
         // und mit etwas Laufzeit im Tonweg ist es immer noch in Ordnung.
         QCOMPARE(urteil(0.288), Ft8Uhrversatz::Lage::Ok);
-        QCOMPARE(urteil(0.33), Ft8Uhrversatz::Lage::Ok);
-        QCOMPARE(urteil(0.38), Ft8Uhrversatz::Lage::Auffaellig);
-        QCOMPARE(urteil(0.46), Ft8Uhrversatz::Lage::Schlecht);
+        QCOMPARE(urteil(0.60), Ft8Uhrversatz::Lage::Ok);
+        QCOMPARE(urteil(0.75), Ft8Uhrversatz::Lage::Auffaellig);
+        QCOMPARE(urteil(0.92), Ft8Uhrversatz::Lage::Schlecht);
     }
 };
 

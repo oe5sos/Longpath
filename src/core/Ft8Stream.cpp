@@ -15,6 +15,8 @@
 
 #include <QLoggingCategory>
 
+#include <algorithm>
+
 // Fuer die Messung am Band: wie viele Funde ein Fenster hergibt und
 // mit wie vielen Runden. Standardmaessig an (QtInfoMsg), weil eine
 // Zeile je 15 s niemandem wehtut und die Gegenprobe sonst nur aus
@@ -156,9 +158,6 @@ void Ft8Stream::werteAus()
         if (m_protocol == Ft8Decoder::Protocol::Ft4) {
             versatz = qMin(Ft8Decoder::kSampleRate * kFt4BlockVersatzMs / 1000,
                            m_fenster.size());
-        } else if (m_protocol == Ft8Decoder::Protocol::Ft2) {
-            versatz = qMin(Ft8Decoder::kSampleRate * kFt2BlockVersatzMs / 1000,
-                           m_fenster.size());
         }
         // ── Wie viele Runden ueber dasselbe Fenster ──────────────────
         //
@@ -191,21 +190,70 @@ void Ft8Stream::werteAus()
         const QVector<ApVorgabe> vorwissen =
             m_vorwissenQuelle ? m_vorwissenQuelle() : QVector<ApVorgabe>{};
 
-        const auto funde = Ft8Decoder::decodeBlock(m_fenster.constData() + versatz,
-                                                   m_fenster.size() - versatz,
-                                                   m_protocol,
-                                                   durchgaenge,
-                                                   vorwissen);
+        const bool ft2 = (m_protocol == Ft8Decoder::Protocol::Ft2);
+        const auto funde = ft2
+            ? dekodiereFt2(m_fenster.constData(), m_fenster.size(), vorwissen)
+            : Ft8Decoder::decodeBlock(m_fenster.constData() + versatz,
+                                      m_fenster.size() - versatz,
+                                      m_protocol,
+                                      durchgaenge,
+                                      vorwissen);
+        // FT4 und FT2 laufen immer einrundig (Ft8Decoder::decodeBlock);
+        // die Zahl aus den Einstellungen gilt nur fuer FT8.
+        const int runden = (m_protocol == Ft8Decoder::Protocol::Ft8)
+                               ? durchgaenge : 1;
+        // Der mittlere Zeitversatz der Funde: bei FT2 ist das Suchband so
+        // schmal, dass die Laufzeit im Tonweg hier sichtbar sein muss --
+        // sonst sucht man den Fehler am Band (2026-11-17).
+        QString zeit;
+        if (!funde.isEmpty()) {
+            QVector<float> dts;
+            for (const Ft8Decode& d : funde) { dts.append(d.dtSeconds); }
+            std::sort(dts.begin(), dts.end());
+            zeit = QStringLiteral(", DT Mitte %1 s")
+                       .arg(double(dts[dts.size() / 2]), 0, 'f', 2);
+        }
         qCInfo(lcFt8).noquote()
-            << QStringLiteral("Fenster: %1 Funde, %2 Runde(n), %3")
+            << QStringLiteral("Fenster: %1 Funde, %2 Runde(n), %3%4")
                    .arg(funde.size())
-                   .arg(durchgaenge)
-                   .arg(QLatin1String(Ft8Decoder::name(m_protocol)));
+                   .arg(runden)
+                   .arg(QLatin1String(Ft8Decoder::name(m_protocol)), zeit);
 
         // Auch leer melden: ein stilles Fenster ist eine Aussage, ein
         // ausbleibendes Fenster ein Fehler. Siehe Ft8Stream.h.
         emit decoded(funde, beginn);
     }
+}
+
+QVector<Ft8Decode> Ft8Stream::dekodiereFt2(const float* fenster, int proben,
+                                           const QVector<ApVorgabe>& vorwissen)
+{
+    QVector<Ft8Decode> alle;
+    if (!fenster || proben <= 0) { return alle; }
+
+    const int rate = Ft8Decoder::kSampleRate;
+    for (const int blockMs : { kFt2BlockVersatzMs, kFt2ZweiterBlockMs }) {
+        const int ab = rate * blockMs / 1000;
+        if (ab >= proben) { break; }
+        const QVector<Ft8Decode> funde =
+            Ft8Decoder::decodeBlock(fenster + ab, proben - ab,
+                                    Ft8Decoder::Protocol::Ft2, 1, vorwissen);
+        // Zeitversatz auf den ERSTEN Block beziehen, damit die Spalte
+        // und die Uhrwarnung nicht springen, je nachdem welcher Block
+        // die Station gefunden hat.
+        const float verschiebung =
+            float(blockMs - kFt2BlockVersatzMs) / 1000.0f;
+        for (Ft8Decode d : funde) {
+            bool schonDa = false;
+            for (const Ft8Decode& alt : alle) {
+                if (alt.text == d.text) { schonDa = true; break; }
+            }
+            if (schonDa) { continue; }
+            d.dtSeconds += verschiebung;
+            alle.append(d);
+        }
+    }
+    return alle;
 }
 
 } // namespace Longpath

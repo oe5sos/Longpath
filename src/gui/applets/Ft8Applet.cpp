@@ -3943,7 +3943,7 @@ void Ft8Applet::zeigeUhrversatz()
             .arg(m_uhrversatz.verfahren() == Ft8Uhrversatz::Verfahren::Ft4
                      ? QStringLiteral("\u22120.48 \u2026 +0.91")
                  : m_uhrversatz.verfahren() == Ft8Uhrversatz::Verfahren::Ft2
-                     ? QStringLiteral("\u22120.24 \u2026 +0.46")
+                     ? QStringLiteral("\u22120.24 \u2026 +0.94")
                      : QStringLiteral("\u22121.60 \u2026 +3.04"))
             .arg(QLatin1String(Ft8Decoder::name(protocol()))));
     m_uhrWarnung->setVisible(true);
