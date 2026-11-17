@@ -433,6 +433,76 @@ private slots:
         QCOMPARE(spion.count(), 1);
     }
 
+    // ── Decodium sendet asynchron ──────────────────────────────────
+    //
+    // Eine Sendung, die 2,2 s nach einer Grenze beginnt, ist erst im
+    // NAECHSTEN Fenster vollstaendig -- und dort nur mit dem Schluss des
+    // vorigen. Vor dem Vorlauf kam sie nie an. Und eine Sendung kurz
+    // nach der Grenze, die schon gemeldet war, darf im naechsten
+    // Fenster nicht noch einmal erscheinen.
+    void asynchroneSendungWirdGelesen()
+    {
+        // Zwei Fenster am Stueck, 48 kHz, wie WDSP liefert.
+        const double rate = 48000.0;
+        const int fenster = int(rate * kFensterMs / 1000);
+        QVector<float> mono(2 * fenster, 0.0f);
+        auto lege = [&](const Bezug& b, int abMs, double f0) {
+            const QVector<float> w = mshvWelle(folgeAus(b.toene), rate, f0);
+            const int ab = int(rate * abMs / 1000);
+            for (int i = 0; i < w.size() && ab + i < mono.size(); ++i) {
+                mono[ab + i] += 0.5f * w[i];
+            }
+        };
+        lege(kMshvFolgen[0], 150, 1200.0);     // im Raster, Fenster 1
+        lege(kMshvFolgen[1], 2200, 1800.0);    // asynchron, ueber die Grenze
+        QVector<float> stereo;
+        stereo.reserve(mono.size() * 2);
+        for (float v : mono) { stereo << v << v; }
+
+        Ft8Stream strom;
+        strom.setProtocol(Ft8Decoder::Protocol::Ft2);
+        qint64 jetzt = 999999990000LL;
+        const qint64 grenze1 = jetzt;
+        strom.setClock([&jetzt]() { return jetzt; });
+        QSignalSpy spion(&strom, &Ft8Stream::decoded);
+        const int stueck = 960;
+        for (int pos = 0; pos + stueck <= mono.size(); pos += stueck) {
+            jetzt = grenze1 + qint64(pos) * 1000 / 48000;
+            strom.feedAudio(stereo.constData() + 2 * pos, stueck);
+        }
+        QCOMPARE(spion.count(), 2);
+
+        const auto erstes  = spion.at(0).at(0).value<QVector<Longpath::Ft8Decode>>();
+        const auto zweites = spion.at(1).at(0).value<QVector<Longpath::Ft8Decode>>();
+        qInfo() << "Fenster 1:" << wortlaute(erstes) << "Fenster 2:" << wortlaute(zweites);
+        QVERIFY(wortlaute(erstes).contains(QLatin1String(kMshvFolgen[0].text)));
+        QVERIFY2(!wortlaute(erstes).contains(QLatin1String(kMshvFolgen[1].text)),
+                 "die asynchrone Sendung war im ersten Fenster noch gar nicht fertig");
+        QVERIFY2(wortlaute(zweites).contains(QLatin1String(kMshvFolgen[1].text)),
+                 "die asynchrone Sendung fehlt -- ohne Vorlauf war sie nie zu hoeren");
+        QVERIFY2(!wortlaute(zweites).contains(QLatin1String(kMshvFolgen[0].text)),
+                 "die Sendung aus Fenster 1 kam ein zweites Mal");
+        // Begann 2,2 s nach Grenze 1, also 1,55 s VOR Grenze 2: negativer
+        // Zeitversatz, ab Grenze 2 + 40 ms, ein Symbol spaet gemeldet --
+        // und um die Laufzeit des Umtasters (48 -> 12 kHz) spaeter: was
+        // er an der Grenze noch zurueckhaelt, kommt erst im naechsten
+        // Fenster heraus und zaehlt dort zum Anfang. Gemessen 2026-11-17:
+        // 126 ms. Im ersten Fenster eines Laufs fehlt das (nichts war
+        // zurueckgehalten); im Dauerbetrieb steckt es in JEDEM Fenster,
+        // bei FT8 und FT4 genauso, und damit in allen Messungen am Band.
+        for (const Ft8Decode& d : zweites) {
+            if (d.text != QLatin1String(kMshvFolgen[1].text)) { continue; }
+            const double ohneUmtaster =
+                (2200 - kFensterMs - Ft8Stream::kFt2BlockVersatzMs) / 1000.0
+                + FT2_SYMBOL_PERIOD;
+            const double umtaster = double(d.dtSeconds) - ohneUmtaster;
+            qInfo() << "Laufzeit des Umtasters:" << umtaster * 1000.0 << "ms";
+            QVERIFY2(umtaster > 0.08 && umtaster < 0.17,
+                     qPrintable(QStringLiteral("dt %1, Umtaster %2 s")
+                                    .arg(double(d.dtSeconds)).arg(umtaster)));
+        }
+    }
+
     // ── Der Sendeplan ────────────────────────────────────────────────
     void sendeplan()
     {

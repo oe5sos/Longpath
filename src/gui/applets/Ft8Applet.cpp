@@ -3422,6 +3422,13 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
         : protocol() == Ft8Decoder::Protocol::Ft2 ? Ft8Uhrversatz::Verfahren::Ft2
                                                   : Ft8Uhrversatz::Verfahren::Ft8);
     for (const Ft8Decode& d : funde) {
+        // FT2: Decodium sendet asynchron (Ft8Stream.h), seine Sendungen
+        // liegen irgendwo im Fenster -- ueber die eigene Uhr sagen sie
+        // nichts. Nur was im Raster liegt (WSJT-X Improved), zaehlt.
+        if (protocol() == Ft8Decoder::Protocol::Ft2
+            && (d.dtSeconds < -0.3f || d.dtSeconds > 1.0f)) {
+            continue;
+        }
         m_uhrversatz.merke(double(d.dtSeconds));
     }
     m_uhrversatz.periodeFertig();

@@ -170,10 +170,37 @@ public:
     /// wenigen Millisekunden. Der Rest bis zur Grenze wird verworfen.
     static constexpr int kFt2DekodierProben = 42000;   // 3,5 s bei 12 kHz
 
-    /// FT2 auswerten wie im Betrieb: beide Bloecke, zusammengefuehrt.
-    /// `fenster` beginnt an der Fenstergrenze. Oeffentlich, damit der
-    /// Pruefstand GENAU diesen Weg faehrt und keinen nachgebauten.
-    static QVector<Ft8Decode> dekodiereFt2(const float* fenster, int proben,
+    /// ── Decodium sendet ASYNCHRON (2026-11-17, am Geraet gefunden) ──
+    ///
+    /// Decodium 4.0 hat fuer FT2 „Async L2" fest eingeschaltet
+    /// (`widgets/mainwindow.cpp`: „force Async L2 in FT2, hide checkbox
+    /// (always on)") und sendet ~100 ms nach dem Dekodieren, nicht auf
+    /// der Grenze („Async TX guard timer: fires after decode to start
+    /// TX immediately", `m_asyncTxGuardTimer.start(100)`). Sein
+    /// Empfaenger wertet alle 100 ms die letzten 3,75 s aus
+    /// (`doc/FT2_ASINCRONO.md`). WSJT-X Improved bleibt im Raster.
+    ///
+    /// Ein Empfaenger, der nur Sendungen kurz nach der Grenze sucht,
+    /// hoert von Decodium also nur einen Teil. Darum wird bei FT2 der
+    /// SCHLUSS des vorigen Fensters mitgenommen (kFt2VorlaufProben)
+    /// und ueber den ganzen Puffer gesucht, Block fuer Block im Abstand
+    /// von 480 ms. Jede Sendung, die seit der letzten Auswertung
+    /// vollstaendig geworden ist, liegt dann in einem Block. Was schon
+    /// gemeldet war (gleicher Wortlaut, gleicher Beginn), kommt nicht
+    /// ein zweites Mal.
+    static constexpr int kFt2BlockSchrittMs = 480;
+    static constexpr int kFt2VorlaufProben  = 36000;   // 3,0 s bei 12 kHz
+
+    /// FT2 auswerten wie im Betrieb. `puffer` enthaelt zuerst
+    /// `vorlaufProben` Proben VOR der Fenstergrenze, danach das Fenster.
+    /// Gesucht wird in Bloecken im Abstand von kFt2BlockSchrittMs,
+    /// ausgerichtet an Grenze + kFt2BlockVersatzMs, soweit der Puffer
+    /// jeweils eine ganze Sendung fasst. Der Zeitversatz zaehlt ab
+    /// Grenze + kFt2BlockVersatzMs; vor der Grenze begonnene Sendungen
+    /// haben einen negativen. Oeffentlich, damit der Pruefstand GENAU
+    /// diesen Weg faehrt und keinen nachgebauten.
+    static QVector<Ft8Decode> dekodiereFt2(const float* puffer, int proben,
+                                           int vorlaufProben = 0,
                                            const QVector<ApVorgabe>& vorwissen
                                                = QVector<ApVorgabe>{});
 
@@ -208,6 +235,11 @@ private:
     /// Fuer den Mitschnitt: ohne sie weiss man nicht, wo im Fenster die
     /// Grenze lag.
     qint64 m_erstesStueckMs{-1};
+    /// FT2: der Schluss des vorigen Fensters (siehe kFt2VorlaufProben).
+    QVector<float> m_ft2Vorlauf;
+    /// FT2: was schon gemeldet wurde -- Wortlaut und Beginn (UTC ms).
+    struct Gemeldet { QString text; qint64 beginnMs; };
+    QVector<Gemeldet> m_ft2Gemeldet;
 };
 
 } // namespace Longpath
