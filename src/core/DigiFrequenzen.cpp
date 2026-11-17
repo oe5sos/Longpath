@@ -39,14 +39,38 @@ struct Stelle {
 // `models/FrequencyList.cpp` steht kein `Modes::FT2`). Die Zahlen
 // kommen darum aus Decodium 4.0, dem Programm, mit dem die Betriebsart
 // entstanden ist: `models/FrequencyList.cpp`, Default_Frequencies,
-// jeweils `Modes::FT2, IARURegions::ALL`. Jede liegt mindestens 2 kHz
-// neben der FT4-Stelle desselben Bandes -- `stehtSchonDort` mit seinen
-// 500 Hz verwechselt sie also nicht.
+// jeweils `Modes::FT2, IARURegions::ALL`.
+//
+// ── Ausser 40 m und 80 m: dort gilt, was am Band GESCHIEHT ──────
+//
+// Betreiber nach dem ersten Versuch auf 14,084: „nur rauschen
+// gehoert". Nachgesehen bei PSK Reporter (`retrieve.pskreporter.info`,
+// mode=FT2, letzte Stunde, 2026-11-17 19:50–20:46 MEZ, 241 Meldungen):
+//
+//     20 m  14,0845–14,0862 MHz  -> 14,084   wie Decodium
+//     40 m   7,0533– 7,0537 MHz  ->  7,052   Decodium sagt 7,062
+//     80 m   3,5788– 3,5802 MHz  ->  3,578   Decodium sagt 3,568
+//     10 m  28,185              -> 28,184   wie Decodium
+//
+// Auf 7,062 und 3,568 sendete in dieser Stunde niemand; auf 7,052
+// (SP6CA, UA3DIB, DB3BD, IK1PMV) und 3,578 (DO5HOK, IK1PMV, IV3NDR)
+// lief europaeischer Betrieb. 7,052 fuehrt auch die Tafel von 4X4XM
+// (qsl.net/4x4xm, „Digital Ham Communication Frequencies"). Wer auf
+// der Liste des Programms sitzt und dort niemanden hoert, dem hilft
+// die Liste nicht.
+//
+// Die uebrigen Baender: in dieser Stunde ohne eine Meldung, also nicht
+// nachgeprueft -- Decodiums Zahl bleibt, bis das Band etwas anderes
+// sagt.
+//
+// Jede Stelle liegt mindestens 2 kHz neben der FT4- und FT8-Stelle
+// desselben Bandes -- `stehtSchonDort` mit seinen 500 Hz verwechselt
+// sie also nicht (geprueft in tests/tst_ft2.cpp).
 constexpr Stelle kStellen[] = {
     { Band::Band160m,  1'840'000,          0,  1'843'000 },
-    { Band::Band80m,   3'573'000,  3'575'000,  3'568'000 },
+    { Band::Band80m,   3'573'000,  3'575'000,  3'578'000 },
     { Band::Band60m,   5'357'000,          0,  5'360'000 },
-    { Band::Band40m,   7'074'000,  7'047'500,  7'062'000 },
+    { Band::Band40m,   7'074'000,  7'047'500,  7'052'000 },
     { Band::Band30m,  10'136'000, 10'140'000, 10'144'000 },
     { Band::Band20m,  14'074'000, 14'080'000, 14'084'000 },
     { Band::Band17m,  18'100'000, 18'104'000, 18'108'000 },

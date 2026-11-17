@@ -453,13 +453,21 @@ private slots:
     }
 
     // ── Die Anrufstellen ─────────────────────────────────────────────
-    void anrufstellenAusDecodium()
+    // 20 m und 10 m wie Decodium; 40 m und 80 m so, wie am Band
+    // tatsaechlich gesendet wird (PSK Reporter, 2026-11-17 -- siehe
+    // DigiFrequenzen.cpp). Decodiums 7,062 / 3,568 waren in der Stunde
+    // leer, waehrend auf 7,052 / 3,578 Europa lief.
+    void anrufstellen()
     {
         using DigiFrequenzen::Digimodus;
         QCOMPARE(DigiFrequenzen::anruffrequenz(Band::Band20m, Digimodus::Ft2),
                  qint64(14'084'000));
         QCOMPARE(DigiFrequenzen::anruffrequenz(Band::Band40m, Digimodus::Ft2),
-                 qint64(7'062'000));
+                 qint64(7'052'000));
+        QCOMPARE(DigiFrequenzen::anruffrequenz(Band::Band80m, Digimodus::Ft2),
+                 qint64(3'578'000));
+        QCOMPARE(DigiFrequenzen::anruffrequenz(Band::Band10m, Digimodus::Ft2),
+                 qint64(28'184'000));
         QCOMPARE(DigiFrequenzen::anruffrequenz(Band::Band6m, Digimodus::Ft2),
                  qint64(50'316'000));
         QVERIFY(DigiFrequenzen::stehtSchonDort(14'084'200, Digimodus::Ft2));
