@@ -47,6 +47,8 @@
 #include "models/LogEntry.h"
 #include "core/AppSettings.h"
 #include "core/Ft8Tx.h"
+#include "core/MoxController.h"
+#include <QLabel>
 
 using namespace Longpath;
 
@@ -830,6 +832,129 @@ private slots:
             m.raeumeAuf();
         }
         QCOMPARE(m.aktive(), 1);
+    }
+
+    // =================================================================
+    // Was das GERAET verweigert, darf nicht als gesendet dastehen
+    // =================================================================
+    //
+    // Am Geraet (2026-11-17, Flex, 15 m): der Stehwellenriegel brach die
+    // erste Sendung nach 0,5 s und tastete danach gar nicht mehr —
+    // richtig so. Das Fenster schrieb trotzdem alle 30 s „Tx", zeigte
+    // „transmitting" und liess den Ablauf weiterzaehlen. Betreiber:
+    // „da steht zwar, dass gesendet wird, aber es geht keine Leistung
+    // raus!"
+
+private:
+    /// Wie das Hauptfenster am Flex: beim Umlegen der Hardware wird
+    /// `flexTasten(true)` gerufen. Ohne Verbindung sagt es nein — das
+    /// erste der Tore, und das einzige, das ohne Geraet zu erreichen
+    /// ist. Der Weg des Signals ist fuer alle Tore derselbe.
+    static QMetaObject::Connection tasteWieAmFlex(RadioModel& radio)
+    {
+        return QObject::connect(
+            radio.moxController(), &MoxController::hardwareFlipped,
+            &radio, [&radio](bool isTx) {
+                if (isTx) { radio.flexTasten(true); }
+            });
+    }
+
+    static int txZeilen(Ft8Applet& applet)
+    {
+        int n = 0;
+        const QStringList z = applet.listForTest()->toPlainText()
+                                  .split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+        for (const QString& zeile : z) {
+            if (zeile.contains(QStringLiteral(" Tx "))) { ++n; }
+        }
+        return n;
+    }
+
+private slots:
+
+    void verweigertDasGeraetDasTastenHaeltDerLaufAn()
+    {
+        stelleEin(1);
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        QVERIFY(radio.moxController());
+        tasteWieAmFlex(radio);
+        Ft8Applet applet(&radio);
+        applet.cqVersucheSpinForTest()->setValue(10);
+
+        applet.cqRufenButtonForTest()->click();
+        QVERIFY(applet.sendetGerade());
+        QVERIFY(sendetaktAbgelaufen(applet));
+
+        // Nichts ging hinaus — also steht auch nichts da.
+        QVERIFY2(!applet.sendetGerade(), "das Fenster haelt sich noch fuer sendend");
+        QVERIFY2(!applet.ablaufForTest().laeuft(),
+                 "der Ablauf zaehlt weiter, obwohl nie getastet wurde");
+        QCOMPARE(txZeilen(applet), 0);
+        const QString grund = applet.statusForTest()->text();
+        QVERIFY2(grund.contains(QStringLiteral("not transmitting")),
+                 qPrintable(grund));
+        QVERIFY2(grund.contains(QStringLiteral("no connection")),
+                 qPrintable(grund));
+        // Kein neuer Versuch im naechsten Fenster.
+        QVERIFY(!applet.sendeTimerForTest()->isActive());
+        QTRY_VERIFY(!radio.moxController()->isMox());
+
+        // Und der Grund BLEIBT stehen: der Sekundentakt schrieb sonst
+        // „listening" darueber.
+        QTest::qWait(1300);
+        QCOMPARE(applet.statusForTest()->text(), grund);
+
+        // Ein neuer Ruf raeumt ihn ab.
+        applet.cqRufenButtonForTest()->click();
+        QVERIFY(applet.statusForTest()->text() != grund);
+        applet.stopButtonForTest()->click();
+    }
+
+    void brichtDasGeraetDieSendungHaeltDerLaufAn()
+    {
+        stelleEin(3);
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        applet.cqVersucheSpinForTest()->setValue(10);
+
+        applet.cqRufenButtonForTest()->click();
+        fund(applet, "OE5SOS DL1ABC JO31", -7.0);
+        QVERIFY(sendetaktAbgelaufen(applet));
+        // Getastet, die Sendung laeuft.
+        QVERIFY(applet.sendetGerade());
+        QCOMPARE(txZeilen(applet), 1);
+        QCOMPARE(applet.mehrfachForTest().aktive(), 1);
+
+        // Der Riegel greift mitten in der Sendung.
+        emit radio.flexNichtGetastet(QStringLiteral(
+            "SWR 2.52 is above the 2.50 limit on 15m — transmission stopped"));
+        QTRY_VERIFY(!applet.sendetGerade());
+
+        QVERIFY(!applet.ablaufForTest().laeuft());
+        QCOMPARE(applet.mehrfachForTest().aktive(), 0);
+        QVERIFY(!radio.moxController()->isMox());
+        const QString grund = applet.statusForTest()->text();
+        QVERIFY2(grund.contains(QStringLiteral("SWR 2.52")), qPrintable(grund));
+        QTest::qWait(1300);
+        QCOMPARE(applet.statusForTest()->text(), grund);
+    }
+
+    // Wer am Mikrofon spricht oder abstimmt, waehrend FT8 nur zuhoert,
+    // hat mit diesem Fenster nichts zu tun.
+    void eineFremdeSperreLaesstDasFensterInRuhe()
+    {
+        stelleEin(1);
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+
+        emit radio.flexNichtGetastet(QStringLiteral("SWR 3.00 is above the 2.50 limit"));
+        QTest::qWait(1300);
+        QVERIFY2(!applet.statusForTest()->text().contains(
+                     QStringLiteral("not transmitting")),
+                 qPrintable(applet.statusForTest()->text()));
     }
 };
 

@@ -180,6 +180,15 @@ Ft8Applet::Ft8Applet(RadioModel* model, QWidget* parent)
         // Scheibe darf keinen alten sliceIndex im Abgriff hinterlassen,
         // sonst laeuft der naechste Empfaenger, der diesen Index
         // bekommt, hier herein.
+        // Gereiht, nicht direkt: das Signal kommt mitten aus
+        // MoxController::setMox() (hardwareFlipped -> flexTasten), und
+        // `sendenGescheitert` tastet selbst wieder aus. Was im
+        // Augenblick des Tastens verweigert wird, faengt
+        // `sendeNachricht` ohnehin an Ort und Stelle; hier kommt an,
+        // was WAEHREND der Sendung bricht.
+        connect(m_model, &RadioModel::flexNichtGetastet,
+                this, &Ft8Applet::sendenGescheitert,
+                Qt::QueuedConnection);
         connect(m_model, &RadioModel::sliceRemoved, this, [this](int index) {
             if (m_slice && m_slice->sliceIndex() == index) {
                 setSlice(nullptr);
@@ -1069,6 +1078,7 @@ void Ft8Applet::buildUI()
         m_mehrfach.abbrechen();
         m_ablauf.abbrechen();
         m_cqVersucheOffen = 0;
+        m_festerHinweis.clear();
         abbrechen();
         zeigeAblauf();
     });
@@ -2599,6 +2609,9 @@ void Ft8Applet::sendeNachricht(const QString& text,
                                                  m_periode)
                           + plan.tastenNachMs;
     m_sendet = true;
+    // Ein neuer Versuch: der Grund des letzten Scheiterns ist damit
+    // ueberholt.
+    m_festerHinweis.clear();
     if (m_cqBtn)   { m_cqBtn->setEnabled(false); }
     if (m_stopBtn) { m_stopBtn->setEnabled(true); }
     zeigeKnopfzustand();
@@ -2839,6 +2852,7 @@ void Ft8Applet::sendeNachricht(const QString& text,
         // nichts hinausging. Jetzt bricht der Versuch sofort ab und
         // sagt, woran es lag.
         bool abgelehnt = false;
+        QString geraetSagtNein;
         if (auto* mox = m_model->moxController()) {
             QMetaObject::Connection c = connect(
                 mox, &MoxController::moxRejected, this,
@@ -2848,8 +2862,25 @@ void Ft8Applet::sendeNachricht(const QString& text,
                         m_status->setText(tr("not transmitting: %1").arg(grund));
                     }
                 });
+            // Und was das GERAET verweigert (Stehwelle, Verriegelung,
+            // keine Sendescheibe): das kommt nicht als moxRejected,
+            // sondern aus `flexTasten()` — im selben Aufruf. Nur
+            // merken; gehandelt wird, wenn setMox() zurueck ist.
+            QMetaObject::Connection g = connect(
+                m_model, &RadioModel::flexNichtGetastet, this,
+                [&geraetSagtNein](const QString& grund) {
+                    geraetSagtNein = grund;
+                },
+                Qt::DirectConnection);
             mox->setMox(true);
             disconnect(c);
+            disconnect(g);
+        }
+        if (!geraetSagtNein.isEmpty()) {
+            // Keine „Tx"-Zeile, kein „transmitting": es ging nichts
+            // hinaus.
+            sendenGescheitert(geraetSagtNein);
+            return;
         }
         if (abgelehnt) {
             // abbrechen() setzt den Sendeweg zurueck und macht die
@@ -2900,6 +2931,49 @@ void Ft8Applet::sendeNachricht(const QString& text,
         schluss->start(static_cast<int>(plan.tastdauerMs));
     });
     m_sendeTimer->start(static_cast<int>(wartet));
+}
+
+// ── Das Geraet hat nicht getastet ────────────────────────────────────
+//
+// Am Geraet gemessen (2026-11-17, Flex, 15 m, FT8):
+//   12:30:30.254  MOX an, getastet
+//   12:30:30.772  SENDUNG GEBROCHEN — Stehwelle 2.52 ueber der Grenze 2.5
+//   12:31:00.475  MOX an — nicht getastet, Stehwelle 2.53 ueber 2.50
+//   12:31:30.258  MOX an — nicht getastet …
+//   12:32:00.458  MOX an — nicht getastet …
+// Der Riegel tat, was er soll. Das Fenster aber schrieb zu jeder dieser
+// Zeiten eine „Tx"-Zeile, zeigte „transmitting" und liess den Ablauf
+// weiterzaehlen („calling T77RN — waiting for his report"), als waere
+// der Anruf draussen. Betreiber: „da steht zwar, dass gesendet wird,
+// aber es geht keine Leistung raus!"
+//
+// `moxRejected` weiter unten faengt nur, was der MoxController selbst
+// ablehnt (Bandplan, Betriebsart). Was das GERAET verweigert, kam hier
+// nie an: `flexTasten()` sagt es nur seinem Aufrufer im Hauptfenster.
+//
+// Jetzt haelt der Lauf an, wie bei Stop — ein Ablauf, der Zuege fuer
+// gesendet haelt, die nie hinausgingen, gibt irgendwann auf oder,
+// schlimmer, schreibt ein QSO ins Log, das es nicht gab. Und der Grund
+// bleibt stehen, bis der Betreiber wieder sendet.
+void Ft8Applet::sendenGescheitert(const QString& grund)
+{
+    // Nur die eigene Sendung: wer am Mikrofon spricht oder abstimmt,
+    // waehrend hier nichts laeuft, geht dieses Fenster nichts an.
+    if (!m_sendet) { return; }
+
+    qCWarning(lcFt8Senden).noquote()
+        << "Nicht gesendet:" << grund << "— der Lauf haelt an";
+
+    m_cqAutomatik = false;
+    m_mehrfach.abbrechen();
+    m_ablauf.abbrechen();
+    m_cqVersucheOffen = 0;
+    abbrechen();
+    zeigeAblauf();
+    // NACH zeigeAblauf(): das schreibt selbst in die Statuszeile, und
+    // der Grund stuende sonst keinen Augenblick dort.
+    m_festerHinweis = tr("not transmitting: %1").arg(grund);
+    if (m_status) { m_status->setText(m_festerHinweis); }
 }
 
 void Ft8Applet::abbrechen()
@@ -2971,7 +3045,8 @@ void Ft8Applet::updateStatus()
     // Oben bleibt, WAS zuletzt los war -- im Leerlauf, wie viele Funde
     // die letzte Periode brachte.
     if (!m_ablauf.laeuft() && !m_sendet) {
-        m_status->setText(tr("listening"));
+        m_status->setText(m_festerHinweis.isEmpty() ? tr("listening")
+                                                    : m_festerHinweis);
     }
 
     // Die Arbeitsleiste laeuft mit derselben Uhr: sie zeigt denselben

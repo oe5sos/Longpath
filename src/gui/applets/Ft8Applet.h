@@ -308,6 +308,11 @@ public:
     void abbrechen();
     bool sendetGerade() const { return m_sendet; }
 
+    /// Das Geraet hat nicht getastet oder die Sendung gebrochen
+    /// (`RadioModel::flexNichtGetastet`). Haelt den Lauf an und sagt,
+    /// woran es lag. Ohne eigene Sendung geschieht nichts.
+    void sendenGescheitert(const QString& grund);
+
     // Fuer den Pruefstand.
     QPushButton* cqButtonForTest()  const { return m_cqBtn; }
     QPushButton* stopButtonForTest() const { return m_stopBtn; }
@@ -808,6 +813,11 @@ private:
     /// ist die Vorgabe und entspricht WSJT-X' „Tx even/1st".
     Ft8Periode   m_periode{Ft8Periode::Gerade};
     bool         m_sendet{false};
+    /// Warum zuletzt NICHT gesendet wurde. Bleibt in der Statuszeile
+    /// stehen, bis wieder gesendet oder Stop gedrueckt wird — sonst
+    /// schriebe der Sekundentakt „listening" darueber, und der Grund
+    /// waere nach einer Sekunde weg (siehe `sendenGescheitert`).
+    QString      m_festerHinweis;
 
     // ── Der QSO-Ablauf (2026-10-16) ──────────────────────────────────
     //
