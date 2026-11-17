@@ -8112,6 +8112,7 @@ bool RadioModel::flexTasten(bool tasten)
         m_flexGetastet = false;
         if (tasten) {
             qCWarning(lcConnection) << "Flex: nicht getastet — keine Verbindung";
+            emit flexNichtGetastet(tr("no connection to the radio"));
         }
         return false;
     }
@@ -8129,11 +8130,13 @@ bool RadioModel::flexTasten(bool tasten)
         if (TransverterSetup::current().sperrtSenden()) {
             qCWarning(lcConnection)
                 << "Flex: nicht getastet — Transverter steht auf nur Empfang (IFo2)";
+            emit flexNichtGetastet(tr("the transverter is set to receive only"));
             return false;
         }
         if (m_flexSendescheibenId.isEmpty()) {
             qCWarning(lcConnection)
                 << "Flex: nicht getastet — keine Sendescheibe gesetzt";
+            emit flexNichtGetastet(tr("no transmit slice"));
             return false;
         }
         // ── Abwesenheit ist keine Aussage (2026-10-27) ───────────
@@ -8165,6 +8168,13 @@ bool RadioModel::flexTasten(bool tasten)
                         ? QString()
                         : QStringLiteral(", Grund ") + m_flexVerriegelungsGrund)
                 << ")";
+            emit flexNichtGetastet(
+                m_flexVerriegelungsGrund.isEmpty()
+                    ? tr("the radio's interlock refuses (%1)")
+                          .arg(m_flexVerriegelungsLage)
+                    : tr("the radio's interlock refuses (%1, %2)")
+                          .arg(m_flexVerriegelungsLage,
+                               m_flexVerriegelungsGrund));
             return false;
         }
         if (!m_flexVerriegelungGehoert) {
@@ -8197,6 +8207,11 @@ bool RadioModel::flexTasten(bool tasten)
                     << "(Band" << band << ")";
                 emit flexSwrGesperrt(m_flexSwrRiegel.letzteSwr(),
                                      m_flexSwrRiegel.grenze());
+                emit flexNichtGetastet(
+                    tr("SWR %1 is above the %2 limit on %3")
+                        .arg(m_flexSwrRiegel.letzteSwr(), 0, 'f', 2)
+                        .arg(m_flexSwrRiegel.grenze(), 0, 'f', 2)
+                        .arg(band));
                 return false;
             }
             // Eine neue Sendung faengt ohne alten Bruch an.
@@ -9026,6 +9041,12 @@ void RadioModel::startFlexStreams()
                         flexAbstimmen(false);
                         emit flexSwrGesperrt(float(*swrFuerDenRiegel),
                                              m_flexSwrRiegel.grenze());
+                        emit flexNichtGetastet(
+                            tr("SWR %1 is above the %2 limit on %3 — "
+                               "transmission stopped")
+                                .arg(*swrFuerDenRiegel, 0, 'f', 2)
+                                .arg(m_flexSwrRiegel.grenze(), 0, 'f', 2)
+                                .arg(flexSwrBandKennung()));
                     }
                 }
 
