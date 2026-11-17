@@ -2600,8 +2600,10 @@ bool RotorLogbookPanel::commitEntry(LogEntry e, QWidget* askParent, QString* mes
     // Every service that is set up, not QRZ alone (2026-11-17). The
     // queue answers on a later turn of the event loop, so this line is
     // on screen first and the result replaces it.
-    if (m_uploadQueue && m_uploadQueue->submit(e) > 0) {
+    // GEGENPROBE: die alte Zeile — live nur an QRZ, keine Warteliste.
+    if (m_uploader && m_uploader->isConfigured()) {
         msg += QStringLiteral(" · uploading…");
+        m_uploader->upload(e);
     }
 
     refreshRecentList();
@@ -2704,8 +2706,10 @@ void RotorLogbookPanel::logExternalQso(const LogEntry& entry)
     // The built-in FT8/FT4 arrives here too (Ft8Applet::qsoFertig), so
     // this is the line that sends a digital contact out — to every
     // service that is set up, see commitEntry().
-    if (m_uploadQueue && m_uploadQueue->submit(e) > 0) {
+    // GEGENPROBE: die alte Zeile — live nur an QRZ, keine Warteliste.
+    if (m_uploader && m_uploader->isConfigured()) {
         msg += QStringLiteral(" · uploading…");
+        m_uploader->upload(e);
     }
     setStatus(msg);
     refreshRecentList();
