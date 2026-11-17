@@ -123,6 +123,36 @@ public:
     /// kostet bei jedem Abgleich wieder Arbeit.
     static constexpr int kFt4BlockVersatzMs = 300;
 
+    /// ── FT2: dieselbe Rechnung, eigene Zahlen (2026-11-17) ──────────
+    ///
+    /// Suchband -10..+19 Symbole zu 0,024 s = −240..+456 ms, Mitte
+    /// +108 ms. Gesendet wird FT2 nicht einheitlich:
+    ///
+    ///     WSJT-X Improved 3.1.0  Modulator.cpp:80   delay_ms=150
+    ///     Decodium 4.0           Modulator.cpp:209  0 (Linux) / 300 (sonst)
+    ///
+    /// Der Block beginnt so, dass 150 ms -- die Mitte beider Lager --
+    /// in der Mitte des Bandes liegt: 150 − 108 = 42, auf 40 gerundet.
+    /// Danach reicht das Band von −200 bis +496 ms: 0 ms hat 200 ms
+    /// Luft nach unten, 300 ms knapp 200 nach oben.
+    static constexpr int kFt2BlockVersatzMs = 40;
+
+    /// ── FT2 wird VOR der Fenstergrenze dekodiert ────────────────────
+    ///
+    /// Bei FT8 und FT4 wird an der Grenze dekodiert, und die Antwort
+    /// geht mit der Dekoderfrist (250 ms) in das neue Fenster. Bei FT2
+    /// ist das Fenster 3,75 s lang und die Sendung beginnt 150 ms nach
+    /// der Grenze -- dafuer reicht die Zeit nicht.
+    ///
+    /// WSJT-X Improved dekodiert FT2 nach `23*1728` Proben
+    /// (`widgets/mainwindow.cpp:2646`, `m_hsymStop=23` mit 1728 je
+    /// Schritt), also nach 3,312 s. Dasselbe hier: sobald so viele
+    /// Proben im Fenster liegen, wird ausgewertet und gemeldet; der
+    /// Rest bis zur Grenze wird verworfen. Das letzte Symbol eines
+    /// Signals, das am oberen Rand des Suchbandes beginnt, endet bei
+    /// 40 + (19 + 105) x 24 = 3016 ms -- also liegt es drin.
+    static constexpr int kFt2DekodierProben = 23 * 1728;
+
 signals:
     /// Ein Fenster ist zu Ende und ausgewertet. periodStart ist seine
     /// UTC-Anfangszeit — ohne die laesst sich ein Decode nicht
@@ -138,6 +168,9 @@ signals:
 
 private:
     void schliesseFenster(qint64 endeMs);
+    /// Auswerten, was im Fenster liegt, und melden. Von
+    /// `schliesseFenster` an der Grenze gerufen, bei FT2 schon vorher.
+    void werteAus();
 
     Ft8Decoder::Protocol m_protocol{Ft8Decoder::Protocol::Ft8};
     std::function<qint64()> m_uhr;
@@ -145,6 +178,8 @@ private:
     std::function<QVector<ApVorgabe>()> m_vorwissenQuelle;
     QVector<float> m_fenster;      ///< 12 kHz, laufendes Fenster
     qint64 m_fensterBeginnMs{-1};  ///< UTC, Anfang des laufenden Fensters
+    /// FT2: dieses Fenster ist schon ausgewertet (vor der Grenze).
+    bool m_schonAusgewertet{false};
 };
 
 } // namespace Longpath

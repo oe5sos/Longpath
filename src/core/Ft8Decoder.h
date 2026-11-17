@@ -62,7 +62,28 @@ struct Ft8Decode {
 
 class Ft8Decoder {
 public:
-    enum class Protocol { Ft8, Ft4 };
+    /// FT2 (2026-11-17) ist FT4 mit halber Symboldauer: dieselben
+    /// Toene, dieselbe Codierung, 3,75-s-Takt. Siehe
+    /// third_party/ft8_lib/FT8LIB-PROVENANCE.md, Abschnitt FT2.
+    enum class Protocol { Ft8, Ft4, Ft2 };
+
+    /// FT4 und FT2 teilen den Aufbau (4 Toene, 105 Symbole, XOR-Folge);
+    /// nur die Zeit ist eine andere.
+    static constexpr bool istFt4Aufbau(Protocol p)
+    {
+        return p == Protocol::Ft4 || p == Protocol::Ft2;
+    }
+
+    /// Der Name, wie WSJT-X, Decodium und das Logbuch ihn fuehren.
+    static const char* name(Protocol p)
+    {
+        switch (p) {
+        case Protocol::Ft4: return "FT4";
+        case Protocol::Ft2: return "FT2";
+        case Protocol::Ft8: break;
+        }
+        return "FT8";
+    }
 
     /// Abtastrate, mit der ft8_lib arbeitet. Wer anders abtastet,
     /// rechnet vorher um — hier wird NICHT stillschweigend

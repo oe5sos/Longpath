@@ -133,7 +133,7 @@ QVector<Ft8TxSource::Platz> Ft8Mehrfach::naechsteNachrichten() const
 {
     QVector<Ft8TxSource::Platz> raus;
     const QVector<float> toene =
-        Ft8TxSource::tonleiter(m_grundtonHz, m_laufend.size());
+        Ft8TxSource::tonleiter(m_grundtonHz, m_laufend.size(), m_abstandHz);
 
     for (int i = 0; i < m_laufend.size(); ++i) {
         if (!m_laufend[i].laeuft()) { continue; }
@@ -196,7 +196,7 @@ QVector<Ft8Mehrfach::Belegung> Ft8Mehrfach::belegung() const
 {
     QVector<Belegung> raus;
     const QVector<float> toene =
-        Ft8TxSource::tonleiter(m_grundtonHz, m_laufend.size());
+        Ft8TxSource::tonleiter(m_grundtonHz, m_laufend.size(), m_abstandHz);
     for (int i = 0; i < m_laufend.size(); ++i) {
         Belegung b;
         b.partner = m_laufend[i].partner();

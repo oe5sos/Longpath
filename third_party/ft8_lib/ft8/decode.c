@@ -189,8 +189,8 @@ static int ft4_sync_score(const ftx_waterfall_t* wf, const ftx_candidate_t* cand
 
 int ftx_find_candidates(const ftx_waterfall_t* wf, int num_candidates, ftx_candidate_t heap[], int min_score)
 {
-    int (*sync_fun)(const ftx_waterfall_t*, const ftx_candidate_t*) = (wf->protocol == FTX_PROTOCOL_FT4) ? ft4_sync_score : ft8_sync_score;
-    int num_tones = (wf->protocol == FTX_PROTOCOL_FT4) ? 4 : 8;
+    int (*sync_fun)(const ftx_waterfall_t*, const ftx_candidate_t*) = (FTX_PROTOCOL_IS_FT4_FAMILY(wf->protocol)) ? ft4_sync_score : ft8_sync_score;
+    int num_tones = (FTX_PROTOCOL_IS_FT4_FAMILY(wf->protocol)) ? 4 : 8;
 
     int heap_size = 0;
     ftx_candidate_t candidate;
@@ -336,7 +336,7 @@ bool ftx_decode_candidate_ap(const ftx_waterfall_t* wf, const ftx_candidate_t* c
                              ftx_message_t* message, ftx_decode_status_t* status)
 {
     float log174[FTX_LDPC_N]; // message bits encoded as likelihood
-    if (wf->protocol == FTX_PROTOCOL_FT4)
+    if (FTX_PROTOCOL_IS_FT4_FAMILY(wf->protocol))
     {
         ft4_extract_likelihood(wf, cand, log174);
     }
@@ -403,7 +403,7 @@ bool ftx_decode_candidate_ap(const ftx_waterfall_t* wf, const ftx_candidate_t* c
     // Reuse CRC value as a hash for the message (TODO: 14 bits only, should perhaps use full 16 or 32 bits?)
     message->hash = status->crc_calculated;
 
-    if (wf->protocol == FTX_PROTOCOL_FT4)
+    if (FTX_PROTOCOL_IS_FT4_FAMILY(wf->protocol))
     {
         // '[..] for FT4 only, in order to avoid transmitting a long string of zeros when sending CQ messages,
         // the assembled 77-bit message is bitwise exclusive-OR’ed with [a] pseudorandom sequence before computing the CRC and FEC parity bits'

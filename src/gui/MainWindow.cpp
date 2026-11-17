@@ -17464,9 +17464,7 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
     // lcContainer, weil MainWindow in dieser Datei ohnehin darueber
     // meldet; eine eigene Kategorie fuer drei Zeilen waere eine mehr,
     // die man beim Suchen kennen muesste.
-    const QString wasName = (modus == DigiFrequenzen::Digimodus::Ft4)
-                                ? QStringLiteral("FT4")
-                                : QStringLiteral("FT8");
+    const QString wasName = QLatin1String(DigiFrequenzen::name(modus));
 
     // ── Und MERKEN, was gemeint war (2026-10-31) ────────────────────
     //
@@ -17633,9 +17631,13 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
     //    Fenster auf einem Band, das im 7,5-s-Takt sendet. Das Fenster
     //    haette geschwiegen, und niemand haette gewusst, warum.
     if (m_ft8Applet) {
-        m_ft8Applet->setProtocol(modus == DigiFrequenzen::Digimodus::Ft4
-                                     ? Ft8Decoder::Protocol::Ft4
-                                     : Ft8Decoder::Protocol::Ft8);
+        Ft8Decoder::Protocol p = Ft8Decoder::Protocol::Ft8;
+        if (modus == DigiFrequenzen::Digimodus::Ft4) {
+            p = Ft8Decoder::Protocol::Ft4;
+        } else if (modus == DigiFrequenzen::Digimodus::Ft2) {
+            p = Ft8Decoder::Protocol::Ft2;
+        }
+        m_ft8Applet->setProtocol(p);
     }
 
     // Und die Lampe in der Leiste sagt, was der Dekoder tut
@@ -17787,8 +17789,7 @@ void MainWindow::profilBetriebsartStellen()
         }
         qCInfo(lcContainer).noquote()
             << "Profil" << name << "ist an"
-            << (*digi == DigiFrequenzen::Digimodus::Ft4
-                    ? QStringLiteral("FT4") : QStringLiteral("FT8"))
+            << QLatin1String(DigiFrequenzen::name(*digi))
             << "gebunden — Betriebsart wird gestellt.";
         aufDigiStellen(*digi);
         return;

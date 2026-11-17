@@ -16,10 +16,10 @@
 
 namespace Longpath {
 
-void Ft8Uhrversatz::setzeFt4(bool ft4)
+void Ft8Uhrversatz::setzeVerfahren(Verfahren v)
 {
-    if (ft4 == m_ft4) { return; }
-    m_ft4 = ft4;
+    if (v == m_verfahren) { return; }
+    m_verfahren = v;
     // Der Spielraum aendert sich, also taugen die alten Perioden
     // nicht mehr als Beleg fuer das neue Urteil.
     leere();
@@ -60,8 +60,15 @@ Ft8Uhrversatz::Lage Ft8Uhrversatz::lage() const
 {
     if (!hatUrteil()) { return Lage::Unbekannt; }
     const double v = std::abs(versatzSek());
-    const double schlecht   = m_ft4 ? kSchlechtFt4   : kSchlechtFt8;
-    const double auffaellig = m_ft4 ? kAuffaelligFt4 : kAuffaelligFt8;
+    double schlecht   = kSchlechtFt8;
+    double auffaellig = kAuffaelligFt8;
+    if (m_verfahren == Verfahren::Ft4) {
+        schlecht   = kSchlechtFt4;
+        auffaellig = kAuffaelligFt4;
+    } else if (m_verfahren == Verfahren::Ft2) {
+        schlecht   = kSchlechtFt2;
+        auffaellig = kAuffaelligFt2;
+    }
     if (v >= schlecht)   { return Lage::Schlecht; }
     if (v >= auffaellig) { return Lage::Auffaellig; }
     return Lage::Ok;

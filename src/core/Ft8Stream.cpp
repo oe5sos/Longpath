@@ -48,6 +48,7 @@ void Ft8Stream::setProtocol(Ft8Decoder::Protocol p)
     // falsch ausgerichtet.
     m_fenster.clear();
     m_fensterBeginnMs = -1;
+    m_schonAusgewertet = false;
 }
 
 void Ft8Stream::setClock(std::function<qint64()> utcMs)
@@ -62,7 +63,12 @@ void Ft8Stream::setVorwissenQuelle(std::function<QVector<ApVorgabe>()> quelle)
 
 int Ft8Stream::slotMs() const
 {
-    return m_protocol == Ft8Decoder::Protocol::Ft4 ? 7500 : 15000;
+    switch (m_protocol) {
+    case Ft8Decoder::Protocol::Ft4: return 7500;
+    case Ft8Decoder::Protocol::Ft2: return 3750;
+    case Ft8Decoder::Protocol::Ft8: break;
+    }
+    return 15000;
 }
 
 void Ft8Stream::poll()
@@ -112,24 +118,46 @@ void Ft8Stream::feedAudio(const float* interleavedStereo, int frames)
                                                         aus.size());
         for (int i = 0; i < geschrieben; ++i) { m_fenster.append(aus[i]); }
     }
+
+    // FT2: nicht auf die Grenze warten -- siehe Ft8Stream.h,
+    // kFt2DekodierProben.
+    if (m_protocol == Ft8Decoder::Protocol::Ft2 && !m_schonAusgewertet
+        && m_fenster.size() >= kFt2DekodierProben) {
+        werteAus();
+        m_schonAusgewertet = true;
+    }
 }
 
 void Ft8Stream::schliesseFenster(qint64 neuerBeginnMs)
 {
-    const QDateTime beginn =
-        QDateTime::fromMSecsSinceEpoch(m_fensterBeginnMs, Qt::UTC);
-
     // Zu kurz? Dann war es ein angebrochenes Fenster — das erste nach
     // dem Einschalten etwa. Nichts melden, nur weiterzaehlen.
     const int nötig = Ft8Decoder::kSampleRate * (slotMs() / 2) / 1000;
-    if (m_fenster.size() >= nötig) {
+    if (!m_schonAusgewertet && m_fenster.size() >= nötig) {
+        werteAus();
+    }
+
+    m_fenster.clear();
+    m_fensterBeginnMs = neuerBeginnMs;
+    m_schonAusgewertet = false;
+}
+
+void Ft8Stream::werteAus()
+{
+    const QDateTime beginn =
+        QDateTime::fromMSecsSinceEpoch(m_fensterBeginnMs, Qt::UTC);
+    {
         // Bei FT4 beginnt der Block spaeter als das Fenster — siehe
         // Ft8Stream.h, kFt4BlockVersatzMs, mit der Messung dazu. Die
         // Laengenpruefung oben zaehlt weiter das GANZE Fenster: ob
         // genug Ton da ist, hat mit dem Suchband nichts zu tun.
+        // FT2 ebenso, mit eigener Zahl (kFt2BlockVersatzMs).
         int versatz = 0;
         if (m_protocol == Ft8Decoder::Protocol::Ft4) {
             versatz = qMin(Ft8Decoder::kSampleRate * kFt4BlockVersatzMs / 1000,
+                           m_fenster.size());
+        } else if (m_protocol == Ft8Decoder::Protocol::Ft2) {
+            versatz = qMin(Ft8Decoder::kSampleRate * kFt2BlockVersatzMs / 1000,
                            m_fenster.size());
         }
         // ── Wie viele Runden ueber dasselbe Fenster ──────────────────
@@ -172,16 +200,12 @@ void Ft8Stream::schliesseFenster(qint64 neuerBeginnMs)
             << QStringLiteral("Fenster: %1 Funde, %2 Runde(n), %3")
                    .arg(funde.size())
                    .arg(durchgaenge)
-                   .arg(m_protocol == Ft8Decoder::Protocol::Ft4
-                            ? QStringLiteral("FT4") : QStringLiteral("FT8"));
+                   .arg(QLatin1String(Ft8Decoder::name(m_protocol)));
 
         // Auch leer melden: ein stilles Fenster ist eine Aussage, ein
         // ausbleibendes Fenster ein Fehler. Siehe Ft8Stream.h.
         emit decoded(funde, beginn);
     }
-
-    m_fenster.clear();
-    m_fensterBeginnMs = neuerBeginnMs;
 }
 
 } // namespace Longpath

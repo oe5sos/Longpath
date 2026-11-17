@@ -62,10 +62,15 @@ public:
         Schlecht     ///< so gehen Funde verloren
     };
 
+    /// Welches Verfahren gehoert wird. Die Schwellen haengen daran.
+    enum class Verfahren { Ft8, Ft4, Ft2 };
+    void setzeVerfahren(Verfahren v);
+    Verfahren verfahren() const { return m_verfahren; }
+
     /// FT4 hat dieselben Symbolzahlen bei einem Drittel Symboldauer,
     /// also ein Drittel Spielraum. Die Schwellen muessen mitgehen.
-    void setzeFt4(bool ft4);
-    bool istFt4() const { return m_ft4; }
+    void setzeFt4(bool ft4) { setzeVerfahren(ft4 ? Verfahren::Ft4 : Verfahren::Ft8); }
+    bool istFt4() const { return m_verfahren == Verfahren::Ft4; }
 
     /// Ein Fund der laufenden Periode.
     void merke(double dtSek);
@@ -100,13 +105,23 @@ public:
     /// FT4: ein Drittel davon, abgerundet auf runde Zahlen.
     static constexpr double kAuffaelligFt4 = 0.25;
     static constexpr double kSchlechtFt4   = 0.50;
+    /// FT2 (2026-11-17): das Suchband ist −10..+19 Symbole zu 0,024 s
+    /// ab Blockbeginn; weil ft8_lib den Anfang um ein Symbol spaet
+    /// meldet (tests/tst_ft2.cpp), erscheint es als −0,22 … +0,48 s.
+    /// NICHT einfach die Haelfte von FT4: Decodium sendet auf dem Mac
+    /// 300 ms nach der Grenze (Modulator.cpp:213), das erscheint hier
+    /// schon als +0,288 s und ist trotzdem in Ordnung -- auch mit
+    /// etwas Laufzeit im Tonweg. Auffaellig ab 0,35 s; schlecht ab
+    /// 0,45 s, ein Symbol vor dem oberen Rand.
+    static constexpr double kAuffaelligFt2 = 0.35;
+    static constexpr double kSchlechtFt2   = 0.45;
 
 private:
     static double median(std::vector<double> werte);
 
     std::vector<double> m_laufend;
     std::deque<double>  m_perioden;
-    bool                m_ft4{false};
+    Verfahren           m_verfahren{Verfahren::Ft8};
 };
 
 }  // namespace Longpath

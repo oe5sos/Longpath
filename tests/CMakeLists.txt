@@ -5926,6 +5926,9 @@ longpath_add_test(tst_scheibenflagge)
 # 2026-10-15: FT8/FT4 nativ — Nachricht hin, Nachricht zurueck, ohne
 # Tondatei und ohne Funkgeraet.
 longpath_add_test(tst_ft8_dekodiert)
+# 2026-11-17: FT2 -- FT4 im doppelten Tempo. Gegen MSHVs eigene
+# Tonfolgen und dessen GFSK-Rechnung, dazu Takt, Sendeplan, Anrufstellen.
+longpath_add_test(tst_ft2)
 # ── 2026-10-31: die dB-Spalte war der Sync-Score ────────────────────
 # Gegen Signale mit BEKANNTEM Stoerabstand gefahren (0 bis −19 dB),
 # damit eine neue Rechnung nicht wieder bloss plausibel aussieht.

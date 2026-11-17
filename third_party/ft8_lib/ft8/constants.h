@@ -14,6 +14,16 @@ extern "C"
 #define FT4_SYMBOL_PERIOD (0.048f) ///< FT4 symbol duration, defines tone deviation in Hz and symbol rate
 #define FT4_SLOT_TIME     (7.5f)   ///< FT4 slot period
 
+// Longpath-Erweiterung (2026-11-17): FT2 ist FT4 mit halber Symboldauer.
+// Gleiche Toene, gleiche Synchronfolgen, gleiche Codierung -- nur
+// 288 statt 576 Proben je Symbol bei 12 kHz und ein 3,75-s-Takt.
+// Belegt in drei unabhaengigen Quellen (siehe FT8LIB-PROVENANCE.md):
+//   Decodium 4.0  widgets/mainwindow.cpp  m_toneSpacing=12000.0/288.0, m_TRperiod=3.75
+//   Decodium 4.0  Modulator/FtxMessageEncoder.cpp  map_ft2_ft4_tones (eine Abbildung fuer beide)
+//   MSHV 2.76.7   HvGenFt2/gen_ft2.cpp  nsym=103, nsps=4*288 bei 48 kHz, icos4a..d wie FT4
+#define FT2_SYMBOL_PERIOD (0.024f) ///< FT2 symbol duration (288 samples at 12 kHz)
+#define FT2_SLOT_TIME     (3.75f)  ///< FT2 slot period
+
 // Define FT8 symbol counts
 // FT8 message structure:
 //     S D1 S D2 S
@@ -52,8 +62,13 @@ extern "C"
 typedef enum
 {
     FTX_PROTOCOL_FT4,
-    FTX_PROTOCOL_FT8
+    FTX_PROTOCOL_FT8,
+    FTX_PROTOCOL_FT2 ///< Longpath-Erweiterung: FT4-Aufbau, halbe Symboldauer
 } ftx_protocol_t;
+
+/// FT2 teilt mit FT4 alles ausser der Zeit. Jede Stelle, die nach dem
+/// Aufbau fragt (Toene, Sync, XOR-Folge), fragt hiermit.
+#define FTX_PROTOCOL_IS_FT4_FAMILY(p) ((p) == FTX_PROTOCOL_FT4 || (p) == FTX_PROTOCOL_FT2)
 
 /// Costas 7x7 tone pattern for synchronization
 extern const uint8_t kFT8_Costas_pattern[7];

@@ -66,7 +66,8 @@ bool Ft8TxSource::vorbereiten(const QString& text,
     return !m_proben.isEmpty();
 }
 
-QVector<float> Ft8TxSource::tonleiter(float grundTonHz, int anzahl)
+QVector<float> Ft8TxSource::tonleiter(float grundTonHz, int anzahl,
+                                      float abstandHz)
 {
     // MSHV gen_ft8.cpp:262-264 [GPLv3, LZ2HV]:
     //   double f0 = f_tx + (60.0*(double)islot);
@@ -76,7 +77,7 @@ QVector<float> Ft8TxSource::tonleiter(float grundTonHz, int anzahl)
     if (anzahl <= 0) { return aus; }
     aus.reserve(anzahl);
     for (int i = 0; i < anzahl; ++i) {
-        float f0 = grundTonHz + kPlatzAbstandHz * static_cast<float>(i);
+        float f0 = grundTonHz + abstandHz * static_cast<float>(i);
         if (f0 < kMinTonHz) { f0 = kMinTonHz; }
         if (f0 > kMaxTonHz) { f0 = kMaxTonHz; }
         aus.append(f0);
