@@ -211,6 +211,25 @@ Richtigkeit — eigens geprüft in `falschesVorwissenErfindetKeinQso`.
 Die Masken selbst stehen NICHT hier, sondern in `src/core/Ft8Apriori.h`:
 sie hängen an Rufzeichen und Betriebsart, nicht am fremden Quelltext.
 
+#### Nachtrag 2026-11-18: bei FT4 und FT2 half das Vorwissen nie
+
+Die Vorgabe (`Ft8Apriori`) kommt als Klartext der 77 Nachrichtenbits.
+FT4 und FT2 verwürfeln die Nachricht aber vor CRC und LDPC mit
+`kFT4_XOR_sequence` (`encode.c`, `ft4_encode`; MSHV `gen_ft2.cpp`
+`rvec`; WSJT-X `ft4_decode.f90` setzt `apbits` aus
+`mod(msgbits+rvec,2)`). Im Codewort steht also Nachricht XOR Folge —
+die Vorgabe zeigte an jeder Stelle mit einer 1 in der Folge auf den
+falschen Wert. Der CRC verhinderte falsche Funde; der Gewinn fehlte
+ganz.
+
+`ft8/decode.c`, `ftx_decode_candidate_ap`: bei
+`FTX_PROTOCOL_IS_FT4_FAMILY` werden die vorgegebenen Bits 0..76 vor dem
+Einsetzen mit der Folge verknüpft. FT8 unverändert.
+
+Gemessen (`tests/tst_ft2.cpp`, FT2, −13,5 dB, 16 Rauschwürfel,
+„OE5SOS SP6CA R-09" mit MeinRufUndSeiner): ohne Vorwissen 1 Fund, mit
+Vorwissen 8. Gegenprobe ohne die Verknüpfung: 1 zu 1.
+
 ### Erweiterung: Typ 5 SENDEN — 2026-11-04
 
 | Datei | Was |

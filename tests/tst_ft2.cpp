@@ -50,7 +50,14 @@
 #include "core/Ft8Stream.h"
 #include "core/Ft8Tx.h"
 #include "core/Ft8Uhrversatz.h"
+#include "core/AppSettings.h"
+#include "core/Ft8Apriori.h"
+#include "gui/applets/Ft8Applet.h"
 #include "models/Band.h"
+#include "models/LogEntry.h"
+#include "models/RadioModel.h"
+
+#include <QPushButton>
 
 extern "C" {
 #include "ft8/constants.h"
@@ -501,6 +508,155 @@ private slots:
                      qPrintable(QStringLiteral("dt %1, Umtaster %2 s")
                                     .arg(double(d.dtSeconds)).arg(umtaster)));
         }
+    }
+
+    // ── Der Sendeweg, gegen den eigenen Empfaenger ─────────────────
+    //
+    // Die Tonquelle, die am Funkgeraet haengt (Ft8TxSource, 48 kHz),
+    // nach dem Sendeplan gestartet -- und was herauskommt, durch
+    // DENSELBEN Strom, der am Band hoert. Prueft Kodierer, Umtaster
+    // 12 -> 48 kHz, Sprung ueber die Stille (probenAbMs) und Takt in
+    // einem Lauf. Ein Fehler irgendwo darin heisst: niemand liest uns.
+    void derSendewegWirdVomEigenenEmpfaengerGelesen()
+    {
+        const QString text = QStringLiteral("CQ OE5SOS JN78");
+        const auto p = Ft8Decoder::Protocol::Ft2;
+        Ft8TxSource quelle(48000);
+        QVERIFY(quelle.vorbereiten(text, 1500.0f, p));
+        // Ein FT2-Fenster bei 48 kHz: 3,75 s = 180 000 Proben -- abzueglich
+        // des Anlaufs des Umtasters (r8brain, ~1700 Proben bei 12 kHz,
+        // siehe Gedaechtnis „Umtaster schluckt"). Ob dabei die Zeitlage
+        // verrutscht, prueft der Zeitversatz unten, nicht diese Zahl.
+        QVERIFY2(quelle.probenImFenster() > 170000
+                     && quelle.probenImFenster() <= 180000,
+                 qPrintable(QString::number(quelle.probenImFenster())));
+
+        const Ft8Tx::Sendeplan plan = Ft8Tx::sendeplan(
+            p, Ft8Tx::dekoderFristMs(p), Ft8Tx::zielVersatzMs(p), 300);
+        quelle.starten(plan.probenAbMs);
+
+        // Getastet ab tastenNachMs nach der Grenze; davor Stille.
+        const int rate = 48000;
+        QVector<float> mono(rate * kFensterMs / 1000 * 2, 0.0f);
+        int pos = rate * int(plan.tastenNachMs) / 1000;
+        const int ende = pos + rate * int(plan.tastdauerMs) / 1000;
+        QVector<float> puffer(960);
+        while (quelle.laeuft() && pos < ende && pos + 960 <= mono.size()) {
+            const int n = quelle.pullSamples(puffer.data(), 960);
+            for (int i = 0; i < n; ++i) { mono[pos + i] = puffer[i]; }
+            pos += n;
+        }
+        QVector<float> stereo;
+        stereo.reserve(mono.size() * 2);
+        for (float v : mono) { stereo << v << v; }
+
+        Ft8Stream strom;
+        strom.setProtocol(p);
+        qint64 jetzt = 999999990000LL;
+        const qint64 grenze = jetzt;
+        strom.setClock([&jetzt]() { return jetzt; });
+        QSignalSpy spion(&strom, &Ft8Stream::decoded);
+        for (int i = 0; i + 960 <= mono.size(); i += 960) {
+            jetzt = grenze + qint64(i) * 1000 / rate;
+            strom.feedAudio(stereo.constData() + 2 * i, 960);
+        }
+        QVERIFY(spion.count() >= 1);
+        const auto funde = spion.at(0).at(0).value<QVector<Longpath::Ft8Decode>>();
+        qInfo() << "eigene Sendung gelesen:" << wortlaute(funde);
+        QVERIFY2(wortlaute(funde).contains(text),
+                 qPrintable(wortlaute(funde).join(QLatin1String(" | "))));
+        // Und der Ton liegt dort, wo der Plan ihn hinlegt: 150 ms nach
+        // der Grenze -> dt = 0,11 s + ein Symbol (ft8_lib meldet spaet).
+        const double soll = (plan.tonBeiMs - Ft8Stream::kFt2BlockVersatzMs) / 1000.0
+                            + FT2_SYMBOL_PERIOD;
+        QVERIFY2(std::abs(double(funde.first().dtSeconds) - soll) < 0.03,
+                 qPrintable(QStringLiteral("dt %1, Plan %2")
+                                .arg(double(funde.first().dtSeconds)).arg(soll)));
+    }
+
+    // ── Ein ganzes QSO im Dekoderfenster, bis ins Logbuch ──────────────
+    //
+    // Derselbe Ablauf wie bei FT8/FT4 (tst_ft8_senden,
+    // einQsoAusDerAnruferRolle), mit FT2 gewaehlt -- und der
+    // Logbucheintrag traegt MFSK/FT2, wie WSJT-X Improved und Decodium.
+    void einFt2QsoLandetAlsMfskImLogbuch()
+    {
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        applet.setProtocol(Ft8Decoder::Protocol::Ft2);
+        QCOMPARE(applet.protocol(), Ft8Decoder::Protocol::Ft2);
+        AppSettings::instance().setValue(QStringLiteral("User/Callsign"),
+                                         QStringLiteral("OE5SOS"));
+        AppSettings::instance().setValue(QStringLiteral("User/GridSquare"),
+                                         QStringLiteral("JN67VV"));
+
+        QSignalSpy gemeldet(&applet, &Ft8Applet::qsoFertig);
+        applet.cqRufenButtonForTest()->click();
+        QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::RufeCq);
+
+        const auto fund = [&applet](const char* text) {
+            Ft8Decode d;
+            d.text   = QString::fromLatin1(text);
+            d.snrDb  = -5.0;
+            d.freqHz = 1500.0;
+            applet.fundForTest(d);
+        };
+        fund("OE5SOS SP6CA JO80");
+        QCOMPARE(applet.ablaufForTest().partner(), QStringLiteral("SP6CA"));
+        QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::SendeReport);
+        fund("OE5SOS SP6CA R-09");
+        QCOMPARE(applet.ablaufForTest().zustand(), Ft8Ablauf::Zustand::SendeRR73);
+        applet.fensterZuEndeForTest();
+        QCOMPARE(gemeldet.count(), 1);
+
+        const auto e = gemeldet.first().first().value<LogEntry>();
+        QCOMPARE(e.call, QStringLiteral("SP6CA"));
+        QCOMPARE(e.mode, QStringLiteral("MFSK"));
+        QCOMPARE(e.submode, QStringLiteral("FT2"));
+        QCOMPARE(e.rstRcvd, QStringLiteral("-09"));
+        applet.abbrechen();
+    }
+
+    // ── Das Vorwissen hilft auch bei FT2 (2026-11-18) ───────────────
+    //
+    // Die A-priori-Bits kommen als Klartext; FT4 und FT2 verwuerfeln
+    // die Nachricht vor dem LDPC mit kFT4_XOR_sequence. Ohne Umrechnung
+    // zeigte die Vorgabe dort auf falsche Werte, und das Vorwissen half
+    // NIE. Gezaehlt ueber viele Rauschwuerfel an der Grenze des
+    // Dekoders: mit Vorwissen muessen deutlich mehr Funde kommen.
+    void dasVorwissenHilftAuchBeiFt2()
+    {
+        const QString text = QStringLiteral("OE5SOS SP6CA R-09");
+        QVector<float> gemittet;
+        QVERIFY(Ft8Decoder::encodeBlock(text, 1500.0f,
+                                        Ft8Decoder::Protocol::Ft2, &gemittet));
+        const int nutz   = int(0.5 + FT4_NN * FT2_SYMBOL_PERIOD * kRate);
+        const int stille = (gemittet.size() - nutz) / 2;
+        const QVector<float> signal = gemittet.mid(stille, nutz);
+        QVector<float> f = fensterMit(signal, kRate, 150);
+        f.resize(Ft8Stream::kFt2DekodierProben);
+        const int von = kRate * 150 / 1000;
+
+        const QVector<ApVorgabe> vorwissen = {
+            baueApVorgabe(ApTyp::MeinRufUndSeiner, QStringLiteral("OE5SOS"),
+                          QStringLiteral("SP6CA")) };
+        QVERIFY(vorwissen.first().brauchbar);
+
+        int ohne = 0, mit = 0;
+        const int wuerfe = 16;
+        for (int saat = 1; saat <= wuerfe; ++saat) {
+            const QVector<float> ton = mitRauschen(f, von, nutz, -13.5, uint32_t(saat));
+            if (wortlaute(Ft8Stream::dekodiereFt2(ton.constData(), ton.size()))
+                    .contains(text)) { ++ohne; }
+            const auto ap = Ft8Stream::dekodiereFt2(ton.constData(), ton.size(), 0,
+                                                    vorwissen);
+            if (wortlaute(ap).contains(text)) { ++mit; }
+        }
+        qInfo() << "FT2 -13,5 dB, von" << wuerfe << "Wuerfen: ohne Vorwissen"
+                << ohne << "mit Vorwissen" << mit;
+        QVERIFY2(mit >= ohne + 4,
+                 qPrintable(QStringLiteral("ohne %1, mit %2").arg(ohne).arg(mit)));
     }
 
     // ── Der Sendeplan ────────────────────────────────────────────────
