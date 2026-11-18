@@ -8693,6 +8693,17 @@ void MainWindow::populateDefaultMeter()
             p->logExternalQso(e);
         }
     });
+    // Die Rotor/Log-Karte folgt dem laufenden FT8-Partner (2026-11-18):
+    // Name, Ort, Foto neben dem FT8-Feld, wie Zeus' Rufzeichenkarte.
+    // Ohne Fokus und ohne zu drehen; was der Betreiber getippt hat,
+    // bleibt -- siehe RotorLogbookPanel::folgeFt8Partner. Nur an ein
+    // Feld, das schon da ist: ensureRotorPanel() wuerde es erst anlegen,
+    // und ein Partnerwechsel soll kein neues Fenster aufmachen.
+    connect(m_ft8Applet, &Ft8Applet::partnerGewechselt, this,
+            [this](const QString& partner) {
+        if (partner.isEmpty() || !m_rotorPanel) { return; }
+        m_rotorPanel->folgeFt8Partner(partner);
+    });
 
     // Ft8PlaetzeApplet (2026-10-30) -- was auf den Plaetzen laeuft.
     //

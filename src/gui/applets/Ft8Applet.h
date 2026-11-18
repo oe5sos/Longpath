@@ -466,6 +466,17 @@ signals:
     /// abliefern.
     void fundAngenommen(const QString& zeile, const QString& partner);
 
+    /// Der QSO-Partner des Ablaufs hat gewechselt (2026-11-18) -- auf
+    /// JEDEM Weg, nicht nur per Doppelklick oder Karte wie
+    /// `fundAngenommen`: ein Antworter auf mein CQ, der naechste aus der
+    /// Schlange, ein Doppelklick. Leer heiszt: keiner mehr (ein neues
+    /// CQ). Gemeldet aus `meldeStand()` und nur bei echtem Wechsel.
+    /// Die Rotor/Log-Karte haengt daran (MainWindow), damit Name, Ort
+    /// und Foto des Partners neben dem FT8-Feld stehen, wie bei Zeus.
+    /// Mehrfach-Betrieb meldet hier nichts: dort fuehrt `m_ablauf` nur
+    /// den CQ-Ruf.
+    void partnerGewechselt(const QString& partner);
+
     /// Jede gehoerte Station mit Rufzeichen, je Fund (2026-11-11). Die
     /// QSO-Karte haengt daran (ueber Ft8KartenBruecke).
     void gehoert(const Longpath::Ft8Gehoert& g);
@@ -850,6 +861,9 @@ private:
     /// jedem Schritt, und der Zustand bleibt auf Fertig stehen — ohne
     /// diese Wache stuende dasselbe QSO mehrfach im Logbuch.
     bool         m_qsoGemeldet{false};
+    /// Der zuletzt mit `partnerGewechselt` gemeldete Partner. Ohne ihn
+    /// ginge das Signal bei jedem Zug hinaus, nicht nur beim Wechsel.
+    QString      m_gemeldeterPartner;
     /// Laeuft der Ruf vom CQ-Knopf? Dann geht es nach einem fertigen
     /// QSO von selbst weiter. Ein Doppelklick in die Fundliste ist
     /// eine Einzelentscheidung und setzt das zurueck, „Stop“ ebenso.

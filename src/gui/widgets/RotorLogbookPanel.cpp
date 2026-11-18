@@ -1446,6 +1446,48 @@ void RotorLogbookPanel::takeSpot(const QString& call)
     }
 }
 
+// 2026-11-18: dem FT8-Partner folgen. Begruendung der drei Unterschiede
+// zu takeSpot() am Kopf der Deklaration.
+void RotorLogbookPanel::folgeFt8Partner(const QString& call)
+{
+    QString c = call.trimmed().toUpper();
+    // Spitze Klammern sagen „kam als Hash" -- im Rufzeichenfeld sind sie
+    // nur im Weg (QRZ kennt sie nicht, die Pruefung lehnt sie ab).
+    c.remove(QLatin1Char('<')).remove(QLatin1Char('>'));
+    if (c.isEmpty()) { return; }
+
+    const QString steht = m_callEdit->text().trimmed().toUpper();
+    const bool frei = steht.isEmpty()
+                      || (!m_ft8Partner.isEmpty() && steht == m_ft8Partner);
+    if (!frei) { return; }          // getippt oder per Spot: bleibt
+    m_ft8Partner = c;
+    if (steht == c) { return; }
+
+    // Was zum VORIGEN Partner gehoerte, geht mit ihm. onCallsignEdited
+    // raeumt nur bei leerem Feld auf; ein Rufzeichen, das ein anderes
+    // ersetzt, liesse sonst Foto und Locator des alten stehen -- und
+    // fehlt der neue bei QRZ, stuende das fremde Gesicht neben ihm.
+    // Ein von Hand getippter Locator bleibt (wie in adoptGridFromQrz).
+    // Die Stationszeile ebenso: onCallsignEdited ueberschreibt sie nur,
+    // wenn cty.dat das Prefix aufloest -- sonst stuende der Name des
+    // vorigen Partners neben dem neuen (im Pruefstand gefunden).
+    m_lastInfo = CallsignInfo{};
+    m_flagEmoji.clear();
+    m_stationLine->clear();
+    m_photo->showPlaceholder(QString{});
+    m_photo->setVisible(false);
+    if (!m_dxGridIsManual) {
+        m_adoptingGrid = true;
+        m_dxGrid->clear();
+        m_adoptingGrid = false;
+    }
+
+    // Derselbe Weg wie das Tippen: Land, Flagge, Peilung aus cty.dat,
+    // dann QRZ mit Schalter, Entprellung und Cache. Kein setFocus(),
+    // kein beginTurn().
+    m_callEdit->setText(c);
+}
+
 void RotorLogbookPanel::openRotorSetupDialog()
 {
     ensureRotor();

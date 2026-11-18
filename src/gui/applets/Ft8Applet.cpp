@@ -3301,6 +3301,17 @@ void Ft8Applet::meldeStand()
     // Plaetze-Panel bekommt den Stand, die QSO-Karte zeichnet „THEN".
     zeigeDann();
     emit plaetzeGeaendert(baueStand());
+
+    // Der Partner fuer die Rotor/Log-Karte (2026-11-18). Hier und nicht
+    // an den Stellen, an denen er gesetzt wird: das sind fuenf (Doppel-
+    // klick, Karte, Antwort auf mein CQ, Schlange, Hound), und jede
+    // endet ohnehin in diesem Aufruf. Mit Plaetzen fuehrt `m_ablauf`
+    // nur den CQ-Ruf -- dort bleibt es vorerst still.
+    const QString partner = mehrfachAn() ? QString() : m_ablauf.partner();
+    if (partner != m_gemeldeterPartner) {
+        m_gemeldeterPartner = partner;
+        emit partnerGewechselt(partner);
+    }
 }
 
 // Der Absender einer FT8-Nachricht.
