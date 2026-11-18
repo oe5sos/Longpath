@@ -14128,14 +14128,14 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         // wurden trotzdem in JEDEM Bild neu hineingeschoben. Die Listen
         // wuchsen ueber die ganze Sitzung und wurden erst beim Beenden
         // abgeraeumt. Dasselbe fuer die Fuellung, wenn sie aus ist.
-        const bool kurveWirdGezeichnet =
-            m_renderMode != SpectrumRenderMode::Mode3D
-            && m_fftFillPipeline && m_fftLinePipeline;
-        if (kurveWirdGezeichnet) {
+        const KurvenPuffer puffer = kurvenPufferFuellen(
+            m_renderMode, m_fftFillPipeline && m_fftLinePipeline, m_panFill,
+            m_peakHoldEnabled && m_pxPeakHold.size() == m_renderedPixels.size());
+        if (puffer.linie) {
             batch->updateDynamicBuffer(m_fftLineVbo, 0,
                 static_cast<size_t>(n) * 2 * kFftVertStride * nStrips * sizeof(float), lineVerts.constData());
         }
-        if (kurveWirdGezeichnet && m_panFill) {
+        if (puffer.fuellung) {
             batch->updateDynamicBuffer(m_fftFillVbo, 0,
                 n * 2 * kFftVertStride * sizeof(float), fillVerts.constData());
         }
@@ -14146,9 +14146,7 @@ void SpectrumWidget::renderGpuFrame(QRhiCommandBuffer* cb)
         // m_peakHoldHasData.  Per-display-pixel array (m_pxPeakHold) is
         // sized to m_renderedPixels in updateSpectrumLinear.
         m_peakHoldHasData = false;
-        if (kurveWirdGezeichnet
-            && m_peakHoldEnabled && m_pxPeakHold.size() == m_renderedPixels.size()
-            && m_fftPeakVbo) {
+        if (puffer.peakHold && m_fftPeakVbo) {
             // Same ribbon treatment as the live trace above, but
             // narrower -- 0.75x the line width, matching the CPU/
             // QPainter fallback's own convention (drawSpectrum():
