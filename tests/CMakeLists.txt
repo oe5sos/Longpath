@@ -5219,6 +5219,16 @@ longpath_add_test(tst_metric_label)
 # CPU survives PA updates, clearing both hides row one, PA label override.
 longpath_add_test(tst_system_tile)
 
+# ── Temperaturen der Geraete im Kopf (2026-11-18) ─────────────────────────
+# DeviceTemperatureStrip + DeviceTemperatureFeed + ihr Platz in TitleBar:
+# ohne Messwert steht nichts da, mit Messwert erscheint der Eintrag, ohne
+# verschwindet er, mehrere Geraete stehen in fester Reihenfolge
+# nebeneinander, eine Warnstufe nur auf Meldung des Geraets (SPE). Dazu
+# ein Zeichenwerkzeug (`blaetter`), das den Kopf mit Beispielwerten als
+# PNG ablegt; es braucht LONGPATH_GRAB_DIR UND LONGPATH_ENTWURF=1 (die CI
+# setzt den ersten global) und ueberspringt sich sonst.
+longpath_add_test(tst_device_temperature_strip)
+
 # ── Shell-Chrome Redesign sub-PR-1: StationBlock widget ───────────────────
 # 5 tests: default/setRadioName/empty-name appearance switching, click +
 # right-click signal emission gated on appearance.

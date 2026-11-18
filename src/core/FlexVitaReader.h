@@ -315,12 +315,17 @@ QVector<FlexMeterSample> meterSamples(const QByteArray& datagram);
 // 27,3 V (ausserhalb von 10,5…15,0) und mit /256 13,65 V. Das ist
 // genau das, was eine 13,8-V-Schiene liest.
 //
-// Fuer degC, RPM und Amps ist NICHTS belegt: dort liegen beide
-// Teiler im erklaerten Bereich, der Bereich entscheidet also nichts.
-// Belegen wuerde das erst eine herbeigefuehrte Aenderung (senden,
-// bis die Endstufe warm wird) — nicht geschehen. Deshalb gibt
-// `meterScaled` fuer diese Einheiten `std::nullopt` zurueck statt
+// Fuer RPM und Amps ist NICHTS belegt: dort liegen mehrere Teiler
+// im erklaerten Bereich, der Bereich entscheidet also nichts. Deshalb
+// gibt `meterScaled` fuer diese Einheiten `std::nullopt` zurueck statt
 // einer Zahl, die gut aussieht und geraten ist (HAUSSTIL Regel 7).
+//
+// degC stand bis 2026-11-18 in derselben Reihe. „Belegen wuerde das
+// erst eine herbeigefuehrte Aenderung (senden, bis die Endstufe warm
+// wird)" hiess es hier — genau die liegt seit dem FT8-Betrieb jenes
+// Tages im Protokoll: roh 1405 in Ruhe, roh 2479 warm. Nur /64 ergibt
+// dafuer eine Maschine, die nicht kaelter ist als ihr Zimmer (22,0 und
+// 38,7 Grad). Einzelheiten an der Funktion.
 std::optional<double> meterScaled(qint16 raw, const QString& unit);
 
 }  // namespace FlexVita
