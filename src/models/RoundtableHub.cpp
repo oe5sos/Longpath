@@ -618,7 +618,14 @@ void RoundtableHub::syncSpots(bool /*refreshAll*/)
 
 RoundtableHub::LinkState RoundtableHub::linkState() const
 {
-    return m_client->linkState();
+    return m_linkStateForTest ? *m_linkStateForTest : m_client->linkState();
+}
+
+void RoundtableHub::setLinkStateForTest(LinkState state, qint64 sinceMs)
+{
+    m_linkStateForTest = state;
+    m_linkSince = sinceMs;
+    emit stateChanged();
 }
 
 QString RoundtableHub::mentionCounts() const

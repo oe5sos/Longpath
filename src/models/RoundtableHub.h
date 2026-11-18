@@ -84,6 +84,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 
 namespace Longpath {
 
@@ -208,6 +209,10 @@ public:
     void pollMetersForTest() { pollMeters(); }
     /// Pruefstand ohne Funkgeraet: die gemeldeten Scheiben direkt setzen.
     void setSlicesForTest(const QList<RoundtableSliceState>& slices);
+    /// Pruefstand ohne Server: der Verbindungszustand, den Modell und
+    /// Panel lesen (nicht der des Clients; die Verben pruefen weiter den
+    /// echten). Wie Upstreams RoundtableState::applyStationValue.
+    void setLinkStateForTest(LinkState state, qint64 sinceMs = 0);
 
     /// Aus den Scheiben die Liste, die `presence` meldet: aktive zuerst,
     /// fremde Empfaenger weg. Rein, fuer den Pruefstand.
@@ -270,6 +275,7 @@ private:
 
     // Stufe 2: Zustand wie Upstream RoundtableState.
     LinkState m_linkState = LinkState::Off;
+    std::optional<LinkState> m_linkStateForTest;
     qint64 m_linkSince = 0;
     QList<RoundtableSliceState> m_sliceStates;
     QJsonObject m_sliceRooms;
