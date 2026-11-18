@@ -3851,6 +3851,20 @@ void SpotHubDialog::setHoveredPanadapterSpot(int spotIdx)
 //
 // Gestaltung vorlaeufig: dieselben Bausteine wie der POTA-Reiter, keine
 // neue Farbe ausser der Vorgabe der Spots (Style::kSpotRoundtableDefault).
+void SpotHubDialog::reloadSourceVisibility()
+{
+    const auto& s = AppSettings::instance();
+    const QString prefix = QStringLiteral("displaySourceShow_");
+    for (QCheckBox* cb : findChildren<QCheckBox*>()) {
+        if (!cb->objectName().startsWith(prefix)) { continue; }
+        const QString source = cb->objectName().mid(prefix.size());
+        const bool on = s.value(QStringLiteral("SpotSourceVisible/") + source,
+                                QStringLiteral("True")).toString()
+                        == QStringLiteral("True");
+        cb->setChecked(on);
+    }
+}
+
 void SpotHubDialog::attachRoundtable(RoundtableHub* hub)
 {
     if (hub == nullptr || m_roundtable != nullptr || m_tabs == nullptr) {
