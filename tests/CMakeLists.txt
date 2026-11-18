@@ -6494,6 +6494,15 @@ longpath_add_test(tst_widget_picker)
 longpath_add_test(tst_layout_profiles)
 longpath_add_test(tst_profilschiene_bindung)
 
+# -- Werksvorgabe der Layoutprofile (2026-11-18): eine frische Sandkiste
+#    bekommt Martins Profile N und F, wer schon welche hat, nie; nichts
+#    Privates in der Ressource, kein Fenster ausserhalb von 1440x900 --
+longpath_add_test(tst_werksprofile)
+if(TEST tst_werksprofile)
+    set_tests_properties(tst_werksprofile PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 # -- Der Rundgang durch ein ECHTES MainWindow, nicht durch ein blosses
 #    QVariantMap an Haken (das deckt tst_layout_profiles.cpp bereits ab,
 #    und genau DAS haette den Bandwidth-Filter-Fehler vom 2026-08-30

@@ -278,6 +278,21 @@ public:
     void load();
     static QString settingsKey();
 
+    /// Werksvorgabe fuer eine frische Installation (Betreiber 2026-11-18:
+    /// „ich finde, dass mein standard profil auch als ausgangsbasis
+    /// herangezogen werden soll"). Liest `json` im Format von save()
+    /// (Vorgabe: die Ressource `:/layout/werksprofile.json`, gezogen mit
+    /// tools/werksprofile_ziehen.py) und uebernimmt sie -- aber NUR, wenn
+    /// noch gar nichts da ist: keine Profile im Speicher UND kein
+    /// Eintrag `LayoutProfiles` in den Einstellungen. Wer schon Profile
+    /// hat, auch nach einem Update, und auch wer einen beschaedigten
+    /// Eintrag hat (load() laesst den absichtlich stehen), bekommt sie
+    /// nie. Aktiv wird Profil 1 (Startregel vom 2026-11-12). Sichert
+    /// selbst, wendet NICHT an -- das macht der Aufrufer mit
+    /// applyCurrent(). false: nichts uebernommen.
+    bool ladeWerksvorgabe(const QByteArray& json);
+    static QString werksvorgabePfad();
+
 signals:
     void profilesChanged();
     void currentChanged(const QString& name);
@@ -298,6 +313,10 @@ private:
     /// steht und nicht an zweien auseinanderlaufen kann.
     bool createInternal(const QString& name,
                         const std::optional<QVariantMap>& given);
+
+    /// Der Leseteil von load(), auch fuer ladeWerksvorgabe(). false
+    /// bei kaputtem JSON; dann bleibt alles, wie es war.
+    bool ausJsonUebernehmen(const QByteArray& raw);
 
     Profile* find(const QString& name);
     const Profile* find(const QString& name) const;
