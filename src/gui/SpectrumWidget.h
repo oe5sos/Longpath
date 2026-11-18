@@ -461,6 +461,31 @@ public:
 
     // ---- 3D stacked-trace view ----
     void setSpectrumRenderMode(SpectrumRenderMode mode);
+
+    /// Welche Puffer der 2D-Kurve in diesem Bild gefuellt werden duerfen.
+    /// Nur, was im selben Bild auch gezeichnet wird: Metal haelt jede
+    /// Aenderung an einem dynamischen Puffer mit einer Kopie der Daten
+    /// vor, bis der Puffer in einem Zeichenbefehl gebunden wird. Ein
+    /// Puffer, der gefuellt, aber nie gezeichnet wird, sammelt ueber die
+    /// Sitzung an (2026-11-18 gemessen: 23 GB, Beenden 64 s).
+    struct KurvenPuffer {
+        bool linie{false};
+        bool fuellung{false};
+        bool peakHold{false};
+    };
+    static KurvenPuffer kurvenPufferFuellen(SpectrumRenderMode modus,
+                                            bool pipelinesDa,
+                                            bool fuellungAn,
+                                            bool peakHoldBereit)
+    {
+        KurvenPuffer p;
+        // Im 3D-Modus zeichnet der Durchgang die 2D-Kurve nicht.
+        const bool kurve = (modus != SpectrumRenderMode::Mode3D) && pipelinesDa;
+        p.linie    = kurve;
+        p.fuellung = kurve && fuellungAn;
+        p.peakHold = kurve && peakHoldBereit;
+        return p;
+    }
     SpectrumRenderMode spectrumRenderMode() const { return m_renderMode; }
     /// True: every row of the surface keeps the full width, so a ridge
     /// stands above the frequency it belongs to and matches the waterfall
@@ -795,7 +820,12 @@ public:
     // Display calibration offset added to every bin before it's mapped
     // to screen Y. Ported from Thetis Display.RX1DisplayCalOffset
     // (display.cs:1372). Range: -30 .. +30 dB.
-    void setDbmCalOffset(float db);
+    //
+    // `merken = false` fuer den Wert, den das Geraet selbst liefert
+    // (RadioModel::rxMeterOffsetChanged): er wird bei jedem Start und bei
+    // jedem Wechsel neu gerechnet und muss nicht in die Einstellungsdatei.
+    // Siehe setDbmCalOffset() in der .cpp fuer die Messung dazu.
+    void setDbmCalOffset(float db, bool merken = true);
     float dbmCalOffset() const { return m_dbmCalOffset; }
 
     // Trace colour (Phase 3G-8 commit 6 wiring). Single colour used for
