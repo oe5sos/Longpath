@@ -246,7 +246,7 @@ constexpr int kBoxHeight = 46;
 QString buttonStyle()
 {
     return QStringLiteral(
-               "QPushButton { background: %1; border: 1px solid %2; border-radius: 3px;"
+               "QPushButton { background: %1; border: 1px solid %2; border-radius: 7px;"
                "  color: %3; font-size: 11px; padding: 2px 8px; }"
                "QPushButton:hover { border-color: %4; color: %5; }"
                "QPushButton:disabled { color: %6; border-color: %7; }")
@@ -257,7 +257,7 @@ QString buttonStyle()
 QString primaryStyle()
 {
     return QStringLiteral(
-               "QPushButton { background: %1; border: 1px solid %2; border-radius: 3px;"
+               "QPushButton { background: %1; border: 1px solid %2; border-radius: 7px;"
                "  color: %3; font-size: 11px; font-weight: bold; padding: 2px 10px; }"
                "QPushButton:hover { background: %4; }"
                "QPushButton:disabled { background: %5; border-color: %6; color: %7; }")
@@ -293,7 +293,7 @@ QString mentionPillStyle()
 QString iconStyle()
 {
     return QStringLiteral(
-               "QToolButton { background: transparent; border: 1px solid transparent; border-radius: 3px;"
+               "QToolButton { background: transparent; border: 1px solid transparent; border-radius: 7px;"
                "  color: %1; font-size: 13px; padding: 0 4px; }"
                "QToolButton:hover { color: %2; border-color: %3; }"
                "QToolButton::menu-indicator { image: none; width: 0; }")
@@ -359,7 +359,7 @@ QString inputStyle()
 {
     return QStringLiteral(
                "QLineEdit, QPlainTextEdit { background: %1; border: 1px solid %2;"
-               "  border-radius: 3px; color: %3; font-size: 13px; padding: 2px 5px;"
+               "  border-radius: 7px; color: %3; font-size: 13px; padding: 2px 5px;"
                "  placeholder-text-color: %4; }"
                "QLineEdit:focus, QPlainTextEdit:focus { border-color: %5; }"
                "QLineEdit:disabled, QPlainTextEdit:disabled { color: %6; border-color: %7; }")
@@ -368,13 +368,11 @@ QString inputStyle()
              role(Style::kDisabledText, "disabled-text"), role(Style::kDisabledBorder, "disabled-border"));
 }
 
-// The monospace fallback chain the workspace's own instruments use, so a
-// machine without the first family still gets a fixed-pitch one (the
-// offscreen platform's system FixedFont on the Mac is proportional).
-QString mono()
-{
-    return QLatin1String(LP_MONO_QSS);
-}
+// The monospace fallback chain the workspace's own instruments use
+// (LP_MONO_QSS, written into labelStyle as a literal: Longpath's
+// tst_schriftfamilien wants no font family by hand), so a machine without
+// the first family still gets a fixed-pitch one (the offscreen platform's
+// system FixedFont on the Mac is proportional).
 
 QString labelStyle(const QString& color, int px, bool bold, bool isMono)
 {
@@ -385,7 +383,7 @@ QString labelStyle(const QString& color, int px, bool bold, bool isMono)
         style += QStringLiteral(" font-weight: bold;");
     }
     if (isMono) {
-        style += QStringLiteral(" font-family: %1;").arg(mono());
+        style += QStringLiteral(" font-family: " LP_MONO_QSS ";");
     }
     return style;
 }
@@ -3260,7 +3258,7 @@ void RoundtablePanel::rebuildMessages(const QJsonObject& room)
             chip->setToolTip(QStringLiteral("Their reading of the talker when they sent it"));
             chip->setStyleSheet(chip->styleSheet()
                                 + QStringLiteral(" background: %1; border: 1px solid %2;"
-                                                 " border-radius: 3px; padding: 0 4px;")
+                                                 " border-radius: 4px; padding: 0 4px;")
                                       .arg(role(Style::kInsetBg, "inset"), role(Style::kInsetBorder, "inset-border")));
             top->addWidget(chip);
         }

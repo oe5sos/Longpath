@@ -96,7 +96,7 @@ QString listStyle()
 QString searchStyle()
 {
     return QStringLiteral(
-               "QLineEdit { background: %1; border: 1px solid %2; border-radius: 3px;"
+               "QLineEdit { background: %1; border: 1px solid %2; border-radius: 7px;"
                "  color: %3; font-size: 13px; padding: 2px 5px; margin: 6px 8px;"
                "  placeholder-text-color: %4; }"
                "QLineEdit:focus { border-color: %5; }")
