@@ -133,6 +133,22 @@ constexpr qint64 kDekoderFristMs = 250;
 /// 0,68 s neben der Norm.
 constexpr qint64 kZielVersatzMs = 500;
 
+// ── FT2 hat eigene Zahlen (2026-11-17) ───────────────────────
+//
+// Die beiden Werte oben gelten fuer FT8 und FT4. FT2 dekodiert vor
+// der Grenze und beginnt 150 ms danach; Herleitung in
+// `Ft8Tx::zielVersatzMs` und `Ft8Tx::dekoderFristMs`.
+qint64 dekoderFrist(Ft8Decoder::Protocol p)
+{
+    return p == Ft8Decoder::Protocol::Ft2 ? Ft8Tx::dekoderFristMs(p)
+                                          : kDekoderFristMs;
+}
+qint64 zielVersatz(Ft8Decoder::Protocol p)
+{
+    return p == Ft8Decoder::Protocol::Ft2 ? Ft8Tx::zielVersatzMs(p)
+                                          : kZielVersatzMs;
+}
+
 /// Nachlauf, damit der letzte Ton wirklich draussen ist, bevor der
 /// Sender abschaltet.
 constexpr qint64 kSenderNachlaufMs = 300;
@@ -309,6 +325,22 @@ void Ft8Applet::buildUI()
         setProtocol(Ft8Decoder::Protocol::Ft4);
     });
     head->addWidget(m_ft4Btn);
+
+    // ── FT2 (2026-11-17) ─────────────────────────────────────
+    //
+    // Betreiber: „es gibt 2 open source FT2 Programme, bitte baue
+    // diese in longpath ein" -- WSJT-X Improved 3.1 und Decodium 4.0.
+    // Ein dritter Knopf derselben Art, kein eigenes Fenster: FT2 ist
+    // FT4 im doppelten Tempo und teilt mit den beiden alles bis auf
+    // die Uhr.
+    m_ft2Btn = blueToggle(QStringLiteral("FT2"), 48);
+    m_ft2Btn->setCheckable(true);
+    m_ft2Btn->setToolTip(tr("3.75 second periods (FT2)"));
+    connect(m_ft2Btn, &QPushButton::clicked, this, [this]() {
+        emit digiGewuenscht(DigiFrequenzen::Digimodus::Ft2);
+        setProtocol(Ft8Decoder::Protocol::Ft2);
+    });
+    head->addWidget(m_ft2Btn);
 
     // ── Hound: eine DX-Expedition rufen (2026-10-30) ──────────
     //
@@ -1110,9 +1142,10 @@ void Ft8Applet::setProtocol(Ft8Decoder::Protocol p)
     const bool wechsel = m_stream && m_stream->protocol() != p;
 
     if (m_stream) { m_stream->setProtocol(p); }
-    const bool ft4 = (p == Ft8Decoder::Protocol::Ft4);
-    if (m_ft8Btn) { m_ft8Btn->setChecked(!ft4); }
-    if (m_ft4Btn) { m_ft4Btn->setChecked(ft4); }
+    m_mehrfach.setAbstandHz(Ft8TxSource::platzAbstandHz(p));
+    if (m_ft8Btn) { m_ft8Btn->setChecked(p == Ft8Decoder::Protocol::Ft8); }
+    if (m_ft4Btn) { m_ft4Btn->setChecked(p == Ft8Decoder::Protocol::Ft4); }
+    if (m_ft2Btn) { m_ft2Btn->setChecked(p == Ft8Decoder::Protocol::Ft2); }
     m_lastPeriodCount = -1;
     if (wechsel) {
         leereFuerNeuenOrt(ft4 ? QStringLiteral("FT4") : QStringLiteral("FT8"));
@@ -1210,11 +1243,17 @@ void Ft8Applet::folgeDerSkala(double skalaHz)
         hz, DigiFrequenzen::Digimodus::Ft4);
     const bool ft8 = DigiFrequenzen::stehtSchonDort(
         hz, DigiFrequenzen::Digimodus::Ft8);
-    if (ft4 == ft8) { return; }   // keine Anrufstelle: Wahl bleibt
+    const bool ft2 = DigiFrequenzen::stehtSchonDort(
+        hz, DigiFrequenzen::Digimodus::Ft2);
+    // Genau EINE Anrufstelle muss passen; keine oder zwei (die
+    // Tafel haelt sie 2 kHz auseinander, aber ein weiter Spielraum
+    // koennte zwei treffen) heisst: die Wahl des Betreibers bleibt.
+    if (int(ft4) + int(ft8) + int(ft2) != 1) { return; }
     const Ft8Decoder::Protocol soll = ft4 ? Ft8Decoder::Protocol::Ft4
+                                    : ft2 ? Ft8Decoder::Protocol::Ft2
                                           : Ft8Decoder::Protocol::Ft8;
     if (protocol() == soll) { return; }
-    const QString name = ft4 ? QStringLiteral("FT4") : QStringLiteral("FT8");
+    const QString name = QLatin1String(Ft8Decoder::name(soll));
     qCInfo(lcFt8Senden).noquote()
         << "Skala" << hz << "Hz steht auf der" << name
         << "-Anrufstelle — der Dekoder folgt";
@@ -1815,7 +1854,7 @@ bool Ft8Applet::sucheFreieStelle(bool nurWennBelegt)
         return false;
     }
 
-    const int abstand = int(Ft8TxSource::kPlatzAbstandHz);
+    const int abstand = int(Ft8TxSource::platzAbstandHz(protocol()));
     if (nurWennBelegt && !stelleBelegt(belegt, alt, abstand)) {
         return false;
     }
@@ -1867,6 +1906,7 @@ QVector<Ft8TxSource::Platz> Ft8Applet::mehrfachPlaetze()
 {
     m_mehrfach.setEigeneDaten(eigenesRufzeichen(), eigenerLocator());
     m_mehrfach.setGrundtonHz(float(m_sendeTonHz));
+    m_mehrfach.setAbstandHz(Ft8TxSource::platzAbstandHz(protocol()));
     QVector<Ft8TxSource::Platz> plaetze = m_mehrfach.naechsteNachrichten();
 
     // ── Der CQ-Ruf ist ein Platz, kein zweiter Ablauf ─────────
@@ -1899,7 +1939,8 @@ QVector<Ft8TxSource::Platz> Ft8Applet::mehrfachPlaetze()
             // ueberlagern sich zu Matsch, und beide sind weg.
             const QVector<float> toene =
                 Ft8TxSource::tonleiter(float(m_sendeTonHz),
-                                       Ft8Mehrfach::kMaxPlaetze);
+                                       Ft8Mehrfach::kMaxPlaetze,
+                                       Ft8TxSource::platzAbstandHz(protocol()));
             float frei = 0.0f;
             for (const float t : toene) {
                 bool belegtVonPlatz = false;
@@ -1957,8 +1998,15 @@ LogEntry Ft8Applet::logEintrag(const Ft8Ablauf& ablauf,
     TransverterSetup::logbuchFrequenz(std::llround(hz), &e.freqMHz, &e.band);
 
     // ADIF kennt FT8 und FT4 als eigene Betriebsarten — kein SUBMODE.
-    e.mode = p == Ft8Decoder::Protocol::Ft4
-                 ? QStringLiteral("FT4") : QStringLiteral("FT8");
+    e.mode = QLatin1String(Ft8Decoder::name(p));
+    // FT2 dagegen ist (noch) kein ADIF-Modus: beide Vorbilder schreiben
+    // MODE=MFSK, SUBMODE=FT2 -- WSJT-X Improved `logbook/logbook.cpp:
+    // 125-131`, Decodium `src/bridge/DecodiumAdifSupport.cpp:60-66`.
+    // So landet der Kontakt bei LoTW/QRZ als dasselbe wie bei ihnen.
+    if (p == Ft8Decoder::Protocol::Ft2) {
+        e.mode    = QStringLiteral("MFSK");
+        e.submode = QStringLiteral("FT2");
+    }
 
     // In FT8 ist der Rapport die Signalstaerke in dB, nicht RST. So
     // schreibt WSJT-X ihn auch: „-12", „+03".
@@ -2654,8 +2702,8 @@ void Ft8Applet::sendeNachricht(const QString& text,
     // und niemand sonst.
     const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
     const Ft8Tx::Sendeplan plan =
-        Ft8Tx::sendeplan(protocol(), kDekoderFristMs,
-                         kZielVersatzMs, kSenderNachlaufMs);
+        Ft8Tx::sendeplan(protocol(), dekoderFrist(protocol()),
+                         zielVersatz(protocol()), kSenderNachlaufMs);
     const qint64 wartet = Ft8Tx::bisZumNaechsten(jetzt, protocol(),
                                                  m_periode)
                           + plan.tastenNachMs;
@@ -3107,9 +3155,11 @@ void Ft8Applet::updateStatus()
                                    m_sendet);
     }
     if (m_arbeitUhr) {
+        // FT2 dauert 3,75 s -- mit einer Stelle stuende „3.8" da.
+        const int stellen = (m_stream->slotMs() % 100 == 0) ? 1 : 2;
         m_arbeitUhr->setText(QStringLiteral("%1 / %2 s")
                                  .arg(sekunden, 0, 'f', 1)
-                                 .arg(voll, 0, 'f', 1));
+                                 .arg(voll, 0, 'f', stellen));
     }
 }
 
@@ -3418,8 +3468,18 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
     // bleibt nur der gemeinsame Anteil stehen, und der ist der
     // eigene. `setzeFt4` zuerst: ein Protokollwechsel leert, was
     // zum alten Fenster gehoerte.
-    m_uhrversatz.setzeFt4(protocol() == Ft8Decoder::Protocol::Ft4);
+    m_uhrversatz.setzeVerfahren(
+        protocol() == Ft8Decoder::Protocol::Ft4 ? Ft8Uhrversatz::Verfahren::Ft4
+        : protocol() == Ft8Decoder::Protocol::Ft2 ? Ft8Uhrversatz::Verfahren::Ft2
+                                                  : Ft8Uhrversatz::Verfahren::Ft8);
     for (const Ft8Decode& d : funde) {
+        // FT2: Decodium sendet asynchron (Ft8Stream.h), seine Sendungen
+        // liegen irgendwo im Fenster -- ueber die eigene Uhr sagen sie
+        // nichts. Nur was im Raster liegt (WSJT-X Improved), zaehlt.
+        if (protocol() == Ft8Decoder::Protocol::Ft2
+            && (d.dtSeconds < -0.3f || d.dtSeconds > 1.0f)) {
+            continue;
+        }
         m_uhrversatz.merke(double(d.dtSeconds));
     }
     m_uhrversatz.periodeFertig();
@@ -3430,8 +3490,7 @@ void Ft8Applet::onDecoded(const QVector<Longpath::Ft8Decode>& funde,
     if (funde.isEmpty()) { return; }
 
     const QString uhrzeit = periodStart.toUTC().toString(QStringLiteral("HHmmss"));
-    const QString modus = protocol() == Ft8Decoder::Protocol::Ft4
-        ? QStringLiteral("FT4") : QStringLiteral("FT8");
+    const QString modus = QLatin1String(Ft8Decoder::name(protocol()));
     // Die Wahlfrequenz der Scheibe liegt in Hz; der Fund steht als
     // Tonlage IM Durchlassbereich. Erst zusammen ergeben sie die
     // Frequenz, unter der das Rufzeichen im Logbuch steht.
@@ -3676,9 +3735,7 @@ bool Ft8Applet::istNeuesLand(const QString& senderRuf) const
     auto* dxcc = m_model->dxccColorProvider();
     if (!dxcc->isEnabled()) { return false; }
     const double mhz = (m_slice ? m_slice->frequency() : 0.0) / 1.0e6;
-    const QString modus = protocol() == Ft8Decoder::Protocol::Ft4
-                              ? QStringLiteral("FT4")
-                              : QStringLiteral("FT8");
+    const QString modus = QLatin1String(Ft8Decoder::name(protocol()));
     return dxcc->statusForSpot(senderRuf, mhz, modus) == DxccStatus::NewDxcc;
 }
 
@@ -3941,11 +3998,12 @@ void Ft8Applet::zeigeUhrversatz()
            "does not change it.")
             .arg(m_uhrversatz.periodenGezaehlt())
             .arg(zahl)
-            .arg(m_uhrversatz.istFt4()
+            .arg(m_uhrversatz.verfahren() == Ft8Uhrversatz::Verfahren::Ft4
                      ? QStringLiteral("\u22120.48 \u2026 +0.91")
+                 : m_uhrversatz.verfahren() == Ft8Uhrversatz::Verfahren::Ft2
+                     ? QStringLiteral("\u22120.24 \u2026 +0.94")
                      : QStringLiteral("\u22121.60 \u2026 +3.04"))
-            .arg(m_uhrversatz.istFt4() ? QStringLiteral("FT4")
-                                       : QStringLiteral("FT8")));
+            .arg(QLatin1String(Ft8Decoder::name(protocol()))));
     m_uhrWarnung->setVisible(true);
 }
 
@@ -4042,9 +4100,7 @@ void Ft8Applet::zeigeZeile(const QString& zeile, const QString& nachricht,
     z.neuesLand = istNeuesLand(senderRuf);
     if (z.neuesLand) {
         const double mhz = (m_slice ? m_slice->frequency() : 0.0) / 1.0e6;
-        const QString modus = protocol() == Ft8Decoder::Protocol::Ft4
-                                  ? QStringLiteral("FT4")
-                                  : QStringLiteral("FT8");
+        const QString modus = QLatin1String(Ft8Decoder::name(protocol()));
         z.landFarbe = m_model->dxccColorProvider()
                           ->colorForSpot(senderRuf, mhz, modus);
     }

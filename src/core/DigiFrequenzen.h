@@ -6,7 +6,7 @@
 // src/core/DigiFrequenzen.h  (Longpath)
 // =================================================================
 //
-// Wo auf einem Band FT8 und FT4 liegen.
+// Wo auf einem Band FT8, FT4 und FT2 liegen.
 //
 // Betreiber am 2026-10-21, vor der Antenne stehend: „ich will nicht
 // die freq suchen" und „quasi wie jtdx". Genau das ist hier gemeint:
@@ -39,7 +39,19 @@ namespace Longpath::DigiFrequenzen {
 enum class Digimodus {
     Ft8,
     Ft4,
+    Ft2,   ///< 2026-11-17, Anrufstellen aus Decodium 4.0 (siehe .cpp)
 };
+
+/// Der Name, wie ihn Knopf, Leiste und Logbuch zeigen.
+inline const char* name(Digimodus modus)
+{
+    switch (modus) {
+    case Digimodus::Ft4: return "FT4";
+    case Digimodus::Ft2: return "FT2";
+    case Digimodus::Ft8: break;
+    }
+    return "FT8";
+}
 
 /// Die Anrufstelle (Skalenfrequenz, Hertz) fuer Band und Betriebsart.
 ///
@@ -51,6 +63,9 @@ enum class Digimodus {
 qint64 anruffrequenz(Band band, Digimodus modus);
 
 /// Ob die Skalenfrequenz schon auf der Anrufstelle ihres Bandes steht.
+/// Bei FT2 zaehlen auch die weiteren gueltigen Stellen (7,062, 3,568,
+/// 4 m, 70 cm, 23 cm -- siehe DigiFrequenzen.cpp), auf die der Knopf
+/// selbst nicht stellt.
 ///
 /// Mit Spielraum, weil ein Geraet nicht immer auf das Hertz genau
 /// meldet (und weil der Betreiber von Hand ein paar hundert Hertz

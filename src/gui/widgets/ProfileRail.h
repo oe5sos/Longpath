@@ -182,6 +182,7 @@ private:
         QAction* importFromDesktop{nullptr};
         QAction* ft8{nullptr};
         QAction* ft4{nullptr};
+        QAction* ft2{nullptr};
         QAction* ren{nullptr};
         QAction* dup{nullptr};
         QAction* del{nullptr};
@@ -199,7 +200,7 @@ public:
     /// vergleicht, faellt um, sobald eine Uebersetzung geladen ist
     /// oder Qt ein Mnemonic anhaengt -- auf dem einen Rechner gruen,
     /// auf dem anderen rot, und der Grund steht nirgends.
-    enum class Eintrag { UseForFt8, UseForFt4, Save, Rename, Delete };
+    enum class Eintrag { UseForFt8, UseForFt4, UseForFt2, Save, Rename, Delete };
 
     /// Nur fuer Prueflaeufe: den Menueweg fahren, ohne `exec()`.
     /// Baut das Menue wie beim Rechtsklick, haekelt den Eintrag an

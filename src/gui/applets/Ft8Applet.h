@@ -433,6 +433,7 @@ public:
     int             sendeTonHzForTest() const { return m_sendeTonHz; }
     QPushButton*    ft8ButtonForTest() const { return m_ft8Btn; }
     QPushButton*    ft4ButtonForTest() const { return m_ft4Btn; }
+    QPushButton*    ft2ButtonForTest() const { return m_ft2Btn; }
     int             lastPeriodCountForTest() const { return m_lastPeriodCount; }
 
     /// Der Rufzeichen-Absender aus einer FT8-Nachricht, oder leer.
@@ -812,6 +813,7 @@ private:
 
     QPushButton*    m_ft8Btn{nullptr};
     QPushButton*    m_ft4Btn{nullptr};
+    QPushButton*    m_ft2Btn{nullptr};
     QPushButton*    m_clearBtn{nullptr};
 
     // Senden

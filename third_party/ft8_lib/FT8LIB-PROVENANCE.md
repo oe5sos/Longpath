@@ -55,6 +55,47 @@ gleich.
 | `common/gfsk.c:60,68` | `dphi[n_wave + 2*n_spsym]`, `pulse[3*n_spsym]` | `malloc`/`free`, einmal je Aussendung |
 | `ft8/message.c` | `stpcpy()` (POSIX, fehlt in MSVCs Bibliothek) | Ersatz unter `#ifdef _MSC_VER` |
 
+### Erweiterung: FT2 — 2026-11-17
+
+**Warum:** Betreiber: „es gibt 2 open source FT2 Programme, bitte baue
+diese in longpath ein" — WSJT-X Improved 3.1.0 (DG2YCB) und Decodium
+4.0 (IU8LMC, ft2.it). Upstream ft8_lib kennt nur FT4 und FT8.
+
+**Was FT2 ist**, übereinstimmend in drei Quellen:
+
+| Quelle | Fundstelle | Aussage |
+| --- | --- | --- |
+| WSJT-X Improved 3.1.0 (260522) | `widgets/mainwindow.cpp:8189-8196` | Senden über `genft4_` + `gen_ft4wave_`, für FT2 nur `nsps=4*288` statt `4*576` |
+| WSJT-X Improved 3.1.0 | `widgets/mainwindow.cpp:11311,11323` | `m_TRperiod=3.75`, `m_toneSpacing=12000.0/288.0` |
+| WSJT-X Improved 3.1.0 | `lib/decoder.f90:1209-1219` | Empfang: Ton auf doppelte Länge strecken, dann FT4-Dekoder |
+| Decodium 4.0 | `Modulator/FtxMessageEncoder.cpp:2656` | `map_ft2_ft4_tones` — eine Abbildung für beide |
+| Decodium 4.0 | `Modulator/FtxWaveformGenerator.cpp:1269` | `generate_ft2_ft4_wave`, BT 1,0 |
+| MSHV 2.76.7 | `HvGenFt2/gen_ft2.cpp` | `nsym=103`, `nsps=4*288` bei 48 kHz, Costas/rvec/Gray wie FT4 |
+
+Also: FT4-Aufbau, halbe Symboldauer (0,024 s), Takt 3,75 s.
+
+**Achtung, Namensgleichheit:** WSJT-X (auch Improved) bringt unter
+`lib/ft2/` ein **anderes, älteres** FT2-Experiment von K1JT mit
+(`ft2_params.f90`: LDPC(128,90), `NSPS=160`). Das ist nicht die
+heutige Betriebsart und wird von keinem der Programme benutzt.
+
+| Datei | Was |
+| --- | --- |
+| `ft8/constants.h` | `FT2_SYMBOL_PERIOD (0.024f)`, `FT2_SLOT_TIME (3.75f)`, `FTX_PROTOCOL_FT2` (hinten angehängt, die Werte von FT4/FT8 bleiben), Makro `FTX_PROTOCOL_IS_FT4_FAMILY` |
+| `common/monitor.c:57-61` | Symboldauer und Fensterlänge für FT2 |
+| `ft8/decode.c:192,193,339,406` | `wf->protocol == FTX_PROTOCOL_FT4` → `FTX_PROTOCOL_IS_FT4_FAMILY(wf->protocol)` |
+
+Sonst nichts: Sync, Likelihood, LDPC, XOR-Folge und Kodierer sind die
+von FT4. Gesendet wird mit `ft4_encode()` und `synth_gfsk()` bei
+0,024 s Symboldauer und BT 1,0.
+
+**Geprüft gegen MSHV, nicht gegen sich selbst** (`tests/tst_ft2.cpp`):
+die Tonfolgen dreier Nachrichten aus MSHVs eigenem Sender
+(`make_c77_i4tone` + `GenPomFt::encode174_91`) stimmen Ton für Ton mit
+`ft4_encode()` überein, und eine nach MSHVs GFSK-Rechnung erzeugte
+Welle wird bei 0, 150 und 300 ms Sendebeginn gelesen. Gegenprobe: als
+FT4 gehört liest dieselbe Welle nichts.
+
 ### Erweiterung: Nachrichtentyp 5 (EU VHF Contest) — 2026-11-04
 
 | Datei | Was |
@@ -169,6 +210,25 @@ Richtigkeit — eigens geprüft in `falschesVorwissenErfindetKeinQso`.
 
 Die Masken selbst stehen NICHT hier, sondern in `src/core/Ft8Apriori.h`:
 sie hängen an Rufzeichen und Betriebsart, nicht am fremden Quelltext.
+
+#### Nachtrag 2026-11-18: bei FT4 und FT2 half das Vorwissen nie
+
+Die Vorgabe (`Ft8Apriori`) kommt als Klartext der 77 Nachrichtenbits.
+FT4 und FT2 verwürfeln die Nachricht aber vor CRC und LDPC mit
+`kFT4_XOR_sequence` (`encode.c`, `ft4_encode`; MSHV `gen_ft2.cpp`
+`rvec`; WSJT-X `ft4_decode.f90` setzt `apbits` aus
+`mod(msgbits+rvec,2)`). Im Codewort steht also Nachricht XOR Folge —
+die Vorgabe zeigte an jeder Stelle mit einer 1 in der Folge auf den
+falschen Wert. Der CRC verhinderte falsche Funde; der Gewinn fehlte
+ganz.
+
+`ft8/decode.c`, `ftx_decode_candidate_ap`: bei
+`FTX_PROTOCOL_IS_FT4_FAMILY` werden die vorgegebenen Bits 0..76 vor dem
+Einsetzen mit der Folge verknüpft. FT8 unverändert.
+
+Gemessen (`tests/tst_ft2.cpp`, FT2, −13,5 dB, 16 Rauschwürfel,
+„OE5SOS SP6CA R-09" mit MeinRufUndSeiner): ohne Vorwissen 1 Fund, mit
+Vorwissen 8. Gegenprobe ohne die Verknüpfung: 1 zu 1.
 
 ### Erweiterung: Typ 5 SENDEN — 2026-11-04
 

@@ -12,8 +12,17 @@
 
 #include "core/Resampler.h"
 #include "core/AppSettings.h"
+#include "core/audio/WavFile.h"
+
+#include <QDir>
+
+extern "C" {
+#include "ft8/constants.h"
+}
 
 #include <QLoggingCategory>
+
+#include <algorithm>
 
 // Fuer die Messung am Band: wie viele Funde ein Fenster hergibt und
 // mit wie vielen Runden. Standardmaessig an (QtInfoMsg), weil eine
@@ -48,6 +57,9 @@ void Ft8Stream::setProtocol(Ft8Decoder::Protocol p)
     // falsch ausgerichtet.
     m_fenster.clear();
     m_fensterBeginnMs = -1;
+    m_schonAusgewertet = false;
+    m_ft2Vorlauf.clear();
+    m_ft2Gemeldet.clear();
 }
 
 void Ft8Stream::setClock(std::function<qint64()> utcMs)
@@ -62,7 +74,12 @@ void Ft8Stream::setVorwissenQuelle(std::function<QVector<ApVorgabe>()> quelle)
 
 int Ft8Stream::slotMs() const
 {
-    return m_protocol == Ft8Decoder::Protocol::Ft4 ? 7500 : 15000;
+    switch (m_protocol) {
+    case Ft8Decoder::Protocol::Ft4: return 7500;
+    case Ft8Decoder::Protocol::Ft2: return 3750;
+    case Ft8Decoder::Protocol::Ft8: break;
+    }
+    return 15000;
 }
 
 void Ft8Stream::poll()
@@ -98,6 +115,8 @@ void Ft8Stream::feedAudio(const float* interleavedStereo, int frames)
         schliesseFenster(beginn);
     }
 
+    if (m_erstesStueckMs < 0) { m_erstesStueckMs = jetzt; }
+
     // Stereo -> Mono -> 12 kHz.
     QVector<float> mono(frames);
     for (int i = 0; i < frames; ++i) {
@@ -112,21 +131,78 @@ void Ft8Stream::feedAudio(const float* interleavedStereo, int frames)
                                                         aus.size());
         for (int i = 0; i < geschrieben; ++i) { m_fenster.append(aus[i]); }
     }
+
+    // FT2: nicht auf die Grenze warten -- siehe Ft8Stream.h,
+    // kFt2DekodierProben.
+    if (m_protocol == Ft8Decoder::Protocol::Ft2 && !m_schonAusgewertet
+        && m_fenster.size() >= kFt2DekodierProben) {
+        werteAus();
+        m_schonAusgewertet = true;
+    }
 }
 
 void Ft8Stream::schliesseFenster(qint64 neuerBeginnMs)
 {
-    const QDateTime beginn =
-        QDateTime::fromMSecsSinceEpoch(m_fensterBeginnMs, Qt::UTC);
-
     // Zu kurz? Dann war es ein angebrochenes Fenster — das erste nach
     // dem Einschalten etwa. Nichts melden, nur weiterzaehlen.
     const int nötig = Ft8Decoder::kSampleRate * (slotMs() / 2) / 1000;
-    if (m_fenster.size() >= nötig) {
+    if (!m_schonAusgewertet && m_fenster.size() >= nötig) {
+        werteAus();
+    }
+
+    // FT2: den Schluss dieses Fensters fuer das naechste aufheben --
+    // aber nur, wenn das naechste wirklich unmittelbar folgt. Nach
+    // einer Pause (Ton stand, Scheibe gewechselt) gehoert er nicht dazu.
+    m_ft2Vorlauf.clear();
+    if (m_protocol == Ft8Decoder::Protocol::Ft2
+        && neuerBeginnMs == m_fensterBeginnMs + slotMs()
+        && m_fenster.size() >= kFt2VorlaufProben) {
+        m_ft2Vorlauf = m_fenster.mid(m_fenster.size() - kFt2VorlaufProben);
+    }
+
+    m_fenster.clear();
+    m_fensterBeginnMs = neuerBeginnMs;
+    m_schonAusgewertet = false;
+    m_erstesStueckMs = -1;
+}
+
+void Ft8Stream::werteAus()
+{
+    const QDateTime beginn =
+        QDateTime::fromMSecsSinceEpoch(m_fensterBeginnMs, Qt::UTC);
+
+    // ── Mitschnitt fuer die Fehlersuche (2026-11-17) ───────────────
+    //
+    // Am Geraet: auf 80 m FT2-Signale hoerbar und im Wasserfall zu
+    // sehen, 0 Funde. Raten hilft da nicht -- es braucht den Ton, so
+    // wie ihn der Dekoder bekam. Nur mit der Umgebungsvariablen
+    // LONGPATH_FT8_MITSCHNITT=<Ordner>; ohne sie geschieht nichts.
+    // Je Fenster eine WAV (12 kHz, mono, ab der ersten Probe nach der
+    // Grenze); der Dateiname traegt, wie spaet diese erste Probe kam.
+    static const QString mitschnitt =
+        qEnvironmentVariable("LONGPATH_FT8_MITSCHNITT");
+    if (!mitschnitt.isEmpty()) {
+        QDir().mkpath(mitschnitt);
+        const qint64 spaeter = m_erstesStueckMs >= 0
+                                   ? m_erstesStueckMs - m_fensterBeginnMs : -1;
+        const QString pfad = mitschnitt + QLatin1Char('/')
+            + beginn.toString(QStringLiteral("yyMMdd_HHmmss_zzz"))
+            + QStringLiteral("_%1_erste+%2ms.wav")
+                  .arg(QLatin1String(Ft8Decoder::name(m_protocol)))
+                  .arg(spaeter);
+        QString fehler;
+        if (writeWavMono(pfad, m_fenster, Ft8Decoder::kSampleRate, &fehler)) {
+            qCInfo(lcFt8).noquote() << "Mitschnitt:" << pfad;
+        } else {
+            qCWarning(lcFt8).noquote() << "Mitschnitt fehlgeschlagen:" << fehler;
+        }
+    }
+    {
         // Bei FT4 beginnt der Block spaeter als das Fenster — siehe
         // Ft8Stream.h, kFt4BlockVersatzMs, mit der Messung dazu. Die
         // Laengenpruefung oben zaehlt weiter das GANZE Fenster: ob
         // genug Ton da ist, hat mit dem Suchband nichts zu tun.
+        // FT2 ebenso, mit eigener Zahl (kFt2BlockVersatzMs).
         int versatz = 0;
         if (m_protocol == Ft8Decoder::Protocol::Ft4) {
             versatz = qMin(Ft8Decoder::kSampleRate * kFt4BlockVersatzMs / 1000,
@@ -163,25 +239,124 @@ void Ft8Stream::schliesseFenster(qint64 neuerBeginnMs)
         const QVector<ApVorgabe> vorwissen =
             m_vorwissenQuelle ? m_vorwissenQuelle() : QVector<ApVorgabe>{};
 
-        const auto funde = Ft8Decoder::decodeBlock(m_fenster.constData() + versatz,
-                                                   m_fenster.size() - versatz,
-                                                   m_protocol,
-                                                   durchgaenge,
-                                                   vorwissen);
+        const bool ft2 = (m_protocol == Ft8Decoder::Protocol::Ft2);
+        QVector<Ft8Decode> funde;
+        if (ft2) {
+            // Vorlauf + Fenster in einen Puffer, dann ueber alles suchen
+            // (Decodium sendet asynchron, siehe Ft8Stream.h).
+            QVector<float> puffer;
+            puffer.reserve(m_ft2Vorlauf.size() + m_fenster.size());
+            puffer += m_ft2Vorlauf;
+            puffer += m_fenster;
+            const QVector<Ft8Decode> alle =
+                dekodiereFt2(puffer.constData(), puffer.size(),
+                             m_ft2Vorlauf.size(), vorwissen);
+            // Was im vorigen Fenster schon gemeldet war, nicht noch
+            // einmal: gleicher Wortlaut UND gleicher Beginn (±400 ms).
+            // Derselbe Wortlaut 3,75 s spaeter ist eine NEUE Sendung --
+            // die Gegenstation wiederholt, weil sie uns nicht hatte.
+            const qint64 bezugMs = m_fensterBeginnMs + kFt2BlockVersatzMs;
+            for (const Ft8Decode& d : alle) {
+                const qint64 beginnMs = bezugMs + qint64(d.dtSeconds * 1000.0f);
+                bool schonGemeldet = false;
+                for (const Gemeldet& g : m_ft2Gemeldet) {
+                    if (g.text == d.text && qAbs(g.beginnMs - beginnMs) < 400) {
+                        schonGemeldet = true;
+                        break;
+                    }
+                }
+                if (schonGemeldet) { continue; }
+                m_ft2Gemeldet.append({ d.text, beginnMs });
+                funde.append(d);
+            }
+            // Nur so lange merken, wie ein Vorlauf zurueckreicht.
+            const qint64 grenze = m_fensterBeginnMs - 2 * slotMs();
+            m_ft2Gemeldet.erase(
+                std::remove_if(m_ft2Gemeldet.begin(), m_ft2Gemeldet.end(),
+                               [grenze](const Gemeldet& g) {
+                                   return g.beginnMs < grenze;
+                               }),
+                m_ft2Gemeldet.end());
+        } else {
+            funde = Ft8Decoder::decodeBlock(m_fenster.constData() + versatz,
+                                            m_fenster.size() - versatz,
+                                            m_protocol,
+                                            durchgaenge,
+                                            vorwissen);
+        }
+        // FT4 und FT2 laufen immer einrundig (Ft8Decoder::decodeBlock);
+        // die Zahl aus den Einstellungen gilt nur fuer FT8.
+        const int runden = (m_protocol == Ft8Decoder::Protocol::Ft8)
+                               ? durchgaenge : 1;
+        // Der mittlere Zeitversatz der Funde: bei FT2 ist das Suchband so
+        // schmal, dass die Laufzeit im Tonweg hier sichtbar sein muss --
+        // sonst sucht man den Fehler am Band (2026-11-17).
+        QString zeit;
+        if (!funde.isEmpty()) {
+            QVector<float> dts;
+            for (const Ft8Decode& d : funde) { dts.append(d.dtSeconds); }
+            std::sort(dts.begin(), dts.end());
+            zeit = QStringLiteral(", DT Mitte %1 s")
+                       .arg(double(dts[dts.size() / 2]), 0, 'f', 2);
+        }
         qCInfo(lcFt8).noquote()
-            << QStringLiteral("Fenster: %1 Funde, %2 Runde(n), %3")
+            << QStringLiteral("Fenster: %1 Funde, %2 Runde(n), %3%4")
                    .arg(funde.size())
-                   .arg(durchgaenge)
-                   .arg(m_protocol == Ft8Decoder::Protocol::Ft4
-                            ? QStringLiteral("FT4") : QStringLiteral("FT8"));
+                   .arg(runden)
+                   .arg(QLatin1String(Ft8Decoder::name(m_protocol)), zeit);
 
         // Auch leer melden: ein stilles Fenster ist eine Aussage, ein
         // ausbleibendes Fenster ein Fehler. Siehe Ft8Stream.h.
         emit decoded(funde, beginn);
     }
+}
 
-    m_fenster.clear();
-    m_fensterBeginnMs = neuerBeginnMs;
+QVector<Ft8Decode> Ft8Stream::dekodiereFt2(const float* puffer, int proben,
+                                           int vorlaufProben,
+                                           const QVector<ApVorgabe>& vorwissen)
+{
+    QVector<Ft8Decode> alle;
+    if (!puffer || proben <= 0) { return alle; }
+
+    const int rate    = Ft8Decoder::kSampleRate;
+    const int schritt = rate * kFt2BlockSchrittMs / 1000;            // 5760
+    const int basis   = vorlaufProben + rate * kFt2BlockVersatzMs / 1000;
+    // Ein Block traegt eine Sendung, die bis +19 Symbole nach seinem
+    // Beginn anfaengt: (19 + 105) x 288 = 35712 Proben muss er haben.
+    const int braucht = (19 + FT4_NN) * 288;
+    // Und mehr als ein FT2-Fenster nimmt ft8_lib ohnehin nicht auf.
+    const int hoechstens = rate * 3750 / 1000;
+
+    const int kVon = -(basis / schritt);
+    for (int k = kVon;; ++k) {
+        const int ab = basis + k * schritt;
+        if (ab < 0) { continue; }
+        if (ab + braucht > proben) { break; }
+        const int laenge = qMin(proben - ab, hoechstens);
+        const QVector<Ft8Decode> funde =
+            Ft8Decoder::decodeBlock(puffer + ab, laenge,
+                                    Ft8Decoder::Protocol::Ft2, 1, vorwissen);
+        // Zeitversatz immer ab Grenze + kFt2BlockVersatzMs, damit die
+        // Spalte nicht springt, je nachdem welcher Block die Station
+        // gefunden hat.
+        const float verschiebung = float(k * kFt2BlockSchrittMs) / 1000.0f;
+        for (Ft8Decode d : funde) {
+            d.dtSeconds += verschiebung;
+            // Zwei benachbarte Bloecke ueberlappen um 216 ms: dieselbe
+            // Sendung faellt dann zweimal an. Gleicher Wortlaut und
+            // (fast) gleicher Beginn ist EINE.
+            bool schonDa = false;
+            for (const Ft8Decode& alt : alle) {
+                if (alt.text == d.text
+                    && qAbs(alt.dtSeconds - d.dtSeconds) < 0.3f) {
+                    schonDa = true;
+                    break;
+                }
+            }
+            if (!schonDa) { alle.append(d); }
+        }
+    }
+    return alle;
 }
 
 } // namespace Longpath
