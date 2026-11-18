@@ -986,8 +986,13 @@ void Ft8Applet::buildUI()
     m_cqVersucheSpin->setPrefix(tr("x"));
     m_cqVersucheSpin->setMinimumWidth(m_cqVersucheSpin->sizeHint().width());
     m_cqVersucheSpin->setToolTip(tr(
-        "How many periods a CQ call repeats by itself.\nIt stops "
-        "earlier when somebody answers, or on Stop."));
+        "How many periods a CQ call — or a call to one station — "
+        "repeats by itself.\nIt stops earlier when somebody answers, "
+        "or on Stop."));
+    // Die Zahl gilt seit dem 2026-11-17 auch fuer den Anruf an EINE
+    // Station (siehe `Ft8Ablauf::setzeAnrufWiederholungen`).
+    m_ablauf.setzeAnrufWiederholungen(m_cqVersucheSpin->value());
+    m_mehrfach.setzeAnrufWiederholungen(m_cqVersucheSpin->value());
 
     // ── Multi Answering: wie viele gleichzeitig (2026-10-30) ─────
     //
@@ -1038,9 +1043,11 @@ void Ft8Applet::buildUI()
         }
     });
     connect(m_cqVersucheSpin, QOverload<int>::of(&QSpinBox::valueChanged),
-            this, [](int v) {
+            this, [this](int v) {
         AppSettings::instance().setValue(QStringLiteral("Ft8/CqVersuche"),
                                          QString::number(v));
+        m_ablauf.setzeAnrufWiederholungen(v);
+        m_mehrfach.setzeAnrufWiederholungen(v);
     });
     sendRow->addWidget(m_cqVersucheSpin);
     sendRow->addWidget(m_plaetzeSpin);
