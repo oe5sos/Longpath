@@ -352,6 +352,15 @@ longpath_add_test(tst_per_band_nf_priming)
 # ── Task 2.11: Clarity + NF-aware grid coexistence (Longpath-original) ────
 longpath_add_test(tst_clarity_nf_grid_coexistence)
 
+# ── Der Messversatz vom Geraet bestellt kein Speichern (2026-11-18) ───────
+# Zehn Minuten FT8: 26 von 29 Neuschreibungen der 2,9-MB-Einstellungsdatei
+# kamen von DisplayCalOffset, zweimal je Sendedurchgang.
+longpath_add_test(tst_cal_offset_bestellt_kein_speichern)
+if(TEST tst_cal_offset_bestellt_kein_speichern)
+    set_tests_properties(tst_cal_offset_bestellt_kein_speichern PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 # ── Phase 3I radio-connector tests ────────────────────────────────────────
 longpath_add_test(tst_hpsdr_enums)
 longpath_add_test(tst_board_capabilities)
@@ -5995,6 +6004,11 @@ longpath_add_test(tst_ft8_warteschlange)
 longpath_add_test(tst_grids_gearbeitet)
 longpath_add_test(tst_applet_fenstermasse)
 longpath_add_test(tst_ft8_plaetze_panel)
+# tst_ft8_plaetze_anordnung (2026-11-18): „FT8 Slots" ordnet sich nach
+#   der Groesse des Fensters -- nebeneinander, Raster, untereinander.
+#   Am echten AppletFloatingWindow und am Abgriff gemessen, nicht an der
+#   Rechnung: Rollbereich, Mindestmasze und Rollbalken reden mit.
+longpath_add_test(tst_ft8_plaetze_anordnung)
 longpath_add_test(tst_panel_automatik)
 longpath_add_test(tst_ft8_dxpedition)
 # 2026-11-04: Typ 5, der EU-VHF-Contest. Dieselbe Klasse wie
