@@ -1334,7 +1334,9 @@ QString RoundtablePanel::myCallsign(const QJsonObject& room) const
     }
     QString callsign = m_model ? m_model->stationSetting(QStringLiteral("Callsign")) : QString();
     if (callsign.isEmpty()) {
-        callsign = AppSettings::instance().value(QStringLiteral("User/Callsign")).toString();
+        // Longpath: the station callsign (Upstream: User/Callsign), as
+        // RoundtableHub::callsign() falls back to it.
+        callsign = AppSettings::stationCallsign();
     }
     return callsign.trimmed().toUpper();
 }
