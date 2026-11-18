@@ -713,6 +713,53 @@ constexpr auto kStatusBarBg     = "#0a0a0c";
 constexpr auto kStatusBarBorder = "#1f1f23";
 constexpr auto kStatusSep       = "#2c2c31";
 
+// ── Roundtable: Panel, Fenster, Leiste (Stufe 2, 2026-11-18) ─────────
+//
+// Upstream NereusSDR malt Roundtable mit den Rollen seiner Workspace-
+// Vorschau und einer eigenen Palette in RoundtableTagLayout.cpp (u. a.
+// Tuerkis #00d4ff fuer "du", #c25a5c fuer einen Doppel, Blau #1e3d5f als
+// Flaeche). Bei uns ist jede dieser Rollen ein Name HIER, und jeder Name
+// zeigt auf einen Ton, den es schon gibt — keine neue Farbe:
+//   - "du" ist der schmale Strich kAccent, nie Tuerkis (HAUSSTIL.md);
+//   - Senden ist Messing wie die Sendetaste, nicht Rot
+//     (design-kein-kraeftiges-rot);
+//   - ein Doppel ist das gedaempfte Gefahr-Rot kRedBorder, nicht kTxRed;
+//   - eine Auswahl oder die eigene Zeile ist eine Mulde (kGlassSel*),
+//     keine blaue Flaeche (design-kein-auswahl-blau).
+// Welche Toene es am Ende werden, entscheidet der Betreiber an den
+// Bildern; geaendert wird dann nur hier.
+constexpr auto kRoundtableTalking       = kLiveGreen;      // spricht, Glyphe
+constexpr auto kRoundtableTalkingText   = kGreenText;      // spricht, Schrift
+constexpr auto kRoundtableTalkingBorder = kGreenBorder;
+constexpr auto kRoundtableUnknown       = kAmberText;      // unbekannt / wartet
+constexpr auto kRoundtableUnknownBorder = kAmberBorder;
+constexpr auto kRoundtableDouble        = kRedBorder;      // zwei zugleich
+constexpr auto kRoundtableDoubleOff     = kBadgeTxBg;      // Streifen/Balken aus
+constexpr auto kRoundtableYou           = kAccent;         // du: Strich, Schrift
+constexpr auto kRoundtableYouOff        = kBadgeInfoBg;    // dein Balken, aus
+constexpr auto kRoundtableYourRow       = kGlassSelTop;    // deine Zeile: Mulde
+constexpr auto kRoundtableQuiet         = kTextScale;      // still / veraltet
+constexpr auto kRoundtableStale         = kLabelMid;       // grauer Messwert
+constexpr auto kRoundtableAway          = kTextTertiary;
+constexpr auto kRoundtableTx            = kTxKeyTop;       // du sendest (Messing)
+constexpr auto kRoundtableTxText        = kTxKeyText;      // Schrift darauf
+constexpr auto kRoundtableTxBorder      = kTxKeyBorder;
+constexpr auto kRoundtableBright        = kGlassSelText;   // Schrift unter dem Zeiger
+constexpr auto kRoundtableSelectedFill  = kGlassSelTop;    // gewaehlt: Mulde
+constexpr auto kRoundtableSelectedEdge  = kGlassSelBorder;
+constexpr auto kRoundtableFocus         = kButtonAltHover; // Tastaturfokus
+constexpr auto kRoundtableFrequency     = kAccent;         // anfassbare Frequenz
+constexpr auto kRoundtableCardFill      = kStatusBarBg;    // Karte (Alpha im Code)
+constexpr auto kRoundtableCardRule      = kBorder;
+constexpr auto kRoundtableCardText      = kTextPrimary;
+constexpr auto kRoundtableCardLastText  = kTitleText;
+constexpr auto kRoundtableCardDim       = kTextSecondary;
+constexpr auto kRoundtableCardOld       = kTextTertiary;
+constexpr auto kRoundtableCardOldBar    = kTextInactive;
+constexpr auto kRoundtableMeterTrack    = kButtonHover;
+constexpr auto kRoundtablePeak          = kGlassSelText;   // Spitzenmarke (Alpha im Code)
+constexpr auto kRoundtableStripOpenFill = kBadgeInfoBg;
+
 // Shared Stylesheet Fragments
 // ── Flaechen mit Verlauf statt flacher Fuellung ──────────────────────
 //

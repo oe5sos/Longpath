@@ -850,6 +850,7 @@ set(MODEL_SOURCES
     src/models/NotchModel.cpp
     src/models/SpotModel.cpp
     src/models/RoundtableHub.cpp
+    src/models/RoundtableModel.cpp
     src/models/SpotTableModel.cpp
     src/models/BandFilterProxy.cpp
     src/models/AlertsTableModel.cpp
@@ -1346,6 +1347,10 @@ set(GUI_SOURCES
     src/gui/applets/TxCfcDialog.cpp
     src/gui/applets/PhoneCwApplet.cpp
     src/gui/applets/RadeApplet.cpp
+    src/gui/applets/RoundtableApplet.cpp
+    src/gui/roundtable/RoundtablePanel.cpp
+    src/gui/roundtable/RoundtableTagLayout.cpp
+    src/gui/roundtable/RoundtableWindow.cpp
     src/gui/applets/EqApplet.cpp
     src/gui/applets/VaxApplet.cpp
     src/gui/applets/FmApplet.cpp

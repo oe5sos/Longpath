@@ -411,6 +411,7 @@ warren@wpratt.com
 #include "gui/hotkeys/MainWindowHotKeyTargets.h"
 #include "applets/RttyDecoderApplet.h"
 #include "applets/CwDecoderApplet.h"
+#include "applets/RoundtableApplet.h"
 #include "applets/Ft8Applet.h"
 #include "Ft8KartenBruecke.h"
 #include "applets/Ft8PlaetzeApplet.h"
@@ -8657,6 +8658,26 @@ void MainWindow::populateDefaultMeter()
     panel->addApplet(m_cwDecoderApplet);
     m_cwDecoderApplet->setVisible(false);
 
+    // Roundtable (Stufe 2, 2026-11-18): wer sonst auf der Frequenz ist, die
+    // Raeume, die Nachrichten. Folgt der aktiven Scheibe. Settings fuehrt in
+    // den Reiter "Roundtable" des Spot Hub -- dort steht die Erstfrage, und
+    // vor ihrer Antwort geht nichts hinaus (RoundtableHub).
+    m_roundtableApplet = new RoundtableApplet(m_radioModel, nullptr);
+    panel->addApplet(m_roundtableApplet);
+    connect(m_roundtableApplet, &RoundtableApplet::settingsRequested, this, [this]() {
+        openSpotHub();
+        if (!m_spotHubDialog) {
+            return;
+        }
+        QWidget* page = m_spotHubDialog->findChild<QWidget*>(QStringLiteral("roundtableTab"));
+        for (QWidget* up = page; up != nullptr; up = up->parentWidget()) {
+            if (auto* tabs = qobject_cast<QTabWidget*>(up)) {
+                tabs->setCurrentWidget(page);
+                break;
+            }
+        }
+    });
+
     // EqApplet — Equalizer, Empfang und Senden (eingehaengt 2026-10-11).
     // Ft8Applet (2026-10-15) -- der native FT8/FT4-Dekoder, sichtbar in
     // den Datenmodi (DIGU/DIGL). Gleiche Verdrahtung wie CW und RTTY.
@@ -9651,6 +9672,7 @@ void MainWindow::populateDefaultMeter()
     m_appletsById[QStringLiteral("Rade")]       = m_radeApplet;
     m_appletsById[QStringLiteral("RttyDecoder")] = m_rttyDecoderApplet;
     m_appletsById[QStringLiteral("CwDecoder")] = m_cwDecoderApplet;
+    m_appletsById[QStringLiteral("Roundtable")] = m_roundtableApplet;
     m_appletsById[QStringLiteral("Eq")]         = m_eqApplet;
     m_appletsById[QStringLiteral("Cat")]        = m_catApplet;
     m_appletsById[QStringLiteral("Ft8Decoder")] = m_ft8Applet;
@@ -9736,6 +9758,11 @@ void MainWindow::populateDefaultMeter()
     // CW: same shape -- defaultVisible=true, gated on CWL/CWU below.
     m_appletVis->registerApplet(QStringLiteral("CwDecoder"),
                                 QStringLiteral("CW Decoder"), true);
+    // Roundtable (2026-11-18): ab Werk AUS. Vor der Antwort auf die
+    // Erstfrage (Spot Hub) zeigt es nichts als den Hinweis darauf; wer es
+    // will, holt es ueber das + unten rechts.
+    m_appletVis->registerApplet(QStringLiteral("Roundtable"),
+                                QStringLiteral("Roundtable"), false);
     // Equalizer (eingehaengt 2026-10-11). Sichtbar ab Werk: beide Haelften
     // sind jetzt verdrahtet, und der Empfangs-Equalizer ist neu -- ein
     // Merkmal, das man erst in einem Menue suchen muss, findet niemand
@@ -10010,6 +10037,11 @@ void MainWindow::populateDefaultMeter()
         QStringLiteral("Digital"),
         {QStringLiteral("cw"), QStringLiteral("morse"), QStringLiteral("decoder"),
          QStringLiteral("telegrafie"), QStringLiteral("cwl"), QStringLiteral("cwu")});
+    m_appletVis->describeApplet(QStringLiteral("Roundtable"),
+        QStringLiteral("Netzwerk"),
+        {QStringLiteral("roundtable"), QStringLiteral("raum"), QStringLiteral("runde"),
+         QStringLiteral("nachrichten"), QStringLiteral("chat"),
+         QStringLiteral("rapport"), QStringLiteral("spots")});
     m_appletVis->describeApplet(QStringLiteral("Ft8Decoder"),
         QStringLiteral("Digital"),
         {QStringLiteral("ft8"), QStringLiteral("ft4"), QStringLiteral("digital"),
