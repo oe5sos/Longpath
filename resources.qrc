@@ -14,6 +14,12 @@
     </qresource>
     <!-- Der 3D-Flug im Logbuch (2026-11-10): CesiumJS-Seite, laedt die
          festgenagelte Fassung vom CDN; siehe Station3dSurface.h. -->
+    <!-- Werksvorgabe der Layoutprofile fuer frische Installationen
+         (2026-11-18), gezogen mit tools/werksprofile_ziehen.py; siehe
+         LayoutProfiles::ladeWerksvorgabe(). -->
+    <qresource prefix="/layout">
+        <file alias="werksprofile.json">resources/layout/werksprofile.json</file>
+    </qresource>
     <qresource prefix="/flug3d">
         <file alias="flug3d.html">resources/flug3d/flug3d.html</file>
     </qresource>

@@ -12,6 +12,9 @@
 //                 Fischer, AI-assisted via Anthropic Claude.
 //   2026-10-21 — runApply(): das Anwenden ist eine EIGENE Bewegung.
 //                 Martin Fischer, AI-assisted via Anthropic Claude.
+//   2026-11-18 — ladeWerksvorgabe(): Martins Profile als Vorgabe fuer
+//                 frische Installationen. Martin Fischer, AI-assisted
+//                 via Anthropic Claude (Claude Code).
 // =================================================================
 
 #include "gui/LayoutProfiles.h"
@@ -561,15 +564,46 @@ void LayoutProfiles::load()
     const QString raw = AppSettings::instance()
                             .value(settingsKey(), QString{}).toString();
     if (raw.isEmpty()) { return; }
+    ausJsonUebernehmen(raw.toUtf8());
+}
 
+QString LayoutProfiles::werksvorgabePfad()
+{
+    return QStringLiteral(":/layout/werksprofile.json");
+}
+
+bool LayoutProfiles::ladeWerksvorgabe(const QByteArray& json)
+{
+    // Zwei Wachen, beide noetig. m_order allein liesse jemanden mit
+    // beschaedigtem Eintrag durch (load() hat dann nichts geladen, aber
+    // seine Profile stehen noch in der Datei -- die Vorgabe wuerde sie
+    // beim Sichern ueberschreiben). Der Schluessel allein liesse durch,
+    // wer in dieser Sitzung schon Profile angelegt hat.
+    if (!m_order.isEmpty()) { return false; }
+    if (!AppSettings::instance().value(settingsKey(), QString{})
+             .toString().isEmpty()) {
+        return false;
+    }
+    if (!ausJsonUebernehmen(json) || m_order.isEmpty()) { return false; }
+    // Profil 1 ist das Startprofil, gleich was in der Datei steht.
+    if (m_current != m_order.first()) {
+        m_current = m_order.first();
+        emit currentChanged(m_current);
+    }
+    save();
+    return true;
+}
+
+bool LayoutProfiles::ausJsonUebernehmen(const QByteArray& raw)
+{
     QJsonParseError err{};
-    const QJsonDocument doc = QJsonDocument::fromJson(raw.toUtf8(), &err);
+    const QJsonDocument doc = QJsonDocument::fromJson(raw, &err);
     if (err.error != QJsonParseError::NoError || !doc.isObject()) {
         // Nichts anfassen. Eine beschaedigte Datei darf nicht dazu
         // fuehren, dass beim naechsten Speichern die heile Fassung
         // ueberschrieben wird — und genau das passierte, wenn man hier
         // auf „keine Profile" zuruecksetzt.
-        return;
+        return false;
     }
 
     QList<Profile> loaded;
@@ -620,6 +654,7 @@ void LayoutProfiles::load()
                     : (order.isEmpty() ? QString{} : order.first());
     emit profilesChanged();
     emit currentChanged(m_current);
+    return true;
 }
 
 } // namespace Longpath
