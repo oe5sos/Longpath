@@ -1933,7 +1933,9 @@ void RoundtablePanel::updateConnectionLine(const QJsonObject& room)
             : QStringLiteral("Roundtable is off");
         break;
     }
-    if (m_model && !m_model->frequencyAvailable()
+    // Longpath: before the first-run answer no server has been asked, so
+    // nothing is known about it.
+    if (m_model && m_model->firstRunAnswered() && !m_model->frequencyAvailable()
         && (historyConnected(m_model) || m_retainedMessages.isEmpty())) {
         text += QStringLiteral(" · Legacy room server");
     }

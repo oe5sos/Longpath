@@ -132,10 +132,18 @@ RoundtableApplet::RoundtableApplet(RadioModel* model, RoundtableHub* hub, QWidge
     if (m_hub) {
         // The followed slice's meter is your own reading, which the panel
         // shows only to you while nothing about the station is sent.
+        // The hub reads every 100 ms (for the signal floor); the row shows
+        // ages in seconds, so it takes one reading every kOwnReadingMs.
         connect(m_hub, &RoundtableHub::sliceMeterRead, this, [this](int sliceId, double dbm) {
-            if (m_slice && m_slice->sliceIndex() == sliceId) {
-                m_panel->setOwnReading(dbm, RoundtableModel::nowMs());
+            if (!m_slice || m_slice->sliceIndex() != sliceId) {
+                return;
             }
+            const qint64 now = RoundtableModel::nowMs();
+            if (m_lastOwnReadingMs > 0 && now - m_lastOwnReadingMs < kOwnReadingMs && now >= m_lastOwnReadingMs) {
+                return;
+            }
+            m_lastOwnReadingMs = now;
+            m_panel->setOwnReading(dbm, now);
         });
     }
     bindActiveSlice();

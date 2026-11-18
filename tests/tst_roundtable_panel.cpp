@@ -165,13 +165,15 @@ private slots:
         slice.setDspMode(DSPMode::LSB);
         RoundtableApplet applet(nullptr, &hub, nullptr);
         applet.setSliceSource([&slice]() { return &slice; });
-        applet.resize(300, 640);
+        applet.resize(260, 640);
         applet.show();
         settle();
 
         auto* line = applet.findChild<QLabel*>(QStringLiteral("roundtableConnectionLine"));
         QVERIFY(line);
         QVERIFY2(line->text().contains(QStringLiteral("answer in Settings")), qPrintable(line->text()));
+        // Kein Server gefragt, also nichts ueber ihn gesagt.
+        QVERIFY2(!line->text().contains(QStringLiteral("Legacy")), qPrintable(line->text()));
         QCOMPARE(hub.client()->linkState(), RoundtableClient::LinkState::Off);
         QVERIFY(!QFile::exists(keyPath));
         bild(applet, QStringLiteral("panel-vor-der-antwort.png"));
@@ -264,7 +266,7 @@ private slots:
 
         RoundtableApplet applet(nullptr, &hub, nullptr);
         applet.setSliceSource([&slice]() { return &slice; });
-        applet.resize(300, 760);
+        applet.resize(260, 760);
         applet.show();
         settle();
         RoundtablePanel* panel = applet.panel();
@@ -299,6 +301,10 @@ private slots:
         settle();
         QCOMPARE(window->shape(), RoundtableWindow::Shape::ThreeColumns);
         bild(*window, QStringLiteral("fenster-breit.png"));
+        window->resize(800, RoundtableWindow::kWideHeight);
+        settle();
+        QCOMPARE(window->shape(), RoundtableWindow::Shape::TwoColumns);
+        bild(*window, QStringLiteral("fenster-zwei-spalten.png"));
         bild(applet, QStringLiteral("spalte-panel-im-fenster.png"));
         auto* back = applet.findChild<QPushButton*>(QStringLiteral("roundtablePutBackBtn"));
         QVERIFY(back);
@@ -425,7 +431,7 @@ private slots:
         slice.setDspMode(DSPMode::LSB);
         RoundtableApplet applet(nullptr, &hub, nullptr);
         applet.setSliceSource([&slice]() { return &slice; });
-        applet.resize(300, 760);
+        applet.resize(260, 760);
         applet.show();
         RoundtablePanel* panel = applet.panel();
         QTRY_COMPARE_WITH_TIMEOUT(hub.client()->linkState(), RoundtableClient::LinkState::Hidden, kStartMs);

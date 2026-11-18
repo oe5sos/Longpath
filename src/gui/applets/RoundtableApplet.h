@@ -147,6 +147,9 @@ private:
     QMetaObject::Connection m_sliceMode;
     std::function<void(const QUrl&)> m_urlOpener;
     bool m_webLinkPending = false;
+    // Longpath: the hub's 10 readings a second, shown once every 500 ms.
+    static constexpr qint64 kOwnReadingMs = 500;
+    qint64 m_lastOwnReadingMs = 0;
 };
 
 } // namespace Longpath
