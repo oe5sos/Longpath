@@ -2,7 +2,7 @@
 
 ## [0.11.0] - 2026-11-18
 
-49 Stände seit 0.10.0. Der größte Teil ist **FT8**: tiefer dekodiert,
+55 Stände seit 0.10.0. Der größte Teil ist **FT8**: tiefer dekodiert,
 mehrere Stationen gleichzeitig, und die Liste sagt nur noch, was
 wirklich fehlt. Dazu Fenster, die an ihrem Platz und vorne bleiben,
 das neu geordnete Logbuch mit Upload zu QRZ und Wavelog, der TS-590
@@ -24,6 +24,11 @@ als bedienbares Gerät und die erste Stufe von Roundtable.
   Weltkarte, eine Liste der fehlenden Felder (#435, #444).
 - **Eine falsch gehende Uhr** sieht nicht mehr aus wie ein totes Band
   (#448).
+- **Ein Bandwechsel hält das Senden an**, und eben Gearbeitetes ist
+  nicht mehr blau (#482). An der Flex bleibt das FT8-Bild auch nach dem
+  Bandwechsel auf dem Durchlassbereich (#485).
+- **FT8 Slots:** die Karten ordnen sich nach der Größe des Fensters
+  (#483).
 
 ### Fenster und Schirme
 
@@ -35,7 +40,8 @@ als bedienbares Gerät und die erste Stufe von Roundtable.
 - **Fenster wandern nicht mehr** bei jedem Start (#443); ihre Lage
   gehört zu ihrem Hauptfenster (#439). Start immer in Profil 1 (#437).
 - **Ein Panel liegt an einem Ort:** das TX-Fenster bleibt im
-  FT8-Profil (#462), Rotor/Log bleibt im Kombi-Feld (#473).
+  FT8-Profil (#462), Rotor/Log bleibt im Kombi-Feld (#473) — und ein
+  Klick auf „Rotor / Log“ holt es von dort als eigenes Fenster (#486).
 - **Das Profil stellt die Betriebsart:** ein FT8-Profil schaltet von
   selbst auf DIGI (#459).
 
@@ -87,6 +93,14 @@ als bedienbares Gerät und die erste Stufe von Roundtable.
 
 ### Behoben
 
+- **Langes Beenden und wachsender Speicher im 3D-Panadapter** (#489):
+  Kurve, Füllung und Peak-Hold wurden in jedem Bild in Puffer
+  geschoben, die im 3D-Modus nie gezeichnet werden. Gemessen an der
+  Flex: vorher 23 GB nach 75 Minuten und 64 s zum Beenden, danach
+  unter 1 GB nach zweieinhalb Stunden und 0,4 s.
+- **Die Einstellungsdatei wurde bei jedem Sendedurchgang zweimal ganz
+  neu geschrieben** (#487) — der Messversatz vom Gerät bestellt kein
+  Speichern mehr.
 - Absturz beim Bewegen-Zeiger ohne Farbprofil unter Qt 6.11.1 (#463).
 - Absturz beim Beenden und beim Profilwechsel mit TS-590 (#416).
 - Ein Bau ohne Contestprogramm behält die Contest-Anordnung (#432).
