@@ -850,6 +850,7 @@ set(MODEL_SOURCES
     src/models/NotchModel.cpp
     src/models/SpotModel.cpp
     src/models/RoundtableHub.cpp
+    src/models/RoundtableModel.cpp
     src/models/SpotTableModel.cpp
     src/models/BandFilterProxy.cpp
     src/models/AlertsTableModel.cpp

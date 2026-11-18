@@ -5662,6 +5662,8 @@ if(TARGET tst_roundtable_client)
         LONGPATH_ROUNDTABLE_CONFORMANCE_DIR="${CMAKE_SOURCE_DIR}/roundtable/conformance/v1")
 endif()
 longpath_add_test(tst_roundtable_hub)
+# Stufe 2 (2026-11-18): das Modell der Roundtable-Oberflaeche, am Hub.
+longpath_add_test(tst_roundtable_model)
 # Der ganze Weg gegen Upstreams Referenzserver auf 127.0.0.1. Braucht
 # Python mit websockets + cryptography (LONGPATH_ROUNDTABLE_PYTHON),
 # sonst uebersprungen.
