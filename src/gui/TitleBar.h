@@ -83,6 +83,7 @@ class QPushButton;
 
 namespace Longpath {
 
+class DeviceTemperatureStrip;
 class MasterOutputWidget;
 
 // ConnectionSegment — always-visible connection-state indicator living
@@ -280,6 +281,13 @@ public:
     // and the activity LED. Phase 3Q-6.
     ConnectionSegment* connectionSegment() const { return m_connectionSegment; }
 
+    /// Die Temperaturen der angeschlossenen Geraete, rechts neben
+    /// Namenszug und Fassung (Betreiber, 2026-11-18). Leer und
+    /// unsichtbar, solange kein Geraet eine meldet. Sie nimmt nur
+    /// freien Platz; allein ihr erster Eintrag bleibt immer. Gefuettert
+    /// wird sie von gui/DeviceTemperatureFeed, nicht von hier.
+    DeviceTemperatureStrip* deviceTemperatures() const { return m_deviceTemps; }
+
     /// Single-row UTC, "23:59:59 UTC". Time lives where every OS puts it,
     /// which also frees the banner's bottom-right corner for alarms alone.
     QString utcText() const;
@@ -289,7 +297,16 @@ signals:
     // connects this to its showFeatureRequestDialog slot.
     void featureRequestClicked();
 
+protected:
+    bool event(QEvent* e) override;
+    void resizeEvent(QResizeEvent* e) override;
+
 private:
+    /// Rechnet aus, wie viel Platz der Kopf fuer die Temperaturleiste
+    /// frei hat, und gibt ihr diese Grenze. Warum nicht das Layout
+    /// allein, steht an der Stelle, an der die Leiste gebaut wird.
+    void platziereTemperaturen();
+
     QHBoxLayout*        m_hbox{nullptr};
     QMenuBar*           m_menuBar{nullptr};
     ConnectionSegment*  m_connectionSegment{nullptr};
@@ -297,6 +314,7 @@ private:
     QPushButton*        m_featureBtn{nullptr};
     // Der Stand der Aktualisierung, neben der Version.
     QLabel*             m_updateState{nullptr};
+    DeviceTemperatureStrip* m_deviceTemps{nullptr};
     QLabel*             m_utcLabel{nullptr};
     QTimer*             m_utcTimer{nullptr};
 };

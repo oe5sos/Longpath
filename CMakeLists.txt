@@ -902,6 +902,7 @@ set(GUI_SOURCES
     src/gui/PsaIndicatorWidget.h
     src/gui/PsForm.cpp
     src/gui/TitleBar.cpp
+    src/gui/DeviceTemperatureFeed.cpp
     src/gui/RelayBar.cpp
     src/gui/WaterfallHistoryBuffer.cpp
     src/gui/WaterfallHistoryBuffer.h
@@ -1001,6 +1002,7 @@ set(GUI_SOURCES
     src/gui/widgets/MetricLabel.cpp
     src/gui/widgets/MetricLabel.h
     src/gui/widgets/SystemTile.cpp
+    src/gui/widgets/DeviceTemperatureStrip.cpp
     src/gui/chrome/ChromeFoldPlan.cpp
     src/gui/chrome/ChromeBarController.cpp
     src/gui/chrome/ChromeBarItems.cpp
