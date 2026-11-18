@@ -2749,7 +2749,8 @@ void RoundtablePanel::rebuildReadings(const QJsonObject& room)
                                          .arg(yourRowColor()));
         }
         if (away) {
-            rowWidget->setToolTip(QStringLiteral("Nobody at the radio. Its Core keeps reporting what it "
+            // Longpath: "its station", not "its Core" (a NereusSDR word).
+            rowWidget->setToolTip(QStringLiteral("Nobody at the radio. Its station keeps reporting what it "
                                                  "hears."));
         }
         rowWidget->setContextMenuPolicy(Qt::CustomContextMenu);
