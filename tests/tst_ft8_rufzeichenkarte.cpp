@@ -63,6 +63,7 @@
 #include "core/QrzClient.h"
 #include "gui/applets/Ft8Applet.h"
 #include "gui/styles/AppTheme.h"
+#include "gui/widgets/Ft8PartnerZeile.h"
 #include "gui/widgets/RotorDialWidget.h"
 #include "gui/widgets/RotorLogbookPanel.h"
 #include "gui/widgets/StationPhoto.h"
@@ -214,6 +215,26 @@ CallsignInfo antwort(const QString& ruf, const QString& vor, const QString& nach
     i.imageUrl     = bildUrl;
     i.fetchedUtc   = QDateTime::currentSecsSinceEpoch();
     return i;
+}
+
+// Die beiden Wege wie in MainWindow: der Partner geht zur Karte, die
+// Auskunft der Karte zurueck ins FT8-Feld.
+void verbinde(Ft8Applet* applet, RotorLogbookPanel* p)
+{
+    QObject::connect(applet, &Ft8Applet::partnerGewechselt, p,
+                     [p](const QString& wer) {
+        if (!wer.isEmpty()) { p->folgeFt8Partner(wer); }
+    });
+    QObject::connect(p, &RotorLogbookPanel::auskunft, applet,
+                     [applet](const RufzeichenAuskunft& a) {
+        applet->setPartnerAuskunft(a);
+    });
+}
+
+QString zeile(Ft8Applet& applet)
+{
+    return applet.partnerZeileForTest()->sichtbareStueckeForTest()
+        .join(QStringLiteral(" | "));
 }
 
 }  // namespace
@@ -513,6 +534,195 @@ private slots:
         QVERIFY2(text->hasFocus(), "das FT8-Textfeld hat den Fokus verloren");
     }
 
+    // ── Die Zeile unter „QSO with" (Entwurf A) ────────────────────────
+
+    // Ohne Netz: Locator aus seiner Nachricht, Weg vom eigenen Feld,
+    // Licht bei ihm. Ohne Partner bleibt die Zeile leer, aber stehen.
+    void zeileOhneNetz()
+    {
+        Stand s;
+        richte(s);
+        s.applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&s.applet, kFensterFrist));
+        Ft8PartnerZeile* z = s.applet.partnerZeileForTest();
+        QVERIFY(z);
+        QVERIFY2(z->isVisibleTo(&s.applet), "die Zeile steht nicht in der QSO-Karte");
+        QVERIFY(z->height() > 0);
+        QVERIFY(z->sichtbareStueckeForTest().isEmpty());
+        const int hoeheLeer = z->height();
+
+        periode(s.applet, {fund(QStringLiteral("CQ DL1ABC JO31"), -8.0f, 1850.0f)},
+                kFenster);
+        QVERIFY(doppelklickAufZeile(s.applet, QStringLiteral("CQ DL1ABC")));
+        const QStringList st = z->sichtbareStueckeForTest();
+        QVERIFY2(st.size() == 2, qPrintable(st.join(QStringLiteral(" | "))));
+        QVERIFY2(st.at(0).startsWith(QStringLiteral("JO31 · ")), qPrintable(st.at(0)));
+        QVERIFY(st.at(0).contains(QStringLiteral(" km · ")));
+        QVERIFY(st.at(0).endsWith(QStringLiteral("°")));
+        QVERIFY2(st.at(1).endsWith(QStringLiteral(" there")), qPrintable(st.at(1)));
+        QCOMPARE(z->height(), hoeheLeer);     // die Liste springt nicht
+    }
+
+    // Die Kette wie in MainWindow: Cache, Abfrage laeuft, Antwort aus
+    // dem Netz, nicht gefunden -- alles ueber die Karte, nie selbst.
+    void zeileMitQrzAusDerKarte()
+    {
+        RadioModel radio;
+        QrzClient qrz;
+        qrz.setCredentials(QStringLiteral("pruefstand"), QStringLiteral("pruefstand"));
+        QWidget fenster;
+        auto* applet = new Ft8Applet(&radio, &fenster);
+        richte(radio, *applet);
+        auto* reihe = new QHBoxLayout(&fenster);
+        auto* p = new RotorLogbookPanel(nullptr, &qrz, nullptr, &fenster);
+        reihe->addWidget(applet);
+        reihe->addWidget(p);
+        verbinde(applet, p);
+        fenster.resize(1030, 733);
+        fenster.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&fenster, kFensterFrist));
+
+        p->merkeQrzAntwortForTest(antwort(QStringLiteral("DL1ABC"),
+            QStringLiteral("Hans"), QStringLiteral("Muster"), QStringLiteral("Bonn"),
+            QStringLiteral("Germany"), QStringLiteral("JO30RR"), QString()));
+
+        // Aus dem Cache: sofort, ohne Anfrage.
+        periode(*applet, {
+            fund(QStringLiteral("CQ DL1ABC JO31"), -8.0f, 1850.0f),
+            fund(QStringLiteral("CQ SP9XYZ KO00"), -7.0f, 1906.0f),
+        }, kFenster);
+        QVERIFY(doppelklickAufZeile(*applet, QStringLiteral("CQ DL1ABC")));
+        // QRZ sagt JO30RR, gesendet hat er JO31: er ist woanders, das
+        // Gesendete gilt.
+        QVERIFY2(zeile(*applet).startsWith(QStringLiteral("Hans Muster | Bonn | class A | JO31 · ")),
+                 qPrintable(zeile(*applet)));
+        QVERIFY(!p->lookupTimerForTest()->isActive());
+
+        // Der naechste ist nicht im Cache: „looking up", und die Karte
+        // hat die Abfrage eingeplant (hier angehalten, kein Netz).
+        QVERIFY(doppelklickAufZeile(*applet, QStringLiteral("CQ SP9XYZ")));
+        QCOMPARE(applet->ablaufForTest().partner(), QStringLiteral("SP9XYZ"));
+        QTimer* uhr = p->lookupTimerForTest();
+        QVERIFY(uhr->isActive());
+        uhr->stop();
+        QVERIFY2(zeile(*applet).startsWith(QStringLiteral("looking up SP9XYZ… | KO00 · ")),
+                 qPrintable(zeile(*applet)));
+        QVERIFY2(!zeile(*applet).contains(QStringLiteral("Hans Muster")),
+                 "der Name des vorigen Partners steht neben dem neuen");
+
+        // Die Antwort kommt -- ueber den QRZ-Weg der Karte.
+        emit qrz.lookupSucceeded(QStringLiteral("SP9XYZ"), antwort(QStringLiteral("SP9XYZ"),
+            QStringLiteral("Jan"), QStringLiteral("Kowalski"), QStringLiteral("Tarnów"),
+            QStringLiteral("Poland"), QStringLiteral("KO00LA"), QString()));
+        QVERIFY2(zeile(*applet).startsWith(QStringLiteral("Jan Kowalski | Tarnów | class A | KO00LA · ")),
+                 qPrintable(zeile(*applet)));
+
+        // Ein dritter, den QRZ nicht kennt.
+        periode(*applet, {fund(QStringLiteral("CQ PD4RJ JO33"), 12.0f, 1338.0f)},
+                kFenster + 15000);
+        QVERIFY(doppelklickAufZeile(*applet, QStringLiteral("CQ PD4RJ")));
+        p->lookupTimerForTest()->stop();
+        emit qrz.lookupFailed(QStringLiteral("PD4RJ"), QrzClient::Error::NotFound, QString());
+        QVERIFY2(zeile(*applet).endsWith(QStringLiteral(" | not in QRZ")),
+                 qPrintable(zeile(*applet)));
+    }
+
+    // Was der Betreiber in die Karte tippt, gehoert nicht in die Zeile.
+    void fremdeAuskunftZaehltNicht()
+    {
+        RadioModel radio;
+        QrzClient qrz;
+        qrz.setCredentials(QStringLiteral("pruefstand"), QStringLiteral("pruefstand"));
+        QWidget fenster;
+        auto* applet = new Ft8Applet(&radio, &fenster);
+        richte(radio, *applet);
+        auto* reihe = new QHBoxLayout(&fenster);
+        auto* p = new RotorLogbookPanel(nullptr, &qrz, nullptr, &fenster);
+        reihe->addWidget(applet);
+        reihe->addWidget(p);
+        verbinde(applet, p);
+        fenster.resize(1030, 733);
+        fenster.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&fenster, kFensterFrist));
+        p->merkeQrzAntwortForTest(antwort(QStringLiteral("OE1XYZ"),
+            QStringLiteral("Franz"), QStringLiteral("Fremd"), QStringLiteral("Wien"),
+            QStringLiteral("Austria"), QStringLiteral("JN88EF"), QString()));
+
+        periode(*applet, {fund(QStringLiteral("CQ DL1ABC JO31"), -8.0f, 1850.0f)},
+                kFenster);
+        QVERIFY(doppelklickAufZeile(*applet, QStringLiteral("CQ DL1ABC")));
+        p->lookupTimerForTest()->stop();
+
+        // Er tippt selbst ein anderes Rufzeichen: die Karte zeigt OE1XYZ.
+        QLineEdit* ruf = feld(*p, QStringLiteral("callsign"));
+        leere(ruf);
+        tippe(ruf, QStringLiteral("OE1XYZ"));
+        QVERIFY(zeigtText(*p, QStringLiteral("Franz Fremd")));
+        QVERIFY2(!zeile(*applet).contains(QStringLiteral("Franz Fremd")),
+                 "die Zeile zeigt ein getipptes Rufzeichen statt des Partners");
+        QVERIFY(zeile(*applet).startsWith(QStringLiteral("looking up DL1ABC…")));
+    }
+
+    // Ohne QRZ-Konto: der Hinweis, wo man es eintraegt.
+    void ohneKontoDerHinweis()
+    {
+        RadioModel radio;
+        QWidget fenster;
+        auto* applet = new Ft8Applet(&radio, &fenster);
+        richte(radio, *applet);
+        auto* reihe = new QHBoxLayout(&fenster);
+        auto* p = new RotorLogbookPanel(nullptr, nullptr, nullptr, &fenster);
+        reihe->addWidget(applet);
+        reihe->addWidget(p);
+        verbinde(applet, p);
+        fenster.resize(1030, 733);
+        fenster.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&fenster, kFensterFrist));
+
+        periode(*applet, {fund(QStringLiteral("CQ DL1ABC JO31"), -8.0f, 1850.0f)},
+                kFenster);
+        QVERIFY(doppelklickAufZeile(*applet, QStringLiteral("CQ DL1ABC")));
+        QVERIFY2(zeile(*applet).endsWith(QStringLiteral(" | name and photo: QRZ account in Tools")),
+                 qPrintable(zeile(*applet)));
+    }
+
+    // Wenn der Platz nicht reicht: erst Hinweis, Ort, Klasse, Weg --
+    // Name und Licht bleiben am laengsten.
+    void schmalBleibenNameUndLicht()
+    {
+        Ft8PartnerZeile z;
+        Ft8PartnerZeile::Inhalt in;
+        in.rufzeichen = QStringLiteral("SP9XYZ");
+        in.name    = QStringLiteral("Jan Kowalski");
+        in.ort     = QStringLiteral("Tarnów");
+        in.klasse  = QStringLiteral("A");
+        in.locator = QStringLiteral("KO00");
+        in.km      = 647;
+        in.grad    = 61;
+        in.licht   = Grauzone::Licht::Nacht;
+        in.qrz     = RufzeichenAuskunft::Stand::Da;
+        z.setzeInhalt(in);
+        z.resize(2000, 20);
+        QCOMPARE(z.sichtbareStueckeForTest(), (QStringList{
+            QStringLiteral("Jan Kowalski"), QStringLiteral("Tarnów"),
+            QStringLiteral("class A"), QStringLiteral("KO00 · 647 km · 61°"),
+            QStringLiteral("night there")}));
+        const int voll = z.sizeHint().width();
+
+        z.resize(voll - 10, 20);
+        QVERIFY2(!z.sichtbareStueckeForTest().contains(QStringLiteral("Tarnów")),
+                 "zuerst geht der Ort");
+        QVERIFY(z.sichtbareStueckeForTest().contains(QStringLiteral("class A")));
+
+        z.resize(140, 20);
+        const QStringList knapp = z.sichtbareStueckeForTest();
+        QVERIFY2(knapp.contains(QStringLiteral("Jan Kowalski")), qPrintable(knapp.join(QLatin1Char('|'))));
+        QVERIFY2(knapp.contains(QStringLiteral("night there"))
+                     || knapp.size() == 1,
+                 qPrintable(knapp.join(QLatin1Char('|'))));
+        QVERIFY(!knapp.contains(QStringLiteral("KO00 · 647 km · 61°")));
+    }
+
     // Ein Bild des echten Felds -- nur mit LONGPATH_GRAB_DIR.
     void bild()
     {
@@ -537,10 +747,7 @@ private slots:
         applet->setFixedSize(706, 733);
         reihe->addWidget(applet);
         reihe->addWidget(p);
-        QObject::connect(applet, &Ft8Applet::partnerGewechselt, p,
-                         [p](const QString& wer) {
-            if (!wer.isEmpty()) { p->folgeFt8Partner(wer); }
-        });
+        verbinde(applet, p);
         fenster.show();
         QVERIFY(QTest::qWaitForWindowExposed(&fenster, kFensterFrist));
         if (QLineEdit* mein = feld(*p, QStringLiteral("your locator"))) {
@@ -564,10 +771,26 @@ private slots:
         QTRY_VERIFY(foto(*p)->hasPhoto());
         QTest::qWait(300);
 
-        QImage img = fenster.grab().toImage();
-        img.setDotsPerMeterX(5669);     // 144 dpi
-        img.setDotsPerMeterY(5669);
-        QVERIFY(img.save(dir + QStringLiteral("/rufzeichenkarte-heute.png")));
+        const auto sichere = [&dir](QWidget* w, const QString& name) {
+            QImage img = w->grab().toImage();
+            img.setDotsPerMeterX(5669);     // 144 dpi
+            img.setDotsPerMeterY(5669);
+            QVERIFY(img.save(dir + QLatin1Char('/') + name));
+        };
+        QVERIFY(zeile(*applet).startsWith(QStringLiteral("Jan Kowalski")));
+        sichere(&fenster, QStringLiteral("rufzeichenkarte-heute.png"));
+
+        // Die QSO-Karte allein, in den drei Faellen der Entwurfsblaetter.
+        QWidget* karte = applet->partnerZeileForTest()->parentWidget();
+        sichere(karte, QStringLiteral("zeile-volle-daten.png"));
+        RufzeichenAuskunft a;
+        a.rufzeichen = QStringLiteral("SP9XYZ");
+        a.stand = RufzeichenAuskunft::Stand::Laeuft;
+        applet->setPartnerAuskunft(a);
+        sichere(karte, QStringLiteral("zeile-abfrage-laeuft.png"));
+        a.stand = RufzeichenAuskunft::Stand::KeinKonto;
+        applet->setPartnerAuskunft(a);
+        sichere(karte, QStringLiteral("zeile-kein-qrz-konto.png"));
     }
 };
 

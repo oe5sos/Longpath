@@ -19477,6 +19477,13 @@ RotorLogbookPanel* MainWindow::ensureRotorPanel()
         ensureSatellites();
         panel->setSatellites(m_satellites);
         m_rotorPanel = panel;
+        // Name, Ort und Klasse des FT8-Partners kommen von hier, nicht
+        // aus einer zweiten QRZ-Abfrage (2026-11-18, RufzeichenAuskunft.h).
+        // Das FT8-Feld nimmt nur, was zu seinem Partner gehoert.
+        connect(panel, &RotorLogbookPanel::auskunft, this,
+                [this](const RufzeichenAuskunft& a) {
+            if (m_ft8Applet) { m_ft8Applet->setPartnerAuskunft(a); }
+        });
         connect(panel, &RotorLogbookPanel::logbookClosed, this, [this]() {
             noteWindowClosedByOperator(QStringLiteral("WinLogbook"));
         });

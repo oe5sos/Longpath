@@ -2459,14 +2459,17 @@ void RotorLogbookPanel::onLookupRequested()
         updateFlagFor(cached.call);
         setStationLine(stationText(cached));
         showStationVisuals(cached);
+        meldeAuskunft(call, RufzeichenAuskunft::Stand::Da, cached);
         return;
     }
 
     if (!m_qrz || !m_qrz->hasCredentials()) {
         setStatus(QStringLiteral("Add your QRZ account in Tools first"), true);
+        meldeAuskunft(call, RufzeichenAuskunft::Stand::KeinKonto);
         return;
     }
     setStatus(QStringLiteral("Looking up %1…").arg(call));
+    meldeAuskunft(call, RufzeichenAuskunft::Stand::Laeuft);
     m_qrz->lookup(call);
 }
 
@@ -2476,16 +2479,34 @@ void RotorLogbookPanel::scheduleAutoLookup(const QString& call)
     m_lookupTimer->stop();
 
     if (!AppSettings::instance().value(kAutoLookupKey, true).toBool()) {
+        meldeAuskunft(call, RufzeichenAuskunft::Stand::Aus);
         return;
     }
     if (call.size() < kMinAutoLookupChars) { return; }
     if (!Callsigns::isLikelyCallsign(call)) { return; }
-    if (!m_qrz || !m_qrz->hasCredentials()) { return; }
+    if (!m_qrz || !m_qrz->hasCredentials()) {
+        meldeAuskunft(call, RufzeichenAuskunft::Stand::KeinKonto);
+        return;
+    }
 
     // A cached answer needs no waiting.
     if (m_qrzCache.contains(call)) { onLookupRequested(); return; }
 
     m_lookupTimer->start();
+    meldeAuskunft(call, RufzeichenAuskunft::Stand::Laeuft);
+}
+
+void RotorLogbookPanel::meldeAuskunft(const QString& call,
+                                      RufzeichenAuskunft::Stand stand,
+                                      const CallsignInfo& info)
+{
+    const QString norm = Callsigns::normalized(call);
+    if (norm.isEmpty()) { return; }
+    RufzeichenAuskunft a;
+    a.rufzeichen = norm;
+    a.stand      = stand;
+    a.info       = info;
+    emit auskunft(a);
 }
 
 void RotorLogbookPanel::adoptGridFromQrz(const CallsignInfo& info)
@@ -3076,6 +3097,7 @@ void RotorLogbookPanel::wireQrz()
         // Remember it whatever the operator has typed since — the next
         // time this callsign comes round, the answer is already here.
         m_qrzCache.insert(call, info);
+        meldeAuskunft(call, RufzeichenAuskunft::Stand::Da, info);
 
         if (Callsigns::normalized(m_callEdit->text()) != call) { return; }
         m_lastInfo = info;
@@ -3101,6 +3123,9 @@ void RotorLogbookPanel::wireQrz()
     connect(m_qrz, &QrzClient::lookupFailed, this,
             [this](const QString& call, QrzClient::Error err,
                    const QString& msg) {
+        meldeAuskunft(call, err == QrzClient::Error::NotFound
+                                ? RufzeichenAuskunft::Stand::NichtGefunden
+                                : RufzeichenAuskunft::Stand::Fehler);
         if (Callsigns::normalized(m_callEdit->text()) != call) { return; }
         m_lastInfo = CallsignInfo{};
         switch (err) {
