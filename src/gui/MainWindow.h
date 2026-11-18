@@ -2155,6 +2155,8 @@ private:
     class RadeApplet* m_radeApplet{nullptr};
     class RttyDecoderApplet* m_rttyDecoderApplet{nullptr};
     class CwDecoderApplet*   m_cwDecoderApplet{nullptr};
+    // Roundtable Stufe 2 (2026-11-18): Panel in der Spalte, eigenes Fenster.
+    class RoundtableApplet*  m_roundtableApplet{nullptr};
     class Ft8Applet*         m_ft8Applet{nullptr};
     class Ft8PlaetzeApplet*  m_ft8PlaetzeApplet{nullptr};
     /// Das Plaetze-Panel geht von selbst auf, wenn etwas laeuft, und

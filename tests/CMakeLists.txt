@@ -5674,6 +5674,13 @@ if(TEST tst_roundtable_e2e)
 endif()
 # Der Reiter im Spot Hub: Erstfrage, Umschalter, Auto-Start.
 longpath_add_test(tst_roundtable_spothub)
+# Stufe 2 (2026-11-18): Panel und eigenes Fenster per Klick; der Fall
+# livePerKlick laeuft gegen den Referenzserver (sonst uebersprungen).
+longpath_add_test(tst_roundtable_panel)
+if(TEST tst_roundtable_panel)
+    set_tests_properties(tst_roundtable_panel PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 longpath_add_test(tst_roundtable_key)
 if(TEST tst_roundtable_key)
     set_tests_properties(tst_roundtable_key PROPERTIES

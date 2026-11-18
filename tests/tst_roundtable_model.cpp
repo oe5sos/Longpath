@@ -198,7 +198,8 @@ private slots:
 
     void sharedPathPreferencesHaveApprovedDefaults()
     {
-        QCOMPARE(RoundtableModel::stationSettingDefault(QStringLiteral("DistanceUnits")), QStringLiteral("mi"));
+        // Longpath: km (Upstream: mi).
+        QCOMPARE(RoundtableModel::stationSettingDefault(QStringLiteral("DistanceUnits")), QStringLiteral("km"));
         QCOMPARE(RoundtableModel::stationSettingDefault(QStringLiteral("ShowBearing")), QStringLiteral("True"));
         QVERIFY(RoundtableModel::stationSettingNames().contains(QStringLiteral("DistanceUnits")));
         QVERIFY(RoundtableModel::stationSettingNames().contains(QStringLiteral("ShowBearing")));

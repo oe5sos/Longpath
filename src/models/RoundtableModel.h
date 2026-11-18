@@ -113,7 +113,7 @@ public:
     static QStringList stationSettingNames();
     /// The default each reads as while unset: AutoStart "True",
     /// AwayChoice "Report", HighlightMentions "True", ShowBearing "True",
-    /// DistanceUnits "mi", the overrides "".
+    /// DistanceUnits "km" (Longpath; Upstream "mi"), the overrides "".
     static QString stationSettingDefault(const QString& name);
 
     explicit RoundtableModel(QObject* parent = nullptr);

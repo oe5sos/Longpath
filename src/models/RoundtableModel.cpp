@@ -142,8 +142,10 @@ QString RoundtableModel::stationSettingDefault(const QString& name)
         || name == QLatin1String("ShowBearing")) {
         return QStringLiteral("True");
     }
+    // Longpath: km. Upstream's approved default is mi (a US operator);
+    // Longpath's operator is in Austria. The panel's menu switches it.
     if (name == QLatin1String("DistanceUnits")) {
-        return QStringLiteral("mi");
+        return QStringLiteral("km");
     }
     if (name == QLatin1String("AwayChoice")) {
         return QStringLiteral("Report");
