@@ -234,13 +234,15 @@ void DeviceTemperatureStrip::render(Slot& s)
 {
     // Kuerzel in Skalengrau, Zahl warm und in fester Breite (HAUSSTIL
     // Regel 4: „Zahlen sind Monospace, Wörter nicht").
+    // Die Familie steht als LP_MONO_QSS in der Vorlage selbst, nicht als
+    // eingesetztes Argument: tst_schriftfamilien sucht genau diese Form
+    // und fiel in der CI ueber die andere.
     s.widget->setText(QStringLiteral(
         "<span style=\"color:%1;\">%2</span>&nbsp;"
-        "<span style=\"color:%3; font-family:%4;\">%5</span>")
+        "<span style=\"color:%3; font-family: " LP_MONO_QSS ";\">%4</span>")
         .arg(QLatin1String(Style::kTextScale),
              s.label.toHtmlEscaped(),
              QLatin1String(Style::kAmberText),
-             QStringLiteral(LP_MONO_QSS),
              valueText(s)));
 
     // Die Meldung des Geraets als Rahmen, nicht als Farbwechsel der
