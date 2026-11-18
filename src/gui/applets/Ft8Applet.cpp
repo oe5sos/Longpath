@@ -33,6 +33,7 @@
 #include "core/DxccWorkedStatus.h"
 #include "gui/widgets/Ft8Wasserfall.h"
 #include "gui/widgets/Ft8DannListe.h"
+#include "gui/widgets/FlowLayout.h"
 #include "core/MoxController.h"
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/audio/AudioTapRing.h"
@@ -56,6 +57,7 @@
 #include <QTextBlock>
 #include <QTextDocument>
 #include <QTextEdit>
+#include <QScrollArea>
 #include <QScrollBar>
 #include <QMouseEvent>
 #include <QProgressBar>
@@ -236,6 +238,45 @@ Ft8Applet::~Ft8Applet()
     }
 }
 
+// ── Die Fundliste gibt zuerst nach (2026-11-18) ─────────────────────
+//
+// Die drei Reihen brechen um; damit haengt die Hoehe des Fensters an
+// seiner Breite. Der Rollbereich des schwebenden Fensters
+// (`AppletFloatingWindow`) fragt dafuer `heightForWidth()` und macht das
+// Applet nie niedriger -- und Qt antwortet mit der Summe der
+// WUNSCHhoehen. Die Fundliste wuenscht sich 192 Punkt und kommt mit 120
+// aus: gemessen bei 260 Punkt Breite 703 gegen 631. In diesen 72 Punkt
+// rollte das Fenster senkrecht, und unten, unter dem Rand, lag die
+// Sendereihe mit `Stop`.
+//
+// Im Rollbereich darum die MINDESThoehe: gerollt wird erst, wenn die
+// Liste nichts mehr abgeben kann. Angedockt in der Spalte bleibt es bei
+// Qts Antwort -- dort rollt die ganze Spalte, und die Liste soll ihre
+// Wunschhoehe behalten.
+//
+// Der zweite Griff ist derselbe wie im Slots-Fenster: der senkrechte
+// Rollbalken nimmt dem Inhalt zehn Punkt Breite, die Reihen brechen
+// frueher um, das Fenster wird hoeher -- und braucht den Balken erst
+// recht. Passt alles, WENN der Balken weg waere, wird fuer diese Breite
+// geantwortet; der Rollbereich nimmt ihn darauf selbst weg.
+int Ft8Applet::heightForWidth(int breite) const
+{
+    QLayout* anordnung = layout();
+    QWidget* sicht = parentWidget();
+    auto* roll = sicht ? qobject_cast<QScrollArea*>(sicht->parentWidget())
+                       : nullptr;
+    if (!anordnung || !roll || roll->viewport() != sicht) {
+        return AppletWidget::heightForWidth(breite);
+    }
+    const QSize frei = roll->maximumViewportSize();
+    if (breite < frei.width()) {
+        const int ohneBalken =
+            anordnung->totalMinimumHeightForWidth(frei.width());
+        if (ohneBalken <= frei.height()) { return ohneBalken; }
+    }
+    return anordnung->totalMinimumHeightForWidth(breite);
+}
+
 void Ft8Applet::buildUI()
 {
     auto* root = new QVBoxLayout(this);
@@ -289,7 +330,40 @@ void Ft8Applet::buildUI()
     root->addWidget(leiste);
 
     // ── Kopfzeile: Verfahren + Zustand ──────────────────────────────
-    auto* head = new QHBoxLayout();
+    //
+    // ── Die drei Reihen brechen um (2026-11-18) ──────────────────────
+    //
+    // Betreiber, mit Bildern seines Fensters bei 460 bis 840 Punkt
+    // Breite: „hier finde ich nun keinen button mehr für CQ" --
+    // „versteckt sich ganz rechts, somit ist es nicht sichtbar" -- „man
+    // sollte hier zu sehen auch dieses fenster kleiner ziehen können,
+    // alle pillen usw. müssen natürlich dann auch verschoben werden".
+    //
+    // Kopfreihe, Sicht-Pillen und Sendereihe waren je ein QHBoxLayout:
+    // EINE Zeile, deren Mindestbreite die Summe ihrer Teile ist
+    // (gemessen: 653 Punkt). Schmaler ging das Fenster zwar, aber dann
+    // rollte der Rollbereich darunter waagrecht, und was rechts stand,
+    // war weg -- ausgerechnet CQ, Send und Stop.
+    //
+    // Jetzt sind es drei FlowLayouts: dieselben Elemente in derselben
+    // Reihenfolge, die in die naechste Zeile rutschen, wenn der Platz
+    // ausgeht. Ist Platz, steht alles, wie es stand. Die Namen `head`,
+    // `sichtReihe` und `sendRow` und ihre Aufrufe (addWidget,
+    // addSpacing, addStretch, insertWidget) sind geblieben: wer eine
+    // weitere Pille anhaengt, schreibt dieselbe Zeile wie bisher.
+    auto* head = new FlowLayout(nullptr, 6, 6);
+    // Beschriftung und Feld gehoeren zusammen: als EIN Stueck in der
+    // Reihe, damit der Umbruch nie zwischen „TX Hz" und seine Zahl
+    // faellt.
+    const auto paar = [this](QWidget* schild, QWidget* feld) {
+        auto* stueck = new QWidget(this);
+        auto* h = new QHBoxLayout(stueck);
+        h->setContentsMargins(0, 0, 0, 0);
+        h->setSpacing(6);
+        h->addWidget(schild);
+        h->addWidget(feld);
+        return stueck;
+    };
 
     m_ft8Btn = blueToggle(QStringLiteral("FT8"), 48);
     m_ft8Btn->setCheckable(true);
@@ -459,7 +533,6 @@ void Ft8Applet::buildUI()
     auto* tonBez = new QLabel(tr("TX Hz"), this);
     tonBez->setFont(Style::monoFont(font(), Style::kFontSmall));
     tonBez->setStyleSheet(QStringLiteral("color: %1;").arg(Style::kTextSecondary));
-    head->addWidget(tonBez);
 
     m_sendeTonHz = AppSettings::instance()
                        .value(QLatin1String(kSendeTonSchluessel),
@@ -481,7 +554,7 @@ void Ft8Applet::buildUI()
         AppSettings::instance().setValue(QLatin1String(kSendeTonSchluessel), hz);
         if (m_wasserfall) { m_wasserfall->setzeSendeTon(hz); }
     });
-    head->addWidget(m_tonFeld);
+    head->addWidget(paar(tonBez, m_tonFeld));
 
     head->addSpacing(8);
 
@@ -501,7 +574,6 @@ void Ft8Applet::buildUI()
     rundenBez->setFont(Style::monoFont(font(), Style::kFontSmall));
     rundenBez->setStyleSheet(QStringLiteral("color: %1;")
                                  .arg(Style::kTextSecondary));
-    head->addWidget(rundenBez);
 
     m_rundenFeld = new QSpinBox(this);
     m_rundenFeld->setRange(1, 3);
@@ -521,15 +593,24 @@ void Ft8Applet::buildUI()
         AppSettings::instance().setValue(QStringLiteral("Ft8/Durchgaenge"),
                                          QString::number(n));
     });
-    head->addWidget(m_rundenFeld);
+    head->addWidget(paar(rundenBez, m_rundenFeld));
 
     head->addSpacing(8);
 
     m_status = new QLabel(QStringLiteral("—"), this);
     m_status->setFont(Style::monoFont(font(), Style::kFontSmall));
     m_status->setStyleSheet(QStringLiteral("color: %1;").arg(Style::kTextSecondary));
+    // Der Zustand nimmt, was in seiner Zeile uebrig ist, und zaehlt
+    // beim Umbruch mit einer festen Breite -- NICHT mit seinem Text.
+    // Der wechselt alle paar Sekunden („listening", „tone 1500 → 2000
+    // Hz (Hounds below …)"), und mit ihm waere die Reihe umgebrochen
+    // und wieder zurueck: die Fundliste darunter spraenge auf und ab.
+    // Vorher machte ein langer Text die ganze Reihe breiter. Darum auch
+    // kein addStretch() mehr dahinter: der Zustand IST der Rest.
+    m_status->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    m_status->setMinimumWidth(
+        m_status->fontMetrics().horizontalAdvance(QString(14, QLatin1Char('0'))));
     head->addWidget(m_status);
-    head->addStretch(1);
     root->addLayout(head);
 
     // Der Fuellstand des laufenden Fensters. Ohne ihn sieht ein
@@ -646,8 +727,12 @@ void Ft8Applet::buildUI()
     // mich gerichtet), nur als Sicht statt als zweites Fenster.
     //
     // Betreiber am 2026-10-30, nach drei Entwurfsblaettern: „c bitte".
-    auto* sichtReihe = new QHBoxLayout();
-    sichtReihe->setSpacing(3);
+    // Bricht um wie die Kopfreihe (2026-11-18); 3 Punkt zwischen den
+    // Pillen wie bisher.
+    auto* sichtReihe = new FlowLayout(nullptr, 3, 4);
+    // Zaehler und `Clear` bleiben am rechten Rand, auch wenn sie in
+    // die zweite Zeile rutschen.
+    sichtReihe->setStretchFollowsNext(true);
     const auto sichtKnopf = [this, sichtReihe](const QString& text,
                                                Sicht welche, int breite) {
         QPushButton* b = blueToggle(text, breite);
@@ -716,11 +801,18 @@ void Ft8Applet::buildUI()
                                "tone, plus anything addressed to you — "
                                "what the second column used to show."));
     sichtReihe->addStretch(1);
+    // Zaehler, Uhrwarnung und `Clear` als EIN Stueck: sie brechen
+    // zusammen um und stehen zusammen rechts (2026-11-18).
+    auto* rechts = new QWidget(this);
+    auto* rechtsReihe = new QHBoxLayout(rechts);
+    rechtsReihe->setContentsMargins(0, 0, 0, 0);
+    rechtsReihe->setSpacing(3);
+    sichtReihe->addWidget(rechts);
     m_fundZahl = new QLabel(QString(), this);
     m_fundZahl->setFont(Style::monoFont(font(), Style::kFontMicro));
     m_fundZahl->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
                                   .arg(Style::kTextInactive));
-    sichtReihe->addWidget(m_fundZahl);
+    rechtsReihe->addWidget(m_fundZahl);
 
     // ── Die Uhr, wenn sie falsch geht (2026-11-13) ──────────────
     //
@@ -733,7 +825,7 @@ void Ft8Applet::buildUI()
     m_uhrWarnung->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
                                     .arg(Style::kAmberWarn));
     m_uhrWarnung->setVisible(false);
-    sichtReihe->addWidget(m_uhrWarnung);
+    rechtsReihe->addWidget(m_uhrWarnung);
 
     m_clearBtn = styledButton(tr("Clear"), 54);
     m_clearBtn->setCheckable(false);   // leert die Liste, rastet nicht ein
@@ -743,7 +835,7 @@ void Ft8Applet::buildUI()
         m_zeilen.clear();
         zeichneListe();
     });
-    sichtReihe->addWidget(m_clearBtn);
+    rechtsReihe->addWidget(m_clearBtn);
     root->addLayout(sichtReihe);
 
     // ── Die Spaltenkoepfe (2026-10-30) ──────────────────────────
@@ -758,6 +850,11 @@ void Ft8Applet::buildUI()
     m_spaltenkopf->setStyleSheet(
         QStringLiteral("QLabel { color: %1; padding: 0 0 2px 6px; }")
             .arg(QString::fromLatin1(Style::kTextInactive)));
+    // Die Ueberschrift ist so breit wie alle Spalten zusammen. Als
+    // gewoehnliche Beschriftung verlangte sie diese Breite auch vom
+    // Fenster; sie darf rechts enden wie die Liste unter ihr
+    // (2026-11-18).
+    m_spaltenkopf->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     root->addWidget(m_spaltenkopf);
 
     root->addWidget(m_list, 1);
@@ -767,7 +864,11 @@ void Ft8Applet::buildUI()
     //
     // Eine Zeile: was gesendet wird, und zwei Knoepfe. Kein
     // Folgeschalter, keine Automatik — siehe Ft8Applet.h.
-    auto* sendRow = new QHBoxLayout();
+    //
+    // Bricht um wie die beiden Reihen oben (2026-11-18). Das Textfeld
+    // dehnt sich in seiner Zeile; `CQ`, `Send` und `Stop` rutschen in
+    // die naechste, statt rechts aus dem Fenster zu fallen.
+    auto* sendRow = new FlowLayout(nullptr, 6, 6);
     m_textFeld = new QLineEdit(this);
     m_textFeld->setFont(Style::monoFont(font(), Style::kFontSmall));
     m_textFeld->setPlaceholderText(tr("CQ <call> <grid>"));
@@ -775,7 +876,7 @@ void Ft8Applet::buildUI()
         "QLineEdit { background: %1; color: %2; border: 1px solid %3;"
         " padding: 2px 4px; }")
         .arg(Style::kInsetBg, Style::kTextPrimary, Style::kInsetBorder));
-    sendRow->addWidget(m_textFeld, 1);
+    sendRow->addWidget(m_textFeld);
     // (der „Manual"-Knopf kommt weiter unten dazu)
 
     // ── CQ rufen ────────────────────────────────────────────────────
@@ -833,8 +934,11 @@ void Ft8Applet::buildUI()
                              Style::kFontSmall);
     kopfReihe->addWidget(m_arbeitZustand);
     kopfReihe->addWidget(m_arbeitPartner);
-    kopfReihe->addWidget(m_arbeitLand);
-    kopfReihe->addStretch(1);
+    // Das Land nimmt den Rest der Zeile und gibt ihn zuerst her, wenn
+    // es eng wird (2026-11-18) -- vorher stand dahinter ein Dehnraum,
+    // und das Land verlangte seine volle Breite vom Fenster.
+    m_arbeitLand->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    kopfReihe->addWidget(m_arbeitLand, 1);
     m_arbeitUhr = schild(QString(), Style::kTextInactive, Style::kFontSmall);
     m_arbeitUhr->setFont(Style::monoFont(font(), Style::kFontSmall));
     kopfReihe->addWidget(m_arbeitUhr);
@@ -893,6 +997,11 @@ void Ft8Applet::buildUI()
     m_dannUhr->setInterval(1000);
     connect(m_dannUhr, &QTimer::timeout, this, [this] { zeigeDann(); });
 
+    // Die Arbeitsleiste nimmt die Breite, die das Fenster hat, und
+    // verlangt keine (2026-11-18): was in ihr steht -- der naechste
+    // Zug, die Schlange -- wechselt mit jedem QSO, und daran darf nicht
+    // haengen, ob `Stop` noch im Fenster liegt.
+    m_arbeit->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     root->addWidget(m_arbeit);
 
     // ── Tx1..Tx6 hinter einem Knopf ─────────────────────
