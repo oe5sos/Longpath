@@ -170,6 +170,8 @@ private slots:
             QStringLiteral("slice set 1 dax=1"),
             // weg auf das Lauschband, OHNE den Panadapter mitzuziehen
             QStringLiteral("slice tune 1 28.074000 autopan=0"),
+            // die Scheibe des Betreibers bleibt die aktive
+            QStringLiteral("slice set 0 active=1"),
             QStringLiteral("stream create type=dax_rx dax_channel=1"),
         };
         QCOMPARE(d.befehle, erwartet);
@@ -408,6 +410,10 @@ private slots:
                  QStringLiteral("CQ 3B8XX LG89"));
         QCOMPARE(Ft8Applet::nachrichtAusZeile(mitMarke),
                  QStringLiteral("CQ 3B8XX LG89"));
+        QCOMPARE(Ft8Applet::bandmarkeAusZeile(mitMarke), QStringLiteral("10m"));
+        QCOMPARE(Ft8Applet::bandmarkeAusZeile(haupt), QString());
+        QCOMPARE(Ft8Applet::ohneBandmarke(mitMarke).simplified(),
+                 haupt.simplified());
         // Eine Zeile ohne Marke, deren Nachricht mit einer Zahl
         // anfaengt, bleibt wie sie ist.
         QString leer = haupt;
@@ -455,11 +461,15 @@ private slots:
         QVERIFY2(applet.lastLabelForTest()->text().contains(QStringLiteral("10m: 3 heard")),
                  qPrintable(applet.lastLabelForTest()->text()));
 
-        // Die Zeilen des Hauptbandes bekommen dieselbe Spalte, leer.
+        // Die Zeilen des Hauptbandes tragen ihr Band ebenso („man sollte
+        // aber sehen, auf welchen bänder man was sieht").
         applet.periodeForTest({fund(QStringLiteral("CQ DL3AAA JN48"), 1500.0f)});
         const QString danach = applet.listForTest()->toPlainText();
         const QString hz = danach.split('\n').filter(QStringLiteral("DL3AAA")).value(0);
-        QVERIFY2(hz.mid(6, 5).trimmed().isEmpty(), qPrintable(hz));
+        QVERIFY2(hz.mid(6).trimmed().startsWith(QStringLiteral("15m")), qPrintable(hz));
+        // Und ein Doppelklick darauf ist der gewohnte Weg (kein Tausch):
+        // der Rapport wird trotz Bandspalte richtig gelesen.
+        QCOMPARE(Ft8Applet::ohneBandmarke(hz).simplified().section(' ', 1, 1).toInt(), -12);
     }
 
     void doppelklickTauschtUndSendetNicht()

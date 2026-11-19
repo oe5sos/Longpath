@@ -115,6 +115,13 @@ void FlexLauschscheibe::richteEin()
     m_sende(QStringLiteral("slice set %1 audio_mute=1").arg(n), {});
     m_sende(QStringLiteral("slice set %1 dax=%2").arg(n).arg(kDaxKanal), {});
     stimme(m_gewuenschtHz);
+    // Die Maschine macht die neue Scheibe zur AKTIVEN (gemessen am
+    // 2026-11-19: `slice 1 … active=1`). Danach richten sich der Knopf
+    // am Geraet und manches CAT-Programm -- also zurueck auf die
+    // Scheibe des Betreibers.
+    if (!m_hauptId.isEmpty()) {
+        m_sende(QStringLiteral("slice set %1 active=1").arg(m_hauptId), {});
+    }
     m_sende(QStringLiteral("stream create type=dax_rx dax_channel=%1")
                 .arg(kDaxKanal),
             [this](quint32 code, const QString& body) {
@@ -140,7 +147,7 @@ void FlexLauschscheibe::richteEin()
             return;
         }
         m_strom = kennung;
-        qCInfo(lcConnection).nospace()
+        qCInfo(lcConnection).nospace().noquote()
             << "Flex-Lauschscheibe: Scheibe " << m_scheibe
             << ", DAX-Strom 0x" << QString::number(m_strom, 16);
         setZustand(Zustand::Laeuft);
@@ -209,7 +216,7 @@ void FlexLauschscheibe::tonAngekommen(int werte)
 {
     if (m_strom == 0 || m_tonGemeldetFuer == m_strom) { return; }
     m_tonGemeldetFuer = m_strom;
-    qCInfo(lcConnection).nospace()
+    qCInfo(lcConnection).nospace().noquote()
         << "Flex-Lauschscheibe: erster DAX-Ton auf Strom 0x"
         << QString::number(m_strom, 16) << " (" << werte
         << " Werte) — die Scheibe ist stumm, DAX liefert trotzdem";
@@ -238,6 +245,9 @@ bool FlexLauschscheibe::nimmStatus(const QString& object,
     if (const auto hz = FlexCommandWire::frequencyHzFromSliceKvs(kv)) {
         if (!qFuzzyCompare(*hz, m_gemeldetHz)) {
             m_gemeldetHz = *hz;
+            qCInfo(lcConnection).nospace()
+                << "Flex-Lauschscheibe: steht auf "
+                << QString::number(*hz / 1.0e6, 'f', 6) << " MHz";
             emit frequenzGemeldet(*hz);
         }
     }
