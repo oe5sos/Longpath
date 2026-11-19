@@ -773,6 +773,9 @@ set(CORE_SOURCES
     # Befehlskanal (TCP 4992, Saetze C/R/S/M). Keine Stroeme.
     src/core/FlexRadioDiscovery.cpp
     src/core/FlexRadioConnection.cpp
+    # FT8 auf einem zweiten Band: die Lauschscheibe mit eigenem
+    # DAX-Strom (2026-11-19)
+    src/core/FlexLauschscheibe.cpp
     src/core/FlexApdState.cpp
     # Stufe 2: der VITA-49-Leser. Nur Bytes und Rahmen, kein Sockel —
     # gegen den Mitschnitt vom 2026-10-18 pruefbar
@@ -960,6 +963,8 @@ set(GUI_SOURCES
     src/gui/widgets/Ft8Fensterbalken.cpp
     # „THEN" in der QSO-Karte: wer nach diesem QSO drankommt (2026-11-15)
     src/gui/widgets/Ft8DannListe.cpp
+    # Wer der FT8-Partner ist und wie es bei ihm aussieht (2026-11-18)
+    src/gui/widgets/Ft8PartnerZeile.cpp
     src/gui/widgets/DspParamPopup.cpp
     src/gui/widgets/RasterOverlay.cpp
     src/gui/widgets/RasterOverlay.h

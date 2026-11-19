@@ -45,7 +45,6 @@
 #pragma once
 
 #include "AppletWidget.h"
-#include "core/DigiFrequenzen.h"
 
 #include "core/DigiFrequenzen.h"
 #include "core/Ft8Decoder.h"
@@ -59,6 +58,7 @@
 #include "core/Ft8Tx.h"
 #include "core/Ft8Uhrversatz.h"
 #include "core/LocatorJagd.h"
+#include "core/RufzeichenAuskunft.h"
 #include "core/WdspTypes.h"
 
 #include <QDateTime>
@@ -68,16 +68,19 @@
 #include <QVector>
 
 #include <memory>
+#include <optional>
 
 class QAction;
 class QLabel;
 class QPlainTextEdit;
 class QSplitter;
 class QSpinBox;
+class QComboBox;
 
 namespace Longpath { class Ft8Wasserfall; }
 namespace Longpath { class Ft8Fensterbalken; }
 namespace Longpath { class Ft8DannListe; }
+namespace Longpath { class Ft8PartnerZeile; }
 class QProgressBar;
 class QLineEdit;
 class QPushButton;
@@ -129,6 +132,12 @@ public:
     void leereFuerNeuenOrt(const QString& grund);
 
     void setProtocol(Ft8Decoder::Protocol p);
+
+    /// Was die Rotor/Log-Karte ueber ein Rufzeichen weiss (2026-11-18).
+    /// Genommen wird nur, was zum laufenden Partner gehoert -- die
+    /// Karte meldet auch, was der Betreiber selbst eintippt. Das FT8-
+    /// Feld fragt QRZ nie selbst: siehe RufzeichenAuskunft.h.
+    void setPartnerAuskunft(const Longpath::RufzeichenAuskunft& a);
     Ft8Decoder::Protocol protocol() const;
 
     // ── Senden (2026-10-15) ─────────────────────────────────────────
@@ -237,6 +246,7 @@ public:
     /// aufloesbar" und nicht „kein Land" -- dann bleibt die Spalte
     /// frei, statt etwas zu behaupten.
     QString landFuer(const QString& rufzeichen) const;
+    bool istNeuesLandAuf(const QString& senderRuf, double hz) const;
 
     /// Das eigene Rufzeichen aus den Einstellungen. `User/Callsign`
     /// ist der kanonische Schluessel (SpotHubDialog schreibt ihn);
@@ -350,6 +360,43 @@ public:
     /// Periode mit einem einzigen Fund, und solche zaehlt der
     /// Uhrversatz bewusst nicht mit.
     void periodeForTest(const QVector<Longpath::Ft8Decode>& funde);
+
+    // ── FT8 auf einem zweiten Band (2026-11-19) ──────────────────────
+    //
+    // Betreiber: „ich will 2 bänder … gleichzeitig empfangen umd ggf.
+    // eine dxcc station zu hören." Ein zweiter Dekoder an einem
+    // eigenen Abgriff (AudioEngine-Lauschplatz 0), gespeist von einer
+    // zweiten Scheibe am Geraet (RadioModel::setLauschfrequenzHz).
+    // Gesendet wird nur auf dem Hauptband.
+    //
+    // In die Liste kommt vom Lauschband nur, was ein NEUES DXCC-Land
+    // ist, vorn mit grauer Bandmarke (Betreiber-Wahl 2B). Ein
+    // Doppelklick darauf tauscht die Baender (3A): die Hauptscheibe
+    // geht dorthin, das bisherige Hauptband wird Lauschband. Gesendet
+    // wird danach NICHTS von selbst -- „aber nicht automatisch
+    // senden … erst dann nach tunen."
+    /// Das naheliegende zweite Band zu einem Hauptband. Belegt sind nur
+    /// die beiden, die der Betreiber genannt hat („10 und 15 meter als
+    /// beispiel"): 15 m -> 10 m und 10 m -> 15 m. Sonst keine Vorgabe.
+    static std::optional<Band> naheliegendesLauschband(Band hauptband);
+    /// Auf `hz` lauschen (Wahlfrequenz, DIGU); 0 schaltet ab.
+    void setLauschfrequenzHz(double hz);
+    double lauschfrequenzHz() const { return m_lauschHz; }
+    /// „10m", leer wenn aus.
+    QString lauschband() const { return m_lauschBand; }
+    /// Wie viele Funde das Lauschband in der letzten Periode hatte.
+    int lauschFundeZuletzt() const { return m_lauschZuletzt; }
+    /// Eine Periode des Lauschbandes einspeisen, als waere sie dort
+    /// dekodiert worden.
+    void lauschPeriodeForTest(const QVector<Longpath::Ft8Decode>& funde);
+    Ft8Stream* lauschStreamForTest() const { return m_lauschStream; }
+    QComboBox* lauschFeldForTest() const { return m_lauschFeld; }
+    /// Ohne Geraet mit zweiter Scheibe lauschen -- nur der Pruefstand
+    /// speist die Funde selbst ein.
+    void setLauschOhneGeraetForTest(bool an) { m_lauschOhneGeraet = an; }
+    /// Der Doppelklick auf eine Zeile, wie ihn die Liste weiterreicht.
+    QString doppelklickForTest(const QString& angezeigteZeile)
+    { return nimmZeileAn(angezeigteZeile); }
     QLabel* uhrWarnungForTest() const { return m_uhrWarnung; }
     const Ft8Uhrversatz& uhrversatzForTest() const { return m_uhrversatz; }
     /// Ein gesendetes Fenster ist um. Im Betrieb kommt das von einem
@@ -380,6 +427,8 @@ public:
     /// „THEN" in der QSO-Karte und die Kapsel „+ Queue" in der
     /// Fundliste (2026-11-15).
     Longpath::Ft8DannListe* dannForTest() const { return m_dann; }
+    /// Die Zeile unter „QSO with" (2026-11-18).
+    Longpath::Ft8PartnerZeile* partnerZeileForTest() const { return m_arbeitWer; }
     QPushButton* queuePilleForTest() const { return m_queuePille; }
     /// Eine Zeile der Fundliste anstellen, wie ein Klick auf „+ Queue".
     /// Leer heisst angestellt; sonst steht da, warum nicht.
@@ -475,6 +524,17 @@ signals:
     /// abliefern.
     void fundAngenommen(const QString& zeile, const QString& partner);
 
+    /// Der QSO-Partner des Ablaufs hat gewechselt (2026-11-18) -- auf
+    /// JEDEM Weg, nicht nur per Doppelklick oder Karte wie
+    /// `fundAngenommen`: ein Antworter auf mein CQ, der naechste aus der
+    /// Schlange, ein Doppelklick. Leer heiszt: keiner mehr (ein neues
+    /// CQ). Gemeldet aus `meldeStand()` und nur bei echtem Wechsel.
+    /// Die Rotor/Log-Karte haengt daran (MainWindow), damit Name, Ort
+    /// und Foto des Partners neben dem FT8-Feld stehen, wie bei Zeus.
+    /// Mehrfach-Betrieb meldet hier nichts: dort fuehrt `m_ablauf` nur
+    /// den CQ-Ruf.
+    void partnerGewechselt(const QString& partner);
+
     /// Jede gehoerte Station mit Rufzeichen, je Fund (2026-11-11). Die
     /// QSO-Karte haengt daran (ueber Ft8KartenBruecke).
     void gehoert(const Longpath::Ft8Gehoert& g);
@@ -487,6 +547,8 @@ protected:
     bool eventFilter(QObject* obj, QEvent* ev) override;
 
 private slots:
+    void onLauschDecoded(const QVector<Longpath::Ft8Decode>& funde,
+                         const QDateTime& periodStart);
     void onDecoded(const QVector<Longpath::Ft8Decode>& funde,
                    const QDateTime& periodStart);
 
@@ -507,6 +569,20 @@ private:
     QPointer<SliceModel> m_slice;
     Ft8Stream* m_stream{nullptr};
     std::unique_ptr<AudioTapRing> m_tapRing;
+    // Das Lauschband (2026-11-19): eigener Dekoder, eigener Ring.
+    Ft8Stream* m_lauschStream{nullptr};
+    std::unique_ptr<AudioTapRing> m_lauschRing;
+    double  m_lauschHz{0.0};
+    QString m_lauschBand;
+    int     m_lauschZuletzt{0};
+    /// Die Skala vor dem letzten Bandwechsel: wohin das Lauschband
+    /// geht, wenn das Hauptband auf seines wechselt.
+    double  m_letzteSkalaHz{0.0};
+    bool    m_lauschOhneGeraet{false};
+    QComboBox* m_lauschFeld{nullptr};
+    /// Das Feld „Also" neu fuellen: ohne das Hauptband, das
+    /// naheliegende Band zuerst, die Wahl wie sie gilt.
+    void fuelleLauschFeld();
     QTimer* m_pumpTimer{nullptr};
     int     m_lastPeriodCount{-1};
     int     m_lineCount{0};
@@ -539,8 +615,20 @@ private:
         bool    neuesGridBand{false};
         QColor  landFarbe;
         bool    eigeneSendung{false};
+        /// Vom Lauschband: dessen Bezeichnung („10m") und Wahlfrequenz.
+        /// Leer bzw. 0 fuer das Hauptband.
+        QString band;
+        double  wahlHz{0.0};
     };
     QVector<Fundzeile> m_zeilen;
+    /// Die Zeile, wie sie in der Liste steht: mit Bandmarke (Lauschband)
+    /// oder, solange ein Lauschband laeuft, mit gleich breiter Luecke.
+    QString anzeigeText(const Fundzeile& z) const;
+    /// Der Doppelklick in der Fundliste: Lauschband-Zeile -> tauschen,
+    /// sonst wie bisher nimmFundAn().
+    QString nimmZeileAn(const QString& angezeigteZeile);
+    /// Tauschen (3A). Sendet nichts.
+    QString wechsleAufLauschband(const Fundzeile& z);
     static constexpr int kMaxZeilen = 400;
 
     /// Welche Zeilen zu sehen sind. Eine Pille, nicht vier Haken:
@@ -570,6 +658,8 @@ private:
     void zeigeUhrversatz();
     /// Die Arbeitsleiste nachziehen: mit wem, welcher Zug, was danach.
     void zeigeArbeit();
+    /// Die Zeile unter „QSO with": Name, Ort, Klasse, Weg, Licht.
+    void zeigeWer(const QString& wer);
 
     QPlainTextEdit* m_list{nullptr};
     // Zweite Spalte wie in WSJT-X: links alles („Band Activity"),
@@ -640,6 +730,12 @@ private:
     QLabel*  m_arbeitDanach{nullptr};
     QLabel*  m_arbeitUhr{nullptr};
     Longpath::Ft8Fensterbalken* m_arbeitBalken{nullptr};
+    /// Wer der Partner ist und wie es bei ihm aussieht -- die Zeile
+    /// unter „QSO with" (2026-11-18, Entwurf A von drei).
+    Longpath::Ft8PartnerZeile* m_arbeitWer{nullptr};
+    /// Die letzte Auskunft der Rotor/Log-Karte. Gilt nur, solange sie
+    /// zum Partner passt (verglichen wird bei jedem Zeichnen).
+    Longpath::RufzeichenAuskunft m_auskunft;
 
     // ── „THEN": die Schlange in der QSO-Karte (2026-11-15) ──────────
     //
@@ -869,6 +965,9 @@ private:
     /// jedem Schritt, und der Zustand bleibt auf Fertig stehen — ohne
     /// diese Wache stuende dasselbe QSO mehrfach im Logbuch.
     bool         m_qsoGemeldet{false};
+    /// Der zuletzt mit `partnerGewechselt` gemeldete Partner. Ohne ihn
+    /// ginge das Signal bei jedem Zug hinaus, nicht nur beim Wechsel.
+    QString      m_gemeldeterPartner;
     /// Laeuft der Ruf vom CQ-Knopf? Dann geht es nach einem fertigen
     /// QSO von selbst weiter. Ein Doppelklick in die Fundliste ist
     /// eine Einzelentscheidung und setzt das zurueck, „Stop“ ebenso.
