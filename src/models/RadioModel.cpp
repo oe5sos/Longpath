@@ -7236,6 +7236,15 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                 this, [this](double) { emit lauschbandGeaendert(); });
         connect(m_flexLausch, &FlexLauschscheibe::abgelehnt,
                 this, &RadioModel::lauschbandAbgelehnt);
+        // Die Lauschscheibe entsteht in der Mitte des Panadapters, wie
+        // ihn Longpath gerade fuehrt -- auch wenn die Maschine ihn noch
+        // nicht bestaetigt hat (uebernimmFlexPanMitte).
+        m_flexLausch->setPanMitteQuelle([this]() {
+            if (m_flexAusschnittTiefHz > 0.0 && m_flexAusschnittHochHz > 0.0) {
+                return 0.5 * (m_flexAusschnittTiefHz + m_flexAusschnittHochHz);
+            }
+            return 0.0;
+        });
         // Unsere Client-Kennung: daran erkennt die Lauschscheibe eine,
         // die die Maschine aus einer frueheren Sitzung wiederhergestellt
         // hat (core/FlexLauschscheibe.h).
@@ -9198,7 +9207,7 @@ void RadioModel::startFlexStreams()
             // zweiten FT8-Dekoder -- nicht in den Lautsprecher, nicht
             // in die Abgriffe der Hauptscheibe (2026-11-19).
             if (m_flexLausch && m_flexLausch->istLauschstrom(id)) {
-                m_flexLausch->tonAngekommen(s.size());
+                m_flexLausch->tonAngekommen(s);
                 if (m_audioEngine && !s.isEmpty()) {
                     // Dieselbe Rate wie der Mix-Strom: Klasse 0x03E3,
                     // 24 kHz (MainWindow_Flex.cpp kFlexAudioRateHz,

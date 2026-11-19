@@ -10,6 +10,8 @@
 
 #include <QLoggingCategory>
 
+#include <cmath>
+
 namespace Longpath {
 
 FlexLauschscheibe::FlexLauschscheibe(Sende sende, QObject* parent)
@@ -44,6 +46,11 @@ void FlexLauschscheibe::setPanadapter(const QString& panId)
     if (m_zustand == Zustand::Aus && m_gewuenschtHz > 0.0 && bereit()) {
         legeAn();
     }
+}
+
+void FlexLauschscheibe::setPanMitteQuelle(std::function<double()> quelle)
+{
+    m_panMitte = std::move(quelle);
 }
 
 void FlexLauschscheibe::setEigenerHandle(quint32 handle)
@@ -180,11 +187,14 @@ void FlexLauschscheibe::setFrequenzHz(double hz)
 void FlexLauschscheibe::legeAn()
 {
     setZustand(Zustand::Anlegen);
-    // Auf der Frequenz der Hauptscheibe, im Panadapter -- siehe Kopf.
+    // Im Panadapter -- siehe Kopf. Seine Mitte, wenn bekannt; sonst die
+    // Frequenz der Hauptscheibe.
+    const double mitte = m_panMitte ? m_panMitte() : 0.0;
+    const double anlegeHz = mitte > 0.0 ? mitte : m_hauptHz;
     const QString befehl =
         QStringLiteral("slice create pan=%1 freq=%2 mode=DIGU")
             .arg(m_panId)
-            .arg(m_hauptHz / 1.0e6, 0, 'f', 6);
+            .arg(anlegeHz / 1.0e6, 0, 'f', 6);
     qCInfo(lcConnection) << "Flex-Lauschscheibe: lege an —" << befehl;
     m_sende(befehl, [this](quint32 code, const QString& body) {
         if (m_zustand != Zustand::Anlegen) { return; }   // inzwischen vergessen
@@ -321,14 +331,44 @@ bool FlexLauschscheibe::istLauschstrom(quint32 streamId) const
     return m_strom != 0 && streamId == m_strom;
 }
 
-void FlexLauschscheibe::tonAngekommen(int werte)
+void FlexLauschscheibe::tonAngekommen(const QVector<float>& werte)
 {
-    if (m_strom == 0 || m_tonGemeldetFuer == m_strom) { return; }
-    m_tonGemeldetFuer = m_strom;
-    qCInfo(lcConnection).nospace().noquote()
-        << "Flex-Lauschscheibe: erster DAX-Ton auf Strom 0x"
-        << QString::number(m_strom, 16) << " (" << werte
-        << " Werte) — die Scheibe ist stumm, DAX liefert trotzdem";
+    if (m_strom == 0) { return; }
+    if (m_tonGemeldetFuer != m_strom) {
+        m_tonGemeldetFuer = m_strom;
+        qCInfo(lcConnection).nospace().noquote()
+            << "Flex-Lauschscheibe: erster DAX-Ton auf Strom 0x"
+            << QString::number(m_strom, 16) << " (" << werte.size()
+            << " Werte) — die Scheibe ist stumm, DAX liefert trotzdem";
+        m_pegelUhr.start();
+        m_pegelSpitze = 0.0f;
+        m_pegelQuadrate = 0.0;
+        m_pegelWerte = 0;
+    }
+    for (float w : werte) {
+        const float b = std::fabs(w);
+        if (b > m_pegelSpitze) { m_pegelSpitze = b; }
+        m_pegelQuadrate += double(w) * double(w);
+    }
+    m_pegelWerte += werte.size();
+
+    constexpr qint64 kPegelAbstandMs = 60000;
+    if (m_pegelUhr.isValid() && m_pegelUhr.elapsed() >= kPegelAbstandMs
+        && m_pegelWerte > 0) {
+        const auto dbfs = [](double x) {
+            return x > 1e-12 ? 20.0 * std::log10(x) : -240.0;
+        };
+        const double effektiv = std::sqrt(m_pegelQuadrate / double(m_pegelWerte));
+        qCInfo(lcConnection).nospace().noquote()
+            << "Flex-Lauschscheibe: DAX-Pegel der letzten Minute — Spitze "
+            << QString::number(dbfs(m_pegelSpitze), 'f', 1) << " dBFS, Mittel "
+            << QString::number(dbfs(effektiv), 'f', 1) << " dBFS, "
+            << m_pegelWerte << " Werte";
+        m_pegelUhr.restart();
+        m_pegelSpitze = 0.0f;
+        m_pegelQuadrate = 0.0;
+        m_pegelWerte = 0;
+    }
 }
 
 bool FlexLauschscheibe::nimmStatus(const QString& object,

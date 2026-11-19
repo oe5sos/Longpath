@@ -182,6 +182,33 @@ private slots:
         QVERIFY(!l.istLauschstrom(0x4000008));   // der Mix-Strom
     }
 
+    void sieEntstehtInDerMitteDesPanadapters()
+    {
+        // Am Geraet, 2026-11-19 18:29: Longpath hatte die Hauptscheibe
+        // auf 14.074 gestellt, die Maschine meldete noch 21.074 -- die
+        // Lauschscheibe entstand dort, ausserhalb des Panadapters.
+        Draht d;
+        FlexLauschscheibe l(d.sende());
+        l.setHauptscheibe(QStringLiteral("0"));
+        l.setPanadapter(QStringLiteral("0x40000000"));
+        l.setHauptfrequenzHz(21074000.0);           // veraltet
+        l.setPanMitteQuelle([]() { return 14074000.0; });
+        l.setFrequenzHz(28074000.0);
+        QCOMPARE(d.befehle.value(0),
+                 QStringLiteral("slice create pan=0x40000000 freq=14.074000 mode=DIGU"));
+    }
+
+    void derPegelWirdGemessen()
+    {
+        Draht d;
+        FlexLauschscheibe l(d.sende());
+        bisLaeuft(l, d);
+        // Kein Absturz, kein Befehl -- nur Protokoll.
+        l.tonAngekommen(QVector<float>(512, 0.1f));
+        l.tonAngekommen(QVector<float>(512, 0.0f));
+        QVERIFY(!d.befehle.join('\n').contains(QStringLiteral("tx")));
+    }
+
     void keinBefehlSendet()
     {
         // „aber nicht automatisch senden": nichts, was die Lauschscheibe

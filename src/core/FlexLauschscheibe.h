@@ -74,7 +74,9 @@
 // =================================================================
 
 #include <QMap>
+#include <QElapsedTimer>
 #include <QObject>
+#include <QVector>
 #include <QSet>
 #include <QString>
 
@@ -101,6 +103,13 @@ public:
     void setHauptscheibe(const QString& id);
     void setPanadapter(const QString& panId);
     void setHauptfrequenzHz(double hz);
+    /// Woher die Mitte des Panadapters kommt, in Hertz (0 = unbekannt).
+    /// Dort entsteht die Lauschscheibe -- nicht auf der zuletzt
+    /// BESTAETIGTEN Frequenz der Hauptscheibe: die Maschine echot eigene
+    /// Abstimmbefehle oft erst eine Minute spaeter (gemessen 2026-11-19
+    /// 18:29:01 -> 18:29:57), und eine Scheibe ausserhalb des
+    /// Panadapters koennte ihn mitziehen.
+    void setPanMitteQuelle(std::function<double()> quelle);
     /// Die Kennung, die die Maschine UNS als Client gegeben hat
     /// (`H<hex>` beim Verbinden). Daran erkennt sie eine Lauschscheibe,
     /// die von einer frueheren Sitzung uebrig ist.
@@ -133,7 +142,7 @@ public:
     /// Ton des DAX-Stroms ist angekommen. Schreibt EINMAL je Strom eine
     /// Zeile ins Protokoll: sie beantwortet am Geraet die offene Frage,
     /// ob DAX bei `audio_mute=1` weiter Ton liefert.
-    void tonAngekommen(int werte);
+    void tonAngekommen(const QVector<float>& werte);
 
     /// Eine Zustandszeile der Maschine. Gibt true zurueck, wenn sie der
     /// Lauschscheibe gehoerte -- dann darf sie KEIN anderer Weg sehen.
@@ -174,6 +183,13 @@ private:
     double  m_gemeldetHz{0.0};
     bool    m_abbauNachAnlegen{false};
     quint32 m_tonGemeldetFuer{0};
+    std::function<double()> m_panMitte;
+    // Pegel des DAX-Tons, einmal je Minute ins Protokoll: „0 heard"
+    // heisst dann entweder „Band zu" (Pegel da) oder „Strom stumm".
+    QElapsedTimer m_pegelUhr;
+    float  m_pegelSpitze{0.0f};
+    double m_pegelQuadrate{0.0};
+    qint64 m_pegelWerte{0};
 
     // ── Uebrig aus einer frueheren Sitzung (2026-11-19, am Geraet) ──
     quint32    m_eigenerHandle{0};
