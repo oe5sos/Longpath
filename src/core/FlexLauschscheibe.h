@@ -94,8 +94,12 @@ public:
 
     enum class Zustand { Aus, Anlegen, Laeuft };
 
-    /// Der DAX-Kanal, den die Lauschscheibe belegt.
-    static constexpr int kDaxKanal = 1;
+    /// Hoechstens so viele Lauschbaender (2026-11-19). Die FLEX-8400 hat
+    /// zwei Scheiben, also einen Platz; die 8600 hat vier, also drei.
+    /// Wie viele gelten, sagt `setPlaetze` (aus `max_slices` - 1).
+    static constexpr int kMaxPlaetze = 3;
+    /// Platz k belegt DAX-Kanal k + 1.
+    static int daxKanal(int platz) { return platz + 1; }
 
     explicit FlexLauschscheibe(Sende sende, QObject* parent = nullptr);
 
@@ -114,19 +118,24 @@ public:
     /// (`H<hex>` beim Verbinden). Daran erkennt sie eine Lauschscheibe,
     /// die von einer frueheren Sitzung uebrig ist.
     void setEigenerHandle(quint32 handle);
+    /// Wie viele Lauschplaetze das Geraet hergibt (0..kMaxPlaetze).
+    void setPlaetze(int anzahl);
+    int plaetze() const { return m_plaetzeAnzahl; }
 
-    /// Lauschen auf `hz` (Wahlfrequenz, DIGU); 0 heisst: abbauen.
-    /// Steht die Verbindung noch nicht (Haupt­scheibe oder Panadapter
-    /// unbekannt), wird es nachgeholt, sobald beide da sind.
-    void setFrequenzHz(double hz);
+    /// Auf Platz `platz` auf `hz` lauschen (Wahlfrequenz, DIGU); 0 heisst:
+    /// abbauen. Steht die Verbindung noch nicht (Hauptscheibe oder
+    /// Panadapter unbekannt), wird es nachgeholt, sobald beide da sind.
+    void setFrequenzHz(int platz, double hz);
+    /// Platz 0 -- die Form von #496, eine Lauschscheibe.
+    void setFrequenzHz(double hz) { setFrequenzHz(0, hz); }
 
-    /// Strom und Scheibe auf der Maschine entfernen. Fuer das Trennen,
-    /// solange der Befehlskanal noch steht.
+    /// Alle Stroeme und Scheiben auf der Maschine entfernen. Fuer das
+    /// Trennen, solange der Befehlskanal noch steht.
     void abbauen();
     /// Alles vergessen, ohne zu senden (der Kanal ist weg).
     void vergiss();
 
-    /// Gehoert diese Scheibenmeldung der Lauschscheibe?
+    /// Gehoert diese Scheibenmeldung einer Lauschscheibe?
     bool istLauschscheibe(int sliceId) const;
     /// Lauschscheibe ODER eine uebriggebliebene aus einer frueheren
     /// Sitzung: in beiden Faellen gehoert ihre Frequenz nie an den VFO.
@@ -137,59 +146,72 @@ public:
     /// Kann diese Scheibe NICHT die Hauptscheibe sein, weil eine andere
     /// nachweislich sendet (oder weil sie eine Lausch-/Restscheibe ist)?
     bool istNichtHaupt(int sliceId) const;
-    /// Ist das die Stromkennung des DAX-Tons der Lauschscheibe?
-    bool istLauschstrom(quint32 streamId) const;
-    /// Ton des DAX-Stroms ist angekommen. Schreibt EINMAL je Strom eine
-    /// Zeile ins Protokoll: sie beantwortet am Geraet die offene Frage,
-    /// ob DAX bei `audio_mute=1` weiter Ton liefert.
-    void tonAngekommen(const QVector<float>& werte);
+    /// Zu welchem Platz gehoert dieser DAX-Strom? -1: zu keinem.
+    int platzFuerStrom(quint32 streamId) const;
+    bool istLauschstrom(quint32 streamId) const { return platzFuerStrom(streamId) >= 0; }
+    /// Ton eines DAX-Stroms ist angekommen: einmal je Strom eine Zeile
+    /// ins Protokoll, dazu einmal je Minute der Pegel.
+    void tonAngekommen(int platz, const QVector<float>& werte);
+    void tonAngekommen(const QVector<float>& werte) { tonAngekommen(0, werte); }
 
-    /// Eine Zustandszeile der Maschine. Gibt true zurueck, wenn sie der
+    /// Eine Zustandszeile der Maschine. Gibt true zurueck, wenn sie einer
     /// Lauschscheibe gehoerte -- dann darf sie KEIN anderer Weg sehen.
     bool nimmStatus(const QString& object, const QMap<QString, QString>& kv);
 
-    Zustand zustand() const { return m_zustand; }
-    int scheibe() const { return m_scheibe; }
-    quint32 strom() const { return m_strom; }
+    Zustand zustand(int platz = 0) const;
+    int scheibe(int platz = 0) const;
+    quint32 strom(int platz = 0) const;
     /// Die Frequenz, die die Maschine fuer die Lauschscheibe meldet
     /// (0, solange keine gemeldet ist).
-    double gemeldeteFrequenzHz() const { return m_gemeldetHz; }
+    double gemeldeteFrequenzHz(int platz = 0) const;
     /// Die Frequenz, auf die gelauscht werden soll (0 = aus).
-    double gewuenschteFrequenzHz() const { return m_gewuenschtHz; }
+    double gewuenschteFrequenzHz(int platz = 0) const;
 
 signals:
     void zustandGeaendert();
-    void frequenzGemeldet(double hz);
+    void frequenzGemeldet(int platz, double hz);
     /// Die Maschine hat das Anlegen verweigert (z. B. 0x50000003, „all
     /// slice receivers in use"). `grund` ist fuer das Protokoll.
-    void abgelehnt(const QString& grund);
+    void abgelehnt(int platz, const QString& grund);
 
 private:
+    struct Platz {
+        Zustand zustand{Zustand::Aus};
+        int     scheibe{-1};
+        quint32 strom{0};
+        double  gewuenschtHz{0.0};
+        double  gemeldetHz{0.0};
+        bool    abbauNachAnlegen{false};
+        quint32 tonGemeldetFuer{0};
+        // Pegel des DAX-Tons, einmal je Minute ins Protokoll: „0 heard"
+        // heisst dann entweder „Band zu" (Pegel da) oder „Strom stumm".
+        QElapsedTimer pegelUhr;
+        float  pegelSpitze{0.0f};
+        double pegelQuadrate{0.0};
+        qint64 pegelWerte{0};
+    };
+
+    bool gueltig(int platz) const { return platz >= 0 && platz < kMaxPlaetze; }
     bool bereit() const;
-    void legeAn();
-    void richteEin();
-    void stimme(double hz);
-    void setZustand(Zustand z);
+    /// Legt den naechsten wartenden Platz an -- immer nur EINEN zur Zeit:
+    /// waehrend des Anlegens ist die neue Scheibe nur daran zu erkennen,
+    /// dass sie keine der bekannten ist.
+    void legeNaechstenAn();
+    void legeAn(int platz);
+    void richteEin(int platz);
+    void stimme(int platz, double hz);
+    void baueAb(int platz);
+    void setZustand(int platz, Zustand z);
+    int platzFuerScheibe(int sliceId) const;
 
     Sende   m_sende;
     QString m_hauptId;
     QString m_panId;
     double  m_hauptHz{0.0};
-
-    Zustand m_zustand{Zustand::Aus};
-    int     m_scheibe{-1};
-    quint32 m_strom{0};
-    double  m_gewuenschtHz{0.0};
-    double  m_gemeldetHz{0.0};
-    bool    m_abbauNachAnlegen{false};
-    quint32 m_tonGemeldetFuer{0};
     std::function<double()> m_panMitte;
-    // Pegel des DAX-Tons, einmal je Minute ins Protokoll: „0 heard"
-    // heisst dann entweder „Band zu" (Pegel da) oder „Strom stumm".
-    QElapsedTimer m_pegelUhr;
-    float  m_pegelSpitze{0.0f};
-    double m_pegelQuadrate{0.0};
-    qint64 m_pegelWerte{0};
+    int     m_plaetzeAnzahl{1};
+    int     m_anlegePlatz{-1};   ///< Platz, dessen Nummer noch aussteht
+    Platz   m_platz[kMaxPlaetze];
 
     // ── Uebrig aus einer frueheren Sitzung (2026-11-19, am Geraet) ──
     quint32    m_eigenerHandle{0};

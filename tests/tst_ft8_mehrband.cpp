@@ -28,6 +28,7 @@
 #include <QtTest/QtTest>
 #include <QApplication>
 #include <QComboBox>
+#include <QSplitter>
 #include <QDialog>
 #include <QLineEdit>
 #include <QPlainTextEdit>
@@ -596,13 +597,13 @@ private slots:
         // DL auf 10 m neu auf diesem Band.
         s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NeuesBand"));
         applet.lauschPeriodeForTest({fund(QStringLiteral("CQ DL2XYZ JN58"), 1300.0f)});
-        QVERIFY2(applet.listForTest()->toPlainText().contains(QStringLiteral("DL2XYZ")),
-                 qPrintable(applet.listForTest()->toPlainText()));
+        QVERIFY2(applet.lauschListeForTest()->toPlainText().contains(QStringLiteral("DL2XYZ")),
+                 qPrintable(applet.lauschListeForTest()->toPlainText()));
         // „CQ only": ein Rapport vom zweiten Band kommt nicht, ein CQ schon.
         s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NurCq"));
         applet.lauschPeriodeForTest({fund(QStringLiteral("DL4QQ DL5RR RR73"), 1840.0f),
                                      fund(QStringLiteral("CQ DL7ABC JO62"), 900.0f)});
-        const QString l = applet.listForTest()->toPlainText();
+        const QString l = applet.lauschListeForTest()->toPlainText();
         QVERIFY2(!l.contains(QStringLiteral("DL5RR")), qPrintable(l));
         QVERIFY2(l.contains(QStringLiteral("DL7ABC")), qPrintable(l));
         s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NeuesLand"));
@@ -667,27 +668,22 @@ private slots:
             fund(QStringLiteral("DL4QQ DL5RR RR73"), 1840.0f),  // auch DL
         });
 
-        const QString liste = applet.listForTest()->toPlainText();
+        // Gestaltung D (2026-11-19): das zweite Band hat seine eigene
+        // Spalte; die Hauptliste bleibt dem Hauptband.
+        QVERIFY(applet.lauschSpalteForTest()->isVisibleTo(&applet));
+        const QString liste = applet.lauschListeForTest()->toPlainText();
         QVERIFY2(liste.contains(QStringLiteral("3B8XX")), qPrintable(liste));
         QVERIFY2(!liste.contains(QStringLiteral("DL2XYZ")), qPrintable(liste));
         QVERIFY2(!liste.contains(QStringLiteral("DL5RR")), qPrintable(liste));
-        // Die Marke steht direkt nach der Uhrzeit.
-        const QString zeile = liste.split('\n').filter(QStringLiteral("3B8XX")).value(0);
-        QVERIFY2(zeile.mid(6).trimmed().startsWith(QStringLiteral("10m")),
-                 qPrintable(zeile));
+        QVERIFY2(!applet.listForTest()->toPlainText().contains(QStringLiteral("3B8XX")),
+                 "das zweite Band gehoert nicht in die Hauptliste");
         QCOMPARE(applet.lauschFundeZuletzt(), 3);
-        QVERIFY2(applet.lastLabelForTest()->text().contains(QStringLiteral("10m: 3 heard")),
-                 qPrintable(applet.lastLabelForTest()->text()));
+        QCOMPARE(applet.lauschTitelForTest()->text(), QStringLiteral("10M · 3 HEARD"));
 
-        // Die Zeilen des Hauptbandes tragen ihr Band ebenso („man sollte
-        // aber sehen, auf welchen bänder man was sieht").
+        // Und umgekehrt: das Hauptband kommt nicht in die Spalte.
         applet.periodeForTest({fund(QStringLiteral("CQ DL3AAA JN48"), 1500.0f)});
-        const QString danach = applet.listForTest()->toPlainText();
-        const QString hz = danach.split('\n').filter(QStringLiteral("DL3AAA")).value(0);
-        QVERIFY2(hz.mid(6).trimmed().startsWith(QStringLiteral("15m")), qPrintable(hz));
-        // Und ein Doppelklick darauf ist der gewohnte Weg (kein Tausch):
-        // der Rapport wird trotz Bandspalte richtig gelesen.
-        QCOMPARE(Ft8Applet::ohneBandmarke(hz).simplified().section(' ', 1, 1).toInt(), -12);
+        QVERIFY(applet.listForTest()->toPlainText().contains(QStringLiteral("DL3AAA")));
+        QVERIFY(!applet.lauschListeForTest()->toPlainText().contains(QStringLiteral("DL3AAA")));
     }
 
     void doppelklickTauschtUndSendetNicht()
@@ -709,10 +705,10 @@ private slots:
         applet.setLauschfrequenzHz(28074000.0);
         applet.lauschPeriodeForTest({fund(QStringLiteral("CQ 3B8XX LG89"), 902.0f)});
 
-        const QString zeile = applet.listForTest()->toPlainText()
+        const QString zeile = applet.lauschListeForTest()->toPlainText()
                                   .split('\n').filter(QStringLiteral("3B8XX")).value(0);
         QVERIFY(!zeile.isEmpty());
-        applet.doppelklickForTest(zeile);
+        applet.lauschDoppelklickForTest(0, zeile);
 
         // Das Hauptband ist jetzt 10 m, auf der Frequenz des Lauschbandes ...
         QCOMPARE(slice->frequency(), 28074000.0);
@@ -729,6 +725,107 @@ private slots:
                  qPrintable(applet.textFeldForTest()->text()));
         QVERIFY2(applet.statusForTest()->text().contains(QStringLiteral("nothing sent")),
                  qPrintable(applet.statusForTest()->text()));
+    }
+
+    void dreiPlaetzeWieAnDer8600()
+    {
+        // „wichtig ist, dass bei 8600 flex es 4 fenster werden können"
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        slice->setFrequency(14074000.0);
+        applet.setSlice(slice);
+        applet.setLauschOhneGeraetForTest(true);
+        applet.setLauschPlaetzeForTest(3);
+        for (int k = 0; k < 3; ++k) {
+            QVERIFY(applet.lauschFeldForTest(k)->isVisibleTo(&applet));
+        }
+        applet.setLauschfrequenzHz(0, 7074000.0);
+        applet.setLauschfrequenzHz(1, 21074000.0);
+        applet.setLauschfrequenzHz(2, 28074000.0);
+        QCOMPARE(applet.lauschband(0), QStringLiteral("40m"));
+        QCOMPARE(applet.lauschband(1), QStringLiteral("15m"));
+        QCOMPARE(applet.lauschband(2), QStringLiteral("10m"));
+        // Ein Band nie auf zwei Plaetzen.
+        applet.setLauschfrequenzHz(2, 7074000.0);
+        QCOMPARE(applet.lauschband(2), QStringLiteral("10m"));
+        // Jedes Feld bietet die Baender der anderen Plaetze nicht an.
+        QComboBox* feld0 = applet.lauschFeldForTest(0);
+        for (int i = 0; i < feld0->count(); ++i) {
+            QVERIFY(!feld0->itemText(i).startsWith(QStringLiteral("15m")));
+            QVERIFY(!feld0->itemText(i).startsWith(QStringLiteral("10m")));
+            QVERIFY(!feld0->itemText(i).startsWith(QStringLiteral("20m")));
+        }
+        // Vier Spalten im Teiler, jede mit ihrem Band, kein Uebersprechen.
+        QCOMPARE(applet.listenTeilerForTest()->count(), 4);
+        auto& s = AppSettings::instance();
+        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("Alles"));
+        applet.lauschPeriodeForTest(0, {fund(QStringLiteral("CQ AA1AAA FN42"), 900.0f)});
+        applet.lauschPeriodeForTest(1, {fund(QStringLiteral("CQ BB1BBB FN42"), 900.0f)});
+        applet.lauschPeriodeForTest(2, {fund(QStringLiteral("CQ CC1CCC FN42"), 900.0f)});
+        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NeuesLand"));
+        const QStringList ruf = {QStringLiteral("AA1AAA"), QStringLiteral("BB1BBB"),
+                                 QStringLiteral("CC1CCC")};
+        for (int k = 0; k < 3; ++k) {
+            const QString l = applet.lauschListeForTest(k)->toPlainText();
+            for (int j = 0; j < 3; ++j) {
+                QCOMPARE(l.contains(ruf.at(j)), j == k);
+            }
+            QVERIFY(applet.lauschSpalteForTest(k)->isVisibleTo(&applet));
+        }
+        // Abschalten blendet die Spalte aus.
+        applet.setLauschfrequenzHz(1, 0.0);
+        QVERIFY(!applet.lauschSpalteForTest(1)->isVisibleTo(&applet));
+    }
+
+    void ander8400NurEinFeld()
+    {
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        applet.setLauschPlaetzeForTest(1);
+        QVERIFY(applet.lauschFeldForTest(0)->isVisibleTo(&applet));
+        QVERIFY(!applet.lauschFeldForTest(1)->isVisibleTo(&applet));
+        QVERIFY(!applet.lauschFeldForTest(2)->isVisibleTo(&applet));
+    }
+
+    void zweiPlaetzeAmDraht()
+    {
+        // Angelegt wird immer nur EINE zur Zeit -- waehrend des Anlegens
+        // ist die neue Scheibe nur daran zu erkennen, dass sie keine der
+        // bekannten ist. Jeder Platz hat seinen DAX-Kanal.
+        Draht d;
+        FlexLauschscheibe l(d.sende());
+        l.setPlaetze(3);
+        l.setHauptscheibe(QStringLiteral("0"));
+        l.setPanadapter(QStringLiteral("0x40000000"));
+        l.setHauptfrequenzHz(14074000.0);
+        l.setFrequenzHz(0, 7074000.0);
+        l.setFrequenzHz(1, 21074000.0);
+        QCOMPARE(d.befehle.filter(QStringLiteral("slice create")).size(), 1);
+        d.antworte(QStringLiteral("slice create"), 0, QStringLiteral("1"));
+        QCOMPARE(d.befehle.filter(QStringLiteral("slice create")).size(), 2);
+        d.antworte(QStringLiteral("stream create"), 0, QStringLiteral("4000009"));
+        d.antworte(QStringLiteral("slice create"), 0, QStringLiteral("2"));
+        d.antworte(QStringLiteral("stream create"), 0, QStringLiteral("400000a"));
+        QVERIFY(d.befehle.contains(QStringLiteral("slice set 1 dax=1")));
+        QVERIFY(d.befehle.contains(QStringLiteral("slice set 2 dax=2")));
+        QVERIFY(d.befehle.contains(QStringLiteral("stream create type=dax_rx dax_channel=2")));
+        QVERIFY(d.befehle.contains(QStringLiteral("slice tune 2 21.074000 autopan=0")));
+        QCOMPARE(l.platzFuerStrom(0x4000009), 0);
+        QCOMPARE(l.platzFuerStrom(0x400000a), 1);
+        QCOMPARE(l.platzFuerStrom(0x4000008), -1);   // der Mix
+        QVERIFY(l.istLauschscheibe(1) && l.istLauschscheibe(2));
+        QVERIFY(!l.darfAnDenVfo(1) && !l.darfAnDenVfo(2));
+        // Nur so viele Plaetze, wie das Geraet hat.
+        l.setPlaetze(1);
+        d.befehle.clear();
+        l.setFrequenzHz(2, 28074000.0);
+        QVERIFY(d.befehle.filter(QStringLiteral("slice create")).isEmpty());
+        // Abbau raeumt beide.
+        l.abbauen();
+        QVERIFY(d.befehle.contains(QStringLiteral("slice remove 1")));
+        QVERIFY(d.befehle.contains(QStringLiteral("slice remove 2")));
     }
 
     void derVfoAufsLauschbandTauschtAuch()
@@ -852,6 +949,18 @@ private slots:
         const QString bildPfad = dir + QStringLiteral("/ft8-zwei-baender.png");
         QVERIFY2(bild.save(bildPfad), qPrintable(bildPfad));
         qInfo() << "Blatt:" << bildPfad << bild.size();
+
+        // Und so saehe es an einer FLEX-8600 aus: drei mitgehoerte Baender.
+        applet.setLauschPlaetzeForTest(3);
+        applet.setLauschfrequenzHz(1, 7074000.0);
+        applet.setLauschfrequenzHz(2, 14074000.0);
+        applet.lauschPeriodeForTest(1, {fund(QStringLiteral("CQ 9K2MP LL49"), 1180.0f, -15.0f)});
+        applet.resize(1400, 600);
+        QTest::qWait(300);
+        const QImage vier = applet.grab().toImage();
+        const QString vierPfad = dir + QStringLiteral("/ft8-vier-baender-8600.png");
+        QVERIFY2(vier.save(vierPfad), qPrintable(vierPfad));
+        qInfo() << "Blatt:" << vierPfad << vier.size();
     }
 
     void blattOptionen()
