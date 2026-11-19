@@ -3637,6 +3637,9 @@ void SpotHubDialog::buildDisplayTab(QTabWidget* tabs)
         {QStringLiteral("FreeDV"),        QStringLiteral("FreeDV")},
         {QStringLiteral("PSK"),           QStringLiteral("PSK Reporter")},
         {QStringLiteral("Roundtable"),    QStringLiteral("Roundtable")},
+        // 2026-11-19: die eigenen Dekoder (FT8, RTTY) stempeln
+        // "Longpath" -- bisher ohne Schalter, also nie ausblendbar.
+        {QStringLiteral("Longpath"),      QStringLiteral("Own decoder (FT8, RTTY)")},
     };
     auto* visGrid = new QGridLayout;
     visGrid->setColumnStretch(1, 1);
