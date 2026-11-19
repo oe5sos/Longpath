@@ -8894,6 +8894,26 @@ void RadioModel::applyFlexPanSetup()
 
 void RadioModel::meldeFlexSpektrum(quint32 id, const QVector<float>& dbm)
 {
+    // Nur der EIGENE Panadapter (2026-11-19). Nach einem Neustart der
+    // Flex lag ein zweiter auf der Maschine (100 Bins, 2000 Hz/bin), und
+    // weil hier jede Stromkennung durchging, mischten sich seine Rahmen
+    // ins Bild: „sehr strichliert".
+    if (!m_flexPanId.isEmpty()) {
+        QString roh = m_flexPanId;
+        if (roh.startsWith(QLatin1String("0x"), Qt::CaseInsensitive)) { roh = roh.mid(2); }
+        bool ok = false;
+        const quint32 eigener = roh.toUInt(&ok, 16);
+        if (ok && id != eigener) {
+            if (!m_flexFremdesBildGemeldet) {
+                m_flexFremdesBildGemeldet = true;
+                qCInfo(lcConnection).nospace().noquote()
+                    << "Flex: FFT-Strom 0x" << QString::number(id, 16)
+                    << " gehoert nicht zum eigenen Panadapter "
+                    << m_flexPanId << " — nicht gezeichnet";
+            }
+            return;
+        }
+    }
     emit flexSpectrumReady(id, dbm);
     // Auch auf den geraeteunabhaengigen Weg (2026-11-03): der
     // TCI-Spektrumstrom hing an der FFTEngine, und die rechnet bei der
@@ -8926,6 +8946,14 @@ void RadioModel::startFlexStreams()
             // eigene Bin-Zahl und ihren eigenen Rand (gemessen 230,6
             // kHz gegen 200 kHz Panadapterbreite). Er wird aus dem
             // `display pan`-Zustand gelesen, siehe dort.
+            // Und nur der eigene Wasserfall (2026-11-19), wie beim Bild.
+            if (!m_flexWasserfallId.isEmpty()) {
+                QString roh = m_flexWasserfallId;
+                if (roh.startsWith(QLatin1String("0x"), Qt::CaseInsensitive)) { roh = roh.mid(2); }
+                bool ok = false;
+                const quint32 eigener = roh.toUInt(&ok, 16);
+                if (ok && id != eigener) { return; }
+            }
             emit flexWaterfallRowReady(id, v, lo, hi, ab);
         });
         connect(m_flexStream, &FlexVitaStream::meterSamplesReady, this,
@@ -9626,6 +9654,7 @@ void RadioModel::teardownFlexConnection()
     m_flexMasseNachgereicht = 0;
     m_flexZuletztGestellteHz = 0.0;
     m_flexPanId.clear();
+    m_flexFremdesBildGemeldet = false;
 
     if (m_flexStream) {
         m_flexStream->stop();

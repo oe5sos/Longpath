@@ -1288,7 +1288,9 @@ private slots:
         radio.antworten.insert(QStringLiteral("client gui"),
                                QStringLiteral("0|11112222-3333-4444-5555-666677778888"));
         radio.vorschub.insert(QStringLiteral("client gui"), zustand);
-        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|0,1"));
+        // Wie am Geraet nach dem Neustart: die Liste antwortet LEER,
+        // obwohl beide Scheiben schon gemeldet sind.
+        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|"));
         radio.antworten.insert(QStringLiteral("stream create"), QStringLiteral("0|4000008"));
         radio.nachschub.insert(QStringLiteral("stream create"), zustand);
 
@@ -1318,6 +1320,10 @@ private slots:
                          "die uebrige Lauschscheibe hat den VFO gezogen");
             }
         }
+        // Kein Rueckfall-Panadapter: die Scheiben sind ja gemeldet.
+        QVERIFY2(!radio.empfangeneBefehle.join('\n')
+                     .contains(QStringLiteral("display panafall create")),
+                 qPrintable(radio.empfangeneBefehle.join('\n')));
         // Und an Scheibe 1 geht ausser dem Entfernen nichts.
         for (const QString& b : radio.empfangeneBefehle) {
             QVERIFY2(!b.startsWith(QStringLiteral("slice set 1"))

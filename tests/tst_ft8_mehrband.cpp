@@ -410,6 +410,23 @@ private slots:
         QVERIFY(!l.darfAnDenVfo(1));          // an den VFO aber trotzdem nicht
     }
 
+    void nurDerEigenePanadapterWirdGezeichnet()
+    {
+        // Am Geraet nach dem Neustart: ein zweiter Panadapter
+        // (0x40000001, 100 Bins) mischte sich ins Bild.
+        RadioModel radio;
+        QSignalSpy bild(&radio, &RadioModel::flexSpectrumReady);
+        const QVector<float> rahmen(100, -120.0f);
+        radio.meldeFlexSpektrum(0x40000001u, rahmen);   // Pan noch unbekannt:
+        QCOMPARE(bild.size(), 1);                       // wie bisher durch
+        radio.setzeFlexPanIdForTest(QStringLiteral("0x40000000"));
+        radio.meldeFlexSpektrum(0x40000001u, rahmen);
+        QCOMPARE(bild.size(), 1);                       // fremd: nicht gezeichnet
+        radio.meldeFlexSpektrum(0x40000000u, QVector<float>(4096, -120.0f));
+        QCOMPARE(bild.size(), 2);
+        QCOMPARE(bild.last().at(0).toUInt(), 0x40000000u);
+    }
+
     // ── 2. Die Abgriffe ──────────────────────────────────────────────
 
     void dieAbgriffeSprechenNichtUeber()
