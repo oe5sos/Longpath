@@ -30,12 +30,14 @@
 //     umgebrochene Zeile faengt links an, nicht acht Punkt eingerueckt.
 //   * insertWidget() und addStretch(int): damit eine Reihe, die als
 //     QHBoxLayout geschrieben wurde, mit denselben Aufrufen umbricht.
-//   * Ein verstecktes Element kostet keinen Abstand, und ein Element,
-//     das breiter waere als die ganze Zeile, bekommt die Zeilenbreite,
-//     soweit seine Mindestbreite es erlaubt. Eine Beschriftung mit
-//     QSizePolicy::Ignored zaehlt beim Umbruch mit ihrer Mindestbreite
-//     (nicht mit ihrem Text) und nimmt dann, was in der Zeile uebrig
-//     ist -- so bricht die Reihe nicht um, weil ein Text laenger wird.
+//   * Ein Element, das breiter waere als die ganze Zeile, bekommt die
+//     Zeilenbreite, soweit seine Mindestbreite es erlaubt. Eine
+//     Beschriftung mit QSizePolicy::Ignored zaehlt beim Umbruch mit
+//     ihrer Mindestbreite (nicht mit ihrem Text) und nimmt dann, was in
+//     der Zeile uebrig ist -- so bricht die Reihe nicht um, weil ein
+//     Text laenger wird.
+// Unveraendert: ein verstecktes Element zaehlt weiter mit Breite null
+// und seinem Abstand (Logbuch und Karte verlassen sich darauf).
 // =================================================================
 #pragma once
 
