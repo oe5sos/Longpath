@@ -313,6 +313,103 @@ private slots:
         QVERIFY(d.befehle.isEmpty());
     }
 
+    // ── 1b. Die Maschine merkt sich die Lauschscheibe (am Geraet) ────
+    //
+    // 2026-11-19, nach einem Neustart der Flex: beim Anmelden kam
+    //   slice 0 … RF_frequency=14.074 tx=1 client_handle=0x08587180
+    //   slice 1 … RF_frequency=21.074 tx=0 audio_mute=1 client_handle=0x08587180
+    // und Longpath zog VFO und Panadapter auf 21,074 MHz, waehrend die
+    // Sendescheibe auf 14,074 stand.
+
+    static QMap<QString, QString> scheibe(const char* rf, const char* tx,
+                                          const char* handle = "0x08587180")
+    {
+        return kv({{QStringLiteral("in_use"), QStringLiteral("1")},
+                   {QStringLiteral("RF_frequency"), QString::fromLatin1(rf)},
+                   {QStringLiteral("tx"), QString::fromLatin1(tx)},
+                   {QStringLiteral("audio_level"), QStringLiteral("50")},
+                   {QStringLiteral("client_handle"), QString::fromLatin1(handle)}});
+    }
+
+    void dieUebrigeKommtNieAnDenVfo()
+    {
+        Draht d;
+        FlexLauschscheibe l(d.sende());
+        l.setEigenerHandle(0x08587180);
+        // Vor der Anmeldung: Hauptscheibe sendet, die uebrige nicht.
+        QVERIFY(!l.nimmStatus(QStringLiteral("slice 0"), scheibe("14.074000", "1")));
+        QVERIFY(l.nimmStatus(QStringLiteral("slice 1"), scheibe("21.074000", "0")));
+        QVERIFY(l.darfAnDenVfo(0));
+        QVERIFY(!l.darfAnDenVfo(1));
+        QVERIFY(l.istNichtHaupt(1));
+        QVERIFY(!l.istNichtHaupt(0));
+        // Entfernt wird erst, wenn die Hauptscheibe feststeht.
+        QVERIFY(d.befehle.isEmpty());
+        l.setHauptscheibe(QStringLiteral("0"));
+        QCOMPARE(d.befehle, QStringList({QStringLiteral("slice remove 1")}));
+        QVERIFY(!l.darfAnDenVfo(1));
+        QVERIFY(l.istFremd(1));
+        // Weitere Meldungen: kein zweites Entfernen, weiter geschluckt.
+        QVERIFY(l.nimmStatus(QStringLiteral("slice 1"), scheibe("21.074000", "0")));
+        QCOMPARE(d.befehle.size(), 1);
+        // Und wenn sie weg ist, ist sie weg.
+        QVERIFY(l.nimmStatus(QStringLiteral("slice 1"),
+                             kv({{QStringLiteral("in_use"), QStringLiteral("0")}})));
+        QVERIFY(!l.istFremd(1));
+    }
+
+    void dieUebrigeWirdUebernommenWennGelauschtWird()
+    {
+        Draht d;
+        FlexLauschscheibe l(d.sende());
+        l.setEigenerHandle(0x08587180);
+        l.setPanadapter(QStringLiteral("0x40000000"));
+        l.setHauptfrequenzHz(14074000.0);
+        l.setFrequenzHz(21074000.0);           // gewuenscht, noch nicht bereit
+        l.nimmStatus(QStringLiteral("slice 0"), scheibe("14.074000", "1"));
+        l.nimmStatus(QStringLiteral("slice 1"), scheibe("21.074000", "0"));
+        QVERIFY(d.befehle.isEmpty());
+        l.setHauptscheibe(QStringLiteral("0"));
+        // Uebernommen statt neu angelegt -- keine dritte Scheibe.
+        QVERIFY2(!d.befehle.join('\n').contains(QStringLiteral("slice create")),
+                 qPrintable(d.befehle.join('\n')));
+        QVERIFY(!d.befehle.contains(QStringLiteral("slice remove 1")));
+        QVERIFY(d.befehle.contains(QStringLiteral("slice set 1 dax=1")));
+        QVERIFY(d.befehle.contains(QStringLiteral("slice tune 1 21.074000 autopan=0")));
+        QCOMPARE(l.scheibe(), 1);
+    }
+
+    void eineHauptscheibeOhneTxWirdNieEntfernt()
+    {
+        // Eine einzige Scheibe, die (noch) nicht sendet: das ist die des
+        // Betreibers, nicht eine uebrige.
+        Draht d;
+        FlexLauschscheibe l(d.sende());
+        l.setEigenerHandle(0x08587180);
+        QVERIFY(!l.nimmStatus(QStringLiteral("slice 0"), scheibe("14.074000", "0")));
+        QVERIFY(!l.istNichtHaupt(0));
+        QVERIFY(l.darfAnDenVfo(0));           // die einzige -- sie darf
+        l.setHauptscheibe(QStringLiteral("0"));
+        QVERIFY(l.darfAnDenVfo(0));
+        QVERIFY(d.befehle.isEmpty());
+    }
+
+    void fremdeClientsBleibenUnberuehrt()
+    {
+        // Die Scheibe eines anderen Clients (Maestro, SmartSDR) ist nicht
+        // unsere Sache -- nie entfernen.
+        Draht d;
+        FlexLauschscheibe l(d.sende());
+        l.setEigenerHandle(0x08587180);
+        l.nimmStatus(QStringLiteral("slice 0"), scheibe("14.074000", "1"));
+        QVERIFY(!l.nimmStatus(QStringLiteral("slice 1"),
+                              scheibe("7.074000", "0", "0x11111111")));
+        l.setHauptscheibe(QStringLiteral("0"));
+        QVERIFY(d.befehle.isEmpty());
+        QVERIFY(!l.istFremd(1));
+        QVERIFY(!l.darfAnDenVfo(1));          // an den VFO aber trotzdem nicht
+    }
+
     // ── 2. Die Abgriffe ──────────────────────────────────────────────
 
     void dieAbgriffeSprechenNichtUeber()

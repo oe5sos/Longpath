@@ -7236,6 +7236,11 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                 this, [this](double) { emit lauschbandGeaendert(); });
         connect(m_flexLausch, &FlexLauschscheibe::abgelehnt,
                 this, &RadioModel::lauschbandAbgelehnt);
+        // Unsere Client-Kennung: daran erkennt die Lauschscheibe eine,
+        // die die Maschine aus einer frueheren Sitzung wiederhergestellt
+        // hat (core/FlexLauschscheibe.h).
+        connect(m_flexConnection, &FlexRadioConnection::handleAssigned,
+                m_flexLausch, &FlexLauschscheibe::setEigenerHandle);
 
         // Die Kennung, unter der die Maschine unsere Scheiben und
         // Panadapter zurueckbehaelt. Sie identifiziert LONGPATH, nicht
@@ -7538,9 +7543,27 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
             }
 
             if (object.startsWith(QLatin1String("slice "))
-                && kv.contains(QStringLiteral("audio_level"))) {
+                && kv.contains(QStringLiteral("audio_level"))
+                // Eine Scheibe, neben der eine ANDERE nachweislich sendet,
+                // ist nicht die des Betreibers (2026-11-19).
+                && !(m_flexLausch && m_flexLausch->istNichtHaupt(
+                         FlexCommandWire::sliceIdFromObject(object)))) {
                 m_flexSliceId       = object.split(QLatin1Char(' ')).value(1);
                 if (m_flexLausch) { m_flexLausch->setHauptscheibe(m_flexSliceId); }
+                // Die Frequenz der Hauptscheibe nachreichen: vor der
+                // Anmeldung durfte nur die Sendescheibe an den VFO.
+                {
+                    bool nummerOk = false;
+                    const int haupt = m_flexSliceId.toInt(&nummerOk);
+                    const double hz = nummerOk
+                        ? m_flexConnection->sliceFrequenciesHz().value(haupt, 0.0)
+                        : 0.0;
+                    if (hz > 0.0 && !qFuzzyCompare(hz, m_flexGeraeteFrequenzHz)) {
+                        m_flexGeraeteFrequenzHz = hz;
+                        if (m_flexLausch) { m_flexLausch->setHauptfrequenzHz(hz); }
+                        emit flexSliceFrequencyChanged(haupt, hz);
+                    }
+                }
                 m_flexAudioLevelWas = kv.value(QStringLiteral("audio_level"));
                 m_flexAudioMuteWas  = kv.value(QStringLiteral("audio_mute"));
                 applyFlexAudioSetup();
@@ -7608,7 +7631,10 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
             // Die Lauschscheibe hat ihre Frequenz schon in
             // nimmStatus() abgegeben; hier darf sie den VFO des
             // Betreibers nicht auf ihr Band ziehen (2026-11-19).
-            if (m_flexLausch && m_flexLausch->istLauschscheibe(sliceId)) {
+            // Und vor der Anmeldung nur die Sendescheibe: die
+            // wiederhergestellte Lauschscheibe einer frueheren Sitzung
+            // stellte am 2026-11-19 sonst den VFO auf ihr Band.
+            if (m_flexLausch && !m_flexLausch->darfAnDenVfo(sliceId)) {
                 return;
             }
             m_flexGeraeteFrequenzHz = hz;
