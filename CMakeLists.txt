@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Longpath VERSION 0.10.0 LANGUAGES C CXX)
+project(Longpath VERSION 0.11.0 LANGUAGES C CXX)
 
 # ── ccache compiler launcher (2026-07-25) ──────────────────────────────
 # CI has always configured ccache explicitly; local dev machines never
@@ -954,6 +954,8 @@ set(GUI_SOURCES
     src/gui/widgets/Ft8Fensterbalken.cpp
     # „THEN" in der QSO-Karte: wer nach diesem QSO drankommt (2026-11-15)
     src/gui/widgets/Ft8DannListe.cpp
+    # Wer der FT8-Partner ist und wie es bei ihm aussieht (2026-11-18)
+    src/gui/widgets/Ft8PartnerZeile.cpp
     src/gui/widgets/DspParamPopup.cpp
     src/gui/widgets/RasterOverlay.cpp
     src/gui/widgets/RasterOverlay.h

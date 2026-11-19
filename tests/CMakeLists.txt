@@ -355,6 +355,11 @@ longpath_add_test(tst_clarity_nf_grid_coexistence)
 # ── Der Messversatz vom Geraet bestellt kein Speichern (2026-11-18) ───────
 # Zehn Minuten FT8: 26 von 29 Neuschreibungen der 2,9-MB-Einstellungsdatei
 # kamen von DisplayCalOffset, zweimal je Sendedurchgang.
+longpath_add_test(tst_kurvenpuffer_nur_wenn_gezeichnet)
+if(TEST tst_kurvenpuffer_nur_wenn_gezeichnet)
+    set_tests_properties(tst_kurvenpuffer_nur_wenn_gezeichnet PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
 longpath_add_test(tst_cal_offset_bestellt_kein_speichern)
 if(TEST tst_cal_offset_bestellt_kein_speichern)
     set_tests_properties(tst_cal_offset_bestellt_kein_speichern PROPERTIES
@@ -6030,6 +6035,9 @@ longpath_add_test(tst_ft8_flaeche)
 # 2026-11-15: „THEN" in der QSO-Karte und „+ Queue" in der Fundliste --
 # die Bedienung der Warteschlange mit echten Maus-Ereignissen.
 longpath_add_test(tst_ft8_anruferliste)
+# 2026-11-18: die Rotor/Log-Karte folgt dem laufenden FT8-Partner -- das
+# Signal auf jedem Weg, die Uebernahme ohne Fokus und nie ueber Getipptes.
+longpath_add_test(tst_ft8_rufzeichenkarte)
 # Die zweite Spalte „Rx Frequency" neben „Band Activity" (2026-10-21).
 longpath_add_test(tst_ft8_sicht_meine_frequenz)
 longpath_add_test(tst_ft8_wasserfall)
