@@ -89,7 +89,6 @@ QSize FlowLayout::sizeHint() const
             if (!wantsWidth(it)) { w += sp->sizeHint().width(); }
             continue;
         }
-        if (it->isEmpty()) { continue; }   // versteckt
         const QSize s = it->sizeHint();
         w += s.width() + (n > 0 ? m_hSpace : 0);
         h = qMax(h, s.height());
@@ -201,10 +200,14 @@ int FlowLayout::layOut(const QRect& rect, bool apply) const
             }
             continue;
         }
-        // Ein verstecktes Widget ist kein Element der Zeile -- sonst
-        // kostete es einen Abstand, hinter dem nichts steht.
-        if (it->isEmpty()) { continue; }
-
+        // Ein VERSTECKTES Widget bleibt ein Element der Zeile, mit
+        // Breite null und seinem Abstand -- wie seit 2026-09-21. Am
+        // 2026-11-18 stand hier kurz „ueberspringen"; die Kartenleiste
+        // traegt aber ein Dutzend versteckte Elemente, passte dadurch
+        // vorübergehend in EINE Zeile, und `tst_logbuch_karte_pfeil`
+        // fand den Pfeil unter dem Radar (Linux-CI und lokal). Wer in
+        // seiner Reihe etwas versteckt, steckt es in ein eigenes Stueck
+        // mit QHBoxLayout -- der kennt versteckte Kinder.
         const QSize hint = it->sizeHint();
         const int minW = it->minimumSize().width();
         int w = qMax(hint.width(), minW);
