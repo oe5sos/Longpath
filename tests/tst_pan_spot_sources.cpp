@@ -17,15 +17,22 @@
 //     den Haken leer und die Spot-Liste verbirgt die Quelle;
 //   * ein schon offener Spot Hub zieht nach (reloadSourceVisibility);
 //   * umgekehrt liest das Zahnrad, was im Spot Hub gesetzt wurde;
-//   * Show all / Hide all.
+//   * Show all / Hide all;
+//   * die eigenen Dekoder (Quelle "Longpath", FT8 und RTTY) haben einen
+//     Haken -- am 19.11. fehlte er, und die FT8-Rufzeichen blieben stehen;
+//   * ein ECHTER Mausklick (Press/Release an das offene Untermenue) stellt
+//     um, nicht nur QAction::trigger().
 //
 // Modification history (Longpath):
+//   2026-11-19 — Eigene Dekoder + echter Klick (Betreiber: „ich denke,
+//                 dass funktioniert nicht").
 //   2026-11-18 — Original fuer Longpath von Martin Fischer,
 //                 KI-gestuetzt ueber Anthropic Claude (Claude Code).
 // =================================================================
 #include <QtTest>
 #include <QCheckBox>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QSignalSpy>
 
 #include <memory>
@@ -36,6 +43,7 @@
 #include "gui/SpotHubDialog.h"
 #include "models/BandFilterProxy.h"
 #include "models/RadioModel.h"
+#include "FensterFrist.h"
 
 using namespace Longpath;
 
@@ -46,6 +54,7 @@ const QStringList kQuellen = {
     QStringLiteral("WSJT-X"),        QStringLiteral("SpotCollector"),
     QStringLiteral("POTA"),          QStringLiteral("FreeDV"),
     QStringLiteral("PSK"),           QStringLiteral("Roundtable"),
+    QStringLiteral("Longpath"),   // eigene Dekoder (FT8, RTTY)
 };
 
 QString schluessel(const QString& quelle)
@@ -92,6 +101,14 @@ class TestPanSpotSources : public QObject
 {
     Q_OBJECT
 
+    static void wegraeumen(QMenu* m)
+    {
+        m->hide();
+        m->deleteLater();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        QCoreApplication::processEvents();
+    }
+
     static void alleSichtbar()
     {
         auto& s = AppSettings::instance();
@@ -135,7 +152,7 @@ private slots:
         imMenue.sort();
         imHub.sort();
         QCOMPARE(imMenue, imHub);
-        QCOMPARE(imMenue.size(), 8);
+        QCOMPARE(imMenue.size(), 9);
         delete m;
     }
 
@@ -216,6 +233,59 @@ private slots:
         QVERIFY2(!haken(spotsMenue(m3), QStringLiteral("RBN"))->isChecked(),
                  "das Zahnrad liest, was im Spot Hub abgeschaltet wurde");
         delete m3;
+    }
+
+    // Der Klick, den der Betreiber macht: Untermenue offen, Maus auf den
+    // Eintrag, druecken, loslassen. QTest::mouseClick verpufft im
+    // Pruefstand (kein echter Schirm), darum QMouseEvent + sendEvent.
+    void echterKlickStelltUm()
+    {
+        PanadapterApplet applet(QStringLiteral("A"));
+        SpectrumWidget* flaeche = applet.spectrumWidget();
+        flaeche->loadSpotDisplaySettings();
+        QMenu* m = applet.buildDisplayMenuForTesting();
+        QMenu* spots = spotsMenue(m);
+        QVERIFY(spots);
+        spots->popup(QPoint(200, 200));
+        QVERIFY(QTest::qWaitForWindowExposed(spots, kFensterFrist));
+
+        const auto klick = [&spots](QAction* a) {
+            QVERIFY(a && a->isEnabled() && a->isVisible());
+            const QPoint mitte = spots->actionGeometry(a).center();
+            QVERIFY2(!spots->actionGeometry(a).isEmpty(), "der Eintrag hat eine Flaeche");
+            const QPointF lokal(mitte);
+            const QPointF global(spots->mapToGlobal(mitte));
+            QMouseEvent bewegt(QEvent::MouseMove, lokal, global,
+                               Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+            QApplication::sendEvent(spots, &bewegt);
+            QMouseEvent drueckt(QEvent::MouseButtonPress, lokal, global,
+                                Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+            QApplication::sendEvent(spots, &drueckt);
+            QMouseEvent laesst(QEvent::MouseButtonRelease, lokal, global,
+                               Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+            QApplication::sendEvent(spots, &laesst);
+            QCoreApplication::processEvents();
+        };
+
+        klick(haken(spots, QStringLiteral("Longpath")));
+        QCOMPARE(schluessel(QStringLiteral("Longpath")), QStringLiteral("False"));
+        QVERIFY2(!flaeche->isSpotSourceVisible(QStringLiteral("Longpath")),
+                 "ein Klick auf den eigenen Dekoder blendet die FT8-Rufzeichen aus");
+        QVERIFY(flaeche->isSpotSourceVisible(QStringLiteral("Cluster")));
+
+        // Das Menue schliesst nach dem Klick; der naechste Klick geht in
+        // ein frisch gebautes, wie beim Betreiber. Abraeumen ueber die
+        // Ereignisschleife: Qt arbeitet nach dem Klick noch am Schliessen.
+        wegraeumen(m);
+        m = applet.buildDisplayMenuForTesting();
+        spots = spotsMenue(m);
+        QVERIFY(!haken(spots, QStringLiteral("Longpath"))->isChecked());
+        spots->popup(QPoint(200, 200));
+        QVERIFY(QTest::qWaitForWindowExposed(spots, kFensterFrist));
+        klick(haken(spots, QStringLiteral("Cluster")));
+        QCOMPARE(schluessel(QStringLiteral("Cluster")), QStringLiteral("False"));
+        QVERIFY(!flaeche->isSpotSourceVisible(QStringLiteral("Cluster")));
+        wegraeumen(m);
     }
 
     void showAllUndHideAll()

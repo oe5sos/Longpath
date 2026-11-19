@@ -1125,7 +1125,7 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
     return menu;
 }
 
-// Die acht Quellen in der Reihenfolge und mit den Namen des Spot Hub
+// Die Quellen in der Reihenfolge und mit den Namen des Spot Hub
 // (SpotHubDialog::buildDisplayTab). tst_pan_spot_sources vergleicht
 // beide Listen, damit eine neue Quelle nicht nur an einer Stelle steht.
 namespace {
@@ -1139,6 +1139,10 @@ constexpr SpotQuelle kSpotQuellen[] = {
     {"FreeDV",        "FreeDV"},
     {"PSK",           "PSK Reporter"},
     {"Roundtable",    "Roundtable"},
+    // Die eigenen Dekoder (Ft8Applet, RttyDecoderApplet) stempeln
+    // "Longpath". Ohne diesen Haken blieben die FT8-Rufzeichen im Bild,
+    // was immer man sonst abschaltet (2026-11-19).
+    {"Longpath",      "Own decoder (FT8, RTTY)"},
 };
 QString spotQuellenSchluessel(const char* quelle)
 {
