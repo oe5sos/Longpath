@@ -26,7 +26,9 @@
 // =================================================================
 
 #include <QtTest/QtTest>
+#include <QApplication>
 #include <QComboBox>
+#include <QDialog>
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QSignalSpy>
@@ -531,6 +533,81 @@ private slots:
 
     // ── 3. Das FT8-Fenster ───────────────────────────────────────────
 
+    void dieWahlFuerDasZweiteBand()
+    {
+        // „sprich was man noch vom anderen band sehen will! zum bespiel
+        // nur CQ oder nur grids, die man noch nie gearbeitet hat"
+        using A = Ft8Applet;
+        const QStringList land{QStringLiteral("NeuesLand")};
+        // Vorgabe: nur neue Laender.
+        QVERIFY(A::lauschZeileGewuenscht(land, true, false, false, false));
+        QVERIFY(!A::lauschZeileGewuenscht(land, false, true, true, true));
+        // Neu auf diesem Band schliesst neue Laender ein.
+        const QStringList band{QStringLiteral("NeuesBand")};
+        QVERIFY(A::lauschZeileGewuenscht(band, false, true, false, false));
+        QVERIFY(A::lauschZeileGewuenscht(band, true, false, false, false));
+        QVERIFY(!A::lauschZeileGewuenscht(band, false, false, true, false));
+        // Nur neue Felder.
+        const QStringList grid{QStringLiteral("NeuesGrid")};
+        QVERIFY(A::lauschZeileGewuenscht(grid, false, false, true, false));
+        QVERIFY(!A::lauschZeileGewuenscht(grid, true, false, false, true));
+        // Neue Felder, aber nur CQ.
+        const QStringList gridCq{QStringLiteral("NeuesGrid"), QStringLiteral("NurCq")};
+        QVERIFY(A::lauschZeileGewuenscht(gridCq, false, false, true, true));
+        QVERIFY(!A::lauschZeileGewuenscht(gridCq, false, false, true, false));
+        // Nur CQ, ohne Grund: jedes CQ.
+        const QStringList nurCq{QStringLiteral("NurCq")};
+        QVERIFY(A::lauschZeileGewuenscht(nurCq, false, false, false, true));
+        QVERIFY(!A::lauschZeileGewuenscht(nurCq, true, false, false, false));
+        // Nichts angekreuzt: alles.
+        QVERIFY(A::lauschZeileGewuenscht({}, false, false, false, false));
+
+        // Gespeichert und gelesen.
+        auto& s = AppSettings::instance();
+        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NeuesGrid,NurCq"));
+        QCOMPARE(A::lauschbandZeigt(), gridCq);
+        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("Alles"));
+        QVERIFY(A::lauschbandZeigt().isEmpty());
+        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("Unsinn"));
+        QCOMPARE(A::lauschbandZeigt(), land);
+        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NeuesLand"));
+    }
+
+    void imFensterWirktDieWahl()
+    {
+        QTemporaryDir dir;
+        RadioModel radio;
+        auto* dxcc = radio.dxccColorProvider();
+        QSignalSpy fertig(dxcc, &DxccColorProvider::importFinished);
+        dxcc->importAdifFile(schreibeLogbuch(dir));     // DL auf 20 m
+        QVERIFY(fertig.wait(5000));
+        dxcc->setEnabled(true);
+
+        Ft8Applet applet(&radio);
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        slice->setFrequency(21074000.0);
+        applet.setSlice(slice);
+        applet.setLauschOhneGeraetForTest(true);
+        applet.setLauschfrequenzHz(28074000.0);
+
+        auto& s = AppSettings::instance();
+        // „Neu auf diesem Band": DL steht nur auf 20 m im Log, also ist
+        // DL auf 10 m neu auf diesem Band.
+        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NeuesBand"));
+        applet.lauschPeriodeForTest({fund(QStringLiteral("CQ DL2XYZ JN58"), 1300.0f)});
+        QVERIFY2(applet.listForTest()->toPlainText().contains(QStringLiteral("DL2XYZ")),
+                 qPrintable(applet.listForTest()->toPlainText()));
+        // „CQ only": ein Rapport vom zweiten Band kommt nicht, ein CQ schon.
+        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NurCq"));
+        applet.lauschPeriodeForTest({fund(QStringLiteral("DL4QQ DL5RR RR73"), 1840.0f),
+                                     fund(QStringLiteral("CQ DL7ABC JO62"), 900.0f)});
+        const QString l = applet.listForTest()->toPlainText();
+        QVERIFY2(!l.contains(QStringLiteral("DL5RR")), qPrintable(l));
+        QVERIFY2(l.contains(QStringLiteral("DL7ABC")), qPrintable(l));
+        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NeuesLand"));
+    }
+
     void naheliegendIst10Und15()
     {
         QCOMPARE(Ft8Applet::naheliegendesLauschband(Band::Band15m),
@@ -775,6 +852,29 @@ private slots:
         const QString bildPfad = dir + QStringLiteral("/ft8-zwei-baender.png");
         QVERIFY2(bild.save(bildPfad), qPrintable(bildPfad));
         qInfo() << "Blatt:" << bildPfad << bild.size();
+    }
+
+    void blattOptionen()
+    {
+        const QString dir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+        if (dir.isEmpty()
+            || qEnvironmentVariable("LONGPATH_ENTWURF") != QStringLiteral("1")) {
+            QSKIP("braucht LONGPATH_GRAB_DIR und LONGPATH_ENTWURF=1");
+        }
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        QString gespeichert;
+        QTimer::singleShot(400, [&]() {
+            QWidget* blatt = QApplication::activeModalWidget();
+            if (!blatt) { return; }
+            const QString pfad = dir + QStringLiteral("/ft8-optionen.png");
+            blatt->grab().toImage().save(pfad);
+            gespeichert = pfad;
+            if (auto* d = qobject_cast<QDialog*>(blatt)) { d->reject(); }
+        });
+        applet.zeigeOptionenForTest();
+        QVERIFY2(!gespeichert.isEmpty(), "kein Optionsblatt gesehen");
+        qInfo() << "Blatt:" << gespeichert;
     }
 
     void ohneZweiteScheibeKeinLauschband()

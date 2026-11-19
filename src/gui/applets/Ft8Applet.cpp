@@ -52,6 +52,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QComboBox>
+#include <QCheckBox>
 #include <QSignalBlocker>
 #include <QMenu>
 #include <QLineEdit>
@@ -148,6 +149,9 @@ constexpr qint64 kZielVersatzMs = 500;
 /// Nachlauf, damit der letzte Ton wirklich draussen ist, bevor der
 /// Sender abschaltet.
 constexpr qint64 kSenderNachlaufMs = 300;
+
+/// Was vom zweiten Band in die Liste kommt: NeuesLand | NeuesBand | Alles.
+constexpr char kLauschbandZeigtSchluessel[] = "Ft8/LauschbandZeigt";
 
 // ── Welche Sicht gewaehlt ist (2026-11-19) ──────────────────────────
 //
@@ -423,7 +427,7 @@ void Ft8Applet::buildUI()
         // schlicht nicht gezeichnet.
         zahnrad->setFixedSize(26, 15);
         zahnrad->setCursor(Qt::PointingHandCursor);
-        zahnrad->setToolTip(tr("Callsign and grid square"));
+        zahnrad->setToolTip(tr("Options: callsign, grid square, second band"));
         zahnrad->setStyleSheet(QStringLiteral(
             // Ruhend in der Schrift der Kopfzeile, nicht in der des
             // Griffs: mit kTextScale (#7e7e85) auf diesem Grund war der
@@ -2659,6 +2663,44 @@ void Ft8Applet::zeigeOptionen()
                        "first four in CQ calls."));
     form->addRow(tr("Grid square"), loc);
 
+    // ── Was vom zweiten Band in die Liste kommt (2026-11-19) ──────
+    //
+    // Betreiber: „das sollte man bei den optionen auch einstellen
+    // können" -- „sprich was man noch vom anderen band sehen will! zum
+    // bespiel nur CQ oder nur grids, die man noch nie gearbeitet hat".
+    // Die ersten drei sind Gruende (eine Zeile kommt, wenn einer
+    // zutrifft; keiner angekreuzt = alles), „CQ only" schraenkt ein.
+    // Vorgabe bleibt die gewaehlte Gestaltung 2B: nur neue Laender.
+    const QStringList gewaehlt = lauschbandZeigt();
+    auto* lauschSpalte = new QVBoxLayout;
+    lauschSpalte->setSpacing(2);
+    const auto haken = [&](const QString& text, const char* schluessel,
+                           const QString& tipp) {
+        auto* h = new QCheckBox(text, &blatt);
+        h->setProperty("schluessel", QString::fromLatin1(schluessel));
+        h->setChecked(gewaehlt.contains(QString::fromLatin1(schluessel)));
+        h->setToolTip(tipp);
+        lauschSpalte->addWidget(h);
+        return h;
+    };
+    const QList<QCheckBox*> lauschHaken = {
+        haken(tr("New DXCC"), "NeuesLand",
+              tr("A country that is not in your log at all.")),
+        haken(tr("New on this band"), "NeuesBand",
+              tr("The country is in your log, but not on that band.")),
+        haken(tr("New grid"), "NeuesGrid",
+              tr("A grid square you have never worked.")),
+        haken(tr("CQ only"), "NurCq",
+              tr("Of those, only stations calling CQ. With none of the "
+                 "above ticked: every CQ from the second band.")),
+    };
+    auto* lauschKasten = new QWidget(&blatt);
+    lauschKasten->setLayout(lauschSpalte);
+    lauschKasten->setToolTip(tr("Which stations from the second band "
+                                "(Also) appear in the list. None of the "
+                                "first three ticked: all stations."));
+    form->addRow(tr("Second band shows"), lauschKasten);
+
     auto* knoepfe = new QDialogButtonBox(
         QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &blatt);
     form->addRow(knoepfe);
@@ -2666,6 +2708,16 @@ void Ft8Applet::zeigeOptionen()
     connect(knoepfe, &QDialogButtonBox::rejected, &blatt, &QDialog::reject);
 
     if (blatt.exec() != QDialog::Accepted) { return; }
+
+    QStringList neueWahl;
+    for (QCheckBox* h : lauschHaken) {
+        if (h->isChecked()) { neueWahl << h->property("schluessel").toString(); }
+    }
+    // Leer heisst „alles": ein eigenes Wort, damit es nicht mit „nie
+    // gesetzt" (= Vorgabe, nur neue Laender) verwechselt wird.
+    s.setValue(QLatin1String(kLauschbandZeigtSchluessel),
+               neueWahl.isEmpty() ? QStringLiteral("Alles")
+                                  : neueWahl.join(QLatin1Char(',')));
 
     const QString neuerRuf = ruf->text().trimmed().toUpper();
     const QString neuerLoc = loc->text().trimmed().toUpper();
@@ -4160,6 +4212,50 @@ bool Ft8Applet::istNeuesLand(const QString& senderRuf) const
 // Dieselbe Frage fuer eine andere Frequenz -- das Lauschband
 // (2026-11-19). „Neu" heisst neu ueberhaupt; die Frequenz braucht der
 // Aufloeser trotzdem, ohne Band antwortet er „unbekannt".
+QStringList Ft8Applet::lauschbandZeigt()
+{
+    const QString v = AppSettings::instance()
+                          .value(QLatin1String(kLauschbandZeigtSchluessel),
+                                 QStringLiteral("NeuesLand")).toString().trimmed();
+    if (v == QLatin1String("Alles")) { return {}; }
+    QStringList teile;
+    for (const QString& t : v.split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+        const QString w = t.trimmed();
+        if (w == QLatin1String("NeuesLand") || w == QLatin1String("NeuesBand")
+            || w == QLatin1String("NeuesGrid") || w == QLatin1String("NurCq")) {
+            teile << w;
+        }
+    }
+    return teile.isEmpty() && !v.isEmpty() ? QStringList{QStringLiteral("NeuesLand")}
+                                           : teile;
+}
+
+bool Ft8Applet::lauschZeileGewuenscht(const QStringList& zeigt, bool neuesLand,
+                                      bool neuesBand, bool neuesGrid, bool cq)
+{
+    if (zeigt.contains(QLatin1String("NurCq")) && !cq) { return false; }
+    const bool landWahl = zeigt.contains(QLatin1String("NeuesLand"));
+    const bool bandWahl = zeigt.contains(QLatin1String("NeuesBand"));
+    const bool gridWahl = zeigt.contains(QLatin1String("NeuesGrid"));
+    if (!landWahl && !bandWahl && !gridWahl) { return true; }   // alles
+    return (landWahl && neuesLand)
+           || (bandWahl && (neuesLand || neuesBand))
+           || (gridWahl && neuesGrid);
+}
+
+// Das Land steht im Logbuch, aber nicht auf DIESEM Band (2026-11-19,
+// fuer die Option „New DXCC and new band").
+bool Ft8Applet::istNeuesBandAuf(const QString& senderRuf, double hz) const
+{
+    if (senderRuf.isEmpty() || !m_model || !m_model->dxccColorProvider()) {
+        return false;
+    }
+    auto* dxcc = m_model->dxccColorProvider();
+    if (!dxcc->isEnabled()) { return false; }
+    return dxcc->statusForSpot(senderRuf, hz / 1.0e6, QStringLiteral("FT8"))
+           == DxccStatus::NewBand;
+}
+
 bool Ft8Applet::istNeuesLandAuf(const QString& senderRuf, double hz) const
 {
     if (senderRuf.isEmpty() || !m_model || !m_model->dxccColorProvider()) {
@@ -4740,15 +4836,26 @@ void Ft8Applet::onLauschDecoded(const QVector<Ft8Decode>& funde,
 {
     if (m_lauschHz <= 0.0) { return; }   // abgeschaltet, Fenster lief noch
     m_lauschZuletzt = funde.size();
+    const QStringList zeigt = lauschbandZeigt();
     const QString uhrzeit =
         periodStart.toUTC().toString(QStringLiteral("HHmmss"));
 
     for (const Ft8Decode& d : funde) {
         const QString ruf = senderCallsign(d.text);
-        // Nur, was fehlt: ein Land, das noch nie im Logbuch stand.
-        // Alles andere vom zweiten Band wuerde die Liste fluten, in der
-        // das QSO auf dem Hauptband laeuft.
-        if (ruf.isEmpty() || !istNeuesLandAuf(ruf, m_lauschHz)) { continue; }
+        // Was hinein darf, steht in den Optionen (Vorgabe: nur, was als
+        // Land ganz fehlt -- alles andere vom zweiten Band wuerde die
+        // Liste fluten, in der das QSO auf dem Hauptband laeuft).
+        if (ruf.isEmpty()) { continue; }
+        const bool neuesLand = istNeuesLandAuf(ruf, m_lauschHz);
+        const QString loc = locatorAusNachricht(d.text);
+        const bool neuesGrid = !m_grids.leer() && !loc.isEmpty()
+                               && m_grids.istNeu(loc);
+        const bool cq = d.text.trimmed().toUpper().startsWith(QStringLiteral("CQ"));
+        if (!lauschZeileGewuenscht(zeigt, neuesLand,
+                                   !neuesLand && istNeuesBandAuf(ruf, m_lauschHz),
+                                   neuesGrid, cq)) {
+            continue;
+        }
 
         Fundzeile z;
         z.text = zeilentext(uhrzeit,
@@ -4758,17 +4865,20 @@ void Ft8Applet::onLauschDecoded(const QVector<Ft8Decode>& funde,
                             d.text, landFuer(ruf));
         z.nachricht = d.text;
         z.tonHz     = static_cast<int>(std::lround(d.freqHz));
-        z.istCq     = d.text.trimmed().toUpper().startsWith(QStringLiteral("CQ"));
-        z.neuesLand = true;
+        z.istCq     = cq;
+        z.neuesLand = neuesLand;
+        z.neuesGrid = neuesGrid;
         z.band      = m_lauschBand;
         z.wahlHz    = m_lauschHz;
-        if (m_model && m_model->dxccColorProvider()) {
+        if (neuesLand && m_model && m_model->dxccColorProvider()) {
             z.landFarbe = m_model->dxccColorProvider()->colorForSpot(
                 ruf, m_lauschHz / 1.0e6, QStringLiteral("FT8"));
         }
-        qCInfo(lcFt8Senden).noquote()
-            << "Lauschband" << m_lauschBand << "neues Land:" << ruf
-            << landFuer(ruf);
+        if (neuesLand) {
+            qCInfo(lcFt8Senden).noquote()
+                << "Lauschband" << m_lauschBand << "neues Land:" << ruf
+                << landFuer(ruf);
+        }
         merkeZeile(z);
     }
     zeigeFundZahl();

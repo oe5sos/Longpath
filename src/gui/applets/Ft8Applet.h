@@ -252,6 +252,7 @@ public:
     /// frei, statt etwas zu behaupten.
     QString landFuer(const QString& rufzeichen) const;
     bool istNeuesLandAuf(const QString& senderRuf, double hz) const;
+    bool istNeuesBandAuf(const QString& senderRuf, double hz) const;
 
     /// Das eigene Rufzeichen aus den Einstellungen. `User/Callsign`
     /// ist der kanonische Schluessel (SpotHubDialog schreibt ihn);
@@ -384,6 +385,13 @@ public:
     /// die beiden, die der Betreiber genannt hat („10 und 15 meter als
     /// beispiel"): 15 m -> 10 m und 10 m -> 15 m. Sonst keine Vorgabe.
     static std::optional<Band> naheliegendesLauschband(Band hauptband);
+    /// Was vom zweiten Band in die Liste kommt (Optionen, „Second band
+    /// shows"): Gruende "NeuesLand" (Vorgabe), "NeuesBand", "NeuesGrid",
+    /// Einschraenkung "NurCq". Leer = alles.
+    static QStringList lauschbandZeigt();
+    /// Die Regel dazu, rein: kommt diese Zeile vom zweiten Band hinein?
+    static bool lauschZeileGewuenscht(const QStringList& zeigt, bool neuesLand,
+                                      bool neuesBand, bool neuesGrid, bool cq);
     /// Auf `hz` lauschen (Wahlfrequenz, DIGU); 0 schaltet ab.
     void setLauschfrequenzHz(double hz);
     double lauschfrequenzHz() const { return m_lauschHz; }
@@ -396,6 +404,8 @@ public:
     void lauschPeriodeForTest(const QVector<Longpath::Ft8Decode>& funde);
     Ft8Stream* lauschStreamForTest() const { return m_lauschStream; }
     QComboBox* lauschFeldForTest() const { return m_lauschFeld; }
+    /// Das Optionsblatt oeffnen (modal) -- fuer Bild-Pruefstaende.
+    void zeigeOptionenForTest() { zeigeOptionen(); }
     /// Ohne Geraet mit zweiter Scheibe lauschen -- nur der Pruefstand
     /// speist die Funde selbst ein.
     void setLauschOhneGeraetForTest(bool an) { m_lauschOhneGeraet = an; }
