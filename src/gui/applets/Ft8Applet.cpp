@@ -4961,6 +4961,7 @@ void Ft8Applet::setLauschfrequenzHz(int platz, double hz)
     l.hz = an ? hz : 0.0;
     l.band = band;
     l.zuletzt = 0;
+    l.vorher = 0;
     if (bandNeu) {
         // Was in der Spalte stand, gehoert zum alten Band.
         l.zeilen.clear();
@@ -5016,7 +5017,14 @@ void Ft8Applet::onLauschDecoded(int platz, const QVector<Ft8Decode>& funde,
     if (platz < 0 || platz >= kLauschPlaetze) { return; }
     LauschPlatz& l = m_lausch[platz];
     if (l.hz <= 0.0) { return; }   // abgeschaltet, Fenster lief noch
-    l.zuletzt = funde.size();
+    // „HEARD" zaehlt ueber die letzten ZWEI Durchgaenge (2026-11-20). Die
+    // Flex hat eine Empfangseinheit: waehrend der eigenen Sendung hoert
+    // sie auf keinem Band, der Durchgang des zweiten Dekoders ist leer --
+    // und die Zahl sprang nach jeder Sendung auf 0. Am Geraet las sich
+    // das als „es passiert nichts". FT8 sendet und empfaengt im Wechsel;
+    // das Groessere aus zwei Durchgaengen ist der letzte Empfang.
+    l.zuletzt = std::max(int(funde.size()), l.vorher);
+    l.vorher = funde.size();
     const QString uhrzeit =
         periodStart.toUTC().toString(QStringLiteral("HHmmss"));
 

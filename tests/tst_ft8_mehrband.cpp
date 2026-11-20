@@ -722,6 +722,31 @@ private slots:
         s.remove(QStringLiteral("Ft8/NebenbandFilter"));
     }
 
+    void dieZahlFaelltNichtNachDerSendung()
+    {
+        // Am Geraet, 2026-11-20 10:46: „15M · 0 HEARD" -- im eigenen
+        // Sendedurchgang hoert die Flex (eine Empfangseinheit) auf keinem
+        // Band, und die Zahl sprang auf 0.
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        slice->setFrequency(14074000.0);
+        applet.setSlice(slice);
+        applet.setLauschOhneGeraetForTest(true);
+        applet.setLauschfrequenzHz(0, 21074000.0);
+        QVector<Ft8Decode> neun;
+        for (int i = 0; i < 9; ++i) {
+            neun << fund(QStringLiteral("CQ AA%1AA FN42").arg(i), 500.0f + 100.0f * i);
+        }
+        applet.lauschPeriodeForTest(0, neun);
+        QCOMPARE(applet.lauschTitelForTest()->text(), QStringLiteral("15M · 9 HEARD"));
+        applet.lauschPeriodeForTest(0, {});            // eigener Sendedurchgang
+        QCOMPARE(applet.lauschTitelForTest()->text(), QStringLiteral("15M · 9 HEARD"));
+        applet.lauschPeriodeForTest(0, {});            // und noch einer: wirklich still
+        QCOMPARE(applet.lauschTitelForTest()->text(), QStringLiteral("15M · 0 HEARD"));
+    }
+
     void dieZeileSiehtAusWieImHauptband()
     {
         // „ich denke, es soll alles so wie im hauptband aussehen": dieselbe

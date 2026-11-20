@@ -682,7 +682,8 @@ private:
         std::unique_ptr<AudioTapRing> ring;
         double  hz{0.0};
         QString band;
-        int     zuletzt{0};
+        int     zuletzt{0};   ///< angezeigt: Groesstes aus den letzten zwei Durchgaengen
+        int     vorher{0};    ///< Funde des vorigen Durchgangs
         QComboBox*      feld{nullptr};
         QWidget*        spalte{nullptr};
         QLabel*         titel{nullptr};
