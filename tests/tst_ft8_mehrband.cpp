@@ -593,8 +593,12 @@ private slots:
         // Nichts angekreuzt: alles.
         QVERIFY(A::lauschZeileGewuenscht({}, false, false, false, false));
 
-        // Gespeichert und gelesen.
+        // Gespeichert und gelesen. Nie gesetzt: alles (Vorgabe seit
+        // 2026-11-20 -- eine fast leere Spalte sah aus wie „empfaengt
+        // nicht").
         auto& s = AppSettings::instance();
+        s.remove(QStringLiteral("Ft8/LauschbandZeigt"));
+        QVERIFY(A::lauschbandZeigt().isEmpty());
         s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NeuesGrid,NurCq"));
         QCOMPARE(A::lauschbandZeigt(), gridCq);
         s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("Alles"));
@@ -691,6 +695,8 @@ private slots:
         applet.setLauschOhneGeraetForTest(true);
         applet.setLauschfrequenzHz(28074000.0);
         QCOMPARE(applet.lauschband(), QStringLiteral("10m"));
+        AppSettings::instance().setValue(QStringLiteral("Ft8/LauschbandZeigt"),
+                                         QStringLiteral("NeuesLand"));
 
         applet.lauschPeriodeForTest({
             fund(QStringLiteral("CQ 3B8XX LG89"), 902.0f),      // neu

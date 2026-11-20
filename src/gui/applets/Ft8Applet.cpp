@@ -2768,7 +2768,9 @@ void Ft8Applet::zeigeOptionen()
     // bespiel nur CQ oder nur grids, die man noch nie gearbeitet hat".
     // Die ersten drei sind Gruende (eine Zeile kommt, wenn einer
     // zutrifft; keiner angekreuzt = alles), „CQ only" schraenkt ein.
-    // Vorgabe bleibt die gewaehlte Gestaltung 2B: nur neue Laender.
+    // Vorgabe seit den Spalten (2026-11-20): alles. Jedes Band hat
+    // seine eigene Spalte, und eine fast immer leere Spalte sah am
+    // Geraet aus wie „empfaengt nicht" (Betreiber: „wie du meinst").
     const QStringList gewaehlt = lauschbandZeigt();
     auto* lauschSpalte = new QVBoxLayout;
     lauschSpalte->setSpacing(2);
@@ -4325,7 +4327,7 @@ QStringList Ft8Applet::lauschbandZeigt()
 {
     const QString v = AppSettings::instance()
                           .value(QLatin1String(kLauschbandZeigtSchluessel),
-                                 QStringLiteral("NeuesLand")).toString().trimmed();
+                                 QStringLiteral("Alles")).toString().trimmed();
     if (v == QLatin1String("Alles")) { return {}; }
     QStringList teile;
     for (const QString& t : v.split(QLatin1Char(','), Qt::SkipEmptyParts)) {

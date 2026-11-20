@@ -386,8 +386,8 @@ public:
     /// beispiel"): 15 m -> 10 m und 10 m -> 15 m. Sonst keine Vorgabe.
     static std::optional<Band> naheliegendesLauschband(Band hauptband);
     /// Was vom zweiten Band in die Liste kommt (Optionen, „Second band
-    /// shows"): Gruende "NeuesLand" (Vorgabe), "NeuesBand", "NeuesGrid",
-    /// Einschraenkung "NurCq". Leer = alles.
+    /// shows"): Gruende "NeuesLand", "NeuesBand", "NeuesGrid",
+    /// Einschraenkung "NurCq". Leer = alles (Vorgabe seit 2026-11-20).
     static QStringList lauschbandZeigt();
     /// Die Regel dazu, rein: kommt diese Zeile vom zweiten Band hinein?
     static bool lauschZeileGewuenscht(const QStringList& zeigt, bool neuesLand,
