@@ -371,7 +371,27 @@ void FlexLauschscheibe::stimme(int platz, double hz)
 {
     const Platz& p = m_platz[platz];
     if (p.scheibe < 0 || !(hz > 0.0)) { return; }
-    m_sende(FlexCommandWire::tuneSliceCommand(QString::number(p.scheibe), hz), {});
+    // Mit Rueckmeldung ins Protokoll (2026-11-20): die Maschine echot
+    // eigene Abstimmbefehle oft NICHT als Zustand („steht auf" blieb am
+    // Geraet bei der Anlegefrequenz stehen, obwohl die Scheibe laengst
+    // auf dem Lauschband war). Ohne diese Zeile sah das Protokoll aus,
+    // als hoerte die Lauschscheibe das falsche Band.
+    const int scheibe = p.scheibe;
+    const QString befehl = FlexCommandWire::tuneSliceCommand(QString::number(scheibe), hz);
+    m_sende(befehl, [platz, scheibe, hz](quint32 code, const QString& body) {
+        if (code == 0) {
+            qCInfo(lcConnection).nospace().noquote()
+                << "Flex-Lauschscheibe: Platz " << platz << " (Scheibe " << scheibe
+                << ") auf " << QString::number(hz / 1.0e6, 'f', 6)
+                << " MHz gestimmt — von der Maschine bestaetigt";
+        } else {
+            qCWarning(lcConnection).nospace().noquote()
+                << "Flex-Lauschscheibe: Platz " << platz << " (Scheibe " << scheibe
+                << ") auf " << QString::number(hz / 1.0e6, 'f', 6)
+                << " MHz NICHT gestimmt, Code 0x" << QString::number(code, 16)
+                << " " << body.trimmed();
+        }
+    });
 }
 
 void FlexLauschscheibe::baueAb(int platz)

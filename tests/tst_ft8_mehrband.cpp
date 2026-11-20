@@ -185,6 +185,36 @@ private slots:
         QVERIFY(!l.istLauschstrom(0x4000008));   // der Mix-Strom
     }
 
+    void derBandwechselStimmtDieLauschscheibe()
+    {
+        // Am Geraet, 2026-11-20 09:15: „Lauschband 40m" -- und im
+        // Protokoll keine Zeile, dass die Scheibe dorthin ging. Der
+        // Befehl muss hinausgehen, und seine Bestaetigung muss sichtbar
+        // sein (die Maschine echot eigene Abstimmbefehle nicht).
+        Draht d;
+        FlexLauschscheibe l(d.sende());
+        bisLaeuft(l, d);                      // Scheibe 1 auf 28.074
+        d.befehle.clear();
+        l.setFrequenzHz(0, 7074000.0);
+        QCOMPARE(d.befehle,
+                 QStringList({QStringLiteral("slice tune 1 7.074000 autopan=0")}));
+        // Mit Rueckruf, damit die Bestaetigung ins Protokoll kommt.
+        d.antworte(QStringLiteral("slice tune 1 7.074000"), 0, QString());
+        QCOMPARE(l.gewuenschteFrequenzHz(0), 7074000.0);
+        // Und beim Anlegen geht die Lauschfrequenz gleich nach dem
+        // Anlegen hinaus -- angelegt wird in der Panadapter-Mitte, damit
+        // die Maschine den Panadapter nicht mitzieht.
+        Draht e;
+        FlexLauschscheibe m(e.sende());
+        m.setHauptscheibe(QStringLiteral("0"));
+        m.setPanadapter(QStringLiteral("0x40000000"));
+        m.setHauptfrequenzHz(14074000.0);
+        m.setFrequenzHz(0, 21074000.0);
+        e.antworte(QStringLiteral("slice create"), 0, QStringLiteral("1"));
+        QVERIFY2(e.befehle.contains(QStringLiteral("slice tune 1 21.074000 autopan=0")),
+                 qPrintable(e.befehle.join('\n')));
+    }
+
     void sieEntstehtInDerMitteDesPanadapters()
     {
         // Am Geraet, 2026-11-19 18:29: Longpath hatte die Hauptscheibe
