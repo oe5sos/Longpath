@@ -32,6 +32,7 @@
 #include <QDialog>
 #include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QPushButton>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTimeZone>
@@ -623,19 +624,21 @@ private slots:
         // Nichts angekreuzt: alles.
         QVERIFY(A::lauschZeileGewuenscht({}, false, false, false, false));
 
-        // Gespeichert und gelesen. Nie gesetzt: alles (Vorgabe seit
-        // 2026-11-20 -- eine fast leere Spalte sah aus wie „empfaengt
-        // nicht").
+        // Gespeichert und gelesen. Nie gesetzt: wie das Hauptband
+        // (Vorgabe seit 2026-11-20: „wenn ich hauptband ändere, soll sich
+        // auch das nebenband genauso mitändern").
         auto& s = AppSettings::instance();
-        s.remove(QStringLiteral("Ft8/LauschbandZeigt"));
+        s.remove(QStringLiteral("Ft8/NebenbandFilter"));
+        QVERIFY(A::nebenbandWieHauptband());
         QVERIFY(A::lauschbandZeigt().isEmpty());
-        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NeuesGrid,NurCq"));
+        QVERIFY(A::nebenbandFilterText().isEmpty());
+        s.setValue(QStringLiteral("Ft8/NebenbandFilter"), QStringLiteral("NeuesGrid,NurCq"));
         QCOMPARE(A::lauschbandZeigt(), gridCq);
-        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("Alles"));
+        s.setValue(QStringLiteral("Ft8/NebenbandFilter"), QStringLiteral("Alles"));
         QVERIFY(A::lauschbandZeigt().isEmpty());
-        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("Unsinn"));
+        s.setValue(QStringLiteral("Ft8/NebenbandFilter"), QStringLiteral("Unsinn"));
         QCOMPARE(A::lauschbandZeigt(), land);
-        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NeuesLand"));
+        s.remove(QStringLiteral("Ft8/NebenbandFilter"));
     }
 
     void imFensterWirktDieWahl()
@@ -659,18 +662,88 @@ private slots:
         auto& s = AppSettings::instance();
         // „Neu auf diesem Band": DL steht nur auf 20 m im Log, also ist
         // DL auf 10 m neu auf diesem Band.
-        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NeuesBand"));
+        s.setValue(QStringLiteral("Ft8/NebenbandFilter"), QStringLiteral("NeuesBand"));
         applet.lauschPeriodeForTest({fund(QStringLiteral("CQ DL2XYZ JN58"), 1300.0f)});
         QVERIFY2(applet.lauschListeForTest()->toPlainText().contains(QStringLiteral("DL2XYZ")),
                  qPrintable(applet.lauschListeForTest()->toPlainText()));
         // „CQ only": ein Rapport vom zweiten Band kommt nicht, ein CQ schon.
-        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NurCq"));
+        s.setValue(QStringLiteral("Ft8/NebenbandFilter"), QStringLiteral("NurCq"));
         applet.lauschPeriodeForTest({fund(QStringLiteral("DL4QQ DL5RR RR73"), 1840.0f),
                                      fund(QStringLiteral("CQ DL7ABC JO62"), 900.0f)});
         const QString l = applet.lauschListeForTest()->toPlainText();
         QVERIFY2(!l.contains(QStringLiteral("DL5RR")), qPrintable(l));
         QVERIFY2(l.contains(QStringLiteral("DL7ABC")), qPrintable(l));
-        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NeuesLand"));
+        s.remove(QStringLiteral("Ft8/NebenbandFilter"));
+    }
+
+    void dasNebenbandFolgtDenPillen()
+    {
+        // „grundversion, beide gleich, bzw. wenn ich hauptband ändere,
+        // soll sich auch das nebenband genauso mitändern"
+        auto& s = AppSettings::instance();
+        s.remove(QStringLiteral("Ft8/NebenbandFilter"));
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        slice->setFrequency(14074000.0);
+        applet.setSlice(slice);
+        applet.setLauschOhneGeraetForTest(true);
+        applet.setLauschfrequenzHz(0, 7074000.0);
+        applet.lauschPeriodeForTest(0, {fund(QStringLiteral("CQ AA1AAA FN42"), 900.0f),
+                                        fund(QStringLiteral("K1ABC W9XYZ EN52"), 1300.0f),
+                                        fund(QStringLiteral("OE5SOS DL7ZZ JO62"), 1500.0f)});
+        QPlainTextEdit* neben = applet.lauschListeForTest(0);
+        // Ab Werk alles, wie die Hauptliste.
+        QVERIFY(neben->toPlainText().contains(QStringLiteral("W9XYZ")));
+        QVERIFY(neben->toPlainText().contains(QStringLiteral("AA1AAA")));
+        QVERIFY(applet.lauschTitelForTest()->text() == QStringLiteral("40M · 3 HEARD"));
+        // Pille CQ im Hauptband: das Nebenband filtert genauso.
+        applet.nurCqButtonForTest()->click();
+        QVERIFY2(!neben->toPlainText().contains(QStringLiteral("W9XYZ")),
+                 qPrintable(neben->toPlainText()));
+        QVERIFY(neben->toPlainText().contains(QStringLiteral("AA1AAA")));
+        // ... und wer mich ruft, bleibt sichtbar (wie im Hauptband).
+        QVERIFY(neben->toPlainText().contains(QStringLiteral("DL7ZZ")));
+        applet.sichtAllesButtonForTest()->click();
+        QVERIFY(neben->toPlainText().contains(QStringLiteral("W9XYZ")));
+
+        // Eigener Filter: die Pillen wirken NICHT mehr, und der Filter
+        // steht im Titel.
+        s.setValue(QStringLiteral("Ft8/NebenbandFilter"), QStringLiteral("NurCq"));
+        applet.sichtAllesButtonForTest()->click();   // neu zeichnen
+        QVERIFY(!neben->toPlainText().contains(QStringLiteral("W9XYZ")));
+        QVERIFY(neben->toPlainText().contains(QStringLiteral("AA1AAA")));
+        QVERIFY2(applet.lauschTitelForTest()->text().endsWith(QStringLiteral("· CQ ONLY")),
+                 qPrintable(applet.lauschTitelForTest()->text()));
+        applet.nurNeueLaenderButtonForTest()->click();   // Hauptband „New DXCC"
+        QVERIFY2(neben->toPlainText().contains(QStringLiteral("AA1AAA")),
+                 "eigener Filter: die Pille des Hauptbands wirkt nicht");
+        s.remove(QStringLiteral("Ft8/NebenbandFilter"));
+    }
+
+    void dieZeileSiehtAusWieImHauptband()
+    {
+        // „ich denke, es soll alles so wie im hauptband aussehen": dieselbe
+        // Zeile, dieselbe Art (an mich / CQ / neues Land).
+        RadioModel radio;
+        Ft8Applet applet(&radio);
+        const int id = radio.addSlice();
+        SliceModel* slice = radio.sliceById(id);
+        slice->setFrequency(14074000.0);
+        applet.setSlice(slice);
+        applet.setLauschOhneGeraetForTest(true);
+        applet.setLauschfrequenzHz(0, 7074000.0);
+        const QVector<Ft8Decode> periode = {fund(QStringLiteral("CQ AA1AAA FN42"), 900.0f)};
+        applet.periodeForTest(periode);
+        applet.lauschPeriodeForTest(0, periode);
+        const QString haupt = applet.listForTest()->toPlainText()
+                                  .split('\n').filter(QStringLiteral("AA1AAA")).value(0);
+        const QString neben = applet.lauschListeForTest(0)->toPlainText()
+                                  .split('\n').filter(QStringLiteral("AA1AAA")).value(0);
+        QVERIFY(!haupt.isEmpty());
+        // Bis auf die Uhrzeit (zwei Aufrufe, zwei Sekunden) gleich.
+        QCOMPARE(neben.mid(6), haupt.mid(6));
     }
 
     void naheliegendIst10Und15()
@@ -725,7 +798,7 @@ private slots:
         applet.setLauschOhneGeraetForTest(true);
         applet.setLauschfrequenzHz(28074000.0);
         QCOMPARE(applet.lauschband(), QStringLiteral("10m"));
-        AppSettings::instance().setValue(QStringLiteral("Ft8/LauschbandZeigt"),
+        AppSettings::instance().setValue(QStringLiteral("Ft8/NebenbandFilter"),
                                          QStringLiteral("NeuesLand"));
 
         applet.lauschPeriodeForTest({
@@ -744,7 +817,9 @@ private slots:
         QVERIFY2(!applet.listForTest()->toPlainText().contains(QStringLiteral("3B8XX")),
                  "das zweite Band gehoert nicht in die Hauptliste");
         QCOMPARE(applet.lauschFundeZuletzt(), 3);
-        QCOMPARE(applet.lauschTitelForTest()->text(), QStringLiteral("10M · 3 HEARD"));
+        // Eigener Filter: er steht im Titel.
+        QCOMPARE(applet.lauschTitelForTest()->text(),
+                 QStringLiteral("10M · 3 HEARD · NEW DXCC"));
 
         // Und umgekehrt: das Hauptband kommt nicht in die Spalte.
         applet.periodeForTest({fund(QStringLiteral("CQ DL3AAA JN48"), 1500.0f)});
@@ -826,11 +901,11 @@ private slots:
         // Vier Spalten im Teiler, jede mit ihrem Band, kein Uebersprechen.
         QCOMPARE(applet.listenTeilerForTest()->count(), 4);
         auto& s = AppSettings::instance();
-        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("Alles"));
+        s.setValue(QStringLiteral("Ft8/NebenbandFilter"), QStringLiteral("Alles"));
         applet.lauschPeriodeForTest(0, {fund(QStringLiteral("CQ AA1AAA FN42"), 900.0f)});
         applet.lauschPeriodeForTest(1, {fund(QStringLiteral("CQ BB1BBB FN42"), 900.0f)});
         applet.lauschPeriodeForTest(2, {fund(QStringLiteral("CQ CC1CCC FN42"), 900.0f)});
-        s.setValue(QStringLiteral("Ft8/LauschbandZeigt"), QStringLiteral("NeuesLand"));
+        s.setValue(QStringLiteral("Ft8/NebenbandFilter"), QStringLiteral("NeuesLand"));
         const QStringList ruf = {QStringLiteral("AA1AAA"), QStringLiteral("BB1BBB"),
                                  QStringLiteral("CC1CCC")};
         for (int k = 0; k < 3; ++k) {

@@ -389,6 +389,12 @@ public:
     /// shows"): Gruende "NeuesLand", "NeuesBand", "NeuesGrid",
     /// Einschraenkung "NurCq". Leer = alles (Vorgabe seit 2026-11-20).
     static QStringList lauschbandZeigt();
+    /// Folgen die Spalten der anderen Baender der Sicht des Hauptbands?
+    /// (Vorgabe seit 2026-11-20: ja.)
+    static bool nebenbandWieHauptband();
+    /// Der eigene Filter der Spalten als Text fuer den Titel; leer, wenn
+    /// keiner gilt.
+    static QString nebenbandFilterText();
     /// Die Regel dazu, rein: kommt diese Zeile vom zweiten Band hinein?
     static bool lauschZeileGewuenscht(const QStringList& zeigt, bool neuesLand,
                                       bool neuesBand, bool neuesGrid, bool cq);
@@ -650,6 +656,8 @@ private:
         /// Leer bzw. 0 fuer das Hauptband.
         QString band;
         double  wahlHz{0.0};
+        /// Das Land steht im Log, aber nicht auf diesem Band.
+        bool    neuesLandBand{false};
     };
     QVector<Fundzeile> m_zeilen;
     /// Die Zeile, wie sie in der Liste steht: mit Bandmarke (Lauschband)
@@ -660,6 +668,9 @@ private:
     QString nimmZeileAn(const QString& angezeigteZeile);
     /// Tauschen (3A). Sendet nichts.
     QString wechsleAufLauschband(const Fundzeile& z);
+    Fundzeile baueFundzeile(const QString& zeile, const QString& nachricht,
+                            int tonHz, double wahlHz, const QString& modus) const;
+    bool lauschInSicht(const Fundzeile& z) const;
     /// Doppelklick in der Spalte von Platz `platz`.
     QString lauschZeileAngeklickt(int platz, const QString& angezeigteZeile);
     void onLauschDecoded(int platz, const QVector<Longpath::Ft8Decode>& funde,
