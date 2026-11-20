@@ -13,6 +13,9 @@
 // Modification history (Longpath):
 //   2026-10-18 — Ported to Longpath by Martin Fischer, AI-assisted via
 //                 Anthropic Claude (Cowork).
+//   2026-11-18 — meterScaled: degC durch 64 (Abkuehlkurve an der
+//                 Maschine + AetherSDR MeterModel.cpp). Martin Fischer,
+//                 AI-assisted via Anthropic Claude.
 // =================================================================
 
 #include "FlexVitaReader.h"
@@ -227,10 +230,32 @@ std::optional<double> meterScaled(qint16 raw, const QString& unit)
     if (unit.compare(QLatin1String("Volts"), Qt::CaseInsensitive) == 0) {
         return static_cast<double>(raw) / 256.0;
     }
-    // degC, RPM, Amps und alles Unbekannte: NICHT belegt. Dort liegen
-    // beide Teiler im erklaerten Bereich, der Bereich entscheidet also
-    // nichts. Eine Zahl auszugeben, die nur plausibel aussieht, waere
-    // eine Messung behaupten, die niemand gemacht hat.
+    // degC: durch 64. Belegt am 2026-11-18, auf zwei Wegen, die nichts
+    // voneinander wissen:
+    //
+    //   1. Die Abkuehlkurve an Martins Maschine (Protokoll desselben
+    //      Tages, `PATEMP`): nach einer halben Stunde ohne Sendung lief
+    //      der Rohwert auf 1405 aus und blieb dort (13:09 roh 1412,
+    //      13:13 roh 1405, Endstufenstrom 0); unter FT8 stieg er bis
+    //      2479. Mit /64 sind das 22,0 Grad in Ruhe und 38,7 Grad warm.
+    //      Mit /128 waeren es 11,0 Grad und mit /256 5,5 Grad — eine
+    //      eingeschaltete Maschine, die kaelter ist als das Zimmer, in
+    //      dem sie steht, gibt es nicht. Der Bereich, den die Maschine
+    //      erklaert, trennte die Teiler nicht; die Zimmertemperatur
+    //      tut es.
+    //   2. From AetherSDR MeterModel.cpp:303-304 [@d58e2b8a] — dort aus
+    //      FlexLib Meter.cs UpdateValue(): degF/degC → raw / 64.0.
+    //
+    // NICHT belegt bleibt: gegen die Anzeige von SmartSDR ist die Zahl
+    // nie gelesen worden. degF ist an dieser Maschine nie vorgekommen
+    // und bleibt darum unten ohne Zahl.
+    if (unit.compare(QLatin1String("degC"), Qt::CaseInsensitive) == 0) {
+        return static_cast<double>(raw) / 64.0;
+    }
+    // RPM, Amps und alles Unbekannte: NICHT belegt. Dort liegen
+    // mehrere Teiler im erklaerten Bereich, der Bereich entscheidet
+    // also nichts. Eine Zahl auszugeben, die nur plausibel aussieht,
+    // waere eine Messung behaupten, die niemand gemacht hat.
     return std::nullopt;
 }
 

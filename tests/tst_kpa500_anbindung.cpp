@@ -36,7 +36,9 @@
 #include "core/Kpa500Connection.h"
 #include "core/Kpa500Protocol.h"
 #include "gui/MainWindow.h"
+#include "gui/TitleBar.h"
 #include "gui/applets/Kpa500Applet.h"
+#include "gui/widgets/DeviceTemperatureStrip.h"
 #include "models/RadioModel.h"
 
 using namespace Longpath;
@@ -246,6 +248,17 @@ void TstKpa500Anbindung::dieZahlenKommenImFeldAn()
     QVERIFY2(!m_applet->powerOnEnabledForTesting(),
              "Er LAEUFT -- der Einschaltknopf hat keinen Sinn und muss grau "
              "sein");
+
+    // Und im Kopf (2026-11-18): die Temperatur, die der Verstaerker auf
+    // ^TM meldet, steht neben dem Namenszug -- durch das ECHTE Fenster
+    // verdrahtet, nicht durch eine Attrappe.
+    auto* kopf = m_mw->findChild<TitleBar*>();
+    QVERIFY(kopf);
+    DeviceTemperatureStrip* leiste = kopf->deviceTemperatures();
+    QVERIFY(leiste);
+    QTRY_COMPARE_WITH_TIMEOUT(
+        leiste->text(QStringLiteral("kpa500")),
+        QStringLiteral("KPA %1°C").arg(m_amp->tempC), 3000);
 }
 
 void TstKpa500Anbindung::derBootZustandMachtDenEinschaltknopfSinnvoll()
@@ -261,6 +274,12 @@ void TstKpa500Anbindung::derBootZustandMachtDenEinschaltknopfSinnvoll()
                               Kpa500Connection::Liveness::BootMode, 5000);
 
     QTRY_VERIFY_WITH_TIMEOUT(m_applet->powerOnEnabledForTesting(), 2000);
+    // Aus, aber am Draht: eine Temperatur gibt es dann nicht, und im
+    // Kopf darf nicht die letzte von vorher stehen bleiben.
+    if (auto* kopf = m_mw->findChild<TitleBar*>()) {
+        QVERIFY(!kopf->deviceTemperatures()->hasReading(
+            QStringLiteral("kpa500")));
+    }
     QVERIFY2(!m_applet->commandsEnabledForTesting(),
              "Im Boot-Zustand nimmt er keine regulaeren Befehle -- die Tasten "
              "muessen grau sein");

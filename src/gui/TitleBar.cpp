@@ -55,6 +55,10 @@
 //   2026-09-21 — Longpath: die Version steht immer neben dem Namen
 //                 (Betreiber: "die Version sollte man auch sehen!"),
 //                 der Bau-Tag nur bei Entwicklungsbauten dahinter.
+//   2026-11-18 — Longpath: die Temperaturen der angeschlossenen Geraete
+//                 stehen rechts neben Namenszug und Fassung
+//                 (DeviceTemperatureStrip), unsichtbar ohne Messwert.
+//                 Martin Fischer (OE5SOS), mit Claude (Anthropic).
 // =================================================================
 
 #include "TitleBar.h"
@@ -63,6 +67,7 @@
 #include "core/BuildIdentity.h"
 
 #include "StyleConstants.h"
+#include "widgets/DeviceTemperatureStrip.h"
 #include "widgets/MasterOutputWidget.h"
 
 #include <QDateTime>
@@ -77,6 +82,7 @@
 #include <QPixmap>
 #include <QPolygonF>
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QSize>
 #include <QSizePolicy>
 #include <QTimer>
@@ -609,6 +615,31 @@ TitleBar::TitleBar(AudioEngine* audio, QWidget* parent)
     m_hbox->addSpacing(6);
     m_hbox->addWidget(m_updateState);
 
+    // ── Temperaturen der Geraete (2026-11-18) ────────────────────────
+    //
+    // Betreiber: „temperaturanzeige von den geräten wäre auch im
+    // bereich des logo longpath oben interessant".
+    //
+    // Die Leiste steht im Layout, aber wie BREIT sie sein darf,
+    // bestimmt platziereTemperaturen() — nicht das Layout. Der Grund
+    // ist eine Messung am echten Kopf (2026-11-18, offscreen, mit den
+    // neun Menues): er braucht 1389 Punkte. Auf dem Notebook des
+    // Betreibers (1470 breit) bleiben 81; im Entwicklungsbau mit Zweig
+    // und Commit hinter der Fassung gar keine, dort stehen schon Menues
+    // hinter dem „»". Liesse man das Layout machen, drueckten fuenf
+    // Endstufen das Menue auf zwei Eintraege zusammen.
+    //
+    // Also: die Leiste nimmt, was FREI ist. Was nicht passt, faellt von
+    // rechts weg. Nur der erste Eintrag (das Funkgeraet, sonst die
+    // erste Endstufe) bleibt immer — er kostet bei vollem Kopf ein
+    // Menue mehr hinter dem „»", und ohne ihn saehe man die Anzeige
+    // genau dort nie, wo sie gewuenscht wurde.
+    m_deviceTemps = new DeviceTemperatureStrip(this);
+    m_deviceTemps->setObjectName(QStringLiteral("titleBarDeviceTemps"));
+    connect(m_deviceTemps, &DeviceTemperatureStrip::contentsChanged,
+            this, &TitleBar::platziereTemperaturen);
+    m_hbox->addWidget(m_deviceTemps);
+
     // ── Right stretch ──────────────────────────────────────────────────────
     m_hbox->addStretch(1);
 
@@ -847,6 +878,37 @@ void TitleBar::faerbeMenueErweiterung(QMenuBar* mb)
         taste->installEventFilter(new PfeilWaechter(taste));
         taste->setProperty("pfeilWaechter", true);
     }
+}
+
+void TitleBar::platziereTemperaturen()
+{
+    if (!m_deviceTemps || !m_hbox) { return; }
+    // Was der Kopf OHNE die Leiste braucht. Ihr eigener Anteil wird
+    // herausgerechnet, sonst haengt die Grenze an sich selbst.
+    const int abstand = m_hbox->spacing();
+    int ohne = m_hbox->sizeHint().width();
+    if (!m_deviceTemps->isHidden()) {
+        ohne -= m_deviceTemps->sizeHint().width() + abstand;
+    }
+    const int frei = width() - ohne - abstand;
+    m_deviceTemps->setWidthLimit(
+        qMax(0, qMax(frei, m_deviceTemps->firstEntryWidth())));
+}
+
+bool TitleBar::event(QEvent* e)
+{
+    // Aendert irgendetwas im Kopf seine Breite (der Stand der
+    // Aktualisierung bekommt einen laengeren Text, ein Menue kommt
+    // dazu), aendert sich auch, was fuer die Leiste frei ist.
+    const bool erledigt = QWidget::event(e);
+    if (e->type() == QEvent::LayoutRequest) { platziereTemperaturen(); }
+    return erledigt;
+}
+
+void TitleBar::resizeEvent(QResizeEvent* e)
+{
+    QWidget::resizeEvent(e);
+    platziereTemperaturen();
 }
 
 QString TitleBar::utcText() const

@@ -442,6 +442,7 @@ warren@wpratt.com
 #include "SetupDialog.h"
 #include "setup/DspSetupPages.h"   // NrAnfSetupPage::selectSubtab
 #include "TitleBar.h"
+#include "DeviceTemperatureFeed.h"
 #include "VaxFirstRunDialog.h"
 #if defined(Q_OS_LINUX)
 #  include "VaxLinuxFirstRunDialog.h"
@@ -1040,6 +1041,14 @@ MainWindow::MainWindow(QWidget* parent)
     m_titleBar = new TitleBar(m_radioModel->audioEngine(), this);
     m_titleBar->setMenuBar(menuBar());
     setMenuWidget(m_titleBar);
+
+    // Temperaturen der Geraete im Kopf (Betreiber, 2026-11-18). Die
+    // Verdrahtung wohnt in einer eigenen Klasse und haengt sich nur an
+    // Signale, die es schon gibt -- kein Abfragen, kein Zeitgeber. Sie
+    // gehoert der LEISTE, nicht dem Fenster: so kann beim Abbau kein
+    // spaetes Signal eines Geraets mehr in eine Leiste greifen, die
+    // schon weg ist (die Klasse von Absturz, die es hier schon gab).
+    new DeviceTemperatureFeed(m_radioModel, m_titleBar->deviceTemperatures());
 
     // Wire the MasterOutputWidget device picker → AudioEngine so picking
     // an output device rebuilds the speakers bus. Task 10b exposes only
