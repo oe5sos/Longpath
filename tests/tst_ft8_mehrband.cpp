@@ -49,6 +49,8 @@
 
 #include "fakes/FakeAudioBus.h"
 
+#include <cmath>
+#include <limits>
 #include <vector>
 
 using namespace Longpath;
@@ -231,14 +233,42 @@ private slots:
                  QStringLiteral("slice create pan=0x40000000 freq=14.074000 mode=DIGU"));
     }
 
+    void unbrauchbareProbenWerdenVerworfen()
+    {
+        // Am Geraet, 2026-11-20 10:32: „Spitze 708.3 dBFS" in der ersten
+        // Minute nach dem Anlegen -- einzelne Werte um 1e35.
+        QVector<float> ton = {0.1f, -0.2f, 1.0e35f,
+                              std::numeric_limits<float>::quiet_NaN(),
+                              std::numeric_limits<float>::infinity(),
+                              -0.9f, 7.9f, -12.0f};
+        float groesster = 0.0f;
+        QCOMPARE(FlexLauschscheibe::bereinigeTon(ton, &groesster), 4);
+        QVERIFY(std::isinf(groesster));
+        const QVector<float> erwartet = {0.1f, -0.2f, 0.0f, 0.0f, 0.0f,
+                                         -0.9f, 7.9f, 0.0f};
+        QCOMPARE(ton, erwartet);
+
+        // Und auf dem Weg durch die Lauschscheibe: was danach gemessen und
+        // weitergereicht wird, ist sauber.
+        Draht d;
+        FlexLauschscheibe l(d.sende());
+        bisLaeuft(l, d);
+        QVector<float> paket(256, 0.25f);
+        paket[17] = 1.0e35f;
+        l.tonAngekommen(0, paket);
+        QCOMPARE(paket[17], 0.0f);
+        for (float w : paket) { QVERIFY(std::isfinite(w) && std::fabs(w) <= 1.0f); }
+    }
+
     void derPegelWirdGemessen()
     {
         Draht d;
         FlexLauschscheibe l(d.sende());
         bisLaeuft(l, d);
         // Kein Absturz, kein Befehl -- nur Protokoll.
-        l.tonAngekommen(QVector<float>(512, 0.1f));
-        l.tonAngekommen(QVector<float>(512, 0.0f));
+        QVector<float> laut(512, 0.1f), still(512, 0.0f);
+        l.tonAngekommen(laut);
+        l.tonAngekommen(still);
         QVERIFY(!d.befehle.join('\n').contains(QStringLiteral("tx")));
     }
 
