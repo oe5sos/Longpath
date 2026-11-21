@@ -33,8 +33,12 @@
 //
 //   · Genau einer je Gruppe leuchtet. Der Rest ist fast unsichtbar.
 //
-//   · Radius 6, Höhe 27. Radius 3 ist der Qt-Standardwert und lässt
-//     alles nach Qt aussehen.
+//   · Radius 6, Höhe 21 (2026-11-21, vorher 27). Radius 3 ist der
+//     Qt-Standardwert und lässt alles nach Qt aussehen.
+//
+//   · Schmal stehen die Gruppen in ZWEI Zeilen, fest umgebrochen vor der
+//     Gruppe „Filter" (Band · Mode · Digi oben; Filter · Step · NR ·
+//     Rate · Profil unten). Breit bleibt es bei einer Zeile.
 //
 // ── Was bewusst fehlt ────────────────────────────────────────────────
 //
@@ -71,6 +75,7 @@
 class QHBoxLayout;
 class QLabel;
 class QPushButton;
+class QResizeEvent;
 
 namespace Longpath {
 
@@ -221,18 +226,81 @@ public:
     /// treten zurueck.
     static QString pillStyleGedaempft();
 
-    static constexpr int kPillHeight = 27;
+    // Maße der Pillen (Betreiber 2026-11-21: niedriger, Schrift 9-10,
+    // Innenabstand 6-7). kPillHeight ist die INHALTSHOEHE (min-height im
+    // Stilblatt); der 1-px-Rand kommt oben und unten dazu -- außen sind
+    // es 23 Punkte, also kPillHeight + 2. Vorher 27 außen 29. Schrift 9 px:
+    // die Stufenleiter
+    // von verify-style-drift kennt 7, 9, 11 -- 10 wäre eine namenlose
+    // Größe. Innenabstand 7 px je Seite.
+    static constexpr int kPillHeight = 17;
     static constexpr int kPillRadius = 6;
+    static constexpr int kPillFontPx = 9;
+    static constexpr int kPillPadX = 7;
+    /// Große Stufe: ab kGrossAbBreite Breite wachsen die Pillen, und die
+    /// Gruppen bekommen ihre Beschriftung zurück (Betreiber 2026-11-21).
+    static constexpr int kPillHeightGross = 23;
+    static constexpr int kPillFontGross = 11;
+    static constexpr int kPillPadGross = 9;
+    static constexpr int kGrossAbBreite = 1700;
+    /// Die aktuelle Stufe; von allen Pillen-Stilen gelesen.
+    static bool grossAktiv();
+    static int pillHoehe();
+    static int pillSchrift();
+    static int pillPolster();
+    /// Unterhalb dieser Breite (Layoutpunkte) stehen die Gruppen in ZWEI
+    /// Zeilen; ab ihr in einer. Die Schwelle ist die Breite, bei der eine
+    /// einzige Zeile gerade noch ohne Stauchen der Pillen passt: die
+    /// Mindestbreite der Einzelzeile (Summe der Gruppen mit Versalzeilen,
+    /// Pillen und Abständen) wurde am 2026-11-21 offscreen gemessen und
+    /// hier mit Reserve aufgerundet. Darunter bricht die Leiste an der
+    /// festen Stelle vor der Gruppe „Filter" um.
+    /// Gemessen am 2026-11-21 offscreen: die Einzelzeile mit drei Profilen
+    /// braucht 1261 Punkte; 1300 ist die Schwelle mit kleiner Reserve. Ist
+    /// die Einzelzeile breiter (mehr Profile), gilt die gemessene Breite
+    /// -- nie eine Zeile, die gestaucht werden muss.
+    static constexpr int kEinzeiligUnterBreite = 1300;
     /// Sichtbare Einträge je Gruppe, bevor das „…" übernimmt.
     static constexpr int kVisiblePerGroup = 3;
+    /// Sichtbare Bänder vorne: vier (160 · 80 · 60 · 40), der Rest im „…".
+    // Acht Baender vorne, in zwei Zeilen zu vier (Betreiber 2026-11-21).
+    static constexpr int kVisibleBand = 8;
+
+    /// Die Gruppen je Zeile (oben, unten) in Reihenfolge. Die untere
+    /// Zeile ist leer, solange die Leiste einzeilig steht.
+    QVector<QStringList> zeilenGruppen() const;
+    /// Steht die Leiste gerade in zwei Zeilen?
+    bool zweiZeilenAktiv() const { return m_zweiZeilen; }
 
 protected:
     void paintEvent(QPaintEvent* e) override;
+    void resizeEvent(QResizeEvent* e) override;
 
 private:
     std::function<QString(NrSlot)> m_maschinenNr;
-    /// Wo die Dehnung steht -- gesucht, nicht geraten (siehe .cpp).
-    int dehnungsPlatz() const;
+    /// Verteilt alle Gruppen und angehängten Bauteile neu auf die Zeilen,
+    /// je nachdem, ob die Leiste einzeilig (zwei == false) oder zweizeilig
+    /// steht. Die Gruppen-Reihenfolge kommt aus m_boxen, nicht aus den
+    /// Zeilen selbst.
+    void ordneZeilen(bool zwei);
+    /// Schaltet zwischen kompakt und groß um: Pillen, Rate, angehängtes Plus,
+    /// Bauteile in den Gruppen und die Beschriftungen.
+    void setzeGrossModus(bool gross);
+    /// Dehnungen einer Zeile setzen. Einzeilig: hinter jeder Gruppe außer
+    /// der letzten eine, die Gruppen verteilen sich über die Breite.
+    /// Zweizeilig (verteilen == false): die Gruppen bleiben links beieinander;
+    /// nur vor dem angehängten Plus steht eine Dehnung, damit es rechts sitzt.
+    void verteileZeile(QHBoxLayout* zeile, bool verteilen);
+    /// Name der Gruppe zu einem Kasten („" für Bauteile ohne Gruppe).
+    QString gruppenName(const QLayout* box) const;
+    /// Der Kasten, an dem die untere Zeile beginnt (die Gruppe „Filter"),
+    /// oder die Anzahl der Kästen, wenn es keinen Umbruch gibt.
+    int umbruchStelle() const;
+    /// Mindestbreite einer Zeile aus den Kästen [von, bis) und, wenn
+    /// gewünscht, dem angehängten Plus -- mit den Abständen dazwischen.
+    int breiteEinerZeile(int von, int bis, bool mitNachStellen) const;
+    /// Mindestbreite der Leiste, wenn alles in EINER Zeile steht (mit Rändern).
+    int einzeiligMindestbreite() const;
     /// Bauteil -> die Gruppe, in der es steckt (fuer removeGroupWidget).
     QHash<QWidget*, QLayout*> m_gruppenWidgets;
 
@@ -246,6 +314,11 @@ private:
         /// eine helle Ueberschrift ueber gedaempften Pillen saehe aus
         /// wie ein halb geladener Zustand.
         QLabel* caption{nullptr};
+        /// Der Kasten, in dem Versalzeile und Pillen stehen. Gemerkt, damit
+        /// die Zeilen-Verteilung die Gruppe beim Namen findet.
+        QLayout* box{nullptr};
+        // Zweite Pillenzeile, nur die Bandgruppe: ab der fuenften Pille.
+        QHBoxLayout* row2{nullptr};
     };
 
     /// ── Die Leiste als Reihe lesbar machen (2026-10-07) ────────────
@@ -268,10 +341,6 @@ private:
     /// weil RATE seinen Wert in einem eigenen Schild traegt und nicht
     /// in Pillen.
     bool gruppeIstLeer(const Group& g) const;
-    /// Die Gruppenkaesten in der Reihenfolge der Reihe. Alles andere
-    /// darin (Dehnungen, das angehaengte Plus) faellt heraus.
-    QVector<QLayout*> gruppenKaesten() const;
-
     Group* group(const QString& name);
     const Group* group(const QString& name) const;
 
@@ -349,7 +418,14 @@ private:
     // anlegt; das ist keine Eigenschaft, auf die sich der naechste
     // Gruppentyp verlassen sollte.
     QVector<Group*> m_groups;
-    QHBoxLayout* m_row{nullptr};   // die äußere Reihe, für addTrailing()
+    QHBoxLayout* m_row{nullptr};      // die obere Zeile (einzeilig: alles)
+    QHBoxLayout* m_rowZwei{nullptr};  // die untere Zeile (nur schmal belegt)
+    bool m_zweiZeilen{false};
+    /// Alle Gruppenkästen in der Reihenfolge der Leiste -- die Quelle für
+    /// die Verteilung auf die Zeilen. Versalzeilen und Pillen hängen darin.
+    QVector<QLayout*> m_boxen;
+    /// Angehängte Bauteile (das Plus), in Reihenfolge, ganz rechts.
+    QVector<QWidget*> m_nachStellen;
     QLabel* m_rateLabel{nullptr};
     bool m_rateWarn{false};
     int m_rateMismatchSeconds{0};

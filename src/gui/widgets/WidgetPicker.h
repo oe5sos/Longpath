@@ -192,14 +192,12 @@ public:
     /// ein Test die Klemmung prüfen kann, ohne ein Fenster zu zeigen.
     QPoint placeNear(const QSize& want) const;
 
-    /// Kantenlaenge des Plus. 29 statt der urspruenglichen 34, seit
-    /// dem 2026-10-07: genau die Aussenhoehe einer Pille in der
-    /// Kommandoleiste (CommandBar::kPillHeight 27 plus die beiden
-    /// Raender). Mit 34 war es das einzige Element der Reihe, das
-    /// fuenf Pixel darueber hinausragte -- vorher verdeckt vom leeren
-    /// Raum rechts, nach dem Verteilen und den Trennstrichen der
-    /// sichtbare Ausreisser.
-    static constexpr int kSide = 29;
+    /// Kantenlaenge des Plus. Genau die Aussenhoehe einer Pille in der
+    /// Kommandoleiste (CommandBar::kPillHeight plus die beiden Raender):
+    /// 23 seit dem 2026-11-21 (Pillenhoehe 21, vorher 29 bei 27). Mit einer
+    /// groesseren Kante ragt das Plus ueber die Pillen hinaus und wird
+    /// zum sichtbaren Ausreisser.
+    static constexpr int kSide = 19;
 
 signals:
     void toggled(const QString& id, bool visible);

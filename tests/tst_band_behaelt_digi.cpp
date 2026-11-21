@@ -108,19 +108,19 @@ private slots:
         QVERIFY2(s != nullptr, "keine aktive Scheibe");
 
         // 20 m war schon einmal dran, in SSB. Das ist die Falle.
-        legeBandAb(s, Band::Band20m, 14'294'700.0, DSPMode::USB);
+        legeBandAb(s, Band::Band80m, 3'600'000.0, DSPMode::USB);
 
         // Und jetzt laeuft FT8 auf 40 m.
         mw.aufDigiStellen(Digimodus::Ft8);
         s->setFrequency(7'074'000.0);
         s->setDspMode(DSPMode::DIGU);
 
-        QPushButton* b20 = knopf(mw, QStringLiteral("20m"));
-        QVERIFY2(b20 != nullptr, "kein 20m-Knopf in der Leiste");
+        QPushButton* b20 = knopf(mw, QStringLiteral("80m"));
+        QVERIFY2(b20 != nullptr, "kein 80m-Knopf in der Leiste");
         b20->click();
 
         QCOMPARE(s->dspMode(), DSPMode::DIGU);
-        QCOMPARE(qint64(s->frequency()), qint64(14'074'000));
+        QCOMPARE(qint64(s->frequency()), qint64(3'573'000));
     }
 
     // Wer zuletzt FT4 fuhr, landet auf der FT4-Stelle des neuen
@@ -131,18 +131,18 @@ private slots:
         SliceModel* s = scheibe(mw);
         QVERIFY(s != nullptr);
 
-        legeBandAb(s, Band::Band20m, 14'294'700.0, DSPMode::USB);
+        legeBandAb(s, Band::Band80m, 3'600'000.0, DSPMode::USB);
 
         s->setFrequency(7'047'500.0);
         mw.aufDigiStellen(Digimodus::Ft4);
         QCOMPARE(qint64(s->frequency()), qint64(7'047'500));
 
-        QPushButton* b20 = knopf(mw, QStringLiteral("20m"));
+        QPushButton* b20 = knopf(mw, QStringLiteral("80m"));
         QVERIFY(b20 != nullptr);
         b20->click();
 
         QCOMPARE(s->dspMode(), DSPMode::DIGU);
-        QCOMPARE(qint64(s->frequency()), qint64(14'080'000));
+        QCOMPARE(qint64(s->frequency()), qint64(3'575'000));
     }
 
     // ── Und das Gegenstueck: ohne Digi wird NICHTS angefasst ────────
@@ -156,17 +156,19 @@ private slots:
         SliceModel* s = scheibe(mw);
         QVERIFY(s != nullptr);
 
-        legeBandAb(s, Band::Band20m, 14'294'700.0, DSPMode::USB);
+        legeBandAb(s, Band::Band80m, 3'600'000.0, DSPMode::USB);
 
         s->setFrequency(7'120'000.0);
         s->setDspMode(DSPMode::LSB);
 
-        QPushButton* b20 = knopf(mw, QStringLiteral("20m"));
+        QPushButton* b20 = knopf(mw, QStringLiteral("80m"));
         QVERIFY(b20 != nullptr);
         b20->click();
 
-        QCOMPARE(s->dspMode(), DSPMode::USB);
-        QCOMPARE(qint64(s->frequency()), qint64(14'294'700));
+        // 80 m: unter 10 MHz ist LSB der Bandstandard, nicht USB (2026-11-21,
+        // Umstellung von 20 m auf 80 m als sichtbarer Knopf).
+        QCOMPARE(s->dspMode(), DSPMode::LSB);
+        QCOMPARE(qint64(s->frequency()), qint64(3'600'000));
     }
 
     // DIGU allein genuegt nicht. Wer in DIGU irgendwo weitab von
@@ -178,7 +180,7 @@ private slots:
         SliceModel* s = scheibe(mw);
         QVERIFY(s != nullptr);
 
-        legeBandAb(s, Band::Band20m, 14'294'700.0, DSPMode::USB);
+        legeBandAb(s, Band::Band80m, 3'600'000.0, DSPMode::USB);
 
         AppletVisibilityController* vis = mw.appletVisibilityForTest();
         QVERIFY2(vis != nullptr, "kein Sichtbarkeitsregler");
@@ -187,12 +189,14 @@ private slots:
         s->setFrequency(7'150'000.0);     // keine Anrufstelle weit und breit
         s->setDspMode(DSPMode::DIGU);
 
-        QPushButton* b20 = knopf(mw, QStringLiteral("20m"));
+        QPushButton* b20 = knopf(mw, QStringLiteral("80m"));
         QVERIFY(b20 != nullptr);
         b20->click();
 
-        QCOMPARE(s->dspMode(), DSPMode::USB);
-        QCOMPARE(qint64(s->frequency()), qint64(14'294'700));
+        // 80 m: unter 10 MHz ist LSB der Bandstandard, nicht USB (2026-11-21,
+        // Umstellung von 20 m auf 80 m als sichtbarer Knopf).
+        QCOMPARE(s->dspMode(), DSPMode::LSB);
+        QCOMPARE(qint64(s->frequency()), qint64(3'600'000));
     }
 
     // Eine gesperrte Scheibe bleibt gesperrt. `onBandButtonClicked`
@@ -204,13 +208,13 @@ private slots:
         SliceModel* s = scheibe(mw);
         QVERIFY(s != nullptr);
 
-        legeBandAb(s, Band::Band20m, 14'294'700.0, DSPMode::USB);
+        legeBandAb(s, Band::Band80m, 3'600'000.0, DSPMode::USB);
 
         s->setFrequency(7'074'000.0);
         s->setDspMode(DSPMode::DIGU);
         s->setLocked(true);
 
-        QPushButton* b20 = knopf(mw, QStringLiteral("20m"));
+        QPushButton* b20 = knopf(mw, QStringLiteral("80m"));
         QVERIFY(b20 != nullptr);
         b20->click();
 
