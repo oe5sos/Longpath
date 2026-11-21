@@ -13,3 +13,11 @@ Seite heute schon bekommt (TCI); Platzhalter sind weggelassen.
 
 Weggelassen, weil die Seite es nicht bekommt: RIT/XIT, SWR-Verlauf, TNF/MOX/VOX.
 Die Schritt-Chips 10 Hz / 100 Hz / 1 kHz sind neu (heute nur 100 Hz ±).
+
+## Umsetzung (Bilder der echten Seite)
+
+`umsetzung-vorher-desktop.png` / `umsetzung-nachher-desktop.png` (1400 × 900) und
+`umsetzung-vorher-iphone.png` / `umsetzung-nachher-iphone.png` (393 × 852, 2x).
+Das iPhone-Bild ist vorher und nachher gleich: unter 900 px bleibt „Ein Schirm".
+Ab 900 px sorgt `desktop.js` für das Raster; die Elemente und ihre
+Ereignishörer bleiben dieselben.
