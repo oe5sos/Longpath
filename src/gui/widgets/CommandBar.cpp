@@ -122,8 +122,8 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     // Leiste breit genug ist; die untere füllt sich nur bei schmaler
     // Breite, nach dem festen Umbruch vor „Filter" (siehe ordneZeilen).
     auto* zeilen = new QVBoxLayout(this);
-    zeilen->setContentsMargins(13, 9, 13, 10);
-    zeilen->setSpacing(8);
+    zeilen->setContentsMargins(13, 6, 13, 6);
+    zeilen->setSpacing(4);
     // Kein automatischer Mindestwert des Layouts: der wäre immer die
     // Einzelzeile und ließe die Leiste nie in zwei Zeilen fallen. Die
     // Mindestgröße setzt ordneZeilen() je nach Aufteilung selbst.
@@ -195,7 +195,7 @@ void CommandBar::addGroupWidget(const QString& caption, QWidget* w)
     // Ueberschrift mit BAND/MODE/FILTER/RATE fluchtet.
     auto* box = new QVBoxLayout;
     box->setContentsMargins(0, 0, 0, 0);
-    box->setSpacing(5);
+    box->setSpacing(3);
     box->addWidget(captionLabel(caption, this), 0, Qt::AlignLeft);
     box->addWidget(w, 0, Qt::AlignLeft);
     m_gruppenWidgets.insert(w, box);
@@ -456,7 +456,7 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
 {
     auto* box = new QVBoxLayout;
     box->setContentsMargins(0, 0, 0, 0);
-    box->setSpacing(5);
+    box->setSpacing(3);
     QLabel* versal = captionLabel(caption, this);
     box->addWidget(versal, 0, Qt::AlignLeft);
 
