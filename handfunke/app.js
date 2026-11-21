@@ -123,6 +123,11 @@ function bildSpanneHz(rueckfall) {
 function eigenerHost() {
   const h = location.hostname;
   if (!h || h === 'localhost' || h === '127.0.0.1') { return ''; }
+  // Kommt die Seite vom Vermittler, ist dieser Rechner NICHT Longpath. Wer
+  // ihn trotzdem als "eigenen Rechner" nimmt, schwenkt nach fuenf Sekunden
+  // von der Fernverbindung auf rv.longpath.at:50001 um und reisst sie damit
+  // mitten im Aufbau ab (am 2026-11-21 so gemessen: clientLeft nach 4 s).
+  if (dienstVomOrt()) { return ''; }
   return h;
 }
 
