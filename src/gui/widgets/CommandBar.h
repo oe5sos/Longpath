@@ -275,6 +275,9 @@ public:
 protected:
     void paintEvent(QPaintEvent* e) override;
     void resizeEvent(QResizeEvent* e) override;
+    // Nach jeder neuen Anordnung die ganze Leiste neu zeichnen -- sonst
+    // bleiben alte Trennstriche als Bildreste stehen (2026-11-21).
+    bool event(QEvent* e) override;
 
 private:
     std::function<QString(NrSlot)> m_maschinenNr;
