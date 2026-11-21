@@ -13,11 +13,16 @@
 #include "BandwidthFilterApplet.h"
 
 #include "gui/StyleConstants.h"
+#include "gui/spectrum/Farbschema.h"
 #include "gui/widgets/BandwidthFilterPane.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
+#include <QActionGroup>
+#include <QContextMenuEvent>
 #include <QHBoxLayout>
+#include <QMenu>
+#include <QPointer>
 #include <QLabel>
 #include <QPushButton>
 #include <QSignalBlocker>
@@ -887,5 +892,65 @@ void BandwidthFilterApplet::resizeEvent(QResizeEvent* event)
     updateGeometry();
 }
 
+
+// ── Farbe des Durchlasses, hier im Fenster (2026-11-21) ──────────────
+//
+// Betreiber: „die option fuer den bandwidth sollte auch in diesem fenster
+// sein". Ab Werk folgt die Bandbreite dem Spektrumschema des Panadapters;
+// hier laesst sich stattdessen ein eigenes waehlen. Gilt fuer alle
+// Bandbreiten-Anzeigen (dieses Fenster und den Filter im RX-Teil) --
+// der Bote in gui/spectrum/Farbschema.h haelt und speichert die Wahl.
+QMenu* BandwidthFilterApplet::baueOptionsMenue(QWidget* parent)
+{
+    auto* menu = new QMenu(parent);
+    QMenu* schemata = menu->addMenu(tr("Passband scheme"));
+    auto* gruppe = new QActionGroup(schemata);
+    gruppe->setExclusive(true);
+    auto& bote = Farbschema::Bote::instance();
+    const struct { int wahl; const char* name; } liste[] = {
+        {Farbschema::Bote::kFolgtPanadapter,      QT_TR_NOOP("Like panadapter")},
+        {int(PanColourScheme::Standard),          QT_TR_NOOP("Standard")},
+        {int(PanColourScheme::Ft8Amber),          QT_TR_NOOP("FT8 amber")},
+        {int(PanColourScheme::Brass),             QT_TR_NOOP("Brass (muted)")},
+        {int(PanColourScheme::Teal),              QT_TR_NOOP("Teal green")},
+        {int(PanColourScheme::SlateBlue),         QT_TR_NOOP("Slate blue")},
+        {int(PanColourScheme::Night),             QT_TR_NOOP("Night")},
+    };
+    for (const auto& e : liste) {
+        QAction* act = schemata->addAction(tr(e.name));
+        act->setCheckable(true);
+        act->setChecked(bote.bandbreitenWahl() == e.wahl);
+        gruppe->addAction(act);
+        const int wahl = e.wahl;
+        connect(act, &QAction::triggered, this,
+                [wahl]() { Farbschema::Bote::instance().setBandbreitenWahl(wahl); });
+        if (e.wahl == Farbschema::Bote::kFolgtPanadapter) {
+            act->setToolTip(tr("Follow the spectrum scheme of the panadapter."));
+            schemata->addSeparator();
+        }
+    }
+    return menu;
+}
+
+void BandwidthFilterApplet::openExtendedSettings()
+{
+    // Wie FrequencyApplet: am Fenster haengen, und ueberleben, falls das
+    // Fenster waehrend exec() stirbt.
+    QMenu* menu = baueOptionsMenue(window());
+    QPointer<QMenu> lebtNoch(menu);
+    menu->exec(mapToGlobal(rect().center()));
+    if (lebtNoch) { lebtNoch->deleteLater(); }
+}
+
+void BandwidthFilterApplet::contextMenuEvent(QContextMenuEvent* ev)
+{
+    QMenu* menu = baueOptionsMenue(window());
+    QPointer<QMenu> lebtNoch(menu);
+    const QPointer<BandwidthFilterApplet> self(this);
+    menu->exec(ev->globalPos());
+    if (lebtNoch) { lebtNoch->deleteLater(); }
+    if (!self) { return; }
+    ev->accept();
+}
 
 } // namespace Longpath

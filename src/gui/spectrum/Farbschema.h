@@ -58,18 +58,36 @@ Durchlass durchlassFuer(PanColourScheme s);
 
 // Pan 0 meldet hier sein Spektrumschema; die Bandbreiten-Anzeigen hoeren
 // darauf. Ein Bote, kein Zustand der Anzeigen: wer spaeter entsteht,
-// fragt durchlass() und ist sofort richtig.
+// fragt bandbreite() und ist sofort richtig.
+//
+// Dazu eine eigene Wahl fuer die Bandbreiten-Anzeigen (2026-11-21,
+// Betreiber im Fenster BANDWIDTH FILTER: „die option fuer den bandwidth
+// sollte auch in diesem fenster sein"): kFolgtPanadapter (Vorgabe) heisst
+// „wie der Panadapter", sonst ein festes Schema. Gespeichert unter
+// BandwidthPassbandScheme.
 class Bote : public QObject {
     Q_OBJECT
 public:
+    static constexpr int kFolgtPanadapter = -1;
+
     static Bote& instance();
     PanColourScheme durchlass() const { return m_durchlass; }
     void setDurchlass(PanColourScheme s);
+
+    /// Die eigene Wahl der Bandbreiten-Anzeigen (kFolgtPanadapter oder
+    /// ein PanColourScheme als int).
+    int bandbreitenWahl() const { return m_bandbreitenWahl; }
+    void setBandbreitenWahl(int wahl);
+    /// Was die Bandbreiten-Anzeigen malen: die eigene Wahl, sonst das
+    /// Spektrumschema von Pan 0.
+    PanColourScheme bandbreite() const;
 signals:
     void durchlassGeaendert(PanColourScheme s);
+    void bandbreiteGeaendert(PanColourScheme s);
 private:
-    Bote() = default;
+    Bote();
     PanColourScheme m_durchlass{PanColourScheme::Standard};
+    int m_bandbreitenWahl{kFolgtPanadapter};
 };
 
 }  // namespace Farbschema

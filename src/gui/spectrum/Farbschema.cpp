@@ -5,6 +5,9 @@
 
 #include "gui/spectrum/Farbschema.h"
 
+#include <algorithm>
+
+#include "core/AppSettings.h"
 #include "gui/StyleConstants.h"
 
 namespace Longpath::Farbschema {
@@ -40,6 +43,20 @@ Durchlass durchlassFuer(PanColourScheme s)
     return {};
 }
 
+namespace {
+const QString kBandbreitenSchluessel = QStringLiteral("BandwidthPassbandScheme");
+}
+
+Bote::Bote()
+{
+    bool ok = false;
+    const int w = AppSettings::instance()
+                      .value(kBandbreitenSchluessel, kFolgtPanadapter).toInt(&ok);
+    if (ok && w >= kFolgtPanadapter && w < static_cast<int>(PanColourScheme::Count)) {
+        m_bandbreitenWahl = w;
+    }
+}
+
 Bote& Bote::instance()
 {
     static Bote bote;
@@ -49,8 +66,27 @@ Bote& Bote::instance()
 void Bote::setDurchlass(PanColourScheme s)
 {
     if (m_durchlass == s) { return; }
+    const PanColourScheme vorher = bandbreite();
     m_durchlass = s;
     emit durchlassGeaendert(s);
+    if (bandbreite() != vorher) { emit bandbreiteGeaendert(bandbreite()); }
+}
+
+void Bote::setBandbreitenWahl(int wahl)
+{
+    wahl = std::clamp(wahl, kFolgtPanadapter, static_cast<int>(PanColourScheme::Count) - 1);
+    if (m_bandbreitenWahl == wahl) { return; }
+    const PanColourScheme vorher = bandbreite();
+    m_bandbreitenWahl = wahl;
+    AppSettings::instance().setValue(kBandbreitenSchluessel, QString::number(wahl));
+    if (bandbreite() != vorher) { emit bandbreiteGeaendert(bandbreite()); }
+}
+
+PanColourScheme Bote::bandbreite() const
+{
+    return m_bandbreitenWahl == kFolgtPanadapter
+        ? m_durchlass
+        : static_cast<PanColourScheme>(m_bandbreitenWahl);
 }
 
 }  // namespace Longpath::Farbschema
