@@ -300,6 +300,27 @@ header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
   color:var(--text-inactive);box-shadow:inset 0 1px 0 var(--light);
 }
 
+/* ── Haltetaste: Entsicherung + gedrueckt ──────────────────────────────
+   Nur sichtbar, wenn die Seite ueberhaupt senden darf (SENDEN_FREIGABE).
+   Entsichert = die Tasten verlieren .locked und werden zu den grossen
+   Messingtasten; gedrueckt = eingedrueckt (versenkt), wie jede Taste am Mac.
+   Kein Rot: Messing ist die Sendefarbe. */
+.txsicher{
+  flex:0 0 84px;height:36px;border-radius:11px;cursor:pointer;
+  background:linear-gradient(#222227,#141417);border:1px solid #33333a;
+  color:var(--text-secondary,#a8a8ae);font:600 var(--f-caption)/1 inherit;
+  letter-spacing:.1em;box-shadow:inset 0 1px 0 var(--light),0 1px 0 rgba(0,0,0,.45);
+}
+.txsicher[hidden]{display:none}
+.txsicher.scharf{height:58px;color:var(--measured);border-color:var(--amber-dim);
+  background:rgba(107,86,48,.20)}
+.tx,.tune{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  touch-action:none}
+.tx.haelt,.tune.haelt{
+  transform:translateY(1px);
+  background:linear-gradient(var(--tx-bot),#6e5426);
+  box-shadow:inset 0 3px 7px rgba(0,0,0,.6)}
+
 /* ── Die Station sendet ──────────────────────────────────────────────────
    Dieselbe Zeile, dieselbe Geometrie, nur in Messing: an dieser Stelle
    steht sonst "SENDEN / NUR IN DER APP", und genau dort schaut man hin,
