@@ -8,6 +8,8 @@
   --measured:#d8a55f; --amber-dim:#6b5630;  /* gemessen */
   --ok:#6fa384; --warn:#a8853f; --danger:#a86b6d;
   --tx-top:#a87a3c; --tx-bot:#8a6a30; --tx-border:#c2924f; --tx-text:#17130a;
+  /* Das Orange des Plus am Mac (kPlusTop/Bottom/Border): fuer alles Antippbare in Orange */
+  --plus-top:#f0b44c; --plus-bot:#d18f2a; --plus-border:#f5c56a;
   --tune-top:#7a5a2c; --tune-bot:#634c24; --tune-border:#9a763c;
   /* Panadapter-Flaeche: Longpaths app-bg, Wert fuer Wert (StyleConstants.h
      kAppBg). Die blaue Fassung steht eine Zeile tiefer -- siehe
@@ -359,8 +361,8 @@ footer .warn{color:var(--warn)}
    Jetzt steht da ein Knopf, und er verschwindet, sobald der Ton laeuft. */
 .tonAn{
   flex:none;height:24px;padding:0 11px;border-radius:12px;
-  background:linear-gradient(var(--tune-top),var(--tune-bot));
-  border:1px solid var(--tune-border);color:#1a150c;
+  background:linear-gradient(var(--plus-top),var(--plus-bot));
+  border:1px solid var(--plus-border);color:#1a150c;
   font:700 var(--f-caption)/1 inherit;letter-spacing:.1em;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 0 rgba(0,0,0,.45);
 }
@@ -375,8 +377,8 @@ footer .warn{color:var(--warn)}
    bleibt dem Gemessenen vorbehalten, und die drei automatischen Zeilen
    sind genau das — gemessene Werte vom Geraet, keine Eingabe. */
 .logAuf{height:28px;padding:0 11px;border-radius:9px;
-  border:1px solid var(--amber-dim);background:rgba(107,86,48,.22);
-  color:var(--measured);font:600 var(--f-caption)/1 inherit;
+  border:1px solid var(--plus-bot);background:rgba(209,143,42,.18);
+  color:var(--plus-top);font:600 var(--f-caption)/1 inherit;
   letter-spacing:.13em;flex:none}
 #qsoBlatt{position:fixed;inset:0;z-index:11;display:none;align-items:center;
   justify-content:center;padding:0 22px;
