@@ -381,7 +381,7 @@ private slots:
         };
 
         leiste.addGroupWidget(QStringLiteral("Profil"), bauteil);
-        QCOMPARE(zaehleVersalzeilen(), 1);
+        QCOMPARE(zaehleVersalzeilen(), 0);   // seit 2026-11-21 keine Versalzeilen mehr
         const int platz = platzVon(bauteil);
         const int plusPlatz = platzDesPlus();
         QVERIFY2(platz >= 0 && plusPlatz >= 0, "Gruppe oder Plus nicht gefunden");
@@ -389,12 +389,12 @@ private slots:
                  "die Gruppe muss VOR dem Plus sitzen, sonst steht sie "
                  "am rechten Rand statt neben der Rate");
 
-        // Dreimal hin und her: es darf genau eine Versalzeile bleiben.
+        // Dreimal hin und her: es darf nie eine Beschriftung zurueckbleiben.
         for (int runde = 0; runde < 3; ++runde) {
             leiste.removeGroupWidget(bauteil);
             QCOMPARE(zaehleVersalzeilen(), 0);
             leiste.addGroupWidget(QStringLiteral("Profil"), bauteil);
-            QCOMPARE(zaehleVersalzeilen(), 1);
+            QCOMPARE(zaehleVersalzeilen(), 0);   // seit 2026-11-21 keine Versalzeilen mehr
             QVERIFY(platzVon(bauteil) < platzDesPlus());
         }
     }

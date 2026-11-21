@@ -37,24 +37,6 @@
 #include <cstdlib>
 
 namespace Longpath {
-namespace {
-
-/// Die Versalzeile über einer Gruppe. 8 px, weite Laufweite,
-/// Skalenfarbe — sie soll benennen, nicht mitreden.
-QLabel* captionLabel(const QString& text, QWidget* parent)
-{
-    auto* l = new QLabel(text.toUpper(), parent);
-    QFont f = l->font();
-    f.setPixelSize(9);
-    f.setBold(true);
-    f.setLetterSpacing(QFont::AbsoluteSpacing, 1.6);
-    l->setFont(f);
-    l->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
-                         .arg(QString::fromLatin1(Style::kTextScale)));
-    return l;
-}
-
-} // namespace
 
 /// Das Aussehen einer Pille. Über Style::-Konstanten, damit die
 /// Theme-Datei sie erreicht. Oeffentlich, weil die untere Leiste
@@ -196,7 +178,9 @@ void CommandBar::addGroupWidget(const QString& caption, QWidget* w)
     auto* box = new QVBoxLayout;
     box->setContentsMargins(0, 0, 0, 0);
     box->setSpacing(3);
-    box->addWidget(captionLabel(caption, this), 0, Qt::AlignLeft);
+    // Keine Versalzeile (2026-11-21, Betreiber: „es muss nicht band, filter
+    // oder step darüber stehen") -- der Name bleibt nur für den Aufrufer.
+    Q_UNUSED(caption);
     box->addWidget(w, 0, Qt::AlignLeft);
     m_gruppenWidgets.insert(w, box);
     // Ans Ende der Gruppen, also hinter die Rate -- wie bisher.
@@ -457,8 +441,8 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
     auto* box = new QVBoxLayout;
     box->setContentsMargins(0, 0, 0, 0);
     box->setSpacing(3);
-    QLabel* versal = captionLabel(caption, this);
-    box->addWidget(versal, 0, Qt::AlignLeft);
+    // Keine Versalzeile über den Pillen (2026-11-21, siehe addGroupWidget).
+    QLabel* versal = nullptr;
 
     auto* pills = new QHBoxLayout;
     pills->setContentsMargins(0, 0, 0, 0);
@@ -737,12 +721,13 @@ void CommandBar::buildBandGroup(QHBoxLayout* row)
     // genannt hat, dann der Rest. Was vorne steht, ist ohne Umweg
     // erreichbar; alles Weitere liegt hinter dem "…".
     m_allBands = {
-        {QStringLiteral("40m"),  Band::Band40m},
-        {QStringLiteral("20m"),  Band::Band20m},
-        {QStringLiteral("15m"),  Band::Band15m},
+        // Vorne 160 · 80 · 60 · 40 (Betreiber 2026-11-21), dann der Rest.
         {QStringLiteral("160m"), Band::Band160m},
         {QStringLiteral("80m"),  Band::Band80m},
         {QStringLiteral("60m"),  Band::Band60m},
+        {QStringLiteral("40m"),  Band::Band40m},
+        {QStringLiteral("20m"),  Band::Band20m},
+        {QStringLiteral("15m"),  Band::Band15m},
         {QStringLiteral("30m"),  Band::Band30m},
         {QStringLiteral("10m"),  Band::Band10m},
         {QStringLiteral("6m"),   Band::Band6m},
@@ -753,7 +738,9 @@ void CommandBar::buildBandGroup(QHBoxLayout* row)
     };
 
     Group& g = addGroup(QStringLiteral("Band"), row);
-    for (int i = 0; i < kVisiblePerGroup && i < m_allBands.size(); ++i) {
+    // Vier Bänder vorne (160 · 80 · 60 · 40, Betreiber 2026-11-21), die
+    // übrigen im „…".
+    for (int i = 0; i < kVisibleBand && i < m_allBands.size(); ++i) {
         const auto entry = m_allBands.at(i);
         QPushButton* b = addPill(g, entry.first);
         b->setProperty("bandValue", static_cast<int>(entry.second));

@@ -197,7 +197,7 @@ public:
     /// 23 seit dem 2026-11-21 (Pillenhoehe 21, vorher 29 bei 27). Mit einer
     /// groesseren Kante ragt das Plus ueber die Pillen hinaus und wird
     /// zum sichtbaren Ausreisser.
-    static constexpr int kSide = 23;
+    static constexpr int kSide = 19;
 
 signals:
     void toggled(const QString& id, bool visible);

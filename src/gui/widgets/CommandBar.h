@@ -233,7 +233,7 @@ public:
     // die Stufenleiter
     // von verify-style-drift kennt 7, 9, 11 -- 10 wäre eine namenlose
     // Größe. Innenabstand 7 px je Seite.
-    static constexpr int kPillHeight = 21;
+    static constexpr int kPillHeight = 17;
     static constexpr int kPillRadius = 6;
     static constexpr int kPillFontPx = 9;
     static constexpr int kPillPadX = 7;
@@ -251,6 +251,8 @@ public:
     static constexpr int kEinzeiligUnterBreite = 1300;
     /// Sichtbare Einträge je Gruppe, bevor das „…" übernimmt.
     static constexpr int kVisiblePerGroup = 3;
+    /// Sichtbare Bänder vorne: vier (160 · 80 · 60 · 40), der Rest im „…".
+    static constexpr int kVisibleBand = 4;
 
     /// Die Gruppen je Zeile (oben, unten) in Reihenfolge. Die untere
     /// Zeile ist leer, solange die Leiste einzeilig steht.
