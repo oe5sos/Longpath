@@ -23,6 +23,8 @@
 //      Setter laesst den anderen Teil unberuehrt (Betreiber 2026-11-21:
 //      „es sollte oben und unten getrennt sein").
 //
+// Gegenprobe „generell" (2026-11-21): Schema im 3D-Durchlass, in der
+// 3D-Flaeche und im Boten per Patch herausgenommen -> 8, 9, 10 fallen.
 // Gegenprobe Trennung (2026-11-21): effectiveWfColorScheme() wieder an
 // das Spektrumschema gehaengt -> Fall 1c faellt; zurueck -> gruen.
 // Gegenprobe gefahren (2026-11-21): effectiveWfColorScheme() und
@@ -36,8 +38,11 @@
 #include <QPainter>
 
 #include "core/AppSettings.h"
+#include "core/WdspTypes.h"
 #include "gui/PanadapterApplet.h"
 #include "gui/SpectrumWidget.h"
+#include "gui/spectrum/Farbschema.h"
+#include "gui/widgets/BandwidthFilterPane.h"
 
 using namespace Longpath;
 
@@ -54,6 +59,51 @@ QImage durchlassMalen(const SpectrumWidget& w)
 
 int helligkeit(QRgb c) { return qRed(c) + qGreen(c) + qBlue(c); }
 
+// Ein Bild, in dem irgendwo das Tuerkis-Gruen des Schemas Teal steht
+// (Gruen vor Blau vor Rot), im unteren Drittel gesucht. Das Tuerkis von
+// heute (#00b4d8) hat Blau VOR Gruen und faellt damit sicher heraus; auf
+// dem Fast-Schwarz der Bandbreiten-Anzeige liegen Gruen und Blau des
+// Schemas nur rund 8 Stufen auseinander, daher die Schwelle 4.
+bool hatTealGruen(const QImage& img)
+{
+    for (int y = img.height() * 2 / 3; y < img.height(); ++y) {
+        for (int x = 0; x < img.width(); ++x) {
+            const QRgb c = img.pixel(x, y);
+            if (qAlpha(c) > 20 && qGreen(c) > qBlue(c) + 4
+                && qGreen(c) > qRed(c) + 25) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Den Panadapter auf einen bekannten Durchlass stellen (14,200 MHz,
+// 100..2900 Hz ueber dem VFO).
+void durchlassStellen(SpectrumWidget& w)
+{
+    w.resize(800, 400);
+    w.setFrequencyRange(14201500.0, 6000.0);
+    w.setDdcCenterFrequency(14201500.0);
+    w.setSampleRate(6000.0);
+    w.setVfoFrequency(14200000.0);
+    w.setFilterOffset(100, 2900);
+}
+
+QImage markenMalen(SpectrumWidget& w, bool dreiD)
+{
+    QImage img(800, 300, QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::black);
+    QPainter p(&img);
+    const QRect spec(0, 0, 800, 300);
+    if (dreiD) {
+        w.paintPassbandOverSurfaceForTest(p, spec);
+    } else {
+        w.paintSliceMarkersForTest(p, spec, QRect(0, 300, 800, 1));
+    }
+    return img;
+}
+
 QImage durchlassMalenRoh(const SpectrumWidget& w) { return durchlassMalen(w); }
 
 }  // namespace
@@ -61,7 +111,11 @@ QImage durchlassMalenRoh(const SpectrumWidget& w) { return durchlassMalen(w); }
 class TestPanadapterFarbschema : public QObject {
     Q_OBJECT
 private slots:
-    void init() { AppSettings::instance().clear(); }
+    void init()
+    {
+        AppSettings::instance().clear();
+        Farbschema::Bote::instance().setDurchlass(PanColourScheme::Standard);
+    }
 
     // 1 ──────────────────────────────────────────────────────────────────
     void vorgabeStandardUndWahlBleibt()
@@ -260,6 +314,83 @@ private slots:
         QCOMPARE(sw->waterfallScheme(), PanColourScheme::Ft8Amber);
         QCOMPARE(sw->spectrumScheme(), PanColourScheme::Night);
         delete m;
+    }
+
+    // 7 ─ Generell, nicht nur bei FT8 (Betreiber 2026-11-21: „es sollte
+    //     nicht beim senden sein, sondern generell"): der Durchlass steht
+    //     im Schema in RX und TX, bei USB wie bei DIGU.
+    void durchlassImSchemaInJedemZustandUndJederBetriebsart_data()
+    {
+        QTest::addColumn<int>("modus");
+        QTest::addColumn<bool>("senden");
+        QTest::newRow("USB, RX")  << int(DSPMode::USB)  << false;
+        QTest::newRow("USB, TX")  << int(DSPMode::USB)  << true;
+        QTest::newRow("DIGU, RX") << int(DSPMode::DIGU) << false;
+        QTest::newRow("DIGU, TX") << int(DSPMode::DIGU) << true;
+    }
+    void durchlassImSchemaInJedemZustandUndJederBetriebsart()
+    {
+        QFETCH(int, modus);
+        QFETCH(bool, senden);
+        SpectrumWidget w;
+        durchlassStellen(w);
+        w.setTxMode(static_cast<DSPMode>(modus));
+        w.setMoxOverlay(senden);
+        QVERIFY2(!hatTealGruen(markenMalen(w, false)), "Standard ist kein Tuerkis-Gruen");
+        w.setSpectrumScheme(PanColourScheme::Teal);
+        QVERIFY2(hatTealGruen(markenMalen(w, false)), "2D: Durchlass im Schema");
+    }
+
+    // 8 ─ Auch in 3D (am 2026-11-21 stand der Panadapter in 3D, und dort
+    //     griff das Schema nicht).
+    void durchlassImSchemaAuchIn3D()
+    {
+        SpectrumWidget w;
+        durchlassStellen(w);
+        w.setSpectrumRenderMode(SpectrumRenderMode::Mode3D);
+        QVERIFY(!hatTealGruen(markenMalen(w, true)));
+        w.setSpectrumScheme(PanColourScheme::Teal);
+        QVERIFY2(hatTealGruen(markenMalen(w, true)), "3D: Durchlass im Schema");
+        w.setMoxOverlay(true);
+        QVERIFY2(hatTealGruen(markenMalen(w, true)), "3D, TX: Durchlass im Schema");
+    }
+
+    // 9 ─ Die 3D-Flaeche ist „oben": sie folgt dem Spektrumschema, nicht
+    //     dem Wasserfall.
+    void dreiDFlaecheFolgtObenNichtUnten()
+    {
+        SpectrumWidget w;
+        w.setWfColorScheme(WfColorScheme::Default);
+        QCOMPARE(w.surfacePalette(), WfColorScheme::Default);
+        w.setWaterfallScheme(PanColourScheme::Night);
+        QCOMPARE(w.surfacePalette(), WfColorScheme::Default);
+        w.setSpectrumScheme(PanColourScheme::SlateBlue);
+        QCOMPARE(w.surfacePalette(), WfColorScheme::SlateBlue);
+        QCOMPARE(w.effectiveWfColorScheme(), WfColorScheme::Night);
+    }
+
+    // 10 ─ Die Bandbreiten-Anzeige (Fenster BANDWIDTH FILTER, Filter im
+    //      RX-Teil) folgt dem Spektrumschema von Pan 0 -- auch eine, die
+    //      erst danach entsteht. „vor allem in der bandwidth".
+    void bandbreitenAnzeigeFolgtPan0()
+    {
+        SpectrumWidget pan0;
+        BandwidthFilterPane frueh;
+        QCOMPARE(frueh.passbandScheme(), PanColourScheme::Standard);
+        pan0.setSpectrumScheme(PanColourScheme::Teal);
+        QCOMPARE(frueh.passbandScheme(), PanColourScheme::Teal);
+        BandwidthFilterPane spaet;
+        QCOMPARE(spaet.passbandScheme(), PanColourScheme::Teal);
+
+        const auto malen = [](BandwidthFilterPane& b) {
+            b.resize(400, 120);
+            b.setSpan(6000);
+            b.setFilter(100, 2900);
+            return b.grab().toImage().convertToFormat(QImage::Format_ARGB32);
+        };
+        QVERIFY2(hatTealGruen(malen(spaet)), "Bandbreite im Schema");
+        pan0.setSpectrumScheme(PanColourScheme::Standard);
+        QVERIFY2(!hatTealGruen(malen(spaet)), "Standard wie bisher");
     }
 };
 

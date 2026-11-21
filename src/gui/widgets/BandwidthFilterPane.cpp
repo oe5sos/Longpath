@@ -87,6 +87,19 @@ BandwidthFilterPane::BandwidthFilterPane(QWidget* parent)
     setMinimumHeight(84);
     setMinimumWidth(180);
     setMouseTracking(true);
+
+    // Das Spektrumschema von Pan 0 gilt auch hier -- jetzt und kuenftig.
+    auto& bote = Farbschema::Bote::instance();
+    m_schema = bote.durchlass();
+    connect(&bote, &Farbschema::Bote::durchlassGeaendert,
+            this, &BandwidthFilterPane::setPassbandScheme);
+}
+
+void BandwidthFilterPane::setPassbandScheme(PanColourScheme s)
+{
+    if (m_schema == s) { return; }
+    m_schema = s;
+    update();
 }
 
 void BandwidthFilterPane::setLabel(const QString& text)
@@ -330,7 +343,20 @@ void BandwidthFilterPane::paintEvent(QPaintEvent*)
     const int xl = hzToX(m_low);
     const int xh = hzToX(m_high);
     const QColor accent(Style::role("accent", Style::kAccent));
-    {
+    const Farbschema::Durchlass schema = Farbschema::durchlassFuer(m_schema);
+    if (schema.gilt) {
+        // Im Farbschema wie im Panadapter: unten kraeftiger, nach oben
+        // auslaufend, Kanten in der Schemafarbe.
+        QLinearGradient pass(0, 0, 0, height());
+        QColor oben(schema.flaeche);  oben.setAlphaF(schema.alphaOben);
+        QColor unten(schema.flaeche); unten.setAlphaF(schema.alphaUnten);
+        pass.setColorAt(0.0, oben);
+        pass.setColorAt(1.0, unten);
+        p.fillRect(QRect(xl, 0, std::max(1, xh - xl), height()), pass);
+        p.setPen(schema.kante);
+        p.drawLine(xl, 0, xl, height());
+        p.drawLine(xh, 0, xh, height());
+    } else {
         QLinearGradient pass(0, 0, 0, height());
         QColor c0(accent); c0.setAlpha(54);
         QColor c1(accent); c1.setAlpha(24);
