@@ -83,7 +83,7 @@ def test_plan_doc_classified_as_docs():
 def test_classifications_are_from_known_set():
     ALLOWED = {
         "thetis-port", "aethersdr-port", "mi0bot-port", "wdsp-vendored",
-        "fftw3-vendored", "sgp4-vendored", "ggmorse-vendored",
+        "fftw3-vendored", "sgp4-vendored", "ggmorse-vendored", "rtmidi-vendored",
         "nereussdr-original", "attribution-doc", "docs", "test", "resource",
         "packaging",
     }

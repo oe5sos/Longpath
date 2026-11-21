@@ -838,7 +838,9 @@ void SetupDialog::buildTree()
     // ZF und sendet, Longpath haengt am ZF-Ausgang und zeigt das Band.
     registerPage(cat, "Companion Rig",
                  [this] { return new CompanionRigPage(m_model); });
-    registerPage(cat, "MIDI Control", [] { return new CatMidiControlPage;  });
+    registerPage(cat, "MIDI Control", [this] {
+        return new CatMidiControlPage(m_model ? m_model->cwTastung() : nullptr);
+    });
 
     tick("CAT & Network");
 

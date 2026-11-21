@@ -734,6 +734,10 @@ set(CORE_SOURCES
     src/core/audio/AnsageAufbereitung.cpp
     src/core/hotkeys/HotKeyActionList.cpp
     src/core/hotkeys/HotKeyBindings.cpp
+    src/core/cw/IambicKeyer.cpp
+    src/core/cw/CwMithoerton.cpp
+    src/core/cw/CwTastung.cpp
+    src/core/midi/MidiKeyInput.cpp
     src/core/roundtable/RoundtableWire.cpp
     src/core/roundtable/RoundtableKey.cpp
     src/core/roundtable/RoundtableClient.cpp
@@ -854,6 +858,7 @@ set(MODEL_SOURCES
     src/models/NotchModel.cpp
     src/models/SpotModel.cpp
     src/models/RoundtableHub.cpp
+    src/models/FlexCwTastziel.cpp
     src/models/SpotTableModel.cpp
     src/models/BandFilterProxy.cpp
     src/models/AlertsTableModel.cpp
@@ -1207,6 +1212,7 @@ set(GUI_SOURCES
     src/gui/setup/FlexApdPage.cpp
     src/gui/setup/TciLogWindow.cpp
     src/gui/setup/KeyboardSetupPages.cpp
+    src/gui/setup/HaliKeyGroup.cpp
     src/gui/setup/DiagnosticsSetupPages.cpp
     src/gui/diagnostics/RadioStatusPage.cpp
     src/gui/diagnostics/DiagnosticsPhaseHPages.cpp
@@ -1987,6 +1993,11 @@ target_link_libraries(LongpathObjs PUBLIC sgp4)
 # --------------------------------------------------------------------------
 add_subdirectory(third_party/ggmorse)
 target_link_libraries(LongpathObjs PUBLIC ggmorse)
+
+# RtMidi (MIT-style) -- MIDI input for the CW key (HaliKey MIDI, 2026-11-17).
+# Taken as AetherSDR carries it; see third_party/rtmidi/README-LONGPATH.md.
+add_subdirectory(third_party/rtmidi)
+target_link_libraries(LongpathObjs PUBLIC rtmidi)
 
 # --------------------------------------------------------------------------
 # Mbed TLS 3.6.7, nur ECDSA P-256 + SHA-256 (Apache-2.0) -- die Anmeldung

@@ -17,6 +17,8 @@
 
 namespace Longpath { class TciServer; }
 namespace Longpath { class RadioModel; }
+namespace Longpath { class CwTastung; }
+namespace Longpath { class HaliKeyGroup; }
 
 namespace Longpath {
 
@@ -231,13 +233,20 @@ class CatMidiControlPage : public SetupPage {
     Q_OBJECT
 
 public:
-    explicit CatMidiControlPage(QWidget* parent = nullptr);
+    // 2026-11-17: bis dahin ein Platzhalter (Haken, Geraeteliste,
+    // „MIDI mapping table will appear here", „Learn...", alles gesperrt).
+    // Jetzt steht hier, was Longpath mit MIDI wirklich kann: Fusstaster
+    // und Morsetaste am HaliKey (HaliKeyGroup, src/core/cw/CwTastung).
+    // Eine allgemeine Zuordnung mit „Learn" gibt es nicht -- darum auch
+    // keinen gesperrten Knopf mehr, der sie verspricht.
+    // cwKey darf null sein: dann steht die Gruppe da, aber gesperrt.
+    explicit CatMidiControlPage(CwTastung* cwKey = nullptr, QWidget* parent = nullptr);
+
+    HaliKeyGroup* haliKeyGroup() const { return m_haliKey; }
 
 private:
-    QCheckBox*  m_enableCheck{nullptr};
-    QComboBox*  m_deviceCombo{nullptr};
-    QLabel*     m_mappingLabel{nullptr};
-    QPushButton* m_learnButton{nullptr};
+    CwTastung*    m_cwKey{nullptr};
+    HaliKeyGroup* m_haliKey{nullptr};
 
     void buildUI();
 };

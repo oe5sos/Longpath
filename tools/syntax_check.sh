@@ -205,6 +205,12 @@ WDSP_INC="$ROOT/third_party/wdsp/src"
 RNNOISE_INC="$(find "$ROOT" -maxdepth 4 -type d -path '*/_deps/rnnoise_upstream-src/include' -print -quit 2>/dev/null)"
 SPECBLEACH_INC="$(find "$ROOT" -maxdepth 4 -type d -path '*/_deps/libspecbleach_upstream-src/include' -print -quit 2>/dev/null)"
 
+# RtMidi (HaliKey MIDI, 2026-11-17): vendored in-tree like WDSP, reached
+# as a bare <RtMidi.h> through the rtmidi target's PUBLIC include path.
+# Without it MidiKeyInput.cpp reported "file not found" -- an error that
+# looks like one in the code and is not.
+RTMIDI_INC="$ROOT/third_party/rtmidi"
+
 compile() {
     # LONGPATH_VERSION setzt sonst CMake. Ohne sie scheitert jede Datei,
     # die QStringLiteral(LONGPATH_VERSION) benutzt, mit "expected ')'" --
@@ -253,7 +259,7 @@ compile() {
         -I"$QTINC" -I"$QTINC/QtCore" -I"$QTINC/QtGui" -I"$QTINC/QtWidgets" \
         -I"$QTINC/QtNetwork" -I"$QTINC/QtTest" -I"$QTINC/rhi" \
         -I"$QTINC/QtMultimedia" -I"$QTINC/QtSvg" -I"$QTINC/QtWebSockets" \
-        ${PA_INC:+-I"$PA_INC"} -I"$WDSP_INC" \
+        ${PA_INC:+-I"$PA_INC"} -I"$WDSP_INC" -I"$RTMIDI_INC" \
         ${RNNOISE_INC:+-I"$RNNOISE_INC"} ${SPECBLEACH_INC:+-I"$SPECBLEACH_INC"} \
         -I"$ROOT/src" -I"$ROOT" "$1" 2>&1
 }
