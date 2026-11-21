@@ -47,6 +47,7 @@ from aiortc import (
 from geraete import Geraet, Geraeteliste
 from kennung import b64url, pruefe_unterschrift, unb64url
 from ton import Umkodierer, lies_kopf
+from relais import Relaisbein, kandidat_text, verbinde_url
 
 log = logging.getLogger("fernzugriff.sitzung")
 
@@ -60,10 +61,32 @@ ANMELDE_FRIST_S = 15.0
 # Der Kanal heisst so; ein anderer wird nicht angenommen.
 KANAL = "longpath-tci"
 
+# Der zweite Kanal, nur fuer die Opus-Bloecke der Station zum Telefon:
+# ungeordnet und ohne Wiederholung. Ein verlorener Block ist 20 ms Ton, die
+# Wiederholung kaeme Hunderte Millisekunden zu spaet -- und auf dem
+# geordneten Kanal hielte sie alle folgenden Bloecke (und TCI-Befehle) auf.
+# Hier kommt NUR Ton von der Station zum Telefon durch; was das Telefon
+# dort schickt, wird verworfen, und vor der Anmeldung auf KANAL gibt es
+# auch hier nichts (die Tuer bleibt die einzige).
+KANAL_TON = "longpath-ton"
+
+# Abschaltbar, damit sich die Gegenprobe gegen die Fassung mit einem Kanal
+# fahren laesst (pruefe-tonkanal.py). Im Betrieb immer an.
+def tonkanal_an() -> bool:
+    return os.environ.get("LONGPATH_TONKANAL", "1") != "0"
+
 # Die Taktung der Tonbloecke abschaltbar, damit sich die Gegenprobe
 # gegen die alte Fassung fahren laesst: ein guter Wert ohne Gegenprobe
 # belegt nichts. Im Betrieb immer an; nur der Pruefstand setzt
 # LONGPATH_TONTAKT=0.
+# Wie lange ICE den direkten Weg und TURN allein versuchen darf, bevor
+# der Relay als letzter Weg dazukommt. Er hat die niedrigste Prioritaet,
+# aber aioice nominiert das ERSTE gelungene Paar -- liefe der Relay vom
+# ersten Augenblick an mit, koennte er einen noch laufenden direkten Weg
+# schlagen. Der Relay-WebSocket selbst wird sofort geoeffnet (12.1: kein
+# Warten auf die Kandidatensammlung); nur der Kandidat kommt spaeter.
+RELAIS_VERZOEGERUNG_S = 3.0
+
 TAKTUNG = os.environ.get("LONGPATH_TONTAKT", "1") != "0"
 
 
@@ -91,8 +114,12 @@ class Sitzung:
         stun: list[str],
         turn: dict | None,
         geraeteliste: Geraeteliste | None = None,
+        relais_verzoegerung_s: float = RELAIS_VERZOEGERUNG_S,
     ) -> None:
         self.geraet = geraet
+        self._relais_verzoegerung = relais_verzoegerung_s
+        self.relais: Relaisbein | None = None
+        self._relais_aufgabe: asyncio.Task | None = None
         self.ziel = ziel
         self.geraeteliste = geraeteliste
         # Der Umkodierer entsteht erst, wenn das Geraet beim Anmelden
@@ -103,6 +130,11 @@ class Sitzung:
         self.ton: Umkodierer | None = None
         self._tontakt: asyncio.Task | None = None
         self._tonschlange: asyncio.Queue | None = None
+        self._tonkanal: Any = None
+        self._ton_eigener = 0       # Bloecke, die ueber KANAL_TON gingen
+        # PRUEFHAKEN: wenn eine Liste, kommt jeder ausgehende Opus-Block mit
+        # seiner Sendezeit hinein -- fuer die Laufzeitmessung im Pruefstand.
+        self.sendelog: list | None = None
         self.pc = RTCPeerConnection(RTCConfiguration(_eisserver(stun, turn)))
         self.angemeldet = False
         self._aufforderung = secrets.token_bytes(32)
@@ -117,6 +149,11 @@ class Sitzung:
     def _verdrahte(self) -> None:
         @self.pc.on("datachannel")
         def _(kanal):  # noqa: ANN001
+            if kanal.label == KANAL_TON and self._tonkanal is None:
+                self._tonkanal = kanal
+                # Vom Telefon wird hier nichts angenommen.
+                kanal.on("message")(lambda _m: None)
+                return
             if kanal.label != KANAL:
                 log.warning("Kanal %r abgewiesen", kanal.label)
                 kanal.close()
@@ -256,7 +293,7 @@ class Sitzung:
                 warten = naechste - jetzt
                 if warten > 0:
                     await asyncio.sleep(warten)
-            self._sende_kanal(rahmen)
+            self._sende_ton(rahmen)
             # Die Dauer steht im Block selbst: Werte durch Abtastrate.
             kopf = lies_kopf(rahmen)
             dauer = (kopf[1] / kopf[0]) if kopf and kopf[0] else 0.02
@@ -311,7 +348,7 @@ class Sitzung:
                             if self._tonschlange is not None:
                                 self._tonschlange.put_nowait(r)
                             else:
-                                self._sende_kanal(r)   # alte Fassung
+                                self._sende_ton(r)     # alte Fassung
                         continue
                 self._sende_kanal(nachricht)
         except Exception as e:
@@ -328,6 +365,24 @@ class Sitzung:
             log.info("an Longpath gescheitert: %s", e)
             self._zu.set()
 
+    @property
+    def ton_ueber_eigenen_kanal(self) -> bool:
+        return self._ton_eigener > 0
+
+    def _sende_ton(self, rahmen: bytes) -> None:
+        """Ein Opus-Block: auf den eigenen Kanal, wenn es ihn gibt und er offen ist."""
+        if self.sendelog is not None:
+            self.sendelog.append((asyncio.get_running_loop().time(), bytes(rahmen)))
+        k = self._tonkanal
+        if tonkanal_an() and self.angemeldet and k is not None and k.readyState == "open":
+            try:
+                k.send(rahmen)
+                self._ton_eigener += 1
+                return
+            except Exception as e:
+                log.info("auf den Tonkanal gescheitert: %s", e)
+        self._sende_kanal(rahmen)
+
     def _sende_kanal(self, nachricht: Any) -> None:
         kanal = self._kanal
         if kanal is None or kanal.readyState != "open":
@@ -337,6 +392,63 @@ class Sitzung:
         except Exception as e:
             log.info("in den Kanal gescheitert: %s", e)
             self._zu.set()
+
+    # -- Relay (Abschnitt 12) --------------------------------------------
+
+    async def relais_an(self, url: str, token: str, verbinder=None) -> None:
+        """Das Relay-Angebot annehmen. Das Token wird nie geloggt."""
+        if self.relais is not None:
+            return
+        bein = Relaisbein(token, url=url, verbinder=verbinder)
+        await bein.starte()
+        self.relais = bein
+        self._relais_aufgabe = asyncio.ensure_future(self._fuehre_relais())
+
+    async def _fuehre_relais(self) -> None:
+        """Kandidat spaet einhaengen; Bein schliessen, wenn es nicht traegt."""
+        try:
+            await asyncio.sleep(self._relais_verzoegerung)
+            if self._zu.is_set() or self.pc.connectionState in ("connected", "closed", "failed"):
+                if self.pc.connectionState == "connected":
+                    await self._schliesse_relais("anderer Weg steht")
+                return
+            from aiortc.sdp import candidate_from_sdp
+
+            k = candidate_from_sdp(kandidat_text(self.relais.adresse)[len("candidate:"):])
+            k.sdpMLineIndex = 0
+            await self.pc.addIceCandidate(k)
+            log.info("Relay als letzter Weg angeboten")
+            # Steht die Verbindung, und lief sie NICHT ueber den Relay,
+            # braucht das Bein keiner mehr.
+            while not self._zu.is_set():
+                await asyncio.sleep(0.25)
+                if self.pc.connectionState == "connected":
+                    break
+            if not self._zu.is_set() and not self.laeuft_ueber_relais():
+                await self._schliesse_relais("Sitzung laeuft anders")
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.info("Relay-Kandidat gescheitert: %s", e)
+
+    def laeuft_ueber_relais(self) -> bool:
+        """Wahr, wenn ICE das Paar ueber die Relay-Steckdose gewaehlt hat."""
+        if self.relais is None:
+            return False
+        try:
+            ice = self.pc.sctp.transport.transport._connection
+            for paar in ice._nominated.values():
+                if (paar.remote_candidate.host, paar.remote_candidate.port) == tuple(self.relais.adresse):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    async def _schliesse_relais(self, grund: str) -> None:
+        if self.relais is not None:
+            log.info("Relay-Bein zu: %s", grund)
+            await self.relais.schliesse()
+            self.relais = None
 
     # -- Ende ------------------------------------------------------------
 
@@ -352,6 +464,12 @@ class Sitzung:
         if self._tontakt is not None:
             self._tontakt.cancel()
             self._tontakt = None
+        if self._relais_aufgabe is not None:
+            self._relais_aufgabe.cancel()
+            self._relais_aufgabe = None
+        if self.relais is not None:
+            await self.relais.schliesse()
+            self.relais = None
         if self._longpath is not None:
             try:
                 await self._longpath.close()
@@ -391,14 +509,34 @@ async def beantworte(
     stun: list[str],
     turn: dict | None,
     geraeteliste: Geraeteliste | None = None,
+    nur_relais: bool = False,
+    relais_verzoegerung_s: float = RELAIS_VERZOEGERUNG_S,
 ) -> tuple[Sitzung, str]:
     """Ein Angebot annehmen und die Antwort zurueckgeben (6.3).
 
     Die Antwort geht ohne eigene Kandidaten hinaus; beide Seiten trickeln
     sie danach einzeln durch den Dienst.
     """
-    sitzung = Sitzung(geraet, ziel, stun, turn, geraeteliste)
+    sitzung = Sitzung(geraet, ziel, stun, turn, geraeteliste, relais_verzoegerung_s)
+    if nur_relais:
+        angebot_sdp = ohne_kandidaten(angebot_sdp)
     await sitzung.pc.setRemoteDescription(RTCSessionDescription(angebot_sdp, "offer"))
     antwort = await sitzung.pc.createAnswer()
     await sitzung.pc.setLocalDescription(antwort)
-    return sitzung, sitzung.pc.localDescription.sdp
+    antwort_sdp = sitzung.pc.localDescription.sdp
+    if nur_relais:
+        antwort_sdp = ohne_kandidaten(antwort_sdp)
+    return sitzung, antwort_sdp
+
+
+def ohne_kandidaten(sdp: str) -> str:
+    """PRUEFHAKEN: alle Kandidaten aus einer SDP nehmen.
+
+    Nur der Pruefstand benutzt das, um ein Netz nachzustellen, in dem
+    weder direkt noch ueber UDP etwas durchgeht -- der Relay ist dann der
+    einzige Weg. Im Betrieb wird es nie gerufen.
+    """
+    return "".join(
+        z + "\r\n" for z in sdp.splitlines()
+        if not z.startswith(("a=candidate:", "a=end-of-candidates"))
+    )
