@@ -3193,19 +3193,27 @@ struct Durchlassfarbe {
     float  alphaOben;
     QColor kante;
 };
+// Kanten deckend genug, um auf jeder Spur zu stehen.
+QColor kante(const char* hex)
+{
+    QColor c(hex);
+    c.setAlpha(190);
+    return c;
+}
+
 Durchlassfarbe durchlassFuer(PanColourScheme s)
 {
     switch (s) {
     case PanColourScheme::Brass:
-        return {QColor(0xa8, 0x8a, 0x5c), 0.20f, 0.03f, QColor(0xc2, 0x92, 0x4f, 190)};
+        return {QColor(Style::kPassbandBrass), 0.20f, 0.03f, kante(Style::kPassbandBrassEdge)};
     case PanColourScheme::SlateBlue:
-        return {QColor(0x6a, 0x88, 0xa8), 0.32f, 0.08f, QColor(0x8a, 0xa4, 0xc0, 190)};
+        return {QColor(Style::kPassbandSlate), 0.32f, 0.08f, kante(Style::kPassbandSlateEdge)};
     case PanColourScheme::Night:
-        return {QColor(0x8a, 0x6a, 0x3a), 0.20f, 0.04f, QColor(0x7a, 0x5e, 0x36, 190)};
+        return {QColor(Style::kPassbandNight), 0.20f, 0.04f, kante(Style::kPassbandNightEdge)};
     case PanColourScheme::Ft8Amber:
-        return {QColor(0xe8, 0x86, 0x2e), 0.48f, 0.14f, QColor(0xf0, 0xa0, 0x50, 190)};
+        return {QColor(Style::kPassbandFt8Amber), 0.48f, 0.14f, kante(Style::kPassbandFt8Edge)};
     case PanColourScheme::Teal:
-        return {QColor(0x2f, 0xa5, 0x8a), 0.36f, 0.10f, QColor(0x5f, 0xc8, 0xac, 190)};
+        return {QColor(Style::kPassbandTeal), 0.36f, 0.10f, kante(Style::kPassbandTealEdge)};
     case PanColourScheme::Standard:
     case PanColourScheme::Count:
         break;
