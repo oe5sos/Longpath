@@ -41,13 +41,15 @@ private slots:
         CommandBar bar;
         const QStringList pills = pillTexts(bar);
         qInfo() << "Sichtbare Baender:" << pills;
-        for (const QString& want : {QStringLiteral("40m"),
-                                    QStringLiteral("20m"),
-                                    QStringLiteral("15m")}) {
+        // Vier Baender vorne: 160 · 80 · 60 · 40 (Betreiber 2026-11-21).
+        for (const QString& want : {QStringLiteral("160m"),
+                                    QStringLiteral("80m"),
+                                    QStringLiteral("60m"),
+                                    QStringLiteral("40m")}) {
             QVERIFY2(pills.contains(want),
                      qPrintable(QStringLiteral(
                          "%1 steht nicht vorne — der Betreiber hat genau "
-                         "40, 20 und 15 verlangt").arg(want)));
+                         "160, 80, 60 und 40 verlangt").arg(want)));
         }
     }
 
