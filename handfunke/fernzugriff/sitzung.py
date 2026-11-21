@@ -198,6 +198,7 @@ class Sitzung:
 
         @kanal.on("close")
         def _():
+            log.info("Kanal vom Geraet geschlossen -- Sitzung zu")
             self._zu.set()
 
     async def _anmeldefrist(self) -> None:

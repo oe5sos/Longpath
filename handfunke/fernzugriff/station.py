@@ -97,6 +97,12 @@ class Station:
         )
         self.ziel = ziel if ziel is not None else Ziel()
         self._sitzungen: dict[str, Any] = {}
+        # Kandidaten des Telefons, die ankommen, solange die Antwort noch
+        # entsteht (aiortc sammelt dabei mehrere Sekunden). Das Telefon darf
+        # schon trickeln, sobald seine Einfuehrung lebt (Abschnitt 6.3);
+        # ohne diese Ablage gingen genau die verloren, die im Mobilfunk den
+        # Weg bedeuten (der Server-Spiegel des Telefons hinter CGNAT).
+        self._wartende: dict[str, list[str]] = {}
         self._turn: dict | None = None
         self.privat = lade_schluessel(Path(schluesselpfad))
         self.oeffentlich = self.privat.public_key()
@@ -319,6 +325,8 @@ class Station:
             return
 
         log.info("Einfuehrung von %s", geraet.name)
+        if woher:
+            self._wartende[woher] = []
         try:
             sitzung, antwort_sdp = await beantworte(
                 nachricht["offer"],
@@ -336,6 +344,8 @@ class Station:
             return
 
         self._sitzungen[woher] = sitzung
+        for text in self._wartende.pop(woher, []):
+            await self._haenge_kandidat_ein(sitzung, text)
         await self._sende(
             {
                 "type": "answer",
@@ -379,14 +389,23 @@ class Station:
         """Einen ICE-Kandidaten der Gegenseite einhaengen.
 
         Ein leerer Kandidat ist das Ende der Reihe und wird nicht
-        eingehaengt (Abschnitt 5.2).
+        eingehaengt (Abschnitt 5.2). Kommt er, bevor die Sitzung steht,
+        wird er aufgehoben und nach der Antwort eingehaengt.
         """
-        sitzung = self._sitzungen.get(nachricht.get("from"))
-        if sitzung is None or self._nur_relais:
+        if self._nur_relais:
             return
+        woher = nachricht.get("from")
         text = nachricht.get("candidate", "")
         if not text:
             return
+        sitzung = self._sitzungen.get(woher)
+        if sitzung is None:
+            if woher in self._wartende and len(self._wartende[woher]) < 64:
+                self._wartende[woher].append(text)
+            return
+        await self._haenge_kandidat_ein(sitzung, text)
+
+    async def _haenge_kandidat_ein(self, sitzung, text: str) -> None:  # noqa: ANN001
         try:
             from aiortc.sdp import candidate_from_sdp
 
@@ -406,6 +425,7 @@ class Station:
         `clientLeft` (Abschnitt 6.3). Wer hier die Sitzung mit abraeumt,
         wirft jede Verbindung nach ein paar Sekunden wieder hinaus.
         """
+        self._wartende.pop(woher or "", None)
         log.info("Einfuehrung %s zu Ende: %s", (woher or "?")[:8], code)
 
 
