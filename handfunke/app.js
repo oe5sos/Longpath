@@ -363,6 +363,27 @@ async function koppelnTippen() {
 
 $('koppelknopf').addEventListener('click', koppelnTippen);
 
+// Den Schluessel dieses Telefons zeigen, damit er von Hand an die Station
+// gehen kann. Er ist oeffentlich (der Teil, der zur Station gehoert) -- der
+// private Teil verlaesst das Telefon nie. Nur in einem sicheren Kontext, nur
+// wenn die Seite von einem Vermittler kommt (dort geht der Tipp-Weg nicht).
+if (window.isSecureContext && window.crypto?.subtle && dienstVomOrt()) {
+  $('schluesselknopf').style.display = '';
+}
+$('schluesselknopf').addEventListener('click', async () => {
+  const t = $('schluesseltext');
+  try {
+    const { geraeteschluessel } = await import('./fernzugriff.js');
+    t.value = (await geraeteschluessel()).schluesselText;
+    t.style.display = '';
+    t.focus(); t.select();
+    try { await navigator.clipboard.writeText(t.value); } catch (e) {}
+  } catch (e) {
+    $('koppelmeldung').style.color = 'var(--warn)';
+    $('koppelmeldung').textContent = 'Der Schlüssel ließ sich nicht erzeugen.';
+  }
+});
+
 // Einmal beim Laden nachsehen, ob gerade ein Fenster offen ist.
 koppelLage().then((l) => {
   if (l && l.offen) {
