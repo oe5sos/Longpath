@@ -61,6 +61,20 @@ ANMELDE_FRIST_S = 15.0
 # Der Kanal heisst so; ein anderer wird nicht angenommen.
 KANAL = "longpath-tci"
 
+# Der zweite Kanal, nur fuer die Opus-Bloecke der Station zum Telefon:
+# ungeordnet und ohne Wiederholung. Ein verlorener Block ist 20 ms Ton, die
+# Wiederholung kaeme Hunderte Millisekunden zu spaet -- und auf dem
+# geordneten Kanal hielte sie alle folgenden Bloecke (und TCI-Befehle) auf.
+# Hier kommt NUR Ton von der Station zum Telefon durch; was das Telefon
+# dort schickt, wird verworfen, und vor der Anmeldung auf KANAL gibt es
+# auch hier nichts (die Tuer bleibt die einzige).
+KANAL_TON = "longpath-ton"
+
+# Abschaltbar, damit sich die Gegenprobe gegen die Fassung mit einem Kanal
+# fahren laesst (pruefe-tonkanal.py). Im Betrieb immer an.
+def tonkanal_an() -> bool:
+    return os.environ.get("LONGPATH_TONKANAL", "1") != "0"
+
 # Die Taktung der Tonbloecke abschaltbar, damit sich die Gegenprobe
 # gegen die alte Fassung fahren laesst: ein guter Wert ohne Gegenprobe
 # belegt nichts. Im Betrieb immer an; nur der Pruefstand setzt
@@ -116,6 +130,11 @@ class Sitzung:
         self.ton: Umkodierer | None = None
         self._tontakt: asyncio.Task | None = None
         self._tonschlange: asyncio.Queue | None = None
+        self._tonkanal: Any = None
+        self._ton_eigener = 0       # Bloecke, die ueber KANAL_TON gingen
+        # PRUEFHAKEN: wenn eine Liste, kommt jeder ausgehende Opus-Block mit
+        # seiner Sendezeit hinein -- fuer die Laufzeitmessung im Pruefstand.
+        self.sendelog: list | None = None
         self.pc = RTCPeerConnection(RTCConfiguration(_eisserver(stun, turn)))
         self.angemeldet = False
         self._aufforderung = secrets.token_bytes(32)
@@ -130,6 +149,11 @@ class Sitzung:
     def _verdrahte(self) -> None:
         @self.pc.on("datachannel")
         def _(kanal):  # noqa: ANN001
+            if kanal.label == KANAL_TON and self._tonkanal is None:
+                self._tonkanal = kanal
+                # Vom Telefon wird hier nichts angenommen.
+                kanal.on("message")(lambda _m: None)
+                return
             if kanal.label != KANAL:
                 log.warning("Kanal %r abgewiesen", kanal.label)
                 kanal.close()
@@ -269,7 +293,7 @@ class Sitzung:
                 warten = naechste - jetzt
                 if warten > 0:
                     await asyncio.sleep(warten)
-            self._sende_kanal(rahmen)
+            self._sende_ton(rahmen)
             # Die Dauer steht im Block selbst: Werte durch Abtastrate.
             kopf = lies_kopf(rahmen)
             dauer = (kopf[1] / kopf[0]) if kopf and kopf[0] else 0.02
@@ -324,7 +348,7 @@ class Sitzung:
                             if self._tonschlange is not None:
                                 self._tonschlange.put_nowait(r)
                             else:
-                                self._sende_kanal(r)   # alte Fassung
+                                self._sende_ton(r)     # alte Fassung
                         continue
                 self._sende_kanal(nachricht)
         except Exception as e:
@@ -340,6 +364,24 @@ class Sitzung:
         except Exception as e:
             log.info("an Longpath gescheitert: %s", e)
             self._zu.set()
+
+    @property
+    def ton_ueber_eigenen_kanal(self) -> bool:
+        return self._ton_eigener > 0
+
+    def _sende_ton(self, rahmen: bytes) -> None:
+        """Ein Opus-Block: auf den eigenen Kanal, wenn es ihn gibt und er offen ist."""
+        if self.sendelog is not None:
+            self.sendelog.append((asyncio.get_running_loop().time(), bytes(rahmen)))
+        k = self._tonkanal
+        if tonkanal_an() and self.angemeldet and k is not None and k.readyState == "open":
+            try:
+                k.send(rahmen)
+                self._ton_eigener += 1
+                return
+            except Exception as e:
+                log.info("auf den Tonkanal gescheitert: %s", e)
+        self._sende_kanal(rahmen)
 
     def _sende_kanal(self, nachricht: Any) -> None:
         kanal = self._kanal

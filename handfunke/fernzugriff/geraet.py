@@ -47,7 +47,7 @@ from kennung import (
     unterschreibe,
 )
 from relais import Relaisbein, kandidat_text
-from sitzung import KANAL, RELAIS_VERZOEGERUNG_S, anmelde_transkript, ohne_kandidaten
+from sitzung import KANAL, KANAL_TON, tonkanal_an, RELAIS_VERZOEGERUNG_S, anmelde_transkript, ohne_kandidaten
 
 log = logging.getLogger("fernzugriff.geraet")
 
@@ -78,6 +78,7 @@ class Geraeteseite:
         self.station_id = station_id
         self.pc: RTCPeerConnection | None = None
         self.kanal: Any = None
+        self.tonkanal: Any = None
         self.offen = asyncio.Event()
         self.beim_empfang: Callable[[Any], None] | None = None
         # Womit die Aufforderung auf dem Kanal unterschrieben wird. Im
@@ -110,6 +111,10 @@ class Geraeteseite:
             )
             self.kanal = self.pc.createDataChannel(KANAL)
             self._verdrahte_kanal()
+            if tonkanal_an():
+                self.tonkanal = self.pc.createDataChannel(
+                    KANAL_TON, ordered=False, maxRetransmits=0)
+                self.tonkanal.on("message")(self._vom_tonkanal)
 
             angebot = await self.pc.createOffer()
             await self.pc.setLocalDescription(angebot)
@@ -214,6 +219,11 @@ class Geraeteseite:
                 return
             if self.beim_empfang is not None:
                 self.beim_empfang(nachricht)
+
+    def _vom_tonkanal(self, nachricht: Any) -> None:
+        # Erst nach der Anmeldung zaehlt, was hier ankommt.
+        if self.offen.is_set() and self.beim_empfang is not None:
+            self.beim_empfang(nachricht)
 
     def _antworte_anmeldung(self, nachricht: Any) -> None:
         if isinstance(nachricht, (bytes, bytearray)):

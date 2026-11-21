@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import socket
 from collections import deque
 from typing import Any, Awaitable, Callable
@@ -70,6 +71,13 @@ KANDIDAT_PRIORITAET = 1
 
 def kandidat_text(adresse: tuple[str, int]) -> str:
     return f"candidate:relais 1 udp {KANDIDAT_PRIORITAET} {adresse[0]} {adresse[1]} typ host"
+
+
+# PRUEFHAKEN: eine schlechte Strecke nachstellen. Nur Pruefstaende setzen
+# das; im Betrieb bleibt es bei null. `verlust` ist die Wahrscheinlichkeit,
+# mit der ein vom Relay kommendes Datagramm verschwindet, `verzoegerung_s`
+# die Zeit, die es unterwegs bleibt (die Reihenfolge bleibt erhalten).
+STOERUNG = {"verlust": 0.0, "verzoegerung_s": 0.0}
 
 
 Verbinder = Callable[[], Awaitable[Any]]
@@ -256,7 +264,20 @@ class Relaisbein:
         if self._agent is None or self._dose is None or self._dose.transport is None:
             return
         self.gezaehlt["herein"] += 1
-        self._dose.transport.sendto(daten, self._agent)
+        if STOERUNG["verlust"] and random.random() < STOERUNG["verlust"]:
+            self.gezaehlt["verworfen"] += 1
+            return
+        if STOERUNG["verzoegerung_s"]:
+            asyncio.get_running_loop().call_later(
+                STOERUNG["verzoegerung_s"], self._schreibe_dem_agenten, daten)
+            return
+        self._schreibe_dem_agenten(daten)
+
+    def _schreibe_dem_agenten(self, daten: bytes) -> None:
+        d = self._dose
+        if self._agent is not None and d is not None and d.transport is not None \
+                and not d.transport.is_closing():
+            d.transport.sendto(daten, self._agent)
 
     # -- Ende ------------------------------------------------------------
 

@@ -59,6 +59,7 @@ const PRAEFIX_INTRODUCE = TEXT.encode('NereusSDR introduce v1\n');
 const PRAEFIX_ANMELDUNG = TEXT.encode('Longpath fernzugriff anmeldung v1\n');
 
 const KANAL = 'longpath-tci';
+const KANAL_TON = 'longpath-ton';
 
 // ── Opus ──────────────────────────────────────────────────────────────────
 //
@@ -175,6 +176,7 @@ export class FernLeitung extends EventTarget {
     this._opusRate = 0;
     this._pc = null;
     this._kanal = null;
+    this._tonkanal = null;
     this._ws = null;
     this._angemeldet = false;
     this._los();
@@ -209,6 +211,23 @@ export class FernLeitung extends EventTarget {
     kanal.binaryType = 'arraybuffer';
     this._kanal = kanal;
     this._verdrahte(kanal, ich);
+
+    // Ein zweiter Kanal nur fuer den Ton der Station: ungeordnet, ohne
+    // Wiederholung. Auf dem geordneten haelt ein verlorenes Datagramm alle
+    // folgenden Bloecke (und Befehle) auf, bis seine Wiederholung da ist --
+    // fuer 20 ms Ton viel zu teuer. Die Station schickt Opus nur dorthin,
+    // wenn der Kanal offen und das Geraet angemeldet ist; sonst bleibt alles
+    // wie es war. Was hier ankommt, zaehlt erst nach der Anmeldung.
+    try {
+      const ton = pc.createDataChannel(KANAL_TON, { ordered: false, maxRetransmits: 0 });
+      ton.binaryType = 'arraybuffer';
+      this._tonkanal = ton;
+      ton.onmessage = (ev) => {
+        if (this._angemeldet && this.ton === 'opus' && ev.data instanceof ArrayBuffer) {
+          this._opusRahmen(ev.data);
+        }
+      };
+    } catch (e) { this._tonkanal = null; }
 
     // Kandidaten einzeln nachreichen (trickle): ein Angebot, das auf das
     // Sammeln wartet, kostet im Mobilfunk mehrere Sekunden, bevor
@@ -454,6 +473,7 @@ export class FernLeitung extends EventTarget {
   _zu(code, grund) {
     if (this.readyState === 3) { return; }
     this.readyState = 3;            // CLOSED
+    try { this._tonkanal?.close(); } catch (e) {}
     try { this._kanal?.close(); } catch (e) {}
     try { this._pc?.close(); } catch (e) {}
     try { this._ws?.close(); } catch (e) {}

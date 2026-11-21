@@ -41,6 +41,7 @@ ausserhalb des Quellbaums:
 | `fuehren.py` | Das Betriebsprogramm: Station fahren, Geraete koppeln und widerrufen |
 | `pruefe-rundlauf.py` | Der ganze Weg gegen einen echten Dienst und die TCI-Attrappe |
 | `relais.py` | Der WebSocket-Relay (Abschnitt 12), Endenseite: Loopback-Steckdose fuer den ICE-Agenten, ein WebSocket zum Relay |
+| `pruefe-tonkanal.py` | Laufzeit der Tonbloecke bei Verlust: ein Kanal gegen eigener Tonkanal, jeweils mit und ohne Verlust |
 | `pruefe-relay.py` | Der Relay gegen den echten Dienst und den echten Relay aus `rendezvous/server/`, in einem nachgestellten Netz ohne UDP |
 
 ## Fahren
@@ -74,17 +75,26 @@ sich den Dienst.
    Datenstrom als Nachrichten durch den Relay-WebSocket, mit einer
    eigenen Verschluesselung Ende zu Ende --, das ist nicht gebaut.
 3. **Die Kopplung per Code** (Station-Link, Abschnitt 3.6) — die Nummer
-   mit zwei Woertern, `7-anvil-harbor`, ueber SPAKE2+EE. Erst damit
-   braucht ein neues Telefon das Heimnetz nie mehr. Bis dahin wird der
-   Schluessel einmal von Hand uebergeben.
-4. **Ein eigener Kanal fuer den Ton.** Gemessen am 2026-10-28 gegen die
-   Attrappe: in zehn Fenstern zu zwei Sekunden stockte der Ton einmal,
-   bei 41 kB/s und 1,5 % Rechenlast an der Station. Es ist also kein
-   Engpass beim Rechnen. Der Verdacht liegt auf dem Kanal selbst: er ist
-   geordnet und verlaesslich, und damit haelt ein nachgelieferter Rahmen
-   alle folgenden auf. Richtig waere ein zweiter Kanal fuer den Ton,
-   ungeordnet und ohne Wiederholung — nachgewiesen ist das aber nicht.
-
+   mit zwei Woertern, `7-anvil-harbor`, ueber SPAKE2+EE. **Nicht gebaut,
+   bewusst:** es gibt dafuer weder in Python noch im Browser eine Bibliothek
+   ohne neue Abhaengigkeit, und ein Eigenbau waere genau die Kryptografie,
+   die man nicht selbst schreibt. Die Wahl samt Begruendung steht in
+   [`KOPPLUNG-PER-CODE.md`](KOPPLUNG-PER-CODE.md); sie braucht Martins Ja zu
+   libsodium und emscripten (nur als Bauwerkzeug). Bis dahin wird einmal
+   zu Hause gekoppelt (`koppeln.py`).
+4. ~~Ein eigener Kanal fuer den Ton.~~ **Gebaut und belegt.** Der
+   Verdacht stimmt, aber nur unter Verlust: auf Loopback stockt nichts
+   (der Befund vom 2026-10-28 war der Schub der Tonpumpe). `pruefe-tonkanal.py`
+   stellt eine Strecke mit Verlust und Laufzeit nach (alles durch den
+   Relay, dort fallen Datagramme heraus): bei 10 % Verlust steigt die
+   Laufzeit der Opus-Bloecke auf dem geordneten Kanal im p99 von 28 auf
+   etwa 500 ms (Spitze ueber 800 ms), auf dem eigenen Kanal bleibt sie bei
+   28 ms; dafuer gehen die verlorenen Bloecke (etwa 10 %) wirklich
+   verloren. Die Seite legt den Kanal `longpath-ton` an (ungeordnet,
+   `maxRetransmits: 0`); die Station schickt Opus nur dorthin, wenn er offen
+   und das Geraet angemeldet ist, sonst bleibt alles wie vorher. Vom
+   Telefon wird auf dem Tonkanal nichts angenommen. **JS-Seite nur auf
+   Syntax geprueft**, nicht im Browser (siehe Bericht).
 ## Zwei Dinge, die man wissen muss
 
 **Der Stationsschluessel ist die Station.** Er liegt ausserhalb des
