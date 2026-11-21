@@ -314,7 +314,9 @@ export class FernLeitung extends EventTarget {
 
   /** Den Versuch verwerfen und noch einmal beginnen, jetzt mit TURN. */
   _nocheinmal() {
-    if (this._angemeldet || this.readyState === 3) { return; }
+    // Steht ICE schon (nur die Anmeldung laeuft noch), wird nichts verworfen.
+    if (this._angemeldet || this.readyState === 3
+        || this._pc?.connectionState === 'connected') { return; }
     // Die alten Handler duerfen die Leitung nicht mehr schliessen.
     if (this._kanal) { this._kanal.onclose = null; this._kanal.onerror = null; }
     if (this._tonkanal) { this._tonkanal.onmessage = null; }
