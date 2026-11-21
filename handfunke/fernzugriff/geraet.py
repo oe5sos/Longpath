@@ -46,7 +46,8 @@ from kennung import (
     unb64url,
     unterschreibe,
 )
-from sitzung import KANAL, anmelde_transkript
+from relais import Relaisbein, kandidat_text
+from sitzung import KANAL, RELAIS_VERZOEGERUNG_S, anmelde_transkript, ohne_kandidaten
 
 log = logging.getLogger("fernzugriff.geraet")
 
@@ -55,7 +56,15 @@ class Geraeteseite:
     """Ein Telefon, das eine Station von aussen erreicht."""
 
     def __init__(self, dienst_url: str, schluesselpfad: Path, station_id: str,
-                 kann: list[str] | None = None) -> None:
+                 kann: list[str] | None = None, nur_relais: bool = False,
+                 relais_verbinder=None,
+                 relais_verzoegerung_s: float = RELAIS_VERZOEGERUNG_S) -> None:
+        # Pruefhaken wie in der Station: ein Netz ohne UDP nachstellen.
+        self.nur_relais = nur_relais
+        self._relais_verbinder = relais_verbinder
+        self._relais_verzoegerung = relais_verzoegerung_s
+        self.relais: Relaisbein | None = None
+        self._relais_aufgabe: asyncio.Task | None = None
         self.url = dienst_url
         # Was dieses Geraet der Station beim Anmelden ueber sich sagt.
         # Ein Pruefstand meldet hier "opus", OHNE einen Dekoder zu haben:
@@ -117,8 +126,31 @@ class Geraeteseite:
                 }
             )
 
-            await asyncio.wait_for(self._warte_auf_antwort(ws), frist)
-            await asyncio.wait_for(self.offen.wait(), frist)
+            # Nach der Antwort kommt noch das Relay-Angebot (12.1); darum
+            # wird weitergelesen, bis der Kanal offen ist.
+            leser = asyncio.ensure_future(self._warte_auf_antwort(ws))
+            offen = asyncio.ensure_future(self.offen.wait())
+            ende = asyncio.get_running_loop().time() + frist
+            try:
+                while not self.offen.is_set():
+                    rest = ende - asyncio.get_running_loop().time()
+                    if rest <= 0:
+                        raise asyncio.TimeoutError()
+                    fertig, _ = await asyncio.wait(
+                        {leser, offen}, timeout=rest,
+                        return_when=asyncio.FIRST_COMPLETED)
+                    if not fertig:
+                        raise asyncio.TimeoutError()
+                    if leser in fertig:
+                        leser.result()          # wirft, wenn die Antwort scheiterte
+                        await asyncio.wait_for(offen, max(ende - asyncio.get_running_loop().time(), 0.01))
+            finally:
+                for a in (leser, offen):
+                    a.cancel()
+                    try:
+                        await a
+                    except (asyncio.CancelledError, Exception):
+                        pass
             # Sobald die Sitzung steht, ist die Rendezvous-Verbindung
             # entbehrlich (Abschnitt 6.3) -- die Station bekommt dann
             # `clientLeft` und laesst die Sitzung ausdruecklich stehen.
@@ -128,17 +160,21 @@ class Geraeteseite:
             nachricht = json.loads(roh)
             art = nachricht.get("type")
             if art == "answer":
-                await self.pc.setRemoteDescription(
-                    RTCSessionDescription(nachricht["answer"], "answer")
-                )
+                sdp = nachricht["answer"]
+                if self.nur_relais:
+                    sdp = ohne_kandidaten(sdp)
+                await self.pc.setRemoteDescription(RTCSessionDescription(sdp, "answer"))
                 # Die TURN-Zugangsdaten kommen hier an. aiortc kann sie
                 # einer schon laufenden Verbindung nicht mehr mitgeben --
                 # fuer die Webseite ist das anders, dort bekommt der
                 # Browser sie rechtzeitig in der Konfiguration.
                 if nachricht.get("turn"):
                     log.info("TURN angeboten: %s", nachricht["turn"].get("urls"))
-                return
-            if art == "candidate":
+            elif art == "relay.grant":
+                await self._nimm_relais(nachricht)
+            elif art == "candidate":
+                if self.nur_relais:
+                    continue
                 text = nachricht.get("candidate", "")
                 if text:
                     k = candidate_from_sdp(text)
@@ -148,6 +184,27 @@ class Geraeteseite:
                 raise RuntimeError(f"{nachricht.get('code')}: {nachricht.get('reason')}")
             elif art == "introduction.end":
                 raise RuntimeError(f"die Einfuehrung endete: {nachricht.get('code')}")
+
+    async def _nimm_relais(self, nachricht: dict) -> None:
+        url, token = nachricht.get("url"), nachricht.get("token")
+        if self.relais is not None or not isinstance(url, str) or not isinstance(token, str):
+            return
+        self.relais = Relaisbein(token, url=url, verbinder=self._relais_verbinder)
+        await self.relais.starte()
+        self._relais_aufgabe = asyncio.ensure_future(self._fuehre_relais())
+
+    async def _fuehre_relais(self) -> None:
+        try:
+            await asyncio.sleep(self._relais_verzoegerung)
+            from aiortc.sdp import candidate_from_sdp
+
+            k = candidate_from_sdp(kandidat_text(self.relais.adresse)[len("candidate:"):])
+            k.sdpMLineIndex = 0
+            await self.pc.addIceCandidate(k)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.info("Relay-Kandidat gescheitert: %s", e)
 
     def _verdrahte_kanal(self) -> None:
         @self.kanal.on("message")
@@ -186,5 +243,9 @@ class Geraeteseite:
         self.kanal.send(nachricht)
 
     async def schliesse(self) -> None:
+        if self._relais_aufgabe is not None:
+            self._relais_aufgabe.cancel()
+        if self.relais is not None:
+            await self.relais.schliesse()
         if self.pc is not None:
             await self.pc.close()

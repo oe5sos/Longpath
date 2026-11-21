@@ -47,6 +47,7 @@ from aiortc import (
 from geraete import Geraet, Geraeteliste
 from kennung import b64url, pruefe_unterschrift, unb64url
 from ton import Umkodierer, lies_kopf
+from relais import Relaisbein, kandidat_text, verbinde_url
 
 log = logging.getLogger("fernzugriff.sitzung")
 
@@ -64,6 +65,14 @@ KANAL = "longpath-tci"
 # gegen die alte Fassung fahren laesst: ein guter Wert ohne Gegenprobe
 # belegt nichts. Im Betrieb immer an; nur der Pruefstand setzt
 # LONGPATH_TONTAKT=0.
+# Wie lange ICE den direkten Weg und TURN allein versuchen darf, bevor
+# der Relay als letzter Weg dazukommt. Er hat die niedrigste Prioritaet,
+# aber aioice nominiert das ERSTE gelungene Paar -- liefe der Relay vom
+# ersten Augenblick an mit, koennte er einen noch laufenden direkten Weg
+# schlagen. Der Relay-WebSocket selbst wird sofort geoeffnet (12.1: kein
+# Warten auf die Kandidatensammlung); nur der Kandidat kommt spaeter.
+RELAIS_VERZOEGERUNG_S = 3.0
+
 TAKTUNG = os.environ.get("LONGPATH_TONTAKT", "1") != "0"
 
 
@@ -91,8 +100,12 @@ class Sitzung:
         stun: list[str],
         turn: dict | None,
         geraeteliste: Geraeteliste | None = None,
+        relais_verzoegerung_s: float = RELAIS_VERZOEGERUNG_S,
     ) -> None:
         self.geraet = geraet
+        self._relais_verzoegerung = relais_verzoegerung_s
+        self.relais: Relaisbein | None = None
+        self._relais_aufgabe: asyncio.Task | None = None
         self.ziel = ziel
         self.geraeteliste = geraeteliste
         # Der Umkodierer entsteht erst, wenn das Geraet beim Anmelden
@@ -338,6 +351,63 @@ class Sitzung:
             log.info("in den Kanal gescheitert: %s", e)
             self._zu.set()
 
+    # -- Relay (Abschnitt 12) --------------------------------------------
+
+    async def relais_an(self, url: str, token: str, verbinder=None) -> None:
+        """Das Relay-Angebot annehmen. Das Token wird nie geloggt."""
+        if self.relais is not None:
+            return
+        bein = Relaisbein(token, url=url, verbinder=verbinder)
+        await bein.starte()
+        self.relais = bein
+        self._relais_aufgabe = asyncio.ensure_future(self._fuehre_relais())
+
+    async def _fuehre_relais(self) -> None:
+        """Kandidat spaet einhaengen; Bein schliessen, wenn es nicht traegt."""
+        try:
+            await asyncio.sleep(self._relais_verzoegerung)
+            if self._zu.is_set() or self.pc.connectionState in ("connected", "closed", "failed"):
+                if self.pc.connectionState == "connected":
+                    await self._schliesse_relais("anderer Weg steht")
+                return
+            from aiortc.sdp import candidate_from_sdp
+
+            k = candidate_from_sdp(kandidat_text(self.relais.adresse)[len("candidate:"):])
+            k.sdpMLineIndex = 0
+            await self.pc.addIceCandidate(k)
+            log.info("Relay als letzter Weg angeboten")
+            # Steht die Verbindung, und lief sie NICHT ueber den Relay,
+            # braucht das Bein keiner mehr.
+            while not self._zu.is_set():
+                await asyncio.sleep(0.25)
+                if self.pc.connectionState == "connected":
+                    break
+            if not self._zu.is_set() and not self.laeuft_ueber_relais():
+                await self._schliesse_relais("Sitzung laeuft anders")
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.info("Relay-Kandidat gescheitert: %s", e)
+
+    def laeuft_ueber_relais(self) -> bool:
+        """Wahr, wenn ICE das Paar ueber die Relay-Steckdose gewaehlt hat."""
+        if self.relais is None:
+            return False
+        try:
+            ice = self.pc.sctp.transport.transport._connection
+            for paar in ice._nominated.values():
+                if (paar.remote_candidate.host, paar.remote_candidate.port) == tuple(self.relais.adresse):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    async def _schliesse_relais(self, grund: str) -> None:
+        if self.relais is not None:
+            log.info("Relay-Bein zu: %s", grund)
+            await self.relais.schliesse()
+            self.relais = None
+
     # -- Ende ------------------------------------------------------------
 
     async def warte_auf_ende(self) -> None:
@@ -352,6 +422,12 @@ class Sitzung:
         if self._tontakt is not None:
             self._tontakt.cancel()
             self._tontakt = None
+        if self._relais_aufgabe is not None:
+            self._relais_aufgabe.cancel()
+            self._relais_aufgabe = None
+        if self.relais is not None:
+            await self.relais.schliesse()
+            self.relais = None
         if self._longpath is not None:
             try:
                 await self._longpath.close()
@@ -391,14 +467,34 @@ async def beantworte(
     stun: list[str],
     turn: dict | None,
     geraeteliste: Geraeteliste | None = None,
+    nur_relais: bool = False,
+    relais_verzoegerung_s: float = RELAIS_VERZOEGERUNG_S,
 ) -> tuple[Sitzung, str]:
     """Ein Angebot annehmen und die Antwort zurueckgeben (6.3).
 
     Die Antwort geht ohne eigene Kandidaten hinaus; beide Seiten trickeln
     sie danach einzeln durch den Dienst.
     """
-    sitzung = Sitzung(geraet, ziel, stun, turn, geraeteliste)
+    sitzung = Sitzung(geraet, ziel, stun, turn, geraeteliste, relais_verzoegerung_s)
+    if nur_relais:
+        angebot_sdp = ohne_kandidaten(angebot_sdp)
     await sitzung.pc.setRemoteDescription(RTCSessionDescription(angebot_sdp, "offer"))
     antwort = await sitzung.pc.createAnswer()
     await sitzung.pc.setLocalDescription(antwort)
-    return sitzung, sitzung.pc.localDescription.sdp
+    antwort_sdp = sitzung.pc.localDescription.sdp
+    if nur_relais:
+        antwort_sdp = ohne_kandidaten(antwort_sdp)
+    return sitzung, antwort_sdp
+
+
+def ohne_kandidaten(sdp: str) -> str:
+    """PRUEFHAKEN: alle Kandidaten aus einer SDP nehmen.
+
+    Nur der Pruefstand benutzt das, um ein Netz nachzustellen, in dem
+    weder direkt noch ueber UDP etwas durchgeht -- der Relay ist dann der
+    einzige Weg. Im Betrieb wird es nie gerufen.
+    """
+    return "".join(
+        z + "\r\n" for z in sdp.splitlines()
+        if not z.startswith(("a=candidate:", "a=end-of-candidates"))
+    )

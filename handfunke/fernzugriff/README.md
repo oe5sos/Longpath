@@ -40,6 +40,8 @@ ausserhalb des Quellbaums:
 | `geraet.py` | Die Geraeteseite in Python — die Vorlage fuer `../fernzugriff.js` |
 | `fuehren.py` | Das Betriebsprogramm: Station fahren, Geraete koppeln und widerrufen |
 | `pruefe-rundlauf.py` | Der ganze Weg gegen einen echten Dienst und die TCI-Attrappe |
+| `relais.py` | Der WebSocket-Relay (Abschnitt 12), Endenseite: Loopback-Steckdose fuer den ICE-Agenten, ein WebSocket zum Relay |
+| `pruefe-relay.py` | Der Relay gegen den echten Dienst und den echten Relay aus `rendezvous/server/`, in einem nachgestellten Netz ohne UDP |
 
 ## Fahren
 
@@ -62,9 +64,15 @@ sich den Dienst.
    er ist die einzige Voraussetzung, die nicht in diesem Baum liegt.
    `rendezvous/README.md` ist das ganze Rezept (Caddy, coturn, zwei
    systemd-Dienste).
-2. **Der WebSocket-Relay** aus Abschnitt 12. Die Station nimmt das
-   Angebot entgegen und laesst es liegen. Ohne ihn bleibt der Weg durch
-   Netze, die nur Web durchlassen, zu — TURN deckt die meisten anderen.
+2. **Der WebSocket-Relay auf der Telefonseite.** Die Station nimmt das
+   Angebot an (`relais.py`, `sitzung.py`), geprueft in `pruefe-relay.py`.
+   Eine **Webseite kann den Relay aber nicht benutzen**: der Relay reicht
+   rohe ICE-Datagramme durch, und ein Browser erlaubt seiner WebRTC-
+   Verbindung weder einen eigenen UDP-Port noch einen fremden Kandidaten.
+   Die Spezifikation legt das Anbinden den nativen Apps auf (iPhone-App,
+   Aufgabe 29). Fuer die Seite braucht es einen eigenen Weg -- etwa den
+   Datenstrom als Nachrichten durch den Relay-WebSocket, mit einer
+   eigenen Verschluesselung Ende zu Ende --, das ist nicht gebaut.
 3. **Die Kopplung per Code** (Station-Link, Abschnitt 3.6) — die Nummer
    mit zwei Woertern, `7-anvil-harbor`, ueber SPAKE2+EE. Erst damit
    braucht ein neues Telefon das Heimnetz nie mehr. Bis dahin wird der

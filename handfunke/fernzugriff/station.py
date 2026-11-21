@@ -82,7 +82,15 @@ class Station:
         nameplate: bool = True,
         geraete: Geraeteliste | None = None,
         ziel: Ziel | None = None,
+        nur_relais: bool = False,
+        relais_verbinder=None,
+        relais_verzoegerung_s: float | None = None,
     ) -> None:
+        # Die drei letzten sind Pruefhaken: ein Netz ohne UDP nachstellen
+        # und den Relay ueber einen Unix-Socket statt wss:// erreichen.
+        self._nur_relais = nur_relais
+        self._relais_verbinder = relais_verbinder
+        self._relais_verzoegerung = relais_verzoegerung_s
         self.url = dienst_url
         self.geraete = geraete if geraete is not None else Geraeteliste(
             Path(schluesselpfad).with_name("geraete.json")
@@ -202,10 +210,9 @@ class Station:
             elif art == "credentials":
                 self._merke_turn(nachricht.get("turn"))
             elif art == "relay.grant":
-                # Der WebSocket-Relay aus Abschnitt 12. Noch nicht gebaut;
-                # die Zugangsdaten laufen in zwei Minuten ab, also wird
-                # hier nichts aufgehoben.
-                log.info("Relay angeboten (noch nicht gebaut)")
+                # Der WebSocket-Relay aus Abschnitt 12: das Bein sofort
+                # oeffnen, nicht erst nach der Kandidatensammlung (12.1).
+                asyncio.ensure_future(self._nimm_relais(nachricht))
             elif art == "candidate":
                 asyncio.ensure_future(self._nimm_kandidat(nachricht))
             elif art == "introduction.end":
@@ -320,6 +327,9 @@ class Station:
                 self.lage.stun,
                 self._turn,
                 self.geraete,
+                nur_relais=self._nur_relais,
+                **({"relais_verzoegerung_s": self._relais_verzoegerung}
+                   if self._relais_verzoegerung is not None else {}),
             )
         except Exception:
             log.exception("die Antwort ist nicht zustande gekommen")
@@ -349,6 +359,22 @@ class Station:
             self.lage.sitzungen = len(self._sitzungen)
             self._melde()
 
+    async def _nimm_relais(self, nachricht: dict) -> None:
+        """Das Relay-Angebot zu einer Einfuehrung annehmen (12.1).
+
+        Das Token ist undurchsichtig: es geht nur an den Relay unter `url`,
+        steht nie im Log und nie in der Adresse.
+        """
+        sitzung = self._sitzungen.get(nachricht.get("from"))
+        url, token = nachricht.get("url"), nachricht.get("token")
+        if sitzung is None or not isinstance(url, str) or not isinstance(token, str):
+            return
+        try:
+            await sitzung.relais_an(url, token, self._relais_verbinder)
+            log.info("Relay angenommen")
+        except Exception as e:
+            log.info("Relay nicht angenommen: %s", type(e).__name__)
+
     async def _nimm_kandidat(self, nachricht: dict) -> None:
         """Einen ICE-Kandidaten der Gegenseite einhaengen.
 
@@ -356,7 +382,7 @@ class Station:
         eingehaengt (Abschnitt 5.2).
         """
         sitzung = self._sitzungen.get(nachricht.get("from"))
-        if sitzung is None:
+        if sitzung is None or self._nur_relais:
             return
         text = nachricht.get("candidate", "")
         if not text:
