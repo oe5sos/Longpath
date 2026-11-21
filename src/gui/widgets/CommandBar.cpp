@@ -66,37 +66,43 @@ QString CommandBar::pillStyle()
     // traegt den gedeckten Auswahlverlauf statt des flachen kBlueBg.
     // Das nimmt der Kopfleiste die Blau-Summe (fuenf leuchtende Knoepfe
     // in einer Reihe), ohne dass die Auswahl leiser wuerde.
+    // Gelb wie das Plus oben rechts (Betreiber 2026-11-21): die aktive
+    // Pille traegt die Plus-Farben und dunkle Schrift aus der Familie der
+    // Sendetaste. Die Mulde der Auswahl (kGlassSel*) bleibt an ihren
+    // anderen Stellen unberuehrt.
     return QStringLiteral(
         "QPushButton {"
         "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
-        "               stop:0 %1, stop:1 %10);"
-        "  border: 1px solid %2; border-radius: %6px;"
-        "  border-top-color: %11; border-bottom-color: %12;"
-        "  color: %3; font-size: 11px; font-weight: 600;"
-        "  padding: 0 11px; min-height: %5px; max-height: %5px;"
+        "               stop:0 %1, stop:1 %2);"
+        "  border: 1px solid %3; border-radius: %4px;"
+        "  border-top-color: %5; border-bottom-color: %6;"
+        "  color: %7; font-size: %8px; font-weight: 600;"
+        "  padding: 0 %9px; min-height: %10px; max-height: %10px;"
         "}"
-        "QPushButton:hover { background: %4; }"
+        "QPushButton:hover { background: %11; }"
         // Genau einer je Gruppe leuchtet. Der Rest ist fast unsichtbar —
         // das ist der Unterschied zwischen einer Leiste und einer Wand.
         "QPushButton:checked {"
         "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
-        "               stop:0 %7, stop:1 %13);"
-        "  border: 1px solid %8; border-top-color: %14; color: %9;"
+        "               stop:0 %12, stop:1 %13);"
+        "  border: 1px solid %14; border-top-color: %15; color: %16;"
         "}")
-        .arg(QString::fromLatin1(Style::kGlassBtnTop),
-             QString::fromLatin1(Style::kBorder),
-             QString::fromLatin1(Style::kTextSecondary),
-             QString::fromLatin1(Style::kButtonHover))
-        .arg(CommandBar::kPillHeight)
-        .arg(CommandBar::kPillRadius)
-        .arg(QString::fromLatin1(Style::kGlassSelTop),
-             QString::fromLatin1(Style::kGlassSelBorder),
-             QString::fromLatin1(Style::kGlassSelText))
-        .arg(QString::fromLatin1(Style::kGlassBtnBot),
-             Style::shiftL(QColor(Style::kBorder), 12),
-             Style::shiftL(QColor(Style::kBorder), -14),
-             QString::fromLatin1(Style::kGlassSelBot),
-             Style::shiftL(QColor(Style::kGlassSelBorder), 16));
+        .arg(QString::fromLatin1(Style::kGlassBtnTop),        // %1
+             QString::fromLatin1(Style::kGlassBtnBot),        // %2
+             QString::fromLatin1(Style::kBorder),             // %3
+             QString::number(kPillRadius),                    // %4
+             Style::shiftL(QColor(Style::kBorder), 12),       // %5
+             Style::shiftL(QColor(Style::kBorder), -14),      // %6
+             QString::fromLatin1(Style::kTextSecondary),      // %7
+             QString::number(kPillFontPx),                    // %8
+             QString::number(kPillPadX))                      // %9
+        .arg(QString::number(kPillHeight))                    // %10
+        .arg(QString::fromLatin1(Style::kButtonHover),        // %11
+             QString::fromLatin1(Style::kPlusTop),            // %12
+             QString::fromLatin1(Style::kPlusBottom),         // %13
+             QString::fromLatin1(Style::kPlusBorder),         // %14
+             Style::shiftL(QColor(Style::kPlusBorder), 16),   // %15
+             QString::fromLatin1(Style::kTxKeyText));         // %16
 }
 
 CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
@@ -112,13 +118,28 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
              QString::fromLatin1(Style::kBorderSubtle),
              QLatin1String(Style::kGlassLight)));
 
-    auto* row = new QHBoxLayout(this);
-    row->setContentsMargins(13, 9, 13, 10);
+    // Zwei Zeilen übereinander. Die obere ist die einzige, solange die
+    // Leiste breit genug ist; die untere füllt sich nur bei schmaler
+    // Breite, nach dem festen Umbruch vor „Filter" (siehe ordneZeilen).
+    auto* zeilen = new QVBoxLayout(this);
+    zeilen->setContentsMargins(13, 9, 13, 10);
+    zeilen->setSpacing(8);
+    // Kein automatischer Mindestwert des Layouts: der wäre immer die
+    // Einzelzeile und ließe die Leiste nie in zwei Zeilen fallen. Die
+    // Mindestgröße setzt ordneZeilen() je nach Aufteilung selbst.
+    zeilen->setSizeConstraint(QLayout::SetNoConstraint);
+
+    auto* row = new QHBoxLayout;
     // Der Abstand ZWISCHEN den Gruppen ist das, was sie zu Gruppen
     // macht. Fünf Pixel innerhalb, zweiundzwanzig dazwischen.
     row->setSpacing(22);
-
+    zeilen->addLayout(row);
     m_row = row;
+
+    m_rowZwei = new QHBoxLayout;
+    m_rowZwei->setSpacing(22);
+    zeilen->addLayout(m_rowZwei);
+
     // ── BAND zuerst ─────────────────────────────────────────────────
     //
     // Der Betreiber am 2026-08-22: "bandwechsel sollte auch mit
@@ -150,17 +171,19 @@ QString CommandBar::pillStyleGedaempft()
         "QPushButton {"
         "  background: %1;"
         "  border: 1px solid %2;"
-        "  color: %3; font-size: 11px; font-weight: 600;"
-        "  padding: 0 11px; min-height: %4px; max-height: %4px;"
-        "  border-radius: %5px;"
+        "  color: %3; font-size: %4px; font-weight: 600;"
+        "  padding: 0 %5px; min-height: %6px; max-height: %6px;"
+        "  border-radius: %7px;"
         "}"
-        "QPushButton:hover { color: %6; border: 1px solid %7; }")
+        "QPushButton:hover { color: %8; border: 1px solid %9; }")
         .arg(QString::fromLatin1(Style::kPanelBg),
              QString::fromLatin1(Style::kBorderSubtle),
-             QString::fromLatin1(Style::kTextScale))
-        .arg(CommandBar::kPillHeight)
-        .arg(CommandBar::kPillRadius)
-        .arg(QString::fromLatin1(Style::kTextSecondary),
+             QString::fromLatin1(Style::kTextScale),
+             QString::number(CommandBar::kPillFontPx),
+             QString::number(CommandBar::kPillPadX),
+             QString::number(CommandBar::kPillHeight),
+             QString::number(CommandBar::kPillRadius),
+             QString::fromLatin1(Style::kTextSecondary),
              QString::fromLatin1(Style::kBorder));
 }
 
@@ -175,48 +198,105 @@ void CommandBar::addGroupWidget(const QString& caption, QWidget* w)
     box->setSpacing(5);
     box->addWidget(captionLabel(caption, this), 0, Qt::AlignLeft);
     box->addWidget(w, 0, Qt::AlignLeft);
-    m_row->insertLayout(dehnungsPlatz(), box);
     m_gruppenWidgets.insert(w, box);
+    // Ans Ende der Gruppen, also hinter die Rate -- wie bisher.
+    m_boxen.append(box);
     verteileGruppen();
 }
 
-int CommandBar::dehnungsPlatz() const
+// ── Zwei Zeilen bei schmaler Breite (2026-11-21) ─────────────────────
+//
+// Betreiber am 2026-11-21: die Pillen niedriger, und bei schmaler Breite
+// ZWEI Zeilen übereinander, damit Baender und Profile Platz haben. Die
+// Umbruchstelle ist FEST: die Gruppe „Filter" beginnt die untere Zeile.
+// Oben stehen Band · Mode · Digi; unten Filter · Step · NR · Rate ·
+// Profil und das Plus. Die Stelle wechselt nie mit der Breite, nur ob
+// umgebrochen wird.
+//
+// Die Gruppen bleiben, wie sie sind -- es werden nur ihre Kaesten
+// umgehaengt. m_boxen ist die Reihenfolge; die Zeilen sind nur die Ablage.
+void CommandBar::ordneZeilen(bool zwei)
 {
-    // Die Stelle der Dehnung SUCHEN, nicht raten.
-    //
-    // Hier stand m_row->count() - 1 mit der Begruendung "buildGroups()
-    // haengt sie als letztes an". Das stimmt nur, solange niemand
-    // addTrailing() gerufen hat -- das haengt WEITER hinten an. Danach
-    // ist das letzte Element der Plus-Knopf, und die Gruppe landete
-    // zwischen Dehnung und Plus, also ganz rechts statt neben der Rate.
-    //
-    // Am 2026-10-07 beim Gegenlesen gefunden: schon der erste Wechsel von
-    // links zurueck in die Leiste setzte die Abzeichen an den rechten
-    // Rand, weil das Plus beim Aufbau laengst angehaengt war.
-    // 2026-10-07, zweite Fassung: seit verteileGruppen() steht zwischen
-    // JEDEM Gruppenpaar eine Dehnung. "Die erste Dehnung" waere jetzt
-    // die zwischen BAND und MODE -- die Profile landeten gleich hinter
-    // dem Band. Also nicht mehr nach der Dehnung suchen, sondern nach
-    // der letzten Gruppe: dort gehoert eine neue Gruppe hin, und das
-    // bleibt richtig, wie viele Dehnungen auch dazwischenstehen.
-    if (!m_row) { return 0; }
-    for (int i = m_row->count() - 1; i >= 0; --i) {
-        if (m_row->itemAt(i) && m_row->itemAt(i)->layout()) { return i + 1; }
+    if (!m_row || !m_rowZwei) { return; }
+
+    // Alles aus beiden Zeilen loesen. Kaesten werden nur losgemacht (ihr
+    // Besitzer bleibt die Leiste bzw. removeGroupWidget), Dehnungen und
+    // Eintraege des Plus werden abgebaut; die Bauteile selbst bleiben.
+    for (QHBoxLayout* zeile : {m_row, m_rowZwei}) {
+        while (zeile->count() > 0) {
+            QLayoutItem* it = zeile->takeAt(0);
+            if (it->layout()) {
+                it->layout()->setParent(nullptr);
+            } else {
+                delete it;
+            }
+        }
     }
-    // Keine Gruppe da: ganz nach vorne. NICHT ans Ende -- dort haengt
-    // schon das Plus, und dahinter waere wieder der rechte Rand.
-    return 0;
+
+    // Umbruch vor „Filter", aber nur bei zwei Zeilen. Fehlt die Gruppe,
+    // bleibt alles oben.
+    const int umbruch = zwei ? umbruchStelle() : m_boxen.size();
+
+    m_zweiZeilen = zwei;
+    for (int i = 0; i < m_boxen.size(); ++i) {
+        QHBoxLayout* zeile = (i < umbruch) ? m_row : m_rowZwei;
+        zeile->addLayout(m_boxen.at(i));
+    }
+
+    // Das Plus hängt ganz rechts an der letzten Zeile.
+    QHBoxLayout* letzte = zwei ? m_rowZwei : m_row;
+    for (QWidget* w : m_nachStellen) {
+        letzte->addWidget(w, 0, Qt::AlignBottom);
+    }
+
+    verteileZeile(m_row, !zwei);
+    verteileZeile(m_rowZwei, !zwei);
+
+    // Die Mindestbreite ist IMMER die der zweizeiligen Aufteilung: nur so
+    // kann das Fenster unter die Einzelzeile schrumpfen, und resizeEvent
+    // schaltet dann um. Die Höhe folgt der tatsächlichen Zeilenzahl.
+    const QMargins r = contentsMargins();
+    const int u = umbruchStelle();
+    const int zweizeiligBreite =
+        qMax(breiteEinerZeile(0, u, false),
+             breiteEinerZeile(u, m_boxen.size(), true));
+    setMinimumSize(zweizeiligBreite + r.left() + r.right(),
+                   layout()->totalMinimumSize().height());
+    updateGeometry();
+    update();
 }
 
-QVector<QLayout*> CommandBar::gruppenKaesten() const
+int CommandBar::umbruchStelle() const
 {
-    QVector<QLayout*> k;
-    if (!m_row) { return k; }
-    for (int i = 0; i < m_row->count(); ++i) {
-        QLayoutItem* it = m_row->itemAt(i);
-        if (it && it->layout()) { k.append(it->layout()); }
+    for (int i = 0; i < m_boxen.size(); ++i) {
+        if (gruppenName(m_boxen.at(i)) == QStringLiteral("Filter")) { return i; }
     }
-    return k;
+    return m_boxen.size();
+}
+
+int CommandBar::breiteEinerZeile(int von, int bis, bool mitNachStellen) const
+{
+    int summe = 0;
+    int anzahl = 0;
+    for (int i = qMax(0, von); i < bis && i < m_boxen.size(); ++i) {
+        summe += m_boxen.at(i)->totalMinimumSize().width();
+        ++anzahl;
+    }
+    if (mitNachStellen) {
+        for (QWidget* w : m_nachStellen) {
+            summe += w->minimumSizeHint().width();
+            ++anzahl;
+        }
+    }
+    // Die Abstände zwischen den Elementen einer Zeile, wie sie Qt setzt.
+    if (anzahl > 1 && m_row) { summe += (anzahl - 1) * m_row->spacing(); }
+    return summe;
+}
+
+int CommandBar::einzeiligMindestbreite() const
+{
+    const QMargins r = contentsMargins();
+    return breiteEinerZeile(0, m_boxen.size(), true) + r.left() + r.right();
 }
 
 // ── Die Gruppen ueber die Breite verteilen ───────────────────────────
@@ -226,7 +306,7 @@ QVector<QLayout*> CommandBar::gruppenKaesten() const
 // Plus schwebte.
 //
 // Jetzt eine Dehnung hinter jeder Gruppe, die nicht das letzte Element
-// der Reihe ist. Damit verteilt Qt den uebrigen Platz gleichmaessig --
+// ihrer Zeile ist. Damit verteilt Qt den uebrigen Platz gleichmaessig --
 // und wenn das Fenster schmal wird, schrumpfen alle Dehnungen auf null,
 // und es bleibt beim Grundabstand von 22. Eine gerechnete Weite haette
 // bei schmalem Fenster ueberlaufen; eine Dehnung kann das nicht.
@@ -235,26 +315,46 @@ QVector<QLayout*> CommandBar::gruppenKaesten() const
 // noch das Plus haengt -- das schiebt das Plus an den rechten Rand, wo
 // es hingehoert. Haengt nichts dahinter, bekommt sie keine, sonst
 // ruecke alles nach links und die Verteilung waere dahin.
+void CommandBar::verteileZeile(QHBoxLayout* zeile, bool verteilen)
+{
+    for (int i = zeile->count() - 2; i >= 0; --i) {
+        QLayoutItem* it = zeile->itemAt(i);
+        if (!it || !it->layout()) { continue; }
+        // Vor einem angehängten Bauteil (dem Plus) steht die Dehnung auch
+        // in der zweizeiligen Anordnung: sie schiebt das Plus nach rechts.
+        QLayoutItem* danach = zeile->itemAt(i + 1);
+        const bool vorBauteil = danach && danach->widget();
+        if (verteilen || vorBauteil) { zeile->insertStretch(i + 1, 1); }
+    }
+}
+
 void CommandBar::verteileGruppen()
 {
-    if (!m_row) { return; }
+    ordneZeilen(m_zweiZeilen);
+}
 
-    for (int i = m_row->count() - 1; i >= 0; --i) {
-        QLayoutItem* it = m_row->itemAt(i);
-        if (it && it->spacerItem()) { delete m_row->takeAt(i); }
+QString CommandBar::gruppenName(const QLayout* box) const
+{
+    for (const Group* g : m_groups) {
+        if (g && g->box == box) { return g->name; }
     }
+    return QString();
+}
 
-    QVector<int> kaesten;
-    for (int i = 0; i < m_row->count(); ++i) {
-        QLayoutItem* it = m_row->itemAt(i);
-        if (it && it->layout()) { kaesten.append(i); }
+QVector<QStringList> CommandBar::zeilenGruppen() const
+{
+    QVector<QStringList> ergebnis(2);
+    const QHBoxLayout* zeilen[2] = {m_row, m_rowZwei};
+    for (int z = 0; z < 2; ++z) {
+        if (!zeilen[z]) { continue; }
+        for (int i = 0; i < zeilen[z]->count(); ++i) {
+            QLayoutItem* it = zeilen[z]->itemAt(i);
+            if (it && it->layout()) {
+                ergebnis[z].append(gruppenName(it->layout()));
+            }
+        }
     }
-    const int letztes = m_row->count() - 1;
-    for (int k = kaesten.size() - 1; k >= 0; --k) {
-        const int i = kaesten.at(k);
-        if (i == letztes) { continue; }
-        m_row->insertStretch(i + 1, 1);
-    }
+    return ergebnis;
 }
 
 void CommandBar::removeGroupWidget(QWidget* w)
@@ -278,9 +378,11 @@ void CommandBar::removeGroupWidget(QWidget* w)
         delete item->widget();
         delete item;
     }
-    m_row->removeItem(box);
-    delete box;
+    // Erst aus der Reihenfolge, dann die Zeilen neu ordnen -- dabei loest
+    // sich der Kasten aus seiner Zeile, und erst danach darf er weg.
+    m_boxen.removeAll(box);
     verteileGruppen();
+    delete box;
 }
 
 // ── Die Trennstriche ─────────────────────────────────────────────────
@@ -295,8 +397,8 @@ void CommandBar::removeGroupWidget(QWidget* w)
 // ist dafuer die Hausfarbe (Lichtkante auf kBorder) -- kein neuer Ton.
 //
 // Gezeichnet, nicht gebaut: ein Strich-Widget waere ein weiteres Element
-// in der Reihe, an dem dehnungsPlatz(), addGroupWidget() und
-// removeGroupWidget() vorbeizielen koennten.
+// in der Reihe, an dem verteileZeile() und addGroupWidget() vorbeizielen
+// koennten. Zwischen Gruppen zweier Zeilen wird KEIN Strich gezogen.
 void CommandBar::paintEvent(QPaintEvent* e)
 {
     // Erst das Stilblatt zeichnen lassen -- die Leiste traegt
@@ -307,14 +409,15 @@ void CommandBar::paintEvent(QPaintEvent* e)
     style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
     QWidget::paintEvent(e);
 
-    const QVector<QLayout*> k = gruppenKaesten();
-    if (k.size() < 2) { return; }
+    if (m_boxen.size() < 2) { return; }
 
     p.setPen(QPen(QColor(QString::fromLatin1(Style::kGlassEdgeLight)), 1));
-    for (int i = 0; i + 1 < k.size(); ++i) {
-        const QRect a = k.at(i)->geometry();
-        const QRect b = k.at(i + 1)->geometry();
+    for (int i = 0; i + 1 < m_boxen.size(); ++i) {
+        const QRect a = m_boxen.at(i)->geometry();
+        const QRect b = m_boxen.at(i + 1)->geometry();
         if (!a.isValid() || !b.isValid()) { continue; }
+        // Andere Zeile: kein Strich zwischen Oben und Unten.
+        if (qAbs(a.top() - b.top()) > 2) { continue; }
         // Genau in die Mitte der Luecke. Am Rand einer Gruppe klebend
         // waere er ihr Rahmen und gehoerte dann auch ringsum.
         const int x = (a.right() + b.left()) / 2;
@@ -324,16 +427,25 @@ void CommandBar::paintEvent(QPaintEvent* e)
     }
 }
 
+void CommandBar::resizeEvent(QResizeEvent* e)
+{
+    QWidget::resizeEvent(e);
+    // Unterhalb der Schwelle zwei Zeilen, ab ihr eine. Die Schwelle ist
+    // die Konstante, aber nie kleiner als die Einzelzeile selbst -- sonst
+    // würde sie gestaucht (siehe kEinzeiligUnterBreite). Nur bei einem
+    // Wechsel umordnen.
+    const int schwelle = qMax(kEinzeiligUnterBreite, einzeiligMindestbreite());
+    const bool zwei = width() < schwelle;
+    if (zwei != m_zweiZeilen) { ordneZeilen(zwei); }
+}
+
 void CommandBar::addTrailing(QWidget* w)
 {
     if (!w || !m_row) { return; }
-    // Rechtsbündig: die Dehnung steht schon davor, angehängt wird
-    // dahinter. Die Ausrichtung unten hält das Plus auf einer Linie mit
-    // den Pillen und nicht mit den Versalzeilen darüber.
-    m_row->addWidget(w, 0, Qt::AlignBottom);
-    // Erst jetzt steht fest, dass hinter der letzten Gruppe noch etwas
-    // haengt -- sie braucht also doch eine Dehnung, damit das Plus an
-    // den rechten Rand wandert. Siehe verteileGruppen().
+    // Rechtsbündig: das Plus kommt ans Ende der letzten Zeile. Die
+    // Ausrichtung unten hält es auf einer Linie mit den Pillen und nicht
+    // mit den Versalzeilen darüber. Ordnen übernimmt ordneZeilen().
+    m_nachStellen.append(w);
     verteileGruppen();
 }
 
@@ -352,9 +464,11 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
     pills->setContentsMargins(0, 0, 0, 0);
     pills->setSpacing(5);
     box->addLayout(pills);
+    // Die Zeile setzt ordneZeilen() endgültig; hier nur der Besitz.
     row->addLayout(box);
+    m_boxen.append(box);
 
-    auto* g = new Group{caption, pills, {}, nullptr, versal};
+    auto* g = new Group{caption, pills, {}, nullptr, versal, box};
     m_groups.append(g);
     return *g;
 }
@@ -383,20 +497,21 @@ void setzeMindestbreite(QPushButton* b, const QString& label)
     b->ensurePolished();
 
     // Mit DER Schrift rechnen, die das Stylesheet setzt, nicht mit der
-    // des Widgets: pillStyle() sagt font-size: 11px und font-weight:
+    // des Widgets: pillStyle() sagt font-size: kPillFontPx und font-weight:
     // 600. b->fontMetrics() antwortet dagegen fuer die geerbte Schrift
     // und kommt zu klein heraus — der zweite Grund, warum die Pillen
     // zu schmal blieben.
     QFont schrift = b->font();
-    schrift.setPixelSize(11);
+    schrift.setPixelSize(CommandBar::kPillFontPx);
     schrift.setWeight(QFont::DemiBold);
 
     // Und mit DEM Beiwerk, das dasselbe Stylesheet verlangt:
-    // padding 0 11px auf beiden Seiten, dazu 1px Rand. Macht 24 statt
+    // padding 0 kPillPadX auf beiden Seiten, dazu 1px Rand. Macht 24 statt
     // der alten 20. Zwei Punkte Luft obendrauf, damit Kantenglaettung
     // und Sperrung nicht an der Kante kratzen.
     const int ausDerSchrift =
-        QFontMetrics(schrift).horizontalAdvance(label) + 24 + 2;
+        QFontMetrics(schrift).horizontalAdvance(label)
+        + 2 * CommandBar::kPillPadX + 2 + 2;
     const int ausDemStil = b->minimumSizeHint().width();
     b->setMinimumWidth(qMax(ausDerSchrift, ausDemStil));
 }
@@ -1163,12 +1278,14 @@ void CommandBar::applyRateStyle(bool warn)
         "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
         "               stop:0 %1, stop:1 %2);"
         "  border: 1px solid %3; border-radius: %5px;"
-        "  color: %4; font-size: 11px; font-weight: 600;"
-        "  padding: 0 11px; min-height: %6px; max-height: %6px;"
+        "  color: %4; font-size: %7px; font-weight: 600;"
+        "  padding: 0 %8px; min-height: %6px; max-height: %6px;"
         "}")
         .arg(top, bot, border, text)
         .arg(kPillRadius)
-        .arg(kPillHeight));
+        .arg(kPillHeight)
+        .arg(kPillFontPx)
+        .arg(kPillPadX));
 }
 
 namespace {

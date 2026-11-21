@@ -181,7 +181,7 @@ private slots:
 
         // ── Gegen eine ECHTE Pille, nicht gegen eine Zahl ────────────
         //
-        // kPillHeight ist 27, eine Pille auf dem Schirm aber 29 hoch:
+        // kPillHeight ist 21, eine Pille auf dem Schirm aber 23 hoch:
         // `min-height` im Stilblatt gilt der Inhaltsflaeche, die beiden
         // Raender kommen dazu. Gegen die Zahl zu pruefen hiesse, die
         // Abzeichen zwei Pixel flacher zu machen als ihre Nachbarn und

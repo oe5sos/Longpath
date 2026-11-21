@@ -115,7 +115,7 @@ public:
     /// Es sind zwei Pixel mehr als CommandBar::kPillHeight, und das ist
     /// kein Versehen: in Qt gilt `min-height` im Stilblatt fuer die
     /// INHALTSflaeche, der 1 px starke Rand kommt oben und unten dazu.
-    /// Eine Pille mit kPillHeight = 27 ist also 29 Pixel hoch. Die
+    /// Eine Pille mit kPillHeight = 21 ist also 23 Pixel hoch. Die
     /// Schiene auf 27 festzunageln hiesse, die Abzeichen zwei Pixel
     /// flacher als ihre Nachbarn zu machen.
     ///
@@ -124,7 +124,7 @@ public:
     /// tst_profilschiene_richtung stellt Schiene, Abzeichen und eine
     /// echte Pille nebeneinander, damit diese Zahl nicht stillschweigend
     /// verrutscht.
-    static constexpr int kLeistenSeite = 29;
+    static constexpr int kLeistenSeite = 23;
 
 signals:
     /// Der Betreiber will ein neues Profil. Den Namen erfragt der
