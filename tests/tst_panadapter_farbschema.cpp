@@ -40,6 +40,8 @@
 #include "core/AppSettings.h"
 #include "core/WdspTypes.h"
 #include "gui/PanadapterApplet.h"
+#include "gui/applets/BandwidthFilterApplet.h"
+#include "models/RadioModel.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/spectrum/Farbschema.h"
 #include "gui/widgets/BandwidthFilterPane.h"
@@ -115,6 +117,8 @@ private slots:
     {
         AppSettings::instance().clear();
         Farbschema::Bote::instance().setDurchlass(PanColourScheme::Standard);
+        Farbschema::Bote::instance().setBandbreitenWahl(
+            Farbschema::Bote::kFolgtPanadapter);
     }
 
     // 1 ──────────────────────────────────────────────────────────────────
@@ -391,6 +395,62 @@ private slots:
         QVERIFY2(hatTealGruen(malen(spaet)), "Bandbreite im Schema");
         pan0.setSpectrumScheme(PanColourScheme::Standard);
         QVERIFY2(!hatTealGruen(malen(spaet)), "Standard wie bisher");
+    }
+
+    // 11 ─ Eine eigene Wahl im Fenster BANDWIDTH FILTER (Betreiber: „die
+    //      option fuer den bandwidth sollte auch in diesem fenster sein"):
+    //      ab Werk „wie der Panadapter", sonst fest -- und gespeichert.
+    void bandbreiteKannEigenesSchemaHaben()
+    {
+        SpectrumWidget pan0;
+        BandwidthFilterPane b;
+        auto& bote = Farbschema::Bote::instance();
+        QCOMPARE(bote.bandbreitenWahl(), Farbschema::Bote::kFolgtPanadapter);
+        pan0.setSpectrumScheme(PanColourScheme::Teal);
+        QCOMPARE(b.passbandScheme(), PanColourScheme::Teal);
+
+        bote.setBandbreitenWahl(int(PanColourScheme::Night));
+        QCOMPARE(b.passbandScheme(), PanColourScheme::Night);
+        pan0.setSpectrumScheme(PanColourScheme::Brass);     // aendert hier nichts
+        QCOMPARE(b.passbandScheme(), PanColourScheme::Night);
+        QCOMPARE(AppSettings::instance()
+                     .value(QStringLiteral("BandwidthPassbandScheme")).toInt(),
+                 int(PanColourScheme::Night));
+
+        bote.setBandbreitenWahl(Farbschema::Bote::kFolgtPanadapter);
+        QCOMPARE(b.passbandScheme(), PanColourScheme::Brass);
+    }
+
+    void dasFensterBandbreiteHatDieWahlImMenue()
+    {
+        RadioModel model;
+        BandwidthFilterApplet applet(&model);
+        QVERIFY(applet.hasExtendedSettings());
+        QMenu* m = applet.buildOptionsMenuForTesting();
+        QMenu* schemata = nullptr;
+        for (QAction* a : m->actions()) {
+            if (a->menu() && a->text() == QStringLiteral("Passband scheme")) {
+                schemata = a->menu();
+            }
+        }
+        QVERIFY2(schemata, "Untermenue „Passband scheme“");
+        QStringList namen;
+        for (QAction* a : schemata->actions()) {
+            if (!a->isSeparator()) { namen << a->text(); }
+        }
+        QCOMPARE(namen, (QStringList{QStringLiteral("Like panadapter"),
+                                     QStringLiteral("Standard"),
+                                     QStringLiteral("FT8 amber"),
+                                     QStringLiteral("Brass (muted)"),
+                                     QStringLiteral("Teal green"),
+                                     QStringLiteral("Slate blue"),
+                                     QStringLiteral("Night")}));
+        QVERIFY(schemata->actions().first()->isChecked());   // ab Werk: wie Panadapter
+        for (QAction* a : schemata->actions()) {
+            if (a->text() == QStringLiteral("Slate blue")) { a->trigger(); }
+        }
+        QCOMPARE(Farbschema::Bote::instance().bandbreite(), PanColourScheme::SlateBlue);
+        delete m;
     }
 };
 

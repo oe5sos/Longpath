@@ -89,9 +89,10 @@ BandwidthFilterPane::BandwidthFilterPane(QWidget* parent)
     setMouseTracking(true);
 
     // Das Spektrumschema von Pan 0 gilt auch hier -- jetzt und kuenftig.
+    // Oder die eigene Wahl aus dem Fenster BANDWIDTH FILTER (Bote).
     auto& bote = Farbschema::Bote::instance();
-    m_schema = bote.durchlass();
-    connect(&bote, &Farbschema::Bote::durchlassGeaendert,
+    m_schema = bote.bandbreite();
+    connect(&bote, &Farbschema::Bote::bandbreiteGeaendert,
             this, &BandwidthFilterPane::setPassbandScheme);
 }
 
