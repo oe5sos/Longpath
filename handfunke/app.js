@@ -276,6 +276,7 @@ async function raumUmschalten() {
     // Beim Zurueckschalten die Flaeche leeren: sonst steht das letzte
     // Raumbild unter dem anlaufenden Wasserfall.
     wfCtx.clearRect(0, 0, wf.width, wf.height);
+    wfLeer = true;
   }
   wfDreck = true;
   zeichneBild();
@@ -731,6 +732,7 @@ wf.width = DATENPUNKTE; wf.height = WF_ZEILEN;
 const wfCtx = wf.getContext('2d', { willReadFrequently: false });
 const raumFl = document.createElement('canvas');
 const raumCtx = raumFl.getContext('2d');
+let wfLeer = true;          // noch keine Zeile da: die erste fuellt den ganzen Puffer
 let wfDreck = true;        // der Puffer hat sich geaendert -> neu auf die Anzeige
 let panBreite = DATENPUNKTE, panHoehe = 96, wfAnzHoehe = 104, anzDpr = 1;
 
@@ -816,7 +818,7 @@ document.documentElement.dataset.wasserfall = WASSERFALL_BLAU ? 'blau' : 'longpa
 // Stellen 0 / .30 / .48 / .64 / .78 / .92 / 1.
 // Mac-Look (2026-11-21, Foto von Mac-Longpath): Wasserfall blau -> cyan ->
 // gruen -> gelb; kein Rot, kein Orange im Bild.
-const STOPS_LONGPATH = [[0,[0,0,40]],[.22,[0,18,130]],[.42,[0,90,225]],[.58,[0,195,240]],
+const STOPS_LONGPATH = [[0,[0,6,70]],[.22,[0,24,140]],[.42,[0,90,225]],[.58,[0,195,240]],
                         [.74,[30,222,100]],[.90,[222,232,40]],[1,[255,255,232]]];
 const STOPS_BLAU     = STOPS_LONGPATH;
 const STOPS = WASSERFALL_BLAU ? STOPS_BLAU : STOPS_LONGPATH;
@@ -872,7 +874,7 @@ function wasserfallLeeren() {
   try {
     wfCtx.fillStyle = WF_BG;
     wfCtx.fillRect(0, 0, wf.width, wf.height);
-    wfDreck = true;
+    wfDreck = true; wfLeer = true;
   } catch (e) { /* vor dem ersten Zeichnen */ }
   neueZeilen = 0;
 }
@@ -1225,6 +1227,13 @@ function zeichneBild() {
       d[o] = c[0]; d[o+1] = c[1]; d[o+2] = c[2]; d[o+3] = 255;
     }
     wfCtx.putImageData(zeile, 0, 0);
+    // Die allererste Zeile fuellt den ganzen Puffer: statt einer leeren
+    // dunkelblauen Flaeche, die erst nach gut einer Minute von oben her
+    // Farbe bekommt, steht von Anfang an der Rauschboden da (die Rampe).
+    if (wfLeer) {
+      wfLeer = false;
+      wfCtx.drawImage(wf, 0, 0, wf.width, 1, 0, 1, wf.width, wf.height - 1);
+    }
     wfDreck = true;
   }
   // Nur auf die Anzeige bringen, wenn sich der Puffer wirklich geaendert hat
