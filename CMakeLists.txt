@@ -926,6 +926,7 @@ set(GUI_SOURCES
     src/gui/spectrum/PeakBlobDetector.cpp
     src/gui/spectrum/SpectrumDetector.cpp
     src/gui/spectrum/Durchlass.cpp
+    src/gui/spectrum/Farbschema.cpp
     src/core/SMeterSkala.cpp
     src/core/FrequenzEichung.cpp
     src/core/RundumLauf.cpp
