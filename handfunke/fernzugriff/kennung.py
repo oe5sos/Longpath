@@ -133,7 +133,9 @@ def lade_schluessel(pfad: Path) -> ec.EllipticCurvePrivateKey:
     pfad = Path(pfad)
     if pfad.exists():
         modus = stat.S_IMODE(pfad.stat().st_mode)
-        if modus & 0o077:
+        # Unter Windows sagt `st_mode` nichts ueber die Rechte (immer 0666);
+        # dort schuetzt die Zugriffsliste, die beim Anlegen gesetzt wird.
+        if os.name != "nt" and modus & 0o077:
             raise PermissionError(
                 f"{pfad} ist fuer andere lesbar (Modus {modus:o}); "
                 "chmod 600, oder einen neuen Schluessel anlegen"
@@ -158,7 +160,27 @@ def lade_schluessel(pfad: Path) -> ec.EllipticCurvePrivateKey:
                 encryption_algorithm=serialization.NoEncryption(),
             )
         )
+    if os.name == "nt":
+        _nur_benutzer_windows(pfad)
     return privat
+
+
+def _nur_benutzer_windows(pfad: Path) -> None:
+    """Die Zugriffsliste der Schluesseldatei auf den Benutzer allein setzen.
+
+    Vererbung weg, dann Vollzugriff nur fuer den angemeldeten Benutzer. Wer
+    das nicht schafft, bekommt keine stille Datei, sondern einen Fehler:
+    der Schluessel ist die Station. NICHT auf Windows geprueft.
+    """
+    import getpass
+    import subprocess
+
+    r = subprocess.run(
+        ["icacls", str(pfad), "/inheritance:r", "/grant:r", f"{getpass.getuser()}:F"],
+        capture_output=True, text=True)
+    if r.returncode != 0:
+        pfad.unlink(missing_ok=True)
+        raise PermissionError(f"Rechte an {pfad} nicht gesetzt: {r.stdout}{r.stderr}")
 
 
 def lade_oeffentlich(text: str) -> ec.EllipticCurvePublicKey:
