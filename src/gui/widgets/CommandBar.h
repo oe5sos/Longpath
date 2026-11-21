@@ -237,6 +237,17 @@ public:
     static constexpr int kPillRadius = 6;
     static constexpr int kPillFontPx = 9;
     static constexpr int kPillPadX = 7;
+    /// Große Stufe: ab kGrossAbBreite Breite wachsen die Pillen, und die
+    /// Gruppen bekommen ihre Beschriftung zurück (Betreiber 2026-11-21).
+    static constexpr int kPillHeightGross = 23;
+    static constexpr int kPillFontGross = 11;
+    static constexpr int kPillPadGross = 9;
+    static constexpr int kGrossAbBreite = 1700;
+    /// Die aktuelle Stufe; von allen Pillen-Stilen gelesen.
+    static bool grossAktiv();
+    static int pillHoehe();
+    static int pillSchrift();
+    static int pillPolster();
     /// Unterhalb dieser Breite (Layoutpunkte) stehen die Gruppen in ZWEI
     /// Zeilen; ab ihr in einer. Die Schwelle ist die Breite, bei der eine
     /// einzige Zeile gerade noch ohne Stauchen der Pillen passt: die
@@ -252,7 +263,8 @@ public:
     /// Sichtbare Einträge je Gruppe, bevor das „…" übernimmt.
     static constexpr int kVisiblePerGroup = 3;
     /// Sichtbare Bänder vorne: vier (160 · 80 · 60 · 40), der Rest im „…".
-    static constexpr int kVisibleBand = 4;
+    // Acht Baender vorne, in zwei Zeilen zu vier (Betreiber 2026-11-21).
+    static constexpr int kVisibleBand = 8;
 
     /// Die Gruppen je Zeile (oben, unten) in Reihenfolge. Die untere
     /// Zeile ist leer, solange die Leiste einzeilig steht.
@@ -271,6 +283,9 @@ private:
     /// steht. Die Gruppen-Reihenfolge kommt aus m_boxen, nicht aus den
     /// Zeilen selbst.
     void ordneZeilen(bool zwei);
+    /// Schaltet zwischen kompakt und groß um: Pillen, Rate, angehängtes Plus,
+    /// Bauteile in den Gruppen und die Beschriftungen.
+    void setzeGrossModus(bool gross);
     /// Dehnungen einer Zeile setzen. Einzeilig: hinter jeder Gruppe außer
     /// der letzten eine, die Gruppen verteilen sich über die Breite.
     /// Zweizeilig (verteilen == false): die Gruppen bleiben links beieinander;
@@ -302,6 +317,8 @@ private:
         /// Der Kasten, in dem Versalzeile und Pillen stehen. Gemerkt, damit
         /// die Zeilen-Verteilung die Gruppe beim Namen findet.
         QLayout* box{nullptr};
+        // Zweite Pillenzeile, nur die Bandgruppe: ab der fuenften Pille.
+        QHBoxLayout* row2{nullptr};
     };
 
     /// ── Die Leiste als Reihe lesbar machen (2026-10-07) ────────────

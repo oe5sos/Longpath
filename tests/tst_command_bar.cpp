@@ -1059,6 +1059,38 @@ private slots:
         QVERIFY(bar.zweiZeilenAktiv());
     }
 
+
+
+    /// Ab 1700 Punkten wachsen die Pillen, und die Gruppen bekommen ihre
+    /// Beschriftung zurueck; darunter bleibt es kompakt ohne Beschriftung
+    /// (Betreiber 2026-11-21). Am Ende wieder kompakt, damit andere Pruefungen
+    /// nicht in der grossen Stufe laufen.
+    void grosseStufeMitBeschriftung()
+    {
+        CommandBar bar;
+        bar.resize(1800, 70);
+        bar.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&bar, kFensterFrist));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        QVERIFY2(CommandBar::grossAktiv(), "bei 1800 Punkten muss die grosse Stufe gelten");
+        int beschriftungen = 0;
+        for (QLabel* l : bar.findChildren<QLabel*>(QStringLiteral("groupCaption"))) {
+            if (l->isVisible()) { ++beschriftungen; }
+        }
+        QVERIFY2(beschriftungen >= 5, "in der grossen Stufe fehlen Gruppenbeschriftungen");
+        for (QPushButton* b : bar.findChildren<QPushButton*>()) {
+            if (b->text().isEmpty()) { continue; }
+            QCOMPARE(b->height(), CommandBar::kPillHeightGross + 2);
+        }
+
+        bar.resize(1400, 70);
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+        QVERIFY2(!CommandBar::grossAktiv(), "bei 1400 Punkten bleibt es kompakt");
+        for (QLabel* l : bar.findChildren<QLabel*>(QStringLiteral("groupCaption"))) {
+            QVERIFY2(!l->isVisible(), "kompakt ohne Beschriftung");
+        }
+    }
 };
 
 QTEST_MAIN(TestCommandBar)

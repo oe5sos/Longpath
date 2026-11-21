@@ -41,6 +41,36 @@ namespace Longpath {
 /// Das Aussehen einer Pille. Über Style::-Konstanten, damit die
 /// Theme-Datei sie erreicht. Oeffentlich, weil die untere Leiste
 /// dieselbe Optik traegt.
+namespace {
+// Pillen je Zeile in der Bandgruppe (zwei Zeilen zu vier).
+constexpr int kPillsProZeile = 4;
+/// Die Stufe der Leiste. Statisch, weil die Stilblätter (auch die der
+/// Profilschiene) sie ohne Leiste erreichen müssen.
+bool s_gross = false;
+} // namespace
+
+namespace {
+/// Die Versalzeile über einer Gruppe (nur in der großen Stufe sichtbar).
+QLabel* captionLabel(const QString& text, QWidget* parent)
+{
+    auto* l = new QLabel(text.toUpper(), parent);
+    l->setObjectName(QStringLiteral("groupCaption"));
+    QFont f = l->font();
+    f.setPixelSize(9);
+    f.setBold(true);
+    f.setLetterSpacing(QFont::AbsoluteSpacing, 1.6);
+    l->setFont(f);
+    l->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
+                         .arg(QString::fromLatin1(Style::kTextScale)));
+    return l;
+}
+} // namespace
+
+bool CommandBar::grossAktiv() { return s_gross; }
+int CommandBar::pillHoehe() { return s_gross ? kPillHeightGross : kPillHeight; }
+int CommandBar::pillSchrift() { return s_gross ? kPillFontGross : kPillFontPx; }
+int CommandBar::pillPolster() { return s_gross ? kPillPadGross : kPillPadX; }
+
 QString CommandBar::pillStyle()
 {
     // Glas & Tiefe (2026-09-17, Stilblatt 3): die Pille ist ERHABEN —
@@ -76,9 +106,9 @@ QString CommandBar::pillStyle()
              Style::shiftL(QColor(Style::kBorder), 12),       // %5
              Style::shiftL(QColor(Style::kBorder), -14),      // %6
              QString::fromLatin1(Style::kTextSecondary),      // %7
-             QString::number(kPillFontPx),                    // %8
-             QString::number(kPillPadX))                      // %9
-        .arg(QString::number(kPillHeight))                    // %10
+             QString::number(pillSchrift()),                    // %8
+             QString::number(pillPolster()))                      // %9
+        .arg(QString::number(pillHoehe()))                    // %10
         .arg(QString::fromLatin1(Style::kButtonHover),        // %11
              QString::fromLatin1(Style::kPlusTop),            // %12
              QString::fromLatin1(Style::kPlusBottom),         // %13
@@ -161,9 +191,9 @@ QString CommandBar::pillStyleGedaempft()
         .arg(QString::fromLatin1(Style::kPanelBg),
              QString::fromLatin1(Style::kBorderSubtle),
              QString::fromLatin1(Style::kTextScale),
-             QString::number(CommandBar::kPillFontPx),
-             QString::number(CommandBar::kPillPadX),
-             QString::number(CommandBar::kPillHeight),
+             QString::number(CommandBar::pillSchrift()),
+             QString::number(CommandBar::pillPolster()),
+             QString::number(CommandBar::pillHoehe()),
              QString::number(CommandBar::kPillRadius),
              QString::fromLatin1(Style::kTextSecondary),
              QString::fromLatin1(Style::kBorder));
@@ -178,9 +208,9 @@ void CommandBar::addGroupWidget(const QString& caption, QWidget* w)
     auto* box = new QVBoxLayout;
     box->setContentsMargins(0, 0, 0, 0);
     box->setSpacing(3);
-    // Keine Versalzeile (2026-11-21, Betreiber: „es muss nicht band, filter
-    // oder step darüber stehen") -- der Name bleibt nur für den Aufrufer.
-    Q_UNUSED(caption);
+    QLabel* beschriftung = captionLabel(caption, this);
+    beschriftung->setVisible(s_gross);
+    box->addWidget(beschriftung, 0, Qt::AlignLeft);
     box->addWidget(w, 0, Qt::AlignLeft);
     m_gruppenWidgets.insert(w, box);
     // Ans Ende der Gruppen, also hinter die Rate -- wie bisher.
@@ -411,9 +441,36 @@ void CommandBar::paintEvent(QPaintEvent* e)
     }
 }
 
+void CommandBar::setzeGrossModus(bool gross)
+{
+    if (s_gross == gross) { return; }
+    // Die alten Stilblätter merken, damit nur die Pillen der Leiste (und
+    // nichts Fremdes mit eigener Optik) umgestellt werden.
+    const QString altPille = pillStyle();
+    const QString altLeise = pillStyleGedaempft();
+    s_gross = gross;
+    const QString neuPille = pillStyle();
+    const QString neuLeise = pillStyleGedaempft();
+    for (QPushButton* b : findChildren<QPushButton*>()) {
+        if (b->styleSheet() == altPille) { b->setStyleSheet(neuPille); }
+        else if (b->styleSheet() == altLeise) { b->setStyleSheet(neuLeise); }
+    }
+    for (QLabel* l : findChildren<QLabel*>(QStringLiteral("groupCaption"))) {
+        l->setVisible(gross);
+    }
+    // Angehängtes Plus und Bauteile in den Gruppen folgen der Pillenhöhe.
+    const int aussen = pillHoehe() + 2;
+    for (QWidget* w : m_nachStellen) { w->setFixedSize(aussen, aussen); }
+    for (QWidget* w : m_gruppenWidgets.keys()) { w->setFixedHeight(aussen); }
+    applyRateStyle(m_rateWarn);
+    verteileGruppen();
+}
+
 void CommandBar::resizeEvent(QResizeEvent* e)
 {
     QWidget::resizeEvent(e);
+    // Ab kGrossAbBreite wachsen die Pillen (große Stufe, mit Beschriftung).
+    setzeGrossModus(width() >= kGrossAbBreite);
     // Unterhalb der Schwelle zwei Zeilen, ab ihr eine. Die Schwelle ist
     // die Konstante, aber nie kleiner als die Einzelzeile selbst -- sonst
     // würde sie gestaucht (siehe kEinzeiligUnterBreite). Nur bei einem
@@ -441,8 +498,9 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
     auto* box = new QVBoxLayout;
     box->setContentsMargins(0, 0, 0, 0);
     box->setSpacing(3);
-    // Keine Versalzeile über den Pillen (2026-11-21, siehe addGroupWidget).
-    QLabel* versal = nullptr;
+    QLabel* versal = captionLabel(caption, this);
+    versal->setVisible(s_gross);
+    box->addWidget(versal, 0, Qt::AlignLeft);
 
     auto* pills = new QHBoxLayout;
     pills->setContentsMargins(0, 0, 0, 0);
@@ -481,21 +539,21 @@ void setzeMindestbreite(QPushButton* b, const QString& label)
     b->ensurePolished();
 
     // Mit DER Schrift rechnen, die das Stylesheet setzt, nicht mit der
-    // des Widgets: pillStyle() sagt font-size: kPillFontPx und font-weight:
+    // des Widgets: pillStyle() sagt font-size: pillSchrift() und font-weight:
     // 600. b->fontMetrics() antwortet dagegen fuer die geerbte Schrift
     // und kommt zu klein heraus — der zweite Grund, warum die Pillen
     // zu schmal blieben.
     QFont schrift = b->font();
-    schrift.setPixelSize(CommandBar::kPillFontPx);
+    schrift.setPixelSize(CommandBar::pillSchrift());
     schrift.setWeight(QFont::DemiBold);
 
     // Und mit DEM Beiwerk, das dasselbe Stylesheet verlangt:
-    // padding 0 kPillPadX auf beiden Seiten, dazu 1px Rand. Macht 24 statt
+    // padding 0 pillPolster() auf beiden Seiten, dazu 1px Rand. Macht 24 statt
     // der alten 20. Zwei Punkte Luft obendrauf, damit Kantenglaettung
     // und Sperrung nicht an der Kante kratzen.
     const int ausDerSchrift =
         QFontMetrics(schrift).horizontalAdvance(label)
-        + 2 * CommandBar::kPillPadX + 2 + 2;
+        + 2 * CommandBar::pillPolster() + 2 + 2;
     const int ausDemStil = b->minimumSizeHint().width();
     b->setMinimumWidth(qMax(ausDerSchrift, ausDemStil));
 }
@@ -521,8 +579,10 @@ QPushButton* CommandBar::addPill(Group& g, const QString& label)
     // darf die Anordnung nicht. Wird es zu eng, muss sich etwas
     // anderes ruehren (die Leiste rollt), nicht die Beschriftung.
     setzeMindestbreite(b, label);
+    // Die Bandgruppe fuellt ihre zweite Zeile ab der fuenften Pille.
+    QHBoxLayout* ziel = (g.row2 && g.pills.size() >= kPillsProZeile) ? g.row2 : g.row;
     g.pills.append(b);
-    if (g.row) { g.row->addWidget(b); }
+    if (ziel) { ziel->addWidget(b); }
     return b;
 }
 
@@ -736,6 +796,12 @@ void CommandBar::buildBandGroup(QHBoxLayout* row)
     };
 
     Group& g = addGroup(QStringLiteral("Band"), row);
+    // Zweite Pillenzeile unter den ersten vier Baendern (2026-11-21).
+    auto* zweite = new QHBoxLayout;
+    zweite->setContentsMargins(0, 0, 0, 0);
+    zweite->setSpacing(5);
+    static_cast<QBoxLayout*>(g.box)->addLayout(zweite);
+    g.row2 = zweite;
     // Vier Bänder vorne (160 · 80 · 60 · 40, Betreiber 2026-11-21), die
     // übrigen im „…".
     for (int i = 0; i < kVisibleBand && i < m_allBands.size(); ++i) {
@@ -786,7 +852,7 @@ void CommandBar::addOverflow(Group& g, const QVector<Entry>& all, Apply apply)
     more->setCursor(Qt::PointingHandCursor);
     more->setToolTip(tr("Show all %1").arg(all.size()));
     g.overflow = more;
-    if (g.row) { g.row->addWidget(more); }
+    if (g.row) { (g.row2 ? g.row2 : g.row)->addWidget(more); }
 
     connect(more, &QPushButton::clicked, this, [this, all, apply]() {
         // Am Fenster, nicht an der Leiste: die Leiste (oder ihr Elternteil)
@@ -882,7 +948,7 @@ void CommandBar::buildFilterGroup(QHBoxLayout* row)
     more->setToolTip(tr("All widths for this mode -- and one of "
                                     "your own to type in."));
     g.overflow = more;
-    if (g.row) { g.row->addWidget(more); }
+    if (g.row) { (g.row2 ? g.row2 : g.row)->addWidget(more); }
 
     connect(more, &QPushButton::clicked, this, [this]() {
         if (!m_slice) { return; }
@@ -1163,7 +1229,7 @@ void CommandBar::buildNrGroup(QHBoxLayout* row)
     more->setCursor(Qt::PointingHandCursor);
     more->setToolTip(tr("Show all %1").arg(m_allNr.size()));
     g.overflow = more;
-    if (g.row) { g.row->addWidget(more); }
+    if (g.row) { (g.row2 ? g.row2 : g.row)->addWidget(more); }
     connect(more, &QPushButton::clicked, this, [this]() {
         ScopedChildWidget<QMenu> menuOwner(window());   // am Fenster, siehe addOverflow()
         QMenu& m = *menuOwner.get();
@@ -1268,9 +1334,9 @@ void CommandBar::applyRateStyle(bool warn)
         "}")
         .arg(top, bot, border, text)
         .arg(kPillRadius)
-        .arg(kPillHeight)
-        .arg(kPillFontPx)
-        .arg(kPillPadX));
+        .arg(pillHoehe())
+        .arg(pillSchrift())
+        .arg(pillPolster()));
 }
 
 namespace {
