@@ -1265,9 +1265,18 @@ void SpectrumWidget::loadSettings()
     m_wfStopOnTx = readBool(QStringLiteral("WaterfallStopOnTx"), false);
     m_haltBildBeimSenden = readBool(QStringLiteral("DisplayHoldRxPictureOnTx"), true);
     m_txDurchlassWieRx   = readBool(QStringLiteral("DisplayTxPassbandLikeRx"), true);
-    m_farbschema = static_cast<PanColourScheme>(qBound(
-        0, readInt(QStringLiteral("DisplayColourScheme"), 0),
-        static_cast<int>(PanColourScheme::Count) - 1));
+    // Oben und unten getrennt (2026-11-21). Wer vorher EIN Schema hatte
+    // (DisplayColourScheme), bekommt es oben und unten.
+    {
+        const int gemeinsam = readInt(QStringLiteral("DisplayColourScheme"), 0);
+        const auto schema = [&](const QString& key) {
+            return static_cast<PanColourScheme>(qBound(
+                0, readInt(key, gemeinsam),
+                static_cast<int>(PanColourScheme::Count) - 1));
+        };
+        m_spektrumSchema   = schema(QStringLiteral("DisplaySpectrumScheme"));
+        m_wasserfallSchema = schema(QStringLiteral("DisplayWaterfallScheme"));
+    }
     m_wfOpacity          = readInt(QStringLiteral("DisplayWfOpacity"), 100);
     m_wfUpdatePeriodMs   = readInt(QStringLiteral("DisplayWfUpdatePeriodMs"), 30);
 
@@ -1571,7 +1580,8 @@ void SpectrumWidget::saveSettings()
               m_haltBildBeimSenden ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayTxPassbandLikeRx"), m_panIndex),
               m_txDurchlassWieRx ? QStringLiteral("True") : QStringLiteral("False"));
-    writeInt(QStringLiteral("DisplayColourScheme"), static_cast<int>(m_farbschema));
+    writeInt(QStringLiteral("DisplaySpectrumScheme"), static_cast<int>(m_spektrumSchema));
+    writeInt(QStringLiteral("DisplayWaterfallScheme"), static_cast<int>(m_wasserfallSchema));
     writeInt(QStringLiteral("DisplayWfOpacity"), m_wfOpacity);
     writeInt(QStringLiteral("DisplayWfUpdatePeriodMs"), m_wfUpdatePeriodMs);
     s.setValue(settingsKey(QStringLiteral("DisplayWaterfallHistoryMs"), m_panIndex),
@@ -3224,12 +3234,23 @@ Durchlassfarbe durchlassFuer(PanColourScheme s)
 constexpr float kNachtSpur = 0.55f;
 }
 
-void SpectrumWidget::setColourScheme(PanColourScheme s)
+// Oben und unten getrennt (Betreiber: „es sollte oben und unten getrennt
+// sein"): das Spektrumschema faerbt Durchlass und Spur, das Wasserfall-
+// schema nur den Wasserfall. Keiner der beiden Setter beruehrt den anderen.
+void SpectrumWidget::setSpectrumScheme(PanColourScheme s)
 {
-    if (m_farbschema == s) { return; }
-    m_farbschema = s;
+    if (m_spektrumSchema == s) { return; }
+    m_spektrumSchema = s;
     scheduleSettingsSave();
     markOverlayDirty();
+    update();
+}
+
+void SpectrumWidget::setWaterfallScheme(PanColourScheme s)
+{
+    if (m_wasserfallSchema == s) { return; }
+    m_wasserfallSchema = s;
+    scheduleSettingsSave();
     // Den sichtbaren Wasserfall neu einfaerben, wie setWfColorScheme.
     rebuildWaterfallViewport();
 #ifdef LONGPATH_GPU_SPECTRUM
@@ -3240,7 +3261,7 @@ void SpectrumWidget::setColourScheme(PanColourScheme s)
 
 WfColorScheme SpectrumWidget::effectiveWfColorScheme() const
 {
-    switch (m_farbschema) {
+    switch (m_wasserfallSchema) {
     case PanColourScheme::Brass:     return WfColorScheme::Muted;
     case PanColourScheme::SlateBlue: return WfColorScheme::SlateBlue;
     case PanColourScheme::Night:     return WfColorScheme::Night;
@@ -3255,7 +3276,7 @@ WfColorScheme SpectrumWidget::effectiveWfColorScheme() const
 
 QColor SpectrumWidget::traceColourForPaint() const
 {
-    if (m_farbschema != PanColourScheme::Night) { return m_fillColor; }
+    if (m_spektrumSchema != PanColourScheme::Night) { return m_fillColor; }
     QColor c = m_fillColor;
     c.setRgbF(c.redF() * kNachtSpur, c.greenF() * kNachtSpur,
               c.blueF() * kNachtSpur, c.alphaF());
@@ -3265,11 +3286,11 @@ QColor SpectrumWidget::traceColourForPaint() const
 void SpectrumWidget::fuelleDurchlass(QPainter& p, const QRectF& r) const
 {
     if (r.width() <= 0.0 || r.height() <= 0.0) { return; }
-    if (m_farbschema == PanColourScheme::Standard) {
+    if (m_spektrumSchema == PanColourScheme::Standard) {
         p.fillRect(r, m_rxFilterColor);
         return;
     }
-    const Durchlassfarbe f = durchlassFuer(m_farbschema);
+    const Durchlassfarbe f = durchlassFuer(m_spektrumSchema);
     QLinearGradient verlauf(QPointF(0.0, r.top()), QPointF(0.0, r.bottom()));
     QColor oben(f.flaeche);
     oben.setAlphaF(f.alphaOben);

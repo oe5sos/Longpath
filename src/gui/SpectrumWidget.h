@@ -251,7 +251,10 @@ enum class WfColorScheme : int {
 // Durchlass (Empfang und -- mit „TX passband in RX colour" -- Senden) und
 // den Wasserfall. Die Spur bleibt Messwert in ihrer Farbe; nur Night
 // dimmt sie. Standard = wie bisher, die eigene Wasserfall-Palette gilt.
-// Als int gespeichert (DisplayColourScheme), also nur anhaengen; die
+// Oben und unten getrennt waehlbar (DisplaySpectrumScheme /
+// DisplayWaterfallScheme; das fruehere gemeinsame DisplayColourScheme wird
+// beim Laden fuer beide uebernommen). Als int gespeichert, also nur
+// anhaengen; die
 // Reihenfolge im Menue steht davon getrennt in PanadapterApplet.
 enum class PanColourScheme : int {
     Standard = 0,
@@ -944,9 +947,13 @@ public:
     // ab Werk an, je Pan gespeichert (DisplayTxPassbandLikeRx).
     void setTxPassbandLikeRx(bool on);
     bool txPassbandLikeRx() const { return m_txDurchlassWieRx; }
-    // Farbschema, siehe PanColourScheme.
-    void setColourScheme(PanColourScheme s);
-    PanColourScheme colourScheme() const { return m_farbschema; }
+    // Farbschema, siehe PanColourScheme -- oben und unten getrennt
+    // (2026-11-21, Betreiber: „es sollte oben und unten getrennt sein").
+    // Oben: Durchlass (RX und TX) und Spur. Unten: der Wasserfall.
+    void setSpectrumScheme(PanColourScheme s);
+    PanColourScheme spectrumScheme() const { return m_spektrumSchema; }
+    void setWaterfallScheme(PanColourScheme s);
+    PanColourScheme waterfallScheme() const { return m_wasserfallSchema; }
     // Die Wasserfall-Palette, die wirklich gemalt wird: bei Standard die
     // eigene (wfColorScheme), sonst die des Schemas. Die eigene bleibt
     // gespeichert und gilt wieder, sobald Standard gewaehlt wird.
@@ -3602,7 +3609,8 @@ private:
     // Empfangsbild beim Senden halten, siehe setHoldReceivePictureOnTx().
     bool    m_haltBildBeimSenden{true};
     bool    m_txDurchlassWieRx{true};
-    PanColourScheme m_farbschema{PanColourScheme::Standard};
+    PanColourScheme m_spektrumSchema{PanColourScheme::Standard};    // oben
+    PanColourScheme m_wasserfallSchema{PanColourScheme::Standard};  // unten
     // Durchlass in der Farbe des Schemas (Standard: m_rxFilterColor flach).
     void fuelleDurchlass(QPainter& p, const QRectF& r) const;
     qint64  m_sendeEndeMs{0};        // Ende der letzten Sendung (Nachlauf)
