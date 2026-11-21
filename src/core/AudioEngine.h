@@ -365,6 +365,33 @@ public:
     const IAudioBus* speakersBus() const { return m_speakersBus.get(); }
     const IAudioBus* txInputBus()  const { return m_txInputBus.get(); }
 
+    // ── Ausfall des PC-Mikrofons (2026-11-20) ───────────────────────────
+    // (Steht AUSSERHALB von LONGPATH_BUILD_TESTS: der Taktgeber im
+    // Programm ruft pruefePcMikrofon, auch im Auslieferungsbau.)
+    //
+    // Am 20.11. um 13:00:24 verschwand das USB-Mikrofon vom Mac. PortAudio
+    // meldet das nicht: der Aufnahmestrom bleibt "offen", CoreAudio ruft
+    // nur nicht mehr zurueck. Longpath hing am weg gewesenen Geraet, und
+    // eine Sendung waere stumm hinausgegangen -- zu sehen nur im Protokoll.
+    //
+    // Ein Taktgeber (250 ms, nur waehrend der Ton laeuft) fragt
+    // `MikrofonWaechter`, ob die Rueckrufe noch kommen. Gilt NUR bei Quelle
+    // PC-Mikrofon; Mikrofon an der Maschine und VAX/DAX gehen ihn nichts an.
+
+    /// True, solange das gewaehlte PC-Mikrofon nichts liefert.
+    bool pcMikrofonAusgefallen() const noexcept {
+        return m_mikroWaechter.zustand() == Audio::MikrofonWaechter::Zustand::Ausgefallen;
+    }
+    /// Wanduhrzeit, zu der der Ausfall erkannt wurde (ungueltig sonst).
+    QDateTime pcMikrofonAusgefallenUm() const { return m_mikroAusgefallenUm; }
+    /// Der eingestellte Name des PC-Mikrofons ("" = Systemvorgabe).
+    QString pcMikrofonName() const;
+    /// Ein Takt der Aufsicht. Oeffentlich, damit ein Pruefstand mit eigener
+    /// Uhr takten kann; im Programm ruft ihn der Taktgeber.
+    void pruefePcMikrofon(qint64 jetztMs);
+    /// Pruefstand: so tun, als liefe der Ton (start() braucht PortAudio).
+    void setTonLaeuftFuerTest(bool an) { m_tonLaeuftFuerTest = an; }
+
 #ifdef LONGPATH_BUILD_TESTS
     // Test seam — inject a fake IAudioBus into a VAX slot so unit tests
     // can exercise the rxBlockReady tee without standing up a real
@@ -397,30 +424,6 @@ public:
     // Plan: 3M-1b E.1.
     void setTxInputBusForTest(std::unique_ptr<IAudioBus> bus);
 
-    // ── Ausfall des PC-Mikrofons (2026-11-20) ───────────────────────────
-    //
-    // Am 20.11. um 13:00:24 verschwand das USB-Mikrofon vom Mac. PortAudio
-    // meldet das nicht: der Aufnahmestrom bleibt "offen", CoreAudio ruft
-    // nur nicht mehr zurueck. Longpath hing am weg gewesenen Geraet, und
-    // eine Sendung waere stumm hinausgegangen -- zu sehen nur im Protokoll.
-    //
-    // Ein Taktgeber (250 ms, nur waehrend der Ton laeuft) fragt
-    // `MikrofonWaechter`, ob die Rueckrufe noch kommen. Gilt NUR bei Quelle
-    // PC-Mikrofon; Mikrofon an der Maschine und VAX/DAX gehen ihn nichts an.
-
-    /// True, solange das gewaehlte PC-Mikrofon nichts liefert.
-    bool pcMikrofonAusgefallen() const noexcept {
-        return m_mikroWaechter.zustand() == Audio::MikrofonWaechter::Zustand::Ausgefallen;
-    }
-    /// Wanduhrzeit, zu der der Ausfall erkannt wurde (ungueltig sonst).
-    QDateTime pcMikrofonAusgefallenUm() const { return m_mikroAusgefallenUm; }
-    /// Der eingestellte Name des PC-Mikrofons ("" = Systemvorgabe).
-    QString pcMikrofonName() const;
-    /// Ein Takt der Aufsicht. Oeffentlich, damit ein Pruefstand mit eigener
-    /// Uhr takten kann; im Programm ruft ihn der Taktgeber.
-    void pruefePcMikrofon(qint64 jetztMs);
-    /// Pruefstand: so tun, als liefe der Ton (start() braucht PortAudio).
-    void setTonLaeuftFuerTest(bool an) { m_tonLaeuftFuerTest = an; }
 
     // Test seam — inject a fake IAudioBus into the VAX-TX slot so unit
     // tests can exercise pullVaxTxMic without standing up a real
