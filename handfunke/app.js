@@ -3235,18 +3235,19 @@ desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logLi
 // hier werden sie nur in das neue Instrument uebersetzt. Kein zweiter Weg zu
 // den Messwerten, damit beide Anzeigen nie auseinanderlaufen.
 {
-  const striche = $('gaugeStriche');
-  for (let i = 0; i <= 8; i++) {
-    const w = (-62 + i * 15.5) * Math.PI / 180;
-    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    l.setAttribute('x1', (66 + 46 * Math.sin(w)).toFixed(1));
-    l.setAttribute('y1', (60 - 46 * Math.cos(w)).toFixed(1));
-    l.setAttribute('x2', (66 + 54 * Math.sin(w)).toFixed(1));
-    l.setAttribute('y2', (60 - 54 * Math.cos(w)).toFixed(1));
-    l.setAttribute('stroke', i > 6 ? '#a86b6d' : '#7e7e85');
-    l.setAttribute('stroke-width', '1.5');
-    striche.appendChild(l);
-  }
+  const ringStriche = (g, n, ab) => {
+    for (let i = 0; i < n; i++) {
+      const w = (-135 + 270 * i / (n - 1)) * Math.PI / 180;
+      const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      l.setAttribute('x1', (50 + 33 * Math.sin(w)).toFixed(1));
+      l.setAttribute('y1', (50 - 33 * Math.cos(w)).toFixed(1));
+      l.setAttribute('x2', (50 + 40 * Math.sin(w)).toFixed(1));
+      l.setAttribute('y2', (50 - 40 * Math.cos(w)).toFixed(1));
+      l.setAttribute('class', 'tk' + (i >= ab ? ' rot' : ''));
+      g.appendChild(l);
+    }
+  };
+  ringStriche($('gaugeStriche'), 10, 8);
   const rotorFeld = $('rotorFeld');
   $('rotorKopf').addEventListener('click', () => {
     const offen = rotorFeld.classList.toggle('offen');
@@ -3256,8 +3257,12 @@ desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logLi
     const t = ($('smeter').textContent || '—').split('·');
     $('sval').textContent = (t[0] || '—').trim();
     $('sdb').textContent = (t[1] || '').trim();
+    $('sval').title = (t[1] || '').trim();
     const w = parseFloat($('sbar').style.width) || 0;
-    $('gaugeNadel').setAttribute('transform', 'rotate(' + (-62 + 1.24 * w) + ' 66 60)');
+    $('gaugeNadel').setAttribute('transform', 'rotate(' + (-135 + 2.7 * w) + ' 50 50)');
+    for (const id of ['sval', 'swrWert', 'rotorGradK']) {
+      const e = $(id); if (e) { e.classList.toggle('aus', !e.textContent.trim() || e.textContent.trim() === '—'); }
+    }
     $('rotorKopfGrad').textContent = ($('rotorGrad').textContent || '').trim();
     $('onAir').classList.toggle('an', !!(link.ready && (link.st.mox || link.st.tune)));
   }, 250);
@@ -3270,15 +3275,14 @@ desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logLi
 // erfundene Zahl, und auch kein stehengebliebener Wert vom letzten Senden.
 {
   const g = $('swrStriche');
-  for (let i = 0; i <= 6; i++) {
-    const w = (-62 + i * 20.67) * Math.PI / 180;
+  for (let i = 0; i < 7; i++) {
+    const w = (-135 + 270 * i / 6) * Math.PI / 180;
     const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    l.setAttribute('x1', (66 + 46 * Math.sin(w)).toFixed(1));
-    l.setAttribute('y1', (60 - 46 * Math.cos(w)).toFixed(1));
-    l.setAttribute('x2', (66 + 54 * Math.sin(w)).toFixed(1));
-    l.setAttribute('y2', (60 - 54 * Math.cos(w)).toFixed(1));
-    l.setAttribute('stroke', i >= 5 ? '#a86b6d' : '#7e7e85');
-    l.setAttribute('stroke-width', '1.5');
+    l.setAttribute('x1', (50 + 33 * Math.sin(w)).toFixed(1));
+    l.setAttribute('y1', (50 - 33 * Math.cos(w)).toFixed(1));
+    l.setAttribute('x2', (50 + 40 * Math.sin(w)).toFixed(1));
+    l.setAttribute('y2', (50 - 40 * Math.cos(w)).toFixed(1));
+    l.setAttribute('class', 'tk' + (i >= 5 ? ' rot' : ''));
     g.appendChild(l);
   }
   setInterval(() => {
@@ -3287,14 +3291,12 @@ desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logLi
     const frisch = performance.now() - (link.st.txSensorZeit || 0) < 1500;
     if (sendet && frisch && v !== null && v >= 1) {
       $('swrWert').textContent = v.toFixed(1);
-      $('swrWert').classList.add('an');
       // 1,0 links ... 3,0 rechts
       $('swrNadel').setAttribute('transform',
-        'rotate(' + (-62 + (Math.min(v, 3) - 1) / 2 * 124) + ' 66 60)');
+        'rotate(' + (-135 + (Math.min(v, 3) - 1) / 2 * 270) + ' 50 50)');
     } else {
       $('swrWert').textContent = '—';
-      $('swrWert').classList.remove('an');
-      $('swrNadel').setAttribute('transform', 'rotate(-62 66 60)');
+      $('swrNadel').setAttribute('transform', 'rotate(-135 50 50)');
     }
   }, 250);
   // Antippen des Kompasses oeffnet die volle Rotorsteuerung (die Zeile

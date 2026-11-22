@@ -146,15 +146,14 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
      oeffnet die volle Rotorsteuerung. -->
 <div id="instrumente">
 <div class="meter schicht">
-  <div class="gauge" aria-label="S-Meter">
-    <svg viewBox="0 0 132 62" aria-hidden="true">
-      <path d="M14 56 A52 52 0 0 1 118 56" fill="none" stroke="#2c2c31" stroke-width="2"/>
-      <g id="gaugeStriche"></g>
-      <line id="gaugeNadel" x1="66" y1="60" x2="66" y2="14" stroke="#ee9a34" stroke-width="2" stroke-linecap="round"/>
-      <circle cx="66" cy="60" r="3" fill="#ee9a34"/>
-    </svg>
-    <div><div class="sval" id="sval">—</div><div class="sdb" id="sdb"></div></div>
-  </div>
+  <div class="kopf"><span class="caps">S-Meter</span><span class="chipw" id="sval">—</span></div>
+  <svg class="ring" viewBox="0 0 100 100" aria-label="S-Meter">
+    <path class="bg" d="M21.72 78.28 A40 40 0 1 1 78.28 78.28"/>
+    <g id="gaugeStriche"></g>
+    <line class="nd" id="gaugeNadel" x1="50" y1="50" x2="50" y2="18"/>
+    <circle class="nb" cx="50" cy="50" r="3"/>
+  </svg>
+  <div class="sdb" id="sdb" hidden></div>
   <div class="row">
     <span class="caps">Signal</span>
     <span class="val" id="smeter">—</span>
@@ -164,25 +163,27 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
     <span>1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>+20</span><span>+40</span>
   </div>
 </div>
-<div class="schicht instr" id="swrBox" aria-label="SWR">
-  <svg viewBox="0 0 132 62" aria-hidden="true">
-    <path d="M14 56 A52 52 0 0 1 118 56" fill="none" stroke="#2c2c31" stroke-width="2"/>
+<div class="schicht instr" id="swrBox">
+  <div class="kopf"><span class="caps">SWR</span><span class="chipw aus" id="swrWert">—</span></div>
+  <svg class="ring" viewBox="0 0 100 100" aria-label="SWR">
+    <path class="bg" d="M21.72 78.28 A40 40 0 1 1 78.28 78.28"/>
     <g id="swrStriche"></g>
-    <line id="swrNadel" x1="66" y1="60" x2="66" y2="14" stroke="#7e7e85" stroke-width="2" stroke-linecap="round"/>
-    <circle cx="66" cy="60" r="3" fill="#7e7e85"/>
+    <line class="nd" id="swrNadel" x1="50" y1="50" x2="50" y2="18"/>
+    <circle class="nb" cx="50" cy="50" r="3"/>
   </svg>
-  <div class="iwert" id="swrWert">—</div>
-  <div class="iname">SWR</div>
 </div>
 <div class="schicht instr" id="kompassBox" aria-label="Rotor, antippen oeffnet die Steuerung" hidden>
-  <svg id="rotorKlein" viewBox="-110 -110 220 220" aria-hidden="true">
-    <circle class="ring" cx="0" cy="0" r="92"/>
+  <div class="kopf"><span class="caps">Rotor</span><span class="chipw aus" id="rotorGradK">—</span></div>
+  <svg class="ring" id="rotorKlein" viewBox="-110 -110 220 220" aria-hidden="true">
+    <circle class="bg" cx="0" cy="0" r="92"/>
     <g class="striche" id="rotorStricheK"></g>
-    <line class="nadel" id="rotorNadelK" x1="0" y1="0" x2="0" y2="-82"/>
-    <circle class="nabe" cx="0" cy="0" r="5"/>
+    <text class="himmel" x="0" y="-62">N</text>
+    <text class="himmel" x="64" y="8">O</text>
+    <text class="himmel" x="0" y="76">S</text>
+    <text class="himmel" x="-64" y="8">W</text>
+    <line class="nd" id="rotorNadelK" x1="0" y1="0" x2="0" y2="-82"/>
+    <circle class="nb" cx="0" cy="0" r="6"/>
   </svg>
-  <div class="iwert" id="rotorGradK">—</div>
-  <div class="iname">ROTOR</div>
 </div>
 </div>
 

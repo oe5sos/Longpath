@@ -720,3 +720,33 @@ footer #onAir.an{color:var(--tx-border)}
   #dtLinks #instrumente .meter .gauge svg,#dtLinks .instr svg{max-width:104px}
   #dtLinks #kompassBox svg{max-width:72px}
 }
+
+/* ═══ Instrumente einheitlich (Martins Wahl 3, 2026-11-22) ═══════════════════
+   Mac-Kopf: Versalbeschriftung links, Wert im Glaschip rechts, darunter derselbe
+   Ring. Messwerte orange, „—" grau. S-Meter, SWR und Rotor sehen gleich aus. */
+#instrumente .meter,#instrumente .instr{padding:6px 8px 7px;display:block;text-align:left}
+#instrumente .kopf{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:2px}
+#instrumente .kopf .caps{margin:0;white-space:nowrap}
+.chipw{font:600 11px/1 var(--mono);color:var(--orT);padding:3px 7px;border-radius:8px;
+  background:linear-gradient(#050507,#0c0c0e);border:1px solid #232329;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.8);white-space:nowrap}
+.chipw.aus{color:var(--text-inactive)}
+.chipw.alt{color:var(--amber-dim)}
+.ring{width:100%;max-width:92px;height:auto;display:block;margin:2px auto 0}
+.ring .bg{fill:none;stroke:#2c2c31;stroke-width:3;stroke-linecap:round}
+.ring .tk{stroke:#7e7e85;stroke-width:1.6}
+.ring .tk.rot{stroke:#a86b6d}
+.ring .nd{stroke:var(--orT);stroke-width:2.6;stroke-linecap:round}
+.ring .nd.alt{stroke:var(--amber-dim)}
+.ring .nb{fill:var(--orT)}
+.ring text{fill:#909096;font:600 17px var(--mono);text-anchor:middle}
+#rotorKlein .striche line{stroke:#7e7e85;stroke-width:3}
+#rotorKlein .striche line.haupt{stroke:#909096;stroke-width:4}
+#kompassBox svg,#instrumente .meter .gauge svg{max-width:92px}
+@media (min-width: 900px){
+  #dtLinks #instrumente .ring,#dtLinks #kompassBox svg{max-width:112px}
+}
+#rotorKlein .bg{stroke-width:6}
+#rotorKlein .nd{stroke-width:7}
+#rotorKlein .nb{r:6px}
+#instrumente .instr{display:block}
