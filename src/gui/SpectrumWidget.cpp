@@ -13013,7 +13013,11 @@ double SpectrumWidget::snapTuneHz(double freqHz, int stepHz, int numSteps)
 int SpectrumWidget::wheelStepsFor(QWheelEvent* ev)
 {
     int steps = 0;
-    if (!ev->pixelDelta().isNull()) {
+    // Nur ein Trackpad hat Phasen. Ein Mausrad (auch Logitech) schickt
+    // zusaetzlich ein kleines pixelDelta (2 px je Raste), das sonst den
+    // Trackpad-Weg mit 15 px je Schritt nahm -- dort kam nie ein Schritt
+    // heraus. Ohne Phase: Raststufen (angleDelta), wie bei jeder Maus.
+    if (!ev->pixelDelta().isNull() && ev->phase() != Qt::NoScrollPhase) {
         if (ev->phase() == Qt::ScrollMomentum) { return 0; }
         if (qAbs(ev->pixelDelta().x()) > qAbs(ev->pixelDelta().y())) { return 0; }
         m_wheelPixelAccum += ev->pixelDelta().y();
