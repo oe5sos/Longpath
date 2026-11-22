@@ -651,7 +651,7 @@ footer #onAir.an{color:var(--tx-border)}
   body.dt .feld:not(#rotorFeld){display:none}
   body.dt::after{display:none}
   #dtGitter{position:absolute;inset:0 0 118px 0;display:grid;gap:10px;padding:10px 14px 0;
-    grid-template-columns:280px 1fr 340px;grid-template-rows:auto 1fr}
+    grid-template-columns:460px 1fr 340px;grid-template-rows:auto 1fr}
   #dtBar{grid-column:1 / 4;display:flex;gap:12px;align-items:center;padding:8px 10px;
     background:#060608;border:1px solid #1f1f23;border-radius:10px;overflow:hidden}
   .dtGruppe{display:flex;gap:6px;align-items:center}
@@ -674,9 +674,6 @@ footer #onAir.an{color:var(--tx-border)}
   #dtRechts .sliders{flex-direction:column;gap:12px}
   #dtRechts .sliders .sl .v{display:inline}
   #dtRechts .mikrow{margin:0}
-  .dtMess{display:flex;align-items:center;gap:10px}
-  .dtMess svg{width:132px;height:62px;flex:none}
-  .dtWert{font:700 28px/1 var(--mono);color:#7e7e85}
   .dtKlein{font:var(--f-small)/1.2 var(--mono);color:#6b6b71}
   .dtZeile{display:flex;align-items:center;justify-content:space-between;margin:8px 0 0}
   .dtW{font:600 13px/1 var(--mono);color:var(--text)}
@@ -685,4 +682,41 @@ footer #onAir.an{color:var(--tx-border)}
   .dtLogZ{font:11px/1.5 var(--mono);color:#a6a6ac;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* Sendeleiste unten links, Fusszeile ueber die ganze Breite */
   body.dt .txrow{max-width:640px;right:auto;left:14px}
+}
+
+
+/* ═══ Instrumentenzeile: S-Meter | SWR | Kompass (2026-11-22) ═══════════════
+   Martins Wahl C. Jedes Instrument ein Drittel (zwei, solange kein Rotor da ist). */
+#instrumente{display:flex;gap:8px;margin:6px 12px 0}
+#instrumente > *{flex:1 1 0;min-width:0}
+#instrumente .meter{margin:0;padding:6px 8px 7px}
+#instrumente .meter .gauge{flex-direction:column;align-items:center;gap:2px;margin:-2px 0 0}
+#instrumente .meter .gauge svg{width:100%!important;max-width:104px;height:auto!important}
+#instrumente .meter .gauge .sval{font-size:22px;text-align:center}
+#instrumente .meter .gauge .sdb{text-align:center;margin-top:2px}
+.instr{padding:6px 8px 7px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
+.instr svg{width:100%;max-width:104px;height:auto;display:block}
+.instr .iwert{font:700 22px/1 var(--mono);color:#7e7e85;text-align:center;margin-top:2px}
+.instr .iwert.an{color:var(--orT)}
+.instr .iwert.alt{color:var(--amber-dim)}
+.instr .iname{font:600 var(--f-caption)/1 var(--mono);letter-spacing:.2em;color:#6b6b71}
+#kompassBox{cursor:pointer}
+#kompassBox svg{max-width:80px;margin:4px 0 0}
+#kompassBox .iwert{color:var(--text)}
+#rotorKlein .ring{fill:rgba(255,255,255,.02);stroke:var(--border);stroke-width:2}
+#rotorKlein .striche line{stroke:var(--text-inactive);stroke-width:2}
+#rotorKlein .striche line.haupt{stroke:var(--text3);stroke-width:3}
+#rotorKlein .nadel{stroke:var(--measured);stroke-width:7;stroke-linecap:round}
+#rotorKlein .nadel.alt{stroke:var(--amber-dim)}
+#rotorKlein .nabe{fill:var(--text3)}
+
+@media (min-width: 900px){ #dtLinks #instrumente{margin:0} }
+/* etwas kompakter, damit die Zeile nicht hoeher wird als noetig */
+#instrumente .meter .gauge svg,.instr svg{max-width:88px}
+#kompassBox svg{max-width:62px;margin:2px 0 0}
+#instrumente .meter .gauge .sval,.instr .iwert{font-size:19px}
+#instrumente .meter .gauge .sdb{font-size:10px}
+@media (min-width: 900px){
+  #dtLinks #instrumente .meter .gauge svg,#dtLinks .instr svg{max-width:104px}
+  #dtLinks #kompassBox svg{max-width:72px}
 }

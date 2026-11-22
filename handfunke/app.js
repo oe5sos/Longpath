@@ -2511,6 +2511,9 @@ function rotorStricheZeichnen() {
     if (haupt) { l.setAttribute('class', 'haupt'); }
     g.appendChild(l);
   }
+  // Dieselbe Teilung fuer den kleinen Kompass in der Instrumentenzeile.
+  const k = $('rotorStricheK');
+  if (k) { k.replaceChildren(...[...g.children].map((c) => c.cloneNode(true))); }
 }
 
 function rotorZeichnen() {
@@ -2523,6 +2526,13 @@ function rotorZeichnen() {
     nadel.classList.toggle('alt', !!alt);
     $('rotorGrad').textContent = `${Math.round(rotorStand.grad)}°`;
     $('rotorGrad').classList.toggle('alt', !!alt);
+    // Kleiner Kompass in der Instrumentenzeile: dieselben Werte, kein zweiter Weg.
+    const nk = $('rotorNadelK');
+    nk.setAttribute('x2', (Math.sin(rad) * 82).toFixed(2));
+    nk.setAttribute('y2', (-Math.cos(rad) * 82).toFixed(2));
+    nk.classList.toggle('alt', !!alt);
+    $('rotorGradK').textContent = `${Math.round(rotorStand.grad)}°`;
+    $('rotorGradK').classList.toggle('alt', !!alt);
   }
   const z = rotorSicherung.gilt(performance.now()) ? rotorSicherung.ziel : null;
   if (z === null) { ziel.setAttribute('hidden', ''); }
@@ -2552,6 +2562,7 @@ link.addEventListener('rotor', (e) => {
     rotorFeldAn = true;
     rotorStricheZeichnen();
     $('rotorFeld').removeAttribute('hidden');
+    $('kompassBox').removeAttribute('hidden');
   }
   rotorZeichnen();
 });
@@ -3250,4 +3261,47 @@ desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logLi
     $('rotorKopfGrad').textContent = ($('rotorGrad').textContent || '').trim();
     $('onAir').classList.toggle('an', !!(link.ready && (link.st.mox || link.st.tune)));
   }, 250);
+}
+
+
+// ── Instrumentenzeile: SWR und Kompass (2026-11-22) ─────────────────────────
+// SWR kommt aus `tx_sensors` (Feld 4) und existiert nur WAEHREND des Sendens:
+// Longpath schickt die Zeilen nur bei getastetem Sender. Sonst „—", nie eine
+// erfundene Zahl, und auch kein stehengebliebener Wert vom letzten Senden.
+{
+  const g = $('swrStriche');
+  for (let i = 0; i <= 6; i++) {
+    const w = (-62 + i * 20.67) * Math.PI / 180;
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', (66 + 46 * Math.sin(w)).toFixed(1));
+    l.setAttribute('y1', (60 - 46 * Math.cos(w)).toFixed(1));
+    l.setAttribute('x2', (66 + 54 * Math.sin(w)).toFixed(1));
+    l.setAttribute('y2', (60 - 54 * Math.cos(w)).toFixed(1));
+    l.setAttribute('stroke', i >= 5 ? '#a86b6d' : '#7e7e85');
+    l.setAttribute('stroke-width', '1.5');
+    g.appendChild(l);
+  }
+  setInterval(() => {
+    const v = link.st.txSwr;
+    const sendet = link.ready && (link.st.mox || link.st.tune);
+    const frisch = performance.now() - (link.st.txSensorZeit || 0) < 1500;
+    if (sendet && frisch && v !== null && v >= 1) {
+      $('swrWert').textContent = v.toFixed(1);
+      $('swrWert').classList.add('an');
+      // 1,0 links ... 3,0 rechts
+      $('swrNadel').setAttribute('transform',
+        'rotate(' + (-62 + (Math.min(v, 3) - 1) / 2 * 124) + ' 66 60)');
+    } else {
+      $('swrWert').textContent = '—';
+      $('swrWert').classList.remove('an');
+      $('swrNadel').setAttribute('transform', 'rotate(-62 66 60)');
+    }
+  }, 250);
+  // Antippen des Kompasses oeffnet die volle Rotorsteuerung (die Zeile
+  // darunter), und zwar sichtbar.
+  $('kompassBox').addEventListener('click', () => {
+    const f = $('rotorFeld');
+    if (!f.classList.contains('offen')) { $('rotorKopf').click(); }
+    f.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
 }

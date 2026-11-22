@@ -89,7 +89,7 @@ export class TciLink extends EventTarget {
     spektrumSpanneHz: null,
     spektrumPunkte: null,        // die Punktzahl, auf die er geklemmt hat
     spektrumFps: null,
-      txPower: null, txSwr: null,
+      txPower: null, txSwr: null, txSensorZeit: 0,
       iqRate: null, audioRate: null,
       modes: [],
     };
@@ -343,7 +343,10 @@ export class TciLink extends EventTarget {
 
       // Messwerte. Kommen erst nach `rx_sensors_enable:true` (siehe app.js).
       case 'rx_sensors': { const t = int(0); if (t !== null) s.smeter[t] = num(1); break; }
-      case 'tx_sensors': s.txPower = num(1); s.txSwr = num(2); break;
+      // tx_sensors:<rx>,<micDbm>,<rmsW>,<peakW>,<swr>  (TciSensorManager::formatTxSensors)
+      // Bis hierher las die Seite Feld 1 (Mikrofonpegel) als Leistung und Feld 2
+      // (Watt) als SWR -- beides falsch, und beides war nirgends angezeigt.
+      case 'tx_sensors': s.txPower = num(2); s.txSwr = num(4); s.txSensorZeit = performance.now(); break;
     }
     this._emit('state');
   }

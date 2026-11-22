@@ -140,6 +140,11 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   </div>
 </div>
 
+<!-- Drei Instrumente in einer Zeile: S-Meter | SWR | Rotor-Kompass (2026-11-22,
+     Martins Wahl C). SWR zeigt nur beim Senden einen Wert (tx_sensors), sonst „—".
+     Der Kompass erscheint erst, wenn Longpath einen Rotor meldet; Antippen
+     oeffnet die volle Rotorsteuerung. -->
+<div id="instrumente">
 <div class="meter schicht">
   <div class="gauge" aria-label="S-Meter">
     <svg viewBox="0 0 132 62" aria-hidden="true">
@@ -158,6 +163,27 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <div class="ticks">
     <span>1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>+20</span><span>+40</span>
   </div>
+</div>
+<div class="schicht instr" id="swrBox" aria-label="SWR">
+  <svg viewBox="0 0 132 62" aria-hidden="true">
+    <path d="M14 56 A52 52 0 0 1 118 56" fill="none" stroke="#2c2c31" stroke-width="2"/>
+    <g id="swrStriche"></g>
+    <line id="swrNadel" x1="66" y1="60" x2="66" y2="14" stroke="#7e7e85" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="66" cy="60" r="3" fill="#7e7e85"/>
+  </svg>
+  <div class="iwert" id="swrWert">—</div>
+  <div class="iname">SWR</div>
+</div>
+<div class="schicht instr" id="kompassBox" aria-label="Rotor, antippen oeffnet die Steuerung" hidden>
+  <svg id="rotorKlein" viewBox="-110 -110 220 220" aria-hidden="true">
+    <circle class="ring" cx="0" cy="0" r="92"/>
+    <g class="striche" id="rotorStricheK"></g>
+    <line class="nadel" id="rotorNadelK" x1="0" y1="0" x2="0" y2="-82"/>
+    <circle class="nabe" cx="0" cy="0" r="5"/>
+  </svg>
+  <div class="iwert" id="rotorGradK">—</div>
+  <div class="iname">ROTOR</div>
+</div>
 </div>
 
 <!-- Betriebsart und Band gehoeren zusammen (was hoere ich, und wo) — darum
