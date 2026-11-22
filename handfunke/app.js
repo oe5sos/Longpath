@@ -751,7 +751,11 @@ function sEinheit(dbm) {
 //     die Rechenzeit im Rahmen bleibt.
 // Den Datenstrom beruehrt nichts davon: es werden weiter DATENPUNKTE Punkte
 // angefordert.
-const DATENPUNKTE = 373, WF_ZEILEN = 160;
+// WF_ZEILEN war 160. Betreiber 2026-11-22: „sollte langsamer sein". Der
+// Puffer wird auf die Anzeigehoehe gestreckt, eine Zeile je Spektrum -- mit
+// doppelt so vielen Zeilen laeuft das Bild halb so schnell und zeigt die
+// doppelte Zeit. Datenstrom und Zeilenrate bleiben gleich.
+const DATENPUNKTE = 373, WF_ZEILEN = 320;
 const pan = $('pan'), panCtx = pan.getContext('2d');
 const wfAnz = $('wf'), wfAnzCtx = wfAnz.getContext('2d');
 const wf = document.createElement('canvas');
@@ -1121,7 +1125,8 @@ function zeichneBild() {
     const yy = y(spitze[x]);
     x ? panCtx.lineTo(x, yy) : panCtx.moveTo(x, yy);
   }
-  panCtx.strokeStyle = '#8fd8ff'; panCtx.lineWidth = 1.5; panCtx.stroke();
+  // 1.5 -> 1 (Betreiber 2026-11-22: „Linie noch duenner").
+  panCtx.strokeStyle = '#8fd8ff'; panCtx.lineWidth = 1; panCtx.stroke();
 
   panCtx.fillStyle = '#9aa0a8'; panCtx.font = '9px ui-monospace,Menlo,monospace';
   for (let i = 0; i <= 3; i++) {
