@@ -8,14 +8,16 @@
   --measured:#d8a55f; --amber-dim:#6b5630;  /* gemessen */
   --ok:#6fa384; --warn:#a8853f; --danger:#a86b6d;
   --tx-top:#a87a3c; --tx-bot:#8a6a30; --tx-border:#c2924f; --tx-text:#17130a;
+  /* Das Orange des Plus am Mac (kPlusTop/Bottom/Border): fuer alles Antippbare in Orange */
+  --plus-top:#f0b44c; --plus-bot:#d18f2a; --plus-border:#f5c56a;
   --tune-top:#7a5a2c; --tune-bot:#634c24; --tune-border:#9a763c;
   /* Panadapter-Flaeche: Longpaths app-bg, Wert fuer Wert (StyleConstants.h
      kAppBg). Die blaue Fassung steht eine Zeile tiefer -- siehe
      WASSERFALL_BLAU in app.js. */
-  --pan-bg:#08080a; --trace:#c2924f; --grid:#8a8f96; --grid-text:#9aa0a8;
+  --pan-bg:#000000; --trace:#c2924f; --grid:#8a8f96; --grid-text:#9aa0a8;
   --glass-btn-top:#222227; --glass-btn-bot:#141417;
-  --glass-sel-top:#2f5f92; --glass-sel-bot:#1e3d5f;
-  --glass-sel-border:#3d78b0; --glass-sel-text:#dbe9f8;
+  --glass-sel-top:#131317; --glass-sel-bot:#0d0d10;
+  --glass-sel-border:#55555e; --glass-sel-text:#f0f0f4;
   --badge-info:#161e27;
   --light:rgba(255,255,255,.07);       /* kGlassLightAlpha 18/255 */
   --shade:rgba(0,0,0,.63);             /* kGlassShadeAlpha 160/255 */
@@ -185,7 +187,7 @@ header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
 .meter .row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
 .meter .val{margin-left:auto;font-family:var(--mono);font-size:var(--f-small);
             color:var(--measured);text-shadow:0 0 12px rgba(216,165,95,.3)}
-.bar{height:10px;border-radius:6px;background:#040507;
+.bar{height:10px;border-radius:6px;background:var(--inset);
      border:1px solid rgba(0,0,0,.8);position:relative;overflow:hidden;
      box-shadow:inset 0 2px 5px rgba(0,0,0,.85)}
 .bar i{position:absolute;inset:1px auto 1px 1px;border-radius:5px;
@@ -210,20 +212,18 @@ header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
   /* Entwurf B: feste Grauwerte statt Weissschleier, dazu ein sichtbarer
      Rahmen. Hoehe 36 -> 38, weil die Flaeche durch den engeren Radius
      optisch schrumpft und der Finger nichts verlieren darf. */
-  background:linear-gradient(180deg,#242429 0%,#141417 100%);
+  background:linear-gradient(180deg,var(--glass-btn-top) 0%,var(--glass-btn-bot) 100%);
   border:1px solid #33333a;border-radius:8px;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.5);
   position:relative;
 }
 .chip::after{content:"";position:absolute;left:0;right:0;top:-4px;bottom:-4px}
 .chip.on{
-  /* Entwurf B: das Blau von kGlassSel (#2f5f92/#1e3d5f/#3d78b0), also genau
-     die Werte, mit denen am Pult eine Auswahl leuchtet. */
-  background:linear-gradient(180deg,#2f5f92 0%,#1e3d5f 100%);
-  border-color:#3d78b0;color:var(--glass-sel-text);
-  box-shadow:0 0 0 1px rgba(61,120,176,.35),
-             0 2px 8px rgba(47,95,146,.35),
-             inset 0 1px 0 rgba(255,255,255,.14);
+  /* Auswahl als Mulde wie am Mac (kGlassSel*, seit 2026-11-02 kein Auswahl-Blau;
+     Martins Wahl 2026-11-21, docs/design/2026-11-21-app-auswahl-mulde). */
+  background:linear-gradient(180deg,#131317 0%,#0d0d10 100%);
+  border-color:#55555e;color:#f0f0f4;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.85),0 0 0 1px rgba(85,85,94,.35);
 }
 .chip.more{flex:0 0 38px;color:var(--text3)}
 /* Zustandsschalter bleiben leise — quietCheckedStyle: im Feld darf genau
@@ -235,7 +235,7 @@ header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
 .sliders{margin:10px 12px 0;padding:10px 12px;display:flex;flex-direction:column;gap:12px}
 .sl{display:flex;align-items:center;gap:10px}
 .sl .caps{flex:0 0 30px}
-.sl .track{flex:1;height:5px;border-radius:3px;background:#040507;
+.sl .track{flex:1;height:5px;border-radius:3px;background:var(--inset);
   border:1px solid rgba(0,0,0,.8);position:relative;
   box-shadow:inset 0 1px 3px rgba(0,0,0,.9)}
 .sl .track i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;
@@ -300,6 +300,27 @@ header .rate{font-size:var(--f-caption);color:var(--text-inactive)}
   color:var(--text-inactive);box-shadow:inset 0 1px 0 var(--light);
 }
 
+/* ── Haltetaste: Entsicherung + gedrueckt ──────────────────────────────
+   Nur sichtbar, wenn die Seite ueberhaupt senden darf (SENDEN_FREIGABE).
+   Entsichert = die Tasten verlieren .locked und werden zu den grossen
+   Messingtasten; gedrueckt = eingedrueckt (versenkt), wie jede Taste am Mac.
+   Kein Rot: Messing ist die Sendefarbe. */
+.txsicher{
+  flex:0 0 84px;height:36px;border-radius:11px;cursor:pointer;
+  background:linear-gradient(#222227,#141417);border:1px solid #33333a;
+  color:var(--text-secondary,#a8a8ae);font:600 var(--f-caption)/1 inherit;
+  letter-spacing:.1em;box-shadow:inset 0 1px 0 var(--light),0 1px 0 rgba(0,0,0,.45);
+}
+.txsicher[hidden]{display:none}
+.txsicher.scharf{height:58px;color:var(--measured);border-color:var(--amber-dim);
+  background:rgba(107,86,48,.20)}
+.tx,.tune{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  touch-action:none}
+.tx.haelt,.tune.haelt{
+  transform:translateY(1px);
+  background:linear-gradient(var(--tx-bot),#6e5426);
+  box-shadow:inset 0 3px 7px rgba(0,0,0,.6)}
+
 /* ── Die Station sendet ──────────────────────────────────────────────────
    Dieselbe Zeile, dieselbe Geometrie, nur in Messing: an dieser Stelle
    steht sonst "SENDEN / NUR IN DER APP", und genau dort schaut man hin,
@@ -340,8 +361,8 @@ footer .warn{color:var(--warn)}
    Jetzt steht da ein Knopf, und er verschwindet, sobald der Ton laeuft. */
 .tonAn{
   flex:none;height:24px;padding:0 11px;border-radius:12px;
-  background:linear-gradient(var(--tune-top),var(--tune-bot));
-  border:1px solid var(--tune-border);color:#1a150c;
+  background:linear-gradient(var(--plus-top),var(--plus-bot));
+  border:1px solid var(--plus-border);color:#1a150c;
   font:700 var(--f-caption)/1 inherit;letter-spacing:.1em;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 0 rgba(0,0,0,.45);
 }
@@ -356,8 +377,8 @@ footer .warn{color:var(--warn)}
    bleibt dem Gemessenen vorbehalten, und die drei automatischen Zeilen
    sind genau das — gemessene Werte vom Geraet, keine Eingabe. */
 .logAuf{height:28px;padding:0 11px;border-radius:9px;
-  border:1px solid var(--amber-dim);background:rgba(107,86,48,.22);
-  color:var(--measured);font:600 var(--f-caption)/1 inherit;
+  border:1px solid var(--plus-bot);background:rgba(209,143,42,.18);
+  color:var(--plus-top);font:600 var(--f-caption)/1 inherit;
   letter-spacing:.13em;flex:none}
 #qsoBlatt{position:fixed;inset:0;z-index:11;display:none;align-items:center;
   justify-content:center;padding:0 22px;
@@ -372,7 +393,7 @@ footer .warn{color:var(--warn)}
 /* Eingefasst wie die Regler-Bahnen: tief eingelassen, damit man sieht,
    dass man hineinschreibt. */
 #qsoRuf{width:100%;box-sizing:border-box;height:58px;border-radius:12px;text-align:center;
-  background:#040507;border:1px solid rgba(0,0,0,.8);color:var(--text);
+  background:var(--inset);border:1px solid rgba(0,0,0,.8);color:var(--text);
   font:600 30px/1 var(--mono);letter-spacing:.09em;
   box-shadow:inset 0 2px 6px rgba(0,0,0,.85);text-transform:uppercase}
 #qsoRuf::placeholder{color:var(--text-inactive);font-weight:500;
@@ -388,7 +409,7 @@ footer .warn{color:var(--warn)}
 #qsoBlatt .rstfeld label{font-size:var(--f-caption);letter-spacing:.11em;
   color:var(--text3);text-transform:uppercase;text-align:center}
 #qsoBlatt .rstfeld input{width:100%;box-sizing:border-box;height:44px;border-radius:11px;text-align:center;
-  background:#040507;border:1px solid rgba(0,0,0,.8);color:var(--text);
+  background:var(--inset);border:1px solid rgba(0,0,0,.8);color:var(--text);
   font:600 19px/1 var(--mono);box-shadow:inset 0 2px 5px rgba(0,0,0,.85)}
 #qsoBlatt .rstfeld input:focus{outline:none;border-color:var(--accent)}
 #qsoBlatt .automatisch{display:flex;flex-direction:column;gap:3px;
@@ -537,3 +558,131 @@ footer .warn{color:var(--warn)}
   box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 6px rgba(0,0,0,.55)}
 .rotor .rotorDreh:disabled{opacity:.4;border-color:var(--border);
   background:rgba(18,19,23,.6);color:var(--text-inactive);box-shadow:none}
+
+
+/* ═══ Mac-Look, Layout „Ein Schirm" (2026-11-21) ══════════════════════════
+   Martins Wahl: Layout 1 aus docs/design/handfunke-entwuerfe/
+   2026-11-21-layout-v3, nach dem Bildschirmfoto von Mac-Longpath.
+   Alles darunter ueberschreibt die Glasfassung weiter oben:
+     * Grund schwarz, Panels flach mit duennem Rand
+     * Knoepfe FLACH dunkel mit duennem Rand, kein Glanzverlauf
+     * Auswahl = orange gefuellte Pille mit dunkler Schrift
+     * Frequenz gross und orange, Spektrum blau/cyan (app.js)
+     * Regler: schmale Rinne, kleiner blau umrandeter Griff
+     * S-Meter als Zeigerinstrument, Sendeleiste fest unten, schmale Fusszeile
+   Messing bleibt der Sendetaste. Die Haltetasten (sendetaste.js) sind
+   unveraendert und ab Werk gesperrt. */
+:root{--or:#f0a82c;--orT:#ee9a34;--orD:#b87a2a;--flat:#131316;--flatB:#2c2c31}
+body{background:#040405;background-attachment:scroll}
+body::after{content:"";flex:none;height:104px}
+.schicht{background:#060608;border:1px solid #1f1f23;box-shadow:none}
+.caps{letter-spacing:.2em}
+.chip{background:var(--flat);border:1px solid var(--flatB);box-shadow:none;
+  color:#c4c4ca;border-radius:8px}
+.chip.on{background:var(--or);border-color:#f6c25e;color:#1a1205;
+  font-weight:700;box-shadow:none}
+.chip.quiet.on{background:var(--badge-info);border-color:var(--accent);
+  color:#cfe0f2;font-weight:400}
+.logAuf,.tonAn,.tune,.txsicher{background:var(--flat);border:1px solid var(--flatB);
+  color:#a6a6ac;box-shadow:none}
+.tune small{color:#7e7e85;opacity:1}
+.txsicher.scharf{background:var(--or);border-color:#f6c25e;color:#1a1205;font-weight:700}
+.vfo .hz{background:none;border:0;box-shadow:none;padding:0;color:var(--orT);
+  text-shadow:none}
+.vfo .hz .khz{color:var(--orT)}
+.vfo .hz .dez{color:var(--orD)}
+.vfo .unit,.vfo .b{color:var(--orD)}
+.scope{border:1px solid #1f1f23;box-shadow:none;background:#000}
+/* Wasserfall niedriger, damit alles auf EINEN Schirm passt */
+#wf{height:104px}
+.durchlass{background:rgba(255,255,255,.10)}
+/* Regler */
+.sl .track{height:3px;background:#1a1a1e;border:0;box-shadow:none}
+.sl .track i{background:#2c4f72;box-shadow:none}
+.sl .track b{width:12px;height:16px;margin:-8px 0 0 -6px;border-radius:5px;
+  background:#0c0c0e;border:1.5px solid #4a7ba8;box-shadow:none}
+.sl .v{color:#dcdce1}
+.sliders{flex-direction:row;gap:16px;margin-top:8px;padding:8px 12px}
+.sliders .sl{flex:1}
+.sliders .sl .v{display:none}
+/* dichter */
+header{height:32px}
+.vfo .hz{font-size:36px}
+.meter{margin:6px 12px 0;padding:6px 12px 7px}
+.feld{margin-top:8px;padding:6px 12px 8px}
+/* S-Meter: Zeigerinstrument; Zahlen und Balken bleiben im DOM (app.js
+   schreibt sie), nur das Instrument wird gezeigt. */
+.meter .row,.meter .bar,.meter .ticks{display:none}
+.gauge{display:flex;align-items:center;gap:12px;margin-top:-4px}
+.gauge svg{width:104px;height:49px;flex:none}
+.gauge .sval{font:700 26px/1 var(--mono);color:var(--orT)}
+.gauge .sdb{font:var(--f-small)/1 var(--mono);color:var(--orD);margin-top:4px}
+/* Rotor: eine Zeile, die Scheibe klappt auf */
+#rotorFeld .rotorKopf{display:flex;align-items:center;gap:10px;cursor:pointer;margin:0}
+#rotorFeld .rotorKopf b{font:600 var(--f-sub)/1 var(--mono);color:var(--text);letter-spacing:0}
+#rotorFeld .rotorKopf .chev{margin-left:auto;color:#6b6b71}
+#rotorFeld:not(.offen) .rotorreihe{display:none}
+#rotorFeld.offen .rotorKopf{margin-bottom:8px}
+/* Sendeleiste fest unten, Fusszeile darunter */
+.txrow{position:fixed;left:0;right:0;bottom:26px;margin:0;padding:12px 12px 4px;
+  z-index:5;background:linear-gradient(rgba(4,4,5,0),#040405 28%)}
+footer{position:fixed;left:0;right:0;bottom:0;height:24px;margin:0;z-index:6;
+  background:#040405;border-top:1px solid #1a1a1e;padding:0 12px;gap:8px}
+footer span{font-weight:600;letter-spacing:.03em;white-space:nowrap}
+footer #onAir{margin-left:auto;color:#6b6b71}
+footer #onAir.an{color:var(--tx-border)}
+/* Mikrofonpruefung: eine schmale Zeile statt eines grossen Knopfs */
+.mikrow{margin:8px 12px 0;gap:4px}
+.mikhalt{height:40px;padding:0 10px}
+.mikhalt b{font-size:var(--f-small)}
+.mikhalt small{font-size:var(--f-caption)}
+.mikhalt{background:var(--flat);border-color:var(--flatB);box-shadow:none}
+
+/* Zeichenflaechen: feste Anzeigehoehe, die Pixelgroesse stellt app.js nach
+   Anzeigegroesse x devicePixelRatio ein (anzeigeAnpassen). */
+#pan{height:96px}
+
+
+/* ═══ Desktop-Layout (ab ca. 900 px), 2026-11-21 ══════════════════════════
+   Martins Blatt: docs/design/handfunke-entwuerfe/2026-11-21-desktop.
+   Nur unter body.dt (desktop.js setzt die Klasse). Darunter: „Ein Schirm". */
+@media (min-width: 900px){
+  body.dt{display:block;height:100dvh;overflow:hidden}
+  body.dt .feld:not(#rotorFeld){display:none}
+  body.dt::after{display:none}
+  #dtGitter{position:absolute;inset:0 0 118px 0;display:grid;gap:10px;padding:10px 14px 0;
+    grid-template-columns:280px 1fr 340px;grid-template-rows:auto 1fr}
+  #dtBar{grid-column:1 / 4;display:flex;gap:12px;align-items:center;padding:8px 10px;
+    background:#060608;border:1px solid #1f1f23;border-radius:10px;overflow:hidden}
+  .dtGruppe{display:flex;gap:6px;align-items:center}
+  .dtGruppe + .dtGruppe{border-left:1px solid #1f1f23;padding-left:12px}
+  #dtBar .chips{display:flex;gap:6px;flex-wrap:nowrap}
+  #dtBar .chip{height:28px;padding:0 10px;font-size:12px;flex:none;min-width:0}
+  #dtLinks,#dtRechts{display:flex;flex-direction:column;gap:10px;min-height:0;grid-row:2}
+  #dtLinks{grid-column:1}
+  #dtMitte{grid-column:2;grid-row:2;min-height:0}
+  #dtRechts{grid-column:3}
+  #dtMitte .scope{height:100%;display:flex;flex-direction:column;min-height:0;margin:0}
+  #dtMitte #pan{flex:none;height:230px}
+  #dtMitte #wf{flex:1;min-height:0;height:auto}
+  body.dt .feinschritt{display:flex}
+  #dtLinks .meter,#dtRechts .sliders,#dtRechts #rotorFeld,.dtPnl{margin:0;padding:10px 12px}
+  #dtRechts header{margin:0;padding:10px 12px;height:auto;background:#060608;border:1px solid #1f1f23;border-radius:10px}
+  #dtRechts .vfo{margin:0;padding:0}
+  #dtRechts .vfo .hz{font-size:46px}
+  #dtRechts .vfo .b,#dtRechts .vfo .zoom,#dtRechts .vfo .spacer{display:none}
+  #dtRechts .sliders{flex-direction:column;gap:12px}
+  #dtRechts .sliders .sl .v{display:inline}
+  #dtRechts .mikrow{margin:0}
+  .dtMess{display:flex;align-items:center;gap:10px}
+  .dtMess svg{width:132px;height:62px;flex:none}
+  .dtWert{font:700 28px/1 var(--mono);color:#7e7e85}
+  .dtKlein{font:var(--f-small)/1.2 var(--mono);color:#6b6b71}
+  .dtZeile{display:flex;align-items:center;justify-content:space-between;margin:8px 0 0}
+  .dtW{font:600 13px/1 var(--mono);color:var(--text)}
+  .dtLogPnl{flex:1;min-height:0;overflow:hidden}
+  .dtLogKopf{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .dtLogZ{font:11px/1.5 var(--mono);color:#a6a6ac;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Sendeleiste unten links, Fusszeile ueber die ganze Breite */
+  body.dt .txrow{max-width:640px;right:auto;left:14px}
+}

@@ -94,7 +94,7 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 
 <header>
   <span class="dot off" id="led"></span>
-  <span class="name" id="station">NICHT VERBUNDEN</span>
+  <span class="name" id="station" style="cursor:pointer">NICHT VERBUNDEN</span>
   <span class="spacer"></span>
   <!-- Der Weg ins Logbuch. Sitzt in der Kopfzeile, weil dort der Daumen
        hinkommt und weil er dort nichts zudeckt: der Wasserfall bleibt frei,
@@ -141,6 +141,15 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 </div>
 
 <div class="meter schicht">
+  <div class="gauge" aria-label="S-Meter">
+    <svg viewBox="0 0 132 62" aria-hidden="true">
+      <path d="M14 56 A52 52 0 0 1 118 56" fill="none" stroke="#2c2c31" stroke-width="2"/>
+      <g id="gaugeStriche"></g>
+      <line id="gaugeNadel" x1="66" y1="60" x2="66" y2="14" stroke="#ee9a34" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="66" cy="60" r="3" fill="#ee9a34"/>
+    </svg>
+    <div><div class="sval" id="sval">—</div><div class="sdb" id="sdb"></div></div>
+  </div>
   <div class="row">
     <span class="caps">Signal</span>
     <span class="val" id="smeter">—</span>
@@ -190,7 +199,7 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
      dieselbe Entscheidung wie bei der Sendetaste: ein Tipp, der sofort
      einen Mast dreht, ist in einer Hosentasche eine schlechte Idee. -->
 <div class="feld schicht rotor" id="rotorFeld" hidden>
-  <div class="caps">Rotor</div>
+  <div class="caps rotorKopf" id="rotorKopf"><span>Rotor</span><b id="rotorKopfGrad"></b><span class="chev" id="rotorChev">▸</span></div>
   <div class="rotorreihe">
     <svg id="rotorScheibe" class="scheibe" viewBox="-110 -110 220 220"
          aria-label="Rotorscheibe, antippen waehlt eine Richtung">
@@ -213,6 +222,9 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 </div>
 
 <div class="txrow">
+  <!-- Entsicherung. Bleibt verborgen, solange SENDEN_FREIGABE in app.js auf
+       false steht — dann ist die Seite so tot wie bisher. -->
+  <button class="txsicher" id="txsicher" type="button" hidden>ENTSICHERN</button>
   <div class="tx locked" id="tx">SENDEN <small>NUR IN DER APP</small></div>
   <div class="tune locked" id="tune">TUNE <small>NUR IN DER APP</small></div>
 </div>
@@ -236,6 +248,7 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <span id="fussStatus">—</span>
   <span id="fussBild"></span>
   <span id="fussTon"></span>
+  <span id="onAir">● on air</span>
 </footer>
 
 <div id="qsy">
@@ -269,6 +282,14 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
           background:transparent;border:1px solid var(--line);
           color:var(--text2)">Dieses Telefon koppeln</button>
   <div class="fehler" id="koppelmeldung" style="color:var(--text3)"></div>
+  <!-- Wenn die Seite vom Vermittler kommt, erreicht sie die Koppelstelle des
+       Mac nicht. Dann wird der Schluessel dieses Telefons gezeigt und von
+       Hand an die Station gegeben (fuehren.py --koppeln). -->
+  <button id="schluesselknopf" style="display:none;margin-top:10px;
+          background:transparent;border:1px solid var(--line);
+          color:var(--text2)">Schlüssel dieses Telefons zeigen</button>
+  <textarea id="schluesseltext" readonly rows="4" style="display:none;width:100%;
+          border-radius:11px;padding:10px;font-size:var(--f-small);word-break:break-all"></textarea>
 </div>
 
 <!-- ton-kern.js zuerst: app.js braucht TonKern fuer den Rueckfall auf
