@@ -1082,6 +1082,45 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
                     &SpectrumWidget::setSpectrumScheme, /*oben=*/true);
         schemaMenue(tr("Waterfall scheme"), m_spectrum->waterfallScheme(),
                     &SpectrumWidget::setWaterfallScheme, /*oben=*/false);
+
+        // Tempo des Wasserfalls (2026-11-22). Betreiber wollte ihn
+        // langsamer und hat das Tempo HIER gesucht -- es stand nur im
+        // Rechtsklick-Menue (SPEED) und im Setup (Update Period).
+        // Optionen gehoeren ins Zahnrad rechts oben. Derselbe Wert wie
+        // dort (SpectrumWidget::wfUpdatePeriodMs, ms je Zeile); beide
+        // lesen ihn beim Oeffnen nach, zeigen also dasselbe.
+        QMenu* tempo = menu->addMenu(tr("Waterfall speed"));
+        auto* tempoGruppe = new QActionGroup(tempo);
+        tempoGruppe->setExclusive(true);
+        const int jetzt = m_spectrum->wfUpdatePeriodMs();
+        const struct { int ms; const char* name; } stufen[] = {
+            {30,  QT_TR_NOOP("Fast (30 ms)")},
+            {60,  QT_TR_NOOP("Normal (60 ms)")},
+            {120, QT_TR_NOOP("Slow (120 ms)")},
+            {250, QT_TR_NOOP("Very slow (250 ms)")},
+        };
+        bool getroffen = false;
+        for (const auto& st : stufen) {
+            QAction* act = tempo->addAction(tr(st.name));
+            act->setCheckable(true);
+            act->setChecked(jetzt == st.ms);
+            getroffen = getroffen || (jetzt == st.ms);
+            tempoGruppe->addAction(act);
+            const int ms = st.ms;
+            connect(act, &QAction::triggered, m_spectrum,
+                    [this, ms]() { m_spectrum->setWfUpdatePeriodMs(ms); });
+        }
+        if (!getroffen) {
+            // Ein eigener Wert aus Rechtsklick oder Setup: zeigen, nicht
+            // wegwerfen. Waehlbar ist er hier nicht, nur sichtbar.
+            tempo->addSeparator();
+            QAction* eigen = tempo->addAction(
+                tr("Custom · %1 ms").arg(jetzt));
+            eigen->setCheckable(true);
+            eigen->setChecked(true);
+            eigen->setEnabled(false);
+            tempoGruppe->addAction(eigen);
+        }
         menu->addSeparator();
     }
 
