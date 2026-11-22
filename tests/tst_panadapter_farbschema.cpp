@@ -66,19 +66,21 @@ int helligkeit(QRgb c) { return qRed(c) + qGreen(c) + qBlue(c); }
 // heute (#00b4d8) hat Blau VOR Gruen und faellt damit sicher heraus; auf
 // dem Fast-Schwarz der Bandbreiten-Anzeige liegen Gruen und Blau des
 // Schemas nur rund 8 Stufen auseinander, daher die Schwelle 4.
-bool hatTealGruen(const QImage& img)
+int tealPunkte(const QImage& img)
 {
+    int n = 0;
     for (int y = img.height() * 2 / 3; y < img.height(); ++y) {
         for (int x = 0; x < img.width(); ++x) {
             const QRgb c = img.pixel(x, y);
             if (qAlpha(c) > 20 && qGreen(c) > qBlue(c) + 4
                 && qGreen(c) > qRed(c) + 25) {
-                return true;
+                ++n;
             }
         }
     }
-    return false;
+    return n;
 }
+bool hatTealGruen(const QImage& img) { return tealPunkte(img) > 0; }
 
 // Den Panadapter auf einen bekannten Durchlass stellen (14,200 MHz,
 // 100..2900 Hz ueber dem VFO).
@@ -392,9 +394,15 @@ private slots:
             b.setFilter(100, 2900);
             return b.grab().toImage().convertToFormat(QImage::Format_ARGB32);
         };
-        QVERIFY2(hatTealGruen(malen(spaet)), "Bandbreite im Schema");
+        // Verglichen, nicht absolut: unter Linux (CI, 2026-11-21) hat die
+        // Kantenglaettung auch im Standard-Bild ein paar Punkte, die die
+        // Farbregel treffen. Im Schema steht die ganze Flaeche darin.
+        const int imSchema = tealPunkte(malen(spaet));
         pan0.setSpectrumScheme(PanColourScheme::Standard);
-        QVERIFY2(!hatTealGruen(malen(spaet)), "Standard wie bisher");
+        const int standard = tealPunkte(malen(spaet));
+        QVERIFY2(imSchema > standard + 500,
+                 qPrintable(QStringLiteral("Bandbreite im Schema: %1 Punkte, "
+                                           "Standard: %2").arg(imSchema).arg(standard)));
     }
 
     // 11 ─ Eine eigene Wahl im Fenster BANDWIDTH FILTER (Betreiber: „die
