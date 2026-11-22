@@ -15,6 +15,7 @@ import { Sendetasten, SENDEN, TUNE, ablehnText } from './sendetaste.js';
 import { Zeichenbremse } from './ton-vorrang.js';
 import { bildIstAlt } from './aufwachen.js';
 import { desktopStarten } from './desktop.js';
+import { zeiger as zeigerBauen, sEinheiten, SIG_KLEIN, SWR_KLEIN, kompassBlatt } from './instrument.js';
 import { standLesen, zustandText, fehlerText as rotorFehlerText,
          peilungAus, Sicherung as RotorSicherung,
          DREHT } from './rotor.js';
@@ -2511,9 +2512,6 @@ function rotorStricheZeichnen() {
     if (haupt) { l.setAttribute('class', 'haupt'); }
     g.appendChild(l);
   }
-  // Dieselbe Teilung fuer den kleinen Kompass in der Instrumentenzeile.
-  const k = $('rotorStricheK');
-  if (k) { k.replaceChildren(...[...g.children].map((c) => c.cloneNode(true))); }
 }
 
 function rotorZeichnen() {
@@ -3235,19 +3233,10 @@ desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logLi
 // hier werden sie nur in das neue Instrument uebersetzt. Kein zweiter Weg zu
 // den Messwerten, damit beide Anzeigen nie auseinanderlaufen.
 {
-  const ringStriche = (g, n, ab) => {
-    for (let i = 0; i < n; i++) {
-      const w = (-135 + 270 * i / (n - 1)) * Math.PI / 180;
-      const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      l.setAttribute('x1', (50 + 33 * Math.sin(w)).toFixed(1));
-      l.setAttribute('y1', (50 - 33 * Math.cos(w)).toFixed(1));
-      l.setAttribute('x2', (50 + 40 * Math.sin(w)).toFixed(1));
-      l.setAttribute('y2', (50 - 40 * Math.cos(w)).toFixed(1));
-      l.setAttribute('class', 'tk' + (i >= ab ? ' rot' : ''));
-      g.appendChild(l);
-    }
-  };
-  ringStriche($('gaugeStriche'), 10, 8);
+  // Zeigerinstrumente nach Longpath (instrument.js): S-Meter und SWR.
+  const zeigerS = zeigerBauen($('gaugeSvg'), SIG_KLEIN, 's');
+  zeigerS(null);
+  kompassBlatt($('rotorBlattK'));
   const rotorFeld = $('rotorFeld');
   $('rotorKopf').addEventListener('click', () => {
     const offen = rotorFeld.classList.toggle('offen');
@@ -3259,7 +3248,8 @@ desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logLi
     $('sdb').textContent = (t[1] || '').trim();
     $('sval').title = (t[1] || '').trim();
     const w = parseFloat($('sbar').style.width) || 0;
-    $('gaugeNadel').setAttribute('transform', 'rotate(' + (-135 + 2.7 * w) + ' 50 50)');
+    const dbmS = (link.ready && link.st.vfo[state.trx] && link.st.vfo[state.trx][0]) ? link.st.smeter[state.trx] : null;
+    zeigerS(dbmS === null || dbmS === undefined ? null : sEinheiten(dbmS));
     for (const id of ['sval', 'swrWert', 'rotorGradK']) {
       const e = $(id); if (e) { e.classList.toggle('aus', !e.textContent.trim() || e.textContent.trim() === '—'); }
     }
@@ -3274,29 +3264,18 @@ desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logLi
 // Longpath schickt die Zeilen nur bei getastetem Sender. Sonst „—", nie eine
 // erfundene Zahl, und auch kein stehengebliebener Wert vom letzten Senden.
 {
-  const g = $('swrStriche');
-  for (let i = 0; i < 7; i++) {
-    const w = (-135 + 270 * i / 6) * Math.PI / 180;
-    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    l.setAttribute('x1', (50 + 33 * Math.sin(w)).toFixed(1));
-    l.setAttribute('y1', (50 - 33 * Math.cos(w)).toFixed(1));
-    l.setAttribute('x2', (50 + 40 * Math.sin(w)).toFixed(1));
-    l.setAttribute('y2', (50 - 40 * Math.cos(w)).toFixed(1));
-    l.setAttribute('class', 'tk' + (i >= 5 ? ' rot' : ''));
-    g.appendChild(l);
-  }
+  const zeigerW = zeigerBauen($('swrSvg'), SWR_KLEIN, 'w');
+  zeigerW(null);
   setInterval(() => {
     const v = link.st.txSwr;
     const sendet = link.ready && (link.st.mox || link.st.tune);
     const frisch = performance.now() - (link.st.txSensorZeit || 0) < 1500;
     if (sendet && frisch && v !== null && v >= 1) {
       $('swrWert').textContent = v.toFixed(1);
-      // 1,0 links ... 3,0 rechts
-      $('swrNadel').setAttribute('transform',
-        'rotate(' + (-135 + (Math.min(v, 3) - 1) / 2 * 270) + ' 50 50)');
+      zeigerW(Math.min(v, 3));
     } else {
       $('swrWert').textContent = '—';
-      $('swrNadel').setAttribute('transform', 'rotate(-135 50 50)');
+      zeigerW(null);
     }
   }, 250);
   // Antippen des Kompasses oeffnet die volle Rotorsteuerung (die Zeile

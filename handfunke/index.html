@@ -147,12 +147,7 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 <div id="instrumente">
 <div class="meter schicht">
   <div class="kopf"><span class="caps">S-Meter</span><span class="chipw" id="sval">—</span></div>
-  <svg class="ring" viewBox="0 0 100 100" aria-label="S-Meter">
-    <path class="bg" d="M21.72 78.28 A40 40 0 1 1 78.28 78.28"/>
-    <g id="gaugeStriche"></g>
-    <line class="nd" id="gaugeNadel" x1="50" y1="50" x2="50" y2="18"/>
-    <circle class="nb" cx="50" cy="50" r="3"/>
-  </svg>
+  <svg class="ring" id="gaugeSvg" aria-label="S-Meter"></svg>
   <div class="sdb" id="sdb" hidden></div>
   <div class="row">
     <span class="caps">Signal</span>
@@ -165,22 +160,12 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 </div>
 <div class="schicht instr" id="swrBox">
   <div class="kopf"><span class="caps">SWR</span><span class="chipw aus" id="swrWert">—</span></div>
-  <svg class="ring" viewBox="0 0 100 100" aria-label="SWR">
-    <path class="bg" d="M21.72 78.28 A40 40 0 1 1 78.28 78.28"/>
-    <g id="swrStriche"></g>
-    <line class="nd" id="swrNadel" x1="50" y1="50" x2="50" y2="18"/>
-    <circle class="nb" cx="50" cy="50" r="3"/>
-  </svg>
+  <svg class="ring" id="swrSvg" aria-label="SWR"></svg>
 </div>
 <div class="schicht instr" id="kompassBox" aria-label="Rotor, antippen oeffnet die Steuerung" hidden>
   <div class="kopf"><span class="caps">Rotor</span><span class="chipw aus" id="rotorGradK">—</span></div>
-  <svg class="ring" id="rotorKlein" viewBox="-110 -110 220 220" aria-hidden="true">
-    <circle class="bg" cx="0" cy="0" r="92"/>
-    <g class="striche" id="rotorStricheK"></g>
-    <text class="himmel" x="0" y="-62">N</text>
-    <text class="himmel" x="64" y="8">O</text>
-    <text class="himmel" x="0" y="76">S</text>
-    <text class="himmel" x="-64" y="8">W</text>
+  <svg class="ring" id="rotorKlein" viewBox="-115 -115 230 230" aria-hidden="true">
+    <g id="rotorBlattK"></g>
     <line class="nd" id="rotorNadelK" x1="0" y1="0" x2="0" y2="-82"/>
     <circle class="nb" cx="0" cy="0" r="6"/>
   </svg>
