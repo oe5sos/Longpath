@@ -25,6 +25,7 @@
 #include <QSignalSpy>
 
 #include "gui/PanadapterApplet.h"
+#include "gui/widgets/SpectrumStatusOverlay.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/meters/MeterPoller.h"
 #include "models/SliceModel.h"
@@ -319,6 +320,45 @@ private slots:
         QVERIFY(eigen->isChecked() && !eigen->isEnabled());
         QCOMPARE(sw->wfUpdatePeriodMs(), 135);
         delete m;
+    }
+
+    // Kopfzeile bei schmalem Panadapter (2026-11-22). Betreiber: „das TX -
+    // die pille ueber den optionen" -- bei ~1160 px lag die rote TX-Pille
+    // ueber 3D und Zahnrad, vom Zahnrad blieb ein Rest. Kein Kopfknopf darf
+    // vom Pillen-Streifen verdeckt sein, das Zahnrad muss klickbar sein.
+    void diePillenLiegenNieUeberDenKopfknoepfen_data()
+    {
+        QTest::addColumn<int>("breite");
+        QTest::newRow("1400") << 1400;
+        QTest::newRow("1160") << 1160;
+        QTest::newRow("900")  << 900;
+    }
+    void diePillenLiegenNieUeberDenKopfknoepfen()
+    {
+        QFETCH(int, breite);
+        PanadapterApplet applet(QStringLiteral("A"));
+        SpectrumStatusOverlay* streifen = applet.statusOverlayForTest();
+        QVERIFY(streifen);
+        streifen->setTxBound(true);      // CH 0 | TX | KIWI wie beim Betreiber
+        streifen->setKiwiActive(true);
+        applet.resize(breite, 500);
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        const QRect pillen = streifen->geometry();
+        for (QPushButton* knopf : {applet.optionsButtonForTest(),
+                                   applet.renderModeButtonForTest()}) {
+            QVERIFY(knopf && knopf->isVisible());
+            const QRect r(knopf->mapTo(&applet, QPoint(0, 0)), knopf->size());
+            QVERIFY2(!pillen.intersects(r),
+                     qPrintable(QStringLiteral("Pillen %1..%2 ueber dem Knopf %3 bei %4..%5")
+                                    .arg(pillen.left()).arg(pillen.right())
+                                    .arg(knopf->text())
+                                    .arg(r.left()).arg(r.right())));
+            // Und klickbar: oben liegt der Knopf, nicht der Streifen.
+            QCOMPARE(applet.childAt(r.center()), static_cast<QWidget*>(knopf));
+        }
     }
 };
 QTEST_MAIN(TestPanOptionsButton)

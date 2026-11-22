@@ -433,6 +433,9 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     // applet area underneath. Parented to `this`, not m_spectrum, so it sits
     // above the SpectrumWidget's QRhi surface without becoming a child of it.
     m_statusOverlay = new SpectrumStatusOverlay(this);
+    // Kopfknoepfe beobachten, damit der Streifen ihnen ausweicht.
+    if (m_btn3d)      { m_btn3d->installEventFilter(this); }
+    if (m_btnOptions) { m_btnOptions->installEventFilter(this); }
     m_statusOverlay->raise();
     // Initial state for the KIWI pill (see its own header comment) --
     // m_spectrum may already have been switched to the KiwiSDR source by
@@ -539,6 +542,14 @@ void PanadapterApplet::setBandwidthMhz(double bw) { m_bandwidthMhz = bw; }
 // so the spectrum keeps its own click handling (tune, drag, zoom).
 bool PanadapterApplet::eventFilter(QObject* obj, QEvent* ev)
 {
+    // Wandert ein Kopfknopf (neue Anordnung, erstes Zeigen), muss der
+    // Pillen-Streifen ihm Platz machen. Siehe repositionStatusOverlay().
+    if ((obj == m_btn3d || obj == m_btnOptions)
+        && (ev->type() == QEvent::Move || ev->type() == QEvent::Resize
+            || ev->type() == QEvent::Show)) {
+        repositionStatusOverlay();
+        return QWidget::eventFilter(obj, ev);
+    }
     if (ev->type() == QEvent::MouseButtonPress) {
         emit activated(m_panId);
     }
@@ -796,8 +807,23 @@ void PanadapterApplet::repositionStatusOverlay()
     // Also wird auch deren Platz freigehalten. Der linke Rand des
     // ersten Knopfes ist die Grenze; was rechts davon liegt, gehoert
     // der Kopfleiste.
-    if (m_btn3d && m_btn3d->isVisible()) {
-        const int links = m_btn3d->mapTo(this, QPoint(0, 0)).x();
+    //
+    // 2026-11-22, Betreiber: „das TX - die pille ueber den optionen". Hier
+    // stand `m_btn3d->isVisible()`. Beim ersten Zeigen schickt Qt das
+    // Resize aber, BEVOR die Kinder sichtbar sind -- die Abfrage war dann
+    // falsch, nichts wurde freigehalten, und der Streifen lag ueber 3D und
+    // Zahnrad, bis zufaellig eine Pille wechselte (tst_pan_options_button:
+    // bei 1400, 1160 und 900 Punkt). Jetzt zaehlt „nicht ausdruecklich
+    // versteckt", und es gilt der linke Rand ALLER Kopfknoepfe; dazu ordnet
+    // der Ereignisfilter neu an, sobald einer davon wandert oder erscheint.
+    int links = width();
+    for (QWidget* knopf : {static_cast<QWidget*>(m_btn3d),
+                           static_cast<QWidget*>(m_btnOptions)}) {
+        if (knopf && !knopf->isHidden()) {
+            links = std::min(links, knopf->mapTo(this, QPoint(0, 0)).x());
+        }
+    }
+    if (links < width()) {
         reserved = std::max(reserved, std::max(0, width() - links + 6));
     }
 
