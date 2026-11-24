@@ -532,8 +532,23 @@ void KombiApplet::ordneSeitenEin()
     if (!senkrecht) { return; }
 
     if (m_aufgeklappt) {
+        // Betreiber 2026-11-24: „ein Fenster RX und TX übereinander" — beim
+        // Aufklappen stehen NUR RX und TX untereinander; Rotor/Log und
+        // Phone/CW bleiben Reiter (ein Klick auf sie klappt zu und zeigt
+        // sie). Enthält das Feld weder RX noch TX, klappen wie bisher alle
+        // Seiten auf, sonst bliebe es leer.
+        const auto istRxOderTx = [](const QWidget* w) {
+            const auto* a = qobject_cast<const AppletWidget*>(w);
+            return a && (a->appletId() == QLatin1String("Rx")
+                         || a->appletId() == QLatin1String("Tx"));
+        };
+        bool hatRxOderTx = false;
+        for (const QPointer<QWidget>& w : m_inhalte) {
+            if (w && istRxOderTx(w)) { hatRxOderTx = true; break; }
+        }
         for (const QPointer<QWidget>& w : m_inhalte) {
             if (!w) { continue; }
+            if (hatRxOderTx && !istRxOderTx(w)) { continue; }
             if (m_stapel->indexOf(w) >= 0) { m_stapel->removeWidget(w); }
             senkrecht->addWidget(w.data());
             w->show();
