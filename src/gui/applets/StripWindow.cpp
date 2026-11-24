@@ -2732,6 +2732,17 @@ void StripWindow::applyPreset(const QString& name)
     refreshChainRow();
     persist();
 
+    // ── Nach vorne, wenn alles durch ist (2026-11-24) ───────────────
+    //
+    // „als ich das Profil ausgewählt habe, ist der Channel Strip im
+    // Hintergrund und ich kann ihn nicht mehr ändern." Der Wechsel
+    // stösst Anzeigen und Applets an, und die schwebenden Paletten
+    // (Qt::Tool) landen dabei vor diesem Fenster. Einen Umlauf später,
+    // wenn alles fertig ist, holt sich das Fenster seinen Platz zurück.
+    QTimer::singleShot(0, this, [this]() {
+        if (isVisible()) { raise(); activateWindow(); }
+    });
+
     // Die Liste neu aufbauen, damit „Zuletzt bearbeitet" darin steht --
     // mit der eben gewählten Voreinstellung als Auswahl, nicht mit dem
     // Sicherungsstand.
