@@ -13538,11 +13538,18 @@ void MainWindow::buildMenuBar()
                     holeInsKombiFeld(ziel, applet, id);
                 }
             }
-            if (m_appletVis) {
-                m_appletVis->setVisible(QStringLiteral("Kombi2"), true);
-            }
             ziel->setAufgeklappt(true);
+            // ensureVisible(), nicht setVisible(): jenes tut nichts, wenn
+            // der Stand schon „sichtbar" lautet, und der Empfänger
+            // (applyAppletVisibility) ist die einzige Stelle, die das
+            // Fenster wirklich einblendet. Beim ersten Versuch am
+            // laufenden Programm blieb Combined 2 deshalb unsichtbar,
+            // während RX und TX schon darin lagen.
+            if (m_appletVis) {
+                m_appletVis->ensureVisible(QStringLiteral("Kombi2"));
+            }
             ziel->show();
+            ziel->raise();
         });
     }
 
