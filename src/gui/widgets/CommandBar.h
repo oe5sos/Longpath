@@ -354,6 +354,7 @@ private:
 
     void buildModeGroup(QHBoxLayout* row);
     void buildDigiGroup(QHBoxLayout* row);
+    void buildAntennaGroup(QHBoxLayout* row);
     void aktualisiereDigiLampe();
 
 public:

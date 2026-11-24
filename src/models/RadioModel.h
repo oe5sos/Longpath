@@ -3911,6 +3911,10 @@ public:
     /// zwei Wahrheiten.
     void setFlexSliceMode(DSPMode mode);
 
+    /// Antenne der Flex-Scheibe stellen (`slice set <n> rxant=|txant=`).
+    /// Ohne Scheibennummer oder Verbindung passiert nichts.
+    void setFlexSliceAntenna(const QString& antenna, bool senden);
+
     /// Die Filterflanken der Flex-Scheibe stellen (Hertz, bezogen auf
     /// die Traegerfrequenz — genau wie `filter_lo`/`filter_hi` im
     /// Scheibenzustand).

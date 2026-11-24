@@ -211,6 +211,11 @@ QString setSliceModeCommand(const QString& sliceId, const QString& mode);
 // sie in `filter_lo`/`filter_hi` zurueckmeldet.
 QString setSliceFilterCommand(const QString& sliceId, int lowHz, int highHz);
 
+// Antenne der Scheibe: `slice set <n> rxant=<name>` bzw. `txant=<name>`
+// (SmartSDR-API; Namen wie ANT1, ANT2, RX_A, XVTR). Leer bei leerem Namen.
+QString setSliceAntennaCommand(const QString& sliceId, bool senden,
+                               const QString& antenna);
+
 // ── Rauschminderung, Störaustaster, Kerbfilter (2026-10-28) ──────────
 //
 // Der Betreiber: „ich kann zwar klicken, aber kein unterschied zu

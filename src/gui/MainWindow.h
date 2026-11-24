@@ -2305,6 +2305,8 @@ private:
     double  m_flexSpurLetzteHz{0.0};
     /// Dasselbe fuer Betriebsart und Filterflanken.
     QMetaObject::Connection m_flexArtBand;
+    QMetaObject::Connection m_flexAntRx;
+    QMetaObject::Connection m_flexAntTx;
     QMetaObject::Connection m_flexFilterBand;
     /// Rauschminderung, Störaustaster, Kerbfilter → Maschine
     /// (2026-10-28). Drei Bänder, ein Befehl: siehe

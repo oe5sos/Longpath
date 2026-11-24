@@ -162,7 +162,8 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     // in der Vorlage und bei Thetis.
     buildBandGroup(row);
     buildModeGroup(row);
-    buildDigiGroup(row);
+    buildDigiGroup(row);     // hängt seine Pillen als zweite Zeile an Mode
+    buildAntennaGroup(row);
     buildFilterGroup(row);
     buildStepGroup(row);
     buildNrGroup(row);
@@ -759,6 +760,12 @@ void CommandBar::setzeDigiDekoder(bool laeuft,
 
 void CommandBar::buildDigiGroup(QHBoxLayout* row)
 {
+    // Betreiber am 2026-11-24: FT8, FT4 und FT2 stehen UNTER LSB/USB/CWL,
+    // nicht als eigene Gruppe daneben. Die Gruppe „Digi" bleibt als
+    // Buchführung (Lampe, Prüfstand) bestehen; ihr Kasten und ihre
+    // Versalzeile entfallen, nur die Pillenzeile wandert in den
+    // Mode-Kasten.
+    Group* mode = group(QStringLiteral("Mode"));
     Group& g = addGroup(QStringLiteral("Digi"), row);
     for (const auto& eintrag : {
              std::pair{QStringLiteral("FT8"), DigiFrequenzen::Digimodus::Ft8},
@@ -766,6 +773,53 @@ void CommandBar::buildDigiGroup(QHBoxLayout* row)
         QPushButton* b = addPill(g, eintrag.first);
         connect(b, &QPushButton::clicked, this,
                 [this, modus = eintrag.second]() { emit digiRequested(modus); });
+    }
+    // FT2 gibt es in diesem Zweig noch nicht (Digimodus::Ft2 steht erst
+    // auf feat/ft2). Die Pille steht schon da, gedämpft und ohne Wirkung;
+    // mit dem Zusammenführen genügt es, sie hier anzuschließen.
+    QPushButton* ft2 = addPill(g, QStringLiteral("FT2"));
+    ft2->setEnabled(false);
+    ft2->setToolTip(tr("FT2 folgt mit dem FT2-Zweig"));
+
+    if (!mode || !mode->box) { return; }
+    auto* modeBox = qobject_cast<QVBoxLayout*>(mode->box);
+    if (!modeBox) { return; }
+    // Zweite Zeile: die Pillen unter die Modusreihe, linksbündig.
+    QLayout* eigenerKasten = g.box;
+    eigenerKasten->removeItem(g.row);
+    row->removeItem(eigenerKasten);
+    m_boxen.removeAll(eigenerKasten);
+    delete g.caption;
+    g.caption = nullptr;
+    g.box = nullptr;
+    delete eigenerKasten;
+    g.row->setParent(nullptr);
+    auto* zeile = new QHBoxLayout;
+    zeile->setContentsMargins(0, 0, 0, 0);
+    zeile->setSpacing(5);
+    // Die Pillen aus der alten Zeile lösen, dann in die neue setzen.
+    while (QLayoutItem* it = g.row->takeAt(0)) { delete it; }
+    for (QPushButton* b : g.pills) { zeile->addWidget(b); }
+    zeile->addStretch(1);
+    delete g.row;
+    g.row = zeile;
+    modeBox->addLayout(zeile);
+}
+
+void CommandBar::buildAntennaGroup(QHBoxLayout* row)
+{
+    // Betreiber am 2026-11-24: ANT1 · ANT2 · ANT3 · ANT4 an der Stelle,
+    // die FT8/FT4/FT2 freigemacht haben. Ein Druck schaltet RX und TX der
+    // aktiven Scheibe auf diese Antenne (wie das Aufklappfeld im RX-Panel).
+    Group& g = addGroup(QStringLiteral("Ant"), row);
+    for (int i = 1; i <= 4; ++i) {
+        const QString name = QStringLiteral("ANT%1").arg(i);
+        QPushButton* b = addPill(g, name);
+        connect(b, &QPushButton::clicked, this, [this, name]() {
+            if (!m_slice) { return; }
+            m_slice->setRxAntenna(name);
+            m_slice->setTxAntenna(name);
+        });
     }
 }
 
@@ -830,13 +884,24 @@ void CommandBar::buildStepGroup(QHBoxLayout* row)
     };
 
     Group& g = addGroup(QStringLiteral("Step"), row);
+    // Zweizeilig (Betreiber 2026-11-24: die Schrittweite braucht man
+    // selten): 10 Hz · 100 Hz oben, 1 kHz · „…" darunter -- halb so breit.
+    auto* zweite = new QHBoxLayout;
+    zweite->setContentsMargins(0, 0, 0, 0);
+    zweite->setSpacing(5);
+    static_cast<QBoxLayout*>(g.box)->addLayout(zweite);
     for (int i = 0; i < kVisiblePerGroup && i < m_allSteps.size(); ++i) {
         const auto entry = m_allSteps.at(i);
         QPushButton* b = addPill(g, entry.first);
+        if (i >= 2) {
+            g.row->removeWidget(b);
+            zweite->addWidget(b);
+        }
         connect(b, &QPushButton::clicked, this, [this, entry]() {
             pushStepToModel(entry.second);
         });
     }
+    g.row2 = zweite;   // das „…" kommt in die zweite Zeile
 
     addOverflow(g, m_allSteps, [this](int hz) { pushStepToModel(hz); });
 }
@@ -893,6 +958,8 @@ void CommandBar::attach(SliceModel* slice)
                        this, [this](int, int) { pullFromModel(); });
     m_links << connect(slice, &SliceModel::activeNrChanged,
                        this, [this](NrSlot) { pullFromModel(); });
+    m_links << connect(slice, &SliceModel::rxAntennaChanged,
+                       this, [this](const QString&) { pullFromModel(); });
     m_links << connect(slice, &SliceModel::bandChanged,
                        this, [this](Longpath::Band) { pullFromModel(); });
     // Die Digi-Lampe haengt an der genauen Frequenz, nicht nur am
@@ -1501,6 +1568,10 @@ void CommandBar::pullFromModel()
             }
             setActive(*g, label);
         }
+    }
+
+    if (Group* g = group(QStringLiteral("Ant"))) {
+        setActive(*g, m_slice->rxAntenna());
     }
 
     // ── Digital leuchtet, wenn es WIRKLICH laeuft ───────────────────

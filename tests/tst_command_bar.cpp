@@ -238,14 +238,17 @@ private slots:
         // je Gruppe genau drei Pillen, und FT8/FT4 sind ohnehin keine
         // Betriebsarten des Geraets, sondern eine Anrufstelle samt
         // Dekoder ueber DIGU.
-        QCOMPARE(g.size(), 7);
+        // 2026-11-24: Digi steht als zweite Zeile UNTER Mode (keine eigene
+        // Spalte mehr); an der freien Stelle sitzt die Antennengruppe.
+        QCOMPARE(g.size(), 8);
         QCOMPARE(g.at(0), QStringLiteral("Band"));
         QCOMPARE(g.at(1), QStringLiteral("Mode"));
         QCOMPARE(g.at(2), QStringLiteral("Digi"));
-        QCOMPARE(g.at(3), QStringLiteral("Filter"));
-        QCOMPARE(g.at(4), QStringLiteral("Step"));
-        QCOMPARE(g.at(5), QStringLiteral("NR"));
-        QCOMPARE(g.at(6), QStringLiteral("Rate"));
+        QCOMPARE(g.at(3), QStringLiteral("Ant"));
+        QCOMPARE(g.at(4), QStringLiteral("Filter"));
+        QCOMPARE(g.at(5), QStringLiteral("Step"));
+        QCOMPARE(g.at(6), QStringLiteral("NR"));
+        QCOMPARE(g.at(7), QStringLiteral("Rate"));
     }
 
     // ── DIGI leuchtet nur, wenn es wirklich laeuft ───────────────────
@@ -1005,7 +1008,7 @@ private slots:
                  "die aktive Pille hat noch die alte Auswahl-Mulde");
     }
 
-    /// Schmal stehen Band · Mode · Digi oben und Filter · Step · NR · Rate
+    /// Schmal stehen Band · Mode · Ant oben und Filter · Step · NR · Rate
     /// unten -- der Umbruch sitzt fest vor „Filter", nicht bei jeder
     /// Breite woanders.
     void schmalBrichtFestVorFilterUm()
@@ -1020,7 +1023,7 @@ private slots:
         const QVector<QStringList> z = bar.zeilenGruppen();
         QCOMPARE(z.size(), 2);
         QCOMPARE(z.at(0), (QStringList{QStringLiteral("Band"), QStringLiteral("Mode"),
-                                       QStringLiteral("Digi")}));
+                                       QStringLiteral("Ant")}));
         QCOMPARE(z.at(1), (QStringList{QStringLiteral("Filter"), QStringLiteral("Step"),
                                        QStringLiteral("NR"), QStringLiteral("Rate")}));
     }
