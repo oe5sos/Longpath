@@ -2873,6 +2873,13 @@ if(TEST tst_kombi_feld)
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
+longpath_add_test(tst_kombi_blaetter_rx_phone)
+longpath_add_test(tst_kombi_ausrichtung_rx_phone)
+if(TEST tst_kombi_ausrichtung_rx_phone)
+    set_tests_properties(tst_kombi_ausrichtung_rx_phone PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 longpath_add_test(tst_flex_socketmeldung)
 
 longpath_add_test(tst_flex_leistung_je_band)
