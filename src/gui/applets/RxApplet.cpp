@@ -930,7 +930,9 @@ void RxApplet::buildUi()
         rightCol->addWidget(m_agcTContainer);
     }
 
-    rightCol->addStretch(1);
+    // 2026-11-24: die Dehnung stand HIER, vor RIT/XIT, und schob die beiden
+    // im Combined ans untere Ende der Spalte, weit weg von den Reglern.
+    // Sie steht jetzt hinter den Modus-Behältern (siehe unten).
 
     // Control 15: RIT toggle + offset + zero
     // Live-wired in S2.8 — SliceModel::setRitEnabled/setRitHz feed the
@@ -1088,6 +1090,8 @@ void RxApplet::buildUi()
         m_rttyContainer->setSlice(m_slice);
         applyModeVisibility(m_slice->dspMode());
     }
+
+    rightCol->addStretch(1);   // Resthöhe unten; RIT/XIT sitzen unter den Reglern
 
     columns->addLayout(rightCol, 3);
     root->addLayout(columns);
