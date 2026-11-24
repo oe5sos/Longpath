@@ -53,7 +53,9 @@
 // =================================================================
 
 #include <QColor>
+#include <QElapsedTimer>
 #include <QString>
+#include <QVector>
 #include <QWidget>
 
 namespace Longpath {
@@ -146,6 +148,10 @@ private:
     QColor  m_accent;
     double  m_vfoHz{0.0};
     QVector<float> m_trace;
+    /// Drosselung des Malens, siehe zeichneGedrosselt().
+    void zeichneGedrosselt();
+    QElapsedTimer m_letzteZeichnung;
+    bool m_zeichnenGeplant{false};
     /// Traeger Mittelwert — die blasse Bezugslinie, siehe paintEvent.
     QVector<float> m_avgLine;
     int     m_spanHz{10000};

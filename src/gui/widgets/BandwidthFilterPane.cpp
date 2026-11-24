@@ -23,6 +23,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QTimer>
 
 #include <algorithm>
 #include <cmath>
@@ -173,7 +174,37 @@ void BandwidthFilterPane::setTrace(const QVector<float>& dbm)
             m_trace[i] = m_trace[i] * (1.0f - a) + in[i] * a;
         }
     }
-    update();
+    zeichneGedrosselt();
+}
+
+// ── Höchstens 15 Bilder je Sekunde (2026-11-24) ──────────────────────
+//
+// Die Kurve kommt mit 20+ Bildern je Sekunde, und jedes Mal malt der
+// Software-Rasterizer Fläche, drei Leuchtdurchgänge und Linie. Gemessen
+// mit `sample` an der laufenden App: ein Drittel der Hauptfadenzeit in
+// paintEvent() dieser Fläche, die Oberfläche hinkte Sekunden hinterher.
+// Die Glättung in setTrace() läuft weiter bei JEDEM Bild (das Gleiten
+// hängt daran); nur das Malen wird gedrosselt, mit einem Nachlauf, damit
+// das letzte Bild nicht stehen bleibt. Nicht sichtbar: gar nicht malen.
+void BandwidthFilterPane::zeichneGedrosselt()
+{
+    if (!isVisible()) { return; }
+    constexpr qint64 kMindestAbstandMs = 66;
+    if (!m_letzteZeichnung.isValid()
+        || m_letzteZeichnung.elapsed() >= kMindestAbstandMs) {
+        m_letzteZeichnung.restart();
+        update();
+        return;
+    }
+    if (m_zeichnenGeplant) { return; }
+    m_zeichnenGeplant = true;
+    const int rest = static_cast<int>(
+        kMindestAbstandMs - m_letzteZeichnung.elapsed());
+    QTimer::singleShot(qMax(1, rest), this, [this]() {
+        m_zeichnenGeplant = false;
+        m_letzteZeichnung.restart();
+        update();
+    });
 }
 
 void BandwidthFilterPane::setSpan(int hz)
