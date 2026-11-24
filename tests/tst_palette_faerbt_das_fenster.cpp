@@ -375,6 +375,71 @@ private slots:
                          .arg(anders * 100.0, 0, 'f', 2)));
     }
 
+    /// Die Palette „Blau-Gold\" — ausgeliefert, im Menue, gemerkt.
+    ///
+    /// Gleiches Muster wie Moos: Datei aus resources/themes/, Wahl
+    /// ueber Theme::activate(), dann der Neustart-Fall (clear() +
+    /// applyStoredChoice()). Mit LONGPATH_GRAB_DIR wird das Hauptfenster
+    /// in dieser Palette als PNG-Blatt gespeichert.
+    void dieAusgelieferteBlauGoldPaletteWirkt()
+    {
+        const QString quelle = QStringLiteral(LONGPATH_SRC_DIR)
+                               + QStringLiteral("/resources/themes/blau-gold.json");
+        QVERIFY2(QFile::exists(quelle), qPrintable(quelle));
+        QVERIFY(QFile::copy(quelle, m_themeDir.filePath(
+                    QStringLiteral("blau-gold.json")))
+                || QFile::exists(m_themeDir.filePath(
+                    QStringLiteral("blau-gold.json"))));
+
+        Style::Theme::instance().clear();
+        Style::forgetSources();
+
+        MainWindow mw;
+        mw.resize(1470, 900);
+        mw.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&mw, kFensterFrist));
+        QTest::qWait(600);
+
+        const QImage vorher = mw.grab().toImage();
+
+        QString fehler;
+        QStringList namen;
+        for (const auto& t : Style::Theme::available()) { namen << t.name; }
+        QVERIFY2(namen.contains(QStringLiteral("Blau-Gold")),
+                 qPrintable(QStringLiteral("„Blau-Gold\" fehlt in der Auswahl: %1")
+                                .arg(namen.join(QLatin1String(", ")))));
+        QVERIFY2(Style::Theme::instance().activate(
+                     QStringLiteral("Blau-Gold"), &fehler),
+                 qPrintable(QStringLiteral("Blau-Gold liess sich nicht "
+                                           "aktivieren: %1").arg(fehler)));
+        Style::ThemeFilter::reapplyAll();
+        QTest::qWait(400);
+        const QImage nachher = mw.grab().toImage();
+
+        const double anders = anteilAnders(vorher, nachher);
+        qInfo() << "Blau-Gold aendert:"
+                << QString::number(anders * 100.0, 'f', 2) << "%";
+
+        const QString dir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+        if (!dir.isEmpty()) {
+            nachher.save(dir + QStringLiteral("/blau-gold-hauptfenster.png"));
+        }
+
+        QVERIFY2(anders > 0.05,
+                 qPrintable(QStringLiteral(
+                     "die ausgelieferte Palette „Blau-Gold\" aendert nur %1 %% "
+                     "der Flaeche — fuer das Auge waechselt da nichts")
+                         .arg(anders * 100.0, 0, 'f', 2)));
+
+        // Neustart: die Wahl muss aus AppSettings wiederkommen.
+        QCOMPARE(AppSettings::instance().value("ActiveTheme", QString())
+                     .toString(), QStringLiteral("Blau-Gold"));
+        Style::Theme::instance().clear();          // „Neustart"
+        QVERIFY(!Style::Theme::instance().isActive());
+        QVERIFY(Style::Theme::instance().applyStoredChoice());
+        QCOMPARE(Style::Theme::instance().name(), QStringLiteral("Blau-Gold"));
+    }
+
     /// Der ganze Weg: KLICK im Menue -> Bild.
     ///
     /// Die beiden Faelle davor rufen `Theme::activate()` direkt. Was
@@ -460,6 +525,7 @@ private slots:
             {"flach.json", false},
             {"tief.json",  false},
             {"moos.json",  true},
+            {"blau-gold.json", true},
         };
         for (const auto& e : f) {
             const QString pfad = wurzel + QString::fromLatin1(e.datei);
