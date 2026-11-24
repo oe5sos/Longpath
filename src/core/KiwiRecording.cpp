@@ -43,11 +43,11 @@ bool KiwiRecording::start(const QString& folder, const QString& kiwiName,
                           const QDateTime& when, QString* error)
 {
     if (m_writer.isOpen()) {
-        if (error) { *error = tr("Es läuft schon eine Aufnahme."); }
+        if (error) { *error = tr("A recording is already running."); }
         return false;
     }
     if (!QDir().mkpath(folder)) {
-        if (error) { *error = tr("Ordner nicht anlegbar: %1").arg(folder); }
+        if (error) { *error = tr("Folder cannot be created: %1").arg(folder); }
         return false;
     }
     const QString base = QDir(folder).filePath(fileBaseName(kiwiName, when));
@@ -77,13 +77,13 @@ void KiwiRecording::feedAudio(const QByteArray& pcm24kStereoFloat)
             frames)) {
         m_writeFailed = true;
         m_writer.close();
-        emit aborted(tr("Schreiben fehlgeschlagen — Platte voll?"));
+        emit aborted(tr("Write failed — disk full?"));
         return;
     }
     if (m_writer.framesWritten() >= kMaxSeconds * kSampleRate) {
         m_stoppedByLimit = true;
         m_writer.close();
-        emit aborted(tr("Obergrenze von zwei Stunden erreicht."));
+        emit aborted(tr("Limit of two hours reached."));
     }
 }
 

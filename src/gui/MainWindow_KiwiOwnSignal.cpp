@@ -154,7 +154,7 @@ void MainWindow::wireKiwiOwnSignal()
     });
     connect(m_kiwiRecording, &KiwiRecording::aborted, this,
             [this](const QString& reason) {
-        showToast(tr("Aufnahme beendet: %1").arg(reason),
+        showToast(tr("Recording ended: %1").arg(reason),
                   ToastSeverity::Warning, 8000);
         stopKiwiRecording();
     });
@@ -295,7 +295,7 @@ void MainWindow::setKiwiOwnSignal(bool on)
         sliceId = m_kiwiSdrManager->assignedSliceForProfile(m_kiwiOwnProfileId);
     }
     if (!kiwiControllableSlice(sliceId)) {
-        showToast(tr("Mein Signal: keine Scheibe frei für den Kiwi."),
+        showToast(tr("My Signal: no slice free for the Kiwi."),
                   ToastSeverity::Warning, 8000);
         if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setOwnSignalActive(false); }
         return;
@@ -423,8 +423,8 @@ void MainWindow::startKiwiRecording()
     if (!m_kiwiRecording || !m_kiwiSdrManager) { return; }
     if (m_kiwiOwnProfileId.isEmpty()
         || !m_kiwiSdrManager->hasProfile(m_kiwiOwnProfileId)) {
-        showToast(tr("Aufnehmen: erst einen Kiwi wählen (Mein Signal oder "
-                     "Anderen Kiwi …)."), ToastSeverity::Warning, 8000);
+        showToast(tr("Record: choose a Kiwi first (My Signal or Other "
+                     "Kiwi …)."), ToastSeverity::Warning, 8000);
         if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setRecordingActive(false); }
         return;
     }
@@ -434,7 +434,7 @@ void MainWindow::startKiwiRecording()
     if (!m_kiwiRecording->start(
             folder, m_kiwiSdrManager->displayName(m_kiwiOwnProfileId),
             QDateTime::currentDateTime(), &error)) {
-        showToast(tr("Aufnahme nicht gestartet: %1").arg(error),
+        showToast(tr("Recording not started: %1").arg(error),
                   ToastSeverity::Warning, 8000);
         if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setRecordingActive(false); }
         return;
@@ -457,7 +457,7 @@ void MainWindow::stopKiwiRecording()
     const QImage img = m_kiwiStrip ? m_kiwiStrip->waterfallImage() : QImage();
     const QString wav = m_kiwiRecording->stop(img);
     if (!wav.isEmpty()) {
-        showToast(tr("Aufnahme gespeichert: %1").arg(QFileInfo(wav).fileName()),
+        showToast(tr("Recording saved: %1").arg(QFileInfo(wav).fileName()),
                   ToastSeverity::Info, 6000);
     }
 }

@@ -41,7 +41,7 @@ QString kmText(double km)
 QString delayText(int ms, bool measured)
 {
     const QString s = QStringLiteral("%1 s").arg(anzeigeZahl(ms / 1000.0, 1));
-    return measured ? s : QStringLiteral("ca. ") + s;
+    return measured ? s : QObject::tr("approx. %1").arg(s);
 }
 
 // Schrittweite der Achsbeschriftung in Hz: 1-2-5, etwa fuenf bis zehn
@@ -154,16 +154,16 @@ QString KiwiOwnSignalStrip::statusText() const
     using V = KiwiHearMeMeter::Verdict;
     switch (m_verdict.verdict) {
     case V::Hears:
-        return tr("hört mich · %1")
+        return tr("hears me · %1")
             .arg(kiwiSUnitsText(m_verdict.sUnits, m_verdict.overS9Db));
     case V::Nothing:
-        return tr("hört nichts");
+        return tr("hears nothing");
     case V::Unknown:
-        return tr("unbekannt");
+        return tr("unknown");
     case V::Waiting:
         break;
     }
-    return tr("wartet auf Sendung");
+    return tr("waiting for transmission");
 }
 
 QColor KiwiOwnSignalStrip::statusColor() const
@@ -180,12 +180,12 @@ QColor KiwiOwnSignalStrip::statusColor() const
 
 QString KiwiOwnSignalStrip::footerText() const
 {
-    if (!m_recording) { return tr("Aufnahme aus"); }
+    if (!m_recording) { return tr("Recording off"); }
     const qint64 s = m_recordMs / 1000;
     const QString t = QStringLiteral("%1:%2")
         .arg(s / 60, 2, 10, QLatin1Char('0'))
         .arg(s % 60, 2, 10, QLatin1Char('0'));
-    return tr("● Aufnahme %1 → %2").arg(t, m_recordFile);
+    return tr("● Recording %1 → %2").arg(t, m_recordFile);
 }
 
 QRect KiwiOwnSignalStrip::bodyRect() const
@@ -305,7 +305,7 @@ void KiwiOwnSignalStrip::paintEvent(QPaintEvent*)
         if (m_rows.isEmpty()) {
             p.setFont(Style::monoFont(font(), 11, QFont::Normal));
             p.setPen(scale());
-            p.drawText(body, Qt::AlignCenter, tr("wartet auf Bild vom Kiwi"));
+            p.drawText(body, Qt::AlignCenter, tr("waiting for picture from the Kiwi"));
         }
     }
     p.setPen(border());

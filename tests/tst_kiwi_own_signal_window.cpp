@@ -184,11 +184,11 @@ private slots:
         mw->setKiwiOwnSignalProfileForTest(pid, 38.0);
         mw->setKiwiOwnSignalForTest(true);
         KiwiOwnSignalStrip* strip = mw->kiwiOwnStripForTest();
-        QCOMPARE(strip->statusText(), QStringLiteral("wartet auf Sendung"));
+        QCOMPARE(strip->statusText(), QStringLiteral("waiting for transmission"));
 
         // Gesendet, aber kein Bild: unbekannt -- NICHT "hoert nichts".
         model->transmitModel().setMox(true);
-        QCOMPARE(strip->statusText(), QStringLiteral("unbekannt"));
+        QCOMPARE(strip->statusText(), QStringLiteral("unknown"));
 
         // Der Kiwi liefert Zeilen, auf der Marke steht ein Buckel.
         for (int i = 0; i < 40; ++i) {
@@ -196,7 +196,7 @@ private slots:
                                         14.185, 14.225, quint32(i));
             QTest::qWait(40);
         }
-        QCOMPARE(strip->statusText().left(8), QStringLiteral("hört mic"));
+        QCOMPARE(strip->statusText().left(7), QStringLiteral("hears m"));
         QVERIFY(strip->rowCount() >= 30);
 
         // Zum Ansehen (Vergleich mit dem Entwurf): das ganze Fenster und die

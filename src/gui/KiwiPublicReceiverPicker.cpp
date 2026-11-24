@@ -81,7 +81,7 @@ KiwiPublicReceiverPicker::KiwiPublicReceiverPicker(QWidget* parent)
 
     m_table = new QTableWidget(0, ColumnCount, this);
     m_table->setHorizontalHeaderLabels(
-        {tr("Receiver"), tr("Location"), tr("Entfernung"), tr("Users"),
+        {tr("Receiver"), tr("Location"), tr("Distance"), tr("Users"),
          tr("API"), tr("Limits")});
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -278,8 +278,8 @@ void KiwiPublicReceiverPicker::applyFilter()
     if (!hiddenParts.isEmpty())
         status += tr(" (%1 hidden)").arg(hiddenParts.join(QStringLiteral(", ")));
     if (m_preselect) {
-        status += tr("  ·  nach Entfernung zu %1 geordnet, passend zu %2 MHz")
-                      .arg(m_ownGrid.isEmpty() ? tr("(Locator fehlt)") : m_ownGrid)
+        status += tr("  ·  sorted by distance from %1, fitting %2 MHz")
+                      .arg(m_ownGrid.isEmpty() ? tr("(locator missing)") : m_ownGrid)
                       .arg(m_frequencyHz / 1.0e6, 0, 'f', 3);
     }
     if (m_fromCache)

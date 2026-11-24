@@ -86,7 +86,7 @@ private slots:
         all << rx("weit", "FN31")                        // New York
             << rx("nah", "JN78")                         // bei Linz
             << rx("nurweb", "JN77", /*extApi=*/0)        // API aus
-            << rx("unbekannt", "JN76", /*extApi=*/-1)    // Regel unbekannt
+            << rx("unknown", "JN76", /*extApi=*/-1)    // Regel unbekannt
             << rx("aus", "JN79", 4, 1, 4, /*offline=*/true)
             << rx("voll", "JN88", 4, /*users=*/4, 4)
             << rx("nurLW", "JO60", 4, 1, 4, false,
@@ -104,7 +104,7 @@ private slots:
 
         // Jeder Ausgeschlossene ist wirklich nicht dabei (Gegenprobe
         // gegen "alles durchreichen").
-        for (const char* weg : {"nurweb", "unbekannt", "aus", "voll", "nurLW"}) {
+        for (const char* weg : {"nurweb", "unknown", "aus", "voll", "nurLW"}) {
             QVERIFY2(!names.contains(QLatin1String(weg)), weg);
         }
 
@@ -335,7 +335,7 @@ private slots:
         strip.setMarkHz(kMark);
 
         // vor dem ersten Bild
-        QCOMPARE(strip.statusText(), QStringLiteral("wartet auf Sendung"));
+        QCOMPARE(strip.statusText(), QStringLiteral("waiting for transmission"));
         QVERIFY(strip.waterfallImage().isNull());
 
         for (int i = 0; i < 80; ++i) {
@@ -349,10 +349,10 @@ private slots:
 
         QCOMPARE(strip.headerText(), QStringLiteral("KIWI LINZ · 38 km · 1,4 s")
                      .replace(',', QLocale::system().decimalPoint()));
-        QCOMPARE(strip.statusText(), QStringLiteral("hört mich · S7"));
+        QCOMPARE(strip.statusText(), QStringLiteral("hears me · S7"));
         QCOMPARE(strip.statusColor(), QColor(Style::kGreenText));
         QCOMPARE(strip.footerText(),
-                 QStringLiteral("● Aufnahme 00:42 → Mein-Signal_2026-11-24.wav"));
+                 QStringLiteral("● Recording 00:42 → Mein-Signal_2026-11-24.wav"));
 
         // Marke genau in der Mitte der Achse.
         const int mx = strip.markX();
@@ -393,18 +393,18 @@ private slots:
         KiwiHearMeMeter::Result r;
         r.verdict = KiwiHearMeMeter::Verdict::Nothing;
         strip.setVerdict(r);
-        QCOMPARE(strip.statusText(), QStringLiteral("hört nichts"));
+        QCOMPARE(strip.statusText(), QStringLiteral("hears nothing"));
         QCOMPARE(strip.statusColor(), QColor(Style::kAmberWarn));
         const QString out = qEnvironmentVariable("LONGPATH_STRIP_PNG");
         if (!out.isEmpty()) { QVERIFY(strip.grab().toImage().save(out + "-nichts.png")); }
 
         r.verdict = KiwiHearMeMeter::Verdict::Unknown;
         strip.setVerdict(r);
-        QCOMPARE(strip.statusText(), QStringLiteral("unbekannt"));
+        QCOMPARE(strip.statusText(), QStringLiteral("unknown"));
         QVERIFY(strip.statusColor() != QColor(Style::kAmberWarn));
         QVERIFY(strip.statusColor() != QColor(Style::kGreenText));
         strip.setRecording(false, 0, QString());
-        QCOMPARE(strip.footerText(), QStringLiteral("Aufnahme aus"));
+        QCOMPARE(strip.footerText(), QStringLiteral("Recording off"));
     }
 
     void streifenBildAufAndererAchseWirdUmgerechnet()

@@ -194,21 +194,22 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     auto* ownRow = new QHBoxLayout;
     ownRow->setContentsMargins(0, 0, 0, 0);
     ownRow->setSpacing(4);
-    m_ownSignalButton = blueToggle(tr("Mein Signal"), -1, 22);
+    m_ownSignalButton = blueToggle(tr("My Signal"), -1, 22);
     m_ownSignalButton->setCheckable(true);
     m_ownSignalButton->setObjectName(QStringLiteral("kiwiOwnSignalButton"));
     m_ownSignalButton->setAccessibleName(
-        tr("Mein Signal am Kiwi hören"));
+        tr("Hear my signal on the Kiwi"));
     m_ownSignalButton->setToolTip(
-        tr("Ein Kiwi hört mit: Wasserfall unter dem Panadapter, "
-           "Marke auf der Sendefrequenz, Ton bleibt beim Senden."));
-    m_recordButton = blueToggle(tr("Aufnehmen"), -1, 22);
+        tr("A Kiwi listens along: waterfall below the panadapter, "
+           "mark on the transmit frequency, audio stays on while "
+           "transmitting."));
+    m_recordButton = blueToggle(tr("Record"), -1, 22);
     m_recordButton->setCheckable(true);
     m_recordButton->setObjectName(QStringLiteral("kiwiRecordButton"));
-    m_recordButton->setAccessibleName(tr("Ton des Kiwi aufnehmen"));
-    m_otherButton = blueToggle(tr("Anderen Kiwi …"), 112, 22);
+    m_recordButton->setAccessibleName(tr("Record the Kiwi audio"));
+    m_otherButton = blueToggle(tr("Other Kiwi …"), 112, 22);
     m_otherButton->setObjectName(QStringLiteral("kiwiOtherButton"));
-    m_otherButton->setAccessibleName(tr("Anderen Kiwi auswählen"));
+    m_otherButton->setAccessibleName(tr("Choose another Kiwi"));
     ownRow->addWidget(m_ownSignalButton, 1);
     ownRow->addWidget(m_recordButton, 1);
     root->addLayout(ownRow);
@@ -302,7 +303,7 @@ void KiwiSdrApplet::setRecordingActive(bool active)
 
 void KiwiSdrApplet::setOwnSignalReceiverName(const QString& name)
 {
-    m_ownSignalLabel->setText(tr("Mein Signal: %1").arg(name));
+    m_ownSignalLabel->setText(tr("My signal: %1").arg(name));
     m_ownSignalLabel->setVisible(!name.isEmpty());
 }
 
