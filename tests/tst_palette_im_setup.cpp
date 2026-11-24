@@ -21,7 +21,9 @@
 #include <QTemporaryDir>
 
 #include "core/AppSettings.h"
+#include "gui/MainWindow.h"
 #include "gui/SetupDialog.h"
+#include "gui/StyleConstants.h"
 #include "gui/styles/Theme.h"
 #include "gui/styles/ThemeQss.h"
 
@@ -128,6 +130,42 @@ private slots:
         // Zurueck zur Standardpalette, damit der Lauf nichts stehen laesst.
         box->setCurrentIndex(0);
         QVERIFY(!Style::Theme::instance().isActive());
+    }
+
+    /// Der Kopf bekommt den Schimmer NUR in Blau-Gold; ohne Palette bleibt
+    /// der Verlauf wie bisher (Standardpalette unveraendert).
+    void kopfleisteHatSchimmerNurInBlauGold()
+    {
+        Style::Theme::instance().clear();
+        QVERIFY2(!Style::titleBarStyle().contains(QLatin1String("qradialgradient")),
+                 "Standard-Kopfleiste hat einen Schimmer -- Standard veraendert");
+
+        QVERIFY(Style::Theme::instance().activate(QStringLiteral("Blau-Gold")));
+        QVERIFY2(Style::titleBarStyle().contains(QLatin1String("qradialgradient")),
+                 "Blau-Gold hat keinen Schimmer am Kopf");
+
+        Style::Theme::instance().clear();
+    }
+
+    /// Das Hauptfenster so, wie es nach einem START in Blau-Gold aussieht:
+    /// die Palette wird VOR dem Bau gesetzt (wie in main.cpp). Die Kopfleisten
+    /// bekommen ihren Verlauf beim Anlegen, ein Wechsel zur Laufzeit faerbt
+    /// sie nicht um. Blatt nur mit LONGPATH_GRAB_DIR.
+    void hauptfensterNachStartInBlauGold()
+    {
+        const QString dir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+        if (dir.isEmpty()) { QSKIP("LONGPATH_GRAB_DIR nicht gesetzt"); }
+
+        QVERIFY(Style::Theme::instance().activate(QStringLiteral("Blau-Gold")));
+        MainWindow mw;
+        mw.resize(1470, 900);
+        mw.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&mw, 20000));
+        QTest::qWait(600);
+        QVERIFY(mw.grab().toImage().save(dir + QStringLiteral("/blau-gold-start-hauptfenster.png")));
+        mw.close();
+
+        Style::Theme::instance().clear();
     }
 
     /// Die Seite in Blau-Gold als Blatt speichern (nur mit LONGPATH_GRAB_DIR).
