@@ -1474,16 +1474,18 @@ void MainWindow::wireFlex()
             return;
         }
 
-        if (!gleicherAusschnitt || m_flexBildFrost.isEmpty()) {
-            sw->updateKiwiSpectrumDbm(dbm, m_flexSpanLowHz, m_flexSpanHighHz);
-            return;
-        }
-
-        QVector<float> gelegt = m_flexBildFrost;
-        for (int i = 0; i < gelegt.size(); ++i) {
-            gelegt[i] = std::max(gelegt[i], dbm[i]);
-        }
-        sw->updateKiwiSpectrumDbm(gelegt, m_flexSpanLowHz, m_flexSpanHighHz);
+        // ── Seit 2026-11-24: beim Senden die Aussendung, nichts Altes ──
+        //
+        // Betreiber: „wenn ich sende, will ich kein eingefrorenes
+        // Signal sehen, sondern genau meine Aussendung!" Das gehaltene
+        // Empfangsbild (je Bin der groessere Wert) zeigte ein
+        // Band, das nicht mehr da war, und verdeckte, wie die
+        // Aussendung wirklich aussieht. Jetzt geht das Bild der
+        // Maschine unveraendert durch -- die eigene Sendung, wie sie
+        // ist. `gleicherAusschnitt` bleibt nur der Vollstaendigkeit
+        // halber stehen.
+        (void)gleicherAusschnitt;
+        sw->updateKiwiSpectrumDbm(dbm, m_flexSpanLowHz, m_flexSpanHighHz);
     });
 
     // ── Aufraeumen beim Trennen ─────────────────────────────────────
@@ -2261,6 +2263,41 @@ void MainWindow::verdrahteFlexSenden()
             << "Flex " << (sendet ? "SENDET" : "empfaengt")
             << (m_flexSelbstGetastet ? " (von uns getastet)"
                                      : " (nicht von uns)");
+
+        // ── Fusstaster am Maestro: das Mac-Mikrofon muss mit (2026-11-24) ──
+        //
+        // Betreiber: „der Fusstaster am Maestro funktioniert nicht, in
+        // SmartSDR schon." Die Maschine sendet dann von selbst (Quelle
+        // Taste/Fusschalter), und bis heute blieb die Pumpe hier AUS --
+        // aus gutem Grund bei einem Mikrofon an der Maschine („sonst
+        // mischt sich unser Ton in seinen"), aber falsch, wenn das
+        // Mikrofon am Mac haengt: dann ging die Maschine auf Sendung
+        // und es kam nichts hinaus.
+        //
+        // Wer sein Sprechzeug am Mac hat, schaltet die Maschine auf
+        // PC-Ton; den Weg dorthin legen wir wie beim eigenen Tasten
+        // (DAX-Route, Pumpe, Uhr). Abschaltbar fuer ein Mikrofon an der
+        // Maschine: Schluessel FlexExternesTastenMitMacMikrofon = False.
+        if (sendet && !m_flexSelbstGetastet && m_flexSendePumpe
+            && !m_radioModel->transmitModel().isTune()
+            && AppSettings::instance()
+                   .value(QStringLiteral("FlexExternesTastenMitMacMikrofon"),
+                          QStringLiteral("True"))
+                   .toString() == QStringLiteral("True")) {
+            m_radioModel->sendeFlexBefehl(
+                FlexCommandWire::setDaxRouteCommand(true));
+            m_flexTonImSenden = 0;
+            m_flexTxProben    = 0;
+            m_flexTxVomMik    = 0;
+            m_flexTxSpitze    = 0.0f;
+            m_flexSendeGeliefert  = 0;
+            m_flexSendeRueckstand = 0;
+            m_flexSendeUhr.start();
+            m_flexSendePumpe->start();
+            qCInfo(lcFlexGui) << "Flex: von aussen getastet (Fusstaster/"
+                                 "Maestro) -- Mac-Mikrofon geht mit";
+        }
+        if (!sendet && !m_flexSelbstGetastet) { m_flexSendeUhr.invalidate(); }
     });
 
     // ── Die Sperre muss sagen, dass sie es war (2026-10-30) ──────
