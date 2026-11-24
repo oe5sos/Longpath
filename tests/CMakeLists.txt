@@ -5919,6 +5919,10 @@ longpath_add_test(tst_dxcluster_wiederanlauf)
 # toter Schalter, die echte Auswahl lag acht Klicks tief, und die Wahl
 # wirkt erst beim Start. Dieser Lauf haelt beides nach.
 longpath_add_test(tst_palette_im_menue)
+# 2026-11-24: Blau-Gold steht auch auf der Seite Setup > Colors & Theme.
+longpath_add_test(tst_palette_im_setup)
+target_compile_definitions(tst_palette_im_setup PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 # 2026-10-15: „zwischen windows ... ein minimaler automatischer
 # Abstand ... dann sieht es besser aus und gleich." Dieser Lauf misst
 # die Luecken am echten Hauptfenster.
