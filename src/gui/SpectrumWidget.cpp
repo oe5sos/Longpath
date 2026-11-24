@@ -9212,6 +9212,20 @@ void SpectrumWidget::setMoxOverlay(bool isTx)
     m_moxOverlay = isTx;
     // Nachlauf des gehaltenen Empfangsbilds (siehe haeltEmpfangsbild).
     m_sendeEndeMs = isTx ? 0 : QDateTime::currentMSecsSinceEpoch();
+
+    // ── Nach dem Senden sofort auf den Boden (2026-11-24) ───────────
+    //
+    // Betreiber: „signal benoetigt sehr lange, bis es wieder am Boden
+    // ist." Die Mittelung rechnet in Leistung: ein Sendepegel 100 dB und
+    // mehr ueber dem Rauschen klingt dort Bild fuer Bild nur um den
+    // Bruchteil ab und braucht Sekunden, bis die Spur wieder unten
+    // liegt. Mit dem Ende der Aussendung gilt der alte Mittelwert nicht
+    // mehr: beide Mittelungen und die Spitzenhaltung von vorn.
+    if (!isTx) {
+        m_spectrumAvenger.clear();
+        m_waterfallAvenger.clear();
+        m_pxPeakHold.clear();
+    }
     markOverlayDirty();
     update();   // ensure QPainter path repaints immediately on MOX flip;
                 // markOverlayDirty alone waits for the next natural QRhi
