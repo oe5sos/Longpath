@@ -84,6 +84,13 @@ private slots:
         QVERIFY2(rr.width() > 0 && tr.width() > 0 && rr.height() > 0 && tr.height() > 0,
                  "RX oder TX hat keine Größe");
 
+        // Zum Ansehen: LONGPATH_RXTX_BILD=<Ordner> schreibt zwei Bilder.
+        const QString bildOrdner = qEnvironmentVariable("LONGPATH_RXTX_BILD");
+        if (!bildOrdner.isEmpty()) {
+            feld2->grab().save(bildOrdner + QStringLiteral("/combined2.png"));
+            mw->grab().save(bildOrdner + QStringLiteral("/fenster.png"));
+        }
+
         delete mw;
     }
 };
