@@ -187,6 +187,17 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     m_btn3d->setObjectName(QStringLiteral("panHeader3dToggle"));
     headLay->addWidget(m_btn3d);
 
+    // Lupe ein/aus (Betreiber 2026-11-24: „der Magnifier soll optional im
+    // Panadapter zum Ein- und Ausblenden sein"). Derselbe Schalter wie
+    // „Passband magnifier" im Optionsmenue; der Knopf zeigt den Zustand.
+    m_btnLupe = new QPushButton(QStringLiteral("MAG"), head);
+    m_btnLupe->setCheckable(true);
+    m_btnLupe->setFixedSize(38, 24);
+    m_btnLupe->setCursor(Qt::PointingHandCursor);
+    m_btnLupe->setToolTip(tr("Show or hide the magnifier (±10 kHz around the VFO)"));
+    m_btnLupe->setObjectName(QStringLiteral("panHeaderMagnifierToggle"));
+    headLay->addWidget(m_btnLupe);
+
     m_btnOptions = new QPushButton(QStringLiteral("\u2699"), head);
     // \u2500\u2500 Das Zahnrad war ein Punkt (2026-10-30) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     //
@@ -214,6 +225,23 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
              QLatin1String(Style::kAccent));
     m_btnOptions->setStyleSheet(kKopfKnopf.arg(17));
     m_btn3d->setStyleSheet(kKopfKnopf.arg(12));
+    m_btnLupe->setStyleSheet(kKopfKnopf.arg(11)
+        + QStringLiteral("QPushButton:checked { color: %1; border-color: %2; }")
+              .arg(QLatin1String(Style::kTextPrimary),
+                   QLatin1String(Style::kAccent)));
+    if (m_spectrum) {
+        m_btnLupe->setChecked(m_spectrum->passbandMagnifier() != 0);
+        connect(m_btnLupe, &QPushButton::clicked, this, [this](bool an) {
+            if (m_spectrum) { m_spectrum->setPassbandMagnifier(an ? 1 : 0); }
+        });
+        connect(m_spectrum, &SpectrumWidget::passbandMagnifierChanged, this,
+                [this](bool an) {
+            if (m_btnLupe && m_btnLupe->isChecked() != an) {
+                QSignalBlocker sperre(m_btnLupe);
+                m_btnLupe->setChecked(an);
+            }
+        });
+    }
     headLay->addWidget(m_btnOptions);
     connect(m_btnOptions, &QPushButton::clicked, this, [this]() {
         QMenu* m = buildDisplayMenu(window());   // am Fenster, siehe contextMenuEvent()

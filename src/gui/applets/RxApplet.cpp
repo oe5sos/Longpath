@@ -516,6 +516,15 @@ void RxApplet::buildUi()
 
         leftCol->addLayout(row);
 
+        // 2026-11-24: die Schrittweite steht jetzt in der Kopfleiste (Step,
+        // zweizeilig). Die Zeile hier war doppelt und zog bei hoher Spalte
+        // die Luft zwischen sich und die Filterfläche. Die Bauteile bleiben
+        // (Modell-Abgleich, Prüfstände), sind aber verborgen.
+        lbl->setVisible(false);
+        m_stepDown->setVisible(false);
+        m_stepLabel->setVisible(false);
+        m_stepUp->setVisible(false);
+
         // Step arrows cycle through kStageOneStepLadder
         // {1, 10, 100, 500, 1k, 10k}. Down = previous, Up = next.
         // Wraps at both ends. Issue #69.
@@ -593,6 +602,7 @@ void RxApplet::buildUi()
             if (m_slice) { m_slice->setFilterCenter(centre); }
         });
         leftCol->addWidget(m_filterPassband);
+        leftCol->addStretch(1);   // Rest der Höhe unten, nicht in der Mitte
     }
 
     columns->addLayout(leftCol, 2);

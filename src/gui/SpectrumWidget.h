@@ -2140,6 +2140,8 @@ signals:
     /// Panadapters — konnte vom anderen Weg nichts erfahren, und die
     /// Beschriftung blieb stehen.
     void spectrumRenderModeChanged(Longpath::SpectrumRenderMode mode);
+    /// Die Lupe (+/-10 kHz um den VFO) wurde ein- oder ausgeschaltet.
+    void passbandMagnifierChanged(bool on);
 
     /// Weitergereicht vom Rechtsklick-Menue (2026-08-18).
     void openSetupPageRequested(const QString& page);

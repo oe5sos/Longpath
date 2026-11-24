@@ -339,6 +339,8 @@ private:
     /// Schnellumschalter 2D/3D in der Kopfleiste; zeigt den Zustand,
     /// nicht das Ziel (siehe PanadapterApplet.cpp).
     QPushButton*            m_btn3d {nullptr};
+    /// Schnellschalter für die Passband-Lupe (±10 kHz), neben 2D/3D.
+    QPushButton*            m_btnLupe {nullptr};
     /// Sichtbarkeit der FUELLFARBE in Prozent (100 = nur Fuellfarbe,
     /// 0 = nur Bild) — dieselbe Zaehlweise wie SpectrumWidget und der
     /// Regler unter Setup -> Display. Nur fuer den Haken im Menue; der
