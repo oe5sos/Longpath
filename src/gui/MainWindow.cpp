@@ -13504,6 +13504,48 @@ void MainWindow::buildMenuBar()
         });
     }
 
+    // ── RX + TX in einem Fenster (2026-11-24) ─────────────────────────
+    //
+    // Betreiber: „ein Window, wo RX und TX zusammen sind." Ein Griff
+    // statt Ziehen und Doppelklicken: RX und TX wandern in Combined 2,
+    // das Feld klappt auf (dort stehen dann nur RX und TX untereinander)
+    // und wird eingeblendet. Was schon in einem Combined liegt, kommt von
+    // dort herüber -- ein Panel hat nur einen Platz.
+    if (m_kombiApplet2 && m_rxApplet && m_txApplet) {
+        QAction* rxtx = containersMenu->addAction(tr("RX + TX in one window"));
+        rxtx->setObjectName(QStringLiteral("actRxTxOneWindow"));
+        rxtx->setToolTip(tr(
+            "Puts RX and TX one above the other in Combined 2."));
+        connect(rxtx, &QAction::triggered, this, [this]() {
+            if (m_shuttingDown || !m_kombiApplet2) { return; }
+            KombiApplet* ziel = m_kombiApplet2;
+            const std::pair<AppletWidget*, QString> beide[] = {
+                {m_rxApplet, QStringLiteral("Rx")},
+                {m_txApplet, QStringLiteral("Tx")}};
+            for (const auto& [applet, id] : beide) {
+                if (!applet || ziel->seiten().contains(applet)) { continue; }
+                KombiApplet* quelle = nullptr;
+                for (KombiApplet* f : kombiFelder()) {
+                    if (f && f != ziel && f->seiten().contains(applet)) {
+                        quelle = f;
+                        break;
+                    }
+                }
+                if (quelle) {
+                    quelle->gibFrei(applet);
+                    uebergibKombiPanel(ziel, applet);
+                } else {
+                    holeInsKombiFeld(ziel, applet, id);
+                }
+            }
+            if (m_appletVis) {
+                m_appletVis->setVisible(QStringLiteral("Kombi2"), true);
+            }
+            ziel->setAufgeklappt(true);
+            ziel->show();
+        });
+    }
+
     // ── Feldbetrieb (2026-10-15) ─────────────────────────────────────
     //
     // Betreiber, 2026-10-14: „wenn man wenig platz hat und sota macht
