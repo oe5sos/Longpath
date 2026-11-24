@@ -603,9 +603,14 @@ void RxApplet::buildUi()
         });
         leftCol->addWidget(m_filterPassband);
         leftCol->addStretch(1);   // Rest der Höhe unten, nicht in der Mitte
+        // 2026-11-24: „die Grafik vom Bandfilter benötigen wir dort nicht" —
+        // die große Kachel BANDWIDTH FILTER zeigt dasselbe. Das Bauteil
+        // bleibt (Modell-Abgleich, Prüfstände), ist aber verborgen und malt
+        // nichts; die linke Spalte ist damit leer und bekommt keine Breite.
+        m_filterPassband->setVisible(false);
     }
 
-    columns->addLayout(leftCol, 2);
+    columns->addLayout(leftCol, 0);   // leer (Filterbild verborgen): keine Breite
 
     // ── Right column ──────────────────────────────────────────────────────
     auto* rightCol = new QVBoxLayout;
@@ -2266,7 +2271,7 @@ void RxApplet::applyColumnDirection()
     // Untereinander bekommt keine Spalte "Stretch" — sonst zoege die
     // rechte (3) die Reihen der linken auseinander.
     for (int i = 0; i < m_columns->count(); ++i) {
-        m_columns->setStretch(i, stacked ? 0 : (i == 0 ? 2 : 3));
+        m_columns->setStretch(i, stacked ? 0 : (i == 0 ? 0 : 3));
     }
 }
 
