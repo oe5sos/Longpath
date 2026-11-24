@@ -1532,6 +1532,7 @@ add_custom_command(TARGET Longpath POST_BUILD
             "${CMAKE_SOURCE_DIR}/resources/themes/flach.json"
             "${CMAKE_SOURCE_DIR}/resources/themes/tief.json"
             "${CMAKE_SOURCE_DIR}/resources/themes/moos.json"
+            "${CMAKE_SOURCE_DIR}/resources/themes/blau-gold.json"
             "${_longpath_theme_dest}/"
     COMMENT "Paletten mitliefern")
 if(LONGPATH_LTO_AVAILABLE)

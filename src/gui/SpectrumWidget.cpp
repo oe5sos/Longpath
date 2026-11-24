@@ -12870,6 +12870,18 @@ void SpectrumWidget::leaveEvent(QEvent* event)
 
 void SpectrumWidget::wheelEvent(QWheelEvent* event)
 {
+    // Diagnose (2026-11-22): welche Radereignisse ein Logitech schickt.
+    // Nur die ersten zwanzig, nur zum Lesen, ohne Wirkung auf die Frequenz.
+    static int diagZaehler = 0;
+    if (diagZaehler++ < 20) {
+        qCInfo(lcSpectrum).nospace()
+            << "Mausrad: winkel=(" << event->angleDelta().x() << "," << event->angleDelta().y()
+            << ") pixel=(" << event->pixelDelta().x() << "," << event->pixelDelta().y()
+            << ") invertiert=" << event->inverted()
+            << " quelle=" << static_cast<int>(event->source())
+            << " phase=" << static_cast<int>(event->phase())
+            << " modifikatoren=" << static_cast<int>(event->modifiers());
+    }
     // MW0LGE before all, handle the notch size change
     //   [original inline comment from console.cs:31140]
     // From Thetis console.cs:31133-31145 [v2.10.3.15] — the wheel resizes
@@ -13006,7 +13018,11 @@ double SpectrumWidget::snapTuneHz(double freqHz, int stepHz, int numSteps)
 int SpectrumWidget::wheelStepsFor(QWheelEvent* ev)
 {
     int steps = 0;
-    if (!ev->pixelDelta().isNull()) {
+    // Nur ein Trackpad hat Phasen. Ein Mausrad (auch Logitech) schickt
+    // zusaetzlich ein kleines pixelDelta (2 px je Raste), das sonst den
+    // Trackpad-Weg mit 15 px je Schritt nahm -- dort kam nie ein Schritt
+    // heraus. Ohne Phase: Raststufen (angleDelta), wie bei jeder Maus.
+    if (!ev->pixelDelta().isNull() && ev->phase() != Qt::NoScrollPhase) {
         if (ev->phase() == Qt::ScrollMomentum) { return 0; }
         if (qAbs(ev->pixelDelta().x()) > qAbs(ev->pixelDelta().y())) { return 0; }
         m_wheelPixelAccum += ev->pixelDelta().y();
