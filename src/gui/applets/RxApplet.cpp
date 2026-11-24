@@ -594,6 +594,9 @@ void RxApplet::buildUi()
         });
         leftCol->addWidget(m_filterPassband);
     }
+    // Oben bleiben, wie der TX-Reiter: der Leerraum wird unten gesammelt,
+    // nicht zwischen Step und Durchlassflaeche verteilt (2026-11-24).
+    leftCol->addStretch(1);
 
     columns->addLayout(leftCol, 2);
 
@@ -920,8 +923,6 @@ void RxApplet::buildUi()
         rightCol->addWidget(m_agcTContainer);
     }
 
-    rightCol->addStretch(1);
-
     // Control 15: RIT toggle + offset + zero
     // Live-wired in S2.8 — SliceModel::setRitEnabled/setRitHz feed the
     // existing RxChannel::setShiftFrequency path via RadioModel.
@@ -1063,6 +1064,10 @@ void RxApplet::buildUi()
     m_rttyContainer = new RttyMarkShiftContainer(this);
     m_rttyContainer->setVisible(false);
     rightCol->addWidget(m_rttyContainer);
+
+    // Der Leerraum sammelt sich UNTEN (wie im TX-Reiter), nicht zwischen
+    // AGC und RIT/XIT (2026-11-24, Blatt vorher-rx.png).
+    rightCol->addStretch(1);
 
     // Stand die Scheibe schon VOR buildUi() fest, bekommen die drei sie
     // hier -- der Konstruktor setzt m_slice direkt und ruft niemals

@@ -563,7 +563,12 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         m_dexpLabel->setStyleSheet(Longpath::Style::insetValueStyle());
         m_dexpLabel->setMinimumWidth(38);   // Monospace-Chip waechst mit ("50 d" auf dem Blatt 2026-09-17)
         m_dexpLabel->setAlignment(Qt::AlignCenter);
-        row->addWidget(m_dexpLabel);
+        // Feste Hoehe, mittig in der Zeile: sonst streckt die Zeile das
+        // Anzeigefeld auf die ganze Hoehe der Schieberspalte -- ein
+        // dunkler Kasten ohne Bedienelement (Blatt vorher-phone.png).
+        m_dexpLabel->setFixedHeight(20);
+        m_dexpLabel->setObjectName(QStringLiteral("PhoneCwDexpValue"));
+        row->addWidget(m_dexpLabel, 0, Qt::AlignVCenter);
 
         vbox->addLayout(row);
     }
@@ -601,10 +606,14 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         m_amCarLabel->setStyleSheet(Longpath::Style::insetValueStyle());
         m_amCarLabel->setMinimumWidth(30);
         m_amCarLabel->setAlignment(Qt::AlignCenter);
-        row->addWidget(m_amCarLabel);
+        m_amCarLabel->setFixedHeight(20);   // wie DEXP: keine Streckung (2026-11-24)
+        row->addWidget(m_amCarLabel, 0, Qt::AlignVCenter);
 
         vbox->addLayout(row);
     }
+
+    // Oben bleiben, wie der TX-Reiter: Leerraum unten, nicht zwischen den Zeilen.
+    vbox->addStretch(1);
 
     // ── Mark Phone controls NYI (wired controls NOT marked) ──────────────────
     // #1  m_levelGauge       — wired (Phase 3M-1b mic level gauge)
