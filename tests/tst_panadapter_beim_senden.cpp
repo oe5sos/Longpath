@@ -7,7 +7,7 @@
 // Entwurf 1 „wie Empfang" (werkzeug/entwuerfe-pan-beim-senden-2026-11-20).
 //
 // Dieser Pruefstand nagelt fest:
-//   1. ab Werk an, Abwahl ueberlebt den Neustart;
+//   1. ab Werk Bild live (Halten aus), Wahl ueberlebt den Neustart;
 //   2. beim Senden bleibt die Spur das letzte Empfangsbild, 400 ms danach
 //      auch noch, dann laeuft sie wieder;
 //   3. der Wasserfall schreibt beim Senden keine Zeilen -- weder die
@@ -88,17 +88,17 @@ private slots:
         {
             SpectrumWidget w;
             w.loadSettings();
-            QVERIFY(w.holdReceivePictureOnTx());
+            QVERIFY(!w.holdReceivePictureOnTx());   // ab Werk live
             QVERIFY(w.txPassbandLikeRx());
             QVERIFY(!w.haeltEmpfangsbild());       // im Empfang nichts halten
             QVERIFY(!w.zeigtSendestreifen());
-            w.setHoldReceivePictureOnTx(false);
+            w.setHoldReceivePictureOnTx(true);
             w.setTxPassbandLikeRx(false);
             w.saveSettings();
         }
         SpectrumWidget w2;
         w2.loadSettings();
-        QVERIFY(!w2.holdReceivePictureOnTx());
+        QVERIFY(w2.holdReceivePictureOnTx());
         QVERIFY(!w2.txPassbandLikeRx());
     }
 
@@ -107,6 +107,7 @@ private slots:
     {
         SpectrumWidget w;
         einrichten(w);
+        w.setHoldReceivePictureOnTx(true);
         fuettern(w, empfang(300));
         const QVector<float> empfangsbild = w.renderedPixels();
         QVERIFY(!empfangsbild.isEmpty());
@@ -133,6 +134,7 @@ private slots:
     {
         SpectrumWidget w;
         einrichten(w);
+        w.setHoldReceivePictureOnTx(true);
         w.resize(900, 500);
         const QVector<float> zeile(600, 100.0f);
         const double tief = kMitteHz - kSpanneHz / 2.0;
@@ -162,6 +164,7 @@ private slots:
     {
         SpectrumWidget w;
         einrichten(w);
+        w.setHoldReceivePictureOnTx(true);
         w.resize(900, 500);
         w.setWfUpdatePeriodMs(20);
         for (int i = 0; i < 10; ++i) {
@@ -193,6 +196,7 @@ private slots:
     {
         SpectrumWidget w;
         einrichten(w);
+        w.setHoldReceivePictureOnTx(true);
         w.resize(800, 400);
         w.setVfoFrequency(14074000.0);
         w.setFrequencyRange(14075750.0, 3500.0);
@@ -252,11 +256,11 @@ private slots:
             }
         }
         QVERIFY2(halten && gruen, "beide Haken stehen im Zahnrad");
-        QVERIFY(halten->isCheckable() && halten->isChecked());
+        QVERIFY(halten->isCheckable() && !halten->isChecked());
         QVERIFY(gruen->isCheckable() && gruen->isChecked());
 
         halten->trigger();
-        QVERIFY(!sw->holdReceivePictureOnTx());
+        QVERIFY(sw->holdReceivePictureOnTx());
         gruen->trigger();
         QVERIFY(!sw->txPassbandLikeRx());
         delete m;

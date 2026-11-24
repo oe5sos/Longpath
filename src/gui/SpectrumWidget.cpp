@@ -1263,7 +1263,12 @@ void SpectrumWidget::loadSettings()
     m_wfNfAgcEnabled = readBool(QStringLiteral("WaterfallNFAGCEnabled"), false);
     m_wfNfAgcOffsetDb = readInt(QStringLiteral("WaterfallAGCOffsetDb"), 0);
     m_wfStopOnTx = readBool(QStringLiteral("WaterfallStopOnTx"), false);
-    m_haltBildBeimSenden = readBool(QStringLiteral("DisplayHoldRxPictureOnTx"), true);
+    // 2026-11-24, Betreiber: „ich moechte beim senden mein signal genau
+    // sehen, derzeit ist alles eingefroren". Ab Werk jetzt AUS, und der
+    // Schluessel heisst neu (V2): der alte Wert „True" stammt aus der
+    // Vorgabe, nicht aus einer Wahl, und haette das Einfrieren auf jeder
+    // Maschine festgehalten, die schon einmal gespeichert hat.
+    m_haltBildBeimSenden = readBool(QStringLiteral("DisplayHoldRxPictureOnTxV2"), false);
     m_txDurchlassWieRx   = readBool(QStringLiteral("DisplayTxPassbandLikeRx"), true);
     // Oben und unten getrennt (2026-11-21). Wer vorher EIN Schema hatte
     // (DisplayColourScheme), bekommt es oben und unten.
@@ -1577,7 +1582,7 @@ void SpectrumWidget::saveSettings()
     writeInt(QStringLiteral("WaterfallAGCOffsetDb"), m_wfNfAgcOffsetDb);
     s.setValue(settingsKey(QStringLiteral("WaterfallStopOnTx"), m_panIndex),
               m_wfStopOnTx ? QStringLiteral("True") : QStringLiteral("False"));
-    s.setValue(settingsKey(QStringLiteral("DisplayHoldRxPictureOnTx"), m_panIndex),
+    s.setValue(settingsKey(QStringLiteral("DisplayHoldRxPictureOnTxV2"), m_panIndex),
               m_haltBildBeimSenden ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayTxPassbandLikeRx"), m_panIndex),
               m_txDurchlassWieRx ? QStringLiteral("True") : QStringLiteral("False"));
