@@ -148,8 +148,7 @@ private slots:
             }
             return n;
         };
-        QTest::qWait(100);
-        QCOMPARE(list->count(), 12);
+        QTRY_COMPARE_WITH_TIMEOUT(list->count(), 12, 3000);   // Aufbau wird gebuendelt
         const int klein = visibleRows();
         mw->resize(1400, 1100);
         QTest::qWait(150);
@@ -364,9 +363,11 @@ private slots:
         SliceModel* radio = model->sliceById(radioSlice);
         QVERIFY(radio && !radio->muted());
 
-        // Ohne Kiwi-Ton: abgelehnt.
+        // Radio stumm geht auch ohne Kiwi-Ton (Betreiber 2026-11-25).
         mw->setRadioMutedForTest(true);
-        QVERIFY(!mw->radioMutedForTest());
+        QVERIFY(mw->radioMutedForTest());
+        QVERIFY(audio->muteNonKiwi());
+        mw->setRadioMutedForTest(false);
         QVERIFY(!audio->muteNonKiwi());
 
         const QString id = profile(mgr, "Linz", 120);
@@ -378,10 +379,9 @@ private slots:
         QVERIFY(audio->muteNonKiwi());
         QVERIFY(!radio->muted());                 // die Scheibe selbst bleibt unberuehrt
 
-        // Letzter Kiwi-Ton weg -> Radio wieder an.
+        // Kiwi-Ton weg: "Radio stumm" bleibt, wie der Betreiber es eingestellt hat.
         mw->setKiwiSoundForTest(id, false);
-        QVERIFY(!mw->radioMutedForTest());
-        QVERIFY(!audio->muteNonKiwi());
+        QVERIFY(mw->radioMutedForTest());
     }
 
     // Aus dem Verzeichnis gewaehlter Kiwi: ist "Mein Signal"-Kiwi UND steht im

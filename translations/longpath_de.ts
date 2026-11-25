@@ -3549,6 +3549,10 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 <context>
     <name>Longpath::MainWindow</name>
     <message>
+        <source>This Kiwi has no free waterfall channel — sound only.</source>
+        <translation>Dieser Kiwi hat keinen freien Wasserfall-Kanal — nur Ton.</translation>
+    </message>
+    <message>
         <source>My Signal: no slice free for the Kiwi.</source>
         <translation>Mein Signal: keine Scheibe frei für den Kiwi.</translation>
     </message>
@@ -5480,6 +5484,14 @@ All custom band/pin mappings will be cleared.</source>
 </context>
 <context>
     <name>Longpath::PanadapterApplet</name>
+    <message>
+        <source>Radio sound on / off (playback only)</source>
+        <translation>Ton des Funkgeräts ein / aus (nur Wiedergabe)</translation>
+    </message>
+    <message>
+        <source>Sound</source>
+        <translation>Ton</translation>
+    </message>
     <message>
         <location filename="../src/gui/PanadapterApplet.cpp" line="507"/>
         <source>Add slice on this pan</source>

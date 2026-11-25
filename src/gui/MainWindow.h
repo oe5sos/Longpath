@@ -2335,6 +2335,7 @@ private:
     KiwiGroup m_kiwiGroup;
     QPointer<KiwiHearingDialog> m_kiwiHearingDialog;
     QTimer* m_kiwiGroupTimer{nullptr};
+    QSet<QString> m_kiwiUserMuted;   // Kiwis, deren Ton der Betreiber ausgeschaltet hat
     bool m_kiwiAppletRefreshBlocked{false};
     bool m_kiwiAppletRefreshDirty{false};
     QHash<QString, double> m_kiwiViewSpanHz;   // Bereich je Kiwi-Streifen (Hz)

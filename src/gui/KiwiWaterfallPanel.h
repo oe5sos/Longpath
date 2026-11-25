@@ -32,6 +32,7 @@ class KiwiWaterfallPanel : public AppletWidget {
 
 public:
     explicit KiwiWaterfallPanel(RadioModel* model, QWidget* parent = nullptr);
+    QSize sizeHint() const override { return QSize(560, 460); }
 
     QString appletId()    const override { return QStringLiteral("kiwiWaterfalls"); }
     QString appletTitle() const override { return tr("KIWI WATERFALLS"); }
@@ -39,6 +40,7 @@ public:
     void syncFromModel() override {}
 
 signals:
+    void emptyChanged(bool empty);   ///< ohne Streifen: das Fenster wird nicht gebraucht
     // Wuensche der Streifen, weitergereicht (das Panel entscheidet nichts).
     void removeRequested(const QString& profileId);
     void renameRequested(const QString& profileId);
@@ -69,6 +71,8 @@ private:
     QPushButton* m_allSoundOff{nullptr};
     QVBoxLayout* m_stripsLayout{nullptr};
     QHash<QString, KiwiWaterfallStripWidget*> m_strips;
+private:
+    bool m_wasEmpty{true};
 };
 
 } // namespace Longpath

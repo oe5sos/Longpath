@@ -145,6 +145,10 @@ void KiwiWaterfallPanel::resetStrip(const QString& profileId)
 void KiwiWaterfallPanel::updateEmptyState()
 {
     m_emptyLabel->setVisible(m_strips.isEmpty());
+    if (m_wasEmpty != m_strips.isEmpty()) {
+        m_wasEmpty = m_strips.isEmpty();
+        emit emptyChanged(m_wasEmpty);
+    }
 }
 
 } // namespace Longpath

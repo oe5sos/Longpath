@@ -34,6 +34,8 @@
 #include "core/LogCategories.h"
 #include "gui/KiwiHearingDialog.h"
 #include "gui/KiwiWaterfallPanel.h"
+#include "gui/PanadapterStack.h"
+#include "gui/PanadapterApplet.h"
 #include "gui/applets/AppletVisibilityController.h"
 #include "gui/KiwiWaterfallStripWidget.h"
 #include "gui/KiwiPublicReceiverPicker.h"
@@ -108,6 +110,23 @@ void MainWindow::wireKiwiGroup()
 
     // Ton je Kiwi (Schalter im Streifen der KIWI-WASSERFAELLE).
     if (m_kiwiWaterfallPanel) {
+        // Ein leeres Fenster braucht niemand (Betreiber 2026-11-25): es geht
+        // mit dem letzten Streifen zu und mit dem ersten auf.
+        connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::emptyChanged, this,
+                [this](bool empty) {
+            if (m_appletVis) { m_appletVis->setVisible(QStringLiteral("KiwiWaterfalls"), !empty); }
+        });
+        QTimer::singleShot(0, this, [this]() {
+            if (m_appletVis && m_kiwiWaterfallPanel
+                && m_kiwiWaterfallPanel->stripForTest(QString()) == nullptr
+                && m_kiwiSdrManager) {
+                bool any = false;
+                for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
+                    if (pr.waterfallPreviewEnabled) { any = true; break; }
+                }
+                if (!any) { m_appletVis->setVisible(QStringLiteral("KiwiWaterfalls"), false); }
+            }
+        });
         connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::soundToggled, this,
                 [this](const QString& id, bool on) { setKiwiSound(id, on); });
         connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::zoomRequested, this,
@@ -229,6 +248,19 @@ void MainWindow::setKiwiSound(const QString& profileId, bool on)
     }
     const int assigned = m_kiwiSdrManager->assignedSliceForProfile(profileId);
 
+    // Der Kiwi von "Mein Signal" behaelt seine Scheibe; sein Ton wird nur stumm/
+    // laut geschaltet (Betreiber 2026-11-25: "das Ein- und Ausschalten geht nicht").
+    if (profileId == m_kiwiOwnProfileId && assigned >= 0) {
+        if (AudioEngine* audio = m_radioModel->audioEngine()) {
+            if (on) { m_kiwiUserMuted.remove(profileId); }
+            else { m_kiwiUserMuted.insert(profileId); }
+            audio->setKiwiSdrAudioSourceEnabled(assigned, on);
+        }
+        refreshKiwiSoundButtons();
+        return;
+    }
+    if (on) { m_kiwiUserMuted.remove(profileId); }
+
     if (on) {
         if (assigned >= 0) { refreshKiwiSoundButtons(); return; }   // schon hoerbar
         // Die aktive Scheibe merken: die neue ungebundene darf nichts verschieben.
@@ -347,28 +379,23 @@ void MainWindow::setRadioMuted(bool on)
 {
     AudioEngine* audio = m_radioModel ? m_radioModel->audioEngine() : nullptr;
     if (!audio) { m_radioMuted = false; return; }
-    if (on && audio->kiwiAudioSliceCount() == 0) {
-        showToast(tr("Switch a Kiwi's sound on first — otherwise nothing would be heard."),
-                  ToastSeverity::Info, 6000);
-        on = false;
-    }
     m_radioMuted = on;
     audio->setMuteNonKiwi(on);
     if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setRadioMutedActive(on); }
+    if (m_panStack) {
+        for (auto* a : m_panStack->allApplets()) {
+            if (a) { a->setRadioMutedActive(on); }
+        }
+    }
 }
 
 void MainWindow::refreshKiwiSoundButtons()
 {
-    if (m_radioMuted && m_radioModel && m_radioModel->audioEngine()
-        && m_radioModel->audioEngine()->kiwiAudioSliceCount() == 0) {
-        setRadioMuted(false);
-        showToast(tr("Radio unmuted: no Kiwi is playing any more."),
-                  ToastSeverity::Info, 6000);
-    }
     if (!m_kiwiWaterfallPanel || !m_kiwiSdrManager) { return; }
     for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
         m_kiwiWaterfallPanel->setSoundActive(
-            pr.id, m_kiwiSdrManager->assignedSliceForProfile(pr.id) >= 0);
+            pr.id, m_kiwiSdrManager->assignedSliceForProfile(pr.id) >= 0
+                       && !m_kiwiUserMuted.contains(pr.id));
         const KiwiSdrClient::State st = m_kiwiSdrManager->state(pr.id);
         const bool up = st == KiwiSdrClient::State::Connected || st == KiwiSdrClient::State::Camping;
         m_kiwiWaterfallPanel->setNotice(

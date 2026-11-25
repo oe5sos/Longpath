@@ -377,6 +377,10 @@ void MainWindow::syncKiwiSdrTransmitMute()
         // darf ihre Sendesperre nicht mehr von einem KiwiSDR-Profil
         // bekommen.
         if (!kiwiControllableSlice(sliceId)) { continue; }
+        if (m_kiwiUserMuted.contains(profile.id)) {
+            audio->setKiwiSdrAudioSourceEnabled(sliceId, false);
+            continue;
+        }
 
         if (sending) {
             // "Mein Signal" haelt den Ton des Modus-Kiwi beim Senden an
@@ -801,6 +805,10 @@ void MainWindow::wireKiwiSdr()
         if (!kiwiControllableSlice(sliceId)) { return; }
         AudioEngine* audio = m_radioModel->audioEngine();
         if (!audio) { return; }
+        if (enabled && m_kiwiUserMuted.contains(profileId)) {
+            audio->setKiwiSdrAudioSourceEnabled(sliceId, false);
+            return;
+        }
         if (enabled) {
             const TransmitModel& tx = m_radioModel->transmitModel();
             const bool sending = tx.isMox() || tx.isTune() || m_radioModel->flexSendetGerade();

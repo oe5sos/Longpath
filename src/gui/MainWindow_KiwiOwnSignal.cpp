@@ -214,6 +214,8 @@ void MainWindow::setKiwiOwnSignalProfile(const QString& profileId, double km)
     }
     m_kiwiOwnProfileId = profileId;
     m_kiwiOwnKm = km;
+    // Auch im Fenster KIWI WASSERFAELLE, dort stehen +/-, Ton und Bereich.
+    m_kiwiSdrManager->setWaterfallPreviewEnabled(profileId, true);
     AppSettings::instance().setValue(kKeyProfile, profileId);
     AppSettings::instance().setValue(kKeyKm, QString::number(km, 'f', 1));
     updateKiwiGroupCapacity();
