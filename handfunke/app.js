@@ -15,6 +15,7 @@ import { Sendetasten, SENDEN, TUNE, ablehnText } from './sendetaste.js';
 import { Zeichenbremse } from './ton-vorrang.js';
 import { bildIstAlt } from './aufwachen.js';
 import { desktopStarten } from './desktop.js';
+import { zeiger as zeigerBauen, sEinheiten, SIG_KLEIN, SWR_KLEIN, kompassBlatt } from './instrument.js';
 import { standLesen, zustandText, fehlerText as rotorFehlerText,
          peilungAus, Sicherung as RotorSicherung,
          DREHT } from './rotor.js';
@@ -751,7 +752,11 @@ function sEinheit(dbm) {
 //     die Rechenzeit im Rahmen bleibt.
 // Den Datenstrom beruehrt nichts davon: es werden weiter DATENPUNKTE Punkte
 // angefordert.
-const DATENPUNKTE = 373, WF_ZEILEN = 160;
+// WF_ZEILEN war 160. Betreiber 2026-11-22: „sollte langsamer sein". Der
+// Puffer wird auf die Anzeigehoehe gestreckt, eine Zeile je Spektrum -- mit
+// doppelt so vielen Zeilen laeuft das Bild halb so schnell und zeigt die
+// doppelte Zeit. Datenstrom und Zeilenrate bleiben gleich.
+const DATENPUNKTE = 373, WF_ZEILEN = 320;
 const pan = $('pan'), panCtx = pan.getContext('2d');
 const wfAnz = $('wf'), wfAnzCtx = wfAnz.getContext('2d');
 const wf = document.createElement('canvas');
@@ -1121,7 +1126,8 @@ function zeichneBild() {
     const yy = y(spitze[x]);
     x ? panCtx.lineTo(x, yy) : panCtx.moveTo(x, yy);
   }
-  panCtx.strokeStyle = '#8fd8ff'; panCtx.lineWidth = 1.5; panCtx.stroke();
+  // 1.5 -> 1 (Betreiber 2026-11-22: „Linie noch duenner").
+  panCtx.strokeStyle = '#8fd8ff'; panCtx.lineWidth = 1; panCtx.stroke();
 
   panCtx.fillStyle = '#9aa0a8'; panCtx.font = '9px ui-monospace,Menlo,monospace';
   for (let i = 0; i <= 3; i++) {
@@ -2518,6 +2524,13 @@ function rotorZeichnen() {
     nadel.classList.toggle('alt', !!alt);
     $('rotorGrad').textContent = `${Math.round(rotorStand.grad)}°`;
     $('rotorGrad').classList.toggle('alt', !!alt);
+    // Kleiner Kompass in der Instrumentenzeile: dieselben Werte, kein zweiter Weg.
+    const nk = $('rotorNadelK');
+    nk.setAttribute('x2', (Math.sin(rad) * 82).toFixed(2));
+    nk.setAttribute('y2', (-Math.cos(rad) * 82).toFixed(2));
+    nk.classList.toggle('alt', !!alt);
+    $('rotorGradK').textContent = `${Math.round(rotorStand.grad)}°`;
+    $('rotorGradK').classList.toggle('alt', !!alt);
   }
   const z = rotorSicherung.gilt(performance.now()) ? rotorSicherung.ziel : null;
   if (z === null) { ziel.setAttribute('hidden', ''); }
@@ -2547,6 +2560,7 @@ link.addEventListener('rotor', (e) => {
     rotorFeldAn = true;
     rotorStricheZeichnen();
     $('rotorFeld').removeAttribute('hidden');
+    $('kompassBox').removeAttribute('hidden');
   }
   rotorZeichnen();
 });
@@ -3219,18 +3233,10 @@ desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logLi
 // hier werden sie nur in das neue Instrument uebersetzt. Kein zweiter Weg zu
 // den Messwerten, damit beide Anzeigen nie auseinanderlaufen.
 {
-  const striche = $('gaugeStriche');
-  for (let i = 0; i <= 8; i++) {
-    const w = (-62 + i * 15.5) * Math.PI / 180;
-    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    l.setAttribute('x1', (66 + 46 * Math.sin(w)).toFixed(1));
-    l.setAttribute('y1', (60 - 46 * Math.cos(w)).toFixed(1));
-    l.setAttribute('x2', (66 + 54 * Math.sin(w)).toFixed(1));
-    l.setAttribute('y2', (60 - 54 * Math.cos(w)).toFixed(1));
-    l.setAttribute('stroke', i > 6 ? '#a86b6d' : '#7e7e85');
-    l.setAttribute('stroke-width', '1.5');
-    striche.appendChild(l);
-  }
+  // Zeigerinstrumente nach Longpath (instrument.js): S-Meter und SWR.
+  const zeigerS = zeigerBauen($('gaugeSvg'), SIG_KLEIN, 's');
+  zeigerS(null);
+  kompassBlatt($('rotorBlattK'));
   const rotorFeld = $('rotorFeld');
   $('rotorKopf').addEventListener('click', () => {
     const offen = rotorFeld.classList.toggle('offen');
@@ -3240,9 +3246,43 @@ desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logLi
     const t = ($('smeter').textContent || '—').split('·');
     $('sval').textContent = (t[0] || '—').trim();
     $('sdb').textContent = (t[1] || '').trim();
+    $('sval').title = (t[1] || '').trim();
     const w = parseFloat($('sbar').style.width) || 0;
-    $('gaugeNadel').setAttribute('transform', 'rotate(' + (-62 + 1.24 * w) + ' 66 60)');
+    const dbmS = (link.ready && link.st.vfo[state.trx] && link.st.vfo[state.trx][0]) ? link.st.smeter[state.trx] : null;
+    zeigerS(dbmS === null || dbmS === undefined ? null : sEinheiten(dbmS));
+    for (const id of ['sval', 'swrWert', 'rotorGradK']) {
+      const e = $(id); if (e) { e.classList.toggle('aus', !e.textContent.trim() || e.textContent.trim() === '—'); }
+    }
     $('rotorKopfGrad').textContent = ($('rotorGrad').textContent || '').trim();
     $('onAir').classList.toggle('an', !!(link.ready && (link.st.mox || link.st.tune)));
   }, 250);
+}
+
+
+// ── Instrumentenzeile: SWR und Kompass (2026-11-22) ─────────────────────────
+// SWR kommt aus `tx_sensors` (Feld 4) und existiert nur WAEHREND des Sendens:
+// Longpath schickt die Zeilen nur bei getastetem Sender. Sonst „—", nie eine
+// erfundene Zahl, und auch kein stehengebliebener Wert vom letzten Senden.
+{
+  const zeigerW = zeigerBauen($('swrSvg'), SWR_KLEIN, 'w');
+  zeigerW(null);
+  setInterval(() => {
+    const v = link.st.txSwr;
+    const sendet = link.ready && (link.st.mox || link.st.tune);
+    const frisch = performance.now() - (link.st.txSensorZeit || 0) < 1500;
+    if (sendet && frisch && v !== null && v >= 1) {
+      $('swrWert').textContent = v.toFixed(1);
+      zeigerW(Math.min(v, 3));
+    } else {
+      $('swrWert').textContent = '—';
+      zeigerW(null);
+    }
+  }, 250);
+  // Antippen des Kompasses oeffnet die volle Rotorsteuerung (die Zeile
+  // darunter), und zwar sichtbar.
+  $('kompassBox').addEventListener('click', () => {
+    const f = $('rotorFeld');
+    if (!f.classList.contains('offen')) { $('rotorKopf').click(); }
+    f.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
 }
