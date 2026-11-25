@@ -34,6 +34,9 @@ public:
     explicit KiwiWaterfallPanel(RadioModel* model, QWidget* parent = nullptr);
     bool isEmptyForTest() const { return m_strips.isEmpty(); }
     QSize sizeHint() const override { return QSize(560, 460); }
+    // Untergrenze fuer die gemerkte Fenstergroesse: ein leeres Fenster
+    // schrumpfte frueher auf 125 x 93 und blieb so, unsichtbar klein.
+    QSize minimumSizeHint() const override { return QSize(420, 300); }
 
     QString appletId()    const override { return QStringLiteral("kiwiWaterfalls"); }
     QString appletTitle() const override { return tr("KIWI WATERFALLS"); }

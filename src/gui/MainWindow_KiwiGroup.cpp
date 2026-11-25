@@ -56,6 +56,31 @@
 namespace Longpath {
 
 namespace {
+// Das KIWI-WASSERFAELLE-Fenster nach vorn holen und auf den Schirm zwingen:
+// "setVisible(true)" tut nichts, wenn es schon offen ist, aber hinter
+// anderen Fenstern oder winzig liegt (Betreiber 2026-11-25: "ich sehe keine
+// am Bildschirm", "wenn ich klicke geht kein Fenster auf").
+void kiwiFensterNachVorn(QWidget* panel, QWidget* haupt)
+{
+    if (!panel) { return; }
+    QWidget* w = panel->window();
+    if (!w || w == haupt) { return; }
+    w->show();
+    const QSize mind = panel->minimumSizeHint();
+    if (w->width() < mind.width() || w->height() < mind.height()) {
+        w->resize(qMax(w->width(), mind.width() + 4), qMax(w->height(), mind.height() + 30));
+    }
+    if (haupt && !haupt->frameGeometry().intersects(w->frameGeometry())) {
+        const QPoint c = haupt->frameGeometry().center();
+        w->move(c.x() - w->width() / 2, c.y() - w->height() / 2);
+    }
+    w->raise();
+    w->activateWindow();
+}
+}  // namespace
+
+
+namespace {
 // Die Kennungen, mit denen Mithoerer beim Client "verfolgt" werden. Der
 // Client braucht nur eine nicht-negative Zahl; eine Scheibe dazu gibt es
 // nicht (und darf es nicht geben).
@@ -81,6 +106,7 @@ void MainWindow::wireKiwiGroup()
         if (!m_kiwiSdrManager || !m_kiwiSdrManager->hasProfile(id)) { return; }
         m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
         if (m_appletVis) { m_appletVis->setVisible(QStringLiteral("KiwiWaterfalls"), true); }
+        kiwiFensterNachVorn(m_kiwiWaterfallPanel, this);
     });
     m_kiwiSoloTimer = new QTimer(this);
     m_kiwiSoloTimer->setSingleShot(true);
@@ -115,6 +141,7 @@ void MainWindow::wireKiwiGroup()
         connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::emptyChanged, this,
                 [this](bool empty) {
             if (m_appletVis) { m_appletVis->setVisible(QStringLiteral("KiwiWaterfalls"), !empty); }
+            if (!empty) { kiwiFensterNachVorn(m_kiwiWaterfallPanel, this); }
         });
         QTimer::singleShot(0, this, [this]() {
             if (m_appletVis && m_kiwiWaterfallPanel

@@ -304,7 +304,16 @@ void AppletFloatingWindow::applyDefaultSize()
     // der Block darunter. Siehe AppletFensterMasse.h.
     if (const QSize gemerkt = AppletFensterMasse::gemerkt(m_panelId);
         gemerkt.isValid()) {
-        resize(gemerkt);
+        // Nie kleiner als das, was der Inhalt selbst als Untergrenze nennt
+        // (sonst bleibt ein einmal winzig gezogenes Fenster winzig).
+        QSize size = gemerkt;
+        if (m_applet) {
+            const QSize floor = m_applet->minimumSizeHint();
+            const int barH2 = m_titleBar ? m_titleBar->height() : 0;
+            size.setWidth(qMax(size.width(), floor.width() + 4));
+            size.setHeight(qMax(size.height(), floor.height() + barH2));
+        }
+        resize(size);
         return;
     }
 
