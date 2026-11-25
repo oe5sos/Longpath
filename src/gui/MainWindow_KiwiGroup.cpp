@@ -158,7 +158,7 @@ void MainWindow::setKiwiSolo(bool on)
         // Nur, solange der Kiwi wirklich Ton liefern kann: ein Kiwi im Fehler
         // (kein Tonstrom, Passwort, getrennt) macht aus Solo nur Stille.
         const KiwiSdrClient::State st = m_kiwiSdrManager->state(m_kiwiOwnProfileId);
-        if (st == KiwiSdrClient::State::Error || st == KiwiSdrClient::State::Disconnected) {
+        if (st == KiwiSdrClient::State::Error) {
             showToast(tr("Solo needs a connected Kiwi — this one is not delivering audio."),
                       ToastSeverity::Info, 6000);
             m_kiwiSoloOn = false;

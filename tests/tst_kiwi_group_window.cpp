@@ -198,6 +198,14 @@ private slots:
         QCOMPARE(audio->soloSlice(), -1);
         QVERIFY(!btn->isChecked());
 
+        // Faellt der Kiwi aus (Fehler), geht Solo von selbst aus: sonst Stille.
+        mw->setKiwiSoloForTest(true);
+        QVERIFY(mw->kiwiSoloOnForTest());
+        emit mgr->profileStateChanged(pid, KiwiSdrClient::State::Error,
+                                      QStringLiteral("kein Tonstrom"));
+        QVERIFY(!mw->kiwiSoloOnForTest());
+        QCOMPARE(audio->soloSlice(), -1);
+
         // "Mein Signal" aus -> Solo aus, sonst bliebe alles stumm.
         mw->setKiwiSoloForTest(true);
         QCOMPARE(audio->soloSlice(), kiwiSlice);
