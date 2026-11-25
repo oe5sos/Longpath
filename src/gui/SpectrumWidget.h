@@ -178,6 +178,7 @@ mw0lge@grange-lane.co.uk
 #include "core/ConnectionState.h"
 #include "core/SignalHistoryStore.h"
 #include "gui/spectrum/Durchlass.h"
+#include "gui/spectrum/Farbschema.h"   // PanColourScheme, Durchlassfarben
 #include "core/WdspTypes.h"  // DSPMode — for TX filter IQ-space mapping (Plan 4 D9)
 #include "core/NoiseFloorEstimator.h"  // Rauschboden der Wasserfall-Bildpunkte
 
@@ -245,23 +246,7 @@ enum class WfColorScheme : int {
     Count
 };
 
-// Farbschema des Panadapters (2026-11-21, Betreiber zu den Entwurfs-
-// blaettern werkzeug/entwuerfe-pan-ft8-look-2026-11-21: „s2,s4,s5 - alles
-// als option!", „vor allem in der bandwidth"). Ein Schema bestimmt den
-// Durchlass (Empfang und -- mit „TX passband in RX colour" -- Senden) und
-// den Wasserfall. Die Spur bleibt Messwert in ihrer Farbe; nur Night
-// dimmt sie. Standard = wie bisher, die eigene Wasserfall-Palette gilt.
-// Als int gespeichert (DisplayColourScheme), also nur anhaengen; die
-// Reihenfolge im Menue steht davon getrennt in PanadapterApplet.
-enum class PanColourScheme : int {
-    Standard = 0,
-    Brass,       // S2 Messing, gedaempft (Wasserfall = Muted)
-    SlateBlue,   // S4 Graublau, ruhig
-    Night,       // S5 Nacht
-    Ft8Amber,    // S1 FT8 Bernstein (Betreiber: „na dann nehme dazu")
-    Teal,        // S3 Tuerkis-Gruen
-    Count
-};
+// PanColourScheme steht in gui/spectrum/Farbschema.h.
 
 // Spectrum-trace display mode. Mode3D swaps the flat FFT trace pipeline for
 // a perspective stacked-trace surface (ported from AetherSDR's "3DSS" —
@@ -944,15 +929,32 @@ public:
     // ab Werk an, je Pan gespeichert (DisplayTxPassbandLikeRx).
     void setTxPassbandLikeRx(bool on);
     bool txPassbandLikeRx() const { return m_txDurchlassWieRx; }
-    // Farbschema, siehe PanColourScheme.
-    void setColourScheme(PanColourScheme s);
-    PanColourScheme colourScheme() const { return m_farbschema; }
+    // Farbschema, siehe PanColourScheme -- oben und unten getrennt
+    // (2026-11-21, Betreiber: „es sollte oben und unten getrennt sein").
+    // Oben: Durchlass (RX und TX) und Spur. Unten: der Wasserfall.
+    void setSpectrumScheme(PanColourScheme s);
+    PanColourScheme spectrumScheme() const { return m_spektrumSchema; }
+    void setWaterfallScheme(PanColourScheme s);
+    PanColourScheme waterfallScheme() const { return m_wasserfallSchema; }
     // Die Wasserfall-Palette, die wirklich gemalt wird: bei Standard die
     // eigene (wfColorScheme), sonst die des Schemas. Die eigene bleibt
     // gespeichert und gilt wieder, sobald Standard gewaehlt wird.
     WfColorScheme effectiveWfColorScheme() const;
+    // Die Palette der 3D-Flaeche: sie ist Spektrum, also „oben", und folgt
+    // dem Spektrumschema (Standard: die eigene Palette).
+    WfColorScheme surfacePalette() const;
     // Die Spurfarbe, wie sie gemalt wird (Night: gedimmt).
     QColor traceColourForPaint() const;
+    // Pruefstand: die Durchlass-Marken malen, wie es die Malwege tun --
+    // 2D (drawVfoMarker) bzw. ueber der 3D-Flaeche.
+    void paintSliceMarkersForTest(QPainter& p, const QRect& spec, const QRect& wf)
+    {
+        drawVfoMarker(p, spec, wf);
+    }
+    void paintPassbandOverSurfaceForTest(QPainter& p, const QRect& spec)
+    {
+        paintPassbandOverSurface(p, spec);
+    }
     // Pruefstand: den Durchlass in `r` fuellen, wie es drawVfoMarker tut.
     void paintPassbandFillForTest(QPainter& p, const QRectF& r) const
     {
@@ -3602,9 +3604,12 @@ private:
     // Empfangsbild beim Senden halten, siehe setHoldReceivePictureOnTx().
     bool    m_haltBildBeimSenden{true};
     bool    m_txDurchlassWieRx{true};
-    PanColourScheme m_farbschema{PanColourScheme::Standard};
+    PanColourScheme m_spektrumSchema{PanColourScheme::Standard};    // oben
+    PanColourScheme m_wasserfallSchema{PanColourScheme::Standard};  // unten
     // Durchlass in der Farbe des Schemas (Standard: m_rxFilterColor flach).
     void fuelleDurchlass(QPainter& p, const QRectF& r) const;
+    WfColorScheme paletteFuer(PanColourScheme s) const;
+    void meldeDurchlassSchema() const;
     qint64  m_sendeEndeMs{0};        // Ende der letzten Sendung (Nachlauf)
     quint64 m_wfZeilenGeschrieben{0};
     // TX attenuator cal offset — applied as an additional dBm shift during TX.

@@ -140,16 +140,15 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   </div>
 </div>
 
+<!-- Drei Instrumente in einer Zeile: S-Meter | SWR | Rotor-Kompass (2026-11-22,
+     Martins Wahl C). SWR zeigt nur beim Senden einen Wert (tx_sensors), sonst „—".
+     Der Kompass erscheint erst, wenn Longpath einen Rotor meldet; Antippen
+     oeffnet die volle Rotorsteuerung. -->
+<div id="instrumente">
 <div class="meter schicht">
-  <div class="gauge" aria-label="S-Meter">
-    <svg viewBox="0 0 132 62" aria-hidden="true">
-      <path d="M14 56 A52 52 0 0 1 118 56" fill="none" stroke="#2c2c31" stroke-width="2"/>
-      <g id="gaugeStriche"></g>
-      <line id="gaugeNadel" x1="66" y1="60" x2="66" y2="14" stroke="#ee9a34" stroke-width="2" stroke-linecap="round"/>
-      <circle cx="66" cy="60" r="3" fill="#ee9a34"/>
-    </svg>
-    <div><div class="sval" id="sval">—</div><div class="sdb" id="sdb"></div></div>
-  </div>
+  <div class="kopf"><span class="caps">S-Meter</span><span class="chipw" id="sval">—</span></div>
+  <svg class="ring" id="gaugeSvg" aria-label="S-Meter"></svg>
+  <div class="sdb" id="sdb" hidden></div>
   <div class="row">
     <span class="caps">Signal</span>
     <span class="val" id="smeter">—</span>
@@ -158,6 +157,19 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <div class="ticks">
     <span>1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>+20</span><span>+40</span>
   </div>
+</div>
+<div class="schicht instr" id="swrBox">
+  <div class="kopf"><span class="caps">SWR</span><span class="chipw aus" id="swrWert">—</span></div>
+  <svg class="ring" id="swrSvg" aria-label="SWR"></svg>
+</div>
+<div class="schicht instr" id="kompassBox" aria-label="Rotor, antippen oeffnet die Steuerung" hidden>
+  <div class="kopf"><span class="caps">Rotor</span><span class="chipw aus" id="rotorGradK">—</span></div>
+  <svg class="ring" id="rotorKlein" viewBox="-115 -115 230 230" aria-hidden="true">
+    <g id="rotorBlattK"></g>
+    <line class="nd" id="rotorNadelK" x1="0" y1="0" x2="0" y2="-82"/>
+    <circle class="nb" cx="0" cy="0" r="6"/>
+  </svg>
+</div>
 </div>
 
 <!-- Betriebsart und Band gehoeren zusammen (was hoere ich, und wo) — darum
@@ -188,6 +200,32 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <div class="chips" id="filters"></div>
   <div class="caps">Aufbereitung</div>
   <div class="chips" id="dsp"></div>
+</div>
+
+<!-- Abstimmschritt und RIT/XIT (2026-11-25), wie die Spalte „Combined" am Mac:
+     [RIT] [0] [<] Versatz [>]. Der Versatz wandert um den gewaehlten Schritt,
+     Grenze +/-10 kHz wie RxApplet. Ein/aus und Wert zeigt die Seite erst, wenn
+     Longpath sie meldet (rit_enable/rit_offset, xit_enable/xit_offset).
+     Am Desktop wandern die Schritt-Chips in die Pillenleiste, RIT/XIT in
+     „Combined" (desktop.js). -->
+<div class="feld schicht" id="feinFeld">
+  <div class="caps">Schritt</div>
+  <div class="chips" id="schritte"></div>
+  <div class="caps">RIT · XIT</div>
+  <div class="versatz" id="ritZeile">
+    <button type="button" class="chip vName" id="ritAn">RIT</button>
+    <button type="button" class="chip vNull" id="ritNull" aria-label="RIT auf null">0</button>
+    <button type="button" class="chip vPfeil" id="ritAb" aria-label="RIT tiefer">◀</button>
+    <span class="vWert" id="ritWert">—</span>
+    <button type="button" class="chip vPfeil" id="ritAuf" aria-label="RIT hoeher">▶</button>
+  </div>
+  <div class="versatz" id="xitZeile">
+    <button type="button" class="chip vName" id="xitAn">XIT</button>
+    <button type="button" class="chip vNull" id="xitNull" aria-label="XIT auf null">0</button>
+    <button type="button" class="chip vPfeil" id="xitAb" aria-label="XIT tiefer">◀</button>
+    <span class="vWert" id="xitWert">—</span>
+    <button type="button" class="chip vPfeil" id="xitAuf" aria-label="XIT hoeher">▶</button>
+  </div>
 </div>
 
 <!-- ── Der Rotor (2026-10-05) ────────────────────────────────────────────

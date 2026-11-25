@@ -4,15 +4,15 @@
 // 900 px bleibt „Ein Schirm" unveraendert. Hier wird NICHTS neu gebaut, nur
 // umgesetzt: dieselben Elemente (mit denselben Kennungen und Ereignishoerern)
 // wandern in ein Raster und kehren bei schmaler Breite an ihren Platz zurueck.
-// Neu sind nur die Darstellungen: SWR-Zeiger, Log-Spiegel, Schrittwahl.
+// Neu sind nur die Darstellungen: SWR-Zeiger, Log-Spiegel.
 // Datenstrom, Station, Server: unveraendert.
 
 const BREITE = '(min-width: 900px)';
 
-export function desktopStarten({ link, $, feinSetzen, logHolen }) {
+export function desktopStarten({ link, $, schrittHz, logHolen }) {
   const mq = window.matchMedia(BREITE);
   const platz = new Map();           // Element -> Platzhalter (Rueckweg)
-  let gitter = null, swrNadel = null, swrWert = null, logZeilen = null, fbText = null, schrittAn = 100;
+  let gitter = null, logZeilen = null, fbText = null;
 
   const mk = (html) => {
     const d = document.createElement('div');
@@ -43,36 +43,15 @@ export function desktopStarten({ link, $, feinSetzen, logHolen }) {
     const rechts = mk('<div id="dtRechts"></div>');
     gitter.append(bar, links, mitte, rechts);
 
-    // Schrittwahl: neu, stellt nur den Feinschritt der +/- Tasten im Bild.
-    const schritt = mk('<div class="chips" id="dtSchritt"></div>');
-    for (const [hz, t] of [[10, '10 Hz'], [100, '100 Hz'], [1000, '1 kHz']]) {
-      const c = mk('<button type="button" class="chip">' + t + '</button>');
-      c.dataset.hz = String(hz);
-      c.addEventListener('click', () => {
-        schrittAn = hz; feinSetzen(hz);
-        schritt.querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === c));
-        const sp = document.querySelector('.feinschritt span');
-        if (sp) { sp.textContent = t; }
-      });
-      if (hz === 100) { c.classList.add('on'); }
-      schritt.append(c);
-    }
     bar.append(gruppe('Band', $('bands')), gruppe('Betriebsart', $('modes')),
-               gruppe('Filter', $('filters')), gruppe('Schritt', schritt),
+               gruppe('Filter', $('filters')), gruppe('Schritt', $('schritte')),
                gruppe('NR', $('dsp')));
 
-    // Links: S-Meter (vorhanden), SWR (neu), Log.
-    const swr = mk('<div class="schicht dtPnl"><div class="caps">SWR</div>' +
-      '<div class="dtMess"><svg viewBox="0 0 132 62" aria-hidden="true">' +
-      '<path d="M14 56 A52 52 0 0 1 118 56" fill="none" stroke="#2c2c31" stroke-width="2"/>' +
-      '<line id="dtSwrNadel" x1="66" y1="60" x2="66" y2="14" stroke="#7e7e85" stroke-width="2" stroke-linecap="round"/>' +
-      '<circle cx="66" cy="60" r="3" fill="#7e7e85"/></svg>' +
-      '<div><div class="dtWert" id="dtSwrWert">—</div><div class="dtKlein">nur beim Senden</div></div></div></div>');
-    swrNadel = swr.querySelector('#dtSwrNadel'); swrWert = swr.querySelector('#dtSwrWert');
+    // Links: die Instrumentenzeile (S-Meter | SWR | Kompass), darunter das Log.
     const log = mk('<div class="schicht dtPnl dtLogPnl"><div class="dtLogKopf"><span class="caps">Log</span></div><div id="dtLogZeilen"></div></div>');
     logZeilen = log.querySelector('#dtLogZeilen');
-    hin(document.querySelector('.meter'), links);
-    links.append(swr, log);
+    hin($('instrumente'), links);
+    links.append(log);
     hin($('logAuf'), log.querySelector('.dtLogKopf'));
 
     hin(document.querySelector('.scope'), mitte);
@@ -81,11 +60,15 @@ export function desktopStarten({ link, $, feinSetzen, logHolen }) {
     const comb = mk('<div class="schicht dtPnl"><div class="caps">Combined</div>' +
       '<div id="dtComb"></div>' +
       '<div class="dtZeile"><span class="caps">Filterbreite</span><span id="dtFb" class="dtW">—</span></div>' +
-      '<div class="dtZeile"><span class="caps">Schritt</span><span id="dtSchr" class="dtW">100 Hz</span></div></div>');
+      '<div class="dtZeile"><span class="caps">Schritt</span><span id="dtSchr" class="dtW">100 Hz</span></div>' +
+      '<div id="dtVersatz"></div></div>');
     fbText = comb.querySelector('#dtFb');
     hin(document.querySelector('header'), rechts);
     rechts.append(comb);
     hin(document.querySelector('.vfo'), comb.querySelector('#dtComb'));
+    // RIT/XIT: dieselben Zeilen wie am Telefon, hier in „Combined" wie am Mac.
+    hin($('ritZeile'), comb.querySelector('#dtVersatz'));
+    hin($('xitZeile'), comb.querySelector('#dtVersatz'));
     hin(document.querySelector('.sliders'), rechts);
     hin($('rotorFeld'), rechts);
     hin(document.querySelector('.mikrow'), rechts);
@@ -120,17 +103,7 @@ export function desktopStarten({ link, $, feinSetzen, logHolen }) {
     const f = document.querySelector('#filters .chip.on');
     if (fbText) { fbText.textContent = f ? f.textContent.trim() : '—'; }
     const s = document.getElementById('dtSchr');
-    if (s) { s.textContent = schrittAn === 1000 ? '1 kHz' : schrittAn + ' Hz'; }
-    const v = link.ready ? link.st.txSwr : null;
-    if (swrNadel && swrWert) {
-      if (v && v >= 1 && (link.st.mox || link.st.tune)) {
-        swrWert.textContent = v.toFixed(1);
-        swrNadel.setAttribute('transform', 'rotate(' + (-62 + (Math.min(v, 3) - 1) / 2 * 124) + ' 66 60)');
-      } else {
-        swrWert.textContent = '—';
-        swrNadel.setAttribute('transform', 'rotate(-62 66 60)');
-      }
-    }
+    if (s) { const hz = schrittHz(); s.textContent = hz === 1000 ? '1 kHz' : hz + ' Hz'; }
     // Log spiegeln: die Zeilen der Logliste, ohne eigene Abfrage-Logik.
     const quelle = document.getElementById('logListe');
     if (quelle && logZeilen) {

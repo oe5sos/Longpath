@@ -160,6 +160,15 @@ INIT_BURST = [
     'tune:1,false;',
     'volume:-12.0;',
     'mute:false;',
+    # RIT/XIT wie im echten Init-Burst (TciProtocol buildRitEnableLine & Co.).
+    'rit_enable:0,true;',
+    'rit_enable:1,false;',
+    'xit_enable:0,false;',
+    'xit_enable:1,false;',
+    'rit_offset:0,120;',
+    'rit_offset:1,0;',
+    'xit_offset:0,0;',
+    'xit_offset:1,0;',
     'start;',
     'ready;',
 ]
@@ -520,7 +529,8 @@ class Verbindung(threading.Thread):
             self.spec_an = False
             self.sende_text(f'spectrum_stop:{args[0]};')
         elif name in ('drive', 'tune_drive', 'vfo', 'modulation',
-                      'rx_filter_band', 'trx', 'tune'):
+                      'rx_filter_band', 'trx', 'tune',
+                      'rit_enable', 'xit_enable', 'rit_offset', 'xit_offset'):
             # Wie der echte Server: setzen und die Gegenmeldung schicken,
             # damit der Client seinen Zustand NUR vom Server bekommt.
             if len(args) >= 2:
@@ -656,6 +666,11 @@ class Verbindung(threading.Thread):
                     self.sendet = soll
                     self.sende_text(f'trx:0,{"true" if soll else "false"};')
                     print(f'  trx:0,{"true" if soll else "false"} (--sendet)')
+            # Wie der echte Server: tx_sensors nur WAEHREND des Sendens
+            # (tx_sensors:<rx>,<micDbm>,<rmsW>,<peakW>,<swr>).
+            if self.sendet and jetzt - getattr(self, 'tx_sens_zeit', 0) > 0.2:
+                self.tx_sens_zeit = jetzt
+                self.sende_text('tx_sensors:0,-30.0,12.5,12.5,%.1f;' % (1.3 + 0.2 * math.sin(jetzt)))
 
             if self.rx_sensors_an and jetzt - smeter_zeit > self.rx_sensors_ms / 1000.0:
                 smeter_zeit = jetzt

@@ -73,6 +73,10 @@ export class TciLink extends EventTarget {
       mode: ['', ''],
       filter: [[0, 0], [0, 0]],  // [trx][lo,hi]
       mox: false, tune: false, split: false,
+      // RIT/XIT je Empfaenger; null = noch nicht gemeldet (Init-Burst
+      // schickt sie, TciProtocol buildRitEnableLine & Co.).
+      rit: [null, null], ritHz: [null, null],
+      xit: [null, null], xitHz: [null, null],
       drive: null, tuneDrive: null,
       volume: null,              // dB, global
       rxVolume: [null, null],
@@ -89,7 +93,7 @@ export class TciLink extends EventTarget {
     spektrumSpanneHz: null,
     spektrumPunkte: null,        // die Punktzahl, auf die er geklemmt hat
     spektrumFps: null,
-      txPower: null, txSwr: null,
+      txPower: null, txSwr: null, txSensorZeit: 0,
       iqRate: null, audioRate: null,
       modes: [],
     };
@@ -289,6 +293,10 @@ export class TciLink extends EventTarget {
       case 'trx':   s.mox   = bool(1); break;
       case 'tune':  s.tune  = bool(1); break;
       case 'split_enable': s.split = bool(1); break;
+      case 'rit_enable':  { const t = int(0); if (t !== null && t < 2) s.rit[t]   = bool(1); break; }
+      case 'xit_enable':  { const t = int(0); if (t !== null && t < 2) s.xit[t]   = bool(1); break; }
+      case 'rit_offset':  { const t = int(0); if (t !== null && t < 2) s.ritHz[t] = int(1); break; }
+      case 'xit_offset':  { const t = int(0); if (t !== null && t < 2) s.xitHz[t] = int(1); break; }
 
       // Die drei, die bis 2026-09-30 fehlten (PR #145).
       case 'drive':       s.drive     = int(1); break;
@@ -343,7 +351,10 @@ export class TciLink extends EventTarget {
 
       // Messwerte. Kommen erst nach `rx_sensors_enable:true` (siehe app.js).
       case 'rx_sensors': { const t = int(0); if (t !== null) s.smeter[t] = num(1); break; }
-      case 'tx_sensors': s.txPower = num(1); s.txSwr = num(2); break;
+      // tx_sensors:<rx>,<micDbm>,<rmsW>,<peakW>,<swr>  (TciSensorManager::formatTxSensors)
+      // Bis hierher las die Seite Feld 1 (Mikrofonpegel) als Leistung und Feld 2
+      // (Watt) als SWR -- beides falsch, und beides war nirgends angezeigt.
+      case 'tx_sensors': s.txPower = num(2); s.txSwr = num(4); s.txSensorZeit = performance.now(); break;
     }
     this._emit('state');
   }

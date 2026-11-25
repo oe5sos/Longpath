@@ -43,6 +43,8 @@
 #include <functional>
 
 class QLabel;
+class QMenu;
+class QContextMenuEvent;
 class QPushButton;
 class QSpinBox;
 class QHBoxLayout;
@@ -91,8 +93,22 @@ public:
     // Fuer Tests: die Flaechen, in der Reihenfolge der Scheiben.
     QList<BandwidthFilterPane*> panes() const { return m_panes; }
 
+    // ⚙ und Rechtsklick (2026-11-21, Betreiber: „die option fuer den
+    // bandwidth sollte auch in diesem fenster sein"): die Farbe des
+    // Durchlasses -- wie der Panadapter (Vorgabe) oder ein eigenes Schema.
+    bool hasExtendedSettings() const override { return true; }
+    void openExtendedSettings() override;
+    /// Das Menue dazu, ohne exec() -- fuer den Pruefstand.
+    QMenu* buildOptionsMenuForTesting() { return baueOptionsMenue(this); }
+
+protected:
+    void contextMenuEvent(QContextMenuEvent* ev) override;
+
+public:
+
 private:
     void buildUI();
+    QMenu* baueOptionsMenue(QWidget* parent);
 
     // Flaechen an die vorhandenen Scheiben angleichen. Erzeugt und
     // entfernt, statt alles neu zu bauen — eine Flaeche, die beim

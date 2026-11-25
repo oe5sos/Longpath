@@ -636,6 +636,8 @@ set(CORE_SOURCES
     src/core/KiwiSdrRedirectPolicy.cpp
     src/core/KiwiSdrCredentialStore.cpp
     src/core/KiwiSdrManager.cpp
+    src/core/KiwiOwnSignal.cpp
+    src/core/KiwiRecording.cpp
     src/core/ReceivePresentationSync.cpp
     src/core/WdspEngine.cpp
     src/core/RxChannel.cpp
@@ -920,6 +922,7 @@ set(GUI_SOURCES
     src/gui/spectrum/PeakBlobDetector.cpp
     src/gui/spectrum/SpectrumDetector.cpp
     src/gui/spectrum/Durchlass.cpp
+    src/gui/spectrum/Farbschema.cpp
     src/core/SMeterSkala.cpp
     src/core/FrequenzEichung.cpp
     src/core/RundumLauf.cpp
@@ -1051,6 +1054,7 @@ set(GUI_SOURCES
     src/gui/applets/KiwiSdrApplet.cpp
     src/gui/KiwiWaterfallStripWidget.cpp
     src/gui/KiwiWaterfallPanel.cpp
+    src/gui/KiwiOwnSignalStrip.cpp
     src/gui/applets/AsrApplet.cpp
     src/gui/widgets/VfoTileRow.cpp
     src/gui/widgets/SliceFlag.cpp
@@ -1059,6 +1063,7 @@ set(GUI_SOURCES
     src/asr/RemoteAsrBackend.cpp
     src/asr/WhisperServerLauncher.cpp
     src/gui/MainWindow_KiwiSdr.cpp
+    src/gui/MainWindow_KiwiOwnSignal.cpp
     # Flex-Treiber Stufe 2: Ton und Bild einer FlexRadio-Maschine
     src/gui/MainWindow_Flex.cpp
     src/gui/MainWindow_Asr.cpp
