@@ -1800,7 +1800,7 @@ $('zoomRaus').addEventListener('click', () => spanneStufe(+1));
 // sein um die frequenz um +/- 100 zu verschieben". Wischen trifft auf ein
 // paar hundert Hertz genau — fuer das letzte Stueck auf eine Station ist das
 // zu grob, und das Eintippblatt ist dafuer zu umstaendlich.
-let kFeinHz = 100;          // Desktop: die Schrittwahl stellt ihn (desktop.js)
+let kFeinHz = 100;          // die Schritt-Chips stellen ihn (schrittSetzen)
 function feinschritt(d) {
   const v = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
   if (!v) { return; }
@@ -3224,9 +3224,75 @@ zeichneBedienung();
 }
 
 
+// ── Abstimmschritt und RIT/XIT (2026-11-25) ─────────────────────────────────
+//
+// Wie die Spalte „Combined" am Mac (RxApplet Control 15/16): RIT und XIT je
+// eine Zeile [RIT] [0] [<] Versatz [>]. Die Pfeile schieben um den gewaehlten
+// Abstimmschritt, geklemmt auf +/-10000 Hz wie dort. Ein, aus und Wert kommen
+// NUR vom Server (Init-Burst und Gegenmeldung); die Seite schaltet nichts
+// lokal um, damit sie nie etwas anderes zeigt, als Longpath tut.
+const SCHRITTE = [[10, '10 Hz'], [100, '100 Hz'], [1000, '1 kHz']];
+const schrittText = (hz) => (SCHRITTE.find(([h]) => h === hz) || [0, hz + ' Hz'])[1];
+function schrittSetzen(hz) {
+  kFeinHz = hz;
+  try { localStorage.setItem('handfunke.schritt', String(hz)); } catch (e) {}
+  $('schritte').querySelectorAll('.chip').forEach((c) =>
+    c.classList.toggle('on', Number(c.dataset.hz) === hz));
+  const sp = document.querySelector('.feinschritt span');
+  if (sp) { sp.textContent = schrittText(hz); }
+  $('feinAb').setAttribute('aria-label', schrittText(hz) + ' tiefer');
+  $('feinAuf').setAttribute('aria-label', schrittText(hz) + ' hoeher');
+}
+for (const [hz, t] of SCHRITTE) {
+  const c = document.createElement('button');
+  c.type = 'button'; c.className = 'chip'; c.textContent = t; c.dataset.hz = String(hz);
+  c.addEventListener('click', () => schrittSetzen(hz));
+  $('schritte').appendChild(c);
+}
+{
+  let gemerkt = 100;
+  try { gemerkt = Number(localStorage.getItem('handfunke.schritt')) || 100; } catch (e) {}
+  schrittSetzen(SCHRITTE.some(([h]) => h === gemerkt) ? gemerkt : 100);
+}
+
+const VERSATZ_MAX = 10000;   // RxApplet.cpp: std::clamp(..., -10000, 10000)
+function versatzText(hz) {
+  if (hz === null || hz === undefined) { return '—'; }
+  return (hz > 0 ? '+' : hz < 0 ? '\u2212' : '\u00b1') + Math.abs(hz) + ' Hz';
+}
+for (const art of ['rit', 'xit']) {
+  const hzVon = () => link.st[art + 'Hz'][state.trx];
+  const schieben = (d) => {
+    const v = hzVon() || 0;
+    const neu = Math.max(-VERSATZ_MAX, Math.min(VERSATZ_MAX, v + d));
+    if (neu !== v) { link.send(`${art}_offset:${state.trx},${neu}`); }
+  };
+  $(art + 'An').addEventListener('click', () => {
+    const an = link.st[art][state.trx];
+    if (an === null) { return; }          // Zustand unbekannt: nicht raten
+    link.send(`${art}_enable:${state.trx},${an ? 'false' : 'true'}`);
+  });
+  $(art + 'Null').addEventListener('click', () => link.send(`${art}_offset:${state.trx},0`));
+  $(art + 'Ab').addEventListener('click', () => schieben(-kFeinHz));
+  $(art + 'Auf').addEventListener('click', () => schieben(+kFeinHz));
+}
+function zeichneVersatz() {
+  for (const art of ['rit', 'xit']) {
+    const an = link.st[art][state.trx];
+    const hz = link.st[art + 'Hz'][state.trx];
+    $(art + 'An').classList.toggle('on', an === true);
+    const w = $(art + 'Wert');
+    const t = versatzText(hz);
+    if (w.textContent !== t) { w.textContent = t; }
+    w.classList.toggle('an', an === true);
+  }
+}
+link.addEventListener('state', zeichneVersatz);
+zeichneVersatz();
+
 // Desktop-Layout ab ca. 900 px Breite (desktop.js); darunter bleibt es bei
 // „Ein Schirm". Dieselben Elemente, anderes Raster.
-desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logListeHolen });
+desktopStarten({ link, $, schrittHz: () => kFeinHz, logHolen: logListeHolen });
 
 // ── Mac-Look: Zeigerinstrument, Rotorzeile, ON AIR ──────────────────────────
 // Die Zahlen schreibt weiter die Schleife oben nach #smeter/#sbar/#rotorGrad;

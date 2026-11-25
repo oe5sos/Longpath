@@ -73,6 +73,10 @@ export class TciLink extends EventTarget {
       mode: ['', ''],
       filter: [[0, 0], [0, 0]],  // [trx][lo,hi]
       mox: false, tune: false, split: false,
+      // RIT/XIT je Empfaenger; null = noch nicht gemeldet (Init-Burst
+      // schickt sie, TciProtocol buildRitEnableLine & Co.).
+      rit: [null, null], ritHz: [null, null],
+      xit: [null, null], xitHz: [null, null],
       drive: null, tuneDrive: null,
       volume: null,              // dB, global
       rxVolume: [null, null],
@@ -289,6 +293,10 @@ export class TciLink extends EventTarget {
       case 'trx':   s.mox   = bool(1); break;
       case 'tune':  s.tune  = bool(1); break;
       case 'split_enable': s.split = bool(1); break;
+      case 'rit_enable':  { const t = int(0); if (t !== null && t < 2) s.rit[t]   = bool(1); break; }
+      case 'xit_enable':  { const t = int(0); if (t !== null && t < 2) s.xit[t]   = bool(1); break; }
+      case 'rit_offset':  { const t = int(0); if (t !== null && t < 2) s.ritHz[t] = int(1); break; }
+      case 'xit_offset':  { const t = int(0); if (t !== null && t < 2) s.xitHz[t] = int(1); break; }
 
       // Die drei, die bis 2026-09-30 fehlten (PR #145).
       case 'drive':       s.drive     = int(1); break;
