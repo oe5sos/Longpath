@@ -8017,8 +8017,8 @@ QString RadioModel::flexNrAnzeige(NrSlot steckplatz)
     // Am Geraet noch nicht gegen die Oberflaeche gesehen.
     switch (steckplatz) {
     case NrSlot::NR1: return QStringLiteral("NRL");
-    case NrSlot::NR2: return QStringLiteral("NR");
-    case NrSlot::NR4: return QStringLiteral("NRS");
+    // NR2/NR4 rechnet seit 2026-11-24 Longpath selbst (WDSP): dort steht
+    // wie an der Anvelina NR2/NR4, nicht der Name der Maschine.
     default:          return QString();
     }
 }
