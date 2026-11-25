@@ -269,6 +269,8 @@ void MasterMixer::accumulate(int sliceId, const float* samples, int frames,
     ensureRing(st, frames);
     if (st.capFrames <= 0) { return; }
 
+    st.idleDrains = 0;
+
     // Enrol as a barrier member: this slice is demonstrably delivering.
     // Opportunistic slots (the TX monitor) are mixed in but never enrol,
     // so they cannot hold up a drain. A slice the lifecycle has withdrawn
@@ -340,10 +342,43 @@ int MasterMixer::tryDrain(float* out, int maxFrames) {
         n = std::min(n, st.avail);
     }
 
+    // ── Taktgeber, wenn keine Taktquelle da ist (2026-11-25) ─────────
+    // Flex-Ton und Kiwi-Ton laufen beide "nebenher". Frueher gab jeder Zug
+    // so viele Frames aus wie die vollste Quelle; die andere wurde mit Stille
+    // aufgefuellt und zerhackt, und die Ausgabe bekam etwa doppelt so viel
+    // wie Echtzeit (Krachen, sobald ein Kiwi zu hoeren war). Mit mindestens
+    // zwei lebenden Quellen gibt eine den Takt vor -- bevorzugt eine ohne
+    // eigenes Netz-Polster (Flex, Mithoerton), sonst die mit der kleinsten
+    // Nummer -- und die anderen durchlaufen das Polster-Tor.
+    const SliceState* pacer = nullptr;
+    int pacerId = 0;
+    bool pacerPlain = false;
+    int live = 0;
+    for (auto& kv : m_slices) {
+        SliceState& st = kv.second;
+        if (st.idleDrains < kPacerLiveDrains * 1000) { ++st.idleDrains; }
+        if (!st.opportunistic.load(std::memory_order_acquire)
+            || st.ringGeneration
+                   != st.streamGeneration.load(std::memory_order_acquire)
+            || st.idleDrains > kPacerLiveDrains) {
+            continue;
+        }
+        ++live;
+        const bool plain = st.cushionStart.load(std::memory_order_acquire) == 0;
+        if (!pacer || (plain && !pacerPlain)
+            || (plain == pacerPlain && kv.first < pacerId)) {
+            pacer = &st;
+            pacerId = kv.first;
+            pacerPlain = plain;
+        }
+    }
+    if (live < 2 || anyMember) { pacer = nullptr; }
+
     if (!anyMember) {
-        // Only opportunistic contributors (the TX monitor slot). Nothing
-        // to wait for, so drain whatever is queued.
-        n = maxAvail;
+        // Only opportunistic contributors. With a pacer its backlog sets the
+        // block; a single one (the TX monitor, one Kiwi alone) drains
+        // whatever is queued.
+        n = pacer ? pacer->avail : maxAvail;
     }
     // The prime gate below only makes sense when a barrier member set n:
     // that is the only case where an opportunistic slot can be SHORT of
@@ -351,7 +386,7 @@ int MasterMixer::tryDrain(float* out, int maxFrames) {
     // the RX slices withdrawn — the monitor's main use), it drains
     // exactly what it has by construction, and gating it would silence
     // it permanently: avail >= avail + margin never holds.
-    const bool barrierPaced = anyMember;
+    const bool barrierPaced = anyMember || pacer != nullptr;
 
     // A member with nothing queued is LATE, not gone, and the barrier
     // holds until it delivers. n == 0 falls through to the guard below
@@ -404,7 +439,7 @@ int MasterMixer::tryDrain(float* out, int maxFrames) {
         // output block, which was the light periodic scratch on the
         // 2026-08-11 bench. De-priming on starvation makes the failure
         // mode one clean dropout instead of per-drain chatter.
-        if (barrierPaced
+        if (barrierPaced && &st != pacer
             && st.opportunistic.load(std::memory_order_acquire)) {
             if (st.cushion <= 0) {
                 const int start = st.cushionStart.load(std::memory_order_acquire);

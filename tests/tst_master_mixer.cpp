@@ -381,6 +381,44 @@ private slots:
         }
     }
 
+    // Flex + Kiwi (2026-11-25, Betreiber: "sobald ich Kiwi hoere, schlecht").
+    // Beide Quellen laufen "nebenher" (keine Taktquelle). Frueher gab jeder
+    // Zug so viele Frames aus wie die VOLLSTE Quelle: die kontinuierliche
+    // (Flex, ohne Polster) wurde dann mit Stille aufgefuellt und zerhackt.
+    void kiwiNebenDemFlexZerhacktIhnNicht() {
+        MasterMixer mix;
+        mix.setRampFrames(1);
+        mix.setSliceGain(0, 1.0f, 0.0f);
+        mix.setSliceGain(1, 1.0f, 0.0f);
+        mix.setSliceOpportunistic(0, true);        // Flex
+        mix.setSliceOpportunistic(1, true);        // Kiwi
+        mix.setSliceCushion(1, 4096, 32768);
+        std::vector<float> flex(2 * 480, 0.25f);   // 10 ms je Paket
+        std::vector<float> kiwi(2 * 2048, 0.25f);  // 43 ms je Paket
+        std::vector<float> out(2 * 8192, 0.0f);
+        int flexOut = 0, produced = 0, holes = 0;
+        for (int i = 0; i < 400; ++i) {
+            // Anlauf nicht zaehlen: da ist erst eine Quelle da.
+            if (i == 40) { produced = 0; flexOut = 0; }
+            if (i % 4 == 0) {                       // der Kiwi in Schueben
+                mix.accumulate(1, kiwi.data(), 2048);
+                const int n = mix.tryDrain(out.data(), 8192);
+                for (int f = 0; f < n; ++f) { if (i > 40 && out[2 * f] < 0.2f) { ++holes; } }
+                produced += n;
+            }
+            mix.accumulate(0, flex.data(), 480);
+            const int n = mix.tryDrain(out.data(), 8192);
+            for (int f = 0; f < n; ++f) { if (i > 40 && out[2 * f] < 0.2f) { ++holes; } }
+            produced += n;
+            flexOut += 480;
+        }
+        // Takt = Flex: es kommt genauso viel heraus wie der Flex liefert ...
+        QVERIFY2(std::abs(produced - flexOut) <= 960,
+                 qPrintable(QStringLiteral("aus %1, Flex %2").arg(produced).arg(flexOut)));
+        // ... und der Flex hat keine Loecher.
+        QCOMPARE(holes, 0);
+    }
+
     // ── Master slew across a membership change ────────────────────────
     //
     // Re-admitting a slice must fade the MIXED output in, not resume it at
