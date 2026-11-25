@@ -56,6 +56,8 @@
 #include <QString>
 #include <QWidget>
 
+#include "gui/spectrum/Farbschema.h"
+
 namespace Longpath {
 
 class BandwidthFilterPane : public QWidget
@@ -106,6 +108,13 @@ public:
     /// Nachgesehen, bevor gebaut wurde.
     void setTrace(const QVector<float>& dbm);
 
+    // Farbschema des Durchlasses (2026-11-21, Betreiber: „vor allem in der
+    // bandwidth"). Folgt von selbst dem Spektrumschema von Pan 0 (Bote in
+    // gui/spectrum/Farbschema.h); Standard = der bisherige Verlauf in der
+    // Akzentfarbe.
+    void setPassbandScheme(PanColourScheme s);
+    PanColourScheme passbandScheme() const { return m_schema; }
+
     /// Die Wunschhoehe. Ohne sie richtete sich ein frisch abgeloestes
     /// Fenster nur nach der Mindesthoehe (84) und der 160-Punkte-
     /// Untergrenze des Fensters — davon gingen Kopfzeile und Achse ab,
@@ -144,6 +153,7 @@ private:
 
     QString m_label{QStringLiteral("RX1")};
     QColor  m_accent;
+    PanColourScheme m_schema{PanColourScheme::Standard};
     double  m_vfoHz{0.0};
     QVector<float> m_trace;
     /// Traeger Mittelwert — die blasse Bezugslinie, siehe paintEvent.
