@@ -98,6 +98,7 @@ private:
     // drei Zeilen): so hoch wie ihr Inhalt, hoechstens so hoch, wie das
     // Fenster Platz laesst. Scrollen nur, wenn es wirklich mehr gibt.
     void updateListHeight();
+    QWidget* scrollViewport() const;
     QPointer<QWidget> m_watchedWindow;
     QWidget* buildReceiverRow(const KiwiSdrReceiverStatus& receiver);
     QWidget* buildSliceAssignmentRow(SliceModel* slice, QWidget* parent);

@@ -13,6 +13,7 @@
 //
 // Longpath-eigener Pruefstand, kein Port.
 #include <QtTest>
+#include <QListWidget>
 #include <QPushButton>
 #include <QScopeGuard>
 
@@ -113,6 +114,43 @@ private slots:
         QVERIFY(!mw->addKiwiListenerForTest(pid));
         QVERIFY(!mgr->isProfileListener(pid));
         QCOMPARE(mw->kiwiGroupForTest().size(), 0);
+    }
+
+    // Im echten Hauptfenster (Applet in der Spalte), nicht allein: waechst
+    // die Liste, wenn das Fenster hoeher wird? (Bild von Martin 2026-11-25:
+    // drei Zeilen und darunter leerer Platz.)
+    void listeImHauptfensterWaechst()
+    {
+        auto* mw = new MainWindow();
+        mw->resize(1400, 700);
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        clearProfiles(mgr);
+        for (int i = 0; i < 12; ++i) {
+            profile(mgr, qPrintable(QStringLiteral("Kiwi%1").arg(i)), 40 + i);
+        }
+        auto* list = mw->kiwiSdrAppletForTest()->findChild<QListWidget*>();
+        QVERIFY(list);
+        const auto visibleRows = [&]() {
+            int n = 0;
+            const QRect view = list->viewport()->rect();
+            for (int i = 0; i < list->count(); ++i) {
+                if (view.contains(list->visualItemRect(list->item(i)))) { ++n; }
+            }
+            return n;
+        };
+        QTest::qWait(100);
+        QCOMPARE(list->count(), 12);
+        const int klein = visibleRows();
+        mw->resize(1400, 1100);
+        QTest::qWait(150);
+        const int gross = visibleRows();
+        qInfo() << "Hauptfenster: Zeilen klein" << klein << "gross" << gross
+                << "Listenhoehe" << list->height() << "Applet sichtbar"
+                << mw->kiwiSdrAppletForTest()->isVisible();
+        QVERIFY2(gross > klein, "hoeheres Hauptfenster muss mehr Zeilen zeigen");
     }
 
     void zeilenKommenAnUndDasFensterOeffnetSich()

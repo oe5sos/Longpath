@@ -17,6 +17,7 @@
 #include "models/SliceModel.h"
 
 #include <QAbstractItemView>
+#include <QAbstractScrollArea>
 #include <QEvent>
 #include <QShowEvent>
 #include <QHBoxLayout>
@@ -258,6 +259,8 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     m_receiverList->setSelectionMode(QAbstractItemView::NoSelection);
     m_receiverList->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     m_receiverList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    // Waechst mit dem Platz, den die Kachel / das Fenster hergibt (war: fest
+    // 176 px, also drei Zeilen). Weniger als drei Zeilen nie.
     m_receiverList->setMinimumHeight(48);
     m_receiverList->setStyleSheet(listStyle());
     root->addWidget(m_receiverList);
@@ -345,29 +348,47 @@ void KiwiSdrApplet::updateListHeight()
     }
     constexpr int kMinHeight = 48;
     constexpr int kOldFixedCap = 176;   // die frueheren drei Zeilen
-    constexpr int kBottomMargin = 12;   // Rand unter der Liste
+    constexpr int kChrome = 36;         // Kachel-Titel und Rand
     int content = 2 * m_receiverList->frameWidth();
     for (int i = 0; i < m_receiverList->count(); ++i) {
         content += m_receiverList->sizeHintForRow(i);
     }
-    const QWidget* top = window();
-    // Platz = vom oberen Rand der Liste bis zum unteren Rand des Fensters
-    // (nicht pauschal "Fensterhoehe minus Rest": das liess ein schwebendes
-    // Applet bei einem Drittel der Hoehe stehen).
-    const int listTop = top ? m_receiverList->mapTo(top, QPoint(0, 0)).y() : 0;
-    const int room = top ? top->height() - listTop - kBottomMargin : kOldFixedCap;
-    const int cap  = qMax(kOldFixedCap, room);
-    const int h    = qBound(kMinHeight, content, cap);
-    if (m_receiverList->height() != h || m_receiverList->minimumHeight() != h) {
+    // Der Platz: die Applets stehen in einer Spalte, die scrollt (AppletGrid
+    // in einer QScrollArea, auch im schwebenden Fenster). Gemessen wird darum
+    // der sichtbare Ausschnitt dieser Spalte, nicht das Fenster -- das Fenster
+    // ist hoeher als jede Spalte, und die Kachel selbst ist nur so hoch wie
+    // ihr Inhalt (Bild 2026-11-25: drei Zeilen und leerer Platz darunter).
+    int room = kOldFixedCap;
+    QWidget* area = scrollViewport();
+    if (area) {
+        const int above = m_receiverList->mapTo(this, QPoint(0, 0)).y();
+        room = area->height() - above - kChrome;
+    } else if (const QWidget* top = window()) {
+        room = top->height() - m_receiverList->mapTo(top, QPoint(0, 0)).y() - 12;
+    }
+    const int cap = qMax(kOldFixedCap, room);
+    const int h = qBound(kMinHeight, content, cap);
+    if (m_receiverList->minimumHeight() != h || m_receiverList->maximumHeight() != h) {
         m_receiverList->setFixedHeight(h);
         updateGeometry();
     }
 }
 
+QWidget* KiwiSdrApplet::scrollViewport() const
+{
+    for (QWidget* w = parentWidget(); w; w = w->parentWidget()) {
+        if (auto* sa = qobject_cast<QAbstractScrollArea*>(w)) {
+            return sa->viewport();
+        }
+    }
+    return nullptr;
+}
+
 void KiwiSdrApplet::showEvent(QShowEvent* event)
 {
     AppletWidget::showEvent(event);
-    QWidget* top = window();
+    QWidget* top = scrollViewport();
+    if (!top) { top = window(); }
     if (top && top != m_watchedWindow) {
         if (m_watchedWindow) {
             m_watchedWindow->removeEventFilter(this);
