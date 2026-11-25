@@ -19,6 +19,7 @@
 // =================================================================
 
 #include "gui/PanadapterApplet.h"
+#include "core/LogCategories.h"
 #include <QActionGroup>
 #include <QFileDialog>
 #include <QImage>
@@ -199,7 +200,10 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     m_btnMute->setToolTip(tr("Radio sound on / off (playback only)"));
     headLay->addWidget(m_btnMute);
     connect(m_btnMute, &QPushButton::toggled, this,
-            [this](bool on) { emit radioMuteToggled(!on); });
+            [this](bool on) {
+        qCInfo(lcAudio) << "Panadapter" << panId() << "Ton-Schalter:" << (on ? "an" : "aus");
+        emit radioMuteToggled(!on);
+    });
 
     m_btnOptions = new QPushButton(QStringLiteral("\u2699"), head);
     // \u2500\u2500 Das Zahnrad war ein Punkt (2026-10-30) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500

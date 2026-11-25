@@ -484,6 +484,8 @@ void MainWindow::setRadioMuted(bool on)
     if (!audio) { m_radioMuted = false; return; }
     m_radioMuted = on;
     audio->setMuteNonKiwi(on);
+    qCInfo(lcKiwiSdr) << "Radio-Ton:" << (on ? "stumm" : "an")
+                      << "(Schalter Panadapter-Kopf oder Kiwi-Fenster)";
     if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setRadioMutedActive(on); }
     if (m_panStack) {
         for (auto* a : m_panStack->allApplets()) {
