@@ -105,7 +105,7 @@ void MainWindow::wireKiwiGroup()
             [this](const QString& id) {
         if (!m_kiwiSdrManager || !m_kiwiSdrManager->hasProfile(id)) { return; }
         m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
-        if (m_appletVis) { m_appletVis->setVisible(QStringLiteral("KiwiWaterfalls"), true); }
+        if (m_appletVis) { m_appletVis->ensureVisible(QStringLiteral("KiwiWaterfalls")); }
         kiwiFensterNachVorn(m_kiwiWaterfallPanel, this);
     });
     m_kiwiSoloTimer = new QTimer(this);
@@ -140,7 +140,10 @@ void MainWindow::wireKiwiGroup()
         // mit dem letzten Streifen zu und mit dem ersten auf.
         connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::emptyChanged, this,
                 [this](bool empty) {
-            if (m_appletVis) { m_appletVis->setVisible(QStringLiteral("KiwiWaterfalls"), !empty); }
+            if (m_appletVis) {
+                if (empty) { m_appletVis->setVisible(QStringLiteral("KiwiWaterfalls"), false); }
+                else { m_appletVis->ensureVisible(QStringLiteral("KiwiWaterfalls")); }
+            }
             if (!empty) { kiwiFensterNachVorn(m_kiwiWaterfallPanel, this); }
         });
         QTimer::singleShot(0, this, [this]() {

@@ -915,6 +915,13 @@ void MainWindow::wireKiwiSdr()
         if (m_kiwiWaterfallPanel) {
             m_kiwiWaterfallPanel->setStripEnabled(
                 profileId, enabled, m_kiwiSdrManager->displayName(profileId));
+            // Jeder Kiwi, dessen Vorschau an geht, soll sein Fenster sehen
+            // lassen (Betreiber 2026-11-25: "ich sehe keine Fenster, wo ich
+            // etwas aendern kann"). ensureVisible blendet immer ein, auch
+            // wenn der Schalter schon auf "an" stand.
+            if (enabled && m_appletVis) {
+                m_appletVis->ensureVisible(QStringLiteral("KiwiWaterfalls"));
+            }
         }
     });
     connect(m_kiwiSdrManager, &KiwiSdrManager::profileStreamReset, this,
