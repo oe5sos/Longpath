@@ -282,6 +282,8 @@ public:
     void kiwiGroupTxEdgeForTest(bool on) { kiwiGroupTxEdge(on); }
     void openKiwiHearingDialogForTest() { openKiwiHearingDialog(); }
     void setKiwiSoloForTest(bool on) { setKiwiSolo(on); }
+    void setRadioMutedForTest(bool on) { setRadioMuted(on); }
+    bool radioMutedForTest() const { return m_radioMuted; }
     void setKiwiSoundForTest(const QString& id, bool on) { setKiwiSound(id, on); }
     void zoomKiwiStripForTest(const QString& id, int dir) { zoomKiwiStrip(id, dir); }
     double kiwiViewSpanForTest(const QString& id) const { return m_kiwiViewSpanHz.value(id, 0.0); }
@@ -1708,6 +1710,7 @@ private:
     void setKiwiSolo(bool on);
     void setKiwiSound(const QString& profileId, bool on);
     void refreshKiwiSoundButtons();
+    void setRadioMuted(bool on);
     void zoomKiwiStrip(const QString& profileId, int direction);
     void setAllKiwiSound(bool on);
     void startKiwiGroupRecording(const QString& profileId);
@@ -2332,6 +2335,7 @@ private:
     QHash<QString, int> m_kiwiSoundSlices;   // Profil -> Scheibe, die wir fuer den Ton anlegten
     QTimer* m_kiwiSoloTimer{nullptr};   // Solo geht nach 30 s von selbst aus
     bool m_kiwiSoloOn{false};
+    bool m_radioMuted{false};
     QHash<QString, class KiwiRecording*> m_kiwiGroupRecordings;
     QHash<QString, QPointF> m_kiwiPositions;   // Profilkennung -> (Breite, Laenge)
     QPointer<class UpdateDialog> m_updateDialog;

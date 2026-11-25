@@ -852,6 +852,15 @@ public:
     /// nicht den Anti-VOX-Abgriff. -1 = aus.
     void setSoloSlice(int sliceId) { m_soloSliceId.store(sliceId, std::memory_order_release); }
     int soloSlice() const { return m_soloSliceId.load(std::memory_order_acquire); }
+
+    /// "Radio stumm" (Longpath 2026-11-25): im Lautsprecher-Mix sind alle Scheiben
+    /// stumm, die KEIN Kiwi speist -- die Kiwis mit Ton bleiben hoerbar. Wie
+    /// setSoloSlice nur Wiedergabe: keine Scheibe, nicht das Funkgeraet, nicht
+    /// VAX/Anti-VOX.
+    void setMuteNonKiwi(bool on) { m_muteNonKiwi.store(on, std::memory_order_release); }
+    bool muteNonKiwi() const { return m_muteNonKiwi.load(std::memory_order_acquire); }
+    /// Wie viele Kiwi-Scheiben gerade Ton liefern duerfen.
+    int kiwiAudioSliceCount() const { return int(m_kiwiEnabledSlices.size()); }
     bool rxMutedForMonitor() const
     { return m_rxMutedForMonitor.load(std::memory_order_acquire); }
     bool masterMuted() const { return m_masterMuted.load(std::memory_order_acquire); }
@@ -1338,6 +1347,10 @@ private:
     // acquire pairing as m_masterMuted above.
     std::atomic<bool>  m_rxMutedForMonitor{false};
     std::atomic<int>   m_soloSliceId{-1};
+    std::atomic<bool>  m_muteNonKiwi{false};
+    // Bit n = Scheibe n wird von einem Kiwi gespeist (Scheiben 0..63); vom
+    // Audiofaden gelesen, vom Hauptfaden geschrieben.
+    std::atomic<quint64> m_kiwiSliceMask{0};
     std::atomic<bool>  m_txMonitorEnabled{false};  // default off per plan §0 row 9
 
     // ── The last sixteen seconds of what is actually going out ───────

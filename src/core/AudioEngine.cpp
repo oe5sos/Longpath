@@ -1548,11 +1548,15 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
     // which is a different slot in the same mix — still reaches the
     // speakers. See setRxMutedForMonitor().
     const int solo = m_soloSliceId.load(std::memory_order_acquire);
+    const bool nonKiwiMuted = m_muteNonKiwi.load(std::memory_order_acquire)
+        && !(sliceId >= 0 && sliceId < 64
+             && (m_kiwiSliceMask.load(std::memory_order_acquire) >> sliceId) & 1u);
     m_masterMix.accumulate(sliceId, samples, frames,
                            slice->muted()
                                || m_rxMutedForMonitor.load(
                                       std::memory_order_acquire)
-                               || (solo >= 0 && sliceId != solo));
+                               || (solo >= 0 && sliceId != solo)
+                               || nonKiwiMuted);
 
     // Anti-VOX hears exactly what the speakers hear. From Thetis
     // cmaster.c:370-372 [v2.10.3.15], every sub-receiver's audio is handed
@@ -2416,6 +2420,9 @@ void AudioEngine::setKiwiSdrAudioSourceEnabled(int sliceId, bool enabled)
 {
     if (enabled) {
         if (m_kiwiEnabledSlices.insert(sliceId).second) {
+            if (sliceId >= 0 && sliceId < 64) {
+                m_kiwiSliceMask.fetch_or(quint64(1) << sliceId, std::memory_order_acq_rel);
+            }
             // Opportunistisch: die Scheibe wird eingemischt, wann immer
             // sie Ton hat, ist aber KEIN Mitglied der Bereitschafts-
             // schranke. Ohne das wuerde ein Netzaussetzer beim KiwiSDR
@@ -2429,6 +2436,9 @@ void AudioEngine::setKiwiSdrAudioSourceEnabled(int sliceId, bool enabled)
         return;
     }
     if (m_kiwiEnabledSlices.erase(sliceId) > 0) {
+        if (sliceId >= 0 && sliceId < 64) {
+            m_kiwiSliceMask.fetch_and(~(quint64(1) << sliceId), std::memory_order_acq_rel);
+        }
         m_masterMix.setSliceOpportunistic(sliceId, false);
         m_antiVoxMix.setSliceOpportunistic(sliceId, false);
         qCInfo(lcAudio) << "KiwiSDR-Ton abgeschaltet fuer Scheibe" << sliceId;

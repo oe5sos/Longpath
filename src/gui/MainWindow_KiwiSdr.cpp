@@ -363,9 +363,12 @@ void MainWindow::syncKiwiSdrTransmitMute()
             // (2026-11-24); ausdruecklich aufheben statt "nichts tun", denn
             // wer den Modus MITTEN in der Sendung einschaltet, trifft eine
             // schon stumm geschaltete Quelle an.
+            // Auch ein Kiwi, dessen Ton der Betreiber eingeschaltet hat (Ton-Schalter
+            // im Streifen / in der Liste): man hoert sich beim Senden ueber den Kiwi
+            // selbst (2026-11-25).
             if (kiwiKeepsAudioDuringTx(
-                    profile, m_kiwiOwnSignalOn
-                                 && profile.id == m_kiwiOwnProfileId)) {
+                    profile, (m_kiwiOwnSignalOn && profile.id == m_kiwiOwnProfileId)
+                                 || m_kiwiSoundSlices.contains(profile.id))) {
                 audio->setKiwiSdrAudioSourceEnabled(sliceId, true);
                 continue;
             }
@@ -781,7 +784,8 @@ void MainWindow::wireKiwiSdr()
             if (sending
                 && !kiwiKeepsAudioDuringTx(
                        m_kiwiSdrManager->profile(profileId),
-                       m_kiwiOwnSignalOn && profileId == m_kiwiOwnProfileId)) {
+                       (m_kiwiOwnSignalOn && profileId == m_kiwiOwnProfileId)
+                           || m_kiwiSoundSlices.contains(profileId))) {
                 return;
             }
         }
@@ -827,6 +831,13 @@ void MainWindow::wireKiwiSdr()
         if (!slice) { return; }
         SpectrumWidget* sw = spectrumForSlice(slice);
         if (!sw || !sw->kiwiDisplaySource()) { return; }
+        // Bild ein / Bild aus (Betreiber 2026-11-25): bei verbundener Flex wird DEREN
+        // Bild ueber denselben Weg gezeichnet (MainWindow_Flex.cpp). Schoebe
+        // zusaetzlich ein Kiwi mit Scheibe seine Zeilen in diesen Panadapter, liefen
+        // zwei Quellen abwechselnd in dasselbe Bild. Ein Kiwi nur zum Hoeren (Ton je
+        // Kiwi) zeigt sein Bild im Wasserfall-Fenster, nicht im Panadapter.
+        if (m_kiwiSoundSlices.contains(profileId)) { return; }
+        if (m_flexTargetSliceId >= 0 && sw == m_radioModel->spectrumWidget()) { return; }
         sw->updateKiwiSpectrumDbm(binsDbm,
                                   lowFreqMhz * 1.0e6, highFreqMhz * 1.0e6);
     });

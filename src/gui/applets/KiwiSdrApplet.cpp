@@ -242,6 +242,15 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
         tr("Mutes the radio's receive audio in the speakers so you hear "
            "only what the Kiwi hears. Switches itself off after 30 seconds."));
     otherRow->addWidget(m_soloButton, 0);
+    m_radioMuteButton = blueToggle(tr("Mute radio"), 74, 22);
+    m_radioMuteButton->setCheckable(true);
+    m_radioMuteButton->setObjectName(QStringLiteral("kiwiRadioMuteButton"));
+    m_radioMuteButton->setAccessibleName(tr("Mute the radio, hear only the Kiwis"));
+    m_radioMuteButton->setToolTip(
+        tr("Mutes the radio's receive audio (all panadapters) in the speakers so "
+           "you hear only the Kiwis that have sound on. Playback only; the radio "
+           "itself is not changed."));
+    otherRow->addWidget(m_radioMuteButton, 0);
     otherRow->addStretch(1);
     root->addLayout(otherRow);
     // Der gewaehlte Name steht in einer EIGENEN Zeile: neben den Knoepfen
@@ -261,6 +270,7 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     connect(m_otherButton, &QPushButton::clicked, this,
             &KiwiSdrApplet::otherReceiverRequested);
     connect(m_soloButton, &QPushButton::toggled, this, &KiwiSdrApplet::soloToggled);
+    connect(m_radioMuteButton, &QPushButton::toggled, this, &KiwiSdrApplet::radioMuteToggled);
     connect(m_hearingButton, &QPushButton::clicked, this,
             &KiwiSdrApplet::hearingRequested);
 
@@ -338,6 +348,12 @@ void KiwiSdrApplet::setRecordingActive(bool active)
 {
     const QSignalBlocker blocker(m_recordButton);
     m_recordButton->setChecked(active);
+}
+
+void KiwiSdrApplet::setRadioMutedActive(bool active)
+{
+    const QSignalBlocker blocker(m_radioMuteButton);
+    m_radioMuteButton->setChecked(active);
 }
 
 void KiwiSdrApplet::setSoloActive(bool active)
@@ -500,6 +516,20 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
     status->setStyleSheet(statusStyle(receiver.state));
     status->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     topRow->addWidget(status, 0, Qt::AlignRight);
+
+    // Ton dieses Kiwi ein/aus (2026-11-25): ein = verbunden und in den
+    // Lautsprechern, aus = Ton weg (und getrennt, wenn nichts anderes ihn braucht).
+    auto* soundToggle = blueToggle(tr("Sound"), 40, 20);
+    soundToggle->setCheckable(true);
+    soundToggle->setObjectName(QStringLiteral("kiwiRowSound"));
+    soundToggle->setAccessibleName(tr("Sound of %1").arg(receiver.name));
+    soundToggle->setToolTip(tr("Listen to this Kiwi (connects it); off disconnects it "
+                               "unless its waterfall is still on."));
+    soundToggle->setChecked(!receiver.assignedSlice.isNull());
+    const QString soundId = receiver.id;
+    connect(soundToggle, &QPushButton::toggled, this,
+            [this, soundId](bool on) { emit soundRequested(soundId, on); });
+    topRow->addWidget(soundToggle, 0, Qt::AlignRight);
 
     // Wasserfall-Vorschau im eigenstaendigen KIWI-WASSERFAELLE-Panel —
     // unabhaengig davon, ob dieses Profil einer Scheibe zugeordnet ist.

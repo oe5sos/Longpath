@@ -2971,6 +2971,30 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <source>Mutes the radio's receive audio in the speakers so you hear only what the Kiwi hears. Switches itself off after 30 seconds.</source>
         <translation>Schaltet den Empfangston des Funkgeräts im Lautsprecher stumm, damit man nur hört, was der Kiwi hört. Geht nach 30 Sekunden von selbst aus.</translation>
     </message>
+    <message>
+        <source>Mute radio</source>
+        <translation>Radio stumm</translation>
+    </message>
+    <message>
+        <source>Mute the radio, hear only the Kiwis</source>
+        <translation>Radio stumm, nur die Kiwis hören</translation>
+    </message>
+    <message>
+        <source>Mutes the radio's receive audio (all panadapters) in the speakers so you hear only the Kiwis that have sound on. Playback only; the radio itself is not changed.</source>
+        <translation>Schaltet den Empfangston des Funkgeräts (alle Panadapter) im Lautsprecher stumm, sodass du nur die Kiwis mit Ton hörst. Nur Wiedergabe; das Funkgerät selbst bleibt unverändert.</translation>
+    </message>
+    <message>
+        <source>Sound</source>
+        <translation>Ton</translation>
+    </message>
+    <message>
+        <source>Sound of %1</source>
+        <translation>Ton von %1</translation>
+    </message>
+    <message>
+        <source>Listen to this Kiwi (connects it); off disconnects it unless its waterfall is still on.</source>
+        <translation>Diesen Kiwi hören (verbindet ihn); aus trennt ihn, solange sein Wasserfall nicht mehr an ist.</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::KiwiSdrClient</name>
@@ -4275,6 +4299,14 @@ Die Beschreibung des Herstellers dokumentiert nur einen Typcode, darum wird die 
     <message>
         <source>This Kiwi carries My Signal — switch that off there.</source>
         <translation>Dieser Kiwi trägt „Mein Signal“ — dort ausschalten.</translation>
+    </message>
+    <message>
+        <source>Switch a Kiwi's sound on first — otherwise nothing would be heard.</source>
+        <translation>Erst den Ton eines Kiwi einschalten — sonst wäre nichts zu hören.</translation>
+    </message>
+    <message>
+        <source>Radio unmuted: no Kiwi is playing any more.</source>
+        <translation>Radio wieder an: kein Kiwi spielt mehr.</translation>
     </message>
 </context>
 <context>

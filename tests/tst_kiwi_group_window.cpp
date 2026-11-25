@@ -327,6 +327,42 @@ private slots:
         QCOMPARE(model->slices().size(), slicesBefore);
     }
 
+    // "Radio stumm": nur mit einem hoerbaren Kiwi, nur Wiedergabe, geht von
+    // selbst aus, wenn der letzte Kiwi-Ton wegfaellt.
+    void radioStummNurMitKiwiTon()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        RadioModel* model = mw->radioModelForTest();
+        AudioEngine* audio = model->audioEngine();
+        clearProfiles(mgr);
+        const int radioSlice = model->addSlice();
+        SliceModel* radio = model->sliceById(radioSlice);
+        QVERIFY(radio && !radio->muted());
+
+        // Ohne Kiwi-Ton: abgelehnt.
+        mw->setRadioMutedForTest(true);
+        QVERIFY(!mw->radioMutedForTest());
+        QVERIFY(!audio->muteNonKiwi());
+
+        const QString id = profile(mgr, "Linz", 120);
+        mgr->setWaterfallPreviewEnabled(id, true);
+        mw->setKiwiSoundForTest(id, true);
+        QVERIFY(audio->kiwiAudioSliceCount() >= 1);
+        mw->setRadioMutedForTest(true);
+        QVERIFY(mw->radioMutedForTest());
+        QVERIFY(audio->muteNonKiwi());
+        QVERIFY(!radio->muted());                 // die Scheibe selbst bleibt unberuehrt
+
+        // Letzter Kiwi-Ton weg -> Radio wieder an.
+        mw->setKiwiSoundForTest(id, false);
+        QVERIFY(!mw->radioMutedForTest());
+        QVERIFY(!audio->muteNonKiwi());
+    }
+
     void zeilenKommenAnUndDasFensterOeffnetSich()
     {
         auto* mw = new MainWindow();

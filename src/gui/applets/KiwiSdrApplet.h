@@ -83,6 +83,8 @@ public:
     void setOwnSignalReceiverName(const QString& name);
     // "Solo": nur der Kiwi aus den Lautsprechern (siehe AudioEngine::setSoloSlice).
     void setSoloActive(bool active);
+    // "Radio stumm": Funkgeraet im Lautsprecher stumm, nur die Kiwis hoeren.
+    void setRadioMutedActive(bool active);
 
 protected:
     void showEvent(QShowEvent* event) override;
@@ -94,6 +96,9 @@ signals:
     void otherReceiverRequested();
     void hearingRequested();
     void soloToggled(bool on);
+    void radioMuteToggled(bool on);
+    // Ton eines Kiwi aus der Liste ein/aus (verbindet bzw. trennt ihn).
+    void soundRequested(const QString& profileId, bool on);
 
 private:
     void rebuildReceiverList();
@@ -117,6 +122,7 @@ private:
     QPushButton* m_otherButton{nullptr};
     QPushButton* m_hearingButton{nullptr};
     QPushButton* m_soloButton{nullptr};
+    QPushButton* m_radioMuteButton{nullptr};
     QLabel* m_ownSignalLabel{nullptr};
     QListWidget* m_receiverList{nullptr};
     QVector<KiwiSdrReceiverStatus> m_receivers;

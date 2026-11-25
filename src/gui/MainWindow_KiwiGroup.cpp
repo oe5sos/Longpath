@@ -69,6 +69,10 @@ void MainWindow::wireKiwiGroup()
             [this]() { openKiwiHearingDialog(); });
     connect(m_kiwiSdrApplet, &KiwiSdrApplet::soloToggled, this,
             [this](bool on) { setKiwiSolo(on); });
+    connect(m_kiwiSdrApplet, &KiwiSdrApplet::radioMuteToggled, this,
+            [this](bool on) { setRadioMuted(on); });
+    connect(m_kiwiSdrApplet, &KiwiSdrApplet::soundRequested, this,
+            [this](const QString& id, bool on) { setKiwiSound(id, on); });
     m_kiwiSoloTimer = new QTimer(this);
     m_kiwiSoloTimer->setSingleShot(true);
     m_kiwiSoloTimer->setInterval(30000);
@@ -319,8 +323,31 @@ void MainWindow::setAllKiwiSound(bool on)
     }
 }
 
+// "Radio stumm": nur Wiedergabe im Lautsprecher-Mix. Ohne hoerbaren Kiwi
+// waere das Stille, also nur mit mindestens einem Kiwi mit Ton -- und es geht
+// von selbst aus, wenn der letzte Kiwi-Ton wegfaellt.
+void MainWindow::setRadioMuted(bool on)
+{
+    AudioEngine* audio = m_radioModel ? m_radioModel->audioEngine() : nullptr;
+    if (!audio) { m_radioMuted = false; return; }
+    if (on && audio->kiwiAudioSliceCount() == 0) {
+        showToast(tr("Switch a Kiwi's sound on first — otherwise nothing would be heard."),
+                  ToastSeverity::Info, 6000);
+        on = false;
+    }
+    m_radioMuted = on;
+    audio->setMuteNonKiwi(on);
+    if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setRadioMutedActive(on); }
+}
+
 void MainWindow::refreshKiwiSoundButtons()
 {
+    if (m_radioMuted && m_radioModel && m_radioModel->audioEngine()
+        && m_radioModel->audioEngine()->kiwiAudioSliceCount() == 0) {
+        setRadioMuted(false);
+        showToast(tr("Radio unmuted: no Kiwi is playing any more."),
+                  ToastSeverity::Info, 6000);
+    }
     if (!m_kiwiWaterfallPanel || !m_kiwiSdrManager) { return; }
     for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
         m_kiwiWaterfallPanel->setSoundActive(

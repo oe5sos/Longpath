@@ -238,6 +238,40 @@ private slots:
         }
     }
 
+    // Jede Kiwi-Zeile hat einen Ton-Schalter; er meldet den Wunsch.
+    void jedeZeileHatEinenTonSchalter()
+    {
+        RadioModel model;
+        KiwiSdrApplet applet(&model);
+        applet.resize(320, 400);
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, 15000));
+        KiwiSdrReceiverStatus a;
+        a.id = QStringLiteral("k1"); a.name = QStringLiteral("Eins");
+        a.state = KiwiSdrClient::State::Disconnected;
+        KiwiSdrReceiverStatus b;
+        b.id = QStringLiteral("k2"); b.name = QStringLiteral("Zwei");
+        b.state = KiwiSdrClient::State::Disconnected;
+        applet.setReceivers({a, b});
+        QTest::qWait(60);
+        auto* list = applet.findChild<QListWidget*>();
+        QSignalSpy spy(&applet, &KiwiSdrApplet::soundRequested);
+        QWidget* row2 = list->itemWidget(list->item(1));
+        auto* snd = row2->findChild<QPushButton*>(QStringLiteral("kiwiRowSound"));
+        QVERIFY(snd);
+        QVERIFY(!snd->isChecked());
+        snd->click();
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.at(0).at(0).toString(), QStringLiteral("k2"));
+        QCOMPARE(spy.at(0).at(1).toBool(), true);
+        // "Radio stumm" ist ein Schalter und meldet sich.
+        auto* mute = applet.findChild<QPushButton*>(QStringLiteral("kiwiRadioMuteButton"));
+        QVERIFY(mute && mute->isCheckable());
+        QSignalSpy mspy(&applet, &KiwiSdrApplet::radioMuteToggled);
+        mute->click();
+        QCOMPARE(mspy.count(), 1);
+    }
+
     void dieScheibeStehtDabeiUndFolgtIhr()
     {
         RadioModel model;
