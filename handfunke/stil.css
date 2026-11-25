@@ -778,3 +778,21 @@ footer #onAir.an{color:var(--tx-border)}
   #dtVersatz .vNull,#dtVersatz .vPfeil{width:30px}
   #dtVersatz .vWert{height:26px;font-size:13px}
 }
+
+
+/* ═══ Aufbereitung und AGC (2026-11-25) ═════════════════════════════════════
+   Pillen wie am Mac: an = orange gefuellt (wie jede Auswahl), dazu klein der
+   Wert (NR-Art, Squelch in dB). AGC-T steht rechts in der Ueberschrift. */
+#dsp .chip{gap:5px}
+#dsp .pWert{font-size:var(--f-caption);opacity:.8}
+#dsp .pWert:empty{display:none}
+.capsZeile{display:flex;justify-content:space-between;align-items:baseline}
+.capsWert{font:600 var(--f-caption)/1 var(--mono);letter-spacing:.04em;color:var(--orT)}
+@media (min-width: 900px){
+  /* Die „…"-Pillen tun nichts; am Desktop machen sie Platz fuer AGC. */
+  #dtBar .chip.more{display:none}
+  #dtAgcW{display:flex;align-items:center;gap:8px}
+  #dtAgcW .chips{gap:4px}
+  #dtAgcW .chip{height:26px;padding:0 9px;font-size:12px;flex:none}
+  #dtAgcW .capsWert{font-size:11px;white-space:nowrap;min-width:36px;text-align:right}
+}

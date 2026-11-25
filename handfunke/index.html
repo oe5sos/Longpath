@@ -200,6 +200,10 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <div class="chips" id="filters"></div>
   <div class="caps">Aufbereitung</div>
   <div class="chips" id="dsp"></div>
+  <!-- AGC wie am Mac: Fast / Med / Slow; rechts in der Ueberschrift AGC-T
+       (agc_gain) und eine Stufe ohne eigene Pille (Long, Fixed). -->
+  <div class="caps capsZeile"><span>AGC</span><span class="capsWert" id="agcWert"></span></div>
+  <div class="chips" id="agc"></div>
 </div>
 
 <!-- Abstimmschritt und RIT/XIT (2026-11-25), wie die Spalte „Combined" am Mac:

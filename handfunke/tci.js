@@ -77,6 +77,13 @@ export class TciLink extends EventTarget {
       // schickt sie, TciProtocol buildRitEnableLine & Co.).
       rit: [null, null], ritHz: [null, null],
       xit: [null, null], xitHz: [null, null],
+      // Aufbereitung und AGC je Empfaenger, ebenfalls nur vom Server
+      // (Init-Burst + Gegenmeldung). nrIdx ist Longpaths Platznummer auf
+      // dem Draht: 0 NR1, 1 NR2, 2 NR3, 3 NR4, 4 DFNR, 5 BNR, 6 MNR, 7 NNR
+      // (RadioModel::rxNrIndex). agcMode wie gesendet: fast/normal/slow/long/off/custom.
+      nb: [null, null], nr: [null, null], nrIdx: [null, null], anf: [null, null],
+      sql: [null, null], sqlDb: [null, null],
+      agcMode: [null, null], agcGain: [null, null],
       drive: null, tuneDrive: null,
       volume: null,              // dB, global
       rxVolume: [null, null],
@@ -297,6 +304,18 @@ export class TciLink extends EventTarget {
       case 'xit_enable':  { const t = int(0); if (t !== null && t < 2) s.xit[t]   = bool(1); break; }
       case 'rit_offset':  { const t = int(0); if (t !== null && t < 2) s.ritHz[t] = int(1); break; }
       case 'xit_offset':  { const t = int(0); if (t !== null && t < 2) s.xitHz[t] = int(1); break; }
+      case 'rx_nb_enable':  { const t = int(0); if (t !== null && t < 2) s.nb[t]  = bool(1); break; }
+      case 'rx_anf_enable': { const t = int(0); if (t !== null && t < 2) s.anf[t] = bool(1); break; }
+      case 'rx_nr_enable':  { const t = int(0); if (t !== null && t < 2) s.nr[t]  = bool(1); break; }
+      case 'rx_nr_enable_ex': {
+        const t = int(0);
+        if (t !== null && t < 2) { s.nr[t] = bool(1); if (bool(1) && int(2) !== null) s.nrIdx[t] = int(2); }
+        break;
+      }
+      case 'sql_enable':  { const t = int(0); if (t !== null && t < 2) s.sql[t]   = bool(1); break; }
+      case 'sql_level':   { const t = int(0); if (t !== null && t < 2) s.sqlDb[t] = num(1); break; }
+      case 'agc_mode':    { const t = int(0); if (t !== null && t < 2) s.agcMode[t] = (args[1] || '').toLowerCase(); break; }
+      case 'agc_gain':    { const t = int(0); if (t !== null && t < 2) s.agcGain[t] = int(1); break; }
 
       // Die drei, die bis 2026-09-30 fehlten (PR #145).
       case 'drive':       s.drive     = int(1); break;
