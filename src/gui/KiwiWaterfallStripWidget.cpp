@@ -79,6 +79,42 @@ KiwiWaterfallStripWidget::KiwiWaterfallStripWidget(const QString& profileId,
     header->addWidget(m_freqLabel, 0);
     header->addWidget(m_peakLabel, 0);
 
+    // Verkleinern / Vergroessern (Betreiber 2026-11-25: "im Display das Plus und
+    // Minus ... zu verkleinern und vergroessern"): der Frequenzbereich des Kiwi.
+    const QString zoomStyle = QStringLiteral(
+        "QToolButton { color: %1; background: transparent; border: 1px solid %2; "
+        "border-radius: 6px; font-size: 13px; }"
+        "QToolButton:hover { color: %3; }")
+            .arg(QString::fromLatin1(Style::kTextSecondary),
+                 QString::fromLatin1(Style::kBorderMuted), ink());
+    m_spanLabel = new QLabel(this);
+    m_spanLabel->setTextFormat(Qt::PlainText);
+    m_spanLabel->setObjectName(QStringLiteral("kiwiStripSpan"));
+    m_spanLabel->setStyleSheet(
+        QStringLiteral("QLabel { color: %1; font-size: 9px; "
+                        "font-family: " LP_MONO_QSS "; }").arg(scale()));
+    header->addWidget(m_spanLabel, 0);
+    m_zoomOut = new QToolButton(this);
+    m_zoomOut->setText(QStringLiteral("−"));
+    m_zoomOut->setObjectName(QStringLiteral("kiwiStripZoomOut"));
+    m_zoomOut->setToolTip(tr("Show a wider frequency range"));
+    m_zoomOut->setAccessibleName(tr("Zoom out"));
+    m_zoomOut->setFixedSize(20, 18);
+    m_zoomOut->setStyleSheet(zoomStyle);
+    connect(m_zoomOut, &QToolButton::clicked, this,
+            [this]() { emit zoomRequested(m_profileId, -1); });
+    header->addWidget(m_zoomOut, 0);
+    m_zoomIn = new QToolButton(this);
+    m_zoomIn->setText(QStringLiteral("+"));
+    m_zoomIn->setObjectName(QStringLiteral("kiwiStripZoomIn"));
+    m_zoomIn->setToolTip(tr("Show a narrower frequency range"));
+    m_zoomIn->setAccessibleName(tr("Zoom in"));
+    m_zoomIn->setFixedSize(20, 18);
+    m_zoomIn->setStyleSheet(zoomStyle);
+    connect(m_zoomIn, &QToolButton::clicked, this,
+            [this]() { emit zoomRequested(m_profileId, +1); });
+    header->addWidget(m_zoomIn, 0);
+
     // Ton ein/aus (Betreiber 2026-11-25: "jeden Kiwi im Kiwiwasserfall Ton ein
     // und ausschalten koennen"). Eingerastet = der Kiwi ist zu hoeren.
     m_soundButton = new QToolButton(this);
@@ -152,6 +188,7 @@ void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm,
         m_lowHz = lowHz;
         m_highHz = highHz;
         m_freqLabel->setText(frequencyText());
+        m_spanLabel->setText(QStringLiteral("±%1 kHz").arg((highHz - lowHz) / 2000.0, 0, 'f', 0));
     }
     // Bremse: nur jede n-te Millisekunde eine neue Zeile.
     const qint64 now = QDateTime::currentMSecsSinceEpoch();

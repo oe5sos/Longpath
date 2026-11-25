@@ -278,6 +278,55 @@ private slots:
         QVERIFY(model->sliceById(radioSlice) != nullptr);    // die andere steht noch
     }
 
+    // Plus/Minus im Streifen veraendern den Bereich; "Alle Ton" schaltet alle
+    // verbundenen Kiwis, hoechstens fuenf.
+    void zoomUndAlleTon()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        RadioModel* model = mw->radioModelForTest();
+        clearProfiles(mgr);
+        const int radioSlice = model->addSlice();
+        QVERIFY(radioSlice >= 0);
+
+        QStringList ids;
+        for (int i = 0; i < 7; ++i) {
+            ids << profile(mgr, qPrintable(QStringLiteral("Z%1").arg(i)), 90 + i);
+            mgr->setWaterfallPreviewEnabled(ids.last(), true);
+        }
+        KiwiWaterfallPanel* panel = mw->kiwiWaterfallPanelForTest();
+        QVERIFY(panel->stripForTest(ids[0]));
+
+        // Zoom: Plus halbiert, Minus verdoppelt, in den Grenzen 5..200 kHz.
+        QCOMPARE(mw->kiwiViewSpanForTest(ids[0]), 0.0);
+        QTest::mouseClick(panel->stripForTest(ids[0])->zoomInButtonForTest(), Qt::LeftButton);
+        QCOMPARE(mw->kiwiViewSpanForTest(ids[0]), 20000.0);      // aus 40 kHz
+        QTest::mouseClick(panel->stripForTest(ids[0])->zoomInButtonForTest(), Qt::LeftButton);
+        QCOMPARE(mw->kiwiViewSpanForTest(ids[0]), 10000.0);
+        for (int i = 0; i < 8; ++i) { mw->zoomKiwiStripForTest(ids[0], +1); }
+        QCOMPARE(mw->kiwiViewSpanForTest(ids[0]), 5000.0);       // nicht kleiner
+        for (int i = 0; i < 10; ++i) { mw->zoomKiwiStripForTest(ids[0], -1); }
+        QCOMPARE(mw->kiwiViewSpanForTest(ids[0]), 200000.0);     // nicht groesser
+
+        // Alle Ton: nur verbundene (hier "Verbindet"), hoechstens fuenf, je eigene Scheibe.
+        const int slicesBefore = model->slices().size();
+        QTest::mouseClick(panel->allSoundOnForTest(), Qt::LeftButton);
+        int hoerbar = 0;
+        for (const QString& id : ids) {
+            if (mgr->assignedSliceForProfile(id) >= 0) { ++hoerbar; }
+        }
+        QVERIFY2(hoerbar >= 1 && hoerbar <= 5, qPrintable(QString::number(hoerbar)));
+        QCOMPARE(model->slices().size(), slicesBefore + hoerbar);
+        QVERIFY(model->sliceById(radioSlice) != nullptr);
+
+        QTest::mouseClick(panel->allSoundOffForTest(), Qt::LeftButton);
+        for (const QString& id : ids) { QCOMPARE(mgr->assignedSliceForProfile(id), -1); }
+        QCOMPARE(model->slices().size(), slicesBefore);
+    }
+
     void zeilenKommenAnUndDasFensterOeffnetSich()
     {
         auto* mw = new MainWindow();

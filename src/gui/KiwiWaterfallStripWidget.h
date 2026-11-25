@@ -59,6 +59,10 @@ public:
     void setSoundActive(bool on);
     bool soundActive() const;
     QToolButton* soundButtonForTest() const { return m_soundButton; }
+    QToolButton* zoomInButtonForTest() const { return m_zoomIn; }
+    QToolButton* zoomOutButtonForTest() const { return m_zoomOut; }
+    // Breite des gezeigten Bereichs in Hz (aus der letzten Zeile), 0 = unbekannt.
+    double spanHz() const { return m_highHz > m_lowHz ? m_highHz - m_lowHz : 0.0; }
 
     // Allgemeine Einstellung (Geschwindigkeit, Pegelbereich) fuer ALLE Kiwi-
     // Wasserfaelle, gespeichert unter KiwiWaterfall/* (Betreiber 2026-11-25:
@@ -74,6 +78,8 @@ signals:
     void closeRequested(const QString& profileId);
     void renameRequested(const QString& profileId);
     void soundToggled(const QString& profileId, bool on);
+    // +1 = naeher heran (kleinerer Bereich), -1 = weiter weg.
+    void zoomRequested(const QString& profileId, int direction);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -101,6 +107,9 @@ private:
     int m_acceptedRows{0};
     QToolButton* m_closeButton{nullptr};
     QToolButton* m_soundButton{nullptr};
+    QToolButton* m_zoomIn{nullptr};
+    QToolButton* m_zoomOut{nullptr};
+    QLabel* m_spanLabel{nullptr};
 
     QString m_profileId;
     QLabel* m_nameLabel{nullptr};

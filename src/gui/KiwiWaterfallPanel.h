@@ -14,6 +14,7 @@
 #include <QVector>
 
 class QLabel;
+class QPushButton;
 class QVBoxLayout;
 
 namespace Longpath {
@@ -42,9 +43,14 @@ signals:
     void removeRequested(const QString& profileId);
     void renameRequested(const QString& profileId);
     void soundToggled(const QString& profileId, bool on);
+    void zoomRequested(const QString& profileId, int direction);
+    // Ton fuer ALLE gezeigten Kiwis ein / aus.
+    void allSoundRequested(bool on);
 
 public:
     KiwiWaterfallStripWidget* stripForTest(const QString& id) const { return m_strips.value(id, nullptr); }
+    QPushButton* allSoundOnForTest() const { return m_allSoundOn; }
+    QPushButton* allSoundOffForTest() const { return m_allSoundOff; }
 
 public slots:
     void setStripEnabled(const QString& profileId, bool enabled,
@@ -58,6 +64,8 @@ private:
     void updateEmptyState();
 
     QLabel* m_emptyLabel{nullptr};
+    QPushButton* m_allSoundOn{nullptr};
+    QPushButton* m_allSoundOff{nullptr};
     QVBoxLayout* m_stripsLayout{nullptr};
     QHash<QString, KiwiWaterfallStripWidget*> m_strips;
 };

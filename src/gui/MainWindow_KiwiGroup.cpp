@@ -34,6 +34,7 @@
 #include "core/LogCategories.h"
 #include "gui/KiwiHearingDialog.h"
 #include "gui/KiwiWaterfallPanel.h"
+#include "gui/KiwiWaterfallStripWidget.h"
 #include "gui/KiwiPublicReceiverPicker.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/applets/KiwiSdrApplet.h"
@@ -98,6 +99,10 @@ void MainWindow::wireKiwiGroup()
     if (m_kiwiWaterfallPanel) {
         connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::soundToggled, this,
                 [this](const QString& id, bool on) { setKiwiSound(id, on); });
+        connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::zoomRequested, this,
+                [this](const QString& id, int dir) { zoomKiwiStrip(id, dir); });
+        connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::allSoundRequested, this,
+                [this](bool on) { setAllKiwiSound(on); });
         connect(m_kiwiSdrManager, &KiwiSdrManager::sliceAssignmentChanged, this,
                 [this](int, const QString&) { refreshKiwiSoundButtons(); });
         connect(m_kiwiSdrManager, &KiwiSdrManager::waterfallPreviewEnabledChanged, this,
@@ -265,6 +270,53 @@ void MainWindow::setKiwiSound(const QString& profileId, bool on)
         }
     }
     refreshKiwiSoundButtons();
+}
+
+// Verkleinern/Vergroessern des Kiwi-Bereichs: der Kiwi kennt nur ganzzahlige
+// Zoomstufen und liefert unter etwa 10 kHz kein brauchbares Bild.
+void MainWindow::zoomKiwiStrip(const QString& profileId, int direction)
+{
+    if (!m_kiwiSdrManager || !m_kiwiSdrManager->hasProfile(profileId)) { return; }
+    constexpr double kMin = 5000.0;
+    constexpr double kMax = 200000.0;
+    double span = m_kiwiViewSpanHz.value(profileId, 0.0);
+    if (span <= 0.0) {
+        // Ausgangswert: was der Streifen gerade zeigt, sonst 40 kHz.
+        auto* strip = m_kiwiWaterfallPanel ? m_kiwiWaterfallPanel->stripForTest(profileId) : nullptr;
+        span = strip && strip->spanHz() > 0.0 ? strip->spanHz() : 40000.0;
+    }
+    span = std::clamp(direction > 0 ? span * 0.5 : span * 2.0, kMin, kMax);
+    m_kiwiViewSpanHz.insert(profileId, span);
+    // Mit Scheibe (Ton an): die Ansicht gleich setzen; sonst nimmt sie der
+    // naechste Takt von sendKiwiGroupTracking mit.
+    const int sid = m_kiwiSdrManager->assignedSliceForProfile(profileId);
+    if (SliceModel* slice = kiwiControllableSlice(sid)) {
+        m_kiwiSdrManager->updateWaterfallView(
+            sid, slice->panKey().isEmpty() ? QStringLiteral("kiwi-zoom") : slice->panKey(),
+            slice->frequency() / 1.0e6, span / 1.0e6,
+            m_kiwiSdrManager->profile(profileId).waterfallRate);
+    }
+}
+
+// Ton fuer alle gezeigten (und verbundenen) Kiwis ein oder aus.
+void MainWindow::setAllKiwiSound(bool on)
+{
+    if (!m_kiwiSdrManager) { return; }
+    int count = 0;
+    for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
+        if (!pr.waterfallPreviewEnabled && m_kiwiSdrManager->assignedSliceForProfile(pr.id) < 0) {
+            continue;
+        }
+        if (pr.id == m_kiwiOwnProfileId) { continue; }   // der von "Mein Signal" bleibt
+        if (on) {
+            const KiwiSdrClient::State st = m_kiwiSdrManager->state(pr.id);
+            if (st == KiwiSdrClient::State::Disconnected || st == KiwiSdrClient::State::Error) {
+                continue;   // kein Ton von etwas, das nicht laeuft
+            }
+            if (++count > kKiwiMaxTotal) { break; }   // hoechstens fuenf
+        }
+        setKiwiSound(pr.id, on);
+    }
 }
 
 void MainWindow::refreshKiwiSoundButtons()
@@ -493,7 +545,8 @@ void MainWindow::sendKiwiGroupTracking()
             ids[i], kListenerTrackingBase + i,
             double(txHz) / 1.0e6, SliceModel::modeName(tx->dspMode()),
             tx->filterLow(), tx->filterHigh(),
-            QStringLiteral("kiwi-group"), double(txHz) / 1.0e6, bw / 1.0e6,
+            QStringLiteral("kiwi-group"), double(txHz) / 1.0e6,
+            m_kiwiViewSpanHz.value(ids[i], bw) / 1.0e6,
             profile.waterfallRate, QString(), SliceModel::cwPitchHz());
     }
 }

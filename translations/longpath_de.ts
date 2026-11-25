@@ -3354,6 +3354,26 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <source>No waterfall switched on — switch one on per receiver in the KiwiSDR panel.</source>
         <translation>Kein Wasserfall eingeschaltet — im KiwiSDR-Panel je Empfänger einschalten.</translation>
     </message>
+    <message>
+        <source>All Kiwis:</source>
+        <translation>Alle Kiwis:</translation>
+    </message>
+    <message>
+        <source>Sound on</source>
+        <translation>Ton an</translation>
+    </message>
+    <message>
+        <source>Listen to every Kiwi shown here that is connected</source>
+        <translation>Jeden hier gezeigten, verbundenen Kiwi hören</translation>
+    </message>
+    <message>
+        <source>Sound off</source>
+        <translation>Ton aus</translation>
+    </message>
+    <message>
+        <source>Switch the sound of all these Kiwis off</source>
+        <translation>Den Ton aller dieser Kiwis ausschalten</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::Kpa500Applet</name>
@@ -8512,6 +8532,22 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
     <message>
         <source>Kiwi sound</source>
         <translation>Kiwi-Ton</translation>
+    </message>
+    <message>
+        <source>Show a wider frequency range</source>
+        <translation>Größeren Frequenzbereich zeigen</translation>
+    </message>
+    <message>
+        <source>Zoom out</source>
+        <translation>Verkleinern</translation>
+    </message>
+    <message>
+        <source>Show a narrower frequency range</source>
+        <translation>Kleineren Frequenzbereich zeigen</translation>
+    </message>
+    <message>
+        <source>Zoom in</source>
+        <translation>Vergrößern</translation>
     </message>
 </context>
 </TS>
