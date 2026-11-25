@@ -464,6 +464,36 @@ function modeArt(m) {
 
 let letzterModus = '', letzteModi = '';
 
+// AGC-Stufen mit eigener Pille (Wortlaut wie am Mac) und wie sie auf dem
+// Draht heissen. Longpath kanonisiert med/medium zu "normal"
+// (TciProtocol::handleAgcModeCommand).
+const AGC_STUFEN = [['fast', 'Fast'], ['normal', 'Med'], ['slow', 'Slow']];
+const AGC_ANDERE = { long: 'Long', off: 'Fixed', custom: 'Custom' };
+// RadioModel::rxNrIndex — die Platznummer, die Longpath mitschickt.
+const NR_NAMEN = ['NR1', 'NR2', 'NR3', 'NR4', 'DFNR', 'BNR', 'MNR', 'NNR'];
+const nrZuletzt = [null, null];   // welche NR-Art beim Wiedereinschalten
+function dspTippen(art) {
+  const t = state.trx, s = link.st;
+  const an = s[art][t];
+  if (an === null) { return; }                 // Zustand unbekannt: nicht raten
+  if (art === 'nr') {
+    if (an) {
+      if (s.nrIdx[t] !== null) { nrZuletzt[t] = s.nrIdx[t]; }
+      link.send(`rx_nr_enable:${t},false`);
+    } else if (nrZuletzt[t] >= 1 && nrZuletzt[t] <= 4) {
+      // Dieselbe Art wieder einschalten. rx_nr_enable_ex nimmt nur 1..4 an
+      // (TciProtocol::handleRxNrEnableExCommand); fuer alles andere bleibt
+      // der einfache Befehl, und die Pille zeigt, was Longpath daraus macht.
+      link.send(`rx_nr_enable_ex:${t},true,${nrZuletzt[t]}`);
+    } else {
+      link.send(`rx_nr_enable:${t},true`);
+    }
+    return;
+  }
+  const cmd = { nb: 'rx_nb_enable', anf: 'rx_anf_enable', sql: 'sql_enable' }[art];
+  link.send(`${cmd}:${t},${an ? 'false' : 'true'}`);
+}
+
 function zeichneBedienung() {
   const s = link.st;
 
@@ -532,24 +562,49 @@ function zeichneBedienung() {
     $('filters').appendChild(mehr);
   }
 
-  // Aufbereitung — Zustandsschalter bleiben leise (nur Rand), damit im Feld
-  // genau eine Stelle kraeftig ist: die Sendetaste.
+  // Aufbereitung und AGC (2026-11-25) — Pillen wie am Mac: an = orange
+  // gefuellt, dazu der Wert (NR-Art, Squelch-Schwelle). Bis hierher schaltete
+  // die Seite die Pillen selbst um, weil "der Server nicht jeden bestaetigt".
+  // Er tut es doch: alle vier kommen im Init-Burst und als Gegenmeldung
+  // (TciServer: activeNrChanged, rx_nb_enable, sql_enable ...). Also zeigt
+  // die Pille jetzt, was Longpath sagt, nicht was zuletzt getippt wurde.
   if (!$('dsp').dataset.fertig) {
     $('dsp').dataset.fertig = '1';
-    [['NB','rx_nb_enable'],['NR','rx_nr_enable'],['ANF','rx_anf_enable'],['SQL','sql_enable']]
-      .forEach(([name, cmd]) => {
-        const el = document.createElement('div');
-        el.className = 'chip quiet'; el.textContent = name; el.dataset.cmd = cmd;
-        el.onclick = () => {
-          const an = el.classList.contains('on');
-          link.send(`${cmd}:${state.trx},${an ? 'false' : 'true'}`);
-          el.classList.toggle('on');   // Der Server bestaetigt nicht jeden
-        };                             // dieser Schalter — hier ist die
-        $('dsp').appendChild(el);      // Anzeige notgedrungen lokal.
-      });
-    const mehr = document.createElement('div');
-    mehr.className = 'chip more'; mehr.textContent = '…';
-    $('dsp').appendChild(mehr);
+    for (const art of ['nb', 'nr', 'anf', 'sql']) {
+      const el = document.createElement('div');
+      el.className = 'chip'; el.dataset.art = art;
+      el.innerHTML = '<span class="pName"></span><span class="pWert"></span>';
+      el.querySelector('.pName').textContent = art.toUpperCase();
+      el.onclick = () => dspTippen(art);
+      $('dsp').appendChild(el);
+    }
+    for (const [m, t] of AGC_STUFEN) {
+      const el = document.createElement('div');
+      el.className = 'chip'; el.dataset.agc = m; el.textContent = t;
+      el.onclick = () => link.send(`agc_mode:${state.trx},${m}`);
+      $('agc').appendChild(el);
+    }
+  }
+  {
+    const t = state.trx;
+    for (const el of $('dsp').children) {
+      const art = el.dataset.art;
+      const an = s[art] ? s[art][t] === true : false;
+      el.classList.toggle('on', an);
+      let w = '';
+      if (art === 'nr' && an && s.nrIdx[t] !== null) { w = NR_NAMEN[s.nrIdx[t]] || ''; }
+      if (art === 'sql' && s.sqlDb[t] !== null) { w = String(Math.round(s.sqlDb[t])).replace('-', '\u2212'); }
+      const pw = el.querySelector('.pWert');
+      if (pw.textContent !== w) { pw.textContent = w; }
+    }
+    const m = s.agcMode[t];
+    for (const el of $('agc').children) { el.classList.toggle('on', el.dataset.agc === m); }
+    // Steht die AGC auf einer Stufe ohne eigene Pille (Long, Off, Custom),
+    // sagt es die Ueberschrift — sonst saehe es aus, als sei keine gewaehlt.
+    const fremd = m && !AGC_STUFEN.some(([k]) => k === m) ? (AGC_ANDERE[m] || m.toUpperCase()) : '';
+    const gain = s.agcGain[t];
+    const kopf = (fremd ? fremd + ' \u00b7 ' : '') + (gain !== null ? 'T ' + gain : '');
+    if ($('agcWert').textContent !== kopf) { $('agcWert').textContent = kopf; }
   }
 
   // Sendeleistung — der Regler, der bis PR #145 wirkungslos war.

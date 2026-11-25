@@ -30,7 +30,9 @@ export function desktopStarten({ link, $, schrittHz, logHolen }) {
   };
   const gruppe = (titel, ...kinder) => {
     const g = mk('<div class="dtGruppe"></div>');
-    g.append(...kinder);
+    // Ueber hin(), damit die Pillen beim Zurueck auf „Ein Schirm" wieder an
+    // ihren Platz kommen (vorher blieben Band/Betriebsart/Filter/NR weg).
+    kinder.forEach((k) => hin(k, g));
     g.setAttribute('aria-label', titel);
     return g;
   };
@@ -61,11 +63,15 @@ export function desktopStarten({ link, $, schrittHz, logHolen }) {
       '<div id="dtComb"></div>' +
       '<div class="dtZeile"><span class="caps">Filterbreite</span><span id="dtFb" class="dtW">—</span></div>' +
       '<div class="dtZeile"><span class="caps">Schritt</span><span id="dtSchr" class="dtW">100 Hz</span></div>' +
+      '<div class="dtZeile dtAgc"><span class="caps">AGC</span><span id="dtAgcW"></span></div>' +
       '<div id="dtVersatz"></div></div>');
     fbText = comb.querySelector('#dtFb');
     hin(document.querySelector('header'), rechts);
     rechts.append(comb);
     hin(document.querySelector('.vfo'), comb.querySelector('#dtComb'));
+    // AGC: die Pillen und AGC-T neben die Ueberschrift, wie die Werte darueber.
+    hin($('agc'), comb.querySelector('#dtAgcW'));
+    hin($('agcWert'), comb.querySelector('#dtAgcW'));
     // RIT/XIT: dieselben Zeilen wie am Telefon, hier in „Combined" wie am Mac.
     hin($('ritZeile'), comb.querySelector('#dtVersatz'));
     hin($('xitZeile'), comb.querySelector('#dtVersatz'));

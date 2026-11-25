@@ -169,6 +169,22 @@ INIT_BURST = [
     'rit_offset:1,0;',
     'xit_offset:0,0;',
     'xit_offset:1,0;',
+    # Aufbereitung und AGC wie im echten Init-Burst.
+    'rx_nb_enable:0,false;',
+    'rx_nb_enable:1,false;',
+    'rx_nr_enable:0,true;',
+    'rx_nr_enable_ex:0,true,1;',
+    'rx_nr_enable:1,false;',
+    'rx_anf_enable:0,false;',
+    'rx_anf_enable:1,false;',
+    'sql_enable:0,false;',
+    'sql_enable:1,false;',
+    'sql_level:0,-30;',
+    'sql_level:1,-30;',
+    'agc_mode:0,normal;',
+    'agc_mode:1,normal;',
+    'agc_gain:0,80;',
+    'agc_gain:1,80;',
     'start;',
     'ready;',
 ]
@@ -474,6 +490,24 @@ class Verbindung(threading.Thread):
                 nr = args[0].strip() if args else '0'
                 print(f'  {self.addr[1]}: {name}:{nr},{"true" if will else "false"}')
                 self.sende_text(f'{name}:{nr},{"true" if will else "false"};')
+        elif name in ('rx_nr_enable', 'rx_nr_enable_ex'):
+            # Wie Longpath: beide Formen zurueck, die Art als Platznummer
+            # (0 NR1, 1 NR2 ...). Der einfache Befehl schaltet dort NR2 ein
+            # (setRxNr mit Index 1) -- die Attrappe macht es genauso.
+            if len(args) >= 2:
+                an = args[1].strip().lower() == 'true'
+                idx = args[2] if name == 'rx_nr_enable_ex' and len(args) >= 3 else '1'
+                self.sende_text(f'rx_nr_enable:{args[0]},{"true" if an else "false"};')
+                self.sende_text(f'rx_nr_enable_ex:{args[0]},{"true" if an else "false"},{idx if an else 0};')
+            print(f'  {self.addr[1]}: {zeile}')
+        elif name == 'agc_mode':
+            if len(args) >= 2:
+                m = args[1].strip().lower()
+                m = {'med': 'normal', 'medium': 'normal', 'fixd': 'off', 'fixed': 'off'}.get(m, m)
+                if m not in ('off', 'long', 'slow', 'fast', 'custom', 'normal'):
+                    m = 'normal'
+                self.sende_text(f'agc_mode:{args[0]},{m};')
+            print(f'  {self.addr[1]}: {zeile}')
         elif name == 'iq_start':
             self.iq_an = True
             print(f'  {self.addr[1]}: IQ an')
@@ -530,7 +564,9 @@ class Verbindung(threading.Thread):
             self.sende_text(f'spectrum_stop:{args[0]};')
         elif name in ('drive', 'tune_drive', 'vfo', 'modulation',
                       'rx_filter_band', 'trx', 'tune',
-                      'rit_enable', 'xit_enable', 'rit_offset', 'xit_offset'):
+                      'rit_enable', 'xit_enable', 'rit_offset', 'xit_offset',
+                      'rx_nb_enable', 'rx_anf_enable', 'sql_enable', 'sql_level',
+                      'agc_gain'):
             # Wie der echte Server: setzen und die Gegenmeldung schicken,
             # damit der Client seinen Zustand NUR vom Server bekommt.
             if len(args) >= 2:
