@@ -858,10 +858,6 @@ public:
     /// setSoloSlice nur Wiedergabe: keine Scheibe, nicht das Funkgeraet, nicht
     /// VAX/Anti-VOX.
     void setMuteNonKiwi(bool on) { m_muteNonKiwi.store(on, std::memory_order_release); }
-    // Alles stumm: Funkgeraet UND alle Kiwis (Ton-Schalter im Panadapter).
-    // Nur die Wiedergabe; Mithoerton und VAX bleiben.
-    void setMuteAllRx(bool on) { m_muteAllRx.store(on, std::memory_order_release); }
-    bool muteAllRx() const { return m_muteAllRx.load(std::memory_order_acquire); }
     bool muteNonKiwi() const { return m_muteNonKiwi.load(std::memory_order_acquire); }
     /// Wie viele Kiwi-Scheiben gerade Ton liefern duerfen.
     int kiwiAudioSliceCount() const { return int(m_kiwiEnabledSlices.size()); }
@@ -1352,7 +1348,6 @@ private:
     std::atomic<bool>  m_rxMutedForMonitor{false};
     std::atomic<int>   m_soloSliceId{-1};
     std::atomic<bool>  m_muteNonKiwi{false};
-    std::atomic<bool>  m_muteAllRx{false};
     // Bit n = Scheibe n wird von einem Kiwi gespeist (Scheiben 0..63); vom
     // Audiofaden gelesen, vom Hauptfaden geschrieben.
     std::atomic<quint64> m_kiwiSliceMask{0};

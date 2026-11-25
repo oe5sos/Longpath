@@ -3553,10 +3553,6 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 <context>
     <name>Longpath::MainWindow</name>
     <message>
-        <source>The panadapter sound is off, so everything is silent. Switch Sound on in the panadapter header.</source>
-        <translation>Der Panadapter-Ton ist aus, deshalb ist alles stumm. Schalte „Ton“ im Kopf des Panadapters ein.</translation>
-    </message>
-    <message>
         <source>Disconnects programs after 10 s when its program slots are full.</source>
         <translation>Trennt Programme nach 10 s, wenn seine Programm-Plätze voll sind.</translation>
     </message>
@@ -5497,8 +5493,8 @@ All custom band/pin mappings will be cleared.</source>
 <context>
     <name>Longpath::PanadapterApplet</name>
     <message>
-        <source>All sound on / off: radio and Kiwis (playback only)</source>
-        <translation>Ton ganz ein / aus: Funkgerät und Kiwis (nur Wiedergabe)</translation>
+        <source>Radio sound on / off (playback only)</source>
+        <translation>Ton des Funkgeräts ein / aus (nur Wiedergabe)</translation>
     </message>
     <message>
         <source>Sound</source>

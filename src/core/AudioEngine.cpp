@@ -1556,8 +1556,7 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
                                || m_rxMutedForMonitor.load(
                                       std::memory_order_acquire)
                                || (solo >= 0 && sliceId != solo)
-                               || nonKiwiMuted
-                               || m_muteAllRx.load(std::memory_order_acquire));
+                               || nonKiwiMuted);
 
     // Anti-VOX hears exactly what the speakers hear. From Thetis
     // cmaster.c:370-372 [v2.10.3.15], every sub-receiver's audio is handed

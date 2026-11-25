@@ -197,7 +197,7 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     m_btnMute->setFixedSize(46, 24);
     m_btnMute->setCursor(Qt::PointingHandCursor);
     m_btnMute->setObjectName(QStringLiteral("panHeaderSoundToggle"));
-    m_btnMute->setToolTip(tr("All sound on / off: radio and Kiwis (playback only)"));
+    m_btnMute->setToolTip(tr("Radio sound on / off (playback only)"));
     headLay->addWidget(m_btnMute);
     connect(m_btnMute, &QPushButton::toggled, this,
             [this](bool on) {

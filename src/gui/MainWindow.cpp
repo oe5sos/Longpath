@@ -5080,7 +5080,7 @@ void MainWindow::wirePanBadgeHandlers()
                 this, &MainWindow::onPanFloatRequested,
                 Qt::UniqueConnection);
         connect(applet, &PanadapterApplet::radioMuteToggled,
-                this, &MainWindow::setPanSoundMuted,
+                this, &MainWindow::setRadioMuted,
                 Qt::UniqueConnection);
         // Der Rueckweg. Ohne ihn ist der Schalter im Kopf der Kachel
         // eine Einbahnstrasse — genau der Zustand, ueber den sich der

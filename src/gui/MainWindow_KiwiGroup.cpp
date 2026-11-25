@@ -373,13 +373,6 @@ void MainWindow::setKiwiSound(const QString& profileId, bool on)
         return;
     }
     if (on) { zeigeKiwiFenster(profileId); }
-    // Kiwi-Ton an, aber der Panadapter ist stumm: sonst sieht es aus, als
-    // ginge der Knopf nicht (Betreiber 2026-11-25).
-    if (on && m_radioModel->audioEngine() && m_radioModel->audioEngine()->muteAllRx()) {
-        showToast(tr("The panadapter sound is off, so everything is silent. "
-                     "Switch Sound on in the panadapter header."),
-                  ToastSeverity::Warning, 8000);
-    }
     const int assigned = m_kiwiSdrManager->assignedSliceForProfile(profileId);
 
     // "Ton an" an einem getrennten Kiwi heisst: wieder verbinden (Betreiber
@@ -541,17 +534,9 @@ void MainWindow::setRadioMuted(bool on)
     qCInfo(lcKiwiSdr) << "Radio-Ton:" << (on ? "stumm" : "an")
                       << "(Schalter Panadapter-Kopf oder Kiwi-Fenster)";
     if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setRadioMutedActive(on); }
-}
-
-void MainWindow::setPanSoundMuted(bool muted)
-{
-    AudioEngine* audio = m_radioModel ? m_radioModel->audioEngine() : nullptr;
-    if (!audio) { return; }
-    audio->setMuteAllRx(muted);
-    qCInfo(lcKiwiSdr) << "Panadapter-Ton:" << (muted ? "alles stumm" : "an");
     if (m_panStack) {
         for (auto* a : m_panStack->allApplets()) {
-            if (a) { a->setRadioMutedActive(muted); }
+            if (a) { a->setRadioMutedActive(on); }
         }
     }
 }

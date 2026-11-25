@@ -348,15 +348,16 @@ private slots:
         SliceModel* radio = model->sliceById(radioSlice);
         QVERIFY(radio && !radio->muted());
 
-        // Der Ton-Schalter im Panadapter-Kopf schaltet ALLES stumm (Betreiber
-        // 2026-11-25: "ich wollte den Panadapter still schalten, vergebens").
+        // Der Ton-Schalter im Panadapter-Kopf schaltet nur das Funkgeraet; ein
+        // Kiwi laeuft allein weiter (Betreiber 2026-11-25).
         auto* panSound = mw->findChild<QAbstractButton*>(
             QStringLiteral("panHeaderSoundToggle"));
         QVERIFY(panSound && panSound->isChecked());
         panSound->click();
-        QVERIFY(audio->muteAllRx());
+        QVERIFY(mw->radioMutedForTest());
+        QVERIFY(audio->muteNonKiwi());
         panSound->click();
-        QVERIFY(!audio->muteAllRx());
+        QVERIFY(!audio->muteNonKiwi());
 
         // Radio stumm geht auch ohne Kiwi-Ton (Betreiber 2026-11-25).
         mw->setRadioMutedForTest(true);
