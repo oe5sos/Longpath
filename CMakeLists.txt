@@ -2451,6 +2451,10 @@ endif()
 # EXCLUDE_FROM_ALL: sie wird nicht mitgebaut und nicht ausgeliefert.
 #   cmake --build build --target tci_probe
 #   ./build/tci_probe ws://127.0.0.1:40001 12
+# Live-Messung der Mithoerer-Verbindung (2026-11-25), siehe tools/kiwi_live_probe.cpp.
+add_executable(kiwi_live_probe EXCLUDE_FROM_ALL tools/kiwi_live_probe.cpp)
+target_link_libraries(kiwi_live_probe PRIVATE LongpathObjs Qt6::Core)
+target_include_directories(kiwi_live_probe PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_executable(tci_probe EXCLUDE_FROM_ALL tools/tci_probe.cpp)
 target_link_libraries(tci_probe PRIVATE Qt6::Core Qt6::WebSockets)
 
