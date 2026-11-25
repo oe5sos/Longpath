@@ -187,10 +187,18 @@ void MainWindow::wireKiwiOwnSignal()
         }
     });
 
+    // Wo werde ich gehoert: die Mithoerer (MainWindow_KiwiGroup.cpp).
+    wireKiwiGroup();
+
     // Gemerkter Kiwi der letzten Sitzung. Der Modus selbst startet nie
     // von allein: er haengt an einer Verbindung zu einem fremden Server.
     const QString saved = AppSettings::instance().value(kKeyProfile).toString();
     if (!saved.isEmpty() && m_kiwiSdrManager->hasProfile(saved)) {
+        const QString la = AppSettings::instance().value("KiwiOwnSignal/Lat", "").toString();
+        const QString lo = AppSettings::instance().value("KiwiOwnSignal/Lon", "").toString();
+        if (!la.isEmpty() && !lo.isEmpty()) {
+            m_kiwiPositions.insert(saved, QPointF(la.toDouble(), lo.toDouble()));
+        }
         setKiwiOwnSignalProfile(
             saved, AppSettings::instance().value(kKeyKm, "-1").toDouble());
     }
@@ -208,6 +216,8 @@ void MainWindow::setKiwiOwnSignalProfile(const QString& profileId, double km)
     m_kiwiOwnKm = km;
     AppSettings::instance().setValue(kKeyProfile, profileId);
     AppSettings::instance().setValue(kKeyKm, QString::number(km, 'f', 1));
+    updateKiwiGroupCapacity();
+    refreshKiwiHearingDialog();
     const QString name = m_kiwiSdrManager->displayName(profileId);
     if (m_kiwiStrip) {
         m_kiwiStrip->setKiwiName(name);
@@ -238,6 +248,12 @@ void MainWindow::chooseOtherKiwi()
         QString id = m_kiwiSdrManager->profileIdForEndpoint(endpoint);
         if (id.isEmpty()) { id = m_kiwiSdrManager->addProfile(name, endpoint); }
         if (id.isEmpty()) { return; }
+        double lat = 0.0, lon = 0.0;
+        if (guard->selectedLatLon(lat, lon)) {
+            m_kiwiPositions.insert(id, QPointF(lat, lon));
+            AppSettings::instance().setValue("KiwiOwnSignal/Lat", QString::number(lat, 'f', 4));
+            AppSettings::instance().setValue("KiwiOwnSignal/Lon", QString::number(lon, 'f', 4));
+        }
         setKiwiOwnSignalProfile(id, guard->selectedKm());
         setKiwiOwnSignal(true);
     });

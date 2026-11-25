@@ -221,6 +221,13 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     otherRow->setContentsMargins(0, 0, 0, 0);
     otherRow->setSpacing(6);
     otherRow->addWidget(m_otherButton, 0);
+    m_hearingButton = blueToggle(tr("Heard …"), 64, 22);
+    m_hearingButton->setObjectName(QStringLiteral("kiwiHearingButton"));
+    m_hearingButton->setAccessibleName(tr("Where am I heard"));
+    m_hearingButton->setToolTip(
+        tr("Up to five Kiwis listen along while you transmit: map, "
+           "waterfalls and who hears you."));
+    otherRow->addWidget(m_hearingButton, 0);
     m_ownSignalLabel = new QLabel(this);
     m_ownSignalLabel->setTextFormat(Qt::PlainText);
     m_ownSignalLabel->setStyleSheet(detailStyle());
@@ -233,6 +240,8 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
             &KiwiSdrApplet::recordToggled);
     connect(m_otherButton, &QPushButton::clicked, this,
             &KiwiSdrApplet::otherReceiverRequested);
+    connect(m_hearingButton, &QPushButton::clicked, this,
+            &KiwiSdrApplet::hearingRequested);
 
     m_emptyLabel = new QLabel(tr("No KiwiSDR receive antenna configured"), this);
     m_emptyLabel->setAccessibleName(tr("KiwiSDR receiver status"));

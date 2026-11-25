@@ -2823,6 +2823,38 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <source>  ·  cached — use “Refresh list” to update</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>not reachable</source>
+        <translation>nicht erreichbar</translation>
+    </message>
+    <message>
+        <source>full</source>
+        <translation>voll</translation>
+    </message>
+    <message>
+        <source>partly busy</source>
+        <translation>teilweise besetzt</translation>
+    </message>
+    <message>
+        <source>free</source>
+        <translation>frei</translation>
+    </message>
+    <message>
+        <source>Distance: %1 km</source>
+        <translation>Entfernung: %1 km</translation>
+    </message>
+    <message>
+        <source>Free channels: %1 of %2</source>
+        <translation>Freie Kanäle: %1 von %2</translation>
+    </message>
+    <message>
+        <source>Band: %1 Hz</source>
+        <translation>Bereich: %1 Hz</translation>
+    </message>
+    <message>
+        <source>SNR: %1</source>
+        <translation>SNR: %1</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::KiwiSdrApplet</name>
@@ -2906,6 +2938,18 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="333"/>
         <source>KiwiSDR receiver details</source>
         <translation>Einzelheiten zum KiwiSDR-Empfaenger</translation>
+    </message>
+    <message>
+        <source>Heard …</source>
+        <translation>Gehört …</translation>
+    </message>
+    <message>
+        <source>Where am I heard</source>
+        <translation>Wo werde ich gehört</translation>
+    </message>
+    <message>
+        <source>Up to five Kiwis listen along while you transmit: map, waterfalls and who hears you.</source>
+        <translation>Bis zu fünf Kiwis hören beim Senden mit: Karte, Wasserfälle und wer dich hört.</translation>
     </message>
 </context>
 <context>
@@ -4119,6 +4163,50 @@ Die Beschreibung des Herstellers dokumentiert nur einen Typcode, darum wird die 
     <message>
         <source>Rotator/log and applets in one area along the right edge, switched by a toolbar; clicking the active icon folds it away.</source>
         <translation>Rotor/Log und Applets in einem Bereich am rechten Rand, umschaltbar über eine Symbolleiste; Klick auf das aktive Symbol klappt ihn zu.</translation>
+    </message>
+    <message>
+        <source>Only five Kiwis at once: the last listener was closed.</source>
+        <translation>Nur fünf Kiwis gleichzeitig: der letzte Mithörer wurde geschlossen.</translation>
+    </message>
+    <message>
+        <source>All five places are taken.</source>
+        <translation>Alle fünf Plätze sind belegt.</translation>
+    </message>
+    <message>
+        <source>Add a Kiwi that listens along</source>
+        <translation>Einen Kiwi hinzufügen, der mithört</translation>
+    </message>
+    <message>
+        <source>That Kiwi is already the one of My Signal.</source>
+        <translation>Das ist schon der Kiwi von „Mein Signal“.</translation>
+    </message>
+    <message>
+        <source>That Kiwi already feeds a slice.</source>
+        <translation>Dieser Kiwi speist schon eine Scheibe.</translation>
+    </message>
+    <message>
+        <source>connected</source>
+        <translation>verbunden</translation>
+    </message>
+    <message>
+        <source>connecting …</source>
+        <translation>verbindet …</translation>
+    </message>
+    <message>
+        <source>busy</source>
+        <translation>belegt</translation>
+    </message>
+    <message>
+        <source>waiting</source>
+        <translation>wartet</translation>
+    </message>
+    <message>
+        <source>error</source>
+        <translation>Fehler</translation>
+    </message>
+    <message>
+        <source>not connected</source>
+        <translation>nicht verbunden</translation>
     </message>
 </context>
 <context>
@@ -8199,6 +8287,128 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
     <message>
         <source>Limit of two hours reached.</source>
         <translation>Obergrenze von zwei Stunden erreicht.</translation>
+    </message>
+</context>
+<context>
+    <name>Longpath::KiwiHearingDialog</name>
+    <message>
+        <source>waiting for a transmission</source>
+        <translation>wartet auf eine Sendung</translation>
+    </message>
+    <message>
+        <source>unknown</source>
+        <translation>unbekannt</translation>
+    </message>
+    <message>
+        <source>weak  %1</source>
+        <translation>schwach  %1</translation>
+    </message>
+    <message>
+        <source>hears me  %1</source>
+        <translation>hört mich  %1</translation>
+    </message>
+    <message>
+        <source>hears nothing</source>
+        <translation>hört nichts</translation>
+    </message>
+    <message>
+        <source>Where am I heard</source>
+        <translation>Wo werde ich gehört</translation>
+    </message>
+    <message>
+        <source>Zoom to my Kiwis</source>
+        <translation>Auf meine Kiwis zoomen</translation>
+    </message>
+    <message>
+        <source>Add Kiwi …</source>
+        <translation>Kiwi hinzufügen …</translation>
+    </message>
+    <message>
+        <source>Kiwi</source>
+        <translation>Kiwi</translation>
+    </message>
+    <message>
+        <source>Distance</source>
+        <translation>Entfernung</translation>
+    </message>
+    <message>
+        <source>Level</source>
+        <translation>Pegel</translation>
+    </message>
+    <message>
+        <source>Verdict</source>
+        <translation>Urteil</translation>
+    </message>
+    <message>
+        <source>Delay</source>
+        <translation>Verzug</translation>
+    </message>
+    <message>
+        <source>Rec</source>
+        <translation>Aufn.</translation>
+    </message>
+    <message>
+        <source>Where I am heard, per Kiwi</source>
+        <translation>Wo ich gehört werde, je Kiwi</translation>
+    </message>
+    <message>
+        <source>Open another Kiwi to listen along (%1 of %2 places free).</source>
+        <translation>Einen weiteren Kiwi mithören lassen (%1 von %2 Plätzen frei).</translation>
+    </message>
+    <message>
+        <source>All %1 places are taken. Close one to add another.</source>
+        <translation>Alle %1 Plätze sind belegt. Erst einen schließen.</translation>
+    </message>
+    <message>
+        <source>Record</source>
+        <translation>Aufnehmen</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Schließen</translation>
+    </message>
+    <message>
+        <source>%1 km</source>
+        <translation>%1 km</translation>
+    </message>
+    <message>
+        <source>delay %1 s</source>
+        <translation>Verzug %1 s</translation>
+    </message>
+    <message>
+        <source>Disconnect this Kiwi.</source>
+        <translation>Diesen Kiwi trennen.</translation>
+    </message>
+    <message>
+        <source>%1 s</source>
+        <translation>%1 s</translation>
+    </message>
+    <message>
+        <source>No Kiwi listening along yet — add one.</source>
+        <translation>Noch kein Kiwi hört mit — einen hinzufügen.</translation>
+    </message>
+    <message>
+        <source>%1 Kiwis listening along. Transmit to see who hears you.</source>
+        <translation>%1 Kiwis hören mit. Senden, um zu sehen, wer dich hört.</translation>
+    </message>
+    <message>
+        <source>%1 of %2 hear me</source>
+        <translation>%1 von %2 hören mich</translation>
+    </message>
+    <message>
+        <source> · farthest: %1 km</source>
+        <translation> · am weitesten: %1 km</translation>
+    </message>
+</context>
+<context>
+    <name>Longpath::KiwiWorldMap</name>
+    <message>
+        <source>World map of KiwiSDR receivers</source>
+        <translation>Weltkarte der KiwiSDR-Empfänger</translation>
+    </message>
+    <message>
+        <source>Shows where public KiwiSDR receivers are and whether they are free, partly busy, full or not reachable. Hover a dot for details, click it to select the receiver.</source>
+        <translation>Zeigt, wo öffentliche KiwiSDR-Empfänger stehen und ob sie frei, teilweise besetzt, voll oder nicht erreichbar sind. Über einen Punkt fahren für Einzelheiten, anklicken zum Auswählen.</translation>
     </message>
 </context>
 </TS>

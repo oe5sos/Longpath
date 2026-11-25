@@ -5884,6 +5884,9 @@ longpath_add_test(tst_kiwi_tracking_follows_the_slice)
 # mich"-Messung, Tonhalt, Aufnahme, Streifenbild -- ohne Hauptfenster.
 longpath_add_test(tst_kiwi_own_signal)
 longpath_add_test(tst_kiwi_own_signal_window)
+longpath_add_test(tst_kiwi_world_map)
+longpath_add_test(tst_kiwi_group)
+longpath_add_test(tst_kiwi_group_window)
 # 2026-09-21: Nebenfenster (Channel Strip, Logbuch, Setup, Meldungen) auf
 # die Ebene der schwebenden Paletten -- welche Fenster der Filter anfasst.
 longpath_add_test(tst_auxiliary_window_leveler)

@@ -79,6 +79,8 @@
 
 #include "core/WdspTypes.h"
 #include "core/DigiFrequenzen.h"
+#include "core/KiwiGroup.h"
+#include "gui/KiwiHearingDialog.h"
 #include "gui/applets/PanelAutomatik.h"
 
 #include <QElapsedTimer>
@@ -270,6 +272,17 @@ public:
     void startKiwiRecordingForTest() { startKiwiRecording(); }
     void stopKiwiRecordingForTest() { stopKiwiRecording(); }
     class KiwiRecording* kiwiRecordingForTest() const { return m_kiwiRecording; }
+    // Wo werde ich gehoert: Mithoerer ohne Verzeichnisdialog.
+    bool addKiwiListenerForTest(const QString& id, double km = -1.0,
+                                bool hasPos = false, double lat = 0.0,
+                                double lon = 0.0)
+    { return addKiwiListener(id, km, hasPos, lat, lon); }
+    void removeKiwiListenerForTest(const QString& id) { removeKiwiListener(id); }
+    const KiwiGroup& kiwiGroupForTest() const { return m_kiwiGroup; }
+    void kiwiGroupTxEdgeForTest(bool on) { kiwiGroupTxEdge(on); }
+    void openKiwiHearingDialogForTest() { openKiwiHearingDialog(); }
+    class KiwiHearingDialog* kiwiHearingDialogForTest() const
+    { return m_kiwiHearingDialog.data(); }
     RadioModel* radioModelForTest() const { return m_radioModel; }
     class InstrumentApplet* signalInstrumentForTest() const;
     class ContestFenster* contestFensterForTest() const { return m_contestFenster; }
@@ -1674,6 +1687,19 @@ private:
     void kiwiOwnSignalTxEdge(bool sending);
     void startKiwiRecording();
     void stopKiwiRecording();
+    // Wo werde ich gehoert (Entwurf B/C) -- MainWindow_KiwiGroup.cpp.
+    void wireKiwiGroup();
+    void openKiwiHearingDialog();
+    void addKiwiToGroupFromPicker();
+    bool addKiwiListener(const QString& profileId, double km, bool hasPos,
+                         double lat, double lon);
+    void removeKiwiListener(const QString& profileId);
+    void kiwiGroupTxEdge(bool sending);
+    void sendKiwiGroupTracking();
+    void refreshKiwiHearingDialog();
+    void updateKiwiGroupCapacity();
+    void startKiwiGroupRecording(const QString& profileId);
+    void stopKiwiGroupRecording(const QString& profileId);
     class SliceModel* kiwiOwnTxSlice() const;
     qint64 kiwiOwnNowMs() const;
     // Stufe 3b (2026-09-21): der Kiwi folgt der zugeordneten Scheibe --
@@ -2286,6 +2312,12 @@ private:
     QVector<QMetaObject::Connection> m_kiwiOwnConnections;
     QPointer<class SpectrumWidget> m_kiwiOwnPan;
     QTimer* m_kiwiRecordTimer{nullptr};
+    // Wo werde ich gehoert: Mithoerer, ohne Scheibe, ohne Ton.
+    KiwiGroup m_kiwiGroup;
+    QPointer<KiwiHearingDialog> m_kiwiHearingDialog;
+    QTimer* m_kiwiGroupTimer{nullptr};
+    QHash<QString, class KiwiRecording*> m_kiwiGroupRecordings;
+    QHash<QString, QPointF> m_kiwiPositions;   // Profilkennung -> (Breite, Laenge)
     QPointer<class UpdateDialog> m_updateDialog;
 
     // ── SunSDR (TCI-Client, 2026-08-24) ──────────────────────────────

@@ -843,6 +843,7 @@ void KiwiSdrManager::removeProfile(const QString& id)
     }
 
     qCInfo(lcKiwiSdr).noquote() << "Profile removed" << displayName(id) << "id=" << id;
+    m_listeners.remove(id);
     cancelReconnect(id);
     disconnectProfile(id);
     destroyClient(id);
@@ -910,7 +911,8 @@ void KiwiSdrManager::connectProfile(const QString& id)
         client->setWaterfallRateOverride(rate);
     });
     if (assignedSliceForProfile(id) < 0) {
-        if (m_profiles[idx].waterfallPreviewEnabled) {
+        if (m_profiles[idx].waterfallPreviewEnabled
+            || m_listeners.contains(id)) {
             // Eine reine Vorschau-Verbindung (kein Scheiben-Bezug) braucht
             // keine Frequenz-/Modus-Verfolgung — sie zeigt, worauf der
             // Kiwi ohnehin schon steht. Ohne diesen Zweig blieb
@@ -988,6 +990,38 @@ void KiwiSdrManager::setWaterfallPreviewEnabled(const QString& id, bool enabled)
     } else if (!shouldMaintainProfileConnection(id)) {
         disconnectProfile(id);
     }
+}
+
+void KiwiSdrManager::setProfileListener(const QString& id, bool enabled)
+{
+    if (profileIndex(id) < 0 || m_listeners.contains(id) == enabled) {
+        return;
+    }
+    if (enabled) {
+        m_listeners.insert(id);
+        connectProfile(id);
+    } else {
+        m_listeners.remove(id);
+        setListenerRecording(id, false);
+        if (!shouldMaintainProfileConnection(id)) {
+            disconnectProfile(id);
+        }
+    }
+}
+
+void KiwiSdrManager::setListenerRecording(const QString& id, bool enabled)
+{
+    if (!client(id)) {
+        return;
+    }
+    // Nur fuer Mithoerer: bei einem Kiwi mit Scheibe regelt die Zuordnung den
+    // Ton, und dessen Dekodierung darf hier nicht angetastet werden.
+    if (enabled && !m_listeners.contains(id)) {
+        return;
+    }
+    invokeClient(id, [enabled](KiwiSdrClient* c) {
+        c->setDecodeAudioWhenInactive(enabled);
+    });
 }
 
 void KiwiSdrManager::disconnectAll()
@@ -1707,7 +1741,8 @@ bool KiwiSdrManager::shouldMaintainProfileConnection(const QString& id) const
     }
 
     return m_profiles[idx].autoConnect || assignedSliceForProfile(id) >= 0
-        || m_profiles[idx].waterfallPreviewEnabled;
+        || m_profiles[idx].waterfallPreviewEnabled
+        || m_listeners.contains(id);
 }
 
 void KiwiSdrManager::scheduleReconnect(const QString& id)

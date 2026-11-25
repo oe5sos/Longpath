@@ -11,6 +11,9 @@
 #include "gui/KiwiPublicReceiverPicker.h"
 #include "core/KiwiOwnSignal.h"
 #include "gui/StyleConstants.h"
+#include "gui/widgets/KiwiWorldMap.h"
+#include "core/AppSettings.h"
+#include "core/Maidenhead.h"
 
 #include <QAccessible>
 #include <QDialogButtonBox>
@@ -20,6 +23,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QSplitter>
 #include <QStringList>
 #include <QTableWidget>
 #include <QTableWidgetItem>
@@ -63,7 +67,7 @@ KiwiPublicReceiverPicker::KiwiPublicReceiverPicker(QWidget* parent)
     : QDialog(parent)
     , m_dir(new KiwiPublicDirectory(this))
 {
-    resize(760, 460);
+    resize(900, 720);
 
     setWindowTitle(tr("Oeffentliche KiwiSDR-Empfaenger"));
 
@@ -94,7 +98,17 @@ KiwiPublicReceiverPicker::KiwiPublicReceiverPicker(QWidget* parent)
     m_table->horizontalHeader()->setSectionResizeMode(UsersColumn, QHeaderView::ResizeToContents);
     m_table->horizontalHeader()->setSectionResizeMode(ApiColumn, QHeaderView::ResizeToContents);
     m_table->horizontalHeader()->setSectionResizeMode(LimitsColumn, QHeaderView::ResizeToContents);
-    outer->addWidget(m_table, 1);
+
+    // Karte ueber der Tabelle (Entwurf A, 2026-11-25). Der Teiler laesst
+    // dem Betreiber die Aufteilung; Karte und Tabelle zeigen dasselbe.
+    m_map = new KiwiWorldMap(this);
+    m_split = new QSplitter(Qt::Vertical, this);
+    m_split->setChildrenCollapsible(false);
+    m_split->addWidget(m_map);
+    m_split->addWidget(m_table);
+    m_split->setStretchFactor(0, 3);
+    m_split->setStretchFactor(1, 2);
+    outer->addWidget(m_split, 1);
 
     m_status = new QLabel(tr("Loading public receivers…"));
     m_status->setStyleSheet(QStringLiteral("QLabel { color: %1; }")
@@ -113,6 +127,22 @@ KiwiPublicReceiverPicker::KiwiPublicReceiverPicker(QWidget* parent)
             [this](QTableWidgetItem*) { acceptCurrentRow(); });
     connect(m_table, &QTableWidget::itemSelectionChanged, this,
             [this] { m_ok->setEnabled(!m_table->selectedItems().isEmpty()); });
+    connect(m_map, &KiwiWorldMap::pointClicked, this, [this](const QString& id) {
+        for (int row = 0; row < m_table->rowCount(); ++row) {
+            QTableWidgetItem* it = m_table->item(row, ReceiverColumn);
+            if (it && it->data(Qt::UserRole).toString() == id) {
+                m_table->selectRow(row);
+                m_table->scrollToItem(it);
+                return;
+            }
+        }
+    });
+    connect(m_table, &QTableWidget::itemSelectionChanged, this, [this]() {
+        const int row = m_table->currentRow();
+        QTableWidgetItem* it = row >= 0 ? m_table->item(row, ReceiverColumn) : nullptr;
+        m_map->setSelectedId(it && m_table->item(row, ReceiverColumn)->isSelected()
+                                 ? it->data(Qt::UserRole).toString() : QString());
+    });
     connect(m_search, &QLineEdit::textChanged, this, &KiwiPublicReceiverPicker::applyFilter);
     connect(m_refresh, &QPushButton::clicked, this, &KiwiPublicReceiverPicker::startFetch);
 
@@ -144,6 +174,7 @@ void KiwiPublicReceiverPicker::setPreselection(const QString& ownGrid,
 void KiwiPublicReceiverPicker::startFetch()
 {
     m_fromCache = false;
+    if (!m_fetchEnabled) { return; }
     m_status->setText(tr("Loading public receivers…"));
     m_refresh->setEnabled(false);
     m_dir->fetch();
@@ -161,8 +192,16 @@ void KiwiPublicReceiverPicker::onReady(const QVector<KiwiPublicReceiver>& receiv
     m_apiReceivers.clear();
     m_hiddenWebOnly = 0;
     m_hiddenUnknown = 0;
+    m_offlineReceivers.clear();
     for (const auto& r : receivers) {
-        if (r.offline) continue;
+        if (r.offline) {
+            // Nur fuer die Karte: wer seinen Empfaenger nur ueber die eigene
+            // Seite anbietet, bleibt auch dort unsichtbar (wie in der Liste).
+            if (r.apiPolicy() != KiwiPublicReceiver::ApiPolicy::Disabled) {
+                m_offlineReceivers.push_back(r);
+            }
+            continue;
+        }
         // Honor the operator: only receivers that allow the external API are
         // listed. Web-only (ext_api == 0) are excluded entirely, as are
         // receivers that don't publish a policy (we can't confirm API is OK).
@@ -237,6 +276,13 @@ void KiwiPublicReceiverPicker::applyFilter()
                               QUrl(r.url).host().left(16));  // short default name
             m_table->setItem(row, ReceiverColumn, nameItem);
             nameItem->setData(Qt::UserRole + 2, km);
+            {
+                double lat = 0.0, lon = 0.0;
+                const bool has = kiwiReceiverLatLon(r, lat, lon);
+                nameItem->setData(Qt::UserRole + 3, lat);
+                nameItem->setData(Qt::UserRole + 4, lon);
+                nameItem->setData(Qt::UserRole + 5, has);
+            }
             m_table->setItem(row, LocationColumn, new QTableWidgetItem(r.location));
             m_table->setItem(row, DistanceColumn, new QTableWidgetItem(
                 km >= 0.0 ? QStringLiteral("%1 km").arg(qRound(km))
@@ -258,6 +304,7 @@ void KiwiPublicReceiverPicker::applyFilter()
         }
     }
     m_table->viewport()->update();
+    rebuildMap(matches);
     {
         QAccessibleTableModelChangeEvent tableEvent(
             m_table, QAccessibleTableModelChangeEvent::DataChanged);
@@ -288,6 +335,77 @@ void KiwiPublicReceiverPicker::applyFilter()
     m_ok->setEnabled(!m_table->selectedItems().isEmpty());
 }
 
+void KiwiPublicReceiverPicker::setOpenEndpoints(const QSet<QString>& endpoints)
+{
+    m_openEndpoints = endpoints;
+    applyFilter();
+}
+
+void KiwiPublicReceiverPicker::showReceiversForTest(
+    const QVector<KiwiPublicReceiver>& receivers)
+{
+    m_fetchEnabled = false;
+    onReady(receivers);
+}
+
+void KiwiPublicReceiverPicker::rebuildMap(
+    const QVector<const KiwiCandidate*>& matches)
+{
+    QVector<KiwiMapPoint> points;
+    const auto make = [this](const KiwiPublicReceiver& r, double km,
+                             KiwiMapPoint::State forced, bool useForced) {
+        KiwiMapPoint pt;
+        if (!kiwiReceiverLatLon(r, pt.lat, pt.lon)) { return KiwiMapPoint(); }
+        pt.id = endpointFromUrl(r.url);
+        pt.name = r.name.isEmpty() ? r.url : r.name;
+        if (useForced) {
+            pt.state = forced;
+        } else if (r.usersMax > 0 && r.users >= r.usersMax) {
+            pt.state = KiwiMapPoint::State::Full;
+        } else if (r.users > 0) {
+            pt.state = KiwiMapPoint::State::Partial;
+        } else {
+            pt.state = KiwiMapPoint::State::Free;
+        }
+        pt.open = m_openEndpoints.contains(pt.id);
+        const QString stateText = pt.state == KiwiMapPoint::State::Offline
+            ? tr("not reachable")
+            : pt.state == KiwiMapPoint::State::Full ? tr("full")
+            : pt.state == KiwiMapPoint::State::Partial ? tr("partly busy")
+            : tr("free");
+        QStringList lines;
+        lines << QStringLiteral("%1 — %2").arg(pt.name, stateText);
+        if (!r.location.isEmpty()) { lines << r.location; }
+        if (km >= 0.0) { lines << tr("Distance: %1 km").arg(qRound(km)); }
+        if (r.usersMax > 0) {
+            lines << tr("Free channels: %1 of %2")
+                         .arg(qMax(0, r.usersMax - r.users)).arg(r.usersMax);
+        }
+        if (!r.bands.isEmpty()) { lines << tr("Band: %1 Hz").arg(r.bands); }
+        if (!r.snr.isEmpty()) { lines << tr("SNR: %1").arg(r.snr); }
+        pt.detail = lines.join(QLatin1Char('\n'));
+        return pt;
+    };
+    for (const KiwiCandidate* c : matches) {
+        const KiwiMapPoint pt = make(c->receiver, c->km, {}, false);
+        if (!pt.id.isEmpty()) { points.append(pt); }
+    }
+    for (const KiwiPublicReceiver& r : m_offlineReceivers) {
+        const KiwiMapPoint pt = make(
+            r, kiwiReceiverDistanceKm(r, m_ownGrid), KiwiMapPoint::State::Offline, true);
+        if (!pt.id.isEmpty()) { points.append(pt); }
+    }
+    m_map->setPoints(points);
+    double lat = 0.0, lon = 0.0;
+    const QString grid = m_ownGrid.isEmpty() ? AppSettings::stationGridSquare() : m_ownGrid;
+    if (isValidGridSquare(grid)) {
+        calculateLatLonFromGridSquare(grid, lat, lon);
+        m_map->setHome(lat, lon, true, grid.left(6).toUpper());
+    } else {
+        m_map->setHome(0, 0, false, QString());
+    }
+}
+
 void KiwiPublicReceiverPicker::acceptCurrentRow()
 {
     const int row = m_table->currentRow();
@@ -297,6 +415,9 @@ void KiwiPublicReceiverPicker::acceptCurrentRow()
     m_selectedEndpoint = item->data(Qt::UserRole).toString();
     m_selectedName = item->data(Qt::UserRole + 1).toString();
     m_selectedKm = item->data(Qt::UserRole + 2).toDouble();
+    m_selectedLat = item->data(Qt::UserRole + 3).toDouble();
+    m_selectedLon = item->data(Qt::UserRole + 4).toDouble();
+    m_selectedHasPos = item->data(Qt::UserRole + 5).toBool();
     accept();
 }
 

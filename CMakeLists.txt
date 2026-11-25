@@ -637,6 +637,7 @@ set(CORE_SOURCES
     src/core/KiwiSdrCredentialStore.cpp
     src/core/KiwiSdrManager.cpp
     src/core/KiwiOwnSignal.cpp
+    src/core/KiwiGroup.cpp
     src/core/KiwiRecording.cpp
     src/core/ReceivePresentationSync.cpp
     src/core/WdspEngine.cpp
@@ -1063,6 +1064,7 @@ set(GUI_SOURCES
     src/asr/WhisperServerLauncher.cpp
     src/gui/MainWindow_KiwiSdr.cpp
     src/gui/MainWindow_KiwiOwnSignal.cpp
+    src/gui/MainWindow_KiwiGroup.cpp
     # Flex-Treiber Stufe 2: Ton und Bild einer FlexRadio-Maschine
     src/gui/MainWindow_Flex.cpp
     src/gui/MainWindow_Asr.cpp
@@ -1074,6 +1076,9 @@ set(GUI_SOURCES
     src/gui/hotkeys/KeyboardRouter.cpp
     src/gui/hotkeys/MainWindowHotKeyTargets.cpp
     src/gui/KiwiPublicReceiverPicker.cpp
+    src/gui/widgets/KiwiWorldMap.cpp
+    src/gui/KiwiHearingDialog.cpp
+    src/gui/widgets/KiwiWorldCoast.cpp
     src/gui/LanScanDialog.cpp
     src/gui/LanScanDialog.h
     src/gui/PgxlSaveRebootDialog.cpp

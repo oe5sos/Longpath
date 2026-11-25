@@ -90,6 +90,7 @@ signals:
     void ownSignalToggled(bool on);
     void recordToggled(bool on);
     void otherReceiverRequested();
+    void hearingRequested();
 
 private:
     void rebuildReceiverList();
@@ -106,6 +107,7 @@ private:
     QPushButton* m_ownSignalButton{nullptr};
     QPushButton* m_recordButton{nullptr};
     QPushButton* m_otherButton{nullptr};
+    QPushButton* m_hearingButton{nullptr};
     QLabel* m_ownSignalLabel{nullptr};
     QListWidget* m_receiverList{nullptr};
     QVector<KiwiSdrReceiverStatus> m_receivers;

@@ -69,6 +69,25 @@ bool kiwiReceiverCoversFrequency(const KiwiPublicReceiver& receiver,
     return frequencyHz >= lo && frequencyHz <= hi;
 }
 
+bool kiwiReceiverLatLon(const KiwiPublicReceiver& receiver,
+                        double& lat, double& lon)
+{
+    if (parseGps(receiver.gps, lat, lon)
+        && !(lat == 0.0 && lon == 0.0)) {   // "(0, 0)" ist der Platzhalter
+        return true;
+    }
+    if (isValidGridSquare(receiver.grid)) {
+        calculateLatLonFromGridSquare(receiver.grid, lat, lon);
+        return true;
+    }
+    return false;
+}
+
+double kiwiGreatCircleKm(double lat1, double lon1, double lat2, double lon2)
+{
+    return greatCircleKm(lat1, lon1, lat2, lon2);
+}
+
 double kiwiReceiverDistanceKm(const KiwiPublicReceiver& receiver,
                               const QString& ownGrid)
 {

@@ -341,6 +341,7 @@ void MainWindow::syncKiwiSdrTransmitMute()
     const TransmitModel& tx = m_radioModel->transmitModel();
     const bool sending = tx.isMox() || tx.isTune();
     kiwiOwnSignalTxEdge(sending);
+    kiwiGroupTxEdge(sending);
 
     AudioEngine* audio = m_radioModel->audioEngine();
     if (!audio) { return; }
