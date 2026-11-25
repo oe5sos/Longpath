@@ -280,11 +280,27 @@ void MainWindow::setKiwiSolo(bool on)
 // FAELLEN legen wir dafuer EINE EIGENE Scheibe an -- ungebunden, ohne Funkgeraet
 // (suppressAutoStreamBinding), also hinter der Sicherheitsschranke
 // kiwiControllableSlice. Die Flex-Scheibe wird nie benutzt oder veraendert.
+void MainWindow::zeigeKiwiFenster(const QString& profileId)
+{
+    // Der Streifen muss da sein, auch wenn die Vorschau schon vorher an war
+    // und deshalb kein Aenderungssignal kam.
+    if (!profileId.isEmpty() && m_kiwiWaterfallPanel && m_kiwiSdrManager
+        && m_kiwiSdrManager->hasProfile(profileId)) {
+        m_kiwiWaterfallPanel->setStripEnabled(
+            profileId, true, m_kiwiSdrManager->displayName(profileId));
+    }
+    if (m_appletVis) {
+        m_appletVis->ensureVisible(QStringLiteral("KiwiWaterfalls"));
+    }
+    kiwiFensterNachVorn(m_kiwiWaterfallPanel, this);
+}
+
 void MainWindow::setKiwiSound(const QString& profileId, bool on)
 {
     if (!m_kiwiSdrManager || !m_radioModel || !m_kiwiSdrManager->hasProfile(profileId)) {
         return;
     }
+    if (on) { zeigeKiwiFenster(profileId); }
     const int assigned = m_kiwiSdrManager->assignedSliceForProfile(profileId);
 
     // Der Kiwi von "Mein Signal" behaelt seine Scheibe; sein Ton wird nur stumm/
@@ -529,6 +545,7 @@ void MainWindow::addKiwiToGroupFromPicker()
         if (addKiwiListener(id, guard->selectedKm(), has, lat, lon)) {
             // Auch im Fenster KIWI WASSERFAELLE zeigen.
             m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
+            zeigeKiwiFenster(id);
         }
     });
     picker->show();

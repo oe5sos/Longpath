@@ -1713,6 +1713,7 @@ private:
     void updateKiwiGroupCapacity();
     void setKiwiSolo(bool on);
     void setKiwiSound(const QString& profileId, bool on);
+    void zeigeKiwiFenster(const QString& profileId = QString());   // KIWI-WASSERFAELLE erzwungen einblenden, nach vorn
     void refreshKiwiSoundButtons();
     void setRadioMuted(bool on);
     void zoomKiwiStrip(const QString& profileId, int direction);

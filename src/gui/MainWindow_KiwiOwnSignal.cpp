@@ -279,6 +279,7 @@ void MainWindow::adoptPickedKiwi(const QString& endpoint, const QString& nameIn,
     m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
     setKiwiOwnSignalProfile(id, km);
     setKiwiOwnSignal(true);
+    zeigeKiwiFenster(id);
 }
 
 void MainWindow::setKiwiOwnSignal(bool on)

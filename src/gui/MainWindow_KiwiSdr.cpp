@@ -567,6 +567,7 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
     // (Betreiber 2026-11-25).
     m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
     m_kiwiSdrManager->connectProfile(id);
+    zeigeKiwiFenster(id);
     refreshKiwiSdrAppletReceivers();
 
     // ── Sag dem Bediener, dass etwas passiert ist (2026-10-14) ───────
