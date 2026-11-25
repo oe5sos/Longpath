@@ -136,6 +136,9 @@ void MainWindow::wireKiwiGroup()
         sendKiwiGroupTracking();
         refreshKiwiHearingDialog();
     });
+    // Laeuft immer: auch ein Kiwi, der nur per WF-Schalter verbunden ist, braucht
+    // eine Abstimmung (siehe sendKiwiGroupTracking). Ohne Arbeit kostet ein Takt nichts.
+    m_kiwiGroupTimer->start();
 }
 
 // "Nur Kiwi hoeren": der Lautsprecher-Mix bekommt nur die Scheibe des Kiwi von
@@ -302,7 +305,6 @@ bool MainWindow::addKiwiListener(const QString& profileId, double km,
     if (hasPos) { m_kiwiPositions.insert(profileId, QPointF(lat, lon)); }
     m_kiwiGroup.setMarkHz(0.0);
     m_kiwiSdrManager->setProfileListener(profileId, true);
-    if (m_kiwiGroupTimer && !m_kiwiGroupTimer->isActive()) { m_kiwiGroupTimer->start(); }
     // Schon senden? Dann zaehlt es als Beginn (wie bei "Mein Signal").
     if (m_radioModel) {
         const TransmitModel& tx = m_radioModel->transmitModel();
@@ -322,7 +324,6 @@ void MainWindow::removeKiwiListener(const QString& profileId)
     }
     m_kiwiGroup.remove(profileId);
     if (m_kiwiSdrManager) { m_kiwiSdrManager->setProfileListener(profileId, false); }
-    if (m_kiwiGroup.size() == 0 && m_kiwiGroupTimer) { m_kiwiGroupTimer->stop(); }
     refreshKiwiHearingDialog();
 }
 
@@ -339,19 +340,37 @@ void MainWindow::kiwiGroupTxEdge(bool sending)
 // der Sendescheibe; geschrieben wird allein an die Kiwis.
 void MainWindow::sendKiwiGroupTracking()
 {
-    if (!m_kiwiSdrManager || !m_radioModel || m_kiwiGroup.size() == 0) { return; }
+    if (!m_kiwiSdrManager || !m_radioModel) { return; }
+    // Wer bekommt eine Abstimmung: die Mithoerer der Gruppe -- und jeder Kiwi, der
+    // nur ueber den WF-Schalter laeuft (keine Scheibe, nicht der von "Mein
+    // Signal"). Ein Kiwi ohne Abstimmung liefert oft keinen Tonstrom, und der
+    // Client gibt nach 12 s mit "no SND audio frames arrived" auf -- genau das
+    // sah der Betreiber bei mehreren WF-Kiwis (2026-11-25, nicht live bestaetigt).
+    QStringList ids = m_kiwiGroup.ids();
+    for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
+        if (pr.id == m_kiwiOwnProfileId || ids.contains(pr.id)) { continue; }
+        if (!pr.waterfallPreviewEnabled) { continue; }
+        if (m_kiwiSdrManager->assignedSliceForProfile(pr.id) >= 0) { continue; }
+        const KiwiSdrClient::State st = m_kiwiSdrManager->state(pr.id);
+        if (st == KiwiSdrClient::State::Disconnected || st == KiwiSdrClient::State::Error) {
+            continue;   // nichts verbunden, nichts abzustimmen
+        }
+        ids << pr.id;
+    }
+    if (ids.isEmpty()) { return; }
     SliceModel* tx = kiwiOwnTxSlice();
     if (!tx) { return; }
     quint64 txHz = m_radioModel->transmitFrequencyHz(tx);
     if (txHz == 0) { txHz = quint64(tx->frequency()); }
     if (txHz == 0) { return; }
 
-    m_kiwiGroup.setMarkHz(double(txHz));
-    if (m_kiwiHearingDialog) { m_kiwiHearingDialog->setMarkHz(double(txHz)); }
+    if (m_kiwiGroup.size() > 0) {
+        m_kiwiGroup.setMarkHz(double(txHz));
+        if (m_kiwiHearingDialog) { m_kiwiHearingDialog->setMarkHz(double(txHz)); }
+    }
 
     SpectrumWidget* sw = spectrumForSlice(tx);
     const double bw = sw ? std::clamp(sw->bandwidth(), kMinViewHz, kMaxViewHz) : 40000.0;
-    const QStringList ids = m_kiwiGroup.ids();
     for (int i = 0; i < ids.size(); ++i) {
         const KiwiSdrAntennaProfile profile = m_kiwiSdrManager->profile(ids[i]);
         m_kiwiSdrManager->primeProfileTracking(

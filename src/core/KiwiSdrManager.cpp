@@ -1558,7 +1558,28 @@ void KiwiSdrManager::loadSettings()
             obj.value(QStringLiteral("waterfallRate")).toInt(0),
             0,
             kKiwiSdrWaterfallRateMax);
-        m_profiles.append(p);
+        // Ein Endpunkt, ein Profil: aeltere Staende konnten denselben Kiwi
+        // mehrfach enthalten (drei "bern.proxy.kiwis" wollten drei Kanaele
+        // bei einem Betreiber, der drei hat). Das erste bleibt, Wunsch-
+        // Schalter der Doppelten gehen auf dieses ueber.
+        bool merged = false;
+        for (KiwiSdrAntennaProfile& existing : m_profiles) {
+            if (!p.endpoint.isEmpty() && existing.endpoint == p.endpoint) {
+                existing.autoConnect = existing.autoConnect || p.autoConnect;
+                existing.waterfallPreviewEnabled =
+                    existing.waterfallPreviewEnabled || p.waterfallPreviewEnabled;
+                existing.keepAudioDuringTx =
+                    existing.keepAudioDuringTx || p.keepAudioDuringTx;
+                qCInfo(lcKiwiSdr).noquote()
+                    << "Doppeltes Profil" << p.name << "fuer" << p.endpoint
+                    << "mit" << existing.name << "zusammengefuehrt";
+                merged = true;
+                break;
+            }
+        }
+        if (!merged) {
+            m_profiles.append(p);
+        }
     }
 }
 
