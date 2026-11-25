@@ -341,7 +341,10 @@ void MainWindow::syncKiwiSdrTransmitMute()
     if (!m_kiwiSdrManager || !m_radioModel) { return; }
     // Die Messung "hoert er mich" braucht die Kante auch ohne Tonweg.
     const TransmitModel& tx = m_radioModel->transmitModel();
-    const bool sending = tx.isMox() || tx.isTune();
+    // Auch wenn der Flex selbst sendet (Mikrofontaste, Fusschalter): dann
+    // stehen MOX/TUNE im Modell auf aus, und ein Kiwi bliebe hoerbar
+    // (Betreiber 2026-11-25: "beim Senden hoere ich einen Kiwi").
+    const bool sending = tx.isMox() || tx.isTune() || m_radioModel->flexSendetGerade();
     kiwiOwnSignalTxEdge(sending);
     kiwiGroupTxEdge(sending);
 
@@ -390,7 +393,7 @@ void MainWindow::syncKiwiSdrTransmitMute()
             if (!m_kiwiSdrManager->hasProfile(id)) { return; }
             if (!kiwiControllableSlice(sliceId)) { return; }
             const TransmitModel& t = m_radioModel->transmitModel();
-            if (t.isMox() || t.isTune()) { return; }
+            if (t.isMox() || t.isTune() || m_radioModel->flexSendetGerade()) { return; }
             if (AudioEngine* a = m_radioModel->audioEngine()) {
                 a->setKiwiSdrAudioSourceEnabled(sliceId, true);
             }
@@ -783,7 +786,7 @@ void MainWindow::wireKiwiSdr()
         if (!audio) { return; }
         if (enabled) {
             const TransmitModel& tx = m_radioModel->transmitModel();
-            const bool sending = tx.isMox() || tx.isTune();
+            const bool sending = tx.isMox() || tx.isTune() || m_radioModel->flexSendetGerade();
             if (sending
                 && !kiwiKeepsAudioDuringTx(
                        m_kiwiSdrManager->profile(profileId),
@@ -901,6 +904,8 @@ void MainWindow::wireKiwiSdr()
     connect(&m_radioModel->transmitModel(), &TransmitModel::moxChanged,
             this, [this](bool) { syncKiwiSdrTransmitMute(); });
     connect(&m_radioModel->transmitModel(), &TransmitModel::tuneChanged,
+            this, [this](bool) { syncKiwiSdrTransmitMute(); });
+    connect(m_radioModel, &RadioModel::flexSendetGeaendert,
             this, [this](bool) { syncKiwiSdrTransmitMute(); });
 
     // ── Sicherheitsschranke: die Zuordnung wieder loesen ─────────────
