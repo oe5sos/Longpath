@@ -232,6 +232,7 @@ void MainWindow::setKiwiOwnSignalProfile(const QString& profileId, double km)
 // dem Sitzungsspeicher) -- kein Hintergrundabruf.
 void MainWindow::chooseOtherKiwi()
 {
+    qCInfo(lcKiwiSdr) << "Anderer Kiwi: Auswahl wird geoeffnet";
     double freqHz = 0.0;
     if (SliceModel* tx = kiwiOwnTxSlice(); tx && m_radioModel) {
         freqHz = double(m_radioModel->transmitFrequencyHz(tx));
@@ -260,6 +261,9 @@ void MainWindow::chooseOtherKiwi()
     picker->show();
     picker->raise();
     picker->activateWindow();
+    qCInfo(lcKiwiSdr) << "Anderer Kiwi: Auswahl sichtbar" << picker->isVisible()
+                      << "Rahmen" << picker->frameGeometry()
+                      << "Fenster" << (picker->windowHandle() != nullptr);
 }
 
 void MainWindow::setKiwiOwnSignal(bool on)

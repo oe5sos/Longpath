@@ -31,6 +31,7 @@
 #include "core/KiwiRecording.h"
 #include "core/Maidenhead.h"
 #include "core/KiwiSdrManager.h"
+#include "core/LogCategories.h"
 #include "gui/KiwiHearingDialog.h"
 #include "gui/KiwiPublicReceiverPicker.h"
 #include "gui/SpectrumWidget.h"
@@ -170,6 +171,7 @@ void MainWindow::updateKiwiGroupCapacity()
 
 void MainWindow::openKiwiHearingDialog()
 {
+    qCInfo(lcKiwiSdr) << "Gehoert: Fenster wird geoeffnet";
     if (!m_kiwiHearingDialog) {
         auto* dlg = new KiwiHearingDialog(this);
         dlg->setAttribute(Qt::WA_DeleteOnClose);
@@ -193,6 +195,9 @@ void MainWindow::openKiwiHearingDialog()
     m_kiwiHearingDialog->show();
     m_kiwiHearingDialog->raise();
     m_kiwiHearingDialog->activateWindow();
+    qCInfo(lcKiwiSdr) << "Gehoert: Fenster sichtbar" << m_kiwiHearingDialog->isVisible()
+                      << "Rahmen" << m_kiwiHearingDialog->frameGeometry()
+                      << "Fenster" << (m_kiwiHearingDialog->windowHandle() != nullptr);
 }
 
 // Das Verzeichnis wie bei "Anderer Kiwi ...": ein Klick, eine Abfrage,
