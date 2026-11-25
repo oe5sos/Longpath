@@ -141,6 +141,11 @@ void MainWindow::wireKiwiOwnSignal()
         }
         const double lowHz = lowMhz * 1.0e6;
         const double highHz = highMhz * 1.0e6;
+        m_kiwiStrip->setRowIntervalMs(
+            AppSettings::instance()
+                .value(QStringLiteral("KiwiWaterfall/RowIntervalMs"),
+                       QStringLiteral("250"))
+                .toString().toInt());
         m_kiwiStrip->pushRow(bins, lowHz, highHz);
         m_kiwiHearMe->feedRow(bins, lowHz, highHz, kiwiOwnNowMs());
         const KiwiHearMeMeter::Result r = m_kiwiHearMe->result();

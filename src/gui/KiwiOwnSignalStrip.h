@@ -56,6 +56,9 @@ public:
     void setPlotMargins(int left, int right);
 
     void pushRow(const QVector<float>& binsDbm, double lowHz, double highHz);
+    // Mindestabstand zwischen Zeilen in ms (0: jede Zeile). Dasselbe Tempo
+    // wie im Fenster KIWI WASSERFAELLE ("KiwiWaterfall/RowIntervalMs").
+    void setRowIntervalMs(int ms) { m_rowIntervalMs = ms; }
     void clearRows();
 
     void setVerdict(const KiwiHearMeMeter::Result& result);
@@ -118,6 +121,8 @@ private:
     bool m_recording{false};
     qint64 m_recordMs{0};
     QString m_recordFile;
+    int m_rowIntervalMs{0};
+    qint64 m_lastRowMs{0};
     QToolButton* m_soundButton{nullptr};
     QToolButton* m_zoomOut{nullptr};
     QToolButton* m_zoomIn{nullptr};

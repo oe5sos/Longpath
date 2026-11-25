@@ -192,6 +192,8 @@ private slots:
         QCOMPARE(strip->statusText(), QStringLiteral("unknown"));
 
         // Der Kiwi liefert Zeilen, auf der Marke steht ein Buckel.
+        AppSettings::instance().setValue(
+            QStringLiteral("KiwiWaterfall/RowIntervalMs"), QStringLiteral("0"));
         for (int i = 0; i < 40; ++i) {
             emit mgr->waterfallRowReady(pid, QStringLiteral("p"), bins(25.0),
                                         14.185, 14.225, quint32(i));
@@ -250,6 +252,21 @@ private slots:
             QVERIFY(b->geometry().bottom() < 26);   // im Kopf
         }
         Q_UNUSED(zoomSpy);
+    }
+
+    // Betreiber 2026-11-25: "alle Wasserfaelle laufen zu schnell".
+    void derStreifenHaeltDasEingestellteTempo()
+    {
+        KiwiOwnSignalStrip strip;
+        strip.setRowIntervalMs(250);
+        const QVector<float> row(256, -100.0f);
+        for (int i = 0; i < 20; ++i) {
+            strip.pushRow(row, 14.19e6, 14.21e6);
+        }
+        QCOMPARE(strip.rowCount(), 1);
+        QTest::qWait(300);
+        strip.pushRow(row, 14.19e6, 14.21e6);
+        QCOMPARE(strip.rowCount(), 2);
     }
 
     void aufnahmeErzeugtEineDatei()

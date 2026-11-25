@@ -9,6 +9,7 @@
 #include "gui/StyleConstants.h"
 #include "gui/Zahlentext.h"
 
+#include <QDateTime>
 #include <QPainter>
 #include <QSignalBlocker>
 #include <QResizeEvent>
@@ -146,6 +147,11 @@ void KiwiOwnSignalStrip::pushRow(const QVector<float>& binsDbm, double lowHz,
                                  double highHz)
 {
     if (binsDbm.size() < 2 || highHz <= lowHz) { return; }
+    if (m_rowIntervalMs > 0) {
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        if (now - m_lastRowMs < m_rowIntervalMs - 5) { return; }
+        m_lastRowMs = now;
+    }
     Row r;
     r.bins = binsDbm;
     r.lowHz = lowHz;
