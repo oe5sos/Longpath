@@ -3576,6 +3576,16 @@ Usually 127.0.0.1 when ExpertSDR2 runs on this machine — NOT the address of th
         <translation>Seitenbereich rechts</translation>
     </message>
     <message>
+        <location filename="../src/gui/MainWindow.cpp" line="10328"/>
+        <source>RX + TX in one window</source>
+        <translation>RX + TX in einem Fenster</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/MainWindow.cpp" line="10328"/>
+        <source>Puts RX and TX one above the other in Combined 2.</source>
+        <translation>Legt RX und TX übereinander in Combined 2.</translation>
+    </message>
+    <message>
         <location filename="../src/gui/MainWindow.cpp" line="10329"/>
         <source>&amp;Field layout</source>
         <translation type="unfinished"></translation>

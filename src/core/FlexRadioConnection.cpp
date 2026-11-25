@@ -228,6 +228,15 @@ QString setSliceModeCommand(const QString& sliceId, const QString& mode)
     return QStringLiteral("slice set %1 mode=%2").arg(sliceId, gross);
 }
 
+QString setSliceAntennaCommand(const QString& sliceId, bool senden,
+                               const QString& antenna)
+{
+    if (sliceId.isEmpty() || antenna.trimmed().isEmpty()) { return QString(); }
+    return QStringLiteral("slice set %1 %2=%3")
+        .arg(sliceId, senden ? QStringLiteral("txant") : QStringLiteral("rxant"),
+             antenna.trimmed());
+}
+
 QString setSliceFilterCommand(const QString& sliceId, int lowHz, int highHz)
 {
     if (sliceId.isEmpty() || highHz <= lowHz) { return QString(); }

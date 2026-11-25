@@ -188,6 +188,17 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     m_btn3d->setObjectName(QStringLiteral("panHeader3dToggle"));
     headLay->addWidget(m_btn3d);
 
+    // Lupe ein/aus (Betreiber 2026-11-24: „der Magnifier soll optional im
+    // Panadapter zum Ein- und Ausblenden sein"). Derselbe Schalter wie
+    // „Passband magnifier" im Optionsmenue; der Knopf zeigt den Zustand.
+    m_btnLupe = new QPushButton(QStringLiteral("MAG"), head);
+    m_btnLupe->setCheckable(true);
+    m_btnLupe->setFixedSize(38, 24);
+    m_btnLupe->setCursor(Qt::PointingHandCursor);
+    m_btnLupe->setToolTip(tr("Show or hide the magnifier (±10 kHz around the VFO)"));
+    m_btnLupe->setObjectName(QStringLiteral("panHeaderMagnifierToggle"));
+    headLay->addWidget(m_btnLupe);
+
     m_btnOptions = new QPushButton(QStringLiteral("\u2699"), head);
     // \u2500\u2500 Das Zahnrad war ein Punkt (2026-10-30) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     //
@@ -215,6 +226,23 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
              QLatin1String(Style::kAccent));
     m_btnOptions->setStyleSheet(kKopfKnopf.arg(17));
     m_btn3d->setStyleSheet(kKopfKnopf.arg(12));
+    m_btnLupe->setStyleSheet(kKopfKnopf.arg(11)
+        + QStringLiteral("QPushButton:checked { color: %1; border-color: %2; }")
+              .arg(QLatin1String(Style::kTextPrimary),
+                   QLatin1String(Style::kAccent)));
+    if (m_spectrum) {
+        m_btnLupe->setChecked(m_spectrum->passbandMagnifier() != 0);
+        connect(m_btnLupe, &QPushButton::clicked, this, [this](bool an) {
+            if (m_spectrum) { m_spectrum->setPassbandMagnifier(an ? 1 : 0); }
+        });
+        connect(m_spectrum, &SpectrumWidget::passbandMagnifierChanged, this,
+                [this](bool an) {
+            if (m_btnLupe && m_btnLupe->isChecked() != an) {
+                QSignalBlocker sperre(m_btnLupe);
+                m_btnLupe->setChecked(an);
+            }
+        });
+    }
     headLay->addWidget(m_btnOptions);
     connect(m_btnOptions, &QPushButton::clicked, this, [this]() {
         QMenu* m = buildDisplayMenu(window());   // am Fenster, siehe contextMenuEvent()
@@ -867,6 +895,36 @@ void PanadapterApplet::contextMenuEvent(QContextMenuEvent* event)
     }
 }
 
+// ── Anzeigequelle Kiwi: ein Schalter, zwei Menues (2026-11-25) ──────
+//
+// Betreiber: „kiwi sollte auch in den optionen im panadapter verfuegbar
+// sein". Der Haken stand nur im Rechtsklickmenue; im Zahnrad-Menue, wo
+// man Optionen sucht, fehlte er. Beide Menues rufen jetzt dieselbe
+// Funktion — ein Schalter, eine Wirkung, keine zweite Fassung.
+// Gibt false zurueck, wenn es keinen Spektrumsteil gibt (dann auch kein
+// Trenner noetig).
+bool PanadapterApplet::addKiwiSourceAction(QMenu* menu)
+{
+    SpectrumWidget* sw = spectrumWidget();
+    if (!sw) { return false; }
+    QAction* kiwiAct = menu->addAction(tr("Display from the KiwiSDR"));
+    kiwiAct->setCheckable(true);
+    kiwiAct->setChecked(sw->kiwiDisplaySource());
+    kiwiAct->setToolTip(
+        tr("Shows the waterfall of the KiwiSDR assigned to this slice "
+           "instead of the radio's."));
+    connect(kiwiAct, &QAction::triggered, this, [this](bool on) {
+        if (SpectrumWidget* w = spectrumWidget()) {
+            // Kein Speichern hier: das erledigt SpectrumWidget selbst
+            // ueber seinen Schluessel (tst_settings_are_remembered,
+            // 2026-08-23).
+            w->setKiwiDisplaySource(on);
+            if (m_statusOverlay) { m_statusOverlay->setKiwiActive(on); }
+        }
+    });
+    return true;
+}
+
 // Task B5 (bottom-banner + pan-menu epic, design doc s8.5): "Add slice on
 // this pan" / "Float this pan" used to live on the +PAN button's dropdown
 // (Phase 3F Sub-Epic D Task 10, retired in Task B4) and resolved through
@@ -925,27 +983,7 @@ QMenu* PanadapterApplet::buildContextMenu(QObject* parent)
     // wer ihn umlegt und ein leeres Bild bekommt, hat eine Antwort
     // ("da kommt nichts"); wer einen ausgegrauten Punkt sieht, hat
     // keine.
-    if (SpectrumWidget* sw = spectrumWidget()) {
-        QAction* kiwiAct = menu->addAction(tr("Display from the KiwiSDR"));
-        kiwiAct->setCheckable(true);
-        kiwiAct->setChecked(sw->kiwiDisplaySource());
-        kiwiAct->setToolTip(
-            tr("Shows the waterfall of the KiwiSDR assigned to this slice "
-                "instead of the radio's."));
-        connect(kiwiAct, &QAction::triggered, this, [this](bool on) {
-            if (SpectrumWidget* w = spectrumWidget()) {
-                // Kein Speichern hier: das erledigt SpectrumWidget
-                // selbst ueber seinen Schluessel. Stuende es an diesem
-                // Bedienweg, vergaesse es die KIWI-Kachel im
-                // Frequenz-Widget — der Fehler, den
-                // tst_settings_are_remembered am 2026-08-23 gefunden
-                // hat.
-                w->setKiwiDisplaySource(on);
-                if (m_statusOverlay) { m_statusOverlay->setKiwiActive(on); }
-            }
-        });
-        menu->addSeparator();
-    }
+    if (addKiwiSourceAction(menu)) { menu->addSeparator(); }
 
     QAction* extAct = menu->addAction(tr("Extended view (wideband wings)"));
     extAct->setCheckable(true);
@@ -980,6 +1018,8 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
     connect(zeileSMeter, &QAction::toggled, this,
             [this](bool an) { setSMeterReadoutShown(an); });
     menu->addSeparator();
+
+    if (addKiwiSourceAction(menu)) { menu->addSeparator(); }
 
     // Durchlass und Bandbreite (2026-11-08): die vier Entwuerfe, die der
     // Betreiber gewaehlt hat. Alle an ab Werk; hier je einzeln aus.

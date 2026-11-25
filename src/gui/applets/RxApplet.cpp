@@ -516,6 +516,15 @@ void RxApplet::buildUi()
 
         leftCol->addLayout(row);
 
+        // 2026-11-24: die Schrittweite steht jetzt in der Kopfleiste (Step,
+        // zweizeilig). Die Zeile hier war doppelt und zog bei hoher Spalte
+        // die Luft zwischen sich und die Filterfläche. Die Bauteile bleiben
+        // (Modell-Abgleich, Prüfstände), sind aber verborgen.
+        lbl->setVisible(false);
+        m_stepDown->setVisible(false);
+        m_stepLabel->setVisible(false);
+        m_stepUp->setVisible(false);
+
         // Step arrows cycle through kStageOneStepLadder
         // {1, 10, 100, 500, 1k, 10k}. Down = previous, Up = next.
         // Wraps at both ends. Issue #69.
@@ -593,9 +602,15 @@ void RxApplet::buildUi()
             if (m_slice) { m_slice->setFilterCenter(centre); }
         });
         leftCol->addWidget(m_filterPassband);
+        leftCol->addStretch(1);   // Rest der Höhe unten, nicht in der Mitte
+        // 2026-11-24: „die Grafik vom Bandfilter benötigen wir dort nicht" —
+        // die große Kachel BANDWIDTH FILTER zeigt dasselbe. Das Bauteil
+        // bleibt (Modell-Abgleich, Prüfstände), ist aber verborgen und malt
+        // nichts; die linke Spalte ist damit leer und bekommt keine Breite.
+        m_filterPassband->setVisible(false);
     }
 
-    columns->addLayout(leftCol, 2);
+    columns->addLayout(leftCol, 0);   // leer (Filterbild verborgen): keine Breite
 
     // ── Right column ──────────────────────────────────────────────────────
     auto* rightCol = new QVBoxLayout;
@@ -920,7 +935,9 @@ void RxApplet::buildUi()
         rightCol->addWidget(m_agcTContainer);
     }
 
-    rightCol->addStretch(1);
+    // 2026-11-24: die Dehnung stand HIER, vor RIT/XIT, und schob die beiden
+    // im Combined ans untere Ende der Spalte, weit weg von den Reglern.
+    // Sie steht jetzt hinter den Modus-Behältern (siehe unten).
 
     // Control 15: RIT toggle + offset + zero
     // Live-wired in S2.8 — SliceModel::setRitEnabled/setRitHz feed the
@@ -1078,6 +1095,8 @@ void RxApplet::buildUi()
         m_rttyContainer->setSlice(m_slice);
         applyModeVisibility(m_slice->dspMode());
     }
+
+    rightCol->addStretch(1);   // Resthöhe unten; RIT/XIT sitzen unter den Reglern
 
     columns->addLayout(rightCol, 3);
     root->addLayout(columns);
@@ -2252,7 +2271,7 @@ void RxApplet::applyColumnDirection()
     // Untereinander bekommt keine Spalte "Stretch" — sonst zoege die
     // rechte (3) die Reihen der linken auseinander.
     for (int i = 0; i < m_columns->count(); ++i) {
-        m_columns->setStretch(i, stacked ? 0 : (i == 0 ? 2 : 3));
+        m_columns->setStretch(i, stacked ? 0 : (i == 0 ? 0 : 3));
     }
 }
 

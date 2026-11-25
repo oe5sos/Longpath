@@ -27,6 +27,7 @@
 #include "MenueFaenger.h"
 
 #include "gui/widgets/CommandBar.h"
+#include "gui/StyleConstants.h"
 #include "core/AppSettings.h"
 #include "models/FilterPresetStore.h"
 #include "models/SliceModel.h"
@@ -288,14 +289,17 @@ private slots:
         // je Gruppe genau drei Pillen, und FT8/FT4 sind ohnehin keine
         // Betriebsarten des Geraets, sondern eine Anrufstelle samt
         // Dekoder ueber DIGU.
-        QCOMPARE(g.size(), 7);
+        // 2026-11-24: Digi steht als zweite Zeile UNTER Mode (keine eigene
+        // Spalte mehr); an der freien Stelle sitzt die Antennengruppe.
+        QCOMPARE(g.size(), 8);
         QCOMPARE(g.at(0), QStringLiteral("Band"));
         QCOMPARE(g.at(1), QStringLiteral("Mode"));
         QCOMPARE(g.at(2), QStringLiteral("Digi"));
-        QCOMPARE(g.at(3), QStringLiteral("Filter"));
-        QCOMPARE(g.at(4), QStringLiteral("Step"));
-        QCOMPARE(g.at(5), QStringLiteral("NR"));
-        QCOMPARE(g.at(6), QStringLiteral("Rate"));
+        QCOMPARE(g.at(3), QStringLiteral("Ant"));
+        QCOMPARE(g.at(4), QStringLiteral("Filter"));
+        QCOMPARE(g.at(5), QStringLiteral("Step"));
+        QCOMPARE(g.at(6), QStringLiteral("NR"));
+        QCOMPARE(g.at(7), QStringLiteral("Rate"));
     }
 
     // ── DIGI leuchtet nur, wenn es wirklich laeuft ───────────────────
@@ -1010,6 +1014,136 @@ private slots:
             ++opened;
         }
         QCOMPARE(opened, 5);   // Modus, Band, Filter, Schritt, NR
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // Pillen niedriger, Gelb des Plus, zwei Zeilen bei schmaler Breite
+    // (2026-11-21, Betreiber: Höhe 21, Schrift 9-10, Innenabstand 6-7;
+    // aktive Pille in der Farbe des Plus; schmal umbrechen vor „Filter").
+    // ════════════════════════════════════════════════════════════════
+
+    /// Jede Pille ist kPillHeight hoch -- am Bild gemessen, nicht an der
+    /// Stilblatt-Zeile. Ein Knopf, der um zwei Pixel abweicht, sitzt in der
+    /// Leiste wie ein Fremdkörper.
+    void pillenSindKPillHeightHoch()
+    {
+        CommandBar bar;
+        bar.resize(1400, 70);
+        bar.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&bar, kFensterFrist));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        int gezaehlt = 0;
+        for (QPushButton* b : bar.findChildren<QPushButton*>()) {
+            if (b->text().isEmpty()) { continue; }
+            ++gezaehlt;
+            // kPillHeight ist die INHALTSHOEHE; der 1 px starke Rand kommt
+            // oben und unten dazu (wie bei der Profilschiene, kLeistenSeite).
+            QCOMPARE(b->height(), CommandBar::kPillHeight + 2);
+        }
+        QVERIFY2(gezaehlt >= 10, "zu wenige Pillen gefunden");
+    }
+
+    /// Die aktive Pille trägt die Farben des Plus oben rechts (kPlusTop,
+    /// kPlusBottom, kPlusBorder) -- und nicht mehr die Mulde der Auswahl.
+    void aktivePilleIstGelbWieDasPlus()
+    {
+        const QString stil = CommandBar::pillStyle();
+        const int a = stil.indexOf(QStringLiteral("QPushButton:checked"));
+        QVERIFY2(a >= 0, "kein Stil für die aktive Pille");
+        const QString aktiv = stil.mid(a);
+        QVERIFY(aktiv.contains(QLatin1String(Style::kPlusTop)));
+        QVERIFY(aktiv.contains(QLatin1String(Style::kPlusBottom)));
+        QVERIFY(aktiv.contains(QLatin1String(Style::kPlusBorder)));
+        QVERIFY2(!aktiv.contains(QLatin1String(Style::kGlassSelTop)),
+                 "die aktive Pille hat noch die alte Auswahl-Mulde");
+    }
+
+    /// Schmal stehen Band · Mode · Ant oben und Filter · Step · NR · Rate
+    /// unten -- der Umbruch sitzt fest vor „Filter", nicht bei jeder
+    /// Breite woanders.
+    void schmalBrichtFestVorFilterUm()
+    {
+        CommandBar bar;
+        bar.resize(900, 120);
+        bar.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&bar, kFensterFrist));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        QVERIFY2(bar.zweiZeilenAktiv(), "bei 900 Punkten muss die Leiste zweizeilig sein");
+        const QVector<QStringList> z = bar.zeilenGruppen();
+        QCOMPARE(z.size(), 2);
+        QCOMPARE(z.at(0), (QStringList{QStringLiteral("Band"), QStringLiteral("Mode"),
+                                       QStringLiteral("Ant")}));
+        QCOMPARE(z.at(1), (QStringList{QStringLiteral("Filter"), QStringLiteral("Step"),
+                                       QStringLiteral("NR"), QStringLiteral("Rate")}));
+    }
+
+    /// Breit bleibt es bei einer Zeile, wie bisher: die untere ist leer.
+    void breitBleibtEineZeile()
+    {
+        CommandBar bar;
+        bar.resize(1600, 70);
+        bar.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&bar, kFensterFrist));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        QVERIFY2(!bar.zweiZeilenAktiv(), "bei 1600 Punkten darf es nur eine Zeile geben");
+        const QVector<QStringList> z = bar.zeilenGruppen();
+        QCOMPARE(z.at(0).size(), 7);
+        QVERIFY(z.at(1).isEmpty());
+    }
+
+    /// Die Umschaltung sitzt an der Schwelle: darunter zwei Zeilen,
+    /// darüber eine. Gilt bei jeder Schrift, weil nur die Breite zählt.
+    void umschaltungSitztAnDerSchwelle()
+    {
+        CommandBar bar;
+        bar.resize(1600, 70);
+        bar.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&bar, kFensterFrist));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        bar.resize(CommandBar::kEinzeiligUnterBreite + 40, 70);
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+        QVERIFY(!bar.zweiZeilenAktiv());
+
+        bar.resize(CommandBar::kEinzeiligUnterBreite - 200, 70);
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+        QVERIFY(bar.zweiZeilenAktiv());
+    }
+
+
+
+    /// Ab 1700 Punkten wachsen die Pillen, und die Gruppen bekommen ihre
+    /// Beschriftung zurueck; darunter bleibt es kompakt ohne Beschriftung
+    /// (Betreiber 2026-11-21). Am Ende wieder kompakt, damit andere Pruefungen
+    /// nicht in der grossen Stufe laufen.
+    void grosseStufeMitBeschriftung()
+    {
+        CommandBar bar;
+        bar.resize(1800, 70);
+        bar.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&bar, kFensterFrist));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        QVERIFY2(CommandBar::grossAktiv(), "bei 1800 Punkten muss die grosse Stufe gelten");
+        int beschriftungen = 0;
+        for (QLabel* l : bar.findChildren<QLabel*>(QStringLiteral("groupCaption"))) {
+            if (l->isVisible()) { ++beschriftungen; }
+        }
+        QVERIFY2(beschriftungen >= 5, "in der grossen Stufe fehlen Gruppenbeschriftungen");
+        for (QPushButton* b : bar.findChildren<QPushButton*>()) {
+            if (b->text().isEmpty()) { continue; }
+            QCOMPARE(b->height(), CommandBar::kPillHeightGross + 2);
+        }
+
+        bar.resize(1400, 70);
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+        QVERIFY2(!CommandBar::grossAktiv(), "bei 1400 Punkten bleibt es kompakt");
+        for (QLabel* l : bar.findChildren<QLabel*>(QStringLiteral("groupCaption"))) {
+            QVERIFY2(!l->isVisible(), "kompakt ohne Beschriftung");
+        }
     }
 };
 

@@ -294,6 +294,8 @@ private:
     /// deleteLater()s it, buildContextMenuForTesting() hands it to a test
     /// untouched. Mirrors AmpApplet::buildContextMenu().
     QMenu* buildContextMenu(QObject* parent);
+    /// Haken "Display from the KiwiSDR" -- Rechtsklick- UND Zahnrad-Menue.
+    bool addKiwiSourceAction(QMenu* menu);
     // Wo der Rechtsklick im Spektrum lag (Koordinaten des SpectrumWidget),
     // fuer "Calibrate frequency on this carrier"; (-1,-1) = nicht im Bild.
     QPoint m_menuSpektrumPos{-1, -1};
@@ -339,6 +341,8 @@ private:
     /// Schnellumschalter 2D/3D in der Kopfleiste; zeigt den Zustand,
     /// nicht das Ziel (siehe PanadapterApplet.cpp).
     QPushButton*            m_btn3d {nullptr};
+    /// Schnellschalter für die Passband-Lupe (±10 kHz), neben 2D/3D.
+    QPushButton*            m_btnLupe {nullptr};
     /// Sichtbarkeit der FUELLFARBE in Prozent (100 = nur Fuellfarbe,
     /// 0 = nur Bild) — dieselbe Zaehlweise wie SpectrumWidget und der
     /// Regler unter Setup -> Display. Nur fuer den Haken im Menue; der

@@ -2515,6 +2515,7 @@ void SpectrumWidget::setPassbandMagnifier(int modus)
     m_overlayDynamicDirty = true;
 #endif
     update();
+    emit passbandMagnifierChanged(m_lupenModus != 0);
 }
 
 void SpectrumWidget::setHeatmapEnabled(bool on)

@@ -606,6 +606,12 @@ void PhoneCwApplet::buildPhonePage(QWidget* page)
         vbox->addLayout(row);
     }
 
+    // 2026-11-24: Reiter Phone/CW im Combined — die Zeilen standen über die
+    // ganze Panelhöhe verteilt (PROC · MON · DEXP · AM Car weit
+    // auseinander, die Wertschilder hoch gezogen). Ohne Dehnung am Ende
+    // verteilt Qt die Resthöhe auf die Zeilen; mit ihr sitzt alles oben.
+    vbox->addStretch(1);
+
     // ── Mark Phone controls NYI (wired controls NOT marked) ──────────────────
     // #1  m_levelGauge       — wired (Phase 3M-1b mic level gauge)
     // #5  m_micLevelSlider   — wired (Phase 3M-1b mic gain)

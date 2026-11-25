@@ -9569,6 +9569,22 @@ void RadioModel::setFlexSliceMode(DSPMode mode)
     flexAutoSqlNeuMessen("andere Betriebsart");
 }
 
+void RadioModel::setFlexSliceAntenna(const QString& antenna, bool senden)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexSliceId.isEmpty()) { return; }
+    const QString befehl =
+        FlexCommandWire::setSliceAntennaCommand(m_flexSliceId, senden, antenna);
+    if (befehl.isEmpty()) { return; }
+    m_flexConnection->sendCommand(befehl,
+        [befehl](quint32 code, const QString& body) {
+            if (code != 0) {
+                qCWarning(lcConnection) << "Flex: Antenne nicht angenommen:"
+                                        << befehl << "->" << code << body;
+            }
+        });
+}
+
 void RadioModel::setFlexSliceFilter(int lowHz, int highHz)
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }

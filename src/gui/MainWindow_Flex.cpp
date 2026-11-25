@@ -359,6 +359,23 @@ void MainWindow::wireFlex()
             m_radioModel->setFlexSliceMode(art);
         });
 
+        // Antenne: die Pillen ANT1…ANT4 der Kopfleiste und das RX-Panel
+        // schreiben in die Scheibe; hier geht es an die Maschine.
+        disconnect(m_flexAntRx);
+        m_flexAntRx = connect(ziel, &SliceModel::rxAntennaChanged, this,
+                [this](const QString& ant) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            m_radioModel->setFlexSliceAntenna(ant, false);
+        });
+        disconnect(m_flexAntTx);
+        m_flexAntTx = connect(ziel, &SliceModel::txAntennaChanged, this,
+                [this](const QString& ant) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            m_radioModel->setFlexSliceAntenna(ant, true);
+        });
+
         disconnect(m_flexFilterBand);
         m_flexFilterBand = connect(ziel, &SliceModel::filterChanged, this,
                 [this](int tief, int hoch) {
@@ -792,6 +809,23 @@ void MainWindow::wireFlex()
             if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
             if (!flexControllableSlice()) { return; }
             m_radioModel->setFlexSliceMode(art);
+        });
+
+        // Antenne: die Pillen ANT1…ANT4 der Kopfleiste und das RX-Panel
+        // schreiben in die Scheibe; hier geht es an die Maschine.
+        disconnect(m_flexAntRx);
+        m_flexAntRx = connect(ziel, &SliceModel::rxAntennaChanged, this,
+                [this](const QString& ant) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            m_radioModel->setFlexSliceAntenna(ant, false);
+        });
+        disconnect(m_flexAntTx);
+        m_flexAntTx = connect(ziel, &SliceModel::txAntennaChanged, this,
+                [this](const QString& ant) {
+            if (m_shuttingDown || m_flexApplyingRemoteState) { return; }
+            if (!flexControllableSlice()) { return; }
+            m_radioModel->setFlexSliceAntenna(ant, true);
         });
 
         disconnect(m_flexFilterBand);

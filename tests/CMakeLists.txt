@@ -5949,6 +5949,9 @@ longpath_add_test(tst_skala_enden_lesbar)
 # 2026-10-15: ein Eintrag fuer das Feldbetrieb-Bild — und der Nachweis,
 # dass er in ein EIGENES Profil schreibt.
 longpath_add_test(tst_feldbetrieb)
+# 2026-11-24: Containers → „RX + TX in einem Fenster“: RX und TX aufgeklappt in
+# Combined 2, und das Feld ist wirklich zu sehen (ensureVisible statt setVisible).
+longpath_add_test(tst_rx_tx_ein_fenster)
 # 2026-11-12: beim Start IMMER Profil 1 („bei mir N muss immer das
 # Startprofil sein") -- im echten MainWindow, zwei Starts hintereinander.
 longpath_add_test(tst_startprofil)
