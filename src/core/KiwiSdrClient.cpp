@@ -2974,6 +2974,16 @@ void KiwiSdrClient::updateWaterfallAvailability()
             << "wf_chans=" << m_waterfallChannelCount;
     }
     emit waterfallAvailabilityChanged(available, detail);
+    // Ohne Wasserfall-Kanal haengt der W/F-Strom nur als zweite, nie bediente
+    // Verbindung am Server; der wirft sie (und den Ton mit) nach ~11 s mit
+    // too_busy hinaus. Also gleich zumachen, der Ton bleibt allein.
+    if (!available && m_waterfallSocket && m_soundSocketConnected
+        && m_waterfallSocket->state() == QAbstractSocket::ConnectedState) {
+        qCInfo(lcKiwiSdr).noquote()
+            << "KiwiSDR W/F-Strom wird geschlossen (kein Wasserfall-Kanal)"
+            << QStringLiteral("endpoint=%1").arg(logEndpoint());
+        m_waterfallSocket->close();
+    }
 }
 
 void KiwiSdrClient::resetCapabilityState()
