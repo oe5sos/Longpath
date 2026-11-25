@@ -34,6 +34,7 @@
 #include "core/LogCategories.h"
 #include "gui/KiwiHearingDialog.h"
 #include "gui/KiwiWaterfallPanel.h"
+#include "gui/applets/AppletVisibilityController.h"
 #include "gui/KiwiWaterfallStripWidget.h"
 #include "gui/KiwiPublicReceiverPicker.h"
 #include "gui/SpectrumWidget.h"
@@ -73,6 +74,12 @@ void MainWindow::wireKiwiGroup()
             [this](bool on) { setRadioMuted(on); });
     connect(m_kiwiSdrApplet, &KiwiSdrApplet::soundRequested, this,
             [this](const QString& id, bool on) { setKiwiSound(id, on); });
+    connect(m_kiwiSdrApplet, &KiwiSdrApplet::openWindowRequested, this,
+            [this](const QString& id) {
+        if (!m_kiwiSdrManager || !m_kiwiSdrManager->hasProfile(id)) { return; }
+        m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
+        if (m_appletVis) { m_appletVis->setVisible(QStringLiteral("KiwiWaterfalls"), true); }
+    });
     m_kiwiSoloTimer = new QTimer(this);
     m_kiwiSoloTimer->setSingleShot(true);
     m_kiwiSoloTimer->setInterval(30000);
@@ -220,7 +227,13 @@ void MainWindow::setKiwiSound(const QString& profileId, bool on)
 
     if (on) {
         if (assigned >= 0) { refreshKiwiSoundButtons(); return; }   // schon hoerbar
+        // Die aktive Scheibe merken: die neue ungebundene darf nichts verschieben.
+        const int activeBefore = m_radioModel->activeSlice() ? m_radioModel->activeSlice()->sliceIndex() : -1;
         const int sid = m_radioModel->addSlice(QString(), true);
+        if (activeBefore >= 0 && m_radioModel->activeSlice()
+            && m_radioModel->activeSlice()->sliceIndex() != activeBefore) {
+            m_radioModel->setActiveSliceById(activeBefore);
+        }
         SliceModel* slice = m_radioModel->sliceById(sid);
         if (!slice) {
             showToast(tr("No slice could be created for this Kiwi."),
@@ -566,7 +579,9 @@ void MainWindow::sendKiwiGroupTracking()
             }
         }
     }
-    sendKiwiOwnSignalTracking();
+    // (Kein sendKiwiOwnSignalTracking() im Sekundentakt: es meldet dem Kiwi die
+    // Panadapter-Ansicht, und jede kleine Verschiebung wuerde den Wasserfall-Strom
+    // neu anfordern -- das Ruckeln. Es laeuft nur bei echten Aenderungen.)
     if (ids.isEmpty()) { return; }
     SliceModel* tx = kiwiOwnTxSlice();
     if (!tx) {

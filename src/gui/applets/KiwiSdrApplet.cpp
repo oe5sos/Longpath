@@ -483,6 +483,13 @@ bool KiwiSdrApplet::eventFilter(QObject* watched, QEvent* event)
     if (watched == m_watchedWindow && event->type() == QEvent::Resize) {
         updateListHeight();
     }
+    // Doppelklick auf eine Zeile: der Kiwi bekommt sein eigenes Fenster
+    // (Betreiber 2026-11-25).
+    if (event->type() == QEvent::MouseButtonDblClick && watched
+        && watched->property("kiwiRowId").isValid()) {
+        emit openWindowRequested(watched->property("kiwiRowId").toString());
+        return true;
+    }
     return AppletWidget::eventFilter(watched, event);
 }
 
@@ -492,6 +499,8 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
     row->setObjectName(QStringLiteral("kiwiReceiverRow"));
     row->setStyleSheet(receiverRowStyle());
     row->setAccessibleName(receiverAccessibleText(receiver));
+    row->setProperty("kiwiRowId", receiver.id);
+    row->installEventFilter(this);
 
     auto* layout = new QVBoxLayout(row);
     layout->setContentsMargins(5, 4, 5, 4);
@@ -507,6 +516,8 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
     name->setAccessibleDescription(receiver.name);
     name->setStyleSheet(primaryLabelStyle());
     name->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    name->setProperty("kiwiRowId", receiver.id);
+    name->installEventFilter(this);
     topRow->addWidget(name, 1);
 
     auto* status = new QLabel(stateText(receiver.state), row);
@@ -515,6 +526,8 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
     status->setAccessibleDescription(receiverAccessibleText(receiver));
     status->setStyleSheet(statusStyle(receiver.state));
     status->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    status->setProperty("kiwiRowId", receiver.id);
+    status->installEventFilter(this);
     topRow->addWidget(status, 0, Qt::AlignRight);
 
     // Ton dieses Kiwi ein/aus (2026-11-25): ein = verbunden und in den

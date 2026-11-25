@@ -99,6 +99,8 @@ signals:
     void radioMuteToggled(bool on);
     // Ton eines Kiwi aus der Liste ein/aus (verbindet bzw. trennt ihn).
     void soundRequested(const QString& profileId, bool on);
+    // Doppelklick auf eine Zeile: eigenes Fenster (Wasserfall) fuer diesen Kiwi.
+    void openWindowRequested(const QString& profileId);
 
 private:
     void rebuildReceiverList();
