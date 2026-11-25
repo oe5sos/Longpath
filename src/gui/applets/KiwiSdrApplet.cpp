@@ -345,13 +345,17 @@ void KiwiSdrApplet::updateListHeight()
     }
     constexpr int kMinHeight = 48;
     constexpr int kOldFixedCap = 176;   // die frueheren drei Zeilen
-    constexpr int kRoomForRest = 220;   // Kopf, Knoepfe, Titel der Kachel
+    constexpr int kBottomMargin = 12;   // Rand unter der Liste
     int content = 2 * m_receiverList->frameWidth();
     for (int i = 0; i < m_receiverList->count(); ++i) {
         content += m_receiverList->sizeHintForRow(i);
     }
     const QWidget* top = window();
-    const int room = top ? top->height() - kRoomForRest : kOldFixedCap;
+    // Platz = vom oberen Rand der Liste bis zum unteren Rand des Fensters
+    // (nicht pauschal "Fensterhoehe minus Rest": das liess ein schwebendes
+    // Applet bei einem Drittel der Hoehe stehen).
+    const int listTop = top ? m_receiverList->mapTo(top, QPoint(0, 0)).y() : 0;
+    const int room = top ? top->height() - listTop - kBottomMargin : kOldFixedCap;
     const int cap  = qMax(kOldFixedCap, room);
     const int h    = qBound(kMinHeight, content, cap);
     if (m_receiverList->height() != h || m_receiverList->minimumHeight() != h) {
