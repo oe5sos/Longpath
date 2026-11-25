@@ -32,6 +32,7 @@ class KiwiWaterfallPanel : public AppletWidget {
 
 public:
     explicit KiwiWaterfallPanel(RadioModel* model, QWidget* parent = nullptr);
+    bool isEmptyForTest() const { return m_strips.isEmpty(); }
     QSize sizeHint() const override { return QSize(560, 460); }
 
     QString appletId()    const override { return QStringLiteral("kiwiWaterfalls"); }

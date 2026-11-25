@@ -186,6 +186,17 @@ void MainWindow::wireKiwiGroup()
     m_kiwiGroupTimer = new QTimer(this);
     m_kiwiGroupTimer->setInterval(1000);
     connect(m_kiwiGroupTimer, &QTimer::timeout, this, [this]() {
+        // Der Kiwi von "Mein Signal" gehoert ins Fenster KIWI WASSERFAELLE (dort
+        // stehen Ton, +/-, Vergroessern); ein leeres Fenster braucht niemand.
+        if (m_kiwiSdrManager && !m_kiwiOwnProfileId.isEmpty() && m_kiwiOwnSignalOn
+            && m_kiwiSdrManager->hasProfile(m_kiwiOwnProfileId)
+            && !m_kiwiSdrManager->profile(m_kiwiOwnProfileId).waterfallPreviewEnabled) {
+            m_kiwiSdrManager->setWaterfallPreviewEnabled(m_kiwiOwnProfileId, true);
+        }
+        if (m_appletVis && m_kiwiWaterfallPanel && m_kiwiWaterfallPanel->isEmptyForTest()
+            && m_kiwiWaterfallPanel->isVisible()) {
+            m_appletVis->setVisible(QStringLiteral("KiwiWaterfalls"), false);
+        }
         sendKiwiGroupTracking();
         refreshKiwiHearingDialog();
     });
