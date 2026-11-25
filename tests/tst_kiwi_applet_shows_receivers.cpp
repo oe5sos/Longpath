@@ -16,6 +16,7 @@
 #include <QLocale>
 #include <QLabel>
 #include <QListWidget>
+#include <QPushButton>
 #include <QScrollBar>
 
 #include "gui/applets/KiwiSdrApplet.h"
@@ -142,6 +143,29 @@ private slots:
         QVERIFY2(gross >= 8, qPrintable(QString::number(gross)));
         // Mehr Eintraege als Platz: es wird gescrollt, nicht abgeschnitten.
         QVERIFY(gross < 12 || list->verticalScrollBar()->maximum() == 0);
+    }
+
+    // Betreiber 2026-11-25: nach der Wahl eines Kiwi verschwand die
+    // "Heard"-Pille -- der Name schob sie neben den Knoepfen aus dem Applet.
+    void gewaehlterNameSchiebtKeinenKnopfHinaus()
+    {
+        RadioModel model;
+        KiwiSdrApplet applet(&model);
+        applet.resize(300, 300);
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, 15000));
+        applet.setOwnSignalReceiverName(
+            QStringLiteral("Ein sehr langer Name eines Kiwi mit viel Text drumherum"));
+        QTest::qWait(50);
+        auto* other = applet.findChild<QPushButton*>(QStringLiteral("kiwiOtherButton"));
+        auto* heard = applet.findChild<QPushButton*>(QStringLiteral("kiwiHearingButton"));
+        QVERIFY(other && heard);
+        QVERIFY(heard->isVisible());
+        QVERIFY(heard->width() >= 40);
+        const QRect inApplet = QRect(QPoint(0, 0), applet.size());
+        QVERIFY2(inApplet.contains(heard->mapTo(&applet, heard->rect().center())),
+                 "Gehoert-Knopf liegt ausserhalb des Applets");
+        QVERIFY(!(other->geometry().intersects(heard->geometry())));
     }
 
     void dieScheibeStehtDabeiUndFolgtIhr()

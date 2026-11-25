@@ -2855,6 +2855,14 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <source>SNR: %1</source>
         <translation>SNR: %1</translation>
     </message>
+    <message>
+        <source>Map</source>
+        <translation>Karte</translation>
+    </message>
+    <message>
+        <source>Show or hide the world map. Drag the bar between map and list to resize.</source>
+        <translation>Weltkarte ein- oder ausblenden. Den Balken zwischen Karte und Liste ziehen, um die Größe zu ändern.</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::KiwiSdrApplet</name>

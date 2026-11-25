@@ -7,6 +7,7 @@
 
 #include <QtTest>
 #include <QPolygonF>
+#include <QPushButton>
 #include <QTableWidget>
 
 #include "gui/KiwiPublicReceiverPicker.h"
@@ -102,6 +103,25 @@ private slots:
         QVERIFY(la0 < 48.0 && la1 > 52.2);
         // Der Ferne liegt ausserhalb, wird aber nicht abgefragt.
         QVERIFY(map.toWidget(-33.9, 151.2).x() > map.width());
+    }
+
+    void kartenKnopfBlendetDieKarteAus()
+    {
+        KiwiPublicReceiverPicker dlg;
+        dlg.showReceiversForTest({rx("Linz", "linz.example", "(48.30, 14.30)", 0, 4, 4)});
+        dlg.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&dlg, 15000));
+        QPushButton* toggle = nullptr;
+        for (QPushButton* b : dlg.findChildren<QPushButton*>()) {
+            if (b->isCheckable() && b->text() == KiwiPublicReceiverPicker::tr("Map")) { toggle = b; }
+        }
+        QVERIFY(toggle);
+        QVERIFY(dlg.mapForTest()->isVisible());
+        toggle->click();
+        QVERIFY(!dlg.mapForTest()->isVisible());
+        QVERIFY(dlg.tableForTest()->isVisible());   // die Liste bleibt
+        toggle->click();
+        QVERIFY(dlg.mapForTest()->isVisible());
     }
 
     void dialogZeigtDieselbenWieDieTabelle()

@@ -78,6 +78,11 @@ KiwiPublicReceiverPicker::KiwiPublicReceiverPicker(QWidget* parent)
     m_search->setPlaceholderText(tr("Filter by name, location, or host…"));
     m_search->setClearButtonEnabled(true);
     topRow->addWidget(m_search, 1);
+    auto* mapToggle = new QPushButton(tr("Map"));
+    mapToggle->setCheckable(true);
+    mapToggle->setToolTip(tr("Show or hide the world map. Drag the bar between map and list to resize."));
+    mapToggle->setChecked(AppSettings::instance().value("KiwiPicker/MapVisible", "True").toString() == "True");
+    topRow->addWidget(mapToggle);
     m_refresh = new QPushButton(tr("Refresh list"));
     m_refresh->setToolTip(tr("Re-fetch the public directory from the network."));
     topRow->addWidget(m_refresh);
@@ -106,9 +111,18 @@ KiwiPublicReceiverPicker::KiwiPublicReceiverPicker(QWidget* parent)
     m_split->setChildrenCollapsible(false);
     m_split->addWidget(m_map);
     m_split->addWidget(m_table);
+    m_split->setHandleWidth(9);
+    m_split->setStyleSheet(QStringLiteral("QSplitter::handle { background: %1; }")
+                               .arg(QLatin1String(Style::kBorderMuted)));
+    m_map->setMinimumHeight(60);
     m_split->setStretchFactor(0, 3);
     m_split->setStretchFactor(1, 2);
     outer->addWidget(m_split, 1);
+    m_map->setVisible(mapToggle->isChecked());
+    connect(mapToggle, &QPushButton::toggled, this, [this](bool on) {
+        m_map->setVisible(on);
+        AppSettings::instance().setValue("KiwiPicker/MapVisible", on ? "True" : "False");
+    });
 
     m_status = new QLabel(tr("Loading public receivers…"));
     m_status->setStyleSheet(QStringLiteral("QLabel { color: %1; }")

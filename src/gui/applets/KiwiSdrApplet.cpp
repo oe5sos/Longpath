@@ -229,12 +229,18 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
         tr("Up to five Kiwis listen along while you transmit: map, "
            "waterfalls and who hears you."));
     otherRow->addWidget(m_hearingButton, 0);
+    otherRow->addStretch(1);
+    root->addLayout(otherRow);
+    // Der gewaehlte Name steht in einer EIGENEN Zeile: neben den Knoepfen
+    // schob er sie aus dem Applet, die "Gehoert"-Pille verschwand
+    // (Betreiber 2026-11-25).
     m_ownSignalLabel = new QLabel(this);
     m_ownSignalLabel->setTextFormat(Qt::PlainText);
     m_ownSignalLabel->setStyleSheet(detailStyle());
     m_ownSignalLabel->setVisible(false);
-    otherRow->addWidget(m_ownSignalLabel, 1);
-    root->addLayout(otherRow);
+    m_ownSignalLabel->setWordWrap(false);
+    m_ownSignalLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    root->addWidget(m_ownSignalLabel);
     connect(m_ownSignalButton, &QPushButton::toggled, this,
             &KiwiSdrApplet::ownSignalToggled);
     connect(m_recordButton, &QPushButton::toggled, this,
@@ -360,6 +366,11 @@ void KiwiSdrApplet::updateListHeight()
     // ihr Inhalt (Bild 2026-11-25: drei Zeilen und leerer Platz darunter).
     int room = kOldFixedCap;
     QWidget* area = scrollViewport();
+    // Beim Umhaengen des Applets (Andocken/Abloesen) ist die Liste kurz kein
+    // Nachkomme -- mapTo() warnt dann; in dem Moment gibt es nichts zu messen.
+    if (!isAncestorOf(m_receiverList)) {
+        return;
+    }
     if (area) {
         const int above = m_receiverList->mapTo(this, QPoint(0, 0)).y();
         room = area->height() - above - kChrome;

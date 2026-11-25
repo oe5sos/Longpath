@@ -129,6 +129,7 @@ void MainWindow::openKiwiHearingDialog()
     if (!m_kiwiHearingDialog) {
         auto* dlg = new KiwiHearingDialog(this);
         dlg->setAttribute(Qt::WA_DeleteOnClose);
+        dlg->setWindowFlag(Qt::WindowStaysOnTopHint, true);
         m_kiwiHearingDialog = dlg;
         connect(dlg, &KiwiHearingDialog::addRequested, this,
                 [this]() { addKiwiToGroupFromPicker(); });
@@ -189,7 +190,10 @@ void MainWindow::addKiwiToGroupFromPicker()
         const bool has = guard->selectedLatLon(lat, lon);
         addKiwiListener(id, guard->selectedKm(), has, lat, lon);
     });
+    picker->setWindowFlag(Qt::WindowStaysOnTopHint, true);
     picker->show();
+    picker->raise();
+    picker->activateWindow();
 }
 
 bool MainWindow::addKiwiListener(const QString& profileId, double km,
