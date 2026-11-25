@@ -548,13 +548,19 @@ void MainWindow::sendKiwiGroupTracking()
         quint64 hz = m_radioModel->transmitFrequencyHz(txs);
         if (hz == 0) { hz = quint64(txs->frequency()); }
         if (hz > 0) {
-            for (auto it = m_kiwiSoundSlices.constBegin(); it != m_kiwiSoundSlices.constEnd(); ++it) {
-                SliceModel* ks = kiwiControllableSlice(it.value());
+            // Dazu der Kiwi von "Mein Signal", auch wenn dessen Streifen aus ist.
+            QList<int> follow = m_kiwiSoundSlices.values();
+            if (!m_kiwiOwnProfileId.isEmpty()) {
+                const int os = m_kiwiSdrManager->assignedSliceForProfile(m_kiwiOwnProfileId);
+                if (os >= 0 && !follow.contains(os)) { follow << os; }
+            }
+            for (const int sliceId : std::as_const(follow)) {
+                SliceModel* ks = kiwiControllableSlice(sliceId);
                 if (!ks) { continue; }
                 if (ks->frequency() != double(hz)) { ks->setFrequency(double(hz)); }
                 if (ks->dspMode() != txs->dspMode()) { ks->setDspMode(txs->dspMode()); }
                 m_kiwiSdrManager->updateSliceTracking(
-                    it.value(), double(hz) / 1.0e6, SliceModel::modeName(txs->dspMode()),
+                    sliceId, double(hz) / 1.0e6, SliceModel::modeName(txs->dspMode()),
                     txs->filterLow(), txs->filterHigh(), ks->panKey(),
                     QString(), SliceModel::cwPitchHz());
             }
