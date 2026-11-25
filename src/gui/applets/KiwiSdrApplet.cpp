@@ -283,6 +283,7 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     // 176 px, also drei Zeilen). Weniger als drei Zeilen nie.
     m_receiverList->setMinimumHeight(48);
     m_receiverList->setStyleSheet(listStyle());
+    m_receiverList->viewport()->installEventFilter(this);
     root->addWidget(m_receiverList);
     // Ist die Kachel hoeher als der Inhalt (sie ist es, wenn der Betreiber sie
     // hoch zieht), bleibt alles oben stehen; der Rest ist leer. Ohne das
@@ -369,7 +370,28 @@ void KiwiSdrApplet::rebuildReceiverList()
         item->setSizeHint(row->sizeHint());
         m_receiverList->setItemWidget(item, row);
     }
+    relayoutRows();
     updateListHeight();
+}
+
+void KiwiSdrApplet::relayoutRows()
+{
+    if (!m_receiverList) { return; }
+    int width = m_receiverList->viewport()->width();
+    if (width < 80) { width = std::max(80, this->width() - 12); }
+    for (int i = 0; i < m_receiverList->count(); ++i) {
+        QListWidgetItem* item = m_receiverList->item(i);
+        QWidget* row = m_receiverList->itemWidget(item);
+        if (!row) { continue; }
+        row->setMinimumWidth(0);
+        row->setMaximumWidth(width);
+        int h = row->sizeHint().height();
+        if (QLayout* l = row->layout()) {
+            if (l->hasHeightForWidth()) { h = l->totalHeightForWidth(width); }
+        }
+        item->setSizeHint(QSize(width, h));
+        row->resize(width, h);
+    }
 }
 
 void KiwiSdrApplet::updateListHeight()
@@ -437,6 +459,11 @@ void KiwiSdrApplet::showEvent(QShowEvent* event)
 
 bool KiwiSdrApplet::eventFilter(QObject* watched, QEvent* event)
 {
+    if (m_receiverList && watched == m_receiverList->viewport()
+        && event->type() == QEvent::Resize) {
+        relayoutRows();
+        updateListHeight();
+    }
     if (watched == m_watchedWindow && event->type() == QEvent::Resize) {
         updateListHeight();
     }

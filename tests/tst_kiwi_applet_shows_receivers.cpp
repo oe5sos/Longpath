@@ -210,6 +210,34 @@ private slots:
         QVERIFY2(gap < 80, qPrintable(QStringLiteral("Luecke %1 px").arg(gap)));
     }
 
+    // Bild 2026-11-25 (COMBINED): die "WF"-Pille rechts war abgeschnitten, weil
+    // die Zeile so breit war wie ihr laengster Text. Sie muss in die Liste passen.
+    void zeilenPassenInDieBreite()
+    {
+        RadioModel model;
+        KiwiSdrApplet applet(&model);
+        applet.resize(260, 500);
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, 15000));
+        KiwiSdrReceiverStatus a;
+        a.id = QStringLiteral("k1");
+        a.name = QStringLiteral("Ein Kiwi mit einem recht langen Namen im Verzeichnis");
+        a.state = KiwiSdrClient::State::Error;
+        a.detail = QStringLiteral("SND requested uncompressed requested · W/F requested uncompressed requested und noch viel mehr Text dahinter");
+        applet.setReceivers({a});
+        QTest::qWait(80);
+        auto* list = applet.findChild<QListWidget*>();
+        QVERIFY(list);
+        const int viewW = list->viewport()->width();
+        QWidget* row = list->itemWidget(list->item(0));
+        QVERIFY(row);
+        QVERIFY2(row->width() <= viewW, qPrintable(QStringLiteral("Zeile %1 > Liste %2").arg(row->width()).arg(viewW)));
+        for (QPushButton* b : row->findChildren<QPushButton*>()) {
+            const QPoint right = b->mapTo(list->viewport(), QPoint(b->width() - 1, 0));
+            QVERIFY2(right.x() < viewW, "Pille ragt ueber den rechten Rand");
+        }
+    }
+
     void dieScheibeStehtDabeiUndFolgtIhr()
     {
         RadioModel model;

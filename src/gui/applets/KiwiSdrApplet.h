@@ -101,6 +101,10 @@ private:
     // drei Zeilen): so hoch wie ihr Inhalt, hoechstens so hoch, wie das
     // Fenster Platz laesst. Scrollen nur, wenn es wirklich mehr gibt.
     void updateListHeight();
+    // Die Zeilen auf die Breite der Liste bringen (Hoehe nach Umbruch). Sonst
+    // sind sie so breit wie ihr laengster Text und die "WF"-Pille am rechten
+    // Rand ist abgeschnitten (Bild 2026-11-25, COMBINED).
+    void relayoutRows();
     QWidget* scrollViewport() const;
     QPointer<QWidget> m_watchedWindow;
     QWidget* buildReceiverRow(const KiwiSdrReceiverStatus& receiver);
