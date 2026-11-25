@@ -152,6 +152,7 @@ private slots:
                 << "Listenhoehe" << list->height() << "Applet sichtbar"
                 << mw->kiwiSdrAppletForTest()->isVisible();
         QVERIFY2(gross > klein, "hoeheres Hauptfenster muss mehr Zeilen zeigen");
+
     }
 
     // "Nur Kiwi hoeren": nur Wiedergabe, nie ein Mute an der Scheibe.

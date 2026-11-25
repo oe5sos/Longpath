@@ -284,6 +284,11 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     m_receiverList->setMinimumHeight(48);
     m_receiverList->setStyleSheet(listStyle());
     root->addWidget(m_receiverList);
+    // Ist die Kachel hoeher als der Inhalt (sie ist es, wenn der Betreiber sie
+    // hoch zieht), bleibt alles oben stehen; der Rest ist leer. Ohne das
+    // verteilte das Layout den Platz zwischen Knoepfe und Liste und die
+    // Zeilen klebten am unteren Rand (Bild 2026-11-25).
+    root->addStretch(1);
 
     rebuildReceiverList();
 }

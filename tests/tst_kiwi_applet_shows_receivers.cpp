@@ -188,6 +188,28 @@ private slots:
         QVERIFY(solo && solo->isCheckable());
     }
 
+    // Bild 2026-11-25: in einer hohen Kachel klebten die Zeilen unten, mit einer
+    // grossen Luecke unter den Knoepfen. Die Liste muss gleich unter dem
+    // Namen beginnen, egal wie hoch das Fenster ist.
+    void zeilenKlebenNichtAmUnterenRand()
+    {
+        RadioModel model;
+        KiwiSdrApplet applet(&model);
+        applet.resize(320, 900);
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, 15000));
+        KiwiSdrReceiverStatus a;
+        a.id = QStringLiteral("k1"); a.name = QStringLiteral("Eins");
+        a.state = KiwiSdrClient::State::Connected;
+        applet.setReceivers({a});
+        QTest::qWait(80);
+        auto* list = applet.findChild<QListWidget*>();
+        auto* heard = applet.findChild<QPushButton*>(QStringLiteral("kiwiHearingButton"));
+        QVERIFY(list && heard);
+        const int gap = list->geometry().top() - heard->geometry().bottom();
+        QVERIFY2(gap < 80, qPrintable(QStringLiteral("Luecke %1 px").arg(gap)));
+    }
+
     void dieScheibeStehtDabeiUndFolgtIhr()
     {
         RadioModel model;
