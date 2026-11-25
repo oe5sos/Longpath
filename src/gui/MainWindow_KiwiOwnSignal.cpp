@@ -257,7 +257,6 @@ void MainWindow::chooseOtherKiwi()
         setKiwiOwnSignalProfile(id, guard->selectedKm());
         setKiwiOwnSignal(true);
     });
-    picker->setWindowFlag(Qt::WindowStaysOnTopHint, true);
     picker->show();
     picker->raise();
     picker->activateWindow();
