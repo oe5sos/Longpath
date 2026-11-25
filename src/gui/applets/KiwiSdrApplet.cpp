@@ -17,6 +17,8 @@
 #include "models/SliceModel.h"
 
 #include <QAbstractItemView>
+#include <QEvent>
+#include <QShowEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
@@ -248,7 +250,6 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     m_receiverList->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     m_receiverList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_receiverList->setMinimumHeight(48);
-    m_receiverList->setMaximumHeight(176);
     m_receiverList->setStyleSheet(listStyle());
     root->addWidget(m_receiverList);
 
@@ -325,6 +326,51 @@ void KiwiSdrApplet::rebuildReceiverList()
         item->setSizeHint(row->sizeHint());
         m_receiverList->setItemWidget(item, row);
     }
+    updateListHeight();
+}
+
+void KiwiSdrApplet::updateListHeight()
+{
+    if (!m_receiverList) {
+        return;
+    }
+    constexpr int kMinHeight = 48;
+    constexpr int kOldFixedCap = 176;   // die frueheren drei Zeilen
+    constexpr int kRoomForRest = 220;   // Kopf, Knoepfe, Titel der Kachel
+    int content = 2 * m_receiverList->frameWidth();
+    for (int i = 0; i < m_receiverList->count(); ++i) {
+        content += m_receiverList->sizeHintForRow(i);
+    }
+    const QWidget* top = window();
+    const int room = top ? top->height() - kRoomForRest : kOldFixedCap;
+    const int cap  = qMax(kOldFixedCap, room);
+    const int h    = qBound(kMinHeight, content, cap);
+    if (m_receiverList->height() != h || m_receiverList->minimumHeight() != h) {
+        m_receiverList->setFixedHeight(h);
+        updateGeometry();
+    }
+}
+
+void KiwiSdrApplet::showEvent(QShowEvent* event)
+{
+    AppletWidget::showEvent(event);
+    QWidget* top = window();
+    if (top && top != m_watchedWindow) {
+        if (m_watchedWindow) {
+            m_watchedWindow->removeEventFilter(this);
+        }
+        m_watchedWindow = top;
+        top->installEventFilter(this);
+    }
+    updateListHeight();
+}
+
+bool KiwiSdrApplet::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == m_watchedWindow && event->type() == QEvent::Resize) {
+        updateListHeight();
+    }
+    return AppletWidget::eventFilter(watched, event);
 }
 
 QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)

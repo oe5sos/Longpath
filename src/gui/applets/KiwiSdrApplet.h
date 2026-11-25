@@ -38,6 +38,8 @@
 
 class QLabel;
 class QListWidget;
+class QShowEvent;
+class QEvent;
 class QPushButton;
 
 namespace Longpath {
@@ -80,6 +82,10 @@ public:
     // Name des Kiwi, an dem "Mein Signal" haengt; leer = noch keiner.
     void setOwnSignalReceiverName(const QString& name);
 
+protected:
+    void showEvent(QShowEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
+
 signals:
     void ownSignalToggled(bool on);
     void recordToggled(bool on);
@@ -87,6 +93,11 @@ signals:
 
 private:
     void rebuildReceiverList();
+    // Die Liste waechst mit der Fensterhoehe (bis dahin fest 176 px =
+    // drei Zeilen): so hoch wie ihr Inhalt, hoechstens so hoch, wie das
+    // Fenster Platz laesst. Scrollen nur, wenn es wirklich mehr gibt.
+    void updateListHeight();
+    QPointer<QWidget> m_watchedWindow;
     QWidget* buildReceiverRow(const KiwiSdrReceiverStatus& receiver);
     QWidget* buildSliceAssignmentRow(SliceModel* slice, QWidget* parent);
     QString sliceText(SliceModel* slice) const;

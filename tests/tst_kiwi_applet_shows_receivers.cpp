@@ -16,6 +16,7 @@
 #include <QLocale>
 #include <QLabel>
 #include <QListWidget>
+#include <QScrollBar>
 
 #include "gui/applets/KiwiSdrApplet.h"
 #include "models/RadioModel.h"
@@ -96,6 +97,51 @@ private slots:
         // Ohne Scheibe muss das auch DASTEHEN, nicht bloss fehlen.
         QVERIFY2(txt.contains(KiwiSdrApplet::tr("Not assigned")),
                  qPrintable(txt));
+    }
+
+    // Martin 2026-11-25: "man sieht nur 3 kiwis" -- die Liste war auf
+    // 176 px festgenagelt. Gemessen wird, wie viele Zeilen ganz im
+    // Sichtfeld stehen, bevor und nachdem das Fenster hoeher gezogen wird.
+    static int sichtbareZeilen(QListWidget* list)
+    {
+        int n = 0;
+        const QRect view = list->viewport()->rect();
+        for (int i = 0; i < list->count(); ++i) {
+            if (view.contains(list->visualItemRect(list->item(i)))) { ++n; }
+        }
+        return n;
+    }
+
+    void dieListeWaechstMitDemFenster()
+    {
+        RadioModel model;
+        KiwiSdrApplet applet(&model);
+        QVector<KiwiSdrReceiverStatus> alle;
+        for (int i = 0; i < 12; ++i) {
+            KiwiSdrReceiverStatus r;
+            r.id    = QStringLiteral("kiwi-%1").arg(i);
+            r.name  = QStringLiteral("Kiwi %1").arg(i);
+            r.state = KiwiSdrClient::State::Connected;
+            alle.append(r);
+        }
+        applet.resize(320, 400);
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, 15000));
+        applet.setReceivers(alle);
+        auto* list = applet.findChild<QListWidget*>();
+        QVERIFY(list);
+
+        applet.resize(320, 400);
+        QTest::qWait(50);
+        const int klein = sichtbareZeilen(list);
+        applet.resize(320, 1000);
+        QTest::qWait(50);
+        const int gross = sichtbareZeilen(list);
+        qInfo() << "Zeilen sichtbar: klein" << klein << "gross" << gross;
+        QVERIFY2(gross > klein, "Hoeheres Fenster muss mehr Zeilen zeigen");
+        QVERIFY2(gross >= 8, qPrintable(QString::number(gross)));
+        // Mehr Eintraege als Platz: es wird gescrollt, nicht abgeschnitten.
+        QVERIFY(gross < 12 || list->verticalScrollBar()->maximum() == 0);
     }
 
     void dieScheibeStehtDabeiUndFolgtIhr()
