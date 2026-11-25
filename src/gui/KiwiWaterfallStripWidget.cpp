@@ -15,6 +15,7 @@
 #include <QDateTime>
 #include <QHBoxLayout>
 #include <QMenu>
+#include <QSignalBlocker>
 #include <QToolButton>
 #include <QLabel>
 #include <QPainter>
@@ -77,6 +78,28 @@ KiwiWaterfallStripWidget::KiwiWaterfallStripWidget(const QString& profileId,
                         "font-family: " LP_MONO_QSS "; }").arg(ink()));
     header->addWidget(m_freqLabel, 0);
     header->addWidget(m_peakLabel, 0);
+
+    // Ton ein/aus (Betreiber 2026-11-25: "jeden Kiwi im Kiwiwasserfall Ton ein
+    // und ausschalten koennen"). Eingerastet = der Kiwi ist zu hoeren.
+    m_soundButton = new QToolButton(this);
+    m_soundButton->setText(tr("Sound"));
+    m_soundButton->setCheckable(true);
+    m_soundButton->setObjectName(QStringLiteral("kiwiStripSound"));
+    m_soundButton->setCursor(Qt::PointingHandCursor);
+    m_soundButton->setToolTip(tr("Listen to this Kiwi (audio on / off)"));
+    m_soundButton->setAccessibleName(tr("Kiwi sound"));
+    m_soundButton->setFixedHeight(18);
+    m_soundButton->setStyleSheet(QStringLiteral(
+        "QToolButton { color: %1; background: transparent; border: 1px solid %2; "
+        "border-radius: 6px; padding: 0 8px; font-size: 9px; }"
+        "QToolButton:hover { color: %3; }"
+        "QToolButton:checked { color: %3; border-color: %4; }")
+            .arg(QString::fromLatin1(Style::kTextSecondary),
+                 QString::fromLatin1(Style::kBorderMuted), ink(),
+                 QString::fromLatin1(Style::kBlueBorder)));
+    connect(m_soundButton, &QToolButton::toggled, this,
+            [this](bool on) { emit soundToggled(m_profileId, on); });
+    header->addWidget(m_soundButton, 0);
 
     // Schliessen: der Streifen verschwindet, die Verbindung wird getrennt
     // (siehe KiwiSdrManager::setWaterfallPreviewEnabled).
@@ -191,6 +214,14 @@ void KiwiWaterfallStripWidget::reset()
     m_peakLabel->setText(QStringLiteral("—"));
     update();
 }
+
+void KiwiWaterfallStripWidget::setSoundActive(bool on)
+{
+    const QSignalBlocker blocker(m_soundButton);
+    m_soundButton->setChecked(on);
+}
+
+bool KiwiWaterfallStripWidget::soundActive() const { return m_soundButton->isChecked(); }
 
 void KiwiWaterfallStripWidget::loadOptions()
 {

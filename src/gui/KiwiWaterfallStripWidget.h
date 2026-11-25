@@ -55,6 +55,10 @@ public:
     float minDbm() const { return m_minDbm; }
     float maxDbm() const { return m_maxDbm; }
     QToolButton* closeButtonForTest() const { return m_closeButton; }
+    // Ton dieses Kiwi in den Lautsprechern (nur Anzeige; die Arbeit macht MainWindow).
+    void setSoundActive(bool on);
+    bool soundActive() const;
+    QToolButton* soundButtonForTest() const { return m_soundButton; }
 
     // Allgemeine Einstellung (Geschwindigkeit, Pegelbereich) fuer ALLE Kiwi-
     // Wasserfaelle, gespeichert unter KiwiWaterfall/* (Betreiber 2026-11-25:
@@ -69,6 +73,7 @@ signals:
     // Der Streifen entscheidet nichts selbst: er meldet den Wunsch.
     void closeRequested(const QString& profileId);
     void renameRequested(const QString& profileId);
+    void soundToggled(const QString& profileId, bool on);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -95,6 +100,7 @@ private:
     qint64 m_lastRowMs{-1000000};
     int m_acceptedRows{0};
     QToolButton* m_closeButton{nullptr};
+    QToolButton* m_soundButton{nullptr};
 
     QString m_profileId;
     QLabel* m_nameLabel{nullptr};

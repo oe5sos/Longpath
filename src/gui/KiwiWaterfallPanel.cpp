@@ -65,6 +65,8 @@ void KiwiWaterfallPanel::setStripEnabled(const QString& profileId, bool enabled,
                 this, &KiwiWaterfallPanel::removeRequested);
         connect(strip, &KiwiWaterfallStripWidget::renameRequested,
                 this, &KiwiWaterfallPanel::renameRequested);
+        connect(strip, &KiwiWaterfallStripWidget::soundToggled,
+                this, &KiwiWaterfallPanel::soundToggled);
         // Allgemeine Einstellung: eine Aenderung gilt fuer alle Streifen.
         connect(strip, &KiwiWaterfallStripWidget::optionsChanged, this, [this, strip]() {
             for (KiwiWaterfallStripWidget* other : std::as_const(m_strips)) {
@@ -84,6 +86,13 @@ void KiwiWaterfallPanel::pushRow(const QString& profileId,
 {
     if (auto* strip = m_strips.value(profileId, nullptr)) {
         strip->pushRow(binsDbm, lowHz, highHz);
+    }
+}
+
+void KiwiWaterfallPanel::setSoundActive(const QString& profileId, bool on)
+{
+    if (auto* strip = m_strips.value(profileId, nullptr)) {
+        strip->setSoundActive(on);
     }
 }
 

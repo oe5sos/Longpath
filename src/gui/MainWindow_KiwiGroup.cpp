@@ -33,6 +33,7 @@
 #include "core/KiwiSdrManager.h"
 #include "core/LogCategories.h"
 #include "gui/KiwiHearingDialog.h"
+#include "gui/KiwiWaterfallPanel.h"
 #include "gui/KiwiPublicReceiverPicker.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/applets/KiwiSdrApplet.h"
@@ -92,6 +93,21 @@ void MainWindow::wireKiwiGroup()
             setKiwiSolo(false);
         }
     });
+
+    // Ton je Kiwi (Schalter im Streifen der KIWI-WASSERFAELLE).
+    if (m_kiwiWaterfallPanel) {
+        connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::soundToggled, this,
+                [this](const QString& id, bool on) { setKiwiSound(id, on); });
+        connect(m_kiwiSdrManager, &KiwiSdrManager::sliceAssignmentChanged, this,
+                [this](int, const QString&) { refreshKiwiSoundButtons(); });
+        connect(m_kiwiSdrManager, &KiwiSdrManager::waterfallPreviewEnabledChanged, this,
+                [this](const QString&, bool) { refreshKiwiSoundButtons(); });
+        connect(m_radioModel, &RadioModel::sliceRemoved, this, [this](int sliceId) {
+            for (auto it = m_kiwiSoundSlices.begin(); it != m_kiwiSoundSlices.end();) {
+                if (it.value() == sliceId) { it = m_kiwiSoundSlices.erase(it); } else { ++it; }
+            }
+        });
+    }
 
     // Zeilen: an die Messung des Mithoerers und an die Kachel.
     connect(m_kiwiSdrManager, &KiwiSdrManager::waterfallRowReady, this,
@@ -177,6 +193,87 @@ void MainWindow::setKiwiSolo(bool on)
         if (m_kiwiSoloTimer) { m_kiwiSoloTimer->stop(); }
     }
     if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setSoloActive(m_kiwiSoloOn); }
+}
+
+// ── Ton je Kiwi ─────────────────────────────────────────────────────
+//
+// Ein Kiwi ist hoerbar, wenn er einer Scheibe zugeordnet ist (Profil->Scheibe-
+// Bruecke, siehe MainWindow_KiwiSdr.cpp). Fuer einen Kiwi aus den KIWI-WASSER-
+// FAELLEN legen wir dafuer EINE EIGENE Scheibe an -- ungebunden, ohne Funkgeraet
+// (suppressAutoStreamBinding), also hinter der Sicherheitsschranke
+// kiwiControllableSlice. Die Flex-Scheibe wird nie benutzt oder veraendert.
+void MainWindow::setKiwiSound(const QString& profileId, bool on)
+{
+    if (!m_kiwiSdrManager || !m_radioModel || !m_kiwiSdrManager->hasProfile(profileId)) {
+        return;
+    }
+    const int assigned = m_kiwiSdrManager->assignedSliceForProfile(profileId);
+
+    if (on) {
+        if (assigned >= 0) { refreshKiwiSoundButtons(); return; }   // schon hoerbar
+        const int sid = m_radioModel->addSlice(QString(), true);
+        SliceModel* slice = m_radioModel->sliceById(sid);
+        if (!slice) {
+            showToast(tr("No slice could be created for this Kiwi."),
+                      ToastSeverity::Warning, 6000);
+            refreshKiwiSoundButtons();
+            return;
+        }
+        slice->setSuppressAutoStreamBinding(true);
+        // Die Frequenz der Sendescheibe als Start (nur gelesen).
+        if (SliceModel* tx = kiwiOwnTxSlice()) {
+            quint64 hz = m_radioModel->transmitFrequencyHz(tx);
+            if (hz == 0) { hz = quint64(tx->frequency()); }
+            if (hz > 0) { slice->setFrequency(double(hz)); }
+            slice->setDspMode(tx->dspMode());
+            slice->setFilter(tx->filterLow(), tx->filterHigh());
+        }
+        m_kiwiSdrManager->assignSliceToProfile(
+            sid, profileId, slice->frequency() / 1.0e6,
+            SliceModel::modeName(slice->dspMode()),
+            slice->filterLow(), slice->filterHigh(), slice->panKey(),
+            QString(), SliceModel::cwPitchHz());
+        if (!kiwiControllableSlice(sid)) {
+            // Schranke sagt nein: wieder zurueck, nichts bleibt haengen.
+            m_kiwiSdrManager->clearSliceAssignment(sid);
+            m_radioModel->removeSlice(sid);
+            refreshKiwiSoundButtons();
+            return;
+        }
+        m_kiwiSoundSlices.insert(profileId, sid);
+        // Wer als Mithoerer lief, folgt jetzt seiner Scheibe (siehe sendKiwiGroupTracking).
+    } else {
+        if (profileId == m_kiwiOwnProfileId) {
+            showToast(tr("This Kiwi carries My Signal — switch that off there."),
+                      ToastSeverity::Info, 6000);
+            refreshKiwiSoundButtons();
+            return;
+        }
+        if (assigned < 0) { refreshKiwiSoundButtons(); return; }
+        if (AudioEngine* audio = m_radioModel->audioEngine()) {
+            audio->removeKiwiSdrAudioSource(assigned);
+        }
+        m_kiwiSdrManager->clearSliceAssignment(assigned);
+        // Die Scheibe, die wir fuer den Ton angelegt haben, wieder wegraeumen;
+        // eine fremde (Antennenwahl am Slice) bleibt stehen.
+        if (m_kiwiSoundSlices.value(profileId, -1) == assigned) {
+            m_kiwiSoundSlices.remove(profileId);
+            if (SliceModel* s = m_radioModel->sliceById(assigned)) {
+                s->setSuppressAutoStreamBinding(false);
+            }
+            m_radioModel->removeSlice(assigned);
+        }
+    }
+    refreshKiwiSoundButtons();
+}
+
+void MainWindow::refreshKiwiSoundButtons()
+{
+    if (!m_kiwiWaterfallPanel || !m_kiwiSdrManager) { return; }
+    for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
+        m_kiwiWaterfallPanel->setSoundActive(
+            pr.id, m_kiwiSdrManager->assignedSliceForProfile(pr.id) >= 0);
+    }
 }
 
 void MainWindow::updateKiwiGroupCapacity()
@@ -346,7 +443,11 @@ void MainWindow::sendKiwiGroupTracking()
     // Signal"). Ein Kiwi ohne Abstimmung liefert oft keinen Tonstrom, und der
     // Client gibt nach 12 s mit "no SND audio frames arrived" auf -- genau das
     // sah der Betreiber bei mehreren WF-Kiwis (2026-11-25, nicht live bestaetigt).
-    QStringList ids = m_kiwiGroup.ids();
+    QStringList ids;
+    for (const QString& gid : m_kiwiGroup.ids()) {
+        // Ein Kiwi mit Scheibe (Ton an) folgt seiner Scheibe, nicht der Sendefrequenz.
+        if (m_kiwiSdrManager->assignedSliceForProfile(gid) < 0) { ids << gid; }
+    }
     for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
         if (pr.id == m_kiwiOwnProfileId || ids.contains(pr.id)) { continue; }
         if (!pr.waterfallPreviewEnabled) { continue; }

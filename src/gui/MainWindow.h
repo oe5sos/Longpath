@@ -282,6 +282,8 @@ public:
     void kiwiGroupTxEdgeForTest(bool on) { kiwiGroupTxEdge(on); }
     void openKiwiHearingDialogForTest() { openKiwiHearingDialog(); }
     void setKiwiSoloForTest(bool on) { setKiwiSolo(on); }
+    void setKiwiSoundForTest(const QString& id, bool on) { setKiwiSound(id, on); }
+    class KiwiWaterfallPanel* kiwiWaterfallPanelForTest() const { return m_kiwiWaterfallPanel; }
     bool kiwiSoloOnForTest() const { return m_kiwiSoloOn; }
     class KiwiHearingDialog* kiwiHearingDialogForTest() const
     { return m_kiwiHearingDialog.data(); }
@@ -1701,6 +1703,8 @@ private:
     void refreshKiwiHearingDialog();
     void updateKiwiGroupCapacity();
     void setKiwiSolo(bool on);
+    void setKiwiSound(const QString& profileId, bool on);
+    void refreshKiwiSoundButtons();
     void startKiwiGroupRecording(const QString& profileId);
     void stopKiwiGroupRecording(const QString& profileId);
     class SliceModel* kiwiOwnTxSlice() const;
@@ -2319,6 +2323,7 @@ private:
     KiwiGroup m_kiwiGroup;
     QPointer<KiwiHearingDialog> m_kiwiHearingDialog;
     QTimer* m_kiwiGroupTimer{nullptr};
+    QHash<QString, int> m_kiwiSoundSlices;   // Profil -> Scheibe, die wir fuer den Ton anlegten
     QTimer* m_kiwiSoloTimer{nullptr};   // Solo geht nach 30 s von selbst aus
     bool m_kiwiSoloOn{false};
     QHash<QString, class KiwiRecording*> m_kiwiGroupRecordings;

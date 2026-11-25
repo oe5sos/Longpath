@@ -21,6 +21,8 @@
 #include "core/KiwiGroup.h"
 #include "core/KiwiSdrManager.h"
 #include "gui/KiwiHearingDialog.h"
+#include "gui/KiwiWaterfallPanel.h"
+#include "gui/KiwiWaterfallStripWidget.h"
 #include "gui/MainWindow.h"
 #include "gui/applets/KiwiSdrApplet.h"
 #include "models/RadioModel.h"
@@ -233,6 +235,47 @@ private slots:
         // Gegenprobe: ein anderer Endpunkt ist ein anderes Profil.
         QVERIFY(mgr->addProfile(QStringLiteral("Anders"), QStringLiteral("127.0.0.1:71")) != a);
         QCOMPARE(mgr->profiles().size(), 2);
+    }
+
+    // Ton je Kiwi im Wasserfall-Streifen: eine EIGENE ungebundene Scheibe, nie
+    // die des Funkgeraets; aus -> Scheibe weg.
+    void tonJeKiwiSchaltetEineEigeneScheibe()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        RadioModel* model = mw->radioModelForTest();
+        clearProfiles(mgr);
+        const int radioSlice = model->addSlice();
+        SliceModel* radio = model->sliceById(radioSlice);
+        QVERIFY(radio);
+        const double radioFreq = radio->frequency();
+
+        const QString id = profile(mgr, "Linz", 80);
+        mgr->setWaterfallPreviewEnabled(id, true);
+        KiwiWaterfallPanel* panel = mw->kiwiWaterfallPanelForTest();
+        QVERIFY(panel && panel->stripForTest(id));
+        auto* strip = panel->stripForTest(id);
+        QVERIFY(!strip->soundActive());
+        QCOMPARE(mgr->assignedSliceForProfile(id), -1);
+
+        const int slicesBefore = model->slices().size();
+        QTest::mouseClick(strip->soundButtonForTest(), Qt::LeftButton);   // Ton an
+        const int sid = mgr->assignedSliceForProfile(id);
+        QVERIFY(sid >= 0);
+        QVERIFY(sid != radioSlice);                          // nicht die des Funkgeraets
+        QCOMPARE(model->slices().size(), slicesBefore + 1);
+        QVERIFY(model->sliceById(sid)->streamIndex() < 0);   // ungebunden
+        QVERIFY(strip->soundActive());
+        QCOMPARE(radio->frequency(), radioFreq);             // Funkgeraet unberuehrt
+
+        QTest::mouseClick(strip->soundButtonForTest(), Qt::LeftButton);   // Ton aus
+        QCOMPARE(mgr->assignedSliceForProfile(id), -1);
+        QCOMPARE(model->slices().size(), slicesBefore);      // unsere Scheibe ist weg
+        QVERIFY(!strip->soundActive());
+        QVERIFY(model->sliceById(radioSlice) != nullptr);    // die andere steht noch
     }
 
     void zeilenKommenAnUndDasFensterOeffnetSich()

@@ -41,6 +41,7 @@ signals:
     // Wuensche der Streifen, weitergereicht (das Panel entscheidet nichts).
     void removeRequested(const QString& profileId);
     void renameRequested(const QString& profileId);
+    void soundToggled(const QString& profileId, bool on);
 
 public:
     KiwiWaterfallStripWidget* stripForTest(const QString& id) const { return m_strips.value(id, nullptr); }
@@ -51,6 +52,7 @@ public slots:
     void pushRow(const QString& profileId, const QVector<float>& binsDbm,
                  double lowHz = 0.0, double highHz = 0.0);
     void resetStrip(const QString& profileId);
+    void setSoundActive(const QString& profileId, bool on);
 
 private:
     void updateEmptyState();

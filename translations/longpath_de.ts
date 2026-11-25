@@ -4248,6 +4248,14 @@ Die Beschreibung des Herstellers dokumentiert nur einen Typcode, darum wird die 
         <source>Name:</source>
         <translation>Name:</translation>
     </message>
+    <message>
+        <source>No slice could be created for this Kiwi.</source>
+        <translation>Für diesen Kiwi ließ sich keine Scheibe anlegen.</translation>
+    </message>
+    <message>
+        <source>This Kiwi carries My Signal — switch that off there.</source>
+        <translation>Dieser Kiwi trägt „Mein Signal“ — dort ausschalten.</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::MultimeterPage</name>
@@ -8492,6 +8500,18 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
     <message>
         <source>Speed: fast (every line)</source>
         <translation>Geschwindigkeit: schnell (jede Zeile)</translation>
+    </message>
+    <message>
+        <source>Sound</source>
+        <translation>Ton</translation>
+    </message>
+    <message>
+        <source>Listen to this Kiwi (audio on / off)</source>
+        <translation>Diesen Kiwi hören (Ton an / aus)</translation>
+    </message>
+    <message>
+        <source>Kiwi sound</source>
+        <translation>Kiwi-Ton</translation>
     </message>
 </context>
 </TS>
