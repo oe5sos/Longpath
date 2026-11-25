@@ -8481,5 +8481,17 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
         <source>Strong signals (−110 … −20 dBm)</source>
         <translation>Starke Signale (−110 … −20 dBm)</translation>
     </message>
+    <message>
+        <source>Speed: slow (1 line/s)</source>
+        <translation>Geschwindigkeit: langsam (1 Zeile/s)</translation>
+    </message>
+    <message>
+        <source>Speed: normal (4 lines/s)</source>
+        <translation>Geschwindigkeit: normal (4 Zeilen/s)</translation>
+    </message>
+    <message>
+        <source>Speed: fast (every line)</source>
+        <translation>Geschwindigkeit: schnell (jede Zeile)</translation>
+    </message>
 </context>
 </TS>

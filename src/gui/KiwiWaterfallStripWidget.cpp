@@ -7,10 +7,12 @@
 
 #include "gui/KiwiWaterfallStripWidget.h"
 
+#include "core/AppSettings.h"
 #include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
 #include <QContextMenuEvent>
+#include <QDateTime>
 #include <QHBoxLayout>
 #include <QMenu>
 #include <QToolButton>
@@ -99,6 +101,7 @@ KiwiWaterfallStripWidget::KiwiWaterfallStripWidget(const QString& profileId,
     // man groesser machen koennen").
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setMinimumHeight(78);
+    loadOptions();
 
     m_history = QImage(1, kHistoryRows, QImage::Format_RGB32);
     m_history.fill(QColor(Style::hexRole(Style::kAppBg)));
@@ -127,6 +130,13 @@ void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm,
         m_highHz = highHz;
         m_freqLabel->setText(frequencyText());
     }
+    // Bremse: nur jede n-te Millisekunde eine neue Zeile.
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (m_rowIntervalMs > 0 && now - m_lastRowMs < m_rowIntervalMs) {
+        return;
+    }
+    m_lastRowMs = now;
+    ++m_acceptedRows;
 
     if (m_history.width() != binsDbm.size()) {
         m_history = QImage(binsDbm.size(), kHistoryRows, QImage::Format_RGB32);
@@ -182,6 +192,36 @@ void KiwiWaterfallStripWidget::reset()
     update();
 }
 
+void KiwiWaterfallStripWidget::loadOptions()
+{
+    AppSettings& st = AppSettings::instance();
+    m_rowIntervalMs = std::max(0, st.value("KiwiWaterfall/RowIntervalMs",
+                                           QString::number(kDefaultRowIntervalMs)).toString().toInt());
+    m_auto = st.value("KiwiWaterfall/RangeAuto", "False").toString() == "True";
+    if (m_auto) { return; }
+    bool okLo = false, okHi = false;
+    const float lo = st.value("KiwiWaterfall/MinDbm", QString::number(double(kDefaultMinDbm))).toString().toFloat(&okLo);
+    const float hi = st.value("KiwiWaterfall/MaxDbm", QString::number(double(kDefaultMaxDbm))).toString().toFloat(&okHi);
+    if (okLo && okHi && hi > lo) { m_minDbm = lo; m_maxDbm = hi; }
+    update();
+}
+
+void KiwiWaterfallStripWidget::saveOptions() const
+{
+    AppSettings& st = AppSettings::instance();
+    st.setValue("KiwiWaterfall/RowIntervalMs", QString::number(m_rowIntervalMs));
+    st.setValue("KiwiWaterfall/RangeAuto", m_auto ? "True" : "False");
+    if (!m_auto) {
+        st.setValue("KiwiWaterfall/MinDbm", QString::number(double(m_minDbm)));
+        st.setValue("KiwiWaterfall/MaxDbm", QString::number(double(m_maxDbm)));
+    }
+}
+
+void KiwiWaterfallStripWidget::setRowIntervalMs(int ms)
+{
+    m_rowIntervalMs = std::max(0, ms);
+}
+
 void KiwiWaterfallStripWidget::setRange(float minDbm, float maxDbm)
 {
     m_auto = false;
@@ -202,6 +242,20 @@ void KiwiWaterfallStripWidget::contextMenuEvent(QContextMenuEvent* event)
 {
     QMenu menu(this);
     QAction* rename = menu.addAction(tr("Rename …"));
+    menu.addSeparator();
+    struct Speed { const char* text; int ms; };
+    static const Speed kSpeeds[] = {
+        {QT_TR_NOOP("Speed: slow (1 line/s)"), 1000},
+        {QT_TR_NOOP("Speed: normal (4 lines/s)"), kDefaultRowIntervalMs},
+        {QT_TR_NOOP("Speed: fast (every line)"), 0},
+    };
+    QList<QAction*> speedActs;
+    for (const Speed& sp : kSpeeds) {
+        QAction* a = menu.addAction(tr(sp.text));
+        a->setCheckable(true);
+        a->setChecked(m_rowIntervalMs == sp.ms);
+        speedActs << a;
+    }
     menu.addSeparator();
     QAction* autoAct = menu.addAction(tr("Level range: automatic"));
     autoAct->setCheckable(true);
@@ -227,11 +281,21 @@ void KiwiWaterfallStripWidget::contextMenuEvent(QContextMenuEvent* event)
         emit renameRequested(m_profileId);
     } else if (chosen == autoAct) {
         setAutoRange(autoAct->isChecked());
+        saveOptions();
+        emit optionsChanged();
     } else if (chosen == close) {
         emit closeRequested(m_profileId);
+    } else if (speedActs.contains(chosen)) {
+        setRowIntervalMs(kSpeeds[int(speedActs.indexOf(chosen))].ms);
+        saveOptions();
+        emit optionsChanged();
     } else {
         const int i = int(presetActs.indexOf(chosen));
-        if (i >= 0) { setRange(kPresets[i].lo, kPresets[i].hi); }
+        if (i >= 0) {
+            setRange(kPresets[i].lo, kPresets[i].hi);
+            saveOptions();
+            emit optionsChanged();
+        }
     }
     update();
 }

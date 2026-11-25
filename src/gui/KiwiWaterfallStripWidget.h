@@ -36,6 +36,14 @@ public:
     double lowHz() const { return m_lowHz; }
     double highHz() const { return m_highHz; }
     QString frequencyText() const;
+
+    // Geschwindigkeit: kleinster Abstand zwischen zwei Zeilen in ms. Ein Kiwi
+    // liefert 10-14 Zeilen/s -- ungebremst laeuft das Bild zu schnell (Betreiber
+    // 2026-11-25: "laeuft viel zu schnell"). 0 = jede Zeile.
+    static constexpr int kDefaultRowIntervalMs = 250;   // 4 Zeilen/s
+    void setRowIntervalMs(int ms);
+    int rowIntervalMs() const { return m_rowIntervalMs; }
+    int acceptedRowsForTest() const { return m_acceptedRows; }
     void reset();
 
     QSize sizeHint() const override;
@@ -48,7 +56,16 @@ public:
     float maxDbm() const { return m_maxDbm; }
     QToolButton* closeButtonForTest() const { return m_closeButton; }
 
+    // Allgemeine Einstellung (Geschwindigkeit, Pegelbereich) fuer ALLE Kiwi-
+    // Wasserfaelle, gespeichert unter KiwiWaterfall/* (Betreiber 2026-11-25:
+    // "man sollte dies als Option generell aendern koennen").
+    void loadOptions();
+    void saveOptions() const;
+
 signals:
+    // Eine allgemeine Einstellung wurde hier geaendert: die anderen Streifen
+    // laden sie neu.
+    void optionsChanged();
     // Der Streifen entscheidet nichts selbst: er meldet den Wunsch.
     void closeRequested(const QString& profileId);
     void renameRequested(const QString& profileId);
@@ -58,7 +75,9 @@ protected:
     void contextMenuEvent(QContextMenuEvent* event) override;
 
 private:
-    static constexpr int kHistoryRows = 48;
+    // Zeilen, die der Streifen vorhaelt. Mit ~4 Zeilen/s (Voreinstellung) sind
+    // das etwa eine Minute Verlauf; ein hoher Streifen zeigt sie gedehnt.
+    static constexpr int kHistoryRows = 240;
     // Feste Anzeigespanne: dieser Streifen hat keine eigene
     // Auto-Scale-Regelung (die haengt am Profil, nicht an der
     // Vorschau). Grosszuegig genug fuer Rauschen bis zu einem starken
@@ -72,6 +91,9 @@ private:
     double m_lowHz{0.0};
     double m_highHz{0.0};
     QLabel* m_freqLabel{nullptr};
+    int m_rowIntervalMs{kDefaultRowIntervalMs};
+    qint64 m_lastRowMs{-1000000};
+    int m_acceptedRows{0};
     QToolButton* m_closeButton{nullptr};
 
     QString m_profileId;

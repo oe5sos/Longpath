@@ -359,7 +359,14 @@ void MainWindow::sendKiwiGroupTracking()
     }
     if (ids.isEmpty()) { return; }
     SliceModel* tx = kiwiOwnTxSlice();
-    if (!tx) { return; }
+    if (!tx) {
+        static bool warnedNoTx = false;
+        if (!warnedNoTx) {
+            warnedNoTx = true;
+            qCInfo(lcKiwiSdr) << "Abstimmung der Vorschau-Kiwis: keine Sendescheibe (kein Funkgeraet?)";
+        }
+        return;
+    }
     quint64 txHz = m_radioModel->transmitFrequencyHz(tx);
     if (txHz == 0) { txHz = quint64(tx->frequency()); }
     if (txHz == 0) { return; }
@@ -371,8 +378,16 @@ void MainWindow::sendKiwiGroupTracking()
 
     SpectrumWidget* sw = spectrumForSlice(tx);
     const double bw = sw ? std::clamp(sw->bandwidth(), kMinViewHz, kMaxViewHz) : 40000.0;
+    static QSet<QString> logged;
     for (int i = 0; i < ids.size(); ++i) {
         const KiwiSdrAntennaProfile profile = m_kiwiSdrManager->profile(ids[i]);
+        if (!logged.contains(ids[i])) {
+            logged.insert(ids[i]);
+            qCInfo(lcKiwiSdr).noquote()
+                << "Abstimmung" << profile.name << "auf" << double(txHz) / 1.0e6
+                << "MHz" << SliceModel::modeName(tx->dspMode())
+                << (m_kiwiGroup.contains(ids[i]) ? "(Mithoerer)" : "(Vorschau)");
+        }
         m_kiwiSdrManager->primeProfileTracking(
             ids[i], kListenerTrackingBase + i,
             double(txHz) / 1.0e6, SliceModel::modeName(tx->dspMode()),

@@ -65,6 +65,12 @@ void KiwiWaterfallPanel::setStripEnabled(const QString& profileId, bool enabled,
                 this, &KiwiWaterfallPanel::removeRequested);
         connect(strip, &KiwiWaterfallStripWidget::renameRequested,
                 this, &KiwiWaterfallPanel::renameRequested);
+        // Allgemeine Einstellung: eine Aenderung gilt fuer alle Streifen.
+        connect(strip, &KiwiWaterfallStripWidget::optionsChanged, this, [this, strip]() {
+            for (KiwiWaterfallStripWidget* other : std::as_const(m_strips)) {
+                if (other != strip) { other->loadOptions(); }
+            }
+        });
     } else if (auto* strip = m_strips.take(profileId)) {
         m_stripsLayout->removeWidget(strip);
         strip->deleteLater();

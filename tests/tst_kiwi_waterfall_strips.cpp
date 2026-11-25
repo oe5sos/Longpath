@@ -6,6 +6,7 @@
 #include <QToolButton>
 #include <QLabel>
 
+#include "core/AppSettings.h"
 #include "gui/KiwiWaterfallPanel.h"
 #include "gui/KiwiWaterfallStripWidget.h"
 #include "models/RadioModel.h"
@@ -56,6 +57,8 @@ private slots:
         const QString out = qEnvironmentVariable("LONGPATH_STRIP_PNG");
         if (!out.isEmpty()) {
             panel.setStripEnabled(QStringLiteral("b"), true, QStringLiteral("Zwei"));
+            panel.stripForTest(QStringLiteral("a"))->setRowIntervalMs(0);
+            panel.stripForTest(QStringLiteral("b"))->setRowIntervalMs(0);
             panel.resize(700, 420);
             panel.show();
             QVERIFY(QTest::qWaitForWindowExposed(&panel, 15000));
@@ -68,6 +71,66 @@ private slots:
             QTest::qWait(60);
             panel.grab().save(out);
         }
+    }
+
+    // Betreiber: "laeuft viel zu schnell". Ein Kiwi schickt 10-14 Zeilen/s; der
+    // Streifen nimmt in der Voreinstellung hoechstens 4/s.
+    void dieGeschwindigkeitIstGebremst()
+    {
+        KiwiWaterfallStripWidget strip(QStringLiteral("a"), QStringLiteral("Eins"));
+        QCOMPARE(strip.rowIntervalMs(), 250);
+        for (int i = 0; i < 30; ++i) {
+            strip.pushRow(bins(-100.0f), 14185000.0, 14225000.0);
+        }
+        QCOMPARE(strip.acceptedRowsForTest(), 1);    // der Rest kam im selben Augenblick
+        QTest::qWait(300);
+        strip.pushRow(bins(-100.0f), 14185000.0, 14225000.0);
+        QCOMPARE(strip.acceptedRowsForTest(), 2);    // nach dem Abstand wieder eine
+
+        // Gegenprobe: "jede Zeile" laesst alles durch.
+        KiwiWaterfallStripWidget fast(QStringLiteral("b"), QStringLiteral("Zwei"));
+        fast.setRowIntervalMs(0);
+        for (int i = 0; i < 30; ++i) {
+            fast.pushRow(bins(-100.0f), 14185000.0, 14225000.0);
+        }
+        QCOMPARE(fast.acceptedRowsForTest(), 30);
+    }
+
+    // "Als Option generell aendern": eine Aenderung gilt fuer alle Streifen und
+    // bleibt gespeichert (neuer Streifen liest sie).
+    void einstellungGiltFuerAlle()
+    {
+        AppSettings::instance().remove(QStringLiteral("KiwiWaterfall/RowIntervalMs"));
+        AppSettings::instance().remove(QStringLiteral("KiwiWaterfall/RangeAuto"));
+        AppSettings::instance().remove(QStringLiteral("KiwiWaterfall/MinDbm"));
+        AppSettings::instance().remove(QStringLiteral("KiwiWaterfall/MaxDbm"));
+
+        RadioModel model;
+        KiwiWaterfallPanel panel(&model);
+        panel.setStripEnabled(QStringLiteral("a"), true, QStringLiteral("Eins"));
+        panel.setStripEnabled(QStringLiteral("b"), true, QStringLiteral("Zwei"));
+        auto* a = panel.stripForTest(QStringLiteral("a"));
+        auto* b = panel.stripForTest(QStringLiteral("b"));
+        QCOMPARE(a->rowIntervalMs(), 250);
+
+        // Was das Menue tut: setzen, speichern, melden.
+        a->setRowIntervalMs(1000);
+        a->setRange(-110.0f, -20.0f);
+        a->saveOptions();
+        emit a->optionsChanged();
+        QCOMPARE(b->rowIntervalMs(), 1000);
+        QCOMPARE(b->minDbm(), -110.0f);
+        QCOMPARE(b->maxDbm(), -20.0f);
+
+        // Ein spaeter geoeffneter Streifen (oder ein neuer Start) bekommt dasselbe.
+        panel.setStripEnabled(QStringLiteral("c"), true, QStringLiteral("Drei"));
+        QCOMPARE(panel.stripForTest(QStringLiteral("c"))->rowIntervalMs(), 1000);
+        QCOMPARE(panel.stripForTest(QStringLiteral("c"))->maxDbm(), -20.0f);
+
+        // aufraeumen, damit andere Laeufe die Voreinstellung sehen
+        AppSettings::instance().remove(QStringLiteral("KiwiWaterfall/RowIntervalMs"));
+        AppSettings::instance().remove(QStringLiteral("KiwiWaterfall/MinDbm"));
+        AppSettings::instance().remove(QStringLiteral("KiwiWaterfall/MaxDbm"));
     }
 
     void schliessenMeldetDenWunsch()
