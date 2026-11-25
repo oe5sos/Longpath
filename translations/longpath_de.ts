@@ -8354,6 +8354,34 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
 <context>
     <name>Longpath::KiwiOwnSignalStrip</name>
     <message>
+        <source>Sound</source>
+        <translation>Ton</translation>
+    </message>
+    <message>
+        <source>Listen to this Kiwi (audio on / off)</source>
+        <translation>Diesen Kiwi hören (Ton an / aus)</translation>
+    </message>
+    <message>
+        <source>Kiwi sound</source>
+        <translation>Kiwi-Ton</translation>
+    </message>
+    <message>
+        <source>Show a wider frequency range</source>
+        <translation>Größeren Frequenzbereich zeigen</translation>
+    </message>
+    <message>
+        <source>Zoom out</source>
+        <translation>Verkleinern</translation>
+    </message>
+    <message>
+        <source>Show a narrower frequency range</source>
+        <translation>Kleineren Frequenzbereich zeigen</translation>
+    </message>
+    <message>
+        <source>Zoom in</source>
+        <translation>Vergrößern</translation>
+    </message>
+    <message>
         <source>hears me · %1</source>
         <translation>hört mich · %1</translation>
     </message>

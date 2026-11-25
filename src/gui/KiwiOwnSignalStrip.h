@@ -28,6 +28,8 @@
 #include <QVector>
 #include <QWidget>
 
+class QToolButton;
+
 namespace Longpath {
 
 class KiwiOwnSignalStrip : public QWidget {
@@ -60,6 +62,13 @@ public:
     // Fusszeile: laeuft eine Aufnahme, mit Dauer und Dateiname.
     void setRecording(bool recording, qint64 elapsedMs, const QString& fileName);
 
+    // Regler im Kopf des Streifens (Betreiber 2026-11-25: "unter dem
+    // Panadapter ist der Kiwi schoen, aber dort kann ich nichts aendern").
+    // Ton ein/aus und Zoom +/- fuer den Kiwi von "Mein Signal".
+    void setSoundActive(bool on);
+    bool soundActiveForTest() const;
+    QToolButton* soundButtonForTest() const { return m_soundButton; }
+
     // Das Bild des Streifens (Wasserfall und Marke, ohne Kopf/Fuss) fuer
     // die Aufnahme als PNG. Leer, wenn noch keine Zeile kam.
     QImage waterfallImage(int width = 1200) const;
@@ -76,8 +85,13 @@ public:
     QSize sizeHint() const override { return QSize(480, 176); }
     QSize minimumSizeHint() const override { return QSize(160, 120); }
 
+signals:
+    void soundToggled(bool on);
+    void zoomRequested(int direction);   // +1 enger, -1 weiter
+
 protected:
     void paintEvent(QPaintEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
     struct Row {
@@ -104,6 +118,11 @@ private:
     bool m_recording{false};
     qint64 m_recordMs{0};
     QString m_recordFile;
+    QToolButton* m_soundButton{nullptr};
+    QToolButton* m_zoomOut{nullptr};
+    QToolButton* m_zoomIn{nullptr};
+    void layoutButtons();
+    int buttonsWidth() const;
 };
 
 } // namespace Longpath

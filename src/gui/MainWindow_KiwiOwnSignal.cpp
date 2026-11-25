@@ -112,6 +112,15 @@ void MainWindow::wireKiwiOwnSignal()
         }
     }
 
+    connect(m_kiwiStrip, &KiwiOwnSignalStrip::soundToggled, this,
+            [this](bool on) {
+        if (!m_kiwiOwnProfileId.isEmpty()) { setKiwiSound(m_kiwiOwnProfileId, on); }
+    });
+    connect(m_kiwiStrip, &KiwiOwnSignalStrip::zoomRequested, this,
+            [this](int dir) {
+        if (!m_kiwiOwnProfileId.isEmpty()) { zoomKiwiStrip(m_kiwiOwnProfileId, dir); }
+    });
+
     // ── Das Applet ────────────────────────────────────────────────────
     connect(m_kiwiSdrApplet, &KiwiSdrApplet::ownSignalToggled, this,
             [this](bool on) { setKiwiOwnSignal(on); });

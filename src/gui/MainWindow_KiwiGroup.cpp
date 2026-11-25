@@ -34,6 +34,7 @@
 #include "core/LogCategories.h"
 #include "gui/KiwiHearingDialog.h"
 #include "gui/KiwiWaterfallPanel.h"
+#include "gui/KiwiOwnSignalStrip.h"
 #include "gui/PanadapterStack.h"
 #include "gui/PanadapterApplet.h"
 #include "gui/applets/AppletVisibilityController.h"
@@ -446,6 +447,11 @@ void MainWindow::setRadioMuted(bool on)
 
 void MainWindow::refreshKiwiSoundButtons()
 {
+    if (m_kiwiStrip && m_kiwiSdrManager && !m_kiwiOwnProfileId.isEmpty()) {
+        m_kiwiStrip->setSoundActive(
+            m_kiwiSdrManager->assignedSliceForProfile(m_kiwiOwnProfileId) >= 0
+            && !m_kiwiUserMuted.contains(m_kiwiOwnProfileId));
+    }
     if (!m_kiwiWaterfallPanel || !m_kiwiSdrManager) { return; }
     for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
         m_kiwiWaterfallPanel->setSoundActive(
