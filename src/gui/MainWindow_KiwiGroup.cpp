@@ -407,6 +407,16 @@ void MainWindow::setKiwiSound(const QString& profileId, bool on)
             }
             m_radioModel->removeSlice(assigned);
         }
+        // Ein Kiwi ohne Wasserfall-Kanal hat ausser dem Ton nichts zu zeigen:
+        // Ton aus heisst getrennt (Betreiber 2026-11-25: "bleibt nach Ton aus
+        // haengen").
+        const KiwiSdrClient::State st = m_kiwiSdrManager->state(profileId);
+        const bool up = st == KiwiSdrClient::State::Connected
+                        || st == KiwiSdrClient::State::Connecting;
+        if (up && !m_kiwiSdrManager->waterfallAvailable(profileId)) {
+            m_kiwiSdrManager->setWaterfallPreviewEnabled(profileId, false);
+            m_kiwiSdrManager->disconnectProfile(profileId);
+        }
     }
     refreshKiwiSoundButtons();
 }

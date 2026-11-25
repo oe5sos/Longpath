@@ -2455,6 +2455,18 @@ void KiwiSdrClient::handleTextMessage(StreamKind stream, const QString& text)
                 }
                 return;
             }
+            // too_busy ist eine Ablehnung VOR dem Ton. Laeuft der Ton schon
+            // (Frames sind angekommen), betrifft es einen zweiten Strom
+            // (Wasserfall, den der Server zu Ende schliesst) und darf den
+            // Ton nicht beenden. Wird der Ton wirklich getrennt, kommt das
+            // ueber das Schliessen des Ton-Stroms an.
+            if (m_state == State::Connected && m_soundFrameSeen) {
+                qCInfo(lcKiwiSdr).noquote()
+                    << "KiwiSDR too_busy bei laufendem Ton ignoriert"
+                    << QStringLiteral("endpoint=%1").arg(logEndpoint())
+                    << "stream=" << streamLabel(stream);
+                return;
+            }
             bool busyOk = false;
             const int busyValue = valueText.toInt(&busyOk);
             // KiwiSDR sends too_busy on denial paths, not as a negative
