@@ -384,7 +384,10 @@ void MainWindow::syncKiwiOwnSignal()
         // dBm-Leiste rechts), nicht mit dem ganzen Fenster.
         if (QWidget* pane = m_kiwiStrip->parentWidget()) {
             const QRect plot = sw->spectrumRect();
-            const int left = sw->mapTo(pane, plot.topLeft()).x();
+            // Ueber Bildschirmkoordinaten: der Panadapter kann ein schwebendes
+            // Fenster sein und ist dann kein Nachkomme von `pane` (mapTo
+            // warnte bei jedem Ziehen, Betreiberlog 2026-11-25).
+            const int left = pane->mapFromGlobal(sw->mapToGlobal(plot.topLeft())).x();
             const int right = pane->width() - (left + plot.width());
             m_kiwiStrip->setPlotMargins(left, right);
         }
