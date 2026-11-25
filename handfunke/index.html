@@ -125,6 +125,12 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <!-- Der Durchlass liegt UNTER dem Abstimmstrich: er sagt, was zu hoeren
        ist, der Strich sagt, worauf abgestimmt ist. -->
   <div class="durchlass" id="durchlass"></div>
+  <!-- Filterkanten zum Ziehen (2026-11-25), wie „Bandwidth Filter" am Mac.
+       Eigene Elemente ueber dem Bild; ihre Beruehrungen halten sie von der
+       Abstimmgeste fern (app.js, filterKanten). -->
+  <div class="kante" id="kanteLo" aria-label="untere Filterkante ziehen"></div>
+  <div class="kante" id="kanteHi" aria-label="obere Filterkante ziehen"></div>
+  <div class="kantenWert" id="kantenWert"></div>
   <div class="cursor"></div>
   <!-- Feinschritt: liegt IM Bild, rechts oben, und haelt seine Beruehrungen
        von der Abstimmgeste darunter fern (app.js). -->

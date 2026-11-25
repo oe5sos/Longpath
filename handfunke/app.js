@@ -683,14 +683,17 @@ function zeichneKopf() {
         bd.style.left  = links.toFixed(2) + '%';
         bd.style.width = (rechts - links).toFixed(2) + '%';
         bd.style.display = 'block';
+        kantenSetzen(links, rechts, Math.min(pA, pB) >= 0, Math.max(pA, pB) <= 100);
       } else {
         // Schmaler als ein halbes Prozent: als Flaeche nicht mehr lesbar,
         // und ein Ein-Pixel-Band waere nur ein zweiter Strich neben dem
         // Abstimmstrich. Dann lieber nichts — weiter hineinzoomen hilft.
         bd.style.display = 'none';
+        kantenSetzen(null);
       }
     } else if (bd) {
       bd.style.display = 'none';
+      kantenSetzen(null);
     }
   }
 
@@ -1812,6 +1815,101 @@ $('scope').addEventListener('pointermove', (e) => {
   wischLetzt = jetzt;
   link.send(`vfo:${state.trx},0,${neu}`);
 });
+// ── Filterkanten ziehen (2026-11-25) ─────────────────────────────────────────
+//
+// Wie „Bandwidth Filter" am Mac: die Kanten des Durchlasses lassen sich mit
+// Finger oder Maus verschieben. Gesendet wird `rx_filter_band:<rx>,<lo>,<hi>`
+// (TciProtocol::handleRxFilterBandCommand), gedrosselt wie das Abstimmen, und
+// beim Loslassen der letzte Stand. Angezeigt wird weiter nur, was Longpath
+// zurueckmeldet — waehrend des Ziehens laeuft das Schild mit der Breite vor.
+//
+// Die Griffe sind eigene Elemente und halten ihre Beruehrungen von der
+// Abstimmgeste darunter fern (wie der Feinschritt). Sie liegen nur dort, wo
+// die Kante im Bild ist; eine Kante ausserhalb des Ausschnitts hat keinen Griff.
+const kKanteMinHz = 50;          // schmaler wird kein Durchlass
+let kanteZug = null;             // { welche, lo, hi, gespiegelt, letzt }
+function kantenSetzen(links, rechts, loSicht, hiSicht) {
+  const a = $('kanteLo'), b = $('kanteHi');
+  if (links === null || links === undefined) {
+    if (!kanteZug) { a.style.display = 'none'; b.style.display = 'none'; }
+    return;
+  }
+  a.style.left = links.toFixed(2) + '%';
+  b.style.left = rechts.toFixed(2) + '%';
+  a.style.display = loSicht ? 'block' : 'none';
+  b.style.display = hiSicht ? 'block' : 'none';
+}
+// Hertz neben der Abstimmfrequenz an einer Bildstelle (wie der Durchlass oben).
+function versatzAnStelle(clientX) {
+  const r = $('scope').getBoundingClientRect();
+  const mitte = link.st.dds[state.trx];
+  const vfo = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
+  const spanne = bildSpanneHz(0);
+  if (!r.width || !mitte || !vfo || !(spanne > 0)) { return null; }
+  const hz = mitte + ((clientX - r.left) / r.width - 0.5) * spanne - vfo;
+  const raster = spanne <= 24000 ? 10 : 50;
+  return Math.round(hz / raster) * raster;
+}
+function breiteText(hz) {
+  return hz >= 1000 ? (hz / 1000).toFixed(hz % 1000 === 0 ? 1 : 2).replace(/0$/, '') + ' kHz' : hz + ' Hz';
+}
+function kanteSenden(zug, endgueltig) {
+  const jetzt = performance.now();
+  if (!endgueltig && jetzt - zug.letzt < kWischAbstandMs) { return; }
+  zug.letzt = jetzt;
+  // Zurueck in die Schreibweise des Servers: hat er die unteren Seitenbaender
+  // positiv gemeldet, zeigt die Seite sie gespiegelt -- dann auch so zurueck.
+  const lo = zug.gespiegelt ? -zug.hi : zug.lo;
+  const hi = zug.gespiegelt ? -zug.lo : zug.hi;
+  if (zug.gesendet === lo + ',' + hi) { return; }
+  zug.gesendet = lo + ',' + hi;
+  link.send(`rx_filter_band:${state.trx},${lo},${hi}`);
+}
+for (const [id, welche] of [['kanteLo', 'lo'], ['kanteHi', 'hi']]) {
+  const el = $(id);
+  el.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    const f = link.st.filter[state.trx] || [];
+    let lo = f[0], hi = f[1];
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) { return; }
+    if (lo > hi) { const t = lo; lo = hi; hi = t; }
+    const m = (link.st.mode[state.trx] || '').toLowerCase();
+    const gespiegelt = (m === 'lsb' || m === 'cwl' || m === 'digl') && lo >= 0 && hi >= 0;
+    if (gespiegelt) { const t = -hi; hi = -lo; lo = t; }
+    kanteZug = { welche, lo, hi, gespiegelt, letzt: 0, gesendet: null, x: e.clientX, bewegt: false };
+    try { el.setPointerCapture(e.pointerId); } catch (x) { /* Zeiger schon weg */ }
+    el.classList.add('zieht');
+  });
+  el.addEventListener('pointermove', (e) => {
+    e.stopPropagation();
+    if (!kanteZug || kanteZug.welche !== welche) { return; }
+    if (!kanteZug.bewegt && Math.abs(e.clientX - kanteZug.x) < 3) { return; }
+    kanteZug.bewegt = true;
+    const hz = versatzAnStelle(e.clientX);
+    if (hz === null) { return; }
+    if (welche === 'lo') { kanteZug.lo = Math.min(hz, kanteZug.hi - kKanteMinHz); }
+    else { kanteZug.hi = Math.max(hz, kanteZug.lo + kKanteMinHz); }
+    // Den Griff selbst gleich mitnehmen; der Durchlass folgt der Gegenmeldung.
+    const r = $('scope').getBoundingClientRect();
+    el.style.left = Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)).toFixed(2) + '%';
+    const w = $('kantenWert');
+    w.textContent = breiteText(kanteZug.hi - kanteZug.lo);
+    w.style.left = el.style.left;
+    w.classList.add('an');
+    kanteSenden(kanteZug, false);
+  });
+  const ende = (e) => {
+    e.stopPropagation();
+    if (!kanteZug || kanteZug.welche !== welche) { return; }
+    if (kanteZug.bewegt) { kanteSenden(kanteZug, true); }
+    kanteZug = null;
+    el.classList.remove('zieht');
+    $('kantenWert').classList.remove('an');
+  };
+  el.addEventListener('pointerup', ende);
+  el.addEventListener('pointercancel', ende);
+}
+
 // ── Kneifen zum Vergroessern (2026-10-01) ───────────────────────────────────
 //
 // Betreiber: "vergrössern kann ich leider nicht". Es gab schlicht keinen Weg.
