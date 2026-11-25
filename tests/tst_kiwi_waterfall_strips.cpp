@@ -3,10 +3,12 @@
 // Die Kiwi-Wasserfaelle oben (2026-11-25): wachsen mit dem Fenster, zeigen die
 // Frequenz, lassen sich schliessen und im Pegelbereich einstellen.
 #include <QtTest>
+#include <QSignalSpy>
 #include <QToolButton>
 #include <QLabel>
 
 #include "core/AppSettings.h"
+#include "core/KiwiSdrClient.h"
 #include "gui/KiwiWaterfallPanel.h"
 #include "gui/KiwiWaterfallStripWidget.h"
 #include "models/RadioModel.h"
@@ -142,6 +144,35 @@ private slots:
         panel.stripForTest(QStringLiteral("a"))->closeButtonForTest()->click();
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.at(0).at(0).toString(), QStringLiteral("a"));
+    }
+
+    // Betreiber 2026-11-25: oe3akb zeigte Bildzeilen und darueber "kein
+    // Wasserfall-Kanal -- nur Ton" (Platz 4, wf_chans=3). Was ankommt, zaehlt.
+    void bildzeilenWiderlegenKeinKanal()
+    {
+        KiwiSdrClient client;
+        QSignalSpy spy(&client, &KiwiSdrClient::waterfallAvailabilityChanged);
+        client.feedWaterfallTextForTest(QStringLiteral("MSG rx_chan=3"));
+        client.feedWaterfallTextForTest(QStringLiteral("MSG wf_chans=3"));
+        QVERIFY(!client.waterfallAvailable());
+        QCOMPARE(spy.count(), 1);
+
+        // Ein W/F-Rahmen mit erweitertem Kopf (Start 0, Zoom 8), 1024 Werte.
+        QByteArray frame("W/F\0", 4);
+        frame.append(QByteArray(4, '\0'));
+        frame.append('\x08');
+        frame.append(QByteArray(7, '\0'));
+        frame.append(QByteArray(1024, '\x80'));
+        client.feedWaterfallFrameForTest(frame);
+        client.feedWaterfallFrameForTest(frame);
+        QVERIFY2(!client.waterfallAvailable(), "zwei Zeilen reichen noch nicht");
+        client.feedWaterfallFrameForTest(frame);
+        QVERIFY(client.waterfallAvailable());
+        QVERIFY(client.waterfallAvailabilityDetail().isEmpty());
+        QCOMPARE(spy.count(), 2);
+        // Eine spaetere Meldung des Servers dreht es nicht zurueck.
+        client.feedWaterfallTextForTest(QStringLiteral("MSG wf_chans=3"));
+        QVERIFY(client.waterfallAvailable());
     }
 
     void pegelbereichLaesstSichEinstellen()

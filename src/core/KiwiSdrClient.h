@@ -103,6 +103,15 @@ public:
     KiwiSdrReceiverControls receiverControls() const { return m_receiverControls; }
     KiwiSdrReceiverTelemetry telemetry() const { return m_telemetry; }
     bool waterfallAvailable() const { return m_waterfallAvailable; }
+    // Pruefstand: eine Textmeldung bzw. ein Bild-Rahmen des W/F-Stroms.
+    void feedWaterfallTextForTest(const QString& text)
+    {
+        handleTextMessage(StreamKind::Waterfall, text);
+    }
+    void feedWaterfallFrameForTest(const QByteArray& frame)
+    {
+        handleWaterfallFrame(frame);
+    }
     QString waterfallAvailabilityDetail() const
     {
         return m_waterfallAvailabilityDetail;
@@ -393,6 +402,10 @@ private:
     int m_waterfallRateOverride{0};
     int m_displayWaterfallRate{100};
     bool m_waterfallAvailable{true};
+    // Longpath 2026-11-25: so viele Bildzeilen seit dem Verbinden (gezaehlt
+    // bis kRowsProveWaterfall).
+    static constexpr int kRowsProveWaterfall = 3;
+    int m_waterfallRows{0};
     QString m_waterfallAvailabilityDetail;
     int m_waterfallRxChannel{-1};
     int m_waterfallChannelCount{-1};
