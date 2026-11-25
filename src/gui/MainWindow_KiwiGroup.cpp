@@ -375,6 +375,19 @@ void MainWindow::setKiwiSound(const QString& profileId, bool on)
     if (on) { zeigeKiwiFenster(profileId); }
     const int assigned = m_kiwiSdrManager->assignedSliceForProfile(profileId);
 
+    // "Ton an" an einem getrennten Kiwi heisst: wieder verbinden (Betreiber
+    // 2026-11-25: "haengt schon wieder" -- der Knopf stand an, nichts geschah).
+    // Ein Klick, ein Versuch; von selbst wird nicht neu gewaehlt.
+    if (on && assigned >= 0) {
+        const KiwiSdrClient::State st = m_kiwiSdrManager->state(profileId);
+        if (st == KiwiSdrClient::State::Disconnected
+            || st == KiwiSdrClient::State::Busy
+            || st == KiwiSdrClient::State::Error
+            || st == KiwiSdrClient::State::CampDisconnected) {
+            m_kiwiSdrManager->connectProfile(profileId);
+        }
+    }
+
     // Der Kiwi von "Mein Signal" behaelt seine Scheibe; sein Ton wird nur stumm/
     // laut geschaltet (Betreiber 2026-11-25: "das Ein- und Ausschalten geht nicht").
     if (profileId == m_kiwiOwnProfileId && assigned >= 0) {

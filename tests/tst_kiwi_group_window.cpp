@@ -12,6 +12,7 @@
 // des Managers eingespeist.
 //
 // Longpath-eigener Pruefstand, kein Port.
+#include <QSignalSpy>
 #include <QAbstractButton>
 #include <QLabel>
 #include <QtTest>
@@ -475,6 +476,25 @@ private slots:
         emit mgr->profileStateChanged(id, KiwiSdrClient::State::Connected, QString());
         emit mgr->profileStateChanged(id, KiwiSdrClient::State::Busy, QStringLiteral("x"));
         QTRY_VERIFY_WITH_TIMEOUT(warnings() >= 1, 3000);
+    }
+
+    void tonAnVerbindetEinenGetrenntenKiwiNeu()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        mw->radioModelForTest()->addSlice();
+        clearProfiles(mgr);
+        const QString id = profile(mgr, "Neu", 91);
+        mw->setKiwiSoundForTest(id, true);
+        mgr->disconnectProfile(id);                 // wie nach einem Rauswurf
+        QTRY_COMPARE_WITH_TIMEOUT(mgr->state(id),
+                                  KiwiSdrClient::State::Disconnected, 3000);
+        QSignalSpy spy(mgr, &KiwiSdrManager::profileStateChanged);
+        mw->setKiwiSoundForTest(id, true);
+        QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 3000);   // neuer Versuch
     }
 };
 
