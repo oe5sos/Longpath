@@ -1,3 +1,4 @@
+// no-port-check: Longpath-original wrapper around vendored WDSP; calls its create/execute functions (values as in RXA.c, attributed below and in WDSP-PROVENANCE.md) -- not a Thetis C# port.
 // =============================================================================
 // longpath_extnr.c  (Longpath-original)
 // =============================================================================
@@ -10,6 +11,8 @@
 // Ein Aufruf = ein Block zu `bsize` Mono-Proben (float, 48 kHz).
 //
 // Copyright (C) 2026 Martin Fischer (OE5SOS)
+// Argument values of the create calls as in RXA.c,
+// Copyright (C) 2013, 2014, 2015, 2016, 2023, 2025 Warren Pratt, NR0V
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the Free
