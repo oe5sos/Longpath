@@ -437,7 +437,10 @@ void MainWindow::addKiwiToGroupFromPicker()
         if (id.isEmpty()) { return; }
         double lat = 0.0, lon = 0.0;
         const bool has = guard->selectedLatLon(lat, lon);
-        addKiwiListener(id, guard->selectedKm(), has, lat, lon);
+        if (addKiwiListener(id, guard->selectedKm(), has, lat, lon)) {
+            // Auch im Fenster KIWI WASSERFAELLE zeigen.
+            m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
+        }
     });
     picker->show();
     picker->raise();

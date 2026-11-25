@@ -282,6 +282,8 @@ public:
     void kiwiGroupTxEdgeForTest(bool on) { kiwiGroupTxEdge(on); }
     void openKiwiHearingDialogForTest() { openKiwiHearingDialog(); }
     void setKiwiSoloForTest(bool on) { setKiwiSolo(on); }
+    void adoptPickedKiwiForTest(const QString& endpoint, const QString& name)
+    { adoptPickedKiwi(endpoint, name, 10.0, false, 0.0, 0.0); }
     void setRadioMutedForTest(bool on) { setRadioMuted(on); }
     bool radioMutedForTest() const { return m_radioMuted; }
     void setKiwiSoundForTest(const QString& id, bool on) { setKiwiSound(id, on); }
@@ -1691,6 +1693,8 @@ private:
     void setKiwiOwnSignal(bool on);
     void setKiwiOwnSignalProfile(const QString& profileId, double km);
     void chooseOtherKiwi();
+    void adoptPickedKiwi(const QString& endpoint, const QString& name, double km,
+                         bool hasPos, double lat, double lon);
     void syncKiwiOwnSignal();
     bool sendKiwiOwnSignalTracking();
     void kiwiOwnSignalTxEdge(bool sending);

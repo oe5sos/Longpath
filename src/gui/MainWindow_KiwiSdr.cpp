@@ -539,6 +539,9 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
 
     SliceModel* slice = assignKiwiProfileToSlice(id);
 
+    // Jeder gewaehlte Kiwi erscheint im Fenster KIWI WASSERFAELLE
+    // (Betreiber 2026-11-25).
+    m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
     m_kiwiSdrManager->connectProfile(id);
     refreshKiwiSdrAppletReceivers();
 

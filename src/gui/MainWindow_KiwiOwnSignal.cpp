@@ -243,20 +243,10 @@ void MainWindow::chooseOtherKiwi()
     const QPointer<KiwiPublicReceiverPicker> guard(picker);
     connect(picker, &QDialog::accepted, this, [this, guard]() {
         if (!guard || !m_kiwiSdrManager) { return; }
-        const QString endpoint = guard->selectedEndpoint();
-        QString name = guard->selectedName();
-        if (name.trimmed().isEmpty()) { name = endpoint; }
-        QString id = m_kiwiSdrManager->profileIdForEndpoint(endpoint);
-        if (id.isEmpty()) { id = m_kiwiSdrManager->addProfile(name, endpoint); }
-        if (id.isEmpty()) { return; }
         double lat = 0.0, lon = 0.0;
-        if (guard->selectedLatLon(lat, lon)) {
-            m_kiwiPositions.insert(id, QPointF(lat, lon));
-            AppSettings::instance().setValue("KiwiOwnSignal/Lat", QString::number(lat, 'f', 4));
-            AppSettings::instance().setValue("KiwiOwnSignal/Lon", QString::number(lon, 'f', 4));
-        }
-        setKiwiOwnSignalProfile(id, guard->selectedKm());
-        setKiwiOwnSignal(true);
+        const bool has = guard->selectedLatLon(lat, lon);
+        adoptPickedKiwi(guard->selectedEndpoint(), guard->selectedName(),
+                        guard->selectedKm(), has, lat, lon);
     });
     picker->show();
     picker->raise();
@@ -264,6 +254,29 @@ void MainWindow::chooseOtherKiwi()
     qCInfo(lcKiwiSdr) << "Anderer Kiwi: Auswahl sichtbar" << picker->isVisible()
                       << "Rahmen" << picker->frameGeometry()
                       << "Fenster" << (picker->windowHandle() != nullptr);
+}
+
+// Der aus dem Verzeichnis gewaehlte Kiwi wird zum Kiwi von "Mein Signal" -- und
+// erscheint ausserdem im Fenster KIWI WASSERFAELLE (Betreiber 2026-11-25: "wenn
+// ich bei anderen Kiwi doppelklick ... erscheint der nicht im eigenen Kiwi-
+// Fenster"): dieses Fenster zeigt nur Kiwis mit eingeschaltetem WF.
+void MainWindow::adoptPickedKiwi(const QString& endpoint, const QString& nameIn,
+                                 double km, bool hasPos, double lat, double lon)
+{
+    if (!m_kiwiSdrManager) { return; }
+    QString name = nameIn;
+    if (name.trimmed().isEmpty()) { name = endpoint; }
+    QString id = m_kiwiSdrManager->profileIdForEndpoint(endpoint);
+    if (id.isEmpty()) { id = m_kiwiSdrManager->addProfile(name, endpoint); }
+    if (id.isEmpty()) { return; }
+    if (hasPos) {
+        m_kiwiPositions.insert(id, QPointF(lat, lon));
+        AppSettings::instance().setValue("KiwiOwnSignal/Lat", QString::number(lat, 'f', 4));
+        AppSettings::instance().setValue("KiwiOwnSignal/Lon", QString::number(lon, 'f', 4));
+    }
+    m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
+    setKiwiOwnSignalProfile(id, km);
+    setKiwiOwnSignal(true);
 }
 
 void MainWindow::setKiwiOwnSignal(bool on)

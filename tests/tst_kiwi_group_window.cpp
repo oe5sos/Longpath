@@ -15,6 +15,10 @@
 #include <QtTest>
 #include <QListWidget>
 #include <QPushButton>
+#include <QToolButton>
+#include <QTcpServer>
+#include <memory>
+#include <vector>
 #include <QScopeGuard>
 
 #include "core/AudioEngine.h"
@@ -292,9 +296,16 @@ private slots:
         const int radioSlice = model->addSlice();
         QVERIFY(radioSlice >= 0);
 
+        // Stumme Gegenstellen: sie nehmen die Verbindung an und antworten nie,
+        // sodass jeder Kiwi im Zustand "Verbindet" bleibt (ein geschlossener
+        // Port wuerde sofort auf Fehler laufen, und der Test hinge am Takt).
+        std::vector<std::unique_ptr<QTcpServer>> stumm;
         QStringList ids;
         for (int i = 0; i < 7; ++i) {
-            ids << profile(mgr, qPrintable(QStringLiteral("Z%1").arg(i)), 90 + i);
+            stumm.push_back(std::make_unique<QTcpServer>());
+            QVERIFY(stumm.back()->listen(QHostAddress::LocalHost, 0));
+            ids << profile(mgr, qPrintable(QStringLiteral("Z%1").arg(i)),
+                           stumm.back()->serverPort());
             mgr->setWaterfallPreviewEnabled(ids.last(), true);
         }
         KiwiWaterfallPanel* panel = mw->kiwiWaterfallPanelForTest();
@@ -313,12 +324,22 @@ private slots:
 
         // Alle Ton: nur verbundene (hier "Verbindet"), hoechstens fuenf, je eigene Scheibe.
         const int slicesBefore = model->slices().size();
+        // Wie viele laufen gerade? (Gegenstellen auf 127.0.0.1 antworten mit
+        // "abgelehnt", der Zustand ist vom Takt abhaengig -- der Test prueft
+        // deshalb die Regel, nicht eine feste Zahl.)
+        int laufend = 0;
+        for (const QString& id : ids) {
+            const KiwiSdrClient::State st = mgr->state(id);
+            if (st != KiwiSdrClient::State::Disconnected && st != KiwiSdrClient::State::Error) {
+                ++laufend;
+            }
+        }
         QTest::mouseClick(panel->allSoundOnForTest(), Qt::LeftButton);
         int hoerbar = 0;
         for (const QString& id : ids) {
             if (mgr->assignedSliceForProfile(id) >= 0) { ++hoerbar; }
         }
-        QVERIFY2(hoerbar >= 1 && hoerbar <= 5, qPrintable(QString::number(hoerbar)));
+        QVERIFY2(hoerbar == qMin(laufend, 5), qPrintable(QString::number(hoerbar)));
         QCOMPARE(model->slices().size(), slicesBefore + hoerbar);
         QVERIFY(model->sliceById(radioSlice) != nullptr);
 
@@ -361,6 +382,28 @@ private slots:
         mw->setKiwiSoundForTest(id, false);
         QVERIFY(!mw->radioMutedForTest());
         QVERIFY(!audio->muteNonKiwi());
+    }
+
+    // Aus dem Verzeichnis gewaehlter Kiwi: ist "Mein Signal"-Kiwi UND steht im
+    // Fenster KIWI WASSERFAELLE.
+    void gewaehlterKiwiErscheintImWasserfallFenster()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        clearProfiles(mgr);
+        mw->adoptPickedKiwiForTest(QStringLiteral("127.0.0.1:130"), QStringLiteral("Gewaehlt"));
+        const QString id = mgr->profileIdForEndpoint(QStringLiteral("127.0.0.1:130"));
+        QVERIFY(!id.isEmpty());
+        QVERIFY(mw->kiwiOwnSignalOnForTest());
+        QVERIFY2(mw->kiwiWaterfallPanelForTest()->stripForTest(id) != nullptr,
+                 "der gewaehlte Kiwi muss im Wasserfall-Fenster stehen");
+        QVERIFY(mgr->waterfallPreviewEnabled(id));
+        // Zweimal gewaehlt: weiter genau ein Profil.
+        mw->adoptPickedKiwiForTest(QStringLiteral("127.0.0.1:130"), QStringLiteral("Nochmal"));
+        QCOMPARE(mgr->profiles().size(), 1);
     }
 
     void zeilenKommenAnUndDasFensterOeffnetSich()
