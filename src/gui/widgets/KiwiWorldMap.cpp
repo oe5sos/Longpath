@@ -41,7 +41,7 @@ QColor pointColor(const KiwiMapPoint& p, bool heardMode)
     }
     switch (p.state) {
     case KiwiMapPoint::State::Free:    return col(Style::kGreenText);
-    case KiwiMapPoint::State::Partial: return col(Style::kTextPrimary);
+    case KiwiMapPoint::State::Partial: return col(Style::kGreenText);   // freier Kanal da, nur nicht alle
     case KiwiMapPoint::State::Full:    return col(Style::kAmberWarn);
     case KiwiMapPoint::State::Offline: return col(Style::kTextGroupHead);
     }
@@ -320,6 +320,40 @@ void KiwiWorldMap::paintEvent(QPaintEvent*)
         if ((m_heardMode || m_autoFit) && !pt.name.isEmpty()) {
             p.setPen(col(Style::kTextSecondary));
             p.drawText(c + QPointF(r + 5, -4), pt.name);
+        }
+    }
+
+    // Legende unten links (nur im Zustandsmodus; im Gehoert-Modus sprechen
+    // die Beschriftungen selbst).
+    if (!m_heardMode && height() >= 150) {
+        const QString texts[4] = {tr("free"), tr("partly busy"), tr("full"), tr("not reachable")};
+        const KiwiMapPoint::State states[4] = {
+            KiwiMapPoint::State::Free, KiwiMapPoint::State::Partial,
+            KiwiMapPoint::State::Full, KiwiMapPoint::State::Offline};
+        double x = 8.0;
+        const double y = height() - 10.0;
+        QFont lf = font();
+        lf.setPointSizeF(std::max(7.5, lf.pointSizeF() - 1.0));
+        p.setFont(lf);
+        for (int i = 0; i < 4; ++i) {
+            KiwiMapPoint legendPoint;
+            legendPoint.state = states[i];
+            const QColor c = pointColor(legendPoint, false);
+            p.setPen(QPen(c, 1.2));
+            p.setBrush(states[i] == KiwiMapPoint::State::Offline ? Qt::NoBrush : QBrush(c));
+            p.drawEllipse(QPointF(x + 4, y), 3.4, 3.4);
+            if (states[i] == KiwiMapPoint::State::Partial) {
+                QPainterPath half;
+                half.moveTo(x + 4, y - 3.4);
+                half.arcTo(QRectF(x + 0.6, y - 3.4, 6.8, 6.8), 90, 180);
+                half.closeSubpath();
+                p.setPen(Qt::NoPen);
+                p.setBrush(col(Style::kInsetBg));
+                p.drawPath(half);
+            }
+            p.setPen(col(Style::kTextSecondary));
+            p.drawText(QPointF(x + 12, y + 4), texts[i]);
+            x += 12 + p.fontMetrics().horizontalAdvance(texts[i]) + 16;
         }
     }
 
