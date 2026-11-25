@@ -2337,6 +2337,11 @@ private:
     QPointer<KiwiHearingDialog> m_kiwiHearingDialog;
     QTimer* m_kiwiGroupTimer{nullptr};
     QSet<QString> m_kiwiUserMuted;   // Kiwis, deren Ton der Betreiber ausgeschaltet hat
+    // Letzter Zustand je Kiwi: "Belegt" direkt nach "Verbunden" ist ein
+    // Rauswurf durch den Server (Programm-Limit).
+    QHash<QString, int> m_kiwiPrevState;
+    bool kiwiEvictsPrograms(const QString& profileId) const;
+    void setKiwiEvictsPrograms(const QString& profileId, bool evicts);
     bool m_kiwiAppletRefreshBlocked{false};
     bool m_kiwiAppletRefreshDirty{false};
     QHash<QString, double> m_kiwiViewSpanHz;   // Bereich je Kiwi-Streifen (Hz)

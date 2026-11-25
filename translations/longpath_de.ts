@@ -3553,6 +3553,10 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 <context>
     <name>Longpath::MainWindow</name>
     <message>
+        <source>Disconnects programs after 10 s when its program slots are full.</source>
+        <translation>Trennt Programme nach 10 s, wenn seine Programm-Plätze voll sind.</translation>
+    </message>
+    <message>
         <source>This Kiwi has no free waterfall channel — sound only.</source>
         <translation>Dieser Kiwi hat keinen freien Wasserfall-Kanal — nur Ton.</translation>
     </message>

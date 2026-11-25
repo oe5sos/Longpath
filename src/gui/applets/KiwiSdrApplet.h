@@ -54,6 +54,9 @@ struct KiwiSdrReceiverStatus {
     QString detail;
     QString metadataSummary;
     QString protocolSummary;
+    // Dauerhafter Hinweis zu diesem Empfaenger (z. B. trennt Programme nach
+    // 10 s), unabhaengig vom augenblicklichen Zustand.
+    QString warning;
     QPointer<SliceModel> assignedSlice;
 };
 

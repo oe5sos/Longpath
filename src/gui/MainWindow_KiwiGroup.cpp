@@ -171,6 +171,20 @@ void MainWindow::wireKiwiGroup()
         connect(m_kiwiSdrManager, &KiwiSdrManager::profileStateChanged, this,
                 [this](const QString& id, KiwiSdrClient::State st, const QString& detail) {
             refreshKiwiSoundButtons();
+            const int before = m_kiwiPrevState.value(id, -1);
+            m_kiwiPrevState.insert(id, int(st));
+            if (st == KiwiSdrClient::State::Busy
+                && before == int(KiwiSdrClient::State::Connected)) {
+                setKiwiEvictsPrograms(id, true);
+            } else if (st == KiwiSdrClient::State::Connected) {
+                // Haelt er deutlich laenger als die 10 s, ist der Hinweis alt.
+                QTimer::singleShot(20000, this, [this, id]() {
+                    if (m_kiwiPrevState.value(id, -1)
+                        == int(KiwiSdrClient::State::Connected)) {
+                        setKiwiEvictsPrograms(id, false);
+                    }
+                });
+            }
             // Warum ein Kiwi wegbleibt, soll sichtbar sein und nicht nur im Log.
             if (st == KiwiSdrClient::State::Busy && !detail.isEmpty()) {
                 showToast(m_kiwiSdrManager->displayName(id) + QStringLiteral(": ") + detail,
@@ -290,6 +304,26 @@ void MainWindow::setKiwiSolo(bool on)
 // FAELLEN legen wir dafuer EINE EIGENE Scheibe an -- ungebunden, ohne Funkgeraet
 // (suppressAutoStreamBinding), also hinter der Sicherheitsschranke
 // kiwiControllableSlice. Die Flex-Scheibe wird nie benutzt oder veraendert.
+namespace {
+const QString kKiwiEvictingKey = QStringLiteral("KiwiEvictingReceivers");
+}
+
+bool MainWindow::kiwiEvictsPrograms(const QString& profileId) const
+{
+    return AppSettings::instance().value(kKiwiEvictingKey).toString()
+        .split(QLatin1Char(';'), Qt::SkipEmptyParts).contains(profileId);
+}
+
+void MainWindow::setKiwiEvictsPrograms(const QString& profileId, bool evicts)
+{
+    QStringList ids = AppSettings::instance().value(kKiwiEvictingKey).toString()
+        .split(QLatin1Char(';'), Qt::SkipEmptyParts);
+    if (ids.contains(profileId) == evicts) { return; }
+    if (evicts) { ids.append(profileId); } else { ids.removeAll(profileId); }
+    AppSettings::instance().setValue(kKiwiEvictingKey, ids.join(QLatin1Char(';')));
+    refreshKiwiSdrAppletReceivers();
+}
+
 void MainWindow::zeigeKiwiFenster(const QString& profileId)
 {
     // Der Streifen muss da sein, auch wenn die Vorschau schon vorher an war

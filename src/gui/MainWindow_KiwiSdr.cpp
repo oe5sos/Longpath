@@ -311,6 +311,10 @@ void MainWindow::refreshKiwiSdrAppletReceivers()
             const int sliceId = m_kiwiSdrManager->assignedSliceForProfile(profile.id);
             receiver.assignedSlice = m_radioModel ? m_radioModel->sliceById(sliceId)
                                                   : nullptr;
+            if (kiwiEvictsPrograms(profile.id)) {
+                receiver.warning = tr("Disconnects programs after 10 s when its "
+                                      "program slots are full.");
+            }
             receivers.append(receiver);
         }
     }

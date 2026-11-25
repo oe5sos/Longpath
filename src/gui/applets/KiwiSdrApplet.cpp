@@ -565,6 +565,15 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
 
     layout->addLayout(topRow);
 
+    if (!receiver.warning.isEmpty()) {
+        auto* warningLabel = new QLabel(receiver.warning, row);
+        warningLabel->setObjectName(QStringLiteral("kiwiRowWarning"));
+        warningLabel->setTextFormat(Qt::PlainText);
+        warningLabel->setWordWrap(true);
+        warningLabel->setStyleSheet(statusStyle(KiwiSdrClient::State::Busy));
+        layout->addWidget(warningLabel);
+    }
+
     QStringList detailLines;
     if (!receiver.detail.trimmed().isEmpty()) {
         detailLines << receiver.detail.trimmed();

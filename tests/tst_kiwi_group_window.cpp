@@ -12,6 +12,7 @@
 // des Managers eingespeist.
 //
 // Longpath-eigener Pruefstand, kein Port.
+#include <QLabel>
 #include <QtTest>
 #include <QListWidget>
 #include <QPushButton>
@@ -436,6 +437,33 @@ private slots:
         dlg->removeButtonForTest(a)->click();
         QCOMPARE(mw->kiwiGroupForTest().size(), 0);
         QVERIFY(!mgr->isProfileListener(a));
+    }
+
+    // Betreiber 2026-11-25: der Kiwi `93` trennt nach 10 s (Programm-Limit).
+    // Das soll an seiner Zeile stehen, auch nach dem naechsten Versuch.
+    void rauswurfStehtAnDerZeile()
+    {
+        auto* mw = new MainWindow();
+        mw->resize(1400, 900);
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        clearProfiles(mgr);
+        profile(mgr, "Voll", 77);
+        const QString id = mgr->profiles().constFirst().id;
+        const auto warnings = [&]() {
+            return mw->kiwiSdrAppletForTest()
+                ->findChildren<QLabel*>(QStringLiteral("kiwiRowWarning")).size();
+        };
+        emit mgr->profileStateChanged(id, KiwiSdrClient::State::Connecting, QString());
+        // Belegt schon beim Verbinden ist kein Rauswurf.
+        emit mgr->profileStateChanged(id, KiwiSdrClient::State::Busy, QStringLiteral("x"));
+        QTest::qWait(500);
+        QCOMPARE(warnings(), 0);
+        emit mgr->profileStateChanged(id, KiwiSdrClient::State::Connected, QString());
+        emit mgr->profileStateChanged(id, KiwiSdrClient::State::Busy, QStringLiteral("x"));
+        QTRY_VERIFY_WITH_TIMEOUT(warnings() >= 1, 3000);
     }
 };
 
