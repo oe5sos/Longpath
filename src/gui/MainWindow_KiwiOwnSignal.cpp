@@ -415,8 +415,19 @@ void MainWindow::syncKiwiOwnSignal()
         }
     }
     if (sw) {
-        const double bw = std::clamp(sw->bandwidth(), kMinViewHz, kMaxViewHz);
-        m_kiwiStrip->setView(sw->centerFrequency(), bw);
+        // Ohne eigene Wahl: dieselbe Achse wie der Panadapter. Nach +/- am
+        // Streifen: der gewaehlte Bereich, die Sendefrequenz in der Mitte.
+        double center = sw->centerFrequency();
+        double width = std::clamp(sw->bandwidth(), kMinViewHz, kMaxViewHz);
+        const double chosen = m_kiwiViewSpanHz.value(m_kiwiOwnProfileId, 0.0);
+        SliceModel* src = tx ? tx : kiwiControllableSlice(
+            m_kiwiSdrManager->assignedSliceForProfile(m_kiwiOwnProfileId));
+        if (chosen > 0.0 && src) {
+            quint64 hz = m_radioModel->transmitFrequencyHz(src);
+            if (hz == 0) { hz = quint64(src->frequency()); }
+            if (hz > 0) { center = double(hz); width = chosen; }
+        }
+        m_kiwiStrip->setView(center, width);
         // Die Achse fluchtet mit der Flaeche des Panadapters (ohne dessen
         // dBm-Leiste rechts), nicht mit dem ganzen Fenster.
         if (QWidget* pane = m_kiwiStrip->parentWidget()) {
@@ -462,10 +473,13 @@ bool MainWindow::sendKiwiOwnSignalTracking()
         src->filterLow(), src->filterHigh(), panId,
         QString(), SliceModel::cwPitchHz());
     // Die Ansicht des Kiwi-Wasserfalls: die Breite des Panadapters (der
-    // Kiwi rundet auf seine Zoomstufen), um die Sendefrequenz.
-    const double bw = sw ? std::clamp(sw->bandwidth(), kMinViewHz, kMaxViewHz)
-                         : 40000.0;
-    const double centerHz = sw ? sw->centerFrequency() : double(txHz);
+    // Kiwi rundet auf seine Zoomstufen) -- oder, nach +/- am Streifen, der
+    // gewaehlte Bereich um die Sendefrequenz.
+    const double chosen = m_kiwiViewSpanHz.value(m_kiwiOwnProfileId, 0.0);
+    const double bw = chosen > 0.0 ? chosen
+        : sw ? std::clamp(sw->bandwidth(), kMinViewHz, kMaxViewHz) : 40000.0;
+    const double centerHz = (chosen > 0.0 || !sw) ? double(txHz)
+                                                  : sw->centerFrequency();
     m_kiwiSdrManager->updateWaterfallView(
         kiwiSlice, panId, centerHz / 1.0e6, bw / 1.0e6,
         m_kiwiSdrManager->profile(m_kiwiOwnProfileId).waterfallRate);

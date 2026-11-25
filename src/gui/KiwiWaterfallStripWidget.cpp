@@ -24,6 +24,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 namespace Longpath {
@@ -219,6 +220,12 @@ void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm,
         return;
     }
     if (highHz > lowHz) {
+        // Anderer Bereich (+/-): der alte Verlauf passt nicht mehr zur Achse.
+        const double old = m_highHz - m_lowHz;
+        if (old > 0.0 && std::abs((highHz - lowHz) - old) > old * 0.01) {
+            m_history.fill(QColor(Style::hexRole(Style::kAppBg)));
+            m_lastRowMs = -1000000;
+        }
         m_lowHz = lowHz;
         m_highHz = highHz;
         m_freqLabel->setText(frequencyText());

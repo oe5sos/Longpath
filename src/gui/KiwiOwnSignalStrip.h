@@ -72,6 +72,8 @@ public:
     // Ton ein/aus und Zoom +/- fuer den Kiwi von "Mein Signal".
     void setSoundActive(bool on);
     bool soundActiveForTest() const;
+    double viewWidthHzForTest() const { return m_bandwidthHz; }
+    double viewCenterHzForTest() const { return m_centerHz; }
     QToolButton* soundButtonForTest() const { return m_soundButton; }
 
     // Kiwi weg: Bild abgedunkelt, Grund und Knopf darueber; title leer = weg.

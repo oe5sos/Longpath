@@ -583,6 +583,40 @@ private slots:
         QVERIFY(mgr->hasProfile(id));   // der Eintrag in der Liste bleibt
     }
 
+    // Betreiber 2026-11-25: "durch Plus und Minus aendert sich aber nichts" --
+    // am Kiwi von "Mein Signal" galt weiter die Achse des Panadapters.
+    void plusMinusAendertDenStreifenUnten()
+    {
+        auto* mw = new MainWindow();
+        mw->resize(1400, 900);
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        const int sid = mw->radioModelForTest()->addSlice();
+        clearProfiles(mgr);
+        mw->radioModelForTest()->sliceById(sid)->setFrequency(7.1e6);
+        mw->adoptPickedKiwiForTest(QStringLiteral("127.0.0.1:135"), QStringLiteral("Zoom"));
+        const QString id = mgr->profileIdForEndpoint(QStringLiteral("127.0.0.1:135"));
+        QVERIFY(mw->kiwiOwnSignalOnForTest());
+        KiwiOwnSignalStrip* strip = mw->kiwiOwnStripForTest();
+        const double wide = strip->viewWidthHzForTest();
+        QVERIFY(wide > 0.0);
+
+        mw->zoomKiwiStripForTest(id, +1);
+        QCOMPARE(strip->viewWidthHzForTest(), wide / 2.0);
+        // Die Sendefrequenz steht in der Mitte (die Marke bleibt sichtbar).
+        QVERIFY(strip->markX() >= 0);
+        // Ein spaeterer Abgleich (Frequenzwechsel) setzt den Zoom nicht zurueck.
+        mw->radioModelForTest()->sliceById(sid)->setFrequency(7.15e6);
+        QTRY_COMPARE_WITH_TIMEOUT(strip->viewCenterHzForTest(), 7.15e6, 3000);
+        QCOMPARE(strip->viewWidthHzForTest(), wide / 2.0);
+
+        mw->zoomKiwiStripForTest(id, -1);
+        QCOMPARE(strip->viewWidthHzForTest(), wide);
+        QCOMPARE(mw->kiwiViewSpanForTest(id), 0.0);   // wieder der Panadapter
+    }
+
     void lautstaerkeJeKiwiBleibtGemerkt()
     {
         auto* mw = new MainWindow();

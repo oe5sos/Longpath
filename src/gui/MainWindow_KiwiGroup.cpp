@@ -492,7 +492,13 @@ void MainWindow::zoomKiwiStrip(const QString& profileId, int direction)
     if (!m_kiwiSdrManager || !m_kiwiSdrManager->hasProfile(profileId)) { return; }
     constexpr double kMin = 5000.0;
     constexpr double kMax = 200000.0;
+    // Der Kiwi von "Mein Signal" geht von der Achse des Panadapters aus.
+    const bool own = m_kiwiOwnSignalOn && profileId == m_kiwiOwnProfileId;
+    SpectrumWidget* pane = m_kiwiOwnPan.data();
+    const double paneSpan = pane
+        ? std::clamp(pane->bandwidth(), kMinViewHz, kMaxViewHz) : 40000.0;
     double span = m_kiwiViewSpanHz.value(profileId, 0.0);
+    if (span <= 0.0 && own) { span = paneSpan; }
     if (span <= 0.0) {
         // Ausgangswert: was der Streifen gerade zeigt, sonst 40 kHz.
         auto* strip = m_kiwiWaterfallPanel ? m_kiwiWaterfallPanel->stripForTest(profileId) : nullptr;
@@ -500,12 +506,20 @@ void MainWindow::zoomKiwiStrip(const QString& profileId, int direction)
     }
     span = std::clamp(direction > 0 ? span * 0.5 : span * 2.0, kMin, kMax);
     m_kiwiViewSpanHz.insert(profileId, span);
+    if (own) {
+        // Wieder so breit wie der Panadapter: dessen Achse gilt wieder.
+        if (std::abs(span - paneSpan) < paneSpan * 0.05) {
+            m_kiwiViewSpanHz.remove(profileId);
+        }
+        syncKiwiOwnSignal();
+        return;
+    }
     // Mit Scheibe (Ton an): die Ansicht gleich setzen; sonst nimmt sie der
     // naechste Takt von sendKiwiGroupTracking mit.
     const int sid = m_kiwiSdrManager->assignedSliceForProfile(profileId);
     if (SliceModel* slice = kiwiControllableSlice(sid)) {
         m_kiwiSdrManager->updateWaterfallView(
-            sid, slice->panKey().isEmpty() ? QStringLiteral("kiwi-zoom") : slice->panKey(),
+            sid, QStringLiteral("kiwi-group"),
             slice->frequency() / 1.0e6, span / 1.0e6,
             m_kiwiSdrManager->profile(profileId).waterfallRate);
     }
@@ -836,7 +850,10 @@ void MainWindow::sendKiwiGroupTracking()
         if (m_kiwiSdrManager->assignedSliceForProfile(gid) < 0) { ids << gid; }
     }
     for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
-        if (pr.id == m_kiwiOwnProfileId || ids.contains(pr.id)) { continue; }
+        if ((m_kiwiOwnSignalOn && pr.id == m_kiwiOwnProfileId)
+            || ids.contains(pr.id)) {
+            continue;
+        }
         if (!pr.waterfallPreviewEnabled) { continue; }
         if (m_kiwiSdrManager->assignedSliceForProfile(pr.id) >= 0) { continue; }
         const KiwiSdrClient::State st = m_kiwiSdrManager->state(pr.id);
@@ -868,6 +885,19 @@ void MainWindow::sendKiwiGroupTracking()
                     sliceId, double(hz) / 1.0e6, SliceModel::modeName(txs->dspMode()),
                     txs->filterLow(), txs->filterHigh(), ks->panKey(),
                     QString(), SliceModel::cwPitchHz());
+                // Auch das Bild zieht mit (Bandwechsel). Gleiches weist der
+                // Client selbst ab. "Mein Signal" regelt seine Ansicht selbst.
+                const QString pid =
+                    m_kiwiSdrManager->assignedProfileForSlice(sliceId);
+                if (m_kiwiOwnSignalOn && pid == m_kiwiOwnProfileId) { continue; }
+                SpectrumWidget* tsw = spectrumForSlice(txs);
+                const double view = m_kiwiViewSpanHz.value(
+                    pid, tsw ? std::clamp(tsw->bandwidth(), kMinViewHz, kMaxViewHz)
+                             : 40000.0);
+                m_kiwiSdrManager->updateWaterfallView(
+                    sliceId, QStringLiteral("kiwi-group"), double(hz) / 1.0e6,
+                    view / 1.0e6,
+                    m_kiwiSdrManager->profile(pid).waterfallRate);
             }
         }
     }
