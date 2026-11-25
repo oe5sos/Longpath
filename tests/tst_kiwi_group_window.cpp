@@ -12,6 +12,7 @@
 // des Managers eingespeist.
 //
 // Longpath-eigener Pruefstand, kein Port.
+#include <QAbstractButton>
 #include <QLabel>
 #include <QtTest>
 #include <QListWidget>
@@ -345,6 +346,16 @@ private slots:
         const int radioSlice = model->addSlice();
         SliceModel* radio = model->sliceById(radioSlice);
         QVERIFY(radio && !radio->muted());
+
+        // Der Ton-Schalter im Panadapter-Kopf schaltet ALLES stumm (Betreiber
+        // 2026-11-25: "ich wollte den Panadapter still schalten, vergebens").
+        auto* panSound = mw->findChild<QAbstractButton*>(
+            QStringLiteral("panHeaderSoundToggle"));
+        QVERIFY(panSound && panSound->isChecked());
+        panSound->click();
+        QVERIFY(audio->muteAllRx());
+        panSound->click();
+        QVERIFY(!audio->muteAllRx());
 
         // Radio stumm geht auch ohne Kiwi-Ton (Betreiber 2026-11-25).
         mw->setRadioMutedForTest(true);

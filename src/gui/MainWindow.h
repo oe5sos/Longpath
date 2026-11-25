@@ -2342,6 +2342,7 @@ private:
     QHash<QString, int> m_kiwiPrevState;
     bool kiwiEvictsPrograms(const QString& profileId) const;
     void setKiwiEvictsPrograms(const QString& profileId, bool evicts);
+    void setPanSoundMuted(bool muted);   // Ton-Schalter im Panadapter: alles
     bool m_kiwiAppletRefreshBlocked{false};
     bool m_kiwiAppletRefreshDirty{false};
     QHash<QString, double> m_kiwiViewSpanHz;   // Bereich je Kiwi-Streifen (Hz)

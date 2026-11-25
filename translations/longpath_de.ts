@@ -5493,8 +5493,8 @@ All custom band/pin mappings will be cleared.</source>
 <context>
     <name>Longpath::PanadapterApplet</name>
     <message>
-        <source>Radio sound on / off (playback only)</source>
-        <translation>Ton des Funkgeräts ein / aus (nur Wiedergabe)</translation>
+        <source>All sound on / off: radio and Kiwis (playback only)</source>
+        <translation>Ton ganz ein / aus: Funkgerät und Kiwis (nur Wiedergabe)</translation>
     </message>
     <message>
         <source>Sound</source>
