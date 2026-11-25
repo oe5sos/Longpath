@@ -107,7 +107,13 @@ export function desktopStarten({ link, $, schrittHz, logHolen }) {
   setInterval(() => {
     if (!gitter) { return; }
     const f = document.querySelector('#filters .chip.on');
-    if (fbText) { fbText.textContent = f ? f.textContent.trim() : '—'; }
+    // Nach dem Ziehen der Kanten passt meist keine Filterpille mehr; dann die
+    // gemeldete Breite selbst.
+    const fl = (link.st.filter && link.st.filter[0]) || [];
+    const breite = Math.abs((fl[1] || 0) - (fl[0] || 0));
+    const fbNeu = f ? f.textContent.trim()
+      : breite ? (breite >= 1000 ? (breite / 1000).toFixed(2).replace(/0$/, '') + 'k' : breite + ' Hz') : '—';
+    if (fbText && fbText.textContent !== fbNeu) { fbText.textContent = fbNeu; }
     const s = document.getElementById('dtSchr');
     if (s) { const hz = schrittHz(); s.textContent = hz === 1000 ? '1 kHz' : hz + ' Hz'; }
     // Log spiegeln: die Zeilen der Logliste, ohne eigene Abfrage-Logik.

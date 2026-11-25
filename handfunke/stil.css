@@ -796,3 +796,25 @@ footer #onAir.an{color:var(--tx-border)}
   #dtAgcW .chip{height:26px;padding:0 9px;font-size:12px;flex:none}
   #dtAgcW .capsWert{font-size:11px;white-space:nowrap;min-width:36px;text-align:right}
 }
+
+
+/* ═══ Filterkanten zum Ziehen (2026-11-25) ══════════════════════════════════
+   Ein Griff je Kante: schmaler orangefarbener Strich ueber die ganze Hoehe,
+   breite unsichtbare Trefferflaeche. Waehrend des Ziehens steht die Breite
+   als Schild oben am Griff. */
+.kante{position:absolute;top:0;bottom:0;width:24px;margin-left:-12px;z-index:2;
+  display:none;cursor:ew-resize;touch-action:none;-webkit-tap-highlight-color:transparent}
+.kante::before{content:"";position:absolute;left:11px;top:0;bottom:0;width:2px;
+  background:rgba(240,168,44,.55)}
+.kante::after{content:"";position:absolute;left:8px;top:52px;width:8px;height:22px;
+  border-radius:3px;background:#131316;border:1px solid rgba(240,168,44,.8)}
+.kante.zieht::before{background:var(--or)}
+.kante.zieht::after{background:var(--or)}
+.kantenWert{position:absolute;top:40px;transform:translateX(-50%);z-index:4;display:none;
+  padding:3px 7px;border-radius:7px;background:rgba(10,12,16,.82);border:1px solid #2c2c31;
+  font:600 11px/1 var(--mono);color:var(--orT);white-space:nowrap;pointer-events:none}
+.kantenWert.an{display:block}
+/* Knopf und Schild im Panadapter halten (der ist am Desktop 230 px hoch) */
+@media (min-width: 900px){
+  body.dt .kante::after{top:150px}
+}
