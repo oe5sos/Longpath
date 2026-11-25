@@ -934,12 +934,6 @@ void KiwiSdrClient::openWebSockets()
             << "reason=" << closeReason;
         traceClose(StreamKind::Waterfall, closeCode, closeReason);
         if (!m_userDisconnecting) {
-            // Ohne Wasserfall-Kanal beim Kiwi ist der Ton der ganze Zweck: der
-            // geschlossene W/F-Strom beendet ihn nicht.
-            if (!m_waterfallAvailable && m_soundSocketConnected
-                && (m_state == State::Connected || m_state == State::Connecting)) {
-                return;
-            }
             if (m_monitorMode
                 || m_state == State::Waiting
                 || m_state == State::Camping
@@ -2435,38 +2429,6 @@ void KiwiSdrClient::handleTextMessage(StreamKind stream, const QString& text)
             return;
         }
         if (key == QStringLiteral("too_busy")) {
-            // Ein Kiwi mit weniger Wasserfall- als Empfangskanaelen (wf_chans <
-            // rx_chan) lehnt den W/F-Strom ab und meldet too_busy -- das
-            // betrifft NUR den Wasserfall. Der Ton laeuft weiter und darf
-            // nicht mit abgeschaltet werden (Betreiber 2026-11-25: Kiwi `93`
-            // fiel jedes Mal nach ~11 s aus, mit Ton).
-            // Auch beim Verbinden (ein Kiwi mit nur EINEM API-Kanal lehnt den
-            // zweiten Strom schon dort ab): steht der Ton-Kanal, bleibt der Ton.
-            if (stream == StreamKind::Waterfall && m_soundSocketConnected
-                && (m_state == State::Connected || m_state == State::Connecting)) {
-                qCInfo(lcKiwiSdr).noquote()
-                    << "KiwiSDR Wasserfall abgelehnt (too_busy) -- Ton bleibt"
-                    << QStringLiteral("endpoint=%1").arg(logEndpoint());
-                if (m_waterfallAvailable) {
-                    m_waterfallAvailable = false;
-                    m_waterfallAvailabilityDetail = tr(
-                        "This KiwiSDR gave no waterfall channel. Audio only.");
-                    emit waterfallAvailabilityChanged(false, m_waterfallAvailabilityDetail);
-                }
-                return;
-            }
-            // too_busy ist eine Ablehnung VOR dem Ton. Laeuft der Ton schon
-            // (Frames sind angekommen), betrifft es einen zweiten Strom
-            // (Wasserfall, den der Server zu Ende schliesst) und darf den
-            // Ton nicht beenden. Wird der Ton wirklich getrennt, kommt das
-            // ueber das Schliessen des Ton-Stroms an.
-            if (m_state == State::Connected && m_soundFrameSeen) {
-                qCInfo(lcKiwiSdr).noquote()
-                    << "KiwiSDR too_busy bei laufendem Ton ignoriert"
-                    << QStringLiteral("endpoint=%1").arg(logEndpoint())
-                    << "stream=" << streamLabel(stream);
-                return;
-            }
             bool busyOk = false;
             const int busyValue = valueText.toInt(&busyOk);
             // KiwiSDR sends too_busy on denial paths, not as a negative
@@ -2476,6 +2438,16 @@ void KiwiSdrClient::handleTextMessage(StreamKind stream, const QString& text)
                 setState(State::Error,
                          tr("This KiwiSDR operator does not allow external API "
                             "clients such as Longpath."));
+            } else if (m_state == State::Connected && busyOk && busyValue > 0) {
+                // Der Server entscheidet nach 10 s, ob ein Client ein Browser
+                // ist, und wirft Fremdprogramme hinaus, wenn das Limit des
+                // Betreibers (ext_api) voll ist: KiwiSDR support/stats.cpp,
+                // EXT_API_DECISION_SECS. Nicht umgehen -- klar sagen, warum.
+                setState(State::Busy,
+                         tr("This KiwiSDR allows only %1 programs (not browsers) at "
+                            "once, and they are all taken; it disconnected Longpath "
+                            "after 10 seconds. Choose another receiver.")
+                             .arg(busyValue));
             } else {
                 setState(State::Busy,
                          busyOk && busyValue > 0
@@ -2974,16 +2946,6 @@ void KiwiSdrClient::updateWaterfallAvailability()
             << "wf_chans=" << m_waterfallChannelCount;
     }
     emit waterfallAvailabilityChanged(available, detail);
-    // Ohne Wasserfall-Kanal haengt der W/F-Strom nur als zweite, nie bediente
-    // Verbindung am Server; der wirft sie (und den Ton mit) nach ~11 s mit
-    // too_busy hinaus. Also gleich zumachen, der Ton bleibt allein.
-    if (!available && m_waterfallSocket && m_soundSocketConnected
-        && m_waterfallSocket->state() == QAbstractSocket::ConnectedState) {
-        qCInfo(lcKiwiSdr).noquote()
-            << "KiwiSDR W/F-Strom wird geschlossen (kein Wasserfall-Kanal)"
-            << QStringLiteral("endpoint=%1").arg(logEndpoint());
-        m_waterfallSocket->close();
-    }
 }
 
 void KiwiSdrClient::resetCapabilityState()

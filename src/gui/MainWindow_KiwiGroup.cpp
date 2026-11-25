@@ -169,7 +169,14 @@ void MainWindow::wireKiwiGroup()
         connect(m_kiwiSdrManager, &KiwiSdrManager::profileWaterfallAvailabilityChanged, this,
                 [this](const QString&, bool, const QString&) { refreshKiwiSoundButtons(); });
         connect(m_kiwiSdrManager, &KiwiSdrManager::profileStateChanged, this,
-                [this](const QString&, KiwiSdrClient::State) { refreshKiwiSoundButtons(); });
+                [this](const QString& id, KiwiSdrClient::State st, const QString& detail) {
+            refreshKiwiSoundButtons();
+            // Warum ein Kiwi wegbleibt, soll sichtbar sein und nicht nur im Log.
+            if (st == KiwiSdrClient::State::Busy && !detail.isEmpty()) {
+                showToast(m_kiwiSdrManager->displayName(id) + QStringLiteral(": ") + detail,
+                          ToastSeverity::Warning, 10000);
+            }
+        });
         connect(m_kiwiSdrManager, &KiwiSdrManager::waterfallPreviewEnabledChanged, this,
                 [this](const QString&, bool) { refreshKiwiSoundButtons(); });
         connect(m_radioModel, &RadioModel::sliceRemoved, this, [this](int sliceId) {
