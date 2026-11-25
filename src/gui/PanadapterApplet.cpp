@@ -201,7 +201,7 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     headLay->addWidget(m_btnMute);
     connect(m_btnMute, &QPushButton::toggled, this,
             [this](bool on) {
-        qCInfo(lcAudio) << "Panadapter" << panId() << "Ton-Schalter:" << (on ? "an" : "aus");
+        qCInfo(lcAudio) << "Panadapter" << m_panId << "Ton-Schalter:" << (on ? "an" : "aus");
         emit radioMuteToggled(!on);
     });
 
