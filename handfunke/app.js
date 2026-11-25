@@ -3496,6 +3496,13 @@ desktopStarten({ link, $, schrittHz: () => kFeinHz, logHolen: logListeHolen });
       $('swrWert').textContent = '—';
       zeigerW(null);
     }
+    // Leistung daneben, nach derselben Regel: nur beim Senden und nur frisch.
+    const p = link.st.txPower;
+    const pw = (sendet && frisch && p !== null && p >= 0)
+      ? (p < 10 ? p.toFixed(1) : String(Math.round(p))) + ' W' : '—';
+    const pe = $('pwrWertI');
+    if (pe.textContent !== pw) { pe.textContent = pw; }
+    pe.classList.toggle('aus', pw === '—');
   }, 250);
   // Antippen des Kompasses oeffnet die volle Rotorsteuerung (die Zeile
   // darunter), und zwar sichtbar.
