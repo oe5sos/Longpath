@@ -34,6 +34,7 @@
 #include "core/LogCategories.h"
 #include "gui/KiwiHearingDialog.h"
 #include "gui/KiwiWaterfallPanel.h"
+#include "gui/applets/AppletPanelWidget.h"
 #include "gui/KiwiOwnSignalStrip.h"
 #include "gui/PanadapterStack.h"
 #include "gui/PanadapterApplet.h"
@@ -50,6 +51,7 @@
 #include <QDateTime>
 #include <QFileInfo>
 #include <QPointer>
+#include <QGuiApplication>
 #include <QTimer>
 
 #include <algorithm>
@@ -292,6 +294,34 @@ void MainWindow::zeigeKiwiFenster(const QString& profileId)
     }
     if (m_appletVis) {
         m_appletVis->ensureVisible(QStringLiteral("KiwiWaterfalls"));
+    }
+    // Ein EIGENES Fenster, nicht eine Kachel in der Applet-Spalte, wo man es
+    // nicht findet (Betreiber 2026-11-25: "es oeffnet sich wieder kein
+    // Fenster!!!!"): steht es weder im Seitenbereich noch schon als Fenster,
+    // wird es hier herausgeloest.
+    if (m_kiwiWaterfallPanel && m_appletPanel) {
+        const QString pid = QStringLiteral("KiwiWaterfalls");
+        // Ohne Grafikflaeche (offscreen-Pruefstaende: "No QRhi") stuerzt das
+        // frisch geloeste Fenster beim Zeichnen ab; dort bleibt es in der Spalte.
+        const bool offscreen =
+            QGuiApplication::platformName() == QLatin1String("offscreen");
+        if (!offscreen && !m_floatingApplets.contains(pid) && !sideAreaHas(pid)
+            && m_appletPanel->applets().contains(m_kiwiWaterfallPanel)) {
+            // Erst im naechsten Durchlauf der Schleife: wir koennen aus einem
+            // Signal des Panels selbst heraus aufgerufen werden.
+            QTimer::singleShot(0, this, [this, pid]() {
+                if (!m_kiwiWaterfallPanel || !m_appletPanel
+                    || m_floatingApplets.contains(pid) || sideAreaHas(pid)
+                    || !m_appletPanel->applets().contains(m_kiwiWaterfallPanel)) {
+                    kiwiFensterNachVorn(m_kiwiWaterfallPanel, this);
+                    return;
+                }
+                detachApplet(m_kiwiWaterfallPanel,
+                             m_appletPanel->appletPosition(m_kiwiWaterfallPanel));
+                kiwiFensterNachVorn(m_kiwiWaterfallPanel, this);
+            });
+            return;
+        }
     }
     kiwiFensterNachVorn(m_kiwiWaterfallPanel, this);
 }
