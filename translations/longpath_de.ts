@@ -4232,6 +4232,14 @@ Die Beschreibung des Herstellers dokumentiert nur einen Typcode, darum wird die 
         <source>Solo needs &quot;My Signal&quot; with a Kiwi switched on.</source>
         <translation>Solo braucht „Mein Signal“ mit eingeschaltetem Kiwi.</translation>
     </message>
+    <message>
+        <source>Solo off: the Kiwi stopped delivering audio.</source>
+        <translation>Solo aus: der Kiwi liefert keinen Ton mehr.</translation>
+    </message>
+    <message>
+        <source>Solo needs a connected Kiwi — this one is not delivering audio.</source>
+        <translation>Solo braucht einen verbundenen Kiwi — dieser liefert keinen Ton.</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::MultimeterPage</name>

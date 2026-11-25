@@ -206,6 +206,27 @@ private slots:
         QVERIFY(!mw->kiwiSoloOnForTest());
     }
 
+    // Ein Endpunkt, ein Profil: dreimal "hinzufuegen" belegt keine drei Kanaele.
+    void einEndpunktEinProfil()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        clearProfiles(mgr);
+        const QString a = mgr->addProfile(QStringLiteral("Bern"), QStringLiteral("127.0.0.1:70"));
+        const QString b = mgr->addProfile(QStringLiteral("Bern 2"), QStringLiteral("127.0.0.1:70"));
+        const QString c = mgr->addProfile(QStringLiteral("Bern 3"), QStringLiteral("127.0.0.1:70"));
+        QVERIFY(!a.isEmpty());
+        QCOMPARE(b, a);
+        QCOMPARE(c, a);
+        QCOMPARE(mgr->profiles().size(), 1);
+        // Gegenprobe: ein anderer Endpunkt ist ein anderes Profil.
+        QVERIFY(mgr->addProfile(QStringLiteral("Anders"), QStringLiteral("127.0.0.1:71")) != a);
+        QCOMPARE(mgr->profiles().size(), 2);
+    }
+
     void zeilenKommenAnUndDasFensterOeffnetSich()
     {
         auto* mw = new MainWindow();

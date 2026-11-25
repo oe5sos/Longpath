@@ -71,6 +71,18 @@ void MainWindow::wireKiwiGroup()
     m_kiwiSoloTimer->setSingleShot(true);
     m_kiwiSoloTimer->setInterval(30000);
     connect(m_kiwiSoloTimer, &QTimer::timeout, this, [this]() { setKiwiSolo(false); });
+    // Solo ohne Ton waere Stille: faellt der Kiwi aus (Fehler, getrennt), geht
+    // Solo von selbst aus und die Flex ist wieder da.
+    connect(m_kiwiSdrManager, &KiwiSdrManager::profileStateChanged, this,
+            [this](const QString& id, KiwiSdrClient::State st, const QString&) {
+        if (m_kiwiSoloOn && id == m_kiwiOwnProfileId
+            && (st == KiwiSdrClient::State::Error
+                || st == KiwiSdrClient::State::Disconnected)) {
+            setKiwiSolo(false);
+            showToast(tr("Solo off: the Kiwi stopped delivering audio."),
+                      ToastSeverity::Warning, 8000);
+        }
+    });
     // Fiel die Scheibe des Kiwi weg, ist Solo aus -- sonst bliebe alles stumm.
     connect(m_kiwiSdrManager, &KiwiSdrManager::sliceAssignmentChanged, this,
             [this](int, const QString&) {
@@ -139,6 +151,16 @@ void MainWindow::setKiwiSolo(bool on)
         if (!audio || !kiwiControllableSlice(sliceId)) {
             showToast(tr("Solo needs \"My Signal\" with a Kiwi switched on."),
                       ToastSeverity::Info, 5000);
+            m_kiwiSoloOn = false;
+            if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setSoloActive(false); }
+            return;
+        }
+        // Nur, solange der Kiwi wirklich Ton liefern kann: ein Kiwi im Fehler
+        // (kein Tonstrom, Passwort, getrennt) macht aus Solo nur Stille.
+        const KiwiSdrClient::State st = m_kiwiSdrManager->state(m_kiwiOwnProfileId);
+        if (st == KiwiSdrClient::State::Error || st == KiwiSdrClient::State::Disconnected) {
+            showToast(tr("Solo needs a connected Kiwi — this one is not delivering audio."),
+                      ToastSeverity::Info, 6000);
             m_kiwiSoloOn = false;
             if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setSoloActive(false); }
             return;

@@ -574,6 +574,17 @@ QString KiwiSdrManager::addProfile(const QString& name, const QString& endpoint)
         return QString();
     }
 
+    // Ein Endpunkt, ein Profil (Longpath 2026-11-25): drei Profile fuer
+    // denselben Kiwi wollten drei Kanaele bei einem Betreiber belegen, der nur
+    // drei hat -- und der eine "voll" meldete. Das gibt es schon, also das.
+    for (const KiwiSdrAntennaProfile& existing : std::as_const(m_profiles)) {
+        if (existing.endpoint == normalizedEndpoint) {
+            qCInfo(lcKiwiSdr).noquote()
+                << "Profile exists for" << normalizedEndpoint << "- reusing" << existing.id;
+            return existing.id;
+        }
+    }
+
     KiwiSdrAntennaProfile profile;
     profile.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     profile.endpoint = normalizedEndpoint;
