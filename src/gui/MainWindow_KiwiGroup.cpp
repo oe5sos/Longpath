@@ -540,6 +540,27 @@ void MainWindow::sendKiwiGroupTracking()
         }
         ids << pr.id;
     }
+    // Kiwis mit Ton laufen auf einer eigenen, ungebundenen Scheibe: die muss der
+    // Sendefrequenz auch ueber Bandwechsel folgen (Betreiber 2026-11-25: "spring
+    // auf ein anderes band nicht um"). Nur die Scheibe des Kiwi wird gesetzt,
+    // nie die des Funkgeraets (kiwiControllableSlice).
+    if (SliceModel* txs = kiwiOwnTxSlice()) {
+        quint64 hz = m_radioModel->transmitFrequencyHz(txs);
+        if (hz == 0) { hz = quint64(txs->frequency()); }
+        if (hz > 0) {
+            for (auto it = m_kiwiSoundSlices.constBegin(); it != m_kiwiSoundSlices.constEnd(); ++it) {
+                SliceModel* ks = kiwiControllableSlice(it.value());
+                if (!ks) { continue; }
+                if (ks->frequency() != double(hz)) { ks->setFrequency(double(hz)); }
+                if (ks->dspMode() != txs->dspMode()) { ks->setDspMode(txs->dspMode()); }
+                m_kiwiSdrManager->updateSliceTracking(
+                    it.value(), double(hz) / 1.0e6, SliceModel::modeName(txs->dspMode()),
+                    txs->filterLow(), txs->filterHigh(), ks->panKey(),
+                    QString(), SliceModel::cwPitchHz());
+            }
+        }
+    }
+    sendKiwiOwnSignalTracking();
     if (ids.isEmpty()) { return; }
     SliceModel* tx = kiwiOwnTxSlice();
     if (!tx) {
