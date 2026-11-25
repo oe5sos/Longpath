@@ -656,6 +656,11 @@ class Verbindung(threading.Thread):
                     self.sendet = soll
                     self.sende_text(f'trx:0,{"true" if soll else "false"};')
                     print(f'  trx:0,{"true" if soll else "false"} (--sendet)')
+            # Wie der echte Server: tx_sensors nur WAEHREND des Sendens
+            # (tx_sensors:<rx>,<micDbm>,<rmsW>,<peakW>,<swr>).
+            if self.sendet and jetzt - getattr(self, 'tx_sens_zeit', 0) > 0.2:
+                self.tx_sens_zeit = jetzt
+                self.sende_text('tx_sensors:0,-30.0,12.5,12.5,%.1f;' % (1.3 + 0.2 * math.sin(jetzt)))
 
             if self.rx_sensors_an and jetzt - smeter_zeit > self.rx_sensors_ms / 1000.0:
                 smeter_zeit = jetzt

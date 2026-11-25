@@ -140,16 +140,15 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   </div>
 </div>
 
+<!-- Drei Instrumente in einer Zeile: S-Meter | SWR | Rotor-Kompass (2026-11-22,
+     Martins Wahl C). SWR zeigt nur beim Senden einen Wert (tx_sensors), sonst „—".
+     Der Kompass erscheint erst, wenn Longpath einen Rotor meldet; Antippen
+     oeffnet die volle Rotorsteuerung. -->
+<div id="instrumente">
 <div class="meter schicht">
-  <div class="gauge" aria-label="S-Meter">
-    <svg viewBox="0 0 132 62" aria-hidden="true">
-      <path d="M14 56 A52 52 0 0 1 118 56" fill="none" stroke="#2c2c31" stroke-width="2"/>
-      <g id="gaugeStriche"></g>
-      <line id="gaugeNadel" x1="66" y1="60" x2="66" y2="14" stroke="#ee9a34" stroke-width="2" stroke-linecap="round"/>
-      <circle cx="66" cy="60" r="3" fill="#ee9a34"/>
-    </svg>
-    <div><div class="sval" id="sval">—</div><div class="sdb" id="sdb"></div></div>
-  </div>
+  <div class="kopf"><span class="caps">S-Meter</span><span class="chipw" id="sval">—</span></div>
+  <svg class="ring" id="gaugeSvg" aria-label="S-Meter"></svg>
+  <div class="sdb" id="sdb" hidden></div>
   <div class="row">
     <span class="caps">Signal</span>
     <span class="val" id="smeter">—</span>
@@ -158,6 +157,19 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <div class="ticks">
     <span>1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>+20</span><span>+40</span>
   </div>
+</div>
+<div class="schicht instr" id="swrBox">
+  <div class="kopf"><span class="caps">SWR</span><span class="chipw aus" id="swrWert">—</span></div>
+  <svg class="ring" id="swrSvg" aria-label="SWR"></svg>
+</div>
+<div class="schicht instr" id="kompassBox" aria-label="Rotor, antippen oeffnet die Steuerung" hidden>
+  <div class="kopf"><span class="caps">Rotor</span><span class="chipw aus" id="rotorGradK">—</span></div>
+  <svg class="ring" id="rotorKlein" viewBox="-115 -115 230 230" aria-hidden="true">
+    <g id="rotorBlattK"></g>
+    <line class="nd" id="rotorNadelK" x1="0" y1="0" x2="0" y2="-82"/>
+    <circle class="nb" cx="0" cy="0" r="6"/>
+  </svg>
+</div>
 </div>
 
 <!-- Betriebsart und Band gehoeren zusammen (was hoere ich, und wo) — darum

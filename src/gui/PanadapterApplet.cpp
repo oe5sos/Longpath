@@ -461,6 +461,9 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     // applet area underneath. Parented to `this`, not m_spectrum, so it sits
     // above the SpectrumWidget's QRhi surface without becoming a child of it.
     m_statusOverlay = new SpectrumStatusOverlay(this);
+    // Kopfknoepfe beobachten, damit der Streifen ihnen ausweicht.
+    if (m_btn3d)      { m_btn3d->installEventFilter(this); }
+    if (m_btnOptions) { m_btnOptions->installEventFilter(this); }
     m_statusOverlay->raise();
     // Initial state for the KIWI pill (see its own header comment) --
     // m_spectrum may already have been switched to the KiwiSDR source by
@@ -567,6 +570,14 @@ void PanadapterApplet::setBandwidthMhz(double bw) { m_bandwidthMhz = bw; }
 // so the spectrum keeps its own click handling (tune, drag, zoom).
 bool PanadapterApplet::eventFilter(QObject* obj, QEvent* ev)
 {
+    // Wandert ein Kopfknopf (neue Anordnung, erstes Zeigen), muss der
+    // Pillen-Streifen ihm Platz machen. Siehe repositionStatusOverlay().
+    if ((obj == m_btn3d || obj == m_btnOptions)
+        && (ev->type() == QEvent::Move || ev->type() == QEvent::Resize
+            || ev->type() == QEvent::Show)) {
+        repositionStatusOverlay();
+        return QWidget::eventFilter(obj, ev);
+    }
     if (ev->type() == QEvent::MouseButtonPress) {
         emit activated(m_panId);
     }
@@ -824,8 +835,23 @@ void PanadapterApplet::repositionStatusOverlay()
     // Also wird auch deren Platz freigehalten. Der linke Rand des
     // ersten Knopfes ist die Grenze; was rechts davon liegt, gehoert
     // der Kopfleiste.
-    if (m_btn3d && m_btn3d->isVisible()) {
-        const int links = m_btn3d->mapTo(this, QPoint(0, 0)).x();
+    //
+    // 2026-11-22, Betreiber: „das TX - die pille ueber den optionen". Hier
+    // stand `m_btn3d->isVisible()`. Beim ersten Zeigen schickt Qt das
+    // Resize aber, BEVOR die Kinder sichtbar sind -- die Abfrage war dann
+    // falsch, nichts wurde freigehalten, und der Streifen lag ueber 3D und
+    // Zahnrad, bis zufaellig eine Pille wechselte (tst_pan_options_button:
+    // bei 1400, 1160 und 900 Punkt). Jetzt zaehlt „nicht ausdruecklich
+    // versteckt", und es gilt der linke Rand ALLER Kopfknoepfe; dazu ordnet
+    // der Ereignisfilter neu an, sobald einer davon wandert oder erscheint.
+    int links = width();
+    for (QWidget* knopf : {static_cast<QWidget*>(m_btn3d),
+                           static_cast<QWidget*>(m_btnOptions)}) {
+        if (knopf && !knopf->isHidden()) {
+            links = std::min(links, knopf->mapTo(this, QPoint(0, 0)).x());
+        }
+    }
+    if (links < width()) {
         reserved = std::max(reserved, std::max(0, width() - links + 6));
     }
 
@@ -1074,36 +1100,92 @@ QMenu* PanadapterApplet::buildDisplayMenu(QObject* parent)
         connect(gruen, &QAction::toggled, m_spectrum,
                 &SpectrumWidget::setTxPassbandLikeRx);
 
-        // Farbschema (2026-11-21, Betreiber: „s2,s4,s5 - alles als
-        // option!", dann „na dann nehme dazu" fuer S1/S3): Durchlass und
-        // Wasserfall gemeinsam, Vorgabe Standard. Hier in der Reihenfolge
-        // der Blaetter, nicht in der des gespeicherten Werts.
-        QMenu* schemata = menu->addMenu(tr("Colour scheme"));
-        auto* gruppe = new QActionGroup(schemata);
-        gruppe->setExclusive(true);
-        const struct { PanColourScheme s; const char* name; const char* tipp; } liste[] = {
-            {PanColourScheme::Standard,  QT_TR_NOOP("Standard"),
-             QT_TR_NOOP("Passband and waterfall as set in Setup.")},
-            {PanColourScheme::Ft8Amber,  QT_TR_NOOP("FT8 amber"),
-             QT_TR_NOOP("Amber-orange passband, waterfall like the FT8 window.")},
-            {PanColourScheme::Brass,     QT_TR_NOOP("Brass (muted)"),
-             QT_TR_NOOP("Brass passband, waterfall from black over grey into brass.")},
-            {PanColourScheme::Teal,      QT_TR_NOOP("Teal green"),
-             QT_TR_NOOP("Teal-green passband, waterfall from black over petrol to mint.")},
-            {PanColourScheme::SlateBlue, QT_TR_NOOP("Slate blue"),
-             QT_TR_NOOP("Quiet slate-blue passband, waterfall from black over slate to light grey.")},
-            {PanColourScheme::Night,     QT_TR_NOOP("Night"),
-             QT_TR_NOOP("For the evening: everything darker, trace dimmed, waterfall never brighter than dark amber.")},
+        // Farbschemata (2026-11-21, Betreiber: „s2,s4,s5 - alles als
+        // option!", „na dann nehme dazu" fuer S1/S3, dann „es sollte oben
+        // und unten getrennt sein"): zwei Wahlen, oben Durchlass und Spur,
+        // unten der Wasserfall. Vorgabe je Standard. Hier in der
+        // Reihenfolge der Blaetter, nicht in der des gespeicherten Werts.
+        const auto schemaMenue = [&](const QString& titel,
+                                     PanColourScheme aktuell,
+                                     void (SpectrumWidget::*setzen)(PanColourScheme),
+                                     bool oben) {
+            QMenu* schemata = menu->addMenu(titel);
+            auto* gruppe = new QActionGroup(schemata);
+            gruppe->setExclusive(true);
+            const struct { PanColourScheme s; const char* name;
+                           const char* tippOben; const char* tippUnten; } liste[] = {
+                {PanColourScheme::Standard,  QT_TR_NOOP("Standard"),
+                 QT_TR_NOOP("Passband as set in Setup."),
+                 QT_TR_NOOP("Waterfall palette as set in Setup.")},
+                {PanColourScheme::Ft8Amber,  QT_TR_NOOP("FT8 amber"),
+                 QT_TR_NOOP("Amber-orange passband."),
+                 QT_TR_NOOP("Waterfall like the FT8 window: black, amber, orange.")},
+                {PanColourScheme::Brass,     QT_TR_NOOP("Brass (muted)"),
+                 QT_TR_NOOP("Quiet brass passband."),
+                 QT_TR_NOOP("Waterfall from black over grey into brass.")},
+                {PanColourScheme::Teal,      QT_TR_NOOP("Teal green"),
+                 QT_TR_NOOP("Teal-green passband."),
+                 QT_TR_NOOP("Waterfall from black over petrol to mint.")},
+                {PanColourScheme::SlateBlue, QT_TR_NOOP("Slate blue"),
+                 QT_TR_NOOP("Quiet slate-blue passband."),
+                 QT_TR_NOOP("Waterfall from black over slate to light grey.")},
+                {PanColourScheme::Night,     QT_TR_NOOP("Night"),
+                 QT_TR_NOOP("For the evening: faint passband, trace dimmed."),
+                 QT_TR_NOOP("For the evening: never brighter than dark amber.")},
+            };
+            for (const auto& e : liste) {
+                QAction* act = schemata->addAction(tr(e.name));
+                act->setToolTip(tr(oben ? e.tippOben : e.tippUnten));
+                act->setCheckable(true);
+                act->setChecked(aktuell == e.s);
+                gruppe->addAction(act);
+                const PanColourScheme s = e.s;
+                connect(act, &QAction::triggered, m_spectrum,
+                        [this, setzen, s]() { (m_spectrum->*setzen)(s); });
+            }
         };
-        for (const auto& e : liste) {
-            QAction* act = schemata->addAction(tr(e.name));
-            act->setToolTip(tr(e.tipp));
+        schemaMenue(tr("Spectrum scheme"), m_spectrum->spectrumScheme(),
+                    &SpectrumWidget::setSpectrumScheme, /*oben=*/true);
+        schemaMenue(tr("Waterfall scheme"), m_spectrum->waterfallScheme(),
+                    &SpectrumWidget::setWaterfallScheme, /*oben=*/false);
+
+        // Tempo des Wasserfalls (2026-11-22). Betreiber wollte ihn
+        // langsamer und hat das Tempo HIER gesucht -- es stand nur im
+        // Rechtsklick-Menue (SPEED) und im Setup (Update Period).
+        // Optionen gehoeren ins Zahnrad rechts oben. Derselbe Wert wie
+        // dort (SpectrumWidget::wfUpdatePeriodMs, ms je Zeile); beide
+        // lesen ihn beim Oeffnen nach, zeigen also dasselbe.
+        QMenu* tempo = menu->addMenu(tr("Waterfall speed"));
+        auto* tempoGruppe = new QActionGroup(tempo);
+        tempoGruppe->setExclusive(true);
+        const int jetzt = m_spectrum->wfUpdatePeriodMs();
+        const struct { int ms; const char* name; } stufen[] = {
+            {30,  QT_TR_NOOP("Fast (30 ms)")},
+            {60,  QT_TR_NOOP("Normal (60 ms)")},
+            {120, QT_TR_NOOP("Slow (120 ms)")},
+            {250, QT_TR_NOOP("Very slow (250 ms)")},
+        };
+        bool getroffen = false;
+        for (const auto& st : stufen) {
+            QAction* act = tempo->addAction(tr(st.name));
             act->setCheckable(true);
-            act->setChecked(m_spectrum->colourScheme() == e.s);
-            gruppe->addAction(act);
-            const PanColourScheme s = e.s;
+            act->setChecked(jetzt == st.ms);
+            getroffen = getroffen || (jetzt == st.ms);
+            tempoGruppe->addAction(act);
+            const int ms = st.ms;
             connect(act, &QAction::triggered, m_spectrum,
-                    [this, s]() { m_spectrum->setColourScheme(s); });
+                    [this, ms]() { m_spectrum->setWfUpdatePeriodMs(ms); });
+        }
+        if (!getroffen) {
+            // Ein eigener Wert aus Rechtsklick oder Setup: zeigen, nicht
+            // wegwerfen. Waehlbar ist er hier nicht, nur sichtbar.
+            tempo->addSeparator();
+            QAction* eigen = tempo->addAction(
+                tr("Custom · %1 ms").arg(jetzt));
+            eigen->setCheckable(true);
+            eigen->setChecked(true);
+            eigen->setEnabled(false);
+            tempoGruppe->addAction(eigen);
         }
         menu->addSeparator();
     }

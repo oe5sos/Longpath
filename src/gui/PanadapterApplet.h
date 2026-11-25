@@ -206,6 +206,11 @@ public:
     /// Eintraege ueber ihren Text ausloesen koennen, ohne eine
     /// verschachtelte Ereignisschleife zu starten.
     QMenu* buildDisplayMenuForTesting() { return buildDisplayMenu(this); }
+    // Pruefstand Kopfzeile (2026-11-22): der Pillen-Streifen und die beiden
+    // Kopfknoepfe, deren Platz er freihalten muss.
+    SpectrumStatusOverlay* statusOverlayForTest() const { return m_statusOverlay; }
+    QPushButton* optionsButtonForTest() const { return m_btnOptions; }
+    QPushButton* renderModeButtonForTest() const { return m_btn3d; }
 
     // ── Spots je Quelle im Zahnrad (2026-11-18) ──────────────────────
     //

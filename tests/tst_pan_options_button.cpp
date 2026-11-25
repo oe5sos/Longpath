@@ -25,6 +25,7 @@
 #include <QSignalSpy>
 
 #include "gui/PanadapterApplet.h"
+#include "gui/widgets/SpectrumStatusOverlay.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/meters/MeterPoller.h"
 #include "models/SliceModel.h"
@@ -307,6 +308,92 @@ private slots:
         QCOMPARE(setSpy.count(), 1);
 
         m->deleteLater();
+    }
+
+    // Tempo des Wasserfalls im Zahnrad (2026-11-22): Betreiber suchte es
+    // hier, es stand nur im Rechtsklick und im Setup. Derselbe Wert.
+    void dasWasserfallTempoStehtImZahnrad()
+    {
+        PanadapterApplet applet(QStringLiteral("A"));
+        SpectrumWidget* sw = applet.spectrumWidget();
+        QVERIFY(sw);
+        const auto tempoMenue = [](QMenu* m) -> QMenu* {
+            for (QAction* a : m->actions()) {
+                if (a->menu() && a->text() == QStringLiteral("Waterfall speed")) {
+                    return a->menu();
+                }
+            }
+            return nullptr;
+        };
+
+        sw->setWfUpdatePeriodMs(30);
+        QMenu* m = applet.buildDisplayMenuForTesting();
+        QMenu* tempo = tempoMenue(m);
+        QVERIFY2(tempo, "Untermenue „Waterfall speed“ im Zahnrad");
+        QStringList namen;
+        for (QAction* a : tempo->actions()) {
+            if (!a->isSeparator()) { namen << a->text(); }
+        }
+        QCOMPARE(namen, (QStringList{QStringLiteral("Fast (30 ms)"),
+                                     QStringLiteral("Normal (60 ms)"),
+                                     QStringLiteral("Slow (120 ms)"),
+                                     QStringLiteral("Very slow (250 ms)")}));
+        QVERIFY(tempo->actions().first()->isChecked());
+        for (QAction* a : tempo->actions()) {
+            if (a->text() == QStringLiteral("Slow (120 ms)")) { a->trigger(); }
+        }
+        QCOMPARE(sw->wfUpdatePeriodMs(), 120);
+        delete m;
+
+        // Ein eigener Wert (Rechtsklick/Setup) wird gezeigt, nicht verworfen.
+        sw->setWfUpdatePeriodMs(135);
+        m = applet.buildDisplayMenuForTesting();
+        tempo = tempoMenue(m);
+        QVERIFY(tempo);
+        QAction* eigen = tempo->actions().last();
+        QCOMPARE(eigen->text(), QStringLiteral("Custom · 135 ms"));
+        QVERIFY(eigen->isChecked() && !eigen->isEnabled());
+        QCOMPARE(sw->wfUpdatePeriodMs(), 135);
+        delete m;
+    }
+
+    // Kopfzeile bei schmalem Panadapter (2026-11-22). Betreiber: „das TX -
+    // die pille ueber den optionen" -- bei ~1160 px lag die rote TX-Pille
+    // ueber 3D und Zahnrad, vom Zahnrad blieb ein Rest. Kein Kopfknopf darf
+    // vom Pillen-Streifen verdeckt sein, das Zahnrad muss klickbar sein.
+    void diePillenLiegenNieUeberDenKopfknoepfen_data()
+    {
+        QTest::addColumn<int>("breite");
+        QTest::newRow("1400") << 1400;
+        QTest::newRow("1160") << 1160;
+        QTest::newRow("900")  << 900;
+    }
+    void diePillenLiegenNieUeberDenKopfknoepfen()
+    {
+        QFETCH(int, breite);
+        PanadapterApplet applet(QStringLiteral("A"));
+        SpectrumStatusOverlay* streifen = applet.statusOverlayForTest();
+        QVERIFY(streifen);
+        streifen->setTxBound(true);      // CH 0 | TX | KIWI wie beim Betreiber
+        streifen->setKiwiActive(true);
+        applet.resize(breite, 500);
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
+        for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
+
+        const QRect pillen = streifen->geometry();
+        for (QPushButton* knopf : {applet.optionsButtonForTest(),
+                                   applet.renderModeButtonForTest()}) {
+            QVERIFY(knopf && knopf->isVisible());
+            const QRect r(knopf->mapTo(&applet, QPoint(0, 0)), knopf->size());
+            QVERIFY2(!pillen.intersects(r),
+                     qPrintable(QStringLiteral("Pillen %1..%2 ueber dem Knopf %3 bei %4..%5")
+                                    .arg(pillen.left()).arg(pillen.right())
+                                    .arg(knopf->text())
+                                    .arg(r.left()).arg(r.right())));
+            // Und klickbar: oben liegt der Knopf, nicht der Streifen.
+            QCOMPARE(applet.childAt(r.center()), static_cast<QWidget*>(knopf));
+        }
     }
 };
 QTEST_MAIN(TestPanOptionsButton)
