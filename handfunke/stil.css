@@ -756,3 +756,25 @@ footer #onAir.an{color:var(--tx-border)}
 #kompassBox #rotorKlein{max-width:70px}
 .ring text{font:inherit;fill:inherit}
 @media (min-width: 900px){ #dtLinks #kompassBox #rotorKlein{max-width:96px} }
+
+
+/* ═══ Abstimmschritt und RIT/XIT (2026-11-25) ═══════════════════════════════
+   Wie „Combined" am Mac: [RIT] [0] [<] Versatz [>]. Der Wert ist ein
+   Messwert: orange, solange RIT/XIT an ist, sonst grau. */
+.versatz{display:flex;gap:6px;align-items:center}
+.versatz + .versatz{margin-top:6px}
+.versatz .chip{flex:none;height:34px;font-size:var(--f-small)}
+.versatz .vName{width:56px}
+.versatz .vNull,.versatz .vPfeil{width:38px;color:#a6a6ac}
+.vWert{flex:1;min-width:0;height:34px;display:flex;align-items:center;justify-content:center;
+  font:600 14px/1 var(--mono);color:#7e7e85;background:#040405;border:1px solid #1a1a1e;
+  border-radius:8px;white-space:nowrap}
+.vWert.an{color:var(--orT)}
+@media (min-width: 900px){
+  #dtVersatz{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+  #dtVersatz .versatz + .versatz{margin-top:0}
+  #dtVersatz .chip{height:26px;font-size:12px}
+  #dtVersatz .vName{width:46px}
+  #dtVersatz .vNull,#dtVersatz .vPfeil{width:30px}
+  #dtVersatz .vWert{height:26px;font-size:13px}
+}
