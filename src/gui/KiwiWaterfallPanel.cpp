@@ -32,34 +32,6 @@ KiwiWaterfallPanel::KiwiWaterfallPanel(RadioModel* model, QWidget* parent)
     root->setContentsMargins(4, 2, 4, 4);
     root->setSpacing(8);
 
-    // Kopfzeile: Ton fuer alle gezeigten Kiwis auf einen Knopf.
-    auto* bar = new QHBoxLayout;
-    bar->setContentsMargins(0, 0, 0, 0);
-    bar->setSpacing(6);
-    auto* barLabel = new QLabel(tr("All Kiwis:"), this);
-    barLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; font-size: 11px; }").arg(label()));
-    bar->addWidget(barLabel);
-    const QString btnStyle = QStringLiteral(
-        "QPushButton { color: %1; background: %2; border: 1px solid %3; border-radius: 6px; "
-        "padding: 2px 10px; font-size: 11px; }"
-        "QPushButton:hover { background: %4; }")
-            .arg(QString::fromLatin1(Style::kTextSecondary), QString::fromLatin1(Style::kButtonBg),
-                 QString::fromLatin1(Style::kBorderMuted), QString::fromLatin1(Style::kButtonHover));
-    m_allSoundOn = new QPushButton(tr("Sound on"), this);
-    m_allSoundOn->setObjectName(QStringLiteral("kiwiAllSoundOn"));
-    m_allSoundOn->setToolTip(tr("Listen to every Kiwi shown here that is connected"));
-    m_allSoundOn->setStyleSheet(btnStyle);
-    m_allSoundOff = new QPushButton(tr("Sound off"), this);
-    m_allSoundOff->setObjectName(QStringLiteral("kiwiAllSoundOff"));
-    m_allSoundOff->setToolTip(tr("Switch the sound of all these Kiwis off"));
-    m_allSoundOff->setStyleSheet(btnStyle);
-    bar->addWidget(m_allSoundOn);
-    bar->addWidget(m_allSoundOff);
-    bar->addStretch(1);
-    root->addLayout(bar);
-    connect(m_allSoundOn, &QPushButton::clicked, this, [this]() { emit allSoundRequested(true); });
-    connect(m_allSoundOff, &QPushButton::clicked, this, [this]() { emit allSoundRequested(false); });
-
     m_emptyLabel = new QLabel(
         tr("No waterfall switched on — switch one on per receiver in the "
             "KiwiSDR panel."), this);
@@ -95,6 +67,15 @@ void KiwiWaterfallPanel::setStripEnabled(const QString& profileId, bool enabled,
                 this, &KiwiWaterfallPanel::removeRequested);
         connect(strip, &KiwiWaterfallStripWidget::renameRequested,
                 this, &KiwiWaterfallPanel::renameRequested);
+        connect(strip, &KiwiWaterfallStripWidget::expandToggled, this,
+                [this](const QString& id, bool on) {
+            m_expandedId = on ? id : QString();
+            for (auto it = m_strips.cbegin(); it != m_strips.cend(); ++it) {
+                it.value()->setVisible(!on || it.key() == id);
+                it.value()->setExpandedState(on && it.key() == id);
+            }
+        });
+        if (!m_expandedId.isEmpty()) { strip->setVisible(false); }
         connect(strip, &KiwiWaterfallStripWidget::soundToggled,
                 this, &KiwiWaterfallPanel::soundToggled);
         connect(strip, &KiwiWaterfallStripWidget::zoomRequested,
@@ -108,6 +89,13 @@ void KiwiWaterfallPanel::setStripEnabled(const QString& profileId, bool enabled,
     } else if (auto* strip = m_strips.take(profileId)) {
         m_stripsLayout->removeWidget(strip);
         strip->deleteLater();
+        if (m_expandedId == profileId) {
+            m_expandedId.clear();
+            for (KiwiWaterfallStripWidget* other : std::as_const(m_strips)) {
+                other->setVisible(true);
+                other->setExpandedState(false);
+            }
+        }
     }
     updateEmptyState();
 }

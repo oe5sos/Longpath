@@ -2430,6 +2430,8 @@ void AudioEngine::setKiwiSdrAudioSourceEnabled(int sliceId, bool enabled)
             // stumm schalten, das damit nichts zu tun hat.
             m_masterMix.setSliceOpportunistic(sliceId, true);
             m_antiVoxMix.setSliceOpportunistic(sliceId, true);
+            // Internet-Ton kommt in Schueben: 0,17 s Startpolster, bis 1,2 s.
+            m_masterMix.setSliceCushion(sliceId, 8192, 57600);
             qCInfo(lcAudio) << "KiwiSDR-Ton eingeschaltet fuer Scheibe"
                             << sliceId << "(opportunistisch im Mix)";
         }

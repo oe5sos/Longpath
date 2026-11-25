@@ -349,6 +349,38 @@ private slots:
         QCOMPARE(out[0], 0.5f);
     }
 
+    // Internet-Ton (KiwiSDR) kommt in Schueben: mit grossem Startpolster bleibt die
+    // Scheibe still, bis genug gepuffert ist, und ueberbrueckt dann eine Luecke.
+    void aLargeCushionBridgesABurstGap() {
+        MasterMixer mix;
+        mix.setRampFrames(1);
+        mix.setSliceGain(1, 1.0f, 0.0f);
+        mix.setSliceGain(-2, 1.0f, 0.0f);
+        mix.setSliceOpportunistic(-2, true);
+        mix.setSliceCushion(-2, 4000, 8000);
+        std::array<float, 2> blk = {0.5f, 0.5f};
+        std::array<float, 2> out{};
+        mix.accumulate(1, blk.data(), 1);
+        mix.accumulate(-2, blk.data(), 1);
+        QCOMPARE(mix.tryDrain(out.data(), 1), 1);
+        QCOMPARE(out[0], 0.5f);                  // noch still: erst das Polster fuellen
+
+        std::vector<float> burst(2 * 4100, 0.5f);   // ein Schub von 4100 Frames
+        mix.accumulate(-2, burst.data(), 4100);
+        mix.accumulate(1, blk.data(), 1);
+        out = {};
+        QCOMPARE(mix.tryDrain(out.data(), 1), 1);
+        QCOMPARE(out[0], 1.0f);                  // jetzt hoerbar
+
+        // Luecke: 100 weitere Zuege ohne neuen Schub -- der Vorrat traegt.
+        for (int i = 0; i < 100; ++i) {
+            mix.accumulate(1, blk.data(), 1);
+            out = {};
+            QCOMPARE(mix.tryDrain(out.data(), 1), 1);
+            QCOMPARE(out[0], 1.0f);
+        }
+    }
+
     // ── Master slew across a membership change ────────────────────────
     //
     // Re-admitting a slice must fade the MIXED output in, not resume it at

@@ -131,8 +131,6 @@ void MainWindow::wireKiwiGroup()
                 [this](const QString& id, bool on) { setKiwiSound(id, on); });
         connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::zoomRequested, this,
                 [this](const QString& id, int dir) { zoomKiwiStrip(id, dir); });
-        connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::allSoundRequested, this,
-                [this](bool on) { setAllKiwiSound(on); });
         connect(m_kiwiSdrManager, &KiwiSdrManager::sliceAssignmentChanged, this,
                 [this](int, const QString&) { refreshKiwiSoundButtons(); });
         connect(m_kiwiSdrManager, &KiwiSdrManager::profileWaterfallAvailabilityChanged, this,

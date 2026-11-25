@@ -175,6 +175,14 @@ void MasterMixer::setSliceOpportunistic(int sliceId, bool opportunistic) {
                                           std::memory_order_release);
 }
 
+void MasterMixer::setSliceCushion(int sliceId, int startFrames, int maxFrames) {
+    std::lock_guard<std::mutex> lk(m_sliceMapMutex);
+    SliceState& st = m_slices[sliceId];
+    st.cushionMax.store(std::max(kOpportunisticPrimeMarginFrames, maxFrames),
+                        std::memory_order_release);
+    st.cushionStart.store(std::max(0, startFrames), std::memory_order_release);
+}
+
 void MasterMixer::setRampFrames(int frames) {
     std::lock_guard<std::mutex> lk(m_sliceMapMutex);
     m_rampFrames = std::max(1, frames);
@@ -399,7 +407,8 @@ int MasterMixer::tryDrain(float* out, int maxFrames) {
         if (barrierPaced
             && st.opportunistic.load(std::memory_order_acquire)) {
             if (st.cushion <= 0) {
-                st.cushion = kOpportunisticPrimeMarginFrames;
+                const int start = st.cushionStart.load(std::memory_order_acquire);
+                st.cushion = start > 0 ? start : kOpportunisticPrimeMarginFrames;
             }
             if (!st.primed) {
                 if (st.avail >= n + st.cushion) {
@@ -455,7 +464,7 @@ int MasterMixer::tryDrain(float* out, int maxFrames) {
                 // every jitter profile converges to zero
                 // discontinuities once the cushion stops being probed
                 // downward and only ever grows on demand.
-                st.cushion = std::min(kOpportunisticCushionMaxFrames,
+                st.cushion = std::min(st.cushionMax.load(std::memory_order_acquire),
                                       st.cushion * 2);
                 if (st.avail <= 0) { continue; }
                 // Play the residue out as a FADE rather than cutting

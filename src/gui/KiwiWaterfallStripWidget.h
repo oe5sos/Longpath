@@ -57,6 +57,8 @@ public:
     float minDbm() const { return m_minDbm; }
     float maxDbm() const { return m_maxDbm; }
     QToolButton* closeButtonForTest() const { return m_closeButton; }
+    QToolButton* expandButtonForTest() const { return m_expandButton; }
+    void setExpandedState(bool on);
     // Ton dieses Kiwi in den Lautsprechern (nur Anzeige; die Arbeit macht MainWindow).
     void setSoundActive(bool on);
     bool soundActive() const;
@@ -78,6 +80,7 @@ signals:
     void optionsChanged();
     // Der Streifen entscheidet nichts selbst: er meldet den Wunsch.
     void closeRequested(const QString& profileId);
+    void expandToggled(const QString& profileId, bool expanded);   ///< gross / wieder alle
     void renameRequested(const QString& profileId);
     void soundToggled(const QString& profileId, bool on);
     // +1 = naeher heran (kleinerer Bereich), -1 = weiter weg.
@@ -109,6 +112,7 @@ private:
     qint64 m_lastRowMs{-1000000};
     int m_acceptedRows{0};
     QToolButton* m_closeButton{nullptr};
+    QToolButton* m_expandButton{nullptr};
     QToolButton* m_soundButton{nullptr};
     QToolButton* m_zoomIn{nullptr};
     QToolButton* m_zoomOut{nullptr};

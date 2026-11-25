@@ -321,30 +321,12 @@ private slots:
         for (int i = 0; i < 10; ++i) { mw->zoomKiwiStripForTest(ids[0], -1); }
         QCOMPARE(mw->kiwiViewSpanForTest(ids[0]), 200000.0);     // nicht groesser
 
-        // Alle Ton: nur verbundene (hier "Verbindet"), hoechstens fuenf, je eigene Scheibe.
-        const int slicesBefore = model->slices().size();
-        // Wie viele laufen gerade? (Gegenstellen auf 127.0.0.1 antworten mit
-        // "abgelehnt", der Zustand ist vom Takt abhaengig -- der Test prueft
-        // deshalb die Regel, nicht eine feste Zahl.)
-        int laufend = 0;
-        for (const QString& id : ids) {
-            const KiwiSdrClient::State st = mgr->state(id);
-            if (st != KiwiSdrClient::State::Disconnected && st != KiwiSdrClient::State::Error) {
-                ++laufend;
-            }
-        }
-        QTest::mouseClick(panel->allSoundOnForTest(), Qt::LeftButton);
-        int hoerbar = 0;
-        for (const QString& id : ids) {
-            if (mgr->assignedSliceForProfile(id) >= 0) { ++hoerbar; }
-        }
-        QVERIFY2(hoerbar == qMin(laufend, 5), qPrintable(QString::number(hoerbar)));
-        QCOMPARE(model->slices().size(), slicesBefore + hoerbar);
-        QVERIFY(model->sliceById(radioSlice) != nullptr);
-
-        QTest::mouseClick(panel->allSoundOffForTest(), Qt::LeftButton);
-        for (const QString& id : ids) { QCOMPARE(mgr->assignedSliceForProfile(id), -1); }
-        QCOMPARE(model->slices().size(), slicesBefore);
+        // Vergroessern: ein Streifen fuellt das Fenster, die anderen treten zurueck.
+        QTest::mouseClick(panel->stripForTest(ids[0])->expandButtonForTest(), Qt::LeftButton);
+        QVERIFY(!panel->stripForTest(ids[1])->isHidden() == false);
+        QVERIFY(!panel->stripForTest(ids[0])->isHidden());
+        QTest::mouseClick(panel->stripForTest(ids[0])->expandButtonForTest(), Qt::LeftButton);
+        QVERIFY(!panel->stripForTest(ids[1])->isHidden());
     }
 
     // "Radio stumm": nur mit einem hoerbaren Kiwi, nur Wiedergabe, geht von

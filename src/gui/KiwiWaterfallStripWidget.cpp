@@ -137,6 +137,23 @@ KiwiWaterfallStripWidget::KiwiWaterfallStripWidget(const QString& profileId,
             [this](bool on) { emit soundToggled(m_profileId, on); });
     header->addWidget(m_soundButton, 0);
 
+    // Vergroessern: dieser Streifen fuellt das ganze Fenster (Splatter sehen).
+    m_expandButton = new QToolButton(this);
+    m_expandButton->setText(QStringLiteral("\u2922"));
+    m_expandButton->setCheckable(true);
+    m_expandButton->setAutoRaise(true);
+    m_expandButton->setCursor(Qt::PointingHandCursor);
+    m_expandButton->setToolTip(tr("Enlarge this waterfall to the whole window (click again to go back)"));
+    m_expandButton->setAccessibleName(tr("Enlarge waterfall"));
+    m_expandButton->setFixedSize(20, 18);
+    m_expandButton->setStyleSheet(QStringLiteral(
+        "QToolButton { color: %1; border: none; font-size: 13px; }"
+        "QToolButton:hover, QToolButton:checked { color: %2; }")
+            .arg(QString::fromLatin1(Style::kTextSecondary), ink()));
+    connect(m_expandButton, &QToolButton::toggled, this,
+            [this](bool on) { emit expandToggled(m_profileId, on); });
+    header->addWidget(m_expandButton, 0);
+
     // Schliessen: der Streifen verschwindet, die Verbindung wird getrennt
     // (siehe KiwiSdrManager::setWaterfallPreviewEnabled).
     m_closeButton = new QToolButton(this);
@@ -371,6 +388,12 @@ void KiwiWaterfallStripWidget::contextMenuEvent(QContextMenuEvent* event)
 QSize KiwiWaterfallStripWidget::sizeHint() const
 {
     return QSize(320, 78);
+}
+
+void KiwiWaterfallStripWidget::setExpandedState(bool on)
+{
+    const QSignalBlocker blocker(m_expandButton);
+    m_expandButton->setChecked(on);
 }
 
 void KiwiWaterfallStripWidget::setNotice(const QString& text)

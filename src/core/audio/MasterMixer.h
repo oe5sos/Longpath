@@ -205,6 +205,12 @@ public:
     // that again on every transition.
     void setSliceOpportunistic(int sliceId, bool opportunistic);
 
+    // Eine Quelle ueber das Internet (KiwiSDR) liefert ihren Ton in Schueben mit
+    // Luecken von 0,5..1 s; der Standard-Polster (max. ~43 ms) war dafuer zu klein
+    // und der Ton knackte (Betreiber 2026-11-25). Je Scheibe: Startpolster und
+    // Obergrenze in Frames. Nur fuer opportunistische Scheiben.
+    void setSliceCushion(int sliceId, int startFrames, int maxFrames);
+
 
     // Audio thread: queue a slice's stereo block. samples is interleaved
     // L/R float32, frames = sample pairs. Enrols the slice as a barrier
@@ -402,6 +408,8 @@ private:
         // the link's observed jitter demanded it, and stays.
         bool primed{false};
         int  cushion{0};
+        std::atomic<int> cushionStart{0};   // 0 = kOpportunisticPrimeMarginFrames
+        std::atomic<int> cushionMax{kOpportunisticCushionMaxFrames};
         // One-shot: this drain plays the slot's residue with gain
         // target 0 (fade-out) because it just starved. Audio-thread
         // only, consumed where the gain targets are computed.
