@@ -281,6 +281,8 @@ public:
     const KiwiGroup& kiwiGroupForTest() const { return m_kiwiGroup; }
     void kiwiGroupTxEdgeForTest(bool on) { kiwiGroupTxEdge(on); }
     void openKiwiHearingDialogForTest() { openKiwiHearingDialog(); }
+    void setKiwiSoloForTest(bool on) { setKiwiSolo(on); }
+    bool kiwiSoloOnForTest() const { return m_kiwiSoloOn; }
     class KiwiHearingDialog* kiwiHearingDialogForTest() const
     { return m_kiwiHearingDialog.data(); }
     RadioModel* radioModelForTest() const { return m_radioModel; }
@@ -1698,6 +1700,7 @@ private:
     void sendKiwiGroupTracking();
     void refreshKiwiHearingDialog();
     void updateKiwiGroupCapacity();
+    void setKiwiSolo(bool on);
     void startKiwiGroupRecording(const QString& profileId);
     void stopKiwiGroupRecording(const QString& profileId);
     class SliceModel* kiwiOwnTxSlice() const;
@@ -2316,6 +2319,8 @@ private:
     KiwiGroup m_kiwiGroup;
     QPointer<KiwiHearingDialog> m_kiwiHearingDialog;
     QTimer* m_kiwiGroupTimer{nullptr};
+    QTimer* m_kiwiSoloTimer{nullptr};   // Solo geht nach 30 s von selbst aus
+    bool m_kiwiSoloOn{false};
     QHash<QString, class KiwiRecording*> m_kiwiGroupRecordings;
     QHash<QString, QPointF> m_kiwiPositions;   // Profilkennung -> (Breite, Laenge)
     QPointer<class UpdateDialog> m_updateDialog;

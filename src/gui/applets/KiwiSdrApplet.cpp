@@ -229,6 +229,14 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
         tr("Up to five Kiwis listen along while you transmit: map, "
            "waterfalls and who hears you."));
     otherRow->addWidget(m_hearingButton, 0);
+    m_soloButton = blueToggle(tr("Solo"), 44, 22);
+    m_soloButton->setCheckable(true);
+    m_soloButton->setObjectName(QStringLiteral("kiwiSoloButton"));
+    m_soloButton->setAccessibleName(tr("Hear only the Kiwi"));
+    m_soloButton->setToolTip(
+        tr("Mutes the radio's receive audio in the speakers so you hear "
+           "only what the Kiwi hears. Switches itself off after 30 seconds."));
+    otherRow->addWidget(m_soloButton, 0);
     otherRow->addStretch(1);
     root->addLayout(otherRow);
     // Der gewaehlte Name steht in einer EIGENEN Zeile: neben den Knoepfen
@@ -247,6 +255,7 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
             &KiwiSdrApplet::recordToggled);
     connect(m_otherButton, &QPushButton::clicked, this,
             &KiwiSdrApplet::otherReceiverRequested);
+    connect(m_soloButton, &QPushButton::toggled, this, &KiwiSdrApplet::soloToggled);
     connect(m_hearingButton, &QPushButton::clicked, this,
             &KiwiSdrApplet::hearingRequested);
 
@@ -318,6 +327,12 @@ void KiwiSdrApplet::setRecordingActive(bool active)
 {
     const QSignalBlocker blocker(m_recordButton);
     m_recordButton->setChecked(active);
+}
+
+void KiwiSdrApplet::setSoloActive(bool active)
+{
+    const QSignalBlocker blocker(m_soloButton);
+    m_soloButton->setChecked(active);
 }
 
 void KiwiSdrApplet::setOwnSignalReceiverName(const QString& name)

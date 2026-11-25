@@ -272,6 +272,7 @@ void MainWindow::setKiwiOwnSignal(bool on)
     }
 
     if (!on) {
+        if (m_kiwiSoloOn) { setKiwiSolo(false); }
         m_kiwiOwnSignalOn = false;
         for (const QMetaObject::Connection& c : m_kiwiOwnConnections) {
             disconnect(c);

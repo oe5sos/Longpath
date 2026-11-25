@@ -81,6 +81,8 @@ public:
     void setRecordingActive(bool active);
     // Name des Kiwi, an dem "Mein Signal" haengt; leer = noch keiner.
     void setOwnSignalReceiverName(const QString& name);
+    // "Solo": nur der Kiwi aus den Lautsprechern (siehe AudioEngine::setSoloSlice).
+    void setSoloActive(bool active);
 
 protected:
     void showEvent(QShowEvent* event) override;
@@ -91,6 +93,7 @@ signals:
     void recordToggled(bool on);
     void otherReceiverRequested();
     void hearingRequested();
+    void soloToggled(bool on);
 
 private:
     void rebuildReceiverList();
@@ -109,6 +112,7 @@ private:
     QPushButton* m_recordButton{nullptr};
     QPushButton* m_otherButton{nullptr};
     QPushButton* m_hearingButton{nullptr};
+    QPushButton* m_soloButton{nullptr};
     QLabel* m_ownSignalLabel{nullptr};
     QListWidget* m_receiverList{nullptr};
     QVector<KiwiSdrReceiverStatus> m_receivers;

@@ -843,6 +843,15 @@ public:
     /// is a state that eventually gets left behind in the wrong
     /// position.
     void setRxMutedForMonitor(bool muted);
+
+    /// "Nur Kiwi hoeren" (Longpath 2026-11-25). Ist eine Scheibenkennung
+    /// gesetzt (>= 0), kommt von den Scheiben NUR DIESE aus den
+    /// Lautsprechern; alle anderen sind im Lautsprecher-Mix stumm. Das ist
+    /// reine Wiedergabe: es beruehrt weder eine Scheibe noch das
+    /// Funkgeraet (SliceModel::muted() bleibt, wie es ist), nicht VAX und
+    /// nicht den Anti-VOX-Abgriff. -1 = aus.
+    void setSoloSlice(int sliceId) { m_soloSliceId.store(sliceId, std::memory_order_release); }
+    int soloSlice() const { return m_soloSliceId.load(std::memory_order_acquire); }
     bool rxMutedForMonitor() const
     { return m_rxMutedForMonitor.load(std::memory_order_acquire); }
     bool masterMuted() const { return m_masterMuted.load(std::memory_order_acquire); }
@@ -1328,6 +1337,7 @@ private:
     // audio thread in E.3's txMonitorBlockReady slot. Same acq_rel /
     // acquire pairing as m_masterMuted above.
     std::atomic<bool>  m_rxMutedForMonitor{false};
+    std::atomic<int>   m_soloSliceId{-1};
     std::atomic<bool>  m_txMonitorEnabled{false};  // default off per plan §0 row 9
 
     // ── The last sixteen seconds of what is actually going out ───────

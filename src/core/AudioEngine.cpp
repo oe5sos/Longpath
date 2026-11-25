@@ -1547,10 +1547,12 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
     // Muted at the accumulate rather than at the push, so the monitor —
     // which is a different slot in the same mix — still reaches the
     // speakers. See setRxMutedForMonitor().
+    const int solo = m_soloSliceId.load(std::memory_order_acquire);
     m_masterMix.accumulate(sliceId, samples, frames,
                            slice->muted()
                                || m_rxMutedForMonitor.load(
-                                      std::memory_order_acquire));
+                                      std::memory_order_acquire)
+                               || (solo >= 0 && sliceId != solo));
 
     // Anti-VOX hears exactly what the speakers hear. From Thetis
     // cmaster.c:370-372 [v2.10.3.15], every sub-receiver's audio is handed

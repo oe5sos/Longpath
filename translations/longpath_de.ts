@@ -2959,6 +2959,18 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <source>Up to five Kiwis listen along while you transmit: map, waterfalls and who hears you.</source>
         <translation>Bis zu fünf Kiwis hören beim Senden mit: Karte, Wasserfälle und wer dich hört.</translation>
     </message>
+    <message>
+        <source>Solo</source>
+        <translation>Solo</translation>
+    </message>
+    <message>
+        <source>Hear only the Kiwi</source>
+        <translation>Nur den Kiwi hören</translation>
+    </message>
+    <message>
+        <source>Mutes the radio's receive audio in the speakers so you hear only what the Kiwi hears. Switches itself off after 30 seconds.</source>
+        <translation>Schaltet den Empfangston des Funkgeräts im Lautsprecher stumm, damit man nur hört, was der Kiwi hört. Geht nach 30 Sekunden von selbst aus.</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::KiwiSdrClient</name>
@@ -4215,6 +4227,10 @@ Die Beschreibung des Herstellers dokumentiert nur einen Typcode, darum wird die 
     <message>
         <source>not connected</source>
         <translation>nicht verbunden</translation>
+    </message>
+    <message>
+        <source>Solo needs &quot;My Signal&quot; with a Kiwi switched on.</source>
+        <translation>Solo braucht „Mein Signal“ mit eingeschaltetem Kiwi.</translation>
     </message>
 </context>
 <context>

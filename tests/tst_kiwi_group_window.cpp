@@ -17,6 +17,7 @@
 #include <QPushButton>
 #include <QScopeGuard>
 
+#include "core/AudioEngine.h"
 #include "core/KiwiGroup.h"
 #include "core/KiwiSdrManager.h"
 #include "gui/KiwiHearingDialog.h"
@@ -151,6 +152,57 @@ private slots:
                 << "Listenhoehe" << list->height() << "Applet sichtbar"
                 << mw->kiwiSdrAppletForTest()->isVisible();
         QVERIFY2(gross > klein, "hoeheres Hauptfenster muss mehr Zeilen zeigen");
+    }
+
+    // "Nur Kiwi hoeren": nur Wiedergabe, nie ein Mute an der Scheibe.
+    void soloHoertNurDenKiwiUndRuehrtKeineScheibeAn()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        RadioModel* model = mw->radioModelForTest();
+        AudioEngine* audio = model->audioEngine();
+        QVERIFY(audio);
+        clearProfiles(mgr);
+        mw->addKiwiSdrReceiverForTest(QStringLiteral("Linz"),
+                                      QStringLiteral("127.0.0.1:60"));
+        const QString pid = mgr->profiles().first().id;
+        const int kiwiSlice = mgr->assignedSliceForProfile(pid);
+        QVERIFY(kiwiSlice >= 0);
+        const int txId = model->addSlice();
+        SliceModel* radio = model->sliceById(txId);
+        QVERIFY(radio && !radio->muted());
+
+        // Ohne "Mein Signal": abgelehnt, nichts stumm.
+        mw->setKiwiSoloForTest(true);
+        QVERIFY(!mw->kiwiSoloOnForTest());
+        QCOMPARE(audio->soloSlice(), -1);
+
+        mw->setKiwiOwnSignalProfileForTest(pid, 10.0);
+        mw->setKiwiOwnSignalForTest(true);
+        QVERIFY(mw->kiwiOwnSignalOnForTest());
+        mw->setKiwiSoloForTest(true);
+        QVERIFY(mw->kiwiSoloOnForTest());
+        QCOMPARE(audio->soloSlice(), kiwiSlice);
+        // Die Scheibe des Funkgeraets bleibt unberuehrt.
+        QVERIFY(!radio->muted());
+        auto* btn = mw->kiwiSdrAppletForTest()->findChild<QPushButton*>(
+            QStringLiteral("kiwiSoloButton"));
+        QVERIFY(btn && btn->isChecked());
+
+        // Aus -> alles wieder da.
+        mw->setKiwiSoloForTest(false);
+        QCOMPARE(audio->soloSlice(), -1);
+        QVERIFY(!btn->isChecked());
+
+        // "Mein Signal" aus -> Solo aus, sonst bliebe alles stumm.
+        mw->setKiwiSoloForTest(true);
+        QCOMPARE(audio->soloSlice(), kiwiSlice);
+        mw->setKiwiOwnSignalForTest(false);
+        QCOMPARE(audio->soloSlice(), -1);
+        QVERIFY(!mw->kiwiSoloOnForTest());
     }
 
     void zeilenKommenAnUndDasFensterOeffnetSich()

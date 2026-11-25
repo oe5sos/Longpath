@@ -25,6 +25,7 @@
 #include "gui/MainWindow.h"
 
 #include "core/AppSettings.h"
+#include "core/AudioEngine.h"
 #include "core/KiwiGroup.h"
 #include "core/KiwiOwnSignal.h"
 #include "core/KiwiRecording.h"
@@ -63,6 +64,21 @@ void MainWindow::wireKiwiGroup()
 
     connect(m_kiwiSdrApplet, &KiwiSdrApplet::hearingRequested, this,
             [this]() { openKiwiHearingDialog(); });
+    connect(m_kiwiSdrApplet, &KiwiSdrApplet::soloToggled, this,
+            [this](bool on) { setKiwiSolo(on); });
+    m_kiwiSoloTimer = new QTimer(this);
+    m_kiwiSoloTimer->setSingleShot(true);
+    m_kiwiSoloTimer->setInterval(30000);
+    connect(m_kiwiSoloTimer, &QTimer::timeout, this, [this]() { setKiwiSolo(false); });
+    // Fiel die Scheibe des Kiwi weg, ist Solo aus -- sonst bliebe alles stumm.
+    connect(m_kiwiSdrManager, &KiwiSdrManager::sliceAssignmentChanged, this,
+            [this](int, const QString&) {
+        if (m_kiwiSoloOn
+            && !kiwiControllableSlice(
+                   m_kiwiSdrManager->assignedSliceForProfile(m_kiwiOwnProfileId))) {
+            setKiwiSolo(false);
+        }
+    });
 
     // Zeilen: an die Messung des Mithoerers und an die Kachel.
     connect(m_kiwiSdrManager, &KiwiSdrManager::waterfallRowReady, this,
@@ -107,6 +123,34 @@ void MainWindow::wireKiwiGroup()
         sendKiwiGroupTracking();
         refreshKiwiHearingDialog();
     });
+}
+
+// "Nur Kiwi hoeren": der Lautsprecher-Mix bekommt nur die Scheibe des Kiwi von
+// "Mein Signal". Nur Wiedergabe; die Scheibe des Funkgeraets bleibt
+// unberuehrt (kein SliceModel-Mute, nichts an das Geraet). Sicherung: nach 30 s
+// von selbst aus, ebenso beim Ende von "Mein Signal".
+void MainWindow::setKiwiSolo(bool on)
+{
+    AudioEngine* audio = m_radioModel ? m_radioModel->audioEngine() : nullptr;
+    if (on) {
+        const int sliceId = m_kiwiSdrManager && m_kiwiOwnSignalOn
+            ? m_kiwiSdrManager->assignedSliceForProfile(m_kiwiOwnProfileId) : -1;
+        if (!audio || !kiwiControllableSlice(sliceId)) {
+            showToast(tr("Solo needs \"My Signal\" with a Kiwi switched on."),
+                      ToastSeverity::Info, 5000);
+            m_kiwiSoloOn = false;
+            if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setSoloActive(false); }
+            return;
+        }
+        audio->setSoloSlice(sliceId);
+        m_kiwiSoloOn = true;
+        if (m_kiwiSoloTimer) { m_kiwiSoloTimer->start(); }
+    } else {
+        if (audio) { audio->setSoloSlice(-1); }
+        m_kiwiSoloOn = false;
+        if (m_kiwiSoloTimer) { m_kiwiSoloTimer->stop(); }
+    }
+    if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setSoloActive(m_kiwiSoloOn); }
 }
 
 void MainWindow::updateKiwiGroupCapacity()
