@@ -116,6 +116,10 @@ void MainWindow::wireKiwiGroup()
                 [this](bool on) { setAllKiwiSound(on); });
         connect(m_kiwiSdrManager, &KiwiSdrManager::sliceAssignmentChanged, this,
                 [this](int, const QString&) { refreshKiwiSoundButtons(); });
+        connect(m_kiwiSdrManager, &KiwiSdrManager::profileWaterfallAvailabilityChanged, this,
+                [this](const QString&, bool, const QString&) { refreshKiwiSoundButtons(); });
+        connect(m_kiwiSdrManager, &KiwiSdrManager::profileStateChanged, this,
+                [this](const QString&, KiwiSdrClient::State) { refreshKiwiSoundButtons(); });
         connect(m_kiwiSdrManager, &KiwiSdrManager::waterfallPreviewEnabledChanged, this,
                 [this](const QString&, bool) { refreshKiwiSoundButtons(); });
         connect(m_radioModel, &RadioModel::sliceRemoved, this, [this](int sliceId) {
@@ -365,6 +369,12 @@ void MainWindow::refreshKiwiSoundButtons()
     for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
         m_kiwiWaterfallPanel->setSoundActive(
             pr.id, m_kiwiSdrManager->assignedSliceForProfile(pr.id) >= 0);
+        const KiwiSdrClient::State st = m_kiwiSdrManager->state(pr.id);
+        const bool up = st == KiwiSdrClient::State::Connected || st == KiwiSdrClient::State::Camping;
+        m_kiwiWaterfallPanel->setNotice(
+            pr.id, (up && !m_kiwiSdrManager->waterfallAvailable(pr.id))
+                       ? tr("This Kiwi has no free waterfall channel — sound only.")
+                       : QString());
     }
 }
 

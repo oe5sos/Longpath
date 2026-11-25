@@ -128,6 +128,13 @@ void KiwiWaterfallPanel::setSoundActive(const QString& profileId, bool on)
     }
 }
 
+void KiwiWaterfallPanel::setNotice(const QString& profileId, const QString& text)
+{
+    if (auto* strip = m_strips.value(profileId, nullptr)) {
+        strip->setNotice(text);
+    }
+}
+
 void KiwiWaterfallPanel::resetStrip(const QString& profileId)
 {
     if (auto* strip = m_strips.value(profileId, nullptr)) {

@@ -45,6 +45,8 @@ public:
     int rowIntervalMs() const { return m_rowIntervalMs; }
     int acceptedRowsForTest() const { return m_acceptedRows; }
     void reset();
+    // Hinweis statt Bild (z. B. Kiwi ohne freien Wasserfall-Kanal); leer = kein Hinweis.
+    void setNotice(const QString& text);
 
     QSize sizeHint() const override;
 
@@ -83,6 +85,7 @@ signals:
 
 protected:
     void paintEvent(QPaintEvent* event) override;
+    QString m_notice;
     void contextMenuEvent(QContextMenuEvent* event) override;
 
 private:

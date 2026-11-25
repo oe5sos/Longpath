@@ -373,6 +373,13 @@ QSize KiwiWaterfallStripWidget::sizeHint() const
     return QSize(320, 78);
 }
 
+void KiwiWaterfallStripWidget::setNotice(const QString& text)
+{
+    if (m_notice == text) { return; }
+    m_notice = text;
+    update();
+}
+
 void KiwiWaterfallStripWidget::paintEvent(QPaintEvent* event)
 {
     QWidget::paintEvent(event);
@@ -382,6 +389,11 @@ void KiwiWaterfallStripWidget::paintEvent(QPaintEvent* event)
     const QRect target(9, 30, width() - 18, height() - 39 - axisH);
     if (target.height() > 0 && target.width() > 0 && m_history.width() > 0) {
         painter.drawImage(target, m_history);
+    }
+    if (!m_notice.isEmpty() && target.width() > 20) {
+        painter.setPen(QColor(Style::hexRole(Style::kTextScale)));
+        painter.drawText(target.adjusted(8, 0, -8, 0),
+                         Qt::AlignCenter | Qt::TextWordWrap, m_notice);
     }
     if (axis && target.width() > 60) {
         // Frequenzachse unter dem Bild, Marke auf der Mitte (dort steht der Kiwi).

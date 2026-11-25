@@ -274,6 +274,23 @@ void MainWindow::refreshKiwiSdrAppletReceivers()
     if (!m_kiwiSdrApplet) {
         return;
     }
+    // Zeilen neu aufbauen ist teuer (jede Zeile parst Stilvorlagen). Beim
+    // Verbinden kommen Meldungen im Takt von Millisekunden -- das war das
+    // Ruckeln ein paar Sekunden nach dem Verbinden (Betreiber 2026-11-25).
+    // Die erste Meldung laeuft sofort, die folgenden werden in 300 ms zu
+    // einem Neuaufbau zusammengefasst.
+    if (m_kiwiAppletRefreshBlocked) {
+        m_kiwiAppletRefreshDirty = true;
+        return;
+    }
+    m_kiwiAppletRefreshBlocked = true;
+    QTimer::singleShot(300, this, [this]() {
+        m_kiwiAppletRefreshBlocked = false;
+        if (m_kiwiAppletRefreshDirty) {
+            m_kiwiAppletRefreshDirty = false;
+            refreshKiwiSdrAppletReceivers();
+        }
+    });
 
     QVector<KiwiSdrReceiverStatus> receivers;
     if (m_kiwiSdrManager) {

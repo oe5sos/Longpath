@@ -58,6 +58,7 @@ public slots:
     void pushRow(const QString& profileId, const QVector<float>& binsDbm,
                  double lowHz = 0.0, double highHz = 0.0);
     void resetStrip(const QString& profileId);
+    void setNotice(const QString& profileId, const QString& text);
     void setSoundActive(const QString& profileId, bool on);
 
 private:

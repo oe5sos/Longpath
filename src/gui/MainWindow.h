@@ -2335,6 +2335,8 @@ private:
     KiwiGroup m_kiwiGroup;
     QPointer<KiwiHearingDialog> m_kiwiHearingDialog;
     QTimer* m_kiwiGroupTimer{nullptr};
+    bool m_kiwiAppletRefreshBlocked{false};
+    bool m_kiwiAppletRefreshDirty{false};
     QHash<QString, double> m_kiwiViewSpanHz;   // Bereich je Kiwi-Streifen (Hz)
     QHash<QString, int> m_kiwiSoundSlices;   // Profil -> Scheibe, die wir fuer den Ton anlegten
     QTimer* m_kiwiSoloTimer{nullptr};   // Solo geht nach 30 s von selbst aus
