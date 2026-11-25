@@ -80,6 +80,8 @@ void KiwiWaterfallPanel::setStripEnabled(const QString& profileId, bool enabled,
                 this, &KiwiWaterfallPanel::soundToggled);
         connect(strip, &KiwiWaterfallStripWidget::zoomRequested,
                 this, &KiwiWaterfallPanel::zoomRequested);
+        connect(strip, &KiwiWaterfallStripWidget::chooseOtherRequested,
+                this, &KiwiWaterfallPanel::chooseOtherRequested);
         // Allgemeine Einstellung: eine Aenderung gilt fuer alle Streifen.
         connect(strip, &KiwiWaterfallStripWidget::optionsChanged, this, [this, strip]() {
             for (KiwiWaterfallStripWidget* other : std::as_const(m_strips)) {
@@ -120,6 +122,14 @@ void KiwiWaterfallPanel::setNotice(const QString& profileId, const QString& text
 {
     if (auto* strip = m_strips.value(profileId, nullptr)) {
         strip->setNotice(text);
+    }
+}
+
+void KiwiWaterfallPanel::setLost(const QString& profileId, const QString& title,
+                                 const QString& detail)
+{
+    if (auto* strip = m_strips.value(profileId, nullptr)) {
+        strip->setLost(title, detail);
     }
 }
 

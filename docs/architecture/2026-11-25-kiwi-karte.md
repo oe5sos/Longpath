@@ -40,3 +40,14 @@ ob der Server ohne Ton-Zuordnung wirklich Wasserfallzeilen auf die gesendete
 Ansicht liefert, die Verzugsmessung je Kiwi, der Mitschnitt eines Mithörers
 (`setDecodeAudioWhenInactive`). Die Sendefrequenz-Nachführung der Mithörer
 läuft im Sekundentakt (der Client weist Gleiches selbst ab).
+
+## Nachtrag 2026-11-25: getrennter Kiwi und Lautstärke
+
+* Ist ein Kiwi weg (belegt, Fehler, getrennt), dunkeln beide Anzeigen ihr Bild ab
+  und zeigen den Grund und den Knopf „Anderen Kiwi wählen“ (`KiwiLostOverlay`).
+  Ein ersetzter Kiwi wird weggeräumt (`MainWindow::retireKiwi`), der Eintrag in der
+  Liste bleibt. Von selbst wird nicht gewechselt (Entscheidung des Betreibers).
+* „Server-Limit“ heißt: der Server hat eine stehende Verbindung mit `too_busy`
+  beendet (Grenze des Kiwi-Betreibers für Programme). Longpath umgeht das nicht.
+* Lautstärke je Kiwi: Regler in der Zeile der KIWISDR-Liste, −30 … +24 dB,
+  gespeichert unter `KiwiVolumes`, oberhalb 0,8 weich begrenzt.

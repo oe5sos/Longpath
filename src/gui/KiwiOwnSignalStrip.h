@@ -32,6 +32,8 @@ class QToolButton;
 
 namespace Longpath {
 
+class KiwiLostOverlay;
+
 class KiwiOwnSignalStrip : public QWidget {
     Q_OBJECT
 
@@ -72,6 +74,10 @@ public:
     bool soundActiveForTest() const;
     QToolButton* soundButtonForTest() const { return m_soundButton; }
 
+    // Kiwi weg: Bild abgedunkelt, Grund und Knopf darueber; title leer = weg.
+    void setLost(const QString& title, const QString& detail = QString());
+    KiwiLostOverlay* lostOverlayForTest() const { return m_lost; }
+
     // Das Bild des Streifens (Wasserfall und Marke, ohne Kopf/Fuss) fuer
     // die Aufnahme als PNG. Leer, wenn noch keine Zeile kam.
     QImage waterfallImage(int width = 1200) const;
@@ -91,6 +97,7 @@ public:
 signals:
     void soundToggled(bool on);
     void zoomRequested(int direction);   // +1 enger, -1 weiter
+    void chooseOtherRequested();
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -126,6 +133,7 @@ private:
     QToolButton* m_soundButton{nullptr};
     QToolButton* m_zoomOut{nullptr};
     QToolButton* m_zoomIn{nullptr};
+    KiwiLostOverlay* m_lost{nullptr};
     void layoutButtons();
     int buttonsWidth() const;
 };

@@ -1077,6 +1077,7 @@ set(GUI_SOURCES
     src/gui/hotkeys/MainWindowHotKeyTargets.cpp
     src/gui/KiwiPublicReceiverPicker.cpp
     src/gui/widgets/KiwiWorldMap.cpp
+    src/gui/widgets/KiwiLostOverlay.cpp
     src/gui/KiwiHearingDialog.cpp
     src/gui/widgets/KiwiWorldCoast.cpp
     src/gui/LanScanDialog.cpp

@@ -2867,6 +2867,18 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 <context>
     <name>Longpath::KiwiSdrApplet</name>
     <message>
+        <source>Volume</source>
+        <translation>Lautstärke</translation>
+    </message>
+    <message>
+        <source>Volume of %1</source>
+        <translation>Lautstärke von %1</translation>
+    </message>
+    <message>
+        <source>Volume of this Kiwi only</source>
+        <translation>Lautstärke nur dieses Kiwi</translation>
+    </message>
+    <message>
         <source>Hear my signal on the Kiwi</source>
         <translation>Mein Signal am Kiwi hören</translation>
     </message>
@@ -3552,6 +3564,22 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 </context>
 <context>
     <name>Longpath::MainWindow</name>
+    <message>
+        <source>Disconnected – server limit</source>
+        <translation>Getrennt – Server-Limit</translation>
+    </message>
+    <message>
+        <source>Disconnected – receiver full</source>
+        <translation>Getrennt – Empfänger voll</translation>
+    </message>
+    <message>
+        <source>Disconnected – connection error</source>
+        <translation>Getrennt – Verbindungsfehler</translation>
+    </message>
+    <message>
+        <source>Choose another Kiwi</source>
+        <translation>Anderen Kiwi wählen</translation>
+    </message>
     <message>
         <source>Disconnects programs after 10 s when its program slots are full.</source>
         <translation>Trennt Programme nach 10 s, wenn seine Programm-Plätze voll sind.</translation>
@@ -8636,6 +8664,13 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
     <message>
         <source>Zoom in</source>
         <translation>Vergrößern</translation>
+    </message>
+</context>
+<context>
+    <name>Longpath::KiwiLostOverlay</name>
+    <message>
+        <source>Choose another Kiwi</source>
+        <translation>Anderen Kiwi wählen</translation>
     </message>
 </context>
 </TS>

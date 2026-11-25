@@ -50,6 +50,7 @@ signals:
     void renameRequested(const QString& profileId);
     void soundToggled(const QString& profileId, bool on);
     void zoomRequested(const QString& profileId, int direction);
+    void chooseOtherRequested(const QString& profileId);
 
 public:
     KiwiWaterfallStripWidget* stripForTest(const QString& id) const { return m_strips.value(id, nullptr); }
@@ -61,6 +62,7 @@ public slots:
                  double lowHz = 0.0, double highHz = 0.0);
     void resetStrip(const QString& profileId);
     void setNotice(const QString& profileId, const QString& text);
+    void setLost(const QString& profileId, const QString& title, const QString& detail);
     void setSoundActive(const QString& profileId, bool on);
 
 private:

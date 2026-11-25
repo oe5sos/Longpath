@@ -287,6 +287,8 @@ public:
     void setRadioMutedForTest(bool on) { setRadioMuted(on); }
     bool radioMutedForTest() const { return m_radioMuted; }
     void setKiwiSoundForTest(const QString& id, bool on) { setKiwiSound(id, on); }
+    void retireKiwiForTest(const QString& id) { retireKiwi(id); }
+    int kiwiVolumeDbForTest(const QString& id) const { return kiwiVolumeDb(id); }
     void zoomKiwiStripForTest(const QString& id, int dir) { zoomKiwiStrip(id, dir); }
     double kiwiViewSpanForTest(const QString& id) const { return m_kiwiViewSpanHz.value(id, 0.0); }
     void setAllKiwiSoundForTest(bool on) { setAllKiwiSound(on); }
@@ -1703,7 +1705,15 @@ private:
     // Wo werde ich gehoert (Entwurf B/C) -- MainWindow_KiwiGroup.cpp.
     void wireKiwiGroup();
     void openKiwiHearingDialog();
-    void addKiwiToGroupFromPicker();
+    // replaceId: dieser (ausgefallene) Kiwi wird durch den gewaehlten ersetzt.
+    void addKiwiToGroupFromPicker(const QString& replaceId = QString());
+    // Warum ein Kiwi gerade weg ist (Ueberschrift der Anzeige), leer = ist da.
+    QString kiwiLostTitle(const QString& profileId) const;
+    // Einen ersetzten Kiwi still wegraeumen: Ton, Mithoeren, Wasserfall.
+    void retireKiwi(const QString& profileId);
+    // Lautstaerke je Kiwi in dB (0 = unveraendert), gespeichert.
+    int kiwiVolumeDb(const QString& profileId) const;
+    void setKiwiVolumeDb(const QString& profileId, int db);
     bool addKiwiListener(const QString& profileId, double km, bool hasPos,
                          double lat, double lon);
     void removeKiwiListener(const QString& profileId);

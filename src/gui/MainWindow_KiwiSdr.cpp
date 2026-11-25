@@ -57,6 +57,7 @@
 #include "gui/widgets/StatusToast.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/applets/KiwiSdrApplet.h"
+#include <cmath>
 #include <QInputDialog>
 #include <QLineEdit>
 #include "models/RadioModel.h"
@@ -311,6 +312,7 @@ void MainWindow::refreshKiwiSdrAppletReceivers()
             const int sliceId = m_kiwiSdrManager->assignedSliceForProfile(profile.id);
             receiver.assignedSlice = m_radioModel ? m_radioModel->sliceById(sliceId)
                                                   : nullptr;
+            receiver.volumeDb = kiwiVolumeDb(profile.id);
             if (kiwiEvictsPrograms(profile.id)) {
                 receiver.warning = tr("Disconnects programs after 10 s when its "
                                       "program slots are full.");
@@ -778,7 +780,9 @@ void MainWindow::wireKiwiSdr()
             m_kiwiSdrManager->assignedSliceForProfile(profileId);
         if (!kiwiControllableSlice(sliceId)) { return; }
         if (AudioEngine* audio = m_radioModel->audioEngine()) {
-            audio->feedKiwiSdrAudioData(sliceId, pcm);
+            const int db = kiwiVolumeDb(profileId);
+            audio->feedKiwiSdrAudioData(
+                sliceId, pcm, db == 0 ? 1.0f : float(std::pow(10.0, db / 20.0)));
         }
     });
 

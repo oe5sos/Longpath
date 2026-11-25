@@ -58,6 +58,7 @@ struct KiwiSdrReceiverStatus {
     // 10 s), unabhaengig vom augenblicklichen Zustand.
     QString warning;
     QPointer<SliceModel> assignedSlice;
+    int volumeDb{0};   // Lautstaerke dieses Kiwi, 0 = unveraendert
 };
 
 class KiwiSdrApplet : public AppletWidget {
@@ -65,6 +66,10 @@ class KiwiSdrApplet : public AppletWidget {
 
 public:
     explicit KiwiSdrApplet(RadioModel* model, QWidget* parent = nullptr);
+
+    // Bereich des Lautstaerkereglers je Kiwi.
+    static constexpr int kVolumeMinDb = -30;
+    static constexpr int kVolumeMaxDb = 24;
 
     QString appletId()    const override { return QStringLiteral("KiwiSdr"); }
     QString appletTitle() const override { return QStringLiteral("KIWISDR"); }
@@ -102,6 +107,7 @@ signals:
     void radioMuteToggled(bool on);
     // Ton eines Kiwi aus der Liste ein/aus (verbindet bzw. trennt ihn).
     void soundRequested(const QString& profileId, bool on);
+    void volumeChanged(const QString& profileId, int db);
     // Doppelklick auf eine Zeile: eigenes Fenster (Wasserfall) fuer diesen Kiwi.
     void openWindowRequested(const QString& profileId);
 
@@ -118,6 +124,7 @@ private:
     QWidget* scrollViewport() const;
     QPointer<QWidget> m_watchedWindow;
     QWidget* buildReceiverRow(const KiwiSdrReceiverStatus& receiver);
+    QWidget* buildVolumeRow(const KiwiSdrReceiverStatus& receiver, QWidget* parent);
     QWidget* buildSliceAssignmentRow(SliceModel* slice, QWidget* parent);
     QString sliceText(SliceModel* slice) const;
 
@@ -131,6 +138,10 @@ private:
     QLabel* m_ownSignalLabel{nullptr};
     QListWidget* m_receiverList{nullptr};
     QVector<KiwiSdrReceiverStatus> m_receivers;
+    // Waehrend am Regler gezogen wird, darf die Liste nicht neu gebaut werden
+    // (der Regler verschwaende unter der Maus).
+    bool m_volumeDragging{false};
+    bool m_rebuildPending{false};
     QList<QMetaObject::Connection> m_sliceConnections;
     QPointer<KiwiSdrManager> m_kiwiSdrManager;
 };

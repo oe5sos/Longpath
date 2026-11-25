@@ -602,7 +602,10 @@ public:
     // "opportunistisch": sie ist dann kein Mitglied der Bereitschafts-
     // schranke mehr und kann bei einem Netzaussetzer nicht den ganzen
     // Mix anhalten.
-    void feedKiwiSdrAudioData(int sliceId, const QByteArray& pcm24kStereoFloat);
+    // gain: Lautstaerke dieses Empfaengers (linear). Ueber 1 hinaus wird
+    // weich begrenzt, statt hart abzuschneiden.
+    void feedKiwiSdrAudioData(int sliceId, const QByteArray& pcm24kStereoFloat,
+                              float gain = 1.0f);
     void setKiwiSdrAudioSourceEnabled(int sliceId, bool enabled);
     void removeKiwiSdrAudioSource(int sliceId);
     bool kiwiSdrAudioEnabled(int sliceId) const;

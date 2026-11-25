@@ -17,6 +17,8 @@ class QToolButton;
 
 namespace Longpath {
 
+class KiwiLostOverlay;
+
 // Ein einzelner, schmaler Wasserfallstreifen fuer EIN KiwiSDR-Profil im
 // KIWI-WASSERFAELLE-Panel. Bewusst kein SpectrumWidget: kein Zoom, kein
 // Cursor, keine Bandplan-Ueberlagerung — nur "reicht mein Signal
@@ -47,6 +49,9 @@ public:
     void reset();
     // Hinweis statt Bild (z. B. Kiwi ohne freien Wasserfall-Kanal); leer = kein Hinweis.
     void setNotice(const QString& text);
+    // Kiwi weg: Bild abgedunkelt, Grund und Knopf darueber; title leer = weg.
+    void setLost(const QString& title, const QString& detail = QString());
+    KiwiLostOverlay* lostOverlayForTest() const { return m_lost; }
 
     QSize sizeHint() const override;
 
@@ -85,9 +90,11 @@ signals:
     void soundToggled(const QString& profileId, bool on);
     // +1 = naeher heran (kleinerer Bereich), -1 = weiter weg.
     void zoomRequested(const QString& profileId, int direction);
+    void chooseOtherRequested(const QString& profileId);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
     QString m_notice;
     void contextMenuEvent(QContextMenuEvent* event) override;
 
@@ -122,6 +129,7 @@ private:
     QLabel* m_nameLabel{nullptr};
     QLabel* m_peakLabel{nullptr};
     QImage m_history;
+    KiwiLostOverlay* m_lost{nullptr};
 };
 
 } // namespace Longpath

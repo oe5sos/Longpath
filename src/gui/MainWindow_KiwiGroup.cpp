@@ -104,6 +104,8 @@ void MainWindow::wireKiwiGroup()
             [this](bool on) { setRadioMuted(on); });
     connect(m_kiwiSdrApplet, &KiwiSdrApplet::soundRequested, this,
             [this](const QString& id, bool on) { setKiwiSound(id, on); });
+    connect(m_kiwiSdrApplet, &KiwiSdrApplet::volumeChanged, this,
+            [this](const QString& id, int db) { setKiwiVolumeDb(id, db); });
     connect(m_kiwiSdrApplet, &KiwiSdrApplet::openWindowRequested, this,
             [this](const QString& id) {
         if (!m_kiwiSdrManager || !m_kiwiSdrManager->hasProfile(id)) { return; }
@@ -150,6 +152,7 @@ void MainWindow::wireKiwiGroup()
             if (!empty) { kiwiFensterNachVorn(m_kiwiWaterfallPanel, this); }
         });
         QTimer::singleShot(0, this, [this]() {
+            refreshKiwiSoundButtons();
             if (m_appletVis && m_kiwiWaterfallPanel
                 && m_kiwiWaterfallPanel->stripForTest(QString()) == nullptr
                 && m_kiwiSdrManager) {
@@ -164,13 +167,17 @@ void MainWindow::wireKiwiGroup()
                 [this](const QString& id, bool on) { setKiwiSound(id, on); });
         connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::zoomRequested, this,
                 [this](const QString& id, int dir) { zoomKiwiStrip(id, dir); });
+        connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::chooseOtherRequested, this,
+                [this](const QString& id) {
+            if (id == m_kiwiOwnProfileId) { chooseOtherKiwi(); }
+            else { addKiwiToGroupFromPicker(id); }
+        });
         connect(m_kiwiSdrManager, &KiwiSdrManager::sliceAssignmentChanged, this,
                 [this](int, const QString&) { refreshKiwiSoundButtons(); });
         connect(m_kiwiSdrManager, &KiwiSdrManager::profileWaterfallAvailabilityChanged, this,
                 [this](const QString&, bool, const QString&) { refreshKiwiSoundButtons(); });
         connect(m_kiwiSdrManager, &KiwiSdrManager::profileStateChanged, this,
                 [this](const QString& id, KiwiSdrClient::State st, const QString& detail) {
-            refreshKiwiSoundButtons();
             const int before = m_kiwiPrevState.value(id, -1);
             m_kiwiPrevState.insert(id, int(st));
             if (st == KiwiSdrClient::State::Busy
@@ -185,6 +192,8 @@ void MainWindow::wireKiwiGroup()
                     }
                 });
             }
+            // Erst jetzt: die Anzeige haengt davon ab, ob er "trennt".
+            refreshKiwiSoundButtons();
             // Warum ein Kiwi wegbleibt, soll sichtbar sein und nicht nur im Log.
             if (st == KiwiSdrClient::State::Busy && !detail.isEmpty()) {
                 showToast(m_kiwiSdrManager->displayName(id) + QStringLiteral(": ") + detail,
@@ -306,6 +315,7 @@ void MainWindow::setKiwiSolo(bool on)
 // kiwiControllableSlice. Die Flex-Scheibe wird nie benutzt oder veraendert.
 namespace {
 const QString kKiwiEvictingKey = QStringLiteral("KiwiEvictingReceivers");
+const QString kKiwiVolumesKey = QStringLiteral("KiwiVolumes");   // "id=dB;..."
 }
 
 bool MainWindow::kiwiEvictsPrograms(const QString& profileId) const
@@ -541,9 +551,72 @@ void MainWindow::setRadioMuted(bool on)
     }
 }
 
+QString MainWindow::kiwiLostTitle(const QString& profileId) const
+{
+    if (!m_kiwiSdrManager || !m_kiwiSdrManager->hasProfile(profileId)) { return QString(); }
+    switch (m_kiwiSdrManager->state(profileId)) {
+    case KiwiSdrClient::State::Busy:
+        return kiwiEvictsPrograms(profileId) ? tr("Disconnected – server limit")
+                                             : tr("Disconnected – receiver full");
+    case KiwiSdrClient::State::Error:
+        return tr("Disconnected – connection error");
+    case KiwiSdrClient::State::Disconnected:
+    case KiwiSdrClient::State::CampDisconnected:
+        return tr("Disconnected");
+    case KiwiSdrClient::State::Connecting:
+    case KiwiSdrClient::State::Connected:
+    case KiwiSdrClient::State::Waiting:
+    case KiwiSdrClient::State::Camping:
+        break;
+    }
+    return QString();
+}
+
+void MainWindow::retireKiwi(const QString& profileId)
+{
+    if (!m_kiwiSdrManager || profileId == m_kiwiOwnProfileId
+        || !m_kiwiSdrManager->hasProfile(profileId)) {
+        return;
+    }
+    if (m_kiwiSdrManager->assignedSliceForProfile(profileId) >= 0) {
+        setKiwiSound(profileId, false);
+    }
+    m_kiwiSoundSlices.remove(profileId);
+    if (m_kiwiGroup.contains(profileId)) { removeKiwiListener(profileId); }
+    m_kiwiSdrManager->setWaterfallPreviewEnabled(profileId, false);
+    m_kiwiSdrManager->disconnectProfile(profileId);
+}
+
+int MainWindow::kiwiVolumeDb(const QString& profileId) const
+{
+    const QStringList entries = AppSettings::instance().value(kKiwiVolumesKey).toString()
+        .split(QLatin1Char(';'), Qt::SkipEmptyParts);
+    const QString prefix = profileId + QLatin1Char('=');
+    for (const QString& e : entries) {
+        if (e.startsWith(prefix)) {
+            return std::clamp(e.mid(prefix.size()).toInt(),
+                              KiwiSdrApplet::kVolumeMinDb, KiwiSdrApplet::kVolumeMaxDb);
+        }
+    }
+    return 0;
+}
+
+void MainWindow::setKiwiVolumeDb(const QString& profileId, int db)
+{
+    if (profileId.isEmpty()) { return; }
+    QStringList entries = AppSettings::instance().value(kKiwiVolumesKey).toString()
+        .split(QLatin1Char(';'), Qt::SkipEmptyParts);
+    const QString prefix = profileId + QLatin1Char('=');
+    entries.removeIf([&prefix](const QString& e) { return e.startsWith(prefix); });
+    if (db != 0) { entries.append(prefix + QString::number(db)); }
+    AppSettings::instance().setValue(kKiwiVolumesKey, entries.join(QLatin1Char(';')));
+}
+
 void MainWindow::refreshKiwiSoundButtons()
 {
     if (m_kiwiStrip && m_kiwiSdrManager && !m_kiwiOwnProfileId.isEmpty()) {
+        m_kiwiStrip->setLost(kiwiLostTitle(m_kiwiOwnProfileId),
+                             m_kiwiSdrManager->stateDetail(m_kiwiOwnProfileId));
         m_kiwiStrip->setSoundActive(
             m_kiwiSdrManager->assignedSliceForProfile(m_kiwiOwnProfileId) >= 0
             && !m_kiwiUserMuted.contains(m_kiwiOwnProfileId));
@@ -559,6 +632,8 @@ void MainWindow::refreshKiwiSoundButtons()
             pr.id, (up && !m_kiwiSdrManager->waterfallAvailable(pr.id))
                        ? tr("This Kiwi has no free waterfall channel — sound only.")
                        : QString());
+        m_kiwiWaterfallPanel->setLost(pr.id, kiwiLostTitle(pr.id),
+                                      m_kiwiSdrManager->stateDetail(pr.id));
     }
 }
 
@@ -610,10 +685,11 @@ void MainWindow::openKiwiHearingDialog()
 
 // Das Verzeichnis wie bei "Anderer Kiwi ...": ein Klick, eine Abfrage,
 // danach aus dem Sitzungsspeicher.
-void MainWindow::addKiwiToGroupFromPicker()
+void MainWindow::addKiwiToGroupFromPicker(const QString& replaceId)
 {
     updateKiwiGroupCapacity();
-    if (m_kiwiGroup.size() >= m_kiwiGroup.capacity()) {
+    // Wer ersetzt, braucht keinen freien Platz.
+    if (replaceId.isEmpty() && m_kiwiGroup.size() >= m_kiwiGroup.capacity()) {
         showToast(tr("All five places are taken."), ToastSeverity::Warning, 6000);
         return;
     }
@@ -623,7 +699,8 @@ void MainWindow::addKiwiToGroupFromPicker()
     }
     auto* picker = new KiwiPublicReceiverPicker(this);
     picker->setAttribute(Qt::WA_DeleteOnClose);
-    picker->setWindowTitle(tr("Add a Kiwi that listens along"));
+    picker->setWindowTitle(replaceId.isEmpty() ? tr("Add a Kiwi that listens along")
+                                              : tr("Choose another Kiwi"));
     picker->setPreselection(AppSettings::stationGridSquare(), freqHz);
     QSet<QString> open;
     for (const QString& id : m_kiwiGroup.ids()) {
@@ -634,7 +711,7 @@ void MainWindow::addKiwiToGroupFromPicker()
     }
     picker->setOpenEndpoints(open);
     const QPointer<KiwiPublicReceiverPicker> guard(picker);
-    connect(picker, &QDialog::accepted, this, [this, guard]() {
+    connect(picker, &QDialog::accepted, this, [this, guard, replaceId]() {
         if (!guard || !m_kiwiSdrManager) { return; }
         const QString endpoint = guard->selectedEndpoint();
         QString name = guard->selectedName();
@@ -644,10 +721,30 @@ void MainWindow::addKiwiToGroupFromPicker()
         if (id.isEmpty()) { return; }
         double lat = 0.0, lon = 0.0;
         const bool has = guard->selectedLatLon(lat, lon);
+        bool soundWanted = false;
+        if (!replaceId.isEmpty() && replaceId != id) {
+            // Der Ersatz uebernimmt: war der Alte zu hoeren, ist es der Neue.
+            soundWanted = m_kiwiSdrManager->assignedSliceForProfile(replaceId) >= 0
+                          && !m_kiwiUserMuted.contains(replaceId);
+            const bool listened = m_kiwiGroup.contains(replaceId);
+            retireKiwi(replaceId);
+            if (!listened) {
+                // Er lief nur als Wasserfall: der Neue ebenso.
+                m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
+                zeigeKiwiFenster(id);
+                if (soundWanted) { setKiwiSound(id, true); }
+                return;
+            }
+        } else if (!replaceId.isEmpty()) {
+            // Derselbe noch einmal gewaehlt: ein neuer Versuch.
+            m_kiwiSdrManager->connectProfile(id);
+            return;
+        }
         if (addKiwiListener(id, guard->selectedKm(), has, lat, lon)) {
             // Auch im Fenster KIWI WASSERFAELLE zeigen.
             m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
             zeigeKiwiFenster(id);
+            if (soundWanted) { setKiwiSound(id, true); }
         }
     });
     picker->show();

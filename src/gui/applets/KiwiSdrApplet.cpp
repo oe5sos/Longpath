@@ -22,6 +22,8 @@
 #include <QShowEvent>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QTimer>
+#include <QSlider>
 #include <QListWidget>
 #include <QPushButton>
 #include <QSignalBlocker>
@@ -373,6 +375,10 @@ void KiwiSdrApplet::rebuildReceiverList()
     if (!m_receiverList || !m_emptyLabel) {
         return;
     }
+    if (m_volumeDragging) {
+        m_rebuildPending = true;
+        return;
+    }
 
     m_receiverList->clear();
     const bool hasReceivers = !m_receivers.isEmpty();
@@ -483,6 +489,11 @@ bool KiwiSdrApplet::eventFilter(QObject* watched, QEvent* event)
     if (watched == m_watchedWindow && event->type() == QEvent::Resize) {
         updateListHeight();
     }
+    if (event->type() == QEvent::Wheel && watched
+        && watched->property("kiwiVolumeSlider").toBool()) {
+        event->ignore();
+        return true;
+    }
     // Doppelklick auf eine Zeile: der Kiwi bekommt sein eigenes Fenster
     // (Betreiber 2026-11-25).
     if (event->type() == QEvent::MouseButtonDblClick && watched
@@ -564,6 +575,7 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
     topRow->addWidget(waterfallToggle, 0, Qt::AlignRight);
 
     layout->addLayout(topRow);
+    layout->addWidget(buildVolumeRow(receiver, row));
 
     if (!receiver.warning.isEmpty()) {
         auto* warningLabel = new QLabel(receiver.warning, row);
@@ -596,6 +608,65 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
     }
 
     layout->addWidget(buildSliceAssignmentRow(receiver.assignedSlice.data(), row));
+    return row;
+}
+
+QWidget* KiwiSdrApplet::buildVolumeRow(const KiwiSdrReceiverStatus& receiver,
+                                       QWidget* parent)
+{
+    auto* row = new QWidget(parent);
+    auto* layout = new QHBoxLayout(row);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(6);
+
+    auto* caption = new QLabel(tr("Volume"), row);
+    caption->setTextFormat(Qt::PlainText);
+    caption->setStyleSheet(labelStyle());
+    layout->addWidget(caption, 0);
+
+    const auto text = [](int db) {
+        return (db > 0 ? QStringLiteral("+%1 dB") : QStringLiteral("%1 dB")).arg(db);
+    };
+    auto* slider = new QSlider(Qt::Horizontal, row);
+    slider->setObjectName(QStringLiteral("kiwiRowVolume"));
+    slider->setRange(kVolumeMinDb, kVolumeMaxDb);
+    slider->setPageStep(3);
+    slider->setValue(receiver.volumeDb);
+    slider->setFixedHeight(18);
+    slider->setStyleSheet(Style::sliderHStyle());
+    slider->setAccessibleName(tr("Volume of %1").arg(receiver.name));
+    slider->setToolTip(tr("Volume of this Kiwi only"));
+    // Das Mausrad rollt die Spalte, es verstellt nicht nebenbei den Ton.
+    slider->setFocusPolicy(Qt::TabFocus);
+    slider->setProperty("kiwiVolumeSlider", true);
+    slider->installEventFilter(this);
+    layout->addWidget(slider, 1);
+
+    auto* value = new QLabel(text(receiver.volumeDb), row);
+    value->setObjectName(QStringLiteral("kiwiRowVolumeValue"));
+    value->setTextFormat(Qt::PlainText);
+    value->setStyleSheet(labelStyle());
+    value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    value->setMinimumWidth(44);
+    layout->addWidget(value, 0);
+
+    const QString id = receiver.id;
+    connect(slider, &QSlider::valueChanged, this, [this, id, value, text](int db) {
+        value->setText(text(db));
+        for (KiwiSdrReceiverStatus& r : m_receivers) {
+            if (r.id == id) { r.volumeDb = db; }
+        }
+        emit volumeChanged(id, db);
+    });
+    connect(slider, &QSlider::sliderPressed, this, [this]() { m_volumeDragging = true; });
+    connect(slider, &QSlider::sliderReleased, this, [this]() {
+        m_volumeDragging = false;
+        if (m_rebuildPending) {
+            m_rebuildPending = false;
+            // Erst nach dem Loslassen: der Regler steckt noch in seinem Signal.
+            QTimer::singleShot(0, this, &KiwiSdrApplet::rebuildReceiverList);
+        }
+    });
     return row;
 }
 

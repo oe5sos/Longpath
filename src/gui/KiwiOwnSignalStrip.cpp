@@ -8,6 +8,7 @@
 
 #include "gui/StyleConstants.h"
 #include "gui/Zahlentext.h"
+#include "gui/widgets/KiwiLostOverlay.h"
 
 #include <QDateTime>
 #include <QPainter>
@@ -96,6 +97,9 @@ KiwiOwnSignalStrip::KiwiOwnSignalStrip(QWidget* parent) : QWidget(parent)
     m_soundButton->setFixedHeight(18);
     m_soundButton->setStyleSheet(btnStyle);
     connect(m_soundButton, &QToolButton::toggled, this, [this](bool on) { emit soundToggled(on); });
+    m_lost = new KiwiLostOverlay(this);
+    connect(m_lost, &KiwiLostOverlay::chooseRequested, this,
+            &KiwiOwnSignalStrip::chooseOtherRequested);
     layoutButtons();
 
     setObjectName(QStringLiteral("kiwiOwnSignalStrip"));
@@ -140,6 +144,8 @@ void KiwiOwnSignalStrip::setPlotMargins(int left, int right)
 {
     m_marginLeft = std::max(0, left);
     m_marginRight = std::max(0, right);
+    m_lost->setGeometry(bodyRect());
+    layoutButtons();
     update();
 }
 
@@ -335,6 +341,13 @@ void KiwiOwnSignalStrip::resizeEvent(QResizeEvent* e)
 {
     QWidget::resizeEvent(e);
     layoutButtons();
+    m_lost->setGeometry(bodyRect());
+}
+
+void KiwiOwnSignalStrip::setLost(const QString& title, const QString& detail)
+{
+    m_lost->setGeometry(bodyRect());
+    m_lost->setLost(title, detail);
 }
 
 void KiwiOwnSignalStrip::setSoundActive(bool on)

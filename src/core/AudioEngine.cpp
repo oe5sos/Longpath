@@ -140,6 +140,7 @@
 #include "core/audio/PipeWireThreadLoop.h"
 #endif
 
+#include <cmath>
 #include <portaudio.h>
 
 #include <QDateTime>
@@ -2462,7 +2463,8 @@ void AudioEngine::removeKiwiSdrAudioSource(int sliceId)
 }
 
 void AudioEngine::feedKiwiSdrAudioData(int sliceId,
-                                       const QByteArray& pcm24kStereoFloat)
+                                       const QByteArray& pcm24kStereoFloat,
+                                       float gain)
 {
     if (!kiwiSdrAudioEnabled(sliceId)) {
         return;
@@ -2491,6 +2493,21 @@ void AudioEngine::feedKiwiSdrAudioData(int sliceId,
     // Derselbe Rauschzweig wie beim Flex-Ton (2026-10-28): fremde
     // Demodulation, also kein WDSP, also hier.
     wendeFremdtonRauschenAn(sliceId, out);
+    if (gain != 1.0f) {
+        // Lautstaerke je Kiwi. Der Mischer kann nur leiser (Gain 0..1), und
+        // ein leiser Kiwi braucht mehr: oberhalb 0,8 weich begrenzt.
+        constexpr float kKnee = 0.8f;
+        auto* s = reinterpret_cast<float*>(out.data());
+        for (int i = 0; i < outFrames * 2; ++i) {
+            float v = s[i] * gain;
+            const float a = std::fabs(v);
+            if (a > kKnee) {
+                v = std::copysign(
+                    kKnee + (1.0f - kKnee) * std::tanh((a - kKnee) / (1.0f - kKnee)), v);
+            }
+            s[i] = v;
+        }
+    }
     rxBlockReady(sliceId,
                  reinterpret_cast<const float*>(out.constData()),
                  outFrames);

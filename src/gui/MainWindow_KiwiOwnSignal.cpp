@@ -116,6 +116,8 @@ void MainWindow::wireKiwiOwnSignal()
             [this](bool on) {
         if (!m_kiwiOwnProfileId.isEmpty()) { setKiwiSound(m_kiwiOwnProfileId, on); }
     });
+    connect(m_kiwiStrip, &KiwiOwnSignalStrip::chooseOtherRequested, this,
+            [this]() { chooseOtherKiwi(); });
     connect(m_kiwiStrip, &KiwiOwnSignalStrip::zoomRequested, this,
             [this](int dir) {
         if (!m_kiwiOwnProfileId.isEmpty()) { zoomKiwiStrip(m_kiwiOwnProfileId, dir); }
@@ -240,6 +242,7 @@ void MainWindow::setKiwiOwnSignalProfile(const QString& profileId, double km)
         m_kiwiStrip->setDistanceKm(km);
     }
     if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setOwnSignalReceiverName(name); }
+    refreshKiwiSoundButtons();
 }
 
 // "Anderen Kiwi ...": das oeffentliche Verzeichnis, nach Entfernung zum
@@ -261,8 +264,12 @@ void MainWindow::chooseOtherKiwi()
         if (!guard || !m_kiwiSdrManager) { return; }
         double lat = 0.0, lon = 0.0;
         const bool has = guard->selectedLatLon(lat, lon);
+        const QString before = m_kiwiOwnProfileId;
+        const bool beforeLost = !kiwiLostTitle(before).isEmpty();
         adoptPickedKiwi(guard->selectedEndpoint(), guard->selectedName(),
                         guard->selectedKm(), has, lat, lon);
+        // Ein ausgefallener Kiwi bleibt nicht als totes Bild im Fenster.
+        if (beforeLost && before != m_kiwiOwnProfileId) { retireKiwi(before); }
     });
     picker->show();
     picker->raise();

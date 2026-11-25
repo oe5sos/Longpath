@@ -18,7 +18,9 @@
 #include <QtTest>
 #include <QListWidget>
 #include <QPushButton>
+#include <QPointer>
 #include <QToolButton>
+#include <QSlider>
 #include <QTcpServer>
 #include <memory>
 #include <vector>
@@ -30,7 +32,9 @@
 #include "gui/KiwiHearingDialog.h"
 #include "gui/KiwiWaterfallPanel.h"
 #include "gui/KiwiWaterfallStripWidget.h"
+#include "gui/KiwiOwnSignalStrip.h"
 #include "gui/MainWindow.h"
+#include "gui/widgets/KiwiLostOverlay.h"
 #include "gui/applets/KiwiSdrApplet.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -496,6 +500,122 @@ private slots:
         QSignalSpy spy(mgr, &KiwiSdrManager::profileStateChanged);
         mw->setKiwiSoundForTest(id, true);
         QTRY_VERIFY_WITH_TIMEOUT(spy.count() >= 1, 3000);   // neuer Versuch
+    }
+
+    // Betreiber 2026-11-25: "deutlich anzeigen" -- ein getrennter Kiwi zeigt
+    // an beiden Anzeigen gross den Grund und einen Knopf.
+    void getrennterKiwiStehtGrossDaMitKnopf()
+    {
+        auto* mw = new MainWindow();
+        mw->resize(1400, 900);
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        clearProfiles(mgr);
+        mw->adoptPickedKiwiForTest(QStringLiteral("127.0.0.1:131"), QStringLiteral("Weg"));
+        const QString id = mgr->profileIdForEndpoint(QStringLiteral("127.0.0.1:131"));
+        auto* strip = mw->kiwiWaterfallPanelForTest()->stripForTest(id);
+        QVERIFY(strip);
+        KiwiLostOverlay* inWindow = strip->lostOverlayForTest();
+        KiwiLostOverlay* below = mw->kiwiOwnStripForTest()->lostOverlayForTest();
+        // Der Zustand kommt vom Manager: getrennt -> beide Anzeigen melden es.
+        mgr->disconnectProfile(id);
+        QTRY_VERIFY_WITH_TIMEOUT(inWindow->isLost() && below->isLost(), 3000);
+        QVERIFY(!inWindow->title().isEmpty());
+        QCOMPARE(below->title(), inWindow->title());
+        QVERIFY(inWindow->chooseButtonForTest());
+        QVERIFY(below->chooseButtonForTest());
+
+        // Neu verbinden -> die Anzeige geht weg.
+        mgr->connectProfile(id);
+        QTRY_COMPARE_WITH_TIMEOUT(mgr->state(id),
+                                  KiwiSdrClient::State::Connecting, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(!inWindow->isLost() && !below->isLost(), 3000);
+
+        // Fuers Auge (nur mit LONGPATH_TEST_BILDER).
+        const QString dir = qEnvironmentVariable("LONGPATH_TEST_BILDER");
+        if (!dir.isEmpty()) {
+            mgr->disconnectProfile(id);
+            QTRY_VERIFY_WITH_TIMEOUT(inWindow->isLost(), 3000);
+            QVector<float> bins(1024, -105.0f);
+            for (int k = 300; k < 330; ++k) { bins[k] = -60.0f; }
+            for (int r = 0; r < 60; ++r) {
+                strip->setRowIntervalMs(0);
+                strip->pushRow(bins, 7.080e6, 7.120e6);
+                mw->kiwiOwnStripForTest()->setRowIntervalMs(0);
+                mw->kiwiOwnStripForTest()->pushRow(bins, 7.080e6, 7.120e6);
+            }
+            strip->resize(560, 220);
+            QTest::qWait(100);
+            strip->grab().save(dir + QStringLiteral("/kiwi-getrennt-fenster.png"));
+            auto* own = mw->kiwiOwnStripForTest();
+            own->setView(7.1e6, 40000.0);
+            own->resize(900, 176);
+            QTest::qWait(100);
+            own->grab().save(dir + QStringLiteral("/kiwi-getrennt-unten.png"));
+            auto* applet = mw->kiwiSdrAppletForTest();
+            applet->resize(360, 520);
+            QTest::qWait(100);
+            applet->grab().save(dir + QStringLiteral("/kiwi-liste.png"));
+        }
+    }
+
+    void ersetzterKiwiWirdWeggeraeumt()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        mw->radioModelForTest()->addSlice();
+        clearProfiles(mgr);
+        const QString id = profile(mgr, "Alt", 132);
+        const int slicesBefore = mw->radioModelForTest()->slices().size();
+        mgr->setWaterfallPreviewEnabled(id, true);
+        mw->setKiwiSoundForTest(id, true);
+        QVERIFY(mgr->assignedSliceForProfile(id) >= 0);
+        mw->retireKiwiForTest(id);
+        QCOMPARE(mgr->assignedSliceForProfile(id), -1);
+        QVERIFY(!mgr->waterfallPreviewEnabled(id));
+        QCOMPARE(mw->radioModelForTest()->slices().size(), slicesBefore);
+        QVERIFY(mw->kiwiWaterfallPanelForTest()->stripForTest(id) == nullptr);
+        QVERIFY(mgr->hasProfile(id));   // der Eintrag in der Liste bleibt
+    }
+
+    void lautstaerkeJeKiwiBleibtGemerkt()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        clearProfiles(mgr);
+        const QString a = profile(mgr, "Laut", 133);
+        const QString b = profile(mgr, "Normal", 134);
+        auto* applet = mw->kiwiSdrAppletForTest();
+        const auto sliderFor = [&](const QString& name) -> QSlider* {
+            for (QSlider* s : applet->findChildren<QSlider*>(QStringLiteral("kiwiRowVolume"))) {
+                if (s->accessibleName().endsWith(name)) { return s; }
+            }
+            return nullptr;
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(sliderFor(QStringLiteral("Laut")), 3000);
+        QSlider* s = sliderFor(QStringLiteral("Laut"));
+        // Waehrend des Ziehens ueberlebt der Regler einen Neubau der Liste.
+        s->setSliderDown(true);
+        QPointer<QSlider> alive(s);
+        s->setValue(12);
+        emit mgr->profileStateChanged(a, KiwiSdrClient::State::Connecting, QString());
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        QVERIFY(alive);
+        QCOMPARE(alive->value(), 12);
+        alive->setSliderDown(false);
+        QCOMPARE(mw->kiwiVolumeDbForTest(a), 12);
+        QCOMPARE(mw->kiwiVolumeDbForTest(b), 0);
+        // Nach dem Neubau steht der Wert wieder am Regler.
+        QTRY_VERIFY_WITH_TIMEOUT(sliderFor(QStringLiteral("Laut"))
+                                 && sliderFor(QStringLiteral("Laut"))->value() == 12, 3000);
     }
 };
 

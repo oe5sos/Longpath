@@ -10,6 +10,7 @@
 #include "core/AppSettings.h"
 #include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
+#include "gui/widgets/KiwiLostOverlay.h"
 
 #include <QContextMenuEvent>
 #include <QDateTime>
@@ -176,11 +177,27 @@ KiwiWaterfallStripWidget::KiwiWaterfallStripWidget(const QString& profileId,
     // Waechst mit dem Fenster (Betreiber 2026-11-25: "die Fenster oben soll
     // man groesser machen koennen").
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    setMinimumHeight(78);
+    setMinimumHeight(92);
     loadOptions();
 
     m_history = QImage(1, kHistoryRows, QImage::Format_RGB32);
     m_history.fill(QColor(Style::hexRole(Style::kAppBg)));
+
+    m_lost = new KiwiLostOverlay(this);
+    connect(m_lost, &KiwiLostOverlay::chooseRequested, this,
+            [this]() { emit chooseOtherRequested(m_profileId); });
+}
+
+void KiwiWaterfallStripWidget::setLost(const QString& title, const QString& detail)
+{
+    m_lost->setLost(title, detail);
+}
+
+void KiwiWaterfallStripWidget::resizeEvent(QResizeEvent* event)
+{
+    QWidget::resizeEvent(event);
+    // Alles unter der Kopfzeile (Bild und Achse).
+    m_lost->setGeometry(1, 28, width() - 2, height() - 29);
 }
 
 void KiwiWaterfallStripWidget::setDisplayName(const QString& name)
