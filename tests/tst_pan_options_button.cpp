@@ -25,6 +25,7 @@
 #include <QSignalSpy>
 
 #include "gui/PanadapterApplet.h"
+#include "gui/SpectrumWidget.h"
 #include "gui/meters/MeterPoller.h"
 #include "models/SliceModel.h"
 #include "FensterFrist.h"
@@ -156,6 +157,41 @@ private slots:
         sMeter->trigger();
         QVERIFY2(!zeile->isVisible(), "aus: Zeile weg");
         delete m;
+    }
+
+    // Betreiber 2026-11-25: „kiwi sollte auch in den optionen im
+    // panadapter verfuegbar sein". Der Haken stand nur im Rechtsklick-
+    // menue; er steht jetzt auch im Zahnrad, und beide Menues schalten
+    // dieselbe Quelle.
+    void kiwiStehtImZahnradUndSchaltetDieQuelle()
+    {
+        PanadapterApplet applet(QStringLiteral("A"));
+        applet.resize(900, 400);
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
+        SpectrumWidget* sw = applet.spectrumWidget();
+        QVERIFY(sw);
+        QVERIFY(!sw->kiwiDisplaySource());
+
+        QMenu* m = applet.buildDisplayMenuForTesting();
+        QAction* kiwi = nullptr;
+        for (QAction* a : m->actions()) {
+            if (a->text() == QStringLiteral("Display from the KiwiSDR")) { kiwi = a; }
+        }
+        QVERIFY2(kiwi, "der Kiwi-Haken steht im Zahnrad");
+        QVERIFY(kiwi->isCheckable() && !kiwi->isChecked());
+        kiwi->trigger();
+        QVERIFY2(sw->kiwiDisplaySource(), "das Zahnrad legt die Quelle um");
+        delete m;
+
+        QMenu* r = applet.buildContextMenuForTesting();
+        QAction* kiwi2 = nullptr;
+        for (QAction* a : r->actions()) {
+            if (a->text() == QStringLiteral("Display from the KiwiSDR")) { kiwi2 = a; }
+        }
+        QVERIFY2(kiwi2 && kiwi2->isChecked(),
+                 "das Rechtsklickmenue zeigt denselben Zustand");
+        delete r;
     }
 
     // Vor dem ersten Wert ein Strich; dann S-Stufe und Balken aus der

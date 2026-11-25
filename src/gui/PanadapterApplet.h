@@ -294,6 +294,8 @@ private:
     /// deleteLater()s it, buildContextMenuForTesting() hands it to a test
     /// untouched. Mirrors AmpApplet::buildContextMenu().
     QMenu* buildContextMenu(QObject* parent);
+    /// Haken "Display from the KiwiSDR" -- Rechtsklick- UND Zahnrad-Menue.
+    bool addKiwiSourceAction(QMenu* menu);
     // Wo der Rechtsklick im Spektrum lag (Koordinaten des SpectrumWidget),
     // fuer "Calibrate frequency on this carrier"; (-1,-1) = nicht im Bild.
     QPoint m_menuSpektrumPos{-1, -1};
