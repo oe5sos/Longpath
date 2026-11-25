@@ -143,7 +143,7 @@ QString sliceBadgeStyle(int colorIdx, bool assigned)
         return QStringLiteral(
             "QLabel { background: %1; color: %2; border: 1px solid %1; "
             "border-radius: 6px; font-weight: bold; font-size: 9px; padding: 0; }")
-            .arg(color);
+            .arg(color, Style::hexRole(Style::kAppBg));
     }
     return QStringLiteral(
         "QLabel { background: %2; color: %1; border: 1px solid %1; "

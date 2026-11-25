@@ -19,6 +19,7 @@
 #include <QListWidget>
 #include <QPushButton>
 #include <QPointer>
+#include <QRegularExpression>
 #include <QToolButton>
 #include <QSlider>
 #include <QTcpServer>
@@ -251,6 +252,9 @@ private slots:
     // die des Funkgeraets; aus -> Scheibe weg.
     void tonJeKiwiSchaltetEineEigeneScheibe()
     {
+        // Die Scheiben-Plakette der Liste hatte ein unausgefuelltes %2
+        // (Betreiberlog 2026-11-25: "Could not parse stylesheet").
+        QTest::failOnWarning(QRegularExpression(QStringLiteral("Could not parse stylesheet")));
         auto* mw = new MainWindow();
         mw->show();
         QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
