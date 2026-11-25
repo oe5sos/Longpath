@@ -818,3 +818,8 @@ footer #onAir.an{color:var(--tx-border)}
 @media (min-width: 900px){
   body.dt .kante::after{top:150px}
 }
+
+
+/* ═══ Sendeleistung unter dem SWR (2026-11-25) ═══════════════════════════════
+   Gleicher Kopf wie oben (Versal links, Wertchip rechts), nur kleiner Abstand. */
+#instrumente .kopf.fuss{margin:3px 0 0}

@@ -167,6 +167,10 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 <div class="schicht instr" id="swrBox">
   <div class="kopf"><span class="caps">SWR</span><span class="chipw aus" id="swrWert">—</span></div>
   <svg class="ring" id="swrSvg" aria-label="SWR"></svg>
+  <!-- Sendeleistung neben dem SWR (2026-11-25): tx_sensors Feld 2 (rms-Watt).
+       Wie das SWR nur beim Senden, sonst „—". ALC liefert Longpath ueber TCI
+       nicht (TciSensorManager::formatTxSensors), darum fehlt sie hier. -->
+  <div class="kopf fuss"><span class="caps">PWR</span><span class="chipw aus" id="pwrWertI">—</span></div>
 </div>
 <div class="schicht instr" id="kompassBox" aria-label="Rotor, antippen oeffnet die Steuerung" hidden>
   <div class="kopf"><span class="caps">Rotor</span><span class="chipw aus" id="rotorGradK">—</span></div>
