@@ -212,6 +212,10 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     m_recordButton->setAccessibleName(tr("Record the Kiwi audio"));
     m_otherButton = blueToggle(tr("Other Kiwi …"), 112, 22);
     m_otherButton->setObjectName(QStringLiteral("kiwiOtherButton"));
+    // Eine Schaltflaeche, kein Schalter: styledButton() macht jeden Knopf
+    // einrastbar, dann blieb die Pille nach dem Klick dunkel stehen
+    // (Betreiber 2026-11-25: "kiwi pille wurde schwarz").
+    m_otherButton->setCheckable(false);
     m_otherButton->setAccessibleName(tr("Choose another Kiwi"));
     ownRow->addWidget(m_ownSignalButton, 1);
     ownRow->addWidget(m_recordButton, 1);
@@ -224,6 +228,7 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     otherRow->addWidget(m_otherButton, 0);
     m_hearingButton = blueToggle(tr("Heard …"), 64, 22);
     m_hearingButton->setObjectName(QStringLiteral("kiwiHearingButton"));
+    m_hearingButton->setCheckable(false);   // Schaltflaeche, rastet nicht ein
     m_hearingButton->setAccessibleName(tr("Where am I heard"));
     m_hearingButton->setToolTip(
         tr("Up to five Kiwis listen along while you transmit: map, "

@@ -168,6 +168,26 @@ private slots:
         QVERIFY(!(other->geometry().intersects(heard->geometry())));
     }
 
+    // Anderer Kiwi / Gehoert sind Schaltflaechen: nach dem Klick darf nichts
+    // eingerastet (dunkel) stehen bleiben.
+    void aktionsKnoepfeRastenNichtEin()
+    {
+        RadioModel model;
+        KiwiSdrApplet applet(&model);
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, 15000));
+        for (const char* name : {"kiwiOtherButton", "kiwiHearingButton"}) {
+            auto* b = applet.findChild<QPushButton*>(QString::fromLatin1(name));
+            QVERIFY(b);
+            QVERIFY2(!b->isCheckable(), name);
+            QTest::mouseClick(b, Qt::LeftButton);
+            QVERIFY2(!b->isChecked(), name);
+        }
+        // Gegenprobe: Solo IST ein Schalter.
+        auto* solo = applet.findChild<QPushButton*>(QStringLiteral("kiwiSoloButton"));
+        QVERIFY(solo && solo->isCheckable());
+    }
+
     void dieScheibeStehtDabeiUndFolgtIhr()
     {
         RadioModel model;
