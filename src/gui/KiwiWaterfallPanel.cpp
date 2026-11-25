@@ -43,8 +43,9 @@ KiwiWaterfallPanel::KiwiWaterfallPanel(RadioModel* model, QWidget* parent)
     m_stripsLayout = new QVBoxLayout;
     m_stripsLayout->setContentsMargins(0, 0, 0, 0);
     m_stripsLayout->setSpacing(8);
-    root->addLayout(m_stripsLayout);
-    root->addStretch(1);
+    // Die Streifen teilen sich die Hoehe: ein hoeheres Fenster macht sie
+    // hoeher (kein Rest-Stretch darunter).
+    root->addLayout(m_stripsLayout, 1);
 
     updateEmptyState();
 }
@@ -59,7 +60,11 @@ void KiwiWaterfallPanel::setStripEnabled(const QString& profileId, bool enabled,
         }
         auto* strip = new KiwiWaterfallStripWidget(profileId, displayName, this);
         m_strips.insert(profileId, strip);
-        m_stripsLayout->addWidget(strip);
+        m_stripsLayout->addWidget(strip, 1);
+        connect(strip, &KiwiWaterfallStripWidget::closeRequested,
+                this, &KiwiWaterfallPanel::removeRequested);
+        connect(strip, &KiwiWaterfallStripWidget::renameRequested,
+                this, &KiwiWaterfallPanel::renameRequested);
     } else if (auto* strip = m_strips.take(profileId)) {
         m_stripsLayout->removeWidget(strip);
         strip->deleteLater();
@@ -68,10 +73,11 @@ void KiwiWaterfallPanel::setStripEnabled(const QString& profileId, bool enabled,
 }
 
 void KiwiWaterfallPanel::pushRow(const QString& profileId,
-                                 const QVector<float>& binsDbm)
+                                 const QVector<float>& binsDbm,
+                                 double lowHz, double highHz)
 {
     if (auto* strip = m_strips.value(profileId, nullptr)) {
-        strip->pushRow(binsDbm);
+        strip->pushRow(binsDbm, lowHz, highHz);
     }
 }
 

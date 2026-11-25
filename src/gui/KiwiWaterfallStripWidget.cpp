@@ -10,7 +10,10 @@
 #include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
+#include <QContextMenuEvent>
 #include <QHBoxLayout>
+#include <QMenu>
+#include <QToolButton>
 #include <QLabel>
 #include <QPainter>
 #include <QPaintEvent>
@@ -61,10 +64,41 @@ KiwiWaterfallStripWidget::KiwiWaterfallStripWidget(const QString& profileId,
     m_peakLabel->setStyleSheet(
         QStringLiteral("QLabel { color: %1; font-size: 10.5px; "
                         "font-family: " LP_MONO_QSS "; }").arg(trace()));
+    // Auf welcher Frequenz der Kiwi steht (Mitte der Zeile) -- Betreiber
+    // 2026-11-25: "man sieht oben auch nicht im kiwi, auf welcher Frequenz
+    // man ist".
+    m_freqLabel = new QLabel(this);
+    m_freqLabel->setTextFormat(Qt::PlainText);
+    m_freqLabel->setObjectName(QStringLiteral("kiwiStripFrequency"));
+    m_freqLabel->setStyleSheet(
+        QStringLiteral("QLabel { color: %1; font-size: 11px; "
+                        "font-family: " LP_MONO_QSS "; }").arg(ink()));
+    header->addWidget(m_freqLabel, 0);
     header->addWidget(m_peakLabel, 0);
+
+    // Schliessen: der Streifen verschwindet, die Verbindung wird getrennt
+    // (siehe KiwiSdrManager::setWaterfallPreviewEnabled).
+    m_closeButton = new QToolButton(this);
+    m_closeButton->setText(QStringLiteral("×"));
+    m_closeButton->setAutoRaise(true);
+    m_closeButton->setCursor(Qt::PointingHandCursor);
+    m_closeButton->setToolTip(tr("Remove this waterfall and disconnect the Kiwi"));
+    m_closeButton->setAccessibleName(tr("Remove waterfall"));
+    m_closeButton->setFixedSize(18, 18);
+    m_closeButton->setStyleSheet(QStringLiteral(
+        "QToolButton { color: %1; border: none; font-size: 13px; }"
+        "QToolButton:hover { color: %2; }")
+            .arg(QString::fromLatin1(Style::kTextSecondary), ink()));
+    connect(m_closeButton, &QToolButton::clicked, this,
+            [this]() { emit closeRequested(m_profileId); });
+    header->addWidget(m_closeButton, 0);
 
     layout->addLayout(header);
     layout->addStretch(1);
+    // Waechst mit dem Fenster (Betreiber 2026-11-25: "die Fenster oben soll
+    // man groesser machen koennen").
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    setMinimumHeight(78);
 
     m_history = QImage(1, kHistoryRows, QImage::Format_RGB32);
     m_history.fill(QColor(Style::hexRole(Style::kAppBg)));
@@ -75,10 +109,23 @@ void KiwiWaterfallStripWidget::setDisplayName(const QString& name)
     m_nameLabel->setText(name);
 }
 
-void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm)
+QString KiwiWaterfallStripWidget::frequencyText() const
+{
+    if (m_highHz <= m_lowHz) { return QString(); }
+    const double centerKhz = (m_lowHz + m_highHz) / 2.0 / 1000.0;
+    return QStringLiteral("%1 kHz").arg(centerKhz, 0, 'f', 1);
+}
+
+void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm,
+                                       double lowHz, double highHz)
 {
     if (binsDbm.isEmpty()) {
         return;
+    }
+    if (highHz > lowHz) {
+        m_lowHz = lowHz;
+        m_highHz = highHz;
+        m_freqLabel->setText(frequencyText());
     }
 
     if (m_history.width() != binsDbm.size()) {
@@ -103,11 +150,20 @@ void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm)
 
     const QColor floor(Style::hexRole(Style::kAppBg));
     const QColor peak(Style::kSpectrumTrace);
-    float maxDbm = kMinDbm;
+    if (m_auto) {
+        // Rauschen (Median) bis zur Spitze der Zeile, mit einem Mindestabstand.
+        QVector<float> sorted = binsDbm;
+        std::nth_element(sorted.begin(), sorted.begin() + sorted.size() / 2, sorted.end());
+        const float median = sorted[sorted.size() / 2];
+        const float top = *std::max_element(binsDbm.begin(), binsDbm.end());
+        m_minDbm = median - 6.0f;
+        m_maxDbm = std::max(top, median + 25.0f);
+    }
+    float maxDbm = m_minDbm;
     for (int x = 0; x < binsDbm.size(); ++x) {
         const float dbm = binsDbm[x];
         maxDbm = std::max(maxDbm, dbm);
-        const float t = std::clamp((dbm - kMinDbm) / (kMaxDbm - kMinDbm), 0.0f, 1.0f);
+        const float t = std::clamp((dbm - m_minDbm) / (m_maxDbm - m_minDbm), 0.0f, 1.0f);
         const QColor c(
             floor.red()   + int((peak.red()   - floor.red())   * t),
             floor.green() + int((peak.green() - floor.green()) * t),
@@ -126,6 +182,60 @@ void KiwiWaterfallStripWidget::reset()
     update();
 }
 
+void KiwiWaterfallStripWidget::setRange(float minDbm, float maxDbm)
+{
+    m_auto = false;
+    m_minDbm = minDbm;
+    m_maxDbm = std::max(maxDbm, minDbm + 1.0f);
+}
+
+void KiwiWaterfallStripWidget::setAutoRange(bool on)
+{
+    m_auto = on;
+    if (!on) {
+        m_minDbm = kDefaultMinDbm;
+        m_maxDbm = kDefaultMaxDbm;
+    }
+}
+
+void KiwiWaterfallStripWidget::contextMenuEvent(QContextMenuEvent* event)
+{
+    QMenu menu(this);
+    QAction* rename = menu.addAction(tr("Rename …"));
+    menu.addSeparator();
+    QAction* autoAct = menu.addAction(tr("Level range: automatic"));
+    autoAct->setCheckable(true);
+    autoAct->setChecked(m_auto);
+    struct Preset { const char* text; float lo; float hi; };
+    static const Preset kPresets[] = {
+        {QT_TR_NOOP("Quiet band (−130 … −80 dBm)"), -130.0f, -80.0f},
+        {QT_TR_NOOP("Normal (−130 … −40 dBm)"), kDefaultMinDbm, kDefaultMaxDbm},
+        {QT_TR_NOOP("Strong signals (−110 … −20 dBm)"), -110.0f, -20.0f},
+    };
+    QList<QAction*> presetActs;
+    for (const Preset& pr : kPresets) {
+        QAction* a = menu.addAction(tr(pr.text));
+        a->setCheckable(true);
+        a->setChecked(!m_auto && qFuzzyCompare(m_minDbm, pr.lo) && qFuzzyCompare(m_maxDbm, pr.hi));
+        presetActs << a;
+    }
+    menu.addSeparator();
+    QAction* close = menu.addAction(tr("Remove waterfall"));
+    QAction* chosen = menu.exec(event->globalPos());
+    if (!chosen) { return; }
+    if (chosen == rename) {
+        emit renameRequested(m_profileId);
+    } else if (chosen == autoAct) {
+        setAutoRange(autoAct->isChecked());
+    } else if (chosen == close) {
+        emit closeRequested(m_profileId);
+    } else {
+        const int i = int(presetActs.indexOf(chosen));
+        if (i >= 0) { setRange(kPresets[i].lo, kPresets[i].hi); }
+    }
+    update();
+}
+
 QSize KiwiWaterfallStripWidget::sizeHint() const
 {
     return QSize(320, 78);
@@ -135,9 +245,33 @@ void KiwiWaterfallStripWidget::paintEvent(QPaintEvent* event)
 {
     QWidget::paintEvent(event);
     QPainter painter(this);
-    const QRect target(9, 30, width() - 18, height() - 39);
+    const bool axis = m_highHz > m_lowHz;
+    const int axisH = axis ? 14 : 0;
+    const QRect target(9, 30, width() - 18, height() - 39 - axisH);
     if (target.height() > 0 && target.width() > 0 && m_history.width() > 0) {
         painter.drawImage(target, m_history);
+    }
+    if (axis && target.width() > 60) {
+        // Frequenzachse unter dem Bild, Marke auf der Mitte (dort steht der Kiwi).
+        QFont f = font();
+        f.setPixelSize(9);
+        painter.setFont(f);
+        painter.setPen(QColor(Style::hexRole(Style::kTextScale)));
+        const int ticks = 4;
+        for (int i = 0; i <= ticks; ++i) {
+            const int x = target.left() + i * target.width() / ticks;
+            const double hz = m_lowHz + (m_highHz - m_lowHz) * i / ticks;
+            painter.drawLine(x, target.bottom() + 1, x, target.bottom() + 4);
+            const QString t = QString::number(hz / 1000.0, 'f', 1);
+            const int w = painter.fontMetrics().horizontalAdvance(t);
+            const int tx = std::clamp(x - w / 2, 0, std::max(0, width() - w));
+            painter.drawText(tx, target.bottom() + 13, t);
+        }
+        QColor mark(Style::kTextPrimary);
+        mark.setAlpha(190);
+        painter.setPen(QPen(mark, 2));
+        const int mx = target.center().x();
+        painter.drawLine(mx, target.top(), mx, target.bottom() + 4);
     }
 }
 

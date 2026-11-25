@@ -57,6 +57,8 @@
 #include "gui/widgets/StatusToast.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/applets/KiwiSdrApplet.h"
+#include <QInputDialog>
+#include <QLineEdit>
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "models/TransmitModel.h"
@@ -829,6 +831,29 @@ void MainWindow::wireKiwiSdr()
                                   lowFreqMhz * 1.0e6, highFreqMhz * 1.0e6);
     });
 
+    // Streifen bearbeiten (2026-11-25): schliessen und umbenennen.
+    if (m_kiwiWaterfallPanel) {
+        connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::removeRequested, this,
+                [this](const QString& id) {
+            if (m_kiwiSdrManager) { m_kiwiSdrManager->setWaterfallPreviewEnabled(id, false); }
+        });
+        connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::renameRequested, this,
+                [this](const QString& id) {
+            if (!m_kiwiSdrManager || !m_kiwiSdrManager->hasProfile(id)) { return; }
+            bool ok = false;
+            const QString name = QInputDialog::getText(
+                this, tr("Rename Kiwi"), tr("Name:"), QLineEdit::Normal,
+                m_kiwiSdrManager->displayName(id), &ok).trimmed();
+            if (!ok || name.isEmpty()) { return; }
+            KiwiSdrAntennaProfile p = m_kiwiSdrManager->profile(id);
+            p.name = name;
+            m_kiwiSdrManager->updateProfile(p);
+            if (m_kiwiWaterfallPanel) {
+                m_kiwiWaterfallPanel->setStripEnabled(id, true, m_kiwiSdrManager->displayName(id));
+            }
+        });
+    }
+
     // ── KIWI-WASSERFÄLLE: die Vorschau, unabhängig von einer Scheibe ──
     //
     // Anders als der Block oben (Zuordnung + Sicherheitsschranke noetig)
@@ -837,9 +862,10 @@ void MainWindow::wireKiwiSdr()
     // (KiwiWaterfallPanel::pushRow ignoriert alles andere von selbst).
     connect(m_kiwiSdrManager, &KiwiSdrManager::waterfallRowReady, this,
             [this](const QString& profileId, const QString&,
-                   const QVector<float>& binsDbm, double, double, quint32) {
+                   const QVector<float>& binsDbm, double lowMhz, double highMhz, quint32) {
         if (m_kiwiWaterfallPanel) {
-            m_kiwiWaterfallPanel->pushRow(profileId, binsDbm);
+            m_kiwiWaterfallPanel->pushRow(profileId, binsDbm,
+                                          lowMhz * 1.0e6, highMhz * 1.0e6);
         }
     });
     connect(m_kiwiSdrManager, &KiwiSdrManager::waterfallPreviewEnabledChanged,

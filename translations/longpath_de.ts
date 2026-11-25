@@ -4240,6 +4240,14 @@ Die Beschreibung des Herstellers dokumentiert nur einen Typcode, darum wird die 
         <source>Solo needs a connected Kiwi — this one is not delivering audio.</source>
         <translation>Solo braucht einen verbundenen Kiwi — dieser liefert keinen Ton.</translation>
     </message>
+    <message>
+        <source>Rename Kiwi</source>
+        <translation>Kiwi umbenennen</translation>
+    </message>
+    <message>
+        <source>Name:</source>
+        <translation>Name:</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::MultimeterPage</name>
@@ -8441,6 +8449,37 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
     <message>
         <source>Shows where public KiwiSDR receivers are and whether they are free, partly busy, full or not reachable. Hover a dot for details, click it to select the receiver.</source>
         <translation>Zeigt, wo öffentliche KiwiSDR-Empfänger stehen und ob sie frei, teilweise besetzt, voll oder nicht erreichbar sind. Über einen Punkt fahren für Einzelheiten, anklicken zum Auswählen.</translation>
+    </message>
+</context>
+<context>
+    <name>Longpath::KiwiWaterfallStripWidget</name>
+    <message>
+        <source>Remove this waterfall and disconnect the Kiwi</source>
+        <translation>Diesen Wasserfall entfernen und den Kiwi trennen</translation>
+    </message>
+    <message>
+        <source>Remove waterfall</source>
+        <translation>Wasserfall entfernen</translation>
+    </message>
+    <message>
+        <source>Rename …</source>
+        <translation>Umbenennen …</translation>
+    </message>
+    <message>
+        <source>Level range: automatic</source>
+        <translation>Pegelbereich: automatisch</translation>
+    </message>
+    <message>
+        <source>Quiet band (−130 … −80 dBm)</source>
+        <translation>Ruhiges Band (−130 … −80 dBm)</translation>
+    </message>
+    <message>
+        <source>Normal (−130 … −40 dBm)</source>
+        <translation>Normal (−130 … −40 dBm)</translation>
+    </message>
+    <message>
+        <source>Strong signals (−110 … −20 dBm)</source>
+        <translation>Starke Signale (−110 … −20 dBm)</translation>
     </message>
 </context>
 </TS>

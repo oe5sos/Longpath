@@ -13,6 +13,7 @@
 #include <QWidget>
 
 class QLabel;
+class QToolButton;
 
 namespace Longpath {
 
@@ -30,13 +31,31 @@ public:
 
     QString profileId() const { return m_profileId; }
     void setDisplayName(const QString& name);
-    void pushRow(const QVector<float>& binsDbm);
+    void pushRow(const QVector<float>& binsDbm, double lowHz = 0.0, double highHz = 0.0);
+    // Frequenzachse der letzten Zeile (0/0: unbekannt, keine Achse).
+    double lowHz() const { return m_lowHz; }
+    double highHz() const { return m_highHz; }
+    QString frequencyText() const;
     void reset();
 
     QSize sizeHint() const override;
 
+    // Pegelbereich der Anzeige. Auto: folgt Rauschen und Spitze der Zeile.
+    void setRange(float minDbm, float maxDbm);
+    void setAutoRange(bool on);
+    bool autoRange() const { return m_auto; }
+    float minDbm() const { return m_minDbm; }
+    float maxDbm() const { return m_maxDbm; }
+    QToolButton* closeButtonForTest() const { return m_closeButton; }
+
+signals:
+    // Der Streifen entscheidet nichts selbst: er meldet den Wunsch.
+    void closeRequested(const QString& profileId);
+    void renameRequested(const QString& profileId);
+
 protected:
     void paintEvent(QPaintEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
 
 private:
     static constexpr int kHistoryRows = 48;
@@ -45,8 +64,15 @@ private:
     // Vorschau). Grosszuegig genug fuer Rauschen bis zu einem starken
     // lokalen Signal — bei Bedarf von Hand nachjustieren, sobald ein
     // echter Kiwi das zeigt.
-    static constexpr float kMinDbm = -130.0f;
-    static constexpr float kMaxDbm = -40.0f;
+    static constexpr float kDefaultMinDbm = -130.0f;
+    static constexpr float kDefaultMaxDbm = -40.0f;
+    float m_minDbm{kDefaultMinDbm};
+    float m_maxDbm{kDefaultMaxDbm};
+    bool m_auto{false};
+    double m_lowHz{0.0};
+    double m_highHz{0.0};
+    QLabel* m_freqLabel{nullptr};
+    QToolButton* m_closeButton{nullptr};
 
     QString m_profileId;
     QLabel* m_nameLabel{nullptr};

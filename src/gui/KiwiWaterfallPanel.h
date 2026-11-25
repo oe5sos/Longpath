@@ -37,10 +37,19 @@ public:
     // Der Inhalt kommt vom KiwiSdrManager, nicht aus dem RadioModel.
     void syncFromModel() override {}
 
+signals:
+    // Wuensche der Streifen, weitergereicht (das Panel entscheidet nichts).
+    void removeRequested(const QString& profileId);
+    void renameRequested(const QString& profileId);
+
+public:
+    KiwiWaterfallStripWidget* stripForTest(const QString& id) const { return m_strips.value(id, nullptr); }
+
 public slots:
     void setStripEnabled(const QString& profileId, bool enabled,
                          const QString& displayName);
-    void pushRow(const QString& profileId, const QVector<float>& binsDbm);
+    void pushRow(const QString& profileId, const QVector<float>& binsDbm,
+                 double lowHz = 0.0, double highHz = 0.0);
     void resetStrip(const QString& profileId);
 
 private:
