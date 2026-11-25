@@ -11,8 +11,10 @@ import { Mikrofon, mikrofonMoeglich } from './mikrofon.js';
 import { Sammelstelle, zeileLesen, befundLesen, zeitKurz, dupeSatz }
   from './logbuch.js';
 import { spotLesen, marken, trefferBei, trefferAufSchrift } from './spots.js';
+import { Sendetasten, SENDEN, TUNE, ablehnText } from './sendetaste.js';
 import { Zeichenbremse } from './ton-vorrang.js';
 import { bildIstAlt } from './aufwachen.js';
+import { desktopStarten } from './desktop.js';
 import { standLesen, zustandText, fehlerText as rotorFehlerText,
          peilungAus, Sicherung as RotorSicherung,
          DREHT } from './rotor.js';
@@ -46,6 +48,13 @@ const FILTER = {
   digi:  [[1000, '1.0k'], [1500, '1.5k'], [2400, '2.4k'], [3000, '3.0k']],
   am:    [[5000, '5.0k'], [8000, '8.0k'], [10000, '10k'], [16000, '16k']],
 };
+
+// ── Sendefreigabe: der Riegel im Quelltext ──────────────────────────────────
+//
+// FALSE, bis Martin im Chat ausdruecklich freigibt (erste Sendung nur an der
+// Dummy-Last, nie an der Antenne). Solange false, ist die Seite so tot wie
+// zuvor: keine Entsicherung, kein `trx:…,true`, kein `tune:…,true`.
+const SENDEN_FREIGABE = false;
 
 const state = {
   trx: 0,
@@ -115,6 +124,11 @@ function bildSpanneHz(rueckfall) {
 function eigenerHost() {
   const h = location.hostname;
   if (!h || h === 'localhost' || h === '127.0.0.1') { return ''; }
+  // Kommt die Seite vom Vermittler, ist dieser Rechner NICHT Longpath. Wer
+  // ihn trotzdem als "eigenen Rechner" nimmt, schwenkt nach fuenf Sekunden
+  // von der Fernverbindung auf rv.longpath.at:50001 um und reisst sie damit
+  // mitten im Aufbau ab (am 2026-11-21 so gemessen: clientLeft nach 4 s).
+  if (dienstVomOrt()) { return ''; }
   return h;
 }
 
@@ -268,7 +282,9 @@ async function raumUmschalten() {
     // Beim Zurueckschalten die Flaeche leeren: sonst steht das letzte
     // Raumbild unter dem anlaufenden Wasserfall.
     wfCtx.clearRect(0, 0, wf.width, wf.height);
+    wfLeer = true;
   }
+  wfDreck = true;
   zeichneBild();
 }
 
@@ -355,6 +371,27 @@ async function koppelnTippen() {
 
 $('koppelknopf').addEventListener('click', koppelnTippen);
 
+// Den Schluessel dieses Telefons zeigen, damit er von Hand an die Station
+// gehen kann. Er ist oeffentlich (der Teil, der zur Station gehoert) -- der
+// private Teil verlaesst das Telefon nie. Nur in einem sicheren Kontext, nur
+// wenn die Seite von einem Vermittler kommt (dort geht der Tipp-Weg nicht).
+if (window.isSecureContext && window.crypto?.subtle && dienstVomOrt()) {
+  $('schluesselknopf').style.display = '';
+}
+$('schluesselknopf').addEventListener('click', async () => {
+  const t = $('schluesseltext');
+  try {
+    const { geraeteschluessel } = await import('./fernzugriff.js');
+    t.value = (await geraeteschluessel()).schluesselText;
+    t.style.display = '';
+    t.focus(); t.select();
+    try { await navigator.clipboard.writeText(t.value); } catch (e) {}
+  } catch (e) {
+    $('koppelmeldung').style.color = 'var(--warn)';
+    $('koppelmeldung').textContent = 'Der Schlüssel ließ sich nicht erzeugen.';
+  }
+});
+
 // Einmal beim Laden nachsehen, ob gerade ein Fenster offen ist.
 koppelLage().then((l) => {
   if (l && l.offen) {
@@ -364,7 +401,7 @@ koppelLage().then((l) => {
   }
 });
 
-$('verbinden').addEventListener('click', () => starten($('adresse').value));
+$('verbinden').addEventListener('click', () => { blattVonHand = false; starten($('adresse').value); });
 $('adresse').addEventListener('keydown', (e) => { if (e.key === 'Enter') starten($('adresse').value); });
 $('adresse').value = gespeichert() || (eigenerHost() ? eigenerHost() + ':' + PORT_TCI : '');
 $('token').value = tokenLesen();
@@ -695,8 +732,67 @@ function sEinheit(dbm) {
 }
 
 // ── Panadapter + Wasserfall ─────────────────────────────────────────────────
+// ── Zeichenflaechen in der ECHTEN Aufloesung (2026-11-21) ──────────────────
+//
+// Bis hierher hatten #pan und #wf feste 373 x 96 / 373 x 160 Bildpunkte, und
+// das Stilblatt streckte sie auf die Anzeigebreite. Kurve, Raster, dBm-Zahlen
+// und Rufzeichen wurden in diese 373 Punkte gezeichnet und danach aufgezogen
+// -- Schrift und Linien waren weich, am iPhone (Faktor 3) und am Desktop erst
+// recht. Betreiber: „sehr unscharf".
+//
+// Jetzt:
+//   * #pan hat die Groesse der Anzeige mal devicePixelRatio. Gezeichnet wird
+//     in CSS-Punkten (panBreite x panHoehe); die Daten bleiben 373 Punkte und
+//     werden dazwischen interpoliert.
+//   * Der Wasserfall-PUFFER `wf` bleibt 373 x 160 (Daten und Zeilenvorschub
+//     aendern sich nicht). Er wird nur noch nicht mehr gezeigt, sondern auf
+//     das Anzeige-Canvas #wf (wfAnz) glatt hochskaliert.
+//   * Das Raumbild rechnet in Anzeigeaufloesung (hoechstens Faktor 2), damit
+//     die Rechenzeit im Rahmen bleibt.
+// Den Datenstrom beruehrt nichts davon: es werden weiter DATENPUNKTE Punkte
+// angefordert.
+const DATENPUNKTE = 373, WF_ZEILEN = 160;
 const pan = $('pan'), panCtx = pan.getContext('2d');
-const wf = $('wf'), wfCtx = wf.getContext('2d', { willReadFrequently: false });
+const wfAnz = $('wf'), wfAnzCtx = wfAnz.getContext('2d');
+const wf = document.createElement('canvas');
+wf.width = DATENPUNKTE; wf.height = WF_ZEILEN;
+const wfCtx = wf.getContext('2d', { willReadFrequently: false });
+const raumFl = document.createElement('canvas');
+const raumCtx = raumFl.getContext('2d');
+let wfLeer = true;          // noch keine Zeile da: die erste fuellt den ganzen Puffer
+let wfDreck = true;        // der Puffer hat sich geaendert -> neu auf die Anzeige
+let panBreite = DATENPUNKTE, panHoehe = 96, wfAnzHoehe = 104, anzDpr = 1;
+
+/** Groesse der Zeichenflaechen an die Anzeige anpassen -- nur bei Aenderung. */
+function anzeigeAnpassen() {
+  const dpr = window.devicePixelRatio || 1;
+  const rp = pan.getBoundingClientRect();
+  const rw = wfAnz.getBoundingClientRect();
+  if (!rp.width || !rw.width) { return; }
+  const bw = Math.max(1, Math.round(rp.width));
+  const ph = Math.max(1, Math.round(rp.height));
+  const wh = Math.max(1, Math.round(rw.height));
+  const pw = Math.round(bw * dpr), pH = Math.round(ph * dpr);
+  if (pan.width !== pw || pan.height !== pH) { pan.width = pw; pan.height = pH; }
+  const ww = Math.round(bw * dpr), wH = Math.round(wh * dpr);
+  if (wfAnz.width !== ww || wfAnz.height !== wH) { wfAnz.width = ww; wfAnz.height = wH; }
+  const rd = Math.min(dpr, 2);
+  const rW = Math.round(bw * rd), rH = Math.round(wh * rd);
+  if (raumFl.width !== rW || raumFl.height !== rH) { raumFl.width = rW; raumFl.height = rH; }
+  panBreite = bw; panHoehe = ph; wfAnzHoehe = wh; anzDpr = dpr;
+  wfZeigen();
+}
+
+/** Den Wasserfall-Puffer glatt auf die Anzeige bringen. */
+function wfZeigen() {
+  if (raumZeigen && raumbild) {
+    wfAnzCtx.drawImage(raumFl, 0, 0, raumFl.width, raumFl.height, 0, 0, wfAnz.width, wfAnz.height);
+    return;
+  }
+  wfAnzCtx.imageSmoothingEnabled = true;
+  wfAnzCtx.imageSmoothingQuality = 'high';
+  wfAnzCtx.drawImage(wf, 0, 0, wf.width, wf.height, 0, 0, wfAnz.width, wfAnz.height);
+}
 const N = 1024;
 const fft = new Fft(N);
 const spec = new Float32Array(N);
@@ -747,10 +843,11 @@ document.documentElement.dataset.wasserfall = WASSERFALL_BLAU ? 'blau' : 'longpa
 // Longpath, SpectrumWidget.cpp mutedStops: app-bg / panel / border /
 // text-inactive / instrument-glow-hi / measured / instrument-face, an den
 // Stellen 0 / .30 / .48 / .64 / .78 / .92 / 1.
-const STOPS_LONGPATH = [[0,[8,8,10]],[.30,[12,12,14]],[.48,[44,44,49]],[.64,[88,88,94]],
-                        [.78,[129,123,92]],[.92,[216,165,95]],[1,[242,242,236]]];
-const STOPS_BLAU     = [[0,[13,17,23]],[.18,[24,36,49]],[.34,[38,62,88]],[.50,[104,100,82]],
-                        [.68,[172,133,83]],[.86,[214,164,95]],[1,[244,244,238]]];
+// Mac-Look (2026-11-21, Foto von Mac-Longpath): Wasserfall blau -> cyan ->
+// gruen -> gelb; kein Rot, kein Orange im Bild.
+const STOPS_LONGPATH = [[0,[0,6,70]],[.22,[0,24,140]],[.42,[0,90,225]],[.58,[0,195,240]],
+                        [.74,[30,222,100]],[.90,[222,232,40]],[1,[255,255,232]]];
+const STOPS_BLAU     = STOPS_LONGPATH;
 const STOPS = WASSERFALL_BLAU ? STOPS_BLAU : STOPS_LONGPATH;
 
 // Flaechen aus EINER Quelle: die Panadapter-Flaeche steht im Stilblatt
@@ -804,6 +901,7 @@ function wasserfallLeeren() {
   try {
     wfCtx.fillStyle = WF_BG;
     wfCtx.fillRect(0, 0, wf.width, wf.height);
+    wfDreck = true; wfLeer = true;
   } catch (e) { /* vor dem ersten Zeichnen */ }
   neueZeilen = 0;
 }
@@ -836,6 +934,7 @@ function wasserfallSchieben(dHz) {
     wfCtx.fillStyle = WF_BG;
     wfCtx.fillRect(0, 0, wf.width, wf.height);
     wfCtx.drawImage(wfPuff, dx, 0);
+    wfDreck = true;
   } catch (e) { /* vor dem ersten Zeichnen */ }
 }
 
@@ -876,6 +975,7 @@ function wasserfallSchnitt() {
   try {
     wfCtx.fillStyle = 'rgba(216,165,95,.55)';   // Bernstein, wie alles Gemessene
     wfCtx.fillRect(0, 0, wf.width, 2);
+    wfDreck = true;
   } catch (e) { /* vor dem ersten Zeichnen */ }
 }
 link.addEventListener('iq', (e) => {
@@ -894,7 +994,8 @@ link.addEventListener('iq', (e) => {
 });
 
 function zeichneBild() {
-  const W = pan.width, H = pan.height;
+  const W = panBreite, H = panHoehe;
+  panCtx.setTransform(anzDpr, 0, 0, anzDpr, 0, 0);
 
   // Ohne Gerät kommt kein I/Q. Das muss dastehen, statt dass der Bediener
   // vor einer leeren Fläche sitzt und rät, ob die Verbindung hängt oder die
@@ -921,6 +1022,7 @@ function zeichneBild() {
                     W / 2, H / 2 + 4);
     panCtx.textAlign = 'left';
     hatSpektrum = false;
+    wfZeigen();
     return;
   }
 
@@ -988,16 +1090,28 @@ function zeichneBild() {
       ? abstandJetzt : state.hfAbstand * 0.9 + abstandJetzt * 0.1;
 
   const spitze = new Float32Array(W);
-  for (let x = 0; x < W; x++) {
-    const von = Math.floor(x * M / W);
-    const bis = Math.max(von + 1, Math.floor((x + 1) * M / W));
-    let m = -Infinity;
-    for (let i = von; i < bis && i < M; i++) if (quelle[i] > m) m = quelle[i];
-    spitze[x] = m;
+  if (W > M) {
+    // Mehr Bildpunkte als Daten: dazwischen LINEAR interpolieren (wie am Mac),
+    // statt Stufen zu zeichnen.
+    for (let x = 0; x < W; x++) {
+      const p = (x + 0.5) * M / W - 0.5;
+      const i0 = Math.max(0, Math.floor(p));
+      const i1 = Math.min(M - 1, i0 + 1);
+      const t = Math.min(1, Math.max(0, p - i0));
+      spitze[x] = quelle[i0] * (1 - t) + quelle[i1] * t;
+    }
+  } else {
+    for (let x = 0; x < W; x++) {
+      const von = Math.floor(x * M / W);
+      const bis = Math.max(von + 1, Math.floor((x + 1) * M / W));
+      let m = -Infinity;
+      for (let i = von; i < bis && i < M; i++) if (quelle[i] > m) m = quelle[i];
+      spitze[x] = m;
+    }
   }
 
   const g = panCtx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, 'rgba(194,146,79,.22)'); g.addColorStop(1, 'rgba(194,146,79,0)');
+  g.addColorStop(0, 'rgba(0,150,255,.62)'); g.addColorStop(1, 'rgba(0,70,190,.28)');
   panCtx.beginPath(); panCtx.moveTo(0, H);
   for (let x = 0; x < W; x++) panCtx.lineTo(x, y(spitze[x]));
   panCtx.lineTo(W, H); panCtx.closePath(); panCtx.fillStyle = g; panCtx.fill();
@@ -1007,7 +1121,7 @@ function zeichneBild() {
     const yy = y(spitze[x]);
     x ? panCtx.lineTo(x, yy) : panCtx.moveTo(x, yy);
   }
-  panCtx.strokeStyle = '#c2924f'; panCtx.lineWidth = 1; panCtx.stroke();
+  panCtx.strokeStyle = '#8fd8ff'; panCtx.lineWidth = 1.5; panCtx.stroke();
 
   panCtx.fillStyle = '#9aa0a8'; panCtx.font = '9px ui-monospace,Menlo,monospace';
   for (let i = 0; i <= 3; i++) {
@@ -1051,7 +1165,7 @@ function zeichneBild() {
         const el = document.querySelector('.feinschritt');
         const rr = el ? el.getBoundingClientRect() : null;
         if (rr && rr.width) {
-          const k = pan.width / rPan.width;
+          const k = panBreite / rPan.width;
           sperrVonX = (rr.left - rPan.left) * k;
           sperrBisY = (rr.bottom - rPan.top) * k;
         }
@@ -1105,13 +1219,14 @@ function zeichneBild() {
       neueZeilen--;
       raumbild.zeileAufnehmen(spitze.subarray ? spitze.subarray(0, W) : spitze);
     }
-    raumbild.malen(wfCtx, wf.width, wf.height, {
+    raumbild.malen(raumCtx, raumFl.width, raumFl.height, {
       bodenDbm: rLo,
       spanneDb: rHi - rLo,
       zKurve: 0.7,
       palette: (db) => rampe((db - rLo) / (rHi - rLo)),
       grund: rampe(0),
     });
+    wfZeigen();
     return;
   }
 
@@ -1133,13 +1248,38 @@ function zeichneBild() {
     const wfLo = state.wfBoden - 3, wfHi = wfLo + 42;
     const d = zeile.data;
     for (let x = 0; x < wf.width; x++) {
-      const db = spitze[Math.min(W - 1, Math.floor(x * W / wf.width))];
+      const db = spitze[Math.min(W - 1, Math.floor((x + 0.5) * W / wf.width))];
       const c = rampe((db - wfLo) / (wfHi - wfLo));
       const o = x * 4;
       d[o] = c[0]; d[o+1] = c[1]; d[o+2] = c[2]; d[o+3] = 255;
     }
     wfCtx.putImageData(zeile, 0, 0);
+    // Die allererste Zeile fuellt den ganzen Puffer: statt einer leeren
+    // dunkelblauen Flaeche, die erst nach gut einer Minute von oben her
+    // Farbe bekommt, steht von Anfang an der Rauschboden da (die Rampe).
+    if (wfLeer) {
+      wfLeer = false;
+      wfCtx.drawImage(wf, 0, 0, wf.width, 1, 0, 1, wf.width, wf.height - 1);
+    }
+    wfDreck = true;
   }
+  // Nur auf die Anzeige bringen, wenn sich der Puffer wirklich geaendert hat
+  // (neue Zeile, Schub, Schnitt) -- nicht bei jedem Bild.
+  if (wfDreck) { wfDreck = false; wfZeigen(); }
+}
+
+// Groesse der Zeichenflaechen bei Aenderung nachfuehren (Drehen, Fenstergroesse,
+// Zoomstufe, anderer Bildschirm mit anderem devicePixelRatio).
+{
+  anzeigeAnpassen();
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => anzeigeAnpassen()).observe($('scope'));
+  }
+  window.addEventListener('resize', anzeigeAnpassen);
+  try {
+    window.matchMedia('(resolution: ' + (window.devicePixelRatio || 1) + 'dppx)')
+      .addEventListener('change', anzeigeAnpassen);
+  } catch (e) { /* aeltere Browser */ }
 }
 
 // Der AF-Regler des Telefons — mit VERSTAERKUNGSVORRAT.
@@ -1628,7 +1768,7 @@ function spanneSetzen(hz) {
     Math.abs(b - hz) < Math.abs(a - hz) ? b : a);
   if (neu === state.spanneHz) { return; }
   state.spanneHz = neu;
-  link.send(`spectrum_start:${state.trx},${pan.width},12,${neu}`);
+  link.send(`spectrum_start:${state.trx},${DATENPUNKTE},12,${neu}`);
   // Nach einem Zoom decken dieselben Zeilen eine andere Bandbreite ab.
   // Schieben hilft da nicht — ein Schnitt sagt, ab wo der neue Massstab
   // gilt, und laesst das Alte sichtbar hinauswandern.
@@ -1654,7 +1794,7 @@ $('zoomRaus').addEventListener('click', () => spanneStufe(+1));
 // sein um die frequenz um +/- 100 zu verschieben". Wischen trifft auf ein
 // paar hundert Hertz genau — fuer das letzte Stueck auf eine Station ist das
 // zu grob, und das Eintippblatt ist dafuer zu umstaendlich.
-const kFeinHz = 100;
+let kFeinHz = 100;          // Desktop: die Schrittwahl stellt ihn (desktop.js)
 function feinschritt(d) {
   const v = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
   if (!v) { return; }
@@ -2112,13 +2252,13 @@ $('scope').addEventListener('pointerup', (e) => {
     // `spotMarken` beim Zeichnen so entstanden ist.
     const r = $('scope').getBoundingClientRect();
     const xCanvas = r.width
-      ? (e.clientX - r.left) / r.width * pan.width : -1;
+      ? (e.clientX - r.left) / r.width * panBreite : -1;
     // Der Panadapter ist nur der OBERE Teil des Feldes; darunter liegt der
     // Wasserfall. Die y-Umrechnung muss darum auf die Hoehe des Canvas
     // gehen und nicht auf die des ganzen Feldes.
     const rPan2 = pan.getBoundingClientRect();
     const yCanvas = rPan2.height
-      ? (e.clientY - rPan2.top) / rPan2.height * pan.height : -1;
+      ? (e.clientY - rPan2.top) / rPan2.height * panHoehe : -1;
 
     // ── Auf der SCHRIFT: das Rufzeichen ist gemeint, nicht die Frequenz ──
     //
@@ -2285,7 +2425,7 @@ link.addEventListener('open', () => {
   // der Schirm nicht zeigen. Gegen rohes I/Q spart das den Faktor sechzig.
   // Ein fremder Server (Thetis, ExpertSDR) kennt den Befehl nicht und
   // verwirft ihn antwortlos — deshalb steht darunter der Rückfall.
-  link.send(`spectrum_start:${state.trx},${pan.width},12,${state.spanneHz}`);
+  link.send(`spectrum_start:${state.trx},${DATENPUNKTE},12,${state.spanneHz}`);
 
   // Rückfall auf rohes I/Q — aber nur, wenn der Server den Befehl gar nicht
   // KENNT, nicht schon dann, wenn gerade keine Bilder kommen.
@@ -2580,12 +2720,28 @@ setInterval(() => {
     //
     // Es gibt keinen Weg, das Blatt absichtlich zu oeffnen; es erscheint nur
     // bei einem Abriss. Darum ist Zumachen bei `ready` immer richtig.
-    if ($('koppeln').classList.contains('an')) {
+    // Nicht zumachen, wenn der Bediener das Blatt selbst geoeffnet hat
+    // (Tipp auf den Namen oben links): er tippt dort gerade ein Token.
+    if ($('koppeln').classList.contains('an') && !blattVonHand) {
       $('koppeln').classList.remove('an');
       $('fehler').textContent = '';
     }
   }
 }, 1000);
+
+// Das Eingabeblatt gezielt oeffnen -- ein Tipp auf den Namen oben links.
+// Bisher kam es nur nach einem Abriss von selbst und ging bei `ready` von
+// selbst wieder zu; wer ein neues Token eintragen wollte, bekam es nie
+// zu fassen, weil die Seite zwischendurch neu verband (2026-11-21).
+let blattVonHand = false;
+$('station').addEventListener('click', () => {
+  blattVonHand = true;
+  $('koppeln').classList.add('an');
+  $('adresse').value = gespeichert() || $('adresse').value;
+  $('token').value = tokenLesen();
+  $('fehler').textContent = 'Neues Token eintragen und auf Verbinden tippen.';
+  $('token').focus();
+});
 
 // Warum es nicht klappt — in einem Satz, den man auf einem Telefon lesen kann.
 //
@@ -2842,7 +2998,8 @@ function schleife(t) {
     txEl.innerHTML = sendetGerade
       ? (link.st.tune ? 'STATION STIMMT AB <small>EMPFÄNGER STUMM</small>'
                       : 'STATION SENDET <small>EMPFÄNGER STUMM</small>')
-      : 'SENDEN <small>NUR IN DER APP</small>';
+      : (SENDEN_FREIGABE ? 'SENDEN <small>HALTEN</small>'
+                         : 'SENDEN <small>NUR IN DER APP</small>');
   }
   requestAnimationFrame(schleife);
 }
@@ -2976,4 +3133,116 @@ zeichneBedienung();
                                      : 'NIMMT AUF …';
     meldung.className = sp >= 0.99 ? 'mikmeldung warn' : 'mikmeldung';
   }, 100);
+}
+
+
+// ── Die Haltetasten: SENDEN und TUNE ───────────────────────────────────────
+//
+// Entwurf 1 (Haltetaste), gewaehlt 2026-10-04: Druecken tastet, Loslassen
+// loest. Es gibt keinen Sendezustand ohne Finger. Die Logik steht in
+// sendetaste.js und ist dort geprueft (pruefe-sendetaste.mjs); hier nur
+// die Verdrahtung. Der Ton kommt vom Mac, das Telefon tastet nur.
+//
+// Ohne SENDEN_FREIGABE passiert hier NICHTS: die Entsicherung bleibt
+// verborgen, beide Tasten behalten `.locked` (pointer-events:none).
+{
+  const tx = $('tx'), tune = $('tune'), sicher = $('txsicher');
+  const taste = new Sendetasten({
+    freigegeben: SENDEN_FREIGABE,
+    sende: (cmd) => { if (link.ws && link.ws.readyState === 1) { link.send(cmd); return true; }
+                      return false; },
+  });
+  const jetzt = () => performance.now();
+
+  const zeigen = () => {
+    const scharf = taste.entsichert(jetzt());
+    sicher.classList.toggle('scharf', scharf);
+    sicher.textContent = scharf ? 'SCHARF' : 'ENTSICHERN';
+    for (const el of [tx, tune]) { el.classList.toggle('locked', !scharf); }
+    const h = taste.halten;
+    tx.classList.toggle('haelt', !!h && h.art === SENDEN);
+    tune.classList.toggle('haelt', !!h && h.art === TUNE);
+  };
+
+  const loesen = () => { taste.loslassen(jetzt()); zeigen(); };
+
+  if (taste.moeglich) {
+    sicher.hidden = false;
+    tx.innerHTML = 'SENDEN <small>HALTEN</small>';
+    tune.innerHTML = 'TUNE <small>HALTEN</small>';
+    sicher.addEventListener('click', () => {
+      if (taste.entsichert(jetzt())) { taste.verriegeln(); } else { taste.entsichern(jetzt()); }
+      zeigen();
+    });
+
+    const halten = (el, art) => {
+      el.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        try { el.setPointerCapture(ev.pointerId); } catch (_) { /* egal */ }
+        taste.druecken(art, state.trx, jetzt());
+        zeigen();
+      });
+      // Jeder Weg, auf dem der Finger weg ist, loest.
+      for (const t of ['pointerup', 'pointercancel', 'lostpointercapture', 'contextmenu']) {
+        el.addEventListener(t, (ev) => { ev.preventDefault(); loesen(); });
+      }
+    };
+    halten(tx, SENDEN);
+    halten(tune, TUNE);
+
+    // Niemand mehr da, der loslassen koennte: Hintergrund, Sperren, Wegwischen.
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { loesen(); } });
+    window.addEventListener('pagehide', loesen);
+    window.addEventListener('blur', loesen);
+    // Leitung weg -> verriegeln. Der Server loest selbst beim Trennen.
+    link.addEventListener('state', () => {
+      if (!(link.ws && link.ws.readyState === 1)) { taste.verbindungWeg(); zeigen(); }
+    });
+    // Lehnt der Server ab, wird geloest und der Grund gesagt.
+    link.addEventListener('txfehler', (e) => {
+      taste.loslassen(0); taste.verriegeln(); zeigen();
+      const m = $('mikmeldung');
+      if (m) { m.className = 'mikmeldung warn';
+               m.textContent = 'SENDEN ABGELEHNT \u2014 ' + ablehnText(e.detail && e.detail.text); }
+    });
+    setInterval(() => { if (taste.takt(jetzt())) { zeigen(); } }, 250);
+  }
+}
+
+
+// Desktop-Layout ab ca. 900 px Breite (desktop.js); darunter bleibt es bei
+// „Ein Schirm". Dieselben Elemente, anderes Raster.
+desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logListeHolen });
+
+// ── Mac-Look: Zeigerinstrument, Rotorzeile, ON AIR ──────────────────────────
+// Die Zahlen schreibt weiter die Schleife oben nach #smeter/#sbar/#rotorGrad;
+// hier werden sie nur in das neue Instrument uebersetzt. Kein zweiter Weg zu
+// den Messwerten, damit beide Anzeigen nie auseinanderlaufen.
+{
+  const striche = $('gaugeStriche');
+  for (let i = 0; i <= 8; i++) {
+    const w = (-62 + i * 15.5) * Math.PI / 180;
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', (66 + 46 * Math.sin(w)).toFixed(1));
+    l.setAttribute('y1', (60 - 46 * Math.cos(w)).toFixed(1));
+    l.setAttribute('x2', (66 + 54 * Math.sin(w)).toFixed(1));
+    l.setAttribute('y2', (60 - 54 * Math.cos(w)).toFixed(1));
+    l.setAttribute('stroke', i > 6 ? '#a86b6d' : '#7e7e85');
+    l.setAttribute('stroke-width', '1.5');
+    striche.appendChild(l);
+  }
+  const rotorFeld = $('rotorFeld');
+  $('rotorKopf').addEventListener('click', () => {
+    const offen = rotorFeld.classList.toggle('offen');
+    $('rotorChev').textContent = offen ? '▾' : '▸';
+  });
+  setInterval(() => {
+    const t = ($('smeter').textContent || '—').split('·');
+    $('sval').textContent = (t[0] || '—').trim();
+    $('sdb').textContent = (t[1] || '').trim();
+    const w = parseFloat($('sbar').style.width) || 0;
+    $('gaugeNadel').setAttribute('transform', 'rotate(' + (-62 + 1.24 * w) + ' 66 60)');
+    $('rotorKopfGrad').textContent = ($('rotorGrad').textContent || '').trim();
+    $('onAir').classList.toggle('an', !!(link.ready && (link.st.mox || link.st.tune)));
+  }, 250);
 }

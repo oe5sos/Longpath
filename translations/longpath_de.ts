@@ -2716,6 +2716,18 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 <context>
     <name>Longpath::KiwiPublicReceiverPicker</name>
     <message>
+        <source>Distance</source>
+        <translation>Entfernung</translation>
+    </message>
+    <message>
+        <source>  ·  sorted by distance from %1, fitting %2 MHz</source>
+        <translation>  ·  nach Entfernung zu %1 geordnet, passend zu %2 MHz</translation>
+    </message>
+    <message>
+        <source>(locator missing)</source>
+        <translation>(Locator fehlt)</translation>
+    </message>
+    <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="65"/>
         <source>Oeffentliche KiwiSDR-Empfaenger</source>
         <translation type="unfinished"></translation>
@@ -2814,6 +2826,38 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 </context>
 <context>
     <name>Longpath::KiwiSdrApplet</name>
+    <message>
+        <source>Hear my signal on the Kiwi</source>
+        <translation>Mein Signal am Kiwi hören</translation>
+    </message>
+    <message>
+        <source>A Kiwi listens along: waterfall below the panadapter, mark on the transmit frequency, audio stays on while transmitting.</source>
+        <translation>Ein Kiwi hört mit: Wasserfall unter dem Panadapter, Marke auf der Sendefrequenz, Ton bleibt beim Senden.</translation>
+    </message>
+    <message>
+        <source>My Signal</source>
+        <translation>Mein Signal</translation>
+    </message>
+    <message>
+        <source>Record</source>
+        <translation>Aufnehmen</translation>
+    </message>
+    <message>
+        <source>Record the Kiwi audio</source>
+        <translation>Ton des Kiwi aufnehmen</translation>
+    </message>
+    <message>
+        <source>Other Kiwi …</source>
+        <translation>Anderen Kiwi …</translation>
+    </message>
+    <message>
+        <source>Choose another Kiwi</source>
+        <translation>Anderen Kiwi auswählen</translation>
+    </message>
+    <message>
+        <source>My signal: %1</source>
+        <translation>Mein Signal: %1</translation>
+    </message>
     <message>
         <location filename="../tests/tst_kiwi_applet_shows_receivers.cpp" line="53"/>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="190"/>
@@ -3396,6 +3440,26 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 </context>
 <context>
     <name>Longpath::MainWindow</name>
+    <message>
+        <source>My Signal: no slice free for the Kiwi.</source>
+        <translation>Mein Signal: keine Scheibe frei für den Kiwi.</translation>
+    </message>
+    <message>
+        <source>Record: choose a Kiwi first (My Signal or Other Kiwi …).</source>
+        <translation>Aufnehmen: erst einen Kiwi wählen (Mein Signal oder Anderen Kiwi …).</translation>
+    </message>
+    <message>
+        <source>Recording not started: %1</source>
+        <translation>Aufnahme nicht gestartet: %1</translation>
+    </message>
+    <message>
+        <source>Recording ended: %1</source>
+        <translation>Aufnahme beendet: %1</translation>
+    </message>
+    <message>
+        <source>Recording saved: %1</source>
+        <translation>Aufnahme gespeichert: %1</translation>
+    </message>
     <message>
         <source>There is no take yet — record something first.</source>
         <translation>Es liegt keine Aufnahme vor — nimm zuerst etwas auf.</translation>
@@ -7869,6 +7933,10 @@ Save before switching?</source>
 <context>
     <name>QObject</name>
     <message>
+        <source>approx. %1</source>
+        <translation>ca. %1</translation>
+    </message>
+    <message>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="104"/>
         <location filename="../src/gui/applets/KiwiSdrApplet.cpp" line="120"/>
         <source>Getrennt</source>
@@ -8091,6 +8159,56 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
     <message>
         <source>Full size -- clicking again restores the previous size</source>
         <translation>Volle Groesse — noch einmal klicken stellt die vorige Groesse wieder her</translation>
+    </message>
+</context>
+<context>
+    <name>Longpath::KiwiOwnSignalStrip</name>
+    <message>
+        <source>hears me · %1</source>
+        <translation>hört mich · %1</translation>
+    </message>
+    <message>
+        <source>hears nothing</source>
+        <translation>hört nichts</translation>
+    </message>
+    <message>
+        <source>unknown</source>
+        <translation>unbekannt</translation>
+    </message>
+    <message>
+        <source>waiting for transmission</source>
+        <translation>wartet auf Sendung</translation>
+    </message>
+    <message>
+        <source>Recording off</source>
+        <translation>Aufnahme aus</translation>
+    </message>
+    <message>
+        <source>● Recording %1 → %2</source>
+        <translation>● Aufnahme %1 → %2</translation>
+    </message>
+    <message>
+        <source>waiting for picture from the Kiwi</source>
+        <translation>wartet auf Bild vom Kiwi</translation>
+    </message>
+</context>
+<context>
+    <name>Longpath::KiwiRecording</name>
+    <message>
+        <source>A recording is already running.</source>
+        <translation>Es läuft schon eine Aufnahme.</translation>
+    </message>
+    <message>
+        <source>Folder cannot be created: %1</source>
+        <translation>Ordner nicht anlegbar: %1</translation>
+    </message>
+    <message>
+        <source>Write failed — disk full?</source>
+        <translation>Schreiben fehlgeschlagen — Platte voll?</translation>
+    </message>
+    <message>
+        <source>Limit of two hours reached.</source>
+        <translation>Obergrenze von zwei Stunden erreicht.</translation>
     </message>
 </context>
 </TS>

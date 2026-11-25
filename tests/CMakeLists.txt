@@ -2337,6 +2337,11 @@ longpath_add_test(tst_tci_logbuch_lesen)
 #   einen Lebendzaehler belegt, nicht behauptet).
 longpath_add_test(tst_bus_mit_frist)
 
+# tst_mikrofon_waechter: das PC-Mikrofon faellt aus (2026-11-20, USB-Mikrofon
+#   ausgesteckt, Rueckrufe stehen). Spielt Ausfall, Jitter, sporadische
+#   Rueckrufe und Erholung mit einer kuenstlichen Uhr durch.
+longpath_add_test(tst_mikrofon_waechter)
+
 # ── Ein gescheiterter Versand muss den Grund NENNEN (2026-10-04) ────────────
 # tst_sendefehler_deutung: haelt auseinander, was auseinandergehalten werden
 #   muss — "das Betriebssystem laesst uns nicht ins lokale Netz" (EHOSTUNREACH,
@@ -5875,6 +5880,10 @@ longpath_add_test(tst_cw_pitch_follows)
 # 2026-09-21, KiwiSDR Stufe 3b: der Kiwi folgt der zugeordneten Scheibe
 # (Frequenz, Betriebsart, Filter) -- vorher nur einmal bei der Zuordnung.
 longpath_add_test(tst_kiwi_tracking_follows_the_slice)
+# 2026-11-24, "Mein Signal am Kiwi" (Entwurf C): Vorauswahl, "hoert er
+# mich"-Messung, Tonhalt, Aufnahme, Streifenbild -- ohne Hauptfenster.
+longpath_add_test(tst_kiwi_own_signal)
+longpath_add_test(tst_kiwi_own_signal_window)
 # 2026-09-21: Nebenfenster (Channel Strip, Logbuch, Setup, Meldungen) auf
 # die Ebene der schwebenden Paletten -- welche Fenster der Filter anfasst.
 longpath_add_test(tst_auxiliary_window_leveler)
@@ -6134,6 +6143,9 @@ longpath_add_test(tst_asr_against_live_server)
 longpath_add_test(tst_filter_follows_the_panadapter)
 longpath_add_test(tst_filter_pane_sheet)
 longpath_add_test(tst_tx_entwurf_sheet)
+# Zeichenwerkzeug, kein Prueflauf: ueberspringt sich ohne
+# LONGPATH_GRAB_DIR UND LONGPATH_ENTWURF=1.
+longpath_add_test(tst_mikro_ausfall_entwurf)
 longpath_add_test(tst_band_flyout_highlight_entwurf)
 # Zeichenwerkzeug, kein Prueflauf: ueberspringt sich ohne
 # LONGPATH_GRAB_DIR UND LONGPATH_ENTWURF=1.
@@ -8728,6 +8740,11 @@ longpath_add_test(tst_panadapter_schaerfe)
 #   der Wasserfall schreibt nichts, statt der TX-Flaeche ein Streifen oben;
 #   Zweiton-Test und Abwahl bleiben live. Gegenprobe gefahren.
 longpath_add_test(tst_panadapter_beim_senden)
+
+# tst_panadapter_farbschema (2026-11-21): Betreiber „s2,s4,s5 - alles als
+#   option!" -- Farbschemata Messing/Graublau/Nacht im Zahnrad, Durchlass
+#   und Wasserfall gemeinsam, Spur nur bei Nacht gedimmt. Gegenprobe gefahren.
+longpath_add_test(tst_panadapter_farbschema)
 
 # ── Weiche Kante und Hof: die Zusage "beide aus = wie vorher" (2026-10-08) ──
 # tst_kurven_streifen: `Kurve::baue` entscheidet, aus wie vielen Baendern die
