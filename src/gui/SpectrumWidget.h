@@ -3147,9 +3147,6 @@ private:
     /// Takten, und der Takt der Maschine ist der richtige.
     bool               m_fremdeWasserfallquelle{false};
     qint64             m_fremdeWasserfallZuletztMs{0};
-    /// Zeitpunkt der letzten ANGENOMMENEN Kachelzeile. Der Bildlaufregler
-    /// (m_wfUpdatePeriodMs) drosselt die Zeilen der Maschine darauf.
-    qint64             m_fremdeWfLetzteZeileMs{0};
     /// Nachgefuehrter Rauschteppich der Kachel, in ihrer eigenen
     /// Intensitaetseinheit. NaN = noch nicht geschaetzt.
     float              m_fremderTeppich{std::numeric_limits<float>::quiet_NaN()};

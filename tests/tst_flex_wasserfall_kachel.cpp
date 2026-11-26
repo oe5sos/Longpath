@@ -589,33 +589,6 @@ private slots:
     // Dieser Stand haelt fest, dass es ueberhaupt passiert, und wie
     // stark. Behoben wird es, indem der Panadapter der Maschine dem
     // Fenster eng folgt (Totband 1 % statt 10 %), nicht hier.
-    // ── 2026-11-26: der Bildlaufregler drosselt auch die Kachel ─────
-    //
-    // Fuenf Zeilen in einem Atemzug bei 250 ms: nur die erste kommt
-    // durch. Bei 30 ms (Standard) und Zeilen im Abstand von 45 ms
-    // kommen alle durch.
-    void derBildlaufreglerDrosseltDieKachel()
-    {
-        SpectrumWidget sw;
-        richteEin(sw, 14.100e6, 200.0e3);
-        const auto kach = kachel(2048, 1024);
-
-        sw.setWfUpdatePeriodMs(250);
-        const quint64 vorher = sw.waterfallRowsWrittenForTest();
-        for (int i = 0; i < 5; ++i) {
-            sw.zeigeFremdeWasserfallzeile(kach, 14.000e6, 14.200e6);
-        }
-        QCOMPARE(sw.waterfallRowsWrittenForTest() - vorher, quint64(1));
-
-        sw.setWfUpdatePeriodMs(30);
-        const quint64 vorher2 = sw.waterfallRowsWrittenForTest();
-        for (int i = 0; i < 3; ++i) {
-            QTest::qWait(45);
-            sw.zeigeFremdeWasserfallzeile(kach, 14.000e6, 14.200e6);
-        }
-        QCOMPARE(sw.waterfallRowsWrittenForTest() - vorher2, quint64(3));
-    }
-
     void einFensterNebenDerFftWirdGedehnt()
     {
         SpectrumWidget sw;
