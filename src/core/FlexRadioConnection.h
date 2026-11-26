@@ -312,19 +312,7 @@ QString setPanCenterCommand(const QString& panId, double hz);
 //
 // Nur ueber die Panafall-Adressierung: `display waterfall set …
 // line_duration=…` weist die Maschine ab (Code 50000016, gemessen).
-QString setWaterfallSetupCommand(const QString& waterfallId, bool rueckfall,
-                                 int lineDurationRate = 100);
-
-// Das Tempo des Wasserfalls an die Flex (2026-11-26, Betreiber an der
-// FLEX-8400: „geschwindigkeit im panadapter aendert sich nicht!"). An der
-// Flex kommen die Zeilen im Takt der MASCHINE; der eigene Takt des
-// Panadapters aendert dort nichts. `msJeZeile` ist das Tempo, wie es
-// Zahnrad, Rechtsklick und Setup fuehren (ms je Zeile); die Rate dafuer
-// rechnet flexLineDurationForMsPerRow ueber die gemessene Kurve aus
-// WaterfallRate.h.
-int flexLineDurationForMsPerRow(int msJeZeile);
-QString setWaterfallLineDurationCommand(const QString& waterfallId,
-                                        int lineDurationRate);
+QString setWaterfallSetupCommand(const QString& waterfallId, bool rueckfall);
 
 // From AetherSDR RadioStatusOwnership.h:48-60 [@d58e2b8a] —
 // parsePanafallCreatePanId(). Die Antwort auf „display panafall
