@@ -43,7 +43,7 @@ static_assert(ProfileRail::kLeistenSeite == CommandBar::kPillHeight + 2,
 // Die Profile stehen zwei Zeilen zu vier, wie die Bandgruppe: die erste
 // Zeile liegt auf der ersten Zeile der Leiste, die zweite auf der zweiten
 // (Betreiber 2026-11-26).
-constexpr int kAbzeichenProZeile = 2;   // zwei Spalten (Betreiber 2026-11-26)
+constexpr int kAbzeichenProZeile = 3;   // drei Spalten (Betreiber 2026-11-26)
 // Abstand von Zeile zu Zeile: 5 px, wie in der Befehlsleiste.
 constexpr int kZeilenAbstand = 5;
 
@@ -307,8 +307,8 @@ void ProfileRail::rebuild()
     // Waagrecht höchstens drei Profile sichtbar, dazu „…“ (Betreiber 2026-11-26):
     // zwei Spalten, zwei Zeilen wie die übrigen Bereiche.
     const QStringList alle = m_profiles->names();
-    const bool ueberlauf = m_richtung == Qt::Horizontal && alle.size() > 3;
-    const QStringList sichtbar = ueberlauf ? alle.mid(0, 3) : alle;
+    const bool ueberlauf = m_richtung == Qt::Horizontal && alle.size() > 5;
+    const QStringList sichtbar = ueberlauf ? alle.mid(0, 5) : alle;
     m_plus->setVisible(!ueberlauf);
     for (const QString& name : sichtbar) {
         // Waagrecht zeigt die Pille das Kürzel (höchstens drei Zeichen),

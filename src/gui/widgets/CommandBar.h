@@ -248,7 +248,7 @@ public:
     /// egal wie lang die Beschriftung ist. Für beide Stufen dieselbe, damit
     /// eine Stufenänderung die Breite nicht verschiebt.
     static int pillBreite();
-    static constexpr int kPillBreite = 60;
+    static constexpr int kPillBreite = 68;
     static int pillHoehe();
     static int pillSchrift();
     static int pillPolster();
@@ -271,7 +271,7 @@ public:
     static constexpr int kVisiblePerGroup = 3;
     /// Sichtbare Bänder vorne: vier (160 · 80 · 60 · 40), der Rest im „…".
     // Acht Baender vorne, in zwei Zeilen zu vier (Betreiber 2026-11-21).
-    static constexpr int kVisibleBand = 4;
+    static constexpr int kVisibleBand = 5;
 
     /// Die Gruppen je Zeile (oben, unten) in Reihenfolge. Die untere
     /// Zeile ist leer, solange die Leiste einzeilig steht.
@@ -327,6 +327,8 @@ private:
         /// Der Kasten, in dem Versalzeile und Pillen stehen. Gemerkt, damit
         /// die Zeilen-Verteilung die Gruppe beim Namen findet.
         QLayout* box{nullptr};
+        /// Spalten je Zeile dieser Gruppe (Betreiber 2026-11-26: meist zwei, die Bänder drei).
+        int spalten{2};
         // Zweite Pillenzeile, nur die Bandgruppe: ab der fuenften Pille.
         QHBoxLayout* row2{nullptr};
     };

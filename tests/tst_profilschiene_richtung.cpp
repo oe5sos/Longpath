@@ -190,8 +190,8 @@ private slots:
         QPushButton* pille = ersteGruppenPille(leiste);
         QVERIFY2(pille, "keine Pille in der Leiste gefunden");
         QCOMPARE(abzeichen->sizeHint().height(), pille->sizeHint().height());
-        // Zwei Zeilen Abzeichen mit 5 px dazwischen (Betreiber 2026-11-26).
-        QCOMPARE(rail.sizeHint().height(), 2 * pille->sizeHint().height() + 5);
+        // Zwei Profile passen in eine Zeile: die Höhe ist die einer Pille.
+        QCOMPARE(rail.sizeHint().height(), pille->sizeHint().height());
         QCOMPARE(ProfileRail::kLeistenSeite, pille->sizeHint().height());
 
         // Auch das Plus. Es traegt als einziges ein eigenes Stilblatt
@@ -521,8 +521,8 @@ private slots:
 
     void waagrechtLiegtInZweiZeilenZuVier()
     {
-        // Betreiber 2026-11-26: zwei Spalten, zwei Zeilen. Ab vier Profilen
-        // stehen drei Pillen und das „…“ darunter.
+        // Betreiber 2026-11-26: drei Spalten, zwei Zeilen. Ab sechs Profilen
+        // stehen fünf Pillen und das „…“ darunter.
         LayoutProfiles profiles;
         for (int i = 1; i <= 6; ++i) {
             QVERIFY(profiles.create(QStringLiteral("P%1").arg(i)));
@@ -534,11 +534,13 @@ private slots:
         QPushButton* erste = badgeFor(rail, namen.at(0));
         QPushButton* zweite = badgeFor(rail, namen.at(1));
         QPushButton* dritte = badgeFor(rail, namen.at(2));
-        QVERIFY(erste && zweite && dritte);
+        QPushButton* vierte = badgeFor(rail, namen.at(3));
+        QVERIFY(erste && zweite && dritte && vierte);
         QCOMPARE(zweite->y(), erste->y());
-        QVERIFY2(dritte->y() > erste->y(), "die dritte Pille liegt in der zweiten Zeile");
-        QVERIFY2(rail.findChildren<QPushButton*>().size() >= 4, "es fehlt das „…“");
+        QCOMPARE(dritte->y(), erste->y());
+        QVERIFY2(vierte->y() > erste->y(), "die vierte Pille liegt in der zweiten Zeile");
     }
+
 
 
 

@@ -47,7 +47,6 @@ namespace {
 // Ein Abstand für alle: zwischen Pillen, zwischen Zeilen und zwischen Bereichen.
 constexpr int kAbstand = 5;
 // Pillen je Zeile in der Bandgruppe (zwei Zeilen zu vier).
-constexpr int kPillsProZeile = 2;   // zwei Spalten je Bereich (Betreiber 2026-11-26)
 /// Die Stufe der Leiste. Statisch, weil die Stilblätter (auch die der
 /// Profilschiene) sie ohne Leiste erreichen müssen.
 bool s_gross = false;
@@ -571,11 +570,18 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
     // ersten Linie der Leiste, nicht mittig (Betreiber 2026-11-26).
     pills->setAlignment(Qt::AlignTop);
     box->addLayout(pills);
+    // Zweite Zeile gleich mit dem Bereich: alle Bereiche haben dieselben
+    // beiden Linien (Betreiber 2026-11-26). Leer bleibt sie ohne Abstand.
+    auto* zweite = new QHBoxLayout;
+    zweite->setContentsMargins(0, 0, 0, 0);
+    zweite->setSpacing(kAbstand);
+    box->addLayout(zweite);
     // Die Zeile setzt ordneZeilen() endgültig; hier nur der Besitz.
     row->addLayout(box);
     m_boxen.append(box);
 
     auto* g = new Group{caption, pills, {}, nullptr, versal, box};
+    g->row2 = zweite;
     m_groups.append(g);
     return *g;
 }
@@ -629,8 +635,19 @@ QPushButton* CommandBar::addPill(Group& g, const QString& label)
     // darf die Anordnung nicht. Wird es zu eng, muss sich etwas
     // anderes ruehren (die Leiste rollt), nicht die Beschriftung.
     setzeMindestbreite(b, label);
-    // Die Bandgruppe fuellt ihre zweite Zeile ab der fuenften Pille.
-    QHBoxLayout* ziel = (g.row2 && g.pills.size() >= kPillsProZeile) ? g.row2 : g.row;
+    // Je Gruppe `spalten` Pillen in der ersten Zeile, der Rest in der zweiten
+    // (Betreiber 2026-11-26). Die zweite Zeile entsteht bei Bedarf.
+    QHBoxLayout* ziel = g.row;
+    if (static_cast<int>(g.pills.size()) >= g.spalten) {
+        if (!g.row2 && g.box) {
+            auto* zweite = new QHBoxLayout;
+            zweite->setContentsMargins(0, 0, 0, 0);
+            zweite->setSpacing(kAbstand);
+            static_cast<QBoxLayout*>(g.box)->addLayout(zweite);
+            g.row2 = zweite;
+        }
+        if (g.row2) { ziel = g.row2; }
+    }
     g.pills.append(b);
     if (ziel) { ziel->addWidget(b); }
     return b;
@@ -853,16 +870,14 @@ void CommandBar::buildDigiGroup(QHBoxLayout* row)
     g.box = nullptr;
     delete eigenerKasten;
     g.row->setParent(nullptr);
-    auto* zeile = new QHBoxLayout;
-    zeile->setContentsMargins(0, 0, 0, 0);
-    zeile->setSpacing(5);
-    // Die Pillen aus der alten Zeile lösen, dann in die neue setzen.
+    // Die Digi-Pillen kommen in die ZWEITE Zeile der Betriebsart, nicht in
+    // eine dritte (Betreiber 2026-11-26: zwei Zeilen; die Reihenfolge ist egal).
+    QHBoxLayout* zeile = mode->row2;
+    if (!zeile) { return; }
     while (QLayoutItem* it = g.row->takeAt(0)) { delete it; }
     for (QPushButton* b : g.pills) { zeile->addWidget(b); }
-    zeile->addStretch(1);
     delete g.row;
     g.row = zeile;
-    modeBox->addLayout(zeile);
 }
 
 void CommandBar::buildAntennaGroup(QHBoxLayout* row)
@@ -909,11 +924,9 @@ void CommandBar::buildBandGroup(QHBoxLayout* row)
     };
 
     Group& g = addGroup(QStringLiteral("Band"), row);
+    g.spalten = 3;   // oben drei Bänder, darunter der Rest (Betreiber 2026-11-26)
     // Zweite Pillenzeile unter den ersten vier Baendern (2026-11-21).
-    auto* zweite = new QHBoxLayout;
-    zweite->setContentsMargins(0, 0, 0, 0);
-    zweite->setSpacing(5);
-    static_cast<QBoxLayout*>(g.box)->addLayout(zweite);
+    QHBoxLayout* zweite = g.row2;
     g.row2 = zweite;
     // Vier Bänder vorne (160 · 80 · 60 · 40, Betreiber 2026-11-21), die
     // übrigen im „…".
@@ -945,10 +958,7 @@ void CommandBar::buildStepGroup(QHBoxLayout* row)
     Group& g = addGroup(QStringLiteral("Step"), row);
     // Zweizeilig (Betreiber 2026-11-24: die Schrittweite braucht man
     // selten): 10 Hz · 100 Hz oben, 1 kHz · „…" darunter -- halb so breit.
-    auto* zweite = new QHBoxLayout;
-    zweite->setContentsMargins(0, 0, 0, 0);
-    zweite->setSpacing(5);
-    static_cast<QBoxLayout*>(g.box)->addLayout(zweite);
+    QHBoxLayout* zweite = g.row2;
     for (int i = 0; i < kVisiblePerGroup && i < m_allSteps.size(); ++i) {
         const auto entry = m_allSteps.at(i);
         QPushButton* b = addPill(g, entry.first);
