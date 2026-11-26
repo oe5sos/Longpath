@@ -618,7 +618,8 @@ const WfGradientStop* wfSchemeStops(WfColorScheme scheme, int& count)
 SpectrumWidget::SpectrumWidget(QWidget* parent)
     : SpectrumBaseClass(parent)
 {
-    setMinimumSize(400, 200);
+    // Kleiner ziehbar (Betreiber 2026-11-26): vorher 400 x 200 Mindestgröße.
+    setMinimumSize(160, 60);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setAutoFillBackground(false);
 
