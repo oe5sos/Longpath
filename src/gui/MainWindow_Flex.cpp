@@ -471,12 +471,17 @@ void MainWindow::wireFlex()
                                [rauschHinaus](NbMode) { rauschHinaus(); });
         // ── Der Schnellgriff zeigt am Flex die Maschine ─────────────
         //
+        // Nicht bei NR2/NR4: die rechnet Longpath (WDSP), dort wirken
+        // die WDSP-Regler wie an der Anvelina (2026-11-26).
+        //
         // Dort stehen sonst WDSP-Werte, die nichts tun. Der Name
         // kommt aus derselben Zuordnung, die auch den Befehl baut --
         // zwei Quellen wuerden frueher oder spaeter auseinanderlaufen.
         if (m_commandBar) {
             m_commandBar->setMaschinenNr([](NrSlot slot) {
-                return RadioModel::flexNrSchluessel(slot);
+                return (slot == NrSlot::NR2 || slot == NrSlot::NR4)
+                           ? QString()
+                           : RadioModel::flexNrSchluessel(slot);
             });
         }
 

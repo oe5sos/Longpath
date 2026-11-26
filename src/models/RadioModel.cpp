@@ -8010,7 +8010,7 @@ bool RadioModel::flexNrAngeboten(NrSlot steckplatz)
 
 QString RadioModel::flexNrAnzeige(NrSlot steckplatz)
 {
-    // NRL / NR / NRS: so heissen die Tasten an der Flex (Flex-Hilfe und
+    // NRL: so heisst die Taste an der Flex (Flex-Hilfe und
     // AetherSDR VfoWidget.cpp). Die Zuordnung zur Befehlszeile ist aus
     // AetherSDR belegt: SliceModel::setNr sendet `nr=`, setNrl `lms_nr=`,
     // setNrs `speex_nr=` -- dieselben Schluessel wie flexNrSchluessel.
