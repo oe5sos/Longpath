@@ -23,6 +23,7 @@
 #include "core/ProfilHerkunft.h"
 #include "core/ZeusAbfrage.h"
 
+#include <QHideEvent>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -301,6 +302,18 @@ StripWindow::~StripWindow()
     // If the window is destroyed with the apply-path bypass engaged,
     // the radio would keep a bypass it never asked for.
     setRadioBypass(false);
+}
+
+// 2026-11-26, am Geraet: „aus dem kopfhoerer schrecklich laut, auch wenn
+// der channelzug geschlossen ist". Das Protokoll zeigte den Mithoerer
+// weiterlaufen, bis die ganze App beendet wurde -- Schliessen versteckt
+// den Dialog nur, und der Mithoerer lebt in seinem eigenen Faden weiter.
+void StripWindow::hideEvent(QHideEvent* ev)
+{
+    if (m_liveBtn && m_liveBtn->isChecked()) {
+        m_liveBtn->setChecked(false);   // haelt ihn ueber toggleLiveMonitor an
+    }
+    QDialog::hideEvent(ev);
 }
 
 void StripWindow::setRadioBypass(bool on)
