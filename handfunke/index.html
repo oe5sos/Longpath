@@ -169,8 +169,11 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <svg class="ring" id="swrSvg" aria-label="SWR"></svg>
   <!-- Sendeleistung neben dem SWR (2026-11-25): tx_sensors Feld 2 (rms-Watt).
        Wie das SWR nur beim Senden, sonst „—". ALC liefert Longpath ueber TCI
-       nicht (TciSensorManager::formatTxSensors), darum fehlt sie hier. -->
+       nicht in tx_sensors; sie kommt als eigene Zeile darunter. -->
   <div class="kopf fuss"><span class="caps">PWR</span><span class="chipw aus" id="pwrWertI">—</span></div>
+  <!-- ALC (2026-11-26): Longpath-eigene Zeile tx_alc, wie das ALC-Instrument am
+       Mac (TXA_ALC_AV, dB). Nur beim Senden, sonst „—". -->
+  <div class="kopf fuss"><span class="caps">ALC</span><span class="chipw aus" id="alcWertI">—</span></div>
 </div>
 <div class="schicht instr" id="kompassBox" aria-label="Rotor, antippen oeffnet die Steuerung" hidden>
   <div class="kopf"><span class="caps">Rotor</span><span class="chipw aus" id="rotorGradK">—</span></div>
