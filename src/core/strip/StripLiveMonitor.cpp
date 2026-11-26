@@ -255,7 +255,7 @@ void StripLiveMonitor::doStart()
     m_sink->setBufferSize(qsizetype(m_blockFrames) * m_outBytesPerFrame
                           * kSinkBlocks);
     m_fade = 0.0f;                 // jeder Start blendet ein
-    m_hotBlocks = 0;
+    m_hotBlocks = 0; m_loopDuck = 1.0f; m_duckRueckMs = 0; m_stilleMs = 0;
     m_feedbackCut.store(false, std::memory_order_release);
     m_sink->setVolume(float(m_volume));
 
@@ -766,7 +766,34 @@ void StripLiveMonitor::pump()
         } else {
             m_hotBlocks = 0;
         }
-        const bool verdacht = m_hotBlocks >= 3000;
+        // Nach einer Bremsung reicht eine Sekunde: die Schleife ist
+        // dann ja bekannt und kommt zurueck, sobald die Bremse loslaesst.
+        const int fristMs = (m_duckRueckMs > 0) ? 1000 : 3000;
+        const bool verdacht = m_hotBlocks >= fristMs;
+
+        // ── Die Bremse: leiser, nie stumm ───────────────────────
+        //
+        // Nur der Mithoerweg, nur solange der Eingang keine Pause
+        // macht. Bis -30 dB mit 20 dB/s; geloest wird erst nach
+        // zwei Sekunden Ruhe, mit 10 dB/s. Sprache macht Pausen --
+        // die Bremse greift dort nie.
+        const float sek = float(blockMs / 1000.0);
+        if (verdacht) {
+            m_stilleMs = 0;
+            m_duckRueckMs = 20000;
+            m_loopDuck = std::max(0.03f, m_loopDuck * std::pow(10.0f, -20.0f * sek / 20.0f));
+        } else {
+            if (m_hotBlocks == 0) { m_stilleMs += int(std::lround(blockMs)); }
+            if (m_duckRueckMs > 0) {
+                m_duckRueckMs = std::max(0, m_duckRueckMs - int(std::lround(blockMs)));
+            }
+            if (m_stilleMs >= 2000) {
+                m_loopDuck = std::min(1.0f, m_loopDuck * std::pow(10.0f, 10.0f * sek / 20.0f));
+            }
+        }
+        if (m_loopDuck < 1.0f) {
+            for (float& v : m_mono) { v *= m_loopDuck; }
+        }
         if (verdacht != m_feedbackCut.load(std::memory_order_acquire)) {
             m_feedbackCut.store(verdacht, std::memory_order_release);
             if (verdacht) {

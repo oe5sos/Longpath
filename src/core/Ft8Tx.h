@@ -121,10 +121,23 @@ public:
 
     /// MSHVs Tonleiter: `grundTonHz`, dann je Platz 60 Hz hoeher,
     /// begrenzt auf 100..5000 Hz. `anzahl` Plaetze.
-    static QVector<float> tonleiter(float grundTonHz, int anzahl);
+    static QVector<float> tonleiter(float grundTonHz, int anzahl,
+                                    float abstandHz = 60.0f);
 
     /// Abstand zweier Plaetze, aus MSHV (gen_ft8.cpp:262).
     static constexpr float kPlatzAbstandHz = 60.0f;
+
+    /// Abstand zweier Plaetze je Verfahren.
+    ///
+    /// FT2 belegt 4 x 41,7 = 167 Hz; 60 Hz wie bei FT8 legte die
+    /// Plaetze uebereinander. MSHV `gen_ft2.cpp:185`:
+    /// `double f0=f_tx + (250.0*(double)islot);//BW=167Hz or 125Hz`.
+    /// FT8 und FT4 bleiben bei 60 Hz wie bisher (siehe den Hinweis
+    /// zu FT4 in docs/architecture/2026-11-17-ft2.md).
+    static float platzAbstandHz(Ft8Decoder::Protocol p)
+    {
+        return p == Ft8Decoder::Protocol::Ft2 ? 250.0f : kPlatzAbstandHz;
+    }
     static constexpr float kMinTonHz = 100.0f;
     static constexpr float kMaxTonHz = 5000.0f;
 
@@ -169,7 +182,15 @@ public:
     /// Laenge eines Fensters in Millisekunden.
     static int fensterMs(Ft8Decoder::Protocol p)
     {
-        return p == Ft8Decoder::Protocol::Ft4 ? 7500 : 15000;
+        switch (p) {
+        case Ft8Decoder::Protocol::Ft4: return 7500;
+        // FT2: WSJT-X Improved 3.1.0 / Decodium 4.0 `m_TRperiod=3.75`.
+        // 60000 / 3750 = 16 Fenster je Minute, ganzzahlig -- die
+        // Zaehlung ab der vollen Minute geht also auf.
+        case Ft8Decoder::Protocol::Ft2: return 3750;
+        case Ft8Decoder::Protocol::Ft8: break;
+        }
+        return 15000;
     }
 
     /// Wie lange das SIGNAL dauert -- nicht das Fenster.
@@ -191,9 +212,43 @@ public:
         // Hier als Zahlen statt als Einbindung: eine C-Kopfdatei aus
         // third_party in eine oeffentliche Qt-Kopfdatei zu ziehen,
         // zoege sie durch das halbe Programm.
-        return p == Ft8Decoder::Protocol::Ft4
-                   ? static_cast<int>(105 * 0.048 * 1000.0 + 0.5)   // 5040 ms
-                   : static_cast<int>(79 * 0.160 * 1000.0 + 0.5);   // 12640 ms
+        //   FT2 (Longpath-Erweiterung): FT2_SYMBOL_PERIOD (0.024f), FT4_NN
+        switch (p) {
+        case Ft8Decoder::Protocol::Ft4:
+            return static_cast<int>(105 * 0.048 * 1000.0 + 0.5);   // 5040 ms
+        case Ft8Decoder::Protocol::Ft2:
+            return static_cast<int>(105 * 0.024 * 1000.0 + 0.5);   // 2520 ms
+        case Ft8Decoder::Protocol::Ft8: break;
+        }
+        return static_cast<int>(79 * 0.160 * 1000.0 + 0.5);        // 12640 ms
+    }
+
+    /// Wo das Signal nach der Fenstergrenze beginnen soll.
+    ///
+    /// FT8 und FT4: 500 ms, der Wert, gegen den Longpath seit dem
+    /// 2026-10-30 sendet (siehe `sendeplan`).
+    ///
+    /// FT2: 150 ms -- WSJT-X Improved 3.1.0 `Modulator/Modulator.cpp:80`
+    /// (`if(mode=="FT2") delay_ms=150;`). Decodium 4.0 nimmt 0 bzw.
+    /// 300 ms (`Modulator.cpp:209-213`); 150 liegt dazwischen und in der
+    /// Mitte des Suchbandes beider Empfaenger. 500 ms wie bei FT8 ginge
+    /// NICHT: das Signal endete dann bei 3020 ms, und WSJT-X Improved
+    /// wertet bei 3312 ms aus -- mit Laufzeit im Tonweg zu knapp.
+    static qint64 zielVersatzMs(Ft8Decoder::Protocol p)
+    {
+        return p == Ft8Decoder::Protocol::Ft2 ? 150 : 500;
+    }
+
+    /// Wie lange nach der Fenstergrenze auf den Dekoder gewartet wird.
+    ///
+    /// FT8 und FT4: 250 ms (gemessen 2026-10-30, siehe Ft8Applet).
+    /// FT2 dekodiert VOR der Grenze (Ft8Stream::kFt2DekodierProben);
+    /// die Antwort steht also schon fest, wenn das Fenster beginnt.
+    /// 50 ms bleiben fuer den Taktgeber und den Ereignisumlauf --
+    /// mehr ginge vom Zielversatz (150) ab.
+    static qint64 dekoderFristMs(Ft8Decoder::Protocol p)
+    {
+        return p == Ft8Decoder::Protocol::Ft2 ? 50 : 250;
     }
 
     /// Fuehrende Stille der Wellenform, in Millisekunden.

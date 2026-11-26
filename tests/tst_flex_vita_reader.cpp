@@ -705,14 +705,34 @@ private slots:
         QVERIFY(3495.0 / 128.0 > 15.0);
     }
 
+    // degC durch 64 (2026-11-18). Die Zahlen sind die vom Geraet: roh
+    // 1405 stand nach einer halben Stunde ohne Sendung, roh 2479 unter
+    // FT8. Die Gegenprobe ist dieselbe wie bei den Spannungen oben —
+    // nur dass hier nicht der erklaerte Bereich trennt, sondern das
+    // Zimmer: mit /128 und /256 waere die eingeschaltete Maschine
+    // kaelter als jede bewohnte Stube.
+    void temperaturWirdDurch64Geteilt()
+    {
+        const auto ruhe = FlexVita::meterScaled(1405, QStringLiteral("degC"));
+        const auto warm = FlexVita::meterScaled(2479, QStringLiteral("degC"));
+        QVERIFY(ruhe.has_value());
+        QVERIFY(warm.has_value());
+        QVERIFY(qFuzzyCompare(*ruhe, 1405.0 / 64.0));
+        QVERIFY(qFuzzyCompare(*warm, 2479.0 / 64.0));
+        QVERIFY2(*ruhe > 18.0 && *ruhe < 26.0,
+                 qPrintable(QStringLiteral("Ruhewert %1").arg(*ruhe)));
+        QVERIFY(1405.0 / 128.0 < 12.0);
+        QVERIFY(1405.0 / 256.0 < 6.0);
+    }
+
     // „Unbekannt ist ein Strich, keine Null" (HAUSSTIL Regel 7).
-    // Fuer degC, RPM und Amps liegen BEIDE Teiler im erklaerten
-    // Bereich; der Bereich entscheidet dort also nichts, und eine
-    // Zahl auszugeben hiesse, eine Messung zu behaupten, die niemand
-    // gemacht hat.
+    // Fuer RPM und Amps liegen mehrere Teiler im erklaerten Bereich;
+    // der Bereich entscheidet dort also nichts, und eine Zahl
+    // auszugeben hiesse, eine Messung zu behaupten, die niemand
+    // gemacht hat. degF kam an der Maschine nie vor.
     void unbelegteEinheitenGebenKeineZahl()
     {
-        QVERIFY(!FlexVita::meterScaled(1505, QStringLiteral("degC")));
+        QVERIFY(!FlexVita::meterScaled(1505, QStringLiteral("degF")));
         QVERIFY(!FlexVita::meterScaled(1060, QStringLiteral("RPM")));
         QVERIFY(!FlexVita::meterScaled(300,  QStringLiteral("Amps")));
         QVERIFY(!FlexVita::meterScaled(1,    QStringLiteral("Unsinn")));

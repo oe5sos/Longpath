@@ -123,6 +123,87 @@ public:
     /// kostet bei jedem Abgleich wieder Arbeit.
     static constexpr int kFt4BlockVersatzMs = 300;
 
+    /// ── FT2: dieselbe Rechnung, eigene Zahlen (2026-11-17) ──────────
+    ///
+    /// Suchband -10..+19 Symbole zu 0,024 s = −240..+456 ms, Mitte
+    /// +108 ms. Gesendet wird FT2 nicht einheitlich:
+    ///
+    ///     WSJT-X Improved 3.1.0  Modulator.cpp:80   delay_ms=150
+    ///     Decodium 4.0           Modulator.cpp:209  0 (Linux) / 300 (sonst)
+    ///
+    /// Der Block beginnt so, dass 150 ms -- die Mitte beider Lager --
+    /// in der Mitte des Bandes liegt: 150 − 108 = 42, auf 40 gerundet.
+    /// Danach reicht das Band von −200 bis +496 ms: 0 ms hat 200 ms
+    /// Luft nach unten, 300 ms knapp 200 nach oben.
+    static constexpr int kFt2BlockVersatzMs = 40;
+
+    /// ── Und ein ZWEITER Block, 480 ms spaeter (2026-11-17, abends) ───
+    ///
+    /// Am Geraet (FLEX-8400, 3,578 MHz): kraeftige FT2-Signale im
+    /// Wasserfall, im Takt von 3,75 s -- und 0 Funde in jedem Fenster.
+    /// Das Suchband oben reicht bis +496 ms; kommt der Ton der Flex mit
+    /// ein paar hundert Millisekunden Laufzeit an, liegt jede Sendung
+    /// dahinter. WSJT-X Improved sucht weiter: FT4-Sync von
+    /// `ibmin=-344` bis `ibmax=1012` bei 12000/18 Hz
+    /// (`lib/ft4_decode.f90:402-411`), fuer FT2 auf halbe Zeit
+    /// gestreckt also −0,26 … +0,76 s.
+    ///
+    /// ft8_libs Band ist fest (−10..+19 Symbole), darum ein zweiter
+    /// Durchlauf auf demselben Fenster, um 20 Symbole (480 ms) versetzt:
+    /// zusammen −200 … +976 ms ab der Grenze. Was beide finden, steht
+    /// einmal da; der Zeitversatz gilt immer ab dem ERSTEN Block.
+    static constexpr int kFt2ZweiterBlockMs = kFt2BlockVersatzMs + 480;
+
+    /// ── FT2 wird VOR der Fenstergrenze dekodiert ────────────────────
+    ///
+    /// Bei FT8 und FT4 wird an der Grenze dekodiert, und die Antwort
+    /// geht mit der Dekoderfrist (250 ms) in das neue Fenster. Bei FT2
+    /// ist das Fenster 3,75 s lang und die Sendung beginnt 150 ms nach
+    /// der Grenze -- dafuer reicht die Zeit nicht.
+    ///
+    /// WSJT-X Improved dekodiert FT2 nach `23*1728` Proben
+    /// (`widgets/mainwindow.cpp:2646`, `m_hsymStop=23` mit 1728 je
+    /// Schritt), also nach 3,312 s. Hier etwas spaeter, nach 3,5 s:
+    /// mit dem zweiten Block (oben) kann eine Sendung bis +976 ms
+    /// beginnen und endet dann bei 976 + 2520 = 3496 ms. Danach bleiben
+    /// bis zur Grenze 250 ms -- dekodiert ist ein FT2-Fenster in
+    /// wenigen Millisekunden. Der Rest bis zur Grenze wird verworfen.
+    static constexpr int kFt2DekodierProben = 42000;   // 3,5 s bei 12 kHz
+
+    /// ── Decodium sendet ASYNCHRON (2026-11-17, am Geraet gefunden) ──
+    ///
+    /// Decodium 4.0 hat fuer FT2 „Async L2" fest eingeschaltet
+    /// (`widgets/mainwindow.cpp`: „force Async L2 in FT2, hide checkbox
+    /// (always on)") und sendet ~100 ms nach dem Dekodieren, nicht auf
+    /// der Grenze („Async TX guard timer: fires after decode to start
+    /// TX immediately", `m_asyncTxGuardTimer.start(100)`). Sein
+    /// Empfaenger wertet alle 100 ms die letzten 3,75 s aus
+    /// (`doc/FT2_ASINCRONO.md`). WSJT-X Improved bleibt im Raster.
+    ///
+    /// Ein Empfaenger, der nur Sendungen kurz nach der Grenze sucht,
+    /// hoert von Decodium also nur einen Teil. Darum wird bei FT2 der
+    /// SCHLUSS des vorigen Fensters mitgenommen (kFt2VorlaufProben)
+    /// und ueber den ganzen Puffer gesucht, Block fuer Block im Abstand
+    /// von 480 ms. Jede Sendung, die seit der letzten Auswertung
+    /// vollstaendig geworden ist, liegt dann in einem Block. Was schon
+    /// gemeldet war (gleicher Wortlaut, gleicher Beginn), kommt nicht
+    /// ein zweites Mal.
+    static constexpr int kFt2BlockSchrittMs = 480;
+    static constexpr int kFt2VorlaufProben  = 36000;   // 3,0 s bei 12 kHz
+
+    /// FT2 auswerten wie im Betrieb. `puffer` enthaelt zuerst
+    /// `vorlaufProben` Proben VOR der Fenstergrenze, danach das Fenster.
+    /// Gesucht wird in Bloecken im Abstand von kFt2BlockSchrittMs,
+    /// ausgerichtet an Grenze + kFt2BlockVersatzMs, soweit der Puffer
+    /// jeweils eine ganze Sendung fasst. Der Zeitversatz zaehlt ab
+    /// Grenze + kFt2BlockVersatzMs; vor der Grenze begonnene Sendungen
+    /// haben einen negativen. Oeffentlich, damit der Pruefstand GENAU
+    /// diesen Weg faehrt und keinen nachgebauten.
+    static QVector<Ft8Decode> dekodiereFt2(const float* puffer, int proben,
+                                           int vorlaufProben = 0,
+                                           const QVector<ApVorgabe>& vorwissen
+                                               = QVector<ApVorgabe>{});
+
 signals:
     /// Ein Fenster ist zu Ende und ausgewertet. periodStart ist seine
     /// UTC-Anfangszeit — ohne die laesst sich ein Decode nicht
@@ -138,6 +219,9 @@ signals:
 
 private:
     void schliesseFenster(qint64 endeMs);
+    /// Auswerten, was im Fenster liegt, und melden. Von
+    /// `schliesseFenster` an der Grenze gerufen, bei FT2 schon vorher.
+    void werteAus();
 
     Ft8Decoder::Protocol m_protocol{Ft8Decoder::Protocol::Ft8};
     std::function<qint64()> m_uhr;
@@ -145,6 +229,17 @@ private:
     std::function<QVector<ApVorgabe>()> m_vorwissenQuelle;
     QVector<float> m_fenster;      ///< 12 kHz, laufendes Fenster
     qint64 m_fensterBeginnMs{-1};  ///< UTC, Anfang des laufenden Fensters
+    /// FT2: dieses Fenster ist schon ausgewertet (vor der Grenze).
+    bool m_schonAusgewertet{false};
+    /// Wann (UTC, Uhr des Stroms) die erste Probe dieses Fensters kam.
+    /// Fuer den Mitschnitt: ohne sie weiss man nicht, wo im Fenster die
+    /// Grenze lag.
+    qint64 m_erstesStueckMs{-1};
+    /// FT2: der Schluss des vorigen Fensters (siehe kFt2VorlaufProben).
+    QVector<float> m_ft2Vorlauf;
+    /// FT2: was schon gemeldet wurde -- Wortlaut und Beginn (UTC ms).
+    struct Gemeldet { QString text; qint64 beginnMs; };
+    QVector<Gemeldet> m_ft2Gemeldet;
 };
 
 } // namespace Longpath

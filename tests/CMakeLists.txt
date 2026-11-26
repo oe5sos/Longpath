@@ -2873,6 +2873,13 @@ if(TEST tst_kombi_feld)
         ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
 endif()
 
+longpath_add_test(tst_kombi_blaetter_rx_phone)
+longpath_add_test(tst_kombi_ausrichtung_rx_phone)
+if(TEST tst_kombi_ausrichtung_rx_phone)
+    set_tests_properties(tst_kombi_ausrichtung_rx_phone PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 longpath_add_test(tst_flex_socketmeldung)
 
 longpath_add_test(tst_flex_leistung_je_band)
@@ -5239,6 +5246,16 @@ longpath_add_test(tst_metric_label)
 # CPU survives PA updates, clearing both hides row one, PA label override.
 longpath_add_test(tst_system_tile)
 
+# ── Temperaturen der Geraete im Kopf (2026-11-18) ─────────────────────────
+# DeviceTemperatureStrip + DeviceTemperatureFeed + ihr Platz in TitleBar:
+# ohne Messwert steht nichts da, mit Messwert erscheint der Eintrag, ohne
+# verschwindet er, mehrere Geraete stehen in fester Reihenfolge
+# nebeneinander, eine Warnstufe nur auf Meldung des Geraets (SPE). Dazu
+# ein Zeichenwerkzeug (`blaetter`), das den Kopf mit Beispielwerten als
+# PNG ablegt; es braucht LONGPATH_GRAB_DIR UND LONGPATH_ENTWURF=1 (die CI
+# setzt den ersten global) und ueberspringt sich sonst.
+longpath_add_test(tst_device_temperature_strip)
+
 # ── Shell-Chrome Redesign sub-PR-1: StationBlock widget ───────────────────
 # 5 tests: default/setRadioName/empty-name appearance switching, click +
 # right-click signal emission gated on appearance.
@@ -5923,6 +5940,10 @@ longpath_add_test(tst_dxcluster_wiederanlauf)
 # toter Schalter, die echte Auswahl lag acht Klicks tief, und die Wahl
 # wirkt erst beim Start. Dieser Lauf haelt beides nach.
 longpath_add_test(tst_palette_im_menue)
+# 2026-11-24: Blau-Gold steht auch auf der Seite Setup > Colors & Theme.
+longpath_add_test(tst_palette_im_setup)
+target_compile_definitions(tst_palette_im_setup PRIVATE
+    LONGPATH_SRC_DIR="${CMAKE_SOURCE_DIR}")
 # 2026-10-15: „zwischen windows ... ein minimaler automatischer
 # Abstand ... dann sieht es besser aus und gleich." Dieser Lauf misst
 # die Luecken am echten Hauptfenster.
@@ -5992,6 +6013,9 @@ longpath_add_test(tst_scheibenflagge)
 # 2026-10-15: FT8/FT4 nativ — Nachricht hin, Nachricht zurueck, ohne
 # Tondatei und ohne Funkgeraet.
 longpath_add_test(tst_ft8_dekodiert)
+# 2026-11-17: FT2 -- FT4 im doppelten Tempo. Gegen MSHVs eigene
+# Tonfolgen und dessen GFSK-Rechnung, dazu Takt, Sendeplan, Anrufstellen.
+longpath_add_test(tst_ft2)
 # ── 2026-10-31: die dB-Spalte war der Sync-Score ────────────────────
 # Gegen Signale mit BEKANNTEM Stoerabstand gefahren (0 bis −19 dB),
 # damit eine neue Rechnung nicht wieder bloss plausibel aussieht.
@@ -6553,6 +6577,15 @@ longpath_add_test(tst_widget_picker)
 longpath_add_test(tst_layout_profiles)
 longpath_add_test(tst_profilschiene_bindung)
 
+# -- Werksvorgabe der Layoutprofile (2026-11-18): eine frische Sandkiste
+#    bekommt Martins Profile N und F, wer schon welche hat, nie; nichts
+#    Privates in der Ressource, kein Fenster ausserhalb von 1440x900 --
+longpath_add_test(tst_werksprofile)
+if(TEST tst_werksprofile)
+    set_tests_properties(tst_werksprofile PROPERTIES
+        ENVIRONMENT "LONGPATH_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+endif()
+
 # -- Der Rundgang durch ein ECHTES MainWindow, nicht durch ein blosses
 #    QVariantMap an Haken (das deckt tst_layout_profiles.cpp bereits ab,
 #    und genau DAS haette den Bandwidth-Filter-Fehler vom 2026-08-30
@@ -6689,6 +6722,19 @@ longpath_add_test(tst_hot_key_bindings)
 longpath_add_test(tst_hot_key_dispatcher)
 longpath_add_test(tst_hot_key_window)
 longpath_add_test(tst_fkey_priority)
+# HaliKey MIDI: Fusstaster und Morsetaste (2026-11-17).
+longpath_add_test(tst_midi_key_input)
+longpath_add_test(tst_cw_mithoerton)
+longpath_add_test(tst_iambic_keyer)
+# Echtzeit auf einem eigenen Faden: nebeneinander mit Hunderten anderer
+# Pruefstaende misst er den Laeufer, nicht den Geber (macOS-CI,
+# 2026-11-17: ein Punkt von 40 ms mass 88). Siehe den Kopf des Laufs.
+if(TEST tst_iambic_keyer)
+    set_tests_properties(tst_iambic_keyer PROPERTIES RUN_SERIAL TRUE)
+endif()
+longpath_add_test(tst_cw_tastung)
+longpath_add_test(tst_cw_tastweg_freigabe)
+longpath_add_test(tst_cw_key_setup_page)
 longpath_add_test(tst_qso_recorder)
 longpath_add_test(tst_wav_recorder)
 longpath_add_test(tst_wav_recorder_controller)

@@ -133,10 +133,11 @@ int Ft8Mehrfach::verarbeite(const QString& nachricht, int snr)
 QVector<float> Ft8Mehrfach::tonleiter(int anzahl) const
 {
     // Passt der volle Stapel unter die Grenze, bleibt es bei MSHV.
+    // Der Abstand kommt vom Verfahren (FT2: 250 Hz), siehe `setAbstandHz`.
     const float oberster = m_grundtonHz
-        + Ft8TxSource::kPlatzAbstandHz * static_cast<float>(m_plaetze - 1);
+        + m_abstandHz * static_cast<float>(m_plaetze - 1);
     if (m_plaetze <= 1 || oberster <= kPlatzObergrenzeHz) {
-        return Ft8TxSource::tonleiter(m_grundtonHz, anzahl);
+        return Ft8TxSource::tonleiter(m_grundtonHz, anzahl, m_abstandHz);
     }
 
     // Sonst nach unten, mit derselben Schrittweite und derselben
@@ -145,8 +146,7 @@ QVector<float> Ft8Mehrfach::tonleiter(int anzahl) const
     if (anzahl <= 0) { return aus; }
     aus.reserve(anzahl);
     for (int i = 0; i < anzahl; ++i) {
-        float f0 = m_grundtonHz
-                   - Ft8TxSource::kPlatzAbstandHz * static_cast<float>(i);
+        float f0 = m_grundtonHz - m_abstandHz * static_cast<float>(i);
         if (f0 < Ft8TxSource::kMinTonHz) { f0 = Ft8TxSource::kMinTonHz; }
         if (f0 > Ft8TxSource::kMaxTonHz) { f0 = Ft8TxSource::kMaxTonHz; }
         aus.append(f0);

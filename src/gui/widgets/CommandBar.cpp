@@ -753,8 +753,7 @@ void CommandBar::aktualisiereDigiLampe()
             // Der Dekoder hat Vorrang: was er faehrt, bestimmt, was
             // ankommt. Die Frequenz sagt nur, WO man steht, und das
             // sagt die Skala schon.
-            label = (m_digiBetriebsart == Digimodus::Ft4)
-                        ? QStringLiteral("FT4") : QStringLiteral("FT8");
+            label = QLatin1String(DigiFrequenzen::name(m_digiBetriebsart));
         } else {
             // Ohne Dekoder bleibt die alte Auskunft: stehe ich auf
             // einer Anrufstelle? Sie darf NICHT schon bei DIGU
@@ -765,6 +764,8 @@ void CommandBar::aktualisiereDigiLampe()
                 label = QStringLiteral("FT8");
             } else if (DigiFrequenzen::stehtSchonDort(f, Digimodus::Ft4)) {
                 label = QStringLiteral("FT4");
+            } else if (DigiFrequenzen::stehtSchonDort(f, Digimodus::Ft2)) {
+                label = QStringLiteral("FT2");
             }
         }
     }
@@ -793,7 +794,8 @@ void CommandBar::buildDigiGroup(QHBoxLayout* row)
     Group& g = addGroup(QStringLiteral("Digi"), row);
     for (const auto& eintrag : {
              std::pair{QStringLiteral("FT8"), DigiFrequenzen::Digimodus::Ft8},
-             std::pair{QStringLiteral("FT4"), DigiFrequenzen::Digimodus::Ft4}}) {
+             std::pair{QStringLiteral("FT4"), DigiFrequenzen::Digimodus::Ft4},
+             std::pair{QStringLiteral("FT2"), DigiFrequenzen::Digimodus::Ft2}}) {
         QPushButton* b = addPill(g, eintrag.first);
         connect(b, &QPushButton::clicked, this,
                 [this, modus = eintrag.second]() { emit digiRequested(modus); });

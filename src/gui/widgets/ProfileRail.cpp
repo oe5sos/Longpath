@@ -436,16 +436,21 @@ ProfileRail::Menueteile ProfileRail::baueMenue(const QString& name,
     // ganze Bindung (auch die an Band und Betriebsart) unerreichbar.
     t.ft8 = menu.addAction(tr("Use for FT8"));
     t.ft4 = menu.addAction(tr("Use for FT4"));
-    for (QAction* a : {t.ft8, t.ft4}) { a->setCheckable(true); }
+    t.ft2 = menu.addAction(tr("Use for FT2"));
+    for (QAction* a : {t.ft8, t.ft4, t.ft2}) { a->setCheckable(true); }
     if (m_profiles) {
         t.ft8->setChecked(m_profiles->isBoundToDigi(
             name, DigiFrequenzen::Digimodus::Ft8));
         t.ft4->setChecked(m_profiles->isBoundToDigi(
             name, DigiFrequenzen::Digimodus::Ft4));
+        t.ft2->setChecked(m_profiles->isBoundToDigi(
+            name, DigiFrequenzen::Digimodus::Ft2));
     }
     t.ft8->setToolTip(tr("Switch to this layout when FT8 is selected.\n"
                          "The current layout is saved first."));
     t.ft4->setToolTip(tr("Switch to this layout when FT4 is selected.\n"
+                         "The current layout is saved first."));
+    t.ft2->setToolTip(tr("Switch to this layout when FT2 is selected.\n"
                          "The current layout is saved first."));
 
     menu.addSeparator();
@@ -476,7 +481,7 @@ bool ProfileRail::werteMenueAus(QAction* chosen, const Menueteile& t,
                                 const QString& name)
 {
     if (!chosen) { return false; }
-    if (chosen == t.ft8 || chosen == t.ft4) {
+    if (chosen == t.ft8 || chosen == t.ft4 || chosen == t.ft2) {
         if (!m_profiles) {
             // Frueher schwieg diese Stelle. Ein Haken, der nichts tut
             // und nichts sagt, ist von „geht nicht" nicht zu
@@ -486,12 +491,12 @@ bool ProfileRail::werteMenueAus(QAction* chosen, const Menueteile& t,
                        << "keine Profilverwaltung";
             return false;
         }
-        const auto was = (chosen == t.ft4)
-                             ? DigiFrequenzen::Digimodus::Ft4
-                             : DigiFrequenzen::Digimodus::Ft8;
+        const auto was = (chosen == t.ft4) ? DigiFrequenzen::Digimodus::Ft4
+                       : (chosen == t.ft2) ? DigiFrequenzen::Digimodus::Ft2
+                                           : DigiFrequenzen::Digimodus::Ft8;
         m_profiles->bindDigi(name, was, chosen->isChecked());
         qInfo() << "[ProfileRail] Profil" << name
-                << (chosen == t.ft4 ? "<-> FT4" : "<-> FT8")
+                << (QStringLiteral("<-> ") + QLatin1String(DigiFrequenzen::name(was)))
                 << (chosen->isChecked() ? "gebunden" : "geloest");
         return true;
     }
@@ -542,6 +547,7 @@ bool ProfileRail::waehleImMenueForTest(const QString& profil,
     switch (eintrag) {
         case Eintrag::UseForFt8: ziel = teile.ft8; break;
         case Eintrag::UseForFt4: ziel = teile.ft4; break;
+        case Eintrag::UseForFt2: ziel = teile.ft2; break;
         case Eintrag::Save:      ziel = teile.save; break;
         case Eintrag::Rename:    ziel = teile.ren; break;
         case Eintrag::Delete:    ziel = teile.del; break;

@@ -442,6 +442,7 @@ warren@wpratt.com
 #include "SetupDialog.h"
 #include "setup/DspSetupPages.h"   // NrAnfSetupPage::selectSubtab
 #include "TitleBar.h"
+#include "DeviceTemperatureFeed.h"
 #include "VaxFirstRunDialog.h"
 #if defined(Q_OS_LINUX)
 #  include "VaxLinuxFirstRunDialog.h"
@@ -1041,6 +1042,14 @@ MainWindow::MainWindow(QWidget* parent)
     m_titleBar = new TitleBar(m_radioModel->audioEngine(), this);
     m_titleBar->setMenuBar(menuBar());
     setMenuWidget(m_titleBar);
+
+    // Temperaturen der Geraete im Kopf (Betreiber, 2026-11-18). Die
+    // Verdrahtung wohnt in einer eigenen Klasse und haengt sich nur an
+    // Signale, die es schon gibt -- kein Abfragen, kein Zeitgeber. Sie
+    // gehoert der LEISTE, nicht dem Fenster: so kann beim Abbau kein
+    // spaetes Signal eines Geraets mehr in eine Leiste greifen, die
+    // schon weg ist (die Klasse von Absturz, die es hier schon gab).
+    new DeviceTemperatureFeed(m_radioModel, m_titleBar->deviceTemperatures());
 
     // Wire the MasterOutputWidget device picker → AudioEngine so picking
     // an output device rebuilds the speakers bus. Task 10b exposes only
@@ -2950,7 +2959,13 @@ bool MainWindow::klickHoltNachVorne(QWidget* ziel)
     if (!ziel || m_shuttingDown) { return false; }
     QWidget* fenster = ziel->window();
     if (fenster != this) {
-        if (fenster->windowType() == Qt::Tool) { fenster->raise(); }
+        // Der Kanalzug ist ein Dialog, kein Qt::Tool -- liegt aber auf
+        // derselben Ebene wie die Paletten (AuxiliaryWindowLeveler) und
+        // blieb nach einem Profilwechsel hinter ihnen, auch beim Klick.
+        if (fenster->windowType() == Qt::Tool
+            || fenster == static_cast<QWidget*>(m_stripWindow.data())) {
+            fenster->raise();
+        }
         return false;
     }
     if (!m_appletPanel || !m_appletPanel->isAncestorOf(ziel)) { return false; }
@@ -11622,11 +11637,32 @@ void MainWindow::populateDefaultMeter()
                        << snap.value(QStringLiteral("floatingPans")).toMap().size()
                        << "rotor=" << snap.value(QStringLiteral("rotor")).toMap();
         }
+        // ── Werksvorgabe bei einer frischen Installation (2026-11-18) ──
+        //
+        // Betreiber: „ich finde, dass mein standard profil auch als
+        // ausgangsbasis herangezogen werden soll". Wer noch GAR KEINE
+        // Profile hat, bekommt seine Profile N und FT8 („nur N und F") aus
+        // der Ressource -- bereinigt und auf einen 1440x900-Schirm
+        // umgerechnet von tools/werksprofile_ziehen.py; der Profilrahmen
+        // zieht sie auf groesseren Schirmen hoch. Wer schon Profile hat,
+        // bekommt sie nie: ladeWerksvorgabe() prueft das selbst.
+        bool werksvorgabe = false;
+        if (m_layoutProfiles->names().isEmpty()) {
+            QFile vorgabe(LayoutProfiles::werksvorgabePfad());
+            if (vorgabe.open(QIODevice::ReadOnly)) {
+                werksvorgabe = m_layoutProfiles->ladeWerksvorgabe(vorgabe.readAll());
+            }
+            qWarning() << "[ProfileFactoryDefault]"
+                       << (werksvorgabe ? "uebernommen:" : "nicht uebernommen")
+                       << m_layoutProfiles->names();
+        }
         if (m_layoutProfiles->names().isEmpty()) {
             // Beim allerersten Start gibt es genau ein Profil, und es
             // hält, was gerade zu sehen ist. Ohne das stünde die
             // Schiene leer da und das Plus hieße „leg dir erst mal
             // etwas an" — dabei hat der Betreiber schon ein Fenster.
+            // Seit 2026-11-18 nur noch der Rueckfall, wenn die
+            // Werksvorgabe nicht zu lesen war.
             m_layoutProfiles->create(QStringLiteral("Standard"));
         } else if (!m_layoutProfiles->current().isEmpty()) {
             // NICHT activate(current()): dessen Namensgleich-Wache
@@ -17682,9 +17718,7 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
     // lcContainer, weil MainWindow in dieser Datei ohnehin darueber
     // meldet; eine eigene Kategorie fuer drei Zeilen waere eine mehr,
     // die man beim Suchen kennen muesste.
-    const QString wasName = (modus == DigiFrequenzen::Digimodus::Ft4)
-                                ? QStringLiteral("FT4")
-                                : QStringLiteral("FT8");
+    const QString wasName = QLatin1String(DigiFrequenzen::name(modus));
 
     // ── Und MERKEN, was gemeint war (2026-10-31) ────────────────────
     //
@@ -17851,9 +17885,13 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
     //    Fenster auf einem Band, das im 7,5-s-Takt sendet. Das Fenster
     //    haette geschwiegen, und niemand haette gewusst, warum.
     if (m_ft8Applet) {
-        m_ft8Applet->setProtocol(modus == DigiFrequenzen::Digimodus::Ft4
-                                     ? Ft8Decoder::Protocol::Ft4
-                                     : Ft8Decoder::Protocol::Ft8);
+        Ft8Decoder::Protocol p = Ft8Decoder::Protocol::Ft8;
+        if (modus == DigiFrequenzen::Digimodus::Ft4) {
+            p = Ft8Decoder::Protocol::Ft4;
+        } else if (modus == DigiFrequenzen::Digimodus::Ft2) {
+            p = Ft8Decoder::Protocol::Ft2;
+        }
+        m_ft8Applet->setProtocol(p);
     }
 
     // Und die Lampe in der Leiste sagt, was der Dekoder tut
@@ -18005,8 +18043,7 @@ void MainWindow::profilBetriebsartStellen()
         }
         qCInfo(lcContainer).noquote()
             << "Profil" << name << "ist an"
-            << (*digi == DigiFrequenzen::Digimodus::Ft4
-                    ? QStringLiteral("FT4") : QStringLiteral("FT8"))
+            << QLatin1String(DigiFrequenzen::name(*digi))
             << "gebunden — Betriebsart wird gestellt.";
         aufDigiStellen(*digi);
         return;

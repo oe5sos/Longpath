@@ -84,6 +84,20 @@ private slots:
         QCOMPARE(wunsch.count(), 2);
         QCOMPARE(wunsch.at(1).at(0).value<DigiFrequenzen::Digimodus>(),
                  DigiFrequenzen::Digimodus::Ft8);
+
+        // 2026-11-17: und FT2 genauso -- der Knopf stellt Skala UND
+        // Dekoder, und nur einer der drei steht gedrueckt.
+        QPushButton* ft2Knopf = applet.ft2ButtonForTest();
+        QVERIFY(ft2Knopf != nullptr);
+        QCOMPARE(ft2Knopf->text(), QStringLiteral("FT2"));
+        ft2Knopf->click();
+        QCOMPARE(wunsch.count(), 3);
+        QCOMPARE(wunsch.at(2).at(0).value<DigiFrequenzen::Digimodus>(),
+                 DigiFrequenzen::Digimodus::Ft2);
+        QCOMPARE(applet.protocol(), Ft8Decoder::Protocol::Ft2);
+        QVERIFY(ft2Knopf->isChecked());
+        QVERIFY(!ft8Knopf->isChecked());
+        QVERIFY(!ft4Knopf->isChecked());
     }
 
     void kopfzeile_mit_zahnrad()
@@ -118,6 +132,14 @@ private slots:
         const QString pfad = dir + QStringLiteral("/ft8-kopfzeile.png");
         QVERIFY2(bild.save(pfad), qPrintable(pfad));
         qInfo() << "Blatt:" << pfad << bild.size();
+
+        // Dasselbe mit FT2 gewaehlt (2026-11-17).
+        applet.setProtocol(Ft8Decoder::Protocol::Ft2);
+        QTest::qWait(300);
+        const QImage ft2 = applet.grab().toImage();
+        const QString pfad2 = dir + QStringLiteral("/ft8-kopfzeile-ft2.png");
+        QVERIFY2(ft2.save(pfad2), qPrintable(pfad2));
+        qInfo() << "Blatt:" << pfad2 << ft2.size();
     }
 };
 

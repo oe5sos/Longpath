@@ -100,6 +100,11 @@ public:
     void setGrundtonHz(float hz);
     float grundtonHz() const { return m_grundtonHz; }
 
+    /// Abstand der Plaetze (2026-11-17): 60 Hz bei FT8/FT4, 250 bei FT2
+    /// -- `Ft8TxSource::platzAbstandHz`.
+    void setAbstandHz(float hz) { m_abstandHz = hz; }
+    float abstandHz() const { return m_abstandHz; }
+
     /// Ueber dieser Tonlage soll kein Platz liegen, wenn es sich
     /// vermeiden laesst.
     ///
@@ -206,6 +211,7 @@ private:
     int                m_plaetze{kVorgabePlaetze};
     int                m_anrufWiederholungen{Ft8Ablauf::kMaxWiederholungen};
     float              m_grundtonHz{1500.0f};
+    float              m_abstandHz{60.0f};
     QVector<Ft8Ablauf> m_laufend;
     QVector<Ft8Ablauf> m_fertig;
     QVector<Wartend>   m_warteschlange;

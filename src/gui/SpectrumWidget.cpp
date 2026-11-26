@@ -1263,7 +1263,12 @@ void SpectrumWidget::loadSettings()
     m_wfNfAgcEnabled = readBool(QStringLiteral("WaterfallNFAGCEnabled"), false);
     m_wfNfAgcOffsetDb = readInt(QStringLiteral("WaterfallAGCOffsetDb"), 0);
     m_wfStopOnTx = readBool(QStringLiteral("WaterfallStopOnTx"), false);
-    m_haltBildBeimSenden = readBool(QStringLiteral("DisplayHoldRxPictureOnTx"), true);
+    // 2026-11-24, Betreiber: „ich moechte beim senden mein signal genau
+    // sehen, derzeit ist alles eingefroren". Ab Werk jetzt AUS, und der
+    // Schluessel heisst neu (V2): der alte Wert „True" stammt aus der
+    // Vorgabe, nicht aus einer Wahl, und haette das Einfrieren auf jeder
+    // Maschine festgehalten, die schon einmal gespeichert hat.
+    m_haltBildBeimSenden = readBool(QStringLiteral("DisplayHoldRxPictureOnTxV2"), false);
     m_txDurchlassWieRx   = readBool(QStringLiteral("DisplayTxPassbandLikeRx"), true);
     // Oben und unten getrennt (2026-11-21). Wer vorher EIN Schema hatte
     // (DisplayColourScheme), bekommt es oben und unten.
@@ -1577,7 +1582,7 @@ void SpectrumWidget::saveSettings()
     writeInt(QStringLiteral("WaterfallAGCOffsetDb"), m_wfNfAgcOffsetDb);
     s.setValue(settingsKey(QStringLiteral("WaterfallStopOnTx"), m_panIndex),
               m_wfStopOnTx ? QStringLiteral("True") : QStringLiteral("False"));
-    s.setValue(settingsKey(QStringLiteral("DisplayHoldRxPictureOnTx"), m_panIndex),
+    s.setValue(settingsKey(QStringLiteral("DisplayHoldRxPictureOnTxV2"), m_panIndex),
               m_haltBildBeimSenden ? QStringLiteral("True") : QStringLiteral("False"));
     s.setValue(settingsKey(QStringLiteral("DisplayTxPassbandLikeRx"), m_panIndex),
               m_txDurchlassWieRx ? QStringLiteral("True") : QStringLiteral("False"));
@@ -9208,6 +9213,20 @@ void SpectrumWidget::setMoxOverlay(bool isTx)
     m_moxOverlay = isTx;
     // Nachlauf des gehaltenen Empfangsbilds (siehe haeltEmpfangsbild).
     m_sendeEndeMs = isTx ? 0 : QDateTime::currentMSecsSinceEpoch();
+
+    // ── Nach dem Senden sofort auf den Boden (2026-11-24) ───────────
+    //
+    // Betreiber: „signal benoetigt sehr lange, bis es wieder am Boden
+    // ist." Die Mittelung rechnet in Leistung: ein Sendepegel 100 dB und
+    // mehr ueber dem Rauschen klingt dort Bild fuer Bild nur um den
+    // Bruchteil ab und braucht Sekunden, bis die Spur wieder unten
+    // liegt. Mit dem Ende der Aussendung gilt der alte Mittelwert nicht
+    // mehr: beide Mittelungen und die Spitzenhaltung von vorn.
+    if (!isTx) {
+        m_spectrumAvenger.clear();
+        m_waterfallAvenger.clear();
+        m_pxPeakHold.clear();
+    }
     markOverlayDirty();
     update();   // ensure QPainter path repaints immediately on MOX flip;
                 // markOverlayDirty alone waits for the next natural QRhi
@@ -12866,6 +12885,18 @@ void SpectrumWidget::leaveEvent(QEvent* event)
 
 void SpectrumWidget::wheelEvent(QWheelEvent* event)
 {
+    // Diagnose (2026-11-22): welche Radereignisse ein Logitech schickt.
+    // Nur die ersten zwanzig, nur zum Lesen, ohne Wirkung auf die Frequenz.
+    static int diagZaehler = 0;
+    if (diagZaehler++ < 20) {
+        qCInfo(lcSpectrum).nospace()
+            << "Mausrad: winkel=(" << event->angleDelta().x() << "," << event->angleDelta().y()
+            << ") pixel=(" << event->pixelDelta().x() << "," << event->pixelDelta().y()
+            << ") invertiert=" << event->inverted()
+            << " quelle=" << static_cast<int>(event->source())
+            << " phase=" << static_cast<int>(event->phase())
+            << " modifikatoren=" << static_cast<int>(event->modifiers());
+    }
     // MW0LGE before all, handle the notch size change
     //   [original inline comment from console.cs:31140]
     // From Thetis console.cs:31133-31145 [v2.10.3.15] — the wheel resizes
@@ -13002,7 +13033,11 @@ double SpectrumWidget::snapTuneHz(double freqHz, int stepHz, int numSteps)
 int SpectrumWidget::wheelStepsFor(QWheelEvent* ev)
 {
     int steps = 0;
-    if (!ev->pixelDelta().isNull()) {
+    // Nur ein Trackpad hat Phasen. Ein Mausrad (auch Logitech) schickt
+    // zusaetzlich ein kleines pixelDelta (2 px je Raste), das sonst den
+    // Trackpad-Weg mit 15 px je Schritt nahm -- dort kam nie ein Schritt
+    // heraus. Ohne Phase: Raststufen (angleDelta), wie bei jeder Maus.
+    if (!ev->pixelDelta().isNull() && ev->phase() != Qt::NoScrollPhase) {
         if (ev->phase() == Qt::ScrollMomentum) { return 0; }
         if (qAbs(ev->pixelDelta().x()) > qAbs(ev->pixelDelta().y())) { return 0; }
         m_wheelPixelAccum += ev->pixelDelta().y();

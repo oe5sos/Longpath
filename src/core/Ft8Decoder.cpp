@@ -51,8 +51,12 @@ constexpr float kFMax = 3000.0f;
 
 ftx_protocol_t toFtx(Ft8Decoder::Protocol p)
 {
-    return p == Ft8Decoder::Protocol::Ft4 ? FTX_PROTOCOL_FT4
-                                          : FTX_PROTOCOL_FT8;
+    switch (p) {
+    case Ft8Decoder::Protocol::Ft4: return FTX_PROTOCOL_FT4;
+    case Ft8Decoder::Protocol::Ft2: return FTX_PROTOCOL_FT2;
+    case Ft8Decoder::Protocol::Ft8: break;
+    }
+    return FTX_PROTOCOL_FT8;
 }
 
 } // namespace
@@ -150,6 +154,31 @@ struct Abzug {
 constexpr float kBezugDbFt8 = -28.2f;
 constexpr float kBezugDbFt4 = -24.2f;
 
+// ── Und FT2 (2026-11-17) ────────────────────────────────────
+//
+// Halbe Symboldauer, also `block_size` 288 und `nfft` 576 -- ein Bin
+// ist 20,83 Hz breit. Die Herleitung gibt 10*log10(31,25/2500) =
+// −19,0 dB; gemessen (tests/tst_ft2.cpp, MSHVs Welle, fuenf
+// Rauschsaaten) traf −19,0 im Mittel 0,7 dB zu hoch, also −19,7:
+//
+//     FT2 Ziel   0 dB -> gemeldet  −0,2 … −0,1
+//     FT2 Ziel  −5 dB -> gemeldet  −5,3 … −5,0
+//     FT2 Ziel −10 dB -> gemeldet −10,0 … −9,6
+//     FT2 Ziel −11 dB -> gemeldet −10,9 … −10,5
+//
+// Unter −11 bis −12 dB dekodiert ft8_lib FT2 nicht mehr.
+constexpr float kBezugDbFt2 = -19.7f;
+
+float bezugDb(Ft8Decoder::Protocol p)
+{
+    switch (p) {
+    case Ft8Decoder::Protocol::Ft4: return kBezugDbFt4;
+    case Ft8Decoder::Protocol::Ft2: return kBezugDbFt2;
+    case Ft8Decoder::Protocol::Ft8: break;
+    }
+    return kBezugDbFt8;
+}
+
 /// Untergrenze. Ein Fund, dessen Rechnung nicht aufgeht (Rauschen
 /// null, Bloecke ausserhalb des Wasserfalls), bekommt sie statt einer
 /// erfundenen Zahl.
@@ -161,7 +190,7 @@ float stoerabstandDb(const ftx_waterfall_t* wf,
 {
     if (!wf || !wf->mag || !kand) { return kSnrUntergrenze; }
 
-    const bool ft4    = (protocol == Ft8Decoder::Protocol::Ft4);
+    const bool ft4    = Ft8Decoder::istFt4Aufbau(protocol);
     const int  toene  = ft4 ? 4 : 8;
     const int  symbole = ft4 ? FT4_NN : FT8_NN;
 
@@ -244,7 +273,7 @@ float stoerabstandDb(const ftx_waterfall_t* wf,
     if (signal <= 0.0 || rauschen <= 0.0) { return kSnrUntergrenze; }
 
     const double jeBin = 10.0 * std::log10(signal / rauschen);
-    const float  snr   = float(jeBin) + (ft4 ? kBezugDbFt4 : kBezugDbFt8);
+    const float  snr   = float(jeBin) + bezugDb(protocol);
     return snr < kSnrUntergrenze ? kSnrUntergrenze : snr;
 }
 
@@ -458,16 +487,26 @@ bool Ft8Decoder::encodeBlock(const QString& text, float toneHz,
         return false;
     }
 
-    const bool ft4 = (protocol == Protocol::Ft4);
+    // FT2 sendet mit FT4s Kodierer: WSJT-X Improved 3.1.0
+    // `widgets/mainwindow.cpp:8189-8196` ruft fuer beide `genft4_` und
+    // setzt fuer FT2 nur `nsps=4*288`; MSHV `gen_ft2.cpp`
+    // `make_c77_i4tone` ist Zeile fuer Zeile FT4. Gegen MSHVs Tonfolge
+    // geprueft in tests/tst_ft2.cpp.
+    const bool ft4 = istFt4Aufbau(protocol);
     const int toene = ft4 ? FT4_NN : FT8_NN;
     std::vector<uint8_t> symbole(static_cast<size_t>(toene), 0);
     if (ft4) { ft4_encode(nachricht.payload, symbole.data()); }
     else     { ft8_encode(nachricht.payload, symbole.data()); }
 
-    // Masse aus ft8_lib demo/gen_ft8.c:160-186 [@9fec6ca].
-    const float symbolPeriod = ft4 ? FT4_SYMBOL_PERIOD : FT8_SYMBOL_PERIOD;
+    // Masse aus ft8_lib demo/gen_ft8.c:160-186 [@9fec6ca]; FT2 aus
+    // ft8/constants.h (Longpath-Erweiterung). BT 1,0 wie FT4: Decodium
+    // `generate_ft2_ft4_wave` ruft `gfsk_pulse (1.0, tt)` fuer beide.
+    const bool ft2 = (protocol == Protocol::Ft2);
+    const float symbolPeriod = ft2 ? FT2_SYMBOL_PERIOD
+                             : ft4 ? FT4_SYMBOL_PERIOD : FT8_SYMBOL_PERIOD;
     const float symbolBt     = ft4 ? 1.0f : 2.0f;
-    const float slotZeit     = ft4 ? 7.5f : 15.0f;
+    const float slotZeit     = ft2 ? FT2_SLOT_TIME
+                             : ft4 ? FT4_SLOT_TIME : FT8_SLOT_TIME;
 
     const int nutz  = static_cast<int>(0.5f + toene * symbolPeriod * kSampleRate);
     const int ganz  = static_cast<int>(slotZeit * kSampleRate);

@@ -299,6 +299,8 @@ warren@wpratt.com
 #include "core/audio/VaxTxMicSource.h"
 #include "core/audio/CompositeTxMicRouter.h"
 #include "core/hotkeys/HotKeyBindings.h"
+#include "core/cw/CwTastung.h"
+#include "models/FlexCwTastziel.h"
 #include "core/audio/TxMicSource.h"
 #include "core/RadioConnection.h"
 #include "core/RadioConnectionTeardown.h"
@@ -951,6 +953,21 @@ RadioModel::RadioModel(QObject* parent)
     // dahin sagt routeToVoiceKeyer() nein, und es wird nichts getastet.
     m_voiceKeyerPlayer = std::make_unique<VoiceKeyerPlayer>(&m_voiceKeyer);
     m_hotKeyBindings = std::make_unique<HotKeyBindings>();
+
+    // ── Die Morsetaste ueber MIDI (HaliKey, 2026-11-17) ─────────────
+    //
+    // Die Tastung kennt das Geraet nur durch das Tastziel; das Ende des
+    // Sendens erfaehrt sie von MoxController -- egal, wer es ausgeloest
+    // hat (MOX-Knopf, Stehwelle, Verbindungsende). Ab Werk ist sie aus,
+    // und „den Sender tasten" ist ein zweiter Schalter.
+    m_cwTastziel = std::make_unique<FlexCwTastziel>(this);
+    m_cwTastung = std::make_unique<CwTastung>();
+    m_cwTastung->setZiel(m_cwTastziel.get());
+    m_cwTastung->lade();
+    connect(m_moxController, &MoxController::moxStateChanged, m_cwTastung.get(),
+            [this](bool an) {
+                if (!an && m_cwTastung) { m_cwTastung->sendenBeendet(); }
+            });
     {
         VoiceKeyerPlayer::Hooks hooks;
         hooks.routeToVoiceKeyer = [this]() {
@@ -2648,8 +2665,16 @@ RadioModel::RadioModel(QObject* parent)
     m_bandStack = new BandStackController(this);
 }
 
+bool RadioModel::cwTastwegOffen() const
+{
+    return m_cwTastung != nullptr && m_cwTastung->eingeschaltet()
+           && m_cwTastung->senderTasten() && istFlexVerbunden();
+}
+
 RadioModel::~RadioModel()
 {
+    // Taste hoch und Ziel weg, solange das Geraet noch steht.
+    if (m_cwTastung) { m_cwTastung->trenneZiel(); }
     teardownConnection();
     qDeleteAll(m_slices);
     qDeleteAll(m_panadapters);
@@ -8196,6 +8221,7 @@ QString RadioModel::flexSwrBandKennung() const
 bool RadioModel::flexTasten(bool tasten)
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) {
+        m_flexGetastet = false;
         if (tasten) {
             qCWarning(lcConnection) << "Flex: nicht getastet — keine Verbindung";
             emit flexNichtGetastet(tr("no connection to the radio"));
@@ -8306,6 +8332,7 @@ bool RadioModel::flexTasten(bool tasten)
     }
 
     m_flexConnection->sendCommand(FlexCommandWire::xmitCommand(tasten));
+    m_flexGetastet = tasten;
     qCInfo(lcConnection) << "Flex:" << (tasten ? "getastet" : "geloest");
     return true;
 }
@@ -9257,6 +9284,34 @@ void RadioModel::startFlexStreams()
                         << " W vorwaerts, "
                         << (refW ? *refW : 0.0) << " W rueckwaerts";
                 }
+            }
+
+            // ── Temperatur der Endstufe (2026-11-18) ────────────────
+            //
+            // Betreiber: „temperaturanzeige von den geräten wäre auch
+            // im bereich des logo longpath oben interessant".
+            //
+            // `PATEMP` lag seit dem ersten Tag im Messwertstrom und
+            // stand nur als Rohwert in der Protokollzeile, weil der
+            // Teiler nicht belegt war. Das ist er jetzt
+            // (`FlexVita::meterScaled`, degC). Der Wert geht denselben
+            // Weg wie bei der Hermes Lite: in `RadioStatus`, und von
+            // dort lesen ihn Kopf, Fussleiste und Diagnoseseite.
+            //
+            // Nur die Maschine selbst: eine angeschlossene Endstufe
+            // meldet unter der Quelle AMP ebenfalls Temperaturen, und
+            // die gehoeren nicht in dieses Feld
+            // (From AetherSDR MeterModel.cpp:163 [@d58e2b8a] —
+            // `def.source != "AMP" && def.name == "PATEMP"`).
+            for (const auto& s : w) {
+                const auto def = m_flexMesswertNamen.value(s.index);
+                if (def.first != QLatin1String("PATEMP")) { continue; }
+                if (m_flexMesswertQuellen.value(s.index)
+                        .startsWith(QLatin1String("AMP"))) { continue; }
+                if (const auto grad = FlexVita::meterScaled(s.raw, def.second)) {
+                    m_radioStatus.setPaTemperature(*grad);
+                }
+                break;
             }
 
             // Hoechstens alle fuenf Sekunden eine Zeile: die Maschine
@@ -13749,7 +13804,8 @@ void RadioModel::installBandPlanMoxCheck()
             return m_bandPlan.checkMoxAllowed(choice.region, freqHz, mode,
                                               txBand, txBand,
                                               /*preventDifferentBand=*/false,
-                                              /*extended=*/false);
+                                              /*extended=*/false,
+                                              /*cwKeyedOutside=*/cwTastwegOffen());
         }
 
         // Nobody has said where this station is. Allow only what every
@@ -13760,7 +13816,8 @@ void RadioModel::installBandPlanMoxCheck()
             const auto verdict =
                 m_bandPlan.checkMoxAllowed(r, freqHz, mode, txBand, txBand,
                                            /*preventDifferentBand=*/false,
-                                           /*extended=*/false);
+                                           /*extended=*/false,
+                                           /*cwKeyedOutside=*/cwTastwegOffen());
             if (!verdict.ok) {
                 return {false,
                         QStringLiteral("Keine Region eingestellt "

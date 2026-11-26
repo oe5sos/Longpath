@@ -442,6 +442,9 @@ private:
     // auf das Ohr, auch wenn er danach richtig wäre.
     std::atomic<bool> m_feedbackCut{false};
     int   m_hotBlocks{0};
+    float m_loopDuck{1.0f};   // Rueckkopplungsbremse, 1 = frei
+    int   m_duckRueckMs{0};   // ms seit Verdacht: kurze Frist = Schleife ist noch da
+    int   m_stilleMs{0};
     float m_fade{0.0f};
     std::atomic<bool> m_bypass{false};
     std::atomic<bool> m_running{false};
