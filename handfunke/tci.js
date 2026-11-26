@@ -73,6 +73,17 @@ export class TciLink extends EventTarget {
       mode: ['', ''],
       filter: [[0, 0], [0, 0]],  // [trx][lo,hi]
       mox: false, tune: false, split: false,
+      // RIT/XIT je Empfaenger; null = noch nicht gemeldet (Init-Burst
+      // schickt sie, TciProtocol buildRitEnableLine & Co.).
+      rit: [null, null], ritHz: [null, null],
+      xit: [null, null], xitHz: [null, null],
+      // Aufbereitung und AGC je Empfaenger, ebenfalls nur vom Server
+      // (Init-Burst + Gegenmeldung). nrIdx ist Longpaths Platznummer auf
+      // dem Draht: 0 NR1, 1 NR2, 2 NR3, 3 NR4, 4 DFNR, 5 BNR, 6 MNR, 7 NNR
+      // (RadioModel::rxNrIndex). agcMode wie gesendet: fast/normal/slow/long/off/custom.
+      nb: [null, null], nr: [null, null], nrIdx: [null, null], anf: [null, null],
+      sql: [null, null], sqlDb: [null, null],
+      agcMode: [null, null], agcGain: [null, null],
       drive: null, tuneDrive: null,
       volume: null,              // dB, global
       rxVolume: [null, null],
@@ -263,6 +274,11 @@ export class TciLink extends EventTarget {
       case 'rotor_ist':       this._emit('rotor', { args }); break;
       case 'rotor_ok':        this._emit('rotorok', { text: args[0] || '' }); break;
       case 'rotor_err':       this._emit('rotorfehler', { text: args[0] || '' }); break;
+      // rotor_peilung:<ruf>,<grad>,<km>,<land>;  /  rotor_peilung_err:<ruf>,<grund>;
+      // Nur eine Auskunft (TciServer, 2026-11-26) -- gedreht wird weiter
+      // ausschliesslich ueber rotor_to.
+      case 'rotor_peilung':     this._emit('peilung', { args }); break;
+      case 'rotor_peilung_err': this._emit('peilungfehler', { args }); break;
       // Ein abgelehnter Sendewunsch, mit Grund. Bis zum 2026-10-04 kam
       // hier gar nichts, und ein stummes Nein ist auf einer
       // Fernbedienung nicht von einem Defekt zu unterscheiden.
@@ -289,6 +305,22 @@ export class TciLink extends EventTarget {
       case 'trx':   s.mox   = bool(1); break;
       case 'tune':  s.tune  = bool(1); break;
       case 'split_enable': s.split = bool(1); break;
+      case 'rit_enable':  { const t = int(0); if (t !== null && t < 2) s.rit[t]   = bool(1); break; }
+      case 'xit_enable':  { const t = int(0); if (t !== null && t < 2) s.xit[t]   = bool(1); break; }
+      case 'rit_offset':  { const t = int(0); if (t !== null && t < 2) s.ritHz[t] = int(1); break; }
+      case 'xit_offset':  { const t = int(0); if (t !== null && t < 2) s.xitHz[t] = int(1); break; }
+      case 'rx_nb_enable':  { const t = int(0); if (t !== null && t < 2) s.nb[t]  = bool(1); break; }
+      case 'rx_anf_enable': { const t = int(0); if (t !== null && t < 2) s.anf[t] = bool(1); break; }
+      case 'rx_nr_enable':  { const t = int(0); if (t !== null && t < 2) s.nr[t]  = bool(1); break; }
+      case 'rx_nr_enable_ex': {
+        const t = int(0);
+        if (t !== null && t < 2) { s.nr[t] = bool(1); if (bool(1) && int(2) !== null) s.nrIdx[t] = int(2); }
+        break;
+      }
+      case 'sql_enable':  { const t = int(0); if (t !== null && t < 2) s.sql[t]   = bool(1); break; }
+      case 'sql_level':   { const t = int(0); if (t !== null && t < 2) s.sqlDb[t] = num(1); break; }
+      case 'agc_mode':    { const t = int(0); if (t !== null && t < 2) s.agcMode[t] = (args[1] || '').toLowerCase(); break; }
+      case 'agc_gain':    { const t = int(0); if (t !== null && t < 2) s.agcGain[t] = int(1); break; }
 
       // Die drei, die bis 2026-09-30 fehlten (PR #145).
       case 'drive':       s.drive     = int(1); break;

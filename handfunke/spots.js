@@ -142,3 +142,41 @@ export function trefferBei(marken, x, radiusPx = 22) {
   }
   return beste;
 }
+
+// ── FT8-Liste (2026-11-26) ────────────────────────────────────────────────
+//
+// Longpaths eigener Dekoder legt jeden Fund als Spot ab (Ft8Applet ->
+// RadioModel::onNativeFt8Decode, Quelle „Longpath", Modus aus dem Kommentar,
+// 120 s Lebenszeit). Die App bekommt sie mit derselben `spots:`-Abfrage wie
+// Cluster und RBN. Hier wird daraus die Liste: nur die eigenen Funde (nicht
+// ein FT8-Spot aus dem Cluster -- das hat jemand anderes gehoert), je
+// Rufzeichen der frischeste, neueste oben.
+export const FT8_MODI = ['FT8', 'FT4', 'FT2'];
+export const FT8_QUELLE = 'LONGPATH';
+
+/** -> [{ruf, hz, df, mode, alterSek}], neueste zuerst, bei Gleichstand nach
+ *  Abstand zur Dial-Frequenz. `dialHz` ist die abgestimmte Frequenz; ohne
+ *  sie bleibt df null (die Zeile wird trotzdem gezeigt). */
+export function ft8Liste(zeilen, dialHz) {
+  if (!Array.isArray(zeilen)) return [];
+  const je = new Map();
+  for (const z of zeilen) {
+    if (!z || !z.ruf || z.quelle !== FT8_QUELLE || !FT8_MODI.includes(z.mode)) continue;
+    const alt = je.get(z.ruf);
+    if (alt && alt.alterSek <= z.alterSek) continue;
+    je.set(z.ruf, {
+      ruf: z.ruf, hz: z.hz, mode: z.mode, alterSek: z.alterSek || 0,
+      df: dialHz > 0 ? z.hz - dialHz : null,
+    });
+  }
+  return [...je.values()].sort((a, b) =>
+    (a.alterSek - b.alterSek)
+    || (Math.abs(a.df ?? 0) - Math.abs(b.df ?? 0))
+    || a.ruf.localeCompare(b.ruf));
+}
+
+/** „12 s", „3 min" -- mehr braucht eine Liste mit 120 s Lebenszeit nicht. */
+export function alterText(sek) {
+  const s = Math.max(0, Math.round(sek || 0));
+  return s < 90 ? s + ' s' : Math.round(s / 60) + ' min';
+}

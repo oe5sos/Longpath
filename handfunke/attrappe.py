@@ -118,7 +118,45 @@ SPOT_VORRAT = [
     (  6400, 'OE5SOS', 'SSB',  'POTA',      60),
     ( 21000, 'IK4EEE', 'FT8',  'CLUSTER',  600),
     (120000, 'WEITWEG','CW',   'CLUSTER',   10),   # ausserhalb jeder Spanne
+    # Funde von Longpaths eigenem FT8-Dekoder (Quelle „Longpath", Modus aus
+    # dem Kommentar), so wie RadioModel::onNativeFt8Decode sie ablegt: im
+    # Audio-Durchlass ueber der Dial-Frequenz, hoechstens 120 s alt.
+    (   412, 'EA7KLM', 'FT8',  'LONGPATH',   4),
+    (   870, 'DL3XYZ', 'FT8',  'LONGPATH',   4),
+    (  1235, 'JA1QRS', 'FT8',  'LONGPATH',  19),
+    (  1590, 'OK1ABC', 'FT8',  'LONGPATH',  19),
+    (  1960, 'W1AW',   'FT8',  'LONGPATH',  34),
+    (  2330, 'SP9TUV', 'FT8',  'LONGPATH',  49),
+    (  2710, 'G4LMN',  'FT8',  'LONGPATH',  79),
+    (   640, 'HB9DEF', 'FT8',  'LONGPATH', 109),
 ]
+
+# Fuer rotor_peilung: eigener Standort (Oberoesterreich) und ein paar
+# Laendermitten, wie sie in cty.dat stehen (Breite, Laenge Ost, Name).
+EIGENE_LAGE = (47.9, 13.8)
+PREFIX_LAGE = [
+    ('EA', (40.4, -3.7, 'Spain')),
+    ('DL', (51.0, 10.0, 'Fed. Rep. of Germany')),
+    ('JA', (36.4, 138.4, 'Japan')),
+    ('OK', (50.0, 15.0, 'Czech Republic')),
+    ('W',  (37.5, -91.7, 'United States')),
+    ('SP', (52.3, 19.2, 'Poland')),
+    ('G',  (52.8, -1.5, 'England')),
+    ('HB9', (46.9, 8.0, 'Switzerland')),
+]
+
+
+def _grosskreis(von, nach):
+    la1, lo1 = map(math.radians, von)
+    la2, lo2 = map(math.radians, nach)
+    d = lo2 - lo1
+    y = math.sin(d) * math.cos(la2)
+    x = math.cos(la1) * math.sin(la2) - math.sin(la1) * math.cos(la2) * math.cos(d)
+    grad = (math.degrees(math.atan2(y, x)) + 360) % 360
+    c = math.acos(max(-1, min(1, math.sin(la1) * math.sin(la2)
+                              + math.cos(la1) * math.cos(la2) * math.cos(d))))
+    return grad, 6371 * c
+
 
 INIT_BURST = [
     'protocol:Longpath-Attrappe,2.0;',
@@ -160,6 +198,31 @@ INIT_BURST = [
     'tune:1,false;',
     'volume:-12.0;',
     'mute:false;',
+    # RIT/XIT wie im echten Init-Burst (TciProtocol buildRitEnableLine & Co.).
+    'rit_enable:0,true;',
+    'rit_enable:1,false;',
+    'xit_enable:0,false;',
+    'xit_enable:1,false;',
+    'rit_offset:0,120;',
+    'rit_offset:1,0;',
+    'xit_offset:0,0;',
+    'xit_offset:1,0;',
+    # Aufbereitung und AGC wie im echten Init-Burst.
+    'rx_nb_enable:0,false;',
+    'rx_nb_enable:1,false;',
+    'rx_nr_enable:0,true;',
+    'rx_nr_enable_ex:0,true,1;',
+    'rx_nr_enable:1,false;',
+    'rx_anf_enable:0,false;',
+    'rx_anf_enable:1,false;',
+    'sql_enable:0,false;',
+    'sql_enable:1,false;',
+    'sql_level:0,-30;',
+    'sql_level:1,-30;',
+    'agc_mode:0,normal;',
+    'agc_mode:1,normal;',
+    'agc_gain:0,80;',
+    'agc_gain:1,80;',
     'start;',
     'ready;',
 ]
@@ -397,6 +460,10 @@ class Verbindung(threading.Thread):
                 if g is None or g != g or g < 0 or g > 360:
                     print(f'  {self.addr[1]}: rotor_to ABGELEHNT ({roh!r})')
                     self.sende_text('rotor_err:peilung unbrauchbar;')
+                elif 0 < g < 180:
+                    # Wie Longpath mit Drehbereich 180 -> 360 (Berg im Osten).
+                    print(f'  {self.addr[1]}: rotor_to ABGELEHNT ({g:.0f} ausserhalb)')
+                    self.sende_text('rotor_err:ausserhalb des drehbereichs;')
                 else:
                     if g == 360:
                         g = 0.0
@@ -404,6 +471,22 @@ class Verbindung(threading.Thread):
                     ROTOR['zustand'] = 'dreht'
                     print(f'  {self.addr[1]}: Rotor auf {g:.1f} Grad')
                     self.sende_text(f'rotor_ok:{g:.1f};')
+        elif name == 'rotor_peilung':
+            # Wie Longpath (TciServer, 2026-11-26): Mitte des Landes aus dem
+            # Prefix, Peilung und Entfernung vom eigenen Standort. Die Attrappe
+            # kennt nur eine Handvoll Prefixe -- genug fuer die FT8-Funde oben.
+            ruf = (args[0].strip().upper() if args else '')
+            ziel = next((v for k, v in PREFIX_LAGE if ruf.startswith(k)), None)
+            if not ruf or ziel is None:
+                self.sende_text(f'rotor_peilung_err:{ruf},unbekanntes prefix;')
+            else:
+                grad, km = _grosskreis(EIGENE_LAGE, ziel[:2])
+                lang = (grad + 180) % 360
+                # Drehbereich wie bei Martin: nur die Westhaelfte 180..360.
+                frei = lambda g: 1 if g >= 180 else 0
+                self.sende_text(f'rotor_peilung:{ruf},{grad:.1f},{km:.0f},{ziel[2]},'
+                                f'{lang:.1f},{frei(grad)},{frei(lang)};')
+            print(f'  {self.addr[1]}: {zeile}')
         elif name == 'spots':
             # Longpath filtert auf den sichtbaren Ausschnitt. Die Attrappe
             # ist dabei absichtlich NICHT gutmuetiger: was ausserhalb der
@@ -465,6 +548,24 @@ class Verbindung(threading.Thread):
                 nr = args[0].strip() if args else '0'
                 print(f'  {self.addr[1]}: {name}:{nr},{"true" if will else "false"}')
                 self.sende_text(f'{name}:{nr},{"true" if will else "false"};')
+        elif name in ('rx_nr_enable', 'rx_nr_enable_ex'):
+            # Wie Longpath: beide Formen zurueck, die Art als Platznummer
+            # (0 NR1, 1 NR2 ...). Der einfache Befehl schaltet dort NR2 ein
+            # (setRxNr mit Index 1) -- die Attrappe macht es genauso.
+            if len(args) >= 2:
+                an = args[1].strip().lower() == 'true'
+                idx = args[2] if name == 'rx_nr_enable_ex' and len(args) >= 3 else '1'
+                self.sende_text(f'rx_nr_enable:{args[0]},{"true" if an else "false"};')
+                self.sende_text(f'rx_nr_enable_ex:{args[0]},{"true" if an else "false"},{idx if an else 0};')
+            print(f'  {self.addr[1]}: {zeile}')
+        elif name == 'agc_mode':
+            if len(args) >= 2:
+                m = args[1].strip().lower()
+                m = {'med': 'normal', 'medium': 'normal', 'fixd': 'off', 'fixed': 'off'}.get(m, m)
+                if m not in ('off', 'long', 'slow', 'fast', 'custom', 'normal'):
+                    m = 'normal'
+                self.sende_text(f'agc_mode:{args[0]},{m};')
+            print(f'  {self.addr[1]}: {zeile}')
         elif name == 'iq_start':
             self.iq_an = True
             print(f'  {self.addr[1]}: IQ an')
@@ -520,7 +621,10 @@ class Verbindung(threading.Thread):
             self.spec_an = False
             self.sende_text(f'spectrum_stop:{args[0]};')
         elif name in ('drive', 'tune_drive', 'vfo', 'modulation',
-                      'rx_filter_band', 'trx', 'tune'):
+                      'rx_filter_band', 'trx', 'tune',
+                      'rit_enable', 'xit_enable', 'rit_offset', 'xit_offset',
+                      'rx_nb_enable', 'rx_anf_enable', 'sql_enable', 'sql_level',
+                      'agc_gain'):
             # Wie der echte Server: setzen und die Gegenmeldung schicken,
             # damit der Client seinen Zustand NUR vom Server bekommt.
             if len(args) >= 2:

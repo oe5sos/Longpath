@@ -756,3 +756,112 @@ footer #onAir.an{color:var(--tx-border)}
 #kompassBox #rotorKlein{max-width:70px}
 .ring text{font:inherit;fill:inherit}
 @media (min-width: 900px){ #dtLinks #kompassBox #rotorKlein{max-width:96px} }
+
+
+/* ═══ Abstimmschritt und RIT/XIT (2026-11-25) ═══════════════════════════════
+   Wie „Combined" am Mac: [RIT] [0] [<] Versatz [>]. Der Wert ist ein
+   Messwert: orange, solange RIT/XIT an ist, sonst grau. */
+.versatz{display:flex;gap:6px;align-items:center}
+.versatz + .versatz{margin-top:6px}
+.versatz .chip{flex:none;height:34px;font-size:var(--f-small)}
+.versatz .vName{width:56px}
+.versatz .vNull,.versatz .vPfeil{width:38px;color:#a6a6ac}
+.vWert{flex:1;min-width:0;height:34px;display:flex;align-items:center;justify-content:center;
+  font:600 14px/1 var(--mono);color:#7e7e85;background:#040405;border:1px solid #1a1a1e;
+  border-radius:8px;white-space:nowrap}
+.vWert.an{color:var(--orT)}
+@media (min-width: 900px){
+  #dtVersatz{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+  #dtVersatz .versatz + .versatz{margin-top:0}
+  #dtVersatz .chip{height:26px;font-size:12px}
+  #dtVersatz .vName{width:46px}
+  #dtVersatz .vNull,#dtVersatz .vPfeil{width:30px}
+  #dtVersatz .vWert{height:26px;font-size:13px}
+}
+
+
+/* ═══ Aufbereitung und AGC (2026-11-25) ═════════════════════════════════════
+   Pillen wie am Mac: an = orange gefuellt (wie jede Auswahl), dazu klein der
+   Wert (NR-Art, Squelch in dB). AGC-T steht rechts in der Ueberschrift. */
+#dsp .chip{gap:5px}
+#dsp .pWert{font-size:var(--f-caption);opacity:.8}
+#dsp .pWert:empty{display:none}
+.capsZeile{display:flex;justify-content:space-between;align-items:baseline}
+.capsWert{font:600 var(--f-caption)/1 var(--mono);letter-spacing:.04em;color:var(--orT)}
+@media (min-width: 900px){
+  /* Die „…"-Pillen tun nichts; am Desktop machen sie Platz fuer AGC. */
+  #dtBar .chip.more{display:none}
+  #dtAgcW{display:flex;align-items:center;gap:8px}
+  #dtAgcW .chips{gap:4px}
+  #dtAgcW .chip{height:26px;padding:0 9px;font-size:12px;flex:none}
+  #dtAgcW .capsWert{font-size:11px;white-space:nowrap;min-width:36px;text-align:right}
+}
+
+
+/* ═══ Filterkanten zum Ziehen (2026-11-25) ══════════════════════════════════
+   Ein Griff je Kante: schmaler orangefarbener Strich ueber die ganze Hoehe,
+   breite unsichtbare Trefferflaeche. Waehrend des Ziehens steht die Breite
+   als Schild oben am Griff. */
+.kante{position:absolute;top:0;bottom:0;width:24px;margin-left:-12px;z-index:2;
+  display:none;cursor:ew-resize;touch-action:none;-webkit-tap-highlight-color:transparent}
+.kante::before{content:"";position:absolute;left:11px;top:0;bottom:0;width:2px;
+  background:rgba(240,168,44,.55)}
+.kante::after{content:"";position:absolute;left:8px;top:52px;width:8px;height:22px;
+  border-radius:3px;background:#131316;border:1px solid rgba(240,168,44,.8)}
+.kante.zieht::before{background:var(--or)}
+.kante.zieht::after{background:var(--or)}
+.kantenWert{position:absolute;top:40px;transform:translateX(-50%);z-index:4;display:none;
+  padding:3px 7px;border-radius:7px;background:rgba(10,12,16,.82);border:1px solid #2c2c31;
+  font:600 11px/1 var(--mono);color:var(--orT);white-space:nowrap;pointer-events:none}
+.kantenWert.an{display:block}
+/* Knopf und Schild im Panadapter halten (der ist am Desktop 230 px hoch) */
+@media (min-width: 900px){
+  body.dt .kante::after{top:150px}
+}
+
+
+/* ═══ Sendeleistung unter dem SWR (2026-11-25) ═══════════════════════════════
+   Gleicher Kopf wie oben (Versal links, Wertchip rechts), nur kleiner Abstand. */
+#instrumente .kopf.fuss{margin:3px 0 0}
+
+
+/* ═══ FT8-Liste (2026-11-26) ════════════════════════════════════════════════
+   Zugeklappt eine Zeile wie der Rotor: FT8, Anzahl, die drei neuesten
+   Rufzeichen. Aufgeklappt je Station eine Zeile: Rufzeichen, Modus, Abstand
+   zur Dial-Frequenz, Alter. Angetippt = orange hinterlegt (wie im Bild). */
+#ft8Feld .ft8Kopf{display:flex;align-items:center;gap:10px;cursor:pointer;margin:0}
+#ft8Feld .ft8Kopf b{font:600 var(--f-small)/1 var(--mono);color:var(--orT);letter-spacing:0;white-space:nowrap}
+#ft8Feld .ft8Neu{flex:1;min-width:0;font:var(--f-small)/1 var(--mono);color:#a6a6ac;letter-spacing:.02em;
+  text-transform:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ft8Feld .chev{margin-left:auto;color:#6b6b71}
+#ft8Feld:not(.offen) .ft8Liste{display:none}
+#ft8Feld.offen .ft8Neu{visibility:hidden}
+.ft8Liste{margin-top:8px;max-height:212px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.ft8Z{display:grid;grid-template-columns:1fr 34px 84px 52px;align-items:center;gap:6px;
+  height:34px;padding:0 8px;border-radius:7px;cursor:pointer;
+  font:var(--f-small)/1 var(--mono);color:#a6a6ac;-webkit-tap-highlight-color:transparent}
+.ft8Z + .ft8Z{border-top:1px solid #141417}
+.ft8Z b{font-weight:600;color:var(--text);letter-spacing:.02em}
+.ft8Z .ft8M{color:#6b6b71;font-size:var(--f-caption)}
+.ft8Z .ft8Df,.ft8Z .ft8A{text-align:right}
+.ft8Z .ft8Df{color:var(--orT)}
+.ft8Z.an{background:var(--or)}
+.ft8Z.an,.ft8Z.an b,.ft8Z.an .ft8M,.ft8Z.an .ft8Df{color:#1a1205}
+@media (min-width: 900px){
+  body.dt #dtLinks #ft8Feld:not([hidden]){display:flex;flex-direction:column;margin:0;padding:10px 12px;
+    flex:0 1 auto;max-height:46%;min-height:0}
+  body.dt #ft8Feld .ft8Kopf{cursor:default}
+  body.dt #ft8Feld .chev,body.dt #ft8Feld .ft8Neu{display:none}
+  body.dt #ft8Feld .ft8Liste{display:block;flex:1;min-height:0;max-height:none}
+  body.dt #ft8Feld .ft8Z{height:26px}
+}
+
+/* Peilung unter der gewaehlten FT8-Zeile (2026-11-26): Zahl orange wie jeder
+   Messwert, Drehknopf flach wie die anderen Knoepfe. */
+.ft8Peil{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:6px 8px 8px;font:var(--f-small)/1.2 var(--mono);color:var(--orT)}
+.ft8Dreh{flex:none;height:30px;padding:0 10px;border-radius:8px;background:var(--flat);
+  border:1px solid #f6c25e;color:var(--orT);font:600 var(--f-small)/1 var(--mono);letter-spacing:.06em}
+.ft8Dreh:active{background:var(--or);color:#1a1205}
+.ft8Dreh:disabled{border-color:#2c2c31;color:#55555e}
+.ft8Wege{display:flex;gap:6px;flex:none}

@@ -31,6 +31,7 @@
 
 #include <QtTest>
 #include <QSignalSpy>
+#include <cmath>
 #include <QWebSocket>
 #include <QNetworkRequest>
 
@@ -117,7 +118,96 @@ private:
 
 private slots:
     void init() { m_antworten.clear(); }
-    void cleanup() { TciServer::setRemoteToken(QString()); }
+    void cleanup()
+    {
+        TciServer::setRemoteToken(QString());
+        auto& s = AppSettings::instance();
+        s.setValue(QStringLiteral("Rotor/LimitOn"), QStringLiteral("False"));
+        s.setValue(QStringLiteral("StationGridSquare"), QString());
+    }
+
+    // ── Peilung zu einem Rufzeichen (2026-11-26) ────────────────────────
+    //
+    // An der Station ist der Osten durch einen Berg verstellt: erlaubt ist
+    // nur 180 -> 360 im Uhrzeigersinn. Nach Japan heisst das: kurzer Weg
+    // (um 40 Grad) gesperrt, langer Weg (um 220 Grad) frei. Genau das muss
+    // die Antwort sagen -- und sie darf dabei nichts drehen, auch nicht mit
+    // Freigabe.
+    void peilungSagtWelcherWegFreiIst()
+    {
+        auto& s = AppSettings::instance();
+        s.setValue(QStringLiteral("StationGridSquare"), QStringLiteral("JN67"));
+        s.setValue(QStringLiteral("Rotor/LimitOn"), QStringLiteral("True"));
+        s.setValue(QStringLiteral("Rotor/LimitFromDeg"), 180.0);
+        s.setValue(QStringLiteral("Rotor/LimitToDeg"), 0.0);
+
+        RadioModel model;
+        RotorAttrappe rot;
+        rot.m_az = 270.0; rot.m_frisch = true;
+        model.setRotor(&rot);
+        TciServer server(&model);
+        QWebSocket client;
+        QVERIFY2(aufbauen(server, client, /*drehenFrei=*/true), "Aufbau gescheitert");
+
+        client.sendTextMessage(QStringLiteral("rotor_peilung:ja1qrs;"));
+        QVERIFY2(warteAuf(QStringLiteral("rotor_peilung:")),
+                 qPrintable(m_antworten.join(QLatin1Char(' '))));
+        const QStringList f = ersteMit(QStringLiteral("rotor_peilung:"))
+                                  .mid(QStringLiteral("rotor_peilung:").size())
+                                  .chopped(1).split(QLatin1Char(','));
+        QCOMPARE(f.size(), 7);
+        QCOMPARE(f.at(0), QStringLiteral("JA1QRS"));
+        const double kurz = f.at(1).toDouble();
+        const double lang = f.at(4).toDouble();
+        QVERIFY2(kurz > 20.0 && kurz < 70.0, qPrintable(f.at(1)));
+        QVERIFY2(std::abs(lang - (kurz + 180.0)) < 0.2, qPrintable(f.at(4)));
+        QVERIFY2(f.at(2).toInt() > 8000 && f.at(2).toInt() < 10000, qPrintable(f.at(2)));
+        QCOMPARE(f.at(3), QStringLiteral("Japan"));
+        QCOMPARE(f.at(5), QStringLiteral("0"));      // kurz: hinter dem Berg
+        QCOMPARE(f.at(6), QStringLiteral("1"));      // lang: frei
+        QVERIFY2(rot.m_ziele.isEmpty(), "eine Peilung darf nichts drehen");
+    }
+
+    /// Ohne eigenen Locator keine Richtung -- und kein geratener Wert.
+    void peilungOhneEigenenLocatorSagtWarum()
+    {
+        AppSettings::instance().setValue(QStringLiteral("StationGridSquare"), QString());
+        RadioModel model;
+        TciServer server(&model);
+        QWebSocket client;
+        QVERIFY(aufbauen(server, client, false));
+        client.sendTextMessage(QStringLiteral("rotor_peilung:JA1QRS;"));
+        QVERIFY(warteAuf(QStringLiteral("rotor_peilung_err:")));
+        QCOMPARE(ersteMit(QStringLiteral("rotor_peilung_err:")),
+                 QStringLiteral("rotor_peilung_err:JA1QRS,eigener locator fehlt;"));
+    }
+
+    /// Ausserhalb des Drehbereichs dreht der Rotor nicht -- und die Antwort
+    /// sagt das. Bis 2026-11-26 kam `rotor_ok`, und die App zeigte
+    /// "angenommen" fuer eine Antenne, die stehen blieb.
+    void drehenAusserhalbDesBereichsWirdAbgelehnt()
+    {
+        auto& s = AppSettings::instance();
+        s.setValue(QStringLiteral("Rotor/LimitOn"), QStringLiteral("True"));
+        s.setValue(QStringLiteral("Rotor/LimitFromDeg"), 180.0);
+        s.setValue(QStringLiteral("Rotor/LimitToDeg"), 0.0);
+        RadioModel model;
+        RotorAttrappe rot;
+        rot.m_az = 270.0; rot.m_frisch = true;
+        model.setRotor(&rot);
+        TciServer server(&model);
+        QWebSocket client;
+        QVERIFY(aufbauen(server, client, /*drehenFrei=*/true));
+        client.sendTextMessage(QStringLiteral("rotor_to:42;"));
+        QVERIFY(warteAuf(QStringLiteral("rotor_err:")));
+        QCOMPARE(ersteMit(QStringLiteral("rotor_err:")),
+                 QStringLiteral("rotor_err:ausserhalb des drehbereichs;"));
+        QVERIFY(rot.m_ziele.isEmpty());
+        m_antworten.clear();
+        client.sendTextMessage(QStringLiteral("rotor_to:222;"));
+        QVERIFY(warteAuf(QStringLiteral("rotor_ok:")));
+        QCOMPARE(rot.m_ziele.size(), 1);
+    }
 
     /// Hinsehen bewegt nichts — und darf darum immer.
     void abfragenGehtAuchOhneFreigabe()

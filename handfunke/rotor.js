@@ -84,6 +84,11 @@ export function fehlerText(roh) {
     // nicht am Mast.
     return 'PEILUNG UNBRAUCHBAR';
   }
+  if (/ausserhalb des drehbereichs/i.test(t)) {
+    // Der eingestellte Drehbereich (Rotor-Fenster am Mac) schliesst das Ziel
+    // aus -- an der Station der Osten hinter dem Berg.
+    return 'AUSSERHALB DES DREHBEREICHS \u2014 nicht gedreht';
+  }
   return t ? t.toUpperCase() : 'ABGELEHNT';
 }
 
@@ -152,4 +157,28 @@ export class Sicherung {
   }
 
   verwerfen() { this.ziel = null; this.gewaehltBei = 0; }
+}
+
+/**
+ * `rotor_peilung:`-Argumente -> {ruf, grad, km, land, lang, kurzFrei, langFrei}
+ * oder null.
+ *
+ *   rotor_peilung:<ruf>,<kurz>,<km>,<land>,<lang>,<kurzFrei>,<langFrei>;
+ *
+ * Die Peilung kommt aus Longpath (cty.dat, Mitte des Landes, vom eigenen
+ * Locator aus) -- dieselbe Zahl, die das Rotor-Feld am Mac zuerst zeigt.
+ * `kurzFrei`/`langFrei` sagen, ob der eingestellte Drehbereich den Weg
+ * erlaubt (RotorController::zielErlaubt); ohne Rotor beide false.
+ */
+export function peilungLesen(args) {
+  const a = args || [];
+  const ruf = (a[0] || '').trim().toUpperCase();
+  const grad = parseFloat(a[1]);
+  const km = parseInt(a[2], 10);
+  if (!ruf || !isFinite(grad) || grad < 0 || grad > 360) return null;
+  const kurz = Math.round(grad) % 360;
+  const langRoh = parseFloat(a[4]);
+  const lang = isFinite(langRoh) ? Math.round(langRoh) % 360 : (kurz + 180) % 360;
+  return { ruf, grad: kurz, km: isNaN(km) ? null : km, land: (a[3] || '').trim(),
+           lang, kurzFrei: (a[5] || '').trim() === '1', langFrei: (a[6] || '').trim() === '1' };
 }

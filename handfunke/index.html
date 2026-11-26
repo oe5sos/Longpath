@@ -125,6 +125,12 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <!-- Der Durchlass liegt UNTER dem Abstimmstrich: er sagt, was zu hoeren
        ist, der Strich sagt, worauf abgestimmt ist. -->
   <div class="durchlass" id="durchlass"></div>
+  <!-- Filterkanten zum Ziehen (2026-11-25), wie „Bandwidth Filter" am Mac.
+       Eigene Elemente ueber dem Bild; ihre Beruehrungen halten sie von der
+       Abstimmgeste fern (app.js, filterKanten). -->
+  <div class="kante" id="kanteLo" aria-label="untere Filterkante ziehen"></div>
+  <div class="kante" id="kanteHi" aria-label="obere Filterkante ziehen"></div>
+  <div class="kantenWert" id="kantenWert"></div>
   <div class="cursor"></div>
   <!-- Feinschritt: liegt IM Bild, rechts oben, und haelt seine Beruehrungen
        von der Abstimmgeste darunter fern (app.js). -->
@@ -161,6 +167,10 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 <div class="schicht instr" id="swrBox">
   <div class="kopf"><span class="caps">SWR</span><span class="chipw aus" id="swrWert">—</span></div>
   <svg class="ring" id="swrSvg" aria-label="SWR"></svg>
+  <!-- Sendeleistung neben dem SWR (2026-11-25): tx_sensors Feld 2 (rms-Watt).
+       Wie das SWR nur beim Senden, sonst „—". ALC liefert Longpath ueber TCI
+       nicht (TciSensorManager::formatTxSensors), darum fehlt sie hier. -->
+  <div class="kopf fuss"><span class="caps">PWR</span><span class="chipw aus" id="pwrWertI">—</span></div>
 </div>
 <div class="schicht instr" id="kompassBox" aria-label="Rotor, antippen oeffnet die Steuerung" hidden>
   <div class="kopf"><span class="caps">Rotor</span><span class="chipw aus" id="rotorGradK">—</span></div>
@@ -170,6 +180,16 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
     <circle class="nb" cx="0" cy="0" r="6"/>
   </svg>
 </div>
+</div>
+
+<!-- FT8-Liste (2026-11-26): was Longpaths eigener Dekoder gehoert hat, aus
+     derselben `spots:`-Abfrage wie die Marken im Bild (Quelle „Longpath",
+     Modus FT8/FT4). Unsichtbar, solange es keinen Fund gibt. Antippen hebt
+     die Station im Panadapter hervor -- es stimmt NICHT ab und sendet nichts.
+     Am Desktop steht das Feld links unter dem Log (desktop.js). -->
+<div class="feld schicht" id="ft8Feld" hidden>
+  <div class="caps ft8Kopf" id="ft8Kopf"><span>FT8</span><b id="ft8Anzahl"></b><span class="ft8Neu" id="ft8Neu"></span><span class="chev" id="ft8Chev">▸</span></div>
+  <div class="ft8Liste" id="ft8Liste" role="list"></div>
 </div>
 
 <!-- Betriebsart und Band gehoeren zusammen (was hoere ich, und wo) — darum
@@ -200,6 +220,36 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   <div class="chips" id="filters"></div>
   <div class="caps">Aufbereitung</div>
   <div class="chips" id="dsp"></div>
+  <!-- AGC wie am Mac: Fast / Med / Slow; rechts in der Ueberschrift AGC-T
+       (agc_gain) und eine Stufe ohne eigene Pille (Long, Fixed). -->
+  <div class="caps capsZeile"><span>AGC</span><span class="capsWert" id="agcWert"></span></div>
+  <div class="chips" id="agc"></div>
+</div>
+
+<!-- Abstimmschritt und RIT/XIT (2026-11-25), wie die Spalte „Combined" am Mac:
+     [RIT] [0] [<] Versatz [>]. Der Versatz wandert um den gewaehlten Schritt,
+     Grenze +/-10 kHz wie RxApplet. Ein/aus und Wert zeigt die Seite erst, wenn
+     Longpath sie meldet (rit_enable/rit_offset, xit_enable/xit_offset).
+     Am Desktop wandern die Schritt-Chips in die Pillenleiste, RIT/XIT in
+     „Combined" (desktop.js). -->
+<div class="feld schicht" id="feinFeld">
+  <div class="caps">Schritt</div>
+  <div class="chips" id="schritte"></div>
+  <div class="caps">RIT · XIT</div>
+  <div class="versatz" id="ritZeile">
+    <button type="button" class="chip vName" id="ritAn">RIT</button>
+    <button type="button" class="chip vNull" id="ritNull" aria-label="RIT auf null">0</button>
+    <button type="button" class="chip vPfeil" id="ritAb" aria-label="RIT tiefer">◀</button>
+    <span class="vWert" id="ritWert">—</span>
+    <button type="button" class="chip vPfeil" id="ritAuf" aria-label="RIT hoeher">▶</button>
+  </div>
+  <div class="versatz" id="xitZeile">
+    <button type="button" class="chip vName" id="xitAn">XIT</button>
+    <button type="button" class="chip vNull" id="xitNull" aria-label="XIT auf null">0</button>
+    <button type="button" class="chip vPfeil" id="xitAb" aria-label="XIT tiefer">◀</button>
+    <span class="vWert" id="xitWert">—</span>
+    <button type="button" class="chip vPfeil" id="xitAuf" aria-label="XIT hoeher">▶</button>
+  </div>
 </div>
 
 <!-- ── Der Rotor (2026-10-05) ────────────────────────────────────────────

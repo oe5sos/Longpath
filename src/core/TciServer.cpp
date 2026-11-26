@@ -32,6 +32,8 @@
 #include "core/LogbuchRueckschau.h"
 #include "core/SpotAuswahl.h"
 #include "core/RotorPeilung.h"
+#include "core/RufPeilung.h"
+#include "core/DxccColorProvider.h"
 #include "core/TciFeld.h"
 #include "core/RotorController.h"
 #include "models/SpotModel.h"
@@ -3396,6 +3398,61 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
         // Erreicht wird der Rotor ueber RadioModel::rotor() -- eine
         // Registrierung, kein Besitz. Angelegt wird er weiter im Fenster;
         // der Netzdienst greift nur nicht hinein.
+        // ── Peilung zu einem Rufzeichen (2026-11-26) ────────────────────────
+        //
+        //     rotor_peilung:<ruf>;
+        //       -> rotor_peilung:<RUF>,<kurz>,<km>,<land>,<lang>,<kurzFrei>,<langFrei>;
+        //       oder rotor_peilung_err:<RUF>,<grund>;
+        //
+        // Fuer die FT8-Liste der App: Station antippen, Richtung sehen. Die
+        // Rechnung ist die des Rotor-Felds am Mac (RufPeilung, cty.dat, Mitte
+        // des Landes). Diese Abfrage DREHT NICHTS -- gedreht wird weiter nur
+        // ueber `rotor_to:` mit seiner Freigabe. Darum genuegt hier die
+        // Anmeldung, wie beim Abfragen der Rotorstellung.
+        //
+        // `kurzFrei`/`langFrei` sagen, ob der eingestellte Drehbereich den Weg
+        // erlaubt (RotorController::zielErlaubt). An der Station ist der Osten
+        // durch einen Berg verstellt; nach Japan geht es nur ueber den langen
+        // Weg, und die App soll das zeigen, bevor jemand drueckt. Ohne Rotor
+        // sind beide 0 -- es gibt dann nichts zu drehen.
+        {
+            const QString t = trimmed;
+            if (t.startsWith(QStringLiteral("rotor_peilung:"), Qt::CaseInsensitive)) {
+                auto antwort = [&](const QString& zeile) {
+                    session->sendQueue.push(TciSendQueue::Priority::Control, zeile);
+                };
+                if (!session->authenticated) { return; }
+                const QString ruf =
+                    TciFeld::sicher(t.mid(14).section(QLatin1Char(','), 0, 0)).toUpper();
+                DxccColorProvider* dxcc = m_model ? m_model->dxccColorProvider() : nullptr;
+                if (!dxcc) {
+                    antwort(QStringLiteral("rotor_peilung_err:%1,kein cty.dat;").arg(ruf));
+                    return;
+                }
+                const RufPeilung::Ergebnis e = RufPeilung::rechne(
+                    dxcc->ctyDat(), ruf,
+                    AppSettings::instance().value(QStringLiteral("StationGridSquare"),
+                                                  QString{}).toString());
+                if (!e.ok) {
+                    antwort(QStringLiteral("rotor_peilung_err:%1,%2;")
+                                .arg(ruf, TciFeld::sicher(e.grund)));
+                    return;
+                }
+                RotorController* rot = m_model ? m_model->rotor() : nullptr;
+                const bool kurzFrei = rot && rot->zielErlaubt(e.kurzGrad);
+                const bool langFrei = rot && rot->zielErlaubt(e.langGrad);
+                antwort(QStringLiteral("rotor_peilung:%1,%2,%3,%4,%5,%6,%7;")
+                            .arg(ruf)
+                            .arg(e.kurzGrad, 0, 'f', 1)
+                            .arg(qRound(e.km))
+                            .arg(TciFeld::sicher(e.land))
+                            .arg(e.langGrad, 0, 'f', 1)
+                            .arg(kurzFrei ? 1 : 0)
+                            .arg(langFrei ? 1 : 0));
+                return;
+            }
+        }
+
         {
             QString t = trimmed;
             const bool istAbfrage =
@@ -3478,6 +3535,14 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                     // 0 Grad ist Nord, und die Antenne wuerde sich auf eine
                     // leere Zeile hin drehen.
                     antwort(QStringLiteral("rotor_err:peilung unbrauchbar;"));
+                    return;
+                }
+                // Ausserhalb des eingestellten Drehbereichs dreht moveTo()
+                // nicht (pruefeZiel) -- bis 2026-11-26 ging trotzdem
+                // `rotor_ok` hinaus, und die App zeigte "angenommen" fuer
+                // eine Antenne, die stehen blieb. Jetzt sagt es die Antwort.
+                if (!rot->zielErlaubt(grad)) {
+                    antwort(QStringLiteral("rotor_err:ausserhalb des drehbereichs;"));
                     return;
                 }
                 rot->moveTo(grad);

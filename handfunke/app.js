@@ -10,14 +10,14 @@ import { TciLink, Fft, feld } from './tci.js';
 import { Mikrofon, mikrofonMoeglich } from './mikrofon.js';
 import { Sammelstelle, zeileLesen, befundLesen, zeitKurz, dupeSatz }
   from './logbuch.js';
-import { spotLesen, marken, trefferBei, trefferAufSchrift } from './spots.js';
+import { ft8Liste, alterText, spotLesen, marken, trefferBei, trefferAufSchrift } from './spots.js';
 import { Sendetasten, SENDEN, TUNE, ablehnText } from './sendetaste.js';
 import { Zeichenbremse } from './ton-vorrang.js';
 import { bildIstAlt } from './aufwachen.js';
 import { desktopStarten } from './desktop.js';
 import { zeiger as zeigerBauen, sEinheiten, SIG_KLEIN, SWR_KLEIN, kompassBlatt } from './instrument.js';
 import { standLesen, zustandText, fehlerText as rotorFehlerText,
-         peilungAus, Sicherung as RotorSicherung,
+         peilungAus, peilungLesen, Sicherung as RotorSicherung,
          DREHT } from './rotor.js';
 
 const $ = (id) => document.getElementById(id);
@@ -464,6 +464,36 @@ function modeArt(m) {
 
 let letzterModus = '', letzteModi = '';
 
+// AGC-Stufen mit eigener Pille (Wortlaut wie am Mac) und wie sie auf dem
+// Draht heissen. Longpath kanonisiert med/medium zu "normal"
+// (TciProtocol::handleAgcModeCommand).
+const AGC_STUFEN = [['fast', 'Fast'], ['normal', 'Med'], ['slow', 'Slow']];
+const AGC_ANDERE = { long: 'Long', off: 'Fixed', custom: 'Custom' };
+// RadioModel::rxNrIndex — die Platznummer, die Longpath mitschickt.
+const NR_NAMEN = ['NR1', 'NR2', 'NR3', 'NR4', 'DFNR', 'BNR', 'MNR', 'NNR'];
+const nrZuletzt = [null, null];   // welche NR-Art beim Wiedereinschalten
+function dspTippen(art) {
+  const t = state.trx, s = link.st;
+  const an = s[art][t];
+  if (an === null) { return; }                 // Zustand unbekannt: nicht raten
+  if (art === 'nr') {
+    if (an) {
+      if (s.nrIdx[t] !== null) { nrZuletzt[t] = s.nrIdx[t]; }
+      link.send(`rx_nr_enable:${t},false`);
+    } else if (nrZuletzt[t] >= 1 && nrZuletzt[t] <= 4) {
+      // Dieselbe Art wieder einschalten. rx_nr_enable_ex nimmt nur 1..4 an
+      // (TciProtocol::handleRxNrEnableExCommand); fuer alles andere bleibt
+      // der einfache Befehl, und die Pille zeigt, was Longpath daraus macht.
+      link.send(`rx_nr_enable_ex:${t},true,${nrZuletzt[t]}`);
+    } else {
+      link.send(`rx_nr_enable:${t},true`);
+    }
+    return;
+  }
+  const cmd = { nb: 'rx_nb_enable', anf: 'rx_anf_enable', sql: 'sql_enable' }[art];
+  link.send(`${cmd}:${t},${an ? 'false' : 'true'}`);
+}
+
 function zeichneBedienung() {
   const s = link.st;
 
@@ -532,24 +562,49 @@ function zeichneBedienung() {
     $('filters').appendChild(mehr);
   }
 
-  // Aufbereitung — Zustandsschalter bleiben leise (nur Rand), damit im Feld
-  // genau eine Stelle kraeftig ist: die Sendetaste.
+  // Aufbereitung und AGC (2026-11-25) — Pillen wie am Mac: an = orange
+  // gefuellt, dazu der Wert (NR-Art, Squelch-Schwelle). Bis hierher schaltete
+  // die Seite die Pillen selbst um, weil "der Server nicht jeden bestaetigt".
+  // Er tut es doch: alle vier kommen im Init-Burst und als Gegenmeldung
+  // (TciServer: activeNrChanged, rx_nb_enable, sql_enable ...). Also zeigt
+  // die Pille jetzt, was Longpath sagt, nicht was zuletzt getippt wurde.
   if (!$('dsp').dataset.fertig) {
     $('dsp').dataset.fertig = '1';
-    [['NB','rx_nb_enable'],['NR','rx_nr_enable'],['ANF','rx_anf_enable'],['SQL','sql_enable']]
-      .forEach(([name, cmd]) => {
-        const el = document.createElement('div');
-        el.className = 'chip quiet'; el.textContent = name; el.dataset.cmd = cmd;
-        el.onclick = () => {
-          const an = el.classList.contains('on');
-          link.send(`${cmd}:${state.trx},${an ? 'false' : 'true'}`);
-          el.classList.toggle('on');   // Der Server bestaetigt nicht jeden
-        };                             // dieser Schalter — hier ist die
-        $('dsp').appendChild(el);      // Anzeige notgedrungen lokal.
-      });
-    const mehr = document.createElement('div');
-    mehr.className = 'chip more'; mehr.textContent = '…';
-    $('dsp').appendChild(mehr);
+    for (const art of ['nb', 'nr', 'anf', 'sql']) {
+      const el = document.createElement('div');
+      el.className = 'chip'; el.dataset.art = art;
+      el.innerHTML = '<span class="pName"></span><span class="pWert"></span>';
+      el.querySelector('.pName').textContent = art.toUpperCase();
+      el.onclick = () => dspTippen(art);
+      $('dsp').appendChild(el);
+    }
+    for (const [m, t] of AGC_STUFEN) {
+      const el = document.createElement('div');
+      el.className = 'chip'; el.dataset.agc = m; el.textContent = t;
+      el.onclick = () => link.send(`agc_mode:${state.trx},${m}`);
+      $('agc').appendChild(el);
+    }
+  }
+  {
+    const t = state.trx;
+    for (const el of $('dsp').children) {
+      const art = el.dataset.art;
+      const an = s[art] ? s[art][t] === true : false;
+      el.classList.toggle('on', an);
+      let w = '';
+      if (art === 'nr' && an && s.nrIdx[t] !== null) { w = NR_NAMEN[s.nrIdx[t]] || ''; }
+      if (art === 'sql' && s.sqlDb[t] !== null) { w = String(Math.round(s.sqlDb[t])).replace('-', '\u2212'); }
+      const pw = el.querySelector('.pWert');
+      if (pw.textContent !== w) { pw.textContent = w; }
+    }
+    const m = s.agcMode[t];
+    for (const el of $('agc').children) { el.classList.toggle('on', el.dataset.agc === m); }
+    // Steht die AGC auf einer Stufe ohne eigene Pille (Long, Off, Custom),
+    // sagt es die Ueberschrift — sonst saehe es aus, als sei keine gewaehlt.
+    const fremd = m && !AGC_STUFEN.some(([k]) => k === m) ? (AGC_ANDERE[m] || m.toUpperCase()) : '';
+    const gain = s.agcGain[t];
+    const kopf = (fremd ? fremd + ' \u00b7 ' : '') + (gain !== null ? 'T ' + gain : '');
+    if ($('agcWert').textContent !== kopf) { $('agcWert').textContent = kopf; }
   }
 
   // Sendeleistung — der Regler, der bis PR #145 wirkungslos war.
@@ -628,14 +683,17 @@ function zeichneKopf() {
         bd.style.left  = links.toFixed(2) + '%';
         bd.style.width = (rechts - links).toFixed(2) + '%';
         bd.style.display = 'block';
+        kantenSetzen(links, rechts, Math.min(pA, pB) >= 0, Math.max(pA, pB) <= 100);
       } else {
         // Schmaler als ein halbes Prozent: als Flaeche nicht mehr lesbar,
         // und ein Ein-Pixel-Band waere nur ein zweiter Strich neben dem
         // Abstimmstrich. Dann lieber nichts — weiter hineinzoomen hilft.
         bd.style.display = 'none';
+        kantenSetzen(null);
       }
     } else if (bd) {
       bd.style.display = 'none';
+      kantenSetzen(null);
     }
   }
 
@@ -1187,6 +1245,8 @@ function zeichneBild() {
       const hoch = Math.ceil(mass.actualBoundingBoxAscent || 7);
       const ersteZeile = hoch + 2;         // zwei Punkte Luft zum Rand
       for (const m of spotMarken) {
+        // Die hervorgehobene Station zeichnet der Block danach, oben auf.
+        if (ft8MarkiertIst(m.ruf)) { continue; }
         const unterDemRegler = (m.x + 27) > sperrVonX;
         const oben = unterDemRegler ? sperrBisY + ersteZeile : ersteZeile;
         const y = oben + m.reihe * 11;       // Schriftgrundlinie
@@ -1214,6 +1274,37 @@ function zeichneBild() {
       }
       panCtx.globalAlpha = 1;
       panCtx.textAlign = 'left';
+    }
+    // ── Aus der FT8-Liste angetippt (2026-11-26) ───────────────────────
+    // Im Gedraenge um die Dial-Frequenz bekommt nicht jede Station eine
+    // Beschriftung (marken: hoechstens drei Reihen). Die angetippte muss man
+    // aber finden -- also eigene Marke, erste Reihe, ueber allen anderen.
+    const gesucht = ft8Markiert && performance.now() < ft8Markiert.bis
+      ? spotZeilen.find((z) => z.ruf === ft8Markiert.ruf) : null;
+    const spanneH = bildSpanneHz(192000);
+    if (gesucht && mitteSpot && spanneH > 0) {
+      const anteil = (gesucht.hz - mitteSpot) / spanneH + 0.5;
+      if (anteil >= 0 && anteil <= 1) {
+        const x = anteil * W;
+        panCtx.font = '600 10px ui-monospace,Menlo,monospace';
+        panCtx.textAlign = 'center';
+        const hoch = Math.ceil(panCtx.measureText('OE5SOS').actualBoundingBoxAscent || 7);
+        const y = hoch + 3;
+        const b = panCtx.measureText(gesucht.ruf).width + 8;
+        const lx = Math.max(b / 2, Math.min(W - b / 2, x));
+        panCtx.globalAlpha = 1;
+        panCtx.strokeStyle = '#f0a82c';
+        panCtx.lineWidth = 2;
+        panCtx.beginPath();
+        panCtx.moveTo(x, y + 2);
+        panCtx.lineTo(x, H);
+        panCtx.stroke();
+        panCtx.fillStyle = '#f0a82c';
+        panCtx.fillRect(lx - b / 2, y - hoch - 2, b, hoch + 5);
+        panCtx.fillStyle = '#1a1205';
+        panCtx.fillText(gesucht.ruf, lx, y);
+        panCtx.textAlign = 'left';
+      }
     }
   }
 
@@ -1757,6 +1848,101 @@ $('scope').addEventListener('pointermove', (e) => {
   wischLetzt = jetzt;
   link.send(`vfo:${state.trx},0,${neu}`);
 });
+// ── Filterkanten ziehen (2026-11-25) ─────────────────────────────────────────
+//
+// Wie „Bandwidth Filter" am Mac: die Kanten des Durchlasses lassen sich mit
+// Finger oder Maus verschieben. Gesendet wird `rx_filter_band:<rx>,<lo>,<hi>`
+// (TciProtocol::handleRxFilterBandCommand), gedrosselt wie das Abstimmen, und
+// beim Loslassen der letzte Stand. Angezeigt wird weiter nur, was Longpath
+// zurueckmeldet — waehrend des Ziehens laeuft das Schild mit der Breite vor.
+//
+// Die Griffe sind eigene Elemente und halten ihre Beruehrungen von der
+// Abstimmgeste darunter fern (wie der Feinschritt). Sie liegen nur dort, wo
+// die Kante im Bild ist; eine Kante ausserhalb des Ausschnitts hat keinen Griff.
+const kKanteMinHz = 50;          // schmaler wird kein Durchlass
+let kanteZug = null;             // { welche, lo, hi, gespiegelt, letzt }
+function kantenSetzen(links, rechts, loSicht, hiSicht) {
+  const a = $('kanteLo'), b = $('kanteHi');
+  if (links === null || links === undefined) {
+    if (!kanteZug) { a.style.display = 'none'; b.style.display = 'none'; }
+    return;
+  }
+  a.style.left = links.toFixed(2) + '%';
+  b.style.left = rechts.toFixed(2) + '%';
+  a.style.display = loSicht ? 'block' : 'none';
+  b.style.display = hiSicht ? 'block' : 'none';
+}
+// Hertz neben der Abstimmfrequenz an einer Bildstelle (wie der Durchlass oben).
+function versatzAnStelle(clientX) {
+  const r = $('scope').getBoundingClientRect();
+  const mitte = link.st.dds[state.trx];
+  const vfo = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
+  const spanne = bildSpanneHz(0);
+  if (!r.width || !mitte || !vfo || !(spanne > 0)) { return null; }
+  const hz = mitte + ((clientX - r.left) / r.width - 0.5) * spanne - vfo;
+  const raster = spanne <= 24000 ? 10 : 50;
+  return Math.round(hz / raster) * raster;
+}
+function breiteText(hz) {
+  return hz >= 1000 ? (hz / 1000).toFixed(hz % 1000 === 0 ? 1 : 2).replace(/0$/, '') + ' kHz' : hz + ' Hz';
+}
+function kanteSenden(zug, endgueltig) {
+  const jetzt = performance.now();
+  if (!endgueltig && jetzt - zug.letzt < kWischAbstandMs) { return; }
+  zug.letzt = jetzt;
+  // Zurueck in die Schreibweise des Servers: hat er die unteren Seitenbaender
+  // positiv gemeldet, zeigt die Seite sie gespiegelt -- dann auch so zurueck.
+  const lo = zug.gespiegelt ? -zug.hi : zug.lo;
+  const hi = zug.gespiegelt ? -zug.lo : zug.hi;
+  if (zug.gesendet === lo + ',' + hi) { return; }
+  zug.gesendet = lo + ',' + hi;
+  link.send(`rx_filter_band:${state.trx},${lo},${hi}`);
+}
+for (const [id, welche] of [['kanteLo', 'lo'], ['kanteHi', 'hi']]) {
+  const el = $(id);
+  el.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    const f = link.st.filter[state.trx] || [];
+    let lo = f[0], hi = f[1];
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) { return; }
+    if (lo > hi) { const t = lo; lo = hi; hi = t; }
+    const m = (link.st.mode[state.trx] || '').toLowerCase();
+    const gespiegelt = (m === 'lsb' || m === 'cwl' || m === 'digl') && lo >= 0 && hi >= 0;
+    if (gespiegelt) { const t = -hi; hi = -lo; lo = t; }
+    kanteZug = { welche, lo, hi, gespiegelt, letzt: 0, gesendet: null, x: e.clientX, bewegt: false };
+    try { el.setPointerCapture(e.pointerId); } catch (x) { /* Zeiger schon weg */ }
+    el.classList.add('zieht');
+  });
+  el.addEventListener('pointermove', (e) => {
+    e.stopPropagation();
+    if (!kanteZug || kanteZug.welche !== welche) { return; }
+    if (!kanteZug.bewegt && Math.abs(e.clientX - kanteZug.x) < 3) { return; }
+    kanteZug.bewegt = true;
+    const hz = versatzAnStelle(e.clientX);
+    if (hz === null) { return; }
+    if (welche === 'lo') { kanteZug.lo = Math.min(hz, kanteZug.hi - kKanteMinHz); }
+    else { kanteZug.hi = Math.max(hz, kanteZug.lo + kKanteMinHz); }
+    // Den Griff selbst gleich mitnehmen; der Durchlass folgt der Gegenmeldung.
+    const r = $('scope').getBoundingClientRect();
+    el.style.left = Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)).toFixed(2) + '%';
+    const w = $('kantenWert');
+    w.textContent = breiteText(kanteZug.hi - kanteZug.lo);
+    w.style.left = el.style.left;
+    w.classList.add('an');
+    kanteSenden(kanteZug, false);
+  });
+  const ende = (e) => {
+    e.stopPropagation();
+    if (!kanteZug || kanteZug.welche !== welche) { return; }
+    if (kanteZug.bewegt) { kanteSenden(kanteZug, true); }
+    kanteZug = null;
+    el.classList.remove('zieht');
+    $('kantenWert').classList.remove('an');
+  };
+  el.addEventListener('pointerup', ende);
+  el.addEventListener('pointercancel', ende);
+}
+
 // ── Kneifen zum Vergroessern (2026-10-01) ───────────────────────────────────
 //
 // Betreiber: "vergrössern kann ich leider nicht". Es gab schlicht keinen Weg.
@@ -1800,7 +1986,7 @@ $('zoomRaus').addEventListener('click', () => spanneStufe(+1));
 // sein um die frequenz um +/- 100 zu verschieben". Wischen trifft auf ein
 // paar hundert Hertz genau — fuer das letzte Stueck auf eine Station ist das
 // zu grob, und das Eintippblatt ist dafuer zu umstaendlich.
-let kFeinHz = 100;          // Desktop: die Schrittwahl stellt ihn (desktop.js)
+let kFeinHz = 100;          // die Schritt-Chips stellen ihn (schrittSetzen)
 function feinschritt(d) {
   const v = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
   if (!v) { return; }
@@ -1963,6 +2149,140 @@ link.addEventListener('spotsende', (e) => {
 });
 
 setInterval(() => { if (link.ready) { spotsHolen(); } }, kSpotTakt);
+
+// ── FT8-Liste (2026-11-26) ──────────────────────────────────────────────────
+//
+// Dieselben Spotzeilen wie die Marken, gefiltert auf Longpaths eigene FT8/FT4-
+// Funde (spots.js: ft8Liste). Kein eigener Abruf: eine zweite Abfrage waere
+// eine zweite Wahrheit ueber dasselbe Band. Das Alter laeuft zwischen zwei
+// Abrufen sekundengenau weiter, damit die Liste nicht in 12-s-Spruengen altert.
+//
+// Antippen hebt die Station im Panadapter hervor (20 s). Es stimmt NICHT ab
+// und sendet nichts -- anrufen hiesse senden, und Senden bleibt gesperrt.
+let ft8Abruf = 0;                 // wann die Liste zuletzt ankam
+let ft8Markiert = null;           // { ruf, bis }
+const kFt8Hervor = 20000;
+function ft8MarkiertIst(ruf) {
+  return !!(ft8Markiert && ft8Markiert.ruf === ruf && performance.now() < ft8Markiert.bis);
+}
+const ft8Offen = () => { try { return localStorage.getItem('handfunke.ft8offen') === '1'; } catch (e) { return false; } };
+$('ft8Kopf').addEventListener('click', () => {
+  const offen = !$('ft8Feld').classList.contains('offen');
+  try { localStorage.setItem('handfunke.ft8offen', offen ? '1' : '0'); } catch (e) {}
+  zeichneFt8();
+});
+$('ft8Liste').addEventListener('click', (e) => {
+  // Die Peilungszeile mit den Knoepfen haengt UNTER der Stationszeile, nicht
+  // in ihr -- beide tragen darum das Rufzeichen.
+  const z = e.target.closest('.ft8Z, .ft8Peil');
+  if (!z) { return; }
+  // Der Knopf in der gewaehlten Zeile dreht -- ueber denselben Weg wie die
+  // Rotorscheibe (Sicherung waehlen, dann bestaetigen, rotor_to). Er waehlt
+  // die Zeile nicht ab.
+  const knopf = e.target.closest('.ft8Dreh');
+  if (knopf) {
+    const g = Number(knopf.dataset.grad);
+    if (!knopf.disabled && Number.isFinite(g)) {
+      if (!rotorSicherung.gilt(performance.now()) || rotorSicherung.ziel !== g) {
+        rotorSicherung.waehle(g, performance.now());
+      }
+      rotorZeichnen();              // gibt den Knopf erst frei
+      $('rotorDreh').click();
+    }
+    return;
+  }
+  if (z.classList.contains('ft8Peil')) { return; }
+  ft8Markiert = ft8MarkiertIst(z.dataset.ruf) ? null
+    : { ruf: z.dataset.ruf, bis: performance.now() + kFt8Hervor };
+  if (ft8Markiert) { peilungFragen(ft8Markiert.ruf); }
+  zeichneFt8();
+});
+
+// ── Peilung zum Rufzeichen (2026-11-26) ─────────────────────────────────────
+// Longpath rechnet sie (rotor_peilung: -> cty.dat, Mitte des Landes, vom
+// eigenen Locator aus; dieselbe Zahl wie zuerst am Mac). Sie WAEHLT nur ein
+// Ziel auf der Rotorscheibe, wenn es einen Rotor gibt; gedreht wird erst mit
+// dem Knopf, und der Server prueft dabei wie immer die Freigabe.
+const ft8Peilungen = new Map();   // ruf -> {grad, km, land} | {fehler}
+function peilungFragen(ruf) {
+  const p = ft8Peilungen.get(ruf);
+  if (p && p.grad !== undefined) { peilungAnwenden(p); return; }
+  if (link.ready) { link.send(`rotor_peilung:${ruf}`); }
+}
+function peilungAnwenden(p) {
+  if (!ft8MarkiertIst(p.ruf) || !rotorFeldAn) { return; }
+  // Vorgewaehlt wird der Weg, den der Drehbereich erlaubt -- bei Martin ist
+  // der Osten zu (Berg), nach Japan geht es nur ueber den langen Weg.
+  const ziel = p.kurzFrei ? p.grad : (p.langFrei ? p.lang : null);
+  if (ziel === null) { return; }
+  rotorSicherung.waehle(ziel, performance.now());
+  $('rotorMeldung').classList.remove('warn');
+  $('rotorMeldung').textContent = '';
+  rotorZeichnen();
+}
+link.addEventListener('peilung', (e) => {
+  const p = peilungLesen((e.detail || {}).args || []);
+  if (!p) { return; }
+  ft8Peilungen.set(p.ruf, p);
+  peilungAnwenden(p);
+  zeichneFt8();
+});
+link.addEventListener('peilungfehler', (e) => {
+  const a = (e.detail || {}).args || [];
+  const ruf = (a[0] || '').trim().toUpperCase();
+  if (!ruf) { return; }
+  ft8Peilungen.set(ruf, { ruf, fehler: (a[1] || 'unbekannt').trim() });
+  zeichneFt8();
+});
+function peilungZeile(ruf) {
+  const p = ft8Peilungen.get(ruf);
+  if (!p) { return `<div class="ft8Peil" data-ruf="${ruf}">Peilung wird gefragt …</div>`; }
+  if (p.fehler) { return `<div class="ft8Peil" data-ruf="${ruf}">keine Peilung — ${p.fehler}</div>`; }
+  const text = (p.km !== null ? `${p.km} km` : '') + (p.land ? ` · ${p.land}` : '');
+  // Kurzer und langer Weg je ein Knopf; was der Drehbereich nicht erlaubt,
+  // steht da, ist aber gesperrt -- man soll sehen, WARUM nicht gedreht wird.
+  const knopf = (g, name, frei) => `<button type="button" class="ft8Dreh" data-grad="${g}"` +
+    `${frei ? '' : ' disabled title="ausserhalb des Drehbereichs"'}>${name} ${g}°</button>`;
+  const knoepfe = rotorFeldAn
+    ? `<span class="ft8Wege">${knopf(p.grad, 'KURZ', p.kurzFrei)}${knopf(p.lang, 'LANG', p.langFrei)}</span>`
+    : `<span>${p.grad}° · lang ${p.lang}°</span>`;
+  return `<div class="ft8Peil" data-ruf="${ruf}"><span>${text}</span>${knoepfe}</div>`;
+}
+const dfText = (df) => df === null ? '—'
+  : (df > 0 ? '+' : df < 0 ? '\u2212' : '\u00b1') + Math.abs(df) + ' Hz';
+function zeichneFt8() {
+  const dial = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : 0;
+  const nachlauf = ft8Abruf ? (performance.now() - ft8Abruf) / 1000 : 0;
+  const liste = ft8Liste(spotZeilen, dial);
+  const feld = $('ft8Feld');
+  feld.hidden = liste.length === 0;
+  if (!liste.length) { return; }
+  const offen = ft8Offen();
+  feld.classList.toggle('offen', offen);
+  $('ft8Chev').textContent = offen ? '▾' : '▸';
+  const anzahl = liste.length + (liste.length === 1 ? ' Station' : ' Stationen');
+  if ($('ft8Anzahl').textContent !== anzahl) { $('ft8Anzahl').textContent = anzahl; }
+  const neu = liste.slice(0, 3).map((x) => x.ruf).join('  ');
+  if ($('ft8Neu').textContent !== neu) { $('ft8Neu').textContent = neu; }
+  // Nur neu schreiben, wenn sich die Zeilen selbst aendern. Das Alter allein
+  // wird an Ort und Stelle nachgezogen: ein Neuschreiben jede Sekunde ersetzte
+  // auch den Knopf, den der Finger gerade drueckt, und der Tipp ging verloren.
+  const html = liste.map((x) =>
+    `<div class="ft8Z${ft8MarkiertIst(x.ruf) ? ' an' : ''}" role="listitem" data-ruf="${x.ruf}">` +
+    `<b>${x.ruf}</b><span class="ft8M">${x.mode}</span>` +
+    `<span class="ft8Df">${dfText(x.df)}</span>` +
+    `<span class="ft8A"></span></div>` +
+    (ft8MarkiertIst(x.ruf) ? peilungZeile(x.ruf) : '')).join('');
+  const el = $('ft8Liste');
+  if (el.dataset.bau !== html) { el.dataset.bau = html; el.innerHTML = html; }
+  const alter = el.querySelectorAll('.ft8A');
+  liste.forEach((x, i) => {
+    const t = alterText(x.alterSek + nachlauf);
+    if (alter[i] && alter[i].textContent !== t) { alter[i].textContent = t; }
+  });
+}
+link.addEventListener('spotsende', () => { ft8Abruf = performance.now(); zeichneFt8(); });
+setInterval(zeichneFt8, 1000);
 
 // ── QSO eintragen (Entwurf A, Betreiber 2026-10-04) ───────────────────────
 //
@@ -3224,9 +3544,75 @@ zeichneBedienung();
 }
 
 
+// ── Abstimmschritt und RIT/XIT (2026-11-25) ─────────────────────────────────
+//
+// Wie die Spalte „Combined" am Mac (RxApplet Control 15/16): RIT und XIT je
+// eine Zeile [RIT] [0] [<] Versatz [>]. Die Pfeile schieben um den gewaehlten
+// Abstimmschritt, geklemmt auf +/-10000 Hz wie dort. Ein, aus und Wert kommen
+// NUR vom Server (Init-Burst und Gegenmeldung); die Seite schaltet nichts
+// lokal um, damit sie nie etwas anderes zeigt, als Longpath tut.
+const SCHRITTE = [[10, '10 Hz'], [100, '100 Hz'], [1000, '1 kHz']];
+const schrittText = (hz) => (SCHRITTE.find(([h]) => h === hz) || [0, hz + ' Hz'])[1];
+function schrittSetzen(hz) {
+  kFeinHz = hz;
+  try { localStorage.setItem('handfunke.schritt', String(hz)); } catch (e) {}
+  $('schritte').querySelectorAll('.chip').forEach((c) =>
+    c.classList.toggle('on', Number(c.dataset.hz) === hz));
+  const sp = document.querySelector('.feinschritt span');
+  if (sp) { sp.textContent = schrittText(hz); }
+  $('feinAb').setAttribute('aria-label', schrittText(hz) + ' tiefer');
+  $('feinAuf').setAttribute('aria-label', schrittText(hz) + ' hoeher');
+}
+for (const [hz, t] of SCHRITTE) {
+  const c = document.createElement('button');
+  c.type = 'button'; c.className = 'chip'; c.textContent = t; c.dataset.hz = String(hz);
+  c.addEventListener('click', () => schrittSetzen(hz));
+  $('schritte').appendChild(c);
+}
+{
+  let gemerkt = 100;
+  try { gemerkt = Number(localStorage.getItem('handfunke.schritt')) || 100; } catch (e) {}
+  schrittSetzen(SCHRITTE.some(([h]) => h === gemerkt) ? gemerkt : 100);
+}
+
+const VERSATZ_MAX = 10000;   // RxApplet.cpp: std::clamp(..., -10000, 10000)
+function versatzText(hz) {
+  if (hz === null || hz === undefined) { return '—'; }
+  return (hz > 0 ? '+' : hz < 0 ? '\u2212' : '\u00b1') + Math.abs(hz) + ' Hz';
+}
+for (const art of ['rit', 'xit']) {
+  const hzVon = () => link.st[art + 'Hz'][state.trx];
+  const schieben = (d) => {
+    const v = hzVon() || 0;
+    const neu = Math.max(-VERSATZ_MAX, Math.min(VERSATZ_MAX, v + d));
+    if (neu !== v) { link.send(`${art}_offset:${state.trx},${neu}`); }
+  };
+  $(art + 'An').addEventListener('click', () => {
+    const an = link.st[art][state.trx];
+    if (an === null) { return; }          // Zustand unbekannt: nicht raten
+    link.send(`${art}_enable:${state.trx},${an ? 'false' : 'true'}`);
+  });
+  $(art + 'Null').addEventListener('click', () => link.send(`${art}_offset:${state.trx},0`));
+  $(art + 'Ab').addEventListener('click', () => schieben(-kFeinHz));
+  $(art + 'Auf').addEventListener('click', () => schieben(+kFeinHz));
+}
+function zeichneVersatz() {
+  for (const art of ['rit', 'xit']) {
+    const an = link.st[art][state.trx];
+    const hz = link.st[art + 'Hz'][state.trx];
+    $(art + 'An').classList.toggle('on', an === true);
+    const w = $(art + 'Wert');
+    const t = versatzText(hz);
+    if (w.textContent !== t) { w.textContent = t; }
+    w.classList.toggle('an', an === true);
+  }
+}
+link.addEventListener('state', zeichneVersatz);
+zeichneVersatz();
+
 // Desktop-Layout ab ca. 900 px Breite (desktop.js); darunter bleibt es bei
 // „Ein Schirm". Dieselben Elemente, anderes Raster.
-desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logListeHolen });
+desktopStarten({ link, $, schrittHz: () => kFeinHz, logHolen: logListeHolen });
 
 // ── Mac-Look: Zeigerinstrument, Rotorzeile, ON AIR ──────────────────────────
 // Die Zahlen schreibt weiter die Schleife oben nach #smeter/#sbar/#rotorGrad;
@@ -3277,6 +3663,13 @@ desktopStarten({ link, $, feinSetzen: (hz) => { kFeinHz = hz; }, logHolen: logLi
       $('swrWert').textContent = '—';
       zeigerW(null);
     }
+    // Leistung daneben, nach derselben Regel: nur beim Senden und nur frisch.
+    const p = link.st.txPower;
+    const pw = (sendet && frisch && p !== null && p >= 0)
+      ? (p < 10 ? p.toFixed(1) : String(Math.round(p))) + ' W' : '—';
+    const pe = $('pwrWertI');
+    if (pe.textContent !== pw) { pe.textContent = pw; }
+    pe.classList.toggle('aus', pw === '—');
   }, 250);
   // Antippen des Kompasses oeffnet die volle Rotorsteuerung (die Zeile
   // darunter), und zwar sichtbar.
