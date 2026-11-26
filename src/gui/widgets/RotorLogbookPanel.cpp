@@ -3375,14 +3375,14 @@ void RotorLogbookPanel::wireQrz()
         showStationVisuals(info);
         setStatus(QString{});
 
-        // Show the answer as a picture too (2026-08-10, operator wish):
-        // a successful lookup brings the globe up and swings it along
-        // the path to the station. The dial is one click away on the
-        // same button.
-        if (m_dial->hasTarget()) {
-            if (m_globeBtn && !m_globeBtn->isChecked()) {
-                m_globeBtn->setChecked(true);   // switches the stack
-            }
+        // Bis 2026-11-26 holte jede erfolgreiche Abfrage die Kugel nach
+        // vorn (Wunsch vom 2026-08-10). Betreiber, 20:33, breit gedockt
+        // mit der Kugel statt des Kompasses: „die weltkugel benötige ich
+        // nicht, sollte eigentlich immer, sofern es leicht geht, der
+        // rotor zu sehen sein". Die Ansicht bleibt jetzt, wie sie ist;
+        // die Kugel gibt es hinter dem Zahnrad („Rose oder Kugel"). Ist
+        // sie gewaehlt, dreht sie weiter zur Station.
+        if (m_dial->hasTarget() && m_globeBtn && m_globeBtn->isChecked()) {
             m_globe->lookAlongBearing(m_dial->targetBearing());
         }
     });
