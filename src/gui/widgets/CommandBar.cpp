@@ -46,6 +46,8 @@ namespace Longpath {
 namespace {
 // Ein Abstand für alle: zwischen Pillen, zwischen Zeilen und zwischen Bereichen.
 constexpr int kAbstand = 5;
+// Abstand zwischen zwei Bereichen; der Trennstrich liegt in der Mitte.
+constexpr int kAbstandZwischenBereichen = 14;
 // Pillen je Zeile in der Bandgruppe (zwei Zeilen zu vier).
 /// Die Stufe der Leiste. Statisch, weil die Stilblätter (auch die der
 /// Profilschiene) sie ohne Leiste erreichen müssen.
@@ -152,12 +154,13 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     auto* row = new QHBoxLayout;
     // Der Abstand ZWISCHEN den Gruppen ist das, was sie zu Gruppen
     // macht. Fünf Pixel innerhalb, zweiundzwanzig dazwischen.
-    row->setSpacing(kAbstand);
+    // Zwischen den Bereichen mehr Abstand, damit der Strich frei steht.
+    row->setSpacing(kAbstandZwischenBereichen);
     zeilen->addLayout(row);
     m_row = row;
 
     m_rowZwei = new QHBoxLayout;
-    m_rowZwei->setSpacing(kAbstand);
+    m_rowZwei->setSpacing(kAbstandZwischenBereichen);
     zeilen->addLayout(m_rowZwei);
 
     // ── BAND zuerst ─────────────────────────────────────────────────
@@ -461,7 +464,8 @@ void CommandBar::paintEvent(QPaintEvent* e)
     }
     if (reihe.size() < 2) { return; }
 
-    p.setPen(QPen(QColor(QString::fromLatin1(Style::kGlassEdgeLight)), 1));
+    // Trennstriche gelb (Betreiber 2026-11-26).
+    p.setPen(QPen(QColor(QString::fromLatin1(Style::kEqBand2)), 1));
     for (int i = 0; i + 1 < reihe.size(); ++i) {
         const QRect a = reihe.at(i);
         const QRect b = reihe.at(i + 1);
@@ -850,12 +854,6 @@ void CommandBar::buildDigiGroup(QHBoxLayout* row)
         connect(b, &QPushButton::clicked, this,
                 [this, modus = eintrag.second]() { emit digiRequested(modus); });
     }
-    // FT2 gibt es in diesem Zweig noch nicht (Digimodus::Ft2 steht erst
-    // auf feat/ft2). Die Pille steht schon da, gedämpft und ohne Wirkung;
-    // mit dem Zusammenführen genügt es, sie hier anzuschließen.
-    QPushButton* ft2 = addPill(g, QStringLiteral("FT2"));
-    ft2->setEnabled(false);
-    ft2->setToolTip(tr("FT2 folgt mit dem FT2-Zweig"));
 
     if (!mode || !mode->box) { return; }
     auto* modeBox = qobject_cast<QVBoxLayout*>(mode->box);
