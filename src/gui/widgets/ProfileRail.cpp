@@ -28,6 +28,7 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QBoxLayout>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
@@ -38,6 +39,13 @@ namespace {
 // beiden Raender. Siehe die Begruendung an kLeistenSeite.
 static_assert(ProfileRail::kLeistenSeite == CommandBar::kPillHeight + 2,
               "Die Schiene muss so hoch sein wie eine Pille mit ihren Raendern.");
+
+// Die Profile stehen zwei Zeilen zu vier, wie die Bandgruppe: die erste
+// Zeile liegt auf der ersten Zeile der Leiste, die zweite auf der zweiten
+// (Betreiber 2026-11-26).
+constexpr int kAbzeichenProZeile = 4;
+// Abstand von Zeile zu Zeile: 5 px, wie in der Befehlsleiste.
+constexpr int kZeilenAbstand = 5;
 
 QString badgeStyle(bool active)
 {
@@ -104,6 +112,25 @@ QString ProfileRail::initialFor(const QString& name)
     return QStringLiteral("?");
 }
 
+QString ProfileRail::plusStilLeiste()
+{
+    return QStringLiteral(
+                  "QPushButton { background: transparent; color: %1;"
+                  "  border: 1px dashed %2; border-radius: %3px;"
+                  // Dieselbe Stufe wie die Pillen daneben (Schrift, Innenabstand,
+                  // Hoehe): sonst ist das Plus kleiner als jede Pille.
+                  "  font-size: %6px; padding: 0 %7px;"
+                  "  min-height: %5px; max-height: %5px; }"
+                  "QPushButton:hover { color: %4; border: 1px dashed %4; }")
+                  .arg(QString::fromLatin1(Style::kTextScale),
+                       QString::fromLatin1(Style::kBorder))
+                  .arg(CommandBar::kPillRadius)
+                  .arg(QString::fromLatin1(Style::kBlueBorder))
+                  .arg(CommandBar::pillHoehe())
+                  .arg(CommandBar::pillSchrift())
+                  .arg(CommandBar::pillPolster());
+}
+
 ProfileRail::ProfileRail(LayoutProfiles* profiles,
                          Qt::Orientation richtung, QWidget* parent)
     : QWidget(parent), m_profiles(profiles), m_richtung(richtung)
@@ -119,16 +146,25 @@ ProfileRail::ProfileRail(LayoutProfiles* profiles,
                  QString::fromLatin1(Style::kBorderSubtle)));
         m_column = new QVBoxLayout(this);
         m_column->setContentsMargins(7, 9, 7, 9);
+        m_column->setSpacing(7);
+        m_rail = m_column;
     } else {
         // In der Leiste: keine eigene Flaeche und keine Trennlinie. Die
         // Abzeichen sollen wie die Pillen daneben auf dem Leistengrund
         // sitzen, sonst liegt ein Kasten im Kasten.
-        setFixedHeight(kLeistenSeite);
         setStyleSheet(QStringLiteral("ProfileRail { background: transparent; }"));
-        m_column = new QHBoxLayout(this);
-        m_column->setContentsMargins(0, 0, 0, 0);
+        // Eine Zeile: die Höhe ergibt sich aus der Pille,
+        // nicht mehr aus kLeistenSeite (das bleibt die Höhe EINER Pille).
+        m_grid = new QGridLayout(this);
+        m_grid->setContentsMargins(0, 0, 0, 0);
+        m_grid->setHorizontalSpacing(5);
+        m_grid->setVerticalSpacing(kZeilenAbstand);
+        // Die Hoehe bleibt die der Zeilen. Ohne feste Hoehe streckt die
+        // Befehlsleiste die Schiene, und das Gitter verteilt den Platz
+        // auf die Zeilen -- dann liegt der Abstand nicht mehr fest.
+        setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+        m_rail = m_grid;
     }
-    m_column->setSpacing(m_richtung == Qt::Vertical ? 7 : 5);
 
     m_plus = new QPushButton(QStringLiteral("+"), this);
     setzeMasse(m_plus);
@@ -164,22 +200,7 @@ ProfileRail::ProfileRail(LayoutProfiles* profiles,
                        QString::fromLatin1(Style::kBorder))
                   .arg(kBadgeSide / 2)
                   .arg(QString::fromLatin1(Style::kBlueBorder))
-            : QStringLiteral(
-                  "QPushButton { background: transparent; color: %1;"
-                  "  border: 1px dashed %2; border-radius: %3px;"
-                  // 13, nicht 14: die Schriftleiter kennt
-                  // [7, 9, 11, 13, 16, 22, 38, 48], und eine Stufe
-                  // daneben waere eine namenlose Groesse mehr
-                  // (verify-style-drift). 11 waere die der Pillen --
-                  // fuer ein Zeichen statt eines Wortes zu klein.
-                  "  font-size: 13px; padding: 0 11px;"
-                  "  min-height: %5px; max-height: %5px; }"
-                  "QPushButton:hover { color: %4; border: 1px dashed %4; }")
-                  .arg(QString::fromLatin1(Style::kTextScale),
-                       QString::fromLatin1(Style::kBorder))
-                  .arg(CommandBar::kPillRadius)
-                  .arg(QString::fromLatin1(Style::kBlueBorder))
-                  .arg(CommandBar::kPillHeight));
+            : plusStilLeiste());
     connect(m_plus, &QPushButton::clicked,
             this, &ProfileRail::newProfileRequested);
 
@@ -221,7 +242,29 @@ void ProfileRail::setzeMasse(QPushButton* b) const
     // max-height), nicht von hier. Sie hier zu setzen hiesse, dieselbe
     // Zahl ein zweites Mal zu pflegen -- und beim naechsten Stilblatt
     // stuenden die Abzeichen zwei Pixel daneben, ohne dass es auffiele.
-    b->setMinimumWidth(b->fontMetrics().horizontalAdvance(b->text()) + 20);
+    // Gleiche Breite wie jede andere Pille in der Leiste (2026-11-26).
+    b->setFixedWidth(CommandBar::pillBreite());
+}
+
+
+void ProfileRail::stufeGewechselt()
+{
+    // Die Stufe der Befehlsleiste wechselt die Höhe der Pillen; das Plus
+    // trägt seine Höhe im eigenen Stilblatt und muss mit (2026-11-26).
+    if (m_plus && m_richtung == Qt::Horizontal) {
+        m_plus->setStyleSheet(plusStilLeiste());
+    }
+}
+
+void ProfileRail::platziere(QWidget* w, int index)
+{
+    if (m_grid) {
+        m_grid->addWidget(w, index / kAbzeichenProZeile,
+                          index % kAbzeichenProZeile,
+                          Qt::AlignLeft | Qt::AlignTop);
+        return;
+    }
+    m_column->addWidget(w, 0, mittig());
 }
 
 void ProfileRail::rebuild()
@@ -230,24 +273,29 @@ void ProfileRail::rebuild()
     // anzulegen wäre einfacher und würde bei jedem Profilwechsel den
     // Knopf unter dem Mauszeiger austauschen.
     for (QPushButton* b : m_badges) {
-        m_column->removeWidget(b);
+        m_rail->removeWidget(b);
         b->deleteLater();
     }
     m_badges.clear();
     m_closers.clear();   // Kinder der Abzeichen, sterben mit ihnen
     m_order.clear();
-    m_column->removeWidget(m_plus);
-    while (QLayoutItem* it = m_column->takeAt(0)) { delete it; }
+    m_rail->removeWidget(m_plus);
+    while (QLayoutItem* it = m_rail->takeAt(0)) { delete it; }
 
     if (!m_profiles) {
-        m_column->addWidget(m_plus, 0, mittig());
-        m_column->addStretch(1);
+        platziere(m_plus, 0);
+        if (m_column) { m_column->addStretch(1); }
         return;
     }
 
     const QString current = m_profiles->current();
     for (const QString& name : m_profiles->names()) {
-        auto* b = new QPushButton(initialFor(name), this);
+        // Waagrecht zeigt die Pille das Kürzel (höchstens drei Zeichen),
+        // sonst den ersten Buchstaben. Senkrecht bleibt die Scheibe bei
+        // einem Zeichen -- drei passen dort nicht hinein.
+        const QString kz = m_richtung == Qt::Horizontal
+                               ? m_profiles->kuerzel(name) : QString();
+        auto* b = new QPushButton(kz.isEmpty() ? initialFor(name) : kz, this);
         setzeMasse(b);
         b->setCursor(Qt::PointingHandCursor);
         b->setToolTip(name);
@@ -321,16 +369,16 @@ void ProfileRail::rebuild()
             });
         }
 
-        m_column->addWidget(b, 0, mittig());
+        platziere(b, m_order.size());
         m_badges.insert(name, b);
         m_order << name;
     }
 
-    m_column->addWidget(m_plus, 0, mittig());
+    platziere(m_plus, m_order.size());
     // Senkrecht schiebt die Dehnung die Abzeichen nach oben. Waagrecht
     // darf sie NICHT dazu: die Leiste setzt die Breite, und eine Dehnung
     // darin wuerde die Abzeichen auseinanderziehen.
-    if (m_richtung == Qt::Vertical) { m_column->addStretch(1); }
+    if (m_column) { m_column->addStretch(1); }
 }
 
 // ── Wer hat umgeschaltet? (2026-11-07) ──────────────────────────────
@@ -455,6 +503,10 @@ ProfileRail::Menueteile ProfileRail::baueMenue(const QString& name,
 
     menu.addSeparator();
     t.ren = menu.addAction(tr("Rename…"));
+    if (m_richtung == Qt::Horizontal) {
+        t.kuerzel = menu.addAction(tr("Short name…"));
+        t.kuerzel->setToolTip(tr("Up to three characters on the button."));
+    }
     t.dup = menu.addAction(tr("Duplicate…"));
     menu.addSeparator();
     t.del = menu.addAction(tr("Delete"));
@@ -504,6 +556,7 @@ bool ProfileRail::werteMenueAus(QAction* chosen, const Menueteile& t,
     if (chosen == t.exportToDesktop) { emit exportRequested(name); return true; }
     if (chosen == t.importFromDesktop) { emit importRequested(name); return true; }
     if (chosen == t.ren) { emit renameRequested(name); return true; }
+    if (t.kuerzel && chosen == t.kuerzel) { emit kuerzelRequested(name); return true; }
     if (chosen == t.dup) { emit duplicateRequested(name); return true; }
     if (chosen == t.del) { emit removeRequested(name); return true; }
     if (chosen == t.verschieben) {

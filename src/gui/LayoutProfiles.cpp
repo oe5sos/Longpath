@@ -150,6 +150,25 @@ bool LayoutProfiles::rename(const QString& from, const QString& to)
     return true;
 }
 
+QString LayoutProfiles::kuerzel(const QString& name) const
+{
+    const Profile* p = find(name);
+    return p ? p->kuerzel : QString();
+}
+
+bool LayoutProfiles::setKuerzel(const QString& name, const QString& text)
+{
+    Profile* p = find(name);
+    if (!p) { return false; }
+    // Höchstens drei Zeichen: die Pille hat für mehr keinen Platz.
+    const QString neu = text.trimmed().left(3);
+    if (p->kuerzel == neu) { return true; }
+    p->kuerzel = neu;
+    save();
+    emit profilesChanged();
+    return true;
+}
+
 bool LayoutProfiles::remove(const QString& name)
 {
     if (!exists(name)) { return false; }
@@ -497,6 +516,9 @@ void LayoutProfiles::save() const
         o.insert(QStringLiteral("bands"), bands);
         o.insert(QStringLiteral("modes"), modes);
         o.insert(QStringLiteral("digis"), digis);
+        if (!p->kuerzel.isEmpty()) {
+            o.insert(QStringLiteral("kuerzel"), p->kuerzel);
+        }
         arr.append(o);
     }
     QJsonObject root;
@@ -616,6 +638,7 @@ bool LayoutProfiles::ausJsonUebernehmen(const QByteArray& raw)
         Profile p;
         p.name = name;
         p.state = o.value(QStringLiteral("state")).toObject().toVariantMap();
+        p.kuerzel = o.value(QStringLiteral("kuerzel")).toString().trimmed().left(3);
         for (const QJsonValue& b : o.value(QStringLiteral("bands")).toArray()) {
             p.bands.insert(b.toInt());
         }

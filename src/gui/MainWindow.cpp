@@ -3705,6 +3705,19 @@ void MainWindow::wireProfileRail()
         m_layoutProfiles->save();
     });
 
+    // Kürzel der Pille: höchstens drei Zeichen, leer = erster Buchstabe.
+    connect(m_profileRail, &ProfileRail::kuerzelRequested, this,
+            [this](const QString& name) {
+        QInputDialog dlg(this);
+        dlg.setWindowTitle(tr("Short name"));
+        dlg.setLabelText(tr("Up to three characters, shown on the profile "
+                            "button (empty = first letter of the name):"));
+        dlg.setTextValue(m_layoutProfiles->kuerzel(name));
+        if (QLineEdit* le = dlg.findChild<QLineEdit*>()) { le->setMaxLength(3); }
+        if (dlg.exec() != QDialog::Accepted) { return; }
+        m_layoutProfiles->setKuerzel(name, dlg.textValue());
+    });
+
     connect(m_profileRail, &ProfileRail::duplicateRequested, this,
             [this, askName, complain](const QString& from) {
         const QString name = askName(tr("Duplicate profile"),

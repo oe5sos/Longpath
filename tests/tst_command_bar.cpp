@@ -1083,12 +1083,12 @@ private slots:
     void breitBleibtEineZeile()
     {
         CommandBar bar;
-        bar.resize(1600, 70);
+        bar.resize(1760, 70);
         bar.show();
         QVERIFY(QTest::qWaitForWindowExposed(&bar, kFensterFrist));
         for (int i = 0; i < 4; ++i) { QCoreApplication::processEvents(); }
 
-        QVERIFY2(!bar.zweiZeilenAktiv(), "bei 1600 Punkten darf es nur eine Zeile geben");
+        QVERIFY2(!bar.zweiZeilenAktiv(), "bei 1760 Punkten darf es nur eine Zeile geben");
         const QVector<QStringList> z = bar.zeilenGruppen();
         QCOMPARE(z.at(0).size(), 7);
         QVERIFY(z.at(1).isEmpty());
@@ -1132,7 +1132,9 @@ private slots:
         for (QLabel* l : bar.findChildren<QLabel*>(QStringLiteral("groupCaption"))) {
             if (l->isVisible()) { ++beschriftungen; }
         }
-        QVERIFY2(beschriftungen >= 5, "in der grossen Stufe fehlen Gruppenbeschriftungen");
+        // Betreiber 2026-11-26: keine Gruppenüberschriften in der Leiste, alle
+        // Pillen beginnen auf derselben Linie.
+        QVERIFY2(beschriftungen == 0, "in der Leiste darf es keine Gruppenüberschriften geben");
         for (QPushButton* b : bar.findChildren<QPushButton*>()) {
             if (b->text().isEmpty()) { continue; }
             QCOMPARE(b->height(), CommandBar::kPillHeightGross + 2);
@@ -1145,6 +1147,8 @@ private slots:
             QVERIFY2(!l->isVisible(), "kompakt ohne Beschriftung");
         }
     }
+
+
 };
 
 QTEST_MAIN(TestCommandBar)

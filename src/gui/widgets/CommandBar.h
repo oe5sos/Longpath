@@ -244,6 +244,11 @@ public:
     static constexpr int kGrossAbBreite = 1700;
     /// Die aktuelle Stufe; von allen Pillen-Stilen gelesen.
     static bool grossAktiv();
+    /// Die feste Breite jeder Pille (Betreiber 2026-11-26): gleich für alle,
+    /// egal wie lang die Beschriftung ist. Für beide Stufen dieselbe, damit
+    /// eine Stufenänderung die Breite nicht verschiebt.
+    static int pillBreite();
+    static constexpr int kPillBreite = 60;
     static int pillHoehe();
     static int pillSchrift();
     static int pillPolster();
@@ -258,7 +263,10 @@ public:
     /// braucht 1261 Punkte; 1300 ist die Schwelle mit kleiner Reserve. Ist
     /// die Einzelzeile breiter (mehr Profile), gilt die gemessene Breite
     /// -- nie eine Zeile, die gestaucht werden muss.
-    static constexpr int kEinzeiligUnterBreite = 1300;
+    // Gemessen 2026-11-26 offscreen bei 60 Punkten Pillenbreite: die Einzelzeile
+    // braucht 1625 Punkte; mit Reserve 1640. Die Profilgruppe kommt dazu, die
+    // Schwelle nimmt sie über einzeiligMindestbreite() selbst auf.
+    static constexpr int kEinzeiligUnterBreite = 1640;
     /// Sichtbare Einträge je Gruppe, bevor das „…" übernimmt.
     static constexpr int kVisiblePerGroup = 3;
     /// Sichtbare Bänder vorne: vier (160 · 80 · 60 · 40), der Rest im „…".
