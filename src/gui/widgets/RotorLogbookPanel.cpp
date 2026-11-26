@@ -905,6 +905,35 @@ void RotorLogbookPanel::resizeEvent(QResizeEvent* ev)
     updateCompactness();
 }
 
+// ── Die Mindestgroesse (2026-11-26) ─────────────────────────────────
+//
+// Betreiber, 20:30, schwebendes Rotor/Log ueber die ganze Schirmhoehe:
+// „hat sich nun so groß gemacht, dass man es nicht mehr kleiner machen
+// kann, das darf nicht passieren."
+//
+// Die Zeilen werden nach der Hoehe abgeworfen, die das Feld BEKOMMT.
+// Haengt die Mindestgroesse aber an den gerade sichtbaren Zeilen, laeuft
+// es im Kreis: ein schwebendes Fenster wird auf die Mindestgroesse
+// seines Inhalts gezogen; sind (auch nur einen Takt lang, etwa nach dem
+// Wechsel zwischen schmal und breit) alle Zeilen auf, waechst das
+// Fenster auf ihre Summe, in der neuen Hoehe passen sie alle, und
+// kleiner ziehen laesst es sich nicht mehr -- die Groesse, die das
+// Abwerfen ausloesen wuerde, kommt nie an.
+//
+// Darum: was abgeworfen werden kann, zaehlt nicht zur Mindestgroesse.
+// Hoehe = Rand + Kompass; Breite hoechstens die des schmalen Felds mit
+// seinem 300 Punkte breiten Rotorband. Die Anordnung folgt der Groesse,
+// sie erzwingt keine.
+QSize RotorLogbookPanel::minimumSizeHint() const
+{
+    QSize s = QWidget::minimumSizeHint();
+    if (!m_aussen || !m_viewStack) { return s; }
+    const QMargins m = m_aussen->contentsMargins();
+    const int hoch  = m.top() + m.bottom() + m_viewStack->minimumSizeHint().height();
+    const int breit = m.left() + m.right() + RotorBandWidget::kBreite;
+    return {std::min(s.width(), breit), std::min(s.height(), hoch)};
+}
+
 // ── Breit gezogen (2026-11-26) ──────────────────────────────────────
 //
 // Betreiber: „wenn ich es in die breite ziehe sollte dort dann der rest,

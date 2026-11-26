@@ -42,6 +42,7 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QTableWidget>
+#include <QVBoxLayout>
 
 using namespace Longpath;
 
@@ -289,6 +290,49 @@ private slots:
         QTest::qWait(100);
         QCOMPARE(p->form(), RotorLogbookPanel::Form::Schmal);
         QVERIFY(!call->isVisibleTo(p));
+        QVERIFY2(abgeschnitten(*p).isEmpty(), qPrintable(abgeschnitten(*p)));
+    }
+
+    // Als schwebendes Fenster (2026-11-26, 20:30, am Geraet): „hat sich
+    // nun so groß gemacht, dass man es nicht mehr kleiner machen kann".
+    // Ein Fenster mit Layout wird auf die Mindestgroesse seines Inhalts
+    // gezogen -- sie darf nie an den gerade sichtbaren Zeilen haengen.
+    void schwebend_wieder_klein()
+    {
+        QrzClient qrz;
+        qrz.setCredentials(QStringLiteral("pruefstand"), QStringLiteral("pruefstand"));
+        QWidget fenster;                       // wie ToolWindow: Fenster + Layout
+        auto* lay = new QVBoxLayout(&fenster);
+        lay->setContentsMargins(0, 0, 0, 0);
+        // Wie im Programm: das Feld entsteht ohne Groesse (Qt: 640 x 480,
+        // also „breit") und kommt erst dann ins schmale Fenster.
+        auto* p = new RotorLogbookPanel(nullptr, &qrz, nullptr);
+        p->resize(640, 480);
+        lay->addWidget(p);
+        fenster.resize(330, 240);
+        fenster.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&fenster, kFensterFrist));
+        fuellen(*p);
+        QTest::qWait(250);
+        QCOMPARE(fenster.size(), QSize(330, 240));
+
+        // Breit, schmal und hoch, wieder klein -- jedes Mal muss das
+        // Fenster die Groesse annehmen, die es bekommt.
+        const QVector<QSize> zuege = {{740, 240}, {330, 240}, {330, 733},
+                                      {330, 240}, {1000, 300}, {330, 240}};
+        for (const QSize z : zuege) {
+            fenster.resize(z);
+            QTest::qWait(150);
+            QVERIFY2(fenster.size() == z, qPrintable(QStringLiteral("gezogen auf %1x%2, steht bei %3x%4")
+                .arg(z.width()).arg(z.height()).arg(fenster.width()).arg(fenster.height())));
+            // Die Mindestgroesse: nie mehr als Rand + Kompass hoch und
+            // das schmale Feld breit -- egal, was gerade zu sehen ist.
+            const QSize min = fenster.minimumSizeHint();
+            QVERIFY2(min.height() <= 8 + 8 + p->dial()->parentWidget()->minimumSizeHint().height()
+                         && min.width() <= 20 + 300,
+                     qPrintable(QStringLiteral("Mindestgroesse %1x%2 nach %3x%4")
+                .arg(min.width()).arg(min.height()).arg(z.width()).arg(z.height())));
+        }
         QVERIFY2(abgeschnitten(*p).isEmpty(), qPrintable(abgeschnitten(*p)));
     }
 
