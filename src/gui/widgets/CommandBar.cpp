@@ -44,6 +44,8 @@ namespace Longpath {
 /// Theme-Datei sie erreicht. Oeffentlich, weil die untere Leiste
 /// dieselbe Optik traegt.
 namespace {
+// Ein Abstand für alle: zwischen Pillen, zwischen Zeilen und zwischen Bereichen.
+constexpr int kAbstand = 5;
 // Pillen je Zeile in der Bandgruppe (zwei Zeilen zu vier).
 constexpr int kPillsProZeile = 4;
 /// Die Stufe der Leiste. Statisch, weil die Stilblätter (auch die der
@@ -151,12 +153,12 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     auto* row = new QHBoxLayout;
     // Der Abstand ZWISCHEN den Gruppen ist das, was sie zu Gruppen
     // macht. Fünf Pixel innerhalb, zweiundzwanzig dazwischen.
-    row->setSpacing(22);
+    row->setSpacing(kAbstand);
     zeilen->addLayout(row);
     m_row = row;
 
     m_rowZwei = new QHBoxLayout;
-    m_rowZwei->setSpacing(22);
+    m_rowZwei->setSpacing(kAbstand);
     zeilen->addLayout(m_rowZwei);
 
     // ── BAND zuerst ─────────────────────────────────────────────────
@@ -283,8 +285,9 @@ void CommandBar::ordneZeilen(bool zwei)
         letzte->addWidget(w, 0, Qt::AlignBottom);
     }
 
-    verteileZeile(m_row, !zwei);
-    verteileZeile(m_rowZwei, !zwei);
+    // Keine Verteilung des Restplatzes auf die Lücken: alle Abstände gleich.
+    verteileZeile(m_row, false);
+    verteileZeile(m_rowZwei, false);
 
     // Die Mindestbreite ist IMMER die der zweizeiligen Aufteilung: nur so
     // kann das Fenster unter die Einzelzeile schrumpfen, und resizeEvent
@@ -481,7 +484,11 @@ void CommandBar::setzeGrossModus(bool gross)
     // Angehängtes Plus und Bauteile in den Gruppen folgen der Pillenhöhe.
     const int aussen = pillHoehe() + 2;
     for (QWidget* w : m_nachStellen) { w->setFixedSize(aussen, aussen); }
-    for (QWidget* w : m_gruppenWidgets.keys()) { w->setFixedHeight(aussen); }
+    // Die Profilschiene hat zwei Zeilen und behält ihre eigene Höhe.
+    for (QWidget* w : m_gruppenWidgets.keys()) {
+        if (qobject_cast<ProfileRail*>(w)) { continue; }
+        w->setFixedHeight(aussen);
+    }
     applyRateStyle(m_rateWarn);
     // Das Plus der Profilschiene trägt seine Höhe im eigenen Stilblatt.
     for (ProfileRail* r : findChildren<ProfileRail*>()) { r->stufeGewechselt(); }
@@ -542,7 +549,7 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
 {
     auto* box = new QVBoxLayout;
     box->setContentsMargins(0, 0, 0, 0);
-    box->setSpacing(3);
+    box->setSpacing(kAbstand);
     QLabel* versal = captionLabel(caption, this);
     versal->setVisible(false);
     box->addWidget(versal, 0, Qt::AlignLeft);

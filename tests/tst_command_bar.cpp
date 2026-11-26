@@ -105,8 +105,9 @@ private slots:
         int luecken = 0;
         for (int i = 0; i + 1 < kaesten.size(); ++i) {
             // Nur die Luecke absuchen, nicht die Gruppen selbst.
-            const int von  = zuBild(kaesten.at(i).right() + 2);
-            const int bis  = zuBild(kaesten.at(i + 1).left() - 2);
+            // Gleiche Abstände (Betreiber 2026-11-26): die Luecke ist 5 px breit.
+            const int von  = zuBild(kaesten.at(i).right() + 1);
+            const int bis  = zuBild(kaesten.at(i + 1).left() - 1);
             if (von > bis) { continue; }        // kein Platz, kein Strich
             ++luecken;
             const int mitteY = zuBild(kaesten.at(i).center().y());
@@ -175,8 +176,11 @@ private slots:
     /// dahinter haengt. Nur so verteilt Qt den Platz gleichmaessig,
     /// statt alles links zusammenzuschieben und rechts 168 Pixel tot
     /// stehen zu lassen.
-    void dieGruppenVerteilenSichUeberDieBreite()
+    void dieGruppenStehenOhneDehnung()
     {
+        // Betreiber 2026-11-26: alle Abstände gleich. Zwischen den Gruppen steht
+        // keine Dehnung, die den Restplatz auf die Lücken verteilt; nur vor dem
+        // angehängten Plus darf eine stehen, damit es an den rechten Rand kommt.
         CommandBar bar;
         auto* plus = new QPushButton(QStringLiteral("+"), &bar);
         bar.addTrailing(plus);
@@ -184,25 +188,14 @@ private slots:
         QVERIFY(row);
 
         int kaesten = 0, dehnungen = 0;
-        bool letzterKastenHatDehnung = false;
         for (int i = 0; i < row->count(); ++i) {
             QLayoutItem* it = row->itemAt(i);
             if (!it) { continue; }
-            if (it->layout()) {
-                ++kaesten;
-                QLayoutItem* next = (i + 1 < row->count()) ? row->itemAt(i + 1) : nullptr;
-                letzterKastenHatDehnung = next && next->spacerItem();
-                QVERIFY2(letzterKastenHatDehnung,
-                         "hinter jeder Gruppe muss eine Dehnung stehen");
-            } else if (it->spacerItem()) { ++dehnungen; }
+            if (it->layout()) { ++kaesten; }
+            else if (it->spacerItem()) { ++dehnungen; }
         }
         QVERIFY2(kaesten >= 6, "zu wenige Gruppen gefunden");
-        // Eine je Gruppe -- auch hinter der letzten, denn dahinter
-        // haengt das Plus und soll an den rechten Rand.
-        QCOMPARE(dehnungen, kaesten);
-        QVERIFY2(letzterKastenHatDehnung,
-                 "auch hinter der letzten Gruppe muss eine stehen, sonst "
-                 "klebt das Plus an der Rate statt am rechten Rand");
+        QVERIFY2(dehnungen <= 1, "zwischen den Gruppen darf keine Dehnung stehen");
     }
 
     /// D — ohne Funkgeraet traegt eine leere Gruppe den leisen Stil,
