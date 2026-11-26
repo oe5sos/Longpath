@@ -49,6 +49,7 @@
 #include "core/FlexRadioConnection.h"
 #include "core/FlexRadioDiscovery.h"
 #include "models/RadioModel.h"
+#include "gui/SpectrumWidget.h"
 
 using namespace Longpath;
 
@@ -1462,6 +1463,75 @@ private slots:
         conn.ingestLineForTesting(QStringLiteral("R%1|0|").arg(seq));
         QTest::qWait(100);
         QCOMPARE(laeufe, 1);
+    }
+
+    // ── Das Tempo des Wasserfalls geht an die Maschine (2026-11-26) ─────
+    //
+    // Betreiber an der FLEX-8400: „geschwindigkeit im panadapter aendert
+    // sich nicht!" Beim Einrichten ging fest `line_duration=100`, danach
+    // nichts. An der Flex kommen die Zeilen im Takt der Maschine.
+    void tempoStufenSindAnDerFlexVerschieden()
+    {
+        using FlexCommandWire::flexLineDurationForMsPerRow;
+        const int fast  = flexLineDurationForMsPerRow(30);
+        const int norm  = flexLineDurationForMsPerRow(60);
+        const int slow  = flexLineDurationForMsPerRow(120);
+        const int vslow = flexLineDurationForMsPerRow(250);
+        // line_duration ist eine RATE: gross = schnell.
+        QVERIFY(fast > norm && norm > slow && slow > vslow);
+        QCOMPARE(fast, 100);
+        QCOMPARE(FlexCommandWire::setWaterfallLineDurationCommand(
+                     QStringLiteral("0x42000000"), slow),
+                 QStringLiteral("display panafall set 0x42000000 line_duration=%1").arg(slow));
+        QVERIFY(FlexCommandWire::setWaterfallLineDurationCommand(QString(), 50).isEmpty());
+    }
+
+    void wasserfallTempoGehtBeimVerbindenUndAendernHinaus()
+    {
+        FalscheMaschine radio;
+        QVERIFY(radio.hoeren());
+        radio.antworten.insert(QStringLiteral("client program"),
+                               QStringLiteral("10000002|unknown client program Longpath"));
+        radio.antworten.insert(QStringLiteral("client gui"),
+                               QStringLiteral("0|11112222-3333-4444-5555-666677778888"));
+        radio.vorschub.insert(QStringLiteral("client gui"), {
+            QStringLiteral("S5081495E|display pan 0x40000000 center=14.074000 "
+                           "bandwidth=0.200000 waterfall=0x42000000"),
+            QStringLiteral("S5081495E|slice 0 in_use=1 RF_frequency=14.074000 mode=DIGU tx=1 "
+                           "audio_level=50 audio_mute=0 client_handle=0x5081495E")});
+        radio.antworten.insert(QStringLiteral("slice list"), QStringLiteral("0|0"));
+        radio.antworten.insert(QStringLiteral("stream create"), QStringLiteral("0|4000008"));
+
+        // Der Panadapter mit dem gespeicherten Tempo (Slow), VOR dem
+        // Verbinden -- wie beim Start.
+        SpectrumWidget sw;
+        sw.setWfUpdatePeriodMs(120);
+        RadioModel model;
+        model.setSpectrumWidget(&sw);
+        QCOMPARE(model.flexWaterfallPeriodMs(), 120);
+
+        RadioInfo info;
+        info.protocol   = ProtocolVersion::Flex;
+        info.boardType  = HPSDRHW::Flex8400;
+        info.name       = QStringLiteral("FLEX-8400 (Pruefstand)");
+        info.macAddress = QStringLiteral("00:1C:2D:05:34:28");
+        info.address    = QHostAddress(QHostAddress::LocalHost);
+        info.port       = radio.port();
+        model.connectToRadio(info);
+
+        const int slow = FlexCommandWire::flexLineDurationForMsPerRow(120);
+        const QString einrichten = QStringLiteral(
+            "display panafall set 0x42000000 auto_black=0 black_level=0 color_gain=50 "
+            "line_duration=%1").arg(slow);
+        QTRY_VERIFY2_WITH_TIMEOUT(radio.empfangeneBefehle.contains(einrichten),
+                                  qPrintable(radio.empfangeneBefehle.join('\n')), 8000);
+
+        // Aendern (Zahnrad, Rechtsklick oder Setup) -> sofort an die Maschine.
+        sw.setWfUpdatePeriodMs(250);
+        const QString aendern = QStringLiteral("display panafall set 0x42000000 line_duration=%1")
+                                    .arg(FlexCommandWire::flexLineDurationForMsPerRow(250));
+        QTRY_VERIFY2_WITH_TIMEOUT(radio.empfangeneBefehle.contains(aendern),
+                                  qPrintable(radio.empfangeneBefehle.join('\n')), 5000);
     }
 };
 

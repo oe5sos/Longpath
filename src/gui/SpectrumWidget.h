@@ -2176,6 +2176,9 @@ public:
     }
 
 signals:
+    /// Das Tempo des Wasserfalls hat sich geaendert (ms je Zeile) -- auch
+    /// beim Laden. An der Flex geht es als line_duration an die Maschine.
+    void wfUpdatePeriodChanged(int ms);
     /// Die Darstellungsart hat gewechselt (2D/3D).
     ///
     /// Es gab dafuer kein Signal: wer die Art von auszen umstellt —
