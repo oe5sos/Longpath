@@ -118,6 +118,17 @@ SPOT_VORRAT = [
     (  6400, 'OE5SOS', 'SSB',  'POTA',      60),
     ( 21000, 'IK4EEE', 'FT8',  'CLUSTER',  600),
     (120000, 'WEITWEG','CW',   'CLUSTER',   10),   # ausserhalb jeder Spanne
+    # Funde von Longpaths eigenem FT8-Dekoder (Quelle „Longpath", Modus aus
+    # dem Kommentar), so wie RadioModel::onNativeFt8Decode sie ablegt: im
+    # Audio-Durchlass ueber der Dial-Frequenz, hoechstens 120 s alt.
+    (   412, 'EA7KLM', 'FT8',  'LONGPATH',   4),
+    (   870, 'DL3XYZ', 'FT8',  'LONGPATH',   4),
+    (  1235, 'JA1QRS', 'FT8',  'LONGPATH',  19),
+    (  1590, 'OK1ABC', 'FT8',  'LONGPATH',  19),
+    (  1960, 'W1AW',   'FT8',  'LONGPATH',  34),
+    (  2330, 'SP9TUV', 'FT8',  'LONGPATH',  49),
+    (  2710, 'G4LMN',  'FT8',  'LONGPATH',  79),
+    (   640, 'HB9DEF', 'FT8',  'LONGPATH', 109),
 ]
 
 INIT_BURST = [

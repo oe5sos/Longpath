@@ -10,7 +10,7 @@ import { TciLink, Fft, feld } from './tci.js';
 import { Mikrofon, mikrofonMoeglich } from './mikrofon.js';
 import { Sammelstelle, zeileLesen, befundLesen, zeitKurz, dupeSatz }
   from './logbuch.js';
-import { spotLesen, marken, trefferBei, trefferAufSchrift } from './spots.js';
+import { ft8Liste, alterText, spotLesen, marken, trefferBei, trefferAufSchrift } from './spots.js';
 import { Sendetasten, SENDEN, TUNE, ablehnText } from './sendetaste.js';
 import { Zeichenbremse } from './ton-vorrang.js';
 import { bildIstAlt } from './aufwachen.js';
@@ -1245,6 +1245,8 @@ function zeichneBild() {
       const hoch = Math.ceil(mass.actualBoundingBoxAscent || 7);
       const ersteZeile = hoch + 2;         // zwei Punkte Luft zum Rand
       for (const m of spotMarken) {
+        // Die hervorgehobene Station zeichnet der Block danach, oben auf.
+        if (ft8MarkiertIst(m.ruf)) { continue; }
         const unterDemRegler = (m.x + 27) > sperrVonX;
         const oben = unterDemRegler ? sperrBisY + ersteZeile : ersteZeile;
         const y = oben + m.reihe * 11;       // Schriftgrundlinie
@@ -1272,6 +1274,37 @@ function zeichneBild() {
       }
       panCtx.globalAlpha = 1;
       panCtx.textAlign = 'left';
+    }
+    // ── Aus der FT8-Liste angetippt (2026-11-26) ───────────────────────
+    // Im Gedraenge um die Dial-Frequenz bekommt nicht jede Station eine
+    // Beschriftung (marken: hoechstens drei Reihen). Die angetippte muss man
+    // aber finden -- also eigene Marke, erste Reihe, ueber allen anderen.
+    const gesucht = ft8Markiert && performance.now() < ft8Markiert.bis
+      ? spotZeilen.find((z) => z.ruf === ft8Markiert.ruf) : null;
+    const spanneH = bildSpanneHz(192000);
+    if (gesucht && mitteSpot && spanneH > 0) {
+      const anteil = (gesucht.hz - mitteSpot) / spanneH + 0.5;
+      if (anteil >= 0 && anteil <= 1) {
+        const x = anteil * W;
+        panCtx.font = '600 10px ui-monospace,Menlo,monospace';
+        panCtx.textAlign = 'center';
+        const hoch = Math.ceil(panCtx.measureText('OE5SOS').actualBoundingBoxAscent || 7);
+        const y = hoch + 3;
+        const b = panCtx.measureText(gesucht.ruf).width + 8;
+        const lx = Math.max(b / 2, Math.min(W - b / 2, x));
+        panCtx.globalAlpha = 1;
+        panCtx.strokeStyle = '#f0a82c';
+        panCtx.lineWidth = 2;
+        panCtx.beginPath();
+        panCtx.moveTo(x, y + 2);
+        panCtx.lineTo(x, H);
+        panCtx.stroke();
+        panCtx.fillStyle = '#f0a82c';
+        panCtx.fillRect(lx - b / 2, y - hoch - 2, b, hoch + 5);
+        panCtx.fillStyle = '#1a1205';
+        panCtx.fillText(gesucht.ruf, lx, y);
+        panCtx.textAlign = 'left';
+      }
     }
   }
 
@@ -2116,6 +2149,60 @@ link.addEventListener('spotsende', (e) => {
 });
 
 setInterval(() => { if (link.ready) { spotsHolen(); } }, kSpotTakt);
+
+// ── FT8-Liste (2026-11-26) ──────────────────────────────────────────────────
+//
+// Dieselben Spotzeilen wie die Marken, gefiltert auf Longpaths eigene FT8/FT4-
+// Funde (spots.js: ft8Liste). Kein eigener Abruf: eine zweite Abfrage waere
+// eine zweite Wahrheit ueber dasselbe Band. Das Alter laeuft zwischen zwei
+// Abrufen sekundengenau weiter, damit die Liste nicht in 12-s-Spruengen altert.
+//
+// Antippen hebt die Station im Panadapter hervor (20 s). Es stimmt NICHT ab
+// und sendet nichts -- anrufen hiesse senden, und Senden bleibt gesperrt.
+let ft8Abruf = 0;                 // wann die Liste zuletzt ankam
+let ft8Markiert = null;           // { ruf, bis }
+const kFt8Hervor = 20000;
+function ft8MarkiertIst(ruf) {
+  return !!(ft8Markiert && ft8Markiert.ruf === ruf && performance.now() < ft8Markiert.bis);
+}
+const ft8Offen = () => { try { return localStorage.getItem('handfunke.ft8offen') === '1'; } catch (e) { return false; } };
+$('ft8Kopf').addEventListener('click', () => {
+  const offen = !$('ft8Feld').classList.contains('offen');
+  try { localStorage.setItem('handfunke.ft8offen', offen ? '1' : '0'); } catch (e) {}
+  zeichneFt8();
+});
+$('ft8Liste').addEventListener('click', (e) => {
+  const z = e.target.closest('.ft8Z');
+  if (!z) { return; }
+  ft8Markiert = ft8MarkiertIst(z.dataset.ruf) ? null
+    : { ruf: z.dataset.ruf, bis: performance.now() + kFt8Hervor };
+  zeichneFt8();
+});
+const dfText = (df) => df === null ? '—'
+  : (df > 0 ? '+' : df < 0 ? '\u2212' : '\u00b1') + Math.abs(df) + ' Hz';
+function zeichneFt8() {
+  const dial = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : 0;
+  const nachlauf = ft8Abruf ? (performance.now() - ft8Abruf) / 1000 : 0;
+  const liste = ft8Liste(spotZeilen, dial);
+  const feld = $('ft8Feld');
+  feld.hidden = liste.length === 0;
+  if (!liste.length) { return; }
+  const offen = ft8Offen();
+  feld.classList.toggle('offen', offen);
+  $('ft8Chev').textContent = offen ? '▾' : '▸';
+  const anzahl = liste.length + (liste.length === 1 ? ' Station' : ' Stationen');
+  if ($('ft8Anzahl').textContent !== anzahl) { $('ft8Anzahl').textContent = anzahl; }
+  const neu = liste.slice(0, 3).map((x) => x.ruf).join('  ');
+  if ($('ft8Neu').textContent !== neu) { $('ft8Neu').textContent = neu; }
+  const html = liste.map((x) =>
+    `<div class="ft8Z${ft8MarkiertIst(x.ruf) ? ' an' : ''}" role="listitem" data-ruf="${x.ruf}">` +
+    `<b>${x.ruf}</b><span class="ft8M">${x.mode}</span>` +
+    `<span class="ft8Df">${dfText(x.df)}</span>` +
+    `<span class="ft8A">${alterText(x.alterSek + nachlauf)}</span></div>`).join('');
+  if ($('ft8Liste').innerHTML !== html) { $('ft8Liste').innerHTML = html; }
+}
+link.addEventListener('spotsende', () => { ft8Abruf = performance.now(); zeichneFt8(); });
+setInterval(zeichneFt8, 1000);
 
 // ── QSO eintragen (Entwurf A, Betreiber 2026-10-04) ───────────────────────
 //

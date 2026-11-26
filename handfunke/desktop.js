@@ -54,6 +54,8 @@ export function desktopStarten({ link, $, schrittHz, logHolen }) {
     logZeilen = log.querySelector('#dtLogZeilen');
     hin($('instrumente'), links);
     links.append(log);
+    // FT8-Liste unter dem Log, am Desktop immer aufgeklappt (stil.css).
+    hin($('ft8Feld'), links);
     hin($('logAuf'), log.querySelector('.dtLogKopf'));
 
     hin(document.querySelector('.scope'), mitte);

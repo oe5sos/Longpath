@@ -182,6 +182,16 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 </div>
 </div>
 
+<!-- FT8-Liste (2026-11-26): was Longpaths eigener Dekoder gehoert hat, aus
+     derselben `spots:`-Abfrage wie die Marken im Bild (Quelle „Longpath",
+     Modus FT8/FT4). Unsichtbar, solange es keinen Fund gibt. Antippen hebt
+     die Station im Panadapter hervor -- es stimmt NICHT ab und sendet nichts.
+     Am Desktop steht das Feld links unter dem Log (desktop.js). -->
+<div class="feld schicht" id="ft8Feld" hidden>
+  <div class="caps ft8Kopf" id="ft8Kopf"><span>FT8</span><b id="ft8Anzahl"></b><span class="ft8Neu" id="ft8Neu"></span><span class="chev" id="ft8Chev">▸</span></div>
+  <div class="ft8Liste" id="ft8Liste" role="list"></div>
+</div>
+
 <!-- Betriebsart und Band gehoeren zusammen (was hoere ich, und wo) — darum
      ein Panel. app.js fuellt unveraendert #modes und #bands. -->
 <div class="feld schicht">
