@@ -7376,12 +7376,32 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
     // Gehaltenes Empfangsbild: die Kachel der Flex zeigt jetzt das eigene
     // Sendesignal, nicht den Empfang.
     if (haeltEmpfangsbild()) { return; }
-    ++m_wfZeilenGeschrieben;
 
     const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
     m_fremdeWasserfallquelle    = true;
     m_fremdeWasserfallZuletztMs = jetzt;
-    m_wfLastPushMs              = jetzt;
+
+    // ── Bildlaufregler auch fuer die Kachelzeilen (2026-11-26) ──────
+    //
+    // Der Regler im ⚙-Menü („Waterfall speed") setzte nur den Zeitgeber
+    // der FFT-Seite. Liefert die Maschine eigene Zeilen, schrieb sie
+    // ungedrosselt in ihrem Takt, und der Regler blieb wirkungslos.
+    // Hier wird auf dasselbe Intervall gedrosselt: eine Zeile, die
+    // früher als m_wfUpdatePeriodMs nach der letzten angenommenen
+    // kommt, wird verworfen. Die Mittelung unten rechnet nur mit den
+    // angenommenen Zeilen; ihr dt bleibt damit ehrlich.
+    //
+    // Toleranz 10 ms: die Maschine liefert bei line_duration=100 rund
+    // 25 Zeilen je Sekunde (~40 ms). Der Standardwert 30 ms verwirft
+    // dadurch nichts, das Standardbild bleibt also gleich.
+    static constexpr int kFremdeWfToleranzMs = 10;
+    if (jetzt - m_fremdeWfLetzteZeileMs
+            < m_wfUpdatePeriodMs - kFremdeWfToleranzMs) {
+        return;
+    }
+    m_fremdeWfLetzteZeileMs = jetzt;
+    ++m_wfZeilenGeschrieben;
+    m_wfLastPushMs = jetzt;
 
     // ── Zeitliche Mittelung (2026-10-23) ────────────────────────────
     //
