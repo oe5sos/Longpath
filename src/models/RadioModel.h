@@ -1043,6 +1043,9 @@ public:
     // Panadapter management (client-side)
     QList<PanadapterModel*> panadapters() const { return m_panadapters; }
     int addPanadapter();
+    /// Sendeantennen, die das Gerät führt (aus dem APD-Zustand). Leer, solange
+    /// noch keine Antwort da ist.
+    QStringList flexSendeantennen() const { return m_flexApd.sendeantennen(); }
     void removePanadapter(int index);
 
     // View hooks: non-owning pointers to the primary spectrum widget and

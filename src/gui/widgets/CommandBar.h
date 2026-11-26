@@ -111,6 +111,9 @@ signals:
     void digimodusGewaehlt();
 
 public:
+    /// ANT3 und ANT4 nur, wenn das Gerät sie führt. Ist die Liste leer
+    /// (noch keine Antwort), bleibt alles an.
+    void setAntennenVerfuegbar(const QStringList& antennen);
     /// Pruef-Naht (2026-10-28): dieselbe Stelle, die das
     /// Ueberlaufmenue benutzt. Noetig, weil DIGU/DIGL nicht unter den
     /// drei sichtbaren Pillen sind und `QMenu::exec()` einen Lauf auf

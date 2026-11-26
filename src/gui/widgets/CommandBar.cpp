@@ -882,6 +882,20 @@ void CommandBar::buildDigiGroup(QHBoxLayout* row)
     g.row = zeile;
 }
 
+void CommandBar::setAntennenVerfuegbar(const QStringList& antennen)
+{
+    Group* g = group(QStringLiteral("Ant"));
+    if (!g) { return; }
+    for (QPushButton* b : g->pills) {
+        if (!b) { continue; }
+        const QString name = b->text();
+        if (name != QStringLiteral("ANT3") && name != QStringLiteral("ANT4")) { continue; }
+        const bool da = antennen.isEmpty() || antennen.contains(name);
+        b->setEnabled(da);
+        b->setToolTip(da ? QString() : tr("Dieses Gerät führt %1 nicht").arg(name));
+    }
+}
+
 void CommandBar::buildAntennaGroup(QHBoxLayout* row)
 {
     // Betreiber am 2026-11-24: ANT1 · ANT2 · ANT3 · ANT4 an der Stelle,

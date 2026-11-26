@@ -7970,6 +7970,14 @@ void MainWindow::buildUI()
         if (rxCh) { m_meterPoller->setRxChannel(rxCh); }
     });
 
+    // ANT3/ANT4 nur, wenn das Gerät sie führt (2026-11-26).
+    if (m_radioModel && m_commandBar) {
+        connect(m_radioModel, &RadioModel::flexApdGeaendert, this, [this]() {
+            m_commandBar->setAntennenVerfuegbar(m_radioModel->flexSendeantennen());
+        });
+        m_commandBar->setAntennenVerfuegbar(m_radioModel->flexSendeantennen());
+    }
+
     // Und einmal jetzt, für den Zustand beim Start: das Signal oben
     // feuert erst beim ersten Wechsel, und bis dahin stünde die Leiste
     // auf ihrem Vorgabewert statt auf dem, was das Gerät tut.
