@@ -51,6 +51,8 @@
 #include <QWidget>
 
 class QBoxLayout;
+class QGridLayout;
+class QLayout;
 class QPushButton;
 
 namespace Longpath {
@@ -83,6 +85,10 @@ public:
 
     /// Abzeichen neu aufbauen. Wird auf profilesChanged() gerufen.
     void rebuild();
+    /// Die Stufe der Befehlsleiste hat gewechselt: das Plus neu stylen.
+    void stufeGewechselt();
+    /// Stilblatt des gestrichelten Plus in der Leiste.
+    static QString plusStilLeiste();
 
     // ── Für Tests ────────────────────────────────────────────────────
 
@@ -138,6 +144,9 @@ signals:
 
     void newProfileRequested();
     void renameRequested(const QString& name);
+    /// Das Kürzel der Pille (höchstens drei Zeichen). Den Text erfragt
+    /// der Empfänger, wie beim Umbenennen.
+    void kuerzelRequested(const QString& name);
     void duplicateRequested(const QString& name);
     void removeRequested(const QString& name);
     /// Betreiber 2026-08-28: "vielleicht sollte es ein profil speichern
@@ -184,6 +193,7 @@ private:
         QAction* ft4{nullptr};
         QAction* ft2{nullptr};
         QAction* ren{nullptr};
+        QAction* kuerzel{nullptr};
         QAction* dup{nullptr};
         QAction* del{nullptr};
         QAction* verschieben{nullptr};
@@ -219,6 +229,12 @@ protected:
 
 private:
     void meldeAusloeser(const QString& name);
+    /// Das „…“ öffnet alle Profile in einem Menü (waagrecht, ab vier Profilen).
+    void zeigeAlleProfile();
+    QPushButton* m_mehr{nullptr};
+    /// Ein Abzeichen (oder das Plus) an seinen Platz setzen. Senkrecht
+    /// untereinander, waagrecht in zwei Zeilen zu vier wie BAND.
+    void platziere(QWidget* w, int index);
     QElapsedTimer m_druckUhr;
     QString m_letzteEingabe;      ///< wovon der naechste Klick kommt
     QString m_letzterAusloeser;   ///< was zuletzt im Log stand
@@ -246,7 +262,9 @@ private:
     /// fest sein, sonst schneidet der geerbte Innenabstand die Schrift ab.
     void setzeMasse(QPushButton* b) const;
 
-    QBoxLayout*  m_column{nullptr};   // VBox oder HBox, je nach Richtung
+    QBoxLayout*  m_column{nullptr};   // senkrecht: VBox, sonst nullptr
+    QGridLayout* m_grid{nullptr};     // waagrecht: zwei Zeilen, wie BAND
+    QLayout*     m_rail{nullptr};     // das, was gerade gilt (fuer Entfernen)
     Qt::Orientation m_richtung{Qt::Vertical};
     QPushButton* m_plus{nullptr};
     QHash<QString, QPushButton*> m_badges;

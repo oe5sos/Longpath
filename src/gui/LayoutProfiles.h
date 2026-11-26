@@ -95,6 +95,13 @@ public:
     QString current() const { return m_current; }
     bool exists(const QString& name) const;
 
+    /// Das Kürzel auf der Pille der Profilschiene, höchstens drei
+    /// Zeichen. Leer heißt: die Pille zeigt den ersten Buchstaben des
+    /// Namens, wie bisher.
+    QString kuerzel(const QString& name) const;
+    /// Setzt das Kürzel; Text über drei Zeichen wird abgeschnitten.
+    bool setKuerzel(const QString& name, const QString& text);
+
     /// Neues Profil aus dem AKTUELLEN Zustand — „Speichern unter".
     /// Sichert vorher das laufende Fenster ins bisher aktive Profil und
     /// wechselt danach in das neue. Scheitert bei leerem oder schon
@@ -304,6 +311,7 @@ private:
         QSet<int> bands;
         QSet<int> modes;
         QSet<int> digis;
+        QString kuerzel;   // höchstens 3 Zeichen, leer = erster Buchstabe
     };
 
     /// Der gemeinsame Weg hinter create() und createWith(). Ohne

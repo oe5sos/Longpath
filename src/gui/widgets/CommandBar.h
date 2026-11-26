@@ -244,6 +244,11 @@ public:
     static constexpr int kGrossAbBreite = 1700;
     /// Die aktuelle Stufe; von allen Pillen-Stilen gelesen.
     static bool grossAktiv();
+    /// Die feste Breite jeder Pille (Betreiber 2026-11-26): gleich für alle,
+    /// egal wie lang die Beschriftung ist. Für beide Stufen dieselbe, damit
+    /// eine Stufenänderung die Breite nicht verschiebt.
+    static int pillBreite();
+    static constexpr int kPillBreite = 68;
     static int pillHoehe();
     static int pillSchrift();
     static int pillPolster();
@@ -258,12 +263,15 @@ public:
     /// braucht 1261 Punkte; 1300 ist die Schwelle mit kleiner Reserve. Ist
     /// die Einzelzeile breiter (mehr Profile), gilt die gemessene Breite
     /// -- nie eine Zeile, die gestaucht werden muss.
-    static constexpr int kEinzeiligUnterBreite = 1300;
+    // Gemessen 2026-11-26 offscreen bei 60 Punkten Pillenbreite: die Einzelzeile
+    // braucht 1625 Punkte; mit Reserve 1640. Die Profilgruppe kommt dazu, die
+    // Schwelle nimmt sie über einzeiligMindestbreite() selbst auf.
+    static constexpr int kEinzeiligUnterBreite = 1000;
     /// Sichtbare Einträge je Gruppe, bevor das „…" übernimmt.
     static constexpr int kVisiblePerGroup = 3;
     /// Sichtbare Bänder vorne: vier (160 · 80 · 60 · 40), der Rest im „…".
     // Acht Baender vorne, in zwei Zeilen zu vier (Betreiber 2026-11-21).
-    static constexpr int kVisibleBand = 8;
+    static constexpr int kVisibleBand = 5;
 
     /// Die Gruppen je Zeile (oben, unten) in Reihenfolge. Die untere
     /// Zeile ist leer, solange die Leiste einzeilig steht.
@@ -319,6 +327,8 @@ private:
         /// Der Kasten, in dem Versalzeile und Pillen stehen. Gemerkt, damit
         /// die Zeilen-Verteilung die Gruppe beim Namen findet.
         QLayout* box{nullptr};
+        /// Spalten je Zeile dieser Gruppe (Betreiber 2026-11-26: meist zwei, die Bänder drei).
+        int spalten{2};
         // Zweite Pillenzeile, nur die Bandgruppe: ab der fuenften Pille.
         QHBoxLayout* row2{nullptr};
     };

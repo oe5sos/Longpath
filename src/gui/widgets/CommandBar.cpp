@@ -21,6 +21,7 @@
 #include "gui/ScopedChildWidget.h"
 #include "gui/StyleConstants.h"
 #include "gui/widgets/DspQuickPopups.h"
+#include "gui/widgets/ProfileRail.h"
 #include "core/AppSettings.h"
 #include "models/FilterPresetStore.h"
 #include "models/SliceModel.h"
@@ -43,8 +44,11 @@ namespace Longpath {
 /// Theme-Datei sie erreicht. Oeffentlich, weil die untere Leiste
 /// dieselbe Optik traegt.
 namespace {
+// Ein Abstand für alle: zwischen Pillen, zwischen Zeilen und zwischen Bereichen.
+constexpr int kAbstand = 5;
+// Abstand zwischen zwei Bereichen; der Trennstrich liegt in der Mitte.
+constexpr int kAbstandZwischenBereichen = 14;
 // Pillen je Zeile in der Bandgruppe (zwei Zeilen zu vier).
-constexpr int kPillsProZeile = 4;
 /// Die Stufe der Leiste. Statisch, weil die Stilblätter (auch die der
 /// Profilschiene) sie ohne Leiste erreichen müssen.
 bool s_gross = false;
@@ -70,6 +74,7 @@ QLabel* captionLabel(const QString& text, QWidget* parent)
 bool CommandBar::grossAktiv() { return s_gross; }
 int CommandBar::pillHoehe() { return s_gross ? kPillHeightGross : kPillHeight; }
 int CommandBar::pillSchrift() { return s_gross ? kPillFontGross : kPillFontPx; }
+int CommandBar::pillBreite() { return kPillBreite; }
 int CommandBar::pillPolster() { return s_gross ? kPillPadGross : kPillPadX; }
 
 QString CommandBar::pillStyle()
@@ -121,6 +126,9 @@ QString CommandBar::pillStyle()
 CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
 {
     setAttribute(Qt::WA_StyledBackground, true);
+    // Die Leiste wächst nicht in die Höhe: sonst verteilt das Layout den
+    // Platz auf die Zeilen, und der Abstand zwischen ihnen wird groß.
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
     // Leichtes Rendering (2026-09-26): dieselbe Platte wie die Panels
     // (Verlauf) und oben die Lichtkante aus HAUSSTIL.md "Weiche
     // Uebergaenge" -- vorher flach kPanelBg.
@@ -136,7 +144,8 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     // Breite, nach dem festen Umbruch vor „Filter" (siehe ordneZeilen).
     auto* zeilen = new QVBoxLayout(this);
     zeilen->setContentsMargins(13, 6, 13, 6);
-    zeilen->setSpacing(4);
+    // Zwischen den Zeilen 5 px (2026-11-26, Betreiber: „da reichen 5 px", bei allen Pillen).
+    zeilen->setSpacing(5);
     // Kein automatischer Mindestwert des Layouts: der wäre immer die
     // Einzelzeile und ließe die Leiste nie in zwei Zeilen fallen. Die
     // Mindestgröße setzt ordneZeilen() je nach Aufteilung selbst.
@@ -145,12 +154,13 @@ CommandBar::CommandBar(QWidget* parent) : QWidget(parent)
     auto* row = new QHBoxLayout;
     // Der Abstand ZWISCHEN den Gruppen ist das, was sie zu Gruppen
     // macht. Fünf Pixel innerhalb, zweiundzwanzig dazwischen.
-    row->setSpacing(22);
+    // Zwischen den Bereichen mehr Abstand, damit der Strich frei steht.
+    row->setSpacing(kAbstandZwischenBereichen);
     zeilen->addLayout(row);
     m_row = row;
 
     m_rowZwei = new QHBoxLayout;
-    m_rowZwei->setSpacing(22);
+    m_rowZwei->setSpacing(kAbstandZwischenBereichen);
     zeilen->addLayout(m_rowZwei);
 
     // ── BAND zuerst ─────────────────────────────────────────────────
@@ -211,7 +221,9 @@ void CommandBar::addGroupWidget(const QString& caption, QWidget* w)
     box->setContentsMargins(0, 0, 0, 0);
     box->setSpacing(3);
     QLabel* beschriftung = captionLabel(caption, this);
-    beschriftung->setVisible(s_gross);
+    // Keine Überschriften in der Leiste (Betreiber 2026-11-26): alle Pillen
+    // beginnen auf derselben Linie.
+    beschriftung->setVisible(false);
     box->addWidget(beschriftung, 0, Qt::AlignLeft);
     box->addWidget(w, 0, Qt::AlignLeft);
     m_gruppenWidgets.insert(w, box);
@@ -259,14 +271,25 @@ void CommandBar::ordneZeilen(bool zwei)
         zeile->addLayout(m_boxen.at(i));
     }
 
+    // Überschriften nur in der ersten Zeile. In der zweiten fehlen sie, damit
+    // alle Pillen auf demselben 5-px-Raster liegen (Betreiber 2026-11-26:
+    // „überschriften ausblenden").
+    for (int i = 0; i < m_boxen.size(); ++i) {
+        QLayoutItem* kopf = m_boxen.at(i)->itemAt(0);
+        if (kopf && kopf->widget()) {
+            kopf->widget()->setVisible(false);
+        }
+    }
+
     // Das Plus hängt ganz rechts an der letzten Zeile.
     QHBoxLayout* letzte = zwei ? m_rowZwei : m_row;
     for (QWidget* w : m_nachStellen) {
         letzte->addWidget(w, 0, Qt::AlignBottom);
     }
 
-    verteileZeile(m_row, !zwei);
-    verteileZeile(m_rowZwei, !zwei);
+    // Keine Verteilung des Restplatzes auf die Lücken: alle Abstände gleich.
+    verteileZeile(m_row, false);
+    verteileZeile(m_rowZwei, false);
 
     // Die Mindestbreite ist IMMER die der zweizeiligen Aufteilung: nur so
     // kann das Fenster unter die Einzelzeile schrumpfen, und resizeEvent
@@ -425,17 +448,28 @@ void CommandBar::paintEvent(QPaintEvent* e)
     style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
     QWidget::paintEvent(e);
 
-    if (m_boxen.size() < 2) { return; }
+    // Die Bereiche in SICHTBARER Reihenfolge (Zeile fuer Zeile), nicht in der
+    // Reihenfolge ihres Anlegens: nur so liegt der Strich zwischen Nachbarn.
+    QVector<QRect> reihe;
+    for (const QHBoxLayout* zeile : {m_row, m_rowZwei}) {
+        if (!zeile) { continue; }
+        for (int i = 0; i < zeile->count(); ++i) {
+            QLayoutItem* it = zeile->itemAt(i);
+            // Ausgeblendete (leere) Bereiche bleiben draußen, damit ihre Nachbarn
+            // einander finden.
+            if (it && it->layout() && it->layout()->geometry().width() > 0) {
+                reihe.append(it->layout()->geometry());
+            }
+        }
+    }
+    if (reihe.size() < 2) { return; }
 
-    p.setPen(QPen(QColor(QString::fromLatin1(Style::kGlassEdgeLight)), 1));
-    for (int i = 0; i + 1 < m_boxen.size(); ++i) {
-        const QRect a = m_boxen.at(i)->geometry();
-        const QRect b = m_boxen.at(i + 1)->geometry();
-        if (!a.isValid() || !b.isValid()) { continue; }
-        // Andere Zeile: kein Strich zwischen Oben und Unten.
-        if (qAbs(a.top() - b.top()) > 2) { continue; }
-        // Genau in die Mitte der Luecke. Am Rand einer Gruppe klebend
-        // waere er ihr Rahmen und gehoerte dann auch ringsum.
+    // Trennstriche gelb (Betreiber 2026-11-26).
+    p.setPen(QPen(QColor(QString::fromLatin1(Style::kEqBand2)), 1));
+    for (int i = 0; i + 1 < reihe.size(); ++i) {
+        const QRect a = reihe.at(i);
+        const QRect b = reihe.at(i + 1);
+        // Genau in die Mitte der Luecke, zwischen den Pillenkanten.
         const int x = (a.right() + b.left()) / 2;
         const int oben  = qMin(a.top(), b.top());
         const int unten = qMax(a.bottom(), b.bottom());
@@ -458,13 +492,19 @@ void CommandBar::setzeGrossModus(bool gross)
         else if (b->styleSheet() == altLeise) { b->setStyleSheet(neuLeise); }
     }
     for (QLabel* l : findChildren<QLabel*>(QStringLiteral("groupCaption"))) {
-        l->setVisible(gross);
+        l->setVisible(false);
     }
     // Angehängtes Plus und Bauteile in den Gruppen folgen der Pillenhöhe.
     const int aussen = pillHoehe() + 2;
     for (QWidget* w : m_nachStellen) { w->setFixedSize(aussen, aussen); }
-    for (QWidget* w : m_gruppenWidgets.keys()) { w->setFixedHeight(aussen); }
+    // Die Profilschiene hat zwei Zeilen und behält ihre eigene Höhe.
+    for (QWidget* w : m_gruppenWidgets.keys()) {
+        if (qobject_cast<ProfileRail*>(w)) { continue; }
+        w->setFixedHeight(aussen);
+    }
     applyRateStyle(m_rateWarn);
+    // Das Plus der Profilschiene trägt seine Höhe im eigenen Stilblatt.
+    for (ProfileRail* r : findChildren<ProfileRail*>()) { r->stufeGewechselt(); }
     verteileGruppen();
 }
 
@@ -473,11 +513,11 @@ void CommandBar::resizeEvent(QResizeEvent* e)
     QWidget::resizeEvent(e);
     // Ab kGrossAbBreite wachsen die Pillen (große Stufe, mit Beschriftung).
     setzeGrossModus(width() >= kGrossAbBreite);
-    // Unterhalb der Schwelle zwei Zeilen, ab ihr eine. Die Schwelle ist
-    // die Konstante, aber nie kleiner als die Einzelzeile selbst -- sonst
-    // würde sie gestaucht (siehe kEinzeiligUnterBreite). Nur bei einem
-    // Wechsel umordnen.
-    const int schwelle = qMax(kEinzeiligUnterBreite, einzeiligMindestbreite());
+    // Unterhalb der Schwelle zwei Zeilen, ab ihr eine. Die Schwelle ist die
+    // gemessene Konstante. Nur bei einem Wechsel umordnen. (2026-11-26:
+    // nicht mehr die dynamische Mindestbreite -- sonst bricht die Leiste bei
+    // der Breite des Betreibers in vier Zeilen um.)
+    const int schwelle = kEinzeiligUnterBreite;
     const bool zwei = width() < schwelle;
     if (zwei != m_zweiZeilen) { ordneZeilen(zwei); }
 }
@@ -522,20 +562,33 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
 {
     auto* box = new QVBoxLayout;
     box->setContentsMargins(0, 0, 0, 0);
-    box->setSpacing(3);
+    box->setSpacing(kAbstand);
     QLabel* versal = captionLabel(caption, this);
-    versal->setVisible(s_gross);
+    versal->setVisible(false);
     box->addWidget(versal, 0, Qt::AlignLeft);
 
     auto* pills = new QHBoxLayout;
     pills->setContentsMargins(0, 0, 0, 0);
     pills->setSpacing(5);
+    // Oben ausgerichtet: eine Gruppe mit einer Pillenreihe beginnt auf der
+    // ersten Linie der Leiste, nicht mittig (Betreiber 2026-11-26).
+    pills->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     box->addLayout(pills);
+    // Zweite Zeile gleich mit dem Bereich: alle Bereiche haben dieselben
+    // beiden Linien (Betreiber 2026-11-26). Leer bleibt sie ohne Abstand.
+    auto* zweite = new QHBoxLayout;
+    zweite->setContentsMargins(0, 0, 0, 0);
+    zweite->setSpacing(kAbstand);
+    // Linksbündig: sonst wird die kürzere zweite Zeile mittig gesetzt und steht
+    // nicht unter der ersten (Betreiber 2026-11-26: FT8 unter LSB).
+    zweite->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    box->addLayout(zweite);
     // Die Zeile setzt ordneZeilen() endgültig; hier nur der Besitz.
     row->addLayout(box);
     m_boxen.append(box);
 
     auto* g = new Group{caption, pills, {}, nullptr, versal, box};
+    g->row2 = zweite;
     m_groups.append(g);
     return *g;
 }
@@ -560,27 +613,12 @@ namespace {
 // antwortet der Hinweis noch ohne Stylesheet.
 void setzeMindestbreite(QPushButton* b, const QString& label)
 {
+    // Jede Pille gleich breit, egal wie lang ihre Beschriftung ist
+    // (Betreiber 2026-11-26: „jede pille gleiche groesse, egal wie breit der text ist").
+    // Die Breite steht fest; ein zu langer Text wird abgeschnitten, nicht die Pille breiter.
+    Q_UNUSED(label);
     if (!b) { return; }
-    b->ensurePolished();
-
-    // Mit DER Schrift rechnen, die das Stylesheet setzt, nicht mit der
-    // des Widgets: pillStyle() sagt font-size: pillSchrift() und font-weight:
-    // 600. b->fontMetrics() antwortet dagegen fuer die geerbte Schrift
-    // und kommt zu klein heraus — der zweite Grund, warum die Pillen
-    // zu schmal blieben.
-    QFont schrift = b->font();
-    schrift.setPixelSize(CommandBar::pillSchrift());
-    schrift.setWeight(QFont::DemiBold);
-
-    // Und mit DEM Beiwerk, das dasselbe Stylesheet verlangt:
-    // padding 0 pillPolster() auf beiden Seiten, dazu 1px Rand. Macht 24 statt
-    // der alten 20. Zwei Punkte Luft obendrauf, damit Kantenglaettung
-    // und Sperrung nicht an der Kante kratzen.
-    const int ausDerSchrift =
-        QFontMetrics(schrift).horizontalAdvance(label)
-        + 2 * CommandBar::pillPolster() + 2 + 2;
-    const int ausDemStil = b->minimumSizeHint().width();
-    b->setMinimumWidth(qMax(ausDerSchrift, ausDemStil));
+    b->setFixedWidth(CommandBar::pillBreite());
 }
 
 } // namespace
@@ -604,8 +642,19 @@ QPushButton* CommandBar::addPill(Group& g, const QString& label)
     // darf die Anordnung nicht. Wird es zu eng, muss sich etwas
     // anderes ruehren (die Leiste rollt), nicht die Beschriftung.
     setzeMindestbreite(b, label);
-    // Die Bandgruppe fuellt ihre zweite Zeile ab der fuenften Pille.
-    QHBoxLayout* ziel = (g.row2 && g.pills.size() >= kPillsProZeile) ? g.row2 : g.row;
+    // Je Gruppe `spalten` Pillen in der ersten Zeile, der Rest in der zweiten
+    // (Betreiber 2026-11-26). Die zweite Zeile entsteht bei Bedarf.
+    QHBoxLayout* ziel = g.row;
+    if (static_cast<int>(g.pills.size()) >= g.spalten) {
+        if (!g.row2 && g.box) {
+            auto* zweite = new QHBoxLayout;
+            zweite->setContentsMargins(0, 0, 0, 0);
+            zweite->setSpacing(kAbstand);
+            static_cast<QBoxLayout*>(g.box)->addLayout(zweite);
+            g.row2 = zweite;
+        }
+        if (g.row2) { ziel = g.row2; }
+    }
     g.pills.append(b);
     if (ziel) { ziel->addWidget(b); }
     return b;
@@ -646,6 +695,14 @@ void CommandBar::zieheLeereGruppenZurueck()
         for (QPushButton* b : g->pills) {
             if (b) { b->setStyleSheet(leer ? pillStyleGedaempft() : pillStyle()); }
         }
+        // Leere Gruppe ganz weg, nicht nur gedämpft (Betreiber 2026-11-26):
+        // ausgeblendet nimmt sie keinen Platz und keinen Abstand mehr ein.
+        for (QPushButton* b : g->pills) {
+            if (b) { b->setVisible(!leer); }
+        }
+        if (g->overflow) { g->overflow->setVisible(!leer); }
+        if (g->pills.isEmpty() && m_rateLabel) { m_rateLabel->setVisible(!leer); }
+        if (g->caption) { g->caption->setVisible(false); }
         if (g->caption) {
             // Zurueck auf kTextScale, nicht auf einen leeren Stil:
             // captionLabel() setzt die Farbe selbst, und ein leeres
@@ -685,6 +742,7 @@ void CommandBar::buildModeGroup(QHBoxLayout* row)
     };
 
     Group& g = addGroup(QStringLiteral("Mode"), row);
+    g.spalten = 4;   // LSB · USB · CWL · „…“ in einer Zeile (Betreiber 2026-11-26)
     for (int i = 0; i < kVisiblePerGroup && i < m_allModes.size(); ++i) {
         const auto entry = m_allModes.at(i);
         QPushButton* b = addPill(g, entry.first);
@@ -800,12 +858,6 @@ void CommandBar::buildDigiGroup(QHBoxLayout* row)
         connect(b, &QPushButton::clicked, this,
                 [this, modus = eintrag.second]() { emit digiRequested(modus); });
     }
-    // FT2 gibt es in diesem Zweig noch nicht (Digimodus::Ft2 steht erst
-    // auf feat/ft2). Die Pille steht schon da, gedämpft und ohne Wirkung;
-    // mit dem Zusammenführen genügt es, sie hier anzuschließen.
-    QPushButton* ft2 = addPill(g, QStringLiteral("FT2"));
-    ft2->setEnabled(false);
-    ft2->setToolTip(tr("FT2 folgt mit dem FT2-Zweig"));
 
     if (!mode || !mode->box) { return; }
     auto* modeBox = qobject_cast<QVBoxLayout*>(mode->box);
@@ -820,16 +872,14 @@ void CommandBar::buildDigiGroup(QHBoxLayout* row)
     g.box = nullptr;
     delete eigenerKasten;
     g.row->setParent(nullptr);
-    auto* zeile = new QHBoxLayout;
-    zeile->setContentsMargins(0, 0, 0, 0);
-    zeile->setSpacing(5);
-    // Die Pillen aus der alten Zeile lösen, dann in die neue setzen.
+    // Die Digi-Pillen kommen in die ZWEITE Zeile der Betriebsart, nicht in
+    // eine dritte (Betreiber 2026-11-26: zwei Zeilen; die Reihenfolge ist egal).
+    QHBoxLayout* zeile = mode->row2;
+    if (!zeile) { return; }
     while (QLayoutItem* it = g.row->takeAt(0)) { delete it; }
     for (QPushButton* b : g.pills) { zeile->addWidget(b); }
-    zeile->addStretch(1);
     delete g.row;
     g.row = zeile;
-    modeBox->addLayout(zeile);
 }
 
 void CommandBar::buildAntennaGroup(QHBoxLayout* row)
@@ -876,11 +926,9 @@ void CommandBar::buildBandGroup(QHBoxLayout* row)
     };
 
     Group& g = addGroup(QStringLiteral("Band"), row);
+    g.spalten = 3;   // oben drei Bänder, darunter der Rest (Betreiber 2026-11-26)
     // Zweite Pillenzeile unter den ersten vier Baendern (2026-11-21).
-    auto* zweite = new QHBoxLayout;
-    zweite->setContentsMargins(0, 0, 0, 0);
-    zweite->setSpacing(5);
-    static_cast<QBoxLayout*>(g.box)->addLayout(zweite);
+    QHBoxLayout* zweite = g.row2;
     g.row2 = zweite;
     // Vier Bänder vorne (160 · 80 · 60 · 40, Betreiber 2026-11-21), die
     // übrigen im „…".
@@ -912,10 +960,7 @@ void CommandBar::buildStepGroup(QHBoxLayout* row)
     Group& g = addGroup(QStringLiteral("Step"), row);
     // Zweizeilig (Betreiber 2026-11-24: die Schrittweite braucht man
     // selten): 10 Hz · 100 Hz oben, 1 kHz · „…" darunter -- halb so breit.
-    auto* zweite = new QHBoxLayout;
-    zweite->setContentsMargins(0, 0, 0, 0);
-    zweite->setSpacing(5);
-    static_cast<QBoxLayout*>(g.box)->addLayout(zweite);
+    QHBoxLayout* zweite = g.row2;
     for (int i = 0; i < kVisiblePerGroup && i < m_allSteps.size(); ++i) {
         const auto entry = m_allSteps.at(i);
         QPushButton* b = addPill(g, entry.first);
@@ -939,11 +984,13 @@ template <typename Entry, typename Apply>
 void CommandBar::addOverflow(Group& g, const QVector<Entry>& all, Apply apply)
 {
     auto* more = new QPushButton(QStringLiteral("…"), this);
+    more->setFixedWidth(CommandBar::pillBreite());   // gleiche Breite wie jede Pille (2026-11-26)
     more->setStyleSheet(pillStyle());
     more->setCursor(Qt::PointingHandCursor);
     more->setToolTip(tr("Show all %1").arg(all.size()));
     g.overflow = more;
-    if (g.row) { (g.row2 ? g.row2 : g.row)->addWidget(more); }
+    // „…“ in die erste Zeile, solange dort Platz ist; sonst in die zweite.
+    if (g.row) { ((static_cast<int>(g.pills.size()) < g.spalten || !g.row2) ? g.row : g.row2)->addWidget(more); }
 
     connect(more, &QPushButton::clicked, this, [this, all, apply]() {
         // Am Fenster, nicht an der Leiste: die Leiste (oder ihr Elternteil)
@@ -1036,12 +1083,14 @@ void CommandBar::buildFilterGroup(QHBoxLayout* row)
     }
 
     auto* more = new QPushButton(QStringLiteral("…"), this);
+    more->setFixedWidth(CommandBar::pillBreite());   // gleiche Breite wie jede Pille (2026-11-26)
     more->setStyleSheet(pillStyle());
     more->setCursor(Qt::PointingHandCursor);
     more->setToolTip(tr("All widths for this mode -- and one of "
                                     "your own to type in."));
     g.overflow = more;
-    if (g.row) { (g.row2 ? g.row2 : g.row)->addWidget(more); }
+    // „…“ in die erste Zeile, solange dort Platz ist; sonst in die zweite.
+    if (g.row) { ((static_cast<int>(g.pills.size()) < g.spalten || !g.row2) ? g.row : g.row2)->addWidget(more); }
 
     connect(more, &QPushButton::clicked, this, [this]() {
         if (!m_slice) { return; }
@@ -1318,11 +1367,13 @@ void CommandBar::buildNrGroup(QHBoxLayout* row)
     // Fassung ändert sie zur Laufzeit (setNrFlexModus). Sonst gleicher
     // Aufbau wie addOverflow().
     auto* more = new QPushButton(QStringLiteral("…"), this);
+    more->setFixedWidth(CommandBar::pillBreite());   // gleiche Breite wie jede Pille (2026-11-26)
     more->setStyleSheet(pillStyle());
     more->setCursor(Qt::PointingHandCursor);
     more->setToolTip(tr("Show all %1").arg(m_allNr.size()));
     g.overflow = more;
-    if (g.row) { (g.row2 ? g.row2 : g.row)->addWidget(more); }
+    // „…“ in die erste Zeile, solange dort Platz ist; sonst in die zweite.
+    if (g.row) { ((static_cast<int>(g.pills.size()) < g.spalten || !g.row2) ? g.row : g.row2)->addWidget(more); }
     connect(more, &QPushButton::clicked, this, [this]() {
         ScopedChildWidget<QMenu> menuOwner(window());   // am Fenster, siehe addOverflow()
         QMenu& m = *menuOwner.get();

@@ -134,11 +134,11 @@ private slots:
         LayoutProfiles profiles;
         ProfileRail rail(&profiles, Qt::Horizontal);
         QCOMPARE(rail.richtung(), Qt::Horizontal);
-        // Feste Hoehe statt fester Breite -- sonst saesse in der Leiste
-        // ein 44 Pixel breiter Klotz, in den die Abzeichen nicht passen.
-        QCOMPARE(rail.height(), ProfileRail::kLeistenSeite);
-        QCOMPARE(rail.minimumHeight(), ProfileRail::kLeistenSeite);
-        QCOMPARE(rail.maximumHeight(), ProfileRail::kLeistenSeite);
+        // Seit der Zweizeiligkeit (2026-11-26) ist die Hoehe NICHT mehr
+        // auf eine Pille festgenagelt: die Abzeichen liegen in zwei
+        // Zeilen wie BAND, die Hoehe kommt aus dem Layout.
+        QVERIFY2(rail.maximumHeight() > ProfileRail::kLeistenSeite,
+                 "waagrecht darf nicht mehr auf eine Pillenhoehe festgenagelt sein");
         // Und ausdruecklich KEINE feste Breite mehr.
         //
         // maximumWidth() > kWidth allein war zu schwach: das ist Qts
@@ -151,9 +151,6 @@ private slots:
         QVERIFY2(senkrecht.maximumWidth() != rail.maximumWidth(),
                  "senkrecht und waagrecht duerfen nicht dieselbe "
                  "Breitenfestlegung haben");
-        QVERIFY2(senkrecht.maximumHeight() != rail.maximumHeight(),
-                 "senkrecht und waagrecht duerfen nicht dieselbe "
-                 "Hoehenfestlegung haben");
     }
 
     // ── Die Form am Platz (2026-10-07) ──────────────────────────────
@@ -193,7 +190,8 @@ private slots:
         QPushButton* pille = ersteGruppenPille(leiste);
         QVERIFY2(pille, "keine Pille in der Leiste gefunden");
         QCOMPARE(abzeichen->sizeHint().height(), pille->sizeHint().height());
-        QCOMPARE(rail.height(), pille->sizeHint().height());
+        // Zwei Profile passen in eine Zeile: die Höhe ist die einer Pille.
+        QCOMPARE(rail.sizeHint().height(), pille->sizeHint().height());
         QCOMPARE(ProfileRail::kLeistenSeite, pille->sizeHint().height());
 
         // Auch das Plus. Es traegt als einziges ein eigenes Stilblatt
@@ -484,6 +482,72 @@ private slots:
         QVERIFY2(rail.letzterAusloeserForTest().contains(QStringLiteral("no input event")),
                  qPrintable(rail.letzterAusloeserForTest()));
     }
+
+    // ── Kürzel und zwei Zeilen (2026-11-26) ─────────────────────────
+    //
+    // Betreiber: „baue 2 zeilig, wie die anderen, dann gewinnen wir
+    // platz. jede pille maximal 3 zeichen!"
+
+    void kuerzelIstHoechstensDreiZeichen()
+    {
+        LayoutProfiles profiles;
+        QVERIFY(profiles.create(QStringLiteral("FT8-Kontest")));
+        QCOMPARE(profiles.kuerzel(QStringLiteral("FT8-Kontest")), QString());
+        QVERIFY(profiles.setKuerzel(QStringLiteral("FT8-Kontest"),
+                                    QStringLiteral("FT8 Kontest")));
+        QCOMPARE(profiles.kuerzel(QStringLiteral("FT8-Kontest")),
+                 QStringLiteral("FT8"));
+        QVERIFY(profiles.setKuerzel(QStringLiteral("FT8-Kontest"),
+                                    QStringLiteral("  LOG  ")));
+        QCOMPARE(profiles.kuerzel(QStringLiteral("FT8-Kontest")),
+                 QStringLiteral("LOG"));
+    }
+
+    void waagrechtZeigtDasKuerzelOhneKuerzelDenBuchstaben()
+    {
+        LayoutProfiles profiles;
+        QVERIFY(profiles.create(QStringLiteral("Neu")));
+        QVERIFY(profiles.create(QStringLiteral("FT8-Kontest")));
+        QVERIFY(profiles.setKuerzel(QStringLiteral("FT8-Kontest"),
+                                    QStringLiteral("FT8")));
+        ProfileRail rail(&profiles, Qt::Horizontal);
+        QPushButton* ft8 = badgeFor(rail, QStringLiteral("FT8-Kontest"));
+        QVERIFY(ft8);
+        QCOMPARE(ft8->text(), QStringLiteral("FT8"));
+        QPushButton* neu = badgeFor(rail, QStringLiteral("Neu"));
+        QVERIFY(neu);
+        QCOMPARE(neu->text(), QStringLiteral("N"));
+    }
+
+    void waagrechtLiegtInZweiZeilenZuVier()
+    {
+        // Betreiber 2026-11-26: drei Spalten, zwei Zeilen. Ab sechs Profilen
+        // stehen fünf Pillen und das „…“ darunter.
+        LayoutProfiles profiles;
+        for (int i = 1; i <= 6; ++i) {
+            QVERIFY(profiles.create(QStringLiteral("P%1").arg(i)));
+        }
+        ProfileRail rail(&profiles, Qt::Horizontal);
+        rail.resize(rail.sizeHint());
+        rail.layout()->activate();
+        const QStringList namen = profiles.names();
+        QPushButton* erste = badgeFor(rail, namen.at(0));
+        QPushButton* zweite = badgeFor(rail, namen.at(1));
+        QPushButton* dritte = badgeFor(rail, namen.at(2));
+        QPushButton* vierte = badgeFor(rail, namen.at(3));
+        QVERIFY(erste && zweite && dritte && vierte);
+        QCOMPARE(zweite->y(), erste->y());
+        QCOMPARE(dritte->y(), erste->y());
+        QVERIFY2(vierte->y() > erste->y(), "die vierte Pille liegt in der zweiten Zeile");
+    }
+
+
+
+
+
+
+
+
 };
 
 QTEST_MAIN(TestProfilschieneRichtung)
