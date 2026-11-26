@@ -572,13 +572,16 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
     pills->setSpacing(5);
     // Oben ausgerichtet: eine Gruppe mit einer Pillenreihe beginnt auf der
     // ersten Linie der Leiste, nicht mittig (Betreiber 2026-11-26).
-    pills->setAlignment(Qt::AlignTop);
+    pills->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     box->addLayout(pills);
     // Zweite Zeile gleich mit dem Bereich: alle Bereiche haben dieselben
     // beiden Linien (Betreiber 2026-11-26). Leer bleibt sie ohne Abstand.
     auto* zweite = new QHBoxLayout;
     zweite->setContentsMargins(0, 0, 0, 0);
     zweite->setSpacing(kAbstand);
+    // Linksbündig: sonst wird die kürzere zweite Zeile mittig gesetzt und steht
+    // nicht unter der ersten (Betreiber 2026-11-26: FT8 unter LSB).
+    zweite->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     box->addLayout(zweite);
     // Die Zeile setzt ordneZeilen() endgültig; hier nur der Besitz.
     row->addLayout(box);
