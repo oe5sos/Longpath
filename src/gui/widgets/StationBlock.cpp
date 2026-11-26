@@ -41,6 +41,21 @@ StationBlock::StationBlock(QWidget* parent) : QWidget(parent)
 
     hbox->addLayout(vbox);
 
+    // Pill: only while connected. Transparent to the mouse so a press on it
+    // reaches this block and emits clicked() like the rest of the box.
+    m_pille = new QLabel(this);
+    m_pille->setObjectName(QStringLiteral("StationBlock_Pille"));
+    m_pille->setText(QStringLiteral("Verbunden · Aus"));
+    m_pille->setAlignment(Qt::AlignCenter);
+    m_pille->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    m_pille->setStyleSheet(Style::themed(QStringLiteral(
+        "QLabel { color: #7fd6a0; font-size: 11px; font-weight: bold;"
+        " background: transparent; border: 1px solid rgba(0,200,120,140);"
+        " border-radius: 4px; padding: 1px 6px; }")));
+    m_pille->setVisible(false);
+    hbox->addSpacing(8);
+    hbox->addWidget(m_pille);
+
     setCursor(Qt::PointingHandCursor);
     setAttribute(Qt::WA_StyledBackground, true);  // QSS background paint on QWidget subclass
 
@@ -66,6 +81,7 @@ void StationBlock::setRadioName(const QString& name)
         setHardwareLine(QString(), QString());
     }
     m_label->setText(name.isEmpty() ? QStringLiteral("Click to connect") : name);
+    m_pille->setVisible(!name.isEmpty());
     applyStyle();
 }
 

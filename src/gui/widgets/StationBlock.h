@@ -47,6 +47,10 @@ private:
     QLabel*  m_label{nullptr};
     QString  m_hardwareLine;
     QLabel*  m_hardwareLabel{nullptr};
+    // "Verbunden · Aus" pill, shown only while a radio is connected. A
+    // click anywhere on the block (pill included) still emits clicked(),
+    // which disconnects in that state.
+    QLabel*  m_pille{nullptr};
 };
 
 } // namespace Longpath

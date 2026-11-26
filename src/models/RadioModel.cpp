@@ -9628,6 +9628,17 @@ void RadioModel::setFlexSliceAntenna(const QString& antenna, bool senden)
 {
     if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
     if (m_flexSliceId.isEmpty()) { return; }
+    // Nur Antennen, die das Geraet fuehrt (2026-11-26). Die Liste kommt
+    // aus der APD-Messung der Maschine: ein FLEX-8400 hat kein ANT3/ANT4
+    // und lehnt sie mit 0x50000004 ab. Die Befehlsleiste graut sie schon
+    // aus; die Pillen im RX-Panel und im VFO-Flag schreiben hier durch.
+    // Ist die Liste noch leer (keine APD-Antwort), bleibt alles frei.
+    const QStringList gefuehrt = flexSendeantennen();
+    if (!gefuehrt.isEmpty() && !gefuehrt.contains(antenna)) {
+        qCInfo(lcConnection) << "Flex: Antenne" << antenna
+                             << "wird vom Geraet nicht gefuehrt, nicht gesendet";
+        return;
+    }
     const QString befehl =
         FlexCommandWire::setSliceAntennaCommand(m_flexSliceId, senden, antenna);
     if (befehl.isEmpty()) { return; }
