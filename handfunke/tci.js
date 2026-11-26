@@ -274,6 +274,11 @@ export class TciLink extends EventTarget {
       case 'rotor_ist':       this._emit('rotor', { args }); break;
       case 'rotor_ok':        this._emit('rotorok', { text: args[0] || '' }); break;
       case 'rotor_err':       this._emit('rotorfehler', { text: args[0] || '' }); break;
+      // rotor_peilung:<ruf>,<grad>,<km>,<land>;  /  rotor_peilung_err:<ruf>,<grund>;
+      // Nur eine Auskunft (TciServer, 2026-11-26) -- gedreht wird weiter
+      // ausschliesslich ueber rotor_to.
+      case 'rotor_peilung':     this._emit('peilung', { args }); break;
+      case 'rotor_peilung_err': this._emit('peilungfehler', { args }); break;
       // Ein abgelehnter Sendewunsch, mit Grund. Bis zum 2026-10-04 kam
       // hier gar nichts, und ein stummes Nein ist auf einer
       // Fernbedienung nicht von einem Defekt zu unterscheiden.

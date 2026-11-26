@@ -13,7 +13,7 @@
 //
 //     node pruefe-rotor.mjs
 
-import { standLesen, zustandText, fehlerText, peilungAus, Sicherung,
+import { standLesen, zustandText, fehlerText, peilungAus, peilungLesen, Sicherung,
          GETRENNT, VERBINDET, BEREIT, DREHT, FEHLER } from './rotor.js';
 
 let fehler = 0;
@@ -130,6 +130,23 @@ console.log('\nDie Sicherung');
   pruefe('und dann steht auch nichts bereit', s3.bestaetige(0) === null);
   pruefe('0 Grad ist eine gueltige Wahl', s3.waehle(0, 0) === true);
   pruefe('und wird auch so herausgegeben', s3.bestaetige(10) === 0);
+}
+
+// ── Peilung zu einem Rufzeichen (2026-11-26) ─────────────────────────────
+{
+  // rotor_peilung:<ruf>,<kurz>,<km>,<land>,<lang>,<kurzFrei>,<langFrei>;
+  const p = peilungLesen(['ja1qrs', '42.4', '9152', 'Japan', '222.4', '0', '1']);
+  pruefe('Peilung gelesen, Rufzeichen gross', p && p.ruf === 'JA1QRS');
+  pruefe('kurzer und langer Weg auf ganze Grad', p && p.grad === 42 && p.lang === 222);
+  pruefe('Entfernung und Land', p && p.km === 9152 && p.land === 'Japan');
+  pruefe('gesperrter kurzer Weg bleibt gesperrt', p && p.kurzFrei === false && p.langFrei === true);
+  const ohne = peilungLesen(['W1AW', '290.0', '6500', 'United States']);
+  pruefe('ohne Angabe zum Bereich: beide gesperrt, langer Weg gerechnet',
+         ohne && ohne.lang === 110 && !ohne.kurzFrei && !ohne.langFrei);
+  pruefe('eine Peilung ueber 360 ist keine', peilungLesen(['X', '400', '1', 'A']) === null);
+  pruefe('eine leere Peilung ist keine (nicht Nord)', peilungLesen(['X', '', '1', 'A']) === null);
+  pruefe('Ablehnung wegen des Drehbereichs wird gesagt',
+         /AUSSERHALB DES DREHBEREICHS/.test(fehlerText('ausserhalb des drehbereichs')));
 }
 
 console.log(fehler === 0 ? '\nAlles gut.' : `\n${fehler} Punkt(e) offen.`);

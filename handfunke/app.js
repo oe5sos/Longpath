@@ -17,7 +17,7 @@ import { bildIstAlt } from './aufwachen.js';
 import { desktopStarten } from './desktop.js';
 import { zeiger as zeigerBauen, sEinheiten, SIG_KLEIN, SWR_KLEIN, kompassBlatt } from './instrument.js';
 import { standLesen, zustandText, fehlerText as rotorFehlerText,
-         peilungAus, Sicherung as RotorSicherung,
+         peilungAus, peilungLesen, Sicherung as RotorSicherung,
          DREHT } from './rotor.js';
 
 const $ = (id) => document.getElementById(id);
@@ -2172,12 +2172,82 @@ $('ft8Kopf').addEventListener('click', () => {
   zeichneFt8();
 });
 $('ft8Liste').addEventListener('click', (e) => {
-  const z = e.target.closest('.ft8Z');
+  // Die Peilungszeile mit den Knoepfen haengt UNTER der Stationszeile, nicht
+  // in ihr -- beide tragen darum das Rufzeichen.
+  const z = e.target.closest('.ft8Z, .ft8Peil');
   if (!z) { return; }
+  // Der Knopf in der gewaehlten Zeile dreht -- ueber denselben Weg wie die
+  // Rotorscheibe (Sicherung waehlen, dann bestaetigen, rotor_to). Er waehlt
+  // die Zeile nicht ab.
+  const knopf = e.target.closest('.ft8Dreh');
+  if (knopf) {
+    const g = Number(knopf.dataset.grad);
+    if (!knopf.disabled && Number.isFinite(g)) {
+      if (!rotorSicherung.gilt(performance.now()) || rotorSicherung.ziel !== g) {
+        rotorSicherung.waehle(g, performance.now());
+      }
+      rotorZeichnen();              // gibt den Knopf erst frei
+      $('rotorDreh').click();
+    }
+    return;
+  }
+  if (z.classList.contains('ft8Peil')) { return; }
   ft8Markiert = ft8MarkiertIst(z.dataset.ruf) ? null
     : { ruf: z.dataset.ruf, bis: performance.now() + kFt8Hervor };
+  if (ft8Markiert) { peilungFragen(ft8Markiert.ruf); }
   zeichneFt8();
 });
+
+// ── Peilung zum Rufzeichen (2026-11-26) ─────────────────────────────────────
+// Longpath rechnet sie (rotor_peilung: -> cty.dat, Mitte des Landes, vom
+// eigenen Locator aus; dieselbe Zahl wie zuerst am Mac). Sie WAEHLT nur ein
+// Ziel auf der Rotorscheibe, wenn es einen Rotor gibt; gedreht wird erst mit
+// dem Knopf, und der Server prueft dabei wie immer die Freigabe.
+const ft8Peilungen = new Map();   // ruf -> {grad, km, land} | {fehler}
+function peilungFragen(ruf) {
+  const p = ft8Peilungen.get(ruf);
+  if (p && p.grad !== undefined) { peilungAnwenden(p); return; }
+  if (link.ready) { link.send(`rotor_peilung:${ruf}`); }
+}
+function peilungAnwenden(p) {
+  if (!ft8MarkiertIst(p.ruf) || !rotorFeldAn) { return; }
+  // Vorgewaehlt wird der Weg, den der Drehbereich erlaubt -- bei Martin ist
+  // der Osten zu (Berg), nach Japan geht es nur ueber den langen Weg.
+  const ziel = p.kurzFrei ? p.grad : (p.langFrei ? p.lang : null);
+  if (ziel === null) { return; }
+  rotorSicherung.waehle(ziel, performance.now());
+  $('rotorMeldung').classList.remove('warn');
+  $('rotorMeldung').textContent = '';
+  rotorZeichnen();
+}
+link.addEventListener('peilung', (e) => {
+  const p = peilungLesen((e.detail || {}).args || []);
+  if (!p) { return; }
+  ft8Peilungen.set(p.ruf, p);
+  peilungAnwenden(p);
+  zeichneFt8();
+});
+link.addEventListener('peilungfehler', (e) => {
+  const a = (e.detail || {}).args || [];
+  const ruf = (a[0] || '').trim().toUpperCase();
+  if (!ruf) { return; }
+  ft8Peilungen.set(ruf, { ruf, fehler: (a[1] || 'unbekannt').trim() });
+  zeichneFt8();
+});
+function peilungZeile(ruf) {
+  const p = ft8Peilungen.get(ruf);
+  if (!p) { return `<div class="ft8Peil" data-ruf="${ruf}">Peilung wird gefragt …</div>`; }
+  if (p.fehler) { return `<div class="ft8Peil" data-ruf="${ruf}">keine Peilung — ${p.fehler}</div>`; }
+  const text = (p.km !== null ? `${p.km} km` : '') + (p.land ? ` · ${p.land}` : '');
+  // Kurzer und langer Weg je ein Knopf; was der Drehbereich nicht erlaubt,
+  // steht da, ist aber gesperrt -- man soll sehen, WARUM nicht gedreht wird.
+  const knopf = (g, name, frei) => `<button type="button" class="ft8Dreh" data-grad="${g}"` +
+    `${frei ? '' : ' disabled title="ausserhalb des Drehbereichs"'}>${name} ${g}°</button>`;
+  const knoepfe = rotorFeldAn
+    ? `<span class="ft8Wege">${knopf(p.grad, 'KURZ', p.kurzFrei)}${knopf(p.lang, 'LANG', p.langFrei)}</span>`
+    : `<span>${p.grad}° · lang ${p.lang}°</span>`;
+  return `<div class="ft8Peil" data-ruf="${ruf}"><span>${text}</span>${knoepfe}</div>`;
+}
 const dfText = (df) => df === null ? '—'
   : (df > 0 ? '+' : df < 0 ? '\u2212' : '\u00b1') + Math.abs(df) + ' Hz';
 function zeichneFt8() {
@@ -2194,12 +2264,22 @@ function zeichneFt8() {
   if ($('ft8Anzahl').textContent !== anzahl) { $('ft8Anzahl').textContent = anzahl; }
   const neu = liste.slice(0, 3).map((x) => x.ruf).join('  ');
   if ($('ft8Neu').textContent !== neu) { $('ft8Neu').textContent = neu; }
+  // Nur neu schreiben, wenn sich die Zeilen selbst aendern. Das Alter allein
+  // wird an Ort und Stelle nachgezogen: ein Neuschreiben jede Sekunde ersetzte
+  // auch den Knopf, den der Finger gerade drueckt, und der Tipp ging verloren.
   const html = liste.map((x) =>
     `<div class="ft8Z${ft8MarkiertIst(x.ruf) ? ' an' : ''}" role="listitem" data-ruf="${x.ruf}">` +
     `<b>${x.ruf}</b><span class="ft8M">${x.mode}</span>` +
     `<span class="ft8Df">${dfText(x.df)}</span>` +
-    `<span class="ft8A">${alterText(x.alterSek + nachlauf)}</span></div>`).join('');
-  if ($('ft8Liste').innerHTML !== html) { $('ft8Liste').innerHTML = html; }
+    `<span class="ft8A"></span></div>` +
+    (ft8MarkiertIst(x.ruf) ? peilungZeile(x.ruf) : '')).join('');
+  const el = $('ft8Liste');
+  if (el.dataset.bau !== html) { el.dataset.bau = html; el.innerHTML = html; }
+  const alter = el.querySelectorAll('.ft8A');
+  liste.forEach((x, i) => {
+    const t = alterText(x.alterSek + nachlauf);
+    if (alter[i] && alter[i].textContent !== t) { alter[i].textContent = t; }
+  });
 }
 link.addEventListener('spotsende', () => { ft8Abruf = performance.now(); zeichneFt8(); });
 setInterval(zeichneFt8, 1000);
