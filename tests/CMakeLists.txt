@@ -8744,6 +8744,12 @@ longpath_add_test(tst_panadapter_beim_senden)
 #   und Wasserfall gemeinsam, Spur nur bei Nacht gedimmt. Gegenprobe gefahren.
 longpath_add_test(tst_panadapter_farbschema)
 
+# tst_panadapter_neustart (2026-11-26): Betreiber „die einstellungen im
+#   panadapter sollten vom letzten beenden gespeichert sein!" -- saveSettings
+#   wie closeEvent, neu aufbauen, loadSettings wie der Start; verglichen wird
+#   auch, was WIRKT (Wasserfall-Takt). Gegenprobe gefahren.
+longpath_add_test(tst_panadapter_neustart)
+
 # ── Weiche Kante und Hof: die Zusage "beide aus = wie vorher" (2026-10-08) ──
 # tst_kurven_streifen: `Kurve::baue` entscheidet, aus wie vielen Baendern die
 #   GPU die Kurve zeichnet. Die Vorgabe beider Schalter ist AUS, und sie taugt

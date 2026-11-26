@@ -976,6 +976,8 @@ public:
     int  wfOpacity() const { return m_wfOpacity; }
     void setWfUpdatePeriodMs(int ms);
     int  wfUpdatePeriodMs() const { return m_wfUpdatePeriodMs; }
+    /// Pruefstand: der Takt, mit dem der Wasserfall WIRKLICH laeuft.
+    int  waterfallTickerPeriodMsForTest() const;
 
     qint64 waterfallHistoryMs() const  { return m_waterfallHistoryMs; }
     void   setWaterfallHistoryMs(qint64 ms);
