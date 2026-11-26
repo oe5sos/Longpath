@@ -2714,6 +2714,9 @@ link.addEventListener('open', () => {
   // langsamer wirkt er traege.
   link.send(`rx_sensors_enable:true,200`);
   link.send(`tx_sensors_enable:true,200`);
+  // ALC dazu (Longpath-eigen). Ein aelteres Longpath kennt den Befehl nicht
+  // und schweigt -- dann bleibt die Zeile bei „—".
+  link.send(`tx_alc_enable:true`);
 
   link.send(`audio_samplerate:${state.audioRate}`);
   link.send(`audio_stream_channels:1`);
@@ -3670,6 +3673,15 @@ desktopStarten({ link, $, schrittHz: () => kFeinHz, logHolen: logListeHolen });
     const pe = $('pwrWertI');
     if (pe.textContent !== pw) { pe.textContent = pw; }
     pe.classList.toggle('aus', pw === '—');
+    // ALC nach derselben Regel, mit eigenem Zeitstempel: ein Longpath ohne
+    // tx_alc schickt nie eine, und dann darf hier kein alter Wert stehen.
+    const a = link.st.txAlc;
+    const alcFrisch = performance.now() - (link.st.txAlcZeit || 0) < 1500;
+    const aw = (sendet && alcFrisch && a !== null)
+      ? (a > 0 ? '+' : a < 0 ? '\u2212' : '') + Math.abs(a).toFixed(1) + ' dB' : '—';
+    const ae = $('alcWertI');
+    if (ae.textContent !== aw) { ae.textContent = aw; }
+    ae.classList.toggle('aus', aw === '—');
   }, 250);
   // Antippen des Kompasses oeffnet die volle Rotorsteuerung (die Zeile
   // darunter), und zwar sichtbar.

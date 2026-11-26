@@ -470,6 +470,19 @@ void TstStripChain::the_limiter_is_last()
     QCOMPARE(static_cast<int>(StripChain::Stage::Clip),    8);
 }
 
+namespace {
+// Die Liste in der Oberflaeche ist seit 2026-11-24 leer
+// (builtInPresets()); applyBuiltIn() kennt die Einstellungen weiter und
+// wird hier mit festen Namen geprueft -- eine Schleife ueber die leere
+// Liste waere gruen, ohne irgend etwas zu pruefen.
+const QStringList kAnsprechbar{
+    QStringLiteral("Recommended — speech"),
+    QStringLiteral("Clean voice"),
+    QStringLiteral("DX — punchy"),
+    QStringLiteral("Ragchew — easy"),
+};
+}  // namespace
+
 void TstStripChain::every_preset_leaves_the_master_alone()
 {
     // A preset is a starting point, not a decision to go on the air
@@ -479,28 +492,20 @@ void TstStripChain::every_preset_leaves_the_master_alone()
     StripChain c;
     c.prepare(kRate);
     QVERIFY(!c.isEnabled());
-    for (const auto& p : StripSettings::builtInPresets()) {
-        QVERIFY2(StripSettings::applyBuiltIn(p.name, c), qPrintable(p.name));
+    for (const QString& name : kAnsprechbar) {
+        QVERIFY2(StripSettings::applyBuiltIn(name, c), qPrintable(name));
         QVERIFY2(!c.isEnabled(),
                  qPrintable(QStringLiteral("%1 switched the strip on")
-                                .arg(p.name)));
+                                .arg(name)));
     }
 }
 
 void TstStripChain::every_preset_names_itself_and_applies()
 {
-    const auto presets = StripSettings::builtInPresets();
-    QVERIFY(!presets.isEmpty());
-
     StripChain c;
     c.prepare(kRate);
-    for (const auto& p : presets) {
-        QVERIFY(!p.name.trimmed().isEmpty());
-        // The description is the whole point of a preset list. A name
-        // like "DX" tells an operator nothing about what it will do to
-        // their voice or what it costs.
-        QVERIFY2(p.description.length() > 40, qPrintable(p.name));
-        QVERIFY(StripSettings::applyBuiltIn(p.name, c));
+    for (const QString& name : kAnsprechbar) {
+        QVERIFY2(StripSettings::applyBuiltIn(name, c), qPrintable(name));
 
         // Each one must actually put something in circuit, or choosing
         // it does nothing and the operator concludes presets are broken.
@@ -509,7 +514,7 @@ void TstStripChain::every_preset_names_itself_and_applies()
             if (c.stageEnabled(static_cast<StripChain::Stage>(i))) { ++on; }
         }
         QVERIFY2(on >= 2, qPrintable(QStringLiteral("%1 enabled %2 stages")
-                                         .arg(p.name).arg(on)));
+                                         .arg(name).arg(on)));
     }
 
     // And an unknown name is refused rather than silently doing nothing

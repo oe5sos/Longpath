@@ -21,6 +21,7 @@ private slots:
     void formatRxChannelSensors_basic_form();
     void formatRxChannelSensorsEx_5_args_F1();
     void formatTxSensors_F1_swr_not_F2();
+    void formatTxAlc_eigeneZeile();
     void minimumRequiredInterval_picks_minimum();
 };
 
@@ -53,6 +54,14 @@ void TestTciSensorFormats::formatRxChannelSensorsEx_5_args_F1()
 // Verifies ALL five fields are F1 (1 decimal place).
 // Plan correction: SWR is F1 -> "1.1" NOT F2 -> "1.10".
 // Thetis source: "{4:F1}" at TCIServer.cs:2326 [v2.10.3.13].
+// Longpath-eigen (2026-11-26): die ALC als eigene Zeile, eine Nachkommastelle,
+// negatives Vorzeichen bleibt (ALC regelt ab = negativer dB-Wert).
+void TestTciSensorFormats::formatTxAlc_eigeneZeile()
+{
+    QCOMPARE(TciSensorManager::formatTxAlc(0, -2.54), QStringLiteral("tx_alc:0,-2.5;"));
+    QCOMPARE(TciSensorManager::formatTxAlc(1, 0.0), QStringLiteral("tx_alc:1,0.0;"));
+}
+
 void TestTciSensorFormats::formatTxSensors_F1_swr_not_F2()
 {
     const QString result = TciSensorManager::formatTxSensors(0, -30.0, 12.5, 12.5, 1.1);

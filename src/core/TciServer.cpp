@@ -757,6 +757,17 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
         }
         const double fwdWatts  = m_model->radioStatus().forwardPowerWatts();
         const double swrRatio  = m_model->radioStatus().swrRatio();
+        // ALC wie am Mac (MeterPoller: TxAlc -> TXA_ALC_AV). Ohne TX-Kanal
+        // gibt es keinen Wert, und dann geht auch keine Zeile hinaus.
+        double alcDb = 0.0;
+        bool   alcDa = false;
+        if (auto* wdsp = m_model->wdspEngine()) {
+            if (wdsp->txChannel(WdspEngine::kTxChannelId) != nullptr) {
+                alcDb = GetTXAMeter(WdspEngine::kTxChannelId,
+                                    static_cast<int>(TxMeterType::AlcAvg));
+                alcDa = true;
+            }
+        }
 
         for (auto it = m_clients.begin(); it != m_clients.end(); ++it) {
             auto& session = it.value();
@@ -767,6 +778,10 @@ TciServer::TciServer(RadioModel* model, QObject* parent)
             const QString frame = TciSensorManager::formatTxSensors(
                 0, micDbm, fwdWatts, fwdWatts, swrRatio);
             session->sendQueue.push(TciSendQueue::Priority::Control, frame);
+            if (session->txAlcEnabled && alcDa) {
+                session->sendQueue.push(TciSendQueue::Priority::Control,
+                                        TciSensorManager::formatTxAlc(0, alcDb));
+            }
         }
     });
 
@@ -4009,6 +4024,21 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                 }
                 return true;
             };
+
+            // Longpath-eigen (2026-11-26): `tx_alc_enable:true|false;` schaltet
+            // die Zeile `tx_alc:` fuer diese Verbindung zu (siehe
+            // TciSensorManager::formatTxAlc). Sie laeuft im Takt von
+            // tx_sensors und nur, solange auch tx_sensors abonniert ist.
+            const QString kTxAlcEnable = QStringLiteral("tx_alc_enable:");
+            if (trimmed.startsWith(kTxAlcEnable)) {
+                const QString w = trimmed.mid(kTxAlcEnable.size()).trimmed();
+                if (w.compare(QLatin1String("true"), Qt::CaseInsensitive) == 0) {
+                    session->txAlcEnabled = true;
+                } else if (w.compare(QLatin1String("false"), Qt::CaseInsensitive) == 0) {
+                    session->txAlcEnabled = false;
+                }
+                return;
+            }
 
             if (trimmed.startsWith(kRxSensEnable)) {
                 // From Thetis TCIServer.cs:4449-4459 [v2.10.3.13] — handleRxSensorsEnable.
