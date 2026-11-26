@@ -602,7 +602,7 @@ void RxApplet::buildUi()
             if (m_slice) { m_slice->setFilterCenter(centre); }
         });
         leftCol->addWidget(m_filterPassband);
-        leftCol->addStretch(1);   // Rest der Höhe unten, nicht in der Mitte
+        // Kein Platzhalter mehr unten: die Regler stehen direkt unter USB (Betreiber 2026-11-26).
         // 2026-11-24: „die Grafik vom Bandfilter benötigen wir dort nicht" —
         // die große Kachel BANDWIDTH FILTER zeigt dasselbe. Das Bauteil
         // bleibt (Modell-Abgleich, Prüfstände), ist aber verborgen und malt
@@ -1096,7 +1096,7 @@ void RxApplet::buildUi()
         applyModeVisibility(m_slice->dspMode());
     }
 
-    rightCol->addStretch(1);   // Resthöhe unten; RIT/XIT sitzen unter den Reglern
+    // Kein Platzhalter mehr unten: die Regler stehen direkt unter USB (Betreiber 2026-11-26).
 
     columns->addLayout(rightCol, 3);
     root->addLayout(columns);
