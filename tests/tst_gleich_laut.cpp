@@ -219,6 +219,49 @@ private slots:
             .arg(double(groessterHub), 0, 'f', 2);
     }
 
+    // ── Kein Ausreisser nach lauter Rede (2026-11-26) ───────────
+    //
+    // Laut verstaerkt die Kette kaum (der Kompressor haelt sie), leise
+    // legt sie 21 dB drauf. Der Wechsel darf in keinem Block lauter
+    // werden als das, was gerade noch hineinging.
+    void nach_lauter_rede_kein_ausreisser()
+    {
+        LoudnessMatch m;
+        m.prepare(kRate);
+        m.setEnabled(true);
+        const auto laut  = rede(int(kRate * 2), 0.5f);
+        const auto leise = rede(int(kRate * 2), 0.03f);
+        std::vector<float> ein = laut;
+        ein.insert(ein.end(), leise.begin(), leise.end());
+        std::vector<float> aus = ein;
+        const float g = std::pow(10.0f, 21.0f / 20.0f);
+        constexpr int kBlock = 128;
+        double halt = 0.0;
+        float groesstesMehr = 0.0f;   // dB ueber der Eingangsspitze
+        const double ab = 1.0 - 1.0 / (0.3 * kRate);
+        for (size_t at = 0; at + kBlock <= ein.size(); at += kBlock) {
+            m.feedInput(ein.data() + at, kBlock);
+            const bool still = at >= laut.size();
+            for (int i = 0; i < kBlock; ++i) {
+                if (still) { aus[at + size_t(i)] *= g; }
+                halt = std::max(double(std::fabs(ein[at + size_t(i)])), halt * ab);
+            }
+            m.applyOutput(aus.data() + at, kBlock);
+            float p = 0.0f;
+            for (int i = 0; i < kBlock; ++i) {
+                p = std::max(p, std::fabs(aus[at + size_t(i)]));
+            }
+            if (p > 1e-5f) {
+                groesstesMehr = std::max(
+                    groesstesMehr, float(20.0 * std::log10(p / halt)));
+            }
+        }
+        QVERIFY2(groesstesMehr < 0.5f,
+                 qPrintable(QStringLiteral("ein Block stand %1 dB ueber der "
+                                           "Eingangsspitze")
+                                .arg(double(groesstesMehr), 0, 'f', 1)));
+    }
+
     // Ausgeschaltet heisst ausgeschaltet.
     void ausgeschaltet_wird_nichts_angefasst()
     {
