@@ -215,9 +215,40 @@ public:
     /// Haelfte aus Luft besteht.
     static constexpr int kFreiH     = 30;
 
+    // ── Eine Station loeschen (2026-11-26) ──────────────────────
+    //
+    // Betreiber: „in den ft8 slots sollte man auch immer eine call
+    // löschen können". Aus drei Blaettern (werkzeug/entwuerfe-ft8-
+    // slots-loeschen-2026-11-26: A beim Ueberfahren, B Rechtsklick,
+    // C immer da) waehlte er C: jede Karte und jeder Wartende traegt
+    // rechts ein leises ✕, das unter dem Zeiger zum Glasknopf wird.
+
+    /// Breite und Hoehe des ✕ -- dasselbe Masz wie die Handgriffe
+    /// unter „THEN" (`Ft8DannListe`).
+    static constexpr int kKreuzB = 17;
+    /// Was das ✕ rechts kostet: es selbst und 3 Luft. In der grossen
+    /// Karte nichts -- dort sitzt es unten rechts, wo nichts steht.
+    static constexpr int kKreuzPlatz = kKreuzB + 3;
+
+    /// Wo das ✕ der Kachel `i` / des Wartenden `k` sitzt, in der
+    /// Anordnung `a`. Leer: dort gibt es keines (der CQ-Ruf).
+    QRect kreuzKachel(const Ft8PlaetzeAnordnung& a, int i) const;
+    QRect kreuzWartend(const Ft8PlaetzeAnordnung& a, int k) const;
+
+    /// Wer an dieser Stelle steht (Kachel mit Partner oder Wartender).
+    QString partnerBei(const QPoint& pos) const;
+
+signals:
+    /// Der Betreiber will diese Station loeschen.
+    void entfernen(const QString& partner);
+
 protected:
     void paintEvent(QPaintEvent*) override;
     void resizeEvent(QResizeEvent* ev) override;
+    void mouseMoveEvent(QMouseEvent* ev) override;
+    void mousePressEvent(QMouseEvent* ev) override;
+    void leaveEvent(QEvent* ev) override;
+    bool event(QEvent* ev) override;
 
 private:
     /// Gibt die Hoehe zurueck, die sie gebraucht hat.
@@ -256,10 +287,21 @@ private:
     /// „sent -05   rcvd +12" -- gemalt und gemessen aus EINER Quelle.
     static QString rapportZeile(const Ft8PlatzStand& z);
 
+    /// Das ✕ malen. `drauf`: der Zeiger steht auf ihm.
+    void maleKreuz(QPainter& p, const QRect& r, bool drauf) const;
+    /// Den Zeiger nachfuehren. Gibt true, wenn sich etwas aenderte.
+    bool merkeZeiger(const QPoint& pos);
+
     Ft8PlaetzeStand m_stand;
     /// Die Dichte, die gerade gilt -- gemerkt nur fuer die kleine
     /// Traegheit beim Ziehen (siehe `anordnungFuer`).
     Dichte          m_dichte{Dichte::Gross};
+
+    /// Wo der Zeiger steht: ueber Kachel / Wartendem (-1: keinem), und
+    /// ob auf dessen ✕.
+    int  m_ueberKachel{-1};
+    int  m_ueberWartend{-1};
+    bool m_aufKreuz{false};
 };
 
 class Ft8PlaetzeApplet : public AppletWidget
@@ -292,6 +334,12 @@ public slots:
 
 public:
     Ft8PlaetzeFlaeche* flaecheForTest() const { return m_flaeche; }
+
+signals:
+    /// Durchgereicht von der Flaeche: diese Station loeschen.
+    void entfernen(const QString& partner);
+
+public:
     QLabel*            leerForTest() const { return m_leer; }
 
     /// Unter dieser Hoehe luegt das Fenster (2026-10-30): der leere

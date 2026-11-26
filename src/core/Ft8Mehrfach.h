@@ -51,6 +51,9 @@
 //                 (Rapport fuer den Anrufer, nicht mein Locator).
 //                 Martin Fischer (OE5SOS), KI-gestuetzt ueber Anthropic
 //                 Claude.
+//   2026-11-26 — entferne(): eine Station von ihrem Platz oder aus der
+//                 Schlange nehmen, ohne die anderen anzufassen. Martin
+//                 Fischer (OE5SOS), KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 #include <QString>
@@ -186,6 +189,30 @@ public:
 
     /// Kennt einer der Plaetze oder die Schlange dieses Rufzeichen?
     bool kennt(const QString& partner) const;
+
+    /// Wer wartet, in der Reihenfolge, in der er nachrueckt.
+    struct Wartender {
+        QString partner;
+        int     snr{0};
+    };
+    QVector<Wartender> warteliste() const;
+
+    /// Eine Station herausnehmen (2026-11-26, Betreiber: „in den ft8
+    /// slots sollte man auch immer eine call löschen können").
+    ///
+    /// Steht sie auf einem Platz und laeuft ihr QSO noch, wird es
+    /// abgebrochen und der Platz ist SOFORT frei: `naechsteNachrichten`
+    /// kennt sie nicht mehr, und aus der Schlange rueckt nach. Ein
+    /// abgebrochenes QSO kommt nie in `nimmFertige` -- also nie ins
+    /// Logbuch. Wartet sie, faellt sie aus der Schlange.
+    ///
+    /// Die uebrigen Plaetze behalten ihren Zug. Ihre Tonlagen ruecken
+    /// nach, wie nach jedem fertigen QSO (`raeumeAuf`): die Tonlage ist
+    /// der Index im Feld, und die Gegenstation sucht nach dem Ruf, nicht
+    /// nach dem Ton.
+    ///
+    /// Gibt true, wenn es sie gab.
+    bool entferne(const QString& partner);
 
     void abbrechen();
 

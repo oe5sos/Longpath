@@ -247,6 +247,93 @@ private slots:
         QVERIFY(!m.nimmAnrufer(QStringLiteral("DL1ABC"), -12));
         QCOMPARE(m.aktive(), 0);
     }
+
+    // ── Eine Station loeschen (2026-11-26) ───────────────────────────
+    //
+    // Betreiber: „in den ft8 slots sollte man auch immer eine call
+    // löschen können". Der Platz wird sofort frei, die anderen behalten
+    // ihren Zug, und das abgebrochene QSO kommt nie ins Logbuch.
+    void entferneLaesstDieAnderenStehen()
+    {
+        Ft8Mehrfach m = frisch(3);
+        QVERIFY(m.nimmAnrufer(QStringLiteral("DL1ABC"), -12));
+        QVERIFY(m.nimmAnrufer(QStringLiteral("G0XYZ"),  -7));
+        QVERIFY(m.nimmAnrufer(QStringLiteral("F5QRP"),  -18));
+        // G0XYZ kommt einen Zug weiter, die anderen nicht.
+        QVERIFY(m.verarbeite(QStringLiteral("OE5SOS G0XYZ R-09"), -7) == 1);
+        const auto vorher = m.belegung();
+        const QString zugDl = m.naechsteNachrichten().at(0).text;
+        const QString zugF5 = m.naechsteNachrichten().at(2).text;
+
+        QVERIFY(m.entferne(QStringLiteral("g0xyz")));     // Schreibweise egal
+
+        QCOMPARE(m.aktive(), 2);
+        QVERIFY(!m.kennt(QStringLiteral("G0XYZ")));
+        const auto raus = m.naechsteNachrichten();
+        QCOMPARE(raus.size(), 2);
+        QCOMPARE(raus.at(0).text, zugDl);
+        QCOMPARE(raus.at(1).text, zugF5);
+        for (const auto& p : raus) {
+            QVERIFY2(!p.text.contains(QStringLiteral("G0XYZ")), qPrintable(p.text));
+        }
+        // Die anderen in ihrem Zustand.
+        const auto nachher = m.belegung();
+        QCOMPARE(nachher.at(0).zustand, vorher.at(0).zustand);
+        QCOMPARE(nachher.at(1).zustand, vorher.at(2).zustand);
+        // Kein Logeintrag fuer das abgebrochene.
+        m.fensterVerstrichen();
+        QCOMPARE(m.nimmFertige().size(), 0);
+        // Wer nicht da ist, ist nicht da.
+        QVERIFY(!m.entferne(QStringLiteral("G0XYZ")));
+    }
+
+    void entfernterPlatzLaesstDieSchlangeNachruecken()
+    {
+        Ft8Mehrfach m = frisch(2);
+        QVERIFY(m.nimmAnrufer(QStringLiteral("DL1ABC"), -12));
+        QVERIFY(m.nimmAnrufer(QStringLiteral("G0XYZ"),  -7));
+        QVERIFY(m.nimmAnrufer(QStringLiteral("F5QRP"),  -18));
+        QCOMPARE(m.wartende(), 1);
+        QCOMPARE(m.warteliste().size(), 1);
+        QCOMPARE(m.warteliste().first().partner, QStringLiteral("F5QRP"));
+        QCOMPARE(m.warteliste().first().snr, -18);
+
+        QVERIFY(m.entferne(QStringLiteral("DL1ABC")));
+        // Sofort, ohne dass ein Fenster vergeht.
+        QCOMPARE(m.aktive(), 2);
+        QCOMPARE(m.wartende(), 0);
+        QVERIFY(m.kennt(QStringLiteral("F5QRP")));
+        QVERIFY(!m.kennt(QStringLiteral("DL1ABC")));
+    }
+
+    void entferneAusDerSchlange()
+    {
+        Ft8Mehrfach m = frisch(1);
+        QVERIFY(m.nimmAnrufer(QStringLiteral("DL1ABC"), -12));
+        QVERIFY(m.nimmAnrufer(QStringLiteral("G0XYZ"),  -7));
+        QVERIFY(m.nimmAnrufer(QStringLiteral("F5QRP"),  -18));
+        QCOMPARE(m.wartende(), 2);
+
+        QVERIFY(m.entferne(QStringLiteral("G0XYZ")));
+        QCOMPARE(m.wartende(), 1);
+        QCOMPARE(m.aktive(), 1);
+        QCOMPARE(m.belegung().first().partner, QStringLiteral("DL1ABC"));
+        QCOMPARE(m.warteliste().first().partner, QStringLiteral("F5QRP"));
+    }
+
+    // Ist das QSO schon fertig (RR73 hinaus, noch nicht abgeholt), ist
+    // es ein QSO -- loeschen nimmt es nicht aus dem Logbuch.
+    void einFertigesQsoBleibtEinQso()
+    {
+        Ft8Mehrfach m = frisch(2);
+        QVERIFY(m.nimmAnrufer(QStringLiteral("DL1ABC"), -12));
+        QVERIFY(m.verarbeite(QStringLiteral("OE5SOS DL1ABC R-09"), -12) == 1);
+        // RR73 ist draussen: das Fenster vergeht, er ist fertig.
+        m.fensterVerstrichen();
+        QCOMPARE(m.aktive(), 0);
+        QVERIFY(!m.entferne(QStringLiteral("DL1ABC")));
+        QCOMPARE(m.nimmFertige().size(), 1);
+    }
 };
 
 QTEST_MAIN(TstFt8Mehrfach)

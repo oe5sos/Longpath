@@ -9,6 +9,9 @@
 //   2026-11-17 — Mehrere Plaetze: siehe den Eintrag in Ft8Applet.h.
 //                 Martin Fischer (OE5SOS), KI-gestuetzt ueber Anthropic
 //                 Claude.
+//   2026-11-26 — entferneStation(): siehe den Eintrag in Ft8Applet.h.
+//                 Martin Fischer (OE5SOS), KI-gestuetzt ueber Anthropic
+//                 Claude (Claude Code).
 // =================================================================
 
 #include "Ft8Applet.h"
@@ -1927,7 +1930,76 @@ bool Ft8Applet::nimmAnruferAufPlatz(const QString& nachricht, int snr)
         << "Anruf auf einen Platz genommen:" << anrufer
         << "—" << m_mehrfach.aktive() << "belegt,"
         << m_mehrfach.wartende() << "wartend — aus:" << nachricht;
+    // Sofort ins Panel (2026-11-26). Der Weg ueber `ablaufSchritt` ->
+    // `sendeMehrfach` -> `zeigeArbeit` meldet nur, wenn noch KEIN Zug
+    // gepackt ist; ist einer gepackt, kehrt `sendeMehrfach` vorher um,
+    // und der zweite und dritte Anrufer standen bis zum Tasten nicht in
+    // „FT8 Slots" -- also auch ohne ✕ zum Loeschen.
+    meldeStand();
     return true;
+}
+
+// ── Eine Station aus „FT8 Slots" loeschen (2026-11-26) ───────────────
+//
+// Betreiber: „in den ft8 slots sollte man auch immer eine call löschen
+// können". Bis hierher ging nur alles auf einmal (Stop).
+//
+// Wann es greift, haengt daran, wo der Sendetakt steht -- und das
+// braucht hier keine eigene Regel:
+//   * Ist der naechste Zug gepackt, aber noch nicht hinaus, packt die
+//     Nachpruefung beim Tasten (`sendeNachricht`, Dekoderfrist) die
+//     PLAETZE neu -- ohne ihn.
+//   * Geht gerade eine Sendung hinaus, laeuft sie zu Ende: die Probe
+//     steckt fertig in der Tonquelle, und ein Fenster mitten im Ton
+//     neu zu packen hiesse, die anderen Stationen mit abzuschneiden.
+//     `fensterZuEnde` findet ihn danach nicht mehr -- kein Zug weiter,
+//     kein Logeintrag.
+// Die Sperrfrist ist die des ✕ unter „THEN": `nimmAnruferAufPlatz`
+// fragt `abgewiesen` schon, also ruft er sich nicht von selbst zurueck.
+void Ft8Applet::entferneStation(const QString& wer)
+{
+    const QString ruf = wer.trimmed().toUpper();
+    if (ruf.isEmpty()) { return; }
+    const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+
+    const bool vomPlatz = m_mehrfach.entferne(ruf);
+    // Auch den einzelnen Ablauf: mit einem Platz zeigt „FT8 Slots" ihn
+    // als Karte. Im Mehrfachbetrieb fuehrt er nur den CQ-Ruf und hat
+    // keinen Partner.
+    bool vomAblauf = false;
+    if (m_ablauf.laeuft() && !m_ablauf.partner().isEmpty()
+        && m_ablauf.partner().toUpper() == ruf) {
+        m_ablauf.abbrechen();
+        vomAblauf = true;
+    }
+    m_schlange.weiseAb(ruf, jetzt);
+
+    qCInfo(lcFt8Senden).noquote()
+        << "Aus FT8 Slots geloescht:" << ruf
+        << (vomPlatz ? "(Platz/Schlange der Plaetze)" : "")
+        << (vomAblauf ? "(einzelner Ablauf)" : "")
+        << "—" << m_mehrfach.aktive() << "belegt,"
+        << m_mehrfach.wartende() << "wartend";
+
+    if (vomAblauf) {
+        // Der einzelne Weg hat sonst niemanden mehr. Im Lauf vom
+        // CQ-Knopf geht es weiter wie nach einem fertigen QSO, nur ohne
+        // Logbuch: zuerst wer wartet, sonst wieder CQ. Laeuft gerade
+        // eine Sendung, wird nur angefangen -- gesendet wird nach ihr.
+        if (m_cqAutomatik) {
+            if (!beginneNaechstenWartenden()) { beginneCqRuf(); }
+            if (!m_sendet) { ablaufSchritt(); }
+        }
+        zeigeAblauf();
+    } else if (vomPlatz && mehrfachAn() && !m_sendet
+               && m_mehrfach.aktive() == 0 && !m_ablauf.laeuft()) {
+        // Der letzte Platz ist weg und nichts ruft: der gepackte Zug
+        // waere an ihn gegangen. Die Nachpruefung verwirft ihn ohnehin;
+        // hier nur die Anzeige.
+        zeigeAblauf();
+    }
+    zeigeFundZahl();
+    meldeStand();
 }
 
 int Ft8Applet::meldeFertigePlaetze()
@@ -3988,11 +4060,33 @@ Ft8PlaetzeStand Ft8Applet::baueStand() const
         st.plaetze.append(ausAblauf(m_ablauf, m_sendeTonHz));
     }
 
+    // ── Wer auf einen Platz wartet (2026-11-26) ─────────────────────
+    //
+    // Sind alle Plaetze belegt, stellt `Ft8Mehrfach` den naechsten
+    // Anrufer in seine EIGENE Schlange -- und die stand bis hierher
+    // nirgends: unter „WAITING" nur, wer unter „THEN" stand. Wer ihn
+    // loeschen will, muss ihn sehen. Zuerst, weil er zuerst nachrueckt
+    // (`Ft8Mehrfach::raeumeAuf` vor `beginneNaechstenWartenden`).
+    if (mehrfachAn()) {
+        for (const Ft8Mehrfach::Wartender& w : m_mehrfach.warteliste()) {
+            Ft8WartenderStand ws;
+            ws.partner = w.partner;
+            ws.land    = landFuer(w.partner);
+            ws.snr     = w.snr;
+            st.wartende.append(ws);
+        }
+    }
     const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
     for (const Ft8Warteschlange::Wartend& w : m_schlange.alle()) {
         if ((jetzt - w.seitMs) >= Ft8Warteschlange::kHaltbarkeitMs) {
             continue;
         }
+        const bool schonDa = std::any_of(
+            st.wartende.cbegin(), st.wartende.cend(),
+            [&w](const Ft8WartenderStand& x) {
+                return x.partner.compare(w.partner, Qt::CaseInsensitive) == 0;
+            });
+        if (schonDa) { continue; }
         Ft8WartenderStand ws;
         ws.partner = w.partner;
         ws.land    = landFuer(w.partner);

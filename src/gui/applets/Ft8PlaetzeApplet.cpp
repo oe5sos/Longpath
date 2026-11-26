@@ -18,8 +18,12 @@
 #include "gui/StyleConstants.h"
 #include "gui/styles/ThemeQss.h"
 
+#include <QCursor>
 #include <QEvent>
 #include <QFontMetrics>
+#include <QHelpEvent>
+#include <QMouseEvent>
+#include <QToolTip>
 #include <QPalette>
 #include <QLabel>
 #include <QPainter>
@@ -151,12 +155,19 @@ Ft8PlaetzeFlaeche::Ft8PlaetzeFlaeche(QWidget* parent)
     : QWidget(parent)
 {
     setAttribute(Qt::WA_OpaquePaintEvent, false);
+    // Das ✕ wird unter dem Zeiger zum Knopf -- ohne Verfolgung kaemen
+    // Bewegungen nur mit gedrueckter Taste an.
+    setMouseTracking(true);
 }
 
 void Ft8PlaetzeFlaeche::setzeStand(const Ft8PlaetzeStand& s)
 {
     m_stand = s;
     merkeDichte();
+    // Der Zeiger steht noch, wo er stand -- aber vielleicht ueber einer
+    // anderen Station. Neu nachsehen, sonst loescht der naechste Klick
+    // den, der vorher dort war.
+    merkeZeiger(mapFromGlobal(QCursor::pos()));
     updateGeometry();
     update();
 }
@@ -481,11 +492,12 @@ int Ft8PlaetzeFlaeche::hartBreite(Dichte d) const
     case Dichte::Kompakt:
         // Oben das Rufzeichen neben der Tonlage, unten Fortschritt und
         // Pille -- das Land darf dort ganz weichen.
-        return qMax(rufBreite(d) + kKompaktNebenRuf, kKompaktNebenLand);
+        return qMax(rufBreite(d) + kKompaktNebenRuf + kKreuzPlatz,
+                    kKompaktNebenLand);
     case Dichte::Zeile:
         // Nummer, Rufzeichen, Pille, Tonlage. Fortschritt und Land
         // weichen vorher.
-        return rufBreite(d) + kZeileNebenRuf;
+        return rufBreite(d) + kZeileNebenRuf + kKreuzPlatz;
     }
     return kachelMindestbreite();
 }
@@ -501,8 +513,8 @@ int Ft8PlaetzeFlaeche::basisBreite(Dichte d) const
     case Dichte::Zeile:
         // Mit Fortschritt und einem gekuerzten Land -- der halben
         // Breite des Maszlandes, „European…".
-        return rufBreite(d) + kZeileNebenRuf + kZeileStriche + 8
-               + landBreite() / 2 + 8;
+        return rufBreite(d) + kZeileNebenRuf + kKreuzPlatz
+               + kZeileStriche + 8 + landBreite() / 2 + 8;
     }
     return kachelMindestbreite();
 }
@@ -554,7 +566,7 @@ int Ft8PlaetzeFlaeche::warteMindestbreite() const
     QFont klein = font();
     klein.setPointSizeF(9.0);
     return QFontMetrics(klein).horizontalAdvance(kMassLand)
-           + kWarteNebenLand + 2;
+           + kWarteNebenLand + kKreuzPlatz + 2;
 }
 
 QString Ft8PlaetzeFlaeche::rapportZeile(const Ft8PlatzStand& z)
@@ -633,6 +645,20 @@ void Ft8PlaetzeFlaeche::paintEvent(QPaintEvent*)
     }
     if (a.wartendeY >= 0) {
         maleWartende(p, a);
+    }
+
+    // Zuletzt die ✕, ueber allem anderen (2026-11-26).
+    for (int i = 0; i < a.kacheln.size(); ++i) {
+        const QRect k = kreuzKachel(a, i);
+        if (!k.isEmpty()) {
+            maleKreuz(p, k, m_aufKreuz && m_ueberKachel == i);
+        }
+    }
+    for (int i = 0; i < a.wartende.size(); ++i) {
+        const QRect k = kreuzWartend(a, i);
+        if (!k.isEmpty()) {
+            maleKreuz(p, k, m_aufKreuz && m_ueberWartend == i);
+        }
     }
 }
 
@@ -798,15 +824,18 @@ void Ft8PlaetzeFlaeche::maleKompakt(QPainter& p, const QRect& r, int nummer,
     ruf.setBold(!cq);
     p.setFont(ruf);
     p.setPen(farbe(cq ? Style::kTextScale : Style::kTextPrimary));
-    p.drawText(QRect(tx, r.top() + 3, w - kKompaktNebenRuf, 20),
+    p.drawText(QRect(tx, r.top() + 3, w - kKompaktNebenRuf - kKreuzPlatz, 20),
                Qt::AlignLeft | Qt::AlignVCenter,
                cq ? tr("calling CQ") : z.partner);
 
+    // Rechts davon das ✕ (2026-11-26) -- die Tonlage rueckt um seinen
+    // Platz nach links.
     p.setFont(Style::monoFont(font(), 12));
     p.setPen(farbe(Style::kTextSecondary));
-    p.drawText(QRect(r.right() - 8 - kKompaktTonB, r.top() + 6,
-                     kKompaktTonB, 14),
-               Qt::AlignRight | Qt::AlignVCenter, tr("%1 Hz").arg(z.tonHz));
+    p.drawText(QRect(r.right() - 8 - kKreuzPlatz - kKompaktTonB,
+                     r.top() + 6, kKompaktTonB, 14),
+               Qt::AlignRight | Qt::AlignVCenter,
+               tr("%1 Hz").arg(z.tonHz));
 
     // Zweite Zeile, von rechts: Pille, Fortschritt, und was bleibt,
     // bekommt das Land.
@@ -882,8 +911,8 @@ void Ft8PlaetzeFlaeche::maleZeile(QPainter& p, const QRect& r, int nummer,
     // Von rechts: die Tonlage ohne „Hz" -- die Einheit steht in der
     // grossen Karte, und vier Ziffern zwischen 200 und 3000 sind in
     // diesem Fenster nichts anderes.
-    const QRect ton(r.right() - 8 - kZeileTonB, r.top(), kZeileTonB,
-                    r.height());
+    const QRect ton(r.right() - 8 - kKreuzPlatz - kZeileTonB, r.top(),
+                    kZeileTonB, r.height());
     p.setFont(Style::monoFont(font(), 11));
     p.setPen(farbe(Style::kTextSecondary));
     p.drawText(ton, Qt::AlignRight | Qt::AlignVCenter,
@@ -1001,14 +1030,185 @@ void Ft8PlaetzeFlaeche::maleWartende(QPainter& p,
 
         p.setFont(klein);
         p.setPen(farbe(Style::kTextInactive));
-        p.drawText(QRect(z.left() + 100, yy, zw - 160, 16),
+        p.drawText(QRect(z.left() + 100, yy, zw - 160 - kKreuzPlatz, 16),
                    Qt::AlignLeft | Qt::AlignVCenter, wart.land);
 
+        // Rechts daneben das ✕ (2026-11-26).
         p.setFont(Style::monoFont(font(), 12));
         p.setPen(farbe(Style::kTextScale));
-        p.drawText(QRect(z.left() + zw - 50, yy, 44, 16),
+        p.drawText(QRect(z.left() + zw - 50 - kKreuzPlatz, yy, 44, 16),
                    Qt::AlignRight | Qt::AlignVCenter, rapport(wart.snr));
     }
+}
+
+// ══ Eine Station loeschen (2026-11-26) ════════════════════════════
+//
+// Betreiber: „in den ft8 slots sollte man auch immer eine call löschen
+// können". Was danach geschieht, entscheidet `Ft8Applet::
+// entferneStation`; hier steht nur, WO man es anfasst.
+//
+// Gewaehlt aus drei Blaettern: Variante C, das ✕ steht immer da, leise
+// in der Farbe der Platznummer. Unter dem Zeiger wird es derselbe
+// Glasknopf wie die Handgriffe unter „THEN" -- 17 Punkt, Radius 4,
+// grau. Kein Rot: es ist eine Bedienung, keine
+// Warnung, und in diesem Panel gibt es genau eine warme Stelle („on
+// air").
+
+QRect Ft8PlaetzeFlaeche::kreuzKachel(const Ft8PlaetzeAnordnung& a, int i) const
+{
+    if (i < 0 || i >= a.kacheln.size() || i >= m_stand.plaetze.size()) {
+        return {};
+    }
+    // Der CQ-Ruf ist keine Station -- ihn haelt `Stop` an.
+    if (m_stand.plaetze.at(i).partner.isEmpty()) { return {}; }
+
+    const QRect r = a.kacheln.at(i);
+    // Rechts buendig mit dem, was dort sonst steht: 8 vom Rand.
+    const int x = r.right() - 8 - kKreuzB + 1;
+    switch (a.dichte) {
+    case Dichte::Gross:
+        // Unten rechts -- dort steht in der grossen Karte nichts, also
+        // rueckt nichts.
+        return QRect(x, r.bottom() - 8 - kKreuzB + 1, kKreuzB, kKreuzB);
+    case Dichte::Kompakt:
+        return QRect(x, r.top() + 4, kKreuzB, kKreuzB);
+    case Dichte::Zeile:
+        return QRect(x, r.top() + (r.height() - kKreuzB) / 2,
+                     kKreuzB, kKreuzB);
+    }
+    return {};
+}
+
+QRect Ft8PlaetzeFlaeche::kreuzWartend(const Ft8PlaetzeAnordnung& a, int k) const
+{
+    if (k < 0 || k >= a.wartende.size()) { return {}; }
+    const QRect z = a.wartende.at(k);
+    // Rechts buendig, wo frueher der Rapport endete (zw - 6).
+    return QRect(z.left() + z.width() - 6 - kKreuzB, z.top() - 1,
+                 kKreuzB, kKreuzB);
+}
+
+void Ft8PlaetzeFlaeche::maleKreuz(QPainter& p, const QRect& r,
+                                  bool drauf) const
+{
+    // Leise, solange der Zeiger nicht drauf ist: nur die zwei Striche
+    // in der Farbe der Platznummer. Darunter der Glasknopf von „THEN".
+    if (drauf) {
+        QLinearGradient g(r.topLeft(), r.bottomLeft());
+        g.setColorAt(0.0, farbe(Style::kGlassBtnTop));
+        g.setColorAt(1.0, farbe(Style::kGlassBtnBot));
+        p.setPen(farbe(drauf ? Style::kGlassSelBorder : Style::kBorderMuted));
+        p.setBrush(g);
+        p.drawRoundedRect(QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5), 4, 4);
+    }
+    // Zwei Striche statt des Zeichens „✕": das Zeichen haengt an der
+    // Schrift, und in 9 Punkt blieb davon auf dem Blatt ein Fleck.
+    QPen stift(farbe(drauf ? Style::kTextPrimary : Style::kTextInactive),
+               1.4);
+    stift.setCapStyle(Qt::RoundCap);
+    p.setPen(stift);
+    const QRectF innen = QRectF(r).adjusted(5.5, 5.5, -5.5, -5.5);
+    p.drawLine(innen.topLeft(), innen.bottomRight());
+    p.drawLine(innen.topRight(), innen.bottomLeft());
+}
+
+QString Ft8PlaetzeFlaeche::partnerBei(const QPoint& pos) const
+{
+    const Ft8PlaetzeAnordnung a = anordnung();
+    for (int i = 0; i < a.kacheln.size() && i < m_stand.plaetze.size(); ++i) {
+        if (a.kacheln.at(i).contains(pos)) {
+            return m_stand.plaetze.at(i).partner;
+        }
+    }
+    for (int k = 0; k < a.wartende.size() && k < m_stand.wartende.size(); ++k) {
+        if (a.wartende.at(k).adjusted(0, -3, 0, 3).contains(pos)) {
+            return m_stand.wartende.at(k).partner;
+        }
+    }
+    return {};
+}
+
+bool Ft8PlaetzeFlaeche::merkeZeiger(const QPoint& pos)
+{
+    const Ft8PlaetzeAnordnung a = anordnung();
+    int kachel = -1;
+    int wartend = -1;
+    bool kreuz = false;
+    if (rect().contains(pos)) {
+        for (int i = 0; i < a.kacheln.size(); ++i) {
+            if (a.kacheln.at(i).contains(pos)) { kachel = i; break; }
+        }
+        if (kachel < 0) {
+            for (int k = 0; k < a.wartende.size(); ++k) {
+                if (a.wartende.at(k).adjusted(0, -3, 0, 3).contains(pos)) {
+                    wartend = k;
+                    break;
+                }
+            }
+        }
+        // Zwei Punkte Fang rundum: das ✕ ist klein.
+        const QRect k = kachel >= 0 ? kreuzKachel(a, kachel)
+                      : wartend >= 0 ? kreuzWartend(a, wartend) : QRect();
+        kreuz = !k.isEmpty() && k.adjusted(-2, -2, 2, 2).contains(pos);
+    }
+    const bool anders = kachel != m_ueberKachel || wartend != m_ueberWartend
+                        || kreuz != m_aufKreuz;
+    m_ueberKachel  = kachel;
+    m_ueberWartend = wartend;
+    m_aufKreuz     = kreuz;
+    if (anders) {
+        if (kreuz) { setCursor(Qt::PointingHandCursor); }
+        else       { unsetCursor(); }
+    }
+    return anders;
+}
+
+void Ft8PlaetzeFlaeche::mouseMoveEvent(QMouseEvent* ev)
+{
+    if (merkeZeiger(ev->position().toPoint())) { update(); }
+    QWidget::mouseMoveEvent(ev);
+}
+
+void Ft8PlaetzeFlaeche::leaveEvent(QEvent* ev)
+{
+    if (merkeZeiger(QPoint(-1, -1))) { update(); }
+    QWidget::leaveEvent(ev);
+}
+
+void Ft8PlaetzeFlaeche::mousePressEvent(QMouseEvent* ev)
+{
+    if (ev->button() == Qt::LeftButton) {
+        merkeZeiger(ev->position().toPoint());
+        if (m_aufKreuz) {
+            const QString wer = partnerBei(ev->position().toPoint());
+            if (!wer.isEmpty()) {
+                emit entfernen(wer);
+                ev->accept();
+                return;
+            }
+        }
+    }
+    QWidget::mousePressEvent(ev);
+}
+
+bool Ft8PlaetzeFlaeche::event(QEvent* ev)
+{
+    if (ev->type() == QEvent::ToolTip) {
+        auto* h = static_cast<QHelpEvent*>(ev);
+        merkeZeiger(h->pos());
+        const QString wer = m_aufKreuz ? partnerBei(h->pos()) : QString();
+        if (!wer.isEmpty()) {
+            QToolTip::showText(h->globalPos(),
+                               tr("Remove %1 — not taken again for 5 min")
+                                   .arg(wer),
+                               this);
+        } else {
+            QToolTip::hideText();
+            ev->ignore();
+        }
+        return true;
+    }
+    return QWidget::event(ev);
 }
 
 // ══ Das Applet ═══════════════════════════════════════════════════
@@ -1059,6 +1259,8 @@ Ft8PlaetzeApplet::Ft8PlaetzeApplet(RadioModel* model, QWidget* parent)
     setMinimumHeight(kMindestH);
 
     m_flaeche = new Ft8PlaetzeFlaeche(this);
+    connect(m_flaeche, &Ft8PlaetzeFlaeche::entfernen,
+            this, &Ft8PlaetzeApplet::entfernen);
     m_flaeche->hide();
     lay->addWidget(m_flaeche, 1);
 }

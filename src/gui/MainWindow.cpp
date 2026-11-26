@@ -8826,6 +8826,11 @@ void MainWindow::populateDefaultMeter()
     m_ft8PlaetzeApplet->setVisible(false);
     connect(m_ft8Applet, &Ft8Applet::plaetzeGeaendert,
             m_ft8PlaetzeApplet, &Ft8PlaetzeApplet::zeigeStand);
+    // Und zurueck nur EINES (2026-11-26): eine Station loeschen. Was
+    // das heisst -- Platz frei, Sperrfrist, kein Logeintrag --,
+    // entscheidet das FT8-Fenster, das die Ablaeufe fuehrt.
+    connect(m_ft8PlaetzeApplet, &Ft8PlaetzeApplet::entfernen,
+            m_ft8Applet, &Ft8Applet::entferneStation);
 
     // ── Es zeigt sich, sobald es etwas zu zeigen hat ──────────
     //
