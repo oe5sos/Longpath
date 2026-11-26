@@ -22,6 +22,7 @@
 #include <QtTest/QtTest>
 #include <QDir>
 #include <QImage>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QStandardPaths>
 
@@ -682,6 +683,184 @@ private slots:
                 << f->hartBreite(D::Kompakt) << f->hartBreite(D::Zeile)
                 << "| bequem k/z" << f->basisBreite(D::Kompakt)
                 << f->basisBreite(D::Zeile);
+        }
+    }
+
+    // ── Eine Station loeschen (2026-11-26) ───────────────────────────
+    //
+    // Betreiber: „in den ft8 slots sollte man auch immer eine call
+    // löschen können". Drei Varianten lagen ihm vor (A beim
+    // Ueberfahren, B Rechtsklick, C immer da); er waehlte C. Dieses
+    // Blatt zeigt das Gebaute aus dem echten Fenster: Spalten = die
+    // drei Kartengroessen, oben ohne Zeiger, unten der Zeiger auf dem ✕.
+    //
+    // Braucht LONGPATH_GRAB_DIR und LONGPATH_ENTWURF=1; mit
+    // QT_SCALE_FACTOR=2 und QT_FONT_DPI=72 in wirklicher Groesse.
+    void loeschen()
+    {
+        const QString ziel = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+        if (ziel.isEmpty() || qEnvironmentVariable("LONGPATH_ENTWURF")
+                                  != QLatin1String("1")) {
+            QSKIP("Werkzeug: braucht LONGPATH_GRAB_DIR und LONGPATH_ENTWURF=1.");
+        }
+        QDir().mkpath(ziel);
+        applyDarkPalette(*qApp);
+        applyAppBaselineQss(*qApp);
+
+        auto stand = [] {
+            static const struct {
+                const char* ruf; const char* land; int ton;
+                const char* zug; int stufe; int gesendet; int empfangen;
+            } quellen[] = {
+                { "R6FMM",  "European Russia", 2280, "Tx3", 3,  -5, -11 },
+                { "UN6LN",  "Kazakhstan",      2220, "Tx2", 2, -14, -99 },
+                { "JS6TWW", "Japan",           2160, "Tx1", 1, -99, -99 } };
+            Ft8PlaetzeStand s;
+            s.plaetzeGesamt = 4;
+            s.sendet = true;
+            for (const auto& q : quellen) {
+                Ft8PlatzStand z;
+                z.partner   = QString::fromLatin1(q.ruf);
+                z.land      = QString::fromLatin1(q.land);
+                z.tonHz     = q.ton;
+                z.zug       = QString::fromLatin1(q.zug);
+                z.stufe     = q.stufe;
+                z.gesendet  = q.gesendet;
+                z.empfangen = q.empfangen;
+                s.plaetze.append(z);
+            }
+            s.wartende.append(Ft8WartenderStand{QStringLiteral("PD4RJ"),
+                                                QStringLiteral("Netherlands"), -9});
+            s.wartende.append(Ft8WartenderStand{QStringLiteral("F5PZT"),
+                                                QStringLiteral("France"), 4});
+            return s;
+        };
+
+        using D = Ft8PlaetzeAnordnung::Dichte;
+        struct Variante { const char* datei; const char* titel;
+                          const char* zeile1; const char* zeile2; };
+        const Variante varianten[] = {
+            { "C-eingebaut",
+              "C — ✕ immer sichtbar, leise (gewählt, eingebaut)",
+              "ohne Zeiger",
+              "Zeiger auf dem ✕ von UN6LN" },
+        };
+        struct Groesse { D dichte; int breite; int hoehe; const char* name; };
+        const Groesse groessen[] = {
+            { D::Gross,   340, 480, "groß" },
+            { D::Kompakt, 340, 300, "kompakt" },
+            { D::Zeile,   340, 215, "Zeile" },
+        };
+
+        // Ein Mauszeiger, damit man sieht, wo er steht.
+        auto zeiger = [](QPainter& p, QPointF at) {
+            QPolygonF pfeil;
+            pfeil << QPointF(0, 0) << QPointF(0, 15) << QPointF(4, 11)
+                  << QPointF(7, 17) << QPointF(9, 16) << QPointF(6, 10)
+                  << QPointF(11, 10);
+            pfeil.translate(at);
+            p.setRenderHint(QPainter::Antialiasing, true);
+            p.setPen(QPen(Qt::black, 1));
+            p.setBrush(Qt::white);
+            p.drawPolygon(pfeil);
+        };
+
+        for (const Variante& v : varianten) {
+            QVector<QImage> bilder;     // je Groesse zwei Zeilen
+            for (const Groesse& g : groessen) {
+                for (int zeile = 0; zeile < 2; ++zeile) {
+                    RadioModel radio;
+                    auto* panel = new Ft8PlaetzeApplet(&radio, nullptr);
+                    panel->zeigeStand(stand());
+                    AppletFloatingWindow fenster(panel, QStringLiteral("Ft8Slots"),
+                                                 0, nullptr);
+                    fenster.resize(g.breite, g.hoehe);
+                    fenster.show();
+                    QVERIFY(QTest::qWaitForWindowExposed(&fenster, kFensterFrist));
+                    for (int runde = 0; runde < 12; ++runde) {
+                        QCoreApplication::sendPostedEvents();
+                        QCoreApplication::processEvents();
+                    }
+                    Ft8PlaetzeFlaeche* f = panel->flaecheForTest();
+                    const Ft8PlaetzeAnordnung a = f->anordnung();
+                    QVERIFY2(a.dichte == g.dichte,
+                             qPrintable(QStringLiteral("%1: falsche Dichte, Hoehe anpassen")
+                                            .arg(QLatin1String(g.name))));
+                    QVERIFY(a.kacheln.size() == 3 && a.wartende.size() == 2);
+
+                    // Unten: der Zeiger auf dem ✕ der zweiten Karte.
+                    const bool mitZeiger = zeile == 1;
+                    const QPoint ziel2 = f->kreuzKachel(a, 1).center();
+                    if (mitZeiger) {
+                        QMouseEvent mv(QEvent::MouseMove, QPointF(ziel2),
+                                       QPointF(f->mapToGlobal(ziel2)),
+                                       Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+                        QCoreApplication::sendEvent(f, &mv);
+                        QCoreApplication::processEvents();
+                    }
+
+                    QImage bild = fenster.grab().toImage();
+                    const QPoint imFenster = f->mapTo(&fenster, ziel2);
+                    QPainter p(&bild);
+                    if (mitZeiger) { zeiger(p, imFenster + QPoint(5, 6)); }
+                    p.end();
+                    bilder.append(bild);
+                }
+            }
+
+            // Das Blatt: drei Spalten, zwei Zeilen.
+            constexpr int kLuft = 24;
+            constexpr int kTitelH = 40;
+            constexpr int kSpaltenKopfH = 22;
+            constexpr int kZeilenKopfH = 20;
+            const int bw = groessen[0].breite;
+            const int h0 = groessen[0].hoehe;
+            const int breiteGes = 3 * bw + 4 * kLuft;
+            const int hoeheGes = kTitelH + kSpaltenKopfH
+                                 + 2 * (kZeilenKopfH + h0) + 3 * kLuft;
+            const qreal dpr = bilder.first().devicePixelRatio();
+            QImage blatt(QSize(breiteGes, hoeheGes) * dpr,
+                         QImage::Format_ARGB32_Premultiplied);
+            blatt.setDevicePixelRatio(dpr);
+            const int dpm = int(72.0 * dpr / 0.0254);
+            blatt.setDotsPerMeterX(dpm);
+            blatt.setDotsPerMeterY(dpm);
+            blatt.fill(farbe(Style::kAppBg));
+            QPainter p(&blatt);
+            p.setRenderHint(QPainter::Antialiasing, true);
+            QFont titel = p.font();
+            titel.setPointSizeF(10.0);
+            titel.setBold(true);
+            p.setFont(titel);
+            p.setPen(farbe(Style::kTextPrimary));
+            p.drawText(QRect(kLuft, 8, breiteGes - 2 * kLuft, 26),
+                       Qt::AlignLeft | Qt::AlignVCenter, QString::fromUtf8(v.titel));
+            QFont klein = p.font();
+            klein.setPointSizeF(8.0);
+            klein.setBold(false);
+            for (int s = 0; s < 3; ++s) {
+                const int x = kLuft + s * (bw + kLuft);
+                p.setFont(klein);
+                p.setPen(farbe(Style::kTextSecondary));
+                p.drawText(QRect(x, kTitelH, bw, kSpaltenKopfH),
+                           Qt::AlignLeft | Qt::AlignVCenter,
+                           QString::fromUtf8(groessen[s].name));
+                int y = kTitelH + kSpaltenKopfH;
+                for (int z = 0; z < 2; ++z) {
+                    p.setPen(farbe(Style::kTextInactive));
+                    p.drawText(QRect(x, y, bw, kZeilenKopfH),
+                               Qt::AlignLeft | Qt::AlignVCenter,
+                               QString::fromUtf8(z == 0 ? v.zeile1 : v.zeile2));
+                    y += kZeilenKopfH;
+                    p.drawImage(QPoint(x, y), bilder.at(s * 2 + z));
+                    y += h0 + kLuft;
+                }
+            }
+            p.end();
+            const QString pfad = ziel + QStringLiteral("/ft8-slots-loeschen-%1.png")
+                                            .arg(QLatin1String(v.datei));
+            QVERIFY2(blatt.save(pfad), qPrintable(pfad));
+            qInfo().noquote() << "Blatt:" << pfad;
         }
     }
 };

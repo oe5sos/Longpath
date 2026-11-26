@@ -15,6 +15,7 @@
 
 #include <QtTest/QtTest>
 #include <QSignalSpy>
+#include <QPushButton>
 
 #include "core/AppSettings.h"
 #include "gui/applets/Ft8Applet.h"
@@ -402,7 +403,7 @@ private slots:
     {
         Ft8PlaetzeFlaeche f;
         f.setzeStand(standMit(2, 3));
-        const int b = breiteFuer(f.kachelMindestbreite(), 3);
+        const int b = breiteFuer(breitesteKarte(f), 3);
 
         const Ft8PlaetzeAnordnung zwei = f.anordnungFuer(b, 2000);
         QCOMPARE(zwei.spalten, 3);
@@ -439,7 +440,7 @@ private slots:
     {
         Ft8PlaetzeFlaeche f;
         f.setzeStand(standMit(1, 4));
-        const int b = breiteFuer(f.kachelMindestbreite(), 4);
+        const int b = breiteFuer(breitesteKarte(f), 4);
 
         const Ft8PlaetzeAnordnung a = f.anordnungFuer(b, 2000);
         QCOMPARE(a.spalten, 4);
@@ -897,6 +898,18 @@ private:
 
     /// Die schmalste Flaeche, in der `n` Kacheln der Mindestbreite `k`
     /// nebeneinander stehen.
+    /// Die Breite, in der eine Karte in JEDER Dichte steht. Bis zum
+    /// 2026-11-26 war das immer die grosse; seit dem ✕ (Variante C),
+    /// das in Kompakt und Zeile rechts 20 Punkt kostet, kann die Zeile
+    /// die breiteste sein. Wer „auch wenn es eng wird" prueft, braucht
+    /// eine Breite, in der die kleinste Dichte dieselbe Spaltenzahl hat.
+    static int breitesteKarte(const Ft8PlaetzeFlaeche& f)
+    {
+        using D = Ft8PlaetzeAnordnung::Dichte;
+        return qMax(f.kachelMindestbreite(),
+                    qMax(f.hartBreite(D::Kompakt), f.hartBreite(D::Zeile)));
+    }
+
     static int breiteFuer(int k, int n)
     {
         return 2 * Ft8PlaetzeFlaeche::kRandX + n * k
@@ -969,6 +982,125 @@ private:
         if (hoehe < f.pflichtHoehe(breite)) {
             QVERIFY2(a.hoehe == f.pflichtHoehe(breite), wo.constData());
         }
+    }
+
+private slots:
+    // ── Eine Station loeschen: das ✕ (2026-11-26) ────────────────────
+    //
+    // Betreiber: „in den ft8 slots sollte man auch immer eine call
+    // löschen können" -- gewaehlt Variante C, das ✕ immer da. Ein Klick
+    // darauf meldet GENAU diese Station, in jeder der drei Dichten und
+    // bei den Wartenden. Ein Klick daneben meldet nichts.
+    void dasKreuzTrifftGenauDieseKarte()
+    {
+        using D = Ft8PlaetzeAnordnung::Dichte;
+        const Ft8PlaetzeStand st = standMit(3, 4, 2);
+        for (D d : {D::Gross, D::Kompakt, D::Zeile}) {
+            Ft8PlaetzeFlaeche f;
+            f.setzeStand(st);
+            // Die hoechste Hoehe, in der genau diese Dichte gilt.
+            int h = 1000;
+            while (h > 50 && f.anordnungFuer(340, h).dichte != d) { --h; }
+            QVERIFY2(h > 50, "keine Hoehe fuer diese Dichte gefunden");
+            f.resize(340, h);
+            f.show();
+            QVERIFY(QTest::qWaitForWindowExposed(&f, 20000));
+            const Ft8PlaetzeAnordnung a = f.anordnung();
+            QCOMPARE(a.dichte, d);
+            QCOMPARE(a.kacheln.size(), 3);
+            QCOMPARE(a.wartende.size(), 2);
+
+            QSignalSpy weg(&f, &Ft8PlaetzeFlaeche::entfernen);
+            for (int i = 0; i < 3; ++i) {
+                const QRect k = f.kreuzKachel(a, i);
+                QVERIFY2(!k.isEmpty(), "jede belegte Karte traegt ein ✕");
+                QVERIFY2(a.kacheln.at(i).contains(k),
+                         "das ✕ sitzt in seiner Karte");
+                for (int j = 0; j < 3; ++j) {
+                    if (j != i) { QVERIFY(!a.kacheln.at(j).intersects(k)); }
+                }
+                QTest::mouseClick(&f, Qt::LeftButton, {}, k.center());
+                QCOMPARE(weg.count(), 1);
+                QCOMPARE(weg.takeFirst().first().toString(),
+                         st.plaetze.at(i).partner);
+                // Daneben -- mitten auf die Karte -- loescht nichts.
+                QTest::mouseClick(&f, Qt::LeftButton, {},
+                                  a.kacheln.at(i).topLeft() + QPoint(40, 10));
+                QCOMPARE(weg.count(), 0);
+            }
+            for (int k = 0; k < 2; ++k) {
+                const QRect x = f.kreuzWartend(a, k);
+                QVERIFY(!x.isEmpty());
+                QTest::mouseClick(&f, Qt::LeftButton, {}, x.center());
+                QCOMPARE(weg.count(), 1);
+                QCOMPARE(weg.takeFirst().first().toString(),
+                         st.wartende.at(k).partner);
+            }
+        }
+    }
+
+    // Der CQ-Ruf ist keine Station -- ihn haelt `Stop` an.
+    void derCqRufHatKeinKreuz()
+    {
+        Ft8PlaetzeStand st = standMit(1, 3);
+        Ft8PlatzStand cq;
+        cq.tonHz = 2400;
+        cq.zug = QStringLiteral("CQ");
+        st.plaetze.append(cq);
+        Ft8PlaetzeFlaeche f;
+        f.setzeStand(st);
+        f.resize(340, 500);
+        const Ft8PlaetzeAnordnung a = f.anordnungFuer(340, 500);
+        QVERIFY(!f.kreuzKachel(a, 0).isEmpty());
+        QVERIFY(f.kreuzKachel(a, 1).isEmpty());
+    }
+
+    // Der ganze Weg: Klick auf das ✕ im Panel -> das FT8-Fenster nimmt
+    // GENAU diese Station vom Platz, die anderen laufen weiter.
+    void dasKreuzLoeschtNurDieseStation()
+    {
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Plaetze"),
+                                         QStringLiteral("3"));
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet quelle(&radio);
+        Ft8PlaetzeApplet panel(&radio);
+        QObject::connect(&quelle, &Ft8Applet::plaetzeGeaendert,
+                         &panel,  &Ft8PlaetzeApplet::zeigeStand);
+        QObject::connect(&panel,  &Ft8PlaetzeApplet::entfernen,
+                         &quelle, &Ft8Applet::entferneStation);
+
+        for (const char* t : {"OE5SOS JA2FRO PM84", "OE5SOS RA5CW MO85",
+                              "OE5SOS 9A2KS JN65"}) {
+            Ft8Decode d;
+            d.text = QString::fromLatin1(t);
+            d.snrDb = -10.0f;
+            d.freqHz = 1500.0f;
+            quelle.fundForTest(d);
+        }
+        QCOMPARE(quelle.mehrfachForTest().aktive(), 3);
+
+        panel.resize(340, 520);
+        panel.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&panel, 20000));
+        Ft8PlaetzeFlaeche* f = panel.flaecheForTest();
+        QCoreApplication::processEvents();
+        const Ft8PlaetzeAnordnung a = f->anordnung();
+        QCOMPARE(a.kacheln.size(), 3);
+        const QString zweiter = f->stand().plaetze.at(1).partner;
+        QCOMPARE(zweiter, QStringLiteral("RA5CW"));
+
+        QTest::mouseClick(f, Qt::LeftButton, {}, f->kreuzKachel(a, 1).center());
+
+        QCOMPARE(quelle.mehrfachForTest().aktive(), 2);
+        QVERIFY(!quelle.mehrfachForTest().kennt(QStringLiteral("RA5CW")));
+        QVERIFY(quelle.mehrfachForTest().kennt(QStringLiteral("JA2FRO")));
+        QVERIFY(quelle.mehrfachForTest().kennt(QStringLiteral("9A2KS")));
+        // Das Panel zeigt es gleich.
+        QCOMPARE(f->stand().plaetze.size(), 2);
+        quelle.stopButtonForTest()->click();
+        AppSettings::instance().setValue(QStringLiteral("Ft8/Plaetze"),
+                                         QStringLiteral("1"));
     }
 };
 

@@ -1154,6 +1154,152 @@ private slots:
         m.raeumeAuf();
         QCOMPARE(m.aktive(), 0);
     }
+
+    // ── Eine Station aus „FT8 Slots" loeschen (2026-11-26) ───────────
+    //
+    // Betreiber: „in den ft8 slots sollte man auch immer eine call
+    // löschen können". Gefragt wird die TONQUELLE, nicht der Zustand.
+    void einGeloeschterPlatzGehtNichtMehrHinaus()
+    {
+        stelleEin(3);
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        applet.cqVersucheSpinForTest()->setValue(10);
+        QSignalSpy gemeldet(&applet, &Ft8Applet::qsoFertig);
+
+        applet.cqRufenButtonForTest()->click();
+        fund(applet, "OE5SOS JA2FRO PM84", -21.0);
+        fund(applet, "OE5SOS RA5CW MO85", -6.0);
+        fund(applet, "OE5SOS 9A2KS JN65", -8.0);
+        QCOMPARE(applet.mehrfachForTest().aktive(), 3);
+
+        // Geloescht, bevor der gepackte Zug hinausgeht: die
+        // Nachpruefung packt ohne ihn -- und der freie Platz nimmt das CQ.
+        applet.entferneStation(QStringLiteral("RA5CW"));
+        QCOMPARE(applet.mehrfachForTest().aktive(), 2);
+        QVERIFY(sendetaktAbgelaufen(applet));
+        QCOMPARE(aufSendung(radio),
+                 QStringLiteral("JA2FRO OE5SOS -21#9A2KS OE5SOS -08"
+                                "#CQ OE5SOS JN67"));
+        applet.fensterZuEndeForTest();
+
+        // Er ruft weiter -- und kommt nicht von selbst wieder.
+        fund(applet, "OE5SOS RA5CW MO85", -6.0);
+        fund(applet, "OE5SOS RA5CW R-08", -6.0);
+        QVERIFY(!applet.mehrfachForTest().kennt(QStringLiteral("RA5CW")));
+        QCOMPARE(applet.mehrfachForTest().aktive(), 2);
+
+        // Die anderen laufen weiter bis ins Logbuch.
+        fund(applet, "OE5SOS JA2FRO R-15", -21.0);
+        QVERIFY(sendetaktAbgelaufen(applet));
+        QVERIFY2(aufSendung(radio).contains(QStringLiteral("JA2FRO OE5SOS RR73")),
+                 qPrintable(aufSendung(radio)));
+        QVERIFY(!aufSendung(radio).contains(QStringLiteral("RA5CW")));
+        applet.fensterZuEndeForTest();
+        QCOMPARE(gemeldet.count(), 1);
+        QCOMPARE(gemeldet.first().first().value<LogEntry>().call,
+                 QStringLiteral("JA2FRO"));
+        applet.stopButtonForTest()->click();
+    }
+
+    // Kein Logeintrag fuer ein geloeschtes QSO -- auch nicht, wenn sein
+    // RR73 danach noch ankommt.
+    void einGeloeschtesQsoKommtNichtInsLogbuch()
+    {
+        stelleEin(3);
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        QSignalSpy gemeldet(&applet, &Ft8Applet::qsoFertig);
+
+        fund(applet, "OE5SOS DL1ABC JO31", -7.0);
+        fund(applet, "OE5SOS SP9XYZ JO90", -12.0);
+        fund(applet, "OE5SOS DL1ABC R-15", -7.0);
+        applet.entferneStation(QStringLiteral("DL1ABC"));
+        fund(applet, "OE5SOS DL1ABC RR73", -7.0);
+        for (int i = 0; i < 3; ++i) { applet.fensterZuEndeForTest(); }
+
+        for (const QList<QVariant>& e : gemeldet) {
+            QVERIFY2(e.first().value<LogEntry>().call != QStringLiteral("DL1ABC"),
+                     "ein geloeschtes QSO steht im Logbuch");
+        }
+        QVERIFY(applet.mehrfachForTest().kennt(QStringLiteral("SP9XYZ")));
+        applet.stopButtonForTest()->click();
+    }
+
+    // Laeuft die Sendung schon, geht sie zu Ende -- die anderen
+    // Stationen darin werden nicht abgeschnitten. Erst der naechste Zug
+    // ist ohne ihn.
+    void eineLaufendeSendungGehtZuEnde()
+    {
+        stelleEin(3);
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+        applet.cqVersucheSpinForTest()->setValue(10);
+
+        applet.cqRufenButtonForTest()->click();
+        fund(applet, "OE5SOS US2YW KN28", -15.0);
+        QVERIFY(sendetaktAbgelaufen(applet));
+        const QString draussen = aufSendung(radio);
+        QCOMPARE(draussen, QStringLiteral("US2YW OE5SOS -15#CQ OE5SOS JN67"));
+        QVERIFY(applet.sendetGerade());
+
+        applet.entferneStation(QStringLiteral("US2YW"));
+        QVERIFY2(applet.sendetGerade(), "die laufende Sendung darf zu Ende gehen");
+        QCOMPARE(aufSendung(radio), draussen);
+
+        applet.fensterZuEndeForTest();
+        QVERIFY(sendetaktAbgelaufen(applet));
+        QCOMPARE(aufSendung(radio), QStringLiteral("CQ OE5SOS JN67"));
+        applet.stopButtonForTest()->click();
+    }
+
+    // „WAITING": wer auf einen Platz wartet, steht dort -- und laesst
+    // sich loeschen, ohne dass ein Platz sich bewegt.
+    void ausWaitingLoeschen()
+    {
+        stelleEin(2);
+        RadioModel radio;
+        radio.installFt8TxForTest();
+        Ft8Applet applet(&radio);
+
+        fund(applet, "OE5SOS DL1ABC JO31", -7.0);
+        fund(applet, "OE5SOS SP9XYZ JO90", -12.0);
+        fund(applet, "OE5SOS F5PZT JN18", 4.0);       // alles belegt: er wartet
+        QCOMPARE(applet.mehrfachForTest().wartende(), 1);
+        {
+            const Ft8PlaetzeStand st = applet.plaetzeStandForTest();
+            QCOMPARE(st.wartende.size(), 1);
+            QCOMPARE(st.wartende.first().partner, QStringLiteral("F5PZT"));
+        }
+        const auto plaetzeVorher = applet.mehrfachForTest().naechsteNachrichten();
+
+        applet.entferneStation(QStringLiteral("F5PZT"));
+        QCOMPARE(applet.mehrfachForTest().wartende(), 0);
+        QVERIFY(applet.plaetzeStandForTest().wartende.isEmpty());
+        const auto plaetzeNachher = applet.mehrfachForTest().naechsteNachrichten();
+        QCOMPARE(plaetzeNachher.size(), plaetzeVorher.size());
+        for (int i = 0; i < plaetzeVorher.size(); ++i) {
+            QCOMPARE(plaetzeNachher.at(i).text, plaetzeVorher.at(i).text);
+        }
+        // Er ruft weiter: er stellt sich nicht von selbst wieder an.
+        fund(applet, "OE5SOS F5PZT JN18", 4.0);
+        QVERIFY(!applet.mehrfachForTest().kennt(QStringLiteral("F5PZT")));
+        QVERIFY(applet.plaetzeStandForTest().wartende.isEmpty());
+
+        // Und wer von Hand unter „THEN" stand, geht denselben Weg.
+        const qint64 jetzt = QDateTime::currentMSecsSinceEpoch();
+        QVERIFY(applet.schlangeForTestSchreibend().stelleAn(
+            QStringLiteral("OE3TVJ"), -17, QStringLiteral("JN78"), 1200, jetzt));
+        QCOMPARE(applet.plaetzeStandForTest().wartende.size(), 1);
+        applet.entferneStation(QStringLiteral("OE3TVJ"));
+        QVERIFY(applet.plaetzeStandForTest().wartende.isEmpty());
+        QVERIFY(applet.schlangeForTest().abgewiesen(QStringLiteral("OE3TVJ"),
+                                                    jetzt + 1000));
+        applet.stopButtonForTest()->click();
+    }
 };
 
 QTEST_MAIN(TstFt8MultiAnswering)
