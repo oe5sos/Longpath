@@ -20,6 +20,10 @@
 //                 mit Host/Port vorbelegt; host:port in der Schnittstelle
 //                 gilt als Netzziel. Martin Fischer, KI-gestuetzt ueber
 //                 Anthropic Claude.
+//   2026-11-26 — Breit gezogen (breiter als hoch) stehen Rufzeichen,
+//                 Karte, Peilung und Log in einer Spalte rechts vom Kompass
+//                 statt zu verschwinden (Entwurf A). Martin Fischer,
+//                 KI-gestuetzt ueber Anthropic Claude Code.
 //   2026-08-10 — workSpot() entry point for "Turn rotor to <call>" from
 //                 the Spot Hub. Enter in the callsign field now only
 //                 looks the station up (it used to also start the
@@ -87,6 +91,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QFontMetrics>
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -316,8 +321,24 @@ void RotorLogbookPanel::buildUi()
     setAttribute(Qt::WA_StyledBackground, true);
     setStyleSheet(QStringLiteral("background: %1;").arg(Style::kAppBg));
 
-    auto* col = new QVBoxLayout(this);
-    col->setContentsMargins(10, 8, 10, 8);
+    // Aussen eine Reihe: links die Spalte von heute mit dem Kompass,
+    // rechts eine Spalte, die nur breit gezogen etwas traegt
+    // (ordneNachForm, Entwurf A vom 2026-11-26).
+    m_aussen = new QHBoxLayout(this);
+    m_aussen->setContentsMargins(10, 8, 10, 8);
+    m_aussen->setSpacing(14);
+    m_mitte = new QWidget(this);
+    m_spalteRechts = new QWidget(this);
+    m_spalteRechts->setObjectName(QStringLiteral("rotorLogSpalteRechts"));
+    auto* rechtsLay = new QVBoxLayout(m_spalteRechts);
+    rechtsLay->setContentsMargins(0, 0, 0, 0);
+    rechtsLay->setSpacing(7);
+    m_spalteRechts->setVisible(false);
+    m_aussen->addWidget(m_mitte, 1);
+    m_aussen->addWidget(m_spalteRechts, 1);
+
+    auto* col = new QVBoxLayout(m_mitte);
+    col->setContentsMargins(0, 0, 0, 0);
     col->setSpacing(7);
 
     // Callsign
@@ -329,6 +350,9 @@ void RotorLogbookPanel::buildUi()
     cf.setPixelSize(16);
     cf.setBold(true);
     m_callEdit->setFont(cf);
+    // So breit, dass ein Rufzeichen mit Zusatz ganz dasteht -- eine
+    // schmale Spalte neben dem Kompass schob es sonst aus dem Feld.
+    m_callEdit->setMinimumWidth(QFontMetrics(cf).horizontalAdvance(QStringLiteral("VE2ABC/P")) + 22);
     m_callEdit->setStyleSheet(Style::lineEditStyle());
     callRow->addWidget(m_callEdit, 1);
 
@@ -388,8 +412,12 @@ void RotorLogbookPanel::buildUi()
     // row (portrait left, text right); the operator wanted the portrait
     // as large as the column allows instead, with the text underneath
     // and trimmed to what still fits at a glance (2026-09-01).
-    auto* cardRow = new QVBoxLayout;
-    cardRow->setSpacing(6);
+    // Ein Gitter statt einer Spalte (2026-11-26): breit gezogen steht
+    // das Foto links neben Name und Land, schmal wie bisher darueber.
+    auto* cardRow = new QGridLayout;
+    cardRow->setHorizontalSpacing(10);
+    cardRow->setVerticalSpacing(6);
+    m_karte = cardRow;
 
     // The fetching rules — https only, no downgrade on redirect, a size
     // cap, a cache beside the log — used to live in this file. The
@@ -429,8 +457,14 @@ void RotorLogbookPanel::buildUi()
     // says who this is, so it stays hidden until there is a picture
     // rather than explaining itself in 78 pixels.
     connect(m_photo, &StationPhoto::photoShown, this,
-            [this]() { m_photo->setVisible(true); });
-    cardRow->addWidget(m_photo, 0, Qt::AlignHCenter);
+            [this]() {
+        m_photo->setVisible(fotoPasst());
+        // Mit dem Foto wird die Karte um 225 Punkte hoeher -- ohne neuen
+        // Durchgang ragte sie in einem niedrigen Feld unten hinaus, bis
+        // jemand das Feld zieht (Pruefstand 2026-11-26).
+        QTimer::singleShot(0, this, [this]() { updateCompactness(); });
+    });
+    cardRow->addWidget(m_photo, 0, 0, Qt::AlignHCenter);
 
     // The flag lives on the same line as the station text rather than in
     // a label of its own. A separate row is one more thing that can end
@@ -446,7 +480,7 @@ void RotorLogbookPanel::buildUi()
     m_stationLine->setAlignment(Qt::AlignHCenter);
     m_stationLine->setStyleSheet(QStringLiteral(
         "QLabel { color: %1; font-size: 11px; }").arg(Style::kTextPrimary));
-    cardRow->addWidget(m_stationLine);
+    cardRow->addWidget(m_stationLine, 1, 0);
 
     // Grey line at the far end. On the low bands this decides whether
     // the path is open at all, so it belongs next to the callsign, not
@@ -465,7 +499,7 @@ void RotorLogbookPanel::buildUi()
     m_workedLine->setVisible(false);
     // Seit Entwurf R (2026-11-12) wieder zu sehen: neu, neues Band, wie
     // oft schon gearbeitet -- die Frage, die man beim Loggen stellt.
-    cardRow->addWidget(m_workedLine);
+    cardRow->addWidget(m_workedLine, 2, 0);
 
     m_rowCard = addShedRow(col, cardRow, this);
 
@@ -481,6 +515,7 @@ void RotorLogbookPanel::buildUi()
     m_myGrid->setVisible(false);
     m_dxGrid = new QLineEdit(this);
     m_dxGrid->setPlaceholderText(QStringLiteral("locator"));
+    m_dxGrid->setMinimumWidth(QFontMetrics(m_dxGrid->font()).horizontalAdvance(QStringLiteral("MM00MM")) + 22);
     m_dxGrid->setToolTip(QStringLiteral(
         "Their locator — filled in from QRZ or the log; type one when neither knows"));
     auto* gridRow = new QHBoxLayout;
@@ -622,6 +657,7 @@ void RotorLogbookPanel::buildUi()
     rstRow->addWidget(m_rstRcvd);
     m_comment = new QLineEdit(this);
     m_comment->setPlaceholderText(QStringLiteral("comment"));
+    m_comment->setMinimumWidth(70);
     rstRow->addWidget(m_comment, 1);
     m_rowRst = addShedRow(col, rstRow, this);
 
@@ -865,12 +901,214 @@ bool RotorLogbookPanel::connectRotorFromSettings(QString* err)
 void RotorLogbookPanel::resizeEvent(QResizeEvent* ev)
 {
     QWidget::resizeEvent(ev);
+    ordneNachForm();
     updateCompactness();
+}
+
+// ── Breit gezogen (2026-11-26) ──────────────────────────────────────
+//
+// Betreiber: „wenn ich es in die breite ziehe sollte dort dann der rest,
+// sofern möglich sein, stehen, also call usw." Gewaehlt: Entwurf A --
+// Kompass links, rechts eine Spalte mit allem in der Reihenfolge von
+// heute; ist sie breit genug, ein kleines Foto neben dem Namen.
+//
+// Ab wann die Spalte traegt: Kompass mindestens kKompassMin breit, die
+// Spalte mindestens kSpalteMin. Und nur, wenn das Feld breiter als hoch
+// ist -- ein hohes Dock zeigt in der einen Spalte ohnehin alles.
+
+namespace {
+// 240: darunter passen „Rotate 303°", „LP 123°" und „Stop" nicht mehr
+// nebeneinander unter den Kompass.
+constexpr int kKompassMin = 240;
+constexpr int kKompassMax = 320;
+constexpr int kSpalteMin  = 220;
+// Ab dieser Spaltenbreite hat das Foto neben Name und Land Platz.
+constexpr int kSpalteMitFoto = 2 * kSpalteMin + 14;
+}
+
+RotorLogbookPanel::Form RotorLogbookPanel::formFuer(QSize s) const
+{
+    if (!m_aussen || s.width() < s.height()) { return Form::Schmal; }
+    const QMargins m = m_aussen->contentsMargins();
+    const int innen = s.width() - m.left() - m.right();
+    const int abst  = m_aussen->spacing();
+    if (innen >= kKompassMin + abst + kSpalteMitFoto) { return Form::Breit; }
+    if (innen >= kKompassMin + abst + kSpalteMin)     { return Form::Mittel; }
+    return Form::Schmal;
+}
+
+bool RotorLogbookPanel::fotoPasst() const
+{
+    // Schmal gross wie bisher, breit klein neben dem Namen, dazwischen nicht.
+    return m_form != Form::Mittel;
+}
+
+void RotorLogbookPanel::ordneNachForm()
+{
+    if (!m_aussen || m_ordnet) { return; }
+    const Form neu = formFuer(size());
+    if (neu == m_form) { return; }
+    m_ordnet = true;
+    m_form = neu;
+
+    auto* rechts = static_cast<QVBoxLayout*>(m_spalteRechts->layout());
+    for (QVBoxLayout* l : {m_column, rechts}) {
+        // Die Widgets selbst bleiben; nur ihre Plaetze im Layout gehen.
+        while (QLayoutItem* it = l->takeAt(0)) { delete it; }
+    }
+
+    const bool schmal = m_form == Form::Schmal;
+    if (schmal) {
+        // Die Spalte von heute, in derselben Reihenfolge.
+        for (QWidget* w : {m_rowCall, m_rowCard, m_rowGrid}) { m_column->addWidget(w); }
+        m_column->addWidget(m_viewStack, 1);
+        for (QWidget* w : {m_rowBtn, m_rowRst, m_rowLog,
+                           static_cast<QWidget*>(m_status),
+                           static_cast<QWidget*>(m_recent)}) {
+            m_column->addWidget(w);
+        }
+    } else {
+        m_column->addWidget(m_viewStack, 1);
+        m_column->addWidget(m_rowBtn);
+        for (QWidget* w : {m_rowCall, m_rowCard, m_rowGrid, m_rowLog, m_rowRst,
+                           static_cast<QWidget*>(m_status)}) {
+            rechts->addWidget(w);
+        }
+        // Die Liste nimmt sich, was unten frei bleibt (bis 130 hoch).
+        rechts->addWidget(m_recent, 10);
+        rechts->addStretch(1);
+    }
+    m_spalteRechts->setVisible(!schmal);
+
+    // Die Karte: schmal das Foto ueber dem Text, breit links daneben.
+    m_karte->removeWidget(m_photo);
+    m_karte->removeWidget(m_stationLine);
+    m_karte->removeWidget(m_workedLine);
+    if (!schmal) {
+        m_karte->addWidget(m_photo, 0, 0, 3, 1, Qt::AlignTop);
+        m_karte->addWidget(m_stationLine, 0, 1);
+        m_karte->addWidget(m_workedLine, 1, 1);
+        m_karte->setColumnStretch(0, 0);
+        m_karte->setColumnStretch(1, 1);
+        // Name und „worked" oben neben dem Foto, nicht ueber seine Hoehe
+        // verteilt.
+        m_karte->setRowStretch(2, 1);
+        m_photo->setFixedSize(96, 72);
+    } else {
+        m_karte->addWidget(m_photo, 0, 0, Qt::AlignHCenter);
+        m_karte->addWidget(m_stationLine, 1, 0);
+        m_karte->addWidget(m_workedLine, 2, 0);
+        m_karte->setColumnStretch(0, 1);
+        m_karte->setColumnStretch(1, 0);
+        m_karte->setRowStretch(2, 0);
+        m_photo->setFixedSize(300, 225);
+    }
+    const Qt::Alignment ausr = schmal ? Qt::AlignHCenter : (Qt::AlignLeft | Qt::AlignVCenter);
+    m_stationLine->setAlignment(ausr);
+    m_workedLine->setAlignment(ausr);
+
+    m_aussen->setStretchFactor(m_mitte, schmal ? 1 : 0);
+    if (schmal) {
+        m_mitte->setMinimumWidth(0);
+        m_mitte->setMaximumWidth(QWIDGETSIZE_MAX);
+        m_rotorBand->setFixedWidth(RotorBandWidget::kBreite);
+        m_rstSent->setFixedWidth(46);
+        m_rstRcvd->setFixedWidth(46);
+        m_recent->setColumnHidden(1, false);
+        m_recent->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        m_recent->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    } else {
+        // Das Band malt nach seiner Breite; neben der Spalte darf es so
+        // schmal werden wie der Kompass darueber.
+        m_rotorBand->setMinimumWidth(kKompassMin);
+        m_rotorBand->setMaximumWidth(RotorBandWidget::kBreite);
+        // Die Spalte ist schmaler als das Feld schmal: Rapporte enger,
+        // und die Liste ohne Frequenz -- Zeit, Rufzeichen, Band,
+        // Betriebsart reichen fuer „wen hatte ich eben".
+        m_rstSent->setFixedWidth(38);
+        m_rstRcvd->setFixedWidth(38);
+        m_recent->setColumnHidden(1, true);
+        m_recent->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        m_recent->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    }
+    m_photo->setVisible(m_photo->hasPhoto() && fotoPasst());
+
+    // Gemessene Hoehen gelten fuer die alte Spalte (die Karte ist schmal
+    // 225 Punkte Foto hoeher als breit). Vergessen und einen Takt spaeter
+    // noch einmal abwerfen, wenn das Layout die Zeilen in der neuen
+    // Spalte wirklich gesetzt hat. Ohne diesen zweiten Durchgang stand
+    // zurueck auf schmal die Rufzeichenzeile wieder ueber dem Kompass,
+    // bis jemand das Feld zog (Pruefstand + Gegenprobe 2026-11-26).
+    m_shedHeights.fill(0);
+    m_zeilenHoehe.clear();
+    QTimer::singleShot(0, this, [this]() { updateCompactness(); });
+    m_ordnet = false;
+}
+
+int RotorLogbookPanel::zeilenHoehe(QWidget* w)
+{
+    if (w->isVisible()) {
+        const int h = w->sizeHint().height();
+        if (h > 0) { m_zeilenHoehe[w] = h; }
+    }
+    int h = m_zeilenHoehe.value(w, 0);
+    if (h <= 0) { h = w->sizeHint().height(); }
+    // Die letzten QSOs zaehlen mit drei Zeilen; den Rest nehmen sie sich,
+    // wenn er da ist.
+    if (w == m_recent) { h = std::min(h, 84); }
+    return std::max(h, 0);
+}
+
+void RotorLogbookPanel::schneideSpalte(const QVector<QWidget*>& reihenfolge,
+                                       int verfuegbar, int abstand)
+{
+    // Wie updateCompactness(): vom Anfang der Liste her abwerfen, bis der
+    // Rest passt. Die Liste steht hier schon in Abwurf-Reihenfolge.
+    int noetig = 0;
+    QVector<int> h(reihenfolge.size());
+    for (int i = 0; i < reihenfolge.size(); ++i) {
+        h[i] = zeilenHoehe(reihenfolge.at(i));
+        noetig += h[i] + abstand;
+    }
+    int weg = 0;
+    while (noetig > verfuegbar && weg < reihenfolge.size()) {
+        noetig -= h.at(weg) + abstand;
+        ++weg;
+    }
+    for (int i = 0; i < reihenfolge.size(); ++i) {
+        QWidget* w = reihenfolge.at(i);
+        const bool zeigen = i >= weg;
+        if (w->isVisible() != zeigen) { w->setVisible(zeigen); }
+    }
 }
 
 void RotorLogbookPanel::updateCompactness()
 {
     if (m_shedOrder.isEmpty() || !m_column) { return; }
+
+    if (m_form != Form::Schmal) {
+        const QMargins m = m_aussen->contentsMargins();
+        const int hoch  = height() - m.top() - m.bottom();
+        const int innen = width() - m.left() - m.right();
+        const int abst  = m_aussen->spacing();
+        // Der Kompass so breit, wie er hoch sein darf -- den Rest bekommt
+        // die Spalte.
+        const int frei = innen - kSpalteMin - abst;
+        m_mitte->setFixedWidth(std::clamp(std::min(frei, hoch), kKompassMin, kKompassMax));
+        m_photo->setVisible(m_photo->hasPhoto() && fotoPasst());
+
+        const int sp = m_column->spacing();
+        // Links: nur noch die Drehknoepfe koennen fallen.
+        schneideSpalte({m_rowBtn}, hoch - m_viewStack->minimumSizeHint().height(), sp);
+        // Rechts, am ehesten entbehrlich zuerst: die Liste, die
+        // Statuszeile (sie sagt meist nur Entfernung und Peilung noch
+        // einmal), die Rapporte, der Log-Knopf, die Karte; Rufzeichen und
+        // Peilung bleiben am laengsten.
+        schneideSpalte({m_recent, m_status, m_rowRst, m_rowLog,
+                        m_rowCard, m_rowGrid, m_rowCall}, hoch + sp, sp);
+        m_dial->setHint(QString{});
+        return;
+    }
 
     // Remember how tall each row is while it is up. A hidden widget's
     // sizeHint is still valid in Qt, but a row that has never been laid
@@ -883,7 +1121,7 @@ void RotorLogbookPanel::updateCompactness()
         if (h > 0) { m_shedHeights[i] = h; }
     }
 
-    const QMargins m = m_column->contentsMargins();
+    const QMargins m = m_aussen->contentsMargins();
     const int spacing = m_column->spacing();
     int avail = height() - m.top() - m.bottom();
 
