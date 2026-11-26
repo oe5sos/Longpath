@@ -51,7 +51,10 @@ EXPECTED = {
     # wdsp_align.h -- neun Dateien mit Warren Pratts eigener
     # GPL-2-or-later-Kopfzeile. calcc/iqc wurden nur gehoben, nicht neu
     # gezaehlt.
-    "gpl2-or-later": 152,
+    # 152 -> 153 (2026-11-25): longpath_extnr.c, die Longpath-eigene Huelle
+    # um create_emnr/create_sbnr fuer schon demodulierten Ton, mit
+    # GPL-2-or-later-Kopf.
+    "gpl2-or-later": 153,
     "copyright-no-permission-block": 0,
     "no-header": 10,
 }

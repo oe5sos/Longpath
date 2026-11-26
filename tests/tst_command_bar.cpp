@@ -840,25 +840,25 @@ private slots:
 
         bar.setNrFlexModus(true);
 
-        // Vorne die drei Pillen der Maschine, dahinter das „…": NRL, NR,
-        // NR3 vorne; NRS (NR4) und MNR (nur mit HAVE_MNR, also auf dem Mac)
-        // im „…". DFNR, BNR, NNR fehlen ganz.
+        // Vorne NRL (Maschine), NR2, NR3; NR4 und MNR (nur mit HAVE_MNR,
+        // also auf dem Mac) im „…". DFNR, BNR, NNR fehlen ganz. NR2 und
+        // NR4 rechnet Longpath selbst, darum tragen sie unsere Namen.
         QCOMPARE(bar.pillsIn(QStringLiteral("NR")),
-                 (QStringList{QStringLiteral("NRL"), QStringLiteral("NR"),
+                 (QStringList{QStringLiteral("NRL"), QStringLiteral("NR2"),
                               QStringLiteral("NR3")}));
-        QStringList erwartet{QStringLiteral("NRL"), QStringLiteral("NR"),
-                             QStringLiteral("NR3"), QStringLiteral("NRS")};
+        QStringList erwartet{QStringLiteral("NRL"), QStringLiteral("NR2"),
+                             QStringLiteral("NR3"), QStringLiteral("NR4")};
         if (ohneFlex.contains(QStringLiteral("MNR"))) {
             erwartet << QStringLiteral("MNR");
         }
         QCOMPARE(bar.allNrLabels(), erwartet);
-        for (const char* weg : {"NR1", "NR2", "NR4", "DFNR", "BNR", "NNR"}) {
+        for (const char* weg : {"NR1", "NR", "NRS", "DFNR", "BNR", "NNR"}) {
             QVERIFY2(!bar.allNrLabels().contains(QString::fromLatin1(weg)),
                      weg);
         }
 
         // Die Namen sind nur Namen: der Knopf „NRL" schaltet NR1 (lms_nr),
-        // der Knopf „NR" schaltet NR2 (nr), und die Leuchte folgt dem Modell.
+        // der Knopf „NR2" schaltet NR2, und die Leuchte folgt dem Modell.
         QVERIFY(bar.clickPill(QStringLiteral("NR"), QStringLiteral("NRL")));
         QCOMPARE(slice.activeNr(), NrSlot::NR1);
         QCOMPARE(bar.activePill(QStringLiteral("NR")),
@@ -867,13 +867,13 @@ private slots:
 
         slice.setActiveNr(NrSlot::NR2);
         QCOMPARE(bar.activePill(QStringLiteral("NR")),
-                 QStringLiteral("NR"));
+                 QStringLiteral("NR2"));
 
         // Die Zuordnung der Namen zu den Verfahren, ohne Oberflaeche:
         QCOMPARE(RadioModel::flexNrAnzeige(NrSlot::NR1), QStringLiteral("NRL"));
-        QCOMPARE(RadioModel::flexNrAnzeige(NrSlot::NR2), QStringLiteral("NR"));
-        QCOMPARE(RadioModel::flexNrAnzeige(NrSlot::NR4), QStringLiteral("NRS"));
-        // NR3 und MNR laufen bei uns: ihr Name bleibt.
+        // NR2, NR3, NR4 und MNR laufen bei uns: ihr Name bleibt.
+        QVERIFY(RadioModel::flexNrAnzeige(NrSlot::NR2).isEmpty());
+        QVERIFY(RadioModel::flexNrAnzeige(NrSlot::NR4).isEmpty());
         QVERIFY(RadioModel::flexNrAnzeige(NrSlot::NR3).isEmpty());
         QVERIFY(RadioModel::flexNrAnzeige(NrSlot::MNR).isEmpty());
 
