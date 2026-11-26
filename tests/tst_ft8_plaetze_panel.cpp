@@ -776,10 +776,21 @@ private slots:
         using D = Ft8PlaetzeAnordnung::Dichte;
         using F = Ft8PlaetzeFlaeche;
         F f;
-        f.setzeStand(standMit(3, 3));
+        // Ein langes Land (2026-11-26). Die grosse Karte muss es ganz
+        // zeigen, die kompakte darf es kuerzen -- so ist die grosse in
+        // JEDER Schrift breiter als die kompakte, und um deren Spalten
+        // geht es hier. Vorher hing das an der Schrift: seit das ✕ die
+        // kompakte Karte 20 Punkt breiter macht, passten in der Breite
+        // unten mit den Linux-Schriften auch drei grosse, und die grosse
+        // gewann (zu Recht).
+        Ft8PlaetzeStand st = standMit(3, 3);
+        st.plaetze[0].land = QStringLiteral("Democratic Republic of the Congo");
+        f.setzeStand(st);
         const int hart  = f.hartBreite(D::Kompakt);
         const int basis = f.basisBreite(D::Kompakt);
         QVERIFY2(basis > hart, "mit Land braucht die Karte mehr Breite");
+        QVERIFY2(f.kachelMindestbreite() > hart,
+                 "Voraussetzung: drei grosse passen nicht, wo drei kompakte passen");
 
         // So breit, dass drei kompakte Karten gerade nebeneinander
         // passen -- aber nicht drei mit ganzem Land.
