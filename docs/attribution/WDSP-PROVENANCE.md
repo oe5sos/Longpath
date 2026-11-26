@@ -20,6 +20,7 @@ WDSP (Warren Pratt NR0V's DSP library) is vendored in `third_party/wdsp/`.
 | `third_party/wdsp/src/fmd.c` | TAPR v1.29 + Longpath-original Basisband-Abgriff (`baseband_tap`, gesetzt ueber `SetRXAFMBasebandTap`) fuer den CTCSS-Tonsquelch; die Demodulation selbst unveraendert | — (eigener Zusatz, keine Vorlage) | 2026-10-09 |
 | `third_party/wdsp/src/fmd.h` | TAPR v1.29 + die beiden Felder und der Prototyp zum Abgriff in `fmd.c` | — (eigener Zusatz, keine Vorlage) | 2026-10-09 |
 | `third_party/wdsp/src/delay.c` | TAPR v1.29 + NereusSDR-original bound on the requested delay (`honourable_delay()`, see the file's modification history); upstream arithmetic unchanged | — (own fix, no upstream source) | 2026-09-20 |
+| `third_party/wdsp/src/longpath_extnr.c` | Longpath-original Huelle: NR2 (`emnr`) und NR4 (`sbnr`) freistehend auf Mono-Bloecken; Aufrufwerte wie in `RXA.c` (Warren Pratt NR0V, GPLv2-or-later); kein WDSP-Verfahren veraendert | — (eigener Zusatz; Werte aus `RXA.c`) | 2026-11-25 |
 | `third_party/wdsp/src/linux_port.c` | NereusSDR-original POSIX port file + `wdsp_dprintf()` shim for the NNR port (see "dprintf" below) | — (own shim, no upstream source) | 2026-09-14 |
 | `third_party/wdsp/src/utilities.c` | TAPR v1.29 + `dprintf()` for Windows taken from WDSP 2.10 (`utilities.c:587-597`), see "dprintf" below | `wdsp 2.10/Source/utilities.c` (that function only) | 2026-09-21 |
 | `third_party/wdsp/src/utilities.h` | TAPR v1.29 + the matching `dprintf` declaration under `_WIN32` | `wdsp 2.10/Source/utilities.h` (that declaration only) | 2026-09-21 |

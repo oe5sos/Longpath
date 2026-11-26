@@ -62,6 +62,8 @@
 //                 via Anthropic Claude (Cowork).
 //   2026-11-11 — Der Sprachspeicher als Quelle der Sendepumpe (F1…F10
 //                 an der Flex). KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-24 — NR2/NR4 am Rechner samt Reglern. KI-gestuetzt ueber
+//                 Anthropic Claude Code.
 // =================================================================
 
 #include "gui/MainWindow.h"
@@ -393,9 +395,10 @@ void MainWindow::wireFlex()
             // funktionieren! das ist bei anvelina ja schon!" Also
             // teilen sich die Steckplaetze auf:
             //
-            //   NR1 / NR2 / NR4  die Maschine (anr, emnr und sbnr sind
-            //                    WDSP-Einheiten und haben auf fertigem
-            //                    Ton kein Gegenstueck)
+            //   NR1              die Maschine
+            //   NR2 / NR4        WDSP-emnr / -sbnr in Longpath, derselbe
+            //                    Code wie im Anvelina-Kanal (2026-11-24,
+            //                    Betreiber: „bei Anvelina deutlich besser")
             //   NR3              rnnoise in Longpath
             //   MNR              Apple Accelerate in Longpath
             //
@@ -404,12 +407,24 @@ void MainWindow::wireFlex()
             // dann noch das tun, was auf ihm steht.
             const NrSlot gewaehlt = s->activeNr();
             const bool eigenesVerfahren =
-                (gewaehlt == NrSlot::NR3 || gewaehlt == NrSlot::MNR);
+                (gewaehlt == NrSlot::NR2 || gewaehlt == NrSlot::NR3 ||
+                 gewaehlt == NrSlot::NR4 || gewaehlt == NrSlot::MNR);
 
             if (AudioEngine* ae = m_radioModel->audioEngine()) {
                 ae->setExternalAudioNr(s->sliceIndex(),
                                        eigenesVerfahren ? gewaehlt : NrSlot::Off,
                                        1.0f);
+                ae->setExternalAudioNrTuning(
+                    s->sliceIndex(),
+                    static_cast<int>(s->nr2GainMethod()),
+                    static_cast<int>(s->nr2NpeMethod()),
+                    s->nr2AeFilter(),
+                    static_cast<float>(s->nr4Reduction()),
+                    static_cast<float>(s->nr4Smoothing()),
+                    static_cast<float>(s->nr4Whitening()),
+                    static_cast<float>(s->nr4Rescale()),
+                    static_cast<float>(s->nr4PostThresh()),
+                    static_cast<int>(s->nr4Algo()));
             }
 
             // ── Jedes Verfahren an SEINEN Minderer (2026-11-01) ──
@@ -439,17 +454,34 @@ void MainWindow::wireFlex()
         disconnect(m_flexNrBand);
         m_flexNrBand = connect(ziel, &SliceModel::activeNrChanged, this,
                                [rauschHinaus](NrSlot) { rauschHinaus(); });
+        for (const auto& c : m_flexNrTuningBand) { disconnect(c); }
+        m_flexNrTuningBand.clear();
+        m_flexNrTuningBand
+            << connect(ziel, &SliceModel::nr2GainMethodChanged, this, [rauschHinaus](Longpath::EmnrGainMethod) { rauschHinaus(); })
+            << connect(ziel, &SliceModel::nr2NpeMethodChanged,  this, [rauschHinaus](Longpath::EmnrNpeMethod)  { rauschHinaus(); })
+            << connect(ziel, &SliceModel::nr2AeFilterChanged,   this, [rauschHinaus](bool) { rauschHinaus(); })
+            << connect(ziel, &SliceModel::nr4ReductionChanged,  this, [rauschHinaus](double) { rauschHinaus(); })
+            << connect(ziel, &SliceModel::nr4SmoothingChanged,  this, [rauschHinaus](double) { rauschHinaus(); })
+            << connect(ziel, &SliceModel::nr4WhiteningChanged,  this, [rauschHinaus](double) { rauschHinaus(); })
+            << connect(ziel, &SliceModel::nr4RescaleChanged,    this, [rauschHinaus](double) { rauschHinaus(); })
+            << connect(ziel, &SliceModel::nr4PostThreshChanged, this, [rauschHinaus](double) { rauschHinaus(); })
+            << connect(ziel, &SliceModel::nr4AlgoChanged,       this, [rauschHinaus](Longpath::SbnrAlgo) { rauschHinaus(); });
         disconnect(m_flexNbBand);
         m_flexNbBand = connect(ziel, &SliceModel::nbModeChanged, this,
                                [rauschHinaus](NbMode) { rauschHinaus(); });
         // ── Der Schnellgriff zeigt am Flex die Maschine ─────────────
+        //
+        // Nicht bei NR2/NR4: die rechnet Longpath (WDSP), dort wirken
+        // die WDSP-Regler wie an der Anvelina (2026-11-26).
         //
         // Dort stehen sonst WDSP-Werte, die nichts tun. Der Name
         // kommt aus derselben Zuordnung, die auch den Befehl baut --
         // zwei Quellen wuerden frueher oder spaeter auseinanderlaufen.
         if (m_commandBar) {
             m_commandBar->setMaschinenNr([](NrSlot slot) {
-                return RadioModel::flexNrSchluessel(slot);
+                return (slot == NrSlot::NR2 || slot == NrSlot::NR4)
+                           ? QString()
+                           : RadioModel::flexNrSchluessel(slot);
             });
         }
 
@@ -1118,7 +1150,8 @@ void MainWindow::wireFlex()
         // (2026-10-28).
         const NrSlot steht = slice->activeNr();
         const bool eigenesVerfahren =
-            (steht == NrSlot::NR3 || steht == NrSlot::MNR);
+            (steht == NrSlot::NR2 || steht == NrSlot::NR3 ||
+             steht == NrSlot::NR4 || steht == NrSlot::MNR);
         if (!nr) {
             if (!eigenesVerfahren) { slice->setActiveNr(NrSlot::Off); }
         } else if (steht == NrSlot::Off) {

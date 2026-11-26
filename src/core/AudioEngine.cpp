@@ -2622,6 +2622,19 @@ void AudioEngine::setExternalAudioNr(int sliceId, NrSlot slot, float amount)
     it->second->setSlot(slot);
 }
 
+void AudioEngine::setExternalAudioNrTuning(int sliceId, int nr2Gain, int nr2Npe,
+                                           bool nr2Ae, float nr4Reduction,
+                                           float nr4Smoothing, float nr4Whitening,
+                                           float nr4Rescale, float nr4PostThresh,
+                                           int nr4Scaling)
+{
+    const auto it = m_externalAudioNr.find(sliceId);
+    if (it == m_externalAudioNr.end()) { return; }
+    it->second->setNr2(nr2Gain, nr2Npe, nr2Ae);
+    it->second->setNr4(nr4Reduction, nr4Smoothing, nr4Whitening,
+                       nr4Rescale, nr4PostThresh, nr4Scaling);
+}
+
 void AudioEngine::removeExternalAudioNr(int sliceId)
 {
     m_externalAudioNr.erase(sliceId);
@@ -2648,12 +2661,16 @@ void AudioEngine::feedFlexAudioData(int sliceId, const float* interleavedStereo,
         it = m_flexResamplers.insert_or_assign(sliceId, std::move(slot)).first;
     }
 
-    const QByteArray out =
+    QByteArray out =
         it->second.resampler->processStereoToStereo(interleavedStereo, frames);
     if (out.isEmpty()) {
         return;   // der Wandler haelt noch zurueck; das ist normal
     }
     const int outFrames = out.size() / int(sizeof(float) * 2);
+    // Rauschminderung am Rechner (NR2/NR3/NR4/MNR), hinter dem Wandler auf
+    // 48 kHz -- wie bei Kiwi und SunSDR. Hier fehlte der Aufruf bis
+    // 2026-11-24: an der Flex rechnete Longpath nie selbst.
+    wendeFremdtonRauschenAn(sliceId, out);
     rxBlockReady(sliceId,
                  reinterpret_cast<const float*>(out.constData()),
                  outFrames);

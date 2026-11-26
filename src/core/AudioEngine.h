@@ -674,6 +674,14 @@ public:
     /// `amount` 0..1. Ein Steckplatz ohne Gegenstück schaltet die
     /// Stufe ab; dann kostet sie nichts.
     void setExternalAudioNr(int sliceId, NrSlot slot, float amount);
+
+    /// Regler für NR2 (WDSP-emnr) und NR4 (WDSP-sbnr) auf fremdem Ton —
+    /// dieselben Werte wie im Anvelina-Kanal. Ohne Zweig: nichts zu tun.
+    void setExternalAudioNrTuning(int sliceId, int nr2Gain, int nr2Npe,
+                                  bool nr2Ae, float nr4Reduction,
+                                  float nr4Smoothing, float nr4Whitening,
+                                  float nr4Rescale, float nr4PostThresh,
+                                  int nr4Scaling);
     /// Den Zweig einer Scheibe vergessen (Scheibe weg, Quelle weg).
     void removeExternalAudioNr(int sliceId);
 
