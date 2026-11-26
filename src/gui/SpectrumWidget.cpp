@@ -1297,6 +1297,9 @@ void SpectrumWidget::loadSettings()
     if (m_waterfallTicker) {
         m_waterfallTicker->setUpdatePeriodMs(m_wfUpdatePeriodMs);
     }
+    // Und melden: an der Flex laeuft der Wasserfall im Takt der Maschine,
+    // die den Wert als line_duration bekommt (RadioModel).
+    emit wfUpdatePeriodChanged(m_wfUpdatePeriodMs);
 
     // Sub-epic E: scrollback depth (default 20 min, range 60s..20min).
     m_waterfallHistoryMs = s.value(
@@ -3404,6 +3407,7 @@ void SpectrumWidget::setWfUpdatePeriodMs(int ms)
     if (m_waterfallTicker) {
         m_waterfallTicker->setUpdatePeriodMs(m_wfUpdatePeriodMs);
     }
+    emit wfUpdatePeriodChanged(m_wfUpdatePeriodMs);
 
     // Sub-epic E: capacity may have changed — debounce history rebuild
     // so slider drag doesn't trash history mid-drag.

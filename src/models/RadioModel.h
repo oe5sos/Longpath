@@ -1054,7 +1054,15 @@ public:
     // constructing each view. Not owned, not lifetime-tracked — MainWindow
     // outlives both.
     class SpectrumWidget* spectrumWidget() const { return m_spectrumWidget; }
-    void setSpectrumWidget(class SpectrumWidget* w) { m_spectrumWidget = w; }
+    void setSpectrumWidget(class SpectrumWidget* w);
+    /// Das Tempo des Wasserfalls an der Flex (2026-11-26, Betreiber:
+    /// „geschwindigkeit im panadapter aendert sich nicht!"). Ms je Zeile,
+    /// wie Zahnrad, Rechtsklick und Setup es fuehren; geht als
+    /// line_duration an die Maschine, sofort und bei jedem Einrichten des
+    /// Wasserfallstroms. Folgt von selbst dem Panadapter aus
+    /// setSpectrumWidget().
+    void setFlexWaterfallPeriodMs(int ms);
+    int  flexWaterfallPeriodMs() const { return m_flexWfPeriodMs; }
     class FFTEngine* fftEngine() const { return m_fftEngine; }
     void setFftEngine(class FFTEngine* e) { m_fftEngine = e; }
 
@@ -4273,6 +4281,8 @@ private:
     /// Die Kennung des Wasserfallstroms, aus `waterfall=` im
     /// Panadapter-Zustand.
     QString              m_flexWasserfallId;
+    int                  m_flexWfPeriodMs{30};   // ms je Zeile, siehe setFlexWaterfallPeriodMs
+    QMetaObject::Connection m_flexWfTempoBand;
     /// Mitte und Breite des Panadapters, EINZELN gemerkt: die Maschine
     /// schickt beim Drehen nur `center=`, nicht beides zusammen.
     double               m_flexPanMitteMhz{0.0};
