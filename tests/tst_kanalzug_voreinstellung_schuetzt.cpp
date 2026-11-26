@@ -57,6 +57,17 @@ private slots:
 
     void ein_griff_in_die_liste_vernichtet_keine_arbeit()
     {
+        // Seit 2026-11-24 liefert die Liste keine eingebauten Profile
+        // mehr: gegriffen wird eine zweite eigene Einstellung.
+        const QString name = QStringLiteral("Andere Kette");
+        {
+            StripChain andere;
+            andere.prepare(48000.0);
+            andere.tube().setDriveDb(2.0f);
+            andere.comp().setMakeupDb(1.0f);
+            QVERIFY(StripSettings::saveUserPreset(name, andere));
+        }
+
         RadioModel radio;
         StripWindow w(&radio);
         StripChain* c = radio.stripChain();
@@ -71,18 +82,10 @@ private slots:
         auto* box = w.findChild<QComboBox*>(QStringLiteral("stripPresetBox"));
         QVERIFY2(box != nullptr, "das Auswahlfeld hat keinen Namen");
 
-        // Irgendeine eingebaute Voreinstellung aus der Liste greifen --
-        // genau wie seine Hand es tut.
-        int ziel = -1;
-        for (int i = 0; i < box->count(); ++i) {
-            const QString n = box->itemData(i).toString();
-            if (!n.isEmpty() && !box->itemData(i, Qt::UserRole + 1).toBool()) {
-                ziel = i;
-                break;
-            }
-        }
-        QVERIFY2(ziel >= 0, "keine eingebaute Voreinstellung in der Liste");
-        const QString name = box->itemData(ziel).toString();
+        // Die andere aus der Liste greifen -- genau wie seine Hand es
+        // tut.
+        const int ziel = box->findData(name);
+        QVERIFY2(ziel >= 0, "die gespeicherte Einstellung fehlt in der Liste");
         box->setCurrentIndex(ziel);        // löst applyPreset aus
 
         // Die Kette ist jetzt die der Voreinstellung -- das ist gewollt.
@@ -115,6 +118,7 @@ private slots:
         QCOMPARE(box->currentData().toString(), name);
 
         StripSettings::removeUserPreset(sicherung);
+        StripSettings::removeUserPreset(name);
     }
 
     // „kann ich die audioprofile nicht löschen" (2026-10-14).

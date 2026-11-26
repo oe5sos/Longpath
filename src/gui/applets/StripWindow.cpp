@@ -23,6 +23,7 @@
 #include "core/ProfilHerkunft.h"
 #include "core/ZeusAbfrage.h"
 
+#include <QHideEvent>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -301,6 +302,18 @@ StripWindow::~StripWindow()
     // If the window is destroyed with the apply-path bypass engaged,
     // the radio would keep a bypass it never asked for.
     setRadioBypass(false);
+}
+
+// 2026-11-26, am Geraet: „aus dem kopfhoerer schrecklich laut, auch wenn
+// der channelzug geschlossen ist". Das Protokoll zeigte den Mithoerer
+// weiterlaufen, bis die ganze App beendet wurde -- Schliessen versteckt
+// den Dialog nur, und der Mithoerer lebt in seinem eigenen Faden weiter.
+void StripWindow::hideEvent(QHideEvent* ev)
+{
+    if (m_liveBtn && m_liveBtn->isChecked()) {
+        m_liveBtn->setChecked(false);   // haelt ihn ueber toggleLiveMonitor an
+    }
+    QDialog::hideEvent(ev);
 }
 
 void StripWindow::setRadioBypass(bool on)
@@ -2731,6 +2744,17 @@ void StripWindow::applyPreset(const QString& name)
     reloadControls();
     refreshChainRow();
     persist();
+
+    // ── Nach vorne, wenn alles durch ist (2026-11-24) ───────────────
+    //
+    // „als ich das Profil ausgewählt habe, ist der Channel Strip im
+    // Hintergrund und ich kann ihn nicht mehr ändern." Der Wechsel
+    // stösst Anzeigen und Applets an, und die schwebenden Paletten
+    // (Qt::Tool) landen dabei vor diesem Fenster. Einen Umlauf später,
+    // wenn alles fertig ist, holt sich das Fenster seinen Platz zurück.
+    QTimer::singleShot(0, this, [this]() {
+        if (isVisible()) { raise(); activateWindow(); }
+    });
 
     // Die Liste neu aufbauen, damit „Zuletzt bearbeitet" darin steht --
     // mit der eben gewählten Voreinstellung als Auswahl, nicht mit dem

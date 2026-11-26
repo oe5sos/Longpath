@@ -2950,7 +2950,13 @@ bool MainWindow::klickHoltNachVorne(QWidget* ziel)
     if (!ziel || m_shuttingDown) { return false; }
     QWidget* fenster = ziel->window();
     if (fenster != this) {
-        if (fenster->windowType() == Qt::Tool) { fenster->raise(); }
+        // Der Kanalzug ist ein Dialog, kein Qt::Tool -- liegt aber auf
+        // derselben Ebene wie die Paletten (AuxiliaryWindowLeveler) und
+        // blieb nach einem Profilwechsel hinter ihnen, auch beim Klick.
+        if (fenster->windowType() == Qt::Tool
+            || fenster == static_cast<QWidget*>(m_stripWindow.data())) {
+            fenster->raise();
+        }
         return false;
     }
     if (!m_appletPanel || !m_appletPanel->isAncestorOf(ziel)) { return false; }
