@@ -17,6 +17,7 @@
 // =================================================================
 
 #include "FlexRadioConnection.h"
+#include "core/WaterfallRate.h"
 
 #include <QLoggingCategory>
 #include <QStringList>
@@ -291,15 +292,37 @@ QString setPanCenterCommand(const QString& panId, double hz)
         .arg(panId).arg(hz / 1.0e6, 0, 'f', 6);
 }
 
-QString setWaterfallSetupCommand(const QString& waterfallId, bool rueckfall)
+QString setWaterfallSetupCommand(const QString& waterfallId, bool rueckfall,
+                                 int lineDurationRate)
 {
     if (waterfallId.isEmpty()) { return QString(); }
     return QStringLiteral("display %1 set %2 "
                           "auto_black=0 black_level=0 color_gain=50 "
-                          "line_duration=100")
+                          "line_duration=%3")
         .arg(rueckfall ? QStringLiteral("waterfall")
                        : QStringLiteral("panafall"),
-             waterfallId);
+             waterfallId)
+        .arg(WaterfallRate::clampRate(lineDurationRate));
+}
+
+int flexLineDurationForMsPerRow(int msJeZeile)
+{
+    // Die Kurve der Maschine (AetherSDR #3104, in WaterfallRate.h): ihr
+    // schnellstes sind rund 42 ms je Zeile. Fast/Normal/Slow/Very slow
+    // (30/60/120/250) werden so zu Rate 100/84/75/66 -- rund 42/64/120/
+    // 250 ms, also wirklich verschieden schnell.
+    return WaterfallRate::flexRateForMsPerRow(static_cast<float>(msJeZeile));
+}
+
+QString setWaterfallLineDurationCommand(const QString& waterfallId,
+                                        int lineDurationRate)
+{
+    if (waterfallId.isEmpty()) { return QString(); }
+    // Nur ueber die Panafall-Adressierung (`display waterfall set …
+    // line_duration=…` weist die Maschine ab, Code 50000016, gemessen).
+    return QStringLiteral("display panafall set %1 line_duration=%2")
+        .arg(waterfallId)
+        .arg(WaterfallRate::clampRate(lineDurationRate));
 }
 
 QString normalizedFlexId(QString text)

@@ -8880,8 +8880,12 @@ void RadioModel::richteFlexWasserfallEin()
     // der Handwert der Maschine, und wir faerben ohnehin selbst — ein
     // Wert ungleich null waere ein zweiter Eingriff, den niemand
     // nachgemessen hat.
+    //
+    // line_duration aus dem Tempo des Panadapters (2026-11-26) statt fest
+    // 100: an der Flex laeuft der Wasserfall im Takt der Maschine.
+    const int rate = FlexCommandWire::flexLineDurationForMsPerRow(m_flexWfPeriodMs);
     m_flexConnection->sendCommand(
-        FlexCommandWire::setWaterfallSetupCommand(m_flexWasserfallId, false),
+        FlexCommandWire::setWaterfallSetupCommand(m_flexWasserfallId, false, rate),
         [this](int code, const QString&) {
             if (code == 0) {
                 qCInfo(lcConnection) << "Flex: Wasserfallstrom"
@@ -8895,6 +8899,49 @@ void RadioModel::richteFlexWasserfallEin()
             m_flexConnection->sendCommand(
                 FlexCommandWire::setWaterfallSetupCommand(
                     m_flexWasserfallId, true));
+        });
+}
+
+void RadioModel::setSpectrumWidget(SpectrumWidget* w)
+{
+    if (m_spectrumWidget == w) { return; }
+    QObject::disconnect(m_flexWfTempoBand);
+    m_spectrumWidget = w;
+    if (!w) { return; }
+    // Das Tempo des Panadapters, in den die Flex zeichnet, gilt auch fuer
+    // die Maschine -- jetzt und bei jeder Aenderung.
+    m_flexWfTempoBand = connect(w, &SpectrumWidget::wfUpdatePeriodChanged,
+                                this, &RadioModel::setFlexWaterfallPeriodMs);
+    setFlexWaterfallPeriodMs(w->wfUpdatePeriodMs());
+}
+
+// ── Das Tempo des Wasserfalls an der Flex (2026-11-26) ───────────────
+//
+// Betreiber an der FLEX-8400: „geschwindigkeit im panadapter aendert sich
+// nicht!" An der Flex kommen die Wasserfallzeilen im Takt der MASCHINE
+// (SpectrumWidget, fremde Wasserfallquelle); der eigene Takt des
+// Panadapters aendert dort nichts. Beim Einrichten ging fest
+// `line_duration=100` hinaus, danach nichts mehr.
+//
+// Jetzt geht jede Aenderung als `display panafall set <id> line_duration=`
+// hinaus. Die Rate rechnet die gemessene Kurve aus WaterfallRate.h
+// (AetherSDR #3104) -- line_duration ist eine Rate 1..100, keine ms.
+void RadioModel::setFlexWaterfallPeriodMs(int ms)
+{
+    ms = std::clamp(ms, 10, 500);
+    const bool anders = (m_flexWfPeriodMs != ms);
+    m_flexWfPeriodMs = ms;
+    if (!anders) { return; }
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexWasserfallId.isEmpty()) { return; }
+    const int rate = FlexCommandWire::flexLineDurationForMsPerRow(ms);
+    m_flexConnection->sendCommand(
+        FlexCommandWire::setWaterfallLineDurationCommand(m_flexWasserfallId, rate),
+        [ms, rate](int code, const QString&) {
+            qCInfo(lcConnection).nospace()
+                << "Flex: Wasserfall-Tempo " << ms << " ms je Zeile -> line_duration="
+                << rate << (code == 0 ? " uebernommen" : " abgelehnt, Code ")
+                << (code == 0 ? QString() : QString::number(code, 16));
         });
 }
 
