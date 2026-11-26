@@ -14817,8 +14817,14 @@ void MainWindow::buildStatusBar()
     // The StationCallsign AppSettings key is preserved on disk for a potential
     // future operator-callsign surface; it is no longer shown in status chrome.
     m_stationBlock = new StationBlock(barWidget);
-    connect(m_stationBlock, &StationBlock::clicked,
-            this, &MainWindow::showConnectionPanel);
+    // Ein/Aus-Schalter: verbunden -> Klick trennt, sonst Verbindungsfenster.
+    connect(m_stationBlock, &StationBlock::clicked, this, [this]() {
+        if (m_radioModel->connectionState() == ConnectionState::Connected) {
+            m_radioModel->disconnectFromRadio();
+            return;
+        }
+        showConnectionPanel();
+    });
     connect(m_stationBlock, &StationBlock::contextMenuRequested,
             this, &MainWindow::showStationContextMenu);
     // Update the block's name on connection state changes.
