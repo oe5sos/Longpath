@@ -739,6 +739,7 @@ void CommandBar::buildModeGroup(QHBoxLayout* row)
     };
 
     Group& g = addGroup(QStringLiteral("Mode"), row);
+    g.spalten = 4;   // LSB · USB · CWL · „…“ in einer Zeile (Betreiber 2026-11-26)
     for (int i = 0; i < kVisiblePerGroup && i < m_allModes.size(); ++i) {
         const auto entry = m_allModes.at(i);
         QPushButton* b = addPill(g, entry.first);
@@ -985,7 +986,8 @@ void CommandBar::addOverflow(Group& g, const QVector<Entry>& all, Apply apply)
     more->setCursor(Qt::PointingHandCursor);
     more->setToolTip(tr("Show all %1").arg(all.size()));
     g.overflow = more;
-    if (g.row) { (g.row2 ? g.row2 : g.row)->addWidget(more); }
+    // „…“ in die erste Zeile, solange dort Platz ist; sonst in die zweite.
+    if (g.row) { ((static_cast<int>(g.pills.size()) < g.spalten || !g.row2) ? g.row : g.row2)->addWidget(more); }
 
     connect(more, &QPushButton::clicked, this, [this, all, apply]() {
         // Am Fenster, nicht an der Leiste: die Leiste (oder ihr Elternteil)
@@ -1084,7 +1086,8 @@ void CommandBar::buildFilterGroup(QHBoxLayout* row)
     more->setToolTip(tr("All widths for this mode -- and one of "
                                     "your own to type in."));
     g.overflow = more;
-    if (g.row) { (g.row2 ? g.row2 : g.row)->addWidget(more); }
+    // „…“ in die erste Zeile, solange dort Platz ist; sonst in die zweite.
+    if (g.row) { ((static_cast<int>(g.pills.size()) < g.spalten || !g.row2) ? g.row : g.row2)->addWidget(more); }
 
     connect(more, &QPushButton::clicked, this, [this]() {
         if (!m_slice) { return; }
@@ -1366,7 +1369,8 @@ void CommandBar::buildNrGroup(QHBoxLayout* row)
     more->setCursor(Qt::PointingHandCursor);
     more->setToolTip(tr("Show all %1").arg(m_allNr.size()));
     g.overflow = more;
-    if (g.row) { (g.row2 ? g.row2 : g.row)->addWidget(more); }
+    // „…“ in die erste Zeile, solange dort Platz ist; sonst in die zweite.
+    if (g.row) { ((static_cast<int>(g.pills.size()) < g.spalten || !g.row2) ? g.row : g.row2)->addWidget(more); }
     connect(more, &QPushButton::clicked, this, [this]() {
         ScopedChildWidget<QMenu> menuOwner(window());   // am Fenster, siehe addOverflow()
         QMenu& m = *menuOwner.get();
