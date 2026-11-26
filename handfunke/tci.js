@@ -101,6 +101,7 @@ export class TciLink extends EventTarget {
     spektrumPunkte: null,        // die Punktzahl, auf die er geklemmt hat
     spektrumFps: null,
       txPower: null, txSwr: null, txSensorZeit: 0,
+      txAlc: null, txAlcZeit: 0,   // tx_alc (Longpath-eigen, nur beim Senden)
       iqRate: null, audioRate: null,
       modes: [],
     };
@@ -379,6 +380,9 @@ export class TciLink extends EventTarget {
       // Bis hierher las die Seite Feld 1 (Mikrofonpegel) als Leistung und Feld 2
       // (Watt) als SWR -- beides falsch, und beides war nirgends angezeigt.
       case 'tx_sensors': s.txPower = num(2); s.txSwr = num(4); s.txSensorZeit = performance.now(); break;
+      // tx_alc:<rx>,<dB>  -- Longpath-eigen (2026-11-26), wie das ALC-Instrument
+      // am Mac (TXA_ALC_AV). Kommt nur nach `tx_alc_enable:true`.
+      case 'tx_alc': s.txAlc = num(1); s.txAlcZeit = performance.now(); break;
     }
     this._emit('state');
   }

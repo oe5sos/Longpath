@@ -326,6 +326,10 @@ struct TciClientSession {
 
     // From Thetis handleTxSensorsEnable (TCIServer.cs:4460-4469 [v2.10.3.13]).
     bool txSensorsEnabled{false};
+    // Longpath-eigen (2026-11-26): zusaetzlich `tx_alc:` im Takt von tx_sensors.
+    // Nur auf ausdruecklichen Wunsch (tx_alc_enable:true), damit fremde
+    // TCI-Clients keine Zeile bekommen, die sie nicht kennen.
+    bool txAlcEnabled{false};
 
     // From Thetis clsTCISensorManager._rxIntervalMs default 200 ms
     // (TCIServer.cs:491 [v2.10.3.13]).
