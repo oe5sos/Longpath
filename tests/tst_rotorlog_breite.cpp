@@ -26,11 +26,14 @@
 #include "core/CallsignInfo.h"
 #include "core/QrzClient.h"
 #include "core/RotorBereich.h"
+#include "core/AppSettings.h"
+#include "gui/ToolWindow.h"
 #include "gui/widgets/RotorDialWidget.h"
 #include "gui/widgets/RotorLogbookPanel.h"
 #include "gui/widgets/StationPhoto.h"
 #include "FensterFrist.h"
 
+#include <QAction>
 #include <QApplication>
 #include <QDateTime>
 #include <QMouseEvent>
@@ -42,6 +45,7 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QTableWidget>
+#include <QVBoxLayout>
 
 using namespace Longpath;
 
@@ -290,6 +294,120 @@ private slots:
         QCOMPARE(p->form(), RotorLogbookPanel::Form::Schmal);
         QVERIFY(!call->isVisibleTo(p));
         QVERIFY2(abgeschnitten(*p).isEmpty(), qPrintable(abgeschnitten(*p)));
+    }
+
+    // Als schwebendes Fenster (2026-11-26, 20:30, am Geraet): „hat sich
+    // nun so groß gemacht, dass man es nicht mehr kleiner machen kann".
+    // Ein Fenster mit Layout wird auf die Mindestgroesse seines Inhalts
+    // gezogen -- sie darf nie an den gerade sichtbaren Zeilen haengen.
+    void schwebend_wieder_klein()
+    {
+        QrzClient qrz;
+        qrz.setCredentials(QStringLiteral("pruefstand"), QStringLiteral("pruefstand"));
+        QWidget fenster;                       // wie ToolWindow: Fenster + Layout
+        auto* lay = new QVBoxLayout(&fenster);
+        lay->setContentsMargins(0, 0, 0, 0);
+        // Wie im Programm: das Feld entsteht ohne Groesse (Qt: 640 x 480,
+        // also „breit") und kommt erst dann ins schmale Fenster.
+        auto* p = new RotorLogbookPanel(nullptr, &qrz, nullptr);
+        p->resize(640, 480);
+        lay->addWidget(p);
+        fenster.resize(330, 240);
+        fenster.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&fenster, kFensterFrist));
+        fuellen(*p);
+        QTest::qWait(250);
+        QCOMPARE(fenster.size(), QSize(330, 240));
+
+        // Breit, schmal und hoch, wieder klein -- jedes Mal muss das
+        // Fenster die Groesse annehmen, die es bekommt.
+        const QVector<QSize> zuege = {{740, 240}, {330, 240}, {330, 733},
+                                      {330, 240}, {1000, 300}, {330, 240}};
+        for (const QSize z : zuege) {
+            fenster.resize(z);
+            QTest::qWait(150);
+            QVERIFY2(fenster.size() == z, qPrintable(QStringLiteral("gezogen auf %1x%2, steht bei %3x%4")
+                .arg(z.width()).arg(z.height()).arg(fenster.width()).arg(fenster.height())));
+            // Die Mindestgroesse: nie mehr als Rand + Kompass hoch und
+            // das schmale Feld breit -- egal, was gerade zu sehen ist.
+            const QSize min = fenster.minimumSizeHint();
+            QVERIFY2(min.height() <= 8 + 8 + p->dial()->parentWidget()->minimumSizeHint().height()
+                         && min.width() <= 20 + 300,
+                     qPrintable(QStringLiteral("Mindestgroesse %1x%2 nach %3x%4")
+                .arg(min.width()).arg(min.height()).arg(z.width()).arg(z.height())));
+        }
+        QVERIFY2(abgeschnitten(*p).isEmpty(), qPrintable(abgeschnitten(*p)));
+    }
+
+    // Der Weg, den der Betreiber am 26.11. um 20:30 ging: Rotor/Log als
+    // schwebendes Werkzeugfenster mit einer GESPEICHERTEN Lage aufmachen.
+    // Das Fenster muss die gespeicherte Groesse behalten und sich danach
+    // klein ziehen lassen.
+    void gespeicherte_lage_im_werkzeugfenster()
+    {
+        const QString id = QStringLiteral("RotorLogPruefstand");
+        {
+            QWidget platz;
+            ToolWindow alt(&platz, id, QStringLiteral("Rotor / Log"));
+            alt.resize(330, 420);
+            alt.show();
+            QVERIFY(QTest::qWaitForWindowExposed(&alt, kFensterFrist));
+            AppSettings::instance().setValue(QStringLiteral("ToolWindowGeometry_%1").arg(id),
+                                             alt.saveGeometry());
+            alt.releaseContent();
+        }
+        QrzClient qrz;
+        qrz.setCredentials(QStringLiteral("pruefstand"), QStringLiteral("pruefstand"));
+        auto* p = new RotorLogbookPanel(nullptr, &qrz, nullptr);   // 640 x 480: „breit"
+        fuellen(*p);
+        ToolWindow fenster(p, id, QStringLiteral("Rotor / Log"));
+        fenster.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&fenster, kFensterFrist));
+        QTest::qWait(250);
+        QVERIFY2(fenster.height() <= 420 + 2,
+                 qPrintable(QStringLiteral("gespeichert 330x420, aufgegangen %1x%2")
+                     .arg(fenster.width()).arg(fenster.height())));
+        fenster.resize(330, 240);
+        QTest::qWait(150);
+        QVERIFY2(fenster.height() <= 240 + 2,
+                 qPrintable(QStringLiteral("auf 330x240 gezogen, steht bei %1x%2")
+                     .arg(fenster.width()).arg(fenster.height())));
+        fenster.resize(1100, 330);
+        QTest::qWait(150);
+        QCOMPARE(p->form(), RotorLogbookPanel::Form::Breit);
+        fenster.resize(330, 240);
+        QTest::qWait(150);
+        QVERIFY(fenster.height() <= 242 && fenster.width() <= 332);
+        QVERIFY2(abgeschnitten(*p).isEmpty(), qPrintable(abgeschnitten(*p)));
+    }
+
+    // Betreiber, 20:33: „die weltkugel benötige ich nicht, sollte
+    // eigentlich immer ... der rotor zu sehen sein". Eine QRZ-Antwort
+    // schaltete bis dahin auf die Kugel um.
+    void qrz_antwort_laesst_den_kompass_stehen()
+    {
+        QrzClient qrz;
+        qrz.setCredentials(QStringLiteral("pruefstand"), QStringLiteral("pruefstand"));
+        QWidget halter;
+        halter.resize(1100, 330);
+        auto* p = new RotorLogbookPanel(nullptr, &qrz, nullptr, &halter);
+        p->setGeometry(0, 0, 1100, 330);
+        halter.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&halter, kFensterFrist));
+        fuellen(*p);
+        QTest::qWait(150);
+        QCOMPARE(p->form(), RotorLogbookPanel::Form::Breit);
+        QVERIFY(p->dial()->isVisibleTo(p));
+        // Die Antwort, wie sie aus dem Netz kaeme.
+        emit qrz.lookupSucceeded(QStringLiteral("VE2ABC"),
+                                 antwort(QStringLiteral("https://example.invalid/pruefstand-ve2abc.png")));
+        QTest::qWait(100);
+        QVERIFY2(p->dial()->isVisibleTo(p), "nach der QRZ-Antwort steht die Kugel statt des Kompasses");
+        // Wer die Kugel ausdruecklich will, bekommt sie weiter (Zahnrad).
+        auto* kugel = p->findChild<QAction*>(QStringLiteral("rotorLogGlobeAction"));
+        QVERIFY(kugel);
+        kugel->setChecked(true);
+        QVERIFY(!p->dial()->isVisibleTo(p));
     }
 
     // Ein hohes Dock bleibt die eine Spalte von heute, auch wenn es

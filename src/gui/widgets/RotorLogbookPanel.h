@@ -92,6 +92,10 @@ public:
     // Where the ADIF log is written.
     static QString logbookPath();
 
+    // Die Mindestgroesse ist die des Kompasses, nicht die aller Zeilen,
+    // die gerade sichtbar sind -- siehe RotorLogbookPanel.cpp.
+    QSize minimumSizeHint() const override;
+
     /// Der Zeiger selbst. Damit MainWindow ihn in ein durchsichtiges
     /// Bild malen und dem Panadapter geben kann (siehe
     /// SpectrumWidget::setCompassOverlay) — das Panel behaelt dabei

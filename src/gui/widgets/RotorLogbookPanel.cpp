@@ -905,6 +905,35 @@ void RotorLogbookPanel::resizeEvent(QResizeEvent* ev)
     updateCompactness();
 }
 
+// ── Die Mindestgroesse (2026-11-26) ─────────────────────────────────
+//
+// Betreiber, 20:30, schwebendes Rotor/Log ueber die ganze Schirmhoehe:
+// „hat sich nun so groß gemacht, dass man es nicht mehr kleiner machen
+// kann, das darf nicht passieren."
+//
+// Die Zeilen werden nach der Hoehe abgeworfen, die das Feld BEKOMMT.
+// Haengt die Mindestgroesse aber an den gerade sichtbaren Zeilen, laeuft
+// es im Kreis: ein schwebendes Fenster wird auf die Mindestgroesse
+// seines Inhalts gezogen; sind (auch nur einen Takt lang, etwa nach dem
+// Wechsel zwischen schmal und breit) alle Zeilen auf, waechst das
+// Fenster auf ihre Summe, in der neuen Hoehe passen sie alle, und
+// kleiner ziehen laesst es sich nicht mehr -- die Groesse, die das
+// Abwerfen ausloesen wuerde, kommt nie an.
+//
+// Darum: was abgeworfen werden kann, zaehlt nicht zur Mindestgroesse.
+// Hoehe = Rand + Kompass; Breite hoechstens die des schmalen Felds mit
+// seinem 300 Punkte breiten Rotorband. Die Anordnung folgt der Groesse,
+// sie erzwingt keine.
+QSize RotorLogbookPanel::minimumSizeHint() const
+{
+    QSize s = QWidget::minimumSizeHint();
+    if (!m_aussen || !m_viewStack) { return s; }
+    const QMargins m = m_aussen->contentsMargins();
+    const int hoch  = m.top() + m.bottom() + m_viewStack->minimumSizeHint().height();
+    const int breit = m.left() + m.right() + RotorBandWidget::kBreite;
+    return {std::min(s.width(), breit), std::min(s.height(), hoch)};
+}
+
 // ── Breit gezogen (2026-11-26) ──────────────────────────────────────
 //
 // Betreiber: „wenn ich es in die breite ziehe sollte dort dann der rest,
@@ -3346,14 +3375,14 @@ void RotorLogbookPanel::wireQrz()
         showStationVisuals(info);
         setStatus(QString{});
 
-        // Show the answer as a picture too (2026-08-10, operator wish):
-        // a successful lookup brings the globe up and swings it along
-        // the path to the station. The dial is one click away on the
-        // same button.
-        if (m_dial->hasTarget()) {
-            if (m_globeBtn && !m_globeBtn->isChecked()) {
-                m_globeBtn->setChecked(true);   // switches the stack
-            }
+        // Bis 2026-11-26 holte jede erfolgreiche Abfrage die Kugel nach
+        // vorn (Wunsch vom 2026-08-10). Betreiber, 20:33, breit gedockt
+        // mit der Kugel statt des Kompasses: „die weltkugel benötige ich
+        // nicht, sollte eigentlich immer, sofern es leicht geht, der
+        // rotor zu sehen sein". Die Ansicht bleibt jetzt, wie sie ist;
+        // die Kugel gibt es hinter dem Zahnrad („Rose oder Kugel"). Ist
+        // sie gewaehlt, dreht sie weiter zur Station.
+        if (m_dial->hasTarget() && m_globeBtn && m_globeBtn->isChecked()) {
             m_globe->lookAlongBearing(m_dial->targetBearing());
         }
     });
