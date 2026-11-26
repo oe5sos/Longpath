@@ -855,3 +855,13 @@ footer #onAir.an{color:var(--tx-border)}
   body.dt #ft8Feld .ft8Liste{display:block;flex:1;min-height:0;max-height:none}
   body.dt #ft8Feld .ft8Z{height:26px}
 }
+
+/* Peilung unter der gewaehlten FT8-Zeile (2026-11-26): Zahl orange wie jeder
+   Messwert, Drehknopf flach wie die anderen Knoepfe. */
+.ft8Peil{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:6px 8px 8px;font:var(--f-small)/1.2 var(--mono);color:var(--orT)}
+.ft8Dreh{flex:none;height:30px;padding:0 10px;border-radius:8px;background:var(--flat);
+  border:1px solid #f6c25e;color:var(--orT);font:600 var(--f-small)/1 var(--mono);letter-spacing:.06em}
+.ft8Dreh:active{background:var(--or);color:#1a1205}
+.ft8Dreh:disabled{border-color:#2c2c31;color:#55555e}
+.ft8Wege{display:flex;gap:6px;flex:none}

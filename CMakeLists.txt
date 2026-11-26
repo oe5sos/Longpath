@@ -537,6 +537,7 @@ set(CORE_SOURCES
     src/core/LogbookDatei.cpp
     src/core/LogbuchRueckschau.cpp
     src/core/SpotAuswahl.cpp
+    src/core/RufPeilung.cpp
     src/core/SettingsBackup.cpp
     src/core/RxProfileManager.cpp
     src/core/CtcssDetector.cpp

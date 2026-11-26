@@ -131,6 +131,33 @@ SPOT_VORRAT = [
     (   640, 'HB9DEF', 'FT8',  'LONGPATH', 109),
 ]
 
+# Fuer rotor_peilung: eigener Standort (Oberoesterreich) und ein paar
+# Laendermitten, wie sie in cty.dat stehen (Breite, Laenge Ost, Name).
+EIGENE_LAGE = (47.9, 13.8)
+PREFIX_LAGE = [
+    ('EA', (40.4, -3.7, 'Spain')),
+    ('DL', (51.0, 10.0, 'Fed. Rep. of Germany')),
+    ('JA', (36.4, 138.4, 'Japan')),
+    ('OK', (50.0, 15.0, 'Czech Republic')),
+    ('W',  (37.5, -91.7, 'United States')),
+    ('SP', (52.3, 19.2, 'Poland')),
+    ('G',  (52.8, -1.5, 'England')),
+    ('HB9', (46.9, 8.0, 'Switzerland')),
+]
+
+
+def _grosskreis(von, nach):
+    la1, lo1 = map(math.radians, von)
+    la2, lo2 = map(math.radians, nach)
+    d = lo2 - lo1
+    y = math.sin(d) * math.cos(la2)
+    x = math.cos(la1) * math.sin(la2) - math.sin(la1) * math.cos(la2) * math.cos(d)
+    grad = (math.degrees(math.atan2(y, x)) + 360) % 360
+    c = math.acos(max(-1, min(1, math.sin(la1) * math.sin(la2)
+                              + math.cos(la1) * math.cos(la2) * math.cos(d))))
+    return grad, 6371 * c
+
+
 INIT_BURST = [
     'protocol:Longpath-Attrappe,2.0;',
     'device:Attrappe;',
@@ -433,6 +460,10 @@ class Verbindung(threading.Thread):
                 if g is None or g != g or g < 0 or g > 360:
                     print(f'  {self.addr[1]}: rotor_to ABGELEHNT ({roh!r})')
                     self.sende_text('rotor_err:peilung unbrauchbar;')
+                elif 0 < g < 180:
+                    # Wie Longpath mit Drehbereich 180 -> 360 (Berg im Osten).
+                    print(f'  {self.addr[1]}: rotor_to ABGELEHNT ({g:.0f} ausserhalb)')
+                    self.sende_text('rotor_err:ausserhalb des drehbereichs;')
                 else:
                     if g == 360:
                         g = 0.0
@@ -440,6 +471,22 @@ class Verbindung(threading.Thread):
                     ROTOR['zustand'] = 'dreht'
                     print(f'  {self.addr[1]}: Rotor auf {g:.1f} Grad')
                     self.sende_text(f'rotor_ok:{g:.1f};')
+        elif name == 'rotor_peilung':
+            # Wie Longpath (TciServer, 2026-11-26): Mitte des Landes aus dem
+            # Prefix, Peilung und Entfernung vom eigenen Standort. Die Attrappe
+            # kennt nur eine Handvoll Prefixe -- genug fuer die FT8-Funde oben.
+            ruf = (args[0].strip().upper() if args else '')
+            ziel = next((v for k, v in PREFIX_LAGE if ruf.startswith(k)), None)
+            if not ruf or ziel is None:
+                self.sende_text(f'rotor_peilung_err:{ruf},unbekanntes prefix;')
+            else:
+                grad, km = _grosskreis(EIGENE_LAGE, ziel[:2])
+                lang = (grad + 180) % 360
+                # Drehbereich wie bei Martin: nur die Westhaelfte 180..360.
+                frei = lambda g: 1 if g >= 180 else 0
+                self.sende_text(f'rotor_peilung:{ruf},{grad:.1f},{km:.0f},{ziel[2]},'
+                                f'{lang:.1f},{frei(grad)},{frei(lang)};')
+            print(f'  {self.addr[1]}: {zeile}')
         elif name == 'spots':
             # Longpath filtert auf den sichtbaren Ausschnitt. Die Attrappe
             # ist dabei absichtlich NICHT gutmuetiger: was ausserhalb der
