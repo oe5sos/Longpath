@@ -266,12 +266,12 @@ public:
     // Gemessen 2026-11-26 offscreen bei 60 Punkten Pillenbreite: die Einzelzeile
     // braucht 1625 Punkte; mit Reserve 1640. Die Profilgruppe kommt dazu, die
     // Schwelle nimmt sie über einzeiligMindestbreite() selbst auf.
-    static constexpr int kEinzeiligUnterBreite = 1640;
+    static constexpr int kEinzeiligUnterBreite = 1000;
     /// Sichtbare Einträge je Gruppe, bevor das „…" übernimmt.
     static constexpr int kVisiblePerGroup = 3;
     /// Sichtbare Bänder vorne: vier (160 · 80 · 60 · 40), der Rest im „…".
     // Acht Baender vorne, in zwei Zeilen zu vier (Betreiber 2026-11-21).
-    static constexpr int kVisibleBand = 8;
+    static constexpr int kVisibleBand = 4;
 
     /// Die Gruppen je Zeile (oben, unten) in Reihenfolge. Die untere
     /// Zeile ist leer, solange die Leiste einzeilig steht.

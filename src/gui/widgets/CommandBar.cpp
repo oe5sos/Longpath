@@ -47,7 +47,7 @@ namespace {
 // Ein Abstand für alle: zwischen Pillen, zwischen Zeilen und zwischen Bereichen.
 constexpr int kAbstand = 5;
 // Pillen je Zeile in der Bandgruppe (zwei Zeilen zu vier).
-constexpr int kPillsProZeile = 4;
+constexpr int kPillsProZeile = 2;   // zwei Spalten je Bereich (Betreiber 2026-11-26)
 /// Die Stufe der Leiste. Statisch, weil die Stilblätter (auch die der
 /// Profilschiene) sie ohne Leiste erreichen müssen.
 bool s_gross = false;
@@ -500,11 +500,11 @@ void CommandBar::resizeEvent(QResizeEvent* e)
     QWidget::resizeEvent(e);
     // Ab kGrossAbBreite wachsen die Pillen (große Stufe, mit Beschriftung).
     setzeGrossModus(width() >= kGrossAbBreite);
-    // Unterhalb der Schwelle zwei Zeilen, ab ihr eine. Die Schwelle ist
-    // die Konstante, aber nie kleiner als die Einzelzeile selbst -- sonst
-    // würde sie gestaucht (siehe kEinzeiligUnterBreite). Nur bei einem
-    // Wechsel umordnen.
-    const int schwelle = qMax(kEinzeiligUnterBreite, einzeiligMindestbreite());
+    // Unterhalb der Schwelle zwei Zeilen, ab ihr eine. Die Schwelle ist die
+    // gemessene Konstante. Nur bei einem Wechsel umordnen. (2026-11-26:
+    // nicht mehr die dynamische Mindestbreite -- sonst bricht die Leiste bei
+    // der Breite des Betreibers in vier Zeilen um.)
+    const int schwelle = kEinzeiligUnterBreite;
     const bool zwei = width() < schwelle;
     if (zwei != m_zweiZeilen) { ordneZeilen(zwei); }
 }

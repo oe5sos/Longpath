@@ -43,7 +43,7 @@ static_assert(ProfileRail::kLeistenSeite == CommandBar::kPillHeight + 2,
 // Die Profile stehen zwei Zeilen zu vier, wie die Bandgruppe: die erste
 // Zeile liegt auf der ersten Zeile der Leiste, die zweite auf der zweiten
 // (Betreiber 2026-11-26).
-constexpr int kAbzeichenProZeile = 4;
+constexpr int kAbzeichenProZeile = 2;   // zwei Spalten (Betreiber 2026-11-26)
 // Abstand von Zeile zu Zeile: 5 px, wie in der Befehlsleiste.
 constexpr int kZeilenAbstand = 5;
 
@@ -256,6 +256,20 @@ void ProfileRail::stufeGewechselt()
     }
 }
 
+void ProfileRail::zeigeAlleProfile()
+{
+    if (!m_profiles || !m_mehr) { return; }
+    QMenu menu(this);
+    const QString aktuell = m_profiles->current();
+    for (const QString& name : m_profiles->names()) {
+        QAction* a = menu.addAction(name);
+        a->setCheckable(true);
+        a->setChecked(name == aktuell);
+    }
+    QAction* gewaehlt = menu.exec(m_mehr->mapToGlobal(QPoint(0, m_mehr->height())));
+    if (gewaehlt) { m_profiles->activate(gewaehlt->text()); }
+}
+
 void ProfileRail::platziere(QWidget* w, int index)
 {
     if (m_grid) {
@@ -279,6 +293,7 @@ void ProfileRail::rebuild()
     m_badges.clear();
     m_closers.clear();   // Kinder der Abzeichen, sterben mit ihnen
     m_order.clear();
+    if (m_mehr) { m_rail->removeWidget(m_mehr); m_mehr->deleteLater(); m_mehr = nullptr; }
     m_rail->removeWidget(m_plus);
     while (QLayoutItem* it = m_rail->takeAt(0)) { delete it; }
 
@@ -289,7 +304,13 @@ void ProfileRail::rebuild()
     }
 
     const QString current = m_profiles->current();
-    for (const QString& name : m_profiles->names()) {
+    // Waagrecht höchstens drei Profile sichtbar, dazu „…“ (Betreiber 2026-11-26):
+    // zwei Spalten, zwei Zeilen wie die übrigen Bereiche.
+    const QStringList alle = m_profiles->names();
+    const bool ueberlauf = m_richtung == Qt::Horizontal && alle.size() > 3;
+    const QStringList sichtbar = ueberlauf ? alle.mid(0, 3) : alle;
+    m_plus->setVisible(!ueberlauf);
+    for (const QString& name : sichtbar) {
         // Waagrecht zeigt die Pille das Kürzel (höchstens drei Zeichen),
         // sonst den ersten Buchstaben. Senkrecht bleibt die Scheibe bei
         // einem Zeichen -- drei passen dort nicht hinein.
@@ -374,7 +395,16 @@ void ProfileRail::rebuild()
         m_order << name;
     }
 
-    platziere(m_plus, m_order.size());
+    if (!ueberlauf) { platziere(m_plus, m_order.size()); }
+    if (ueberlauf) {
+        m_mehr = new QPushButton(QStringLiteral("…"), this);
+        m_mehr->setStyleSheet(leistenStil());
+        setzeMasse(m_mehr);
+        m_mehr->setCursor(Qt::PointingHandCursor);
+        m_mehr->setToolTip(tr("Alle Profile"));
+        connect(m_mehr, &QPushButton::clicked, this, &ProfileRail::zeigeAlleProfile);
+        platziere(m_mehr, m_order.size());
+    }
     // Senkrecht schiebt die Dehnung die Abzeichen nach oben. Waagrecht
     // darf sie NICHT dazu: die Leiste setzt die Breite, und eine Dehnung
     // darin wuerde die Abzeichen auseinanderziehen.

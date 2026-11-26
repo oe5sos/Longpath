@@ -229,6 +229,9 @@ protected:
 
 private:
     void meldeAusloeser(const QString& name);
+    /// Das „…“ öffnet alle Profile in einem Menü (waagrecht, ab vier Profilen).
+    void zeigeAlleProfile();
+    QPushButton* m_mehr{nullptr};
     /// Ein Abzeichen (oder das Plus) an seinen Platz setzen. Senkrecht
     /// untereinander, waagrecht in zwei Zeilen zu vier wie BAND.
     void platziere(QWidget* w, int index);

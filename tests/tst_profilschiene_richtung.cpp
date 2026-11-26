@@ -190,9 +190,8 @@ private slots:
         QPushButton* pille = ersteGruppenPille(leiste);
         QVERIFY2(pille, "keine Pille in der Leiste gefunden");
         QCOMPARE(abzeichen->sizeHint().height(), pille->sizeHint().height());
-        // Die Schiene hat keine feste Hoehe mehr; ihre Hoehe kommt aus
-        // dem Layout. Eine Zeile Abzeichen muss so hoch sein wie eine Pille.
-        QCOMPARE(rail.sizeHint().height(), pille->sizeHint().height());
+        // Zwei Zeilen Abzeichen mit 5 px dazwischen (Betreiber 2026-11-26).
+        QCOMPARE(rail.sizeHint().height(), 2 * pille->sizeHint().height() + 5);
         QCOMPARE(ProfileRail::kLeistenSeite, pille->sizeHint().height());
 
         // Auch das Plus. Es traegt als einziges ein eigenes Stilblatt
@@ -522,8 +521,8 @@ private slots:
 
     void waagrechtLiegtInZweiZeilenZuVier()
     {
-        // Betreiber 2026-11-26: die Profile zwei Zeilen zu vier, auf den Zeilen
-        // der Befehlsleiste.
+        // Betreiber 2026-11-26: zwei Spalten, zwei Zeilen. Ab vier Profilen
+        // stehen drei Pillen und das „…“ darunter.
         LayoutProfiles profiles;
         for (int i = 1; i <= 6; ++i) {
             QVERIFY(profiles.create(QStringLiteral("P%1").arg(i)));
@@ -532,17 +531,13 @@ private slots:
         rail.resize(rail.sizeHint());
         rail.layout()->activate();
         const QStringList namen = profiles.names();
-        QPushButton* oben = badgeFor(rail, namen.at(0));
-        QVERIFY(oben);
-        for (int i = 0; i < namen.size(); ++i) {
-            QPushButton* b = badgeFor(rail, namen.at(i));
-            QVERIFY(b);
-            if (i < 4) {
-                QCOMPARE(b->y(), oben->y());
-            } else {
-                QVERIFY2(b->y() > oben->y(), "die zweite Zeile liegt unter der ersten");
-            }
-        }
+        QPushButton* erste = badgeFor(rail, namen.at(0));
+        QPushButton* zweite = badgeFor(rail, namen.at(1));
+        QPushButton* dritte = badgeFor(rail, namen.at(2));
+        QVERIFY(erste && zweite && dritte);
+        QCOMPARE(zweite->y(), erste->y());
+        QVERIFY2(dritte->y() > erste->y(), "die dritte Pille liegt in der zweiten Zeile");
+        QVERIFY2(rail.findChildren<QPushButton*>().size() >= 4, "es fehlt das „…“");
     }
 
 
