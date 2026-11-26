@@ -24,6 +24,10 @@
 #include "gui/MainWindow.h"
 #include "gui/SetupDialog.h"
 #include "gui/StyleConstants.h"
+#include "gui/SpectrumWidget.h"
+
+#include <QImage>
+#include <QPainter>
 #include "gui/styles/Theme.h"
 #include "gui/styles/ThemeQss.h"
 
@@ -144,6 +148,44 @@ private slots:
         QVERIFY2(Style::titleBarStyle().contains(QLatin1String("qradialgradient")),
                  "Blau-Gold hat keinen Schimmer am Kopf");
 
+        Style::Theme::instance().clear();
+    }
+
+    /// Der Panadapter-Grund: Standard flach, Blau-Gold mit Verlauf oben rechts.
+    /// Gemalt direkt in ein Bild (paintBackgroundLayer), ohne GPU.
+    void panadapterGrundInBlauGold()
+    {
+        const QRect rect(0, 0, 400, 300);
+        Style::Theme::instance().clear();
+        {
+            SpectrumWidget w(nullptr);
+            QImage img(rect.size(), QImage::Format_ARGB32);
+            img.fill(Qt::black);
+            QPainter p(&img);
+            w.paintBackgroundLayer(p, rect);
+            p.end();
+            QCOMPARE(img.pixelColor(390, 10), img.pixelColor(10, 290));   // flach
+        }
+
+        QVERIFY(Style::Theme::instance().activate(QStringLiteral("Blau-Gold")));
+        {
+            SpectrumWidget w(nullptr);
+            QImage img(rect.size(), QImage::Format_ARGB32);
+            img.fill(Qt::black);
+            QPainter p(&img);
+            w.paintBackgroundLayer(p, rect);
+            p.end();
+            const QColor oben = img.pixelColor(390, 10);
+            const QColor unten = img.pixelColor(10, 290);
+            qInfo().noquote() << "Panadapter oben rechts" << oben.name()
+                              << "unten links" << unten.name();
+            QVERIFY2(oben != unten, "Blau-Gold: kein Verlauf im Panadapter");
+            QVERIFY2(oben.blue() > unten.blue(), "Verlauf läuft nicht nach oben rechts hell aus");
+            const QString dir = qEnvironmentVariable("LONGPATH_GRAB_DIR");
+            if (!dir.isEmpty()) {
+                img.save(dir + QStringLiteral("/blau-gold-panadapter-grund.png"));
+            }
+        }
         Style::Theme::instance().clear();
     }
 
