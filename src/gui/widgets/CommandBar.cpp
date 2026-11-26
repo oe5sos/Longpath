@@ -446,17 +446,27 @@ void CommandBar::paintEvent(QPaintEvent* e)
     style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
     QWidget::paintEvent(e);
 
-    if (m_boxen.size() < 2) { return; }
+    // Die Bereiche in SICHTBARER Reihenfolge (Zeile fuer Zeile), nicht in der
+    // Reihenfolge ihres Anlegens: nur so liegt der Strich zwischen Nachbarn.
+    QVector<QRect> reihe;
+    for (const QHBoxLayout* zeile : {m_row, m_rowZwei}) {
+        if (!zeile) { continue; }
+        for (int i = 0; i < zeile->count(); ++i) {
+            QLayoutItem* it = zeile->itemAt(i);
+            // Ausgeblendete (leere) Bereiche bleiben draußen, damit ihre Nachbarn
+            // einander finden.
+            if (it && it->layout() && it->layout()->geometry().width() > 0) {
+                reihe.append(it->layout()->geometry());
+            }
+        }
+    }
+    if (reihe.size() < 2) { return; }
 
     p.setPen(QPen(QColor(QString::fromLatin1(Style::kGlassEdgeLight)), 1));
-    for (int i = 0; i + 1 < m_boxen.size(); ++i) {
-        const QRect a = m_boxen.at(i)->geometry();
-        const QRect b = m_boxen.at(i + 1)->geometry();
-        if (!a.isValid() || !b.isValid()) { continue; }
-        // Andere Zeile: kein Strich zwischen Oben und Unten.
-        if (qAbs(a.top() - b.top()) > 2) { continue; }
-        // Genau in die Mitte der Luecke. Am Rand einer Gruppe klebend
-        // waere er ihr Rahmen und gehoerte dann auch ringsum.
+    for (int i = 0; i + 1 < reihe.size(); ++i) {
+        const QRect a = reihe.at(i);
+        const QRect b = reihe.at(i + 1);
+        // Genau in die Mitte der Luecke, zwischen den Pillenkanten.
         const int x = (a.right() + b.left()) / 2;
         const int oben  = qMin(a.top(), b.top());
         const int unten = qMax(a.bottom(), b.bottom());
@@ -661,6 +671,14 @@ void CommandBar::zieheLeereGruppenZurueck()
         for (QPushButton* b : g->pills) {
             if (b) { b->setStyleSheet(leer ? pillStyleGedaempft() : pillStyle()); }
         }
+        // Leere Gruppe ganz weg, nicht nur gedämpft (Betreiber 2026-11-26):
+        // ausgeblendet nimmt sie keinen Platz und keinen Abstand mehr ein.
+        for (QPushButton* b : g->pills) {
+            if (b) { b->setVisible(!leer); }
+        }
+        if (g->overflow) { g->overflow->setVisible(!leer); }
+        if (g->pills.isEmpty() && m_rateLabel) { m_rateLabel->setVisible(!leer); }
+        if (g->caption) { g->caption->setVisible(false); }
         if (g->caption) {
             // Zurueck auf kTextScale, nicht auf einen leeren Stil:
             // captionLabel() setzt die Farbe selbst, und ein leeres

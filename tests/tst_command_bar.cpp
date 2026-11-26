@@ -81,7 +81,9 @@ private slots:
         QVector<QRect> kaesten;
         for (int i = 0; i < row->count(); ++i) {
             QLayoutItem* it = row->itemAt(i);
-            if (it && it->layout() && it->layout()->geometry().isValid()) {
+            // Ausgeblendete leere Gruppen zählen nicht (2026-11-26).
+            if (it && it->layout() && it->layout()->geometry().isValid()
+                && it->layout()->geometry().width() > 0) {
                 kaesten.append(it->layout()->geometry());
             }
         }
