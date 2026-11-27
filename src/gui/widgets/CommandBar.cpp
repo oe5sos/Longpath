@@ -747,7 +747,7 @@ void CommandBar::buildModeGroup(QHBoxLayout* row)
     };
 
     Group& g = addGroup(QStringLiteral("Mode"), row);
-    g.spalten = 4;   // LSB · USB · CWL · „…“ in einer Zeile (Betreiber 2026-11-26)
+    g.spalten = 2;   // Betreiber 2026-11-27: jede Gruppe höchstens zwei Spalten
     for (int i = 0; i < kVisiblePerGroup && i < m_allModes.size(); ++i) {
         const auto entry = m_allModes.at(i);
         QPushButton* b = addPill(g, entry.first);
@@ -945,7 +945,7 @@ void CommandBar::buildBandGroup(QHBoxLayout* row)
     };
 
     Group& g = addGroup(QStringLiteral("Band"), row);
-    g.spalten = 3;   // oben drei Bänder, darunter der Rest (Betreiber 2026-11-26)
+    g.spalten = 2;   // Betreiber 2026-11-27: jede Gruppe höchstens zwei Spalten
     // Zweite Pillenzeile unter den ersten vier Baendern (2026-11-21).
     QHBoxLayout* zweite = g.row2;
     g.row2 = zweite;
