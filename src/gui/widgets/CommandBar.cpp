@@ -579,15 +579,10 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
     // ersten Linie der Leiste, nicht mittig (Betreiber 2026-11-26).
     pills->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     box->addLayout(pills);
-    // Zweite Zeile gleich mit dem Bereich: alle Bereiche haben dieselben
-    // beiden Linien (Betreiber 2026-11-26). Leer bleibt sie ohne Abstand.
-    auto* zweite = new QHBoxLayout;
-    zweite->setContentsMargins(0, 0, 0, 0);
-    zweite->setSpacing(kAbstand);
-    // Linksbündig: sonst wird die kürzere zweite Zeile mittig gesetzt und steht
-    // nicht unter der ersten (Betreiber 2026-11-26: FT8 unter LSB).
-    zweite->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-    box->addLayout(zweite);
+    // Die zweite Zeile entsteht erst, wenn eine Pille sie braucht (addPill).
+    // Eine leere Zeile hier hat trotzdem einen Abstand gekostet: die Lücke
+    // zwischen den Reihen (Betreiber 2026-11-27: "diese gehört weg").
+    QHBoxLayout* zweite = nullptr;
     // Die Zeile setzt ordneZeilen() endgültig; hier nur der Besitz.
     row->addLayout(box);
     m_boxen.append(box);
@@ -655,6 +650,8 @@ QPushButton* CommandBar::addPill(Group& g, const QString& label)
             auto* zweite = new QHBoxLayout;
             zweite->setContentsMargins(0, 0, 0, 0);
             zweite->setSpacing(kAbstand);
+            // Linksbündig, wie in addGroup(): FT8 steht unter LSB.
+            zweite->setAlignment(Qt::AlignLeft | Qt::AlignTop);
             static_cast<QBoxLayout*>(g.box)->addLayout(zweite);
             g.row2 = zweite;
         }
