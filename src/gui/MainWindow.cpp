@@ -628,6 +628,10 @@ void catSetzeSperre(Longpath::SliceModel* sl, bool an)
 
 } // namespace
 
+// Betreiber 2026-11-27: Ein Bandwechsel schaltet NIE das Profil um. Solange
+// dieser Schalter gesetzt ist, lässt profilNachstellen() alles stehen.
+static bool s_bandwechselOhneProfil = false;
+
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , m_radioModel(new RadioModel(this))
@@ -17681,7 +17685,9 @@ void MainWindow::bandUmschalten(Band band)
     qCInfo(lcContainer).noquote()
         << "Bandwechsel nach" << bandLabel(band)
         << "— Digi lief, stelle wieder her.";
+    s_bandwechselOhneProfil = true;
     aufDigiStellen(m_letzterDigiModus);
+    s_bandwechselOhneProfil = false;
 }
 
 void MainWindow::bandstapelMarkenNachziehen()
@@ -18047,6 +18053,7 @@ void MainWindow::aufDigiStellen(DigiFrequenzen::Digimodus modus)
 void MainWindow::profilNachstellen(
     std::optional<DigiFrequenzen::Digimodus> digi)
 {
+    if (s_bandwechselOhneProfil) { return; }
     if (!m_layoutProfiles || !m_radioModel) { return; }
     SliceModel* slice = m_radioModel->activeSlice();
     if (!slice) { return; }
