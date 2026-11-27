@@ -13,7 +13,7 @@
 //
 //     node pruefe-rotor.mjs
 
-import { standLesen, zustandText, fehlerText, peilungAus, peilungLesen, Sicherung,
+import { standLesen, zustandText, fehlerText, peilungAus, peilungLesen, rufEingabe, istLocator, Sicherung,
          GETRENNT, VERBINDET, BEREIT, DREHT, FEHLER } from './rotor.js';
 
 let fehler = 0;
@@ -147,6 +147,21 @@ console.log('\nDie Sicherung');
   pruefe('eine leere Peilung ist keine (nicht Nord)', peilungLesen(['X', '', '1', 'A']) === null);
   pruefe('Ablehnung wegen des Drehbereichs wird gesagt',
          /AUSSERHALB DES DREHBEREICHS/.test(fehlerText('ausserhalb des drehbereichs')));
+}
+
+// ── Rufzeichen oder Locator eintippen (2026-11-27) ───────────────────────
+{
+  const p = peilungLesen(['PM95TQ', '42.0', '9300', '', '222.0', '0', '1', 'locator']);
+  pruefe('Locator: Quelle genau', p && p.quelle === 'locator' && p.land === '');
+  const alt = peilungLesen(['JA1QRS', '42.4', '9152', 'Japan', '222.4', '0', '1']);
+  pruefe('aeltere Longpath-Fassung ohne Quelle: Landesmitte', alt && alt.quelle === 'land');
+  pruefe('Eingabe gross und ohne Leerzeichen', rufEingabe(' ja1 qrs ') === 'JA1QRS');
+  pruefe('Portabel-Zusatz bleibt', rufEingabe('oe5sos/p') === 'OE5SOS/P');
+  pruefe('Semikolon zerlegte die TCI-Zeile: abgelehnt', rufEingabe('A;rotor_to:90') === '');
+  pruefe('Komma ebenso', rufEingabe('DL1,X') === '');
+  pruefe('leer ist nichts', rufEingabe('  ') === '');
+  pruefe('Locator erkannt', istLocator('jn78') && istLocator('IO91wm'));
+  pruefe('Rufzeichen ist kein Locator', !istLocator('OE5SOS') && !istLocator('JA1QRS'));
 }
 
 console.log(fehler === 0 ? '\nAlles gut.' : `\n${fehler} Punkt(e) offen.`);
