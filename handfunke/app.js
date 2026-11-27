@@ -2866,6 +2866,7 @@ function rotorZeichnen() {
   const knopf = $('rotorDreh');
   knopf.disabled = (z === null);
   knopf.textContent = (z === null) ? 'RICHTUNG WÄHLEN' : `AUF ${z}° DREHEN`;
+  $('rotorStop').classList.toggle('laeuft', !!rotorStand && rotorStand.zustand === DREHT);
   const t = zustandText(rotorStand);
   if (!$('rotorMeldung').classList.contains('warn')) {
     $('rotorMeldung').textContent = t;
@@ -2888,9 +2889,9 @@ link.addEventListener('rotor', (e) => {
   rotorZeichnen();
 });
 
-link.addEventListener('rotorok', () => {
+link.addEventListener('rotorok', (e) => {
   $('rotorMeldung').classList.remove('warn');
-  $('rotorMeldung').textContent = 'ANGENOMMEN';
+  $('rotorMeldung').textContent = /^stop$/i.test(((e.detail || {}).text || '').trim()) ? 'ANGEHALTEN' : 'ANGENOMMEN';
   // Gleich nachfragen: der Rotor meldet den Zustand `dreht` erst, wenn er
   // wirklich anlaeuft.
   setTimeout(rotorHolen, 400);
@@ -2934,6 +2935,22 @@ $('rotorDreh').addEventListener('click', () => {
     return;
   }
   link.send(`rotor_to:${z}`);
+  $('rotorMeldung').classList.remove('warn');
+  $('rotorMeldung').textContent = 'wird gesendet …';
+  rotorZeichnen();
+});
+
+// STOP: kein Zwei-Griff wie beim Drehen -- Anhalten richtet keinen Schaden
+// an, und wer es braucht, braucht es sofort. Ein gewaehltes Ziel verfaellt.
+$('rotorStop').addEventListener('click', () => {
+  rotorSicherung.verwerfen();
+  if (!link.ready) {
+    $('rotorMeldung').textContent = 'keine Verbindung — nicht angehalten';
+    $('rotorMeldung').classList.add('warn');
+    rotorZeichnen();
+    return;
+  }
+  link.send('rotor_stop:');
   $('rotorMeldung').classList.remove('warn');
   $('rotorMeldung').textContent = 'wird gesendet …';
   rotorZeichnen();
