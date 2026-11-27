@@ -225,7 +225,9 @@ void CommandBar::addGroupWidget(const QString& caption, QWidget* w)
     // beginnen auf derselben Linie.
     beschriftung->setVisible(false);
     box->addWidget(beschriftung, 0, Qt::AlignLeft);
-    box->addWidget(w, 0, Qt::AlignLeft);
+    // Oben ausgerichtet: die Profile stehen auf der ersten Linie der Leiste
+    // (Betreiber 2026-11-27: "die Profile gehoeren rauf").
+    box->addWidget(w, 0, Qt::AlignLeft | Qt::AlignTop);
     m_gruppenWidgets.insert(w, box);
     // Ans Ende der Gruppen, also hinter die Rate -- wie bisher.
     m_boxen.append(box);
