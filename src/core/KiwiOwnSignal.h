@@ -56,6 +56,14 @@ QVector<KiwiCandidate> kiwiPreselect(
 double kiwiReceiverDistanceKm(const KiwiPublicReceiver& receiver,
                               const QString& ownGrid);
 
+// Breite/Laenge des Empfaengers: "gps" ("(lat, lon)"), ersatzweise der
+// Locator (Feldmitte). false, wenn beides nicht lesbar. (2026-11-25, Karte)
+bool kiwiReceiverLatLon(const KiwiPublicReceiver& receiver,
+                        double& lat, double& lon);
+
+// Grosskreisentfernung in km zwischen zwei Punkten (Grad).
+double kiwiGreatCircleKm(double lat1, double lon1, double lat2, double lon2);
+
 // Deckt "bands" ("0-30000000", Hz) die Frequenz ab? Nicht lesbar: true.
 bool kiwiReceiverCoversFrequency(const KiwiPublicReceiver& receiver,
                                  double frequencyHz);

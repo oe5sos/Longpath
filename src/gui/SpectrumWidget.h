@@ -981,6 +981,10 @@ public:
     // Pruefstand: wie viele Wasserfallzeilen bisher geschrieben wurden
     // (beide Wege: aus den Spektren und die fertige Zeile der Flex).
     quint64 waterfallRowsWrittenForTest() const { return m_wfZeilenGeschrieben; }
+    // Fremde Zeilen (Flex-Kacheln) kommen im Takt der Maschine (~25/s). Mit
+    // Bremse wird nur im eingestellten Zeilenabstand geschrieben (gemittelt
+    // wird weiter jede Kachel).
+    void setForeignRowThrottle(bool on) { m_fremdeZeilenGebremst = on; }
     void paintTxOverlayForTest(QPainter& p, const QRect& specRect)
     {
         drawTxFilterOverlay(p, specRect);
@@ -3631,6 +3635,8 @@ private:
     void meldeDurchlassSchema() const;
     qint64  m_sendeEndeMs{0};        // Ende der letzten Sendung (Nachlauf)
     quint64 m_wfZeilenGeschrieben{0};
+    bool    m_fremdeZeilenGebremst{false};
+    qint64  m_fremdeZeileGeschriebenMs{0};
     // TX attenuator cal offset — applied as an additional dBm shift during TX.
     // From Thetis display.cs:4840 [v2.10.3.13]: if (!local_mox) fOffset += rx1_preamp_offset;
     // Upstream tags preserved: //MW0LGE (from cited upstream lines) [v2.10.3.15]

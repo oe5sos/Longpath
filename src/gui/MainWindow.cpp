@@ -5085,6 +5085,9 @@ void MainWindow::wirePanBadgeHandlers()
         connect(applet, &PanadapterApplet::floatRequested,
                 this, &MainWindow::onPanFloatRequested,
                 Qt::UniqueConnection);
+        connect(applet, &PanadapterApplet::radioMuteToggled,
+                this, &MainWindow::setRadioMuted,
+                Qt::UniqueConnection);
         // Der Rueckweg. Ohne ihn ist der Schalter im Kopf der Kachel
         // eine Einbahnstrasse — genau der Zustand, ueber den sich der
         // Betreiber am 2026-08-19 beschwert hat.

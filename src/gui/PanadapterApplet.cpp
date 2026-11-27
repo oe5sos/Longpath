@@ -19,6 +19,7 @@
 // =================================================================
 
 #include "gui/PanadapterApplet.h"
+#include "core/LogCategories.h"
 #include <QActionGroup>
 #include <QFileDialog>
 #include <QImage>
@@ -188,6 +189,22 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     m_btn3d->setObjectName(QStringLiteral("panHeader3dToggle"));
     headLay->addWidget(m_btn3d);
 
+    // Ton des Funkgeraets ein/aus, gleich im Panadapter (Betreiber 2026-11-25).
+    // Nur die Wiedergabe im Lautsprecher; am Geraet aendert sich nichts.
+    m_btnMute = new QPushButton(tr("Sound"), head);
+    m_btnMute->setCheckable(true);
+    m_btnMute->setChecked(true);
+    m_btnMute->setFixedSize(46, 24);
+    m_btnMute->setCursor(Qt::PointingHandCursor);
+    m_btnMute->setObjectName(QStringLiteral("panHeaderSoundToggle"));
+    m_btnMute->setToolTip(tr("Radio sound on / off (playback only)"));
+    headLay->addWidget(m_btnMute);
+    connect(m_btnMute, &QPushButton::toggled, this,
+            [this](bool on) {
+        qCInfo(lcAudio) << "Panadapter" << m_panId << "Ton-Schalter:" << (on ? "an" : "aus");
+        emit radioMuteToggled(!on);
+    });
+
     m_btnOptions = new QPushButton(QStringLiteral("\u2699"), head);
     // \u2500\u2500 Das Zahnrad war ein Punkt (2026-10-30) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     //
@@ -215,6 +232,9 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
              QLatin1String(Style::kAccent));
     m_btnOptions->setStyleSheet(kKopfKnopf.arg(17));
     m_btn3d->setStyleSheet(kKopfKnopf.arg(12));
+    m_btnMute->setStyleSheet(kKopfKnopf.arg(11)
+        + QStringLiteral("QPushButton:checked { color: %1; border-color: %2; }")
+              .arg(QLatin1String(Style::kTextPrimary), QLatin1String(Style::kAccent)));
     headLay->addWidget(m_btnOptions);
     connect(m_btnOptions, &QPushButton::clicked, this, [this]() {
         QMenu* m = buildDisplayMenu(window());   // am Fenster, siehe contextMenuEvent()
@@ -1358,4 +1378,13 @@ void PanadapterApplet::setFloatingIndicator(bool floating)
         : QStringLiteral("Detach into its own window"));
 }
 
+} // namespace Longpath
+
+namespace Longpath {
+void PanadapterApplet::setRadioMutedActive(bool muted)
+{
+    if (!m_btnMute) { return; }
+    const QSignalBlocker blocker(m_btnMute);
+    m_btnMute->setChecked(!muted);
+}
 } // namespace Longpath

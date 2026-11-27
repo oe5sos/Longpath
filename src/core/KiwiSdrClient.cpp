@@ -13,6 +13,9 @@
 //                Namensraum AetherSDR -> Longpath, Kopfdatei-Pfade auf
 //                unsere Ablage. Sonst zeichengetreu — dies spricht mit
 //                fremden Geraeten.
+//   2026-11-25 — Kommen Bildzeilen, gilt der Wasserfall als vorhanden,
+//                auch wenn rx_chan >= wf_chans (Betreiber: Kiwi zeigte
+//                Bild und darueber "nur Ton").
 // =================================================================
 
 #include "core/KiwiSdrClient.h"
@@ -538,6 +541,7 @@ void KiwiSdrClient::connectToEndpoint(const QString& endpoint,
     m_waterfallRequestLowMhz = 0.0;
     m_waterfallRequestHighMhz = 0.0;
     m_waterfallAvailable = true;
+    m_waterfallRows = 0;
     m_waterfallAvailabilityDetail.clear();
     m_waterfallRxChannel = -1;
     m_waterfallChannelCount = -1;
@@ -1276,6 +1280,7 @@ void KiwiSdrClient::cleanupSockets()
         m_waterfallRowFlushTimer->stop();
     }
     m_waterfallAvailable = true;
+    m_waterfallRows = 0;
     m_waterfallAvailabilityDetail.clear();
     m_waterfallRxChannel = -1;
     m_waterfallChannelCount = -1;
@@ -2288,6 +2293,12 @@ void KiwiSdrClient::handleWaterfallFrame(const QByteArray& frame)
     if (rawBins.isEmpty()) {
         return;
     }
+    // Longpath: neuere Server bedienen auch Plaetze jenseits von wf_chans
+    // (gemeinsamer Wasserfall). Was ankommt, zaehlt -- nicht die Rechnung.
+    if (!m_monitorMode && m_waterfallRows < kRowsProveWaterfall
+        && ++m_waterfallRows == kRowsProveWaterfall) {
+        updateWaterfallAvailability();
+    }
     if (updateWaterfallFftBins(rawBins.size())) {
         return;
     }
@@ -2438,6 +2449,16 @@ void KiwiSdrClient::handleTextMessage(StreamKind stream, const QString& text)
                 setState(State::Error,
                          tr("This KiwiSDR operator does not allow external API "
                             "clients such as Longpath."));
+            } else if (m_state == State::Connected && busyOk && busyValue > 0) {
+                // Der Server entscheidet nach 10 s, ob ein Client ein Browser
+                // ist, und wirft Fremdprogramme hinaus, wenn das Limit des
+                // Betreibers (ext_api) voll ist: KiwiSDR support/stats.cpp,
+                // EXT_API_DECISION_SECS. Nicht umgehen -- klar sagen, warum.
+                setState(State::Busy,
+                         tr("This KiwiSDR allows only %1 programs (not browsers) at "
+                            "once, and they are all taken; it disconnected Longpath "
+                            "after 10 seconds. Choose another receiver.")
+                             .arg(busyValue));
             } else {
                 setState(State::Busy,
                          busyOk && busyValue > 0
@@ -2910,13 +2931,15 @@ void KiwiSdrClient::updateWaterfallAvailability()
 {
     bool available = true;
     QString detail;
-    if (m_waterfallRxChannel >= 0 && m_waterfallChannelCount > 0
+    const bool rowsArrive = m_waterfallRows >= kRowsProveWaterfall;
+    if (!rowsArrive && m_waterfallRxChannel >= 0 && m_waterfallChannelCount > 0
         && m_waterfallRxChannel >= m_waterfallChannelCount) {
         available = false;
         detail = tr("No KiwiSDR waterfall channel is available. Audio is connected on receiver slot %1, but this server only provides %2 waterfall channels.")
             .arg(m_waterfallRxChannel + 1)
             .arg(m_waterfallChannelCount);
-    } else if (m_waterfallRxChannel >= 0 && m_waterfallChannelCount == 0) {
+    } else if (!rowsArrive && m_waterfallRxChannel >= 0
+               && m_waterfallChannelCount == 0) {
         available = false;
         detail = tr("No KiwiSDR waterfall channel is available for this receiver slot.");
     }

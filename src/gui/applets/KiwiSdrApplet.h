@@ -38,6 +38,8 @@
 
 class QLabel;
 class QListWidget;
+class QShowEvent;
+class QEvent;
 class QPushButton;
 
 namespace Longpath {
@@ -52,7 +54,11 @@ struct KiwiSdrReceiverStatus {
     QString detail;
     QString metadataSummary;
     QString protocolSummary;
+    // Dauerhafter Hinweis zu diesem Empfaenger (z. B. trennt Programme nach
+    // 10 s), unabhaengig vom augenblicklichen Zustand.
+    QString warning;
     QPointer<SliceModel> assignedSlice;
+    int volumeDb{0};   // Lautstaerke dieses Kiwi, 0 = unveraendert
 };
 
 class KiwiSdrApplet : public AppletWidget {
@@ -60,6 +66,10 @@ class KiwiSdrApplet : public AppletWidget {
 
 public:
     explicit KiwiSdrApplet(RadioModel* model, QWidget* parent = nullptr);
+
+    // Bereich des Lautstaerkereglers je Kiwi.
+    static constexpr int kVolumeMinDb = -30;
+    static constexpr int kVolumeMaxDb = 24;
 
     QString appletId()    const override { return QStringLiteral("KiwiSdr"); }
     QString appletTitle() const override { return QStringLiteral("KIWISDR"); }
@@ -79,15 +89,42 @@ public:
     void setRecordingActive(bool active);
     // Name des Kiwi, an dem "Mein Signal" haengt; leer = noch keiner.
     void setOwnSignalReceiverName(const QString& name);
+    // "Solo": nur der Kiwi aus den Lautsprechern (siehe AudioEngine::setSoloSlice).
+    void setSoloActive(bool active);
+    // "Radio stumm": Funkgeraet im Lautsprecher stumm, nur die Kiwis hoeren.
+    void setRadioMutedActive(bool active);
+
+protected:
+    void showEvent(QShowEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 signals:
     void ownSignalToggled(bool on);
     void recordToggled(bool on);
     void otherReceiverRequested();
+    void hearingRequested();
+    void soloToggled(bool on);
+    void radioMuteToggled(bool on);
+    // Ton eines Kiwi aus der Liste ein/aus (verbindet bzw. trennt ihn).
+    void soundRequested(const QString& profileId, bool on);
+    void volumeChanged(const QString& profileId, int db);
+    // Doppelklick auf eine Zeile: eigenes Fenster (Wasserfall) fuer diesen Kiwi.
+    void openWindowRequested(const QString& profileId);
 
 private:
     void rebuildReceiverList();
+    // Die Liste waechst mit der Fensterhoehe (bis dahin fest 176 px =
+    // drei Zeilen): so hoch wie ihr Inhalt, hoechstens so hoch, wie das
+    // Fenster Platz laesst. Scrollen nur, wenn es wirklich mehr gibt.
+    void updateListHeight();
+    // Die Zeilen auf die Breite der Liste bringen (Hoehe nach Umbruch). Sonst
+    // sind sie so breit wie ihr laengster Text und die "WF"-Pille am rechten
+    // Rand ist abgeschnitten (Bild 2026-11-25, COMBINED).
+    void relayoutRows();
+    QWidget* scrollViewport() const;
+    QPointer<QWidget> m_watchedWindow;
     QWidget* buildReceiverRow(const KiwiSdrReceiverStatus& receiver);
+    QWidget* buildVolumeRow(const KiwiSdrReceiverStatus& receiver, QWidget* parent);
     QWidget* buildSliceAssignmentRow(SliceModel* slice, QWidget* parent);
     QString sliceText(SliceModel* slice) const;
 
@@ -95,9 +132,16 @@ private:
     QPushButton* m_ownSignalButton{nullptr};
     QPushButton* m_recordButton{nullptr};
     QPushButton* m_otherButton{nullptr};
+    QPushButton* m_hearingButton{nullptr};
+    QPushButton* m_soloButton{nullptr};
+    QPushButton* m_radioMuteButton{nullptr};
     QLabel* m_ownSignalLabel{nullptr};
     QListWidget* m_receiverList{nullptr};
     QVector<KiwiSdrReceiverStatus> m_receivers;
+    // Waehrend am Regler gezogen wird, darf die Liste nicht neu gebaut werden
+    // (der Regler verschwaende unter der Maus).
+    bool m_volumeDragging{false};
+    bool m_rebuildPending{false};
     QList<QMetaObject::Connection> m_sliceConnections;
     QPointer<KiwiSdrManager> m_kiwiSdrManager;
 };

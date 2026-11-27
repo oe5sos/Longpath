@@ -220,6 +220,8 @@ public:
     // spotSourcesChanged(), damit MainWindow den Spot Hub nachzieht.
     void setSpotSourcesVisible(const QStringList& sources, bool visible);
 
+public:
+    void setRadioMutedActive(bool muted);
 signals:
     /// Ein Haken unter „Spots" im Zahnrad hat SpotSourceVisible/<Quelle>
     /// geaendert. MainWindow laedt die Spot-Anzeige nach und laesst den
@@ -252,6 +254,7 @@ signals:
     /// pan.
     void addSliceRequested(const QString& panId);
     void floatRequested(const QString& panId);
+    void radioMuteToggled(bool muted);   ///< Ton des Funkgeraets aus/ein (Wiedergabe)
 
     // ── Anzeige-Wuensche aus der Kopfleiste (2026-08-20) ─────────────
     //
@@ -344,6 +347,7 @@ private:
     /// Schnellumschalter 2D/3D in der Kopfleiste; zeigt den Zustand,
     /// nicht das Ziel (siehe PanadapterApplet.cpp).
     QPushButton*            m_btn3d {nullptr};
+    QPushButton*            m_btnMute {nullptr};
     /// Sichtbarkeit der FUELLFARBE in Prozent (100 = nur Fuellfarbe,
     /// 0 = nur Bild) — dieselbe Zaehlweise wie SpectrumWidget und der
     /// Regler unter Setup -> Display. Nur fuer den Haken im Menue; der

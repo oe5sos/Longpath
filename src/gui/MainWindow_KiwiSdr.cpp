@@ -57,6 +57,9 @@
 #include "gui/widgets/StatusToast.h"
 #include "gui/SpectrumWidget.h"
 #include "gui/applets/KiwiSdrApplet.h"
+#include <cmath>
+#include <QInputDialog>
+#include <QLineEdit>
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 #include "models/TransmitModel.h"
@@ -272,6 +275,23 @@ void MainWindow::refreshKiwiSdrAppletReceivers()
     if (!m_kiwiSdrApplet) {
         return;
     }
+    // Zeilen neu aufbauen ist teuer (jede Zeile parst Stilvorlagen). Beim
+    // Verbinden kommen Meldungen im Takt von Millisekunden -- das war das
+    // Ruckeln ein paar Sekunden nach dem Verbinden (Betreiber 2026-11-25).
+    // Die erste Meldung laeuft sofort, die folgenden werden in 300 ms zu
+    // einem Neuaufbau zusammengefasst.
+    if (m_kiwiAppletRefreshBlocked) {
+        m_kiwiAppletRefreshDirty = true;
+        return;
+    }
+    m_kiwiAppletRefreshBlocked = true;
+    QTimer::singleShot(300, this, [this]() {
+        m_kiwiAppletRefreshBlocked = false;
+        if (m_kiwiAppletRefreshDirty) {
+            m_kiwiAppletRefreshDirty = false;
+            refreshKiwiSdrAppletReceivers();
+        }
+    });
 
     QVector<KiwiSdrReceiverStatus> receivers;
     if (m_kiwiSdrManager) {
@@ -292,6 +312,11 @@ void MainWindow::refreshKiwiSdrAppletReceivers()
             const int sliceId = m_kiwiSdrManager->assignedSliceForProfile(profile.id);
             receiver.assignedSlice = m_radioModel ? m_radioModel->sliceById(sliceId)
                                                   : nullptr;
+            receiver.volumeDb = kiwiVolumeDb(profile.id);
+            if (kiwiEvictsPrograms(profile.id)) {
+                receiver.warning = tr("Disconnects programs after 10 s when its "
+                                      "program slots are full.");
+            }
             receivers.append(receiver);
         }
     }
@@ -339,8 +364,12 @@ void MainWindow::syncKiwiSdrTransmitMute()
     if (!m_kiwiSdrManager || !m_radioModel) { return; }
     // Die Messung "hoert er mich" braucht die Kante auch ohne Tonweg.
     const TransmitModel& tx = m_radioModel->transmitModel();
-    const bool sending = tx.isMox() || tx.isTune();
+    // Auch wenn der Flex selbst sendet (Mikrofontaste, Fusschalter): dann
+    // stehen MOX/TUNE im Modell auf aus, und ein Kiwi bliebe hoerbar
+    // (Betreiber 2026-11-25: "beim Senden hoere ich einen Kiwi").
+    const bool sending = tx.isMox() || tx.isTune() || m_radioModel->flexSendetGerade();
     kiwiOwnSignalTxEdge(sending);
+    kiwiGroupTxEdge(sending);
 
     AudioEngine* audio = m_radioModel->audioEngine();
     if (!audio) { return; }
@@ -354,15 +383,22 @@ void MainWindow::syncKiwiSdrTransmitMute()
         // darf ihre Sendesperre nicht mehr von einem KiwiSDR-Profil
         // bekommen.
         if (!kiwiControllableSlice(sliceId)) { continue; }
+        if (m_kiwiUserMuted.contains(profile.id)) {
+            audio->setKiwiSdrAudioSourceEnabled(sliceId, false);
+            continue;
+        }
 
         if (sending) {
             // "Mein Signal" haelt den Ton des Modus-Kiwi beim Senden an
             // (2026-11-24); ausdruecklich aufheben statt "nichts tun", denn
             // wer den Modus MITTEN in der Sendung einschaltet, trifft eine
             // schon stumm geschaltete Quelle an.
+            // Auch ein Kiwi, dessen Ton der Betreiber eingeschaltet hat (Ton-Schalter
+            // im Streifen / in der Liste): man hoert sich beim Senden ueber den Kiwi
+            // selbst (2026-11-25).
             if (kiwiKeepsAudioDuringTx(
-                    profile, m_kiwiOwnSignalOn
-                                 && profile.id == m_kiwiOwnProfileId)) {
+                    profile, (m_kiwiOwnSignalOn && profile.id == m_kiwiOwnProfileId)
+                                 || m_kiwiSoundSlices.contains(profile.id))) {
                 audio->setKiwiSdrAudioSourceEnabled(sliceId, true);
                 continue;
             }
@@ -384,7 +420,7 @@ void MainWindow::syncKiwiSdrTransmitMute()
             if (!m_kiwiSdrManager->hasProfile(id)) { return; }
             if (!kiwiControllableSlice(sliceId)) { return; }
             const TransmitModel& t = m_radioModel->transmitModel();
-            if (t.isMox() || t.isTune()) { return; }
+            if (t.isMox() || t.isTune() || m_radioModel->flexSendetGerade()) { return; }
             if (AudioEngine* a = m_radioModel->audioEngine()) {
                 a->setKiwiSdrAudioSourceEnabled(sliceId, true);
             }
@@ -533,7 +569,11 @@ void MainWindow::addKiwiSdrReceiver(const QString& name,
 
     SliceModel* slice = assignKiwiProfileToSlice(id);
 
+    // Jeder gewaehlte Kiwi erscheint im Fenster KIWI WASSERFAELLE
+    // (Betreiber 2026-11-25).
+    m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
     m_kiwiSdrManager->connectProfile(id);
+    zeigeKiwiFenster(id);
     refreshKiwiSdrAppletReceivers();
 
     // ── Sag dem Bediener, dass etwas passiert ist (2026-10-14) ───────
@@ -740,7 +780,9 @@ void MainWindow::wireKiwiSdr()
             m_kiwiSdrManager->assignedSliceForProfile(profileId);
         if (!kiwiControllableSlice(sliceId)) { return; }
         if (AudioEngine* audio = m_radioModel->audioEngine()) {
-            audio->feedKiwiSdrAudioData(sliceId, pcm);
+            const int db = kiwiVolumeDb(profileId);
+            audio->feedKiwiSdrAudioData(
+                sliceId, pcm, db == 0 ? 1.0f : float(std::pow(10.0, db / 20.0)));
         }
     });
 
@@ -772,13 +814,18 @@ void MainWindow::wireKiwiSdr()
         if (!kiwiControllableSlice(sliceId)) { return; }
         AudioEngine* audio = m_radioModel->audioEngine();
         if (!audio) { return; }
+        if (enabled && m_kiwiUserMuted.contains(profileId)) {
+            audio->setKiwiSdrAudioSourceEnabled(sliceId, false);
+            return;
+        }
         if (enabled) {
             const TransmitModel& tx = m_radioModel->transmitModel();
-            const bool sending = tx.isMox() || tx.isTune();
+            const bool sending = tx.isMox() || tx.isTune() || m_radioModel->flexSendetGerade();
             if (sending
                 && !kiwiKeepsAudioDuringTx(
                        m_kiwiSdrManager->profile(profileId),
-                       m_kiwiOwnSignalOn && profileId == m_kiwiOwnProfileId)) {
+                       (m_kiwiOwnSignalOn && profileId == m_kiwiOwnProfileId)
+                           || m_kiwiSoundSlices.contains(profileId))) {
                 return;
             }
         }
@@ -824,9 +871,39 @@ void MainWindow::wireKiwiSdr()
         if (!slice) { return; }
         SpectrumWidget* sw = spectrumForSlice(slice);
         if (!sw || !sw->kiwiDisplaySource()) { return; }
+        // Bild ein / Bild aus (Betreiber 2026-11-25): bei verbundener Flex wird DEREN
+        // Bild ueber denselben Weg gezeichnet (MainWindow_Flex.cpp). Schoebe
+        // zusaetzlich ein Kiwi mit Scheibe seine Zeilen in diesen Panadapter, liefen
+        // zwei Quellen abwechselnd in dasselbe Bild. Ein Kiwi nur zum Hoeren (Ton je
+        // Kiwi) zeigt sein Bild im Wasserfall-Fenster, nicht im Panadapter.
+        if (m_kiwiSoundSlices.contains(profileId)) { return; }
+        if (m_flexTargetSliceId >= 0 && sw == m_radioModel->spectrumWidget()) { return; }
         sw->updateKiwiSpectrumDbm(binsDbm,
                                   lowFreqMhz * 1.0e6, highFreqMhz * 1.0e6);
     });
+
+    // Streifen bearbeiten (2026-11-25): schliessen und umbenennen.
+    if (m_kiwiWaterfallPanel) {
+        connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::removeRequested, this,
+                [this](const QString& id) {
+            if (m_kiwiSdrManager) { m_kiwiSdrManager->setWaterfallPreviewEnabled(id, false); }
+        });
+        connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::renameRequested, this,
+                [this](const QString& id) {
+            if (!m_kiwiSdrManager || !m_kiwiSdrManager->hasProfile(id)) { return; }
+            bool ok = false;
+            const QString name = QInputDialog::getText(
+                this, tr("Rename Kiwi"), tr("Name:"), QLineEdit::Normal,
+                m_kiwiSdrManager->displayName(id), &ok).trimmed();
+            if (!ok || name.isEmpty()) { return; }
+            KiwiSdrAntennaProfile p = m_kiwiSdrManager->profile(id);
+            p.name = name;
+            m_kiwiSdrManager->updateProfile(p);
+            if (m_kiwiWaterfallPanel) {
+                m_kiwiWaterfallPanel->setStripEnabled(id, true, m_kiwiSdrManager->displayName(id));
+            }
+        });
+    }
 
     // ── KIWI-WASSERFÄLLE: die Vorschau, unabhängig von einer Scheibe ──
     //
@@ -836,9 +913,10 @@ void MainWindow::wireKiwiSdr()
     // (KiwiWaterfallPanel::pushRow ignoriert alles andere von selbst).
     connect(m_kiwiSdrManager, &KiwiSdrManager::waterfallRowReady, this,
             [this](const QString& profileId, const QString&,
-                   const QVector<float>& binsDbm, double, double, quint32) {
+                   const QVector<float>& binsDbm, double lowMhz, double highMhz, quint32) {
         if (m_kiwiWaterfallPanel) {
-            m_kiwiWaterfallPanel->pushRow(profileId, binsDbm);
+            m_kiwiWaterfallPanel->pushRow(profileId, binsDbm,
+                                          lowMhz * 1.0e6, highMhz * 1.0e6);
         }
     });
     connect(m_kiwiSdrManager, &KiwiSdrManager::waterfallPreviewEnabledChanged,
@@ -846,6 +924,13 @@ void MainWindow::wireKiwiSdr()
         if (m_kiwiWaterfallPanel) {
             m_kiwiWaterfallPanel->setStripEnabled(
                 profileId, enabled, m_kiwiSdrManager->displayName(profileId));
+            // Jeder Kiwi, dessen Vorschau an geht, soll sein Fenster sehen
+            // lassen (Betreiber 2026-11-25: "ich sehe keine Fenster, wo ich
+            // etwas aendern kann"). ensureVisible blendet immer ein, auch
+            // wenn der Schalter schon auf "an" stand.
+            if (enabled && m_appletVis) {
+                m_appletVis->ensureVisible(QStringLiteral("KiwiWaterfalls"));
+            }
         }
     });
     connect(m_kiwiSdrManager, &KiwiSdrManager::profileStreamReset, this,
@@ -860,6 +945,8 @@ void MainWindow::wireKiwiSdr()
     connect(&m_radioModel->transmitModel(), &TransmitModel::moxChanged,
             this, [this](bool) { syncKiwiSdrTransmitMute(); });
     connect(&m_radioModel->transmitModel(), &TransmitModel::tuneChanged,
+            this, [this](bool) { syncKiwiSdrTransmitMute(); });
+    connect(m_radioModel, &RadioModel::flexSendetGeaendert,
             this, [this](bool) { syncKiwiSdrTransmitMute(); });
 
     // ── Sicherheitsschranke: die Zuordnung wieder loesen ─────────────

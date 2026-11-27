@@ -55,6 +55,19 @@ quint16 FlexVitaStream::start(const QHostAddress& radioAddress)
     m_radioAddress = radioAddress;
     m_localPort = m_socket.localPort();
 
+    // Empfangspuffer gross stellen (2026-11-25): der Strom (Ton + Bild +
+    // Wasserfall, ~5 Mbit/s) wird im Hauptprogramm-Thread gelesen. Haengt
+    // die Oberflaeche kurz (Kiwi-Liste, Karte, Wasserfall), laeuft der
+    // Standardpuffer des Systems ueber und Pakete fehlen -- ein Loch im Ton,
+    // hoerbar als Krachen. Wie bei Protokoll 2 gleich 4 MB verlangt, der
+    // Kern darf kuerzen; nachgelesen wird, was er wirklich gab.
+    m_socket.setSocketOption(QAbstractSocket::ReceiveBufferSizeSocketOption,
+                             QVariant(0x400000));
+    qCInfo(lcFlexStream) << "Empfangspuffer:"
+        << m_socket.socketOption(
+               QAbstractSocket::ReceiveBufferSizeSocketOption).toInt()
+        << "Bytes (verlangt 4194304)";
+
     // From AetherSDR PanadapterStream.cpp:261-268 [@d58e2b8a] — ein
     // Null-Byte an die Maschine; sie lernt IP:Port aus der
     // Absenderadresse. Das ist der Weg, der sicher trägt; der

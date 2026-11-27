@@ -28,7 +28,11 @@
 #include <QVector>
 #include <QWidget>
 
+class QToolButton;
+
 namespace Longpath {
+
+class KiwiLostOverlay;
 
 class KiwiOwnSignalStrip : public QWidget {
     Q_OBJECT
@@ -54,11 +58,27 @@ public:
     void setPlotMargins(int left, int right);
 
     void pushRow(const QVector<float>& binsDbm, double lowHz, double highHz);
+    // Mindestabstand zwischen Zeilen in ms (0: jede Zeile). Dasselbe Tempo
+    // wie im Fenster KIWI WASSERFAELLE ("KiwiWaterfall/RowIntervalMs").
+    void setRowIntervalMs(int ms) { m_rowIntervalMs = ms; }
     void clearRows();
 
     void setVerdict(const KiwiHearMeMeter::Result& result);
     // Fusszeile: laeuft eine Aufnahme, mit Dauer und Dateiname.
     void setRecording(bool recording, qint64 elapsedMs, const QString& fileName);
+
+    // Regler im Kopf des Streifens (Betreiber 2026-11-25: "unter dem
+    // Panadapter ist der Kiwi schoen, aber dort kann ich nichts aendern").
+    // Ton ein/aus und Zoom +/- fuer den Kiwi von "Mein Signal".
+    void setSoundActive(bool on);
+    bool soundActiveForTest() const;
+    double viewWidthHzForTest() const { return m_bandwidthHz; }
+    double viewCenterHzForTest() const { return m_centerHz; }
+    QToolButton* soundButtonForTest() const { return m_soundButton; }
+
+    // Kiwi weg: Bild abgedunkelt, Grund und Knopf darueber; title leer = weg.
+    void setLost(const QString& title, const QString& detail = QString());
+    KiwiLostOverlay* lostOverlayForTest() const { return m_lost; }
 
     // Das Bild des Streifens (Wasserfall und Marke, ohne Kopf/Fuss) fuer
     // die Aufnahme als PNG. Leer, wenn noch keine Zeile kam.
@@ -76,8 +96,14 @@ public:
     QSize sizeHint() const override { return QSize(480, 176); }
     QSize minimumSizeHint() const override { return QSize(160, 120); }
 
+signals:
+    void soundToggled(bool on);
+    void zoomRequested(int direction);   // +1 enger, -1 weiter
+    void chooseOtherRequested();
+
 protected:
     void paintEvent(QPaintEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
     struct Row {
@@ -104,6 +130,14 @@ private:
     bool m_recording{false};
     qint64 m_recordMs{0};
     QString m_recordFile;
+    int m_rowIntervalMs{0};
+    qint64 m_lastRowMs{0};
+    QToolButton* m_soundButton{nullptr};
+    QToolButton* m_zoomOut{nullptr};
+    QToolButton* m_zoomIn{nullptr};
+    KiwiLostOverlay* m_lost{nullptr};
+    void layoutButtons();
+    int buttonsWidth() const;
 };
 
 } // namespace Longpath

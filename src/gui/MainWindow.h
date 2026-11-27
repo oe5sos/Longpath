@@ -79,6 +79,8 @@
 
 #include "core/WdspTypes.h"
 #include "core/DigiFrequenzen.h"
+#include "core/KiwiGroup.h"
+#include "gui/KiwiHearingDialog.h"
 #include "gui/applets/PanelAutomatik.h"
 
 #include <QElapsedTimer>
@@ -270,6 +272,30 @@ public:
     void startKiwiRecordingForTest() { startKiwiRecording(); }
     void stopKiwiRecordingForTest() { stopKiwiRecording(); }
     class KiwiRecording* kiwiRecordingForTest() const { return m_kiwiRecording; }
+    // Wo werde ich gehoert: Mithoerer ohne Verzeichnisdialog.
+    bool addKiwiListenerForTest(const QString& id, double km = -1.0,
+                                bool hasPos = false, double lat = 0.0,
+                                double lon = 0.0)
+    { return addKiwiListener(id, km, hasPos, lat, lon); }
+    void removeKiwiListenerForTest(const QString& id) { removeKiwiListener(id); }
+    const KiwiGroup& kiwiGroupForTest() const { return m_kiwiGroup; }
+    void kiwiGroupTxEdgeForTest(bool on) { kiwiGroupTxEdge(on); }
+    void openKiwiHearingDialogForTest() { openKiwiHearingDialog(); }
+    void setKiwiSoloForTest(bool on) { setKiwiSolo(on); }
+    void adoptPickedKiwiForTest(const QString& endpoint, const QString& name)
+    { adoptPickedKiwi(endpoint, name, 10.0, false, 0.0, 0.0); }
+    void setRadioMutedForTest(bool on) { setRadioMuted(on); }
+    bool radioMutedForTest() const { return m_radioMuted; }
+    void setKiwiSoundForTest(const QString& id, bool on) { setKiwiSound(id, on); }
+    void retireKiwiForTest(const QString& id) { retireKiwi(id); }
+    int kiwiVolumeDbForTest(const QString& id) const { return kiwiVolumeDb(id); }
+    void zoomKiwiStripForTest(const QString& id, int dir) { zoomKiwiStrip(id, dir); }
+    double kiwiViewSpanForTest(const QString& id) const { return m_kiwiViewSpanHz.value(id, 0.0); }
+    void setAllKiwiSoundForTest(bool on) { setAllKiwiSound(on); }
+    class KiwiWaterfallPanel* kiwiWaterfallPanelForTest() const { return m_kiwiWaterfallPanel; }
+    bool kiwiSoloOnForTest() const { return m_kiwiSoloOn; }
+    class KiwiHearingDialog* kiwiHearingDialogForTest() const
+    { return m_kiwiHearingDialog.data(); }
     RadioModel* radioModelForTest() const { return m_radioModel; }
     class InstrumentApplet* signalInstrumentForTest() const;
     class ContestFenster* contestFensterForTest() const { return m_contestFenster; }
@@ -1669,11 +1695,41 @@ private:
     void setKiwiOwnSignal(bool on);
     void setKiwiOwnSignalProfile(const QString& profileId, double km);
     void chooseOtherKiwi();
+    void adoptPickedKiwi(const QString& endpoint, const QString& name, double km,
+                         bool hasPos, double lat, double lon);
     void syncKiwiOwnSignal();
     bool sendKiwiOwnSignalTracking();
     void kiwiOwnSignalTxEdge(bool sending);
     void startKiwiRecording();
     void stopKiwiRecording();
+    // Wo werde ich gehoert (Entwurf B/C) -- MainWindow_KiwiGroup.cpp.
+    void wireKiwiGroup();
+    void openKiwiHearingDialog();
+    // replaceId: dieser (ausgefallene) Kiwi wird durch den gewaehlten ersetzt.
+    void addKiwiToGroupFromPicker(const QString& replaceId = QString());
+    // Warum ein Kiwi gerade weg ist (Ueberschrift der Anzeige), leer = ist da.
+    QString kiwiLostTitle(const QString& profileId) const;
+    // Einen ersetzten Kiwi still wegraeumen: Ton, Mithoeren, Wasserfall.
+    void retireKiwi(const QString& profileId);
+    // Lautstaerke je Kiwi in dB (0 = unveraendert), gespeichert.
+    int kiwiVolumeDb(const QString& profileId) const;
+    void setKiwiVolumeDb(const QString& profileId, int db);
+    bool addKiwiListener(const QString& profileId, double km, bool hasPos,
+                         double lat, double lon);
+    void removeKiwiListener(const QString& profileId);
+    void kiwiGroupTxEdge(bool sending);
+    void sendKiwiGroupTracking();
+    void refreshKiwiHearingDialog();
+    void updateKiwiGroupCapacity();
+    void setKiwiSolo(bool on);
+    void setKiwiSound(const QString& profileId, bool on);
+    void zeigeKiwiFenster(const QString& profileId = QString());   // KIWI-WASSERFAELLE erzwungen einblenden, nach vorn
+    void refreshKiwiSoundButtons();
+    void setRadioMuted(bool on);
+    void zoomKiwiStrip(const QString& profileId, int direction);
+    void setAllKiwiSound(bool on);
+    void startKiwiGroupRecording(const QString& profileId);
+    void stopKiwiGroupRecording(const QString& profileId);
     class SliceModel* kiwiOwnTxSlice() const;
     qint64 kiwiOwnNowMs() const;
     // Stufe 3b (2026-09-21): der Kiwi folgt der zugeordneten Scheibe --
@@ -2286,6 +2342,25 @@ private:
     QVector<QMetaObject::Connection> m_kiwiOwnConnections;
     QPointer<class SpectrumWidget> m_kiwiOwnPan;
     QTimer* m_kiwiRecordTimer{nullptr};
+    // Wo werde ich gehoert: Mithoerer, ohne Scheibe, ohne Ton.
+    KiwiGroup m_kiwiGroup;
+    QPointer<KiwiHearingDialog> m_kiwiHearingDialog;
+    QTimer* m_kiwiGroupTimer{nullptr};
+    QSet<QString> m_kiwiUserMuted;   // Kiwis, deren Ton der Betreiber ausgeschaltet hat
+    // Letzter Zustand je Kiwi: "Belegt" direkt nach "Verbunden" ist ein
+    // Rauswurf durch den Server (Programm-Limit).
+    QHash<QString, int> m_kiwiPrevState;
+    bool kiwiEvictsPrograms(const QString& profileId) const;
+    void setKiwiEvictsPrograms(const QString& profileId, bool evicts);
+    bool m_kiwiAppletRefreshBlocked{false};
+    bool m_kiwiAppletRefreshDirty{false};
+    QHash<QString, double> m_kiwiViewSpanHz;   // Bereich je Kiwi-Streifen (Hz)
+    QHash<QString, int> m_kiwiSoundSlices;   // Profil -> Scheibe, die wir fuer den Ton anlegten
+    QTimer* m_kiwiSoloTimer{nullptr};   // Solo geht nach 30 s von selbst aus
+    bool m_kiwiSoloOn{false};
+    bool m_radioMuted{false};
+    QHash<QString, class KiwiRecording*> m_kiwiGroupRecordings;
+    QHash<QString, QPointF> m_kiwiPositions;   // Profilkennung -> (Breite, Laenge)
     QPointer<class UpdateDialog> m_updateDialog;
 
     // ── SunSDR (TCI-Client, 2026-08-24) ──────────────────────────────
