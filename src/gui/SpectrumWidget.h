@@ -429,6 +429,18 @@ public:
     void setSampleRate(double hz);
     double sampleRate() const { return m_sampleRateHz; }
 
+    /// Bis wohin das Fenster aufgezoomt werden darf. Ohne Vorgabe die
+    /// Abtastrate (mehr liefert ein OpenHPSDR-Empfaenger nicht). Bei
+    /// der Flex folgt der Panadapter der Maschine dem Zoom
+    /// (core/FlexZoomZug.h): die Abtastrate ist dann die Breite des
+    /// ZULETZT gezoomten Panadapters und als Decke eine Falle -- nach
+    /// dem Hineinzoomen kaeme man nicht mehr heraus. 0 = keine Vorgabe.
+    void setZoomObergrenzeHz(double hz) { m_zoomObergrenzeHz = hz > 0.0 ? hz : 0.0; }
+    double zoomObergrenzeHz() const
+    {
+        return m_zoomObergrenzeHz > 0.0 ? m_zoomObergrenzeHz : m_sampleRateHz;
+    }
+
     /// Hoehe des Kurvenbereichs allein — ohne Wasserfall, Bandbalken
     /// und Frequenzskala. Die Knopfspalte am linken Rand richtet ihre
     /// Hoehe danach: parentWidget()->height() waere die ganze Flaeche,
@@ -2177,6 +2189,9 @@ public:
     }
 
 signals:
+    /// Das Tempo des Wasserfalls hat sich geaendert (ms je Zeile) -- auch
+    /// beim Laden. An der Flex geht es als line_duration an die Maschine.
+    void wfUpdatePeriodChanged(int ms);
     /// Die Darstellungsart hat gewechselt (2D/3D).
     ///
     /// Es gab dafuer kein Signal: wer die Art von auszen umstellt —
@@ -2797,6 +2812,7 @@ private:
     double m_bandwidthHz{192000.0};   // 192 kHz default (P1 base sample rate)
     double m_ddcCenterHz{14225000.0};   // DDC hardware center frequency
     double m_sampleRateHz{768000.0};    // DDC sample rate
+    double m_zoomObergrenzeHz{0.0};     // 0 = Abtastrate, siehe zoomObergrenzeHz()
     bool   m_kiwiDisplaySource{false};  // Stufe 6: Geraet oder KiwiSDR
     QString m_persistKey;               // leer = nichts merken
     // Nur waehrend updateKiwiSpectrumDbm gesetzt. Ohne dieses

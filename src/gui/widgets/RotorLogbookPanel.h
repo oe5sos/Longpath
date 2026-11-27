@@ -20,6 +20,9 @@
 //   2026-11-17 — Live logging goes to every configured service through
 //                 QsoUploadQueue, not to QRZ alone. AI-assisted via
 //                 Anthropic Claude Code, operator Martin Fischer.
+//   2026-11-26 — Breit gezogen stehen Rufzeichen, Karte, Peilung und Log
+//                 in einer Spalte rechts vom Kompass (Entwurf A). AI-assisted
+//                 via Anthropic Claude Code, operator Martin Fischer.
 // =================================================================
 
 #include "core/CallsignInfo.h"
@@ -47,6 +50,8 @@ class QResizeEvent;
 class QStackedWidget;
 class QTableWidget;
 class QVBoxLayout;
+class QHBoxLayout;
+class QGridLayout;
 
 namespace Longpath {
 
@@ -86,6 +91,10 @@ public:
 
     // Where the ADIF log is written.
     static QString logbookPath();
+
+    // Die Mindestgroesse ist die des Kompasses, nicht die aller Zeilen,
+    // die gerade sichtbar sind -- siehe RotorLogbookPanel.cpp.
+    QSize minimumSizeHint() const override;
 
     /// Der Zeiger selbst. Damit MainWindow ihn in ein durchsichtiges
     /// Bild malen und dem Panadapter geben kann (siehe
@@ -485,6 +494,33 @@ private:
     static constexpr int kUserPresetSlots = 4;
 
     QVBoxLayout*     m_column{nullptr};
+
+    // ── Breit gezogen (2026-11-26) ───────────────────────────────────
+    //
+    // Betreiber: „wenn ich es in die breite ziehe sollte dort dann der
+    // rest, sofern möglich sein, stehen, also call usw." Ein breites,
+    // niedriges Feld warf bisher alle Zeilen ab und liess links und
+    // rechts vom Kompass leere Flaeche. Ist es breiter als hoch und
+    // breit genug, wandern dieselben Zeilen in eine Spalte rechts vom
+    // Kompass. Schmal bleibt alles wie zuvor. Kein Schalter: die Form
+    // folgt allein der Groesse.
+public:
+    enum class Form { Schmal, Mittel, Breit };
+    Form form() const { return m_form; }
+private:
+    Form formFuer(QSize s) const;
+    void ordneNachForm();
+    void schneideSpalte(const QVector<QWidget*>& reihenfolge, int verfuegbar, int abstand);
+    int  zeilenHoehe(QWidget* w);
+    bool fotoPasst() const;
+    Form             m_form{Form::Schmal};
+    bool             m_ordnet{false};
+    QHBoxLayout* m_aussen{nullptr};
+    QGridLayout* m_karte{nullptr};
+    QWidget*         m_mitte{nullptr};
+    QWidget*         m_spalteRechts{nullptr};
+    QHash<QWidget*, int> m_zeilenHoehe;
+
     QVector<QWidget*> m_shedOrder;      // least useful first
     // Measured while each row was last visible. A hidden widget's hint
     // is still valid, but a row laid out for the first time reports one

@@ -1296,6 +1296,9 @@ void SpectrumWidget::loadSettings()
     if (m_waterfallTicker) {
         m_waterfallTicker->setUpdatePeriodMs(m_wfUpdatePeriodMs);
     }
+    // Und melden: an der Flex laeuft der Wasserfall im Takt der Maschine,
+    // die den Wert als line_duration bekommt (RadioModel).
+    emit wfUpdatePeriodChanged(m_wfUpdatePeriodMs);
 
     // Sub-epic E: scrollback depth (default 20 min, range 60s..20min).
     m_waterfallHistoryMs = s.value(
@@ -3402,6 +3405,7 @@ void SpectrumWidget::setWfUpdatePeriodMs(int ms)
     if (m_waterfallTicker) {
         m_waterfallTicker->setUpdatePeriodMs(m_wfUpdatePeriodMs);
     }
+    emit wfUpdatePeriodChanged(m_wfUpdatePeriodMs);
 
     // Sub-epic E: capacity may have changed — debounce history rebuild
     // so slider drag doesn't trash history mid-drag.
@@ -12251,7 +12255,7 @@ void SpectrumWidget::mouseMoveEvent(QMouseEvent* event)
         int dx = m_bwDragStartX - mx;
         double factor = 1.0 + dx * 0.003;  // 0.3% per pixel
         double newBw = m_bwDragStartBw * factor;
-        newBw = std::clamp(newBw, 1000.0, m_sampleRateHz);
+        newBw = std::clamp(newBw, 1000.0, zoomObergrenzeHz());
         m_bandwidthHz = newBw;
         // Recenter on VFO when zooming so the signal stays visible
         // Only emit centerChanged if center actually moved — avoids DDC retune per drag frame
@@ -12974,7 +12978,7 @@ void SpectrumWidget::wheelEvent(QWheelEvent* event)
         // Cmd+scroll (macOS) or Ctrl+scroll: zoom bandwidth in/out
         double factor = (steps > 0) ? 0.8 : 1.25;
         double newBw = m_bandwidthHz * factor;
-        newBw = std::clamp(newBw, 1000.0, m_sampleRateHz);
+        newBw = std::clamp(newBw, 1000.0, zoomObergrenzeHz());
         // Recenter on VFO when zooming. Ueber setFrequencyRange
         // (2026-09-27): nur dort wird der Wasserfall umgerechnet, der
         // Zoom gespeichert und frequencyRangeChanged gesendet, dem die

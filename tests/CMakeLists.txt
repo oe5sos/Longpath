@@ -6515,6 +6515,8 @@ if(TEST tst_logbuch_ordnung)
 endif()
 # Rotor/Log nach Entwurf R (2026-11-12): Zahnrad, Ablesegitter, Rotorband, „blocked".
 longpath_add_test(tst_rotorlog_ordnung)
+# Rotor/Log breit gezogen (2026-11-26): Rufzeichen, Karte und Log neben dem Kompass.
+longpath_add_test(tst_rotorlog_breite)
 # Das Logbuch geht in der vorgesehenen Groesse auf (2026-09-26).
 longpath_add_test(tst_logbook_opens_at_its_size)
 # -- Logbuch als eine Seite: Karte als Spalte, Kennzahlen als Reihe --
@@ -8673,6 +8675,15 @@ longpath_add_test(tst_flex_frequenzspur)
 # prueft beide Richtungen: der eigene Zug muss stehen, und der Zoom des
 # Betreibers (2026-10-23) muss ihn ueberleben.
 longpath_add_test(tst_flex_fensterzug)
+
+# -- Der Zoom geht an die Flex (2026-11-27) ------------------------------
+# Zoomt der Betreiber, bekommt die FLEX-8400 Mitte UND Breite in einem
+# `display pan set … center=… bandwidth=…` (AetherSDR [@d58e2b8a]) und
+# rechnet Spektrum und Wasserfall in der neuen Aufloesung. Prueft die
+# Entscheidung (core/FlexZoomZug.h), den Draht gegen eine falsche
+# Maschine (genau ein Befehl, richtige Mitte/Breite) und dass das Echo
+# der Maschine keinen zweiten Befehl ausloest.
+longpath_add_test(tst_flex_zoomzug)
 
 # -- Die 80 kHz, nachgerechnet --------------------------------------------
 # Der Versatz beim Flex-Verbinden war Breite/2 − Breite·Randanteil, also
