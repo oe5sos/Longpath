@@ -1284,7 +1284,18 @@ void SpectrumWidget::loadSettings()
         meldeDurchlassSchema();
     }
     m_wfOpacity          = readInt(QStringLiteral("DisplayWfOpacity"), 100);
-    m_wfUpdatePeriodMs   = readInt(QStringLiteral("DisplayWfUpdatePeriodMs"), 30);
+    m_wfUpdatePeriodMs   = qBound(10, readInt(QStringLiteral("DisplayWfUpdatePeriodMs"), 30), 500);
+    // ── Den Takt auch WIRKEN lassen (2026-11-26) ─────────────────────
+    //
+    // Betreiber: „die einstellungen im panadapter sollten vom letzten
+    // beenden gespeichert sein!" Der Taktgeber des Wasserfalls wird im
+    // Konstruktor mit der Vorgabe (30 ms) gestartet, loadSettings() kommt
+    // erst danach (configureSpectrumForPan). Hier wurde nur der Wert
+    // gelesen: Zahnrad, Rechtsklick und Setup zeigten z. B. 135 ms, der
+    // Wasserfall lief nach jedem Start mit 30 (tst_panadapter_neustart).
+    if (m_waterfallTicker) {
+        m_waterfallTicker->setUpdatePeriodMs(m_wfUpdatePeriodMs);
+    }
 
     // Sub-epic E: scrollback depth (default 20 min, range 60s..20min).
     m_waterfallHistoryMs = s.value(
@@ -3371,6 +3382,11 @@ void SpectrumWidget::setWfOpacity(int percent)
     m_wfOpacity = percent;
     scheduleSettingsSave();
     markOverlayDirty();
+}
+
+int SpectrumWidget::waterfallTickerPeriodMsForTest() const
+{
+    return m_waterfallTicker ? m_waterfallTicker->updatePeriodMs() : -1;
 }
 
 void SpectrumWidget::setWfUpdatePeriodMs(int ms)
