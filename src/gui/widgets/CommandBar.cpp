@@ -519,8 +519,10 @@ void CommandBar::resizeEvent(QResizeEvent* e)
     // gemessene Konstante. Nur bei einem Wechsel umordnen. (2026-11-26:
     // nicht mehr die dynamische Mindestbreite -- sonst bricht die Leiste bei
     // der Breite des Betreibers in vier Zeilen um.)
-    const int schwelle = kEinzeiligUnterBreite;
-    const bool zwei = width() < schwelle;
+    // Betreiber 2026-11-27: "genau wie das Bild von 13:49" -- alle Gruppen in
+    // EINER Reihe, jede mit zwei Pillenzeilen. Kein Umbruch in eine zweite
+    // Reihe mehr; sonst beginnt die zweite Pillenzeile eine Zeile zu tief.
+    const bool zwei = false;
     if (zwei != m_zweiZeilen) { ordneZeilen(zwei); }
 }
 
