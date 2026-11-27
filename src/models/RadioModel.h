@@ -1817,6 +1817,9 @@ public:
     // Connected → anything transition; cleared on non-Connected states.
     QString connectionUptimeText() const;     // "14m 32s" / "—"
     QString connectedRadioName() const;       // RadioInfo.name / "—"
+    // Name des zuletzt gewaehlten Geraets, auch fuer eine Flex
+    // (m_connection ist dort leer, isConnected() also falsch).
+    QString lastRadioName() const { return m_lastRadioInfo.name; }
     QString connectionProtocolText() const;   // "1" or "2" / "—"
     QString connectionFirmwareText() const;   // "v27" / "—"
     QString connectionIpText() const;         // "192.168.x.y : port" / "—"
