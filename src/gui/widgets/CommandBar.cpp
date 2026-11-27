@@ -576,10 +576,15 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
     // ersten Linie der Leiste, nicht mittig (Betreiber 2026-11-26).
     pills->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     box->addLayout(pills);
-    // Die zweite Zeile entsteht erst, wenn eine Pille sie braucht (addPill).
-    // Eine leere Zeile hier hat trotzdem einen Abstand gekostet: die Lücke
-    // zwischen den Reihen (Betreiber 2026-11-27: "diese gehört weg").
-    QHBoxLayout* zweite = nullptr;
+    // Zweite Zeile gleich mit dem Bereich: alle Bereiche haben dieselben
+    // beiden Linien (Betreiber 2026-11-26). Leer bleibt sie ohne Abstand.
+    auto* zweite = new QHBoxLayout;
+    zweite->setContentsMargins(0, 0, 0, 0);
+    zweite->setSpacing(kAbstand);
+    // Linksbündig: sonst wird die kürzere zweite Zeile mittig gesetzt und steht
+    // nicht unter der ersten (Betreiber 2026-11-26: FT8 unter LSB).
+    zweite->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    box->addLayout(zweite);
     // Die Zeile setzt ordneZeilen() endgültig; hier nur der Besitz.
     row->addLayout(box);
     m_boxen.append(box);
@@ -647,8 +652,6 @@ QPushButton* CommandBar::addPill(Group& g, const QString& label)
             auto* zweite = new QHBoxLayout;
             zweite->setContentsMargins(0, 0, 0, 0);
             zweite->setSpacing(kAbstand);
-            // Linksbündig, wie in addGroup(): FT8 steht unter LSB.
-            zweite->setAlignment(Qt::AlignLeft | Qt::AlignTop);
             static_cast<QBoxLayout*>(g.box)->addLayout(zweite);
             g.row2 = zweite;
         }
@@ -973,14 +976,19 @@ void CommandBar::buildStepGroup(QHBoxLayout* row)
     Group& g = addGroup(QStringLiteral("Step"), row);
     // Zweizeilig (Betreiber 2026-11-24: die Schrittweite braucht man
     // selten): 10 Hz · 100 Hz oben, 1 kHz · „…" darunter -- halb so breit.
-    // addPill legt die zweite Zeile selbst an, sobald die dritte Pille kommt.
+    QHBoxLayout* zweite = g.row2;
     for (int i = 0; i < kVisiblePerGroup && i < m_allSteps.size(); ++i) {
         const auto entry = m_allSteps.at(i);
         QPushButton* b = addPill(g, entry.first);
+        if (i >= 2) {
+            g.row->removeWidget(b);
+            zweite->addWidget(b);
+        }
         connect(b, &QPushButton::clicked, this, [this, entry]() {
             pushStepToModel(entry.second);
         });
     }
+    g.row2 = zweite;   // das „…" kommt in die zweite Zeile
 
     addOverflow(g, m_allSteps, [this](int hz) { pushStepToModel(hz); });
 }
