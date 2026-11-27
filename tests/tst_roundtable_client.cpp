@@ -69,6 +69,10 @@
 //                (hiddenIsTheLastFrameBeforeTheClose rot auf macOS-CI,
 //                auch auf main). Martin Fischer, KI-gestuetzt ueber
 //                Anthropic Claude Code.
+//   2026-11-27 - Langsamer Fake-Server (slowPath) und der Prueffall
+//                flushWaitsForAFrameStillOnItsWay: der CI-Fall von oben,
+//                ohne Zufall nachgestellt. Martin Fischer, KI-gestuetzt
+//                ueber Anthropic Claude Code.
 // =================================================================
 // no-port-check: NereusSDR-original, in Longpath uebernommen.
 
@@ -77,6 +81,7 @@
 #include "core/roundtable/RoundtableKey.h"
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QHostAddress>
@@ -87,6 +92,7 @@
 #include <QRegularExpression>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QWebSocket>
 #include <QWebSocketServer>
 #include <QtTest/QtTest>
@@ -132,6 +138,9 @@ struct FakeConnection {
     bool closed = false;
     bool welcomed = false;
     bool allFramesValid = true;
+    // Longpath: when the server is told to be slow on this path, the
+    // time (FakeServer::m_clock) the last held frame is handed over.
+    qint64 lastHandOverMs = -1;
 
     QStringList types() const
     {
@@ -167,6 +176,13 @@ public:
 
     bool autoSignIn = true;
     bool autoWebLink = true;
+    // Longpath: a slow server on one path. Every frame arriving there is
+    // handed to `frames` only after slowMs, in arrival order, and at
+    // least slowGapMs after the one before -- a frame "still on its way"
+    // while the next one is sent, as a loaded macOS CI runner has it.
+    QString slowPath;
+    int slowMs = 0;
+    int slowGapMs = 0;
     std::vector<std::unique_ptr<FakeConnection>> connections;
     // The most station connections signed in at once, this one included.
     int maxSignedInStations = 0;
@@ -225,6 +241,17 @@ private:
             qWarning() << "fake server: refused" << decoded.error;
             return;
         }
+        if (!slowPath.isEmpty() && c->path == slowPath) {
+            if (!m_clock.isValid()) {
+                m_clock.start();
+            }
+            const qint64 due = std::max(m_clock.elapsed() + slowMs, c->lastHandOverMs + slowGapMs);
+            c->lastHandOverMs = due;
+            const QJsonObject message = decoded.message;
+            QTimer::singleShot(std::max<qint64>(0, due - m_clock.elapsed()), Qt::PreciseTimer, &m_context,
+                               [c, message] { c->frames.append(message); });
+            return;  // nothing on a slow path is answered
+        }
         c->frames.append(decoded.message);
         const QString type = decoded.type;
         if (type == QLatin1String("hello") && autoSignIn) {
@@ -264,6 +291,7 @@ private:
     }
 
     QWebSocketServer m_server;
+    QElapsedTimer m_clock;
     // Declared last, destroyed first: the accepted sockets and every
     // connection made for them go before the server and the records.
     QObject m_context;
@@ -306,6 +334,7 @@ private slots:
     void noReadingWhileKeyed();
     void aClearedSlicesNoReadingSendsNothingAndLeavesTheFloor();
     void hiddenIsTheLastFrameBeforeTheClose();
+    void flushWaitsForAFrameStillOnItsWay();
     void archiveWhileUnansweredSendsOnlyHelloAndWeblink();
     void aBriefConnectionErrorFailsItsWaitingWebLinks();
     void retriesFollowTheLadder();
@@ -632,6 +661,30 @@ void TstRoundtableClient::hiddenIsTheLastFrameBeforeTheClose()
     QVERIFY(flush(live));
     QCOMPARE(live->types(), QStringList{QStringLiteral("watchBand")});
     QCOMPARE(m_server->count(QStringLiteral("/v1/station")), 1);
+}
+
+// Longpath 2026-11-27: the macOS CI case of
+// hiddenIsTheLastFrameBeforeTheClose, made certain. The client sends
+// watchBand the moment /v1/live connects and is Hidden at once; the frame
+// can still be on its way to the server when flush() sends its marker.
+// Here the server holds every live frame 300 ms and hands them over at
+// least 100 ms apart, so watchBand comes alone, before the marker. A
+// flush() that takes "one frame more" for its marker returns false here.
+void TstRoundtableClient::flushWaitsForAFrameStillOnItsWay()
+{
+    m_server->slowPath = QStringLiteral("/v1/live");
+    m_server->slowMs = 300;
+    m_server->slowGapMs = 100;
+    makeClient(true);
+    m_client->setHidden(true);
+    m_client->start();
+    FakeConnection* live = waitConnection(QStringLiteral("/v1/live"), 1);
+    QVERIFY(live != nullptr);
+    QTRY_COMPARE_WITH_TIMEOUT(m_client->linkState(), RoundtableClient::LinkState::Hidden, kWaitMs);
+    QVERIFY(live->frames.isEmpty());  // watchBand is sent, not yet here
+    QVERIFY(flush(live));
+    QCOMPARE(live->types(), QStringList{QStringLiteral("watchBand")});
+    QCOMPARE(m_server->count(QStringLiteral("/v1/station")), 0);
 }
 
 void TstRoundtableClient::archiveWhileUnansweredSendsOnlyHelloAndWeblink()
