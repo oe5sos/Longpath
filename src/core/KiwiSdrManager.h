@@ -194,6 +194,9 @@ public slots:
     // kann die Sicherheitsschranke (kiwiControllableSlice) nicht beruehren.
     // Wird nicht gespeichert: nach einem Neustart ist keiner verbunden.
     // Frequenz und Ansicht gibt man ihm mit primeProfileTracking().
+    // Wartezeit vor dem naechsten Versuch nach so vielen Fehlschlaegen;
+    // -1: aufgeben (kein Kiwi wird endlos angefragt).
+    static int reconnectDelayMs(int failedAttempts);
     void setProfileListener(const QString& id, bool enabled);
     // Dekodiert den Ton fuer einen Mitschnitt (decodedAudioReady), ohne ihn
     // in eine Scheibe zu fuehren. Nur sinnvoll, solange id Mithoerer ist.
@@ -257,7 +260,7 @@ private:
     void ensureClientThread();
     void invokeClient(const QString& id, std::function<void(KiwiSdrClient*)> fn);
     void destroyClient(const QString& id, bool blocking = false);
-    void scheduleReconnect(const QString& id);
+    void scheduleReconnect(const QString& id, int delayMs = -1);
     void scheduleWaitingReconnectIfRecommended(const QString& id);
     void cancelReconnect(const QString& id);
     static QString sanitizedName(const QString& name, const QString& endpoint);
@@ -267,6 +270,8 @@ private:
     QHash<QString, KiwiSdrClient::State> m_states;
     QHash<QString, bool> m_clientHasTrackedSlice;
     QHash<QString, QTimer*> m_reconnectTimers;
+    // Laufende Wiederverbindung nach einem Abriss: Zahl der Fehlschlaege.
+    QHash<QString, int> m_reconnectAttempts;
     QHash<QString, QString> m_stateDetails;
     QHash<QString, KiwiSdrReceiverTelemetry> m_telemetry;
     QHash<QString, bool> m_waterfallAvailable;

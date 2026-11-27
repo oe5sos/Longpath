@@ -199,6 +199,15 @@ void MainWindow::wireKiwiOwnSignal()
             m_kiwiStrip->clearRows();
         }
     });
+    connect(m_kiwiSdrManager, &KiwiSdrManager::meterReadingReady, this,
+            [this](const QString& id,
+                   const KiwiSdrProtocol::MeterReading& r) {
+        if (!m_kiwiOwnSignalOn || id != m_kiwiOwnProfileId || !m_kiwiStrip) {
+            return;
+        }
+        m_kiwiStrip->setSignal(r.valid && r.hasDbm ? r.sUnits : QString(),
+                               r.adcOverload);
+    });
     // Unabhaengig von der Stummschaltung: stumm heisst nicht ungehoert.
     connect(m_kiwiSdrManager, &KiwiSdrManager::decodedAudioReady, this,
             [this](const QString& id, const QByteArray& pcm) {

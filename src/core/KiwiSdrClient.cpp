@@ -407,6 +407,7 @@ KiwiSdrClient::KiwiSdrClient(QObject* parent)
 
         setState(State::Error, setupTimeoutDetail());
         cleanupSockets();
+        emit setupTransportFailed();
     });
 
     m_stallTimer = new QTimer(this);
@@ -883,6 +884,7 @@ void KiwiSdrClient::openWebSockets()
                          tr("KiwiSDR sound connection closed during setup. %1")
                              .arg(identityDiagnosticText()));
                 cleanupSockets();
+                emit setupTransportFailed();
             } else if (m_state == State::Camping) {
                 const QString detail =
                     tr("KiwiSDR monitor audio connection closed.");
@@ -2133,6 +2135,9 @@ void KiwiSdrClient::handleSoundFrame(const QByteArray& frame)
         meterReading.squelchStateKnown = true;
         meterReading.squelched = header.squelched;
     }
+    // SND_FLAG_ADC_OVFL des KiwiSDR-Servers (rx_sound.cpp): sein Wandler
+    // uebersteuert.
+    meterReading.adcOverload = (header.flags & 0x02) != 0;
     markSoundAudioReady();
     KiwiSdrProtocol::SoundFrameDecodeResult decodedSound;
     const bool decodeForAudio =
@@ -3786,10 +3791,13 @@ void KiwiSdrClient::handleSocketError(const QString& detail,
             return;
         }
         const bool wasConnected = m_state == State::Connected;
+        const bool wasConnecting = m_state == State::Connecting;
         setState(State::Error, detail);
         cleanupSockets();
         if (wasConnected) {
             emit recoverableDisconnect(detail);
+        } else if (wasConnecting) {
+            emit setupTransportFailed();
         }
     }
 }

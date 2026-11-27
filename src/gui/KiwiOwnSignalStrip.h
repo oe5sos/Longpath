@@ -64,6 +64,9 @@ public:
     void setRowIntervalMs(int ms) { m_rowIntervalMs = ms; }
     void clearRows();
 
+    // S-Wert des Kiwi aus dem Tonstrom; overload: sein Wandler uebersteuert
+    // (bleibt kurz stehen). Leerer Text: kein Wert.
+    void setSignal(const QString& sUnits, bool overload);
     void setVerdict(const KiwiHearMeMeter::Result& result);
     // Fusszeile: laeuft eine Aufnahme, mit Dauer und Dateiname.
     void setRecording(bool recording, qint64 elapsedMs, const QString& fileName);
@@ -160,6 +163,9 @@ private:
     bool m_recording{false};
     qint64 m_recordMs{0};
     QString m_recordFile;
+    QString m_sUnits;
+    qint64 m_overloadUntilMs{0};
+    qint64 m_signalPaintMs{0};
     int m_rowIntervalMs{0};
     qint64 m_lastRowMs{0};
     QToolButton* m_soundButton{nullptr};

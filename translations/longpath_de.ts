@@ -1653,6 +1653,10 @@ Your own files live next to the settings and win over a shipped palette of the s
 <context>
     <name>Longpath::CommandBar</name>
     <message>
+        <source>This radio does not offer %1</source>
+        <translation>Dieses Gerät führt %1 nicht</translation>
+    </message>
+    <message>
         <location filename="../src/gui/widgets/CommandBar.cpp" line="593"/>
         <source>Show all %1</source>
         <translation>Alle %1 anzeigen</translation>
@@ -3580,6 +3584,10 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 </context>
 <context>
     <name>Longpath::MainWindow</name>
+    <message>
+        <source>Radio sound is on again: no Kiwi is delivering audio.</source>
+        <translation>Der Radio-Ton ist wieder an: Kein Kiwi liefert Ton.</translation>
+    </message>
     <message>
         <source>Disconnected – server limit</source>
         <translation>Getrennt – Server-Limit</translation>
@@ -5805,6 +5813,10 @@ All custom band/pin mappings will be cleared.</source>
 </context>
 <context>
     <name>Longpath::ProfileRail</name>
+    <message>
+        <source>All profiles</source>
+        <translation>Alle Profile</translation>
+    </message>
     <message>
         <location filename="../src/gui/widgets/ProfileRail.cpp" line="294"/>
         <source>Delete profile “%1”</source>
@@ -8419,6 +8431,10 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
 </context>
 <context>
     <name>Longpath::KiwiOwnSignalStrip</name>
+    <message>
+        <source>KIWI OVERLOADED</source>
+        <translation>KIWI ÜBERSTEUERT</translation>
+    </message>
     <message>
         <source>View options of this Kiwi picture</source>
         <translation>Ansicht dieses Kiwi-Bildes</translation>

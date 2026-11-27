@@ -172,6 +172,9 @@ signals:
     void telemetryChanged(const Longpath::KiwiSdrReceiverTelemetry& telemetry);
     void waterfallAvailabilityChanged(bool available, const QString& detail);
     void recoverableDisconnect(const QString& detail);
+    // Ein Verbindungsaufbau scheiterte am Netz (Zeitlimit, Socket) -- nicht,
+    // weil der Server abgelehnt hat.
+    void setupTransportFailed();
 
 private:
     enum class StreamKind {

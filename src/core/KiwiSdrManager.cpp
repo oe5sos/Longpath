@@ -956,6 +956,7 @@ void KiwiSdrManager::connectProfile(const QString& id)
 void KiwiSdrManager::disconnectProfile(const QString& id)
 {
     cancelReconnect(id);
+    m_reconnectAttempts.remove(id);
     if (KiwiSdrClient* c = client(id)) {
         Q_UNUSED(c);
         qCInfo(lcKiwiSdr).noquote() << "Disconnecting" << displayName(id);
@@ -990,6 +991,14 @@ bool KiwiSdrManager::waterfallPreviewEnabled(const QString& id) const
 void KiwiSdrManager::setWaterfallPreviewEnabled(const QString& id, bool enabled)
 {
     const int idx = profileIndex(id);
+    if (idx >= 0 && enabled && m_profiles[idx].waterfallPreviewEnabled
+        && (state(id) == KiwiSdrClient::State::Disconnected
+            || state(id) == KiwiSdrClient::State::Error)) {
+        // Der Haken war vom letzten Mal gesetzt, verbunden ist nichts: der
+        // Klick soll verbinden, nicht verpuffen (2026-11-27).
+        connectProfile(id);
+        return;
+    }
     if (idx < 0 || m_profiles[idx].waterfallPreviewEnabled == enabled) {
         return;
     }
@@ -1332,6 +1341,11 @@ KiwiSdrClient* KiwiSdrManager::ensureClient(const QString& id)
             emit profileTelemetryChanged(id, m_telemetry.value(id));
             emit profileWaterfallAvailabilityChanged(id, true, QString());
         }
+        if (KiwiSdrClient::stateHasReceiveAudio(state)
+            || state == KiwiSdrClient::State::Busy) {
+            // Verbunden, oder der Server will uns nicht: Reihe beendet.
+            m_reconnectAttempts.remove(id);
+        }
         if (KiwiSdrClient::stateHasReceiveAudio(state)) {
             const int idx = profileIndex(id);
             const bool hasAssignedSlice = assignedSliceForProfile(id) >= 0;
@@ -1378,7 +1392,24 @@ KiwiSdrClient* KiwiSdrManager::ensureClient(const QString& id)
         if (client(id) != c) {
             return;
         }
+        m_reconnectAttempts.insert(id, 0);
         scheduleReconnect(id);
+    }, Qt::QueuedConnection);
+    // Scheitert der Versuch danach am Netz, folgen weitere mit wachsendem
+    // Abstand (2026-11-27: vorher blieb es bei einem einzigen).
+    connect(c, &KiwiSdrClient::setupTransportFailed,
+            this, [this, id, c]() {
+        if (client(id) != c || !m_reconnectAttempts.contains(id)) {
+            return;
+        }
+        const int failed = m_reconnectAttempts.value(id) + 1;
+        const int delay = reconnectDelayMs(failed);
+        if (delay < 0) {
+            m_reconnectAttempts.remove(id);
+            return;
+        }
+        m_reconnectAttempts.insert(id, failed);
+        scheduleReconnect(id, delay);
     }, Qt::QueuedConnection);
     connect(c, &KiwiSdrClient::telemetryChanged, this,
             [this, id, c](const KiwiSdrReceiverTelemetry& telemetry) {
@@ -1777,7 +1808,15 @@ bool KiwiSdrManager::shouldMaintainProfileConnection(const QString& id) const
         || m_listeners.contains(id);
 }
 
-void KiwiSdrManager::scheduleReconnect(const QString& id)
+int KiwiSdrManager::reconnectDelayMs(int failedAttempts)
+{
+    static constexpr int kDelays[] = {kRecoverableReconnectDelayMs,
+                                      10000, 30000, 60000};
+    return failedAttempts >= 0 && failedAttempts < 4 ? kDelays[failedAttempts]
+                                                     : -1;
+}
+
+void KiwiSdrManager::scheduleReconnect(const QString& id, int delayMs)
 {
     if (!shouldMaintainProfileConnection(id) && !reconnectRecommended(id)) {
         return;
@@ -1798,10 +1837,11 @@ void KiwiSdrManager::scheduleReconnect(const QString& id)
     }
 
     if (!timer->isActive()) {
+        const int delay = delayMs > 0 ? delayMs : kRecoverableReconnectDelayMs;
         qCInfo(lcKiwiSdr).noquote()
             << "Reconnect scheduled for" << displayName(id)
-            << "in" << kRecoverableReconnectDelayMs << "ms";
-        timer->start();
+            << "in" << delay << "ms";
+        timer->start(delay);
     }
 }
 

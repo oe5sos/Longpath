@@ -21,6 +21,7 @@
 #include "core/KiwiOwnSignal.h"
 #include "core/KiwiSdrClient.h"
 #include "core/KiwiReplayBuffer.h"
+#include "core/KiwiSdrManager.h"
 #include "core/KiwiRecording.h"
 #include "gui/KiwiOwnSignalStrip.h"
 #include "gui/StyleConstants.h"
@@ -191,6 +192,27 @@ private slots:
         b.feed(QByteArray(100 * ms, 'z'));
         b.finish(5000);
         QVERIFY(!b.isPlaying());
+    }
+
+    // 2026-11-27: mehrere Versuche mit wachsendem Abstand, dann Schluss.
+    void neuverbindenGibtNachVierVersuchenAuf()
+    {
+        QCOMPARE(KiwiSdrManager::reconnectDelayMs(0), 3000);
+        QCOMPARE(KiwiSdrManager::reconnectDelayMs(1), 10000);
+        QCOMPARE(KiwiSdrManager::reconnectDelayMs(2), 30000);
+        QCOMPARE(KiwiSdrManager::reconnectDelayMs(3), 60000);
+        QCOMPARE(KiwiSdrManager::reconnectDelayMs(4), -1);
+    }
+
+    void derStreifenZeigtSWertUndUebersteuerung()
+    {
+        KiwiOwnSignalStrip s;
+        s.setKiwiName(QStringLiteral("Linz"));
+        s.setSignal(QStringLiteral("S7"), false);
+        QVERIFY(s.headerText().contains(QStringLiteral("S7")));
+        QVERIFY(!s.headerText().contains(QStringLiteral("OVERLOADED")));
+        s.setSignal(QStringLiteral("S9+20"), true);
+        QVERIFY(s.headerText().contains(QStringLiteral("KIWI OVERLOADED")));
     }
 
     void tonBleibtImModusBeimSenden()

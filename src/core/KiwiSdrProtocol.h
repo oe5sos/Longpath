@@ -286,6 +286,7 @@ struct MeterReading {
     bool hasRelativeLevel{false};
     bool squelchStateKnown{false};
     bool squelched{false};
+    bool adcOverload{false};   // der Kiwi meldet Uebersteuerung
     bool valid{false};
     MeterConfidence confidence{MeterConfidence::None};
     QString label{QStringLiteral("Meter unavailable")};

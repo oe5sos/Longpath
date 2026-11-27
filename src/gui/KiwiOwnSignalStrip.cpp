@@ -384,6 +384,17 @@ void KiwiOwnSignalStrip::clearRows()
     update();
 }
 
+void KiwiOwnSignalStrip::setSignal(const QString& sUnits, bool overload)
+{
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (overload) { m_overloadUntilMs = now + 3000; }
+    // Die Werte kommen mit jedem Tonpaket; viermal je Sekunde genuegt.
+    if (!overload && now - m_signalPaintMs < 250) { return; }
+    m_signalPaintMs = now;
+    m_sUnits = sUnits;
+    update();
+}
+
 void KiwiOwnSignalStrip::setVerdict(const KiwiHearMeMeter::Result& result)
 {
     m_verdict = result;
@@ -406,6 +417,11 @@ QString KiwiOwnSignalStrip::headerText() const
               + (m_name.isEmpty() ? QStringLiteral("—") : m_name.toUpper()));
     if (m_km >= 0.0) { parts << kmText(m_km); }
     if (m_delayMs > 0) { parts << delayText(m_delayMs, m_delayMeasured); }
+    if (!m_sUnits.isEmpty()) { parts << m_sUnits; }
+    if (QDateTime::currentMSecsSinceEpoch() < m_overloadUntilMs) {
+        // Vorn, damit es beim Kuerzen nicht wegfaellt.
+        parts.insert(1, tr("KIWI OVERLOADED"));
+    }
     return parts.join(QStringLiteral(" · "));
 }
 

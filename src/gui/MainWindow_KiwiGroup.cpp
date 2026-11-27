@@ -129,6 +129,29 @@ void MainWindow::wireKiwiGroup()
                       ToastSeverity::Warning, 8000);
         }
     });
+    // "Radio stumm" ohne einen Kiwi, der liefert, waere nur Stille: dann ist
+    // das Funkgeraet wieder zu hoeren.
+    connect(m_kiwiSdrManager, &KiwiSdrManager::profileStateChanged, this,
+            [this](const QString&, KiwiSdrClient::State st, const QString&) {
+        if (!m_radioMuted || m_kiwiReplayMutedRadio
+            || (st != KiwiSdrClient::State::Error
+                && st != KiwiSdrClient::State::Busy
+                && st != KiwiSdrClient::State::Disconnected)) {
+            return;
+        }
+        for (const auto& pr : m_kiwiSdrManager->profiles()) {
+            const KiwiSdrClient::State other = m_kiwiSdrManager->state(pr.id);
+            if (m_kiwiSdrManager->assignedSliceForProfile(pr.id) >= 0
+                && !m_kiwiUserMuted.contains(pr.id)
+                && (KiwiSdrClient::stateHasReceiveAudio(other)
+                    || other == KiwiSdrClient::State::Connecting)) {
+                return;
+            }
+        }
+        setRadioMuted(false);
+        showToast(tr("Radio sound is on again: no Kiwi is delivering audio."),
+                  ToastSeverity::Warning, 8000);
+    });
     // Fiel die Scheibe des Kiwi weg, ist Solo aus -- sonst bliebe alles stumm.
     connect(m_kiwiSdrManager, &KiwiSdrManager::sliceAssignmentChanged, this,
             [this](int, const QString&) {
