@@ -32,7 +32,7 @@ KiwiLostOverlay::KiwiLostOverlay(QWidget* parent) : QWidget(parent)
     // Streifen breiter zu zwingen.
     m_label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     m_label->setStyleSheet(QStringLiteral(
-        "QLabel { color: %1; background: transparent; font-size: 15px; font-weight: 600; }")
+        "QLabel { color: %1; background: transparent; font-size: 13px; font-weight: 600; }")
             .arg(QString::fromLatin1(Style::kTextPrimary)));
     layout->addWidget(m_label);
 
