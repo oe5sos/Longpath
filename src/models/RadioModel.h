@@ -3958,6 +3958,19 @@ public:
     /// Panadapter hat nichts zu zeichnen.
     void zieheFlexPanadapterAuf(double hz);
 
+    /// Den Panadapter der Maschine auf Mitte UND Breite stellen — ein
+    /// Befehl, `display pan set <id> center=… bandwidth=…`. Der Weg des
+    /// Zooms (core/FlexZoomZug.h, 2026-11-27). Hat die Maschine
+    /// angenommen, wird der Ausschnitt selbst nachgefuehrt und als
+    /// EIGENER Zug gemeldet (`flexAusschnittGeaendert(…, true)`).
+    void zieheFlexPanadapterAuf(double mitteHz, double breiteHz);
+
+    /// Wie schmal / wie breit die Maschine ihren Panadapter stellt.
+    /// Meldet sie `min_bw` / `max_bw` im Zustand, gilt das; sonst die
+    /// Grenzen von AetherSDR (core/FlexZoomZug.h).
+    double flexPanMindestBreiteHz() const;
+    double flexPanHoechstBreiteHz() const;
+
     /// Die Frequenz, die die MASCHINE zuletzt gemeldet hat (Hertz).
     /// Beim Verbinden gewinnt sie gegen das gespeicherte Profil: der
     /// Betreiber hat die Maschine womoeglich gerade von SmartSDR oder
@@ -4193,6 +4206,8 @@ private:
     /// Maschine eine von uns gesetzte Panadaptermitte NICHT
     /// zurueckechot — gemessen am 2026-10-23.
     void uebernimmFlexPanMitte(double mitteMhz);
+    /// Dasselbe fuer Mitte UND Breite (der Zoomzug).
+    void uebernimmFlexPanAusschnitt(double mitteMhz, double breiteMhz);
 
 public:
 
@@ -4266,6 +4281,10 @@ private:
     /// schickt beim Drehen nur `center=`, nicht beides zusammen.
     double               m_flexPanMitteMhz{0.0};
     double               m_flexPanBreiteMhz{0.0};
+    /// Was die Maschine als schmalste / breiteste Breite meldet
+    /// (`min_bw` / `max_bw`, MHz); 0 = nicht gemeldet.
+    double               m_flexPanMinBreiteMhz{0.0};
+    double               m_flexPanMaxBreiteMhz{0.0};
     /// Zuletzt von der Maschine gemeldete Scheibenfrequenz (Hertz).
     double               m_flexGeraeteFrequenzHz{0.0};
 

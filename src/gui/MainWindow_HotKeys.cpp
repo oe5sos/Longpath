@@ -251,11 +251,12 @@ void MainWindow::panoramaZoomen(double factor)
     // Faktor 1.5 je Druck — AetherSDRs Wert
     // (SpectrumWidget.cpp:2205-2206 [@0cd4559]). Untergrenze 2 kHz
     // (darunter sieht man nur noch die eigene Bandbreite), Obergrenze
-    // die Abtastrate (mehr liefert der Empfaenger nicht). Stand bis
+    // die Abtastrate (mehr liefert der Empfaenger nicht; bei der Flex
+    // die Zoomdecke, siehe SpectrumWidget::zoomObergrenzeHz). Stand bis
     // 2026-11-10 als Lambda am Anschluss der Lupe in MainWindow.cpp.
     SpectrumWidget* sw = activeSpectrumWidget();
     if (!sw) { return; }
-    const double maxBw = sw->sampleRate() > 0.0 ? sw->sampleRate() : 384000.0;
+    const double maxBw = sw->zoomObergrenzeHz() > 0.0 ? sw->zoomObergrenzeHz() : 384000.0;
     const double bw = qBound(2000.0, sw->bandwidth() * factor, maxBw);
     sw->setFrequencyRange(sw->centerFrequency(), bw);
 }
