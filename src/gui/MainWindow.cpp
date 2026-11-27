@@ -7495,7 +7495,11 @@ void MainWindow::buildUI()
                 const double last =
                     slice->property(kLastFreqProp).toDouble();
                 if (std::abs(last - freq) > kFastAttackFreqJumpHz) {
-                    activeSpectrumWidget()->setNoiseFloorFastAttack(true);
+                    // Beim Schliessen gibt es keinen Panadapter mehr,
+                    // Signale der Scheiben kommen aber noch an.
+                    if (SpectrumWidget* sw = activeSpectrumWidget()) {
+                        sw->setNoiseFloorFastAttack(true);
+                    }
                 }
                 slice->setProperty(kLastFreqProp, freq);
             });
@@ -7630,7 +7634,9 @@ void MainWindow::buildUI()
     if (activeSpectrumWidget()) {
         connect(&m_radioModel->transmitModel(), &TransmitModel::moxChanged,
                 this, [this](bool) {
-            activeSpectrumWidget()->setNoiseFloorFastAttack(true);
+            if (SpectrumWidget* sw = activeSpectrumWidget()) {
+                sw->setNoiseFloorFastAttack(true);
+            }
         });
     }
 
@@ -16874,7 +16880,9 @@ void MainWindow::wireSliceToSpectrum()
             // pushed by frequencyChanged.  Without this re-sync, a filter
             // change immediately after a CTUN tune could leave the detector
             // pointing at the wrong bins until the user nudges the VFO again.
-            const double ddcCenter = activeSpectrumWidget()->ddcCenterFrequency();
+            const SpectrumWidget* sw = activeSpectrumWidget();
+            if (!sw) { return; }   // 100 ms spaeter kann er schon weg sein
+            const double ddcCenter = sw->ddcCenterFrequency();
             const double sliceFreq = slice ? slice->frequency() : ddcCenter;
             eng->setMaxBinSliceOffsetHz(/*disp=*/0, sliceFreq - ddcCenter);
         });
