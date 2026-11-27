@@ -33,6 +33,7 @@ void LoudnessMatch::prepare(double sampleRate) noexcept
     m_alphaAb  = alphaFuer(0.4,  m_rate);
     m_alphaFolg    = alphaFuer(1.5, m_rate);
     m_alphaSchnell = alphaFuer(0.05, m_rate);
+    m_haltAb = 1.0 - alphaFuer(0.3, m_rate);
     m_kIn1.k  = Loudness::shelfAt(m_rate);
     m_kIn2.k  = Loudness::rlbAt(m_rate);
     m_kOut1.k = m_kIn1.k;
@@ -45,6 +46,8 @@ void LoudnessMatch::reset() noexcept
     m_msIn  = 0.0;
     m_msOut = 0.0;
     m_gain  = 1.0f;
+    m_spitzeIn = 0.0;
+    m_schranke = 1.0f;
     m_kIn1.leeren();  m_kIn2.leeren();
     m_kOut1.leeren(); m_kOut2.leeren();
     m_gainDb.store(0.0f, std::memory_order_relaxed);
@@ -54,6 +57,8 @@ void LoudnessMatch::feedInput(const float* samples, int frames) noexcept
 {
     if (samples == nullptr || frames <= 0) { return; }
     for (int i = 0; i < frames; ++i) {
+        m_spitzeIn = std::max(std::fabs(double(samples[i])),
+                              m_spitzeIn * m_haltAb);
         // Gewichtet messen, aber NICHT das Signal anfassen: gefiltert
         // wird eine Kopie, hoerbar bleibt das Original.
         const double v = m_kIn2.schritt(m_kIn1.schritt(double(samples[i])));
@@ -110,7 +115,29 @@ void LoudnessMatch::applyOutput(float* samples, int frames) noexcept
         m_gain += float(a) * (ziel - m_gain);
         samples[i] *= m_gain;
     }
-    m_gainDb.store(m_gain > 1e-6f ? 20.0f * std::log10(m_gain) : kMinDb,
+
+    // Die Spitzenschranke, siehe Header: sofort zu, in 100 ms wieder
+    // auf. Ausgeschaltet laeuft sie nur noch auf.
+    float spitze = 0.0f;
+    for (int i = 0; i < frames; ++i) {
+        spitze = std::max(spitze, std::fabs(samples[i]));
+    }
+    float noetig = 1.0f;
+    if (isEnabled() && double(spitze) > m_spitzeIn && spitze > 0.0f) {
+        noetig = float(m_spitzeIn / double(spitze));
+    }
+    if (noetig < m_schranke) {
+        m_schranke = noetig;
+    } else {
+        m_schranke += float(1.0 - std::exp(-double(frames) / (0.1 * m_rate)))
+                      * (noetig - m_schranke);
+    }
+    for (int i = 0; i < frames; ++i) { samples[i] *= m_schranke; }
+
+    const float gesamt = m_gain * m_schranke;
+    m_gainDb.store(gesamt > 1e-6f
+                       ? std::max(kMinDb, 20.0f * std::log10(gesamt))
+                       : kMinDb,
                    std::memory_order_relaxed);
 }
 

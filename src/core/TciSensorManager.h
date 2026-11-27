@@ -146,6 +146,20 @@ public:
             .arg(QString::number(swr, 'f', 1));
     }
 
+    // Longpath-eigen (2026-11-26), kein Thetis-Format: die ALC beim Senden,
+    // wie sie das ALC-Instrument am Mac zeigt (TXA_ALC_AV in dB, MeterPoller).
+    // tx_sensors bleibt byte-gleich mit Thetis; die ALC kommt als eigene
+    // Zeile und nur an Clients, die `tx_alc_enable:true` geschickt haben.
+    //
+    // Encodes:  tx_alc:<rx>,<alcDb>;
+    // Example:  tx_alc:0,-2.5;
+    static inline QString formatTxAlc(int rx, double alcDb)
+    {
+        return QStringLiteral("tx_alc:%1,%2;")
+            .arg(rx)
+            .arg(QString::number(alcDb, 'f', 1));
+    }
+
     // Aggregate the minimum requested interval across all subscribed clients.
     //
     // From Thetis TCIServer.cs:7571-7603 [v2.10.3.13] —

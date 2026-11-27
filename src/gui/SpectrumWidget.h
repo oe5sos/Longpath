@@ -917,7 +917,8 @@ public:
     // Wasserfallzeilen an: Spur und Wasserfall bleiben das letzte
     // Empfangsbild, der Empfangsdurchlass bleibt in seiner Farbe, und
     // statt der TX-Flaeche zeigt ein 3-px-Streifen oben den Sendebereich.
-    // Ab Werk an, je Pan gespeichert (DisplayHoldRxPictureOnTx). Waehrend
+    // Ab Werk AUS (seit 2026-11-24: der Betreiber will beim Senden sein
+    // Signal live sehen), je Pan gespeichert (DisplayHoldRxPictureOnTxV2). Waehrend
     // des Zweiton-Tests bleibt das Bild live -- dort wird gemessen.
     void setHoldReceivePictureOnTx(bool on);
     bool holdReceivePictureOnTx() const { return m_haltBildBeimSenden; }
@@ -3607,7 +3608,7 @@ private:
     // From Thetis display.cs:1568 [v2.10.3.13]: static bool _mox = false;
     bool  m_moxOverlay{false};
     // Empfangsbild beim Senden halten, siehe setHoldReceivePictureOnTx().
-    bool    m_haltBildBeimSenden{true};
+    bool    m_haltBildBeimSenden{false};
     bool    m_txDurchlassWieRx{true};
     PanColourScheme m_spektrumSchema{PanColourScheme::Standard};    // oben
     PanColourScheme m_wasserfallSchema{PanColourScheme::Standard};  // unten

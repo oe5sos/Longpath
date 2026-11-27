@@ -15,7 +15,7 @@ import { Sendetasten, SENDEN, TUNE, ablehnText } from './sendetaste.js';
 import { Zeichenbremse } from './ton-vorrang.js';
 import { bildIstAlt } from './aufwachen.js';
 import { desktopStarten } from './desktop.js';
-import { zeiger as zeigerBauen, sEinheiten, SIG_KLEIN, SWR_KLEIN, kompassBlatt } from './instrument.js';
+import { zeiger as zeigerBauen, sEinheiten, SIG_KLEIN, SWR_KLEIN, kompassRund } from './instrument.js';
 import { standLesen, zustandText, fehlerText as rotorFehlerText,
          peilungAus, peilungLesen, Sicherung as RotorSicherung,
          DREHT } from './rotor.js';
@@ -2714,6 +2714,9 @@ link.addEventListener('open', () => {
   // langsamer wirkt er traege.
   link.send(`rx_sensors_enable:true,200`);
   link.send(`tx_sensors_enable:true,200`);
+  // ALC dazu (Longpath-eigen). Ein aelteres Longpath kennt den Befehl nicht
+  // und schweigt -- dann bleibt die Zeile bei „—".
+  link.send(`tx_alc_enable:true`);
 
   link.send(`audio_samplerate:${state.audioRate}`);
   link.send(`audio_stream_channels:1`);
@@ -2814,6 +2817,9 @@ const rotorSicherung = new RotorSicherung();
 let rotorStand = null;
 let rotorFeldAn = false;
 let rotorTakt = null;
+// Kleiner Kompass in der Instrumentenzeile, gezeichnet wie das S-Meter.
+const kompassK = kompassRund($('rotorKlein'), 'k');
+kompassK(null);
 
 function rotorStricheZeichnen() {
   const g = $('rotorStriche');
@@ -2845,10 +2851,7 @@ function rotorZeichnen() {
     $('rotorGrad').textContent = `${Math.round(rotorStand.grad)}°`;
     $('rotorGrad').classList.toggle('alt', !!alt);
     // Kleiner Kompass in der Instrumentenzeile: dieselben Werte, kein zweiter Weg.
-    const nk = $('rotorNadelK');
-    nk.setAttribute('x2', (Math.sin(rad) * 82).toFixed(2));
-    nk.setAttribute('y2', (-Math.cos(rad) * 82).toFixed(2));
-    nk.classList.toggle('alt', !!alt);
+    kompassK(rotorStand.grad, !!alt);
     $('rotorGradK').textContent = `${Math.round(rotorStand.grad)}°`;
     $('rotorGradK').classList.toggle('alt', !!alt);
   }
@@ -3622,7 +3625,6 @@ desktopStarten({ link, $, schrittHz: () => kFeinHz, logHolen: logListeHolen });
   // Zeigerinstrumente nach Longpath (instrument.js): S-Meter und SWR.
   const zeigerS = zeigerBauen($('gaugeSvg'), SIG_KLEIN, 's');
   zeigerS(null);
-  kompassBlatt($('rotorBlattK'));
   const rotorFeld = $('rotorFeld');
   $('rotorKopf').addEventListener('click', () => {
     const offen = rotorFeld.classList.toggle('offen');
@@ -3670,6 +3672,15 @@ desktopStarten({ link, $, schrittHz: () => kFeinHz, logHolen: logListeHolen });
     const pe = $('pwrWertI');
     if (pe.textContent !== pw) { pe.textContent = pw; }
     pe.classList.toggle('aus', pw === '—');
+    // ALC nach derselben Regel, mit eigenem Zeitstempel: ein Longpath ohne
+    // tx_alc schickt nie eine, und dann darf hier kein alter Wert stehen.
+    const a = link.st.txAlc;
+    const alcFrisch = performance.now() - (link.st.txAlcZeit || 0) < 1500;
+    const aw = (sendet && alcFrisch && a !== null)
+      ? (a > 0 ? '+' : a < 0 ? '\u2212' : '') + Math.abs(a).toFixed(1) + ' dB' : '—';
+    const ae = $('alcWertI');
+    if (ae.textContent !== aw) { ae.textContent = aw; }
+    ae.classList.toggle('aus', aw === '—');
   }, 250);
   // Antippen des Kompasses oeffnet die volle Rotorsteuerung (die Zeile
   // darunter), und zwar sichtbar.

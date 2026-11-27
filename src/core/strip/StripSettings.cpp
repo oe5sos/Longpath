@@ -627,33 +627,15 @@ bool removeUserPreset(const QString& name)
 
 QVector<Preset> builtInPresets()
 {
-    return {
-        {QStringLiteral("Clean voice"),
-         QStringLiteral("High-pass, a little compression, nothing else. "
-                        "What a voice should sound like before anyone "
-                        "decides to improve it — and the right place to "
-                        "start from.")},
-        {QStringLiteral("DX — punchy"),
-         QStringLiteral("Harder compression, presence lifted, low end "
-                        "cut further. Costs naturalness and buys "
-                        "intelligibility through noise. For working "
-                        "stations you can barely hear.")},
-        {QStringLiteral("Recommended — speech"),
-         QStringLiteral("What I would set, and why each part is there. "
-                        "Denoise first so the compressor never lifts the "
-                        "room; a gentle gate behind it; a small, honest "
-                        "EQ; 3:1 compression; 12 dB of clipping for the "
-                        "talk power, and a brickwall above it. Every "
-                        "number here was measured, not guessed. Tube, "
-                        "exciter and reverb stay OFF — they colour, and "
-                        "on SSB colour costs bandwidth you do not have. "
-                        "A starting point like any other: adjust from it.")},
-        {QStringLiteral("Ragchew — easy"),
-         QStringLiteral("Gentle throughout, gate as an expander rather "
-                        "than a gate, more low end. For a long contact "
-                        "with a strong signal, where the other operator "
-                        "has to listen to you for an hour.")},
-    };
+    // ── Keine mitgelieferten Profile mehr (2026-11-24) ──────────────
+    //
+    // „lösche bitte dx punchy, speech, easy und clean voice" -- und
+    // sie liessen sich nicht loeschen, weil sie eingebaut waren. Die
+    // Liste zeigt jetzt nur noch, was der Betreiber selbst gespeichert
+    // hat; jedes davon ist loeschbar. applyBuiltIn() bleibt als
+    // Messgrundlage der Pruefstaende (tst_kanalzug_messlauf u.a.),
+    // ist aber von der Oberflaeche aus nicht mehr erreichbar.
+    return {};
 }
 
 bool applyBuiltIn(const QString& name, StripChain& c)
