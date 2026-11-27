@@ -112,6 +112,17 @@ void MainWindow::wireKiwiOwnSignal()
         }
     }
 
+    connect(m_kiwiStrip, &KiwiOwnSignalStrip::soundToggled, this,
+            [this](bool on) {
+        if (!m_kiwiOwnProfileId.isEmpty()) { setKiwiSound(m_kiwiOwnProfileId, on); }
+    });
+    connect(m_kiwiStrip, &KiwiOwnSignalStrip::chooseOtherRequested, this,
+            [this]() { chooseOtherKiwi(); });
+    connect(m_kiwiStrip, &KiwiOwnSignalStrip::zoomRequested, this,
+            [this](int dir) {
+        if (!m_kiwiOwnProfileId.isEmpty()) { zoomKiwiStrip(m_kiwiOwnProfileId, dir); }
+    });
+
     // ── Das Applet ────────────────────────────────────────────────────
     connect(m_kiwiSdrApplet, &KiwiSdrApplet::ownSignalToggled, this,
             [this](bool on) { setKiwiOwnSignal(on); });
@@ -132,6 +143,11 @@ void MainWindow::wireKiwiOwnSignal()
         }
         const double lowHz = lowMhz * 1.0e6;
         const double highHz = highMhz * 1.0e6;
+        m_kiwiStrip->setRowIntervalMs(
+            AppSettings::instance()
+                .value(QStringLiteral("KiwiWaterfall/RowIntervalMs"),
+                       QStringLiteral("250"))
+                .toString().toInt());
         m_kiwiStrip->pushRow(bins, lowHz, highHz);
         m_kiwiHearMe->feedRow(bins, lowHz, highHz, kiwiOwnNowMs());
         const KiwiHearMeMeter::Result r = m_kiwiHearMe->result();
@@ -187,10 +203,18 @@ void MainWindow::wireKiwiOwnSignal()
         }
     });
 
+    // Wo werde ich gehoert: die Mithoerer (MainWindow_KiwiGroup.cpp).
+    wireKiwiGroup();
+
     // Gemerkter Kiwi der letzten Sitzung. Der Modus selbst startet nie
     // von allein: er haengt an einer Verbindung zu einem fremden Server.
     const QString saved = AppSettings::instance().value(kKeyProfile).toString();
     if (!saved.isEmpty() && m_kiwiSdrManager->hasProfile(saved)) {
+        const QString la = AppSettings::instance().value("KiwiOwnSignal/Lat", "").toString();
+        const QString lo = AppSettings::instance().value("KiwiOwnSignal/Lon", "").toString();
+        if (!la.isEmpty() && !lo.isEmpty()) {
+            m_kiwiPositions.insert(saved, QPointF(la.toDouble(), lo.toDouble()));
+        }
         setKiwiOwnSignalProfile(
             saved, AppSettings::instance().value(kKeyKm, "-1").toDouble());
     }
@@ -206,14 +230,19 @@ void MainWindow::setKiwiOwnSignalProfile(const QString& profileId, double km)
     }
     m_kiwiOwnProfileId = profileId;
     m_kiwiOwnKm = km;
+    // Auch im Fenster KIWI WASSERFAELLE, dort stehen +/-, Ton und Bereich.
+    m_kiwiSdrManager->setWaterfallPreviewEnabled(profileId, true);
     AppSettings::instance().setValue(kKeyProfile, profileId);
     AppSettings::instance().setValue(kKeyKm, QString::number(km, 'f', 1));
+    updateKiwiGroupCapacity();
+    refreshKiwiHearingDialog();
     const QString name = m_kiwiSdrManager->displayName(profileId);
     if (m_kiwiStrip) {
         m_kiwiStrip->setKiwiName(name);
         m_kiwiStrip->setDistanceKm(km);
     }
     if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setOwnSignalReceiverName(name); }
+    refreshKiwiSoundButtons();
 }
 
 // "Anderen Kiwi ...": das oeffentliche Verzeichnis, nach Entfernung zum
@@ -222,6 +251,7 @@ void MainWindow::setKiwiOwnSignalProfile(const QString& profileId, double km)
 // dem Sitzungsspeicher) -- kein Hintergrundabruf.
 void MainWindow::chooseOtherKiwi()
 {
+    qCInfo(lcKiwiSdr) << "Anderer Kiwi: Auswahl wird geoeffnet";
     double freqHz = 0.0;
     if (SliceModel* tx = kiwiOwnTxSlice(); tx && m_radioModel) {
         freqHz = double(m_radioModel->transmitFrequencyHz(tx));
@@ -232,16 +262,45 @@ void MainWindow::chooseOtherKiwi()
     const QPointer<KiwiPublicReceiverPicker> guard(picker);
     connect(picker, &QDialog::accepted, this, [this, guard]() {
         if (!guard || !m_kiwiSdrManager) { return; }
-        const QString endpoint = guard->selectedEndpoint();
-        QString name = guard->selectedName();
-        if (name.trimmed().isEmpty()) { name = endpoint; }
-        QString id = m_kiwiSdrManager->profileIdForEndpoint(endpoint);
-        if (id.isEmpty()) { id = m_kiwiSdrManager->addProfile(name, endpoint); }
-        if (id.isEmpty()) { return; }
-        setKiwiOwnSignalProfile(id, guard->selectedKm());
-        setKiwiOwnSignal(true);
+        double lat = 0.0, lon = 0.0;
+        const bool has = guard->selectedLatLon(lat, lon);
+        const QString before = m_kiwiOwnProfileId;
+        const bool beforeLost = !kiwiLostTitle(before).isEmpty();
+        adoptPickedKiwi(guard->selectedEndpoint(), guard->selectedName(),
+                        guard->selectedKm(), has, lat, lon);
+        // Ein ausgefallener Kiwi bleibt nicht als totes Bild im Fenster.
+        if (beforeLost && before != m_kiwiOwnProfileId) { retireKiwi(before); }
     });
     picker->show();
+    picker->raise();
+    picker->activateWindow();
+    qCInfo(lcKiwiSdr) << "Anderer Kiwi: Auswahl sichtbar" << picker->isVisible()
+                      << "Rahmen" << picker->frameGeometry()
+                      << "Fenster" << (picker->windowHandle() != nullptr);
+}
+
+// Der aus dem Verzeichnis gewaehlte Kiwi wird zum Kiwi von "Mein Signal" -- und
+// erscheint ausserdem im Fenster KIWI WASSERFAELLE (Betreiber 2026-11-25: "wenn
+// ich bei anderen Kiwi doppelklick ... erscheint der nicht im eigenen Kiwi-
+// Fenster"): dieses Fenster zeigt nur Kiwis mit eingeschaltetem WF.
+void MainWindow::adoptPickedKiwi(const QString& endpoint, const QString& nameIn,
+                                 double km, bool hasPos, double lat, double lon)
+{
+    if (!m_kiwiSdrManager) { return; }
+    QString name = nameIn;
+    if (name.trimmed().isEmpty()) { name = endpoint; }
+    QString id = m_kiwiSdrManager->profileIdForEndpoint(endpoint);
+    if (id.isEmpty()) { id = m_kiwiSdrManager->addProfile(name, endpoint); }
+    if (id.isEmpty()) { return; }
+    if (hasPos) {
+        m_kiwiPositions.insert(id, QPointF(lat, lon));
+        AppSettings::instance().setValue("KiwiOwnSignal/Lat", QString::number(lat, 'f', 4));
+        AppSettings::instance().setValue("KiwiOwnSignal/Lon", QString::number(lon, 'f', 4));
+    }
+    m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
+    setKiwiOwnSignalProfile(id, km);
+    setKiwiOwnSignal(true);
+    zeigeKiwiFenster(id);
 }
 
 void MainWindow::setKiwiOwnSignal(bool on)
@@ -253,6 +312,7 @@ void MainWindow::setKiwiOwnSignal(bool on)
     }
 
     if (!on) {
+        if (m_kiwiSoloOn) { setKiwiSolo(false); }
         m_kiwiOwnSignalOn = false;
         for (const QMetaObject::Connection& c : m_kiwiOwnConnections) {
             disconnect(c);
@@ -355,13 +415,27 @@ void MainWindow::syncKiwiOwnSignal()
         }
     }
     if (sw) {
-        const double bw = std::clamp(sw->bandwidth(), kMinViewHz, kMaxViewHz);
-        m_kiwiStrip->setView(sw->centerFrequency(), bw);
+        // Ohne eigene Wahl: dieselbe Achse wie der Panadapter. Nach +/- am
+        // Streifen: der gewaehlte Bereich, die Sendefrequenz in der Mitte.
+        double center = sw->centerFrequency();
+        double width = std::clamp(sw->bandwidth(), kMinViewHz, kMaxViewHz);
+        const double chosen = m_kiwiViewSpanHz.value(m_kiwiOwnProfileId, 0.0);
+        SliceModel* src = tx ? tx : kiwiControllableSlice(
+            m_kiwiSdrManager->assignedSliceForProfile(m_kiwiOwnProfileId));
+        if (chosen > 0.0 && src) {
+            quint64 hz = m_radioModel->transmitFrequencyHz(src);
+            if (hz == 0) { hz = quint64(src->frequency()); }
+            if (hz > 0) { center = double(hz); width = chosen; }
+        }
+        m_kiwiStrip->setView(center, width);
         // Die Achse fluchtet mit der Flaeche des Panadapters (ohne dessen
         // dBm-Leiste rechts), nicht mit dem ganzen Fenster.
         if (QWidget* pane = m_kiwiStrip->parentWidget()) {
             const QRect plot = sw->spectrumRect();
-            const int left = sw->mapTo(pane, plot.topLeft()).x();
+            // Ueber Bildschirmkoordinaten: der Panadapter kann ein schwebendes
+            // Fenster sein und ist dann kein Nachkomme von `pane` (mapTo
+            // warnte bei jedem Ziehen, Betreiberlog 2026-11-25).
+            const int left = pane->mapFromGlobal(sw->mapToGlobal(plot.topLeft())).x();
             const int right = pane->width() - (left + plot.width());
             m_kiwiStrip->setPlotMargins(left, right);
         }
@@ -399,10 +473,13 @@ bool MainWindow::sendKiwiOwnSignalTracking()
         src->filterLow(), src->filterHigh(), panId,
         QString(), SliceModel::cwPitchHz());
     // Die Ansicht des Kiwi-Wasserfalls: die Breite des Panadapters (der
-    // Kiwi rundet auf seine Zoomstufen), um die Sendefrequenz.
-    const double bw = sw ? std::clamp(sw->bandwidth(), kMinViewHz, kMaxViewHz)
-                         : 40000.0;
-    const double centerHz = sw ? sw->centerFrequency() : double(txHz);
+    // Kiwi rundet auf seine Zoomstufen) -- oder, nach +/- am Streifen, der
+    // gewaehlte Bereich um die Sendefrequenz.
+    const double chosen = m_kiwiViewSpanHz.value(m_kiwiOwnProfileId, 0.0);
+    const double bw = chosen > 0.0 ? chosen
+        : sw ? std::clamp(sw->bandwidth(), kMinViewHz, kMaxViewHz) : 40000.0;
+    const double centerHz = (chosen > 0.0 || !sw) ? double(txHz)
+                                                  : sw->centerFrequency();
     m_kiwiSdrManager->updateWaterfallView(
         kiwiSlice, panId, centerHz / 1.0e6, bw / 1.0e6,
         m_kiwiSdrManager->profile(m_kiwiOwnProfileId).waterfallRate);

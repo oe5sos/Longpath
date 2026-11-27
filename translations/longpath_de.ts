@@ -2823,9 +2823,61 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <source>  ·  cached — use “Refresh list” to update</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>not reachable</source>
+        <translation>nicht erreichbar</translation>
+    </message>
+    <message>
+        <source>full</source>
+        <translation>voll</translation>
+    </message>
+    <message>
+        <source>partly busy</source>
+        <translation>teilweise besetzt</translation>
+    </message>
+    <message>
+        <source>free</source>
+        <translation>frei</translation>
+    </message>
+    <message>
+        <source>Distance: %1 km</source>
+        <translation>Entfernung: %1 km</translation>
+    </message>
+    <message>
+        <source>Free channels: %1 of %2</source>
+        <translation>Freie Kanäle: %1 von %2</translation>
+    </message>
+    <message>
+        <source>Band: %1 Hz</source>
+        <translation>Bereich: %1 Hz</translation>
+    </message>
+    <message>
+        <source>SNR: %1</source>
+        <translation>SNR: %1</translation>
+    </message>
+    <message>
+        <source>Map</source>
+        <translation>Karte</translation>
+    </message>
+    <message>
+        <source>Show or hide the world map. Drag the bar between map and list to resize.</source>
+        <translation>Weltkarte ein- oder ausblenden. Den Balken zwischen Karte und Liste ziehen, um die Größe zu ändern.</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::KiwiSdrApplet</name>
+    <message>
+        <source>Volume</source>
+        <translation>Lautstärke</translation>
+    </message>
+    <message>
+        <source>Volume of %1</source>
+        <translation>Lautstärke von %1</translation>
+    </message>
+    <message>
+        <source>Volume of this Kiwi only</source>
+        <translation>Lautstärke nur dieses Kiwi</translation>
+    </message>
     <message>
         <source>Hear my signal on the Kiwi</source>
         <translation>Mein Signal am Kiwi hören</translation>
@@ -2907,9 +2959,61 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <source>KiwiSDR receiver details</source>
         <translation>Einzelheiten zum KiwiSDR-Empfaenger</translation>
     </message>
+    <message>
+        <source>Heard …</source>
+        <translation>Gehört …</translation>
+    </message>
+    <message>
+        <source>Where am I heard</source>
+        <translation>Wo werde ich gehört</translation>
+    </message>
+    <message>
+        <source>Up to five Kiwis listen along while you transmit: map, waterfalls and who hears you.</source>
+        <translation>Bis zu fünf Kiwis hören beim Senden mit: Karte, Wasserfälle und wer dich hört.</translation>
+    </message>
+    <message>
+        <source>Solo</source>
+        <translation>Solo</translation>
+    </message>
+    <message>
+        <source>Hear only the Kiwi</source>
+        <translation>Nur den Kiwi hören</translation>
+    </message>
+    <message>
+        <source>Mutes the radio's receive audio in the speakers so you hear only what the Kiwi hears. Switches itself off after 30 seconds.</source>
+        <translation>Schaltet den Empfangston des Funkgeräts im Lautsprecher stumm, damit man nur hört, was der Kiwi hört. Geht nach 30 Sekunden von selbst aus.</translation>
+    </message>
+    <message>
+        <source>Mute radio</source>
+        <translation>Radio stumm</translation>
+    </message>
+    <message>
+        <source>Mute the radio, hear only the Kiwis</source>
+        <translation>Radio stumm, nur die Kiwis hören</translation>
+    </message>
+    <message>
+        <source>Mutes the radio's receive audio (all panadapters) in the speakers so you hear only the Kiwis that have sound on. Playback only; the radio itself is not changed.</source>
+        <translation>Schaltet den Empfangston des Funkgeräts (alle Panadapter) im Lautsprecher stumm, sodass du nur die Kiwis mit Ton hörst. Nur Wiedergabe; das Funkgerät selbst bleibt unverändert.</translation>
+    </message>
+    <message>
+        <source>Sound</source>
+        <translation>Ton</translation>
+    </message>
+    <message>
+        <source>Sound of %1</source>
+        <translation>Ton von %1</translation>
+    </message>
+    <message>
+        <source>Listen to this Kiwi (connects it); off disconnects it unless its waterfall is still on.</source>
+        <translation>Diesen Kiwi hören (verbindet ihn); aus trennt ihn, solange sein Wasserfall nicht mehr an ist.</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::KiwiSdrClient</name>
+    <message>
+        <source>This KiwiSDR allows only %1 programs (not browsers) at once, and they are all taken; it disconnected Longpath after 10 seconds. Choose another receiver.</source>
+        <translation>Dieser KiwiSDR erlaubt nur %1 Programme (keine Browser) gleichzeitig, und alle Plätze sind belegt. Er hat Longpath nach 10 Sekunden getrennt. Wähle einen anderen Empfänger.</translation>
+    </message>
     <message>
         <location filename="../src/core/KiwiSdrClient.cpp" line="451"/>
         <source>The KiwiSDR password is too long after URL encoding (maximum %1 characters).</source>
@@ -3290,6 +3394,26 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <source>No waterfall switched on — switch one on per receiver in the KiwiSDR panel.</source>
         <translation>Kein Wasserfall eingeschaltet — im KiwiSDR-Panel je Empfänger einschalten.</translation>
     </message>
+    <message>
+        <source>All Kiwis:</source>
+        <translation>Alle Kiwis:</translation>
+    </message>
+    <message>
+        <source>Sound on</source>
+        <translation>Ton an</translation>
+    </message>
+    <message>
+        <source>Listen to every Kiwi shown here that is connected</source>
+        <translation>Jeden hier gezeigten, verbundenen Kiwi hören</translation>
+    </message>
+    <message>
+        <source>Sound off</source>
+        <translation>Ton aus</translation>
+    </message>
+    <message>
+        <source>Switch the sound of all these Kiwis off</source>
+        <translation>Den Ton aller dieser Kiwis ausschalten</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::Kpa500Applet</name>
@@ -3440,6 +3564,34 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 </context>
 <context>
     <name>Longpath::MainWindow</name>
+    <message>
+        <source>Disconnected – server limit</source>
+        <translation>Getrennt – Server-Limit</translation>
+    </message>
+    <message>
+        <source>Disconnected – receiver full</source>
+        <translation>Getrennt – Empfänger voll</translation>
+    </message>
+    <message>
+        <source>Disconnected – connection error</source>
+        <translation>Getrennt – Verbindungsfehler</translation>
+    </message>
+    <message>
+        <source>Choose another Kiwi</source>
+        <translation>Anderen Kiwi wählen</translation>
+    </message>
+    <message>
+        <source>Disconnects programs after 10 s when its program slots are full.</source>
+        <translation>Trennt Programme nach 10 s, wenn seine Programm-Plätze voll sind.</translation>
+    </message>
+    <message>
+        <source>This Kiwi has no free waterfall channel — nothing to show. Choose another Kiwi.</source>
+        <translation>Dieser Kiwi hat keinen freien Wasserfall-Kanal — hier gibt es nichts zu zeigen. Wähle einen anderen Kiwi.</translation>
+    </message>
+    <message>
+        <source>This Kiwi has no free waterfall channel — sound only.</source>
+        <translation>Dieser Kiwi hat keinen freien Wasserfall-Kanal — nur Ton.</translation>
+    </message>
     <message>
         <source>My Signal: no slice free for the Kiwi.</source>
         <translation>Mein Signal: keine Scheibe frei für den Kiwi.</translation>
@@ -4129,6 +4281,86 @@ Die Beschreibung des Herstellers dokumentiert nur einen Typcode, darum wird die 
     <message>
         <source>Rotator/log and applets in one area along the right edge, switched by a toolbar; clicking the active icon folds it away.</source>
         <translation>Rotor/Log und Applets in einem Bereich am rechten Rand, umschaltbar über eine Symbolleiste; Klick auf das aktive Symbol klappt ihn zu.</translation>
+    </message>
+    <message>
+        <source>Only five Kiwis at once: the last listener was closed.</source>
+        <translation>Nur fünf Kiwis gleichzeitig: der letzte Mithörer wurde geschlossen.</translation>
+    </message>
+    <message>
+        <source>All five places are taken.</source>
+        <translation>Alle fünf Plätze sind belegt.</translation>
+    </message>
+    <message>
+        <source>Add a Kiwi that listens along</source>
+        <translation>Einen Kiwi hinzufügen, der mithört</translation>
+    </message>
+    <message>
+        <source>That Kiwi is already the one of My Signal.</source>
+        <translation>Das ist schon der Kiwi von „Mein Signal“.</translation>
+    </message>
+    <message>
+        <source>That Kiwi already feeds a slice.</source>
+        <translation>Dieser Kiwi speist schon eine Scheibe.</translation>
+    </message>
+    <message>
+        <source>connected</source>
+        <translation>verbunden</translation>
+    </message>
+    <message>
+        <source>connecting …</source>
+        <translation>verbindet …</translation>
+    </message>
+    <message>
+        <source>busy</source>
+        <translation>belegt</translation>
+    </message>
+    <message>
+        <source>waiting</source>
+        <translation>wartet</translation>
+    </message>
+    <message>
+        <source>error</source>
+        <translation>Fehler</translation>
+    </message>
+    <message>
+        <source>not connected</source>
+        <translation>nicht verbunden</translation>
+    </message>
+    <message>
+        <source>Solo needs &quot;My Signal&quot; with a Kiwi switched on.</source>
+        <translation>Solo braucht „Mein Signal“ mit eingeschaltetem Kiwi.</translation>
+    </message>
+    <message>
+        <source>Solo off: the Kiwi stopped delivering audio.</source>
+        <translation>Solo aus: der Kiwi liefert keinen Ton mehr.</translation>
+    </message>
+    <message>
+        <source>Solo needs a connected Kiwi — this one is not delivering audio.</source>
+        <translation>Solo braucht einen verbundenen Kiwi — dieser liefert keinen Ton.</translation>
+    </message>
+    <message>
+        <source>Rename Kiwi</source>
+        <translation>Kiwi umbenennen</translation>
+    </message>
+    <message>
+        <source>Name:</source>
+        <translation>Name:</translation>
+    </message>
+    <message>
+        <source>No slice could be created for this Kiwi.</source>
+        <translation>Für diesen Kiwi ließ sich keine Scheibe anlegen.</translation>
+    </message>
+    <message>
+        <source>This Kiwi carries My Signal — switch that off there.</source>
+        <translation>Dieser Kiwi trägt „Mein Signal“ — dort ausschalten.</translation>
+    </message>
+    <message>
+        <source>Switch a Kiwi's sound on first — otherwise nothing would be heard.</source>
+        <translation>Erst den Ton eines Kiwi einschalten — sonst wäre nichts zu hören.</translation>
+    </message>
+    <message>
+        <source>Radio unmuted: no Kiwi is playing any more.</source>
+        <translation>Radio wieder an: kein Kiwi spielt mehr.</translation>
     </message>
 </context>
 <context>
@@ -5302,6 +5534,14 @@ All custom band/pin mappings will be cleared.</source>
 </context>
 <context>
     <name>Longpath::PanadapterApplet</name>
+    <message>
+        <source>Radio sound on / off (playback only)</source>
+        <translation>Ton des Funkgeräts ein / aus (nur Wiedergabe)</translation>
+    </message>
+    <message>
+        <source>Sound</source>
+        <translation>Ton</translation>
+    </message>
     <message>
         <location filename="../src/gui/PanadapterApplet.cpp" line="507"/>
         <source>Add slice on this pan</source>
@@ -8164,6 +8404,34 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
 <context>
     <name>Longpath::KiwiOwnSignalStrip</name>
     <message>
+        <source>Sound</source>
+        <translation>Ton</translation>
+    </message>
+    <message>
+        <source>Listen to this Kiwi (audio on / off)</source>
+        <translation>Diesen Kiwi hören (Ton an / aus)</translation>
+    </message>
+    <message>
+        <source>Kiwi sound</source>
+        <translation>Kiwi-Ton</translation>
+    </message>
+    <message>
+        <source>Show a wider frequency range</source>
+        <translation>Größeren Frequenzbereich zeigen</translation>
+    </message>
+    <message>
+        <source>Zoom out</source>
+        <translation>Verkleinern</translation>
+    </message>
+    <message>
+        <source>Show a narrower frequency range</source>
+        <translation>Kleineren Frequenzbereich zeigen</translation>
+    </message>
+    <message>
+        <source>Zoom in</source>
+        <translation>Vergrößern</translation>
+    </message>
+    <message>
         <source>hears me · %1</source>
         <translation>hört mich · %1</translation>
     </message>
@@ -8209,6 +8477,214 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
     <message>
         <source>Limit of two hours reached.</source>
         <translation>Obergrenze von zwei Stunden erreicht.</translation>
+    </message>
+</context>
+<context>
+    <name>Longpath::KiwiHearingDialog</name>
+    <message>
+        <source>waiting for a transmission</source>
+        <translation>wartet auf eine Sendung</translation>
+    </message>
+    <message>
+        <source>unknown</source>
+        <translation>unbekannt</translation>
+    </message>
+    <message>
+        <source>weak  %1</source>
+        <translation>schwach  %1</translation>
+    </message>
+    <message>
+        <source>hears me  %1</source>
+        <translation>hört mich  %1</translation>
+    </message>
+    <message>
+        <source>hears nothing</source>
+        <translation>hört nichts</translation>
+    </message>
+    <message>
+        <source>Where am I heard</source>
+        <translation>Wo werde ich gehört</translation>
+    </message>
+    <message>
+        <source>Zoom to my Kiwis</source>
+        <translation>Auf meine Kiwis zoomen</translation>
+    </message>
+    <message>
+        <source>Add Kiwi …</source>
+        <translation>Kiwi hinzufügen …</translation>
+    </message>
+    <message>
+        <source>Kiwi</source>
+        <translation>Kiwi</translation>
+    </message>
+    <message>
+        <source>Distance</source>
+        <translation>Entfernung</translation>
+    </message>
+    <message>
+        <source>Level</source>
+        <translation>Pegel</translation>
+    </message>
+    <message>
+        <source>Verdict</source>
+        <translation>Urteil</translation>
+    </message>
+    <message>
+        <source>Delay</source>
+        <translation>Verzug</translation>
+    </message>
+    <message>
+        <source>Rec</source>
+        <translation>Aufn.</translation>
+    </message>
+    <message>
+        <source>Where I am heard, per Kiwi</source>
+        <translation>Wo ich gehört werde, je Kiwi</translation>
+    </message>
+    <message>
+        <source>Open another Kiwi to listen along (%1 of %2 places free).</source>
+        <translation>Einen weiteren Kiwi mithören lassen (%1 von %2 Plätzen frei).</translation>
+    </message>
+    <message>
+        <source>All %1 places are taken. Close one to add another.</source>
+        <translation>Alle %1 Plätze sind belegt. Erst einen schließen.</translation>
+    </message>
+    <message>
+        <source>Record</source>
+        <translation>Aufnehmen</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Schließen</translation>
+    </message>
+    <message>
+        <source>%1 km</source>
+        <translation>%1 km</translation>
+    </message>
+    <message>
+        <source>delay %1 s</source>
+        <translation>Verzug %1 s</translation>
+    </message>
+    <message>
+        <source>Disconnect this Kiwi.</source>
+        <translation>Diesen Kiwi trennen.</translation>
+    </message>
+    <message>
+        <source>%1 s</source>
+        <translation>%1 s</translation>
+    </message>
+    <message>
+        <source>No Kiwi listening along yet — add one.</source>
+        <translation>Noch kein Kiwi hört mit — einen hinzufügen.</translation>
+    </message>
+    <message>
+        <source>%1 Kiwis listening along. Transmit to see who hears you.</source>
+        <translation>%1 Kiwis hören mit. Senden, um zu sehen, wer dich hört.</translation>
+    </message>
+    <message>
+        <source>%1 of %2 hear me</source>
+        <translation>%1 von %2 hören mich</translation>
+    </message>
+    <message>
+        <source> · farthest: %1 km</source>
+        <translation> · am weitesten: %1 km</translation>
+    </message>
+</context>
+<context>
+    <name>Longpath::KiwiWorldMap</name>
+    <message>
+        <source>World map of KiwiSDR receivers</source>
+        <translation>Weltkarte der KiwiSDR-Empfänger</translation>
+    </message>
+    <message>
+        <source>Shows where public KiwiSDR receivers are and whether they are free, partly busy, full or not reachable. Hover a dot for details, click it to select the receiver.</source>
+        <translation>Zeigt, wo öffentliche KiwiSDR-Empfänger stehen und ob sie frei, teilweise besetzt, voll oder nicht erreichbar sind. Über einen Punkt fahren für Einzelheiten, anklicken zum Auswählen.</translation>
+    </message>
+</context>
+<context>
+    <name>Longpath::KiwiWaterfallStripWidget</name>
+    <message>
+        <source>Enlarge this waterfall to the whole window (click again to go back)</source>
+        <translation>Dieses Diagramm auf das ganze Fenster vergrößern (nochmal klicken: zurück)</translation>
+    </message>
+    <message>
+        <source>Enlarge waterfall</source>
+        <translation>Diagramm vergrößern</translation>
+    </message>
+    <message>
+        <source>Remove this waterfall and disconnect the Kiwi</source>
+        <translation>Diesen Wasserfall entfernen und den Kiwi trennen</translation>
+    </message>
+    <message>
+        <source>Remove waterfall</source>
+        <translation>Wasserfall entfernen</translation>
+    </message>
+    <message>
+        <source>Rename …</source>
+        <translation>Umbenennen …</translation>
+    </message>
+    <message>
+        <source>Level range: automatic</source>
+        <translation>Pegelbereich: automatisch</translation>
+    </message>
+    <message>
+        <source>Quiet band (−130 … −80 dBm)</source>
+        <translation>Ruhiges Band (−130 … −80 dBm)</translation>
+    </message>
+    <message>
+        <source>Normal (−130 … −40 dBm)</source>
+        <translation>Normal (−130 … −40 dBm)</translation>
+    </message>
+    <message>
+        <source>Strong signals (−110 … −20 dBm)</source>
+        <translation>Starke Signale (−110 … −20 dBm)</translation>
+    </message>
+    <message>
+        <source>Speed: slow (1 line/s)</source>
+        <translation>Geschwindigkeit: langsam (1 Zeile/s)</translation>
+    </message>
+    <message>
+        <source>Speed: normal (4 lines/s)</source>
+        <translation>Geschwindigkeit: normal (4 Zeilen/s)</translation>
+    </message>
+    <message>
+        <source>Speed: fast (every line)</source>
+        <translation>Geschwindigkeit: schnell (jede Zeile)</translation>
+    </message>
+    <message>
+        <source>Sound</source>
+        <translation>Ton</translation>
+    </message>
+    <message>
+        <source>Listen to this Kiwi (audio on / off)</source>
+        <translation>Diesen Kiwi hören (Ton an / aus)</translation>
+    </message>
+    <message>
+        <source>Kiwi sound</source>
+        <translation>Kiwi-Ton</translation>
+    </message>
+    <message>
+        <source>Show a wider frequency range</source>
+        <translation>Größeren Frequenzbereich zeigen</translation>
+    </message>
+    <message>
+        <source>Zoom out</source>
+        <translation>Verkleinern</translation>
+    </message>
+    <message>
+        <source>Show a narrower frequency range</source>
+        <translation>Kleineren Frequenzbereich zeigen</translation>
+    </message>
+    <message>
+        <source>Zoom in</source>
+        <translation>Vergrößern</translation>
+    </message>
+</context>
+<context>
+    <name>Longpath::KiwiLostOverlay</name>
+    <message>
+        <source>Choose another Kiwi</source>
+        <translation>Anderen Kiwi wählen</translation>
     </message>
 </context>
 </TS>

@@ -1481,6 +1481,7 @@ void MainWindow::wireFlex()
         for (int i = 0; i < roh.size(); ++i) {
             intensitaet[i] = FlexVita::tileColourValue(roh[i]);
         }
+        sw->setForeignRowThrottle(true);
         sw->zeigeFremdeWasserfallzeile(intensitaet, lowFreqMhz * 1.0e6,
                                        highFreqMhz * 1.0e6);
 

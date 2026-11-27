@@ -8,8 +8,13 @@
 
 #include "gui/StyleConstants.h"
 #include "gui/Zahlentext.h"
+#include "gui/widgets/KiwiLostOverlay.h"
 
+#include <QDateTime>
 #include <QPainter>
+#include <QSignalBlocker>
+#include <QResizeEvent>
+#include <QToolButton>
 #include <QPaintEvent>
 #include <QPolygon>
 
@@ -60,6 +65,43 @@ double niceStepHz(double spanHz)
 
 KiwiOwnSignalStrip::KiwiOwnSignalStrip(QWidget* parent) : QWidget(parent)
 {
+    const QString btnStyle = QStringLiteral(
+        "QToolButton { color: %1; background: transparent; border: 1px solid %2; "
+        "border-radius: 6px; padding: 0 8px; font-size: 9px; }"
+        "QToolButton:hover { color: %3; }"
+        "QToolButton:checked { color: %3; border-color: %4; }")
+        .arg(QString::fromLatin1(Style::kTextSecondary),
+             QString::fromLatin1(Style::kBorderMuted),
+             QString::fromLatin1(Style::kTextPrimary),
+             QString::fromLatin1(Style::kBlueBorder));
+    m_zoomOut = new QToolButton(this);
+    m_zoomOut->setText(QStringLiteral("\u2212"));
+    m_zoomOut->setToolTip(tr("Show a wider frequency range"));
+    m_zoomOut->setAccessibleName(tr("Zoom out"));
+    m_zoomOut->setFixedSize(22, 18);
+    m_zoomOut->setStyleSheet(btnStyle);
+    connect(m_zoomOut, &QToolButton::clicked, this, [this]() { emit zoomRequested(-1); });
+    m_zoomIn = new QToolButton(this);
+    m_zoomIn->setText(QStringLiteral("+"));
+    m_zoomIn->setToolTip(tr("Show a narrower frequency range"));
+    m_zoomIn->setAccessibleName(tr("Zoom in"));
+    m_zoomIn->setFixedSize(22, 18);
+    m_zoomIn->setStyleSheet(btnStyle);
+    connect(m_zoomIn, &QToolButton::clicked, this, [this]() { emit zoomRequested(+1); });
+    m_soundButton = new QToolButton(this);
+    m_soundButton->setText(tr("Sound"));
+    m_soundButton->setCheckable(true);
+    m_soundButton->setCursor(Qt::PointingHandCursor);
+    m_soundButton->setToolTip(tr("Listen to this Kiwi (audio on / off)"));
+    m_soundButton->setAccessibleName(tr("Kiwi sound"));
+    m_soundButton->setFixedHeight(18);
+    m_soundButton->setStyleSheet(btnStyle);
+    connect(m_soundButton, &QToolButton::toggled, this, [this](bool on) { emit soundToggled(on); });
+    m_lost = new KiwiLostOverlay(this);
+    connect(m_lost, &KiwiLostOverlay::chooseRequested, this,
+            &KiwiOwnSignalStrip::chooseOtherRequested);
+    layoutButtons();
+
     setObjectName(QStringLiteral("kiwiOwnSignalStrip"));
     setAttribute(Qt::WA_OpaquePaintEvent, true);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -102,6 +144,8 @@ void KiwiOwnSignalStrip::setPlotMargins(int left, int right)
 {
     m_marginLeft = std::max(0, left);
     m_marginRight = std::max(0, right);
+    m_lost->setGeometry(bodyRect());
+    layoutButtons();
     update();
 }
 
@@ -109,6 +153,11 @@ void KiwiOwnSignalStrip::pushRow(const QVector<float>& binsDbm, double lowHz,
                                  double highHz)
 {
     if (binsDbm.size() < 2 || highHz <= lowHz) { return; }
+    if (m_rowIntervalMs > 0) {
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        if (now - m_lastRowMs < m_rowIntervalMs - 5) { return; }
+        m_lastRowMs = now;
+    }
     Row r;
     r.bins = binsDbm;
     r.lowHz = lowHz;
@@ -273,6 +322,43 @@ QImage KiwiOwnSignalStrip::waterfallImage(int width) const
     return img;
 }
 
+int KiwiOwnSignalStrip::buttonsWidth() const
+{
+    return m_soundButton->sizeHint().width() + 2 * 22 + 3 * 4 + 8;
+}
+
+void KiwiOwnSignalStrip::layoutButtons()
+{
+    const int y = (kHeaderH - 2 - 18) / 2;
+    int x = width() - m_marginRight - 8;
+    x -= m_zoomIn->width();   m_zoomIn->move(x, y);
+    x -= 4 + m_zoomOut->width(); m_zoomOut->move(x, y);
+    x -= 4 + m_soundButton->sizeHint().width();
+    m_soundButton->move(x, y);
+}
+
+void KiwiOwnSignalStrip::resizeEvent(QResizeEvent* e)
+{
+    QWidget::resizeEvent(e);
+    layoutButtons();
+    m_lost->setGeometry(bodyRect());
+}
+
+void KiwiOwnSignalStrip::setLost(const QString& title, const QString& detail)
+{
+    m_lost->setGeometry(bodyRect());
+    m_lost->setLost(title, detail);
+}
+
+void KiwiOwnSignalStrip::setSoundActive(bool on)
+{
+    if (m_soundButton->isChecked() == on) { return; }
+    const QSignalBlocker block(m_soundButton);
+    m_soundButton->setChecked(on);
+}
+
+bool KiwiOwnSignalStrip::soundActiveForTest() const { return m_soundButton->isChecked(); }
+
 void KiwiOwnSignalStrip::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
@@ -287,14 +373,14 @@ void KiwiOwnSignalStrip::paintEvent(QPaintEvent*)
     p.setFont(Style::monoFont(font(), 11, QFont::DemiBold));
     p.setPen(ink());
     const QString status = statusText();
-    const int statusW = p.fontMetrics().horizontalAdvance(status) + 24;
+    const int statusW = p.fontMetrics().horizontalAdvance(status) + 24 + buttonsWidth();
     p.drawText(head.adjusted(14, 0, -statusW, 0),
                Qt::AlignVCenter | Qt::AlignLeft | Qt::TextSingleLine,
                p.fontMetrics().elidedText(headerText(), Qt::ElideRight,
                                           head.width() - statusW - 14));
     p.setFont(Style::monoFont(font(), 11, QFont::Normal));
     p.setPen(statusColor());
-    p.drawText(head.adjusted(0, 0, -12, 0), Qt::AlignVCenter | Qt::AlignRight,
+    p.drawText(head.adjusted(0, 0, -12 - buttonsWidth(), 0), Qt::AlignVCenter | Qt::AlignRight,
                status);
 
     // ── Wasserfall ─────────────────────────────────────────────────────

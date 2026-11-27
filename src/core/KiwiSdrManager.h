@@ -133,6 +133,7 @@ public:
     bool isConnected(const QString& id) const;
     bool reconnectRecommended(const QString& id) const;
     bool waterfallPreviewEnabled(const QString& id) const;
+    bool isProfileListener(const QString& id) const { return m_listeners.contains(id); }
 
     QString assignedProfileForSlice(int sliceId) const;
     int assignedSliceForProfile(const QString& id) const;
@@ -184,6 +185,19 @@ public slots:
     // the connection (shouldMaintainProfileConnection) — a profile that is
     // also assigned to a slice, or has autoConnect set, stays connected.
     void setWaterfallPreviewEnabled(const QString& id, bool enabled);
+
+    // ── Mithoerer (Longpath 2026-11-25, "Wo werde ich gehoert") ───────
+    //
+    // Ein Mithoerer ist ein Kiwi, der verbunden bleibt, ohne einer Scheibe
+    // zugeordnet zu sein: nur Wasserfall (und, auf Wunsch, ein Mitschnitt),
+    // KEIN Ton in der Mischung. Er beruehrt darum nie eine Scheibe und
+    // kann die Sicherheitsschranke (kiwiControllableSlice) nicht beruehren.
+    // Wird nicht gespeichert: nach einem Neustart ist keiner verbunden.
+    // Frequenz und Ansicht gibt man ihm mit primeProfileTracking().
+    void setProfileListener(const QString& id, bool enabled);
+    // Dekodiert den Ton fuer einen Mitschnitt (decodedAudioReady), ohne ihn
+    // in eine Scheibe zu fuehren. Nur sinnvoll, solange id Mithoerer ist.
+    void setListenerRecording(const QString& id, bool enabled);
 
 signals:
     void profilesChanged();
@@ -272,6 +286,7 @@ private:
     QSet<QString> m_loadedProfilePasswords;
     QSet<QString> m_loadingProfilePasswords;
     QSet<QString> m_pendingPasswordConnects;
+    QSet<QString> m_listeners;
     std::shared_ptr<IKiwiSdrCredentialStore> m_credentialStore;
     QString m_operatorCallsign;
     QThread* m_clientThread{nullptr};

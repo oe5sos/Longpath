@@ -205,6 +205,12 @@ public:
     // that again on every transition.
     void setSliceOpportunistic(int sliceId, bool opportunistic);
 
+    // Eine Quelle ueber das Internet (KiwiSDR) liefert ihren Ton in Schueben mit
+    // Luecken von 0,5..1 s; der Standard-Polster (max. ~43 ms) war dafuer zu klein
+    // und der Ton knackte (Betreiber 2026-11-25). Je Scheibe: Startpolster und
+    // Obergrenze in Frames. Nur fuer opportunistische Scheiben.
+    void setSliceCushion(int sliceId, int startFrames, int maxFrames);
+
 
     // Audio thread: queue a slice's stereo block. samples is interleaved
     // L/R float32, frames = sample pairs. Enrols the slice as a barrier
@@ -287,6 +293,9 @@ private:
     // drain block before it becomes audible (see SliceState::primed /
     // cushion). Four monitor blocks ≈ 5 ms — the clean-LAN latency.
     static constexpr int kOpportunisticPrimeMarginFrames = 256;
+    // Ohne Taktquelle: wie viele Zuege eine "nebenher"-Quelle ohne neue Daten
+    // noch als lebend gilt und den Takt vorgeben kann.
+    static constexpr int kPacerLiveDrains = 24;
 
     // Upper bound for the adaptive cushion: ~43 ms. Reached only on
     // links whose jitter actually demanded every doubling step; the
@@ -402,6 +411,11 @@ private:
         // the link's observed jitter demanded it, and stays.
         bool primed{false};
         int  cushion{0};
+        // Zuege seit der letzten Lieferung (nur Audio-Thread). Wer lange
+        // nichts geliefert hat, taugt nicht als Taktgeber (siehe tryDrain).
+        int  idleDrains{1000000};
+        std::atomic<int> cushionStart{0};   // 0 = kOpportunisticPrimeMarginFrames
+        std::atomic<int> cushionMax{kOpportunisticCushionMaxFrames};
         // One-shot: this drain plays the slot's residue with gain
         // target 0 (fade-out) because it just starved. Audio-thread
         // only, consumed where the gain targets are computed.

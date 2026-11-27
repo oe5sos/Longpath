@@ -14,6 +14,7 @@
 #include <QVector>
 
 class QLabel;
+class QPushButton;
 class QVBoxLayout;
 
 namespace Longpath {
@@ -31,17 +32,38 @@ class KiwiWaterfallPanel : public AppletWidget {
 
 public:
     explicit KiwiWaterfallPanel(RadioModel* model, QWidget* parent = nullptr);
+    bool isEmptyForTest() const { return m_strips.isEmpty(); }
+    QSize sizeHint() const override { return QSize(560, 460); }
+    // Untergrenze fuer die gemerkte Fenstergroesse: ein leeres Fenster
+    // schrumpfte frueher auf 125 x 93 und blieb so, unsichtbar klein.
+    QSize minimumSizeHint() const override { return QSize(420, 300); }
 
     QString appletId()    const override { return QStringLiteral("kiwiWaterfalls"); }
     QString appletTitle() const override { return tr("KIWI WATERFALLS"); }
     // Der Inhalt kommt vom KiwiSdrManager, nicht aus dem RadioModel.
     void syncFromModel() override {}
 
+signals:
+    void emptyChanged(bool empty);   ///< ohne Streifen: das Fenster wird nicht gebraucht
+    // Wuensche der Streifen, weitergereicht (das Panel entscheidet nichts).
+    void removeRequested(const QString& profileId);
+    void renameRequested(const QString& profileId);
+    void soundToggled(const QString& profileId, bool on);
+    void zoomRequested(const QString& profileId, int direction);
+    void chooseOtherRequested(const QString& profileId);
+
+public:
+    KiwiWaterfallStripWidget* stripForTest(const QString& id) const { return m_strips.value(id, nullptr); }
+
 public slots:
     void setStripEnabled(const QString& profileId, bool enabled,
                          const QString& displayName);
-    void pushRow(const QString& profileId, const QVector<float>& binsDbm);
+    void pushRow(const QString& profileId, const QVector<float>& binsDbm,
+                 double lowHz = 0.0, double highHz = 0.0);
     void resetStrip(const QString& profileId);
+    void setNotice(const QString& profileId, const QString& text);
+    void setLost(const QString& profileId, const QString& title, const QString& detail);
+    void setSoundActive(const QString& profileId, bool on);
 
 private:
     void updateEmptyState();
@@ -49,6 +71,9 @@ private:
     QLabel* m_emptyLabel{nullptr};
     QVBoxLayout* m_stripsLayout{nullptr};
     QHash<QString, KiwiWaterfallStripWidget*> m_strips;
+private:
+    bool m_wasEmpty{true};
+    QString m_expandedId;
 };
 
 } // namespace Longpath

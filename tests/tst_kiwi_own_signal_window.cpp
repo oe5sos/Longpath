@@ -19,6 +19,7 @@
 #include <QPushButton>
 #include <QScopeGuard>
 #include <QSignalSpy>
+#include <QToolButton>
 
 #include "core/AppSettings.h"
 #include "core/AudioEngine.h"
@@ -191,6 +192,8 @@ private slots:
         QCOMPARE(strip->statusText(), QStringLiteral("unknown"));
 
         // Der Kiwi liefert Zeilen, auf der Marke steht ein Buckel.
+        AppSettings::instance().setValue(
+            QStringLiteral("KiwiWaterfall/RowIntervalMs"), QStringLiteral("0"));
         for (int i = 0; i < 40; ++i) {
             emit mgr->waterfallRowReady(pid, QStringLiteral("p"), bins(25.0),
                                         14.185, 14.225, quint32(i));
@@ -222,6 +225,48 @@ private slots:
                     << strip->isVisible() << "Spalte" << strip->parentWidget()->size();
         }
         model->transmitModel().setMox(false);
+    }
+
+    // Betreiber 2026-11-25: "unter dem Panadapter ist der Kiwi schoen, aber dort
+    // kann ich nichts aendern" -- der Streifen hat Ton und Zoom im Kopf.
+    void derStreifenHatTonUndZoom()
+    {
+        KiwiOwnSignalStrip strip;
+        strip.resize(600, 176);
+        strip.show();   // erst sichtbar bekommt es die Groessenmeldung
+        QToolButton* ton = strip.soundButtonForTest();
+        QVERIFY(ton);
+        QSignalSpy tonSpy(&strip, &KiwiOwnSignalStrip::soundToggled);
+        QSignalSpy zoomSpy(&strip, &KiwiOwnSignalStrip::zoomRequested);
+        QTest::mouseClick(ton, Qt::LeftButton);
+        QCOMPARE(tonSpy.count(), 1);
+        QVERIFY(tonSpy.at(0).at(0).toBool());
+        QVERIFY(strip.soundActiveForTest());
+        // Von aussen gesetzt: kein Echo.
+        strip.setSoundActive(false);
+        QCOMPARE(tonSpy.count(), 1);
+        const auto buttons = strip.findChildren<QToolButton*>();
+        QCOMPARE(buttons.size(), 3);
+        for (QToolButton* b : buttons) {
+            QVERIFY(b->geometry().right() <= strip.width());
+            QVERIFY(b->geometry().bottom() < 26);   // im Kopf
+        }
+        Q_UNUSED(zoomSpy);
+    }
+
+    // Betreiber 2026-11-25: "alle Wasserfaelle laufen zu schnell".
+    void derStreifenHaeltDasEingestellteTempo()
+    {
+        KiwiOwnSignalStrip strip;
+        strip.setRowIntervalMs(250);
+        const QVector<float> row(256, -100.0f);
+        for (int i = 0; i < 20; ++i) {
+            strip.pushRow(row, 14.19e6, 14.21e6);
+        }
+        QCOMPARE(strip.rowCount(), 1);
+        QTest::qWait(300);
+        strip.pushRow(row, 14.19e6, 14.21e6);
+        QCOMPARE(strip.rowCount(), 2);
     }
 
     void aufnahmeErzeugtEineDatei()

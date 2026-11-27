@@ -7517,6 +7517,14 @@ void SpectrumWidget::zeigeFremdeWasserfallzeile(const QVector<float>& intensitae
     // Betreiber darf zoomen.
     const int breite = m_waterfall.width();
     if (breite <= 0) { return; }
+    // Das eingestellte Tempo gilt auch hier (Betreiber 2026-11-25: "alle
+    // Wasserfaelle laufen zu schnell"): sonst liefe der Flex-Wasserfall mit
+    // jeder Kachel, und die Zeitskala daneben (Zeilenabstand) stimmte nicht.
+    if (m_fremdeZeilenGebremst
+        && jetzt - m_fremdeZeileGeschriebenMs < m_wfUpdatePeriodMs - 5) {
+        return;
+    }
+    m_fremdeZeileGeschriebenMs = jetzt;
     const int h = m_waterfall.height();
     m_wfWriteRow = (m_wfWriteRow - 1 + h) % h;
 #ifdef LONGPATH_GPU_SPECTRUM

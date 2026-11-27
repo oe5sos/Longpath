@@ -140,6 +140,7 @@
 #include "core/audio/PipeWireThreadLoop.h"
 #endif
 
+#include <cmath>
 #include <portaudio.h>
 
 #include <QDateTime>
@@ -1547,10 +1548,16 @@ void AudioEngine::rxBlockReady(int sliceId, const float* samples, int frames)
     // Muted at the accumulate rather than at the push, so the monitor —
     // which is a different slot in the same mix — still reaches the
     // speakers. See setRxMutedForMonitor().
+    const int solo = m_soloSliceId.load(std::memory_order_acquire);
+    const bool nonKiwiMuted = m_muteNonKiwi.load(std::memory_order_acquire)
+        && !(sliceId >= 0 && sliceId < 64
+             && (m_kiwiSliceMask.load(std::memory_order_acquire) >> sliceId) & 1u);
     m_masterMix.accumulate(sliceId, samples, frames,
                            slice->muted()
                                || m_rxMutedForMonitor.load(
-                                      std::memory_order_acquire));
+                                      std::memory_order_acquire)
+                               || (solo >= 0 && sliceId != solo)
+                               || nonKiwiMuted);
 
     // Anti-VOX hears exactly what the speakers hear. From Thetis
     // cmaster.c:370-372 [v2.10.3.15], every sub-receiver's audio is handed
@@ -2414,6 +2421,9 @@ void AudioEngine::setKiwiSdrAudioSourceEnabled(int sliceId, bool enabled)
 {
     if (enabled) {
         if (m_kiwiEnabledSlices.insert(sliceId).second) {
+            if (sliceId >= 0 && sliceId < 64) {
+                m_kiwiSliceMask.fetch_or(quint64(1) << sliceId, std::memory_order_acq_rel);
+            }
             // Opportunistisch: die Scheibe wird eingemischt, wann immer
             // sie Ton hat, ist aber KEIN Mitglied der Bereitschafts-
             // schranke. Ohne das wuerde ein Netzaussetzer beim KiwiSDR
@@ -2421,12 +2431,17 @@ void AudioEngine::setKiwiSdrAudioSourceEnabled(int sliceId, bool enabled)
             // stumm schalten, das damit nichts zu tun hat.
             m_masterMix.setSliceOpportunistic(sliceId, true);
             m_antiVoxMix.setSliceOpportunistic(sliceId, true);
+            // Internet-Ton kommt in Schueben: 0,17 s Startpolster, bis 1,2 s.
+            m_masterMix.setSliceCushion(sliceId, 8192, 57600);
             qCInfo(lcAudio) << "KiwiSDR-Ton eingeschaltet fuer Scheibe"
                             << sliceId << "(opportunistisch im Mix)";
         }
         return;
     }
     if (m_kiwiEnabledSlices.erase(sliceId) > 0) {
+        if (sliceId >= 0 && sliceId < 64) {
+            m_kiwiSliceMask.fetch_and(~(quint64(1) << sliceId), std::memory_order_acq_rel);
+        }
         m_masterMix.setSliceOpportunistic(sliceId, false);
         m_antiVoxMix.setSliceOpportunistic(sliceId, false);
         qCInfo(lcAudio) << "KiwiSDR-Ton abgeschaltet fuer Scheibe" << sliceId;
@@ -2448,7 +2463,8 @@ void AudioEngine::removeKiwiSdrAudioSource(int sliceId)
 }
 
 void AudioEngine::feedKiwiSdrAudioData(int sliceId,
-                                       const QByteArray& pcm24kStereoFloat)
+                                       const QByteArray& pcm24kStereoFloat,
+                                       float gain)
 {
     if (!kiwiSdrAudioEnabled(sliceId)) {
         return;
@@ -2477,6 +2493,21 @@ void AudioEngine::feedKiwiSdrAudioData(int sliceId,
     // Derselbe Rauschzweig wie beim Flex-Ton (2026-10-28): fremde
     // Demodulation, also kein WDSP, also hier.
     wendeFremdtonRauschenAn(sliceId, out);
+    if (gain != 1.0f) {
+        // Lautstaerke je Kiwi. Der Mischer kann nur leiser (Gain 0..1), und
+        // ein leiser Kiwi braucht mehr: oberhalb 0,8 weich begrenzt.
+        constexpr float kKnee = 0.8f;
+        auto* s = reinterpret_cast<float*>(out.data());
+        for (int i = 0; i < outFrames * 2; ++i) {
+            float v = s[i] * gain;
+            const float a = std::fabs(v);
+            if (a > kKnee) {
+                v = std::copysign(
+                    kKnee + (1.0f - kKnee) * std::tanh((a - kKnee) / (1.0f - kKnee)), v);
+            }
+            s[i] = v;
+        }
+    }
     rxBlockReady(sliceId,
                  reinterpret_cast<const float*>(out.constData()),
                  outFrames);

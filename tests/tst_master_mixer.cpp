@@ -349,6 +349,76 @@ private slots:
         QCOMPARE(out[0], 0.5f);
     }
 
+    // Internet-Ton (KiwiSDR) kommt in Schueben: mit grossem Startpolster bleibt die
+    // Scheibe still, bis genug gepuffert ist, und ueberbrueckt dann eine Luecke.
+    void aLargeCushionBridgesABurstGap() {
+        MasterMixer mix;
+        mix.setRampFrames(1);
+        mix.setSliceGain(1, 1.0f, 0.0f);
+        mix.setSliceGain(-2, 1.0f, 0.0f);
+        mix.setSliceOpportunistic(-2, true);
+        mix.setSliceCushion(-2, 4000, 8000);
+        std::array<float, 2> blk = {0.5f, 0.5f};
+        std::array<float, 2> out{};
+        mix.accumulate(1, blk.data(), 1);
+        mix.accumulate(-2, blk.data(), 1);
+        QCOMPARE(mix.tryDrain(out.data(), 1), 1);
+        QCOMPARE(out[0], 0.5f);                  // noch still: erst das Polster fuellen
+
+        std::vector<float> burst(2 * 4100, 0.5f);   // ein Schub von 4100 Frames
+        mix.accumulate(-2, burst.data(), 4100);
+        mix.accumulate(1, blk.data(), 1);
+        out = {};
+        QCOMPARE(mix.tryDrain(out.data(), 1), 1);
+        QCOMPARE(out[0], 1.0f);                  // jetzt hoerbar
+
+        // Luecke: 100 weitere Zuege ohne neuen Schub -- der Vorrat traegt.
+        for (int i = 0; i < 100; ++i) {
+            mix.accumulate(1, blk.data(), 1);
+            out = {};
+            QCOMPARE(mix.tryDrain(out.data(), 1), 1);
+            QCOMPARE(out[0], 1.0f);
+        }
+    }
+
+    // Flex + Kiwi (2026-11-25, Betreiber: "sobald ich Kiwi hoere, schlecht").
+    // Beide Quellen laufen "nebenher" (keine Taktquelle). Frueher gab jeder
+    // Zug so viele Frames aus wie die VOLLSTE Quelle: die kontinuierliche
+    // (Flex, ohne Polster) wurde dann mit Stille aufgefuellt und zerhackt.
+    void kiwiNebenDemFlexZerhacktIhnNicht() {
+        MasterMixer mix;
+        mix.setRampFrames(1);
+        mix.setSliceGain(0, 1.0f, 0.0f);
+        mix.setSliceGain(1, 1.0f, 0.0f);
+        mix.setSliceOpportunistic(0, true);        // Flex
+        mix.setSliceOpportunistic(1, true);        // Kiwi
+        mix.setSliceCushion(1, 4096, 32768);
+        std::vector<float> flex(2 * 480, 0.25f);   // 10 ms je Paket
+        std::vector<float> kiwi(2 * 2048, 0.25f);  // 43 ms je Paket
+        std::vector<float> out(2 * 8192, 0.0f);
+        int flexOut = 0, produced = 0, holes = 0;
+        for (int i = 0; i < 400; ++i) {
+            // Anlauf nicht zaehlen: da ist erst eine Quelle da.
+            if (i == 40) { produced = 0; flexOut = 0; }
+            if (i % 4 == 0) {                       // der Kiwi in Schueben
+                mix.accumulate(1, kiwi.data(), 2048);
+                const int n = mix.tryDrain(out.data(), 8192);
+                for (int f = 0; f < n; ++f) { if (i > 40 && out[2 * f] < 0.2f) { ++holes; } }
+                produced += n;
+            }
+            mix.accumulate(0, flex.data(), 480);
+            const int n = mix.tryDrain(out.data(), 8192);
+            for (int f = 0; f < n; ++f) { if (i > 40 && out[2 * f] < 0.2f) { ++holes; } }
+            produced += n;
+            flexOut += 480;
+        }
+        // Takt = Flex: es kommt genauso viel heraus wie der Flex liefert ...
+        QVERIFY2(std::abs(produced - flexOut) <= 960,
+                 qPrintable(QStringLiteral("aus %1, Flex %2").arg(produced).arg(flexOut)));
+        // ... und der Flex hat keine Loecher.
+        QCOMPARE(holes, 0);
+    }
+
     // ── Master slew across a membership change ────────────────────────
     //
     // Re-admitting a slice must fade the MIXED output in, not resume it at

@@ -23,6 +23,8 @@
 #pragma once
 
 #include <QDialog>
+#include <QSet>
+#include <QString>
 #include <QVector>
 
 #include "core/KiwiPublicDirectory.h"
@@ -31,8 +33,11 @@ class QLabel;
 class QLineEdit;
 class QPushButton;
 class QTableWidget;
+class QSplitter;
 
 namespace Longpath {
+
+class KiwiWorldMap;
 
 // Auswahlliste oeffentlicher KiwiSDR-Empfaenger. Holt das Verzeichnis
 // beim Oeffnen — also auf ausdrueckliche Handlung des Betreibers — und
@@ -51,13 +56,27 @@ public:
     QString selectedName() const { return m_selectedName; }          // Namensvorschlag
     // Entfernung der Auswahl in km; < 0, wenn nicht bekannt.
     double selectedKm() const { return m_selectedKm; }
+    // Breite/Laenge der Auswahl; false, wenn nicht bekannt.
+    bool selectedLatLon(double& lat, double& lon) const
+    { lat = m_selectedLat; lon = m_selectedLon; return m_selectedHasPos; }
 
     // Vorauswahl nach Entfernung zum eigenen Locator und nach Band
     // (kiwiPreselect). Haengt nichts an der Netzabfrage: wer sie ruft,
     // sortiert und filtert nur, was ohnehin geladen wird.
     void setPreselection(const QString& ownGrid, double frequencyHz);
 
+    // Endpunkte ("host[:port]"), die schon offen sind: auf der Karte mit
+    // Ring und Linie vom eigenen Standort. Reine Anzeige.
+    void setOpenEndpoints(const QSet<QString>& endpoints);
+
+    // Fuer die Pruefung.
+    KiwiWorldMap* mapForTest() const { return m_map; }
+    QTableWidget* tableForTest() const { return m_table; }
+    // Zeigt eine fertige Liste an, ohne das Verzeichnis zu holen.
+    void showReceiversForTest(const QVector<KiwiPublicReceiver>& receivers);
+
 private:
+    void rebuildMap(const QVector<const struct KiwiCandidate*>& matches);
     void startFetch();
     void onReady(const QVector<KiwiPublicReceiver>& receivers);
     void applyFilter();
@@ -69,6 +88,11 @@ private:
     int m_hiddenUnknown{0};  // verworfen, weil keine Regel veroeffentlicht ist
     bool m_fromCache{false};  // die Liste kam aus dem Sitzungsspeicher
 
+    KiwiWorldMap* m_map{nullptr};
+    QSplitter*    m_split{nullptr};
+    QVector<KiwiPublicReceiver> m_offlineReceivers;  // nur fuer die Karte
+    QSet<QString> m_openEndpoints;
+    bool m_fetchEnabled{true};
     QLineEdit*    m_search{nullptr};
     QTableWidget* m_table{nullptr};
     QLabel*       m_status{nullptr};
@@ -78,6 +102,9 @@ private:
     QString m_selectedEndpoint;
     QString m_selectedName;
     double m_selectedKm{-1.0};
+    double m_selectedLat{0.0};
+    double m_selectedLon{0.0};
+    bool m_selectedHasPos{false};
     bool m_preselect{false};
     QString m_ownGrid;
     double m_frequencyHz{0.0};

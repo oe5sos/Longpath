@@ -17,8 +17,13 @@
 #include "models/SliceModel.h"
 
 #include <QAbstractItemView>
+#include <QAbstractScrollArea>
+#include <QEvent>
+#include <QShowEvent>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QTimer>
+#include <QSlider>
 #include <QListWidget>
 #include <QPushButton>
 #include <QSignalBlocker>
@@ -138,7 +143,7 @@ QString sliceBadgeStyle(int colorIdx, bool assigned)
         return QStringLiteral(
             "QLabel { background: %1; color: %2; border: 1px solid %1; "
             "border-radius: 6px; font-weight: bold; font-size: 9px; padding: 0; }")
-            .arg(color);
+            .arg(color, Style::hexRole(Style::kAppBg));
     }
     return QStringLiteral(
         "QLabel { background: %2; color: %1; border: 1px solid %1; "
@@ -209,6 +214,10 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     m_recordButton->setAccessibleName(tr("Record the Kiwi audio"));
     m_otherButton = blueToggle(tr("Other Kiwi …"), 112, 22);
     m_otherButton->setObjectName(QStringLiteral("kiwiOtherButton"));
+    // Eine Schaltflaeche, kein Schalter: styledButton() macht jeden Knopf
+    // einrastbar, dann blieb die Pille nach dem Klick dunkel stehen
+    // (Betreiber 2026-11-25: "kiwi pille wurde schwarz").
+    m_otherButton->setCheckable(false);
     m_otherButton->setAccessibleName(tr("Choose another Kiwi"));
     ownRow->addWidget(m_ownSignalButton, 1);
     ownRow->addWidget(m_recordButton, 1);
@@ -219,18 +228,53 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     otherRow->setContentsMargins(0, 0, 0, 0);
     otherRow->setSpacing(6);
     otherRow->addWidget(m_otherButton, 0);
+    m_hearingButton = blueToggle(tr("Heard …"), 64, 22);
+    m_hearingButton->setObjectName(QStringLiteral("kiwiHearingButton"));
+    m_hearingButton->setCheckable(false);   // Schaltflaeche, rastet nicht ein
+    m_hearingButton->setAccessibleName(tr("Where am I heard"));
+    m_hearingButton->setToolTip(
+        tr("Up to five Kiwis listen along while you transmit: map, "
+           "waterfalls and who hears you."));
+    otherRow->addWidget(m_hearingButton, 0);
+    m_soloButton = blueToggle(tr("Solo"), 44, 22);
+    m_soloButton->setCheckable(true);
+    m_soloButton->setObjectName(QStringLiteral("kiwiSoloButton"));
+    m_soloButton->setAccessibleName(tr("Hear only the Kiwi"));
+    m_soloButton->setToolTip(
+        tr("Mutes the radio's receive audio in the speakers so you hear "
+           "only what the Kiwi hears. Switches itself off after 30 seconds."));
+    otherRow->addWidget(m_soloButton, 0);
+    m_radioMuteButton = blueToggle(tr("Mute radio"), 74, 22);
+    m_radioMuteButton->setCheckable(true);
+    m_radioMuteButton->setObjectName(QStringLiteral("kiwiRadioMuteButton"));
+    m_radioMuteButton->setAccessibleName(tr("Mute the radio, hear only the Kiwis"));
+    m_radioMuteButton->setToolTip(
+        tr("Mutes the radio's receive audio (all panadapters) in the speakers so "
+           "you hear only the Kiwis that have sound on. Playback only; the radio "
+           "itself is not changed."));
+    otherRow->addWidget(m_radioMuteButton, 0);
+    otherRow->addStretch(1);
+    root->addLayout(otherRow);
+    // Der gewaehlte Name steht in einer EIGENEN Zeile: neben den Knoepfen
+    // schob er sie aus dem Applet, die "Gehoert"-Pille verschwand
+    // (Betreiber 2026-11-25).
     m_ownSignalLabel = new QLabel(this);
     m_ownSignalLabel->setTextFormat(Qt::PlainText);
     m_ownSignalLabel->setStyleSheet(detailStyle());
     m_ownSignalLabel->setVisible(false);
-    otherRow->addWidget(m_ownSignalLabel, 1);
-    root->addLayout(otherRow);
+    m_ownSignalLabel->setWordWrap(false);
+    m_ownSignalLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    root->addWidget(m_ownSignalLabel);
     connect(m_ownSignalButton, &QPushButton::toggled, this,
             &KiwiSdrApplet::ownSignalToggled);
     connect(m_recordButton, &QPushButton::toggled, this,
             &KiwiSdrApplet::recordToggled);
     connect(m_otherButton, &QPushButton::clicked, this,
             &KiwiSdrApplet::otherReceiverRequested);
+    connect(m_soloButton, &QPushButton::toggled, this, &KiwiSdrApplet::soloToggled);
+    connect(m_radioMuteButton, &QPushButton::toggled, this, &KiwiSdrApplet::radioMuteToggled);
+    connect(m_hearingButton, &QPushButton::clicked, this,
+            &KiwiSdrApplet::hearingRequested);
 
     m_emptyLabel = new QLabel(tr("No KiwiSDR receive antenna configured"), this);
     m_emptyLabel->setAccessibleName(tr("KiwiSDR receiver status"));
@@ -247,10 +291,17 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     m_receiverList->setSelectionMode(QAbstractItemView::NoSelection);
     m_receiverList->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     m_receiverList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    // Waechst mit dem Platz, den die Kachel / das Fenster hergibt (war: fest
+    // 176 px, also drei Zeilen). Weniger als drei Zeilen nie.
     m_receiverList->setMinimumHeight(48);
-    m_receiverList->setMaximumHeight(176);
     m_receiverList->setStyleSheet(listStyle());
+    m_receiverList->viewport()->installEventFilter(this);
     root->addWidget(m_receiverList);
+    // Ist die Kachel hoeher als der Inhalt (sie ist es, wenn der Betreiber sie
+    // hoch zieht), bleibt alles oben stehen; der Rest ist leer. Ohne das
+    // verteilte das Layout den Platz zwischen Knoepfe und Liste und die
+    // Zeilen klebten am unteren Rand (Bild 2026-11-25).
+    root->addStretch(1);
 
     rebuildReceiverList();
 }
@@ -301,6 +352,18 @@ void KiwiSdrApplet::setRecordingActive(bool active)
     m_recordButton->setChecked(active);
 }
 
+void KiwiSdrApplet::setRadioMutedActive(bool active)
+{
+    const QSignalBlocker blocker(m_radioMuteButton);
+    m_radioMuteButton->setChecked(active);
+}
+
+void KiwiSdrApplet::setSoloActive(bool active)
+{
+    const QSignalBlocker blocker(m_soloButton);
+    m_soloButton->setChecked(active);
+}
+
 void KiwiSdrApplet::setOwnSignalReceiverName(const QString& name)
 {
     m_ownSignalLabel->setText(tr("My signal: %1").arg(name));
@@ -310,6 +373,10 @@ void KiwiSdrApplet::setOwnSignalReceiverName(const QString& name)
 void KiwiSdrApplet::rebuildReceiverList()
 {
     if (!m_receiverList || !m_emptyLabel) {
+        return;
+    }
+    if (m_volumeDragging) {
+        m_rebuildPending = true;
         return;
     }
 
@@ -325,6 +392,116 @@ void KiwiSdrApplet::rebuildReceiverList()
         item->setSizeHint(row->sizeHint());
         m_receiverList->setItemWidget(item, row);
     }
+    relayoutRows();
+    updateListHeight();
+}
+
+void KiwiSdrApplet::relayoutRows()
+{
+    if (!m_receiverList) { return; }
+    int width = m_receiverList->viewport()->width();
+    if (width < 80) { width = std::max(80, this->width() - 12); }
+    for (int i = 0; i < m_receiverList->count(); ++i) {
+        QListWidgetItem* item = m_receiverList->item(i);
+        QWidget* row = m_receiverList->itemWidget(item);
+        if (!row) { continue; }
+        row->setMinimumWidth(0);
+        row->setMaximumWidth(width);
+        int h = row->sizeHint().height();
+        if (QLayout* l = row->layout()) {
+            if (l->hasHeightForWidth()) { h = l->totalHeightForWidth(width); }
+        }
+        item->setSizeHint(QSize(width, h));
+        row->resize(width, h);
+    }
+}
+
+void KiwiSdrApplet::updateListHeight()
+{
+    if (!m_receiverList) {
+        return;
+    }
+    constexpr int kMinHeight = 48;
+    constexpr int kOldFixedCap = 176;   // die frueheren drei Zeilen
+    constexpr int kChrome = 36;         // Kachel-Titel und Rand
+    int content = 2 * m_receiverList->frameWidth();
+    for (int i = 0; i < m_receiverList->count(); ++i) {
+        content += m_receiverList->sizeHintForRow(i);
+    }
+    // Der Platz: die Applets stehen in einer Spalte, die scrollt (AppletGrid
+    // in einer QScrollArea, auch im schwebenden Fenster). Gemessen wird darum
+    // der sichtbare Ausschnitt dieser Spalte, nicht das Fenster -- das Fenster
+    // ist hoeher als jede Spalte, und die Kachel selbst ist nur so hoch wie
+    // ihr Inhalt (Bild 2026-11-25: drei Zeilen und leerer Platz darunter).
+    int room = kOldFixedCap;
+    QWidget* area = scrollViewport();
+    // Beim Umhaengen des Applets (Andocken/Abloesen) ist die Liste kurz kein
+    // Nachkomme -- mapTo() warnt dann; in dem Moment gibt es nichts zu messen.
+    if (!isAncestorOf(m_receiverList)) {
+        return;
+    }
+    if (area) {
+        const int above = m_receiverList->mapTo(this, QPoint(0, 0)).y();
+        room = area->height() - above - kChrome;
+    } else if (const QWidget* top = window()) {
+        room = top->height() - m_receiverList->mapTo(top, QPoint(0, 0)).y() - 12;
+    }
+    const int cap = qMax(kOldFixedCap, room);
+    const int h = qBound(kMinHeight, content, cap);
+    if (m_receiverList->minimumHeight() != h || m_receiverList->maximumHeight() != h) {
+        m_receiverList->setFixedHeight(h);
+        updateGeometry();
+    }
+}
+
+QWidget* KiwiSdrApplet::scrollViewport() const
+{
+    for (QWidget* w = parentWidget(); w; w = w->parentWidget()) {
+        if (auto* sa = qobject_cast<QAbstractScrollArea*>(w)) {
+            return sa->viewport();
+        }
+    }
+    return nullptr;
+}
+
+void KiwiSdrApplet::showEvent(QShowEvent* event)
+{
+    AppletWidget::showEvent(event);
+    QWidget* top = scrollViewport();
+    if (!top) { top = window(); }
+    if (top && top != m_watchedWindow) {
+        if (m_watchedWindow) {
+            m_watchedWindow->removeEventFilter(this);
+        }
+        m_watchedWindow = top;
+        top->installEventFilter(this);
+    }
+    updateListHeight();
+}
+
+bool KiwiSdrApplet::eventFilter(QObject* watched, QEvent* event)
+{
+    if (m_receiverList && watched == m_receiverList->viewport()
+        && event->type() == QEvent::Resize) {
+        relayoutRows();
+        updateListHeight();
+    }
+    if (watched == m_watchedWindow && event->type() == QEvent::Resize) {
+        updateListHeight();
+    }
+    if (event->type() == QEvent::Wheel && watched
+        && watched->property("kiwiVolumeSlider").toBool()) {
+        event->ignore();
+        return true;
+    }
+    // Doppelklick auf eine Zeile: der Kiwi bekommt sein eigenes Fenster
+    // (Betreiber 2026-11-25).
+    if (event->type() == QEvent::MouseButtonDblClick && watched
+        && watched->property("kiwiRowId").isValid()) {
+        emit openWindowRequested(watched->property("kiwiRowId").toString());
+        return true;
+    }
+    return AppletWidget::eventFilter(watched, event);
 }
 
 QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
@@ -333,6 +510,8 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
     row->setObjectName(QStringLiteral("kiwiReceiverRow"));
     row->setStyleSheet(receiverRowStyle());
     row->setAccessibleName(receiverAccessibleText(receiver));
+    row->setProperty("kiwiRowId", receiver.id);
+    row->installEventFilter(this);
 
     auto* layout = new QVBoxLayout(row);
     layout->setContentsMargins(5, 4, 5, 4);
@@ -348,6 +527,8 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
     name->setAccessibleDescription(receiver.name);
     name->setStyleSheet(primaryLabelStyle());
     name->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    name->setProperty("kiwiRowId", receiver.id);
+    name->installEventFilter(this);
     topRow->addWidget(name, 1);
 
     auto* status = new QLabel(stateText(receiver.state), row);
@@ -356,7 +537,23 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
     status->setAccessibleDescription(receiverAccessibleText(receiver));
     status->setStyleSheet(statusStyle(receiver.state));
     status->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    status->setProperty("kiwiRowId", receiver.id);
+    status->installEventFilter(this);
     topRow->addWidget(status, 0, Qt::AlignRight);
+
+    // Ton dieses Kiwi ein/aus (2026-11-25): ein = verbunden und in den
+    // Lautsprechern, aus = Ton weg (und getrennt, wenn nichts anderes ihn braucht).
+    auto* soundToggle = blueToggle(tr("Sound"), 40, 20);
+    soundToggle->setCheckable(true);
+    soundToggle->setObjectName(QStringLiteral("kiwiRowSound"));
+    soundToggle->setAccessibleName(tr("Sound of %1").arg(receiver.name));
+    soundToggle->setToolTip(tr("Listen to this Kiwi (connects it); off disconnects it "
+                               "unless its waterfall is still on."));
+    soundToggle->setChecked(!receiver.assignedSlice.isNull());
+    const QString soundId = receiver.id;
+    connect(soundToggle, &QPushButton::toggled, this,
+            [this, soundId](bool on) { emit soundRequested(soundId, on); });
+    topRow->addWidget(soundToggle, 0, Qt::AlignRight);
 
     // Wasserfall-Vorschau im eigenstaendigen KIWI-WASSERFAELLE-Panel —
     // unabhaengig davon, ob dieses Profil einer Scheibe zugeordnet ist.
@@ -378,6 +575,16 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
     topRow->addWidget(waterfallToggle, 0, Qt::AlignRight);
 
     layout->addLayout(topRow);
+    layout->addWidget(buildVolumeRow(receiver, row));
+
+    if (!receiver.warning.isEmpty()) {
+        auto* warningLabel = new QLabel(receiver.warning, row);
+        warningLabel->setObjectName(QStringLiteral("kiwiRowWarning"));
+        warningLabel->setTextFormat(Qt::PlainText);
+        warningLabel->setWordWrap(true);
+        warningLabel->setStyleSheet(statusStyle(KiwiSdrClient::State::Busy));
+        layout->addWidget(warningLabel);
+    }
 
     QStringList detailLines;
     if (!receiver.detail.trimmed().isEmpty()) {
@@ -401,6 +608,65 @@ QWidget* KiwiSdrApplet::buildReceiverRow(const KiwiSdrReceiverStatus& receiver)
     }
 
     layout->addWidget(buildSliceAssignmentRow(receiver.assignedSlice.data(), row));
+    return row;
+}
+
+QWidget* KiwiSdrApplet::buildVolumeRow(const KiwiSdrReceiverStatus& receiver,
+                                       QWidget* parent)
+{
+    auto* row = new QWidget(parent);
+    auto* layout = new QHBoxLayout(row);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(6);
+
+    auto* caption = new QLabel(tr("Volume"), row);
+    caption->setTextFormat(Qt::PlainText);
+    caption->setStyleSheet(labelStyle());
+    layout->addWidget(caption, 0);
+
+    const auto text = [](int db) {
+        return (db > 0 ? QStringLiteral("+%1 dB") : QStringLiteral("%1 dB")).arg(db);
+    };
+    auto* slider = new QSlider(Qt::Horizontal, row);
+    slider->setObjectName(QStringLiteral("kiwiRowVolume"));
+    slider->setRange(kVolumeMinDb, kVolumeMaxDb);
+    slider->setPageStep(3);
+    slider->setValue(receiver.volumeDb);
+    slider->setFixedHeight(18);
+    slider->setStyleSheet(Style::sliderHStyle());
+    slider->setAccessibleName(tr("Volume of %1").arg(receiver.name));
+    slider->setToolTip(tr("Volume of this Kiwi only"));
+    // Das Mausrad rollt die Spalte, es verstellt nicht nebenbei den Ton.
+    slider->setFocusPolicy(Qt::TabFocus);
+    slider->setProperty("kiwiVolumeSlider", true);
+    slider->installEventFilter(this);
+    layout->addWidget(slider, 1);
+
+    auto* value = new QLabel(text(receiver.volumeDb), row);
+    value->setObjectName(QStringLiteral("kiwiRowVolumeValue"));
+    value->setTextFormat(Qt::PlainText);
+    value->setStyleSheet(labelStyle());
+    value->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    value->setMinimumWidth(44);
+    layout->addWidget(value, 0);
+
+    const QString id = receiver.id;
+    connect(slider, &QSlider::valueChanged, this, [this, id, value, text](int db) {
+        value->setText(text(db));
+        for (KiwiSdrReceiverStatus& r : m_receivers) {
+            if (r.id == id) { r.volumeDb = db; }
+        }
+        emit volumeChanged(id, db);
+    });
+    connect(slider, &QSlider::sliderPressed, this, [this]() { m_volumeDragging = true; });
+    connect(slider, &QSlider::sliderReleased, this, [this]() {
+        m_volumeDragging = false;
+        if (m_rebuildPending) {
+            m_rebuildPending = false;
+            // Erst nach dem Loslassen: der Regler steckt noch in seinem Signal.
+            QTimer::singleShot(0, this, &KiwiSdrApplet::rebuildReceiverList);
+        }
+    });
     return row;
 }
 

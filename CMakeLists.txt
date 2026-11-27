@@ -638,6 +638,7 @@ set(CORE_SOURCES
     src/core/KiwiSdrCredentialStore.cpp
     src/core/KiwiSdrManager.cpp
     src/core/KiwiOwnSignal.cpp
+    src/core/KiwiGroup.cpp
     src/core/KiwiRecording.cpp
     src/core/ReceivePresentationSync.cpp
     src/core/WdspEngine.cpp
@@ -1072,6 +1073,7 @@ set(GUI_SOURCES
     src/asr/WhisperServerLauncher.cpp
     src/gui/MainWindow_KiwiSdr.cpp
     src/gui/MainWindow_KiwiOwnSignal.cpp
+    src/gui/MainWindow_KiwiGroup.cpp
     # Flex-Treiber Stufe 2: Ton und Bild einer FlexRadio-Maschine
     src/gui/MainWindow_Flex.cpp
     src/gui/MainWindow_Asr.cpp
@@ -1083,6 +1085,10 @@ set(GUI_SOURCES
     src/gui/hotkeys/KeyboardRouter.cpp
     src/gui/hotkeys/MainWindowHotKeyTargets.cpp
     src/gui/KiwiPublicReceiverPicker.cpp
+    src/gui/widgets/KiwiWorldMap.cpp
+    src/gui/widgets/KiwiLostOverlay.cpp
+    src/gui/KiwiHearingDialog.cpp
+    src/gui/widgets/KiwiWorldCoast.cpp
     src/gui/LanScanDialog.cpp
     src/gui/LanScanDialog.h
     src/gui/PgxlSaveRebootDialog.cpp
@@ -2462,6 +2468,10 @@ endif()
 # EXCLUDE_FROM_ALL: sie wird nicht mitgebaut und nicht ausgeliefert.
 #   cmake --build build --target tci_probe
 #   ./build/tci_probe ws://127.0.0.1:40001 12
+# Live-Messung der Mithoerer-Verbindung (2026-11-25), siehe tools/kiwi_live_probe.cpp.
+add_executable(kiwi_live_probe EXCLUDE_FROM_ALL tools/kiwi_live_probe.cpp)
+target_link_libraries(kiwi_live_probe PRIVATE LongpathObjs Qt6::Core)
+target_include_directories(kiwi_live_probe PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_executable(tci_probe EXCLUDE_FROM_ALL tools/tci_probe.cpp)
 target_link_libraries(tci_probe PRIVATE Qt6::Core Qt6::WebSockets)
 

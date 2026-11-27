@@ -574,6 +574,17 @@ QString KiwiSdrManager::addProfile(const QString& name, const QString& endpoint)
         return QString();
     }
 
+    // Ein Endpunkt, ein Profil (Longpath 2026-11-25): drei Profile fuer
+    // denselben Kiwi wollten drei Kanaele bei einem Betreiber belegen, der nur
+    // drei hat -- und der eine "voll" meldete. Das gibt es schon, also das.
+    for (const KiwiSdrAntennaProfile& existing : std::as_const(m_profiles)) {
+        if (existing.endpoint == normalizedEndpoint) {
+            qCInfo(lcKiwiSdr).noquote()
+                << "Profile exists for" << normalizedEndpoint << "- reusing" << existing.id;
+            return existing.id;
+        }
+    }
+
     KiwiSdrAntennaProfile profile;
     profile.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     profile.endpoint = normalizedEndpoint;
@@ -843,6 +854,7 @@ void KiwiSdrManager::removeProfile(const QString& id)
     }
 
     qCInfo(lcKiwiSdr).noquote() << "Profile removed" << displayName(id) << "id=" << id;
+    m_listeners.remove(id);
     cancelReconnect(id);
     disconnectProfile(id);
     destroyClient(id);
@@ -910,7 +922,8 @@ void KiwiSdrManager::connectProfile(const QString& id)
         client->setWaterfallRateOverride(rate);
     });
     if (assignedSliceForProfile(id) < 0) {
-        if (m_profiles[idx].waterfallPreviewEnabled) {
+        if (m_profiles[idx].waterfallPreviewEnabled
+            || m_listeners.contains(id)) {
             // Eine reine Vorschau-Verbindung (kein Scheiben-Bezug) braucht
             // keine Frequenz-/Modus-Verfolgung — sie zeigt, worauf der
             // Kiwi ohnehin schon steht. Ohne diesen Zweig blieb
@@ -988,6 +1001,38 @@ void KiwiSdrManager::setWaterfallPreviewEnabled(const QString& id, bool enabled)
     } else if (!shouldMaintainProfileConnection(id)) {
         disconnectProfile(id);
     }
+}
+
+void KiwiSdrManager::setProfileListener(const QString& id, bool enabled)
+{
+    if (profileIndex(id) < 0 || m_listeners.contains(id) == enabled) {
+        return;
+    }
+    if (enabled) {
+        m_listeners.insert(id);
+        connectProfile(id);
+    } else {
+        m_listeners.remove(id);
+        setListenerRecording(id, false);
+        if (!shouldMaintainProfileConnection(id)) {
+            disconnectProfile(id);
+        }
+    }
+}
+
+void KiwiSdrManager::setListenerRecording(const QString& id, bool enabled)
+{
+    if (!client(id)) {
+        return;
+    }
+    // Nur fuer Mithoerer: bei einem Kiwi mit Scheibe regelt die Zuordnung den
+    // Ton, und dessen Dekodierung darf hier nicht angetastet werden.
+    if (enabled && !m_listeners.contains(id)) {
+        return;
+    }
+    invokeClient(id, [enabled](KiwiSdrClient* c) {
+        c->setDecodeAudioWhenInactive(enabled);
+    });
 }
 
 void KiwiSdrManager::disconnectAll()
@@ -1513,7 +1558,28 @@ void KiwiSdrManager::loadSettings()
             obj.value(QStringLiteral("waterfallRate")).toInt(0),
             0,
             kKiwiSdrWaterfallRateMax);
-        m_profiles.append(p);
+        // Ein Endpunkt, ein Profil: aeltere Staende konnten denselben Kiwi
+        // mehrfach enthalten (drei "bern.proxy.kiwis" wollten drei Kanaele
+        // bei einem Betreiber, der drei hat). Das erste bleibt, Wunsch-
+        // Schalter der Doppelten gehen auf dieses ueber.
+        bool merged = false;
+        for (KiwiSdrAntennaProfile& existing : m_profiles) {
+            if (!p.endpoint.isEmpty() && existing.endpoint == p.endpoint) {
+                existing.autoConnect = existing.autoConnect || p.autoConnect;
+                existing.waterfallPreviewEnabled =
+                    existing.waterfallPreviewEnabled || p.waterfallPreviewEnabled;
+                existing.keepAudioDuringTx =
+                    existing.keepAudioDuringTx || p.keepAudioDuringTx;
+                qCInfo(lcKiwiSdr).noquote()
+                    << "Doppeltes Profil" << p.name << "fuer" << p.endpoint
+                    << "mit" << existing.name << "zusammengefuehrt";
+                merged = true;
+                break;
+            }
+        }
+        if (!merged) {
+            m_profiles.append(p);
+        }
     }
 }
 
@@ -1707,7 +1773,8 @@ bool KiwiSdrManager::shouldMaintainProfileConnection(const QString& id) const
     }
 
     return m_profiles[idx].autoConnect || assignedSliceForProfile(id) >= 0
-        || m_profiles[idx].waterfallPreviewEnabled;
+        || m_profiles[idx].waterfallPreviewEnabled
+        || m_listeners.contains(id);
 }
 
 void KiwiSdrManager::scheduleReconnect(const QString& id)
