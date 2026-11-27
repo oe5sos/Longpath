@@ -2338,6 +2338,15 @@ private:
     /// Der Blick des Betreibers zieht den Panadapter der Maschine nach.
     QMetaObject::Connection m_flexBlickBand;
     QTimer* m_flexPanNachzug{nullptr};
+    /// Der Zoom des Betreibers geht an die Maschine: Mitte UND Breite
+    /// (core/FlexZoomZug.h, 2026-11-27). Entprellt auf den Endstand.
+    QMetaObject::Connection m_flexZoomBand;
+    QMetaObject::Connection m_flexZoomEndeBand;
+    QTimer* m_flexZoomZug{nullptr};
+    /// Breite des offenen Zoomzugs (0 = keiner). Kommt der Ausschnitt
+    /// mit genau dieser Breite als eigener Zug zurueck, bleibt das
+    /// Fenster stehen -- es war die Quelle.
+    double  m_flexZoomZugBreiteHz{0.0};
     /// Die Spur: WER schiebt die Scheibe im Verbindungsfenster?
     /// Siehe MainWindow_Flex.cpp, "Die Spur der Frequenz".
     QMetaObject::Connection m_flexFreqSpur;

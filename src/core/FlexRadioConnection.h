@@ -285,6 +285,19 @@ QString setSliceAnfLevelCommand(const QString& sliceId, int stufe);
 // Megahertz mit sechs Nachkommastellen, wie bei `slice tune`.
 QString setPanCenterCommand(const QString& panId, double hz);
 
+// ── Mitte UND Breite in EINEM Befehl (2026-11-27) ───────────────────
+//
+// Zoomt der Betreiber, bekommt die Maschine den neuen Ausschnitt, damit
+// sie Spektrum und Wasserfall in der neuen Aufloesung rechnet (siehe
+// core/FlexZoomZug.h). Beide Werte reisen zusammen:
+// From AetherSDR RadioModel.cpp:5513-5517 [@d58e2b8a] —
+//   "display pan set %1 center=%2 bandwidth=%3" (MHz, 'f', 6)
+//   „Center and bandwidth must travel together when both are
+//   requested; splitting them produced the P1/P2 waterfall-loss and
+//   zoom-drift bugs."
+QString setPanCenterBandwidthCommand(const QString& panId, double mitteHz,
+                                     double breiteHz);
+
 // ── Der Wasserfallstrom wird getrennt eingerichtet (2026-10-23) ──────
 //
 // Er ist nicht der Panadapter: der Panadapter-Zustand nennt ihn als

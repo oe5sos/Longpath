@@ -8725,6 +8725,15 @@ longpath_add_test(tst_flex_frequenzspur)
 # Betreibers (2026-10-23) muss ihn ueberleben.
 longpath_add_test(tst_flex_fensterzug)
 
+# -- Der Zoom geht an die Flex (2026-11-27) ------------------------------
+# Zoomt der Betreiber, bekommt die FLEX-8400 Mitte UND Breite in einem
+# `display pan set … center=… bandwidth=…` (AetherSDR [@d58e2b8a]) und
+# rechnet Spektrum und Wasserfall in der neuen Aufloesung. Prueft die
+# Entscheidung (core/FlexZoomZug.h), den Draht gegen eine falsche
+# Maschine (genau ein Befehl, richtige Mitte/Breite) und dass das Echo
+# der Maschine keinen zweiten Befehl ausloest.
+longpath_add_test(tst_flex_zoomzug)
+
 # -- Die 80 kHz, nachgerechnet --------------------------------------------
 # Der Versatz beim Flex-Verbinden war Breite/2 − Breite·Randanteil, also
 # bei 200 kHz genau 80 kHz: die neue Fenstermitte, nachdem das Fenster dem

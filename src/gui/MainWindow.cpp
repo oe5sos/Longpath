@@ -7763,7 +7763,7 @@ void MainWindow::buildUI()
             }
             if (hi <= lo) { return; }   // Frequenz liegt in keinem Segment
 
-            const double maxBw = sw->sampleRate() > 0.0 ? sw->sampleRate() : 384000.0;
+            const double maxBw = sw->zoomObergrenzeHz() > 0.0 ? sw->zoomObergrenzeHz() : 384000.0;
             // 10 % Luft an den Raendern, damit die Bandkante SICHTBAR
             // bleibt statt genau auf dem Bildrand zu liegen.
             const double span = qBound(2000.0, (hi - lo) * 1e6 * 1.1, maxBw);

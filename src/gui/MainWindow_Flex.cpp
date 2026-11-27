@@ -88,6 +88,7 @@
 #include "core/FlexFrequenzSpur.h"
 #include "core/DigiFrequenzen.h"
 #include "core/FlexFensterZug.h"
+#include "core/FlexZoomZug.h"
 #include <algorithm>
 #include "gui/SpectrumWidget.h"
 #include "gui/widgets/CommandBar.h"
@@ -1028,6 +1029,10 @@ void MainWindow::wireFlex()
             connect(m_flexPanNachzug, &QTimer::timeout, this, [this]() {
                 if (m_shuttingDown || !m_radioModel) { return; }
                 if (m_flexTargetSliceId < 0) { return; }
+                // Ein offener Zoomzug nimmt die Mitte mit (Mitte und
+                // Breite in EINEM Befehl, core/FlexZoomZug.h). Ein
+                // zweiter Befehl nur fuer die Mitte liefe ihm hinterher.
+                if (m_flexZoomZug && m_flexZoomZug->isActive()) { return; }
                 SpectrumWidget* sw = m_radioModel->spectrumWidget();
                 if (!sw) { return; }
                 const double mitte = sw->centerFrequency();
@@ -1087,6 +1092,78 @@ void MainWindow::wireFlex()
                     return;
                 }
                 if (m_flexPanNachzug) { m_flexPanNachzug->start(); }
+            });
+        }
+
+        // ── Der Zoom geht an die Maschine (2026-11-27) ──────────────
+        //
+        // Bis heute zoomte Longpath an der Flex nur LOKAL: das Fenster
+        // nahm einen Ausschnitt aus den 200 kHz der Maschine. Am
+        // 2026-11-27 zeigte es 7,9 kHz -- rund 84 Bins auf 1298
+        // Punkten, jeder 15 Punkte breit. Betreiber: „warum ist das
+        // blau so pixelig?". Jetzt bekommt die Maschine Mitte und
+        // Breite des Fensters und rechnet Spektrum und Wasserfall in
+        // der neuen Aufloesung. Herleitung in core/FlexZoomZug.h.
+        //
+        // Zwei Ausloeser, ein Endstand: `frequencyRangeChanged` (Rad,
+        // Tasten, Knoepfe, Band-/Segmentzoom, Digi-Bild) und
+        // `bandwidthChangeRequested` (Ende des Ziehens an der Skala --
+        // waehrend des Ziehens geht kein Range-Signal hinaus). Erst
+        // nach der Ruhe von AetherSDR (300 ms) geht genau EIN Befehl.
+        if (!m_flexZoomZug) {
+            m_flexZoomZug = new QTimer(this);
+            m_flexZoomZug->setSingleShot(true);
+            m_flexZoomZug->setInterval(FlexZoomZug::kRuheMs);
+            connect(m_flexZoomZug, &QTimer::timeout, this, [this]() {
+                if (m_shuttingDown || !m_radioModel) { return; }
+                if (m_flexTargetSliceId < 0 || !m_flexAusschnittUebernommen) {
+                    return;
+                }
+                SpectrumWidget* sw = m_radioModel->spectrumWidget();
+                if (!sw) { return; }
+                const double panBreite = m_flexSpanHighHz - m_flexSpanLowHz;
+                // Hat die Maschine selbst schon schmaler (oder breiter)
+                // gestellt, als wir es ihr zutrauen, gilt das als
+                // moeglich -- sonst zoegen wir einen fremden Zoom
+                // (SmartSDR, Maestro) auf unsere Grenze zurueck.
+                const double mindest =
+                    std::min(m_radioModel->flexPanMindestBreiteHz(),
+                             panBreite > 0.0 ? panBreite
+                                             : m_radioModel->flexPanMindestBreiteHz());
+                const double hoechst =
+                    std::max(m_radioModel->flexPanHoechstBreiteHz(), panBreite);
+                const FlexZoomZug::Ausschnitt wunsch =
+                    FlexZoomZug::wunschFuerFenster(sw->centerFrequency(),
+                                                   sw->bandwidth(),
+                                                   mindest, hoechst);
+                if (!wunsch.gueltig()
+                    || !FlexZoomZug::zugNoetig(wunsch.breiteHz, panBreite)) {
+                    return;
+                }
+                if (m_flexPanNachzug) { m_flexPanNachzug->stop(); }
+                m_flexZoomZugBreiteHz = wunsch.breiteHz;
+                qCInfo(lcFlexGui).nospace()
+                    << "Flex: Panadapter folgt dem Zoom — "
+                    << (wunsch.breiteHz / 1.0e3) << " kHz um "
+                    << (wunsch.mitteHz / 1.0e6) << " MHz (war "
+                    << (panBreite / 1.0e3) << " kHz; Fenster "
+                    << (sw->bandwidth() / 1.0e3) << " kHz)";
+                m_radioModel->zieheFlexPanadapterAuf(wunsch.mitteHz,
+                                                     wunsch.breiteHz);
+            });
+        }
+        disconnect(m_flexZoomBand);
+        disconnect(m_flexZoomEndeBand);
+        if (SpectrumWidget* sw = m_radioModel->spectrumWidget()) {
+            m_flexZoomBand = connect(sw, &SpectrumWidget::frequencyRangeChanged,
+                                     this, [this](double, double) {
+                if (m_shuttingDown || m_flexTargetSliceId < 0) { return; }
+                if (m_flexZoomZug) { m_flexZoomZug->start(); }
+            });
+            m_flexZoomEndeBand = connect(sw, &SpectrumWidget::bandwidthChangeRequested,
+                                         this, [this](double) {
+                if (m_shuttingDown || m_flexTargetSliceId < 0) { return; }
+                if (m_flexZoomZug) { m_flexZoomZug->start(); }
             });
         }
 
@@ -1260,6 +1337,18 @@ void MainWindow::wireFlex()
         // Herleitung steht in core/FlexFensterZug.h.
         if (eigenerZug && m_flexPanNachzug) { m_flexPanNachzug->stop(); }
 
+        // ── Unser Zoomzug kommt zurueck (2026-11-27) ──────────────
+        //
+        // Das Fenster war die Quelle und bleibt, wie es ist. Nimmt es
+        // hier die Breite der Maschine an, wird aus einem Fenster unter
+        // der Mindestbreite (7,9 kHz gegen 10 kHz) eines mit 10 kHz --
+        // der Zoom des Betreibers waere weg. Und jede Aenderung am
+        // Fenster ginge als neuer Zoom wieder hinaus: der Echo-
+        // Kreislauf. Siehe core/FlexZoomZug.h.
+        const bool fensterBleibt = FlexZoomZug::fensterBleibt(
+            hochHz - tiefHz, m_flexZoomZugBreiteHz, eigenerZug);
+        if (fensterBleibt) { m_flexZoomZugBreiteHz = 0.0; }
+
         // Das Fenster folgt dem Ausschnitt der Maschine — auch wenn er
         // sich spaeter aendert (Bandwechsel, Zoom am Geraet, oder weil
         // `tuneFlexSlice` den Panadapter nachgezogen hat).
@@ -1291,8 +1380,15 @@ void MainWindow::wireFlex()
             // Fenster zurueck, und der Betreiber stand beim Start
             // 80 kHz neben dem Band. Das Urteil liegt jetzt geprueft
             // in core/FlexFensterZug.h; dort steht auch die Messung.
+            // Die Decke des Zooms ist, was die Maschine kann -- nicht
+            // die Breite ihres letzten Panadapters (SpectrumWidget::
+            // zoomObergrenzeHz). Hier, weil `max_bw` erst mit dem
+            // Zustand der Maschine kommt.
+            sw->setZoomObergrenzeHz(
+                FlexZoomZug::zoomDecke(m_radioModel->flexPanHoechstBreiteHz()));
+
             const double alteBreite = m_flexFensterBreiteHz;
-            const bool folgt = FlexFensterZug::fensterFolgt(
+            const bool folgt = !fensterBleibt && FlexFensterZug::fensterFolgt(
                 breite, alteBreite, m_flexAusschnittUebernommen,
                 eigenerZug);
             const bool nimmtBreite = FlexFensterZug::fensterNimmtBreite(
@@ -1342,10 +1438,17 @@ void MainWindow::wireFlex()
                     sw->setWaterfallNFAGCEnabled(true);
                 }
             }
-            qCInfo(lcFlexGui).nospace()
-                << "Flex-Bild: Ausschnitt der Maschine uebernommen — "
-                << (breite / 1.0e3) << " kHz um " << (mitte / 1.0e6)
-                << " MHz";
+            if (fensterBleibt) {
+                qCInfo(lcFlexGui).nospace()
+                    << "Flex-Bild: Zoom-Ausschnitt steht — " << (breite / 1.0e3)
+                    << " kHz um " << (mitte / 1.0e6) << " MHz; Fenster bleibt "
+                    << (sw->bandwidth() / 1.0e3) << " kHz";
+            } else {
+                qCInfo(lcFlexGui).nospace()
+                    << "Flex-Bild: Ausschnitt der Maschine uebernommen — "
+                    << (breite / 1.0e3) << " kHz um " << (mitte / 1.0e6)
+                    << " MHz";
+            }
         }
     });
 
@@ -1587,6 +1690,14 @@ void MainWindow::wireFlex()
         m_flexTargetSliceId = -1;
         m_flexSpanLowHz = 0.0;
         m_flexSpanHighHz = 0.0;
+        // Der Zoomzug gehoert zu dieser Verbindung; die Zoomdecke auch
+        // (ein OpenHPSDR-Geraet danach hat wieder seine Abtastrate).
+        if (m_flexZoomZug) { m_flexZoomZug->stop(); }
+        m_flexZoomZugBreiteHz = 0.0;
+        if (SpectrumWidget* sw = m_radioModel
+                ? m_radioModel->spectrumWidget() : nullptr) {
+            sw->setZoomObergrenzeHz(0.0);
+        }
     });
 }
 

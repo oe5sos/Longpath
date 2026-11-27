@@ -264,6 +264,7 @@ warren@wpratt.com
 #include "BandDefaults.h"
 #include "RxDspWorker.h"
 #include "core/FrequenzEichung.h"
+#include "core/FlexZoomZug.h"
 #include "core/SMeterSkala.h"
 #include "core/TransverterSetup.h"
 #include "core/FFTEngine.h"
@@ -7451,6 +7452,20 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                         kv.value(QStringLiteral("bandwidth")).toDouble(&okBreite);
                     if (okBreite && b > 0.0) { m_flexPanBreiteMhz = b; }
                 }
+                // Die Grenzen, falls die Maschine sie nennt (FlexLib
+                // fuehrt sie als `min_bw` / `max_bw`). Fehlen sie, gelten
+                // die Grenzen aus AetherSDR (core/FlexZoomZug.h).
+                bool okGrenze = false;
+                if (kv.contains(QStringLiteral("min_bw"))) {
+                    const double g =
+                        kv.value(QStringLiteral("min_bw")).toDouble(&okGrenze);
+                    if (okGrenze && g > 0.0) { m_flexPanMinBreiteMhz = g; }
+                }
+                if (kv.contains(QStringLiteral("max_bw"))) {
+                    const double g =
+                        kv.value(QStringLiteral("max_bw")).toDouble(&okGrenze);
+                    if (okGrenze && g > 0.0) { m_flexPanMaxBreiteMhz = g; }
+                }
                 const double mitteMhz  = m_flexPanMitteMhz;
                 const double breiteMhz = m_flexPanBreiteMhz;
                 if (mitteMhz > 0.0 && breiteMhz > 0.0) {
@@ -7784,6 +7799,73 @@ void RadioModel::zieheFlexPanadapterAuf(double hz)
         }
         uebernimmFlexPanMitte(hz / 1.0e6);
     });
+}
+
+void RadioModel::zieheFlexPanadapterAuf(double mitteHz, double breiteHz)
+{
+    if (!m_flexConnection || !m_flexConnection->isConnected()) { return; }
+    if (m_flexPanId.isEmpty() || !(mitteHz > 0.0) || !(breiteHz > 0.0)) {
+        return;
+    }
+    // Auf das Hertz, wie es auf den Draht geht: was wir danach selbst
+    // nachfuehren, muss GENAU das sein, was die Maschine bekam.
+    const double mitte  = FlexZoomZug::aufDrahtGerundet(mitteHz);
+    const double breite = FlexZoomZug::aufDrahtGerundet(breiteHz);
+    const QString befehl =
+        FlexCommandWire::setPanCenterBandwidthCommand(m_flexPanId, mitte, breite);
+    if (befehl.isEmpty()) { return; }
+
+    // Wie bei der Mitte allein (oben): die Maschine echot den
+    // gesetzten Ausschnitt nicht verlaesslich -- AetherSDR fuehrt ihn
+    // darum ebenfalls selbst nach, sobald der Befehl hinaus ist
+    // (RadioModel.cpp:5576-5581 [@d58e2b8a]: „the radio may ACK
+    // without echoing a display status back to the setting client").
+    // Longpath wartet die Annahme ab; vorher waere es eine Behauptung.
+    m_flexConnection->sendCommand(befehl,
+        [this, mitte, breite](int code, const QString&) {
+        if (code != 0) {
+            qCWarning(lcConnection).nospace()
+                << "Flex: Zoom-Ausschnitt abgelehnt, Code " << code
+                << " (" << (breite / 1.0e3) << " kHz um "
+                << (mitte / 1.0e6) << " MHz)";
+            return;
+        }
+        uebernimmFlexPanAusschnitt(mitte / 1.0e6, breite / 1.0e6);
+    });
+}
+
+double RadioModel::flexPanMindestBreiteHz() const
+{
+    return m_flexPanMinBreiteMhz > 0.0 ? m_flexPanMinBreiteMhz * 1.0e6
+                                       : FlexZoomZug::kMindestBreiteHz;
+}
+
+double RadioModel::flexPanHoechstBreiteHz() const
+{
+    return m_flexPanMaxBreiteMhz > 0.0 ? m_flexPanMaxBreiteMhz * 1.0e6
+                                       : FlexZoomZug::kHoechstBreiteHz;
+}
+
+void RadioModel::uebernimmFlexPanAusschnitt(double mitteMhz, double breiteMhz)
+{
+    if (!(mitteMhz > 0.0) || !(breiteMhz > 0.0)) { return; }
+    m_flexPanMitteMhz  = mitteMhz;
+    m_flexPanBreiteMhz = breiteMhz;
+    const double tief = (mitteMhz - breiteMhz * 0.5) * 1.0e6;
+    const double hoch = (mitteMhz + breiteMhz * 0.5) * 1.0e6;
+    if (qFuzzyCompare(tief, m_flexAusschnittTiefHz)
+        && qFuzzyCompare(hoch, m_flexAusschnittHochHz)) {
+        return;
+    }
+    m_flexAusschnittTiefHz = tief;
+    m_flexAusschnittHochHz = hoch;
+    qCInfo(lcConnection).nospace()
+        << "Flex: Zoom-Ausschnitt angenommen " << (tief / 1.0e6)
+        << "–" << (hoch / 1.0e6) << " MHz (" << (breiteMhz * 1.0e3)
+        << " kHz)";
+    // `true`: UNSER Zug. Das Fenster war die Quelle und bleibt, wie es
+    // ist (FlexZoomZug::fensterBleibt).
+    emit flexAusschnittGeaendert(tief, hoch, true);
 }
 
 void RadioModel::uebernimmFlexPanMitte(double mitteMhz)
@@ -9904,6 +9986,8 @@ void RadioModel::teardownFlexConnection()
     m_flexMasseNachgereicht = 0;
     m_flexZuletztGestellteHz = 0.0;
     m_flexPanId.clear();
+    m_flexPanMinBreiteMhz = 0.0;
+    m_flexPanMaxBreiteMhz = 0.0;
     m_flexFremdesBildGemeldet = false;
 
     if (m_flexStream) {
