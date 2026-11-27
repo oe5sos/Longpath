@@ -175,6 +175,18 @@ private slots:
         QVERIFY(client.waterfallAvailable());
     }
 
+    // Betreiber 2026-11-27: "kiwi hat sich gerade aufgehaengt" -- ohne
+    // Wasserfall-Kanal darf kein alter Verlauf stehen bleiben.
+    void hinweisRaeumtDasAlteBildWeg()
+    {
+        KiwiWaterfallStripWidget strip(QStringLiteral("a"), QStringLiteral("Eins"));
+        strip.pushRow(bins(-100.0f), 14185000.0, 14225000.0);
+        QVERIFY(!strip.frequencyText().isEmpty());
+        strip.setNotice(QStringLiteral("kein Kanal"));
+        QVERIFY(strip.frequencyText().isEmpty());
+        QCOMPARE(strip.spanHz(), 0.0);
+    }
+
     void pegelbereichLaesstSichEinstellen()
     {
         KiwiWaterfallStripWidget strip(QStringLiteral("a"), QStringLiteral("Eins"));

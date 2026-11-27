@@ -290,6 +290,10 @@ void KiwiWaterfallStripWidget::reset()
 {
     m_history.fill(QColor(Style::hexRole(Style::kAppBg)));
     m_peakLabel->setText(QStringLiteral("—"));
+    m_lowHz = 0.0;
+    m_highHz = 0.0;
+    m_freqLabel->clear();
+    m_spanLabel->clear();
     update();
 }
 
@@ -423,6 +427,9 @@ void KiwiWaterfallStripWidget::setExpandedState(bool on)
 void KiwiWaterfallStripWidget::setNotice(const QString& text)
 {
     if (m_notice == text) { return; }
+    // Statt eines Bildes: ein alter Verlauf darunter saehe wie ein haengendes
+    // Bild aus (Betreiber 2026-11-27: "kiwi hat sich gerade aufgehaengt").
+    if (m_notice.isEmpty()) { reset(); }
     m_notice = text;
     update();
 }

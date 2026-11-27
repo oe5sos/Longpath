@@ -637,15 +637,19 @@ void MainWindow::refreshKiwiSoundButtons()
     }
     if (!m_kiwiWaterfallPanel || !m_kiwiSdrManager) { return; }
     for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
-        m_kiwiWaterfallPanel->setSoundActive(
-            pr.id, m_kiwiSdrManager->assignedSliceForProfile(pr.id) >= 0
-                       && !m_kiwiUserMuted.contains(pr.id));
+        const bool audible = m_kiwiSdrManager->assignedSliceForProfile(pr.id) >= 0
+                             && !m_kiwiUserMuted.contains(pr.id);
+        m_kiwiWaterfallPanel->setSoundActive(pr.id, audible);
         const KiwiSdrClient::State st = m_kiwiSdrManager->state(pr.id);
         const bool up = st == KiwiSdrClient::State::Connected || st == KiwiSdrClient::State::Camping;
-        m_kiwiWaterfallPanel->setNotice(
-            pr.id, (up && !m_kiwiSdrManager->waterfallAvailable(pr.id))
-                       ? tr("This Kiwi has no free waterfall channel — sound only.")
-                       : QString());
+        QString notice;
+        if (up && !m_kiwiSdrManager->waterfallAvailable(pr.id)) {
+            notice = audible
+                ? tr("This Kiwi has no free waterfall channel — sound only.")
+                : tr("This Kiwi has no free waterfall channel — nothing to show. "
+                     "Choose another Kiwi.");
+        }
+        m_kiwiWaterfallPanel->setNotice(pr.id, notice);
         m_kiwiWaterfallPanel->setLost(pr.id, kiwiLostTitle(pr.id),
                                       m_kiwiSdrManager->stateDetail(pr.id));
     }
