@@ -82,6 +82,12 @@ EINGETRAGEN = []
 ROTOR_FREI = '--rotorfrei' in sys.argv
 # Zustand als NAME, wie `rotor_ist:` ihn seit dem 2026-10-07 sendet.
 ROTOR = {'ist': 143.0, 'ziel': 143.0, 'zustand': 'bereit', 'frisch': True}
+# --rotorstand N: Anfangsstellung des Rotors (fuer Entwurfsblaetter; 143 liegt
+# an der Station hinter dem Berg, genutzt wird 180..360).
+if '--rotorstand' in sys.argv:
+    _i = sys.argv.index('--rotorstand')
+    if _i + 1 < len(sys.argv):
+        ROTOR['ist'] = ROTOR['ziel'] = float(sys.argv[_i + 1]) % 360
 
 
 def _rotor_nachziehen():
