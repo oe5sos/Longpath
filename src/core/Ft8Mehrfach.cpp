@@ -10,6 +10,8 @@
 //   2026-11-17 — nimmVonHand(), raeumeAuf(); das Nachruecken waehlt den
 //                 ersten Zug nach der Herkunft. Martin Fischer (OE5SOS),
 //                 KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-26 — entferne(), warteliste(). Martin Fischer (OE5SOS),
+//                 KI-gestuetzt ueber Anthropic Claude.
 // =================================================================
 
 #include "core/Ft8Mehrfach.h"
@@ -229,6 +231,44 @@ QVector<Ft8Mehrfach::Belegung> Ft8Mehrfach::belegung() const
         raus.push_back(b);
     }
     return raus;
+}
+
+QVector<Ft8Mehrfach::Wartender> Ft8Mehrfach::warteliste() const
+{
+    QVector<Wartender> raus;
+    raus.reserve(m_warteschlange.size());
+    for (const Wartend& w : m_warteschlange) {
+        raus.push_back(Wartender{w.partner, w.snr});
+    }
+    return raus;
+}
+
+bool Ft8Mehrfach::entferne(const QString& partner)
+{
+    const QString p = partner.trimmed().toUpper();
+    if (p.isEmpty()) { return false; }
+
+    bool gab = false;
+    // Nur ein LAUFENDES QSO abbrechen. Ist es in diesem Augenblick
+    // schon fertig (das RR73 ist hinaus, `raeumeAuf` kam noch nicht),
+    // ist es ein QSO und kommt ins Logbuch wie jedes andere.
+    for (Ft8Ablauf& a : m_laufend) {
+        if (a.partner().toUpper() == p) {
+            gab = true;
+            a.abbrechen();
+        }
+    }
+    const auto vorher = m_warteschlange.size();
+    m_warteschlange.erase(
+        std::remove_if(m_warteschlange.begin(), m_warteschlange.end(),
+                       [&p](const Wartend& w) {
+                           return w.partner.toUpper() == p;
+                       }),
+        m_warteschlange.end());
+    if (m_warteschlange.size() != vorher) { gab = true; }
+
+    if (gab) { raeumeAuf(); }
+    return gab;
 }
 
 void Ft8Mehrfach::abbrechen()

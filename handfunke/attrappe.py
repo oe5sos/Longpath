@@ -82,6 +82,12 @@ EINGETRAGEN = []
 ROTOR_FREI = '--rotorfrei' in sys.argv
 # Zustand als NAME, wie `rotor_ist:` ihn seit dem 2026-10-07 sendet.
 ROTOR = {'ist': 143.0, 'ziel': 143.0, 'zustand': 'bereit', 'frisch': True}
+# --rotorstand N: Anfangsstellung des Rotors (fuer Entwurfsblaetter; 143 liegt
+# an der Station hinter dem Berg, genutzt wird 180..360).
+if '--rotorstand' in sys.argv:
+    _i = sys.argv.index('--rotorstand')
+    if _i + 1 < len(sys.argv):
+        ROTOR['ist'] = ROTOR['ziel'] = float(sys.argv[_i + 1]) % 360
 
 
 def _rotor_nachziehen():
@@ -566,6 +572,9 @@ class Verbindung(threading.Thread):
                     m = 'normal'
                 self.sende_text(f'agc_mode:{args[0]},{m};')
             print(f'  {self.addr[1]}: {zeile}')
+        elif name == 'tx_alc_enable':
+            # Longpath-eigen (2026-11-26): ALC-Zeile zuschalten.
+            self.alc_an = bool(args) and args[0].strip().lower() == 'true'
         elif name == 'iq_start':
             self.iq_an = True
             print(f'  {self.addr[1]}: IQ an')
@@ -765,6 +774,8 @@ class Verbindung(threading.Thread):
             if self.sendet and jetzt - getattr(self, 'tx_sens_zeit', 0) > 0.2:
                 self.tx_sens_zeit = jetzt
                 self.sende_text('tx_sensors:0,-30.0,12.5,12.5,%.1f;' % (1.3 + 0.2 * math.sin(jetzt)))
+                if getattr(self, 'alc_an', False):
+                    self.sende_text('tx_alc:0,%.1f;' % (-2.0 + 1.5 * math.sin(jetzt * 1.7)))
 
             if self.rx_sensors_an and jetzt - smeter_zeit > self.rx_sensors_ms / 1000.0:
                 smeter_zeit = jetzt

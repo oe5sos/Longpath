@@ -69,6 +69,8 @@ public slots:
     // QMetaObject::invokeMethod hop ensures the start() lands on the
     // worker thread that owns m_timer.
     void setUpdatePeriodMs(int ms);
+    /// Der Takt, der wirklich laeuft (ms je Zeile).
+    int updatePeriodMs() const { return m_periodMs.load(); }
 
     // Start / stop the timer.  Idempotent.
     void start();

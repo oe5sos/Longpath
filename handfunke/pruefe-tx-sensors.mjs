@@ -26,5 +26,11 @@ const vorher = l.st.txSensorZeit;
 l._onText('tx_sensors:0,-30.0,0.0,0.0,1.0');
 pruefe('ein zweiter Rahmen ueberschreibt', l.st.txSwr === 1 && l.st.txSensorZeit >= vorher);
 
+// tx_alc (Longpath-eigen, 2026-11-26): eigene Zeile, eigener Zeitstempel.
+pruefe('ohne tx_alc keine ALC', l.st.txAlc === null && l.st.txAlcZeit === 0);
+l._onText('tx_alc:0,-2.5');
+pruefe('ALC gelesen, negatives Vorzeichen bleibt', l.st.txAlc === -2.5, String(l.st.txAlc));
+pruefe('ALC hat einen eigenen Zeitstempel', l.st.txAlcZeit > 0);
+
 console.log(fehler ? `\n${fehler} FEHLT` : '\nalles ok');
 process.exit(fehler ? 1 : 0);

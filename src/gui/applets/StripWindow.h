@@ -100,6 +100,13 @@ public:
     // route here since 2026-08-11 — the standalone dialog is gone).
     void showVoiceCheckTab();
 
+protected:
+    // Ein geschlossenes Fenster hat kein Haekchen mehr, mit dem man den
+    // Mithoerer ausschalten koennte -- er geht deshalb mit aus.
+    void hideEvent(QHideEvent* ev) override;
+
+public:
+
     // ── PUDU monitor buttons (AetherSDR contract, 2026-08-11) ────────
     //
     // The same two-button, three-setter surface AetherialAudioStrip

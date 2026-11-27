@@ -40,6 +40,9 @@
 //                 ueberschreiben; Doppelklick und „THEN" gehen im
 //                 Mehrfachbetrieb auf einen Platz. Martin Fischer
 //                 (OE5SOS), KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-26 — entferneStation(): eine Station aus „FT8 Slots"
+//                 loeschen. Martin Fischer (OE5SOS), KI-gestuetzt ueber
+//                 Anthropic Claude (Claude Code).
 // =================================================================
 
 #pragma once
@@ -343,6 +346,16 @@ public:
     /// (`RadioModel::flexNichtGetastet`). Haelt den Lauf an und sagt,
     /// woran es lag. Ohne eigene Sendung geschieht nichts.
     void sendenGescheitert(const QString& grund);
+
+    /// Eine Station aus „FT8 Slots" loeschen (2026-11-26, Betreiber:
+    /// „in den ft8 slots sollte man auch immer eine call löschen
+    /// können"). Von ihrem Platz, aus der Schlange der Plaetze und
+    /// unter „THEN" -- wo immer sie steht. Danach gilt fuer sie
+    /// dieselbe Sperrfrist wie nach dem ✕ unter „THEN"
+    /// (`Ft8Warteschlange::weiseAb`): ruft sie weiter, kommt sie nicht
+    /// von selbst wieder. Kein Logeintrag. Die anderen Plaetze laufen
+    /// weiter; eine Sendung, die gerade hinausgeht, geht zu Ende.
+    void entferneStation(const QString& wer);
 
     // Fuer den Pruefstand.
     QPushButton* cqButtonForTest()  const { return m_cqBtn; }

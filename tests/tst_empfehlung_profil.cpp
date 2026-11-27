@@ -26,13 +26,13 @@ class TstEmpfehlungProfil : public QObject {
     Q_OBJECT
 
 private slots:
-    void itIsOfferedAsAStartingPoint()
+    void itIsNoLongerInTheList()
     {
-        bool da = false;
-        for (const auto& p : StripSettings::builtInPresets()) {
-            if (p.name == QStringLiteral("Recommended — speech")) { da = true; }
-        }
-        QVERIFY2(da, "die Empfehlung steht nicht in der Liste");
+        // 2026-11-24: Die eingebauten Profile sind aus der Liste
+        // genommen (loeschen liess sich keines). Die Kette selbst
+        // bleibt als Messgrundlage ueber applyBuiltIn() erreichbar.
+        QVERIFY2(StripSettings::builtInPresets().isEmpty(),
+                 "eingebaute Profile stehen wieder in der Liste");
     }
 
     void itSwitchesOnWhatItNamesAndNothingElse()

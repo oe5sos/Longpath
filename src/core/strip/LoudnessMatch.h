@@ -126,6 +126,20 @@ private:
     // anderthalb Sekunden. Leiser darf schnell gehen; lauter nie.
     double m_alphaSchnell{0.0};
     float  m_gain{1.0f};     // linear, das was wirklich multipliziert wird
+
+    // ── Die Spitzenschranke ─────────────────────────────────────
+    //
+    // 2026-11-26, am Headset an der Klinke: mit dem Ausgleich lief
+    // das Mithoeren, aber „ab und zu trotzdem kurzes" Aufschaukeln.
+    // Der Ausgleich folgt dem Effektivwert und braucht dafuer Zeit:
+    // steht er nach lauter Rede nahe 0 dB und die Kette legt beim
+    // naechsten leisen Laut 20 dB drauf, ist das bis zum Nachziehen
+    // hoerbar -- und am Headset schliesst es die Schleife. Darum
+    // darf im Mithoerweg keine Spitze ueber der juengsten
+    // Eingangsspitze liegen. Das gilt sofort, je Block.
+    double m_spitzeIn{0.0};  // Eingangsspitze, klingt mit 300 ms ab
+    double m_haltAb{1.0};
+    float  m_schranke{1.0f};
 };
 
 } // namespace Longpath
