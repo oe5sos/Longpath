@@ -7680,6 +7680,11 @@ void RadioModel::connectFlexRadio(const RadioInfo& info)
                 this, [this] {
             // Der Kanal ist weg: nichts mehr senden, nur vergessen.
             if (m_flexLausch) { m_flexLausch->vergiss(); }
+            // Auch der Sendetonstrom: die Maschine raeumt ihn mit der
+            // Sitzung ab, das naechste Verbinden muss einen neuen anlegen
+            // (sonst getastet ohne Ton, 2026-11-27).
+            m_flexSendetonstromId = 0;
+            m_flexSendetonZaehler = 0;
             // Der gemerkte APD-Zustand gehoert der Maschine, nicht uns.
             m_flexApd.clear();
             emit flexApdGeaendert();
@@ -9852,6 +9857,18 @@ void RadioModel::teardownFlexConnection()
             m_flexConnection->sendCommand(
                 QStringLiteral("stream remove %1").arg(kennung));
         }
+        // Der Sendetonstrom ebenso. Seine Kennung blieb bis 2026-11-27
+        // ueber das Trennen hinaus stehen; legeFlexSendetonstromAn()
+        // sah sie beim Neuverbinden und legte KEINEN neuen an. Getastet
+        // wurde, der FT8-Ton ging an einen Strom, den die Maschine nicht
+        // mehr kannte: Betreiber „es geht bei ft8 gerade keine leistung
+        // raus" — FWDPWR 11 dBm bei rfpower 50, Ton -3 dBFS vor der
+        // Maschine (Protokoll 10:20, nach Trennen/Verbinden um 09:58).
+        if (m_flexSendetonstromId != 0) {
+            m_flexConnection->sendCommand(
+                QStringLiteral("stream remove 0x%1")
+                    .arg(QString::number(m_flexSendetonstromId, 16)));
+        }
         // Zurueck auf den Wert der MASCHINE, nicht auf einen geratenen.
         if (m_flexRestoreMuteLocal && !m_flexMuteLocalWas.isEmpty()) {
             m_flexConnection->sendCommand(
@@ -9870,6 +9887,8 @@ void RadioModel::teardownFlexConnection()
         }
     }
     m_flexAudioStreamId.clear();
+    m_flexSendetonstromId = 0;
+    m_flexSendetonZaehler = 0;
     m_flexSliceId.clear();
     // Der Wunsch bleibt stehen: beim naechsten Verbinden wird wieder
     // gelauscht.
