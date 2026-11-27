@@ -225,12 +225,7 @@ void CommandBar::addGroupWidget(const QString& caption, QWidget* w)
     // beginnen auf derselben Linie.
     beschriftung->setVisible(false);
     box->addWidget(beschriftung, 0, Qt::AlignLeft);
-    // Oben ausgerichtet, wie addGroup(): die Schiene beginnt auf der ersten
-    // Linie der Leiste. Ohne Ausrichtung wurde sie in der unteren Zeile
-    // mittig gesetzt, sobald die Filtergruppe fehlte (ohne Empfaenger), und
-    // rutschte zwischen die beiden Pillenreihen (Betreiber 2026-11-27: 13:49
-    // war richtig).
-    box->addWidget(w, 0, Qt::AlignLeft | Qt::AlignTop);
+    box->addWidget(w, 0, Qt::AlignLeft);
     m_gruppenWidgets.insert(w, box);
     // Ans Ende der Gruppen, also hinter die Rate -- wie bisher.
     m_boxen.append(box);
@@ -579,10 +574,15 @@ CommandBar::Group& CommandBar::addGroup(const QString& caption,
     // ersten Linie der Leiste, nicht mittig (Betreiber 2026-11-26).
     pills->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     box->addLayout(pills);
-    // Die zweite Zeile entsteht erst, wenn eine Pille sie braucht (addPill).
-    // Eine leere Zeile hier hat trotzdem einen Abstand gekostet: die Lücke
-    // zwischen den Reihen (Betreiber 2026-11-27: "diese gehört weg").
-    QHBoxLayout* zweite = nullptr;
+    // Zweite Zeile gleich mit dem Bereich: alle Bereiche haben dieselben
+    // beiden Linien (Betreiber 2026-11-26). Leer bleibt sie ohne Abstand.
+    auto* zweite = new QHBoxLayout;
+    zweite->setContentsMargins(0, 0, 0, 0);
+    zweite->setSpacing(kAbstand);
+    // Linksbündig: sonst wird die kürzere zweite Zeile mittig gesetzt und steht
+    // nicht unter der ersten (Betreiber 2026-11-26: FT8 unter LSB).
+    zweite->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    box->addLayout(zweite);
     // Die Zeile setzt ordneZeilen() endgültig; hier nur der Besitz.
     row->addLayout(box);
     m_boxen.append(box);
@@ -650,8 +650,6 @@ QPushButton* CommandBar::addPill(Group& g, const QString& label)
             auto* zweite = new QHBoxLayout;
             zweite->setContentsMargins(0, 0, 0, 0);
             zweite->setSpacing(kAbstand);
-            // Linksbündig, wie in addGroup(): FT8 steht unter LSB.
-            zweite->setAlignment(Qt::AlignLeft | Qt::AlignTop);
             static_cast<QBoxLayout*>(g.box)->addLayout(zweite);
             g.row2 = zweite;
         }
@@ -744,7 +742,7 @@ void CommandBar::buildModeGroup(QHBoxLayout* row)
     };
 
     Group& g = addGroup(QStringLiteral("Mode"), row);
-    g.spalten = 2;   // Betreiber 2026-11-27: jede Gruppe höchstens zwei Spalten
+    g.spalten = 4;   // LSB · USB · CWL · „…“ in einer Zeile (Betreiber 2026-11-26)
     for (int i = 0; i < kVisiblePerGroup && i < m_allModes.size(); ++i) {
         const auto entry = m_allModes.at(i);
         QPushButton* b = addPill(g, entry.first);
@@ -942,7 +940,7 @@ void CommandBar::buildBandGroup(QHBoxLayout* row)
     };
 
     Group& g = addGroup(QStringLiteral("Band"), row);
-    g.spalten = 2;   // Betreiber 2026-11-27: jede Gruppe höchstens zwei Spalten
+    g.spalten = 3;   // oben drei Bänder, darunter der Rest (Betreiber 2026-11-26)
     // Zweite Pillenzeile unter den ersten vier Baendern (2026-11-21).
     QHBoxLayout* zweite = g.row2;
     g.row2 = zweite;
