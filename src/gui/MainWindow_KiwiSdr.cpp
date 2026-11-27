@@ -398,7 +398,8 @@ void MainWindow::syncKiwiSdrTransmitMute()
             // selbst (2026-11-25).
             if (kiwiKeepsAudioDuringTx(
                     profile, (m_kiwiOwnSignalOn && profile.id == m_kiwiOwnProfileId)
-                                 || m_kiwiSoundSlices.contains(profile.id))) {
+                                 || m_kiwiSoundSlices.contains(profile.id)
+                                 || m_kiwiListenWanted.contains(profile.id))) {
                 audio->setKiwiSdrAudioSourceEnabled(sliceId, true);
                 continue;
             }
@@ -859,7 +860,8 @@ void MainWindow::wireKiwiSdr()
                 && !kiwiKeepsAudioDuringTx(
                        m_kiwiSdrManager->profile(profileId),
                        (m_kiwiOwnSignalOn && profileId == m_kiwiOwnProfileId)
-                           || m_kiwiSoundSlices.contains(profileId))) {
+                           || m_kiwiSoundSlices.contains(profileId)
+                           || m_kiwiListenWanted.contains(profileId))) {
                 return;
             }
         }

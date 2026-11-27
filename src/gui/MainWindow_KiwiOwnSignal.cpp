@@ -276,6 +276,14 @@ void MainWindow::setKiwiOwnSignalProfile(const QString& profileId, double km)
 {
     if (!m_kiwiSdrManager || !m_kiwiSdrManager->hasProfile(profileId)) { return; }
     const bool changed = profileId != m_kiwiOwnProfileId;
+    // Wird der Kiwi von "Mein Signal" durch einen anderen ERSETZT, laeuft der
+    // alte hoerbar weiter -- und darf beim Senden nicht still werden
+    // (2026-11-27: der neue war nicht erreichbar, der alte stumm).
+    if (changed && !m_kiwiOwnProfileId.isEmpty() && m_kiwiOwnSignalOn
+        && !m_kiwiUserMuted.contains(m_kiwiOwnProfileId)
+        && m_kiwiSdrManager->assignedSliceForProfile(m_kiwiOwnProfileId) >= 0) {
+        m_kiwiListenWanted.insert(m_kiwiOwnProfileId);
+    }
     if (changed && m_kiwiOwnSignalOn) {
         // Anderer Kiwi: der Modus beginnt am neuen von vorn.
         setKiwiOwnSignal(false);
@@ -591,6 +599,15 @@ void MainWindow::kiwiReplayTxEdge(bool sending, int delayMs, bool delayMeasured)
 {
     if (sending == m_kiwiReplaySending) { return; }   // nur die Kante zaehlt
     m_kiwiReplaySending = sending;
+    // Wer sendet und sich hoeren will, muss wissen, dass sein Kiwi gar nicht
+    // da ist.
+    if (sending && m_kiwiSdrManager
+        && !KiwiSdrClient::stateHasReceiveAudio(
+               m_kiwiSdrManager->state(m_kiwiOwnProfileId))) {
+        showToast(tr("My Signal: %1 delivers no audio — choose another Kiwi.")
+                      .arg(m_kiwiSdrManager->displayName(m_kiwiOwnProfileId)),
+                  ToastSeverity::Warning, 8000);
+    }
     if (!m_kiwiReplayOn || !m_kiwiReplayTail) { return; }
     if (sending) {
         stopKiwiReplay();      // wer wieder tastet, bricht das Abspielen ab

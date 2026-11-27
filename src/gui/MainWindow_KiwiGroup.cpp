@@ -434,8 +434,16 @@ void MainWindow::setKiwiSound(const QString& profileId, bool on)
     }
     if (on) { m_kiwiUserMuted.remove(profileId); }
 
+    if (!on) { m_kiwiListenWanted.remove(profileId); }
     if (on) {
-        if (assigned >= 0) { refreshKiwiSoundButtons(); return; }   // schon hoerbar
+        if (assigned >= 0) {   // schon hoerbar -- und auch beim Senden
+            m_kiwiListenWanted.insert(profileId);
+            if (AudioEngine* audio = m_radioModel->audioEngine()) {
+                audio->setKiwiSdrAudioSourceEnabled(assigned, true);
+            }
+            refreshKiwiSoundButtons();
+            return;
+        }
         // Die aktive Scheibe merken: die neue ungebundene darf nichts verschieben.
         const int activeBefore = m_radioModel->activeSlice() ? m_radioModel->activeSlice()->sliceIndex() : -1;
         const int sid = m_radioModel->addSlice(QString(), true);
@@ -636,6 +644,7 @@ void MainWindow::closeKiwi(const QString& profileId)
         }
     }
     m_kiwiSoundSlices.remove(id);
+    m_kiwiListenWanted.remove(id);
     m_kiwiUserMuted.remove(id);
     m_kiwiSdrManager->setWaterfallPreviewEnabled(id, false);
     m_kiwiSdrManager->disconnectProfile(id);
@@ -657,6 +666,7 @@ void MainWindow::retireKiwi(const QString& profileId)
         setKiwiSound(profileId, false);
     }
     m_kiwiSoundSlices.remove(profileId);
+    m_kiwiListenWanted.remove(profileId);
     if (m_kiwiGroup.contains(profileId)) { removeKiwiListener(profileId); }
     m_kiwiSdrManager->setWaterfallPreviewEnabled(profileId, false);
     m_kiwiSdrManager->disconnectProfile(profileId);

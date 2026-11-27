@@ -2382,6 +2382,10 @@ private:
     QHash<QString, double> m_kiwiViewSpanHz;   // Bereich je Kiwi-Streifen (Hz)
     QHash<QString, int> m_kiwiSoundSlices;   // Profil -> Scheibe, die wir fuer den Ton anlegten
     QSet<int> m_kiwiCreatedSlices;   // weitere eigens fuer einen Kiwi angelegte Scheiben
+    // Kiwis, die der Betreiber hoeren will, ohne dass wir ihre Scheibe fuer
+    // den Ton angelegt haben (abgeloester "Mein Signal"-Kiwi, Ton-Knopf):
+    // sie bleiben auch beim Senden hoerbar.
+    QSet<QString> m_kiwiListenWanted;
     QTimer* m_kiwiSoloTimer{nullptr};   // Solo geht nach 30 s von selbst aus
     bool m_kiwiSoloOn{false};
     bool m_radioMuted{false};

@@ -177,6 +177,43 @@ private slots:
         clearProfiles(mgr);
     }
 
+    // 2026-11-27 an Martins Station: "Mein Signal" auf einen zweiten Kiwi
+    // gestellt, der nicht erreichbar war -- der erste lief weiter und wurde
+    // beim Senden stumm.
+    void einAbgeloesterKiwiBleibtBeimSendenHoerbar()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        RadioModel* model = mw->radioModelForTest();
+        clearProfiles(mgr);
+        const QString a = mgr->addProfile(QStringLiteral("Erster"),
+                                          QStringLiteral("kiwi-g.example.at:8073"));
+        const QString b = mgr->addProfile(QStringLiteral("Zweiter"),
+                                          QStringLiteral("kiwi-h.example.at:8073"));
+        mw->setKiwiOwnSignalProfileForTest(a);
+        mw->setKiwiOwnSignalForTest(true);
+        mw->setKiwiOwnSignalProfileForTest(b);
+        mw->setKiwiOwnSignalForTest(true);
+        const int sliceA = mgr->assignedSliceForProfile(a);
+        QVERIFY(sliceA >= 0);
+        AudioEngine* audio = model->audioEngine();
+        QVERIFY(audio);
+        audio->setKiwiSdrAudioSourceEnabled(sliceA, true);
+        model->transmitModel().setMox(true);
+        QVERIFY2(audio->kiwiSdrAudioEnabled(sliceA),
+                 "der abgeloeste Kiwi wurde beim Senden stumm");
+        model->transmitModel().setMox(false);
+        // Ton aus heisst aus.
+        mw->closeKiwiForTest(a);
+        QCOMPARE(mgr->assignedSliceForProfile(a), -1);
+        mw->setKiwiOwnSignalForTest(false);
+        clearProfiles(mgr);
+    }
+
     void derTonBleibtImModusBeimSenden()
     {
         auto* mw = new MainWindow();

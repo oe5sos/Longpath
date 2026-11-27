@@ -3589,6 +3589,10 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <translation>Der Radio-Ton ist wieder an: Kein Kiwi liefert Ton.</translation>
     </message>
     <message>
+        <source>My Signal: %1 delivers no audio — choose another Kiwi.</source>
+        <translation>Mein Signal: %1 liefert keinen Ton – bitte einen anderen Kiwi wählen.</translation>
+    </message>
+    <message>
         <source>Disconnected – server limit</source>
         <translation>Getrennt – Server-Limit</translation>
     </message>
