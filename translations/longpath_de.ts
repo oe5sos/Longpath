@@ -3011,6 +3011,10 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 <context>
     <name>Longpath::KiwiSdrClient</name>
     <message>
+        <source>KiwiSDR sound stream stalled.</source>
+        <translation>Der Ton vom KiwiSDR ist stehengeblieben.</translation>
+    </message>
+    <message>
         <source>This KiwiSDR allows only %1 programs (not browsers) at once, and they are all taken; it disconnected Longpath after 10 seconds. Choose another receiver.</source>
         <translation>Dieser KiwiSDR erlaubt nur %1 Programme (keine Browser) gleichzeitig, und alle Plätze sind belegt. Er hat Longpath nach 10 Sekunden getrennt. Wähle einen anderen Empfänger.</translation>
     </message>

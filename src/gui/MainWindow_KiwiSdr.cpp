@@ -490,13 +490,33 @@ SliceModel* MainWindow::assignKiwiProfileToSlice(const QString& id)
         return s && m_flexTargetSliceId == s->sliceIndex();
     };
 
-    SliceModel* slice = m_radioModel ? m_radioModel->activeSlice() : nullptr;
-    if (slice && (slice->streamIndex() >= 0 || isSunSdrClaimed(slice)
-                  || isFlexClaimed(slice))) { slice = nullptr; }
+    // Und keine, die schon ein ANDERER Kiwi speist: sonst verlor der erste
+    // beim Zuschalten des zweiten Ton und Verbindung (2026-11-27).
+    const auto isOtherKiwiClaimed = [this, &id](const SliceModel* s) {
+        if (!s || !m_kiwiSdrManager) { return false; }
+        const QString owner =
+            m_kiwiSdrManager->assignedProfileForSlice(s->sliceIndex());
+        return !owner.isEmpty() && owner != id;
+    };
+    const auto isFree = [&](const SliceModel* s) {
+        return s && s->streamIndex() < 0 && !isSunSdrClaimed(s)
+            && !isFlexClaimed(s) && !isOtherKiwiClaimed(s);
+    };
+
+    SliceModel* slice = nullptr;
+    if (m_radioModel) {
+        // Die eigene, wenn der Kiwi schon eine hat; sonst die aktive.
+        SliceModel* own = m_radioModel->sliceById(
+            m_kiwiSdrManager->assignedSliceForProfile(id));
+        if (isFree(own)) {
+            slice = own;
+        } else if (isFree(m_radioModel->activeSlice())) {
+            slice = m_radioModel->activeSlice();
+        }
+    }
     if (!slice && m_radioModel) {
         for (SliceModel* candidate : m_radioModel->slices()) {
-            if (candidate && candidate->streamIndex() < 0
-                && !isSunSdrClaimed(candidate) && !isFlexClaimed(candidate)) {
+            if (isFree(candidate)) {
                 slice = candidate;
                 break;
             }

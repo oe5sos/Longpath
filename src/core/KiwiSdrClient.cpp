@@ -409,6 +409,23 @@ KiwiSdrClient::KiwiSdrClient(QObject* parent)
         cleanupSockets();
     });
 
+    m_stallTimer = new QTimer(this);
+    m_stallTimer->setInterval(5000);
+    connect(m_stallTimer, &QTimer::timeout, this, [this]() {
+        if (m_userDisconnecting
+            || !soundStreamStalled(m_state, m_lastSoundFrameUtcMs,
+                                   QDateTime::currentMSecsSinceEpoch())) {
+            return;
+        }
+        const QString detail = tr("KiwiSDR sound stream stalled.");
+        qCWarning(lcKiwiSdr).noquote()
+            << "KiwiSDR SND stalled"
+            << QStringLiteral("endpoint=%1").arg(logEndpoint());
+        setState(State::Error, detail);
+        cleanupSockets();
+        emit recoverableDisconnect(detail);
+    });
+
     m_waterfallRowFlushTimer = new QTimer(this);
     m_waterfallRowFlushTimer->setSingleShot(true);
     connect(m_waterfallRowFlushTimer, &QTimer::timeout,
@@ -948,6 +965,13 @@ void KiwiSdrClient::openWebSockets()
             if (retryWithSecureWebSocket(m_waterfallSocketConnected)) {
                 return;
             }
+            if (m_state == State::Connected) {
+                // Nur das Bild ist weg; der Ton laeuft weiter (2026-11-27).
+                qCWarning(lcKiwiSdr).noquote()
+                    << "KiwiSDR W/F lost, sound continues"
+                    << QStringLiteral("endpoint=%1").arg(logEndpoint());
+                return;
+            }
             const QString detail = tr("KiwiSDR waterfall connection closed.");
             const bool wasConnected = m_state == State::Connected;
             setState(State::Error, detail);
@@ -963,6 +987,12 @@ void KiwiSdrClient::openWebSockets()
         const QString error = m_waterfallSocket
             ? m_waterfallSocket->errorString()
             : QString();
+        if (m_state == State::Connected) {
+            qCWarning(lcKiwiSdr).noquote()
+                << "KiwiSDR W/F error, sound continues"
+                << QStringLiteral("endpoint=%1").arg(logEndpoint()) << error;
+            return;
+        }
         handleSocketError(error.isEmpty()
                               ? tr("KiwiSDR waterfall socket error.")
                               : tr("KiwiSDR waterfall socket error: %1")
@@ -980,6 +1010,9 @@ void KiwiSdrClient::openWebSockets()
         << QStringLiteral("endpoint=%1").arg(logEndpoint())
         << waterfallUrl;
     m_waterfallSocket->open(kiwiWebSocketRequest(waterfallUrl, origin));
+    // Das Zeitlimit laeuft schon ab hier: bleibt der WebSocket-Aufbau
+    // haengen, kam "connected" nie, und es hiess ewig "Connecting".
+    m_audioReadyTimer->start();
 }
 #endif
 
@@ -1231,6 +1264,9 @@ void KiwiSdrClient::cleanupSockets()
     if (m_audioReadyTimer) {
         m_audioReadyTimer->stop();
     }
+    if (m_stallTimer) {
+        m_stallTimer->stop();
+    }
     m_soundAudioReady = false;
     m_soundAudioRateAcked = false;
     m_soundSampleRateCommandsSent = false;
@@ -1371,6 +1407,14 @@ void KiwiSdrClient::sendSoundSampleRateCommands()
     sendSoundCommand(KiwiSdrProtocol::formatAgcCommand(
         c.agcEnabled, c.agcHang, c.agcThresholdDb,
         c.agcGainDb, c.agcDecayMs));
+    if ((m_trackedSliceId < 0 || m_trackedFrequencyMhz <= 0.0)
+        && !receiverControlSuppressed()) {
+        // Ohne "SET mod" schickt ein KiwiSDR keinen Ton und kein Bild
+        // ("no SND audio frames arrived", 2026-11-27 ohne Sendescheibe).
+        // Die erste echte Abstimmung ueberschreibt das sofort.
+        sendSoundCommand(QStringLiteral(
+            "SET mod=lsb low_cut=-2700 high_cut=-300 freq=7100.000"));
+    }
     sendTrackedSliceToServer();
     sendKeepalive();
 }
@@ -2312,13 +2356,15 @@ void KiwiSdrClient::handleWaterfallFrame(const QByteArray& frame)
     recordWaterfallAutoScaleRow(bins);
     updateWaterfallAutoScale();
 
-    const QString panId = !m_waterfallRequestPanId.isEmpty()
+    QString panId = !m_waterfallRequestPanId.isEmpty()
         ? m_waterfallRequestPanId
         : (!m_waterfallViewPanId.isEmpty()
               ? m_waterfallViewPanId
               : m_trackedPanId);
     if (panId.isEmpty()) {
-        return;
+        // Frisch angelegte Scheiben haben noch keinen Panadapter; die
+        // Zeilen laufen je Profil ins Kiwi-Fenster und gingen verloren.
+        panId = QStringLiteral("kiwi");
     }
     double rowLowMhz = m_waterfallRequestLowMhz;
     double rowHighMhz = m_waterfallRequestHighMhz;
@@ -3246,6 +3292,9 @@ void KiwiSdrClient::markSoundAudioReady()
     }
 
     setState(State::Connected, tr("Connected to %1.").arg(m_endpoint));
+    if (m_stallTimer) {
+        m_stallTimer->start();
+    }
 }
 
 QString KiwiSdrClient::logEndpoint() const
@@ -3772,6 +3821,13 @@ QString KiwiSdrClient::stateLabel(State state)
 bool KiwiSdrClient::stateHasReceiveAudio(State state)
 {
     return state == State::Connected || state == State::Camping;
+}
+
+bool KiwiSdrClient::soundStreamStalled(State state, qint64 lastFrameUtcMs,
+                                       qint64 nowUtcMs)
+{
+    return state == State::Connected && lastFrameUtcMs > 0
+        && nowUtcMs - lastFrameUtcMs > kSoundStallTimeoutMs;
 }
 
 bool KiwiSdrClient::stateAllowsReceiverControl(State state)

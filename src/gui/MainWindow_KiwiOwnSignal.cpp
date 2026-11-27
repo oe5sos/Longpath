@@ -60,6 +60,9 @@ namespace Longpath {
 namespace {
 constexpr const char* kKeyProfile = "KiwiOwnSignal/ProfileId";
 constexpr const char* kKeyKm = "KiwiOwnSignal/Km";
+// Durchlass des Kiwi in "Mein Signal" bei SSB (Hoerfrequenz).
+constexpr int kKiwiOwnSignalLowHz = 50;
+constexpr int kKiwiOwnSignalHighHz = 4000;
 // Der Kiwi zeigt nie weniger als dies (er hat nur ganzzahlige Zoomstufen
 // und sein Bild wird ab etwa 10 kHz Breite unbrauchbar eng).
 constexpr double kMinViewHz = 10000.0;
@@ -392,7 +395,9 @@ void MainWindow::setKiwiOwnSignal(bool on)
 
     // Tastenzustand: schon ein laufendes Senden zaehlt als Beginn.
     const TransmitModel& tx = m_radioModel->transmitModel();
-    kiwiOwnSignalTxEdge(tx.isMox() || tx.isTune());
+    // Auch wenn die Flex selbst getastet hat (Mikrofontaste, Fussschalter).
+    kiwiOwnSignalTxEdge(tx.isMox() || tx.isTune()
+                        || m_radioModel->flexSendetGerade());
     // Ton: im Modus bleibt er beim Senden (siehe kiwiKeepsAudioDuringTx).
     syncKiwiSdrTransmitMute();
 }
@@ -467,10 +472,22 @@ bool MainWindow::sendKiwiOwnSignalTracking()
     SpectrumWidget* sw = m_kiwiOwnPan.data();
     const QString panId = src->panKey().isEmpty() ? QStringLiteral("own-signal")
                                                   : src->panKey();
+    // Den eigenen Ton beurteilt man nicht durch das Empfangsfilter: ein
+    // schmales Filter der Sendescheibe beschnitt sonst, was zu hoeren war
+    // (Betreiber 2026-11-27). In SSB hoert der Kiwi darum breit.
+    int lowCut = src->filterLow();
+    int highCut = src->filterHigh();
+    if (src->dspMode() == DSPMode::LSB) {
+        lowCut = -kKiwiOwnSignalHighHz;
+        highCut = -kKiwiOwnSignalLowHz;
+    } else if (src->dspMode() == DSPMode::USB) {
+        lowCut = kKiwiOwnSignalLowHz;
+        highCut = kKiwiOwnSignalHighHz;
+    }
     m_kiwiSdrManager->updateSliceTracking(
         kiwiSlice, double(txHz) / 1.0e6,
         SliceModel::modeName(src->dspMode()),
-        src->filterLow(), src->filterHigh(), panId,
+        lowCut, highCut, panId,
         QString(), SliceModel::cwPitchHz());
     // Die Ansicht des Kiwi-Wasserfalls: die Breite des Panadapters (der
     // Kiwi rundet auf seine Zoomstufen) -- oder, nach +/- am Streifen, der

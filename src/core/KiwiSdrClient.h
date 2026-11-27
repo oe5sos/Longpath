@@ -121,6 +121,11 @@ public:
     static bool diagnosticWaterfallCompressionRequested();
     static bool stateHasReceiveAudio(State state);
     static bool stateAllowsReceiverControl(State state);
+    // Verbunden, aber seit mehr als kSoundStallTimeoutMs kein Tonrahmen mehr:
+    // der Strom steht, ohne dass der Server die Verbindung schliesst.
+    static constexpr qint64 kSoundStallTimeoutMs = 15000;
+    static bool soundStreamStalled(State state, qint64 lastFrameUtcMs,
+                                   qint64 nowUtcMs);
 
 public slots:
     void setOperatorCallsign(const QString& callsign);
@@ -422,6 +427,7 @@ private:
     bool m_lastWaterfallRowValid{false};
     QTimer* m_keepaliveTimer{nullptr};
     QTimer* m_audioReadyTimer{nullptr};
+    QTimer* m_stallTimer{nullptr};     // siehe soundStreamStalled
     QTimer* m_waterfallRowFlushTimer{nullptr};
     bool m_waterfallRowPending{false};
     QString m_pendingWaterfallPanId;

@@ -94,6 +94,11 @@ private slots:
         QVERIFY(tracked.count() >= 1);
         QCOMPARE(tracked.last().at(0).toInt(), kiwiSlice);
         QCOMPARE(tracked.last().at(1).toDouble(), 14.205);   // Sende-, nicht Empfangsfrequenz
+        // SSB: der Kiwi hoert breit, nicht durch das Empfangsfilter (2026-11-27).
+        const int lo = tracked.last().at(3).toInt();
+        const int hi = tracked.last().at(4).toInt();
+        QCOMPARE(std::min(std::abs(lo), std::abs(hi)), 50);
+        QCOMPARE(std::max(std::abs(lo), std::abs(hi)), 4000);
         QCOMPARE(mw->kiwiOwnStripForTest()->markX() >= -1, true);
 
         // XIT verschiebt die Sendefrequenz -- der Kiwi folgt.

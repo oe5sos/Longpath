@@ -810,7 +810,7 @@ bool MainWindow::addKiwiListener(const QString& profileId, double km,
     // Schon senden? Dann zaehlt es als Beginn (wie bei "Mein Signal").
     if (m_radioModel) {
         const TransmitModel& tx = m_radioModel->transmitModel();
-        if (tx.isMox() || tx.isTune()) {
+        if (tx.isMox() || tx.isTune() || m_radioModel->flexSendetGerade()) {
             m_kiwiGroup.txChanged(true, kiwiOwnNowMs());
         }
     }

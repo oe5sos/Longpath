@@ -133,6 +133,37 @@ private slots:
         model->setCwPitch(SliceModel::kCwPitchDefaultHz);
     }
 
+    // 2026-11-27: der zweite Kiwi nahm dem ersten die Scheibe weg.
+    void einZweiterKiwiNimmtDemErstenNichtDieScheibe()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        QVERIFY(mgr);
+        clearProfiles(mgr);
+
+        mw->addKiwiSdrReceiverForTest(QStringLiteral("Erster"),
+                                      QStringLiteral("kiwi-a.example.at:8073"));
+        const QString a = mgr->profileIdForEndpoint(
+            QStringLiteral("kiwi-a.example.at:8073"));
+        QVERIFY(!a.isEmpty());
+        const int sliceA = mgr->assignedSliceForProfile(a);
+        QVERIFY(sliceA >= 0);
+
+        mw->addKiwiSdrReceiverForTest(QStringLiteral("Zweiter"),
+                                      QStringLiteral("kiwi-b.example.at:8073"));
+        const QString b = mgr->profileIdForEndpoint(
+            QStringLiteral("kiwi-b.example.at:8073"));
+        QVERIFY(!b.isEmpty());
+        QCOMPARE(mgr->assignedSliceForProfile(a), sliceA);
+        QVERIFY(mgr->assignedSliceForProfile(b) >= 0);
+        QVERIFY(mgr->assignedSliceForProfile(b) != sliceA);
+        clearProfiles(mgr);
+    }
+
     void eineUebernommeneScheibeSteuertDenKiwiNichtMehr()
     {
         auto* mw = new MainWindow();

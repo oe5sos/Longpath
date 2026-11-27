@@ -16,6 +16,7 @@
 #include <QTemporaryDir>
 
 #include "core/KiwiOwnSignal.h"
+#include "core/KiwiSdrClient.h"
 #include "core/KiwiRecording.h"
 #include "gui/KiwiOwnSignalStrip.h"
 #include "gui/StyleConstants.h"
@@ -136,6 +137,19 @@ private slots:
     }
 
     // ── Tonhalt ──────────────────────────────────────────────────────
+    // 2026-11-27: verbunden, aber seit 15 s kein Ton -- das meldete niemand.
+    void stehenderTonstromWirdErkannt()
+    {
+        using C = KiwiSdrClient;
+        const qint64 t = 1000000;
+        QVERIFY(!C::soundStreamStalled(C::State::Connected, t, t + 14000));
+        QVERIFY(C::soundStreamStalled(C::State::Connected, t, t + 16000));
+        // noch kein Rahmen, oder gar nicht verbunden: kein Urteil
+        QVERIFY(!C::soundStreamStalled(C::State::Connected, 0, t));
+        QVERIFY(!C::soundStreamStalled(C::State::Waiting, t, t + 60000));
+        QVERIFY(!C::soundStreamStalled(C::State::Camping, t, t + 60000));
+    }
+
     void tonBleibtImModusBeimSenden()
     {
         KiwiSdrAntennaProfile p;
