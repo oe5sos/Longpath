@@ -279,6 +279,9 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
       <div class="gradAn" id="rotorGrad">—</div>
       <div class="rotorMeldung" id="rotorMeldung"></div>
       <button id="rotorDreh" class="rotorDreh" disabled>RICHTUNG WÄHLEN</button>
+      <!-- STOP (2026-11-27): rotor_stop. Ohne Sicherung, Anhalten ist nie
+           falsch; hervorgehoben, solange der Rotor „dreht" meldet. -->
+      <button id="rotorStop" class="rotorStop" type="button">STOP</button>
     </div>
   </div>
 </div>
