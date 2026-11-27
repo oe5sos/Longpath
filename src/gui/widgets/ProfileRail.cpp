@@ -43,7 +43,7 @@ static_assert(ProfileRail::kLeistenSeite == CommandBar::kPillHeight + 2,
 // Die Profile stehen zwei Zeilen zu vier, wie die Bandgruppe: die erste
 // Zeile liegt auf der ersten Zeile der Leiste, die zweite auf der zweiten
 // (Betreiber 2026-11-26).
-constexpr int kAbzeichenProZeile = 3;   // drei Spalten (Betreiber 2026-11-26)
+constexpr int kAbzeichenProZeile = 2;   // Betreiber 2026-11-27: überall zwei Spalten
 // Abstand von Zeile zu Zeile: 5 px, wie in der Befehlsleiste.
 constexpr int kZeilenAbstand = 5;
 
